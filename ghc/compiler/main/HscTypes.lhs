@@ -12,16 +12,17 @@ module HscTypes (
 
 	WhetherHasOrphans, ImportVersion, ExportItem,
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
-	IfaceInsts, IfaceRules, DeprecationEnv, OrigNameEnv, AvailEnv,
+	IfaceInsts, IfaceRules, DeprecationEnv, OrigNameEnv, 
+	AvailEnv, AvailInfo, GenAvailInfo(..),
 	PersistentCompilerState(..),
 
 	InstEnv, 
 
-	GlobalRdrEnv,
+	GlobalRdrEnv, RdrAvailInfo,
 
 	-- Provenance
 	Provenance(..), ImportReason(..), PrintUnqualified,
-        pprProvenance, hasBetterProv
+        pprNameProvenance, hasBetterProv
 
     ) where
 
@@ -480,9 +481,9 @@ hasBetterProv (NonLocalDef (UserImport _ _ True) _) _				   = True
 hasBetterProv (NonLocalDef (UserImport _ _ _   ) _) (NonLocalDef ImplicitImport _) = True
 hasBetterProv _					    _				   = False
 
-pprProvenance :: Name -> Provenance -> SDoc
-pprProvenance name LocalDef   	       = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
-pprProvenance name (NonLocalDef why _) = sep [ppr_reason why, 
+pprNameProvenance :: Name -> Provenance -> SDoc
+pprNameProvenance name LocalDef   	       = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
+pprNameProvenance name (NonLocalDef why _) = sep [ppr_reason why, 
 					      nest 2 (parens (ppr_defn (nameSrcLoc name)))]
 
 ppr_reason ImplicitImport	  = ptext SLIT("implicitly imported")

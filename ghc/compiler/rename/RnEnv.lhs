@@ -16,14 +16,17 @@ import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
 			  mkRdrUnqual, qualifyRdrName
 			)
 import HsTypes		( hsTyVarName, hsTyVarNames, replaceTyVarName )
-import HscTypes		( pprNameProvenance )
+import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
+			  ImportReason(..), GlobalRdrEnv, Avails, AvailEnv,
+			  AvailInfo, GenAvailInfo(..), RdrAvailInfo )
 import RnMonad
-import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
-			  ImportReason(..), getSrcLoc, 
+import Name		( Name, NamedThing(..),
+			  getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName,
-			  mkIPName, hasBetterProv, isLocallyDefined, 
-			  nameOccName, setNameModule, nameModule,
-			  extendNameEnv_C, plusNameEnv_C, nameEnvElts
+			  mkIPName, isLocallyDefined, 
+			  nameOccName, nameModule,
+			  extendNameEnv_C, plusNameEnv_C, nameEnvElts,
+			  setNameModuleAndLoc
 			)
 import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
@@ -31,7 +34,7 @@ import Module		( ModuleName, moduleName, mkVanillaModule )
 import FiniteMap
 import Unique		( Unique )
 import UniqSupply
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
 import ListSetOps	( removeDups, equivClasses )
 import Util		( thenCmp, sortLt )
@@ -53,7 +56,7 @@ implicitImportProvenance = NonLocalDef ImplicitImport False
 newTopBinder :: Module -> RdrName -> SrcLoc -> RnM d Name
 newTopBinder mod rdr_name loc
   = 	-- First check the cache
-    traceRn (text "newTopBinder" <+> ppr mod <+> ppr occ) `thenRn_`
+    traceRn (text "newTopBinder" <+> ppr mod <+> ppr loc) `thenRn_`
 
     getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let 
@@ -220,7 +223,7 @@ lookupGlobalOccRn rdr_name
     case lookupRdrEnv global_env rdr_name of
 	Just [(name,_)]	 -> returnRn name
 	Just stuff@(_:_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
-			    returnRn name
+			    returnRn rdr_name
 	Nothing -> 	-- Not found when processing source code; so fail
 			failWithRn (mkUnboundName rdr_name)
 				   (unknownNameErr rdr_name)
@@ -510,7 +513,7 @@ combine_globals ns_old ns_new	-- ns_new is often short
 
     is_duplicate :: Provenance -> (Name,Provenance) -> Bool
     is_duplicate (n1,LocalDef _) (n2,LocalDef _) = False
-    is_duplicate _		 _		 = n1 == n2
+    is_duplicate n1		 n2		 = n1 == n2
 \end{code}
 
 We treat two bindings of a locally-defined name as a duplicate,
@@ -686,7 +689,7 @@ warnUnusedModules mods
     unused_mod m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
 			   text "is imported, but nothing from it is used",
 			 parens (ptext SLIT("except perhaps to re-export instances visible in") <+>
-				   quotes (pprModuleName m))]
+				   quotes (ppr (moduleName m)))]
 
 warnUnusedImports :: [(Name,Provenance)] -> RnM d ()
 warnUnusedImports names
@@ -696,12 +699,12 @@ warnUnusedImports names
   = warnUnusedBinds names
 
 warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM d ()
-warnUnusedLocalBinds ns
+warnUnusedLocalBinds names
   | not opt_WarnUnusedBinds = returnRn ()
-  | otherwise		    = warnUnusedBinds [(n,LocalDef) | n<-ns]
+  | otherwise		    = warnUnusedBinds [(n,LocalDef) | n<-names]
 
 warnUnusedMatches names
-  | opt_WarnUnusedMatches = warnUnusedGroup [(n,LocalDef) | n<-ns]
+  | opt_WarnUnusedMatches = warnUnusedGroup [(n,LocalDef) | n<-names]
   | otherwise 		  = returnRn ()
 
 -------------------------
