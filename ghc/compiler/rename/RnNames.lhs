@@ -216,9 +216,9 @@ checkEarlyExit mod
 	-- Unchanged source, and no errors yet; see if usage info
 	-- up to date, and exit if so
     checkUpToDate mod						`thenRn` \ up_to_date ->
-    putDocRn (text "Compilation" <+> 
-	      text (if up_to_date then "IS NOT" else "IS") <+>
-	      text "required")					`thenRn_`
+    (if up_to_date 
+	then putDocRn (text "Compilation IS NOT required")
+	else returnRn ())					`thenRn_`
     returnRn up_to_date
 \end{code}
 	
