@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.20 2002/04/09 12:56:36 simonmar Exp $
+ * $Id: Stable.c,v 1.21 2002/04/24 13:29:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -245,7 +245,7 @@ freeStablePtr(StgStablePtr sp)
     // If this entry has no StableName attached, then just free it
     // immediately.  This is important; it might be a while before the
     // next major GC which actually collects the entry.
-    if (sn->sn_obj == NULL) {
+    if (sn->sn_obj == NULL && sn->ref == 0) {
 	freeStableName(sn);
     }
 }
