@@ -573,18 +573,29 @@ Here's how to install Cygwin.
 
 <ListItem>
 <Para>
-Install Cygwin 1.1 from
-<ULink URL="http://sources.redhat.com/cygwin/">sources.redhat.com</ULink>
-Install this somewhere locally. Despite the warnings, things seem to work better if you install Cygwin into the root directory rather than <Filename>cygwin</Filename>, which is the default. If you're upgrading from Cygwin B20.1, running <Command>mount --import-old-mounts</Command> immediately after installation may help. Either way, you want to end up with your main drive mounted in <Emphasis><Constant>textmode</Constant></Emphasis>, and only the <Filename>bin</Filename> directories mounted in <Constant>binmode</Constant>.
+Install Cygwin 1.1 from <ULink
+URL="http://sources.redhat.com/cygwin/">sources.redhat.com</ULink> Install
+this into your root directory (<Filename>C:\</Filename>), despite the
+warnings (but you may want to back up <Filename>C:\bin</Filename>,
+<Filename>C:\etc</Filename>, <Filename>C:\lib</Filename>,
+<Filename>C:\usr</Filename> and <Filename>C:\var</Filename> first) and
+choose DOS text mode. If you're upgrading from Cygwin B20.1, running
+<Command>mount --import-old-mounts</Command> immediately after installation
+may help. Either way, you want to end up with your main drive mounted in
+<Emphasis><Constant>textmode</Constant></Emphasis>, and only the
+<Filename>bin</Filename> directories mounted in <Constant>binmode</Constant>
+(you can check by running <Command>mount</Command>).
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-Create the following directories (if they aren't already there; substitute the drive you installed Cygwin on for <Filename>c:</Filename>):
+Create the following directories (if they aren't already there; substitute
+the drive you installed Cygwin on for <Filename>c:</Filename>):
 </Para>
 
 <ItemizedList>
+<ListItem><Para><Filename>c:/Temp</Filename></Para></ListItem>
 <ListItem><Para><Filename>c:/etc</Filename></Para></ListItem>
 <ListItem><Para><Filename>c:/bin</Filename></Para></ListItem>
 <ListItem><Para><Filename>c:/usr/local/bin</Filename></Para></ListItem>
@@ -592,19 +603,6 @@ Create the following directories (if they aren't already there; substitute the d
 
 <Para>
 (using <Command>mkdir -p /bin</Command>, etc.)
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-Copy <Filename>bash.exe</Filename> from the <Filename>bin</Filename>
-directory of the cygwin tree
-(<Filename>cygwin/bin/bash.exe</Filename>) to
-<Filename>/bin</Filename> as <Filename>sh.exe</Filename>.  You might
-think that it was easier to use bash directly from it original Cygwin
-directory, but (a) some UNIX utils have got
-<Filename>/bin/sh</Filename> hardwired in, and (b) the path following
-<Literal>#!</Literal> is limited to 32 characters.
 </Para>
 </ListItem>
 
@@ -677,13 +675,10 @@ The following environment variables must be set:
 <Entry><Constant>PATH</Constant></Entry>
 <Entry>System</Entry>
 <Entry><Para>
-Add <Filename>C:/cygnus/cygwin-b20/H-i586-cygwin32/bin</Filename>.
-<Command>bash</Command> needs this, and when it is invoked from
-<Filename>/bin</Filename> it can't find it. <Filename>c:/bin</Filename> and
-<Filename>c:/usr/local/bin</Filename> should also be added. These should all
-come <Emphasis>before</Emphasis> the Windows system directories (e.g.
-<Filename>WINNT\system32</Filename>). You might want to set them in your
-<Filename>.bashrc</Filename> rather than in the system-wide
+Add <Filename>c:/bin</Filename> and <Filename>c:/usr/local/bin</Filename>.
+These should come <Emphasis>before</Emphasis> the Windows system directories
+(e.g. <Filename>\WINNT\system32</Filename>). You might want to set them in
+your <Filename>.bashrc</Filename> rather than in the system-wide
 <Constant>PATH</Constant>.
 </Para></Entry>
 </Row>
@@ -720,7 +715,7 @@ this you get very weird messages when you type `<Command>make</Command>', such a
 <Entry><Constant>TMPDIR</Constant></Entry>
 <Entry>User</Entry>
 <Entry><Para>
-Set to <Filename>c:/tmp</Filename> (note the forward slash). For some reason, Win2k invisibly sets this variable to point to a temporary directory in your profile, that contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant> variable set, it tries to use it for temporary files, but Cygwin doesn't grok filenames with spaces, so disaster results.
+Set to <Filename>c:/tmp</Filename>. For some reason, Win2k invisibly sets this variable to point to a temporary directory in your profile, that contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant> variable set, it tries to use it for temporary files, but Cygwin doesn't grok filenames with spaces, so disaster results.
 </Para><Para>
 Furthermore, it seems that <Constant>TMPDIR</Constant> must be set to a directory in the same file system in which you invoke GHC.  Otherwise you get very weird messages when you invoke GHC, such as:
 <Screen>
@@ -773,12 +768,13 @@ Download a GHC distribution:
 
 <VarListEntry>
 <Term>ghc-4.08&mdash;InstallShield installer, 15M: <ULink
-URL="http://www.haskell.org/ghc/dist/ghc-4-08.exe">http</ULink>
+URL="http://www.haskell.org/ghc/download.html">http</ULink>
 </Term>
 
 <ListItem>
 <Para>
-(The version number may change.) It is packaged up using an installer that should be familiar-looking to Windows users.
+It is packaged up using an installer that should be familiar-looking to
+Windows users.
 </Para>
 
 <Para>
@@ -857,13 +853,12 @@ Invoking ghc doesn't seem to do anything, it immediately returns without having 
 </Question>
 
 <Answer>
-<Para>
-One cause of this is that <Filename>/bin/sh</Filename> is missing. To verify, open up a
-bash session and type <Command>ls -l /bin/sh.exe</Command>. If <Filename>sh.exe</Filename> is 
-reported as not being there, copy <Filename>bash.exe</Filename> (which you'll find
-inside the cygwin installation tree as <Filename>H-i586-cygwin32/bin/bash.exe</Filename>)
-to <Filename>/bin/sh.exe</Filename>.
-</Para>
+<Para> One cause of this is that <Filename>/bin/sh</Filename> is missing. To
+verify, open up a bash session and type <Command>ls -l
+/bin/sh.exe</Command>. If <Filename>sh.exe</Filename> is reported as not
+being there, copy <Filename>bash.exe</Filename> (which you'll find inside
+the cygwin installation tree as <Filename>bin/bash.exe</Filename>) to
+<Filename>/bin/sh.exe</Filename>. </Para>
 
 <Para>
 All being well, ghc should then start to function.
@@ -1038,9 +1033,12 @@ just make a symlink from
 <Para>
 It's a good idea to use Norman Walsh's <ULink
 URL="http://nwalsh.com/docbook/dsssl/doc/install.html">installation
-notes</ULink> as a guide. You should get version
-3.1 of DocBook, and note that his file <Filename>test.sgm</Filename> won't
-work, as it needs version 3.0. You should unpack Jade into <Filename>\Jade</Filename>, along with the entities, DocBook into <Filename>\docbook</Filename>, and the DocBook stylesheets into <Filename>\docbook\stylesheets</Filename> (so they actually end up in <Filename>\docbook\stylesheets\docbook</Filename>).
+notes</ULink> as a guide. You should get version 3.1 of DocBook, and note
+that his file <Filename>test.sgm</Filename> won't work, as it needs version
+3.0. You should unpack Jade into <Filename>\Jade</Filename>, along with the
+entities, DocBook into <Filename>\docbook</Filename>, and the DocBook
+stylesheets into <Filename>\docbook\stylesheets</Filename> (so they actually
+end up in <Filename>\docbook\stylesheets\docbook</Filename>).
 </Para>
 
 </Sect2>
