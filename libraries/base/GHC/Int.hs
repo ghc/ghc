@@ -21,6 +21,7 @@ module GHC.Int (
 
 import Data.Bits
 
+import {-# SOURCE #-} GHC.Err
 import GHC.Base
 import GHC.Enum
 import GHC.Num
@@ -80,24 +81,24 @@ instance Enum Int8 where
 instance Integral Int8 where
     quot    x@(I8# x#) y@(I8# y#)
         | y /= 0                  = I8# (narrow8Int# (x# `quotInt#` y#))
-        | otherwise               = divZeroError "quot{Int8}" x
+        | otherwise               = divZeroError
     rem     x@(I8# x#) y@(I8# y#)
         | y /= 0                  = I8# (narrow8Int# (x# `remInt#` y#))
-        | otherwise               = divZeroError "rem{Int8}" x
+        | otherwise               = divZeroError
     div     x@(I8# x#) y@(I8# y#)
         | y /= 0                  = I8# (narrow8Int# (x# `divInt#` y#))
-        | otherwise               = divZeroError "div{Int8}" x
+        | otherwise               = divZeroError
     mod     x@(I8# x#) y@(I8# y#)
         | y /= 0                  = I8# (narrow8Int# (x# `modInt#` y#))
-        | otherwise               = divZeroError "mod{Int8}" x
+        | otherwise               = divZeroError
     quotRem x@(I8# x#) y@(I8# y#)
         | y /= 0                  = (I8# (narrow8Int# (x# `quotInt#` y#)),
                                     I8# (narrow8Int# (x# `remInt#` y#)))
-        | otherwise               = divZeroError "quotRem{Int8}" x
+        | otherwise               = divZeroError
     divMod  x@(I8# x#) y@(I8# y#)
         | y /= 0                  = (I8# (narrow8Int# (x# `divInt#` y#)),
                                     I8# (narrow8Int# (x# `modInt#` y#)))
-        | otherwise               = divZeroError "divMod{Int8}" x
+        | otherwise               = divZeroError
     toInteger (I8# x#)            = S# x#
 
 instance Bounded Int8 where
@@ -189,24 +190,24 @@ instance Enum Int16 where
 instance Integral Int16 where
     quot    x@(I16# x#) y@(I16# y#)
         | y /= 0                  = I16# (narrow16Int# (x# `quotInt#` y#))
-        | otherwise               = divZeroError "quot{Int16}" x
+        | otherwise               = divZeroError
     rem     x@(I16# x#) y@(I16# y#)
         | y /= 0                  = I16# (narrow16Int# (x# `remInt#` y#))
-        | otherwise               = divZeroError "rem{Int16}" x
+        | otherwise               = divZeroError
     div     x@(I16# x#) y@(I16# y#)
         | y /= 0                  = I16# (narrow16Int# (x# `divInt#` y#))
-        | otherwise               = divZeroError "div{Int16}" x
+        | otherwise               = divZeroError
     mod     x@(I16# x#) y@(I16# y#)
         | y /= 0                  = I16# (narrow16Int# (x# `modInt#` y#))
-        | otherwise               = divZeroError "mod{Int16}" x
+        | otherwise               = divZeroError
     quotRem x@(I16# x#) y@(I16# y#)
         | y /= 0                  = (I16# (narrow16Int# (x# `quotInt#` y#)),
                                     I16# (narrow16Int# (x# `remInt#` y#)))
-        | otherwise               = divZeroError "quotRem{Int16}" x
+        | otherwise               = divZeroError
     divMod  x@(I16# x#) y@(I16# y#)
         | y /= 0                  = (I16# (narrow16Int# (x# `divInt#` y#)),
                                     I16# (narrow16Int# (x# `modInt#` y#)))
-        | otherwise               = divZeroError "divMod{Int16}" x
+        | otherwise               = divZeroError
     toInteger (I16# x#)           = S# x#
 
 instance Bounded Int16 where
@@ -305,22 +306,22 @@ instance Enum Int32 where
 instance Integral Int32 where
     quot    x@(I32# x#) y@(I32# y#)
         | y /= 0                  = I32# (x# `quotInt32#` y#)
-        | otherwise               = divZeroError "quot{Int32}" x
+        | otherwise               = divZeroError
     rem     x@(I32# x#) y@(I32# y#)
         | y /= 0                  = I32# (x# `remInt32#` y#)
-        | otherwise               = divZeroError "rem{Int32}" x
+        | otherwise               = divZeroError
     div     x@(I32# x#) y@(I32# y#)
         | y /= 0                  = I32# (x# `divInt32#` y#)
-        | otherwise               = divZeroError "div{Int32}" x
+        | otherwise               = divZeroError
     mod     x@(I32# x#) y@(I32# y#)
         | y /= 0                  = I32# (x# `modInt32#` y#)
-        | otherwise               = divZeroError "mod{Int32}" x
+        | otherwise               = divZeroError
     quotRem x@(I32# x#) y@(I32# y#)
         | y /= 0                  = (I32# (x# `quotInt32#` y#), I32# (x# `remInt32#` y#))
-        | otherwise               = divZeroError "quotRem{Int32}" x
+        | otherwise               = divZeroError
     divMod  x@(I32# x#) y@(I32# y#)
         | y /= 0                  = (I32# (x# `divInt32#` y#), I32# (x# `modInt32#` y#))
-        | otherwise               = divZeroError "divMod{Int32}" x
+        | otherwise               = divZeroError
     toInteger x@(I32# x#)
 	| x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
                                   = S# (int32ToInt# x#)
@@ -449,24 +450,24 @@ instance Enum Int32 where
 instance Integral Int32 where
     quot    x@(I32# x#) y@(I32# y#)
         | y /= 0                  = I32# (narrow32Int# (x# `quotInt#` y#))
-        | otherwise               = divZeroError "quot{Int32}" x
+        | otherwise               = divZeroError
     rem     x@(I32# x#) y@(I32# y#)
         | y /= 0                  = I32# (narrow32Int# (x# `remInt#` y#))
-        | otherwise               = divZeroError "rem{Int32}" x
+        | otherwise               = divZeroError
     div     x@(I32# x#) y@(I32# y#)
         | y /= 0                  = I32# (narrow32Int# (x# `divInt#` y#))
-        | otherwise               = divZeroError "div{Int32}" x
+        | otherwise               = divZeroError
     mod     x@(I32# x#) y@(I32# y#)
         | y /= 0                  = I32# (narrow32Int# (x# `modInt#` y#))
-        | otherwise               = divZeroError "mod{Int32}" x
+        | otherwise               = divZeroError
     quotRem x@(I32# x#) y@(I32# y#)
         | y /= 0                  = (I32# (narrow32Int# (x# `quotInt#` y#)),
                                     I32# (narrow32Int# (x# `remInt#` y#)))
-        | otherwise               = divZeroError "quotRem{Int32}" x
+        | otherwise               = divZeroError
     divMod  x@(I32# x#) y@(I32# y#)
         | y /= 0                  = (I32# (narrow32Int# (x# `divInt#` y#)),
                                     I32# (narrow32Int# (x# `modInt#` y#)))
-        | otherwise               = divZeroError "divMod{Int32}" x
+        | otherwise               = divZeroError
     toInteger (I32# x#)           = S# x#
 
 instance Read Int32 where
@@ -575,22 +576,22 @@ instance Enum Int64 where
 instance Integral Int64 where
     quot    x@(I64# x#) y@(I64# y#)
         | y /= 0                  = I64# (x# `quotInt64#` y#)
-        | otherwise               = divZeroError "quot{Int64}" x
+        | otherwise               = divZeroError
     rem     x@(I64# x#) y@(I64# y#)
         | y /= 0                  = I64# (x# `remInt64#` y#)
-        | otherwise               = divZeroError "rem{Int64}" x
+        | otherwise               = divZeroError
     div     x@(I64# x#) y@(I64# y#)
         | y /= 0                  = I64# (x# `divInt64#` y#)
-        | otherwise               = divZeroError "div{Int64}" x
+        | otherwise               = divZeroError
     mod     x@(I64# x#) y@(I64# y#)
         | y /= 0                  = I64# (x# `modInt64#` y#)
-        | otherwise               = divZeroError "mod{Int64}" x
+        | otherwise               = divZeroError
     quotRem x@(I64# x#) y@(I64# y#)
         | y /= 0                  = (I64# (x# `quotInt64#` y#), I64# (x# `remInt64#` y#))
-        | otherwise               = divZeroError "quotRem{Int64}" x
+        | otherwise               = divZeroError
     divMod  x@(I64# x#) y@(I64# y#)
         | y /= 0                  = (I64# (x# `divInt64#` y#), I64# (x# `modInt64#` y#))
-        | otherwise               = divZeroError "divMod{Int64}" x
+        | otherwise               = divZeroError
     toInteger x@(I64# x#)
 	| x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
                                   = S# (int64ToInt# x#)
@@ -730,22 +731,22 @@ instance Enum Int64 where
 instance Integral Int64 where
     quot    x@(I64# x#) y@(I64# y#)
         | y /= 0                  = I64# (x# `quotInt#` y#)
-        | otherwise               = divZeroError "quot{Int64}" x
+        | otherwise               = divZeroError
     rem     x@(I64# x#) y@(I64# y#)
         | y /= 0                  = I64# (x# `remInt#` y#)
-        | otherwise               = divZeroError "rem{Int64}" x
+        | otherwise               = divZeroError
     div     x@(I64# x#) y@(I64# y#)
         | y /= 0                  = I64# (x# `divInt#` y#)
-        | otherwise               = divZeroError "div{Int64}" x
+        | otherwise               = divZeroError
     mod     x@(I64# x#) y@(I64# y#)
         | y /= 0                  = I64# (x# `modInt#` y#)
-        | otherwise               = divZeroError "mod{Int64}" x
+        | otherwise               = divZeroError
     quotRem x@(I64# x#) y@(I64# y#)
         | y /= 0                  = (I64# (x# `quotInt#` y#), I64# (x# `remInt#` y#))
-        | otherwise               = divZeroError "quotRem{Int64}" x
+        | otherwise               = divZeroError
     divMod  x@(I64# x#) y@(I64# y#)
         | y /= 0                  = (I64# (x# `divInt#` y#), I64# (x# `modInt#` y#))
-        | otherwise               = divZeroError "divMod{Int64}" x
+        | otherwise               = divZeroError
     toInteger (I64# x#)           = S# x#
 
 instance Read Int64 where

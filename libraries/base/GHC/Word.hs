@@ -18,11 +18,12 @@
 
 module GHC.Word (
     Word(..), Word8(..), Word16(..), Word32(..), Word64(..),
-    divZeroError, toEnumError, fromEnumError, succError, predError)
+    toEnumError, fromEnumError, succError, predError)
     where
 
 import Data.Bits
 
+import {-# SOURCE #-} GHC.Err
 import GHC.Base
 import GHC.Enum
 import GHC.Num
@@ -34,11 +35,6 @@ import GHC.Show
 ------------------------------------------------------------------------
 -- Helper functions
 ------------------------------------------------------------------------
-
-{-# NOINLINE divZeroError #-}
-divZeroError :: (Show a) => String -> a -> b
-divZeroError meth x =
-    error $ "Integral." ++ meth ++ ": divide by 0 (" ++ show x ++ " / 0)"
 
 {-# NOINLINE toEnumError #-}
 toEnumError :: (Show a) => String -> Int -> (a,a) -> b
@@ -115,22 +111,22 @@ instance Enum Word where
 instance Integral Word where
     quot    x@(W# x#) y@(W# y#)
         | y /= 0                = W# (x# `quotWord#` y#)
-        | otherwise             = divZeroError "quot{Word}" x
+        | otherwise             = divZeroError
     rem     x@(W# x#) y@(W# y#)
         | y /= 0                = W# (x# `remWord#` y#)
-        | otherwise             = divZeroError "rem{Word}" x
+        | otherwise             = divZeroError
     div     x@(W# x#) y@(W# y#)
         | y /= 0                = W# (x# `quotWord#` y#)
-        | otherwise             = divZeroError "div{Word}" x
+        | otherwise             = divZeroError
     mod     x@(W# x#) y@(W# y#)
         | y /= 0                = W# (x# `remWord#` y#)
-        | otherwise             = divZeroError "mod{Word}" x
+        | otherwise             = divZeroError
     quotRem x@(W# x#) y@(W# y#)
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
-        | otherwise             = divZeroError "quotRem{Word}" x
+        | otherwise             = divZeroError
     divMod  x@(W# x#) y@(W# y#)
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
-        | otherwise             = divZeroError "divMod{Word}" x
+        | otherwise             = divZeroError
     toInteger (W# x#)
         | i# >=# 0#             = S# i#
         | otherwise             = case word2Integer# x# of (# s, d #) -> J# s d
@@ -227,22 +223,22 @@ instance Enum Word8 where
 instance Integral Word8 where
     quot    x@(W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (x# `quotWord#` y#)
-        | otherwise               = divZeroError "quot{Word8}" x
+        | otherwise               = divZeroError
     rem     x@(W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (x# `remWord#` y#)
-        | otherwise               = divZeroError "rem{Word8}" x
+        | otherwise               = divZeroError
     div     x@(W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (x# `quotWord#` y#)
-        | otherwise               = divZeroError "div{Word8}" x
+        | otherwise               = divZeroError
     mod     x@(W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (x# `remWord#` y#)
-        | otherwise               = divZeroError "mod{Word8}" x
+        | otherwise               = divZeroError
     quotRem x@(W8# x#) y@(W8# y#)
         | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
-        | otherwise               = divZeroError "quotRem{Word8}" x
+        | otherwise               = divZeroError
     divMod  x@(W8# x#) y@(W8# y#)
         | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
-        | otherwise               = divZeroError "quotRem{Word8}" x
+        | otherwise               = divZeroError
     toInteger (W8# x#)            = S# (word2Int# x#)
 
 instance Bounded Word8 where
@@ -330,22 +326,22 @@ instance Enum Word16 where
 instance Integral Word16 where
     quot    x@(W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (x# `quotWord#` y#)
-        | otherwise                 = divZeroError "quot{Word16}" x
+        | otherwise                 = divZeroError
     rem     x@(W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (x# `remWord#` y#)
-        | otherwise                 = divZeroError "rem{Word16}" x
+        | otherwise                 = divZeroError
     div     x@(W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (x# `quotWord#` y#)
-        | otherwise                 = divZeroError "div{Word16}" x
+        | otherwise                 = divZeroError
     mod     x@(W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (x# `remWord#` y#)
-        | otherwise                 = divZeroError "mod{Word16}" x
+        | otherwise                 = divZeroError
     quotRem x@(W16# x#) y@(W16# y#)
         | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
-        | otherwise                 = divZeroError "quotRem{Word16}" x
+        | otherwise                 = divZeroError
     divMod  x@(W16# x#) y@(W16# y#)
         | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
-        | otherwise                 = divZeroError "quotRem{Word16}" x
+        | otherwise                 = divZeroError
     toInteger (W16# x#)             = S# (word2Int# x#)
 
 instance Bounded Word16 where
@@ -438,22 +434,22 @@ instance Enum Word32 where
 instance Integral Word32 where
     quot    x@(W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `quotWord32#` y#)
-        | otherwise                 = divZeroError "quot{Word32}" x
+        | otherwise                 = divZeroError
     rem     x@(W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `remWord32#` y#)
-        | otherwise                 = divZeroError "rem{Word32}" x
+        | otherwise                 = divZeroError
     div     x@(W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `quotWord32#` y#)
-        | otherwise                 = divZeroError "div{Word32}" x
+        | otherwise                 = divZeroError
     mod     x@(W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `remWord32#` y#)
-        | otherwise                 = divZeroError "mod{Word32}" x
+        | otherwise                 = divZeroError
     quotRem x@(W32# x#) y@(W32# y#)
         | y /= 0                    = (W32# (x# `quotWord32#` y#), W32# (x# `remWord32#` y#))
-        | otherwise                 = divZeroError "quotRem{Word32}" x
+        | otherwise                 = divZeroError
     divMod  x@(W32# x#) y@(W32# y#)
         | y /= 0                    = (W32# (x# `quotWord32#` y#), W32# (x# `remWord32#` y#))
-        | otherwise                 = divZeroError "quotRem{Word32}" x
+        | otherwise                 = divZeroError
     toInteger x@(W32# x#)
         | x <= fromIntegral (maxBound::Int)  = S# (word2Int# (word32ToWord# x#))
         | otherwise                 = case word32ToInteger# x# of (# s, d #) -> J# s d
@@ -561,22 +557,22 @@ instance Enum Word32 where
 instance Integral Word32 where
     quot    x@(W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `quotWord#` y#)
-        | otherwise                 = divZeroError "quot{Word32}" x
+        | otherwise                 = divZeroError
     rem     x@(W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `remWord#` y#)
-        | otherwise                 = divZeroError "rem{Word32}" x
+        | otherwise                 = divZeroError
     div     x@(W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `quotWord#` y#)
-        | otherwise                 = divZeroError "div{Word32}" x
+        | otherwise                 = divZeroError
     mod     x@(W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `remWord#` y#)
-        | otherwise                 = divZeroError "mod{Word32}" x
+        | otherwise                 = divZeroError
     quotRem x@(W32# x#) y@(W32# y#)
         | y /= 0                    = (W32# (x# `quotWord#` y#), W32# (x# `remWord#` y#))
-        | otherwise                 = divZeroError "quotRem{Word32}" x
+        | otherwise                 = divZeroError
     divMod  x@(W32# x#) y@(W32# y#)
         | y /= 0                    = (W32# (x# `quotWord#` y#), W32# (x# `remWord#` y#))
-        | otherwise                 = divZeroError "quotRem{Word32}" x
+        | otherwise                 = divZeroError
     toInteger (W32# x#)
 #if WORD_SIZE_IN_BITS == 32
         | i# >=# 0#                 = S# i#
@@ -698,22 +694,22 @@ instance Enum Word64 where
 instance Integral Word64 where
     quot    x@(W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord64#` y#)
-        | otherwise                 = divZeroError "quot{Word64}" x
+        | otherwise                 = divZeroError
     rem     x@(W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord64#` y#)
-        | otherwise                 = divZeroError "rem{Word64}" x
+        | otherwise                 = divZeroError
     div     x@(W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord64#` y#)
-        | otherwise                 = divZeroError "div{Word64}" x
+        | otherwise                 = divZeroError
     mod     x@(W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord64#` y#)
-        | otherwise                 = divZeroError "mod{Word64}" x
+        | otherwise                 = divZeroError
     quotRem x@(W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
-        | otherwise                 = divZeroError "quotRem{Word64}" x
+        | otherwise                 = divZeroError
     divMod  x@(W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
-        | otherwise                 = divZeroError "quotRem{Word64}" x
+        | otherwise                 = divZeroError
     toInteger x@(W64# x#)
         | x <= 0x7FFFFFFF           = S# (word2Int# (word64ToWord# x#))
         | otherwise                 = case word64ToInteger# x# of (# s, d #) -> J# s d
@@ -826,22 +822,22 @@ instance Enum Word64 where
 instance Integral Word64 where
     quot    x@(W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord#` y#)
-        | otherwise                 = divZeroError "quot{Word64}" x
+        | otherwise                 = divZeroError
     rem     x@(W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord#` y#)
-        | otherwise                 = divZeroError "rem{Word64}" x
+        | otherwise                 = divZeroError
     div     x@(W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord#` y#)
-        | otherwise                 = divZeroError "div{Word64}" x
+        | otherwise                 = divZeroError
     mod     x@(W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord#` y#)
-        | otherwise                 = divZeroError "mod{Word64}" x
+        | otherwise                 = divZeroError
     quotRem x@(W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
-        | otherwise                 = divZeroError "quotRem{Word64}" x
+        | otherwise                 = divZeroError
     divMod  x@(W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
-        | otherwise                 = divZeroError "quotRem{Word64}" x
+        | otherwise                 = divZeroError
     toInteger (W64# x#)
         | i# >=# 0#                 = S# i#
         | otherwise                 = case word2Integer# x# of (# s, d #) -> J# s d

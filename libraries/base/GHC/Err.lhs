@@ -30,6 +30,7 @@ module GHC.Err
        , runtimeError              -- :: Addr#  -> a	-- Addr# points to UTF8 encoded C string
 
        , absentErr	           -- :: a
+       , divZeroError		   -- :: a
 
        , error		           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
@@ -126,3 +127,13 @@ untangle coded message
 	}
     not_bar c = c /= '|'
 \end{code}
+
+Divide by zero.  We put it here because it is needed relatively early
+in the libraries before the Exception type has been defined yet.
+
+\begin{code}
+{-# NOINLINE divZeroError #-}
+divZeroError :: a
+divZeroError = throw (ArithException DivideByZero)
+\end{code}
+

@@ -172,18 +172,22 @@ instance  Real Int  where
 instance  Integral Int	where
     toInteger i = int2Integer i  -- give back a full-blown Integer
 
-    -- Following chks for zero divisor are non-standard (WDP)
-    a `quot` b	=  if b /= 0
-		   then a `quotInt` b
-		   else error "Prelude.Integral.quot{Int}: divide by 0"
-    a `rem` b	=  if b /= 0
-		   then a `remInt` b
-		   else error "Prelude.Integral.rem{Int}: divide by 0"
+    a `quot` 0   = divZeroError
+    a `quot` b	=  a `quotInt` b
 
-    x `div` y = x `divInt` y
-    x `mod` y = x `modInt` y
+    a `rem` 0   = divZeroError
+    a `rem` b	= a `remInt` b
 
+    a `div` 0   = divZeroError
+    a `div` b   = a `divInt` b
+
+    a `mod` 0   = divZeroError
+    a `mod` b   = a `modInt` b
+
+    a `quotRem` 0 = divZeroError
     a `quotRem` b = a `quotRemInt` b
+
+    a `divMod`  0 = divZeroError
     a `divMod`  b = a `divModInt`  b
 \end{code}
 
@@ -201,14 +205,19 @@ instance  Real Integer  where
 instance  Integral Integer where
     toInteger n	     = n
 
+    a `quot` 0 = divZeroError
     n `quot` d = n `quotInteger` d
+
+    a `rem` 0 = divZeroError
     n `rem`  d = n `remInteger`  d
 
-    n `div` d	=  q  where (q,_) = divMod n d
-    n `mod` d	=  r  where (_,r) = divMod n d
-
+    a `divMod` 0 = divZeroError
     a `divMod` b = a `divModInteger` b
+
+    a `quotRem` 0 = divZeroError
     a `quotRem` b = a `quotRemInteger` b
+
+    -- use the defaults for div & mod
 \end{code}
 
 

@@ -15,3 +15,6 @@ module GHC.Err where
 -- to mention 'error' so that it gets exported from this .hi-boot
 -- file.
 error    :: GHC.Base.String -> a
+
+-- divide by zero is needed quite early
+divZeroError :: a

@@ -478,7 +478,7 @@ data Exception
   = ArithException  	ArithException
 	-- ^Exceptions raised by arithmetic
 	-- operations.  (NOTE: GHC currently does not throw
-	-- 'ArithException's).
+	-- 'ArithException's except for 'DivideByZero').
   | ArrayException	ArrayException
 	-- ^Exceptions raised by array-related
 	-- operations.  (NOTE: GHC currently does not throw

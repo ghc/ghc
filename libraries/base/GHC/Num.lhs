@@ -79,22 +79,15 @@ instance  Num Int  where
 	     | otherwise   = 1
 
     fromInteger = integer2Int
-\end{code}
-
-
-\begin{code}
--- These can't go in GHC.Base with the defn of Int, because
--- we don't have pairs defined at that time!
 
 quotRemInt :: Int -> Int -> (Int, Int)
-a@(I# _) `quotRemInt` b@(I# _) = (a `quotInt` b, a `remInt` b)
+quotRemInt a@(I# _) b@(I# _) = (a `quotInt` b, a `remInt` b)
     -- OK, so I made it a little stricter.  Shoot me.  (WDP 94/10)
 
 divModInt ::  Int -> Int -> (Int, Int)
 divModInt x@(I# _) y@(I# _) = (x `divInt` y, x `modInt` y)
     -- Stricter.  Sorry if you don't like it.  (WDP 94/10)
 \end{code}
-
 
 %*********************************************************
 %*							*
