@@ -331,7 +331,7 @@ mkFastSubStringFO# fo# start# len# =
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
-       case copySubStrFO (_ForeignObj fo#) (I# start#) (I# len#) of
+       case copySubStrFO (ForeignObj fo#) (I# start#) (I# len#) of
 #if __GLASGOW_HASKELL__ < 405
 	 (ByteArray _ barr#) ->  
 #else
@@ -345,7 +345,7 @@ mkFastSubStringFO# fo# start# len# =
        -- entry with same length and compare byte by byte.
        case bucket_match ls start# len# fo# of
 	 Nothing -> 
-           case copySubStrFO (_ForeignObj fo#) (I# start#) (I# len#) of
+           case copySubStrFO (ForeignObj fo#) (I# start#) (I# len#) of
 #if __GLASGOW_HASKELL__ < 405
 	     (ByteArray _ barr#) ->  
 #else
@@ -449,8 +449,8 @@ mkFastSubString :: Addr -> Int -> Int -> FastString
 mkFastSubString (A# a#) (I# start#) (I# len#) =
  mkFastString# (addrOffset# a# start#) len#
 
-mkFastSubStringFO :: _ForeignObj -> Int -> Int -> FastString
-mkFastSubStringFO (_ForeignObj fo#) (I# start#) (I# len#) =
+mkFastSubStringFO :: ForeignObj -> Int -> Int -> FastString
+mkFastSubStringFO (ForeignObj fo#) (I# start#) (I# len#) =
  mkFastSubStringFO# fo# start# len#
 \end{code}
 
