@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.9 2000/04/12 17:33:16 simonmar Exp $
+ * $Id: fileObject.c,v 1.10 2000/04/14 16:26:53 rrt Exp $
  *
  * hPutStr Runtime Support
  */
@@ -128,7 +128,7 @@ fill_up_line_buffer(IOFileObject* fo)
       fo->bufWPtr=0;
   }
   ipos = fo->bufWPtr;
-  len = fo->bufSize - fo->bufWPtr + 1;
+  len = fo->bufSize - fo->bufWPtr;
   p   = (unsigned char*)fo->buf + fo->bufWPtr;
 
   if ((count = 

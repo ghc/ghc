@@ -29,7 +29,8 @@ typedef struct _IOFileObject {
 
 			bufRPtr == -1 => buffer is empty.
 		     */
-   int     bufSize;
+   int     bufSize;  /* the size of the buffer, i.e. the number of bytes
+                        malloced */
    int     flags;
    struct _IOFileObject*   connectedTo;
 
