@@ -219,18 +219,13 @@ genJump expr actuals =
 --
 --      switch [0 .. n] (expr) { case ... ; }
 --
--- N.B. we remove 'Nothing's from the list of branches, as they don't
--- seem to make sense currently. This may change, if they are defined in
--- some way.
---
 genSwitch :: CmmExpr -> [Maybe BlockId] -> SDoc
 genSwitch expr maybe_ids 
 
-    = let ids   = [ i | Just i <- maybe_ids ]
-          pairs = groupBy snds (zip [0 .. ] ids )
+    = let pairs = groupBy snds (zip [0 .. ] maybe_ids )
 
       in hang (hcat [ ptext SLIT("switch [0 .. ") 
-                    , int (length ids - 1)
+                    , int (length maybe_ids - 1)
                     , ptext SLIT("] ")
                     , if isTrivialCmmExpr expr
                         then pprExpr expr
@@ -242,13 +237,16 @@ genSwitch expr maybe_ids
     where
       snds a b = (snd a) == (snd b)
 
-      caseify :: [(Int,BlockId)] -> SDoc
+      caseify :: [(Int,Maybe BlockId)] -> SDoc
+      caseify ixs@((i,Nothing):_)
+        = ptext SLIT("/* impossible: ") <> hcat (intersperse comma (map (int.fst) ixs))
+		<> ptext SLIT(" */")
       caseify as 
         = let (is,ids) = unzip as 
           in hsep [ ptext SLIT("case")
                   , hcat (punctuate comma (map int is))
                   , ptext SLIT(": goto")
-                  , pprBlockId (head ids) <> semi ]
+                  , pprBlockId (head [ id | Just id <- ids]) <> semi ]
 
 -- --------------------------------------------------------------------------
 -- Expressions

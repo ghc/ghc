@@ -394,16 +394,14 @@ mk_switch tag_expr [(tag,stmts)] (Just deflt) lo_tag hi_tag
 -- DENSE TAG RANGE: use a switch statment
 mk_switch tag_expr branches mb_deflt lo_tag hi_tag
   | use_switch 	-- Use a switch
-  = do	{ deflt_id <- get_deflt_id mb_deflt
-	; branch_ids <- mapM forkCgStmts (map snd branches)
+  = do	{ branch_ids <- mapM forkCgStmts (map snd branches)
 	; let 
-		tagged_blk_ids = zip (map fst branches) branch_ids
+		tagged_blk_ids = zip (map fst branches) (map Just branch_ids)
 
-		find_branch :: BlockId -> ConTagZ -> BlockId
-		find_branch deflt_id i = assocDefault deflt_id tagged_blk_ids i
+		find_branch :: ConTagZ -> Maybe BlockId
+		find_branch i = assocDefault mb_deflt tagged_blk_ids i
 
-		arms = [ Just (find_branch deflt_id (i+lo_tag))
-		       | i <- [0..n_tags-1]]
+		arms = [ find_branch (i+lo_tag) | i <- [0..n_tags-1]]
 
 	        switch_stmt = CmmSwitch (cmmOffset tag_expr (- lo_tag)) arms
 
@@ -442,19 +440,6 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag
 
     (lo_branches, hi_branches) = span is_lo branches
     is_lo (t,_) = t < mid_tag
-
-	-- Add a default block if the case is not exhaustive
-    get_deflt_id  (Just deflt_id) = return deflt_id
-    get_deflt_id  Nothing
- 	| exhaustive 
-	= return (pprPanic "mk_deflt_blks" (ppr tag_expr))
-	| otherwise
-	= do { stmts <- getCgStmts (stmtC jump_to_impossible)
-	     ; id <- forkCgStmts stmts
-	     ; return id }
-
-    jump_to_impossible 
-      = CmmJump (mkLblExpr mkErrorStdEntryLabel) []
 
 
 assignTemp' e

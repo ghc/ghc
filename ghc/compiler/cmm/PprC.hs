@@ -40,7 +40,7 @@ import Constants
 import CmdLineOpts	( opt_EnsureSplittableC )
 
 -- The rest
-import Data.List        ( intersperse, group )
+import Data.List        ( intersperse, groupBy )
 import Data.Bits        ( shiftR )
 import Char             ( ord, chr )
 import IO               ( Handle )
@@ -251,29 +251,26 @@ pprCondBranch expr ident
 --
 pprSwitch :: CmmExpr -> [ Maybe BlockId ] -> SDoc
 pprSwitch e maybe_ids 
-  = let ids  = [ i | Just i <- maybe_ids ]
-        pairs = zip [ 0 .. ] (concatMap markfalls (group ids))
+  = let pairs  = [ (ix, ident) | (ix,Just ident) <- zip [0..] maybe_ids ]
+	pairs2 = [ (map fst as, snd (head as)) | as <- groupBy sndEq pairs ]
     in 
         (hang (ptext SLIT("switch") <+> parens ( pprExpr e ) <+> lbrace)
-                4 (vcat ( map caseify pairs )))
+                4 (vcat ( map caseify pairs2 )))
         $$ rbrace
 
   where
+    sndEq (_,x) (_,y) = x == y
+
     -- fall through case
-    caseify (i,Left ident) = 
-        hsep [ ptext SLIT("case") , pprHexVal i <> colon ,
-                        ptext SLIT("/* fall through for"), 
-                        pprBlockId ident, 
-                        ptext SLIT("*/") ]
+    caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
+	where 
+	do_fallthrough ix =
+                 hsep [ ptext SLIT("case") , pprHexVal ix <> colon ,
+                        ptext SLIT("/* fall through */") ]
 
-    caseify (i,Right ident) = 
-        hsep [ ptext SLIT("case") , pprHexVal i <> colon ,
-                        ptext SLIT("goto") , (pprBlockId ident) <> semi ]
-
-    -- mark the bottom of a fallthough sequence of cases as `Right'
-    markfalls [a] = [Right a]
-    markfalls as  = map (\a -> Left a) (init as) ++ [Right (last as)]
-
+	final_branch ix = 
+	        hsep [ ptext SLIT("case") , pprHexVal ix <> colon ,
+                       ptext SLIT("goto") , (pprBlockId ident) <> semi ]
 
 -- ---------------------------------------------------------------------
 -- Expressions.
