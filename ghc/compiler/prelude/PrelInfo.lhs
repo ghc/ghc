@@ -157,6 +157,7 @@ prim_tycons
     , intPrimTyCon
     , int64PrimTyCon
     , foreignObjPrimTyCon
+    , bcoPrimTyCon
     , weakPrimTyCon
     , mutableArrayPrimTyCon
     , mutableByteArrayPrimTyCon
@@ -211,6 +212,7 @@ knownKeyNames
     , (byteArrayTyCon_RDR, 	byteArrayTyConKey)
     , (mutableByteArrayTyCon_RDR, mutableByteArrayTyConKey)
     , (foreignObjTyCon_RDR, 	foreignObjTyConKey)
+    , (bcoPrimTyCon_RDR, 	bcoPrimTyConKey)
     , (stablePtrTyCon_RDR, 	stablePtrTyConKey)
     , (stablePtrDataCon_RDR,    stablePtrDataConKey)
 

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.85 2000/07/21 08:45:05 rrt Exp $
+# $Id: Makefile,v 1.86 2000/08/07 14:11:48 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -227,6 +227,38 @@ simplStg/UpdAnal_HC_OPTS	= -fno-strictness
 
 SRC_C_OPTS     += -O -I. -IcodeGen
 
+
+# ----------------------------------------------------------------------------
+#		Generate supporting stuff for prelude/PrimOp.lhs 
+#		from prelude/primops.txt
+
+GENPOC=$(TOP)/utils/genprimopcode/genprimopcode
+
+prelude/PrimOp.o : prelude/PrimOp.lhs prelude/primops.txt
+	$(RM) primop-data-decl.hs
+	$(RM) primop-tag
+	$(RM) primop-list
+	$(RM) primop-has-side-effects.hs
+	$(RM) primop-out-of-line.hs
+	$(RM) primop-commutable.hs
+	$(RM) primop-needs-wrapper.hs
+	$(RM) primop-can-fail.hs
+	$(RM) primop-strictness.hs
+	$(RM) primop-usage.hs
+	$(RM) primop-primop-info.hs
+	$(GENPOC) --data-decl          < prelude/primops.txt > primop-data-decl.hs
+	$(GENPOC) --primop-tag         < prelude/primops.txt > primop-tag.hs
+	$(GENPOC) --primop-list        < prelude/primops.txt > primop-list.hs
+	$(GENPOC) --has-side-effects   < prelude/primops.txt > primop-has-side-effects.hs
+	$(GENPOC) --out-of-line        < prelude/primops.txt > primop-out-of-line.hs
+	$(GENPOC) --commutable         < prelude/primops.txt > primop-commutable.hs
+	$(GENPOC) --needs-wrapper      < prelude/primops.txt > primop-needs-wrapper.hs
+	$(GENPOC) --can-fail           < prelude/primops.txt > primop-can-fail.hs
+	$(GENPOC) --strictness         < prelude/primops.txt > primop-strictness.hs
+	$(GENPOC) --usage              < prelude/primops.txt > primop-usage.hs
+	$(GENPOC) --primop-primop-info < prelude/primops.txt > primop-primop-info.hs
+	$(RM) $@
+	$(HC) -c -o $@ $(HC_OPTS) prelude/PrimOp.lhs
 
 # ----------------------------------------------------------------------------
 #		Parsers/lexers

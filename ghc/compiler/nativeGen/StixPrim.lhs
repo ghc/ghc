@@ -170,62 +170,6 @@ primCode [] WriteArrayOp [obj, ix, v]
     in
     returnUs (\xs -> assign : xs)
 
-primCode lhs@[_] (IndexByteArrayOp pk) args
-  = primCode lhs (ReadByteArrayOp pk) args
-
--- NB: indexing in "pk" units, *not* in bytes (WDP 95/09)
-
-primCode [lhs] (ReadByteArrayOp pk) [obj, ix]
-  = let
-	lhs' = amodeToStix lhs
-    	obj' = amodeToStix obj
-    	ix' = amodeToStix ix
-    	base = StIndex IntRep obj' arrWordsHS
-    	assign = StAssign pk lhs' (StInd pk (StIndex pk base ix'))
-    in
-    returnUs (\xs -> assign : xs)
-
-primCode lhs@[_] (ReadOffAddrOp pk) args
-  = primCode lhs (IndexOffAddrOp pk) args
-
-primCode [lhs] (IndexOffAddrOp pk) [obj, ix]
-  = let
-	lhs' = amodeToStix lhs
-    	obj' = amodeToStix obj
-    	ix' = amodeToStix ix
-    	assign = StAssign pk lhs' (StInd pk (StIndex pk obj' ix'))
-    in
-    returnUs (\xs -> assign : xs)
-
-primCode [lhs] (IndexOffForeignObjOp pk) [obj, ix]
-  = let
-	lhs' = amodeToStix lhs
-    	obj' = amodeToStix obj
-    	ix' = amodeToStix ix
-	obj'' = StIndex AddrRep obj' fixedHS
-    	assign = StAssign pk lhs' (StInd pk (StIndex pk obj'' ix'))
-    in
-    returnUs (\xs -> assign : xs)
-
-primCode [] (WriteOffAddrOp pk) [obj, ix, v]
-  = let
-	obj' = amodeToStix obj
-    	ix' = amodeToStix ix
-    	v' = amodeToStix v
-    	assign = StAssign pk (StInd pk (StIndex pk obj' ix')) v'
-    in
-    returnUs (\xs -> assign : xs)
-
-primCode [] (WriteByteArrayOp pk) [obj, ix, v]
-  = let
-	obj' = amodeToStix obj
-    	ix' = amodeToStix ix
-    	v' = amodeToStix v
-    	base = StIndex IntRep obj' arrWordsHS
-    	assign = StAssign pk (StInd pk (StIndex pk base ix')) v'
-    in
-    returnUs (\xs -> assign : xs)
-
 primCode [] WriteForeignObjOp [obj, v]
   = let
     	obj' = amodeToStix obj
@@ -234,6 +178,78 @@ primCode [] WriteForeignObjOp [obj, v]
     	assign = StAssign AddrRep (StInd AddrRep obj'') v'
     in
     returnUs (\xs -> assign : xs)
+
+-- NB: indexing in "pk" units, *not* in bytes (WDP 95/09)
+primCode ls IndexByteArrayOp_Char      rs = primCode_ReadByteArrayOp CharRep      ls rs
+primCode ls IndexByteArrayOp_Int       rs = primCode_ReadByteArrayOp IntRep       ls rs
+primCode ls IndexByteArrayOp_Word      rs = primCode_ReadByteArrayOp WordRep      ls rs
+primCode ls IndexByteArrayOp_Addr      rs = primCode_ReadByteArrayOp AddrRep      ls rs
+primCode ls IndexByteArrayOp_Float     rs = primCode_ReadByteArrayOp FloatRep     ls rs
+primCode ls IndexByteArrayOp_Double    rs = primCode_ReadByteArrayOp DoubleRep    ls rs
+primCode ls IndexByteArrayOp_StablePtr rs = primCode_ReadByteArrayOp StablePtrRep ls rs
+primCode ls IndexByteArrayOp_Int64     rs = primCode_ReadByteArrayOp Int64Rep     ls rs
+primCode ls IndexByteArrayOp_Word64    rs = primCode_ReadByteArrayOp Word64Rep    ls rs
+
+primCode ls ReadByteArrayOp_Char      rs = primCode_ReadByteArrayOp CharRep      ls rs
+primCode ls ReadByteArrayOp_Int       rs = primCode_ReadByteArrayOp IntRep       ls rs
+primCode ls ReadByteArrayOp_Word      rs = primCode_ReadByteArrayOp WordRep      ls rs
+primCode ls ReadByteArrayOp_Addr      rs = primCode_ReadByteArrayOp AddrRep      ls rs
+primCode ls ReadByteArrayOp_Float     rs = primCode_ReadByteArrayOp FloatRep     ls rs
+primCode ls ReadByteArrayOp_Double    rs = primCode_ReadByteArrayOp DoubleRep    ls rs
+primCode ls ReadByteArrayOp_StablePtr rs = primCode_ReadByteArrayOp StablePtrRep ls rs
+primCode ls ReadByteArrayOp_Int64     rs = primCode_ReadByteArrayOp Int64Rep     ls rs
+primCode ls ReadByteArrayOp_Word64    rs = primCode_ReadByteArrayOp Word64Rep    ls rs
+
+primCode ls ReadOffAddrOp_Char      rs = primCode_IndexOffAddrOp CharRep      ls rs
+primCode ls ReadOffAddrOp_Int       rs = primCode_IndexOffAddrOp IntRep       ls rs
+primCode ls ReadOffAddrOp_Word      rs = primCode_IndexOffAddrOp WordRep      ls rs
+primCode ls ReadOffAddrOp_Addr      rs = primCode_IndexOffAddrOp AddrRep      ls rs
+primCode ls ReadOffAddrOp_Float     rs = primCode_IndexOffAddrOp FloatRep     ls rs
+primCode ls ReadOffAddrOp_Double    rs = primCode_IndexOffAddrOp DoubleRep    ls rs
+primCode ls ReadOffAddrOp_StablePtr rs = primCode_IndexOffAddrOp StablePtrRep ls rs
+primCode ls ReadOffAddrOp_Int64     rs = primCode_IndexOffAddrOp Int64Rep     ls rs
+primCode ls ReadOffAddrOp_Word64    rs = primCode_IndexOffAddrOp Word64Rep    ls rs
+
+primCode ls IndexOffAddrOp_Char      rs = primCode_IndexOffAddrOp CharRep      ls rs
+primCode ls IndexOffAddrOp_Int       rs = primCode_IndexOffAddrOp IntRep       ls rs
+primCode ls IndexOffAddrOp_Word      rs = primCode_IndexOffAddrOp WordRep      ls rs
+primCode ls IndexOffAddrOp_Addr      rs = primCode_IndexOffAddrOp AddrRep      ls rs
+primCode ls IndexOffAddrOp_Float     rs = primCode_IndexOffAddrOp FloatRep     ls rs
+primCode ls IndexOffAddrOp_Double    rs = primCode_IndexOffAddrOp DoubleRep    ls rs
+primCode ls IndexOffAddrOp_StablePtr rs = primCode_IndexOffAddrOp StablePtrRep ls rs
+primCode ls IndexOffAddrOp_Int64     rs = primCode_IndexOffAddrOp Int64Rep     ls rs
+primCode ls IndexOffAddrOp_Word64    rs = primCode_IndexOffAddrOp Word64Rep    ls rs
+
+primCode ls IndexOffForeignObjOp_Char      rs = primCode_IndexOffForeignObjOp CharRep      ls rs
+primCode ls IndexOffForeignObjOp_Int       rs = primCode_IndexOffForeignObjOp IntRep       ls rs
+primCode ls IndexOffForeignObjOp_Word      rs = primCode_IndexOffForeignObjOp WordRep      ls rs
+primCode ls IndexOffForeignObjOp_Addr      rs = primCode_IndexOffForeignObjOp AddrRep      ls rs
+primCode ls IndexOffForeignObjOp_Float     rs = primCode_IndexOffForeignObjOp FloatRep     ls rs
+primCode ls IndexOffForeignObjOp_Double    rs = primCode_IndexOffForeignObjOp DoubleRep    ls rs
+primCode ls IndexOffForeignObjOp_StablePtr rs = primCode_IndexOffForeignObjOp StablePtrRep ls rs
+primCode ls IndexOffForeignObjOp_Int64     rs = primCode_IndexOffForeignObjOp Int64Rep     ls rs
+primCode ls IndexOffForeignObjOp_Word64    rs = primCode_IndexOffForeignObjOp Word64Rep    ls rs
+
+primCode ls WriteOffAddrOp_Char      rs = primCode_WriteOffAddrOp CharRep      ls rs
+primCode ls WriteOffAddrOp_Int       rs = primCode_WriteOffAddrOp IntRep       ls rs
+primCode ls WriteOffAddrOp_Word      rs = primCode_WriteOffAddrOp WordRep      ls rs
+primCode ls WriteOffAddrOp_Addr      rs = primCode_WriteOffAddrOp AddrRep      ls rs
+primCode ls WriteOffAddrOp_Float     rs = primCode_WriteOffAddrOp FloatRep     ls rs
+primCode ls WriteOffAddrOp_Double    rs = primCode_WriteOffAddrOp DoubleRep    ls rs
+primCode ls WriteOffAddrOp_StablePtr rs = primCode_WriteOffAddrOp StablePtrRep ls rs
+primCode ls WriteOffAddrOp_Int64     rs = primCode_WriteOffAddrOp Int64Rep     ls rs
+primCode ls WriteOffAddrOp_Word64    rs = primCode_WriteOffAddrOp Word64Rep    ls rs
+
+primCode ls WriteByteArrayOp_Char      rs = primCode_WriteByteArrayOp CharRep      ls rs
+primCode ls WriteByteArrayOp_Int       rs = primCode_WriteByteArrayOp IntRep       ls rs
+primCode ls WriteByteArrayOp_Word      rs = primCode_WriteByteArrayOp WordRep      ls rs
+primCode ls WriteByteArrayOp_Addr      rs = primCode_WriteByteArrayOp AddrRep      ls rs
+primCode ls WriteByteArrayOp_Float     rs = primCode_WriteByteArrayOp FloatRep     ls rs
+primCode ls WriteByteArrayOp_Double    rs = primCode_WriteByteArrayOp DoubleRep    ls rs
+primCode ls WriteByteArrayOp_StablePtr rs = primCode_WriteByteArrayOp StablePtrRep ls rs
+primCode ls WriteByteArrayOp_Int64     rs = primCode_WriteByteArrayOp Int64Rep     ls rs
+primCode ls WriteByteArrayOp_Word64    rs = primCode_WriteByteArrayOp Word64Rep    ls rs
+
 \end{code}
 
 ToDo: saving/restoring of volatile regs around ccalls.
@@ -329,6 +345,63 @@ primCode lhs op rhs
 	pk   = getAmodeRep (head lhs)
     in
     returnUs (\ xs -> simplePrim pk lhs' op rhs' : xs)
+\end{code}
+
+Helper fns for some array ops.
+
+\begin{code}
+primCode_ReadByteArrayOp pk [lhs] [obj, ix]
+  = let
+	lhs' = amodeToStix lhs
+    	obj' = amodeToStix obj
+    	ix' = amodeToStix ix
+    	base = StIndex IntRep obj' arrWordsHS
+    	assign = StAssign pk lhs' (StInd pk (StIndex pk base ix'))
+    in
+    returnUs (\xs -> assign : xs)
+
+
+primCode_IndexOffAddrOp pk [lhs] [obj, ix]
+  = let
+	lhs' = amodeToStix lhs
+    	obj' = amodeToStix obj
+    	ix' = amodeToStix ix
+    	assign = StAssign pk lhs' (StInd pk (StIndex pk obj' ix'))
+    in
+    returnUs (\xs -> assign : xs)
+
+
+primCode_IndexOffForeignObjOp pk [lhs] [obj, ix]
+  = let
+	lhs' = amodeToStix lhs
+    	obj' = amodeToStix obj
+    	ix' = amodeToStix ix
+	obj'' = StIndex AddrRep obj' fixedHS
+    	assign = StAssign pk lhs' (StInd pk (StIndex pk obj'' ix'))
+    in
+    returnUs (\xs -> assign : xs)
+
+
+primCode_WriteOffAddrOp pk [] [obj, ix, v]
+  = let
+	obj' = amodeToStix obj
+    	ix' = amodeToStix ix
+    	v' = amodeToStix v
+    	assign = StAssign pk (StInd pk (StIndex pk obj' ix')) v'
+    in
+    returnUs (\xs -> assign : xs)
+
+
+primCode_WriteByteArrayOp pk [] [obj, ix, v]
+  = let
+	obj' = amodeToStix obj
+    	ix' = amodeToStix ix
+    	v' = amodeToStix v
+    	base = StIndex IntRep obj' arrWordsHS
+    	assign = StAssign pk (StInd pk (StIndex pk base ix')) v'
+    in
+    returnUs (\xs -> assign : xs)
+
 \end{code}
 
 \begin{code}

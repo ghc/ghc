@@ -10,7 +10,7 @@ types and operations.''
 module TysPrim(
 	alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 	alphaTy, betaTy, gammaTy, deltaTy,
-	openAlphaTyVar, openAlphaTyVars,
+	openAlphaTy, openAlphaTyVar, openAlphaTyVars,
 
 	charPrimTyCon, 		charPrimTy,
 	intPrimTyCon,		intPrimTy,
@@ -31,6 +31,7 @@ module TysPrim(
 	mVarPrimTyCon,			mkMVarPrimTy,	
 	stablePtrPrimTyCon,		mkStablePtrPrimTy,
 	stableNamePrimTyCon,		mkStableNamePrimTy,
+	bcoPrimTyCon,			bcoPrimTy,
 	weakPrimTyCon,  		mkWeakPrimTy,
 	foreignObjPrimTyCon,		foreignObjPrimTy,
 	threadIdPrimTyCon,		threadIdPrimTy,
@@ -50,7 +51,7 @@ import Name		( mkWiredInTyConName )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( mkPrimTyCon, TyCon, ArgVrcs )
 import Type		( Type, 
-			  mkTyConApp, mkTyConTy, mkTyVarTys,
+			  mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unboxedTypeKind, boxedTypeKind, openTypeKind, mkArrowKinds
 			)
 import PrelNames	( pREL_GHC )
@@ -80,6 +81,8 @@ openAlphaTyVar = mkSysTyVar (mkAlphaTyVarUnique 1) openTypeKind
 openAlphaTyVars :: [TyVar]
 openAlphaTyVars = [ mkSysTyVar u openTypeKind
 		  | u <- map mkAlphaTyVarUnique [2..] ]
+
+openAlphaTy = mkTyVarTy openAlphaTyVar
 
 vrcPos,vrcZero :: (Bool,Bool)
 vrcPos  = (True,False)
@@ -264,6 +267,17 @@ dead before it really was.
 \begin{code}
 foreignObjPrimTy    = mkTyConTy foreignObjPrimTyCon
 foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConKey SLIT("ForeignObj#") 0 [] ForeignObjRep
+\end{code}
+  
+%************************************************************************
+%*									*
+\subsection[TysPrim-BCOs]{The ``bytecode object'' type}
+%*									*
+%************************************************************************
+
+\begin{code}
+bcoPrimTy    = mkTyConTy bcoPrimTyCon
+bcoPrimTyCon = pcPrimTyCon bcoPrimTyConKey SLIT("BCO#") 0 [] BCORep
 \end{code}
   
 %************************************************************************

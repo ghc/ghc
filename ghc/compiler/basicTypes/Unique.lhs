@@ -50,6 +50,7 @@ module Unique (
 	arrayPrimTyConKey,
 	assertIdKey,
 	augmentIdKey,
+	bcoPrimTyConKey,
 	bindIOIdKey,
 	boolTyConKey,
 	boundedClassKey,
@@ -567,6 +568,7 @@ kindConKey				= mkPreludeTyConUnique 67
 boxityConKey				= mkPreludeTyConUnique 68
 typeConKey				= mkPreludeTyConUnique 69
 threadIdPrimTyConKey			= mkPreludeTyConUnique 70
+bcoPrimTyConKey				= mkPreludeTyConUnique 71
 \end{code}
 
 %************************************************************************

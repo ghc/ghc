@@ -42,6 +42,7 @@ module PrelNames
 
 	orderingTyCon_RDR, rationalTyCon_RDR, ratioTyCon_RDR, byteArrayTyCon_RDR,
 	mutableByteArrayTyCon_RDR, foreignObjTyCon_RDR,
+        bcoPrimTyCon_RDR,
 	intTyCon_RDR, stablePtrTyCon_RDR, stablePtrDataCon_RDR, 
 	int8TyCon_RDR, int16TyCon_RDR, int32TyCon_RDR, int64TyCon_RDR,
 	word8TyCon_RDR, word16TyCon_RDR, word32TyCon_RDR, word64TyCon_RDR,
@@ -182,6 +183,7 @@ byteArrayTyCon_RDR		= tcQual pREL_BYTEARR_Name  SLIT("ByteArray")
 mutableByteArrayTyCon_RDR	= tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray")
 
 foreignObjTyCon_RDR	= tcQual   pREL_IO_BASE_Name SLIT("ForeignObj")
+bcoPrimTyCon_RDR	= tcQual   pREL_BASE_Name SLIT("BCO#")
 stablePtrTyCon_RDR	= tcQual   pREL_STABLE_Name SLIT("StablePtr")
 stablePtrDataCon_RDR	= dataQual pREL_STABLE_Name SLIT("StablePtr")
 deRefStablePtr_RDR      = varQual  pREL_STABLE_Name SLIT("deRefStablePtr")

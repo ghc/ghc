@@ -57,6 +57,7 @@ data PrimRep
 
   | WeakPtrRep
   | ForeignObjRep	
+  | BCORep
 
   | StablePtrRep	-- guaranteed to be represented by a pointer
 
