@@ -644,6 +644,7 @@ endif # LINK
 #	INSTALL_LIB_SCRIPTS  platform-dependent scripts   in $(libdir)
 #	INSTALL_LIBEXECS     platform-dependent execs in $(libdir)
 #	INSTALL_DATAS	     platform-independent files in $(datadir)
+#	INSTALL_IFACES	     platform-dependent interface files in $(ifacedir)
 #
 # If the installation directory variable is undefined, the install rule simply
 # emits a suitable error message.
@@ -764,11 +765,19 @@ install:: $(INSTALL_DATAS)
 	done
 endif
 
-ifneq "$(INSTALL_DATAS_WITH_DIRS)" ""
-install:: $(INSTALL_DATAS_WITH_DIRS)
-	@$(INSTALL_DIR) $(datadir)
-	for i in $(INSTALL_DATAS_WITH_DIRS); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/`dirname $$i`; \
+ifneq "$(INSTALL_IFACES)" ""
+install:: $(INSTALL_IFACES)
+	@$(INSTALL_DIR) $(ifacedir)
+	for i in $(INSTALL_IFACES); do \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(ifacedir); \
+	done
+endif
+
+ifneq "$(INSTALL_IFACES_WITH_DIRS)" ""
+install:: $(INSTALL_IFACES_WITH_DIRS)
+	@$(INSTALL_DIR) $(ifacedir)
+	for i in $(INSTALL_IFACES_WITH_DIRS); do \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(ifacedir)/`dirname $$i`; \
 	done
 endif
 
