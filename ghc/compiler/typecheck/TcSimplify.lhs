@@ -760,10 +760,7 @@ addGiven avails given
 	 -- This assertion isn't necessarily true.  It's permitted
 	 -- to given a redundant context in a type signature (eg (Ord a, Eq a) => ...)
 	 -- and when typechecking instance decls we generate redundant "givens" too.
-    -- addAvail avails given avail
-    addAvail avails given avail `thenNF_Tc` \av ->
-    zonkInst given `thenNF_Tc` \given' ->
-    returnNF_Tc av	
+    addAvail avails given avail
   where
     avail = Avail (instToId given) NoRhs []
 
@@ -1148,7 +1145,7 @@ disambigGroup dicts
     unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenTc_`
     reduceContext (text "disambig" <+> ppr dicts)
 		  try_me [] dicts			`thenTc` \ (binds, frees, ambigs) ->
-    ASSERT( null frees && null ambigs )
+    WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
     warnDefault dicts chosen_default_ty			`thenTc_`
     returnTc binds
 
