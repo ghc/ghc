@@ -40,10 +40,10 @@ import PrelNames	( mkUnboundName, intTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, 
 			  bindIOName, returnIOName, failIOName, thenIOName
-#ifdef GHCI	
-			  , templateHaskellNames, qTyConName
-#endif
 			)
+#ifdef GHCI	
+import DsMeta		( templateHaskellNames, qTyConName )
+#endif
 import TysWiredIn	( unitTyCon )	-- A little odd
 import FiniteMap
 import UniqSupply

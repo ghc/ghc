@@ -339,10 +339,6 @@ zonkMonoBinds env (VarMonoBind var expr)
     zonkExpr env expr	`thenM` \ new_expr ->
     returnM (VarMonoBind new_var new_expr, unitBag new_var)
 
-zonkMonoBinds env (CoreMonoBind var core_expr)
-  = zonkIdBndr env var    	`thenM` \ new_var ->
-    returnM (CoreMonoBind new_var core_expr, unitBag new_var)
-
 zonkMonoBinds env (FunMonoBind var inf ms locn)
   = zonkIdBndr env var			`thenM` \ new_var ->
     mappM (zonkMatch env) ms		`thenM` \ new_ms ->

@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.105 2002/09/27 08:20:45 simonpj Exp $
+$Id: Parser.y,v 1.106 2002/10/09 15:03:53 simonpj Exp $
 
 Haskell grammar.
 
@@ -19,7 +19,6 @@ import HsTypes		( mkHsTupCon )
 import RdrHsSyn
 import HscTypes		( ParsedIface(..), IsBootInterface )
 import Lex
-import ParseUtil
 import RdrName
 import PrelNames	( mAIN_Name, funTyConName, listTyConName, 
 			  parrTyConName, consDataConName, nilDataConName )
@@ -280,7 +279,7 @@ top 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
 	| cvtopdecls				{ ([],$1) }
 
 cvtopdecls :: { [RdrNameHsDecl] }
-	: topdecls				{ cvTopDecls (groupBindings $1)}
+	: topdecls			{ cvTopDecls $1 }
 
 -----------------------------------------------------------------------------
 -- Interfaces (.hi-boot files)
@@ -307,30 +306,14 @@ ifacebody :: { [RdrNameTyClDecl] }
  	|      layout_on  ifacedecls close		{ $2 }
 
 ifacedecls :: { [RdrNameTyClDecl] }
-	: ifacedecl ';' ifacedecls			{ $1 : $3 }
-	| ';' ifacedecls				{ $2 }
-	| ifacedecl					{ [$1] }
-	| {- empty -}					{ [] }
+	: ifacedecl ';' ifacedecls	{ $1 : $3 }
+	| ';' ifacedecls		{ $2 }
+	| ifacedecl			{ [$1] }
+	| {- empty -}			{ [] }
 
 ifacedecl :: { RdrNameTyClDecl }
-	: srcloc 'data' tycl_hdr constrs 
-	  { mkTyData DataType $3 (DataCons (reverse $4)) Nothing $1 }
-
-	| srcloc 'newtype' tycl_hdr '=' newconstr
-	  { mkTyData NewType $3 (DataCons [$5]) Nothing $1 }
-
-	| srcloc 'class' tycl_hdr fds where
-		{ let 
-			(binds,sigs) = cvMonoBindsAndSigs cvClassOpSig 
-					(groupBindings $5) 
-		   in
-	 	   mkClassDecl $3 $4 sigs (Just binds) $1 }
-
- 	| srcloc 'type' tycon tv_bndrs '=' ctype	
-	  { TySynonym $3 $4 $6 $1 }
-
-	| srcloc var '::' sigtype
-	  { IfaceSig $2 $4 [] $1 }
+	: tycl_decl			{ $1 }
+	| srcloc var '::' sigtype	{ IfaceSig $2 $4 [] $1 }
 
 -----------------------------------------------------------------------------
 -- The Export List
@@ -404,8 +387,7 @@ impspec :: { (Bool, [RdrNameIE]) }
 
 prec 	:: { Int }
 	: {- empty -}				{ 9 }
-	| INTEGER				{%  checkPrec $1 `thenP_`
-						    returnP (fromInteger $1) }
+	| INTEGER				{% checkPrecP (fromInteger $1) }
 
 infix 	:: { FixityDirection }
 	: 'infix'				{ InfixN  }
@@ -419,48 +401,43 @@ ops   	:: { [RdrName] }
 -----------------------------------------------------------------------------
 -- Top-Level Declarations
 
-topdecls :: { [RdrBinding] }
-	: topdecls ';' topdecl		{ ($3 : $1) }
+topdecls :: { [RdrBinding] }	-- Reversed
+	: topdecls ';' topdecl		{ $3 : $1 }
 	| topdecls ';'			{ $1 }
 	| topdecl			{ [$1] }
 
 topdecl :: { RdrBinding }
+  	: tycl_decl			{ RdrHsDecl (TyClD $1) }
+	| srcloc 'instance' inst_type where
+		{ let (binds,sigs) = cvMonoBindsAndSigs $4
+		  in RdrHsDecl (InstD (InstDecl $3 binds sigs Nothing $1)) }
+	| srcloc 'default' '(' comma_types0 ')'		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
+	| 'foreign' fdecl				{ RdrHsDecl $2 }
+	| '{-# DEPRECATED' deprecations '#-}'	 	{ RdrBindings $2 }
+	| '{-# RULES' rules '#-}'		 	{ RdrBindings $2 }
+	| '$(' exp ')'					{ RdrHsDecl (SpliceD $2) }
+      	| decl						{ $1 }
+
+tycl_decl :: { RdrNameTyClDecl }
  	: srcloc 'type' syn_hdr '=' ctype	
 		-- Note ctype, not sigtype.
 		-- We allow an explicit for-all but we don't insert one
 		-- in 	type Foo a = (b,b)
 		-- Instead we just say b is out of scope
- 		{ let (tc,tvs) = $3
-		  in RdrHsDecl (TyClD (TySynonym tc tvs $5 $1)) }
+ 		{ let (tc,tvs) = $3 in TySynonym tc tvs $5 $1 }
 
 
 	| srcloc 'data' tycl_hdr constrs deriving
-		{% returnP (RdrHsDecl (TyClD
-		      (mkTyData DataType $3 (DataCons (reverse $4)) $5 $1))) }
+		{ mkTyData DataType $3 (DataCons (reverse $4)) $5 $1 }
 
 	| srcloc 'newtype' tycl_hdr '=' newconstr deriving
-		{% returnP (RdrHsDecl (TyClD
-		      (mkTyData NewType $3 (DataCons [$5]) $6 $1))) }
+		{ mkTyData NewType $3 (DataCons [$5]) $6 $1 }
 
 	| srcloc 'class' tycl_hdr fds where
-		{% let 
-			(binds,sigs) = cvMonoBindsAndSigs cvClassOpSig (groupBindings $5) 
-		   in
-	 	   returnP (RdrHsDecl (TyClD
-		      (mkClassDecl $3 $4 sigs (Just binds) $1))) }
-
-	| srcloc 'instance' inst_type where
-		{ let (binds,sigs) 
-			= cvMonoBindsAndSigs cvInstDeclSig 
-				(groupBindings $4)
-		  in RdrHsDecl (InstD (InstDecl $3 binds sigs Nothing $1)) }
-
-	| srcloc 'default' '(' comma_types0 ')'		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
-	| 'foreign' fdecl				{ RdrHsDecl $2 }
-	| '{-# DEPRECATED' deprecations '#-}'	 	{ $2 }
-	| '{-# RULES' rules '#-}'		 	{ $2 }
-	| '$(' exp ')'					{ RdrHsDecl (SpliceD $2) }
-      	| decl						{ $1 }
+		{ let 
+			(binds,sigs) = cvMonoBindsAndSigs $5 
+		  in
+	 	  mkClassDecl $3 $4 (map cvClassOpSig sigs) (Just binds) $1 }
 
 syn_hdr :: { (RdrName, [RdrNameHsTyVar]) }	-- We don't retain the syntax of an infix
 						-- type synonym declaration. Oh well.
@@ -479,94 +456,41 @@ tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
 	| type				{% checkTyClHdr $1	`thenP` \ (tc,tvs) ->
 					   returnP ([], tc, tvs) }
 
-{-
-	: '(' comma_types1 ')' '=>' gtycon tv_bndrs
-		{% mapP checkPred $2	`thenP` \ cxt ->
-		  returnP (cxt, $5, $6) }
+-----------------------------------------------------------------------------
+-- Nested declarations
 
-	| '(' ')' '=>' gtycon tv_bndrs
-		{ ([], $4, $5) }
-
-          -- qtycon for the class below name would lead to many s/r conflicts
-	  --   FIXME: does the renamer pick up all wrong forms and raise an
-	  --	      error 
-	| gtycon atypes1 '=>' gtycon atypes0	
-		{% checkTyVars $5	`thenP` \ tvs ->
-		   returnP ([HsClassP $1 $2], $4, tvs) }
-
-	| gtycon  atypes0
-		{% checkTyVars $2	`thenP` \ tvs ->
-		   returnP ([], $1, tvs) }
-		-- We have to have qtycon in this production to avoid s/r
-		-- conflicts with the previous one.  The renamer will complain
-		-- if we use a qualified tycon.
-		--
-		-- Using a `gtycon' throughout.  This enables special syntax,
-		-- such as "[]" for tycons as well as tycon ops in
-		-- parentheses.  This is beyond H98, but used repeatedly in
-		-- the Prelude modules.  (So, it would be a good idea to raise
-		-- an error in the renamer if some non-H98 form is used and
-		-- -fglasgow-exts is not given.)  -=chak 
-
-atypes0	:: { [RdrNameHsType] }
-	: atypes1			{ $1 }
-	| {- empty -}			{ [] }
-
-atypes1	:: { [RdrNameHsType] }
-	: atype				{ [$1] }
-	| atype atypes1			{ $1 : $2 }
--}
-
-decls 	:: { [RdrBinding] }
+decls 	:: { [RdrBinding] }	-- Reversed
 	: decls ';' decl		{ $3 : $1 }
 	| decls ';'			{ $1 }
 	| decl				{ [$1] }
 	| {- empty -}			{ [] }
 
-decl 	:: { RdrBinding }
-	: fixdecl			{ $1 }
-	| valdef			{ $1 }
-	| '{-# INLINE'   srcloc activation qvar '#-}'	      { RdrSig (InlineSig True  $4 $3 $2) }
-	| '{-# NOINLINE' srcloc inverse_activation qvar '#-}' { RdrSig (InlineSig False $4 $3 $2) }
-	| '{-# SPECIALISE' srcloc qvar '::' sigtypes '#-}'
-	 	{ foldr1 RdrAndBindings 
-		    (map (\t -> RdrSig (SpecSig $3 t $2)) $5) }
-	| '{-# SPECIALISE' srcloc 'instance' inst_type '#-}'
-		{ RdrSig (SpecInstSig $4 $2) }
 
 wherebinds :: { RdrNameHsBinds }
-	: where			{ cvBinds cvValSig (groupBindings $1) }
+	: where				{ cvBinds $1 }
 
-where 	:: { [RdrBinding] }
+where 	:: { [RdrBinding] }	-- Reversed
 	: 'where' decllist		{ $2 }
 	| {- empty -}			{ [] }
 
-declbinds :: { RdrNameHsBinds }
-	: decllist			{ cvBinds cvValSig (groupBindings $1) }
-
-decllist :: { [RdrBinding] }
+decllist :: { [RdrBinding] }	-- Reversed
 	: '{'            decls '}'	{ $2 }
 	|     layout_on  decls close	{ $2 }
 
 letbinds :: { RdrNameHsExpr -> RdrNameHsExpr }
-	: decllist		{ HsLet (cvBinds cvValSig (groupBindings $1)) }
+	: decllist			{ HsLet (cvBinds $1) }
 	| '{'            dbinds '}'	{ \e -> HsWith e $2 False{-not with-} }
 	|     layout_on  dbinds close	{ \e -> HsWith e $2 False{-not with-} }
 
-fixdecl :: { RdrBinding }
-	: srcloc infix prec ops	    	{ foldr1 RdrAndBindings
-					    [ RdrSig (FixSig (FixitySig n 
-							    (Fixity $3 $2) $1))
-					    | n <- $4 ] }
+
 
 -----------------------------------------------------------------------------
 -- Transformation Rules
 
-rules	:: { RdrBinding }
-	:  rules ';' rule			{ $1 `RdrAndBindings` $3 }
-        |  rules ';'				{ $1 }
-        |  rule					{ $1 }
-	|  {- empty -}				{ RdrNullBind }
+rules	:: { [RdrBinding] }
+	:  rule ';' rules			{ $1 : $3 }
+        |  rule					{ [$1] }
+	|  {- empty -}				{ [] }
 
 rule  	:: { RdrBinding }
 	: STRING activation rule_forall infixexp '=' srcloc exp
@@ -599,16 +523,15 @@ rule_var :: { RdrNameRuleBndr }
 -----------------------------------------------------------------------------
 -- Deprecations
 
-deprecations :: { RdrBinding }
-	: deprecations ';' deprecation		{ $1 `RdrAndBindings` $3 }
-	| deprecations ';'			{ $1 }
-	| deprecation				{ $1 }
-	| {- empty -}				{ RdrNullBind }
+deprecations :: { [RdrBinding] }
+	: deprecation ';' deprecations		{ $1 : $3 }
+	| deprecation				{ [$1] }
+	| {- empty -}				{ [] }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { RdrBinding }
 	: srcloc depreclist STRING
-		{ foldr RdrAndBindings RdrNullBind 
+		{ RdrBindings
 			[ RdrHsDecl (DeprecD (Deprecation n $3 $1)) | n <- $2 ] }
 
 
@@ -957,16 +880,13 @@ deriving :: { Maybe RdrNameContext }
   We can't tell whether to reduce var to qvar until after we've read the signatures.
 -}
 
-valdef :: { RdrBinding }
-	: infixexp srcloc opt_sig rhs		{% (checkValDef $1 $3 $4 $2) }
-	| infixexp srcloc '::' sigtype		{% (checkValSig $1 $4 $2) }
-	| var ',' sig_vars srcloc '::' sigtype	{ foldr1 RdrAndBindings 
-							 [ RdrSig (Sig n $6 $4) | n <- $1:$3 ]
-                                                }
+decl 	:: { RdrBinding }
+	: sigdecl			{ $1 }
+	| infixexp srcloc opt_sig rhs	{% checkValDef $1 $3 $4 $2 }
 
 rhs	:: { RdrNameGRHSs }
-	: '=' srcloc exp wherebinds	{ (GRHSs (unguardedRHS $3 $2) $4 placeHolderType)}
-	| gdrhs	wherebinds		{ GRHSs (reverse $1) $2 placeHolderType }
+	: '=' srcloc exp wherebinds	{ GRHSs (unguardedRHS $3 $2) $4 placeHolderType }
+	| gdrhs	wherebinds		{ GRHSs (reverse $1)         $2 placeHolderType }
 
 gdrhs :: { [RdrNameGRHS] }
 	: gdrhs gdrh			{ $2 : $1 }
@@ -975,11 +895,28 @@ gdrhs :: { [RdrNameGRHS] }
 gdrh :: { RdrNameGRHS }
 	: '|' srcloc quals '=' exp  	{ GRHS (reverse (ResultStmt $5 $2 : $3)) $2 }
 
+sigdecl :: { RdrBinding }
+	: infixexp srcloc '::' sigtype		
+				{% checkValSig $1 $4 $2 }
+		-- See the above notes for why we need infixexp here
+	| var ',' sig_vars srcloc '::' sigtype	
+				{ mkSigDecls [ Sig n $6 $4 | n <- $1:$3 ] }
+	| srcloc infix prec ops	{ mkSigDecls [ FixSig (FixitySig n (Fixity $3 $2) $1)
+					     | n <- $4 ] }
+	| '{-# INLINE'   srcloc activation qvar '#-}'	      
+				{ RdrHsDecl (SigD (InlineSig True  $4 $3 $2)) }
+	| '{-# NOINLINE' srcloc inverse_activation qvar '#-}' 
+				{ RdrHsDecl (SigD (InlineSig False $4 $3 $2)) }
+	| '{-# SPECIALISE' srcloc qvar '::' sigtypes '#-}'
+			 	{ mkSigDecls  [ SpecSig $3 t $2 | t <- $5] }
+	| '{-# SPECIALISE' srcloc 'instance' inst_type '#-}'
+				{ RdrHsDecl (SigD (SpecInstSig $4 $2)) }
+
 -----------------------------------------------------------------------------
 -- Expressions
 
 exp   :: { RdrNameHsExpr }
-	: infixexp '::' sigtype		{ (ExprWithTySig $1 $3) }
+	: infixexp '::' sigtype		{ ExprWithTySig $1 $3 }
 	| infixexp 'with' dbinding	{ HsWith $1 $3 True{-not a let-} }
 	| infixexp			{ $1 }
 
@@ -1069,7 +1006,7 @@ aexp2	:: { RdrNameHsExpr }
 	| '[t|' ctype '|]'              { HsBracket (TypBr $2) }                       
 	| '[p|' srcloc infixexp '|]'    {% checkPattern $2 $3 `thenP` \p ->
 					   returnP (HsBracket (PatBr p)) }
-	| '[d|' cvtopdecls '|]'		{ HsBracket (DecBr $2) }
+	| '[d|' cvtopdecls '|]'		{ HsBracket (DecBr (mkGroup $2)) }
 
 
 texps :: { [RdrNameHsExpr] }
@@ -1207,7 +1144,7 @@ stmt  :: { RdrNameStmt }
 	: srcloc infixexp '<-' exp	{% checkPattern $1 $2 `thenP` \p ->
 					   returnP (BindStmt p $4 $1) }
 	| srcloc exp			{ ExprStmt $2 placeHolderType $1 }
-  	| srcloc 'let' declbinds	{ LetStmt $3 }
+  	| srcloc 'let' decllist		{ LetStmt (cvBinds $3) }
 
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction

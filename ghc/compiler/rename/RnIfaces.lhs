@@ -38,7 +38,7 @@ import Name		( Name {-instance NamedThing-}, isWiredInName, isInternalName, name
 import NameEnv 		( delFromNameEnv, lookupNameEnv )
 import NameSet
 import Module		( Module, isHomeModule, extendModuleSet )
-import PrelInfo		( hasKey, fractionalClassKey, numClassKey, 
+import PrelNames	( hasKey, fractionalClassKey, numClassKey, 
 			  integerTyConName, doubleTyConName )
 import FiniteMap
 import Outputable
@@ -631,18 +631,16 @@ checkModUsage (mod_name, _, is_boot, whats_imported)
     in
     traceHiDiffs (text "Checking usages for module" <+> ppr mod_name) `thenM_`
 
-    recoverM (returnM Nothing)
-    	     (loadInterface doc_str mod_name from	`thenM` \ iface ->
-	      returnM (Just iface))			`thenM` \ mb_iface ->
+    tryM (loadInterface doc_str mod_name from)	`thenM` \ mb_iface ->
 
     case mb_iface of {
-	Nothing ->  (out_of_date (sep [ptext SLIT("Can't find version number for module"), 
+	Left exn ->  (out_of_date (sep [ptext SLIT("Can't find version number for module"), 
 				       ppr mod_name]));
 		-- Couldn't find or parse a module mentioned in the
 		-- old interface file.  Don't complain -- it might just be that
 		-- the current module doesn't need that import and it's been deleted
 
-	Just iface -> 
+	Right iface -> 
     let
 	new_vers      	= mi_version iface
 	new_mod_vers    = vers_module  new_vers

@@ -8,6 +8,6 @@ rnBindsAndThen :: forall b . RdrHsSyn.RdrNameHsBinds
 rnBinds :: RdrHsSyn.RdrNameHsBinds
 	-> TcRnTypes.RnM (RnHsSyn.RenamedHsBinds, NameSet.FreeVars) ;
 
-rnSrcDecls :: [RdrHsSyn.RdrNameHsDecl]
-	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, [RnHsSyn.RenamedHsDecl], NameSet.FreeVars)
+rnSrcDecls :: HsDecls.HsGroup RdrName.RdrName
+	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name, NameSet.FreeVars)
 

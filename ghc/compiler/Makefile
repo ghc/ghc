@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.223 2002/09/16 10:16:14 simonmar Exp $
+# $Id: Makefile,v 1.224 2002/10/09 15:03:48 simonpj Exp $
 
 TOP = ..
 
@@ -137,9 +137,9 @@ endif
 # Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 # Yes, include the interepreter, readline, and Template Haskell extensions
-SRC_HC_OPTS += -DGHCI -package readline -package haskell-src
+SRC_HC_OPTS += -DGHCI -package haskell-src
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-SRC_HC_OPTS += -package unix
+SRC_HC_OPTS += -package unix -package readline 
 endif
 ALL_DIRS += ghci
 else

@@ -52,8 +52,8 @@ import Name		( getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
-import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass, 
-			  splitName, fstName, sndName )
+import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass ) 
+import PrelNames	( splitName, fstName, sndName )
 
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import TysWiredIn	( unitTy, pairTyCon )
@@ -1720,27 +1720,30 @@ disambigGroup dicts
 	= failM
 
       try_default (default_ty : default_tys)
-	= tryTc_ (try_default default_tys) $	-- If default_ty fails, we try
+	= tryTcLIE_ (try_default default_tys) $	-- If default_ty fails, we try
 						-- default_tys instead
 	  tcSimplifyDefault theta		`thenM` \ _ ->
 	  returnM default_ty
         where
 	  theta = [mkClassPred clas [default_ty] | clas <- classes]
     in
-	-- See if any default works, and if so bind the type variable to it
-	-- If not, add an AmbigErr
-    recoverM (addAmbigErrs dicts	`thenM_`
-	      returnM EmptyMonoBinds)	$
+	-- See if any default works
+    tryM (try_default default_tys)	`thenM` \ mb_ty ->
+    case mb_ty of {
+	Left _ -> 	-- If not, add an AmbigErr
+		  addAmbigErrs dicts	`thenM_`
+		  returnM EmptyMonoBinds ;
 
-    try_default default_tys		 	`thenM` \ chosen_default_ty ->
+	Right chosen_default_ty ->
 
-	-- Bind the type variable and reduce the context, for real this time
+	-- If so, bind the type variable 
+	-- and reduce the context, for real this time
     unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenM_`
     simpleReduceLoop (text "disambig" <+> ppr dicts)
 		     reduceMe dicts			`thenM` \ (frees, binds, ambigs) ->
     WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
     warnDefault dicts chosen_default_ty			`thenM_`
-    returnM binds
+    returnM binds }
 
   | all isCreturnableClass classes
   = 	-- Default CCall stuff to (); we don't even both to check that () is an

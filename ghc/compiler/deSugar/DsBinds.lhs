@@ -54,9 +54,6 @@ dsMonoBinds auto_scc (AndMonoBinds  binds_1 binds_2) rest
   = dsMonoBinds auto_scc binds_2 rest	`thenDs` \ rest' ->
     dsMonoBinds auto_scc binds_1 rest'
 
-dsMonoBinds _ (CoreMonoBind var core_expr) rest
-  = returnDs ((var, core_expr) : rest)
-
 dsMonoBinds _ (VarMonoBind var expr) rest
   = dsExpr expr			`thenDs` \ core_expr ->
 

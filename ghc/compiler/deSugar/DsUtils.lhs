@@ -40,8 +40,7 @@ import CoreSyn
 import DsMonad
 
 import CoreUtils	( exprType, mkIfThenElse, mkCoerce )
-import PrelInfo		( iRREFUT_PAT_ERROR_ID )
-import MkId		( mkReboxingAlt, mkNewTypeBody )
+import MkId		( iRREFUT_PAT_ERROR_ID, mkReboxingAlt, mkNewTypeBody )
 import Id		( idType, Id, mkWildId )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons )

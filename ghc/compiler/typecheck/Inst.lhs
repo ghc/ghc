@@ -80,7 +80,6 @@ import PrelNames( fromIntegerName, fromRationalName, rationalTyConName )
 import Util	( equalLength )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
-import Bag
 import Outputable
 \end{code}
 

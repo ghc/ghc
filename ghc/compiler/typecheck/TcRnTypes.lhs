@@ -9,7 +9,7 @@ module TcRnTypes(
 	thenM, thenM_, returnM, failM,
 
 	-- Non-standard operations
-	runTcRn, fixM, recoverM, ioToTcRn,
+	runTcRn, fixM, tryM, ioToTcRn,
 	newMutVar, readMutVar, writeMutVar,
 	getEnv, setEnv, updEnv, unsafeInterleaveM, 
 		
@@ -74,6 +74,7 @@ import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
 import Maybe		( mapMaybe )
 import List		( nub )
+import Control.Exception as Exception ( try, Exception )
 \end{code}
 
 
@@ -151,11 +152,9 @@ fixM f = TcRn (\ env -> fixIO (\ r -> unTcRn (f r) env))
 Error recovery
 
 \begin{code}
-recoverM :: TcRn m r 	-- Recovery action; do this if the main one fails
-	 -> TcRn m r	-- Main action: do this first
-	 -> TcRn m r
-recoverM (TcRn recover) (TcRn m)
-  = TcRn (\ env -> catch (m env) (\ _ -> recover env))
+tryM :: TcRn m r -> TcRn m (Either Exception.Exception r)
+-- Reflect exception into TcRn monad
+tryM (TcRn thing) = TcRn (\ env -> Exception.try (thing env))
 \end{code}
 
 Lazy interleave 

@@ -99,9 +99,11 @@ import Demand		hiding( Demand, seqDemand )
 import qualified Demand
 import NewDemand
 import Outputable	
-import Util		( listLengthCmp )
 import Maybe		( isJust )
+#ifdef OLD_STRICTNESS
+import Util		( listLengthCmp )
 import List		( replicate )
+#endif
 
 -- infixl so you can say (id `set` a `set` b)
 infixl 	1 `setSpecInfo`,

@@ -5,3 +5,8 @@ tcSpliceExpr :: Name.Name
 	     -> TcType.TcType
 	     -> TcRnTypes.TcM TcHsSyn.TcExpr
 
+tcSpliceDecls :: RnHsSyn.RenamedHsExpr 
+	      -> TcRnTypes.TcM [RdrHsSyn.RdrNameHsDecl]
+
+tcBracket :: HsExpr.HsBracket Name.Name 
+	  -> TcRnTypes.TcM TcType.TcType

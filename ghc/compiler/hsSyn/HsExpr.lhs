@@ -9,7 +9,7 @@ module HsExpr where
 #include "HsVersions.h"
 
 -- friends:
-import HsDecls		( HsDecl )
+import HsDecls		( HsGroup )
 import HsBinds		( HsBinds(..), nullBinds )
 import HsPat		( Pat )
 import HsLit		( HsLit, HsOverLit )
@@ -670,7 +670,7 @@ pprComp brack stmts = brack $
 \begin{code}
 data HsBracket id = ExpBr (HsExpr id)
 		  | PatBr (Pat id)
-		  | DecBr [HsDecl id]
+		  | DecBr (HsGroup id)
 		  | TypBr (HsType id)
 
 instance OutputableBndr id => Outputable (HsBracket id) where
@@ -679,7 +679,7 @@ instance OutputableBndr id => Outputable (HsBracket id) where
 
 pprHsBracket (ExpBr e) = thBrackets empty (ppr e)
 pprHsBracket (PatBr p) = thBrackets (char 'p') (ppr p)
-pprHsBracket (DecBr d) = thBrackets (char 'd') (vcat (map ppr d))
+pprHsBracket (DecBr d) = thBrackets (char 'd') (ppr d)
 pprHsBracket (TypBr t) = thBrackets (char 't') (ppr t)
 
 

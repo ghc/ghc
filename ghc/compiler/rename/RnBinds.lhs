@@ -208,7 +208,7 @@ rnMonoBindsAndThen mbinds sigs thing_inside -- Non-empty monobinds
     rnMonoBinds mbinds sigs		`thenM` \ (binds, bind_fvs) ->
 
 	-- Now do the "thing inside"
-    thing_inside binds 			   `thenM` \ (result,result_fvs) ->
+    thing_inside binds 			`thenM` \ (result,result_fvs) ->
 
 	-- Final error checking
     let

@@ -12,6 +12,7 @@ module PrelInfo (
 	wiredInThingEnv,
 	ghcPrimExports,
 	cCallableClassDecl, cReturnableClassDecl,
+	knownKeyNames,
 	
 	-- Random other things
 	maybeCharLikeCon, maybeIntLikeCon,
@@ -24,14 +25,22 @@ module PrelInfo (
 
 #include "HsVersions.h"
 
-import PrelNames	-- Prelude module names
+import PrelNames	( basicKnownKeyNames, 
+			  cCallableClassName, cReturnableClassName,
+			  hasKey, charDataConKey, intDataConKey,
+			  numericClassKeys, standardClassKeys, cCallishClassKeys,
+			  noDictClassKeys )
+#ifdef GHCI
+import DsMeta		( templateHaskellNames )
+#endif
 
 import PrimOp		( allThePrimOps, primOpOcc )
 import DataCon		( DataCon )
 import Id		( idName )
 import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
-import Name		( nameOccName )
+import Name		( Name, nameOccName )
+import NameSet		( nameSetToList )
 import RdrName		( mkRdrUnqual, getRdrName )
 import HsSyn		( HsTyVarBndr(..) )
 import OccName		( mkVarOcc )
@@ -40,7 +49,7 @@ import TysWiredIn	( wiredInTyCons )
 import RdrHsSyn		( mkClassDecl )
 import HscTypes 	( TyThing(..), implicitTyThingIds, TypeEnv, mkTypeEnv,
 			  GenAvailInfo(..), RdrAvailInfo )
-import Class	 	( Class, classKey )
+import Class	 	( Class, classKey, className )
 import Type		( funTyCon, openTypeKind, liftedTypeKind )
 import TyCon		( tyConName )
 import SrcLoc		( noSrcLoc )
@@ -75,6 +84,13 @@ wiredInThings
 
 wiredInThingEnv :: TypeEnv
 wiredInThingEnv = mkTypeEnv wiredInThings
+
+knownKeyNames :: [Name]
+knownKeyNames 
+  = basicKnownKeyNames
+#ifdef GHCI
+    ++ nameSetToList templateHaskellNames
+#endif
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make
@@ -153,7 +169,7 @@ isCcallishClass, isCreturnableClass, isNoDictClass,
 isNumericClass     clas = classKey clas `is_elem` numericClassKeys
 isStandardClass    clas = classKey clas `is_elem` standardClassKeys
 isCcallishClass	   clas = classKey clas `is_elem` cCallishClassKeys
-isCreturnableClass clas = classKey clas == cReturnableClassKey
+isCreturnableClass clas = className clas == cReturnableClassName
 isNoDictClass      clas = classKey clas `is_elem` noDictClassKeys
 is_elem = isIn "is_X_Class"
 \end{code}

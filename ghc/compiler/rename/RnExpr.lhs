@@ -28,6 +28,7 @@ import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
 import RnEnv
+import RnNames		( importsFromLocalDecls )
 import RnTypes		( rnHsTypeFVs, rnPat, litFVs, rnOverLit, rnPatsAndThen,
 			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
@@ -41,8 +42,10 @@ import PrelNames	( hasKey, assertIdKey,
 			  replicatePName, mapPName, filterPName,
 			  crossPName, zipPName, toPName,
 			  enumFromToPName, enumFromThenToPName, assertErrorName,
-			  negateName, qTyConName, monadNames, mfixName )
-import RdrName		( RdrName )
+			  negateName, monadNames, mfixName )
+#ifdef GHCI
+import DsMeta		( qTyConName )
+#endif
 import Name		( Name, nameOccName )
 import NameSet
 import UnicodeUtil	( stringToUtf8 )
@@ -224,12 +227,14 @@ rnExpr (HsPar e)
     returnM (HsPar e', fvs_e)
 
 -- Template Haskell extensions
+#ifdef GHCI
 rnExpr (HsBracket br_body)
   = checkGHCI (thErr "bracket")		`thenM_`
     rnBracket br_body			`thenM` \ (body', fvs_e) ->
     returnM (HsBracket body', fvs_e `addOneFV` qTyConName)
 	-- We use the Q tycon as a proxy to haul in all the smart
 	-- constructors; see the hack in RnIfaces
+#endif
 
 rnExpr (HsSplice n e)
   = checkGHCI (thErr "splice")		`thenM_`
@@ -458,10 +463,16 @@ rnBracket (TypBr t) = rnHsTypeFVs doc t	`thenM` \ (t', fvs) ->
 		      returnM (TypBr t', fvs)
 		    where
 		      doc = ptext SLIT("In a Template-Haskell quoted type")
-rnBracket (DecBr ds) = rnSrcDecls ds	`thenM` \ (tcg_env, ds', fvs) ->
-			-- Discard the tcg_env; it contains the extended global RdrEnv
-			-- because there is no scope that these decls cover (yet!)
-		       returnM (DecBr ds', fvs)
+rnBracket (DecBr group) 
+  = importsFromLocalDecls group `thenM` \ (rdr_env, avails) ->
+	-- Discard avails (not useful here)
+
+    updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env gbl }) $
+
+    rnSrcDecls group	`thenM` \ (tcg_env, group', fvs) ->
+	-- Discard the tcg_env; it contains only extra info about fixity
+
+    returnM (DecBr group', fvs)
 \end{code}
 
 %************************************************************************

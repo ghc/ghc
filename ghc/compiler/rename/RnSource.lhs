@@ -5,7 +5,7 @@
 
 \begin{code}
 module RnSource ( 
-	rnSrcDecls, rnExtCoreDecls, checkModDeprec,
+	rnSrcDecls, checkModDeprec,
 	rnTyClDecl, rnIfaceRuleDecl, rnInstDecl, 
 	rnBinds, rnBindsAndThen, rnStats,
     ) where
@@ -14,15 +14,13 @@ module RnSource (
 
 import HsSyn
 import RdrName		( RdrName, isRdrDataCon, elemRdrEnv )
-import RdrHsSyn		( RdrNameConDecl, RdrNameTyClDecl, RdrNameHsDecl,
+import RdrHsSyn		( RdrNameConDecl, RdrNameTyClDecl, 
 			  RdrNameDeprecation, RdrNameFixitySig,
 			  RdrNameHsBinds,
 			  extractGenericPatTyVars
 			)
 import RnHsSyn
 import HsCore
-
-import RnNames		( importsFromLocalDecls )
 import RnExpr		( rnExpr )
 import RnTypes		( rnHsType, rnHsSigType, rnHsTypeFVs, rnContext )
 
@@ -35,8 +33,7 @@ import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupSysBndr,
 			  bindCoreLocalRn, bindCoreLocalsRn, bindLocalNames,
 			  checkDupOrQualNames, checkDupNames, mapFvRn,
 			  lookupTopSrcBndr_maybe, lookupTopSrcBndr,
-			  dataTcOccs, unknownNameErr,
-			  plusGlobalRdrEnv
+			  dataTcOccs, unknownNameErr
 			)
 import TcRnMonad
 
@@ -78,48 +75,56 @@ Checks the @(..)@ etc constraints in the export list.
 
 
 \begin{code}
-rnSrcDecls :: [RdrNameHsDecl] -> RnM (TcGblEnv, [RenamedHsDecl], FreeVars)
+rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name, FreeVars)
 
-rnSrcDecls decls
- = do {	(rdr_env, imports) <- importsFromLocalDecls decls ;
-	updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv`
-						  tcg_rdr_env gbl,
-				 tcg_imports = imports `plusImportAvails` 
-						  tcg_imports gbl }) 
-		     $ do {
+rnSrcDecls (HsGroup { hs_valds  = MonoBind binds sigs _,
+		      hs_tyclds = tycl_decls,
+		      hs_instds = inst_decls,
+		      hs_fixds  = fix_decls,
+		      hs_depds  = deprec_decls,
+		      hs_fords  = foreign_decls,
+		      hs_defds  = default_decls,
+		      hs_ruleds = rule_decls,
+		      hs_coreds = core_decls })
 
-		-- Deal with deprecations (returns only the extra deprecations)
-	deprecs <- rnSrcDeprecDecls [d | DeprecD d <- decls] ;
+ = do {		-- Deal with deprecations (returns only the extra deprecations)
+	deprecs <- rnSrcDeprecDecls deprec_decls ;
 	updGblEnv (\gbl -> gbl { tcg_deprecs = tcg_deprecs gbl `plusDeprecs` deprecs })
 		  $ do {
 
 		-- Deal with top-level fixity decls 
 		-- (returns the total new fixity env)
-	fix_env <- rnSrcFixityDecls decls ;
+	fix_env <- rnSrcFixityDecls fix_decls ;
 	updGblEnv (\gbl -> gbl { tcg_fix_env = fix_env })
 		  $ do {
 
 	failIfErrsM ;	-- No point in continuing if (say) we have duplicate declarations
 
-		-- Rename remaining declarations
-	(rn_src_decls, src_fvs) <- rn_src_decls decls ;
+		-- Rename other declarations
+	(rn_val_decls, src_fvs1)     <- rnTopMonoBinds binds sigs ;
+	(rn_inst_decls, src_fvs2)    <- mapFvRn rnSrcInstDecl inst_decls ;
+	(rn_tycl_decls, src_fvs3)    <- mapFvRn rnSrcTyClDecl tycl_decls ;
+	(rn_rule_decls, src_fvs4)    <- mapFvRn rnHsRuleDecl rule_decls ;
+	(rn_foreign_decls, src_fvs5) <- mapFvRn rnHsForeignDecl foreign_decls ;
+	(rn_default_decls, src_fvs6) <- mapFvRn rnDefaultDecl default_decls ;
+	(rn_core_decls,    src_fvs7) <- mapFvRn rnCoreDecl core_decls ;
+	
+	let {
+	   rn_group = HsGroup { hs_valds  = rn_val_decls,
+			    	hs_tyclds = rn_tycl_decls,
+			    	hs_instds = rn_inst_decls,
+			    	hs_fixds  = [],
+			    	hs_depds  = [],
+			    	hs_fords  = rn_foreign_decls,
+			    	hs_defds  = rn_default_decls,
+			    	hs_ruleds = rn_rule_decls,
+			    	hs_coreds = rn_core_decls } ;
+	   src_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, 
+			      src_fvs5, src_fvs6, src_fvs7] } ;
 
 	tcg_env <- getGblEnv ;
-	return (tcg_env, rn_src_decls, src_fvs)
-    }}}}
-
-rnExtCoreDecls :: [RdrNameHsDecl] -> RnM ([RenamedHsDecl], FreeVars)
-rnExtCoreDecls decls = rn_src_decls decls
-
-rn_src_decls decls	-- Declarartions get reversed, but no matter
-  = go emptyFVs [] decls
-  where
-	-- Fixity and deprecations have been dealt with already; ignore them
-    go fvs ds' []             = returnM (ds', fvs)
-    go fvs ds' (FixD _:ds)    = go fvs ds' ds
-    go fvs ds' (DeprecD _:ds) = go fvs ds' ds
-    go fvs ds' (d:ds)         = rnSrcDecl d	`thenM` \(d', fvs') ->
-			        go (fvs `plusFV` fvs') (d':ds') ds
+	return (tcg_env, rn_group, src_fvs)
+    }}}
 \end{code}
 
 
@@ -130,21 +135,13 @@ rn_src_decls decls	-- Declarartions get reversed, but no matter
 %*********************************************************
 
 \begin{code}
-rnSrcFixityDecls :: [RdrNameHsDecl] -> TcRn m FixityEnv
-rnSrcFixityDecls decls
+rnSrcFixityDecls :: [RdrNameFixitySig] -> TcRn m FixityEnv
+rnSrcFixityDecls fix_decls
   = getGblEnv					`thenM` \ gbl_env ->
     foldlM rnFixityDecl (tcg_fix_env gbl_env) 
 	    fix_decls				`thenM` \ fix_env ->
     traceRn (text "fixity env" <+> ppr fix_env)	`thenM_`
     returnM fix_env
-  where
-    fix_decls = foldr get_fix_sigs [] decls
-
-	-- Get fixities from top level decls, and from class decl sigs too
-    get_fix_sigs (FixD fix) acc = fix:acc
-    get_fix_sigs (TyClD (ClassDecl { tcdSigs = sigs})) acc
-       = [sig | FixSig sig <- sigs] ++ acc
-    get_fix_sigs other_decl acc = acc
 
 rnFixityDecl :: FixityEnv -> RdrNameFixitySig -> TcRn m FixityEnv
 rnFixityDecl fix_env (FixitySig rdr_name fixity loc)
@@ -213,43 +210,30 @@ badDeprec d
 %*********************************************************
 
 \begin{code}
-rnSrcDecl :: RdrNameHsDecl -> RnM (RenamedHsDecl, FreeVars)
-
-rnSrcDecl (ValD binds) = rnTopBinds binds	`thenM` \ (new_binds, fvs) ->
-			 returnM (ValD new_binds, fvs)
-
-rnSrcDecl (TyClD tycl_decl)
+rnSrcTyClDecl tycl_decl
   = rnTyClDecl tycl_decl			`thenM` \ new_decl ->
     finishSourceTyClDecl tycl_decl new_decl	`thenM` \ (new_decl', fvs) ->
-    returnM (TyClD new_decl', fvs `plusFV` tyClDeclFVs new_decl')
+    returnM (new_decl', fvs `plusFV` tyClDeclFVs new_decl')
 
-rnSrcDecl (InstD inst)
+rnSrcInstDecl inst
   = rnInstDecl inst			`thenM` \ new_inst ->
     finishSourceInstDecl inst new_inst	`thenM` \ (new_inst', fvs) ->
-    returnM (InstD new_inst', fvs `plusFV` instDeclFVs new_inst')
+    returnM (new_inst', fvs `plusFV` instDeclFVs new_inst')
 
-rnSrcDecl (RuleD rule)
-  = rnHsRuleDecl rule		`thenM` \ (new_rule, fvs) ->
-    returnM (RuleD new_rule, fvs)
-
-rnSrcDecl (ForD ford)
-  = rnHsForeignDecl ford		`thenM` \ (new_ford, fvs) ->
-    returnM (ForD new_ford, fvs)
-
-rnSrcDecl (DefD (DefaultDecl tys src_loc))
+rnDefaultDecl (DefaultDecl tys src_loc)
   = addSrcLoc src_loc $
     mapFvRn (rnHsTypeFVs doc_str) tys		`thenM` \ (tys', fvs) ->
-    returnM (DefD (DefaultDecl tys' src_loc), fvs)
+    returnM (DefaultDecl tys' src_loc, fvs)
   where
     doc_str = text "In a `default' declaration"
 
 
-rnSrcDecl (CoreD (CoreDecl name ty rhs loc))
+rnCoreDecl (CoreDecl name ty rhs loc)
   = addSrcLoc loc $
     lookupTopBndrRn name		`thenM` \ name' ->
     rnHsTypeFVs doc_str ty		`thenM` \ (ty', ty_fvs) ->
     rnCoreExpr rhs                      `thenM` \ rhs' ->
-    returnM (CoreD (CoreDecl name' ty' rhs' loc), 
+    returnM (CoreDecl name' ty' rhs' loc, 
 	     ty_fvs `plusFV` ufExprFVs rhs')
   where
     doc_str = text "In the Core declaration for" <+> quotes (ppr name)

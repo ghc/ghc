@@ -31,6 +31,7 @@ import HsSyn		( Pat(..), HsConDetails(..), HsExpr(..), MonoBinds(..),
 			  HsBinds(..), HsType(..), HsStmtContext(..),
 			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList, placeHolderType
 			)
+import PrelNames	( )
 import RdrName		( RdrName, mkUnqual, nameRdrName, getRdrName )
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat, mkHsDo )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
@@ -49,7 +50,7 @@ import Name		( getOccString, getOccName, getSrcLoc, occNameString,
 			)
 
 import HscTypes		( FixityEnv, lookupFixity )
-import PrelInfo		-- Lots of Names
+import PrelNames	-- Lots of Names
 import PrimOp		-- Lots of Names
 import SrcLoc		( generatedSrcLoc, SrcLoc )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
@@ -62,7 +63,6 @@ import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 import Util		( zipWithEqual, isSingleton,
 			  zipWith3Equal, nOfThem, zipEqual )
 import Panic		( panic, assertPanic )
-import Maybes		( maybeToBool )
 import Char		( ord, isAlpha )
 import Constants
 import List		( partition, intersperse )

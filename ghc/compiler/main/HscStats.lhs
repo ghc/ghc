@@ -34,7 +34,7 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
 		("  ImpAll         ", import_all),
 		("  ImpPartial     ", import_partial),
 		("  ImpHiding      ", import_hiding),
-		("FixityDecls      ", fixity_ds),
+		("FixityDecls      ", fixity_sigs),
 		("DefaultDecls     ", default_ds),
 	      	("TypeDecls        ", type_ds),
 	      	("DataDecls        ", data_ds),
@@ -64,7 +64,8 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     
     trim ls     = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
-    fixity_ds   = count (\ x -> case x of { FixD{} -> True; _ -> False}) decls
+    (fixity_sigs, bind_tys, _, bind_specs, bind_inlines) 
+	= count_sigs [d | SigD d <- decls]
 		-- NB: this omits fixity decls on local bindings and
 		-- in class decls.  ToDo
 
@@ -83,8 +84,8 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     export_ds  	 = n_exports - export_ms
     export_all 	 = case exports of { Nothing -> 1; other -> 0 }
 
-    (val_bind_ds, fn_bind_ds, bind_tys, bind_specs, bind_inlines)
-	= count_binds (foldr ThenBinds EmptyBinds val_decls)
+    (val_bind_ds, fn_bind_ds)
+	= foldr add2 (0,0) (map count_monobinds val_decls)
 
     (import_no, import_qual, import_as, import_all, import_partial, import_hiding)
 	= foldr add6 (0,0,0,0,0,0) (map import_info imports)
@@ -95,12 +96,6 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     (inst_method_ds, method_specs, method_inlines)
 	= foldr add3 (0,0,0) (map inst_info inst_decls)
 
-
-    count_binds EmptyBinds        = (0,0,0,0,0)
-    count_binds (ThenBinds b1 b2) = count_binds b1 `add5` count_binds b2
-    count_binds (MonoBind b sigs _) = case (count_monobinds b, count_sigs sigs) of
-				        ((vs,fs),(ts,_,ss,is)) -> (vs,fs,ts,ss,is)
-
     count_monobinds EmptyMonoBinds	  	 = (0,0)
     count_monobinds (AndMonoBinds b1 b2)  	 = count_monobinds b1 `add2` count_monobinds b2
     count_monobinds (PatMonoBind (VarPat n) r _) = (1,0)
@@ -110,13 +105,14 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     count_mb_monobinds (Just mbs) = count_monobinds mbs
     count_mb_monobinds Nothing	  = (0,0)
 
-    count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
+    count_sigs sigs = foldr add5 (0,0,0,0,0) (map sig_info sigs)
 
-    sig_info (Sig _ _ _)            = (1,0,0,0)
-    sig_info (ClassOpSig _ _ _ _)   = (0,1,0,0)
-    sig_info (SpecSig _ _ _)        = (0,0,1,0)
-    sig_info (InlineSig _ _ _ _)    = (0,0,0,1)
-    sig_info _                      = (0,0,0,0)
+    sig_info (FixSig _)		    = (1,0,0,0,0)
+    sig_info (Sig _ _ _)            = (0,1,0,0,0)
+    sig_info (ClassOpSig _ _ _ _)   = (0,0,1,0,0)
+    sig_info (SpecSig _ _ _)        = (0,0,0,1,0)
+    sig_info (InlineSig _ _ _ _)    = (0,0,0,0,1)
+    sig_info _                      = (0,0,0,0,0)
 
     import_info (ImportDecl _ _ qual as spec _)
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
@@ -134,13 +130,13 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
 
     class_info decl@(ClassDecl {})
 	= case count_sigs (tcdSigs decl) of
-	    (_,classops,_,_) ->
+	    (_,_,classops,_,_) ->
 	       (classops, addpr (count_mb_monobinds (tcdMeths decl)))
     class_info other = (0,0)
 
     inst_info (InstDecl _ inst_meths inst_sigs _ _)
 	= case count_sigs inst_sigs of
-	    (_,_,ss,is) ->
+	    (_,_,_,ss,is) ->
 	       (addpr (count_monobinds inst_meths), ss, is)
 
     addpr :: (Int,Int) -> Int

@@ -8,9 +8,8 @@ module TcDefaults ( tcDefaults ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), DefaultDecl(..) )
-import RnHsSyn		( RenamedHsDecl )
-
+import HsSyn		( DefaultDecl(..) )
+import Name		( Name )
 import TcRnMonad
 import TcEnv		( tcLookupGlobal_maybe )
 import TcMonoType	( tcHsType )
@@ -22,18 +21,17 @@ import HscTypes		( TyThing(..) )
 \end{code}
 
 \begin{code}
-tcDefaults :: [RenamedHsDecl]
+tcDefaults :: [DefaultDecl Name]
 	   -> TcM [Type] 	    -- defaulting types to heave
 				    -- into Tc monad for later use
 				    -- in Disambig.
-tcDefaults decls = tc_defaults [default_decl | DefD default_decl <- decls]
 
-tc_defaults [] = returnM defaultDefaultTys
+tcDefaults [] = returnM defaultDefaultTys
 
-tc_defaults [DefaultDecl [] locn]
+tcDefaults [DefaultDecl [] locn]
   = returnM []		-- no defaults
 
-tc_defaults [DefaultDecl mono_tys locn]
+tcDefaults [DefaultDecl mono_tys locn]
   = tcLookupGlobal_maybe numClassName	`thenM` \ maybe_num ->
     case maybe_num of
 	Just (AClass num_class) -> common_case num_class

@@ -9,13 +9,12 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 \begin{code}
 module HsDecls (
 	HsDecl(..), TyClDecl(..), InstDecl(..), RuleDecl(..), RuleBndr(..),
-	DefaultDecl(..), 
+	DefaultDecl(..), HsGroup(..),
 	ForeignDecl(..), ForeignImport(..), ForeignExport(..),
 	CImportSpec(..), FoType(..),
 	ConDecl(..), CoreDecl(..),
 	BangType(..), getBangType, getBangStrictness, unbangedType,
 	DeprecDecl(..), DeprecTxt,
-	hsDeclName, instDeclName, 
 	tyClDeclName, tyClDeclNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, 
 	isTypeOrClassDecl, countTyClDecls,
@@ -68,17 +67,17 @@ import Maybe		( isNothing, fromJust )
 data HsDecl id
   = TyClD	(TyClDecl id)
   | InstD	(InstDecl  id)
+  | ValD	(MonoBinds id)
+  | SigD	(Sig id)
   | DefD	(DefaultDecl id)
-  | ValD	(HsBinds id)
   | ForD        (ForeignDecl id)
-  | FixD	(FixitySig id)
   | DeprecD	(DeprecDecl id)
   | RuleD	(RuleDecl id)
   | CoreD	(CoreDecl id)
   | SpliceD	(HsExpr id)	-- Top level splice
 
 -- NB: all top-level fixity decls are contained EITHER
--- EITHER FixDs
+-- EITHER SigDs
 -- OR     in the ClassDecls in TyClDs
 --
 -- The former covers
@@ -89,42 +88,63 @@ data HsDecl id
 --	d) top level decls
 --
 -- The latter is for class methods only
-\end{code}
 
-\begin{code}
-#ifdef DEBUG
-hsDeclName :: (NamedThing name, OutputableBndr name)
-	   => HsDecl name -> name
-#endif
-hsDeclName (TyClD decl)			 = tyClDeclName     decl
-hsDeclName (InstD decl)		         = instDeclName     decl
-hsDeclName (ForD  decl)		         = foreignDeclName decl
-hsDeclName (FixD  (FixitySig name _ _))  = name
-hsDeclName (CoreD (CoreDecl name _ _ _)) = name
--- Others don't make sense
-#ifdef DEBUG
-hsDeclName x				= pprPanic "HsDecls.hsDeclName" (ppr x)
-#endif
+-- A [HsDecl] is categorised into a HsGroup before being 
+-- fed to the renamer.
+data HsGroup id
+  = HsGroup {
+	hs_valds  :: HsBinds id,	
+		-- Before the renamer, this is a single big MonoBinds, 
+		-- with all the bindings, and all the signatures.
+		-- The renamer does dependency analysis, using ThenBinds
+		-- to give the structure
 
+	hs_tyclds :: [TyClDecl id],
+	hs_instds :: [InstDecl id],
 
-instDeclName :: InstDecl name -> name
-instDeclName (InstDecl _ _ _ (Just name) _) = name
+	hs_fixds  :: [FixitySig id],
+		-- Snaffled out of both top-level fixity signatures,
+		-- and those in class declarations
 
+	hs_defds  :: [DefaultDecl id],
+	hs_fords  :: [ForeignDecl id],
+	hs_depds  :: [DeprecDecl id],
+	hs_ruleds :: [RuleDecl id],
+	hs_coreds :: [CoreDecl id]
+  }
 \end{code}
 
 \begin{code}
 instance OutputableBndr name => Outputable (HsDecl name) where
-
     ppr (TyClD dcl)  = ppr dcl
     ppr (ValD binds) = ppr binds
     ppr (DefD def)   = ppr def
     ppr (InstD inst) = ppr inst
     ppr (ForD fd)    = ppr fd
-    ppr (FixD fd)    = ppr fd
+    ppr (SigD sd)    = ppr sd
     ppr (RuleD rd)   = ppr rd
     ppr (DeprecD dd) = ppr dd
     ppr (CoreD dd)   = ppr dd
     ppr (SpliceD e)  = ptext SLIT("splice") <> parens (pprExpr e)
+
+instance OutputableBndr name => Outputable (HsGroup name) where
+    ppr (HsGroup { hs_valds  = val_decls,
+		   hs_tyclds = tycl_decls,
+		   hs_instds = inst_decls,
+		   hs_fixds  = fix_decls,
+		   hs_depds  = deprec_decls,
+		   hs_fords  = foreign_decls,
+		   hs_defds  = default_decls,
+		   hs_ruleds = rule_decls,
+		   hs_coreds = core_decls })
+	= vcat [ppr_ds fix_decls, ppr_ds default_decls, 
+		ppr_ds deprec_decls, ppr_ds rule_decls,
+		ppr val_decls,
+		ppr_ds tycl_decls, ppr_ds inst_decls,
+		ppr_ds foreign_decls, ppr_ds core_decls]
+	where
+	  ppr_ds [] = empty
+	  ppr_ds ds = text "" $$ vcat (map ppr ds)
 \end{code}
 
 

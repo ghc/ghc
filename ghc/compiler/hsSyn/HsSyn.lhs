@@ -9,11 +9,9 @@ therefore, is almost nothing but re-exporting.
 
 \begin{code}
 module HsSyn (
-
 	-- NB: don't reexport HsCore
 	-- this module tells about "real Haskell"
 
-	module HsSyn,
 	module HsBinds,
 	module HsDecls,
 	module HsExpr,
@@ -23,10 +21,11 @@ module HsSyn (
 	module HsTypes,
 	Fixity, NewOrData, 
 
+	HsModule(..), hsModule, hsImports,
+	collectStmtsBinders,
 	collectHsBinders,   collectLocatedHsBinders, 
 	collectMonoBinders, collectLocatedMonoBinders,
-	collectSigTysFromHsBinds, collectSigTysFromMonoBinds,
-	hsModule, hsImports
+	collectSigTysFromHsBinds, collectSigTysFromMonoBinds
      ) where
 
 #include "HsVersions.h"
@@ -150,6 +149,13 @@ collectMonoBinders binds
     go (FunMonoBind f _ _ loc) acc = f : acc
     go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Getting patterns out of bindings}
+%*									*
+%************************************************************************
 
 Get all the pattern type signatures out of a bunch of bindings
 

@@ -19,11 +19,11 @@ module TcForeign
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
+import HsSyn		( ForeignDecl(..), HsExpr(..),
 			  MonoBinds(..), ForeignImport(..), ForeignExport(..),
 			  CImportSpec(..)
 			)
-import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
+import RnHsSyn		( RenamedForeignDecl )
 
 import TcRnMonad
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
@@ -36,7 +36,7 @@ import IdInfo		( noCafIdInfo )
 import PrimRep		( getPrimRepSize, isFloatingRep )
 import Type		( typePrimRep )
 import OccName		( mkForeignExportOcc )
-import Name		( NamedThing(..), mkExternalName )
+import Name		( Name, NamedThing(..), mkExternalName )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  tcSplitForAllTys, 
 			  isFFIArgumentTy, isFFIImportResultTy, 
@@ -72,10 +72,9 @@ isForeignExport _	  	          = False
 %************************************************************************
 
 \begin{code}
-tcForeignImports :: [RenamedHsDecl] -> TcM ([Id], [TypecheckedForeignDecl])
-tcForeignImports decls = 
-  mapAndUnzipM tcFImport 
-    [ foreign_decl | ForD foreign_decl <- decls, isForeignImport foreign_decl]
+tcForeignImports :: [ForeignDecl Name] -> TcM ([Id], [TypecheckedForeignDecl])
+tcForeignImports decls
+  = mapAndUnzipM tcFImport (filter isForeignImport decls)
 
 tcFImport :: RenamedForeignDecl -> TcM (Id, TypecheckedForeignDecl)
 tcFImport fo@(ForeignImport nm hs_ty imp_decl isDeprec src_loc)
@@ -190,11 +189,10 @@ checkFEDArgs arg_tys = returnM ()
 %************************************************************************
 
 \begin{code}
-tcForeignExports :: [RenamedHsDecl] 
+tcForeignExports :: [ForeignDecl Name] 
     		 -> TcM (TcMonoBinds, [TcForeignDecl])
-tcForeignExports decls = 
-   foldlM combine (EmptyMonoBinds, [])
-     [foreign_decl | ForD foreign_decl <- decls, isForeignExport foreign_decl]
+tcForeignExports decls
+  = foldlM combine (EmptyMonoBinds, []) (filter isForeignExport decls)
   where
    combine (binds, fs) fe = 
        tcFExport fe	`thenM ` \ (b, f) ->

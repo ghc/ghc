@@ -8,19 +8,26 @@ module TcRnDriver (
 #ifdef GHCI
 	mkGlobalContext, getModuleContents,
 #endif
-	tcRnModule, checkOldIface, importSupportingDecls,
+	tcRnModule, checkOldIface, 
+	importSupportingDecls, tcTopSrcDecls,
 	tcRnIface, tcRnExtCore, tcRnStmt, tcRnExpr, tcRnThing
     ) where
 
 #include "HsVersions.h"
 
+#ifdef GHCI
+import {-# SOURCE #-} TcSplice( tcSpliceDecls )
+#endif
+
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  Stmt(..), Pat(VarPat), HsStmtContext(..), RuleDecl(..),
+			  HsGroup(..),
 			  mkSimpleMatch, placeHolderType, toHsType, andMonoBinds,
 			  isSrcRule, collectStmtsBinders
 			)
-import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameStmt, RdrNameHsExpr )
+import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameStmt, RdrNameHsExpr,
+			  emptyGroup, mkGroup, findSplice, addImpDecls )
 
 import PrelNames	( iNTERACTIVE, ioTyConName, printName,
 			  returnIOName, bindIOName, failIOName, thenIOName, runIOName, 
@@ -69,7 +76,8 @@ import RnHiFiles	( readIface, loadOldIface )
 import RnEnv		( lookupSrcName, lookupOccRn,
 			  ubiquitousNames, implicitModuleFVs, implicitStmtFVs, dataTcOccs )
 import RnExpr		( rnStmts, rnExpr )
-import RnSource		( rnSrcDecls, rnExtCoreDecls, checkModDeprec, rnStats )
+import RnNames		( importsFromLocalDecls )
+import RnSource		( rnSrcDecls, checkModDeprec, rnStats )
 
 import OccName		( varName )
 import CoreUnfold	( unfoldingTemplate )
@@ -213,7 +221,7 @@ tcRnIface hsc_env pcs
 	-- Get the supporting decls, and typecheck them all together
 	-- so that any mutually recursive types are done right
     extra_decls <- slurpImpDecls needed ;
-    env <- typecheckIfaceDecls (decls ++ extra_decls) ;
+    env <- typecheckIfaceDecls (group `addImpDecls` extra_decls) ;
 
     returnM (ModDetails { md_types = tcg_type_env env,
 			  md_insts = tcg_insts env,
@@ -224,9 +232,9 @@ tcRnIface hsc_env pcs
 	rule_decls = dcl_rules iface_decls
 	inst_decls = dcl_insts iface_decls
 	tycl_decls = dcl_tycl  iface_decls
-	decls = map RuleD rule_decls ++
-		map InstD inst_decls ++
-		map TyClD tycl_decls
+	group = emptyGroup { hs_ruleds = rule_decls,
+			     hs_instds = inst_decls,
+			     hs_tyclds = tycl_decls }
 	needed = unionManyNameSets (map ruleDeclFVs rule_decls) `unionNameSets`
 		 unionManyNameSets (map instDeclFVs inst_decls) `unionNameSets`
 		 unionManyNameSets (map tyClDeclFVs tycl_decls) `unionNameSets`
@@ -352,7 +360,7 @@ tcUserStmt (ExprStmt expr _ loc)
         the_bind = FunMonoBind fresh_it False 
 			[ mkSimpleMatch [] expr placeHolderType loc ] loc
     in
-    tryTc_ (do { 	-- Try this if the other fails
+    tryTcLIE_ (do { 	-- Try this if the other fails
 		traceTc (text "tcs 1b") ;
 		tc_stmts [
 		    LetStmt (MonoBind the_bind [] NonRecursive),
@@ -398,7 +406,7 @@ tc_stmts stmts
 	-- Simplify the context right here, so that we fail
 	-- if there aren't enough instances.  Notably, when we see
 	--		e
-	-- we use tryTc_ to try		it <- e
+	-- we use recoverTc_ to try	it <- e
 	-- and then			let it = e
 	-- It's the simplify step that rejects the first.
 	traceTc (text "tcs 3") ;
@@ -471,7 +479,7 @@ tcRnThing hsc_env pcs ictxt rdr_name
     let { rdr_names = dataTcOccs rdr_name } ;
 
     (msgs_s, mb_names) <- initRnInteractive ictxt
-			    (mapAndUnzipM (tryM . lookupOccRn) rdr_names) ;
+			    (mapAndUnzipM (tryTc . lookupOccRn) rdr_names) ;
     let { names = catMaybes mb_names } ;
 
     if null names then
@@ -523,18 +531,19 @@ tcRnExtCore hsc_env pcs
 	-- Rename the source, only in interface mode.
 	-- rnSrcDecls handles fixity decls etc too, which won't occur
 	-- but that doesn't matter
-   (rn_local_decls, fvs) <- initRn (InterfaceMode this_mod) 
-				   (rnExtCoreDecls local_decls) ;
+   let { local_group = mkGroup local_decls } ;
+   (_, rn_local_decls, fvs) <- initRn (InterfaceMode this_mod) 
+				      (rnSrcDecls local_group) ;
    failIfErrsM ;
 
  	-- Get the supporting decls, and typecheck them all together
 	-- so that any mutually recursive types are done right
    extra_decls <- slurpImpDecls fvs ;
-   tcg_env <- typecheckIfaceDecls (rn_local_decls ++ extra_decls) ;
+   tcg_env <- typecheckIfaceDecls (rn_local_decls `addImpDecls` extra_decls) ;
    setGblEnv tcg_env $ do {
    
 	-- Now the core bindings
-   core_prs <- tcCoreBinds [d | CoreD d <- rn_local_decls] ;
+   core_prs <- tcCoreBinds (hs_coreds rn_local_decls) ;
    tcExtendGlobalValEnv (map fst core_prs) $ do {
    
 	-- Wrap up
@@ -574,16 +583,20 @@ tcRnExtCore hsc_env pcs
 %*									*
 %************************************************************************
 
+\begin{code}
 tcRnSrcDecls :: [RdrNameHsDecl] -> TcM (TcGblEnv, FreeVars)
 	-- Returns the variables free in the decls
-tcRnSrcDecls [] = getGblEnv
+	-- Reason: solely to report unused imports and bindings
+tcRnSrcDecls [] = do { tcg_env <- getGblEnv ; return (tcg_env, emptyFVs) }
 tcRnSrcDecls ds
  = do { let { (first_group, group_tail) = findSplice ds } ;
 
-	tcg_env <- tcRnGroup first_group ;
+	-- Type check the decls up to, but not including, the first splice
+	(tcg_env, src_fvs1) <- tcRnGroup first_group ;
 
+	-- If there is no splice, we're done
 	case group_tail of
-	   Nothing -> return gbl_env
+	   Nothing -> return (tcg_env, src_fvs1)
 	   Just (splice_expr, rest_ds) -> do {
 
 	setGblEnv tcg_env $ do {
@@ -597,15 +610,11 @@ tcRnSrcDecls ds
 	spliced_decls <- tcSpliceDecls rn_splice_expr ;
 
 	-- Glue them on the front of the remaining decls and loop
-	tcRnSrcDeclsDecls (splice_decls ++ rest_ds)
-    }}}}
+	(tcg_env, src_fvs2) <- tcRnSrcDecls (spliced_decls ++ rest_ds) ;
 
-findSplice :: [HsDecl a] -> ([HsDecl a], Maybe (HsExpr a, [HsDecl a]))
-findSplice []		    = ([], Nothing)
-findSplice (SpliceD e : ds) = ([], Just (e, ds))
-findSplice (d : ds) 	    = (d:gs, rest)
-			    where
-			      (gs, rest) = findSplice ds
+	return (tcg_env, src_fvs1 `plusFV` src_fvs2)
+    }}}}
+\end{code}
 
 
 %************************************************************************
@@ -614,7 +623,7 @@ findSplice (d : ds) 	    = (d:gs, rest)
 %*									*
 %************************************************************************
 
-tcRnSrcDecls takes a bunch of top-level source-code declarations, and
+tcRnGroup takes a bunch of top-level source-code declarations, and
  * renames them
  * gets supporting declarations from interface files
  * typechecks them
@@ -626,9 +635,9 @@ declarations.  It expects there to be an incoming TcGblEnv in the
 monad; it augments it and returns the new TcGblEnv.
 
 \begin{code}
-tcRnSrcDecls :: [RdrNameHsDecl] -> TcM (TcGblEnv, FreeVars)
+tcRnGroup :: HsGroup RdrName -> TcM (TcGblEnv, FreeVars)
 	-- Returns the variables free in the decls
-tcRnSrcDecls decls
+tcRnGroup decls
  = do {		-- Rename the declarations
 	(tcg_env, rn_decls, src_fvs) <- rnTopSrcDecls decls ;
 	setGblEnv tcg_env $ do {
@@ -639,26 +648,35 @@ tcRnSrcDecls decls
   }}
 
 ------------------------------------------------
-rnTopSrcDecls :: [RdrNameHsDecl] -> TcM (TcGblEnv, [RenamedHsDecl], FreeVars)
-rnTopSrcDecls decls
- = do { (tcg_env, rn_src_decls, src_fvs) <- initRn SourceMode (rnSrcDecls decls) ;
+rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name, FreeVars)
+rnTopSrcDecls group
+ = do { 	-- Bring top level binders into scope
+	(rdr_env, imports) <- importsFromLocalDecls group ;
+	updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv`
+						  tcg_rdr_env gbl,
+				 tcg_imports = imports `plusImportAvails` 
+						  tcg_imports gbl }) 
+		     $ do {
+
+		-- Rename the source decls
+	(tcg_env, rn_src_decls, src_fvs) <- initRn SourceMode (rnSrcDecls group) ;
 	setGblEnv tcg_env $ do {
 
 	failIfErrsM ;
 
 		-- Import consquential imports
 	rn_imp_decls <- slurpImpDecls (src_fvs `plusFV` implicitModuleFVs src_fvs) ;
-	let { rn_decls = rn_src_decls ++ rn_imp_decls } ;
+	let { rn_decls = rn_src_decls `addImpDecls` rn_imp_decls } ;
 
 		-- Dump trace of renaming part
-	rnDump (vcat (map ppr rn_decls)) ;
+	rnDump (ppr rn_decls) ;
 	rnStats rn_imp_decls ;
 
 	return (tcg_env, rn_decls, src_fvs)
-  }}
+  }}}
 
 ------------------------------------------------
-tcTopSrcDecls :: [RenamedHsDecl] -> TcM TcGblEnv
+tcTopSrcDecls :: HsGroup Name -> TcM TcGblEnv
 tcTopSrcDecls rn_decls
  = fixM (\ unf_env -> do {	
 	-- Loop back the final environment, including the fully zonked
@@ -695,7 +713,13 @@ tcTopSrcDecls rn_decls
 	return tcg_env'	
     })
 
-tc_src_decls unf_env decls
+tc_src_decls unf_env 
+	(HsGroup { hs_tyclds = tycl_decls, 
+		   hs_instds = inst_decls,
+		   hs_fords  = foreign_decls,
+		   hs_defds  = default_decls,
+		   hs_ruleds = rule_decls,
+		   hs_valds  = val_binds })
  = do {		-- Type-check the type and class decls, and all imported decls
         traceTc (text "Tc2") ;
 	tcg_env <- tcTyClDecls unf_env tycl_decls ;
@@ -712,14 +736,14 @@ tc_src_decls unf_env decls
 	        -- Foreign import declarations next.  No zonking necessary
 		-- here; we can tuck them straight into the global environment.
         traceTc (text "Tc4") ;
-	(fi_ids, fi_decls) <- tcForeignImports decls ;
+	(fi_ids, fi_decls) <- tcForeignImports foreign_decls ;
 	tcExtendGlobalValEnv fi_ids		     $
 	updGblEnv (\gbl -> gbl { tcg_fords = tcg_fords gbl ++ fi_decls }) 
 		  $ do {
 
 		-- Default declarations
         traceTc (text "Tc4a") ;
-	default_tys <- tcDefaults decls ;
+	default_tys <- tcDefaults default_decls ;
 	updGblEnv (\gbl -> gbl { tcg_default = default_tys }) $ do {
 	
 		-- Value declarations next
@@ -740,7 +764,7 @@ tc_src_decls unf_env decls
 		-- Foreign exports
 		-- They need to be zonked, so we return them
         traceTc (text "Tc7") ;
-	(foe_binds, foe_decls) <- tcForeignExports decls ;
+	(foe_binds, foe_decls) <- tcForeignExports foreign_decls ;
 
 		-- Rules
 		-- Need to partition them because the source rules
@@ -760,12 +784,6 @@ tc_src_decls unf_env decls
 
   	return (tcg_env, all_binds, src_rules, foe_decls)
      }}}}}}}}}
-  where		
-    tycl_decls = [d | TyClD d <- decls]
-    rule_decls = [d | RuleD d <- decls]
-    inst_decls = [d | InstD d <- decls]
-    val_decls  = [d | ValD d  <- decls]
-    val_binds  = foldr ThenBinds EmptyBinds val_decls
 \end{code}
 
 \begin{code}
@@ -888,9 +906,9 @@ importSupportingDecls fvs
  = do { traceRn (text "Import supporting decls for" <+> ppr (nameSetToList fvs)) ;
 	decls <- slurpImpDecls fvs ;
 	traceRn (text "...namely:" <+> vcat (map ppr decls)) ;
-	typecheckIfaceDecls decls }
+	typecheckIfaceDecls (mkGroup decls) }
 
-typecheckIfaceDecls :: [RenamedHsDecl] -> TcM TcGblEnv
+typecheckIfaceDecls :: HsGroup Name -> TcM TcGblEnv
   -- The decls are all interface-file declarations
   -- Usually they are all from other modules, but when we are reading
   -- this module's interface from a file, it's possible that some of
@@ -900,12 +918,10 @@ typecheckIfaceDecls :: [RenamedHsDecl] -> TcM TcGblEnv
   -- If all the decls are from other modules, the returned TcGblEnv
   -- will have an empty tc_genv, but its tc_inst_env and tc_ist 
   -- caches may have been augmented.
-typecheckIfaceDecls decls 
- = do {	let { tycl_decls = [d | TyClD d <- decls] ;
-	      inst_decls = [d | InstD d <- decls] ;
-	      rule_decls = [d | RuleD d <- decls] } ;
-
-		-- Typecheck the type, class, and interface-sig decls
+typecheckIfaceDecls (HsGroup { hs_tyclds = tycl_decls,
+			       hs_instds = inst_decls,
+			       hs_ruleds = rule_decls })
+ = do {		-- Typecheck the type, class, and interface-sig decls
 	tcg_env <- fixM (\ unf_env -> tcTyClDecls unf_env tycl_decls) ;
 	setGblEnv tcg_env		$ do {
 	

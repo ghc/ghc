@@ -125,9 +125,6 @@ data MonoBinds id
   | VarMonoBind	    id			-- TRANSLATION
 		    (HsExpr id)
 
-  | CoreMonoBind    id			-- TRANSLATION
-		    CoreExpr		-- No zonking; this is a final CoreExpr with Ids and Types!
-
   | AbsBinds				-- Binds abstraction; TRANSLATION
 		[TyVar]	  		-- Type variables
 		[id]			-- Dicts
@@ -211,9 +208,6 @@ ppr_monobind (FunMonoBind fun inf matches locn) = pprFunBind fun matches
 
 ppr_monobind (VarMonoBind name expr)
       = sep [pprBndr LetBind name <+> equals, nest 4 (pprExpr expr)]
-
-ppr_monobind (CoreMonoBind name expr)
-      = sep [pprBndr LetBind name <+> equals, nest 4 (ppr expr)]
 
 ppr_monobind (AbsBinds tyvars dictvars exports inlines val_binds)
      = sep [ptext SLIT("AbsBinds"),

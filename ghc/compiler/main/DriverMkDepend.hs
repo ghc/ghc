@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.23 2002/09/18 10:51:01 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.24 2002/10/09 15:03:52 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -22,7 +22,7 @@ import Finder		( findModuleDep )
 import Util             ( global )
 import Panic
 
-import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+import DATA_IOREF	( IORef, readIORef, writeIORef )
 import EXCEPTION
 
 import Directory

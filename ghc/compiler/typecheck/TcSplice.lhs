@@ -4,21 +4,19 @@
 \section[TcSplice]{Template Haskell splices}
 
 \begin{code}
-module TcSplice( tcSpliceExpr, tcSpliceDecls ) where
+module TcSplice( tcSpliceExpr, tcSpliceDecls, tcBracket ) where
 
 #include "HsVersions.h"
 
 import HscMain		( compileExpr )
-import TcRnDriver	( importSupportingDecls )
+import TcRnDriver	( importSupportingDecls, tcTopSrcDecls )
 	-- These imports are the reason that TcSplice 
 	-- is very high up the module hierarchy
-
-import CompManager	( sandboxIO )
-	-- Ditto, but this one could be defined muchlower down
 
 import qualified Language.Haskell.THSyntax as Meta
 
 import HscTypes		( HscEnv(..), GhciMode(..), PersistentCompilerState(..), unQualInScope )
+import HsSyn		( HsBracket(..) )
 import Convert		( convertToHsExpr, convertToHsDecls )
 import RnExpr		( rnExpr )
 import RdrHsSyn		( RdrNameHsExpr, RdrNameHsDecl )
@@ -26,14 +24,15 @@ import RnHsSyn		( RenamedHsExpr )
 import TcExpr		( tcMonoExpr )
 import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
 import TcSimplify	( tcSimplifyTop )
-import TcType		( TcType )
+import TcType		( TcType, openTypeKind )
 import TcEnv		( spliceOK, tcMetaTy )
 import TcRnTypes	( TopEnv(..) )
+import TcMType		( newTyVarTy )
 import Name		( Name )
 import TcRnMonad
 
 import TysWiredIn	( mkListTy )
-import PrelNames	( exprTyConName, declTyConName )
+import DsMeta		( exprTyConName, declTyConName )
 import Outputable
 import GHC.Base		( unsafeCoerce# )	-- Should have a better home in the module hierarchy
 \end{code}
@@ -57,6 +56,25 @@ tcSpliceExpr :: Name
 tcSpliceExpr n e ty = pprPanic "Cant do tcSpliceExpr without GHCi" (ppr e)
 tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 #else
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Splicing an expression}
+%*									*
+%************************************************************************
+
+\begin{code}
+tcBracket :: HsBracket Name -> TcM TcType
+tcBracket (ExpBr expr) 
+  = newTyVarTy openTypeKind		`thenM` \ any_ty ->
+    tcMonoExpr expr any_ty		`thenM_`
+    tcMetaTy exprTyConName
+
+tcBracket (DecBr decls)
+  = tcTopSrcDecls decls			`thenM_`
+    tcMetaTy declTyConName		`thenM` \ decl_ty ->
+    returnM (mkListTy decl_ty)
 \end{code}
 
 %************************************************************************
@@ -161,6 +179,7 @@ tcSpliceDecls expr
 	decls :: [RdrNameHsDecl]
 	decls = convertToHsDecls simple_expr 
     in
+    traceTc (text "Got result" <+> vcat (map ppr decls))	`thenM_`
     returnM decls
 \end{code}
 
@@ -174,15 +193,24 @@ tcSpliceDecls expr
 \begin{code}
 runMetaE :: TypecheckedHsExpr 	-- Of type (Q Exp)
 	 -> TcM Meta.Exp	-- Of type Exp
-runMetaE e = runMeta e
+runMetaE e = runMeta tcRunQ e
 
-runMetaD :: TypecheckedHsExpr 	-- Of type (Q [Dec]
+runMetaD :: TypecheckedHsExpr 	-- Of type [Q Dec]
 	 -> TcM [Meta.Dec]	-- Of type [Dec]
-runMetaD e = runMeta e
+runMetaD e = runMeta run_decl e
+	   where
+	     run_decl :: [Meta.Decl] -> TcM [Meta.Dec]
+	     run_decl ds = mappM tcRunQ ds
 
-runMeta :: TypecheckedHsExpr 	-- Of type (Q t)
+-- Warning: if Q is anything other than IO, we need to change this
+tcRunQ :: Meta.Q a -> TcM a
+tcRunQ thing = ioToTcRn thing
+
+
+runMeta :: (x -> TcM t)		-- :: X -> IO t
+	-> TypecheckedHsExpr 	-- Of type X
 	-> TcM t		-- Of type t
-runMeta expr :: TcM t
+runMeta run_it expr :: TcM t
   = getTopEnv		`thenM` \ top_env ->
     getEps		`thenM` \ eps ->
     getNameCache	`thenM` \ name_cache -> 
@@ -204,19 +232,17 @@ runMeta expr :: TcM t
 	-- enough information available to link all the things that
 	-- are needed when you try to run a splice
     else
-    ioToTcRn (do {
-	-- Warning: if Q is anything other than IO, we may need to wrap 
-	-- the expression 'expr' in a runQ before compiling it
-      hval <- HscMain.compileExpr hsc_env pcs this_mod print_unqual expr
 
-	-- hval :: HValue
-	-- Need to coerce it to IO t
-    ; sandboxIO (unsafeCoerce# hval :: IO t) })	`thenM` \ either_tval ->
+    ioToTcRn (HscMain.compileExpr hsc_env pcs this_mod 
+				  print_unqual expr) `thenM` \ hval ->
+
+    tryM (run_it (unsafeCoerce# hval))	`thenM` \ either_tval ->
 
     case either_tval of
-	Left err -> failWithTc (vcat [text "Exception when running compiled-time code:", 
-				      nest 4 (text (show err))])
-	Right v  -> returnM v
+	  Left exn -> failWithTc (vcat [text "Exception when running compile-time code:", 
+				        nest 4 (vcat [text "Code:" <+> ppr expr,
+						      text ("Exn: " ++ show exn)])])
+	  Right v  -> returnM v
 \end{code}
 
 

@@ -16,7 +16,7 @@ import {-# SOURCE #-} RnHiFiles	( loadInterface )
 import CmdLineOpts	( DynFlag(..) )
 
 import HsSyn		( HsDecl(..), IE(..), ieName, ImportDecl(..),
-			  ForeignDecl(..), 
+			  ForeignDecl(..), HsGroup(..),
 			  collectLocatedHsBinders, tyClDeclNames 
 			)
 import RdrHsSyn		( RdrNameIE, RdrNameImportDecl, RdrNameHsDecl )
@@ -39,7 +39,8 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  Deprecations(..), ModIface(..), 
 		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE
 			)
-import RdrName		( rdrNameOcc, setRdrNameSpace, emptyRdrEnv, foldRdrEnv, isQual )
+import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
+			  emptyRdrEnv, foldRdrEnv, isQual )
 import Outputable
 import Maybes		( maybeToBool, catMaybes )
 import ListSetOps	( removeDups )
@@ -127,13 +128,11 @@ importsFromImportDecl this_mod_name
 
 	-- If there's an error in loadInterface, (e.g. interface
 	-- file not found) we get lots of spurious errors from 'filterImports'
-    recoverM (returnM Nothing)
-	     (loadInterface doc imp_mod_name (ImportByUser is_boot)	`thenM` \ iface ->
-	      returnM (Just iface))					`thenM` \ mb_iface ->
+    tryM (loadInterface doc imp_mod_name (ImportByUser is_boot))	`thenM` \ mb_iface ->
 
     case mb_iface of {
-	Nothing    -> returnM (emptyRdrEnv, emptyImportAvails ) ;
-	Just iface ->    
+	Left exn    -> returnM (emptyRdrEnv, emptyImportAvails ) ;
+	Right iface ->    
 
     let
 	imp_mod		 = mi_module iface
@@ -205,15 +204,13 @@ created by its bindings.
 Complain about duplicate bindings
 
 \begin{code}
-importsFromLocalDecls :: [RdrNameHsDecl] 
+importsFromLocalDecls :: HsGroup RdrName
 		      -> TcRn m (GlobalRdrEnv, ImportAvails)
-importsFromLocalDecls decls
-  = getModule					`thenM` \ this_mod ->
-    mappM (getLocalDeclBinders this_mod) decls	`thenM` \ avails_s ->
+importsFromLocalDecls group
+  = getModule				`thenM` \ this_mod ->
+    getLocalDeclBinders this_mod group	`thenM` \ avails ->
 	-- The avails that are returned don't include the "system" names
     let
-	avails = concat avails_s
-
 	all_names :: [Name]	-- All the defns; no dups eliminated
 	all_names = [name | avail <- avails, name <- availNames avail]
 
@@ -283,35 +280,27 @@ files (@loadDecl@ calls @getTyClDeclBinders@).
 	*** See "THE NAMING STORY" in HsDecls ****
 
 \begin{code}
-getLocalDeclBinders :: Module -> RdrNameHsDecl -> TcRn m [AvailInfo]
-getLocalDeclBinders mod (TyClD tycl_decl)
+getLocalDeclBinders :: Module -> HsGroup RdrName -> TcRn m [AvailInfo]
+getLocalDeclBinders mod (HsGroup {hs_valds = val_decls, 
+				  hs_tyclds = tycl_decls, 
+				  hs_fords = foreign_decls })
   =	-- For type and class decls, we generate Global names, with
 	-- no export indicator.  They need to be global because they get
 	-- permanently bound into the TyCons and Classes.  They don't need
 	-- an export indicator because they are all implicitly exported.
-    mapM new (tyClDeclNames tycl_decl)	`thenM` \ names@(main_name:_) ->
-    returnM [AvailTC main_name names]
+
+    mappM new_tc tycl_decls				`thenM` \ tc_avails ->
+    mappM new_bndr (for_hs_bndrs ++ val_hs_bndrs)	`thenM` \ simple_bndrs ->
+
+    returnM (tc_avails ++ map Avail simple_bndrs)
   where
-    new (nm,loc) = newTopBinder mod nm loc
+    new_bndr (rdr_name,loc) = newTopBinder mod rdr_name loc
 
-getLocalDeclBinders mod (ValD binds)
-  = mappM new (collectLocatedHsBinders binds)		`thenM` \ avails ->
-    returnM avails
-  where
-    new (rdr_name, loc) = newTopBinder mod rdr_name loc 	`thenM` \ name ->
-			  returnM (Avail name)
+    val_hs_bndrs = collectLocatedHsBinders val_decls
+    for_hs_bndrs = [(nm,loc) | ForeignImport nm _ _ _ loc <- foreign_decls]
 
-getLocalDeclBinders mod (ForD (ForeignImport nm _ _ _ loc))
-  = newTopBinder mod nm loc	    `thenM` \ name ->
-    returnM [Avail name]
-getLocalDeclBinders mod (ForD _)
-  = returnM []
-
-getLocalDeclBinders mod (FixD _)    = returnM []
-getLocalDeclBinders mod (DeprecD _) = returnM []
-getLocalDeclBinders mod (DefD _)    = returnM []
-getLocalDeclBinders mod (InstD _)   = returnM []
-getLocalDeclBinders mod (RuleD _)   = returnM []
+    new_tc tc_decl = mappM new_bndr (tyClDeclNames tc_decl)	`thenM` \ names@(main_name:_) ->
+		     returnM (AvailTC main_name names)
 \end{code}
 
 

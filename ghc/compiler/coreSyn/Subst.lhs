@@ -373,13 +373,21 @@ type TyVarSubst = Subst	-- TyVarSubst are expected to have range elements
 -- it'll never be evaluated
 mkTyVarSubst :: [TyVar] -> [Type] -> Subst
 mkTyVarSubst tyvars tys = Subst (mkInScopeSet (tyVarsOfTypes tys)) 
-				(zip_ty_env tyvars tys emptySubstEnv)
+				(zipTyEnv tyvars tys)
 
 -- mkTopTyVarSubst is called when doing top-level substitutions.
 -- Here we expect that the free vars of the range of the
 -- substitution will be empty.
 mkTopTyVarSubst :: [TyVar] -> [Type] -> Subst
-mkTopTyVarSubst tyvars tys = Subst emptyInScopeSet (zip_ty_env tyvars tys emptySubstEnv)
+mkTopTyVarSubst tyvars tys = Subst emptyInScopeSet (zipTyEnv tyvars tys)
+
+zipTyEnv tyvars tys
+#ifdef DEBUG
+  | length tyvars /= length tys
+  = pprTrace "mkTopTyVarSubst" (ppr tyvars $$ ppr tys) emptySubstEnv
+  | otherwise
+  = zip_ty_env tyvars tys emptySubstEnv
+#endif
 
 zip_ty_env []       []       env = env
 zip_ty_env (tv:tvs) (ty:tys) env = zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))

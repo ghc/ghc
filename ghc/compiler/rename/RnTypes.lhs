@@ -24,13 +24,13 @@ import RnEnv	( lookupOccRn, lookupBndrRn, lookupSyntaxName, lookupGlobalOccRn,
 		  bindPatSigTyVars, bindLocalsFVRn, warnUnusedMatches )
 import TcRnMonad
 
-import PrelInfo	( cCallishClassKeys, eqStringName, eqClassName, ordClassName, 
+import PrelNames( cCallishClassKeys, eqStringName, eqClassName, ordClassName, 
 		  negateName, minusName, lengthPName, indexPName, plusIntegerName, fromIntegerName,
 		  timesIntegerName, ratioDataConName, fromRationalName, cCallableClassName )
 import TysWiredIn	( intTyCon )
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon )
-import RdrName	( RdrName, elemRdrEnv )
+import RdrName	( elemRdrEnv )
 import Name	( Name, NamedThing(..) )
 import NameSet
 import Unique	( Uniquable(..) )

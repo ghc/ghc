@@ -4,13 +4,6 @@
 \section[PrelNames]{Definitions of prelude modules and names}
 
 
--- MetaHaskell Extension
-to do -- three things
-1) Allocate a key
-2) Make a "Name"
-3) Add the name to knownKeyNames
-
-
 The strings identify built-in prelude modules.  They are
 defined here so as to avod 
 
@@ -53,7 +46,7 @@ module PrelNames (
 				-- So many that we export them all
 
 	-----------------------------------------------------------
-	knownKeyNames, templateHaskellNames,
+	basicKnownKeyNames, 
 	mkTupNameStr, isBuiltInSyntaxName,
 
 	------------------------------------------------------------
@@ -89,7 +82,6 @@ import Unique	  ( Unique, Uniquable(..), hasKey,
 		  ) 
 import BasicTypes ( Boxity(..) )
 import Name	  ( Name, mkInternalName, mkKnownKeyExternalName, mkWiredInName, nameUnique )
-import NameSet	  ( NameSet, mkNameSet )
 import SrcLoc     ( noSrcLoc )
 import Util	  ( nOfThem )
 import Panic	  ( panic )
@@ -151,12 +143,9 @@ This section tells what the compiler knows about the assocation of
 names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in TysWiredIn etc.
 
-
-MetaHaskell Extension
-It is here that the names defiend in module Meta must be added
 \begin{code}
-knownKeyNames :: [Name]
-knownKeyNames
+basicKnownKeyNames :: [Name]
+basicKnownKeyNames
  =  [	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
 	runIOName,
@@ -231,53 +220,6 @@ knownKeyNames
 	filterPName, zipPName, crossPName, indexPName,
 	toPName, bpermutePName, bpermuteDftPName, indexOfPName,
 
-        -- MetaHaskell Extension, "the smart constructors" 
-        -- text1 from Meta/work/gen.hs
-        intLName,
-        charLName,
-        plitName,
-        pvarName,
-        ptupName,
-        pconName,
-        ptildeName,
-        paspatName,
-        pwildName,
-        varName,
-        conName,
-        litName,
-        appName,
-        infixEName,        
-        lamName,
-        tupName,
-        doEName,
-        compName,
-        listExpName,
-        condName,
-        letEName,
-        caseEName,
-        infixAppName,
-        sectionLName,
-        sectionRName,        
-        guardedName,
-        normalName,
-        bindStName,
-        letStName,
-        noBindStName,
-        parStName,
-        fromName,
-        fromThenName,
-        fromToName,
-        fromThenToName,
-        liftName,
-        gensymName,
-        returnQName,
-        bindQName,   
-        funName,
-        valName,
-        protoName, matchName, clauseName,
-	exprTyConName, declTyConName, pattTyConName, mtchTyConName, clseTyConName,
-	qTyConName, expTyConName, matTyConName, clsTyConName,
-        
 	-- FFI primitive types that are not wired-in.
 	int8TyConName, int16TyConName, int32TyConName, int64TyConName,
 	word8TyConName, word16TyConName, word32TyConName, word64TyConName,
@@ -667,64 +609,6 @@ concatName	  = varQual pREL_LIST_Name FSLIT("concat") concatIdKey
 filterName	  = varQual pREL_LIST_Name FSLIT("filter") filterIdKey
 zipName	   	  = varQual pREL_LIST_Name FSLIT("zip") zipIdKey
 
--- MetaHaskell Extension, "the smart constructors"
--- text3 from Meta/work/gen.hs
-intLName       = varQual mETA_META_Name FSLIT("intL")          intLIdKey
-charLName      = varQual mETA_META_Name FSLIT("charL")         charLIdKey
-plitName       = varQual mETA_META_Name FSLIT("plit")          plitIdKey
-pvarName       = varQual mETA_META_Name FSLIT("pvar")          pvarIdKey
-ptupName       = varQual mETA_META_Name FSLIT("ptup")          ptupIdKey
-pconName       = varQual mETA_META_Name FSLIT("pcon")          pconIdKey
-ptildeName     = varQual mETA_META_Name FSLIT("ptilde")        ptildeIdKey
-paspatName     = varQual mETA_META_Name FSLIT("paspat")        paspatIdKey
-pwildName      = varQual mETA_META_Name FSLIT("pwild")         pwildIdKey
-varName        = varQual mETA_META_Name FSLIT("var")           varIdKey
-conName        = varQual mETA_META_Name FSLIT("con")           conIdKey
-litName        = varQual mETA_META_Name FSLIT("lit")           litIdKey
-appName        = varQual mETA_META_Name FSLIT("app")           appIdKey
-infixEName     = varQual mETA_META_Name FSLIT("infixE")        infixEIdKey
-lamName        = varQual mETA_META_Name FSLIT("lam")           lamIdKey
-tupName        = varQual mETA_META_Name FSLIT("tup")           tupIdKey
-doEName        = varQual mETA_META_Name FSLIT("doE")           doEIdKey
-compName       = varQual mETA_META_Name FSLIT("comp")          compIdKey
-listExpName    = varQual mETA_META_Name FSLIT("listExp")       listExpIdKey
-condName       = varQual mETA_META_Name FSLIT("cond")          condIdKey
-letEName       = varQual mETA_META_Name FSLIT("letE")          letEIdKey
-caseEName      = varQual mETA_META_Name FSLIT("caseE")         caseEIdKey
-infixAppName   = varQual mETA_META_Name FSLIT("infixApp")      infixAppIdKey
-sectionLName   = varQual mETA_META_Name FSLIT("sectionL")      sectionLIdKey
-sectionRName   = varQual mETA_META_Name FSLIT("sectionR")      sectionRIdKey
-guardedName    = varQual mETA_META_Name FSLIT("guarded")       guardedIdKey
-normalName     = varQual mETA_META_Name FSLIT("normal")        normalIdKey
-bindStName     = varQual mETA_META_Name FSLIT("bindSt")        bindStIdKey
-letStName      = varQual mETA_META_Name FSLIT("letSt")         letStIdKey
-noBindStName   = varQual mETA_META_Name FSLIT("noBindSt")      noBindStIdKey
-parStName      = varQual mETA_META_Name FSLIT("parSt")         parStIdKey
-fromName       = varQual mETA_META_Name FSLIT("from")          fromIdKey
-fromThenName   = varQual mETA_META_Name FSLIT("fromThen")      fromThenIdKey
-fromToName     = varQual mETA_META_Name FSLIT("fromTo")        fromToIdKey
-fromThenToName = varQual mETA_META_Name FSLIT("fromThenTo")    fromThenToIdKey
-liftName       = varQual mETA_META_Name FSLIT("lift")          liftIdKey
-gensymName     = varQual mETA_META_Name FSLIT("gensym")        gensymIdKey
-returnQName    = varQual mETA_META_Name FSLIT("returnQ")       returnQIdKey
-bindQName      = varQual mETA_META_Name FSLIT("bindQ")         bindQIdKey
-funName        = varQual mETA_META_Name FSLIT("fun")           funIdKey
-valName        = varQual mETA_META_Name FSLIT("val")           valIdKey
-matchName      = varQual mETA_META_Name FSLIT("match")         matchIdKey
-clauseName     = varQual mETA_META_Name FSLIT("clause")        clauseIdKey
-protoName      = varQual mETA_META_Name FSLIT("proto")         protoIdKey
-exprTyConName  = tcQual  mETA_META_Name FSLIT("Expr")  	       exprTyConKey
-declTyConName  = tcQual  mETA_META_Name FSLIT("Decl")  	       declTyConKey
-pattTyConName  = tcQual  mETA_META_Name FSLIT("Patt")  	       pattTyConKey
-mtchTyConName  = tcQual  mETA_META_Name FSLIT("Mtch")  	       mtchTyConKey
-clseTyConName  = tcQual  mETA_META_Name FSLIT("Clse")  	       clseTyConKey
-stmtTyConName  = tcQual  mETA_META_Name FSLIT("Stmt") 	       stmtTyConKey
-
-qTyConName     = tcQual  mETA_META_Name FSLIT("Q")  	       qTyConKey
-expTyConName   = tcQual  mETA_META_Name FSLIT("Exp")  	       expTyConKey
-matTyConName   = tcQual  mETA_META_Name FSLIT("Mat")  	       matTyConKey
-clsTyConName   = tcQual  mETA_META_Name FSLIT("Cls")  	       clsTyConKey
-
 -- Class Show
 showClassName	  = clsQual pREL_SHOW_Name FSLIT("Show")       showClassKey
 
@@ -813,29 +697,6 @@ splitName          = varQual gLA_EXTS_Name FSLIT("split") splitIdKey
 
 -- Recursive-do notation
 mfixName	   = varQual mONAD_FIX_Name FSLIT("mfix") mfixIdKey
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Standard groups of names}
-%*									*
-%************************************************************************
-
-\begin{code}
-templateHaskellNames :: NameSet
--- The names that are implicitly mentioned by ``bracket''
--- Should stay in sync with the import list of DsMeta
-templateHaskellNames
-  = mkNameSet [ intLName,charLName, plitName, pvarName, ptupName, 
-		pconName, ptildeName, paspatName, pwildName, 
-                varName, conName, litName, appName, lamName,
-                tupName, doEName, compName, 
-                listExpName, condName, letEName, caseEName,
-                infixAppName, guardedName, normalName,
-		bindStName, letStName, noBindStName, parStName,
-		fromName, fromThenName, fromToName, fromThenToName,
-		funName, valName, liftName,gensymName, bindQName, 
-		appendName, matchName, clauseName ]
 \end{code}
 
 %************************************************************************
@@ -981,17 +842,9 @@ genUnitTyConKey				= mkPreludeTyConUnique 81
 -- Parallel array type constructor
 parrTyConKey				= mkPreludeTyConUnique 82
 
--- Template Haskell
-qTyConKey    = mkPreludeTyConUnique 83
-exprTyConKey = mkPreludeTyConUnique 84
-declTyConKey = mkPreludeTyConUnique 85
-pattTyConKey = mkPreludeTyConUnique 86
-mtchTyConKey = mkPreludeTyConUnique 87
-clseTyConKey = mkPreludeTyConUnique 88
-stmtTyConKey = mkPreludeTyConUnique 89
-expTyConKey  = mkPreludeTyConUnique 90
-matTyConKey  = mkPreludeTyConUnique 91
-clsTyConKey  = mkPreludeTyConUnique 92
+---------------- Template Haskell -------------------
+--	USES TyConUniques 100-119
+-----------------------------------------------------
 
 unitTyConKey = mkTupleTyConUnique Boxed 0
 \end{code}
@@ -1141,54 +994,12 @@ bindMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
 thenMClassOpKey		      = mkPreludeMiscIdUnique 114 -- (>>)
 returnMClassOpKey	      = mkPreludeMiscIdUnique 117
 
--- MetaHaskell Extension, (text4 118) from Meta/work/gen.hs
-intLIdKey       = mkPreludeMiscIdUnique 118
-charLIdKey      = mkPreludeMiscIdUnique 119
-plitIdKey       = mkPreludeMiscIdUnique 120
-pvarIdKey       = mkPreludeMiscIdUnique 121
-ptupIdKey       = mkPreludeMiscIdUnique 122
-pconIdKey       = mkPreludeMiscIdUnique 123
-ptildeIdKey     = mkPreludeMiscIdUnique 124
-paspatIdKey     = mkPreludeMiscIdUnique 125
-pwildIdKey      = mkPreludeMiscIdUnique 126
-varIdKey        = mkPreludeMiscIdUnique 127
-conIdKey        = mkPreludeMiscIdUnique 128
-litIdKey        = mkPreludeMiscIdUnique 129
-appIdKey        = mkPreludeMiscIdUnique 130
-infixEIdKey     = mkPreludeMiscIdUnique 131
-lamIdKey        = mkPreludeMiscIdUnique 132
-tupIdKey        = mkPreludeMiscIdUnique 133
-doEIdKey        = mkPreludeMiscIdUnique 134
-compIdKey       = mkPreludeMiscIdUnique 135
-listExpIdKey    = mkPreludeMiscIdUnique 137
-condIdKey       = mkPreludeMiscIdUnique 138
-letEIdKey       = mkPreludeMiscIdUnique 139
-caseEIdKey      = mkPreludeMiscIdUnique 140
-infixAppIdKey   = mkPreludeMiscIdUnique 141
-sectionLIdKey   = mkPreludeMiscIdUnique 142
-sectionRIdKey   = mkPreludeMiscIdUnique 143
-guardedIdKey    = mkPreludeMiscIdUnique 144
-normalIdKey     = mkPreludeMiscIdUnique 145
-bindStIdKey     = mkPreludeMiscIdUnique 146
-letStIdKey      = mkPreludeMiscIdUnique 147
-noBindStIdKey   = mkPreludeMiscIdUnique 148
-parStIdKey      = mkPreludeMiscIdUnique 149
-fromIdKey       = mkPreludeMiscIdUnique 150
-fromThenIdKey   = mkPreludeMiscIdUnique 151
-fromToIdKey     = mkPreludeMiscIdUnique 152
-fromThenToIdKey = mkPreludeMiscIdUnique 153
-liftIdKey       = mkPreludeMiscIdUnique 154
-gensymIdKey     = mkPreludeMiscIdUnique 155
-returnQIdKey    = mkPreludeMiscIdUnique 156
-bindQIdKey      = mkPreludeMiscIdUnique 157
-funIdKey        = mkPreludeMiscIdUnique 158
-valIdKey        = mkPreludeMiscIdUnique 159
-protoIdKey      = mkPreludeMiscIdUnique 160
-matchIdKey      = mkPreludeMiscIdUnique 161
-clauseIdKey     = mkPreludeMiscIdUnique 162
-
 -- Recursive do notation
-mfixIdKey	= mkPreludeMiscIdUnique 163
+mfixIdKey	= mkPreludeMiscIdUnique 118
+
+---------------- Template Haskell -------------------
+--	USES IdUniques 200-299
+-----------------------------------------------------
 \end{code}
 
 

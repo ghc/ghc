@@ -9,11 +9,10 @@ module TcExpr ( tcExpr, tcExpr_id, tcMonoExpr ) where
 #include "HsVersions.h"
 
 #ifdef GHCI 	/* Only if bootstrapped */
-import {-# SOURCE #-}	TcSplice( tcSpliceExpr )
-import TcEnv		( bracketOK, tcMetaTy )
+import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
+import TcEnv		( bracketOK )
 import TcSimplify	( tcSimplifyBracket )
-import PrelNames	( exprTyConName )
-import HsSyn		( HsBracket(..) )
+import DsMeta		( liftName )
 #endif
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
@@ -63,8 +62,9 @@ import PrelNames	( cCallableClassName, cReturnableClassName,
 			  enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
 			  enumFromToPName, enumFromThenToPName,
-			  ioTyConName, liftName
+			  ioTyConName
 			)
+import DsMeta		
 import ListSetOps	( minusList )
 import CmdLineOpts
 import HscTypes		( TyThing(..) )
@@ -624,7 +624,7 @@ tcMonoExpr (PArrSeqIn _) _
 
 tcMonoExpr (HsSplice n expr) res_ty = tcSpliceExpr n expr res_ty
   
-tcMonoExpr (HsBracket (ExpBr expr)) res_ty
+tcMonoExpr (HsBracket brack) res_ty
   = getStage 					`thenM` \ level ->
     case bracketOK level of {
 	Nothing         -> failWithTc (illegalBracket level) ;
@@ -635,19 +635,17 @@ tcMonoExpr (HsBracket (ExpBr expr)) res_ty
 	-- it again when we actually use it.
     newMutVar []	 		`thenM` \ pending_splices ->
     getLIEVar				`thenM` \ lie_var ->
-    newTyVarTy openTypeKind		`thenM` \ any_ty ->
 
     setStage (Brack next_level pending_splices lie_var) (
-	getLIE (tcMonoExpr expr any_ty)
-    )						`thenM` \ (expr', lie) ->
-    tcSimplifyBracket lie 			`thenM_`  
+	getLIE (tcBracket brack)
+    )					`thenM` \ (meta_ty, lie) ->
+    tcSimplifyBracket lie 		`thenM_`  
 
-    tcMetaTy exprTyConName			`thenM` \ meta_exp_ty ->
-    unifyTauTy res_ty meta_exp_ty		`thenM_`
+    unifyTauTy res_ty meta_ty		`thenM_`
 
 	-- Return the original expression, not the type-decorated one
     readMutVar pending_splices		`thenM` \ pendings ->
-    returnM (HsBracketOut (ExpBr expr) pendings)
+    returnM (HsBracketOut brack pendings)
     }
 #endif GHCI
 \end{code}
@@ -812,6 +810,7 @@ tcId name	-- Look up the Id and instantiate its type
   = tcLookupIdLvl name			`thenM` \ (id, bind_lvl) ->
 
 	-- Check for cross-stage lifting
+#ifdef GHCI
     getStage				`thenM` \ use_stage -> 
     case use_stage of
       Brack use_lvl ps_var lie_var
@@ -850,7 +849,8 @@ tcId name	-- Look up the Id and instantiate its type
 	in
 	checkTc (wellStaged bind_lvl use_lvl)
 		(badStageErr id bind_lvl use_lvl)	`thenM_`
-
+#endif
+	-- This is the bit that handles the no-Template-Haskell case
 	case isDataConWrapId_maybe id of
 		Nothing       -> loop (HsVar id) (idType id)
 		Just data_con -> inst_data_con id data_con

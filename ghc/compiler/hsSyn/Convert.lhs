@@ -16,7 +16,7 @@ import HsSyn as Hs
 	(	HsExpr(..), HsLit(..), ArithSeqInfo(..), 
 		HsStmtContext(..), 
 		Match(..), GRHSs(..), GRHS(..), HsPred(..),
-		HsDecl(..), TyClDecl(..), InstDecl(..), ConDecl(..),
+		HsDecl(..), InstDecl(..), ConDecl(..),
 		Stmt(..), HsBinds(..), MonoBinds(..), Sig(..),
 		Pat(..), HsConDetails(..), HsOverLit, BangType(..),
 		placeHolderType, HsType(..), HsTupCon(..),
@@ -41,11 +41,12 @@ import Outputable
 
 -------------------------------------------------------------------
 convertToHsDecls :: [Meta.Dec] -> [HsDecl RdrName]
-convertToHsDecls ds 
-  = ValD (cvtdecs binds_and_sigs) : map cvt_top top_decls
-  where
-    (binds_and_sigs, top_decls) = partition sigOrBindP ds
+convertToHsDecls ds = map cvt_top ds
 
+
+cvt_top d@(Val _ _ _) = ValD (cvtd d)
+cvt_top d@(Fun _ _)   = ValD (cvtd d)
+ 
 cvt_top (Data tc tvs constrs derivs)
   = TyClD (mkTyData DataType 
 		    (noContext, tconName tc, cvt_tvs tvs)
@@ -75,6 +76,8 @@ cvt_top (Instance tys ty decs)
     inst_ty = HsForAllTy Nothing 
 			 (cvt_context tys) 
 			 (HsPredTy (cvt_pred ty))
+
+cvt_top (Proto nm typ) = SigD (Sig (vName nm) (cvtType typ) loc0)
 
 noContext      = []
 noExistentials = []
@@ -196,7 +199,7 @@ cvtp Pwild        = WildPat void
 cvt_tvs :: [String] -> [HsTyVarBndr RdrName]
 cvt_tvs tvs = map (UserTyVar . tName) tvs
 
-cvt_context :: Context -> HsContext RdrName 
+cvt_context :: Cxt -> HsContext RdrName 
 cvt_context tys = map cvt_pred tys
 
 cvt_pred :: Typ -> HsPred RdrName
@@ -205,15 +208,23 @@ cvt_pred ty = case split_ty_app ty of
 		other -> panic "Malformed predicate"
 
 cvtType :: Meta.Typ -> HsType RdrName
-cvtType (Tvar nm)  = HsTyVar(tName nm)
-cvtType (Tapp x y) = trans (root x [y])
-  where root (Tapp a b) zs = root a (b:zs)
-        root t zs = (t,zs)
-        trans (Tcon (Tuple n),args) = HsTupleTy (HsTupCon Boxed n) (map cvtType args)
-        trans (Tcon Arrow,[x,y])    =  HsFunTy (cvtType x) (cvtType y)
-        trans (Tcon List,[x])	    = HsListTy (cvtType x)
-        trans (Tcon (Name nm),args) = HsTyVar(tconName nm)
-        trans (t,args)		    = panic "bad type application"
+cvtType ty = trans (root ty [])
+  where root (Tapp a b) zs = root a (cvtType b : zs)
+        root t zs 	   = (t,zs)
+
+        trans (Tcon (Tuple n),args) | length args == n
+				    = HsTupleTy (HsTupCon Boxed n) args
+        trans (Tcon Arrow,   [x,y]) = HsFunTy x y
+        trans (Tcon List,    [x])   = HsListTy x
+
+	trans (Tvar nm, args)	    = foldl HsAppTy (HsTyVar (tName nm)) args
+        trans (Tcon tc, args)       = foldl HsAppTy (HsTyVar (tc_name tc)) args
+
+	tc_name (TconName nm) = tconName nm
+	tc_name Arrow	      = tconName "->"
+	tc_name List	      = tconName "[]"
+	tc_name (Tuple 0)     = tconName "()"
+   	tc_name (Tuple n)     = tconName ("(" ++ replicate (n-1) ',' ++ ")")
 
 split_ty_app :: Typ -> (Typ, [Typ])
 split_ty_app ty = go ty []
@@ -225,12 +236,6 @@ split_ty_app ty = go ty []
 sigP :: Dec -> Bool
 sigP (Proto _ _) = True
 sigP other	 = False
-
-sigOrBindP :: Dec -> Bool
-sigOrBindP (Proto _ _) = True
-sigOrBindP (Val _ _ _) = True
-sigOrBindP (Fun _ _)   = True
-sigOrBindP other       = False
 
 
 -----------------------------------------------------------
