@@ -1,4 +1,4 @@
-% $Id: Memo.lhs,v 1.1 1999/02/03 16:54:02 simonm Exp $
+% $Id: Memo.lhs,v 1.2 1999/02/11 17:54:36 simonm Exp $
 %
 % (c) The GHC Team, 1999
 %
@@ -32,7 +32,7 @@ It's important that we can garbage collect old entries in the table
 when the key is no longer reachable in the heap.  Hence the value part
 of each table entry is (Weak val), where the weak pointer "key" is the
 key for our memo table, and 'val' is the value of this memo table
-entry.  When the key becomes unreachable, a finaliser will fire and
+entry.  When the key becomes unreachable, a finalizer will fire and
 remove this entry from the hash bucket, and further attempts to
 dereference the weak pointer will return Nothing.  References from
 'val' to the key are ignored (see the semantics of weak pointers in
@@ -47,14 +47,14 @@ type MemoTable key val
 \end{code}
 
 We use an MVar to the hash table, so that several threads may safely
-access it concurrently.  This includes the finalisation threads that
+access it concurrently.  This includes the finalization threads that
 remove entries from the table.
 
-ToDo: make the finalisers refer to the memo table only through a weak
+ToDo: make the finalizers refer to the memo table only through a weak
 pointer, because otherwise the memo table will keep itself alive
 (i.e. even after the function is dead, the weak pointers in the memo
 table stay alive because their keys are alive, and hence the values
-and finalisers are alive, therefore the table itself stays alive.
+and finalizers are alive, therefore the table itself stays alive.
 Bad).
 
 \begin{code}
@@ -84,12 +84,12 @@ memo' f ref = \x -> unsafePerformIO $ do
 		return result
 	Nothing -> do
 	   	let result = f x
-	   	weak <- mkWeak x result finaliser
+	   	weak <- mkWeak x result (Just finalizer)
 		writeIOArray table hash_key ((stable_key,weak):bucket)
 	   	putMVar ref (size,table)
 		return result
 
-	    where finaliser = do
+	    where finalizer = do
 			(size,table) <- takeMVar ref
 			bucket <- readIOArray table hash_key
 			let new_bucket = [ (sn,weak) 

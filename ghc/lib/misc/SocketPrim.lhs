@@ -82,7 +82,7 @@ module SocketPrim (
 import GlaExts
 import ST
 import Ix
-import Weak	    ( addForeignFinaliser )
+import Weak	    ( addForeignFinalizer )
 import PrelIOBase  -- IOError, Handle representation
 import PrelHandle
 import Foreign
@@ -1206,7 +1206,7 @@ socketToHandle :: Socket -> IOMode -> IO Handle
 socketToHandle (MkSocket fd _ _ _ _) m = do
     fileobj <- _ccall_ openFd fd (file_mode::Int) (flush_on_close::Int)
     fo <- makeForeignObj fileobj
-    addForeignFinaliser fo (freeFileObject fo)
+    addForeignFinalizer fo (freeFileObject fo)
     mkBuffer__ fo 0  -- not buffered
     hndl <- newHandle (Handle__ fo htype NoBuffering socket_str)
     return hndl
