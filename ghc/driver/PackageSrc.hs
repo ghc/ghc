@@ -235,7 +235,7 @@ package_details installing =
                              then [ clibdir ++ "/imports/text" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/text" 
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/text/html" 
-                                  , cFPTOOLS_TOP_ABS ++ "/hslibs/text/haxml/lib" 
+                                  , cFPTOOLS_TOP_ABS ++ "/hslibs/text/HaXml/lib" 
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/text/parsec" ],
          library_dirs   = if installing
                              then [ clibdir ]
