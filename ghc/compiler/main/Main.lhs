@@ -47,7 +47,9 @@ import IOExts		( unsafePerformIO )
 import NativeInfo       ( os, arch )
 #endif
 import StgInterp	( runStgI )
-
+#ifdef GHCI
+import Linker		( linkPrelude )
+#endif
 \end{code}
 
 \begin{code}
