@@ -36,6 +36,10 @@ module GlaExts
 	ioToPrimIO,
 	primIOToIO,
 	unsafePerformPrimIO,
+	thenPrimIO, thenIO_Prim,
+	seqPrimIO, returnPrimIO,
+
+	seqST, thenST, returnST,
 
         -- Everything from module ByteArray:
 	module ByteArray,
@@ -69,5 +73,25 @@ type PrimIO a = IO a
 primIOToIO io = io
 ioToPrimIO io = io
 unsafePerformPrimIO = unsafePerformIO
+thenPrimIO :: PrimIO a -> (a -> PrimIO b) -> PrimIO b
+thenPrimIO = (>>=)
 
+seqPrimIO :: PrimIO a -> PrimIO b -> PrimIO b
+seqPrimIO = (>>)
+
+returnPrimIO :: a -> PrimIO a
+returnPrimIO = return
+
+thenIO_Prim :: PrimIO a -> (a -> IO b) -> IO b
+thenIO_Prim = (>>=)
+
+-- ST compatibility stubs.
+thenST :: ST s a -> ( a -> ST s b) -> ST s b
+thenST = (>>=)
+
+seqST :: ST s a -> ST s b -> ST s b
+seqST = (>>)
+
+returnST :: a -> ST s a
+returnST = return
 \end{code}
