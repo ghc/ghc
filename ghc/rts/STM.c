@@ -90,7 +90,7 @@ static int shake(void) {
   StgTRecHeader *__t = (_t);			\
   StgTRecChunk *__c = __t -> current_chunk;		\
   StgWord __limit = __c -> next_entry_idx;		\
-  TRACE("trec=%p chunk=%p limit=%d\n", __t, __c, __limit); \
+  TRACE("trec=%p chunk=%p limit=%ld\n", __t, __c, __limit); \
   while (__c != END_STM_CHUNK_LIST) {		\
     StgWord __i;                                  \
     for (__i = 0; __i < __limit; __i ++) {		\
@@ -247,7 +247,7 @@ static StgTRecHeader *new_stg_trec_header(StgTRecHeader *enclosing_trec) {
     result -> state = enclosing_trec -> state;
   }
 
-  TRACE("new_stg_trec_header creating %p nidx=%d chunk=%p enclosing_trec=%p state=%d\n",
+  TRACE("new_stg_trec_header creating %p nidx=%ld chunk=%p enclosing_trec=%p state=%d\n",
         result, result->current_chunk->next_entry_idx, result -> current_chunk, enclosing_trec, result->state);
   return result;  
 }
