@@ -11,6 +11,47 @@
       Probably the most important phase in the frontend is the type checker,
       which is located at <a
 	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/"><code>fptools/ghc/compiler/typecheck/</code>.</a>
+      GHC type checks programs in their original Haskell form before the
+      desugarer converts them into Core code.  This complicates the type
+      checker as it has to handle the much more verbose Haskell AST, but it
+      improves error messages, as the those message are based on the same
+      structure that the user sees.
+    <p>
+      GHC defines the abstract syntax of Haskell programs in <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/hsSyn/HsSyn.lhs"><code>HsSyn</code></a>
+      using a structure that abstracts over the concrete representation of
+      bound occurences of identifiers and patterns.  The module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcHsSyn.lhs"><code>TcHsSyn</code></a>
+      instantiates this structure for the type checker using <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcEnv.lhs"><code>TcEnv</code></a>.<code>TcId</code>
+      to represent identifiers - in fact, a <code>TcId</code> is currently
+      nothing but just a synonym for a <a href="vars.html">plain
+      <code>Id</code>.</a>
+
+    <h4>Types Variables and Zonking</h4>
+    <p>
+      During type checking type variables are represented by mutable variables
+      - cf. the <a href="vars.html#TyVar">variable story.</a>  Consequently,
+      unification can instantiate type variables by updating those mutable
+      variables.  This process of instantiation is (for reasons that elude
+      me) called <a
+      href="http://www.dictionary.com/cgi-bin/dict.pl?term=zonk&db=*">zonking</a>
+      in GHC's sources.  The zonking routines for the various forms of Haskell
+      constructs are responsible for most of the code in the module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcHsSyn.lhs"><code>TcHsSyn</code>,</a>
+      whereas the routines that actually operate on mutable types are defined
+      in <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcMType.lhs"><code>TcMTypes</code></a>;
+      this includes routines to create mutable structures and update them as
+      well as routines that check constraints, such as that type variables in
+      function signatures have not been instantiated during type checking.
+      The actual type unification routine is <code>uTys</code> in the same
+      module.
+    <p>
+      All type variables that may be instantiated (those in signatures
+      may not), but haven't been instantiated during type checking, are zonked
+      to <code>()</code>, so that after type checking all mutable variables
+      have been eliminated.
 
     <h4>Type Checking Environment</h4>
     <p>
@@ -89,7 +130,7 @@
 
     <p><small>
 <!-- hhmts start -->
-Last modified: Wed Aug  8 19:24:09 EST 2001
+Last modified: Tue Nov 13 14:28:44 EST 2001
 <!-- hhmts end -->
     </small>
   </body>
