@@ -486,15 +486,14 @@ endif
 # override the various *_PREFIX in build.mk, i.e., having the following
 # in build.mk:
 #
-#   FASTMAKE_PREFIX=
+#   MKDEPENDC_PREFIX=
 #
-# will force `make' to rummage around in your PATH to find `fastmake' (not
+# will force `make' to rummage around in your PATH to find `mkdependC' (not
 # sure it would need it in the first place, but still).
 #
 GLAFP_UTILS  		= $(FPTOOLS_TOP)/glafp-utils
 
 SCRIPT_PREFIX 		= $(GLAFP_UTILS)/scripts/
-FASTMAKE_PREFIX		= $(GLAFP_UTILS)/fastmake/
 MKDEPENDC_PREFIX	= $(GLAFP_UTILS)/mkdependC/
 LTX_PREFIX		= $(GLAFP_UTILS)/ltx/
 RUNTEST_PREFIX		= $(GLAFP_UTILS)/runstdtest/
@@ -649,7 +648,6 @@ SGML2TXT		= sgml2txt
 
 # Stuff from fptools/glafp-utils
 MKDEPENDC 		= $(MKDEPENDC_PREFIX)mkdependC
-FASTMAKE 		= $(FASTMAKE_PREFIX)fastmake
 LTX 			= $(LTX_PREFIX)ltx
 MKDIRHIER		= $(MKDIRHIER_PREFIX)mkdirhier
 LNDIR			= $(LNDIR_PREFIX)lndir
