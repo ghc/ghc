@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.28 1999/02/08 10:41:17 simonm Exp $
+ * $Id: GC.c,v 1.29 1999/02/09 12:50:38 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -558,7 +558,7 @@ void GarbageCollect(void (*get_roots)(void))
      * performance we get from 3L bytes, reducing to the same
      * performance at 2L bytes.  
      */
-    blocks = g0s0->n_blocks;
+    blocks = g0s0->to_blocks;
 
     if ( blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
 	 RtsFlags.GcFlags.maxHeapSize ) {
