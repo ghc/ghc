@@ -7,6 +7,9 @@ FP_SETUP_PROJECT_INFO
 # Hmmm, we fix the RPM release number to 1 here... Is this convenient?
 AC_SUBST([release], [1])
 
+# Check whether this GHC has readline installed
+FP_GHC_HAS_READLINE
+
 # Write the results...
-AC_CONFIG_FILES([ghc.spec VERSION docs/users_guide/ug-book.xml mk/version.mk])
+AC_CONFIG_FILES([ghc.spec VERSION docs/users_guide/ug-book.xml mk/config.mk mk/version.mk])
 AC_OUTPUT

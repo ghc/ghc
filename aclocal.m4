@@ -657,19 +657,6 @@ ifelse($#, [1], [dnl
 ])dnl
 
 
-AC_DEFUN(FPTOOLS_GHC_HAS_READLINE,
-[AC_CACHE_CHECK([whether ghc has readline package], [fptools_ghc_has_readline],
-[if "${GhcPkgCmd-ghc-pkg}" --show-package readline >/dev/null 2>&1; then
-    fptools_ghc_has_readline='yes';
-    GhcHasReadline='YES';
- else
-    fptools_ghc_has_readline='no';
-    GhcHasReadline='NO';
- fi
- AC_SUBST(GhcHasReadline)
-])
-])
-
 dnl ** Map an arithmetic C type to a Haskell type.
 dnl    Based on autconf's AC_CHECK_SIZEOF.
 

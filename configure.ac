@@ -874,9 +874,6 @@ FP_PROG_FO_PROCESSOR
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
-dnl Check whether this GHC has readline installed
-FPTOOLS_GHC_HAS_READLINE
-
 AC_ARG_WITH(greencard,
 [AC_HELP_STRING([--with-greencard=ARG],
         [Use ARG as the path to greencard  [default=autodetct]])],

@@ -1,5 +1,4 @@
 # -----------------------------------------------------------------------------
-# $Id: config.mk,v 1.20 2003/05/19 13:01:23 simonmar Exp $
 #
 # GHC project configuration
 #
@@ -21,5 +20,8 @@ GhcBinDistPrlScripts =
 GhcBinDistLibPrlScripts = ghc-asm ghc-split
 GhcBinDistBins = hp2ps ghcprof
 GhcBinDistLinks = ghc ghci ghc-pkg
+
+# Set to YES if $(GHC) has the readline package installed
+GhcHasReadline	= @GhcHasReadline@
 
 include $(GhcMainDir)/mk/version.mk
