@@ -46,7 +46,7 @@ import NewDemand	( isTopSig )
 import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
 			  arityInfo, cafInfo, newStrictnessInfo, 
 			  workerInfo, unfoldingInfo, inlinePragInfo )
-import TyCon		( ArgVrcs, DataConDetails(..), isRecursiveTyCon, isForeignTyCon,
+import TyCon		( TyCon, ArgVrcs, DataConDetails(..), isRecursiveTyCon, isForeignTyCon,
 			  isSynTyCon, isNewTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
 			  isTupleTyCon, tupleTyConBoxity,
 			  tyConHasGenerics, tyConArgVrcs, tyConTheta, getSynTyConDefn,
@@ -399,16 +399,17 @@ ppr_hs_info (HsWorker w a)	= ptext SLIT("Worker:") <+> ppr w <+> int a
 
 		 
 \begin{code}
-tyThingToIfaceDecl :: Bool -> (Name -> IfaceExtName) -> TyThing -> IfaceDecl
-tyThingToIfaceDecl discard_prags ext (AnId id)
+tyThingToIfaceDecl :: Bool -> (TyCon -> Bool)
+		   -> (Name -> IfaceExtName) -> TyThing -> IfaceDecl
+tyThingToIfaceDecl discard_id_info _ ext (AnId id)
   = IfaceId { ifName   = getOccName id, 
 	      ifType   = toIfaceType ext (idType id),
 	      ifIdInfo = info }
   where
-    info | discard_prags = NoInfo
-	 | otherwise	 = HasInfo (toIfaceIdInfo ext (idInfo id))
+    info | discard_id_info = NoInfo
+	 | otherwise	   = HasInfo (toIfaceIdInfo ext (idInfo id))
 
-tyThingToIfaceDecl _ ext (AClass clas)
+tyThingToIfaceDecl _ _ ext (AClass clas)
   = IfaceClass { ifCtxt	  = toIfaceContext ext sc_theta,
 		 ifName	  = getOccName clas,
 		 ifTyVars = toIfaceTvBndrs clas_tyvars,
@@ -434,7 +435,7 @@ tyThingToIfaceDecl _ ext (AClass clas)
 
     toIfaceFD (tvs1, tvs2) = (map getOccName tvs1, map getOccName tvs2)
 
-tyThingToIfaceDecl _ ext (ATyCon tycon)
+tyThingToIfaceDecl _ discard_data_cons ext (ATyCon tycon)
   | isSynTyCon tycon
   = IfaceSyn {	ifName   = getOccName tycon,
 		ifTyVars = toIfaceTvBndrs tyvars,
@@ -473,6 +474,7 @@ tyThingToIfaceDecl _ ext (ATyCon tycon)
     new_or_data | isNewTyCon tycon = NewType
 	        | otherwise	   = DataType
 
+    ifaceConDecls _ | discard_data_cons tycon = Unknown
     ifaceConDecls Unknown       = Unknown
     ifaceConDecls (DataCons cs) = DataCons (map ifaceConDecl cs)
 
@@ -490,7 +492,7 @@ tyThingToIfaceDecl _ ext (ATyCon tycon)
 
 	-- This case only happens in the call to ifaceThing in InteractiveUI
 	-- Otherwise DataCons are filtered out in ifaceThing_acc
-tyThingToIfaceDecl _ ext (ADataCon dc)
+tyThingToIfaceDecl _ _ ext (ADataCon dc)
  = IfaceId { ifName   = getOccName dc, 
 	     ifType   = toIfaceType ext full_ty,
 	     ifIdInfo = NoInfo }

@@ -233,9 +233,7 @@ addExportFlags ghci_mode exports keep_alive bndrs prs rules
 	-- introduced by the type checker.
     is_exported :: Name -> Bool
     is_exported | ghci_mode == Interactive = isExternalName
-		| otherwise 		   = (`elemNameSet` export_fvs)
-
-    export_fvs = availsToNameSet exports
+		| otherwise 		   = (`elemNameSet` exports)
 
 ppr_ds_rules [] = empty
 ppr_ds_rules rules

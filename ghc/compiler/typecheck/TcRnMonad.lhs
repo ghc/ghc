@@ -84,7 +84,7 @@ initTc hsc_env mod do_this
 		tcg_type_env_var = type_env_var,
 		tcg_inst_env  = mkImpInstEnv hsc_env,
 		tcg_inst_uses = dfuns_var,
-		tcg_exports  = [],
+		tcg_exports  = emptyNameSet,
 		tcg_imports  = init_imports,
 		tcg_dus      = emptyDUs,
 		tcg_binds    = emptyBag,

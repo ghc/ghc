@@ -275,7 +275,7 @@ data ModDetails
 data ModGuts
   = ModGuts {
         mg_module   :: !Module,
-	mg_exports  :: !Avails,		-- What it exports
+	mg_exports  :: !NameSet,	-- What it exports
 	mg_deps	    :: !Dependencies,	-- What is below it, directly or otherwise
 	mg_dir_imps :: ![Module],	-- Directly-imported modules; used to
 					--	generate initialisation code

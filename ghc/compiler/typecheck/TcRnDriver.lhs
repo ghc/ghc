@@ -172,8 +172,9 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
 	reportDeprecations tcg_env ;
 
 		-- Process the export list
-	export_avails <- exportsFromAvail (isJust maybe_mod) exports ;
+	exports <- exportsFromAvail (isJust maybe_mod) exports ;
 
+{- 	Jan 04: I don't think this is necessary any more; usage info is derived from tcg_dus
 		-- Get any supporting decls for the exports that have not already
 		-- been sucked in for the declarations in the body of the module.
 		-- (This can happen if something is imported only to be re-exported.)
@@ -184,15 +185,15 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
 		-- We don't need the results, but sucking them in may side-effect
 		-- the ExternalPackageState, apart from recording usage
 	mappM (tcLookupGlobal . availName) export_avails ;
+-}
 
 		-- Check whether the entire module is deprecated
 		-- This happens only once per module
 	let { mod_deprecs = checkModDeprec mod_deprec } ;
 
 		-- Add exports and deprecations to envt
-	let { export_fvs = availsToNameSet export_avails ;
-	      final_env  = tcg_env { tcg_exports = export_avails,
-				     tcg_dus = tcg_dus tcg_env `plusDU` usesOnly export_fvs,
+	let { final_env  = tcg_env { tcg_exports = exports,
+				     tcg_dus = tcg_dus tcg_env `plusDU` usesOnly exports,
 				     tcg_deprecs = tcg_deprecs tcg_env `plusDeprecs` 
 						   mod_deprecs }
 		-- A module deprecation over-rides the earlier ones
@@ -469,7 +470,8 @@ tcRnThing hsc_env ictxt rdr_name
 
 toIfaceDecl :: InteractiveContext -> TyThing -> IfaceDecl
 toIfaceDecl ictxt thing
-  = tyThingToIfaceDecl True {- Discard IdInfo -} ext_nm thing
+  = tyThingToIfaceDecl True {- Discard IdInfo -} (const False) {- Show data cons -} 
+		       ext_nm thing
   where
     unqual = icPrintUnqual ictxt
     ext_nm n | unqual n  = LocalTop (nameOccName n)	-- What a hack
@@ -535,7 +537,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	-- Wrap up
    let {
 	bndrs 	   = bindersOfBinds core_binds ;
-	my_exports = map (Avail . idName) bndrs ;
+	my_exports = mkNameSet (map idName bndrs) ;
 		-- ToDo: export the data types also?
 
 	final_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) bndrs ;

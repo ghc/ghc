@@ -201,14 +201,16 @@ import HscTypes		( ModIface(..),
 
 import CmdLineOpts
 import Name		( Name, nameModule, nameOccName, nameParent, isExternalName,
-			  nameParent_maybe, isWiredInName, NamedThing(..) )
+			  nameParent_maybe, isWiredInName, NamedThing(..), nameModuleName )
 import NameEnv
 import NameSet
 import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv_C,
 			  OccSet, emptyOccSet, elemOccSet, occSetElts, 
 			  extendOccSet, extendOccSetList,
-			  isEmptyOccSet, intersectOccSet, intersectsOccSet )
-import TyCon		( visibleDataCons )
+			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
+			  occNameFS, isTcOcc )
+import TyCon		( visibleDataCons, tyConDataCons )
+import DataCon		( dataConName )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			  ModLocation(..), mkSysModuleNameFS, moduleUserString,
 			  ModuleEnv, emptyModuleEnv, lookupModuleEnv,
@@ -227,6 +229,7 @@ import FastString
 
 import DATA_IOREF	( writeIORef )
 import Monad		( when )
+import List		( insert )
 import Maybes		( orElse, mapCatMaybes, isNothing, fromJust, expectJust )
 \end{code}
 
@@ -261,7 +264,7 @@ mkIface hsc_env location maybe_old_iface
   = do	{ eps <- hscEPS hsc_env
 	; let	{ this_mod_name = moduleName this_mod
 		; ext_nm = mkExtNameFn hsc_env eps this_mod_name
-		; decls  = [ tyThingToIfaceDecl omit_prags ext_nm thing 
+		; decls  = [ tyThingToIfaceDecl omit_prags omit_data_cons ext_nm thing 
 			   | thing <- typeEnvElts type_env
 			   , not (isImplicitTyThing thing) && not (isWiredInName (getName thing)) ]
 			    	-- Don't put implicit Ids and class tycons in the interface file
@@ -281,7 +284,7 @@ mkIface hsc_env location maybe_old_iface
 			mi_boot     = False,
 			mi_deps     = deps,
 			mi_usages   = usages,
-			mi_exports  = groupAvails exports,
+			mi_exports  = mkIfaceExports exports,
 			mi_insts    = iface_insts,
 			mi_rules    = iface_rules,
 			mi_fixities = fixities,
@@ -325,6 +328,11 @@ mkIface hsc_env location maybe_old_iface
      ghci_mode = hsc_mode hsc_env
      hi_file_path = ml_hi_file location
      omit_prags = dopt Opt_OmitInterfacePragmas dflags
+     omit_data_cons tycon 	-- Don't expose data constructors if none are
+				-- exported and we are not optimising (i.e. not omit_prags)
+	| omit_prags = not (any exported_data_con (tyConDataCons tycon))
+	| otherwise  = False
+     exported_data_con con = dataConName con `elemNameSet` exports
 
 deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
@@ -693,39 +701,35 @@ mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
 \end{code}
 
 \begin{code}
-groupAvails :: Avails -> [(ModuleName, [GenAvailInfo OccName])]
+mkIfaceExports :: NameSet -> [(ModuleName, [GenAvailInfo OccName])]
   -- Group by module and sort by occurrence
   -- This keeps the list in canonical order
-groupAvails avails 
-  = [ (mkSysModuleNameFS fs, sortLt lt avails)
-    | (fs,avails) <- fmToList groupFM
+mkIfaceExports exports
+  = [ (mkSysModuleNameFS fs, eltsFM avails)
+    | (fs, avails) <- fmToList groupFM
     ]
   where
-    groupFM :: FiniteMap FastString [GenAvailInfo OccName]
+    groupFM :: FiniteMap FastString (FiniteMap FastString (GenAvailInfo OccName))
 	-- Deliberately use the FastString so we
 	-- get a canonical ordering
-    groupFM = foldl add emptyFM avails
+    groupFM = foldl add emptyFM (nameSetToList exports)
 
-    add env avail = addToFM_C (\old _ -> avail':old) env mod_fs [avail']
-		  where
-		    mod_fs    = moduleNameFS (moduleName avail_mod)
-		    avail_mod = nameModule (availName avail)
-		    avail'    = sortAvail avail
+    add env name = addToFM_C add_avail env mod_fs 
+			     (unitFM avail_fs avail)
+      where
+	occ    = nameOccName name
+	occ_fs = occNameFS occ
+	mod_fs = moduleNameFS (nameModuleName name)
+	avail | Just p <- nameParent_maybe name = AvailTC (nameOccName p) [occ]
+	      | isTcOcc occ 			= AvailTC occ [occ]
+	      | otherwise			= Avail occ
+	avail_fs = occNameFS (availName avail)	    
+	add_avail avail_fm _ = addToFM_C add_item avail_fm avail_fs avail
 
-    a1 `lt` a2 = availName a1 < availName a2
-
-sortAvail :: AvailInfo -> GenAvailInfo OccName
--- Convert to OccName, and sort the sub-names into canonical order
--- The canonical order has the "main name" at the beginning 
--- (if it's there at all)
-sortAvail (Avail n) = Avail (nameOccName n)
-sortAvail (AvailTC n ns) 
-  | n `elem` ns = AvailTC occ (occ : mk_occs (filter (/= n) ns))
-  | otherwise   = AvailTC occ (      mk_occs ns)
-  where
-    occ = nameOccName n
-    mk_occs ns = sortLt (<) (map nameOccName ns)
+	add_item (AvailTC p occs) _ = AvailTC p (insert occ occs)
+	add_item (Avail n)	   _ = pprPanic "MkIface.addAvail" (ppr n <+> ppr name)
 \end{code}
+
 
 %************************************************************************
 %*									*

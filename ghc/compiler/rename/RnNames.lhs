@@ -565,9 +565,8 @@ type ExportAccum	-- The type of the accumulating parameter of
 			-- the main worker function in exportsFromAvail
      = ([ModuleName], 		-- 'module M's seen so far
 	ExportOccMap,		-- Tracks exported occurrence names
-	AvailEnv)		-- The accumulated exported stuff, kept in an env
-				--   so we can common-up related AvailInfos
-emptyExportAccum = ([], emptyOccEnv, emptyAvailEnv) 
+	NameSet)		-- The accumulated exported stuff
+emptyExportAccum = ([], emptyOccEnv, emptyNameSet) 
 
 type ExportOccMap = OccEnv (Name, IE RdrName)
 	-- Tracks what a particular exported OccName
@@ -578,7 +577,7 @@ type ExportOccMap = OccEnv (Name, IE RdrName)
 
 exportsFromAvail :: Bool  -- False => no 'module M(..) where' header at all
 		 -> Maybe [Located (IE RdrName)] -- Nothing => no explicit export list
-		 -> RnM Avails
+		 -> RnM NameSet
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
@@ -601,33 +600,27 @@ exportsFromAvail explicit_mod exports
 	exports_from_avail real_exports rdr_env imports }
 
 
-exports_from_avail Nothing rdr_env
-		   imports@(ImportAvails { imp_env = entity_avail_env })
+exports_from_avail Nothing rdr_env imports
  =  	-- Export all locally-defined things
 	-- We do this by filtering the global RdrEnv,
-	-- keeping only things that are (a) qualified,
-	-- (b) locally defined, (c) a 'main' name
-	-- Then we look up in the entity-avail-env
-   return [ lookupAvailEnv entity_avail_env name
-	  | gre <- globalRdrEnvElts rdr_env,
-	    isLocalGRE gre,
-	    let name = gre_name gre,
-	    isNothing (nameParent_maybe name)	-- Main things only
-	  ]
+	-- keeping only things that are locally-defined
+   return (mkNameSet [ gre_name gre 
+		     | gre <- globalRdrEnvElts rdr_env,
+		       isLocalGRE gre ])
 
 exports_from_avail (Just export_items) rdr_env
 		   (ImportAvails { imp_qual = mod_avail_env, 
 				   imp_env  = entity_avail_env }) 
   = foldlM (exports_from_litem) emptyExportAccum
-	    export_items			`thenM` \ (_, _, export_avail_map) ->
-    returnM (nameEnvElts export_avail_map)
+	    export_items			`thenM` \ (_, _, exports) ->
+    returnM exports
 
   where
     exports_from_litem :: ExportAccum -> Located (IE RdrName) -> RnM ExportAccum
     exports_from_litem acc = addLocM (exports_from_item acc)
 
     exports_from_item :: ExportAccum -> IE RdrName -> RnM ExportAccum
-    exports_from_item acc@(mods, occs, avails) ie@(IEModuleContents mod)
+    exports_from_item acc@(mods, occs, exports) ie@(IEModuleContents mod)
 	| mod `elem` mods 	-- Duplicate export of M
 	= do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
 	       warnIf warn_dup_exports (dupModuleExport mod) ;
@@ -640,23 +633,19 @@ exports_from_avail (Just export_items) rdr_env
 
 	    Just avail_env
 		-> let
-			mod_avails = [ filtered_avail
-				     | avail <- availEnvElts avail_env,
-				       let mb_avail = filter_unqual rdr_env avail,
-				       isJust mb_avail,
-				       let Just filtered_avail = mb_avail]
-						
-			avails' = foldl addAvail avails mod_avails
+			new_exports = [ name | avail <- availEnvElts avail_env,
+					       name  <- availNames avail,
+				               inScopeUnqual rdr_env name ]
 		   in
+
 		-- This check_occs not only finds conflicts between this item
 		-- and others, but also internally within this item.  That is,
 		-- if 'M.x' is in scope in several ways, we'll have several
 		-- members of mod_avails with the same OccName.
+		   check_occs ie occs new_exports	`thenM` \ occs' ->
+		   returnM (mod:mods, occs', addListToNameSet exports new_exports)
 
-		   foldlM (check_occs ie) occs mod_avails	`thenM` \ occs' ->
-		   returnM (mod:mods, occs', avails')
-
-    exports_from_item acc@(mods, occs, avails) ie
+    exports_from_item acc@(mods, occs, exports) ie
 	= lookupGlobalOccRn (ieName ie)	 		`thenM` \ name -> 
 	  if isUnboundName name then
 		returnM acc 	-- Avoid error cascade
@@ -675,41 +664,34 @@ exports_from_avail (Just export_items) rdr_env
 	    Just export_avail -> 	
 
 		-- Phew!  It's OK!  Now to check the occurrence stuff!
-	  checkForDodgyExport ie avail				`thenM_`
-          check_occs ie occs export_avail			`thenM` \ occs' ->
-	  returnM (mods, occs', addAvail avails export_avail)
+	
+	  let 
+ 	      new_exports = availNames export_avail 
+	  in
+	  checkForDodgyExport ie new_exports		`thenM_`
+          check_occs ie occs new_exports		`thenM` \ occs' ->
+	  returnM (mods, occs', addListToNameSet exports new_exports)
 	  }
 
 
 -------------------------------
-filter_unqual :: GlobalRdrEnv -> AvailInfo -> Maybe AvailInfo
--- Filter the Avail by what's in scope unqualified
-filter_unqual env (Avail n)
-  | in_scope env n = Just (Avail n)
-  | otherwise	   = Nothing
-filter_unqual env (AvailTC n ns)
-  | not (null ns') = Just (AvailTC n ns')
-  | otherwise	   = Nothing
-  where
-    ns' = filter (in_scope env) ns
-
-in_scope :: GlobalRdrEnv -> Name -> Bool
+inScopeUnqual :: GlobalRdrEnv -> Name -> Bool
 -- Checks whether the Name is in scope unqualified, 
 -- regardless of whether it's ambiguous or not
-in_scope env n = any unQualOK (lookupGRE_Name env n)
+inScopeUnqual env n = any unQualOK (lookupGRE_Name env n)
 
 -------------------------------
-checkForDodgyExport :: IE RdrName -> AvailInfo -> RnM ()
-checkForDodgyExport (IEThingAll tc) (AvailTC _ [n]) = addWarn (dodgyExportWarn tc)
+checkForDodgyExport :: IE RdrName -> [Name] -> RnM ()
+checkForDodgyExport (IEThingAll tc) [n] = addWarn (dodgyExportWarn tc)
   -- This occurs when you import T(..), but
   -- only export T abstractly.  The single [n]
   -- in the AvailTC is the type or class itself
 checkForDodgyExport _ _ = return ()
 
 -------------------------------
-check_occs :: IE RdrName -> ExportOccMap -> AvailInfo -> RnM ExportOccMap
-check_occs ie occs avail 
-  = foldlM check occs (availNames avail)
+check_occs :: IE RdrName -> ExportOccMap -> [Name] -> RnM ExportOccMap
+check_occs ie occs names
+  = foldlM check occs names
   where
     check occs name
       = case lookupOccEnv occs name_occ of
