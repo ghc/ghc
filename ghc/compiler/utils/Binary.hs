@@ -96,7 +96,18 @@ import GHC.Real			( Ratio(..) )
 import GHC.Exts
 import GHC.IOBase	 	( IO(..) )
 import GHC.Word			( Word8(..) )
+#endif
+
+#if __GLASGOW_HASKELL__ < 601
+-- openFileEx is available from the lang package, but we want to 
+-- be independent of hslibs libraries.
 import GHC.Handle		( openFileEx, IOModeEx(..) )
+#else
+import System.IO		( openBinaryFile )
+#endif
+
+#if __GLASGOW_HASKELL__ < 601
+openBinaryFile f mode = openFileEx f (BinaryMode mode)
 #endif
 
 #if __GLASGOW_HASKELL__ < 503
@@ -226,7 +237,7 @@ isEOFBin (BinIO _ ix_r h) = hIsEOF h
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinIO _ _ _) _ = error "Data.Binary.writeBinMem: not a memory handle"
 writeBinMem (BinMem _ ix_r sz_r arr_r) fn = do
-  h <- openFileEx fn (BinaryMode WriteMode)
+  h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
   hPutArray h arr ix
