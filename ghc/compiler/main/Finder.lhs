@@ -109,14 +109,14 @@ maybeHomeModule mod_name = do
                                                 (path ++ '/':hs);
 	Nothing -> do
 
-   -- last chance: .hi-boot and .hi-boot-<ver>
+   -- last chance: .hi-boot-<ver> and .hi-boot
    let hi_boot = basename ++ ".hi-boot"
    let hi_boot_ver = basename ++ ".hi-boot-" ++ cHscIfaceFileVersion
-   case lookupFM home_map hi_boot of {
+   case lookupFM home_map hi_boot_ver of {
 	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename)
                                                 (path ++ '/':hs);
 	Nothing -> do
-   case lookupFM home_map hi_boot_ver of {
+   case lookupFM home_map hi_boot of {
 	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename)
                                                 (path ++ '/':hs);
 	Nothing -> return Nothing

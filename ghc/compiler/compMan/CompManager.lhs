@@ -27,7 +27,7 @@ import CmLink 		( PersistentLinkerState, emptyPLS, Linkable(..),
 import Interpreter	( HValue )
 import CmSummarise	( summarise, ModSummary(..), 
 			  name_of_summary, deps_of_summary,
-			  mimp_name, ms_get_imports )
+			  mimp_name, ms_get_imports, is_source_import )
 import Module		( ModuleName, moduleName, packageOfModule, 
 			  isModuleInThisPackage, PackageName, moduleEnvElts )
 import CmStaticInfo	( Package(..), PackageConfigInfo )
@@ -39,7 +39,6 @@ import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
 import Finder		( findModule, emptyHomeDirCache )
 import BasicTypes	( GhciMode(..) )
-import Util		( unJust )
 import DriverUtil	( BarfKind(..) )
 import Exception	( throwDyn )
 \end{code}
@@ -143,7 +142,6 @@ cmLoadModule cmstate1 modname
 
         putStr "cmLoadModule: downsweep begins\n"
         mg2unsorted <- downsweep modname
-        putStrLn (showSDoc (vcat (map ppr mg2unsorted)))
 
         let modnames1   = map name_of_summary (flattenSCCs mg1)
         let modnames2   = map name_of_summary mg2unsorted
@@ -155,7 +153,7 @@ cmLoadModule cmstate1 modname
         let mg2 = topological_sort mg2unsorted
 
         putStrLn "after tsort:\n"
-        putStrLn (showSDoc (vcat (map ppr (flattenSCCs mg2))))
+        putStrLn (showSDoc (vcat (map ppr ({-flattenSCCs-} mg2))))
 
         -- Now do the upsweep, calling compile for each module in
         -- turn.  Final result is version 3 of everything.
@@ -499,6 +497,7 @@ topological_sort summaries
      in
          sccs
 
+-- NB: ignores import-sources for the time being
 downsweep :: ModuleName          -- module to chase from
           -> IO [ModSummary]
 downsweep rootNm
@@ -512,7 +511,7 @@ downsweep rootNm
 		case found of
 		   Just (mod, location) -> summarise preprocess mod location
 		   Nothing -> throwDyn (OtherError 
-                                   ("ghc --make: no signs of life for module `" 
+                                   ("no signs of life for module `" 
                                      ++ showSDoc (ppr nm) ++ "'"))
                                  
 
@@ -521,7 +520,8 @@ downsweep rootNm
         loop homeSummaries
            = do let allImps :: [ModuleName]
                     allImps   -- all imports
-                       = (nub . map mimp_name . concat . map ms_get_imports)
+                       = (nub . map mimp_name 
+                              . concat . map ms_get_imports)
                          homeSummaries
                 let allHome   -- all modules currently in homeSummaries
                        = map (moduleName.ms_mod) homeSummaries

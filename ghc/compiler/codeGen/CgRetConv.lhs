@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.28 2000/10/18 09:40:17 simonmar Exp $
+% $Id: CgRetConv.lhs,v 1.29 2000/11/14 17:41:04 sewardj Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -58,7 +58,7 @@ ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
 
 ctrlReturnConvAlg tycon
   = case (tyConFamilySize tycon) of
-      0 -> panic "ctrlRetConvAlg"
+      0 -> pprPanic "ctrlRetConvAlg" (ppr tycon)
       size -> -- we're supposed to know...
 	if (size > (1::Int) && size <= mAX_FAMILY_SIZE_FOR_VEC_RETURNS) then
 	    VectoredReturn size

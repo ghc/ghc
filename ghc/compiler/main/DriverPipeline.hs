@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.24 2000/11/14 16:28:38 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.25 2000/11/14 17:41:04 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -764,12 +764,13 @@ compile summary old_iface hst hit pcs = do
    init_dyn_flags <- readIORef v_InitDynFlags
    writeIORef v_DynFlags init_dyn_flags
 
-   let location = ms_location summary   
-   let input_fn = unJust (ml_hs_file location) "compile:hs"
+   let location   = ms_location summary   
+   let input_fn   = unJust (ml_hs_file location) "compile:hs"
+   let input_fnpp = unJust (ml_hspp_file location) "compile:hspp"
 
-   when verb (hPutStrLn stderr ("compile: input file " ++ input_fn))
+   when verb (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
 
-   opts <- getOptionsFromSource input_fn
+   opts <- getOptionsFromSource input_fnpp
    processArgs dynamic_flags opts []
    dyn_flags <- readIORef v_DynFlags
 

@@ -501,7 +501,7 @@ findAndReadIface doc_str mod_name hi_boot_file
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
 
 mkHiPath hi_boot_file (Just path)
-  | hi_boot_file = path ++ "-boot"
+  | hi_boot_file = path ++ "-boot-5"
   | otherwise    = path
 \end{code}
 

@@ -6,7 +6,7 @@
 \begin{code}
 module CmSummarise ( ModImport(..), mimp_name,
                      ModSummary(..), summarise, ms_get_imports,
-		     name_of_summary, deps_of_summary,
+		     name_of_summary, deps_of_summary, is_source_import,
 		     getImports )
 where
 
@@ -58,6 +58,9 @@ instance Outputable ModImport where
 mimp_name (MINormal nm) = nm
 mimp_name (MISource nm) = nm
 
+is_source_import (MINormal _) = False
+is_source_import (MISource _) = True
+
 name_of_summary :: ModSummary -> ModuleName
 name_of_summary = moduleName . ms_mod
 
@@ -92,10 +95,13 @@ approximate: we don't parse the module, but we do eliminate comments
 and strings.  Doesn't currently know how to unlit or cppify the module
 first.
 
+NB !!!!! Ignores source imports, pro tem.
+
 \begin{code}
 
 getImports :: String -> [ModImport]
-getImports = nub . gmiBase . clean
+getImports = filter (not . is_source_import) .
+             nub . gmiBase . clean
 
 -- really get the imports from a de-litted, cpp'd, de-literal'd string
 gmiBase :: String -> [ModImport]

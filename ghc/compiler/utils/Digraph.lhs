@@ -43,6 +43,7 @@ import ST
 import Maybe
 import Array
 import List
+import Outputable
 \end{code}
 
 
@@ -61,6 +62,10 @@ flattenSCCs = concatMap flattenSCC
 
 flattenSCC (AcyclicSCC v) = [v]
 flattenSCC (CyclicSCC vs) = vs
+
+instance Outputable a => Outputable (SCC a) where
+   ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))
+   ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
 \end{code}
 
 \begin{code}
