@@ -4446,7 +4446,7 @@ Now you can make a data type into an instance of Bin like this:
   instance (Bin a, Bin b) => Bin (a,b)
   instance Bin a => Bin [a]
 </programlisting>
-That is, just leave off the "where" clasuse.  Of course, you can put in the
+That is, just leave off the "where" clause.  Of course, you can put in the
 where clause and over-ride whichever methods you please.
 </para>
 
