@@ -707,6 +707,7 @@ layout:</para>
 <programlisting>
   $(libdir)/
     package.conf           GHC package configuration
+    ghc-usage.txt          Message displayed by ghc --help
     
     bin/                   [Win32 only]  User-visible binaries
          ghc.exe
