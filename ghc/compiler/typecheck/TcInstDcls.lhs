@@ -610,19 +610,37 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
     mappM (addErrTc . badMethodErr clas) bad_bndrs	`thenM_`
 
 	-- Make the method bindings
-    mapAndUnzipM do_one op_items			`thenM` \ (meth_ids, meth_binds_s) ->
-   
-    returnM (meth_ids, andMonoBindList meth_binds_s)
+    let
+	mk_method_bind = mkMethodBind InstanceDeclOrigin clas inst_tys' monobinds
+    in
+    mapAndUnzipM mk_method_bind  op_items 	`thenM` \ (meth_insts, meth_infos) ->
 
-  where
-    xtve = inst_tyvars `zip` inst_tyvars'
-    do_one op_item 
-	= mkMethodBind InstanceDeclOrigin clas 
-		       inst_tys' monobinds op_item 	`thenM` \ (meth_inst, meth_info) ->
-	  tcMethodBind xtve inst_tyvars' dfun_theta' 
-		       avail_insts uprags meth_info	`thenM` \ meth_bind ->
-		-- Could add meth_insts to avail_insts, but not worth the bother
-	  returnM (instToId meth_inst, meth_bind)
+	-- And type check them
+	-- It's really worth making meth_insts available to the tcMethodBind
+	-- Consider	instance Monad (ST s) where
+	--		  {-# INLINE (>>) #-}
+	--		  (>>) = ...(>>=)...
+	-- If we don't include meth_insts, we end up with bindings like this:
+	--	rec { dict = MkD then bind ...
+	--	      then = inline_me (... (GHC.Base.>>= dict) ...)
+	--	      bind = ... }
+	-- The trouble is that (a) 'then' and 'dict' are mutually recursive, 
+	-- and (b) the inline_me prevents us inlining the >>= selector, which
+	-- would unravel the loop.  Result: (>>) ends up as a loop breaker, and
+	-- is not inlined across modules. Rather ironic since this does not
+	-- happen without the INLINE pragma!  
+	--
+	-- Solution: make meth_insts available, so that 'then' refers directly
+	-- 	     to the local 'bind' rather than going via the dictionary.
+    let
+	all_insts      = avail_insts ++ meth_insts
+	xtve	       = inst_tyvars `zip` inst_tyvars'
+	tc_method_bind = tcMethodBind xtve inst_tyvars' dfun_theta' all_insts uprags 
+    in
+    mapM tc_method_bind meth_infos		`thenM` \ meth_binds_s ->
+   
+    returnM (map instToId meth_insts, andMonoBindList meth_binds_s)
+
 
 -- Derived newtype instances
 tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
