@@ -648,18 +648,25 @@ schemeT d s p app
      )
 
    -- Case 2
-   | [arg1,arg2] <- args_r_to_l,
+   | is_con_call,
+     isUnboxedTupleCon con,			-- (# ... #)
+     [(_,arg1),(_,arg2)] <- args_r_to_l,	-- Exactly two args
      let 
-	 isVoidRepAtom (_, AnnVar v)    = typePrimRep (idType v) == VoidRep
-         isVoidRepAtom (_, AnnNote n e) = isVoidRepAtom e
-	 isVoidRepAtom _ = False
+	 isVoidRepAtom (AnnVar v)        = typePrimRep (idType v) == VoidRep
+         isVoidRepAtom (AnnNote n (_,e)) = isVoidRepAtom e
+	 isVoidRepAtom _ 	         = False
      in  
-	 isVoidRepAtom arg2
+     isVoidRepAtom arg2			-- The first arg is void
    = --trace (if isSingleton args_r_to_l
      --       then "schemeT: unboxed singleton"
      --       else "schemeT: unboxed pair with Void first component") (
-     schemeT d s p arg1
-     --)
+     pushAtom True d p arg1	`thenBc` \ (push, szw) ->
+     returnBc (push 				-- value onto stack
+               `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
+               `snocOL` RETURN (atomRep arg1))	-- go
+	-- We used to use "schemeT d s p arg1", but that is wrong.
+	-- We must use RETURN (because it's an unboxed tuple)
+	-- I think that this still does not work: SLPJ Oct 02
 
    -- Case 3
    | Just (CCall ccall_spec) <- isFCallId_maybe fn
