@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/04/27 14:07:55 $
+ * $Revision: 1.15 $
+ * $Date: 1999/04/28 12:59:51 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -490,7 +490,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             /* Start of the bytecode evaluator                      */
             /* ---------------------------------------------------- */
         {
-#           if !DEBUG && USE_GCC_LABELS
+#           if USE_GCC_LABELS
 #           define Ins(x)          &&l##x
             static void *labs[] = { INSTRLIST };
 #           undef Ins
@@ -532,11 +532,11 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             fprintf(stderr,"Sp = %p\tSu = %p\tpc = %d\t", xSp, xSu, PC);
                     SSS;
                     disInstr(bco,PC);
-                    //{ int i;
-                    //fprintf(stderr,"\n");
-                    //  for (i = 4; i >= 0; i--) 
-                    //     fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(Sp+i)));
-                    //  }
+                    { int i;
+                    fprintf(stderr,"\n");
+                      for (i = 8; i >= 0; i--) 
+                         fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(Sp+i)));
+                      }
                     fprintf(stderr,"\n");
                     LLL;
                    );
