@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.69 2003/01/29 09:54:33 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.70 2003/01/30 10:19:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -140,10 +140,6 @@ hs_init(int *argc, char **argv[])
     initProfiling1();
 #endif
 
-#if defined(PROFILING) || defined(DEBUG)
-    initProfiling2();
-#endif
-
     /* start the virtual timer 'subsystem'. */
     startVirtTimer(TICK_MILLISECS);
 
@@ -258,6 +254,12 @@ hs_add_root(void (*init_root)(void))
     StgRun((StgFunPtr)stg_init, &cap.r);
 
     freeGroup(bd);
+
+#if defined(PROFILING) || defined(DEBUG)
+    // This must be done after module initialisation.
+    // ToDo: make this work in the presence of multiple hs_add_root()s.
+    initProfiling2();
+#endif
 }
 
 /* -----------------------------------------------------------------------------
