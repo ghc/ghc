@@ -225,8 +225,12 @@ endif
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkHaskellSupport)" "YES"
 boot ::
-	cd gmp && CC=$(WhatGccIsCalled) ./configure --enable-shared=no \
-		--host=`echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g'`
+	if [ -f gmp/config.status ]; then \
+	   cd gmp && CC=$(WhatGccIsCalled) ./config.status; \
+        else \
+	   cd gmp && CC=$(WhatGccIsCalled) ./configure --enable-shared=no \
+		        --host=`echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g'`; \
+	fi
 
 # Slight cheatage here to pass host as target, but x-compilation isn't supported by ghc.
 
