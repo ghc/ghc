@@ -87,7 +87,7 @@ $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
 @Obj_suffix =  ("o");
 @File_suffix = ();
-$ghc_version_info = ${ProjectVersionInt}
+$ghc_version_info = ${ProjectVersionInt};
 
 $Import_dirs = '.';
 %Syslibs = ();

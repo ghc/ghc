@@ -379,7 +379,7 @@ require special handling.
 # We need to look in ghc/ and glaExts/ when searching for implicitly needed .hi files, but 
 # we should really *not* look there for explicitly imported modules.
 
-$GhcVersionInfo  = $ProjectVersionInt
+$GhcVersionInfo  = $ProjectVersionInt;
 $Haskell1Version = 4; # i.e., Haskell 1.4
 @Cpp_define	 = ();
 
