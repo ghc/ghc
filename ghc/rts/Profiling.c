@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.34 2002/11/01 11:17:29 simonmar Exp $
+ * $Id: Profiling.c,v 1.35 2002/12/19 18:02:13 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -715,6 +715,7 @@ reportCCSProfiling( void )
       gen_XML_logfile();
       return;
     default:
+      break;
     }
 
     fprintf(prof_file, "\t%s Time and Allocation Profiling Report  (%s)\n", 
