@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.34 2005/03/07 14:52:20 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.35 2005/03/07 15:16:41 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -64,7 +64,11 @@ defaults
 -- matched pairs of embedded curly brackets.
 
 #include "MachDeps.h"
-#include "ghc_boot_platform.h"
+
+-- We need platform defines (tests for mingw32 below).  However, we only
+-- test the TARGET platform, which doesn't vary between stages, so the
+-- stage1 platform defines are fine:
+#include "../stage1/ghc_boot_platform.h"
 
 section "The word size story."
 	{Haskell98 specifies that signed integers (type {\tt Int})
