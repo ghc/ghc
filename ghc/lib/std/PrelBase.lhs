@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.45 2001/04/14 22:28:22 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.46 2001/04/27 20:30:55 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -426,6 +426,17 @@ instance Ord Char where
   (C# c1) <= (C# c2) = c1 `leChar#` c2
   (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
+{- XXX
+{-# RULES
+"x# `eqChar#` x#" forall x#. eqChar# x# x# = True
+"x# `neChar#` x#" forall x#. neChar# x# x# = False
+"x# `gtChar#` x#" forall x#. gtChar# x# x# = False
+"x# `geChar#` x#" forall x#. geChar# x# x# = True
+"x# `leChar#` x#" forall x#. leChar# x# x# = True
+"x# `ltChar#` x#" forall x#. ltChar# x# x# = False
+    #-}
+-}
+
 chr :: Int -> Char
 chr (I# i) | i >=# 0# && i <=# 0x10FFFF# = C# (chr# i)
            | otherwise                   = error "Prelude.chr: bad argument"
@@ -608,6 +619,19 @@ plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt, gcdInt :: Int -> I
 (I# x) `divInt`   (I# y) = I# (x `divInt#`  y)
 (I# x) `modInt`   (I# y) = I# (x `modInt#`  y)
 
+{- XXX
+{-# RULES
+"x# +# 0#" forall x#. x# +# 0# = x#
+"0# +# x#" forall x#. 0# +# x# = x#
+"x# -# 0#" forall x#. x# -# 0# = x#
+"x# -# x#" forall x#. x# -# x# = 0#
+"x# *# 0#" forall x#. x# *# 0# = 0#
+"0# *# x#" forall x#. 0# *# x# = 0#
+"x# *# 1#" forall x#. x# *# 1# = x#
+"1# *# x#" forall x#. 1# *# x# = x#
+    #-}
+-}
+
 gcdInt (I# a) (I# b) = g a b
    where g 0# 0# = error "PrelBase.gcdInt: gcd 0 0 is undefined"
          g 0# _  = I# absB
@@ -630,6 +654,16 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 (I# x) `ltInt` (I# y) = x <#  y
 (I# x) `leInt` (I# y) = x <=# y
 
+{- XXX
+{-# RULES
+"x# >#  x#" forall x#. x# >#  x# = False
+"x# >=# x#" forall x#. x# >=# x# = True
+"x# ==# x#" forall x#. x# ==# x# = True
+"x# /=# x#" forall x#. x# /=# x# = False
+"x# <#  x#" forall x#. x# <#  x# = False
+"x# <=# x#" forall x#. x# <=# x# = True
+    #-}
+
 #if WORD_SIZE_IN_BYTES == 4
 {-# RULES
 "intToInt32#"   forall x#. intToInt32#   x# = x#
@@ -641,6 +675,7 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 "int2Word2Int"  forall x#. int2Word# (word2Int# x#) = x#
 "word2Int2Word" forall x#. word2Int# (int2Word# x#) = x#
     #-}
+-}
 \end{code}
 
 
