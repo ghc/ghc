@@ -87,8 +87,8 @@ module Constants (
 All pretty arbitrary:
 
 \begin{code}
-mAX_TUPLE_SIZE = 37
-mAX_CONTEXT_REDUCTION_DEPTH = 20
+mAX_TUPLE_SIZE = (37 :: Int)
+mAX_CONTEXT_REDUCTION_DEPTH = (20 :: Int)
 \end{code}
 
 \begin{code}
