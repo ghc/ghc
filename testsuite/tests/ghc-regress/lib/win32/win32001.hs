@@ -33,7 +33,7 @@ onPaint (_,_,w,h) hdc = do
    return ()
 
 -- Simple window procedure - one way to improve and generalise
-- it would be to pass it a message map (represented as a 
+-- it would be to pass it a message map (represented as a 
 -- finite map from WindowMessages to actions, perhaps).
 
 wndProc :: Win32.LPPAINTSTRUCT
