@@ -476,7 +476,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
 		-- 	case t of {(_,counts') -> if counts'=0 then ... }
 		-- So the conditional didn't force counts', because the
 		-- selection got duplicated.  Sigh!
-	   case initSmpl dflags us1 (simplTopBinds simpl_env tagged_binds) of {
+	   case initSmpl dflags us1 (_scc_ "SimplTopBinds" simplTopBinds simpl_env tagged_binds) of {
 	  	(binds', counts') -> do {
 
 	   let	{ guts'      = guts { mg_binds = binds' }
