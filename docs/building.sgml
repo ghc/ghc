@@ -172,7 +172,7 @@ manual in detail.
 
 </Sect1>
 
-<Sect1>
+<Sect1 id="sec-build-checks">
 <Title>Things to check before you start typing</Title>
 
 <Para>
@@ -1451,7 +1451,7 @@ User's Guide section on "Separate Compilation").
 
 </Sect1>
 
-<Sect1>
+<Sect1 id="sec-makefile-arch">
 <Title>The <Filename>Makefile</Filename> architecture
 <IndexTerm><Primary>makefile architecture</Primary></IndexTerm></Title>
 
