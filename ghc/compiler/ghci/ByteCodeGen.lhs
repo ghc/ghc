@@ -22,7 +22,8 @@ import PrimRep		( PrimRep(..) )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
 import DataCon		( DataCon, dataConTag, fIRST_TAG )
-import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe )
+import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
+import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
 import PrimRep		( getPrimRepSize, isFollowableRep )
 import Constants	( wORD_SIZE )
@@ -65,7 +66,7 @@ type LocalLabel = Int
 data BCInstr
    -- Messing with the stack
    = ARGCHECK  Int
-   | PUSH_L    Int{-size-} Int{-offset-}
+   | PUSH_L    Int{-offset-}
    | PUSH_G    Name
    | PUSHT_I   Int
    | PUSHT_F   Float
@@ -95,7 +96,7 @@ data BCInstr
 
 instance Outputable BCInstr where
    ppr (ARGCHECK n)          = text "ARGCHECK" <+> int n
-   ppr (PUSH_L sz offset)    = text "PUSH_L  " <+> int sz <+> int offset
+   ppr (PUSH_L offset)       = text "PUSH_L  " <+> int offset
    ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
    ppr (PUSHT_I i)           = text "PUSHT_I " <+> int i
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
@@ -149,22 +150,30 @@ type BCEnv = FiniteMap Id Int	-- To find vars on the stack
 -- variable to which this value was bound, so as to give the
 -- resulting BCO a name.
 schemeR :: (Id, AnnExpr Id VarSet) -> BcM ()
-schemeR (nm, rhs) = schemeR_wrk nm (collect [] rhs)
+schemeR (nm, rhs) = schemeR_wrk rhs nm (collect [] rhs)
 
-collect xs (_, AnnLam x e) = collect (x:xs) e
-collect xs not_lambda      = (reverse xs, not_lambda)
+collect xs (_, AnnLam x e) 
+   = collect (if isTyVar x then xs else (x:xs)) e
+collect xs not_lambda
+   = (reverse xs, not_lambda)
 
-schemeR_wrk nm (args, body)
-   = let fvs       = fst body
-         all_args  = varSetElems fvs ++ args
+schemeR_wrk original_body nm (args, body)
+   = let fvs       = filter (not.isTyVar) (varSetElems (fst original_body))
+         all_args  = fvs ++ reverse args
          szsw_args = map taggedIdSizeW all_args
          szw_args  = sum szsw_args
-         p_init    = listToFM (zip all_args (scanl (+) 0 szsw_args))
+         p_init    = listToFM (zip all_args (mkStackOffsets 0 szsw_args))
          argcheck  = if null args then nilOL else unitOL (ARGCHECK szw_args)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
-     emitBc (ProtoBCO (getName nm) (appOL argcheck body_code) (Right body))
+     emitBc (ProtoBCO (getName nm) (appOL argcheck body_code) (Right original_body))
 
+-- Let szsw be the sizes in words of some items pushed onto the stack,
+-- which has initial depth d'.  Return the values which the stack environment
+-- should map these items to.
+mkStackOffsets :: Int -> [Int] -> [Int]
+mkStackOffsets original_depth szsw
+   = map (subtract 1) (tail (scanl (+) original_depth szsw))
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
@@ -179,30 +188,36 @@ schemeE d s p e@(fvs, AnnVar v)
 schemeE d s p (fvs, AnnLet binds b)
    = let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
                                    AnnRec xs_n_rhss -> unzip xs_n_rhss
-     in
-     mapBc schemeR (zip xs rhss)			`thenBc_`
-     let n     = length xs
-         fvss  = map (varSetElems.fst) rhss
+         n     = length xs
+         fvss  = map (filter (not.isTyVar).varSetElems.fst) rhss
          sizes = map (\rhs_fvs -> 1 + sum (map taggedIdSizeW rhs_fvs)) fvss
-         p'    = addListToFM p (zipE xs [d .. d+n-1])
+
+         -- This p', d' defn is safe because all the items being pushed
+         -- are ptrs, so all have size 1.  d' and p' reflect the stack
+         -- after the closures have been allocated in the heap (but not
+         -- filled in), and pointers to them parked on the stack.
+         p'    = addListToFM p (zipE xs (mkStackOffsets d (nOfThem n 1)))
          d'    = d + n
+
          infos = zipE4 fvss sizes xs [n, n-1 .. 1]
          zipE  = zipEqual "schemeE"
          zipE4 = zipWith4Equal "schemeE" (\a b c d -> (a,b,c,d))
 
          -- ToDo: don't build thunks for things with no free variables
-         buildThunk (fvs, size, id, off)
-            = case unzip (map (pushAtom True d' p . AnnVar) (reverse fvs)) of
-                (push_codes, pushed_szsw) 
-                   -> ASSERT(sum pushed_szsw == size - 1)
-                            (toOL push_codes `snocOL` PUSH_G (getName id) 
-                                             `appOL` unitOL (MKAP off size))
+         buildThunk dd ([], size, id, off)
+            = PUSH_G (getName id) 
+              `consOL` unitOL (MKAP (off+size-1) size)
+         buildThunk dd ((fv:fvs), size, id, off)
+            = case pushAtom True dd p' (AnnVar fv) of
+                 (push_code, pushed_szw)
+                    -> push_code `appOL`
+                       buildThunk (dd+pushed_szw) (fvs, size, id, off)
 
-         thunkCode = concatOL (map buildThunk infos)
+         thunkCode = concatOL (map (buildThunk d') infos)
          allocCode = toOL (map ALLOC sizes)
      in
-     schemeE d' s p' b   				`thenBc` \ bodyCode ->
-     mapBc schemeR (zip xs rhss) 			`thenBc` \_ ->
+     schemeE d' s p' b   				`thenBc`  \ bodyCode ->
+     mapBc schemeR (zip xs rhss) 			`thenBc_`
      returnBc (allocCode `appOL` thunkCode `appOL` bodyCode)
 
 
@@ -217,7 +232,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         -- Env and depth in which to compile the alts, not including
         -- any vars bound by the alts themselves
         d' = d + ret_frame_sizeW + taggedIdSizeW bndr
-        p' = addToFM p bndr d'
+        p' = addToFM p bndr (d' - 1)
 
         isAlgCase
            = case typePrimRep (idType bndr) of
@@ -230,7 +245,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
            | isAlgCase 
            = let binds_szsw = map untaggedIdSizeW binds
                  binds_szw  = sum binds_szsw
-                 p'' = addListToFM p' (zip binds (scanl (+) d' binds_szsw))
+                 p'' = addListToFM p' (zip binds (mkStackOffsets d' binds_szsw))
                  d'' = d' + binds_szw
              in schemeE d'' s p'' rhs	`thenBc` \ rhs_code -> 
                 returnBc (my_discr alt, UNPACK binds_szw `consOL` rhs_code)
@@ -270,8 +285,9 @@ schemeT :: Bool 	-- do tagging?
 
 schemeT enTag d s narg_words p (_, AnnApp f a) 
    = let (push, arg_words) = pushAtom enTag d p (snd a)
-     in push 
-        `consOL` schemeT enTag (d+arg_words) s (narg_words+arg_words) p f
+     in arg_words `seq`
+        push 
+        `appOL` schemeT enTag (d+arg_words) s (narg_words+arg_words) p f
 
 schemeT enTag d s narg_words p (_, AnnVar f)
    | Just con <- isDataConId_maybe f
@@ -280,9 +296,10 @@ schemeT enTag d s narg_words p (_, AnnVar f)
    | otherwise
    = ASSERT(enTag == True)
      let (push, arg_words) = pushAtom True d p (AnnVar f)
-     in push 
-        `consOL` SLIDE (narg_words+arg_words) (d - s - narg_words)
-        `consOL` unitOL ENTER
+     in arg_words `seq`
+        push 
+        `snocOL` SLIDE (narg_words+arg_words) (d - s - narg_words)
+        `snocOL` ENTER
 
 should_args_be_tagged (_, AnnVar v)
    = case isDataConId_maybe v of
@@ -309,33 +326,45 @@ should_args_be_tagged (_, other)
 --
 -- Blargh.  JRS 001206
 --
-pushAtom True{-tagged-} d p (AnnVar v) 
-   = case lookupBCEnv_maybe p v of
-        Just offset -> (PUSH_L sz offset, sz)
-        Nothing     -> ASSERT(sz == 1) (PUSH_G nm, sz)
-     where
-        nm = getName v
-        sz = taggedIdSizeW v
+-- NB (further) that the env p must map each variable to the highest-
+-- numbered stack slot for it.  For example, if the stack has depth 4 
+-- and we tagged-ly push (v :: Int#) on it, the value will be in stack[4],
+-- the tag in stack[5], the stack will have depth 6, and p must map v to
+-- 5 and not to 4.
 
-pushAtom False{-not tagged-} d p (AnnVar v) 
-   = case lookupBCEnv_maybe p v of
-        Just offset -> (PUSH_L sz (offset+1), sz-1)
-        Nothing     -> ASSERT(sz == 1) (PUSH_G nm, sz)
-     where
-        nm = getName v
-        sz = untaggedIdSizeW v
+pushAtom tagged d p (AnnVar v) 
+   = let str = "\npushAtom " ++ showSDocDebug (ppr v) ++ ", depth = " ++ show d
+               ++ ", env =\n" ++ 
+               showSDocDebug (nest 4 (vcat (map ppr (fmToList p))))
+               ++ " -->\n" ++
+               showSDoc (nest 4 (vcat (map ppr (fromOL (fst result)))))
+               ++ "\nendPushAtom " ++ showSDocDebug (ppr v)
+         str' = if str == str then str else str
+
+         result
+            = case lookupBCEnv_maybe p v of
+                 Just d_v -> (toOL (nOfThem nwords (PUSH_L (d-d_v+sz_t-2))), sz_t)
+                 Nothing  -> ASSERT(sz_t == 1) (unitOL (PUSH_G nm), sz_t)
+
+         nm     = getName v
+         sz_t   = taggedIdSizeW v
+         sz_u   = untaggedIdSizeW v
+         nwords = if tagged then sz_t else sz_u
+     in
+         --trace str'
+         result
 
 pushAtom True d p (AnnLit lit)
    = case lit of
-        MachInt i    -> (PUSHT_I (fromInteger i),  taggedSizeW IntRep)
-        MachFloat r  -> (PUSHT_F (fromRational r), taggedSizeW FloatRep)
-        MachDouble r -> (PUSHT_D (fromRational r), taggedSizeW DoubleRep)
+        MachInt i    -> (unitOL (PUSHT_I (fromInteger i)),  taggedSizeW IntRep)
+        MachFloat r  -> (unitOL (PUSHT_F (fromRational r)), taggedSizeW FloatRep)
+        MachDouble r -> (unitOL (PUSHT_D (fromRational r)), taggedSizeW DoubleRep)
 
 pushAtom False d p (AnnLit lit)
    = case lit of
-        MachInt i    -> (PUSHU_I (fromInteger i),  untaggedSizeW IntRep)
-        MachFloat r  -> (PUSHU_F (fromRational r), untaggedSizeW FloatRep)
-        MachDouble r -> (PUSHU_D (fromRational r), untaggedSizeW DoubleRep)
+        MachInt i    -> (unitOL (PUSHU_I (fromInteger i)),  untaggedSizeW IntRep)
+        MachFloat r  -> (unitOL (PUSHU_F (fromRational r)), untaggedSizeW FloatRep)
+        MachDouble r -> (unitOL (PUSHU_D (fromRational r)), untaggedSizeW DoubleRep)
 
 
 -- Given a bunch of alts code and their discrs, do the donkey work
@@ -462,6 +491,7 @@ instance Outputable Discr where
 
 
 -- Find things in the BCEnv (the what's-on-the-stack-env)
+-- See comment preceding pushAtom for precise meaning of env contents
 lookupBCEnv :: BCEnv -> Id -> Int
 lookupBCEnv env nm
    = case lookupFM env nm of
@@ -597,7 +627,7 @@ mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs []
 mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs (instr:instrs)
    = case instr of
         ARGCHECK  n    -> boring2 i_ARGCHECK n
-        PUSH_L    sz off -> boring3 i_PUSH_L sz off
+        PUSH_L    off  -> boring2 i_PUSH_L off
         PUSH_G    nm   -> exciting2_P i_PUSH_G n_ptrs nm
         PUSHT_I   i    -> exciting2_I i_PUSHT_I n_lits i
         PUSHT_F   f    -> exciting2_F i_PUSHT_F n_lits f
@@ -687,7 +717,7 @@ instrSizeB :: BCInstr -> Int
 instrSizeB instr
    = case instr of
         ARGCHECK _   -> 4
-        PUSH_L   _ _ -> 6
+        PUSH_L   _   -> 4
         PUSH_G   _   -> 4
         PUSHT_I  _   -> 4
         PUSHT_F  _   -> 4
