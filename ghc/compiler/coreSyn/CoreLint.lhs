@@ -41,7 +41,7 @@ import Type		( Type, Kind, tyVarsOfType,
 import TyCon		( TyCon, isPrimTyCon, tyConDataCons )
 import Outputable
 
-infixr 9 `thenL`, `seqL`, `thenMaybeL`
+infixr 9 `thenL`, `seqL`
 \end{code}
 
 %************************************************************************
