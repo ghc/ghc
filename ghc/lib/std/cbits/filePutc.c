@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePutc.c,v 1.8 1999/09/16 13:14:43 simonmar Exp $
+ * $Id: filePutc.c,v 1.9 1999/11/25 16:54:14 simonmar Exp $
  *
  * hPutChar Runtime Support
  */
@@ -21,9 +21,7 @@
 #define TERMINATE_LINE(x)   ((x) == '\n')
 
 StgInt
-filePutc(ptr, c)
-StgForeignPtr ptr;
-StgChar c;
+filePutc(StgForeignPtr ptr, StgChar c)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;

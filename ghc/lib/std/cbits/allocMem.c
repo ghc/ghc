@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: allocMem.c,v 1.2 1998/12/02 13:27:13 simonm Exp $
+ * $Id: allocMem.c,v 1.3 1999/11/25 16:54:14 simonmar Exp $
  *
  * malloc interface
  */
@@ -10,8 +10,7 @@
 #include "stgio.h"
 
 StgAddr
-allocMemory__(sz)
-StgInt sz;/* bytes*/
+allocMemory__(StgInt sz/* bytes */)
 {
  StgAddr ptr;
 

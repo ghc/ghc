@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.9 1999/11/05 15:25:49 simonmar Exp $
+ * $Id: writeFile.c,v 1.10 1999/11/25 16:54:15 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -18,9 +18,7 @@
 #endif
 
 StgInt
-writeFileObject(ptr, bytes)
-StgForeignPtr ptr;
-StgInt bytes;
+writeFileObject(StgForeignPtr ptr, StgInt bytes)
 {
     int rc=0;
     IOFileObject* fo = (IOFileObject*)ptr;
@@ -40,18 +38,20 @@ StgInt bytes;
 }
 
 StgInt
-writeBuffer(ptr, bytes)
-StgForeignPtr ptr;
-StgInt bytes;
+writeBuffer(StgForeignPtr ptr, StgInt bytes)
 {
     int count, rc=0;
     IOFileObject* fo = (IOFileObject*)ptr;
 
-    char *pBuf = (char *) fo->buf;
+    char *pBuf = (char *) fo->buf + fo->bufStart;
+
+    bytes -= fo->bufStart;
 
     /* Disallow short writes */
-    if (bytes == 0  || fo->buf == NULL)
+    if (bytes == 0  || fo->buf == NULL) {
+        fo->bufStart = 0;
 	return 0;
+    }
 
     while ((count = 
 	       (
@@ -74,19 +74,18 @@ StgInt bytes;
         else {
 	    bytes -= count;
 	    pBuf  += count;
+            fo->bufStart += count;
         }
     }
     /* Signal that we've emptied the buffer */
-    fo->bufWPtr=0;
+    fo->bufStart = 0;
+    fo->bufWPtr  = 0;
     return 0;
 }
 
 
 StgInt
-writeBuf(ptr, buf, len)
-StgForeignPtr ptr;
-StgAddr buf;
-StgInt  len;
+writeBuf(StgForeignPtr ptr, StgAddr buf, StgInt len)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int count;
@@ -117,11 +116,9 @@ StgInt  len;
        ) {
        /* Flush buffer */
        rc = writeFileObject(ptr, fo->bufWPtr);
-       /* ToDo: undo buffer fill if we're blocking.. */
-    }
-
-    if (rc != 0) { 
-       return rc;
+       if (rc != 0) { 
+           return rc;
+       }
     }
 
     while ((count = 
@@ -151,8 +148,7 @@ StgInt  len;
 }
 
 StgInt
-writeBufBA(ptr, buf, len)
-     StgForeignPtr ptr;
-StgByteArray buf;
-StgInt  len;
-{ return (writeBuf(ptr,(StgAddr)buf, len)); }
+writeBufBA(StgForeignPtr ptr, StgByteArray buf, StgInt len)
+{ 
+    return (writeBuf(ptr,(StgAddr)buf, len)); 
+}

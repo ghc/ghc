@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileLookAhead.c,v 1.3 1998/12/02 13:27:25 simonm Exp $
+ * $Id: fileLookAhead.c,v 1.4 1999/11/25 16:54:14 simonmar Exp $
  *
  * hLookAhead Runtime Support
  */
@@ -10,8 +10,7 @@
 #include "stgio.h"
 
 StgInt
-fileLookAhead(ptr)
-StgForeignPtr ptr;
+fileLookAhead(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int c, rc;
@@ -45,9 +44,7 @@ StgForeignPtr ptr;
 }
 
 StgInt
-ungetChar(ptr,c)
-StgForeignPtr ptr;
-StgChar c;
+ungetChar(StgForeignPtr ptr, StgChar c)
 {
   IOFileObject* fo = (IOFileObject*)ptr;
   int rc = 0, sz = 0;

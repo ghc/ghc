@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: closeFile.c,v 1.6 1999/07/12 10:43:12 sof Exp $
+ * $Id: closeFile.c,v 1.7 1999/11/25 16:54:14 simonmar Exp $
  *
  * hClose Runtime Support
  */
@@ -20,9 +20,7 @@
 StgInt __really_close_stdfiles=1;
 
 StgInt
-closeFile(ptr,flush_buf)
-StgForeignPtr ptr;
-StgInt flush_buf;
+closeFile(StgForeignPtr ptr, StgInt flush_buf)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;
@@ -33,7 +31,7 @@ StgInt flush_buf;
        return 0;
     }
 
-    if ( flush_buf != 0 && (fo->flags & FILEOBJ_FLUSH) ) {
+    if ( flush_buf != 0 && (fo->flags & FILEOBJ_WRITE) ) {
        writeFileObject(ptr,fo->bufWPtr);
     }
 

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: setBuffering.c,v 1.5 1999/05/05 10:33:16 sof Exp $
+ * $Id: setBuffering.c,v 1.6 1999/11/25 16:54:15 simonmar Exp $
  *
  * hSetBuffering Runtime Support
  */
@@ -42,7 +42,7 @@ StgInt size;
    
 
     /* First off, flush old buffer.. */
-    if ( (fo->flags & FILEOBJ_FLUSH) ) {
+    if ( (fo->flags & FILEOBJ_WRITE) ) {
        rc = flushBuffer(ptr);
     }
     if (rc<0) return rc;

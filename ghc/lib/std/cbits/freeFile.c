@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: freeFile.c,v 1.6 1999/07/12 10:43:13 sof Exp $
+ * $Id: freeFile.c,v 1.7 1999/11/25 16:54:14 simonmar Exp $
  *
  * Giving up files
  */
@@ -24,26 +24,29 @@
    ForeignObj finaliser, as we probably want to use these
    before we *really* shut down (dumping stats etc.)
 */
-void freeStdFile(fp)
-StgForeignPtr fp;
+void
+freeStdFile(StgForeignPtr fp)
 { return; }
 
-void freeStdFileObject(ptr)
-StgForeignPtr ptr;
+void
+freeStdFileObject(StgForeignPtr ptr)
 { 
   IOFileObject* fo = (IOFileObject*)ptr;
+  int rc;
 
   /* Don't close the file, just flush the buffer */
   if (fo != NULL && fo->fd != -1) {
-    if (fo->buf != NULL && (fo->flags & FILEOBJ_FLUSH) && fo->bufWPtr > 0) {
+    if (fo->buf != NULL && (fo->flags & FILEOBJ_WRITE) && fo->bufWPtr > 0) {
        /* Flush buffer contents */
-       writeBuffer((StgForeignPtr)fo, fo->bufWPtr);
+       do {
+	 rc = writeBuffer((StgForeignPtr)fo, fo->bufWPtr);
+       } while (rc == FILEOBJ_BLOCKED_WRITE) ;
     }
   }
 }
 
-void freeFileObject(ptr)
-StgForeignPtr ptr;
+void
+freeFileObject(StgForeignPtr ptr)
 {
     /*
      * The finaliser for the file objects embedded in Handles. The RTS
@@ -85,12 +88,14 @@ StgForeignPtr ptr;
     return;
 }
 
-StgAddr	ref_freeStdFileObject(void)
+StgAddr
+ref_freeStdFileObject(void)
 {
     return (StgAddr)&freeStdFileObject;
 }
 
-StgAddr	ref_freeFileObject(void)
+StgAddr
+ref_freeFileObject(void)
 {
     return (StgAddr)&freeFileObject;
 }

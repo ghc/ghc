@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.10 1999/09/30 12:35:04 sof Exp $
+ * $Id: openFile.c,v 1.11 1999/11/25 16:54:14 simonmar Exp $
  *
  * openFile Runtime Support
  */
@@ -47,7 +47,7 @@ StgInt rd;
     fo->buf      = NULL;
     fo->bufWPtr  = 0;
     fo->bufRPtr  = 0;
-    fo->flags    = FILEOBJ_STD | ( rd ? FILEOBJ_READ : (FILEOBJ_WRITE | FILEOBJ_FLUSH));
+    fo->flags    = FILEOBJ_STD | ( rd ? FILEOBJ_READ : FILEOBJ_WRITE);
     fo->connectedTo = NULL;
  
     /* MS Win32 CRT doesn't support fcntl() -- the workaround is to
@@ -96,11 +96,11 @@ StgInt binary;
       case OPENFILE_APPEND:
         oflags = O_NONBLOCK | O_WRONLY | O_NOCTTY | O_APPEND; 
 	for_writing = 1;
-	flags |= FILEOBJ_WRITE | FILEOBJ_FLUSH;
+	flags |= FILEOBJ_WRITE;
 	break;
       case OPENFILE_WRITE:
 	oflags = O_NONBLOCK | O_WRONLY | O_NOCTTY;
-	flags |= FILEOBJ_WRITE | FILEOBJ_FLUSH;
+	flags |= FILEOBJ_WRITE;
 	for_writing = 1;
 	break;
     case OPENFILE_READ_ONLY:
@@ -110,7 +110,7 @@ StgInt binary;
 	break;
     case OPENFILE_READ_WRITE:
 	oflags = O_NONBLOCK | O_RDWR | O_NOCTTY;
-	flags |= FILEOBJ_READ | FILEOBJ_WRITE | FILEOBJ_FLUSH;
+	flags |= FILEOBJ_READ | FILEOBJ_WRITE;
 	for_writing = 1;
 	break;
     default:
@@ -280,6 +280,7 @@ StgInt binary;
 
     fo->fd       = fd;
     fo->buf      = NULL;
+    fo->bufStart = 0;
     fo->bufWPtr  = 0;
     fo->bufRPtr  = 0;
     fo->flags    = flags;
@@ -289,10 +290,7 @@ StgInt binary;
 
 /* `Lock' file descriptor and return file object. */
 IOFileObject*
-openFd(fd,oflags,flags)
-StgInt fd;
-StgInt oflags;
-StgInt flags;
+openFd(StgInt fd,StgInt oflags,StgInt flags)
 {
     int for_writing;
     FILE* fp;
@@ -318,11 +316,12 @@ StgInt flags;
     /* See openFileObject() comment */
     if ((fo = malloc(sizeof(IOFileObject))) == NULL)
        return NULL;
-    fo->fd      = fd;
-    fo->buf     = NULL;
-    fo->bufWPtr = 0;
-    fo->bufRPtr = 0;
-    fo->flags   = flags | ( oflags & O_RDONLY ? FILEOBJ_READ 
+    fo->fd       = fd;
+    fo->buf      = NULL;
+    fo->bufStart = 0;
+    fo->bufWPtr  = 0;
+    fo->bufRPtr  = 0;
+    fo->flags    = flags | ( oflags & O_RDONLY ? FILEOBJ_READ 
     			  : oflags & O_RDWR   ? FILEOBJ_READ 
 			  : 0)
 			| ( oflags & O_WRONLY ? FILEOBJ_WRITE

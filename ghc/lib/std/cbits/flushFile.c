@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: flushFile.c,v 1.5 1999/09/19 19:26:14 sof Exp $
+ * $Id: flushFile.c,v 1.6 1999/11/25 16:54:14 simonmar Exp $
  *
  * hFlush Runtime Support
  */
@@ -10,13 +10,12 @@
 #include "stgio.h"
 
 StgInt
-flushFile(ptr)
-StgForeignPtr ptr;
+flushFile(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;
 
-    if ( (fo->flags & FILEOBJ_FLUSH) && FILEOBJ_NEEDS_FLUSHING(fo) ) {
+    if ( (fo->flags & FILEOBJ_WRITE) && FILEOBJ_NEEDS_FLUSHING(fo) ) {
        rc = writeBuffer(ptr,fo->bufWPtr - fo->bufRPtr);
     }
 
@@ -24,8 +23,7 @@ StgForeignPtr ptr;
 }
 
 StgInt
-flushBuffer(ptr)
-StgForeignPtr ptr;
+flushBuffer(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;
@@ -57,8 +55,7 @@ StgForeignPtr ptr;
  the solution of leaving this to the programmer!)
 */
 StgInt
-flushReadBuffer(ptr)
-StgForeignPtr ptr;
+flushReadBuffer(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int delta;
@@ -81,8 +78,7 @@ StgForeignPtr ptr;
 }
 
 void
-flushConnectedBuf(ptr)
-StgForeignPtr ptr;
+flushConnectedBuf(StgForeignPtr ptr)
 {
     StgInt rc;
     IOFileObject* fo = (IOFileObject*)ptr;

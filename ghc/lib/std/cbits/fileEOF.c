@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileEOF.c,v 1.3 1998/12/02 13:27:22 simonm Exp $
+ * $Id: fileEOF.c,v 1.4 1999/11/25 16:54:14 simonmar Exp $
  *
  * hIsEOF Runtime Support
  */
@@ -10,8 +10,7 @@
 #include "stgio.h"
 
 StgInt
-fileEOF(ptr)
-StgForeignPtr ptr;
+fileEOF(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
 
