@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.137 2001/02/12 10:15:19 simonmar Exp $
+# $Id: Makefile,v 1.138 2001/02/13 09:35:45 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -219,6 +219,9 @@ utils/Digraph_HC_OPTS		= -fglasgow-exts
 #	the -funfolding flags.
 
 utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -funfolding-interface-threshold7
+
+# ByteCodeItbls uses primops that the NCG doesn't support yet.
+ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
 
 # ----------------------------------------------------------------------------
 #		C compilations
