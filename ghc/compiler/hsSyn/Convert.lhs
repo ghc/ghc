@@ -168,10 +168,10 @@ cvt (Comp ss)     = HsDo ListComp (cvtstmts ss) [] void loc0
 cvt (ArithSeq dd) = ArithSeqIn (cvtdd dd)
 cvt (ListExp xs)  = ExplicitList void (map cvt xs)
 cvt (Infix (Just x) s (Just y))
-    = HsPar (OpApp (cvt x) (HsVar(vName s)) undefined (cvt y))
-cvt (Infix Nothing  s (Just y)) = SectionR (HsVar(vName s)) (cvt y)
-cvt (Infix (Just x) s Nothing ) = SectionL (cvt x) (HsVar(vName s))
-cvt (Infix Nothing  s Nothing ) = HsVar(vName s) -- Can I indicate this is an infix thing?
+    = HsPar (OpApp (cvt x) (cvt s) undefined (cvt y))
+cvt (Infix Nothing  s (Just y)) = SectionR (cvt s) (cvt y)
+cvt (Infix (Just x) s Nothing ) = SectionL (cvt x) (cvt s)
+cvt (Infix Nothing  s Nothing ) = cvt s	-- Can I indicate this is an infix thing?
 cvt (SigExp e t)		= ExprWithTySig (cvt e) (cvtType t)
 
 cvtdecs :: [Meta.Dec] -> HsBinds RdrName

@@ -426,12 +426,10 @@ repE (HsLam m)     = repLambda m
 repE (HsApp x y)   = do {a <- repE x; b <- repE y; repApp a b}
 
 repE (OpApp e1 op fix e2) =
-  case op of
-    HsVar op -> do { arg1 <- repE e1; 
-		     arg2 <- repE e2; 
-		     the_op <- lookupOcc op ;
-		     repInfixApp arg1 the_op arg2 } 
-    _        -> panic "DsMeta.repE: Operator is not a variable"
+  do { arg1 <- repE e1; 
+       arg2 <- repE e2; 
+       the_op <- repE op ;
+       repInfixApp arg1 the_op arg2 } 
 repE (NegApp x nm)        = do
 			      a         <- repE x
 			      negateVar <- lookupOcc negateName >>= repVar
@@ -930,14 +928,14 @@ repListExp (MkC es) = rep2 listExpName [es]
 repSigExp :: Core M.Expr -> Core M.Type -> DsM (Core M.Expr)
 repSigExp (MkC e) (MkC t) = rep2 sigExpName [e,t]
 
-repInfixApp :: Core M.Expr -> Core String -> Core M.Expr -> DsM (Core M.Expr)
+repInfixApp :: Core M.Expr -> Core M.Expr -> Core M.Expr -> DsM (Core M.Expr)
 repInfixApp (MkC x) (MkC y) (MkC z) = rep2 infixAppName [x,y,z]
 
 repSectionL :: Core M.Expr -> Core M.Expr -> DsM (Core M.Expr)
-repSectionL (MkC x) (MkC y) = rep2 infixAppName [x,y]
+repSectionL (MkC x) (MkC y) = rep2 sectionLName [x,y]
 
 repSectionR :: Core M.Expr -> Core M.Expr -> DsM (Core M.Expr)
-repSectionR (MkC x) (MkC y) = rep2 infixAppName [x,y]
+repSectionR (MkC x) (MkC y) = rep2 sectionRName [x,y]
 
 ------------ Right hand sides (guarded expressions) ----
 repGuarded :: Core [(M.Expr, M.Expr)] -> DsM (Core M.Rihs)
