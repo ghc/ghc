@@ -196,11 +196,27 @@ parser output
 </Para>
 </ListItem>
 </VarListEntry>
+
 <VarListEntry>
 <Term><Option>-ddump-rn</Option>:</Term>
 <ListItem>
 <Para>
 renamer output
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term><Option>-ddump-minimal-imports</Option>:</Term>
+<ListItem>
+<Para>
+Dump to the file "M.imports" (where M is the module being compiled)
+a "minimal" set of import declarations.  You can safely replace
+all the import declarations in "M.hs" with those found in "M.imports".
+Why would you want to do that?  Because the "minimal" imports (a) import
+everything explicitly, by name, and (b) import nothing that is not required.
+It can be quite painful to maintain this property by hand, so this flag is
+intended to reduce the labour.
 </Para>
 </ListItem>
 </VarListEntry>
