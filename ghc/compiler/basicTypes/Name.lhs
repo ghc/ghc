@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module Name (
-	-- The Module type
+	-- Re-export the Module type
 	SYN_IE(Module),
 	pprModule, moduleString,
 
@@ -41,7 +41,7 @@ module Name (
 	-- Sets of Names
 	SYN_IE(NameSet),
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
-	minusNameSet, elemNameSet, nameSetToList, addListToNameSet, isEmptyNameSet,
+	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, isEmptyNameSet,
 
 	-- Misc
 	DefnInfo(..),
@@ -58,9 +58,9 @@ IMP_Ubiq()
 import TyLoop		--( GenId, Id(..), TyCon )			-- Used inside Names
 import CStrings		( identToC, modnameToC, cSEP )
 import CmdLineOpts	( opt_OmitInterfacePragmas, opt_EnsureSplittableC )
+import BasicTypes	( SYN_IE(Module), moduleString, pprModule )
 
-import Outputable	( Outputable(..) )
-import PprStyle		( PprStyle(..), codeStyle, ifaceStyle )
+import Outputable	( Outputable(..), PprStyle(..), codeStyle, ifaceStyle )
 import PrelMods		( gHC__ )
 import Pretty
 import Lex		( isLexSym, isLexConId )
@@ -68,7 +68,7 @@ import SrcLoc		( noSrcLoc, SrcLoc )
 import Usage            ( SYN_IE(UVar), SYN_IE(Usage) )
 import Unique		( pprUnique, showUnique, Unique )
 import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, isEmptyUniqSet,
-		 	  unionManyUniqSets, minusUniqSet, mkUniqSet, elementOfUniqSet, addListToUniqSet )
+		 	  unionManyUniqSets, minusUniqSet, mkUniqSet, elementOfUniqSet, addListToUniqSet, addOneToUniqSet )
 import UniqFM		( UniqFM, SYN_IE(Uniquable) )
 import Util		--( cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
 
@@ -77,22 +77,14 @@ import Util		--( cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
 
 %************************************************************************
 %*									*
-\subsection[Name-pieces-datatypes]{The @Module@, @OccName@ datatypes}
+\subsection[Name-pieces-datatypes]{The @OccName@ datatypes}
 %*									*
 %************************************************************************
 
 \begin{code}
-type Module   = FAST_STRING
-
 data OccName  = VarOcc  FAST_STRING	-- Variables and data constructors
 	      | TvOcc	FAST_STRING	-- Type variables
 	      | TCOcc	FAST_STRING	-- Type constructors and classes
-
-moduleString :: Module -> String
-moduleString mod = _UNPK_ mod
-
-pprModule :: PprStyle -> Module -> Doc
-pprModule sty m = ptext m
 
 pprOccName :: PprStyle -> OccName -> Doc
 pprOccName sty      n = if codeStyle sty 
@@ -113,10 +105,10 @@ prefixOccName prefix (TCOcc s) = TCOcc (prefix _APPEND_ s)
 -- that the VarOcc case isn't mega-efficient.  We could have different Occ constructors for
 -- data constructors and values, but that makes everything else a bit more complicated.
 occNameFlavour :: OccName -> String
-occNameFlavour (VarOcc s) | isLexConId s = "data constructor"
-			  | otherwise    = "value"
-occNameFlavour (TvOcc s)  = "type variable"
-occNameFlavour (TCOcc s)  = "type constructor or class"
+occNameFlavour (VarOcc s) | isLexConId s = "Data constructor"
+			  | otherwise    = "Value"
+occNameFlavour (TvOcc s)  = "Type variable"
+occNameFlavour (TCOcc s)  = "Type constructor or class"
 
 isVarOcc, isTCOcc, isTvOcc :: OccName -> Bool
 isVarOcc (VarOcc s) = True
@@ -409,15 +401,15 @@ instance NamedThing Name where
 
 \begin{code}
 instance Outputable Name where
-    ppr PprQuote name@(Local _ _ _) = quotes (ppr PprForUser name)
-    ppr PprForUser (Local _ n _)    = ptext (occNameString n)
+    ppr PprQuote name@(Local _ _ _) = quotes (ppr (PprForUser 1) name)
+    ppr (PprForUser _) (Local _ n _)    = ptext (occNameString n)
 
     ppr sty (Local u n _) | codeStyle sty ||
 			    ifaceStyle sty = pprUnique u
 
     ppr sty  (Local u n _) = hcat [ptext (occNameString n), ptext SLIT("_"), pprUnique u]
 
-    ppr PprQuote name@(Global _ _ _ _ _) = quotes (ppr PprForUser name)
+    ppr PprQuote name@(Global _ _ _ _ _) = quotes (ppr (PprForUser 1) name)
 
     ppr sty name@(Global u m n _ _)
 	| codeStyle sty
@@ -428,7 +420,7 @@ instance Outputable Name where
 	where
 	  pp_mod = case prov of				--- Omit home module qualifier
 			LocalDef _ _ -> empty
-			other	     -> pprModule PprForUser m <> char '.'
+			other	     -> pprModule (PprForUser 1) m <> char '.'
 
 
 pp_debug PprDebug (Global uniq m n _ prov) = hcat [text "{-", pprUnique uniq, char ',', 
@@ -466,6 +458,7 @@ type NameSet = UniqSet Name
 emptyNameSet	  :: NameSet
 unitNameSet	  :: Name -> NameSet
 addListToNameSet  :: NameSet -> [Name] -> NameSet
+addOneToNameSet   :: NameSet -> Name -> NameSet
 mkNameSet         :: [Name] -> NameSet
 unionNameSets	  :: NameSet -> NameSet -> NameSet
 unionManyNameSets :: [NameSet] -> NameSet
@@ -479,6 +472,7 @@ emptyNameSet	  = emptyUniqSet
 unitNameSet	  = unitUniqSet
 mkNameSet         = mkUniqSet
 addListToNameSet  = addListToUniqSet
+addOneToNameSet	  = addOneToUniqSet
 unionNameSets     = unionUniqSets
 unionManyNameSets = unionManyUniqSets
 minusNameSet	  = minusUniqSet
