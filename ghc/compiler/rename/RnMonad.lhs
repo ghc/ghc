@@ -196,12 +196,14 @@ type ExportAvails	= (FiniteMap Module Avails,	-- Used to figure out "module M" e
 							-- not constructors (see defn of availEntityNames)
 
 
-data AvailInfo		= NotAvailable 
-			| Avail Name		-- An ordinary identifier
-			| AvailTC Name 		-- The name of the type or class
-				  [Name]	-- The available pieces of type/class. NB: If the type or
+data GenAvailInfo name	= NotAvailable 
+			| Avail name		-- An ordinary identifier
+			| AvailTC name 		-- The name of the type or class
+				  [name]	-- The available pieces of type/class. NB: If the type or
 						-- class is itself to be in scope, it must be in this list.
 						-- Thus, typically: AvailTC Eq [Eq, ==, /=]
+type AvailInfo    = GenAvailInfo Name
+type RdrAvailInfo = GenAvailInfo OccName
 \end{code}
 
 ===================================================
@@ -209,9 +211,9 @@ data AvailInfo		= NotAvailable
 ===================================================
 
 \begin{code}
-type ExportItem		 = (Module, [(OccName, [OccName])])
+type ExportItem		 = (Module, IfaceFlavour, [RdrAvailInfo])
 type VersionInfo name    = [ImportVersion name]
-type ImportVersion name  = (Module, Version, [LocalVersion name])
+type ImportVersion name  = (Module, IfaceFlavour, Version, [LocalVersion name])
 type LocalVersion name   = (name, Version)
 
 data ParsedIface
@@ -233,9 +235,11 @@ type RdrNamePragma = ()				-- Fudge for now
 -------------------
 
 data Ifaces = Ifaces
-		Module							-- Name of this module
-		(FiniteMap Module Version)
-		(FiniteMap Module (Avails, [(OccName,Fixity)]))		-- Exports
+		Module						-- Name of this module
+		(FiniteMap Module (IfaceFlavour, 		-- Exports
+				   Version, 
+				   Avails, 
+				   [(OccName,Fixity)]))
 		DeclsMap
 
 		NameSet			-- All the names (whether "big" or "small", whether wired-in or not,
@@ -308,7 +312,7 @@ initRnMS rn_env@(RnEnv name_env _) mod_name mode m rn_down g_down
 
 
 emptyIfaces :: Module -> Ifaces
-emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyFM emptyNameSet [] (emptyBag, emptyNameSet) emptyFM []
+emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyNameSet [] (emptyBag, emptyNameSet) emptyFM []
 
 builtins :: FiniteMap (Module,OccName) Name
 builtins = bagToFM (mapBag (\ name -> (modAndOcc name, name)) builtinNames)

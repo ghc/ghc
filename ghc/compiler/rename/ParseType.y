@@ -6,7 +6,7 @@ IMP_Ubiq(){-uitous-}
 
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
-import HsDecls		( HsIdInfo(..) )
+import HsDecls		( HsIdInfo(..), HsStrictnessInfo )
 import HsTypes		( mkHsForAllTy )
 import HsCore
 import Literal
@@ -18,7 +18,7 @@ import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
 import Lex		
 
 import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
-			  SYN_IE(RdrNamePragma), SYN_IE(ExportItem)
+			  SYN_IE(RdrNamePragma), SYN_IE(ExportItem), GenAvailInfo
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
@@ -128,13 +128,14 @@ akind		:: { Kind }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }
+		|  VARSYM		{ Unqual (TvOcc $1) {- Allow $t2 as a tyvar -} }
 
 tv_names	:: { [RdrName] }
 		:  			{ [] }
 		| tv_name tv_names	{ $1 : $2 }
 
 tc_name		:: { RdrName }
-tc_name		:  QCONID		{ tcQual $1 }
+tc_name		:  QCONID		{ lexTcQual $1 }
 		|  CONID		{ Unqual (TCOcc $1) }
 		|  CONSYM		{ Unqual (TCOcc $1) }
 		|  OPAREN RARROW CPAREN	{ Unqual (TCOcc SLIT("->")) }

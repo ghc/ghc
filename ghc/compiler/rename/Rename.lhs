@@ -220,7 +220,7 @@ closeDecls necessity decls
 	-- An unresolved name
 	Just name
 	  -> 	-- Slurp its declaration, if any
-	     traceRn (sep [ptext SLIT("Considering"), ppr PprDebug name])	`thenRn_`
+--	     traceRn (sep [ptext SLIT("Considering"), ppr PprDebug name])	`thenRn_`
 	     importDecl name necessity		`thenRn` \ maybe_decl ->
 	     case maybe_decl of
 

@@ -26,7 +26,6 @@ import CoreSyn
 import Digraph		( stronglyConnComp, stronglyConnCompR, SCC(..) )
 import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
 			  idType, idUnique, SYN_IE(Id),
-			  isConstMethodId,
 			  emptyIdSet, unionIdSets, mkIdSet,
 			  unitIdSet, elementOfIdSet,
 			  addOneToIdSet, SYN_IE(IdSet),
@@ -112,7 +111,8 @@ keepUnusedBinding (OccEnv keep_dead keep_spec keep_conjurable _ _ _) binder
 
 keepBecauseConjurable :: OccEnv -> Id -> Bool
 keepBecauseConjurable (OccEnv _ _ keep_conjurable _ _ _) binder
-  = keep_conjurable && isConstMethodId binder
+  = False
+    {- keep_conjurable && isConstMethodId binder -}
 
 type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
 

@@ -6,7 +6,7 @@ IMP_Ubiq(){-uitous-}
 
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
-import HsDecls		( HsIdInfo(..) )
+import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
 import HsTypes		( mkHsForAllTy )
 import HsCore
 import Literal
@@ -19,7 +19,7 @@ import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
 import Lex		
 
 import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
-			  SYN_IE(RdrNamePragma), SYN_IE(ExportItem)
+			  SYN_IE(RdrNamePragma), SYN_IE(ExportItem), GenAvailInfo
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
@@ -123,16 +123,16 @@ id_info		: 	 					{ [] }
 id_info_item	:: { HsIdInfo RdrName }
 id_info_item	: ARITY_PART arity_info			{ HsArity $2 }
 		| STRICT_PART strict_info		{ HsStrictness $2 }
-		| BOTTOM 				{ HsStrictness mkBottomStrictnessInfo }
+		| BOTTOM 				{ HsStrictness HsBottom }
 		| UNFOLD_PART core_expr			{ HsUnfold $1 $2 }
 
 arity_info	:: { ArityInfo }
 arity_info	: INTEGER					{ exactArity (fromInteger $1) }
 
-strict_info	:: { StrictnessInfo RdrName }
-strict_info	: DEMAND any_var_name OCURLY data_names CCURLY 	{ mkStrictnessInfo $1 (Just ($2,$4)) }
-		| DEMAND any_var_name 			 	{ mkStrictnessInfo $1 (Just ($2,[])) }
-		| DEMAND 					{ mkStrictnessInfo $1 Nothing }
+strict_info	:: { HsStrictnessInfo RdrName }
+strict_info	: DEMAND any_var_name OCURLY data_names CCURLY 	{ HsStrictnessInfo $1 (Just ($2,$4)) }
+		| DEMAND any_var_name 			 	{ HsStrictnessInfo $1 (Just ($2,[])) }
+		| DEMAND 					{ HsStrictnessInfo $1 Nothing }
 
 core_expr	:: { UfExpr RdrName }
 core_expr	: any_var_name					{ UfVar $1 }
@@ -255,14 +255,14 @@ var_occ		: VARID			{ VarOcc $1 }
 		| BANG  		{ VarOcc SLIT("!") {-sigh, double-sigh-} }
 
 data_name	:: { RdrName }
-data_name	:  QCONID		{ varQual $1 }
-		|  QCONSYM		{ varQual $1 }
+data_name	:  QCONID		{ lexVarQual $1 }
+		|  QCONSYM		{ lexVarQual $1 }
 		|  CONID		{ Unqual (VarOcc $1) }
 		|  CONSYM		{ Unqual (VarOcc $1) }
 
 qvar_name	:: { RdrName }
-		:  QVARID		{ varQual $1 }
-		|  QVARSYM		{ varQual $1 }
+		:  QVARID		{ lexVarQual $1 }
+		|  QVARSYM		{ lexVarQual $1 }
 
 var_name	:: { RdrName }
 var_name	:  var_occ		{ Unqual $1 }
@@ -339,13 +339,14 @@ akind		:: { Kind }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }
+		|  VARSYM		{ Unqual (TvOcc $1) {- Allow $t2 as a tyvar -} }
 
 tv_names	:: { [RdrName] }
 		:  			{ [] }
 		| tv_name tv_names	{ $1 : $2 }
 
 tc_name		:: { RdrName }
-tc_name		:  QCONID		{ tcQual $1 }
+tc_name		:  QCONID		{ lexTcQual $1 }
 		|  CONID		{ Unqual (TCOcc $1) }
 		|  CONSYM		{ Unqual (TCOcc $1) }
 		|  OPAREN RARROW CPAREN	{ Unqual (TCOcc SLIT("->")) }

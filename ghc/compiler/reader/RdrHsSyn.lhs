@@ -46,7 +46,7 @@ module RdrHsSyn (
 	extractHsTyVars,
 
 	RdrName(..),
-	qual, varQual, tcQual, varUnqual,
+	qual, varQual, tcQual, varUnqual, lexVarQual, lexTcQual,
 	dummyRdrVarName, dummyRdrTcName,
 	isUnqual, isQual,
 	showRdr, rdrNameOcc, ieOcc,
@@ -60,7 +60,7 @@ IMP_Ubiq()
 import HsSyn
 import Lex
 import PrelMods		( pRELUDE )
-import BasicTypes	( Module(..), NewOrData )
+import BasicTypes	( Module(..), NewOrData, IfaceFlavour(..) )
 import Name		( ExportFlag(..), pprModule,
 			  OccName(..), pprOccName, 
 			  prefixOccName, SYN_IE(NamedThing) )
@@ -138,7 +138,7 @@ extractHsTyVars ty
 				     where
 				       locals = map getTyVarName tvs
 
-    insert (Qual _ _)	      acc = acc
+    insert (Qual _ _ _)	      acc = acc
     insert (Unqual (TCOcc _)) acc = acc
     insert other 	      acc | other `elem` acc = acc
 				  | otherwise	     = other : acc
@@ -162,11 +162,15 @@ mkOpApp e1 op e2 = OpApp e1 (HsVar op) (error "mkOpApp:fixity") e2
 \begin{code}
 data RdrName
   = Unqual OccName
-  | Qual   Module OccName
+  | Qual   Module OccName IfaceFlavour	-- HiBootFile for M!.t (interface files only), 
+					-- HiFile for the common M.t
 
-qual     (m,n) = Qual m n
-tcQual   (m,n) = Qual m (TCOcc n)
-varQual  (m,n) = Qual m (VarOcc n)
+qual     (m,n) = Qual m n HiFile
+tcQual   (m,n) = Qual m (TCOcc n) HiFile
+varQual  (m,n) = Qual m (VarOcc n) HiFile
+
+lexTcQual  (m,n,hif) = Qual m (TCOcc n) hif
+lexVarQual (m,n,hif) = Qual m (VarOcc n) hif
 
 	-- This guy is used by the reader when HsSyn has a slot for
 	-- an implicit name that's going to be filled in by
@@ -178,26 +182,26 @@ dummyRdrTcName = Unqual (VarOcc SLIT("TC-DUMMY"))
 
 varUnqual n = Unqual (VarOcc n)
 
-isUnqual (Unqual _) = True
-isUnqual (Qual _ _) = False
+isUnqual (Unqual _)   = True
+isUnqual (Qual _ _ _) = False
 
-isQual (Unqual _) = False
-isQual (Qual _ _) = True
+isQual (Unqual _)   = False
+isQual (Qual _ _ _) = True
 
 	-- Used for adding a prefix to a RdrName
 prefixRdrName :: FAST_STRING -> RdrName -> RdrName
-prefixRdrName prefix (Qual m n) = Qual m (prefixOccName prefix n)
-prefixRdrName prefix (Unqual n) = Unqual (prefixOccName prefix n)
+prefixRdrName prefix (Qual m n hif) = Qual m (prefixOccName prefix n) hif
+prefixRdrName prefix (Unqual n)     = Unqual (prefixOccName prefix n)
 
-cmpRdr (Unqual  n1) (Unqual  n2) = n1 `cmp` n2
-cmpRdr (Unqual  n1) (Qual m2 n2) = LT_
-cmpRdr (Qual m1 n1) (Unqual  n2) = GT_
-cmpRdr (Qual m1 n1) (Qual m2 n2) = (n1 `cmp` n2) `thenCmp` (_CMP_STRING_ m1 m2)
+cmpRdr (Unqual  n1) (Unqual  n2)     = n1 `cmp` n2
+cmpRdr (Unqual  n1) (Qual m2 n2 _)   = LT_
+cmpRdr (Qual m1 n1 _) (Unqual  n2)   = GT_
+cmpRdr (Qual m1 n1 _) (Qual m2 n2 _) = (n1 `cmp` n2) `thenCmp` (_CMP_STRING_ m1 m2)
 				   -- always compare module-names *second*
 
 rdrNameOcc :: RdrName -> OccName
-rdrNameOcc (Unqual occ) = occ
-rdrNameOcc (Qual _ occ) = occ
+rdrNameOcc (Unqual occ)   = occ
+rdrNameOcc (Qual _ occ _) = occ
 
 ieOcc :: RdrNameIE -> OccName
 ieOcc ie = rdrNameOcc (ieName ie)
@@ -219,8 +223,8 @@ instance Ord3 RdrName where
     cmp = cmpRdr
 
 instance Outputable RdrName where
-    ppr sty (Unqual n) = pprQuote sty $ \ sty -> pprOccName sty n
-    ppr sty (Qual m n) = pprQuote sty $ \ sty -> hcat [pprModule sty m, char '.', pprOccName sty n]
+    ppr sty (Unqual n)   = pprQuote sty $ \ sty -> pprOccName sty n
+    ppr sty (Qual m n _) = pprQuote sty $ \ sty -> hcat [pprModule sty m, char '.', pprOccName sty n]
 
 instance NamedThing RdrName where		-- Just so that pretty-printing of expressions works
     getOccName = rdrNameOcc

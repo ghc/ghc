@@ -24,7 +24,7 @@ import HsSyn
 import HsTypes		( HsTyVar(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas, noGenPragmas )
 import RdrHsSyn         
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..) )
 import PrefixToHs
 
 import CmdLineOpts      ( opt_PprUserLength )
@@ -78,7 +78,7 @@ wlkQid	:: (FAST_STRING -> OccName) -> U_qid -> UgnM RdrName
 wlkQid mk_occ_name (U_noqual name)
   = returnUgn (Unqual (mk_occ_name name))
 wlkQid mk_occ_name (U_aqual  mod name)
-  = returnUgn (Qual mod (mk_occ_name name))
+  = returnUgn (Qual mod (mk_occ_name name) HiFile)
 
 	-- I don't understand this one!  It is what shows up when we meet (), [], or (,,,).
 wlkQid mk_occ_name (U_gid n name)
@@ -905,7 +905,7 @@ rdImport pt
     mkSrcLocUgn srcline				$ \ src_loc      ->
     wlkMaybe rdU_stringId ias		`thenUgn` \ maybe_as	->
     wlkMaybe rd_spec ispec		`thenUgn` \ maybe_spec	->
-    returnUgn (ImportDecl imod (cvFlag iqual) (cvFlag isrc) maybe_as maybe_spec src_loc)
+    returnUgn (ImportDecl imod (cvFlag iqual) (cvIfaceFlavour isrc) maybe_as maybe_spec src_loc)
   where
     rd_spec pt = rdU_either pt 		`thenUgn` \ spec ->
       case spec of
@@ -913,6 +913,9 @@ rdImport pt
 		      returnUgn (False, ents)
 	U_right pt -> rdEntities pt 	`thenUgn` \ ents ->
 		      returnUgn (True, ents)
+
+cvIfaceFlavour 0 = HiFile	-- No pragam
+cvIfaceFlavour 1 = HiBootFile	-- {-# SOURCE #-}
 \end{code}
 
 \begin{code}

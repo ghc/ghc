@@ -2,5 +2,5 @@ _interface_ TysWiredIn 1
 _exports_
 TysWiredIn tupleCon tupleTyCon;
 _declarations_
-1 tupleCon _:_ PrelBase.Int -> Id.Id ;;
-1 tupleTyCon _:_ PrelBase.Int -> TyCon.TyCon ;;
+1 tupleCon _:_ BasicTypes.Arity -> Id.Id ;;
+1 tupleTyCon _:_ BasicTypes.Arity -> TyCon.TyCon ;;

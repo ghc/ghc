@@ -14,11 +14,12 @@ IMP_Ubiq()
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(RnLoop)		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
 #else
-import {-# SOURCE #-} RnExpr
+import RnExpr
+--import {-# SOURCE #-} RnExpr
 #endif
 
 import HsSyn
-import HsDecls		( HsIdInfo(..) )
+import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
 import HsPragmas
 import HsTypes		( getTyVarName )
 import RdrHsSyn
@@ -28,14 +29,15 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas )
 
 import RnBinds		( rnTopBinds, rnMethodBinds )
 import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
-			  newSysName, newDfunName, checkDupOrQualNames, checkDupNames,
+			  newDfunName, checkDupOrQualNames, checkDupNames,
+			  newLocallyDefinedGlobalName, newGlobalName, ifaceFlavour,
 			  listType_RDR, tupleType_RDR )
 import RnMonad
 
 import Name		( Name, isLocallyDefined, 
 			  OccName(..), occNameString, prefixOccName,
 			  ExportFlag(..),
-			  Provenance,
+			  Provenance(..), getNameProvenance,
 			  SYN_IE(NameSet), unionNameSets, emptyNameSet, mkNameSet, unitNameSet,
 			  elemNameSet
 			)
@@ -156,18 +158,19 @@ original names, reporting any unknown names.
 \begin{code}
 rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
   = pushSrcLocRn src_loc $
+
     bindTyVarsRn cls_doc [tyvar]			( \ [tyvar'] ->
 	rnContext context	    				`thenRn` \ context' ->
 	lookupBndrRn cname					`thenRn` \ cname' ->
 
 	     -- Check the signatures
-	checkDupOrQualNames sig_doc sig_names		`thenRn_` 
-	mapRn (rn_op cname' (getTyVarName tyvar')) sigs	`thenRn` \ sigs' ->
+	checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	`thenRn_` 
+	mapRn (rn_op cname' (getTyVarName tyvar')) sigs		`thenRn` \ sigs' ->
 	returnRn (tyvar', context', cname', sigs')
     )							`thenRn` \ (tyvar', context', cname', sigs') ->
 
 	-- Check the methods
-    checkDupOrQualNames meth_doc meth_names		`thenRn_`
+    checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
     rnMethodBinds mbinds				`thenRn` \ mbinds' ->
 
 	-- Typechecker is responsible for checking that we only
@@ -182,22 +185,36 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
     sig_doc sty  = text "the signatures for class"  	<+> ppr sty cname
     meth_doc sty = text "the default-methods for class" <+> ppr sty cname
 
-    sig_names   = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
-    meth_names   = bagToList (collectMonoBinders mbinds)
+    sig_rdr_names_w_locs  = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
+    meth_rdr_names_w_locs = bagToList (collectMonoBinders mbinds)
+    meth_rdr_names	  = map fst meth_rdr_names_w_locs
 
-    rn_op clas clas_tyvar sig@(ClassOpSig op _ ty locn)
+    rn_op clas clas_tyvar sig@(ClassOpSig op maybe_dm ty locn)
       = pushSrcLocRn locn $
 	lookupBndrRn op				`thenRn` \ op_name ->
 	rnHsSigType (\sty -> ppr sty op) ty	`thenRn` \ new_ty  ->
 
-		-- Call up interface info for default method, if such info exists
+		-- Make the default-method name
 	let
 	    dm_occ = prefixOccName SLIT("$m") (rdrNameOcc op)
 	in
-        newSysName dm_occ Exported locn		`thenRn` \ dm_name ->
-	setModeRn (InterfaceMode Optional) (
-            addOccurrenceName dm_name
-	)						`thenRn_`
+	getModuleRn			`thenRn` \ mod_name ->
+	getModeRn			`thenRn` \ mode ->
+	(case (mode, maybe_dm) of 
+	    (SourceMode, _) | op `elem` meth_rdr_names
+		-> 	-- There's an explicit method decl
+		   newLocallyDefinedGlobalName mod_name dm_occ 
+					       (\_ -> Exported) locn	`thenRn` \ dm_name ->
+		   returnRn (Just dm_name)
+
+	    (InterfaceMode _, Just _) 
+		-> 	-- Imported class that has a default method decl
+		    newGlobalName mod_name dm_occ (ifaceFlavour clas)	`thenRn` \ dm_name ->
+		    addOccurrenceName dm_name				`thenRn_`
+		    returnRn (Just dm_name)
+
+	    other -> returnRn Nothing
+	)					`thenRn` \ maybe_dm_name ->
 
 		-- Checks.....
 	let
@@ -213,7 +230,7 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
 	        (classTyVarNotInOpTyErr clas_tyvar sig)
 							 `thenRn_`
 
-	returnRn (ClassOpSig op_name dm_name new_ty locn)
+	returnRn (ClassOpSig op_name maybe_dm_name new_ty locn)
 \end{code}
 
 
@@ -547,18 +564,17 @@ rnIdInfo (HsFBType fb)		= returnRn (HsFBType fb)
 rnIdInfo (HsArgUsage au)	= returnRn (HsArgUsage au)
 rnIdInfo (HsDeforest df)	= returnRn (HsDeforest df)
 
-rnStrict (StrictnessInfo demands (Just (worker,cons)))
+rnStrict (HsStrictnessInfo demands (Just (worker,cons)))
 	-- The sole purpose of the "cons" field is so that we can mark the constructors
 	-- needed to build the wrapper as "needed", so that their data type decl will be
 	-- slurped in. After that their usefulness is o'er, so we just put in the empty list.
   = lookupOccRn worker			`thenRn` \ worker' ->
     mapRn lookupOccRn cons		`thenRn_` 
-    returnRn (StrictnessInfo demands (Just (worker',[])))
+    returnRn (HsStrictnessInfo demands (Just (worker',[])))
 
 -- Boring, but necessary for the type checker.
-rnStrict (StrictnessInfo demands Nothing) = returnRn (StrictnessInfo demands Nothing)
-rnStrict BottomGuaranteed		  = returnRn BottomGuaranteed
-rnStrict NoStrictnessInfo		  = returnRn NoStrictnessInfo
+rnStrict (HsStrictnessInfo demands Nothing) = returnRn (HsStrictnessInfo demands Nothing)
+rnStrict HsBottom			  = returnRn HsBottom
 \end{code}
 
 UfCore expressions.
@@ -706,10 +722,10 @@ classTyVarNotInOpTyErr clas_tyvar sig sty
 	 4 (ppr sty sig)
 
 dupClassAssertWarn ctxt ((clas,ty) : dups) sty
-  = hang (hcat [ptext SLIT("Duplicated class assertion"), 
-		       pprQuote sty $ \ sty -> ppr sty clas <+> ppr sty ty,
-		       ptext SLIT("in context:")])
-	 4 (pprContext sty ctxt)
+  = sep [hsep [ptext SLIT("Duplicated class assertion"), 
+	       pprQuote sty $ \ sty -> ppr sty clas <+> ppr sty ty,
+	       ptext SLIT("in context:")],
+	 nest 4 (pprQuote sty $ \ sty -> pprContext sty ctxt)]
 
 badDataCon name sty
    = hsep [ptext SLIT("Illegal data constructor name"), ppr sty name]

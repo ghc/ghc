@@ -17,9 +17,9 @@ import RdrHsSyn		( RdrName(..), SYN_IE(RdrNameIE),
 			  rdrNameOcc, ieOcc, isQual, qual
 			)
 import HsTypes		( getTyVarName, replaceTyVarName )
-import BasicTypes	( Fixity(..), FixityDirection(..) )
+import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..), pprModule )
 import RnMonad
-import Name		( Name, OccName(..), Provenance(..), DefnInfo(..), ExportFlag(..), NamedThing(..),
+import Name		( Name, OccName(..), Provenance(..), ExportFlag(..), NamedThing(..),
 			  occNameString, occNameFlavour,
 			  SYN_IE(NameSet), emptyNameSet, addListToNameSet,
 			  mkLocalName, mkGlobalName, modAndOcc, isLocallyDefinedName,
@@ -29,15 +29,14 @@ import Name		( Name, OccName(..), Provenance(..), DefnInfo(..), ExportFlag(..), 
 import TyCon		( TyCon )
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon, intTyCon )
 import FiniteMap
-import Outputable
 import Unique		( Unique, Uniquable(..), unboundKey )
 import UniqFM           ( listToUFM, plusUFM_C )
 import Maybes		( maybeToBool )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Pretty
-import Outputable	( PprStyle(..) )
-import Util		--( panic, removeDups, pprTrace, assertPanic )
+import Outputable	( Outputable(..), PprStyle(..) )
+import Util		( Ord3(..), panic, removeDups, pprTrace, assertPanic )
 
 \end{code}
 
@@ -50,8 +49,8 @@ import Util		--( panic, removeDups, pprTrace, assertPanic )
 %*********************************************************
 
 \begin{code}
-newGlobalName :: Module -> OccName -> RnM s d Name
-newGlobalName mod occ
+newGlobalName :: Module -> OccName -> IfaceFlavour -> RnM s d Name
+newGlobalName mod occ iface_flavour
   = 	-- First check the cache
     getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
     let key = (mod,occ)         in
@@ -63,12 +62,12 @@ newGlobalName mod occ
 	Just name ->  returnRn name
 
 	-- Miss in the cache, so build a new original name,
-	-- and put it in the cache
+	-- And put it in the cache
 	Nothing        -> 
 	    let
 		(us', us1) = splitUniqSupply us
 		uniq   	   = getUnique us1
-		name       = mkGlobalName uniq mod occ VanillaDefn Implicit
+		name       = mkGlobalName uniq mod occ (Implicit iface_flavour)
 		cache'     = addToFM cache key name
 	    in
 	    setNameSupplyRn (us', inst_ns, cache')		`thenRn_`
@@ -110,29 +109,11 @@ newLocallyDefinedGlobalName mod occ rec_exp_fn loc
         key        = (mod,occ)
 	new_name   = case lookupFM cache key of
 		         Just name -> setNameProvenance name provenance
-		         other     -> mkGlobalName uniq mod occ VanillaDefn provenance
+		         other     -> mkGlobalName uniq mod occ provenance
 	new_cache  = addToFM cache key new_name
     in
     setNameSupplyRn (us', inst_ns, new_cache)		`thenRn_`
     returnRn new_name
-
--- newSysName is used to create the names for
---	a) default methods
--- These are never mentioned explicitly in source code (hence no point in looking
--- them up in the NameEnv), but when reading an interface file
--- we may want to slurp in their pragma info.  In the source file itself we
--- need to create these names too so that we export them into the inferface file for this module.
-
-newSysName :: OccName -> ExportFlag -> SrcLoc -> RnMS s Name
-newSysName occ export_flag loc
-  = getModeRn	`thenRn` \ mode ->
-    getModuleRn	`thenRn` \ mod_name ->
-    case mode of 
-	SourceMode -> newLocallyDefinedGlobalName 
-				mod_name occ
-				(\_ -> export_flag)
-				loc
-	InterfaceMode _ -> newGlobalName mod_name occ
 
 -- newDfunName is a variant, specially for dfuns.  
 -- When renaming derived definitions we are in *interface* mode (because we can trip
@@ -150,7 +131,7 @@ newDfunName Nothing src_loc			-- Local instance decls have a "Nothing"
 
 newDfunName (Just n) src_loc			-- Imported ones have "Just n"
   = getModuleRn		`thenRn` \ mod_name ->
-    newGlobalName mod_name (rdrNameOcc n)
+    newGlobalName mod_name (rdrNameOcc n) HiFile {- Correct? -} 
 
 
 newLocalNames :: [(RdrName,SrcLoc)] -> RnM s d [Name]
@@ -236,6 +217,13 @@ checkDupNames doc_str rdr_names_w_loc
     returnRn ()
   where
     (_, dups) = removeDups (\(n1,l1) (n2,l2) -> n1 `cmp` n2) rdr_names_w_loc
+
+
+-- Yuk!
+ifaceFlavour name = case getNameProvenance name of
+			Imported _ _ hif -> hif
+			Implicit hif     -> hif
+			other		 -> HiFile	-- Shouldn't happen
 \end{code}
 
 
@@ -267,13 +255,13 @@ lookupRn name_env rdr_name
 			InterfaceMode _ -> 
 			    case rdr_name of
 
-				Qual mod_name occ -> newGlobalName mod_name occ
+				Qual mod_name occ hif -> newGlobalName mod_name occ hif
 
 				-- An Unqual is allowed; interface files contain 
 				-- unqualified names for locally-defined things, such as
 				-- constructors of a data type.
 				Unqual occ -> getModuleRn 	`thenRn ` \ mod_name ->
-					      newGlobalName mod_name occ
+					      newGlobalName mod_name occ HiFile
 
 
 lookupBndrRn rdr_name
@@ -317,8 +305,8 @@ lookupGlobalOccRn rdr_name
 -- The name cache should have the correct provenance, though.
 
 lookupImplicitOccRn :: RdrName -> RnMS s Name 
-lookupImplicitOccRn (Qual mod occ)
- = newGlobalName mod occ		`thenRn` \ name ->
+lookupImplicitOccRn (Qual mod occ hif)
+ = newGlobalName mod occ hif		`thenRn` \ name ->
    addOccurrenceName name
 
 addImplicitOccRn :: Name -> RnMS s Name
@@ -372,9 +360,10 @@ addOneToNameEnv env rdr_name name
 		   -> addErrRn (nameClashErr (rdr_name, (name, name2)))	`thenRn_`
 		      returnRn env
 
-	Nothing    -> returnRn (addToFM env rdr_name name)
+	other      -> returnRn (addToFM env rdr_name name)
 
-conflicting_name n1 n2 = (n1 /= n2) || (isLocallyDefinedName n1 && isLocallyDefinedName n2)
+conflicting_name n1 n2 = (n1 /= n2) || 
+			 (isLocallyDefinedName n1 && isLocallyDefinedName n2)
 	-- We complain of a conflict if one RdrName maps to two different Names,
 	-- OR if one RdrName maps to the same *locally-defined* Name.  The latter
 	-- case is to catch two separate, local definitions of the same thing.

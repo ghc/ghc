@@ -34,7 +34,7 @@ import PrelBase ( Char(..) )
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
-import BasicTypes	( NewOrData(..) )
+import BasicTypes	( NewOrData(..), IfaceFlavour(..) )
 
 #if __GLASGOW_HASKELL__ >= 202
 import Maybes		( MaybeErr(..) )
@@ -205,10 +205,10 @@ data IfaceToken
   | ITconid   FAST_STRING
   | ITvarsym  FAST_STRING
   | ITconsym  FAST_STRING
-  | ITqvarid  (FAST_STRING,FAST_STRING)
-  | ITqconid  (FAST_STRING,FAST_STRING)
-  | ITqvarsym (FAST_STRING,FAST_STRING)
-  | ITqconsym (FAST_STRING,FAST_STRING)
+  | ITqvarid  (FAST_STRING,FAST_STRING,IfaceFlavour)
+  | ITqconid  (FAST_STRING,FAST_STRING,IfaceFlavour)
+  | ITqvarsym (FAST_STRING,FAST_STRING,IfaceFlavour)
+  | ITqconsym (FAST_STRING,FAST_STRING,IfaceFlavour)
 
   | ITidinfo [IfaceToken]  -- lazily return the stream of tokens for
 		           -- the info attached to an id.
@@ -624,15 +624,19 @@ lex_id buf =
  case expandWhile (is_mod_char) buf of
    buf' ->
     case currentChar# buf' of
-     '.'# ->
+     '.'# -> munch buf' HiFile
+     '!'# -> munch buf' HiBootFile
+     _    -> lex_id2 Nothing buf'
+   where
+    munch buf' hif = 
 	if not (emptyLexeme buf') then
 --	   _trace ("lex_id: "++(C# (currentChar# (stepOverLexeme buf'))):show (lexemeToFastString buf')) $ 
 	   case lexemeToFastString buf' of
-	     l@(FastString u# l# ba#) -> lex_id2 (Just (FastString u# l# ba#)) 
+	     l@(FastString u# l# ba#) -> lex_id2 (Just (FastString u# l# ba#, hif)) 
 	     					 (stepOn (stepOverLexeme buf'))
 	else
 	   lex_id2 Nothing buf'		
-     _  -> lex_id2 Nothing buf'
+	
 
 -- Dealt with the Module.part
 lex_id2 module_dot buf =
@@ -719,14 +723,14 @@ mk_var_token pk_str =
 -}
 			    
 end_lex_id Nothing token buf  = token : lexIface buf
-end_lex_id (Just m) token buf =
+end_lex_id (Just (m,hif)) token buf =
  case token of
-   ITconid n  -> ITqconid  (m,n)         : lexIface buf
-   ITvarid n  -> ITqvarid  (m,n)         : lexIface buf
-   ITconsym n -> ITqconsym (m,n)         : lexIface buf
-   ITvarsym n -> ITqvarsym (m,n)         : lexIface buf
-   ITbang     -> ITqvarsym (m,SLIT("!")) : lexIface buf
-   _	      -> ITunknown (show token)  : lexIface buf
+   ITconid n  -> ITqconid  (m,n,hif)         : lexIface buf
+   ITvarid n  -> ITqvarid  (m,n,hif)         : lexIface buf
+   ITconsym n -> ITqconsym (m,n,hif)         : lexIface buf
+   ITvarsym n -> ITqvarsym (m,n,hif)         : lexIface buf
+   ITbang     -> ITqvarsym (m,SLIT("!"),hif) : lexIface buf
+   _	      -> ITunknown (show token)      : lexIface buf
 
 ------------
 ifaceKeywordsFM :: UniqFM IfaceToken

@@ -27,6 +27,7 @@ IMPORT_1_3(Char(isDigit))
 
 import HsSyn
 import RdrHsSyn
+import BasicTypes	( IfaceFlavour )
 import Util		( panic )
 import SrcLoc           ( SrcLoc )
 

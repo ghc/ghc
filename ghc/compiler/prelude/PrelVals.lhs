@@ -525,7 +525,7 @@ runSTId
     id_info
       = noIdInfo
 	`addArityInfo` exactArity 1
-	`addStrictnessInfo` mkStrictnessInfo [WwStrict] Nothing
+	`addStrictnessInfo` mkStrictnessInfo [WwStrict] False
 	`addArgUsageInfo` mkArgUsageInfo [ArgUsage 1]
 	-- ABSOLUTELY NO UNFOLDING, e.g.: (mk_inline_unfolding run_ST_template)
 	-- see example below
@@ -601,7 +601,7 @@ buildId
   = pcMiscPrelId buildIdKey gHC_ERR SLIT("build") buildTy
 	((((noIdInfo
 		{-LATER:`addUnfoldInfo` mkMagicUnfolding buildIdKey-})
-		`addStrictnessInfo` mkStrictnessInfo [WwStrict] Nothing)
+		`addStrictnessInfo` mkStrictnessInfo [WwStrict] False)
 		`addArgUsageInfo` mkArgUsageInfo [ArgUsage 2])
 		`addSpecInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
 	-- cheating, but since _build never actually exists ...
@@ -646,7 +646,7 @@ augmentId
   = pcMiscPrelId augmentIdKey gHC_ERR SLIT("augment") augmentTy
 	(((noIdInfo
 		{-LATER:`addUnfoldInfo` mkMagicUnfolding augmentIdKey-})
-		`addStrictnessInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
+		`addStrictnessInfo` mkStrictnessInfo [WwStrict,WwLazy False] False)
 		`addArgUsageInfo` mkArgUsageInfo [ArgUsage 2,UnknownArgUsage])
 	-- cheating, but since _augment never actually exists ...
   where
@@ -669,7 +669,7 @@ foldrId = pcMiscPrelId foldrIdKey pREL_BASE SLIT("foldr")
 
 	idInfo = (((((noIdInfo
 			{-LATER:`addUnfoldInfo` mkMagicUnfolding foldrIdKey-})
-			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
+			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] False)
 			`addArityInfo` exactArity 3)
 			`addUpdateInfo` mkUpdateInfo [2,2,1])
 			`addSpecInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
@@ -683,7 +683,7 @@ foldlId = pcMiscPrelId foldlIdKey pREL_LIST SLIT("foldl")
 
 	idInfo = (((((noIdInfo
 			{-LATER:`addUnfoldInfo` mkMagicUnfolding foldlIdKey-})
-			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
+			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] False)
 			`addArityInfo` exactArity 3)
 			`addUpdateInfo` mkUpdateInfo [2,2,1])
 			`addSpecInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
@@ -709,7 +709,7 @@ appendId
       (mkSigmaTy [alphaTyVar] []
 	    (mkFunTys [mkListTy alphaTy, mkListTy alphaTy] (mkListTy alphaTy)))
     idInfo = (((noIdInfo
-		`addStrictnessInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
+		`addStrictnessInfo` mkStrictnessInfo [WwStrict,WwLazy False] False)
 		`addArityInfo` exactArity 2)
 		`addUpdateInfo` mkUpdateInfo [1,2])
 -}

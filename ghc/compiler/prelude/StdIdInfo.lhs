@@ -21,6 +21,7 @@ module StdIdInfo (
 IMP_Ubiq()
 
 import Type
+import TyVar		( alphaTyVar )
 import CmdLineOpts      ( opt_PprUserLength )
 import CoreSyn
 import Literal
@@ -36,7 +37,7 @@ import Id		( GenId, mkTemplateLocals, idType,
 			  SYN_IE(Id)
 			)
 import IdInfo		( ArityInfo, exactArity )
-import Class		( GenClass, GenClassOp, classSig, classOpLocalType )
+import Class		( GenClass, classBigSig, classDictArgTys )
 import TyCon		( isNewTyCon, isDataTyCon, isAlgTyCon )
 import FieldLabel	( FieldLabel )
 import PrelVals		( pAT_ERROR_ID )
@@ -187,41 +188,17 @@ addStandardIdInfo sel_id
 \begin{code}
 addStandardIdInfo sel_id
   | maybeToBool maybe_sc_sel_id
-  = sel_id `addIdUnfolding` unfolding
-	-- The always-inline thing means we don't need any other IdInfo
+  = sel_id `addIdUnfolding` (mk_selector_unfolding cls sel_id)
   where
     maybe_sc_sel_id    = isSuperDictSelId_maybe sel_id
-    Just (cls, the_sc) = maybe_sc_sel_id
-
-    unfolding = mkUnfolding IWantToBeINLINEd {- Always inline selectors -} rhs
-    rhs	      = mk_dict_selector [tyvar] dict_id arg_ids the_arg_id
-
-    (tyvar, scs, ops)  = classSig cls
-    tyvar_ty	       = mkTyVarTy tyvar
-    [dict_id]	       = mkTemplateLocals [mkDictTy cls tyvar_ty]
-    arg_ids	       = mkTemplateLocals ([mkDictTy sc tyvar_ty | sc <- scs] ++
-					   map classOpLocalType ops)
-    the_arg_id	       = assoc "StdIdInfoSC" (scs `zip` arg_ids) the_sc
+    Just (cls, _) = maybe_sc_sel_id
 
 addStandardIdInfo sel_id
   | maybeToBool maybe_meth_sel_id
-  = sel_id `addIdUnfolding` unfolding
-	-- The always-inline thing means we don't need any other IdInfo
+  = sel_id `addIdUnfolding` (mk_selector_unfolding cls sel_id)
   where
     maybe_meth_sel_id  = isMethodSelId_maybe sel_id
-    Just (cls, the_op) = maybe_meth_sel_id
-
-    unfolding = mkUnfolding IWantToBeINLINEd {- Always inline selectors -} rhs
-    rhs       = mk_dict_selector [tyvar] dict_id arg_ids the_arg_id
-
-    (tyvar, scs, ops) = classSig cls
-    n_scs	      = length scs
-    tyvar_ty	      = mkTyVarTy tyvar
-    [dict_id]	      = mkTemplateLocals [mkDictTy cls tyvar_ty]
-    arg_ids	      = mkTemplateLocals ([mkDictTy sc tyvar_ty | sc <- scs] ++
-					  map classOpLocalType ops)
-					  
-    the_arg_id	      = assoc "StdIdInfoMeth" (ops `zip` (drop n_scs arg_ids)) the_op
+    Just cls = maybe_meth_sel_id
 \end{code}
 
 
@@ -275,6 +252,19 @@ Selecting a field for a dictionary.  If there is just one field, then
 there's nothing to do.
 
 \begin{code}
+mk_selector_unfolding clas sel_id
+  = mkUnfolding IWantToBeINLINEd {- Always inline selectors -} rhs
+	-- The always-inline thing means we don't need any other IdInfo
+  where
+    rhs	       = mk_dict_selector [alphaTyVar] dict_id arg_ids the_arg_id
+    tyvar_ty   = mkTyVarTy alphaTyVar
+    [dict_id]  = mkTemplateLocals [mkDictTy clas tyvar_ty]
+    arg_tys    = classDictArgTys clas tyvar_ty
+    arg_ids    = mkTemplateLocals arg_tys
+    the_arg_id = assoc "StdIdInfo:mk_sel" ((sc_sel_ids ++ op_sel_ids) `zip` arg_ids) sel_id
+
+    (_, _, sc_sel_ids, op_sel_ids, defms) = classBigSig clas
+
 mk_dict_selector tyvars dict_id [arg_id] the_arg_id
   = mkLam tyvars [dict_id] (Var dict_id)
 

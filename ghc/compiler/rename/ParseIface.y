@@ -6,18 +6,18 @@ IMP_Ubiq(){-uitous-}
 
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
-import HsDecls		( HsIdInfo(..) )
+import HsDecls		( HsIdInfo(..), HsStrictnessInfo )
 import HsTypes		( mkHsForAllTy )
 import HsCore
 import Literal
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), Version(..) )
+import BasicTypes	( IfaceFlavour(..), Fixity(..), FixityDirection(..), NewOrData(..), Version(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
 import IdInfo           ( ArgUsageInfo, FBTypeInfo )
 import Lex		
 
 import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
-			  SYN_IE(RdrNamePragma), SYN_IE(ExportItem)
+			  SYN_IE(RdrNamePragma), SYN_IE(ExportItem), SYN_IE(RdrAvailInfo), GenAvailInfo(..)
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
@@ -149,8 +149,8 @@ module_stuff_pairs  :  						{ [] }
 		    |  module_stuff_pair module_stuff_pairs	{ $1 : $2 }
 
 module_stuff_pair   ::  { ImportVersion OccName }
-module_stuff_pair   :  mod_name INTEGER DCOLON name_version_pairs SEMI
-			{ ($1, fromInteger $2, $4) }
+module_stuff_pair   :  mod_name opt_bang INTEGER DCOLON name_version_pairs SEMI
+			{ ($1, $2, fromInteger $3, $5) }
 
 versions_part	    :: { [LocalVersion OccName] }
 versions_part	    :  VERSIONS_PART name_version_pairs		{ $2 }
@@ -171,23 +171,27 @@ exports_part	:  EXPORTS_PART export_items			{ $2 }
 
 export_items	:: { [ExportItem] }
 export_items	:  			    			{ [] }
-		|  mod_name entities SEMI export_items 		{ ($1,$2) : $4 }
+		|  opt_bang mod_name entities SEMI export_items { ($2,$1,$3) : $5 }
 
-entities	:: { [(OccName, [OccName])] }
+opt_bang	:: { IfaceFlavour }
+opt_bang	:						{ HiFile }
+		| BANG						{ HiBootFile }
+
+entities	:: { [RdrAvailInfo] }
 entities	: 						{ [] }
 		|  entity entities				{ $1 : $2 }
 
-entity		:: { (OccName, [OccName]) }
-entity		:  entity_occ 					{ ($1, if isTCOcc $1 
-								       then [$1]  {- AvailTC -}
-								       else [])   {- Avail -} }
-		|  entity_occ stuff_inside			{ ($1, ($1 : $2)) {- TyCls exported too -} }
-		|  entity_occ BANG stuff_inside			{ ($1, $3) 	  {- TyCls not exported -} }
+entity		:: { RdrAvailInfo }
+entity		:  entity_occ 				{ if isTCOcc $1 
+							  then AvailTC $1 [$1]
+							  else Avail $1 }
+		|  entity_occ stuff_inside		{ AvailTC $1 ($1:$2) }
+		|  entity_occ VBAR stuff_inside		{ AvailTC $1 $3 }
 
 stuff_inside	:: { [OccName] }
-stuff_inside	:  OPAREN val_occs1 CPAREN			{ $2
+stuff_inside	:  OPAREN val_occs1 CPAREN		{ $2
 --------------------------------------------------------------------------
-								}
+							}
 
 inst_modules_part :: { [Module] }
 inst_modules_part :				    		{ [] }
@@ -259,7 +263,9 @@ csigs1		: csig				{ [$1] }
 		| csig SEMI csigs1		{ $1 : $3 }
 
 csig		:: { RdrNameSig }
-csig		:  var_name DCOLON type 	{ ClassOpSig $1 $1 $3 mkIfaceSrcLoc
+csig		:  var_name DCOLON type 	{ ClassOpSig $1 Nothing $3 mkIfaceSrcLoc }
+	        |  var_name EQUAL DCOLON type	{ ClassOpSig $1 (Just (error "Un-filled-in default method"))
+								$4 mkIfaceSrcLoc
 ----------------------------------------------------------------
 			 			 }
 
@@ -371,8 +377,8 @@ val_occs1	:: { [OccName] }
 
 
 qvar_name	:: { RdrName }
-		:  QVARID		{ varQual $1 }
-		|  QVARSYM		{ varQual $1 }
+		:  QVARID		{ lexVarQual $1 }
+		|  QVARSYM		{ lexVarQual $1 }
 
 var_name	:: { RdrName }
 var_name	:  var_occ		{ Unqual $1 }
@@ -386,8 +392,8 @@ any_var_name	:  var_name		{ $1 }
 		|  qvar_name		{ $1 }
 
 qdata_name	:: { RdrName }
-qdata_name	:  QCONID		{ varQual $1 }
-		|  QCONSYM		{ varQual $1 }
+qdata_name	:  QCONID		{ lexVarQual $1 }
+		|  QCONSYM		{ lexVarQual $1 }
 
 data_name	:: { RdrName }
 data_name	:  CONID		{ Unqual (VarOcc $1) }
@@ -400,10 +406,11 @@ tc_names1	:: { [RdrName] }
 
 tc_name		:: { RdrName }
 tc_name		: tc_occ			{ Unqual $1 }
-		| QCONID			{ tcQual $1 }
+		| QCONID			{ lexTcQual $1 }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }
+		|  VARSYM		{ Unqual (TvOcc $1) {- Allow $t2 as a tyvar -} }
 
 tv_names	:: { [RdrName] }
 		:  			{ [] }

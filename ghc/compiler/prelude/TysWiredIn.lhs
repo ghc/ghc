@@ -94,8 +94,6 @@ IMPORT_DELOOPER(IdLoop)	( SpecEnv, nullSpecEnv,
 #else
 import {-# SOURCE #-} Id ( Id, mkDataCon, mkTupleCon, StrictnessMark(..) )
 import {-# SOURCE #-} SpecEnv ( SpecEnv, nullSpecEnv )
-import {-# SOURCE #-} Type ( Type )
-import {-# SOURCE #-} TyVar ( TyVar )
 #endif
 
 -- friends:
@@ -103,16 +101,17 @@ import PrelMods
 import TysPrim
 
 -- others:
+import FieldLabel	()	--
 import Kind		( mkBoxedTypeKind, mkArrowKind )
-import Name		--( mkWiredInTyConName, mkWiredInIdName, mkTupNameStr )
+import Name		( mkWiredInTyConName, mkWiredInIdName )
 import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
 			  TyCon, SYN_IE(Arity)
 			)
-import BasicTypes	( NewOrData(..) )
-import Type		( mkTyConTy, applyTyCon, mkSigmaTy, mkTyVarTys, 
+import BasicTypes	( SYN_IE(Module), NewOrData(..) )
+import Type		( SYN_IE(Type), mkTyConTy, applyTyCon, mkSigmaTy, mkTyVarTys, 
 			  mkFunTy, mkFunTys, maybeAppTyCon,
 			  GenType(..), SYN_IE(ThetaType), SYN_IE(TauType) )
-import TyVar		( tyVarKind, alphaTyVars, alphaTyVar, betaTyVar )
+import TyVar		( SYN_IE(TyVar), tyVarKind, alphaTyVars, alphaTyVar, betaTyVar )
 import Lex		( mkTupNameStr )
 import Unique
 import Util		( assoc, panic )

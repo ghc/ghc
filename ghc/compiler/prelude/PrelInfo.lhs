@@ -52,8 +52,9 @@ import TysWiredIn
 -- others:
 import SpecEnv		( SpecEnv )
 import RdrHsSyn		( RdrName(..), varQual, tcQual, qual )
+import BasicTypes	( IfaceFlavour )
 import Id		( GenId, SYN_IE(Id) )
-import Name		( Name, OccName(..), DefnInfo(..), Provenance(..),
+import Name		( Name, OccName(..), Provenance(..),
 			  getName, mkGlobalName, modAndOcc )
 import Class		( Class(..), GenClass, classKey )
 import TyCon		( tyConDataCons, mkFunTyCon, TyCon )
@@ -250,7 +251,8 @@ Ids, Synonyms, Classes and ClassOps with builtin keys.
 
 \begin{code}
 mkKnownKeyGlobal :: (RdrName, Unique) -> Name
-mkKnownKeyGlobal (Qual mod occ, uniq) = mkGlobalName uniq mod occ VanillaDefn Implicit
+mkKnownKeyGlobal (Qual mod occ hif, uniq)
+  = mkGlobalName uniq mod occ (Implicit hif)
 
 allClass_NAME    = mkKnownKeyGlobal (allClass_RDR,   allClassKey)
 main_NAME	 = mkKnownKeyGlobal (main_RDR,	     mainKey)

@@ -24,6 +24,7 @@ import RdrHsSyn	( RdrNameHsDecl(..), RdrName(..), RdrNameIE(..), SYN_IE(RdrNameI
 		)
 import RnHsSyn	( RenamedHsModule(..), RenamedFixityDecl(..) )
 import RnIfaces	( getInterfaceExports, getDeclBinders, checkUpToDate, recordSlurp )
+import BasicTypes ( IfaceFlavour(..) )
 import RnEnv
 import RnMonad
 import FiniteMap
@@ -110,7 +111,7 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 
 		 | otherwise		   = [ImportDecl pRELUDE 
 							 False		{- Not qualified -}
-							 False		{- Not source imported -}
+							 HiFile		{- Not source imported -}
 							 Nothing	{- No "as" -}
 							 Nothing	{- No import list -}
 							 mod_loc]
@@ -129,7 +130,7 @@ checkEarlyExit mod
     traceRn (text "Considering whether compilation is required...")	`thenRn_`
     (if not opt_SourceUnchanged then
 	-- Source code changed and no errors yet... carry on 
-	traceRn (nest 4 (text "source file changed"))			`thenRn_` 
+	traceRn (nest 4 (text "source file changed or recompilation check turned off"))	`thenRn_` 
 	returnRn False
      else
 	-- Unchanged source, and no errors yet; see if usage info
@@ -167,8 +168,9 @@ importsFromImportDecl (ImportDecl mod qual_only as_source as_mod import_spec loc
     set_avail_prov NotAvailable   = NotAvailable
     set_avail_prov (Avail n)      = Avail (set_name_prov n) 
     set_avail_prov (AvailTC n ns) = AvailTC (set_name_prov n) (map set_name_prov ns)
-    set_name_prov name = setNameProvenance name provenance
-    provenance = Imported mod loc
+    set_name_prov name | isWiredInName name = name
+		       | otherwise	    = setNameProvenance name provenance
+    provenance = Imported mod loc as_source
 \end{code}
 
 
@@ -302,7 +304,7 @@ qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities) h
 		  Just another_name -> another_name
 
     add_avail env avail = foldlRn add_name env (availNames avail)
-    add_name env name   = add qual_imp   env  (Qual qual_mod occ)	`thenRn` \ env1 ->
+    add_name env name   = add qual_imp   env  (Qual qual_mod occ err_hif) `thenRn` \ env1 ->
 			  add unqual_imp env1 (Unqual occ)
 			where
 			  add False env rdr_name = returnRn env
@@ -316,20 +318,22 @@ qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities) h
     add_fixity name_env fix_env (occ_name, (fixity, provenance))
 	= add qual $ add unqual $ fix_env
  	where
-	  qual   = Qual qual_mod occ_name
+	  qual   = Qual qual_mod occ_name err_hif
 	  unqual = Unqual occ_name
 
 	  add rdr_name fix_env | maybeToBool (lookupFM name_env rdr_name)
 			       = addOneToFixityEnv fix_env rdr_name (fixity,provenance)
 			       | otherwise
 			       = fix_env
+
+err_hif = error "qualifyImports: hif"	-- Not needed in key to mapping
 \end{code}
 
 unQualify adds an Unqual binding for every existing Qual binding.
 
 \begin{code}
 unQualify :: FiniteMap RdrName elt -> FiniteMap RdrName elt
-unQualify fm = addListToFM fm [(Unqual occ, elt) | (Qual _ occ, elt) <- fmToList fm]
+unQualify fm = addListToFM fm [(Unqual occ, elt) | (Qual _ occ _, elt) <- fmToList fm]
 \end{code}
 
 %************************************************************************
