@@ -2135,8 +2135,10 @@ both @PAP@ and @PAP_STATIC@.
 
 \Subsubsection{\texttt{AP\_UPD} objects}{AP_UPD}
 
-@AP_UPD@ objects are used to represent thunks built by Hugs.  The only
-distintion between an @AP_UPD@ and a @PAP@ is that an @AP_UPD@ is
+@AP_UPD@ objects are used to represent thunks built by Hugs, and to
+save the currently-active computations when performing @raiseAsync()@.
+The only
+distinction between an @AP_UPD@ and a @PAP@ is that an @AP_UPD@ is
 updateable.
 
 \begin{center}
