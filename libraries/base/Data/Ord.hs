@@ -15,7 +15,7 @@
 
 module Data.Ord (
    Ord(..),
-   Ordering,
+   Ordering(..),
    comparing,
  ) where
 
