@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.25 2000/01/13 14:34:05 hwloidl Exp $
+ * $Id: Updates.hc,v 1.26 2000/04/03 19:39:17 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -12,7 +12,6 @@
 #include "RtsFlags.h"
 #include "HeapStackCheck.h"
 #include "Storage.h"
-#include "ProfRts.h"
 #if defined(GRAN) || defined(PAR)
 # include "FetchMe.h"
 #endif
