@@ -4,10 +4,7 @@
 \section[TcInstDecls]{Typechecking instance declarations}
 
 \begin{code}
-module TcInstDcls (
-	tcInstDecls1,
-	tcInstDecls2
-    ) where
+module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
 #include "HsVersions.h"
 
