@@ -4,7 +4,8 @@
 
 \section[Int]{Module @Int@}
 
-This code is largely copied from the Hugs library of the same name.
+This code is largely copied from the Hugs library of the same name,
+suitably hammered to use unboxed types.
 
 \begin{code}
 -----------------------------------------------------------------------------
@@ -16,15 +17,16 @@ module Int
 	( Int8
 	, Int16
 	, Int32
-	--, Int64
+	, Int64
 	, int8ToInt  -- :: Int8  -> Int
 	, intToInt8  -- :: Int   -> Int8
 	, int16ToInt -- :: Int16 -> Int
 	, intToInt16 -- :: Int   -> Int16
 	, int32ToInt -- :: Int32 -> Int
 	, intToInt32 -- :: Int   -> Int32
+	, intToInt64 -- :: Int   -> Int64
 	-- plus Eq, Ord, Num, Bounded, Real, Integral, Ix, Enum, Read,
-	--  Show and Bits instances for each of Int8, Int16 and Int32
+	--  Show and Bits instances for each of Int8, Int16, Int32 and Int64
 	) where
 
 import PrelBase
@@ -328,7 +330,11 @@ instance Bits Int16 where
   isSigned _        = True
 \end{code}
 
+%
+%
 \subsection[Int32]{The @Int32@ interface}
+%
+%
 
 \begin{code}
 data Int32  = I32# Int#
@@ -473,20 +479,37 @@ instance Bits Int32 where
   bitSize  _    = 32
   isSigned _    = True
 
-{-# INLINE wordop #-}
-wordop op (I# x) (I# y) = I# (word2Int# (int2Word# x `op` int2Word# y))
+\end{code}
 
------------------------------------------------------------------------------
--- End of exported definitions
---
--- The remainder of this file consists of definitions which are only
--- used in the implementation.
------------------------------------------------------------------------------
+\subsection[Int64]{The @Int64@ interface}
 
------------------------------------------------------------------------------
--- Code copied from the Prelude
------------------------------------------------------------------------------
+\begin{code}
+data Int64 = I64 {lo,hi::Int32} deriving (Eq, Ord, Bounded)
 
+i64ToInteger I64{lo,hi} = toInteger lo + 0x100000000 * toInteger hi 
+integerToI64 x = case x `quotRem` 0x100000000 of 
+                 (h,l) -> I64{lo=fromInteger l, hi=fromInteger h}
+
+intToInt64 :: Int -> Int64
+intToInt64 x =  I64{lo=intToInt32 x, hi=0}
+
+instance Show Int64 where
+  showsPrec p x = showsPrec p (i64ToInteger x)
+
+instance Read Int64 where
+  readsPrec p s = [ (integerToI64 x,r) | (x,r) <- readDec s ]
+
+\end{code}
+
+%
+%
+\subsection[Int Utils]{Miscellaneous utilities}
+%
+%
+
+Code copied from the Prelude
+
+\begin{code}
 absReal x    | x >= 0    = x
 	     | otherwise = -x
 
