@@ -56,17 +56,17 @@ main = do
   cmdline <- getArgs
   case getOpt Permute options cmdline of
     (flags, args, []    ) -> run flags args
-    (_,     _,    errors) -> do prog <- getProgName
+    (_,     _,    errors) -> do prog <- getProgramName
                                 die (concat errors ++
                                      usageInfo (usageHeader prog) options)
 
 usageHeader :: String -> String
-usageHeader prog = prog ++ " [OPTION...] file...\n"
+usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
 
 data Flag
   = Flag_CSS String
   | Flag_Debug
-  | Flag_DocBook
+--  | Flag_DocBook
   | Flag_DumpInterface FilePath
   | Flag_Heading String
   | Flag_Html
@@ -84,32 +84,32 @@ data Flag
 options :: [OptDescr Flag]
 options =
   [ 
-    Option ['d']  ["docbook"]  (NoArg Flag_DocBook)
-	"output in docbook (SGML)",
-    Option ['D']  ["debug"]  (NoArg Flag_Debug)
-	"extra debugging output",
-    Option ['h']  ["html"]     (NoArg Flag_Html)
-	"output in HTML",
     Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
-    Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")
-	"file containing prologue text",
-    Option ['s']  ["source"]   (ReqArg Flag_SourceURL "URL") 
-	"base URL for links to source code",
-    Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
-	"page heading",
     Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
 	"read an interface from FILE",
-    Option []  ["css"]         (ReqArg Flag_CSS "FILE") 
-	"The CSS file to use for HTML output",
-    Option []  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
+    Option ['D']  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
         "dump an interface for these modules in FILE",
-    Option []  ["lib"]         (ReqArg Flag_Lib "DIR") 
-	"Location of Haddock's auxiliary files",
-    Option []  ["ms-help"]    (NoArg Flag_MSHtmlHelp)
-	"Produce Microsoft HTML Help files (with -h)",
-    Option []  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
- 	"Do not assume Prelude is imported",
+    Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
+	"location of Haddock's auxiliary files",
+--    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
+--	"output in docbook (SGML)",
+    Option ['h']  ["html"]     (NoArg Flag_Html)
+	"output in HTML",
+    Option ['m']  ["ms-help"]    (NoArg Flag_MSHtmlHelp)
+	"produce Microsoft HTML Help files (with -h)",
+    Option ['s']  ["source"]   (ReqArg Flag_SourceURL "URL") 
+	"base URL for links to source code",
+    Option ['c']  ["css"]         (ReqArg Flag_CSS "FILE") 
+	"the CSS file to use for HTML output",
+    Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")
+	"file containing prologue text",
+    Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
+	"page heading",
+    Option ['n']  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
+ 	"do not assume Prelude is imported",
+    Option ['d']  ["debug"]  (NoArg Flag_Debug)
+	"extra debugging output",
     Option ['?']  ["help"]  (NoArg Flag_Help)
 	"display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
@@ -122,13 +122,11 @@ saved_flags = unsafePerformIO (newIORef (error "no flags yet"))
 run :: [Flag] -> [FilePath] -> IO ()
 run flags files = do
   when (Flag_Help `elem` flags) $ do
-     prog <- getProgName
-     putStrLn (usageInfo (usageHeader prog) options)
-     exitWith ExitSuccess
+     prog <- getProgramName
+     bye (usageInfo (usageHeader prog) options)
 
-  when (Flag_Version `elem` flags) $ do
-     putStrLn ("Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2002")
-     exitWith ExitSuccess
+  when (Flag_Version `elem` flags) $
+     bye ("Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2002\n")
 
   let title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
@@ -265,7 +263,7 @@ parse_file file = do
     (\h -> do stuff <- hGetContents h 
 	      case parse stuff (SrcLoc 1 1) 1 0 [] of
 	        Ok _ e -> return e
-	        Failed err -> die (file ++ ':':err)
+	        Failed err -> die (file ++ ':':err ++ "\n")
     )
 
 getPrologue :: [Flag] -> IO (Maybe Doc)

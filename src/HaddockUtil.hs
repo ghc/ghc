@@ -18,7 +18,7 @@ module HaddockUtil (
   moduleHtmlFile,
 
   -- * Miscellaneous utilities
-  die, dieMsg, mapSnd, mapMaybeM,
+  getProgramName, bye, die, dieMsg, mapSnd, mapMaybeM,
 
   -- * HTML cross reference mapping
   html_xrefs_ref, html_xrefs,
@@ -26,7 +26,7 @@ module HaddockUtil (
 
 import HsSyn
 
-import List	( intersect )
+import List	( intersect, isSuffixOf )
 import Maybe
 import IO	( hPutStr, stderr )
 import System
@@ -261,11 +261,20 @@ moduleHtmlFile dir mod0 = dir ++ pathSeparator : mod0 ++ ".html"
 -----------------------------------------------------------------------------
 -- misc.
 
+getProgramName :: IO String
+getProgramName = liftM (`withoutSuffix` ".bin") getProgName
+   where str `withoutSuffix` suff
+            | suff `isSuffixOf` str = take (length str - length suff) str
+            | otherwise             = str
+
+bye :: String -> IO a
+bye s = putStr s >> exitWith ExitSuccess
+
 die :: String -> IO a
 die s = hPutStr stderr s >> exitWith (ExitFailure 1)
 
 dieMsg :: String -> IO a
-dieMsg s = getProgName >>= \prog -> die (prog ++ ": " ++ s)
+dieMsg s = getProgramName >>= \prog -> die (prog ++ ": " ++ s)
 
 mapSnd :: (b -> c) -> [(a,b)] -> [(a,c)]
 mapSnd _ [] = []

@@ -225,19 +225,49 @@
 
     <variablelist>
       <varlistentry>
-	<term><option>-d</option></term>
-	<term><option>--docbook</option></term>
-	<indexterm><primary><option>-d</option></primary></indexterm>
-	<indexterm><primary><option>--docbook</option></primary></indexterm>
+	<term><option>-o</option> <replaceable>dir</replaceable></term>
+	<term><option>--odir</option>=<replaceable>dir</replaceable></term>
+	<indexterm><primary><option>-o</option></primary></indexterm>
+	<indexterm><primary><option>--odir</option></primary></indexterm>
 	<listitem>
-	  <para>Output documentation in SGML DocBook format.  NOTE: at
-	  time of writing this is only partially implemented and
-	  doesn't work.</para>
+	  <para>Generate files into <replaceable>dir</replaceable>
+	  instead of the current directory.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
+	<term><option>-i</option> <replaceable>path</replaceable>,<replaceable>file</replaceable></term>
+	<term><option>--read-interface</option>=<replaceable>path</replaceable>,<replaceable>file</replaceable></term>
+	<indexterm><primary><option>-i</option></primary></indexterm>
+	<indexterm><primary><option>--read-interface</option></primary></indexterm>
+	<listitem>
+	  <para>Read the interface file in
+	  <replaceable>file</replaceable>, which must have been
+	  produced by running Haddock with the
+	  <option>--dump-interface</option> option.  The interface
+	  describes a set of modules whose HTML documentation is
+	  located in <replaceable>path</replaceable> (which may be a
+	  relative pathname).  The <replaceable>path</replaceable> is
+	  optional, and defaults to <quote>.</quote>.</para>
+
+	  <para>This option allows Haddock to produce separate sets of
+	  documentation with hyperlinks between them.  The
+	  <replaceable>path</replaceable> is used to direct hyperlinks
+	  to point to the right files; so make sure you don't move the
+	  HTML files later or these links will break.  Using a
+	  relative <replaceable>path</replaceable> means that a
+	  documentation subtree can still be moved around without
+	  breaking links.</para>
+
+	  <para>Multiple <option>--read-interface</option> options may
+	  be given.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-D</option> <replaceable>file</replaceable></term>
 	<term><option>--dump-interface</option>=<replaceable>file</replaceable></term>
+	<indexterm><primary><option>-D</option></primary></indexterm>
 	<indexterm><primary><option>--dump-interface</option></primary>
 	</indexterm>
 	<listitem>
@@ -251,6 +281,28 @@
 	  processed - see the <option>--read-interface</option> option
 	  for more details.  The interface file is in a binary format;
 	  don't try to read it.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-l</option> <replaceable>dir</replaceable></term>
+	<term><option>--lib</option>=<replaceable>dir</replaceable></term>
+	<indexterm><primary><option>-l</option></primary></indexterm>
+	<indexterm><primary><option>--lib</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Use auxiliary files in <replaceable>dir</replaceable>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-S</option></term>
+	<term><option>--docbook</option></term>
+	<indexterm><primary><option>-S</option></primary></indexterm>
+	<indexterm><primary><option>--docbook</option></primary></indexterm>
+	<listitem>
+	  <para>Reserved for future use (output documentation in SGML DocBook
+	  format).</para>
 	</listitem>
       </varlistentry>
 
@@ -304,36 +356,9 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-i</option> <replaceable>path</replaceable>,<replaceable>file</replaceable></term>
-	<term><option>--read-interface</option>=<replaceable>path</replaceable>,<replaceable>file</replaceable></term>
-	<indexterm><primary><option>-i</option></primary></indexterm>
-	<indexterm><primary><option>--read-interface</option></primary></indexterm>
-	<listitem>
-	  <para>Read the interface file in
-	  <replaceable>file</replaceable>, which must have been
-	  produced by running Haddock with the
-	  <option>--dump-interface</option> option.  The interface
-	  describes a set of modules whose HTML documentation is
-	  located in <replaceable>path</replaceable> (which may be a
-	  relative pathname).  The <replaceable>path</replaceable> is
-	  optional, and defaults to <quote>.</quote>.</para>
-
-	  <para>This option allows Haddock to produce separate sets of
-	  documentation with hyperlinks between them.  The
-	  <replaceable>path</replaceable> is used to direct hyperlinks
-	  to point to the right files; so make sure you don't move the
-	  HTML files later or these links will break.  Using a
-	  relative <replaceable>path</replaceable> means that a
-	  documentation subtree can still be moved around without
-	  breaking links.</para>
-
-	  <para>Multiple <option>--read-interface</option> options may
-	  be given.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
+	<term><option>-m</option></term>
 	<term><option>--ms-help</option></term>
+	<indexterm><primary><option>-m</option></primary></indexterm>
 	<indexterm><primary><option>--ms-help</option></primary>
 	</indexterm>
 	<listitem>
@@ -359,24 +384,25 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>--no-implicit-prelude</option></term>
-	<indexterm><primary><option>--no-implicit-prelude</option></primary>
-	</indexterm>
+	<term><option>-s</option> <replaceable>URL</replaceable></term>
+	<term><option>--source</option>=<replaceable>URL</replaceable></term>
+	<indexterm><primary><option>-s</option></primary></indexterm>
+	<indexterm><primary><option>--source</option></primary></indexterm>
 	<listitem>
-	  <para>Don't automatically import <literal>Prelude</literal>
-	  in every module.  Used when producing documentation for the
-	  <literal>Prelude</literal> itself.</para>
+	  <para>Include links to the source files in the generated
+	  documentation, where <replaceable>URL</replaceable> is the
+	  base URL where the source files can be found.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-o</option> <replaceable>dir</replaceable></term>
-	<term><option>--odir</option>=<replaceable>dir</replaceable></term>
-	<indexterm><primary><option>-o</option></primary></indexterm>
-	<indexterm><primary><option>--odir</option></primary></indexterm>
+	<term><option>-c</option> <replaceable>file</replaceable></term>
+	<term><option>--css</option>=<replaceable>file</replaceable></term>
+	<indexterm><primary><option>--css</option></primary></indexterm>
 	<listitem>
-	  <para>Generate files into <replaceable>dir</replaceable>
-	  instead of the current directory.</para>
+	  <para>Specify a stylesheet to use instead of the default one
+	  that comes with Haddock.  It should specify certain classes:
+	  see the default stylesheet for details.</para>
 	</listitem>
       </varlistentry>
 
@@ -395,18 +421,6 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-s</option> <replaceable>URL</replaceable></term>
-	<term><option>--source</option>=<replaceable>URL</replaceable></term>
-	<indexterm><primary><option>-s</option></primary></indexterm>
-	<indexterm><primary><option>--source</option></primary></indexterm>
-	<listitem>
-	  <para>Include links to the source files in the generated
-	  documentation, where <replaceable>URL</replaceable> is the
-	  base URL where the source files can be found.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
 	<term><option>-t</option> <replaceable>title</replaceable></term>
 	<term><option>--title</option>=<replaceable>title</replaceable></term>
 	<indexterm><primary><option>-t</option></primary></indexterm>
@@ -418,6 +432,29 @@
 
 	  <para>The title should be a plain string (no markup
 	  please!).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-n</option></term>
+	<term><option>--no-implicit-prelude</option></term>
+	<indexterm><primary><option>-n</option></primary></indexterm>
+	<indexterm><primary><option>--no-implicit-prelude</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Don't automatically import <literal>Prelude</literal>
+	  in every module.  Used when producing documentation for the
+	  <literal>Prelude</literal> itself.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-d</option></term>
+	<term><option>--debug</option></term>
+	<indexterm><primary><option>-d</option></primary></indexterm>
+	<indexterm><primary><option>--debug</option></primary></indexterm>
+	<listitem>
+	  <para>Produce extra debugging output.</para>
 	</listitem>
       </varlistentry>
 
@@ -438,16 +475,6 @@
 	<indexterm><primary><option>--version</option></primary></indexterm>
 	<listitem>
 	  <para>Output version information and exit.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>--css</option>=<replaceable>filename</replaceable></term>
-	<indexterm><primary><option>--css</option></primary></indexterm>
-	<listitem>
-	  <para>Specify a stylesheet to use instead of the default one
-	  that comes with Haddock.  It should specify certain classes:
-	  see the default stylesheet for details.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
