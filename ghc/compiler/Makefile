@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.62 1999/06/21 13:12:43 simonmar Exp $
+# $Id: Makefile,v 1.63 1999/06/24 13:05:53 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -150,7 +150,7 @@ prelude/PrimOp_HC_OPTS 		= -H12m -K3m
 parser/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 
 # -dcore-lint is *temporary* to work around ghc space leak.
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -dcore-lint -fno-warn-incomplete-patterns -dcore-lint
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -dcore-lint -fno-warn-incomplete-patterns -dcore-lint
 rename/ParseIface_HAPPY_OPTS    += -g
 
 parser/Parser_HC_OPTS 		+= -Onot -H80m -K2m -dcore-lint -fno-warn-incomplete-patterns -dcore-lint
