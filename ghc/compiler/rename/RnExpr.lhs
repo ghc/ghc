@@ -916,7 +916,7 @@ precParseErr op1 op2
 sectionPrecErr op arg_op section
  = vcat [ptext SLIT("The operator") <+> ppr_opfix op <+> ptext SLIT("of a section"),
 	 nest 4 (ptext SLIT("must have lower precedence than the operand") <+> ppr_opfix arg_op),
-	 nest 4 (ptext SLIT("In the section:") <+> quotes (ppr section))]
+	 nest 4 (ptext SLIT("in the section:") <+> quotes (ppr section))]
 
 nonStdGuardErr guard
   = hang (ptext

@@ -352,7 +352,7 @@ decl    : src_loc qvar_name '::' type maybe_idinfo
 	| src_loc 'type' qtc_name tv_bndrs '=' type 		       
 			{ TySynonym $3 $4 $6 $1 }
 	| src_loc 'foreign' 'type' qtc_name  		       
-			{ ForeignType $4 DNType $1 }
+			{ ForeignType $4 Nothing DNType $1 }
 	| src_loc 'data' opt_decl_context qtc_name tv_bndrs constrs 	       
 	       		{ mkTyData DataType $3 $4 $5 $6 (length $6) Nothing $1 }
 	| src_loc 'newtype' opt_decl_context qtc_name tv_bndrs newtype_constr

@@ -43,6 +43,7 @@ import Class		( FunDep, DefMeth(..) )
 import CStrings		( CLabelString )
 import Outputable	
 import SrcLoc		( SrcLoc )
+import FastString
 \end{code}
 
 
@@ -261,9 +262,10 @@ data TyClDecl name pat
 		tcdLoc :: SrcLoc
     }
 
-  | ForeignType { tcdName   :: name,		-- See remarks about IfaceSig above
-		  tcdFoType :: FoType,
-		  tcdLoc    :: SrcLoc }
+  | ForeignType { tcdName    :: name,		-- See remarks about IfaceSig above
+		  tcdExtName :: Maybe FastString,
+		  tcdFoType  :: FoType,
+		  tcdLoc     :: SrcLoc }
 
   | TyData {	tcdND     :: NewOrData,
 		tcdCtxt   :: HsContext name,	 -- context

@@ -329,8 +329,8 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 				 | otherwise			  -> DataTyCon
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
-                  (ForeignType {tcdName = tycon_name})
-  = ATyCon (mkForeignTyCon tycon_name liftedTypeKind 0 [])
+                  (ForeignType {tcdName = tycon_name, tcdExtName = tycon_ext_name})
+  = ATyCon (mkForeignTyCon tycon_name tycon_ext_name liftedTypeKind 0 [])
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
                   (ClassDecl {tcdName = class_name, tcdTyVars = tyvar_names,

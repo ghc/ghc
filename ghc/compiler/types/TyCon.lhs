@@ -64,6 +64,7 @@ import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Outputable
+import FastString
 \end{code}
 
 %************************************************************************
@@ -135,8 +136,9 @@ data TyCon
 	primTyConRep :: PrimRep,	-- Many primitive tycons are unboxed, but some are
 					-- boxed (represented by pointers). The PrimRep tells.
 
-	isUnLifted   :: Bool	-- Most primitive tycons are unlifted, 
+	isUnLifted   :: Bool,	-- Most primitive tycons are unlifted, 
 				-- but foreign-imported ones may not be
+	tyConExtName :: Maybe FastString
     }
 
   | TupleTyCon {
@@ -297,9 +299,11 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
     }
 
 -- Foreign-imported (.NET) type constructors are represented
--- as primitive, but *lifted*, TyCons for now.  
--- They  have PtrRep
-mkForeignTyCon name kind arity arg_vrcs
+-- as primitive, but *lifted*, TyCons for now. They are lifted
+-- because the Haskell type T representing the (foreign) .NET
+-- type T is actually implemented (in ILX) as a thunk<T>
+-- They have PtrRep
+mkForeignTyCon name ext_name kind arity arg_vrcs
   = PrimTyCon {
 	tyConName    = name,
 	tyConUnique  = nameUnique name,
@@ -307,7 +311,8 @@ mkForeignTyCon name kind arity arg_vrcs
 	tyConArity   = arity,
         tyConArgVrcs = arg_vrcs,
 	primTyConRep = PtrRep,
-	isUnLifted   = False
+	isUnLifted   = False,
+	tyConExtName = ext_name
     }
 
 
@@ -319,7 +324,8 @@ mkPrimTyCon name kind arity arg_vrcs rep
 	tyConArity   = arity,
         tyConArgVrcs = arg_vrcs,
 	primTyConRep = rep,
-	isUnLifted   = True
+	isUnLifted   = True,
+	tyConExtName = Nothing
     }
 
 mkSynTyCon name kind arity tyvars rhs argvrcs

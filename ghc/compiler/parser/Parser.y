@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.67 2001/06/11 12:21:17 simonpj Exp $
+$Id: Parser.y,v 1.68 2001/06/13 15:50:57 rrt Exp $
 
 Haskell grammar.
 
@@ -402,8 +402,8 @@ fordecl : srcloc 'label' ext_name varid '::' sigtype
 	| srcloc 'import' 'dotnet' ext_name varid '::' sigtype
 		{ ForD (ForeignImport $5 $7 (DNImport (DNCallSpec ($4 `orElse` mkExtName $5))) $1) }
 
-	| srcloc 'import' 'dotnet' 'type' tycon
-		{ TyClD (ForeignType $5 DNType $1) }
+	| srcloc 'import' 'dotnet' 'type' ext_name tycon
+		{ TyClD (ForeignType $6 $5 DNType $1) }
 
 decls 	:: { [RdrBinding] }
 	: decls ';' decl		{ $3 : $1 }
