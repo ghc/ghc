@@ -85,7 +85,7 @@ alpha*-dec-osf[[345]]*)
         HostVendor_CPP='dec'
         HostOS_CPP='osf3'
         ;;
-alpha*-unknown-linux)
+alpha*-unknown-linux*)
 	HostPlatform=alpha-unknown-linux
 	TargetPlatform=alpha-unknown-linux
 	BuildPlatform=alpha-unknown-linux
