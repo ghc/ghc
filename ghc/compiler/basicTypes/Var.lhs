@@ -77,7 +77,7 @@ data Var
 
 data VarDetails
   = LocalId 		-- Used for locally-defined Ids (see NOTE below)
-	LocalIdDetails	-- True <=> exported; don't discard even if dead
+	LocalIdDetails
 
   | GlobalId 		-- Used for imported Ids, dict selectors etc
 	GlobalIdDetails
