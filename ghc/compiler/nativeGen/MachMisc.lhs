@@ -70,8 +70,10 @@ underscorePrefix
     ,{-else-} IF_ARCH_i386(
 	IF_OS_linuxaout(True
 	, IF_OS_freebsd(True
+	, IF_OS_cygwin32(True
 	, IF_OS_bsdi(True
 	, {-otherwise-} False)))
+        )
      ,{-else-}IF_ARCH_sparc(
 	IF_OS_sunos4(True, {-otherwise-} False)
      ,)))
