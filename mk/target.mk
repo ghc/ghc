@@ -1034,6 +1034,11 @@ maintainer-clean:: extraclean
 # Expects:	$(WAYS)			the possible "way" strings to one of 
 #					which $(way) will be set
 
+ifneq "$(way)" ""
+ifeq "$(findstring $(way), $(WAYS))" ""
+$(error Unknown way $(way))
+endif
+endif
 
 # So how does $(way) ever get set to anything?  Answer, we recursively
 # invoke make, setting $(way) on the command line.
