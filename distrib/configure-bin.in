@@ -40,7 +40,7 @@ i[[3456]]86-*-linux*)
 	TargetPlatform=i386-unknown-linux;;
 i[[3456]]86-*-freebsd2*)
 	TargetPlatform=i386-unknown-freebsd2;;
-i[[3456]]86-*-freebsd[[^0-2]]*)
+i[[3456]]86-*-freebsd[[3-9]]*)
 	TargetPlatform=i386-unknown-freebsd;;
 i[[3456]]86-*-netbsd*)
 	TargetPlatform=i386-unknown-netbsd;;
