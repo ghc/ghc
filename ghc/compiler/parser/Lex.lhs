@@ -627,9 +627,9 @@ lex_string cont glaexts s buf
 
 	-- ignore \& in a string, deal with string gaps
 	'\\'# | next_ch `eqChar#` '&'# 
-		-> lex_string cont glaexts s (setCurrentPos# buf 2#)
+		-> lex_string cont glaexts s buf'
 	      | is_space next_ch
-		-> lex_stringgap cont glaexts s buf'
+		-> lex_stringgap cont glaexts s (incLexeme buf)
 
 	    where next_ch = lookAhead# buf 1#
 		  buf' = setCurrentPos# buf 2#
