@@ -103,6 +103,7 @@ module Control.Exception (
 
 	bracket,  	-- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO ()
 	bracket_, 	-- :: IO a -> IO b -> IO c -> IO ()
+	bracketOnError,
 
 	finally, 	-- :: IO a -> IO b -> IO a
 	
@@ -389,6 +390,21 @@ a `finally` sequel =
 -- is not required.
 bracket_ :: IO a -> IO b -> IO c -> IO c
 bracket_ before after thing = bracket before (const after) (const thing)
+
+-- | Like bracket, but only performs the final action if there was an 
+-- exception raised by the in-between computation.
+bracketOnError
+	:: IO a		-- ^ computation to run first (\"acquire resource\")
+	-> (a -> IO b)  -- ^ computation to run last (\"release resource\")
+	-> (a -> IO c)	-- ^ computation to run in-between
+	-> IO c		-- returns the value from the in-between computation
+bracketOnError before after thing =
+  block (do
+    a <- before 
+    catch 
+	(unblock (thing a))
+	(\e -> do { after a; throw e })
+ )
 
 -- -----------------------------------------------------------------------------
 -- Asynchronous exceptions
