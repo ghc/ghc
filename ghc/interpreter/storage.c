@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.55 $
- * $Date: 2000/03/24 14:32:03 $
+ * $Revision: 1.56 $
+ * $Date: 2000/03/30 09:02:12 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1609,7 +1609,7 @@ void nukeModule ( Module m )
    ObjectCode* oc2;
    Int         i;
 assert(isModule(m));
-fprintf(stderr, "NUKEMODULE `%s'\n", textToStr(module(m).text));
+/*fprintf(stderr, "NUKEMODULE `%s'\n", textToStr(module(m).text)); */
    oc = module(m).object;
    while (oc) {
       oc2 = oc->next;
