@@ -99,7 +99,7 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 
 SRCS=$(wildcard *.lhs *.hs *.c *.lc *.prl *.lprl *.lit *.verb)
 
-HS_SRCS=$(filter %.lhs %.hs %.hc,$(SRCS) $(BOOT_SRCS))
+HS_SRCS=$(filter %.lhs %.hs %.hc,$(sort $(SRCS) $(BOOT_SRCS)))
 HS_OBJS=$(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
 HS_HCS=$(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
 HS_SS=$(addsuffix .$(way_)s,$(basename $(HS_SRCS)))
