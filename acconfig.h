@@ -15,24 +15,6 @@
 
 @TOP@
 
-/* Define if we're have GNU libc. */
-#undef _GNU_SOURCE
-
-/* Define if time.h or sys/time.h define the altzone variable */
-#undef HAVE_ALTZONE
-
-/* Define to the type of the timezone variable (usually long or time_t) */
-#undef TYPE_TIMEZONE
-
-/* Define to unsigned int if <sys/types.h> doesn't define */
-#undef uint
-
-/* Define to unsigned long int if <sys/types.h> doesn't define */
-#undef ulong
-
-/* Define to unsigned long long int if <sys/types.h> doesn't define */
-#undef ullong
-
 /* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
 #undef ALIGNMENT_DOUBLE
 
@@ -45,8 +27,17 @@
 /* Define to alignment constraint on unsigned int - whichever is the greater */
 #undef ALIGNMENT_UNSIGNED_INT
 
+/* Define if we're have GNU libc. */
+#undef _GNU_SOURCE
+
+/* Define if time.h or sys/time.h define the altzone variable */
+#undef HAVE_ALTZONE
+
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
+
+/* Define to the type of the timezone variable (usually long or time_t) */
+#undef TYPE_TIMEZONE
 
 
 /* Leave that blank line there!!  Autoheader needs it.
