@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.36 2001/04/02 07:22:50 qrczak Exp $
+ * $Id: Linker.c,v 1.37 2001/04/14 22:29:16 qrczak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -85,6 +85,7 @@ typedef struct _RtsSymbolVal {
       Sym(stg_gen_chk)				\
       SymX(stg_exit)				\
       SymX(stg_update_PAP)			\
+      SymX(stg_ap_1_upd_info)			\
       SymX(stg_ap_2_upd_info)			\
       SymX(stg_ap_3_upd_info)			\
       SymX(stg_ap_4_upd_info)			\
