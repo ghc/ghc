@@ -212,20 +212,19 @@ def simple_run_main( $_extra_args )
 
 
 -- returns True if both files exist and are identical.
-def exist_and_same ( $_file1, $_file2 )
+def same ( $_file1, $_file2 )
 {
-   if   not(exists($_file1) && exists($_file2))
-   then return False
-   else if defined $verbose 
-	    then print "vanilla-test: comparing " ++ $_file1
-			 ++ " and " ++ $_file2
-	fi
-        $cts1 = contents($_file1)
-        $cts2 = contents($_file2)
-        $same = $cts1 == $cts2
-        if not($same) then say_fail_because_noteq($_file1, $_file2) fi
-        return $same
+   if defined $verbose 
+	then print "vanilla-test: comparing " ++ $_file1
+		 ++ " and " ++ $_file2
    fi
+   $cts1 = contents($_file1)
+   $cts2 = contents($_file2)
+   $same = $cts1 == $cts2
+   if not($same) then 
+	say_fail_because_noteq($_file1, $_file2) 
+   fi
+   return $same
 }
 
 
@@ -234,24 +233,12 @@ def check_stdout_ok()
 {
    $r_stdout  = qualify("run.stdout")
    $s_stdout  = qualify("stdout")
-   $s1_stdout = qualify("stdout1")
-   $s2_stdout = qualify("stdout2")
-   $s3_stdout = qualify("stdout3")
-   $s4_stdout = qualify("stdout4")
-   $sm_stdout = qualify("stdout-mingw")
 
-   -- check for minimal level of sanity
-   if   not ( exists($s_stdout) && exists($r_stdout) )
-   then framefail "vanilla-test: .stdout and/or .run.stdout are missing"
+   if   not ( exists($s_stdout) )
+   then return (contents($r_stdout) == "")
    fi
 
-   return
-      exist_and_same($s_stdout, $r_stdout)
-      || exist_and_same($s1_stdout, $r_stdout)
-      || exist_and_same($s2_stdout, $r_stdout)
-      || exist_and_same($s3_stdout, $r_stdout)
-      || exist_and_same($s4_stdout, $r_stdout)
-      || exist_and_same($sm_stdout, $r_stdout)
+   return same($s_stdout, $r_stdout)
 }
 
 
@@ -261,22 +248,12 @@ def check_stderr_ok()
 {
    $r_stderr  = qualify("run.stderr")
    $s_stderr  = qualify("stderr")
-   $s1_stderr = qualify("stderr1")
-   $s2_stderr = qualify("stderr2")
-   $s3_stderr = qualify("stderr3")
-   $s4_stderr = qualify("stderr4")
-   $sm_stderr = qualify("stderr-mingw")
 
-   -- if it doesn't look like there's any stderr to be seen, it's OK.
-   if not ( exists($s_stderr) ) then return True fi
+   if   not ( exists($s_stderr) )
+   then return (contents($r_stderr) == "")
+   fi
 
-   return
-      exist_and_same($s_stderr, $r_stderr)
-      || exist_and_same($s1_stderr, $r_stderr)
-      || exist_and_same($s2_stderr, $r_stderr)
-      || exist_and_same($s3_stderr, $r_stderr)
-      || exist_and_same($s4_stderr, $r_stderr)
-      || exist_and_same($sm_stderr, $r_stderr)
+   return same($s_stderr, $r_stderr)
 }
 
 
