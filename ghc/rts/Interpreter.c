@@ -1157,6 +1157,9 @@ run_BCO:
 	    int stk_offset            = BCO_NEXT;
 	    int o_itbl                = BCO_NEXT;
 	    void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
+	    int ret_dyn_size = 
+		RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE
+		+ sizeofW(StgRetDyn);
 
 #ifdef RTS_SUPPORTS_THREADS
 	    // Threaded RTS:
@@ -1168,7 +1171,7 @@ run_BCO:
 	    
 	    memcpy(arguments, Sp, sizeof(W_) * stk_offset);
 #endif
-		
+
 	    // There are a bunch of non-ptr words on the stack (the
 	    // ccall args, the ccall fun address and space for the
 	    // result), which we need to cover with an info table
@@ -1179,7 +1182,7 @@ run_BCO:
 	    // CCALL instruction.   So we build a RET_DYN stack frame
 	    // on the stack frame to describe this chunk of stack.
 	    //
-	    Sp -= RET_DYN_SIZE + sizeofW(StgRetDyn);
+	    Sp -= ret_dyn_size;
 	    ((StgRetDyn *)Sp)->liveness = ALL_NON_PTRS | N_NONPTRS(stk_offset);
 	    ((StgRetDyn *)Sp)->info = (StgInfoTable *)&stg_gc_gen_info;
 
@@ -1192,7 +1195,7 @@ run_BCO:
 	    // around (stack squeezing), so we have to grab the real
 	    // Sp out of the TSO to find the ccall args again.
 
-	    marshall_fn ( (void*)(cap->r.rCurrentTSO->sp + RET_DYN_SIZE + sizeofW(StgRetDyn)) );
+	    marshall_fn ( (void*)(cap->r.rCurrentTSO->sp + ret_dyn_size) );
 #else
 	    // Threaded RTS:
 	    // We already made a malloced copy of the arguments above.
@@ -1203,8 +1206,7 @@ run_BCO:
 	    // And restart the thread again, popping the RET_DYN frame.
 	    cap = (Capability *)((void *)resumeThread(tok,rtsFalse) - sizeof(StgFunTable));
 	    LOAD_STACK_POINTERS;
-	    Sp += RET_DYN_SIZE + sizeofW(StgRetDyn);
-
+	    Sp += ret_dyn_size;
 	    
 #ifdef RTS_SUPPORTS_THREADS
 	    // Threaded RTS:

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.29 2003/03/19 18:56:14 sof Exp $
+ * $Id: HeapStackCheck.hc,v 1.30 2003/04/22 16:25:10 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -810,6 +810,7 @@ EXTFUN(stg_gc_fun_ret)
 // it's not a big deal.
 
 #define RESTORE_EVERYTHING			\
+    L1   = PK_Word64(Sp+19);			\
     D2   = PK_DBL(Sp+17);			\
     D1   = PK_DBL(Sp+15);			\
     F4   = PK_FLT(Sp+14);			\
@@ -824,12 +825,13 @@ EXTFUN(stg_gc_fun_ret)
     R3.w = Sp[5];				\
     R2.w = Sp[4];				\
     R1.w = Sp[3];				\
-    Sp += 19;
+    Sp += 21;
 
-#define RET_OFFSET (-17)
+#define RET_OFFSET (-19)
 
 #define SAVE_EVERYTHING				\
-    Sp -= 19;					\
+    Sp -= 21;					\
+    ASSIGN_Word64(Sp+19,L1);			\
     ASSIGN_DBL(Sp+17,D2);			\
     ASSIGN_DBL(Sp+15,D1);			\
     ASSIGN_FLT(Sp+14,F4);			\

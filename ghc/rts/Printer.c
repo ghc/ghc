@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.58 2003/04/01 17:09:40 sof Exp $
+ * $Id: Printer.c,v 1.59 2003/04/22 16:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -558,8 +558,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
 	    p = (P_)(r->payload);
 	    printSmallBitmap(spBottom, sp,
-			     GET_LIVENESS(r->liveness), RET_DYN_SIZE);
-	    p += RET_DYN_SIZE;
+			     GET_LIVENESS(r->liveness), RET_DYN_BITMAP_SIZE);
+	    p += RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE;
 
 	    for (size = GET_NONPTRS(dyn); size > 0; size--) {
 		fprintf(stderr,"   stk[%ld] (%p) = ", (long)(spBottom-p), p);

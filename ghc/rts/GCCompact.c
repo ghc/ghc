@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.15 2003/03/24 16:18:26 simonmar Exp $
+ * $Id: GCCompact.c,v 1.16 2003/04/22 16:25:10 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -270,7 +270,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    // traverse the bitmap first
 	    bitmap = GET_LIVENESS(dyn);
 	    p      = (P_)&((StgRetDyn *)p)->payload[0];
-	    size   = RET_DYN_SIZE;
+	    size   = RET_DYN_BITMAP_SIZE;
 	    while (size > 0) {
 		if ((bitmap & 1) == 0) {
 		    thread(p);
@@ -281,7 +281,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    }
 	    
 	    // skip over the non-ptr words
-	    p += GET_NONPTRS(dyn);
+	    p += GET_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
 	    
 	    // follow the ptr words
 	    for (size = GET_PTRS(dyn); size > 0; size--) {

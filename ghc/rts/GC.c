@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.153 2003/04/01 15:05:13 sof Exp $
+ * $Id: GC.c,v 1.154 2003/04/22 16:25:09 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -3689,11 +3689,11 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	// traverse the bitmap first
 	bitmap = GET_LIVENESS(dyn);
 	p      = (P_)&((StgRetDyn *)p)->payload[0];
-	size   = RET_DYN_SIZE;
+	size   = RET_DYN_BITMAP_SIZE;
 	p = scavenge_small_bitmap(p, size, bitmap);
 
 	// skip over the non-ptr words
-	p += GET_NONPTRS(dyn);
+	p += GET_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
 	
 	// follow the ptr words
 	for (size = GET_PTRS(dyn); size > 0; size--) {

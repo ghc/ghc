@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.51 2003/03/27 13:54:32 simonmar Exp $
+ * $Id: Storage.h,v 1.52 2003/04/22 16:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -419,7 +419,8 @@ static inline StgWord stack_frame_sizeW( StgClosure *frame )
     case RET_DYN:
     {
 	StgRetDyn *dyn = (StgRetDyn *)frame;
-	return  sizeofW(StgRetDyn) + RET_DYN_SIZE + 
+	return  sizeofW(StgRetDyn) + RET_DYN_BITMAP_SIZE + 
+	    RET_DYN_NONPTR_REGS_SIZE +
 	    GET_PTRS(dyn->liveness) + GET_NONPTRS(dyn->liveness);
     }
 	    

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.50 2002/12/11 15:36:39 simonmar Exp $
+ * $Id: StgMacros.h,v 1.51 2003/04/22 16:25:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -230,14 +230,18 @@ typedef StgWord StgWordArray[];
 
    The stack frame layout for a RET_DYN is like this:
 
-          some pointers
-          some nonpointers
-          DblReg1-2
-	  FltReg1-4
-	  R1-8
-	  return address
-	  liveness mask
-	  stg_gen_chk_info
+          some pointers         |-- GET_PTRS(liveness) words
+          some nonpointers      |-- GET_NONPTRS(liveness) words
+			       
+	  L1                    \
+          D1-2                  |-- RET_DYN_NONPTR_REGS_SIZE words
+	  F1-4                  /
+			       
+	  R1-8                  |-- RET_DYN_BITMAP_SIZE words
+			       
+	  return address        \
+	  liveness mask         |-- StgRetDyn structure
+	  stg_gen_chk_info      /
 
    we assume that the size of a double is always 2 pointers (wasting a
    word when it is only one pointer, but avoiding lots of #ifdefs).
@@ -247,8 +251,9 @@ typedef StgWord StgWordArray[];
 // VERY MAGIC CONSTANTS! 
 // must agree with code in HeapStackCheck.c, stg_gen_chk
 //
-#define ALL_NON_PTRS   0xffff
-#define RET_DYN_SIZE   16
+#define RET_DYN_BITMAP_SIZE 8
+#define RET_DYN_NONPTR_REGS_SIZE 10
+#define ALL_NON_PTRS 0xff
 
 #define LIVENESS_MASK(ptr_regs)  (ALL_NON_PTRS ^ (ptr_regs))
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.32 2003/03/24 14:46:56 simonmar Exp $
+ * $Id: Sanity.c,v 1.33 2003/04/22 16:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -113,8 +113,8 @@ checkStackFrame( StgPtr c )
 	dyn = r->liveness;
 	
 	p = (P_)(r->payload);
-	checkSmallBitmap(p,GET_LIVENESS(r->liveness),RET_DYN_SIZE);
-	p += RET_DYN_SIZE;
+	checkSmallBitmap(p,GET_LIVENESS(r->liveness),RET_DYN_BITMAP_SIZE);
+	p += RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE;
 
 	// skip over the non-pointers
 	p += GET_NONPTRS(dyn);
@@ -125,7 +125,8 @@ checkStackFrame( StgPtr c )
 	    p++;
 	}
 	
-	return sizeofW(StgRetDyn) + RET_DYN_SIZE + 
+	return sizeofW(StgRetDyn) + RET_DYN_BITMAP_SIZE +
+	    RET_DYN_NONPTR_REGS_SIZE +
 	    GET_NONPTRS(dyn) + GET_PTRS(dyn);
     }
 
