@@ -1,4 +1,56 @@
-21 Oct 00
+NB: all floats are let-binds, but some non-rec lets
+    may be unlifted (with RHS ok-for-speculation)
 
-- Do we want to continue to record the package name in an interface file?
-  Does pi_mod have a Module or a ModuleName?
+
+simplArg:  [use strictness]
+	   [used for non-top-lvl non-rec RHS or function arg]
+  if strict-type || demanded
+	simplStrictExpr
+  else
+	simplExpr ---> (floats,expr)
+	float all the floats if exposes constr app, return expr
+
+simpl (applied lambda)	    ==> simplNonRecBind
+simpl (Let (NonRec ...) ..) ==> simplNonRecBind
+
+simpl (Let (Rec ...)    ..) ==> simplRecBind
+
+simplRecBind:
+  simplify binders (but not its IdInfo)
+  simplify the pairs one at a time
+	using simplRecPair
+
+simplNonRecBind:	[was simplBeta]
+	[used for non-top-lvl non-rec bindings]
+  - check for PreInlineUnconditionally
+  - simplify binder, including its IdInfo
+  - simplArg
+  - if strict-type 
+	addCaseBind [which makes a let if ok-for-spec]
+    else
+	completeLazyBind
+
+simplRecPair:	[binder already simplified, but not its IdInfo]
+	  	[used for both rec and top-lvl non-rec]
+		[must not be strict/unboxed; case not allowed]
+  - check for PreInlineUnconditionally
+  - substituteIdInfo and add result to in-scope 
+	[so that rules are available in rec rhs]
+  - simplExpr --> (floats,expr)
+  - float: lifted floats only
+	if exposes constructor or pap (even if non-triv args)
+	or if top level
+  - completeLazyBind
+  
+
+completeLazyBind: 	[given a simplified RHS]
+	[used for both rec and non-rec bindings, top level and not]
+  - try discarding dead
+  - try PostInlineUnconditionally
+  - let-bind coerce arg and repeat
+  - try rhs tylam (float)
+  - try eta expand (float)    [not if any float is unlifted && (non-spec || top_lvl || rec)]
+  - let-bind constructor args [not if any float is ..as above..]
+
+  - add unfolding [this is the only place we add an unfolding]
+    add arity
