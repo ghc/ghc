@@ -236,8 +236,11 @@ regUsage instr = case instr of
     ADD    sz src dst	-> usageRM src dst
     SUB    sz src dst	-> usageRM src dst
     IMUL   sz src dst	-> usageRM src dst
+    MUL    sz src dst	-> usageRM src dst
     IQUOT  sz src dst	-> usageRM src dst
     IREM   sz src dst	-> usageRM src dst
+    QUOT   sz src dst	-> usageRM src dst
+    REM    sz src dst	-> usageRM src dst
     AND    sz src dst	-> usageRM src dst
     OR     sz src dst	-> usageRM src dst
     XOR    sz src dst	-> usageRM src dst
@@ -266,10 +269,7 @@ regUsage instr = case instr of
     GLDZ   dst		-> mkRU [] [dst]
     GLD1   dst		-> mkRU [] [dst]
 
-    GFTOD  src dst	-> mkRU [src] [dst]
     GFTOI  src dst	-> mkRU [src] [dst]
-
-    GDTOF  src dst	-> mkRU [src] [dst]
     GDTOI  src dst	-> mkRU [src] [dst]
 
     GITOF  src dst	-> mkRU [src] [dst]
@@ -627,8 +627,11 @@ patchRegs instr env = case instr of
     ADD  sz src dst	-> patch2 (ADD  sz) src dst
     SUB  sz src dst	-> patch2 (SUB  sz) src dst
     IMUL sz src dst 	-> patch2 (IMUL sz) src dst
+    MUL sz src dst 	-> patch2 (MUL sz) src dst
     IQUOT sz src dst 	-> patch2 (IQUOT sz) src dst
     IREM sz src dst 	-> patch2 (IREM sz) src dst
+    QUOT sz src dst 	-> patch2 (QUOT sz) src dst
+    REM sz src dst 	-> patch2 (REM sz) src dst
     AND  sz src dst	-> patch2 (AND  sz) src dst
     OR   sz src dst	-> patch2 (OR   sz) src dst
     XOR  sz src dst	-> patch2 (XOR  sz) src dst
@@ -652,10 +655,7 @@ patchRegs instr env = case instr of
     GLDZ dst		-> GLDZ (env dst)
     GLD1 dst		-> GLD1 (env dst)
 
-    GFTOD src dst	-> GFTOD (env src) (env dst)
     GFTOI src dst	-> GFTOI (env src) (env dst)
-
-    GDTOF src dst	-> GDTOF (env src) (env dst)
     GDTOI src dst	-> GDTOI (env src) (env dst)
 
     GITOF src dst	-> GITOF (env src) (env dst)

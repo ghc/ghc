@@ -21,7 +21,7 @@ import SMRep		( fixedItblSize,
 			  rET_SMALL, rET_BIG, 
 			  rET_VEC_SMALL, rET_VEC_BIG 
 			)
-import Constants   	( mIN_UPD_SIZE )
+import Constants   	( mIN_UPD_SIZE, wORD_SIZE )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
                           mkClosureTblLabel, mkClosureLabel,
 			  labelDynamic, mkSplitMarkerLabel )
@@ -30,14 +30,14 @@ import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  staticClosureNeedsLink
 			)
 import Literal		( Literal(..), word2IntLit )
-import Maybes	    	( maybeToBool )
+import Maybes	    	( Maybe012(..), maybeToBool )
 import StgSyn		( StgOp(..) )
-import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
+import MachOp		( MachOp(..), resultRepsOfMachOp )
 import PrimRep	    	( isFloatingRep, PrimRep(..) )
 import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable,
 			  livenessIsSmall, bitmapToIntegers )
 import StixMacro	( macroCode, checkCode )
-import StixPrim		( primCode, foreignCallCode, amodeToStix, amodeToStix' )
+import StixPrim		( foreignCallCode, amodeToStix, amodeToStix' )
 import Outputable       ( pprPanic, ppr )
 import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Util		( naturalMergeSortLe )
@@ -47,6 +47,12 @@ import DataCon		( dataConWrapId )
 import Name             ( NamedThing(..) )
 import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
 import Outputable	( assertPanic )
+
+-- DEBUGGING ONLY
+--import IOExts		( trace )
+--import Outputable	( showSDoc )
+--import MachOp		( pprMachOp )
+
 \end{code}
 
 For each independent chunk of AbstractC code, we generate a list of
@@ -55,7 +61,7 @@ We leave the chunks separated so that register allocation can be
 performed locally within the chunk.
 
 \begin{code}
-genCodeAbstractC :: AbstractC -> UniqSM [StixTree]
+genCodeAbstractC :: AbstractC -> UniqSM [StixStmt]
 
 genCodeAbstractC absC
   = gentopcode absC
@@ -64,7 +70,6 @@ genCodeAbstractC absC
  a2stix'     = amodeToStix'
  volsaves    = volatileSaves
  volrestores = volatileRestores
- p2stix      = primCode
  macro_code  = macroCode
  -- real code follows... ---------
 \end{code}
@@ -151,7 +156,7 @@ Here we handle top-level things, like @CCodeBlock@s and
 	     , StData DataPtrRep (map mk_StCLbl_for_SRT closures)
 	     ]
     where
-       mk_StCLbl_for_SRT :: CLabel -> StixTree
+       mk_StCLbl_for_SRT :: CLabel -> StixExpr
        mk_StCLbl_for_SRT label
           | labelDynamic label
           = StIndex Int8Rep (StCLbl label) (StInt 1)
@@ -183,15 +188,15 @@ Here we handle top-level things, like @CCodeBlock@s and
 	     : StData IntRep [StInt 0]
 	     : StSegment TextSegment
 	     : StLabel lbl
-	     : StCondJump tmp_lbl (StPrim IntNeOp 	
+	     : StCondJump tmp_lbl (StMachOp MO_Nat_Ne
 				     [StInd IntRep (StCLbl flag_lbl),
 				      StInt 0])
-	     : StAssign IntRep (StInd IntRep (StCLbl flag_lbl)) (StInt 1)
+	     : StAssignMem IntRep (StCLbl flag_lbl) (StInt 1)
 	     : code 
 	     [ StLabel tmp_lbl
-	     , StAssign PtrRep stgSp
-                        (StIndex PtrRep stgSp (StInt (-1)))
-	     , StJump NoDestInfo (StInd WordRep stgSp)
+	     , StAssignReg PtrRep stgSp
+                           (StIndex PtrRep (StReg stgSp) (StInt (-1)))
+	     , StJump NoDestInfo (StInd WordRep (StReg stgSp))
 	     ])
 
  gentopcode absC
@@ -294,6 +299,14 @@ resulting StixTreeLists are joined together.
     gencode c2				`thenUs` \ b2 ->
     returnUs (b1 . b2)
 
+ gencode (CSequential stuff)
+  = foo stuff
+    where
+       foo [] = returnUs id
+       foo (s:ss) = gencode s 	`thenUs` \ stix ->
+                    foo ss 	`thenUs` \ stixes ->
+                    returnUs (stix . stixes)
+
 \end{code}
 
 Initialising closure headers in the heap...a fairly complex ordeal if
@@ -309,7 +322,7 @@ addresses, etc.)
 	lhs = a2stix reg_rel
     	lbl = infoTableLabelFromCI cl_info
     in
-	returnUs (\xs -> StAssign PtrRep (StInd PtrRep lhs) (StCLbl lbl) : xs)
+	returnUs (\xs -> StAssignMem PtrRep lhs (StCLbl lbl) : xs)
 
 \end{code}
 
@@ -340,7 +353,7 @@ of the source?  Be careful about floats/doubles.
     	lhs' = a2stix lhs
     	rhs' = a2stix' rhs
     in
-	returnUs (\xs -> StAssign pk' lhs' rhs' : xs)
+	returnUs (\xs -> mkStAssign pk' lhs' rhs' : xs)
 
 \end{code}
 
@@ -373,8 +386,8 @@ which varies depending on whether we're profiling etc.
   = returnUs (\xs -> StJump NoDestInfo dest : xs)
   where
     dest = StInd PtrRep (StIndex PtrRep (a2stix table) dyn_off)
-    dyn_off = StPrim IntSubOp [StPrim IntNegOp [a2stix am], 
-			       StInt (toInteger (fixedItblSize+1))]
+    dyn_off = StMachOp MO_Nat_Sub [StMachOp MO_NatS_Neg [a2stix am], 
+			           StInt (toInteger (fixedItblSize+1))]
 
 \end{code}
 
@@ -386,17 +399,60 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
     foreignCallCode (nonVoid results) fcall (nonVoid args)
 
  gencode (COpStmt results (StgPrimOp op) args vols)
-  -- ToDo (ADR?): use that liveness mask
-  | primOpNeedsWrapper op
-  = let
-	saves    = volsaves vols
-    	restores = volrestores vols
-    in
-    	p2stix (nonVoid results) op (nonVoid args)
-    	    	    	    		    	      	`thenUs` \ code ->
-    	returnUs (\xs -> saves ++ code (restores ++ xs))
+  = panic "AbsCStixGen.gencode: un-translated PrimOp"
 
-  | otherwise = p2stix (nonVoid results) op (nonVoid args)
+ -- Translate out array indexing primops right here, so that
+ -- individual targets don't have to deal with them
+
+ gencode (CMachOpStmt (Just1 r1) (MO_ReadOSBI off_w rep) [base,index] vols) 
+  = returnUs (\xs ->
+       mkStAssign 
+          rep 
+          (a2stix r1) 
+          (StInd rep (StMachOp MO_Nat_Add 
+                               [StIndex rep (a2stix base) (a2stix index), 
+                                StInt (toInteger (off_w * wORD_SIZE))]))
+       : xs
+    )
+
+ gencode (CMachOpStmt Just0 (MO_WriteOSBI off_w rep) [base,index,val] vols) 
+  = returnUs (\xs ->
+       StAssignMem 
+          rep 
+          (StMachOp MO_Nat_Add 
+                    [StIndex rep (a2stix base) (a2stix index), 
+                     StInt (toInteger (off_w * wORD_SIZE))])
+          (a2stix val)
+       : xs
+    )
+
+ -- Gruesome cases for multiple-result primops
+ gencode (CMachOpStmt (Just2 r1 r2) mop [arg1, arg2] vols)
+  | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC]
+  = getUniqueUs `thenUs`		\ u1 ->
+    getUniqueUs `thenUs` 		\ u2 ->
+    let vr1 = StixVReg u1 IntRep
+        vr2 = StixVReg u2 IntRep
+        r1s = a2stix r1
+        r2s = a2stix r2
+    in
+    returnUs (\xs ->
+       StAssignMachOp (Just2 vr1 vr2) mop [a2stix arg1, a2stix arg2]
+       : mkStAssign IntRep r1s (StReg (StixTemp vr1))
+       : mkStAssign IntRep r2s (StReg (StixTemp vr2))
+       : xs
+    )
+
+ -- Ordinary MachOps are passed through unchanged.
+
+ gencode (CMachOpStmt (Just1 r1) mop args vols)
+  = let (Just1 rep) = resultRepsOfMachOp mop
+    in 
+    returnUs (\xs ->
+       mkStAssign rep (a2stix r1) 
+                  (StMachOp mop (map a2stix args))
+       : xs
+    )
 \end{code}
 
 Now the dreaded conditional jump.
@@ -564,10 +620,10 @@ already finish with a jump to the join point.
  mkJumpTable am alts lowTag highTag dflt
   = getUniqLabelNCG 	    	    	    	    	`thenUs` \ utlbl ->
     mapUs genLabel alts 	  	    	    	`thenUs` \ branches ->
-    let	cjmpLo = StCondJump dflt (StPrim IntLtOp [am, StInt (toInteger lowTag)])
-    	cjmpHi = StCondJump dflt (StPrim IntGtOp [am, StInt (toInteger highTag)])
+    let	cjmpLo = StCondJump dflt (StMachOp MO_NatS_Lt [am, StInt (toInteger lowTag)])
+    	cjmpHi = StCondJump dflt (StMachOp MO_NatS_Gt [am, StInt (toInteger highTag)])
 
-    	offset = StPrim IntSubOp [am, StInt lowTag]
+    	offset = StMachOp MO_Nat_Sub [am, StInt lowTag]
         dsts   = DestInfo (dflt : map fst branches)
 
     	jump = StJump dsts (StInd PtrRep (StIndex PtrRep (StCLbl utlbl) offset))
@@ -624,8 +680,8 @@ alternatives should already finish with a jump to the join point.
   | rangeOfOne = gencode alt
   | otherwise
   = let	tag' = a2stix (CLit tag)
-    	cmpOp = if floating then DoubleNeOp else IntNeOp
-    	test = StPrim cmpOp [am, tag']
+    	cmpOp = if floating then MO_Dbl_Ne else MO_Nat_Ne
+    	test = StMachOp cmpOp [am, tag']
     	cjmp = StCondJump udlbl test
     in
     	gencode alt 	    	    	    	`thenUs` \ alt_code ->
@@ -638,8 +694,8 @@ alternatives should already finish with a jump to the join point.
  mkBinaryTree am floating alts choices lowTag highTag udlbl
   = getUniqLabelNCG					`thenUs` \ uhlbl ->
     let tag' = a2stix (CLit splitTag)
-    	cmpOp = if floating then DoubleGeOp else IntGeOp
-    	test = StPrim cmpOp [am, tag']
+    	cmpOp = if floating then MO_Dbl_Ge else MO_NatS_Ge
+    	test = StMachOp cmpOp [am, tag']
     	cjmp = StCondJump uhlbl test
     in
     	mkBinaryTree am floating alts_lo half lowTag splitTag udlbl
@@ -671,8 +727,8 @@ alternatives should already finish with a jump to the join point.
     getUniqLabelNCG					`thenUs` \ utlbl ->
     let discrim' = a2stix discrim
     	tag' = a2stix (CLit tag)
-    	cmpOp = if (isFloatingRep (getAmodeRep discrim)) then DoubleNeOp else IntNeOp
-    	test = StPrim cmpOp [discrim', tag']
+    	cmpOp = if (isFloatingRep (getAmodeRep discrim)) then MO_Dbl_Ne else MO_Nat_Ne
+    	test = StMachOp cmpOp [discrim', tag']
     	cjmp = StCondJump utlbl test
     	dest = StLabel utlbl
     	join = StLabel ujlbl
@@ -681,8 +737,8 @@ alternatives should already finish with a jump to the join point.
 	gencode deflt				`thenUs` \ dflt_code ->
 	returnUs (\xs -> cjmp : alt_code (dest : dflt_code (join : xs)))
 
-mkJoin :: AbstractC -> CLabel -> AbstractC
 
+mkJoin :: AbstractC -> CLabel -> AbstractC
 mkJoin code lbl
   | mightFallThrough code = mkAbsCStmts code (CJump (CLbl lbl PtrRep))
   | otherwise = code

@@ -18,28 +18,34 @@ import MachMisc		-- may differ per-platform
 import MachRegs
 import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
 			  snocOL, consOL, concatOL )
+import MachOp		( MachOp(..), pprMachOp )
 import AbsCUtils	( magicIdPrimRep )
+import PprAbsC		( pprMagicId )
 import ForeignCall	( CCallConv(..) )
 import CLabel		( CLabel, labelDynamic )
 #if sparc_TARGET_ARCH || alpha_TARGET_ARCH
 import CLabel 		( isAsmTemp )
 #endif
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, Maybe012(..) )
 import PrimRep		( isFloatingRep, PrimRep(..) )
-import PrimOp		( PrimOp(..) )
-import Stix		( getNatLabelNCG, StixTree(..),
-			  StixReg(..), CodeSegment(..), 
+import Stix		( getNatLabelNCG, StixStmt(..), StixExpr(..),
+			  StixReg(..), StixVReg(..), CodeSegment(..), 
                           DestInfo, hasDestInfo,
-                          pprStixTree, 
+                          pprStixExpr, 
+                          liftStrings,
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
                           getDeltaNat, setDeltaNat,
                           ncgPrimopMoan
 			)
 import Pretty
-import Outputable	( panic, pprPanic )
+import Outputable	( panic, pprPanic, showSDoc )
 import qualified Outputable
 import CmdLineOpts	( opt_Static )
+
+-- DEBUGGING ONLY
+import IOExts		( trace )
+import Stix		( pprStixStmt )
 
 infixr 3 `bind`
 \end{code}
@@ -58,84 +64,13 @@ x `bind` f = f x
 Code extractor for an entire stix tree---stix statement level.
 
 \begin{code}
-stmtsToInstrs :: [StixTree] -> NatM InstrBlock
+stmtsToInstrs :: [StixStmt] -> NatM InstrBlock
 stmtsToInstrs stmts
-   = liftStrings stmts [] []		`thenNat` \ lifted ->
-     mapNat stmtToInstrs lifted		`thenNat` \ instrss ->
+   = mapNat stmtToInstrs stmts		`thenNat` \ instrss ->
      returnNat (concatOL instrss)
 
 
--- Lift StStrings out of top-level StDatas, putting them at the end of
--- the block, and replacing them with StCLbls which refer to the lifted-out strings. 
-{- Motivation for this hackery provided by the following bug:
-   Stix:
-      (DataSegment)
-      Bogon.ping_closure :
-      (Data P_ Addr.A#_static_info)
-      (Data StgAddr (Str `alalal'))
-      (Data P_ (0))
-   results in:
-      .data
-              .align 8
-      .global Bogon_ping_closure
-      Bogon_ping_closure:
-              .long   Addr_Azh_static_info
-              .long   .Ln1a8
-      .Ln1a8:
-              .byte   0x61
-              .byte   0x6C
-              .byte   0x61
-              .byte   0x6C
-              .byte   0x61
-              .byte   0x6C
-              .byte   0x00
-              .long   0
-   ie, the Str is planted in-line, when what we really meant was to place
-   a _reference_ to the string there.  liftStrings will lift out all such
-   strings in top-level data and place them at the end of the block.
-
-   This is still a rather half-baked solution -- to do the job entirely right
-   would mean a complete traversal of all the Stixes, but there's currently no
-   real need for it, and it would be slow.  Also, potentially there could be
-   literal types other than strings which need lifting out?
--}
-
-liftStrings :: [StixTree]    -- originals
-            -> [StixTree]    -- (reverse) originals with strings lifted out
-            -> [(CLabel, FAST_STRING)]   -- lifted strs, and their new labels
-            -> NatM [StixTree]
-
--- First, examine the original trees and lift out strings in top-level StDatas.
-liftStrings (st:sts) acc_stix acc_strs
-   = case st of
-        StData sz datas
-           -> lift datas acc_strs 	`thenNat` \ (datas_done, acc_strs1) ->
-              liftStrings sts ((StData sz datas_done):acc_stix) acc_strs1
-        other 
-           -> liftStrings sts (other:acc_stix) acc_strs
-     where
-        -- Handle a top-level StData
-        lift []     acc_strs = returnNat ([], acc_strs)
-        lift (d:ds) acc_strs
-           = lift ds acc_strs 		`thenNat` \ (ds_done, acc_strs1) ->
-             case d of
-                StString s 
-                   -> getNatLabelNCG 	`thenNat` \ lbl ->
-                      returnNat ((StCLbl lbl):ds_done, ((lbl,s):acc_strs1))
-                other
-                   -> returnNat (other:ds_done, acc_strs1)
-
--- When we've run out of original trees, emit the lifted strings.
-liftStrings [] acc_stix acc_strs
-   = returnNat (reverse acc_stix ++ concatMap f acc_strs)
-     where
-        f (lbl,str) = [StSegment RoDataSegment, 
-                       StLabel lbl, 
-                       StString str, 
-                       StSegment TextSegment]
-
-
-stmtToInstrs :: StixTree {- a stix statement -} -> NatM InstrBlock
+stmtToInstrs :: StixStmt -> NatM InstrBlock
 stmtToInstrs stmt = case stmt of
     StComment s    -> returnNat (unitOL (COMMENT s))
     StSegment seg  -> returnNat (unitOL (SEGMENT seg))
@@ -150,13 +85,19 @@ stmtToInstrs stmt = case stmt of
     StJump dsts arg	   -> genJump dsts (derefDLL arg)
     StCondJump lab arg	   -> genCondJump lab (derefDLL arg)
 
-    -- A call returning void, ie one done for its side-effects
-    StCall fn cconv VoidRep args -> genCCall fn
-                                             cconv VoidRep (map derefDLL args)
+    -- A call returning void, ie one done for its side-effects.  Note
+    -- that this is the only StVoidable we handle.
+    StVoidable (StCall fn cconv VoidRep args) 
+       -> genCCall fn cconv VoidRep (map derefDLL args)
 
-    StAssign pk dst src
-      | isFloatingRep pk -> assignFltCode pk (derefDLL dst) (derefDLL src)
-      | otherwise	 -> assignIntCode pk (derefDLL dst) (derefDLL src)
+    StAssignMem pk addr src
+      | isFloatingRep pk -> assignMem_FltCode pk (derefDLL addr) (derefDLL src)
+      | otherwise	 -> assignMem_IntCode pk (derefDLL addr) (derefDLL src)
+    StAssignReg pk reg src
+      | isFloatingRep pk -> assignReg_FltCode pk reg (derefDLL src)
+      | otherwise	 -> assignReg_IntCode pk reg (derefDLL src)
+    StAssignMachOp lhss mop rhss
+      -> assignMachOp lhss mop rhss
 
     StFallThrough lbl
 	-- When falling through on the Alpha, we still have to load pv
@@ -169,7 +110,7 @@ stmtToInstrs stmt = case stmt of
 	 returnNat (DATA (primRepToSize kind) imms  
                     `consOL`  concatOL codes)
       where
-	getData :: StixTree -> NatM (InstrBlock, Imm)
+	getData :: StixExpr -> NatM (InstrBlock, Imm)
 	getData (StInt i)        = returnNat (nilOL, ImmInteger i)
 	getData (StDouble d)     = returnNat (nilOL, ImmDouble d)
 	getData (StFloat d)      = returnNat (nilOL, ImmFloat d)
@@ -181,8 +122,8 @@ stmtToInstrs stmt = case stmt of
                            ImmIndex lbl (fromInteger off * sizeOf rep))
 
     -- Top-level lifted-out string.  The segment will already have been set
-    -- (see liftStrings above).
-    StString str
+    -- (see Stix.liftStrings).
+    StDataString str
       -> returnNat (unitOL (ASCII True (_UNPK_ str)))
 
 #ifdef DEBUG
@@ -193,7 +134,7 @@ stmtToInstrs stmt = case stmt of
 -- as labelDynamic.  stmt2Instrs calls derefDLL selectively, because
 -- not all such CLabel occurrences need this dereferencing -- SRTs don't
 -- for one.
-derefDLL :: StixTree -> StixTree
+derefDLL :: StixExpr -> StixExpr
 derefDLL tree
    | opt_Static   -- short out the entire deal if not doing DLLs
    = tree
@@ -207,7 +148,7 @@ derefDLL tree
                               else t
                 -- all the rest are boring
                 StIndex pk base offset -> StIndex pk (qq base) (qq offset)
-                StPrim pk args         -> StPrim pk (map qq args)
+                StMachOp mop args      -> StMachOp mop (map qq args)
                 StInd pk addr          -> StInd pk (qq addr)
                 StCall who cc pk args  -> StCall who cc pk (map qq args)
                 StInt    _             -> t
@@ -215,9 +156,8 @@ derefDLL tree
                 StDouble _             -> t
                 StString _             -> t
                 StReg    _             -> t
-                StScratchWord _        -> t
                 _                      -> pprPanic "derefDLL: unhandled case" 
-                                                   (pprStixTree t)
+                                                   (pprStixExpr t)
 \end{code}
 
 %************************************************************************
@@ -227,19 +167,19 @@ derefDLL tree
 %************************************************************************
 
 \begin{code}
-mangleIndexTree :: StixTree -> StixTree
+mangleIndexTree :: StixExpr -> StixExpr
 
 mangleIndexTree (StIndex pk base (StInt i))
-  = StPrim IntAddOp [base, off]
+  = StMachOp MO_Nat_Add [base, off]
   where
     off = StInt (i * toInteger (sizeOf pk))
 
 mangleIndexTree (StIndex pk base off)
-  = StPrim IntAddOp [
+  = StMachOp MO_Nat_Add [
        base,
        let s = shift pk
-       in  if s == 0 then off else StPrim SllOp [off, StInt (toInteger s)]
-      ]
+       in  if s == 0 then off else StMachOp MO_Nat_Shl [off, StInt (toInteger s)]
+    ]
   where
     shift :: PrimRep -> Int
     shift rep = case sizeOf rep of
@@ -252,7 +192,7 @@ mangleIndexTree (StIndex pk base off)
 \end{code}
 
 \begin{code}
-maybeImm :: StixTree -> Maybe Imm
+maybeImm :: StixExpr -> Maybe Imm
 
 maybeImm (StCLbl l)       
    = Just (ImmCLbl l)
@@ -304,6 +244,10 @@ registerRep :: Register -> PrimRep
 registerRep (Fixed pk _ _) = pk
 registerRep (Any   pk _) = pk
 
+swizzleRegisterRep :: Register -> PrimRep -> Register
+swizzleRegisterRep (Fixed _ reg code) rep = Fixed rep reg code
+swizzleRegisterRep (Any _ codefn)     rep = Any rep codefn
+
 {-# INLINE registerCode  #-}
 {-# INLINE registerCodeF #-}
 {-# INLINE registerName  #-}
@@ -321,17 +265,31 @@ isAny = not . isFixed
 
 Generate code to get a subtree into a @Register@:
 \begin{code}
-getRegister :: StixTree -> NatM Register
 
-getRegister (StReg (StixMagicId stgreg))
-  = case (magicIdRegMaybe stgreg) of
-      Just reg -> returnNat (Fixed (magicIdPrimRep stgreg) reg nilOL)
-                  -- cannae be Nothing
+getRegisterReg :: StixReg -> NatM Register
 
-getRegister (StReg (StixTemp u pk))
+getRegisterReg (StixMagicId mid)
+  = case get_MagicId_reg_or_addr mid of
+       Left (RealReg rrno) 
+          -> let pk = magicIdPrimRep mid
+             in  returnNat (Fixed pk (RealReg rrno) nilOL)
+       Right baseRegAddr 
+          -- By this stage, the only MagicIds remaining should be the
+          -- ones which map to a real machine register on this platform.  Hence ...
+          -> pprPanic "getRegisterReg-memory" (pprMagicId mid)
+
+getRegisterReg (StixTemp (StixVReg u pk))
   = returnNat (Fixed pk (mkVReg u pk) nilOL)
 
-getRegister tree@(StIndex _ _ _) = getRegister (mangleIndexTree tree)
+-------------
+
+getRegister :: StixExpr -> NatM Register
+
+getRegister (StReg reg) 
+  = getRegisterReg reg
+
+getRegister tree@(StIndex _ _ _) 
+  = getRegister (mangleIndexTree tree)
 
 getRegister (StCall fn cconv kind args)
   = genCCall fn cconv kind args   	    `thenNat` \ call ->
@@ -638,176 +596,180 @@ getRegister (StDouble d)
     in
     returnNat (Any DoubleRep code)
 
--- Calculate the offset for (i+1) words above the _initial_
--- %esp value by first determining the current offset of it.
-getRegister (StScratchWord i)
-   | i >= 0 && i < 6
-   = getDeltaNat `thenNat` \ current_stack_offset ->
-     let j = i+1   - (current_stack_offset `div` 4)
-         code dst
-           = unitOL (LEA L (OpAddr (spRel j)) (OpReg dst))
-     in 
-     returnNat (Any PtrRep code)
 
-getRegister (StPrim primop [x]) -- unary PrimOps
-  = case primop of
-      IntNegOp  -> trivialUCode (NEGI L) x
-      NotOp	-> trivialUCode (NOT L) x
+getRegister (StMachOp mop [x]) -- unary MachOps
+  = case mop of
+      MO_NatS_Neg  -> trivialUCode (NEGI L) x
+      MO_Nat_Not   -> trivialUCode (NOT L) x
 
-      FloatNegOp  -> trivialUFCode FloatRep  (GNEG F) x
-      DoubleNegOp -> trivialUFCode DoubleRep (GNEG DF) x
+      MO_Flt_Neg  -> trivialUFCode FloatRep  (GNEG F) x
+      MO_Dbl_Neg  -> trivialUFCode DoubleRep (GNEG DF) x
 
-      FloatSqrtOp  -> trivialUFCode FloatRep  (GSQRT F) x
-      DoubleSqrtOp -> trivialUFCode DoubleRep (GSQRT DF) x
+      MO_Flt_Sqrt -> trivialUFCode FloatRep  (GSQRT F) x
+      MO_Dbl_Sqrt -> trivialUFCode DoubleRep (GSQRT DF) x
 
-      FloatSinOp  -> trivialUFCode FloatRep  (GSIN F) x
-      DoubleSinOp -> trivialUFCode DoubleRep (GSIN DF) x
+      MO_Flt_Sin  -> trivialUFCode FloatRep  (GSIN F) x
+      MO_Dbl_Sin  -> trivialUFCode DoubleRep (GSIN DF) x
 
-      FloatCosOp  -> trivialUFCode FloatRep  (GCOS F) x
-      DoubleCosOp -> trivialUFCode DoubleRep (GCOS DF) x
+      MO_Flt_Cos  -> trivialUFCode FloatRep  (GCOS F) x
+      MO_Dbl_Cos  -> trivialUFCode DoubleRep (GCOS DF) x
 
-      FloatTanOp  -> trivialUFCode FloatRep  (GTAN F) x
-      DoubleTanOp -> trivialUFCode DoubleRep (GTAN DF) x
+      MO_Flt_Tan  -> trivialUFCode FloatRep  (GTAN F) x
+      MO_Dbl_Tan  -> trivialUFCode DoubleRep (GTAN DF) x
 
-      Double2FloatOp -> trivialUFCode FloatRep  GDTOF x
-      Float2DoubleOp -> trivialUFCode DoubleRep GFTOD x
+      MO_Flt_to_NatS -> coerceFP2Int x
+      MO_NatS_to_Flt -> coerceInt2FP FloatRep x
+      MO_Dbl_to_NatS -> coerceFP2Int x
+      MO_NatS_to_Dbl -> coerceInt2FP DoubleRep x
 
-      OrdOp -> coerceIntCode IntRep x
-      ChrOp -> chrCode x
+      -- Conversions which are a nop on x86
+      MO_NatS_to_32U  -> conversionNop WordRep   x
+      MO_32U_to_NatS  -> conversionNop IntRep    x
 
-      Float2IntOp  -> coerceFP2Int x
-      Int2FloatOp  -> coerceInt2FP FloatRep x
-      Double2IntOp -> coerceFP2Int x
-      Int2DoubleOp -> coerceInt2FP DoubleRep x
+      MO_NatU_to_NatS -> conversionNop IntRep    x
+      MO_NatS_to_NatU -> conversionNop WordRep   x
+      MO_NatP_to_NatU -> conversionNop WordRep   x
+      MO_NatU_to_NatP -> conversionNop PtrRep    x
+      MO_NatS_to_NatP -> conversionNop PtrRep    x
+      MO_NatP_to_NatS -> conversionNop IntRep    x
 
-      other_op ->
-	getRegister (StCall fn CCallConv DoubleRep [x])
-       where
+      MO_Dbl_to_Flt   -> conversionNop FloatRep  x
+      MO_Flt_to_Dbl   -> conversionNop DoubleRep x
+
+      MO_8U_to_NatU   -> integerExtend False 24 x
+      MO_8S_to_NatS   -> integerExtend True  24 x
+      MO_16U_to_NatU  -> integerExtend False 16 x
+      MO_16S_to_NatS  -> integerExtend True  16 x
+
+      other_op 
+         -> getRegister (
+               (if is_float_op then demote else id)
+               (StCall fn CCallConv DoubleRep 
+                          [(if is_float_op then promote else id) x])
+            )
+      where
+        integerExtend signed nBits x
+           = getRegister (
+                StMachOp (if signed then MO_Nat_Sar else MO_Nat_Shr) 
+                         [StInt nBits, StMachOp MO_Nat_Shl [StInt nBits, x]]
+             )
+
+        conversionNop new_rep expr
+            = getRegister expr		`thenNat` \ e_code ->
+              returnNat (swizzleRegisterRep e_code new_rep)
+
+        promote x = StMachOp MO_Flt_to_Dbl [x]
+        demote  x = StMachOp MO_Dbl_to_Flt [x]
 	(is_float_op, fn)
-	  = case primop of
-	      FloatExpOp    -> (True,  SLIT("exp"))
-	      FloatLogOp    -> (True,  SLIT("log"))
+	  = case mop of
+	      MO_Flt_Exp   -> (True,  SLIT("exp"))
+	      MO_Flt_Log   -> (True,  SLIT("log"))
 
-	      FloatAsinOp   -> (True,  SLIT("asin"))
-	      FloatAcosOp   -> (True,  SLIT("acos"))
-	      FloatAtanOp   -> (True,  SLIT("atan"))
+	      MO_Flt_Asin  -> (True,  SLIT("asin"))
+	      MO_Flt_Acos  -> (True,  SLIT("acos"))
+	      MO_Flt_Atan  -> (True,  SLIT("atan"))
 
-	      FloatSinhOp   -> (True,  SLIT("sinh"))
-	      FloatCoshOp   -> (True,  SLIT("cosh"))
-	      FloatTanhOp   -> (True,  SLIT("tanh"))
+	      MO_Flt_Sinh  -> (True,  SLIT("sinh"))
+	      MO_Flt_Cosh  -> (True,  SLIT("cosh"))
+	      MO_Flt_Tanh  -> (True,  SLIT("tanh"))
 
-	      DoubleExpOp   -> (False, SLIT("exp"))
-	      DoubleLogOp   -> (False, SLIT("log"))
+	      MO_Dbl_Exp   -> (False, SLIT("exp"))
+	      MO_Dbl_Log   -> (False, SLIT("log"))
 
-	      DoubleAsinOp  -> (False, SLIT("asin"))
-	      DoubleAcosOp  -> (False, SLIT("acos"))
-	      DoubleAtanOp  -> (False, SLIT("atan"))
+	      MO_Dbl_Asin  -> (False, SLIT("asin"))
+	      MO_Dbl_Acos  -> (False, SLIT("acos"))
+	      MO_Dbl_Atan  -> (False, SLIT("atan"))
 
-	      DoubleSinhOp  -> (False, SLIT("sinh"))
-	      DoubleCoshOp  -> (False, SLIT("cosh"))
-	      DoubleTanhOp  -> (False, SLIT("tanh"))
+	      MO_Dbl_Sinh  -> (False, SLIT("sinh"))
+	      MO_Dbl_Cosh  -> (False, SLIT("cosh"))
+	      MO_Dbl_Tanh  -> (False, SLIT("tanh"))
 
-              other
-                 -> ncgPrimopMoan "getRegister(x86,unary primop)" 
-                                  (pprStixTree (StPrim primop [x]))
+              other -> pprPanic "getRegister(x86) - binary StMachOp (2)" 
+                                (pprMachOp mop)
 
-getRegister (StPrim primop [x, y]) -- dyadic PrimOps
-  = case primop of
-      CharGtOp -> condIntReg GTT x y
-      CharGeOp -> condIntReg GE x y
-      CharEqOp -> condIntReg EQQ x y
-      CharNeOp -> condIntReg NE x y
-      CharLtOp -> condIntReg LTT x y
-      CharLeOp -> condIntReg LE x y
 
-      IntGtOp  -> condIntReg GTT x y
-      IntGeOp  -> condIntReg GE x y
-      IntEqOp  -> condIntReg EQQ x y
-      IntNeOp  -> condIntReg NE x y
-      IntLtOp  -> condIntReg LTT x y
-      IntLeOp  -> condIntReg LE x y
+getRegister (StMachOp mop [x, y]) -- dyadic MachOps
+  = case mop of
+      MO_32U_Gt  -> condIntReg GTT x y
+      MO_32U_Ge  -> condIntReg GE x y
+      MO_32U_Eq  -> condIntReg EQQ x y
+      MO_32U_Ne  -> condIntReg NE x y
+      MO_32U_Lt  -> condIntReg LTT x y
+      MO_32U_Le  -> condIntReg LE x y
 
-      WordGtOp -> condIntReg GU  x y
-      WordGeOp -> condIntReg GEU x y
-      WordEqOp -> condIntReg EQQ  x y
-      WordNeOp -> condIntReg NE  x y
-      WordLtOp -> condIntReg LU  x y
-      WordLeOp -> condIntReg LEU x y
+      MO_Nat_Eq   -> condIntReg EQQ x y
+      MO_Nat_Ne   -> condIntReg NE x y
 
-      AddrGtOp -> condIntReg GU  x y
-      AddrGeOp -> condIntReg GEU x y
-      AddrEqOp -> condIntReg EQQ  x y
-      AddrNeOp -> condIntReg NE  x y
-      AddrLtOp -> condIntReg LU  x y
-      AddrLeOp -> condIntReg LEU x y
+      MO_NatS_Gt  -> condIntReg GTT x y
+      MO_NatS_Ge  -> condIntReg GE x y
+      MO_NatS_Lt  -> condIntReg LTT x y
+      MO_NatS_Le  -> condIntReg LE x y
 
-      FloatGtOp -> condFltReg GTT x y
-      FloatGeOp -> condFltReg GE x y
-      FloatEqOp -> condFltReg EQQ x y
-      FloatNeOp -> condFltReg NE x y
-      FloatLtOp -> condFltReg LTT x y
-      FloatLeOp -> condFltReg LE x y
+      MO_NatU_Gt  -> condIntReg GU  x y
+      MO_NatU_Ge  -> condIntReg GEU x y
+      MO_NatU_Lt  -> condIntReg LU  x y
+      MO_NatU_Le  -> condIntReg LEU x y
 
-      DoubleGtOp -> condFltReg GTT x y
-      DoubleGeOp -> condFltReg GE x y
-      DoubleEqOp -> condFltReg EQQ x y
-      DoubleNeOp -> condFltReg NE x y
-      DoubleLtOp -> condFltReg LTT x y
-      DoubleLeOp -> condFltReg LE x y
+      MO_Flt_Gt -> condFltReg GTT x y
+      MO_Flt_Ge -> condFltReg GE x y
+      MO_Flt_Eq -> condFltReg EQQ x y
+      MO_Flt_Ne -> condFltReg NE x y
+      MO_Flt_Lt -> condFltReg LTT x y
+      MO_Flt_Le -> condFltReg LE x y
 
-      IntAddOp  -> add_code L x y
-      IntSubOp  -> sub_code L x y
-      IntQuotOp -> trivialCode (IQUOT L) Nothing x y
-      IntRemOp  -> trivialCode (IREM L) Nothing x y
-      IntMulOp  -> let op = IMUL L in trivialCode op (Just op) x y
+      MO_Dbl_Gt -> condFltReg GTT x y
+      MO_Dbl_Ge -> condFltReg GE x y
+      MO_Dbl_Eq -> condFltReg EQQ x y
+      MO_Dbl_Ne -> condFltReg NE x y
+      MO_Dbl_Lt -> condFltReg LTT x y
+      MO_Dbl_Le -> condFltReg LE x y
 
-      WordAddOp  -> add_code L x y
-      WordSubOp  -> sub_code L x y
-      WordMulOp  -> let op = IMUL L in trivialCode op (Just op) x y
+      MO_Nat_Add   -> add_code L x y
+      MO_Nat_Sub   -> sub_code L x y
+      MO_NatS_Quot -> trivialCode (IQUOT L) Nothing x y
+      MO_NatS_Rem  -> trivialCode (IREM L) Nothing x y
+      MO_NatU_Quot -> trivialCode (QUOT L) Nothing x y
+      MO_NatU_Rem  -> trivialCode (REM L) Nothing x y
+      MO_NatS_Mul  -> let op = IMUL L in trivialCode op (Just op) x y
+      MO_NatU_Mul  -> let op = MUL L in trivialCode op (Just op) x y
 
-      FloatAddOp -> trivialFCode  FloatRep  GADD x y
-      FloatSubOp -> trivialFCode  FloatRep  GSUB x y
-      FloatMulOp -> trivialFCode  FloatRep  GMUL x y
-      FloatDivOp -> trivialFCode  FloatRep  GDIV x y
+      MO_Flt_Add -> trivialFCode  FloatRep  GADD x y
+      MO_Flt_Sub -> trivialFCode  FloatRep  GSUB x y
+      MO_Flt_Mul -> trivialFCode  FloatRep  GMUL x y
+      MO_Flt_Div -> trivialFCode  FloatRep  GDIV x y
 
-      DoubleAddOp -> trivialFCode DoubleRep GADD x y
-      DoubleSubOp -> trivialFCode DoubleRep GSUB x y
-      DoubleMulOp -> trivialFCode DoubleRep GMUL x y
-      DoubleDivOp -> trivialFCode DoubleRep GDIV x y
+      MO_Dbl_Add -> trivialFCode DoubleRep GADD x y
+      MO_Dbl_Sub -> trivialFCode DoubleRep GSUB x y
+      MO_Dbl_Mul -> trivialFCode DoubleRep GMUL x y
+      MO_Dbl_Div -> trivialFCode DoubleRep GDIV x y
 
-      AddrAddOp -> add_code L x y
-      AddrSubOp -> sub_code L x y
-      AddrRemOp -> trivialCode (IREM L) Nothing x y
-
-      AndOp -> let op = AND L in trivialCode op (Just op) x y
-      OrOp  -> let op = OR  L in trivialCode op (Just op) x y
-      XorOp -> let op = XOR L in trivialCode op (Just op) x y
+      MO_Nat_And -> let op = AND L in trivialCode op (Just op) x y
+      MO_Nat_Or  -> let op = OR  L in trivialCode op (Just op) x y
+      MO_Nat_Xor -> let op = XOR L in trivialCode op (Just op) x y
 
 	{- Shift ops on x86s have constraints on their source, it
 	   either has to be Imm, CL or 1
 	    => trivialCode's is not restrictive enough (sigh.)
-	-}
-	   
-      SllOp  -> shift_code (SHL L) x y {-False-}
-      SrlOp  -> shift_code (SHR L) x y {-False-}
-      ISllOp -> shift_code (SHL L) x y {-False-}
-      ISraOp -> shift_code (SAR L) x y {-False-}
-      ISrlOp -> shift_code (SHR L) x y {-False-}
+	-}	   
+      MO_Nat_Shl  -> shift_code (SHL L) x y {-False-}
+      MO_Nat_Shr  -> shift_code (SHR L) x y {-False-}
+      MO_Nat_Sar  -> shift_code (SAR L) x y {-False-}
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
+      MO_Flt_Pwr  -> getRegister (demote 
+                                 (StCall SLIT("pow") CCallConv DoubleRep 
                                            [promote x, promote y])
-		       where promote x = StPrim Float2DoubleOp [x]
-      DoublePowerOp -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
+                                 )
+      MO_Dbl_Pwr -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
                                            [x, y])
-      other
-         -> ncgPrimopMoan "getRegister(x86,dyadic primop)" 
-                          (pprStixTree (StPrim primop [x, y]))
+      other -> pprPanic "getRegister(x86) - binary StMachOp (1)" (pprMachOp mop)
   where
+    promote x = StMachOp MO_Flt_to_Dbl [x]
+    demote x  = StMachOp MO_Dbl_to_Flt [x]
 
     --------------------
     shift_code :: (Imm -> Operand -> Instr)
-	       -> StixTree
-	       -> StixTree
+	       -> StixExpr
+	       -> StixExpr
 	       -> NatM Register
 
       {- Case1: shift length as immediate -}
@@ -895,7 +857,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
        returnNat (Any IntRep code__2)
 
     --------------------
-    add_code :: Size -> StixTree -> StixTree -> NatM Register
+    add_code :: Size -> StixExpr -> StixExpr -> NatM Register
 
     add_code sz x (StInt y)
       = getRegister x		`thenNat` \ register ->
@@ -914,7 +876,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
     add_code sz x y = trivialCode (ADD sz) (Just (ADD sz)) x y
 
     --------------------
-    sub_code :: Size -> StixTree -> StixTree -> NatM Register
+    sub_code :: Size -> StixExpr -> StixExpr -> NatM Register
 
     sub_code sz x (StInt y)
       = getRegister x		`thenNat` \ register ->
@@ -931,7 +893,6 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	returnNat (Any IntRep code__2)
 
     sub_code sz x y = trivialCode (SUB sz) Nothing x y
-
 
 getRegister (StInd pk mem)
   = getAmode mem    	    	    `thenNat` \ amode ->
@@ -970,10 +931,48 @@ getRegister leaf
     in
     	returnNat (Any PtrRep code)
   | otherwise
-  = ncgPrimopMoan "getRegister(x86)" (pprStixTree leaf)
+  = ncgPrimopMoan "getRegister(x86)" (pprStixExpr leaf)
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
+
+
+assignMachOp :: Maybe012 StixVReg -> MachOp -> [StixExpr] 
+             -> NatM InstrBlock
+
+assignMachOp (Just2 sv_rr sv_cc) mop [aa,bb]
+  | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC] 
+  = getRegister aa			`thenNat` \ registeraa ->
+    getRegister bb			`thenNat` \ registerbb ->
+    getNewRegNCG IntRep			`thenNat` \ tmp ->
+    getNewRegNCG IntRep			`thenNat` \ tmpaa ->
+    getNewRegNCG IntRep			`thenNat` \ tmpbb ->
+    let stixVReg_to_VReg (StixVReg u rep) = mkVReg u rep
+        rr = stixVReg_to_VReg sv_rr
+        cc = stixVReg_to_VReg sv_cc
+        codeaa = registerCode registeraa tmpaa
+        srcaa  = registerName registeraa tmpaa
+        codebb = registerCode registerbb tmpbb
+        srcbb  = registerName registerbb tmpbb
+
+        insn = case mop of MO_NatS_AddC -> ADD; MO_NatS_SubC -> SUB
+                           MO_NatS_MulC -> IMUL
+        cond = if mop == MO_NatS_MulC then OFLO else CARRY
+        str  = showSDoc (pprMachOp mop)
+
+        code = toOL [
+                 COMMENT (_PK_ ("begin " ++ str)),
+                 MOV L (OpReg srcbb) (OpReg tmp),
+                 insn L (OpReg srcaa) (OpReg tmp),
+                 MOV L (OpReg tmp) (OpReg rr),
+                 MOV L (OpImm (ImmInt 0)) (OpReg eax),
+                 SETCC cond (OpReg eax),
+                 MOV L (OpReg eax) (OpReg cc),
+                 COMMENT (_PK_ ("end " ++ str))
+               ]
+    in
+       returnNat (codeaa `appOL` codebb `appOL` code)
+
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1239,7 +1238,7 @@ temporary, then do the other computation, and then use the temporary:
     ... (tmp) ...
 
 \begin{code}
-getAmode :: StixTree -> NatM Amode
+getAmode :: StixExpr -> NatM Amode
 
 getAmode tree@(StIndex _ _ _) = getAmode (mangleIndexTree tree)
 
@@ -1285,7 +1284,9 @@ getAmode other
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
-getAmode (StPrim IntSubOp [x, StInt i])
+-- This is all just ridiculous, since it carefully undoes 
+-- what mangleIndexTree has just done.
+getAmode (StMachOp MO_Nat_Sub [x, StInt i])
   = getNewRegNCG PtrRep		`thenNat` \ tmp ->
     getRegister x		`thenNat` \ register ->
     let
@@ -1295,14 +1296,14 @@ getAmode (StPrim IntSubOp [x, StInt i])
     in
     returnNat (Amode (AddrBaseIndex (Just reg) Nothing off) code)
 
-getAmode (StPrim IntAddOp [x, StInt i])
+getAmode (StMachOp MO_Nat_Add [x, StInt i])
   | maybeToBool imm
   = returnNat (Amode (ImmAddr imm__2 (fromInteger i)) nilOL)
   where
     imm    = maybeImm x
     imm__2 = case imm of Just x -> x
 
-getAmode (StPrim IntAddOp [x, StInt i])
+getAmode (StMachOp MO_Nat_Add [x, StInt i])
   = getNewRegNCG PtrRep		`thenNat` \ tmp ->
     getRegister x		`thenNat` \ register ->
     let
@@ -1312,7 +1313,7 @@ getAmode (StPrim IntAddOp [x, StInt i])
     in
     returnNat (Amode (AddrBaseIndex (Just reg) Nothing off) code)
 
-getAmode (StPrim IntAddOp [x, StPrim SllOp [y, StInt shift]])
+getAmode (StMachOp MO_Nat_Add [x, StMachOp MO_Nat_Shl [y, StInt shift]])
   | shift == 0 || shift == 1 || shift == 2 || shift == 3
   = getNewRegNCG PtrRep		`thenNat` \ tmp1 ->
     getNewRegNCG IntRep    	`thenNat` \ tmp2 ->
@@ -1428,7 +1429,7 @@ condCode  (CondCode _ _ code)	   = code
 Set up a condition code for a conditional branch.
 
 \begin{code}
-getCondCode :: StixTree -> NatM CondCode
+getCondCode :: StixExpr -> NatM CondCode
 
 #if alpha_TARGET_ARCH
 getCondCode = panic "MachCode.getCondCode: not on Alphas"
@@ -1438,49 +1439,43 @@ getCondCode = panic "MachCode.getCondCode: not on Alphas"
 #if i386_TARGET_ARCH || sparc_TARGET_ARCH
 -- yes, they really do seem to want exactly the same!
 
-getCondCode (StPrim primop [x, y])
-  = case primop of
-      CharGtOp -> condIntCode GTT  x y
-      CharGeOp -> condIntCode GE   x y
-      CharEqOp -> condIntCode EQQ  x y
-      CharNeOp -> condIntCode NE   x y
-      CharLtOp -> condIntCode LTT  x y
-      CharLeOp -> condIntCode LE   x y
+getCondCode (StMachOp mop [x, y])
+  = case mop of
+      MO_32U_Gt -> condIntCode GTT  x y
+      MO_32U_Ge -> condIntCode GE   x y
+      MO_32U_Eq -> condIntCode EQQ  x y
+      MO_32U_Ne -> condIntCode NE   x y
+      MO_32U_Lt -> condIntCode LTT  x y
+      MO_32U_Le -> condIntCode LE   x y
  
-      IntGtOp  -> condIntCode GTT  x y
-      IntGeOp  -> condIntCode GE   x y
-      IntEqOp  -> condIntCode EQQ  x y
-      IntNeOp  -> condIntCode NE   x y
-      IntLtOp  -> condIntCode LTT  x y
-      IntLeOp  -> condIntCode LE   x y
+      MO_Nat_Eq  -> condIntCode EQQ  x y
+      MO_Nat_Ne  -> condIntCode NE   x y
 
-      WordGtOp -> condIntCode GU   x y
-      WordGeOp -> condIntCode GEU  x y
-      WordEqOp -> condIntCode EQQ  x y
-      WordNeOp -> condIntCode NE   x y
-      WordLtOp -> condIntCode LU   x y
-      WordLeOp -> condIntCode LEU  x y
+      MO_NatS_Gt -> condIntCode GTT  x y
+      MO_NatS_Ge -> condIntCode GE   x y
+      MO_NatS_Lt -> condIntCode LTT  x y
+      MO_NatS_Le -> condIntCode LE   x y
 
-      AddrGtOp -> condIntCode GU   x y
-      AddrGeOp -> condIntCode GEU  x y
-      AddrEqOp -> condIntCode EQQ  x y
-      AddrNeOp -> condIntCode NE   x y
-      AddrLtOp -> condIntCode LU   x y
-      AddrLeOp -> condIntCode LEU  x y
+      MO_NatU_Gt -> condIntCode GU   x y
+      MO_NatU_Ge -> condIntCode GEU  x y
+      MO_NatU_Lt -> condIntCode LU   x y
+      MO_NatU_Le -> condIntCode LEU  x y
 
-      FloatGtOp -> condFltCode GTT x y
-      FloatGeOp -> condFltCode GE  x y
-      FloatEqOp -> condFltCode EQQ x y
-      FloatNeOp -> condFltCode NE  x y
-      FloatLtOp -> condFltCode LTT x y
-      FloatLeOp -> condFltCode LE  x y
+      MO_Flt_Gt -> condFltCode GTT x y
+      MO_Flt_Ge -> condFltCode GE  x y
+      MO_Flt_Eq -> condFltCode EQQ x y
+      MO_Flt_Ne -> condFltCode NE  x y
+      MO_Flt_Lt -> condFltCode LTT x y
+      MO_Flt_Le -> condFltCode LE  x y
 
-      DoubleGtOp -> condFltCode GTT x y
-      DoubleGeOp -> condFltCode GE  x y
-      DoubleEqOp -> condFltCode EQQ x y
-      DoubleNeOp -> condFltCode NE  x y
-      DoubleLtOp -> condFltCode LTT x y
-      DoubleLeOp -> condFltCode LE  x y
+      MO_Dbl_Gt -> condFltCode GTT x y
+      MO_Dbl_Ge -> condFltCode GE  x y
+      MO_Dbl_Eq -> condFltCode EQQ x y
+      MO_Dbl_Ne -> condFltCode NE  x y
+      MO_Dbl_Lt -> condFltCode LTT x y
+      MO_Dbl_Le -> condFltCode LE  x y
+
+      other -> pprPanic "getCondCode(x86,sparc)" (pprMachOp mop)
 
 #endif {- i386_TARGET_ARCH || sparc_TARGET_ARCH -}
 \end{code}
@@ -1491,7 +1486,7 @@ getCondCode (StPrim primop [x, y])
 passed back up the tree.
 
 \begin{code}
-condIntCode, condFltCode :: Cond -> StixTree -> StixTree -> NatM CondCode
+condIntCode, condFltCode :: Cond -> StixExpr -> StixExpr -> NatM CondCode
 
 #if alpha_TARGET_ARCH
 condIntCode = panic "MachCode.condIntCode: not on Alphas"
@@ -1735,8 +1730,11 @@ generation for the right hand side.  This only fails when the right
 hand side is forced into a fixed register (e.g. the result of a call).
 
 \begin{code}
-assignIntCode, assignFltCode
-	:: PrimRep -> StixTree -> StixTree -> NatM InstrBlock
+assignMem_IntCode :: PrimRep -> StixExpr -> StixExpr -> NatM InstrBlock
+assignReg_IntCode :: PrimRep -> StixReg  -> StixExpr -> NatM InstrBlock
+
+assignMem_FltCode :: PrimRep -> StixExpr -> StixExpr -> NatM InstrBlock
+assignReg_FltCode :: PrimRep -> StixReg  -> StixExpr -> NatM InstrBlock
 
 #if alpha_TARGET_ARCH
 
@@ -1771,10 +1769,9 @@ assignIntCode pk dst src
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
--- Destination of an assignment can only be reg or mem.
--- This is the mem case.
-assignIntCode pk (StInd _ dst) src
-  = getAmode dst		`thenNat` \ amode ->
+-- non-FP assignment to memory
+assignMem_IntCode pk addr src
+  = getAmode addr		`thenNat` \ amode ->
     get_op_RI src		`thenNat` \ (codesrc, opsrc) ->
     getNewRegNCG PtrRep         `thenNat` \ tmp ->
     let
@@ -1801,7 +1798,7 @@ assignIntCode pk (StInd _ dst) src
     returnNat code
   where
     get_op_RI
-	:: StixTree
+	:: StixExpr
 	-> NatM (InstrBlock,Operand)	-- code, operator
 
     get_op_RI op
@@ -1818,15 +1815,13 @@ assignIntCode pk (StInd _ dst) src
 	returnNat (code, OpReg reg)
 
 -- Assign; dst is a reg, rhs is mem
-assignIntCode pk dst (StInd pks src)
+assignReg_IntCode pk reg (StInd pks src)
   = getNewRegNCG PtrRep    	    `thenNat` \ tmp ->
     getAmode src    	    	    `thenNat` \ amode ->
-    getRegister dst	  	    `thenNat` \ reg_dst ->
+    getRegisterReg reg  	    `thenNat` \ reg_dst ->
     let
     	c_addr  = amodeCode amode
     	am_addr = amodeAddr amode
-
-    	c_dst = registerCode reg_dst tmp  -- should be empty
     	r_dst = registerName reg_dst tmp
     	szs   = primRepToSize pks
         opc   = case szs of
@@ -1837,30 +1832,23 @@ assignIntCode pk dst (StInd pks src)
             L  -> MOV L
             Lu -> MOV L
 
-    	code  | isNilOL c_dst
-              = c_addr `snocOL`
+    	code  = c_addr `snocOL`
                 opc (OpAddr am_addr) (OpReg r_dst)
-              | otherwise
-              = panic "assignIntCode(x86): bad dst(2)"
     in
     returnNat code
 
 -- dst is a reg, but src could be anything
-assignIntCode pk dst src
-  = getRegister dst	    	    `thenNat` \ registerd ->
+assignReg_IntCode pk reg src
+  = getRegisterReg reg    	    `thenNat` \ registerd ->
     getRegister src	    	    `thenNat` \ registers ->
     getNewRegNCG IntRep    	    `thenNat` \ tmp ->
     let 
         r_dst = registerName registerd tmp
-        c_dst = registerCode registerd tmp -- should be empty
         r_src = registerName registers r_dst
         c_src = registerCode registers r_dst
         
-        code | isNilOL c_dst
-             = c_src `snocOL` 
+        code = c_src `snocOL` 
                MOV L (OpReg r_src) (OpReg r_dst)
-             | otherwise
-             = panic "assignIntCode(x86): bad dst(3)"
     in
     returnNat code
 
@@ -1935,11 +1923,8 @@ assignFltCode pk dst src
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
--- dst is memory
-assignFltCode pk (StInd pk_dst addr) src
-   | pk /= pk_dst
-   = panic "assignFltCode(x86): src/ind sz mismatch"
-   | otherwise
+-- Floating point assignment to memory
+assignMem_FltCode pk addr src
    = getRegister src      `thenNat`  \ reg_src  ->
      getRegister addr     `thenNat`  \ reg_addr ->
      getNewRegNCG pk      `thenNat`  \ tmp_src  ->
@@ -1960,24 +1945,19 @@ assignFltCode pk (StInd pk_dst addr) src
      in
      returnNat code
 
--- dst must be a (FP) register
-assignFltCode pk dst src
-  = getRegister dst	    	    `thenNat` \ reg_dst ->
+-- Floating point assignment to a register/temporary
+assignReg_FltCode pk reg src
+  = getRegisterReg reg    	    `thenNat` \ reg_dst ->
     getRegister src	    	    `thenNat` \ reg_src ->
     getNewRegNCG pk                 `thenNat` \ tmp ->
     let
     	r_dst = registerName reg_dst tmp
-        c_dst = registerCode reg_dst tmp -- should be empty
-
     	r_src = registerName reg_src r_dst
     	c_src = registerCode reg_src r_dst
 
-    	code | isNilOL c_dst
-             = if   isFixed reg_src
+    	code = if   isFixed reg_src
                then c_src `snocOL` GMOV r_src r_dst
                else c_src
-             | otherwise
-             = panic "assignFltCode(x86): lhs is not mem or reg" 
     in
     returnNat code
 
@@ -2055,7 +2035,7 @@ branch instruction.  Other CLabels are assumed to be far away.
 register allocator.
 
 \begin{code}
-genJump :: DestInfo -> StixTree{-the branch target-} -> NatM InstrBlock
+genJump :: DestInfo -> StixExpr{-the branch target-} -> NatM InstrBlock
 
 #if alpha_TARGET_ARCH
 
@@ -2157,7 +2137,7 @@ allocator.
 \begin{code}
 genCondJump
     :: CLabel	    -- the branch target
-    -> StixTree     -- the condition on which to branch
+    -> StixExpr     -- the condition on which to branch
     -> NatM InstrBlock
 
 #if alpha_TARGET_ARCH
@@ -2354,7 +2334,7 @@ genCCall
     :: FAST_STRING	-- function to call
     -> CCallConv
     -> PrimRep		-- type of the result
-    -> [StixTree]	-- arguments (of mixed type)
+    -> [StixExpr]	-- arguments (of mixed type)
     -> NatM InstrBlock
 
 #if alpha_TARGET_ARCH
@@ -2482,7 +2462,7 @@ genCCall fn cconv kind args
     arg_size _  = 4
 
     ------------
-    get_call_arg :: StixTree{-current argument-}
+    get_call_arg :: StixExpr{-current argument-}
                     -> NatM (Int, InstrBlock)  -- argsz, code
 
     get_call_arg arg
@@ -2506,7 +2486,7 @@ genCCall fn cconv kind args
                        )
     ------------
     get_op
-	:: StixTree
+	:: StixExpr
 	-> NatM (InstrBlock, Reg, Size) -- code, reg, size
 
     get_op op
@@ -2665,7 +2645,7 @@ the right hand side of an assignment).
 register allocator.
 
 \begin{code}
-condIntReg, condFltReg :: Cond -> StixTree -> StixTree -> NatM Register
+condIntReg, condFltReg :: Cond -> StixExpr -> StixExpr -> NatM Register
 
 #if alpha_TARGET_ARCH
 condIntReg = panic "MachCode.condIntReg (not on Alpha)"
@@ -2827,7 +2807,7 @@ trivialCode
                      -> Maybe (Operand -> Operand -> Instr)
       ,IF_ARCH_sparc((Reg -> RI -> Reg -> Instr)
       ,)))
-    -> StixTree -> StixTree -- the two arguments
+    -> StixExpr -> StixExpr -- the two arguments
     -> NatM Register
 
 trivialFCode
@@ -2836,7 +2816,7 @@ trivialFCode
       ,IF_ARCH_sparc((Size -> Reg -> Reg -> Reg -> Instr)
       ,IF_ARCH_i386 ((Size -> Reg -> Reg -> Reg -> Instr)
       ,)))
-    -> StixTree -> StixTree -- the two arguments
+    -> StixExpr -> StixExpr -- the two arguments
     -> NatM Register
 
 trivialUCode
@@ -2844,7 +2824,7 @@ trivialUCode
       ,IF_ARCH_i386 ((Operand -> Instr)
       ,IF_ARCH_sparc((RI -> Reg -> Instr)
       ,)))
-    -> StixTree	-- the one argument
+    -> StixExpr	-- the one argument
     -> NatM Register
 
 trivialUFCode
@@ -2853,7 +2833,7 @@ trivialUFCode
       ,IF_ARCH_i386 ((Reg -> Reg -> Instr)
       ,IF_ARCH_sparc((Reg -> Reg -> Instr)
       ,)))
-    -> StixTree -- the one argument
+    -> StixExpr -- the one argument
     -> NatM Register
 
 #if alpha_TARGET_ARCH
@@ -3207,11 +3187,11 @@ conversions.  We have to store temporaries in memory to move
 between the integer and the floating point register sets.
 
 \begin{code}
-coerceIntCode :: PrimRep -> StixTree -> NatM Register
-coerceFltCode ::	    StixTree -> NatM Register
+coerceIntCode :: PrimRep -> StixExpr -> NatM Register
+coerceFltCode ::	    StixExpr -> NatM Register
 
-coerceInt2FP :: PrimRep -> StixTree -> NatM Register
-coerceFP2Int :: 	   StixTree -> NatM Register
+coerceInt2FP :: PrimRep -> StixExpr -> NatM Register
+coerceFP2Int :: 	   StixExpr -> NatM Register
 
 coerceIntCode pk x
   = getRegister x		`thenNat` \ register ->
@@ -3339,7 +3319,7 @@ coerceFP2Int x
 Integer to character conversion.
 
 \begin{code}
-chrCode :: StixTree -> NatM Register
+chrCode :: StixExpr -> NatM Register
 
 #if alpha_TARGET_ARCH
 

@@ -13,27 +13,34 @@ module AbsCUtils (
 	mixedTypeLocn, mixedPtrLocn,
 	flattenAbsC,
 	mkAbsCStmtList
-
 	-- printing/forcing stuff comes from PprAbsC
     ) where
 
 #include "HsVersions.h"
 
 import AbsCSyn
+import CLabel		( mkMAP_FROZEN_infoLabel )
 import Digraph		( stronglyConnComp, SCC(..) )
 import DataCon		( fIRST_TAG, ConTag )
-import Literal		( literalPrimRep, mkMachWord )
+import Literal		( literalPrimRep, mkMachWord, mkMachInt )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
+import PrimOp		( PrimOp(..) )
+import MachOp		( MachOp(..), isDefinitelyInlineMachOp )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
 import CmdLineOpts      ( opt_EmitCExternDecls )
-import ForeignCall	( ForeignCall(..), CCallSpec(..), isDynamicTarget, isCasmTarget )
+import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety(..),
+			  isDynamicTarget, isCasmTarget, defaultCCallConv )
 import StgSyn		( StgOp(..) )
+import SMRep		( arrPtrsHdrSize, arrWordsHdrSize, fixedHdrSize )
+import Constants	( wORD_SIZE )
+import Maybes		( Maybe012(..) )
+import Outputable
 import Panic		( panic )
 import FastTypes
 
-import Maybe		( isJust )
+import Maybe		( isJust, maybeToList )
 
 infixr 9 `thenFlt`
 \end{code}
@@ -171,6 +178,7 @@ getAmodeRep (CIntLike _)	    	    = PtrRep
 getAmodeRep (CLit lit)		    	    = literalPrimRep lit
 getAmodeRep (CMacroExpr kind _ _)    	    = kind
 getAmodeRep (CJoinPoint _)	    	    = panic "getAmodeRep:CJoinPoint"
+getAmodeRep (CMem rep addr)                 = rep
 \end{code}
 
 @mixedTypeLocn@ tells whether an amode identifies an ``StgWord''
@@ -342,8 +350,8 @@ flatAbsC (CSwitch discrim alts deflt)
 	returnFlt ( (tag, alt_heres), alt_tops )
 
 flatAbsC stmt@(COpStmt results (StgFCallOp (CCall ccall@(CCallSpec target _ _)) uniq) args _)
-  |  is_dynamic	 					 -- Emit a typedef if its a dynamic call
-  || (opt_EmitCExternDecls && not (isCasmTarget target)) -- or we want extern decls
+  |  is_dynamic	 			 -- Emit a typedef if its a dynamic call
+     || (opt_EmitCExternDecls && not (isCasmTarget target)) -- or we want extern decls
   = returnFlt (stmt, CCallTypedef is_dynamic ccall uniq results args)
   where
     is_dynamic = isDynamicTarget target
@@ -370,8 +378,44 @@ flatAbsC stmt@(CAssign dest source) 		 = returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CJump target) 			 = returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CFallThrough target) 		 = returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CReturn target return_info) 	 = returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CInitHdr a b cc _) 		 = returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(COpStmt results op args vol_regs) = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CInitHdr a b cc sz) 		 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CMachOpStmt res mop args m_vols)  = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(COpStmt results (StgFCallOp _ _) args vol_regs) 
+                                                 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(COpStmt results (StgPrimOp op) args vol_regs) 
+   = dscCOpStmt (filter non_void_amode results) op 
+                (filter non_void_amode args) vol_regs	
+				`thenFlt` \ simpl ->
+     case simpl of
+        COpStmt _ _ _ _ -> panic "flatAbsC - dscCOpStmt"   -- make sure we don't loop!
+        other           -> flatAbsC other
+     {-
+        A gruesome hack for printing the names of inline primops when they
+        are used. 
+                                  oink other
+     where
+        oink xxx 
+            = getUniqFlt `thenFlt` \ uu ->
+              flatAbsC (CSequential [moo uu (showSDoc (ppr op)), xxx])
+
+        moo uu op_str
+           = COpStmt 
+                []
+                (StgFCallOp
+                    (CCall (CCallSpec (CasmTarget (_PK_ (mktxt op_str))) 
+                                      defaultCCallConv PlaySafe))
+                    uu
+                )
+                [CReg VoidReg]
+                []
+        mktxt op_str
+            = " asm(\"pushal;\"); printf(\"%%s\\n\",\"" ++ op_str ++ "\"); asm(\"popal\"); "
+     -}
+
+flatAbsC (CSequential abcs)
+  = mapAndUnzipFlt flatAbsC abcs `thenFlt` \ (inlines, tops) ->
+    returnFlt (CSequential inlines, foldr AbsCStmts AbsCNop tops)
+
 
 -- Some statements only make sense at the top level, so we always float
 -- them.  This probably isn't necessary.
@@ -493,7 +537,6 @@ doSimultaneously1 vertices
       = or [dest1 `conflictsWith` src2 | dest1 <- dests1, src2 <- srcs2]
 \end{code}
 
-
 @conflictsWith@ tells whether an assignment to its first argument will
 screw up an access to its second.
 
@@ -539,4 +582,547 @@ rrConflictsWithRR s1b s2b rr1 rr2 = rr rr1 rr2
     rr (HpRel _)	 (HpRel _)    = True	-- Give up (ToDo)
 
     rr other1	         other2	      = False
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[flat-primops]{Translating COpStmts to CMachOpStmts}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+
+------------------------------------------------------------------------------
+
+-- Assumes no volatiles
+mkHalfWord_HIADDR res arg
+#  if WORDS_BIGENDIAN
+   = CMachOpStmt (Just1 res) MO_Nat_And [arg, CLit (mkMachWord halfword_mask)] Nothing
+#  else
+   = CMachOpStmt (Just1 res) MO_Nat_Shr [arg, CLit (mkMachWord halfword_shift)] Nothing
+#  endif
+   where
+      (halfword_mask, halfword_shift)
+         | wORD_SIZE == 4  = (65535,               16)
+         | wORD_SIZE == 8  = (4294967295::Integer, 32)
+
+
+mkTemp :: PrimRep -> FlatM CAddrMode
+mkTemp rep 
+   = getUniqFlt `thenFlt` \ uniq -> returnFlt (CTemp uniq rep)
+
+mkTemps = mapFlt mkTemp
+
+mkDerefOff :: PrimRep -> CAddrMode -> Int -> CAddrMode
+mkDerefOff rep base off
+   | off == 0	-- optimisation
+   = CMem rep base
+   | otherwise
+   = CMem rep (CAddr (CIndex base (CLit (mkMachInt (toInteger off))) rep))
+
+mkNoDerefOff :: PrimRep -> CAddrMode -> Int -> CAddrMode
+mkNoDerefOff rep base off
+   = CAddr (CIndex base (CLit (mkMachInt (toInteger off))) rep)
+
+-- Sigh.  This is done in 3 seperate places.  Should be
+-- commoned up (here, in pprAbsC of COpStmt, and presumably
+-- somewhere in the NCG).
+non_void_amode amode 
+   = case getAmodeRep amode of
+        VoidRep -> False
+        k       -> True
+
+doIndexOffForeignObjOp rep res addr idx
+   = Just (Just1 res, MO_ReadOSBI fixedHdrSize rep, [addr,idx])
+
+doIndexOffAddrOp rep res addr idx
+   = Just (Just1 res, MO_ReadOSBI 0 rep, [addr,idx])
+
+doIndexByteArrayOp rep res addr idx
+   = Just (Just1 res, MO_ReadOSBI arrWordsHdrSize rep, [addr,idx])
+
+doWriteOffAddrOp rep addr idx val
+   = Just (Just0, MO_WriteOSBI 0 rep, [addr,idx,val])
+
+doWriteByteArrayOp rep addr idx val
+   = Just (Just0, MO_WriteOSBI arrWordsHdrSize rep, [addr,idx,val])
+
+-- Simple dyadic op but one for which we need to cast first arg to
+-- be sure of correctness
+translateOp_dyadic_cast1 mop res cast_arg1_to arg1 arg2 vols
+   = mkTemp cast_arg1_to		`thenFlt` \ arg1casted ->
+     (returnFlt . CSequential) [
+        CAssign arg1casted arg1,
+        CMachOpStmt (Just1 res) mop [arg1casted,arg2]
+           (if isDefinitelyInlineMachOp mop then Nothing else Just vols)
+     ]
+
+------------------------------------------------------------------------------
+
+dscCOpStmt :: [CAddrMode]	-- Results
+           -> PrimOp
+           -> [CAddrMode]	-- Arguments
+           -> [MagicId]		-- Potentially volatile/live registers
+                         	-- (to save/restore around the op)
+           -> FlatM AbstractC
+
+-- #define parzh(r,node) r = 1
+dscCOpStmt [res] ParOp [arg] vols
+   = returnFlt
+        (CAssign res (CLit (mkMachInt 1)))
+
+-- #define readMutVarzh(r,a)	 r=(P_)(((StgMutVar *)(a))->var)
+dscCOpStmt [res] ReadMutVarOp [mutv] vols
+   = returnFlt
+        (CAssign res (mkDerefOff PtrRep mutv fixedHdrSize))
+
+-- #define writeMutVarzh(a,v)       (P_)(((StgMutVar *)(a))->var)=(v)
+dscCOpStmt [] WriteMutVarOp [mutv,var] vols
+   = returnFlt
+        (CAssign (mkDerefOff PtrRep mutv fixedHdrSize) var)
+
+
+-- #define ForeignObj_CLOSURE_DATA(c)  (((StgForeignObj *)c)->data)
+-- #define foreignObjToAddrzh(r,fo)    r=ForeignObj_CLOSURE_DATA(fo)
+dscCOpStmt [res] ForeignObjToAddrOp [fo] vols
+   = returnFlt
+        (CAssign res (mkDerefOff PtrRep fo fixedHdrSize))
+
+-- #define writeForeignObjzh(res,datum) \
+--    (ForeignObj_CLOSURE_DATA(res) = (P_)(datum))
+dscCOpStmt [] WriteForeignObjOp [fo,addr] vols
+   = returnFlt
+        (CAssign (mkDerefOff PtrRep fo fixedHdrSize) addr)
+
+
+-- #define sizzeofByteArrayzh(r,a) \
+--     r = (((StgArrWords *)(a))->words * sizeof(W_))
+dscCOpStmt [res] SizeofByteArrayOp [arg] vols
+   = mkTemp WordRep 			`thenFlt` \ w ->
+     (returnFlt . CSequential) [
+        CAssign w (mkDerefOff WordRep arg fixedHdrSize),
+        CMachOpStmt (Just1 w) 
+           MO_NatU_Mul [w, CLit (mkMachInt (toInteger wORD_SIZE))] (Just vols),
+        CAssign res w
+     ]
+
+-- #define sizzeofMutableByteArrayzh(r,a) \
+--      r = (((StgArrWords *)(a))->words * sizeof(W_))
+dscCOpStmt [res] SizeofMutableByteArrayOp [arg] vols
+   = dscCOpStmt [res] SizeofByteArrayOp [arg] vols
+
+
+-- #define touchzh(o)                  /* nothing */
+dscCOpStmt [] TouchOp [arg] vols
+   = returnFlt AbsCNop
+
+-- #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
+dscCOpStmt [res] ByteArrayContents_Char [arg] vols
+   = mkTemp PtrRep			`thenFlt` \ ptr ->
+     (returnFlt . CSequential) [
+         CMachOpStmt (Just1 ptr) MO_NatU_to_NatP [arg] Nothing,
+         CAssign ptr (mkNoDerefOff WordRep ptr arrWordsHdrSize),
+         CAssign res ptr
+     ]
+
+-- #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
+dscCOpStmt [res] StableNameToIntOp [arg] vols
+   = returnFlt 
+        (CAssign res (mkDerefOff WordRep arg fixedHdrSize))
+
+-- #define eqStableNamezh(r,sn1,sn2)					\
+--    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
+dscCOpStmt [res] EqStableNameOp [arg1,arg2] vols
+   = mkTemps [WordRep, WordRep] 	`thenFlt` \ [sn1,sn2] ->
+     (returnFlt . CSequential) [
+        CAssign sn1 (mkDerefOff WordRep arg1 fixedHdrSize),
+        CAssign sn2 (mkDerefOff WordRep arg2 fixedHdrSize),
+        CMachOpStmt (Just1 res) MO_Nat_Eq [sn1,sn2] Nothing
+     ]
+
+-- #define addrToHValuezh(r,a) r=(P_)a
+dscCOpStmt [res] AddrToHValueOp [arg] vols
+   = returnFlt 
+        (CAssign res arg)
+
+-- #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
+dscCOpStmt [res] DataToTagOp [arg] vols
+   = mkTemps [PtrRep, WordRep]		`thenFlt` \ [t_infoptr, t_theword] ->
+     (returnFlt . CSequential) [
+        CAssign t_infoptr (mkDerefOff PtrRep arg 0),
+        CAssign t_theword (mkDerefOff WordRep t_infoptr (-1)),
+        mkHalfWord_HIADDR res t_theword
+     ]
+
+
+{- Freezing arrays-of-ptrs requires changing an info table, for the
+   benefit of the generational collector.  It needs to scavenge mutable
+   objects, even if they are in old space.  When they become immutable,
+   they can be removed from this scavenge list.	 -}
+
+-- #define unsafeFreezzeArrayzh(r,a)					\
+--	{								\
+--        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN_info);        \
+--	r = a;								\
+--	}
+dscCOpStmt [res] UnsafeFreezeArrayOp [arg] vols
+   = (returnFlt . CSequential) [
+        CAssign (mkDerefOff PtrRep arg 0) (CLbl mkMAP_FROZEN_infoLabel PtrRep),
+        CAssign res arg
+     ]
+
+-- #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
+dscCOpStmt [res] UnsafeFreezeByteArrayOp [arg] vols
+   = returnFlt
+        (CAssign res arg)
+
+-- This ought to be trivial, but it's difficult to insert the casts
+-- required to keep the C compiler happy.
+dscCOpStmt [r] AddrRemOp [a1,a2] vols 
+   = mkTemp WordRep			`thenFlt` \ a1casted ->
+     (returnFlt . CSequential) [
+        CMachOpStmt (Just1 a1casted) MO_NatP_to_NatU [a1] Nothing,
+        CMachOpStmt (Just1 r) MO_NatU_Rem [a1casted,a2] Nothing
+     ]
+
+-- not handled by translateOp because they need casts
+dscCOpStmt [r] SllOp [a1,a2] vols
+   = translateOp_dyadic_cast1 MO_Nat_Shl r WordRep a1 a2 vols
+dscCOpStmt [r] SrlOp [a1,a2] vols 
+   = translateOp_dyadic_cast1 MO_Nat_Shr r WordRep a1 a2 vols
+
+dscCOpStmt [r] ISllOp [a1,a2] vols 
+   = translateOp_dyadic_cast1 MO_Nat_Shl r IntRep a1 a2 vols
+dscCOpStmt [r] ISrlOp [a1,a2] vols 
+   = translateOp_dyadic_cast1 MO_Nat_Shr r IntRep a1 a2 vols
+dscCOpStmt [r] ISraOp [a1,a2] vols 
+   = translateOp_dyadic_cast1 MO_Nat_Sar r IntRep a1 a2 vols
+
+
+-- Handle all others as simply as possible.
+dscCOpStmt ress op args vols
+   = case translateOp ress op args of
+        Nothing 
+           -> pprPanic "dscCOpStmt: can't translate PrimOp" (ppr op)
+        Just (maybe_res, mop, args)
+           -> returnFlt (
+                 CMachOpStmt maybe_res mop args 
+                    (if isDefinitelyInlineMachOp mop then Nothing else Just vols)
+              )
+
+
+
+translateOp [r] ReadArrayOp [obj,ix] 
+   = Just (Just1 r, MO_ReadOSBI arrPtrsHdrSize PtrRep, [obj,ix])
+translateOp [r] IndexArrayOp [obj,ix] 
+   = Just (Just1 r, MO_ReadOSBI arrPtrsHdrSize PtrRep, [obj,ix])
+translateOp [] WriteArrayOp [obj,ix,v] 
+   = Just (Just0, MO_WriteOSBI arrPtrsHdrSize PtrRep, [obj,ix,v])
+
+-- IndexXXXoffForeignObj
+
+translateOp [r] IndexOffForeignObjOp_Char [a,i]  = doIndexOffForeignObjOp Word8Rep r a i
+translateOp [r] IndexOffForeignObjOp_WideChar [a,i]  = doIndexOffForeignObjOp Word32Rep r a i
+translateOp [r] IndexOffForeignObjOp_Int [a,i]  = doIndexOffForeignObjOp IntRep r a i
+translateOp [r] IndexOffForeignObjOp_Word [a,i]  = doIndexOffForeignObjOp WordRep r a i
+translateOp [r] IndexOffForeignObjOp_Addr [a,i]  = doIndexOffForeignObjOp AddrRep r a i
+translateOp [r] IndexOffForeignObjOp_Float [a,i]  = doIndexOffForeignObjOp FloatRep r a i
+translateOp [r] IndexOffForeignObjOp_Double [a,i]  = doIndexOffForeignObjOp DoubleRep r a i
+translateOp [r] IndexOffForeignObjOp_StablePtr [a,i]  = doIndexOffForeignObjOp StablePtrRep r a i
+
+translateOp [r] IndexOffForeignObjOp_Int8  [a,i] = doIndexOffForeignObjOp Int8Rep  r a i
+translateOp [r] IndexOffForeignObjOp_Int16 [a,i] = doIndexOffForeignObjOp Int16Rep r a i
+translateOp [r] IndexOffForeignObjOp_Int32 [a,i] = doIndexOffForeignObjOp Int32Rep r a i
+translateOp [r] IndexOffForeignObjOp_Int64 [a,i] = doIndexOffForeignObjOp Int64Rep r a i
+
+translateOp [r] IndexOffForeignObjOp_Word8  [a,i] = doIndexOffForeignObjOp Word8Rep  r a i
+translateOp [r] IndexOffForeignObjOp_Word16 [a,i] = doIndexOffForeignObjOp Word16Rep r a i
+translateOp [r] IndexOffForeignObjOp_Word32 [a,i] = doIndexOffForeignObjOp Word32Rep r a i
+translateOp [r] IndexOffForeignObjOp_Word64 [a,i] = doIndexOffForeignObjOp Word64Rep r a i
+
+-- IndexXXXoffAddr
+
+translateOp [r] IndexOffAddrOp_Char [a,i]  = doIndexOffAddrOp Word8Rep r a i
+translateOp [r] IndexOffAddrOp_WideChar [a,i]  = doIndexOffAddrOp Word32Rep r a i
+translateOp [r] IndexOffAddrOp_Int [a,i]  = doIndexOffAddrOp IntRep r a i
+translateOp [r] IndexOffAddrOp_Word [a,i]  = doIndexOffAddrOp WordRep r a i
+translateOp [r] IndexOffAddrOp_Addr [a,i]  = doIndexOffAddrOp AddrRep r a i
+translateOp [r] IndexOffAddrOp_Float [a,i]  = doIndexOffAddrOp FloatRep r a i
+translateOp [r] IndexOffAddrOp_Double [a,i]  = doIndexOffAddrOp DoubleRep r a i
+translateOp [r] IndexOffAddrOp_StablePtr [a,i]  = doIndexOffAddrOp StablePtrRep r a i
+
+translateOp [r] IndexOffAddrOp_Int8  [a,i] = doIndexOffAddrOp Int8Rep  r a i
+translateOp [r] IndexOffAddrOp_Int16 [a,i] = doIndexOffAddrOp Int16Rep r a i
+translateOp [r] IndexOffAddrOp_Int32 [a,i] = doIndexOffAddrOp Int32Rep r a i
+translateOp [r] IndexOffAddrOp_Int64 [a,i] = doIndexOffAddrOp Int64Rep r a i
+
+translateOp [r] IndexOffAddrOp_Word8  [a,i] = doIndexOffAddrOp Word8Rep  r a i
+translateOp [r] IndexOffAddrOp_Word16 [a,i] = doIndexOffAddrOp Word16Rep r a i
+translateOp [r] IndexOffAddrOp_Word32 [a,i] = doIndexOffAddrOp Word32Rep r a i
+translateOp [r] IndexOffAddrOp_Word64 [a,i] = doIndexOffAddrOp Word64Rep r a i
+
+-- ReadXXXoffAddr, which are identical, for our purposes, to IndexXXXoffAddr.
+
+translateOp [r] ReadOffAddrOp_Char [a,i]  = doIndexOffAddrOp Word8Rep r a i
+translateOp [r] ReadOffAddrOp_WideChar [a,i]  = doIndexOffAddrOp Word32Rep r a i
+translateOp [r] ReadOffAddrOp_Int [a,i]  = doIndexOffAddrOp IntRep r a i
+translateOp [r] ReadOffAddrOp_Word [a,i]  = doIndexOffAddrOp WordRep r a i
+translateOp [r] ReadOffAddrOp_Addr [a,i]  = doIndexOffAddrOp AddrRep r a i
+translateOp [r] ReadOffAddrOp_Float [a,i]  = doIndexOffAddrOp FloatRep r a i
+translateOp [r] ReadOffAddrOp_Double [a,i]  = doIndexOffAddrOp DoubleRep r a i
+translateOp [r] ReadOffAddrOp_StablePtr [a,i]  = doIndexOffAddrOp StablePtrRep r a i
+
+translateOp [r] ReadOffAddrOp_Int8  [a,i] = doIndexOffAddrOp Int8Rep  r a i
+translateOp [r] ReadOffAddrOp_Int16 [a,i] = doIndexOffAddrOp Int16Rep r a i
+translateOp [r] ReadOffAddrOp_Int32 [a,i] = doIndexOffAddrOp Int32Rep r a i
+translateOp [r] ReadOffAddrOp_Int64 [a,i] = doIndexOffAddrOp Int64Rep r a i
+
+translateOp [r] ReadOffAddrOp_Word8  [a,i] = doIndexOffAddrOp Word8Rep  r a i
+translateOp [r] ReadOffAddrOp_Word16 [a,i] = doIndexOffAddrOp Word16Rep r a i
+translateOp [r] ReadOffAddrOp_Word32 [a,i] = doIndexOffAddrOp Word32Rep r a i
+translateOp [r] ReadOffAddrOp_Word64 [a,i] = doIndexOffAddrOp Word64Rep r a i
+
+-- WriteXXXoffAddr
+
+translateOp [] WriteOffAddrOp_Char [a,i,x]  = doWriteOffAddrOp Word8Rep a i x
+translateOp [] WriteOffAddrOp_WideChar [a,i,x]  = doWriteOffAddrOp Word32Rep a i x
+translateOp [] WriteOffAddrOp_Int [a,i,x]  = doWriteOffAddrOp IntRep a i x
+translateOp [] WriteOffAddrOp_Word [a,i,x]  = doWriteOffAddrOp WordRep a i x
+translateOp [] WriteOffAddrOp_Addr [a,i,x]  = doWriteOffAddrOp AddrRep a i x
+translateOp [] WriteOffAddrOp_Float [a,i,x]  = doWriteOffAddrOp FloatRep a i x
+translateOp [] WriteOffAddrOp_ForeignObj [a,i,x]  = doWriteOffAddrOp ForeignObjRep a i x
+translateOp [] WriteOffAddrOp_Double [a,i,x]  = doWriteOffAddrOp DoubleRep a i x
+translateOp [] WriteOffAddrOp_StablePtr [a,i,x]  = doWriteOffAddrOp StablePtrRep a i x
+
+translateOp [] WriteOffAddrOp_Int8  [a,i,x] = doWriteOffAddrOp Int8Rep  a i x
+translateOp [] WriteOffAddrOp_Int16 [a,i,x] = doWriteOffAddrOp Int16Rep a i x
+translateOp [] WriteOffAddrOp_Int32 [a,i,x] = doWriteOffAddrOp Int32Rep a i x
+translateOp [] WriteOffAddrOp_Int64 [a,i,x] = doWriteOffAddrOp Int64Rep a i x
+
+translateOp [] WriteOffAddrOp_Word8  [a,i,x] = doWriteOffAddrOp Word8Rep  a i x
+translateOp [] WriteOffAddrOp_Word16 [a,i,x] = doWriteOffAddrOp Word16Rep a i x
+translateOp [] WriteOffAddrOp_Word32 [a,i,x] = doWriteOffAddrOp Word32Rep a i x
+translateOp [] WriteOffAddrOp_Word64 [a,i,x] = doWriteOffAddrOp Word64Rep a i x
+
+-- IndexXXXArray
+
+translateOp [r] IndexByteArrayOp_Char [a,i]  = doIndexByteArrayOp Word8Rep r a i
+translateOp [r] IndexByteArrayOp_WideChar [a,i]  = doIndexByteArrayOp Word32Rep r a i
+translateOp [r] IndexByteArrayOp_Int [a,i]  = doIndexByteArrayOp IntRep r a i
+translateOp [r] IndexByteArrayOp_Word [a,i]  = doIndexByteArrayOp WordRep r a i
+translateOp [r] IndexByteArrayOp_Addr [a,i]  = doIndexByteArrayOp AddrRep r a i
+translateOp [r] IndexByteArrayOp_Float [a,i]  = doIndexByteArrayOp FloatRep r a i
+translateOp [r] IndexByteArrayOp_Double [a,i]  = doIndexByteArrayOp DoubleRep r a i
+translateOp [r] IndexByteArrayOp_StablePtr [a,i]  = doIndexByteArrayOp StablePtrRep r a i
+
+translateOp [r] IndexByteArrayOp_Int8  [a,i] = doIndexByteArrayOp Int8Rep  r a i
+translateOp [r] IndexByteArrayOp_Int16 [a,i] = doIndexByteArrayOp Int16Rep  r a i
+translateOp [r] IndexByteArrayOp_Int32 [a,i] = doIndexByteArrayOp Int32Rep  r a i
+translateOp [r] IndexByteArrayOp_Int64 [a,i] = doIndexByteArrayOp Int64Rep  r a i
+
+translateOp [r] IndexByteArrayOp_Word8  [a,i] = doIndexByteArrayOp Word8Rep  r a i
+translateOp [r] IndexByteArrayOp_Word16 [a,i] = doIndexByteArrayOp Word16Rep  r a i
+translateOp [r] IndexByteArrayOp_Word32 [a,i] = doIndexByteArrayOp Word32Rep  r a i
+translateOp [r] IndexByteArrayOp_Word64 [a,i] = doIndexByteArrayOp Word64Rep  r a i
+
+-- ReadXXXArray, identical to IndexXXXArray.
+
+translateOp [r] ReadByteArrayOp_Char [a,i]  = doIndexByteArrayOp Word8Rep r a i
+translateOp [r] ReadByteArrayOp_WideChar [a,i]  = doIndexByteArrayOp Word32Rep r a i
+translateOp [r] ReadByteArrayOp_Int [a,i]  = doIndexByteArrayOp IntRep r a i
+translateOp [r] ReadByteArrayOp_Word [a,i]  = doIndexByteArrayOp WordRep r a i
+translateOp [r] ReadByteArrayOp_Addr [a,i]  = doIndexByteArrayOp AddrRep r a i
+translateOp [r] ReadByteArrayOp_Float [a,i]  = doIndexByteArrayOp FloatRep r a i
+translateOp [r] ReadByteArrayOp_Double [a,i]  = doIndexByteArrayOp DoubleRep r a i
+translateOp [r] ReadByteArrayOp_StablePtr [a,i]  = doIndexByteArrayOp StablePtrRep r a i
+
+translateOp [r] ReadByteArrayOp_Int8  [a,i] = doIndexByteArrayOp Int8Rep  r a i
+translateOp [r] ReadByteArrayOp_Int16 [a,i] = doIndexByteArrayOp Int16Rep  r a i
+translateOp [r] ReadByteArrayOp_Int32 [a,i] = doIndexByteArrayOp Int32Rep  r a i
+translateOp [r] ReadByteArrayOp_Int64 [a,i] = doIndexByteArrayOp Int64Rep  r a i
+
+translateOp [r] ReadByteArrayOp_Word8  [a,i] = doIndexByteArrayOp Word8Rep  r a i
+translateOp [r] ReadByteArrayOp_Word16 [a,i] = doIndexByteArrayOp Word16Rep  r a i
+translateOp [r] ReadByteArrayOp_Word32 [a,i] = doIndexByteArrayOp Word32Rep  r a i
+translateOp [r] ReadByteArrayOp_Word64 [a,i] = doIndexByteArrayOp Word64Rep  r a i
+
+-- WriteXXXArray
+
+translateOp [] WriteByteArrayOp_Char [a,i,x]  = doWriteByteArrayOp Word8Rep a i x
+translateOp [] WriteByteArrayOp_WideChar [a,i,x]  = doWriteByteArrayOp Word32Rep a i x
+translateOp [] WriteByteArrayOp_Int [a,i,x]  = doWriteByteArrayOp IntRep a i x
+translateOp [] WriteByteArrayOp_Word [a,i,x]  = doWriteByteArrayOp WordRep a i x
+translateOp [] WriteByteArrayOp_Addr [a,i,x]  = doWriteByteArrayOp AddrRep a i x
+translateOp [] WriteByteArrayOp_Float [a,i,x]  = doWriteByteArrayOp FloatRep a i x
+translateOp [] WriteByteArrayOp_Double [a,i,x]  = doWriteByteArrayOp DoubleRep a i x
+translateOp [] WriteByteArrayOp_StablePtr [a,i,x]  = doWriteByteArrayOp StablePtrRep a i x
+
+translateOp [] WriteByteArrayOp_Int8  [a,i,x] = doWriteByteArrayOp Int8Rep  a i x
+translateOp [] WriteByteArrayOp_Int16 [a,i,x] = doWriteByteArrayOp Int16Rep  a i x
+translateOp [] WriteByteArrayOp_Int32 [a,i,x] = doWriteByteArrayOp Int32Rep  a i x
+translateOp [] WriteByteArrayOp_Int64 [a,i,x] = doWriteByteArrayOp Int64Rep  a i x
+
+translateOp [] WriteByteArrayOp_Word8  [a,i,x] = doWriteByteArrayOp Word8Rep  a i x
+translateOp [] WriteByteArrayOp_Word16 [a,i,x] = doWriteByteArrayOp Word16Rep  a i x
+translateOp [] WriteByteArrayOp_Word32 [a,i,x] = doWriteByteArrayOp Word32Rep  a i x
+translateOp [] WriteByteArrayOp_Word64 [a,i,x] = doWriteByteArrayOp Word64Rep  a i x
+
+-- Native word signless ops
+
+translateOp [r] IntAddOp       [a1,a2] = Just (Just1 r, MO_Nat_Add,        [a1,a2])
+translateOp [r] IntSubOp       [a1,a2] = Just (Just1 r, MO_Nat_Sub,        [a1,a2])
+translateOp [r] WordAddOp      [a1,a2] = Just (Just1 r, MO_Nat_Add,        [a1,a2])
+translateOp [r] WordSubOp      [a1,a2] = Just (Just1 r, MO_Nat_Sub,        [a1,a2])
+translateOp [r] AddrAddOp      [a1,a2] = Just (Just1 r, MO_Nat_Add,        [a1,a2])
+translateOp [r] AddrSubOp      [a1,a2] = Just (Just1 r, MO_Nat_Sub,        [a1,a2])
+
+translateOp [r] IntEqOp        [a1,a2] = Just (Just1 r, MO_Nat_Eq,         [a1,a2])
+translateOp [r] IntNeOp        [a1,a2] = Just (Just1 r, MO_Nat_Ne,         [a1,a2])
+translateOp [r] WordEqOp       [a1,a2] = Just (Just1 r, MO_Nat_Eq,         [a1,a2])
+translateOp [r] WordNeOp       [a1,a2] = Just (Just1 r, MO_Nat_Ne,         [a1,a2])
+translateOp [r] AddrEqOp       [a1,a2] = Just (Just1 r, MO_Nat_Eq,         [a1,a2])
+translateOp [r] AddrNeOp       [a1,a2] = Just (Just1 r, MO_Nat_Ne,         [a1,a2])
+
+translateOp [r] AndOp          [a1,a2] = Just (Just1 r, MO_Nat_And,        [a1,a2])
+translateOp [r] OrOp           [a1,a2] = Just (Just1 r, MO_Nat_Or,         [a1,a2])
+translateOp [r] XorOp          [a1,a2] = Just (Just1 r, MO_Nat_Xor,        [a1,a2])
+translateOp [r] NotOp          [a1]    = Just (Just1 r, MO_Nat_Not,        [a1])
+
+-- Native word signed ops
+
+translateOp [r] IntMulOp       [a1,a2] = Just (Just1 r, MO_NatS_Mul,       [a1,a2])
+translateOp [r] IntQuotOp      [a1,a2] = Just (Just1 r, MO_NatS_Quot,      [a1,a2])
+translateOp [r] IntRemOp       [a1,a2] = Just (Just1 r, MO_NatS_Rem,       [a1,a2])
+translateOp [r] IntNegOp       [a1]    = Just (Just1 r, MO_NatS_Neg,       [a1])
+
+translateOp [r,c] IntAddCOp    [a1,a2] = Just (Just2 r c, MO_NatS_AddC,    [a1,a2])
+translateOp [r,c] IntSubCOp    [a1,a2] = Just (Just2 r c, MO_NatS_SubC,    [a1,a2])
+translateOp [r,c] IntMulCOp    [a1,a2] = Just (Just2 r c, MO_NatS_MulC,    [a1,a2])
+
+translateOp [r] IntGeOp        [a1,a2] = Just (Just1 r, MO_NatS_Ge,        [a1,a2])
+translateOp [r] IntLeOp        [a1,a2] = Just (Just1 r, MO_NatS_Le,        [a1,a2])
+translateOp [r] IntGtOp        [a1,a2] = Just (Just1 r, MO_NatS_Gt,        [a1,a2])
+translateOp [r] IntLtOp        [a1,a2] = Just (Just1 r, MO_NatS_Lt,        [a1,a2])
+
+-- Native word unsigned ops
+
+translateOp [r] WordGeOp       [a1,a2] = Just (Just1 r, MO_NatU_Ge,        [a1,a2])
+translateOp [r] WordLeOp       [a1,a2] = Just (Just1 r, MO_NatU_Le,        [a1,a2])
+translateOp [r] WordGtOp       [a1,a2] = Just (Just1 r, MO_NatU_Gt,        [a1,a2])
+translateOp [r] WordLtOp       [a1,a2] = Just (Just1 r, MO_NatU_Lt,        [a1,a2])
+
+translateOp [r] WordMulOp      [a1,a2] = Just (Just1 r, MO_NatU_Mul,       [a1,a2])
+translateOp [r] WordQuotOp     [a1,a2] = Just (Just1 r, MO_NatU_Quot,      [a1,a2])
+translateOp [r] WordRemOp      [a1,a2] = Just (Just1 r, MO_NatU_Rem,       [a1,a2])
+
+translateOp [r] AddrGeOp       [a1,a2] = Just (Just1 r, MO_NatU_Ge,        [a1,a2])
+translateOp [r] AddrLeOp       [a1,a2] = Just (Just1 r, MO_NatU_Le,        [a1,a2])
+translateOp [r] AddrGtOp       [a1,a2] = Just (Just1 r, MO_NatU_Gt,        [a1,a2])
+translateOp [r] AddrLtOp       [a1,a2] = Just (Just1 r, MO_NatU_Lt,        [a1,a2])
+
+-- 32-bit unsigned ops
+
+translateOp [r] CharEqOp       [a1,a2] = Just (Just1 r, MO_32U_Eq,        [a1,a2])
+translateOp [r] CharNeOp       [a1,a2] = Just (Just1 r, MO_32U_Ne,        [a1,a2])
+translateOp [r] CharGeOp       [a1,a2] = Just (Just1 r, MO_32U_Ge,        [a1,a2])
+translateOp [r] CharLeOp       [a1,a2] = Just (Just1 r, MO_32U_Le,        [a1,a2])
+translateOp [r] CharGtOp       [a1,a2] = Just (Just1 r, MO_32U_Gt,        [a1,a2])
+translateOp [r] CharLtOp       [a1,a2] = Just (Just1 r, MO_32U_Lt,        [a1,a2])
+
+-- Double ops
+
+translateOp [r] DoubleEqOp     [a1,a2] = Just (Just1 r, MO_Dbl_Eq,      [a1,a2])
+translateOp [r] DoubleNeOp     [a1,a2] = Just (Just1 r, MO_Dbl_Ne,      [a1,a2])
+translateOp [r] DoubleGeOp     [a1,a2] = Just (Just1 r, MO_Dbl_Ge,      [a1,a2])
+translateOp [r] DoubleLeOp     [a1,a2] = Just (Just1 r, MO_Dbl_Le,      [a1,a2])
+translateOp [r] DoubleGtOp     [a1,a2] = Just (Just1 r, MO_Dbl_Gt,      [a1,a2])
+translateOp [r] DoubleLtOp     [a1,a2] = Just (Just1 r, MO_Dbl_Lt,      [a1,a2])
+
+translateOp [r] DoubleAddOp    [a1,a2] = Just (Just1 r, MO_Dbl_Add,    [a1,a2])
+translateOp [r] DoubleSubOp    [a1,a2] = Just (Just1 r, MO_Dbl_Sub,    [a1,a2])
+translateOp [r] DoubleMulOp    [a1,a2] = Just (Just1 r, MO_Dbl_Mul,    [a1,a2])
+translateOp [r] DoubleDivOp    [a1,a2] = Just (Just1 r, MO_Dbl_Div,    [a1,a2])
+translateOp [r] DoublePowerOp  [a1,a2] = Just (Just1 r, MO_Dbl_Pwr,    [a1,a2])
+
+translateOp [r] DoubleSinOp    [a1]    = Just (Just1 r, MO_Dbl_Sin,    [a1])
+translateOp [r] DoubleCosOp    [a1]    = Just (Just1 r, MO_Dbl_Cos,    [a1])
+translateOp [r] DoubleTanOp    [a1]    = Just (Just1 r, MO_Dbl_Tan,    [a1])
+translateOp [r] DoubleSinhOp   [a1]    = Just (Just1 r, MO_Dbl_Sinh,   [a1])
+translateOp [r] DoubleCoshOp   [a1]    = Just (Just1 r, MO_Dbl_Cosh,   [a1])
+translateOp [r] DoubleTanhOp   [a1]    = Just (Just1 r, MO_Dbl_Tanh,   [a1])
+translateOp [r] DoubleAsinOp   [a1]    = Just (Just1 r, MO_Dbl_Asin,    [a1])
+translateOp [r] DoubleAcosOp   [a1]    = Just (Just1 r, MO_Dbl_Acos,    [a1])
+translateOp [r] DoubleAtanOp   [a1]    = Just (Just1 r, MO_Dbl_Atan,    [a1])
+translateOp [r] DoubleLogOp    [a1]    = Just (Just1 r, MO_Dbl_Log,    [a1])
+translateOp [r] DoubleExpOp    [a1]    = Just (Just1 r, MO_Dbl_Exp,    [a1])
+translateOp [r] DoubleSqrtOp   [a1]    = Just (Just1 r, MO_Dbl_Sqrt,    [a1])
+translateOp [r] DoubleNegOp    [a1]    = Just (Just1 r, MO_Dbl_Neg,    [a1])
+
+-- Float ops
+
+translateOp [r] FloatEqOp     [a1,a2] = Just (Just1 r, MO_Flt_Eq,      [a1,a2])
+translateOp [r] FloatNeOp     [a1,a2] = Just (Just1 r, MO_Flt_Ne,      [a1,a2])
+translateOp [r] FloatGeOp     [a1,a2] = Just (Just1 r, MO_Flt_Ge,      [a1,a2])
+translateOp [r] FloatLeOp     [a1,a2] = Just (Just1 r, MO_Flt_Le,      [a1,a2])
+translateOp [r] FloatGtOp     [a1,a2] = Just (Just1 r, MO_Flt_Gt,      [a1,a2])
+translateOp [r] FloatLtOp     [a1,a2] = Just (Just1 r, MO_Flt_Lt,      [a1,a2])
+
+translateOp [r] FloatAddOp    [a1,a2] = Just (Just1 r, MO_Flt_Add,    [a1,a2])
+translateOp [r] FloatSubOp    [a1,a2] = Just (Just1 r, MO_Flt_Sub,    [a1,a2])
+translateOp [r] FloatMulOp    [a1,a2] = Just (Just1 r, MO_Flt_Mul,    [a1,a2])
+translateOp [r] FloatDivOp    [a1,a2] = Just (Just1 r, MO_Flt_Div,    [a1,a2])
+translateOp [r] FloatPowerOp  [a1,a2] = Just (Just1 r, MO_Flt_Pwr,    [a1,a2])
+
+translateOp [r] FloatSinOp    [a1]    = Just (Just1 r, MO_Flt_Sin,    [a1])
+translateOp [r] FloatCosOp    [a1]    = Just (Just1 r, MO_Flt_Cos,    [a1])
+translateOp [r] FloatTanOp    [a1]    = Just (Just1 r, MO_Flt_Tan,    [a1])
+translateOp [r] FloatSinhOp   [a1]    = Just (Just1 r, MO_Flt_Sinh,   [a1])
+translateOp [r] FloatCoshOp   [a1]    = Just (Just1 r, MO_Flt_Cosh,   [a1])
+translateOp [r] FloatTanhOp   [a1]    = Just (Just1 r, MO_Flt_Tanh,   [a1])
+translateOp [r] FloatAsinOp   [a1]    = Just (Just1 r, MO_Flt_Asin,    [a1])
+translateOp [r] FloatAcosOp   [a1]    = Just (Just1 r, MO_Flt_Acos,    [a1])
+translateOp [r] FloatAtanOp   [a1]    = Just (Just1 r, MO_Flt_Atan,    [a1])
+translateOp [r] FloatLogOp    [a1]    = Just (Just1 r, MO_Flt_Log,    [a1])
+translateOp [r] FloatExpOp    [a1]    = Just (Just1 r, MO_Flt_Exp,    [a1])
+translateOp [r] FloatSqrtOp   [a1]    = Just (Just1 r, MO_Flt_Sqrt,    [a1])
+translateOp [r] FloatNegOp    [a1]    = Just (Just1 r, MO_Flt_Neg,    [a1])
+
+-- Conversions
+
+translateOp [r] Int2DoubleOp [a1]    = Just (Just1 r, MO_NatS_to_Dbl,    [a1])
+translateOp [r] Double2IntOp [a1]    = Just (Just1 r, MO_Dbl_to_NatS,    [a1])
+
+translateOp [r] Int2FloatOp  [a1]    = Just (Just1 r, MO_NatS_to_Flt,    [a1])
+translateOp [r] Float2IntOp  [a1]    = Just (Just1 r, MO_Flt_to_NatS,    [a1])
+
+translateOp [r] Float2DoubleOp [a1]    = Just (Just1 r, MO_Flt_to_Dbl,    [a1])
+translateOp [r] Double2FloatOp [a1]    = Just (Just1 r, MO_Dbl_to_Flt,    [a1])
+
+translateOp [r] Int2WordOp   [a1]    = Just (Just1 r, MO_NatS_to_NatU,   [a1])
+translateOp [r] Word2IntOp   [a1]    = Just (Just1 r, MO_NatU_to_NatS,   [a1])
+
+translateOp [r] Int2AddrOp   [a1]    = Just (Just1 r, MO_NatS_to_NatP,   [a1])
+translateOp [r] Addr2IntOp   [a1]    = Just (Just1 r, MO_NatP_to_NatS,   [a1])
+
+translateOp [r] OrdOp    [a1]    = Just (Just1 r, MO_32U_to_NatS,    [a1])
+translateOp [r] ChrOp    [a1]    = Just (Just1 r, MO_NatS_to_32U,    [a1])
+
+translateOp [r] Narrow8IntOp   [a1]    = Just (Just1 r, MO_8S_to_NatS,    [a1])
+translateOp [r] Narrow16IntOp  [a1]    = Just (Just1 r, MO_16S_to_NatS,    [a1])
+translateOp [r] Narrow32IntOp  [a1]    = Just (Just1 r, MO_32S_to_NatS,    [a1])
+
+translateOp [r] Narrow8WordOp   [a1]    = Just (Just1 r, MO_8U_to_NatU,    [a1])
+translateOp [r] Narrow16WordOp  [a1]    = Just (Just1 r, MO_16U_to_NatU,    [a1])
+translateOp [r] Narrow32WordOp  [a1]    = Just (Just1 r, MO_32U_to_NatU,    [a1])
+
+translateOp [r] SameMutVarOp   [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] SameMVarOp     [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] SameMutableArrayOp  [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] SameMutableByteArrayOp [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] EqForeignObj [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] EqStablePtrOp [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
+
+translateOp _ _ _ = Nothing
+
 \end{code}

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.54 2001/10/11 14:31:45 sewardj Exp $
+% $Id: CgCase.lhs,v 1.55 2001/12/05 17:35:13 sewardj Exp $
 %
 %********************************************************
 %*							*
@@ -156,7 +156,8 @@ cgCase (StgOpApp op args _)
 		tag_amode = CTemp (newTagUnique (getUnique bndr) 'C') IntRep
 	      in
 	      getVolatileRegs live_in_alts			`thenFC` \ vol_regs ->
- 	      absC (COpStmt [tag_amode] op arg_amodes vol_regs)	`thenC`
+ 	      absC (COpStmt [tag_amode] op arg_amodes vol_regs)
+								`thenC`
 				-- NB: no liveness arg
 	      returnFC tag_amode
     }						`thenFC` \ tag_amode ->

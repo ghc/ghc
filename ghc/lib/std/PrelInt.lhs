@@ -648,6 +648,8 @@ foreign import "stg_iShiftRA64"    unsafe iShiftRA64#    :: Int64# -> Int# -> In
 foreign import "stg_shiftL64"      unsafe shiftL64#      :: Word64# -> Int# -> Word64#
 foreign import "stg_shiftRL64"     unsafe shiftRL64#     :: Word64# -> Int# -> Word64#
 
+foreign import "stg_integerToInt64"  unsafe integerToInt64#  :: Int# -> ByteArray# -> Int64#
+
 {-# RULES
 "fromIntegral/Int->Int64"    fromIntegral = \(I#   x#) -> I64# (intToInt64# x#)
 "fromIntegral/Word->Int64"   fromIntegral = \(W#   x#) -> I64# (word64ToInt64# (wordToWord64# x#))

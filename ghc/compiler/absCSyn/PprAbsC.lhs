@@ -19,13 +19,14 @@ module PprAbsC (
 
 import IO	( Handle )
 
+import PrimRep 
 import AbsCSyn
 import ClosureInfo
 import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			  mixedPtrLocn, mixedTypeLocn
 			)
 
-import Constants	( mIN_UPD_SIZE )
+import Constants	( mIN_UPD_SIZE, wORD_SIZE )
 import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe, ccallConvAttribute )
 import CLabel		( externallyVisibleCLabel,
 			  needsCDecl, pprCLabel,
@@ -44,10 +45,11 @@ import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
 import DataCon		( dataConWrapId )
-import Maybes		( maybeToBool, catMaybes )
+import Maybes		( Maybe012(..), maybe012ToList, maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper )
+import MachOp		( MachOp(..) )
 import ForeignCall	( ForeignCall(..) )
-import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize )
+import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, getPrimRepArrayElemSize )
 import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
@@ -58,6 +60,7 @@ import BitSet		( BitSet, intBS )
 import Outputable
 import GlaExts
 import Util		( nOfThem, lengthExceeds, listLengthCmp )
+import Maybe		( isNothing )
 
 import ST
 
@@ -248,6 +251,70 @@ pprAbsC stmt@(COpStmt results (StgPrimOp op) args vol_regs) _
     ppr_op_result r = ppr_amode r
       -- primop macros do their own casting of result;
       -- hence we can toss the provided cast...
+
+-- NEW CASES FOR EXPANDED PRIMOPS
+
+-- We have to deal with some of these specially
+pprAbsC (CMachOpStmt (Just1 res) (MO_ReadOSBI offw scaleRep)
+                     [baseAmode, indexAmode] maybe_vols) 
+        _
+  | isNothing maybe_vols
+  = hcat [ -- text " /* ReadOSBI */ ",
+           ppr_amode res, equals, 
+           ppr_array_expression offw scaleRep baseAmode indexAmode, 
+           semi ]
+  | otherwise
+  = panic "pprAbsC:MO_ReadOSBI -- out-of-line array indexing ?!?!"
+
+pprAbsC (CMachOpStmt Just0 (MO_WriteOSBI offw scaleRep)
+                     [baseAmode, indexAmode, vAmode] maybe_vols)
+        _
+  | isNothing maybe_vols
+  = hcat [ -- text " /* WriteOSBI */ ",
+           ppr_array_expression offw scaleRep baseAmode indexAmode, 
+           equals, pprAmode vAmode,
+           semi ]
+  | otherwise
+  = panic "pprAbsC:MO_WriteOSBI -- out-of-line array indexing ?!?!"
+
+pprAbsC (CMachOpStmt (Just2 res carry) mop [arg1,arg2] maybe_vols) _
+  | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC]
+  = hcat [ pprMachOp_for_C mop, 
+           lparen,
+           ppr_amode res, comma, ppr_amode carry, comma,
+           pprAmode arg1, comma, pprAmode arg2, 
+           rparen, semi ]
+
+-- The rest generically.
+
+pprAbsC stmt@(CMachOpStmt (Just1 res) mop [arg1,arg2] maybe_vols) _
+  = let prefix_fn = mop `elem` [MO_Dbl_Pwr, MO_Flt_Pwr]
+    in
+    case ppr_maybe_vol_regs maybe_vols of {(saves,restores) ->
+    saves $$
+    hcat (
+       [ppr_amode res, equals]
+       ++ (if prefix_fn 
+           then [pprMachOp_for_C mop, parens (pprAmode arg1 <> comma <> pprAmode arg2)]
+           else [pprAmode arg1, pprMachOp_for_C mop, pprAmode arg2])
+       ++ [semi]
+    )
+    $$ restores
+    }
+
+pprAbsC stmt@(CMachOpStmt (Just1 res) mop [arg1] maybe_vols) _
+  = case ppr_maybe_vol_regs maybe_vols of {(saves,restores) ->
+    saves $$
+    hcat [ppr_amode res, equals, 
+          pprMachOp_for_C mop, parens (pprAmode arg1),
+          semi]
+    $$ restores
+    }
+
+pprAbsC stmt@(CSequential stuff) c
+  = vcat (map (flip pprAbsC c) stuff)
+
+-- end of NEW CASES FOR EXPANDED PRIMOPS
 
 pprAbsC stmt@(CSRT lbl closures) c
   = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
@@ -580,6 +647,151 @@ pprAbsC (CCostCentreStackDecl ccs)    _ = pprCostCentreStackDecl ccs
 \end{code}
 
 \begin{code}
+-- Print a CMachOp in a way suitable for emitting via C.
+pprMachOp_for_C MO_Nat_Add       = char '+'
+pprMachOp_for_C MO_Nat_Sub       = char '-'
+pprMachOp_for_C MO_Nat_Eq        = text "==" 
+pprMachOp_for_C MO_Nat_Ne        = text "!="
+
+pprMachOp_for_C MO_NatS_Ge       = text ">="
+pprMachOp_for_C MO_NatS_Le       = text "<="
+pprMachOp_for_C MO_NatS_Gt       = text ">"
+pprMachOp_for_C MO_NatS_Lt       = text "<"
+
+pprMachOp_for_C MO_NatU_Ge       = text ">="
+pprMachOp_for_C MO_NatU_Le       = text "<="
+pprMachOp_for_C MO_NatU_Gt       = text ">"
+pprMachOp_for_C MO_NatU_Lt       = text "<"
+
+pprMachOp_for_C MO_NatS_Mul      = char '*'
+pprMachOp_for_C MO_NatS_Quot     = char '/'
+pprMachOp_for_C MO_NatS_Rem      = char '%'
+pprMachOp_for_C MO_NatS_Neg      = char '-'
+
+pprMachOp_for_C MO_NatU_Mul      = char '*'
+pprMachOp_for_C MO_NatU_Quot     = char '/'
+pprMachOp_for_C MO_NatU_Rem      = char '%'
+
+pprMachOp_for_C MO_NatS_AddC	 = text "addIntCzh"
+pprMachOp_for_C MO_NatS_SubC	 = text "subIntCzh"
+pprMachOp_for_C MO_NatS_MulC	 = text "mulIntCzh"
+
+pprMachOp_for_C MO_Nat_And       = text "&"
+pprMachOp_for_C MO_Nat_Or        = text "|"
+pprMachOp_for_C MO_Nat_Xor       = text "^"
+pprMachOp_for_C MO_Nat_Not       = text "~"
+pprMachOp_for_C MO_Nat_Shl       = text "<<"
+pprMachOp_for_C MO_Nat_Shr       = text ">>"
+pprMachOp_for_C MO_Nat_Sar       = text ">>"
+
+pprMachOp_for_C MO_32U_Eq        = text "=="
+pprMachOp_for_C MO_32U_Ne        = text "!="
+pprMachOp_for_C MO_32U_Ge        = text ">="
+pprMachOp_for_C MO_32U_Le        = text "<="
+pprMachOp_for_C MO_32U_Gt        = text ">"
+pprMachOp_for_C MO_32U_Lt        = text "<"
+
+pprMachOp_for_C MO_Dbl_Eq        = text "=="
+pprMachOp_for_C MO_Dbl_Ne        = text "!="
+pprMachOp_for_C MO_Dbl_Ge        = text ">="
+pprMachOp_for_C MO_Dbl_Le        = text "<="
+pprMachOp_for_C MO_Dbl_Gt        = text ">"
+pprMachOp_for_C MO_Dbl_Lt        = text "<"
+
+pprMachOp_for_C MO_Dbl_Add       = text "+"
+pprMachOp_for_C MO_Dbl_Sub       = text "-"
+pprMachOp_for_C MO_Dbl_Mul       = text "*"
+pprMachOp_for_C MO_Dbl_Div       = text "/"
+pprMachOp_for_C MO_Dbl_Pwr       = text "pow"
+
+pprMachOp_for_C MO_Dbl_Sin       = text "sin"
+pprMachOp_for_C MO_Dbl_Cos       = text "cos"
+pprMachOp_for_C MO_Dbl_Tan       = text "tan"
+pprMachOp_for_C MO_Dbl_Sinh      = text "sinh"
+pprMachOp_for_C MO_Dbl_Cosh      = text "cosh"
+pprMachOp_for_C MO_Dbl_Tanh      = text "tanh"
+pprMachOp_for_C MO_Dbl_Asin      = text "asin"
+pprMachOp_for_C MO_Dbl_Acos      = text "acos"
+pprMachOp_for_C MO_Dbl_Atan      = text "atan"
+pprMachOp_for_C MO_Dbl_Log       = text "log"
+pprMachOp_for_C MO_Dbl_Exp       = text "exp"
+pprMachOp_for_C MO_Dbl_Sqrt      = text "sqrt"
+pprMachOp_for_C MO_Dbl_Neg       = text "-"
+
+pprMachOp_for_C MO_Flt_Add       = text "+"
+pprMachOp_for_C MO_Flt_Sub       = text "-"
+pprMachOp_for_C MO_Flt_Mul       = text "*"
+pprMachOp_for_C MO_Flt_Div       = text "/"
+pprMachOp_for_C MO_Flt_Pwr       = text "pow"
+
+pprMachOp_for_C MO_Flt_Eq        = text "=="
+pprMachOp_for_C MO_Flt_Ne        = text "!="
+pprMachOp_for_C MO_Flt_Ge        = text ">="
+pprMachOp_for_C MO_Flt_Le        = text "<="
+pprMachOp_for_C MO_Flt_Gt        = text ">"
+pprMachOp_for_C MO_Flt_Lt        = text "<"
+
+pprMachOp_for_C MO_Flt_Sin       = text "sin"
+pprMachOp_for_C MO_Flt_Cos       = text "cos"
+pprMachOp_for_C MO_Flt_Tan       = text "tan"
+pprMachOp_for_C MO_Flt_Sinh      = text "sinh"
+pprMachOp_for_C MO_Flt_Cosh      = text "cosh"
+pprMachOp_for_C MO_Flt_Tanh      = text "tanh"
+pprMachOp_for_C MO_Flt_Asin      = text "asin"
+pprMachOp_for_C MO_Flt_Acos      = text "acos"
+pprMachOp_for_C MO_Flt_Atan      = text "atan"
+pprMachOp_for_C MO_Flt_Log       = text "log"
+pprMachOp_for_C MO_Flt_Exp       = text "exp"
+pprMachOp_for_C MO_Flt_Sqrt      = text "sqrt"
+pprMachOp_for_C MO_Flt_Neg       = text "-"
+
+pprMachOp_for_C MO_32U_to_NatS   = text "(StgInt)"
+pprMachOp_for_C MO_NatS_to_32U   = text "(StgWord32)"
+
+pprMachOp_for_C MO_NatS_to_Dbl   = text "(StgDouble)"
+pprMachOp_for_C MO_Dbl_to_NatS   = text "(StgInt)"
+
+pprMachOp_for_C MO_NatS_to_Flt   = text "(StgFloat)"
+pprMachOp_for_C MO_Flt_to_NatS   = text "(StgInt)"
+
+pprMachOp_for_C MO_NatS_to_NatU  = text "(StgWord)"
+pprMachOp_for_C MO_NatU_to_NatS  = text "(StgInt)"
+
+pprMachOp_for_C MO_NatS_to_NatP  = text "(void*)"
+pprMachOp_for_C MO_NatP_to_NatS  = text "(StgInt)"
+pprMachOp_for_C MO_NatU_to_NatP  = text "(void*)"
+pprMachOp_for_C MO_NatP_to_NatU  = text "(StgWord)"
+
+pprMachOp_for_C MO_Dbl_to_Flt    = text "(StgFloat)"
+pprMachOp_for_C MO_Flt_to_Dbl    = text "(StgDouble)"
+
+pprMachOp_for_C MO_8S_to_NatS    = text "(StgInt8)(StgInt)"
+pprMachOp_for_C MO_16S_to_NatS   = text "(StgInt16)(StgInt)"
+pprMachOp_for_C MO_32S_to_NatS   = text "(StgInt32)(StgInt)"
+
+pprMachOp_for_C MO_8U_to_NatU    = text "(StgWord8)(StgWord)"
+pprMachOp_for_C MO_16U_to_NatU   = text "(StgWord16)(StgWord)"
+pprMachOp_for_C MO_32U_to_NatU   = text "(StgWord32)(StgWord)"
+
+pprMachOp_for_C (MO_ReadOSBI _ _)  = panic "pprMachOp_for_C:MO_ReadOSBI"
+pprMachOp_for_C (MO_WriteOSBI _ _) = panic "pprMachOp_for_C:MO_WriteOSBI"
+
+
+-- Helper for printing array expressions.
+ppr_array_expression offw scaleRep baseAmode indexAmode
+   -- create:
+   -- * (scaleRep*) (
+   --      ((char*)baseAmode) + offw*bytes_per_word + indexAmode*bytes_per_scaleRep
+   --   )
+   = let offb  = parens (int offw <> char '*' <> int wORD_SIZE)
+         indb  = parens (parens (pprAmode indexAmode) 
+                         <> char '*' <> int (getPrimRepArrayElemSize scaleRep))
+         baseb = text "(char*)" <> parens (pprAmode baseAmode)
+         addr  = parens baseb <+> char '+' <+> offb <+> char '+' <+> indb
+     in
+         char '*' <> parens (ppr scaleRep <> char '*') <> parens addr
+
+
 ppLocalness lbl
   = if (externallyVisibleCLabel lbl) 
 		then empty 
@@ -626,6 +838,15 @@ non_void amode
 \end{code}
 
 \begin{code}
+ppr_maybe_vol_regs :: Maybe [MagicId] -> (SDoc, SDoc)
+ppr_maybe_vol_regs Nothing
+   = (empty, empty)
+ppr_maybe_vol_regs (Just vrs)
+   = case ppr_vol_regs vrs of
+        (saves, restores) 
+           -> (pp_basic_saves $$ saves,
+               pp_basic_restores $$ restores)
+
 ppr_vol_regs :: [MagicId] -> (SDoc, SDoc)
 
 ppr_vol_regs [] = (empty, empty)
@@ -677,33 +898,27 @@ if_profiling pretty
 -- ---------------------------------------------------------------------------
 
 do_if_stmt discrim tag alt_code deflt c
-  = case tag of
-      -- This special case happens when testing the result of a comparison.
-      -- We can just avoid some redundant clutter in the output.
-      MachInt n | n==0 -> ppr_if_stmt (pprAmode discrim)
-				      deflt alt_code
-				      (addrModeCosts discrim Rhs) c
-      other            -> let
-			       cond = hcat [ pprAmode discrim
-					   , ptext SLIT(" == ")
-					   , tcast
-					   , pprAmode (CLit tag)
-					   ]
-				-- to be absolutely sure that none of the 
-				-- conversion rules hit, e.g.,
-				--
-				--     minInt is different to (int)minInt
-			        --
-				-- in C (when minInt is a number not a constant
-				--  expression which evaluates to it.)
-				-- 
-			       tcast = case other of
-					   MachInt _  -> ptext SLIT("(I_)")
-					   _ 	      -> empty
-			    in
-			    ppr_if_stmt cond
-					 alt_code deflt
-					 (addrModeCosts discrim Rhs) c
+   = let
+       cond = hcat [ pprAmode discrim
+		   , ptext SLIT(" == ")
+		   , tcast
+		   , pprAmode (CLit tag)
+		   ]
+	-- to be absolutely sure that none of the 
+	-- conversion rules hit, e.g.,
+	--
+	--     minInt is different to (int)minInt
+        --
+	-- in C (when minInt is a number not a constant
+	--  expression which evaluates to it.)
+	-- 
+       tcast = case tag of
+		   MachInt _  -> ptext SLIT("(I_)")
+		   _ 	      -> empty
+     in
+     ppr_if_stmt cond
+		 alt_code deflt
+		 (addrModeCosts discrim Rhs) c
 
 ppr_if_stmt pp_pred then_part else_part discrim_costs c
   = vcat [
@@ -1093,6 +1308,10 @@ That is, the indexing is done in units of kind1, but the resulting
 amode has kind2.
 
 \begin{code}
+ppr_amode (CMem rep addr)
+  = let txt_rep = pprPrimKind rep
+    in  hcat [ char '*', parens (txt_rep <> char '*'), parens (ppr_amode addr) ]
+
 ppr_amode (CVal reg_rel@(CIndex _ _ _) kind)
   = case (pprRegRelative False{-no sign wanted-} reg_rel) of
 	(pp_reg, Nothing)     -> panic "ppr_amode: CIndex"
@@ -1175,6 +1394,9 @@ cCheckMacroText	HP_CHK_D1		= SLIT("HP_CHK_D1")
 cCheckMacroText	HP_CHK_L1		= SLIT("HP_CHK_L1")
 cCheckMacroText	HP_CHK_UT_ALT		= SLIT("HP_CHK_UT_ALT")
 cCheckMacroText	HP_CHK_GEN		= SLIT("HP_CHK_GEN")
+\end{code}
+
+\begin{code}
 \end{code}
 
 %************************************************************************
@@ -1493,8 +1715,14 @@ ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre _)
   where
     info_lbl = infoTableLabelFromCI cl_info
 
+ppr_decls_AbsC (CMachOpStmt res	_ args _) = ppr_decls_Amodes (maybe012ToList res ++ args)
 ppr_decls_AbsC (COpStmt	results	_ args _) = ppr_decls_Amodes (results ++ args)
+
 ppr_decls_AbsC (CSimultaneous abc)  	  = ppr_decls_AbsC abc
+
+ppr_decls_AbsC (CSequential abcs) 
+  = mapTE ppr_decls_AbsC abcs	`thenTE` \ t_and_e_s ->
+    returnTE (maybe_vcat t_and_e_s)
 
 ppr_decls_AbsC (CCheck  	    _ amodes code) = 
      ppr_decls_Amodes amodes `thenTE` \p1 ->

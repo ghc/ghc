@@ -42,21 +42,24 @@ import AbsCSyn		( MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel, isAsmTemp )
 import Literal		( mkMachInt, Literal(..) )
-import MachRegs		( stgReg, callerSaves, RegLoc(..),
-			  Imm(..), Reg(..), 
-			  MachRegsAddr(..)
+import MachRegs		( callerSaves,
+                          get_MagicId_addr, get_MagicId_reg_or_addr,
+			  Imm(..), Reg(..), MachRegsAddr(..)
 #                         if sparc_TARGET_ARCH
                           ,fp, sp
 #                         endif
 			)
 import PrimRep		( PrimRep(..) )
-import Stix		( StixTree(..), StixReg(..), CodeSegment, DestInfo(..) )
+import Stix		( StixStmt(..), StixExpr(..), StixReg(..), 
+                          CodeSegment, DestInfo(..) )
 import Panic		( panic )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
 import Outputable	( pprPanic, ppr, showSDoc )
 import IOExts		( trace )
 import Config           ( cLeadingUnderscore )
 import FastTypes
+
+import Maybe		( catMaybes )
 \end{code}
 
 \begin{code}
@@ -110,30 +113,45 @@ constants.
 (@volatileRestores@ used only for wrapper-hungry PrimOps.)
 
 \begin{code}
-volatileSaves, volatileRestores :: [MagicId] -> [StixTree]
+volatileSaves, volatileRestores :: [MagicId] -> [StixStmt]
+
+volatileSaves    = volatileSavesOrRestores True
+volatileRestores = volatileSavesOrRestores False
 
 save_cands    = [BaseReg,Sp,Su,SpLim,Hp,HpLim]
 restore_cands = save_cands
 
-volatileSaves vols
-  = map save ((filter callerSaves) (save_cands ++ vols))
-  where
-    save x = StAssign (magicIdPrimRep x) loc reg
-      where
-	reg = StReg (StixMagicId x)
-	loc = case stgReg x of
-		Save loc -> loc
-		Always _ -> panic "volatileSaves"
-
-volatileRestores vols
-  = map restore ((filter callerSaves) (restore_cands ++ vols))
-  where
-    restore x = StAssign (magicIdPrimRep x) reg loc
-      where
-	reg = StReg (StixMagicId x)
-	loc = case stgReg x of
-		Save loc -> loc
-		Always _ -> panic "volatileRestores"
+volatileSavesOrRestores do_saves vols
+   = catMaybes (map mkCode vols)
+     where
+        mkCode mid
+           | not (callerSaves mid)
+           = Nothing
+           | otherwise	-- must be callee-saves ...
+           = case get_MagicId_reg_or_addr mid of
+                -- If stored in BaseReg, we ain't interested
+                Right baseRegAddr 
+                   -> Nothing
+                Left (RealReg rrno)
+                   -- OK, it's callee-saves, and in a real reg (rrno).
+                   -- We have to cook up some transfer code.
+                   {- Note that the use of (StixMagicId mid) here is a bit subtle.  
+                      Here, we only create those for MagicIds which are stored in 
+                      a real reg on this arch -- the preceding case on the result 
+                      of get_MagicId_reg_or_addr guarantees this.  Later, when 
+                      selecting insns, that means these assignments are sure to turn 
+                      into real reg-to-mem or mem-to-reg moves, rather than being 
+                      pointless moves from some address in the reg-table 
+                      back to itself.-}
+                   |  do_saves
+                   -> Just (StAssignMem rep addr 
+                                            (StReg (StixMagicId mid)))
+                   |  otherwise
+                   -> Just (StAssignReg rep (StixMagicId mid)
+                                            (StInd rep addr))
+                      where
+                         rep  = magicIdPrimRep mid
+                         addr = get_MagicId_addr mid
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -206,6 +224,8 @@ data Cond
   | NE
   | NEG
   | POS
+  | CARRY
+  | OFLO
 #endif
 #if sparc_TARGET_ARCH
   = ALWAYS	-- What's really used? ToDo
@@ -291,6 +311,7 @@ primRepToSize WeakPtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W
 primRepToSize ForeignObjRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize BCORep        = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize StablePtrRep  = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
+primRepToSize StableNameRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize ThreadIdRep   = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 
 primRepToSize Word64Rep     = primRepToSize_fail "Word64Rep"
@@ -476,14 +497,17 @@ but we don't care, since it doesn't get used much.  We hope.
 
 	      | ADD	      Size Operand Operand
 	      | SUB	      Size Operand Operand
-	      | IMUL	      Size Operand Operand
+	      | IMUL	      Size Operand Operand	-- signed int mul
+	      | MUL	      Size Operand Operand	-- unsigned int mul
 
 -- Quotient and remainder.  SEE comment above -- these are not
 -- real x86 insns; instead they are expanded when printed
 -- into a sequence of real insns.
 
-              | IQUOT         Size Operand Operand
-              | IREM          Size Operand Operand
+              | IQUOT         Size Operand Operand	-- signed quotient
+              | IREM          Size Operand Operand	-- signed remainder
+              | QUOT          Size Operand Operand	-- unsigned quotient
+              | REM           Size Operand Operand	-- unsigned remainder
 
 -- Simple bit-twiddling.
 
@@ -513,10 +537,7 @@ but we don't care, since it doesn't get used much.  We hope.
               | GLDZ          Reg -- dst(fpreg)
               | GLD1          Reg -- dst(fpreg)
 
-    	      | GFTOD	      Reg Reg -- src(fpreg), dst(fpreg)
               | GFTOI         Reg Reg -- src(fpreg), dst(intreg)
-
-    	      | GDTOF	      Reg Reg -- src(fpreg), dst(fpreg)
               | GDTOI         Reg Reg -- src(fpreg), dst(intreg)
 
               | GITOF         Reg Reg -- src(intreg), dst(fpreg)
@@ -592,8 +613,7 @@ is_G_instr instr
    = case instr of
         GMOV _ _ -> True; GLD _ _ _ -> True; GST _ _ _ -> True;
         GLDZ _ -> True; GLD1 _ -> True;
-        GFTOD _ _ -> True; GFTOI _ _ -> True;
-        GDTOF _ _ -> True; GDTOI _ _ -> True;
+        GFTOI _ _ -> True; GDTOI _ _ -> True;
         GITOF _ _ -> True; GITOD _ _ -> True;
 	GADD _ _ _ _ -> True; GDIV _ _ _ _ -> True
 	GSUB _ _ _ _ -> True; GMUL _ _ _ _ -> True

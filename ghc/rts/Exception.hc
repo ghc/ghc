@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.22 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Exception.hc,v 1.23 2001/12/05 17:35:15 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -211,6 +211,17 @@ FN_(killThreadzh_fast)
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
+
+
+FN_(myThreadIdzh_fast)
+{
+  /* no args. */
+  FB_
+  R1.p = (P_)CurrentTSO;
+  JMP_(ENTRY_CODE(Sp[0]));
+  FE_
+}
+
 
 /* -----------------------------------------------------------------------------
    Catch frames

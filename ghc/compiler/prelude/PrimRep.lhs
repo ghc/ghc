@@ -17,6 +17,7 @@ module PrimRep
       , is64BitRep
       , getPrimRepSize
       , getPrimRepSizeInBytes
+      , getPrimRepArrayElemSize
       , retPrimRepSize
       ) where
 
@@ -193,7 +194,32 @@ getPrimRepSizeInBytes StablePtrRep  = wORD_SIZE
 getPrimRepSizeInBytes StableNameRep = wORD_SIZE
 getPrimRepSizeInBytes ArrayRep      = wORD_SIZE
 getPrimRepSizeInBytes ByteArrayRep  = wORD_SIZE
-getPrimRepSizeInBytes _             = panic "getPrimRepSize: ouch - this wasn't supposed to happen!"
+getPrimRepSizeInBytes other         = pprPanic "getPrimRepSizeInBytes" (ppr other)
+
+
+-- Sizes in bytes of things when they are array elements,
+-- so that we can generate the correct indexing code
+-- inside the compiler.  This is not the same as the above
+-- getPrimRepSizeInBytes, the rationale behind which is
+-- unclear to me.
+getPrimRepArrayElemSize :: PrimRep -> Int
+getPrimRepArrayElemSize PtrRep        = wORD_SIZE
+getPrimRepArrayElemSize IntRep        = wORD_SIZE
+getPrimRepArrayElemSize WordRep       = wORD_SIZE
+getPrimRepArrayElemSize AddrRep       = wORD_SIZE
+getPrimRepArrayElemSize StablePtrRep  = wORD_SIZE
+getPrimRepArrayElemSize ForeignObjRep = wORD_SIZE
+getPrimRepArrayElemSize Word8Rep      = 1
+getPrimRepArrayElemSize Word16Rep     = 2
+getPrimRepArrayElemSize Word32Rep     = 4
+getPrimRepArrayElemSize Word64Rep     = 8
+getPrimRepArrayElemSize Int8Rep       = 1
+getPrimRepArrayElemSize Int16Rep      = 2
+getPrimRepArrayElemSize Int32Rep      = 4
+getPrimRepArrayElemSize Int64Rep      = 8
+getPrimRepArrayElemSize FloatRep      = 4
+getPrimRepArrayElemSize DoubleRep     = 8
+getPrimRepArrayElemSize other         = pprPanic "getPrimRepSizeArrayElemSize" (ppr other)
 
 \end{code}
 

@@ -20,7 +20,6 @@ module MachRegs (
 
 	Imm(..),
 	MachRegsAddr(..),
-	RegLoc(..),
 
 	addrOffset,
 	baseRegOffset,
@@ -28,11 +27,10 @@ module MachRegs (
 	freeReg,
 	getNewRegNCG,
 	mkVReg,
-	magicIdRegMaybe,
-	saveLoc,
+        get_MagicId_reg_or_addr,
+        get_MagicId_addr,
+        get_Regtable_addr_from_offset,
 	spRel,
-	stgReg,
-	regTableEntry,
 	strImmLit
 
 #if alpha_TARGET_ARCH
@@ -56,11 +54,10 @@ module MachRegs (
 #include "HsVersions.h"
 
 import AbsCSyn		( MagicId(..) )
-import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel, mkMainRegTableLabel )
-import PrimOp		( PrimOp(..) )
+import MachOp		( MachOp(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
-import Stix		( StixTree(..), StixReg(..),
+import Stix		( StixExpr(..), StixReg(..),
                           getUniqueNat, returnNat, thenNat, NatM )
 import Unique		( mkPseudoUnique2, Uniquable(..), Unique )
 import Pretty
@@ -171,42 +168,34 @@ largeOffsetError i
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-@stgReg@: we map STG registers onto appropriate Stix Trees.  First, we
-handle the two constants, @STK_STUB_closure@ and @vtbl_StdUpdFrame@.
-The rest are either in real machine registers or stored as offsets
-from BaseReg.
+@stgReg@: we map STG registers onto appropriate Stix Trees.  Either
+they map to real machine registers or stored as offsets from BaseReg.
+Given a MagicId, get_MagicId_reg_or_addr produces either the real
+register it is in, on this platform, or a StixExpr denoting the
+address in the register table holding it.  get_MagicId_addr always
+produces the register table address for it.
 
 \begin{code}
-data RegLoc = Save StixTree | Always StixTree
-\end{code}
+get_MagicId_reg_or_addr       :: MagicId -> Either Reg StixExpr
+get_MagicId_addr              :: MagicId -> StixExpr
+get_Regtable_addr_from_offset :: Int -> StixExpr
 
-Trees for register save locations:
-\begin{code}
-saveLoc :: MagicId -> StixTree
-saveLoc reg = case (stgReg reg) of {Always loc -> loc; Save loc -> loc}
-\end{code}
+get_MagicId_reg_or_addr mid
+   = case magicIdRegMaybe mid of
+        Just rr -> Left rr
+        Nothing -> Right (get_MagicId_addr mid)
 
-\begin{code}
-stgReg :: MagicId -> RegLoc
-stgReg BaseReg
- = case magicIdRegMaybe BaseReg of
-	Nothing -> Always (StCLbl mkMainRegTableLabel)
-	Just _  -> Save   (StCLbl mkMainRegTableLabel)
-stgReg x
-  = case magicIdRegMaybe x of
-	Just _  -> Save   stix
-	Nothing -> Always stix
-  where
-    stix   = regTableEntry (magicIdPrimRep x) (baseRegOffset x)
+get_MagicId_addr BaseReg
+   = panic "MachRegs.get_MagicId_addr of BaseReg"
+get_MagicId_addr mid
+   = get_Regtable_addr_from_offset (baseRegOffset mid)
 
-regTableEntry :: PrimRep -> Int -> StixTree
-regTableEntry rep offset 
-  = StInd rep (StPrim IntAddOp 
-		   [baseLoc, StInt (toInteger (offset*BYTES_PER_WORD))])
-  where
-    baseLoc = case (magicIdRegMaybe BaseReg) of
-      Just _  -> StReg (StixMagicId BaseReg)
-      Nothing -> StCLbl mkMainRegTableLabel
+get_Regtable_addr_from_offset offset_in_words
+   = case magicIdRegMaybe BaseReg of
+        Nothing -> panic "MachRegs.get_Regtable_addr_from_offset: BaseReg not in a reg"
+        Just rr -> StMachOp MO_Nat_Add 
+                            [StReg (StixMagicId BaseReg),
+                             StInt (toInteger (offset_in_words*BYTES_PER_WORD))]
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

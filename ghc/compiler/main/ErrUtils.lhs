@@ -29,7 +29,7 @@ import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt )
 
 import List             ( replicate )
 import System		( ExitCode(..), exitWith )
-import IO		( hPutStr, hPutStrLn, stderr )
+import IO		( hPutStr, hPutStrLn, stderr, stdout )
 \end{code}
 
 \begin{code}
@@ -146,8 +146,12 @@ dumpIfSet_core dflags flag hdr doc
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
-  | dopt flag dflags || verbosity dflags >= 4 = printDump (dump hdr doc)
-  | otherwise                                 = return ()
+  | dopt flag dflags || verbosity dflags >= 4 
+  = if   flag `elem` [Opt_D_dump_stix, Opt_D_dump_asm]
+    then printForC stdout (dump hdr doc)
+    else printDump (dump hdr doc)
+  | otherwise
+  = return ()
 
 dumpIfSet_dyn_or :: DynFlags -> [DynFlag] -> String -> SDoc -> IO ()
 dumpIfSet_dyn_or dflags flags hdr doc

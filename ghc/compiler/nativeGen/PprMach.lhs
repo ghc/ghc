@@ -249,6 +249,7 @@ pprCond c = ptext (case c of {
 	LTT	-> SLIT("l");	LE    -> SLIT("le");
 	LEU	-> SLIT("be");	NE    -> SLIT("ne");
 	NEG	-> SLIT("s");	POS   -> SLIT("ns");
+        CARRY   -> SLIT("c");   OFLO  -> SLIT("o");
 	ALWAYS	-> SLIT("mp")	-- hack
 #endif
 #if sparc_TARGET_ARCH
@@ -939,6 +940,15 @@ pprInstr (ADD size src dst)
 pprInstr (SUB size src dst) = pprSizeOpOp SLIT("sub") size src dst
 pprInstr (IMUL size op1 op2) = pprSizeOpOp SLIT("imul") size op1 op2
 
+{- A hack.  The Intel documentation says that "The two and three
+   operand forms [of IMUL] may also be used with unsigned operands
+   because the lower half of the product is the same regardless if
+   (sic) the operands are signed or unsigned.  The CF and OF flags,
+   however, cannot be used to determine if the upper half of the
+   result is non-zero."  So there.  
+-} 
+pprInstr (MUL size op1 op2) = pprSizeOpOp SLIT("imul") size op1 op2
+
 pprInstr (AND size src dst) = pprSizeOpOp SLIT("and") size src dst
 pprInstr (OR  size src dst) = pprSizeOpOp SLIT("or")  size src dst
 pprInstr (XOR size src dst) = pprSizeOpOp SLIT("xor")  size src dst
@@ -968,8 +978,12 @@ pprInstr (JMP dsts (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
 pprInstr (JMP dsts op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
 pprInstr (CALL imm)             = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
 
-pprInstr (IQUOT sz src dst) = pprInstr_quotRem True sz src dst
-pprInstr (IREM  sz src dst) = pprInstr_quotRem False sz src dst
+-- First bool indicates signedness; second whether quot or rem
+pprInstr (IQUOT sz src dst) = pprInstr_quotRem True True sz src dst
+pprInstr (IREM  sz src dst) = pprInstr_quotRem True False sz src dst
+
+pprInstr (QUOT sz src dst) = pprInstr_quotRem False True sz src dst
+pprInstr (REM  sz src dst) = pprInstr_quotRem False False sz src dst
 
 -- Simulating a flat register set on the x86 FP stack is tricky.
 -- you have to free %st(7) before pushing anything on the FP reg stack
@@ -995,15 +1009,12 @@ pprInstr g@(GLDZ dst)
 pprInstr g@(GLD1 dst)
  = pprG g (hcat [gtab, text "ffree %st(7) ; fld1 ; ", gpop dst 1])
 
-pprInstr g@(GFTOD src dst) 
-   = pprG g bogus
 pprInstr g@(GFTOI src dst) 
-   = pprG g bogus
-
-pprInstr g@(GDTOF src dst) 
-   = pprG g bogus
+   = pprInstr (GDTOI src dst)
 pprInstr g@(GDTOI src dst) 
-   = pprG g bogus
+   = pprG g (hcat [gtab, text "subl $4, %esp ; ", 
+                   gpush src 0, gsemi, text "fistpl 0(%esp) ; popl ", 
+                   pprReg L dst])
 
 pprInstr g@(GITOF src dst) 
    = pprInstr (GITOD src dst)
@@ -1108,7 +1119,7 @@ pprInstr GFREE
           ]
 
 
-pprInstr_quotRem isQuot sz src dst
+pprInstr_quotRem signed isQuot sz src dst
    | case sz of L -> False; _ -> True
    = panic "pprInstr_quotRem: dunno how to do non-32bit operands"
    | otherwise
@@ -1116,20 +1127,23 @@ pprInstr_quotRem isQuot sz src dst
      (text "\t# BEGIN " <> fakeInsn),
      (text "\tpushl $0;  pushl %eax;  pushl %edx;  pushl " <> pprOperand sz src),
      (text "\tmovl " <> pprOperand sz dst <> text ",%eax;  xorl %edx,%edx;  cltd"),
-     (text "\tdivl 0(%esp);  movl " <> text resReg <> text ",12(%esp)"),
+     (x86op <> text " 0(%esp);  movl " <> text resReg <> text ",12(%esp)"),
      (text "\tpopl %edx;  popl %edx;  popl %eax;  popl " <> pprOperand sz dst),
      (text "\t# END   " <> fakeInsn)
      ]
      where
+        x86op = if signed then text "\tidivl" else text "\tdivl"
         resReg = if isQuot then "%eax" else "%edx"
-        opStr  = if isQuot then "IQUOT" else "IREM"
-        fakeInsn = text opStr <+> pprOperand sz src <> char ',' <+> pprOperand sz dst
+        opStr  | signed     = if isQuot then "IQUOT" else "IREM"
+               | not signed = if isQuot then "QUOT"  else "REM"
+        fakeInsn = text opStr <+> pprOperand sz src 
+                              <> char ',' <+> pprOperand sz dst
 
 --------------------------
 
 -- coerce %st(0) to the specified size
 gcoerceto DF = empty
-gcoerceto  F = text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ; "
+gcoerceto  F = empty --text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ; "
 
 gpush reg offset
    = hcat [text "ffree %st(7) ; fld ", greg reg offset]
@@ -1157,10 +1171,7 @@ pprGInstr (GST sz src dst) = pprSizeRegAddr SLIT("gst") sz src dst
 pprGInstr (GLDZ dst) = pprSizeReg SLIT("gldz") DF dst
 pprGInstr (GLD1 dst) = pprSizeReg SLIT("gld1") DF dst
 
-pprGInstr (GFTOD src dst) = pprSizeSizeRegReg SLIT("gftod") F DF src dst
 pprGInstr (GFTOI src dst) = pprSizeSizeRegReg SLIT("gftoi") F L  src dst
-
-pprGInstr (GDTOF src dst) = pprSizeSizeRegReg SLIT("gdtof") DF F src dst
 pprGInstr (GDTOI src dst) = pprSizeSizeRegReg SLIT("gdtoi") DF L src dst
 
 pprGInstr (GITOF src dst) = pprSizeSizeRegReg SLIT("gitof") L F  src dst

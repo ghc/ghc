@@ -17,13 +17,14 @@ import PprMach
 
 import AbsCStixGen	( genCodeAbstractC )
 import AbsCSyn		( AbstractC )
-import AbsCUtils	( mkAbsCStmtList )
+import AbsCUtils	( mkAbsCStmtList, magicIdPrimRep )
 import AsmRegAlloc	( runRegAllocate )
-import PrimOp		( commutableOp, PrimOp(..) )
+import MachOp		( MachOp(..), isCommutableMachOp, isComparisonMachOp )
 import RegAllocInfo	( findReservedRegs )
-import Stix		( StixTree(..), StixReg(..), 
-                          pprStixTrees, pprStixTree, 
-                          stixCountTempUses, stixSubst,
+import Stix		( StixReg(..), StixStmt(..), StixExpr(..), StixVReg(..),
+                          pprStixStmts, pprStixStmt, 
+                          stixStmt_CountTempUses, stixStmt_Subst,
+                          liftStrings,
                           initNat, mapNat,
                           mkNatM_State,
                           uniqOfNatM_State, deltaOfNatM_State )
@@ -95,12 +96,16 @@ nativeCodeGen absC us
          insn_sdoc         = my_vcat insn_sdocs
          stix_sdoc         = vcat stix_sdocs
 
-#        ifdef NCG_DEBUG
+#        ifdef NCG_DEBUG */
          my_trace m x = trace m x
-         my_vcat sds = vcat (intersperse (char ' ' 
-                                          $$ ptext SLIT("# ___ncg_debug_marker")
-                                          $$ char ' ') 
-                                          sds)
+         my_vcat sds = Pretty.vcat (
+                          intersperse (
+                             Pretty.char ' ' 
+                                Pretty.$$ Pretty.ptext SLIT("# ___ncg_debug_marker")
+                                Pretty.$$ Pretty.char ' '
+                          ) 
+                          sds
+                       )
 #        else
          my_vcat sds = Pretty.vcat sds
          my_trace m x = x
@@ -114,11 +119,12 @@ absCtoNat :: AbstractC -> UniqSM (SDoc, Pretty.Doc)
 absCtoNat absC
    = _scc_ "genCodeAbstractC" genCodeAbstractC absC        `thenUs` \ stixRaw ->
      _scc_ "genericOpt"       genericOpt stixRaw           `bind`   \ stixOpt ->
-     _scc_ "genMachCode"      genMachCode stixOpt          `thenUs` \ pre_regalloc ->
+     _scc_ "liftStrings"      liftStrings stixOpt          `thenUs` \ stixLifted ->
+     _scc_ "genMachCode"      genMachCode stixLifted       `thenUs` \ pre_regalloc ->
      _scc_ "regAlloc"         regAlloc pre_regalloc        `bind`   \ almost_final ->
      _scc_ "x86fp_kludge"     x86fp_kludge almost_final    `bind`   \ final_mach_code ->
      _scc_ "vcat"     Pretty.vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
-     _scc_ "pprStixTrees"    pprStixTrees stixOpt          `bind`   \ stix_sdoc ->
+     _scc_ "pprStixTrees"     pprStixStmts stixOpt         `bind`   \ stix_sdoc ->
      returnUs (stix_sdoc, final_sdoc)
      where
         bind f x = x f
@@ -147,7 +153,7 @@ Switching between the two monads whilst carrying along the same Unique
 supply breaks abstraction.  Is that bad?
 
 \begin{code}
-genMachCode :: [StixTree] -> UniqSM InstrBlock
+genMachCode :: [StixStmt] -> UniqSM InstrBlock
 
 genMachCode stmts initial_us
   = let initial_st             = mkNatM_State initial_us 0
@@ -178,12 +184,12 @@ have introduced some new opportunities for constant-folding wrt
 address manipulations.
 
 \begin{code}
-genericOpt :: [StixTree] -> [StixTree]
-genericOpt = map stixConFold . stixPeep
+genericOpt :: [StixStmt] -> [StixStmt]
+genericOpt = map stixStmt_ConFold . stixPeep
 
 
 
-stixPeep :: [StixTree] -> [StixTree]
+stixPeep :: [StixStmt] -> [StixStmt]
 
 -- This transformation assumes that the temp assigned to in t1
 -- is not assigned to in t2; for otherwise the target of the
@@ -191,111 +197,120 @@ stixPeep :: [StixTree] -> [StixTree]
 -- code.  As far as I can see, StixTemps are only ever assigned
 -- to once.  It would be nice to be sure!
 
-stixPeep ( t1@(StAssign pka (StReg (StixTemp u pk)) rhs)
+stixPeep ( t1@(StAssignReg pka (StixTemp (StixVReg u pk)) rhs)
          : t2
          : ts )
-   | stixCountTempUses u t2 == 1
-     && sum (map (stixCountTempUses u) ts) == 0
+   | stixStmt_CountTempUses u t2 == 1
+     && sum (map (stixStmt_CountTempUses u) ts) == 0
    = 
 #    ifdef NCG_DEBUG
-     trace ("nativeGen: inlining " ++ showSDoc (pprStixTree rhs))
+     trace ("nativeGen: inlining " ++ showSDoc (pprStixExpr rhs))
 #    endif
-           (stixPeep (stixSubst u rhs t2 : ts))
+           (stixPeep (stixStmt_Subst u rhs t2 : ts))
 
 stixPeep (t1:t2:ts) = t1 : stixPeep (t2:ts)
 stixPeep [t1]       = [t1]
 stixPeep []         = []
-
--- disable stix inlining until we figure out how to fix the
--- latent bugs in the register allocator which are exposed by
--- the inliner.
---stixPeep = id
 \end{code}
 
 For most nodes, just optimize the children.
 
 \begin{code}
-stixConFold :: StixTree -> StixTree
+stixExpr_ConFold :: StixExpr -> StixExpr
+stixStmt_ConFold :: StixStmt -> StixStmt
 
-stixConFold (StInd pk addr) = StInd pk (stixConFold addr)
+stixStmt_ConFold stmt
+   = case stmt of
+        StAssignReg pk reg@(StixTemp _) src
+           -> StAssignReg pk reg (stixExpr_ConFold src)
+        StAssignReg pk reg@(StixMagicId mid) src
+           -- Replace register leaves with appropriate StixTrees for 
+           -- the given target.
+           -> case get_MagicId_reg_or_addr mid of
+                 Left  realreg 
+                    -> StAssignReg pk reg (stixExpr_ConFold src)
+                 Right baseRegAddr 
+                    -> stixStmt_ConFold
+                          (StAssignMem pk baseRegAddr src)
+        StAssignMem pk addr src
+           -> StAssignMem pk (stixExpr_ConFold addr) (stixExpr_ConFold src)
+        StAssignMachOp lhss mop args
+           -> StAssignMachOp lhss mop (map stixExpr_ConFold args)
+        StVoidable expr
+           -> StVoidable (stixExpr_ConFold expr)
+        StJump dsts addr
+           -> StJump dsts (stixExpr_ConFold addr)
+        StCondJump addr test
+           -> StCondJump addr (stixExpr_ConFold test)
+        StData pk datas
+           -> StData pk (map stixExpr_ConFold datas)
+        other
+           -> other
 
-stixConFold (StAssign pk dst src)
-  = StAssign pk (stixConFold dst) (stixConFold src)
 
-stixConFold (StJump dsts addr) = StJump dsts (stixConFold addr)
+stixExpr_ConFold expr
+   = case expr of
+        StInd pk addr
+           -> StInd pk (stixExpr_ConFold addr)
+        StCall fn cconv pk args
+           -> StCall fn cconv pk (map stixExpr_ConFold args)
+        StIndex pk (StIndex pk' base off) off'
+           -- Fold indices together when the types match:
+           |  pk == pk'
+           -> StIndex pk (stixExpr_ConFold base)
+                         (stixExpr_ConFold (StMachOp MO_Nat_Add [off, off']))
+        StIndex pk base off
+           -> StIndex pk (stixExpr_ConFold base) (stixExpr_ConFold off)
 
-stixConFold (StCondJump addr test)
-  = StCondJump addr (stixConFold test)
-
-stixConFold (StCall fn cconv pk args)
-  = StCall fn cconv pk (map stixConFold args)
-\end{code}
-
-Fold indices together when the types match:
-\begin{code}
-stixConFold (StIndex pk (StIndex pk' base off) off')
-  | pk == pk'
-  = StIndex pk (stixConFold base)
-    	       (stixConFold (StPrim IntAddOp [off, off']))
-
-stixConFold (StIndex pk base off)
-  = StIndex pk (stixConFold base) (stixConFold off)
-\end{code}
-
-For PrimOps, we first optimize the children, and then we try our hand
-at some constant-folding.
-
-\begin{code}
-stixConFold (StPrim op args) = stixPrimFold op (map stixConFold args)
-\end{code}
-
-Replace register leaves with appropriate StixTrees for the given
-target.
-
-\begin{code}
-stixConFold leaf@(StReg (StixMagicId id))
-  = case (stgReg id) of
-    	Always tree -> stixConFold tree
-    	Save _      -> leaf
-
-stixConFold other = other
+        StMachOp mop args
+           -- For PrimOps, we first optimize the children, and then we try 
+           -- our hand at some constant-folding.
+           -> stixMachOpFold mop (map stixExpr_ConFold args)
+        StReg (StixMagicId mid)
+           -- Replace register leaves with appropriate StixTrees for 
+           -- the given target.
+           -> case get_MagicId_reg_or_addr mid of
+                 Left  realreg -> expr
+                 Right baseRegAddr 
+                    -> stixExpr_ConFold (StInd (magicIdPrimRep mid) baseRegAddr)
+        other
+           -> other
 \end{code}
 
 Now, try to constant-fold the PrimOps.  The arguments have already
 been optimized and folded.
 
 \begin{code}
-stixPrimFold
-    :: PrimOp	    	-- The operation from an StPrim
-    -> [StixTree]   	-- The optimized arguments
-    -> StixTree
+stixMachOpFold
+    :: MachOp	    	-- The operation from an StMachOp
+    -> [StixExpr]   	-- The optimized arguments
+    -> StixExpr
 
-stixPrimFold op arg@[StInt x]
-  = case op of
-    	IntNegOp -> StInt (-x)
-    	_ -> StPrim op arg
+stixMachOpFold mop arg@[StInt x]
+  = case mop of
+    	MO_NatS_Neg -> StInt (-x)
+    	other       -> StMachOp mop arg
 
-stixPrimFold op args@[StInt x, StInt y]
-  = case op of
-    	CharGtOp -> StInt (if x > y  then 1 else 0)
-    	CharGeOp -> StInt (if x >= y then 1 else 0)
-    	CharEqOp -> StInt (if x == y then 1 else 0)
-    	CharNeOp -> StInt (if x /= y then 1 else 0)
-    	CharLtOp -> StInt (if x < y  then 1 else 0)
-    	CharLeOp -> StInt (if x <= y then 1 else 0)
-    	IntAddOp -> StInt (x + y)
-    	IntSubOp -> StInt (x - y)
-    	IntMulOp -> StInt (x * y)
-    	IntQuotOp -> StInt (x `quot` y)
-    	IntRemOp -> StInt (x `rem` y)
-    	IntGtOp -> StInt (if x > y  then 1 else 0)
-    	IntGeOp -> StInt (if x >= y then 1 else 0)
-    	IntEqOp -> StInt (if x == y then 1 else 0)
-    	IntNeOp -> StInt (if x /= y then 1 else 0)
-    	IntLtOp -> StInt (if x < y  then 1 else 0)
-    	IntLeOp -> StInt (if x <= y then 1 else 0)
-	-- ToDo: WordQuotOp, WordRemOp.
-    	_ -> StPrim op args
+stixMachOpFold mop args@[StInt x, StInt y]
+  = case mop of
+    	MO_32U_Gt   -> StInt (if x > y  then 1 else 0)
+    	MO_32U_Ge   -> StInt (if x >= y then 1 else 0)
+    	MO_32U_Eq   -> StInt (if x == y then 1 else 0)
+    	MO_32U_Ne   -> StInt (if x /= y then 1 else 0)
+    	MO_32U_Lt   -> StInt (if x < y  then 1 else 0)
+    	MO_32U_Le   -> StInt (if x <= y then 1 else 0)
+    	MO_Nat_Add  -> StInt (x + y)
+    	MO_Nat_Sub  -> StInt (x - y)
+    	MO_NatS_Mul -> StInt (x * y)
+    	MO_NatS_Quot | y /= 0 -> StInt (x `quot` y)
+    	MO_NatS_Rem  | y /= 0 -> StInt (x `rem` y)
+    	MO_NatS_Gt  -> StInt (if x > y  then 1 else 0)
+    	MO_NatS_Ge  -> StInt (if x >= y then 1 else 0)
+    	MO_Nat_Eq   -> StInt (if x == y then 1 else 0)
+    	MO_Nat_Ne   -> StInt (if x /= y then 1 else 0)
+    	MO_NatS_Lt  -> StInt (if x < y  then 1 else 0)
+    	MO_NatS_Le  -> StInt (if x <= y then 1 else 0)
+    	other       -> StMachOp mop args
 \end{code}
 
 When possible, shift the constants to the right-hand side, so that we
@@ -304,68 +319,65 @@ also assume that constants have been shifted to the right when
 possible.
 
 \begin{code}
-stixPrimFold op [x@(StInt _), y] | commutableOp op = stixPrimFold op [y, x]
+stixMachOpFold op [x@(StInt _), y] | isCommutableMachOp op 
+   = stixMachOpFold op [y, x]
 \end{code}
 
 We can often do something with constants of 0 and 1 ...
 
 \begin{code}
-stixPrimFold op args@[x, y@(StInt 0)]
-  = case op of
-    	IntAddOp -> x
-    	IntSubOp -> x
-    	IntMulOp -> y
-    	AndOp  	 -> y
-    	OrOp   	 -> x
-    	XorOp  	 -> x
-    	SllOp  	 -> x
-    	SrlOp  	 -> x
-    	ISllOp 	 -> x
-    	ISraOp 	 -> x
-    	ISrlOp 	 -> x
-        IntNeOp  | is_comparison -> x
-    	_	 -> StPrim op args
+stixMachOpFold mop args@[x, y@(StInt 0)]
+  = case mop of
+    	MO_Nat_Add  -> x
+    	MO_Nat_Sub  -> x
+    	MO_NatS_Mul -> y
+    	MO_NatU_Mul -> y
+    	MO_Nat_And  -> y
+    	MO_Nat_Or   -> x
+    	MO_Nat_Xor  -> x
+    	MO_Nat_Shl  -> x
+    	MO_Nat_Shr  -> x
+    	MO_Nat_Sar  -> x
+        MO_Nat_Ne | x_is_comparison -> x
+    	other       -> StMachOp mop args
     where
-       is_comparison
+       x_is_comparison
           = case x of
-               StPrim opp [_, _] -> opp `elem` comparison_ops
-               _                 -> False
+               StMachOp mopp [_, _] -> isComparisonMachOp mopp
+               _                    -> False
 
-stixPrimFold op args@[x, y@(StInt 1)]
-  = case op of
-    	IntMulOp  -> x
-    	IntQuotOp -> x
-    	IntRemOp  -> StInt 0
-    	_	  -> StPrim op args
+stixMachOpFold mop args@[x, y@(StInt 1)]
+  = case mop of
+    	MO_NatS_Mul  -> x
+    	MO_NatU_Mul  -> x
+    	MO_NatS_Quot -> x
+    	MO_NatU_Quot -> x
+    	MO_NatS_Rem  -> StInt 0
+    	MO_NatU_Rem  -> StInt 0
+    	other        -> StMachOp mop args
 \end{code}
 
 Now look for multiplication/division by powers of 2 (integers).
 
 \begin{code}
-stixPrimFold op args@[x, y@(StInt n)]
-  = case op of
-    	IntMulOp -> case exactLog2 n of
-	    Nothing -> StPrim op args
-    	    Just p  -> StPrim ISllOp [x, StInt p]
-    	IntQuotOp -> case exactLog2 n of
-	    Nothing -> StPrim op args
-    	    Just p  -> StPrim ISrlOp [x, StInt p]
-    	_ -> StPrim op args
+stixMachOpFold mop args@[x, y@(StInt n)]
+  = case mop of
+    	MO_NatS_Mul 
+           -> case exactLog2 n of
+                 Nothing -> unchanged
+                 Just p  -> StMachOp MO_Nat_Shl [x, StInt p]
+    	MO_NatS_Quot 
+           -> case exactLog2 n of
+                 Nothing -> unchanged
+                 Just p  -> StMachOp MO_Nat_Shr [x, StInt p]
+    	other 
+           -> unchanged
+    where
+       unchanged = StMachOp mop args
 \end{code}
 
 Anything else is just too hard.
 
 \begin{code}
-stixPrimFold op args = StPrim op args
-\end{code}
-
-\begin{code}
-comparison_ops
-   = [ CharGtOp  , CharGeOp  , CharEqOp  , CharNeOp  , CharLtOp  , CharLeOp,
-       IntGtOp   , IntGeOp   , IntEqOp   , IntNeOp   , IntLtOp   , IntLeOp,
-       WordGtOp  , WordGeOp  , WordEqOp  , WordNeOp  , WordLtOp  , WordLeOp,
-       AddrGtOp  , AddrGeOp  , AddrEqOp  , AddrNeOp  , AddrLtOp  , AddrLeOp,
-       FloatGtOp , FloatGeOp , FloatEqOp , FloatNeOp , FloatLtOp , FloatLeOp,
-       DoubleGtOp, DoubleGeOp, DoubleEqOp, DoubleNeOp, DoubleLtOp, DoubleLeOp
-     ]
+stixMachOpFold mop args = StMachOp mop args
 \end{code}

@@ -42,7 +42,7 @@ Generating code for info tables (arrays of data).
 \begin{code}
 genCodeInfoTable
     :: AbstractC
-    -> UniqSM StixTreeList
+    -> UniqSM StixStmtList
 
 genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
   = returnUs (\xs -> StData PtrRep table : StLabel info_lbl : xs)
@@ -106,7 +106,7 @@ genBitmapInfoTable
 	-> C_SRT
 	-> Int
 	-> Bool			-- must include SRT field (i.e. it's a vector)
-	-> UniqSM StixTreeList
+	-> UniqSM StixStmtList
 
 genBitmapInfoTable liveness srt closure_type include_srt
   = returnUs (\xs -> StData PtrRep table : xs)

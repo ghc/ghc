@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.48 2001/11/08 12:56:01 simonmar Exp $
+% $Id: CLabel.lhs,v 1.49 2001/12/05 17:35:12 sewardj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -348,6 +348,7 @@ labelType (RtsLabel (RtsBlackHoleInfoTbl _))  = InfoTblType
 labelType (RtsLabel (RtsSelectorInfoTbl _ _)) = InfoTblType
 labelType (RtsLabel (RtsApInfoTbl _ _))       = InfoTblType
 labelType (RtsLabel RtsUpdInfo)       	      = InfoTblType
+labelType (RtsLabel (Rts_Info _))             = InfoTblType
 labelType (CaseLabel _ CaseReturnInfo)        = InfoTblType
 labelType (CaseLabel _ CaseReturnPt)	      = CodeType
 labelType (CaseLabel _ CaseVecTbl)            = VecTblType

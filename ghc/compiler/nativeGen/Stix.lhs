@@ -4,9 +4,11 @@
 
 \begin{code}
 module Stix (
-	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
-	pprStixTrees, pprStixTree, ppStixReg,
-        stixCountTempUses, stixSubst,
+	CodeSegment(..), StixReg(..), StixExpr(..), StixVReg(..),
+        StixStmt(..), mkStAssign, StixStmtList,
+	pprStixStmts, pprStixStmt, pprStixExpr, pprStixReg,
+        stixStmt_CountTempUses, stixStmt_Subst,
+        liftStrings,
 	DestInfo(..), hasDestInfo,
 
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
@@ -35,54 +37,45 @@ import AbsCSyn		( node, tagreg, MagicId(..) )
 import ForeignCall	( CCallConv )
 import CLabel		( mkAsmTempLabel, CLabel, pprCLabel )
 import PrimRep          ( PrimRep(..) )
-import PrimOp           ( PrimOp )
+import MachOp		( MachOp(..), pprMachOp )
 import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
                           UniqSM, thenUs, returnUs, getUniqueUs )
+import Maybes		( Maybe012(..), maybe012ToList )
 import Outputable
 import FastTypes
 \end{code}
 
-Here is the tag at the nodes of our @StixTree@.	 Notice its
-relationship with @PrimOp@ in prelude/PrimOp.
+Two types, StixStmt and StixValue, define Stix.
 
 \begin{code}
-data StixTree
-  = -- Segment (text or data)
 
+-- Non-value trees; ones executed for their side-effect.
+data StixStmt
+
+  = -- Directive for the assembler to change segment
     StSegment CodeSegment
 
-    -- We can tag the leaves with constants/immediates.
+    -- Assembly-language comments
+  | StComment FAST_STRING
 
-  | StInt	Integer	    -- ** add Kind at some point
-  | StFloat	Rational
-  | StDouble	Rational
-  | StString	FAST_STRING
-  | StCLbl	CLabel	    -- labels that we might index into
+    -- Assignments are typed to determine size and register placement.
+    -- Assign a value to a StixReg
+  | StAssignReg PrimRep StixReg StixExpr
 
-    -- Abstract registers of various kinds
+    -- Assign a value to memory.  First tree indicates the address to be
+    -- assigned to, so there is an implicit dereference here.
+  | StAssignMem PrimRep StixExpr StixExpr -- dst, src
 
-  | StReg StixReg
-
-    -- A typed offset from a base location
-
-  | StIndex PrimRep StixTree StixTree -- kind, base, offset
-
-    -- An indirection from an address to its contents.
-
-  | StInd PrimRep StixTree
-
-    -- Assignment is typed to determine size and register placement
-
-  | StAssign PrimRep StixTree StixTree -- dst, src
+    -- Do a machine op which generates multiple values, and assign
+    -- the results to the lvalues stated here.
+  | StAssignMachOp (Maybe012 StixVReg) MachOp [StixExpr]
 
     -- A simple assembly label that we might jump to.
-
   | StLabel CLabel
 
     -- A function header and footer
-
   | StFunBegin CLabel
   | StFunEnd CLabel
 
@@ -93,41 +86,71 @@ data StixTree
     -- the exact targets to be attached, so that the allocator can
     -- easily construct the exact flow edges leaving this insn.
     -- Dynamic targets are allowed.
-
-  | StJump DestInfo StixTree
+  | StJump DestInfo StixExpr
 
     -- A fall-through, from slow to fast
-
   | StFallThrough CLabel
 
     -- A conditional jump. This instruction can be non-terminal :-)
     -- Only static, local, forward labels are allowed
-
-  | StCondJump CLabel StixTree
+  | StCondJump CLabel StixExpr
 
     -- Raw data (as in an info table).
+  | StData PrimRep [StixExpr]
+    -- String which has been lifted to the top level (sigh).
+  | StDataString FAST_STRING
 
-  | StData PrimRep [StixTree]
+    -- A value computed only for its side effects; result is discarded
+    -- (A handy trapdoor to allow CCalls with no results to appear as
+    -- statements).
+  | StVoidable StixExpr
+
+
+-- Helper fn to make Stix assignment statements where the 
+-- lvalue masquerades as a StixExpr.  A kludge that should
+-- be done away with.
+mkStAssign :: PrimRep -> StixExpr -> StixExpr -> StixStmt
+mkStAssign rep (StReg reg) rhs  
+   = StAssignReg rep reg rhs
+mkStAssign rep (StInd rep' addr) rhs 
+   | rep `isCloseEnoughTo` rep'
+   = StAssignMem rep addr rhs
+   | otherwise
+   = --pprPanic "Stix.mkStAssign: mismatched reps" (ppr rep <+> ppr rep')
+     --trace ("Stix.mkStAssign: mismatched reps: " ++ showSDoc (ppr rep <+> ppr rep')) (
+     StAssignMem rep addr rhs
+     --)
+     where
+        isCloseEnoughTo r1 r2
+           = r1 == r2 || (wordIsh r1 && wordIsh r2)
+        wordIsh rep
+           = rep `elem` [IntRep, WordRep, PtrRep, AddrRep, CodePtrRep, 
+                         RetRep, ArrayRep, PrimPtrRep, StableNameRep, BCORep]
+                        -- determined by looking at PrimRep.showPrimRep
+
+-- Stix trees which denote a value.
+data StixExpr
+  = -- Literals
+    StInt	Integer	    -- ** add Kind at some point
+  | StFloat	Rational
+  | StDouble	Rational
+  | StString	FAST_STRING
+  | StCLbl	CLabel	    -- labels that we might index into
+
+    -- Abstract registers of various kinds
+  | StReg StixReg
+
+    -- A typed offset from a base location
+  | StIndex PrimRep StixExpr StixExpr -- kind, base, offset
+
+    -- An indirection from an address to its contents.
+  | StInd PrimRep StixExpr
 
     -- Primitive Operations
-
-  | StPrim PrimOp [StixTree]
+  | StMachOp MachOp [StixExpr]
 
     -- Calls to C functions
-
-  | StCall FAST_STRING CCallConv PrimRep [StixTree]
-
-    -- A volatile memory scratch array, which is allocated
-    -- relative to the stack pointer.  It is an array of
-    -- ptr/word/int sized things.  Do not expect to be preserved
-    -- beyond basic blocks or over a ccall.  Current max size
-    -- is 6, used in StixInteger.
-
-  | StScratchWord Int
-
-    -- Assembly-language comments
-
-  | StComment FAST_STRING
+  | StCall FAST_STRING CCallConv PrimRep [StixExpr]
 
 
 -- used by insnFuture in RegAllocInfo.lhs
@@ -143,46 +166,64 @@ pprDests NoDestInfo      = text "NoDestInfo"
 pprDests (DestInfo dsts) = brackets (hsep (map pprCLabel dsts))
 
 
-pprStixTrees :: [StixTree] -> SDoc
-pprStixTrees ts 
+pprStixStmts :: [StixStmt] -> SDoc
+pprStixStmts ts 
   = vcat [
-       vcat (map pprStixTree ts),
+       vcat (map pprStixStmt ts),
        char ' ',
        char ' '
     ]
 
-pprStixTree :: StixTree -> SDoc
-pprStixTree t 
+
+pprStixExpr :: StixExpr -> SDoc
+pprStixExpr t 
    = case t of
-       StSegment cseg   -> parens (ppCodeSegment cseg)
-       StInt i          -> parens (integer i)
+       StCLbl lbl       -> pprCLabel lbl
+       StInt i          -> (if i < 0 then parens else id) (integer i)
        StFloat rat      -> parens (text "Float" <+> rational rat)
        StDouble	rat     -> parens (text "Double" <+> rational rat)
        StString str     -> parens (text "Str `" <> ptext str <> char '\'')
-       StComment str    -> parens (text "Comment" <+> ptext str)
-       StCLbl lbl       -> pprCLabel lbl
-       StReg reg        -> ppStixReg reg
-       StIndex k b o    -> parens (pprStixTree b <+> char '+' <> 
-                                   ppr k <+> pprStixTree o)
-       StInd k t        -> ppr k <> char '[' <> pprStixTree t <> char ']'
-       StAssign k d s   -> pprStixTree d <> text "  :=" <> ppr k 
-                                         <> text "  " <> pprStixTree s
-       StLabel ll       -> pprCLabel ll <+> char ':'
-       StFunBegin ll    -> char ' ' $$ parens (text "FunBegin" <+> pprCLabel ll)
-       StFunEnd ll      -> parens (text "FunEnd" <+> pprCLabel ll)
-       StJump dsts t    -> parens (text "Jump" <+> pprDests dsts <+> pprStixTree t)
-       StFallThrough ll -> parens (text "FallThru" <+> pprCLabel ll)
-       StCondJump l t   -> parens (text "JumpC" <+> pprCLabel l 
-                                                <+> pprStixTree t)
-       StData k ds      -> parens (text "Data" <+> ppr k <+>
-                                   hsep (map pprStixTree ds))
-       StPrim op ts     -> parens (text "Prim" <+> ppr op <+> 
-                                   hsep (map pprStixTree ts))
+       StIndex k b o    -> parens (pprStixExpr b <+> char '+' <> 
+                                   ppr k <+> pprStixExpr o)
+       StInd k t        -> ppr k <> char '[' <> pprStixExpr t <> char ']'
+       StReg reg        -> pprStixReg reg
+       StMachOp op args -> pprMachOp op 
+                           <> parens (hsep (punctuate comma (map pprStixExpr args)))
        StCall nm cc k args
                         -> parens (text "Call" <+> ptext nm <+>
                                    ppr cc <+> ppr k <+> 
-                                   hsep (map pprStixTree args))
-       StScratchWord i  -> text "ScratchWord" <> parens (int i)
+                                   hsep (map pprStixExpr args))
+
+pprStixStmt :: StixStmt -> SDoc
+pprStixStmt t 
+   = case t of
+       StSegment cseg   -> parens (ppCodeSegment cseg)
+       StComment str    -> parens (text "Comment" <+> ptext str)
+       StAssignReg pr reg rhs
+                        -> pprStixReg reg <> text "  :=" <> ppr pr
+                                          <> text "  " <> pprStixExpr rhs
+       StAssignMem pr addr rhs
+                        -> ppr pr <> char '[' <> pprStixExpr addr <> char ']'
+                                  <> text "  :=" <> ppr pr
+                                  <> text "  " <> pprStixExpr rhs
+       StAssignMachOp lhss mop args
+                        -> parens (hcat (punctuate comma (
+                              map pprStixVReg (maybe012ToList lhss)
+                           )))
+                           <> text "  :=  "
+                           <> pprMachOp mop
+                           <> parens (hsep (punctuate comma (map pprStixExpr args)))
+       StLabel ll       -> pprCLabel ll <+> char ':'
+       StFunBegin ll    -> char ' ' $$ parens (text "FunBegin" <+> pprCLabel ll)
+       StFunEnd ll      -> parens (text "FunEnd" <+> pprCLabel ll)
+       StJump dsts t    -> parens (text "Jump" <+> pprDests dsts <+> pprStixExpr t)
+       StFallThrough ll -> parens (text "FallThru" <+> pprCLabel ll)
+       StCondJump l t   -> parens (text "JumpC" <+> pprCLabel l 
+                                                <+> pprStixExpr t)
+       StData k ds      -> parens (text "Data" <+> ppr k <+>
+                                   hsep (map pprStixExpr ds))
+       StDataString str -> parens (text "DataString" <+> ppr str)
+       StVoidable expr  -> text "(void)" <+> pprStixExpr expr
 \end{code}
 
 Stix registers can have two forms.  They {\em may} or {\em may not}
@@ -192,13 +233,17 @@ map to real, machine-level registers.
 data StixReg
   = StixMagicId MagicId	-- Regs which are part of the abstract machine model
 
-  | StixTemp Unique PrimRep -- "Regs" which model local variables (CTemps) in
-					-- the abstract C.
+  | StixTemp StixVReg   -- "Regs" which model local variables (CTemps) in
+		        -- the abstract C.
 
-ppStixReg (StixMagicId mid)
-   = ppMId mid
-ppStixReg (StixTemp u pr)
-   = hcat [text "Temp(", ppr u, ppr pr, char ')']
+pprStixReg (StixMagicId mid)  = ppMId mid
+pprStixReg (StixTemp temp)    = pprStixVReg temp
+
+data StixVReg
+   = StixVReg Unique PrimRep
+
+pprStixVReg (StixVReg u pr) = hcat [text "VReg(", ppr u, ppr pr, char ')']
+
 
 
 ppMId BaseReg              = text "BaseReg"
@@ -222,30 +267,35 @@ segment (or that it has no segments at all, and we can lump these
 together).
 
 \begin{code}
-data CodeSegment = DataSegment | TextSegment | RoDataSegment deriving (Eq, Show)
+data CodeSegment 
+   = DataSegment 
+   | TextSegment 
+   | RoDataSegment 
+     deriving (Eq, Show)
+
 ppCodeSegment = text . show
 
-type StixTreeList = [StixTree] -> [StixTree]
+type StixStmtList = [StixStmt] -> [StixStmt]
 \end{code}
 
 Stix Trees for STG registers:
 \begin{code}
 stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, stgHp, stgHpLim 
-	:: StixTree
+	:: StixReg
 
-stgBaseReg 	    = StReg (StixMagicId BaseReg)
-stgNode    	    = StReg (StixMagicId node)
-stgTagReg	    = StReg (StixMagicId tagreg)
-stgSp 		    = StReg (StixMagicId Sp)
-stgSu 		    = StReg (StixMagicId Su)
-stgSpLim	    = StReg (StixMagicId SpLim)
-stgHp		    = StReg (StixMagicId Hp)
-stgHpLim	    = StReg (StixMagicId HpLim)
-stgHpAlloc	    = StReg (StixMagicId HpAlloc)
-stgCurrentTSO	    = StReg (StixMagicId CurrentTSO)
-stgCurrentNursery   = StReg (StixMagicId CurrentNursery)
-stgR9               = StReg (StixMagicId (VanillaReg WordRep (_ILIT 9)))
-stgR10              = StReg (StixMagicId (VanillaReg WordRep (_ILIT 10)))
+stgBaseReg 	    = StixMagicId BaseReg
+stgNode    	    = StixMagicId node
+stgTagReg	    = StixMagicId tagreg
+stgSp 		    = StixMagicId Sp
+stgSu 		    = StixMagicId Su
+stgSpLim	    = StixMagicId SpLim
+stgHp		    = StixMagicId Hp
+stgHpLim	    = StixMagicId HpLim
+stgHpAlloc	    = StixMagicId HpAlloc
+stgCurrentTSO	    = StixMagicId CurrentTSO
+stgCurrentNursery   = StixMagicId CurrentNursery
+stgR9               = StixMagicId (VanillaReg WordRep (_ILIT 9))
+stgR10              = StixMagicId (VanillaReg WordRep (_ILIT 10))
 
 getNatLabelNCG :: NatM CLabel
 getNatLabelNCG
@@ -267,82 +317,219 @@ given temporary appears in a tree, so as to be able to decide
 whether or not to inline the assignment's RHS at usage site(s).
 
 \begin{code}
-stixCountTempUses :: Unique -> StixTree -> Int
-stixCountTempUses u t 
-   = let qq = stixCountTempUses u
+stixExpr_CountTempUses :: Unique -> StixExpr -> Int
+stixExpr_CountTempUses u t 
+   = let qs = stixStmt_CountTempUses u
+         qe = stixExpr_CountTempUses u
+         qr = stixReg_CountTempUses u
      in
      case t of
-        StReg reg
-           -> case reg of 
-                 StixTemp uu pr  -> if u == uu then 1 else 0
-                 StixMagicId mid -> 0
-
-        StIndex    pk t1 t2       -> qq t1 + qq t2
-        StInd      pk t1          -> qq t1
-        StAssign   pk t1 t2       -> qq t1 + qq t2
-        StJump     dsts t1        -> qq t1
-        StCondJump lbl t1         -> qq t1
-        StData     pk ts          -> sum (map qq ts)
-        StPrim     op ts          -> sum (map qq ts)
-        StCall     nm cconv pk ts -> sum (map qq ts)
-
-        StSegment _      -> 0
+        StReg      reg            -> qr reg
+        StIndex    pk t1 t2       -> qe t1 + qe t2
+        StInd      pk t1          -> qe t1
+        StMachOp   mop ts         -> sum (map qe ts)
+        StCall     nm cconv pk ts -> sum (map qe ts)
         StInt _          -> 0
         StFloat _        -> 0
         StDouble _       -> 0
         StString _       -> 0
         StCLbl _         -> 0
-        StLabel _        -> 0
+
+stixStmt_CountTempUses :: Unique -> StixStmt -> Int
+stixStmt_CountTempUses u t 
+   = let qe = stixExpr_CountTempUses u
+         qr = stixReg_CountTempUses u
+         qv = stixVReg_CountTempUses u
+     in
+     case t of
+        StAssignReg pk reg rhs  -> qr reg + qe rhs
+        StAssignMem pk addr rhs -> qe addr + qe rhs
+        StJump     dsts t1      -> qe t1
+        StCondJump lbl t1       -> qe t1
+        StData     pk ts        -> sum (map qe ts)
+        StAssignMachOp lhss mop args
+           -> sum (map qv (maybe012ToList lhss)) + sum (map qe args)
+        StVoidable expr  -> qe expr
+        StSegment _      -> 0
         StFunBegin _     -> 0
         StFunEnd _       -> 0
         StFallThrough _  -> 0
-        StScratchWord _  -> 0
         StComment _      -> 0
+        StLabel _        -> 0
+        StDataString _   -> 0
 
+stixReg_CountTempUses u reg
+   = case reg of 
+        StixTemp vreg    -> stixVReg_CountTempUses u vreg
+        StixMagicId mid  -> 0
 
-stixSubst :: Unique -> StixTree -> StixTree -> StixTree
-stixSubst u new_u in_this_tree
-   = stixMapUniques f in_this_tree
+stixVReg_CountTempUses u (StixVReg uu pr)
+   = if u == uu then 1 else 0
+\end{code}
+
+If we do decide to inline a temporary binding, the following functions
+do the biz.
+
+\begin{code}
+stixStmt_Subst :: Unique -> StixExpr -> StixStmt -> StixStmt
+stixStmt_Subst u new_u in_this_tree
+   = stixStmt_MapUniques f in_this_tree
      where
-        f :: Unique -> Maybe StixTree
+        f :: Unique -> Maybe StixExpr
         f uu = if uu == u then Just new_u else Nothing
 
 
-stixMapUniques :: (Unique -> Maybe StixTree) -> StixTree -> StixTree
-stixMapUniques f t
-   = let qq = stixMapUniques f
+stixExpr_MapUniques :: (Unique -> Maybe StixExpr) -> StixExpr -> StixExpr
+stixExpr_MapUniques f t
+   = let qe = stixExpr_MapUniques f
+         qs = stixStmt_MapUniques f
+         qr = stixReg_MapUniques f
      in
      case t of
-        StReg reg
-           -> case reg of 
-                 StixMagicId mid -> t
-                 StixTemp uu pr  
-                    -> case f uu of
-                          Just xx -> xx
-                          Nothing -> t
-
-        StIndex    pk t1 t2       -> StIndex    pk (qq t1) (qq t2)
-        StInd      pk t1          -> StInd      pk (qq t1)
-        StAssign   pk t1 t2       -> StAssign   pk (qq t1) (qq t2)
-        StJump     dsts t1        -> StJump     dsts (qq t1)
-        StCondJump lbl t1         -> StCondJump lbl (qq t1)
-        StData     pk ts          -> StData     pk (map qq ts)
-        StPrim     op ts          -> StPrim     op (map qq ts)
-        StCall     nm cconv pk ts -> StCall     nm cconv pk (map qq ts)
-
-        StSegment _      -> t
+        StReg reg -> case qr reg of
+                     Nothing -> StReg reg
+                     Just xx -> xx
+        StIndex    pk t1 t2       -> StIndex    pk (qe t1) (qe t2)
+        StInd      pk t1          -> StInd      pk (qe t1)
+        StMachOp   mop args       -> StMachOp   mop (map qe args)
+        StCall     nm cconv pk ts -> StCall     nm cconv pk (map qe ts)
         StInt _          -> t
         StFloat _        -> t
         StDouble _       -> t
         StString _       -> t
         StCLbl _         -> t
+
+stixStmt_MapUniques :: (Unique -> Maybe StixExpr) -> StixStmt -> StixStmt
+stixStmt_MapUniques f t
+   = let qe = stixExpr_MapUniques f
+         qs = stixStmt_MapUniques f
+         qr = stixReg_MapUniques f
+         qv = stixVReg_MapUniques f
+
+         doMopLhss Just0 = Just0
+         doMopLhss (Just1 r1)
+            = case qv r1 of
+                 Nothing -> Just1 r1
+                 other   -> doMopLhss_panic
+         doMopLhss (Just2 r1 r2)
+            = case (qv r1, qv r2) of
+                 (Nothing, Nothing) -> Just2 r1 r2
+                 other              -> doMopLhss_panic
+         -- Because the StixRegs processed by doMopLhss are lvalues, they
+         -- absolutely shouldn't be mapped to a StixExpr; 
+         -- hence we panic if they do.  Same deal for StAssignReg below.
+         doMopLhss_panic
+            = panic "stixStmt_MapUniques:doMopLhss"
+     in
+     case t of
+        StAssignReg pk reg rhs
+           -> case qr reg of
+                 Nothing -> StAssignReg pk reg (qe rhs)
+                 Just xx -> panic "stixStmt_MapUniques:StAssignReg"
+        StAssignMem pk addr rhs   -> StAssignMem pk (qe addr) (qe rhs)
+        StJump     dsts t1        -> StJump     dsts (qe t1)
+        StCondJump lbl t1         -> StCondJump lbl (qe t1)
+        StData     pk ts          -> StData     pk (map qe ts)
+        StVoidable expr           ->  StVoidable (qe expr)
+        StAssignMachOp lhss mop args
+           -> StAssignMachOp (doMopLhss lhss) mop (map qe args)
+        StSegment _      -> t
         StLabel _        -> t
         StFunBegin _     -> t
         StFunEnd _       -> t
         StFallThrough _  -> t
-        StScratchWord _  -> t
         StComment _      -> t
+        StDataString _   -> t
+
+
+stixReg_MapUniques :: (Unique -> Maybe StixExpr) -> StixReg -> Maybe StixExpr
+stixReg_MapUniques f reg
+   = case reg of
+        StixMagicId mid -> Nothing
+        StixTemp vreg   -> stixVReg_MapUniques f vreg
+
+stixVReg_MapUniques :: (Unique -> Maybe StixExpr) -> StixVReg -> Maybe StixExpr
+stixVReg_MapUniques f (StixVReg uu pr)
+   = f uu
 \end{code}
+
+\begin{code}
+-- Lift StStrings out of top-level StDatas, putting them at the end of
+-- the block, and replacing them with StCLbls which refer to the lifted-out strings. 
+{- Motivation for this hackery provided by the following bug:
+   Stix:
+      (DataSegment)
+      Bogon.ping_closure :
+      (Data P_ Addr.A#_static_info)
+      (Data StgAddr (Str `alalal'))
+      (Data P_ (0))
+   results in:
+      .data
+              .align 8
+      .global Bogon_ping_closure
+      Bogon_ping_closure:
+              .long   Addr_Azh_static_info
+              .long   .Ln1a8
+      .Ln1a8:
+              .byte   0x61
+              .byte   0x6C
+              .byte   0x61
+              .byte   0x6C
+              .byte   0x61
+              .byte   0x6C
+              .byte   0x00
+              .long   0
+   ie, the Str is planted in-line, when what we really meant was to place
+   a _reference_ to the string there.  liftStrings will lift out all such
+   strings in top-level data and place them at the end of the block.
+
+   This is still a rather half-baked solution -- to do the job entirely right
+   would mean a complete traversal of all the Stixes, but there's currently no
+   real need for it, and it would be slow.  Also, potentially there could be
+   literal types other than strings which need lifting out?
+-}
+
+liftStrings :: [StixStmt] -> UniqSM [StixStmt]
+liftStrings stmts
+   = liftStrings_wrk stmts [] []
+
+liftStrings_wrk :: [StixStmt]    -- originals
+                -> [StixStmt]    -- (reverse) originals with strings lifted out
+                -> [(CLabel, FAST_STRING)]   -- lifted strs, and their new labels
+                -> UniqSM [StixStmt]
+
+-- First, examine the original trees and lift out strings in top-level StDatas.
+liftStrings_wrk (st:sts) acc_stix acc_strs
+   = case st of
+        StData sz datas
+           -> lift datas acc_strs 	`thenUs` \ (datas_done, acc_strs1) ->
+              liftStrings_wrk sts ((StData sz datas_done):acc_stix) acc_strs1
+        other 
+           -> liftStrings_wrk sts (other:acc_stix) acc_strs
+     where
+        -- Handle a top-level StData
+        lift []     acc_strs = returnUs ([], acc_strs)
+        lift (d:ds) acc_strs
+           = lift ds acc_strs 		`thenUs` \ (ds_done, acc_strs1) ->
+             case d of
+                StString s 
+                   -> getUniqueUs 	`thenUs` \ unq ->
+                      let lbl = mkAsmTempLabel unq in
+                      returnUs ((StCLbl lbl):ds_done, ((lbl,s):acc_strs1))
+                other
+                   -> returnUs (other:ds_done, acc_strs1)
+
+-- When we've run out of original trees, emit the lifted strings.
+liftStrings_wrk [] acc_stix acc_strs
+   = returnUs (reverse acc_stix ++ concatMap f acc_strs)
+     where
+        f (lbl,str) = [StSegment RoDataSegment, 
+                       StLabel lbl, 
+                       StDataString str, 
+                       StSegment TextSegment]
+\end{code}
+
+The NCG's monad.
 
 \begin{code}
 data NatM_State = NatM_State UniqSupply Int

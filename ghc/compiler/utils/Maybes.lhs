@@ -5,7 +5,7 @@
 
 \begin{code}
 module Maybes (
-	Maybe2(..), Maybe3(..),
+	Maybe012(..), maybe012ToList,
 	MaybeErr(..),
 
 	orElse, 
@@ -32,13 +32,16 @@ infixr 4 `orElse`
 
 %************************************************************************
 %*									*
-\subsection[Maybe2,3 types]{The @Maybe2@ and @Maybe3@ types}
+\subsection[Maybe012 type]{The @Maybe012@ type}
 %*									*
 %************************************************************************
 
 \begin{code}
-data Maybe2 a b   = Just2 a b   | Nothing2  deriving (Eq,Show)
-data Maybe3 a b c = Just3 a b c | Nothing3  deriving (Eq,Show)
+data Maybe012 a = Just0 | Just1 a | Just2 a a deriving (Eq,Show)
+
+maybe012ToList Just0       = []
+maybe012ToList (Just1 x)   = [x]
+maybe012ToList (Just2 x y) = [x, y]
 \end{code}
 
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.85 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.86 2001/12/05 17:35:15 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -329,7 +329,6 @@ FN_(newMutVarzh_fast)
 
 /* -----------------------------------------------------------------------------
    Foreign Object Primitives
-
    -------------------------------------------------------------------------- */
 
 FN_(mkForeignObjzh_fast)
@@ -448,6 +447,25 @@ FN_(finalizzeWeakzh_fast)
   } else {
       RET_NP(1,f);
   }
+  FE_
+}
+
+FN_(deRefWeakzh_fast)
+{
+  /* R1.p = weak ptr */
+  StgWeak* w;
+  I_       code;
+  P_       val;
+  FB_
+  w = (StgWeak*)R1.p;
+  if (w->header.info == &stg_WEAK_info) {
+    code = 1;
+    val = (P_)((StgWeak *)w)->value;
+  } else {
+    code = 0;
+    val = (P_)w;
+  }
+  RET_NP(code,val);
   FE_
 }
 
@@ -751,6 +769,97 @@ GMP_TAKE1_RET1(complementIntegerzh_fast, mpz_com);
 GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr);
 GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr);
 
+
+FN_(gcdIntzh_fast)
+{
+  /* R1 = the first Int#; R2 = the second Int# */
+  mp_limb_t aa;
+  I_        r;
+  FB_
+  aa = (mp_limb_t)(R1.i);
+  r = RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(&aa), 1, (mp_limb_t)(R2.i));
+  RET_N(r);
+  FE_
+}
+
+FN_(gcdIntegerIntzh_fast)
+{
+  /* R1 = s1; R2 = d1; R3 = the int */
+  I_ r;
+  FB_
+  MAYBE_GC(R2_PTR, gcdIntegerIntzh_fast);
+  r = RET_STGCALL3(I_,mpn_gcd_1,(mp_limb_t *)(BYTE_ARR_CTS(R2.p)), R1.i, R3.i);
+  RET_N(r);
+  FE_
+}
+
+FN_(cmpIntegerIntzh_fast)
+{
+  /* R1 = s1; R2 = d1; R3 = the int */
+  MP_INT arg;
+  I_ r;
+  FB_
+  MAYBE_GC(R2_PTR, cmpIntegerIntzh_fast);
+  arg._mp_size	= R1.i;
+  arg._mp_alloc = ((StgArrWords *)R2.p)->words;
+  arg._mp_d	= (mp_limb_t *) (BYTE_ARR_CTS(R2.p));
+  r = RET_STGCALL2(I_,mpz_cmp_si,&arg,R3.i);
+  RET_N(r);
+  FE_
+}
+
+FN_(cmpIntegerzh_fast)
+{
+  /* R1 = s1; R2 = d1; R3 = s2; R4 = d2 */
+  MP_INT arg1, arg2;
+  I_ r;
+  FB_
+  MAYBE_GC(R2_PTR | R4_PTR, cmpIntegerIntzh_fast);
+  arg1._mp_size	= R1.i;
+  arg1._mp_alloc= ((StgArrWords *)R2.p)->words;
+  arg1._mp_d	= (mp_limb_t *) (BYTE_ARR_CTS(R2.p));
+  arg2._mp_size	= R3.i;
+  arg2._mp_alloc= ((StgArrWords *)R4.p)->words;
+  arg2._mp_d	= (mp_limb_t *) (BYTE_ARR_CTS(R4.p));
+  r = RET_STGCALL2(I_,mpz_cmp,&arg1,&arg2);
+  RET_N(r);
+  FE_
+}
+
+FN_(integer2Intzh_fast)
+{
+  /* R1 = s; R2 = d */
+  I_ r, s;
+  FB_
+  s = R1.i;
+  if (s == 0)
+    r = 0;
+  else {
+    r = ((mp_limb_t *) (BYTE_ARR_CTS(R2.p)))[0];
+    if (s < 0) r = -r;
+  }
+  RET_N(r);
+  FE_
+}
+
+FN_(integer2Wordzh_fast)
+{
+  /* R1 = s; R2 = d */
+  I_ s;
+  W_ r;
+  FB_
+  s = R1.i;
+  if (s == 0)
+    r = 0;
+  else {
+    r = ((mp_limb_t *) (BYTE_ARR_CTS(R2.p)))[0];
+    if (s < 0) r = -r;
+  }
+  RET_N(r);
+  FE_
+}
+
+
 FN_(decodeFloatzh_fast)
 { 
   MP_INT mantissa;
@@ -874,6 +983,17 @@ FN_(yieldzh_fast)
  * deadlock.
  *
  * -------------------------------------------------------------------------- */
+
+FN_(isEmptyMVarzh_fast)
+{
+  /* args: R1 = MVar closure */
+  I_ r;
+  FB_
+  r = (I_)((GET_INFO((StgMVar*)(R1.p))) == &stg_EMPTY_MVAR_info);
+  RET_N(r);
+  FE_
+}
+
 
 FN_(newMVarzh_fast)
 {
@@ -1216,6 +1336,31 @@ FN_(makeStableNamezh_fast)
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(sn_obj);
+}
+
+
+FN_(makeStablePtrzh_fast)
+{
+  /* Args: R1 = a */
+  StgStablePtr sp;
+  FB_
+  MAYBE_GC(R1_PTR, makeStablePtrzh_fast);
+  sp = RET_STGCALL1(StgStablePtr,getStablePtr,R1.p);
+  RET_N(sp);
+  FE_
+}
+
+FN_(deRefStablePtrzh_fast)
+{
+  /* Args: R1 = the stable ptr */
+  P_ r;
+  StgStablePtr sp;
+  FB_
+  sp = (StgStablePtr)R1.w;
+  ASSERT(stable_ptr_table[(StgWord)sp].weight > 0);
+  r = stable_ptr_table[(StgWord)sp].addr;
+  RET_P(r);
+  FE_
 }
 
 /* -----------------------------------------------------------------------------

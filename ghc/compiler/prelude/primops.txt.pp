@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.9 2001/10/31 17:03:12 rrt Exp $
+-- $Id: primops.txt.pp,v 1.10 2001/12/05 17:35:14 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -193,6 +193,8 @@ primop   IntRemOp    "remInt#"    Dyadic
    with can_fail = True
 
 primop   IntGcdOp    "gcdInt#"    Dyadic   Int# -> Int# -> Int#
+   with out_of_line = True
+
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
 	 {Add with carry.  First member of result is (wrapped) sum; second member is 0 iff no overflow occured.}
@@ -383,7 +385,7 @@ primop   IntegerGcdOp   "gcdInteger#" GenPrimOp
 primop   IntegerIntGcdOp   "gcdIntegerInt#" GenPrimOp
    Int# -> ByteArr# -> Int# -> Int#
    {Greatest common divisor, where second argument is an ordinary Int\#.}
-   -- with commutable = True  (surely not? APT 8/01)
+   with out_of_line = True
 
 primop   IntegerDivExactOp   "divExactInteger#" GenPrimOp
    Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
@@ -404,12 +406,14 @@ primop   IntegerCmpOp   "cmpInteger#"   GenPrimOp
    Int# -> ByteArr# -> Int# -> ByteArr# -> Int#
    {Returns -1,0,1 according as first argument is less than, equal to, or greater than second argument.}
    with needs_wrapper = True
+        out_of_line = True
 
 primop   IntegerCmpIntOp   "cmpIntegerInt#" GenPrimOp
    Int# -> ByteArr# -> Int# -> Int#
    {Returns -1,0,1 according as first argument is less than, equal to, or greater than second argument, which
    is an ordinary Int\#.}
    with needs_wrapper = True
+        out_of_line = True
 
 primop   IntegerQuotRemOp   "quotRemInteger#" GenPrimOp
    Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr#, Int#, ByteArr# #)
@@ -427,10 +431,12 @@ primop   IntegerDivModOp    "divModInteger#"  GenPrimOp
 primop   Integer2IntOp   "integer2Int#"    GenPrimOp
    Int# -> ByteArr# -> Int#
    with needs_wrapper = True
+        out_of_line = True
 
 primop   Integer2WordOp   "integer2Word#"   GenPrimOp
    Int# -> ByteArr# -> Word#
    with needs_wrapper = True
+        out_of_line = True
 
 #if WORD_SIZE_IN_BITS < 32
 primop   IntegerToInt32Op   "integerToInt32#" GenPrimOp
@@ -438,14 +444,6 @@ primop   IntegerToInt32Op   "integerToInt32#" GenPrimOp
 
 primop   IntegerToWord32Op   "integerToWord32#" GenPrimOp
    Int# -> ByteArr# -> Word32#
-#endif
-
-#if WORD_SIZE_IN_BITS < 64
-primop   IntegerToInt64Op   "integerToInt64#" GenPrimOp
-   Int# -> ByteArr# -> Int64#
-
-primop   IntegerToWord64Op   "integerToWord64#" GenPrimOp
-   Int# -> ByteArr# -> Word64#
 #endif
 
 primop   IntegerAndOp  "andInteger#" GenPrimOp
@@ -464,7 +462,7 @@ primop   IntegerComplementOp  "complementInteger#" GenPrimOp
    Int# -> ByteArr# -> (# Int#, ByteArr# #)
    with out_of_line = True
 
-#endif /* ILX */
+#endif /* ndef ILX */
 
 ------------------------------------------------------------------------
 section "Double#"
@@ -1355,7 +1353,7 @@ primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    {Return 1 if mvar is empty; 0 otherwise.}
    with
    usage = { mangle IsEmptyMVarOp [mkP, mkP] mkM }
-
+   out_of_line = True
 
 ------------------------------------------------------------------------
 section "Delay/wait operations"
@@ -1414,7 +1412,9 @@ primop  YieldOp "yield#" GenPrimOp
    out_of_line      = True
 
 primop  MyThreadIdOp "myThreadId#" GenPrimOp
-    State# RealWorld -> (# State# RealWorld, ThreadId# #)
+   State# RealWorld -> (# State# RealWorld, ThreadId# #)
+   with
+   out_of_line = True
 
 ------------------------------------------------------------------------
 section "Weak pointers"
@@ -1435,6 +1435,7 @@ primop  DeRefWeakOp "deRefWeak#" GenPrimOp
    with
    usage            = { mangle DeRefWeakOp [mkM, mkP] mkM }
    has_side_effects = True
+   out_of_line      = True
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
@@ -1456,6 +1457,7 @@ primop  MakeStablePtrOp "makeStablePtr#" GenPrimOp
    strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    usage            = { mangle MakeStablePtrOp [mkM, mkP] mkM }
    has_side_effects = True
+   out_of_line      = True
 
 primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
    StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
@@ -1463,6 +1465,7 @@ primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
    usage            = { mangle DeRefStablePtrOp [mkM, mkP] mkM }
    needs_wrapper    = True
    has_side_effects = True
+   out_of_line      = True
 
 primop  EqStablePtrOp "eqStablePtr#" GenPrimOp
    StablePtr# a -> StablePtr# a -> Int#
@@ -1488,16 +1491,6 @@ primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
    StableName# a -> Int#
    with
    usage = { mangle StableNameToIntOp [mkP] mkR }
-
-------------------------------------------------------------------------
-section "Unsafe pointer equality"
---  (#1 Bad Guy: Alistair Reid :)   
-------------------------------------------------------------------------
-
-primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
-   a -> a -> Int#
-   with
-   usage = { mangle ReallyUnsafePtrEqualityOp [mkZ, mkZ] mkR }
 
 ------------------------------------------------------------------------
 section "Parallelism"

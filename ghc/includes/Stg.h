@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.42 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: Stg.h,v 1.43 2001/12/05 17:35:14 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -217,6 +217,7 @@ typedef StgWord64       LW_;
 #include "StgTicky.h"
 #include "CCall.h"
 #include "Stable.h"
+#include "PrimOpHelpers.h"
 
 /* Built-in entry points */
 #include "StgMiscClosures.h"

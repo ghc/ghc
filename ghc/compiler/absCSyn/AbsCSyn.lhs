@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.40 2001/11/23 11:58:00 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.41 2001/12/05 17:35:12 sewardj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -47,12 +47,15 @@ import CostCentre       ( CostCentre, CostCentreStack )
 import Literal		( mkMachInt, Literal(..) )
 import ForeignCall	( CCallSpec )
 import PrimRep		( PrimRep(..) )
+import MachOp		( MachOp(..) )
 import Unique           ( Unique )
 import StgSyn		( StgOp )
 import TyCon		( TyCon )
 import BitSet				-- for liveness masks
+import Maybes		( Maybe012(..) )
 import FastTypes
 
+import Outputable
 \end{code}
 
 @AbstractC@ is a list of Abstract~C statements, but the data structure
@@ -116,6 +119,25 @@ stored in a mixed type location.)
 	CAddrMode	-- cost centre to place in closure
 			--   CReg CurCostCentre or CC_HDR(R1.p{-Node-})
 	Int		-- size of closure, for profiling
+
+  -- NEW CASES FOR EXPANDED PRIMOPS
+
+  | CMachOpStmt			-- Machine-level operation
+	(Maybe012 CAddrMode)	-- 0, 1 or 2 results
+	MachOp
+	[CAddrMode]		-- Arguments
+        (Maybe [MagicId])	-- list of regs which need to be preserved
+	-- across the primop.  This is allowed to be Nothing only if
+	-- machOpIsDefinitelyInline returns True.  And that in turn may
+	-- only return True if we are absolutely sure that the mach op
+	-- can be done inline on all platforms.  
+
+  | CSequential		-- Do the nested AbstractCs sequentially.
+	[AbstractC]	-- In particular, as far as the AbsCUtils.doSimultaneously
+			-- is concerned, these stmts are to be treated as atomic
+			-- and are not to be reordered.
+
+  -- end of NEW CASES FOR EXPANDED PRIMOPS
 
   | COpStmt
 	[CAddrMode]	-- Results
@@ -349,6 +371,9 @@ data CAddrMode
     	!PrimRep    	-- the kind of the result
     	CExprMacro    	-- the macro to generate a value
 	[CAddrMode]   	-- and its arguments
+
+  | CMem   PrimRep	-- A value :: PrimRep, in memory, at the 
+           CAddrMode	-- specified address
 \end{code}
 
 Various C macros for values which are dependent on the back-end layout.

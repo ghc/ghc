@@ -11,13 +11,13 @@ module StixMacro ( macroCode, checkCode ) where
 import {-# SOURCE #-} StixPrim ( amodeToStix )
 
 import MachRegs
-import AbsCSyn		( CStmtMacro(..), CAddrMode, tagreg,
-			  CCheckMacro(..) )
+import AbsCSyn		( CStmtMacro(..), CAddrMode, tagreg, CCheckMacro(..) )
 import Constants	( uF_RET, uF_SU, uF_UPDATEE, uF_SIZE )
 import ForeignCall	( CCallConv(..) )
-import PrimOp		( PrimOp(..) )
+import MachOp		( MachOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix
+import Panic		( panic )
 import UniqSupply	( returnUs, thenUs, UniqSM )
 import CLabel		( mkBlackHoleInfoTableLabel, mkIndStaticInfoLabel,
 			  mkIndInfoLabel, mkUpdInfoLabel, mkSeqInfoLabel,
@@ -33,7 +33,7 @@ closure address.
 macroCode
     :: CStmtMacro   	    -- statement macro
     -> [CAddrMode]  	    -- args
-    -> UniqSM StixTreeList
+    -> UniqSM StixStmtList
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -44,18 +44,18 @@ macroCode ARGS_CHK_LOAD_NODE args
   = getUniqLabelNCG					`thenUs` \ ulbl ->
     let
 	  [words, lbl] = map amodeToStix args
-	  temp = StIndex PtrRep stgSp words
-	  test = StPrim AddrGeOp [stgSu, temp]
+	  temp = StIndex PtrRep (StReg stgSp) words
+	  test = StMachOp MO_NatU_Ge [StReg stgSu, temp]
 	  cjmp = StCondJump ulbl test
-	  assign = StAssign PtrRep stgNode lbl
+	  assign = StAssignReg PtrRep stgNode lbl
 	  join = StLabel ulbl
     in
     returnUs (\xs -> cjmp : assign : updatePAP : join : xs)
 
 macroCode ARGS_CHK [words]
   = getUniqLabelNCG					`thenUs` \ ulbl ->
-    let temp = StIndex PtrRep stgSp (amodeToStix words)
-	test = StPrim AddrGeOp [stgSu, temp]
+    let temp = StIndex PtrRep (StReg stgSp) (amodeToStix words)
+	test = StMachOp MO_NatU_Ge [StReg stgSu, temp]
 	cjmp = StCondJump ulbl test
 	join = StLabel ulbl
     in
@@ -72,11 +72,9 @@ adding an indirection.
 macroCode UPD_CAF args
   = let
 	[cafptr,bhptr] = map amodeToStix args
-	new_caf = StCall SLIT("newCAF") CCallConv VoidRep [cafptr]
-    	w0 = StInd PtrRep cafptr
-	w1 = StInd PtrRep (StIndex PtrRep cafptr fixedHS)
-	a1 = StAssign PtrRep w1 bhptr
-	a2 = StAssign PtrRep w0 ind_static_info
+	new_caf = StVoidable (StCall SLIT("newCAF") CCallConv VoidRep [cafptr])
+	a1 = StAssignMem PtrRep (StIndex PtrRep cafptr fixedHS) bhptr
+	a2 = StAssignMem PtrRep cafptr ind_static_info
     in
     returnUs (\xs -> new_caf : a1 : a2 : xs)
 \end{code}
@@ -119,37 +117,35 @@ to the current Sp location.
 macroCode PUSH_UPD_FRAME args
   = let
 	[bhptr, _{-0-}] = map amodeToStix args
-    	frame n = StInd PtrRep
-	    (StIndex PtrRep stgSp (StInt (toInteger (n-uF_SIZE))))
+    	frame n = StIndex PtrRep (StReg stgSp) (StInt (toInteger (n-uF_SIZE)))
 
         -- HWL: these values are *wrong* in a GranSim setup; ToDo: fix
-	a1 = StAssign PtrRep (frame uF_RET)     upd_frame_info
-	a3 = StAssign PtrRep (frame uF_SU)      stgSu
-	a4 = StAssign PtrRep (frame uF_UPDATEE) bhptr
+	a1 = StAssignMem PtrRep (frame uF_RET)     upd_frame_info
+	a3 = StAssignMem PtrRep (frame uF_SU)      (StReg stgSu)
+	a4 = StAssignMem PtrRep (frame uF_UPDATEE) bhptr
 
-	updSu = StAssign PtrRep stgSu
-		(StIndex PtrRep stgSp (StInt (toInteger (-uF_SIZE))))
+	updSu = StAssignReg 
+                   PtrRep 
+                   stgSu
+	           (StIndex PtrRep (StReg stgSp) (StInt (toInteger (-uF_SIZE))))
     in
     returnUs (\xs -> a1 : a3 : a4 : updSu : xs)
 
 
 macroCode PUSH_SEQ_FRAME args
    = let [arg_frame] = map amodeToStix args
-         frame n = StInd PtrRep
-                     (StIndex PtrRep arg_frame (StInt (toInteger n)))
-         a1 = StAssign PtrRep (frame 0) seq_frame_info
-         a2 = StAssign PtrRep (frame 1) stgSu
-         updSu = StAssign PtrRep stgSu arg_frame 
+         frame n = StIndex PtrRep arg_frame (StInt (toInteger n))
+         a1 = StAssignMem PtrRep (frame 0) seq_frame_info
+         a2 = StAssignMem PtrRep (frame 1) (StReg stgSu)
+         updSu = StAssignReg PtrRep stgSu arg_frame 
      in
      returnUs (\xs -> a1 : a2 : updSu : xs)
 
 
 macroCode UPDATE_SU_FROM_UPD_FRAME args
    = let [arg_frame] = map amodeToStix args
-         frame n = StInd PtrRep
-                      (StIndex PtrRep arg_frame (StInt (toInteger n)))
-         updSu
-            = StAssign PtrRep stgSu (frame uF_SU)
+         frame n = StIndex PtrRep arg_frame (StInt (toInteger n))
+         updSu = StAssignReg PtrRep stgSu (StInd PtrRep (frame uF_SU))
      in
      returnUs (\xs -> updSu : xs)
 \end{code}
@@ -161,11 +157,12 @@ This one only applies if we have a machine register devoted to TagReg.
 
 \begin{code}
 macroCode SET_TAG [tag]
-  = let set_tag = StAssign IntRep stgTagReg (amodeToStix tag)
-    in
-    case stgReg tagreg of
-      Always _ -> returnUs id
-      Save   _ -> returnUs (\ xs -> set_tag : xs)
+  = case get_MagicId_reg_or_addr tagreg of
+       Right baseRegAddr 
+          -> returnUs id
+       Left  realreg 
+          -> let a1 = StAssignReg IntRep (StixMagicId tagreg) (amodeToStix tag)
+             in returnUs ( \xs -> a1 : xs )
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -173,23 +170,22 @@ macroCode SET_TAG [tag]
 \begin{code}
 macroCode REGISTER_IMPORT [arg]
    = returnUs (
-	\xs -> StAssign WordRep (StInd WordRep stgSp) (amodeToStix arg)
-	     : StAssign PtrRep  stgSp (StPrim IntAddOp [stgSp, StInt 4])
+	\xs -> StAssignMem WordRep (StReg stgSp) (amodeToStix arg)
+	     : StAssignReg PtrRep  stgSp (StMachOp MO_Nat_Add [StReg stgSp, StInt 4])
 	     : xs
      )
 
 macroCode REGISTER_FOREIGN_EXPORT [arg]
    = returnUs (
-	\xs -> StCall SLIT("getStablePtr") CCallConv VoidRep [amodeToStix arg]
+	\xs -> StVoidable (
+                  StCall SLIT("getStablePtr") CCallConv VoidRep [amodeToStix arg]
+               )
 	     : xs
      )
 
 macroCode other args
-   = case other of
-        SET_TAG -> error "foobarxyzzy8"
-	_       -> error "StixMacro.macroCode: unknown macro/args"
+   = panic "StixMacro.macroCode"
 \end{code}
-
 
 Do the business for a @HEAP_CHK@, having converted the args to Trees
 of StixOp.
@@ -200,7 +196,7 @@ Let's make sure that these CAFs are lifted out, shall we?
 \begin{code}
 -- Some common labels
 
-bh_info, ind_static_info, ind_info :: StixTree
+bh_info, ind_static_info, ind_info :: StixExpr
 
 bh_info   	= StCLbl mkBlackHoleInfoTableLabel
 ind_static_info	= StCLbl mkIndStaticInfoLabel
@@ -208,37 +204,34 @@ ind_info  	= StCLbl mkIndInfoLabel
 upd_frame_info	= StCLbl mkUpdInfoLabel
 seq_frame_info	= StCLbl mkSeqInfoLabel
 
-stg_update_PAP  = regTableEntry CodePtrRep OFFSET_stgUpdatePAP
-
 -- Some common call trees
 
-updatePAP :: StixTree
-updatePAP = StJump NoDestInfo stg_update_PAP
+updatePAP :: StixStmt
+updatePAP = mkStJump_to_RegTable_offw OFFSET_stgUpdatePAP
+
 \end{code}
 
 -----------------------------------------------------------------------------
 Heap/Stack checks
 
 \begin{code}
-checkCode :: CCheckMacro -> [CAddrMode] -> StixTreeList -> UniqSM StixTreeList
+checkCode :: CCheckMacro -> [CAddrMode] -> StixStmtList -> UniqSM StixStmtList
 checkCode macro args assts
   = getUniqLabelNCG		`thenUs` \ ulbl_fail ->
     getUniqLabelNCG		`thenUs` \ ulbl_pass ->
 
-    let args_stix = map amodeToStix args
-	newHp wds = StIndex PtrRep stgHp wds
-	assign_hp wds = StAssign PtrRep stgHp (newHp wds)
-	hp_alloc wds = StAssign IntRep stgHpAlloc wds
-	test_hp = StPrim AddrLeOp [stgHp, stgHpLim]
-	cjmp_hp = StCondJump ulbl_pass test_hp
-
-	newSp wds = StIndex PtrRep stgSp (StPrim IntNegOp [wds])
-	test_sp_pass wds = StPrim AddrGeOp [newSp wds, stgSpLim]
-	test_sp_fail wds = StPrim AddrLtOp [newSp wds, stgSpLim]
+    let args_stix        = map amodeToStix args
+	newHp wds        = StIndex PtrRep (StReg stgHp) wds
+	assign_hp wds    = StAssignReg PtrRep stgHp (newHp wds)
+	hp_alloc wds     = StAssignReg IntRep stgHpAlloc wds
+	test_hp          = StMachOp MO_NatU_Le [StReg stgHp, StReg stgHpLim]
+	cjmp_hp          = StCondJump ulbl_pass test_hp
+	newSp wds        = StIndex PtrRep (StReg stgSp) (StMachOp MO_NatS_Neg [wds])
+	test_sp_pass wds = StMachOp MO_NatU_Ge [newSp wds, StReg stgSpLim]
+	test_sp_fail wds = StMachOp MO_NatU_Lt [newSp wds, StReg stgSpLim]
 	cjmp_sp_pass wds = StCondJump ulbl_pass (test_sp_pass wds)
 	cjmp_sp_fail wds = StCondJump ulbl_fail (test_sp_fail wds)
-
-	assign_ret r ret = StAssign CodePtrRep r ret
+	assign_ret r ret = mkStAssign CodePtrRep r ret
 
 	fail = StLabel ulbl_fail
 	join = StLabel ulbl_pass
@@ -248,10 +241,10 @@ checkCode macro args assts
            = IF_ARCH_alpha(16383,65535)
 
         assign_liveness ptr_regs 
-           = StAssign WordRep stgR9
-                      (StPrim XorOp [StInt aLL_NON_PTRS, ptr_regs])
+           = StAssignReg WordRep stgR9
+                         (StMachOp MO_Nat_Xor [StInt aLL_NON_PTRS, ptr_regs])
         assign_reentry reentry 
-           = StAssign WordRep stgR10 reentry
+           = StAssignReg WordRep stgR10 reentry
     in	
 
     returnUs (
@@ -340,28 +333,34 @@ checkCode macro args assts
 
 -- Various canned heap-check routines
 
-mkStJump_to_GCentry :: String -> StixTree
-mkStJump_to_GCentry gcname
+mkStJump_to_GCentry_name :: String -> StixStmt
+mkStJump_to_GCentry_name gcname
 --   | opt_Static
    = StJump NoDestInfo (StCLbl (mkRtsGCEntryLabel gcname))
 --   | otherwise -- it's in a different DLL
 --   = StJump (StInd PtrRep (StLitLbl True sdoc))
 
-gc_chk (StInt 0)   = StJump NoDestInfo (regTableEntry CodePtrRep OFFSET_stgChk0)
-gc_chk (StInt 1)   = StJump NoDestInfo (regTableEntry CodePtrRep OFFSET_stgChk1)
-gc_chk (StInt n)   = mkStJump_to_GCentry ("stg_chk_" ++ show n)
+mkStJump_to_RegTable_offw :: Int -> StixStmt
+mkStJump_to_RegTable_offw regtable_offw
+--   | opt_Static
+   = StJump NoDestInfo (StInd PtrRep (get_Regtable_addr_from_offset regtable_offw))
+--   | otherwise
+--   do something plausible for cross-DLL jump
 
-gc_enter (StInt 1) = StJump NoDestInfo (regTableEntry CodePtrRep OFFSET_stgGCEnter1)
-gc_enter (StInt n) = mkStJump_to_GCentry ("stg_gc_enter_" ++ show n)
+gc_chk (StInt 0)   = mkStJump_to_RegTable_offw OFFSET_stgChk0
+gc_chk (StInt 1)   = mkStJump_to_RegTable_offw OFFSET_stgChk1
+gc_chk (StInt n)   = mkStJump_to_GCentry_name ("stg_chk_" ++ show n)
 
-gc_seq (StInt n)   = mkStJump_to_GCentry ("stg_gc_seq_" ++ show n)
-gc_noregs          = mkStJump_to_GCentry "stg_gc_noregs"
-gc_unpt_r1         = mkStJump_to_GCentry "stg_gc_unpt_r1"
-gc_unbx_r1         = mkStJump_to_GCentry "stg_gc_unbx_r1"
-gc_f1              = mkStJump_to_GCentry "stg_gc_f1"
-gc_d1              = mkStJump_to_GCentry "stg_gc_d1"
-gc_gen             = mkStJump_to_GCentry "stg_gen_chk"
+gc_enter (StInt 1) = mkStJump_to_RegTable_offw OFFSET_stgGCEnter1
+gc_enter (StInt n) = mkStJump_to_GCentry_name ("stg_gc_enter_" ++ show n)
+
+gc_seq (StInt n)   = mkStJump_to_GCentry_name ("stg_gc_seq_" ++ show n)
+gc_noregs          = mkStJump_to_GCentry_name "stg_gc_noregs"
+gc_unpt_r1         = mkStJump_to_GCentry_name "stg_gc_unpt_r1"
+gc_unbx_r1         = mkStJump_to_GCentry_name "stg_gc_unbx_r1"
+gc_f1              = mkStJump_to_GCentry_name "stg_gc_f1"
+gc_d1              = mkStJump_to_GCentry_name "stg_gc_d1"
+gc_gen             = mkStJump_to_GCentry_name "stg_gen_chk"
 gc_ut (StInt p) (StInt np)
-                   = mkStJump_to_GCentry ("stg_gc_ut_" ++ show p 
-                                          ++ "_" ++ show np)
+                   = mkStJump_to_GCentry_name ("stg_gc_ut_" ++ show p ++ "_" ++ show np)
 \end{code}

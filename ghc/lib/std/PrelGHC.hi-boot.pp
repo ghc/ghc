@@ -238,8 +238,6 @@ __export PrelGHC
   word32ToIntegerzh
 #endif  
 #if WORD_SIZE_IN_BITS < 64
-  integerToInt64zh
-  integerToWord64zh
   int64ToIntegerzh
   word64ToIntegerzh
 #endif
@@ -421,8 +419,6 @@ __export PrelGHC
   makeStableNamezh
   eqStableNamezh
   stableNameToIntzh
-
-  reallyUnsafePtrEqualityzh
 
   newBCOzh
   BCOzh
