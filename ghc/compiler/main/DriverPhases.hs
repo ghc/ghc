@@ -1,9 +1,9 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.14 2001/10/29 11:31:51 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.15 2002/01/04 16:02:04 simonmar Exp $
 --
 -- GHC Driver
 --
--- (c) Simon Marlow 2000
+-- (c) The University of Glasgow 2002
 --
 -----------------------------------------------------------------------------
 
@@ -42,7 +42,7 @@ data Phase
 	| Unlit
 	| Cpp
 	| HsPp
-	| Hsc -- ToDo: HscTargetLang
+	| Hsc
 	| Cc
 	| HCc		-- Haskellised C (as opposed to vanilla C) compilation
 	| Mangle	-- assembly mangling, now done by a separate script.

@@ -2,7 +2,7 @@
 --
 -- GHC Driver
 --
--- (c) Simon Marlow 2000
+-- (c) The University of Glasgow 2002
 --
 -----------------------------------------------------------------------------
 
@@ -11,7 +11,6 @@
 module DriverPipeline (
 
 	-- interfaces for the batch-mode driver
-   GhcMode(..), getGhcMode, v_GhcMode,
    genPipeline, runPipeline, pipeLoop,
 
 	-- interfaces for the compilation manager (interpreted/batch-mode)
@@ -58,33 +57,6 @@ import Maybe
 
 import PackedString
 import MatchPS
-
------------------------------------------------------------------------------
--- GHC modes of operation
-
-modeFlag :: String -> Maybe GhcMode
-modeFlag "-M" 		 = Just $ DoMkDependHS
-modeFlag "--mk-dll"      = Just $ DoMkDLL
-modeFlag "-E" 		 = Just $ StopBefore Hsc
-modeFlag "-C" 		 = Just $ StopBefore HCc
-modeFlag "-S" 		 = Just $ StopBefore As
-modeFlag "-c" 		 = Just $ StopBefore Ln
-modeFlag "--make"        = Just $ DoMake
-modeFlag "--interactive" = Just $ DoInteractive
-modeFlag _               = Nothing
-
-getGhcMode :: [String]
-	 -> IO ( [String]   -- rest of command line
-	       , GhcMode
-	       , String	    -- "GhcMode" flag
-	       )
-getGhcMode flags 
-  = case my_partition modeFlag flags of
-	([]   , rest) -> return (rest, DoLink,  "") -- default is to do linking
-	([(flag,one)], rest) -> return (rest, one, flag)
-	(_    , _   ) -> 
-	  throwDyn (UsageError 
-		"only one of the flags -M, -E, -C, -S, -c, --make, --interactive, --mk-dll is allowed")
 
 -----------------------------------------------------------------------------
 -- genPipeline
@@ -161,29 +133,34 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
-    pipeline
-      | todo == DoMkDependHS = [ Unlit, Cpp, HsPp, MkDependHS ]
+    pipeline = preprocess ++ compile
+
+    preprocess
+	| haskellish = [ Unlit, Cpp, HsPp ]
+	| otherwise  = [ ]
+
+    compile
+      | todo == DoMkDependHS = [ MkDependHS ]
+
+      | cish = [ Cc, As ]
 
       | haskellish = 
        case real_lang of
-	HscC    | split && mangle -> [ Unlit, Cpp, HsPp, Hsc, HCc, Mangle, 
-					SplitMangle, SplitAs ]
-	        | mangle          -> [ Unlit, Cpp, HsPp, Hsc, HCc, Mangle, As ]
+	HscC    | split && mangle -> [ Hsc, HCc, Mangle, SplitMangle, SplitAs ]
+	        | mangle          -> [ Hsc, HCc, Mangle, As ]
 	        | split	       	  -> not_valid
-	        | otherwise       -> [ Unlit, Cpp, HsPp, Hsc, HCc, As ]
+	        | otherwise       -> [ Hsc, HCc, As ]
 
-	HscAsm  | split           -> [ Unlit, Cpp, HsPp, Hsc, SplitMangle, SplitAs ]
-	        | otherwise       -> [ Unlit, Cpp, HsPp, Hsc, As ]
+	HscAsm  | split           -> [ Hsc, SplitMangle, SplitAs ]
+	        | otherwise       -> [ Hsc, As ]
 
 	HscJava	| split	          -> not_valid
 		| otherwise       -> error "not implemented: compiling via Java"
 #ifdef ILX
 	HscILX  | split           -> not_valid
-		| otherwise       -> [ Unlit, Cpp, HsPp, Hsc, Ilx2Il, Ilasm ]
+		| otherwise       -> [ Hsc, Ilx2Il, Ilasm ]
 #endif
-	HscNothing 		  -> [ Unlit, Cpp, HsPp, Hsc ]
-
-      | cish      = [ Cc, As ]
+	HscNothing		  -> [ Hsc, HCc ] -- HCc is a dummy stop phase
 
       | otherwise = [ ]  -- just pass this file through to the linker
 
@@ -212,8 +189,9 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
    when (start_phase `elem` pipeline && 
    	 (stop_phase /= Ln && stop_phase `notElem` pipeline))
         (throwDyn (UsageError 
-		    ("flag " ++ stop_flag
-		     ++ " is incompatible with source file `" ++ filename ++ "'")))
+		    ("flag `" ++ stop_flag
+		     ++ "' is incompatible with source file `"
+		     ++ filename ++ "'" ++ show pipeline ++ show stop_phase)))
    let
 	-- .o and .hc suffixes can be overriden by command-line options:
       myPhaseInputExt Ln  | Just s <- osuf  = s
@@ -635,12 +613,17 @@ run_phase cc_phase basename suff input_fn output_fn
 	pkg_extra_cc_opts <- getPackageExtraCcOpts
 
 	split_objs <- readIORef v_Split_object_files
-	let split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
-		      | otherwise         = [ ]
 
 	excessPrecision <- readIORef v_Excess_precision
-	SysTools.runCc ([ SysTools.Option "-x", SysTools.Option "c"
-	                , SysTools.FileOption "" input_fn
+
+	-- force the C compiler to interpret this file as C when
+	-- compiling .hc files, by adding the -x c option.
+	let langopt
+		| cc_phase == HCc = [ SysTools.Option "-x", SysTools.Option "c"]
+		| otherwise       = [ ]
+
+	SysTools.runCc (langopt ++
+			[ SysTools.FileOption "" input_fn
 			, SysTools.Option "-o"
 			, SysTools.FileOption "" output_fn
 			]
@@ -652,7 +635,6 @@ run_phase cc_phase basename suff input_fn output_fn
 		       ++ [ verb, "-S", "-Wimplicit", opt_flag ]
 		       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		       ++ cc_opts
-		       ++ split_opt
 		       ++ (if excessPrecision then [] else [ "-ffloat-store" ])
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts

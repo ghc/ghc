@@ -16,7 +16,7 @@ module RnHiFiles (
 
 #include "HsVersions.h"
 
-import DriverState	( GhcMode(..), v_GhcMode )
+import DriverState	( GhcMode(..), v_GhcMode, isCompManagerMode )
 import DriverUtil	( splitFilename )
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import HscTypes		( ModuleLocation(..),
@@ -497,8 +497,7 @@ findAndReadIface doc_str mod_name hi_boot_file
     -- and start up GHCi - it won't complain that all the modules it tries
     -- to load are found in the home location.
     ioToRnM_no_fail (readIORef v_GhcMode) `thenRn` \ mode ->
-    let home_allowed = hi_boot_file ||
-		       mode `notElem` [ DoInteractive, DoMake ]
+    let home_allowed = hi_boot_file || not (isCompManagerMode mode)
     in
 
     ioToRnM (if home_allowed 

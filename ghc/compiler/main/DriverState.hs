@@ -1,9 +1,9 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.65 2001/12/15 12:03:08 panne Exp $
+-- $Id: DriverState.hs,v 1.66 2002/01/04 16:02:04 simonmar Exp $
 --
 -- Settings for the driver
 --
--- (c) The University of Glasgow 2000
+-- (c) The University of Glasgow 2002
 --
 -----------------------------------------------------------------------------
 
@@ -46,7 +46,18 @@ data GhcMode
   | DoLink				-- [ the default ]
   deriving (Eq)
 
-GLOBAL_VAR(v_GhcMode, error "mode not set", GhcMode)
+GLOBAL_VAR(v_GhcMode,     DoLink, GhcMode)
+GLOBAL_VAR(v_GhcModeFlag, "",     String)
+
+setMode :: GhcMode -> String -> IO ()
+setMode m flag = do
+  old_mode <- readIORef v_GhcMode
+  old_flag <- readIORef v_GhcModeFlag
+  when (not (null (old_flag))) $
+      throwDyn (UsageError 
+          ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
+  writeIORef v_GhcMode m
+  writeIORef v_GhcModeFlag flag
 
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
@@ -146,13 +157,10 @@ osuf_ify f = do
 
 GLOBAL_VAR(v_OptLevel, 0, Int)
 
-setOptLevel :: String -> IO ()
-setOptLevel ""  	    = do { writeIORef v_OptLevel 1 }
-setOptLevel "not" 	    = writeIORef v_OptLevel 0
-setOptLevel [c] | isDigit c = do
-   let level = ord c - ord '0'
-   writeIORef v_OptLevel level
-setOptLevel s = unknownFlagErr ("-O"++s)
+setOptLevel :: Int -> IO ()
+setOptLevel n = do
+  when (n >= 1) $ setLang HscC		-- turn on -fvia-C with -O
+  writeIORef v_OptLevel n
 
 GLOBAL_VAR(v_minus_o2_for_C,            False, Bool)
 GLOBAL_VAR(v_MaxSimplifierIterations,   4,     Int)

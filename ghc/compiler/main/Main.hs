@@ -1,11 +1,11 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.93 2002/01/04 11:35:13 simonmar Exp $
+-- $Id: Main.hs,v 1.94 2002/01/04 16:02:04 simonmar Exp $
 --
 -- GHC Driver program
 --
--- (c) Simon Marlow 2000
+-- (c) The University of Glasgow 2002
 --
 -----------------------------------------------------------------------------
 
@@ -29,17 +29,16 @@ import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles )
 import Packages		( showPackages )
 
-import DriverPipeline	( GhcMode(..), doLink, doMkDLL, genPipeline,
-			  getGhcMode, pipeLoop, v_GhcMode
-			)
+import DriverPipeline	( doLink, doMkDLL, genPipeline, pipeLoop )
 import DriverState	( buildCoreToDo, buildStgToDo, defaultHscLang,
 			  findBuildTag, getPackageInfo, unregFlags, 
+			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
 			  v_Cmdline_libraries, v_Keep_tmp_files, v_Ld_inputs,
 			  v_OptLevel, v_Output_file, v_Output_hi, 
 			  v_Package_details, v_Ways, getPackageExtraGhcOpts,
 			  readPackageConf
 			)
-import DriverFlags	( dynFlag, getDynFlags, buildStaticHscOpts,
+import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
@@ -48,10 +47,9 @@ import DriverPhases	( Phase(HsPp, Hsc, HCc), haskellish_src_file, objish_file )
 import DriverUtil	( add, handle, handleDyn, later, splitFilename,
 			  unknownFlagErr, getFileSuffix )
 import CmdLineOpts	( dynFlag, defaultDynFlags, restoreDynFlags,
-			  saveDynFlags, setDynFlags, 
+			  saveDynFlags, setDynFlags, getDynFlags, dynFlag,
 			  DynFlags(..), HscLang(..), v_Static_hsc_opts
 			)
-
 import Outputable
 import Util
 import Panic		( GhcException(..), panic )
@@ -79,13 +77,6 @@ import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
 import Dynamic		( toDyn )
 #endif
 
-
------------------------------------------------------------------------------
--- Changes:
-
--- * -fglasgow-exts NO LONGER IMPLIES -package lang!!!  (-fglasgow-exts is a
---   dynamic flag whereas -package is a static flag.)
-
 -----------------------------------------------------------------------------
 -- ToDo:
 
@@ -104,7 +95,6 @@ import Dynamic		( toDyn )
 
 -- No more "Enter your Haskell program, end with ^D (on a line of its own):"
 -- consistency checking removed (may do this properly later)
--- removed -noC
 -- no -Ofile
 
 -----------------------------------------------------------------------------
@@ -158,12 +148,10 @@ main =
    conf_file <- getPackageConfigPath
    readPackageConf conf_file
 
-	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
-   (flags2, mode, stop_flag) <- getGhcMode argv'
-   writeIORef v_GhcMode mode
-
 	-- process all the other arguments, and get the source files
-   non_static <- processArgs static_flags flags2 []
+   non_static <- processArgs static_flags argv' []
+   mode <- readIORef v_GhcMode
+   stop_flag <- readIORef v_GhcModeFlag
 
 	-- -O and --interactive are not a good combination
 	-- ditto with any kind of way selection
@@ -199,23 +187,18 @@ main =
    -- set the "global" HscLang.  The HscLang can be further adjusted on a module
    -- by module basis, using only the -fvia-C and -fasm flags.  If the global
    -- HscLang is not HscC or HscAsm, -fvia-C and -fasm have no effect.
-   opt_level  <- readIORef v_OptLevel
-
-
+   dyn_flags <- getDynFlags
    let lang = case mode of 
-		 StopBefore HCc -> HscC
 		 DoInteractive  -> HscInterpreted
-		 _other        | opt_level >= 1  -> HscC  -- -O implies -fvia-C 
-			       | otherwise       -> defaultHscLang
+		 _other         -> hscLang dyn_flags
 
-   setDynFlags (defaultDynFlags{ coreToDo = core_todo,
-			  	 stgToDo  = stg_todo,
-                  		 hscLang  = lang,
-			  	 -- leave out hscOutName for now
-	                  	 hscOutName = panic "Main.main:hscOutName not set",
-
-			  	 verbosity = 1
-				})
+   setDynFlags (dyn_flags{ coreToDo = core_todo,
+			   stgToDo  = stg_todo,
+                  	   hscLang  = lang,
+			   -- leave out hscOutName for now
+	                   hscOutName = panic "Main.main:hscOutName not set",
+		  	   verbosity = 1
+			})
 
 	-- the rest of the arguments are "dynamic"
    srcs <- processArgs dynamic_flags (extra_non_static ++ non_static) []

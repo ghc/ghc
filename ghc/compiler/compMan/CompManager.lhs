@@ -46,7 +46,6 @@ where
 import CmLink
 import CmTypes
 import DriverPipeline
-import DriverFlags	( getDynFlags )
 import DriverState	( v_Output_file )
 import DriverPhases
 import DriverUtil
@@ -59,7 +58,7 @@ import HscMain		( initPersistentCompilerState )
 import HscTypes
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
 			  isHomePackageName )
-import RdrName		( lookupRdrEnv, emptyRdrEnv )
+import RdrName		( emptyRdrEnv )
 import Module
 import GetImports
 import UniqFM
@@ -70,11 +69,12 @@ import SysTools		( cleanTempFilesExcept )
 import Util
 import Outputable
 import Panic
-import CmdLineOpts	( DynFlags(..) )
+import CmdLineOpts	( DynFlags(..), getDynFlags )
 
 import IOExts
 
 #ifdef GHCI
+import RdrName		( lookupRdrEnv )
 import Id		( idType, idName )
 import NameEnv
 import Type		( tidyType )

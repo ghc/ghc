@@ -26,6 +26,9 @@ module CmdLineOpts (
 	dopt_StgToDo,			-- DynFlags -> [StgToDo]
 	dopt_HscLang,			-- DynFlags -> HscLang
 	dopt_OutName,			-- DynFlags -> String
+	getOpts,			-- (DynFlags -> [a]) -> IO [a]
+	setLang,
+	getVerbFlag,
 
 	-- Manipulating the DynFlags state
 	getDynFlags,			-- IO DynFlags
@@ -383,6 +386,22 @@ dopt_set dfs f = dfs{ flags = f : flags dfs }
 
 dopt_unset :: DynFlags -> DynFlag -> DynFlags
 dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
+
+getOpts :: (DynFlags -> [a]) -> IO [a]
+	-- We add to the options from the front, so we need to reverse the list
+getOpts opts = dynFlag opts >>= return . reverse
+
+-- we can only switch between HscC, HscAsmm, and HscILX with dynamic flags 
+-- (-fvia-C, -fasm, -filx respectively).
+setLang l = updDynFlags (\ dfs -> case hscLang dfs of
+					HscC   -> dfs{ hscLang = l }
+					HscAsm -> dfs{ hscLang = l }
+					HscILX -> dfs{ hscLang = l }
+					_      -> dfs)
+
+getVerbFlag = do
+   verb <- dynFlag verbosity
+   if verb >= 3  then return  "-v" else return ""
 \end{code}
 
 -----------------------------------------------------------------------------

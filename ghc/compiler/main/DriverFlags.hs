@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.83 2001/12/20 11:19:07 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.84 2002/01/04 16:02:04 simonmar Exp $
 --
 -- Driver flags
 --
@@ -11,8 +11,7 @@
 
 module DriverFlags ( 
 	processArgs, OptKind(..), static_flags, dynamic_flags, 
-	getDynFlags, dynFlag, 
-	getOpts, getVerbFlag, addCmdlineHCInclude,
+	addCmdlineHCInclude,
 	buildStaticHscOpts, 
 	machdepCCOpts
   ) where
@@ -21,6 +20,7 @@ module DriverFlags (
 #include "../includes/config.h"
 
 import DriverState
+import DriverPhases
 import DriverUtil
 import SysTools
 import CmdLineOpts
@@ -166,6 +166,22 @@ static_flags =
       ------- verbosity ----------------------------------------------------
   ,  ( "n"              , NoArg setDryRun )
 
+      ------- primary modes ------------------------------------------------
+  ,  ( "M"		, PassFlag (setMode DoMkDependHS))
+  ,  ( "E"		, PassFlag (setMode (StopBefore Hsc)))
+  ,  ( "C"		, PassFlag (\f -> do setMode (StopBefore HCc) f
+					     setLang HscC))
+  ,  ( "S"		, PassFlag (setMode (StopBefore As)))
+  ,  ( "c"		, PassFlag (setMode (StopBefore Ln)))
+  ,  ( "-make"		, PassFlag (setMode DoMake))
+  ,  ( "-interactive"	, PassFlag (setMode DoInteractive))
+  ,  ( "-mk-dll"	, PassFlag (setMode DoMkDLL))
+
+	-- -fno-code says to stop after Hsc but don't generate any code.
+  ,  ( "fno-code"	, PassFlag (\f -> do setMode (StopBefore HCc) f
+				             setLang HscNothing
+				             writeIORef v_Recomp False))
+
 	------- GHCi -------------------------------------------------------
   ,  ( "ignore-dot-ghci", NoArg (writeIORef v_Read_DotGHCi False) )
   ,  ( "read-dot-ghci"  , NoArg (writeIORef v_Read_DotGHCi True) )
@@ -268,7 +284,9 @@ static_flags =
 
         ------ Compiler flags -----------------------------------------------
   ,  ( "O2-for-C"	   , NoArg (writeIORef v_minus_o2_for_C True) )
-  ,  ( "O"		   , OptPrefix (setOptLevel) )
+  ,  ( "O"		   , NoArg (setOptLevel 1))
+  ,  ( "Onot"		   , NoArg (setOptLevel 0))
+  ,  ( "O"		   , PrefixPred (all isDigit) (setOptLevel . read))
 
   ,  ( "fno-asm-mangling"  , NoArg (writeIORef v_Do_asm_mangling False) )
 
@@ -397,7 +415,6 @@ dynamic_flags = [
   ,  ( "fvia-c",	NoArg (setLang HscC) )
   ,  ( "fvia-C",	NoArg (setLang HscC) )
   ,  ( "filx",		NoArg (setLang HscILX) )
-  ,  ( "fno-code",      NoArg (setLang HscNothing) )
 
 	-- "active negatives"
   ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )
@@ -547,7 +564,8 @@ machdepCCOpts
    | otherwise
 	= return ( [], [] )
 
-
+-----------------------------------------------------------------------------
+-- local utils
 
 addOpt_L a = updDynFlags (\s -> s{opt_L = a : opt_L s})
 addOpt_P a = updDynFlags (\s -> s{opt_P = a : opt_P s})
@@ -560,25 +578,9 @@ addOpt_I a = updDynFlags (\s -> s{opt_I = a : opt_I s})
 addOpt_i a = updDynFlags (\s -> s{opt_i = a : opt_i s})
 #endif
 
-addCmdlineHCInclude a = updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
-
-getOpts :: (DynFlags -> [a]) -> IO [a]
-	-- We add to the options from the front, so we need to reverse the list
-getOpts opts = dynFlag opts >>= return . reverse
-
--- we can only change HscC to HscAsm and vice-versa with dynamic flags 
--- (-fvia-C and -fasm). We can also set the new lang to ILX, via -filx.
-setLang l = updDynFlags (\ dfs -> case hscLang dfs of
-					HscC   -> dfs{ hscLang = l }
-					HscAsm -> dfs{ hscLang = l }
-					HscILX -> dfs{ hscLang = l }
-					_      -> dfs)
-
 setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 3 })
 setVerbosity n 
   | all isDigit n = updDynFlags (\dfs -> dfs{ verbosity = read n })
   | otherwise     = throwDyn (UsageError "can't parse verbosity flag (-v<n>)")
 
-getVerbFlag = do
-   verb <- dynFlag verbosity
-   if verb >= 3  then return  "-v" else return ""
+addCmdlineHCInclude a = updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
