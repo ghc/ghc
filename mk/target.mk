@@ -976,7 +976,7 @@ SGML_HTML = $(addsuffix .html,$(SGML_DOC))
 # HTML output goes in a subdirectory on its own.
 SGML_TEXT = $(addsuffix .txt,$(SGML_DOC))
 
-$(SGML_DVI) $(SGML_PS) $(SGML_HTML) $(SGML_TEXT) :: $(SGML_SRCS)
+$(SGML_DVI) $(SGML_PS) $(SGML_HTML) $(SGML_TEXT) $(SGML_PDF) :: $(SGML_SRCS)
 
 dvi  :: $(SGML_DVI)
 ps   :: $(SGML_PS)

@@ -239,6 +239,10 @@ endif
 	@$(RM) $@
 	$(SGML2RTF) $(SGML2RTF_OPTS) $<
 
+%.pdf : %.sgml
+	@$(RM) $@
+	$(SGML2PDF) $(SGML2PDF_OPTS) $<
+
 #-----------------------------------------------------------------------------
 # Literate suffix rules
 
