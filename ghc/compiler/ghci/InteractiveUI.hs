@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.122 2002/05/01 15:46:15 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.123 2002/05/01 15:48:48 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -1119,20 +1119,8 @@ locateOneObj (d:ds) lib
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
 #ifdef mingw32_TARGET_OS
-loadDynamic paths rootname = do
+loadDynamic paths rootname = addDLL rootname
   -- ignore paths on windows (why? --SDM)
-  maybe_errmsg <- addDLL rootname
-  if maybe_errmsg == nullPtr
-	then return Nothing
-	else do str <- peekCString maybe_errmsg
-		return (Just str)
-
-addDLL :: String -> String -> IO (Ptr CChar)
-addDLL path lib = do
-  withCString path $ \c_path -> do
-  withCString lib $ \c_lib -> do
-    maybe_errmsg <- c_addDLL c_path c_lib
-    return maybe_errmsg
 
 #else
 
@@ -1150,6 +1138,8 @@ loadDynamic [] rootname = do
 
 mkSOName root = "lib" ++ root ++ ".so"
 
+#endif
+
 addDLL :: String -> IO (Maybe String)
 addDLL str = do
   maybe_errmsg <- withCString str $ \dll -> c_addDLL dll
@@ -1160,11 +1150,6 @@ addDLL str = do
 
 foreign import ccall "addDLL" unsafe  
   c_addDLL :: CString -> IO CString
-
-foreign import ccall "dlerror" unsafe  
-  dlerror :: IO CString
-
-#endif
 
 -----------------------------------------------------------------------------
 -- timing & statistics
