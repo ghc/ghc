@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.27 2000/06/19 12:09:22 simonmar Exp $
+# $Id: Makefile,v 1.28 2000/06/23 14:01:09 rrt Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -98,7 +98,9 @@ unexport CC
 DLL_NAME          = HSrts.dll
 ifeq "$(way)" "dll"
 DLL_IMPLIB_NAME   = libHSrts_imp.a
-SRC_BLD_DLL_OPTS += --export-all -lwinmm -lHS_imp_stub -lgmp -L. -Lgmp
+
+SRC_BLD_DLL_OPTS += --output-def=HSrts.def --export-all -lwinmm \
+                    -lHS_imp_stub -lgmp -L. -Lgmp
 
 #
 # Need an import library containing the symbols the RTS uses from the Prelude.
