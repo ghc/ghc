@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.27 2003/05/23 10:00:04 simonmar Exp $
+# $Id: package.mk,v 1.28 2003/05/29 13:36:39 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -223,6 +223,8 @@ $(HTML_DOC) : $(HS_PPS)
 		--dump-interface=$(PACKAGE).haddock \
 		$(foreach pkg, $(PACKAGE_DEPS), \
 		   --read-interface=../$(pkg),../$(pkg)/$(pkg).haddock)
+
+CLEAN_FILES += $(PACKAGE).haddock
 
 %.raw-hs : %.lhs
 	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
