@@ -9,19 +9,21 @@ Numeric part of the prelude.
 It's rather big!
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude -#include "cbits/floatExtreme.h" #-}
 {-# OPTIONS -H20m #-}
+
 #include "../includes/ieee-flpt.h"
+
 \end{code}
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
-
 module PrelNum where
 
 import {-# SOURCE #-}	IOBase	( error )
 import PrelList
 import PrelBase
 import ArrBase	( Array, array, (!) )
+import STBase   ( unsafePerformPrimIO )
 import Ix	( Ix(..) )
 import GHC
 
@@ -484,6 +486,15 @@ instance  RealFloat Float  where
 
     scaleFloat k x	= case decodeFloat x of
 			    (m,n) -> encodeFloat m (n+k)
+    isNaN x = 
+      (0::Int) /= unsafePerformPrimIO (_ccall_ isFloatNaN x) {- a _pure_function! -}
+    isInfinite x =
+      (0::Int) /= unsafePerformPrimIO (_ccall_ isFloatInfinite x) {- ditto! -}
+    isDenormalized x =
+      (0::Int) /= unsafePerformPrimIO (_ccall_ isFloatDenormalized x) -- ..
+    isNegativeZero x =
+      (0::Int) /= unsafePerformPrimIO (_ccall_ isFloatNegativeZero x) -- ...
+    isIEEE x    = True
 
 instance  Show Float  where
     showsPrec   x = showSigned showFloat x
@@ -627,6 +638,15 @@ instance  RealFloat Double  where
 
     scaleFloat k x	= case decodeFloat x of
 			    (m,n) -> encodeFloat m (n+k)
+    isNaN x = 
+      (0::Int) /= unsafePerformPrimIO (_ccall_ isDoubleNaN x) {- a _pure_function! -}
+    isInfinite x =
+      (0::Int) /= unsafePerformPrimIO (_ccall_ isDoubleInfinite x) {- ditto -}
+    isDenormalized x =
+      (0::Int) /= unsafePerformPrimIO (_ccall_ isDoubleDenormalized x) -- ..
+    isNegativeZero x =
+      (0::Int) /= unsafePerformPrimIO (_ccall_ isDoubleNegativeZero x) -- ...
+    isIEEE x    = True
 
 instance  Show Double  where
     showsPrec   x = showSigned showFloat x
@@ -690,7 +710,7 @@ It normalises a ratio by dividing both numerator and denominator by
 their greatest common divisor.
 
 \begin{code}
-reduce _ 0		=  error "{Ratio.%}: zero denominator"
+reduce x 0		=  error "{Ratio.%}: zero denominator"
 reduce x y		=  (x `quot` d) :% (y `quot` d)
 			   where d = gcd x y
 \end{code}
@@ -722,8 +742,12 @@ approxRational x eps	=  simplest (x-eps) (x+eps)
 			   | x > 0	=  simplest' n d n' d'
 			   | y < 0	=  - simplest' (-n') d' (-n) d
 			   | otherwise	=  0 :% 1
-					where xr@(n:%d) = toRational x
-					      (n':%d')	= toRational y
+					where xr  = toRational x
+					      n   = numerator xr
+					      d   = denominator xr
+					      nd' = toRational y
+					      n'  = numerator nd'
+					      d'  = denominator nd'
 
 	      simplest' n d n' d'	-- assumes 0 < n%d < n'%d'
 			| r == 0     =	q :% 1
@@ -731,7 +755,9 @@ approxRational x eps	=  simplest (x-eps) (x+eps)
 			| otherwise  =	(q*n''+d'') :% n''
 				     where (q,r)      =	 quotRem n d
 					   (q',r')    =	 quotRem n' d'
-					   (n'':%d'') =	 simplest' d' r' d r
+					   nd''       =  simplest' d' r' d r
+					   n''        =  numerator nd''
+					   d''        =	 denominator nd''
 \end{code}
 
 
@@ -742,6 +768,7 @@ instance  (Integral a)	=> Ord (Ratio a)  where
 
 instance  (Integral a)	=> Num (Ratio a)  where
     (x:%y) + (x':%y')	=  reduce (x*y' + x'*y) (y*y')
+    (x:%y) - (x':%y')	=  reduce (x*y' - x'*y) (y*y')
     (x:%y) * (x':%y')	=  reduce (x * x') (y * y')
     negate (x:%y)	=  (-x) :% y
     abs (x:%y)		=  abs x :% y
