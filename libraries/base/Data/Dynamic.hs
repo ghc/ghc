@@ -34,7 +34,8 @@ module Data.Dynamic
 	
 	-- * Applying functions of dynamic type
 	dynApply,
-	dynApp
+	dynApp,
+        dynTypeRep
 
   ) where
 
@@ -162,3 +163,6 @@ dynApp f x = case dynApply f x of
              Nothing -> error ("Type error in dynamic application.\n" ++
                                "Can't apply function " ++ show f ++
                                " to argument " ++ show x)
+
+dynTypeRep :: Dynamic -> TypeRep
+dynTypeRep (Dynamic tr _) = tr 
