@@ -32,7 +32,8 @@ import Name		( Name, nameSrcLoc, nameOccName, nameModuleName,
 			  nameParent, nameParent_maybe, isExternalName )
 import NameSet
 import NameEnv
-import OccName		( OccName, srcDataName, isTcOcc )
+import OccName		( OccName, srcDataName, isTcOcc, OccEnv, elemOccEnv,
+			  mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo, Avails, GhciMode(..),
 			  IsBootInterface, IfaceExport, 
 			  availName, availNames, availsToNameSet, unQualInScope, 
@@ -49,7 +50,7 @@ import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes )
 import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc )
 import ListSetOps	( removeDups )
-import Util		( sortLt, notNull )
+import Util		( sortLt, notNull, isSingleton )
 import List		( partition, insert )
 import IO		( openFile, IOMode(..) )
 \end{code}
@@ -173,11 +174,19 @@ importsFromImportDecl this_mod
 	--	   import {-# SOURCE #-} A( AType )
 	--
 	-- then you'll get a 'B does not export AType' message.  Oh well.
-    in
-    exportsToAvails filtered_exports			`thenM` \ avails ->
 
-	-- Filter the imports according to the import list
-    filterImports imp_mod want_boot imp_details avails	`thenM` \ (filtered_avails, explicits) ->
+	qual_mod_name = case as_mod of
+			  Nothing  	    -> imp_mod_name
+			  Just another_name -> another_name
+	imp_spec  = ImportSpec { is_mod = imp_mod_name, is_qual = qual_only,  
+		  		 is_loc = loc, is_as = qual_mod_name }
+	mk_deprec = mi_dep_fn iface
+    in
+
+	-- Get the total imports, and filter them according to the import list
+    exportsToAvails filtered_exports		`thenM` \ total_avails ->
+    filterImports iface imp_spec
+		  imp_details total_avails	`thenM` \ (avail_env, gbl_env) ->
 
     let
 	-- Compute new transitive dependencies
@@ -208,24 +217,10 @@ importsFromImportDecl this_mod
 			_ -> Nothing		-- Everything is imported, 
 						-- (or almost everything [hiding])
 
-	qual_mod_name = case as_mod of
-			  Nothing  	    -> imp_mod_name
-			  Just another_name -> another_name
-	
 	-- unqual_avails is the Avails that are visible in *unqualified* form
 	-- We need to know this so we know what to export when we see
 	--	module M ( module P ) where ...
 	-- Then we must export whatever came from P unqualified.
-	imp_spec  = ImportSpec { is_mod = imp_mod_name, is_qual = qual_only,  
-		  		 is_loc = loc, is_as = qual_mod_name }
-	mk_deprec = mi_dep_fn iface
-	gres	  = [ GRE { gre_name = name, 
-		  	    gre_prov = Imported [imp_spec] (name `elemNameSet` explicits),
-		  	    gre_deprec = mk_deprec name }
-		  	| avail <- filtered_avails, name <- availNames avail ]
-	gbl_env   = mkGlobalRdrEnv gres
-		  
-	avail_env = mkAvailEnv filtered_avails
 	imports   = ImportAvails { 
 			imp_qual     = unitModuleEnvByName qual_mod_name avail_env,
 			imp_env      = avail_env,
@@ -409,52 +404,72 @@ getLocalDeclBinders mod (HsGroup {hs_valds = val_decls,
 available, and filters it through the import spec (if any).
 
 \begin{code}
-filterImports :: Module				-- The module being imported
-	      -> IsBootInterface		-- Tells whether it's a {-# SOURCE #-} import
+filterImports :: ModIface
+	      -> ImportSpec			-- The span for the entire import decl
 	      -> Maybe (Bool, [Located (IE RdrName)])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
-	      -> RnM ([AvailInfo],		-- What's imported
-		       NameSet)			-- What was imported explicitly
+	      -> RnM (AvailEnv,			-- What's imported
+		      GlobalRdrEnv)		-- ...in two forms
 
 	-- Complains if import spec mentions things that the module doesn't export
         -- Warns/informs if import spec contains duplicates.
-filterImports mod from Nothing imports
-  = returnM (imports, emptyNameSet)
+mkGenericRdrEnv iface imp_spec avails
+  = mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] False,
+			   gre_deprec = mi_dep_fn iface name }
+		   | avail <- avails, name <- availNames avail ]
+			
+filterImports iface imp_spec Nothing total_avails
+  = returnM (mkAvailEnv total_avails, mkGenericRdrEnv iface imp_spec total_avails)
 
-filterImports mod from (Just (want_hiding, import_items)) total_avails
-  = mappM (addLocM get_item) import_items 	`thenM` \ avails_w_explicits_s ->
+filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
+  = mapAndUnzipM (addLocM get_item) import_items 	`thenM` \ (avails, gres) ->
     let
-	(item_avails, explicits_s) = unzip (concat avails_w_explicits_s)
-	explicits		   = foldl addListToNameSet emptyNameSet explicits_s
+	all_avails = foldr plusAvailEnv     emptyAvailEnv     avails
+	rdr_env    = foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres
     in
-    if want_hiding then
-	let	-- All imported; item_avails to be hidden
-	   hidden = availsToNameSet item_avails
-	   keep n = not (n `elemNameSet` hidden)
-  	in
-	returnM (pruneAvails keep total_avails, emptyNameSet)
+    if not want_hiding then
+	returnM (all_avails, rdr_env)
     else
-	-- Just item_avails imported; nothing to be hidden
-	returnM (item_avails, explicits)
+    let	-- Hide stuff in all_avails
+	   hidden = availsToNameSet (availEnvElts all_avails)
+	   keep n = not (n `elemNameSet` hidden)
+	   pruned_avails = pruneAvails keep total_avails
+    in
+    returnM (mkAvailEnv pruned_avails, mkGenericRdrEnv iface imp_spec pruned_avails)
   where
-    import_fm :: FiniteMap OccName AvailInfo
-    import_fm = listToFM [ (nameOccName name, avail) 
+    import_fm :: OccEnv AvailInfo
+    import_fm = mkOccEnv [ (nameOccName name, avail) 
 			 | avail <- total_avails,
 			   name  <- availNames avail]
 	-- Even though availNames returns data constructors too,
 	-- they won't make any difference because naked entities like T
 	-- in an import list map to TcOccs, not VarOccs.
 
-    bale_out item = addErr (badImportItemErr mod from item)	`thenM_`
-		    returnM []
+    bale_out item = addErr (badImportItemErr iface imp_spec item)	`thenM_`
+		    returnM (emptyAvailEnv, emptyGlobalRdrEnv)
 
-    get_item :: IE RdrName -> RnM [(AvailInfo, [Name])]
-	-- Empty list for a bad item.
-	-- Singleton is typical case.
+    mk_deprec = mi_dep_fn iface
+
+    succeed_with :: Bool -> AvailInfo -> RnM (AvailEnv, GlobalRdrEnv)
+    succeed_with all_explicit avail
+      = do { loc <- getSrcSpanM
+	   ; returnM (unitAvailEnv avail, 
+		      mkGlobalRdrEnv (map (mk_gre loc) (availNames avail))) }
+      where
+	mk_gre loc name = GRE { gre_name = name, 
+				gre_prov = Imported [this_imp_spec loc] (explicit name), 
+				gre_deprec = mk_deprec name }
+	this_imp_spec loc = imp_spec { is_loc = loc }
+	explicit name = all_explicit || name == main_name
+	main_name = availName avail
+
+    get_item :: IE RdrName -> RnM (AvailEnv, GlobalRdrEnv)
+	-- Empty result for a bad item.
+	-- Singleton result is typical case.
 	-- Can have two when we are hiding, and mention C which might be
 	--	both a class and a data constructor.  
-	-- The [Name] is the list of explicitly-mentioned names
-    get_item item@(IEModuleContents _) = bale_out item
+    get_item item@(IEModuleContents _) 
+      = bale_out item
 
     get_item item@(IEThingAll tc)
       = case check_item item of
@@ -462,24 +477,24 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 	  Just avail@(AvailTC _ [n]) -> 	-- This occurs when you import T(..), but
 						-- only export T abstractly.  The single [n]
 						-- in the AvailTC is the type or class itself
-					ifOptM Opt_WarnMisc (addWarn (dodgyImportWarn mod tc))	`thenM_`
-		     	 		returnM [(avail, [availName avail])]
-	  Just avail 		     -> returnM [(avail, [availName avail])]
+					ifOptM Opt_WarnMisc (addWarn (dodgyImportWarn tc))	`thenM_`
+		     	 		succeed_with False avail
+	  Just avail 		     -> succeed_with False avail
 
     get_item item@(IEThingAbs n)
       | want_hiding	-- hiding( C ) 
 			-- Here the 'C' can be a data constructor *or* a type/class
       = case catMaybes [check_item item, check_item (IEVar data_n)] of
-		[]     -> bale_out item
-		avails -> returnM [(a, []) | a <- avails]
-				-- The 'explicits' list is irrelevant when hiding
+	  []     -> bale_out item
+	  avails -> returnM (mkAvailEnv avails, emptyGlobalRdrEnv)
+			-- The GlobalRdrEnv result is irrelevant when hiding
       where
 	data_n = setRdrNameSpace n srcDataName
 
     get_item item
       = case check_item item of
 	  Nothing    -> bale_out item
-	  Just avail -> returnM [(avail, availNames avail)]
+	  Just avail -> succeed_with True avail
 
     check_item item
       | isNothing maybe_in_import_avails ||
@@ -491,7 +506,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 		
       where
  	wanted_occ	       = rdrNameOcc (ieName item)
-	maybe_in_import_avails = lookupFM import_fm wanted_occ
+	maybe_in_import_avails = lookupOccEnv import_fm wanted_occ
 
 	Just avail	       = maybe_in_import_avails
 	maybe_filtered_avail   = filterAvail item avail
@@ -561,9 +576,9 @@ type ExportAccum	-- The type of the accumulating parameter of
 	ExportOccMap,		-- Tracks exported occurrence names
 	AvailEnv)		-- The accumulated exported stuff, kept in an env
 				--   so we can common-up related AvailInfos
-emptyExportAccum = ([], emptyFM, emptyAvailEnv) 
+emptyExportAccum = ([], emptyOccEnv, emptyAvailEnv) 
 
-type ExportOccMap = FiniteMap OccName (Name, IE RdrName)
+type ExportOccMap = OccEnv (Name, IE RdrName)
 	-- Tracks what a particular exported OccName
 	--   in an export list refers to, and which item
 	--   it came from.  It's illegal to export two distinct things
@@ -706,8 +721,8 @@ check_occs ie occs avail
   = foldlM check occs (availNames avail)
   where
     check occs name
-      = case lookupFM occs name_occ of
-	  Nothing -> returnM (addToFM occs name_occ (name, ie))
+      = case lookupOccEnv occs name_occ of
+	  Nothing -> returnM (extendOccEnv occs name_occ (name, ie))
 
 	  Just (name', ie') 
 	    | name == name'  	-- Duplicate export
@@ -735,6 +750,7 @@ reportUnusedNames gbl_env
   = warnUnusedModules unused_imp_mods	`thenM_`
     warnUnusedTopBinds bad_locals	`thenM_`
     warnUnusedImports bad_imports	`thenM_`
+    warnDuplicateImports dup_imps	`thenM_`
     printMinimalImports minimal_imports
   where
     used_names, all_used_names :: NameSet
@@ -751,6 +767,7 @@ reportUnusedNames gbl_env
     defined_and_used, defined_but_not_used :: [GlobalRdrElt]
     (defined_and_used, defined_but_not_used) = partition is_used defined_names
 
+    dup_imps = filter isDupImport defined_and_used
     is_used gre = gre_name gre `elemNameSet` all_used_names
     
     -- Filter out the ones that are 
@@ -842,6 +859,18 @@ reportUnusedNames gbl_env
     module_unused mod = mod `elem` unused_imp_mods
 
 
+isDupImport (GRE {gre_prov = Imported imp_spec True}) = not (isSingleton imp_spec)
+isDupImport other				      = False
+		      
+warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
+warnDuplicateImports gres
+  = ifOptM Opt_WarnUnusedImports (mapM_ warn gres)
+  where
+    warn (GRE { gre_name = name, gre_prov = Imported imps _ })
+	= addWarn ((quotes (ppr name) <+> ptext SLIT("is imported more than once:")) 
+	       $$ nest 2 (vcat (map ppr imps)))
+			      
+
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports :: FiniteMap ModuleName AvailEnv	-- Minimal imports
 		    -> RnM ()
@@ -900,16 +929,15 @@ printMinimalImports imps
 %************************************************************************
 
 \begin{code}
-badImportItemErr mod from ie
-  = sep [ptext SLIT("Module"), quotes (ppr mod), source_import,
+badImportItemErr iface imp_spec ie
+  = sep [ptext SLIT("Module"), quotes (ppr (is_mod imp_spec)), source_import,
 	 ptext SLIT("does not export"), quotes (ppr ie)]
   where
-    source_import = case from of
-		      True  -> ptext SLIT("(hi-boot interface)")
-		      other -> empty
+    source_import | mi_boot iface = ptext SLIT("(hi-boot interface)")
+		  | otherwise     = empty
 
-dodgyImportWarn mod item = dodgyMsg (ptext SLIT("import")) item
-dodgyExportWarn     item = dodgyMsg (ptext SLIT("export")) item
+dodgyImportWarn item = dodgyMsg (ptext SLIT("import")) item
+dodgyExportWarn item = dodgyMsg (ptext SLIT("export")) item
 
 dodgyMsg kind tc
   = sep [ ptext SLIT("The") <+> kind <+> ptext SLIT("item") <+> quotes (ppr (IEThingAll tc)),

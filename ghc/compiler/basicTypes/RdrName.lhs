@@ -473,10 +473,11 @@ pprNameProvenance :: GlobalRdrElt -> SDoc
 pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef _})
   = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported (why:whys) _})
-  = sep [ppr_reason why, nest 2 (ppr_defn (nameSrcLoc name))]
+  = sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
 
-ppr_reason imp_spec
- = ptext SLIT("imported from") <+> ppr (is_mod imp_spec) 
+instance Outputable ImportSpec where
+   ppr imp_spec
+     = ptext SLIT("imported from") <+> ppr (is_mod imp_spec) 
 	<+> ptext SLIT("at") <+> ppr (is_loc imp_spec)
 
 ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("defined at") <+> ppr loc)
