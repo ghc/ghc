@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.56 1999/05/13 17:30:50 simonm Exp $
+# $Id: Makefile,v 1.57 1999/05/14 11:23:47 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -213,6 +213,7 @@ typecheck/TcGenDeriv_HC_OPTS	= -H10m
 
 # tmp, -- SDM
 specialise/Specialise_HC_OPTS 	+= -fno-prune-tydecls
+hsSyn/HsBasic_HC_OPTS		+= -fno-prune-tydecls
 
 # Was 10m for 2.10
 typecheck/TcHsSyn_HC_OPTS	= -H15m	
