@@ -615,7 +615,12 @@ lazyGet bh = do
 -- --------------------------------------------------------------
 
 initBinMemSize       = (1024*1024) :: Int
+
+#if   WORD_SIZE_IN_BITS == 32
 binaryInterfaceMagic = 0x1face :: Word32
+#elif WORD_SIZE_IN_BITS == 64
+binaryInterfaceMagic = 0x1face64 :: Word32
+#endif
 
 getBinFileWithDict :: Binary a => FilePath -> IO a
 getBinFileWithDict file_path = do
