@@ -29,6 +29,10 @@ instance Functor Tree where
 mapTree              :: (a -> b) -> (Tree a -> Tree b)
 mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
 
+-- explicit instance for Haddock's benefit
+instance Eq a => Eq (Tree a) where
+  Node x ts == Node x' ts'  =  x == x' && ts == ts'
+
 instance Show a => Show (Tree a) where
   show = showTree
   showList ts s = showForest ts ++ s
