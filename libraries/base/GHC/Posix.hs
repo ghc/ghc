@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hs,v 1.3 2002/02/13 14:26:01 simonmar Exp $
+-- $Id: Posix.hs,v 1.4 2002/02/14 07:33:09 sof Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -257,9 +257,6 @@ foreign import ccall unsafe "dup"
 foreign import ccall unsafe "dup2"
    c_dup2 :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "fpathconf"
-   c_fpathconf :: CInt -> CInt -> IO CLong
-
 foreign import ccall unsafe "fstat"
    c_fstat :: CInt -> Ptr CStat -> IO CInt
 
@@ -268,9 +265,6 @@ foreign import ccall unsafe "getcwd"
 
 foreign import ccall unsafe "isatty"
    c_isatty :: CInt -> IO CInt
-
-foreign import ccall unsafe "link"
-   c_link :: CString -> CString -> IO CInt
 
 foreign import ccall unsafe "lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
@@ -286,15 +280,6 @@ foreign import ccall unsafe "opendir"
 
 foreign import ccall unsafe "__hscore_mkdir"
    mkdir :: CString -> CInt -> IO CInt
-
-foreign import ccall unsafe "mkfifo"
-   c_mkfifo :: CString -> CMode -> IO CInt
-
-foreign import ccall unsafe "pathconf"
-   c_pathconf :: CString -> CInt -> IO CLong
-
-foreign import ccall unsafe "pipe"
-   c_pipe :: Ptr CInt -> IO CInt
 
 foreign import ccall unsafe "read" 
    c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
@@ -317,9 +302,6 @@ foreign import ccall unsafe "stat"
 foreign import ccall unsafe "umask"
    c_umask :: CMode -> IO CMode
 
-foreign import ccall unsafe "utime"
-   c_utime :: CString -> Ptr CUtimbuf -> IO CMode
-
 foreign import ccall unsafe "write" 
    c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
@@ -339,8 +321,23 @@ foreign import ccall unsafe "fcntl"
 foreign import ccall unsafe "fork"
    c_fork :: IO CPid 
 
+foreign import ccall unsafe "fpathconf"
+   c_fpathconf :: CInt -> CInt -> IO CLong
+
 foreign import ccall unsafe "__hscore_sigemptyset"
    c_sigemptyset :: Ptr CSigset -> IO ()
+
+foreign import ccall unsafe "link"
+   c_link :: CString -> CString -> IO CInt
+
+foreign import ccall unsafe "mkfifo"
+   c_mkfifo :: CString -> CMode -> IO CInt
+
+foreign import ccall unsafe "pathconf"
+   c_pathconf :: CString -> CInt -> IO CLong
+
+foreign import ccall unsafe "pipe"
+   c_pipe :: Ptr CInt -> IO CInt
 
 foreign import ccall unsafe "sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO ()
@@ -356,6 +353,9 @@ foreign import ccall unsafe "tcsetattr"
 
 foreign import ccall unsafe "uname"
    c_uname :: Ptr CUtsname -> IO CInt
+
+foreign import ccall unsafe "utime"
+   c_utime :: CString -> Ptr CUtimbuf -> IO CMode
 
 foreign import ccall unsafe "waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
