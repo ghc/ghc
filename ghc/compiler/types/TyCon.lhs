@@ -67,7 +67,7 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..),
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import Maybes		( expectJust, orElse )
+import Maybes		( orElse )
 import Outputable
 import FastString
 \end{code}

@@ -27,8 +27,7 @@ import TcType		( ThetaType, PredType, TyThing(..),
 import Var		( TyVar, tyVarKind )
 import Class		( Class )
 import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, tupleTyConBoxity,
-			  maybeTyConSingleCon, isEnumerationTyCon, 
-			  tyConArity, tyConName
+			  maybeTyConSingleCon, isEnumerationTyCon, tyConArity
 			)
 
 -- others:
