@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelList.lhs,v 1.22 2000/09/14 13:46:42 simonpj Exp $
+% $Id: PrelList.lhs,v 1.23 2001/02/26 09:29:32 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -157,9 +157,15 @@ filterList pred (x:xs)
 -- scanl1 is similar, again without the starting element:
 --      scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
-foldl                   :: (a -> b -> a) -> a -> [b] -> a
-foldl _ z []            =  z
-foldl f z (x:xs)        =  foldl f (f z x) xs
+-- We write foldl as a non-recursive thing, so that it
+-- can be inlined, and then (often) strictness-analysed,
+-- and hence the classic space leak on foldl (+) 0 xs
+
+foldl        :: (a -> b -> a) -> a -> [b] -> a
+foldl f z xs = lgo z xs
+	     where
+		lgo z []     =  z
+		lgo z (x:xs) = lgo (f z x) xs
 
 foldl1                  :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
