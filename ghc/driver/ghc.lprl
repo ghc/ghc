@@ -1380,11 +1380,14 @@ if ($Do_lnkr) {
     # for a linker, use an explicitly given one, or the going C compiler ...
     local($lnkr) = ( $Lnkr ) ? $Lnkr : $CcRegd;
 
+    if ( ($Specific_output_file eq '') && 
+         ($TargetPlatform eq 'i386-unknown-cygwin32') ) {
+         $Specific_output_file = 'main.exe';
+         print STDERR "Output file not specified, defaulting to \"main.exe\"\n";
+    }
+
     local($output) = ($Specific_output_file ne '') ? "-o $Specific_output_file" : '';
-    @Files_to_tidy = ($Specific_output_file ne '') ? 
-    		      $Specific_output_file : 
-		      ( ($TargetPlatform eq 'i386-unknown-cygwin32') ? 'main.exe' : 'a.out');
-    print STDERR "Output file not specified, defaulting to \"main.exe\"\n" if ($Specific_output_file eq '' && $TargetPlatform eq 'i386-unknown-cygwin32');
+    @Files_to_tidy = ($Specific_output_file ne '') ? $Specific_output_file : 'a.out'; 
 
     local($to_do) = "$lnkr $Verbose @Ld_flags $output @Link_file $TopClosureFile $libdirs @UserLibrary @SysLibrary";
     &run_something($to_do, 'Linker');
