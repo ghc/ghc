@@ -17,7 +17,7 @@ module Inst (
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, predsOfInst, predsOfInsts,
-	instLoc, getDictClassTys, 
+	instLoc, getDictClassTys, dictPred,
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
@@ -204,6 +204,9 @@ instToId (LitInst id _ _ _)    = id
 instLoc (Dict _ _         loc) = loc
 instLoc (Method _ _ _ _ _ loc) = loc
 instLoc (LitInst _ _ _    loc) = loc
+
+dictPred (Dict _ pred _ ) = pred
+dictPred inst		  = pprPanic "dictPred" (ppr inst)
 
 getDictClassTys (Dict _ pred _) = getClassPredTys pred
 
@@ -604,12 +607,16 @@ lookupInst dict@(Dict _ (ClassP clas tys) loc)
 				   Nothing 	    -> tcInstTyVar tv 	`thenNF_Tc` \ tc_tv ->
 						       returnTc (mkTyVarTy tc_tv)
 	   in
+		-- It's possible that not all the tyvars are in
+		-- the substitution, tenv. For example:
+		--	instance C X a => D X where ...
+		-- (presumably there's a functional dependency in class C)
+		-- Hence the mk_ty_arg to instantiate any un-substituted tyvars.	
 	   mapNF_Tc mk_ty_arg tyvars	`thenNF_Tc` \ ty_args ->
 	   let
-		subst	      = mkTyVarSubst tyvars ty_args
-		dfun_rho      = substTy subst rho
-		(theta, _)    = tcSplitRhoTy dfun_rho
-		ty_app        = mkHsTyApp (HsVar dfun_id) ty_args
+		dfun_rho   = substTy (mkTyVarSubst tyvars ty_args) rho
+		(theta, _) = tcSplitRhoTy dfun_rho
+		ty_app     = mkHsTyApp (HsVar dfun_id) ty_args
 	   in
 	   if null theta then
 		returnNF_Tc (SimpleInst ty_app)

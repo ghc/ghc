@@ -11,7 +11,7 @@ module TcSimplify (
 	tcSimplifyCheck, tcSimplifyRestricted,
 	tcSimplifyToDicts, tcSimplifyIPs, tcSimplifyTop,
 
-	tcSimplifyThetas, tcSimplifyCheckThetas,
+	tcSimplifyDeriv, tcSimplifyDefault,
 	bindInstsOfLocalFuns
     ) where
 
@@ -26,11 +26,11 @@ import TcHsSyn		( TcExpr, TcId,
 
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
-			  tyVarsOfInst, predsOfInsts, predsOfInst,
+			  tyVarsOfInst, predsOfInsts, predsOfInst, newDicts,
 			  isDict, isClassDict, isLinearInst, linearInstType,
 			  isStdClassTyVarDict, isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
-			  ipNamesOfInsts, ipNamesOfInst,
+			  ipNamesOfInsts, ipNamesOfInst, dictPred,
 			  instBindingRequired, instCanBeGeneralised,
 			  newDictsFromOld, newMethodAtLoc,
 			  getDictClassTys, isTyVarDict,
@@ -40,13 +40,14 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			)
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv, tcLookupGlobalId )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
-import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars )
+import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, PredType, 
 			  mkClassPred, isOverloadedTy, mkTyConApp,
-			  mkTyVarTy, tcGetTyVar, isTyVarClassPred,
+			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
 			  tyVarsOfPred, getClassPredTys_maybe, isClassPred, isIPPred,
 			  inheritablePred, predHasFDs )
 import Id		( idType, mkUserLocal )
+import Var		( TyVar )
 import Name		( getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig )
@@ -1020,6 +1021,9 @@ data WhatToDo
 
  | Free			  -- Return as free
 
+reduceMe :: Inst -> WhatToDo
+reduceMe inst = ReduceMe
+
 data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 				-- of a predicate when adding it to the avails
 \end{code}
@@ -1519,26 +1523,6 @@ than a selection.
 %************************************************************************
 
 
-If a dictionary constrains a type variable which is
-	* not mentioned in the environment
-	* and not mentioned in the type of the expression
-then it is ambiguous. No further information will arise to instantiate
-the type variable; nor will it be generalised and turned into an extra
-parameter to a function.
-
-It is an error for this to occur, except that Haskell provided for
-certain rules to be applied in the special case of numeric types.
-Specifically, if
-	* at least one of its classes is a numeric class, and
-	* all of its classes are numeric or standard
-then the type variable can be defaulted to the first type in the
-default-type list which is an instance of all the offending classes.
-
-So here is the function which does the work.  It takes the ambiguous
-dictionaries and either resolves them (producing bindings) or
-complains.  It works by splitting the dictionary list by type
-variable, and using @disambigOne@ to do the real business.
-
 @tcSimplifyTop@ is called once per module to simplify all the constant
 and ambiguous Insts.
 
@@ -1555,7 +1539,7 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 \begin{code}
 tcSimplifyTop :: LIE -> TcM TcDictBinds
 tcSimplifyTop wanted_lie
-  = simpleReduceLoop (text "tcSimplTop") try_me wanteds	`thenTc` \ (frees, binds, irreds) ->
+  = simpleReduceLoop (text "tcSimplTop") reduceMe wanteds	`thenTc` \ (frees, binds, irreds) ->
     ASSERT( null frees )
 
     let
@@ -1590,7 +1574,6 @@ tcSimplifyTop wanted_lie
     returnTc (binds `andMonoBinds` andMonoBindList binds_ambig)
   where
     wanteds	= lieToList wanted_lie
-    try_me inst	= ReduceMe
 
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
@@ -1599,6 +1582,26 @@ get_tv d   = case getDictClassTys d of
 get_clas d = case getDictClassTys d of
 		   (clas, [ty]) -> clas
 \end{code}
+
+If a dictionary constrains a type variable which is
+	* not mentioned in the environment
+	* and not mentioned in the type of the expression
+then it is ambiguous. No further information will arise to instantiate
+the type variable; nor will it be generalised and turned into an extra
+parameter to a function.
+
+It is an error for this to occur, except that Haskell provided for
+certain rules to be applied in the special case of numeric types.
+Specifically, if
+	* at least one of its classes is a numeric class, and
+	* all of its classes are numeric or standard
+then the type variable can be defaulted to the first type in the
+default-type list which is an instance of all the offending classes.
+
+So here is the function which does the work.  It takes the ambiguous
+dictionaries and either resolves them (producing bindings) or
+complains.  It works by splitting the dictionary list by type
+variable, and using @disambigOne@ to do the real business.
 
 @disambigOne@ assumes that its arguments dictionaries constrain all
 the same type variable.
@@ -1637,7 +1640,7 @@ disambigGroup dicts
       try_default (default_ty : default_tys)
 	= tryTc_ (try_default default_tys) $	-- If default_ty fails, we try
 						-- default_tys instead
-	  tcSimplifyCheckThetas [] theta	`thenTc` \ _ ->
+	  tcSimplifyDefault theta		`thenTc` \ _ ->
 	  returnTc default_ty
         where
 	  theta = [mkClassPred clas [default_ty] | clas <- classes]
@@ -1652,7 +1655,7 @@ disambigGroup dicts
 	-- Bind the type variable and reduce the context, for real this time
     unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenTc_`
     simpleReduceLoop (text "disambig" <+> ppr dicts)
-		     try_me dicts			`thenTc` \ (frees, binds, ambigs) ->
+		     reduceMe dicts			`thenTc` \ (frees, binds, ambigs) ->
     WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
     warnDefault dicts chosen_default_ty			`thenTc_`
     returnTc binds
@@ -1668,7 +1671,6 @@ disambigGroup dicts
     returnTc EmptyMonoBinds
 
   where
-    try_me inst = ReduceMe			-- This reduce should not fail
     tyvar       = get_tv (head dicts)		-- Should be non-empty
     classes     = map get_clas dicts
 \end{code}
@@ -1723,116 +1725,73 @@ a,b,c are type variables.  This is required for the context of
 instance declarations.
 
 \begin{code}
-tcSimplifyThetas :: ThetaType		-- Wanted
-	       	 -> TcM ThetaType		-- Needed
+tcSimplifyDeriv :: [TyVar]	
+		-> ThetaType		-- Wanted
+	        -> TcM ThetaType	-- Needed
 
-tcSimplifyThetas wanteds
-  = doptsTc Opt_GlasgowExts 		`thenNF_Tc` \ glaExts ->
-    reduceSimple [] wanteds		`thenNF_Tc` \ irreds ->
+tcSimplifyDeriv tyvars theta
+  = tcInstTyVars tyvars					`thenNF_Tc` \ (tvs, _, tenv) ->
+	-- The main loop may do unification, and that may crash if 
+	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
+	-- ToDo: what if two of them do get unified?
+    newDicts DataDeclOrigin (substTheta tenv theta)	`thenNF_Tc` \ wanteds ->
+    simpleReduceLoop doc reduceMe wanteds		`thenTc` \ (frees, _, irreds) ->
+    ASSERT( null frees )			-- reduceMe never returns Free
+
+    doptsTc Opt_AllowUndecidableInstances		`thenNF_Tc` \ undecidable_ok ->
     let
-	-- For multi-param Haskell, check that the returned dictionaries
- 	-- don't have any of the form (C Int Bool) for which
-	-- we expect an instance here
-	-- For Haskell 98, check that all the constraints are of the form C a,
-	-- where a is a type variable
-    	bad_guys | glaExts   = [pred | pred <- irreds,
-				       isEmptyVarSet (tyVarsOfPred pred)]
-		 | otherwise = [pred | pred <- irreds,
-				       not (isTyVarClassPred pred)]
+ 	tv_set      = mkVarSet tvs
+	simpl_theta = map dictPred irreds	-- reduceMe squashes all non-dicts
+
+	check_pred pred
+	  -- Check that the returned dictionaries are all of form (C a b)
+	  -- 	(where a, b are type variables).  
+	  -- Unless we have -fallow-undecidable-instances.
+	  | not undecidable_ok && not (isTyVarClassPred pred)
+          = addErrTc (noInstErr pred)
+  
+	  -- Check for a bizarre corner case, when the derived instance decl should
+	  -- have form 	instance C a b => D (T a) where ...
+	  -- Note that 'b' isn't a parameter of T.  This gives rise to all sorts
+	  -- of problems; in particular, it's hard to compare solutions for
+	  -- equality when finding the fixpoint.  So I just rule it out for now.
+	  | not (tyVarsOfPred pred `subVarSet` tv_set) 
+	  = addErrTc (badDerivedPred pred)
+  
+	  | otherwise
+	  = returnNF_Tc ()
+
+	rev_env = mkTopTyVarSubst tvs (mkTyVarTys tyvars)
+		-- This reverse-mapping is a Royal Pain, 
+		-- but the result should mention TyVars not TcTyVars
     in
-    if null bad_guys then
-	returnTc irreds
-    else
-       mapNF_Tc addNoInstErr bad_guys		`thenNF_Tc_`
-       failTc
+   
+    mapNF_Tc check_pred simpl_theta		`thenNF_Tc_`
+    checkAmbiguity tvs simpl_theta tv_set	`thenTc_`
+    returnTc (substTheta rev_env simpl_theta)
+  where
+    doc    = ptext SLIT("deriving classes for a data type")
 \end{code}
 
-@tcSimplifyCheckThetas@ just checks class-type constraints, essentially;
+@tcSimplifyDefault@ just checks class-type constraints, essentially;
 used with \tr{default} declarations.  We are only interested in
 whether it worked or not.
 
 \begin{code}
-tcSimplifyCheckThetas :: ThetaType	-- Given
-		      -> ThetaType	-- Wanted
-		      -> TcM ()
+tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
+		  -> TcM ()
 
-tcSimplifyCheckThetas givens wanteds
-  = reduceSimple givens wanteds    `thenNF_Tc`	\ irreds ->
+tcSimplifyDefault theta
+  = newDicts DataDeclOrigin theta		`thenNF_Tc` \ wanteds ->
+    simpleReduceLoop doc reduceMe wanteds	`thenTc` \ (frees, _, irreds) ->
+    ASSERT( null frees )	-- try_me never returns Free
+    mapNF_Tc (addErrTc . noInstErr) irreds 	`thenNF_Tc_`
     if null irreds then
-       returnTc ()
+	returnTc ()
     else
-       mapNF_Tc addNoInstErr irreds		`thenNF_Tc_`
-       failTc
-\end{code}
-
-
-\begin{code}
-type AvailsSimple = FiniteMap PredType Bool
-		    -- True  => irreducible
-		    -- False => given, or can be derived from a given or from an irreducible
-
-reduceSimple :: ThetaType			-- Given
-	     -> ThetaType			-- Wanted
-	     -> NF_TcM ThetaType		-- Irreducible
-
-reduceSimple givens wanteds
-  = reduce_simple (0,[]) givens_fm wanteds	`thenNF_Tc` \ givens_fm' ->
-    returnNF_Tc [pred | (pred,True) <- fmToList givens_fm']
+	failTc
   where
-    givens_fm     = foldl addNonIrred emptyFM givens
-
-reduce_simple :: (Int,ThetaType)		-- Stack
-	      -> AvailsSimple
-	      -> ThetaType
-	      -> NF_TcM AvailsSimple
-
-reduce_simple (n,stack) avails wanteds
-  = go avails wanteds
-  where
-    go avails []     = returnNF_Tc avails
-    go avails (w:ws) = reduce_simple_help (n+1,w:stack) avails w	`thenNF_Tc` \ avails' ->
-		       go avails' ws
-
-reduce_simple_help stack givens wanted
-  | wanted `elemFM` givens
-  = returnNF_Tc givens
-
-  | Just (clas, tys) <- getClassPredTys_maybe wanted
-  = lookupSimpleInst clas tys	`thenNF_Tc` \ maybe_theta ->
-    case maybe_theta of
-      Nothing ->    returnNF_Tc (addSimpleIrred givens wanted)
-      Just theta -> reduce_simple stack (addNonIrred givens wanted) theta
-
-  | otherwise
-  = returnNF_Tc (addSimpleIrred givens wanted)
-
-addSimpleIrred :: AvailsSimple -> PredType -> AvailsSimple
-addSimpleIrred givens pred
-  = addSCs (addToFM givens pred True) pred
-
-addNonIrred :: AvailsSimple -> PredType -> AvailsSimple
-addNonIrred givens pred
-  = addSCs (addToFM givens pred False) pred
-
-addSCs givens pred
-  | not (isClassPred pred) = givens
-  | otherwise		   = foldl add givens sc_theta
- where
-   Just (clas,tys) = getClassPredTys_maybe pred
-   (tyvars, sc_theta_tmpl, _, _) = classBigSig clas
-   sc_theta = substTheta (mkTopTyVarSubst tyvars tys) sc_theta_tmpl
-
-   add givens ct
-     = case lookupFM givens ct of
-       Nothing    -> -- Add it and its superclasses
-		     addSCs (addToFM givens ct False) ct
-
-       Just True  -> -- Set its flag to False; superclasses already done
-		     addToFM givens ct False
-
-       Just False -> -- Already done
-		     givens
-
+    doc = ptext SLIT("default declaration")
 \end{code}
 
 
@@ -1979,8 +1938,12 @@ addNoInstanceErrs what_doc givens dicts
     addInstErrTcM (instLoc (head dicts)) (tidy_env2, doc)
 
 -- Used for the ...Thetas variants; all top level
-addNoInstErr pred
-  = addErrTc (ptext SLIT("No instance for") <+> quotes (ppr pred))
+noInstErr pred = ptext SLIT("No instance for") <+> quotes (ppr pred)
+
+badDerivedPred pred
+  = vcat [ptext SLIT("Can't derive instances where the instance context mentions"),
+	  ptext SLIT("type variables that are not data type parameters"),
+	  nest 2 (ptext SLIT("Offending constraint:") <+> ppr pred)]
 
 reduceDepthErr n stack
   = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,

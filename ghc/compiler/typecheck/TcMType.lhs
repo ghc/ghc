@@ -27,7 +27,7 @@ module TcMType (
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, pprUserTypeCtxt,
   SourceTyCtxt(..), checkValidTheta, 
-  checkValidInstHead, instTypeErr,
+  checkValidInstHead, instTypeErr, checkAmbiguity,
 
   --------------------------------
   -- Zonking
@@ -680,7 +680,8 @@ check_poly_type rank ty
     in
     check_valid_theta SigmaCtxt theta		`thenTc_`
     check_tau_type (decRank rank) False tau	`thenTc_`
-    checkAmbiguity tvs theta tau
+    checkFreeness tvs theta 			`thenTc_`
+    checkAmbiguity tvs theta (tyVarsOfType tau)
 
 ----------------------------------------
 check_arg_type :: Type -> TcM ()
@@ -756,6 +757,13 @@ check_tau_type rank ubx_tup_ok ty@(TyConApp tc tys)
 ----------------------------------------
 check_note (FTVNote _)  = returnTc ()
 check_note (SynNote ty) = check_tau_type (Rank 0) False ty
+
+----------------------------------------
+forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr_ty ty
+usageTyErr      ty = ptext SLIT("Illegal usage type:") <+> ppr_ty ty
+unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr_ty ty
+ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr_ty ty
+kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
 \end{code}
 
 Check for ambiguity
@@ -770,12 +778,6 @@ when we speak of 'mentioned in tau'.  Example:
 Then the type
 	forall x y. (C x y) => x
 is not ambiguous because x is mentioned and x determines y
-
-NOTE: In addition, GHC insists that at least one type variable
-in each constraint is in V.  So we disallow a type like
-	forall a. Eq b => b -> b
-even in a scope where b is in scope.
-This is the is_free test below.
 
 NB; the ambiguity check is only used for *user* types, not for types
 coming from inteface files.  The latter can legitimately have
@@ -795,45 +797,46 @@ don't need to check for ambiguity either, because the test can't fail
 (see is_ambig).
 
 \begin{code}
-checkAmbiguity :: [TyVar] -> ThetaType -> Type -> TcM ()
-checkAmbiguity forall_tyvars theta tau
-  = mapTc_ check_pred theta	`thenTc_`
-    returnTc ()
+checkAmbiguity :: [TyVar] -> ThetaType -> TyVarSet -> TcM ()
+checkAmbiguity forall_tyvars theta tau_tyvars
+  = mapTc_ complain (filter is_ambig theta)
   where
-    tau_vars	      = tyVarsOfType tau
-    extended_tau_vars = grow theta tau_vars
+    complain pred     = addErrTc (ambigErr pred)
+    extended_tau_vars = grow theta tau_tyvars
+    is_ambig pred     = any ambig_var (varSetElems (tyVarsOfPred pred))
 
-    is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
+    ambig_var ct_var  = (ct_var `elem` forall_tyvars) &&
 		        not (ct_var `elemVarSet` extended_tau_vars)
-    is_free ct_var    = not (ct_var `elem` forall_tyvars)
-    
-    check_pred pred = checkTc (not any_ambig)                 (ambigErr pred) `thenTc_`
-	    	      checkTc (isIPPred pred || not all_free) (freeErr  pred)
-             where 
-	    	ct_vars	  = varSetElems (tyVarsOfPred pred)
-	    	all_free  = all is_free ct_vars
-	    	any_ambig = any is_ambig ct_vars
-\end{code}
 
-\begin{code}
+    is_free ct_var    = not (ct_var `elem` forall_tyvars)
+
 ambigErr pred
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
 	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$
 		 ptext SLIT("must be reachable from the type after the '=>'"))]
+\end{code}
+    
+In addition, GHC insists that at least one type variable
+in each constraint is in V.  So we disallow a type like
+	forall a. Eq b => b -> b
+even in a scope where b is in scope.
 
+\begin{code}
+checkFreeness forall_tyvars theta
+  = mapTc_ complain (filter is_free theta)
+  where    
+    is_free pred     =  not (isIPPred pred)
+		     && not (any bound_var (varSetElems (tyVarsOfPred pred)))
+    bound_var ct_var = ct_var `elem` forall_tyvars
+    complain pred    = addErrTc (freeErr pred)
 
 freeErr pred
   = sep [ptext SLIT("All of the type variables in the constraint") <+> quotes (pprPred pred) <+>
 		   ptext SLIT("are already in scope"),
 	 nest 4 (ptext SLIT("At least one must be universally quantified here"))
     ]
-
-forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr_ty ty
-usageTyErr      ty = ptext SLIT("Illegal usage type:") <+> ppr_ty ty
-unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr_ty ty
-ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr_ty ty
-kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
 \end{code}
+
 
 %************************************************************************
 %*									*

@@ -23,7 +23,7 @@ import TcEnv		( tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( InstEnv, simpleDFunClassTyCon, extendInstEnv )
 import TcMonoType	( tcHsPred )
-import TcSimplify	( tcSimplifyThetas )
+import TcSimplify	( tcSimplifyDeriv )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( bindLocatedLocalsRn )
@@ -47,11 +47,11 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
-			  tcSplitTyConApp_maybe, tcEqTypes )
+			  tcSplitTyConApp_maybe, tcEqTypes, tyVarsOfTheta )
 import Var		( TyVar, tyVarKind )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
-import Util		( zipWithEqual, sortLt )
+import Util		( zipWithEqual, sortLt, eqListBy )
 import ListSetOps	( removeDups,  assoc )
 import Outputable
 import Maybe		( isJust )
@@ -318,7 +318,7 @@ makeDerivEqns tycl_decls
     mk_eqn (new_or_data, tycon_name, pred)
       = tcLookupTyCon tycon_name		`thenNF_Tc` \ tycon ->
 	tcAddSrcLoc (getSrcLoc tycon)		$
-        tcAddErrCtxt (derivCtxt tycon)		$
+        tcAddErrCtxt (derivCtxt Nothing tycon)	$
 	tcExtendTyVarEnv (tyConTyVars tycon)	$	-- Deriving preds may (now) mention
 							-- the type variables for the type constructor
         tcHsPred pred				`thenTc` \ pred' ->
@@ -501,36 +501,29 @@ solveDerivEqns inst_env_in orig_eqns
 	-- It fails if any iteration fails
     iterateDeriv :: [DerivSoln] ->TcM [DFunId]
     iterateDeriv current_solns
-      = checkNoErrsTc (iterateOnce current_solns)
-						`thenTc` \ (new_dfuns, new_solns) ->
+      =	getDOptsTc				`thenNF_Tc` \ dflags ->
+        let 
+	    dfuns    = zipWithEqual "add_solns" mk_deriv_dfun orig_eqns current_solns
+	    inst_env = extend_inst_env dflags inst_env_in dfuns
+        in
+        checkNoErrsTc (
+		  -- Extend the inst info from the explicit instance decls
+		  -- with the current set of solutions, and simplify each RHS
+	    tcSetInstEnv inst_env $
+	    mapTc gen_soln orig_eqns
+	)				`thenTc` \ new_solns ->
 	if (current_solns == new_solns) then
-	    returnTc new_dfuns
+	    returnTc dfuns
 	else
 	    iterateDeriv new_solns
 
     ------------------------------------------------------------------
-    iterateOnce current_solns
-      =	    -- Extend the inst info from the explicit instance decls
-	    -- with the current set of solutions, giving a
-	getDOptsTc				`thenNF_Tc` \ dflags ->
-        let 
-	    new_dfuns = zipWithEqual "add_solns" mk_deriv_dfun orig_eqns current_solns
-	    inst_env  = extend_inst_env dflags inst_env_in new_dfuns
-	    -- the eqns and solns move "in lockstep"; we have the eqns
-	    -- because we need the LHS info for addClassInstance.
-        in
-	    -- Simplify each RHS
-	tcSetInstEnv inst_env (
-	  listTc [ tcAddSrcLoc (getSrcLoc tc)	$
-		   tcAddErrCtxt (derivCtxt tc)	$
-		   tcSimplifyThetas deriv_rhs
-	         | (_, _,tc,_,deriv_rhs) <- orig_eqns ]  
-	)					`thenTc` \ next_solns ->
 
-	    -- Canonicalise the solutions, so they compare nicely
-	let canonicalised_next_solns = [ sortLt (<) next_soln | next_soln <- next_solns ]
-	in
-	returnTc (new_dfuns, canonicalised_next_solns)
+    gen_soln (_, clas, tc,tyvars,deriv_rhs)
+      = tcAddSrcLoc (getSrcLoc tc)		$
+	tcAddErrCtxt (derivCtxt (Just clas) tc)	$
+	tcSimplifyDeriv tyvars deriv_rhs	`thenTc` \ theta ->
+	returnTc (sortLt (<) theta)	-- Canonicalise before returning the soluction
 \end{code}
 
 \begin{code}
@@ -724,7 +717,12 @@ derivingThingErr clas tys tycon tyvars why
 
 malformedPredErr tycon pred = ptext SLIT("Illegal deriving item") <+> ppr pred
 
-derivCtxt tycon
-  = ptext SLIT("When deriving classes for") <+> quotes (ppr tycon)
+derivCtxt :: Maybe Class -> TyCon -> SDoc
+derivCtxt maybe_cls tycon
+  = ptext SLIT("When deriving") <+> cls <+> ptext SLIT("for type") <+> quotes (ppr tycon)
+  where
+    cls = case maybe_cls of
+	    Nothing -> ptext SLIT("instances")
+	    Just c  -> ptext SLIT("the") <+> quotes (ppr c) <+> ptext SLIT("instance")
 \end{code}
 
