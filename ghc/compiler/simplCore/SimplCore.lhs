@@ -209,6 +209,21 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
 
 	-- Glom all binds together in one Rec, in case any
 	-- transformations have introduced any new dependencies
+	--
+	-- NB: the global invariant is this:
+	--	*** the top level bindings are never cloned, and are always unique ***
+	--
+	-- We sort them into dependency order, but applying transformation rules may
+	-- make something at the top refer to something at the bottom:
+	--	f = \x -> p (q x)
+	--	h = \y -> 3
+	--	
+	--	RULE:  p (q x) = h x
+	--
+	-- Applying this rule makes f refer to h, although it doesn't appear to in the
+	-- source program.  Our solution is to do this occasional glom-together step,
+	-- just once per overall simplfication step.
+
 	let { recd_binds = [Rec (flattenBinds binds)] };
 
 	(termination_msg, it_count, counts_out, binds') <- iteration us 1 zeroSimplCount recd_binds;
