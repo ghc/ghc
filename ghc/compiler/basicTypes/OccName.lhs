@@ -27,7 +27,7 @@ module OccName (
 	mkSrcOccFS, mkSysOcc, mkSysOccFS, mkSrcVarOcc, mkKindOccFS,
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
- 	mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
+ 	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
 	
 	isTvOcc, isDataOcc, isDataSymOcc, isSymOcc,
 
@@ -401,8 +401,9 @@ mkDictOcc, mkWorkerOcc, mkDefaultMethodOcc,
 -- These derived variables have a prefix that no Haskell value could have
 mkWorkerOcc        = mk_simple_deriv varName  "$w"
 mkDefaultMethodOcc = mk_simple_deriv varName  "$dm"
-mkClassTyConOcc    = mk_simple_deriv tcName   ":T"	-- The : prefix makes sure it classifies
-mkClassDataConOcc  = mk_simple_deriv dataName ":D"	-- as a tycon/datacon
+mkDerivedTyConOcc  = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it classifies
+mkClassTyConOcc    = mk_simple_deriv tcName   ":T"	-- as a tycon/datacon
+mkClassDataConOcc  = mk_simple_deriv dataName ":D"	--
 mkDictOcc	   = mk_simple_deriv varName  "$d"
 mkSpecOcc	   = mk_simple_deriv varName  "$s"
 mkForeignExportOcc = mk_simple_deriv varName  "$f"

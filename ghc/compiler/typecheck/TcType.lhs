@@ -58,7 +58,8 @@ import Type		( Type(..), Kind, ThetaType, TyNote(..),
 			  fullSubstTy, substTopTy, 
 			  typeCon, openTypeKind, boxedTypeKind, boxedKind, superKind, superBoxity
 			)
-import TyCon		( tyConKind )
+import TyCon		( tyConKind, mkPrimTyCon )
+import PrimRep		( PrimRep(VoidRep) )
 import VarEnv
 import VarSet		( emptyVarSet )
 import Var		( TyVar, tyVarKind, tyVarName, isTyVar, isMutTyVar, mkTyVar )
@@ -67,8 +68,10 @@ import Var		( TyVar, tyVarKind, tyVarName, isTyVar, isMutTyVar, mkTyVar )
 import TcMonad
 import TysWiredIn	( voidTy )
 
-import Name		( NamedThing(..), setNameUnique, mkSysLocalName )
-import Unique		( Unique )
+import Name		( NamedThing(..), setNameUnique, mkSysLocalName,
+			  mkDerivedName, mkDerivedTyConOcc
+			)
+import Unique		( Unique, Uniquable(..) )
 import Util		( nOfThem )
 import Outputable
 \end{code}
@@ -336,15 +339,14 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
 		tcPutTyVar tv voidTy	-- Just to avoid creating a new tycon in
 					-- this vastly common case
 	  else
-		tcPutTyVar tv (TyConApp (mk_void_tycon tv) [])
+		tcPutTyVar tv (TyConApp (mk_void_tycon tv kind) [])
 
-    mk_void_tycon tv	-- Make a new TyCon with the same kind as the 
-			-- type variable tv.  Same name too, apart from
-			-- making it start with a capital letter (sigh)
-			-- I can't quite bring myself to write the Name-fiddling
-			-- code yet.  ToDo.  SLPJ Nov 98
-	= pprPanic "zonkTcTypeToType: free type variable with non-* type:" (ppr tv)
-
+    mk_void_tycon tv kind	-- Make a new TyCon with the same kind as the 
+				-- type variable tv.  Same name too, apart from
+				-- making it start with a colon (sigh)
+	= mkPrimTyCon tc_name kind 0 VoidRep
+	where
+	  tc_name = mkDerivedName mkDerivedTyConOcc (getName tv) (getUnique tv)
 
 -- zonkTcTyVarToTyVar is applied to the *binding* occurrence 
 -- of a type variable, at the *end* of type checking.
