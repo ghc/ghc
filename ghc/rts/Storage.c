@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.12 1999/02/05 16:03:01 simonm Exp $
+ * $Id: Storage.c,v 1.13 1999/02/17 17:35:31 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -114,6 +114,8 @@ initStorage (void)
       step->hp = NULL;
       step->hpLim = NULL;
       step->hp_bd = NULL;
+      step->scan = NULL;
+      step->scan_bd = NULL;
       step->large_objects = NULL;
       step->new_large_objects = NULL;
       step->scavenged_large_objects = NULL;
