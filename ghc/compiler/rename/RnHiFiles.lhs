@@ -18,10 +18,10 @@ import DriverUtil	( splitFilename, replaceFilenameSuffix )
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Parser		( parseIface )
 import HscTypes		( ModIface(..), emptyModIface,
-			  ExternalPackageState(..), 
+			  ExternalPackageState(..), noDependencies,
 			  VersionInfo(..), Usage(..),
 			  lookupIfaceByModName, RdrExportItem, 
-			  WhetherHasOrphans, IsBootInterface,
+			  IsBootInterface,
 			  DeclsMap, GatedDecl, IfaceInsts, IfaceRules, mkIfaceDecls,
 			  AvailInfo, GenAvailInfo(..), ParsedIface(..), IfaceDeprecs,
 			  Avails, availNames, availName, Deprecations(..)
@@ -135,18 +135,16 @@ loadInterface doc_str mod_name from
 			-- before we got to real imports.  
 	other	    -> 
 
-   traceRn (vcat [text "loadInterface" <+> brackets doc_str,
-		  ppr (dep_mods import_avails)])	`thenM_`
    let
-	mod_map  = dep_mods import_avails
+	mod_map  = imp_dep_mods import_avails
 	mod_info = lookupModuleEnvByName mod_map mod_name
 
 	hi_boot_file 
 	  = case (from, mod_info) of
-		(ImportByUser   is_boot, _)  	       -> is_boot
-		(ImportForUsage is_boot, _)	       -> is_boot
-		(ImportBySystem, Just (_, _, is_boot)) -> is_boot
-		(ImportBySystem, Nothing)	       -> False
+		(ImportByUser   is_boot, _)  	    -> is_boot
+		(ImportForUsage is_boot, _)	    -> is_boot
+		(ImportBySystem, Just (_, is_boot)) -> is_boot
+		(ImportBySystem, Nothing)	    -> False
 			-- We're importing a module we know absolutely
 			-- nothing about, so we assume it's from
 			-- another package, where we aren't doing 
@@ -154,8 +152,8 @@ loadInterface doc_str mod_name from
 
 	redundant_source_import 
 	  = case (from, mod_info) of 
-		(ImportByUser True, Just (_, _, False)) -> True
-		other			                -> False
+		(ImportByUser True, Just (_, False)) -> True
+		other			             -> False
    in
 
 	-- Issue a warning for a redundant {- SOURCE -} import
@@ -685,7 +683,7 @@ ghcPrimIface :: ParsedIface
 ghcPrimIface = ParsedIface {
       pi_mod	 = gHC_PRIM_Name,
       pi_pkg     = basePackage,
-      pi_deps    = ([],[]),
+      pi_deps    = noDependencies,
       pi_vers    = 1,
       pi_orphan  = False,
       pi_usages  = [],

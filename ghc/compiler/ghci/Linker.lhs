@@ -16,7 +16,7 @@ necessary.
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module Linker ( HValue, initLinker, showLinkerState,
-		linkPackages, linkLibraries,
+		linkPackages, linkLibraries, findLinkable,
 		linkModules, unload, extendLinkEnv, linkExpr,
 		LibrarySpec(..)
 	) where
@@ -33,16 +33,19 @@ import ByteCodeAsm	( CompiledByteCode(..), bcosFreeNames,
 import Packages		( PackageConfig(..), PackageName, PackageConfigMap, lookupPkg,
 			  packageDependents, packageNameString )
 import DriverState	( v_Library_paths, v_Cmdline_libraries, getPackageConfigMap )
-
+import DriverUtil	( splitFilename3 )
+import Finder		( findModule )
 import HscTypes		( Linkable(..), isObjectLinkable, nameOfObject, byteCodeOfObject,
-			  Unlinked(..), isInterpretable, isObject,
+			  Unlinked(..), isInterpretable, isObject, Dependencies(..),
 			  HscEnv(..), PersistentCompilerState(..), ExternalPackageState(..),
-			  HomePackageTable, PackageIfaceTable, ModIface(..), HomeModInfo(..) )
+			  HomePackageTable, PackageIfaceTable, ModIface(..), HomeModInfo(..),
+			  lookupIface )
 import Name		( Name,  nameModule, isExternalName )
 import NameEnv
 import NameSet		( nameSetToList )
-import Module		( Module, ModuleName, moduleName, lookupModuleEnvByName )
+import Module		( ModLocation(..), Module, ModuleName, moduleName, lookupModuleEnvByName )
 import FastString	( FastString(..), unpackFS )
+import ListSetOps	( minusList )
 import CmdLineOpts	( DynFlags(verbosity) )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
@@ -54,10 +57,10 @@ import ErrUtils		( Message )
 import Control.Monad	( when, filterM, foldM )
 
 import Data.IORef	( IORef, readIORef, writeIORef )
-import Data.List	( partition )
+import Data.List	( partition, nub )
 
 import System.IO	( putStr, putStrLn, hPutStrLn, stderr, fixIO )
-import System.Directory	( doesFileExist )
+import System.Directory	( doesFileExist, getModificationTime )
 
 import Control.Exception ( block, throwDyn )
 
@@ -176,11 +179,11 @@ linkExpr :: HscEnv -> PersistentCompilerState
 -- dependents to link.
 
 linkExpr hsc_env pcs (root_ul_bco, aux_ul_bcos)
-   = 	-- Find what packages and linkables are required
-     case getLinkDeps hpt pit needed_mods of {
-	Left msg -> dieWith (msg $$ ptext SLIT("When linking an expression")) ;
-	Right (lnks, pkgs) -> do {
+  = do {  
+	-- Find what packages and linkables are required
+     (lnks, pkgs) <- getLinkDeps hpt pit needed_mods ;
 
+	-- Link the packages and modules required
      linkPackages dflags pkgs
    ; ok <-  linkModules dflags lnks
    ; if failed ok then
@@ -195,7 +198,7 @@ linkExpr hsc_env pcs (root_ul_bco, aux_ul_bcos)
 	-- Link the necessary packages and linkables
    ; (_, (root_hval:_)) <- linkSomeBCOs False ie ce all_bcos
    ; return root_hval
-   }}}
+   }}
    where
      pit    = eps_PIT (pcs_EPS pcs)
      hpt    = hsc_HPT hsc_env
@@ -209,45 +212,62 @@ linkExpr hsc_env pcs (root_ul_bco, aux_ul_bcos)
 dieWith msg = throwDyn (UsageError (showSDoc msg))
 
 getLinkDeps :: HomePackageTable -> PackageIfaceTable
-	    -> [Module]					-- If you need these
-	    -> Either Message
-		      ([Linkable], [PackageName])	-- ... then link these first
-
--- Find all the packages and linkables that a set of modules depends on
+	    -> [Module]				-- If you need these
+	    -> IO ([Linkable], [PackageName])	-- ... then link these first
+-- Fails with an IO exception if it can't find enough files
 
 getLinkDeps hpt pit mods
-  = go [] 	-- Linkables so far
-       [] 	-- Packages so far
-       [] 	-- Modules dealt with
-       (map moduleName mods)	-- The usage info that we use for 
-				-- dependencies has ModuleNames not Modules
+-- Find all the packages and linkables that a set of modules depends on
+ = do {	pls <- readIORef v_PersistentLinkerState ;
+	let {
+	-- 1.  Find the iface for each module (must exist), 
+	--     and extract its dependencies
+	    deps = [ mi_deps (get_iface mod) | mod <- mods ] ;
+
+	-- 2.  Find the dependent home-pkg-modules/packages from each iface
+	--     Include mods themselves; and exclude ones already linked
+	    mods_needed = nub (map moduleName mods ++ [m | dep <- deps, (m,_) <- dep_mods dep])
+			    `minusList`
+		          linked_mods ;
+	    linked_mods = map linkableModName (objs_loaded pls ++ bcos_loaded pls) ;
+
+	    pkgs_needed = nub (concatMap dep_pkgs deps)
+			     `minusList`
+		          pkgs_loaded pls } ;
+	
+	-- 3.  For each dependent module, find its linkable
+	--     This will either be in the HPT or (in the case of one-shot compilation)
+	--     we may need to use maybe_getFileLinkable
+	lnks_needed <- mapM get_linkable mods_needed ;
+
+	return (lnks_needed, pkgs_needed) }
   where
-     go lnks pkgs _ 	    [] = Right (lnks,pkgs)
-     go lnks pkgs mods_done (mod:mods) 
-	| mod `elem` mods_done 
-	= 	-- Already dealt with
-	  go lnks pkgs mods_done mods	
+    get_iface mod = case lookupIface hpt pit mod of
+			Just iface -> iface
+			Nothing    -> pprPanic "getLinkDeps" (no_iface mod)
+    no_iface mod = ptext SLIT("No iface for") <+> ppr mod
+	-- This one is a GHC bug
 
-	| Just mod_info <- lookupModuleEnvByName hpt mod 
-	= 	-- OK, so it's a home module
-	  let
-	     mod_deps = [m | (m,_,_,_) <- mi_usages (hm_iface mod_info)]
-		-- Get the modules that this one depends on
-	  in
-	  go (hm_linkable mod_info : lnks) pkgs (mod : mods_done) (mod_deps ++ mods)
+    no_obj mod = dieWith (ptext SLIT("No compiled code for for") <+> ppr mod)
+	-- This one is a build-system bug
 
-	| Just pkg_iface <- lookupModuleEnvByName pit mod 
-	=	-- It's a package module, so add it to the package list
-	  let
-	     pkg_name = mi_package pkg_iface
-	     pkgs' | pkg_name `elem` pkgs = pkgs
-		   | otherwise		  = pkg_name : pkgs
-	  in
-	  go lnks pkgs' (mod : mods_done) mods
+    get_linkable mod_name	-- A home-package module
+	| Just mod_info <- lookupModuleEnvByName hpt mod_name 
+	= return (hm_linkable mod_info)
+	| otherwise	
+	=	-- It's not in the HPT because we are in one shot mode, 
+		-- so use the Finder to get a ModLocation...
+	  do { mb_stuff <- findModule mod_name ;
+	       case mb_stuff of {
+		  Nothing -> no_obj mod_name ;
+		  Just (_, loc) -> do {
 
-	| otherwise
-	= 	-- Not in either table
-	  Left (ptext SLIT("Can't find compiled code for dependent module") <+> ppr mod)
+		-- ...and then find the linkable for it
+	       mb_lnk <- findLinkable mod_name loc ;
+	       case mb_lnk of {
+		  Nothing -> no_obj mod_name ;
+		  Just lnk -> return lnk
+	  }}}} 
 \end{code}			  
 
 
@@ -761,6 +781,24 @@ findFile mk_file_path (dir:dirs)
 	     return (Just file_path)
 	  else
 	     findFile mk_file_path dirs }
+
+
+findLinkable :: ModuleName -> ModLocation -> IO (Maybe Linkable)
+findLinkable mod locn
+   | Just obj_fn <- ml_obj_file locn
+   = do obj_exist <- doesFileExist obj_fn
+        if not obj_exist 
+         then return Nothing 
+         else 
+         do let stub_fn = case splitFilename3 obj_fn of
+                             (dir, base, ext) -> dir ++ "/" ++ base ++ ".stub_o"
+            stub_exist <- doesFileExist stub_fn
+            obj_time <- getModificationTime obj_fn
+            if stub_exist
+             then return (Just (LM obj_time mod [DotO obj_fn, DotO stub_fn]))
+             else return (Just (LM obj_time mod [DotO obj_fn]))
+   | otherwise
+   = return Nothing
 \end{code}
 
 \begin{code}

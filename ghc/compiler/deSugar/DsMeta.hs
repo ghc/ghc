@@ -52,8 +52,10 @@ import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
 -- ws previously used in this file.
 import qualified OccName( varName, tcName )
 
-import Module	  ( moduleUserString )
+import Module	  ( Module, mkThPkgModule, moduleUserString )
 import Id         ( Id, idType )
+import Name	  ( mkKnownKeyExternalName )
+import OccName	  ( mkOccFS )
 import NameEnv
 import NameSet
 import Type       ( Type, TyThing(..), mkGenTyConApp )
@@ -976,7 +978,7 @@ thModule :: Module
 -- NB: the THSyntax module comes from the "haskell-src" package
 thModule = mkThPkgModule mETA_META_Name
 
-mk_known_key_name space mod str uniq 
+mk_known_key_name space str uniq 
   = mkKnownKeyExternalName thModule (mkOccFS space str) uniq 
 
 intLName       = varQual FSLIT("intL")          intLIdKey

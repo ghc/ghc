@@ -100,7 +100,7 @@ import HscTypes		( PersistentCompilerState(..), InteractiveContext(..),
 			  ModIface, ModDetails(..), ModGuts(..),
 			  HscEnv(..), 
 			  ModIface(..), ModDetails(..), IfaceDecls(..),
-			  GhciMode(..), 
+			  GhciMode(..), Dependencies(..), noDependencies,
 			  Deprecations(..), plusDeprecs,
 			  emptyGlobalRdrEnv,
 			  GenAvailInfo(Avail), availsToNameSet, 
@@ -147,7 +147,7 @@ tcRnModule hsc_env pcs
 	updGblEnv ( \ gbl -> gbl { tcg_rdr_env = rdr_env,
 				   tcg_imports = tcg_imports gbl `plusImportAvails` imports }) 
 		     $ do {
-	traceRn (text "rn1" <+> ppr (dep_mods imports)) ;
+	traceRn (text "rn1" <+> ppr (imp_dep_mods imports)) ;
 		-- Fail if there are any errors so far
 		-- The error printing (if needed) takes advantage 
 		-- of the tcg_env we have now set
@@ -556,7 +556,7 @@ tcRnExtCore hsc_env pcs
 	mod_guts = ModGuts {	mg_module   = this_mod,
 				mg_usages   = [],	-- ToDo: compute usage
 				mg_dir_imps = [],	-- ??
-				mg_deps     = ([],[]),	-- ??
+				mg_deps     = noDependencies,	-- ??
 				mg_exports  = my_exports,
 				mg_types    = final_type_env,
 				mg_insts    = tcg_insts tcg_env,
@@ -1172,8 +1172,8 @@ pprTcGblEnv (TcGblEnv { tcg_type_env = type_env,
 	 , ppr_insts dfun_ids
 	 , vcat (map ppr rules)
 	 , ppr_gen_tycons (typeEnvTyCons type_env)
-	 , ppr (moduleEnvElts (dep_mods imports))
-	 , ppr (dep_pkgs imports)]
+	 , ppr (moduleEnvElts (imp_dep_mods imports))
+	 , ppr (imp_dep_pkgs imports)]
 
 pprModGuts :: ModGuts -> SDoc
 pprModGuts (ModGuts { mg_types = type_env,

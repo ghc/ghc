@@ -10,7 +10,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 
 import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), ExternalPackageState(..), 
-			  PersistentCompilerState(..), 
+			  PersistentCompilerState(..), Dependencies(..),
 	  		  lookupType, unQualInScope )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
@@ -89,7 +89,9 @@ deSugar hsc_env pcs
 		  (printDump (ppr_ds_rules ds_rules))
 
 	; let 
-	     deps = (moduleEnvElts (dep_mods imports), dep_pkgs imports)
+	     deps = Deps { dep_mods = moduleEnvElts (imp_dep_mods imports), 
+			   dep_pkgs = imp_dep_pkgs imports,
+			   dep_orphs = imp_orphs imports }
 	     mod_guts = ModGuts {	
 		mg_module   = mod,
 		mg_exports  = exports,

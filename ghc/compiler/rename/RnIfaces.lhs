@@ -498,7 +498,7 @@ getImportedInstDecls gates
 	old_gates = eps_inst_gates eps
 	new_gates = gates `minusNameSet` old_gates
 	all_gates = new_gates `unionNameSets` old_gates
-	orphan_mods = [mod | (mod, True, _) <- moduleEnvElts (dep_mods imports)]
+	orphan_mods = imp_orphs imports
     in
     loadOrphanModules orphan_mods			`thenM_` 
 
@@ -599,7 +599,7 @@ checkVersions source_unchanged iface
 
 	-- Source code unchanged and no errors yet... carry on 
 	-- First put the dependent-module info in the envt, just temporarily,
-	-- so that when we look for interfaces we look for the right one.
+	-- so that when we look for interfaces we look for the right one (.hi or .hi-boot)
 	-- It's just temporary because either the usage check will succeed 
 	-- (in which case we are done with this module) or it'll fail (in which
 	-- case we'll compile the module from scratch anyhow).
@@ -609,7 +609,7 @@ checkVersions source_unchanged iface
 
   where
 	-- This is a bit of a hack really
-    mod_deps = emptyImportAvails { dep_mods = mkModDeps (fst (mi_deps iface)) }
+    mod_deps = emptyImportAvails { imp_dep_mods = mkModDeps (dep_mods (mi_deps iface)) }
 
 checkList :: [TcRn m RecompileRequired] -> TcRn m RecompileRequired
 checkList []		 = returnM upToDate

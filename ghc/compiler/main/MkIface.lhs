@@ -26,10 +26,10 @@ import TcRnTypes	( ImportAvails(..) )
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), HomeModInfo(..),
 			  ModGuts(..), ModGuts, 
-			  GhciMode(..), HscEnv(..),
+			  GhciMode(..), HscEnv(..), Dependencies(..),
 			  FixityEnv, lookupFixity, collectFixities,
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  TyThing(..), DFunId, Dependencies,
+			  TyThing(..), DFunId, 
 			  Avails, AvailInfo, GenAvailInfo(..), availName, 
 			  ExternalPackageState(..),
 			  ParsedIface(..), Usage(..),
@@ -476,7 +476,7 @@ mkUsageInfo :: HscEnv -> ExternalPackageState
 
 mkUsageInfo hsc_env eps
 	    (ImportAvails { imp_mods = dir_imp_mods,
-			    dep_mods = dep_mods })
+			    imp_dep_mods = dep_mods })
 	    used_names
   = -- seq the list of Usages returned: occasionally these
     -- don't get evaluated for a while and we can end up hanging on to
@@ -484,7 +484,7 @@ mkUsageInfo hsc_env eps
     usages `seqList` usages
   where
     usages = catMaybes [ mkUsage mod_name 
-		       | (mod_name,_,_) <- moduleEnvElts dep_mods]
+		       | (mod_name,_) <- moduleEnvElts dep_mods]
 
     hpt = hsc_HPT hsc_env
     pit = eps_PIT eps
@@ -781,16 +781,15 @@ pprUsage getOcc usage
 
 
 pprDeps :: Dependencies -> SDoc
-pprDeps (mods, pkgs)
+pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs})
   = vcat [ptext SLIT("module dependencies:") <+> fsep (map ppr_mod mods),
-	  ptext SLIT("package dependencies:") <+> fsep (map ppr pkgs)]
+	  ptext SLIT("package dependencies:") <+> fsep (map ppr pkgs), 
+	  ptext SLIT("orphans:") <+> fsep (map ppr orphs)
+	]
   where
-    ppr_mod (mod_name, orph, boot)
-      = ppr mod_name <+> ppr_orphan orph <+> ppr_boot boot
+    ppr_mod (mod_name, boot) = ppr mod_name <+> ppr_boot boot
    
-    ppr_orphan True  = char '!'
-    ppr_orphan False = empty
-    ppr_boot   True  = char '@'
+    ppr_boot   True  = text "[boot]"
     ppr_boot   False = empty
 \end{code}
 

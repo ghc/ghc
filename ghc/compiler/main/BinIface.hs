@@ -393,6 +393,16 @@ instance Binary ParsedIface where
 
 --  Imported from other files :-
 
+instance Binary Dependencies where
+    put_ bh deps = do put_ bh (dep_mods deps)
+		      put_ bh (dep_pkgs deps)
+		      put_ bh (dep_orphs deps)
+
+    get bh = do ms <- get bh 
+		ps <- get bh
+		os <- get bh
+		return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os })
+
 instance (Binary name) => Binary (GenAvailInfo name) where
     put_ bh (Avail aa) = do
 	    putByte bh 0

@@ -49,7 +49,7 @@ import RnHsSyn		( RenamedHsExpr, RenamedPat, RenamedArithSeqInfo )
 import HscTypes		( GhciMode, ExternalPackageState, HomePackageTable, NameCache,
 			  GlobalRdrEnv, LocalRdrEnv, FixityEnv, TypeEnv, TyThing, 
 			  Avails, GenAvailInfo(..), AvailInfo, availName,
-			  IsBootInterface, Deprecations, WhetherHasOrphans )
+			  IsBootInterface, Deprecations )
 import Packages		( PackageName )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, TcPredType, TcKind,
 			  tcCmpPred, tcCmpType, tcCmpTypes )
@@ -76,7 +76,7 @@ import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
 import EXCEPTION	( Exception )
 import Maybe		( mapMaybe )
-import List		( nub )
+import ListSetOps	( unionLists )
 import Panic		( tryMost )
 \end{code}
 
@@ -483,11 +483,8 @@ data ImportAvails
 		--       need to recompile if the module version changes
 		--   (b) to specify what child modules to initialise
 
-	dep_mods :: ModuleEnv (ModuleName, WhetherHasOrphans, IsBootInterface),
-		-- For a given import or set of imports, 
-		-- there's an entry here for
-		-- (a) modules below the one being compiled, in the current package
-		-- (b) orphan modules below the one being compiled, regardless of package
+	imp_dep_mods :: ModuleEnv (ModuleName, IsBootInterface),
+		-- Home-package modules needed by the module being compiled
 		--
 		-- It doesn't matter whether any of these dependencies are actually
 		-- *used* when compiling the module; they are listed if they are below
@@ -495,40 +492,40 @@ data ImportAvails
 		-- compiling M might not need to consult X.hi, but X is still listed
 		-- in M's dependencies.
 
-	dep_pkgs :: [PackageName]
+	imp_dep_pkgs :: [PackageName],
 		-- Packages needed by the module being compiled, whether
 		-- directly, or via other modules in this package, or via
 		-- modules imported from other packages.
+
+ 	imp_orphs :: [ModuleName]
+		-- Orphan modules below us in the import tree
       }
 
 emptyImportAvails :: ImportAvails
-emptyImportAvails = ImportAvails { imp_env    = emptyAvailEnv, 
-				   imp_unqual = emptyModuleEnv, 
-				   imp_mods   = emptyModuleEnv,
-				   dep_mods   = emptyModuleEnv,
-				   dep_pkgs   = [] }
+emptyImportAvails = ImportAvails { imp_env    	= emptyAvailEnv, 
+				   imp_unqual 	= emptyModuleEnv, 
+				   imp_mods   	= emptyModuleEnv,
+				   imp_dep_mods = emptyModuleEnv,
+				   imp_dep_pkgs = [],
+				   imp_orphs    = [] }
 
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_env = env1, imp_unqual = unqual1, imp_mods = mods1,
-		  dep_mods = dmods1, dep_pkgs = dpkgs1 })
+		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, imp_orphs = orphs1 })
   (ImportAvails { imp_env = env2, imp_unqual = unqual2, imp_mods = mods2,
-		  dep_mods = dmods2, dep_pkgs = dpkgs2 })
+		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2, imp_orphs = orphs2 })
   = ImportAvails { imp_env    = env1 `plusAvailEnv` env2, 
 		   imp_unqual = plusModuleEnv_C plusAvailEnv unqual1 unqual2, 
 		   imp_mods   = mods1  `plusModuleEnv` mods2,	
-		   dep_mods   = plusModuleEnv_C plus_mod_dep dmods1 dmods2,	
-		   dep_pkgs   = nub (dpkgs1 ++ dpkgs2)	 }
+		   imp_dep_mods   = plusModuleEnv_C plus_mod_dep dmods1 dmods2,	
+		   imp_dep_pkgs   = dpkgs1 `unionLists` dpkgs2,
+		   imp_orphs      = orphs1 `unionLists` orphs2 }
   where
-    plus_mod_dep (m1, orphan1, boot1) (m2, orphan2, boot2) 
-	= WARN( not (m1 == m2 && (boot1 || boot2 || orphan1 == orphan2)), 
-	        (ppr m1 <+> ppr m2) $$ (ppr orphan1 <+> ppr orphan2) $$ (ppr boot1 <+> ppr boot2) )
-		-- Check mod-names match, and orphan-hood matches; but a boot interface
-		-- might not know about orphan hood, so only check the orphan match
-		-- if both are non-boot interfaces
-	  (m1, orphan1 || orphan2, boot1 && boot2)
-	-- If either side can "see" a non-hi-boot interface, use that
-	-- Similarly orphan-hood (see note about about why orphan1 and 2 might differ)
+    plus_mod_dep (m1, boot1) (m2, boot2) 
+	= WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
+		-- Check mod-names match
+	  (m1, boot1 && boot2)	-- If either side can "see" a non-hi-boot interface, use that
 \end{code}
 
 %************************************************************************
@@ -539,7 +536,7 @@ v%************************************************************************
 
 \begin{code}
 plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
-plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n2 (nub (ns1 ++ ns2))
+plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n2 (ns1 `unionLists` ns2)
 -- Added SOF 4/97
 #ifdef DEBUG
 plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])

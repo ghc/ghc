@@ -35,9 +35,9 @@ import NameEnv
 import OccName		( OccName, dataName, isTcOcc )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, 
-			  IsBootInterface, WhetherHasOrphans,
+			  IsBootInterface,
 			  availName, availNames, availsToNameSet, 
-			  Deprecations(..), ModIface(..), 
+			  Deprecations(..), ModIface(..), Dependencies(..),
 		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE
 			)
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
@@ -140,6 +140,7 @@ importsFromImportDecl this_mod
 	avails_by_module = mi_exports iface
 	deprecs	     	 = mi_deprecs iface
 	is_orph		 = mi_orphan iface 
+	deps 		 = mi_deps iface
 
 	avails :: Avails
 	avails = [ avail | (mod_name, avails) <- avails_by_module,
@@ -168,10 +169,10 @@ importsFromImportDecl this_mod
     filterImports imp_mod is_boot imp_spec avails    `thenM` \ (filtered_avails, explicits) ->
 
     let
-	(sub_dep_mods, sub_dep_pkgs) = mi_deps iface
+	-- Compute new transitive dependencies
+ 	orphans | is_orph   = insert imp_mod_name (dep_orphs deps)
+		| otherwise = dep_orphs deps
 
-	-- Compute new transitive dependencies: take the ones in 
-	-- the interface and add 
 	(dependent_mods, dependent_pkgs) 
 	   | isHomeModule imp_mod 
 	   = 	-- Imported module is from the home package
@@ -179,19 +180,16 @@ importsFromImportDecl this_mod
 		--	(a) remove this_mod (might be there as a hi-boot)
 		--	(b) add imp_mod itself
 		-- Take its dependent packages unchanged
-	     ((imp_mod_name, is_orph, is_boot) : filter not_self sub_dep_mods, 
-	      sub_dep_pkgs)
+	     ((imp_mod_name, is_boot) : filter not_self (dep_mods deps), dep_pkgs deps)
+
 	   | otherwise	
  	   = 	-- Imported module is from another package
-		-- Take only the orphan modules from its dependent modules
-		--	(sigh!  it would be better to dump them entirely)
+		-- Dump the dependent modules
 		-- Add the package imp_mod comes from to the dependent packages
 		-- from imp_mod
-	     (filter sub_is_orph sub_dep_mods, 
-	      insert (mi_package iface) sub_dep_pkgs)
+	     ([], insert (mi_package iface) (dep_pkgs deps))
 
-	not_self    (m, _, _)    = m /= this_mod_name
-	sub_is_orph (_, orph, _) = orph
+	not_self (m, _) = m /= this_mod_name
 
 	import_all = case imp_spec of
 			(Just (False, _)) -> False	-- Imports are spec'd explicitly
@@ -201,7 +199,7 @@ importsFromImportDecl this_mod
 	qual_mod_name = case as_mod of
 			  Nothing  	    -> imp_mod_name
 			  Just another_name -> another_name
-
+	
 	-- unqual_avails is the Avails that are visible in *unqualified* form
 	-- We need to know this so we know what to export when we see
 	--	module M ( module P ) where ...
@@ -217,8 +215,9 @@ importsFromImportDecl this_mod
 			imp_unqual = unitModuleEnvByName qual_mod_name unqual_avails,
 			imp_env    = avail_env,
 			imp_mods   = unitModuleEnv imp_mod (imp_mod, import_all),
-			dep_mods   = mkModDeps dependent_mods,
-			dep_pkgs   = dependent_pkgs }
+			imp_orphs  = orphans,
+			imp_dep_mods   = mkModDeps dependent_mods,
+			imp_dep_pkgs   = dependent_pkgs }
 
     in
 	-- Complain if we import a deprecated module
@@ -231,11 +230,11 @@ importsFromImportDecl this_mod
     returnM (gbl_env, imports)
     }
 
-mkModDeps :: [(ModuleName, WhetherHasOrphans, IsBootInterface)]
-	  -> ModuleEnv (ModuleName, WhetherHasOrphans, IsBootInterface)
+mkModDeps :: [(ModuleName, IsBootInterface)]
+	  -> ModuleEnv (ModuleName, IsBootInterface)
 mkModDeps deps = foldl add emptyModuleEnv deps
 	       where
-		 add env elt@(m,_,_) = extendModuleEnvByName env m elt
+		 add env elt@(m,_) = extendModuleEnvByName env m elt
 \end{code}
 
 

@@ -32,7 +32,8 @@ module HscTypes (
 	extendTypeEnvList, extendTypeEnvWithIds,
 	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
 
-	WhetherHasOrphans, IsBootInterface, DeclsMap, Usage(..), Dependencies, 
+	WhetherHasOrphans, IsBootInterface, DeclsMap, Usage(..), 
+	Dependencies(..), noDependencies,
 	IfaceInsts, IfaceRules, GatedDecl, GatedDecls, GateFn, 
 	NameCache(..), OrigNameCache, OrigIParamCache,
 	Avails, availsToNameSet, availName, availNames,
@@ -146,14 +147,12 @@ data HomeModInfo = HomeModInfo { hm_iface    :: ModIface,
 Simple lookups in the symbol table.
 
 \begin{code}
-lookupIface :: HomePackageTable -> PackageIfaceTable -> Name -> Maybe ModIface
+lookupIface :: HomePackageTable -> PackageIfaceTable -> Module -> Maybe ModIface
 -- We often have two IfaceTables, and want to do a lookup
-lookupIface hpt pit name
+lookupIface hpt pit mod
   = case lookupModuleEnv hpt mod of
 	Just mod_info -> Just (hm_iface mod_info)
 	Nothing       -> lookupModuleEnv pit mod
-  where
-    mod = nameModule name
 
 lookupIfaceByModName :: HomePackageTable -> PackageIfaceTable -> ModuleName -> Maybe ModIface
 -- We often have two IfaceTables, and want to do a lookup
@@ -328,7 +327,7 @@ emptyModIface mod
 	       mi_package  = basePackage, -- XXX fully bogus
 	       mi_version  = initialVersionInfo,
 	       mi_usages   = [],
-	       mi_deps     = ([], []),
+	       mi_deps     = noDependencies,
 	       mi_orphan   = False,
 	       mi_boot	   = False,
 	       mi_exports  = [],
@@ -618,9 +617,14 @@ type IsBootInterface = Bool
 -- in the import hierarchy.  See TcRnTypes.ImportAvails for details.
 --
 -- Invariant: the dependencies of a module M never includes M
-type Dependencies
-  = ([(ModuleName, WhetherHasOrphans, IsBootInterface)], [PackageName])
+data Dependencies
+  = Deps { dep_mods  :: [(ModuleName,IsBootInterface)],	-- Home-package module dependencies
+	   dep_pkgs  :: [PackageName], 			-- External package dependencies
+	   dep_orphs :: [ModuleName] }			-- Orphan modules (whether home or external pkg)
 
+noDependencies :: Dependencies
+noDependencies = Deps [] [] []
+ 	  
 data Usage name 
   = Usage { usg_name     :: ModuleName,		-- Name of the module
 	    usg_mod      :: Version,		-- Module version

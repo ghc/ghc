@@ -88,12 +88,12 @@ import DATA_IOREF	( readIORef )
 import HscMain		( hscThing, hscStmt, hscTcExpr )
 import Module		( moduleUserString )
 import TcRnDriver	( mkGlobalContext, getModuleContents )
-import Name		( Name, NamedThing(..), isExternalName )
+import Name		( Name, NamedThing(..), isExternalName, nameModule )
 import Id		( idType )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import BasicTypes	( Fixity, FixitySig(..), defaultFixity )
-import Linker		( HValue, unload, extendLinkEnv )
+import Linker		( HValue, unload, extendLinkEnv, findLinkable )
 import GHC.Exts		( unsafeCoerce# )
 import Foreign
 import Control.Exception as Exception ( Exception, try )
@@ -267,7 +267,7 @@ cmInfoThing cmstate dflags id
      getFixity :: PersistentCompilerState -> Name -> Fixity
      getFixity pcs name
 	| isExternalName name,
-	  Just iface  <- lookupIface hpt pit name,
+	  Just iface  <- lookupIface hpt pit (nameModule name),
 	  Just (FixitySig _ fixity _) <- lookupNameEnv (mi_fixities iface) name
 	= fixity
 	| otherwise
@@ -801,9 +801,7 @@ getValidLinkable old_linkables objects_allowed new_linkables summary
           <- if (not objects_allowed)
 		then return Nothing
 
-		else case ml_obj_file (ms_location summary) of
-                 	Just obj_fn -> maybe_getFileLinkable mod_name obj_fn
-                 	Nothing     -> return Nothing
+		else findLinkable mod_name (ms_location summary)
 
 	let old_linkable = findModuleLinkable_maybe old_linkables mod_name
 
@@ -846,20 +844,6 @@ getValidLinkable old_linkables objects_allowed new_linkables summary
 
 	return (new_linkables' ++ new_linkables)
 
-
-maybe_getFileLinkable :: ModuleName -> FilePath -> IO (Maybe Linkable)
-maybe_getFileLinkable mod obj_fn
-   = do obj_exist <- doesFileExist obj_fn
-        if not obj_exist 
-         then return Nothing 
-         else 
-         do let stub_fn = case splitFilename3 obj_fn of
-                             (dir, base, ext) -> dir ++ "/" ++ base ++ ".stub_o"
-            stub_exist <- doesFileExist stub_fn
-            obj_time <- getModificationTime obj_fn
-            if stub_exist
-             then return (Just (LM obj_time mod [DotO obj_fn, DotO stub_fn]))
-             else return (Just (LM obj_time mod [DotO obj_fn]))
 
 hptLinkables :: HomePackageTable -> [Linkable]
 -- Get all the linkables from the home package table, one for each module

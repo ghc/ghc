@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.112 2002/10/24 14:17:50 simonpj Exp $
+$Id: Parser.y,v 1.113 2002/10/25 15:23:06 simonpj Exp $
 
 Haskell grammar.
 
@@ -17,7 +17,7 @@ import HsSyn
 import HsTypes		( mkHsTupCon )
 
 import RdrHsSyn
-import HscTypes		( ParsedIface(..), IsBootInterface )
+import HscTypes		( ParsedIface(..), IsBootInterface, noDependencies )
 import Lex
 import RdrName
 import PrelNames	( mAIN_Name, funTyConName, listTyConName, 
@@ -295,7 +295,7 @@ iface   :: { ParsedIface }
 			pi_vers    = 1, 		-- Module version
 			pi_orphan  = False,
 			pi_exports = (1,[($2,mkIfaceExports $4)]),
-			pi_deps    = ([],[]),
+			pi_deps    = noDependencies,
 			pi_usages  = [],
 			pi_fixity  = [],
 			pi_insts   = [],
