@@ -276,6 +276,8 @@ mkInterface no_implicit_prelude mod_map filename
      -- type signatures
      expanded_decls = concat (map expandDecl decls)
 
+     sub_map = mkSubNames expanded_decls
+
      -- first, attach documentation to declarations
      annotated_decls = collectDoc expanded_decls
 
@@ -310,7 +312,7 @@ mkInterface no_implicit_prelude mod_map filename
      -- gather up a list of entities that are exported (original names)
      (exported_names, exported_visible_names)
 	 = exportedNames mod mod_map
-			locally_defined_names orig_env
+			locally_defined_names orig_env sub_map
 			orig_exports options
 
      -- build the import env, which maps original names to import names
@@ -328,7 +330,7 @@ mkInterface no_implicit_prelude mod_map filename
      instances = [ d | d@HsInstDecl{} <- final_decls ]
 
   -- make the "export items", which will be converted into docs later
-  orig_export_list <- mkExportItems mod_map mod orig_env decl_map
+  orig_export_list <- mkExportItems mod_map mod orig_env decl_map sub_map
 			 		final_decls options orig_exports
 
   let
@@ -368,7 +370,7 @@ mkInterface no_implicit_prelude mod_map filename
 		   iface_filename     = filename,
 		   iface_env          = name_env,
 		   iface_exports      = renamed_export_list,
-		   iface_sub	      = mkSubNames final_decls,
+		   iface_sub	      = sub_map,
 		   iface_orig_exports = pruned_export_list,
 		   iface_insts	      = instances,
 		   iface_decls        = decl_map,
@@ -388,20 +390,22 @@ mkExportItems
 	-> Module			-- this module
 	-> FiniteMap HsQName HsQName	-- the orig env
 	-> FiniteMap HsName HsDecl	-- maps local names to declarations
+	-> FiniteMap HsName [HsName]	-- sub-map for this module
 	-> [HsDecl]			-- decls in the current module
 	-> [DocOption]
 	-> Maybe [HsExportSpec]
 	-> ErrMsgM [ExportItem]
 
-mkExportItems mod_map mod orig_env decl_map decls options maybe_exps
+mkExportItems mod_map this_mod orig_env decl_map sub_map decls
+	 options maybe_exps
   | Nothing <- maybe_exps	    = everything_local_exported
   | OptIgnoreExports `elem` options = everything_local_exported
   | Just specs <- maybe_exps = do 
 	exps <- mapM lookupExport specs
         return (concat exps)
   where
-    everything_local_exported =
-	return (fullContentsOfThisModule mod decl_map) -- everything exported
+    everything_local_exported =  -- everything exported
+	return (fullContentsOfThisModule this_mod decl_map)
 
     lookupExport (HsEVar x)            = declWith x (Just [])
     lookupExport (HsEAbs t)            = declWith t (Just [])
@@ -433,10 +437,14 @@ mkExportItems mod_map mod orig_env decl_map decls options maybe_exps
 
 	      in_scope_subs = map nameOfQName in_scope_subs_qnames
 	      in_scope_subs_qnames = filter (`elem` in_scope) all_subs_qnames
-	      all_subs_qnames = map (Qual mod) (all_subs_of_qname mod_map t)
+
+	      all_subs_qnames = map (Qual mod) all_subs
+
+	      all_subs | mod == this_mod = lookupWithDefaultFM sub_map [] x
+		       | otherwise       = all_subs_of_qname mod_map t
 
     fullContentsOf m
-	| m == mod  = return (fullContentsOfThisModule mod decl_map)
+	| m == this_mod  = return (fullContentsOfThisModule this_mod decl_map)
 	| otherwise = 
 	   case lookupFM mod_map m of
 	     Just iface
@@ -450,7 +458,7 @@ mkExportItems mod_map mod orig_env decl_map decls options maybe_exps
     findDecl (UnQual n)
 	= Nothing	-- must be a name we couldn't resolve
     findDecl (Qual m n)
-	| m == mod  = lookupFM decl_map n
+	| m == this_mod  = lookupFM decl_map n
 	| otherwise = 
 	   case lookupFM mod_map m of
 		Just iface -> lookupFM (iface_decls iface) n
@@ -537,11 +545,12 @@ mkSubNames decls =
 
 exportedNames :: Module -> ModuleMap -> [HsName]
 	-> FiniteMap HsQName HsQName
+	-> FiniteMap HsName [HsName]
 	-> Maybe [HsExportSpec]
 	-> [DocOption]
 	-> ([HsQName], [HsQName])
 
-exportedNames mod mod_map local_names orig_env maybe_exps options
+exportedNames mod mod_map local_names orig_env sub_map maybe_exps options
   | Nothing <- maybe_exps 	    = all_local_names_pr
   | OptIgnoreExports `elem` options = all_local_names_pr
   | Just expspecs <- maybe_exps     = 
@@ -557,10 +566,12 @@ exportedNames mod mod_map local_names orig_env maybe_exps options
    case e of
     HsEVar x -> [x]
     HsEAbs t -> [t]
-    HsEThingAll t@(Qual m _) -> 
-	t : filter (`elem` in_scope) (
-		map (Qual m) (all_subs_of_qname mod_map t)
-	     )
+    HsEThingAll t@(Qual m x) ->
+	 t : filter (`elem` in_scope) (map (Qual m) all_subs)
+	 where
+	      all_subs | m == mod  = lookupWithDefaultFM sub_map [] x
+		       | otherwise = all_subs_of_qname mod_map t
+
     HsEThingWith t cs -> t : cs
     HsEModuleContents m
 	| m == mod  -> map (Qual mod) local_names
