@@ -1,36 +1,26 @@
 
    ============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 5.02
+    The (Interactive) Glasgow Haskell Compiler -- version 5.04
    ============================================================
 
 We are pleased to announce a new major release of the Glasgow Haskell
-Compiler (GHC), version 5.02.  
+Compiler (GHC), version 5.04.
 
-This is the first version of GHC that has all of the following:
+Highlights include:
 
-  * An interactive read-eval-print loop, similar to Hugs.
-    You can load a mixture of compiled and interpreted modules;
-    in particular, you automatically use the precompiled libraries,
-    so your "interpreted" programs often run pretty fast.
+  * Hierarchical libraries, with documentation produced by Haddock.
 
-  * Works solidly on Windows platforms.  Installation is simple
-    (Installshield); you don't have to install anything else; 
-    and GHC does not get confused if you also happen to 
-    have (say) Cygwin installed.
+  * New type system extensions: full rank-N types and kind
+    annotations.
+ 
+  * New heap profiling facilities (retainer profiling, biographical
+    profiling).
 
-  * Implements the changes adopted for the (now almost finalised)
-    Revised Haskell 98 Language and Library Reports.
+  * MacOS X support
 
-  * The ability to emit "External Core", a documented typed 
-    intermediate language, suitable for slurping up into other
-    tools.  [Andrew Tolmach's work.]
+See the release notes for a full list of the changes:
 
-  * A particularly thorough pre-release test programme.
-    Some releases are more solid than others; this one is
-    at the solid end of the spectrum.  We fondly hope.
-
-So if you have been waiting to upgrade your GHC 4.08, this is 
-the moment. 
+   http://www.haskell.org/ghc/docs/latest/users_guide/release-5-04.html
 
 
 How to get it
@@ -47,53 +37,6 @@ also available from the same place.
 
 Once you have the distribution, please follow the pointers in the
 README file to find all of the documentation about this release.
-
-
-More details about what's new
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-5.02 incorporates many small refinements and bug fixes over the previous 
-stable release (5.00.2).  There are no major language changes.
-
-   - Implements Haskell 98 (revised)
-
-   - Ability to emit External Core.  (But GhC can't read External Core
-     back in.  Yet.)
-
-   - Much improved support for Windows platforms.  Binary builds are
-     now entirely freestanding.  There's no need to install Cygwin or
-     Mingwin to use it.  It's a one-click-install-and-off-you-go story now.
-
-   - Several small changes to bring GHC into line with the newest Haskell 98 
-     report.
-
-   - GHCi (the interactive system) now works on Windows.
-
-   - Partial FFI support in GHCi.  At the moment, foreign import (both
-     static and dynamic) is supported on x86 and sparc platforms.
-
-   - A compacting garbage collector, to try and reduce space use.
-
-   - Ability to disconnect built-in numeric syntax from the supplied 
-     Prelude. This allows you to define your own arithmetic packages,
-     which Haskell98 doesn't quite support.
-
-   - Experimental: partial support for hierarchical module names.
-
-   - Experimental: following heroic hacking by Ken Shan, 5.02 now
-     works on Alpha (Tru64 only).  Many 64-bit bugs have been shaken
-     out.  At the moment only the batch-mode compiler works -- no GHCi
-     or native code generator yet.
-
-We've found and fixed more bugs than you could possibly imagine.  A
-big thank-you to all those who reported bugs in the 5.00.X series.  We
-claim to have fixed almost all reported bugs.  In general we've spent
-a large amount of effort trying to improve the stability of the
-system relative to 5.00.X.  (Famous last words ...)
-
-For full details see the release notes:
-
-        http://www.haskell.org/ghc/docs/5.02/set/release-5-02.html
 
 
 Background
@@ -113,13 +56,7 @@ BSD-style open source license.
 A wide variety of Haskell related resources (tutorials, libraries,
 specifications, documentation, compilers, interpreters, references,
 contact information, links to research groups) are available from the
-Haskell home page at
-
-        http://www.haskell.org/
-
-GHC's Web page lives at
-
-        http://www.haskell.org/ghc/
+Haskell home page (see below).
 
 
 On-line GHC-related resources
@@ -151,11 +88,10 @@ wunderhacker), but haven't been tested due to lack of time/hardware:
   * mips-sgi-irix{5,6}
   * {rs6000,powerpc}-ibm-aix
 
-The builder's guide included in distribution gives a complete
-run-down of what ports work; an on-line version can be found at
+The builder's guide on the web site gives a complete run-down of what
+ports work; it can be found at
 
    http://www.haskell.org/ghc/docs/latest/building/building-guide.html
-
 
 
 Mailing lists
