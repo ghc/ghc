@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/01/07 17:49:29 $
+ * $Revision: 1.28 $
+ * $Date: 2000/01/10 16:23:32 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -213,9 +213,13 @@ static Name  predefinePrim ( String s );
 static Tycon linkTycon( String s )
 {
     Tycon tc = findTycon(findText(s));
-    if (nonNull(tc)) {
-        return tc;
+    if (nonNull(tc)) return tc;
+    if (combined) {
+       tc = findTyconInAnyModule(findText(s));
+       if (nonNull(tc)) return tc;
     }
+fprintf(stderr, "frambozenvla!  unknown tycon %s\n", s );
+return NIL;
     ERRMSG(0) "Prelude does not define standard type \"%s\"", s
     EEND;
 }
@@ -223,9 +227,13 @@ static Tycon linkTycon( String s )
 static Class linkClass( String s )
 {
     Class cc = findClass(findText(s));
-    if (nonNull(cc)) {
-        return cc;
-    }
+    if (nonNull(cc)) return cc;
+    if (combined) {
+       cc = findClassInAnyModule(findText(s));
+       if (nonNull(cc)) return cc;
+    }   
+fprintf(stderr, "frambozenvla!  unknown class %s\n", s );
+return NIL;
     ERRMSG(0) "Prelude does not define standard class \"%s\"", s
     EEND;
 }
@@ -233,9 +241,13 @@ static Class linkClass( String s )
 static Name linkName( String s )
 {
     Name n = findName(findText(s));
-    if (nonNull(n)) {
-        return n;
-    }
+    if (nonNull(n)) return n;
+    if (combined) {
+       n = findNameInAnyModule(findText(s));
+       if (nonNull(n)) return n;
+    }   
+fprintf(stderr, "frambozenvla!  unknown  name %s\n", s );
+return NIL;
     ERRMSG(0) "Prelude does not define standard name \"%s\"", s
     EEND;
 }
@@ -427,7 +439,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         setCurrModule(modulePrelude);
 
         /* primops */
-        nameMkIO           = linkName("primMkIO");
+        nameMkIO           = linkName("hugsprimMkIO");
         for (i=0; asmPrimOps[i].name; ++i) {
             Text t = findText(asmPrimOps[i].name);
             Name n = findName(t);
@@ -447,25 +459,25 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         /* static(tidyInfix)                        */
         nameNegate         = linkName("negate");
         /* user interface                           */
-        nameRunIO          = linkName("primRunIO_hugs_toplevel");
+        nameRunIO          = linkName("hugsprimRunIO_toplevel");
         namePrint          = linkName("print");
         /* desugar                                  */
         nameOtherwise      = linkName("otherwise");
         nameUndefined      = linkName("undefined");
         /* pmc                                      */
 #       if NPLUSK                      
-        namePmSub          = linkName("primPmSub");
+        namePmSub          = linkName("hugsprimPmSub");
 #       endif                          
         /* translator                               */
         nameEqChar         = linkName("primEqChar");
-        nameCreateAdjThunk = linkName("primCreateAdjThunk");
-        namePmInt          = linkName("primPmInt");
-        namePmInteger      = linkName("primPmInteger");
+        nameCreateAdjThunk = linkName("hugsprimCreateAdjThunk");
+        namePmInt          = linkName("hugsprimPmInt");
+        namePmInteger      = linkName("hugsprimPmInteger");
         namePmDouble       = linkName("primPmDouble");
  
-        namePmFromInteger = linkName("primPmFromInteger");
-        namePmSubtract    = linkName("primPmSubtract");
-        namePmLe          = linkName("primPmLe");
+        namePmFromInteger = linkName("hugsprimPmFromInteger");
+        namePmSubtract    = linkName("hugsprimPmSubtract");
+        namePmLe          = linkName("hugsprimPmLe");
 
         implementCfun ( nameCons, NIL );
         implementCfun ( nameNil, NIL );
@@ -492,6 +504,12 @@ Int what; {
         case POSTPREL: 
 #if 1
 	  fprintf(stderr, "linkControl(POSTPREL)\n");
+#if 1
+          setCurrModule(modulePrelude);
+          linkPreludeTC();
+          linkPreludeCM();
+          linkPreludeNames();
+#endif
 #endif
           break;
 

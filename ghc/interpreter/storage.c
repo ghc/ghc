@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.33 $
- * $Date: 2000/01/07 17:49:29 $
+ * $Revision: 1.34 $
+ * $Date: 2000/01/10 16:23:33 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1209,6 +1209,29 @@ Tycon findQualTyconWithoutConsultingExportList ( QualId q )
    return NIL;
 }
 
+Tycon findTyconInAnyModule ( Text t )
+{
+   Tycon tc;
+   for (tc = TYCMIN; tc < tyconHw; tc++)
+      if (tycon(tc).text == t) return tc;
+   return NIL;
+}
+
+Class findClassInAnyModule ( Text t )
+{
+   Class cc;
+   for (cc = CLASSMIN; cc < classHw; cc++)
+      if (cclass(cc).text == t) return cc;
+   return NIL;
+}
+
+Name findNameInAnyModule ( Text t )
+{
+   Name nm;
+   for (nm = NAMEMIN; nm < nameHw; nm++)
+      if (name(nm).text == t) return nm;
+   return NIL;
+}
 
 /* Same deal, except for Names. */
 Name findQualNameWithoutConsultingExportList ( QualId q )
