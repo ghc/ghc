@@ -1,6 +1,13 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* The lexer should handle "...." in doc strings, only recognising it if the
+  contents looks like a module name.
+
+* Mentioning a qualified identifer in doc loses the qualifier, even when
+  it is required?  (see "[Haskell] auto-qualification of identifiers in
+  Haddock").
+
 * doc --gen-contents and --use-contents
 
 * A module re-export should only reference the target module if the
@@ -40,6 +47,9 @@
 
 -----------------------------------------------------------------------------
 -- features
+
+* Have a short description for a module, which is presented by the module
+  name in the contents? (idea from George Russell).
 
 * In theory there's no reason why we have to only link to modules which
   are imported by the current module.  This is an artificial
