@@ -1,4 +1,116 @@
-<Chapter id="win32-dlls">
+<chapter id="win32">
+<title>Running GHC on Win32 systems</title>
+
+<sect1>
+<title>
+Starting GHC on Win32 platforms</title>
+
+<para>
+The installer that installs GHC on Win32 also sets up the file-suffix associations
+for ".hs" and ".lhs" files so that double-clicking them starts <command>ghci</command>.
+</para>
+<para>
+One little hitch happens if you right-click on a file, select "Open With..." and 
+then pick <command>ghci</command>.  If the filename has spaces in, what will happen is
+that GHC will get invoked like this:
+<programlisting>
+  c:\ghc\bin\ghci \Documents and Settings\MyFile.lhs
+</programlisting>
+So it looks to GHC as if there are three arguments, "\Documents", "and", and "Settings\MyFile.lhs".
+</para>
+<para> Solution: don't use "Open With...", avoid spaces in file names, 
+or fiddle with the appropriate registry setting:
+<programlisting>
+  HKEY_CLASSES_ROOT\Unknown\shell\openas\command
+</programlisting>
+Notice how the "%1" argument is quoted (or not).
+</para>
+<para> This problem doesn't occur when double-clicking.
+
+</para>
+
+</sect1>
+
+<sect1>
+<title>
+Using GHC (and other GHC-compiled executables) with cygwin</title>
+
+<sect2>
+<title>Background</title> <para>The cygwin tools aim to provide a
+unix-style API on top of the windows libraries, to facilitate ports of
+unix software to windows. To this end, they introduce a unix-style
+directory hierarchy under some root directory (typically
+<filename>/</filename> is <filename>C:\cygwin\</filename>). Moreover,
+everything built against the cygwin API (including the cygwin tools
+and programs compiled with cygwin's ghc) will see / as the root of
+their file system, happily pretending to work in a typical unix
+environment, and finding things like <filename>/bin</filename> and <filename>/usr/include</filename> without
+ever explicitly bothering with their actual location on the windows
+system (probably <filename>C:\cygwin\bin</filename> and <filename>C:\cygwin\usr\include</filename>).
+</para>
+</sect2>
+
+<sect2><title>The problem</title>
+<para>GHC, by default, no longer depends on cygwin, but is a native
+windows program. It is built using mingw, and it uses mingw's ghc
+while compiling your Haskell sources (even if you call it from
+cygwin's bash), but what matters here is that - just like any other
+normal windows program - neither GHC nor the executables it produces
+are aware of cygwin's pretended unix hierarchy. GHC will happily
+accept either '/' or '\' as path separators, but it won't know where
+to find <filename>/home/joe/Main.hs</filename> or <filename>/bin/bash</filename> 
+or the like. This causes all
+kinds of fun when GHC is used from within cygwin's bash, or in
+make-sessions running under cygwin.
+</para>
+</sect2>
+
+<sect2><title>Things to do</title>
+<itemizedlist>
+<listitem>
+<para> Don't use absolute paths in make, configure & co if there is any chance 
+  that those might be passed to GHC (or to GHC-compiled programs). Relative
+  paths are fine because cygwin tools are happy with them and GHC accepts 
+  '/' as path-separator. And relative paths don't depend on where cygwin's
+  root directory is located, or on which partition or network drive your source
+  tree happens to reside, as long as you 'cd' there first.
+</para></listitem>
+
+<listitem>
+<para> If you have to use absolute paths (beware of the innocent-looking
+  <literal>ROOT=`pwd`</literal> in makefile hierarchies or configure scripts), cygwin provides
+  a tool called <command>cygpath</command> that can convert cygwin's unix-style paths to their
+  actual windows-style counterparts. Many cygwin tools actually accept
+  absolute windows-style paths (remember, though, that you either need 
+  to escape '\' or convert '\' to '/'), so you should be fine just using those 
+  everywhere. If you need to use tools that do some kind of path-mangling 
+  that depends on unix-style paths (one fun example is trying to interpret ':' 
+  as a separator in path lists..), you can still try to convert paths using 
+  <command>cygpath</command> just before they are passed to GHC and friends.
+</para></listitem>
+  
+<listitem>
+<para> If you don't have <command>cygpath</command>, you probably don't have cygwin and hence
+  no problems with it... unless you want to write one build process for several
+  platforms. Again, relative paths are your friend, but if you have to use
+  absolute paths, and don't want to use different tools on different platforms,
+  you can simply write a short Haskell program to print the current directory
+   (thanks to George Russell for this idea): compiled with GHC, this will give 
+  you the view of the file system that GHC depends on (which will differ 
+  depending on whether GHC is compiled with cygwin's gcc or mingw's
+  gcc or on a real unix system..) - that little program can also deal with 
+  escaping '\' in paths. Apart from the banner and the startup time, 
+  something like this would also do:
+<programlisting>
+  $ echo "Directory.getCurrentDirectory >>= putStrLn . init . tail . show " | ghci
+</programlisting>
+</para></listitem>
+</itemizedlist>
+</sect2>
+</sect1>
+
+
+<sect1 id="win32-dlls">
 <Title>Building and using Win32 DLLs
 </Title>
 
@@ -18,7 +130,7 @@ cured the problem (it was supposedly fixed some years ago).
 </Para>
 
 
-<Sect1 id="win32-dlls-link">
+<Sect2 id="win32-dlls-link">
 <Title>Linking with DLLs
 </Title>
 
@@ -55,9 +167,9 @@ statically.
 4K for a <Literal>"hello, world"</Literal> application&mdash;not bad, huh? :-)
 </Para>
 
-</Sect1>
+</Sect2>
 
-<Sect1 id="win32-dlls-linking-static">
+<Sect2 id="win32-dlls-linking-static">
 <Title>Not linking with DLLs
 <IndexTerm><Primary>-static option (Win32)</Primary></IndexTerm></Title>
 
@@ -73,9 +185,9 @@ Notice that you cannot mix code that has been compiled with
 option on all the Haskell modules that make up your application.
 </Para>
 
-</Sect1>
+</Sect2>
 
-<Sect1 id="win32-dlls-create">
+<Sect2 id="win32-dlls-create">
 <Title>Creating a DLL
 </Title>
 
@@ -183,10 +295,10 @@ non-static to static linking is simply a question of adding
 </ItemizedList>
 </Para>
 
-</Sect1>
+</Sect2>
 
 
-<Sect1 id="win32-dlls-foreign">
+<Sect2 id="win32-dlls-foreign">
 <Title>Making DLLs to be called from other languages</Title>
 
 <Para>
@@ -306,8 +418,9 @@ the Haskell source and build the DLL.
 
 </ItemizedList>
 
-</Sect1>
+</Sect2>
 
+</sect1>
 </Chapter>
 
 <!-- Emacs stuff:
