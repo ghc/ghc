@@ -9,6 +9,9 @@
 Describe how to set the mark bit for a closure.
 
 \begin{code}
+#ifndef SMMARKDEFS_H
+#define SMMARKDEFS_H
+
 #if defined(GCgn)
 
 #define SET_MARK_BIT(closure) 					\
@@ -318,5 +321,6 @@ Define some debugging macros.
 
 #endif
 
+#endif /* SMMARKDEFS_H */
 \end{code}
 

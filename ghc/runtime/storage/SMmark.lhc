@@ -185,6 +185,8 @@ HeapLim  -- The limit of the heap
 This code is only used if @_INFO_MARKING@ is defined.
 
 \begin{code}
+#include "SMmarkDefs.h"
+
 #if defined(_INFO_MARKING)
 \end{code}
 
@@ -193,7 +195,6 @@ First the necessary forward declarations.
 \begin{code}
 /* #define MARK_REG_MAP -- Must be done on command line for threaded code */
 #include "SMinternal.h"
-#include "SMmarkDefs.h"
 
 #if defined(GRAN)
 extern P_ ret_MRoot, ret_Mark;
