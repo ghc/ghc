@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileSize.c,v 1.4 2000/12/11 17:51:57 simonmar Exp $
+ * $Id: fileSize.c,v 1.5 2001/01/16 11:27:45 simonmar Exp $
  *
  * hClose Runtime Support
  */
@@ -38,7 +38,11 @@ fileSize(StgForeignPtr ptr, StgByteArray result)
     }
     if (S_ISREG(sb.st_mode)) {
 	/* result will be word aligned */
+#if defined( macosx_TARGET_OS )
+	*(W_ *) result = (W_)sb.st_size;
+#else
 	*(off_t *) result = sb.st_size;
+#endif
 	return 0;
     } else {
 	ghc_errtype = ERR_INAPPROPRIATETYPE;
