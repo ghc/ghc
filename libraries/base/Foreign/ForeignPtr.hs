@@ -88,6 +88,19 @@ instance Show (ForeignPtr a) where
 
 
 #ifndef __NHC__
+newForeignPtr :: Ptr a -> FinalizerPtr a -> IO (ForeignPtr a)
+-- ^Turns a plain memory reference into a foreign pointer, and
+-- associates a finaliser with the reference.  The finaliser will be executed
+-- after the last reference to the foreign object is dropped.  Note that there
+-- is no guarantee on how soon the finaliser is executed after the last
+-- reference was dropped; this depends on the details of the Haskell storage
+-- manager. The only guarantee is that the finaliser runs before the program
+-- terminates.
+newForeignPtr p finalizer
+  = do fObj <- newForeignPtr_ p
+       addForeignPtrFinalizer fObj finalizer
+       return fObj
+
 withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- ^This is a way to look at the pointer living inside a
 -- foreign object.  This function takes a function which is
@@ -113,11 +126,6 @@ withForeignPtr fo io
        touchForeignPtr fo
        return r
 #endif /* ! __NHC__ */
-
-#ifdef __HUGS__
--- temporary aliasing until hugs catches up
-unsafeForeignPtrToPtr = foreignPtrToPtr
-#endif
 
 #ifndef __GLASGOW_HASKELL__
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)

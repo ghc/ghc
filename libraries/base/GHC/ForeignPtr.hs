@@ -17,7 +17,6 @@ module GHC.ForeignPtr
   (
 	ForeignPtr(..),
 	FinalizerPtr,
-	newForeignPtr,
 	newForeignPtr_,
 	mallocForeignPtr,
 	mallocForeignPtrBytes,
@@ -78,19 +77,6 @@ INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 -- foreign pointer that the finalizer is associated with.
 -- 
 type FinalizerPtr a = FunPtr (Ptr a -> IO ())
-
-newForeignPtr :: Ptr a -> FinalizerPtr a -> IO (ForeignPtr a)
--- ^Turns a plain memory reference into a foreign pointer, and
--- associates a finaliser with the reference.  The finaliser will be executed
--- after the last reference to the foreign object is dropped.  Note that there
--- is no guarantee on how soon the finaliser is executed after the last
--- reference was dropped; this depends on the details of the Haskell storage
--- manager. The only guarantee is that the finaliser runs before the program
--- terminates.
-newForeignPtr p finalizer
-  = do fObj <- newForeignPtr_ p
-       addForeignPtrFinalizer fObj finalizer
-       return fObj
 
 newConcForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign object
