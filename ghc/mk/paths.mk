@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.24 2000/07/18 17:34:52 rrt Exp $
+# $Id: paths.mk,v 1.25 2000/08/02 15:39:11 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -25,7 +25,6 @@ GHC_INCLUDE_DIR   	:= $(TOP)/includes
 GHC_UTILS_DIR	 	:= $(TOP)/utils
 GHC_INTERPRETER_DIR 	:= $(TOP)/interpreter
 
-GHC_MKDEPENDHS_DIR	:= $(GHC_UTILS_DIR)/mkdependHS
 GHC_HSC_DIR 		:= $(GHC_COMPILER_DIR)
 GHC_UNLIT_DIR 		:= $(GHC_UTILS_DIR)/unlit
 GHC_MANGLER_DIR 	:= $(GHC_DRIVER_DIR)/mangler
@@ -33,7 +32,6 @@ GHC_SPLIT_DIR	 	:= $(GHC_DRIVER_DIR)/split
 GHC_STAT_DIR            := $(GHC_DRIVER_DIR)/stats
 
 GHC_INPLACE		= $(GHC_DRIVER_DIR)/ghc-inplace
-GHC_MKDEPENDHS 		= $(GHC_MKDEPENDHS_DIR)/mkdependHS-inplace
 GHC_HSC    		= $(GHC_HSC_DIR)/hsc$(EXE_SUFFIX)
 GHC_UNLIT		= $(GHC_UNLIT_DIR)/unlit$(EXE_SUFFIX)
 GHC_MANGLER		= $(GHC_MANGLER_DIR)/ghc-asm
