@@ -6,14 +6,15 @@
 </Address>
 </BookInfo>
 
-&license
-&intro
-&installing
-&using
-&prof
-&sooner
-&lang-features
-&ffi-chap
-&wrong
-&utils
-&win32-dll
+&license;
+&intro;
+&installing;
+&using;
+&ghci;
+&prof;
+&sooner;
+&lang-features;
+&ffi-chap;
+&wrong;
+&utils;
+&win32-dll;

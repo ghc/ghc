@@ -41,13 +41,21 @@
       <indexterm><primary>C pre-processor options</primary></indexterm>
       <indexterm><primary>cpp, pre-processing with</primary></indexterm>
 
-      <para>The C pre-processor <command>cpp</command> is run over
-      your Haskell code only if the <option>-cpp</option> option
-      <indexterm><primary>-cpp option</primary></indexterm> is given.
-      Unless you are building a large system with significant doses of
-      conditional compilation, you really shouldn't need it.</para>
-
       <variablelist>
+
+	<varlistentry>
+	  <term><option>-cpp</option></term>
+	  <indexterm><primary><option>-cpp</option></primary></indexterm>
+	  <listitem>
+	    <para>The C pre-processor <command>cpp</command> is run
+            over your Haskell code only if the <option>-cpp</option>
+            option <indexterm><primary>-cpp
+            option</primary></indexterm> is given.  Unless you are
+            building a large system with significant doses of
+            conditional compilation, you really shouldn't need
+            it.</para>
+	  </listitem>
+	</varlistentry>
 
 	<varlistentry>
 	  <term><option>-D</option><replaceable>symbol</replaceable><optional>=<replaceable>value</replaceable></optional></term>
@@ -203,28 +211,6 @@ strmod = "\
       <indexterm><primary>C compiler options</primary></indexterm>
       <indexterm><primary>GCC options</primary></indexterm>
 
-      <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
-	  <thead>
-	    <row>
-	      <entry>Flag</entry>
-	      <entry>Description</entry>
-	      <entry>Static/Dynamic</entry>
-	      <entry>Reverse</entry>
-	    </row>
-	  </thead>
-	  <tbody>
-	    <row>
-	      <entry><option>-#include</option> <replaceable>file</replaceable></entry>
-	      <entry>Include <replaceable>file</replaceable> when
-	      compiling the <filename>.hc</filename> file</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	  </tbody>
-	</tgroup>
-      </informaltable>
-
       <para>If you are compiling with lots of foreign calls, you may
       need to tell the C&nbsp;compiler about some
       <literal>&num;include</literal> files.  There is no real pretty
@@ -235,6 +221,37 @@ strmod = "\
 % ghc -c '-#include &lt;X/Xlib.h&gt;' Xstuff.lhs
 </Screen>
 
+    </sect2>
+
+    <sect2 id="options-codegen">
+      <title>Options affecting code generation</title>
+
+      <variablelist>
+	<varlistentry>
+	  <term><option>-fasm</option></term>
+	  <indexterm><primary><option>-fasm</option></primary></indexterm>
+	  <listitem>
+	    <para>Use GHC's native code generator rather than
+	    compiling via C.  This will compile faster (up to twice as
+	    fast), but may produce code that is slightly slower than
+	    compiling via C.  <option>-fasm</option> is the default
+	    when optimisation is off (see <xref
+	    linkend="options-optimise">).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-fvia-C</option></term>
+	  <indexterm><primary><option>-fvia-C</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Compile via C instead of using the native code
+	    generator.  This is default for optimised compilations,
+	    and on architectures for which GHC doesn't have a native
+	    code generator.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
     </sect2>
 
     <sect2 id="options-linker">

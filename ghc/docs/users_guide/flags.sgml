@@ -1,5 +1,10 @@
-  <sect1>
+  <sect1 id="flag-reference">
     <title>Flag reference</title>
+
+    <para>This section is a quick-reference for GHC's command-line
+    flags.  For each flag, we also list its static/dynamic status (see
+    <xref linkend="static-dynamic-flags">), and the flag's opposite
+    (if available).</para>
 
     <sect2>
       <title>Help and verbosity options (<xref linkend="options-help">)</title>
@@ -71,12 +76,6 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-cpp</option></entry>
-	      <entry>Run the C pre-processor on the Haskell source</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-E</option></entry>
 	      <entry>Stop after preprocessing (<literal>.hspp</literal> file)</entry>
 	      <entry>static</entry>
@@ -99,18 +98,6 @@
 	      <entry>Stop after compiling to object code (<literal>.o</literal> file)</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-fasm</option></entry>
-	      <entry>Use the native code generator</entry>
-	      <entry>dynamic</entry>
-	      <entry>-fvia-C</entry>
-	    </row>
-	    <row>
-	      <entry><option>-fvia-C</option></entry>
-	      <entry>Compile via C</entry>
-	      <entry>dynamic</entry>
-	      <entry>-fasm</entry>
 	    </row>
 	  </tbody>
 	</tgroup>
@@ -324,7 +311,7 @@
 	      <entry><option>-no-recomp</option></entry>
 	      <entry>Turn off recompilation checking</entry>
 	      <entry>static</entry>
-	      <entry>-recomp</entry>
+	      <entry><option>-recomp</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>
@@ -935,6 +922,12 @@
 	  </thead>
 	  <tbody>
 	    <row>
+	      <entry><option>-cpp</option></entry>
+	      <entry>Run the C pre-processor on Haskell source files</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-D</option><replaceable>symbol</replaceable><optional>=<replaceable>value</replaceable></optional></entry>
 	      <entry>Define a symbol in the C pre-processor</entry>
 	      <entry>dynamic</entry>
@@ -977,6 +970,37 @@
 	      compiling the <filename>.hc</filename> file</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
+      <title>Code generation options (<xref linkend="options-codegen">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-fasm</option></entry>
+	      <entry>Use the native code generator</entry>
+	      <entry>dynamic</entry>
+	      <entry>-fvia-C</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fvia-C</option></entry>
+	      <entry>Compile via C</entry>
+	      <entry>dynamic</entry>
+	      <entry>-fasm</entry>
 	    </row>
 	  </tbody>
 	</tgroup>
@@ -1197,12 +1221,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-mlong-calls</option></entry>
-	      <entry>(HPPA only) enable long call support</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-monly-[32]-regs</option></entry>
 	      <entry>(x86 only) give some registers back to the C compiler</entry>
 	      <entry>dynamic</entry>
@@ -1283,7 +1301,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-ddump-foreign</option></entry>
-	      <entry>Dump FFI-related output</entry>
+	      <entry>Dump <literal>foreign export</literal> stubs</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1384,12 +1402,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-dshow-passes</option></entry>
-	      <entry>(equivalent to <option>-v2</option>)</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-ddump-rn-trace</option></entry>
 	      <entry>Trace renamer</entry>
 	      <entry>dynamic</entry>
@@ -1465,6 +1477,12 @@
 	      <entry><option>-dverbose-stg2stg</option></entry>
 	      <entry>Show output from each STG-to-STG pass</entry>
 	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-unreg</option></entry>
+	      <entry>Enable unregisterised compilation</entry>
+	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -1566,7 +1584,7 @@ Misc:
   ,  ( "H"                 , HasArg (setHeapSize . fromIntegral . decodeSize) )
   ,  ( "Rghc-timing"	   , NoArg  (enableTimingStats) )
 
-  ,  ( "unreg"		, NoArg (addNoDups v_Ways	WayUnreg) )
+  -Bdir
 -->
 
 <!-- Emacs stuff:

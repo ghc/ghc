@@ -7,7 +7,7 @@
     
     <para>This section describes how GHC supports separate
     compilation.</para>
-    
+
     <sect2 id="hi-files">
       <title>Interface files</title>
       

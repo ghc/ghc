@@ -1,140 +1,246 @@
-<Chapter id="using-GHC">
-<title>Using GHC
-</title>
+<chapter>
+  <title>Using GHC</title>
 
-<para>
-<IndexTerm><Primary>GHC, using</Primary></IndexTerm>
-<IndexTerm><Primary>using GHC</Primary></IndexTerm>
-GHC is a command-line compiler: in order to compile a Haskell program,
-GHC must be invoked on the source file(s) by typing a command to the
-shell.  The steps involved in compiling a program can be automated
-using the <command>make</command> tool (this is especially useful if the program
-consists of multiple source files which depend on each other).  This
-section describes how to use GHC from the command-line.
-</para>
+  <indexterm><primary>GHC, using</primary></indexterm>
+  <indexterm><primary>using GHC</primary></indexterm>
 
-<Sect1 id="command-line-structure">
-<title>Overall command-line structure
-</title>
+    <para>GHC can work in one of three &ldquo;modes&rdquo;:</para>
 
-<para>
-<IndexTerm><Primary>structure, command-line</Primary></IndexTerm>
-<IndexTerm><Primary>command-line structure</Primary></IndexTerm>
-</para>
+    <variablelist>
+      <varlistentry>
+	<term><cmdsynopsis><command>ghc</command>
+	    <arg choice=plain>--interactive</arg>
+	  </cmdsynopsis></term>
+	<indexterm><primary>interactive mode</primary>
+	</indexterm>
+	<indexterm><primary>ghci</primary>
+	</indexterm>
+	<listitem>
+	  <para>Interactive mode, which is also available as
+	  <command>ghci</command>.  Interactive mode is described in
+	  more detail in <xref linkend="ghci">.</para>
+	</listitem>
+      </varlistentry>
 
-<para>
-An invocation of GHC takes the following form:
-</para>
+      <varlistentry>
+	<term><cmdsynopsis><command>ghc</command>
+	    <arg choice=plain>--make</arg>
+	  </cmdsynopsis></term>
+	<indexterm><primary>make mode</primary>
+	</indexterm>
+	<indexterm><primary><option>--make</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>In this mode, GHC will build a multi-module Haskell
+	  program automatically, figuring out dependencies for itself.
+	  If you have a straightforward Haskell program, this is
+	  likely to be much easier, and faster, than using
+	  <command>make</command>.</para>
+	</listitem>
+      </varlistentry>
 
-<para>
+      <varlistentry>
+	<term><cmdsynopsis>
+	    <command>ghc</command>
+	    <group>
+	      <arg>-E</arg>
+	      <arg>-C</arg>
+	      <arg>-S</arg>
+	      <arg>-c</arg>
+	    </group>
+	  </cmdsynopsis></term>
+	<indexterm><primary><option>--make</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>This is the traditional batch-compiler mode, in which
+	  GHC can compile source files one at a time, or link objects
+	  together into an executable.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+  <sect1>
+    <title>Options overview</title>
+    
+    <para>GHC's behaviour is controlled by
+    <firstterm>options</firstterm>, which for historical reasons are
+    also sometimes referred to as command-line flags or arguments.
+    Options can be specified in three ways:</para>
+
+    <sect2>
+      <title>Command-line arguments</title>
+      
+      <indexterm><primary>structure, command-line</primary></indexterm>
+      <indexterm><primary>command-line</primary><secondary>arguments</secondary></indexterm>
+      <indexterm><primary>arguments</primary><secondary>command-line</secondary></indexterm>
+      
+      <para>An invocation of GHC takes the following form:</para>
 
 <Screen>
 ghc [argument...]
 </Screen>
 
-</para>
+      <para>Command-line arguments are either options or file names.</para>
 
-<para>
-Command-line arguments are either options or file names.
-</para>
+      <para>Command-line options begin with <literal>-</literal>.
+      They may <emphasis>not</emphasis> be grouped:
+      <option>-vO</option> is different from <option>-v -O</option>.
+      Options need not precede filenames: e.g., <literal>ghc *.o -o
+      foo</literal>.  All options are processed and then applied to
+      all files; you cannot, for example, invoke <literal>ghc -c -O1
+      Foo.hs -O2 Bar.hs</literal> to apply different optimisation
+      levels to the files <filename>Foo.hs</filename> and
+      <filename>Bar.hs</filename>.</para>
+    </sect2>
 
-<para>
-Command-line options begin with <literal>-</literal>.  They may <emphasis>not</emphasis> be
-grouped: <option>-vO</option> is different from <option>-v -O</option>.  Options need not
-precede filenames: e.g., <command>ghc *.o -o foo</command>.  All options are
-processed and then applied to all files; you cannot, for example, invoke
-<command>ghc -c -O1 Foo.hs -O2 Bar.hs</command> to apply different optimisation
-levels to the files <filename>Foo.hs</filename> and <filename>Bar.hs</filename>.  For conflicting
-options, e.g., <option>-c -S</option>, we reserve the right to do anything we
-want.  (Usually, the last one applies.)
-</para>
+    <Sect2 id="source-file-options">
+      <title>Command line options in source files</title>
+    
+      <indexterm><primary>source-file options</primary></indexterm>
 
-</Sect1>
+      <para>Sometimes it is useful to make the connection between a
+      source file and the command-line options it requires quite
+      tight. For instance, if a Haskell source file uses GHC
+      extensions, it will always need to be compiled with the
+      <option>-fglasgow-exts</option> option.  Rather than maintaining
+      the list of per-file options in a <filename>Makefile</filename>,
+      it is possible to do this directly in the source file using the
+      <literal>OPTIONS</literal> pragma <indexterm><primary>OPTIONS
+      pragma</primary></indexterm>:</para>
 
-<Sect1 id="file-suffixes">
-<title>Meaningful file suffixes
-</title>
+<ProgramListing>
+{-# OPTIONS -fglasgow-exts #-}
+module X where
+...
+</ProgramListing>
+      
+      <para><literal>OPTIONS</literal> pragmas are only looked for at
+      the top of your source files, upto the first
+      (non-literate,non-empty) line not containing
+      <literal>OPTIONS</literal>. Multiple <literal>OPTIONS</literal>
+      pragmas are recognised. Note that your command shell does not
+      get to the source file options, they are just included literally
+      in the array of command-line arguments the compiler driver
+      maintains internally, so you'll be desperately disappointed if
+      you try to glob etc. inside <literal>OPTIONS</literal>.</para>
 
-<para>
-<IndexTerm><Primary>suffixes, file</Primary></IndexTerm>
-<IndexTerm><Primary>file suffixes for GHC</Primary></IndexTerm>
-</para>
+      <para>NOTE: the contents of OPTIONS are prepended to the
+      command-line options, so you <emphasis>do</emphasis> have the
+      ability to override OPTIONS settings via the command
+      line.</para>
 
-<para>
-File names with &ldquo;meaningful&rdquo; suffixes (e.g., <filename>.lhs</filename> or <filename>.o</filename>)
-cause the &ldquo;right thing&rdquo; to happen to those files.
-</para>
+      <para>It is not recommended to move all the contents of your
+      Makefiles into your source files, but in some circumstances, the
+      <literal>OPTIONS</literal> pragma is the Right Thing. (If you
+      use <option>-keep-hc-file-too</option> and have OPTION flags in
+      your module, the OPTIONS will get put into the generated .hc
+      file).</para>
+    </sect2>
 
-<para>
-<VariableList>
+    <sect2>
+      <title>Setting options in GHCi</title>
 
-<VarListEntry>
-<Term><filename>.lhs</filename>:</Term>
-<ListItem>
-<para>
-<IndexTerm><Primary>lhs suffix</Primary></IndexTerm>
-A &ldquo;literate Haskell&rdquo; module.
-</para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><filename>.hs</filename>:</Term>
-<ListItem>
-<para>
-A not-so-literate Haskell module.
-</para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><filename>.hi</filename>:</Term>
-<ListItem>
-<para>
-A Haskell interface file, probably compiler-generated.
-</para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><filename>.hc</filename>:</Term>
-<ListItem>
-<para>
-Intermediate C file produced by the Haskell compiler.
-</para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><filename>.c</filename>:</Term>
-<ListItem>
-<para>
-A C&nbsp;file not produced by the Haskell compiler.
-</para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><filename>.s</filename>:</Term>
-<ListItem>
-<para>
-An assembly-language source file, usually
-produced by the compiler.
-</para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><filename>.o</filename>:</Term>
-<ListItem>
-<para>
-An object file, produced by an assembler.
-</para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</para>
+      <para>Options may also be modified from within GHCi, using the
+      <literal>:set</literal> command.  See <xref linkend="ghci-set">
+      for more details.</para>
+    </sect2>
+  </sect1>
+    
+  <sect1 id="static-dynamic-flags">
+    <title>Static vs. Dynamic options</title>
+    <indexterm><primary>static</primary><secondary>options</secondary>
+    </indexterm>
+    <indexterm><primary>dynamic</primary><secondary>options</secondary>
+    </indexterm>
 
-<para>
-Files with other suffixes (or without suffixes) are passed straight
-to the linker.
-</para>
+    <para>Each of GHC's command line options is classified as either
+    <firstterm>static</firstterm> or <firstterm>dynamic</firstterm>.
+    A static flag may only be specified on the command line, whereas a
+    dynamic flag may also be given in an <literal>OPTIONS</literal>
+    pragma in a source file or set from the GHCi command-line with
+    <literal>:set</literal>.</para>
 
-</Sect1>
+    <para>As a rule of thumb, all the language options are dynamic, as
+    are the warning options and the debugging options.  The rest are
+    static, with the notable exceptions of <option>-v</option>,
+    <option>-cpp</option>, <option>-fasm</option>,
+    <option>-fvia-C</option>, and <option>-#include</option>.
+
+    The flag reference tables (<xref linkend="flag-reference">) lists
+    the status of each flag.</para>
+  </sect1>
+
+  <sect1 id="file-suffixes">
+    <title>Meaningful file suffixes</title>
+
+    <indexterm><primary>suffixes, file</primary></indexterm>
+    <indexterm><primary>file suffixes for GHC</primary></indexterm>
+
+    <para>File names with &ldquo;meaningful&rdquo; suffixes (e.g.,
+    <filename>.lhs</filename> or <filename>.o</filename>) cause the
+    &ldquo;right thing&rdquo; to happen to those files.</para>
+
+    <variablelist>
+
+      <varlistentry>
+	<term><filename>.lhs</filename></term>
+	<indexterm><primary><literal>lhs</literal> suffix</primary></indexterm>
+	<listitem>
+	  <para>A &ldquo;literate Haskell&rdquo; module.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><filename>.hs</filename></term>
+	<listitem>
+	  <para>A not-so-literate Haskell module.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><filename>.hi</filename></term>
+	<listitem>
+	  <para>A Haskell interface file, probably
+	  compiler-generated.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><filename>.hc</filename></term>
+	<listitem>
+	  <para>Intermediate C file produced by the Haskell
+	  compiler.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><filename>.c</filename></term>
+	<listitem>
+	  <para>A C&nbsp;file not produced by the Haskell
+	  compiler.</para>
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term><filename>.s</filename></term>
+	<listitem>
+	  <para>An assembly-language source file, usually produced by
+          the compiler.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><filename>.o</filename></term>
+	<listitem>
+	  <para>An object file, produced by an assembler.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>Files with other suffixes (or without suffixes) are passed
+    straight to the linker.</para>
+
+  </sect1>
 
   <sect1 id="options-help">
     <title>Help and verbosity options</title>
@@ -249,145 +355,169 @@ to the linker.
       </varlistentry>
     </variablelist>
   </sect1>
+
+  <sect1 id="make-mode">
+    <title>Using <command>ghc</command> <option>--make</option></title>
+
+    <indexterm><primary><option>--make</option></primary>
+    </indexterm>
+    <indexterm><primary>separate compilation</primary>
+    </indexterm>
     
+    <para>When given the <option>--make</option> option, GHC will
+    build a multi-module Haskell program by following dependencies
+    from a single root module (usually <literal>Main</literal>).  For
+    example, if your <literal>Main</literal> module is in a file
+    called <filename>Main.hs</filename>, you could compile and link
+    the program like this:</para>
+
+<screen>
+ghc --make Main.hs
+</screen>
+
+    <para>The command line must contain one source file or module
+    name; GHC will figure out all the modules in the program by
+    following the imports from this initial module.  It will then
+    attempt to compile each module which is out of date, and finally
+    if the top module is <literal>Main</literal>, the program
+    will also be linked into an executable.</para>
+
+    <para>The main advantages to using <literal>ghc --make</literal>
+    over traditional <literal>Makefile</literal>s are:</para>
+
+    <itemizedlist>
+      <listitem>
+	<para>GHC doesn't have to be restarted for each compilation,
+	which means it can cache information between compilations.
+	Compiling a muli-module program with <literal>ghc
+	--make</literal> can be up to twice as fast as running
+	<literal>ghc</literal> individually on each source
+	file.</para>
+      </listitem>
+      <listitem>
+	<para>You don't have to write a
+	<literal>Makefile</literal>.</para>
+      </listitem>
+      <indexterm><primary><literal>Makefile</literal>s</primary><secondary>avoiding</secondary>
+      </indexterm>
+      <listitem>
+	<para>GHC re-calculates the dependencies each time it is
+	invoked, so the dependencies never get out of sync with the
+	source.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para>Any of the command-line options described in the rest of
+    this chapter can be used with <option>--make</option>, but note
+    that any options you give on the command line will apply to all
+    the source files compiled, so if you want any options to apply to
+    a single source file only, you'll need to use an
+    <literal>OPTIONS</literal> pragma (see <xref
+    linkend="source-file-options">).</para>
+
+    <para>If the program needs to be linked with additional objects
+    (say, some auxilliary C code), these can be specified on the
+    command line as usual.</para>
+  </sect1>
+  
   <Sect1 id="options-order">
-    <title>Running the right phases in the right order</title>
+    <title>GHC without <option>--make</option></title>
 
-    <indexterm><primary>order of passes in GHC</primary></indexterm>
-    <indexterm><primary>pass ordering in GHC</primary></indexterm>
+    <para>Without <option>--make</option>, GHC will compile one or
+    more source files given on the command line.</para>
 
-
-    <para>The basic task of the <command>ghc</command> driver is to
-    run each input file through the right phases (compiling, linking,
-    etc.).</para>
-
-    <para>The first phase to run is determined by the input-file
+    <para>The first phase to run is determined by each input-file
     suffix, and the last phase is determined by a flag.  If no
     relevant flag is present, then go all the way through linking.
     This table summarises:</para>
 
-<InformalTable>
-<TGroup Cols="4">
-<ColSpec Align="Left">
-<ColSpec Align="Left">
-<ColSpec Align="Left">
-<ColSpec Align="Left">
-<TBody>
+    <informaltable>
+      <tgroup cols="4">
+	<colspec align="left">
+	<colspec align="left">
+	<colspec align="left">
+	<colspec align="left">
 
-<Row>
-<Entry>Phase of the compilation system</Entry>
-<Entry>Suffix saying &ldquo;start here&rdquo;</Entry>
-<Entry>Flag saying &ldquo;stop after&rdquo;</Entry>
-<Entry>(suffix of) output file</Entry>
-</Row>
+	<thead>
+	  <row>
+	    <entry>Phase of the compilation system</entry>
+	    <entry>Suffix saying &ldquo;start here&rdquo;</entry>
+	    <entry>Flag saying &ldquo;stop after&rdquo;</entry>
+	    <entry>(suffix of) output file</entry>
+	  </row>
+	</thead>
+	<tbody>
+	  <row>
+	    <entry>literate pre-processor</entry>
+	    <entry><literal>.lhs</literal></entry>
+	    <entry>-</entry>
+	    <entry><literal>.hs</literal></entry>
+	  </row>
 
-<Row>
-<Entry>
-literate pre-processor </Entry>
-<Entry> .lhs </Entry>
-<Entry> - </Entry>
-<Entry> .hs </Entry>
-</Row>
-<Row>
-<Entry>
-C pre-processor (opt.) </Entry>
-<Entry> .hs (with <literal>-cpp</literal>) </Entry>
-<Entry> -E </Entry>
-<Entry> .hspp </Entry>
-</Row>
-<Row>
-<Entry>
-Haskell compiler </Entry>
-<Entry> .hs </Entry>
-<Entry> -C, -S </Entry>
-<Entry> .hc, .s </Entry>
-</Row>
-<Row>
-<Entry>
-C compiler (opt.) </Entry>
-<Entry> .hc or .c </Entry>
-<Entry> -S </Entry>
-<Entry> .s </Entry>
-</Row>
-<Row>
-<Entry>
-assembler </Entry>
-<Entry> .s </Entry>
-<Entry> -c </Entry>
-<Entry> .o </Entry>
-</Row>
-<Row>
-<Entry>
-linker </Entry>
-<Entry> other </Entry>
-<Entry> - </Entry>
-<Entry> a.out </Entry>
-</Row>
-</TBody>
-</TGroup>
-</InformalTable>
+	  <row>
+	    <entry>C pre-processor (opt.)
+           </entry> 
+	    <entry><literal>.hs</literal> (with
+	    <option>-cpp</option>)</entry>
+	    <entry><option>-E</option></entry>
+	    <entry><literal>.hspp</literal></entry>
+	  </row>
+	  
+	  <row>
+	    <entry>Haskell compiler</entry>
+	    <entry><literal>.hs</literal></entry>
+	    <entry><option>-C</option>, <option>-S</option></entry>
+	    <entry><literal>.hc</literal>, <literal>.s</literal></entry>
+	  </row>
 
-<IndexTerm><Primary>-C option</Primary></IndexTerm>
-<IndexTerm><Primary>-S option</Primary></IndexTerm>
-<IndexTerm><Primary>-c option</Primary></IndexTerm>
+	  <row>
+	    <entry>C compiler (opt.)</entry>
+	    <entry><literal>.hc</literal> or <literal>.c</literal></entry>
+	    <entry><option>-S</option></entry>
+	    <entry><literal>.s</literal></entry>
+	  </row>
 
-<para>
-Thus, a common invocation would be: <command>ghc -c Foo.hs</command>
-</para>
+	  <row>
+	    <entry>assembler</entry>
+	    <entry><literal>.s</literal></entry>
+	    <entry><option>-c</option></entry>
+	    <entry><literal>.o</literal></entry>
+	  </row>
+	  
+	  <row>
+	    <entry>linker</entry>
+	    <entry><replaceable>other</replaceable></entry>
+	    <entry>-</entry>
+	    <entry><filename>a.out</filename></entry>
+	  </row>
+	</tbody>
+      </tgroup>
+    </informaltable>
 
-<para>
-Note: What the Haskell compiler proper produces depends on whether a
-native-code generator is used (producing assembly language) or not
-(producing C).
-</para>
-    
-    <para>NOTE: the option <option>-E</option><IndexTerm><Primary>-E
+    <indexterm><primary><option>-C</option></primary></indexterm>
+    <indexterm><primary><option>-E</option></primary></indexterm>
+    <indexterm><primary><option>-S</option></primary></indexterm>
+    <indexterm><primary><option>-c</option></primary></indexterm>
+
+    <para>Thus, a common invocation would be: <literal>ghc -c
+    Foo.hs</literal></para>
+
+    <para>Note: What the Haskell compiler proper produces depends on
+    whether a native-code generator<indexterm><primary>native-code
+    generator</primary></indexterm> is used (producing assembly
+    language) or not (producing C).  See <xref
+    linkend="options-codegen"> for more details.</para>
+
+    <para>Note: C pre-processing is optional, the
+    <option>-ccp</option><indexterm><primary><option>-cpp</option></primary>
+      </indexterm>flag turns it on.  See <xref
+    linkend="c-pre-processor"> for more details.</para>
+
+    <para>Note: The option <option>-E</option><IndexTerm><Primary>-E
     option</Primary></IndexTerm> runs just the pre-processing passes
     of the compiler, dumping the result in a file.  Note that this
-    differs from all GHCs prior to version 4.11, in which the result
-    was dumped to the standard output.  If used in conjunction with
-    -cpp, the output is the code blocks of the original (literal)
-    source after having put it through the grinder that is the C
-    pre-processor. Sans <option>-cpp</option>, the output is the
-    de-litted version of the original source.</para>
-
-    <para>The following options also affect which phases get run:</para>
-
-    <variablelist>
-      <varlistentry>
-	<term><option>-cpp</option></term>
-	<indexterm><primary><option>-cpp</option></primary></indexterm>
-	<listitem>
-	  <para>Run the C pre-processor on the Haskell source before
-	  compiling it.  See <xref linkend="c-pre-processor"> for more
-	  details.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-fasm</option></term>
-	<indexterm><primary><option>-fasm</option></primary></indexterm>
-	<listitem>
-	  <para>Use GHC's native code generator rather than compiling
-	  via C.  This will compile faster (up to twice as fast), but
-	  may produce code that is slightly slower than compiling via
-	  C.  <option>-fasm</option> is the default when optimisation
-	  is off (see <xref linkend="options-optimise">).</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-fvia-C</option></term>
-	<indexterm><primary><option>-fvia-C</option></primary>
-	</indexterm>
-	<listitem>
-	  <para>Compile via C instead of using the native code
-	  generator.  This is default for optimised compilations, and
-	  on architectures for which GHC doesn't have a native code
-	  generator.</para>
-	</listitem>
-      </varlistentry>
-    </variablelist>
+    differs from the previous behaviour of dumping the file to
+    standard output.</para>
   </sect1>
 
   <sect1 id="options-output">
@@ -1316,45 +1446,45 @@ machine.  You can then do various things to control/monitor your
 <ColSpec Align="Left">
 <TBody>
 
-<Row>
-<Entry><KeyCombo><KeyCap>Control</KeyCap><KeyCap>D</KeyCap></KeyCombo></Entry>
-<Entry>exit <command>pvm</command>, leaving it running</Entry>
-</Row>
+<row>
+<entry><KeyCombo><KeyCap>Control</KeyCap><KeyCap>D</KeyCap></KeyCombo></entry>
+<entry>exit <command>pvm</command>, leaving it running</entry>
+</row>
 
-<Row>
-<Entry><command>halt</command></Entry>
-<Entry>kill off this &ldquo;parallel machine&rdquo; &amp; exit</Entry>
-</Row>
+<row>
+<entry><command>halt</command></entry>
+<entry>kill off this &ldquo;parallel machine&rdquo; &amp; exit</entry>
+</row>
 
-<Row>
-<Entry><command>add &lt;host&gt;</command></Entry>
-<Entry>add <command>&lt;host&gt;</command> as a processor</Entry>
-</Row>
+<row>
+<entry><command>add &lt;host&gt;</command></entry>
+<entry>add <command>&lt;host&gt;</command> as a processor</entry>
+</row>
 
-<Row>
-<Entry><command>delete &lt;host&gt;</command></Entry>
-<Entry>delete <command>&lt;host&gt;</command></Entry>
-</Row>
+<row>
+<entry><command>delete &lt;host&gt;</command></entry>
+<entry>delete <command>&lt;host&gt;</command></entry>
+</row>
 
-<Row>
-<Entry><command>reset</command></Entry>
-<Entry>kill what's going, but leave PVM up</Entry>
-</Row>
+<row>
+<entry><command>reset</command></entry>
+<entry>kill what's going, but leave PVM up</entry>
+</row>
 
-<Row>
-<Entry><command>conf</command></Entry>
-<Entry>list the current configuration</Entry>
-</Row>
+<row>
+<entry><command>conf</command></entry>
+<entry>list the current configuration</entry>
+</row>
 
-<Row>
-<Entry><command>ps</command></Entry>
-<Entry>report processes' status</Entry>
-</Row>
+<row>
+<entry><command>ps</command></entry>
+<entry>report processes' status</entry>
+</row>
 
-<Row>
-<Entry><command>pstat &lt;pid&gt;</command></Entry>
-<Entry>status of a particular process</Entry>
-</Row>
+<row>
+<entry><command>pstat &lt;pid&gt;</command></entry>
+<entry>status of a particular process</entry>
+</row>
 
 </TBody>
 </TGroup>
@@ -1572,16 +1702,6 @@ computation speed.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-mlong-calls</option>:</term>
-	<listitem>
-	  <para>(HPPA machines)<indexterm><primary>-mlong-calls option
-          (HPPA only)</primary></indexterm> Means to pass the
-          like-named option to GCC.  Required for Very Big modules,
-          maybe.  (Probably means you're in trouble&hellip;)</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
 	<term><option>-monly-[32]-regs</option>:</term>
 	<listitem>
 	  <para>(iX86 machines)<indexterm><primary>-monly-N-regs
@@ -1606,9 +1726,9 @@ statements or clauses.
 
   </sect1>
 
-&runtime
-&debug
-&flags
+&runtime;
+&debug;
+&flags;
 
 </Chapter>
 

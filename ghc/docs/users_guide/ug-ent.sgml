@@ -1,3 +1,4 @@
+<!ENTITY ghci           SYSTEM "ghci.sgml">
 <!ENTITY flags          SYSTEM "flags.sgml">
 <!ENTITY license        SYSTEM "license.sgml">
 <!ENTITY intro          SYSTEM "intro.sgml" >
