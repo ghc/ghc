@@ -14,15 +14,15 @@ module SimplUtils (
 
 	etaExpandCount,
 
-	mkIdentityAlts,
-
 	simplIdWantsToBeINLINEd,
 
 	singleConstructorType, typeOkForCase
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
+#endif
 
 import BinderInfo
 import CmdLineOpts	( opt_DoEtaReduction, SimplifierSwitch(..) )
@@ -38,13 +38,14 @@ import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
-import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, isPrimType, 
+import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, isPrimType, getTyVar_maybe,
 			  maybeAppDataTyConExpandingDicts, SYN_IE(Type)
 			)
+import TyCon		( isDataTyCon )
 import TysWiredIn	( realWorldStateTy )
 import TyVar		( elementOfTyVarSet,
 			  GenTyVar{-instance Eq-} )
-import Util		( isIn, panic )
+import Util		( isIn, panic, assertPanic )
 
 \end{code}
 
@@ -269,21 +270,27 @@ etaCoreExpr expr@(Lam bndr body)
 	other	    -> expr			-- Can't eliminate it, so do nothing at all
   where
     eta_match (ValBinder v) (VarArg v') = v == v'
-    eta_match (TyBinder tv) (TyArg  ty) = tv `elementOfTyVarSet` tyVarsOfType ty
+    eta_match (TyBinder tv) (TyArg  ty) = case getTyVar_maybe ty of
+						Nothing  -> False
+						Just tv' -> tv == tv'
     eta_match bndr	    arg 	= False
 
     residual_ok :: CoreExpr -> Bool	-- Checks for type application
 					-- and function not one of the
 					-- bound vars
 
+    (VarArg v) `mentions` (ValBinder v') = v == v'
+    (TyArg ty) `mentions` (TyBinder tv)  = tv `elementOfTyVarSet` tyVarsOfType ty
+    bndr       `mentions` arg 	 	 = False
+
     residual_ok (Var v)
-	= not (eta_match bndr (VarArg v))
+	= not (VarArg v `mentions` bndr)
     residual_ok (App fun arg)
-	| eta_match bndr arg = False
-	| otherwise	     = residual_ok fun
+	| arg `mentions` bndr = False
+	| otherwise	      = residual_ok fun
     residual_ok (Coerce coercion ty body)
-	| eta_match bndr (TyArg ty) = False
-	| otherwise		    = residual_ok body
+	| TyArg ty `mentions` bndr = False
+	| otherwise		   = residual_ok body
 
     residual_ok other	     = False		-- Safe answer
 	-- This last clause may seem conservative, but consider:
@@ -417,68 +424,6 @@ manifestlyCheap other_expr   -- look for manifest partial application
 \end{code}
 
 
-Let to case
-~~~~~~~~~~~
-
-Given a type generate the case alternatives
-
-	C a b -> C a b
-
-if there's one constructor, or
-
-	x -> x
-
-if there's many, or if it's a primitive type.
-
-
-\begin{code}
-mkIdentityAlts
-	:: Type			-- type of RHS
-	-> DemandInfo		-- Appropriate demand info
-	-> SmplM InAlts		-- result
-
-mkIdentityAlts rhs_ty demand_info
-  = case (maybeAppDataTyConExpandingDicts rhs_ty) of
-	Just (tycon, ty_args, [data_con]) ->  -- algebraic type suitable for unpacking
-	    let
-		inst_con_arg_tys = dataConArgTys data_con ty_args
-	    in
-	    newIds inst_con_arg_tys	`thenSmpl` \ new_bindees ->
-	    let
-		new_binders = [ (b, bad_occ_info) | b <- new_bindees ]
-	    in
-	    returnSmpl (
-	      AlgAlts
-		[(data_con, new_binders, mkCon data_con [] ty_args (map VarArg new_bindees))]
-		NoDefault
-	    )
-
-	_ -> panic "mkIdentityAlts"	-- Should never happen; only called for single-constructor types
-  where
-    bad_occ_info = ManyOcc 0	-- Non-committal!
-
-
-{-		SHOULD NEVER HAPPEN 
-  | isPrimType rhs_ty
-  = newId rhs_ty	`thenSmpl` \ binder ->
-    let
-	binder_w_info = binder `addIdDemandInfo` demand_info
-	-- It's occasionally really worth adding the right demand info.  Consider
-	-- 	let x = E in B
-	-- where x is sure to be demanded in B
-	-- We will transform to:
-	--	case E of x -> B
-	-- Now suppose that E simplifies to just y; we get
-	--	case y of x -> B
-	-- Because x is sure to be demanded, we can eliminate the case
-	-- even if pedantic-bottoms is on; but we need to have the right
-	-- demand-info on the default branch of the case.  That's what
-	-- we are doing here.
-    in
-    returnSmpl (PrimAlts [] (BindDefault (binder, bad_occ_info) (Var binder)))
--}
-\end{code}
-
 \begin{code}
 simplIdWantsToBeINLINEd :: Id -> SimplEnv -> Bool
 
@@ -515,15 +460,15 @@ idMinArity id = case getIdArity id of
 singleConstructorType :: Type -> Bool
 singleConstructorType ty
   = case (maybeAppDataTyConExpandingDicts ty) of
-      Just (tycon, ty_args, [con]) -> True
-      other			   -> False
+      Just (tycon, ty_args, [con]) | isDataTyCon tycon -> True
+      other			   		       -> False
 
 typeOkForCase :: Type -> Bool
 typeOkForCase ty
   = case (maybeAppDataTyConExpandingDicts ty) of
-      Nothing                                   -> False
-      Just (tycon, ty_args, [])                 -> False
-      Just (tycon, ty_args, non_null_data_cons) -> True
+      Just (tycon, ty_args, [])                 		    -> False
+      Just (tycon, ty_args, non_null_data_cons) | isDataTyCon tycon -> True
+      other	                                   		    -> False
       -- Null data cons => type is abstract, which code gen can't 
       -- currently handle.  (ToDo: when return-in-heap is universal we
       -- don't need to worry about this.)
