@@ -28,8 +28,8 @@ import Id		( idType, idInfo, idName, isExportedId,
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( isNeverActive )
-import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
-		  	  localiseName, isGlobalName, setNameUnique
+import Name		( getOccName, nameOccName, mkLocalName, mkGlobalName, 
+		  	  localiseName, isGlobalName, nameSrcLoc
 			)
 import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
@@ -503,7 +503,7 @@ tidyTopName mod ns occ_env external name
 	-- so they already have the "right" unique
 	-- And it's a system-wide unique too
 
-  | local  && internal = (ns { nsUniqs = us2 }, occ_env', unique_name)
+  | local  && internal = (ns_w_local, occ_env', new_local_name)
 	-- Even local, internal names must get a unique occurrence, because
 	-- if we do -split-objs we globalise the name later, in the code generator
 	--
@@ -511,11 +511,11 @@ tidyTopName mod ns occ_env external name
 	-- the byte-code generator builds a system-wide Name->BCO symbol table
 
   | local  && external = case lookupFM ns_names key of
-			   Just orig -> (ns,			 		    occ_env', orig)
-			   Nothing   -> (ns { nsUniqs = us2, nsNames = ns_names' }, occ_env', global_name)
+			   Just orig -> (ns,	      occ_env', orig)
+			   Nothing   -> (ns_w_global, occ_env', new_global_name)
 	-- If we want to globalise a currently-local name, check
 	-- whether we have already assigned a unique for it.
-	-- If so, use it; if not, extend the table.
+	-- If so, use it; if not, extend the table (ns_w_global).
 	-- This is needed when *re*-compiling a module in GHCi; we want to
 	-- use the same name for externally-visible things as we did before.
 
@@ -529,9 +529,14 @@ tidyTopName mod ns occ_env external name
     ns_names	     = nsNames ns
     ns_uniqs	     = nsUniqs ns
     (us1, us2)	     = splitUniqSupply ns_uniqs
-    unique_name	     = setNameUnique (setNameOcc name occ') (uniqFromSupply us1)
-    global_name      = globaliseName unique_name mod
-    ns_names' 	     = addToFM ns_names key global_name
+    uniq	     = uniqFromSupply us1
+    loc		     = nameSrcLoc name
+
+    new_local_name   = mkLocalName  uniq     occ' loc
+    new_global_name  = mkGlobalName uniq mod occ' loc  
+
+    ns_w_local	     = ns { nsUniqs = us2 }
+    ns_w_global	     = ns { nsUniqs = us2, nsNames = addToFM ns_names key new_global_name }
 
 
 ------------  Worker  --------------

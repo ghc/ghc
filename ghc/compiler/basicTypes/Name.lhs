@@ -300,8 +300,8 @@ pprLocal sty uniq occ
 -- Like Local, except that we only omit the unique in Iface style
 pprSysLocal sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | ifaceStyle sty = pprOccName occ	-- The tidy phase has ensured that OccNames
-					-- are enough
+  | ifaceStyle sty = pprOccName occ	-- The tidy phase has ensured 
+					-- that OccNames are enough
   | otherwise	   = pprOccName occ <> char '_' <> pprUnique uniq
 				-- If the tidy phase hasn't run, the OccName
 				-- is unlikely to be informative (like 's'),

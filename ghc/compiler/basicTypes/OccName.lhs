@@ -18,7 +18,7 @@ module OccName (
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
-	mkGenOcc1, mkGenOcc2, 
+	mkGenOcc1, mkGenOcc2, mkLocalOcc,
 	
 	isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
 
@@ -42,6 +42,7 @@ module OccName (
 
 import Char	( isDigit, isUpper, isLower, ISALPHANUM, ord, chr, digitToInt )
 import Util	( thenCmp )
+import Unique	( Unique )
 import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, elemFM )
 import Outputable
 import GlaExts
@@ -280,7 +281,7 @@ NB: The string must already be encoded!
 mk_deriv :: NameSpace 
 	 -> String		-- Distinguishes one sort of derived name from another
 	 -> EncodedString	-- Must be already encoded!!  We don't want to encode it a 
-				-- second time because encoding isn't itempotent
+				-- second time because encoding isn't idempotent
 	 -> OccName
 
 mk_deriv occ_sp sys_prefix str = mkSysOcc occ_sp (encode sys_prefix ++ str)
@@ -292,15 +293,15 @@ mkDictOcc, mkIPOcc, mkWorkerOcc, mkDefaultMethodOcc,
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
-mkWorkerOcc        = mk_simple_deriv varName  "$w"
-mkDefaultMethodOcc = mk_simple_deriv varName  "$dm"
-mkDerivedTyConOcc  = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it classifies
-mkClassTyConOcc    = mk_simple_deriv tcName   ":T"	-- as a tycon/datacon
-mkClassDataConOcc  = mk_simple_deriv dataName ":D"	--
-mkDictOcc	   = mk_simple_deriv varName  "$d"
-mkIPOcc		   = mk_simple_deriv varName  "$i"
-mkSpecOcc	   = mk_simple_deriv varName  "$s"
-mkForeignExportOcc = mk_simple_deriv varName  "$f"
+mkWorkerOcc         = mk_simple_deriv varName  "$w"
+mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
+mkDerivedTyConOcc   = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it classifies
+mkClassTyConOcc     = mk_simple_deriv tcName   ":T"	-- as a tycon/datacon
+mkClassDataConOcc   = mk_simple_deriv dataName ":D"	--
+mkDictOcc	    = mk_simple_deriv varName  "$d"
+mkIPOcc		    = mk_simple_deriv varName  "$i"
+mkSpecOcc	    = mk_simple_deriv varName  "$s"
+mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkGenOcc1           = mk_simple_deriv varName  "$gfrom"      -- Generics
 mkGenOcc2           = mk_simple_deriv varName  "$gto"        -- Generics
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
@@ -309,9 +310,15 @@ mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 \begin{code}
 mkSuperDictSelOcc :: Int 	-- Index of superclass, eg 3
 		  -> OccName 	-- Class, eg "Ord"
-		  -> OccName	-- eg "p3Ord"
+		  -> OccName	-- eg "$p3Ord"
 mkSuperDictSelOcc index cls_occ
   = mk_deriv varName "$p" (show index ++ occNameString cls_occ)
+
+mkLocalOcc :: Unique 		-- Unique
+	   -> OccName		-- Local name (e.g. "sat")
+	   -> OccName		-- Nice unique version ("$L23sat")
+mkLocalOcc uniq occ
+   = mk_deriv varName "$L" (show uniq ++ occNameString occ)
 \end{code}
 
 

@@ -40,7 +40,8 @@ import CmdLineOpts	( DynFlags, DynFlag(..),
 			  opt_SccProfilingOn, opt_EnsureSplittableC )
 import CostCentre       ( CostCentre, CostCentreStack )
 import Id               ( Id, idName, setIdName )
-import Name		( globaliseName )
+import Name		( nameSrcLoc, nameOccName, nameUnique, isLocalName, mkGlobalName )
+import OccName		( mkLocalOcc )
 import Module           ( Module )
 import PrimRep		( PrimRep(..) )
 import TyCon            ( TyCon, isDataTyCon )
@@ -194,7 +195,8 @@ cgTopBinding (StgNonRec srt_info id rhs, srt)
     mkSRT srt_label srt [] 	`thenC`
     setSRTLabel srt_label (
     cgTopRhs id' rhs srt_info  	`thenFC` \ (id, info) ->
-    addBindC id info
+    addBindC id info	-- Add the un-globalised Id to the envt, so we
+			-- find it when we look up occurrences
     )
 
 cgTopBinding (StgRec srt_info pairs, srt)
@@ -228,31 +230,16 @@ mkSRT lbl ids these
 				`thenFC` \ (id, _, _) -> returnFC id
 		(id':_) -> returnFC id'
 
--- If we're splitting the object, we need to globalise all the top-level names
--- (and then make sure we only use the globalised one in any C label we use
--- which refers to this name).
-maybeGlobaliseId :: Id -> FCode Id
-maybeGlobaliseId id
-  | opt_EnsureSplittableC 
-  = moduleName				 `thenFC` \ mod ->
-    returnFC (setIdName id (globaliseName (idName id) mod))
-  | otherwise		-- Globalise the name for -split-objs
-  = returnFC id
-
-maybeSplitCode
-  | opt_EnsureSplittableC = CSplitMarker 
-  | otherwise             = AbsCNop
-
 -- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
 -- to enclose the listFCs in cgTopBinding, but that tickled the
 -- statics "error" call in initC.  I DON'T UNDERSTAND WHY!
 
 cgTopRhs :: Id -> StgRhs -> SRT -> FCode (Id, CgIdInfo)
-	-- the Id is passed along for setting up a binding...
+	-- The Id is passed along for setting up a binding...
+	-- It's already been globalised if necessary
 
 cgTopRhs bndr (StgRhsCon cc con args) srt
-  = maybeGlobaliseId bndr `thenFC` \ bndr' ->
-    forkStatics (cgTopRhsCon bndr con args)
+  = forkStatics (cgTopRhsCon bndr con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag args body) srt
   =     -- There should be no free variables
@@ -260,6 +247,39 @@ cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag args body) srt
     let 
 	lf_info = mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args
     in
-    maybeGlobaliseId bndr			`thenFC` \ bndr' ->
-    forkStatics (cgTopRhsClosure bndr' cc bi srt args body lf_info)
+    forkStatics (cgTopRhsClosure bndr cc bi srt args body lf_info)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Stuff to support splitting}
+%*									*
+%************************************************************************
+
+If we're splitting the object, we need to globalise all the top-level names
+(and then make sure we only use the globalised one in any C label we use
+which refers to this name).
+
+\begin{code}
+maybeGlobaliseId :: Id -> FCode Id
+maybeGlobaliseId id
+  | opt_EnsureSplittableC, 	-- Globalise the name for -split-objs
+    isLocalName name
+  = moduleName				 `thenFC` \ mod ->
+    returnFC (setIdName id (mkGlobalName uniq mod new_occ (nameSrcLoc name)))
+  | otherwise		
+  = returnFC id
+  where
+    name       = idName id
+    uniq       = nameUnique name
+    new_occ    = mkLocalOcc uniq (nameOccName name)
+	-- We want to conjure up a name that can't clash with any
+	-- existing name.  So we generate
+	--	Mod_$L243foo
+	-- where 243 is the unique.
+
+maybeSplitCode
+  | opt_EnsureSplittableC = CSplitMarker 
+  | otherwise             = AbsCNop
 \end{code}
