@@ -359,19 +359,23 @@ SRC_HC_OPTS += -split-objs
 
 define BUILD_LIB
 $(RM) $@
-( echo $(STUBOBJS) ; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print ) | xargs ar q $@
+(echo $(STUBOBJS); $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o') | xargs ar q $@
 $(RANLIB) $@
 endef
 
 # Extra stuff for compiling Haskell files with $(SplitObjs):
 
-HC_SPLIT_PRE= \
- $(RM) $@ ; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
- $(FIND) $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food ; fi
-HC_SPLIT_POST  = touch $@
+HC_SPLIT_PRE = \
+    $(RM) $@; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
+    $(FIND) $(basename $@) -name '*.$(way_)o' | xargs $(RM) __rm_food; fi
+ifeq "$(GhcWithInterpreter)" "YES"
+HC_SPLIT_POST = ld -r -x -o $@ $(basename $@)/*.$(way_)o
+else
+HC_SPLIT_POST = touch $@
+endif
 
-SRC_HC_PRE_OPTS  += $(HC_SPLIT_PRE) ;
-SRC_HC_POST_OPTS += $(HC_SPLIT_POST) ;
+SRC_HC_PRE_OPTS  += $(HC_SPLIT_PRE);
+SRC_HC_POST_OPTS += $(HC_SPLIT_POST);
 
 #
 # If (Haskell) object files are split, cleaning up 
@@ -422,13 +426,6 @@ GHCI_LIBOBJS = $(LIBOBJS)
 endif
 
 $(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
-ifneq "$(HS_SRCS)" ""
-ifeq "$(SplitObjs)" "YES"
-	$(foreach obj,$(GHCI_LIBOBJS), \
-	    ld -r -x -o $(obj)         \
-	    $(patsubst %.$(way_)o,%,$(obj))/*.$(way_)o &&) true
-endif
-endif
 	ld -r -x -o $@ $(GHCI_LIBOBJS) $(STUBOBJS)
 
 CLEAN_FILES += $(GHCI_LIBRARY)
