@@ -2644,29 +2644,20 @@ Workaround: don't put weird things in string args to <Command>cpp</Command> macr
 This section summarises how to get the utilities you need on your
 Win95/98/NT/2000 machine to use CVS and build GHC. Similar notes for
 installing and running GHC may be found in the user guide. In general,
-Win95/Win98 behave the same, and WinNT/Win2k behave the same. It is based
-largely on detailed advice from Sigbj&oslash;rn Finne. You should read the
-GHC installation guide sections on Windows (in the user guide) before
-continuing to read these notes.
+Win95/Win98 behave the same, and WinNT/Win2k behave the same.
+You should read the GHC installation guide sections on Windows (in the user
+guide) before continuing to read these notes.
 </para>
 
+<para>
+Before you start, make sure you've installed the Cygwin packages
+<filename>openssh</filename>, <filename>openssl</filename>,
+<filename>cvs</filename> and <filename>autoconf</filename>.
+</para>
 
-<Sect2><Title>Installing ssh</Title>
+<Sect2><Title>Configuring ssh</Title>
 
 <ItemizedList>
-
-<ListItem>
-<para>
-Extract the whole of <ULink URL="http://research.microsoft.com/~simonpj/ssh-1_2_26-cygwinb19.tar.gz">the ssh archive</ULink> into your <filename>C:\</filename> directory, and use the ``All files'' and ``User folder names'' options in WinZip extract dialogue box. This populates your <filename>C:\usr\local</filename> tree.
-</para>
-</ListItem>
-
-<ListItem>
-<para>
-Extract <ULink URL="http://research.microsoft.com/~simonpj/cygwinb19.dll.zip">cygwinb19.dll</ULink> into <filename>/usr/local/bin</filename>.  The current version
-of Cywin is b20, but this version of ssh was compiled with b19.
-</para>
-</ListItem>
 
 <ListItem>
 <para>
@@ -2765,18 +2756,9 @@ If you don't have an account on <Literal>cvs.haskell.org</Literal>, send
 </Sect2>
 
 
-<Sect2><Title>Installing CVS</Title>
+<Sect2><Title>Configuring CVS</Title>
 
 <ItemizedList>
-
-<ListItem>
-<para>
-Unpack 
-<ULink URL="http://research.microsoft.com/~simonpj/cvs-1_10-win.zip">
-CVS</ULink> and, following the instructions in the <filename>README</filename>, copy the
-appropriate files into <filename>/usr/local/bin</filename>.
-</para>
-</ListItem>
 
 <ListItem>
 <para>
@@ -2794,7 +2776,7 @@ will look for its <filename>.cvsrc</filename> file.
 
 <ListItem>
 <para>
-<Constant>CVS_RSH</Constant>: <filename>c:/usr/local/bin/ssh1</filename>
+<Constant>CVS_RSH</Constant>: <filename>c:/path_to_Cygwin/bin/ssh</filename>
 </para>
 </ListItem>
 
@@ -2832,7 +2814,7 @@ free to change them.)
 </para>
 
 <para>
-Filenames starting with "<filename>.</filename>" were illegal in 
+Filenames starting with <filename>.</filename> were illegal in 
 the 8.3 DOS filesystem, but that restriction should have
 been lifted by now (i.e., you're using VFAT or later filesystems.) If
 you're still having problems creating it, don't worry; <filename>.cvsrc</filename> is entirely
@@ -2893,51 +2875,6 @@ There is a very nice graphical front-end to CVS for Win32 platforms,
 with a UI that people will be familiar with, at 
 <ULink URL="http://www.wincvs.org/">wincvs.org</ULink>.
 I have not tried it yet.
-</para>
-
-</Sect2>
-
-
-<Sect2><Title>Installing autoconf</Title>
-
-<para>
-Only required if you are doing builds from GHC's sources
-checked out from the CVS tree.
-</para>
-
-<ItemizedList>
-<ListItem>
-<para>
-Fetch the (standard, Unix) <Command>autoconf</Command> distribution from
-<ULink URL="ftp://ftp.gnu.org/gnu/autoconf">ftp.gnu.org</ULink>.
-</para>
-</ListItem>
-<ListItem>
-<para>
-Unpack it into an arbitrary directory.
-</para>
-</ListItem>
-<ListItem>
-<para>
-Make sure that the directory <filename>/usr/local/bin</filename> exists.
-</para>
-</ListItem>
-<ListItem>
-<para>
-Say "<filename>./configure</filename>".
-</para>
-</ListItem>
-<ListItem>
-<para>
-Now <Command>make install</Command>.  This should put <filename>autoheader</filename>
-and <filename>autoconf</filename> in <filename>/usr/local/bin</filename>.
-</para>
-</ListItem>
-</ItemizedList>
-
-<para>
-<Command>autoheader</Command> doesn't seem to work, but you don't need it
-for GHC.
 </para>
 
 </Sect2>
