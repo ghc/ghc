@@ -66,7 +66,11 @@ import Exception
 import GlaExts hiding (ByteArray, newByteArray, freezeByteArray)
 import Array
 import IO
-import PrelIOBase		( IOError(..), IOErrorType(..), IOException(..) )
+import PrelIOBase		( IOError(..), IOErrorType(..)
+#if __GLASGOW_HASKELL__ > 411
+				, IOException(..)
+#endif
+				)
 import PrelReal			( Ratio(..) )
 import PrelIOBase	 	( IO(..) )
 #else
