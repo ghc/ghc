@@ -1996,7 +1996,7 @@ pprPrimOp (CCallOp fun is_casm may_gc cconv arg_tys res_ty)
 
 	before
 	  | is_casm && may_gc = "_casm_GC_ ``"
-	  | is_casm	      = "casm_ ``"
+	  | is_casm	      = "_casm_ ``"
 	  | may_gc	      = "_ccall_GC_ "
 	  | otherwise	      = "_ccall_ "
 
