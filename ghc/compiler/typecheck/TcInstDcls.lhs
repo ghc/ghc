@@ -33,7 +33,7 @@ import TcType		( mkClassPred, mkTyVarTy, mkTyVarTys, tcSplitForAllTys,
 import Inst		( InstOrigin(..), newDicts, instToId,
 			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( TcEnv, tcExtendGlobalValEnv, isLocalThing,
+import TcEnv		( TcEnv, tcExtendGlobalValEnv, isHomePackageThing,
 			  tcExtendTyVarEnvForMeths, tcLookupId, tcLookupClass,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
 			  simpleInstInfoTy, newDFunName
@@ -204,7 +204,7 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
 	-- manager.
     let
 	local_inst_info = catMaybes local_inst_infos
-	(local_iface_dfuns, pkg_iface_dfuns) = partition (isLocalThing this_mod) iface_dfuns
+	(local_iface_dfuns, pkg_iface_dfuns) = partition isHomePackageThing iface_dfuns
 	hst_dfuns       = foldModuleEnv ((++) . md_insts) [] hst
     in 
 
