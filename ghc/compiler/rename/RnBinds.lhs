@@ -153,7 +153,7 @@ rnTopMonoBinds :: RdrNameMonoBinds
 	       -> RnM (RenamedHsBinds, FreeVars)
 
 -- Assumes the binders of the binding are in scope already
--- Very like rnMonoBinds, bu checks for missing signatures too
+-- Very like rnMonoBinds, but checks for missing signatures too
 
 rnTopMonoBinds mbinds sigs
  =  bindPatSigTyVars (collectSigTysFromMonoBinds mbinds) $ 
