@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.40 2000/03/23 17:45:19 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.41 2000/04/05 15:17:38 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -80,11 +80,13 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling,
 			  opt_SMP )
 import Id		( Id, idType, idArityInfo )
-import DataCon		( DataCon, dataConTag, fIRST_TAG,
+import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 			  isNullaryDataCon, isTupleCon, dataConName
 			)
 import IdInfo		( ArityInfo(..) )
-import Name		( Name, isExternallyVisibleName, nameUnique )
+import Name		( Name, isExternallyVisibleName, nameUnique, 
+			  getOccName )
+import OccName		( occNameUserString )
 import PprType		( getTyDescription )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
 import SMRep		-- all of it
@@ -1041,6 +1043,8 @@ closureTypeDescr (MkClosureInfo name (LFThunk ty _ _ _ _ _ _) _)
   = getTyDescription ty
 closureTypeDescr (MkClosureInfo name (LFReEntrant ty _ _ _ _ _) _)
   = getTyDescription ty
+closureTypeDescr (MkClosureInfo name (LFCon data_con _) _)
+  = occNameUserString (getOccName (dataConTyCon data_con))
 closureTypeDescr (MkClosureInfo name lf _)
   = showSDoc (ppr name)
 \end{code}
