@@ -639,9 +639,11 @@ rnBracket (DecBr group)
 
     updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env gbl }) $
 
-    rnSrcDecls group	`thenM` \ (tcg_env, group', dus) ->
+    rnSrcDecls group	`thenM` \ (tcg_env, group') ->
 	-- Discard the tcg_env; it contains only extra info about fixity
-
+    let 
+	dus = tcg_dus tcg_env 
+    in
     returnM (DecBr group', duUses dus `minusNameSet` duDefs dus)
 \end{code}
 
