@@ -782,13 +782,16 @@ typeKind (AppTy fun arg)	= funResultTy (typeKind fun)
 
 typeKind (FunTy arg res)	= fix_up (typeKind res)
 				where
-				  fix_up kind = case splitTyConApp_maybe kind of
-						  Just (tycon, [_]) | tycon == typeCon	-> boxedTypeKind
-						  other					-> kind
+				  fix_up (TyConApp tycon _) |  tycon == typeCon
+							    || tycon == openKindCon = boxedTypeKind
+				  fix_up (NoteTy _ kind) = fix_up kind
+				  fix_up kind	         = kind
 		-- The basic story is 
 		-- 	typeKind (FunTy arg res) = typeKind res
 		-- But a function is boxed regardless of its result type
-		-- Hencd the strange fix-up
+		-- Hence the strange fix-up.
+		-- Note that 'res', being the result of a FunTy, can't have 
+		-- a strange kind like (*->*).
 
 typeKind (ForAllTy tv ty)	= typeKind ty
 \end{code}
