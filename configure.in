@@ -31,7 +31,7 @@ fi
 # Remove some automounter nonsense (Glasgow specific gruff)
 #
 hardtop=`pwd`
-hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | /sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
 
 echo ''
 echo "*** The top of your build tree is: $hardtop"
