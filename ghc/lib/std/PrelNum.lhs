@@ -169,11 +169,15 @@ remInteger ia 0
   = error "Prelude.Integral.rem{Integer}: divide by 0"
 remInteger a@(S# (-2147483648#)) b = remInteger (toBig a) b
 remInteger (S# a) (S# b) = S# (remInt# a b)
+{- Special case doesn't work, because a 1-element J# has the range
+   -(2^32-1) -- 2^32-1, whereas S# has the range -2^31 -- (2^31-1)
 remInteger ia@(S# a) (J# sb b)
   | sb ==# 1#  = S# (remInt# a (word2Int# (integer2Word# sb b)))
   | sb ==# -1# = S# (remInt# a (0# -# (word2Int# (integer2Word# sb b))))
   | 0# <# sb   = ia
   | otherwise  = S# (0# -# a)
+-}
+remInteger ia@(S# _) ib@(J# _ _) = remInteger (toBig ia) ib
 remInteger (J# sa a) (S# b)
   = case int2Integer# b of { (# sb, b #) ->
     case remInteger# sa a sb b of { (# sr, r #) ->
@@ -186,10 +190,13 @@ quotInteger ia 0
   = error "Prelude.Integral.quot{Integer}: divide by 0"
 quotInteger a@(S# (-2147483648#)) b = quotInteger (toBig a) b
 quotInteger (S# a) (S# b) = S# (quotInt# a b)
+{- Special case disabled, see remInteger above
 quotInteger (S# a) (J# sb b)
   | sb ==# 1#  = S# (quotInt# a (word2Int# (integer2Word# sb b)))
   | sb ==# -1# = S# (quotInt# a (0# -# (word2Int# (integer2Word# sb b))))
   | otherwise  = zeroInteger
+-}
+quotInteger ia@(S# _) ib@(J# _ _) = quotInteger (toBig ia) ib
 quotInteger (J# sa a) (S# b)
   = case int2Integer# b of { (# sb, b #) ->
     case quotInteger# sa a sb b of (# sq, q #) -> J# sq q }
