@@ -973,5 +973,8 @@ FPTOOLS_END_DATA_SECTION
 dnl ** code before data?
 FPTOOLS_CODE_BEFORE_DATA
 
+dnl ** check for ld, and whether ld has -x option
+AC_PATH_PROG(LdCmd, ld)
+FPTOOLS_LD_X
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )

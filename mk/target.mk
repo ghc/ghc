@@ -461,7 +461,7 @@ HC_SPLIT_PRE = \
     $(RM) $@; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
     $(FIND) $(basename $@) -name '*.$(way_)o' | xargs $(RM) __rm_food; fi
 ifeq "$(GhcWithInterpreter)" "YES"
-HC_SPLIT_POST = $(LD) -r -x -o $@ $(basename $@)/*.$(way_)o
+HC_SPLIT_POST = $(LD) -r $(LD_X) -o $@ $(basename $@)/*.$(way_)o
 else
 HC_SPLIT_POST = touch $@
 endif # GhcWithInterpreter == YES
@@ -491,12 +491,12 @@ ifeq "$(StripLibraries)" "YES"
 ifeq "$(SplitObjs)" "YES"
 SRC_HC_POST_OPTS += \
   for i in $(basename $@)/*; do \
-	$(LD) -r -x -o $$i.tmp $$i; \
+	$(LD) -r $(LD_X) -o $$i.tmp $$i; \
 	$(MV) $$i.tmp $$i; \
   done
 else
 SRC_HC_POST_OPTS += \
-  $(LD) -r -x -o $@.tmp $@; $(MV) $@.tmp $@
+  $(LD) -r $(LD_X) -o $@.tmp $@; $(MV) $@.tmp $@
 endif # SplitObjs
 endif # StripLibraries
 
@@ -538,7 +538,7 @@ ifneq "$(DONT_WANT_STD_GHCI_LIB_RULE)" "YES"
 # hslibs/Win32 uses this 'feature'.
 #
 $(GHCI_LIBRARY) :: $(LIBOBJS)
-	$(LD) -r -x -o $@ $(LIBOBJS) $(STUBOBJS)
+	$(LD) -r $(LD_X) -o $@ $(LIBOBJS) $(STUBOBJS)
 
 endif # DONT_WANT_STD_GHCI_LIB_RULE
 endif # GhcWithInterpreter

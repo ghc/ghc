@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.85 2001/10/13 20:26:13 sof Exp $
+dnl $Id: aclocal.m4,v 1.86 2001/10/24 09:43:47 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -242,6 +242,29 @@ rm -f conftest1 conftest2
 ])
 ContextDiffCmd=$fptools_cv_context_diffs
 AC_SUBST(ContextDiffCmd)
+])
+
+dnl
+dnl Check whether ld supports -x
+dnl
+AC_DEFUN(FPTOOLS_LD_X,
+[AC_CACHE_CHECK([whether ld understands -x], fptools_cv_ld_x,
+[
+echo 'foo() {}' > conftest.c
+${CC-cc} -c conftest.c
+if ${LdCmd} -r -x -o foo.o conftest.o; then
+   fptools_cv_ld_x=yes
+else
+   fptools_cv_ld_x=no
+fi
+rm -rf conftest.c conftest.o foo.o
+])
+if test "$fptools_cv_ld_x" = yes; then
+	LdXFlag=-x
+else
+	LdXFlag=
+fi
+AC_SUBST(LdXFlag)
 ])
 
 dnl
