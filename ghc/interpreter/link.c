@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.21 $
- * $Date: 1999/12/10 15:59:48 $
+ * $Revision: 1.22 $
+ * $Date: 1999/12/16 16:34:42 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -496,15 +496,38 @@ break;
 
         case PREPREL : 
 
-           modulePrelude = newModule(textPrelude);
-           setCurrModule(modulePrelude);
-        
-           for (i=0; i<NUM_TUPLES; ++i) {
-               allocTupleTycon(i);
-           }
-
            if (combined) {
+
+               nameMkC = addWiredInBoxingTycon("PrelBase","Char",  "C#",1,0,CHAR_REP  );
+               nameMkI = addWiredInBoxingTycon("PrelBase","Int",   "I#",1,0,INT_REP   );
+               nameMkW = addWiredInBoxingTycon("PrelAddr","Word",  "W#",1,0,WORD_REP  );
+               nameMkA = addWiredInBoxingTycon("PrelAddr","Addr",  "A#",1,0,ADDR_REP  );
+               nameMkF = addWiredInBoxingTycon("PrelBase","Float", "F#",1,0,FLOAT_REP );
+               nameMkD = addWiredInBoxingTycon("PrelBase","Double","D#",1,0,DOUBLE_REP);
+               nameMkInteger            
+                       = addWiredInBoxingTycon("PrelBase","Integer","Integer#",1,0,0);
+               nameMkPrimByteArray      
+                       = addWiredInBoxingTycon("PrelGHC","ByteArray","PrimByteArray#",1,0,0);
+
+               for (i=0; i<NUM_TUPLES; ++i) {
+                   addTupleTycon(i);
+               }
+	       addWiredInEnumTycon("PrelBase","Bool",
+                                   doubleton(findText("False"),findText("True")));
+
+               //nameMkThreadId
+               //        = addWiredInBoxingTycon("PrelConc","ThreadId","ThreadId#"
+               //                                ,1,0,THREADID_REP);
+
            } else {
+
+               modulePrelude = newModule(textPrelude);
+               setCurrModule(modulePrelude);
+        
+               for (i=0; i<NUM_TUPLES; ++i) {
+                   addTupleTycon(i);
+               }
+               setCurrModule(modulePrelude);
 
                typeArrow = addPrimTycon(findText("(->)"),
                                         pair(STAR,pair(STAR,STAR)),

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.25 $
- * $Date: 1999/12/10 15:59:53 $
+ * $Revision: 1.26 $
+ * $Date: 1999/12/16 16:34:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -581,18 +581,20 @@ List   ts; {                            /* Null pattern matches every tycon*/
 Text ghcTupleText_n ( Int n )
 {
     Int  i;
-    char buf[103];
+    char buf[104];
     if (n < 0 || n >= 100) internal("ghcTupleText_n");
     buf[0] = '(';
     for (i = 1; i <= n; i++) buf[i] = ',';
-    buf[i] = ')';
-    buf[i+1] = 0;
+    buf[n+1] = ')';
+    buf[n+2] = 0;
     return findText(buf);
 }
 
 Text ghcTupleText(tup)
 Tycon tup; {
-    assert(isTuple(tup));
+    if (!isTuple(tup)) {
+       assert(isTuple(tup));
+    }
     return ghcTupleText_n ( tupleOf(tup) );
 }
 
@@ -607,23 +609,6 @@ Tycon mkTuple ( Int n )
    internal("mkTuple: request for non-existent tuple");
 }
 
-Void allocTupleTycon ( Int n )
-{
-   Int   i;
-   Kind  k;
-   Tycon t;
-   for (i = TYCMIN; i < tyconHw; i++)
-      if (tycon(i).tuple == n) return;
-
-   //t = addPrimTycon(findText(buf),simpleKind(n),n, DATATYPE,NIL);
-
-   k = STAR;
-   for (i = 0; i < n; i++) k = ap(STAR,k);
-   t = newTycon(ghcTupleText_n(n));
-   tycon(t).kind = k;
-   tycon(t).tuple = n;
-   tycon(t).what = DATATYPE;
-}
 
 /* --------------------------------------------------------------------------
  * Name storage:
@@ -770,6 +755,95 @@ void* getHugs_AsmObject_for ( char* s )
 /* --------------------------------------------------------------------------
  * Primitive functions:
  * ------------------------------------------------------------------------*/
+
+Module findFakeModule ( Text t )
+{
+   Module m = findModule(t);
+   if (nonNull(m)) {
+      if (!module(m).fake) internal("findFakeModule");
+   } else {
+      m = newModule(t);
+      module(m).fake = TRUE;
+   }
+   return m;
+}
+
+
+Name addWiredInBoxingTycon
+        ( String modNm, String typeNm, String constrNm,
+          Int arity, Int no, Int rep )
+{
+   Name  n;
+   Tycon t;
+   Text modT  = findText(modNm);
+   Text typeT = findText(typeNm);
+   Text conT  = findText(constrNm);
+   Module m = findFakeModule(modT);
+   setCurrModule(m);
+   
+   n = newName(conT,NIL);
+   name(n).arity = arity;
+   name(n).number = cfunNo(no);
+   name(n).type = NIL;
+   name(n).primop = (void*)rep;
+
+   t = newTycon(typeT);
+   tycon(t).what = DATATYPE;
+   return n;
+}
+
+
+Tycon addTupleTycon ( Int n )
+{
+   Int   i;
+   Kind  k;
+   Tycon t;
+   Module m;
+
+   for (i = TYCMIN; i < tyconHw; i++)
+      if (tycon(i).tuple == n) return i;
+
+   if (combined)
+      m = findFakeModule(findText(n==0 ? "PrelBase" : "PrelTup")); else
+      m = findModule(findText("Prelude"));
+
+   setCurrModule(m);
+   k = STAR;
+   for (i = 0; i < n; i++) k = ap(STAR,k);
+   t = newTycon(ghcTupleText_n(n));
+   tycon(t).kind  = k;
+   tycon(t).tuple = n;
+   tycon(t).what  = DATATYPE;
+   return t;
+}
+
+
+Tycon addWiredInEnumTycon ( String modNm, String typeNm, 
+                            List /*of Text*/ constrs )
+{
+   Int    i;
+   Tycon  t;
+   Text   modT  = findText(modNm);
+   Text   typeT = findText(typeNm);
+   Module m     = findFakeModule(modT);
+   setCurrModule(m);
+
+   t             = newTycon(typeT);
+   tycon(t).kind = STAR;
+   tycon(t).what = DATATYPE;
+   
+   constrs = reverse(constrs);
+   i       = length(constrs);
+   for (; nonNull(constrs); constrs=tl(constrs),i--) {
+      Text conT        = hd(constrs);
+      Name con         = newName(conT,t);
+      name(con).number = cfunNo(i);
+      name(con).type   = t;
+      tycon(t).defn    = cons(con, tycon(t).defn);      
+   }
+   return t;
+}
+
 
 Name addPrimCfunREP(t,arity,no,rep)     /* add primitive constructor func  */
 Text t;                                 /* sets rep, not type              */
@@ -1052,18 +1126,121 @@ Type tc; {
                          || typeInvolves(arg(ty),tc)));
 }
 
-Inst findSimpleInstance ( ConId klass, ConId dataty )
+
+/* Needed by finishGHCInstance to find classes, before the
+   export list has been built -- so we can't use 
+   findQualClass.
+*/
+Class findQualClassWithoutConsultingExportList ( QualId q )
 {
-   Inst in;
-   for (in = INSTMIN; in < instHw; in++) {
-      Cell head = inst(in).head;
-      if (isClass(fun(head)) 
-          && cclass(fun(head)).text==textOf(klass)
-          && typeInvolves(arg(head), findTycon(textOf(dataty)) )
-         )
-         return in;
+   Class cl;
+   Text t_mod;
+   Text t_class;
+
+   assert(isQCon(q));
+
+   if (isCon(q)) {
+      t_mod   = NIL;
+      t_class = textOf(q);
+   } else {
+      t_mod   = qmodOf(q);
+      t_class = qtextOf(q);
+   }
+
+   for (cl = CLASSMIN; cl < classHw; cl++) {
+      if (cclass(cl).text == t_class) {
+         /* Class name is ok, but is this the right module? */
+         if (isNull(t_mod)   /* no module name specified */
+             || (nonNull(t_mod) 
+                 && t_mod == module(cclass(cl).mod).text)
+            )
+            return cl;
+      }
    }
    return NIL;
+}
+
+
+/* Same deal, except for Tycons. */
+Tycon findQualTyconWithoutConsultingExportList ( QualId q )
+{
+   Tycon tc;
+   Text t_mod;
+   Text t_tycon;
+
+   assert(isQCon(q));
+
+   if (isCon(q)) {
+      t_mod   = NIL;
+      t_tycon = textOf(q);
+   } else {
+      t_mod   = qmodOf(q);
+      t_tycon = qtextOf(q);
+   }
+
+   for (tc = TYCMIN; tc < tyconHw; tc++) {
+      if (tycon(tc).text == t_tycon) {
+         /* Tycon name is ok, but is this the right module? */
+         if (isNull(t_mod)   /* no module name specified */
+             || (nonNull(t_mod) 
+                 && t_mod == module(tycon(tc).mod).text)
+            )
+            return tc;
+      }
+   }
+   return NIL;
+}
+
+
+/* Same deal, except for Names. */
+Name findQualNameWithoutConsultingExportList ( QualId q )
+{
+   Name nm;
+   Text t_mod;
+   Text t_name;
+
+   assert(isQVar(q) || isQCon(q));
+
+   if (isCon(q) || isVar(q)) {
+      t_mod  = NIL;
+      t_name = textOf(q);
+   } else {
+      t_mod  = qmodOf(q);
+      t_name = qtextOf(q);
+   }
+
+   for (nm = NAMEMIN; nm < nameHw; nm++) {
+      if (name(nm).text == t_name) {
+         /* Name is ok, but is this the right module? */
+         if (isNull(t_mod)   /* no module name specified */
+             || (nonNull(t_mod) 
+                 && t_mod == module(name(nm).mod).text)
+            )
+            return nm;
+      }
+   }
+   return NIL;
+}
+
+
+/* returns List of QualId */
+List getAllKnownTyconsAndClasses ( void )
+{
+   Tycon tc;
+   Class nw;
+   List  xs = NIL;
+   for (tc = TYCMIN; tc < tyconHw; tc++) {
+      /* almost certainly undue paranoia about duplicate avoidance, but .. */
+      QualId q = mkQCon( module(tycon(tc).mod).text, tycon(tc).text );
+      if (!qualidIsMember(q,xs))
+         xs = cons ( q, xs );
+   }
+   for (nw = CLASSMIN; nw < classHw; nw++) {
+      QualId q = mkQCon( module(cclass(nw).mod).text, cclass(nw).text );
+      if (!qualidIsMember(q,xs))
+         xs = cons ( q, xs );
+   }
+   return xs;
 }
 
 /* --------------------------------------------------------------------------
@@ -1153,6 +1330,7 @@ Text t; {
     }
     module(moduleHw).text          = t; /* clear new module record         */
     module(moduleHw).qualImports   = NIL;
+    module(moduleHw).fake          = FALSE;
     module(moduleHw).exports       = NIL;
     module(moduleHw).tycons        = NIL;
     module(moduleHw).names         = NIL;
@@ -1306,7 +1484,7 @@ void* lookupOTabName ( Module m, char* nm )
 {
    int i;
    for (i = 0; i < module(m).usedoTab; i++) {
-      if (1)
+      if (0)
          fprintf ( stderr, 
                    "lookupOTabName: request %s, table has %s\n",
                    nm, module(m).oTab[i].nm );
@@ -1969,7 +2147,7 @@ Int  depth; {
                 Printf("Offset %d", offsetOf(c));
                 break;
         case TUPLE:
-                Printf("%s", textToStr(ghcTupleText(tupleOf(c))));
+                Printf("%s", textToStr(ghcTupleText(c)));
                 break;
         case POLYTYPE:
                 Printf("Polytype");
@@ -2103,8 +2281,20 @@ Int  depth; {
                 break;
         case ZTUP2:
                 Printf("<ZPair ");
-                print(snd(c),depth-1);
+                print(zfst(c),depth-1);
+                Putchar(' ');
+                print(zsnd(c),depth-1);
                 Putchar('>');
+                break;
+        case ZTUP3:
+                Printf("<ZTriple ");
+                print(zfst3(c),depth-1);
+                Putchar(' ');
+                print(zsnd3(c),depth-1);
+                Putchar(' ');
+                print(zthd3(c),depth-1);
+                Putchar('>');
+                break;
         case BANG:
                 Printf("(BANG,");
                 print(snd(c),depth-1);
@@ -2170,6 +2360,16 @@ Cell c; {
 Bool isQualIdent(c)                    /* is cell a qualified identifier?  */
 Cell c; {
     return isPair(c) && (fst(c)==QUALIDENT);
+}
+
+Bool eqQualIdent ( QualId c1, QualId c2 )
+{
+   assert(isQualIdent(c1));
+   if (!isQualIdent(c2)) {
+   assert(isQualIdent(c2));
+   }
+   return qmodOf(c1)==qmodOf(c2) &&
+          qtextOf(c1)==qtextOf(c2);
 }
 
 Bool isIdent(c)                        /* is cell an identifier?           */
@@ -2348,6 +2548,15 @@ List xs, ys; {                         /* list xs onto list ys...          */
     }
     return ys;
 }
+
+QualId qualidIsMember ( QualId q, List xs )
+{
+   for (; nonNull(xs); xs=tl(xs)) {
+      if (eqQualIdent(q, hd(xs)))
+         return hd(xs);
+   }
+   return NIL;
+}  
 
 Cell varIsMember(t,xs)                 /* Test if variable is a member of  */
 Text t;                                /* given list of variables          */

@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.18 $
- * $Date: 1999/12/10 15:59:49 $
+ * $Revision: 1.19 $
+ * $Date: 1999/12/16 16:34:42 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -150,7 +150,7 @@ ifTopDecl
 
           | TINSTANCE ifCtxInst ifInstHdL '=' ifVar
                                         {$$=gc5(ap(I_INSTANCE,
-                                                   z4ble($1,$2,$3,$5)));}
+                                                   z5ble($1,$2,$3,$5,NIL)));}
 
           | NUMLIT TYPE ifCon ifKindedTyvarL '=' ifType
                                         {$$=gc6(ap(I_TYPE,
@@ -236,7 +236,7 @@ ifInstHd /* { Class aType }    :: (ConId, Type) */
 
 ifInstHdL /* { C a1 } -> { C2 a2 } -> ... -> { Cn an } :: Type */
           : ifInstHd ARROW ifInstHdL    {$$=gc3(fn($1,$3));}
-          | ifInstHd                    {$$=gc1(NIL);}
+          | ifInstHd                    {$$=gc1($1);}
           ;
 
 ifCtxDecl /* {M.C1 a, C2 b} =>  :: [(QConId, VarId)] */ 
@@ -265,36 +265,36 @@ ifCtxDeclLE /* M.C1 a   :: (QConId,VarId) */
    mkInt(2) indicates unpacked -- a GHC extension.
 */
 
-ifConstrs /* = Con1 | ... | ConN  :: [(ConId,[(Type,VarId,Int)])] */
+ifConstrs /* = Con1 | ... | ConN  :: [((ConId,[((Type,VarId,Int))]))] */
           :                             {$$ = gc0(NIL);}
           | '=' ifConstrL               {$$ = gc2($2);}
           ;
-ifConstrL /* [(ConId,[(Type,VarId,Int)])] */
+ifConstrL /* [((ConId,[((Type,VarId,Int))]))] */
           : ifConstr                    {$$ = gc1(singleton($1));}
           | ifConstr '|' ifConstrL      {$$ = gc3(cons($1,$3));}
           ;
-ifConstr /* (ConId,[(Type,VarId,Int)]) */
+ifConstr /* ((ConId,[((Type,VarId,Int))])) */
           : ifConData ifDataAnonFieldL  {$$ = gc2(zpair($1,$2));}
           | ifConData '{' ifDataNamedFieldL '}' 
                                         {$$ = gc4(zpair($1,$3));}
           ;
-ifDataAnonFieldL /* [(Type,VarId,Int)] */
+ifDataAnonFieldL /* [((Type,VarId,Int))] */
           :                             {$$=gc0(NIL);}
           | ifDataAnonField ifDataAnonFieldL
                                         {$$=gc2(cons($1,$2));}
           ;
-ifDataNamedFieldL /* [(Type,VarId,Int)] */
+ifDataNamedFieldL /* [((Type,VarId,Int))] */
           :                             {$$=gc0(NIL);}
           | ifDataNamedField            {$$=gc1(cons($1,NIL));}
           | ifDataNamedField ',' ifDataNamedFieldL 
                                         {$$=gc3(cons($1,$3));}
           ;
-ifDataAnonField /* (Type,VarId,Int) */
+ifDataAnonField /* ((Type,VarId,Int)) */
           : ifAType                     {$$=gc1(ztriple($1,NIL,mkInt(0)));}
           | '!' ifAType                 {$$=gc2(ztriple($2,NIL,mkInt(1)));}
           | '!' '!' ifAType             {$$=gc3(ztriple($3,NIL,mkInt(2)));}
           ;
-ifDataNamedField  /* (Type,VarId,Int) */
+ifDataNamedField  /* ((Type,VarId,Int)) */
           : ifVar COCO ifAType          {$$=gc3(ztriple($3,$1,mkInt(0)));}
           | ifVar COCO '!' ifAType      {$$=gc4(ztriple($4,$1,mkInt(1)));}
           | ifVar COCO '!' '!' ifAType  {$$=gc5(ztriple($5,$1,mkInt(2)));}
@@ -302,15 +302,15 @@ ifDataNamedField  /* (Type,VarId,Int) */
 
 
 /*- Interface class declarations - methods ----------------*/
-ifCmeths /* [(VarId,Type)] */
+ifCmeths /* [((VarId,Type))] */
           :                             { $$ = gc0(NIL); }
           | WHERE '{' ifCmethL '}'      { $$ = gc4($3); }
           ;
-ifCmethL /* [(VarId,Type)] */
+ifCmethL /* [((VarId,Type))] */
           : ifCmeth                     { $$ = gc1(singleton($1)); }
           | ifCmeth ';' ifCmethL        { $$ = gc3(cons($1,$3));    }
           ;
-ifCmeth /* (VarId,Type) */
+ifCmeth /* ((VarId,Type)) */
           : ifVar     COCO ifType       { $$ = gc3(zpair($1,$3)); }
           | ifVar '=' COCO ifType       { $$ = gc4(zpair($1,$4)); } 
                                               /* has default method */
@@ -318,7 +318,7 @@ ifCmeth /* (VarId,Type) */
 
 
 /*- Interface newtype declararions ------------------------*/
-ifNewTypeConstr /* (ConId,Type) */
+ifNewTypeConstr /* ((ConId,Type)) */
           : '=' ifCon ifAType           { $$ = gc3(zpair($2,$3)); }
           ;
 
@@ -356,7 +356,8 @@ ifAType   : ifQTCName                   { $$ = gc1($1); }
           | ifTyvar                     { $$ = gc1($1); }
           | '(' ')'                     { $$ = gc2(typeUnit); }
           | '(' ifTypeL2 ')'            { $$ = gc3(buildTuple($2)); }
-          | '[' ifType ']'              { $$ = gc3(ap(typeList,$2));}
+          | '[' ifType ']'              { $$ = gc3(ap(mkCon(tycon(typeList).text),
+                                                      $2));}
           | '{' ifQTCName ifATypes '}'  { $$ = gc4(ap(DICTAP,
                                                       pair($2,$3))); }
           | '(' ifType ')'              { $$ = gc3($2); }

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.19 $
- * $Date: 1999/12/10 15:59:57 $
+ * $Revision: 1.20 $
+ * $Date: 1999/12/16 16:34:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2801,6 +2801,32 @@ Int what; {
            typeChecker(RESET);
 
            if (combined) {
+               Module m = findFakeModule(findText("PrelBase"));
+               setCurrModule(m);
+
+               starToStar   = simpleKind(1);
+               typeList     = addPrimTycon(findText("[]"),
+                                           starToStar,1,
+                                           DATATYPE,NIL);
+
+               listof       = ap(typeList,aVar);
+               nameNil      = addPrimCfun(findText("[]"),0,1,
+                                           mkPolyType(starToStar,
+                                                      listof));
+               nameCons     = addPrimCfun(findText(":"),2,2,
+                                           mkPolyType(starToStar,
+                                                      fn(aVar,
+                                                      fn(listof,
+                                                         listof))));
+               name(nameNil).parent =
+               name(nameCons).parent = typeList;
+
+               name(nameCons).syntax
+                            = mkSyntax(RIGHT_ASS,5);
+
+               tycon(typeList).defn
+                            = cons(nameNil,cons(nameCons,NIL));
+
            } else {
                dummyVar     = inventVar();
 

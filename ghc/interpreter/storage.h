@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.20 $
- * $Date: 1999/12/10 15:59:54 $
+ * $Revision: 1.21 $
+ * $Date: 1999/12/16 16:34:45 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -49,6 +49,8 @@ typedef Cell         Ext;                        /* extension label        */
 
 typedef Cell         ConId;
 typedef Cell         VarId;
+typedef Cell         QualId;
+typedef Cell         ConVarId;
 
 /* --------------------------------------------------------------------------
  * Text storage:
@@ -177,6 +179,7 @@ extern  Cell         whatIs    Args((Cell));
 #define mkQCon(m,t)     ap(QUALIDENT,pair(mkCon(m),mkCon(t)))
 #define mkQVarOp(m,t)   ap(QUALIDENT,pair(mkCon(m),mkVarop(t)))
 #define mkQConOp(m,t)   ap(QUALIDENT,pair(mkCon(m),mkConop(t)))
+#define mkQualId(m,t)   ap(QUALIDENT,pair(m,t))
 #define intValOf(c)     (snd(c))
 #define inventVar()     mkVar(inventText())
 #define mkDictVar(t)    ap(DICTVAR,t)
@@ -196,6 +199,7 @@ extern  Bool            isCon        Args((Cell));
 extern  Bool            isQVar       Args((Cell));
 extern  Bool            isQCon       Args((Cell));
 extern  Bool            isQualIdent  Args((Cell));
+extern  Bool            eqQualIdent ( QualId c1, QualId c2 );
 extern  Bool            isIdent      Args((Cell));
 extern  String          stringNegate Args((String));
 extern  Text            textOf       Args((Cell));
@@ -318,63 +322,67 @@ extern  Ptr             cptrOf          Args((Cell));
    type <a>              = ZList a
    type ExportListEntry  = ConVarId | (ConId, <ConVarId>) 
    type Associativity    = mkInt of LEFT_ASS | RIGHT_ASS | NON_ASS
-   type Constr           = (ConId, <(Type,VarId,Int)>)
-               (constr name, list of (type, field name if any, strictness))
+   type Constr           = ((ConId, [((Type,VarId,Int))]))
+               ((constr name, [((type, field name if any, strictness))]))
                strictness: 0 => none, 1 => !, 2 => !! (unpacked)
    All 2/3/4/5 tuples in the interface abstract syntax are done with
    z-tuples.
 */
 
-#define I_INTERFACE  109  /* snd :: (ConId, <I_IMPORT..I_VALUE>) 
+#define I_INTERFACE  109  /* snd :: ((ConId, [I_IMPORT..I_VALUE])) 
                                     interface name, list of iface entities */
 
-#define I_IMPORT     110  /* snd :: (ConId, <ConVarId>)
+#define I_IMPORT     110  /* snd :: ((ConId, [ConVarId]))
                                     module name, list of entities          */
 
 #define I_INSTIMPORT 111  /* snd :: NIL    -- not used at present          */
 
-#define I_EXPORT     112  /* snd :: (ConId, <ExportListEntry>
+#define I_EXPORT     112  /* snd :: ((ConId, [ExportListEntry]))
                                     this module name?, entities to export  */
 
-#define I_FIXDECL    113  /* snd :: (NIL|Int, Associativity, ConVarId)   
+#define I_FIXDECL    113  /* snd :: ((NIL|Int, Associativity, ConVarId))   
                                     fixity, associativity, name            */
 
-#define I_INSTANCE   114 /* snd :: (Line, <(QConId,VarId)>, Type, VarId)
+#define I_INSTANCE   114 /* snd :: ((Line, [((QConId,VarId))], 
+                                    Type, VarId, Inst))
                    lineno, 
                    forall-y bit (eg __forall [a b] {M.C1 a, M.C2 b} =>),
                    other bit, eg { C a1 } -> { C2 a2 } -> ... -> { Cn an },
-                   name of dictionary builder */
+                   name of dictionary builder,
+                   (after startGHCInstance) the instance table location    */
 
-#define I_TYPE       115 /* snd :: (Line, ConId, <(VarId,Kind)>, Type)
+#define I_TYPE       115 /* snd :: ((Line, ConId, [((VarId,Kind))], Type))
                             lineno, tycon, kinded tyvars, the type expr    */
 
-#define I_DATA       116 /* snd :: (Line, <(QConId,VarId)>, ConId, 
-                                          <(VarId,Kind)>, <Constr>) 
-                            lineno, context, tycon, kinded tyvars, constrs */
+#define I_DATA       116 /* snd :: ((Line, [((QConId,VarId))], ConId, 
+                                          [((VarId,Kind))], [Constr]) 
+                            lineno, context, tycon, kinded tyvars, constrs 
+                           An empty constr list means exported abstractly. */
 
-#define I_NEWTYPE    117 /* snd :: (Line, <(QConId,VarId)>, ConId,
-                                          <(VarId,Kind)>, (ConId,Type))
-                             lineno, context, tycon, kinded tyvars, constr */
+#define I_NEWTYPE    117 /* snd :: ((Line, [((QConId,VarId))], ConId,
+                                    [((VarId,Kind))], ((ConId,Type)) ))
+                             lineno, context, tycon, kinded tyvars, constr 
+                                    constr==NIL means exported abstractly. */
 
-#define I_CLASS      118 /* snd :: (Line, <(QConId,VarId)>, ConId,
-                                    <(VarId,Kind)>, <(VarId,Type)>)
+#define I_CLASS      118 /* snd :: ((Line, [((QConId,VarId))], ConId,
+                                    [((VarId,Kind))], [((VarId,Type))]))
                             lineno, context, classname, 
                                       kinded tyvars, method sigs           */
 
-#define I_VALUE      119 /* snd :: (Line, VarId, Type)                     */
+#define I_VALUE      119 /* snd :: ((Line, VarId, Type))                   */
 
 
 
 /* Generic syntax */
 #if 0
-#define ZCONS        190          /* snd :: (Cell,Cell)                   */
+#define ZCONS        190          /* snd :: (Cell,Cell)                    */
 #endif
 
 
-#define ZTUP2        192          /* snd :: (Cell,Cell)                   */
-#define ZTUP3        193          /* snd :: (Cell,(Cell,Cell))            */
-#define ZTUP4        194          /* snd :: (Cell,(Cell,(Cell,Cell)))     */
-#define ZTUP5        195       /* snd :: (Cell,(Cell,(Cell,(Cell,Cell)))) */
+#define ZTUP2        192          /* snd :: (Cell,Cell)                    */
+#define ZTUP3        193          /* snd :: (Cell,(Cell,Cell))             */
+#define ZTUP4        194          /* snd :: (Cell,(Cell,(Cell,Cell)))      */
+#define ZTUP5        195       /* snd :: (Cell,(Cell,(Cell,(Cell,Cell))))  */
 
 /* Last constructor tag must be less than SPECMIN */
 
@@ -448,6 +456,14 @@ extern Ext           mkExt Args((Text));
 #define mkExt(t) NIL
 #endif
 
+extern Module findFakeModule ( Text t );
+extern Tycon addTupleTycon ( Int n );
+extern Name addWiredInBoxingTycon
+               ( String modNm, String typeNm, String constrNm,
+                 Int arity, Int no, Int rep );
+Tycon addWiredInEnumTycon ( String modNm, String typeNm, 
+                            List /*of Text*/ constrs );
+
 /* --------------------------------------------------------------------------
  * Offsets: (generic types/stack offsets)
  * ------------------------------------------------------------------------*/
@@ -513,6 +529,9 @@ struct Module {
      */
     List  qualImports;
 
+    /* TRUE if module exists only via GHC primop defn; usually FALSE */
+    Bool  fake; 
+
     /* ptr to malloc'd lump of memory holding the obj file */
     void* oImage;
 
@@ -558,7 +577,6 @@ extern DLSect    lookupDLSect Args((void*));
 #define isTuple(c)   (TYCMIN<=(c) && (c)<NAMEMIN && tabTycon[(c)-TYCMIN].tuple>=0)
 #define tupleOf(n)   (tabTycon[(n)-TYCMIN].tuple)
 extern Tycon mkTuple ( Int );
-extern Void allocTupleTycon ( Int );
 
 
 struct strTycon {
@@ -593,6 +611,7 @@ extern Tycon addPrimTycon Args((Text,Kind,Int,Cell,Cell));
 #define monotypeOf(t)   snd(snd(t))
 
 #define bang(t)         ap(BANG,t)
+extern Tycon findQualTyconWithoutConsultingExportList ( QualId q );
 
 /* --------------------------------------------------------------------------
  * Globally defined name values:
@@ -663,6 +682,8 @@ extern Int    sfunPos         Args((Name,Name));
 extern Name   nameFromStgVar  Args((Cell));
 extern Name   jrsFindQualName Args((Text,Text));
 
+extern Name findQualNameWithoutConsultingExportList ( QualId q );
+
 /* --------------------------------------------------------------------------
  * Type class values:
  * ------------------------------------------------------------------------*/
@@ -725,7 +746,8 @@ extern Class findQualClass Args((Cell));
 extern Inst  newInst       Args((Void));
 extern Inst  findFirstInst Args((Tycon));
 extern Inst  findNextInst  Args((Tycon,Inst));
-extern Inst  findSimpleInstance ( ConId klass, ConId dataty );
+extern List getAllKnownTyconsAndClasses ( void );
+extern Class findQualClassWithoutConsultingExportList ( QualId q );
 
 /* --------------------------------------------------------------------------
  * Character values:
@@ -790,6 +812,7 @@ extern  Cell         cellRevAssoc Args((Cell,List));
 extern  Bool         eqList       Args((List,List));
 extern  Cell         varIsMember  Args((Text,List));
 extern  Name         nameIsMember Args((Text,List));
+extern  QualId       qualidIsMember ( QualId, List );
 extern  Cell         intIsMember  Args((Int,List));
 extern  List         replicate    Args((Int,Cell));
 extern  List         diffList     Args((List,List));    /* destructive     */
