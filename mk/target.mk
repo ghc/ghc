@@ -449,7 +449,7 @@ endef
 #
 
 ifneq "$(HS_SRCS)" ""
-ifneq "$(filter -split-objs,$(HC_OPTS))" ""
+ifeq "$(SplitObjs)" "YES"
 define BUILD_LIB
 $(RM) $@
 TMPDIR=$(TMPDIR); export TMPDIR; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print | xargs ar q $@
@@ -463,7 +463,7 @@ endif
 #
 
 ifeq "$(StripLibraries)" "YES"
-ifneq "$(filter -split-objs,$(HC_OPTS))" ""
+ifeq "$(SplitObjs)" "YES"
 SRC_HC_POST_OPTS += \
   for i in $(basename $@)/*; do \
 	ld -r -x -o $$i.tmp $$i; \
@@ -495,8 +495,7 @@ DLL_IMPLIB_NAME = $(patsubst %.a, %_imp.a, $(LIBRARY))
 endif
 
 $(DLL_NAME) :: $(LIBRARY)
-	$(BLD_DLL) --output-lib $(DLL_IMPLIB_NAME) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS) 
-	touch dLL_ifs.hi
+	$(BLD_DLL) --output-lib $(DLL_IMPLIB_NAME) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS)
 endif
 
 #

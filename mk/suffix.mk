@@ -35,8 +35,10 @@ HC_SPLIT_PRE= \
  $(FIND) $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food ; fi
 HC_SPLIT_POST  = touch $@
 
-HC_PRE__       = $(patsubst %,$(HC_SPLIT_PRE) ; ,$(filter -split-objs,$(HC_OPTS)))
-HC_POST__      = $(patsubst %,$(HC_SPLIT_POST) ; ,$(filter -split-objs,$(HC_OPTS)))
+ifeq "$(SplitObjs)" "YES"
+HC_PRE__  = $(HC_SPLIT_PRE) ;
+HC_POST__ = $(HC_SPLIT_POST) ;
+endif
 
 SRC_HC_POST_OPTS += $(HC_POST__)
 SRC_HC_PRE_OPTS  += $(HC_PRE__)

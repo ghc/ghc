@@ -216,11 +216,15 @@ endif
 #		things (incl "+") happens when compiling with this compiler
 
 GhcLibHcOpts=-O
-SplitObjs = YES
+
 
 # Win32 only: Enable the RTS and libraries to be built as DLLs
-#
+# Don't split object files for libs if we're building DLLs
 EnableWin32DLLs=@EnableWin32DLLs@
+ifeq "($EnableWin32DLLs)" "YES"
+SplitObjs=NO
+endif
+
 
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.
