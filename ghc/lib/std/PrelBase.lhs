@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.48 2001/04/28 11:21:47 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.49 2001/04/29 11:01:13 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -191,7 +191,7 @@ class  Monad m  where
     return      :: a -> m a
     fail	:: String -> m a
 
-    m >> k      =  m >>= \_ -> k
+    m >> k      = m >>= \_ -> k
     fail s      = error s
 \end{code}
 
@@ -207,7 +207,7 @@ data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
 			  -- to avoid weird names like con2tag_[]#
 
 
-instance (Eq a) => Eq [a]  where
+instance (Eq a) => Eq [a] where
     {-# SPECIALISE instance Eq [Char] #-}
     []     == []     = True
     (x:xs) == (y:ys) = x == y && xs == ys
@@ -215,7 +215,6 @@ instance (Eq a) => Eq [a]  where
 
 instance (Ord a) => Ord [a] where
     {-# SPECIALISE instance Ord [Char] #-}
-
     compare []     []     = EQ
     compare []     (_:_)  = LT
     compare (_:_)  []     = GT
@@ -322,7 +321,7 @@ mapList f (x:xs) = f x : mapList f xs
 (++) = append
 
 {-# RULES
-  "++"	forall xs ys. (++) xs ys = augment (\c n -> foldr c n xs) ys
+"++"	forall xs ys. (++) xs ys = augment (\c n -> foldr c n xs) ys
  #-}
 
 append :: [a] -> [a] -> [a]
@@ -372,7 +371,7 @@ need ().  (We could arrange suck in () only if -fglasgow-exts, but putting
 it here seems more direct.)
 
 \begin{code}
-data  ()  =  ()
+data () = ()
 
 instance Eq () where
     () == () = True
@@ -417,14 +416,14 @@ data Char = C# Char#
 -- '>' uses compare, and therefore takes two primops instead of one.
 
 instance Eq Char where
-  (C# c1) == (C# c2) = c1 `eqChar#` c2
-  (C# c1) /= (C# c2) = c1 `neChar#` c2
+    (C# c1) == (C# c2) = c1 `eqChar#` c2
+    (C# c1) /= (C# c2) = c1 `neChar#` c2
 
 instance Ord Char where
-  (C# c1) >  (C# c2) = c1 `gtChar#` c2
-  (C# c1) >= (C# c2) = c1 `geChar#` c2
-  (C# c1) <= (C# c2) = c1 `leChar#` c2
-  (C# c1) <  (C# c2) = c1 `ltChar#` c2
+    (C# c1) >  (C# c2) = c1 `gtChar#` c2
+    (C# c1) >= (C# c2) = c1 `geChar#` c2
+    (C# c1) <= (C# c2) = c1 `leChar#` c2
+    (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
 {-# RULES
 "x# `eqChar#` x#" forall x#. eqChar# x# x# = True
@@ -480,20 +479,19 @@ instance Eq Int where
 
 instance Ord Int where
     compare = compareInt
-
-    (<)  = ltInt
-    (<=) = leInt
-    (>=) = geInt
-    (>)  = gtInt
+    (<)     = ltInt
+    (<=)    = leInt
+    (>=)    = geInt
+    (>)     = gtInt
 
 compareInt :: Int -> Int -> Ordering
-(I# x) `compareInt` (I# y) = compareInt# x y
+(I# x#) `compareInt` (I# y#) = compareInt# x# y#
 
 compareInt# :: Int# -> Int# -> Ordering
 compareInt# x# y#
- | x# <#  y# = LT
- | x# ==# y# = EQ
- | otherwise = GT
+    | x# <#  y# = LT
+    | x# ==# y# = EQ
+    | otherwise = GT
 \end{code}
 
 
@@ -651,11 +649,11 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 (I# x) `leInt` (I# y) = x <=# y
 
 {-# RULES
-"x# >#  x#" forall x#. (>#)  x# x# = False
+"x# ># x#"  forall x#. (>#)  x# x# = False
 "x# >=# x#" forall x#. (>=#) x# x# = True
 "x# ==# x#" forall x#. (==#) x# x# = True
 "x# /=# x#" forall x#. (/=#) x# x# = False
-"x# <#  x#" forall x#. (<#)  x# x# = False
+"x# <# x#"  forall x#. (<#)  x# x# = False
 "x# <=# x#" forall x#. (<=#) x# x# = True
     #-}
 
