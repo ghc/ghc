@@ -21,7 +21,7 @@ import TcKind		( TcKind, mkTcTypeKind, mkBoxedTypeKind,
 			)
 import Type		( GenType, SYN_IE(Type), SYN_IE(ThetaType), 
 			  mkTyVarTy, mkTyConTy, mkFunTy, mkAppTy, mkSynTy,
-			  mkSigmaTy, mkDictTy
+			  mkSigmaTy, mkDictTy, mkAppTys
 			)
 import TyVar		( GenTyVar, SYN_IE(TyVar), mkTyVar )
 import Outputable
@@ -109,33 +109,43 @@ tcTyApp ty tys
   = tcFunType ty []
 
   | otherwise
-  = mapAndUnzipTc tcHsTypeKind tys	`thenTc`    \ (arg_kinds, arg_tys) ->
+  = mapAndUnzipTc tcHsTypeKind tys	`thenTc` \ (arg_kinds, arg_tys) ->
     tcFunType ty arg_tys		`thenTc` \ (fun_kind, result_ty) ->
 
-	-- Check argument compatibility; special ca
+	-- Check argument compatibility
     newKindVar				`thenNF_Tc` \ result_kind ->
     unifyKind fun_kind (foldr mkTcArrowKind result_kind arg_kinds)
 					`thenTc_`
     returnTc (result_kind, result_ty)
 
+-- (tcFunType ty arg_tys) returns (kind-of ty, mkAppTys ty arg_tys)
+-- But not quite; for synonyms it checks the correct arity, and builds a SynTy
+-- 	hence the rather strange functionality.
+
 tcFunType (MonoTyVar name) arg_tys
   | isTvOcc (getOccName name)	-- Must be a type variable
   = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
-    returnTc (kind, foldl mkAppTy (mkTyVarTy tyvar) arg_tys)
+    returnTc (kind, mkAppTys (mkTyVarTy tyvar) arg_tys)
 
   | otherwise		 	-- Must be a type constructor
-  = tcLookupTyCon name			`thenTc` \ (kind,maybe_arity,tycon) ->
+  = tcLookupTyCon name			`thenTc` \ (tycon_kind,maybe_arity, tycon) ->
     case maybe_arity of
-	Nothing    -> returnTc (kind, foldl mkAppTy (mkTyConTy tycon) arg_tys)
-	Just arity -> checkTc (arity == n_args) (err arity)	`thenTc_`
-		      returnTc (kind, mkSynTy tycon arg_tys)
-  where
-    err arity = arityErr "Type synonym constructor" name arity n_args
-    n_args    = length arg_tys
+	Nothing    -> returnTc (tycon_kind, mkAppTys (mkTyConTy tycon) arg_tys)
+	Just arity -> checkTc (arity <= n_args) err_msg	`thenTc_`
+		      returnTc (tycon_kind, result_ty)
+		   where
+			-- It's OK to have an *over-applied* type synonym
+			--	data Tree a b = ...
+			--	type Foo a = Tree [a]
+			--	f :: Foo a b -> ...
+		      result_ty = mkAppTys (mkSynTy tycon (take arity arg_tys))
+					   (drop arity arg_tys)
+		      err_msg = arityErr "Type synonym constructor" name arity n_args
+		      n_args  = length arg_tys
 
 tcFunType ty arg_tys
   = tcHsTypeKind ty		`thenTc` \ (fun_kind, fun_ty) ->
-    returnTc (fun_kind, foldl mkAppTy fun_ty arg_tys)
+    returnTc (fun_kind, mkAppTys fun_ty arg_tys)
 \end{code}
 
 
