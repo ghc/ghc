@@ -343,13 +343,13 @@ rnExpr (HsPar e)
 rnExpr section@(SectionL expr op)
   = rnExpr expr	 				`thenRn` \ (expr', fvs_expr) ->
     rnExpr op	 				`thenRn` \ (op', fvs_op) ->
-    checkSectionPrec "left" section op' expr'	`thenRn_`
+    checkSectionPrec InfixL section op' expr' `thenRn_`
     returnRn (SectionL expr' op', fvs_op `plusFV` fvs_expr)
 
 rnExpr section@(SectionR op expr)
   = rnExpr op	 				`thenRn` \ (op',   fvs_op) ->
     rnExpr expr	 				`thenRn` \ (expr', fvs_expr) ->
-    checkSectionPrec "right" section op' expr'	`thenRn_`
+    checkSectionPrec InfixR section op' expr'	`thenRn_`
     returnRn (SectionR op' expr', fvs_op `plusFV` fvs_expr)
 
 rnExpr (HsCCall fun args may_gc is_casm _)
@@ -790,19 +790,22 @@ checkPrec op pat right
   = returnRn ()
 
 -- Check precedence of (arg op) or (op arg) respectively
--- If arg is itself an operator application, its precedence should
--- be higher than that of op
-checkSectionPrec left_or_right section op arg
+-- If arg is itself an operator application, then either
+--   (a) its precedence must be higher than that of op
+--   (b) its precedency & associativity must be the same as that of op
+checkSectionPrec direction section op arg
   = case arg of
 	OpApp _ op fix _ -> go_for_it (ppr_op op)     fix
 	NegApp _ _	 -> go_for_it pp_prefix_minus negateFixity
 	other		 -> returnRn ()
   where
     HsVar op_name = op
-    go_for_it pp_arg_op arg_fix@(Fixity arg_prec _)
+    go_for_it pp_arg_op arg_fix@(Fixity arg_prec assoc)
 	= lookupFixityRn op_name	`thenRn` \ op_fix@(Fixity op_prec _) ->
-	  checkRn (op_prec < arg_prec)
-		  (sectionPrecErr (ppr_op op_name, op_fix) (pp_arg_op, arg_fix) section)
+	  checkRn (op_prec < arg_prec
+		     || op_prec == arg_prec && direction == assoc)
+		  (sectionPrecErr (ppr_op op_name, op_fix) 	
+		  (pp_arg_op, arg_fix) section)
 \end{code}
 
 Consider
