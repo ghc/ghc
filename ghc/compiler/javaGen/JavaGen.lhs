@@ -10,7 +10,8 @@ import Java
 
 import Literal	( Literal(..) )
 import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder )
-import Name	( NamedThing(..), getOccString, isGlobalName )
+import Name	( NamedThing(..), getOccString, isGlobalName 
+		, nameModule )
 import DataCon	( DataCon, dataConRepArity, dataConId )
 import qualified CoreSyn 
 import CoreSyn	( CoreBind, CoreExpr, CoreAlt, CoreBndr,
@@ -92,7 +93,7 @@ java_top_bind :: Id -> CoreExpr -> Decl
 --	  public Object ENTER() { ...translation of rhs... }
 --	}
 java_top_bind bndr rhs
-  = Class [Public] (javaName bndr) [] [codeName] [enter_meth]
+  = Class [Public] (javaShortName bndr) [] [codeName] [enter_meth]
   where
     enter_meth = Method [Public] objectType enterName [] [papExcName] 
 			(javaExpr rhs)
@@ -295,7 +296,14 @@ fieldName :: Int -> Name	-- Names for fields of a constructor
 fieldName n = "f" ++ show n
 
 javaName :: NamedThing a => a -> Name
-javaName n = getOccString n
+javaName n = if isGlobalName n'
+	     then moduleString (nameModule n') ++ "." ++ getOccString n
+	     else getOccString n
+  where
+	     n' = getName n
+
+-- this is used for getting the name of a class when defining it.
+javaShortName n = getOccString n
 
 javaConstrWkrName :: DataCon -> Name
 -- The function that makes the constructor
@@ -437,9 +445,14 @@ rememberClass decl = LifterM (\ n s -> ((),[],[decl],s))
 
 
 liftCompilationUnit :: CompilationUnit -> CompilationUnit
-liftCompilationUnit (Package name ds) =
-    case unLifterM (liftDecls True (Env [] []) ds) [] 1 of
-      (ds,_,ds',_) -> Package name (ds ++ ds')
+liftCompilationUnit (Package name ds) = 
+    Package name (concatMap liftCompilationUnit' ds)
+
+liftCompilationUnit' :: Decl -> [Decl]
+liftCompilationUnit' decl = 
+    case unLifterM (liftDecls True (Env [] []) [decl]) [] 1 of
+      (ds,_,ds',_) -> ds ++ ds'
+
 
 -- The bound vars for the current class have
 -- already be captured before calling liftDecl,
