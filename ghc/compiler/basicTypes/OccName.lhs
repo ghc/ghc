@@ -480,7 +480,9 @@ encodeFS fast_str  | all unencodedChar str = fast_str
 unencodedChar :: Char -> Bool	-- True for chars that don't need encoding
 unencodedChar 'Z' = False
 unencodedChar 'z' = False
-unencodedChar c   = ISALPHANUM c
+unencodedChar c   =  c >= 'a' && c <= 'z'
+	          || c >= 'A' && c <= 'Z'
+		  || c >= '0' && c <= '9'
 
 encode_ch :: Char -> EncodedString
 encode_ch c | unencodedChar c = [c]	-- Common case first
