@@ -7,6 +7,8 @@ Buffers for scanning string input stored in external arrays.
 
 \begin{code}
 
+{-# OPTIONS -fvia-C #-}
+
 module StringBuffer
        (
         StringBuffer,
