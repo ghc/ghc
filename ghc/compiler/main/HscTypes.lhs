@@ -54,7 +54,6 @@ import Module		( Module, ModuleName, ModuleEnv,
 			)
 import Rules		( RuleBase )
 import VarSet		( TyVarSet )
-import VarEnv		( emptyVarEnv )
 import Id		( Id )
 import Class		( Class )
 import TyCon		( TyCon )
@@ -65,7 +64,7 @@ import HsSyn		( DeprecTxt )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameTyClDecl )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
-import CoreSyn		( CoreRule )
+import CoreSyn		( CoreRule, IdCoreRule )
 import Type		( Type )
 
 import FiniteMap	( FiniteMap, emptyFM, addToFM, lookupFM, foldFM )
@@ -150,7 +149,7 @@ data ModDetails
 	-- The next three fields are created by the typechecker
         md_types    :: TypeEnv,
         md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
-        md_rules    :: [(Id,CoreRule)]	-- Domain may include Ids from other modules
+        md_rules    :: [IdCoreRule]	-- Domain may include Ids from other modules
      }
 \end{code}
 

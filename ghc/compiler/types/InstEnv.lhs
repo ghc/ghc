@@ -7,30 +7,22 @@ The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
 module InstEnv (
-	InstInfo(..), pprInstInfo,
-	simpleInstInfoTy, simpleInstInfoTyCon, simpleDFunClassTyCon,
-
 	-- Instance environment
 	InstEnv, emptyInstEnv, extendInstEnv,
 	lookupInstEnv, InstLookupResult(..),
-	classInstEnv, classDataCon,
-
-	isLocalInst
+	classInstEnv, classDataCon, simpleDFunClassTyCon
     ) where
 
 #include "HsVersions.h"
 
-import RnHsSyn		( RenamedMonoBinds, RenamedSig )
-
 import HscTypes		( InstEnv, ClsInstEnv, DFunId )
 import Class		( Class )
-import Var		( TyVar, Id )
+import Var		( Id )
 import VarSet		( unionVarSet, mkVarSet )
 import VarEnv		( TyVarSubstEnv )
 import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc )
-import SrcLoc		( SrcLoc )
-import Type		( Type, ThetaType, splitTyConApp_maybe, 
+import Type		( Type, splitTyConApp_maybe, 
 			  splitSigmaTy, splitDFunTy, tyVarsOfTypes
 			)
 import PprType		( )
@@ -45,50 +37,6 @@ import ErrUtils		( Message )
 import CmdLineOpts
 \end{code}
 
-
-
-%************************************************************************
-%*									*
-\subsection{The InstInfo type}
-%*									*
-%************************************************************************
-
-The InstInfo type summarises the information in an instance declaration
-
-    instance c => k (t tvs) where b
-
-\begin{code}
-data InstInfo
-  = InstInfo {
-      iClass :: Class,	        -- Class, k
-      iTyVars :: [TyVar],	-- Type variables, tvs
-      iTys    :: [Type],	-- The types at which the class is being instantiated
-      iTheta  :: ThetaType,	-- inst_decl_theta: the original context, c, from the
-				--   instance declaration.  It constrains (some of)
-				--   the TyVars above
-      iLocal  :: Bool,		-- True <=> it's defined in this module
-      iDFunId :: DFunId,		-- The dfun id
-      iBinds  :: RenamedMonoBinds,	-- Bindings, b
-      iLoc    :: SrcLoc,		-- Source location assoc'd with this instance's defn
-      iPrags  :: [RenamedSig]		-- User pragmas recorded for generating specialised instances
-    }
-
-pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info)),
-			 nest 4 (ppr (iBinds info))]
-
-simpleInstInfoTy :: InstInfo -> Type
-simpleInstInfoTy (InstInfo {iTys = [ty]}) = ty
-
-simpleInstInfoTyCon :: InstInfo -> TyCon
-  -- Gets the type constructor for a simple instance declaration,
-  -- i.e. one of the form 	instance (...) => C (T a b c) where ...
-simpleInstInfoTyCon inst
-   = case splitTyConApp_maybe (simpleInstInfoTy inst) of 
-	Just (tycon, _) -> tycon
-
-isLocalInst :: InstInfo -> Bool
-isLocalInst info = iLocal info
-\end{code}
 
 
 A tiny function which doesn't belong anywhere else.

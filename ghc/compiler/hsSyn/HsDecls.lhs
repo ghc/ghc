@@ -15,7 +15,7 @@ module HsDecls (
 	BangType(..), getBangType,
 	DeprecDecl(..), DeprecTxt,
 	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames,
-	isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule,
+	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
 	mkClassDeclSysNames, isIfaceRuleDecl,
 	getClassDeclSysNames
     ) where
@@ -27,20 +27,19 @@ import HsBinds		( HsBinds, MonoBinds, Sig(..), FixitySig(..) )
 import HsExpr		( HsExpr )
 import HsTypes
 import PprCore		( pprCoreRule )
-import HsCore		( UfExpr(UfVar), UfBinder, HsIdInfo, pprHsIdInfo,
-			  eq_ufBinders, eq_ufExpr, pprUfExpr, toUfExpr, toUfBndr
+import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
+			  eq_ufBinders, eq_ufExpr, pprUfExpr 
 			)
 import CoreSyn		( CoreRule(..) )
 import BasicTypes	( NewOrData(..) )
 import CallConv		( CallConv, pprCallConv )
-import Name		( getName )
 
 -- others:
 import FunDeps		( pprFundeps )
 import Class		( FunDep )
 import CStrings		( CLabelString, pprCLabelString )
 import Outputable	
-import SrcLoc		( SrcLoc, noSrcLoc )
+import SrcLoc		( SrcLoc )
 \end{code}
 
 
@@ -200,7 +199,29 @@ data TyClDecl name pat
 		(MonoBinds name pat)	-- default methods
 		(ClassDeclSysNames name)
 		SrcLoc
+\end{code}
 
+Simple classifiers
+
+\begin{code}
+isIfaceSigDecl, isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
+
+isIfaceSigDecl (IfaceSig _ _ _ _) = True
+isIfaceSigDecl other		  = False
+
+isSynDecl (TySynonym _ _ _ _) = True
+isSynDecl other		      = False
+
+isDataDecl (TyData _ _ _ _ _ _ _ _ _ _) = True
+isDataDecl other		        = False
+
+isClassDecl (ClassDecl _ _ _ _ _ _ _ _ ) = True
+isClassDecl other		 	 = False
+\end{code}
+
+Dealing with names
+
+\begin{code}
 tyClDeclName :: TyClDecl name pat -> name
 tyClDeclName (IfaceSig name _ _ _)	     = name
 tyClDeclName (TyData _ _ name _ _ _ _ _ _ _) = name
@@ -235,19 +256,6 @@ mkClassDeclSysNames  :: (name, name, name, [name]) -> [name]
 getClassDeclSysNames :: [name] -> (name, name, name, [name])
 mkClassDeclSysNames  (a,b,c,ds) = a:b:c:ds
 getClassDeclSysNames (a:b:c:ds) = (a,b,c,ds)
-\end{code}
-
-\begin{code}
-isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
-
-isSynDecl (TySynonym _ _ _ _) = True
-isSynDecl other		      = False
-
-isDataDecl (TyData _ _ _ _ _ _ _ _ _ _) = True
-isDataDecl other		        = False
-
-isClassDecl (ClassDecl _ _ _ _ _ _ _ _ ) = True
-isClassDecl other		 	 = False
 \end{code}
 
 \begin{code}
@@ -669,16 +677,6 @@ instance (Outputable name, Outputable pat)
 instance Outputable name => Outputable (RuleBndr name) where
    ppr (RuleBndr name) = ppr name
    ppr (RuleBndrSig name ty) = ppr name <> dcolon <> ppr ty
-
-toHsRule id (BuiltinRule _)
-  = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule id)
-
-toHsRule id (Rule name bndrs args rhs)
-  = IfaceRule name (map toUfBndr bndrs) (getName id)
-	      (map toUfExpr args) (toUfExpr rhs) noSrcLoc
-
-bogusIfaceRule id
-  = IfaceRule SLIT("bogus") [] (getName id) [] (UfVar (getName id)) noSrcLoc
 \end{code}
 
 

@@ -1,4 +1,15 @@
 	------------------------------------
+	   GHCI hacking
+	------------------------------------
+
+* Don't forget to put deferred-type-decls back into RnIfaces
+
+* Do we want to record a package name in a .hi file?
+  Does pi_mod have a ModuleName or a Module?
+
+* Does teh finder
+
+	------------------------------------
 	   Mainly PredTypes (28 Sept 00)
 	------------------------------------
 

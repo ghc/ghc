@@ -12,7 +12,7 @@ module PprCore (
 	pprCoreExpr, pprParendExpr,
 	pprCoreBinding, pprCoreBindings, pprIdBndr,
 	pprCoreBinding, pprCoreBindings,
-	pprCoreRules, pprCoreRule
+	pprCoreRules, pprCoreRule, pprIdCoreRule
     ) where
 
 #include "HsVersions.h"
@@ -360,6 +360,9 @@ ppIdInfo b info
 \begin{code}
 pprCoreRules :: Id -> CoreRules -> SDoc
 pprCoreRules var (Rules rules _) = vcat (map (pprCoreRule (ppr var)) rules)
+
+pprIdCoreRule :: IdCoreRule -> SDoc
+pprIdCoreRule (id,rule) = pprCoreRule (ppr id) rule
 
 pprCoreRule :: SDoc -> CoreRule -> SDoc
 pprCoreRule pp_fn (BuiltinRule _)

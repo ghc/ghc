@@ -54,7 +54,7 @@ import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			  addListToRdrEnv, rdrEnvToList, rdrEnvElts
 			)
 import Name		( Name, OccName, NamedThing(..), getSrcLoc,
-			  isLocallyDefinedName, nameModule, nameOccName,
+			  isLocallyDefinedName, nameOccName,
 			  decode, mkLocalName, mkKnownKeyGlobal,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
 			  extendNameEnvList

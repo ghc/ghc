@@ -10,7 +10,7 @@ module RnIfaces
 	recordLocalSlurps, 
 	mkImportInfo, 
 
-	slurpImpDecls, 
+	slurpImpDecls, closeDecls,
 
 	RecompileRequired, outOfDate, upToDate, recompileRequired
        )
@@ -20,18 +20,23 @@ where
 
 import CmdLineOpts	( DynFlags, opt_NoPruneDecls, opt_NoPruneTyDecls, opt_IgnoreIfacePragmas )
 import HscTypes
-import HsSyn		( HsDecl(..), InstDecl(..),  HsType(..) )
+import HsSyn		( HsDecl(..), Sig(..), TyClDecl(..), ConDecl(..), ConDetails(..),
+			  InstDecl(..), HsType(..), hsTyVarNames, getBangType
+			)
 import HsImpExp		( ImportDecl(..) )
-import BasicTypes	( Version, defaultFixity )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameTyClDecl, RdrNameInstDecl )
+import RnHsSyn		( RenamedHsDecl, extractHsTyNames, extractHsCtxtTyNames, tyClDeclFVs )
 import RnHiFiles	( tryLoadInterface, loadHomeInterface, loadInterface, 
 			  loadOrphanModules
 			)
 import RnSource		( rnTyClDecl, rnDecl )
 import RnEnv
 import RnMonad
+import Id		( idType )
+import Type		( namesOfType )
+import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule, isLocallyDefined, 
+			  nameModule, isLocallyDefined, nameUnique,
 			  NamedThing(..),
 			  elemNameEnv
 			 )
@@ -42,7 +47,8 @@ import Module		( Module, ModuleEnv,
 			  extendModuleEnv_C, lookupWithDefaultModuleEnv
 			)
 import NameSet
-import PrelInfo		( wiredInThingEnv )
+import PrelInfo		( wiredInThingEnv, fractionalClassKeys )
+import TysWiredIn	( doubleTyCon )
 import Maybes		( orElse )
 import FiniteMap
 import Outputable
@@ -450,7 +456,8 @@ rnIfaceDecls decls fvs (d:ds) = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
 				rnIfaceDecls (new_decl:decls) (fvs1 `plusFV` fvs) ds
 
 rnIfaceDecl	(mod, decl) = initIfaceRnMS mod (rnDecl decl)	
-rnIfaceTyClDecl (mod, decl) = initIfaceRnMS mod (rnTyClDecl decl)	
+rnIfaceTyClDecl (mod, decl) = initIfaceRnMS mod (rnTyClDecl decl)	`thenRn` \ decl' ->
+			      returnRn (decl', tyClDeclFVs decl')
 \end{code}
 
 

@@ -193,6 +193,7 @@ pcDataCon name tyvars context arg_tys tycon
 
     wrap_rdr  = nameRdrName name
     wrap_occ  = rdrNameOcc wrap_rdr
+
     mod       = nameModule name
     wrap_id   = mkDataConWrapId data_con
 

@@ -30,11 +30,10 @@ import TcDeriv		( tcDeriving )
 import TcEnv		( TcEnv, tcExtendGlobalValEnv, 
 			  tcExtendTyVarEnvForMeths, 
 			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
+ 			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, simpleInstInfoTy, isLocalInst,
 			  newDFunName, tcExtendTyVarEnv
 			)
-import InstEnv		( InstInfo(..), InstEnv, pprInstInfo, classDataCon, 
- 			  simpleInstInfoTyCon, simpleInstInfoTy, isLocalInst,
-			  extendInstEnv )
+import InstEnv		( InstEnv, classDataCon, extendInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )
@@ -191,7 +190,7 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod local_tycons decls
 	-- The result of (b) replaces the cached InstEnv in the PCS
     let
 	(local_inst_info, imported_inst_info)
-	   = partition isLocalInst (concat inst_infos)
+	   = partition (isLocalInst mod) (concat inst_infos)
 
 	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . iDFunId) 
 			       imported_inst_info
@@ -817,3 +816,5 @@ nonBoxedPrimCCallErr clas inst_ty
 methodCtxt     = ptext SLIT("When checking the methods of an instance declaration")
 superClassCtxt = ptext SLIT("When checking the superclasses of an instance declaration")
 \end{code}
+
+ 

@@ -41,7 +41,7 @@ module Name (
 #include "HsVersions.h"
 
 import OccName		-- All of it
-import Module		( Module, moduleName, pprModule, mkVanillaModule, 
+import Module		( Module, moduleName, mkVanillaModule, 
 			  isModuleInThisPackage )
 import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, 
 			  rdrNameModule )
@@ -480,7 +480,7 @@ toRdrName	    :: NamedThing a => a -> RdrName
 
 getSrcLoc	    = nameSrcLoc	   . getName
 isLocallyDefined    = isLocallyDefinedName . getName
-getOccString x	    = occNameString (getOccName x)
+getOccString 	    = occNameString	   . getOccName
 toRdrName	    = ifaceNameRdrName	   . getName
 \end{code}
 

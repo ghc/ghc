@@ -38,7 +38,6 @@ import HsLit
 import HsMatches
 import HsPat
 import HsTypes
-import HsCore
 import BasicTypes	( Fixity, Version, NewOrData )
 
 -- others:

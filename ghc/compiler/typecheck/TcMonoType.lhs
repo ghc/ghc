@@ -371,10 +371,13 @@ tcHsType full_ty@(HsForAllTy (Just tv_names) ctxt ty)
     tcHsTyVars tv_names kind_check		$ \ tyvars ->
     tcContext ctxt				`thenTc` \ theta ->
     tcHsType ty					`thenTc` \ tau ->
-    checkAmbiguity full_ty tyvars theta tau	`thenTc_`
-    returnTc (mkSigmaTy tyvars theta tau)
+    checkAmbiguity is_source tyvars theta tau
+  where
+    is_source = case tv_names of
+		   (UserTyVar _ : _) -> True
+	    	   other	     -> False
 
-checkAmbiguity :: RenamedHsType -> [TyVar] -> ThetaType -> Type -> TcM ()
+checkAmbiguity :: Bool -> [TyVar] -> ThetaType -> Type -> TcM Type
   -- Check for ambiguity
   --   forall V. P => tau
   -- is ambiguous if P contains generic variables
@@ -393,25 +396,6 @@ checkAmbiguity :: RenamedHsType -> [TyVar] -> ThetaType -> Type -> TcM ()
   -- even in a scope where b is in scope.
   -- This is the is_free test below.
 
-checkAmbiguity full_ty forall_tyvars theta tau
-  = mapTc_ check_pred theta
-  where
-    tau_vars	      = tyVarsOfType tau
-    fds		      = instFunDepsOfTheta theta
-    tvFundep	      = tyVarFunDep fds
-    extended_tau_vars = oclose tvFundep tau_vars
-
-    is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
-		        not (ct_var `elemUFM` extended_tau_vars)
-    is_free ct_var    = not (ct_var `elem` forall_tyvars)
-    
-    check_pred pred = checkTc (not any_ambig) (ambigErr pred full_ty) `thenTc_`
-	    	      checkTc (not all_free)  (freeErr  pred full_ty)
-             where 
-	    	ct_vars	  = varSetElems (tyVarsOfPred pred)
-	    	all_free  = all is_free ct_vars
-	    	any_ambig = is_source_polytype && any is_ambig ct_vars
-    
     -- Notes on the 'is_source_polytype' test above
     -- Check ambiguity only for source-program types, not
     -- for types coming from inteface files.  The latter can
@@ -427,10 +411,27 @@ checkAmbiguity full_ty forall_tyvars theta tau
     -- If the list of tv_names is empty, we have a monotype,
     -- and then we don't need to check for ambiguity either,
     -- because the test can't fail (see is_ambig).
-    is_source_polytype 
-	= case full_ty of
-	    HsForAllTy (Just (UserTyVar _ : _)) _ _ -> True
-    	    other			  	    -> False
+
+checkAmbiguity is_source_polytype forall_tyvars theta tau
+  = mapTc_ check_pred theta	`thenTc_`
+    returnTc sigma_ty
+  where
+    sigma_ty	      = mkSigmaTy forall_tyvars theta tau
+    tau_vars	      = tyVarsOfType tau
+    fds		      = instFunDepsOfTheta theta
+    tvFundep	      = tyVarFunDep fds
+    extended_tau_vars = oclose tvFundep tau_vars
+
+    is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
+		        not (ct_var `elemUFM` extended_tau_vars)
+    is_free ct_var    = not (ct_var `elem` forall_tyvars)
+    
+    check_pred pred = checkTc (not any_ambig) (ambigErr pred sigma_ty) `thenTc_`
+	    	      checkTc (not all_free)  (freeErr  pred sigma_ty)
+             where 
+	    	ct_vars	  = varSetElems (tyVarsOfPred pred)
+	    	all_free  = all is_free ct_vars
+	    	any_ambig = is_source_polytype && any is_ambig ct_vars
 \end{code}
 
 Help functions for type applications

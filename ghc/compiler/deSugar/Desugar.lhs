@@ -14,7 +14,7 @@ import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..),
 import TcHsSyn		( TypecheckedRuleDecl )
 import TcModule		( TcResults(..) )
 import CoreSyn
-import Rules		( ProtoCoreRule(..), pprProtoCoreRule )
+import PprCore		( pprIdCoreRule )
 import Subst		( substExpr, mkSubst, mkInScopeSet )
 import DsMonad
 import DsExpr		( dsExpr )
@@ -48,7 +48,7 @@ deSugar :: DynFlags
 	-> UniqSupply
 	-> HomeSymbolTable
         -> TcResults
-	-> IO ([CoreBind], RuleEnv, SDoc, SDoc, [CoreBndr])
+	-> IO ([CoreBind], [(Id,CoreRule)], SDoc, SDoc, [CoreBndr])
 
 deSugar dflags mod_name us hst
         (TcResults {tc_env   = global_val_env,
@@ -98,7 +98,7 @@ dsProgram mod_name all_binds rules fo_decls
 ppr_ds_rules [] = empty
 ppr_ds_rules rules
   = text "" $$ text "-------------- DESUGARED RULES -----------------" $$
-    vcat (map pprProtoCoreRule rules)
+    vcat (map pprIdCoreRule rules)
 \end{code}
 
 
@@ -109,13 +109,12 @@ ppr_ds_rules rules
 %************************************************************************
 
 \begin{code}
-dsRule :: IdSet -> TypecheckedRuleDecl -> DsM ProtoCoreRule
+dsRule :: IdSet -> TypecheckedRuleDecl -> DsM (Id, CoreRule)
 dsRule in_scope (HsRule name sig_tvs vars lhs rhs loc)
   = putSrcLocDs loc		$
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->
     dsExpr rhs			`thenDs` \ core_rhs ->
-    returnDs (ProtoCoreRule True {- local -} fn
-			    (Rule name tpl_vars args core_rhs))
+    returnDs (fn, Rule name tpl_vars args core_rhs)
   where
     tpl_vars = sig_tvs ++ [var | RuleBndr var <- vars]
     all_vars = mkInScopeSet (in_scope `unionVarSet` mkVarSet tpl_vars)

@@ -16,10 +16,9 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
 import CmdLineOpts	( DynFlag(..), DynFlags )
 
 import TcMonad
-import TcEnv		( TcEnv, tcSetInstEnv, newDFunName )
+import TcEnv		( TcEnv, tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo )
 import TcGenDeriv	-- Deriv stuff
-import InstEnv		( InstInfo(..), InstEnv, 
-			  pprInstInfo, simpleDFunClassTyCon, extendInstEnv )
+import InstEnv		( InstEnv, simpleDFunClassTyCon, extendInstEnv )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )

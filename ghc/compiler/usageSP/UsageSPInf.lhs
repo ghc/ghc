@@ -92,10 +92,9 @@ monad.
 doUsageSPInf :: DynFlags 
 	     -> UniqSupply
              -> [CoreBind]
-             -> RuleBase
              -> IO [CoreBind]
 
-doUsageSPInf dflags us binds local_rules
+doUsageSPInf dflags us binds
   | not opt_UsageSPOn
   = do { printErrs (text "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on") ;
 	 return binds

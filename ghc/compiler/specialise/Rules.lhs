@@ -5,18 +5,17 @@
 
 \begin{code}
 module Rules (
-	RuleBase, emptyRuleBase, extendRuleBase, extendRuleBaseList,
-	prepareLocalRuleBase, prepareOrphanRuleBase,
-        unionRuleBase, lookupRule, addRule, addIdSpecialisations,
-	ProtoCoreRule(..), pprProtoCoreRule, pprRuleBase,
-	localRule, orphanRule
+	RuleBase, emptyRuleBase, extendRuleBase, extendRuleBaseList, pprRuleBase,
+	addRuleBaseFVs,
+
+        lookupRule, addRule, addIdSpecialisations
     ) where
 
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseRule )
-import CoreFVs		( exprFreeVars, idRuleVars, ruleRhsFreeVars, ruleSomeLhsFreeVars )
+import CoreFVs		( exprFreeVars, ruleRhsFreeVars, ruleSomeLhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( eqExpr )
 import PprCore		( pprCoreRule )
@@ -25,17 +24,14 @@ import Subst		( Subst, InScopeSet, mkInScopeSet, lookupSubst, extendSubst,
 			  bindSubstList, unBindSubstList, substInScope, uniqAway
 			)
 import Id		( Id, idUnfolding, zapLamIdInfo, 
-			  idSpecialisation, setIdSpecialisation,
-			  setIdNoDiscard
+			  idSpecialisation, setIdSpecialisation
 			) 
-import Name		( isLocallyDefined )
 import Var		( isTyVar, isId )
 import VarSet
 import VarEnv
 import Type		( mkTyVarTy )
 import qualified Unify	( match )
 
-import UniqFM
 import Outputable
 import Maybes		( maybeToBool )
 import Util		( sortLt )
@@ -207,11 +203,11 @@ matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
 		Nothing    -> Nothing
 
    eta_complete other vars = Nothing
--}
 
 
 zapOccInfo bndr | isTyVar bndr = bndr
 		| otherwise    = zapLamIdInfo bndr
+-}
 \end{code}
 
 \begin{code}
@@ -444,29 +440,10 @@ addIdSpecialisations id spec_stuff
 %************************************************************************
 
 \begin{code}
-data ProtoCoreRule 
-  = ProtoCoreRule 
-	Bool 		-- True <=> this rule was defined in this module,
-	Id		-- What Id is it for
-	CoreRule	-- The rule itself
-	
-
-pprProtoCoreRule (ProtoCoreRule _ fn rule) = pprCoreRule (ppr fn) rule
-
 lookupRule :: InScopeSet -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 lookupRule in_scope fn args
   = case idSpecialisation fn of
 	Rules rules _ -> matchRules in_scope rules args
-
-localRule :: ProtoCoreRule -> Bool
-localRule (ProtoCoreRule local _ _) = local
-
-orphanRule :: ProtoCoreRule -> Bool
--- An "orphan rule" is one that is defined in this 
--- module, but for an *imported* function.  We need
--- to track these separately when generating the interface file
-orphanRule (ProtoCoreRule local fn _)
-  = local && not (isLocallyDefined fn)
 \end{code}
 
 
@@ -485,7 +462,14 @@ data RuleBase = RuleBase
 		     IdSet	-- Ids (whether local or imported) mentioned on 
 				-- LHS of some rule; these should be black listed
 
+	-- This representation is a bit cute, and I wonder if we should
+	-- change it to use (IdEnv CoreRule) which seems a bit more natural
+
 emptyRuleBase = RuleBase emptyVarSet emptyVarSet
+
+addRuleBaseFVs :: RuleBase -> IdSet -> RuleBase
+addRuleBaseFVs (RuleBase rules fvs) extra_fvs 
+  = RuleBase rules (fvs `unionVarSet` extra_fvs)
 
 extendRuleBaseList :: RuleBase -> [(Id,CoreRule)] -> RuleBase
 extendRuleBaseList rule_base new_guys
@@ -505,75 +489,8 @@ extendRuleBase (RuleBase rule_ids rule_fvs) (id, rule)
 	-- Find *all* the free Ids of the LHS, not just
 	-- locally defined ones!!
 
-unionRuleBase (RuleBase rule_ids1 black_ids1) (RuleBase rule_ids2 black_ids2)
-  = RuleBase (plusUFM_C merge_rules rule_ids1 rule_ids2)
-	     (unionVarSet black_ids1 black_ids2)
-  where
-
-merge_rules id1 id2 = let rules1 = idSpecialisation id1
-                          rules2 = idSpecialisation id2
-                          new_rules = foldl (addRule id1) rules1 (rulesRules rules2)
-                      in
-                      setIdSpecialisation id1 new_rules
-
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase (RuleBase rules _) = vcat [ pprCoreRule (ppr id) rs
 				      | id <- varSetElems rules,
 					rs <- rulesRules $ idSpecialisation id ]
-
--- prepareLocalRuleBase takes the CoreBinds and rules defined in this module.
--- It attaches those rules that are for local Ids to their binders, and
--- returns the remainder attached to Ids in an IdSet.  It also returns
--- Ids mentioned on LHS of some rule; these should be blacklisted.
-
--- The rule Ids and LHS Ids are black-listed; that is, they aren't inlined
--- so that the opportunity to apply the rule isn't lost too soon
-
-prepareLocalRuleBase :: [CoreBind] -> [(Id,CoreRule)] -> ([CoreBind], RuleBase)
-prepareLocalRuleBase binds local_rules
-  = error "urk"
-{-
-  = (map zap_bind binds, RuleBase imported_id_rule_ids rule_lhs_fvs)
-  where
-    RuleBase rule_ids rule_lhs_fvs = extendRuleBaseList emptyRuleBase local_rules
-    imported_id_rule_ids = filterVarSet (not . isLocallyDefined) rule_ids
-
-	-- rule_fvs is the set of all variables mentioned in this module's rules
-    rule_fvs = foldVarSet (unionVarSet . idRuleVars) rule_lhs_fvs rule_ids
-
-	-- Attach the rules for each locally-defined Id to that Id.
-	-- 	- This makes the rules easier to look up
-	--	- It means that transformation rules and specialisations for
-	--	  locally defined Ids are handled uniformly
-	--	- It keeps alive things that are referred to only from a rule
-	--	  (the occurrence analyser knows about rules attached to Ids)
-	--	- It makes sure that, when we apply a rule, the free vars
-	--	  of the RHS are more likely to be in scope
-	--
-	-- The LHS and RHS Ids are marked 'no-discard'. 
-	-- This means that the binding won't be discarded EVEN if the binding
-	-- ends up being trivial (v = w) -- the simplifier would usually just 
-	-- substitute w for v throughout, but we don't apply the substitution to
-	-- the rules (maybe we should?), so this substitution would make the rule
-	-- bogus.
-    zap_bind (NonRec b r) = NonRec (zap_bndr b) r
-    zap_bind (Rec prs)    = Rec [(zap_bndr b, r) | (b,r) <- prs]
-
-    zap_bndr bndr = case lookupVarSet rule_ids bndr of
-			  Just bndr' 			       -> setIdNoDiscard bndr'
-			  Nothing | bndr `elemVarSet` rule_fvs -> setIdNoDiscard bndr
-				  | otherwise		       -> bndr
--}
-
-addRuleToId id rule = setIdSpecialisation id (addRule (idSpecialisation id) id rule)
-
--- prepareOrphanRuleBase does exactly the same as prepareLocalRuleBase, except that
--- it assumes that none of the rules can be attached to local Ids.
-
-prepareOrphanRuleBase :: [ProtoCoreRule] -> RuleBase
-prepareOrphanRuleBase imported_rules
-  = error "urk"
-{-
-  = foldr add_rule emptyRuleBase imported_rules
--}
 \end{code}

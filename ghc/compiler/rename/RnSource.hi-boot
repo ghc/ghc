@@ -3,7 +3,7 @@ _exports_
 RnSource rnHsType rnHsSigType rnHsTypeFVs;
 _declarations_
 1 rnHsTypeFVs _:_ Outputable.SDoc -> RdrHsSyn.RdrNameHsType
-			          -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;;
+			          -> RnMonad.RnMS (RnHsSyn.RenamedHsType, NameSet.FreeVars) ;;
 2 rnHsSigType _:_ Outputable.SDoc -> RdrHsSyn.RdrNameHsType
 			          -> RnMonad.RnMS RnHsSyn.RenamedHsType ;;
 2 rnHsType _:_ Outputable.SDoc -> RdrHsSyn.RdrNameHsType

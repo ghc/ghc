@@ -351,15 +351,14 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 		Just name -> pushSrcLocRn loc $
 			     addWarnRn (shadowedNameWarn rdr_name)
 
-bindCoreLocalFVRn :: RdrName -> (Name -> RnMS (a, FreeVars))
-	  	  -> RnMS (a, FreeVars)
+bindCoreLocalRn :: RdrName -> (Name -> RnMS a) -> RnMS a
   -- A specialised variant when renaming stuff from interface
   -- files (of which there is a lot)
   --	* one at a time
   --	* no checks for shadowing
   -- 	* always imported
   -- 	* deal with free vars
-bindCoreLocalFVRn rdr_name enclosed_scope
+bindCoreLocalRn rdr_name enclosed_scope
   = getSrcLocRn 		`thenRn` \ loc ->
     getLocalNameEnv		`thenRn` \ name_env ->
     getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
@@ -372,13 +371,12 @@ bindCoreLocalFVRn rdr_name enclosed_scope
     let
 	new_name_env = extendRdrEnv name_env rdr_name name
     in
-    setLocalNameEnv new_name_env (enclosed_scope name)	`thenRn` \ (result, fvs) ->
-    returnRn (result, delFromNameSet fvs name)
+    setLocalNameEnv new_name_env (enclosed_scope name)
 
-bindCoreLocalsFVRn []     thing_inside = thing_inside []
-bindCoreLocalsFVRn (b:bs) thing_inside = bindCoreLocalFVRn b	$ \ name' ->
-					 bindCoreLocalsFVRn bs	$ \ names' ->
-					 thing_inside (name':names')
+bindCoreLocalsRn []     thing_inside = thing_inside []
+bindCoreLocalsRn (b:bs) thing_inside = bindCoreLocalRn b	$ \ name' ->
+				       bindCoreLocalsRn bs	$ \ names' ->
+				       thing_inside (name':names')
 
 bindLocalNames names enclosed_scope
   = getLocalNameEnv 		`thenRn` \ name_env ->
@@ -408,8 +406,8 @@ bindLocalsFVRn doc rdr_names enclosed_scope
     returnRn (thing, delListFromNameSet fvs names)
 
 -------------------------------------
-bindUVarRn :: SDoc -> RdrName -> (Name -> RnMS (a, FreeVars)) -> RnMS (a, FreeVars)
-bindUVarRn = bindLocalRn
+bindUVarRn :: RdrName -> (Name -> RnMS a) -> RnMS a
+bindUVarRn = bindCoreLocalRn
 
 -------------------------------------
 extendTyVarEnvFVRn :: [Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)

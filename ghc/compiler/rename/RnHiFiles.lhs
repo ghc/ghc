@@ -27,13 +27,13 @@ import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..),
 import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl,
 			  extractHsTyRdrNames 
 			)
-import BasicTypes	( Version )
+import BasicTypes	( Version, defaultFixity )
 import RnEnv
 import RnMonad
 import ParseIface	( parseIface, IfaceStuff(..) )
 
 import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule,
+			  nameModule, isLocallyDefined, 
 			  NamedThing(..),
 			  mkNameEnv, extendNameEnv
 			 )
@@ -45,7 +45,7 @@ import Module		( Module,
 import RdrName		( RdrName, rdrNameOcc )
 import NameSet
 import SrcLoc		( mkSrcLoc, SrcLoc )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )

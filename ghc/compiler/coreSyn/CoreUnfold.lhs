@@ -20,7 +20,7 @@ module CoreUnfold (
 	mkOtherCon, otherCons,
 	unfoldingTemplate, maybeUnfoldingTemplate,
 	isEvaldUnfolding, isValueUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
-	hasUnfolding, hasSomeUnfolding,
+	hasUnfolding, hasSomeUnfolding, neverUnfold,
 
 	couldBeSmallEnoughToInline, 
 	certainlyWillInline, 

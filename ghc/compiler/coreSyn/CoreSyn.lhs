@@ -28,7 +28,7 @@ module CoreSyn (
 	noUnfolding, mkOtherCon,
 	unfoldingTemplate, maybeUnfoldingTemplate, otherCons, 
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
-	hasUnfolding, hasSomeUnfolding,
+	hasUnfolding, hasSomeUnfolding, neverUnfold,
 
 	-- Seq stuff
 	seqRules, seqExpr, seqExprs, seqUnfolding,
@@ -39,6 +39,7 @@ module CoreSyn (
 	-- Core rules
 	CoreRules(..), 	-- Representation needed by friends
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
+	IdCoreRule,
 	RuleName,
 	emptyCoreRules, isEmptyCoreRules, rulesRhsFreeVars, rulesRules,
 	isBuiltinRule
@@ -47,9 +48,9 @@ module CoreSyn (
 #include "HsVersions.h"
 
 import CostCentre	( CostCentre, noCostCentre )
-import Var		( Var, Id, TyVar, isTyVar, isId, idType )
-import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
-import Literal	        ( Literal(MachStr), mkMachInt )
+import Var		( Var, Id, TyVar, isTyVar, isId )
+import Type		( Type, UsageAnn, mkTyVarTy, seqType )
+import Literal	        ( Literal, mkMachInt )
 import DataCon		( DataCon, dataConId )
 import VarSet
 import Outputable
@@ -137,6 +138,7 @@ rulesRules (Rules rules _) = rules
 
 \begin{code}
 type RuleName = FAST_STRING
+type IdCoreRule = (Id,CoreRule)		-- Rules don't have their leading Id inside them
 
 data CoreRule
   = Rule RuleName
@@ -257,6 +259,12 @@ hasUnfolding other 	 	       = False
 hasSomeUnfolding :: Unfolding -> Bool
 hasSomeUnfolding NoUnfolding = False
 hasSomeUnfolding other	     = True
+
+neverUnfold :: Unfolding -> Bool
+neverUnfold NoUnfolding				= True
+neverUnfold (OtherCon _)			= True
+neverUnfold (CoreUnfolding _ _ _ _ UnfoldNever) = True
+neverUnfold other 				= False
 \end{code}
 
 
@@ -296,7 +304,6 @@ type CoreExpr = Expr CoreBndr
 type CoreArg  = Arg  CoreBndr
 type CoreBind = Bind CoreBndr
 type CoreAlt  = Alt  CoreBndr
-type CoreNote = Note
 \end{code}
 
 Binders are ``tagged'' with a \tr{t}:

@@ -25,7 +25,7 @@ import Inst		( plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
-import TcEnv		( TcEnv, tcExtendGlobalValEnv, tcLookupGlobal_maybe,
+import TcEnv		( TcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, tcLookupGlobal_maybe,
 			  tcEnvTyCons, tcEnvClasses, 
 			  tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
 			)
@@ -33,7 +33,6 @@ import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import InstEnv		( InstInfo(..) )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkImplicitDataBinds )
@@ -56,7 +55,7 @@ import BasicTypes       ( EP(..), Fixity )
 import Bag		( isEmptyBag )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, HomeIfaceTable,
-			  PackageSymbolTable, PackageIfaceTable, DFunId, ModIface(..),
+			  PackageSymbolTable, DFunId, ModIface(..),
 			  TypeEnv, extendTypeEnv, lookupTable,
 		          TyThing(..), groupTyThings )
 import FiniteMap	( FiniteMap, delFromFM, lookupWithDefaultFM )
@@ -204,9 +203,9 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     
     	-- Second pass over class and instance declarations,
     	-- to compile the bindings themselves.
-    tcInstDecls2  local_inst_info	`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
-    tcClassDecls2 decls			`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
-    tcRules (pcs_rules pcs) decls	`thenNF_Tc` \ (new_pcs_rules, lie_rules, local_rules) ->
+    tcInstDecls2  local_inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
+    tcClassDecls2 decls				`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
+    tcRules (pcs_rules pcs) this_mod decls	`thenNF_Tc` \ (new_pcs_rules, lie_rules, local_rules) ->
     
          -- Deal with constant or ambiguous InstIds.  How could
          -- there be ambiguous ones?  They can only arise if a
@@ -265,7 +264,7 @@ tcModule pcs hst get_fixity this_mod decls unf_env
 			  tc_binds   = all_binds', 
 			  tc_insts   = map iDFunId local_inst_info,
 			  tc_fords   = foi_decls ++ foe_decls',
-			  tc_rules   = rules'
+			  tc_rules   = local_rules'
                         })
 
 get_binds decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]

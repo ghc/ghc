@@ -8,8 +8,10 @@ module TcEnv(
 	tcEnvTyCons, tcEnvClasses, tcEnvIds, tcEnvTcIds, tcEnvTyVars,
 	getTcGST, getTcGEnv,
 	
-	-- Instance environment
+	-- Instance environment, and InstInfo type
 	tcGetInstEnv, tcSetInstEnv, 
+	InstInfo(..), pprInstInfo,
+	simpleInstInfoTy, simpleInstInfoTyCon, isLocalInst,
 
 	-- Global environment
 	tcExtendGlobalEnv, tcExtendGlobalValEnv, 
@@ -37,19 +39,20 @@ module TcEnv(
 
 #include "HsVersions.h"
 
+import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 import TcMonad
 import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, TcThetaType,
 			  tcInstTyVars, zonkTcTyVars,
 			)
-import Id		( mkUserLocal, isDataConWrapId_maybe )
+import Id		( idName, mkUserLocal, isDataConWrapId_maybe )
 import IdInfo		( vanillaIdInfo )
 import MkId	 	( mkSpecPragmaId )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
-import Type		( Type,
+import Type		( Type, ThetaType,
 			  tyVarsOfTypes,
 			  splitForAllTys, splitRhoTy,
-			  getDFunTyKey
+			  getDFunTyKey, splitTyConApp_maybe
 			)
 import DataCon		( DataCon )
 import TyCon		( TyCon )
@@ -57,18 +60,18 @@ import Class		( Class, ClassOpItem, ClassContext )
 import Subst		( substTy )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
-			  isLocallyDefined,
+			  isLocallyDefined, nameModule,
 			  NameEnv, lookupNameEnv, nameEnvElts, 
 			  extendNameEnvList, emptyNameEnv
 			)
 import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
+import HscTypes		( DFunId )
 import Module		( Module )
-import HscTypes		( InstEnv, lookupTypeEnv, TyThing(..),
-			  GlobalSymbolTable )
+import InstEnv		( InstEnv, emptyInstEnv )
+import HscTypes		( lookupTypeEnv, TyThing(..), GlobalSymbolTable )
 import Util		( zipEqual )
 import SrcLoc		( SrcLoc )
 import Outputable
-import InstEnv	( emptyInstEnv )
 
 import IOExts		( newIORef )
 \end{code}
@@ -480,6 +483,50 @@ tcSetInstEnv ie thing_inside
   = tcGetEnv 	`thenNF_Tc` \ env ->
     tcSetEnv (env {tcInsts = ie}) thing_inside
 \end{code}    
+
+
+%************************************************************************
+%*									*
+\subsection{The InstInfo type}
+%*									*
+%************************************************************************
+
+The InstInfo type summarises the information in an instance declaration
+
+    instance c => k (t tvs) where b
+
+\begin{code}
+data InstInfo
+  = InstInfo {
+      iClass :: Class,	        -- Class, k
+      iTyVars :: [TyVar],	-- Type variables, tvs
+      iTys    :: [Type],	-- The types at which the class is being instantiated
+      iTheta  :: ThetaType,	-- inst_decl_theta: the original context, c, from the
+				--   instance declaration.  It constrains (some of)
+				--   the TyVars above
+      iLocal  :: Bool,		-- True <=> it's defined in this module
+      iDFunId :: DFunId,		-- The dfun id
+      iBinds  :: RenamedMonoBinds,	-- Bindings, b
+      iLoc    :: SrcLoc,		-- Source location assoc'd with this instance's defn
+      iPrags  :: [RenamedSig]		-- User pragmas recorded for generating specialised instances
+    }
+
+pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info)),
+			 nest 4 (ppr (iBinds info))]
+
+simpleInstInfoTy :: InstInfo -> Type
+simpleInstInfoTy (InstInfo {iTys = [ty]}) = ty
+
+simpleInstInfoTyCon :: InstInfo -> TyCon
+  -- Gets the type constructor for a simple instance declaration,
+  -- i.e. one of the form 	instance (...) => C (T a b c) where ...
+simpleInstInfoTyCon inst
+   = case splitTyConApp_maybe (simpleInstInfoTy inst) of 
+	Just (tycon, _) -> tycon
+
+isLocalInst :: Module -> InstInfo -> Bool
+isLocalInst mod info = mod == nameModule (idName (iDFunId info))
+\end{code}
 
 
 %************************************************************************

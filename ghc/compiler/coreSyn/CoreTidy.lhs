@@ -15,7 +15,6 @@ import CmdLineOpts	( DynFlags, DynFlag(..), opt_UsageSPOn, dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding )
 import CoreLint		( beginPass, endPass )
-import Rules		( ProtoCoreRule(..), RuleBase )
 import UsageSPInf       ( doUsageSPInf )
 import VarEnv
 import VarSet
@@ -66,9 +65,10 @@ Several tasks are done by @tidyCorePgm@
    from the uniques for local thunks etc.]
 
 \begin{code}
-tidyCorePgm :: DynFlags -> Module -> [CoreBind] -> RuleBase
-	    -> IO ([CoreBind], [ProtoCoreRule])
-tidyCorePgm dflags module_name binds_in rulebase_in
+tidyCorePgm :: DynFlags -> Module
+	    -> [CoreBind] -> [IdCoreRule]
+	    -> IO ([CoreBind], [IdCoreRule])
+tidyCorePgm dflags module_name binds_in orphans_in
   = do
 	us <- mkSplitUniqSupply 'u'
 
@@ -81,13 +81,13 @@ tidyCorePgm dflags module_name binds_in rulebase_in
 
 	let (tidy_env1, binds_out)  = mapAccumL (tidyBind (Just module_name))
                                                 init_tidy_env binds_in1
-	    rules_out	  	    = tidyProtoRules tidy_env1 (mk_local_protos rulebase_in)
+	    orphans_out	  	    = tidyIdRules tidy_env1 orphans_in
 
 	endPass dflags "Tidy Core" (dopt Opt_D_dump_simpl dflags || 
 				    dopt Opt_D_verbose_core2core dflags)
 	        binds_out
 
-	return (binds_out, rules_out)
+	return (binds_out, orphans_out)
   where
 	-- We also make sure to avoid any exported binders.  Consider
 	--	f{-u1-} = 1	-- Local decl
@@ -100,11 +100,6 @@ tidyCorePgm dflags module_name binds_in rulebase_in
     init_tidy_env = (initTidyOccEnv avoids, emptyVarEnv)
     avoids	  = [getOccName bndr | bndr <- bindersOfBinds binds_in,
 				       exportWithOrigOccName bndr]
-
-    mk_local_protos :: RuleBase -> [ProtoCoreRule]
-    mk_local_protos (rule_ids, _)
-      = [ProtoCoreRule True id rule | id <- varSetElems rule_ids,
-                                      rule <- rulesRules (idSpecialisation id)]
 
 tidyBind :: Maybe Module		-- (Just m) for top level, Nothing for nested
 	 -> TidyEnv
@@ -245,17 +240,15 @@ tidyIdInfo env info
 	  | otherwise	           = info `setSpecInfo` tidyRules env rules
 		
     info3 = info2 `setUnfoldingInfo` noUnfolding 
-    info4 = info3 `setDemandInfo`    wwLazy		-- I don't understand why...
+    info4 = info3 `setDemandInfo`    wwLazy		
 
     info5 = case workerInfo info of
 		NoWorker -> info4
 		HasWorker w a  -> info4 `setWorkerInfo` HasWorker (tidyVarOcc env w) a
 
-tidyProtoRules :: TidyEnv -> [ProtoCoreRule] -> [ProtoCoreRule]
-tidyProtoRules env rules
-  = [ ProtoCoreRule is_local (tidyVarOcc env fn) (tidyRule env rule)
-    | ProtoCoreRule is_local fn rule <- rules
-    ]
+tidyIdRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
+tidyIdRules env rules
+  = [ (tidyVarOcc env fn, tidyRule env rule) | (fn,rule) <- rules  ]
 
 tidyRules :: TidyEnv -> CoreRules -> CoreRules
 tidyRules env (Rules rules fvs) 

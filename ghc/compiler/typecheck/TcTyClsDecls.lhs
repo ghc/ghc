@@ -11,12 +11,13 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), TyClDecl(..),
-			  HsType(..), HsTyVarBndr,
-			  ConDecl(..), ConDetails(..), 
-			  Sig(..), HsPred(..), HsTupCon(..),
-			  tyClDeclName, hsTyVarNames, isClassDecl, isSynDecl, isClassOpSig, getBangType
+			  HsTyVarBndr,
+			  ConDecl(..), 
+			  Sig(..), HsPred(..), 
+			  tyClDeclName, hsTyVarNames, 
+			  isIfaceSigDecl, isClassDecl, isSynDecl, isClassOpSig
 			)
-import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name )
+import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, tyClDeclFVs )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonad
@@ -38,15 +39,13 @@ import DataCon		( isNullaryDataCon )
 import Var		( varName )
 import FiniteMap
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( Name, NamedThing(..), NameEnv, getSrcLoc, isTvOcc, nameOccName,
-			  mkNameEnv, lookupNameEnv_NF
+import Name		( Name, NamedThing(..), NameEnv, getSrcLoc, 
+			  mkNameEnv, lookupNameEnv_NF, isTyVarName
 			)
+import NameSet
 import Outputable
-import Maybes		( mapMaybe, catMaybes )
-import UniqSet		( emptyUniqSet, unitUniqSet, unionUniqSets, 
-			  unionManyUniqSets, uniqSetToList ) 
+import Maybes		( mapMaybe )
 import ErrUtils		( Message )
-import Unique		( Unique, Uniquable(..) )
 import HsDecls          ( getClassDeclSysNames )
 import Generics         ( mkTyConGenInfo )
 import CmdLineOpts	( DynFlags )
@@ -362,7 +361,7 @@ Dependency analysis
 sortByDependency :: [RenamedHsDecl] -> TcM [SCC RenamedTyClDecl]
 sortByDependency decls
   = let		-- CHECK FOR CLASS CYCLES
-	cls_sccs   = stronglyConnComp (mapMaybe mk_cls_edges tycl_decls)
+	cls_sccs   = stronglyConnComp (mapMaybe mkClassEdges tycl_decls)
 	cls_cycles = [ decls | CyclicSCC decls <- cls_sccs]
     in
     checkTc (null cls_cycles) (classCycleErr cls_cycles)	`thenTc_`
@@ -380,8 +379,8 @@ sortByDependency decls
     in
     returnTc decl_sccs
   where
-    tycl_decls = [d | TyClD d <- decls]
-    edges      = map mk_edges tycl_decls
+    tycl_decls = [d | TyClD d <- decls, not (isIfaceSigDecl d)]
+    edges      = map mkEdges tycl_decls
     
     is_syn_decl (d, _, _) = isSynDecl d
 \end{code}
@@ -390,84 +389,25 @@ Edges in Type/Class decls
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
+tyClDeclFTVs :: RenamedTyClDecl -> [Name]
+tyClDeclFTVs d = foldNameSet add [] (tyClDeclFVs d)
+	       where
+		 add n fvs | isTyVarName n = fvs
+			   | otherwise	   = n : fvs
+
 ----------------------------------------------------
 -- mk_cls_edges looks only at the context of class decls
 -- Its used when we are figuring out if there's a cycle in the
 -- superclass hierarchy
 
-mk_cls_edges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Unique, [Unique])
+mkClassEdges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Name, [Name])
 
-mk_cls_edges decl@(ClassDecl ctxt name _ _ _ _ _ _)
-  = Just (decl, getUnique name, map getUnique (catMaybes (map get_clas ctxt)))
-mk_cls_edges other_decl
-  = Nothing
+mkClassEdges decl@(ClassDecl ctxt name _ _ _ _ _ _) = Just (decl, name, [c | HsPClass c _ <- ctxt])
+mkClassEdges other_decl				    = Nothing
 
 ----------------------------------------------------
-mk_edges :: RenamedTyClDecl -> (RenamedTyClDecl, Unique, [Unique])
-
-mk_edges decl@(TyData _ ctxt name _ condecls _ derivs _ _ _)
-  = (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
-					 get_cons condecls `unionUniqSets`
-					 get_deriv derivs))
-
-mk_edges decl@(TySynonym name _ rhs _)
-  = (decl, getUnique name, uniqSetToList (get_ty rhs))
-
-mk_edges decl@(ClassDecl ctxt name _ _ sigs _ _ _)
-  = (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
-				         get_sigs sigs))
-
-
-----------------------------------------------------
-get_ctxt ctxt = unionManyUniqSets (map set_name (catMaybes (map get_clas ctxt)))
-get_clas (HsPClass clas _) = Just clas
-get_clas _                 = Nothing
-
-----------------------------------------------------
-get_deriv Nothing     = emptyUniqSet
-get_deriv (Just clss) = unionManyUniqSets (map set_name clss)
-
-----------------------------------------------------
-get_cons cons = unionManyUniqSets (map get_con cons)
-
-----------------------------------------------------
-get_con (ConDecl _ _ _ ctxt details _) 
-  = get_ctxt ctxt `unionUniqSets` get_con_details details
-
-----------------------------------------------------
-get_con_details (VanillaCon btys)    = unionManyUniqSets (map get_bty btys)
-get_con_details (InfixCon bty1 bty2) = unionUniqSets (get_bty bty1) (get_bty bty2)
-get_con_details (RecCon nbtys)       = unionManyUniqSets (map (get_bty.snd) nbtys)
-
-----------------------------------------------------
-get_bty bty = get_ty (getBangType bty)
-
-----------------------------------------------------
-get_ty (HsTyVar name) | isTvOcc (nameOccName name) = emptyUniqSet 
-		      | otherwise		   = set_name name
-get_ty (HsAppTy ty1 ty2)	      = unionUniqSets (get_ty ty1) (get_ty ty2)
-get_ty (HsFunTy ty1 ty2)	      = unionUniqSets (get_ty ty1) (get_ty ty2)
-get_ty (HsListTy ty)		      = set_name listTyCon_name `unionUniqSets` get_ty ty
-get_ty (HsTupleTy (HsTupCon n _) tys) = set_name n `unionUniqSets` get_tys tys
-get_ty (HsUsgTy _ ty) 		      = get_ty ty
-get_ty (HsUsgForAllTy _ ty) 	      = get_ty ty
-get_ty (HsForAllTy _ ctxt mty) 	      = get_ctxt ctxt `unionUniqSets` get_ty mty
-get_ty (HsPredTy (HsPClass name _))   = set_name name
-get_ty (HsPredTy (HsPIParam _ _))     = emptyUniqSet	-- I think
-
-----------------------------------------------------
-get_tys tys = unionManyUniqSets (map get_ty tys)
-
-----------------------------------------------------
-get_sigs sigs
-  = unionManyUniqSets (map get_sig sigs)
-  where 
-    get_sig (ClassOpSig _ _ ty _) = get_ty ty
-    get_sig (FixSig _)		  = emptyUniqSet
-    get_sig other = panic "TcTyClsDecls:get_sig"
-
-----------------------------------------------------
-set_name name = unitUniqSet (getUnique name)
+mkEdges :: RenamedTyClDecl -> (RenamedTyClDecl, Name, [Name])
+mkEdges decl = (decl, tyClDeclName decl, tyClDeclFTVs decl)
 \end{code}
 
 

@@ -8,10 +8,10 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..), isIfaceRuleDecl )
+import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..) )
 import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedHsDecl, RenamedRuleDecl )
-import HscTypes		( PackageRuleEnv )
+import HscTypes		( PackageRuleBase )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyAndCheck )
@@ -21,9 +21,10 @@ import TcMonoType	( kcHsSigType, tcHsSigType, tcTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
 import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv	)
 import Rules		( extendRuleBase )
-import Inst		( LIE, plusLIEs, instToId )
+import Inst		( LIE, emptyLIE, plusLIEs, instToId )
 import Id		( idType, idName, mkVanillaId )
-import Name		( Name, extendNameEnvList )
+import Name		( nameModule )
+import Module		( Module )
 import VarSet
 import Type		( tyVarsOfTypes, openTypeKind )
 import Bag		( bagToList )
@@ -32,29 +33,35 @@ import Outputable
 \end{code}
 
 \begin{code}
-tcRules :: PackageRuleEnv -> [RenamedHsDecl] -> TcM (PackageRuleEnv, LIE, [TypecheckedRuleDecl])
-tcRules pkg_rule_env decls 
-  = mapAndUnzipTc tcLocalRule local_rules	`thenTc` \ (lies, new_local_rules) ->
-    mapTc tcIfaceRule imported_rules		`thenTc` \ new_imported_rules ->
-    returnTc (extendRuleBaseList pkg_rule_env new_imported_rules,
-	      plusLIEs lies, new_local_rules)
+tcRules :: PackageRuleBase -> Module -> [RenamedHsDecl] 
+	-> TcM (PackageRuleBase, LIE, [TypecheckedRuleDecl])
+tcRules pkg_rule_base mod decls 
+  = mapAndUnzipTc tcRule [rule | RuleD rule <- decls]	`thenTc` \ (lies, new_rules) ->
+    let
+	(local_rules, imported_rules) = partition is_local new_rules
+	new_rule_base = foldl add pkg_rule_base imported_rules
+    in
+    returnTc (new_rule_base, plusLIEs lies, local_rules)
   where
-    rule_decls = [rule | RuleD rule <- decls]
-    (imported_rules, local_rules) = partition isIfaceRuleDecl rule_decls
+    add rule_base (IfaceRuleOut id rule) = extendRuleBase rule_base (id, rule)
 
-tcIfaceRule :: RenamedRuleDecl -> TcM (Id, CoreRule)
+	-- When relinking this module from its interface-file decls
+	-- we'll have IfaceRules that are in fact local to this module
+    is_local (IfaceRuleOut n _) = mod == nameModule (idName n)
+    is_local other		= True
+
+tcRule :: RenamedRuleDecl -> TcM (LIE, TypecheckedRuleDecl)
   -- No zonking necessary!
-tcIfaceRule (IfaceRule name vars fun args rhs src_loc)
+tcRule (IfaceRule name vars fun args rhs src_loc)
   = tcAddSrcLoc src_loc 		$
     tcAddErrCtxt (ruleCtxt name)	$
     tcVar fun				`thenTc` \ fun' ->
     tcCoreLamBndrs vars			$ \ vars' ->
     mapTc tcCoreExpr args		`thenTc` \ args' ->
     tcCoreExpr rhs			`thenTc` \ rhs' ->
-    returnTc (fun', Rule name vars' args' rhs')
+    returnTc (emptyLIE, IfaceRuleOut fun' (Rule name vars' args' rhs'))
 
-tcLocalRule :: RenamedRuleDecl -> TcM (LIE, TypecheckedRuleDecl)
-tcLocalRule (HsRule name sig_tvs vars lhs rhs src_loc)
+tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
   = tcAddSrcLoc src_loc 				$
     tcAddErrCtxt (ruleCtxt name)			$
     newTyVarTy openTypeKind				`thenNF_Tc` \ rule_ty ->

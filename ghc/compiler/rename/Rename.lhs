@@ -13,45 +13,42 @@ import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation,
 			  RdrNameTyClDecl, RdrNameRuleDecl, RdrNameInstDecl
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl,
-			  extractHsTyNames, extractHsCtxtTyNames,
+			  extractHsTyNames, 
 			  instDeclFVs, tyClDeclFVs, ruleDeclFVs
 			)
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
 import RnNames		( getGlobalNames )
-import RnSource		( rnSourceDecls, rnDecl, rnTyClDecl, rnRuleDecl, rnInstDecl )
+import RnSource		( rnSourceDecls, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl )
 import RnIfaces		( slurpImpDecls, mkImportInfo, 
-			  getInterfaceExports,
+			  getInterfaceExports, closeDecls,
 			  RecompileRequired, recompileRequired
 			)
 import RnHiFiles	( findAndReadIface, removeContext, loadExports, loadFixDecls, loadDeprecs )
 import RnEnv		( availName, availsToNameSet, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, sortAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
-			  lookupOrigNames, lookupGlobalRn, newGlobalName,
-			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs, addOneFV
+			  lookupOrigNames, lookupGlobalRn, newGlobalName
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName, 
 			  lookupModuleEnv
 			)
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
-			  nameOccName, nameUnique, nameModule,
+			  nameOccName, nameModule,
 			  mkNameEnv, nameEnvElts, extendNameEnv
 			)
 import OccName		( occNameFlavour )
-import Id		( idType )
-import TyCon		( isSynTyCon, getSynTyConDefn )
 import NameSet
-import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
+import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
 import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
 			  ioTyCon_RDR,
 			  unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
 			  eqString_RDR
 			)
-import PrelInfo		( fractionalClassKeys, derivingOccurrences, wiredInThingEnv )
-import Type		( namesOfType, funTyCon )
+import PrelInfo		( derivingOccurrences )
+import Type		( funTyCon )
 import ErrUtils		( dumpIfSet )
 import Bag		( bagToList )
 import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, lookupFM, 
@@ -62,7 +59,7 @@ import Maybes		( maybeToBool, catMaybes )
 import Outputable
 import IO		( openFile, IOMode(..) )
 import HscTypes		( Finder, PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
-			  ModIface(..), TyThing(..), WhatsImported(..), 
+			  ModIface(..), WhatsImported(..), 
 			  VersionInfo(..), ImportVersion, IfaceDecls(..),
 			  GlobalRdrEnv, AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
 			  Provenance(..), ImportReason(..), initialVersionInfo,
@@ -438,21 +435,20 @@ loadHomeDecl :: (NameEnv Version, [RenamedTyClDecl])
 	     -> (Version, RdrNameTyClDecl)
 	     -> RnMS (NameEnv Version, [RenamedTyClDecl])
 loadHomeDecl (version_map, decls) (version, decl)
-  = rnTyClDecl decl	`thenRn` \ (decl', _) ->
+  = rnTyClDecl decl	`thenRn` \ decl' ->
     returnRn (extendNameEnv version_map (tyClDeclName decl') version, decl':decls)
 
 ------------------
 loadHomeRules :: (Version, [RdrNameRuleDecl])
 	      -> RnMS (Version, [RenamedRuleDecl])
 loadHomeRules (version, rules)
-  = mapAndUnzipRn rnRuleDecl rules	`thenRn` \ (rules', _) ->
+  = mapRn rnIfaceRuleDecl rules	`thenRn` \ rules' ->
     returnRn (version, rules')
 
 ------------------
 loadHomeInsts :: [RdrNameInstDecl]
 	      -> RnMS [RenamedInstDecl]
-loadHomeInsts insts = mapAndUnzipRn rnInstDecl insts	`thenRn` \ (insts', _) ->
-		      returnRn insts'
+loadHomeInsts insts = mapRn rnInstDecl insts
 
 ------------------
 loadHomeUsage :: ImportVersion OccName
@@ -487,7 +483,7 @@ closeIfaceDecls :: DynFlags -> Finder
 	      	-> ModIface 	-- Get the decls from here
 	      	-> IO (PersistentCompilerState, Bool, [RenamedHsDecl])
 				-- True <=> errors happened
-closeIfaceDecls dflags finder hit hst pcs mod 
+closeIfaceDecls dflags finder hit hst pcs
 		mod_iface@(ModIface { mi_module = mod, mi_decls = iface_decls })
   = initRn dflags finder hit hst pcs mod $
 
@@ -499,8 +495,8 @@ closeIfaceDecls dflags finder hit hst pcs mod
 		map InstD inst_decls ++
 		map TyClD tycl_decls
 	needed = unionManyNameSets (map ruleDeclFVs rule_decls) `unionNameSets`
-		 unionManyNameSets (map instDeclFVs rule_decls) `unionNameSets`
-		 unionManyNameSets (map tyClDeclFVs rule_decls)
+		 unionManyNameSets (map instDeclFVs inst_decls) `unionNameSets`
+		 unionManyNameSets (map tyClDeclFVs tycl_decls)
     in
     closeDecls decls needed
 \end{code}
@@ -706,7 +702,7 @@ rnDump imp_decls local_decls
 \begin{code}
 getRnStats :: [RenamedHsDecl] -> Ifaces -> SDoc
 getRnStats imported_decls ifaces
-  = hcat [text "Renamer stats: ", stats])
+  = hcat [text "Renamer stats: ", stats]
   where
     n_mods = length [() | (_, _, True) <- eltsFM (iImpModInfo ifaces)]
     

@@ -11,7 +11,7 @@ they may be affected by renaming (which isn't fully worked out yet).
 \begin{code}
 module RnBinds (
 	rnTopBinds, rnTopMonoBinds,
-	rnMethodBinds, renameSigs,
+	rnMethodBinds, renameSigs, renameSigsFVs,
 	rnBinds,
 	unknownSigErr
    ) where
@@ -29,7 +29,6 @@ import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, 
 			  lookupGlobalOccRn, lookupSigOccRn,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
-			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV
 			)
 import CmdLineOpts	( DynFlag(..) )
 import Digraph		( stronglyConnComp, SCC(..) )
@@ -169,8 +168,8 @@ rnTopMonoBinds mbinds sigs
     let
 	bndr_name_set = mkNameSet binder_names
     in
-    renameSigs (okBindSig bndr_name_set) sigs 	`thenRn` \ (siglist, sig_fvs) ->
-    doptRn Opt_WarnMissingSigs			`thenRn` \ warnMissing ->
+    renameSigsFVs (okBindSig bndr_name_set) sigs 	`thenRn` \ (siglist, sig_fvs) ->
+    doptRn Opt_WarnMissingSigs				`thenRn` \ warnMissing ->
     let
 	type_sig_vars	= [n | Sig n _ _ <- siglist]
 	un_sigd_binders | warnMissing = nameSetToList (delListFromNameSet 
@@ -226,7 +225,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
 	binder_set = mkNameSet new_mbinders
     in
 	-- Rename the signatures
-    renameSigs (okBindSig binder_set) sigs	`thenRn` \ (siglist, sig_fvs) ->
+    renameSigsFVs (okBindSig binder_set) sigs	`thenRn` \ (siglist, sig_fvs) ->
 
 	-- Report the fixity declarations in this group that 
 	-- don't refer to any of the group's binders.
@@ -479,12 +478,15 @@ At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
 
 \begin{code}
+renameSigsFVs ok_sig sigs
+  = renameSigs ok_sig sigs	`thenRn` \ sigs' ->
+    returnRn (sigs', hsSigsFVs sigs')
+
 renameSigs ::  (RenamedSig -> Bool)		-- OK-sig predicate
 	    -> [RdrNameSig]
-	    -> RnMS ([RenamedSig], FreeVars)
+	    -> RnMS [RenamedSig]
 
-renameSigs ok_sig []
-  = returnRn ([], emptyFVs)	-- Common shortcut
+renameSigs ok_sig [] = returnRn []
 
 renameSigs ok_sig sigs
   =	 -- Rename the signatures
@@ -500,7 +502,7 @@ renameSigs ok_sig sigs
 	(goods, bads)	 = partition ok_sig in_scope
     in
     mapRn_ unknownSigErr bads			`thenRn_`
-    returnRn (goods, hsSigFVs goods)
+    returnRn goods
 
 -- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:

@@ -139,9 +139,11 @@ tyClDeclFVs (ClassDecl context _ tyvars fds sigs _ _ src_loc)
   = delFVs (map hsTyVarName tyvars) $
     extractHsCtxtTyNames context	  `plusFV`
     plusFVs (map extractFunDepNames fds)  `plusFV`
-    plusFVs (map hsSigFVs sigs)
+    hsSigsFVs sigs
 
 ----------------
+hsSigsFVs sigs = plusFVs (map hsSigFVs sigs)
+
 hsSigFVs (Sig v ty _) 	    	    = extractHsTyNames ty `addOneFV` v
 hsSigFVs (SpecInstSig ty _) 	    = extractHsTyNames ty
 hsSigFVs (SpecSig v ty _)   	    = extractHsTyNames ty `addOneFV` v

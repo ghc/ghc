@@ -11,7 +11,7 @@ module TcClassDcl ( tcClassDecl1, tcClassDecls2, mkImplicitClassBinds,
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
-			  HsExpr(..), HsLit(..), HsType(..), HsPred(..),
+			  HsExpr(..), HsLit(..), HsType(..), HsPred(..), 
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
 			  isClassDecl, isClassOpSig, isPragSig,
 			  getClassDeclSysNames, tyClDeclName
@@ -37,8 +37,8 @@ import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcSigTyVars )
 import TcMonad
 import Generics		( mkGenericRhs, validGenericMethodType )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import Class		( classTyVars, classBigSig, classSelIds, classTyCon, 
-			  Class, ClassOpItem, DefMeth (..) )
+import Class		( classTyVars, classBigSig, classSelIds, classTyCon, classTvsFds,
+			  Class, ClassOpItem, DefMeth (..), FunDep )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
@@ -47,7 +47,7 @@ import Name		( Name, isLocallyDefined, NamedThing(..),
 			  plusNameEnv, nameEnvElts )
 import NameSet		( emptyNameSet )
 import Outputable
-import Type		( Type, ClassContext, mkTyVarTys, mkDictTys, mkSigmaTy, mkClassPred,
+import Type		( Type, ClassContext, mkTyVarTys, mkDictTys, mkClassPred,
 			  splitTyConApp_maybe, isTyVarTy
 			)
 import Var		( TyVar )
@@ -128,7 +128,7 @@ tcClassDecl1 rec_env
     tcSuperClasses clas context sc_sel_names	`thenTc` \ (sc_theta, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig rec_env tyvar_names clas tyvars fds dm_info) 
+    mapTc (tcClassSig rec_env clas tyvars fds dm_info) 
 	  op_sigs				`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS DETAILS
@@ -237,7 +237,6 @@ tcSuperClasses clas context sc_sel_names
 
 
 tcClassSig :: TcEnv			-- Knot tying only!
-	   -> [HsTyVarBndr Name]	-- From the declaration, for error messages
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> [FunDep TyVar]
@@ -251,7 +250,7 @@ tcClassSig :: TcEnv			-- Knot tying only!
 -- so we distinguish them in checkDefaultBinds, and pass this knowledge in the
 -- Class.DefMeth data structure. 
 
-tcClassSig rec_env tyvar_names clas clas_tyvars fds dm_info
+tcClassSig rec_env clas clas_tyvars fds dm_info
 	   (ClassOpSig op_name maybe_dm op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
@@ -260,9 +259,12 @@ tcClassSig rec_env tyvar_names clas clas_tyvars fds dm_info
 
     tcHsSigType op_ty				`thenTc` \ local_ty ->
     let
-	theta	    = [mkClassPred clas (mkTyVarTys clas_tyvars)]
-	global_ty   = mkSigmaTy clas_tyvars theta local_ty
+	theta = [mkClassPred clas (mkTyVarTys clas_tyvars)]
+    in
+	-- Check for ambiguous class op types
+    checkAmbiguity True clas_tyvars theta local_ty	 `thenTc` \ global_ty ->
 
+    let
 	-- Build the selector id and default method id
 	sel_id      = mkDictSelId op_name clas
 
@@ -274,12 +276,7 @@ tcClassSig rec_env tyvar_names clas clas_tyvars fds dm_info
 			DefMeth dm_name -> DefMeth (tcAddImportedIdInfo rec_env dm_id)
 				        where
 					   dm_id = mkDefaultMethodId dm_name clas global_ty
-
-	full_hs_ty = HsForAllTy (Just tyvar_names) op_ty
     in
-	-- Check for ambiguous class op types
-    checkAmbiguity full_ty clas_tyvars theta local_ty		 `thenRn_`
-
 	-- Check that for a generic method, the type of 
 	-- the method is sufficiently simple
     checkTc (dm_info_name /= GenDefMeth || validGenericMethodType local_ty)

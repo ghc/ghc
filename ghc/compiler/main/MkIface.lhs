@@ -36,7 +36,7 @@ import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo(..),
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), isBuiltinRule, rulesRules, rulesRhsFreeVars )
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
-import CoreUnfold	( okToUnfoldInHiFile, couldBeSmallEnoughToInline )
+import CoreUnfold	( okToUnfoldInHiFile, mkTopUnfolding, neverUnfold )
 import Name		( isLocallyDefined, getName, nameModule,
 			  Name, NamedThing(..),
 			  plusNameEnv, lookupNameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv_NF, nameEnvElts
@@ -70,8 +70,24 @@ import List		( partition )
 completeModDetails :: ModDetails
 	  	   -> [CoreBind] -> [Id]	-- Final bindings, plus the top-level Ids from the
 						-- code generator; they have authoritative arity info
-		   -> [ProtoCoreRule]		-- Tidy orphan rules
+		   -> [IdCoreRule]		-- Tidy orphan rules
 		   -> ModDetails
+completeModDetails mds tidy_binds stg_ids orphan_rules
+  = ModDetails { 
+
+  where
+    dfun_ids = md_insts mds
+    
+    final_ids = bindsToIds (mkVarSet dfun_ids `unionVarSet` orphan_rule_ids)
+			   (mkVarSet stg_ids)
+			   tidy_binds
+
+     rule_dcls | opt_OmitInterfacePragmas = []
+	       | otherwise		  = getRules orphan_rules tidy_binds (mkVarSet final_ids)
+
+     orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
+				    | (_, rule) <- tidy_orphan_rules]
+
 
 completeIface :: Maybe ModIface		-- The old interface, if we have it
 	      -> ModIface		-- The new one, minus the decls and versions
@@ -87,32 +103,17 @@ completeIface :: Maybe ModIface		-- The old interface, if we have it
 	-- The IO in the type is solely for debug output
 	-- In particular, dumping a record of what has changed
 completeIface maybe_old_iface new_iface mod_details 
-	      tidy_binds final_ids tidy_orphan_rules
-  = let
-	new_decls = declsFromDetails mod_details tidy_binds final_ids tidy_orphan_rules
-    in
-    addVersionInfo maybe_old_iface (new_iface { mi_decls = new_decls })
+  = addVersionInfo maybe_old_iface (new_iface { mi_decls = new_decls })
+  where
+     new_decls = IfaceDecls { dcl_tycl  = ty_cls_dcls,
+			      dcl_insts = inst_dcls,
+			      dcl_rules = rule_dcls }
 
-declsFromDetails :: ModDetails -> [CoreBind] -> [Id] -> [ProtoCoreRule] -> IfaceDecls
-declsFromDetails details tidy_binds final_ids tidy_orphan_rules
-   = IfaceDecls { dcl_tycl  = ty_cls_dcls ++ bagToList val_dcls,
-		  dcl_insts = inst_dcls,
-		  dcl_rules = rule_dcls }
-   where
-     dfun_ids	 = md_insts details
-     inst_dcls   = map ifaceInstance dfun_ids
-     ty_cls_dcls = map ifaceTyCls (filter emitTyCls (nameEnvElts (md_types details)))
-  
-     (val_dcls, emitted_ids) = ifaceBinds (mkVarSet dfun_ids `unionVarSet` orphan_rule_ids)
-					  final_ids tidy_binds
-
-     rule_dcls | opt_OmitInterfacePragmas = []
-	       | otherwise		  = ifaceRules tidy_orphan_rules emitted_ids
-
-     orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
-				    | ProtoCoreRule _ _ rule <- tidy_orphan_rules]
-
+     inst_dcls   = map ifaceInstance (mk_insts mds)
+     ty_cls_dcls = map ifaceTyCls (nameEnvElts (md_types details))
+     rule_dcls   = map ifaceRule (md_rules details)
 \end{code}
+
 
 %************************************************************************
 %*				 					*
@@ -121,13 +122,6 @@ declsFromDetails details tidy_binds final_ids tidy_orphan_rules
 %************************************************************************
 
 \begin{code}
-emitTyCls :: TyThing -> Bool
-emitTyCls (ATyCon tc) = True	-- Could filter out wired in ones, but it's not
-				-- strictly necessary, and it costs extra time
-emitTyCls (AClass cl) = True
-emitTyCls (AnId   _)  = False
-
-
 ifaceTyCls :: TyThing -> RenamedTyClDecl
 ifaceTyCls (AClass clas)
   = ClassDecl (toHsContext sc_theta)
@@ -193,6 +187,49 @@ ifaceTyCls (ATyCon tycon)
 	= ([getName field_label], mk_bang_ty strict_mark (fieldLabelType field_label))
 
 ifaceTyCls (ATyCon tycon) = pprPanic "ifaceTyCls" (ppr tycon)
+
+ifaceTyCls (AnId id) 
+  = IfaceSig (getName id) (toHsType id_type) hs_idinfo noSrcLoc
+  where
+    id_type = idType id
+    id_info = idInfo id
+
+    hs_idinfo | opt_OmitInterfacePragmas = []
+ 	      | otherwise		 = arity_hsinfo  ++ caf_hsinfo  ++ cpr_hsinfo ++ 
+					   strict_hsinfo ++ wrkr_hsinfo ++ unfold_hsinfo
+
+    ------------  Arity  --------------
+    arity_hsinfo = case arityInfo id_info of
+			a@(ArityExactly n) -> [HsArity a]
+			other		   -> []
+
+    ------------ Caf Info --------------
+    caf_hsinfo = case cafInfo id_info of
+		   NoCafRefs -> [HsNoCafRefs]
+		   otherwise -> []
+
+    ------------ CPR Info --------------
+    cpr_hsinfo = case cprInfo id_info of
+		   ReturnsCPR -> [HsCprInfo]
+		   NoCPRInfo  -> []
+
+    ------------  Strictness  --------------
+    strict_hsinfo = case strictnessInfo id_info of
+			NoStrictnessInfo -> []
+			info		 -> [HsStrictness info]
+
+
+    ------------  Worker  --------------
+    wkr_hsinfo = case workerInfo id_info of
+		    HasWorker work_id wrap_arity -> [HsWorker (getName work_id)]
+		    NoWorker			 -> []
+
+    ------------  Unfolding  --------------
+    unfold_info = unfoldInfo id_info
+    inine_prag  = inlinePragInfo id_info
+    rhs		= unfoldingTempate unfold_info
+    unfold_hsinfo | neverUnfold unfold_info = []
+		  | otherwise		    = [HsUnfold inline_prag (toUfExpr rhs)]
 \end{code}
 
 
@@ -217,55 +254,40 @@ ifaceInstance dfun_id
 		--	instance Foo Tibble where ...
 		-- and this instance decl wouldn't get imported into a module
 		-- that mentioned T but not Tibble.
-\end{code}
 
-\begin{code}
-ifaceRules :: [ProtoCoreRule] -> IdSet -> [RenamedRuleDecl]
-ifaceRules rules emitted
-  = orphan_rules ++ local_rules
-  where
-    orphan_rules = [ toHsRule fn rule | ProtoCoreRule _ fn rule <- rules ]
-    local_rules  = [ toHsRule fn rule
- 		   | fn <- varSetElems emitted, 
-		     rule <- rulesRules (idSpecialisation fn),
-		     not (isBuiltinRule rule),
-				-- We can't print builtin rules in interface files
-				-- Since they are built in, an importing module
-				-- will have access to them anyway
+ifaceRule (id, BuiltinRule _)
+  = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule id)
 
-			-- Sept 00: I've disabled this test.  It doesn't stop many, if any, rules
-			-- from coming out, and to make it work properly we need to add ????
-			--	(put it back in for now)
-		     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
-				-- Spit out a rule only if all its lhs free vars are emitted
-				-- This is a good reason not to do it when we emit the Id itself
-		   ]
+ifaceRule (id, Rule name bndrs args rhs)
+  = IfaceRule name (map toUfBndr bndrs) (getName id)
+	      (map toUfExpr args) (toUfExpr rhs) noSrcLoc
+
+bogusIfaceRule id
+  = IfaceRule SLIT("bogus") [] (getName id) [] (UfVar (getName id)) noSrcLoc
 \end{code}
 
 
 %************************************************************************
 %*				 					*
-\subsection{Value bindings}
+\subsection{Compute final Ids}
 %*				 					* 
 %************************************************************************
 
-\begin{code}
-ifaceBinds :: IdSet		-- These Ids are needed already
-	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
-	   -> [CoreBind]	-- In dependency order, later depend on earlier
-	   -> (Bag RenamedIfaceSig, IdSet)		-- Set of Ids actually spat out
+A "final Id" has exactly the IdInfo for going into an interface file, or
+exporting to another module.
 
-ifaceBinds needed_ids final_ids binds
-  = go needed_ids (reverse binds) emptyBag emptyVarSet 
+\begin{code}
+bindsToIds :: IdSet		-- These Ids are needed already
+	   -> IdSet		-- Ids used at code-gen time; they have better pragma info!
+	   -> [CoreBind]	-- In dependency order, later depend on earlier
+	   -> [Id]		-- Set of Ids actually spat out, complete with exactly the IdInfo
+				-- they need for exporting to another module
+
+bindsToIds needed_ids codegen_ids binds
+  = go needed_ids (reverse binds) []
 		-- Reverse so that later things will 
 		-- provoke earlier ones to be emitted
   where
-    final_id_map  = listToUFM [(id,id) | id <- final_ids]
-    get_idinfo id = case lookupUFM final_id_map id of
-			Just id' -> idInfo id'
-			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
-				    idInfo id
-
 	-- The 'needed' set contains the Ids that are needed by earlier
 	-- interface file emissions.  If the Id isn't in this set, and isn't
 	-- exported, there's no need to emit anything
@@ -274,22 +296,21 @@ ifaceBinds needed_ids final_ids binds
     go needed [] decls emitted
 	| not (isEmptyVarSet needed) = pprTrace "ifaceBinds: free vars:" 
 					  (sep (map ppr (varSetElems needed)))
-				       (decls, emitted)
-	| otherwise 		     = (decls, emitted)
+				       emitted
+	| otherwise 		     = emitted
 
-    go needed (NonRec id rhs : binds) decls emitted
+    go needed (NonRec id rhs : binds) emitted
 	| need_id needed id
 	= if omitIfaceSigForId id then
-	    go (needed `delVarSet` id) binds decls (emitted `extendVarSet` id)
+	    go (needed `delVarSet` id) binds (id:emitted)
 	  else
 	    go ((needed `unionVarSet` extras) `delVarSet` id)
 	       binds
-	       (decl `consBag` decls)
-	       (emitted `extendVarSet` id)
+	       (new_id:emitted)
 	| otherwise
 	= go needed binds decls emitted
 	where
-	  (decl, extras) = ifaceId get_idinfo False id rhs
+	  (new_id, extras) = mkFinalId codegen_ids False id rhs
 
 	-- Recursive groups are a bit more of a pain.  We may only need one to
 	-- start with, but it may call out the next one, and so on.  So we
@@ -297,72 +318,60 @@ ifaceBinds needed_ids final_ids binds
 	-- because without -O we may only need the first one (if we don't emit
 	-- its unfolding)
     go needed (Rec pairs : binds) decls emitted
-	= go needed' binds decls' emitted' 
+	= go needed' binds emitted' 
 	where
-	  (new_decls, new_emitted, extras) = go_rec needed pairs
-	  decls'   = new_decls `unionBags` decls
+	  (new_emitted, extras) = go_rec needed pairs
 	  needed'  = (needed `unionVarSet` extras) `minusVarSet` mkVarSet (map fst pairs) 
-	  emitted' = emitted `unionVarSet` new_emitted
+	  emitted' = new_emitted ++ emitted 
 
-    go_rec :: IdSet -> [(Id,CoreExpr)] -> (Bag RenamedIfaceSig, IdSet, IdSet)
+    go_rec :: IdSet -> [(Id,CoreExpr)] -> ([Id], IdSet)
     go_rec needed pairs
-	| null decls = (emptyBag, emptyVarSet, emptyVarSet)
-	| otherwise  = (more_decls   `unionBags`   listToBag decls, 
-			more_emitted `unionVarSet` mkVarSet (map fst needed_prs),
-			more_extras  `unionVarSet` extras)
+	| null needed_prs = ([], emptyVarSet)
+	| otherwise 	  = (emitted ++           more_emitted,
+			     extras `unionVarSet` more_extras)
 	where
-	  (needed_prs,leftover_prs) = partition is_needed pairs
-	  (decls, extras_s)         = unzip [ifaceId get_idinfo True id rhs 
-				            | (id,rhs) <- needed_prs, not (omitIfaceSigForId id)]
-	  extras	            = unionVarSets extras_s
-	  (more_decls, more_emitted, more_extras) = go_rec extras leftover_prs
+	  (needed_prs,leftover_prs)   = partition is_needed pairs
+	  (emitted, extras_s)         = unzip [ mkFinalId codegen_ids True id rhs 
+				    	      | (id,rhs) <- needed_prs, not (omitIfaceSigForId id)]
+	  extras	              = unionVarSets extras_s
+	  (more_emitted, more_extras) = go_rec extras leftover_prs
+
 	  is_needed (id,_) = need_id needed id
 \end{code}
 
 
-\begin{code}
-ifaceId :: (Id -> IdInfo)	-- This function "knows" the extra info added
-				-- by the STG passes.  Sigh
-	-> Bool			-- True <=> recursive, so don't print unfolding
-	-> Id
-	-> CoreExpr		-- The Id's right hand side
-	-> (RenamedTyClDecl, IdSet)	-- The emitted stuff, plus any *extra* needed Ids
 
-ifaceId get_idinfo is_rec id rhs
-  = (IfaceSig (getName id) (toHsType id_type) hs_idinfo noSrcLoc,  new_needed_ids)
+\begin{code}
+mkFinalId :: IdSet		-- The Ids with arity info from the code generator
+	  -> Bool			-- True <=> recursive, so don't include unfolding
+	  -> Id
+	  -> CoreExpr		-- The Id's right hand side
+	  -> (Id, IdSet)		-- The emitted id, plus any *extra* needed Ids
+
+mkFinalId codegen_ids is_rec id rhs
+  = (id `setIdInfo` new_idinfo, new_needed_ids)
   where
     id_type     = idType id
     core_idinfo = idInfo id
-    stg_idinfo  = get_idinfo id
+    stg_idinfo  = case lookupVarSet codegen_ids id of
+			Just id' -> idInfo id'
+			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
+				    idInfo id
 
-    hs_idinfo | opt_OmitInterfacePragmas = []
- 	      | otherwise		 = arity_hsinfo  ++ caf_hsinfo  ++ cpr_hsinfo ++ 
-					   strict_hsinfo ++ wrkr_hsinfo ++ unfold_hsinfo
+    new_idinfo | opt_OmitInterfacePragmas
+	       = vanillaIdInfo
+ 	       | otherwise		  
+	       = core_idinfo `setArityInfo` 	 stg_arity_info
+			     `setCafInfo`   	 cafInfo stg_idinfo
+			     `setUnfoldingInfo`	 unfold_info
+			     `setWorkerInfo`	 worker_info
+			     `setSpecInfo`	 emptyCoreRules
+	-- We zap the specialisations because they are
+	-- passed on separately through the modules IdCoreRules
 
     ------------  Arity  --------------
-    arity_info   = arityInfo stg_idinfo
-    stg_arity	 = arityLowerBound arity_info
-    arity_hsinfo = case arityInfo stg_idinfo of
-			a@(ArityExactly n) -> [HsArity a]
-			other		   -> []
-
-    ------------ Caf Info --------------
-    caf_hsinfo = case cafInfo stg_idinfo of
-		   NoCafRefs -> [HsNoCafRefs]
-		   otherwise -> []
-
-    ------------ CPR Info --------------
-    cpr_hsinfo = case cprInfo core_idinfo of
-		   ReturnsCPR -> [HsCprInfo]
-		   NoCPRInfo  -> []
-
-    ------------  Strictness  --------------
-    strict_info   = strictnessInfo core_idinfo
-    bottoming_fn  = isBottomingStrictness strict_info
-    strict_hsinfo = case strict_info of
-			NoStrictnessInfo -> []
-			info		 -> [HsStrictness info]
-
+    stg_arity_info = arityInfo stg_idinfo
+    stg_arity	   = arityLowerBound arity_info
 
     ------------  Worker  --------------
 	-- We only treat a function as having a worker if
@@ -386,26 +395,30 @@ ifaceId get_idinfo is_rec id rhs
 	-- top level lambdas are there" in interface files; but during the
 	-- compilation of this module it means "how many things can I apply
 	-- this to".
-    work_info           = workerInfo core_idinfo
-    HasWorker work_id _ = work_info
+    worker_info = case workerInfo core_idinfo of
+		     HasWorker work_id wrap_arity 
+			| wrap_arity == stg_arity -> worker_info_in
+			| otherwise	          -> pprTrace "ifaceId: arity change:" (ppr id) 
+						     NoWorker
+		     NoWorker		          -> NoWorker
 
-    has_worker = case work_info of
-		  HasWorker work_id wrap_arity 
-		   | wrap_arity == stg_arity -> True
-		   | otherwise		     -> pprTrace "ifaceId: arity change:" (ppr id) 
-						False
-							  
-		  other			     -> False
+    has_worker = case worker_info of
+		   HasWorker _ _ -> True
+		   other	 -> False
 
-    wrkr_hsinfo | has_worker = [HsWorker (getName work_id)]
-		| otherwise  = []
+    HasWorker work_id _ = worker_info
 
     ------------  Unfolding  --------------
     inline_pragma  = inlinePragInfo core_idinfo
     dont_inline	   = isNeverInlinePrag inline_pragma
+    loop_breaker   = isLoopBreaker (occInfo core_idinfo)
+    bottoming_fn   = isBottomingStrictness (strictnessInfo core_idinfo)
 
-    unfold_hsinfo | show_unfold = [HsUnfold inline_pragma (toUfExpr rhs)]
-		  | otherwise   = []
+    unfolding    = mkTopUnfolding rhs
+    rhs_is_small = neverUnfold unfolding
+
+    unfold_info | show_unfold = unfolding
+		| otherwise   = noUnfolding
 
     show_unfold = not has_worker	 &&	-- Not unnecessary
 		  not bottoming_fn	 &&	-- Not necessary
@@ -414,13 +427,6 @@ ifaceId get_idinfo is_rec id rhs
 		  rhs_is_small		 &&	-- Small enough
 		  okToUnfoldInHiFile rhs 	-- No casms etc
 
-    rhs_is_small = couldBeSmallEnoughToInline opt_UF_HiFileThreshold rhs
-
-    ------------  Specialisations --------------
-    spec_info   = specInfo core_idinfo
-    
-    ------------  Occ info  --------------
-    loop_breaker  = isLoopBreaker (occInfo core_idinfo)
 
     ------------  Extra free Ids  --------------
     new_needed_ids | opt_OmitInterfacePragmas = emptyVarSet
@@ -428,12 +434,12 @@ ifaceId get_idinfo is_rec id rhs
 						unfold_ids	`unionVarSet`
 						spec_ids
 
+    spec_ids = filterVarSet interestingId (rulesRhsFreeVars (specInfo core_idinfo))
+
     worker_ids | has_worker && interestingId work_id = unitVarSet work_id
 			-- Conceivably, the worker might come from
 			-- another module
 	       | otherwise = emptyVarSet
-
-    spec_ids = filterVarSet interestingId (rulesRhsFreeVars spec_info)
 
     unfold_ids | show_unfold = find_fvs rhs
 	       | otherwise   = emptyVarSet
@@ -441,6 +447,33 @@ ifaceId get_idinfo is_rec id rhs
     find_fvs expr = exprSomeFreeVars interestingId expr
 
 interestingId id = isId id && isLocallyDefined id && not (hasNoBinding id)
+\end{code}
+
+
+\begin{code}
+getRules :: [IdCoreRule] 	-- Orphan rules
+	 -> [CoreBind]		-- Bindings, with rules in the top-level Ids
+	 -> IdSet		-- Ids that are exported, so we need their rules
+	 -> [IdCoreRule]
+getRules orphan_rules binds emitted
+  = orphan_rules ++ local_rules
+  where
+    local_rules  = [ (fn, rule)
+ 		   | fn <- bindersOfBinds binds,
+		     fn `elemVarSet` emitted,
+		     rule <- rulesRules (idSpecialisation fn),
+		     not (isBuiltinRule rule),
+				-- We can't print builtin rules in interface files
+				-- Since they are built in, an importing module
+				-- will have access to them anyway
+
+			-- Sept 00: I've disabled this test.  It doesn't stop many, if any, rules
+			-- from coming out, and to make it work properly we need to add ????
+			--	(put it back in for now)
+		     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
+				-- Spit out a rule only if all its lhs free vars are emitted
+				-- This is a good reason not to do it when we emit the Id itself
+		   ]
 \end{code}
 
 
