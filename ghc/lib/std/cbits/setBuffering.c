@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: setBuffering.c,v 1.6 1999/11/25 16:54:15 simonmar Exp $
+ * $Id: setBuffering.c,v 1.7 2000/03/28 08:48:44 simonmar Exp $
  *
  * hSetBuffering Runtime Support
  */
@@ -30,9 +30,7 @@
 #define SB_BB (-2)
 
 StgInt
-setBuffering(ptr, size)
-StgForeignPtr ptr;
-StgInt size;
+setBuffering(StgForeignPtr ptr, StgInt size)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int flags, rc=0;
