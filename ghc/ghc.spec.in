@@ -169,12 +169,15 @@ cd $dir
 rm -rf $RPM_BUILD_ROOT
 
 %files -f rpm-noprof-lib-files
+%defattr(-,root,root)
 %doc %{prefix}/share/doc/ghc-%{version}/ANNOUNCE
 %doc %{prefix}/share/doc/ghc-%{version}/README
 %{prefix}/bin/*
 
 %files prof -f rpm-prof-lib-files
+%defattr(-,root,root)
 
 %files doc
+%defattr(-,root,root)
 %doc %{prefix}/share/doc/ghc-%{version}/*.ps
 %doc %{prefix}/share/doc/ghc-%{version}/html
