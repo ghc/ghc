@@ -11,7 +11,10 @@ setTestOpts(f)
 test('conc001', normal, compile_and_run, [''])
 test('conc002', normal, compile_and_run, [''])
 test('conc003', normal, compile_and_run, [''])
-test('conc004', normal, compile_and_run, [''])
+
+# Omit GHCi way - it blows up to 0.5G.  Something to do with the threaded RTS?
+test('conc004', omit_ways(['ghci']), compile_and_run, [''])
+
 test('conc005', normal, compile_and_run, ['-package concurrent'])
 test('conc006', normal, compile_and_run, [''])
 test('conc007', extra_run_opts('+RTS -H128M -RTS'), compile_and_run, [''])
