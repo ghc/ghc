@@ -168,7 +168,7 @@ GhcCompilerWays=
 #
 #	-dcore-lint	check the types after every pass of the compiler;
 #			a pretty strong internal check
-GhcHcOpts=
+GhcHcOpts=-O
 
 # GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
 GhcWithHscBuiltViaC=@BootingFromHc@
@@ -262,7 +262,10 @@ GhcRtsCcOpts=-O2 -optc-fomit-frame-pointer
 HsLibsFor	= ghc
 
 # hslibs for GHC also uses the following variables (defined above):
-#   GhcLibWays, GhcLibHcOpts, EnableWin32DLLs, StripLibraries
+#   GhcLibWays, GhcLibHcOpts, GhcLibToolsHcOpts, EnableWin32DLLs, StripLibraries
+
+# Haskell compiler options for tools in hslibs
+GhcLibToolsHcOpts=-O
 
 # Build the Haskell Readline bindings?
 #
