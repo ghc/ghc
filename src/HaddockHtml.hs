@@ -336,7 +336,7 @@ ifaceToHtml _ iface inst_maps
 
 	no_doc_at_all = not (any has_doc exports)
 
-	contents = td << ppModuleContents exports
+	contents = td << vanillaTable << ppModuleContents exports
 
 	description
          | Just doc <- iface_doc iface
@@ -476,6 +476,9 @@ ppShortDataDecl summary is_newty
 	(HsDataDecl _ _ nm args [con] _ _doc) =
    ppHsDataHeader summary is_newty nm args      
      <+> equals <+> ppShortConstr summary con
+ppShortDataDecl summary is_newty
+	(HsDataDecl _ _ nm args [] _ _doc) = 
+   ppHsDataHeader summary is_newty nm args
 ppShortDataDecl summary is_newty
 	(HsDataDecl _ _ nm args cons _ _doc) = 
    vanillaTable << (
