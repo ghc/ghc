@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.10 1999/02/01 18:05:34 simonm Exp $
+ * $Id: PrimOps.hc,v 1.11 1999/02/02 14:17:05 simonm Exp $
  *
  * Primitive functions / data
  *
@@ -315,7 +315,7 @@ FN_(mkWeakzh_fast)
   w->value      = R2.cl;
   if (R3.cl) {
      w->finaliser  = R3.cl;
-  } else
+  } else {
      w->finaliser  = &NO_FINALISER_closure;
   }
 
@@ -337,13 +337,11 @@ FN_(finaliseWeakzh_fast)
   TICK_RET_UNBOXED_TUP(0);
   w = (StgWeak *)R1.p;
 
-  if (w->finaliser != &NO_FINALISER_info) {
+  if (w->finaliser != &NO_FINALISER_closure) {
 #ifdef INTERPRETER
-      STGCALL2(StgTSO *, createGenThread,
-		RtsFlags.GcFlags.initialStkSize, w->finaliser);
+      STGCALL2(createGenThread, RtsFlags.GcFlags.initialStkSize, w->finaliser);
 #else
-      STGCALL2(StgTSO *, createIOThread,
-		RtsFlags.GcFlags.initialStkSize, w->finaliser);
+      STGCALL2(createIOThread, RtsFlags.GcFlags.initialStkSize, w->finaliser);
 #endif
   }
   w->header.info = &DEAD_WEAK_info;
