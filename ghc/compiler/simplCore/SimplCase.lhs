@@ -508,10 +508,10 @@ simplAlts :: SimplEnv
 
 simplAlts env scrut (AlgAlts [] (BindDefault bndr@(id,occ_info) rhs)) rhs_c
   | maybeToBool maybe_data_ty && 
-    not (null cons) &&		-- Not an abstract type (can arise if we're pruning tydecl imports)
-    null other_cons
-  = ASSERT( isDataTyCon tycon )
-    newIds inst_con_arg_tys	`thenSmpl` \ new_bindees ->
+    not (null cons)           && -- Not an abstract type (can arise if we're pruning tydecl imports)
+    null other_cons           &&
+    isDataTyCon tycon  -- doesn't apply to (constructor-less) newtypes
+  = newIds inst_con_arg_tys	`thenSmpl` \ new_bindees ->
     let
 	new_args = [ (b, bad_occ_info) | b <- new_bindees ]
 	con_app  = mkCon con ty_args (map VarArg new_bindees)
