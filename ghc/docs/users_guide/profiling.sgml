@@ -681,7 +681,7 @@ x = nfib 25
       currently support mixing the <option>-hr</option> and
       <option>-hb</option> options.</para>
 
-      <para>There's one more option which relates to heap
+      <para>There are two more options which relate to heap
       profiling:</para>
 
       <variablelist>
@@ -689,13 +689,34 @@ x = nfib 25
 	  <term><Option>-i<replaceable>secs</replaceable></Option>:</Term>
 	  <indexterm><primary><option>-i</option></primary></indexterm>
 	  <listItem>
-	    <para> Set the profiling (sampling) interval to
+	    <para>Set the profiling (sampling) interval to
             <replaceable>secs</replaceable> seconds (the default is
             0.1&nbsp;second).  Fractions are allowed: for example
             <Option>-i0.2</Option> will get 5 samples per second.
             This only affects heap profiling; time profiles are always
             sampled on a 1/50 second frequency.</para>
 	  </listItem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-xt</option></term>
+	  <indexterm><primary><option>-xt</option></primary><secondary>RTS option</secondary>
+	  </indexterm>
+	  <listitem>
+	    <para>Include the memory occupied by threads in a heap
+	    profile.  Each thread takes up a small area for its thread
+	    state in addition to the space allocated for its stack
+	    (stacks normally start small and then grow as
+	    necessary).</para>
+	    
+	    <para>This includes the main thread, so using
+	    <option>-xt</option> is a good way to see how much stack
+	    space the program is using.</para>
+
+	    <para>Memory occupied by threads and their stacks is
+	    labelled as &ldquo;TSO&rdquo; when displaying the profile
+	    by closure description or type description.</para>
+	  </listitem>
 	</varlistentry>
       </variablelist>
 
