@@ -1183,10 +1183,18 @@ import B
 
 <programlisting>
 -- #hide, prune, ignore-exports
+
 -- |Module description
 module A where
 ...
 </programlisting>
+
+      <para>The options and module description can be in either order, but
+	remember to separate them using a blank line if you are using the
+	<literal>--</literal> style comments.  Without the blank line in the
+	example above, the module description would be assumed to be part of
+	the options, and Haddock would complain about unrecognised
+	options.</para>
 
       <para>The following attributes are currently understood by
       Haddock:</para>
