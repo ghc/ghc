@@ -1,6 +1,10 @@
-if [ ! -f "$DOCBOOK_CATALOG" ] ; then
+if [ ! -f "$DOCBOOK_CATALOG" ] && [ ! -f "$SGML_CATALOG_FILES" ] ; then
   echo "CATALOG file not set up; see installation guide for details."
   exit 1
+fi
+
+if [ -f "$DOCBOOK_CATALOG" ] ; then
+  CATALOG_OPTION=-c $DOCBOOK_CATALOG
 fi
 
 output=db2rtf.rtf
@@ -33,7 +37,7 @@ then
   fi
 fi
 
-cat $* | $JADE -t rtf -d ${DB_STYLESHEET}\#print -c $DOCBOOK_CATALOG
+cat $* | $JADE -t rtf -d ${DB_STYLESHEET}\#print $CATALOG_OPTION
 
 if [ $# -eq 1 ]
 then

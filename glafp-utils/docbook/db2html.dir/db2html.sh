@@ -1,6 +1,10 @@
-if [ ! -f "$DOCBOOK_CATALOG" ] ; then
+if [ ! -f "$DOCBOOK_CATALOG" ] && [ ! -f "$SGML_CATALOG_FILES" ] ; then
   echo "CATALOG file not set up; see installation guide for details."
   exit 1
+fi
+
+if [ -f "$DOCBOOK_CATALOG" ] ; then
+  CATALOG_OPTION=-c $DOCBOOK_CATALOG
 fi
 
 HTML_STYLESHEET=$HTML_DIR/html/docbook.css
@@ -53,10 +57,10 @@ mkdir $TMPDIR
 SAVE_PWD=`pwd`
 if [ $1 = `basename $1` ]; then
   echo "working on ../$1"
-  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html -c $DOCBOOK_CATALOG ../$1; cd $SAVE_PWD)
+  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html $CATALOG_OPTION ../$1; cd $SAVE_PWD)
 else
   echo "working on $1"
-  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html -c $DOCBOOK_CATALOG $1; cd $SAVE_PWD)
+  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html $CATALOG_OPTION $1; cd $SAVE_PWD)
 fi
 
 if [ $# -eq 1 ]

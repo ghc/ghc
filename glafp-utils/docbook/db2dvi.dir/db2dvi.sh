@@ -1,6 +1,10 @@
-if [ ! -f "$DOCBOOK_CATALOG" ] ; then
+if [ ! -f "$DOCBOOK_CATALOG" ] && [ ! -f "$SGML_CATALOG_FILES" ] ; then
   echo "CATALOG file not set up; see installation guide for details."
   exit 1
+fi
+
+if [ -f "$DOCBOOK_CATALOG" ] ; then
+  CATALOG_OPTION=-c $DOCBOOK_CATALOG
 fi
 
 # Dave Mason's option to specify a different stylesheet
@@ -35,7 +39,7 @@ echo OUTPUT FILE NAME IS $output
 
 TMPFN=`echo $1 | sed 's/\.sgml//'`
 
-$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex -c $DOCBOOK_CATALOG $1
+$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $CATALOG_OPTION $1
 
 jadetex ${TMPFN}.tex
 
