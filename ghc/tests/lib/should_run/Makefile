@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.18 2000/02/25 15:20:33 simonmar Exp $
+# $Id: Makefile,v 1.19 2000/03/21 15:57:47 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -7,9 +7,9 @@ include $(TOP)/mk/should_run.mk
 
 SRC_HC_OPTS += -dcore-lint
 
-npackedstring001_HC_OPTS = -syslib lang
-
+packedstring001_HC_OPTS = -syslib lang
 exceptions001_HC_OPTS   = -fglasgow-exts -fno-warn-missing-methods
+stableptr001_HC_OPTS    = -fglasgow-exts
 stableptr002_HC_OPTS    = -fglasgow-exts
 stableptr003_HC_OPTS    = -fglasgow-exts
 list001_HC_OPTS         = -fglasgow-exts
