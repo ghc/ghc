@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.h,v 1.4 1999/02/05 16:02:40 simonm Exp $
+ * $Id: Evaluator.h,v 1.5 1999/10/22 15:58:25 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -32,3 +32,22 @@ extern nat marshall   ( char arg_ty, void* arg );
 extern nat unmarshall ( char res_ty, void* res );
 extern nat argSize    ( const char* ks );
 
+
+extern StgInt          PopTaggedInt        ( void ) ;
+extern StgWord         PopTaggedWord       ( void ) ;
+extern StgAddr         PopTaggedAddr       ( void ) ;
+extern StgStablePtr    PopTaggedStablePtr  ( void ) ;
+extern StgChar         PopTaggedChar       ( void ) ;
+extern StgFloat        PopTaggedFloat      ( void ) ;
+extern StgDouble       PopTaggedDouble     ( void ) ;
+
+extern void   PushTaggedInt        ( StgInt       );
+extern void   PushTaggedWord       ( StgWord      );
+extern void   PushTaggedAddr       ( StgAddr      );
+extern void   PushTaggedStablePtr  ( StgStablePtr );
+extern void   PushTaggedChar       ( StgChar      );
+extern void   PushTaggedFloat      ( StgFloat     );
+extern void   PushTaggedDouble     ( StgDouble    );
+
+extern void   PushPtr        ( StgPtr );
+extern StgPtr PopPtr         ( void );

@@ -1,25 +1,75 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.8 1999/10/22 09:59:34 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.9 1999/10/22 15:58:21 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
- * Foreign Function calls
- *
+ * Implementation of foreign import and foreign export.
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
 
 #ifdef INTERPRETER
 
-#include "Assembler.h" /* for CFun stuff */
+#include "RtsUtils.h"    /* barf :-) */
+#include "Assembler.h"   /* for CFun stuff */
 #include "Evaluator.h"
 #include "ForeignCall.h"
 
+/* Exports of this file:
+      mkDescriptor
+      ccall
+      createAdjThunk
+   Everything else is local, I think.
+*/
 
-/* --------------------------------------------------------------------------
+/* ----------------------------------------------------------------------
+ * Some misc-ery to begin with.
+ * --------------------------------------------------------------------*/
+
+CFunDescriptor* mkDescriptor( char* as, char* rs ) 
+{ 
+    /* ToDo: don't use malloc */
+    CFunDescriptor *d  = malloc(sizeof(CFunDescriptor));
+    if (d == NULL) return d;
+    d->arg_tys     = as;
+    d->result_tys  = rs;
+    d->num_args    = strlen(as);
+    d->num_results = strlen(rs);
+    return d;
+}
+
+
+/* ----------------------------------------------------------------------
+ * Part the first: CALLING OUT -- foreign import
+ * --------------------------------------------------------------------*/
+
+/* SOME NOTES ABOUT PARAMETERISATION.
+
+   These pertain equally to foreign import and foreign export.
+  
+   Implementations for calling in and out are very architecture
+   dependent.  After some consideration, it appears that the two
+   important factors are the instruction set, and the calling
+   convention used.  Factors like the OS and compiler are not
+   directly relevant.
+
+   So: routines which are architecture dependent are have
+       _instructionsetname_callingconventionname attached to the
+       the base name.  For example, code specific to the ccall
+       convention on x86 would be suffixed _x86_ccall.
+
+   A third possible dimension of parameterisation relates to the
+   split between callee and caller saves registers.  For example,
+   x86_ccall code needs to assume a split, and different splits
+   using ccall on x86 need different code.  However, that does not
+   yet seem an issue, so it is ignored here.
+*/
+
+
+/* ------------------------------------------------------------------
  * Calling out to C: a simple, universal calling API
- * ------------------------------------------------------------------------*/
+ * ----------------------------------------------------------------*/
 
 /* The universal call-C API supplies a single function:
 
@@ -93,41 +143,29 @@
    have to be handwritten assembly.  The above design is intended
    to make that assembly as simple as possible, at the expense
    of a small amount of complication for the API's user.
+
+   These architecture-dependent assembly routines are in
+   rts/universal_call_c.S.
 */
 
-/* ToDo: move these to the Right Place */
-extern StgInt          PopTaggedInt        ( void ) ;
-extern StgWord         PopTaggedWord       ( void ) ;
-extern StgAddr         PopTaggedAddr       ( void ) ;
-extern StgStablePtr    PopTaggedStablePtr  ( void ) ;
-extern StgChar         PopTaggedChar       ( void ) ;
-extern StgFloat        PopTaggedFloat      ( void ) ;
-extern StgDouble       PopTaggedDouble     ( void ) ;
 
-extern void   PushTaggedInt        ( StgInt       );
-extern void   PushTaggedWord       ( StgWord      );
-extern void   PushTaggedAddr       ( StgAddr      );
-extern void   PushTaggedStablePtr  ( StgStablePtr );
-extern void   PushTaggedChar       ( StgChar      );
-extern void   PushTaggedFloat      ( StgFloat     );
-extern void   PushTaggedDouble     ( StgDouble    );
+/* ----------------------------------------------------------------*
+ * External  refs for the assembly routines.
+ * ----------------------------------------------------------------*/
 
-extern void   PushPtr        ( StgPtr );
-extern StgPtr PopPtr         ( void );
+extern void universal_call_c_x86_ccall  ( int, void*, char*, void* );
+static void universal_call_c_generic    ( int, void*, char*, void* );
 
 
-extern void universal_call_c_x86_linux  ( int, void*, char*, void* );
-       void universal_call_c_generic    ( int, void*, char*, void* );
-
-/* --------------------------------------------------------------------------
+/* ----------------------------------------------------------------*
  * This is a generic version of universal call that
  * only works for specific argument patterns.
  * 
- * It allows ports to work on the Hugs Prelude immeduately,
- * even if univeral_call_c_<os/specific> is not ported.
- * ------------------------------------------------------------------------*/
+ * It allows ports to work on the Hugs Prelude immediately,
+ * even if univeral_call_c_arch_callingconvention is not available.
+ * ----------------------------------------------------------------*/
 
-void universal_call_c_generic
+static void universal_call_c_generic
 ( int   n_args,
   void* args, 
   char* argstr, 
@@ -165,10 +203,13 @@ void universal_call_c_generic
     printf("' [%d arg(s)]\n",n_args);
     assert(0);
   }
+#undef CALL
 #undef CMP
+#undef ARG
 }
 
-/* --------------------------------------------------------------------------
+
+/* ----------------------------------------------------------------*
  * Move args/results between STG stack and the above API's arg block
  * Returns 0 on success
  *         1 if too many args/results or non-handled type
@@ -177,7 +218,8 @@ void universal_call_c_generic
  * Assumes an LP64 programming model for 64 bit: 
  *    sizeof(long)==sizeof(void*)==64  on a 64 bit platform
  *    sizeof(int)==32                  on a 64 bit platform
- * ------------------------------------------------------------------------*/
+ * This code attempts to be architecture neutral (viz, generic).
+ * ----------------------------------------------------------------*/
 
 int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
 {
@@ -194,9 +236,6 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
 
    if (d->num_args > 30 || d->num_results > 1)
       return 1; /* unlikely, but ... */
-
-   //fprintf ( stderr, "ccall: `%s' %d -> `%s' %d\n",
-   //         d-> arg_tys, d->num_args, d->result_tys, d->num_results );
 
    p = (unsigned int*) &arg_vec[1];
    for (i = 0; i < d->num_args; i++) {
@@ -267,11 +306,8 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
    PushPtr((StgPtr)(*bco));
    SaveThreadState();
 
-   //fprintf(stderr, " argc=%d  arg_vec=%p  argd_vec=%p `%s' fun=%p\n", 
-   //          d->num_args, arg_vec, argd_vec, argd_vec, fun );
-
 #if 1
-   universal_call_c_x86_linux ( 
+   universal_call_c_x86_ccall ( 
       d->num_args, (void*)arg_vec, argd_vec, fun );
 #else
    universal_call_c_generic ( 
@@ -320,17 +356,244 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
 
 
 
-CFunDescriptor* mkDescriptor( char* as, char* rs ) 
-{ 
-    /* ToDo: don't use malloc */
-    CFunDescriptor *d  = malloc(sizeof(CFunDescriptor));
-    if (d == NULL) return d;
-    d->arg_tys     = as;
-    d->result_tys  = rs;
-    d->num_args    = strlen(as);
-    d->num_results = strlen(rs);
-    return d;
+/* ----------------------------------------------------------------------
+ * Part the second: CALLING IN -- foreign export {dynamic}
+ * --------------------------------------------------------------------*/
+
+/* Make it possible for the evaluator to get hold of bytecode
+   for a given function by name.  Useful but a hack.  Sigh.
+ */
+extern void* getHugs_AsmObject_for ( char* s );
+
+
+/* ----------------------------------------------------------------*
+ * The implementation for x86_ccall.
+ * ----------------------------------------------------------------*/
+
+static 
+HaskellObj
+unpackArgsAndCallHaskell_x86_ccall_wrk ( StgStablePtr stableptr, 
+                                         char* tydesc, char* args)
+{
+   /* Copy args out of the C stack frame in an architecture
+      dependent fashion, under the direction of the type description
+      string tydesc.  Dereference the stable pointer, giving the
+      Haskell function to call.  Build an application of this to
+      the arguments, and finally wrap primRunST round the whole
+      thing, since we know it returns an IO type.  Then evaluate
+      the whole, which leaves nodeOut as the evaluated 'a', where
+      the type of the function called is .... -> IO a.
+
+      We can't immediately unpack the results and return, since
+      int results need to return in a different register (%eax and
+      possibly %edx) from float things (%st(0)).  So return nodeOut
+      to the relevant wrapper function, which knows enough about
+      the return type to do the Right Thing.
+
+      There's no getting round it: this is most heinous hack.
+   */
+
+   HaskellObj      node;
+   HaskellObj      nodeOut;
+   SchedulerStatus sstat;
+
+   char* resp = tydesc;
+   char* argp = tydesc;
+
+   node = (HaskellObj)deRefStablePtr(stableptr);
+
+   if (*argp != ':') argp++;
+   ASSERT( *argp == ':' );
+   argp++;
+   while (*argp) {
+      switch (*argp) {
+         case CHAR_REP:
+            node = rts_apply ( node, rts_mkChar ( *(char*)args ) );
+            args += 4;
+            break;
+         case INT_REP:
+            node = rts_apply ( node, rts_mkInt ( *(int*)args ) );
+            args += 4;
+            break;
+         case WORD_REP:
+            node = rts_apply ( node, rts_mkWord ( *(unsigned int*)args ) );
+            args += 4;
+            break;
+         case ADDR_REP:
+            node = rts_apply ( node, rts_mkAddr ( *(void**)args ) );
+            args += 4;
+            break;
+         case STABLE_REP:
+            node = rts_apply ( node, rts_mkStablePtr ( *(int*)args ) );
+            args += 4;
+            break;
+         case FLOAT_REP:
+            node = rts_apply ( node, rts_mkFloat ( *(float*)args ) );
+            args += 4;
+            break;
+         case DOUBLE_REP:
+            node = rts_apply ( node, rts_mkDouble ( *(double*)args ) );
+            args += 8;
+            break;
+         default:
+            barf(
+               "unpackArgsAndCallHaskell_x86_ccall: unexpected arg type rep");
+      }
+      argp++;
+   }
+
+   node = rts_apply ( 
+             asmClosureOfObject(getHugs_AsmObject_for("primRunST")), 
+             node );
+
+   sstat = rts_eval ( node, &nodeOut );
+   if (sstat != Success)
+      barf ("unpackArgsAndCallHaskell_x86_ccall: eval failed");
+
+   return nodeOut;
+}
+
+
+static 
+double
+unpackArgsAndCallHaskell_x86_ccall_DOUBLE ( StgStablePtr stableptr, 
+                                            char* tydesc, char* args)
+{
+   HaskellObj nodeOut
+      = unpackArgsAndCallHaskell_x86_ccall_wrk ( stableptr, tydesc, args );
+   /* Return a double.  This return will go into %st(0), which 
+      is unmodified by the adjustor thunk.
+   */
+   ASSERT(tydesc[0] == DOUBLE_REP);
+   return rts_getDouble(nodeOut);
+}
+
+
+static 
+float
+unpackArgsAndCallHaskell_x86_ccall_FLOAT ( StgStablePtr stableptr, 
+                                           char* tydesc, char* args)
+{
+   HaskellObj nodeOut
+      = unpackArgsAndCallHaskell_x86_ccall_wrk ( stableptr, tydesc, args );
+   /* Probably could be merged with the double case, since %st(0) is
+      still the return register.
+   */
+   ASSERT(tydesc[0] == FLOAT_REP);
+   return rts_getFloat(nodeOut);
+}
+
+
+static 
+unsigned long
+unpackArgsAndCallHaskell_x86_ccall_INTISH ( StgStablePtr stableptr, 
+                                            char* tydesc, char* args)
+{
+   HaskellObj nodeOut
+      = unpackArgsAndCallHaskell_x86_ccall_wrk ( stableptr, tydesc, args );
+   /* A complete hack.  We know that all these returns will be
+      put into %eax (and %edx, if it is a 64-bit return), and
+      the adjustor thunk will then itself return to the original
+      (C-world) caller without modifying %eax or %edx, so the
+      original caller will be a Happy Bunny.
+   */
+   switch (*tydesc) {
+      case ':':        return 0;
+      case CHAR_REP:   return (unsigned long)rts_getChar(nodeOut);
+      case INT_REP:    return (unsigned long)rts_getInt(nodeOut);
+      case WORD_REP:   return (unsigned long)rts_getWord(nodeOut);
+      case ADDR_REP:   return (unsigned long)rts_getAddr(nodeOut);
+      case STABLE_REP: return (unsigned long)rts_getStablePtr(nodeOut);
+      default:
+         barf(
+            "unpackArgsAndCallHaskell_x86_ccall: unexpected res type rep");
+   }
+}
+
+
+static
+StgAddr createAdjThunk_x86_ccall ( StgStablePtr stableptr,
+                                   StgAddr      typestr )
+{
+   unsigned char* codeblock;
+   unsigned char* cp;
+   unsigned int ts = (unsigned int)typestr;
+   unsigned int sp = (unsigned int)stableptr;
+   unsigned int ch;
+
+   if (((char*)typestr)[0] == DOUBLE_REP)
+      ch = (unsigned int)&unpackArgsAndCallHaskell_x86_ccall_DOUBLE;
+   else if (((char*)typestr)[0] == FLOAT_REP)
+      ch = (unsigned int)&unpackArgsAndCallHaskell_x86_ccall_FLOAT;
+   else
+      ch = (unsigned int)&unpackArgsAndCallHaskell_x86_ccall_INTISH;
+
+   codeblock = malloc ( 1 + 0x22 );
+   if (!codeblock) {
+      fprintf ( stderr, 
+                "createAdjThunk_x86_ccall (foreign export dynamic):\n"
+                "\tfatal: can't alloc mem\n" );
+      exit(1);
+   }
+   cp = codeblock;
+   /* Generate the following:
+      0000 53           pushl %ebx
+      0001 51           pushl %ecx
+      0002 56           pushl %esi
+      0003 57           pushl %edi
+      0004 55           pushl %ebp
+      0005 89E0         movl %esp,%eax    # sp -> eax
+      0007 83C018       addl $24,%eax     # move eax back over 5 saved regs + retaddr
+      000a 50           pushl %eax        # push arg-block addr
+      000b 6844332211   pushl $0x11223344 # push addr of type descr string
+      0010 6877665544   pushl $0x44556677 # push stableptr to closure
+      0015 E8BBAA9988   call 0x8899aabb   # SEE COMMENT BELOW
+      001a 83C40C       addl $12,%esp     # pop 3 args
+      001d 5D           popl %ebp
+      001e 5F           popl %edi
+      001f 5E           popl %esi
+      0020 59           popl %ecx
+      0021 5B           popl %ebx
+      0022 C3           ret
+    */
+   *cp++ = 0x53;
+   *cp++ = 0x51;
+   *cp++ = 0x56;
+   *cp++ = 0x57;
+   *cp++ = 0x55;
+   *cp++ = 0x89; *cp++ = 0xE0;
+   *cp++ = 0x83; *cp++ = 0xC0; *cp++ = 0x18;
+   *cp++ = 0x50;
+   *cp++ = 0x68; *cp++=ts;ts>>=8; *cp++=ts;ts>>=8; *cp++=ts;ts>>=8; *cp++=ts;
+   *cp++ = 0x68; *cp++=sp;sp>>=8; *cp++=sp;sp>>=8; *cp++=sp;sp>>=8; *cp++=sp;
+
+   /* call address needs to be: displacement relative to next insn */
+   ch = ch - ( ((unsigned int)cp) + 5);
+   *cp++ = 0xE8; *cp++=ch;ch>>=8; *cp++=ch;ch>>=8; *cp++=ch;ch>>=8; *cp++=ch;
+
+   *cp++ = 0x83; *cp++ = 0xC4; *cp++ = 0x0C;
+   *cp++ = 0x5D;
+   *cp++ = 0x5F;
+   *cp++ = 0x5E;
+   *cp++ = 0x59;
+   *cp++ = 0x5B;
+   *cp++ = 0xC3;
+
+   return codeblock;
+}
+
+
+/* ----------------------------------------------------------------*
+ * The only function involved in foreign-export that needs to be
+ * visible outside this file.
+ * ----------------------------------------------------------------*/
+
+StgAddr createAdjThunk ( StgStablePtr stableptr,
+                         StgAddr      typestr )
+{
+   return createAdjThunk_x86_ccall ( stableptr, typestr );
 }
 
 
 #endif /* INTERPRETER */
+

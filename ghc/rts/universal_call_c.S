@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1999.
  *
  * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.2 $
- * $Date: 1999/10/19 12:11:05 $
+ * $Revision: 1.3 $
+ * $Date: 1999/10/22 15:58:26 $
  * ------------------------------------------------------------------------*/
 	
 #include "config.h"
@@ -66,8 +66,8 @@
 #endif
 	
 #if i386_TARGET_ARCH
-.globl universal_call_c_x86_linux
-universal_call_c_x86_linux:
+.globl universal_call_c_x86_ccall
+universal_call_c_x86_ccall:
 	pushl %ebp
 	movl %esp,%ebp
 	pushl %edi

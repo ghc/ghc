@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.h,v 1.5 1999/10/19 11:01:28 sewardj Exp $
+ * $Id: ForeignCall.h,v 1.6 1999/10/22 15:58:21 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,3 +14,5 @@ extern int ccall ( CFunDescriptor* descriptor,
                    StgBCO**        bco 
                  );
 
+extern StgAddr createAdjThunk ( StgStablePtr stableptr,
+                                StgAddr      typestr );

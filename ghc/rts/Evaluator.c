@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.20 $
- * $Date: 1999/10/22 09:59:28 $
+ * $Revision: 1.21 $
+ * $Date: 1999/10/22 15:58:22 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -323,8 +323,6 @@ static inline void PushTaggedInteger  ( mpz_ptr );
 static inline StgPtr grabHpUpd( nat size );
 static inline StgPtr grabHpNonUpd( nat size );
 static        StgClosure* raiseAnError   ( StgClosure* errObj );
-static StgAddr createAdjThunkARCH ( StgStablePtr stableptr,
-                                    StgAddr      typestr );
 
 static int  enterCountI = 0;
 
@@ -462,7 +460,6 @@ StgThreadReturnCode enter( StgClosure* obj0 )
     register StgPtr           xSpLim; /* local state -- stack lim pointer */
     register StgClosure*      obj;    /* object currently under evaluation */
              char             eCount; /* enter counter, for context switching */
-             StgBCO**         bco_SAVED;
 
 #ifdef DEBUG
     /* use the t values to check that Su/Sp/SpLim do not change unexpectedly */
@@ -544,8 +541,6 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             register StgWord8* bciPtr; /* instruction pointer */
             register StgBCO*   bco = (StgBCO*)obj;
             StgWord wantToGC;
-
-            bco_SAVED = bco;
 
             /* Don't need to SSS ... LLL around doYouWantToGC */
             wantToGC = doYouWantToGC();
@@ -1683,7 +1678,7 @@ static inline void PushCatchFrame( StgClosure* handler )
     /* ToDo: stack check! */
     Sp -= sizeofW(StgCatchFrame);
     fp = stgCast(StgCatchFrame*,Sp);
-    SET_HDR(fp,&catch_frame_info,CCCS);
+    SET_HDR(fp,(StgInfoTable*)&catch_frame_info,CCCS);
     fp->handler         = handler;
     fp->link            = Su;
     Su = stgCast(StgUpdateFrame*,fp);
@@ -1703,7 +1698,7 @@ static inline void PushSeqFrame( void )
     /* ToDo: stack check! */
     Sp -= sizeofW(StgSeqFrame);
     fp = stgCast(StgSeqFrame*,Sp);
-    SET_HDR(fp,&seq_frame_info,CCCS);
+    SET_HDR(fp,(StgInfoTable*)&seq_frame_info,CCCS);
     fp->link = Su;
     Su = stgCast(StgUpdateFrame*,fp);
 }
@@ -2142,7 +2137,7 @@ void SloppifyIntegerEnd ( StgPtr arr0 )
       do_renormalise(b);
       ASSERT(is_sane(b));
       arr->words -= nwunused;
-      slop = &(arr->payload[arr->words]);
+      slop = (StgArrWords*)&(arr->payload[arr->words]);
       SET_HDR(slop,&ARR_WORDS_info,CCCS);
       slop->words = nwunused - sizeofW(StgArrWords);
       ASSERT( &(slop->payload[slop->words]) == 
@@ -2888,7 +2883,7 @@ static void* enterBCO_primop2 ( int primop2code,
             {
                 StgStablePtr stableptr = PopTaggedStablePtr();
                 StgAddr      typestr   = PopTaggedAddr();
-                StgAddr      adj_thunk = createAdjThunkARCH(stableptr,typestr);
+                StgAddr      adj_thunk = createAdjThunk(stableptr,typestr);
                 PushTaggedAddr(adj_thunk);
                 break;
             }     
@@ -3402,159 +3397,5 @@ void B__decodeFloat (B* man, I_* exp, StgFloat flt)
 #endif	/* FLOATS_AS_DOUBLES */
 
 #endif /* STANDALONE_INTEGER */
-
-
-
-/* -----------------------------------------------------------------------------
- * Support for foreign export dynamic.
- * ---------------------------------------------------------------------------*/
-
-static 
-int unpackArgsAndCallHaskell_x86 ( StgStablePtr stableptr, 
-                                   char* tydesc, char* args)
-{
-   HaskellObj      node;
-   HaskellObj      nodeOut;
-   SchedulerStatus sstat;
-
-   char* resp = tydesc;
-   char* argp = tydesc;
-
-   /*
-   fprintf ( stderr,
-      "unpackArgsAndCallHaskell_x86: args=0x%x tydesc=%s stableptr=0x%x\n",
-      (unsigned int)args, tydesc, stableptr );
-   */
-
-   node = deRefStablePtr(stableptr);
-
-   if (*argp != ':') argp++;
-   ASSERT( *argp == ':' );
-   argp++;
-   while (*argp) {
-      switch (*argp) {
-         case CHAR_REP:
-            node = rts_apply ( node, rts_mkChar ( *(char*)args ) );
-            /* fprintf(stderr, "char `%c' ", *(char*)args ); */
-            args += 4;
-            break;
-         case INT_REP:
-            node = rts_apply ( node, rts_mkInt ( *(int*)args ) );
-            /* fprintf(stderr, "int  %d ", *(int*)args ); */
-            args += 4;
-            break;
-         case FLOAT_REP:
-            node = rts_apply ( node, rts_mkFloat ( *(float*)args ) );
-            /* fprintf(stderr, "float %f ", *(float*)args ); */
-            args += 4;
-            break;
-         case DOUBLE_REP:
-            node = rts_apply ( node, rts_mkDouble ( *(double*)args ) );
-            /* fprintf(stderr, "double %f ", *(double*)args ); */
-            args += 8;
-            break;
-         case WORD_REP:
-         case ADDR_REP:
-         default:
-            internal(
-               "unpackArgsAndCallHaskell_x86: unexpected arg type rep");
-      }
-      argp++;
-   }
-   fprintf ( stderr, "\n" );
-   node = rts_apply ( 
-             asmClosureOfObject(getHugs_AsmObject_for("primRunST")), 
-             node );
-
-   sstat = rts_eval ( node, &nodeOut );
-   if (sstat != Success)
-      internal ("unpackArgsAndCallHaskell_x86: evalIO failed");
-
-   switch (*resp) {
-      case ':':        return 0;
-      case CHAR_REP:   return rts_getChar(nodeOut);
-      case INT_REP:    return rts_getInt(nodeOut);
-      //case FLOAT_REP:  return rts_getFloat(nodeOut);
-      //case DOUBLE_REP: return rts_getDouble(nodeOut);
-      case WORD_REP:
-      case ADDR_REP:
-      default:
-         internal(
-            "unpackArgsAndCallHaskell_x86: unexpected res type rep");
-   }
-}
-
-static
-StgAddr createAdjThunk_x86 ( StgStablePtr stableptr,
-                             StgAddr      typestr )
-{
-   unsigned char* codeblock;
-   unsigned char* cp;
-   unsigned int ts = (unsigned int)typestr;
-   unsigned int sp = (unsigned int)stableptr;
-   unsigned int ch = (unsigned int)&unpackArgsAndCallHaskell_x86;
-
-   /* fprintf ( stderr, "createAdjThunk_x86: %s 0x%x\n", (char*)typestr, sp ); */
-   codeblock = malloc ( 1 + 0x22 );
-   if (!codeblock) {
-      fprintf ( stderr, 
-                "createAdjThunk_x86 (foreign export dynamic):\n"
-                "\tfatal: can't alloc mem\n" );
-      exit(1);
-   }
-   cp = codeblock;
-   /* Generate the following:
-   9 0000 53           pushl %ebx
-  10 0001 51           pushl %ecx
-  11 0002 56           pushl %esi
-  12 0003 57           pushl %edi
-  13 0004 55           pushl %ebp
-  14 0005 89E0         movl %esp,%eax    # sp -> eax
-  15 0007 83C018       addl $24,%eax     # move eax back over 5 saved regs + retaddr
-  16 000a 50           pushl %eax        # push arg-block addr
-  17 000b 6844332211   pushl $0x11223344 # push addr of type descr string
-  18 0010 6877665544   pushl $0x44556677 # push stableptr to closure
-  19 0015 E8BBAA9988   call 0x8899aabb   # SEE COMMENT BELOW
-  20 001a 83C40C       addl $12,%esp     # pop 3 args
-  21 001d 5D           popl %ebp
-  22 001e 5F           popl %edi
-  23 001f 5E           popl %esi
-  24 0020 59           popl %ecx
-  25 0021 5B           popl %ebx
-  26 0022 C3           ret
-    */
-   *cp++ = 0x53;
-   *cp++ = 0x51;
-   *cp++ = 0x56;
-   *cp++ = 0x57;
-   *cp++ = 0x55;
-   *cp++ = 0x89; *cp++ = 0xE0;
-   *cp++ = 0x83; *cp++ = 0xC0; *cp++ = 0x18;
-   *cp++ = 0x50;
-   *cp++ = 0x68; *cp++=ts;ts>>=8; *cp++=ts;ts>>=8; *cp++=ts;ts>>=8; *cp++=ts;
-   *cp++ = 0x68; *cp++=sp;sp>>=8; *cp++=sp;sp>>=8; *cp++=sp;sp>>=8; *cp++=sp;
-
-   /* call address needs to be: displacement relative to next insn */
-   ch = ch - ( ((unsigned int)cp) + 5);
-   *cp++ = 0xE8; *cp++=ch;ch>>=8; *cp++=ch;ch>>=8; *cp++=ch;ch>>=8; *cp++=ch;
-
-   *cp++ = 0x83; *cp++ = 0xC4; *cp++ = 0x0C;
-   *cp++ = 0x5D;
-   *cp++ = 0x5F;
-   *cp++ = 0x5E;
-   *cp++ = 0x59;
-   *cp++ = 0x5B;
-   *cp++ = 0xC3;
-
-   return codeblock;
-}
-
-
-static
-StgAddr createAdjThunkARCH ( StgStablePtr stableptr,
-                             StgAddr      typestr )
-{
-   return createAdjThunk_x86 ( stableptr, typestr );
-}
 
 #endif /* INTERPRETER */
