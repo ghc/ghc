@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.46 2000/12/19 14:30:58 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.47 2001/02/09 12:09:33 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -59,7 +59,7 @@ static ullong startTime = 0;
 #endif
 
 EXTFUN(__init_Prelude);
-static void initModules ( void * );
+static void initModules ( void (*)(void) );
 
 void
 setProgArgv(int argc, char *argv[])
@@ -82,7 +82,7 @@ getProgArgv(int *argc, char **argv[])
 
 
 void
-startupHaskell(int argc, char *argv[], void *init_root)
+startupHaskell(int argc, char *argv[], void (*init_root)(void))
 {
     /* To avoid repeated initialisations of the RTS */
    if (rts_has_started_up)
@@ -244,7 +244,7 @@ nat init_sp = 0;
 
 #ifndef INTERPRETER
 static void
-initModules ( void *init_root )
+initModules ( void (*init_root)(void) )
 {
 #ifdef SMP
     Capability cap;
