@@ -85,6 +85,7 @@ module Id (
 	
 	-- PRINTING and RENUMBERING
 	pprId,
+--	pprIdInUnfolding,
 	showId,
 
 	-- Specialialisation
