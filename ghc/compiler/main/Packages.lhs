@@ -60,9 +60,8 @@ mkPackageName = mkFastString
 packageNameString :: PackageName -> String
 packageNameString = unpackFS
 
-stdPackage, rtsPackage, preludePackage, haskell98Package :: PackageName
+rtsPackage, preludePackage, haskell98Package :: PackageName
 preludePackage   = FSLIT("base")
-stdPackage 	 = FSLIT("std")	-- Do we still have this?
 rtsPackage 	 = FSLIT("rts")
 haskell98Package = FSLIT("haskell98")
 
