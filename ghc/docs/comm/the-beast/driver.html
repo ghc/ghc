@@ -70,6 +70,41 @@
       <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/HsVersions.h"><code>HsVersions.h</code></a>. 
 
+    <h2>Scheduling Optimisations Phases</h2>
+    <p>
+      GHC has a large variety of optimisations at its disposal, many of which
+      have subtle interdependencies.  The overall plan for program
+      optimisation is fixed in <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/main/DriverState.hs"><code>DriverState.hs</code></a>.
+      First of all, there is the variable <code>hsc_minusNoO_flags</code> that
+      determines the <code>-f</code> options that you get without
+      <code>-O</code> (aka optimisation level 0) as well as
+      <code>hsc_minusO_flags</code> and <code>hsc_minusO2_flags</code> for
+      <code>-O</code> and <code>-O2</code>.
+    <p>
+      However, most of the strategic decisions about optimisations on the
+      intermediate language Core are encoded in the value produced by
+      <code>buildCoreToDo</code>, which is a list with elements of type
+      <code>CoreToDo</code>.  Each element of this list specifies one step in
+      the sequence of core optimisations executed by the <a
+      href="simplifier.html">Mighty Simplifier</a>.  The type
+      <code>CoreToDo</code> is defined in <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/main/CmdLineOpts.lhs"><code>CmdLineOpts.lhs</code></a>.
+      The actual execution of the optimisation plan produced by
+      <code>buildCoreToDo</code> is performed by <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/simplCore/SimplCore.lhs"><code>SimpleCore</code></a><code>.doCorePasses</code>.
+      Core optimisation plans consist of a number of simplification phases
+      (currently, three for optimisation levels of 1 or higher) with
+      decreasing phase numbers (the lowest, corresponding to the last phase,
+      namely 0).  Before and after these phases, optimisations such as
+      specialisation, let floating, worker/wrapper, and so on are executed.
+      The sequence of phases is such that the synergistic effect of the phases
+      is maximised -- however, this is a fairly fragile arrangement.
+    <p>
+      There is a similar construction for optimisations on STG level stored in
+      the variable <code>buildStgToDo :: [StgToDo]</code>.  However, this is a
+      lot less complex than the arrangement for Core optimisations.
+
     <h2>Linking the <code>RTS</code> and <code>libHSstd</code></h2>
     <p>
       Since the RTS and HSstd refer to each other, there is a Cunning
@@ -122,7 +157,7 @@
     
     <p><small>
 <!-- hhmts start -->
-Last modified: Fri Aug 24 23:12:33 EST 2001
+Last modified: Tue Nov  6 16:08:59 EST 2001
 <!-- hhmts end -->
     </small>
   </body>
