@@ -36,8 +36,6 @@ import Foreign
 
 import System
 
---#include <readline/readline.h>
-     
 type KeyCode = Int
 
 type RlCallbackFunction = 
@@ -64,7 +62,7 @@ readline prompt =  do
 		prompt	(length prompt)
     litstr <- _casm_GC_ ``%r = readline (rl_prompt_hack);''
     if (litstr == ``NULL'') 
-     then fail (userError "Readline has read EOF")
+     then ioError (userError "Readline has read EOF")
      else do
 	str <- unpackCStringIO litstr
 	_ccall_ free litstr
@@ -80,7 +78,7 @@ rlBindKey :: KeyCode		    -- Key to Bind to
 	  -> IO ()
 rlBindKey key cback =
     if (0 > key) || (key > 255) then
-	fail (userError "Invalid ASCII Key Code, must be in range 0.255")
+	ioError (userError "Invalid ASCII Key Code, must be in range 0.255")
     else  do
 	addCbackEntry (key,cback)
 	_casm_ `` rl_bind_key((KeyCode)%0,&genericRlCback); '' key
@@ -100,7 +98,7 @@ rlAddDefun :: String ->			-- Function Name
 	      IO ()
 rlAddDefun name cback key =
     if (0 > key) || (key > 255) then
-	fail (userError "Invalid ASCII Key Code, must be in range 0..255")
+	ioError (userError "Invalid ASCII Key Code, must be in range 0..255")
     else do
 	addCbackEntry (key, cback)
 	_casm_ ``rl_add_defun (%0, &genericRlCback, (KeyCode)%1);'' name key
@@ -231,8 +229,8 @@ rlSetMark :: Int -> IO ()
 rlSetMark mark = _casm_ ``rl_mark = %0;'' mark
 
 rlSetDone :: Bool -> IO ()
-rlSetDone True  = _casm_ ``rl_done = %0;'' 1
-rlSetDone False = _casm_ ``rl_done = %0;'' 0
+rlSetDone True  = _casm_ ``rl_done = %0;'' (1::Int)
+rlSetDone False = _casm_ ``rl_done = %0;'' (0::Int)
 
 rlPendingInput :: KeyCode -> IO ()
 rlPendingInput key = primIOToIO (_casm_ ``rl_pending_input = %0;'' key)
