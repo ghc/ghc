@@ -856,13 +856,21 @@ primOpStrictness :: PrimOp -> ([Demand], Bool)
 	-- Use only the ones you ned.
 
 primOpStrictness SeqOp            = ([wwLazy], False)
+primOpStrictness NewArrayOp       = ([wwPrim, wwLazy, wwPrim], False)
 primOpStrictness WriteArrayOp     = ([wwPrim, wwPrim, wwLazy, wwPrim], False)
+
+primOpStrictness NewMutVarOp	  = ([wwLazy, wwPrim], False)
 primOpStrictness WriteMutVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
+
 primOpStrictness PutMVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
+
 primOpStrictness CatchOp	  = ([wwLazy, wwLazy], False)
 primOpStrictness RaiseOp	  = ([wwLazy], True)	-- NB: True => result is bottom
+
 primOpStrictness MkWeakOp	  = ([wwLazy, wwLazy, wwLazy, wwPrim], False)
 primOpStrictness MakeStablePtrOp  = ([wwLazy, wwPrim], False)
+
+	-- The rest all have primitive-typed arguments
 primOpStrictness other		  = (repeat wwPrim, False)
 \end{code}
 
