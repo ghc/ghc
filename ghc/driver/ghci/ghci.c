@@ -1,6 +1,6 @@
 /*
  *
- * $Id: ghci.c,v 1.3 2001/08/02 01:01:46 sof Exp $
+ * $Id: ghci.c,v 1.4 2001/10/10 17:25:15 sof Exp $
  *
  * ghci wrapper - invokes ghc.exe with the added command-line
  *                option "--interactive".
@@ -79,7 +79,7 @@ main(int argc, char** argv)
     return 1;
   }
   
-  new_argv = (char**)malloc(sizeof(char) * (argc + 1 + 1));
+  new_argv = (char**)malloc(sizeof(char*) * (argc + 1 + 1));
   if (new_argv == NULL) {
     errmsg("failed to start up ghc.exe");
     return 1;
@@ -95,7 +95,7 @@ main(int argc, char** argv)
   }
 
   for ( i=1; i < argc; i++ ) {
-    new_argv[i+1] = (char*)malloc(sizeof(char) * (strlen(argv[i] + 1)));
+    new_argv[i+1] = (char*)malloc(sizeof(char) * (strlen(argv[i]) + 1));
     if (new_argv[i+1] == NULL) {
       errmsg("failed to start up ghc.exe");
       return 1;
@@ -116,5 +116,13 @@ main(int argc, char** argv)
      
      ==> Just use spawnv().
   */
+#if 0
+  fprintf(stderr, "Invoking ghc: ");
+  i=0;
+  while (new_argv[i] != NULL) {
+    fprintf(stderr, "%s ", new_argv[i++]);
+  }
+  fprintf(stderr, "\n"); fflush(stderr);
+#endif
   return _spawnv(_P_WAIT, binPath, new_argv);
 }
