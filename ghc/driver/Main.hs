@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.52 2000/08/07 23:29:46 qrczak Exp $
+-- $Id: Main.hs,v 1.53 2000/08/09 09:56:08 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -2438,3 +2438,11 @@ newdir dir s = dir ++ '/':drop_longest_prefix s '/'
 
 remove_spaces :: String -> String
 remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
+
+-----------------------------------------------------------------------------
+-- compatibility code
+
+#if __GLASGOW_HASKELL__ <= 408
+catchJust = catchIO
+ioErrors  = justIoErrors
+#endif
