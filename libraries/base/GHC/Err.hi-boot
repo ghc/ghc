@@ -7,6 +7,12 @@
 --	because it's wired into the compiler
 ---------------------------------------------------------------------------
 
-__interface "core" GHCziErr 1 where
-__export GHCziErr error parError;
+module GHC.Err where
 
+-- We can't give an accurate type for error, because it mentions an open
+-- type variable, but fortunately it doesn't matter what type we
+-- give here because the compiler will use its wired-in version.  But we have
+-- to mention 'error' so that it gets exported from this .hi-boot
+-- file.
+error    :: GHC.Base.String -> a
+parError :: GHC.Base.String -> a
