@@ -126,6 +126,27 @@ class  (Real a, Fractional a) => RealFrac a  where
 \end{code}
 
 
+These 'numeric' enumerations come straight from the Report
+
+\begin{code}
+numericEnumFrom		:: (Fractional a) => a -> [a]
+numericEnumFrom		=  iterate (+1)
+
+numericEnumFromThen	:: (Fractional a) => a -> a -> [a]
+numericEnumFromThen n m	=  iterate (+(m-n)) n
+
+numericEnumFromTo       :: (Ord a, Fractional a) => a -> a -> [a]
+numericEnumFromTo n m   = takeWhile (<= m + 1/2) (numericEnumFrom n)
+
+numericEnumFromThenTo   :: (Ord a, Fractional a) => a -> a -> a -> [a]
+numericEnumFromThenTo e1 e2 e3 = takeWhile pred (numericEnumFromThen e1 e2)
+				where
+				 mid = (e2 - e1) / 2
+				 pred | e2 > e1   = (<= e3 + mid)
+				      | otherwise = (>= e3 + mid)
+\end{code}
+
+
 %*********************************************************
 %*							*
 \subsection{Instances for @Int@}
@@ -227,17 +248,10 @@ instance  (Integral a)	=> Enum (Ratio a)  where
     toEnum n            =  fromInt n :% 1
     fromEnum            =  fromInteger . truncate
 
-    enumFrom		=  bounded_iterator True (1)
-    enumFromThen n m	=  bounded_iterator (diff >= 0) diff n 
-			where diff = m - n
-
-bounded_iterator :: (Ord a, Num a) => Bool -> a -> a -> [a]
-bounded_iterator inc step v 
-   | inc      && v > new_v = [v]  -- oflow
-   | not inc  && v < new_v = [v]  -- uflow
-   | otherwise             = v : bounded_iterator inc step new_v
-  where
-   new_v = v + step
+    enumFrom		=  numericEnumFrom
+    enumFromThen 	=  numericEnumFromThen
+    enumFromTo		=  numericEnumFromTo
+    enumFromThenTo	=  numericEnumFromThenTo
 \end{code}
 
 
