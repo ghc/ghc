@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.121 2003/06/09 13:17:40 matthewc Exp $
+ * $Id: Linker.c,v 1.122 2003/06/24 08:29:13 stolz Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -2041,10 +2041,18 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #define Elf_Sym     Elf32_Sym
 #define Elf_Rel     Elf32_Rel
 #define Elf_Rela    Elf32_Rela
+#ifndef ELF_ST_TYPE
 #define ELF_ST_TYPE ELF32_ST_TYPE
+#endif
+#ifndef ELF_ST_BIND
 #define ELF_ST_BIND ELF32_ST_BIND
+#endif
+#ifndef ELF_R_TYPE
 #define ELF_R_TYPE  ELF32_R_TYPE
+#endif
+#ifndef ELF_R_SYM
 #define ELF_R_SYM   ELF32_R_SYM
+#endif
 #endif
 
 
