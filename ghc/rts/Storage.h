@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.38 2002/01/25 16:35:29 simonmar Exp $
+ * $Id: Storage.h,v 1.39 2002/02/01 10:50:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -11,6 +11,7 @@
 #define STORAGE_H
 
 #include "Block.h"
+#include "MBlock.h"
 #include "BlockAlloc.h"
 #include "StoragePriv.h"
 #ifdef PROFILING
@@ -351,7 +352,7 @@ void printMutableList(generation *gen);
 	     it does by mallocing them.
 
    Three macros identify these three areas:
-     IS_CODE(p), IS_DATA(p), HEAP_ALLOCED(p)
+     IS_DATA(p), HEAP_ALLOCED(p)
 
    HEAP_ALLOCED is called FOR EVERY SINGLE CLOSURE during GC.
    It needs to be FAST.
@@ -401,7 +402,7 @@ void printMutableList(generation *gen);
          is_dynamically_loaded_code_or_rodata_ptr
          is_dynamically_loaded_code_or_rwdata_ptr
 
-   For the [DLL] case, IS_CODE and IS_DATA are really not usable at all.
+   For the [DLL] case, IS_DATA is really not usable at all.
  */
 
 
@@ -414,8 +415,6 @@ extern void* TEXT_SECTION_END_MARKER_DECL;
 extern void* DATA_SECTION_END_MARKER_DECL;
 
 /* Take into account code sections in dynamically loaded object files. */
-#define IS_CODE_PTR(p) (  ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER) \
-                       || is_dynamically_loaded_code_or_rodata_ptr((char *)p) )
 #define IS_DATA_PTR(p) ( ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && \
                           (P_)(p) < (P_)&DATA_SECTION_END_MARKER) \
                        || is_dynamically_loaded_rwdata_ptr((char *)p) )
@@ -469,8 +468,7 @@ extern int is_heap_alloced(const void* x);
   We have three approaches:
 
   Plan A: Address-space partitioning.  
-    Keep info tables in the (single, contiguous) text segment:    IS_CODE_PTR(p)
-    and static closures in the (single, contiguous) data segment: IS_DATA_PTR(p)
+    keep static closures in the (single, contiguous) data segment: IS_DATA_PTR(p)
 
   Plan A can fail for two reasons:
     * In many environments (eg. dynamic loading),
@@ -558,13 +556,8 @@ extern int is_heap_alloced(const void* x);
 /* LOOKS_LIKE_GHC_INFO is called moderately often during GC, but
  * Certainly not as often as HEAP_ALLOCED.
  */
-#ifdef TEXT_BEFORE_HEAP /* needed for mingw DietHEP */
-# define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
-#else
-# define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) \
-                                    && !LOOKS_LIKE_STATIC_CLOSURE(info))
-#endif
-
+#define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) \
+                                   && !LOOKS_LIKE_STATIC_CLOSURE(info))
 
 /* -----------------------------------------------------------------------------
    Macros for calculating how big a closure will be (used during allocation)
