@@ -1,7 +1,10 @@
 -- !!! Test seeking
 
 import IO
-import PrelHandle(hSetBinaryMode)
+
+#ifdef __GLASGOW_HASKELL__
+import GHC.Handle ( hSetBinaryMode )
+#endif
 
 main = do
     h  <- openFile "hSeek001.in" ReadMode
