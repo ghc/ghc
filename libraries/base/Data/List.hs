@@ -209,7 +209,7 @@ import GHC.List
 import GHC.Base
 #endif
 
-infix 5 \\ 
+infix 5 \\ -- comment to fool cpp
 
 -- -----------------------------------------------------------------------------
 -- List functions
