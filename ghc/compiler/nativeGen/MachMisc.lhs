@@ -274,7 +274,7 @@ primRepToSize CostCentreRep = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc(
 primRepToSize CharRep	    = IF_ARCH_alpha( L,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 
 primRepToSize Int8Rep	    = IF_ARCH_alpha( B,  IF_ARCH_i386( B, IF_ARCH_sparc( B ,)))
-primRepToSize Word8Rep	    = IF_ARCH_alpha( B,  IF_ARCH_i386( B, IF_ARCH_sparc( BU,)))
+primRepToSize Word8Rep	    = IF_ARCH_alpha( BU, IF_ARCH_i386( BU, IF_ARCH_sparc( BU,)))
 
 primRepToSize IntRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize WordRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
