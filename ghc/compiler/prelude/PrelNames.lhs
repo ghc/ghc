@@ -107,7 +107,7 @@ basicKnownKeyNames
  ++ typeableClassNames
  ++ [	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
-	runIOName,
+	runMainIOName,
 	orderingTyConName,
 	rationalTyConName,
 	ratioDataConName,
@@ -425,8 +425,8 @@ and it's convenient to write them all down in one place.
 
 
 \begin{code}
-rootMainName = varQual rOOT_MAIN FSLIT("main") rootMainKey
-runIOName    = varQual pREL_TOP_HANDLER FSLIT("runIO") runMainKey
+rootMainName  = varQual rOOT_MAIN FSLIT("main") rootMainKey
+runMainIOName = varQual pREL_TOP_HANDLER FSLIT("runMainIO") runMainKey
 
 orderingTyConName = tcQual   pREL_BASE FSLIT("Ordering") orderingTyConKey
 

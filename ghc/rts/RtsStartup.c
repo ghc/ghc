@@ -360,11 +360,6 @@ hs_exit(void)
     /* start timing the shutdown */
     stat_startExit();
     
-#if !defined(GRAN)
-    /* Finalize any remaining weak pointers */
-    finalizeWeakPointersNow();
-#endif
-    
     /* stop all running tasks */
     exitScheduler();
     

@@ -21,37 +21,6 @@
 StgWeak *weak_ptr_list;
 
 /*
- * finalizeWeakPointersNow() is called just before the system is shut
- * down.  It runs the finalizer for each weak pointer still in the
- * system.
- *
- * Careful here - rts_evalIO might cause a garbage collection, which
- * might change weak_ptr_list.  Must re-load weak_ptr_list each time
- * around the loop.
- */
-
-void
-finalizeWeakPointersNow(void)
-{
-  StgWeak *w;
-  
-  rts_lock();
-  while ((w = weak_ptr_list)) {
-    weak_ptr_list = w->link;
-    if (w->header.info != &stg_DEAD_WEAK_info) {
-	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
-	IF_DEBUG(weak,debugBelch("Finalising weak pointer at %p -> %p\n", w, w->key));
-	if (w->finalizer != &stg_NO_FINALIZER_closure) {
-	    rts_evalLazyIO(w->finalizer,NULL);
-	    rts_unlock();
-	    rts_lock();
-	}
-    }
-  }
-  rts_unlock();
-} 
-
-/*
  * scheduleFinalizers() is called on the list of weak pointers found
  * to be dead after a garbage collection.  It overwrites each object
  * with DEAD_WEAK, and creates a new thread to run the pending finalizers.

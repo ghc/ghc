@@ -28,7 +28,7 @@ import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl, SpliceDecl(..
 			  nlHsApp, nlHsVar, pprLHsBinds )
 import RdrHsSyn		( findSplice )
 
-import PrelNames	( runIOName, rootMainName, mAIN,
+import PrelNames	( runMainIOName, rootMainName, mAIN,
 			  main_RDR_Unqual )
 import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv, 
 			  plusGlobalRdrEnv )
@@ -668,8 +668,8 @@ check_main ghci_mode tcg_env main_mod main_fn
 	     Nothing -> do { complain_no_main	
 			   ; return tcg_env } ;
 	     Just main_name -> do
-	{ let { rhs = nlHsApp (nlHsVar runIOName) (nlHsVar main_name) }
-		   	-- :Main.main :: IO () = runIO main 
+	{ let { rhs = nlHsApp (nlHsVar runMainIOName) (nlHsVar main_name) }
+		   	-- :Main.main :: IO () = runMainIO main 
 
 	; (main_expr, ty) <- setSrcSpan (srcLocSpan (getSrcLoc main_name)) $
 			     tcInferRho rhs
