@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.86 2002/02/11 15:16:26 simonpj Exp $
+$Id: Parser.y,v 1.87 2002/02/12 03:52:08 chak Exp $
 
 Haskell grammar.
 
@@ -389,15 +389,25 @@ topdecl :: { RdrBinding }
 --	(Eq a, Ord b) => T a b
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
-	: '(' comma_types1 ')' '=>' tycon tv_bndrs	{% mapP checkPred $2	`thenP` \ cxt ->
+	: '(' comma_types1 ')' '=>' gtycon tv_bndrs	{% mapP checkPred $2	`thenP` \ cxt ->
 							   returnP (cxt, $5, $6) }
-	| qtycon atypes1 '=>' tycon atypes0		{% checkTyVars $5	`thenP` \ tvs ->
+          -- qtycon for the class below name would lead to many s/r conflicts
+	  --   FIXME: does the renamer pick up all wrong forms and raise an
+	  --	      error 
+	| gtycon atypes1 '=>' gtycon atypes0		{% checkTyVars $5	`thenP` \ tvs ->
 						  	   returnP ([HsClassP $1 $2], $4, tvs) }
-	| qtycon  atypes0				{% checkTyVars $2	`thenP` \ tvs ->
+	| gtycon  atypes0				{% checkTyVars $2	`thenP` \ tvs ->
 						  	   returnP ([], $1, tvs) }
-		-- We have to have qtycon in this production to avoid s/r conflicts
-		-- with the previous one.  The renamer will complain if we use
-		-- a qualified tycon.
+		-- We have to have qtycon in this production to avoid s/r
+		-- conflicts with the previous one.  The renamer will complain
+		-- if we use a qualified tycon.
+		--
+		-- Using a `gtycon' throughout.  This enables special syntax,
+		-- such as "[]" for tycons as well as tycon ops in
+		-- parentheses.  This is beyond H98, but used repeatedly in
+		-- the Prelude modules.  (So, it would be a good idea to raise
+		-- an error in the renamer if some non-H98 form is used and
+		-- -fglasgow-exts is not given.)  -=chak 
 
 decls 	:: { [RdrBinding] }
 	: decls ';' decl		{ $3 : $1 }

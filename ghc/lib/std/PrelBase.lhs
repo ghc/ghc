@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.60 2002/01/29 09:58:19 simonpj Exp $
+% $Id: PrelBase.lhs,v 1.61 2002/02/12 03:52:09 chak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -599,8 +599,8 @@ instance CReturnable () -- Why, exactly?
 
 \begin{code}
 data Unit = Unit
-data a :+: b = Inl a | Inr b
-data a :*: b = a :*: b
+data (:+:) a b = Inl a | Inr b
+data (:*:) a b = a :*: b
 \end{code}
 
 
