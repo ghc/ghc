@@ -184,7 +184,7 @@ AUTO_APPLY_CMM = AutoApply$(_way).cmm
 ifneq "$(BootingFromHc)" "YES"
 $(AUTO_APPLY_CMM): $(GHC_GENAPPLY)
 	@$(RM) $@
-	$(GHC_GENAPPLY) $(if $(filter u,$(way)), -u) >$@
+	$(GHC_GENAPPLY) $(if $(filter $(way), u debug_u), -u) >$@
 endif
 
 EXTRA_CMM_SRCS += $(AUTO_APPLY_CMM)
