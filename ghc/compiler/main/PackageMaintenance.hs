@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PackageMaintenance.hs,v 1.8 2001/03/08 09:50:18 simonmar Exp $
+-- $Id: PackageMaintenance.hs,v 1.9 2001/03/08 11:44:16 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -13,8 +13,7 @@ module PackageMaintenance
 
 import CmStaticInfo
 import DriverState
-import DriverUtil
-import DriverFlags	( runSomething )
+import TmpFiles
 import Panic
 
 import Exception
@@ -84,7 +83,7 @@ maybeRestoreOldConfig conf_file io
         hPutStr stdout "\nWARNING: an error was encountered while the new \n\ 
         	       \configuration was being written.  Attempting to \n\ 
         	       \restore the old configuration... "
-        runSomething ("cp " ++ conf_file ++ ".old " ++ conf_file) "Restoring old configuration"
+        kludgedSystem ("cp " ++ conf_file ++ ".old " ++ conf_file) "Restoring old configuration"
         hPutStrLn stdout "done."
 	throw e
     )
@@ -104,7 +103,7 @@ savePackageConfig conf_file = do
     -- mv rather than cp because we've already done an hGetContents
     -- on this file so we won't be able to open it for writing
     -- unless we move the old one out of the way...
-  runSomething ("mv " ++ conf_file ++ " " ++ conf_file ++ ".old") "Saving package configuration"
+  kludgedSystem ("mv " ++ conf_file ++ " " ++ conf_file ++ ".old") "Saving package configuration"
   hPutStrLn stdout "done."
 
 -----------------------------------------------------------------------------
