@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.25 2000/04/26 11:54:28 simonmar Exp $
+ * $Id: Storage.c,v 1.26 2000/07/14 13:28:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,7 +14,6 @@
 #include "Hooks.h"
 #include "BlockAlloc.h"
 #include "MBlock.h"
-#include "gmp.h"
 #include "Weak.h"
 #include "Sanity.h"
 
