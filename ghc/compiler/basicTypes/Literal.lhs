@@ -249,13 +249,14 @@ litTag (MachLitLit    _ _) = ILIT(10)
 pprLit lit
   = getPprStyle $ \ sty ->
     let
-      code_style = codeStyle sty
+      code_style  = codeStyle  sty
+      iface_style = ifaceStyle sty
     in
     case lit of
-      MachChar ch | code_style     -> hcat [ptext SLIT("(C_)"), char '\'', 
-					    text (charToC ch), char '\'']
-	          | ifaceStyle sty -> char '\'' <> text (charToEasyHaskell ch) <> char '\''
-		  | otherwise      -> text ['\'', ch, '\'']
+      MachChar ch | code_style  -> hcat [ptext SLIT("(C_)"), char '\'', 
+					 text (charToC ch), char '\'']
+	          | iface_style -> char '\'' <> text (charToEasyHaskell ch) <> char '\''
+		  | otherwise   -> text ['\'', ch, '\'']
 
       MachStr s | code_style -> pprFSInCStyle s
 	        | otherwise  -> pprFSAsString s
@@ -277,16 +278,17 @@ pprLit lit
       MachFloat f | code_style -> ptext SLIT("(StgFloat)") <> rational f
                   | otherwise  -> ptext SLIT("__float") <+> rational f
 
-      MachDouble d | ifaceStyle sty && d < 0 -> parens (rational d)
-		   | otherwise -> rational d
+      MachDouble d | iface_style && d < 0 -> parens (rational d)
+		   | otherwise            -> rational d
 
       MachAddr p | code_style -> ptext SLIT("(void*)") <> integer p
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p
 
-      MachLitLit s ty | code_style -> ptext s
-		      | otherwise  -> parens (hsep [ptext SLIT("__litlit"), 
-						    pprFSAsString s,
-						    pprParendType ty])
+      MachLitLit s ty | code_style  -> ptext s
+		      | iface_style -> ptext SLIT("__litlit") <+> pprFSAsString s
+		      | otherwise   -> parens (hsep [ptext SLIT("__litlit"), 
+						     pprFSAsString s,
+						     pprParendType ty])
 
 pprIntVal :: Integer -> SDoc
 -- Print negative integers with parens to be sure it's unambiguous
