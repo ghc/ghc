@@ -24,7 +24,7 @@ module GHC.Conc
 	, par  		-- :: a -> b -> b
 	, pseq 		-- :: a -> b -> b
 	, yield         -- :: IO ()
-	, labelThread	-- :: String -> IO ()
+	, labelThread	-- :: ThreadId -> String -> IO ()
 	, forkProcess	-- :: IO Int
 
 	-- Waiting
@@ -123,11 +123,11 @@ yield :: IO ()
 yield = IO $ \s -> 
    case (yield# s) of s1 -> (# s1, () #)
 
-labelThread :: String -> IO ()
-labelThread str = IO $ \ s ->
+labelThread :: ThreadId -> String -> IO ()
+labelThread (ThreadId t) str = IO $ \ s ->
    let ps  = packCString# str
        adr = byteArrayContents# ps in
-     case (labelThread# adr s) of s1 -> (# s1, () #)
+     case (labelThread# t adr s) of s1 -> (# s1, () #)
 
 forkProcess :: IO Int
 forkProcess = IO $ \s -> case (forkProcess# s) of (# s1, id #) -> (# s1, (I# id) #)
