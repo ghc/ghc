@@ -1,37 +1,28 @@
-TOP=../../../..
+CWD=${shell pwd}
+TOP=${CWD}/../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-# Everything below should be removed ultimately.
+# Use a stage2 compiler
+stage2=${TOP}/../ghc/compiler/stage2/ghc-inplace
 
-drift	=	DrIFT-Strafunski
-ghc	=	../../../../../ghc/compiler/stage2/ghc-inplace -fglasgow-exts
-ghci	=	${ghc} --interactive
+# A tweaked main target to use a stage 2 compiler
+tweak:
+	gmake TEST_HC=${stage2}
 
-%.hs: %.ds
-	${drift} -g Data $< > $@
+# Just do the ghci way for testing during development
+fast:
+	gmake TEST_HC=${stage2} WAY=ghci
 
-local-build:
-	gmake gen002
-	gmake gen003
+# Should probably be reused from somewhere else
+clean:
+	find . -depth -name "Main"       -exec rm -rf \{\} \;
+	find . -depth -name "*~"         -exec rm -rf \{\} \;
+	find . -depth -name "*.o"        -exec rm -rf \{\} \;
+	find . -depth -name "*.hi"       -exec rm -rf \{\} \;
+	find . -depth -name "*.prof"     -exec rm -rf \{\} \;
+	find . -depth -name "*.script"   -exec rm -rf \{\} \;
+	find . -depth -name "*.comp.*"   -exec rm -rf \{\} \;
+	find . -depth -name "*.interp.*" -exec rm -rf \{\} \;
+	find . -depth -name "*.run.*"    -exec rm -rf \{\} \;
 
-local-clean:
-	rm -f *.o
-	rm -f *.script
-	rm -f *~
-	rm -f *.hi
-	rm -f *.prof
-	rm -f *.comp.*
-	rm -f *.run.*
-	rm -f *.interp.*
-
-local-very-clean: local-clean
-	rm -f CompanyDatatypes.hs
-
-gen002: gen002.hs CompanyDatatypes.hs
-	${ghc} --make gen002.hs -o gen002 
-	./gen002 > gen002.stdout
-
-gen003: gen003.hs CompanyDatatypes.hs
-	${ghc} --make gen003.hs -o gen003 
-	./gen003 > gen003.stdout
