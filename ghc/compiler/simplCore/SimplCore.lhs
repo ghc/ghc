@@ -109,8 +109,8 @@ simplifyExpr dflags expr
 
 gentleSimplEnv :: SimplEnv
 gentleSimplEnv = mkSimplEnv SimplGently 
-			    (panic "simplifyExpr: switches")
-			     emptyRuleBase
+			    (isAmongSimpl [])
+			    emptyRuleBase
 
 doCorePasses :: HscEnv
              -> UniqSupply      -- uniques
