@@ -20,7 +20,9 @@ module Outputable (
 	ifPprInterface,
 	pprQuote, 
 
-	printDoc, interppSP, interpp'SP,
+	printDoc, printErrs, pprCols, pprDumpStyle, pprErrorsStyle,
+
+	interppSP, interpp'SP,
 
 	speakNth
 	
@@ -38,6 +40,7 @@ import Ubiq		( Uniquable(..), Unique, Name )	-- FastString mentions it; todo: rm
 
 #endif
 
+import CmdLineOpts	( opt_PprStyle_All, opt_PprStyle_Debug, opt_PprStyle_User )
 import FastString
 import Pretty
 import Util		( cmpPString )
@@ -156,15 +159,29 @@ instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) wher
 %************************************************************************
 
 \begin{code}
+pprCols = (100 :: Int) -- could make configurable
+
+-- pprErrorsStyle is the style to print ordinary error messages with
+-- pprDumpStyle   is the style to print -ddump-xx information in
+(pprDumpStyle, pprErrorsStyle)
+  | opt_PprStyle_All   = (PprShowAll, PprShowAll)
+  | opt_PprStyle_Debug = (PprDebug,   PprDebug)
+  | otherwise	       = (PprDebug,   PprQuote)
+
 printDoc :: Mode -> Handle -> Doc -> IO ()
 printDoc mode hdl doc
-  = fullRender mode 100 1.5 put done doc
+  = fullRender mode pprCols 1.5 put done doc
   where
     put (Chr c)  next = hPutChar hdl c >> next 
     put (Str s)  next = hPutStr  hdl s >> next 
     put (PStr s) next = hPutFS   hdl s >> next 
 
     done = hPutChar hdl '\n'
+
+-- I'm not sure whether the direct-IO approach of printDoc
+-- above is better or worse than the put-big-string approach here
+printErrs :: Doc -> IO ()
+printErrs doc = hPutStr stderr (show (doc $$ text ""))
 \end{code}
 
 
