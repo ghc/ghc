@@ -419,7 +419,8 @@ importDecl (name, loc) mode
          mod = nameModule name
        in
        if mod == this_mod  then    -- Don't bring in decls from
-	  pprTrace "importDecl wierdness:" (ppr name) $
+	  addWarnRn (importDeclWarn mod name loc) `thenRn_`
+--	  pprTrace "importDecl wierdness:" (ppr name) $
 	  returnRn Nothing         -- the renamed module's own interface file
 			           -- 
        else
@@ -1075,6 +1076,15 @@ getDeclErr name loc
          quotes (ppr name), ptext SLIT("needed at"), ppr loc]
 
 getDeclWarn name loc
-  = sep [ptext SLIT("Warning: failed to find (optional) interface decl for"), 
+  = sep [ptext SLIT("Failed to find (optional) interface decl for"), 
          quotes (ppr name), ptext SLIT("desired at"), ppr loc]
+
+importDeclWarn mod name loc
+  = sep [ptext SLIT("Compiler tried to import decl from interface file with same name as module."), 
+	 ptext SLIT("(possible cause: module name clashes with interface file already in scope.)")
+	] $$
+    hsep [ptext SLIT("Interface:"), quotes (pprModule mod), ptext SLIT(", name:"), quotes (ppr name), 
+	  ptext SLIT(", desired at:"), ppr loc
+         ]
+
 \end{code}
