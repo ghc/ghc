@@ -21,7 +21,7 @@ in a different DLL, by setting the DLL flag.
 \begin{code}
 module Module 
     (
-      Module, moduleName
+      Module, moduleName, packageOfModule,
 			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
     , isModuleInThisPackage, mkModuleInThisPackage,
@@ -255,7 +255,7 @@ moduleString :: Module -> EncodedString
 moduleString (Module (ModuleName fs) _) = _UNPK_ fs
 
 moduleName :: Module -> ModuleName
-moduleName (Module mod _) = mod
+moduleName (Module mod pkg_info) = mod
 
 moduleUserString :: Module -> UserString
 moduleUserString (Module mod _) = moduleNameUserString mod
@@ -263,6 +263,10 @@ moduleUserString (Module mod _) = moduleNameUserString mod
 isModuleInThisPackage :: Module -> Bool
 isModuleInThisPackage (Module nm ThisPackage) = True
 isModuleInThisPackage _                       = False
+
+packageOfModule :: Module -> Maybe PackageName
+packageOfModule (Module nm (AnotherPackage pn)) = Just pn
+packageOfModule _                               = Nothing
 
 printModulePrefix :: Module -> Bool
   -- When printing, say M.x

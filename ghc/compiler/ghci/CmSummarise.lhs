@@ -13,10 +13,9 @@ where
 #include "HsVersions.h"
 
 import List 		( nub )
-import Char		( ord, isAlphaNum )
+import Char		( isAlphaNum )
 import Util		( unJust )
 import HscTypes		( ModuleLocation(..) )
-import FastTypes
 
 import Module
 import Outputable
@@ -36,7 +35,6 @@ data ModSummary
    = ModSummary {
         ms_mod      :: Module,                          -- name, package
 	ms_location :: ModuleLocation,			-- location
-        ms_ppsource :: (Maybe (FilePath, Fingerprint)), -- preprocessed and sig if .hs
         ms_imports  :: (Maybe [ModImport])              -- imports if .hs or .hi
      }
 
@@ -44,15 +42,9 @@ instance Outputable ModSummary where
    ppr ms
       = sep [text "ModSummary {",
              nest 3 (sep [text "ms_mod =" <+> ppr (ms_mod ms),
-             text "ms_ppsource =" <+> fooble (ms_ppsource ms),
              text "ms_imports=" <+> ppr (ms_imports ms)]),
              char '}'
             ]
-        where
-           fooble Nothing = text "Nothing"
-           fooble (Just (cppd_source_name,fp)) 
-              = text "(fp =" <+> int fp <> text "," 
-                <+> text (show cppd_source_name) <> text ")"
 
 data ModImport
    = MINormal ModuleName | MISource ModuleName
@@ -80,28 +72,13 @@ type Fingerprint = Int
 
 summarise :: Module -> ModuleLocation -> IO ModSummary
 summarise mod location
-   = if isModuleInThisPackage mod
-	then do 
-	    let source_fn = unJust (ml_hspp_file location) "summarise"
-	    modsrc <- readFile source_fn
-            let imps = getImports modsrc
-                fp   = fingerprint modsrc
-            return (ModSummary mod location (Just (source_fn,fp)) (Just imps))
-	else
-           return (ModSummary mod location Nothing Nothing)
-	
-fingerprint :: String -> Int
-fingerprint s
-   = dofp s (_ILIT 3) (_ILIT 3)
-     where
-        -- Copied from hash() in Hugs' storage.c.
-        dofp :: String -> FastInt -> FastInt -> Int
-        dofp []     m fp = iBox fp
-        dofp (c:cs) m fp = dofp cs (m +# _ILIT 1) 
-				(iabs (fp +# m *# iUnbox (ord c)))
-
-        iabs :: FastInt -> FastInt
-        iabs n = if n <# _ILIT 0 then (_ILIT 0) -# n else n
+   | isModuleInThisPackage mod
+   = do let hspp_fn = unJust (ml_hspp_file location) "summarise"
+        modsrc <- readFile hspp_fn
+        let imps = getImports modsrc
+        return (ModSummary mod location (Just imps))
+   | otherwise
+   = return (ModSummary mod location Nothing)
 \end{code}
 
 Collect up the imports from a Haskell source module.  This is
@@ -141,21 +118,21 @@ clean s
      where
         -- running through text we want to keep
         keep []                   = []
-        keep ('"':cs)             = dquote cs
+        keep ('"':cs)             = dquote cs		-- "
 		-- try to eliminate single quotes when they're part of
 		-- an identifier...
 	keep (c:'\'':cs) | isAlphaNum c || c == '_' = keep (dropWhile (=='\'') cs)
         keep ('\'':cs)            = squote cs
         keep ('-':'-':cs)         = linecomment cs
         keep ('{':'-':'#':' ':cs) = "{-# " ++ keep cs
-        keep ('{':'-':cs)         = runcomment cs
+        keep ('{':'-':cs)         = runcomment cs	-- -}
         keep (c:cs)               = c : keep cs
 
         -- in a double-quoted string
         dquote []             = []
-        dquote ('\\':'\"':cs) = dquote cs
+        dquote ('\\':'\"':cs) = dquote cs		-- "
         dquote ('\\':'\\':cs) = dquote cs
-        dquote ('\"':cs)      = keep cs
+        dquote ('\"':cs)      = keep cs			-- "
         dquote (c:cs)         = dquote cs
 
         -- in a single-quoted string

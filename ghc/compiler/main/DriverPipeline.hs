@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.14 2000/10/31 13:01:46 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.15 2000/11/02 13:58:45 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -14,10 +14,10 @@ module DriverPipeline (
    genPipeline, runPipeline,
 
 	-- interfaces for the compilation manager (interpreted/batch-mode)
-   preprocess, compile,
+   preprocess, compile, CompResult(..),
 
 	-- batch-mode linking interface
-   doLink,
+   doLink
   ) where
 
 #include "HsVersions.h"

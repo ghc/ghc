@@ -6,7 +6,8 @@
 \begin{code}
 module Finder (
     initFinder, 	-- :: PackageConfigInfo -> IO (), 
-    findModule		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+    findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+    emptyHomeDirCache	-- :: IO ()
   ) where
 
 #include "HsVersions.h"
@@ -18,6 +19,7 @@ import DriverState
 import Module
 import FiniteMap
 import Util
+import Panic		( panic )
 
 import IOExts
 import Directory
@@ -35,11 +37,12 @@ source, interface, and object files for a module live.
 \begin{code}
 
 -- v_PkgDirCache caches contents of package directories, never expunged
-GLOBAL_VAR(v_PkgDirCache,    error "no pkg cache!",  FiniteMap String (PackageName, FilePath))
+GLOBAL_VAR(v_PkgDirCache, panic "no pkg cache!", 
+           FiniteMap String (PackageName, FilePath))
 
 -- v_HomeDirCache caches contents of home directories, 
 -- expunged whenever we create a new finder.
-GLOBAL_VAR(v_HomeDirCache,   Nothing,  Maybe (FiniteMap String FilePath))
+GLOBAL_VAR(v_HomeDirCache, Nothing, Maybe (FiniteMap String FilePath))
 
 
 initFinder :: PackageConfigInfo -> IO ()
@@ -53,6 +56,10 @@ initFinder pkgs
 --	; pkg_dbg_info <- readIORef v_PkgDirCache
 --	; putStrLn (unlines (map show (fmToList pkg_dbg_info)))
 	}
+
+emptyHomeDirCache :: IO ()
+emptyHomeDirCache
+   = writeIORef v_HomeDirCache Nothing
 
 findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 findModule name
@@ -69,7 +76,7 @@ findModule_wrk name
   = do	{ j <- maybeHomeModule name
 	; case j of
 	    Just home_module -> return (Just home_module)
-	    Nothing		 -> maybePackageModule name
+	    Nothing	     -> maybePackageModule name
 	}
 
 maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
