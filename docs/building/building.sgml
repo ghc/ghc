@@ -1070,8 +1070,7 @@ $ cvs checkout nofib/spectral
 	</varlistentry>
 
 	<varlistentry>
-	  <term>i386-unknown-netbsd (PCs running NetBSD and
-	    OpenBSD)</term>
+	  <term>i386-unknown-netbsd (PCs running NetBSD)</term>
 	    <indexterm><primary>i386-unknown-netbsd</primary></indexterm>
 	  <listitem>
 	    <para>Will require some minor porting effort, but should
