@@ -4435,15 +4435,32 @@ This is the point at which you specify that you are building GHC-mingw
 (see <xref linkend="ghc-mingw">). </para>
 
 <para> Both these options are important! It's possible to get into
-trouble using the wrong C compiler!
-Furthermore, it's very important that you specify a 
-full mingw path for <command>gcc</command>, not a cygwin path, because GHC (which
-uses this path to invoke <command>gcc</command>) is a Mingw program and won't
-understand a cygwin path..  For example, if you 
+trouble using the wrong C compiler!</para>
+<para>
+Furthermore, it's <emphasis>very important</emphasis> that you specify a 
+full MinGW path for <command>gcc</command>, not a Cygwin path, because GHC (which
+uses this path to invoke <command>gcc</command>) is a MinGW program and won't
+understand a Cygwin path.  For example, if you 
 say <literal>--with-gcc=/mingw/bin/gcc</literal>, it'll be interpreted as
 <filename>/cygdrive/c/mingw/bin/gcc</filename>, and GHC will fail the first
-time it tries to invoke it.   (Worse, the failure does not come with
-a helpful error message, unfortunately.)
+time it tries to invoke it.   Worse, the failure comes with
+no error message whatsoever.  GHC simply fails silently when first invoked, 
+typically leaving you with this:
+<programlisting>
+make[4]: Leaving directory `/cygdrive/e/fptools-stage1/ghc/rts/gmp'
+../../ghc/compiler/ghc-inplace -optc-mno-cygwin -optc-O 
+  -optc-Wall -optc-W  -optc-Wstrict-prototypes -optc-Wmissing-prototypes 
+  -optc-Wmissing-declarations -optc-Winline -optc-Waggregate-return 
+  -optc-Wbad-function-cast -optc-Wcast-align -optc-I../includes 
+  -optc-I. -optc-Iparallel -optc-DCOMPILING_RTS 
+  -optc-fomit-frame-pointer -O2 -static 
+  -package-name rts -O -dcore-lint -c Adjustor.c -o Adjustor.o
+make[2]: *** [Adjustor.o] Error 1
+make[1]: *** [all] Error 1
+make[1]: Leaving directory `/cygdrive/e/fptools-stage1/ghc'
+make: *** [all] Error 1
+</programlisting>
+Be warned!
 </para>
 
 <para>
