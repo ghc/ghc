@@ -195,11 +195,11 @@ install :: config-pkgs install-dirs install-bin install-libs install-datas
 .PHONY: install-bin install-libs install-datas
 
 install-bin:
-	for i in $(PACKAGE_BIN_INSTALL); do \
-	   $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i $(bindir); \
+	for i in $(PACKAGE_BIN_INSTALL) ""; do \
+	   test -n "$i" && $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i $(bindir); \
 	done;
-	for i in $(PACKAGE_BINS); do \
-	   $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i$(exeext) $(bindir); \
+	for i in $(PACKAGE_BINS) ""; do \
+	   test -n "$i" && $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i$(exeext) $(bindir); \
 	done;
 	for i in $(VERSION_SYMLINKS_FOR) ""; do \
 	   if [ "x$$i" != "x" ]; then 		\
