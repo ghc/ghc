@@ -17,8 +17,8 @@ import HaddockUtil
 import HaddockTypes
 
 
-ppHHContents :: FilePath -> Maybe String -> [ModuleTree] -> IO ()
-ppHHContents odir maybe_package tree = do
+ppHHContents :: FilePath -> String -> Maybe String -> [ModuleTree] -> IO ()
+ppHHContents odir doctitle maybe_package tree = do
   let contentsHHFile = package++".hhc"
 
       html =
@@ -40,9 +40,17 @@ ppHHContents odir maybe_package tree = do
 		text "<PARAM name=\"FrameName\" value=\"main\">" $$
 		text "</OBJECT>" $$
 		text "<UL>" $+$
-		nest 4 (fn [] ts) $+$
+		nest 4 (text "<LI>" <> nest 4
+		                (text "<OBJECT type=\"text/sitemap\">" $$
+		                 nest 4 (text "<PARAM name=\"Name\" value=\""<>text doctitle<>text "\">" $$
+		                         text "<PARAM name=\"Local\" value=\"index.html\">") $$
+		                 text "</OBJECT>") $+$
+		        text "</LI>" $$
+		        text "<UL>" $+$
+		        nest 4 (fn [] ts) $+$
+		        text "</UL>") $+$
 		text "</UL>"
-  	
+
 	fn :: [String] -> [ModuleTree] -> Doc
 	fn ss [x]    = ppNode ss x
 	fn ss (x:xs) = ppNode ss x $$ fn ss xs

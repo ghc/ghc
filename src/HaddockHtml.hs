@@ -234,8 +234,8 @@ ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_ur
   -- Generate contents page for Html Help if requested
   case maybe_html_help_format of
     Nothing        -> return ()
-    Just "mshelp"  -> ppHHContents  odir maybe_package tree
-    Just "mshelp2" -> ppHH2Contents odir maybe_package tree
+    Just "mshelp"  -> ppHHContents  odir doctitle maybe_package tree
+    Just "mshelp2" -> ppHH2Contents odir doctitle maybe_package tree
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
 

@@ -17,8 +17,8 @@ import HaddockModuleTree
 import HaddockUtil
 import HaddockTypes
 
-ppHH2Contents :: FilePath -> Maybe String -> [ModuleTree] -> IO ()
-ppHH2Contents odir maybe_package tree = do
+ppHH2Contents :: FilePath -> String -> Maybe String -> [ModuleTree] -> IO ()
+ppHH2Contents odir doctitle maybe_package tree = do
   let 	
 	contentsHH2File = package++".HxT"
 
@@ -26,7 +26,9 @@ ppHH2Contents odir maybe_package tree = do
 		text "<?xml version=\"1.0\"?>" $$
 		text "<!DOCTYPE HelpTOC SYSTEM \"ms-help://hx/resources/HelpTOC.DTD\">" $$
 		text "<HelpTOC DTDVersion=\"1.0\">" $$
-		nest 4 (ppModuleTree [] tree) $$
+		nest 4 (text "<HelpTOCNode Title=\""<>text doctitle<>text"\" Url=\"index.html\">" $$
+		        nest 4 (ppModuleTree [] tree) $+$
+		        text "</HelpTOCNode>") $$
 		text "</HelpTOC>"
   writeFile (odir ++ pathSeparator:contentsHH2File) (render doc)
   where
