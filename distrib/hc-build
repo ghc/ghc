@@ -43,7 +43,7 @@ $MAKE -C hslibs boot all
 $MAKE -C ghc all
 
 echo "*** Building libraries..."
-./configure
+GHC="$PWD/ghc/compiler/ghc-inplace" HappyCmd="$PWD/distrib/fake-happy" ./configure
 
 # make ghc/utils while we still have libraries in ghc/lib
 $MAKE -C ghc/utils clean boot
