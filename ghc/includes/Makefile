@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.14 2000/12/08 11:47:00 rrt Exp $
+# $Id: Makefile,v 1.15 2001/07/16 21:01:58 qrczak Exp $
 #
 
 TOP = ..
@@ -88,7 +88,7 @@ boot :: all
 # (ditto for interface files). This is not *really* needed, but
 # it gives (perhaps) a cleaner binary dist structure..might change.
 #
-override datadir:=$(libdir)/includes
+override datadir:=$(libdir)/include
 INSTALL_DATAS += $(H_FILES) $(H_CONFIG)
 
 #

@@ -374,7 +374,7 @@ endif
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR)
 
 ifeq "$(IS_CBITS_LIB)" "YES"
-override datadir:=$(libdir)/includes
+override datadir:=$(libdir)/include
 INSTALL_DATAS += Hs$(shell perl -e 'print ucfirst "$(PACKAGE)"').h
 else
 SRC_CC_OPTS += -Icbits
