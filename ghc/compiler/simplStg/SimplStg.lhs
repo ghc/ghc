@@ -27,7 +27,7 @@ import Module		( Module, moduleString )
 import VarEnv
 import ErrUtils		( doIfSet, dumpIfSet )
 import UniqSupply	( splitUniqSupply, UniqSupply )
-import IO		( hPutStr, stderr )
+import IO		( hPutStr, stdout )
 import Outputable
 \end{code}
 
@@ -114,7 +114,7 @@ stg2stg stg_todos module_name us binds
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
 	(if opt_D_verbose_stg2stg then
-	    hPutStr stderr (showSDoc
+	    hPutStr stdout (showSDoc
 	      (text ("*** "++what++":") $$ vcat (map ppr binds2)
 	    ))
 	 else return ()) >>
