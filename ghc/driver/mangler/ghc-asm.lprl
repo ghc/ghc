@@ -93,14 +93,14 @@ sub init_TARGET_STUFF {
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = 'DONT THINK THIS APPLIES'; # regexp that says what comes before APP/NO_APP
-    $T_CONST_LBL    = '^\$C(\d+):$'; # regexp for what such a lbl looks like
+    $T_CONST_LBL    = '^\$L?C(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
 
     $T_MOVE_DIRVS   = '^(\s*(\.align\s+\d+|\.(globl|ent)\s+\S+|\#.*|\.(file|loc)\s+\S+\s+\S+|\.text|\.r?data)\n)';
     $T_COPY_DIRVS   = '^\s*(\#|\.(file|globl|ent|loc))';
 
     $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
-    $T_DOT_WORD	    = '\.quad';
+    $T_DOT_WORD	    = '\.(long|quad|byte|word)';
     $T_DOT_GLOBAL   = '^\t\.globl';
     $T_HDR_literal  = "\.rdata\n\t\.align 3\n";
     $T_HDR_misc	    = "\.text\n\t\.align 3\n";
@@ -433,7 +433,7 @@ sub mangle_asm {
 	last if /^_section_\.text:$/ && $TargetPlatform =~ /^powerpc-|^rs6000-/;
 
 	if ( $TargetPlatform =~ /^mips-/ 
-	  && /^\t\.(globl \S+ \.text|comm\t)/ ) {
+	  && /^\t\.(globl\S+\.text|comm\t)/ ) {
 	    $EXTERN_DECLS .= $_ unless /(__DISCARD__|\b(PK_|ASSIGN_)(FLT|DBL)\b)/;
   
 	# As a temporary solution for compiling "foreign export" declarations,
@@ -588,7 +588,7 @@ sub mangle_asm {
 		   || ! /^(L\.\.\d+|LT\.\..*):$/ ) ) {
 	    local($thing);
 	    chop($thing = $_);
-	    print "Funny global thing?: $_"
+	    print STDERR "Funny global thing?: $_"
 		unless $KNOWN_FUNNY_THING{$thing}
 		    || /^${T_US}stg_.*${T_POST_LBL}$/o          # RTS internals
 		    || /^${T_US}__fexp_.*${T_POST_LBL}$/o       # foreign export
@@ -609,6 +609,10 @@ sub mangle_asm {
     }
     $numchks = $#chk + 1;
 
+    # open CHUNKS, ">/tmp/chunks1" or die "Cannot open /tmp/chunks1: $!\n";
+    # for (my $i = 0; $i < @chk; ++$i) { print CHUNKS "======= $i =======\n", $chk[$i] }
+    # close CHUNKS;
+
     # the division into chunks is imperfect;
     # we throw some things over the fence into the next
     # chunk.
@@ -618,12 +622,13 @@ sub mangle_asm {
     # output.
 
     local($FIRST_MANGLABLE) = ($TargetPlatform =~ /^(alpha-|hppa|mips-)/) ? 1 : 0;
+    local($FIRST_TOSSABLE ) = ($TargetPlatform =~ /^(hppa|mips-)/) ? 1 : 0;
 
 #   print STDERR "first chunk to mangle: $FIRST_MANGLABLE\n";
 
     # Alphas: NB: we start meddling at chunk 1, not chunk 0
     # The first ".rdata" is quite magical; as of GCC 2.7.x, it
-    # spits a ".quad 0" in after the v first ".rdata"; we
+    # spits a ".quad 0" in after the very first ".rdata"; we
     # detect this special case (tossing the ".quad 0")!
     local($magic_rdata_seen) = 0;
   
@@ -660,7 +665,7 @@ sub mangle_asm {
     }
     };
 
-    for ($i = $FIRST_MANGLABLE; $i < $numchks; $i++) {
+    for ($i = $FIRST_TOSSABLE; $i < $numchks; $i++) {
 	$c = $chk[$i]; # convenience copy
 
 #	print STDERR "\nCHK $i (BEFORE) (",$chkcat[$i],"):\n", $c;
@@ -762,7 +767,7 @@ sub mangle_asm {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
 
-		print "WARNING: Epilogue junk?: $e\n" if $e =~ /^\t\s*[^\.\s\n]/
+		print STDERR "WARNING: Epilogue junk?: $e\n" if $e =~ /^\t\s*[^\.\s\n]/
 		   && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
 		# glue together what's left
@@ -859,6 +864,10 @@ sub mangle_asm {
 
 	$chk[$i] = $c; # update w/ convenience copy
     }
+
+    # open CHUNKS, ">/tmp/chunks2" or die "Cannot open /tmp/chunks2: $!\n";
+    # for (my $i = 0; $i < @chk; ++$i) { print CHUNKS "======= $i =======\n", $chk[$i] }
+    # close CHUNKS;
 
     if ( $TargetPlatform =~ /^alpha-/ ) {
 	# print out the header stuff first
@@ -1418,9 +1427,13 @@ sub rev_tbl {
 
     # Alphas:If we have anonymous text (not part of a procedure), the
     # linker may complain about missing exception information.  Bleh.
+    # To suppress this, we place a .ent/.end pair around the code.
+    # At the same time, we have to be careful and not enclose any leading
+    # .file/.loc directives.
     if ( $TargetPlatform =~ /^alpha-/ && $label =~ /^([A-Za-z0-9_]+):$/) {
-    	$before = "\t.ent $1\n" . $before;
-    	$after .= "\t.end $1\n";
+        local ($ident) = $1;
+        $before =~ s/^((\s*\.(file|loc)\s+[^\n]*\n)*)/$1\t.ent $ident\n/;
+    	$after .= "\t.end $ident\n";
     }
 
     $tbl = $before
