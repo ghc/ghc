@@ -244,11 +244,8 @@ Ids
 libCaseId :: LibCaseEnv -> Id -> CoreExpr
 libCaseId env v
   | Just the_bind <- lookupRecId env v	-- It's a use of a recursive thing
-  -- = not (null free_scruts)		-- with free vars scrutinised in RHS
-  = if null free_scruts then
-	pprTrace "No:" (ppr v $$ pprEnv env) (Var v)
-    else
-	pprTrace "Yes:" (ppr v) $ Let the_bind (Var v)
+  , not (null free_scruts)		-- with free vars scrutinised in RHS
+  = Let the_bind (Var v)
 
   | otherwise
   = Var v
@@ -306,8 +303,8 @@ lookupLevel (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
 
 freeScruts :: LibCaseEnv
 	   -> LibCaseLevel 	-- Level of the recursive Id
-	   -> [Id]		-- Ids that are bound ouside the recursive Id, (level <=)
-				-- but which are scrutinised on the way to this call
+	   -> [Id]		-- Ids that are scrutinised between the binding
+				-- of the recursive Id and here
 freeScruts (LibCaseEnv bomb lvl lvl_env rec_env scruts) rec_bind_lvl
-  = [v | (v,lvl) <- scruts, lvl <= rec_bind_lvl]
+  = [v | (v,scrut_lvl) <- scruts, scrut_lvl > rec_bind_lvl]
 \end{code}
