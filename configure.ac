@@ -955,8 +955,6 @@ AC_SYS_LARGEFILE
 dnl ** check for specific header (.h) files that we are interested in
 AC_CHECK_HEADERS([bfd.h ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h nlist.h pthread.h pwd.h signal.h sys/mman.h sys/resource.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h])
 
-AC_CHECK_HEADER([unistd.h], [AC_CHECK_FUNCS(lchown)])
-
 AC_CHECK_HEADER([readline/readline.h], [HaveReadlineReadlineH=YES], [HaveReadlineReadlineH=NO])
 AC_CHECK_HEADER([readline/history.h], [HaveReadlineHistoryH=YES], [HaveReadlineHistoryH=NO])
 
@@ -1100,7 +1098,10 @@ if test "$ac_cv_type_signal" = void; then
 fi
 
 dnl ** check for more functions
-AC_CHECK_FUNCS([ftime getclock getpagesize getrusage gettimeofday gmtime_r localtime_r lstat readdir_r readlink setenv setitimer siginterrupt symlink sysconf times unsetenv])
+dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
+AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times])
+dnl ** For ghc/rts/gmp:
+AC_CHECK_FUNCS([getpagesize])
 
 dnl ** check whether this machine has gmp3 installed
 AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
