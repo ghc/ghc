@@ -1,11 +1,14 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.19 2003/11/12 17:49:10 sof Exp $
+ * $Id: RtsUtils.h,v 1.20 2004/02/26 16:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
  * General utility functions used in the RTS.
  *
  * ---------------------------------------------------------------------------*/
+
+#ifndef RTSUTILS_H
+#define RTSUTILS_H
 
 /* (Checked) dynamic allocation: */
 extern void *stgMallocBytes(int n, char *msg);
@@ -39,3 +42,5 @@ extern void heapCheckFail( void );
 
 extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
+
+#endif // RTSUTILS_H
