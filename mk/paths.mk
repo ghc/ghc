@@ -211,7 +211,7 @@ MAINTAINER_CLEAN_FILES += $(BOOT_SRCS)
 # `Standard' set of files to clean out.
 #
 MOSTLY_CLEAN_FILES += \
- *.CKP *.ln *.BAK *.bak .*.bak *.o *core a.out errs ,* *.a .emacs_*  \
+ *.CKP *.ln *.BAK *.bak .*.bak *.o core a.out errs ,* *.a .emacs_*  \
  tags TAGS *.ind *.ilg *.idx *.idx-prev *.aux *.aux-prev *.dvi *.log \
  *.toc *.lot *.lof *.blg *.cb *_stub.c *_stub.h *.raw_s *.a.list
 
