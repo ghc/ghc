@@ -1,0 +1,4 @@
+
+tcfail135.hs:6:22:
+    Kind error: `f' is not applied to enough type arguments
+    In the class declaration for `Foo'
