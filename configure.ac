@@ -734,21 +734,6 @@ AC_ARG_ENABLE(objectio,
 )
 AC_SUBST(GhcLibsWithObjectIO)
 
-dnl ** Enable the building of the OpenAL binding?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE([openal],
-  AC_HELP_STRING([--enable-openal],
-                 [Build OpenAL binding [[default=autodetect]]]),
-  [ if test x"$enableval" = x"yes"; then
-	GhcLibsWithOpenAL=YES
-    else
-	GhcLibsWithOpenAL=NO
-    fi
-  ],
-  [GhcLibsWithOpenAL=YES])
-
-AC_SUBST([GhcLibsWithOpenAL])
-
 dnl ** .NET interop support?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(dotnet,
@@ -960,33 +945,6 @@ else
 fi
 AC_SUBST(GhcLibsWithReadline)
 
-dnl ** check for OpenGL/GLUT include paths and libraries
-FP_CHECK_GLUT
-
-if test x"$no_GLU" = xyes; then
-  GhcLibsWithOpenGL=NO
-else
-  GhcLibsWithOpenGL=YES
-fi
-AC_SUBST([GhcLibsWithOpenGL])
-
-if test x"$no_GLUT" = xyes; then
-  GhcLibsWithGLUT=NO
-else
-  GhcLibsWithGLUT=YES
-fi
-AC_SUBST([GhcLibsWithGLUT])
-
-dnl ** check for OpenGL include files
-fp_save_cppflags="$CPPFLAGS"
-CPPFLAGS="$CPPFLAGS $X_CFLAGS"
-if test x"$use_quartz_opengl" = xyes; then
-  AC_CHECK_HEADERS([OpenGL/gl.h])
-else
-  AC_CHECK_HEADERS([GL/gl.h])
-fi
-CPPFLAGS="$fp_save_cppflags"
-
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME
 
@@ -1041,24 +999,6 @@ FP_CHECK_ALIGNMENT(unsigned long long)
 fi
 FP_CHECK_ALIGNMENT(unsigned short)
 FP_CHECK_ALIGNMENT(void *)
-
-dnl ** Map OpenGL data types to Haskell types
-if test $GhcLibsWithOpenGL = YES ; then
-FPTOOLS_CHECK_HTYPE(GLboolean)
-FPTOOLS_CHECK_HTYPE(GLbyte)
-FPTOOLS_CHECK_HTYPE(GLubyte)
-FPTOOLS_CHECK_HTYPE(GLshort)
-FPTOOLS_CHECK_HTYPE(GLushort)
-FPTOOLS_CHECK_HTYPE(GLint)
-FPTOOLS_CHECK_HTYPE(GLuint)
-FPTOOLS_CHECK_HTYPE(GLsizei)
-FPTOOLS_CHECK_HTYPE(GLenum)
-FPTOOLS_CHECK_HTYPE(GLbitfield)
-FPTOOLS_CHECK_HTYPE(GLfloat)
-FPTOOLS_CHECK_HTYPE(GLclampf)
-FPTOOLS_CHECK_HTYPE(GLdouble)
-FPTOOLS_CHECK_HTYPE(GLclampd)
-fi
 
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
