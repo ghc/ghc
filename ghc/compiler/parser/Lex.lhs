@@ -826,33 +826,39 @@ lex_num cont exts acc buf =
              -- files is not that common. (ToDo)
 	    case expandWhile# is_digit (incCurrentPos buf') of
               buf2 -> -- points to first non digit char
+		  case currentChar# buf of
+			'E'# -> float_exponent cont exts buf2
+			'e'# -> float_exponent cont exts buf2
+			_    -> float_done cont exts buf2
 
-		let l = case currentChar# buf2 of
-			  'E'# -> do_exponent
-		          'e'# -> do_exponent
-		          _ -> buf2
-
-		    do_exponent 
-			= let buf3 = incCurrentPos buf2 in
-			  case currentChar# buf3 of
-				'-'# | is_digit (lookAhead# buf3 1#)
-				   -> expandWhile# is_digit (incCurrentPos buf3)
-				'+'# | is_digit (lookAhead# buf3 1#)
-				   -> expandWhile# is_digit (incCurrentPos buf3)
-				x | is_digit x -> expandWhile# is_digit buf3
-				_ -> buf2
-
-		    v = readRational__ (lexemeToString l)
-
-		in case currentChar# l of -- glasgow exts only
-		      '#'# | glaExtsEnabled exts -> let l' = incCurrentPos l in
-			      case currentChar# l' of
-				'#'# -> cont (ITprimdouble v) (incCurrentPos l')
-				_    -> cont (ITprimfloat  v) l'
-		      _ -> cont (ITrational v) l
-
-         _ -> after_lexnum cont exts acc' buf'
+	 -- numbers like '9e4' are floats
+	 'E'# -> float_exponent cont exts buf'
+	 'e'# -> float_exponent cont exts buf'
+         _    -> after_lexnum cont exts acc' buf' -- it's an integer
 		
+float_exponent cont exts buf2 =
+  let buf3 = incCurrentPos buf2
+      buf4 = case currentChar# buf3 of
+		'-'# | is_digit (lookAhead# buf3 1#)
+	   		-> expandWhile# is_digit (incCurrentPos buf3)
+		'+'# | is_digit (lookAhead# buf3 1#)
+			-> expandWhile# is_digit (incCurrentPos buf3)
+		x | is_digit x -> expandWhile# is_digit buf3
+		_ -> buf2
+  in 
+     float_done cont exts buf4
+
+float_done cont exts buf =
+   case currentChar# buf of -- glasgow exts only
+	'#'# | glaExtsEnabled exts -> 
+	      let buf' = incCurrentPos buf in
+	      case currentChar# buf' of
+		'#'# -> cont (ITprimdouble v) (incCurrentPos buf')
+		_    -> cont (ITprimfloat  v) buf'
+	_ -> cont (ITrational v) buf
+ where
+   v = readRational__ (lexemeToString buf)
+
 after_lexnum cont exts i buf
   = case currentChar# buf of
 	'#'# | glaExtsEnabled exts -> cont (ITprimint i) (incCurrentPos buf)
