@@ -69,7 +69,7 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\.data\n\t\.align 3\n";
     $T_HDR_consist  = "\.text\n";
     $T_HDR_closure  = "\.data\n\t\.align 3\n";
-    $T_HDR_srt      = "\.text\n\t\.align 3\n";
+    $T_HDR_srt      = "\.data\n\t\.align 3\n";
     $T_HDR_info	    = "\.text\n\t\.align 3\n";
     $T_HDR_entry    = "\.text\n\t\.align 3\n";
     $T_HDR_fast	    = "\.text\n\t\.align 3\n";
@@ -127,7 +127,7 @@ sub init_TARGET_STUFF {
     $T_HDR_consist  = "\.text\n";
     $T_HDR_closure  = "\.data\n\t\.align 2\n";
     $T_HDR_closure  = "\.data\n\t\.align 2\n\t.long 0\n" if ( $TargetPlatform =~ /.*-mingw32$/ );
-    $T_HDR_srt      = "\.text\n\t\.align 2\n";
+    $T_HDR_srt      = "\.data\n\t\.align 2\n";
     $T_HDR_info	    = "\.text\n\t\.align 2\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
     $T_HDR_fast	    = "\.text\n\t\.align 2,0x90\n";
@@ -135,12 +135,12 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\.text\n\t\.align 2,0x90\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd|netbsd_elf)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd3|netbsd_elf)$/ ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = # regexp that says what comes before APP/NO_APP
-		      ($TargetPlatform =~ /-(linux|freebsd|netbsd_elf)$/) ? '#' : '/' ;
+		      ($TargetPlatform =~ /-(linux|freebsd3|netbsd_elf)$/) ? '#' : '/' ;
     $T_CONST_LBL    = '^\.LC(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
     $T_X86_PRE_LLBL_PAT = '\.L';
@@ -150,7 +150,7 @@ sub init_TARGET_STUFF {
     $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.Lfe.*\n\t\.size\s+.*|\.size\s+.*|\.ident.*)\n)';
     $T_COPY_DIRVS   = '\.(globl)';
 
-    if ( $TargetPlatform =~ /freebsd|netbsd_elf/ ) {
+    if ( $TargetPlatform =~ /freebsd3|netbsd_elf/ ) {
         $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
     } else {
         $T_hsc_cc_PAT   = '\.string.*\)(hsc|cc) (.*)\\\\t(.*)"';
@@ -163,7 +163,7 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\.data\n\t\.align 4\n"; # ToDo: change align??
     $T_HDR_consist  = "\.text\n";
     $T_HDR_closure  = "\.data\n\t\.align 4\n"; # ToDo: change align?
-    $T_HDR_srt      = "\.text\n\t\.align 4\n"; # ToDo: change align?
+    $T_HDR_srt      = "\.data\n\t\.align 4\n"; # ToDo: change align?
     $T_HDR_info	    = "\.text\n\t\.align 4\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
     $T_HDR_fast	    = "\.text\n\t\.align 4\n";
@@ -190,7 +190,7 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\.data\n\t\.even\n";
     $T_HDR_consist  = "\.text\n";
     $T_HDR_closure  = "\.data\n\t\.even\n";
-    $T_HDR_srt      = "\.text\n\t\.even\n";
+    $T_HDR_srt      = "\.data\n\t\.even\n";
     $T_HDR_info	    = "\.text\n\t\.even\n";
     $T_HDR_entry    = "\.text\n\t\.even\n";
     $T_HDR_fast	    = "\.text\n\t\.even\n";
@@ -217,7 +217,7 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
     $T_HDR_consist  = 'TOO LAZY TO DO THIS TOO';
     $T_HDR_closure  = "\t\.data\n\t\.align 2\n";
-    $T_HDR_srt      = "\t\.text\n\t\.align 2\n";
+    $T_HDR_srt      = "\t\.data\n\t\.align 2\n";
     $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
     $T_HDR_fast	    = "\t\.text\n\t\.align 2\n";
@@ -564,7 +564,7 @@ sub mangle_asm {
 		unless $KNOWN_FUNNY_THING{$thing}
 		    || /^$TUS[@]?stg_.*$TPOSTLBL[@]?$/o    # RTS internals
 		    || /^$TUS[@]__fexp_.*$TPOSTLBL$/o	   # foreign export
-		    || /^$TUS[@]?__init.*$TPOSTLBL$/o	   # __init<module>
+		    || /^$TUS[@]?_reg.*$TPOSTLBL$/o	   # PROF: __reg<module>
 		    || /^$TUS[@]?.*_btm$TPOSTLBL$/o        # large bitmaps
 		    || /^$TUS[@]?.*_closure_tbl$TPOSTLBL$/o; # closure tables
 	    $chk[++$i]   = $_;
@@ -687,9 +687,6 @@ sub mangle_asm {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
 
-		# HWL HACK: dont die, just print a warning
-		#print stderr  "HWL: this should die! Prologue junk?: $p\n" if $p =~ /^\t[^\.]/
-		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/
 		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
@@ -730,9 +727,6 @@ sub mangle_asm {
 		} else {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
-		# HWL HACK: dont die, just print a warning
-		#print stderr "HWL: this should die! Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
-		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 		die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
 		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
@@ -887,7 +881,7 @@ sub mangle_asm {
                 };
  		&print_doctored($chk[$i], 0);
                 if ($TargetPlatform =~ /^powerpc-|^rs6000-/ && $printDS) { 
-#ok                   if ($chksymb[$i] !~ /\__init_Main/) {
+#ok                   if ($chksymb[$i] !~ /\_regMain/) {
   		     print OUTASM "\.csect ${chksymb[$i]}[DS]\n"; 	
   		     print OUTASM "${p}TOC[tc0], 0\n";
 #ok                   }
@@ -1168,7 +1162,7 @@ sub print_doctored {
 
     if ( $TargetPlatform !~ /^i386-/ 
       || ! /^\t[a-z]/  # no instructions in here, apparently
-      || /^${T_US}__init_[A-Za-z0-9_]+${T_POST_LBL}/) {
+      || /^${T_US}_reg[A-Za-z0-9_]+${T_POST_LBL}/) {
 	print OUTASM $_;
 	return;
     }
