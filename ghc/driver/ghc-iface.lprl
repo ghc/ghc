@@ -27,7 +27,7 @@ sub postprocessHiFile {
     print STDERR "*** New hi file follows...\n" if $Verbose;
     system("$Cat $hsc_hi 1>&2") if $Verbose;
 
-    &constructNewHiFile($hsc_hi, $hifile_target, $new_hi, $show_hi_diffs);
+    &constructNewHiFile($hsc_hi, *hifile_target, $new_hi, $show_hi_diffs);
 
     # run diff if they asked for it
     if ($show_hi_diffs) {
@@ -90,12 +90,20 @@ sub deUsagifyHi {
 \begin{code}
 sub constructNewHiFile {
     local($hsc_hi,	    # The iface info produced by hsc.
-	  $hifile_target,   # Pre-existing .hi filename (if it exists)
+	  *hifile_target,   # Pre-existing .hi filename (if it exists)
 	  $new_hi,	    # Filename for new one
 	  $show_hi_diffs) = @_;
+    local($hiname,$hidir);
 
-    &readHiFile('old',$hifile_target) unless $HiHasBeenRead{'old'} == 1;
     &readHiFile('new',$hsc_hi)	      unless $HiHasBeenRead{'new'} == 1;
+    if ($Specific_hi_file eq '') {  # -ohi is used even if  module name != stem of filename.
+        ($hiname = $hifile_target) =~ s/([^\/]*\/)*(.*)\.$HiSuffix/$2/;
+        if ($ModuleName{'new'} ne $hiname) {
+          ($hidir  = $hifile_target) =~ s/([^\/]*\/)*.*\.$HiSuffix/$1/;
+	  $hifile_target = $hidir . $ModuleName{'new'} . ".$HiSuffix";
+        }
+    }
+    &readHiFile('old',$hifile_target) unless $HiHasBeenRead{'old'} == 1;
 
     open(NEWHI, "> $new_hi") || &tidy_up_and_die(1,"Can't open $new_hi (write)\n");
 
@@ -178,7 +186,7 @@ sub readHiFile {
 	}
 
 	if ( /^_interface_ ([A-Z]\S*) (\d+)/ ) {
-	    $ModuleName{$mod}	 = $1; # not sure this is used much...
+	    $ModuleName{$mod}	 = $1; # used to decide name of interface file.
 	    $ModuleVersion{$mod} = $2;
 
 	} elsif ( /^_interface_ ([A-Z]\S*)/ && $mod eq 'new' ) { # special case: no version
