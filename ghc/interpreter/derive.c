@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/11/12 17:32:38 $
+ * $Revision: 1.10 $
+ * $Date: 1999/12/01 10:22:53 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -255,17 +255,7 @@ Tycon t; {
     implementTagToCon(t);
     return cons(mkBind("toEnum",      mkVarAlts(l,tycon(t).tagToCon)),
            cons(mkBind("fromEnum",    mkVarAlts(l,tycon(t).conToTag)),
-           cons(mkBind("enumFrom",    singleton(pair(singleton(x),  
-                                        pair(mkInt(l),
-                                        ap2(nameFromTo,x,last))))),
-           /* default instance of enumFromTo is good */
-           cons(mkBind("enumFromThen",singleton(pair(doubleton(x,y),
-                                        pair(mkInt(l),
-                                        ap3(nameFromThenTo,x,y,
-                                        ap(COND,triple(ap2(nameLe,x,y),
-                                        last,first))))))),
-           /* default instance of enumFromThenTo is good */
-           NIL))));
+           NIL));
 }
 
 
