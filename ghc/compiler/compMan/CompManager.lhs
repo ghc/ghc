@@ -158,12 +158,6 @@ cmLoadModule cmstate1 rootname
         let pcii      = pci   pcms1 -- this never changes
         let ghci_mode = gmode pcms1 -- ToDo: fix!
 
-        -- During upsweep, look at new summaries to see if source has
-        -- changed.  Here's a function to pass down; it takes a new
-        -- summary.
-        let source_changed :: ModSummary -> Bool
-            source_changed = summary_indicates_source_changed mg1
-
         -- Do the downsweep to reestablish the module graph
         -- then generate version 2's by removing from HIT,HST,UI any
         -- modules in the old MG which are not in the new one.
@@ -205,7 +199,7 @@ cmLoadModule cmstate1 rootname
         let threaded2 = CmThreaded pcs1 hst2 hit2
 
         (upsweep_complete_success, threaded3, modsDone, newLis)
-           <- upsweep_mods ghci_mode ui2 reachable_from source_changed threaded2 mg2
+           <- upsweep_mods ghci_mode ui2 reachable_from threaded2 mg2
 
         let ui3 = add_to_ui ui2 newLis
         let (CmThreaded pcs3 hst3 hit3) = threaded3
@@ -274,39 +268,6 @@ cmLoadModule cmstate1 rootname
                                      else Just (last mods_to_keep_names))
 
 
--- Given a bunch of old summaries and a new summary, try and
--- find the corresponding old summary, and, if found, compare
--- its source timestamp with that of the new summary.  If in
--- doubt say True.
-summary_indicates_source_changed :: [ModSummary] -> ModSummary -> Bool
-summary_indicates_source_changed old_summaries new_summary
-   = panic "SISC"
-#if 0
-   = case [old | old <- old_summaries, 
-                 name_of_summary old == name_of_summary new_summary] of
-
-        (_:_:_) -> panic "summary_indicates_newer_source"
-                   
-        []      -> -- can't find a corresponding old summary, so
-                   -- compare source and iface dates in the new summary.
-                   trace (showSDoc (text "SISC: no old summary, new =" 
-                                    <+> pprSummaryTimes new_summary)) (
-                   case (ms_hs_date new_summary, ms_hi_date new_summary) of
-                      (Just hs_t, Just hi_t) -> hs_t > hi_t
-                      other                  -> True
-                   )
-
-        [old]   -> -- found old summary; compare source timestamps
-                   trace (showSDoc (text "SISC: old =" 
-                                    <+> pprSummaryTimes old
-                                    <+> pprSummaryTimes new_summary)) (
-                   case (ms_hs_date old, ms_hs_date new_summary) of
-                      (Just old_t, Just new_t) -> new_t > old_t
-                      other                    -> True
-                   )
-#endif
-
-
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
 findPartiallyCompletedCycles :: [ModuleName] -> [SCC ModSummary] -> [ModuleName]
@@ -360,7 +321,6 @@ data CmThreaded  -- stuff threaded through individual module compilations
 upsweep_mods :: GhciMode
              -> UnlinkedImage         -- old linkables
              -> (ModuleName -> [ModuleName])  -- to construct downward closures
-             -> (ModSummary -> Bool)  -- has source changed?
              -> CmThreaded            -- PCS & HST & HIT
              -> [SCC ModSummary]      -- mods to do (the worklist)
                                       -- ...... RETURNING ......
@@ -369,28 +329,27 @@ upsweep_mods :: GhciMode
                     [ModSummary],     -- mods which succeeded
                     [Linkable])       -- new linkables
 
-upsweep_mods ghci_mode oldUI reachable_from source_changed threaded 
+upsweep_mods ghci_mode oldUI reachable_from threaded 
      []
    = return (True, threaded, [], [])
 
-upsweep_mods ghci_mode oldUI reachable_from source_changed threaded 
+upsweep_mods ghci_mode oldUI reachable_from threaded 
      ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("ghc: module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleNameUserString.name_of_summary) ms))
         return (False, threaded, [], [])
 
-upsweep_mods ghci_mode oldUI reachable_from source_changed threaded 
+upsweep_mods ghci_mode oldUI reachable_from threaded 
      ((AcyclicSCC mod):mods)
    = do (threaded1, maybe_linkable) 
            <- upsweep_mod ghci_mode oldUI threaded mod 
                           (reachable_from (name_of_summary mod)) 
-                          (source_changed mod)
         case maybe_linkable of
            Just linkable 
               -> -- No errors; do the rest
                  do (restOK, threaded2, modOKs, linkables) 
                        <- upsweep_mods ghci_mode oldUI reachable_from 
-                                       source_changed threaded1 mods
+                                       threaded1 mods
                     return (restOK, threaded2, mod:modOKs, linkable:linkables)
            Nothing -- we got a compilation error; give up now
               -> return (False, threaded1, [], [])
@@ -418,11 +377,9 @@ upsweep_mod :: GhciMode
             -> CmThreaded
             -> ModSummary
             -> [ModuleName]
-            -> Bool
             -> IO (CmThreaded, Maybe Linkable)
 
-upsweep_mod ghci_mode oldUI threaded1 summary1 
-            reachable_from_here source_might_have_changed
+upsweep_mod ghci_mode oldUI threaded1 summary1 reachable_from_here
    = do let mod_name = name_of_summary summary1
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
