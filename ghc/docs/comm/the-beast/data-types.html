@@ -56,7 +56,7 @@ Each of these three names gets a distinct unique key in GHC's name cache.
 
 Suppose the Haskell source looks like this:
 <pre>
-  data T a = MkT !(a,a) !Int | Nil{d}
+  data T a = MkT !(a,a) !Int | Nil
 
   f x = case x of
           Nil     -> Nil
