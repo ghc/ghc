@@ -1043,7 +1043,7 @@ dnl ################################################################
 dnl ** check for libdl & RTLD_NEXT
 
 dnl (Mac OS X only) ... but don't check if we already have the
-dl HaskellSupport.framework
+dnl HaskellSupport.framework
 
 if test $HaveFrameworkHaskellSupport = YES; then
     HaveLibDL = NO
