@@ -5,6 +5,8 @@
 \section[Addr]{Module @Addr@}
 
 \begin{code}
+#include "MachDeps.h"
+
 module Addr 
 	( Addr
 
@@ -51,8 +53,12 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 
 \begin{code}
 instance Show Addr where
-   showsPrec p (A# a) = showHex int
+   showsPrec p (A# a) rs = pad_out (showHex int rs)
      where
+        -- want 0s prefixed to pad it out to a fixed length.
+       pad_out ('0':'x':ls) = 
+	  '0':'x':(replicate (2*ADDR_SIZE_IN_BYTES - length ls) '0') ++  ls
+
        int = 
 	case word2Integer# (int2Word# (addr2Int# a)) of
 	  (# s, d #) -> J# s d
