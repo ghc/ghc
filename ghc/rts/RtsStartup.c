@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.81 2004/08/13 13:10:32 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.82 2004/08/21 12:48:00 panne Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -146,6 +146,9 @@ hs_init(int *argc, char **argv[])
                  fprintf(stderr, "==== Synchronising system (%d PEs)\n", nPEs));
     synchroniseSystem();             // calls initParallelSystem etc
 #endif	/* PAR */
+
+    /* Perform initialisation of adjustor thunk layer. */
+    initAdjustor();
 
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
