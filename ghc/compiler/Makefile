@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.128 2000/12/30 20:35:37 panne Exp $
+# $Id: Makefile,v 1.129 2001/01/05 17:57:07 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -204,9 +204,9 @@ prelude/PrimOp_HC_OPTS 		= -H12m -no-recomp
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
 
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
 
-parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -Onot -K2m -fno-warn-incomplete-patterns
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
 # seem to be necessary anymore for the modules below.
