@@ -54,8 +54,8 @@
 \begin{document}
 
 \title{The STG runtime system (revised)}
-\author{Simon Peyton Jones \\ Glasgow University and Oregon Graduate Institute \and
-Simon Marlow \\ Glasgow University \and
+\author{Simon Peyton Jones \\ Microsoft Research Ltd., Cambridge \and
+Simon Marlow \\ Microsoft Research Ltd., Cambridge \and
 Alastair Reid \\ Yale University} 
 
 \maketitle
@@ -87,7 +87,7 @@ accessible code tree.  This feature eliminates a whole class of painful
 space leaks.
 
 \item A running thread has only one stack, which contains a mixture of
-pointers and non-pointers.  \secref{stacks} describes how we find out
+pointers and non-pointers.  \secref{TSO} describes how we find out
 which is which.  (GHC has used two stacks for some while.  Using one
 stack instead of two reduces register pressure, reduces the size of
 update frames, and eliminates ``stack-stubbing'' instructions.)
@@ -1298,6 +1298,7 @@ All \emph{pointed} values are \emph{boxed}.
 
 
 \Subsection{Heap Objects}{heap-objects}
+\label{sec:fixed-header}
 
 \begin{figure}
 \begin{center}
@@ -1552,7 +1553,7 @@ locations, with globally known addresses.
 \emph{Stack closures} are closures allocated within a thread's stack
 (which is itself a heap object).  Unlike other closures, there are
 never any pointers to stack closures.  Stack closures are discussed in
-\secref{stacks}.
+\secref{TSO}.
 
 \end{itemize}
 A second useful classification is this:
@@ -1581,11 +1582,8 @@ once we support speculative evaluation.}
 state objects, do not represent values in the original program.
 \end{itemize}
 
-Only pointed objects can be entered.  All pointed objects share a
-common header format: the ``pointed header''; while all unpointed
-objects share a common header format: the ``unpointed header''.
-\ToDo{Describe the difference and update the diagrams to mention an
-appropriate header type.}
+Only pointed objects can be entered.  If an unpointed object is
+entered the program will usually terminate with a fatal error.
 
 This section enumerates all the kinds of heap objects in the system.
 Each is identified by a distinct closure type field in its info table.
@@ -1600,20 +1598,22 @@ closure type          & Section \\
 \hline 		      
 		      
 @CONSTR@              & \ref{sec:CONSTR}    \\
+@CONSTR_p_n@	      & \ref{sec:CONSTR}    \\
 @CONSTR_STATIC@       & \ref{sec:CONSTR}    \\
-@CONSTR_STATIC_NOCAF@ & \ref{sec:CONSTR}    \\
+@CONSTR_NOCAF_STATIC@ & \ref{sec:CONSTR}    \\
 		      
 @FUN@                 & \ref{sec:FUN}       \\
+@FUN_p_n@             & \ref{sec:FUN}       \\
 @FUN_STATIC@          & \ref{sec:FUN}       \\
 		      
 @THUNK@               & \ref{sec:THUNK}     \\
+@THUNK_p_n@           & \ref{sec:THUNK}     \\
 @THUNK_STATIC@        & \ref{sec:THUNK}     \\
-@THUNK_SELECTOR@      & \ref{sec:THUNK_SEL} \\
+@THUNK_SELECTOR@      & \ref{sec:THUNK_SELECTOR} \\
 		      
 @BCO@		      & \ref{sec:BCO}       \\
-@BCO_CAF@	      & \ref{sec:BCO}       \\
 		      
-@AP@	      	      & \ref{sec:AP}        \\
+@AP_UPD@      	      & \ref{sec:AP_UPD}    \\
 @PAP@                 & \ref{sec:PAP}       \\
 		      
 @IND@                 & \ref{sec:IND}       \\
@@ -1622,22 +1622,29 @@ closure type          & Section \\
 @IND_OLDGEN_PERM@     & \ref{sec:IND}       \\
 @IND_STATIC@          & \ref{sec:IND}       \\
 		      
+@CAF_UNENTERED@	      & \ref{sec:CAF}       \\
+@CAF_ENTERED@	      & \ref{sec:CAF}       \\
+@CAF_BLACKHOLE@	      & \ref{sec:CAF}       \\
+
 \hline		      
 \emph{Unpointed} \\    
 \hline		      
 		      		      
-@ARR_WORDS@           & \ref{sec:ARR_WORDS1},\ref{sec:ARR_WORDS2} \\
-@ARR_PTRS@            & \ref{sec:ARR_PTRS}  \\
-@MUTVAR@              & \ref{sec:MUTVAR}    \\
-@MUTARR_PTRS@         & \ref{sec:MUTARR_PTRS} \\
-@MUTARR_PTRS_FROZEN@  & \ref{sec:MUTARR_PTRS_FROZEN} \\
+@BLACKHOLE@           & \ref{sec:BLACKHOLE} \\
+@BLACKHOLE_BQ@        & \ref{sec:BLACKHOLE_BQ} \\
 
-@FOREIGN@             & \ref{sec:FOREIGN}   \\
-		      
-@BH@                  & \ref{sec:BH}        \\
 @MVAR@ 		      & \ref{sec:MVAR}      \\
-@IVAR@ 		      & \ref{sec:IVAR}      \\
-@FETCHME@             & \ref{sec:FETCHME}   \\
+
+@ARR_WORDS@           & \ref{sec:ARR_WORDS} \\
+
+@MUTARR_PTRS@         & \ref{sec:MUT_ARR_PTRS} \\
+@MUTARR_PTRS_FROZEN@  & \ref{sec:MUT_ARR_PTRS_FROZEN} \\
+
+@MUT_VAR@              & \ref{sec:MUT_VAR}    \\
+
+@WEAK@		      & \ref{sec:WEAK}   \\
+@FOREIGN@             & \ref{sec:FOREIGN}   \\
+@STABLE_NAME@	      & \ref{sec:STABLE_NAME}   \\
 \hline
 \end{tabular}
 
@@ -1651,30 +1658,25 @@ closure type		& Section			\\ \hline
 @RET_BIG@		& \ref{sec:activation-records}	\\
 @RET_VEC_BIG@		& \ref{sec:activation-records}	\\
 @UPDATE_FRAME@ 		& \ref{sec:activation-records}	\\
+@CATCH_FRAME@ 		& \ref{sec:activation-records}	\\
+@SEQ_FRAME@ 		& \ref{sec:activation-records}	\\
+@STOP_FRAME@ 		& \ref{sec:activation-records}	\\
 \hline
 \end{tabular}
 
-There are also a number of administrative objects.
+There are also a number of administrative objects.  It is an error to
+enter one of these objects.
 
 \begin{tabular}{|l|l|}\hline
 closure type		& Section 			\\ \hline
 @TSO@                   & \ref{sec:TSO} 		\\
-@STABLEPTR_TABLE@       & \ref{sec:STABLEPTR_TABLE} 	\\
 @SPARK_OBJECT@          & \ref{sec:SPARK}		\\
 @BLOCKED_FETCH@       	& \ref{sec:BLOCKED_FETCH} 	\\
+@FETCHME@               & \ref{sec:FETCHME}   \\
 \hline
 \end{tabular}
 
-\ToDo{I guess the parallel system has something like a stable ptr
-table.  Is there any opportunity for sharing code/data structures
-here?}
-
-
 \Subsection{Predicates}{closure-predicates}
-
-\ToDo{The following is a first attempt at defining a useful set of
-predicates.  Some (such as @isWHNF@ and @isSparkable@) may need their
-definitions tweaked a little.}
 
 The runtime system sometimes needs to be able to distinguish objects
 according to their properties: is the object updateable? is it in weak
@@ -1779,70 +1781,9 @@ As a minor optimisation, we might use the top bits of the @INFO_TYPE@
 field to ``cache'' the answers to some of these predicates.
 
 An indirection either points to HNF (post update); or is result of
-overwriting a FetchMe, in which case the thing fetched is either
-under evaluation (BH), or by now an HNF.  Thus, indirections get NoSpark flag.
-
-
-\iffalse
-@
-#define _NF			0x0001  /* Normal form  */
-#define _NS			0x0002	/* Don't spark  */
-#define _ST			0x0004	/* Is static    */
-#define _MU 	    	    	0x0008  /* Is mutable   */
-#define _UP			0x0010	/* Is updatable (but not mutable) */
-#define _BM			0x0020	/* Is a "rimitive" array */
-#define _BH			0x0040	/* Is a black hole */
-#define _IN			0x0080	/* Is an indirection */
-#define _TH			0x0100	/* Is a thunk */
-
-
-
-SPEC	
-SPEC_N		SPEC | _NF | _NS
-SPEC_S		SPEC | _TH
-SPEC_U		SPEC | _UP | _TH
-		
-GEN	
-GEN_N		GEN | _NF | _NS
-GEN_S		GEN | _TH
-GEN_U		GEN | _UP | _TH
-		
-DYN	        _NF | _NS
-TUPLE		_NF | _NS | _BM
-DATA		_NF | _NS | _BM
-MUTUPLE		_NF | _NS | _MU | _BM
-IMMUTUPLE	_NF | _NS | _BM
-STATIC		_NS | _ST
-CONST		_NF | _NS
-CHARLIKE	_NF | _NS
-INTLIKE		_NF | _NS
-
-BH		_NS | _BH
-BH_N		BH
-BH_U		BH | _UP
-		
-BQ		_NS | _MU | _BH
-IND		_NS | _IN
-CAF		_NF | _NS | _ST | _IN
-
-FM		
-FETCHME		FM | _MU
-FMBQ		FM | _MU | _BH
-
-TSO		_MU
-
-STKO	
-STKO_DYNAMIC	STKO | _MU
-STKO_STATIC	STKO | _ST
-		
-SPEC_RBH	_NS | _MU | _BH
-GEN_RBH		_NS | _MU | _BH
-BF		_NS | _MU | _BH
-INTERNAL	
-
-@
-\fi
-
+overwriting a FetchMe, in which case the thing fetched is either under
+evaluation (BLACKHOLE), or by now an HNF.  Thus, indirections get
+NoSpark flag.
 
 \subsection{Closures (aka Pointed Objects)}
 
@@ -1865,11 +1806,11 @@ The layout of a function closure is as follows:
 \emph{Fixed header}  & \emph{Pointers} & \emph{Non-pointers} \\ \hline
 \end{tabular}
 \end{center}
+
 The data words (pointers and non-pointers) are the free variables of
-the function closure.  
-The number of pointers
-and number of non-pointers are stored in the @INFO_SM@ word, in the least significant
-and most significant half-word respectively.
+the function closure.  The number of pointers and number of
+non-pointers are stored in @info->layout.ptrs@ and
+@info->layout.nptrs@ respecively.
 
 There are several different sorts of function closure, distinguished
 by their closure type field:
@@ -1901,8 +1842,9 @@ closures that have been determined to be live but that have not yet
 been scavenged.
 
 \note{Static function closures that have no static references, and
-hence a null SRT pointer, don't need the static object link field.  Is
-it worth taking advantage of this?  See @CONSTR_STATIC_NOCAF@.}
+hence a null SRT pointer, don't need the static object link field.  We
+don't take advantage of this at the moment, but we could.  See
+@CONSTR_NOCAF_STATIC@.}  
 \end{itemize}
 
 Each lambda abstraction, $f$, in the STG program has its own private
@@ -1967,7 +1909,7 @@ The static object link occurs last in the closure so that static
 constructors can store their data fields in exactly the same place as
 dynamic constructors.
 
-\item @CONSTR_STATIC_NOCAF@.  A statically allocated data constructor
+\item @CONSTR_NOCAF_STATIC@.  A statically allocated data constructor
 that guarantees not to point (directly or indirectly) to any CAF
 (\secref{CAF}).  This means it does not need a static object
 link field.  Since we expect that there might be quite a lot of static
@@ -1988,7 +1930,8 @@ shared by all static instances of the constructor.
 
 Each constructor also has a \emph{constructor function}, which is a
 curried function which builds an instance of the constructor.  The
-constructor function has an info table labelled as @$Con$_info@.
+constructor function has an info table labelled as @$Con$_info@, and
+entry code pointed to by @$Con$_entry@.
 
 Nullary constructors are represented by a single static info table,
 which everyone points to.  Thus for a nullary constructor we can omit
@@ -1996,7 +1939,7 @@ the dynamic info table and the constructor function.
 
 \subsubsection{Thunks}
 \label{sec:THUNK}
-\label{sec:THUNK_SEL}
+\label{sec:THUNK_SELECTOR}
 
 A thunk represents an expression that is not obviously in head normal 
 form.  For example, consider the following top-level definitions:
@@ -2009,7 +1952,7 @@ Here the right-hand sides of @range@ and @ys@ are both thunks; the former
 is static while the latter is dynamic.
 
 The layout of a thunk is the same as that for a function closure.
-However, thunks must have a payload of at least @MIN_UPD_PAYLOAD@
+However, thunks must have a payload of at least @MIN_UPD_SIZE@
 words to allow it to be overwritten with a black hole and an
 indirection.  The compiler may have to add extra non-pointer fields to
 satisfy this constraint.
@@ -2031,15 +1974,17 @@ There are several forms of thunk:
 \begin{itemize}
 
 \item @THUNK@ and $@THUNK_@p@_@np$: vanilla, dynamically allocated
-thunks.  Dynamic thunks are overwritten with normal indirections.
+thunks.  Dynamic thunks are overwritten with normal indirections
+(@IND@), or old generation indirections (@IND_OLDGEN@): see
+\secref{IND}.
 
 \item @THUNK_STATIC@.  A static thunk is also known as a
 \emph{constant applicative form}, or \emph{CAF}.  Static thunks are
 overwritten with static indirections.
 
 \begin{center}
-\begin{tabular}{|l|l|l|l|l|}\hline
-\emph{Fixed header}  & \emph{Pointers} & \emph{Non-pointers} \emph{Static object link}\\ \hline
+\begin{tabular}{|l|l|}\hline
+\emph{Fixed header}  & \emph{Static object link}\\ \hline
 \end{tabular}
 \end{center}
 
@@ -2076,6 +2021,7 @@ info tables are labelled @sel_info_$n$@ where $n$ is the offset.
 \end{itemize}
 
 The only label associated with a thunk is its info table:
+
 \begin{description}
 \item[$f$@_info@] is $f$'s info table.
 \end{description}
@@ -2122,41 +2068,59 @@ code.
 
 \Subsubsection{Partial applications}{PAP}
 
-\ToDo{PAPs don't contains update frames or activation frames.  When we
-add revertible black holes, we'll introduce a new kind of object which
-can contain activation frames.}
+A partial application (PAP) represents a function applied to too few
+arguments.  It is only built as a result of updating after an
+argument-satisfaction check failure.  A PAP has the following shape:
 
-A partial application (PAP) represents a function applied to too few arguments.
-It is only built as a result of updating after an argument-satisfaction
-check failure.  A PAP has the following shape:
 \begin{center}
 \begin{tabular}{|l|l|l|l|}\hline
-\emph{Fixed header}  & \emph{No of arg words} & \emph{Function closure} & \emph{Arg stack} \\ \hline
+\emph{Fixed header}  & \emph{No of words of stack} & \emph{Function closure} & \emph{Stack chunk ...} \\ \hline
 \end{tabular}
 \end{center}
-The ``arg stack'' is a copy of the chunk of stack above the update
-frame; ``no of arg words'' tells how many words it consists of.  The
-function closure is (a pointer to) the closure for the function whose
-argument-satisfaction check failed.
+
+The ``Stack chunk'' is a copy of the chunk of stack above the update
+frame; ``No of words of stack'' tells how many words it consists of.
+The function closure is (a pointer to) the closure for the function
+whose argument-satisfaction check failed.
+
+In the normal case where a PAP is built as a result of an argument
+satisfaction check failure, the stack chunk will just contain
+``pending arguments'', ie. pointers and tagged non-pointers.  It may
+in fact also contain activation records, but not update frames, seq
+frames, or catch frames.  The reason is the garbage collector uses the
+same code to scavenge a stack as it does to scavenge the payload of a
+PAP, but an update frame contains a link to the next update frame in
+the chain and this link would need to be relocated during garbage
+collection.  Revertible black holes and asynchronous exceptions use
+the more general form of PAPs (see Section \ref{revertible-bh}).
 
 There is just one standard form of PAP. There is just one info table
 too, called @PAP_info@.  Its entry code simply copies the arg stack
 chunk back on top of the stack and enters the function closure.  (It
 has to do a stack overflow test first.)
 
+There is just one way to build a PAP: by calling @stg_update_PAP@ with
+the function closure in register @R1@ and the pending arguments on the
+stack.  The @stg_update_PAP@ function will build the PAP, perform the
+update, and return to the next activation record on the stack.  If
+there are \emph{no} pending arguments on the stack, then no PAP need
+be built: in this case @stg_update_PAP@ just overwrites the updatee
+with an indirection to the function closure.
+
 PAPs are also used to implement Hugs functions (where the arguments
 are free variables).  PAPs generated by Hugs can be static so we need
 both @PAP@ and @PAP_STATIC@.
 
-\Subsubsection{@AP@ objects}{AP}
+\Subsubsection{@AP_UPD@ objects}{AP_UPD}
 
-@AP@ objects are used to represent thunks built by Hugs.  The only
-distintion between an @AP@ and a @PAP@ is that an @AP@ is updateable.
+@AP_UPD@ objects are used to represent thunks built by Hugs.  The only
+distintion between an @AP_UPD@ and a @PAP@ is that an @AP_UPD@ is
+updateable.
 
 \begin{center}
 \begin{tabular}{|l|l|l|l|}
 \hline
-\emph{Fixed Header} & \emph{No of arg words} & \emph{Function closure} & \emph{Arg stack} \\
+\emph{Fixed Header} & \emph{No of stack words} & \emph{Function closure} & \emph{Stack chunk} \\
 \hline
 \end{tabular}
 \end{center}
@@ -2165,13 +2129,13 @@ The entry code pushes an update frame, copies the arg stack chunk on
 top of the stack, and enters the function closure.  (It has to do a
 stack overflow test first.)
 
-The ``arg stack'' is a block of (tagged) arguments representing the
-free variables of the thunk; ``no of arg words'' tells how many words
-it consists of.  The function closure is (a pointer to) the closure
-for the thunk.  The argument stack may be empty if the thunk has no
-free variables.
+The ``stack chunk'' is a block of stack not containing update frames,
+seq frames or catch frames (just like a PAP).  In the case of Hugs,
+the stack chunk will contain the free variables of the thunk, and the
+function closure is (a pointer to) the closure for the thunk.  The
+argument stack may be empty if the thunk has no free variables.
 
-\note{Since @AP@s are updateable, the @MIN_UPD_PAYLOAD@ constraint
+\note{Since @AP_UPD@s are updateable, the @MIN_UPD_SIZE@ constraint
 applies here too.}
 
 \Subsubsection{Indirections}{IND}
@@ -2181,20 +2145,34 @@ when a thunk is updated to point to its value.  The entry code for all
 indirections simply enters the closure it points to.
 
 There are several forms of indirection:
+
 \begin{description}
 \item[@IND@] is the vanilla, dynamically-allocated indirection.
 It is removed by the garbage collector. It has the following
 shape:
 \begin{center}
 \begin{tabular}{|l|l|l|}\hline
-\emph{Fixed header} & \emph{Mutable link field} & \emph{Target closure} \\ \hline
+\emph{Fixed header} & \emph{Target closure} \\ \hline
+\end{tabular}
+\end{center}
+
+An @IND@ only exists in the youngest generation.  In older
+generations, we have @IND_OLDGEN@s.  The update code
+(@Upd_frame_$n$_entry@) checks whether the updatee is in the youngest
+generation before deciding which kind of indirection to use.
+
+\item[@IND_OLDGEN@] is the vanilla, dynamically-allocated indirection.
+It is removed by the garbage collector. It has the following
+shape:
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+\emph{Fixed header} & \emph{Target closure} & \emph{Mutable link field} \\ \hline
 \end{tabular}
 \end{center}
 It contains a \emph{mutable link field} that is used to string together
-indirections in each generation.
+mutable objects in each old generation.
 
-
-\item[@IND_PERMANENT@]
+\item[@IND_PERM@]
 for lexical profiling, it is necessary to maintain cost centre
 information in an indirection, so ``permanent indirections'' are
 retained forever.  Otherwise they are just like vanilla indirections.
@@ -2205,6 +2183,9 @@ since it will have no effect on the profiler.}
 \note{Do we still need @IND@ in the profiling build, or do we just
 need @IND@ but its behaviour changes when profiling is on?}
 
+\item[@IND_OLDGEN_PERM@]
+Just like an @IND_OLDGEN@, but sticks around like an @IND_PERM@.
+
 \item[@IND_STATIC@] is used for overwriting CAFs when they have been
 evaluated.  Static indirections are not removed by the garbage
 collector; and are statically allocated outside the heap (and should
@@ -2214,46 +2195,79 @@ stay there).  Their static object link field is used just as for
 \begin{center}
 \begin{tabular}{|l|l|l|}
 \hline
-\emph{Fixed header} & \emph{Target closure} & \emph{Static object link} \\
+\emph{Fixed header} & \emph{Target closure} & \emph{Static link field} \\
 \hline
 \end{tabular}
 \end{center}
 
 \end{description}
 
-\Subsubsection{Black holes and blocking queues}{BH}
+\subsubsection{Black holes and blocking queues}
+\label{sec:BLACKHOLE}
+\label{sec:BLACKHOLE_BQ}
 
 Black hole closures are used to overwrite closures currently being
 evaluated. They inform the garbage collector that there are no live
 roots in the closure, thus removing a potential space leak.  
 
-Black holes also become synchronization points in the threaded world.
-They contain a pointer to a list of blocked threads to be awakened
-when the black hole is updated (or @NULL@ if the list is empty).
+Black holes also become synchronization points in the concurrent
+world.  When a thread attempts to enter a blackhole, it must wait for
+the result of the computation, which is presumably in progress in
+another thread.
+
+\note{In a single-threaded system, entering a black hole indicates an
+infinite loop.  In a concurrent system, entering a black hole
+indicates an infinite loop only if the hole is being entered by the
+same thread that originally entered the closure.  It could also bring
+about a deadlock situation where several threads are waiting
+circularly on computations in progress.}
+
+There are two types of black hole:
+
+\begin{description}
+
+\item[@BLACKHOLE@]
+A straightforward blackhole just consists of an info pointer and some
+padding to allow updating with an @IND_OLDGEN@ if necessary.  This
+type of blackhole has no waiting threads.
 
 \begin{center}
 \begin{tabular}{|l|l|l|}
 \hline 
-\emph{Fixed header} & \emph{Mutable link} & \emph{Blocked thread link} \\
+\emph{Fixed header} & \emph{Padding} & \emph{Padding} \\
+\hline
+\end{tabular}
+\end{center}
+
+If we're doing \emph{eager blackholing} then a thunk's info pointer is
+overwritten with @BLACKHOLE_info@ at the time of entry; hence the need
+for blackholes to be small, otherwise we'd be overwriting part of the
+thunk itself.
+
+\item[@BLACKHOLE_BQ@] 
+When a thread enters a @BLACKHOLE@, it is turned into a @BLACKHOLE_BQ@
+(blocking queue), which contains a linked list of blocked threads in
+addition to the info pointer.
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline 
+\emph{Fixed header} & \emph{Blocked thread link} & \emph{Mutable link field} \\
 \hline
 \end{tabular}
 \end{center}
 
 The \emph{Blocked thread link} points to the TSO of the first thread
 waiting for the value of this thunk.  All subsequent TSOs in the list
-are linked together using their @TSO_LINK@ field.
+are linked together using their @tso->link@ field, ending in
+@END_TSO_QUEUE_closure@.
 
-When the blocking queue is non-@NULL@ and the @BH@ is in the old
-generation, the black hole must be added to the mutables list since
-the TSOs on the list may contain pointers into the new generation.
-There is no need to clutter up the mutables list with black holes with
-empty blocking queues.
+Because new threads can be added to the \emph{Blocked thread link}, a
+blocking queue is \emph{mutable}, so we need a mutable link field in
+order to chain it on to a mutable list for the generational garbage
+collector.
 
-\note{In a single-threaded system, entering a black hole indicates an
-infinite loop.  In a concurrent system, entering a black hole
-indicates an infinite loop only if the hole is being entered by the
-same thread that originally entered the closure.}
-
+\end{description}
 
 \Subsubsection{FetchMes}{FETCHME} 
 
@@ -2276,71 +2290,89 @@ to a \emph{thunk}.  For this reason, unpointed objects cannot be
 entered.
 
 \subsubsection{Immutable objects}
-\label{sec:ARR_WORDS1}
-\label{sec:ARR_PTRS}
+\label{sec:ARR_WORDS}
 
 \begin{description}
 \item[@ARR_WORDS@] is a variable-sized object consisting solely of
 non-pointers.  It is used for arrays of all sorts of things (bytes,
 words, floats, doubles... it doesn't matter).
+
+Strictly speaking, an @ARR_WORDS@ could be mutable, but because it
+only contains non-pointers we don't need to track this fact.
+
 \begin{center}
 \begin{tabular}{|c|c|c|c|}
 \hline
 \emph{Fixed Hdr} & \emph{No of non-pointers} & \emph{Non-pointers\ldots}	\\ \hline
 \end{tabular}
 \end{center}
-
-\item[@ARR_PTRS@] is an immutable, variable sized array of pointers.
-\begin{center}
-\begin{tabular}{|c|c|c|c|}
-\hline
-\emph{Fixed Hdr} & \emph{Mutable link} & \emph{No of pointers} & \emph{Pointers\ldots}	\\ \hline
-\end{tabular}
-\end{center}
-The mutable link is present so that we can easily freeze and thaw an
-array (by changing the header and adding/removing the array to the
-mutables list).
-
 \end{description}
 
 \subsubsection{Mutable objects}
 \label{sec:mutables}
-\label{sec:ARR_WORDS2}
-\label{sec:MUTVAR}
-\label{sec:MUTARR_PTRS}
-\label{sec:MUTARR_PTRS_FROZEN}
+\label{sec:MUT_VAR}
+\label{sec:MUT_ARR_PTRS}
+\label{sec:MUT_ARR_PTRS_FROZEN}
+\label{sec:MVAR}
 
 Some of these objects are \emph{mutable}; they represent objects which
-are explicitly mutated by Haskell code through the @ST@ monad.
-They're not used for thunks which are updated precisely once.
+are explicitly mutated by Haskell code through the @ST@ or @IO@
+monads.  They're not used for thunks which are updated precisely once.
 Depending on the garbage collector, mutable closures may contain extra
 header information which allows a generational collector to implement
 the ``write barrier.''
 
+Notice that mutable objects all have the same general layout: there is
+a mutable link field as the second word after the header.  This is so
+that code to process old-generation mutable lists doesn't need to look
+at the type of the object to determine where its link field is.
+
 \begin{description}
 
-\item[@ARR_WORDS@] is also used to represent \emph{mutable} arrays of
-bytes, words, floats, doubles, etc.  It's possible to use the same
-object type because even generational collectors don't need to
-distinguish them.
-
-\item[@MUTVAR@] is a mutable variable.
+\item[@MUT_VAR@] is a mutable variable.
 \begin{center}
 \begin{tabular}{|c|c|c|}
 \hline
-\emph{Fixed Hdr} & \emph{Mutable link} & \emph{Pointer} \\ \hline
+\emph{Fixed Hdr} \emph{Pointer} & \emph{Mutable link} & \\ \hline
 \end{tabular}
 \end{center}
 
-\item[@MUTARR_PTRS@] is a mutable array of pointers.
-Such an array may be \emph{frozen}, becoming an @ARR_PTRS@, with a
+\item[@MUT_ARR_PTRS@] is a mutable array of pointers.  Such an array
+may be \emph{frozen}, becoming an @MUT_ARR_PTRS_FROZEN@, with a
 different info-table.
+
 \begin{center}
 \begin{tabular}{|c|c|c|c|}
 \hline
-\emph{Fixed Hdr} & \emph{Mutable link} & \emph{No of ptrs} & \emph{Pointers\ldots} \\ \hline
+\emph{Fixed Hdr} & \emph{No of ptrs} & \emph{Mutable link} & \emph{Pointers\ldots} \\ \hline
 \end{tabular}
 \end{center}
+
+\item[@MUT_ARR_PTRS_FROZEN@] This is the immutable version of
+@MUT_ARR_PTRS@.  It still has a mutable link field for two reasons: we
+need to keep it on the mutable list for an old generation at least
+until the next garbage collection, and it may become mutable again via
+@thawArray@.
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\emph{Fixed Hdr} & \emph{No of ptrs} & \emph{Mutable link} & \emph{Pointers\ldots} \\ \hline
+\end{tabular}
+\end{center}
+
+\item[@MVAR@]
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}
+\hline 
+\emph{Fixed header} & \emph{Head} & \emph{Mutable link} & \emph{Tail}
+& \emph{Value}\\
+\hline
+\end{tabular}
+\end{center}
+
+\ToDo{MVars}
 
 \end{description}
 
@@ -2352,30 +2384,43 @@ Here's what a ForeignObj looks like:
 \begin{center}
 \begin{tabular}{|l|l|l|l|}
 \hline 
-\emph{Fixed header} & \emph{Data} & \emph{Free Routine} & \emph{Foreign object link} \\
+\emph{Fixed header} & \emph{Data} \\
 \hline
 \end{tabular}
 \end{center}
 
-The @FreeRoutine@ is a reference to the finalisation routine to call
-when the @ForeignObj@ becomes garbage.  If @freeForeignObject@ is
-called on a Foreign Object, the @FreeRoutine@ is set to zero and the
-garbage collector will not attempt to call @FreeRoutine@ when the
-object becomes garbage.
+A foreign object is simple a boxed pointer to an address outside the
+Haskell heap, possible to @malloc@ed data.  The only reason foreign
+objects exist is so that we can track the lifetime of one using weak
+pointers (see \secref{WEAK}) and run a finaliser when the foreign
+object is unreachable.
 
-The Foreign object link is a link to the next foreign object in the
-list.  This list is traversed at the end of garbage collection: if an
-object is about to be deallocated (e.g.~it was not marked or
-evacuated), the free routine is called and the object is deleted from
-the list.  
+\subsubsection{Weak pointers}
+\label{sec:WEAK}
 
-\subsubsection{MVars and IVars}
-\label{sec:MVAR}
-\label{sec:IVAR}
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}
+\hline 
+\emph{Fixed header} & \emph{Key} & \emph{Value} & \emph{Finaliser}
+& \emph{Link}\\
+\hline
+\end{tabular}
+\end{center}
 
-\ToDo{MVars and IVars}
+\ToDo{Weak poitners}
 
+\subsubsection{Stable names}
+\label{sec:STABLE_NAME}
 
+\begin{center}
+\begin{tabular}{|l|l|l|l|}
+\hline 
+\emph{Fixed header} & \emph{Index} \\
+\hline
+\end{tabular}
+\end{center}
+
+\ToDo{Stable names}
 
 The remaining objects types are all administrative --- none of them
 may be entered.
@@ -2430,14 +2475,13 @@ fixed header.  This doesn't cause problems because slop objects are
 always unreachable --- they can only be accessed by linearly scanning
 the heap.
 
+\note{Currently we don't use slop objects because the storage manager
+isn't reliant on objects being adjacent, but if we move to a ``mostly
+copying'' style collector, this will become an issue.}
+
 \end{description}
 
 \Subsection{Thread State Objects (TSOs)}{TSO}
-
-\ToDo{This is very out of date.  We now embed a single stack object
-within the TSO.  TSOs include an ID number which can be used to
-generate a hash value.  The gransim, profiling and ticky info is
-surely bogus.}
 
 In the multi-threaded system, the state of a suspended thread is
 packed up into a Thread State Object (TSO) which contains all the
@@ -2459,13 +2503,21 @@ ones.
 \begin{center}
 \begin{tabular}{|l|l|}
    \hline \emph{Fixed header}
-\\ \hline @TSO_LINK@
-\\ \hline @TSO_STATE@
+\\ \hline \emph{Link field}
+\\ \hline \emph{Mutable link field}
+\\ \hline \emph{What next}
+\\ \hline \emph{State}
+\\ \hline \emph{Thread Id}
 \\ \hline \emph{Exception Handlers}
 \\ \hline \emph{Ticky Info}
 \\ \hline \emph{Profiling Info}
 \\ \hline \emph{Parallel Info}
 \\ \hline \emph{GranSim Info}
+\\ \hline \emph{Stack size}
+\\ \hline \emph{Max Stack size}
+\\ \hline \emph{Sp}
+\\ \hline \emph{Su}
+\\ \hline \emph{SpLim}
 \\ \hline 
 \\
           \emph{Stack}
@@ -2474,21 +2526,48 @@ ones.
 \end{tabular}
 \end{center}
 The contents of a TSO are:
-\begin{itemize}
+\begin{description}
 
-\item A pointer (@TSO_LINK@) used to maintain a list of threads with a similar
-  state (e.g.~all runnable, all sleeping, all blocked on the same black
-  hole, all blocked on the same MVar, etc.)
+\item[\emph{Link field}] This is a pointer used to maintain a list of
+threads with a similar state (e.g.~all runnable, all sleeping, all
+blocked on the same black hole, all blocked on the same MVar,
+etc.)
 
-\item A word (@TSO_STATE@) which records the current state of a thread: running, runnable, blocked, etc.
+\item[\emph{Mutable link field}] Because the stack is mutable by
+definition, the generational collector needs to track TSOs in older
+generations that may point into younger ones (which is just about any
+TSO for a thread that has run recently).  Hence the need for a mutable
+link field (see \secref{mutables}).
 
-\item Optional information for ``Ticky Ticky'' statistics: @TSO_STK_HWM@ is
-  the maximum number of words allocated to this thread.
+\item[\emph{What next}]
+This field has five values:  
+\begin{description}
+\item[@ThreadEnterGHC@]  The thread can be started by entering the
+closure pointed to by the word on the top of the stack.
+\item[@ThreadRunGHC@]  The thread can be started by jumping to the
+address on the top of the stack.
+\item[@ThreadEnterHugs@]  The stack has a pointer to a Hugs-built
+closure on top of the stack: enter the closure to run the thread.
+\item[@ThreadKilled@] The thread has been killed (by @killThread#@).
+It is probably still around because it is on some queue somewhere and
+hasn't been garbage collected yet.
+\item[@ThreadComplete@] The thread has finished.  Its @TSO@ hasn't
+been garbage collected yet.
+\end{description}
 
-\item Optional information for profiling: 
-  @TSO_CCC@ is the current cost centre.
+\item[\emph{Thread Id}]
+This field contains a (not necessarily unique) integer that identifies
+the thread.  It can be used eg. for hashing.
 
-\item Optional information for parallel execution:
+\item[\emph{Ticky Info}] Optional information for ``Ticky Ticky''
+statistics: @TSO_STK_HWM@ is the maximum number of words allocated to
+this thread.
+
+\item[\emph{Profiling Info}] Optional information for profiling:
+@TSO_CCC@ is the current cost centre.
+
+\item[\emph{Parallel Info}]
+Optional information for parallel execution.
 
 % \begin{itemize}
 % 
@@ -2503,7 +2582,10 @@ The contents of a TSO are:
 % \item I've no idea what else
 % 
 % \end{itemize}
-% 
+
+\item[\emph{GranSim Info}]
+Optional information for gransim execution.
+
 % \item Optional information for GranSim execution:
 % \begin{itemize}
 % \item locked         
@@ -2534,55 +2616,20 @@ The contents of a TSO are:
 % Q_MIGRATING 
 % 
 
-\end{itemize}
+\item[\emph{Stack Info}] Various fields contain information on the
+stack: its current size, its maximum size (to avoid infinite loops
+overflowing the memory), the current stack pointer (\emph{Sp}), the
+current stack update frame pointer (\emph{Su}), and the stack limit
+(\emph{SpLim}).  The latter three fields are loaded into the relevant
+registers when the thread is run.
 
-\subsection{Stack Objects}
-\label{sec:STACK_OBJECT}
-\label{sec:stacks}
+\item[\emph{Stack}] This is the actual stack for the thread,
+\emph{Stack size} words long.  It grows downwards from higher
+addresses to lower addresses.  When the stack overflows, it will
+generally be relocated into larger premises unless \emph{Max stack
+size} is reached.
 
-\ToDo{Merge this in with the section on TSOs}
-
-These are ``stack objects,'' which are used in the threaded world as
-the stack for each thread is allocated from the heap in smallish
-chunks.  (The stack in the sequential world is allocated outside of
-the heap.)
-
-Each reduction thread has to have its own stack space.  As there may
-be many such threads, and as any given one may need quite a big stack,
-a naive give-'em-a-big-stack-and-let-'em-run approach will cost a {\em
-lot} of memory.
-
-Our approach is to give a thread a small stack space, and then link
-on/off extra ``chunks'' as the need arises.  Again, this is a
-storage-management problem, and, yet again, we choose to graft the
-whole business onto the existing heap-management machinery.  So stack
-objects will live in the heap, be garbage collected, etc., etc..
-
-A stack object is laid out like this:
-
-\begin{center}
-\begin{tabular}{|l|}
-\hline
-\emph{Fixed header} 
-\\ \hline
-\emph{Link to next stack object (0 for last)}
-\\ \hline
-\emph{N, the payload size in words}
-\\ \hline
-\emph{@Sp@ (byte offset from head of object)}
-\\ \hline
-\emph{@Su@ (byte offset from head of object)}
-\\ \hline
-\emph{Payload (N words)}
-\\ \hline
-\end{tabular}
-\end{center}
-
-The stack grows downwards, towards decreasing
-addresses.  This makes it easier to print out the stack
-when debugging, and it means that a return address is
-at the lowest address of the chunk of stack it ``knows about''
-just like an info pointer on a closure.
+\end{description}
 
 The garbage collector needs to be able to find all the
 pointers in a stack.  How does it do this?
@@ -2610,14 +2657,12 @@ a well-defined activation record.
 
 \end{itemize}
 
-The game plan is this.  The garbage collector
-walks the stack from the top, traversing pending-argument sections and
-activation records alternately.  Next we discuss how it finds
-the pointers in each of these two stack regions.
-
+The game plan is this.  The garbage collector walks the stack from the
+top, traversing pending-argument sections and activation records
+alternately.  Next we discuss how it finds the pointers in each of
+these two stack regions.
 
 \Subsubsection{Activation records}{activation-records}
-
 
 An \emph{activation record} is a contiguous chunk of stack,
 with a return address as its first word, followed by as many
@@ -3151,12 +3196,12 @@ of that code.  Since Hugs byte-code is lambda-lifted, free variables
 become arguments and are expected to be on the stack by the called
 function.
 
-Hugs represents updateable thunks with @AP@ objects applying a closure
+Hugs represents updateable thunks with @AP_UPD@ objects applying a closure
 to a list of arguments.  (As for @PAP@s, unboxed arguments should be
 preceded by a tag.)  When it is entered, it pushes an update frame
 followed by its payload on the stack, and enters the first word (which
-will be a pointer to a BCO).  The layout of @AP@ objects is described
-in more detail in \secref{AP}.
+will be a pointer to a BCO).  The layout of @AP_UPD@ objects is described
+in more detail in \secref{AP_UPD}.
 
 Partial applications are represented by @PAP@ objects, which are
 non-updatable.
@@ -3214,7 +3259,7 @@ the function.  (Not forgetting a stack check at the start.)
 
 \item[Selector]
 
-To enter a selector (\secref{THUNK_SEL}), we test whether the
+To enter a selector (\secref{THUNK_SELECTOR}), we test whether the
 selectee is a value.  If so, we simply select the appropriate
 component; if not, it's simplest to treat it as a GHC-built closure
 --- though we could interpret it if we wanted.
@@ -4126,10 +4171,9 @@ what we're going to do when we add support for speculative
 evaluation.}
 \ToDo{I think update frames contain cost centres sometimes}
 
-\item 
-If we are doing ``eager blackholing,'' we then overwrite the thunk
-with a black hole.  Otherwise, we leave it to the garbage collector to
-black hole the thunk.
+\item If we are doing ``eager blackholing,'' we then overwrite the
+thunk with a black hole (\secref{BLACKHOLE}).  Otherwise, we leave it
+to the garbage collector to black hole the thunk.
 
 \item 
 Start evaluating the body of the expression.
