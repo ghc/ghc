@@ -153,11 +153,11 @@ terminateProcess (ProcHandle handle)
 int
 getProcessExitCode (ProcHandle handle, int *pExitCode)
 {
-    int wstat;
+    int wstat, res;
     
     *pExitCode = 0;
     
-    if (waitpid(handle, &wstat, WNOHANG) > 0)
+    if ((res = waitpid(handle, &wstat, WNOHANG)) > 0)
     {
 	if (WIFEXITED(wstat))
 	{
@@ -176,7 +176,15 @@ getProcessExitCode (ProcHandle handle, int *pExitCode)
 	    }
     }
     
-    return 0;
+    if (res == 0) return 0;
+
+    if (errno == ECHILD) 
+    {
+	    *pExitCode = 0;
+	    return 1;
+    }
+
+    return -1;
 }
 
 int waitForProcess (ProcHandle handle)
