@@ -242,6 +242,7 @@ instance  Num Integer  where
     (*) (J# s1 d1) (J# s2 d2)
       = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
+    negate i@(S# (-2147483648#)) = 2147483648
     negate (S# i) = S# (negateInt# i)
     negate (J# s d) = J# (negateInt# s) d
 
