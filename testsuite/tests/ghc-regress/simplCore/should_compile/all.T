@@ -9,3 +9,4 @@ test('simpl005', normal, compile, [''])
 
 test('simpl007', normal, compile, [''])
 test('simpl008', normal, compile, ['-fglasgow-exts'])
+test('simpl009', normal, compile, [''])
