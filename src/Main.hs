@@ -31,6 +31,11 @@ import Char	( isSpace )
 import IO
 import IOExts
 
+#if __GLASGOW_HASKELL__ < 500
+import Regex
+import PackedString
+#endif
+
 -----------------------------------------------------------------------------
 -- Top-level stuff
 
@@ -64,7 +69,7 @@ options =
 	"directory in which to put the output files",
     Option ['s']  ["source"]   (ReqArg Flag_SourceURL "URL") 
 	"base URL for links to source code",
-    Option ['t']  ["heading"]  (ReqArg Flag_Heading "HEADING")
+    Option ['t']  ["title"]  (ReqArg Flag_Heading "TITLE")
 	"page heading",
     Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
 	"be verbose",
@@ -418,8 +423,8 @@ buildEnv mod_map this_mod exported_names (HsImportDecl _ mod qual _ _)
 
 expandDecl :: HsDecl -> [HsDecl]
 expandDecl (HsTypeSig loc fs qt) = [ HsTypeSig loc [f] qt | f <- fs ]
-expandDecl (HsClassDecl loc ty decls)
-  = [ HsClassDecl loc ty (concat (map expandDecl decls)) ]
+expandDecl (HsClassDecl loc ty fds decls)
+  = [ HsClassDecl loc ty fds (concat (map expandDecl decls)) ]
 expandDecl d = [ d ]
 
 -----------------------------------------------------------------------------
@@ -460,7 +465,7 @@ docsFromDecl (HsDataDecl loc ctxt nm tvs cons drvs)
   = concat (map docsFromConDecl cons)
 docsFromDecl (HsNewTypeDecl loc ctxt nm tvs con drvs)
   = docsFromConDecl con
-docsFromDecl (HsClassDecl loc ty decls)
+docsFromDecl (HsClassDecl loc ty fds decls)
   = collect Nothing "" decls
 docsFromDecl _
   = []
@@ -568,6 +573,13 @@ moduleHeaderRE = mkRegexWithOpts
 	-- rest of the module documentation - we might want to revist
 	-- this at some point (perhaps have a separator between the 
 	-- portability field and the module documentation?).
+
+#if __GLASGOW_HASKELL__ < 500
+mkRegexWithOpts :: String -> Bool -> Bool -> Regex
+mkRegexWithOpts s single_line case_sensitive
+      = unsafePerformIO (re_compile_pattern (packString s) 
+                              single_line case_sensitive)
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Named documentation

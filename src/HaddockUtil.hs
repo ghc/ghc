@@ -41,7 +41,7 @@ declMainBinder d =
      HsTypeDecl _ n _ _          -> Just n
      HsDataDecl _ _ n _ cons _   -> Just n
      HsNewTypeDecl _ _ n _ _ _   -> Just n
-     HsClassDecl _ qt decls      -> Just (exQtNm qt)
+     HsClassDecl _ qt _ decls    -> Just (exQtNm qt)
      HsTypeSig _ [n] _           -> Just n
      HsTypeSig _ ns _            -> error "declMainBinder"
      HsForeignImport _ _ _ _ n _ -> Just n
@@ -53,7 +53,7 @@ declBinders d =
      HsTypeDecl _ n _ _          -> [n]
      HsDataDecl _ _ n _ cons _   -> n : concat (map conDeclBinders cons)
      HsNewTypeDecl _ _ n _ _ _   -> [n]
-     HsClassDecl _ qt decls      -> exQtNm qt : collectNames decls
+     HsClassDecl _ qt _ decls    -> exQtNm qt : collectNames decls
      HsTypeSig _ ns _            -> ns
      HsForeignImport _ _ _ _ n _ -> [n]
      _                           -> []
@@ -83,8 +83,8 @@ restrictTo names decl = case decl of
 	HsDataDecl loc ctxt n xs (restrictCons names cons) drv
      HsNewTypeDecl loc ctxt n xs con drv ->
 	HsDataDecl loc ctxt n xs (restrictCons names [con]) drv	
-     HsClassDecl loc qt decls  ->
-	HsClassDecl loc qt (restrictDecls names decls)
+     HsClassDecl loc qt fds decls  ->
+	HsClassDecl loc qt fds (restrictDecls names decls)
      _ -> decl
    
 restrictCons :: [HsName] -> [HsConDecl] -> [HsConDecl]

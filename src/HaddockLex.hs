@@ -73,4 +73,4 @@ tokenise_string_newline str cs =
   case dropWhile nonNewlineSpace cs  of
    '\n':cs -> TokString (reverse str) : TokPara : tokenise_para cs
    _other -> tokenise_string ('\n':str) cs  -- don't throw away whitespace
-      
+

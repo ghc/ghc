@@ -70,7 +70,7 @@ ppIfaces mods
 	        ++ map ppHsName args)
             <+> vcat (zipWith (<+>) (equals : repeat (char '|'))
                                     (map ppHsConstr cons))
-     do_decl (HsClassDecl loc ty decl)
+     do_decl (HsClassDecl loc ty fds decl)
 	= hsep [text "class", ppHsType ty]
      do_decl decl
 	= empty

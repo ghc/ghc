@@ -445,7 +445,7 @@ doDecl doc_map summary decl = do_decl decl
      do_decl decl@(HsDataDecl loc ctx nm args cons drv) 
 	= ppHsDataDecl doc_map summary False{-not newtype-} decl
 
-     do_decl decl@(HsClassDecl _ _ _)
+     do_decl decl@(HsClassDecl _ _ _ _)
 	= ppHsClassDecl doc_map summary decl
 
      do_decl (HsDocGroup lev str) 
@@ -580,9 +580,15 @@ ppHsBangType (HsUnBangedTy ty) = ppHsAType ty
 -- -----------------------------------------------------------------------------
 -- Class declarations
 
-ppClassHdr ty = keyword "class" <+> ppHsType ty
+ppClassHdr ty fds = 
+  keyword "class" <+> ppHsType ty <+>
+  if null fds then noHtml else 
+	char '|' <+> hsep (punctuate comma (map fundep fds))
+  where
+	fundep (vars1,vars2) = hsep (map ppHsName vars1) <+> toHtml "->" <+>
+			       hsep (map ppHsName vars2)
 
-ppShortClassDecl doc_map summary decl@(HsClassDecl loc ty decls) = 
+ppShortClassDecl doc_map summary decl@(HsClassDecl loc ty fds decls) = 
   if null decls
     then declBox hdr
     else td << (
@@ -596,10 +602,10 @@ ppShortClassDecl doc_map summary decl@(HsClassDecl loc ty decls) =
          ))
    where
 	Just c = declMainBinder decl
-	hdr | not summary = linkTarget c +++ ppClassHdr ty
-	    | otherwise   = ppClassHdr ty
+	hdr | not summary = linkTarget c +++ ppClassHdr ty fds
+	    | otherwise   = ppClassHdr ty fds
 
-ppHsClassDecl doc_map summary decl@(HsClassDecl loc ty decls)
+ppHsClassDecl doc_map summary decl@(HsClassDecl loc ty fds decls)
   |  summary || (isNothing doc && all decl_has_no_doc kept_decls)
 	= ppShortClassDecl doc_map summary decl
 
@@ -611,8 +617,8 @@ ppHsClassDecl doc_map summary decl@(HsClassDecl loc ty decls)
 	Just c = declMainBinder decl
 
 	header
-	   | null decls = declBox (linkTarget c +++ ppClassHdr ty)
-	   | otherwise  = declBox (linkTarget c +++ ppClassHdr ty <+> 
+	   | null decls = declBox (linkTarget c +++ ppClassHdr ty fds)
+	   | otherwise  = declBox (linkTarget c +++ ppClassHdr ty fds <+> 
 					keyword "where")
 
 	classdoc

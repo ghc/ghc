@@ -85,10 +85,10 @@ renameDecl decl
         HsNewTypeDecl loc ctx t args con drv -> do
 	    con <- renameConDecl con
 	    return (HsNewTypeDecl loc ctx t args con drv)
-        HsClassDecl loc qt decls -> do
+        HsClassDecl loc qt fds decls -> do
 	    qt <- renameClassHead qt
 	    decls <- mapM renameDecl decls
-	    return (HsClassDecl loc qt decls)
+	    return (HsClassDecl loc qt fds decls)
 	HsTypeSig loc fs qt -> do
 	    qt <- renameType qt
 	    return (HsTypeSig loc fs qt)

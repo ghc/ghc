@@ -3,8 +3,6 @@ module HaddockParse (parseParas, parseString) where
 
 import HaddockLex
 import HaddockTypes
-
-import MonadError
 }
 
 %tokentype { Token }
@@ -59,5 +57,13 @@ elem	:: { ParsedDoc }
 {
 happyError :: [Token] -> Either String a
 happyError toks = 
-  throwError ("parse error in doc string: "  ++ show (take 3 toks))
+  Left ("parse error in doc string: "  ++ show (take 3 toks))
+
+-- Either monad (we can't use MonadError because GHC < 5.00 has
+-- an older incompatible version).
+instance Monad (Either String) where
+	return        = Right
+	Left  l >>= _ = Left l
+	Right r >>= k = k r
+	fail msg      = Left msg
 }

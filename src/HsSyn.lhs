@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.4 2002/04/25 14:40:05 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.5 2002/04/26 11:18:57 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -17,7 +17,7 @@ module HsSyn (
     HsGuardedRhs(..), HsType(..), HsContext, HsAsst,
     HsLiteral(..), HsExp(..), HsPat(..), HsPatField(..), HsStmt(..),
     HsFieldUpdate(..), HsAlt(..), HsGuardedAlts(..), HsGuardedAlt(..),
-    HsCallConv(..), HsFISafety(..),
+    HsCallConv(..), HsFISafety(..), HsFunDep,
 
     mkHsForAllType,
 
@@ -119,7 +119,7 @@ data HsDecl
 	 | HsDataDecl	 SrcLoc HsContext HsName [HsName] [HsConDecl] [HsQName]
 	 | HsInfixDecl   SrcLoc HsAssoc Int [HsName]
 	 | HsNewTypeDecl SrcLoc HsContext HsName [HsName] HsConDecl [HsQName]
-	 | HsClassDecl	 SrcLoc HsType [HsDecl]
+	 | HsClassDecl	 SrcLoc HsType [HsFunDep] [HsDecl]
 	 | HsInstDecl	 SrcLoc HsType [HsDecl]
 	 | HsDefaultDecl SrcLoc [HsType]
 	 | HsTypeSig	 SrcLoc [HsName] HsType
@@ -169,6 +169,7 @@ data HsType
 	 | HsTyCon   HsQName
   deriving (Eq,Show)
 
+type HsFunDep  = ([HsName], [HsName])
 type HsContext = [HsAsst]
 type HsAsst    = (HsQName,[HsType])	-- for multi-parameter type classes
 

@@ -1,5 +1,5 @@
-q-----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.4 2002/04/25 14:40:05 simonmar Exp $
+-----------------------------------------------------------------------------
+$Id: HsParser.ly,v 1.5 2002/04/26 11:18:57 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -299,8 +299,8 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| 'newtype' ctype srcloc '=' constr deriving
 >			{% checkDataHeader $2 `thenP` \(cs,c,t) ->
 >			   returnP (HsNewTypeDecl $3 cs c t $5 $6) }
->	| 'class' srcloc ctype optcbody	
->			{ HsClassDecl $2 $3 $4 }
+>	| 'class' srcloc ctype fds optcbody
+>			{ HsClassDecl $2 $3 $4 $5}
 >	| 'instance' srcloc ctype optvaldefs
 >			{ HsInstDecl $2 $3 $4 }
 >	| 'default' srcloc '(' typelist ')'
@@ -500,9 +500,24 @@ Datatype declarations
 -----------------------------------------------------------------------------
 Class declarations
 
+> fds :: { [HsFunDep] }
+> 	: {- empty -}			{ [] }
+> 	| '|' fds1			{ reverse $2 }
+
+> fds1 :: { [HsFunDep] }
+> 	: fds1 ',' fd			{ $3 : $1 }
+> 	| fd				{ [$1] }
+
+> fd :: { HsFunDep }
+> 	: varids0 '->' varids0		{ (reverse $1, reverse $3) }
+
+> varids0	:: { [HsName] }
+> 	: {- empty -}			{ [] }
+>	| varids0 tyvar			{ $2 : $1 }
+
 > optcbody :: { [HsDecl] }
->	: 'where' decllist			{ $2 }
->	| {- empty -}				{ [] }
+>	: 'where' decllist		{ $2 }
+>	| {- empty -}			{ [] }
 
 -----------------------------------------------------------------------------
 Instance declarations
