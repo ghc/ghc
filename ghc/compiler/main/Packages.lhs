@@ -222,7 +222,7 @@ readPackageConfig
    :: DynFlags -> PackageConfigMap -> FilePath -> IO PackageConfigMap
 readPackageConfig dflags pkg_map conf_file = do
   when (verbosity dflags >= 2) $
-	hPutStrLn stderr ("Reading package config file: "
+	hPutStrLn stderr ("Using package config file: "
 			 ++ conf_file)
   proto_pkg_configs <- loadPackageConfig conf_file
   top_dir 	    <- getTopDir
