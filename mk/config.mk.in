@@ -164,6 +164,24 @@ GhcHcOpts=-O -Rghc-timing
 # GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
 GhcWithHscBuiltViaC=@BootingFromHc@
 
+# Build a compiler that will build *unregisterised* libraries and
+# binaries by default.  Unregisterised code is supposed to compile and
+# run without any support for architecture-specific assembly mangling,
+# register assignment or tail-calls, and is therefore a good way to get
+# started when porting GHC to new architectures.
+#
+# If this is set to NO, you can still use the unregisterised way
+# (way 'u') to get unregisterised code, but the default way will be
+# registerised.
+#
+# NOTE: this is not the same as building the compiler itself
+# unregisterised.  That's done by either (a) bootstrapping with a
+# compiler that was built with GhcUnregisterized=YES, or (b)
+# bootstrapping with a compiler that has way 'u' libraries, and the
+# flag '-unreg' is added to GhcHcOpts above.
+#
+GhcUnregisterised=NO
+
 # Build a compiler with a native code generator backend
 # (as well as a C backend)
 #
