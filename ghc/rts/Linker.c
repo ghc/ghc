@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.38 2001/04/24 11:20:50 sewardj Exp $
+ * $Id: Linker.c,v 1.39 2001/04/24 15:49:19 qrczak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -70,7 +70,7 @@ typedef struct _RtsSymbolVal {
 #endif
 
 #if !defined (mingw32_TARGET_OS)
-#define RTS_POSIX_ONLY_SYMBOLS                  \         
+#define RTS_POSIX_ONLY_SYMBOLS                  \
       SymX(stg_sig_install)			\
       Sym(nocldstop)
 #else
@@ -251,7 +251,7 @@ typedef struct _RtsSymbolVal {
 #ifndef SUPPORT_LONG_LONGS
 #define RTS_LONG_LONG_SYMS /* nothing */
 #else
-#define RTS_LONG_LONG_SYMS \
+#define RTS_LONG_LONG_SYMS			\
       SymX(stg_gtWord64)			\
       SymX(stg_geWord64)			\
       SymX(stg_eqWord64)			\
@@ -295,6 +295,7 @@ typedef struct _RtsSymbolVal {
 #define Sym(vvv)  extern void (vvv);
 #define SymX(vvv) /**/
 RTS_SYMBOLS
+RTS_POSIX_ONLY_SYMBOLS
 #undef Sym
 #undef SymX
 
