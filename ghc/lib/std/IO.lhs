@@ -428,9 +428,6 @@ writeLines obj buf bufLen initPos s =
    shoveString n ls = 
      case ls of
       [] ->   
-        if n == 0 then
-	  setBufWPtr obj 0{-new pos-}
-        else do
 	  {-
 	    At the end of a buffer write, update the buffer position
 	    in the underlying file object, so that if the handle
@@ -476,9 +473,6 @@ writeLines obj buf (I# bufLen) (I# initPos#) s =
    shoveString n ls = 
      case ls of
       [] ->   
-        if n ==# 0# then
-	  setBufWPtr obj 0
-        else do
 	  {-
 	    At the end of a buffer write, update the buffer position
 	    in the underlying file object, so that if the handle
@@ -521,9 +515,6 @@ writeBlocks obj buf bufLen initPos s =
    shoveString n ls = 
      case ls of
       [] ->   
-        if n == 0 then
-          setBufWPtr obj (0::Int)
-        else do
 	  {-
 	    At the end of a buffer write, update the buffer position
 	    in the underlying file object, so that if the handle
@@ -570,9 +561,6 @@ writeBlocks obj buf (I# bufLen) (I# initPos#) s =
    shoveString n ls = 
      case ls of
       [] ->   
-        if n ==# 0# then
-          setBufWPtr obj (0::Int)
-        else do
 	  {-
 	    At the end of a buffer write, update the buffer position
 	    in the underlying file object, so that if the handle
