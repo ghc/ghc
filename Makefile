@@ -315,8 +315,7 @@ DIST_CLEAN_FILES += config.cache config.status
 ifeq "$(HAPPY)" "$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace"
 all :: $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace
 
-$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace :
-	cd ghc/includes && make boot
+$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace : glafp-utils
 	cd happy && make boot all
 endif
 
