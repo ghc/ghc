@@ -321,6 +321,20 @@ endif
 
 #----------------------------------------
 #	Building HsLibs libraries.
+#
+# Inputs:
+#   $(HSLIB) is the name of the library to build
+#   $(IS_CBITS_LIB) should be "YES" for a "cbits" library
+#
+# Outputs:
+#   $(LIBRARY)		the name of the library.a
+#   $(GHIC_LIBRARY)	the name of the library.o (for GHCi0
+#   $(LIBOBJS)		objects to put in library
+#   $(STUBOBJS)		more objects to put in library
+# 
+# $(LIBOBJS) is set to $(HS_OBJS) or $(C_OBJS) depending
+# on whether or not it's a "cbits" library.  But you can
+# override this by setting $(LIBOBJS) yourself
 
 ifneq "$(HSLIB)" ""
 
@@ -357,6 +371,15 @@ endif # HSLIB
 
 #----------------------------------------
 #	Libraries/archives
+#
+# Build $(LIBRARY) from $(LIBOJBS)+$(STUBOBJS)
+#
+# Inputs:
+#   $(LIBOBJS)
+#   $(STUBOBJS)
+#
+# Outputs:
+#   Rule to build $(LIBRARY)
 
 ifneq "$(LIBRARY)" ""
 all :: $(LIBRARY)
@@ -397,7 +420,7 @@ ifeq "$(GhcWithInterpreter)" "YES"
 HC_SPLIT_POST = ld -r -x -o $@ $(basename $@)/*.$(way_)o
 else
 HC_SPLIT_POST = touch $@
-endif
+endif # GhcWithInterpreter == YES
 
 SRC_HC_PRE_OPTS  += $(HC_SPLIT_PRE);
 SRC_HC_POST_OPTS += $(HC_SPLIT_POST);
@@ -430,35 +453,54 @@ SRC_HC_POST_OPTS += \
 else
 SRC_HC_POST_OPTS += \
   ld -r -x -o $@.tmp $@; $(MV) $@.tmp $@
-endif
-endif
+endif # SplitObjs
+endif # StripLibraries
 
 $(LIBRARY) :: $(STUBOBJS) $(LIBOBJS)
 	$(BUILD_LIB)
-endif
+endif # LIBRARY = ""
 
 #--------------------------------------------------------------
 #	Build dynamically-linkable libraries for GHCi
 #
+# Build $(GHCI_LIBRARY) from $(LIBOBJS)+$(STUBOBJS)
+#
+# Why?  GHCi can only link .o files (at the moment), not .a files
+# so we have to build libFoo.o as well as libFoo.a
+#
+# Furthermore, GHCi currently never loads 
+# profiling libraries (or other non-std ways)
+#
+# Inputs:
+#   $(GHCI_LIBRARY)
+#
+# Outputs:
+#   Rule to build $(GHCI_LIBRARY)
+
 
 ifneq "$(GHCI_LIBRARY)" ""
 ifeq "$(way)" ""
 ifeq "$(GhcWithInterpreter)" "YES"
 
-all :: $(GHCI_LIBRARY)
-
-ifeq "$(GHCI_LIBOBJS)" ""
-GHCI_LIBOBJS = $(LIBOBJS)
-endif
-
-$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
-	ld -r -x -o $@ $(GHCI_LIBOBJS) $(STUBOBJS)
 
 INSTALL_LIBS += $(GHCI_LIBRARY)
 CLEAN_FILES += $(GHCI_LIBRARY)
+
+all :: $(GHCI_LIBRARY)
+
+ifneq "$(HSLIB)" "std"
+# An annoying gotcha is that the Prelude is a bit special,
+# for reasons described in ghc/lib/std/Makefile.
+# So we only put in this standard rule for packages other than std
+# The rule for the Prelude is in ghc/lib/std/Makefile
+$(GHCI_LIBRARY) :: $(LIBOBJS)
+	ld -r -x -o $@ $(LIBOBJS) $(STUBOBJS)
 endif
-endif
-endif
+
+endif # GhcWithInterpreter
+endif # way
+endif # GHCI_LIBRARY
+
 
 #----------------------------------------
 #	Building Win32 DLLs

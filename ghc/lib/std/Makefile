@@ -34,9 +34,6 @@ endif
 
 HSLIB = std
 
-# we don't want PrelMain in the GHCi library.
-GHCI_LIBOBJS = $(filter-out PrelMain.$(way_)o,$(HS_OBJS))
-
 BOOT_SRCS += PrelPrimopWrappers.hs
 
 #-----------------------------------------------------------------------------
@@ -99,6 +96,35 @@ endif
 
 CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
+
+#-----------------------------------------------------------------------------
+# 	Building the library for GHCi
+#
+# The procedure differs from that in fptools/mk/target.mk in two ways:
+#  (a) we don't want PrelMain in the GHCi std library
+#  (b) on Win32 we must split it into two, because a single .o file can't
+#      
+
+# we don't want PrelMain in the GHCi library.
+GHCI_LIBOBJS = $(filter-out PrelMain.$(way_)o,$(HS_OBJS))
+
+
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+# 		Standard rule
+$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
+	ld -r -x -o $@ $(GHCI_LIBOBJS)
+
+else
+# 		Rule for Win32 platform
+# Keep HSstd.o as a pseudo-target (I think)
+HSstd.o :: $(GHCI_LIBOBJS)
+	ld -r -x -o HSstd1.o $(filter     Prel%, $(GHCI_LIBOBJS))
+	ld -r -x -o HSstd2.o $(filter-out Prel%, $(GHCI_LIBOBJS))
+endif # TARGETPLATFORM = win32
+
+
+
+
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
 #
@@ -118,6 +144,8 @@ INSTALL_LIBS  += PrelMain.dll_o
 endif
 
 INSTALL_DATAS += PrelGHC.$(way_)hi
+
+
 
 #-----------------------------------------------------------------------------
 # ILX stuff.  PLEASE IGNORE THIS UNLESS YOU'RE WORKING ON GHC.NET
