@@ -246,7 +246,7 @@ of the loop too, and it must be defined in this module.
 rnBindGroups :: [HsBindGroup RdrName] -> RnM ([HsBindGroup Name], DefUses)
 -- This version assumes that the binders are already in scope
 -- It's used only in 'mdo'
-rnBindGropus []
+rnBindGroups []
    = returnM ([], emptyDUs)
 rnBindGroups [HsBindGroup bind sigs _]
    = rnBinds NotTopLevel bind sigs
