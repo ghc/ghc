@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerInternals.h,v 1.5 2001/09/04 16:33:04 sewardj Exp $
+ * $Id: LinkerInternals.h,v 1.6 2002/06/09 13:37:44 matthewc Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -70,7 +70,13 @@ typedef struct _ObjectCode {
        safely be prodded during relocation.  Any attempt to prod
        outside one of these is an error in the linker. */
     ProddableBlock* proddables;
-    
+
+#ifdef ia64_TARGET_ARCH
+    /* Procedure Linkage Table for this object */
+    void *plt;
+    unsigned int pltIndex;
+#endif
+
 } ObjectCode;
 
 extern ObjectCode *objects;

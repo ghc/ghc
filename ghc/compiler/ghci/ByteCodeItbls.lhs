@@ -147,9 +147,8 @@ mkJumpToAddr a
            0x8610E000 .|. (lo10 w32),
            0x81C0C000,
            0x01000000 ]
-#endif
 
-#if i386_TARGET_ARCH
+#elif i386_TARGET_ARCH
 -- Let the address to jump to be 0xWWXXYYZZ.
 -- Generate   movl $0xWWXXYYZZ,%eax  ;  jmp *%eax
 -- which is
@@ -165,9 +164,8 @@ mkJumpToAddr a
                0xFF, 0xE0]
      in
          insnBytes
-#endif
 
-#if alpha_TARGET_ARCH
+#elif alpha_TARGET_ARCH
 type ItblCode = Word32
 mkJumpToAddr a
     = [ 0xc3800000      -- br   at, .+4
@@ -177,6 +175,11 @@ mkJumpToAddr a
       , fromIntegral (w64 .&. 0x0000FFFF)
       , fromIntegral ((w64 `shiftR` 32) .&. 0x0000FFFF) ]
     where w64 = fromIntegral (ptrToInt a) :: Word64
+
+#else
+type ItblCode = Word32
+mkJumpToAddr a
+    = undefined
 #endif
 
 
