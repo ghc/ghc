@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.24 $
- * $Date: 2000/01/05 13:53:37 $
+ * $Revision: 1.25 $
+ * $Date: 2000/01/11 15:40:57 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -461,7 +461,7 @@ extern Module findFakeModule ( Text t );
 extern Tycon addTupleTycon ( Int n );
 extern Name addWiredInBoxingTycon
                ( String modNm, String typeNm, String constrNm,
-                 Int arity, Int no, Int rep );
+                 Int rep, Kind kind );
 Tycon addWiredInEnumTycon ( String modNm, String typeNm, 
                             List /*of Text*/ constrs );
 

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/01/11 14:21:43 $
+ * $Revision: 1.33 $
+ * $Date: 2000/01/11 15:40:57 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -532,16 +532,16 @@ Int what; {
                module(modulePrelude).objectExtraNames 
                   = singleton(findText("libHS_cbits"));
 
-               nameMkC = addWiredInBoxingTycon("PrelBase","Char",  "C#",1,0,CHAR_REP  );
-               nameMkI = addWiredInBoxingTycon("PrelBase","Int",   "I#",1,0,INT_REP   );
-               nameMkW = addWiredInBoxingTycon("PrelAddr","Word",  "W#",1,0,WORD_REP  );
-               nameMkA = addWiredInBoxingTycon("PrelAddr","Addr",  "A#",1,0,ADDR_REP  );
-               nameMkF = addWiredInBoxingTycon("PrelFloat","Float", "F#",1,0,FLOAT_REP );
-               nameMkD = addWiredInBoxingTycon("PrelFloat","Double","D#",1,0,DOUBLE_REP);
+               nameMkC = addWiredInBoxingTycon("PrelBase", "Char",  "C#",CHAR_REP,   STAR );
+               nameMkI = addWiredInBoxingTycon("PrelBase", "Int",   "I#",INT_REP,    STAR );
+               nameMkW = addWiredInBoxingTycon("PrelAddr", "Word",  "W#",WORD_REP,   STAR );
+               nameMkA = addWiredInBoxingTycon("PrelAddr", "Addr",  "A#",ADDR_REP,   STAR );
+               nameMkF = addWiredInBoxingTycon("PrelFloat","Float", "F#",FLOAT_REP,  STAR );
+               nameMkD = addWiredInBoxingTycon("PrelFloat","Double","D#",DOUBLE_REP, STAR );
                nameMkInteger            
-                       = addWiredInBoxingTycon("PrelNum","Integer","Integer#",1,0,0);
+                       = addWiredInBoxingTycon("PrelNum","Integer","Integer#",0 ,STAR );
                nameMkPrimByteArray      
-                       = addWiredInBoxingTycon("PrelGHC","ByteArray","PrimByteArray#",1,0,0);
+                       = addWiredInBoxingTycon("PrelGHC","ByteArray","PrimByteArray#",0 ,STAR );
 
                for (i=0; i<NUM_TUPLES; ++i) {
                    addTupleTycon(i);

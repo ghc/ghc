@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.37 $
- * $Date: 2000/01/11 14:51:43 $
+ * $Revision: 1.38 $
+ * $Date: 2000/01/11 15:40:57 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -779,24 +779,25 @@ Module findFakeModule ( Text t )
 
 Name addWiredInBoxingTycon
         ( String modNm, String typeNm, String constrNm,
-          Int arity, Int no, Int rep )
+          Int rep, Kind kind )
 {
-   Name  n;
-   Tycon t;
-   Text modT  = findText(modNm);
-   Text typeT = findText(typeNm);
-   Text conT  = findText(constrNm);
-   Module m = findFakeModule(modT);
+   Name   n;
+   Tycon  t;
+   Text   modT  = findText(modNm);
+   Text   typeT = findText(typeNm);
+   Text   conT  = findText(constrNm);
+   Module m     = findFakeModule(modT);
    setCurrModule(m);
    
    n = newName(conT,NIL);
-   name(n).arity = arity;
-   name(n).number = cfunNo(no);
-   name(n).type = NIL;
+   name(n).arity  = 1;
+   name(n).number = cfunNo(0);
+   name(n).type   = NIL;
    name(n).primop = (void*)rep;
 
    t = newTycon(typeT);
    tycon(t).what = DATATYPE;
+   tycon(t).kind = kind;
    return n;
 }
 
