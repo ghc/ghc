@@ -86,10 +86,10 @@ byteCodeGen dflags binds local_tycons local_classes
         let flatBinds = concatMap getBind binds
             getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
             getBind (Rec binds)       = [(bndr, freeVars rhs) | (bndr,rhs) <- binds]
-            final_state = runBc (BcM_State [] 0) 
-                                (mapBc (schemeR True) flatBinds
-					`thenBc_` returnBc ())
-            (BcM_State proto_bcos final_ctr) = final_state
+
+        (BcM_State proto_bcos final_ctr, ())
+           <- runBc (BcM_State [] 0) 
+                    (mapBc (schemeR True) flatBinds `thenBc_` returnBc ())
 
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
            "Proto-bcos" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
@@ -113,9 +113,10 @@ coreExprToBCOs dflags expr
 				     (panic "invented_id's type")
       let invented_name = idName invented_id
 
-      let (BcM_State all_proto_bcos final_ctr) 
-             = runBc (BcM_State [] 0) 
-                     (schemeR True (invented_id, freeVars expr))
+      (BcM_State all_proto_bcos final_ctr, ()) 
+         <- runBc (BcM_State [] 0) 
+                  (schemeR True (invented_id, freeVars expr))
+
       dumpIfSet_dyn dflags Opt_D_dump_BCOs
          "Proto-bcos" (vcat (intersperse (char ' ') (map ppr all_proto_bcos)))
 
@@ -709,21 +710,24 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
             void marshall_code ( StgWord* ptr_to_top_of_stack )
          -}
          -- resolve static address
-         (is_static, static_target_addr)
+         get_target_info
             = case target of
                  DynamicTarget
-                    -> (False, panic "ByteCodeGen.generateCCall(dyn)")
+                    -> returnBc (False, panic "ByteCodeGen.generateCCall(dyn)")
                  StaticTarget target
-                    -> let unpacked = _UNPK_ target
-                       in  case unsafePerformIO (lookupSymbol unpacked) of
-                              Just aa -> case aa of Ptr a# -> (True, A# a#)
-                              Nothing -> invalid
+                    -> ioToBc (lookupSymbol (_UNPK_ target)) `thenBc` \res ->
+                       case res of
+                           Just aa -> case aa of Ptr a# -> returnBc (True, A# a#)
+                           Nothing -> returnBc invalid
                  CasmTarget _
-                    -> invalid
+                    -> returnBc invalid
                  where
                     invalid = pprPanic ("ByteCodeGen.generateCCall: unfindable " 
                                         ++ "symbol or otherwise invalid target")
                                        (ppr ccall_spec)
+     in
+         get_target_info	`thenBc` \ (is_static, static_target_addr) ->
+     let
 
          -- Get the arg reps, zapping the leading Addr# in the dynamic case
          a_reps -- | trace (showSDoc (ppr a_reps_pushed_RAW)) False = error "???"
@@ -753,22 +757,22 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                       `appOL` 
                       unitOL (PUSH_TAG r_usizeW)
 
-         -- do the call
-         do_call      = unitOL (CCALL addr_of_marshaller)
-         -- slide and return
-         wrapup       = mkSLIDE r_tsizeW (d_after_r - r_tsizeW - s)
-                        `snocOL` RETURN r_rep
-
          -- generate the marshalling code we're going to call
          r_offW       = 0 
          addr_offW    = r_tsizeW
          arg1_offW    = r_tsizeW + addr_tsizeW
          args_offW    = map (arg1_offW +) 
                             (init (scanl (+) 0 (map taggedSizeW a_reps)))
-         addr_of_marshaller
-                      = mkMarshalCode cconv
-                                      (r_offW, r_rep) addr_offW
-                                      (zip args_offW a_reps)
+     in
+         ioToBc (mkMarshalCode cconv
+                    (r_offW, r_rep) addr_offW
+                    (zip args_offW a_reps))	`thenBc` \ addr_of_marshaller ->
+     let
+         -- do the call
+         do_call      = unitOL (CCALL addr_of_marshaller)
+         -- slide and return
+         wrapup       = mkSLIDE r_tsizeW (d_after_r - r_tsizeW - s)
+                        `snocOL` RETURN r_rep
      in
          --trace (show (arg1_offW, args_offW  ,  (map taggedSizeW a_reps) )) (
          returnBc (
@@ -791,18 +795,18 @@ mkDummyLiteral pr
 
 
 -- Convert (eg) 
---       PrelGHC.Int# -> PrelGHC.State# PrelGHC.RealWorld
---                    -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
+--     PrelGHC.Char# -> PrelGHC.State# PrelGHC.RealWorld
+--                   -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
 --
--- to    Just IntRep
--- and check that an unboxed pair isreturned wherein the first arg is VoidRep'd.
+-- to  Just IntRep
+-- and check that an unboxed pair is returned wherein the first arg is VoidRep'd.
 --
 -- Alternatively, for call-targets returning nothing, convert
 --
---       PrelGHC.Int# -> PrelGHC.State# PrelGHC.RealWorld
---                    -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
+--     PrelGHC.Char# -> PrelGHC.State# PrelGHC.RealWorld
+--                   -> (# PrelGHC.State# PrelGHC.RealWorld #)
 --
--- to    Nothing
+-- to  Nothing
 
 maybe_getCCallReturnRep :: Type -> Maybe PrimRep
 maybe_getCCallReturnRep fn_ty
@@ -1232,21 +1236,31 @@ data BcM_State
    = BcM_State { bcos      :: [ProtoBCO Name],	-- accumulates completed BCOs
                  nextlabel :: Int }		-- for generating local labels
 
-type BcM result = BcM_State -> (result, BcM_State)
+type BcM r = BcM_State -> IO (BcM_State, r)
 
-runBc :: BcM_State -> BcM () -> BcM_State
-runBc init_st m = case m init_st of { (r,st) -> st }
+ioToBc :: IO a -> BcM a
+ioToBc io st = do x <- io 
+                  return (st, x)
+
+runBc :: BcM_State -> BcM r -> IO (BcM_State, r)
+runBc st0 m = do (st1, res) <- m st0
+                 return (st1, res)
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
-thenBc expr cont st
-  = case expr st of { (result, st') -> cont result st' }
+thenBc expr cont st0
+   = do (st1, q) <- expr st0
+        (st2, r) <- cont q st1
+        return (st2, r)
 
 thenBc_ :: BcM a -> BcM b -> BcM b
-thenBc_ expr cont st
-  = case expr st of { (result, st') -> cont st' }
+thenBc_ expr cont st0
+   = do (st1, q) <- expr st0
+        (st2, r) <- cont st1
+        return (st2, r)
 
 returnBc :: a -> BcM a
-returnBc result st = (result, st)
+returnBc result st = return (st, result)
+
 
 mapBc :: (a -> BcM b) -> [a] -> BcM [b]
 mapBc f []     = returnBc []
@@ -1257,15 +1271,15 @@ mapBc f (x:xs)
 
 emitBc :: ProtoBCO Name -> BcM ()
 emitBc bco st
-   = ((), st{bcos = bco : bcos st})
+   = return (st{bcos = bco : bcos st}, ())
 
 getLabelBc :: BcM Int
 getLabelBc st
-   = (nextlabel st, st{nextlabel = 1 + nextlabel st})
+   = return (st{nextlabel = 1 + nextlabel st}, nextlabel st)
 
 getLabelsBc :: Int -> BcM [Int]
 getLabelsBc n st
    = let ctr = nextlabel st 
-     in  ([ctr .. ctr+n-1], st{nextlabel = ctr+n})
+     in return (st{nextlabel = ctr+n}, [ctr .. ctr+n-1])
 
 \end{code}

@@ -15,7 +15,7 @@ import Bits		( Bits(..), shiftR )
 import Word		( Word8, Word32 )
 import Addr		( Addr(..), writeWord8OffAddr )
 import Foreign		( Ptr(..), mallocBytes )
-import IOExts		( unsafePerformIO, trace )
+import IOExts		( trace )
 
 \end{code}
 
@@ -83,11 +83,11 @@ we don't clear our own (single) arg off the C stack.
 -}
 mkMarshalCode :: CCallConv
               -> (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
-              -> Addr
+              -> IO Addr
 mkMarshalCode cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
    = let bytes = mkMarshalCode_wrk cconv (r_offW, r_rep) 
                                    addr_offW arg_offs_n_reps
-     in  unsafePerformIO (sendBytesToMallocville bytes)
+     in  sendBytesToMallocville bytes
 
 
 
