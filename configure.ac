@@ -478,24 +478,21 @@ dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
 
 AC_ARG_WITH(ghc,
-[  --with-ghc=<haskell compiler>
-        Use a command different from 'ghc' to compile GHC-specific Haskell code
-	    (including GHC itself).
-],
+[AC_HELP_STRING([--with-ghc=ARG],
+	[Use ARG as the path to GHC  [default=autodetect]])],
 [ WithGhc="$withval" ],
 [ 
   if test "$GHC" = ""; then
     AC_PATH_PROG(GHC,ghc)
   fi
   WithGhc=$GHC
-]
-)
+])
 AC_SUBST(WithGhc)
 
 AC_ARG_WITH(hc,
-[  --with-hc=<haskell compiler>
-        Use a command different from 'ghc' to compile generic Haskell code.
-],
+[AC_HELP_STRING([--with-hc=ARG],
+        [Use ARG as the path to the compiler for compiling ordinary
+	 Haskell code  (default= value of --with-ghc)])],
 [WithHc="$withval"],
 [WithHc=$WithGhc]
 )
@@ -515,9 +512,8 @@ AC_PATH_PROG(HBC,hbc)
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_ARG_WITH(gcc,
-[  --with-gcc=<gcc command>
-        Use a different command instead of 'gcc' for the GNU C compiler.
-],
+[AC_HELP_STRING([--with-gcc=ARG],
+        [Use ARG as the path to GCC  [default=autodetect]])],
 [WhatGccIsCalled="$withval"
  if test "x$HostPlatform" = "xi386-unknown-mingw32"; then
     # Canonicalise to <drive>:/path/to/gcc
@@ -531,11 +527,15 @@ AC_SUBST(WhatGccIsCalled)
 dnl ** Booting from .hc files?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hc-boot,
-[  --enable-hc-boot
-        Boot the Glasgow Haskell Compiler from intermediate .hc files.
-        (This option is mostly of interest to porters.)
+[AC_HELP_STRING([--enable-hc-boot],
+[Boot the Glasgow Haskell Compiler from intermediate .hc files.
+ (This option is mostly of interest to porters.) [default=no]])],
+[ if test x"$enableval" = x"yes"; then
+	BootingFromHc=YES
+  else
+	BootingFromHc=NO
+  fi
 ],
-[BootingFromHc=YES],
 [BootingFromHc=NO]
 )
 AC_SUBST(BootingFromHc)
@@ -543,12 +543,16 @@ AC_SUBST(BootingFromHc)
 dnl ** Booting from unregisterised .hc files?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hc-boot-unregisterised,
-[  --enable-hc-boot-unregisterised
-        With --enable-hc-boot, treat the intermediate .hc files as
-        unregisterised rather than registerised code.
-        (This option is mostly of interest to porters.)
+[AC_HELP_STRING([--enable-hc-boot-unregisterised],
+[ With --enable-hc-boot, treat the intermediate .hc files as
+ unregisterised rather than registerised code.
+ (This option is mostly of interest to porters.) [default=no]])],
+[ if test x"$enableval" = x"yes"; then
+	BootingFromUnregisterisedHc=YES
+  else
+	BootingFromUnregisterisedHc=NO
+  fi
 ],
-[BootingFromUnregisterisedHc=YES],
 [BootingFromUnregisterisedHc=NO]
 )
 AC_SUBST(BootingFromUnregisterisedHc)
@@ -567,10 +571,14 @@ fi;
 dnl ** Enable multi-thread friendly RTS?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(threaded-rts,
-[  --enable-threaded-rts
-        Support better interop with OS threads.
+[AC_HELP_STRING([--enable-threaded-rts],
+[Support better interop with OS threads. [default=no]])],
+[ if test x"$enableval" = x"yes"; then
+	ThreadedRts=YES
+  else
+	ThreadedRts=NO
+  fi
 ],
-[ThreadedRts=YES],
 [ThreadedRts=NO]
 )
 AC_SUBST(ThreadedRts)
@@ -611,10 +619,14 @@ dnl fi
 dnl ** Enable the building of the ObjectIO?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(objectio,
-[  --enable-objectio
-        Build ObjectIO, a portable GUI library for Haskell.
+[AC_HELP_STRING([--enable-objectio],
+[Build ObjectIO, a portable GUI library for Haskell. [default=no]])],
+[ if test x"$enableval" = x"yes"; then
+	GhcLibsWithObjectIO=YES
+  else
+	GhcLibsWithObjectIO=NO
+  fi
 ],
-[GhcLibsWithObjectIO=YES],
 [GhcLibsWithObjectIO=NO]
 )
 AC_SUBST(GhcLibsWithObjectIO)
@@ -624,21 +636,26 @@ dnl --------------------------------------------------------------
 AC_ARG_ENABLE([openal],
   AC_HELP_STRING([--enable-openal],
                  [Build OpenAL binding [[default=autodetect]]]),
-  [GhcLibsWithOpenAL=$enableval],
+  [ if test x"$enableval" = x"yes"; then
+	GhcLibsWithOpenAL=YES
+    else
+	GhcLibsWithOpenAL=NO
+    fi
+  ],
   [GhcLibsWithOpenAL=yes])
-
-# This is silly! Alas, "YES" and "NO" are currently our standard...
-GhcLibsWithOpenAL=`echo $GhcLibsWithOpenAL | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'`
 
 AC_SUBST([GhcLibsWithOpenAL])
 
 dnl ** .NET interop support?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(dotnet,
-[  --enable-dotnet
-        Build .NET interop layer.
-],
-[DotnetSupport=YES; AC_DEFINE([WANT_DOTNET_SUPPORT], [1], [Define to 1 if you want to include .NET interop support.])],
+[AC_HELP_STRING([--enable-dotnet],
+[Build .NET interop layer. [default=no]])],
+[ if test x"$enableval" = x"yes"; then
+	DotnetSupport=YES; AC_DEFINE([WANT_DOTNET_SUPPORT], [1], [Define to 1 if you want to include .NET interop support.])
+  else 
+	DotnetSupport=NO
+  fi],
 [DotnetSupport=NO]
 )
 AC_SUBST(DotnetSupport)
@@ -779,9 +796,8 @@ else
 fi
 
 AC_ARG_WITH(greencard,
-[  --with-greencard=<greencard compiler>
-        Use a command different from 'greencard' to compile GreenCard files
-],
+[AC_HELP_STRING([--with-greencard=ARG],
+        [Use ARG as the path to greencard  [default=autodetct]])],
 [
 GreenCardCmd=$withval;
 FPTOOLS_GREENCARD(3.00)
@@ -789,10 +805,15 @@ FPTOOLS_GREENCARD(3.00)
 )
 
 AC_ARG_ENABLE(src-tree-happy,
-[  --enable-src-tree-happy
-        Build and use source tree (fptools/happy) version of Happy.
+[AC_HELP_STRING([--enable-src-tree-happy],
+	[Build and use source tree (fptools/happy) version of Happy. 
+	 [default=autodetect]])],
+[ if test x"$enableval" = x"yes"; then
+	UseSrcTreeHappy=YES
+  else
+	UseSrcTreeHappy=NO
+  fi
 ],
-[UseSrcTreeHappy=YES],
 [UseSrcTreeHappy=NO]
 )
 dnl ** check for installed happy binary + version
@@ -802,20 +823,30 @@ FPTOOLS_HAPPY
 fi;
 
 AC_ARG_ENABLE(src-tree-haddock,
-[  --enable-src-tree-haddock
-        Build and use source tree (fptools/haddock) version of Haddock.
+[AC_HELP_STRING([--enable-src-tree-haddock],
+        [Build and use source tree (fptools/haddock) version of Haddock.
+	 [default=autodetect]])],
+[ if test x"$enableval" = x"yes"; then
+	UseSrcTreeHaddock=YES
+  else
+	UseSrcTreeHaddock=NO
+  fi
 ],
-[UseSrcTreeHaddock=YES],
 [UseSrcTreeHaddock=NO]
 )
 dnl ** check for installed haddock
 FPTOOLS_HADDOCK
 
 AC_ARG_ENABLE(src-tree-alex,
-[  --enable-src-tree-alex
-        Build and use source tree (fptools/alex) version of Alex.
+[AC_HELP_STRING([--enable-src-tree-alex],
+        [Build and use source tree (fptools/alex) version of Alex.
+	 [default=autodetect]])],
+[ if test x"$enableval" = x"yes"; then
+	UseSrcTreeAlex=YES
+  else
+	UseSrcTreeAlex=NO
+  fi
 ],
-[UseSrcTreeAlex=YES],
 [UseSrcTreeAlex=NO]
 )
 dnl ** check for installed alex binary + version
