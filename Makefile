@@ -101,7 +101,7 @@ ifeq "$(BIN_DIST)" ""
 	echo "WARNING: To run the binary-dist target, you need to set BIN_DIST=1 in your build.mk" && exit 1
 endif
 	-rm -rf $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
-	-rm -f $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
+	-$(RM) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
 	@for i in $(BIN_DIST_DIRS); do 		 	 \
 	  if test -d "$$i"; then 			 \
 	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
@@ -224,7 +224,7 @@ endif
 
 ifneq "$(way)" ""
 remove-way-dist::
-	( cd $(BIN_DIST_TMPDIR); $(FIND) $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print -exec rm -f {} \; )
+	( cd $(BIN_DIST_TMPDIR); $(FIND) $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print -exec $(RM) {} \; )
 endif
 
 binary-dist::
@@ -266,7 +266,7 @@ dist :: distclean
 
 dist ::
 	-rm -rf $(SRC_DIST_DIR)
-	-rm -f $(SRC_DIST_NAME).tar.gz
+	-$(RM) $(SRC_DIST_NAME).tar.gz
 	mkdir $(SRC_DIST_DIR)
 	mkdir $(SRC_DIST_DIR)/mk
 	( cd $(FPTOOLS_TOP_ABS); $(FIND) $(SRC_DIST_DIRS) -type d \( -name CVS -prune -o -name SRC -prune -o -print \) | sed -e 's!.*!mkdir "$(SRC_DIST_DIR)/&"!' | sh )
