@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.70 2001/10/22 16:02:44 sewardj Exp $
+ * $Id: Linker.c,v 1.71 2001/10/22 22:55:31 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -142,23 +142,13 @@ typedef struct _RtsSymbolVal {
       Sym(_imp___iob)                           \
       Sym(localtime)                            \
       Sym(gmtime)                               \
-      SymX(getenv)                              \
-      SymX(free)                                \
-      SymX(rename)                              \
       Sym(opendir)                              \
       Sym(readdir)                              \
       Sym(closedir)                             \
-      SymX(GetCurrentProcess)                   \
-      SymX(GetProcessTimes)                     \
-      SymX(CloseHandle)                         \
-      SymX(GetExitCodeProcess)                  \
-      SymX(WaitForSingleObject)                 \
-      SymX(CreateProcessA)                      \
       Sym(__divdi3)                             \
       Sym(__udivdi3)                            \
       Sym(__moddi3)                             \
-      Sym(__umoddi3)                            \
-      SymX(_errno)
+      Sym(__umoddi3)
 #endif
 
 
@@ -543,7 +533,7 @@ lookupSymbol( char *lbl )
         OpenedDLL* o_dll;
         void* sym;
         for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
-           /* fprintf(stderr, "look in %s for %s\n", o_dll->name, lbl); */
+	  /* fprintf(stderr, "look in %s for %s\n", o_dll->name, lbl); */
            if (lbl[0] == '_') {
               /* HACK: if the name has an initial underscore, try stripping
                  it off & look that up first. I've yet to verify whether there's
@@ -551,10 +541,16 @@ lookupSymbol( char *lbl )
                  stripped off when mapping from import lib name to the DLL name.
               */
               sym = GetProcAddress(o_dll->instance, (lbl+1));
-              if (sym != NULL) return sym;
+              if (sym != NULL) {
+		/*fprintf(stderr, "found %s in %s\n", lbl+1,o_dll->name); fflush(stderr);*/
+		return sym;
+	      } 
            }
            sym = GetProcAddress(o_dll->instance, lbl);
-           if (sym != NULL) return sym;
+           if (sym != NULL) {
+	     /*fprintf(stderr, "found %s in %s\n", lbl,o_dll->name); fflush(stderr);*/
+	     return sym;
+	   }
         }
         return NULL;
 #       else
