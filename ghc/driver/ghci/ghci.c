@@ -1,6 +1,6 @@
 /*
  *
- * $Id: ghci.c,v 1.4 2001/10/10 17:25:15 sof Exp $
+ * $Id: ghci.c,v 1.5 2002/01/07 16:32:54 sof Exp $
  *
  * ghci wrapper - invokes ghc.exe with the added command-line
  *                option "--interactive".
@@ -25,7 +25,7 @@
  *   * Compile it up (assuming the .ico file is in the same dir
  *     as the .rc file):
  *
- *         MSVC:    rc /I. ghci.rc /o ghci.res
+ *         MSVC:    rc /i. /fo ghci.res ghci.rc 
  *         mingw:   windres -o ghci.res -i ghci.rc -O coff
  *
  *   * Add the resulting .res file to the link line of the wrapper:
