@@ -588,13 +588,16 @@ FPTOOLS_DOCBOOK_CATALOG(Catalog, $JadeCmd, docs/fptools-both.dsl,
 if test -z "$Catalog"; then
   AC_MSG_RESULT([Warning: You will not be able to build the documentation.])
 fi
-case $HostOS_CPP in
-   mingw32)
-      Catalog=`cygpath -w $hardtop/$Catalog`
-      ;;
-   *)
-      Catalog=$hardtop/$Catalog
-      ;;
+case $Catalog in
+   glafp*) 
+	case $HostOS_CPP in
+	   mingw32)
+	      Catalog=`cygpath -w $hardtop/$Catalog`
+	      ;;
+	   *) Catalog=$hardtop/$Catalog
+	      ;;
+	esac
+   ;;
 esac   
 AC_SUBST(Catalog)
 
