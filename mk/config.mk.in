@@ -764,12 +764,6 @@ HaveLibMingwEx	= @HaveLibMingwEx@
 HaveFrameworkHaskellSupport = @HaveFrameworkHaskellSupport@
 
 #-----------------------------------------------------------------------------
-# Regex library
-# (if present in libc use that one, otherwise use the one in the tree)
-#
-HavePosixRegex  = @HavePosixRegex@
-
-#-----------------------------------------------------------------------------
 # Flex (currently unused, could be moved to glafp-utils)
 
 # FLEX			= @LEX@

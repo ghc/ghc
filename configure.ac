@@ -951,11 +951,6 @@ AC_SUBST(GhcLibsWithReadline)
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME
 
-dnl ** check for POSIX regex
-HavePosixRegex=NO
-AC_CHECK_HEADERS([regex.h], [AC_CHECK_FUNCS(regcomp, [HavePosixRegex=YES])])
-AC_SUBST(HavePosixRegex)
-
 dnl ** how do we get a timezone name, and UTC offset ?
 AC_STRUCT_TIMEZONE
 
