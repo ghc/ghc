@@ -97,8 +97,17 @@ stage_dirs :
 	    $(MKDIRHIER) stage$(stage)/$$i; \
 	done
 
-boot :: stage_dirs
+ifeq "$(stage) $(ghc_ge_603)" "1 YES"
+UsingHsBoot = YES
+else
+ifneq "$(findstring $(stage), 2 3)" ""
+UsingHsBoot = YES
+else
+UsingHsBoot = NO
+endif
+endif
 
+boot :: stage_dirs
 # On Windows, we can't use symbolic links for the -hi-boot files
 # because GHC itself is a Mingw program and does not understand
 # symbolic links.  So we have to copy the files instead of link them.
@@ -108,8 +117,7 @@ boot :: stage_dirs
 # PS: 'ln -s foo baz' takes 'foo' relative to the path to 'baz'
 #     whereas 'cp foo baz' treats the two paths independently.
 #     Hence the "../.." in the ln command line
-ifeq "$(stage)" "1"
-ifeq "$(ghc_ge_603)" "NO"
+ifeq "$(UsingHsBoot)" "NO"
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 	for i in */*hi-boot*; do \
 	    cp -u -f $$i stage$(stage)/$$i; \
@@ -118,7 +126,6 @@ else
 	for i in */*hi-boot*; do \
 	    $(LN_S) -f ../../$$i stage$(stage)/$$i || true ; \
 	done
-endif
 endif
 endif
 
@@ -150,7 +157,14 @@ SRC_HC_OPTS += $(patsubst %, -i$(odir)/%, $(ALL_DIRS))
 HS_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(HS_SRCS))))
 C_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(C_SRCS))))
 
+# Our standard cleaning rules don't know that we're doing our output into $(odir), so
+# we have to augment CLEAN_FILES appropriateliy.
+
 CLEAN_FILES += $(odir)/*/*.hi
+
+ifeq "$(UsingHsBoot)" "YES"
+CLEAN_FILES += $(odir)/*/*.hi-boot $(odir)/*/*.o-boot
+endif
 
 ifeq "$(stage)" "1"
 mostlyclean clean distclean maintainer-clean ::
