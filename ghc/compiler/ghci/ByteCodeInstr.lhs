@@ -87,6 +87,8 @@ data BCInstr
    | TESTEQ_P  Int    LocalLabel
 
    | CASEFAIL
+   | JMP              LocalLabel
+
    -- To Infinity And Beyond
    | ENTER
    | RETURN	PrimRep
@@ -132,6 +134,7 @@ instance Outputable BCInstr where
    ppr (TESTEQ_D  d lab)     = text "TESTEQ_D" <+> double d <+> text "__" <> int lab
    ppr (TESTLT_P  i lab)     = text "TESTLT_P" <+> int i <+> text "__" <> int lab
    ppr (TESTEQ_P  i lab)     = text "TESTEQ_P" <+> int i <+> text "__" <> int lab
+   ppr (JMP lab)             = text "JMP"      <+> int lab
    ppr CASEFAIL              = text "CASEFAIL"
    ppr ENTER                 = text "ENTER"
    ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
@@ -162,6 +165,7 @@ bciStackUse (TESTEQ_D  d lab)     = 0
 bciStackUse (TESTLT_P  i lab)     = 0
 bciStackUse (TESTEQ_P  i lab)     = 0
 bciStackUse CASEFAIL              = 0
+bciStackUse (JMP lab)             = 0
 bciStackUse ENTER                 = 0
 bciStackUse (RETURN pk)           = 0
 

@@ -250,6 +250,7 @@ mkBits findLabel st proto_insns
                TESTLT_P  i l      -> instr3 st i_TESTLT_P i (findLabel l)
                TESTEQ_P  i l      -> instr3 st i_TESTEQ_P i (findLabel l)
                CASEFAIL           -> instr1 st i_CASEFAIL
+               JMP l              -> instr2 st i_JMP (findLabel l)
                ENTER              -> instr1 st i_ENTER
                RETURN rep         -> do (itbl_no,st2) <- itoc_itbl st rep
                                         instr2 st2 i_RETURN itbl_no
@@ -376,6 +377,7 @@ instrSize16s instr
         TESTEQ_D _ _   -> 3
         TESTLT_P _ _   -> 3
         TESTEQ_P _ _   -> 3
+        JMP      _     -> 2
         CASEFAIL       -> 1
         ENTER          -> 1
         RETURN   _     -> 2
@@ -587,6 +589,7 @@ i_CASEFAIL = (bci_CASEFAIL :: Int)
 i_ENTER    = (bci_ENTER :: Int)
 i_RETURN   = (bci_RETURN :: Int)
 i_STKCHECK = (bci_STKCHECK :: Int)
+i_JMP      = (bci_JMP :: Int)
 
 iNTERP_STACK_CHECK_THRESH = (INTERP_STACK_CHECK_THRESH :: Int)
 

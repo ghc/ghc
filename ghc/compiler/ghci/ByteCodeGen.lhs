@@ -12,23 +12,23 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 #include "HsVersions.h"
 
 import Outputable
-import Name		( Name, getName, mkSysLocalName )
+import Name		( Name, getName )
 import Id		( Id, idType, isDataConId_maybe, isPrimOpId_maybe,
 			  idPrimRep, mkSysLocal, idName )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM,
-			  addToFM, lookupFM, fmToList, plusFM )
+			  addToFM, lookupFM, fmToList )
 import CoreSyn
 import PprCore		( pprCoreExpr )
 import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
 import PrimOp		( PrimOp(..)  )
 import CoreFVs		( freeVars )
-import Type		( typePrimRep )
+import Type		( typePrimRep, splitTyConApp_maybe )
 import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, 
                           dataConWrapId, isUnboxedTupleCon )
-import TyCon		( TyCon, tyConFamilySize )
+import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons )
 import Class		( Class, classTyCon )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
 import Var		( isTyVar )
@@ -46,7 +46,7 @@ import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 			  ClosureEnv, HValue, filterNameMap,
 			  iNTERP_STACK_CHECK_THRESH )
 
-import List		( intersperse, sortBy )
+import List		( intersperse, sortBy, zip4 )
 import Foreign		( Ptr(..), mallocBytes )
 import Addr		( Addr(..), addrToInt, writeCharOffAddr )
 import CTypes		( CInt )
@@ -261,10 +261,10 @@ schemeE :: Int -> Sequel -> BCEnv -> AnnExpr Id VarSet -> BcM BCInstrList
 
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(fvs, AnnApp f a) 
-   = returnBc (schemeT d s p (fvs, AnnApp f a))
+   = schemeT d s p (fvs, AnnApp f a)
 schemeE d s p e@(fvs, AnnVar v)
    | isFollowableRep v_rep
-   = returnBc (schemeT d s p (fvs, AnnVar v))
+   = schemeT d s p (fvs, AnnVar v)
 
    | otherwise
    = -- returning an unboxed value.  Heave it on the stack, SLIDE, and RETURN.
@@ -398,7 +398,14 @@ schemeE d s p other
                (pprCoreExpr (deAnnotate other))
 
 
--- Compile code to do a tail call.  Three cases:
+-- Compile code to do a tail call.  Specifically, push the fn,
+-- slide the on-stack app back down to the sequel depth,
+-- and enter.  Four cases:
+--
+-- 0.  (Nasty hack).
+--     An application "PrelGHC.tagToEnum# <type> unboxed-int".
+--     The int will be on the stack.  Generate a code sequence
+--     to convert it to the relevant constructor, SLIDE and ENTER.
 --
 -- 1.  A nullary constructor.  Push its closure on the stack 
 --     and SLIDE and RETURN.
@@ -414,74 +421,106 @@ schemeT :: Int 		-- Stack depth
         -> Sequel 	-- Sequel depth
         -> BCEnv 	-- stack env
         -> AnnExpr Id VarSet 
-        -> BCInstrList
+        -> BcM BCInstrList
 
 schemeT d s p app
 --   | trace ("schemeT: env in = \n" ++ showSDocDebug (ppBCEnv p)) False
 --   = panic "schemeT ?!?!"
 
+   -- Handle case 0
+   | Just (arg, constr_names) <- maybe_is_tagToEnum_call
+   = pushAtom True d p arg 		`bind` \ (push, arg_words) ->
+     implement_tagToId constr_names	`thenBc` \ tagToId_sequence ->
+     returnBc (push `appOL`  tagToId_sequence            
+                    `appOL`  mkSLIDE 1 (d+arg_words-s)
+                    `snocOL` ENTER)
+
    -- Handle case 1
    | is_con_call && null args_r_to_l
-   = (PUSH_G (Left (getName con)) `consOL` mkSLIDE 1 (d-s))
-     `snocOL` ENTER
+   = returnBc (
+        (PUSH_G (Left (getName con)) `consOL` mkSLIDE 1 (d-s))
+        `snocOL` ENTER
+     )
 
    -- Cases 2 and 3
    | otherwise
    = if   is_con_call && isUnboxedTupleCon con
-     then unboxedTupleException
-     else code
+     then returnBc unboxedTupleException
+     else returnBc code
 
-     where
-         -- Extract the args (R->L) and fn
-         (args_r_to_l_raw, fn) = chomp app
-         chomp expr
-            = case snd expr of
-                 AnnVar v    -> ([], v)
-                 AnnApp f a  -> case chomp f of (az, f) -> (snd a:az, f)
-                 AnnNote n e -> chomp e
-                 other       -> pprPanic "schemeT" 
-                                   (ppr (deAnnotate (panic "schemeT.chomp", other)))
+   where
+      -- Detect and extract relevant info for the tagToEnum kludge.
+      maybe_is_tagToEnum_call
+         = let extract_constr_Names ty
+                  = case splitTyConApp_maybe ty of
+                       (Just (tyc, [])) |  isDataTyCon tyc
+                                        -> map getName (tyConDataCons tyc)
+                       other
+                          -> panic "maybe_is_tagToEnum_call.extract_constr_Ids"
+           in 
+           case app of
+              (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg)
+                 -> case isPrimOpId_maybe v of
+                       Nothing -> Nothing
+                       Just primop |  primop == TagToEnumOp
+                                   -> Just (snd arg, extract_constr_Names t)
+                                   |  otherwise
+                                   -> Nothing
+              other -> Nothing
+
+      -- Extract the args (R->L) and fn
+      (args_r_to_l_raw, fn) = chomp app
+      chomp expr
+         = case snd expr of
+              AnnVar v    -> ([], v)
+              AnnApp f a  -> case chomp f of (az, f) -> (snd a:az, f)
+              AnnNote n e -> chomp e
+              other       -> pprPanic "schemeT" 
+                                (ppr (deAnnotate (panic "schemeT.chomp", other)))
          
-         args_r_to_l = filter (not.isTypeAtom) args_r_to_l_raw
-         isTypeAtom (AnnType _) = True
-         isTypeAtom _           = False
+      args_r_to_l = filter (not.isTypeAtom) args_r_to_l_raw
+      isTypeAtom (AnnType _) = True
+      isTypeAtom _           = False
 
-         -- decide if this is a constructor call, and rearrange
-         -- args appropriately.
-         maybe_dcon  = isDataConId_maybe fn
-         is_con_call = case maybe_dcon of Nothing -> False; Just _ -> True
-         (Just con)  = maybe_dcon
+      -- decide if this is a constructor call, and rearrange
+      -- args appropriately.
+      maybe_dcon  = isDataConId_maybe fn
+      is_con_call = case maybe_dcon of Nothing -> False; Just _ -> True
+      (Just con)  = maybe_dcon
 
-         args_final_r_to_l
-            | not is_con_call
-            = args_r_to_l
-            | otherwise
-            = filter (not.isPtr) args_r_to_l ++ filter isPtr args_r_to_l
-              where isPtr = isFollowableRep . atomRep
+      args_final_r_to_l
+         | not is_con_call
+         = args_r_to_l
+         | otherwise
+         = filter (not.isPtr) args_r_to_l ++ filter isPtr args_r_to_l
+           where isPtr = isFollowableRep . atomRep
 
-         -- make code to push the args and then do the SLIDE-ENTER thing
-         code = do_pushery d args_final_r_to_l
+      -- make code to push the args and then do the SLIDE-ENTER thing
+      code = do_pushery d args_final_r_to_l
 
-         tag_when_push = not is_con_call
-         narg_words    = sum (map (get_arg_szw . atomRep) args_r_to_l)
-         get_arg_szw   = if tag_when_push then taggedSizeW else untaggedSizeW
+      tag_when_push = not is_con_call
+      narg_words    = sum (map (get_arg_szw . atomRep) args_r_to_l)
+      get_arg_szw   = if tag_when_push then taggedSizeW else untaggedSizeW
 
-         do_pushery d (arg:args)
-            = let (push, arg_words) = pushAtom tag_when_push d p arg
-              in  push `appOL` do_pushery (d+arg_words) args
-         do_pushery d []
-            = case maybe_dcon of
-                 Just con -> PACK con narg_words `consOL` (
-                             mkSLIDE 1 (d - narg_words - s) `snocOL` ENTER)
-                 Nothing
-                    -> let (push, arg_words) = pushAtom True d p (AnnVar fn)
-                       in  push 
-                           `appOL` mkSLIDE (narg_words+arg_words) 
-                                           (d - s - narg_words)
-                           `snocOL` ENTER
+      do_pushery d (arg:args)
+         = let (push, arg_words) = pushAtom tag_when_push d p arg
+           in  push `appOL` do_pushery (d+arg_words) args
+      do_pushery d []
+         = case maybe_dcon of
+              Just con -> PACK con narg_words `consOL` (
+                          mkSLIDE 1 (d - narg_words - s) `snocOL` ENTER)
+              Nothing
+                 -> let (push, arg_words) = pushAtom True d p (AnnVar fn)
+                    in  push 
+                        `appOL` mkSLIDE (narg_words+arg_words) 
+                                        (d - s - narg_words)
+                        `snocOL` ENTER
 
 mkSLIDE n d 
    = if d == 0 then nilOL else unitOL (SLIDE n d)
+bind x f 
+   = f x
+
 
 atomRep (AnnVar v)    = typePrimRep (idType v)
 atomRep (AnnLit l)    = literalPrimRep l
@@ -489,6 +528,29 @@ atomRep (AnnNote n b) = atomRep (snd b)
 atomRep (AnnApp f (_, AnnType _)) = atomRep (snd f)
 atomRep (AnnLam x e) | isTyVar x = atomRep (snd e)
 atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
+
+
+-- Compile code which expects an unboxed Int on the top of stack,
+-- (call it i), and pushes the i'th closure in the supplied list 
+-- as a consequence.
+implement_tagToId :: [Name] -> BcM BCInstrList
+implement_tagToId names
+   = ASSERT(not (null names))
+     getLabelsBc (length names)			`thenBc` \ labels ->
+     getLabelBc					`thenBc` \ label_fail ->
+     getLabelBc 				`thenBc` \ label_exit ->
+     zip4 labels (tail labels ++ [label_fail])
+                 [0 ..] names			`bind`   \ infos ->
+     map (mkStep label_exit) infos		`bind`   \ steps ->
+     returnBc (concatOL steps
+               `appOL` 
+               toOL [LABEL label_fail, CASEFAIL, LABEL label_exit])
+     where
+        mkStep l_exit (my_label, next_label, n, name_for_n)
+           = toOL [LABEL my_label, 
+                   TESTEQ_I n next_label, 
+                   PUSH_G (Left name_for_n), 
+                   JMP l_exit]
 
 
 -- Make code to unpack the top-of-stack constructor onto the stack, 
@@ -904,5 +966,10 @@ emitBc bco st
 getLabelBc :: BcM Int
 getLabelBc st
    = (nextlabel st, st{nextlabel = 1 + nextlabel st})
+
+getLabelsBc :: Int -> BcM [Int]
+getLabelsBc n st
+   = let ctr = nextlabel st 
+     in  ([ctr .. ctr+n-1], st{nextlabel = ctr+n})
 
 \end{code}
