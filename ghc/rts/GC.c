@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.67 1999/11/18 16:02:21 sewardj Exp $
+ * $Id: GC.c,v 1.68 1999/12/01 15:07:00 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1515,6 +1515,28 @@ scavenge_srt(const StgInfoTable *info)
 }
 
 /* -----------------------------------------------------------------------------
+   Scavenge a TSO.
+   -------------------------------------------------------------------------- */
+
+static void
+scavengeTSO (StgTSO *tso)
+{
+  /* chase the link field for any TSOs on the same queue */
+  (StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
+  if (   tso->why_blocked == BlockedOnMVar
+	 || tso->why_blocked == BlockedOnBlackHole
+	 || tso->why_blocked == BlockedOnException) {
+    tso->block_info.closure = evacuate(tso->block_info.closure);
+  }
+  if ( tso->blocked_exceptions != NULL ) {
+    tso->blocked_exceptions = 
+      (StgTSO *)evacuate((StgClosure *)tso->blocked_exceptions);
+  }
+  /* scavenge this thread's stack */
+  scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+}
+
+/* -----------------------------------------------------------------------------
    Scavenge a given step until there are no more objects in this step
    to scavenge.
 
@@ -1819,18 +1841,9 @@ scavenge(step *step)
 
     case TSO:
       { 
-	StgTSO *tso;
-	
-	tso = (StgTSO *)p;
+	StgTSO *tso = (StgTSO *)p;
 	evac_gen = 0;
-	/* chase the link field for any TSOs on the same queue */
-	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
-	if (   tso->why_blocked == BlockedOnMVar
-	    || tso->why_blocked == BlockedOnBlackHole) {
-	  tso->block_info.closure = evacuate(tso->block_info.closure);
-	}
-	/* scavenge this thread's stack */
-	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+	scavengeTSO(tso);
 	evac_gen = saved_evac_gen;
 	p += tso_sizeW(tso);
 	break;
@@ -2178,12 +2191,7 @@ scavenge_mutable_list(generation *gen)
       { 
 	StgTSO *tso = (StgTSO *)p;
 
-	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
-	if (   tso->why_blocked == BlockedOnMVar
-	    || tso->why_blocked == BlockedOnBlackHole) {
-	  tso->block_info.closure = evacuate(tso->block_info.closure);
-	}
-	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+	scavengeTSO(tso);
 
 	/* Don't take this TSO off the mutable list - it might still
 	 * point to some younger objects (because we set evac_gen to 0
@@ -2571,20 +2579,8 @@ scavenge_large(step *step)
       }
 
     case TSO:
-      { 
-	StgTSO *tso;
-	
-	tso = (StgTSO *)p;
-	/* chase the link field for any TSOs on the same queue */
-	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
-	if (   tso->why_blocked == BlockedOnMVar
-	    || tso->why_blocked == BlockedOnBlackHole) {
-	  tso->block_info.closure = evacuate(tso->block_info.closure);
-	}
-	/* scavenge this thread's stack */
-	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+	scavengeTSO((StgTSO *)p);
 	continue;
-      }
 
     default:
       barf("scavenge_large: unknown/strange object");
