@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- 
 -- Module      :  Control.Monad.Fix
@@ -10,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Fix.hs,v 1.3 2002/03/14 12:09:49 simonmar Exp $
+-- $Id: Fix.hs,v 1.4 2002/03/22 10:20:24 simonmar Exp $
 --
 -- The Fix monad.
 --
@@ -29,14 +28,7 @@ module Control.Monad.Fix (
 	fix	-- :: (a -> a) -> a
   ) where
 
-#ifdef __GLASGOW_HASKELL__
--- MonadFix is needed by System.IO, so it is below the Prelude.
-import Control.Monad
-import GHC.Base
-import GHC.Err
-import Data.Maybe
-#endif
-
+import Prelude
 import System.IO
 
 fix :: (a -> a) -> a
