@@ -505,38 +505,5 @@ vtbl_Underflow[] = {
     (W_) UnderflowVect7
 };
 
-\end{code}
-
-\begin{code}
-
-IFN_(seqDirectReturn) {
-    void *cont;
-
-    FB_
-    RetReg = (StgRetAddr) SpB[BREL(0)];
-    cont = (void *) SpB[BREL(1)];
-    /* SpB += BREL(2); */
-    JMP_(cont);
-    FE_
-}
-
-/*
-   NB: For direct returns to work properly, the name of the routine must be
-   the same as the name of the vector table with vtbl_ removed and DirectReturn
-   appended.  This is all the mangler understands.
- */
-
-const W_
-vtbl_seq[] = {
-    (W_) seqDirectReturn,
-    (W_) seqDirectReturn,
-    (W_) seqDirectReturn,
-    (W_) seqDirectReturn,
-    (W_) seqDirectReturn,
-    (W_) seqDirectReturn,
-    (W_) seqDirectReturn,
-    (W_) seqDirectReturn
-};
-
 #endif /* CONCURRENT */
 \end{code}
