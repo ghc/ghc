@@ -243,7 +243,7 @@ ppPrologue title (Just doc) =
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
   tda [theclass "section1"] << toHtml "Modules" </>
-  td << vanillaTable << htmlTable
+  pad_td 0 << vanillaTable << htmlTable
   where
     genTable htmlTable id []     = (htmlTable,id)
     genTable htmlTable id (x:xs) = genTable (htmlTable </> u) id' xs      
@@ -265,7 +265,7 @@ mkNode ss (Node s leaf pkg ts) id = htmlNode
       | otherwise = toHtml s
 
     htmlPkg = case pkg of
-      Nothing -> td << empty
+      Nothing -> tda [width "1"] << empty
       Just p  -> td << toHtml p
 
     mdl = foldr (++) "" (s' : map ('.':) ss')
@@ -284,8 +284,8 @@ mkNode ss (Node s leaf pkg ts) id = htmlNode
       where
         (u,id') = mkNode (s:ss) x id
 
-    pad_td 0 = tda [width "100%"]
-    pad_td n = tda [thestyle ("padding-left:" ++ show n ++ "px"), width "100%"]
+pad_td 0 = tda [width "100%"]
+pad_td n = tda [thestyle ("padding-left:" ++ show n ++ "px"), width "100%"]
 
 -- ---------------------------------------------------------------------------
 -- Generate the index
