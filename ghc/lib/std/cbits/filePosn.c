@@ -1,13 +1,17 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePosn.c,v 1.4 1999/09/19 19:20:50 sof Exp $
+ * $Id: filePosn.c,v 1.5 1999/09/20 08:36:35 panne Exp $
  *
  * hGetPosn and hSetPosn Runtime Support
  */
 
 #include "Rts.h"
 #include "stgio.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
 
 StgInt
 getFilePosn(ptr)
