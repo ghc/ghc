@@ -54,6 +54,9 @@ module Control.Exception (
 	-- ** The @evaluate@ function
 	evaluate,  -- :: a -> IO a
 
+	-- ** The @mapException@ function
+	mapException,		-- :: (Exception -> Exception) -> a -> a
+
 	-- ** Exception predicates
 	
 	-- $preds
@@ -123,6 +126,7 @@ import Hugs.Exception	as ExceptionBase
 
 import Prelude 		hiding ( catch )
 import System.IO.Error
+import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
 
 #include "Dynamic.h"
@@ -242,6 +246,18 @@ evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
 #elif defined(__HUGS__)
 evaluate a = a `seq` return a	-- dummy implementation: to be fixed
 #endif
+
+-----------------------------------------------------------------------------
+-- 'mapException'
+
+-- | This function maps one exception into another as proposed in the
+-- paper "A semantics for imprecise exceptions".
+
+-- Notice that the usage of 'unsafePerformIO' is safe here.
+
+mapException :: (Exception -> Exception) -> a -> a
+mapException f v = unsafePerformIO (catch (evaluate v)
+                                          (\x -> throw (f x)))
 
 -----------------------------------------------------------------------------
 -- 'try' and variations.
