@@ -1,73 +1,17 @@
-#################################################################################
+################################################################################
 #
 #			    paths.mk
 #
 # 	This file defines Make variables for standard directories
 #	and file lists
 #
-#################################################################################
+################################################################################
 
-
-#-----------------------------------------------------------------
-#
-# Installation setup
-#
-
-#-----------------------------------------------------------------------------
-# install configuration
-#
-# The install standard target is guided by the following four variables
-#
-#  INSTALL_PROGS    (installed in $(bindir))
-#  INSTALL_LIBS     (installed in $(libdir))
-#  INSTALL_LIBEXECS (installed in $(libexecdir))
-#  INSTALL_DATAS    (installed in $(datadir))
-#  INSTALL_IFACES   (installed in $(ifacedir))
-#
-# see target.mk for more information.
-#
-
-#
-# Setting user/group ownership for the installed entities
-#
-# this stuff about "who" does the installing doesn't have make vars
-# as it is not intended to be run-time changeable.
-#
-ifneq "$(OWNER)" ""
-INSTALL_OWNER 	= -o $(OWNER)
-else
-INSTALL_OWNER	=
-endif
-
-ifneq "$(GROUP)" ""
-INSTALL_GROUP	= -g $(GROUP)
-else
-INSTALL_GROUP	=
-endif
-
-SRC_INSTALL_OPTS += $(INSTALL_OWNER) $(INSTALL_GROUP)
-
-#
-# Invocations of `install' for the four different classes
-# of targets:
-#
-
-INSTALL_PROGRAM = $(INSTALL) -m 755
-INSTALL_SCRIPT  = $(INSTALL) -m 755
-INSTALL_SHLIB   = $(INSTALL) -m 755
-INSTALL_DATA    = $(INSTALL) -m 644
-INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
-
-#
-# The install variables does not have any defaults,
-# what files to install have to be specified in the Makefiles.
-#
-
-#################################################################################
+################################################################################
 #
 #		Standard variable names
 #
-#################################################################################
+################################################################################
 # The fptools mk setup defines a set of standard names which are used
 # by the standard targets provided by mk. One example of this is the
 # use of standard names for specifying what files to compile, their
