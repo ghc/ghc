@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.28 2003/05/29 13:36:39 simonmar Exp $
+# $Id: package.mk,v 1.29 2003/05/29 14:47:05 reid Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -64,7 +64,7 @@ else # $(STANDALONE_PACKAGE) == "YES"
 # redefines it to point to GHC's libdir (bug or feature?).
 #
 install :: package.conf.installed
-	pkglibdir=$(libdir) $(GHC_PKG) --update-package <package.conf.installed
+	pkglibdir=$(libdir) $(GHC_PKG) --force --update-package <package.conf.installed
 
 endif # $(STANDALONE_PACKAGE)
 
