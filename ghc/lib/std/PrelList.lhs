@@ -44,21 +44,21 @@ infix  4 `elem`, `notElem`
 
 head                    :: [a] -> a
 head (x:_)              =  x
-head []                 =  error "PreludeList.head: empty list"
+head []                 =  errorEmptyList "head"
 
 last                    :: [a] -> a
 last [x]                =  x
 last (_:xs)             =  last xs
-last []                 =  error "PreludeList.last: empty list"
+last []                 =  errorEmptyList "last"
 
 tail                    :: [a] -> [a]
 tail (_:xs)             =  xs
-tail []                 =  error "PreludeList.tail: empty list"
+tail []                 =  errorEmptyList "tail"
 
 init                    :: [a] -> [a]
 init [x]                =  []
 init (x:xs)             =  x : init xs
-init []                 =  error "PreludeList.init: empty list"
+init []                 =  errorEmptyList "init"
 
 null                    :: [a] -> Bool
 null []                 =  True
@@ -97,7 +97,7 @@ foldl f z (x:xs)        =  foldl f (f z x) xs
 
 foldl1                  :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
-foldl1 _ []             =  error "PreludeList.foldl1: empty list"
+foldl1 _ []             =  errorEmptyList "foldl1"
 
 scanl                   :: (a -> b -> a) -> a -> [b] -> [a]
 scanl f q xs            =  q : (case xs of
@@ -106,7 +106,7 @@ scanl f q xs            =  q : (case xs of
 
 scanl1                  :: (a -> a -> a) -> [a] -> [a]
 scanl1 f (x:xs)         =  scanl f x xs
-scanl1 _ []             =  error "PreludeList.scanl1: empty list"
+scanl1 _ []             =  errorEmptyList "scanl1"
 
 -- foldr, foldr1, scanr, and scanr1 are the right-to-left duals of the
 -- above functions.
@@ -114,7 +114,7 @@ scanl1 _ []             =  error "PreludeList.scanl1: empty list"
 foldr1                  :: (a -> a -> a) -> [a] -> a
 foldr1 f [x]            =  x
 foldr1 f (x:xs)         =  f x (foldr1 f xs)
-foldr1 _ []             =  error "PreludeList.foldr1: empty list"
+foldr1 _ []             =  errorEmptyList "foldr1"
 
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr f q0 []           =  [q0]
@@ -125,7 +125,7 @@ scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 f  [x]           =  [x]
 scanr1 f  (x:xs)        =  f x q : qs
                            where qs@(q:_) = scanr1 f xs 
-scanr1 _ []             =  error "PreludeList.scanr1: empty list"
+scanr1 _ []             =  errorEmptyList "scanr1"
 
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
@@ -156,19 +156,19 @@ take                   :: Int -> [a] -> [a]
 take 0 _               =  []
 take _ []              =  []
 take n (x:xs) | n > 0  =  x : take (n-1) xs
-take _     _           =  error "PreludeList.take: negative argument"
+take _     _           =  errorNegativeIdx "take"
 
 drop                   :: Int -> [a] -> [a]
 drop 0 xs              =  xs
 drop _ []              =  []
 drop n (_:xs) | n > 0  =  drop (n-1) xs
-drop _     _           =  error "PreludeList.drop: negative argument"
+drop _     _           =  errorNegativeIdx "drop"
 
 splitAt                   :: Int -> [a] -> ([a],[a])
 splitAt 0 xs              =  ([],xs)
 splitAt _ []              =  ([],[])
 splitAt n (x:xs) | n > 0  =  (x:xs',xs'') where (xs',xs'') = splitAt (n-1) xs
-splitAt _     _           =  error "PreludeList.splitAt: negative argument"
+splitAt _     _           =  errorNegativeIdx "splitAt"
 
 #else /* hack away */
 take	:: Int -> [b] -> [b]
@@ -181,30 +181,32 @@ take (I# n#) xs = takeUInt n# xs
 takeUInt :: Int# -> [b] -> [b]
 takeUInt n xs
   | n >=# 0#  =  take_unsafe_UInt n xs
-  | otherwise =  error "take{PreludeList}: negative index"
+  | otherwise =  errorNegativeIdx "take"
 
 take_unsafe_UInt 0# _     = []
-take_unsafe_UInt _  []	  = []
-take_unsafe_UInt m (x:xs) = x : take_unsafe_UInt (m -# 1#) xs
+take_unsafe_UInt m  ls    =
+  case ls of
+    []     -> ls
+    (x:xs) -> x : take_unsafe_UInt (m -# 1#) xs
 
 drop		:: Int -> [b] -> [b]
 drop (I# n#) xs
-  | n# <# 0#	= error "drop{PreludeList}: negative index"
+  | n# <# 0#	= errorNegativeIdx "drop"
   | otherwise	= drop# n# xs
     where
 	drop# :: Int# -> [a] -> [a]
 	drop# 0# xs      = xs
-	drop# _  []	 = []
+	drop# _  xs@[]	 = xs
 	drop# m# (_:xs)  = drop# (m# -# 1#) xs
 
 splitAt	:: Int -> [b] -> ([b], [b])
 splitAt (I# n#) xs
-  | n# <# 0#	= error "splitAt{PreludeList}: negative index"
+  | n# <# 0#	= errorNegativeIdx "splitAt"
   | otherwise	= splitAt# n# xs
     where
 	splitAt# :: Int# -> [a] -> ([a], [a])
 	splitAt# 0# xs	   = ([], xs)
-	splitAt# _  []	   = ([], [])
+	splitAt# _  xs@[]  = (xs, xs)
 	splitAt# m# (x:xs) = (x:xs', xs'')
 	  where
 	    (xs', xs'') = splitAt# (m# -# 1#) xs
@@ -212,7 +214,7 @@ splitAt (I# n#) xs
 #endif /* USE_REPORT_PRELUDE */
 
 span, break             :: (a -> Bool) -> [a] -> ([a],[a])
-span p []               =  ([],[])
+span p xs@[]            =  (xs, xs)
 span p xs@(x:xs')
          | p x          =  let (ys,zs) = span p xs' in (x:ys,zs)
          | otherwise    =  ([],xs)
@@ -221,7 +223,7 @@ span p xs@(x:xs')
 break p                 =  span (not . p)
 #else
 -- HBC version (stolen)
-break p []		=  ([],[])
+break p xs@[]		=  (xs, xs)
 break p xs@(x:xs')
 	   | p x	=  ([],xs)
 	   | otherwise	=  let (ys,zs) = break p xs' in (x:ys,zs)
@@ -306,10 +308,10 @@ product	l	= prod l 1
 -- maximum and minimum return the maximum or minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
 maximum, minimum        :: (Ord a) => [a] -> a
-maximum []              =  error "PreludeList.maximum: empty list"
+maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1 max xs
 
-minimum []              =  error "PreludeList.minimum: empty list"
+minimum []              =  errorEmptyList "minimum"
 minimum xs              =  foldl1 min xs
 
 concatMap               :: (a -> [b]) -> [a] -> [b]
@@ -417,4 +419,17 @@ unwords [w]		= w
 unwords (w:ws)		= w ++ ' ' : unwords ws
 #endif
 
+\end{code}
+
+Common up near identical calls to `error' to reduce the number
+constant strings created when compiled:
+
+\begin{code}
+errorEmptyList fun =
+  error (prel_list_str ++ fun ++ ": empty list")
+
+errorNegativeIdx fun =
+ error (prel_list_str ++ fun ++ ": negative index")
+
+prel_list_str = "PreludeList."
 \end{code}
