@@ -1,0 +1,3 @@
+Permissions {readable = True, writable = True, executable = False, searchable = True}
+Permissions {readable = True, writable = True, executable = False, searchable = False}
+Permissions {readable = True, writable = False, executable = True, searchable = False}
