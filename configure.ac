@@ -850,8 +850,16 @@ dnl ** do we have long longs?
 AC_CHECK_TYPES([long long])
 
 dnl ** check what fields struct msghdr contains
-FPTOOLS_MSGHDR_MSG_ACCRIGHTS
-FPTOOLS_MSGHDR_MSG_CONTROL
+AC_CHECK_HEADERS([sys/types.h sys/socket.h sys/uio.h])
+AC_CHECK_MEMBERS([struct msghdr.msg_control, struct msghdr.msg_accrights], [], [], [#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#if HAVE_SYS_SOCKET_H
+# include <sys/socket.h>
+#endif
+#if HAVE_SYS_UIO_H
+# include <sys/uio.h>
+#endif])
 
 dnl ** what are the sizes of various types
 AC_CHECK_SIZEOF(char,               1)
