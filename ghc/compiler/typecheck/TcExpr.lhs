@@ -63,7 +63,6 @@ import PrelNames	( cCallableClassName,
 			  thenMName, failMName, returnMName, ioTyConName
 			)
 import Outputable
-import Maybes		( maybeToBool )
 import ListSetOps	( minusList )
 import Util
 import CmdLineOpts

@@ -31,7 +31,6 @@ import VarSet
 import VarEnv
 import TcType		( mkTyVarTy )
 import qualified TcType ( match )
-import TypeRep		( Type(..) )	-- Can see type representation for matching
 
 import Outputable
 import Maybe		( isJust, isNothing, fromMaybe )

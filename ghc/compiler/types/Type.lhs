@@ -84,7 +84,6 @@ import TypeRep
 
 -- Other imports:
 
-import {-# SOURCE #-}	DataCon( DataCon )
 import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
 
@@ -93,24 +92,22 @@ import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
 
-import OccName	( mkDictOcc )
-import Name	( Name, NamedThing(..), OccName, mkLocalName, tidyOccName )
-import NameSet
+import Name	( NamedThing(..), mkLocalName, tidyOccName )
 import Class	( classTyCon )
 import TyCon	( TyCon, isRecursiveTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep,
-		  isAlgTyCon, isSynTyCon, tyConArity, tyConTyVars,
-	          tyConKind, tyConDataCons, getSynTyConDefn,
-		  tyConPrimRep, isPrimTyCon
+		  isAlgTyCon, isSynTyCon, tyConArity, 
+	          tyConKind, getSynTyConDefn,
+		  tyConPrimRep, 
 		)
 
 -- others
 import Maybes		( maybeToBool )
-import SrcLoc		( SrcLoc, noSrcLoc )
+import SrcLoc		( noSrcLoc )
 import PrimRep		( PrimRep(..) )
-import Unique		( Unique, Uniquable(..) )
-import Util		( mapAccumL, seqList, thenCmp )
+import Unique		( Uniquable(..) )
+import Util		( mapAccumL, seqList )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 \end{code}

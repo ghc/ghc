@@ -15,7 +15,7 @@ import CoreUtils	( exprType )
 import Id		( Id, idType, idStrictness, idArity, isOneShotLambda,
 			  setIdStrictness, idInlinePragma, mkWorkerId,
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
-import Type		( Type, splitForAllTys, splitFunTys )
+import Type		( Type )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
 			  CprInfo(..), InlinePragInfo(..), isNeverInlinePrag,
 			  WorkerInfo(..)

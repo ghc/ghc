@@ -9,9 +9,7 @@ module Specialise ( specProgram ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
-import Id		( Id, idName, idType, mkUserLocal,
-			  idSpecialisation, modifyIdInfo
-			)
+import Id		( Id, idName, idType, mkUserLocal, idSpecialisation )
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, 
 			  mkForAllTys, tcCmpType
@@ -1098,12 +1096,6 @@ splitUDs bndrs uds@(MkUD {dict_binds = orig_dbs,
 %************************************************************************
 
 \begin{code}
-lookupId:: IdEnv Id -> Id -> Id
-lookupId env id = case lookupVarEnv env id of
-			Nothing  -> id
-			Just id' -> id'
-
-----------------------------------------
 type SpecM a = UniqSM a
 
 thenSM    = thenUs

@@ -26,7 +26,7 @@ import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
 			  splitForAllTys, splitFunTys,  isAlgType
 			)
-import BasicTypes	( NewOrData(..), Arity, Boxity(..) )
+import BasicTypes	( Arity, Boxity(..) )
 import Var              ( Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, UniqSM )
 import Util		( zipWithEqual )

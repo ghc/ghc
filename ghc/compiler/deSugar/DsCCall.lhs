@@ -18,7 +18,7 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( exprType, mkCoerce )
+import CoreUtils	( exprType )
 import Id		( Id, mkWildId, idType )
 import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
@@ -31,7 +31,6 @@ import TcType		( isUnLiftedType, mkFunTys,
 			  tcEqType, isBoolTy, isUnitTy,
 			  Type
 			)
-import Type		( repType )
 import PrimOp		( PrimOp(TouchOp) )
 import TysPrim		( realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,

@@ -28,19 +28,15 @@ import TcClassDcl	( tcClassDecl1 )
 import TcInstDcls	( tcAddDeclCtxt )
 import TcMonoType	( kcHsTyVars, kcHsType, kcHsLiftedSigType, kcHsContext, mkTyClTyVars )
 import TcMType		( unifyKind, newKindVar, zonkKindEnv )
-import TcType		( tcSplitTyConApp_maybe,
-			  Type, Kind, mkArrowKind, liftedTypeKind, zipFunTys
-			)
-import Subst		( mkTyVarSubst, substTy )
+import TcType		( Type, Kind, mkArrowKind, liftedTypeKind, zipFunTys )
 import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
 import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), 
-			  tyConName, tyConKind, tyConTyVars, tyConArity, tyConDataCons,
-			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon, isNewTyCon,
+			  tyConKind, tyConDataCons,
+			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon, 
 			  isRecursiveTyCon )
-import TysWiredIn	( unitTy )
-import DataCon		( isNullaryDataCon, dataConOrigArgTys )
-import Var		( varName, varType )
+import DataCon		( dataConOrigArgTys )
+import Var		( varName )
 import FiniteMap
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name, getSrcLoc, isTyVarName )

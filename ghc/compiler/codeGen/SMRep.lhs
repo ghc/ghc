@@ -49,7 +49,6 @@ module SMRep (
 #include "HsVersions.h"
 
 import CmdLineOpts
-import AbsCSyn		( Liveness(..) )
 import Constants	( sTD_HDR_SIZE, pROF_HDR_SIZE,
 			  gRAN_HDR_SIZE, tICKY_HDR_SIZE, 
                           aRR_WORDS_HDR_SIZE, aRR_PTRS_HDR_SIZE,

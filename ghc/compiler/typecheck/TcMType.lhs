@@ -47,15 +47,12 @@ module TcMType (
 -- friends:
 import TypeRep		( Type(..), Kind, TyNote(..) )  -- friend
 import Type		-- Lots and lots
-import TcType		( SigmaType, RhoType, tcEqType,
+import TcType		( tcEqType,
 			  tcSplitRhoTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe
 			)
-import PprType		( pprType )
 import Subst		( Subst, mkTopTyVarSubst, substTy )
-import TyCon		( TyCon, mkPrimTyCon, isNewTyCon, isSynTyCon, isTupleTyCon, 
-			  tyConArity, tupleTyConBoxity
-			)
+import TyCon		( TyCon, mkPrimTyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
 import PrimRep		( PrimRep(VoidRep) )
 import Var		( TyVar, varName, tyVarKind, tyVarName, isTyVar, mkTyVar,
 			  isMutTyVar, isSigTyVar )
@@ -67,11 +64,9 @@ import TysWiredIn	( voidTy, listTyCon, mkListTy, mkTupleTy )
 import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
 			  mkLocalName, mkDerivedTyConOcc, isSystemName
 			)
-import PrelNames	( floatTyConKey, doubleTyConKey, foreignPtrTyConKey,
-			  integerTyConKey, intTyConKey, addrTyConKey )
 import VarSet
 import BasicTypes	( Boxity, Arity, isBoxed )
-import Unique		( Unique, Uniquable(..) )
+import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( nOfThem )
 import Outputable

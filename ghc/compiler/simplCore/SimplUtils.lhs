@@ -19,7 +19,7 @@ module SimplUtils (
 #include "HsVersions.h"
 
 import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
-			  opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge, opt_DictsStrict,
+			  opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge, 
 			  opt_UF_UpdateInPlace
 			)
 import CoreSyn
@@ -38,7 +38,7 @@ import Maybes		( maybeToBool, catMaybes )
 import Name		( setNameUnique )
 import Demand		( isStrict )
 import SimplMonad
-import Type		( Type, mkForAllTys, seqType, repType,
+import Type		( Type, mkForAllTys, seqType, 
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys,
 			  isUnLiftedType,
 			  splitRepFunTys

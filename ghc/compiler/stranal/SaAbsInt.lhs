@@ -26,7 +26,6 @@ import Demand		( Demand(..), wwPrim, wwStrict, wwUnpack, wwLazy,
 			)
 import SaLib
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import BasicTypes	( NewOrData(..) )
 import Type		( splitTyConApp_maybe, 
 		          isUnLiftedType, Type )
 import TyCon		( tyConUnique )

@@ -42,7 +42,7 @@ import CmdLineOpts	( opt_HiVersion, opt_NoHiCheck )
 import ForeignCall	( Safety(..) )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( listToUFM, lookupUFM )
-import BasicTypes	( NewOrData(..), Boxity(..) )
+import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile, srcLocLine,
 			  replaceSrcLine, mkSrcLoc )
 

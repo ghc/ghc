@@ -10,7 +10,7 @@ module CSE (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
+import CmdLineOpts	( DynFlag(..), DynFlags )
 import Id		( Id, idType )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr )
 import DataCon		( isUnboxedTupleCon )

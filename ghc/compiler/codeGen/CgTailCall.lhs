@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.29 2000/12/06 13:19:49 simonmar Exp $
+% $Id: CgTailCall.lhs,v 1.30 2001/06/25 14:36:04 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -39,8 +39,7 @@ import CgRetConv	( dataReturnConvPrim,
 import CgStackery	( mkTaggedStkAmodes, adjustStackHW )
 import CgUsages		( getSpRelOffset, adjustSpAndHp )
 import CgUpdate		( pushSeqFrame )
-import CLabel		( mkUpdInfoLabel, mkRtsPrimOpLabel, 
-			  mkBlackHoleInfoTableLabel )
+import CLabel		( mkUpdInfoLabel, mkRtsPrimOpLabel )
 import ClosureInfo	( nodeMustPointToIt,
 			  getEntryConvention, EntryConvention(..), LambdaFormInfo
 			)

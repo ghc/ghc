@@ -7,7 +7,7 @@ module Generics ( mkTyConGenInfo, mkGenericRhs,
 import RnHsSyn		( RenamedHsExpr )
 import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch )
 
-import Type             ( Type, isUnLiftedType, applyTys, tyVarsOfType, tyVarsOfTypes,
+import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
 			  mkTyVarTys, mkForAllTys, mkTyConApp, 
 			  mkFunTy, isTyVarTy, getTyVar_maybe,
 			  funTyCon
@@ -19,7 +19,7 @@ import TyCon            ( TyCon, tyConTyVars, tyConDataConsIfAvailable,
 			  tyConGenInfo, isNewTyCon, newTyConRep, isBoxedTupleTyCon
 			)
 import Name		( Name, mkSysLocalName )
-import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), Note(..),
+import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), 
 			  mkConApp, Alt, mkTyApps, mkVarApps )
 import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
@@ -36,7 +36,6 @@ import CoreUnfold       ( mkTopUnfolding )
 
 import Unique		( mkBuiltinUnique )
 import SrcLoc		( builtinSrcLoc )
-import Maybes		( expectJust )
 import Outputable 
 
 #include "HsVersions.h"

@@ -73,7 +73,6 @@ import HscTypes		( PersistentCompilerState(..), HomeSymbolTable,
 		          TyThing(..), implicitTyThingIds, 
 			  mkTypeEnv
 			)
-import VarSet
 \end{code}
 
 

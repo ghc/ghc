@@ -27,7 +27,7 @@ module HsTypes (
 #include "HsVersions.h"
 
 import Class		( FunDep )
-import TcType		( Type, Kind, ThetaType, SourceType(..), PredType, 
+import TcType		( Type, Kind, ThetaType, SourceType(..), 
 			  tcSplitSigmaTy, liftedTypeKind, eqKind, tcEqType
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation

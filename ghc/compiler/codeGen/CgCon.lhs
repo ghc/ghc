@@ -75,7 +75,6 @@ cgTopRhsCon id con args
 	name          = idName id
     	closure_label = mkClosureLabel name
 	lf_info       = mkConLFInfo con
-    	cg_id_info    = stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info
     in
 
     (

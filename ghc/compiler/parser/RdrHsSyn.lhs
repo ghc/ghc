@@ -61,7 +61,6 @@ module RdrHsSyn (
 #include "HsVersions.h"
 
 import HsSyn		-- Lots of it
-import HsPat		( collectSigTysFromPats )
 import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
                           mkSuperDictSelOcc, mkDefaultMethodOcc, mkGenOcc1,
 			  mkGenOcc2, 

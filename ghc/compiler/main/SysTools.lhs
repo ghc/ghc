@@ -49,8 +49,7 @@ import Panic		( progName, GhcException(..) )
 import Util		( global )
 import CmdLineOpts	( dynFlag, verbosity )
 
-import List		( isPrefixOf )
-import Exception	( throw, throwDyn, catchAllIO )
+import Exception	( throwDyn, catchAllIO )
 import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
@@ -69,7 +68,8 @@ import Int
 #if !defined(mingw32_TARGET_OS)
 import qualified Posix
 #else
-import Addr              ( nullAddr )
+import Addr             ( nullAddr )
+import List		( isPrefixOf )
 #endif
 
 #include "HsVersions.h"
@@ -565,9 +565,8 @@ interpreted a command line 'foo\baz' as 'foobaz'.
 -----------------------------------------------------------------------------
 -- Convert filepath into MSDOS form.
 
-dosifyPath  :: String -> String
 dosifyPaths :: [String] -> [String]
--- dosifyPath does two things
+-- dosifyPaths does two things
 -- a) change '/' to '\'
 -- b) remove initial '/cygdrive/'
 
@@ -595,7 +594,6 @@ dosifyPath stuff
 #else
 
 --------------------- Unix version ---------------------
-dosifyPath   p  = p
 dosifyPaths  ps = ps
 unDosifyPath xs = subst '\\' '/' xs
 --------------------------------------------------------

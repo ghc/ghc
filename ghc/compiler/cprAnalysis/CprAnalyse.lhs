@@ -6,7 +6,7 @@ module CprAnalyse ( cprAnalyse ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
 import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUtils	( exprIsValue )
@@ -90,10 +90,6 @@ data AbsVal = Top                -- Not a constructed product
             | Bot                -- Bot'tom included for convenience
                                  -- we could use appropriate Tuple Vals
      deriving (Eq,Show)
-
-isFun :: AbsVal -> Bool
-isFun (Fun _) = True
-isFun _       = False
 
 -- For pretty debugging
 instance Outputable AbsVal where

@@ -8,14 +8,13 @@ module LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_LiberateCaseThreshold )
+import CmdLineOpts	( DynFlags, DynFlag(..), opt_LiberateCaseThreshold )
 import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUnfold	( couldBeSmallEnoughToInline )
 import Var		( Id )
 import VarEnv
 import UniqFM		( ufmToList )
-import Maybes
 import Outputable
 \end{code}
 

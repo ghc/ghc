@@ -18,14 +18,13 @@ import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
 import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
-import TcMonoType	( kcHsSigTypes, tcHsSigType, tcScopedTyVars, checkSigTyVars )
+import TcMonoType	( kcHsSigTypes, tcHsSigType, tcScopedTyVars )
 import TcExpr		( tcExpr )
-import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, isLocalThing )
+import TcEnv		( tcExtendLocalValEnv, isLocalThing )
 import Rules		( extendRuleBase )
 import Inst		( LIE, plusLIEs, instToId )
 import Id		( idName, idType, mkLocalId )
 import Module		( Module )
-import VarSet
 import List		( partition )
 import Outputable
 \end{code}

@@ -17,7 +17,6 @@ import HsImpExp		( isOperator )
 
 -- others:
 import ForeignCall	( Safety )
-import Name		( Name )
 import Outputable	
 import PprType		( pprParendType )
 import Type		( Type )

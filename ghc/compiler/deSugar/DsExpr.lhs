@@ -13,11 +13,9 @@ import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
 			  Stmt(..), HsMatchContext(..), HsDoContext(..), 
 			  Match(..), HsBinds(..), MonoBinds(..), 
-			  mkSimpleMatch, isDoExpr
+			  mkSimpleMatch 
 			)
-import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
-			  TypecheckedStmt, TypecheckedMatchContext
-			)
+import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt )
 import TcType		( tcSplitAppTy, tcSplitFunTys, tcSplitTyConApp_maybe, tcTyConAppArgs,
 			  isIntegerTy, tcSplitTyConApp, isUnLiftedType, Type )
 import CoreSyn

@@ -90,22 +90,20 @@ import TypeRep		( Type(..), TyNote(..) )  -- friend
 import Type		-- Lots and lots
 import TyCon		( TyCon, isPrimTyCon, tyConArity, isNewTyCon )
 import Class		( classTyCon, classHasFDs, Class )
-import Var		( TyVar, tyVarName, isTyVar, tyVarKind, mkTyVar )
+import Var		( TyVar, tyVarKind )
 import VarEnv
 import VarSet
 
 -- others:
 import CmdLineOpts	( opt_DictsStrict )
-import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
-			  mkLocalName, mkDerivedTyConOcc
-			)
+import Name		( Name, NamedThing(..), mkLocalName )
 import OccName		( OccName, mkDictOcc )
 import NameSet
 import PrelNames	( floatTyConKey, doubleTyConKey, foreignPtrTyConKey,
 			  integerTyConKey, intTyConKey, addrTyConKey, boolTyConKey )
 import Unique		( Unique, Uniquable(..), mkTupleTyConUnique )
-import SrcLoc		( SrcLoc, noSrcLoc )
-import Util		( nOfThem, cmpList, thenCmp )
+import SrcLoc		( SrcLoc )
+import Util		( cmpList, thenCmp )
 import Maybes		( maybeToBool, expectJust )
 import BasicTypes	( Boxity(..) )
 import Outputable

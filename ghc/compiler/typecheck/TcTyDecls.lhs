@@ -21,21 +21,16 @@ import TcEnv		( tcExtendTyVarEnv,
 			  tcLookupTyCon, tcLookupRecId, 
 			  TyThingDetails(..), RecTcEnv
 			)
-import TcType		( tcSplitTyConApp_maybe, tcEqType, 
-			  tyVarsOfTypes, tyVarsOfPred, 
-			  mkTyConApp, mkTyVarTys, mkForAllTys, 
-			  Type, ThetaType
-			)
+import TcType		( tcEqType, tyVarsOfTypes, tyVarsOfPred, Type, ThetaType )
 import TcMonad
 
-import DataCon		( DataCon, mkDataCon, dataConFieldLabels, dataConRepType,
-			  isNullaryDataCon, dataConOrigArgTys )
+import DataCon		( DataCon, mkDataCon, dataConFieldLabels )
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import FieldLabel
 import Var		( TyVar )
 import Name		( Name, NamedThing(..) )
 import Outputable
-import TyCon		( TyCon, AlgTyConFlavour(..), tyConTyVars )
+import TyCon		( TyCon, tyConTyVars )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name )
 import ListSetOps	( equivClasses )

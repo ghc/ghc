@@ -11,7 +11,6 @@ module MkExternalCore (
 
 import qualified ExternalCore as C
 import Char
-import Ratio
 import Module
 import CoreSyn
 import HscTypes	
@@ -22,13 +21,10 @@ import DataCon
 import CoreSyn
 import Var
 import IdInfo
-import NameEnv
 import Literal
 import Name
 import CostCentre
 import Outputable
-import PrimOp
-import Class
 import ForeignCall
 import PprExternalCore	
 import CmdLineOpts

@@ -19,7 +19,7 @@ import HsSyn		( HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedPat, RenamedHsType,
 			  RenamedMatchContext, extractHsTyVars )
-import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat, TypecheckedMatchContext )
+import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
 
 import TcMonad
 import TcMonoType	( kcHsSigTypes, tcScopedTyVars, checkSigTyVars, tcHsSigType, sigPatCtxt )

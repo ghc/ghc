@@ -16,7 +16,7 @@ module FloatIn ( floatInwards ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
 import CoreSyn
 import CoreUtils	( exprIsValue, exprIsDupable )
 import CoreLint		( showPass, endPass )
