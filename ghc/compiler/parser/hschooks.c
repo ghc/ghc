@@ -53,22 +53,6 @@ setHeapSize( HsInt size )
 #endif
 }
 
-#if __GLASGOW_HASKELL__ >= 303
-
-void
-ErrorHdrHook (long fd)
-{
-    char msg[]="\n";
-    write(fd,msg,1);
-}
-
-void
-PatErrorHdrHook (long fd)
-{
-    const char msg[]="\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@haskell.org.\n\nFail:";
-    write(fd,msg,sizeof(msg)-1);
-}
-
 void
 PreTraceHook (long fd)
 {
@@ -84,34 +68,6 @@ PostTraceHook (long fd)
     write(fd,msg,sizeof(msg)-1);
 #endif
 }
-
-#else /* pre-3.03 GHC with old IO system */
-
-void
-ErrorHdrHook (FILE *where)
-{
-    fprintf(where, "\n"); /* no "Fail: " */
-}
-
-void
-PatErrorHdrHook (FILE *where)
-{
-    fprintf(where, "\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@haskell.org.\n\nFail: ");
-}
-
-void
-PreTraceHook (FILE *where)
-{
-    fprintf(where, "\n"); /* not "Trace On" */
-}
-
-void
-PostTraceHook (FILE *where)
-{
-    fprintf(where, "\n"); /* not "Trace Off" */
-}
-
-#endif
 
 #if __GLASGOW_HASKELL__ >= 400
 void
