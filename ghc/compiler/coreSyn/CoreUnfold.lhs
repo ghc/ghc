@@ -42,14 +42,14 @@ import CoreSyn
 import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( exprIsValue, exprIsCheap, exprIsTrivial )
-import Id		( Id, idType, idFlavour, isId,
+import Id		( Id, idType, isId,
 			  idSpecialisation, idInlinePragma, idUnfolding,
-			  isPrimOpId_maybe
+			  isPrimOpId_maybe, globalIdDetails
 			)
 import VarSet
 import Literal		( isLitLitLit, litSize )
 import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
-import IdInfo		( InlinePragInfo(..), OccInfo(..), IdFlavour(..),
+import IdInfo		( InlinePragInfo(..), OccInfo(..), GlobalIdDetails(..),
 			  isNeverInlinePrag
 			)
 import Type		( isUnLiftedType )
@@ -288,7 +288,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
       | fun `hasKey` buildIdKey   = buildSize
       | fun `hasKey` augmentIdKey = augmentSize
       | otherwise 
-      = case idFlavour fun of
+      = case globalIdDetails fun of
 	  DataConId dc -> conSizeN (valArgCount args)
 
 	  PrimOpId op  -> primOpSize op (valArgCount args)

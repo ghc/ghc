@@ -26,10 +26,10 @@ import RnMonad
 
 import FiniteMap
 import PrelNames	( pRELUDE_Name, mAIN_Name, main_RDR_Unqual, isUnboundName )
-import UniqFM		( lookupUFM )
 import Module		( ModuleName, moduleName, WhereFrom(..) )
+import Name		( Name, nameSrcLoc, nameOccName )
 import NameSet
-import Name		( Name, nameSrcLoc, nameOccName,  nameEnvElts )
+import NameEnv
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv, 
 			  Deprecations(..), ModIface(..)
@@ -39,7 +39,6 @@ import OccName		( setOccNameSpace, dataName )
 import NameSet		( elemNameSet, emptyNameSet )
 import Outputable
 import Maybes		( maybeToBool, catMaybes, mapMaybe )
-import UniqFM		( emptyUFM, listToUFM )
 import ListSetOps	( removeDups )
 import Util		( sortLt )
 import List		( partition )
@@ -370,7 +369,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 
 \begin{code}
 mkEmptyExportAvails :: ModuleName -> ExportAvails
-mkEmptyExportAvails mod_name = (unitFM mod_name [], emptyUFM)
+mkEmptyExportAvails mod_name = (unitFM mod_name [], emptyNameEnv)
 
 mkExportAvails :: ModuleName -> Bool -> GlobalRdrEnv -> [AvailInfo] -> ExportAvails
 mkExportAvails mod_name unqual_imp gbl_env avails
@@ -396,7 +395,7 @@ mkExportAvails mod_name unqual_imp gbl_env avails
 
     unqual_in_scope n = unQualInScope gbl_env n
 
-    entity_avail_env = listToUFM [ (name,avail) | avail <- avails, 
+    entity_avail_env = mkNameEnv [ (name,avail) | avail <- avails, 
 			  	   		  name  <- availNames avail]
 
 plusExportAvails ::  ExportAvails ->  ExportAvails ->  ExportAvails
@@ -491,7 +490,7 @@ exportsFromAvail this_mod (Just export_items)
 	= lookupSrcName global_name_env (ieName ie)	`thenRn` \ name -> 
 
 		-- See what's available in the current environment
-	  case lookupUFM entity_avail_env name of {
+	  case lookupNameEnv entity_avail_env name of {
 	    Nothing -> 	-- Presumably this happens because lookupSrcName didn't find
 			-- the name and returned an unboundName, which won't be in
 			-- the entity_avail_env, of course

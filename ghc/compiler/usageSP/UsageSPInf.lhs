@@ -18,7 +18,6 @@ import UsageSPLint
 import UConSet
 
 import CoreSyn
-import CoreFVs		( mustHaveLocalBinding )
 import Rules            ( RuleBase )
 import TypeRep          ( Type(..), TyNote(..) ) -- friend
 import Type             ( applyTy, applyTys,

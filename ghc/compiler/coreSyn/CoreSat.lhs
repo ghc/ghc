@@ -21,9 +21,8 @@ import Demand	( Demand, isStrict, wwLazy, StrictnessInfo(..) )
 import PrimOp	( PrimOp(..) )
 import Var 	( Id, TyVar, setTyVarUnique )
 import VarSet
-import IdInfo	( IdFlavour(..) )
-import Id	( mkSysLocal, idType, idStrictness, idFlavour, idDemandInfo, idArity,
-		  isDeadBinder, setIdType, isPrimOpId_maybe
+import Id	( mkSysLocal, idType, idStrictness, idDemandInfo, idArity,
+		  isDeadBinder, setIdType, isPrimOpId_maybe, hasNoBinding
 		)
 
 import UniqSupply
@@ -372,10 +371,8 @@ cloneTyVar tv
 -- The type is the type of the entire application
 maybeSaturate :: Id -> CoreExpr -> Int -> Type -> UniqSM CoreExpr
 maybeSaturate fn expr n_args ty
-  = case idFlavour fn of
-      PrimOpId op  -> saturate_it
-      DataConId dc -> saturate_it
-      other 	   -> returnUs expr
+  | hasNoBinding fn = saturate_it
+  | otherwise	    = returnUs expr
   where
     fn_arity	 = idArity fn
     excess_arity = fn_arity - n_args
@@ -475,12 +472,8 @@ tryEta bndrs expr@(App _ _)
     ok bndr other	    = False
 
 	  -- we can't eta reduce something which must be saturated.
-    ok_to_eta_reduce (Var f)
-	 = case idFlavour f of
-	      PrimOpId op  -> False
-	      DataConId dc -> False
-	      other 	   -> True
-    ok_to_eta_reduce _ = False --safe. ToDo: generalise
+    ok_to_eta_reduce (Var f) = not (hasNoBinding f)
+    ok_to_eta_reduce _ 	     = False --safe. ToDo: generalise
 
 tryEta bndrs (Let bind@(NonRec b r) body)
   | not (any (`elemVarSet` fvs) bndrs)

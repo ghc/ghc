@@ -52,7 +52,7 @@ module HscTypes (
 
 import RdrName		( RdrNameEnv, addListToRdrEnv, emptyRdrEnv, mkRdrUnqual, rdrEnvToList )
 import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameSrcLoc )
-import Name -- Env
+import NameEnv
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
 			  lookupModuleEnv, lookupModuleEnvByName, emptyModuleEnv
@@ -169,6 +169,25 @@ data ModDetails
         md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
         md_rules    :: [IdCoreRule]	-- Domain may include Ids from other modules
      }
+
+--	NOT YET IMPLEMENTED
+-- The ModDetails takes on several slightly different forms:
+--
+-- After typecheck + desugar
+--	md_types	contains TyCons, Classes, and hasNoBinding Ids
+--	md_insts	all instances from this module (incl derived ones)
+--	md_rules	all rules from this module
+--	md_binds	desugared bindings
+--
+-- After simplification
+--	md_types	same as after typecheck
+--	md_insts	ditto
+--	md_rules	orphan rules only (local ones attached to binds)
+--	md_binds	with rules attached
+--
+-- After tidy 
+--	md_types	now contains Ids as well, replete with correct IdInfo
+--			apart from
 \end{code}
 
 \begin{code}

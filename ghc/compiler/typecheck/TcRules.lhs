@@ -22,7 +22,7 @@ import TcExpr		( tcExpr )
 import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, isLocalThing )
 import Rules		( extendRuleBase )
 import Inst		( LIE, plusLIEs, instToId )
-import Id		( idName, idType, mkVanillaId )
+import Id		( idName, idType, mkLocalId )
 import Module		( Module )
 import VarSet
 import Type		( tyVarsOfTypes, openTypeKind )
@@ -137,9 +137,9 @@ tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
     sig_tys = [t | RuleBndrSig _ t <- vars]
 
     new_id (RuleBndr var) 	   = newTyVarTy openTypeKind	`thenNF_Tc` \ ty ->
-		          	     returnNF_Tc (mkVanillaId var ty)
+		          	     returnNF_Tc (mkLocalId var ty)
     new_id (RuleBndrSig var rn_ty) = tcHsSigType rn_ty	`thenTc` \ ty ->
-				     returnNF_Tc (mkVanillaId var ty)
+				     returnNF_Tc (mkLocalId var ty)
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
 		doubleQuotes (ptext name)

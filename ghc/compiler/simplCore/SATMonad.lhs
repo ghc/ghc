@@ -35,7 +35,7 @@ import Type		( mkTyVarTy, mkSigmaTy,
 			  InstTyEnv(..)
 			)
 import MkId		( mkSysLocal )
-import Id		( idType, idName, mkVanillaId )
+import Id		( idType, idName, mkLocalId )
 import UniqSupply
 import Util
 
@@ -139,7 +139,7 @@ newSATName id ty us env
     let
 	new_name = mkCompoundName SLIT("$sat") unique (idName id)
     in
-    (mkVanillaId new_name ty, env) }
+    (mkLocalId new_name ty, env) }
 
 getArgLists :: CoreExpr -> ([Arg Type],[Arg Id])
 getArgLists expr

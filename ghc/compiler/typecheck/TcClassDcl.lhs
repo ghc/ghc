@@ -44,7 +44,7 @@ import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
 import Module		( Module )
 import Name		( Name, NamedThing(..) )
-import Name		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv, nameEnvElts )
+import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv, nameEnvElts )
 import NameSet		( emptyNameSet )
 import Outputable
 import Type		( Type, ClassContext, mkTyVarTys, mkDictTys, mkClassPred,
@@ -287,7 +287,7 @@ tcClassSig is_rec unf_env clas clas_tyvars maybe_dm_env
     let
 	-- Build the selector id and default method id
 	sel_id = mkDictSelId op_name clas
- 	dm_id  = mkDefaultMethodId dm_name clas global_ty
+ 	dm_id  = mkDefaultMethodId dm_name global_ty
 	DefMeth dm_name = sig_dm
 
 	dm_info = case maybe_dm_env of

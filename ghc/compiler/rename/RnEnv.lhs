@@ -29,9 +29,9 @@ import Name		( Name,
 			  getSrcLoc, 
 			  mkLocalName, mkGlobalName,
 			  mkIPName, nameOccName, nameModule_maybe,
-			  setNameModuleAndLoc, mkNameEnv
+			  setNameModuleAndLoc
 			)
-import Name		( extendNameEnv_C, plusNameEnv_C, nameEnvElts )
+import NameEnv
 import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
 import Module		( ModuleName, moduleName, mkVanillaModule, 

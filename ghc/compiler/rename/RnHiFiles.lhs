@@ -42,7 +42,7 @@ import ParseIface	( parseIface )
 import Name		( Name {-instance NamedThing-}, 
 			  nameModule, isLocalName, nameIsLocalOrFrom
 			 )
-import Name		( mkNameEnv, extendNameEnv )
+import NameEnv
 import Module		( Module, 
 			  moduleName, isHomeModule,
 			  ModuleName, WhereFrom(..),

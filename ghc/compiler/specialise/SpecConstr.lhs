@@ -16,7 +16,7 @@ import CoreUtils	( exprType, eqExpr )
 import CoreFVs 		( exprsFreeVars )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
-import PprCore		( pprCoreRules )
+import PprCore		( pprCoreRules, pprCoreRule )
 import Id		( Id, idName, idType, idSpecialisation,
 			  isDataConId_maybe,
 			  mkUserLocal, mkSysLocal )
@@ -430,7 +430,6 @@ specialise env fn bndrs body (SCU {calls=calls, occs=occs})
 		       let (_, pats) = argsToPats con_env us call_args
 		     ]
     in
-    pprTrace "specialise" (ppr all_calls $$ ppr good_calls) $
     mapAndUnzipUs (spec_one env fn (mkLams bndrs body)) 
 		  (nubBy same_call good_calls `zip` [1..])
   where
@@ -446,8 +445,7 @@ good_arg con_env arg_occs (bndr, arg)
 
 bndr_usg_ok :: IdEnv ArgOcc -> Var -> CoreArg -> Bool
 bndr_usg_ok arg_occs bndr arg
-  = pprTrace "bndr_ok" (ppr bndr <+> ppr (lookupVarEnv arg_occs bndr)) $
-    case lookupVarEnv arg_occs bndr of
+  = case lookupVarEnv arg_occs bndr of
 	Just CaseScrut -> True			-- Used only by case scrutiny
 	Just Both      -> case arg of		-- Used by case and elsewhere
 			    App _ _ -> True	-- so the arg should be an explicit con app
@@ -502,6 +500,7 @@ spec_one env fn rhs (pats, n)
 	spec_id   = mkUserLocal spec_occ spec_uniq (exprType spec_rhs) fn_loc
 	rule      = Rule rule_name pat_fvs pats (mkVarApps (Var spec_id) bndrs)
     in
+    pprTrace "SpecConstr" (pprCoreRule (ppr fn) rule)	$
     returnUs (rule, (spec_id, spec_rhs))
 \end{code}
 

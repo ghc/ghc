@@ -13,27 +13,37 @@ module Var (
 	TyVar,
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique,
-	mkTyVar, mkSysTyVar, isTyVar, isSigTyVar,
+	mkTyVar, mkSysTyVar, 
 	newMutTyVar, newSigTyVar,
-	readMutTyVar, writeMutTyVar, isMutTyVar, makeTyVarImmutable,
+	readMutTyVar, writeMutTyVar, makeTyVarImmutable,
 
 	-- Ids
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
-	setIdName, setIdUnique, setIdInfo, lazySetIdInfo, zapIdInfo,
-	mkIdVar, isId, externallyVisibleId
+	setIdName, setIdUnique, setIdInfo, lazySetIdInfo, 
+	setIdNoDiscard, zapSpecPragmaId,
+
+	globalIdDetails, setGlobalIdDetails, 
+
+	mkLocalId, mkGlobalId, mkSpecPragmaId,
+
+	isTyVar, isMutTyVar, isSigTyVar,
+	isId, isLocalVar, isLocalId,
+	isGlobalId, isExportedId, isSpecPragmaId,
+	mustHaveLocalBinding
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TypeRep( Type, Kind )
-import {-# SOURCE #-}	IdInfo( IdInfo, seqIdInfo, vanillaIdInfo )
+import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId,
+				IdInfo, seqIdInfo )
 
-import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import Name		( Name, OccName, NamedThing(..),
 			  setNameUnique, setNameOcc, nameUnique, 
 			  mkSysLocalName, isExternallyVisibleName
 			)
+import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import FastTypes
 import Outputable
 
@@ -66,17 +76,41 @@ data Var
     }
 
 data VarDetails
-  = AnId
+  = LocalId 		-- Used for locally-defined Ids (see NOTE below)
+	LocalIdDetails	-- True <=> exported; don't discard even if dead
+
+  | GlobalId 		-- Used for imported Ids, dict selectors etc
+	GlobalIdDetails
+
   | TyVar
   | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
 	     Bool			-- True <=> this is a type signature variable, which
 					--	    should not be unified with a non-tyvar type
 
--- For a long time I tried to keep mutable Vars statically type-distinct
--- from immutable Vars, but I've finally given up.   It's just too painful.
--- After type checking there are no MutTyVars left, but there's no static check
--- of that fact.
+	-- For a long time I tried to keep mutable Vars statically type-distinct
+	-- from immutable Vars, but I've finally given up.   It's just too painful.
+	-- After type checking there are no MutTyVars left, but there's no static check
+	-- of that fact.
+
+data LocalIdDetails 
+  = NotExported	-- Not exported
+  | Exported	-- Exported
+  | SpecPragma	-- Not exported, but not to be discarded either
+		-- It's unclean that this is so deeply built in
 \end{code}
+
+LocalId and GlobalId
+~~~~~~~~~~~~~~~~~~~~
+A GlobalId is
+  * always a constant (top-level)
+  * imported, or data constructor, or primop, or record selector
+
+A LocalId is 
+  * bound within an expression (lambda, case, local let(rec))
+  * or defined at top level in the module being compiled
+
+After CoreTidy, top-level LocalIds are turned into GlobalIds
+ 
 
 \begin{code}
 instance Outputable Var where
@@ -189,20 +223,6 @@ writeMutTyVar (Var {varDetails = MutTyVar loc _}) val = writeIORef loc val
 
 makeTyVarImmutable :: TyVar -> TyVar
 makeTyVarImmutable tyvar = tyvar { varDetails = TyVar}
-
-isTyVar :: Var -> Bool
-isTyVar (Var {varDetails = details}) = case details of
-					TyVar        -> True
-					MutTyVar _ _ -> True
-					other	     -> False
-
-isMutTyVar :: Var -> Bool
-isMutTyVar (Var {varDetails = MutTyVar _ _}) = True
-isMutTyVar other			     = False
-
-isSigTyVar :: Var -> Bool
-isSigTyVar (Var {varDetails = MutTyVar _ is_sig}) = is_sig
-isSigTyVar other			          = False
 \end{code}
 
 
@@ -231,15 +251,23 @@ setIdUnique = setVarUnique
 setIdName :: Id -> Name -> Id
 setIdName = setVarName
 
+setIdNoDiscard :: Id -> Id
+setIdNoDiscard id 
+  = WARN( not (isLocalId id), ppr id )
+    id { varDetails = LocalId Exported }
+
+zapSpecPragmaId :: Id -> Id
+zapSpecPragmaId id 
+  = case varDetails id of
+	LocalId SpecPragma -> id { varDetails = LocalId NotExported }
+	other		   -> id
+
 lazySetIdInfo :: Id -> IdInfo -> Id
 lazySetIdInfo var info = var {varInfo = info}
 
 setIdInfo :: Id -> IdInfo -> Id
 setIdInfo var info = seqIdInfo info `seq` var {varInfo = info}
 	-- Try to avoid spack leaks by seq'ing
-
-zapIdInfo :: Id -> Id
-zapIdInfo var = var {varInfo = vanillaIdInfo}
 
 modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
 modifyIdInfo fn var@(Var {varInfo = info})
@@ -254,31 +282,94 @@ maybeModifyIdInfo fn var@(Var {varInfo = info}) = case fn info of
 							Just new_info -> var {varInfo = new_info}
 \end{code}
 
-\begin{code}
-mkIdVar :: Name -> Type -> IdInfo -> Id
-mkIdVar name ty info
-  = Var {varName = name, realUnique = getKey (nameUnique name), varType = ty, 
-	 varDetails = AnId, varInfo = info}
-\end{code}
+%************************************************************************
+%*									*
+\subsection{Predicates over variables
+%*									*
+%************************************************************************
 
 \begin{code}
-isId :: Var -> Bool
-isId (Var {varDetails = AnId}) = True
-isId other		       = False
+mkId :: Name -> Type -> VarDetails -> IdInfo -> Id
+mkId name ty details info
+  = Var { varName    = name, 
+	  realUnique = getKey (nameUnique name), 	-- Cache the unique
+	  varType    = ty,	
+	  varDetails = details,
+	  varInfo    = info }
+
+mkLocalId :: Name -> Type -> IdInfo -> Id
+mkLocalId name ty info = mkId name ty (LocalId NotExported) info
+
+mkSpecPragmaId :: Name -> Type -> IdInfo -> Id
+mkSpecPragmaId name ty info = mkId name ty (LocalId SpecPragma) info
+
+mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
+mkGlobalId details name ty info = mkId name ty (GlobalId details) info
 \end{code}
 
-@externallyVisibleId@: is it true that another module might be
-able to ``see'' this Id in a code generation sense. That
-is, another .o file might refer to this Id.
-
-In tidyCorePgm (SimplCore.lhs) we carefully set each top level thing's
-local-ness precisely so that the test here would be easy
-
-This defn appears here (rather than, say, in Id.lhs) because
-CostCentre.lhs uses it (CostCentre feeds PprType feeds Id.lhs)
-
-\end{code}
 \begin{code}
-externallyVisibleId :: Id -> Bool
-externallyVisibleId var = isExternallyVisibleName (varName var)
+isTyVar, isMutTyVar, isSigTyVar		 :: Var -> Bool
+isId, isLocalVar, isLocalId    		 :: Var -> Bool
+isGlobalId, isExportedId, isSpecPragmaId :: Var -> Bool
+mustHaveLocalBinding			 :: Var -> Bool
+
+isTyVar var = case varDetails var of
+		TyVar        -> True
+		MutTyVar _ _ -> True
+		other	     -> False
+
+isMutTyVar (Var {varDetails = MutTyVar _ _}) = True
+isMutTyVar other			     = False
+
+isSigTyVar (Var {varDetails = MutTyVar _ is_sig}) = is_sig
+isSigTyVar other			          = False
+
+isId var = case varDetails var of
+		LocalId _  -> True
+		GlobalId _ -> True
+		other	   -> False
+
+isLocalId var = case varDetails var of
+		  LocalId _  -> True
+		  other	     -> False
+
+-- isLocalVar returns True for type variables as well as local Ids
+-- These are the variables that we need to pay attention to when finding free
+-- variables, or doing dependency analysis.
+isLocalVar var = case varDetails var of
+		    LocalId _  	 -> True
+		    TyVar      	 -> True
+		    MutTyVar _ _ -> True
+		    other	 -> False
+
+-- mustHaveLocalBinding returns True of Ids and TyVars
+-- that must have a binding in this module.  The converse
+-- is not quite right: there are some GlobalIds that must have
+-- bindings, such as record selectors.  But that doesn't matter,
+-- because it's only used for assertions
+mustHaveLocalBinding var = isLocalVar var
+
+isGlobalId var = case varDetails var of
+		   GlobalId _ -> True
+		   other      -> False
+
+isExportedId var = case varDetails var of
+			LocalId Exported -> True
+			GlobalId _	 -> True
+			other		 -> False
+
+isSpecPragmaId var = case varDetails var of
+			LocalId SpecPragma -> True
+			other		   -> False
 \end{code}
+
+\begin{code}
+globalIdDetails :: Var -> GlobalIdDetails
+-- Works OK on local Ids too, returning notGlobalId
+globalIdDetails var = case varDetails var of
+			  GlobalId details -> details
+			  other		   -> notGlobalId
+setGlobalIdDetails :: Id -> GlobalIdDetails -> Id
+setGlobalIdDetails id details = id { varDetails = GlobalId details }
+\end{code}
+

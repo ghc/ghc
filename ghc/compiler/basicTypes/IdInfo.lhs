@@ -8,18 +8,15 @@ Haskell. [WDP 94/11])
 
 \begin{code}
 module IdInfo (
-	IdInfo,		-- Abstract
+	GlobalIdDetails(..), notGlobalId, 	-- Not abstract
 
-	vanillaIdInfo, constantIdInfo, mkIdInfo, seqIdInfo, megaSeqIdInfo,
+	IdInfo,		-- Abstract
+	vanillaIdInfo, noTyGenIdInfo, noCafOrTyGenIdInfo, noCafIdInfo,
+	seqIdInfo, megaSeqIdInfo,
 
 	-- Zapping
 	zapLamInfo, zapDemandInfo,
-	zapSpecPragInfo, shortableIdInfo, copyIdInfo,
-
-	-- Flavour
-	IdFlavour(..), flavourInfo,  makeConstantFlavour,
-	setNoDiscardInfo, setFlavourInfo,
-	ppFlavourInfo,
+	shortableIdInfo, copyIdInfo,
 
 	-- Arity
 	ArityInfo(..),
@@ -104,13 +101,53 @@ infixl 	1 `setDemandInfo`,
 	-- infixl so you can say (id `set` a `set` b)
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{GlobalIdDetails
+%*									*
+%************************************************************************
+
+This type is here (rather than in Id.lhs) mainly because there's 
+an IdInfo.hi-boot, but no Id.hi-boot, and GlobalIdDetails is imported
+(recursively) by Var.lhs.
+
+\begin{code}
+data GlobalIdDetails
+  = VanillaGlobal		-- Imported from elsewhere, a default method Id.
+
+  | RecordSelId FieldLabel	-- The Id for a record selector
+  | DataConId DataCon		-- The Id for a data constructor *worker*
+  | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
+				-- [the only reasons we need to know is so that
+				--  a) we can  suppress printing a definition in the interface file
+				--  b) when typechecking a pattern we can get from the
+				--     Id back to the data con]
+
+  | PrimOpId PrimOp		-- The Id for a primitive operator
+
+  | NotGlobalId			-- Used as a convenient extra return value from globalIdDetails
+    
+notGlobalId = NotGlobalId
+
+instance Outputable GlobalIdDetails where
+    ppr NotGlobalId       = ptext SLIT("[***NotGlobalId***]")
+    ppr VanillaGlobal     = ptext SLIT("[GlobalId]")
+    ppr (DataConId _)     = ptext SLIT("[DataCon]")
+    ppr (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
+    ppr (PrimOpId _)      = ptext SLIT("[PrimOp]")
+    ppr (RecordSelId _)   = ptext SLIT("[RecSel]")
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The main IdInfo type}
+%*									*
+%************************************************************************
+
 An @IdInfo@ gives {\em optional} information about an @Id@.  If
 present it never lies, but it may not be present, in which case there
 is always a conservative assumption which can be made.
-
-	There is one exception: the 'flavour' is *not* optional.
-	You must not discard it.
-	It used to be in Var.lhs, but that seems unclean.
 
 Two @Id@s may have different info even though they have the same
 @Unique@ (and are hence the same @Id@); for example, one might lack
@@ -124,7 +161,6 @@ case.  KSW 1999-04).
 \begin{code}
 data IdInfo
   = IdInfo {
-	flavourInfo	:: IdFlavour,		-- NOT OPTIONAL
 	arityInfo 	:: ArityInfo,		-- Its arity
 	demandInfo 	:: Demand,		-- Whether or not it is definitely demanded
 	specInfo 	:: CoreRules,		-- Specialisations of this function which exist
@@ -144,8 +180,7 @@ seqIdInfo (IdInfo {}) = ()
 
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
-  = seqFlavour (flavourInfo info) 		`seq`
-    seqArity (arityInfo info)			`seq`
+  = seqArity (arityInfo info)			`seq`
     seqDemand (demandInfo info)			`seq`
     seqRules (specInfo info)			`seq`
     seqTyGenInfo (tyGenInfo info)               `seq`
@@ -165,7 +200,6 @@ megaSeqIdInfo info
 Setters
 
 \begin{code}
-setFlavourInfo    info fl = fl `seq` info { flavourInfo = fl }
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
 setSpecInfo 	  info sp = PSEQ sp (info { specInfo = sp })
 setTyGenInfo      info tg = tg `seq` info { tyGenInfo = tg }
@@ -197,34 +231,14 @@ setArityInfo	  info ar = info { arityInfo = ar  }
 setCafInfo        info cf = info { cafInfo = cf }
 setCprInfo        info cp = info { cprInfo = cp }
 setLBVarInfo      info lb = info { lbvarInfo = lb }
-
-setNoDiscardInfo  info = case flavourInfo info of
-				VanillaId -> info { flavourInfo = ExportedId }
-				other	  -> info
-zapSpecPragInfo   info = case flavourInfo info of
-				SpecPragmaId -> info { flavourInfo = VanillaId }
-				other	     -> info
 \end{code}
 
 
 \begin{code}
 vanillaIdInfo :: IdInfo
-	-- Used for locally-defined Ids
-	-- We are going to calculate correct CAF information at the end
-vanillaIdInfo = mkIdInfo VanillaId NoCafRefs
-
-constantIdInfo :: IdInfo
-	-- Used for imported Ids
-	-- The default is that they *do* have CAFs; an interface-file pragma
-	-- may say "oh no it doesn't", but in the absence of such a pragma
-	-- we'd better assume it does
-constantIdInfo = mkIdInfo ConstantId MayHaveCafRefs
-
-mkIdInfo :: IdFlavour -> CafInfo -> IdInfo
-mkIdInfo flv caf 
+vanillaIdInfo 
   = IdInfo {
-	    flavourInfo		= flv,
-	    cafInfo		= caf,
+	    cafInfo		= MayHaveCafRefs,	-- Safe!
 	    arityInfo		= UnknownArity,
 	    demandInfo		= wwLazy,
 	    specInfo		= emptyCoreRules,
@@ -237,73 +251,17 @@ mkIdInfo flv caf
 	    inlinePragInfo 	= NoInlinePragInfo,
 	    occInfo		= NoOccInfo
 	   }
+
+noTyGenIdInfo = vanillaIdInfo `setTyGenInfo` TyGenNever
+	-- Many built-in things have fixed types, so we shouldn't
+	-- run around generalising them
+
+noCafIdInfo = vanillaIdInfo  `setCafInfo` NoCafRefs
+	-- Local things don't refer to Cafs
+
+noCafOrTyGenIdInfo = noTyGenIdInfo `setCafInfo` NoCafRefs
+	-- Most also guarantee not to refer to CAFs
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Flavour}
-%*									*
-%************************************************************************
-
-\begin{code}
-data IdFlavour
-  = VanillaId			-- Locally defined, not exported
-  | ExportedId			-- Locally defined, exported
-  | SpecPragmaId		-- Locally defined, RHS holds specialised call
-
-  | ConstantId 			-- Imported from elsewhere, or a default method Id.
-
-  | DictFunId			-- We flag dictionary functions so that we can
-				-- conveniently extract the DictFuns from a set of
-				-- bindings when building a module's interface
-
-  | DataConId DataCon		-- The Id for a data constructor *worker*
-  | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
-				-- [the only reasons we need to know is so that
-				--  a) we can  suppress printing a definition in the interface file
-				--  b) when typechecking a pattern we can get from the
-				--     Id back to the data con]
-  | PrimOpId PrimOp		-- The Id for a primitive operator
-  | RecordSelId FieldLabel	-- The Id for a record selector
-
-
-makeConstantFlavour :: IdFlavour -> IdFlavour
-makeConstantFlavour flavour = new_flavour
-  where new_flavour = case flavour of
-		        VanillaId  -> ConstantId
-		        ExportedId -> ConstantId
-		        ConstantId -> ConstantId	-- e.g. Default methods
-		        DictFunId  -> DictFunId
-		        flavour    -> pprTrace "makeConstantFlavour" 
-					(ppFlavourInfo flavour)
-				  	flavour
-
-
-ppFlavourInfo :: IdFlavour -> SDoc
-ppFlavourInfo VanillaId         = empty
-ppFlavourInfo ExportedId        = ptext SLIT("[Exported]")
-ppFlavourInfo SpecPragmaId    	= ptext SLIT("[SpecPrag]")
-ppFlavourInfo ConstantId        = ptext SLIT("[Constant]")
-ppFlavourInfo DictFunId         = ptext SLIT("[DictFun]")
-ppFlavourInfo (DataConId _)     = ptext SLIT("[DataCon]")
-ppFlavourInfo (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
-ppFlavourInfo (PrimOpId _)    	= ptext SLIT("[PrimOp]")
-ppFlavourInfo (RecordSelId _) 	= ptext SLIT("[RecSel]")
-
-seqFlavour :: IdFlavour -> ()
-seqFlavour f = f `seq` ()
-\end{code}
-
-The @SpecPragmaId@ exists only to make Ids that are
-on the *LHS* of bindings created by SPECIALISE pragmas; 
-eg:		s = f Int d
-The SpecPragmaId is never itself mentioned; it
-exists solely so that the specialiser will find
-the call to f, and make specialised version of it.
-The SpecPragmaId binding is discarded by the specialiser
-when it gathers up overloaded calls.
-Meanwhile, it is not discarded as dead code.
 
 
 %************************************************************************
@@ -500,8 +458,6 @@ seqWorker NoWorker	   = ()
 
 ppWorkerInfo NoWorker            = empty
 ppWorkerInfo (HasWorker wk_id _) = ptext SLIT("__P") <+> ppr wk_id
-
-noWorkerInfo = NoWorker
 
 workerExists :: WorkerInfo -> Bool
 workerExists NoWorker        = False

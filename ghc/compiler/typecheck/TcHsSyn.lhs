@@ -38,7 +38,7 @@ module TcHsSyn (
 import HsSyn	-- oodles of it
 
 -- others:
-import Id	( idName, idType, isLocalId, setIdType, Id )
+import Id	( idName, idType, setIdType, Id )
 import DataCon	( dataConWrapId )	
 import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv,
 		  TcEnv, TcId

@@ -25,7 +25,7 @@ import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
 import Module		( Module )
 import Id		( Id )
-import Name		( lookupNameEnv )
+import NameEnv		( lookupNameEnv )
 import VarEnv
 import VarSet
 import Bag		( isEmptyBag )

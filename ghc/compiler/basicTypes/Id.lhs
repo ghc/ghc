@@ -8,28 +8,29 @@ module Id (
 	Id, DictId,
 
 	-- Simple construction
-	mkId, mkVanillaId, mkSysLocal, mkUserLocal,
+	mkGlobalId, mkLocalId, mkSpecPragmaId, mkLocalIdWithInfo,
+	mkSysLocal, mkUserLocal, mkVanillaGlobal,
 	mkTemplateLocals, mkTemplateLocalsNum, mkWildId, mkTemplateLocal,
+	mkWorkerId,
 
 	-- Taking an Id apart
 	idName, idType, idUnique, idInfo,
-	idPrimRep, isId,
+	idPrimRep, isId, globalIdDetails,
 	recordSelectorFieldLabel,
 
 	-- Modifying an Id
-	setIdName, setIdUnique, setIdType, setIdNoDiscard, 
+	setIdName, setIdUnique, setIdType, setIdNoDiscard, setGlobalIdDetails,
 	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
-	zapLamIdInfo, zapDemandIdInfo,
+	zapLamIdInfo, zapDemandIdInfo, 
 
 	-- Predicates
 	isImplicitId, isDeadBinder,
-	externallyVisibleId,
-	isSpecPragmaId,	isRecordSelector,
-	isPrimOpId, isPrimOpId_maybe, isDictFunId,
+	isSpecPragmaId,	isExportedId, isLocalId, isGlobalId,
+	isRecordSelector,
+	isPrimOpId, isPrimOpId_maybe, 
 	isDataConId, isDataConId_maybe, 
 	isDataConWrapId, isDataConWrapId_maybe,
 	isBottomingId,
-	isExportedId, isLocalId, 
 	hasNoBinding,
 
 	-- Inline pragma stuff
@@ -52,7 +53,6 @@ module Id (
 	setIdOccInfo,
 
 	idArity, idArityInfo, 
-	idFlavour,
 	idDemandInfo,
 	idStrictness,
         idTyGenInfo,
@@ -72,13 +72,14 @@ module Id (
 import CoreSyn		( Unfolding, CoreRules )
 import BasicTypes	( Arity )
 import Var		( Id, DictId,
-			  isId, mkIdVar,
-			  idName, idType, idUnique, idInfo,
-			  setIdName, setVarType, setIdUnique, 
+			  isId, isExportedId, isSpecPragmaId, isLocalId,
+			  idName, idType, idUnique, idInfo, isGlobalId,
+			  setIdName, setVarType, setIdUnique, setIdNoDiscard,
 			  setIdInfo, lazySetIdInfo, modifyIdInfo, 
 			  maybeModifyIdInfo,
-			  externallyVisibleId
+			  globalIdDetails, setGlobalIdDetails
 			)
+import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId )
 import Type		( Type, typePrimRep, addFreeTyVars, 
                           usOnce, seqType, splitTyConApp_maybe )
 
@@ -87,9 +88,9 @@ import IdInfo
 import Demand		( Demand )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
-			  getOccName
+			  getOccName, getSrcLoc
 			) 
-import OccName		( UserFS )
+import OccName		( UserFS, mkWorkerOcc )
 import PrimRep		( PrimRep )
 import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
@@ -120,37 +121,53 @@ infixl 	1 `setIdUnfolding`,
 %*									*
 %************************************************************************
 
-Absolutely all Ids are made by mkId.  It 
-	a) Pins free-tyvar-info onto the Id's type, 
-	   where it can easily be found.
-	b) Ensures that exported Ids are 
+Absolutely all Ids are made by mkId.  It is just like Var.mkId,
+but in addition it pins free-tyvar-info onto the Id's type, 
+where it can easily be found.
 
 \begin{code}
-mkId :: Name -> Type -> IdInfo -> Id
-mkId name ty info = mkIdVar name (addFreeTyVars ty) info
+mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
+mkLocalIdWithInfo name ty info = Var.mkLocalId name (addFreeTyVars ty) info
+
+mkSpecPragmaId :: OccName -> Unique -> Type -> SrcLoc -> Id
+mkSpecPragmaId occ uniq ty loc = Var.mkSpecPragmaId (mkLocalName uniq occ loc)
+						    (addFreeTyVars ty)
+						    noCafIdInfo
+
+mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
+mkGlobalId details name ty info = Var.mkGlobalId details name (addFreeTyVars ty) info
 \end{code}
 
 \begin{code}
-mkVanillaId :: Name -> Type -> Id
-mkVanillaId name ty = mkId name ty vanillaIdInfo
+mkLocalId :: Name -> Type -> Id
+mkLocalId name ty = mkLocalIdWithInfo name ty noCafIdInfo
 
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
 mkUserLocal :: OccName -> Unique -> Type -> SrcLoc -> Id
 mkSysLocal  :: UserFS  -> Unique -> Type -> Id
+mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
 
-mkSysLocal  fs uniq ty      = mkVanillaId (mkSysLocalName uniq fs)      ty
-mkUserLocal occ uniq ty loc = mkVanillaId (mkLocalName    uniq occ loc) ty
+mkSysLocal  fs uniq ty      = mkLocalId (mkSysLocalName uniq fs)      ty
+mkUserLocal occ uniq ty loc = mkLocalId (mkLocalName    uniq occ loc) ty
+mkVanillaGlobal 	    = mkGlobalId VanillaGlobal
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
 @Uniques@, but that's OK because the templates are supposed to be
 instantiated before use.
-
+ 
 \begin{code}
 -- "Wild Id" typically used when you need a binder that you don't expect to use
 mkWildId :: Type -> Id
 mkWildId ty = mkSysLocal SLIT("wild") (mkBuiltinUnique 1) ty
+
+mkWorkerId :: Unique -> Id -> Type -> Id
+-- A worker gets a local name.  CoreTidy will globalise it if necessary.
+mkWorkerId uniq unwrkr ty
+  = mkLocalId wkr_name ty
+  where
+    wkr_name = mkLocalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcLoc unwrkr)
 
 -- "Template locals" typically used in unfoldings
 mkTemplateLocals :: [Type] -> [Id]
@@ -161,8 +178,8 @@ mkTemplateLocals tys = zipWith (mkSysLocal SLIT("tpl"))
 mkTemplateLocalsNum :: Int -> [Type] -> [Id]
 -- The Int gives the starting point for unique allocation
 mkTemplateLocalsNum n tys = zipWith (mkSysLocal SLIT("tpl"))
-			       (getNumBuiltinUniques n (length tys))
-			       tys
+			    	    (getNumBuiltinUniques n (length tys))
+			       	    tys
 
 mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkSysLocal SLIT("tpl") (mkBuiltinUnique i) ty
@@ -191,95 +208,64 @@ idPrimRep id = typePrimRep (idType id)
 %*									*
 %************************************************************************
 
+The @SpecPragmaId@ exists only to make Ids that are
+on the *LHS* of bindings created by SPECIALISE pragmas; 
+eg:		s = f Int d
+The SpecPragmaId is never itself mentioned; it
+exists solely so that the specialiser will find
+the call to f, and make specialised version of it.
+The SpecPragmaId binding is discarded by the specialiser
+when it gathers up overloaded calls.
+Meanwhile, it is not discarded as dead code.
+
+
 \begin{code}
-idFlavour :: Id -> IdFlavour
-idFlavour id = flavourInfo (idInfo id)
-
-setIdNoDiscard :: Id -> Id
-setIdNoDiscard id	-- Make an Id into a NoDiscardId, unless it is already
-  = modifyIdInfo setNoDiscardInfo id
-
 recordSelectorFieldLabel :: Id -> FieldLabel
-recordSelectorFieldLabel id = case idFlavour id of
-				RecordSelId lbl -> lbl
+recordSelectorFieldLabel id = case globalIdDetails id of
+				 RecordSelId lbl -> lbl
 
-isRecordSelector id = case idFlavour id of
+isRecordSelector id = case globalIdDetails id of
 			RecordSelId lbl -> True
 			other	  	-> False
 
-isPrimOpId id = case idFlavour id of
+isPrimOpId id = case globalIdDetails id of
 		    PrimOpId op -> True
 		    other	-> False
 
-isPrimOpId_maybe id = case idFlavour id of
+isPrimOpId_maybe id = case globalIdDetails id of
 			    PrimOpId op -> Just op
 			    other	-> Nothing
 
-isDataConId id = case idFlavour id of
+isDataConId id = case globalIdDetails id of
 			DataConId _ -> True
 			other	    -> False
 
-isDataConId_maybe id = case idFlavour id of
+isDataConId_maybe id = case globalIdDetails id of
 			  DataConId con -> Just con
 			  other	        -> Nothing
 
-isDataConWrapId_maybe id = case idFlavour id of
+isDataConWrapId_maybe id = case globalIdDetails id of
 				  DataConWrapId con -> Just con
 				  other	            -> Nothing
 
-isDataConWrapId id = case idFlavour id of
+isDataConWrapId id = case globalIdDetails id of
 			DataConWrapId con -> True
 			other	          -> False
 
-isSpecPragmaId id = case idFlavour id of
-			SpecPragmaId -> True
-			other	     -> False
-
-hasNoBinding id = case idFlavour id of
-			DataConId _ -> True
-			PrimOpId _  -> True
-			other	    -> False
 	-- hasNoBinding returns True of an Id which may not have a
 	-- binding, even though it is defined in this module.  Notably,
 	-- the constructors of a dictionary are in this situation.
+hasNoBinding id = case globalIdDetails id of
+			DataConId _ -> True
+			PrimOpId _  -> True
+			other	    -> False
 
-isDictFunId id = case idFlavour id of
-		   DictFunId -> True
-		   other     -> False
-
--- Don't drop a binding for an exported Id,
--- if it otherwise looks dead.  
--- Perhaps a better name would be isDiscardableId
-isExportedId :: Id -> Bool
-isExportedId id = case idFlavour id of
-			VanillaId  -> False
-			other	   -> True
-
-isLocalId :: Id -> Bool
--- True of Ids that are locally defined, but are not constants
--- like data constructors, record selectors, and the like. 
--- See comments with CoreFVs.isLocalVar
-isLocalId id 
-#ifdef DEBUG
-  | not (isId id) = pprTrace "isLocalid" (ppr id) False
-  | otherwise
-#endif
-  = case idFlavour id of
-	 VanillaId    -> True
-	 ExportedId   -> True
-	 SpecPragmaId -> True
-	 other	      -> False
-\end{code}
-
-
-isImplicitId tells whether an Id's info is implied by other
-declarations, so we don't need to put its signature in an interface
-file, even if it's mentioned in some other interface unfolding.
-
-\begin{code}
 isImplicitId :: Id -> Bool
+	-- isImplicitId tells whether an Id's info is implied by other
+	-- declarations, so we don't need to put its signature in an interface
+	-- file, even if it's mentioned in some other interface unfolding.
 isImplicitId id
-  = case idFlavour id of
+  = case globalIdDetails id of
 	RecordSelId _   -> True	-- Includes dictionary selectors
         PrimOpId _      -> True
         DataConId _     -> True

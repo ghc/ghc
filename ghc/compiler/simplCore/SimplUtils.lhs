@@ -31,7 +31,7 @@ import Subst		( InScopeSet, mkSubst, substExpr )
 import qualified Subst	( simplBndrs, simplBndr, simplLetId )
 import Id		( idType, idName, 
 			  idUnfolding, idStrictness,
-			  mkVanillaId, idInfo
+			  mkLocalId, idInfo
 			)
 import IdInfo		( StrictnessInfo(..) )
 import Maybes		( maybeToBool, catMaybes )
@@ -615,7 +615,7 @@ tryRhsTyLam rhs 			-- Only does something if there's a let
 	let
 	    poly_name = setNameUnique (idName var) uniq		-- Keep same name
 	    poly_ty   = mkForAllTys tyvars_here (idType var)	-- But new type of course
-	    poly_id   = mkVanillaId poly_name poly_ty 
+	    poly_id   = mkLocalId poly_name poly_ty 
 
 		-- In the olden days, it was crucial to copy the occInfo of the original var, 
 		-- because we were looking at occurrence-analysed but as yet unsimplified code!

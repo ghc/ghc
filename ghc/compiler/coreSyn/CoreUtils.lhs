@@ -51,12 +51,12 @@ import Literal		( hashLiteral, literalType, litIsDupable )
 import DataCon		( DataCon, dataConRepArity )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap, 
 			  primOpIsDupable )
-import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo, 
+import Id		( Id, idType, globalIdDetails, idStrictness, idLBVarInfo, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
 			  isDataConId_maybe, isPrimOpId_maybe, mkSysLocal, hasNoBinding
 			)
 import IdInfo		( LBVarInfo(..),  
-			  IdFlavour(..),
+			  GlobalIdDetails(..),
 			  megaSeqIdInfo )
 import Demand		( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, 
@@ -419,7 +419,7 @@ idAppIsCheap id n_val_args
   | n_val_args == 0 = True	-- Just a type application of
 				-- a variable (f t1 t2 t3)
 				-- counts as WHNF
-  | otherwise = case idFlavour id of
+  | otherwise = case globalIdDetails id of
 		  DataConId _   -> True			
 		  RecordSelId _ -> True			-- I'm experimenting with making record selection
 							-- look cheap, so we will substitute it inside a
@@ -467,7 +467,7 @@ exprOkForSpeculation other_expr
   = go other_expr 0 True
   where
     go (Var f) n_args args_ok 
-      = case idFlavour f of
+      = case globalIdDetails f of
 	  DataConId _ -> True	-- The strictness of the constructor has already
 				-- been expressed by its "wrapper", so we don't need
 				-- to take the arguments into account
@@ -543,7 +543,7 @@ exprIsValue other_expr
 
 idAppIsValue :: Id -> Int -> Bool
 idAppIsValue id n_val_args 
-  = case idFlavour id of
+  = case globalIdDetails id of
 	DataConId _ -> True
 	PrimOpId _  -> n_val_args < idArity id
 	other | n_val_args == 0 -> isEvaldUnfolding (idUnfolding id)

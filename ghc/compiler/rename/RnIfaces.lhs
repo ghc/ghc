@@ -40,7 +40,8 @@ import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocalName, NamedThing(..)
 			 )
-import Name 		( elemNameEnv, delFromNameEnv )
+import NameEnv 		( elemNameEnv, delFromNameEnv, lookupNameEnv )
+import NameSet
 import Module		( Module, ModuleEnv, 
 			  moduleName, isHomeModule,
 			  ModuleName, WhereFrom(..),
@@ -48,7 +49,6 @@ import Module		( Module, ModuleEnv,
 			  extendModuleEnv_C, foldModuleEnv, lookupModuleEnv,
 			  elemModuleSet, extendModuleSet
 			)
-import NameSet
 import PrelInfo		( wiredInThingEnv )
 import Maybes		( orElse )
 import FiniteMap

@@ -16,13 +16,13 @@ import IO		( hPutStr, hPutStrLn, stdout )
 
 import CoreSyn
 import Rules            ( RuleBase, pprRuleBase )
-import CoreFVs		( idFreeVars, mustHaveLocalBinding )
+import CoreFVs		( idFreeVars )
 import CoreUtils	( exprOkForSpeculation, coreBindsSize, mkPiType )
 
 import Bag
 import Literal		( literalType )
 import DataCon		( dataConRepType )
-import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId )
+import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId, mustHaveLocalBinding )
 import VarSet
 import Subst		( mkTyVarSubst, substTy )
 import Name		( getSrcLoc )

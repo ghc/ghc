@@ -39,7 +39,7 @@ import TcType		( newTyVarTy, newTyVar,
 import TcUnify		( unifyTauTy, unifyTauTyLists )
 
 import CoreFVs		( idFreeTyVars )
-import Id		( mkVanillaId, setInlinePragma )
+import Id		( mkLocalId, setInlinePragma )
 import Var		( idType, idName )
 import IdInfo		( InlinePragInfo(..) )
 import Name		( Name, getOccName, getSrcLoc )
@@ -217,7 +217,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	  poly_ids      = map mk_dummy binder_names
 	  mk_dummy name = case maybeSig tc_ty_sigs name of
 			    Just (TySigInfo _ poly_id _ _ _ _ _ _) -> poly_id	-- Signature
-			    Nothing -> mkVanillaId name forall_a_a          	-- No signature
+			    Nothing -> mkLocalId name forall_a_a          	-- No signature
 	in
 	returnTc (EmptyMonoBinds, emptyLIE, poly_ids)
     )						$
@@ -278,7 +278,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 			(sig_tyvars, sig_poly_id)
 		  Nothing -> (real_tyvars_to_gen, new_poly_id)
 
-	    new_poly_id = mkVanillaId binder_name poly_ty
+	    new_poly_id = mkLocalId binder_name poly_ty
 	    poly_ty = mkForAllTys real_tyvars_to_gen
 			$ mkFunTys dict_tys 
 			$ idType zonked_mono_id

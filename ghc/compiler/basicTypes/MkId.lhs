@@ -13,8 +13,6 @@ have a standard form, namely:
 
 \begin{code}
 module MkId (
-	mkSpecPragmaId,	mkWorkerId,
-
 	mkDictFunId, mkDefaultMethodId,
 	mkDictSelId,
 
@@ -54,10 +52,7 @@ import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
 import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
 import VarSet		( isEmptyVarSet )
-import Name		( mkWiredInName, mkLocalName, 
-			  mkWorkerOcc, mkCCallName,
-			  Name, NamedThing(..), getSrcLoc
-			)
+import Name		( mkWiredInName, mkCCallName, Name )
 import OccName		( mkVarOcc )
 import PrimOp		( PrimOp(DataToTagOp, CCallOp), 
 			  primOpSig, mkPrimOpIdName,
@@ -72,15 +67,15 @@ import DataCon		( DataCon, StrictnessMark(..),
 			  dataConSig, dataConStrictMarks, dataConId,
 			  maybeMarkedUnboxed, splitProductType_maybe
 			)
-import Id		( idType, mkId,
-			  mkVanillaId, mkTemplateLocals, mkTemplateLocalsNum,
+import Id		( idType, mkGlobalId, mkVanillaGlobal,
+			  mkTemplateLocals, mkTemplateLocalsNum,
 			  mkTemplateLocal, idCprInfo
 			)
-import IdInfo		( IdInfo, constantIdInfo, mkIdInfo,
+import IdInfo		( IdInfo, vanillaIdInfo, noTyGenIdInfo, noCafOrTyGenIdInfo,
 			  exactArity, setUnfoldingInfo, setCafInfo, setCprInfo,
-			  setArityInfo, setSpecInfo, setTyGenInfo,
+			  setArityInfo, setSpecInfo, 
 			  mkStrictnessInfo, setStrictnessInfo,
-			  IdFlavour(..), CafInfo(..), CprInfo(..), TyGenInfo(..)
+			  GlobalIdDetails(..), CafInfo(..), CprInfo(..)
 			)
 import FieldLabel	( mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
@@ -94,7 +89,6 @@ import ListSetOps	( assoc, assocMaybe )
 import UnicodeUtil      ( stringToUtf8 )
 import Char             ( ord )
 \end{code}		
-
 
 %************************************************************************
 %*									*
@@ -132,32 +126,6 @@ wiredInIds
 
 %************************************************************************
 %*									*
-\subsection{Easy ones}
-%*									*
-%************************************************************************
-
-\begin{code}
-mkSpecPragmaId occ uniq ty loc
-  = mkId (mkLocalName uniq occ loc) ty (mkIdInfo SpecPragmaId NoCafRefs)
-	-- Maybe a SysLocal?  But then we'd lose the location
-
-mkDefaultMethodId dm_name rec_c ty
-  = mkId dm_name ty info
-  where
-    info = constantIdInfo `setTyGenInfo` TyGenNever
-             -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
-             -- do not generalise it
-
-mkWorkerId :: Unique -> Id -> Type -> Id
--- A worker gets a local name.  CoreTidy will globalise it if necessary.
-mkWorkerId uniq unwrkr ty
-  = mkVanillaId wkr_name ty
-  where
-    wkr_name = mkLocalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcLoc unwrkr)
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection{Data constructors}
 %*									*
 %************************************************************************
@@ -167,9 +135,9 @@ mkDataConId :: Name -> DataCon -> Id
 	-- Makes the *worker* for the data constructor; that is, the function
 	-- that takes the reprsentation arguments and builds the constructor.
 mkDataConId work_name data_con
-  = mkId work_name (dataConRepType data_con) info
+  = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
   where
-    info = mkIdInfo (DataConId data_con) NoCafRefs
+    info = noCafOrTyGenIdInfo
 	   `setArityInfo`	exactArity arity
 	   `setStrictnessInfo`	strict_info
 	   `setCprInfo`		cpr_info
@@ -228,10 +196,10 @@ Notice that
 mkDataConWrapId data_con
   = wrap_id
   where
-    wrap_id = mkId (dataConName data_con) wrap_ty info
+    wrap_id = mkGlobalId (DataConWrapId data_con) (dataConName data_con) wrap_ty info
     work_id = dataConId data_con
 
-    info = mkIdInfo (DataConWrapId data_con) NoCafRefs
+    info = noCafOrTyGenIdInfo
 	   `setUnfoldingInfo`	mkTopUnfolding (mkInlineMe wrap_rhs)
 	   `setCprInfo`		cpr_info
 		-- The Cpr info can be important inside INLINE rhss, where the
@@ -239,9 +207,6 @@ mkDataConWrapId data_con
 	   `setArityInfo`	exactArity arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
-           `setTyGenInfo`     TyGenNever
-                -- No point generalising its type, since it gets eagerly inlined
-                -- away anyway
 
     wrap_ty = mkForAllTys all_tyvars $
 	      mkFunTys all_arg_tys
@@ -382,8 +347,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	-- we can't conjure it up out of thin air
   = sel_id
   where
-    sel_id     = mkId (fieldLabelName field_label) selector_ty info
-
+    sel_id     = mkGlobalId (RecordSelId field_label) (fieldLabelName field_label) selector_ty info
     field_ty   = fieldLabelType field_label
     data_cons  = tyConDataCons tycon
     tyvars     = tyConTyVars tycon	-- These scope over the types in 
@@ -429,10 +393,10 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 		   mkFunTy data_ty field_tau
       
     arity = 1 + n_dict_tys + n_field_dict_tys
-    info = mkIdInfo (RecordSelId field_label) caf_info
+    info = noTyGenIdInfo
+	   `setCafInfo`		caf_info
 	   `setArityInfo`	exactArity arity
 	   `setUnfoldingInfo`	unfolding	
-           `setTyGenInfo`	TyGenNever
 	-- ToDo: consider adding further IdInfo
 
     unfolding = mkTopUnfolding sel_rhs
@@ -551,14 +515,13 @@ mkDictSelId name clas
   = sel_id
   where
     ty	      = exprType rhs
-    sel_id    = mkId name ty info
+    sel_id    = mkGlobalId (RecordSelId field_lbl) name ty info
     field_lbl = mkFieldLabel name tycon ty tag
     tag       = assoc "MkId.mkDictSelId" (classSelIds clas `zip` allFieldLabelTags) sel_id
 
-    info      = mkIdInfo (RecordSelId field_lbl) NoCafRefs
+    info      = noCafOrTyGenIdInfo
 		`setArityInfo`	    exactArity 1
 		`setUnfoldingInfo`  unfolding
-                `setTyGenInfo`      TyGenNever
 		
 	-- We no longer use 'must-inline' on record selectors.  They'll
 	-- inline like crazy if they scrutinise a constructor
@@ -598,9 +561,9 @@ mkPrimOpId prim_op
     (tyvars,arg_tys,res_ty, arity, strict_info) = primOpSig prim_op
     ty   = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
     name = mkPrimOpIdName prim_op
-    id   = mkId name ty info
+    id   = mkGlobalId (PrimOpId prim_op) name ty info
 		
-    info = mkIdInfo (PrimOpId prim_op) NoCafRefs
+    info = noCafOrTyGenIdInfo
 	   `setSpecInfo`	rules
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
@@ -622,7 +585,7 @@ mkCCallOpId uniq ccall ty
   = ASSERT( isEmptyVarSet (tyVarsOfType ty) )
 	-- A CCallOpId should have no free type variables; 
 	-- when doing substitutions won't substitute over it
-    mkId name ty info
+    mkGlobalId (PrimOpId prim_op) name ty info
   where
     occ_str = showSDocIface (braces (pprCCallOp ccall <+> ppr ty))
 	-- The "occurrence name" of a ccall is the full info about the
@@ -631,7 +594,7 @@ mkCCallOpId uniq ccall ty
     name    = mkCCallName uniq occ_str
     prim_op = CCallOp ccall
 
-    info = mkIdInfo (PrimOpId prim_op) NoCafRefs
+    info = noCafOrTyGenIdInfo
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
 
@@ -644,11 +607,14 @@ mkCCallOpId uniq ccall ty
 
 %************************************************************************
 %*									*
-\subsection{DictFuns}
+\subsection{DictFuns and default methods}
 %*									*
 %************************************************************************
 
 \begin{code}
+mkDefaultMethodId dm_name ty
+  = mkVanillaGlobal dm_name ty noTyGenIdInfo
+
 mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Class 
 	    -> [TyVar]
@@ -657,14 +623,12 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Id
 
 mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
-  = mkId dfun_name dfun_ty info
+  = mkVanillaGlobal dfun_name dfun_ty noTyGenIdInfo
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
-    info = mkIdInfo DictFunId MayHaveCafRefs
-	   `setTyGenInfo` TyGenNever
-             -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
-             -- do not generalise it
-	-- An imported dfun may refer to CAFs, so we assume the worst
+    info     = noTyGenIdInfo
+             -- Type is wired-in (see comment at TcClassDcl.tcClassSig),
+             -- so do not generalise it
 
 {-  1 dec 99: disable the Mark Jones optimisation for the sake
     of compatibility with Hugs.
@@ -716,7 +680,7 @@ another gun with which to shoot yourself in the foot.
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty info
   where
-    info = constantIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+    info = noCafOrTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
 
     ty  = mkForAllTys [openAlphaTyVar,openBetaTyVar]
@@ -734,8 +698,7 @@ evaluate its argument and call the dataToTag# primitive.
 getTagId
   = pcMiscPrelId getTagIdKey pREL_GHC SLIT("getTag#") ty info
   where
-    info = constantIdInfo
-	   `setUnfoldingInfo`	mkCompulsoryUnfolding rhs
+    info = noCafOrTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	-- We don't provide a defn for this; you must inline it
 
     ty = mkForAllTys [alphaTyVar] (mkFunTy alphaTy intPrimTy)
@@ -753,7 +716,7 @@ nasty as-is, change it back to a literal (@Literal@).
 realWorldPrimId	-- :: State# RealWorld
   = pcMiscPrelId realWorldPrimIdKey pREL_GHC SLIT("realWorld#")
 		 realWorldStatePrimTy
-		 (noCafIdInfo `setUnfoldingInfo` mkOtherCon [])
+		 (noCafOrTyGenIdInfo `setUnfoldingInfo` mkOtherCon [])
 	-- The mkOtherCon makes it look that realWorld# is evaluated
 	-- which in turn makes Simplify.interestingArg return True,
 	-- which in turn makes INLINE things applied to realWorld# likely
@@ -806,8 +769,7 @@ aBSENT_ERROR_ID
 
 pAR_ERROR_ID
   = pcMiscPrelId parErrorIdKey pREL_ERR SLIT("parError")
-    (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noCafIdInfo
-
+    (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noCafOrTyGenIdInfo
 \end{code}
 
 
@@ -822,7 +784,7 @@ pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
 pcMiscPrelId key mod str ty info
   = let
 	name = mkWiredInName mod (mkVarOcc str) key
-	imp  = mkId name ty info -- the usual case...
+	imp  = mkVanillaGlobal name ty info -- the usual case...
     in
     imp
     -- We lie and say the thing is imported; otherwise, we get into
@@ -834,15 +796,12 @@ pcMiscPrelId key mod str ty info
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
-    bottoming_info = noCafIdInfo 
+    bottoming_info = noCafOrTyGenIdInfo 
 		     `setStrictnessInfo` mkStrictnessInfo ([wwStrict], True)
 		     
 	-- these "bottom" out, no matter what their arguments
 
 generic_ERROR_ID u n = pc_bottoming_Id u pREL_ERR n errorTy
-
--- Very useful...
-noCafIdInfo = constantIdInfo `setCafInfo` NoCafRefs
 
 (openAlphaTyVar:openBetaTyVar:_) = openAlphaTyVars
 openAlphaTy  = mkTyVarTy openAlphaTyVar

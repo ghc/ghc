@@ -5,8 +5,6 @@ Taken quite directly from the Peyton Jones/Lester paper.
 
 \begin{code}
 module CoreFVs (
-	isLocalVar, mustHaveLocalBinding,
-
 	exprFreeVars,	-- CoreExpr -> VarSet	-- Find all locally-defined free Ids or tyvars
 	exprsFreeVars,	-- [CoreExpr] -> VarSet
 
@@ -26,33 +24,10 @@ module CoreFVs (
 import CoreSyn
 import Id		( Id, idType, isLocalId, hasNoBinding, idSpecialisation )
 import VarSet
-import Var		( Var, isId )
+import Var		( Var, isId, isLocalVar )
 import Type		( tyVarsOfType )
 import Util		( mapAndUnzip )
 import Outputable
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{isLocalVar}
-%*									*
-%************************************************************************
-
-@isLocalVar@ returns True of all TyVars, and of Ids that are defined in 
-this module and are not constants like data constructors and record selectors.
-These are the variables that we need to pay attention to when finding free
-variables, or doing dependency analysis.
-
-\begin{code}
-isLocalVar :: Var -> Bool
-isLocalVar v = isTyVar v || isLocalId v
-\end{code}
-
-\begin{code}
-mustHaveLocalBinding :: Var -> Bool
--- True <=> the variable must have a binding in this module
-mustHaveLocalBinding v = isTyVar v || (isLocalId v && not (hasNoBinding v))
 \end{code}
 
 

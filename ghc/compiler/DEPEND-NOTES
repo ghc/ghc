@@ -5,12 +5,12 @@ The Name/Var/Type group is a bit complicated. Here's the deal
 Things in brackets are what the module *uses*.
 A 'loop' indicates a use from a module compiled later
 
-	Name, PrimRep, FieldLabel (loop Type.Type)
+	Name, PrimRep 
 then
 	PrelNames
 then
-	Var (Name, loop CoreSyn.CoreExpr, loop IdInfo.IdInfo, 
-	     loop Type.GenType, loop Type.Kind)
+	Var (Name, loop IdInfo.IdInfo, 
+	     loop Type.Type, loop Type.Kind)
 then
 	VarEnv, VarSet, ThinAir
 then
@@ -20,7 +20,7 @@ then
 then
 	Type (loop DataCon.DataCon, loop Subst.substTy)
 then
-	TysPrim (Type), PprEnv (loop DataCon.DataCon, Type)
+	FieldLabel( Type), TysPrim (Type), PprEnv (loop DataCon.DataCon, Type)
 then
 	Unify, PprType (PprEnv)
 then

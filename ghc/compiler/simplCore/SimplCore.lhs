@@ -23,7 +23,7 @@ import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds,
 			  extendRuleBaseList, addRuleBaseFVs, pprRuleBase )
 import Module		( moduleEnvElts )
 import CoreUnfold
-import PprCore		( pprCoreBindings, pprIdCoreRule, pprCoreExpr )
+import PprCore		( pprCoreBindings, pprCoreExpr )
 import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
@@ -32,7 +32,7 @@ import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idName, isDataConWrapId, setIdNoDiscard, isLocalId )
+import Id		( idName, isDataConWrapId, setIdNoDiscard, isLocalId, isImplicitId )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -273,11 +273,16 @@ updateBinders rule_ids rule_rhs_fvs is_exported binds
     update_bndrs (Rec prs)    = Rec [(update_bndr b, r) | (b,r) <- prs]
 
     update_bndr bndr 
-	|  is_exported (idName bndr)
-	|| bndr `elemVarSet` rule_rhs_fvs = setIdNoDiscard bndr'
-	| otherwise			  = bndr'
+	| isImplicitId bndr = bndr	-- Constructors, selectors; doesn't 
+					-- make sense to call setIdNoDiscard
+					-- Also can't have rules
+	| dont_discard bndr = setIdNoDiscard bndr_with_rules
+	| otherwise	    = bndr_with_rules
 	where
-	  bndr' = lookupVarSet rule_ids bndr `orElse` bndr
+	  bndr_with_rules = lookupVarSet rule_ids bndr `orElse` bndr
+
+    dont_discard bndr =  is_exported (idName bndr)
+		      || bndr `elemVarSet` rule_rhs_fvs 
 \end{code}
 
 

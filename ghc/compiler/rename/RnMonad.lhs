@@ -58,7 +58,7 @@ import Name		( Name, OccName, NamedThing(..),
 			  nameOccName,
 			  decode, mkLocalName, mkKnownKeyGlobal
 			)
-import Name		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnvList )
+import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnvList )
 import Module		( Module, ModuleName, ModuleSet, emptyModuleSet )
 import NameSet		
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )

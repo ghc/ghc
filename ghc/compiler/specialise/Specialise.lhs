@@ -12,10 +12,6 @@ import CmdLineOpts	( DynFlags, DynFlag(..) )
 import Id		( Id, idName, idType, mkUserLocal,
 			  idSpecialisation, modifyIdInfo
 			)
-import IdInfo		( zapSpecPragInfo )
-import VarSet
-import VarEnv
-
 import Type		( Type, mkTyVarTy, splitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, 
 			  mkForAllTys 
@@ -25,6 +21,7 @@ import Subst		( Subst, mkSubst, substTy, mkSubst, extendSubstList, mkInScopeSet,
 			  substAndCloneId, substAndCloneIds, substAndCloneRecIds,
 			  lookupIdSubst, substInScope
 			) 
+import Var		( zapSpecPragmaId )
 import VarSet
 import VarEnv
 import CoreSyn
@@ -815,7 +812,7 @@ specDefn subst calls (fn, rhs)
     returnSM ((zapped_fn, rhs'), [], rhs_uds)
   
   where
-    zapped_fn		 = modifyIdInfo zapSpecPragInfo fn
+    zapped_fn		 = zapSpecPragmaId fn
 	-- If the fn is a SpecPragmaId, make it discardable
 	-- It's role as a holder for a call instance is o'er
 	-- But it might be alive for some other reason by now.

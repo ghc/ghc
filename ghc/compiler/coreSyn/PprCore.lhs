@@ -20,11 +20,12 @@ module PprCore (
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import Id		( Id, idType, isDataConId_maybe, idLBVarInfo, idArity,
-			  idInfo, idInlinePragma, idDemandInfo, idOccInfo
+			  idInfo, idInlinePragma, idDemandInfo, idOccInfo,
+			  globalIdDetails, isGlobalId, isExportedId, isSpecPragmaId
 			)
 import Var		( isTyVar )
 import IdInfo		( IdInfo, megaSeqIdInfo, 
-			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
+			  arityInfo, ppArityInfo, 
 			  specInfo, cprInfo, ppCprInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
 			  cprInfo, ppCprInfo, 
@@ -297,7 +298,7 @@ and @pprCoreExpr@ functions.
 \begin{code}
 -- Used for printing dump info
 pprCoreBinder LetBind binder
-  = vcat [sig, pragmas, ppr binder]
+  = vcat [sig, pprIdDetails binder, pragmas, ppr binder]
   where
     sig     = pprTypedBinder binder
     pragmas = ppIdInfo binder (idInfo binder)
@@ -332,11 +333,15 @@ pprIdBndr id = ppr id <+>
 
 
 \begin{code}
+pprIdDetails :: Id -> SDoc
+pprIdDetails id | isGlobalId id     = ppr (globalIdDetails id)
+		| isExportedId id   = ptext SLIT("[Exported]")
+		| isSpecPragmaId id = ptext SLIT("[SpecPrag]")
+		| otherwise	    = empty
+
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo b info
-  = hsep [
-	    ppFlavourInfo (flavourInfo info),
-	    ppArityInfo a,
+  = hsep [  ppArityInfo a,
             ppTyGenInfo g,
 	    ppWorkerInfo (workerInfo info),
 	    ppStrictnessInfo s,

@@ -24,14 +24,14 @@ import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), Note(..),
 import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
 import VarSet		( varSetElems )
-import Id               ( Id, mkTemplateLocal, idType, idName, 
-			  mkTemplateLocalsNum, mkId
+import Id               ( Id, mkVanillaGlobal, idType, idName, 
+			  mkTemplateLocal, mkTemplateLocalsNum
 			) 
 import TysWiredIn       ( genericTyCons,
 			  genUnitTyCon, genUnitDataCon, plusTyCon, inrDataCon,
 			  inlDataCon, crossTyCon, crossDataCon
 			)
-import IdInfo           ( constantIdInfo, setUnfoldingInfo )
+import IdInfo           ( noCafOrTyGenIdInfo, setUnfoldingInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
 import Unique		( mkBuiltinUnique )
@@ -250,16 +250,16 @@ mkTyConGenInfo tycon [from_name, to_name]
   = Nothing
 
   | otherwise
-  = Just (EP { fromEP = mkId from_name from_ty from_id_info,
-	       toEP   = mkId to_name   to_ty   to_id_info })
+  = Just (EP { fromEP = mkVanillaGlobal from_name from_ty from_id_info,
+	       toEP   = mkVanillaGlobal to_name   to_ty   to_id_info })
   where
     tyvars	 = tyConTyVars tycon			-- [a, b, c]
     datacons 	 = tyConDataConsIfAvailable tycon	-- [C, D]
     tycon_ty	 = mkTyConApp tycon tyvar_tys		-- T a b c
     tyvar_tys    = mkTyVarTys tyvars
 
-    from_id_info = constantIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
-    to_id_info   = constantIdInfo `setUnfoldingInfo` mkTopUnfolding to_fn
+    from_id_info = noCafOrTyGenIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
+    to_id_info   = noCafOrTyGenIdInfo `setUnfoldingInfo` mkTopUnfolding to_fn
 
     from_ty = mkForAllTys tyvars (mkFunTy tycon_ty rep_ty)
     to_ty   = mkForAllTys tyvars (mkFunTy rep_ty tycon_ty)

@@ -27,7 +27,6 @@ module UsageSPUtils ( {- SEE BELOW:  -- KSW 2000-10-13
 
 {- ENTIRE FILE COMMENTED OUT FOR NOW  -- KSW 2000-10-13
 import CoreSyn
-import CoreFVs		( mustHaveLocalBinding )
 import Var              ( Var, varType, setVarType, mkUVar )
 import Id               ( isExportedId )
 import Name             ( isLocallyDefined )

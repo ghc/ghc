@@ -40,7 +40,7 @@ import Var		( varName )
 import FiniteMap
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name, getSrcLoc, isTyVarName )
-import Name		( NameEnv, mkNameEnv, lookupNameEnv_NF )
+import NameEnv		( NameEnv, mkNameEnv, lookupNameEnv_NF )
 import NameSet
 import Outputable
 import Maybes		( mapMaybe )

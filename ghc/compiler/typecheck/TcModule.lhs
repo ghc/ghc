@@ -11,12 +11,11 @@ module TcModule (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), DynFlags, opt_PprStyle_Debug )
+import CmdLineOpts	( DynFlag(..), DynFlags )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
-			  Stmt(..), InPat(..), HsMatchContext(..),
+			  Stmt(..), InPat(..), HsMatchContext(..), RuleDecl(..),
 			  isIfaceRuleDecl, nullBinds, andMonoBindList, mkSimpleMatch
 			)
-import HsTypes		( toHsType )
 import PrelNames	( SyntaxMap, mAIN_Name, mainName, ioTyConName, printName,
 			  returnIOName, bindIOName, failIOName, 
 			  itName
@@ -30,7 +29,7 @@ import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  zonkExpr, zonkIdBndr
 			)
 
-
+import MkIface		( pprModDetails )
 import TcExpr 		( tcMonoExpr )
 import TcMonad
 import TcType		( newTyVarTy, zonkTcType, tcInstType )
@@ -40,10 +39,10 @@ import Inst		( emptyLIE, plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults, defaultDefaultTys )
-import TcEnv		( TcEnv, RecTcEnv, InstInfo, tcExtendGlobalValEnv, tcLookup_maybe,
+import TcEnv		( TcEnv, RecTcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, tcLookup_maybe,
 			  isLocalThing, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv,
 			  tcExtendGlobalTypeEnv, tcLookupGlobalId, tcLookupTyCon,
-			  TcTyThing(..), tcLookupId
+			  TcTyThing(..), tcLookupId 
 			)
 import TcRules		( tcIfaceRules, tcSourceRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
@@ -55,23 +54,23 @@ import TcTyClsDecls	( tcTyAndClassDecls )
 import CoreUnfold	( unfoldingTemplate, hasUnfolding )
 import TysWiredIn	( mkListTy, unitTy )
 import Type
-import ErrUtils		( printErrorsAndWarnings, errorsFound, dumpIfSet_dyn, showPass )
-import Id		( Id, idType, idName, isLocalId, idUnfolding )
+import ErrUtils		( printErrorsAndWarnings, errorsFound, 
+			  dumpIfSet_dyn, dumpIfSet_dyn_or, showPass )
+import Id		( Id, idType, idUnfolding )
 import Module           ( Module, moduleName )
-import Name		( Name, toRdrName, isGlobalName )
-import Name		( nameEnvElts, lookupNameEnv )
+import Name		( Name )
+import NameEnv		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
-import Util
 import BasicTypes       ( EP(..), Fixity, RecFlag(..) )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
 			  PackageTypeEnv, ModIface(..),
+			  ModDetails(..), DFunId,
 			  TypeEnv, extendTypeEnvList, 
 		          TyThing(..), implicitTyThingIds, 
 			  mkTypeEnv
 			)
-import Rules ( ruleBaseIds )
 import VarSet
 \end{code}
 
@@ -306,9 +305,10 @@ data TcResults
   = TcResults {
 	-- All these fields have info *just for this module*
 	tc_env	   :: TypeEnv,			-- The top level TypeEnv
+	tc_insts   :: [DFunId],			-- Instances 
+	tc_rules   :: [TypecheckedRuleDecl],	-- Transformation rules
 	tc_binds   :: TypecheckedMonoBinds,	-- Bindings
-	tc_fords   :: [TypecheckedForeignDecl], -- Foreign import & exports.
-	tc_rules   :: [TypecheckedRuleDecl]	-- Transformation rules
+	tc_fords   :: [TypecheckedForeignDecl]	-- Foreign import & exports.
     }
 
 
@@ -427,6 +427,7 @@ tcModule pcs hst get_fixity this_mod decls
 	returnTc (final_env,
 		  new_pcs,
 		  TcResults { tc_env     = local_type_env,
+			      tc_insts   = map iDFunId local_insts,
 			      tc_binds   = implicit_binds `AndMonoBinds` all_binds', 
 			      tc_fords   = foi_decls ++ foe_decls',
 			      tc_rules   = all_local_rules
@@ -454,12 +455,9 @@ typecheckIface
 	-> HomeSymbolTable
 	-> ModIface		-- Iface for this module (just module & fixities)
 	-> (SyntaxMap, [RenamedHsDecl])
-	-> IO (Maybe (PersistentCompilerState, TypeEnv, [TypecheckedRuleDecl]))
+	-> IO (Maybe (PersistentCompilerState, ModDetails))
 			-- The new PCS is Augmented with imported information,
 			-- (but not stuff from this module).
-			-- The TcResults returned contains only the environment
-			-- and rules.
-
 
 typecheckIface dflags pcs hst mod_iface (syn_map, decls)
   = do	{ maybe_tc_stuff <- typecheck dflags syn_map pcs hst alwaysQualify $
@@ -480,15 +478,14 @@ typecheckIface dflags pcs hst mod_iface (syn_map, decls)
 			    deriv_binds, local_rules) ->
 	  ASSERT(nullBinds deriv_binds)
 	  let 
-	      local_things = filter (isLocalThing this_mod) 
-				 	(nameEnvElts (getTcGEnv env))
-	      local_type_env :: TypeEnv
-	      local_type_env = mkTypeEnv local_things
+	      local_things = filter (isLocalThing this_mod) (nameEnvElts (getTcGEnv env))
+
+	      mod_details = ModDetails { md_types = mkTypeEnv local_things,
+					 md_insts = map iDFunId local_inst_info,
+					 md_rules = [(id,rule) | IfaceRuleOut id rule <- local_rules] }
+			-- All the rules from an interface are of the IfaceRuleOut form
 	  in
-
-	  -- throw away local_inst_info
-          returnTc (new_pcs, local_type_env, local_rules)
-
+          returnTc (new_pcs, mod_details)
 
 tcImports :: RecTcEnv
 	  -> PersistentCompilerState
@@ -500,9 +497,9 @@ tcImports :: RecTcEnv
 			 RenamedHsBinds, [TypecheckedRuleDecl])
 
 -- tcImports is a slight mis-nomer.  
--- It deals with everythign that could be an import:
+-- It deals with everything that could be an import:
 --	type and class decls
---	interface signatures
+--	interface signatures (checked lazily)
 --	instance decls
 --	rule decls
 -- These can occur in source code too, of course
@@ -664,47 +661,31 @@ typecheck dflags syn_map pcs hst unqual thing_inside
 \begin{code}
 printTcDump dflags Nothing = return ()
 printTcDump dflags (Just (_, results))
-  = do dumpIfSet_dyn dflags Opt_D_dump_types 
-                     "Type signatures" (dump_sigs (tc_env results))
-       dumpIfSet_dyn dflags Opt_D_dump_tc    
-                     "Typechecked" (dump_tc results) 
+  = do dumpIfSet_dyn_or dflags [Opt_D_dump_types, Opt_D_dump_tc]
+                     "Interface" (dump_tc_iface results)
 
+       dumpIfSet_dyn dflags Opt_D_dump_tc    
+                     "Typechecked" (ppr (tc_binds results))
+
+	  
 printIfaceDump dflags Nothing = return ()
-printIfaceDump dflags (Just (_, env, rules))
-  = do dumpIfSet_dyn dflags Opt_D_dump_types 
-                     "Type signatures" (dump_sigs env)
-       dumpIfSet_dyn dflags Opt_D_dump_tc    
-                     "Typechecked" (dump_iface env rules) 
+printIfaceDump dflags (Just (_, details))
+  = dumpIfSet_dyn_or dflags [Opt_D_dump_types, Opt_D_dump_tc]
+                     "Interface" (pprModDetails details)
 
-dump_tc results
-  = vcat [ppr (tc_binds results),
-	  pp_rules (tc_rules results),
+dump_tc_iface results
+  = vcat [pprModDetails (ModDetails {md_types = tc_env results, 
+				     md_insts = tc_insts results,
+				     md_rules = []}) ,
+	  ppr_rules (tc_rules results),
+
 	  ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts (tc_env results)]
     ]
 
-dump_iface env rules
-  = vcat [pp_rules rules,
-	  ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts env]
-    ]
-
-dump_sigs env	-- Print type signatures
-  = 	-- Convert to HsType so that we get source-language style printing
-	-- And sort by RdrName
-    vcat $ map ppr_sig $ sortLt lt_sig $
-    [ (toRdrName id, toHsType (idType id))
-    | AnId id <- nameEnvElts env,
-      want_sig id
-    ]
-  where
-    lt_sig (n1,_) (n2,_) = n1 < n2
-    ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
-
-    want_sig id | opt_PprStyle_Debug = True
-	        | otherwise	     = isLocalId id && isGlobalName (idName id)
-	-- isLocalId ignores data constructors, records selectors etc
-	-- The isGlobalName ignores local dictionary and method bindings
-	-- that the type checker has invented.  User-defined things have
-	-- Global names.
+ppr_rules [] = empty
+ppr_rules rs = vcat [ptext SLIT("{-# RULES"),
+		      nest 4 (vcat (map ppr rs)),
+		      ptext SLIT("#-}")]
 
 ppr_gen_tycons tcs = vcat [ptext SLIT("{-# Generic type constructor details"),
 			   vcat (map ppr_gen_tycon tcs),
@@ -726,8 +707,4 @@ ppr_ep (EP from to)
   where
     (_,from_tau) = splitForAllTys (idType from)
 
-pp_rules [] = empty
-pp_rules rs = vcat [ptext SLIT("{-# RULES"),
-		    nest 4 (vcat (map ppr rs)),
-		    ptext SLIT("#-}")]
 \end{code}

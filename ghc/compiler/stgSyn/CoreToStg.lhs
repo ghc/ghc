@@ -20,7 +20,7 @@ import StgSyn
 import Type
 import TyCon		( isAlgTyCon )
 import Id
-import Var		( Var )
+import Var		( Var, globalIdDetails )
 import IdInfo
 import DataCon
 import CostCentre	( noCCS )
@@ -308,7 +308,7 @@ coreToStgExpr (Case scrut bndr alts)
 	  case scrut of
 	    -- ToDo: Notes?
 	    e@(App _ _) | (v, args) <- myCollectArgs e,
-			  PrimOpId (CCallOp ccall) <- idFlavour v,
+			  PrimOpId (CCallOp ccall) <- globalIdDetails v,
 			  ccallMayGC ccall
 			  -> Just (filterVarSet isForeignObjArg (exprFreeVars e))
 	    _   -> Nothing
@@ -507,7 +507,7 @@ coreToStgApp maybe_thunk_body f args
 	--	   continuation, but it does no harm to just union the
 	--	   two regardless.
 
-	app = case idFlavour f of
+	app = case globalIdDetails f of
       		DataConId dc -> StgConApp dc args'
 	        PrimOpId op  -> StgPrimApp op args' (exprType (mkApps (Var f) args))
 		_other       -> StgApp f args'

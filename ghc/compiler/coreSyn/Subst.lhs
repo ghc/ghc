@@ -41,20 +41,20 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			  CoreRules(..), CoreRule(..), 
 			  isEmptyCoreRules, seqRules, hasUnfolding, noUnfolding
 			)
-import CoreFVs		( exprFreeVars, mustHaveLocalBinding )
+import CoreFVs		( exprFreeVars )
 import TypeRep		( Type(..), TyNote(..) )  -- friend
 import Type		( ThetaType, PredType(..), ClassContext,
 			  tyVarsOfType, tyVarsOfTypes, mkAppTy, mkUTy, isUTy
 			)
 import VarSet
 import VarEnv
-import Var		( setVarUnique, isId )
-import Id		( idType, idInfo, setIdInfo, setIdType, idOccInfo, maybeModifyIdInfo )
-import IdInfo		( IdInfo, mkIdInfo,
+import Var		( setVarUnique, isId, mustHaveLocalBinding )
+import Id		( idType, idInfo, setIdInfo, setIdType, 
+			  idOccInfo, maybeModifyIdInfo )
+import IdInfo		( IdInfo, vanillaIdInfo,
 			  occInfo, isFragileOcc, setOccInfo, 
-			  specInfo, setSpecInfo, flavourInfo,
+			  specInfo, setSpecInfo, 
 			  unfoldingInfo, setUnfoldingInfo,
-			  CafInfo(NoCafRefs),
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo,
                           lbvarInfo, LBVarInfo(..), setLBVarInfo, hasNoLBVarInfo
 			)
@@ -566,8 +566,7 @@ simplLetId subst@(Subst in_scope env) old_id
     old_info = idInfo old_id
     id1	    = uniqAway in_scope old_id
     id2     = substIdType subst id1
-    new_id  = id2 `setIdInfo` mkIdInfo (flavourInfo old_info) NoCafRefs
-		-- Zap the IdIno altogether, but preserve the flavour
+    new_id  = setIdInfo id2 vanillaIdInfo
 
 	-- Extend the substitution if the unique has changed,
 	-- or there's some useful occurrence information

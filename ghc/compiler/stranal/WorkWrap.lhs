@@ -12,9 +12,8 @@ import CoreSyn
 import CoreUnfold	( certainlyWillInline )
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType )
-import MkId		( mkWorkerId )
 import Id		( Id, idType, idStrictness, idArity, isOneShotLambda,
-			  setIdStrictness, idInlinePragma, 
+			  setIdStrictness, idInlinePragma, mkWorkerId,
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
 import Type		( Type, isNewType, splitForAllTys, splitFunTys )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),

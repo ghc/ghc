@@ -16,9 +16,8 @@ module FieldLabel(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TypeRep( Type )	-- FieldLabel is compiled very early
-import {-# SOURCE #-}	TyCon( TyCon )	-- FieldLabel is compiled very early
-
+import Type( Type )
+import TyCon( TyCon )
 import Name		( Name{-instance Eq/Outputable-}, NamedThing(..), nameUnique )
 import Outputable
 import Unique           ( Uniquable(..) )

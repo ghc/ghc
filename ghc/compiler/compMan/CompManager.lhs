@@ -37,8 +37,8 @@ import CmTypes
 import HscTypes
 import RnEnv		( unQualInScope )
 import Id		( idType, idName )
-import Name		( Name, lookupNameEnv, extendNameEnvList, 
-			  NamedThing(..) )
+import Name		( Name, NamedThing(..) )
+import NameEnv
 import RdrName		( emptyRdrEnv )
 import Module		( Module, ModuleName, moduleName, isHomeModule,
 			  mkModuleName, moduleNameUserString, moduleUserString )

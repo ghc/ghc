@@ -25,7 +25,7 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkId, mkVanillaId, idName, isDataConWrapId_maybe )
+import Id		( Id, mkVanillaGlobal, mkLocalId, idName, isDataConWrapId_maybe )
 import Module		( Module )
 import MkId		( mkCCallOpId )
 import IdInfo
@@ -74,12 +74,12 @@ tcInterfaceSigs unf_env mod decls
 	tcIfaceType ty					`thenTc` \ sigma_ty ->
 	tcIdInfo unf_env in_scope_vars name 
 		 sigma_ty id_infos			`thenTc` \ id_info ->
-	returnTc (mkId name sigma_ty id_info)
+	returnTc (mkVanillaGlobal name sigma_ty id_info)
 \end{code}
 
 \begin{code}
 tcIdInfo unf_env in_scope_vars name ty info_ins
-  = foldlTc tcPrag constantIdInfo info_ins
+  = foldlTc tcPrag vanillaIdInfo info_ins
   where
     tcPrag info (HsArity arity) = returnTc (info `setArityInfo`  arity)
     tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)
@@ -236,7 +236,7 @@ tcCoreExpr (UfCase scrut case_bndr alts)
   = tcCoreExpr scrut					`thenTc` \ scrut' ->
     let
 	scrut_ty = exprType scrut'
-	case_bndr' = mkVanillaId case_bndr scrut_ty
+	case_bndr' = mkLocalId case_bndr scrut_ty
     in
     tcExtendGlobalValEnv [case_bndr']	$
     mapTc (tcCoreAlt scrut_ty) alts	`thenTc` \ alts' ->
@@ -271,7 +271,7 @@ tcCoreExpr (UfNote note expr)
 tcCoreLamBndr (UfValBinder name ty) thing_inside
   = tcIfaceType ty		`thenTc` \ ty' ->
     let
-	id = mkVanillaId name ty'
+	id = mkLocalId name ty'
     in
     tcExtendGlobalValEnv [id] $
     thing_inside id
@@ -291,7 +291,7 @@ tcCoreLamBndrs (b:bs) thing_inside
 tcCoreValBndr (UfValBinder name ty) thing_inside
   = tcIfaceType ty			`thenTc` \ ty' ->
     let
-	id = mkVanillaId name ty'
+	id = mkLocalId name ty'
     in
     tcExtendGlobalValEnv [id] $
     thing_inside id
@@ -299,7 +299,7 @@ tcCoreValBndr (UfValBinder name ty) thing_inside
 tcCoreValBndrs bndrs thing_inside		-- Expect them all to be ValBinders
   = mapTc tcIfaceType tys		`thenTc` \ tys' ->
     let
-	ids = zipWithEqual "tcCoreValBndr" mkVanillaId names tys'
+	ids = zipWithEqual "tcCoreValBndr" mkLocalId names tys'
     in
     tcExtendGlobalValEnv ids $
     thing_inside ids
@@ -348,7 +348,7 @@ tcCoreAlt scrut_ty alt@(con, names, rhs)
 					 ppr arg_tys)
 		| otherwise
 #endif
-		= zipWithEqual "tcCoreAlts" mkVanillaId id_names arg_tys
+		= zipWithEqual "tcCoreAlts" mkLocalId id_names arg_tys
     in
     ASSERT( con `elem` cons && length inst_tys == length main_tyvars )
     tcExtendTyVarEnv ex_tyvars'			$

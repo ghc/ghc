@@ -43,9 +43,9 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleEnvElts
 			)
 import Name		( Name, nameIsLocalOrFrom, nameModule )
-import Name		( mkNameEnv, nameEnvElts, extendNameEnv )
-import RdrName		( foldRdrEnv, isQual )
+import NameEnv
 import NameSet
+import RdrName		( foldRdrEnv, isQual )
 import PrelNames	( SyntaxMap, pRELUDE_Name )
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass, 
 			  printErrorsAndWarnings, errorsFound )

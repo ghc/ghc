@@ -17,7 +17,7 @@ import Inst		( InstOrigin(..),
 			  emptyLIE, plusLIE, LIE, mkLIE, unitLIE, instToId,
 			  newMethod, newOverloadedLit, newDicts, newClassDicts
 			)
-import Id		( mkVanillaId )
+import Id		( mkLocalId )
 import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupSyntaxId )
@@ -52,7 +52,7 @@ import Outputable
 -- This is the right function to pass to tcPat when 
 -- we're looking at a lambda-bound pattern, 
 -- so there's no polymorphic guy to worry about
-tcMonoPatBndr binder_name pat_ty = returnTc (mkVanillaId binder_name pat_ty)
+tcMonoPatBndr binder_name pat_ty = returnTc (mkLocalId binder_name pat_ty)
 \end{code}
 
 

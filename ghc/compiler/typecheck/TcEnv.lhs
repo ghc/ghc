@@ -44,9 +44,8 @@ import TcMonad
 import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, 
 			  zonkTcTyVarsAndFV
 			)
-import Id		( idName, mkUserLocal, isDataConWrapId_maybe )
-import IdInfo		( constantIdInfo )
-import MkId	 	( mkSpecPragmaId )
+import Id		( idName, mkSpecPragmaId, mkUserLocal, isDataConWrapId_maybe )
+import IdInfo		( vanillaIdInfo )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
 import Type		( Type,
@@ -60,7 +59,7 @@ import Name		( Name, OccName, NamedThing(..),
 			  nameOccName, getSrcLoc, mkLocalName, isLocalName,
 			  nameIsLocalOrFrom
 			)
-import Name		( NameEnv, lookupNameEnv, nameEnvElts, 
+import NameEnv		( NameEnv, lookupNameEnv, nameEnvElts, 
 			  extendNameEnvList, emptyNameEnv, plusNameEnv )
 import OccName		( mkDFunOcc, occNameString )
 import HscTypes		( DFunId, 
@@ -215,7 +214,7 @@ tcAddImportedIdInfo env id
 	-- The Id must be returned without a data dependency on maybe_id
   where
     new_info = case tcLookupRecId_maybe env (idName id) of
-		  Nothing	   -> pprTrace "tcAddIdInfo" (ppr id) constantIdInfo
+		  Nothing	   -> pprTrace "tcAddIdInfo" (ppr id) vanillaIdInfo
 		  Just imported_id -> idInfo imported_id
 		-- ToDo: could check that types are the same
 

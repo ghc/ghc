@@ -51,7 +51,7 @@ import Type		( Type, Kind, PredType(..), ThetaType, SigmaType, TauType,
 import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
 import CoreFVs		( idFreeTyVars )
-import Id		( mkVanillaId, idName, idType )
+import Id		( mkLocalId, idName, idType )
 import Var		( Id, Var, TyVar, mkTyVar, tyVarKind )
 import VarEnv
 import VarSet
@@ -660,7 +660,7 @@ tcTySig (Sig v ty src_loc)
  = tcAddSrcLoc src_loc				$ 
    tcAddErrCtxt (tcsigCtxt v) 			$
    tcHsSigType ty				`thenTc` \ sigma_tc_ty ->
-   mkTcSig (mkVanillaId v sigma_tc_ty) src_loc	`thenNF_Tc` \ sig -> 
+   mkTcSig (mkLocalId v sigma_tc_ty) src_loc	`thenNF_Tc` \ sig -> 
    returnTc sig
 
 mkTcSig :: TcId -> SrcLoc -> NF_TcM TcSigInfo

@@ -5,8 +5,8 @@
 
 \begin{code}
 module MkIface ( 
-	mkModDetails, mkModDetailsFromIface, completeIface, 
-	writeIface, pprIface, pprUsage
+	completeIface, writeIface, 
+	pprModDetails, pprIface, pprUsage
   ) where
 
 #include "HsVersions.h"
@@ -19,31 +19,23 @@ import BasicTypes	( Fixity(..), NewOrData(..),
 			)
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
-import TcHsSyn		( TypecheckedRuleDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  TyThing(..), DFunId, TypeEnv, Avails,
+			  TyThing(..), DFunId, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..),
-			  extendTypeEnvList, lookupVersion,
+			  lookupVersion,
 			)
 
 import CmdLineOpts
-import Id		( idType, idInfo, isImplicitId, isDictFunId,
-			  idSpecialisation, isLocalId, idName, hasNoBinding
-			)
-import Var		( isId )
-import VarSet
+import Id		( idType, idInfo, isImplicitId, isLocalId, idName )
 import DataCon		( StrictnessMark(..), dataConId, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
-import CoreSyn		( CoreBind, CoreRule(..), IdCoreRule, 
-			  isBuiltinRule, rulesRules, 
-			  bindersOf, bindersOfBinds
-			)
-import CoreFVs		( ruleSomeLhsFreeVars )
+import CoreSyn		( CoreBind, CoreRule(..) )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
-import Name		( getName, nameModule, Name, NamedThing(..) )
-import Name 	-- Env
+import PprCore		( pprIdCoreRule )
+import Name		( getName, nameModule, toRdrName, isGlobalName, Name, NamedThing(..) )
+import NameEnv
 import OccName		( pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon, tyConGenIds,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize, isClassTyCon
@@ -54,102 +46,9 @@ import Type		( splitSigmaTy, tidyTopType, deNoteType )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
-import Maybes		( orElse )
+import Util		( sortLt )
 
 import IO		( IOMode(..), openFile, hClose )
-\end{code}
-
-
-%************************************************************************
-%*				 					*
-\subsection{Write a new interface file}
-%*				 					*
-%************************************************************************
-
-\begin{code}
-mkModDetails :: TypeEnv		-- From typechecker
-	     -> [CoreBind]	-- Final bindings
-				-- they have authoritative arity info
-	     -> [IdCoreRule]	-- Tidy orphan rules
-	     -> ModDetails
-mkModDetails type_env tidy_binds orphan_rules
-  = ModDetails { md_types = new_type_env,
-		 md_rules = rule_dcls,
-		 md_insts = filter isDictFunId final_ids }
-  where
-	-- The competed type environment is gotten from
-	-- 	a) keeping the types and classes
-	--	b) removing all Ids, 
-	--	c) adding Ids with correct IdInfo, including unfoldings,
-	--		gotten from the bindings
-	-- From (c) we keep only those Ids with Global names;
-	--	    the CoreTidy pass makes sure these are all and only
-	--	    the externally-accessible ones
-	-- This truncates the type environment to include only the 
-	-- exported Ids and things needed from them, which saves space
-	--
-	-- However, we do keep things like constructors, which should not appear 
-	-- in interface files, because they are needed by importing modules when
-	-- using the compilation manager
-    new_type_env = extendTypeEnvList (filterNameEnv keep_it type_env)
-				     (map AnId final_ids)
-
-	-- We keep constructor workers, because they won't appear
-	-- in the bindings from which final_ids are derived!
-    keep_it (AnId id) = hasNoBinding id
-    keep_it other     = True
-
-    final_ids  = [id | bind <- tidy_binds
-		     , id <- bindersOf bind
-		     , isGlobalName (idName id)]
-
-	-- The complete rules are gotten by combining
-	--	a) the orphan rules
-	--	b) rules embedded in the top-level Ids
-    rule_dcls | opt_OmitInterfacePragmas = []
-	      | otherwise		 = getRules orphan_rules tidy_binds (mkVarSet final_ids)
-
--- This version is used when we are re-linking a module
--- so we've only run the type checker on its previous interface 
-mkModDetailsFromIface :: TypeEnv 
-		      -> [TypecheckedRuleDecl]
-		      -> ModDetails
-mkModDetailsFromIface type_env rules
-  = ModDetails { md_types = type_env,
-		 md_rules = rule_dcls,
-		 md_insts = dfun_ids }
-  where
-    dfun_ids  = [dfun_id | AnId dfun_id <- nameEnvElts type_env, isDictFunId dfun_id]
-    rule_dcls = [(id,rule) | IfaceRuleOut id rule <- rules]
-	-- All the rules from an interface are of the IfaceRuleOut form
-\end{code}
-
-\begin{code}
-getRules :: [IdCoreRule] 	-- Orphan rules
-	 -> [CoreBind]		-- Bindings, with rules in the top-level Ids
-	 -> IdSet		-- Ids that are exported, so we need their rules
-	 -> [IdCoreRule]
-getRules orphan_rules binds emitted
-  = orphan_rules ++ local_rules
-  where
-    local_rules  = [ (fn, rule)
- 		   | fn <- bindersOfBinds binds,
-		     fn `elemVarSet` emitted,
-		     rule <- rulesRules (idSpecialisation fn),
-		     not (isBuiltinRule rule),
-				-- We can't print builtin rules in interface files
-				-- Since they are built in, an importing module
-				-- will have access to them anyway
-
-			-- Sept 00: I've disabled this test.  It doesn't stop many, if any, rules
-			-- from coming out, and to make it work properly we need to add ????
-			--	(put it back in for now)
-		     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
-				-- Spit out a rule only if all its lhs free vars are emitted
-				-- This is a good reason not to do it when we emit the Id itself
-		   ]
-
-interestingId id = isId id && isLocalId id
 \end{code}
 
 
@@ -452,6 +351,53 @@ diffDecls (VersionInfo { vers_module = old_mod_vers, vers_decls = old_decls_vers
 							 (ptext SLIT("New:")  <+> ppr nd))
 \end{code}
 
+
+
+%************************************************************************
+%*				 					*
+\subsection{Writing ModDetails}
+%*				 					*
+%************************************************************************
+
+\begin{code}
+pprModDetails :: ModDetails -> SDoc
+pprModDetails (ModDetails { md_types = type_env, md_insts = dfun_ids, md_rules = rules })
+  = vcat [ dump_types dfun_ids type_env
+	 , dump_insts dfun_ids
+	 , dump_rules rules]
+	  
+dump_types dfun_ids type_env
+  = text "TYPE SIGNATURES" $$ nest 4 (dump_sigs ids)
+  where
+    ids = [id | AnId id <- nameEnvElts type_env, want_sig id]
+    want_sig id | opt_PprStyle_Debug = True
+	        | otherwise	     = isLocalId id && 
+				       isGlobalName (idName id) && 
+				       not (id `elem` dfun_ids)
+	-- isLocalId ignores data constructors, records selectors etc
+	-- The isGlobalName ignores local dictionary and method bindings
+	-- that the type checker has invented.  User-defined things have
+	-- Global names.
+
+dump_insts []       = empty
+dump_insts dfun_ids = text "INSTANCES" $$ nest 4 (dump_sigs dfun_ids)
+
+dump_sigs ids
+	-- Print type signatures
+   	-- Convert to HsType so that we get source-language style printing
+	-- And sort by RdrName
+  = vcat $ map ppr_sig $ sortLt lt_sig $
+    [ (toRdrName id, toHsType (idType id))
+    | id <- ids ]
+  where
+    lt_sig (n1,_) (n2,_) = n1 < n2
+    ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
+
+dump_rules [] = empty
+dump_rules rs = vcat [ptext SLIT("{-# RULES"),
+		      nest 4 (vcat (map pprIdCoreRule rs)),
+		      ptext SLIT("#-}")]
+\end{code}
 
 
 %************************************************************************

@@ -48,7 +48,7 @@ import TcType	( TcThetaType, TcClassContext,
 		)
 import CoreFVs	( idFreeTyVars )
 import Class	( Class )
-import Id	( Id, idType, mkUserLocal, mkSysLocal, mkVanillaId )
+import Id	( Id, idType, mkUserLocal, mkSysLocal, mkLocalId )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( mkDictOcc, mkMethodOcc, getOccName, mkLocalName )
 import NameSet	( NameSet )
@@ -314,14 +314,14 @@ newDictsAtLoc inst_loc@(_,loc,_) theta
   = tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
     returnNF_Tc (zipWithEqual "newDictsAtLoc" mk_dict new_uniqs theta)
   where
-    mk_dict uniq pred = Dict (mkVanillaId (mk_dict_name uniq pred) (mkPredTy pred)) pred inst_loc
+    mk_dict uniq pred = Dict (mkLocalId (mk_dict_name uniq pred) (mkPredTy pred)) pred inst_loc
 
     mk_dict_name uniq (Class cls tys)  = mkLocalName uniq (mkDictOcc (getOccName cls)) loc
     mk_dict_name uniq (IParam name ty) = name
 
 newIPDict orig name ty
   = tcGetInstLoc orig			`thenNF_Tc` \ inst_loc ->
-    returnNF_Tc (Dict (mkVanillaId name ty) (IParam name ty) inst_loc)
+    returnNF_Tc (Dict (mkLocalId name ty) (IParam name ty) inst_loc)
 \end{code}
 
 

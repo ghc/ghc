@@ -16,8 +16,8 @@ module HscMain ( HscResult(..), hscMain,
 import RdrHsSyn		( RdrNameStmt )
 import Rename		( renameStmt )
 import ByteCodeGen	( byteCodeGen )
-import Id		( Id, idName, idFlavour, modifyIdInfo )
-import IdInfo		( setFlavourInfo, makeConstantFlavour )
+import Id		( Id, idName )
+import IdInfo		( GlobalIdDetails(VanillaGlobal) )
 import HscTypes		( InteractiveContext(..), TyThing(..) )
 #endif
 
@@ -32,8 +32,7 @@ import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( vanillaSyntaxMap, knownKeyNames, iNTERACTIVE )
-import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
-			  writeIface, pprIface )
+import MkIface		( completeIface, writeIface, pprIface )
 import Type		( Type )
 import TcModule
 import InstEnv		( emptyInstEnv )
@@ -68,9 +67,8 @@ import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			)
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
-import Name		( Name, nameModule, nameOccName, getName, isGlobalName,
-			  emptyNameEnv
-			)
+import Name		( Name, nameModule, nameOccName, getName, isGlobalName )
+import NameEnv		( emptyNameEnv )
 import Module		( Module, lookupModuleEnvByName )
 
 import Monad		( when )
@@ -167,13 +165,10 @@ hscNoRecomp ghci_mode dflags mod location (Just old_iface) hst hit pcs_ch
 
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);
-         Just (pcs_tc, env_tc, local_rules) -> do {
+         Just (pcs_tc, new_details) ->
 
-      -- create a new details from the closed, typechecked, old iface
-      let new_details = mkModDetailsFromIface env_tc local_rules
-      ;
       return (HscNoRecomp pcs_tc new_details old_iface)
-      }}}}
+      }}}
 
 compMsg mod location =
     mod_str ++ take (12 - length mod_str) (repeat ' ')
@@ -228,7 +223,8 @@ hscRecomp ghci_mode dflags mod location maybe_checked_iface hst hit pcs_ch
       	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
       	     Just (pcs_tc, tc_result) -> do {
     
-	; let env_tc = tc_env tc_result
+	; let env_tc   = tc_env tc_result
+	      insts_tc = tc_insts tc_result
 
  	    -------------------
  	    -- DESUGAR
@@ -238,19 +234,25 @@ hscRecomp ghci_mode dflags mod location maybe_checked_iface hst hit pcs_ch
 		deSugar dflags pcs_tc hst this_mod print_unqualified tc_result
 
  	    -------------------
- 	    -- SIMPLIFY, TIDY-CORE
+ 	    -- SIMPLIFY
  	    -------------------
-      	  -- We grab the the unfoldings at this point.
-	; (pcs_simpl, tidy_binds, orphan_rules)
-	      <- simplThenTidy dflags pcs_tc hst this_mod dont_discard ds_binds ds_rules
-      	    
+	; (simplified, orphan_rules) 
+	     <- _scc_     "Core2Core"
+		core2core dflags pcs_tc hst dont_discard ds_binds ds_rules
+
+ 	    -------------------
+ 	    -- TIDY
+ 	    -------------------
+	; (pcs_simpl, tidy_binds, new_details) 
+	     <- tidyCorePgm dflags this_mod pcs_tc env_tc insts_tc 
+			    simplified orphan_rules
+      
  	    -------------------
  	    -- BUILD THE NEW ModDetails AND ModIface
  	    -------------------
-	; let new_details = mkModDetails env_tc tidy_binds orphan_rules
 	; final_iface <- _scc_ "MkFinalIface" 
 			  mkFinalIface ghci_mode dflags location 
-                                      maybe_checked_iface new_iface new_details
+                                       maybe_checked_iface new_iface new_details
 
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION
@@ -320,19 +322,6 @@ myParseModule dflags src_filename
       return (Just rdr_module)
 	-- ToDo: free the string buffer later.
       }}
-
-
-simplThenTidy dflags pcs hst this_mod dont_discard binds rules
- = do -- Do main Core-language transformations ---------
-      -- _scc_     "Core2Core"
-      (simplified, orphan_rules) 
-         <- core2core dflags pcs hst dont_discard binds rules
-
-      -- Do the final tidy-up
-      (pcs', tidy_binds, tidy_orphan_rules) 
-         <- tidyCorePgm dflags this_mod pcs simplified orphan_rules
-      
-      return (pcs', tidy_binds, tidy_orphan_rules)
 
 
 restOfCodeGeneration dflags toInterp this_mod imported_module_names
@@ -511,18 +500,15 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 	; bcos <- coreExprToBCOs dflags sat_expr
 
 	; let
-		-- make all the bound ids "constant" ids, now that
+		-- Make all the bound ids "global" ids, now that
 		-- they're notionally top-level bindings.  This is
 		-- important: otherwise when we come to compile an expression
 		-- using these ids later, the byte code generator will consider
 		-- the occurrences to be free rather than global.
-	     constant_bound_ids = map constantizeId bound_ids;
+	     global_bound_ids = map globaliseId bound_ids;
+	     globaliseId id   = setIdGlobalDetails id VanillaGlobal
 
-	     constantizeId id
-		 = modifyIdInfo (`setFlavourInfo` makeConstantFlavour 
-					(idFlavour id)) id
-
-	; return (pcs2, Just (constant_bound_ids, ty, bcos))
+	; return (pcs2, Just (global_bound_ids, ty, bcos))
 
      }}}}}
 

@@ -102,8 +102,9 @@ coreExprToBCOs dflags expr
 
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
-      let invented_name = mkSysLocalName (mkPseudoUnique3 0) SLIT("Expr-Top-Level")
-      let invented_id   = mkVanillaId invented_name (panic "invented_id's type")
+      let invented_id   = mkSysLocal SLIT("Expr-Top-Level") (mkPseudoUnique3 0) 
+				     (panic "invented_id's type")
+      let invented_name = idName invented_id
 
       let (BcM_State all_proto_bcos final_ctr) 
              = runBc (BcM_State [] 0) 
