@@ -145,6 +145,7 @@ hsSigsFVs sigs = plusFVs (map hsSigFVs sigs)
 hsSigFVs (Sig v ty _) 	    = extractHsTyNames ty
 hsSigFVs (SpecInstSig ty _) = extractHsTyNames ty
 hsSigFVs (SpecSig v ty _)   = extractHsTyNames ty
+hsSigFVs (ClassOpSig _ _ ty _) = extractHsTyNames ty
 hsSigFVs other		    = emptyFVs
 
 ----------------
