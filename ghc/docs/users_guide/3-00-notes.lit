@@ -50,4 +50,9 @@ parameters now; it's all handled under the hood in @Outputable.lhs@.
 
 \item Better failure message when entering an unimplemented instance method
 
+\item The Installation Guide is now in SGML format.  SGML-Tools 1.0.3
+or later are required (check @http://www.xs4all.nl/~cg/sgmltools/@).
+The index generation isn't automatic yet, but will hopefully be fixed
+for the next release.
+
 \end{itemize}
