@@ -45,8 +45,8 @@
 <VariableList>
 
 <VarListEntry>
-<Term><IndexTerm><Primary>Binary distribution</Primary></IndexTerm>Binary distribution.</Term>
-<ListItem>
+<term><indexterm><primary>Binary distribution</primary></indexterm>Binary distribution.</term>
+<listitem>
 <para>
 If your only purpose is to install some of the
 <Literal>fptools</Literal> suite then the easiest thing to do is to
@@ -70,10 +70,10 @@ off.
 The second reason a binary distribution may not be what you want is
 if you want to read or modify the souce code.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><IndexTerm><Primary>Source distribution</Primary></IndexTerm>Source distribution.</Term>
-<ListItem>
+<term><indexterm><primary>Source distribution</primary></indexterm>Source distribution.</term>
+<listitem>
 <para>
 You have a supported
 platform, but (a)&nbsp;you like the warm fuzzy feeling of compiling things
@@ -87,7 +87,7 @@ A source distribution contains complete sources for one or more
 projects in the <Literal>fptools</Literal> suite.  Not only that, but
 the more awkward machine-independent steps are done for you.  For
 example, if you don't have
-<Command>happy</Command><IndexTerm><Primary>happy</Primary></IndexTerm>
+<Command>happy</Command><indexterm><primary>happy</primary></indexterm>
 you'll find it convenient that the source distribution contains the
 result of running <Command>happy</Command> on the parser
 specifications.  If you don't want to alter the parser then this saves
@@ -96,7 +96,7 @@ still need a working version of GHC (preferably version 4.08+) on your
 machine in order to compile (most of) the sources, however.
 </para>
 
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 
       <varlistentry>
 	<term>The CVS repository.</term>
@@ -125,7 +125,7 @@ machine in order to compile (most of) the sources, however.
       </varlistentry>
 
       <varlistentry>
-	<term>Build GHC from intermediate C <Filename>.hc</Filename> files<IndexTerm><Primary>hc files</Primary></IndexTerm>:</term>
+	<term>Build GHC from intermediate C <Filename>.hc</Filename> files<indexterm><primary>hc files</primary></indexterm>:</term>
 	<listitem>
 	  <para>You need a working GHC to use a source distribution.
           What if you don't have a working GHC? Then you may be able
@@ -889,10 +889,10 @@ list</secondary></indexterm></para>
 </Title>
 
 <para>
-<IndexTerm><Primary>ports, GHC</Primary></IndexTerm>
-<IndexTerm><Primary>GHC ports</Primary></IndexTerm>
-<IndexTerm><Primary>supported platforms</Primary></IndexTerm>
-<IndexTerm><Primary>platforms, supported</Primary></IndexTerm>
+<indexterm><primary>ports, GHC</primary></indexterm>
+<indexterm><primary>GHC ports</primary></indexterm>
+<indexterm><primary>supported platforms</primary></indexterm>
+<indexterm><primary>platforms, supported</primary></indexterm>
 The main question is whether or not the Haskell compiler (GHC) runs on
 your platform.
 </para>
@@ -921,10 +921,10 @@ supports the underlying BSDisms.
 <Title>What platforms the Haskell compiler (GHC) runs on</Title>
 
 <para>
-<IndexTerm><Primary>fully-supported platforms</Primary></IndexTerm>
-<IndexTerm><Primary>native-code generator</Primary></IndexTerm>
-<IndexTerm><Primary>registerised ports</Primary></IndexTerm>
-<IndexTerm><Primary>unregisterised ports</Primary></IndexTerm>
+<indexterm><primary>fully-supported platforms</primary></indexterm>
+<indexterm><primary>native-code generator</primary></indexterm>
+<indexterm><primary>registerised ports</primary></indexterm>
+<indexterm><primary>unregisterised ports</primary></indexterm>
 The GHC hierarchy of Porting Goodness: (a)&nbsp;Best is a native-code
 generator; (b)&nbsp;next best is a ``registerised''
 port; (c)&nbsp;the bare minimum is an ``unregisterised'' port.
@@ -1050,7 +1050,7 @@ or higher)</term>
 	<varlistentry>
 	  <term>powerpc-ibm-aix</term>
 	  <indexterm><primary>powerpc-ibm-aix</primary></indexterm>
-	  <ListItem>
+	  <listitem>
 	    <para>Port currently doesn't work, needs some minimal
             porting effort.  As usual, we don't have access to
             machines and there hasn't been an overwhelming demand for
@@ -1085,16 +1085,16 @@ or higher)</term>
 <Sect1 id="sec-pre-supposed">
 <Title>Installing pre-supposed utilities
 
-<IndexTerm><Primary>pre-supposed utilities</Primary></IndexTerm>
-<IndexTerm><Primary>utilities, pre-supposed</Primary></IndexTerm></Title>
+<indexterm><primary>pre-supposed utilities</primary></indexterm>
+<indexterm><primary>utilities, pre-supposed</primary></indexterm></Title>
 
 <para>
 Here are the gory details about some utility programs you may need;
 <Command>perl</Command>, <Command>gcc</Command> and
 <command>happy</command> are the only important
-ones. (PVM<IndexTerm><Primary>PVM</Primary></IndexTerm> is important
+ones. (PVM<indexterm><primary>PVM</primary></indexterm> is important
 if you're going for Parallel Haskell.)  The
-<Command>configure</Command><IndexTerm><Primary>configure</Primary></IndexTerm>
+<Command>configure</Command><indexterm><primary>configure</primary></indexterm>
 script will tell you if you are missing something.
 </para>
 
@@ -1102,10 +1102,10 @@ script will tell you if you are missing something.
 <VariableList>
 
 <VarListEntry>
-<Term>Perl:</Term>
-<IndexTerm><Primary>pre-supposed: Perl</Primary></IndexTerm>
-<IndexTerm><Primary>Perl, pre-supposed</Primary></IndexTerm>
-<ListItem>
+<term>Perl:</term>
+<indexterm><primary>pre-supposed: Perl</primary></indexterm>
+<indexterm><primary>Perl, pre-supposed</primary></indexterm>
+<listitem>
 <para>
 <Emphasis>You have to have Perl to proceed!</Emphasis>
 It is pretty easy to install.
@@ -1124,12 +1124,12 @@ pathname may need to be less than 32 characters long on some
 systems.
 </para>
 
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term>GNU C (<Command>gcc</Command>):</Term>
-<IndexTerm><Primary>pre-supposed: GCC (GNU C compiler)</Primary></IndexTerm>
-<IndexTerm><Primary>GCC (GNU C compiler), pre-supposed</Primary></IndexTerm>
-<ListItem>
+<term>GNU C (<Command>gcc</Command>):</term>
+<indexterm><primary>pre-supposed: GCC (GNU C compiler)</primary></indexterm>
+<indexterm><primary>GCC (GNU C compiler), pre-supposed</primary></indexterm>
+<listitem>
 
 <para>
 We recommend using GCC version 2.95.2 on all platforms.  Failing that,
@@ -1145,7 +1145,7 @@ please let us know, so we can report it and get things improved.
 (Exception: on iX86 boxes&mdash;you may need to fiddle with GHC's
 <Option>-monly-N-regs</Option> option; see the User's Guide)
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 
 <varlistentry>
 <term>Happy:</term>
@@ -1164,10 +1164,10 @@ url="http://www.haskell.org/happy/">Happy's Web Page</ulink>.
 </varlistentry>
 
 <VarListEntry>
-<Term>Autoconf:</Term>
-<IndexTerm><Primary>pre-supposed: Autoconf</Primary></IndexTerm>
-<IndexTerm><Primary>Autoconf, pre-supposed</Primary></IndexTerm>
-<ListItem>
+<term>Autoconf:</term>
+<indexterm><primary>pre-supposed: Autoconf</primary></indexterm>
+<indexterm><primary>Autoconf, pre-supposed</primary></indexterm>
+<listitem>
 <para>
 GNU Autoconf is needed if you intend to build from the CVS sources, it
 is <Emphasis>not</Emphasis> needed if you just intend to build a
@@ -1181,12 +1181,12 @@ If you modify either of these files, you'll need
 <command>autoconf</command> to rebuild <Filename>configure</Filename>.
 </para>
 
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Command>sed</Command></Term>
-<IndexTerm><Primary>pre-supposed: sed</Primary></IndexTerm>
-<IndexTerm><Primary>sed, pre-supposed</Primary></IndexTerm>
-<ListItem>
+<term><Command>sed</Command></term>
+<indexterm><primary>pre-supposed: sed</primary></indexterm>
+<indexterm><primary>sed, pre-supposed</primary></indexterm>
+<listitem>
 <para>
 You need a working <Command>sed</Command> if you are going to build
 from sources.  The build-configuration stuff needs it.  GNU sed
@@ -1194,7 +1194,7 @@ version 2.0.4 is no good!  It has a bug in it that is tickled by the
 build-configuration.  2.0.5 is OK. Others are probably OK too
 (assuming we don't create too elaborate configure scripts.)
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 </VariableList>
 </para>
 
@@ -1214,10 +1214,10 @@ particularly Glasgow-ish, but Occasionally Indispensable.  Like
 <VariableList>
 
 <VarListEntry>
-<Term>PVM version 3:</Term>
-<IndexTerm><Primary>pre-supposed: PVM3 (Parallel Virtual Machine)</Primary></IndexTerm>
-<IndexTerm><Primary>PVM3 (Parallel Virtual Machine), pre-supposed</Primary></IndexTerm>
-<ListItem>
+<term>PVM version 3:</term>
+<indexterm><primary>pre-supposed: PVM3 (Parallel Virtual Machine)</primary></indexterm>
+<indexterm><primary>PVM3 (Parallel Virtual Machine), pre-supposed</primary></indexterm>
+<listitem>
 
 <para>
 PVM is the Parallel Virtual Machine on which Parallel Haskell programs
@@ -1237,17 +1237,17 @@ available on the net; I think I got it from
 A PVM installation is slightly quirky, but easy to do.  Just follow
 the <Filename>Readme</Filename> instructions.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Command>bash</Command>:</Term>
-<IndexTerm><Primary>bash, presupposed (Parallel Haskell only)</Primary></IndexTerm>
-<ListItem>
+<term><Command>bash</Command>:</term>
+<indexterm><primary>bash, presupposed (Parallel Haskell only)</primary></indexterm>
+<listitem>
 <para>
 Sadly, the <Command>gr2ps</Command> script, used to convert ``parallelism profiles''
 to PostScript, is written in Bash (GNU's Bourne Again shell).
 This bug will be fixed (someday).
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 </VariableList>
 </para>
 
@@ -1266,28 +1266,28 @@ documentation that comes with the <Literal>fptools</Literal> projects:
 <VariableList>
 
 <VarListEntry>
-<Term>DocBook:</Term>
-<IndexTerm><Primary>pre-supposed: DocBook</Primary></IndexTerm>
-<IndexTerm><Primary>DocBook, pre-supposed</Primary></IndexTerm>
-<ListItem>
+<term>DocBook:</term>
+<indexterm><primary>pre-supposed: DocBook</primary></indexterm>
+<indexterm><primary>DocBook, pre-supposed</primary></indexterm>
+<listitem>
 <para>
 All our documentation is written in SGML, using the DocBook DTD.
 Instructions on installing and configuring the DocBook tools are in the
 installation guide (in the GHC user guide).
 </para>
 
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term>TeX:</Term>
-<IndexTerm><Primary>pre-supposed: TeX</Primary></IndexTerm>
-<IndexTerm><Primary>TeX, pre-supposed</Primary></IndexTerm>
-<ListItem>
+<term>TeX:</term>
+<indexterm><primary>pre-supposed: TeX</primary></indexterm>
+<indexterm><primary>TeX, pre-supposed</primary></indexterm>
+<listitem>
 <para>
 A decent TeX distribution is required if you want to produce printable
 documentation.  We recomment teTeX, which includes just about
 everything you need.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 </VariableList>
 </para>
 
@@ -1308,10 +1308,10 @@ everything you need.
 
 <VariableList>
 <VarListEntry>
-<Term>Flex:</Term>
-<IndexTerm><Primary>pre-supposed: flex</Primary></IndexTerm> 
-<IndexTerm><Primary>flex, pre-supposed</Primary></IndexTerm>
-<ListItem>
+<term>Flex:</term>
+<indexterm><primary>pre-supposed: flex</primary></indexterm> 
+<indexterm><primary>flex, pre-supposed</primary></indexterm>
+<listitem>
 
 <para>
 This is a quite-a-bit-better-than-Lex lexer.  Used to build a couple
@@ -1319,7 +1319,7 @@ of utilities in <Literal>glafp-utils</Literal>.  Depending on your
 operating system, the supplied <Command>lex</Command> may or may not
 work; you should get the GNU version.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 </VariableList>
 
 </Sect2>
@@ -1329,8 +1329,8 @@ work; you should get the GNU version.
 <Sect1 id="sec-building-from-source">
 <Title>Building from source
 
-<IndexTerm><Primary>Building from source</Primary></IndexTerm>
-<IndexTerm><Primary>Source, building from</Primary></IndexTerm></Title>
+<indexterm><primary>Building from source</primary></indexterm>
+<indexterm><primary>Source, building from</primary></indexterm></Title>
 
 <para>
 You've been rash enough to want to build some of
@@ -1366,33 +1366,33 @@ contain the following directories and files:
 <para>
 
 <ItemizedList>
-<ListItem>
+<listitem>
 
 <para>
 <Filename>Makefile</Filename>: the root Makefile.
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
 <Filename>mk/</Filename>: the directory that contains the
 main Makefile code, shared by all the
 <Literal>fptools</Literal> software.
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  <Filename>configure.in</Filename>, <Filename>config.sub</Filename>, <Filename>config.guess</Filename>:
 these files support the configuration process.
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  <Filename>install-sh</Filename>.
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
@@ -1418,8 +1418,8 @@ just the <Filename>happy/</Filename> directory.
 
 <Sect2>
 <Title>Build trees
-<IndexTerm><Primary>build trees</Primary></IndexTerm>
-<IndexTerm><Primary>link trees, for building</Primary></IndexTerm></Title>
+<indexterm><primary>build trees</primary></indexterm>
+<indexterm><primary>link trees, for building</primary></indexterm></Title>
 
 <para>
 While you can build a system in the source tree, we don't recommend it.
@@ -1435,7 +1435,7 @@ build tree is initially an exact copy of the source tree, except that
 each file is a symbolic link to the source file, rather than being a
 copy of the source file.  There are ``standard'' Unix utilities that
 make such copies, so standard that they go by different names:
-<Command>lndir</Command><IndexTerm><Primary>lndir</Primary></IndexTerm>, <Command>mkshadowdir</Command><IndexTerm><Primary>mkshadowdir</Primary></IndexTerm> are two (If you
+<Command>lndir</Command><indexterm><primary>lndir</primary></indexterm>, <Command>mkshadowdir</Command><indexterm><primary>mkshadowdir</primary></indexterm> are two (If you
 don't have either, the source distribution includes sources for the
 X11 <Command>lndir</Command>&mdash;check out <Filename>fptools/glafp-utils/lndir</Filename>). See <Xref LinkEnd="sec-storysofar"> for a typical invocation.
 </para>
@@ -1478,10 +1478,10 @@ copy.  More commonly you do want to edit the source file.)
 Like the source tree, the top level of your build tree must be (a
 linked copy of) the root directory of the <Literal>fptools</Literal> suite.  Inside
 Makefiles, the root of your build tree is called
-<Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant><IndexTerm><Primary>FPTOOLS&lowbar;TOP</Primary></IndexTerm>.  In the rest of this document path
-names are relative to <Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant> unless otherwise stated.  For
+<constant>&dollar;(FPTOOLS&lowbar;TOP)</constant><indexterm><primary>FPTOOLS&lowbar;TOP</primary></indexterm>.  In the rest of this document path
+names are relative to <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> unless otherwise stated.  For
 example, the file <Filename>ghc/mk/target.mk</Filename> is actually
-<Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/ghc/mk/target.mk</Filename>.
+<Filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/ghc/mk/target.mk</Filename>.
 </para>
 
 </Sect2>
@@ -1493,7 +1493,7 @@ example, the file <Filename>ghc/mk/target.mk</Filename> is actually
 <para>
 When you build <Literal>fptools</Literal> you will be compiling code on a particular
 <Emphasis>host platform</Emphasis>, to run on a particular <Emphasis>target platform</Emphasis>
-(usually the same as the host platform)<IndexTerm><Primary>platform</Primary></IndexTerm>.  The
+(usually the same as the host platform)<indexterm><primary>platform</primary></indexterm>.  The
 difficulty is that there are minor differences between different
 platforms; minor, but enough that the code needs to be a bit different
 for each.  There are some big differences too: for a different
@@ -1516,21 +1516,21 @@ You set the configuration using a three-step process.
 <VariableList>
 
 <VarListEntry>
-<Term>Step 1: get ready for configuration.</Term>
-<ListItem>
+<term>Step 1: get ready for configuration.</term>
+<listitem>
 	      <para>Change directory to
-              <Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant> and
+              <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> and
               issue the command
-              <Command>autoconf</Command><IndexTerm><Primary>autoconf</Primary></IndexTerm>
+              <Command>autoconf</Command><indexterm><primary>autoconf</primary></indexterm>
               (with no arguments). This GNU program converts
-              <Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/configure.in</Filename>
+              <Filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure.in</Filename>
               to a shell script called
-              <Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/configure</Filename>.
+              <Filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure</Filename>.
               </para>
 
 	      <para>Some projects, including GHC, have their own
               configure script.  If there's an
-              <Constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.in</Constant>,
+              <constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.in</constant>,
               then you need to run <command>autoconf</command> in that
               directory too.</para>
 
@@ -1574,9 +1574,9 @@ You set the configuration using a three-step process.
 		<listitem>
 
 		  <para>It translates
-                  <Filename>mk/config.mk.in</Filename><IndexTerm><Primary>config.mk.in</Primary></IndexTerm>
+                  <Filename>mk/config.mk.in</Filename><indexterm><primary>config.mk.in</primary></indexterm>
                   to
-                  <Filename>mk/config.mk</Filename><IndexTerm><Primary>config.mk</Primary></IndexTerm>,
+                  <Filename>mk/config.mk</Filename><indexterm><primary>config.mk</primary></indexterm>,
                   substituting for things between
                   ``<Literal>@</Literal>'' brackets.  So,
                   ``<Literal>@HaveGcc@</Literal>'' will be replaced by
@@ -1587,13 +1587,13 @@ You set the configuration using a three-step process.
                   every Makefile (directly or indirectly), so the
                   configuration information is thereby communicated to
                   all Makefiles.</para>
-		</ListItem>
+		</listitem>
 
 		<listitem>
 		  <para> It translates
-                  <Filename>mk/config.h.in</Filename><IndexTerm><Primary>config.h.in</Primary></IndexTerm>
+                  <Filename>mk/config.h.in</Filename><indexterm><primary>config.h.in</primary></indexterm>
                   to
-                  <Filename>mk/config.h</Filename><IndexTerm><Primary>config.h</Primary></IndexTerm>.
+                  <Filename>mk/config.h</Filename><indexterm><primary>config.h</primary></indexterm>.
                   The latter is <Literal>&num;include</Literal>d by
                   various C programs, which can thereby make use of
                   configuration information.</para>
@@ -1660,11 +1660,11 @@ You set the configuration using a three-step process.
 	  </varlistentry>
 
 <VarListEntry>
-<Term>Step 3: build configuration.</Term>
-<ListItem>
+<term>Step 3: build configuration.</term>
+<listitem>
 <para>
 Next, you say how this build of <Literal>fptools</Literal> is to differ from the
-standard defaults by creating a new file <Filename>mk/build.mk</Filename><IndexTerm><Primary>build.mk</Primary></IndexTerm>
+standard defaults by creating a new file <Filename>mk/build.mk</Filename><indexterm><primary>build.mk</primary></indexterm>
 <Emphasis>in the build tree</Emphasis>.  This file is the one and only file you edit
 in the build tree, precisely because it says how this build differs
 from the source.  (Just in case your build tree does die, you might
@@ -1674,7 +1674,7 @@ symbolic link in each build tree to point to the appropriate one.)  So
 each build tree from the template.  We'll discuss what to put in it
 shortly.  
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 </VariableList>
 </para>
 
@@ -1695,7 +1695,7 @@ And that's it for configuration. Simple, eh?
       <filename>mk/build.mk</filename> that override any of the
       <filename>config.mk</filename> definitions that you want to
       change.  (The override occurs because the main boilerplate file,
-      <filename>mk/boilerplate.mk</filename><IndexTerm><Primary>boilerplate.mk</Primary></IndexTerm>,
+      <filename>mk/boilerplate.mk</filename><indexterm><primary>boilerplate.mk</primary></indexterm>,
       includes <filename>build.mk</filename> after
       <filename>config.mk</filename>.)</para>
 
@@ -1742,7 +1742,7 @@ GhcHcOpts=-DDEBUG -Rghc-timing
 YACC = @YaccCmd@
 </ProgramListing>
 
-      <para>This defines the Make variables <Constant>YACC</Constant>
+      <para>This defines the Make variables <constant>YACC</constant>
       to the pathname for a <Command>yacc</Command> that
       <Command>configure</Command> finds somewhere.  If you have your
       own pet <Command>yacc</Command> you want to use instead, that's
@@ -1760,7 +1760,7 @@ YACC = myyacc
       <para>You can also use <filename>build.mk</filename> to override
       anything that <Command>configure</Command> got wrong.  One place
       where this happens often is with the definition of
-      <Constant>FPTOOLS&lowbar;TOP&lowbar;ABS</Constant>: this
+      <constant>FPTOOLS&lowbar;TOP&lowbar;ABS</constant>: this
       variable is supposed to be the canonical path to the top of your
       source tree, but if your system uses an automounter then the
       correct directory is hard to find automatically.  If you find
@@ -1892,16 +1892,16 @@ $ emacs mk/build.mk
 
     <Sect2 id="sec-standard-targets">
       <Title>Standard Targets</title>
-      <IndexTerm><Primary>targets, standard makefile</Primary></IndexTerm>
-      <IndexTerm><Primary>makefile targets</Primary></IndexTerm>
+      <indexterm><primary>targets, standard makefile</primary></indexterm>
+      <indexterm><primary>makefile targets</primary></indexterm>
 
       <para>In any directory you should be able to make the following:
 
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>boot</Literal>:</Term>
-<ListItem>
+<term><Literal>boot</Literal>:</term>
+<listitem>
 <para>does the one-off preparation required to get ready for the real
 work.  Notably, it does <Command>gmake depend</Command> in all
 directories that contain programs.  It also builds the necessary tools
@@ -1918,20 +1918,20 @@ subdirectories, in the order specified by
 <para>If you're working in a subdirectory somewhere and need to update
 the dependencies, <literal>gmake boot</literal> is a good way to do it.</para>
 
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Literal>all</Literal>:</Term>
-<ListItem>
+<term><Literal>all</Literal>:</term>
+<listitem>
 <para>
 makes all the final target(s) for this Makefile.
 Depending on which directory you are in a ``final target'' may be an
 executable program, a library archive, a shell script, or a Postscript
 file.  Typing <Command>gmake</Command> alone is generally the same as typing <Command>gmake all</Command>.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Literal>install</Literal>:</Term>
-<ListItem>
+<term><Literal>install</Literal>:</term>
+<listitem>
 <para>
 installs the things built by <Literal>all</Literal> (except for the documentation).  Where does it
 install them?  That is specified by
@@ -1941,32 +1941,32 @@ install them?  That is specified by
 <literal>--bindir=/home/simonpj/bin</literal>;  see <literal>./configure
 --help</literal> for the full details.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Literal>install-docs</Literal>:</Term>
-<ListItem>
+<term><Literal>install-docs</Literal>:</term>
+<listitem>
 <para>
 installs the documentation. Otherwise behaves just like <literal>install</literal>.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Literal>uninstall</Literal>:</Term>
-<ListItem>
+<term><Literal>uninstall</Literal>:</term>
+<listitem>
 <para>
 reverses the effect of <Literal>install</Literal>.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 
 <VarListEntry>
-<Term><Literal>clean</Literal>:</Term>
-<ListItem>
+<term><Literal>clean</Literal>:</term>
+<listitem>
 <para>
 Delete all files from the current directory that are normally created
 by building the program.  Don't delete the files that record the
 configuration, or files generated by <Command>gmake boot</Command>.
 Also preserve files that could be made by building, but normally
 aren't because the distribution comes with them.</para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 
 <varlistentry>
 <term><literal>distclean</literal>:</term>
@@ -1988,8 +1988,8 @@ few files that people normally don't want to recompile.</para>
 </varlistentry>
 
 <VarListEntry>
-<Term><Literal>maintainer-clean</Literal>:</Term>
-<ListItem>
+<term><Literal>maintainer-clean</Literal>:</term>
+<listitem>
 <para>
 Delete everything from the current directory that can be reconstructed
 with this Makefile.  This typically includes everything deleted by
@@ -2007,12 +2007,12 @@ build the program.</para>
 </varlistentry>
 
 <VarListEntry>
-<Term><Literal>check</Literal>:</Term>
-<ListItem>
+<term><Literal>check</Literal>:</term>
+<listitem>
 <para>
 run the test suite.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 </VariableList>
 </para>
 
@@ -2025,16 +2025,16 @@ sub-directories.  Certain other standard targets do not:
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>configure</Literal>:</Term>
-<ListItem>
+<term><Literal>configure</Literal>:</term>
+<listitem>
 <para>
 is only available in the root directory
-<Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>; it has been discussed in <XRef LinkEnd="sec-build-config">.
+<constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>; it has been discussed in <XRef LinkEnd="sec-build-config">.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Literal>depend</Literal>:</Term>
-<ListItem>
+<term><Literal>depend</Literal>:</term>
+<listitem>
 <para>
 make a <filename>.depend</filename> file in each directory that needs
 it. This <filename>.depend</filename> file contains mechanically-generated dependency
@@ -2056,24 +2056,24 @@ which says that the object file <filename>Foo.o</filename> depends on the interf
 <filename>Baz.hi</filename> generated by compiling module <Literal>Baz</Literal>.  The <filename>.depend</filename> file is
 automatically included by every Makefile.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Literal>binary-dist</Literal>:</Term>
-<ListItem>
+<term><Literal>binary-dist</Literal>:</term>
+<listitem>
 <para>
 make a binary distribution.  This is the
 target we use to build the binary distributions of GHC and Happy.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 <VarListEntry>
-<Term><Literal>dist</Literal>:</Term>
-<ListItem>
+<term><Literal>dist</Literal>:</term>
+<listitem>
 <para>
 make a source distribution.  Note that this target does &ldquo;make
 distclean&rdquo; as part of its work; don't use it if you want to keep
 what you've built.
 </para>
-</ListItem></VarListEntry>
+</listitem></VarListEntry>
 </VariableList>
 </para>
 
@@ -2106,10 +2106,10 @@ Happy can similarly be run from the build tree, using
 </sect2>
 
 <Sect2>
-<Title>Fast Making <IndexTerm><Primary>fastmake</Primary></IndexTerm>
-<IndexTerm><Primary>dependencies, omitting</Primary></IndexTerm>
-<IndexTerm><Primary>FAST, makefile
-variable</Primary></IndexTerm></Title>
+<Title>Fast Making <indexterm><primary>fastmake</primary></indexterm>
+<indexterm><primary>dependencies, omitting</primary></indexterm>
+<indexterm><primary>FAST, makefile
+variable</primary></indexterm></Title>
 
 <para>
 Sometimes the dependencies get in the way: if you've made a small
@@ -2147,7 +2147,7 @@ User's Guide section on "Separate Compilation").
 
 <Sect1 id="sec-makefile-arch">
 <Title>The <filename>Makefile</filename> architecture
-<IndexTerm><Primary>makefile architecture</Primary></IndexTerm></Title>
+<indexterm><primary>makefile architecture</primary></indexterm></Title>
 
 <para>
 <Command>make</Command> is great if everything works&mdash;you type <Command>gmake install</Command> and
@@ -2162,19 +2162,40 @@ The purpose of this section is to give you a road-map to help you figure
 out what is going right and what is going wrong.
 </para>
 
+    <sect2>
+      <title>Debugging</title>
+      
+      <para>Debugging <filename>Makefile</filename>s is something of a
+      black art, but here's a couple of tricks that we find
+      particularly useful.  The following command allows you to see
+      the contents of any make variable in the context of the current
+      <filename>Makefile</filename>:</para>
+
+<screen>$  make show VALUE=HS_SRCS</screen>
+
+      <para>where you can replace <literal>HS_SRCS</literal> with the
+      name of any variable you wish to see the value of.</para>
+      
+      <para>GNU make has a <option>-d</option> option which generates
+      a dump of the decision procedure used to arrive at a conclusion
+      about which files should be recompiled.  Sometimes useful for
+      tracking down problems with superfluous or missing
+      recompilations.</para>
+    </sect2>
+
 <Sect2>
 <Title>A small project</Title>
 
 <para>
 To get started, let us look at the <filename>Makefile</filename> for an imaginary small
 <Literal>fptools</Literal> project, <Literal>small</Literal>.  Each project in <Literal>fptools</Literal> has its own
-directory in <Constant>FPTOOLS&lowbar;TOP</Constant>, so the <Literal>small</Literal> project will have its own
-directory <Constant>FPOOLS&lowbar;TOP/small/</Constant>.  Inside the <filename>small/</filename> directory there
+directory in <constant>FPTOOLS&lowbar;TOP</constant>, so the <Literal>small</Literal> project will have its own
+directory <constant>FPOOLS&lowbar;TOP/small/</constant>.  Inside the <filename>small/</filename> directory there
 will be a <filename>Makefile</filename>, looking something like this:
 </para>
 
 <para>
-<IndexTerm><Primary>Makefile, minimal</Primary></IndexTerm>
+<indexterm><primary>Makefile, minimal</primary></indexterm>
 
 <ProgramListing>
 #     Makefile for fptools project "small"
@@ -2197,7 +2218,7 @@ This <filename>Makefile</filename> has three sections:
 <para>
 
 <OrderedList>
-<ListItem>
+<listitem>
 
 <para>
  The first section includes
@@ -2213,15 +2234,15 @@ directive.
 </FOOTNOTE>
  a file of ``boilerplate'' code from the level
 above (which in this case will be
-<filename><Constant>FPTOOLS&lowbar;TOP</Constant>/mk/boilerplate.mk</filename><IndexTerm><Primary>boilerplate.mk</Primary></IndexTerm>).  As its name
+<filename><constant>FPTOOLS&lowbar;TOP</constant>/mk/boilerplate.mk</filename><indexterm><primary>boilerplate.mk</primary></indexterm>).  As its name
 suggests, <filename>boilerplate.mk</filename> consists of a large quantity of standard
 <filename>Makefile</filename> code.  We discuss this boilerplate in more detail in
 <XRef LinkEnd="sec-boiler">.
-<IndexTerm><Primary>include, directive in Makefiles</Primary></IndexTerm>
-<IndexTerm><Primary>Makefile inclusion</Primary></IndexTerm>
+<indexterm><primary>include, directive in Makefiles</primary></indexterm>
+<indexterm><primary>Makefile inclusion</primary></indexterm>
 
 Before the <Literal>include</Literal> statement, you must define the <Command>make</Command> variable
-<Constant>TOP</Constant><IndexTerm><Primary>TOP</Primary></IndexTerm> to be the directory containing the <filename>mk</filename> directory in
+<constant>TOP</constant><indexterm><primary>TOP</primary></indexterm> to be the directory containing the <filename>mk</filename> directory in
 which the <filename>boilerplate.mk</filename> file is.  It is <Emphasis>not</Emphasis> OK to simply say
 
 
@@ -2235,41 +2256,41 @@ that it can, in turn, <Literal>include</Literal> other files.  (Unfortunately, w
 <Literal>include</Literal>d file does an <Literal>include</Literal>, the filename is treated relative to
 the directory in which <Command>gmake</Command> is being run, not the directory in
 which the <Literal>include</Literal>d sits.)  In general, <Emphasis>every file <filename>foo.mk</filename>
-assumes that <filename><Constant>&dollar;(TOP)</Constant>/mk/foo.mk</filename> refers to itself.</Emphasis> It is up to the
+assumes that <filename><constant>&dollar;(TOP)</constant>/mk/foo.mk</filename> refers to itself.</Emphasis> It is up to the
 <filename>Makefile</filename> doing the <Literal>include</Literal> to ensure this is the case.
 
 Files intended for inclusion in other <filename>Makefile</filename>s are written to have
 the following property: <Emphasis>after <filename>foo.mk</filename> is <Literal>include</Literal>d, it leaves
-<Constant>TOP</Constant> containing the same value as it had just before the <Literal>include</Literal>
+<constant>TOP</constant> containing the same value as it had just before the <Literal>include</Literal>
 statement</Emphasis>.  In our example, this invariant guarantees that the
 <Literal>include</Literal> for <filename>target.mk</filename> will look in the same directory as that for
 <filename>boilerplate.mk</filename>.
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  The second section defines the following standard <Command>make</Command>
-variables: <Constant>SRCS</Constant><IndexTerm><Primary>SRCS</Primary></IndexTerm> (the source files from which is to be
-built), and <Constant>HS&lowbar;PROG</Constant><IndexTerm><Primary>HS&lowbar;PROG</Primary></IndexTerm> (the executable binary to be
+variables: <constant>SRCS</constant><indexterm><primary>SRCS</primary></indexterm> (the source files from which is to be
+built), and <constant>HS&lowbar;PROG</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm> (the executable binary to be
 built).  We will discuss in more detail what the ``standard
 variables'' are, and how they affect what happens, in <XRef LinkEnd="sec-targets">.
 
-The definition for <Constant>SRCS</Constant> uses the useful GNU <Command>make</Command> construct
-<Literal>&dollar;(wildcard&nbsp;$pat$)</Literal><IndexTerm><Primary>wildcard</Primary></IndexTerm>, which expands to a list of all
+The definition for <constant>SRCS</constant> uses the useful GNU <Command>make</Command> construct
+<Literal>&dollar;(wildcard&nbsp;$pat$)</Literal><indexterm><primary>wildcard</primary></indexterm>, which expands to a list of all
 the files matching the pattern <Literal>pat</Literal> in the current directory.  In
-this example, <Constant>SRCS</Constant> is set to the list of all the <filename>.lhs</filename> and <filename>.c</filename>
+this example, <constant>SRCS</constant> is set to the list of all the <filename>.lhs</filename> and <filename>.c</filename>
 files in the directory.  (Let's suppose there is one of each,
 <filename>Foo.lhs</filename> and <filename>Baz.c</filename>.)
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  The last section includes a second file of standard code,
-called <filename>target.mk</filename><IndexTerm><Primary>target.mk</Primary></IndexTerm>.  It contains the rules that tell
+called <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm>.  It contains the rules that tell
 <Command>gmake</Command> how to make the standard targets (<Xref LinkEnd="sec-standard-targets">).  Why, you ask,
 can't this standard code be part of <filename>boilerplate.mk</filename>?  Good question.
 We discuss the reason later, in <Xref LinkEnd="sec-boiler-arch">.
@@ -2281,7 +2302,7 @@ in <filename>target.mk</filename>; the price tag is that you have to understand 
 canned rules get enabled, and what they do (<Xref LinkEnd="sec-targets">).
 
 </para>
-</ListItem>
+</listitem>
 
 </OrderedList>
 
@@ -2296,15 +2317,15 @@ happen:
 <para>
 
 <ItemizedList>
-<ListItem>
+<listitem>
 
 <para>
  <Command>gmake</Command> figures out that the object files are <filename>Foo.o</filename> and
 <filename>Baz.o</filename>.
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  It uses a boilerplate pattern rule to compile <filename>Foo.lhs</filename> to
@@ -2312,27 +2333,27 @@ happen:
 build configuration.)
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  It uses another standard pattern rule to compile <filename>Baz.c</filename> to
 <filename>Baz.o</filename>, using a C compiler.  (Ditto.)
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  It links the resulting <filename>.o</filename> files together to make <Literal>small</Literal>,
 using the Haskell compiler to do the link step.  (Why not use <Command>ld</Command>?
 Because the Haskell compiler knows what standard libraries to link in.
 How did <Command>gmake</Command> know to use the Haskell compiler to do the link,
-rather than the C compiler?  Because we set the variable <Constant>HS&lowbar;PROG</Constant>
-rather than <Constant>C&lowbar;PROG</Constant>.)
+rather than the C compiler?  Because we set the variable <constant>HS&lowbar;PROG</constant>
+rather than <constant>C&lowbar;PROG</constant>.)
 
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
@@ -2381,7 +2402,7 @@ $(FPTOOLS_TOP)/ghc/
 <para>
 The sub-directories <filename>docs</filename>, <filename>driver</filename>, <filename>compiler</filename>, and so on, each
 contains a sub-component of GHC, and each has its own <filename>Makefile</filename>.
-There must also be a <filename>Makefile</filename> in <filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/ghc</filename>.  It does most
+There must also be a <filename>Makefile</filename> in <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/ghc</filename>.  It does most
 of its work by recursively invoking <Command>gmake</Command> on the <filename>Makefile</filename>s in the
 sub-directories.  We say that <filename>ghc/Makefile</filename> is a <Emphasis>non-leaf
 <filename>Makefile</filename></Emphasis>, because it does little except organise its children,
@@ -2407,7 +2428,7 @@ contains GHC-specific <filename>Makefile</filename> boilerplate code.  More prec
 <para>
 
 <ItemizedList>
-<ListItem>
+<listitem>
 
 <para>
  <filename>ghc/mk/boilerplate.mk</filename> is included at the top of
@@ -2417,8 +2438,8 @@ sub-directories.  It in turn <Literal>include</Literal>s the main boilerplate fi
 
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  <filename>ghc/mk/target.mk</filename> is <Literal>include</Literal>d at the bottom of
@@ -2426,7 +2447,7 @@ sub-directories.  It in turn <Literal>include</Literal>s the main boilerplate fi
 sub-directories.  It in turn <Literal>include</Literal>s the file <filename>mk/target.mk</filename>.
 
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
@@ -2441,12 +2462,12 @@ of the standard boilerplate.
 
 <Sect2 id="sec-boiler-arch">
 <Title>Boilerplate architecture
-<IndexTerm><Primary>boilerplate architecture</Primary></IndexTerm>
+<indexterm><primary>boilerplate architecture</primary></indexterm>
 </Title>
 
 <para>
-Every <filename>Makefile</filename> includes a <filename>boilerplate.mk</filename><IndexTerm><Primary>boilerplate.mk</Primary></IndexTerm> file
-at the top, and <filename>target.mk</filename><IndexTerm><Primary>target.mk</Primary></IndexTerm> file at the bottom.  In
+Every <filename>Makefile</filename> includes a <filename>boilerplate.mk</filename><indexterm><primary>boilerplate.mk</primary></indexterm> file
+at the top, and <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm> file at the bottom.  In
 this section we discuss what is in these files, and why there have to
 be two of them.  In general:
 </para>
@@ -2454,30 +2475,30 @@ be two of them.  In general:
 <para>
 
 <ItemizedList>
-<ListItem>
+<listitem>
 
 <para>
  <filename>boilerplate.mk</filename> consists of:
 
 <ItemizedList>
-<ListItem>
+<listitem>
 
 <para>
  <Emphasis>Definitions of millions of <Command>make</Command> variables</Emphasis> that
 collectively specify the build configuration.  Examples:
-<Constant>HC&lowbar;OPTS</Constant><IndexTerm><Primary>HC&lowbar;OPTS</Primary></IndexTerm>, the options to feed to the Haskell compiler;
-<Constant>NoFibSubDirs</Constant><IndexTerm><Primary>NoFibSubDirs</Primary></IndexTerm>, the sub-directories to enable within the
-<Literal>nofib</Literal> project; <Constant>GhcWithHc</Constant><IndexTerm><Primary>GhcWithHc</Primary></IndexTerm>, the name of the Haskell
+<constant>HC&lowbar;OPTS</constant><indexterm><primary>HC&lowbar;OPTS</primary></indexterm>, the options to feed to the Haskell compiler;
+<constant>NoFibSubDirs</constant><indexterm><primary>NoFibSubDirs</primary></indexterm>, the sub-directories to enable within the
+<Literal>nofib</Literal> project; <constant>GhcWithHc</constant><indexterm><primary>GhcWithHc</primary></indexterm>, the name of the Haskell
 compiler to use when compiling GHC in the <Literal>ghc</Literal> project.  
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
 <Emphasis>Standard pattern rules</Emphasis> that tell <Command>gmake</Command> how to construct one
 file from another.
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
@@ -2497,11 +2518,11 @@ SRC_HC_OPTS += -O
 </ProgramListing>
 
 
-thereby adding ``<Option>-O</Option>'' to the end of <Constant>SRC&lowbar;HC&lowbar;OPTS</Constant><IndexTerm><Primary>SRC&lowbar;HC&lowbar;OPTS</Primary></IndexTerm>.
+thereby adding ``<Option>-O</Option>'' to the end of <constant>SRC&lowbar;HC&lowbar;OPTS</constant><indexterm><primary>SRC&lowbar;HC&lowbar;OPTS</primary></indexterm>.
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  <filename>target.mk</filename> contains <Command>make</Command> rules for the standard
@@ -2515,7 +2536,7 @@ variables are usually set in the middle section of the
 
 
 <ItemizedList>
-<ListItem>
+<listitem>
 
 <para>
  <Command>gmake</Command> commits target and dependency lists earlier than
@@ -2529,8 +2550,8 @@ $(HS_PROG) : $(OBJS)
 </ProgramListing>
 
 
-If this rule was in <filename>boilerplate.mk</filename> then <Constant>&dollar;(HS&lowbar;PROG)</Constant><IndexTerm><Primary>HS&lowbar;PROG</Primary></IndexTerm>
-and <Constant>&dollar;(OBJS)</Constant><IndexTerm><Primary>OBJS</Primary></IndexTerm> would not have their final values at the
+If this rule was in <filename>boilerplate.mk</filename> then <constant>&dollar;(HS&lowbar;PROG)</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm>
+and <constant>&dollar;(OBJS)</constant><indexterm><primary>OBJS</primary></indexterm> would not have their final values at the
 moment <Command>gmake</Command> encountered the rule.  Alas, <Command>gmake</Command> takes a snapshot
 of their current values, and wires that snapshot into the rule.  (In
 contrast, the commands executed when the rule ``fires'' are only
@@ -2538,8 +2559,8 @@ substituted at the moment of firing.)  So, the rule must follow the
 definitions given in the <filename>Makefile</filename> itself.
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  Unlike pattern rules, ordinary rules cannot be overriden or
@@ -2548,19 +2569,19 @@ error message).  Including ordinary rules in <filename>boilerplate.mk</filename>
 prevent the user from writing rules for specific targets in specific cases.
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  There are a couple of other reasons I've forgotten, but it doesn't
 matter too much.
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
@@ -2571,118 +2592,232 @@ matter too much.
 <Sect2 id="sec-boiler">
 <Title>The main <filename>mk/boilerplate.mk</filename> file
 
-<IndexTerm><Primary>boilerplate.mk</Primary></IndexTerm></Title>
+<indexterm><primary>boilerplate.mk</primary></indexterm></Title>
 
 <para>
-If you look at <filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/mk/boilerplate.mk</filename> you will find
+If you look at <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/mk/boilerplate.mk</filename> you will find
 that it consists of the following sections, each held in a separate
 file: 
 </para>
 
-<para>
-<VariableList>
+      <variablelist>
 
-<VarListEntry>
-<Term><filename>config.mk</filename><IndexTerm><Primary>config.mk</Primary></IndexTerm></Term>
-<ListItem>
-<para>
-is the build configuration file we
-discussed at length in <Xref LinkEnd="sec-build-config">.
-</para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><filename>paths.mk</filename><IndexTerm><Primary>paths.mk</Primary></IndexTerm></Term>
-<ListItem>
-<para>
-defines <Command>make</Command> variables for
-pathnames and file lists.  In particular, it gives definitions for:
-</para>
+	<varlistentry>
+	  <term><filename>config.mk</filename></term>
+	  <indexterm><primary>config.mk</primary></indexterm>
+	  <listitem>
+	    <para>is the build configuration file we discussed at
+            length in <Xref LinkEnd="sec-build-config">.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
-<VariableList>
+	<varlistentry>
+	  <term><filename>paths.mk</filename></term>
+	  <indexterm><primary>paths.mk</primary></indexterm>
+	  <listitem>
+	    <para>defines <Command>make</Command> variables for
+            pathnames and file lists.  This file contains code for
+            automatically compiling lists of source files and deriving
+            lists of object files from those.  The results can be
+            overriden in the <filename>Makefile</filename>, but in
+            most cases the automatic setup should do the right
+            thing.</para>
+	    
+	    <para>The following variables may be set in the
+	    <filename>Makefile</filename> to affect how the automatic
+	    source file search is done:</para>
 
-<VarListEntry>
-<Term><Constant>SRCS</Constant><IndexTerm><Primary>SRCS</Primary></IndexTerm>:</Term>
-<ListItem>
-<para>
-all source files in the current directory.
-</para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>HS&lowbar;SRCS</Constant><IndexTerm><Primary>HS&lowbar;SRCS</Primary></IndexTerm>:</Term>
-<ListItem>
-<para>
-all Haskell source files in the current directory.
-It is derived from <Constant>&dollar;(SRCS)</Constant>, so if you override <Constant>SRCS</Constant> with a new value
-<Constant>HS&lowbar;SRCS</Constant> will follow suit.
-</para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>C&lowbar;SRCS</Constant><IndexTerm><Primary>C&lowbar;SRCS</Primary></IndexTerm>:</Term>
-<ListItem>
-<para>
-similarly for C source files.
-</para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>HS&lowbar;OBJS</Constant><IndexTerm><Primary>HS&lowbar;OBJS</Primary></IndexTerm>:</Term>
-<ListItem>
-<para>
-the <filename>.o</filename> files derived from <Constant>&dollar;(HS&lowbar;SRCS)</Constant>.
-</para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>C&lowbar;OBJS</Constant><IndexTerm><Primary>C&lowbar;OBJS</Primary></IndexTerm>:</Term>
-<ListItem>
-<para>
-similarly for <Constant>&dollar;(C&lowbar;SRCS)</Constant>.
-</para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>OBJS</Constant><IndexTerm><Primary>OBJS</Primary></IndexTerm>:</Term>
-<ListItem>
-<para>
-the concatenation of <Constant>&dollar;(HS&lowbar;OBJS)</Constant> and <Constant>&dollar;(C&lowbar;OBJS)</Constant>.
-</para>
-</ListItem></VarListEntry>
-</VariableList>
-</para>
+	    <variablelist>
+	      <varlistentry>
+		<term><literal>ALL_DIRS</literal></term>
+		<indexterm><primary><literal>ALL_DIRS</literal></primary>
+		</indexterm>
+		<listitem>
+		  <para>Set to a list of directories to search in
+		  addition to the current directory for source
+		  files.</para>
+		</listitem>
+	      </varlistentry>
 
-<para>
-Any or all of these definitions can easily be overriden by giving new
-definitions in your <filename>Makefile</filename>.  For example, if there are things in
-the current directory that look like source files but aren't, then
-you'll need to set <Constant>SRCS</Constant> manually in your <filename>Makefile</filename>.  The other
-definitions will then work from this new definition.
-</para>
+	      <varlistentry>
+		<term><literal>EXCLUDE_SRCS</literal></term>
+		<indexterm><primary><literal>EXCLUDE_SRCS</literal></primary>
+		</indexterm>
+		<listitem>
+		  <para>Set to a list of source files (relative to the
+		  current directory) to omit from the automatic
+		  search.  The source searching machinery is clever
+		  enough to know that if you exclude a source file
+		  from which other sources are derived, then the
+		  derived sources should also be excluded.  For
+		  example, if you set <literal>EXCLUDED_SRCS</literal>
+		  to include <filename>Foo.y</filename>, then
+		  <filename>Foo.hs</filename> will also be
+		  excluded.</para>
+		</listitem>
+	      </varlistentry>
 
-<para>
-What, exactly, does <filename>paths.mk</filename> consider a ``source file'' to be?  It's
-based on the file's suffix (e.g. <filename>.hs</filename>, <filename>.lhs</filename>, <filename>.c</filename>, <filename>.lc</filename>, etc), but
-this is the kind of detail that changes, so rather than
-enumerate the source suffices here the best thing to do is to look in
-<filename>paths.mk</filename>.
-</para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><filename>opts.mk</filename><IndexTerm><Primary>opts.mk</Primary></IndexTerm></Term>
-<ListItem>
-<para>
-defines <Command>make</Command> variables for option
-strings to pass to each program. For example, it defines
-<Constant>HC&lowbar;OPTS</Constant><IndexTerm><Primary>HC&lowbar;OPTS</Primary></IndexTerm>, the option strings to pass to the Haskell
-compiler.  See <Xref LinkEnd="sec-suffix">.
-</para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><filename>suffix.mk</filename><IndexTerm><Primary>suffix.mk</Primary></IndexTerm></Term>
-<ListItem>
-<para>
-defines standard pattern rules&mdash;see <Xref LinkEnd="sec-suffix">.
-</para>
-</ListItem></VarListEntry>
-</VariableList>
-</para>
+	      <varlistentry>
+		<term><literal>EXTRA_SRCS</literal></term>
+		<indexterm><primary><literal>EXCLUDE_SRCS</literal></primary>
+		</indexterm>
+		  <listitem>
+		  <para>Set to a list of extra source files (perhaps
+		  in directories not listed in
+		  <literal>ALL_DIRS</literal>) that should be
+		  considered.</para>
+		</listitem>
+	      </varlistentry>
+	    </variablelist>
+
+	    <para>The results of the automatic source file search are
+	    placed in the following make variables:</para>
+
+	    <variablelist>
+	      <varlistentry>
+		<term><literal>SRCS</literal></term>
+		<indexterm><primary><literal>SRCS</literal></primary></indexterm>
+		<listitem>
+		  <para>All source files found, sorted and without
+		  duplicates, including those which might not exist
+		  yet but will be derived from other existing sources.
+		  <literal>SRCS</literal> <emphasis>can</emphasis> be
+		  overriden if necessary, in which case the variables
+		  below will follow suit.</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>HS_SRCS</literal></term>
+		<indexterm><primary><literal>HS_SRCS</literal></primary></indexterm>
+		<listitem>
+		  <para>all Haskell source files in the current
+                  directory, including those derived from other source
+                  files (eg. Happy sources also give rise to Haskell
+                  sources).</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>HS_OBJS</literal></term>
+		<indexterm><primary><literal>HS_OBJS</literal></primary></indexterm>
+		<listitem>
+		  <para>Object files derived from
+		  <literal>HS_SRCS</literal>.</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>HS_IFACES</literal></term>
+		<indexterm><primary><literal>HS_IFACES</literal></primary></indexterm>
+		<listitem>
+		  <para>Interface files (<literal>.hi</literal> files)
+		  derived from <literal>HS_SRCS</literal>.</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>C_SRCS</literal></term>
+		<indexterm><primary><literal>C_SRCS</literal></primary></indexterm>
+		<listitem>
+		  <para>All C source files found.</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>C_OBJS</literal></term>
+		<indexterm><primary><literal>C_OBJS</literal></primary></indexterm>
+		<listitem>
+		  <para>Object files derived from
+		  <literal>C_SRCS</literal>.</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>SCRIPT_SRCS</literal></term>
+		<indexterm><primary><literal>SCRIPT_SRCS</literal></primary></indexterm>
+		<listitem>
+		  <para>All script source files found
+		  (<literal>.lprl</literal> files).</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>SCRIPT_OBJS</literal></term>
+		<indexterm><primary><literal>SCRIPT_OBJS</literal></primary></indexterm>
+		<listitem>
+		  <para><quote>object</quote> files derived from
+		  <literal>SCRIPT_SRCS</literal>
+		  (<literal>.prl</literal> files).</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>HSC_SRCS</literal></term>
+		<indexterm><primary><literal>HSC_SRCS</literal></primary></indexterm>
+		<listitem>
+		  <para>All <literal>hsc2hs</literal> source files
+		  (<literal>.hsc</literal> files).</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>HAPPY_SRCS</literal></term>
+		<indexterm><primary><literal>HAPPY_SRCS</literal></primary></indexterm>
+		<listitem>
+		  <para>All <literal>happy</literal> source files
+		  (<literal>.y</literal> or <literal>.hy</literal> files).</para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><literal>OBJS</literal></term>
+		<indexterm><primary>OBJS</primary></indexterm>
+		<listitem>
+		  <para>the concatenation of
+		  <literal>&dollar;(HS_OBJS)</literal>,
+		  <literal>&dollar;(C_OBJS)</literal>, and
+		  <literal>&dollar;(SCRIPT_OBJS)</literal>.</para>
+		</listitem>
+	      </varlistentry>
+	    </variablelist>
+
+	    <para>Any or all of these definitions can easily be
+            overriden by giving new definitions in your
+            <filename>Makefile</filename>.</para>
+
+	    <para>What, exactly, does <filename>paths.mk</filename>
+            consider a <quote>source file</quote> to be?  It's based
+            on the file's suffix (e.g. <filename>.hs</filename>,
+            <filename>.lhs</filename>, <filename>.c</filename>,
+            <filename>.hy</filename>, etc), but this is the kind of
+            detail that changes, so rather than enumerate the source
+            suffices here the best thing to do is to look in
+            <filename>paths.mk</filename>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><filename>opts.mk</filename></term>
+	  <indexterm><primary>opts.mk</primary></indexterm>
+	  <listitem>
+	    <para>defines <Command>make</Command> variables for option
+            strings to pass to each program. For example, it defines
+            <constant>HC&lowbar;OPTS</constant><indexterm><primary>HC&lowbar;OPTS</primary></indexterm>,
+            the option strings to pass to the Haskell compiler.  See
+            <Xref LinkEnd="sec-suffix">.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><filename>suffix.mk</filename></term>
+	  <indexterm><primary>suffix.mk</primary></indexterm>
+	  <listitem>
+	    <para>defines standard pattern rules&mdash;see <Xref
+	    LinkEnd="sec-suffix">.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
 <para>
 Any of the variables and pattern rules defined by the boilerplate file
@@ -2696,10 +2831,10 @@ directive simply override the default ones in <filename>boilerplate.mk</filename
 <Sect2 id="sec-suffix">
 <Title>Pattern rules and options
 
-<IndexTerm><Primary>Pattern rules</Primary></IndexTerm></Title>
+<indexterm><primary>Pattern rules</primary></indexterm></Title>
 
 <para>
-The file <filename>suffix.mk</filename><IndexTerm><Primary>suffix.mk</Primary></IndexTerm> defines standard <Emphasis>pattern
+The file <filename>suffix.mk</filename><indexterm><primary>suffix.mk</primary></indexterm> defines standard <Emphasis>pattern
 rules</Emphasis> that say how to build one kind of file from another, for
 example, how to build a <filename>.o</filename> file from a <filename>.c</filename> file.  (GNU <Command>make</Command>'s
 <Emphasis>pattern rules</Emphasis> are more powerful and easier to use than Unix
@@ -2724,8 +2859,8 @@ Almost all the rules look something like this:
 Here's how to understand the rule.  It says that
 <Emphasis>something</Emphasis><filename>.o</filename> (say <filename>Foo.o</filename>) can be built from
 <Emphasis>something</Emphasis><filename>.c</filename> (<filename>Foo.c</filename>), by invoking the C compiler
-(path name held in <Constant>&dollar;(CC)</Constant>), passing to it the options
-<Constant>&dollar;(CC&lowbar;OPTS)</Constant> and the rule's dependent file of the rule
+(path name held in <constant>&dollar;(CC)</constant>), passing to it the options
+<constant>&dollar;(CC&lowbar;OPTS)</constant> and the rule's dependent file of the rule
 <Literal>&dollar;&lt;</Literal> (<filename>Foo.c</filename> in this case), and putting the result in
 the rule's target <Literal>&dollar;@</Literal> (<filename>Foo.o</filename> in this case).
 </para>
@@ -2734,12 +2869,12 @@ the rule's target <Literal>&dollar;@</Literal> (<filename>Foo.o</filename> in th
 Every program is held in a <Command>make</Command> variable defined in
 <filename>mk/config.mk</filename>&mdash;look in <filename>mk/config.mk</filename> for the
 complete list.  One important one is the Haskell compiler, which is
-called <Constant>&dollar;(HC)</Constant>.
+called <constant>&dollar;(HC)</constant>.
 </para>
 
 <para>
 Every program's options are are held in a <Command>make</Command> variables called
-<Constant>&lt;prog&gt;&lowbar;OPTS</Constant>.  the <Constant>&lt;prog&gt;&lowbar;OPTS</Constant> variables are defined in
+<constant>&lt;prog&gt;&lowbar;OPTS</constant>.  the <constant>&lt;prog&gt;&lowbar;OPTS</constant> variables are defined in
 <filename>mk/opts.mk</filename>.  Almost all of them are defined like this:
 </para>
 
@@ -2752,45 +2887,45 @@ CC_OPTS = $(SRC_CC_OPTS) $(WAY$(_way)_CC_OPTS) $($*_CC_OPTS) $(EXTRA_CC_OPTS)
 </para>
 
 <para>
-The four variables from which <Constant>CC&lowbar;OPTS</Constant> is built have the following meaning:
+The four variables from which <constant>CC&lowbar;OPTS</constant> is built have the following meaning:
 </para>
 
 <para>
 <VariableList>
 
-<VarListEntry>
-<Term><Constant>SRC&lowbar;CC&lowbar;OPTS</Constant><IndexTerm><Primary>SRC&lowbar;CC&lowbar;OPTS</Primary></IndexTerm>:</Term>
-<ListItem>
+<varlistentry>
+<term><constant>SRC&lowbar;CC&lowbar;OPTS</constant><indexterm><primary>SRC&lowbar;CC&lowbar;OPTS</primary></indexterm>:</term>
+<listitem>
 <para>
 options passed to all C
 compilations.
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>WAY&lowbar;&lt;way&gt;&lowbar;CC&lowbar;OPTS</Constant>:</Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><constant>WAY&lowbar;&lt;way&gt;&lowbar;CC&lowbar;OPTS</constant>:</term>
+<listitem>
 <para>
 options passed to C
 compilations for way <Literal>&lt;way&gt;</Literal>. For example,
-<Constant>WAY&lowbar;mp&lowbar;CC&lowbar;OPTS</Constant> gives options to pass to the C compiler when
-compiling way <Literal>mp</Literal>.  The variable <Constant>WAY&lowbar;CC&lowbar;OPTS</Constant> holds
+<constant>WAY&lowbar;mp&lowbar;CC&lowbar;OPTS</constant> gives options to pass to the C compiler when
+compiling way <Literal>mp</Literal>.  The variable <constant>WAY&lowbar;CC&lowbar;OPTS</constant> holds
 options to pass to the C compiler when compiling the standard way.
 (<Xref LinkEnd="sec-ways"> dicusses multi-way
 compilation.)  
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>&lt;module&gt;&lowbar;CC&lowbar;OPTS</Constant>:</Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><constant>&lt;module&gt;&lowbar;CC&lowbar;OPTS</constant>:</term>
+<listitem>
 <para>
 options to
-pass to the C compiler that are specific to module <Literal>&lt;module&gt;</Literal>.  For example, <Constant>SMap&lowbar;CC&lowbar;OPTS</Constant> gives the specific options
+pass to the C compiler that are specific to module <Literal>&lt;module&gt;</Literal>.  For example, <constant>SMap&lowbar;CC&lowbar;OPTS</constant> gives the specific options
 to pass to the C compiler when compiling <filename>SMap.c</filename>.
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>EXTRA&lowbar;CC&lowbar;OPTS</Constant><IndexTerm><Primary>EXTRA&lowbar;CC&lowbar;OPTS</Primary></IndexTerm>:</Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><constant>EXTRA&lowbar;CC&lowbar;OPTS</constant><indexterm><primary>EXTRA&lowbar;CC&lowbar;OPTS</primary></indexterm>:</term>
+<listitem>
 <para>
 extra options to pass to all
 C compilations.  This is intended for command line use, thus:
@@ -2803,7 +2938,7 @@ gmake libHS.a EXTRA_CC_OPTS="-v"
 </ProgramListing>
 
 </para>
-</ListItem></VarListEntry>
+</listitem></varlistentry>
 </VariableList>
 </para>
 
@@ -2812,7 +2947,7 @@ gmake libHS.a EXTRA_CC_OPTS="-v"
 <Sect2 id="sec-targets">
 <Title>The main <filename>mk/target.mk</filename> file
 
-<IndexTerm><Primary>target.mk</Primary></IndexTerm></Title>
+<indexterm><primary>target.mk</primary></indexterm></Title>
 
 <para>
 <filename>target.mk</filename> contains canned rules for all the standard targets
@@ -2830,75 +2965,75 @@ special cases yourself.
 <para>
 <VariableList>
 
-<VarListEntry>
-<Term><Constant>HS&lowbar;PROG</Constant><IndexTerm><Primary>HS&lowbar;PROG</Primary></IndexTerm>.</Term>
-<ListItem>
+<varlistentry>
+<term><constant>HS&lowbar;PROG</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm>.</term>
+<listitem>
 <para>
-If <Constant>HS&lowbar;PROG</Constant> is defined, you get
+If <constant>HS&lowbar;PROG</constant> is defined, you get
 rules with the following targets:
 <VariableList>
 
-<VarListEntry>
-<Term><filename>HS&lowbar;PROG</filename><IndexTerm><Primary>HS&lowbar;PROG</Primary></IndexTerm></Term>
-<ListItem>
+<varlistentry>
+<term><filename>HS&lowbar;PROG</filename><indexterm><primary>HS&lowbar;PROG</primary></indexterm></term>
+<listitem>
 <para>
-itself.  This rule links <Constant>&dollar;(OBJS)</Constant>
+itself.  This rule links <constant>&dollar;(OBJS)</constant>
 with the Haskell runtime system to get an executable called
-<Constant>&dollar;(HS&lowbar;PROG)</Constant>.
+<constant>&dollar;(HS&lowbar;PROG)</constant>.
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>install</Literal><IndexTerm><Primary>install</Primary></IndexTerm></Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><Literal>install</Literal><indexterm><primary>install</primary></indexterm></term>
+<listitem>
 <para>
-installs <Constant>&dollar;(HS&lowbar;PROG)</Constant>
-in <Constant>&dollar;(bindir)</Constant>.
+installs <constant>&dollar;(HS&lowbar;PROG)</constant>
+in <constant>&dollar;(bindir)</constant>.
 </para>
-</ListItem></VarListEntry>
+</listitem></varlistentry>
 </VariableList>
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>C&lowbar;PROG</Constant><IndexTerm><Primary>C&lowbar;PROG</Primary></IndexTerm></Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><constant>C&lowbar;PROG</constant><indexterm><primary>C&lowbar;PROG</primary></indexterm></term>
+<listitem>
 <para>
-is similar to <Constant>HS&lowbar;PROG</Constant>, except that
-the link step links <Constant>&dollar;(C&lowbar;OBJS)</Constant> with the C runtime system.
+is similar to <constant>HS&lowbar;PROG</constant>, except that
+the link step links <constant>&dollar;(C&lowbar;OBJS)</constant> with the C runtime system.
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>LIBRARY</Constant><IndexTerm><Primary>LIBRARY</Primary></IndexTerm></Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><constant>LIBRARY</constant><indexterm><primary>LIBRARY</primary></indexterm></term>
+<listitem>
 <para>
-is similar to <Constant>HS&lowbar;PROG</Constant>, except that
-it links <Constant>&dollar;(LIB&lowbar;OBJS)</Constant> to make the library archive <Constant>&dollar;(LIBRARY)</Constant>, and
-<Literal>install</Literal> installs it in <Constant>&dollar;(libdir)</Constant>.
+is similar to <constant>HS&lowbar;PROG</constant>, except that
+it links <constant>&dollar;(LIB&lowbar;OBJS)</constant> to make the library archive <constant>&dollar;(LIBRARY)</constant>, and
+<Literal>install</Literal> installs it in <constant>&dollar;(libdir)</constant>.
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>LIB&lowbar;DATA</Constant><IndexTerm><Primary>LIB&lowbar;DATA</Primary></IndexTerm></Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><constant>LIB&lowbar;DATA</constant><indexterm><primary>LIB&lowbar;DATA</primary></indexterm></term>
+<listitem>
 <para>
 &hellip;
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>LIB&lowbar;EXEC</Constant><IndexTerm><Primary>LIB&lowbar;EXEC</Primary></IndexTerm></Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><constant>LIB&lowbar;EXEC</constant><indexterm><primary>LIB&lowbar;EXEC</primary></indexterm></term>
+<listitem>
 <para>
 &hellip;
 </para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Constant>HS&lowbar;SRCS</Constant><IndexTerm><Primary>HS&lowbar;SRCS</Primary></IndexTerm>, <Constant>C&lowbar;SRCS</Constant><IndexTerm><Primary>C&lowbar;SRCS</Primary></IndexTerm>.</Term>
-<ListItem>
+</listitem></varlistentry>
+<varlistentry>
+<term><constant>HS&lowbar;SRCS</constant><indexterm><primary>HS&lowbar;SRCS</primary></indexterm>, <constant>C&lowbar;SRCS</constant><indexterm><primary>C&lowbar;SRCS</primary></indexterm>.</term>
+<listitem>
 <para>
-If <Constant>HS&lowbar;SRCS</Constant>
+If <constant>HS&lowbar;SRCS</constant>
 is defined and non-empty, a rule for the target <Literal>depend</Literal> is included,
 which generates dependency information for Haskell programs.
-Similarly for <Constant>C&lowbar;SRCS</Constant>.
+Similarly for <constant>C&lowbar;SRCS</constant>.
 </para>
-</ListItem></VarListEntry>
+</listitem></varlistentry>
 </VariableList>
 </para>
 
@@ -2919,7 +3054,7 @@ install :: $(HS_PROG)
 GNU <Command>make</Command> treats double-colon rules as separate entities.  If there
 are several double-colon rules for the same target it takes each in
 turn and fires it if its dependencies say to do so.  This means that
-you can, for example, define both <Constant>HS&lowbar;PROG</Constant> and <Constant>LIBRARY</Constant>, which will
+you can, for example, define both <constant>HS&lowbar;PROG</constant> and <constant>LIBRARY</constant>, which will
 generate two rules for <Literal>install</Literal>.  When you type <Command>gmake install</Command> both
 rules will be fired, and both the program and the library will be
 installed, just as you wanted.
@@ -2930,25 +3065,25 @@ installed, just as you wanted.
 <Sect2 id="sec-subdirs">
 <Title>Recursion
 
-<IndexTerm><Primary>recursion, in makefiles</Primary></IndexTerm>
-<IndexTerm><Primary>Makefile, recursing into subdirectories</Primary></IndexTerm></Title>
+<indexterm><primary>recursion, in makefiles</primary></indexterm>
+<indexterm><primary>Makefile, recursing into subdirectories</primary></indexterm></Title>
 
 <para>
-In leaf <filename>Makefile</filename>s the variable <Constant>SUBDIRS</Constant><IndexTerm><Primary>SUBDIRS</Primary></IndexTerm> is undefined.
-In non-leaf <filename>Makefile</filename>s, <Constant>SUBDIRS</Constant> is set to the list of
+In leaf <filename>Makefile</filename>s the variable <constant>SUBDIRS</constant><indexterm><primary>SUBDIRS</primary></indexterm> is undefined.
+In non-leaf <filename>Makefile</filename>s, <constant>SUBDIRS</constant> is set to the list of
 sub-directories that contain subordinate <filename>Makefile</filename>s.  <Emphasis>It is up to
-you to set <Constant>SUBDIRS</Constant> in the <filename>Makefile</filename>.</Emphasis> There is no automation here&mdash;<Constant>SUBDIRS</Constant> is too important to automate.
+you to set <constant>SUBDIRS</constant> in the <filename>Makefile</filename>.</Emphasis> There is no automation here&mdash;<constant>SUBDIRS</constant> is too important to automate.
 </para>
 
 <para>
-When <Constant>SUBDIRS</Constant> is defined, <filename>target.mk</filename> includes a rather
+When <constant>SUBDIRS</constant> is defined, <filename>target.mk</filename> includes a rather
 neat rule for the standard targets (<Xref LinkEnd="sec-standard-targets"> that simply invokes
 <Command>make</Command> recursively in each of the sub-directories.
 </para>
 
 <para>
 <Emphasis>These recursive invocations are guaranteed to occur in the order
-in which the list of directories is specified in <Constant>SUBDIRS</Constant>. </Emphasis>This
+in which the list of directories is specified in <constant>SUBDIRS</constant>. </Emphasis>This
 guarantee can be important.  For example, when you say <Command>gmake boot</Command> it
 can be important that the recursive invocation of <Command>make boot</Command> is done
 in one sub-directory (the include files, say) before another (the
@@ -2961,7 +3096,7 @@ first, and the most dependent last.
 <Sect2 id="sec-ways">
 <Title>Way management
 
-<IndexTerm><Primary>way management</Primary></IndexTerm></Title>
+<indexterm><primary>way management</primary></indexterm></Title>
 
 <para>
 We sometimes want to build essentially the same system in several
@@ -2975,7 +3110,7 @@ the build tree need to be constructed in multiple ways.
 </para>
 
 <para>
-Instead, the <filename>target.mk</filename><IndexTerm><Primary>target.mk</Primary></IndexTerm> contains some clever magic to
+Instead, the <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm> contains some clever magic to
 allow you to build several versions of a system; and to control
 locally how many versions are built and how they differ.  This section
 explains the magic.
@@ -2993,47 +3128,47 @@ side of the dot, for boring reasons; thus, <filename>libHS&lowbar;mp.a</filename
 </para>
 
 <para>
-A <Command>make</Command> variable called <Constant>way</Constant> holds the current way tag.  <Emphasis><Constant>way</Constant>
+A <Command>make</Command> variable called <constant>way</constant> holds the current way tag.  <Emphasis><constant>way</constant>
 is only ever set on the command line of a recursive invocation of
 <Command>gmake</Command>.</Emphasis> It is never set inside a <filename>Makefile</filename>.  So it is a global
 constant for any one invocation of <Command>gmake</Command>.  Two other <Command>make</Command>
-variables, <Constant>way&lowbar;</Constant> and <Constant>&lowbar;way</Constant> are immediately derived from <Constant>&dollar;(way)</Constant> and
-never altered.  If <Constant>way</Constant> is not set, then neither are <Constant>way&lowbar;</Constant> and
-<Constant>&lowbar;way</Constant>, and the invocation of <Command>make</Command> will build the ``normal way''.
-If <Constant>way</Constant> is set, then the other two variables are set in sympathy.
-For example, if <Constant>&dollar;(way)</Constant> is ``<Literal>mp</Literal>'', then <Constant>way&lowbar;</Constant> is set to ``<Literal>mp&lowbar;</Literal>''
-and <Constant>&lowbar;way</Constant> is set to ``<Literal>&lowbar;mp</Literal>''.  These three variables are then used
+variables, <constant>way&lowbar;</constant> and <constant>&lowbar;way</constant> are immediately derived from <constant>&dollar;(way)</constant> and
+never altered.  If <constant>way</constant> is not set, then neither are <constant>way&lowbar;</constant> and
+<constant>&lowbar;way</constant>, and the invocation of <Command>make</Command> will build the ``normal way''.
+If <constant>way</constant> is set, then the other two variables are set in sympathy.
+For example, if <constant>&dollar;(way)</constant> is ``<Literal>mp</Literal>'', then <constant>way&lowbar;</constant> is set to ``<Literal>mp&lowbar;</Literal>''
+and <constant>&lowbar;way</constant> is set to ``<Literal>&lowbar;mp</Literal>''.  These three variables are then used
 when constructing file names.
 </para>
 
 <para>
-So how does <Command>make</Command> ever get recursively invoked with <Constant>way</Constant> set?  There
+So how does <Command>make</Command> ever get recursively invoked with <constant>way</constant> set?  There
 are two ways in which this happens:
 </para>
 
 <para>
 
 <ItemizedList>
-<ListItem>
+<listitem>
 
 <para>
  For some (but not all) of the standard targets, when in a leaf
 sub-directory, <Command>make</Command> is recursively invoked for each way tag in
-<Constant>&dollar;(WAYS)</Constant>.  You set <Constant>WAYS</Constant> to the list of way tags you want these
+<constant>&dollar;(WAYS)</constant>.  You set <constant>WAYS</constant> to the list of way tags you want these
 targets built for.  The mechanism here is very much like the recursive
 invocation of <Command>make</Command> in sub-directories (<Xref LinkEnd="sec-subdirs">).
 
-It is up to you to set <Constant>WAYS</Constant> in your <filename>Makefile</filename>; this is how you
+It is up to you to set <constant>WAYS</constant> in your <filename>Makefile</filename>; this is how you
 control what ways will get built.  
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  For a useful collection of
 targets (such as <filename>libHS&lowbar;mp.a</filename>, <filename>Foo.mp&lowbar;o</filename>) there is a rule which
 recursively invokes <Command>make</Command> to make the specified target, setting the
-<Constant>way</Constant> variable.  So if you say <Command>gmake Foo.mp&lowbar;o</Command> you should see a
+<constant>way</constant> variable.  So if you say <Command>gmake Foo.mp&lowbar;o</Command> you should see a
 recursive invocation <Command>gmake Foo.mp&lowbar;o way=mp</Command>, and <Emphasis>in this
 recursive invocation the pattern rule for compiling a Haskell file
 into a <filename>.o</filename> file will match</Emphasis>.  The key pattern rules (in <filename>suffix.mk</filename>)
@@ -3048,7 +3183,7 @@ look like this:
 
 Neat, eh?
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
@@ -3063,7 +3198,7 @@ Neat, eh?
 Sometimes the canned rule just doesn't do the right thing.  For
 example, in the <Literal>nofib</Literal> suite we want the link step to print out
 timing information.  The thing to do here is <Emphasis>not</Emphasis> to define
-<Constant>HS&lowbar;PROG</Constant> or <Constant>C&lowbar;PROG</Constant>, and instead define a special purpose rule in
+<constant>HS&lowbar;PROG</constant> or <constant>C&lowbar;PROG</constant>, and instead define a special purpose rule in
 your own <filename>Makefile</filename>.  By using different variable names you will avoid
 the canned rules being included, and conflicting with yours.
 </para>
@@ -3075,9 +3210,9 @@ the canned rules being included, and conflicting with yours.
 <Sect1 id="sec-booting-from-C">
 <Title>Booting/porting from C (<filename>.hc</filename>) files
 
-<IndexTerm><Primary>building GHC from .hc files</Primary></IndexTerm>
-<IndexTerm><Primary>booting GHC from .hc files</Primary></IndexTerm>
-<IndexTerm><Primary>porting GHC</Primary></IndexTerm></Title>
+<indexterm><primary>building GHC from .hc files</primary></indexterm>
+<indexterm><primary>booting GHC from .hc files</primary></indexterm>
+<indexterm><primary>porting GHC</primary></indexterm></Title>
 
 <para>
 This section is for people trying to get GHC going by using the supplied
@@ -3112,7 +3247,7 @@ command will execute the whole build process (it won't install yet):
 <Screen>
 foo% distrib/hc-build --prefix=INSTALL_DIRECTORY
 </Screen>
-<IndexTerm><Primary>--hc-build</Primary></IndexTerm>
+<indexterm><primary>--hc-build</primary></indexterm>
 <para>
 By default, the installation directory is <filename>/usr/local</filename>.  If
 that is what you want, you may omit the argument to
@@ -3138,9 +3273,9 @@ the adventure&hellip;(ToDo: porting tips&mdash;stuff to look out for, etc.)
 <Sect1 id="sec-build-pitfalls">
 <Title>Known pitfalls in building Glasgow Haskell
 
-<IndexTerm><Primary>problems, building</Primary></IndexTerm>
-<IndexTerm><Primary>pitfalls, in building</Primary></IndexTerm>
-<IndexTerm><Primary>building pitfalls</Primary></IndexTerm></Title>
+<indexterm><primary>problems, building</primary></indexterm>
+<indexterm><primary>pitfalls, in building</primary></indexterm>
+<indexterm><primary>building pitfalls</primary></indexterm></Title>
 
 <para>
 WARNINGS about pitfalls and known ``problems'':
@@ -3149,16 +3284,16 @@ WARNINGS about pitfalls and known ``problems'':
 <para>
 
 <OrderedList>
-<ListItem>
+<listitem>
 
 <para>
 One difficulty that comes up from time to time is running out of space
 in <literal>TMPDIR</literal>.  (It is impossible for the configuration stuff to
 compensate for the vagaries of different sysadmin approaches to temp
 space.)
-<IndexTerm><Primary>tmp, running out of space in</Primary></IndexTerm>
+<indexterm><primary>tmp, running out of space in</primary></indexterm>
 
-The quickest way around it is <Command>setenv TMPDIR /usr/tmp</Command><IndexTerm><Primary>TMPDIR</Primary></IndexTerm> or
+The quickest way around it is <Command>setenv TMPDIR /usr/tmp</Command><indexterm><primary>TMPDIR</primary></indexterm> or
 even <Command>setenv TMPDIR .</Command> (or the equivalent incantation with your shell
 of choice).
 
@@ -3174,8 +3309,8 @@ in all cases.
 
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
 In compiling some support-code bits, e.g., in <filename>ghc/rts/gmp</filename> and even
@@ -3183,16 +3318,16 @@ in <filename>ghc/lib</filename>, you may get a few C-compiler warnings.  We thin
 are OK.
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
 When compiling via C, you'll sometimes get ``warning: assignment from
 incompatible pointer type'' out of GCC.  Harmless.
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
 Similarly, <Command>ar</Command>chiving warning messages like the following are not
@@ -3206,8 +3341,8 @@ ar: filename GlaIOMonad__2_2s.o truncated to GlaIOMonad_
 
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  In compiling the compiler proper (in <filename>compiler/</filename>), you <Emphasis>may</Emphasis>
@@ -3216,7 +3351,7 @@ vagaries of different systems, it seems.  The solution is simple:
 
 
 <ItemizedList>
-<ListItem>
+<listitem>
 
 <para>
  If you're compiling with GHC 4.00 or later, then the
@@ -3224,26 +3359,26 @@ vagaries of different systems, it seems.  The solution is simple:
 is somewhat unlikely, since the maximum is set to 64M by default.
 Anyway, you can raise it with the
 <Option>-optCrts-M&lt;size&gt;</Option> flag (add this flag to
-<Constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</Constant>
+<constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</constant>
 <Command>make</Command> variable in the appropriate
 <filename>Makefile</filename>).
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
  For GHC &#60; 4.00, add a suitable <Option>-H</Option> flag to the <filename>Makefile</filename>, as
 above.
 
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
 
 and try again: <Command>gmake</Command>.  (see <Xref LinkEnd="sec-suffix"> for information about
-<Constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</Constant>.)
+<constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</constant>.)
 
 Alternatively, just cut to the chase:
 
@@ -3254,8 +3389,8 @@ Alternatively, just cut to the chase:
 
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
 If you try to compile some Haskell, and you get errors from GCC about
@@ -3267,11 +3402,11 @@ this bug also suggests that you have an old GCC.
 
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
-You <Emphasis>may</Emphasis> need to re-<Command>ranlib</Command><IndexTerm><Primary>ranlib</Primary></IndexTerm> your libraries (on Sun4s).
+You <Emphasis>may</Emphasis> need to re-<Command>ranlib</Command><indexterm><primary>ranlib</primary></indexterm> your libraries (on Sun4s).
 
 
 <Screen>
@@ -3287,8 +3422,8 @@ We'd be interested to know if this is still necessary.
 
 
 </para>
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
 <para>
 GHC's sources go through <Command>cpp</Command> before being compiled, and <Command>cpp</Command> varies
@@ -3314,7 +3449,7 @@ Alas, <Command>cpp</Command> doesn't tell you the offending file!
 
 Workaround: don't put weird things in string args to <Command>cpp</Command> macros.
 </para>
-</ListItem>
+</listitem>
 
 </OrderedList>
 
@@ -3345,7 +3480,7 @@ by typign <Command>mount</Command>).
 
 <para>
 Before you start, you need to make sure that the user environment variable
-<Constant>MAKE_MODE</Constant> is set to <Literal>UNIX</Literal>. If you
+<constant>MAKE_MODE</constant> is set to <Literal>UNIX</Literal>. If you
 don't do this you get very weird messages when you type
 <Command>make</Command>, such as:
 </para>
@@ -3356,7 +3491,7 @@ don't do this you get very weird messages when you type
 
 <ItemizedList>
 
-<ListItem>
+<listitem>
 <para>
 Generate a key, by running <filename>c:/user/local/bin/ssh-keygen1</filename>.
   This generates a public key in <filename>.ssh/identity.pub</filename>, and a
@@ -3387,9 +3522,9 @@ Generate a key, by running <filename>c:/user/local/bin/ssh-keygen1</filename>.
 c:\tmp> set CYGWIN32=tty
 c:\tmp> c:/user/local/bin/ssh-keygen1
 </Screen>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
 If you don't have an account on <Literal>cvs.haskell.org</Literal>, send 
   your <filename>.ssh/identity.pub</filename> to the CVS repository administrator
@@ -3404,7 +3539,7 @@ If you don't have an account on <Literal>cvs.haskell.org</Literal>, send
   your <filename>~/.ssh/authorized_keys</filename>. Make sure that the new version
   of <filename>authorized_keys</filename> still has 600 file permission.
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
@@ -3415,50 +3550,50 @@ If you don't have an account on <Literal>cvs.haskell.org</Literal>, send
 
 <ItemizedList>
 
-<ListItem>
+<listitem>
 <para>
 From the System control panel,
 set the following <Emphasis>user</Emphasis> environment variables (see the GHC user guide)
 </para>
 
 <ItemizedList>
-<ListItem>
+<listitem>
 <para>
-<Constant>HOME</Constant>: points to your home directory.  This is where CVS
+<constant>HOME</constant>: points to your home directory.  This is where CVS
 will look for its <filename>.cvsrc</filename> file.
 </para>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
-<Constant>CVS_RSH</Constant>: <filename>c:/path_to_ghc/extra-bin/ssh</filename>
+<constant>CVS_RSH</constant>: <filename>c:/path_to_ghc/extra-bin/ssh</filename>
 </para>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
-<Constant>CVSROOT</Constant>: <Literal>:ext:username@cvs.haskell.org:/home/cvs/root</Literal>,
+<constant>CVSROOT</constant>: <Literal>:ext:username@cvs.haskell.org:/home/cvs/root</Literal>,
 where <Literal>username</Literal> is your userid
 </para>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
-<Constant>CVSEDITOR</Constant>: <filename>bin/gnuclient.exe</filename> if you want to use an Emacs buffer for typing in those long commit messages.
+<constant>CVSEDITOR</constant>: <filename>bin/gnuclient.exe</filename> if you want to use an Emacs buffer for typing in those long commit messages.
 </para>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
-<Constant>SHELL</Constant>: To use bash as the shell in Emacs, you need to
+<constant>SHELL</constant>: To use bash as the shell in Emacs, you need to
 set this to point to <Filename>bash.exe</Filename>.
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
 Put the following in <filename>$HOME/.cvsrc</filename>:
 </para>
@@ -3483,9 +3618,9 @@ been lifted by now (i.e., you're using VFAT or later filesystems.) If
 you're still having problems creating it, don't worry; <filename>.cvsrc</filename> is entirely
 optional.
 </para>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
 Try doing <Command>cvs co fpconfig</Command>. All being well, bytes should
 start to trickle through, leaving a directory <filename>fptools</filename>
@@ -3505,9 +3640,9 @@ for some reason bombed out.  This was from a bash shell running in Emacs.
 I solved this by invoking a Cygnus shell, and running CVS from there.
 Once things are dialogue free, it seems to work OK from within Emacs.
 </para>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
 If you want to check out part of large tree, proceed as follows:
 </para>
@@ -3530,7 +3665,7 @@ in this case bogus.
 <para>
 The <Command>cvs update</Command> command sucks in a named sub-directory.
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
@@ -3548,7 +3683,7 @@ I have not tried it yet.
       
       <ItemizedList>
 
-	<ListItem>
+	<listitem>
 	  <para>
 	    You should give the option
 	    <option>--host=i386-unknown-mingw32</option> to
@@ -3559,9 +3694,9 @@ I have not tried it yet.
 	    Cygwin gcc, or to explicitly specify
 	    <option>--with-gcc=/mingw/bin/gcc</option>.
 	  </para>
-	</ListItem>
+	</listitem>
 
-<ListItem>
+<listitem>
 <para>
 You have to run <Command>autoconf</Command> both in <filename>fptools</filename>
 and in <filename>fptools/ghc</filename>.  If you omit the latter step you'll
@@ -3577,15 +3712,15 @@ running /bin/sh ./configure  --cache-file=.././config.cache --srcdir=.
 ./configure: ./configure: No such file or directory
 configure: error: ./configure failed for ghc
 </Screen>
-</ListItem>
+</listitem>
 
-<ListItem>
+<listitem>
 <para>
-You need <filename>ghc</filename> to be in your <Constant>PATH</Constant> before you run
+You need <filename>ghc</filename> to be in your <constant>PATH</constant> before you run
 <Command>configure</Command>. The InstallShield tells you the path
 when you install it.
 </para>
-</ListItem>
+</listitem>
 
 </ItemizedList>
 
