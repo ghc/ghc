@@ -345,7 +345,7 @@ getProcessExitCode (ProcessHandle handle) =
 
    On Windows, CreateProcess takes a single string for the command,
    which is later decomposed by cmd.exe.  In this case, we just want
-   to prepend "c:\WINDOWS\CMD.EXE /c" to our command line.  The
+   to prepend @\"c:\WINDOWS\CMD.EXE \/c\"@ to our command line.  The
    command-line translation that we normally do for arguments on
    Windows isn't required (or desirable) here.
 -}
