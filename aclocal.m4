@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.83 2001/09/20 14:08:13 sewardj Exp $
+dnl $Id: aclocal.m4,v 1.84 2001/10/09 08:31:15 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1166,8 +1166,8 @@ AC_CACHE_CHECK([whether $CC accepts $1], [ac_cv_cc_$2],
  CFLAGS="$save_CFLAGS"
 ])
 if test "$ac_cv_cc_$2"x = "yesx"; then
-  $2=$extra_flag;
+  $2=$1;
 else
-  $2=$extra_flag;
+  $2="";
 fi;
 ])
