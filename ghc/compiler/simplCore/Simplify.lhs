@@ -1239,9 +1239,11 @@ rebuildCase env scrut case_bndr alts cont
 			other -> [alt | alt@(con,_,_) <- alts, 
 					not (con `elem` impossible_cons)]
 
-	-- handled_cons are handled either by the context, 
-	-- or by an alternative in this case
-	handled_cons = impossible_cons ++ [con | (con,_,_) <- better_alts]
+	-- "handled_cons" are handled either by the context, 
+	-- or by a branch in this case expression
+	-- Don't add DEFAULT to the handled_cons!!
+	(alts_wo_default, _) = findDefault better_alts
+	handled_cons = impossible_cons ++ [con | (con,_,_) <- alts_wo_default]
     in
 
 	-- Deal with the case binder, and prepare the continuation;
