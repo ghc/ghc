@@ -38,6 +38,7 @@ import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), isNonRec )
 import CmdLineOpts
 import Maybe
+import Util             ( notNull )
 import Outputable
 
 import IO		( hPutStrLn, stderr )
