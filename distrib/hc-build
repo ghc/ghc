@@ -38,7 +38,6 @@ touch ghc/compiler/main/ParsePkgConf.hs
 echo "*** Building hsc..."
 ./configure --enable-hc-boot $configopts
 $MAKE -C glafp-utils boot all
-$MAKE -C ghc/utils/unlit boot all
 $MAKE -C ghc boot
 $MAKE -C hslibs boot all
 $MAKE -C ghc all
@@ -46,9 +45,9 @@ $MAKE -C ghc all
 echo "*** Building libraries..."
 ./configure
 
-# clean in ghc/lib, but avoid removing hsc2hs-generated .hs files
-$MAKE -C ghc/lib   clean HSC_SRCS=""
-$MAKE -C ghc/lib   boot all
-
-$MAKE -C hslibs    clean boot all
-$MAKE -C ghc/utils clean boot all
+$MAKE -C ghc/lib   clean boot
+$MAKE -C ghc/lib   all
+$MAKE -C hslibs    clean boot
+$MAKE -C hslibs    all
+$MAKE -C ghc/utils clean boot
+$MAKE -C ghc/utils all
