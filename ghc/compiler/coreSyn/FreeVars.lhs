@@ -262,8 +262,11 @@ fvExpr id_cands tyvar_cands (Case expr alts)
 	binder_ftvs = munge_id_ty binder
 	    -- We need to collect free tyvars from the binder
 
+-- Don't forget to notice that the idSpecVars of the binder
+-- are free in the whole expression; albeit not in the RHS or body
+
 fvExpr id_cands tyvar_cands (Let (NonRec binder rhs) body)
-  = (FVInfo (freeVarsOf rhs'   `combine` body_fvs)
+  = (FVInfo (freeVarsOf rhs'   `combine` body_fvs `combine` mkIdSet (idSpecVars binder))
 	    (freeTyVarsOf rhs' `combine` freeTyVarsOf body2 `combine` binder_ftvs)
 	    (leakinessOf rhs' `orLeak` leakinessOf body2),
      AnnLet (AnnNonRec binder rhs') body2)
@@ -288,7 +291,12 @@ fvExpr id_cands tyvar_cands (Let (Rec binds) body)
     FVInfo rhss_fvs rhss_tfvs leakiness_of_rhss
 	= foldr1 combineFVInfo [info | (info,_) <- rhss']
 
-    binds_fvs	      = rhss_fvs `minusIdSet` binders_set
+	-- Don't forget to notice that the idSpecVars of the binder
+	-- are free in the whole expression; albeit not in the RHS or body
+    binds_fvs	      = (foldr (unionIdSets . mkIdSet . idSpecVars) rhss_fvs binders)
+			`minusIdSet`
+			binders_set
+
     body2	      = fvExpr new_id_cands tyvar_cands body
     body_fvs	      = freeVarsOf body2 `minusIdSet` binders_set
     binders_ftvs      = foldr (combine . munge_id_ty) noFreeTyVars binders
@@ -309,15 +317,8 @@ fvExpr id_cands tyvar_cands (Note other_note expr)
   where
     expr2@(fvinfo,_) = fvExpr id_cands tyvar_cands expr
 
--- fvRhs returns the annotated RHS, but it adds to the
--- free vars of the RHS the idSpecVars of the binder,
--- since those are, in truth, free in the definition.
 fvRhs id_cands tyvar_cands (bndr,rhs)
-  = (FVInfo fvs' ftvs leak, rhs')
-  where
-    (FVInfo fvs ftvs leak, rhs') = fvExpr id_cands tyvar_cands rhs
-    fvs' = fvs `unionIdSets` mkIdSet (idSpecVars bndr)
-
+  = fvExpr id_cands tyvar_cands rhs
 \end{code}
 
 \begin{code}

@@ -504,10 +504,14 @@ deriving: /* empty */				{ $$ = mknothing(); }
         | DERIVING dtyclses                     { $$ = mkjust($2); }
 	;
 
-classd	:  classkey simple_context DARROW simple_con_app1 cbody
-		{ $$ = mkcbind($2,$4,$5,startlineno); }
-	|  classkey simple_con_app1 cbody		 	
-		{ $$ = mkcbind(Lnil,$2,$3,startlineno); }
+classd	:  classkey btype DARROW simple_con_app1 cbody
+		/* Context can now be more than simple_context */
+		{ $$ = mkcbind(type2context($2),$4,$5,startlineno); }
+	|  classkey btype cbody
+		/* We have to say btype rather than simple_con_app1, else
+		   we get reduce/reduce errs */
+		{ check_class_decl_head($3);
+		  $$ = mkcbind(Lnil,$2,$3,startlineno); }
 	;
 
 cbody	:  /* empty */				{ $$ = mknullbind(); }
@@ -521,7 +525,7 @@ instd	:  instkey inst_type rinst		{ $$ = mkibind($2,$3,startlineno); }
 /* Compare ctype */
 inst_type : type DARROW type			{ is_context_format( $3, 0 );   /* Check the instance head */
 						  $$ = mkcontext(type2context($1),$3); }
-	  | type				{ is_context_format( $1, 0 );   /* Check the instance head */
+	  | btype				{ is_context_format( $1, 0 );   /* Check the instance head */
 						  $$ = $1; }
 	  ;
 
@@ -649,7 +653,7 @@ type_and_maybe_id :
 /* A sigtype is a rank 2 type; it can have for-alls as function args:
   	f :: All a => (All b => ...) -> Int
 */
-sigtype	: type DARROW sigarrowtype		{ $$ = mkcontext(type2context($1),$3); }
+sigtype	: btype DARROW sigarrowtype		{ $$ = mkcontext(type2context($1),$3); }
 	| sigarrowtype 
 	;
 
@@ -659,11 +663,11 @@ sigarrowtype : bigatype RARROW sigarrowtype	{ $$ = mktfun($1,$3); }
 	     ;
 
 /* A "big" atype can be a forall-type in brackets.  */
-bigatype: OPAREN type DARROW type CPAREN	{ $$ = mkcontext(type2context($2),$4); }
+bigatype: OPAREN btype DARROW type CPAREN	{ $$ = mkcontext(type2context($2),$4); }
 	;
 
 	/* 1 S/R conflict at DARROW -> shift */
-ctype   : type DARROW type			{ $$ = mkcontext(type2context($1),$3); }
+ctype   : btype DARROW type			{ $$ = mkcontext(type2context($1),$3); }
 	| type
 	;
 
@@ -733,7 +737,7 @@ constrs	:  constr				{ $$ = lsing($1); }
 	;
 
 constr	:  constr_after_context
-	|  type DARROW constr_after_context	{ $$ = mkconstrcxt ( type2context($1), $3 ); }
+	|  btype DARROW constr_after_context	{ $$ = mkconstrcxt ( type2context($1), $3 ); }
 	;
 
 constr_after_context :

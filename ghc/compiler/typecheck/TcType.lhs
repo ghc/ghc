@@ -55,6 +55,7 @@ import Class		( Class )
 import TyCon		( isFunTyCon )
 import Kind		( Kind )
 import TcMonad
+import Name		( changeUnique )
 
 import TysPrim		( voidTy )
 
@@ -181,8 +182,13 @@ inst_sig_tyvar (TyVar _ kind name _)
 
     tcNewMutVar UnBound		`thenNF_Tc` \ box ->
 	-- Was DontBind, but we've nuked that "optimisation"
+    let
+	name' = case name of
+		  Nothing -> Nothing
+		  Just n  -> Just (changeUnique n uniq)
+    in
 
-    returnNF_Tc (TyVar uniq kind name box)
+    returnNF_Tc (TyVar uniq kind name' box)
 	-- We propagate the name of the sigature type variable
 \end{code}
 

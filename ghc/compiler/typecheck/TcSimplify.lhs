@@ -139,7 +139,7 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  Inst, LIE, pprInsts, pprInstsInFull, mkLIE, 
 			  InstOrigin, pprOrigin
 			)
-import TcEnv		( TcIdOcc(..) )
+import TcEnv		( TcIdOcc(..), tcGetGlobalTyVars )
 import TcType		( TcType, TcTyVarSet, TcMaybe, tcInstType, tcInstTheta )
 import Unify		( unifyTauTy )
 import Id		( mkIdSet )
@@ -155,7 +155,7 @@ import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
 import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
 import TyVar		( intersectTyVarSets, unionManyTyVarSets, minusTyVarSet,
-			  isEmptyTyVarSet, tyVarSetToList,
+			  isEmptyTyVarSet, tyVarSetToList, unionTyVarSets,
 			  zipTyVarEnv, emptyTyVarEnv
 			)
 import FiniteMap
@@ -208,10 +208,14 @@ tcSimplify str top_lvl local_tvs wanted_lie
 	-- But we can get stuck with 
 	--	C a b
 	-- where "a" is one of the local_tvs, but "b" is unconstrained.
-	-- Then we must yell about the ambiguous b
+	-- Then we must yell about the ambiguous b.
+	-- But we must only do so if "b" really is unconstrained; so
+	-- we must grab the global tyvars to answer that question
+    tcGetGlobalTyVars				`thenNF_Tc` \ global_tvs ->
     let
+	avail_tvs	    = local_tvs `unionTyVarSets` global_tvs
 	(irreds', bad_guys) = partition (isEmptyTyVarSet . ambig_tv_fn) irreds
-	ambig_tv_fn dict    = tyVarsOfInst dict `minusTyVarSet` local_tvs
+	ambig_tv_fn dict    = tyVarsOfInst dict `minusTyVarSet` avail_tvs
     in
     addAmbigErrs ambig_tv_fn bad_guys	`thenNF_Tc_`
 
@@ -401,7 +405,6 @@ reduceContext str try_me givens wanteds
 	     text "----------------------"
 	     ]) $
 -}
-
         -- Build the Avail mapping from "givens"
     foldlNF_Tc addGiven emptyFM givens		`thenNF_Tc` \ avails ->
 
@@ -432,7 +435,9 @@ reduceContext str try_me givens wanteds
 	     text "given" <+> ppr givens,
 	     text "wanted" <+> ppr wanteds,
 	     text "----", 
-	     pprAvails avails,
+	     text "avails" <+> pprAvails avails,
+	     text "free" <+> ppr frees,		
+	     text "irreds" <+> ppr irreds,		
 	     text "----------------------"
 	     ]) $
 -}

@@ -10,7 +10,7 @@ module TcClassDcl ( tcClassDecl1, tcClassDecls2, tcMethodBind, badMethodErr ) wh
 
 import HsSyn		( HsDecl(..), ClassDecl(..), Sig(..), MonoBinds(..),
 			  InPat(..), HsBinds(..), GRHSsAndBinds(..), GRHS(..),
-			  HsExpr(..), HsLit(..),
+			  HsExpr(..), HsLit(..), HsType(..), pprClassAssertion,
 			  unguardedRHS, andMonoBinds, getTyVarName
 			)
 import HsPragmas	( ClassPragmas(..) )
@@ -125,7 +125,7 @@ tcClassDecl1 rec_env rec_inst_mapper
     unifyKinds class_kinds tyvar_kinds	`thenTc_`
 
 	-- CHECK THE CONTEXT
-    tcClassContext rec_class rec_tyvars context pragmas	
+    tcClassContext class_name rec_class rec_tyvars context pragmas	
 						`thenTc` \ (sc_theta, sc_tys, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
@@ -170,18 +170,27 @@ tcClassDecl1 rec_env rec_inst_mapper
 
 
 \begin{code}
-tcClassContext :: Class -> [TyVar]
+tcClassContext :: Name -> Class -> [TyVar]
 	       -> RenamedContext 	-- class context
 	       -> RenamedClassPragmas	-- pragmas for superclasses  
 	       -> TcM s (ThetaType,	-- the superclass context
 			 [Type],	-- types of the superclass dictionaries
 		         [Id])  	-- superclass selector Ids
 
-tcClassContext rec_class rec_tyvars context pragmas
+tcClassContext class_name rec_class rec_tyvars context pragmas
   = 	-- Check the context.
 	-- The renamer has already checked that the context mentions
 	-- only the type variable of the class decl.
+
+	-- For std Haskell check that the context constrains only tyvars
+    (if opt_GlasgowExts then
+	returnTc []
+     else
+	mapTc check_constraint context
+    )					`thenTc_`
+
     tcContext context			`thenTc` \ sc_theta ->
+
     let
        sc_tys = [mkDictTy sc tys | (sc,tys) <- sc_theta]
     in
@@ -209,6 +218,12 @@ tcClassContext rec_class rec_tyvars context pragmas
 		     mkFunTy (mkDictTy rec_class rec_tyvar_tys) (mkDictTy super_class tys)
 	  in
 	  returnTc (mkSuperDictSelId uniq rec_class index ty)
+
+    check_constraint (c, tys) = checkTc (all is_tyvar tys)
+					(superClassErr class_name (c, tys))
+
+    is_tyvar (MonoTyVar _) = True
+    is_tyvar other	   = False
 
 
 tcClassSig :: GlobalValueEnv		-- Knot tying only!
@@ -577,6 +592,10 @@ classArityErr class_name
 
 classDeclCtxt class_name
   = ptext SLIT("In the class declaration for") <+> quotes (ppr class_name)
+
+superClassErr class_name sc
+  = ptext SLIT("Illegal superclass constraint") <+> quotes (pprClassAssertion sc)
+    <+> ptext SLIT("in declaration for class") <+> quotes (ppr class_name)
 
 methodCtxt sel_id
   = ptext SLIT("In the definition for method") <+> quotes (ppr sel_id)

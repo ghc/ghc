@@ -362,27 +362,23 @@ sepBindsByDropPoint drop_pts floaters
     split' drop_pts_fvs [] mult_branch drop_boxes
       = (drop_boxes, mult_branch, drop_pts_fvs)
 
-    -- only in a or unused
-    split' (a:as) (bind:binds) mult_branch (drop_box_a:drop_boxes)
-      | all (\b -> {-b `elementOfIdSet` a &&-}
-		   not (b `elementOfIdSet` (unionManyIdSets as)))
-	    (bindersOf (fst bind))
-      = split' (a':as) binds mult_branch ((bind:drop_box_a):drop_boxes)
-      where
-	a' = a `unionIdSets` fvsOfBind bind
+    split' drop_pts_fvs (bind:binds) mult_branch drop_boxes
+      | no_of_branches == 1	-- Exactly one branch
+      = split' drop_pts_fvs' binds mult_branch drop_boxes'
 
-    -- not in a
-    split' (a:as) (bind:binds) mult_branch (drop_box_a:drop_boxes)
-      | all (\b -> not (b `elementOfIdSet` a)) (bindersOf (fst bind))
-      = split' (a:as') binds mult_branch' (drop_box_a:drop_boxes')
-      where
-	(drop_boxes',mult_branch',as') = split' as [bind] mult_branch drop_boxes
+      | otherwise		-- Zero or many branches; drop it here
+      = split' drop_pts_fvs binds (bind:mult_branch) drop_boxes
 
-    -- in a and in as
-    split' aas@(a:as) (bind:binds) mult_branch drop_boxes
-      = split' aas' binds (bind : mult_branch) drop_boxes
       where
-	aas' = map (unionIdSets (fvsOfBind bind)) aas
+	binders		= bindersOf (fst bind)
+	no_of_branches  = length [() | True <- in_branch_flags]
+	in_branch_flags = [ any (`elementOfIdSet` branch_fvs) binders
+			  | branch_fvs <- drop_pts_fvs ]
+
+	(drop_pts_fvs', drop_boxes') = unzip (zipWith3 drop in_branch_flags drop_pts_fvs drop_boxes)
+	drop True drop_fvs box  = (drop_fvs `unionIdSets` fvsOfBind bind, bind:box)
+	drop False drop_fvs box = (drop_fvs, 				  box)
+      
 
     -------------------------
     fvsOfBind (_,fvs)	= fvs

@@ -268,11 +268,11 @@ tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
 	-- The tyvars_not_to_gen are free in the environment, and hence
 	-- candidates for generalisation, but sometimes the monomorphism
 	-- restriction means we can't generalise them nevertheless
-    getTyVarsToGen is_unrestricted mono_id_tys lie	`thenTc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
+    getTyVarsToGen is_unrestricted mono_id_tys lie	`thenNF_Tc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
 
 	-- DEAL WITH TYPE VARIABLE KINDS
 	-- **** This step can do unification => keep other zonking after this ****
-    mapTc defaultUncommittedTyVar (tyVarSetToList tyvars_to_gen)	`thenTc` \ real_tyvars_to_gen_list ->
+    mapTc defaultUncommittedTyVar (tyVarSetToList tyvars_to_gen)  `thenTc` \ real_tyvars_to_gen_list ->
     let
 	real_tyvars_to_gen = mkTyVarSet real_tyvars_to_gen_list
 		-- It's important that the final list 
@@ -487,8 +487,13 @@ getTyVarsToGen is_unrestricted mono_id_tys lie
     in
     if is_unrestricted
     then
-	returnTc (emptyTyVarSet, tyvars_to_gen)
+	returnNF_Tc (emptyTyVarSet, tyvars_to_gen)
     else
+	-- This recover and discard-errs is to avoid duplicate error
+	-- messages; this, after all, is an "extra" call to tcSimplify
+	recoverNF_Tc (returnNF_Tc (emptyTyVarSet, tyvars_to_gen))	$
+	discardErrsTc							$
+
 	tcSimplify (text "getTVG") NotTopLevel tyvars_to_gen lie    `thenTc` \ (_, _, constrained_dicts) ->
 	let
 	  -- ASSERT: dicts_sig is already zonked!

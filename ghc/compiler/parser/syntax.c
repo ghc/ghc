@@ -540,9 +540,50 @@ checknobangs(app)
 	hsperror("syntax error: unexpected ! in type");
 
       checknobangs(gtapp((struct Stapp *)app));
-    }	  
+    }
 }
 
+
+/* Check that a type is of the form
+	C a1 a2 .. an
+   where n>=1, and the ai are all type variables
+   This is used to check that a class decl is well formed.
+*/
+void
+check_class_decl_head_help( app, n )
+  ttype app;
+  int n;	/* Number of args so far */
+{
+  switch (tttype(app)) {
+    case tapp:
+	/* Check the arg is a type variable */
+	switch (tttype (gtarg((struct Stapp *) app))) {
+		case namedtvar: break;
+		default: hsperror("Class declaration head must use only type variables");
+	}
+
+	/* Check the fun part */
+	check_class_decl_head_help( gtapp((struct Stapp *) app), n+1 );
+	break;
+
+    case tname:
+	/* Class name; check there is at least one argument */
+      if (n==0) {
+	    hsperror("Class must have at least one argument");
+      }
+      break;
+
+    default:
+	hsperror("Illegal syntax in class declaration head");
+  }
+}
+
+void
+check_class_decl_head( app )
+  ttype app;
+{ check_class_decl_head_help( app, 0 ); }
+
+	
 
 /*
   Splits a tycon application into its constructor and a list of types.
