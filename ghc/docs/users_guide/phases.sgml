@@ -123,6 +123,15 @@
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
+	  <term><option>-optF</option> <replaceable>option</replaceable></term>
+	  <indexterm><primary><option>-optF</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Pass <replaceable>option</replaceable> to the
+	    custom pre-processor (see <xref linkend="pre-processor">).</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
 	  <term><option>-optc</option>  <replaceable>option</replaceable></term>
 	  <indexterm><primary><option>-optc</option></primary>
 	  </indexterm>

@@ -1271,6 +1271,13 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-optF</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the
+	      custom pre-processor</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-optc</option> <replaceable>option</replaceable></entry>
 	      <entry>pass <replaceable>option</replaceable> to the C compiler</entry>
 	      <entry>dynamic</entry>
