@@ -1,0 +1,108 @@
+<sect1>Release notes for version~2.06---9/97
+<label id="release-2-06">
+<p>
+
+GHC 2.06 is a minor upgrade of GHC 2.05, and is released as source only.  It represents work done through August '97.
+
+Here's a list of the changes made since GHC 2.05:
+
+<itemize>
+
+<item> Fix to reader to allow let expressions in pattern guards.
+
+<item> Tidied up @nofib/parallel@
+
+<item> Changed derived @Show@ (and @Read@) code for constructors
+with labelled fields to bring them into line with the Report.
+
+<item> Fixed @ghc-0.29 -O@ booting problem (codeGen/ClosureInfo not closed.)
+
+<item> Improved error messages for illegal derivings of @Ix@, @Enum@
+and @Bounded@.
+
+<item> Fixed bug in deriving @Ix@ code. (need to actively slurp in
+return and zero)
+
+<item> New module: @PackBase@ - minimum pack/unpack code.
+
+<item> Moved @PackedString@ to ghc system library
+
+<item> Added export of @unionBy@ and @intersectBy@ to @List@ (plus
+commented out unused functions).
+
+<item> Uniform size to @ForeignObj@ closures (indep of GC scheme).
+
+<item> Added @ForeignObj@ support to NCG
+
+<item> Added @index*OffForeignObj#@ primops (for completeness, mostly)
+
+<item> Removed: @Util.mapAccumL@ and @Util.mapAccumR@ (now via List)
+
+<item> Removed: @forall@ and @exists@ from @Util@ (now @any@ and @all@ from @Prelude@). 
+
+<item> fixed: handling of source input from stdin in the driver.
+
+<item> x86 NCG should now compile under 2.0x
+
+<item> PECULIAR: compiling -prof "fixes" simplifier performance on deep
+  list comprehensions.
+
+<item> Added -O for ghc/lib/cbits
+
+<item> Updated @lndir@ (sync wrt. X11R6.3)
+
+<item> Removed @glafp-utils/msub@
+
+<item> Fixed misleading error message for guards (used to
+mention list comprehensions)
+
+<item> Fixed incorrect handling of default methods (used to
+complain about differing contexts)
+
+<item> Fixed missing @tidyPrimOp@ in @simplCore/SimplCore@
+	(Sven Panne bug report.)
+
+<item> Fixed desugaring of record construction for overloaded
+constructors. (Dave Barton bug report.)
+
+<item> Fixed rank-2 polymorphism bug (Ralf Hinze bug report.)
+
+<item> Fixed interface-file parser error on @GHC.->@
+
+<item> Added @-no-recomp@ flag
+
+<item> Changed grouping syntax for simplifier opts, instead of
+  '(' and ')', use `&lsqb' and `&rsqb'. The change is made to make
+  it more Win32 (and cygwin32) friendly.
+
+<item> Removed the use of @COMPILING_GHC@ in @ghc/compiler/@
+
+<item> Use @COMPILING_NCG@ instead of @COMPILING_GHC@ in @ghc/includes/@
+  header files to control visibility of info needed when
+  compiling the native code generator.
+
+<item> Tidied up handling of IO error messages in @IOBase@
+
+<item> Fixed @PackBase.unpackCString@ and @PackedString.unpackCString@
+to handle @NULL@ pointer arg gracefully.
+
+<item> fix: archives in @INSTALL_LIBS@ are now ranlib'ed when installing.
+
+<item> fix: for @-monly-x-regs@, the mangler now generates necessary code
+  for loading up unstolen registers before GC, and save their updated
+  contents (via BaseReg) on GC return before `handing back'
+  the registers. This change fixed the @SIGSEGV@ problem reported by
+ David Barton on an x86 platform (linux) with 2.05.
+
+<item> changed @SMstats.elapsedtime@ to return non-negative floats. (=>
+  no more @-Rghc-timing@ warnings about not finding @InitTime@ etc.)
+
+<item> Change @mkWrapper@ in @WwLib.lhs@ to call
+  @splitForAllTyExpandingDicts@ instead of @splitForALlTy@ to fix
+ @absApply@ crash. (Jon Mountjoy bug report.)
+
+<item> GHC's interface file parser now uses the latest version of
+Happy.
+
+<item> Happy is now included in the source distribution.
+</itemize>

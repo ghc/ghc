@@ -1,0 +1,57 @@
+<sect1>Release notes for version~3-00---1/97
+<label id="release-3-00">
+<p>
+
+Changes made since 2.10:
+
+<itemize>
+
+<item> Multi-parameter type classes are fully implemented.  There is more
+  sharing of dictionaries than in 2.10, so there's a chance that
+  efficiency will increase a little too.
+
+<item> Error messages from the type checker should be noticeably improved
+
+<item> Warnings for unused bindings @-fwarn-unused-names@.
+
+<item> The "boing" example works, and many other minor bug fixes.
+
+<item> Can only be built with 2.10 or later; committed to Haskell 1.4
+  module system and libraries.  Much cruft removed as a result.
+
+<item> Dramatic clean-up of the @PprStyle@ stuff.  No explicit "sty"
+parameters now; it's all handled under the hood in @Outputable.lhs@.
+
+<item> The type @Type@ has been substantially changed.  Usage types have
+  gone away entirely.  Type is parameterised wrt the "flexi" slot
+  in type variables, rather than wrt the type variable itself.
+  That means that many instance decls become much simpler, because
+  they are polymorphic in the "flexi" slot rather than needing
+  (say) @Outputable@ on the type variable.
+
+<item> The dictionary for each class is represented by a new
+  data type for that purpose, rather than by a tuple.  That in
+  turn means that @Type@ can be a straightforward instance of @Eq@ and
+  @Ord@ No need for @eqSimpleTy@, @eqTy@.
+
+<item> The resulting compiler is just slightly (2%) shorter than the
+  old one in terms of source code size.
+
+<item> Fix bug in posix signal handling.
+
+<item> @Int@ and @Word@ rewritten to use unboxed types and operations.
+
+<item> Removed @ghc/Error.{lhs,hi-boot}@
+
+<item> Moved contents of @Error@ to @GHCerr@ + adjusted
+  import lists of files that use old Error functionality.
+
+<item> Moved @seqError@ from @Prelude@ to @GHCerr@.
+
+<item> Fix a misleading type checker error msg.
+
+<item> Fix a bug in @floatBind@ in @Simplify.lhs@
+
+<item> Better failure message when entering an unimplemented instance method
+
+</itemize>

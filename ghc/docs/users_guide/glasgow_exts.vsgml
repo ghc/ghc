@@ -1,0 +1,674 @@
+% 
+% $Id: glasgow_exts.vsgml,v 1.1 1998/01/30 17:02:18 simonm Exp $
+%
+% GHC Language Extensions.
+%
+
+As with all known Haskell systems, GHC implements some extensions to
+the language.  To use them, you'll need to give a @-fglasgow-exts@%
+<nidx>-fglasgow-exts option</nidx> option.
+
+Virtually all of the Glasgow extensions serve to give you access to
+the underlying facilities with which we implement Haskell.  Thus, you
+can get at the Raw Iron, if you are willing to write some non-standard
+code at a more primitive level.  You need not be ``stuck'' on
+performance because of the implementation costs of Haskell's
+``high-level'' features---you can always code ``under'' them.  In an
+extreme case, you can write all your time-critical code in C, and then
+just glue it together with Haskell!
+
+Executive summary of our extensions:
+
+<descrip>
+
+<tag>Unboxed types and primitive operations:</tag> 
+
+You can get right down to the raw machine types and operations;
+included in this are ``primitive arrays'' (direct access to Big Wads
+of Bytes).  Please see Section <ref name="Unboxed types"
+id="glasgow-unboxed"> and following.
+
+<tag>Multi-parameter type classes:</tag>
+
+GHC's type system supports extended type classes with multiple
+parameters.  Please see Section <ref name="Mult-parameter type
+classes" id="multi-param-type-classes">.
+
+<tag>Local universal quantification:</tag>
+
+GHC's type system supports explicit unversal quantification in
+constructor fields and function arguments.  This is useful for things
+like defining @runST@ from the state-thread world amongst other
+things.  See Section <ref name="Local universal quantification"
+id="universal-quantification">.
+
+<tag>Calling out to C:</tag> 
+
+Just what it sounds like.  We provide <em>lots</em> of rope that you
+can dangle around your neck.  Please see Section <ref name="Calling~C
+directly from Haskell" id="glasgow-ccalls">.
+
+</descrip>
+
+Before you get too carried away working at the lowest level (e.g.,
+sloshing @MutableByteArray#@s around your program), you may wish to
+check if there are system libraries that provide a ``Haskellised
+veneer'' over the features you want.  See Section <ref name="GHC
+Prelude and libraries" id="ghc-prelude">.
+
+%************************************************************************
+%*                                                                      *
+<sect1>Unboxed types
+<label id="glasgow-unboxed">
+<p>
+<nidx>Unboxed types (Glasgow extension)</nidx>
+%*                                                                      *
+%************************************************************************
+
+These types correspond to the ``raw machine'' types you would use in
+C: @Int#@ (long int), @Double#@ (double), @Addr#@ (void *), etc.  The
+<em>primitive operations</em> (PrimOps) on these types are what you
+might expect; e.g., @(+#)@ is addition on @Int#@s, and is the
+machine-addition that we all know and love---usually one instruction.
+
+A numerically-intensive program using unboxed types can go a <em>lot</em>
+faster than its ``standard'' counterpart---we saw a threefold speedup
+on one example.
+
+Please see Section <ref name="The module PrelGHC: really primitive
+stuff" id="ghc-libs-ghc"> for the details of unboxed types and the
+operations on them.
+
+%************************************************************************
+%*                                                                      *
+<sect1>Primitive state-transformer monad
+<label id="glasgow-ST-monad">
+<p>
+<nidx>state transformers (Glasgow extensions)</nidx>
+<nidx>ST monad (Glasgow extension)</nidx>
+%*                                                                      *
+%************************************************************************
+
+This monad underlies our implementation of arrays, mutable and
+immutable, and our implementation of I/O, including ``C calls''.
+
+The @ST@ library, which provides access to the @ST@ monad, is a
+GHC/Hugs extension library and is described in the separate <htmlurl
+name="GHC/Hugs Extension Libraries" url="libs.html"> document.
+
+%************************************************************************
+%*                                                                      *
+<sect1>Primitive arrays, mutable and otherwise
+<label id="glasgow-prim-arrays">
+<p>
+<nidx>primitive arrays (Glasgow extension)</nidx>
+<nidx>arrays, primitive (Glasgow extension)</nidx>
+%*                                                                      *
+%************************************************************************
+
+GHC knows about quite a few flavours of Large Swathes of Bytes.
+
+First, GHC distinguishes between primitive arrays of (boxed) Haskell
+objects (type @Array# obj@) and primitive arrays of bytes (type
+@ByteArray#@).
+
+Second, it distinguishes between...
+<descrip>
+<tag>Immutable:</tag>
+Arrays that do not change (as with ``standard'' Haskell arrays); you
+can only read from them.  Obviously, they do not need the care and
+attention of the state-transformer monad.
+
+<tag>Mutable:</tag>
+Arrays that may be changed or ``mutated.''  All the operations on them
+live within the state-transformer monad and the updates happen
+<em>in-place</em>.
+
+<tag>``Static'' (in C land):</tag>
+A C~routine may pass an @Addr#@ pointer back into Haskell land.  There
+are then primitive operations with which you may merrily grab values
+over in C land, by indexing off the ``static'' pointer.
+
+<tag>``Stable'' pointers:</tag>
+If, for some reason, you wish to hand a Haskell pointer (i.e.,
+<em>not</em> an unboxed value) to a C~routine, you first make the
+pointer ``stable,'' so that the garbage collector won't forget that it
+exists.  That is, GHC provides a safe way to pass Haskell pointers to
+C.
+
+Please see Section <ref name="Subverting automatic unboxing with
+``stable pointers''" id="glasgow-stablePtrs"> for more details.
+
+<tag>``Foreign objects'':</tag>
+A ``foreign object'' is a safe way to pass an external object (a
+C~allocated pointer, say) to Haskell and have Haskell do the Right
+Thing when it no longer references the object.  So, for example, C
+could pass a large bitmap over to Haskell and say ``please free this
+memory when you're done with it.'' 
+
+Please see Section <ref name="Pointing outside the Haskell heap"
+id="glasgow-foreignObjs"> for more details.
+
+</descrip>
+
+The libraries section give more details on all these ``primitive
+array'' types and the operations on them, Section <ref name="The GHC
+Prelude and Libraries" id="ghc-prelude">.  Some of these extensions
+are also supported by Hugs, and the supporting libraries are described
+in the <htmlurl name="GHC/Hugs Extension Libraries" url="libs.html">
+document.
+
+%************************************************************************
+%*									*
+<sect1>Using your own @mainIO@
+<label id="own-mainIO">
+<p>
+<nidx>mainIO, rolling your own</nidx>
+<nidx>GHCmain, module containing mainIO</nidx>
+%*									*
+%************************************************************************
+
+Normally, the GHC runtime system begins things by called an internal
+function 
+
+<tscreen><verb>
+	mainIO :: IO ()
+</verb></tscreen>
+
+ which, in turn, fires up your @Main.main@.  The standard
+definition of @mainIO@ looks like this:
+
+<tscreen><verb>
+	mainIO = catch Main.main 
+		   (\err -> error ("I/O error: " ++ show err ++ "\n"))
+</verb></tscreen>
+
+That is, all it does is run @Main.main@, catching any I/O errors that
+occur and displaying them on standard error before exiting the
+program.
+
+To subvert the above process, you need only provide a @mainIO@ of your
+own (in a module named @PrelMain@).
+
+Here's a little example, stolen from Alastair Reid:
+
+<tscreen><verb>
+module GHCmain ( mainIO ) where
+
+import GlaExts
+
+mainIO :: IO ()
+mainIO = do
+	 _ccall_ sleep 5
+	 _ccall_ printf "%d\n" (14::Int)
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect1>Calling~C directly from Haskell
+<label id="glasgow-ccalls">
+<p>
+<nidx>C calls (Glasgow extension)</nidx>
+<nidx>_ccall_ (Glasgow extension)</nidx>
+<nidx>_casm_ (Glasgow extension)</nidx>
+%*                                                                      *
+%************************************************************************
+
+GOOD ADVICE: Because this stuff is not Entirely Stable as far as names
+and things go, you would be well-advised to keep your C-callery
+corraled in a few modules, rather than sprinkled all over your code.
+It will then be quite easy to update later on.
+
+WARNING AS OF 2.03: Yes, the @_ccall_@ stuff probably <em>will
+change</em>, to something better, of course!  One step in that
+direction is Green Card, a foreign function interface pre-processor
+for Haskell (``Glasgow'' Haskell in particular) --- check out
+
+<tscreen><verb>
+ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/green-card.ANNOUNCE
+ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/green-card-src.tar.gz
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>@_ccall_@ and @_casm_@: an introduction
+<label id="ccall-intro">
+<p>
+%*                                                                      *
+%************************************************************************
+
+The simplest way to use a simple C function
+
+<tscreen><verb>
+double fooC( FILE *in, char c, int i, double d, unsigned int u )
+</verb></tscreen>
+
+is to provide a Haskell wrapper:
+
+<tscreen><verb>
+fooH :: Char -> Int -> Double -> Word -> IO Double
+fooH c i d w = _ccall_ fooC (``stdin''::Addr) c i d w
+</verb></tscreen>
+
+The function @fooH@ will unbox all of its arguments, call the C
+function @fooC@ and box the corresponding arguments.
+
+One of the annoyances about @_ccall_@s is when the C types don't quite
+match the Haskell compiler's ideas.  For this, the @_casm_@ variant
+may be just the ticket (NB: <em>no chance</em> of such code going
+through a native-code generator):
+
+<tscreen><verb>
+oldGetEnv name
+  = _casm_ ``%r = getenv((char *) %0);'' name >>= \ litstring@(A# str#) ->
+    return (
+        if (litstring == ``NULL'') then
+            Left ("Fail:oldGetEnv:"++name)
+        else
+            Right (unpackCString# str#)
+    )
+</verb></tscreen>
+
+The first literal-literal argument to a @_casm_@ is like a @printf@
+format: @%r@ is replaced with the ``result,'' @%0@--@%n-1@ are
+replaced with the 1st--nth arguments.  As you can see above, it is an
+easy way to do simple C~casting.  Everything said about @_ccall_@ goes
+for @_casm_@ as well.
+
+%************************************************************************
+%*                                                                      *
+<sect2>Using function headers
+<label id="glasgow-foreign-headers">
+<p>
+<nidx>C calls, function headers</nidx>
+%*                                                                      *
+%************************************************************************
+
+When generating C (using the @-fvia-C@ directive), one can assist the
+C compiler in detecting type errors by using the @-#include@ directive
+to provide @.h@ files containing function headers.
+
+For example,
+
+<tscreen><verb>
+typedef unsigned long *StgForeignObj;
+typedef long StgInt;
+
+void          initialiseEFS (StgInt size);
+StgInt        terminateEFS (void);
+StgForeignObj emptyEFS(void);
+StgForeignObj updateEFS (StgForeignObj a, StgInt i, StgInt x);
+StgInt        lookupEFS (StgForeignObj a, StgInt i);
+</verb></tscreen>
+
+You can find appropriate definitions for @StgInt@, @StgForeignObj@,
+etc using @gcc@ on your architecture by consulting
+@ghc/includes/StgTypes.lh@.  The following table summarises the
+relationship between Haskell types and C types.
+
+<tabular ca="ll">
+<bf>C type name</bf>      | <bf>Haskell Type</bf> @@
+@@
+@StgChar@          | @Char#@ @@               
+@StgInt@           | @Int#@ @@                
+@StgWord@          | @Word#@ @@               
+@StgAddr@          | @Addr#@ @@               
+@StgFloat@         | @Float#@ @@              
+@StgDouble@        | @Double#@ @@             
+
+@StgArray@         | @Array#@ @@              
+@StgByteArray@     | @ByteArray#@ @@          
+@StgArray@         | @MutableArray#@ @@       
+@StgByteArray@     | @MutableByteArray#@ @@   
+
+@StgStablePtr@     | @StablePtr#@ @@
+@StgForeignObj@    | @ForeignObj#@
+</tabular>
+
+Note that this approach is only <em>essential</em> for returning
+@float@s (or if @sizeof(int) != sizeof(int *)@ on your
+architecture) but is a Good Thing for anyone who cares about writing
+solid code.  You're crazy not to do it.
+
+%************************************************************************
+%*                                                                      *
+<sect2>Subverting automatic unboxing with ``stable pointers''
+<label id="glasgow-stablePtrs">
+<p>
+<nidx>stable pointers (Glasgow extension)</nidx>
+%*                                                                      *
+%************************************************************************
+
+The arguments of a @_ccall_@ are automatically unboxed before the
+call.  There are two reasons why this is usually the Right Thing to
+do:
+
+<itemize>
+<item>
+C is a strict language: it would be excessively tedious to pass
+unevaluated arguments and require the C programmer to force their
+evaluation before using them.
+
+<item> Boxed values are stored on the Haskell heap and may be moved
+within the heap if a garbage collection occurs---that is, pointers
+to boxed objects are not <em>stable</em>.
+</itemize>
+
+It is possible to subvert the unboxing process by creating a ``stable
+pointer'' to a value and passing the stable pointer instead.  For
+example, to pass/return an integer lazily to C functions @storeC@ and
+@fetchC@, one might write:
+
+<tscreen><verb>
+storeH :: Int -> IO ()
+storeH x = makeStablePtr x              >>= \ stable_x ->
+           _ccall_ storeC stable_x
+
+fetchH :: IO Int
+fetchH x = _ccall_ fetchC               >>= \ stable_x ->
+           deRefStablePtr stable_x      >>= \ x ->
+           freeStablePtr stable_x       >>
+           return x
+</verb></tscreen>
+
+The garbage collector will refrain from throwing a stable pointer away
+until you explicitly call one of the following from C or Haskell.
+
+<tscreen><verb>
+void freeStablePointer( StgStablePtr stablePtrToToss )
+freeStablePtr :: StablePtr a -> IO ()
+</verb></tscreen>
+
+As with the use of @free@ in C programs, GREAT CARE SHOULD BE
+EXERCISED to ensure these functions are called at the right time: too
+early and you get dangling references (and, if you're lucky, an error
+message from the runtime system); too late and you get space leaks.
+
+And to force evaluation of the argument within @fooC@, one would
+call one of the following C functions (according to type of argument).
+
+<tscreen><verb>
+void     performIO  ( StgStablePtr stableIndex /* StablePtr s (IO ()) */ );
+StgInt   enterInt   ( StgStablePtr stableIndex /* StablePtr s Int */ );
+StgFloat enterFloat ( StgStablePtr stableIndex /* StablePtr s Float */ );
+</verb></tscreen>
+
+<nidx>performIO</nidx>
+<nidx>enterInt</nidx>
+<nidx>enterFloat</nidx>
+
+% ToDo ADR: test these functions!
+
+Note Bene: @_ccall_GC_@<nidx>_ccall_GC_</nidx> must be used if any of
+these functions are used.
+
+%************************************************************************
+%*                                                                      *
+<sect2>Pointing outside the Haskell heap
+<label id="glasgow-foreignObjs">
+<p>
+<nidx>foreign objects (Glasgow extension)</nidx>
+%*                                                                      *
+%************************************************************************
+
+There are two types that @ghc@ programs can use to reference
+(heap-allocated) objects outside the Haskell world: @Addr@ and
+@ForeignObj@.
+
+If you use @Addr@, it is up to you to the programmer to arrange
+allocation and deallocation of the objects.
+
+If you use @ForeignObj@, @ghc@'s garbage collector will call upon the
+user-supplied <em>finaliser</em> function to free the object when the
+Haskell world no longer can access the object.  (An object is
+associated with a finaliser function when the abstract
+ Haskell type @ForeignObj@ is created). The finaliser function is
+expressed in C, and is passed as argument the object:
+
+<tscreen><verb>
+void foreignFinaliser ( StgForeignObj fo )
+</verb></tscreen>
+
+when the Haskell world can no longer access the object.  Since
+@ForeignObj@s only get released when a garbage collection occurs, we
+provide ways of triggering a garbage collection from within C and from
+within Haskell.
+
+<tscreen><verb>
+void StgPerformGarbageCollection()
+performGC :: IO ()
+</verb></tscreen>
+
+More information on the programmers' interface to @ForeignObj@ can be
+found in Section <ref name="Foreign objects" id="sec:foreign-obj">.
+
+%************************************************************************
+%*                                                                      *
+<sect2>Avoiding monads
+<label id="glasgow-avoiding-monads">
+<p>
+<nidx>C calls to `pure C'</nidx>
+<nidx>unsafePerformIO</nidx>
+%*                                                                      *
+%************************************************************************
+
+The @_ccall_@ construct is part of the @IO@ monad because 9 out of 10
+uses will be to call imperative functions with side effects such as
+@printf@.  Use of the monad ensures that these operations happen in a
+predictable order in spite of laziness and compiler optimisations.
+
+To avoid having to be in the monad to call a C function, it is
+possible to use @unsafePerformIO@, which is available from the
+@IOExts@ module.  There are three situations where one might like to
+call a C function from outside the IO world:
+
+<itemize>
+<item>
+Calling a function with no side-effects:
+<tscreen><verb>
+atan2d :: Double -> Double -> Double
+atan2d y x = unsafePerformIO (_ccall_ atan2d y x)
+
+sincosd :: Double -> (Double, Double)
+sincosd x = unsafePerformIO $ do
+        da <- newDoubleArray (0, 1)
+        _casm_ ``sincosd( %0, &((double *)%1[0]), &((double *)%1[1]) );'' x da
+        s <- readDoubleArray da 0
+        c <- readDoubleArray da 1
+        return (s, c)
+</verb></tscreen>
+
+<item> Calling a set of functions which have side-effects but which can
+be used in a purely functional manner.
+
+For example, an imperative implementation of a purely functional
+lookup-table might be accessed using the following functions.
+
+<tscreen><verb>
+empty  :: EFS x
+update :: EFS x -> Int -> x -> EFS x
+lookup :: EFS a -> Int -> a
+
+empty = unsafePerformIO (_ccall_ emptyEFS)
+
+update a i x = unsafePerformIO $
+        makeStablePtr x         >>= \ stable_x ->
+        _ccall_ updateEFS a i stable_x
+
+lookup a i = unsafePerformIO $
+        _ccall_ lookupEFS a i   >>= \ stable_x ->
+        deRefStablePtr stable_x
+</verb></tscreen>
+
+You will almost always want to use @ForeignObj@s with this.
+
+<item> Calling a side-effecting function even though the results will
+be unpredictable.  For example the @trace@ function is defined by:
+
+<tscreen><verb>
+trace :: String -> a -> a
+trace string expr
+  = unsafePerformIO (
+	((_ccall_ PreTraceHook sTDERR{-msg-}):: IO ())  >>
+	fputs sTDERR string			        >>
+	((_ccall_ PostTraceHook sTDERR{-msg-}):: IO ()) >>
+	return expr )
+  where
+    sTDERR = (``stderr'' :: Addr)
+</verb></tscreen>
+
+(This kind of use is not highly recommended --- it is only really
+useful in debugging code.)
+</itemize>
+
+%************************************************************************
+%*                                                                      *
+<sect2>C-calling ``gotchas'' checklist
+<label id="ccall-gotchas">
+<p>
+<nidx>C call dangers</nidx>
+%*                                                                      *
+%************************************************************************
+
+And some advice, too.
+
+<itemize>
+<item> For modules that use @_ccall_@s, etc., compile with
+@-fvia-C@.<nidx>-fvia-C option</nidx> You don't have to, but you should.
+
+Also, use the @-#include "prototypes.h"@ flag (hack) to inform the C
+compiler of the fully-prototyped types of all the C functions you
+call.  (Section <ref name="Using function headers"
+id="glasgow-foreign-headers"> says more about this...)
+
+This scheme is the <em>only</em> way that you will get <em>any</em>
+typechecking of your @_ccall_@s.  (It shouldn't be that way,
+but...)
+
+<item>
+Try to avoid @_ccall_@s to C~functions that take @float@
+arguments or return @float@ results.  Reason: if you do, you will
+become entangled in (ANSI?) C's rules for when arguments/results are
+promoted to @doubles@.  It's a nightmare and just not worth it.
+Use @doubles@ if possible.
+
+If you do use @floats@, check and re-check that the right thing is
+happening.  Perhaps compile with @-keep-hc-file-too@ and look at
+the intermediate C (@.hc@ file).
+
+<item> The compiler uses two non-standard type-classes when
+type-checking the arguments and results of @_ccall_@: the arguments
+(respectively result) of @_ccall_@ must be instances of the class
+@CCallable@ (respectively @CReturnable@).  Both classes may be
+imported from the module @CCall@, but this should only be
+necessary if you want to define a new instance.  (Neither class
+defines any methods --- their only function is to keep the
+type-checker happy.)
+
+The type checker must be able to figure out just which of the
+C-callable/returnable types is being used.  If it can't, you have to
+add type signatures. For example,
+
+<tscreen><verb>
+f x = _ccall_ foo x
+</verb></tscreen>
+
+is not good enough, because the compiler can't work out what type @x@
+is, nor what type the @_ccall_@ returns.  You have to write, say:
+
+<tscreen><verb>
+f :: Int -> IO Double
+f x = _ccall_ foo x
+</verb></tscreen>
+
+This table summarises the standard instances of these classes.
+
+% ToDo: check this table against implementation!
+
+<tabular ca="llll">
+<bf>Type</bf>       |<bf>CCallable</bf>|<bf>CReturnable</bf> | <bf>Which is probably...</bf> @@
+
+@Char@              | Yes  | Yes   | @unsigned char@ @@
+@Int@               | Yes  | Yes   | @long int@ @@
+@Word@              | Yes  | Yes   | @unsigned long int@ @@
+@Addr@              | Yes  | Yes   | @void *@ @@
+@Float@             | Yes  | Yes   | @float@ @@
+@Double@            | Yes  | Yes   | @double@ @@
+@()@                | No   | Yes   | @void@ @@
+@[Char]@            | Yes  | No    | @char *@ (null-terminated) @@
+                                      
+@Array@             | Yes  | No    | @unsigned long *@ @@
+@ByteArray@         | Yes  | No    | @unsigned long *@ @@
+@MutableArray@      | Yes  | No    | @unsigned long *@ @@
+@MutableByteArray@  | Yes  | No    | @unsigned long *@ @@
+                      		       
+@State@             | Yes  | Yes   | nothing!@@
+                      		       
+@StablePtr@         | Yes  | Yes   | @unsigned long *@ @@
+@ForeignObjs@       | Yes  | Yes   | see later @@
+</tabular>
+
+The brave and careful programmer can add their own instances of these
+classes for the following types:
+
+<itemize>
+<item>
+A <em>boxed-primitive</em> type may be made an instance of both
+@CCallable@ and @CReturnable@.  
+
+A boxed primitive type is any data type with a
+single unary constructor with a single primitive argument.  For
+example, the following are all boxed primitive types:
+
+<tscreen><verb>
+Int
+Double
+data XDisplay = XDisplay Addr#
+data EFS a = EFS# ForeignObj#
+</verb></tscreen>
+
+<tscreen><verb>
+instance CCallable   (EFS a)
+instance CReturnable (EFS a)
+</verb></tscreen>
+
+<item> Any datatype with a single nullary constructor may be made an
+instance of @CReturnable@.  For example:
+
+<tscreen><verb>
+data MyVoid = MyVoid
+instance CReturnable MyVoid
+</verb></tscreen>
+
+<item> As at version 2.09, @String@ (i.e., @[Char]@) is still
+not a @CReturnable@ type.
+
+Also, the now-builtin type @PackedString@ is neither
+@CCallable@ nor @CReturnable@.  (But there are functions in
+the PackedString interface to let you get at the necessary bits...)
+</itemize>
+
+<item> The code-generator will complain if you attempt to use @%r@ in
+a @_casm_@ whose result type is @IO ()@; or if you don't use @%r@
+<em>precisely</em> once for any other result type.  These messages are
+supposed to be helpful and catch bugs---please tell us if they wreck
+your life.
+
+<item> If you call out to C code which may trigger the Haskell garbage
+collector (examples of this later...), then you must use the
+@_ccall_GC_@<nidx>_ccall_GC_ primitive</nidx> or
+@_casm_GC_@<nidx>_casm_GC_ primitive</nidx> variant of C-calls.  (This
+does not work with the native code generator - use @\fvia-C@.) This
+stuff is hairy with a capital H!  </itemize>
+
+<sect1> Multi-parameter type classes
+<label id="multi-param-type-classes">
+<p>
+
+(ToDo)
+
+<sect1> Local universal quantification
+<label id="universal-quantification">
+<p>
+
+(ToDo)

@@ -1,153 +1,158 @@
 %************************************************************************
 %*                                                                      *
-\section[vs-Haskell-defn]{Haskell~1.3 vs.~Glasgow Haskell~2.02: language non-compliance}
-\index{GHC vs the Haskell 1.4 language}
-\index{Haskell 1.4 language vs GHC}
+<sect1>Haskell~1.4 vs.~Glasgow Haskell~3.00: language non-compliance
+<label id="vs-Haskell-defn">
+<p>
+<nidx>GHC vs the Haskell 1.4 language</nidx>
+<nidx>Haskell 1.4 language vs GHC</nidx>
 %*                                                                      *
 %************************************************************************
 
 This section lists Glasgow Haskell infelicities in its implementation
 of Haskell~1.4.  See also the ``when things go wrong'' section
-(\sectionref{wrong}) for information about crashes, space leaks, and
-other undesirable phenomena.
-
-GHC~2.02 does not have a ``Haskell~1.2 compatibility mode.''  If
-enough people yelled loudly and long enough, it could conceivably
-happen...
+(Section <ref name="What to do when something goes wrong" id="wrong">)
+for information about crashes, space leaks, and other undesirable
+phenomena.
 
 The limitations here are listed in Haskell-Report order (roughly).
-%Limitations related to Glasgow extensions (unboxed numbers, etc.) are
-%given thereafter (\sectionref{infelicities-Glasgow-exts}).
 
 %************************************************************************
 %*                                                                      *
-\subsection[infelicities-exprs-pats]{Expressions and patterns}
+<sect2>Expressions and patterns
+<label id="infelicities-exprs-pats">
+<p>
 %*                                                                      *
 %************************************************************************
 
-\begin{description}
-%-------------------------------------------------------------------
-%\item[No @n+k@ patterns:]
-%We took them out of GHC, because we thought they weren't going to
-%survive into Haskell~1.3.  But they did.  And we haven't put them
-%back.  Yet.
+<descrip>
 
 %-------------------------------------------------------------------
-\item[Very long @String@ constants:]
+<tag>Very long @String@ constants:</tag>
 May not go through.  If you add a ``string gap'' every
 few thousand characters, then the strings can be as long
 as you like.
 
-Bear in mind that string gaps and the \tr{-cpp}\index{-cpp option}
-option don't mix.  The C-preprocessor may munch the backslashes.
+Bear in mind that string gaps and the @-cpp@<nidx>-cpp option</nidx>
+option don't mix very well (see Section <ref id="c-pre-processor"
+name="The C pre-processor">).
 
 %-------------------------------------------------------------------
-\item[Very long literal lists:]
+<tag>Very long literal lists:</tag>
 These may tickle a ``yacc stack overflow'' error in the parser.
 (It depends on the Yacc used to build your parser.)
 
 %-------------------------------------------------------------------
-\item[Single quotes in module names:]
+<tag>Single quotes in module names:</tag>
 It might work, but it's just begging for trouble.
-\end{description}
+</descrip>
 
 %************************************************************************
 %*                                                                      *
-\subsection[infelicities-decls]{Declarations and bindings}
+<sect2>Declarations and bindings
+<label id="infelicities-decls">
+<p>
 %*                                                                      *
 %************************************************************************
 
-\begin{description}
+<descrip>
 %-------------------------------------------------------------------
-\item[Derived instances of @Read@ and @Show@ for infix constructors:]
+<tag>Derived instances of @Read@ and @Show@ for infix constructors:</tag>
 All the carry-on about derived @readsPrec@ and @showsPrec@ for infix
 constructors---we don't do it (yet).  We treat them the same way as
 all other constructors.
 
 %-------------------------------------------------------------------
-\item[Derived instances for records:] Hmmm.
-\end{description}
+<tag>Derived instances for records:</tag> Hmmm.
+</descrip>
 
 %************************************************************************
 %*                                                                      *
-\subsection[infelicities-Modules]{Module system and interface files}
+<sect2>Module system and interface files
+<label id="infelicities-Modules">
+<p>
 %*                                                                      *
 %************************************************************************
 
-\begin{description}
+<descrip>
 %-------------------------------------------------------------------
-\item[Can't export primitives types (e.g., \tr{Int#}):]
+<tag> Namespace pollution </tag>
+
+Several modules internal to GHC are visible in the standard namespace.
+All of these modules begin with @Prel@, so the rule is: don't use any
+modules beginning with @Prel@ in your programl, or you will be
+comprehensively screwed.
+
+%-------------------------------------------------------------------
+<tag>Can't export primitive types (e.g., @Int#@):</tag>
 
 Don't even try...
-\end{description}
+</descrip>
 
 %************************************************************************
 %*                                                                      *
-\subsection[infelicities-numbers]{Numbers, basic types, and built-in classes}
+<sect2>Numbers, basic types, and built-in classes
+<label id="infelicities-numbers">
+<p>
 %*                                                                      *
 %************************************************************************
 
-\begin{description}
+<descrip>
 %-------------------------------------------------------------------
-\item[Very large/small fractional constants:]
+<tag>Very large/small fractional constants:</tag>
 (i.e., with a decimal point somewhere) GHC does not check that these
 are out of range (e.g., for a @Float@), and bad things will inevitably
 follow.  (To be corrected?)
 
-This problem does {\em not} exist for integral constants.
+This problem does <em>not</em> exist for integral constants.
 
 For very large/small fractional constants near the limits of your
 floating-point precision, things may go wrong.  (It's better than it
 used to be.)  Please report any such bugs.
 
 %-------------------------------------------------------------------
-\item[Unchecked arithmetic:]
-Arguably {\em not} an infelicity, but... Bear in mind that operations
-on \tr{Int}, \tr{Float}, and \tr{Double} numbers are {\em unchecked}
-for overflow, underflow, and other sad occurrences.
+<tag>Unchecked arithmetic:</tag>
 
-Use \tr{Integer}, \tr{Rational}, etc., numeric types if this stuff
+Arguably <em>not</em> an infelicity, but... Bear in mind that
+operations on @Int@, @Float@, and @Double@ numbers are
+<em>unchecked</em> for overflow, underflow, and other sad occurrences.
+(note, however that some architectures trap floating-point overflow
+and loss-of-precision and report a floating-point exception).
+
+Use @Integer@, @Rational@, etc., numeric types if this stuff
 keeps you awake at night.
 
 %-------------------------------------------------------------------
-\item[Multiply-defined array elements---not checked:]
-This code fragment {\em should} elicit a fatal error, but it does not:
-\begin{verbatim}
+<tag>Multiply-defined array elements---not checked:</tag>
+This code fragment <em>should</em> elicit a fatal error, but it does not:
+<tscreen><verb>
 main = print (array (1,1) [ 1:=2, 1:=3 ])
-\end{verbatim}
-\end{description}
+</verb></tscreen>
+</descrip>
 
 %************************************************************************
 %*                                                                      *
-\subsection[infelicities-Prelude]{In Prelude support}
+<sect2>In Prelude support
+<label id="infelicities-Prelude">
+<p>
 %*                                                                      *
 %************************************************************************
 
-\begin{description}
+<descrip>
 %-------------------------------------------------------------------
-\item[Polymorphic @seq@:]
-Required by the Haskell~1.3 prelude; not done yet.  Consequently,
-the @strict@ function doesn't really do what you want either.
-
-%-------------------------------------------------------------------
-\item[Arbitrary-sized tuples:]
-Plain old tuples of arbitrary size {\em do} work.  Note that lots of
+<tag>Arbitrary-sized tuples:</tag>
+Plain old tuples of arbitrary size <em>do</em> work.  Note that lots of
 overloading can give rise to large tuples ``under the hood'' of your
 program.
 
 HOWEVER: standard instances for tuples (@Eq@, @Ord@, @Bounded@, @Ix@
-@Read@, and @Show@) are available {\em only} up to 5-tuples.
+@Read@, and @Show@) are available <em>only</em> up to 5-tuples.
 
 These limitations are easily subvertible, so please ask if you get
 stuck on them.
 
 %-------------------------------------------------------------------
-\item[Unicode character set:]
-Haskell~1.4 embraces the Unicode character set, but GHC~2.02 does
+<tag>Unicode character set:</tag>
+Haskell~1.4 embraces the Unicode character set, but GHC~3.00 doesn't
 handle it. Yet.
 
-%-------------------------------------------------------------------
-\item[class @Enum@:]
-In Haskell~1.4, @Ord@ is dropped as a superclass of @Enum@. GHC~2.02
-still has the @Ord@ constraint.
-\end{description}
+</descrip>

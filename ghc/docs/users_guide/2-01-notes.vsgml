@@ -4,7 +4,7 @@ It represents a major step forward in GHC development since GHC~0.26
 state-of-play with the Haskell~1.2 compiler---at the same time as
 2.01.
 
-The announcement for this release is distributed as \tr{ANNOUNCE-2.01}
+The announcement for this release is distributed as @ANNOUNCE-2.01@
 in the top-level directory.  It contains very important caveats about
 2.01, which we do not repeat here!
 
@@ -14,13 +14,17 @@ Installation Guide.  Since 0.26, we've improved our support for iX86
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-01-config]{New configuration things in 2.01}
+<sect1>New configuration things in 2.01
+<label id="2-01-config">
+<p>
 %*                                                                      *
 %************************************************************************
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-01-user-visible]{User-visible changes in 2.01, including incompatibilities}
+<sect1>User-visible changes in 2.01, including incompatibilities
+<label id="2-01-user-visible">
+<p>
 %*                                                                      *
 %************************************************************************
 
@@ -31,49 +35,53 @@ are described there (and not repeated here).
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-01-options]{New or changed GHC command-line options}
+<sect1>New or changed GHC command-line options
+<label id="2-01-options">
+<p>
 %*                                                                      *
 %************************************************************************
 
-A new flag, \tr{-recomp} invokes the new ``recompilation checker.''
+A new flag, @-recomp@ invokes the new ``recompilation checker.''
 We recommend that you use it whenever you use `make' to build your
 Haskell programs.  Please see the User's Guide for details.
 
-The flags \tr{-fomit-derived-read} and
-\tr{-fomit-reexported-instances} have died; there is no longer any
+The flags @-fomit-derived-read@ and
+@-fomit-reexported-instances@ have died; there is no longer any
 need for them.
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-01-new-in-compiler]{New in the compiler proper}
+<sect1>New in the compiler proper
+<label id="2-01-new-in-compiler">
+<p>
 %*                                                                      *
 %************************************************************************
 
 Substantially rewritten.  Notable points:
-\begin{itemize}
-\item
+<itemize>
+<item>
 The typechecker, besides doing all the new 1.3
 features (constructor classes, records, etc.), has been made
 ready to do linear types (e.g., there are now ``usage
 variables'' as well as ``type variables'').
 
-\item
+<item>
 The Core language now has one constructor for lambdas
-(\tr{Lam}; rather than two, \tr{CoLam} and \tr{CoTyLam});
-also, one constructor for applications (\tr{App}, rather
-than two, \tr{CoApp} and \tr{CoTyApp}).
+(@Lam@; rather than two, @CoLam@ and @CoTyLam@);
+also, one constructor for applications (@App@, rather
+than two, @CoApp@ and @CoTyApp@).
 
 Consequently, new more-general datatypes for binders and
-arguments now exist (\tr{CoreBinder} and \tr{CoreArg},
+arguments now exist (@CoreBinder@ and @CoreArg@,
 respectively).
 
 Again, the Core language is now ``linear types''-ready
 (though the work hasn't been done yet).
 
-A new Core constructor, \tr{Coerce}, exists to support the
-1.3 \tr{newtype} construct.
+A new Core constructor, @Coerce@, exists to support the
+1.3 @newtype@ construct.
 
-\item
+<item>
 The ``renamer''---the part of the compiler that implements
 the Haskell module system---has been completely rewritten.
 
@@ -82,9 +90,9 @@ changed from 1.2, even if the user is unlikely to notice.
 
 We've implemented the new system with a ``go to the
 horse's mouth'' scheme; that is, to discover the facts about
-an entity \tr{Foo.bar}, we {\em always} go to the interface
-for module \tr{Foo}; hence, we can never get duff information
-about \tr{bar} from some intermediary.
+an entity @Foo.bar@, we <em>always</em> go to the interface
+for module @Foo@; hence, we can never get duff information
+about @bar@ from some intermediary.
 
 Interface files are no longer mandated by the language, so
 they are completely different in 2.01 compared to 0.2x.  They
@@ -92,31 +100,35 @@ will very likely change again.  All processing of interface
 files is done in Haskell now (the most likely reason why GHC
 has slowed down :-().
 
-\item
+<item>
 Much less special pleading for the Prelude.  If you wanted
 to write your own Prelude and drop it in, you would have
 a fighting chance now.
 
-\item
+<item>
 No more `make' dependency loops!  (Hooray!) The whole compiler
 will build in one `make' run, no fuss or bother.
-\end{itemize}
+</itemize>
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-01-new-in-libraries]{In the ``required'' libraries (incl. Prelude)}
+<sect1>In the ``required'' libraries (incl. Prelude)
+<label id="2-01-new-in-libraries">
+<p>
 %*                                                                      *
 %************************************************************************
 
 We support standard 1.3 monadic I/O, to the best of our knowledge.
 
-The proposal for \tr{LibPosix} didn't make it into Haskell 1.3 I/O.
-So it's now a system library, \tr{-syslib posix}.  (And, of course,
-the \tr{Lib} prefix is gone.)
+The proposal for @LibPosix@ didn't make it into Haskell 1.3 I/O.
+So it's now a system library, @-syslib posix@.  (And, of course,
+the @Lib@ prefix is gone.)
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-01-new-in-glaexts]{New in ``Glasgow extensions'' library things}
+<sect1>New in ``Glasgow extensions'' library things
+<label id="2-01-new-in-glaexts">
+<p>
 %*                                                                      *
 %************************************************************************
 
@@ -129,10 +141,10 @@ eventually look like...
 MallocPtrs now called ForeignObjs
 
 The @_PackedString@ gunk (with leading underscores) is gone.  Just
-\tr{import PackedString} and use ``normal'' names.
+@import PackedString@ and use ``normal'' names.
 
-All of the following are {\em gone}:
-\begin{verbatim}
+All of the following are <em>gone</em>:
+<tscreen><verb>
 data _FILE  -- corresponds to a "FILE *" in C
 
 fclose  :: _FILE -> PrimIO Int
@@ -147,49 +159,53 @@ appendChanPrimIO :: String -> String -> PrimIO ()
 appendFilePrimIO :: String -> String -> PrimIO ()
 getArgsPrimIO	 :: PrimIO [String]
 readChanPrimIO	 :: String -> PrimIO String
-\end{verbatim}
+</verb></tscreen>
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-01-new-in-syslibs]{In the ``system'' libraries}
+<sect1>In the ``system'' libraries
+<label id="2-01-new-in-syslibs">
+<p>
 %*                                                                      *
 %************************************************************************
 
 The ``system'' libraries are no longer part of GHC (they lived in
-\tr{ghc/lib/}); they have been lifted out into a subsystem in their
-own right (they live in \tr{hslibs}).
+@ghc/lib/@); they have been lifted out into a subsystem in their
+own right (they live in @hslibs@).
 
 Of course, a GHC distribution will ``happen'' to have these libraries
 included; however, we hope the libraries will evolve into a large,
 flourishing, independently-maintained, and independently-distributed
 body of code---preferably compiler-independent, too!
 
-Renamings in the GHC system library (\tr{hslibs/ghc/}): The function
-\tr{BitSet.singletonBS} is now called \tr{unitBS}.  Similarly,
-\tr{FiniteMap.singletonFM} is now \tr{unitFM}.  \tr{Set.singletonSet}
-lingers briefly; \tr{unitSet} is also available now.
+Renamings in the GHC system library (@hslibs/ghc/@): The function
+@BitSet.singletonBS@ is now called @unitBS@.  Similarly,
+@FiniteMap.singletonFM@ is now @unitFM@.  @Set.singletonSet@
+lingers briefly; @unitSet@ is also available now.
 
-We are {\em not} up-to-date with the HBC-for-1.3's HBC library (the source
+We are <em>not</em> up-to-date with the HBC-for-1.3's HBC library (the source
 hasn't been released yet).
 
-The \tr{Either}, \tr{Maybe}, and \tr{Option} modules in the HBC
-library (\tr{hslibs/hbc/}) have been deleted---they are too close to
+The @Either@, @Maybe@, and @Option@ modules in the HBC
+library (@hslibs/hbc/@) have been deleted---they are too close to
 what Haskell~1.3 provides anyway (hence, confusing).
 
-The POSIX support code is in \tr{hslibs/posix}.
+The POSIX support code is in @hslibs/posix@.
 
-We have added a ``contrib'' system library (\tr{hslibs/contrib/});
+We have added a ``contrib'' system library (@hslibs/contrib/@);
 made up of code that was contributed to the ``Haskell library'',
 mostly by Stephen Bevan.  Quite of bit of code for numerical methods
 in there...
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-01-new-in-rts]{In the runtime system}
+<sect1>In the runtime system
+<label id="2-01-new-in-rts">
+<p>
 %*                                                                      *
 %************************************************************************
 
-We have made a point {\em not} to beat on the runtime system very much.
+We have made a point <em>not</em> to beat on the runtime system very much.
 Some bugs have been fixed since 0.26, of course.
 
 The GranSim (parallel-machine simulator) stuff is substantially improved
@@ -197,6 +213,8 @@ The GranSim (parallel-machine simulator) stuff is substantially improved
 
 %************************************************************************
 %*                                                                      *
-%\subsection[2-01-new-elsewhere]{Other new stuff}
+%<sect1>Other new stuff
+<label id="2-01-new-elsewhere">
+<p>
 %*                                                                      *
 %************************************************************************

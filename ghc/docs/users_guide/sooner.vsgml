@@ -1,6 +1,8 @@
 %************************************************************************
 %*                                                                      *
-\section[sooner-faster-quicker]{Advice on: sooner, faster, smaller, stingier}
+<sect>Advice on: sooner, faster, smaller, stingier
+<label id="sooner-faster-quicker">
+<p>
 %*                                                                      *
 %************************************************************************
 
@@ -8,65 +10,66 @@ Please advise us of other ``helpful hints'' that should go here!
 
 %************************************************************************
 %*                                                                      *
-\subsection[sooner]{Sooner: producing a program more quickly}
-\index{compiling faster}
-\index{faster compiling}
+<sect1>Sooner: producing a program more quickly
+<label id="sooner">
+<p>
+<nidx>compiling faster</nidx>
+<nidx>faster compiling</nidx>
 %*                                                                      *
 %************************************************************************
 
-\begin{description}
+<descrip>
 %----------------------------------------------------------------
-\item[Don't use \tr{-O} or (especially) \tr{-O2}:]
+<tag>Don't use @-O@ or (especially) @-O2@:</tag>
 By using them, you are telling GHC that you are willing to suffer
 longer compilation times for better-quality code.
 
-GHC is surprisingly zippy for normal compilations without \tr{-O}!
+GHC is surprisingly zippy for normal compilations without @-O@!
 
 %----------------------------------------------------------------
-\item[Use more memory:]
+<tag>Use more memory:</tag>
 Within reason, more memory for heap space means less garbage
 collection for GHC, which means less compilation time.  If you use
-the \tr{-Rgc-stats} option, you'll get a garbage-collector report.
-(Again, you can use the cheap-and-nasty \tr{-optCrts-Sstderr} option to
+the @-Rgc-stats@ option, you'll get a garbage-collector report.
+(Again, you can use the cheap-and-nasty @-optCrts-Sstderr@ option to
 send the GC stats straight to standard error.)
 
 If it says you're using more than 20\% of total time in garbage
 collecting, then more memory would help.
 
-You ask for more heap with the \tr{-H<size>}\index{-H<size> option}
-option; e.g.: \tr{ghc -c -O -H16m Foo.hs}.
+You ask for more heap with the @-H<size>@<nidx>-H&lt;size&gt; option</nidx>
+option; e.g.: @ghc -c -O -H16m Foo.hs@.
 
 If GHC persists in being a bad memory citizen, please report it as a
 bug.
 
 %----------------------------------------------------------------
-\item[Don't use too much memory!]
+<tag>Don't use too much memory!</tag>
 As soon as GHC plus its ``fellow citizens'' (other processes on your machine) start
-using more than the {\em real memory} on your machine, and the machine
-starts ``thrashing,'' {\em the party is over}.  Compile times will be
-worse than terrible!  Use something like the csh-builtin \tr{time}
+using more than the <em>real memory</em> on your machine, and the machine
+starts ``thrashing,'' <em>the party is over</em>.  Compile times will be
+worse than terrible!  Use something like the csh-builtin @time@
 command to get a report on how many page faults you're getting.
 
 If you don't know what virtual memory, thrashing, and page faults are,
-or you don't know the memory configuration of your machine, {\em
-don't} try to be clever about memory use: you'll just make your life a
+or you don't know the memory configuration of your machine, <em>don't</em> try to be clever about memory use: you'll just make your life a
 misery (and for other people, too, probably).
 
 %----------------------------------------------------------------
-\item[Try to use local disks when linking:]
+<tag>Try to use local disks when linking:</tag>
 Because Haskell objects and libraries tend to be large, it can take
 many real seconds to slurp the bits to/from an NFS filesystem (say).
 
-It would be quite sensible to {\em compile} on a fast machine using
-remotely-mounted disks; then {\em link} on a slow machine that had
+It would be quite sensible to <em>compile</em> on a fast machine using
+remotely-mounted disks; then <em>link</em> on a slow machine that had
 your disks directly mounted.
 
 %----------------------------------------------------------------
-\item[Don't derive/use \tr{Read} unnecessarily:]
+<tag>Don't derive/use @Read@ unnecessarily:</tag>
 It's ugly and slow.
 
 %----------------------------------------------------------------
-\item[GHC compiles some program constructs slowly:]
+<tag>GHC compiles some program constructs slowly:</tag>
 Deeply-nested list comprehensions seem to be one such; in the past,
 very large constant tables were bad, too.
 
@@ -76,59 +79,61 @@ to correct it.
 The parts of the compiler that seem most prone to wandering off for a
 long time are the abstract interpreters (strictness and update
 analysers).  You can turn these off individually with
-\tr{-fno-strictness}\index{-fno-strictness anti-option} and
-\tr{-fno-update-analysis}.\index{-fno-update-analysis anti-option}
+@-fno-strictness@<nidx>-fno-strictness anti-option</nidx> and
+@-fno-update-analysis@.<nidx>-fno-update-analysis anti-option</nidx>
 
-If \tr{-ddump-simpl} produces output after a reasonable time, but
-\tr{-ddump-stg} doesn't, then it's probably the update analyser
+If @-ddump-simpl@ produces output after a reasonable time, but
+@-ddump-stg@ doesn't, then it's probably the update analyser
 slowing you down.
 
 If your module has big wads of constant data, GHC may produce a huge
 basic block that will cause the native-code generator's register
 allocator to founder.
 
-If \tr{-ddump-absC} produces output after a reasonable time, but
+If @-ddump-absC@ produces output after a reasonable time, but
 nothing after that---it's probably the native-code generator.  Bring
-on \tr{-fvia-C}\index{-fvia-C option} (not that GCC will be that quick about it, either).
+on @-fvia-C@<nidx>-fvia-C option</nidx> (not that GCC will be that quick about it, either).
 
 %----------------------------------------------------------------
-\item[Avoid the consistency-check on linking:]
-Use \tr{-no-link-chk}\index{-no-link-chk}; saves effort.  This is probably
+<tag>Avoid the consistency-check on linking:</tag>
+Use @-no-link-chk@<nidx>-no-link-chk</nidx>; saves effort.  This is probably
 safe in a I-only-compile-things-one-way setup.
 
 %----------------------------------------------------------------
-\item[Explicit \tr{import} declarations:]
-Instead of saying \tr{import Foo}, say
-\tr{import Foo (...stuff I want...)}.
+<tag>Explicit @import@ declarations:</tag>
+Instead of saying @import Foo@, say
+@import Foo (...stuff I want...)@.
 
 Truthfully, the reduction on compilation time will be very small.
-However, judicious use of \tr{import} declarations can make a
+However, judicious use of @import@ declarations can make a
 program easier to understand, so it may be a good idea anyway.
-\end{description}
+</descrip>
 
 %************************************************************************
 %*                                                                      *
-\subsection[faster]{Faster: producing a program that runs quicker}
-\index{faster programs, how to produce}
+<sect1>Faster: producing a program that runs quicker
+<label id="faster">
+<p>
+<nidx>faster programs, how to produce</nidx>
 %*                                                                      *
 %************************************************************************
 
 The key tool to use in making your Haskell program run faster are
 GHC's profiling facilities, described separately in
-\sectionref{profiling}.  There is {\em no substitute} for finding
-where your program's time/space is {\em really} going, as opposed
+Section <ref name="Profiling" id="profiling">.  There is <em>no substitute</em> for finding
+where your program's time/space is <em>really</em> going, as opposed
 to where you imagine it is going.
 
 Another point to bear in mind: By far the best way to improve a
-program's performance {\em dramatically} is to use better algorithms.
+program's performance <em>dramatically</em> is to use better algorithms.
 Once profiling has thrown the spotlight on the guilty
 time-consumer(s), it may be better to re-think your program than to
 try all the tweaks listed below.
 
 Another extremely efficient way to make your program snappy is to use
-library code that has been Seriously Tuned By Someone Else.  You {\em might} be able
+library code that has been Seriously Tuned By Someone Else.  You <em>might</em> be able
 to write a better quicksort than the one in the HBC library, but it
-will take you much longer than typing \tr{import QSort}.
+will take you much longer than typing @import QSort@.
 (Incidentally, it doesn't hurt if the Someone Else is Lennart
 Augustsson.)
 
@@ -136,100 +141,101 @@ Please report any overly-slow GHC-compiled programs.  The current
 definition of ``overly-slow'' is ``the HBC-compiled version ran
 faster''...
 
-\begin{description}
+<descrip>
 %----------------------------------------------------------------
-\item[Optimise, using \tr{-O} or \tr{-O2}:] This is the most basic way
+<tag>Optimise, using @-O@ or @-O2@:</tag> This is the most basic way
 to make your program go faster.  Compilation time will be slower,
-especially with \tr{-O2}.
+especially with @-O2@.
 
-At present, \tr{-O2} is nearly indistinguishable from \tr{-O}.
+At present, @-O2@ is nearly indistinguishable from @-O@.
 
-%At version 2.01, \tr{-O} is a dodgy proposition, no matter what.
+%At version 2.01, @-O@ is a dodgy proposition, no matter what.
 
 %----------------------------------------------------------------
-\item[Compile via C and crank up GCC:] Even with \tr{-O}, GHC tries to
+<tag>Compile via C and crank up GCC:</tag> Even with @-O@, GHC tries to
 use a native-code generator, if available.  But the native
 code-generator is designed to be quick, not mind-bogglingly clever.
 Better to let GCC have a go, as it tries much harder on register
 allocation, etc.
 
-So, when we want very fast code, we use: \tr{-O -fvia-C -O2-for-C}.
+So, when we want very fast code, we use: @-O -fvia-C -O2-for-C@.
 
 %----------------------------------------------------------------
-\item[Overloaded functions are not your friend:]
+<tag>Overloaded functions are not your friend:</tag>
 Haskell's overloading (using type classes) is elegant, neat, etc.,
 etc., but it is death to performance if left to linger in an inner
 loop.  How can you squash it?
 
-\begin{description}
-\item[Give explicit type signatures:]
+<descrip>
+<tag>Give explicit type signatures:</tag>
 Signatures are the basic trick; putting them on exported, top-level
 functions is good software-engineering practice, anyway.
 
 The automatic specialisation of overloaded functions should take care
 of overloaded local and/or unexported functions.
 
-\item[Use \tr{SPECIALIZE} pragmas:]
-\index{SPECIALIZE pragma}
-\index{overloading, death to}
+<tag>Use @SPECIALIZE@ pragmas:</tag>
+<nidx>SPECIALIZE pragma</nidx>
+<nidx>overloading, death to</nidx>
 (UK spelling also accepted.)  For key overloaded functions, you can
 create extra versions (NB: more code space) specialised to particular
 types.  Thus, if you have an overloaded function:
-\begin{verbatim}
+<tscreen><verb>
 hammeredLookup :: Ord key => [(key, value)] -> key -> value
-\end{verbatim}
-If it is heavily used on lists with \tr{Widget} keys, you could
+</verb></tscreen>
+If it is heavily used on lists with @Widget@ keys, you could
 specialise it as follows:
-\begin{verbatim}
+<tscreen><verb>
 {-# SPECIALIZE hammeredLookup :: [(Widget, value)] -> Widget -> value #-}
-\end{verbatim}
+</verb></tscreen>
 
 To get very fancy, you can also specify a named function to use for
-the specialised value, by adding \tr{= blah}, as in:
-\begin{verbatim}
+the specialised value, by adding @= blah@, as in:
+<tscreen><verb>
 {-# SPECIALIZE hammeredLookup :: ...as before... = blah #-}
-\end{verbatim}
-It's {\em Your Responsibility} to make sure that \tr{blah} really
-behaves as a specialised version of \tr{hammeredLookup}!!!
+</verb></tscreen>
+It's <em>Your Responsibility</em> to make sure that @blah@ really
+behaves as a specialised version of @hammeredLookup@!!!
 
-An example in which the \tr{= blah} form will Win Big:
-\begin{verbatim}
+An example in which the @= blah@ form will Win Big:
+<tscreen><verb>
 toDouble :: Real a => a -> Double
 toDouble = fromRational . toRational
 
 {-# SPECIALIZE toDouble :: Int -> Double = i2d #-}
 i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
-\end{verbatim}
-The \tr{i2d} function is virtually one machine instruction; the
-default conversion---via an intermediate \tr{Rational}---is obscenely
+</verb></tscreen>
+The @i2d@ function is virtually one machine instruction; the
+default conversion---via an intermediate @Rational@---is obscenely
 expensive by comparison.
 
-By using the US spelling, your \tr{SPECIALIZE} pragma will work with
-HBC, too.  Note that HBC doesn't support the \tr{= blah} form.
+By using the US spelling, your @SPECIALIZE@ pragma will work with
+HBC, too.  Note that HBC doesn't support the @= blah@ form.
 
-A \tr{SPECIALIZE} pragma for a function can be put anywhere its type
+A @SPECIALIZE@ pragma for a function can be put anywhere its type
 signature could be put.
 
-\item[Use \tr{SPECIALIZE instance} pragmas:]
+<tag>Use @SPECIALIZE instance@ pragmas:</tag>
 Same idea, except for instance declarations.  For example:
-\begin{verbatim}
+<tscreen><verb>
 instance (Eq a) => Eq (Foo a) where { ... usual stuff ... }
 
 {-# SPECIALIZE instance Eq (Foo [(Int, Bar)] #-}
-\end{verbatim}
+</verb></tscreen>
 Compatible with HBC, by the way.
 
-See also: overlapping instances, in \Sectionref{glasgow-hbc-exts}.
-They are to \tr{SPECIALIZE instance} pragmas what \tr{= blah}
-hacks are to \tr{SPECIALIZE} (value) pragmas...
+% See also: overlapping instances, in Section <ref name="``HBC-ish''
+% extensions implemented by GHC" id="glasgow-hbc-exts">.  They are to
+% @SPECIALIZE instance@ pragmas what @= blah@ hacks are to @SPECIALIZE@
+% (value) pragmas...
 
-\item[``How do I know what's happening with specialisations?'':]
+<tag>``How do I know what's happening with specialisations?'':</tag>
 
-The \tr{-fshow-specialisations}\index{-fshow-specialisations option}
+The @-fshow-specialisations@<nidx>-fshow-specialisations option</nidx>
 will show the specialisations that actually take place.
 
-The \tr{-fshow-import-specs}\index{-fshow-import-specs option} will
-show the specialisations that GHC {\em wished} were available, but
+The @-fshow-import-specs@<nidx>-fshow-import-specs option</nidx> will
+show the specialisations that GHC <em>wished</em> were available, but
 were not.  You can add the relevant pragmas to your code if you wish.
 
 You're a bit stuck if the desired specialisation is of a Prelude
@@ -237,17 +243,17 @@ function.  If it's Really Important, you can just snap a copy of the
 Prelude code, rename it, and then SPECIALIZE that to your heart's
 content.
 
-\item[``But how do I know where overloading is creeping in?'':]
+<tag>``But how do I know where overloading is creeping in?'':</tag>
 
 A low-tech way: grep (search) your interface files for overloaded
 type signatures; e.g.,:
-\begin{verbatim}
+<tscreen><verb>
 % egrep '^[a-z].*::.*=>' *.hi
-\end{verbatim}
-\end{description}
+</verb></tscreen>
+</descrip>
 
 %----------------------------------------------------------------
-\item[Strict functions are your dear friends:]
+<tag>Strict functions are your dear friends:</tag>
 and, among other things, lazy pattern-matching is your enemy.
 
 (If you don't know what a ``strict function'' is, please consult a
@@ -255,16 +261,16 @@ functional-programming textbook.  A sentence or two of
 explanation here probably would not do much good.)
 
 Consider these two code fragments:
-\begin{verbatim}
+<tscreen><verb>
 f (Wibble x y) =  ... # strict
 
 f arg = let { (Wibble x y) = arg } in ... # lazy
-\end{verbatim}
+</verb></tscreen>
 The former will result in far better code.
 
-A less contrived example shows the use of \tr{cases} instead
-of \tr{lets} to get stricter code (a good thing):
-\begin{verbatim}
+A less contrived example shows the use of @cases@ instead
+of @lets@ to get stricter code (a good thing):
+<tscreen><verb>
 f (Wibble x y)  # beautiful but slow
   = let
         (a1, b1, c1) = unpackFoo x
@@ -276,42 +282,42 @@ f (Wibble x y)  # ugly, and proud of it
     case (unpackFoo y) of { (a2, b2, c2) ->
     ...
     }}
-\end{verbatim}
+</verb></tscreen>
 
 %----------------------------------------------------------------
-\item[GHC loves single-constructor data-types:]
+<tag>GHC loves single-constructor data-types:</tag>
 
 It's all the better if a function is strict in a single-constructor
 type (a type with only one data-constructor; for example, tuples are
 single-constructor types).
 
 %----------------------------------------------------------------
-\item[``How do I find out a function's strictness?'']
+<tag>``How do I find out a function's strictness?''</tag>
 
 Don't guess---look it up.
 
 Look for your function in the interface file, then for the third field
-in the pragma; it should say \tr{_S_ <string>}.  The \tr{<string>}
-gives the strictness of the function's arguments.  \tr{L} is lazy
-(bad), \tr{S} and \tr{E} are strict (good), \tr{P} is ``primitive'' (good),
-\tr{U(...)} is strict and
-``unpackable'' (very good), and \tr{A} is absent (very good).
+in the pragma; it should say @_S_ <string>@.  The @<string>@
+gives the strictness of the function's arguments.  @L@ is lazy
+(bad), @S@ and @E@ are strict (good), @P@ is ``primitive'' (good),
+@U(...)@ is strict and
+``unpackable'' (very good), and @A@ is absent (very good).
 
-For an ``unpackable'' \tr{U(...)} argument, the info inside
+For an ``unpackable'' @U(...)@ argument, the info inside
 tells the strictness of its components.  So, if the argument is a
-pair, and it says \tr{U(AU(LSS))}, that means ``the first component of the
+pair, and it says @U(AU(LSS))@, that means ``the first component of the
 pair isn't used; the second component is itself unpackable, with three
 components (lazy in the first, strict in the second \& third).''
 
-If the function isn't exported, just compile with the extra flag \tr{-ddump-simpl};
+If the function isn't exported, just compile with the extra flag @-ddump-simpl@;
 next to the signature for any binder, it will print the self-same
 pragmatic information as would be put in an interface file.
 (Besides, Core syntax is fun to look at!)
 
 %----------------------------------------------------------------
-\item[Force key functions to be \tr{INLINE}d (esp. monads):]
+<tag>Force key functions to be @INLINE@d (esp. monads):</tag>
 
-GHC (with \tr{-O}, as always) tries to inline (or ``unfold'')
+GHC (with @-O@, as always) tries to inline (or ``unfold'')
 functions/values that are ``small enough,'' thus avoiding the call
 overhead and possibly exposing other more-wonderful optimisations.
 
@@ -323,50 +329,50 @@ will not do so, nor will it export that unfolding for other modules to
 use.
 
 The sledgehammer you can bring to bear is the
-\tr{INLINE}\index{INLINE pragma} pragma, used thusly:
-\begin{verbatim}
+@INLINE@<nidx>INLINE pragma</nidx> pragma, used thusly:
+<tscreen><verb>
 key_function :: Int -> String -> (Bool, Double) 
 
 #ifdef __GLASGOW_HASKELL__
 {-# INLINE key_function #-}
 #endif
-\end{verbatim}
+</verb></tscreen>
 (You don't need to do the C pre-processor carry-on unless you're going
-to stick the code through HBC---it doesn't like \tr{INLINE} pragmas.)
+to stick the code through HBC---it doesn't like @INLINE@ pragmas.)
 
-The major effect of an \tr{INLINE} pragma is to declare a function's
+The major effect of an @INLINE@ pragma is to declare a function's
 ``cost'' to be very low.  The normal unfolding machinery will then be
 very keen to inline it.
 
-An \tr{INLINE} pragma for a function can be put anywhere its type
+An @INLINE@ pragma for a function can be put anywhere its type
 signature could be put.
 
-\tr{INLINE} pragmas are a particularly good idea for the
-\tr{then}/\tr{return} (or \tr{bind}/\tr{unit}) functions in a monad.
+@INLINE@ pragmas are a particularly good idea for the
+@then@/@return@ (or @bind@/@unit@) functions in a monad.
 For example, in GHC's own @UniqueSupply@ monad code, we have:
-\begin{verbatim}
+<tscreen><verb>
 #ifdef __GLASGOW_HASKELL__
 {-# INLINE thenUs #-}
 {-# INLINE returnUs #-}
 #endif
-\end{verbatim}
+</verb></tscreen>
 
-GHC reserves the right to {\em disallow} any unfolding, even if you
+GHC reserves the right to <em>disallow</em> any unfolding, even if you
 explicitly asked for one.  That's because a function's body may
-become {\em unexportable}, because it mentions a non-exported value,
+become <em>unexportable</em>, because it mentions a non-exported value,
 to which any importing module would have no access.
 
 If you want to see why candidate unfoldings are rejected, use the
-\tr{-freport-disallowed-unfoldings}
-\index{-freport-disallowed-unfoldings}
+@-freport-disallowed-unfoldings@
+<nidx>-freport-disallowed-unfoldings</nidx>
 option.
 
 %----------------------------------------------------------------
-\item[Explicit \tr{export} list:]
+<tag>Explicit @export@ list:</tag>
 If you do not have an explicit export list in a module, GHC must
 assume that everything in that module will be exported.  This has
 various pessimising effect.  For example, if a bit of code is actually
-{\em unused} (perhaps because of unfolding effects), GHC will not be
+<em>unused</em> (perhaps because of unfolding effects), GHC will not be
 able to throw it away, because it is exported and some other module
 may be relying on its existence.
 
@@ -374,99 +380,103 @@ GHC can be quite a bit more aggressive with pieces of code if it knows
 they are not exported.
 
 %----------------------------------------------------------------
-\item[Look at the Core syntax!]
+<tag>Look at the Core syntax!</tag>
 (The form in which GHC manipulates your code.)  Just run your
-compilation with \tr{-ddump-simpl} (don't forget the \tr{-O}).
+compilation with @-ddump-simpl@ (don't forget the @-O@).
 
 If profiling has pointed the finger at particular functions, look at
-their Core code.  \tr{lets} are bad, \tr{cases} are good, dictionaries
-(\tr{d.<Class>.<Unique>}) [or anything overloading-ish] are bad,
+their Core code.  @lets@ are bad, @cases@ are good, dictionaries
+(@d.<Class>.<Unique>@) [or anything overloading-ish] are bad,
 nested lambdas are bad, explicit data constructors are good, primitive
-operations (e.g., \tr{eqInt#}) are good, ...
+operations (e.g., @eqInt#@) are good, ...
 
 %----------------------------------------------------------------
-\item[Use unboxed types (a GHC extension):]
-When you are {\em really} desperate for speed, and you want to
+<tag>Use unboxed types (a GHC extension):</tag>
+When you are <em>really</em> desperate for speed, and you want to
 get right down to the ``raw bits.''
-Please see \sectionref{glasgow-unboxed} for some information about
+Please see Section <ref name="Unboxed types" id="glasgow-unboxed"> for some information about
 using unboxed types.
 
 %----------------------------------------------------------------
-\item[Use \tr{_ccall_s} (a GHC extension) to plug into fast libraries:]
+<tag>Use @_ccall_s@ (a GHC extension) to plug into fast libraries:</tag>
 This may take real work, but... There exist piles of
 massively-tuned library code, and the best thing is not
 to compete with it, but link with it.
 
-\Sectionref{glasgow-ccalls} says a little about how to use C calls.
+Section <ref name="Calling~C directly from Haskell" id="glasgow-ccalls"> says a little about how to use C calls.
 
 %----------------------------------------------------------------
-\item[Don't use \tr{Float}s:]
-We don't provide specialisations of Prelude functions for \tr{Float}
-(but we do for \tr{Double}).  If you end up executing overloaded
+<tag>Don't use @Float@s:</tag>
+We don't provide specialisations of Prelude functions for @Float@
+(but we do for @Double@).  If you end up executing overloaded
 code, you will lose on performance, perhaps badly.
 
-\tr{Floats} (probably 32-bits) are almost always a bad idea, anyway,
+@Floats@ (probably 32-bits) are almost always a bad idea, anyway,
 unless you Really Know What You Are Doing.  Use Doubles.  There's
 rarely a speed disadvantage---modern machines will use the same
-floating-point unit for both.  With \tr{Doubles}, you are much less
+floating-point unit for both.  With @Doubles@, you are much less
 likely to hang yourself with numerical errors.
 
 %----------------------------------------------------------------
-\item[Use a bigger heap!]
-If your program's GC stats (\tr{-S}\index{-S RTS option} RTS option)
+<tag>Use a bigger heap!</tag>
+If your program's GC stats (@-S@<nidx>-S RTS option</nidx> RTS option)
 indicate that it's doing lots of garbage-collection (say, more than
 20\% of execution time), more memory might help---with the
-\tr{-H<size>}\index{-H<size> RTS option} RTS option.
+@-H<size>@<nidx>-H&lt;size&gt; RTS option</nidx> RTS option.
 
 %----------------------------------------------------------------
-\item[Use a smaller heap!]
+<tag>Use a smaller heap!</tag>
 Some programs with a very small heap residency (toy programs, usually)
 actually benefit from running the heap size way down.  The
-\tr{-H<size>} RTS option, as above.
+@-H<size>@ RTS option, as above.
 
 %----------------------------------------------------------------
-\item[Use a smaller ``allocation area'':]
+<tag>Use a smaller ``allocation area'':</tag>
 If you can get the garbage-collector's youngest generation to fit
 entirely in your machine's cache, it may make quite a difference.
-The effect is {\em very machine dependent}.  But, for example,
-a \tr{+RTS -A128k}\index{-A<size> RTS option} option on one of our
+The effect is <em>very machine dependent</em>.  But, for example,
+a @+RTS -A128k@<nidx>-A&lt;size&gt; RTS option</nidx> option on one of our
 DEC Alphas was worth an immediate 5\% performance boost.
-\end{description}
+</descrip>
 
 %************************************************************************
 %*                                                                      *
-\subsection[smaller]{Smaller: producing a program that is smaller}
-\index{smaller programs, how to produce}
+<sect1>Smaller: producing a program that is smaller
+<label id="smaller">
+<p>
+<nidx>smaller programs, how to produce</nidx>
 %*                                                                      *
 %************************************************************************
 
 Decrease the ``go-for-it'' threshold for unfolding smallish expressions.
-Give a \tr{-funfolding-use-threshold0}\index{-funfolding-use-threshold0 option}
+Give a @-funfolding-use-threshold0@<nidx>-funfolding-use-threshold0 option</nidx>
 option for the extreme case. (``Only unfoldings with zero cost should proceed.'')
 
 (Note: I have not been too successful at producing code smaller
-than that which comes out with \tr{-O}.  WDP 94/12)
+than that which comes out with @-O@.  WDP 94/12)
 
-Avoid \tr{Read}.
+Avoid @Read@.
 
-Use \tr{strip} on your executables.
+Use @strip@ on your executables.
 
 %************************************************************************
 %*                                                                      *
-\subsection[stingier]{Stingier: producing a program that gobbles less heap space}
-\index{memory, using less heap}
-\index{space-leaks, avoiding}
-\index{heap space, using less}
+<sect1>Stingier: producing a program that gobbles less heap space
+<label id="stingier">
+<p>
+<nidx>memory, using less heap</nidx>
+<nidx>space-leaks, avoiding</nidx>
+<nidx>heap space, using less</nidx>
 %*                                                                      *
 %************************************************************************
 
 ``I think I have a space leak...''  Re-run your program with
-\tr{+RTS -Sstderr},\index{-Sstderr RTS option} and remove all doubt!
+@+RTS -Sstderr@,<nidx>-Sstderr RTS option</nidx> and remove all doubt!
 (You'll see the heap usage get bigger and bigger...)  [Hmmm... this
-might be even easier with the \tr{-F2s}\index{-F2s RTS option} RTS
-option; so...  \tr{./a.out +RTS -Sstderr -F2s}...]
+might be even easier with the @-F2s@<nidx>-F2s RTS option</nidx> RTS
+option; so...  @./a.out +RTS -Sstderr -F2s@...]
 
-Once again, the profiling facilities (\sectionref{profiling}) are the
+Once again, the profiling facilities (Section <ref name="Profiling" id="profiling">) are the
 basic tool for demystifying the space behaviour of your program.
 
 Strict functions are good to space usage, as they are for time, as
@@ -477,18 +487,18 @@ be required).
 
 If you have a true blue ``space leak'' (your program keeps gobbling up
 memory and never ``lets go''), then 7 times out of 10 the problem is
-related to a {\em CAF} (constant applicative form).  Real people call
+related to a <em>CAF</em> (constant applicative form).  Real people call
 them ``top-level values that aren't functions.''  Thus, for example:
-\begin{verbatim}
+<tscreen><verb>
 x = (1 :: Int)
 f y = x
 ones = [ 1, (1 :: Float), .. ]
-\end{verbatim}
-\tr{x} and \tr{ones} are CAFs; \tr{f} is not.
+</verb></tscreen>
+@x@ and @ones@ are CAFs; @f@ is not.
 
 The GHC garbage collectors are not clever about CAFs.  The part of the
 heap reachable from a CAF is never collected.  In the case of
-\tr{ones} in the example above, it's {\em disastrous}.  For this
+@ones@ in the example above, it's <em>disastrous</em>.  For this
 reason, the GHC ``simplifier'' tries hard to avoid creating CAFs, but
 it cannot subvert the will of a determined CAF-writing programmer (as
 in the case above).

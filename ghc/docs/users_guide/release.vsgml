@@ -1,0 +1,13 @@
+% NOTE TO MAINTAINERS: the way these notes are organized:
+%   (1) What's new in the current release
+%   (2) What's next ("real soon now")
+%   (3) What was new in previous releases (reverse chronological order)
+%   (4) anything else
+%
+% Remember: this isn't the compiler documentation! -- it's just
+% pointers to it.  Mentioning something in the release notes is not
+% the same as documenting it.
+
+<sect>Release notes
+<label id="release-notes">
+<p>

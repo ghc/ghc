@@ -1,0 +1,773 @@
+%************************************************************************
+%*                                                                      *
+<sect1>Miscellaneous libraries
+<label id="GHC-library">
+<p>
+<nidx>libraries, miscellaneous</nidx>
+<nidx>misc, syslib</nidx>
+%*                                                                      *
+%************************************************************************
+
+This section describes a collection of Haskell libraries we've
+collected over the years.  Access to any of these modules is provided
+by giving the @-syslib misc@<nidx>-syslib misc option</nidx>.
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @Bag@ type
+<label id="Bag">
+<p>
+<nidx>Bag module (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+A <em>bag</em> is an unordered collection of elements which may contain
+duplicates.  To use, @import Bag@.
+
+<tscreen><verb>
+data Bag elt    -- abstract
+
+emptyBag        :: Bag elt
+unitBag         :: elt -> Bag elt
+
+consBag         :: elt       -> Bag elt -> Bag elt
+snocBag         :: Bag elt   -> elt     -> Bag elt
+
+unionBags       :: Bag elt   -> Bag elt -> Bag elt
+unionManyBags   :: [Bag elt] -> Bag elt
+
+isEmptyBag      :: Bag elt   -> Bool
+elemBag         :: Eq elt => elt -> Bag elt -> Bool
+
+filterBag       :: (elt -> Bool) -> Bag elt -> Bag elt
+partitionBag    :: (elt -> Bool) -> Bag elt-> (Bag elt, Bag elt)
+        -- returns the elements that do/don't satisfy the predicate
+
+concatBag       :: Bag (Bag a) -> Bag a 
+foldBag         :: (r -> r -> r) -> (a -> r) -> r -> Bag a -> r
+mapBag          :: (a -> b) -> Bag a -> Bag b
+
+listToBag       :: [elt] -> Bag elt
+bagToList       :: Bag elt -> [elt]
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @FiniteMap@ type
+<label id="FiniteMap">
+<p>
+<nidx>FiniteMap module (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+What functional programmers call a <em>finite map</em>, everyone else
+calls a <em>lookup table</em>.
+
+Out code is derived from that in this paper:
+<quote>
+S Adams
+"Efficient sets: a balancing act"
+Journal of functional programming 3(4) Oct 1993, pages 553-562
+</quote>
+Guess what?  The implementation uses balanced trees.
+
+<tscreen><verb>
+data FiniteMap key elt  -- abstract
+
+--      BUILDING
+emptyFM         :: FiniteMap key elt
+unitFM          :: key -> elt -> FiniteMap key elt
+listToFM        :: Ord key => [(key,elt)] -> FiniteMap key elt
+                        -- In the case of duplicates, the last is taken
+
+--      ADDING AND DELETING
+                   -- Throws away any previous binding
+                   -- In the list case, the items are added starting with the
+                   -- first one in the list
+addToFM         :: Ord key => FiniteMap key elt -> key -> elt  -> FiniteMap key elt
+addListToFM     :: Ord key => FiniteMap key elt -> [(key,elt)] -> FiniteMap key elt
+
+                 -- Combines with previous binding
+		 -- In the combining function, the first argument is
+		 -- the "old" element, while the second is the "new" one.
+addToFM_C       :: Ord key => (elt -> elt -> elt)
+                           -> FiniteMap key elt -> key -> elt  
+                           -> FiniteMap key elt
+addListToFM_C   :: Ord key => (elt -> elt -> elt)
+                           -> FiniteMap key elt -> [(key,elt)] 
+                           -> FiniteMap key elt
+
+                 -- Deletion doesn't complain if you try to delete something
+                 -- which isn't there
+delFromFM       :: Ord key => FiniteMap key elt -> key   -> FiniteMap key elt
+delListFromFM   :: Ord key => FiniteMap key elt -> [key] -> FiniteMap key elt
+
+--      COMBINING
+                 -- Bindings in right argument shadow those in the left
+plusFM          :: Ord key => FiniteMap key elt -> FiniteMap key elt
+                           -> FiniteMap key elt
+
+                   -- Combines bindings for the same thing with the given function
+plusFM_C        :: Ord key => (elt -> elt -> elt) 
+                           -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
+
+minusFM         :: Ord key => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
+                   -- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
+
+intersectFM     :: Ord key => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt 
+intersectFM_C   :: Ord key => (elt -> elt -> elt)
+                           -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt 
+
+--      MAPPING, FOLDING, FILTERING
+foldFM          :: (key -> elt -> a -> a) -> a -> FiniteMap key elt -> a
+mapFM           :: (key -> elt1 -> elt2) -> FiniteMap key elt1 -> FiniteMap key elt2
+filterFM        :: Ord key => (key -> elt -> Bool) 
+                           -> FiniteMap key elt -> FiniteMap key elt
+
+--      INTERROGATING
+sizeFM          :: FiniteMap key elt -> Int
+isEmptyFM	:: FiniteMap key elt -> Bool
+
+elemFM		:: Ord key => key -> FiniteMap key elt -> Bool
+lookupFM        :: Ord key => FiniteMap key elt -> key -> Maybe elt
+lookupWithDefaultFM
+                :: Ord key => FiniteMap key elt -> elt -> key -> elt
+                -- lookupWithDefaultFM supplies a "default" elt
+                -- to return for an unmapped key
+
+--      LISTIFYING
+fmToList        :: FiniteMap key elt -> [(key,elt)]
+keysFM          :: FiniteMap key elt -> [key]
+eltsFM          :: FiniteMap key elt -> [elt]
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @ListSetOps@ type
+<label id="ListSetOps">
+<p>
+<nidx>ListSetOps module (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+Just a few set-sounding operations on lists.  If you want sets, use
+the @Set@ module.
+
+<tscreen><verb>
+unionLists          :: Eq a => [a] -> [a] -> [a]
+intersectLists      :: Eq a => [a] -> [a] -> [a]
+minusList           :: Eq a => [a] -> [a] -> [a]
+disjointLists       :: Eq a => [a] -> [a] -> Bool
+intersectingLists   :: Eq a => [a] -> [a] -> Bool
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @Maybes@ type
+<label id="Maybes">
+<p>
+<nidx>Maybes module (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+The @Maybe@ type is in the Haskell 1.4 prelude. Moreover, the
+required @Maybe@ library provides many useful functions on
+@Maybe@s. This (pre-1.3) module provides some more:
+
+An @Either@-like type called @MaybeErr@:
+<tscreen><verb>
+data MaybeErr val err = Succeeded val | Failed err
+</verb></tscreen>
+
+Some operations to do with @Maybe@ (some commentary follows):
+<tscreen><verb>
+maybeToBool :: Maybe a -> Bool      -- Nothing => False; Just => True
+allMaybes   :: [Maybe a] -> Maybe [a]
+firstJust   :: [Maybe a] -> Maybe a
+findJust    :: (a -> Maybe b) -> [a] -> Maybe b
+
+assocMaybe  :: Eq a => [(a,b)] -> a -> Maybe b
+mkLookupFun :: (key -> key -> Bool) -- Equality predicate
+            -> [(key,val)]          -- The assoc list
+            -> (key -> Maybe val)   -- A lookup fun to use
+mkLookupFunDef :: (key -> key -> Bool)	-- Equality predicate
+	       -> [(key,val)] 		-- The assoc list
+	       -> val 			-- Value to return on failure
+	       -> key 			-- The key
+	       -> val			-- The corresponding value
+
+    -- a monad thing
+thenMaybe   :: Maybe a -> (a -> Maybe b) -> Maybe b
+returnMaybe :: a -> Maybe a
+failMaybe   :: Maybe a
+mapMaybe    :: (a -> Maybe b) -> [a] -> Maybe [b]
+</verb></tscreen>
+
+NB: @catMaybes@ which used to be here, is now available via the
+standard @Maybe@ interface (@Maybe@ is an instance of @MonadPlus@).
+
+@allMaybes@ collects a list of @Justs@ into a single @Just@, returning
+@Nothing@ if there are any @Nothings@.
+
+@firstJust@ takes a list of @Maybes@ and returns the
+first @Just@ if there is one, or @Nothing@ otherwise.
+
+@assocMaybe@ looks up in an association list, returning
+@Nothing@ if it fails.
+
+Now, some operations to do with @MaybeErr@ (comments follow):
+<tscreen><verb>
+    -- a monad thing (surprise, surprise)
+thenMaB   :: MaybeErr a err -> (a -> MaybeErr b err) -> MaybeErr b err
+returnMaB :: val -> MaybeErr val err
+failMaB   :: err -> MaybeErr val err
+
+listMaybeErrs :: [MaybeErr val err] -> MaybeErr [val] [err]
+foldlMaybeErrs :: (acc -> input -> MaybeErr acc err)
+               -> acc
+               -> [input]
+               -> MaybeErr acc [err]
+</verb></tscreen>
+
+@listMaybeErrs@ takes a list of @MaybeErrs@ and, if they all succeed,
+returns a @Succeeded@ of a list of their values.  If any fail, it
+returns a @Failed@ of the list of all the errors in the list.
+
+@foldlMaybeErrs@ works along a list, carrying an accumulator; it
+applies the given function to the accumulator and the next list item,
+accumulating any errors that occur.
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @PackedString@ type
+<label id="PackedString">
+<p>
+<nidx>PackedString module (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+You need to @import PackedString@ and heave in your
+@-syslib ghc@ to use @PackedString@s.
+
+The basic type and functions available are:
+<tscreen><verb>
+data PackedString -- abstract
+
+packString          :: [Char] -> PackedString
+packStringST        :: [Char] -> ST s PackedString
+packCBytesST        :: Int -> Addr -> ST s PackedString
+packBytesForCST     :: [Char] -> ST s (ByteArray Int)
+byteArrayToPS       :: ByteArray Int -> PackedString
+unsafeByteArrayToPS :: ByteArray a   -> Int -> PackedString
+psToByteArray       :: PackedString -> ByteArray Int
+psToByteArrayST     :: PackedString -> ST s (ByteArray Int)
+
+unpackPS        :: PackedString -> [Char]
+</verb></tscreen>
+
+We also provide a wad of list-manipulation-like functions:
+<tscreen><verb>
+nilPS       :: PackedString
+consPS      :: Char -> PackedString -> PackedString
+
+headPS      :: PackedString -> Char
+tailPS      :: PackedString -> PackedString
+nullPS      :: PackedString -> Bool
+appendPS    :: PackedString -> PackedString -> PackedString
+lengthPS    :: PackedString -> Int
+indexPS     :: PackedString -> Int -> Char
+            -- 0-origin indexing into the string
+mapPS       :: (Char -> Char) -> PackedString -> PackedString
+filterPS    :: (Char -> Bool) -> PackedString -> PackedString
+foldlPS     :: (a -> Char -> a) -> a -> PackedString -> a
+foldrPS     :: (Char -> a -> a) -> a -> PackedString -> a
+takePS      :: Int -> PackedString -> PackedString
+dropPS      :: Int -> PackedString -> PackedString
+splitAtPS   :: Int -> PackedString -> (PackedString, PackedString)
+takeWhilePS :: (Char -> Bool) -> PackedString -> PackedString
+dropWhilePS :: (Char -> Bool) -> PackedString -> PackedString
+spanPS      :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
+breakPS     :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
+linesPS     :: PackedString -> [PackedString]
+wordsPS     :: PackedString -> [PackedString]
+reversePS   :: PackedString -> PackedString
+concatPS    :: [PackedString] -> PackedString
+elemPS      :: Char -> PackedString -> Bool
+  -- Perl-style split&join
+splitPS     :: Char -> PackedString -> [PackedString]
+splitWithPS :: (Char -> Bool) -> PackedString -> [PackedString]
+joinPS      :: PackedString -> [PackedString] -> PackedString
+
+substrPS   :: PackedString -> Int -> Int -> PackedString
+           -- pluck out a piece of a PackedString
+           -- start and end chars you want; both 0-origin-specified
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @Pretty@ type
+<label id="Pretty">
+<p>
+<nidx>Pretty module (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+This is the pretty-printer that is currently used in GHC:
+
+<tscreen><verb>
+type Pretty
+
+ppShow          :: Int{-width-} -> Pretty -> [Char]
+
+pp'SP           :: Pretty -- "comma space"
+ppComma         :: Pretty -- ,
+ppEquals        :: Pretty -- =
+ppLbrack        :: Pretty -- [
+ppLparen        :: Pretty -- (
+ppNil           :: Pretty -- nothing
+ppRparen        :: Pretty -- )
+ppRbrack        :: Pretty -- ]
+ppSP            :: Pretty -- space
+ppSemi          :: Pretty -- ;
+
+ppChar          :: Char -> Pretty
+ppDouble        :: Double -> Pretty
+ppFloat         :: Float -> Pretty
+ppInt           :: Int -> Pretty
+ppInteger       :: Integer -> Pretty
+ppRational      :: Rational -> Pretty
+ppStr           :: [Char] -> Pretty
+
+ppAbove         :: Pretty -> Pretty -> Pretty
+ppAboves        :: [Pretty] -> Pretty
+ppBeside        :: Pretty -> Pretty -> Pretty
+ppBesides       :: [Pretty] -> Pretty
+ppCat           :: [Pretty] -> Pretty
+ppHang          :: Pretty -> Int -> Pretty -> Pretty
+ppInterleave    :: Pretty -> [Pretty] -> Pretty -- spacing between
+ppIntersperse   :: Pretty -> [Pretty] -> Pretty -- no spacing between
+ppNest          :: Int -> Pretty -> Pretty
+ppSep           :: [Pretty] -> Pretty
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @Set@ type
+<label id="Set">
+<p>
+<nidx>Set module (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+Our implementation of <em>sets</em> (key property: no duplicates) is just
+a variant of the @FiniteMap@ module.
+
+<tscreen><verb>
+data Set        -- abstract
+                -- instance of: Eq
+
+emptySet        :: Set a
+mkSet           :: Ord a => [a]  -> Set a
+setToList       :: Set a -> [a]
+unitSet         :: a -> Set a
+singletonSet    :: a -> Set a  -- deprecated, use unitSet.
+
+union           :: Ord a => Set a -> Set a -> Set a
+unionManySets   :: Ord a => [Set a] -> Set a
+minusSet        :: Ord a => Set a -> Set a -> Set a
+mapSet          :: Ord a => (b -> a) -> Set b -> Set a
+intersect       :: Ord a => Set a -> Set a -> Set a
+
+elementOf       :: Ord a => a -> Set a -> Bool
+isEmptySet      :: Set a -> Bool
+
+cardinality     :: Set a -> Int
+
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @BitSet@ interface
+<label id="BitSet">
+<p>
+<nidx>Bitset interface (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+Bit sets are a fast implementation of sets of integers ranging from 0
+to one less than the number of bits in a machine word (typically 31).
+If any element exceeds the maximum value for a particular machine
+architecture, the results of these operations are undefined.  You have
+been warned. 
+
+<tscreen><verb>
+data BitSet   -- abstract
+              -- instance of:
+
+emptyBS       :: BitSet
+mkBS          :: [Int] -> BitSet
+unitBS        :: Int -> BitSet
+unionBS       :: BitSet -> BitSet -> BitSet
+minusBS       :: BitSet -> BitSet -> BitSet
+isEmptyBS     :: BitSet -> Bool
+intersectBS   :: BitSet -> BitSet -> BitSet
+elementBS     :: Int -> BitSet -> Bool
+listBS        :: BitSet -> [Int]
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @Util@ type
+<label id="Util">
+<p>
+<nidx>Util module (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+Stuff that has been generally useful to use in writing the compiler.
+Don't be too surprised if this stuff moves/gets-renamed/etc.
+
+<tscreen><verb>
+-- general list processing
+forall          :: (a -> Bool) -> [a] -> Bool
+exists          :: (a -> Bool) -> [a] -> Bool
+
+nOfThem         :: Int -> a -> [a]
+lengthExceeds   :: [a] -> Int -> Bool
+isSingleton     :: [a] -> Bool
+
+--paranoid zip'ing (equal length lists)
+zipEqual        :: [a] -> [b] -> [(a,b)]
+zipWithEqual	:: String -> (a->b->c) -> [a]->[b]->[c]
+zipWith3Equal	:: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
+zipWith4Equal	:: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
+-- lazy in second argument
+zipLazy :: [a] -> [b] -> [(a,b)]
+
+mapAndUnzip :: (a -> (b, c)) -> [a] -> ([b], [c])
+mapAndUnzip3 :: (a -> (b, c, d)) -> [a] -> ([b], [c], [d])
+
+-- prefix and suffix matching on lists of characters.
+startsWith :: {-prefix-}String -> String -> Maybe String
+endsWith   :: {-suffix-}String -> String -> Maybe String
+
+-- association lists
+assoc       :: Eq a => String -> [(a, b)] -> a -> b
+
+-- duplicate handling
+hasNoDups    :: Eq a => [a] -> Bool
+equivClasses :: (a -> a -> Ordering) -> [a] -> [[a]]
+runs         :: (a -> a -> Bool)     -> [a] -> [[a]]
+removeDups   :: (a -> a -> Ordering) -> [a] -> ([a], [[a]])
+
+-- sorting (don't complain of no choice...)
+quicksort          :: (a -> a -> Bool)     -> [a] -> [a]
+sortLt             :: (a -> a -> Bool)     -> [a] -> [a]
+stableSortLt       :: (a -> a -> Bool)     -> [a] -> [a]
+mergesort          :: (a -> a -> _CMP_TAG) -> [a] -> [a]
+mergeSort          :: Ord a => [a] -> [a]
+naturalMergeSort   :: Ord a => [a] -> [a]
+mergeSortLe        :: Ord a => [a] -> [a]
+naturalMergeSortLe :: Ord a => [a] -> [a]
+
+-- transitive closures
+transitiveClosure :: (a -> [a])         -- Successor function
+                  -> (a -> a -> Bool)   -- Equality predicate
+                  -> [a] 
+                  -> [a]                -- The transitive closure
+
+-- accumulating (Left, Right, Bi-directional)
+mapAccumL :: (acc -> x -> (acc, y))
+                        -- Function of elt of input list and
+                        -- accumulator, returning new accumulator and
+                        -- elt of result list
+          -> acc        -- Initial accumulator
+          -> [x]        -- Input list
+          -> (acc, [y]) -- Final accumulator and result list
+
+mapAccumR :: (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [y])
+
+mapAccumB :: (accl -> accr -> x -> (accl, accr,y))
+          -> accl -> accr -> [x]
+          -> (accl, accr, [y])
+
+--list comparison with explicit element comparer.
+cmpList :: (a -> a -> Ordering) -> [a] -> [a] -> Ordering
+
+-- pairs
+applyToPair :: ((a -> c), (b -> d)) -> (a, b) -> (c, d)
+applyToFst  :: (a -> c) -> (a, b) -> (c, b)
+applyToSnd  :: (b -> d) -> (a, b) -> (a, d)
+foldPair    :: (a->a->a, b->b->b) -> (a, b) -> [(a, b)] -> (a, b)
+unzipWith   :: (a -> b -> c) -> [(a, b)] -> [c]
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect1>Interfaces to C libraries
+<label id="C-interfaces">
+<p>
+<nidx>C library interfaces</nidx>
+<nidx>interfaces, C library</nidx>
+%*                                                                      *
+%************************************************************************
+
+The GHC system library (@-syslib ghc@) also provides interfaces to
+several useful C libraries, mostly from the GNU project.
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @Readline@ interface
+<label id="Readline">
+<p>
+<nidx>Readline library (GHC syslib)</nidx>
+<nidx>command-line editing library</nidx>
+%*                                                                      *
+%************************************************************************
+
+(Darren Moffat supplied the @Readline@ interface.)
+
+The @Readline@ module is a straightforward interface to the GNU
+Readline library.  As such, you will need to look at the GNU
+documentation (and have a @libreadline.a@ file around somewhere...)
+
+You'll need to link any Readlining program with @-lreadline -ltermcap@,
+besides the usual @-syslib ghc@ (and @-fhaskell-1.3@).
+
+The main function you'll use is:
+<tscreen><verb>
+readline :: String{-the prompt-} -> IO String
+</verb></tscreen>
+
+If you want to mess around with Full Readline G(l)ory, we also
+provide:
+<tscreen><verb>
+rlInitialize, addHistory,
+
+rlBindKey, rlAddDefun, RlCallbackFunction(..),
+
+rlGetLineBuffer, rlSetLineBuffer, rlGetPoint, rlSetPoint, rlGetEnd,
+rlSetEnd, rlGetMark, rlSetMark, rlSetDone, rlPendingInput,
+
+rlPrompt, rlTerminalName, rlSetReadlineName, rlGetReadlineName
+</verb></tscreen>
+(All those names are just Haskellised versions of what you
+will see in the GNU readline documentation.)
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @Regexp@ and @MatchPS@ interfaces
+<label id="Regexp">
+<p>
+<nidx>Regex library (GHC syslib)</nidx>
+<nidx>MatchPS library (GHC syslib)</nidx>
+<nidx>regular-expressions library</nidx>
+%*                                                                      *
+%************************************************************************
+
+(Sigbjorn Finne supplied the regular-expressions interface.)
+
+The @Regex@ library provides quite direct interface to the GNU
+regular-expression library, for doing manipulation on
+@PackedString@s.  You probably need to see the GNU documentation
+if you are operating at this level.
+
+The datatypes and functions that @Regex@ provides are:
+<tscreen><verb>
+data PatBuffer	# just a bunch of bytes (mutable)
+
+data REmatch
+ = REmatch (Array Int GroupBounds)  -- for $1, ... $n
+	   GroupBounds		    -- for $` (everything before match)
+	   GroupBounds		    -- for $& (entire matched string)
+	   GroupBounds		    -- for $' (everything after)
+	   GroupBounds		    -- for $+ (matched by last bracket)
+
+-- GroupBounds hold the interval where a group
+-- matched inside a string, e.g.
+--
+-- matching "reg(exp)" "a regexp" returns the pair (5,7) for the
+-- (exp) group. (PackedString indices start from 0)
+
+type GroupBounds = (Int, Int)
+
+re_compile_pattern
+	:: PackedString	        -- pattern to compile
+	-> Bool			-- True <=> assume single-line mode
+	-> Bool			-- True <=> case-insensitive
+	-> PrimIO PatBuffer
+
+re_match :: PatBuffer		-- compiled regexp
+	 -> PackedString	-- string to match
+	 -> Int			-- start position
+	 -> Bool		-- True <=> record results in registers
+	 -> PrimIO (Maybe REmatch)
+
+-- Matching on 2 strings is useful when you're dealing with multiple
+-- buffers, which is something that could prove useful for
+-- PackedStrings, as we don't want to stuff the contents of a file
+-- into one massive heap chunk, but load (smaller chunks) on demand.
+
+re_match2 :: PatBuffer		-- 2-string version
+	  -> PackedString
+	  -> PackedString
+	  -> Int
+	  -> Int
+	  -> Bool
+	  -> PrimIO (Maybe REmatch)
+
+re_search :: PatBuffer		-- compiled regexp
+	  -> PackedString	-- string to search
+	  -> Int		-- start index
+	  -> Int		-- stop index
+	  -> Bool		-- True <=> record results in registers
+	  -> PrimIO (Maybe REmatch)
+
+re_search2 :: PatBuffer		-- Double buffer search
+	   -> PackedString
+	   -> PackedString
+	   -> Int		-- start index
+	   -> Int		-- range (?)
+	   -> Int		-- stop index
+	   -> Bool		-- True <=> results in registers
+	   -> PrimIO (Maybe REmatch)
+</verb></tscreen>
+
+The @MatchPS@ module provides Perl-like ``higher-level'' facilities
+to operate on @PackedStrings@.  The regular expressions in
+question are in Perl syntax.  The ``flags'' on various functions can
+include: @i@ for case-insensitive, @s@ for single-line mode, and
+@g@ for global.  (It's probably worth your time to peruse the
+source code...)
+
+<tscreen><verb>
+matchPS :: PackedString    -- regexp
+	-> PackedString    -- string to match
+	-> [Char]	   -- flags
+	-> Maybe REmatch   -- info about what matched and where
+
+searchPS :: PackedString    -- regexp
+	 -> PackedString    -- string to match
+	 -> [Char]	    -- flags
+	 -> Maybe REmatch
+
+-- Perl-like match-and-substitute:
+substPS :: PackedString     -- regexp
+	-> PackedString     -- replacement
+	-> [Char]	    -- flags
+	-> PackedString     -- string
+	-> PackedString
+
+-- same as substPS, but no prefix and suffix:
+replacePS :: PackedString  -- regexp
+	  -> PackedString  -- replacement
+	  -> [Char]	   -- flags
+	  -> PackedString  -- string
+	  -> PackedString
+
+match2PS :: PackedString   -- regexp
+	 -> PackedString   -- string1 to match
+	 -> PackedString   -- string2 to match
+	 -> [Char]	   -- flags
+	 -> Maybe REmatch
+
+search2PS :: PackedString  -- regexp
+	  -> PackedString  -- string to match
+	  -> PackedString  -- string to match
+	  -> [Char]	   -- flags
+	  -> Maybe REmatch
+
+-- functions to pull the matched pieces out of an REmatch:
+
+getMatchesNo    :: REmatch -> Int
+getMatchedGroup :: REmatch -> Int -> PackedString -> PackedString
+getWholeMatch   :: REmatch -> PackedString -> PackedString
+getLastMatch    :: REmatch -> PackedString -> PackedString
+getAfterMatch   :: REmatch -> PackedString -> PackedString
+
+-- (reverse) brute-force string matching;
+-- Perl equivalent is index/rindex:
+findPS, rfindPS :: PackedString -> PackedString -> Maybe Int
+
+-- Equivalent to Perl "chop" (off the last character, if any):
+chopPS :: PackedString -> PackedString
+
+-- matchPrefixPS: tries to match as much as possible of strA starting
+-- from the beginning of strB (handy when matching fancy literals in
+-- parsers):
+matchPrefixPS :: PackedString -> PackedString -> Int
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>Network-interface toolkit---@Socket@ and @SocketPrim@
+<label id="Socket">
+<p>
+<nidx>SocketPrim interface (GHC syslib)</nidx>
+<nidx>Socket interface (GHC syslib)</nidx>
+<nidx>network-interface library</nidx>
+<nidx>sockets library</nidx>
+<nidx>BSD sockets library</nidx>
+%*                                                                      *
+%************************************************************************
+
+(Darren Moffat supplied the network-interface toolkit.)
+
+Your best bet for documentation is to look at the code---really!--- 
+normally in @fptools/ghc/lib/misc/{BSD,Socket,SocketPrim@.lhs}.
+
+The @BSD@ module provides functions to get at system-database info;
+pretty straightforward if you're into this sort of thing:
+<tscreen><verb>
+getHostName	    :: IO String
+
+getServiceByName    :: ServiceName -> IO ServiceEntry
+getServicePortNumber:: ServiceName -> IO PortNumber
+getServiceEntry	    :: IO ServiceEntry
+setServiceEntry	    :: Bool -> IO ()
+endServiceEntry	    :: IO ()
+
+getProtocolByName   :: ProtocolName -> IO ProtocolEntry
+getProtocolByNumber :: ProtocolNumber -> IO ProtcolEntry
+getProtocolNumber   :: ProtocolName -> ProtocolNumber
+getProtocolEntry    :: IO ProtocolEntry
+setProtocolEntry    :: Bool -> IO ()
+endProtocolEntry    :: IO ()
+
+getHostByName	    :: HostName -> IO HostEntry
+getHostByAddr	    :: Family -> HostAddress -> IO HostEntry
+getHostEntry	    :: IO HostEntry
+setHostEntry	    :: Bool -> IO ()
+endHostEntry	    :: IO ()
+</verb></tscreen>
+
+The @SocketPrim@ interface provides quite direct access to the
+socket facilities in a BSD Unix system, including all the
+complications.  We hope you don't need to use it!  See the source if
+needed...
+
+The @Socket@ interface is a ``higher-level'' interface to sockets,
+and it is what we recommend.  Please tell us if the facilities it
+offers are inadequate to your task!
+
+The interface is relatively modest:
+<tscreen><verb>
+connectTo	:: Hostname -> PortID -> IO Handle
+listenOn	:: PortID -> IO Socket
+
+accept		:: Socket -> IO (Handle, HostName)
+sendTo		:: Hostname -> PortID -> String -> IO ()
+
+recvFrom	:: Hostname -> PortID -> IO String
+socketPort	:: Socket -> IO PortID
+
+data PortID	-- PortID is a non-abstract type
+  = Service String	-- Service Name eg "ftp"
+  | PortNumber Int	-- User defined Port Number
+  | UnixSocket String	-- Unix family socket in file system
+
+type Hostname = String
+</verb></tscreen>
+
+Various examples of networking Haskell code are provided in
+%@ghc/misc/examples/@, notably the @net???/Main.hs@ programs.

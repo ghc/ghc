@@ -1,0 +1,290 @@
+%************************************************************************
+%*                                                                      *
+<sect>What to do when something goes wrong
+<label id="wrong">
+<p>
+<nidx>problems</nidx>
+%*                                                                      *
+%************************************************************************
+
+If you still have a problem after consulting this section, then you
+may have found a <em>bug</em>---please report it!  See
+Section <ref name="How to report a bug in the GHC system" id="bug-reports"> for a list of things we'd like to know about
+your bug.  If in doubt, send a report---we love mail from irate users :-!
+
+(Section <ref name="Haskell 1.4 vs. Glasgow Haskell 3.00: language
+non-compliance" id="vs-Haskell-defn">, which describes Glasgow
+Haskell's shortcomings vs.~the Haskell language definition, may also
+be of interest.)
+
+%************************************************************************
+%*                                                                      *
+<sect1>When the compiler ``does the wrong thing''
+<label id="wrong-compiler">
+<p>
+<nidx>compiler problems</nidx>
+<nidx>problems with the compiler</nidx>
+%*                                                                      *
+%************************************************************************
+
+<descrip>
+%-------------------------------------------------------------------
+<tag>``Help! The compiler crashed (or `panic'd)!''</tag>
+These events are <em>always</em> bugs in the GHC system---please report
+them.
+
+%-------------------------------------------------------------------
+<tag>``The compiler ran out of heap (or stack) when compiling itself!''</tag>
+It happens.  We try to supply reasonable @-H<n>@ flags for
+@ghc/compiler/@ and @ghc/lib/@, but GHC's memory consumption
+can vary by platform (e.g., on a 64-bit machine).
+
+Just say @make all EXTRA_HC_OPTS=-H<a reasonable number>@ and see
+how you get along.
+
+%-------------------------------------------------------------------
+<tag>``The compiler died with a pattern-matching error.''</tag>
+This is a bug just as surely as a ``panic.'' Please report it.
+
+%-------------------------------------------------------------------
+<tag>``This is a terrible error message.''</tag>
+If you think that GHC could have produced a better error message,
+please report it as a bug.
+
+%-------------------------------------------------------------------
+<tag>``What about these `trace' messages from GHC?''</tag>
+Almost surely not a problem.  About some specific cases...
+<descrip>
+<tag>Simplifier still going after N iterations:</tag>
+Sad, but harmless.  You can change the number with a
+@-fmax-simplifier-iterations<N>@<nidx>-fmax-simplifier-iterations&lt;N&gt; option</nidx> option (no space);
+and you can see what actions took place in each iteration by
+turning on the @-fshow-simplifier-progress@
+<nidx>-fshow-simplifier-progress option</nidx> option.
+
+If the simplifier definitely seems to be ``looping,'' please report
+it.
+</descrip>
+
+%-------------------------------------------------------------------
+<tag>``What about this warning from the C compiler?''</tag>
+
+For example: ``...warning: `Foo' declared `static' but never defined.''
+Unsightly, but not a problem.
+
+%-------------------------------------------------------------------
+<tag>Sensitivity to @.hi@ interface files:</tag>
+
+GHC is very sensitive about interface files.  For example, if it picks
+up a non-standard @Prelude.hi@ file, pretty terrible things will
+happen.  If you turn on
+@-fno-implicit-prelude@<nidx>-fno-implicit-prelude option</nidx>, the
+compiler will almost surely die, unless you know what you are doing.
+
+Furthermore, as sketched below, you may have big problems
+running programs compiled using unstable interfaces.
+
+%-------------------------------------------------------------------
+<tag>``I think GHC is producing incorrect code'':</tag>
+
+Unlikely :-) A useful be-more-paranoid option to give to GHC is
+@-dcore-lint@<nidx>-dcore-lint option</nidx>; this causes a ``lint''
+pass to check for errors (notably type errors) after each Core-to-Core
+transformation pass.  We run with @-dcore-lint@ on all the time; it
+costs about 5\% in compile time.  (Or maybe 25\%; who knows?)
+
+%-------------------------------------------------------------------
+<tag>``Why did I get a link error?''</tag>
+
+If the linker complains about not finding @_<something>_fast@, then
+your interface files haven't settled---keep on compiling!  (In
+particular, this error means that arity information, which you can see
+in any @.hi@ file, has changed.)
+
+%-------------------------------------------------------------------
+<tag>``What's a `consistency error'?''</tag>
+(These are reported just after linking your program.)
+
+You tried to link incompatible object files, e.g., normal ones
+(registerised, Appel garbage-collector) with profiling ones (two-space
+collector).  Or those compiled by a previous version of GHC
+with an incompatible newer version.
+
+If you run @nm -o *.o | egrep 't (cc|hsc)\.'@ (or, on
+unregisterised files: @what *.o@), you'll see all the consistency
+tags/strings in your object files.  They must all be the same!
+(ToDo: tell you what they mean...)
+
+%-------------------------------------------------------------------
+<tag>``Is this line number right?''</tag>
+On this score, GHC usually does pretty well, especially
+if you ``allow'' it to be off by one or two.  In the case of an
+instance or class declaration, the line number
+may only point you to the declaration, not to a specific method.
+
+Please report line-number errors that you find particularly unhelpful.
+</descrip>
+
+%************************************************************************
+%*                                                                      *
+<sect1>When your program ``does the wrong thing''
+<label id="wrong-compilee">
+<p>
+<nidx>problems running your program</nidx>
+%*                                                                      *
+%************************************************************************
+
+(For advice about overly slow or memory-hungry Haskell programs,
+please see Section <ref name="Advice on: sooner, faster, smaller,
+stingier" id="sooner-faster-quicker">).
+
+<descrip>
+%-----------------------------------------------------------------------
+<tag>``Help! My program crashed!''</tag>
+(e.g., a `segmentation fault' or `core dumped')
+
+If your program has no @_ccall_@s/@_casm_@s in it, then a crash is always
+a BUG in the GHC system, except in one case: If your program is made
+of several modules, each module must have been compiled with a stable
+group of interface (@.hi@) files.
+
+For example, if an interface is lying about the type of an imported
+value then GHC may well generate duff code for the importing module.
+<em>This applies to pragmas inside interfaces too!</em>  If the pragma is
+lying (e.g., about the ``arity'' of a value), then duff code may result.
+Furthermore, arities may change even if types do not.
+
+In short, if you compile a module and its interface changes, then all
+the modules that import that interface <em>must</em> be re-compiled.
+
+A useful option to alert you when interfaces change is
+@-hi-diffs@<nidx>-hi-diffs option</nidx>.  It will run @diff@ on the
+changed interface file, before and after, when applicable.
+
+If you are using @make@, a useful tool to make sure that every module
+<em>is</em> up-to-date with respect to its imported interfaces is
+@mkdependHS@ (which comes with GHC).  Please see Section <ref
+name="Makefile dependencies in Haskell: using mkdependHS"
+id="mkdependHS">.
+
+If you are down to your last-compile-before-a-bug-report, we would
+recommend that you add a @-dcore-lint@ option (for extra checking) to
+your compilation options.
+
+So, before you report a bug because of a core dump, you should probably:
+<tscreen><verb>
+% rm *.o        # scrub your object files
+% make my_prog  # re-make your program; use -hi-diffs to highlight changes;
+		# as mentioned above, use -dcore-lint to be more paranoid
+% ./my_prog ... # retry...
+</verb></tscreen>
+
+Of course, if you have @_ccall_@s/@_casm_@s in your program then all
+bets are off, because you can trash the heap, the stack, or whatever.
+
+If you are interested in hard-core debugging of a crashing
+GHC-compiled program, please see Section <ref name="Hard-core
+debugging of GHC-compiled programs" id="hard-core-debug">.
+
+% (If you have an ``unregisterised'' arity-checking
+% (@-O0 -darity-checks@) around [as we sometimes do at Glasgow], then you
+% might recompile with @-darity-checks@<nidx>-darity-checks option</nidx>,
+% which will definitely detect arity-compatibility errors.)
+
+%-------------------------------------------------------------------
+<tag>``My program entered an `absent' argument.''</tag>
+This is definitely caused by a bug in GHC. Please report it.
+
+%-----------------------------------------------------------------------
+<tag>``What's with this `arithmetic (or `floating') exception' ''?</tag>
+
+@Int@, @Float@, and @Double@ arithmetic is <em>unchecked</em>.
+Overflows, underflows and loss of precision are either silent or
+reported as an exception by the operating system (depending on the
+architecture).  Divide-by-zero <em>may</em> cause an untrapped
+exception (please report it if it does).
+
+</descrip>
+
+%************************************************************************
+%*                                                                      *
+<sect1>How to report a bug in the GHC system
+<label id="bug-reports">
+<p>
+<nidx>bug reports</nidx>
+%*                                                                      *
+%************************************************************************
+
+Glasgow Haskell is a changing system so there are sure to be bugs in
+it.  Please report them to <htmlurl
+name="glasgow-haskell-bugs@@dcs.gla.ac.uk"
+url="mailto:glasgow-haskell-bugs@@dcs.gla.ac.uk">!  (However, please
+check the earlier part of this section to be sure it's not a known
+not-really-a problem.)
+
+The name of the bug-reporting game is: facts, facts, facts.
+Don't omit them because ``Oh, they won't be interested...''
+
+<enum>
+
+<item> What kind of machine are you running on, and exactly what
+version of the operating system are you using? (@uname -a@ or @cat
+/etc/motd@ will show the desired information.)
+
+<item> What version of GCC are you using? @gcc -v@ will tell you.
+
+<item> Run the sequence of compiles/runs that caused the offending
+behaviour, capturing all the input/output in a ``script'' (a UNIX
+command) or in an Emacs shell window.  We'd prefer to see the whole
+thing.
+
+<item> Be sure any Haskell compilations are run with a @-v@ (verbose)
+flag, so we can see exactly what was run, what versions of things you
+have, etc.
+
+<item> What is the program behaviour that is wrong, in your opinion?
+
+<item> If practical, please send enough source files/interface files
+for us to duplicate the problem.
+
+<item> If you are a Hero and track down the problem in the
+compilation-system sources, please send us patches relative to a known
+released version of GHC, or whole files if you prefer.
+
+</enum>
+
+%************************************************************************
+%*                                                                      *
+<sect1>Hard-core debugging of GHC-compiled programs
+<label id="hard-core-debug">
+<p>
+<nidx>debugging, hard-core</nidx>
+%*                                                                      *
+%************************************************************************
+
+If your program is crashing, you should almost surely file a bug
+report, as outlined in previous sections.
+
+This section suggests ways to Make Further Progress Anyway.
+
+The first thing to establish is: Is it a garbage-collection (GC) bug?
+Try your program with a very large heap and a @-Sstderr@ RTS
+flag.
+<itemize>
+<item>
+If it crashes <em>without</em> garbage-collecting, then it is
+definitely <em>not</em> a GC bug.
+<item>
+If you can make it crash with one heap size but not with another, then
+it <em>probably is</em> a GC bug.
+<item>
+If it crashes with the normal
+collector, but not when you force two-space collection (@-F2s@
+runtime flag), then it <em>probably is</em> a GC bug.
+</itemize>
+
+If it <em>is</em> a GC bug, you may be able to avoid it by using a
+particular heap size or by using a @-F2s@ runtime flag.  (But don't
+forget to report the bug!!!)
+
+ToDo: more here?

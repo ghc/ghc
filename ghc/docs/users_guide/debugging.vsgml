@@ -1,0 +1,372 @@
+%************************************************************************
+%*                                                                      *
+<sect1>Debugging the compiler
+<label id="options-debugging">
+<p>
+<nidx>debugging options (for GHC)</nidx>
+%*                                                                      *
+%************************************************************************
+
+HACKER TERRITORY. HACKER TERRITORY.
+(You were warned.)
+
+%----------------------------------------------------------------------
+<sect2>Replacing the program for one or more phases.
+<label id="replacing-phases">
+<p>
+<nidx>GHC phases, changing</nidx>
+<nidx>phases, changing GHC</nidx>
+
+You may specify that a different program
+be used for one of the phases of the compilation system, in place of
+whatever the driver @ghc@ has wired into it.  For example, you
+might want to try a different assembler.  The
+@-pgm<phase-code><program-name>@<nidx>-pgm&lt;phase&gt;&lt;stuff&gt; option</nidx> option to
+@ghc@ will cause it to use @<program-name>@ for phase
+@<phase-code>@, where the codes to indicate the phases are:
+
+<tabular ca="ll">
+<bf>code</bf> | <bf>phase</bf> @@
+@@
+L    | literate pre-processor @@
+P    | C pre-processor (if -cpp only) @@
+C    | Haskell compiler @@
+c    | C compiler@@
+a    | assembler @@
+l    | linker @@
+</tabular>
+
+%----------------------------------------------------------------------
+<sect2>Forcing options to a particular phase.
+<label id="forcing-options-through">
+<p>
+<nidx>forcing GHC-phase options</nidx>
+
+The preceding sections describe driver options that are mostly
+applicable to one particular phase.  You may also <em>force</em> a
+specific option @<option>@ to be passed to a particular phase
+@<phase-code>@ by feeding the driver the option
+@-opt<phase-code><option>@.<nidx>-opt&lt;phase&gt;&lt;stuff&gt; option</nidx> The
+codes to indicate the phases are the same as in the previous section.
+
+So, for example, to force an @-Ewurble@ option to the assembler, you
+would tell the driver @-opta-Ewurble@ (the dash before the E is
+required).
+
+Besides getting options to the Haskell compiler with @-optC<blah>@,
+you can get options through to its runtime system with
+@-optCrts<blah>@<nidx>-optCrts&lt;blah&gt; option</nidx>.
+
+So, for example: when I want to use my normal driver but with my
+profiled compiler binary, I use this script:
+<tscreen><verb>
+#! /bin/sh
+exec /local/grasp_tmp3/simonpj/ghc-BUILDS/working-alpha/ghc/driver/ghc \
+     -pgmC/local/grasp_tmp3/simonpj/ghc-BUILDS/working-hsc-prof/hsc \
+     -optCrts-i0.5 \
+     -optCrts-PT \
+     "$@"
+</verb></tscreen>
+
+%----------------------------------------------------------------------
+<sect2>Dumping out compiler intermediate structures
+<label id="dumping-output">
+<p>
+<nidx>dumping GHC intermediates</nidx>
+<nidx>intermediate passes, output</nidx>
+
+<descrip>
+<tag>@-noC@:</tag>
+<nidx>-noC option</nidx>
+Don't bother generating C output <em>or</em> an interface file.  Usually
+used in conjunction with one or more of the @-ddump-*@ options; for
+example: @ghc -noC -ddump-simpl Foo.hs@
+
+<tag>@-hi@:</tag>
+<nidx>-hi option</nidx>
+<em>Do</em> generate an interface file.  This would normally be used in
+conjunction with @-noC@, which turns off interface generation;
+thus: @-noC -hi@.
+
+<tag>@-dshow-passes@:</tag>
+<nidx>-dshow-passes option</nidx>
+Prints a message to stderr as each pass starts.  Gives a warm but
+undoubtedly misleading feeling that GHC is telling you what's
+happening.
+
+<tag>@-ddump-<pass>@:</tag>
+<nidx>-ddump-&lt;pass&gt; options</nidx>
+Make a debugging dump after pass @<pass>@ (may be common enough to
+need a short form...).  Some of the most useful ones are:
+
+<tabular ca="ll">
+@-ddump-rdr@ | reader output (earliest stuff in the compiler) @@
+@-ddump-rn@ | renamer output @@
+@-ddump-tc@ | typechecker output @@
+@-ddump-deriv@ | derived instances @@
+@-ddump-ds@ | desugarer output @@
+@-ddump-simpl@ | simplifer output (Core-to-Core passes) @@
+@-ddump-stranal@ | strictness analyser output @@
+@-ddump-occur-anal@ | `occurrence analysis' output @@
+@-ddump-spec@ | dump specialisation info @@
+@-ddump-stg@ | output of STG-to-STG passes @@
+@-ddump-absC@ | <em>un</em>flattened Abstract~C @@
+@-ddump-flatC@ | <em>flattened</em> Abstract~C @@
+@-ddump-realC@ | same as what goes to the C compiler @@
+@-ddump-asm@ | assembly language from the native-code generator @@
+</tabular>
+
+<nidx>-ddump-rdr option</nidx>%
+<nidx>-ddump-rn option</nidx>%
+<nidx>-ddump-tc option</nidx>%
+<nidx>-ddump-deriv option</nidx>%
+<nidx>-ddump-ds option</nidx>%
+<nidx>-ddump-simpl option</nidx>%
+<nidx>-ddump-stranal option</nidx>%
+<nidx>-ddump-occur-anal option</nidx>%
+<nidx>-ddump-spec option</nidx>%
+<nidx>-ddump-stg option</nidx>%
+<nidx>-ddump-absC option</nidx>%
+<nidx>-ddump-flatC option</nidx>%
+<nidx>-ddump-realC option</nidx>%
+<nidx>-ddump-asm option</nidx>
+
+%For any other @-ddump-*@ options: consult the source, notably
+%@ghc/compiler/main/CmdLineOpts.lhs@.
+
+<tag>@-dverbose-simpl@ and @-dverbose-stg@:</tag>
+<nidx>-dverbose-simpl option</nidx>
+<nidx>-dverbose-stg option</nidx>
+Show the output of the intermediate Core-to-Core and STG-to-STG
+passes, respectively.  (<em>Lots</em> of output!) So: when we're 
+really desperate:
+<tscreen><verb>
+% ghc -noC -O -ddump-simpl -dverbose-simpl -dcore-lint Foo.hs
+</verb></tscreen>
+
+<tag>@-dppr-{user,debug,all@}:</tag>
+<nidx>-dppr-user option</nidx>
+<nidx>-dppr-debug option</nidx>
+<nidx>-dppr-all option</nidx>
+Debugging output is in one of several ``styles.''  Take the printing
+of types, for example.  In the ``user'' style, the compiler's internal
+ideas about types are presented in Haskell source-level syntax,
+insofar as possible.  In the ``debug'' style (which is the default for
+debugging output), the types are printed in the most-often-desired
+form, with explicit foralls, etc.  In the ``show all'' style, very
+verbose information about the types (e.g., the Uniques on the
+individual type variables) is displayed.
+
+<tag>@-ddump-raw-asm@:</tag>
+<nidx>-ddump-raw-asm option</nidx>
+Dump out the assembly-language stuff, before the ``mangler'' gets it.
+
+<tag>@-ddump-rn-trace@:</tag>
+<nidx>-ddump-rn-trace</nidx>
+Make the renamer be *real* chatty about what it is upto.
+
+<tag>@-dshow-rn-stats@:</tag>
+<nidx>-dshow-rn-stats</nidx>
+Print out summary of what kind of information the renamer had to bring
+in.
+<tag>@-dshow-unused-imports@:</tag>
+<nidx>-dshow-unused-imports</nidx>
+Have the renamer report what imports does not contribute.
+
+%
+%<tag>@-dgc-debug@:</tag>
+%<nidx>-dgc-debug option</nidx>
+%Enables some debugging code related to the garbage-collector.
+</descrip>
+
+%ToDo: -ddump-asm-insn-counts
+%-ddump-asm-globals-info
+
+%----------------------------------------------------------------------
+<sect2>How to read Core syntax (from some @-ddump-*@ flags)
+<p>
+<nidx>reading Core syntax</nidx>
+<nidx>Core syntax, how to read</nidx>
+
+Let's do this by commenting an example.  It's from doing
+@-ddump-ds@ on this code:
+<tscreen><verb>
+skip2 m = m : skip2 (m+2)
+</verb></tscreen>
+
+Before we jump in, a word about names of things.  Within GHC,
+variables, type constructors, etc., are identified by their
+``Uniques.''  These are of the form `letter' plus `number' (both
+loosely interpreted).  The `letter' gives some idea of where the
+Unique came from; e.g., @_@ means ``built-in type variable'';
+@t@ means ``from the typechecker''; @s@ means ``from the
+simplifier''; and so on.  The `number' is printed fairly compactly in
+a `base-62' format, which everyone hates except me (WDP).
+
+Remember, everything has a ``Unique'' and it is usually printed out
+when debugging, in some form or another.  So here we go...
+
+<tscreen><verb>
+Desugared:
+Main.skip2{-r1L6-} :: _forall_ a$_4 =>{{Num a$_4}} -> a$_4 -> [a$_4]
+
+--# `r1L6' is the Unique for Main.skip2;
+--# `_4' is the Unique for the type-variable (template) `a'
+--# `{{Num a$_4}}' is a dictionary argument
+
+_NI_
+
+--# `_NI_' means "no (pragmatic) information" yet; it will later
+--# evolve into the GHC_PRAGMA info that goes into interface files.
+
+Main.skip2{-r1L6-} =
+    /\ _4 -> \ d.Num.t4Gt ->
+	let {
+	  {- CoRec -}
+	  +.t4Hg :: _4 -> _4 -> _4
+	  _NI_
+	  +.t4Hg = (+{-r3JH-} _4) d.Num.t4Gt
+
+	  fromInt.t4GS :: Int{-2i-} -> _4
+	  _NI_
+	  fromInt.t4GS = (fromInt{-r3JX-} _4) d.Num.t4Gt
+
+--# The `+' class method (Unique: r3JH) selects the addition code
+--# from a `Num' dictionary (now an explicit lamba'd argument).
+--# Because Core is 2nd-order lambda-calculus, type applications
+--# and lambdas (/\) are explicit.  So `+' is first applied to a
+--# type (`_4'), then to a dictionary, yielding the actual addition
+--# function that we will use subsequently...
+
+--# We play the exact same game with the (non-standard) class method
+--# `fromInt'.  Unsurprisingly, the type `Int' is wired into the
+--# compiler.
+
+	  lit.t4Hb :: _4
+	  _NI_
+	  lit.t4Hb =
+	      let {
+		ds.d4Qz :: Int{-2i-}
+		_NI_
+		ds.d4Qz = I#! 2#
+	      } in  fromInt.t4GS ds.d4Qz
+
+--# `I# 2#' is just the literal Int `2'; it reflects the fact that
+--# GHC defines `data Int = I# Int#', where Int# is the primitive
+--# unboxed type.  (see relevant info about unboxed types elsewhere...)
+
+--# The `!' after `I#' indicates that this is a *saturated*
+--# application of the `I#' data constructor (i.e., not partially
+--# applied).
+
+	  skip2.t3Ja :: _4 -> [_4]
+	  _NI_
+	  skip2.t3Ja =
+	      \ m.r1H4 ->
+		  let { ds.d4QQ :: [_4]
+			_NI_
+			ds.d4QQ =
+		    let {
+		      ds.d4QY :: _4
+		      _NI_
+		      ds.d4QY = +.t4Hg m.r1H4 lit.t4Hb
+		    } in  skip2.t3Ja ds.d4QY
+		  } in
+		  :! _4 m.r1H4 ds.d4QQ
+
+	  {- end CoRec -}
+	} in  skip2.t3Ja
+</verb></tscreen>
+
+(``It's just a simple functional language'' is an unregisterised
+trademark of Peyton Jones Enterprises, plc.)
+
+%----------------------------------------------------------------------
+<sect2>Command line options in source files
+<label id="source-file-options">
+<p>
+<nidx>source-file options</nidx>
+
+Sometimes it is useful to make the connection between a source file
+and the command-line options it requires quite tight. For instance,
+if a (Glasgow) Haskell source file uses @casm@s, the C back-end
+often needs to be told about which header files to include. Rather than
+maintaining the list of files the source depends on in a
+@Makefile@ (using the @-#include@ command-line option), it is
+possible to do this directly in the source file using the @OPTIONS@
+pragma <nidx>OPTIONS pragma</nidx>: 
+
+<tscreen><verb>
+{-# OPTIONS -#include "foo.h" #-}
+module X where
+
+...
+</verb></tscreen>
+
+@OPTIONS@ pragmas are only looked for at the top of your source
+files, upto the first (non-literate,non-empty) line not containing
+@OPTIONS@. Multiple @OPTIONS@ pragmas are recognised. Note
+that your command shell does not get to the source file options, they
+are just included literally in the array of command-line arguments
+the compiler driver maintains internally, so you'll be desperately
+disappointed if you try to glob etc. inside @OPTIONS@.
+
+NOTE: the contents of OPTIONS are prepended to the command-line
+options, so you *do* have the ability to override OPTIONS settings
+via the command line.
+
+It is not recommended to move all the contents of your Makefiles into
+your source files, but in some circumstances, the @OPTIONS@ pragma
+is the Right Thing. (If you use @-keep-hc-file-too@ and have OPTION
+flags in your module, the OPTIONS will get put into the generated .hc
+file).
+
+%----------------------------------------------------------------------
+<sect2>How to compile mutually recursive modules
+<p>
+<nidx>module system, recursion</nidx>
+
+Currently, the compiler does not have proper support for dealing with
+mutually recursive modules:
+
+<tscreen><verb>
+module A where
+
+import B
+
+newtype A = A Int
+
+f :: B -> A
+f (B x) = A x
+--------
+module B where
+
+import A
+
+data B = B !Int
+
+g :: A -> B
+g (A x) = B x
+</verb></tscreen>
+
+When compiling either module A and B, the compiler will try (in vain)
+to look for the interface file of the other. So, to get mutually
+recursive modules off the ground, you need to hand write an interface
+file for A or B, so as to break the loop. For the example at hand, the
+boot interface file for A would like the following:
+
+<tscreen><verb>
+_interface_ A 1
+_exports_
+A A(A) f;
+_declarations_
+1 newtype A = A PrelBase.Int ;
+1 f _:_ B.B -> A.A ;;
+</verb></tscreen>
+
+To make sure you get the syntax right, tailoring an existing interface
+file is a Good Idea.
+
+<bf>Note:</bf> This is all a temporary solution, a version of the
+compiler that handles mutually recursive properly without the manual
+construction of interface file, is in the works.

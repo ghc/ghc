@@ -1,0 +1,13 @@
+<sect1>Release notes for version~3-01---2/97
+<label id="release-3-01">
+<p>
+
+Changes made since 3.00:
+
+<itemize>
+
+<item>  Fix interaction of "hiding" on import with "module M" on export.
+
+<item>  Fix some floating point conversion problems in @floatExtreme.lc@.
+
+</itemize>

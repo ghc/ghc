@@ -1,7 +1,9 @@
 %************************************************************************
 %*                                                                      *
-\section[utils]{Other Haskell utility programs}
-\index{utilities, Haskell}
+<sect>Other Haskell utility programs
+<label id="utils">
+<p>
+<nidx>utilities, Haskell</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -10,41 +12,43 @@ with the Great Haskell Programming Task.
 
 %************************************************************************
 %*                                                                      *
-\subsection[mkdependHS]{Makefile dependencies in Haskell: using \tr{mkdependHS}}
-\index{mkdependHS}
-\index{Makefile dependencies}
-\index{dependencies in Makefiles}
+<sect1>Makefile dependencies in Haskell: using @mkdependHS@
+<label id="mkdependHS">
+<p>
+<nidx>mkdependHS</nidx>
+<nidx>Makefile dependencies</nidx>
+<nidx>dependencies in Makefiles</nidx>
 %*                                                                      *
 %************************************************************************
 
 You run @mkdependHS@ like this:
-\begin{verbatim}
+<tscreen><verb>
   mkdependHS [mkdependHS options] [-- GHC options --] srcfile1 [srcfile2 ...]
-\end{verbatim}
+</verb></tscreen>
 or
-\begin{verbatim}
+<tscreen><verb>
   ghc -M [mkdependHS options(prefix with -optdep)] [ GHC options ] srcfile1 [srcfile2 ...]
-\end{verbatim}
-To see \tr{mkdependHS}'s command-line flags, give it a duff flag,
-e.g., \tr{mkdependHS -help}.
+</verb></tscreen>
+To see @mkdependHS@'s command-line flags, give it a duff flag,
+e.g., @mkdependHS -help@.
 
 In general, if module @A@ contains the line
-\begin{verbatim}
+<tscreen><verb>
 	import B ...blah...
-\end{verbatim}
+</verb></tscreen>
 then @mkdependHS@ will generate a dependency line of the form:
-\begin{verbatim}
+<tscreen><verb>
 	A.o : B.hi
-\end{verbatim}
+</verb></tscreen>
 If module @A@ contains the line 
-\begin{verbatim}
+<tscreen><verb>
 	import {-# SOURCE #-} B ...blah...
-\end{verbatim}
+</verb></tscreen>
 then @mkdependHS@ will generate a dependency line of the form:
-\begin{verbatim}
+<tscreen><verb>
 	A.o : B.hi-boot
-\end{verbatim}
-(See \Sectionref{hi-files} for details of interface files.)
+</verb></tscreen>
+(See Section <ref name="Interface files" id="hi-files"> for details of interface files.)
 If @A@ imports multiple modules, then there will be multiple lines with @A.o@ as the
 target.
 
@@ -60,40 +64,38 @@ dependencies first.
 It understands the following ones. Any options between @--@ brackets
 that it doesn't understand are simply ignored; this way you can feed your
 Makefile's standard GHC options to @mkdependHS@ un-filtered.
-\begin{description}
+<descrip>
 
-\item[@-D<blah>@]	A cpp @#define@; usual meaning.
+<tag>@-D<blah>@</tag>	A cpp @#define@; usual meaning.
 
-\item[@-i<dirs>@]	Add @<dirs>@ (colon-separated) to list of directories
+<tag>@-i<dirs>@</tag>	Add @<dirs>@ (colon-separated) to list of directories
 		to search for "import"ed modules.
 
-\item[@-I<dir>@]	Add @<dir>@ to list of directories to search for
+<tag>@-I<dir>@</tag>	Add @<dir>@ to list of directories to search for
 		.h files (i.e., usual meaning).
 
-\item[@-syslib <blah>@] This program uses this GHC system library; take
+<tag>@-syslib <blah>@</tag> This program uses this GHC system library; take
 		appropriate action (e.g., recognise when they are
 		"import"ing a module from that library).
-
-\item[@-ignore <mod>@]
-\end{description}
+</descrip>
 
 Here are the @mkdependHS@-specific options (not between @--@'s):
-\begin{description}
-\item[@-v@]	Be verbose.
-\item[@-v -v@]	Be very verbose.
-\item[@-w@]	Turn off warnings about interface file shadowing.
-\item[@-f blah@]
+<descrip>
+<tag>@-v@</tag>	Be verbose.
+<tag>@-v -v@</tag>	Be very verbose.
+<tag>@-w@</tag>	Turn off warnings about interface file shadowing.
+<tag>@-f blah@</tag>
 	Use @blah@ as the makefile, rather than @makefile@
 	or @Makefile@.  If @blah@ doesn't exist, @mkdependHS@ creates it.
 	We often use @-f .depend@ to put the dependencies in @.depend@ and
 	then @include@ the file @.depend@ into @Makefilpe@.
 
-\item[@-o <osuf>@]	
+<tag>@-o <osuf>@</tag>	
 	Use @.<osuf>@ as the "target file" suffix ( default: @o@).
 	Multiple @-o@ flags are permitted (GHC2.05 onwards).  Thus "@-o hc -o o@"
 	will generate dependencies for @.hc@ and @.o@ files.
 
-\item[@-s <suf>@]	
+<tag>@-s <suf>@</tag>	
 		Make extra dependencies that declare that files with
 		suffix @.<suf>_<osuf>@ depend on interface files with suffix @.<suf>_hi@, or
 		(for @{-# SOURCE #-}@ imports) on @.hi-boot@.
@@ -102,36 +104,38 @@ Here are the @mkdependHS@-specific options (not between @--@'s):
 		make dependencies for @.hc@ on @.hi@, @.a_hc@ on @.a_hi@, and @.b_hc@ on @.b_hi@.
 		(Useful in conjunction with NoFib "ways".)  
 
-\item[@--exclude-module=<file>@] 
+<tag>@--exclude-module=<file>@</tag> 
                 Regard @<file>@ as "stable"; i.e., exclude it from having
 		dependencies on it.
 
-\item[@-x@]      same as @--exclude-module@
+<tag>@-x@</tag>      same as @--exclude-module@
 
-\item[@--exclude-directory=<dirs>@] 
+<tag>@--exclude-directory=<dirs>@</tag> 
                 Regard the colon-separated list of directories @<dirs>@ as containing stable,
                 don't generate any dependencies on modules therein.
 
-\item[@-Xdirs@]      same as @--exclude-directory@.
+<tag>@-Xdirs@</tag>      same as @--exclude-directory@.
 
-\item[@--include-module=<file>@]
+<tag>@--include-module=<file>@</tag>
                 Regard @<file>@ as not "stable"; i.e., generate dependencies
                 on it (if any). This option is normally used in conjunction 
                 with the @--exclude-directory@ option.
-\item[@--include-prelude@]
+<tag>@--include-prelude@</tag>
 		Regard prelude libraries as unstable, i.e., generate dependencies
-		on the prelude modules used (including \tr{Prelude}).
+		on the prelude modules used (including @Prelude@).
 		This option is normally only used by the various system libraries. If
-		a \tr{-syslib} option is used, dependencies will also be
+		a @-syslib@ option is used, dependencies will also be
 		generated on the library's interfaces. 
-\end{description}
+</descrip>
 
 
 %************************************************************************
 %*                                                                      *
-\subsection[hstags]{Emacs `TAGS' for Haskell: \tr{hstags}}
-\index{hstags}
-\index{TAGS for Haskell}
+<sect1>Emacs `TAGS' for Haskell: @hstags@
+<label id="hstags">
+<p>
+<nidx>hstags</nidx>
+<nidx>TAGS for Haskell</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -140,24 +144,24 @@ programming-language things in a multi-file program, and then using
 that index to jump around among these definitions.
 
 Rather than scratch your head, saying ``Now where did we define
-`foo'?'', you just do (in Emacs) \tr{M-. foo RET}, and You're There!
+`foo'?'', you just do (in Emacs) @M-. foo RET@, and You're There!
 Some people go wild over this stuff...
 
-GHC comes with a program \tr{hstags}, which build Emacs-able TAGS
+GHC comes with a program @hstags@, which build Emacs-able TAGS
 files.  The invocation syntax is:
-\begin{verbatim}
+<tscreen><verb>
 hstags [GHC-options] file [files...]
-\end{verbatim}
+</verb></tscreen>
 
 The best thing is just to feed it your GHC command-line flags.
 A good Makefile entry might be:
-\begin{verbatim}
+<tscreen><verb>
 tags:
         $(RM) TAGS
         hstags $(GHC_FLAGS) *.lhs
-\end{verbatim}
+</verb></tscreen>
 
-The only flags of its own are: \tr{-v} to be verbose; \tr{-a} to
+The only flags of its own are: @-v@ to be verbose; @-a@ to
 **APPEND** to the TAGS file, rather than write to it.
 
 Shortcomings: (1)~Instance declarations don't get into the TAGS file
@@ -165,42 +169,46 @@ Shortcomings: (1)~Instance declarations don't get into the TAGS file
 is probably just as well.  (2)~Data-constructor definitions don't get
 in.  Go for the corresponding type constructor instead.
 
-(Actually, GHC also comes with \tr{etags} [for C], and \tr{perltags}
+(Actually, GHC also comes with @etags@ [for C], and @perltags@
 [for You Know What].  And---I cannot tell a lie---there is Denis
-Howe's \tr{fptags} [for Haskell, etc.] in the \tr{ghc/CONTRIB}
+Howe's @fptags@ [for Haskell, etc.] in the @ghc/CONTRIB@
 section...)
 
 %************************************************************************
 %*                                                                      *
-\subsection[happy]{``Yacc for Haskell'': \tr{happy}}
-\index{happy}
-\index{Yacc for Haskell}
-\index{parser generator for Haskell}
+<sect1>``Yacc for Haskell'': @happy@
+<label id="happy">
+<p>
+<nidx>happy</nidx>
+<nidx>Yacc for Haskell</nidx>
+<nidx>parser generator for Haskell</nidx>
 %*                                                                      *
 %************************************************************************
 
 Andy Gill and Simon Marlow have written a parser-generator for
-Haskell, called \tr{happy}.\index{happy parser generator} \tr{Happy}
-is to Haskell what \tr{Yacc} is to C.
+Haskell, called @happy@.<nidx>happy parser generator</nidx> @Happy@
+is to Haskell what @Yacc@ is to C.
 
-You can get \tr{happy} by FTP from \tr{ftp.dcs.gla.ac.uk} in
-\tr{pub/haskell/happy}, the file \tr{happy-0.8.tar.gz}.
+You can get @happy@ by FTP from @ftp.dcs.gla.ac.uk@ in
+@pub/haskell/happy@, the file @happy-0.8.tar.gz@.
 
-\tr{Happy} is at its shining best when compiled by GHC.
+@Happy@ is at its shining best when compiled by GHC.
 
 %************************************************************************
 %*                                                                      *
-\subsection[pphs]{Pretty-printing Haskell: \tr{pphs}}
-\index{pphs}
-\index{pretty-printing Haskell code}
+<sect1>Pretty-printing Haskell: @pphs@
+<label id="pphs">
+<p>
+<nidx>pphs</nidx>
+<nidx>pretty-printing Haskell code</nidx>
 %*                                                                      *
 %************************************************************************
 
 Andrew Preece has written
-\tr{pphs},\index{pphs}\index{pretty-printing Haskell}
+@pphs@,<nidx>pphs</nidx><nidx>pretty-printing Haskell</nidx>
 a utility to pretty-print Haskell code in LaTeX documents.
 Keywords in bolds, variables in italics---that sort of thing.  It is
 good at lining up program clauses and equals signs, things that are
 very tiresome to do by hand.
 
-The code is distributed with GHC in \tr{ghc/CONTRIB/pphs}.
+The code is distributed with GHC in @ghc/CONTRIB/pphs@.
