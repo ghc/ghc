@@ -21,8 +21,8 @@ import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId, 
 			  idSpecialisation, idUnique, isDataConWrapId,
-			  mkVanillaGlobal, isLocalId, 
-			  hasNoBinding, mkUserLocal
+			  mkVanillaGlobal, isLocalId, isRecordSelector,
+			  setIdUnfolding, hasNoBinding, mkUserLocal
 			) 
 import IdInfo		{- loads of stuff -}
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
@@ -413,6 +413,12 @@ tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
 -- 
 -- What about the Id in the TyCon?  It probably shouldn't be in the TyCon at
 -- all, but in any case it will have the error message inline so it won't matter.
+
+
+  | isRecordSelector id	-- We can't use the "otherwise" case, because that
+			-- forgets the IdDetails, which forgets that this is
+			-- a record selector, which confuses an importing module
+  = (env, id `setIdUnfolding` unfold_info)
 
   | otherwise
 	-- This function is the heart of Step 2
