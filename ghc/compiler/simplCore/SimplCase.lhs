@@ -11,7 +11,12 @@ Support code for @Simplify@.
 module SimplCase ( simplCase, bindLargeRhs ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(SmplLoop)		( simplBind, simplExpr, MagicUnfoldingFun )
+#else
+import {-# SOURCE #-} Simplify ( simplBind, simplExpr )
+--import {-# SOURCE #-} MagicUFs ( MagicUnfoldingFun )
+#endif
 
 import BinderInfo	-- too boring to try to select things...
 import CmdLineOpts	( SimplifierSwitch(..) )
@@ -20,7 +25,7 @@ import CoreUnfold	( Unfolding, SimpleUnfolding )
 import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
 			  unTagBindersAlts, unTagBinders, coreExprType
 			)
-import Id		( idType, isDataCon, getIdDemandInfo,
+import Id		( idType, isDataCon, getIdDemandInfo, dataConArgTys,
 			  SYN_IE(DataCon), GenId{-instance Eq-},
 			  SYN_IE(Id)
 			)
@@ -31,7 +36,8 @@ import PrelVals		( voidId )
 import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
 import SimplEnv
 import SimplMonad
-import Type		( isPrimType, getAppDataTyConExpandingDicts, mkFunTy, mkFunTys, eqTy )
+import Type		( isPrimType, maybeAppDataTyConExpandingDicts, getAppDataTyConExpandingDicts, mkFunTy, mkFunTys, eqTy )
+import TyCon		( isDataTyCon )
 import TysPrim		( voidTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
@@ -131,7 +137,10 @@ simplCase env scrut alts rhs_c result_ty
   | maybeToBool maybe_error_app
   = 	-- Look for an application of an error id
     tick CaseOfError 	`thenSmpl_`
-    returnSmpl retyped_error_app
+    simplExpr env retyped_error_app [] result_ty
+		-- Ignore rhs_c!
+		-- We must apply simplExpr because "rhs" isn't yet simplified.
+		-- The ice is a little thin because body_ty is an OutType; but it's ok really
   where
     maybe_error_app 	   = maybeErrorApp scrut (Just result_ty)
     Just retyped_error_app = maybe_error_app
@@ -501,6 +510,27 @@ simplAlts :: SimplEnv
 	  -> InAlts
 	  -> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
 	  -> SmplM OutAlts
+-- For single-constructor types
+--	case e of y -> b    ===>   case e of (a,b) -> let y = (a,b) in b
+
+simplAlts env scrut (AlgAlts [] (BindDefault bndr@(id,occ_info) rhs)) rhs_c
+  | maybeToBool maybe_data_ty && 
+    not (null cons) &&		-- Not an abstract type (can arise if we're pruning tydecl imports)
+    null other_cons
+  = ASSERT( isDataTyCon tycon )
+    newIds inst_con_arg_tys	`thenSmpl` \ new_bindees ->
+    let
+	new_args = [ (b, bad_occ_info) | b <- new_bindees ]
+	con_app  = mkCon con [] ty_args (map VarArg new_bindees)
+	new_rhs  = Let (NonRec bndr con_app) rhs
+    in
+    simplAlts env scrut (AlgAlts [(con,new_args,new_rhs)] NoDefault) rhs_c
+  where
+    maybe_data_ty		= maybeAppDataTyConExpandingDicts (idType id)
+    Just (tycon, ty_args, cons)	= maybe_data_ty
+    (con:other_cons)		= cons
+    inst_con_arg_tys 		= dataConArgTys con ty_args
+    bad_occ_info     		= ManyOcc 0	-- Non-committal!
 
 simplAlts env scrut (AlgAlts alts deflt) rhs_c
   = mapSmpl do_alt alts					`thenSmpl` \ alts' ->
