@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePosn.c,v 1.6 1999/12/08 15:47:07 simonmar Exp $
+ * $Id: filePosn.c,v 1.7 2000/04/14 16:25:08 rrt Exp $
  *
  * hGetPosn and hSetPosn Runtime Support
  */
@@ -19,7 +19,6 @@ StgForeignPtr ptr;
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     off_t posn;
-   
     while ( (posn = lseek(fo->fd, 0, SEEK_CUR)) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -32,13 +31,14 @@ StgForeignPtr ptr;
     } else if (fo->flags & FILEOBJ_READ) {
        posn -= (fo->bufWPtr - fo->bufRPtr);
 #if defined(_WIN32)
-       if (!(fo->flags & FILEOBJ_BINARY)) {
+       if (fo->buf && !(fo->flags & FILEOBJ_BINARY)) {
 	  /* Sigh, to get at the Real file position for files opened
 	     in text mode, we need to scan the read buffer looking for
 	     '\n's, making them count as \r\n (i.e., undoing the work of
              read()), since lseek() returns the raw position.
 	  */
           int i, j;
+
 	  i = fo->bufRPtr;
 	  j = fo->bufWPtr;
           while (i <= j) {
