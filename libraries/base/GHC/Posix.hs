@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hs,v 1.1 2002/02/05 17:32:26 simonmar Exp $
+-- $Id: Posix.hs,v 1.2 2002/02/13 12:12:08 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -242,9 +242,6 @@ foreign import ccall unsafe "chmod"
 foreign import ccall unsafe "chdir"
    c_chdir :: CString -> IO CInt
 
-foreign import ccall unsafe "chown"
-   c_chown :: CString -> CUid -> CGid -> IO CInt
-
 foreign import ccall unsafe "close"
    c_close :: CInt -> IO CInt
 
@@ -389,10 +386,6 @@ foreign import ccall unsafe "__hscore_st_mtime" st_mtime :: Ptr CStat -> IO CTim
 foreign import ccall unsafe "__hscore_st_size" st_size :: Ptr CStat -> IO COff
 foreign import ccall unsafe "__hscore_st_mode" st_mode :: Ptr CStat -> IO CMode
 
-foreign import ccall unsafe "__hscore_lflag" c_lflag :: Ptr CTermios -> IO CTcflag
-foreign import ccall unsafe "__hscore_poke_lflag" poke_c_lflag :: Ptr CTermios -> CTcflag -> IO ()
-foreign import ccall unsafe "__hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
-
 foreign import ccall unsafe "__hscore_echo"         const_echo :: CInt
 foreign import ccall unsafe "__hscore_tcsanow"      const_tcsanow :: CInt
 foreign import ccall unsafe "__hscore_icanon"       const_icanon :: CInt
@@ -407,6 +400,10 @@ foreign import ccall unsafe "__hscore_f_setfl"      const_f_setfl :: CInt
 #ifndef mingw32_TARGET_OS
 foreign import ccall unsafe "__hscore_sizeof_termios"  sizeof_termios :: Int
 foreign import ccall unsafe "__hscore_sizeof_sigset_t" sizeof_sigset_t :: Int
+
+foreign import ccall unsafe "__hscore_lflag" c_lflag :: Ptr CTermios -> IO CTcflag
+foreign import ccall unsafe "__hscore_poke_lflag" poke_c_lflag :: Ptr CTermios -> CTcflag -> IO ()
+foreign import ccall unsafe "__hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
 #endif
 
 #ifndef mingw32_TARGET_OS
