@@ -15,7 +15,7 @@
 module System.Cmd
     ( system,        -- :: String -> IO ExitCode
 #ifdef __GLASGOW_HASKELL__
-      rawSystem,     -- :: String -> IO ExitCode
+      rawSystem,     -- :: FilePath -> [String] -> IO ExitCode
 #endif
     ) where
 
@@ -26,6 +26,7 @@ import Foreign
 import Foreign.C
 import System.Exit
 import GHC.IOBase
+#include "config.h"
 #endif
 
 #ifdef __HUGS__
