@@ -1130,7 +1130,7 @@ mkMultiBranch :: Maybe Int	-- # datacons in tycon, if alg alt
               -> BcM BCInstrList
 mkMultiBranch maybe_ncons raw_ways
    = let d_way     = filter (isNoDiscr.fst) raw_ways
-         notd_ways = naturalMergeSortLe 
+         notd_ways = sortLe 
                         (\w1 w2 -> leAlt (fst w1) (fst w2))
                         (filter (not.isNoDiscr.fst) raw_ways)
 
