@@ -643,7 +643,6 @@ show2' x
  where x' = x `rem` 100
 
 show3 x = show (x `quot` 100) ++ show2 (x `rem` 100)
- where x' = x `rem` 1000
 
 to12 :: Int -> Int
 to12 h = let h' = h `mod` 12 in if h' == 0 then 12 else h'
