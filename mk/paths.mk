@@ -109,18 +109,33 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #             (caveat: assuming no funny use of -hisuf and that
 #               file name and module name match)
 
-PRE_SRCS    = $(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb *.hsc)
+PRE_SRCS    = $(patsubst ./%, %, \
+		$(wildcard $(patsubst %, %/*.hs, .   $(ALL_DIRS))) \
+	        $(wildcard $(patsubst %, %/*.lhs, .  $(ALL_DIRS))) \
+		$(wildcard $(patsubst %, %/*.y,   .  $(ALL_DIRS))) \
+	        $(wildcard $(patsubst %, %/*.c, .    $(ALL_DIRS))) \
+	        $(wildcard $(patsubst %, %/*.prl, .  $(ALL_DIRS))) \
+	        $(wildcard $(patsubst %, %/*.lprl, . $(ALL_DIRS))) \
+	        $(wildcard $(patsubst %, %/*.lit, .  $(ALL_DIRS))) \
+	        $(wildcard $(patsubst %, %/*.verb, . $(ALL_DIRS))) \
+	        $(wildcard $(patsubst %, %/*.hsc, .  $(ALL_DIRS))) \
+              )
 
 HSC_SRCS     = $(filter %.hsc, $(PRE_SRCS))
+HAPPY_SRCS   = $(filter %.y,   $(PRE_SRCS))
+
 DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 	       $(patsubst %.hsc, %_hsc.c, $(HSC_SRCS)) \
-	       $(patsubst %.hsc, %_hsc.h, $(HSC_SRCS))
+	       $(patsubst %.hsc, %_hsc.h, $(HSC_SRCS)) \
+	       $(patsubst %.y, %.hs, $(HAPPY_SRCS))
 
 # EXCLUDED_SRCS can be set in the Makefile, otherwise it defaults to empty.
 EXCLUDED_HSC_SRCS     = $(filter %.hsc, $(EXCLUDED_SRCS))
+EXCLUDED_HAPPY_SRCS   = $(filter %.y,   $(EXCLUDED_SRCS))
 EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.h, $(EXCLUDED_HSC_SRCS)) \
-			$(patsubst %.hsc, %_hsc.c, $(HSC_SRCS))
+			$(patsubst %.hsc, %_hsc.c, $(EXCLUDED_HSC_SRCS)) \
+			$(patsubst %.y, %.hs, $(EXCLUDED_HAPPY_SRCS))
 # Exclude _hsc.c files; they get built as part of the cbits library,
 # not part of the main library
 
