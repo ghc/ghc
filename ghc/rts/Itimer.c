@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.26 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Itimer.c,v 1.27 2001/11/26 12:58:17 simonpj Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -142,7 +142,9 @@ initialize_virtual_timer(nat ms)
     }
   }
 
+#ifdef PROFILING
   initProfTimer();
+#endif
 
   return 0;
 }
