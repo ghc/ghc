@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.54 2002/01/02 12:32:18 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.55 2002/02/14 11:56:03 njn Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -261,7 +261,11 @@ closureCodeBody binder_info closure_info cc [] body
     
     is_box  = case body of { StgApp fun [] -> True; _ -> False }
 
-    body_code   = profCtrC SLIT("TICK_ENT_THK") []		`thenC`
+    ticky_ent_lit = if (isStaticClosure closure_info)
+                    then SLIT("TICK_ENT_STATIC_THK")
+                    else SLIT("TICK_ENT_DYN_THK")
+
+    body_code   = profCtrC ticky_ent_lit []			`thenC`
 		  -- node always points when profiling, so this is ok:
 		  ldvEnter					`thenC`
 		  thunkWrapper closure_info body_label (
@@ -272,6 +276,7 @@ closureCodeBody binder_info closure_info cc [] body
 		    enterCostCentreCode closure_info cc IsThunk	is_box `thenC`
 		    cgExpr body
 		  )
+
 \end{code}
 
 If there is {\em at least one argument}, then this closure is in
@@ -333,7 +338,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	--slow_entry_code = forceHeapCheck [] True slow_entry_code'
 
     	slow_entry_code
-	  = profCtrC SLIT("TICK_ENT_FUN_STD") [
+	  = profCtrC slow_ticky_ent_lit [
 		    CLbl ticky_ctr_label DataPtrRep
 	    ] `thenC`
 
@@ -375,7 +380,7 @@ closureCodeBody binder_info closure_info cc all_args body
 			mkCString (_PK_ (map (showTypeCategory . idType) all_args))
 			] 
 		let prof = 
-			profCtrC SLIT("TICK_ENT_FUN_DIRECT") [
+			profCtrC fast_ticky_ent_lit [
 				CLbl ticky_ctr_label DataPtrRep
 			] 
 
@@ -424,6 +429,11 @@ closureCodeBody binder_info closure_info cc all_args body
   where
     ticky_ctr_label = mkRednCountsLabel name
 
+    (slow_ticky_ent_lit, fast_ticky_ent_lit) = 
+        if (isStaticClosure closure_info)
+        then (SLIT("TICK_ENT_STATIC_FUN_STD"), SLIT("TICK_ENT_STATIC_FUN_DIRECT"))
+        else (SLIT("TICK_ENT_DYN_FUN_STD"), SLIT("TICK_ENT_DYN_FUN_DIRECT"))
+        
     stg_arity = length all_args
     lf_info = closureLFInfo closure_info
 

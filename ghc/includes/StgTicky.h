@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.10 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: StgTicky.h,v 1.11 2002/02/14 11:56:04 njn Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -135,7 +135,8 @@
 
 #define TICK_ENT_VIA_NODE()	ENT_VIA_NODE_ctr++
 
-#define TICK_ENT_THK()		ENT_THK_ctr++         /* thunk */
+#define TICK_ENT_STATIC_THK(n)	ENT_STATIC_THK_ctr++ 
+#define TICK_ENT_DYN_THK(n)	ENT_DYN_THK_ctr++
 
 typedef struct _StgEntCounter {
     unsigned	registeredp:16,	/* 0 == no, 1 == yes */
@@ -159,11 +160,15 @@ typedef struct _StgEntCounter {
 /* The slow entry point for a function always goes to
    the fast entry point, which will register the stats block,
    so no need to do so here */
-#define TICK_ENT_FUN_STD(f_ct)                          	\
+#define TICK_ENT_STATIC_FUN_STD(f_ct)                          	\
         f_ct.slow_entry_count++;                                \
-        ENT_FUN_STD_ctr++     /* The total one */
+        ENT_STATIC_FUN_STD_ctr++     /* The static total one */
 
-#define TICK_ENT_FUN_DIRECT(f_ct)				\
+#define TICK_ENT_DYN_FUN_STD(f_ct)                          	\
+        f_ct.slow_entry_count++;                                \
+        ENT_DYN_FUN_STD_ctr++        /* The dynamic total one */
+
+#define TICK_ENT_FUN_DIRECT_BODY(f_ct)                          \
 	{							\
 	  if ( ! f_ct.registeredp ) {				\
 	    /* hook this one onto the front of the list */	\
@@ -174,13 +179,22 @@ typedef struct _StgEntCounter {
 	  }							\
 	  f_ct.entry_count += 1;				\
 	}							\
-	ENT_FUN_DIRECT_ctr++ /* The total one */
+
+#define TICK_ENT_STATIC_FUN_DIRECT(f_ct)			\
+        TICK_ENT_FUN_DIRECT_BODY(f_ct)                          \
+	ENT_STATIC_FUN_DIRECT_ctr++ /* The static total one */
+
+#define TICK_ENT_DYN_FUN_DIRECT(f_ct)				\
+        TICK_ENT_FUN_DIRECT_BODY(f_ct)                          \
+	ENT_DYN_FUN_DIRECT_ctr++ /* The dynamic total one */
 
 extern StgEntCounter top_ct;
 extern StgEntCounter *ticky_entry_ctrs;
 
-#define TICK_ENT_CON(n)		ENT_CON_ctr++	      /* enter constructor */
-#define TICK_ENT_IND(n)		ENT_IND_ctr++	      /* enter indirection */
+#define TICK_ENT_STATIC_CON(n)	ENT_STATIC_CON_ctr++  /* enter static constructor */
+#define TICK_ENT_DYN_CON(n)	ENT_DYN_CON_ctr++     /* enter dynamic constructor */
+#define TICK_ENT_STATIC_IND(n)	ENT_STATIC_IND_ctr++  /* enter static indirection */
+#define TICK_ENT_DYN_IND(n)	ENT_DYN_IND_ctr++     /* enter dynamic indirection */
 #define TICK_ENT_PERM_IND(n)    ENT_PERM_IND_ctr++    /* enter permanent indirection */
 #define TICK_ENT_PAP(n)		ENT_PAP_ctr++	      /* enter PAP */
 #define TICK_ENT_AP_UPD(n) 	ENT_AP_UPD_ctr++      /* enter AP_UPD */
@@ -462,11 +476,16 @@ EXTERN unsigned long ALLOC_BF_hst[5]
 #endif
 
 EXTERN unsigned long ENT_VIA_NODE_ctr INIT(0);
-EXTERN unsigned long ENT_THK_ctr INIT(0);
-EXTERN unsigned long ENT_FUN_STD_ctr INIT(0);
-EXTERN unsigned long ENT_FUN_DIRECT_ctr INIT(0);
-EXTERN unsigned long ENT_CON_ctr INIT(0);
-EXTERN unsigned long ENT_IND_ctr INIT(0);
+EXTERN unsigned long ENT_STATIC_THK_ctr INIT(0);
+EXTERN unsigned long ENT_DYN_THK_ctr INIT(0);
+EXTERN unsigned long ENT_STATIC_FUN_STD_ctr INIT(0);
+EXTERN unsigned long ENT_DYN_FUN_STD_ctr INIT(0);
+EXTERN unsigned long ENT_STATIC_FUN_DIRECT_ctr INIT(0);
+EXTERN unsigned long ENT_DYN_FUN_DIRECT_ctr INIT(0);
+EXTERN unsigned long ENT_STATIC_CON_ctr INIT(0);
+EXTERN unsigned long ENT_DYN_CON_ctr INIT(0);
+EXTERN unsigned long ENT_STATIC_IND_ctr INIT(0);
+EXTERN unsigned long ENT_DYN_IND_ctr INIT(0);
 EXTERN unsigned long ENT_PERM_IND_ctr INIT(0);
 EXTERN unsigned long ENT_PAP_ctr INIT(0);
 EXTERN unsigned long ENT_AP_UPD_ctr INIT(0);
@@ -585,12 +604,17 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 
 #define TICK_ENT_VIA_NODE()	
 				
-#define TICK_ENT_THK()
-#define TICK_ENT_FUN_STD(n)
-#define TICK_ENT_FUN_DIRECT(n)
+#define TICK_ENT_STATIC_THK()
+#define TICK_ENT_DYN_THK()
+#define TICK_ENT_STATIC_FUN_STD(n)
+#define TICK_ENT_DYN_FUN_STD(n)
+#define TICK_ENT_STATIC_FUN_DIRECT(n)
+#define TICK_ENT_DYN_FUN_DIRECT(n)
 				
-#define TICK_ENT_CON(n)
-#define TICK_ENT_IND(n)
+#define TICK_ENT_STATIC_CON(n)
+#define TICK_ENT_DYN_CON(n)
+#define TICK_ENT_STATIC_IND(n)
+#define TICK_ENT_DYN_IND(n)
 #define TICK_ENT_PERM_IND(n)
 #define TICK_ENT_PAP(n)
 #define TICK_ENT_AP_UPD(n)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.73 2002/02/12 15:17:22 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.74 2002/02/14 11:56:05 njn Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -292,7 +292,7 @@ INFO_TABLE(stg_IND_info,stg_IND_entry,1,0,IND,,EF_,"IND","IND");
 STGFUN(stg_IND_entry)
 {
     FB_
-    TICK_ENT_IND(Node);	/* tick */
+    TICK_ENT_DYN_IND(Node);	/* tick */
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
     JMP_(GET_ENTRY(R1.cl));
@@ -303,7 +303,7 @@ INFO_TABLE(stg_IND_STATIC_info,stg_IND_STATIC_entry,1,0,IND_STATIC,,EF_,"IND_STA
 STGFUN(stg_IND_STATIC_entry)
 {
     FB_
-    TICK_ENT_IND(Node);	/* tick */
+    TICK_ENT_STATIC_IND(Node);	/* tick */
     R1.p = (P_) ((StgIndStatic*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
     JMP_(GET_ENTRY(R1.cl));
@@ -315,7 +315,7 @@ STGFUN(stg_IND_PERM_entry)
 {
     FB_
     /* Don't add INDs to granularity cost */
-    /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profiling */
+    /* Dont: TICK_ENT_STATIC_IND(Node); for ticky-ticky; this ind is here only to help profiling */
 
 #if defined(TICKY_TICKY) && !defined(PROFILING)
     /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than being extra  */
@@ -358,7 +358,7 @@ INFO_TABLE(stg_IND_OLDGEN_info,stg_IND_OLDGEN_entry,1,1,IND_OLDGEN,,EF_,"IND_OLD
 STGFUN(stg_IND_OLDGEN_entry)
 {
     FB_
-    TICK_ENT_IND(Node);	/* tick */
+    TICK_ENT_STATIC_IND(Node);	/* tick */
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
     JMP_(GET_ENTRY(R1.cl));
@@ -369,7 +369,7 @@ INFO_TABLE(stg_IND_OLDGEN_PERM_info,stg_IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PER
 STGFUN(stg_IND_OLDGEN_PERM_entry)
 {
     FB_
-    /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profiling */
+    /* Dont: TICK_ENT_STATIC_IND(Node); for ticky-ticky; this ind is here only to help profiling */
 
 #if defined(TICKY_TICKY) && !defined(PROFILING)
     /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than being extra  */

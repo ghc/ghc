@@ -117,10 +117,15 @@ genConInfo comp_info data_con
     -- info-table contains the information we need.
     (static_ci,_) = layOutStaticConstr con_name data_con typePrimRep arg_tys
 
-    body       = initC comp_info (
-	    	      profCtrC SLIT("TICK_ENT_CON") [CReg node] `thenC`
-		      ldvEnter `thenC`
-		      body_code)
+    static_body  = initC comp_info (
+                      profCtrC SLIT("TICK_ENT_STATIC_CON") [CReg node] `thenC`
+                      ldv_enter_and_body_code)
+
+    closure_body = initC comp_info (
+                      profCtrC SLIT("TICK_ENT_DYN_CON") [CReg node] `thenC`
+                      ldv_enter_and_body_code)
+
+    ldv_enter_and_body_code = ldvEnter `thenC` body_code
 
     con_descr  = occNameUserString (getOccName data_con)
 
@@ -128,9 +133,9 @@ genConInfo comp_info data_con
     closure_code = if zero_arity_con then 
 			AbsCNop 
 		   else 
-			CClosureInfoAndCode closure_info body Nothing con_descr
+			CClosureInfoAndCode closure_info closure_body Nothing con_descr
 
-    static_code  = CClosureInfoAndCode static_ci body Nothing con_descr
+    static_code  = CClosureInfoAndCode static_ci static_body Nothing con_descr
 
     zero_arity_con   = isNullaryDataCon data_con
 	-- We used to check that all the arg-sizes were zero, but we don't

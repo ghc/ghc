@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.13 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Ticky.c,v 1.14 2002/02/14 11:56:05 njn Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -67,14 +67,20 @@ PrintTickyInfo(void)
   unsigned long tot_wds = /* total words */
 	tot_adm_wds + tot_gds_wds + tot_slp_wds;
 
+  unsigned long tot_thk_enters = ENT_STATIC_THK_ctr + ENT_DYN_THK_ctr;
+  unsigned long tot_con_enters = ENT_STATIC_CON_ctr + ENT_DYN_CON_ctr;
+  unsigned long tot_fun_direct_enters = ENT_STATIC_FUN_DIRECT_ctr + ENT_DYN_FUN_DIRECT_ctr;
+  unsigned long tot_fun_std_enters = ENT_STATIC_FUN_STD_ctr + ENT_DYN_FUN_STD_ctr;
+  unsigned long tot_ind_enters = ENT_STATIC_IND_ctr + ENT_DYN_IND_ctr;
+  
   unsigned long tot_enters =
-	ENT_CON_ctr + ENT_FUN_DIRECT_ctr +
-	ENT_IND_ctr + ENT_PERM_IND_ctr + ENT_PAP_ctr + ENT_THK_ctr;
+	tot_con_enters + tot_fun_direct_enters +
+	tot_ind_enters + ENT_PERM_IND_ctr + ENT_PAP_ctr + tot_thk_enters;
   unsigned long jump_direct_enters =
 	tot_enters - ENT_VIA_NODE_ctr;
   unsigned long bypass_enters =
-	ENT_FUN_DIRECT_ctr -
-	(ENT_FUN_STD_ctr - UPD_PAP_IN_NEW_ctr);
+	tot_fun_direct_enters -
+	(tot_fun_std_enters - UPD_PAP_IN_NEW_ctr);
 
   unsigned long tot_returns =
 	RET_NEW_ctr + RET_OLD_ctr + RET_UNBOXED_TUP_ctr +
@@ -183,22 +189,22 @@ PrintTickyInfo(void)
 	jump_direct_enters,
 	PC(INTAVG(jump_direct_enters,tot_enters)));
   fprintf(tf,"%7ld (%5.1f%%) thunks\n",
-	ENT_THK_ctr,
-	PC(INTAVG(ENT_THK_ctr,tot_enters)));
+	tot_thk_enters,
+	PC(INTAVG(tot_thk_enters,tot_enters)));
   fprintf(tf,"%7ld (%5.1f%%) data values\n",
-	ENT_CON_ctr,
-	PC(INTAVG(ENT_CON_ctr,tot_enters)));
+	tot_con_enters,
+	PC(INTAVG(tot_con_enters,tot_enters)));
   fprintf(tf,"%7ld (%5.1f%%) function values\n\t\t  [of which %ld (%.1f%%) bypassed arg-satisfaction chk]\n",
-	ENT_FUN_DIRECT_ctr,
-	PC(INTAVG(ENT_FUN_DIRECT_ctr,tot_enters)),
+	tot_fun_direct_enters,
+	PC(INTAVG(tot_fun_direct_enters,tot_enters)),
 	bypass_enters,
-	PC(INTAVG(bypass_enters,ENT_FUN_DIRECT_ctr)));
+	PC(INTAVG(bypass_enters,tot_fun_direct_enters)));
   fprintf(tf,"%7ld (%5.1f%%) partial applications\n",
 	ENT_PAP_ctr,
 	PC(INTAVG(ENT_PAP_ctr,tot_enters)));
   fprintf(tf,"%7ld (%5.1f%%) normal indirections\n",
-	ENT_IND_ctr,
-	PC(INTAVG(ENT_IND_ctr,tot_enters)));
+	tot_ind_enters,
+	PC(INTAVG(tot_ind_enters,tot_enters)));
   fprintf(tf,"%7ld (%5.1f%%) permanent indirections\n",
 	ENT_PERM_IND_ctr,
 	PC(INTAVG(ENT_PERM_IND_ctr,tot_enters)));
@@ -403,10 +409,14 @@ PrintTickyInfo(void)
 #endif
 
   PR_CTR(ENT_VIA_NODE_ctr);
-  PR_CTR(ENT_CON_ctr);
-  PR_CTR(ENT_FUN_STD_ctr);
-  PR_CTR(ENT_FUN_DIRECT_ctr);
-  PR_CTR(ENT_IND_ctr);
+  PR_CTR(ENT_STATIC_CON_ctr);
+  PR_CTR(ENT_DYN_CON_ctr);
+  PR_CTR(ENT_STATIC_FUN_STD_ctr);
+  PR_CTR(ENT_DYN_FUN_STD_ctr);
+  PR_CTR(ENT_STATIC_FUN_DIRECT_ctr);
+  PR_CTR(ENT_DYN_FUN_DIRECT_ctr);
+  PR_CTR(ENT_STATIC_IND_ctr);
+  PR_CTR(ENT_DYN_IND_ctr);
 
 /* The counters ENT_PERM_IND and UPD_{NEW,OLD}_PERM_IND are not dumped
  * at the end of execution unless update squeezing is turned off (+RTS
@@ -426,7 +436,8 @@ PrintTickyInfo(void)
   PR_CTR(ENT_PAP_ctr);
   PR_CTR(ENT_AP_UPD_ctr);
   PR_CTR(ENT_BH_ctr);
-  PR_CTR(ENT_THK_ctr);
+  PR_CTR(ENT_STATIC_THK_ctr);
+  PR_CTR(ENT_DYN_THK_ctr);
 
   PR_CTR(RET_NEW_ctr);
   PR_CTR(RET_OLD_ctr);
