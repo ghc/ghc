@@ -5,6 +5,50 @@
   <para>This section describes other program(s) which we distribute,
   that help with the Great Haskell Programming Task.</para>
 
+<!-- comment: hasktags documentation losely based on that for hstags -->
+
+<sect1  id ="hasktags">
+	<title>Ctags and Etags for Haskell: <command>hasktags</command></title>
+	<indexterm><primary><command>hasktags</command></primary></indexterm>
+	<indexterm><primary>CTAGS for Haskell</primary></indexterm>
+	
+	<para><command>hasktags</command> is a very simple Haskell program that produces ctags "tags" and etags "TAGS" files for Haskell programs.</para>
+	
+	<para>When loaded into an editor such an NEdit, Vim, or Emacs, this allows one to easily navigate around a multi-file program, finding definitions of functions, types, and constructors.</para>
+	
+	<para>Invocation Syntax:</para>
+	
+<screen>
+hasktags files	
+</screen>
+
+<para>This will read all the files listed in <option>files</option> and produce a ctags "tags" file and an etags "TAGS" file in the current directory.</para>
+	
+	<para>Example usage</para>
+	
+<screen>
+find -name \*.\*hs | xargs hasktags
+</screen>
+
+<para>This will find all haskell source files in the current directory and below, and create tags files indexing them in the current directory.</para>
+	
+	<para><command>hasktags</command> is a simple program that uses simple
+	parsing rules to find definitions of functions, constructors, and types. It isn't guranteed to find everything, and will sometimes create false index entries, but it usually gets the job done fairly well. In particular, at present, functions are only indexed if a type signature is given for them.</para>	
+	
+	<para>Before hasktags, there used to be <command>fptags</command> and <command>hstags</command>, which did essentially the same job, however neither of these seem to be maintained any more.</para>
+
+<sect2>
+<title>Using tags with your editor</title>
+
+<para>With NEdit, load the "tags" file using "File/Load Tags File". Use "Ctrl-D" to search for a tag.</para>
+
+<para>With XEmacs, load the "TAGS" file using "visit-tags-table". Use "M-." to search for a tag.</para>
+
+
+</sect2>
+	
+</sect1>
+
 <!-- comment: hstags doesn't work anymore
 
   <sect1 id="hstags">
