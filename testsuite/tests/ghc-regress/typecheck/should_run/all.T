@@ -26,4 +26,3 @@ test "tcrun018" { vtr("", "", "") }
 test "tcrun019" { vtr("", "", "") }
 test "tcrun020" { vtr("", "", "") }
 test "tcrun021" { vtr("-package data", "", "") }
-test "tcrun022" { vtr("", "", "") }
