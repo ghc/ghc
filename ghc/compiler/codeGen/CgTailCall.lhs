@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.41 2004/11/26 16:20:12 simonmar Exp $
+% $Id: CgTailCall.lhs,v 1.42 2005/03/31 10:16:34 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -97,7 +97,7 @@ performTailCall
 	:: CgIdInfo		-- The function
 	-> [(CgRep,CmmExpr)]	-- Args
 	-> CmmStmts		-- Pending simultaneous assignments
-				-- *** GUARANTEED to contain only stack assignments.
+				--  *** GUARANTEED to contain only stack assignments.
 	-> Code
 
 performTailCall fun_info arg_amodes pending_assts
@@ -372,7 +372,7 @@ tailCallPrimOp op args
 -- -----------------------------------------------------------------------------
 -- Return Addresses
 
--- | We always push the return address just before performing a tail call
+-- We always push the return address just before performing a tail call
 -- or return.  The reason we leave it until then is because the stack
 -- slot that the return address is to go into might contain something
 -- useful.

@@ -295,7 +295,7 @@ mk_wrap_arg uniq ty dmd one_shot
 
 \begin{code}
 mkWWstr :: [Var]				-- Wrapper args; have their demand info on them
-						-- *Includes type variables*
+						--  *Includes type variables*
         -> UniqSM ([Var],			-- Worker args
 		   CoreExpr -> CoreExpr,	-- Wrapper body, lacking the worker call
 						-- and without its lambdas 

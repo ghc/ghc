@@ -300,7 +300,7 @@ repC (L loc (ConDecl con tvs (L cloc ctxt) details))
 repC (L loc con_decl)
   = do	{ dsWarn (loc, hang ds_msg 4 (ppr con_decl))
 	; return (panic "DsMeta:repC") }
-  where
+
 -- gaw 2004 FIX! Need a case for GadtDecl
 
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
@@ -881,7 +881,7 @@ lookupBinder n
 
 -- Look up a name that is either locally bound or a global name
 --
--- * If it is a global name, generate the "original name" representation (ie,
+--  * If it is a global name, generate the "original name" representation (ie,
 --   the <module>:<name> form) for the associated entity
 --
 lookupLOcc :: Located Name -> DsM (Core TH.Name)

@@ -165,7 +165,7 @@ idInfoToAmode info
       VirStkLoc sp_off -> do { sp_rel <- getSpRelOffset sp_off
 			     ; return (CmmLoad sp_rel mach_rep) }
 
-      VirStkLNE sp_off -> getSpRelOffset sp_off ;
+      VirStkLNE sp_off -> getSpRelOffset sp_off
 
       VoidLoc -> return $ pprPanic "idInfoToAmode: void" (ppr (cg_id info))
 		-- We return a 'bottom' amode, rather than panicing now

@@ -143,7 +143,7 @@ panic, pgmError :: String -> a
 panic    x = Exception.throwDyn (Panic x)
 pgmError x = Exception.throwDyn (ProgramError x)
 
--- #-versions because panic can't return an unboxed int, and that's
+--  #-versions because panic can't return an unboxed int, and that's
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)
 -- No, man -- Too Beautiful! (Will)
 

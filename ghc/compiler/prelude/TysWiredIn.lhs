@@ -485,7 +485,7 @@ mkPArrTy ty  = mkTyConApp parrTyCon [ty]
 
 -- represents the type constructor of parallel arrays
 --
--- * this must match the definition in `PrelPArr'
+--  * this must match the definition in `PrelPArr'
 --
 -- NB: Although the constructor is given here, it will not be accessible in
 --     user code as it is not in the environment of any compiled module except
@@ -511,7 +511,7 @@ isPArrTyCon tc  = tyConName tc == parrTyConName
 
 -- fake array constructors
 --
--- * these constructors are never really used to represent array values;
+--  * these constructors are never really used to represent array values;
 --   however, they are very convenient during desugaring (and, in particular,
 --   in the pattern matching compiler) to treat array pattern just like
 --   yet another constructor pattern

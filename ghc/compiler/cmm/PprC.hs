@@ -370,8 +370,8 @@ pprLit lit = case lit of
     CmmLabelOff clbl i -> mkW_ <> pprCLabel clbl <> char '+' <> int i
     CmmLabelDiffOff clbl1 clbl2 i
         -- WARNING:
-        -- * the lit must occur in the info table clbl2
-        -- * clbl1 must be an SRT, a slow entry point or a large bitmap
+        --  * the lit must occur in the info table clbl2
+        --  * clbl1 must be an SRT, a slow entry point or a large bitmap
         -- The Mangler is expected to convert any reference to an SRT,
         -- a slow entry point or a large bitmap
         -- from an info table to an offset.

@@ -279,7 +279,7 @@ data DataConIds
 				-- may or may not have a wrapper, depending on whether
 				-- the wrapper does anything.
 
-	-- *Neither* the worker *nor* the wrapper take the dcStupidTheta dicts as arguments
+	-- _Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
 
 	-- The wrapper takes dcOrigArgTys as its arguments
 	-- The worker takes dcRepArgTys as its arguments

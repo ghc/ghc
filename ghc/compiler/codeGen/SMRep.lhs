@@ -251,8 +251,8 @@ data SMRep
   = GenericRep		-- GC routines consult sizes in info tbl
 	Bool		-- True <=> This is a static closure.  Affects how 
 			-- 	    we garbage-collect it
-	!Int		-- # ptr words
-	!Int		-- # non-ptr words
+	!Int		--  # ptr words
+	!Int		--  # non-ptr words
 	ClosureType	-- closure type
 
   | BlackHoleRep

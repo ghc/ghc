@@ -61,7 +61,7 @@ tcRule (HsRule name act vars lhs rhs)
 	--	   See the 'lhs_dicts' in tcSimplifyAndCheck for the RHS
 
 	-- We initially quantify over any tyvars free in *either* the rule
-	-- *or* the bound variables.  The latter is important.  Consider
+	--  *or* the bound variables.  The latter is important.  Consider
 	--	ss (x,(y,z)) = (x,z)
 	--	RULE:  forall v. fst (ss v) = fst v
 	-- The type of the rhs of the rule is just a, but v::(a,(b,c))

@@ -284,8 +284,8 @@ idFreeTyVars :: Id -> TyVarSet
 -- Only local Ids conjured up locally, can have free type variables.
 -- (During type checking top-level Ids can have free tyvars)
 idFreeTyVars id = tyVarsOfType (idType id)
--- | isLocalId id = tyVarsOfType (idType id)
--- | otherwise    = emptyVarSet
+--  | isLocalId id = tyVarsOfType (idType id)
+--  | otherwise    = emptyVarSet
 
 idRuleVars ::Id -> VarSet
 idRuleVars id = ASSERT( isId id) rulesRhsFreeVars (idSpecialisation id)

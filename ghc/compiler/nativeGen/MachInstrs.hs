@@ -452,8 +452,8 @@ bit or 64 bit precision.
 	| PUSH          MachRep Operand
 	| POP           MachRep Operand
 	-- both unused (SDM):
-	-- | PUSHA
-	-- | POPA
+	--  | PUSHA
+	--  | POPA
 
 -- Jumping around.
 	| JMP	      Operand
@@ -495,15 +495,15 @@ ffree_before_nonlocal_transfers insn
 is_G_instr :: Instr -> Bool
 is_G_instr instr
    = case instr of
-        GMOV _ _ -> True; GLD _ _ _ -> True; GST _ _ _ -> True;
-        GLDZ _ -> True; GLD1 _ -> True;
-        GFTOI _ _ -> True; GDTOI _ _ -> True;
-        GITOF _ _ -> True; GITOD _ _ -> True;
+        GMOV _ _ -> True; GLD _ _ _ -> True; GST _ _ _ -> True
+        GLDZ _ -> True; GLD1 _ -> True
+        GFTOI _ _ -> True; GDTOI _ _ -> True
+        GITOF _ _ -> True; GITOD _ _ -> True
 	GADD _ _ _ _ -> True; GDIV _ _ _ _ -> True
 	GSUB _ _ _ _ -> True; GMUL _ _ _ _ -> True
     	GCMP _ _ _ -> True; GABS _ _ _ -> True
     	GNEG _ _ _ -> True; GSQRT _ _ _ -> True
-        GSIN _ _ _ -> True; GCOS _ _ _ -> True; GTAN _ _ _ -> True;
+        GSIN _ _ _ -> True; GCOS _ _ _ -> True; GTAN _ _ _ -> True
         GFREE -> panic "is_G_instr: GFREE (!)"
         other -> False
 

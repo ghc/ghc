@@ -69,7 +69,7 @@ stg2stg dflags module_name binds
 	     end_pass us2 "StgStats" ccs binds
 
 	  StgDoMassageForProfiling ->
-	     _scc_ "ProfMassage"
+	     {-# SCC "ProfMassage" #-}
 	     let
 		 (collected_CCs, binds3)
 		   = stgMassageForProfiling dflags module_name us1 binds

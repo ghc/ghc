@@ -9,9 +9,9 @@ Buffers for scanning string input stored in external arrays.
 module StringBuffer
        (
         StringBuffer(..),
-	-- non-abstract for vs/HaskellService
+	-- non-abstract for vs\/HaskellService
 
-	 -- * Creation/destruction
+	 -- * Creation\/destruction
         hGetStringBuffer,     -- :: FilePath     -> IO StringBuffer
 	stringToStringBuffer, -- :: String       -> IO StringBuffer
 
@@ -24,12 +24,12 @@ module StringBuffer
 	-- * Moving
 	stepOn, stepOnBy,
 
-         -- * Conversion
+        -- * Conversion
         lexemeToString,     -- :: StringBuffer -> Int -> String
         lexemeToFastString, -- :: StringBuffer -> Int -> FastString
 
 	 -- * Parsing integers
-	 parseInteger,
+	parseInteger,
        ) where
 
 #include "HsVersions.h"

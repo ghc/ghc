@@ -50,9 +50,9 @@ In particular:
 
 \begin{code}
 data Kind 
-  = LiftedTypeKind 	-- *
+  = LiftedTypeKind 	--  *
   | OpenTypeKind	-- ?
-  | UnliftedTypeKind	-- #
+  | UnliftedTypeKind	--  #
   | UbxTupleKind	-- (##)
   | ArgTypeKind		-- ??
   | FunKind Kind Kind	-- k1 -> k2

@@ -208,7 +208,7 @@ type LHsTyVarBndr name = Located (HsTyVarBndr name)
 data HsTyVarBndr name
   = UserTyVar name
   | KindedTyVar name Kind
-	-- *** NOTA BENE *** A "monotype" in a pragma can have
+	--  *** NOTA BENE *** A "monotype" in a pragma can have
 	-- for-alls in it, (mostly to do with dictionaries).  These
 	-- must be explicitly Kinded.
 

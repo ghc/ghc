@@ -368,7 +368,6 @@ mkPackageState dflags pkg_db = do
 	  --
 	  when (not (null overlaps)) $ overlappingError pkg overlaps
 	  --
-	  let
 	  return (addListToUFM modmap 
 		    [(m, (pkg, m `elem` exposed_mods)) 
 		    | m <- all_mods])

@@ -229,15 +229,15 @@ This gets filled in by the renamer.
 
 \begin{code}
 type ReboundNames id = [(Name, HsExpr id)]
--- * Before the renamer, this list is empty
+--  * Before the renamer, this list is empty
 --
--- * After the renamer, it takes the form [(std_name, HsVar actual_name)]
+--  * After the renamer, it takes the form [(std_name, HsVar actual_name)]
 --   For example, for the 'return' op of a monad
 --	normal case:		(GHC.Base.return, HsVar GHC.Base.return)
 --	with rebindable syntax:	(GHC.Base.return, return_22)
 --		where return_22 is whatever "return" is in scope
 --
--- * After the type checker, it takes the form [(std_name, <expression>)]
+--  * After the type checker, it takes the form [(std_name, <expression>)]
 --	where <expression> is the evidence for the method
 \end{code}
 
@@ -814,7 +814,7 @@ pprComp brack stmts
 %************************************************************************
 
 \begin{code}
-data HsSplice id  = HsSplice 	-- $z  or $(f 4)
+data HsSplice id  = HsSplice 	--  $z  or $(f 4)
 			id 		-- The id is just a unique name to 
 			(LHsExpr id) 	-- identify this splice point
 					

@@ -1156,7 +1156,7 @@ callerSaves CurrentNursery		= True
 callerSaves _				= False
 
 
--- | Returns 'Nothing' if this global register is not stored
+--  | Returns 'Nothing' if this global register is not stored
 -- in a real machine register, otherwise returns @'Just' reg@, where
 -- reg is the machine register it is stored in.
 

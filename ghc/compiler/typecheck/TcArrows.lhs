@@ -330,7 +330,7 @@ tc_cmd env cmd _
 \begin{code}
 mkPairTy t1 t2 = mkTyConApp pairTyCon [t1,t2]
 
-arrowTyConKind :: Kind		-- *->*->*
+arrowTyConKind :: Kind		--  *->*->*
 arrowTyConKind = mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind
 \end{code}
 

@@ -1114,7 +1114,7 @@ gen_Data_binds fix_env tycon
                         emptyLHsBinds
                         (nlHsVar data_type_name)
 
-	------------ $dT
+	------------  $dT
 
     data_type_name = mkDerivedRdrName tycon_name mkDataTOcc
     datatype_bind  = mkVarBind
@@ -1127,7 +1127,7 @@ gen_Data_binds fix_env tycon
     constrs = [nlHsVar (mk_constr_name con) | con <- data_cons]
 
 
-	------------ $cT1 etc
+	------------  $cT1 etc
     mk_constr_name con = mkDerivedRdrName (dataConName con) mkDataCOcc
     mk_con_bind dc = mkVarBind
                        tycon_loc

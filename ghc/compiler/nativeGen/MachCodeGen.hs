@@ -1553,7 +1553,7 @@ extendSExpr rep x = CmmMachOp (MO_S_Conv rep I32) [x]
 extendUExpr I32 x = x
 extendUExpr rep x = CmmMachOp (MO_U_Conv rep I32) [x]
 
--- ###FIXME: exact code duplication from x86 case
+--  ###FIXME: exact code duplication from x86 case
 -- The dual to getAnyReg: compute an expression into a register, but
 -- we don't mind which one it is.
 getSomeReg :: CmmExpr -> NatM (Reg, InstrBlock)
@@ -2085,7 +2085,7 @@ condFltCode cond x y
 #endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
--- ###FIXME: I16 and I8!
+--  ###FIXME: I16 and I8!
 condIntCode cond x (CmmLit (CmmInt y rep))
   | Just src2 <- makeImmediate rep (not $ condUnsigned cond) y
   = do

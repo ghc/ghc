@@ -1037,7 +1037,7 @@ composeTvSubst in_scope env1 env2
 	-- First apply env1 to the range of env2
 	-- Then combine the two, making sure that env1 loses if
 	-- both bind the same variable; that's why env1 is the
-	-- *left* argument to plusVarEnv, because the right arg wins
+	--  *left* argument to plusVarEnv, because the right arg wins
   where
     subst1 = TvSubst in_scope env1
 

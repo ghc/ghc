@@ -170,8 +170,8 @@ howToAccessLabel _ lbl | labelDynamic lbl = AccessViaSymbolPtr
 -- Mach-O (Darwin, Mac OS X)
 --
 -- Indirect access is required in the following cases:
--- * things imported from a dynamic library
--- * things from a different module, if we're generating PIC code
+--  * things imported from a dynamic library
+--  * things from a different module, if we're generating PIC code
 -- It is always possible to access something indirectly,
 -- even when it's not necessary.
 

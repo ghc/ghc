@@ -550,7 +550,7 @@ make_con (ConPatOut (L _ id) _ _ _ (PrefixCon pats) _) (ps, constraints)
 
 -- reconstruct parallel array pattern
 --
--- * don't check for the type only; we need to make sure that we are really
+--  * don't check for the type only; we need to make sure that we are really
 --   dealing with one of the fake constructors and not with the real
 --   representation 
 

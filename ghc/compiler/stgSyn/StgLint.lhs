@@ -59,7 +59,7 @@ generation.  Solution: don't use it!  (KSW 2000-05).
 lintStgBindings :: String -> [StgBinding] -> [StgBinding]
 
 lintStgBindings whodunnit binds
-  = _scc_ "StgLint"
+  = {-# SCC "StgLint" #-}
     case (initL (lint_binds binds)) of
       Nothing  -> binds
       Just msg -> pprPanic "" (vcat [

@@ -326,12 +326,12 @@ And so the code for let(rec)-things:
   | StgLetNoEscape			-- remember: ``advanced stuff''
 	(GenStgLiveVars occ)		-- Live in the whole let-expression
 					-- Mustn't overwrite these stack slots
-    	    	    	    	    	-- *Doesn't* include binders of the let(rec).
+    	    	    	    	    	--  *Doesn't* include binders of the let(rec).
 
 	(GenStgLiveVars occ)		-- Live in the right hand sides (only)
 					-- These are the ones which must be saved on
 					-- the stack if they aren't there already
-    	    	    	    	    	-- *Does* include binders of the let(rec) if recursive.
+    	    	    	    	    	--  *Does* include binders of the let(rec) if recursive.
 
 	(GenStgBinding bndr occ)	-- right hand sides (see below)
 	(GenStgExpr bndr occ)		-- body

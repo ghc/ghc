@@ -775,7 +775,7 @@ been instantiated.
 \begin{code}
 data TcSigInfo
   = TcSigInfo {
-	sig_id     :: TcId,		-- *Polymorphic* binder for this value...
+	sig_id     :: TcId,		--  *Polymorphic* binder for this value...
 
 	sig_scoped :: [Name],		-- Names for any scoped type variables
 					-- Invariant: correspond 1-1 with an initial

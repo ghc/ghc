@@ -205,7 +205,7 @@ saTransform binder rhs
 	    nonrec_rhs = origLams local_body
 
 	    -- HACK! The following is a fake SysLocal binder with
-	    -- *the same* unique as binder.
+	    --  *the same* unique as binder.
 	    -- the reason for this is the following:
 	    -- this binder *will* get inlined but if it happen to be
 	    -- a top level binder it is never removed as dead code,

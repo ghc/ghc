@@ -93,7 +93,7 @@ charType c = case c of
    '\10'  -> cSpace	               -- \n (not allowed in strings, so !cAny)
    '\11'  -> cAny + cSpace             -- \v
    '\12'  -> cAny + cSpace             -- \f
-   '\13'  -> cAny + cSpace             -- ^M
+   '\13'  -> cAny + cSpace             --  ^M
    '\14'  -> 0                         -- \016
    '\15'  -> 0                         -- \017
    '\16'  -> 0                         -- \020
@@ -115,19 +115,19 @@ charType c = case c of
    '\32'  -> cAny + cSpace             --
    '\33'  -> cAny + cSymbol            -- !
    '\34'  -> cAny                      -- "
-   '\35'  -> cAny + cSymbol            -- #
-   '\36'  -> cAny + cSymbol            -- $
+   '\35'  -> cAny + cSymbol            --  #
+   '\36'  -> cAny + cSymbol            --  $
    '\37'  -> cAny + cSymbol            -- %
    '\38'  -> cAny + cSymbol            -- &
    '\39'  -> cAny + cIdent             -- '
    '\40'  -> cAny                      -- (
    '\41'  -> cAny                      -- )
-   '\42'  -> cAny + cSymbol            -- *
+   '\42'  -> cAny + cSymbol            --  *
    '\43'  -> cAny + cSymbol            -- +
    '\44'  -> cAny                      -- ,
    '\45'  -> cAny + cSymbol            -- -
    '\46'  -> cAny + cSymbol            -- .
-   '\47'  -> cAny + cSymbol            -- /
+   '\47'  -> cAny + cSymbol            --  /
    '\48'  -> cAny + cIdent  + cDigit   -- 0
    '\49'  -> cAny + cIdent  + cDigit   -- 1
    '\50'  -> cAny + cIdent  + cDigit   -- 2
@@ -174,7 +174,7 @@ charType c = case c of
    '\91'  -> cAny                      -- [
    '\92'  -> cAny + cSymbol            -- backslash
    '\93'  -> cAny                      -- ]
-   '\94'  -> cAny + cSymbol            -- ^
+   '\94'  -> cAny + cSymbol            --  ^
    '\95'  -> cAny + cIdent  + cLower   -- _
    '\96'  -> cAny                      -- `
    '\97'  -> cAny + cIdent  + cLower   -- a
@@ -204,7 +204,7 @@ charType c = case c of
    '\121' -> cAny + cIdent  + cLower   -- y
    '\122' -> cAny + cIdent  + cLower   -- z
    '\123' -> cAny                      -- {
-   '\124' -> cAny + cSymbol            -- |
+   '\124' -> cAny + cSymbol            --  |
    '\125' -> cAny                      -- }
    '\126' -> cAny + cSymbol            -- ~
    '\127' -> 0                         -- \177

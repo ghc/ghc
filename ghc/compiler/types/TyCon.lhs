@@ -99,9 +99,9 @@ data TyCon
 
 	algTcFields :: [(FieldLabel, Type, Id)],  
 					-- Its fields (empty if none): 
-					-- * field name
-					-- * its type (scoped over tby tyConTyVars)
-					-- * record selector (name = field name)
+					--  * field name
+					--  * its type (scoped over tby tyConTyVars)
+					--  * record selector (name = field name)
 
 	algTcRhs :: AlgTyConRhs,	-- Data constructors in here
 

@@ -1777,7 +1777,7 @@ reduce stack try_me wanted avails
 isAvailable :: Avails -> Inst -> Maybe Avail
 isAvailable avails wanted = lookupFM avails wanted
 	-- NB 1: the Ord instance of Inst compares by the class/type info
-	-- *not* by unique.  So
+	--  *not* by unique.  So
 	--	d1::C Int ==  d2::C Int
 
 addLinearAvailable :: Avails -> Avail -> Inst -> TcM (Avails, [Inst])

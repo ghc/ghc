@@ -915,11 +915,11 @@ mkArbitraryType tv
     kind       = tyVarKind tv
     (args,res) = splitKindFunTys kind
 
-    tycon | kind == tyConKind listTyCon 	-- *->*
+    tycon | kind == tyConKind listTyCon 	--  *->*
 	  = listTyCon				-- No tuples this size
 
 	  | all isLiftedTypeKind args && isLiftedTypeKind res
-	  = tupleTyCon Boxed (length args)	-- *-> ... ->*->*
+	  = tupleTyCon Boxed (length args)	--  *-> ... ->*->*
 
 	  | otherwise
 	  = pprTrace "Urk! Inventing strangely-kinded void TyCon:" (ppr tc_name $$ ppr kind) $

@@ -134,7 +134,7 @@ pprStmt stmt = case stmt of
     -- ;
     CmmNop -> semi
 
-    -- // text
+    --  // text
     CmmComment s -> text "//" <+> ftext s
 
     -- reg = expr;

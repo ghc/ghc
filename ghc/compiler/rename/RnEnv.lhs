@@ -253,7 +253,7 @@ lookupGlobalOccRn rdr_name
 	Nothing   -> 
 
 	-- We allow qualified names on the command line to refer to 
-	-- *any* name exported by any module in scope, just as if 
+	--  *any* name exported by any module in scope, just as if 
 	-- there was an "import qualified M" declaration for every 
 	-- module.
    getModule 		`thenM` \ mod ->

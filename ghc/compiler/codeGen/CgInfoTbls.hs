@@ -191,9 +191,9 @@ mkFunGenInfoExtraBits fun_type arity srt_label liveness slow_entry
 --			<srt slot>
 --			<forward vector table>
 --
--- * The vector table is only present for vectored returns
+--  * The vector table is only present for vectored returns
 --
--- * The SRT slot is only there if either
+--  * The SRT slot is only there if either
 --	(a) there is SRT info to record, OR
 --	(b) if the return is vectored
 --   The latter (b) is necessary so that the vector is in a
@@ -346,7 +346,7 @@ emitDirectReturnInstr
   = do 	{ info_amode <- getSequelAmode
 	; stmtC (CmmJump (entryCode info_amode) []) }
 
-emitVectoredReturnInstr :: CmmExpr	-- *Zero-indexed* constructor tag
+emitVectoredReturnInstr :: CmmExpr	-- _Zero-indexed_ constructor tag
 			-> Code
 emitVectoredReturnInstr zero_indexed_tag
   = do	{ info_amode <- getSequelAmode

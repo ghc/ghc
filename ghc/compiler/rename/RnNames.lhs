@@ -355,7 +355,7 @@ getLocalDeclBinders mod (HsGroup {hs_valds = val_decls,
     mappM new_tc     tycl_decls				`thenM` \ tc_avails ->
 	
 	-- In a hs-boot file, the value binders come from the
-	-- *signatures*, and there should be no foreign binders 
+	--  *signatures*, and there should be no foreign binders 
     tcIsHsBoot						`thenM` \ is_hs_boot ->
     let val_bndrs | is_hs_boot = sig_hs_bndrs
 		  | otherwise  = for_hs_bndrs ++ val_hs_bndrs
@@ -468,7 +468,7 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) all_names
     get_item item@(IEThingAbs n)
       | want_hiding	-- hiding( C ) 
 			-- Here the 'C' can be a data constructor 
-			-- *or* a type/class, or even both
+			--  *or* a type/class, or even both
       = case concat [check_item item, check_item (IEVar data_n)] of
 	  []    -> bale_out item
 	  names -> succeed_with True names

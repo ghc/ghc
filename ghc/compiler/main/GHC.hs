@@ -28,7 +28,7 @@ module GHC (
 	addTarget,
 	guessTarget,
 	
-	-- * Loading/compiling the program
+	-- * Loading\/compiling the program
 	depanal,
 	load, SuccessFlag(..),		-- also does depanal
 	workingDirectoryChanged,
@@ -210,7 +210,7 @@ GLOBAL_VAR(v_initDynFlags, error "initDynFlags", DynFlags)
 
 -- | Starts a new session.  A session consists of a set of loaded
 -- modules, a set of options (DynFlags), and an interactive context.
--- ToDo: GhcMode should say "keep typechecked code" and/or "keep renamed
+-- ToDo: GhcMode should say "keep typechecked code" and\/or "keep renamed
 -- code".
 newSession :: GhcMode -> IO Session
 newSession mode = do
@@ -256,7 +256,7 @@ setMsgHandler = ErrUtils.setMsgHandler
 
 -- | Sets the targets for this session.  Each target may be a module name
 -- or a filename.  The targets correspond to the set of root modules for
--- the program/library.  Unloading the current program is achieved by
+-- the program\/library.  Unloading the current program is achieved by
 -- setting the current set of targets to be empty, followed by load.
 setTargets :: Session -> [Target] -> IO ()
 setTargets s targets = modifySession s (\h -> h{ hsc_targets = targets })

@@ -1154,7 +1154,7 @@ tcRnGetInfo :: HscEnv
 -- Look up a RdrName and return all the TyThings it might be
 -- A capitalised RdrName is given to us in the DataName namespace,
 -- but we want to treat it as *both* a data constructor 
--- *and* as a type or class constructor; 
+--  *and* as a type or class constructor; 
 -- hence the call to dataTcOccs, and we return up to two results
 tcRnGetInfo hsc_env ictxt rdr_name
   = initTcPrintErrors hsc_env iNTERACTIVE $ 

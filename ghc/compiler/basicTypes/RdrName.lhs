@@ -69,7 +69,7 @@ data RdrName
 
   | Qual Module OccName
 	-- A qualified name written by the user in 
-	-- *source* code.  The module isn't necessarily 
+	--  *source* code.  The module isn't necessarily 
 	-- the module where the thing is defined; 
 	-- just the one from which it is imported
 

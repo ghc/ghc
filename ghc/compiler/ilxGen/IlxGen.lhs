@@ -1914,7 +1914,7 @@ ilxPrimOpTable op
 	FloatSinhOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Sinh(float64) conv.r4")
 	FloatCoshOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Cosh(float64) conv.r4")
 	FloatTanhOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Tanh(float64) conv.r4")
-	FloatPowerOp -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Pow(float64, float64) conv.r4") -- ** op, make use of implicit cast to r8...
+	FloatPowerOp -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Pow(float64, float64) conv.r4") --  ** op, make use of implicit cast to r8...
 
 	DoubleExpOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Exp(float64)")
 	DoubleLogOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Log(float64)")

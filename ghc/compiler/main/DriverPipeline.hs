@@ -174,7 +174,6 @@ compile hsc_env mod_summary maybe_old_linkable old_iface = do
 
 	| otherwise		-- Normal Haskell source files
 	-> do
-	   let 
 	   maybe_stub_o <- compileStub dflags' stub_c_exists
 	   let stub_unlinked = case maybe_stub_o of
 				  Nothing -> []

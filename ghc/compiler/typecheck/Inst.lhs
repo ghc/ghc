@@ -572,7 +572,7 @@ addInst dflags home_ie dfun
 		-- not overlap with anything in the things being looked up
 		-- (since we do unification).  
 		-- We use tcSkolType because we don't want to allocate fresh
-		-- *meta* type variables.  
+		--  *meta* type variables.  
 	  (tvs', theta', tau') <- tcSkolType (InstSkol dfun) (idType dfun)
 	; let	(cls, tys') = tcSplitDFunHead tau'
 		dfun' 	    = setIdType dfun (mkSigmaTy tvs' theta' tau')	    

@@ -42,7 +42,7 @@ data Demand
   = WwLazy		-- Argument is lazy as far as we know
 	MaybeAbsent	-- (does not imply worker's existence [etc]).
 			-- If MaybeAbsent == True, then it is
-			-- *definitely* lazy.  (NB: Absence implies
+			--  *definitely* lazy.  (NB: Absence implies
 			-- a worker...)
 
   | WwStrict		-- Argument is strict but that's all we know

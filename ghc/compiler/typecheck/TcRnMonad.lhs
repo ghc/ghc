@@ -798,6 +798,7 @@ popArrowBinders
 	  ArrCtxt {proc_level = curr_lvl + 1, proc_banned = curr_lvl : banned}
 
 getBannedProcLevels :: TcM [ProcLevel]
+getBannedProcLevels
   = do { env <- getLclEnv; return (proc_banned (tcl_arrow_ctxt env)) }
 
 incProcLevel :: TcM a -> TcM a

@@ -886,7 +886,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
      let
 
          -- Get the arg reps, zapping the leading Addr# in the dynamic case
-         a_reps -- | trace (showSDoc (ppr a_reps_pushed_RAW)) False = error "???"
+         a_reps --  | trace (showSDoc (ppr a_reps_pushed_RAW)) False = error "???"
                 | is_static = a_reps_pushed_RAW
                 | otherwise = if null a_reps_pushed_RAW 
                               then panic "ByteCodeGen.generateCCall: dyn with no args"
@@ -1121,7 +1121,7 @@ foreign import ccall unsafe "memcpy"
 -- of making a multiway branch using a switch tree.
 -- What a load of hassle!
 
-mkMultiBranch :: Maybe Int	-- # datacons in tycon, if alg alt
+mkMultiBranch :: Maybe Int	--  # datacons in tycon, if alg alt
 				-- a hint; generates better code
 				-- Nothing is always safe
               -> [(Discr, BCInstrList)] 

@@ -91,7 +91,7 @@ exprType (Var var)		= idType var
 exprType (Lit lit)		= literalType lit
 exprType (Let _ body)	   	= exprType body
 exprType (Case _ _ ty alts)     = ty
-exprType (Note (Coerce ty _) e) = ty  -- **! should take usage from e
+exprType (Note (Coerce ty _) e) = ty  --  **! should take usage from e
 exprType (Note other_note e)    = exprType e
 exprType (Lam binder expr)      = mkPiType binder (exprType expr)
 exprType e@(App _ _)

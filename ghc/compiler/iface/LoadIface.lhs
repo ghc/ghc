@@ -363,7 +363,7 @@ bumpDeclStats name
 
 -----------------
 ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
--- *Excludes* the 'main' name, but *includes* the implicitly-bound names
+--  *Excludes* the 'main' name, but *includes* the implicitly-bound names
 -- Deeply revolting, because it has to predict what gets bound,
 -- especially the question of whether there's a wrapper for a datacon
 

@@ -656,8 +656,8 @@ slash s1 s2 = s1 ++ ('/' : s2)
 -----------------------------------------------------------------------------
 -- Define	getBaseDir     :: IO (Maybe String)
 
-#if defined(mingw32_HOST_OS)
 getBaseDir :: IO (Maybe String)
+#if defined(mingw32_HOST_OS)
 -- Assuming we are running ghc, accessed by path  $()/bin/ghc.exe,
 -- return the path $(stuff).  Note that we drop the "bin/" directory too.
 getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
@@ -673,7 +673,7 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
-getBaseDir :: IO (Maybe String) = do return Nothing
+getBaseDir = return Nothing
 #endif
 
 #ifdef mingw32_HOST_OS

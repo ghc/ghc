@@ -101,6 +101,7 @@ wired-in Ids.
 
 \begin{code}
 ghcPrimExports :: [RdrAvailInfo]
+ghcPrimExports
  = map (Avail . nameOccName . idName) ghcPrimIds ++
    map (Avail . primOpOcc) allThePrimOps ++
    [ AvailTC occ [occ] |

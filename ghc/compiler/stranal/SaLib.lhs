@@ -54,7 +54,7 @@ data AbsVal
   | AbsBot		    -- An expression whose abstract value is
 			    -- AbsBot is sure to fail to terminate.
 			    -- AbsBot represents the abstract
-			    -- *function* bottom too.
+			    --  *function* bottom too.
 
   | AbsProd [AbsVal]	    -- (Lifted) product of abstract values
 			    -- "Lifted" means that AbsBot is *different* from

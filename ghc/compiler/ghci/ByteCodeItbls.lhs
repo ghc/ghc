@@ -223,6 +223,7 @@ vecret_entry 5 = stg_interp_constr6_entry
 vecret_entry 6 = stg_interp_constr7_entry
 vecret_entry 7 = stg_interp_constr8_entry
 
+#ifndef __HADDOCK__
 -- entry point for direct returns for created constr itbls
 foreign label "stg_interp_constr_entry" stg_interp_constr_entry :: Ptr ()
 -- and the 8 vectored ones
@@ -234,7 +235,7 @@ foreign label "stg_interp_constr5_entry" stg_interp_constr5_entry :: Ptr ()
 foreign label "stg_interp_constr6_entry" stg_interp_constr6_entry :: Ptr ()
 foreign label "stg_interp_constr7_entry" stg_interp_constr7_entry :: Ptr ()
 foreign label "stg_interp_constr8_entry" stg_interp_constr8_entry :: Ptr ()
-
+#endif
 
 
 

@@ -135,7 +135,7 @@ codeGen dflags this_mod type_env foreign_stubs imported_mods
    startupHaskell() must supply the name of the init function for the "top"
    module in the program, and we don't want to require that this name
    has the version and way info appended to it.
-   -------------------------------------------------------------------------- */
+   --------------------------------------------------------------------------  */
 
 We initialise the module tree by keeping a work-stack, 
 	* pointed to by Sp

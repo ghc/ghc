@@ -31,7 +31,7 @@ import PrelNames   (fstName, andName, orName, lengthPName, replicatePName,
 -- this is a list of names that need to be available if flattening is
 -- performed (EXPORTED)
 --
--- * needs to be kept in sync with the names used in Core generation in
+--  * needs to be kept in sync with the names used in Core generation in
 --   `FlattenMonad' and `NDPCoreUtils'
 --
 namesNeededForFlattening :: FreeVars

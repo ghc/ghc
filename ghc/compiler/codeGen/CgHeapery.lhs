@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.44 2005/03/18 13:37:42 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.45 2005/03/31 10:16:34 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -138,8 +138,8 @@ layOutConstr  is_static dflags data_con args
    = (mkConInfo dflags is_static data_con tot_wds ptr_wds,
       things_w_offsets)
   where
-    (tot_wds,		 -- #ptr_wds + #nonptr_wds
-     ptr_wds,		 -- #ptr_wds
+    (tot_wds,		 --  #ptr_wds + #nonptr_wds
+     ptr_wds,		 --  #ptr_wds
      things_w_offsets) = mkVirtHeapOffsets args
 \end{code}
 
@@ -150,7 +150,7 @@ list
 \begin{code}
 mkVirtHeapOffsets
 	  :: [(CgRep,a)]	-- Things to make offsets for
-	  -> (WordOff,		-- *Total* number of words allocated
+	  -> (WordOff,		-- _Total_ number of words allocated
 	      WordOff,		-- Number of words allocated for *pointers*
 	      [(a, VirtualHpOffset)])
 				-- Things with their offsets from start of 

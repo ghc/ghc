@@ -891,7 +891,7 @@ newtype LifterM a =
   	LifterM { unLifterM ::
 		     TypeName ->		-- this class name
 		     Int -> 			-- uniq supply
-			  ( a			-- *
+			  ( a			--  *
 			    , Frees		-- frees
 			    , [Decl]		-- lifted classes
 			    , Int		-- The uniqs

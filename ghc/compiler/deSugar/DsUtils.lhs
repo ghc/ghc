@@ -325,13 +325,13 @@ mkCoAlgCaseMatchResult var ty match_alts
 
 	-- Stuff for parallel arrays
 	-- 
-	-- * the following is to desugar cases over fake constructors for
+	--  * the following is to desugar cases over fake constructors for
 	--   parallel arrays, which are introduced by `tidy1' in the `PArrPat'
 	--   case
 	--
 	-- Concerning `isPArrFakeAlts':
 	--
-	-- * it is *not* sufficient to just check the type of the type
+	--  * it is *not* sufficient to just check the type of the type
 	--   constructor, as we have to be careful not to confuse the real
 	--   representation of parallel arrays with the fake constructors;
 	--   moreover, a list of alternatives must not mix fake and real

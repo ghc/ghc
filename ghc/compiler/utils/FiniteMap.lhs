@@ -194,7 +194,7 @@ emptyFM
     bottom = panic "emptyFM"
 -}
 
--- #define EmptyFM (Branch _ _ IF_GHC(0#,0) _ _)
+--  #define EmptyFM (Branch _ _ IF_GHC(0#,0) _ _)
 
 unitFM key elt = Branch key elt IF_GHC(1#,1) emptyFM emptyFM
 

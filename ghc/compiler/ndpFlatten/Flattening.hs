@@ -755,7 +755,7 @@ mkIndexOfExprDft idType b lits =
 
 -- create a back-permute binder
 --
--- * `mkDftBackpermute ty indexArrayVar srcArrayVar dftArrayVar' creates a
+--  * `mkDftBackpermute ty indexArrayVar srcArrayVar dftArrayVar' creates a
 --   Core binding of the form
 --
 --     x = bpermuteDftP indexArrayVar srcArrayVar dftArrayVar

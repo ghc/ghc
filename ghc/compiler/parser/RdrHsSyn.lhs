@@ -20,30 +20,30 @@ module RdrHsSyn (
 	findSplice, mkGroup,
 
 	-- Stuff to do with Foreign declarations
-	, CallConv(..)
-	, mkImport            -- CallConv -> Safety 
+	CallConv(..),
+	mkImport,            -- CallConv -> Safety 
 			      -- -> (FastString, RdrName, RdrNameHsType)
 			      -- -> P RdrNameHsDecl
-	, mkExport            -- CallConv
+	mkExport,            -- CallConv
 			      -- -> (FastString, RdrName, RdrNameHsType)
 			      -- -> P RdrNameHsDecl
-	, mkExtName           -- RdrName -> CLabelString
+	mkExtName,           -- RdrName -> CLabelString
 			      
 	-- Bunch of functions in the parser monad for 
 	-- checking and constructing values
-	, checkPrecP 	      -- Int -> P Int
-	, checkContext	      -- HsType -> P HsContext
-	, checkPred	      -- HsType -> P HsPred
-	, checkTyClHdr
-	, checkSynHdr	
-	, checkInstType	      -- HsType -> P HsType
-	, checkPattern	      -- HsExp -> P HsPat
-	, checkPatterns	      -- SrcLoc -> [HsExp] -> P [HsPat]
-	, checkDo	      -- [Stmt] -> P [Stmt]
-	, checkMDo	      -- [Stmt] -> P [Stmt]
-	, checkValDef	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
-	, checkValSig	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
-	, parseError	      -- String -> Pa
+	checkPrecP, 	      -- Int -> P Int
+	checkContext,	      -- HsType -> P HsContext
+	checkPred,	      -- HsType -> P HsPred
+	checkTyClHdr,
+	checkSynHdr,	
+	checkInstType,	      -- HsType -> P HsType
+	checkPattern,	      -- HsExp -> P HsPat
+	checkPatterns,	      -- SrcLoc -> [HsExp] -> P [HsPat]
+	checkDo,	      -- [Stmt] -> P [Stmt]
+	checkMDo,	      -- [Stmt] -> P [Stmt]
+	checkValDef,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
+	checkValSig,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
+	parseError,	      -- String -> Pa
     ) where
 
 #include "HsVersions.h"
@@ -187,7 +187,7 @@ analyser.
 
 
 \begin{code}
--- | Groups together bindings for a single function
+--  | Groups together bindings for a single function
 cvTopDecls :: OrdList (LHsDecl RdrName) -> [LHsDecl RdrName]
 cvTopDecls decls = go (fromOL decls)
   where

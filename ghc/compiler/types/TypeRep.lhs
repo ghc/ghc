@@ -153,7 +153,7 @@ data Type
 			-- (or NoteTy of these)
 
   | TyConApp		-- Application of a TyCon, including newtypes
-	TyCon		-- *Invariant* saturated appliations of FunTyCon and
+	TyCon		--  *Invariant* saturated appliations of FunTyCon and
 			-- 	synonyms have their own constructors, below.
 			-- However, *unsaturated* type synonyms, and FunTyCons
 			-- 	do appear as TyConApps.  (Unsaturated type synonyms

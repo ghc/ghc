@@ -199,18 +199,18 @@ mkBind lexeme e  =
 
 -- extend the parallel context by the given set of variables (EXPORTED)
 --
--- * if there is no parallel context at the moment, the first element of the
+--  * if there is no parallel context at the moment, the first element of the
 --   variable list will be used to determine the new parallel context
 --
--- * the second argument is executed in the current context extended with the
+--  * the second argument is executed in the current context extended with the
 --   given variables
 --
--- * the variables must already have been lifted by transforming their type,
+--  * the variables must already have been lifted by transforming their type,
 --   but they *must* have retained their original name (or, at least, their
 --   unique); this is needed so that they match the original variable in
 --   variable environments
 --
--- * any trace of the given set of variables has to be removed from the state
+--  * any trace of the given set of variables has to be removed from the state
 --   at the end of this operation
 --
 extendContext      :: [Var] -> Flatten a -> Flatten a
@@ -232,12 +232,12 @@ extendContext vs m  = Flatten $ \state ->
 
 -- execute the second argument in a restricted context (EXPORTED)
 --
--- * all variables in the current parallel context are packed according to
+--  * all variables in the current parallel context are packed according to
 --   the permutation vector associated with the variable passed as the first
 --   argument (ie, all elements of vectorised context variables that are
 --   invalid in the restricted context are dropped)
 --
--- * the returned list of core binders contains the operations that perform
+--  * the returned list of core binders contains the operations that perform
 --   the restriction on all variables in the parallel context that *do* occur
 --   during the execution of the second argument (ie, `liftVar' is executed at
 --   least once on any such variable)
@@ -286,14 +286,14 @@ packContext perm m  = Flatten $ \state ->
 
 -- lift a single variable in the current context (EXPORTED)
 --
--- * if the variable does not occur in the context, it's value is vectorised to
+--  * if the variable does not occur in the context, it's value is vectorised to
 --   match the size of the current context
 --
--- * otherwise, the variable is replaced by whatever the context environment
+--  * otherwise, the variable is replaced by whatever the context environment
 --   maps it to (this may either be simply the lifted version of the original
 --   variable or a packed variant of that variable)
 --
--- * the monad keeps track of all lifted variables that occur in the parallel
+--  * the monad keeps track of all lifted variables that occur in the parallel
 --   context, so that `packContext' can determine the correct set of core
 --   bindings
 --
@@ -311,7 +311,7 @@ liftVar var  = Flatten $ \s ->
 
 -- lift a constant expression in the current context (EXPORTED)
 --
--- * the value of the constant expression is vectorised to match the current
+--  * the value of the constant expression is vectorised to match the current
 --   parallel context
 --
 liftConst   :: CoreExpr -> Flatten CoreExpr
@@ -326,7 +326,7 @@ liftConst e  = Flatten $ \s ->
 -- pick those variables of the given set that occur (if albeit in lifted form)
 -- in the current parallel context (EXPORTED)
 --
--- * the variables returned are from the given set and *not* the corresponding
+--  * the variables returned are from the given set and *not* the corresponding
 --   context variables
 --
 intersectWithContext    :: VarSet -> Flatten [Var]
@@ -382,10 +382,10 @@ mk'neq ty a1 a2  = return (mkApps (Var neqName) [a1, a2])
 		   where
 		     tc = tyConAppTyCon ty
 		     --
-		     neqName {- | name == charPrimTyConName   = neqCharName -}
+		     neqName {-  | name == charPrimTyConName   = neqCharName -}
 			     | tc == intPrimTyCon	      = primOpId IntNeOp
-			     {- | name == floatPrimTyConName  = neqFloatName -}
-			     {- | name == doublePrimTyConName = neqDoubleName -}
+			     {-  | name == floatPrimTyConName  = neqFloatName -}
+			     {-  | name == doublePrimTyConName = neqDoubleName -}
 			     | otherwise		   =
 			       pprPanic "FlattenMonad.mk'neq: " (ppr ty)
 
@@ -443,7 +443,7 @@ mkFunApp name args  =
 
 -- get the `Id' of a known `Name'
 --
--- * this can be the `Name' of any function that's visible on the toplevel of
+--  * this can be the `Name' of any function that's visible on the toplevel of
 --   the current compilation unit
 --
 lookupName      :: Name -> Flatten Id

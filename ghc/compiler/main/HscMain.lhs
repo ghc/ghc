@@ -10,9 +10,9 @@ module HscMain (
 	hscMain, newHscEnv, hscCmmFile, 
 	hscBufferCheck, hscFileCheck,
 #ifdef GHCI
-	, hscStmt, hscTcExpr, hscKcType
-	, hscGetInfo, GetInfoResult
-	, compileExpr
+	hscStmt, hscTcExpr, hscKcType,
+	hscGetInfo, GetInfoResult,
+	compileExpr,
 #endif
 	) where
 
@@ -171,7 +171,7 @@ hscMain hsc_env msg_act mod_summary
 	source_unchanged have_object maybe_old_iface
  = do {
       (recomp_reqd, maybe_checked_iface) <- 
-		_scc_ "checkOldIface" 
+		{-# SCC "checkOldIface" #-}
 		checkOldIface hsc_env mod_summary 
 			      source_unchanged maybe_old_iface;
 
@@ -201,7 +201,7 @@ hscNoRecomp hsc_env msg_act mod_summary
  = do	{ compilationProgressMsg (hsc_dflags hsc_env) $
 		("Skipping  " ++ showModMsg have_object mod_summary)
 
-	; new_details <- _scc_ "tcRnIface"
+	; new_details <- {-# SCC "tcRnIface" #-}
 		     typecheckIface hsc_env old_iface ;
 	; dumpIfaceStats hsc_env
 
@@ -233,7 +233,7 @@ hscCoreFrontEnd hsc_env msg_act mod_summary = do {
  	    -------------------
  	    -- RENAME and TYPECHECK
  	    -------------------
-	; (tc_msgs, maybe_tc_result) <- _scc_ "TypeCheck" 
+	; (tc_msgs, maybe_tc_result) <- {-# SCC "TypeCheck" #-}
 			      tcRnExtCore hsc_env rdr_module
 	; msg_act tc_msgs
 	; case maybe_tc_result of
@@ -270,7 +270,7 @@ hscFileFrontEnd hsc_env msg_act mod_summary = do {
  	    -- RENAME and TYPECHECK
  	    -------------------
 	  (tc_msgs, maybe_tc_result) 
-		<- _scc_ "Typecheck-Rename" 
+		<- {-# SCC "Typecheck-Rename" #-}
 		   tcRnModule hsc_env (ms_hsc_src mod_summary) rdr_module
 
 	; msg_act tc_msgs
@@ -281,7 +281,7 @@ hscFileFrontEnd hsc_env msg_act mod_summary = do {
  	    -------------------
  	    -- DESUGAR
  	    -------------------
-	; (warns, maybe_ds_result) <- _scc_ "DeSugar" 
+	; (warns, maybe_ds_result) <- {-# SCC "DeSugar" #-}
 		 	     deSugar hsc_env tc_result
 	; msg_act (warns, emptyBag)
 	; case maybe_ds_result of
@@ -296,7 +296,7 @@ hscBootBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO 
 hscBootBackEnd hsc_env mod_summary maybe_checked_iface Nothing 
   = return HscFail
 hscBootBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
-  = do	{ final_iface <- _scc_ "MkFinalIface" 
+  = do	{ final_iface <- {-# SCC "MkFinalIface" #-}
 			 mkIface hsc_env (ms_location mod_summary)
                          	 maybe_checked_iface ds_result
 
@@ -327,7 +327,7 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
  	    -------------------
  	    -- FLATTENING
  	    -------------------
-	; flat_result <- _scc_ "Flattening"
+	; flat_result <- {-# SCC "Flattening" #-}
  			 flatten hsc_env ds_result
 
 
@@ -357,13 +357,13 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
  	    -------------------
  	    -- SIMPLIFY
  	    -------------------
-	; simpl_result <- _scc_ "Core2Core"
+	; simpl_result <- {-# SCC "Core2Core" #-}
 			  core2core hsc_env flat_result
 
  	    -------------------
  	    -- TIDY
  	    -------------------
-	; tidy_result <- _scc_ "CoreTidy"
+	; tidy_result <- {-# SCC "CoreTidy" #-}
 		         tidyCorePgm hsc_env simpl_result
 
 	-- Emit external core
@@ -379,7 +379,7 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
 	    -- This has to happen *after* code gen so that the back-end
 	    -- info has been set.  Not yet clear if it matters waiting
 	    -- until after code output
-	; new_iface <- _scc_ "MkFinalIface" 
+	; new_iface <- {-# SCC "MkFinalIface" #-}
 			mkIface hsc_env (ms_location mod_summary)
                          	maybe_checked_iface tidy_result
 
@@ -444,7 +444,7 @@ hscBufferCheck hsc_env buffer msg_act = do
 		   hscBufferTypecheck hsc_env rdr_module msg_act
 
 hscBufferTypecheck hsc_env rdr_module msg_act = do
-	(tc_msgs, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
+	(tc_msgs, maybe_tc_result) <- {-# SCC "Typecheck-Rename" #-}
 					tcRnModule hsc_env HsSrcFile rdr_module
 	msg_act tc_msgs
 	case maybe_tc_result of
@@ -466,7 +466,7 @@ hscCodeGen dflags
  	    -------------------
  	    -- PREPARE FOR CODE GENERATION
 	    -- Do saturation and convert to A-normal form
-  prepd_binds <- _scc_ "CorePrep"
+  prepd_binds <- {-# SCC "CorePrep" #-}
 		 corePrepPgm dflags core_binds type_env;
 
   case hscTarget dflags of
@@ -489,11 +489,11 @@ hscCodeGen dflags
       other ->
 	do
 	    -----------------  Convert to STG ------------------
-	    (stg_binds, cost_centre_info) <- _scc_ "CoreToStg"
+	    (stg_binds, cost_centre_info) <- {-# SCC "CoreToStg" #-}
 	    		 myCoreToStg dflags this_mod prepd_binds	
 
             ------------------  Code generation ------------------
-	    abstractC <- _scc_ "CodeGen"
+	    abstractC <- {-# SCC "CodeGen" #-}
 		         codeGen dflags this_mod type_env foreign_stubs
 				 dir_imps cost_centre_info stg_binds
 
@@ -519,9 +519,9 @@ hscCmmFile dflags filename = do
 
 
 myParseModule dflags src_filename maybe_src_buf
- = do --------------------------  Parser  ----------------
-      showPass dflags "Parser"
-      _scc_  "Parser" do
+ =    --------------------------  Parser  ----------------
+      showPass dflags "Parser" >>
+      {-# SCC "Parser" #-} do
 
 	-- sometimes we already have the buffer in memory, perhaps
 	-- because we needed to parse the imports out of it, or get the 
@@ -550,10 +550,10 @@ myParseModule dflags src_filename maybe_src_buf
 
 myCoreToStg dflags this_mod prepd_binds
  = do 
-      stg_binds <- _scc_ "Core2Stg" 
+      stg_binds <- {-# SCC "Core2Stg" #-}
 	     coreToStg dflags prepd_binds
 
-      (stg_binds2, cost_centre_info) <- _scc_ "Core2Stg" 
+      (stg_binds2, cost_centre_info) <- {-# SCC "Core2Stg" #-}
 	     stg2stg dflags this_mod stg_binds
 
       return (stg_binds2, cost_centre_info)
@@ -671,8 +671,8 @@ hscParseThing :: Outputable thing
 	-- Nothing => Parse error (message already printed)
 	-- Just x  => success
 hscParseThing parser dflags str
- = do showPass dflags "Parser"
-      _scc_ "Parser"  do
+ = showPass dflags "Parser" >>
+      {-# SCC "Parser" #-} do
 
       buf <- stringToStringBuffer str
 

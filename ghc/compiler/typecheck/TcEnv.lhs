@@ -467,7 +467,7 @@ checkWellStaged pp_thing bind_lvl use_stage
 topIdLvl :: Id -> ThLevel
 -- Globals may either be imported, or may be from an earlier "chunk" 
 -- (separated by declaration splices) of this module.  The former
--- *can* be used inside a top-level splice, but the latter cannot.
+--  *can* be used inside a top-level splice, but the latter cannot.
 -- Hence we give the former impLevel, but the latter topLevel
 -- E.g. this is bad:
 --	x = [| foo |]

@@ -475,7 +475,7 @@ lookupThName th_name
 		    -> do { 
 				  mb_name <- lookupSrcOcc_maybe rdr_name
 			  ; case mb_name of
-			      Just name -> return name ;
+			      Just name -> return name
 			      Nothing   -> failWithTc (notInScope th_name) }
 	}
   where
@@ -490,8 +490,8 @@ tcLookupTh :: Name -> TcM TcTyThing
 -- tcLookup, failure is a bug.
 tcLookupTh name
   = do	{ (gbl_env, lcl_env) <- getEnvs
-	; case lookupNameEnv (tcl_env lcl_env) name of
-		Just thing -> returnM thing
+	; case lookupNameEnv (tcl_env lcl_env) name of {
+		Just thing -> returnM thing;
 		Nothing    -> do
 	{ if nameIsLocalOrFrom (tcg_mod gbl_env) name
 	  then	-- It's defined in this module
@@ -507,7 +507,7 @@ tcLookupTh name
 			     ; return (AGlobal thing) }
 		-- Imported names should always be findable; 
 		-- if not, we fail hard in tcImportDecl
-    }}}
+    }}}}
 
 mk_uniq :: Int# -> Unique
 mk_uniq u = mkUniqueGrimily (I# u)

@@ -425,25 +425,25 @@ data Token
   | ITprimdouble Rational
 
   -- MetaHaskell extension tokens
-  | ITopenExpQuote  		-- [| or [e|
-  | ITopenPatQuote		-- [p|
-  | ITopenDecQuote		-- [d|
-  | ITopenTypQuote		-- [t|         
-  | ITcloseQuote		-- |]
-  | ITidEscape   FastString	-- $x
-  | ITparenEscape		-- $( 
-  | ITvarQuote			-- '
-  | ITtyQuote			-- ''
+  | ITopenExpQuote  		--  [| or [e|
+  | ITopenPatQuote		--  [p|
+  | ITopenDecQuote		--  [d|
+  | ITopenTypQuote		--  [t|         
+  | ITcloseQuote		--  |]
+  | ITidEscape   FastString	--  $x
+  | ITparenEscape		--  $( 
+  | ITvarQuote			--  '
+  | ITtyQuote			--  ''
 
   -- Arrow notation extension
   | ITproc
   | ITrec
-  | IToparenbar			-- (|
-  | ITcparenbar			-- |)
-  | ITlarrowtail		-- -<
-  | ITrarrowtail		-- >-
-  | ITLarrowtail		-- -<<
-  | ITRarrowtail		-- >>-
+  | IToparenbar			--  (|
+  | ITcparenbar			--  |)
+  | ITlarrowtail		--  -<
+  | ITrarrowtail		--  >-
+  | ITLarrowtail		--  -<<
+  | ITRarrowtail		--  >>-
 
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof			-- end of file token

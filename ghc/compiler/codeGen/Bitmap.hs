@@ -66,9 +66,9 @@ intsToReverseBitmap size slots{- must be sorted -}
 	   | size >= wORD_SIZE_IN_BITS = complement 0
 	   | otherwise                 = (1 `shiftL` size) - 1
 
-{-|
+{- |
 Magic number, must agree with @BITMAP_BITS_SHIFT@ in InfoTables.h.
-Some kinds of bitmap pack a size/bitmap into a single word if
+Some kinds of bitmap pack a size\/bitmap into a single word if
 possible, or fall back to an external pointer when the bitmap is too
 large.  This value represents the largest size of bitmap that can be
 packed into a single word.

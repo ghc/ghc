@@ -442,8 +442,10 @@ cmpFS (FastString u1# l1# b1#) (FastString u2# l2# b2#) =
     else		    GT
     ))
 
+#ifndef __HADDOCK__
 foreign import ccall "ghc_memcmp" unsafe 
   memcmp :: ByteArray# -> ByteArray# -> Int# -> IO Int
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Outputting 'FastString's

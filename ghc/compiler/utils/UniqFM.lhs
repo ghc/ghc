@@ -334,25 +334,25 @@ plusUFM_C f fm1 fm2	= mix_trees fm1 fm2
 		--     t1   t2	    t1'	  t2'		      t1   t2 + j'
 		--						       / \
 		--						     t1'  t2'
-	  mix_branches (LeftRoot Leftt) -- | trace "LL" True
+	  mix_branches (LeftRoot Leftt) --  | trace "LL" True
 	    = mkSLNodeUFM
 		(NodeUFMData j p)
 		(mix_trees t1 right_t)
 		t2
 
-	  mix_branches (LeftRoot Rightt) -- | trace "LR" True
+	  mix_branches (LeftRoot Rightt) --  | trace "LR" True
 	    = mkLSNodeUFM
 		(NodeUFMData j p)
 		t1
 		(mix_trees t2 right_t)
 
-	  mix_branches (RightRoot Leftt) -- | trace "RL" True
+	  mix_branches (RightRoot Leftt) --  | trace "RL" True
 	    = mkSLNodeUFM
 		(NodeUFMData j' p')
 		(mix_trees left_t t1')
 		t2'
 
-	  mix_branches (RightRoot Rightt) -- | trace "RR" True
+	  mix_branches (RightRoot Rightt) --  | trace "RR" True
 	    = mkLSNodeUFM
 		(NodeUFMData j' p')
 		t1'

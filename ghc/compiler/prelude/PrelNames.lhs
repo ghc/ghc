@@ -946,7 +946,7 @@ arrAIdKey	= mkPreludeMiscIdUnique 119
 composeAIdKey	= mkPreludeMiscIdUnique 120 -- >>>
 firstAIdKey	= mkPreludeMiscIdUnique 121
 appAIdKey	= mkPreludeMiscIdUnique 122
-choiceAIdKey	= mkPreludeMiscIdUnique 123 -- |||
+choiceAIdKey	= mkPreludeMiscIdUnique 123 --  |||
 loopAIdKey	= mkPreludeMiscIdUnique 124
 
 ---------------- Template Haskell -------------------

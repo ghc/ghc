@@ -240,7 +240,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 		-- into h; if we inline f first, while it looks small, then g's 
 		-- wrapper will get inlined later anyway.  To avoid this nasty
 		-- ordering difference, we make (case a of (x,y) -> ...), 
-		-- *where a is one of the arguments* look free.
+		--  *where a is one of the arguments* look free.
 
 		other -> 
 -}
@@ -561,7 +561,7 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 
 	  | otherwise
 	  = case guidance of
-	      UnfoldNever  -> False ;
+	      UnfoldNever  -> False
 	      UnfoldIfGoodArgs n_vals_wanted arg_discounts size res_discount
 
 		  | enough_args && size <= (n_vals_wanted + 1)
@@ -622,8 +622,8 @@ computeDiscount :: Int -> [Int] -> Int -> [Bool] -> Bool -> Int
 computeDiscount n_vals_wanted arg_discounts res_discount arg_infos result_used
  	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
-	-- *size* whereas the discounts imply that there's some extra 
-	-- *efficiency* to be gained (e.g. beta reductions, case reductions) 
+	--  *size* whereas the discounts imply that there's some extra 
+	--  *efficiency* to be gained (e.g. beta reductions, case reductions) 
 	-- by inlining.
 
 	-- we also discount 1 for each argument passed, because these will

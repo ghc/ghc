@@ -586,7 +586,7 @@ instance (OutputableBndr name)
 -- foreign declarations are distinguished as to whether they define or use a
 -- Haskell name
 --
--- * the Boolean value indicates whether the pre-standard deprecated syntax
+--  * the Boolean value indicates whether the pre-standard deprecated syntax
 --   has been used
 --
 type LForeignDecl name = Located (ForeignDecl name)
@@ -600,17 +600,17 @@ data ForeignDecl name
 --
 data ForeignImport = -- import of a C entity
 		     --
-                     -- * the two strings specifying a header file or library
+                     --  * the two strings specifying a header file or library
                      --   may be empty, which indicates the absence of a
                      --   header or object specification (both are not used
                      --   in the case of `CWrapper' and when `CFunction'
                      --   has a dynamic target)
 		     --
-		     -- * the calling convention is irrelevant for code
+		     --  * the calling convention is irrelevant for code
 		     --   generation in the case of `CLabel', but is needed
 		     --   for pretty printing 
 		     --
-		     -- * `Safety' is irrelevant for `CLabel' and `CWrapper'
+		     --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
 		     --
 		     CImport  CCallConv	      -- ccall or stdcall
 			      Safety	      -- safe or unsafe

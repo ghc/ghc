@@ -191,8 +191,8 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 data Target = Target TargetId (Maybe (StringBuffer,ClockTime))
 
 data TargetId
-  = TargetModule Module	   -- | A module name: search for the file
-  | TargetFile   FilePath  -- | A filename: parse it to find the module name.
+  = TargetModule Module	   -- ^ A module name: search for the file
+  | TargetFile   FilePath  -- ^ A filename: parse it to find the module name.
 
 
 pprTarget :: Target -> SDoc

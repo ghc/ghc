@@ -239,7 +239,7 @@ data DynFlags = DynFlags {
   pgm_l			:: (String,[Option]),
   pgm_dll		:: (String,[Option]),
 
-  -- ** Package flags
+  --  ** Package flags
   extraPkgConfs		:: [FilePath],
 	-- The -package-conf flags given on the command line, in the order
 	-- they appeared.
@@ -247,7 +247,7 @@ data DynFlags = DynFlags {
   packageFlags		:: [PackageFlag],
 	-- The -package and -hide-package flags from the command-line
 
-  -- ** Package state
+  --  ** Package state
   pkgState		:: PackageState,
 
   -- hsc dynamic flags

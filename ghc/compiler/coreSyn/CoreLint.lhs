@@ -104,9 +104,9 @@ Outstanding issues:
     --
     -- Things are *not* OK if:
     --
-    -- * Unsaturated type app before specialisation has been done;
+    --  * Unsaturated type app before specialisation has been done;
     --
-    -- * Oversaturated type app after specialisation (eta reduction
+    --  * Oversaturated type app after specialisation (eta reduction
     --   may well be happening...);
 
 \begin{code}

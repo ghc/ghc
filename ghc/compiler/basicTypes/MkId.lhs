@@ -225,7 +225,7 @@ mkDataConIds wrap_name wkr_name data_con
 	-- If we pretend it is strict then when we see
 	--	case x of y -> $wMkT y
 	-- the simplifier thinks that y is "sure to be evaluated" (because
-	-- $wMkT is strict) and drops the case.  No, $wMkT is not strict.
+	--  $wMkT is strict) and drops the case.  No, $wMkT is not strict.
 	--
 	-- When the simplifer sees a pattern 
 	--	case e of MkT x -> ...

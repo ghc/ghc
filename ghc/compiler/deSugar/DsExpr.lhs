@@ -317,7 +317,7 @@ dsExpr (ExplicitList ty xs)
 -- we create a list from the array elements and convert them into a list using
 -- `PrelPArr.toP'
 --
--- * the main disadvantage to this scheme is that `toP' traverses the list
+--  * the main disadvantage to this scheme is that `toP' traverses the list
 --   twice: once to determine the length and a second time to put to elements
 --   into the array; this inefficiency could be avoided by exposing some of
 --   the innards of `PrelPArr' to the compiler (ie, have a `PrelPArrBase') so

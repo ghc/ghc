@@ -121,7 +121,7 @@ emitPrimOp [res] ForeignObjToAddrOp [fo] live
 emitPrimOp [] WriteForeignObjOp [fo,addr] live
    = stmtC (CmmStore (cmmOffsetW fo fixedHdrSize) addr)
 
--- #define sizzeofByteArrayzh(r,a) \
+--  #define sizzeofByteArrayzh(r,a) \
 --     r = (((StgArrWords *)(a))->words * sizeof(W_))
 emitPrimOp [res] SizeofByteArrayOp [arg] live
    = stmtC $
@@ -130,25 +130,25 @@ emitPrimOp [res] SizeofByteArrayOp [arg] live
 			  CmmLit (mkIntCLit wORD_SIZE)
 			])
 
--- #define sizzeofMutableByteArrayzh(r,a) \
+--  #define sizzeofMutableByteArrayzh(r,a) \
 --      r = (((StgArrWords *)(a))->words * sizeof(W_))
 emitPrimOp [res] SizeofMutableByteArrayOp [arg] live
    = emitPrimOp [res] SizeofByteArrayOp [arg] live
 
 
--- #define touchzh(o)                  /* nothing */
+--  #define touchzh(o)                  /* nothing */
 emitPrimOp [] TouchOp [arg] live
    = nopC
 
--- #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
+--  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
 emitPrimOp [res] ByteArrayContents_Char [arg] live
    = stmtC (CmmAssign res (cmmOffsetB arg arrWordsHdrSize))
 
--- #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
+--  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
 emitPrimOp [res] StableNameToIntOp [arg] live
    = stmtC (CmmAssign res (cmmLoadIndexW arg fixedHdrSize))
 
--- #define eqStableNamezh(r,sn1,sn2)					\
+--  #define eqStableNamezh(r,sn1,sn2)					\
 --    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
 emitPrimOp [res] EqStableNameOp [arg1,arg2] live
    = stmtC (CmmAssign res (CmmMachOp mo_wordEq [
@@ -160,11 +160,11 @@ emitPrimOp [res] EqStableNameOp [arg1,arg2] live
 emitPrimOp [res] ReallyUnsafePtrEqualityOp [arg1,arg2] live
    = stmtC (CmmAssign res (CmmMachOp mo_wordEq [arg1,arg2]))
 
--- #define addrToHValuezh(r,a) r=(P_)a
+--  #define addrToHValuezh(r,a) r=(P_)a
 emitPrimOp [res] AddrToHValueOp [arg] live
    = stmtC (CmmAssign res arg)
 
--- #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
+--  #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
 emitPrimOp [res] DataToTagOp [arg] live
    = stmtC (CmmAssign res (getConstrTag arg))
 
@@ -173,7 +173,7 @@ emitPrimOp [res] DataToTagOp [arg] live
    objects, even if they are in old space.  When they become immutable,
    they can be removed from this scavenge list.	 -}
 
--- #define unsafeFreezzeArrayzh(r,a)
+--  #define unsafeFreezzeArrayzh(r,a)
 --	{
 --        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN0_info);
 --	  r = a;
@@ -182,7 +182,7 @@ emitPrimOp [res] UnsafeFreezeArrayOp [arg] live
    = stmtsC [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
 	     CmmAssign res arg ]
 
--- #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
+--  #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
 emitPrimOp [res] UnsafeFreezeByteArrayOp [arg] live
    = stmtC (CmmAssign res arg)
 

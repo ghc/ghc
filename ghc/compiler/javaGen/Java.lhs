@@ -112,8 +112,8 @@ data Name        = Name String Type
 				-- to store an access to this thing.
 				-- So variables might be Int or Object.
 
-				-- ** method calls store the returned
-				-- ** type, not a complete arg x result type.
+				--  ** method calls store the returned
+				--  ** type, not a complete arg x result type.
 				--
 				-- Thinking:
 				-- ... foo1.foo2(...).foo3 ...

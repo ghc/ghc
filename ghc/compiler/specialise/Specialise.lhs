@@ -1007,7 +1007,7 @@ mkCallUDs subst f args
   || not (all isClassPred theta)	
 	-- Only specialise if all overloading is on class params. 
 	-- In ptic, with implicit params, the type args
-	-- *don't* say what the value of the implicit param is!
+	--  *don't* say what the value of the implicit param is!
   || not (spec_tys `lengthIs` n_tyvars)
   || not ( dicts   `lengthIs` n_dicts)
   || maybeToBool (lookupRule (\act -> True) (substInScope subst) emptyRuleBase f args)

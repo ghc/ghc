@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.67 2005/03/18 13:37:40 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.68 2005/03/31 10:16:34 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -155,7 +155,7 @@ cgRhsClosure bndr cc bndr_info srt fvs upd_flag args body = do
 	-- it in the closure.  Instead, just bind it to Node on entry.
 	-- NB we can be sure that Node will point to it, because we
 	-- havn't told mkClosureLFInfo about this; so if the binder
-	-- *was* a free var of its RHS, mkClosureLFInfo thinks it *is*
+	-- _was_ a free var of its RHS, mkClosureLFInfo thinks it *is*
 	-- stored in the closure itself, so it will make sure that
 	-- Node points to it...
     let

@@ -18,7 +18,7 @@ module ErrUtils (
 	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, mkDumpDoc,
 	showPass,
 
-	-- * Messages during compilation
+	--  * Messages during compilation
 	setMsgHandler,
 	putMsg,
 	compilationProgressMsg,

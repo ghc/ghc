@@ -888,7 +888,7 @@ argDemand d	    = d
 -------------------------
 -- Consider (if x then y else []) with demand V
 -- Then the first branch gives {y->V} and the second
--- *implicitly* has {y->A}.  So we must put {y->(V `lub` A)}
+--  *implicitly* has {y->A}.  So we must put {y->(V `lub` A)}
 -- in the result env.
 lubType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
   = DmdType lub_fv2 (lub_ds ds1 ds2) (r1 `lubRes` r2)

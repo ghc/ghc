@@ -84,7 +84,7 @@ funTyArgs  = splitFunTy
 
 -- for a type of the form `[:t:]', yield `t' (EXPORTED)
 --
--- * if the type has any other form, a fatal error occurs
+--  * if the type has any other form, a fatal error occurs
 --
 parrElemTy    :: Type -> Type
 parrElemTy ty  = 
@@ -100,7 +100,7 @@ parrElemTy ty  =
 -- make a tuple construction expression from a list of argument types and
 -- argument values (EXPORTED)
 --
--- * the two lists need to be of the same length
+--  * the two lists need to be of the same length
 --
 mkTuple                                  :: [Type] -> [CoreExpr] -> CoreExpr
 mkTuple []  []                            = Var unitDataConId

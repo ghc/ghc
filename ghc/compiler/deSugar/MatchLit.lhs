@@ -88,8 +88,8 @@ tidyLitPat :: HsLit -> LPat Id -> LPat Id
 -- Result has only the following HsLits:
 --	HsIntPrim, HsCharPrim, HsFloatPrim
 --	HsDoublePrim, HsStringPrim ?
--- * HsInteger, HsRat, HsInt can't show up in LitPats,
--- * HsString has been turned into an NPat in tcPat
+--  * HsInteger, HsRat, HsInt can't show up in LitPats,
+--  * HsString has been turned into an NPat in tcPat
 -- and we get rid of HsChar right here
 tidyLitPat (HsChar c) pat = mkCharLitPat c
 tidyLitPat lit	      pat = pat

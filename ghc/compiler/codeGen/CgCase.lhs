@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.73 2005/03/18 13:37:38 simonmar Exp $
+% $Id: CgCase.lhs,v 1.74 2005/03/31 10:16:34 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -171,7 +171,7 @@ cgCase (StgOpApp op@(StgFCallOp fcall _) args _)
        live_in_whole_case live_in_alts bndr srt alt_type alts
   | unsafe_foreign_call
   = ASSERT( isSingleton alts )
-    do	-- *must* be an unboxed tuple alt.
+    do	--  *must* be an unboxed tuple alt.
 	-- exactly like the cgInlinePrimOp case for unboxed tuple alts..
 	{ res_tmps <- mapFCs bindNewToTemp non_void_res_ids
 	; let res_hints = map (typeHint.idType) non_void_res_ids
@@ -471,7 +471,7 @@ are inlined alternatives.
 \begin{code}
 cgAlgAlts :: GCFlag
        -> Maybe VirtualSpOffset
-       -> AltType				-- ** AlgAlt or PolyAlt only **
+       -> AltType				--  ** AlgAlt or PolyAlt only **
        -> [StgAlt]				-- The alternatives
        -> FCode ( [(ConTagZ, CgStmts)], -- The branches
 		  Maybe CgStmts )	-- The default case
@@ -491,7 +491,7 @@ cgAlgAlts gc_flag cc_slot alt_type alts
 
 cgAlgAlt :: GCFlag
       	 -> Maybe VirtualSpOffset	-- Turgid state
-      	 -> AltType			-- ** AlgAlt or PolyAlt only **
+      	 -> AltType			--  ** AlgAlt or PolyAlt only **
       	 -> StgAlt
       	 -> FCode (AltCon, CgStmts)
 
