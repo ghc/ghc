@@ -67,10 +67,18 @@ tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcLookupTy tycon_name			`thenNF_Tc` \ (ATyCon tycon) ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
     tcHsType rhs				`thenTc` \ rhs_ty ->
+	-- Note tcHsType not tcHsSigType; we allow type synonyms
+	-- that aren't types; e.g.  type List = []
+	--
 	-- If the RHS mentions tyvars that aren't in scope, we'll 
-	-- quantify over them.  With gla-exts that's right, but for H98
-	-- we should complain. We can now do that here without falling into
+	-- quantify over them:
+	--	e.g. 	type T = a->a
+	-- will become	type T = forall a. a->a
+	--
+	-- With gla-exts that's right, but for H98 we should complain. 
+	-- We can now do that here without falling into
 	-- a black hole, we still do it in rnDecl (TySynonym case)
+
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
 tcTyDecl1 (TyData _ context tycon_name _ con_decls _ derivings _  src_loc)
