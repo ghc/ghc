@@ -191,10 +191,6 @@ compile ghci_mode this_mod location
 		-- we're in batch mode: finish the compilation pipeline.
 		_other -> do
 		   let object_filename = ml_obj_file location
-		       object_dir = directoryOf object_filename
-
-		   -- create the object dir if it doesn't exist
-		   createDirectoryHierarchy object_dir
 
 		   runPipeline (StopBefore Ln) ""
 			True Nothing output_fn (Just location)
@@ -793,6 +789,10 @@ runPhase As _basename _suff input_fn get_output_fn maybe_loc
         cmdline_include_paths <- readIORef v_Include_paths
 
 	output_fn <- get_output_fn Ln maybe_loc
+
+	-- we create directories for the object file, because it
+	-- might be a hierarchical module.
+	createDirectoryHierarchy (directoryOf output_fn)
 
 	SysTools.runAs (map SysTools.Option as_opts
 		       ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
