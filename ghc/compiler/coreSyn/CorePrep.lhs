@@ -170,9 +170,10 @@ corePrepTopBind env (Rec pairs) = corePrepRecPairs TopLevel env pairs
 corePrepBind ::  CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)
 	-- This one is used for *local* bindings
 corePrepBind env (NonRec bndr rhs)
-  = corePrepExprFloat env rhs				`thenUs` \ (floats, rhs') ->
+  = etaExpandRhs bndr rhs				`thenUs` \ rhs1 ->
+    corePrepExprFloat env rhs1				`thenUs` \ (floats, rhs2) ->
     cloneBndr env bndr					`thenUs` \ (env', bndr') ->
-    mkLocalNonRec bndr' (bdrDem bndr') floats rhs'	`thenUs` \ floats' ->
+    mkLocalNonRec bndr' (bdrDem bndr') floats rhs2	`thenUs` \ floats' ->
     returnUs (env', floats')
 
 corePrepBind env (Rec pairs) = corePrepRecPairs NotTopLevel env pairs
@@ -200,7 +201,8 @@ corePrepRhs :: TopLevelFlag -> RecFlag
 	    -> UniqSM (OrdList FloatingBind, CoreExpr)
 -- Used for top-level bindings, and local recursive bindings
 corePrepRhs top_lvl is_rec env (bndr, rhs)
-  = corePrepExprFloat env rhs		`thenUs` \ floats_w_rhs ->
+  = etaExpandRhs bndr rhs	`thenUs` \ rhs' ->
+    corePrepExprFloat env rhs'	`thenUs` \ floats_w_rhs ->
     floatRhs top_lvl is_rec bndr floats_w_rhs
 
 
@@ -213,14 +215,11 @@ corePrepArg :: CloneEnv -> CoreArg -> RhsDemand
 	   -> UniqSM (OrdList FloatingBind, CoreArg)
 corePrepArg env arg dem
   = corePrepExprFloat env arg		`thenUs` \ (floats, arg') ->
-    if no_binding_needed arg'
+    if exprIsTrivial arg'
     then returnUs (floats, arg')
     else newVar (exprType arg') (exprArity arg')	`thenUs` \ v ->
 	 mkLocalNonRec v dem floats arg'		`thenUs` \ floats' -> 
 	 returnUs (floats', Var v)
-
-no_binding_needed | opt_RuntimeTypes = exprIsAtom
-	          | otherwise	     = exprIsTrivial
 
 -- version that doesn't consider an scc annotation to be trivial.
 exprIsTrivial (Var v)
@@ -416,14 +415,12 @@ floatRhs top_lvl is_rec bndr (floats, rhs)
 	-- because floating the case would make it evaluated too early
 	--
 	-- Finally, eta-expand the RHS, for the benefit of the code gen
-    etaExpandRhs bndr rhs	`thenUs` \ rhs' ->
-    returnUs (floats, rhs')
+    returnUs (floats, rhs)
     
   | otherwise
 	-- Don't float; the RHS isn't a value
   = mkBinds floats rhs		`thenUs` \ rhs' ->
-    etaExpandRhs bndr rhs'	`thenUs` \ rhs'' ->
-    returnUs (nilOL, rhs'')
+    returnUs (nilOL, rhs')
 
 -- mkLocalNonRec is used only for *nested*, *non-recursive* bindings
 mkLocalNonRec :: Id  -> RhsDemand 			-- Lhs: id with demand
@@ -475,6 +472,16 @@ etaExpandRhs bndr rhs
 	--    to establish.  One possible cause is eta expanding inside of
 	--    an SCC note - we're now careful in etaExpand to make sure the
 	--    SCC is pushed inside any new lambdas that are generated.
+	--
+	-- NB3: It's important to do eta expansion, and *then* ANF-ising
+	--		f = /\a -> g (h 3)	-- h has arity 2
+	-- If we ANF first we get
+	--		f = /\a -> let s = h 3 in g s
+	-- and now eta expansion gives
+	-- 		f = /\a -> \ y -> (let s = h 3 in g s) y
+	-- which is horrible.
+	-- Eta expanding first gives
+	--		f = /\a -> \y -> let s = h 3 in g s y
 	--
     getUniquesUs		`thenUs` \ us ->
     returnUs (etaExpand (idArity bndr) us rhs (idType bndr))
