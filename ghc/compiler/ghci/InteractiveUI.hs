@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.93 2001/10/16 13:25:00 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.94 2001/10/16 13:29:35 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -826,7 +826,7 @@ loaded_in_ghci
 
 linkPackage :: PackageConfig -> IO ()
 linkPackage pkg
-   = do putStr ("Loading package " ++ name pkg ++ " ... ")
+   = do 
         -- For each obj, try obj.o and if that fails, obj.so.
         -- Complication: all the .so's must be loaded before any of the .o's.  
         let dirs      =  library_dirs pkg
@@ -839,6 +839,10 @@ linkPackage pkg
         let sos_first | name pkg `elem` loaded_in_ghci = obj_libs
 		      | otherwise      		       = so_libs ++ obj_libs
 
+	-- nothing to do?
+	if null sos_first then return () else do
+
+	putStr ("Loading package " ++ name pkg ++ " ... ")
         mapM loadClassified sos_first
         putStr "linking ... "
         ok <- resolveObjs
