@@ -382,7 +382,8 @@ pipeLoop phase stop_phase input_fn orig_basename orig_suff
   
 genOutputFilenameFunc :: Bool -> Maybe FilePath -> Phase -> String
   -> IO (Phase{-next phase-} -> Maybe ModLocation -> IO FilePath)
-genOutputFilenameFunc keep_output maybe_output_filename stop_phase basename
+genOutputFilenameFunc keep_final_output maybe_output_filename 
+		stop_phase basename
  = do
    hcsuf      <- readIORef v_HC_suf
    odir       <- readIORef v_Output_dir
@@ -400,23 +401,30 @@ genOutputFilenameFunc keep_output maybe_output_filename stop_phase basename
         myPhaseInputExt other = phaseInputExt other
 
 	func next_phase maybe_location
-     		| next_phase == stop_phase
-                     = case maybe_output_filename of
-			     Just file -> return file
-			     Nothing
-				 | Ln <- next_phase -> return odir_persistent
-				 | keep_output      -> return persistent
-				 | otherwise        -> newTempName suffix
-			-- sometimes, we keep output from intermediate stages
-     		| otherwise
-     		     = case next_phase of
-     			     Ln                  -> return odir_persistent
-     			     Mangle | keep_raw_s -> return persistent
-     			     As     | keep_s     -> return persistent
-     			     HCc    | keep_hc    -> return persistent
-     			     _other              -> newTempName suffix
+		| is_last_phase, Just f <- maybe_output_filename = return f
+		| is_last_phase && keep_final_output = persistent_fn
+		| keep_this_output 		     = persistent_fn
+     		| otherwise        		     = newTempName suffix
+
 	   where
+		is_last_phase = next_phase == stop_phase
+
+		-- sometimes, we keep output from intermediate stages
+		keep_this_output = 
+     		     case next_phase of
+     			     Ln                  -> True
+     			     Mangle | keep_raw_s -> True
+     			     As     | keep_s     -> True
+     			     HCc    | keep_hc    -> True
+     			     _other              -> False
+
 		suffix = myPhaseInputExt next_phase
+
+		-- persistent object files get put in odir
+	        persistent_fn 
+		   | Ln <- next_phase  = return odir_persistent
+		   | otherwise         = return persistent
+
 		persistent = basename ++ '.':suffix
 
 		odir_persistent
