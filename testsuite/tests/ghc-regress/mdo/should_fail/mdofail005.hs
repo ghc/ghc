@@ -1,6 +1,7 @@
 -- {-# OPTIONS -fglasgow-exts #-}
 
--- use of mdo requires -fglasgow-exts to be given:
+-- use of mdo requires -fglasgow-exts to be given,
+-- so let's try leaving it out
 
 module Main (main) where
 
