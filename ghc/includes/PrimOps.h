@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.87 2001/12/07 11:34:48 sewardj Exp $
+ * $Id: PrimOps.h,v 1.88 2001/12/11 18:25:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -486,5 +486,10 @@ extern StgInt stg_sig_install (StgInt, StgInt, StgStablePtr, sigset_t *);
 #else /* !GRAN && !SMP && !PAR */
 #define parzh(r,node) r = 1
 #endif
+
+/* -----------------------------------------------------------------------------
+   ForeignObj - the C backend still needs this. 
+   -------------------------------------------------------------------------- */
+#define ForeignObj_CLOSURE_DATA(c)  (((StgForeignObj *)c)->data)
 
 #endif /* PRIMOPS_H */
