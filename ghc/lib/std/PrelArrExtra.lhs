@@ -17,69 +17,40 @@ import Ix
 import PrelArr
 import PrelByteArr
 import PrelST
+import PrelIOBase
 import PrelBase
 import PrelGHC
+\end{code}
 
-freezeFloatArray  :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeDoubleArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+%*********************************************************
+%*							*
+\subsection{Moving between mutable and immutable}
+%*							*
+%*********************************************************
 
-freezeFloatArray (MutableByteArray l u arr#) = ST $ \ s# ->
-    case rangeSize (l,u)   of { I# n# ->
-    case freeze arr# n# s# of { (# s2#, frozen# #) ->
-    (# s2#, ByteArray l u frozen# #) }}
-  where
-    freeze  :: MutableByteArray# s	-- the thing
-	    -> Int#			-- size of thing to be frozen
-	    -> State# s			-- the Universe and everything
-	    -> (# State# s, ByteArray# #)
+\begin{code}
+freezeByteArray   :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 
-    freeze arr1# end# s#
-      = case (newFloatArray# end# s#)    of { (# s2#, newarr1# #) ->
-	case copy 0# arr1# newarr1# s2#  of { (# s3#, newarr2# #) ->
-	unsafeFreezeByteArray# newarr2# s3#
-	}}
-      where
-	copy :: Int#
-	     -> MutableByteArray# s -> MutableByteArray# s
-	     -> State# s
-	     -> (# State# s, MutableByteArray# s #)
+{-# SPECIALISE freezeByteArray :: MutableByteArray s Int -> ST s (ByteArray Int) #-}
 
-	copy cur# from# to# s1#
-	  | cur# ==# end#
-	    = (# s1#, to# #)
-	  | otherwise
-	    = case (readFloatArray#  from# cur#     s1#)  of { (# s2#, ele #) ->
-	      case (writeFloatArray# to#   cur# ele s2#)  of { s3# ->
-	      copy (cur# +# 1#) from# to# s3#
-	      }}
+-- This coercion of memcpy to the ST monad is safe, because memcpy
+-- only modifies its destination operand, which is already MutableByteArray.
+freezeByteArray (MutableByteArray l u arr) = ST $ \ s ->
+	let n = sizeofMutableByteArray# arr in
+	case (newCharArray# n s)                   of { (# s, newarr #) -> 
+	case ((unsafeCoerce# memcpy) newarr arr n s) of { (# s, () #) ->
+	case unsafeFreezeByteArray# newarr s       of { (# s, frozen #) ->
+	(# s, ByteArray l u frozen #) }}}
 
-freezeDoubleArray (MutableByteArray l u arr#) = ST $ \ s# ->
-    case rangeSize (l,u)   of { I# n# ->
-    case freeze arr# n# s# of { (# s2#, frozen# #) ->
-    (# s2#, ByteArray l u frozen# #) }}
-  where
-    freeze  :: MutableByteArray# s	-- the thing
-	    -> Int#			-- size of thing to be frozen
-	    -> State# s			-- the Universe and everything
-	    -> (# State# s, ByteArray# #)
+foreign import "memcpy" unsafe 
+  memcpy :: MutableByteArray# RealWorld -> ByteArray# -> Int# -> IO ()
 
-    freeze arr1# n# s1#
-      = case (newDoubleArray# n# s1#)  	   of { (# s2#, newarr1# #) ->
-	case copy 0# n# arr1# newarr1# s2# of { (# s3#, newarr2# #) ->
-	unsafeFreezeByteArray# newarr2# s3#
-	}}
-      where
-	copy :: Int# -> Int#
-	     -> MutableByteArray# s -> MutableByteArray# s
-	     -> State# s
-	     -> (# State# s, MutableByteArray# s #)
+unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 
-	copy cur# end# from# to# st#
-	  | cur# ==# end#
-	    = (# st#, to# #)
-	  | otherwise
-	    = case (readDoubleArray#  from# cur#     st#) of { (# s2#, ele #) ->
-	      case (writeDoubleArray# to#   cur# ele s2#) of { s3# ->
-	      copy (cur# +# 1#) end# from# to# s3#
-	      }}
+{-# SPECIALIZE unsafeFreezeByteArray :: MutableByteArray s Int -> ST s (ByteArray Int)
+  #-}
+
+unsafeFreezeByteArray (MutableByteArray l u arr#) = ST $ \ s# ->
+    case unsafeFreezeByteArray# arr# s# of { (# s2#, frozen# #) ->
+    (# s2#, ByteArray l u frozen# #) }
 \end{code}

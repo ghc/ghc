@@ -20,7 +20,8 @@ module CPUTime
 import Prelude		-- To generate the dependency
 import PrelGHC		( indexIntArray# )
 import PrelBase		( Int(..) )
-import PrelByteArr  	( ByteArray(..), newIntArray, unsafeFreezeByteArray )
+import PrelByteArr  	( ByteArray(..), newIntArray )
+import PrelArrExtra     ( unsafeFreezeByteArray )
 import PrelNum		( fromInt )
 import PrelIOBase	( IOError(..), IOErrorType( UnsupportedOperation ), 
 			  unsafePerformIO, stToIO )

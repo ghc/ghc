@@ -50,9 +50,6 @@ ifneq "$(way)" ""
 SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
-# per-module flags
-PrelArrExtra_HC_OPTS     += -monly-2-regs
-
 # Far too much heap is needed to compile PrelNumExtra with -O at the
 # moment, but there you go..
 PrelNumExtra_HC_OPTS     += -H24m -K2m

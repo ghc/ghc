@@ -58,9 +58,8 @@ import Prelude		-- Just to get it in the dependencies
 
 import PrelGHC		( RealWorld, or#, and# )
 import PrelByteArr	( ByteArray, MutableByteArray,
-			  newWordArray, readWordArray, newCharArray,
-			  unsafeFreezeByteArray
-			)
+			  newWordArray, readWordArray, newCharArray )
+import PrelArrExtra	( unsafeFreezeByteArray )
 import PrelPack		( unpackNBytesST, packString, unpackCStringST )
 import PrelIOBase	( stToIO,
 			  constructErrorAndFail, constructErrorAndFailWithInfo,
