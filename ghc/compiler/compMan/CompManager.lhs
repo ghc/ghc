@@ -31,9 +31,9 @@ import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
 import Finder
 import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
-			  UniqFM, listToUFM )
+			  UniqFM, listToUFM, eltsUFM )
 import Unique		( Uniquable )
-import Digraph		( SCC(..), stronglyConnComp )
+import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
 import DriverFlags	( getDynFlags )
 import DriverPhases
 import DriverUtil	( BarfKind(..), splitFilename3 )
@@ -47,7 +47,6 @@ import CmdLineOpts	( DynFlags(..) )
 #ifdef GHCI
 import Interpreter	( HValue )
 import HscMain		( hscExpr )
-import RdrName
 import Type		( Type )
 import PrelGHC		( unsafeCoerce# )
 #endif
@@ -162,7 +161,7 @@ cmUnload state
    where
      CmState{ pcms=pcms } = state
      PersistentCMState{ hst=hst, hit=hit } = pcms
-     (new_hst, new_hit) = retainInTopLevelEnvs [] (hst,hit)
+     (new_hst, new_hit,[]) = retainInTopLevelEnvs [] (hst,hit,[])
 \end{code}
 
 The real business of the compilation manager: given a system state and
@@ -189,8 +188,8 @@ cmLoadModule cmstate1 rootname
         let ghci_mode = gmode pcms1 -- this never changes
 
         -- Do the downsweep to reestablish the module graph
-        -- then generate version 2's by removing from HIT,HST,UI any
-        -- modules in the old MG which are not in the new one.
+        -- then generate version 2's by retaining in HIT,HST,UI a
+        -- stable set S of modules, as defined below.
 
 	dflags <- getDynFlags
         let verb = verbosity dflags
@@ -199,14 +198,13 @@ cmLoadModule cmstate1 rootname
         when (verb >= 1 && ghci_mode == Batch) $
            hPutStrLn stderr (prog_name ++ ": chasing modules from: " ++ rootname)
 
-        mg2unsorted <- downsweep [rootname]
+        (mg2unsorted, a_root_is_Main) <- downsweep [rootname]
+        let mg2unsorted_names = map name_of_summary mg2unsorted
 
-        let modnames1   = map name_of_summary mg1
-        let modnames2   = map name_of_summary mg2unsorted
-        let mods_to_zap = filter (`notElem` modnames2) modnames1
+        -- reachable_from follows source as well as normal imports
+        let reachable_from :: ModuleName -> [ModuleName]
+            reachable_from = downwards_closure_of_module mg2unsorted
 
-        let (hst2, hit2, ui2)
-               = removeFromTopLevelEnvs mods_to_zap (hst1, hit1, ui1)
         -- should be cycle free; ignores 'import source's
         let mg2 = topological_sort False mg2unsorted
         -- ... whereas this takes them into account.  Used for
@@ -214,9 +212,71 @@ cmLoadModule cmstate1 rootname
         -- upsweep, and for removing from hst/hit all the modules
         -- not in strict downwards closure, during calls to compile.
         let mg2_with_srcimps = topological_sort True mg2unsorted
-      
-        let reachable_from :: ModuleName -> [ModuleName]
-            reachable_from = downwards_closure_of_module mg2unsorted
+
+        -- Figure out a stable set of modules which can be retained
+        -- the top level envs, to avoid upsweeping them.  Goes to a
+        -- bit of trouble to avoid upsweeping module cycles.
+        --
+        -- Construct a set S of stable modules like this:
+        -- Travel upwards, over the sccified graph.  For each scc
+        -- of modules ms, add ms to S only if:
+        -- 1.  All home imports of ms are either in ms or S
+        -- 2.  All m <- ms satisfy P, where
+        --      P | interactive = have old summary for m and it indicates
+        --                        that the source is unchanged
+        --        | batch = linkable exists on disk, and is younger 
+        --                  than source.
+
+        let mkStableSet :: [ModuleName] -- accumulating stable modules
+                        -> [Linkable]   -- their linkables, in batch mode
+                        -> [[ModSummary]] 
+                        -> IO ([ModuleName], [Linkable])
+            mkStableSet stable lis [] = return (stable, lis)
+            mkStableSet stable lis (scc:sccs)
+               = do let scc_allhomeimps :: [ModuleName]
+                        scc_allhomeimps 
+                           = nub (
+                                filter (`elem` mg2unsorted_names)
+                                   (concatMap (\m -> ms_srcimps m ++ ms_imps m) scc))
+                        all_imports_in_scc_or_stable
+                           = all in_stable_or_scc scc_allhomeimps
+                        scc_names
+                           = map name_of_summary scc
+                        in_stable_or_scc m
+                           = m `elem` scc_names || m `elem` stable
+                    (all_scc_stable, more_lis)
+                       <- if   not all_imports_in_scc_or_stable
+                          then do --putStrLn ("PART1 fail " ++ showSDoc (ppr scc_allhomeimps <+> ppr (filter (not.in_stable_or_scc) scc_allhomeimps)))
+                                  return (False, [])
+                          else do bools_n_lis <- mapM (good_enough ghci_mode mg1) scc
+                                  let (bools, liss) = unzip bools_n_lis
+                                  return (and bools, concat liss)
+                    if not all_scc_stable
+                     then mkStableSet stable lis sccs
+                     else mkStableSet (scc_names++stable) (more_lis++lis) sccs
+
+        (stable_mods, linkables_for_stable_mods_BATCH_ONLY)
+           <- --return ([],[]) 
+              mkStableSet [] [] (map flattenSCC mg2_with_srcimps)
+
+        when (verb >= 2) $
+           putStrLn ("STABLE MODS: " ++ show (map moduleNameUserString stable_mods))
+
+        let (hst2, hit2, ui2)
+               = retainInTopLevelEnvs stable_mods (hst1, hit1, ui1)
+        let upsweep_these
+               = filter (\scc -> case scc of 
+                                   AcyclicSCC m -> name_of_summary m `notElem` stable_mods)
+                 mg2
+
+        -- In batch mode, we need to pre-load UI with linkables for 
+        -- modules in the stable set, since there is no other way for
+        -- them to be there.  In interactive mode, we re-use the 
+        -- linkables retained from ui1, generated in the previous
+        -- sweep.
+        let ui2a | ghci_mode == Interactive = ui2
+                 | ghci_mode == Batch       = ASSERT(null ui2) 
+                                              linkables_for_stable_mods_BATCH_ONLY
 
         --hPutStrLn stderr "after tsort:\n"
         --hPutStrLn stderr (showSDoc (vcat (map ppr mg2)))
@@ -232,9 +292,9 @@ cmLoadModule cmstate1 rootname
         let threaded2 = CmThreaded pcs1 hst2 hit2
 
         (upsweep_complete_success, threaded3, modsDone, newLis)
-           <- upsweep_mods ghci_mode dflags ui2 reachable_from threaded2 mg2
+           <- upsweep_mods ghci_mode dflags ui2 reachable_from threaded2 upsweep_these
 
-        let ui3 = add_to_ui ui2 newLis
+        let ui3 = add_to_ui ui2a newLis
         let (CmThreaded pcs3 hst3 hit3) = threaded3
 
         -- At this point, modsDone and newLis should have the same
@@ -252,8 +312,8 @@ cmLoadModule cmstate1 rootname
 		hPutStrLn stderr "Upsweep completely successful."
               linkresult 
                  <- link ghci_mode dflags 
-			(any exports_main (moduleEnvElts hst3)) 
-                        newLis pls1
+			a_root_is_Main --(any exports_main (moduleEnvElts hst3)) 
+                        ui3 pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
@@ -302,6 +362,36 @@ cmLoadModule cmstate1 rootname
                           return (cmstate4, False, reverse mods_to_keep_names)
 
 
+
+good_enough :: GhciMode -> [ModSummary] -> ModSummary -> IO (Bool, [Linkable])
+good_enough ghci_mode old_summaries new_summary
+   | ghci_mode == Interactive
+   = case found_old_summarys of
+        [] -> return (False, bomb)
+        [old_summary]
+           -> case (ms_hs_date new_summary, ms_hs_date old_summary) of
+                 (Just d1, Just d2) -> return (d1 == d2, bomb)
+                 (_,       _      ) -> return (False, bomb)
+   | ghci_mode == Batch
+   = case ms_hs_date new_summary of
+        Nothing -> return (False, [])  -- no source date (?!)
+        Just hs_time 
+         -> case ml_obj_file (ms_location new_summary) of
+               Nothing -> return (False, [])  -- no obj filename
+               Just fn 
+                -> do maybe_li <- maybe_getFileLinkable
+                                     (moduleName (ms_mod new_summary)) fn
+                      case maybe_li of
+                         Nothing -> return (False, []) -- no object file on disk
+                         Just li -> return (linkableTime li >= hs_time, [li])
+   where
+      bomb
+         = panic "good_enough: inappropriate request for batch linkables"
+      found_old_summarys
+         = [s | s <- old_summaries, 
+                name_of_summary s == name_of_summary new_summary]
+
+
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
 findPartiallyCompletedCycles :: [ModuleName] -> [SCC ModSummary] -> [ModuleName]
@@ -324,9 +414,9 @@ findPartiallyCompletedCycles modsDone theGraph
 
 
 -- Does this ModDetails export Main.main?
-exports_main :: ModDetails -> Bool
-exports_main md
-   = isJust (lookupNameEnv (md_types md) mainName)
+--exports_main :: ModDetails -> Bool
+--exports_main md
+--   = isJust (lookupNameEnv (md_types md) mainName)
 
 
 -- Add the given (LM-form) Linkables to the UI, overwriting previous
@@ -376,7 +466,11 @@ upsweep_mods ghci_mode dflags oldUI reachable_from threaded
 
 upsweep_mods ghci_mode dflags oldUI reachable_from threaded 
      ((AcyclicSCC mod):mods)
-   = do (threaded1, maybe_linkable) 
+   = do --case threaded of
+        --   CmThreaded pcsz hstz hitz
+        --      -> putStrLn ("UPSWEEP_MOD: hit = " ++ show (map (moduleNameUserString.moduleName.mi_module) (eltsUFM hitz)))
+
+        (threaded1, maybe_linkable) 
            <- upsweep_mod ghci_mode dflags oldUI threaded mod 
                           (reachable_from (name_of_summary mod)) 
         case maybe_linkable of
@@ -459,8 +553,8 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
             source_unchanged
                = not compilation_mandatory
 
-            (hst1_strictDC, hit1_strictDC)
-               = retainInTopLevelEnvs reachable_from_here (hst1,hit1)
+            (hst1_strictDC, hit1_strictDC, [])
+               = retainInTopLevelEnvs reachable_from_here (hst1,hit1,[])
 
             old_linkable 
                = unJust "upsweep_mod:old_linkable" maybe_old_linkable
@@ -522,11 +616,12 @@ removeFromTopLevelEnvs zap_these (hst, hit, ui)
      )
 
 retainInTopLevelEnvs :: [ModuleName]
-                        -> (HomeSymbolTable, HomeIfaceTable)
-                        -> (HomeSymbolTable, HomeIfaceTable)
-retainInTopLevelEnvs keep_these (hst, hit)
+                        -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
+                        -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
+retainInTopLevelEnvs keep_these (hst, hit, ui)
    = (retainInUFM hst keep_these,
-      retainInUFM hit keep_these
+      retainInUFM hit keep_these,
+      filterModuleLinkables (`elem` keep_these) ui
      )
      where
         retainInUFM :: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
@@ -588,11 +683,17 @@ topological_sort include_source_imports summaries
 
 -- Chase downwards from the specified root set, returning summaries
 -- for all home modules encountered.  Only follow source-import
--- links.
-downsweep :: [FilePath] -> IO [ModSummary]
+-- links.  Also returns a Bool to indicate whether any of the roots
+-- are module Main.
+downsweep :: [FilePath] -> IO ([ModSummary], Bool)
 downsweep rootNm
    = do rootSummaries <- mapM getRootSummary rootNm
-        loop (filter (isHomeModule.ms_mod) rootSummaries)
+        let a_root_is_Main 
+               = any ((=="Main").moduleNameUserString.name_of_summary) 
+                     rootSummaries
+        all_summaries
+           <- loop (filter (isHomeModule.ms_mod) rootSummaries)
+        return (all_summaries, a_root_is_Main)
      where
 	getRootSummary :: FilePath -> IO ModSummary
 	getRootSummary file
