@@ -132,7 +132,7 @@ instance Bounded () where
     maxBound = ()
 
 instance Enum () where
-    succ _      = error "Prelude.Enum.().succ: bad argment"
+    succ _      = error "Prelude.Enum.().succ: bad argument"
     pred _      = error "Prelude.Enum.().pred: bad argument"
 
     toEnum x | x == zeroInt = ()
@@ -173,14 +173,14 @@ instance Bounded Bool where
 
 instance Enum Bool where
   succ False = True
-  succ True  = error "Prelude.Enum.Bool.succ: bad argment"
+  succ True  = error "Prelude.Enum.Bool.succ: bad argument"
 
   pred True  = False
-  pred False  = error "Prelude.Enum.Bool.pred: bad argment"
+  pred False  = error "Prelude.Enum.Bool.pred: bad argument"
 
   toEnum n | n == zeroInt = False
 	   | n == oneInt  = True
-	   | otherwise    = error "Prelude.Enum.Bool.toEnum: bad argment"
+	   | otherwise    = error "Prelude.Enum.Bool.toEnum: bad argument"
 
   fromEnum False = zeroInt
   fromEnum True  = oneInt
@@ -204,16 +204,16 @@ instance Bounded Ordering where
 instance Enum Ordering where
   succ LT = EQ
   succ EQ = GT
-  succ GT = error "Prelude.Enum.Ordering.succ: bad argment"
+  succ GT = error "Prelude.Enum.Ordering.succ: bad argument"
 
   pred GT = EQ
   pred EQ = LT
-  pred LT = error "Prelude.Enum.Ordering.pred: bad argment"
+  pred LT = error "Prelude.Enum.Ordering.pred: bad argument"
 
   toEnum n | n == zeroInt = LT
 	   | n == oneInt  = EQ
 	   | n == twoInt  = GT
-  toEnum _ = error "Prelude.Enum.Ordering.toEnum: bad argment"
+  toEnum _ = error "Prelude.Enum.Ordering.toEnum: bad argument"
 
   fromEnum LT = zeroInt
   fromEnum EQ = oneInt
