@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.62 2001/04/06 01:07:23 lewie Exp $
+# $Id: Makefile,v 1.63 2001/04/12 15:17:17 michaelw Exp $
 #
 
 TOP=..
@@ -60,7 +60,7 @@ ifeq "$(BIN_DIST)" "1"
 INSTALL_PROGS += pkgconf
 endif
 
-CLEAN_FILES += pkgconf package.conf.inplace package.conf
+CLEAN_FILES += Main.hi pkgconf package.conf.inplace package.conf
 
 # -----------------------------------------------------------------------------
 
