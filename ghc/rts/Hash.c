@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.c,v 1.6 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Hash.c,v 1.7 2001/11/26 13:06:49 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1995-1998
  * (c) The GHC Team, 1999
@@ -13,6 +13,7 @@
 #include "Rts.h"
 #include "Hash.h"
 #include "RtsUtils.h"
+#include "Arena.h"
 
 #define HSEGSIZE    1024    /* Size of a single hash table segment */
 			    /* Also the minimum size of a hash table */
@@ -46,6 +47,7 @@ struct hashtable {
     HashList **dir[HDIRSIZE];	/* Directory of segments */
     HashFunction *hash;		/* hash function */
     CompareFunction *compare;   /* key comparison function */
+    Arena *arena;
 };
 
 /* -----------------------------------------------------------------------------
@@ -118,7 +120,6 @@ allocSegment(HashTable *table, int segment)
     table->dir[segment] = stgMallocBytes(HSEGSIZE * sizeof(HashList *), 
 					 "allocSegment");
 }
-
 
 /* -----------------------------------------------------------------------------
  * Expand the larger hash table by one bucket, and split one bucket
@@ -202,39 +203,6 @@ lookupHashTable(HashTable *table, StgWord key)
     return NULL;
 }
 
-/* -----------------------------------------------------------------------------
- * We allocate the hashlist cells in large chunks to cut down on malloc
- * overhead.  Although we keep a free list of hashlist cells, we make
- * no effort to actually return the space to the malloc arena.
- * -------------------------------------------------------------------------- */
-
-static HashList *freeList = NULL;
-
-static HashList *
-allocHashList(void)
-{
-    HashList *hl, *p;
-
-    if ((hl = freeList) != NULL) {
-	freeList = hl->next;
-    } else {
-        hl = stgMallocBytes(HCHUNK * sizeof(HashList), "allocHashList");
-
-	freeList = hl + 1;
-	for (p = freeList; p < hl + HCHUNK - 1; p++)
-	    p->next = p + 1;
-	p->next = NULL;
-    }
-    return hl;
-}
-
-static void
-freeHashList(HashList *hl)
-{
-    hl->next = freeList;
-    freeList = hl;
-}
-
 void
 insertHashTable(HashTable *table, StgWord key, void *data)
 {
@@ -254,7 +222,7 @@ insertHashTable(HashTable *table, StgWord key, void *data)
     segment = bucket / HSEGSIZE;
     index = bucket % HSEGSIZE;
 
-    hl = allocHashList();
+    hl = arenaAlloc(table->arena, sizeof(struct hashlist));
 
     hl->key = key;
     hl->data = data;
@@ -300,7 +268,7 @@ removeHashTable(HashTable *table, StgWord key, void *data)
  * -------------------------------------------------------------------------- */
 
 void
-freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
+freeHashTable( HashTable *table, void (*freeDataFun)(void *) )
 {
     long segment;
     long index;
@@ -310,21 +278,23 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
     /* The last bucket with something in it is table->max + table->split - 1 */
     segment = (table->max + table->split - 1) / HSEGSIZE;
     index = (table->max + table->split - 1) % HSEGSIZE;
-
+    
     while (segment >= 0) {
-	while (index >= 0) {
-	    for (hl = table->dir[segment][index]; hl != NULL; hl = next) {
-		next = hl->next;
-		if (freeDataFun != NULL)
+	if (freeDataFun != NULL) {
+	    while (index >= 0) {
+		for (hl = table->dir[segment][index]; hl != NULL; hl = next) {
+		    next = hl->next;
 		    (*freeDataFun)(hl->data);
-		freeHashList(hl);
+		}
+		index--;
 	    }
-	    index--;
 	}
 	free(table->dir[segment]);
 	segment--;
 	index = HSEGSIZE - 1;
     }
+
+    arenaFree(table->arena);
     free(table);
 }
 
@@ -340,6 +310,8 @@ allocHashTable_(HashFunction *hash, CompareFunction *compare)
     HashList **hb;
 
     table = stgMallocBytes(sizeof(HashTable),"allocHashTable");
+
+    table->arena = newArena();
 
     allocSegment(table, 0);
 
