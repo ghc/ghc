@@ -1,9 +1,8 @@
 -- !!! Test passing doubles to a ccall
 
-import Foreign
 import Foreign.C
 
-foreign import ccall unsafe 
-  printf :: CString -> Double -> IO CInt
+foreign import ccall unsafe "math.h sin"
+  c_sin :: CDouble -> IO CDouble
 
-main = withCString "%f" $ \s -> printf s 1.2345
+main = c_sin 1.0 >>= print
