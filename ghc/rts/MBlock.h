@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.15 2002/10/21 11:38:54 simonmar Exp $
+ * $Id: MBlock.h,v 1.16 2002/11/22 06:54:05 matthewc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -49,26 +49,34 @@ extern void * getMBlocks(nat n);
    constant comparison).
    -------------------------------------------------------------------------- */
 
-#if SIZEOF_VOID_P == 4
-
-// This is the table.  Each byte is non-zero if the appropriate MBlock
-// in the address space contains heap.
 extern StgWord8 mblock_map[];
 
-#define HEAP_ALLOCED(p) \
-  ((int)(mblock_map[((StgWord)(p) & ~MBLOCK_MASK) >> MBLOCK_SHIFT]))
+#if SIZEOF_VOID_P == 4
+/* On a 32-bit machine a 4KB table is always sufficient */
+# define MBLOCK_MAP_SIZE	4096
+# define MBLOCK_MAP_ENTRY(p)	((StgWord)(p) >> MBLOCK_SHIFT)
+# define HEAP_ALLOCED(p)	mblock_map[MBLOCK_MAP_ENTRY(p)]
+# define MARK_HEAP_ALLOCED(p)	(mblock_map[MBLOCK_MAP_ENTRY(p)] = 1)
 
-#else // SIZEOF_VOID_P != 4
+#elif defined(ia64_TARGET_ARCH)
+/* Instead of trying to cover the whole 64-bit address space (which would
+ * require a better data structure), we assume that mmap allocates mappings
+ * from the bottom of region 1, and track some portion of address space from
+ * there upwards (currently 4GB). */
+# define MBLOCK_MAP_SIZE	4096
+# define MBLOCK_MAP_ENTRY(p)	(((StgWord)(p) - (1UL << 61)) >> MBLOCK_SHIFT)
+# define HEAP_ALLOCED(p)	((MBLOCK_MAP_ENTRY(p) < MBLOCK_MAP_SIZE) \
+					&& mblock_map[MBLOCK_MAP_ENTRY(p)])
+# define MARK_HEAP_ALLOCED(p)	((MBLOCK_MAP_ENTRY(p) < MBLOCK_MAP_SIZE) \
+					&& (mblock_map[MBLOCK_MAP_ENTRY(p)] = 1))
 
-// on a 64-bit machine, we need to extend the above scheme to use a
-// 2-level mapping.  (ToDo)
+#elif defined(TEXT_BEFORE_HEAP)
+/* Fall back to old method - assume heap above HEAP_BASE */
+# define HEAP_ALLOCED(p)	((StgPtr)(p) >= (StgPtr)(HEAP_BASE))
+# define MARK_HEAP_ALLOCED(p)	do {} while(0)
 
-#ifdef TEXT_BEFORE_HEAP
-# define HEAP_ALLOCED(x)  ((StgPtr)(x) >= (StgPtr)(HEAP_BASE))
 #else
-#error HEAP_ALLOCED not defined
+# error HEAP_ALLOCED not defined
 #endif
-
-#endif // SIZEOF_VOID_P != 4
 
 #endif // __MBLOCK_H__

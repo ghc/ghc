@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.38 2002/11/07 14:42:25 simonmar Exp $
+ * $Id: MBlock.c,v 1.39 2002/11/22 06:54:05 matthewc Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -50,13 +50,9 @@ lnat mblocks_allocated = 0;
    The MBlock Map: provides our implementation of HEAP_ALLOCED()
    -------------------------------------------------------------------------- */
 
-StgWord8 mblock_map[4096]; // initially all zeros
-
-static void
-mblockIsHeap (void *p)
-{
-    mblock_map[((StgWord)p & ~MBLOCK_MASK) >> MBLOCK_SHIFT] = 1;
-}
+#ifdef MBLOCK_MAP_SIZE
+StgWord8 mblock_map[MBLOCK_MAP_SIZE]; // initially all zeros
+#endif
 
 /* -----------------------------------------------------------------------------
    Allocate new mblock(s)
@@ -213,7 +209,7 @@ getMBlocks(nat n)
 
   // fill in the table
   for (i = 0; i < n; i++) {
-      mblockIsHeap( ret + i * MBLOCK_SIZE );
+      MARK_HEAP_ALLOCED( ret + i * MBLOCK_SIZE );
   }
 
   mblocks_allocated += n;
