@@ -1042,11 +1042,11 @@ we generate
     gfoldl k z (T1 a b) = z T `k` a `k` b
     gfoldl k z T2	    = z T2
     -- ToDo: add gmapT,Q,M, gfoldr
-    
-    fromConstr c = case conIndex c of
-	    		I# 1# -> T1 undefined undefined
-    			I# 2# -> T2
-    
+ 
+    gunfold k z c = case conIndex c of
+	    		I# 1# -> k (k (z T1))
+    			I# 2# -> z T2
+
     toConstr (T1 _ _) = $cT1
     toConstr T2	      = $cT2
     
@@ -1058,7 +1058,7 @@ gen_Data_binds :: FixityEnv
 	       -> (LHsBinds RdrName,	-- The method bindings
 		   LHsBinds RdrName)	-- Auxiliary bindings
 gen_Data_binds fix_env tycon
-  = (listToBag [gfoldl_bind, fromCon_bind, toCon_bind, dataTypeOf_bind],
+  = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind],
 		-- Auxiliary definitions: the data type and constructors
      datatype_bind `consBag` listToBag (map mk_con_bind data_cons))
   where
@@ -1076,13 +1076,22 @@ gen_Data_binds fix_env tycon
 		     as_needed = take (dataConSourceArity con) as_RDRs
 		     mk_k_app e v = nlHsPar (nlHsOpApp e k_RDR (nlHsVar v))
 
-	------------ fromConstr
-    fromCon_bind = mk_FunBind tycon_loc fromConstr_RDR [([c_Pat], from_con_rhs)]
-    from_con_rhs = nlHsCase (nlHsVar conIndex_RDR `nlHsApp` c_Expr) 
-			  (map from_con_alt data_cons)
-    from_con_alt dc = mkSimpleHsAlt (nlConPat intDataCon_RDR [nlLitPat (HsIntPrim (toInteger (dataConTag dc)))])
-				    (nlHsVarApps (getRdrName dc)
-					         (replicate (dataConSourceArity dc) undefined_RDR))
+	------------ gunfold
+    gunfold_bind = mk_FunBind tycon_loc
+                              gunfold_RDR
+                              [([k_Pat,z_Pat,c_Pat], gunfold_rhs)]
+
+    gunfold_rhs = nlHsCase (nlHsVar conIndex_RDR `nlHsApp` c_Expr) 
+			   (map gunfold_alt data_cons)
+
+    gunfold_alt dc =
+      mkSimpleHsAlt (nlConPat intDataCon_RDR
+                            [nlLitPat (HsIntPrim (toInteger (dataConTag dc)))])
+	            (foldr nlHsApp
+                           (nlHsVar z_RDR `nlHsApp` nlHsVar (getRdrName dc))
+                           (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
+                    )
+
 			  
 	------------ toConstr
     toCon_bind = mk_FunBind tycon_loc toConstr_RDR (map to_con_eqn data_cons)
@@ -1130,7 +1139,7 @@ gen_Data_binds fix_env tycon
 		 | otherwise = prefix_RDR
 
 gfoldl_RDR     = varQual_RDR gENERICS_Name FSLIT("gfoldl")
-fromConstr_RDR = varQual_RDR gENERICS_Name FSLIT("fromConstr")
+gunfold_RDR    = varQual_RDR gENERICS_Name FSLIT("gunfold")
 toConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("toConstr")
 dataTypeOf_RDR = varQual_RDR gENERICS_Name FSLIT("dataTypeOf")
 mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkConstr")
@@ -1437,6 +1446,8 @@ a_Pat		= nlVarPat a_RDR
 b_Pat		= nlVarPat b_RDR
 c_Pat		= nlVarPat c_RDR
 d_Pat		= nlVarPat d_RDR
+k_Pat		= nlVarPat k_RDR
+z_Pat		= nlVarPat z_RDR
 
 con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon ->  RdrName
 -- Generates Orig s RdrName, for the binding positions
