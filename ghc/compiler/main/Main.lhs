@@ -74,8 +74,7 @@ main =
 doIt :: ([CoreToDo], [StgToDo]) -> String -> IO ()
 
 doIt (core_cmds, stg_cmds) input_pgm
-  = doDump opt_Verbose "Glasgow Haskell Compiler, version 2.04, for Haskell 1.4" "" >>
-
+  = doDump opt_Verbose ("Glasgow Haskell Compiler, version " ++ show PROJECTVERSION ++ ", for Haskell 1.4" "") >>
     -- ******* READER
     show_pass "Reader"	>>
     _scc_     "Reader"
@@ -116,7 +115,6 @@ doIt (core_cmds, stg_cmds) input_pgm
     case maybe_rn_stuff of {
 	Nothing -> 	-- Hurrah!  Renamer reckons that there's no need to
 			-- go any further
-			hPutStr stderr "No recompilation required!\n"	>>
 			ghcExit 0 ;
 
 		-- Oh well, we've got to recompile for real
@@ -242,6 +240,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     doDump opt_D_dump_flatC "Flat Abstract C:"
 	(dumpRealC flat_abstractC)		>>
 
+    show_pass "CodeOutput" 			>>
     _scc_     "CodeOutput"
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
