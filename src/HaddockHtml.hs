@@ -17,6 +17,7 @@ import HaddockUtil
 import HaddockModuleTree
 import HaddockHH
 import HaddockHH2
+import HaddockDevHelp
 import HsSyn
 
 import Maybe	( fromJust, isJust )
@@ -86,13 +87,12 @@ ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format =  do
 
   -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
-    Just "mshelp" -> do
-		ppHHProject odir doctitle maybe_package visible_ifaces
+    Just "mshelp"  -> ppHHProject odir doctitle maybe_package visible_ifaces
     Just "mshelp2" -> do
 		ppHH2Files      odir maybe_package visible_ifaces
 		ppHH2Collection odir doctitle maybe_package
-    _ -> return ()
-
+    Just "devhelp" -> ppDevHelpFile odir doctitle maybe_package visible_ifaces
+    Just format    -> fail ("The "++format++" format is not implemented")
 
 copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
@@ -234,6 +234,7 @@ ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_ur
     Nothing        -> return ()
     Just "mshelp"  -> ppHHContents  odir maybe_package tree
     Just "mshelp2" -> ppHH2Contents odir maybe_package tree
+    Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
 
 ppPrologue :: String -> Maybe Doc -> HtmlTable
@@ -319,6 +320,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
     Nothing        -> return ()
     Just "mshelp"  -> ppHHIndex  odir maybe_package ifaces
     Just "mshelp2" -> ppHH2Index odir maybe_package ifaces
+    Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
  where
   split_indices = length index > 50
