@@ -11,13 +11,13 @@ module CostCentre (
 	CostCentreStack,
 	CollectedCCs,
 	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
-	noCostCentre, noCCAttached,
+	noCostCentre,
 	noCCSAttached, isCurrentCCS,  isSubsumedCCS, currentOrSubsumedCCS,
 	isDerivedFromCurrentCCS,
 
 	mkUserCC, mkAutoCC, mkAllCafsCC, 
-	mkSingletonCCS, cafifyCC, dupifyCC, pushCCOnCCS,
-	isCafCC, isDupdCC, isEmptyCC, isCafCCS,
+	mkSingletonCCS, dupifyCC, pushCCOnCCS,
+	isCafCCS,
 	isSccCountCostCentre,
 	sccAbleCostCentre,
 	ccFromThisModule,
@@ -219,15 +219,6 @@ mkSingletonCCS cc = pushCCOnCCS cc NoCCS
 
 pushCCOnCCS :: CostCentre -> CostCentreStack -> CostCentreStack
 pushCCOnCCS = PushCC
-
-cafifyCC, dupifyCC  :: CostCentre -> CostCentre
-cafifyCC cc@(NormalCC {cc_is_caf = is_caf})
-  = ASSERT(not_a_caf_already is_caf)
-    cc {cc_is_caf = CafCC}
-  where
-    not_a_caf_already CafCC = False
-    not_a_caf_already _       = True
-cafifyCC cc = pprPanic "cafifyCC" (ppr cc)
 
 dupifyCC cc = cc {cc_is_dupd = DupdCC}
 
