@@ -731,7 +731,7 @@ variable set, it tries to use it for temporary files, but Cygwin
 doesn't grok filenames with spaces, so disaster results.
 </Para><Para>
 Furthermore, it seems that <Constant>TMPDIR</Constant> must be set to a directory
-in the same file system in which you invoke GHC.  Otherwise you get very werid messages
+in the same file system in which you invoke GHC.  Otherwise you get very weird messages
 when you invoke GHC, such as:
 <Screen>
 does not exist
