@@ -352,7 +352,7 @@ amodeToStix (CCharLike (CLit (MachChar c)))
 amodeToStix (CCharLike x)
   = StIndex PtrRep charLike off
   where
-    off = StPrim IntMulOp [amodeToStix x, StInt (toInteger (fixedHdrSize+1))]
+    off = StPrim IntMulOp [amodeToStix x, StInt (toInteger charLikeSize)]
 
 amodeToStix (CIntLike (CLit (MachInt i _)))
   = StLitLbl ((<>) (ptext SLIT("INTLIKE_closure+")) (int off))
