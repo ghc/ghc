@@ -8,8 +8,7 @@ import TcGRHSs( tcGRHSsAndBinds )
 import HsMatches(GRHSsAndBinds)
 import HsPat(InPat, OutPat)
 import HsSyn(Fake)
-import TcHsSyn(TcIdOcc)
-import TcType(TcMaybe)
+import TcType(TcIdOcc, TcMaybe)
 import SST(FSST_R)
 import Unique(Unique)
 import Name(Name)
@@ -21,7 +20,8 @@ import Bag(Bag)
 import Type(GenType)
 import Inst(Inst)
 
-tcGRHSsAndBinds :: GRHSsAndBinds Fake Fake Name (InPat Name) 
+tcGRHSsAndBinds :: GenType (GenTyVar (_MutableArray a Int (TcMaybe a))) Unique
+		-> GRHSsAndBinds Fake Fake Name (InPat Name) 
 	        -> TcDown a 
 		-> TcEnv a 
 		-> State# a 
@@ -31,8 +31,7 @@ tcGRHSsAndBinds :: GRHSsAndBinds Fake Fake Name (InPat Name)
 					   (OutPat (GenTyVar (_MutableArray a Int (TcMaybe a))) 
 						   Unique 
 						   (TcIdOcc a)),
-			     Bag (Inst a),
-			     GenType (GenTyVar (_MutableArray a Int (TcMaybe a))) Unique
+			     Bag (Inst a)
 			    )
 			    ()
 \end{code}
