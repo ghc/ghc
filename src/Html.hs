@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Html.hs,v 1.3 2004/03/25 15:17:24 simonmar Exp $
+-- $Id: Html.hs,v 1.4 2004/03/25 15:45:10 simonmar Exp $
 --
 -- An Html combinator library
 --
@@ -1034,5 +1034,5 @@ renderTag x name0 markupAttrs0 n r
 
       showPair :: HtmlAttr -> String
       showPair (HtmlAttr tag0 val)
-              = tag0 ++ " = \"" ++ val  ++ "\""
+              = tag0 ++ "=\"" ++ val  ++ "\""
 
