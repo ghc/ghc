@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.40 2002/11/22 07:43:30 matthewc Exp $
+ * $Id: MBlock.c,v 1.41 2002/11/26 07:02:04 mthomas Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -312,7 +312,7 @@ getMBlocks(nat n)
   
   // fill in the table
   for (i = 0; i < n; i++) {
-      mblockIsHeap( ret + i * MBLOCK_SIZE );
+      MARK_HEAP_ALLOCED ( ret + i * MBLOCK_SIZE );
   }
 
   return ret;
