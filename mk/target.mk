@@ -380,7 +380,7 @@ SRC_HC_OPTS += -split-objs
 
 define BUILD_LIB
 $(RM) $@
-TMPDIR=$(TMPDIR); export TMPDIR; ( echo $(STUBOBJS) ; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print ) | xargs ar q $@
+( echo $(STUBOBJS) ; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print ) | xargs ar q $@
 $(RANLIB) $@
 endef
 
