@@ -20,11 +20,11 @@ module Data.Generics (
 	Typeable(..), cast,
 
 	-- * Prime types of generic functions
-        GenericT, GenericQ, GenericM, GenericG,
+        GenericT, GenericQ, GenericM, GenericB,
 
 	-- * Combinators to \"make\" generic functions
-	mkT, mkQ, mkM, mkF, mkG,
-	extT, extQ, extM, extF, extG,
+	mkT, mkQ, mkM, mkF, mkB,
+	extT, extQ, extM, extF, extB,
 
 	-- * The Data class for folding and unfolding constructor applications
 	Data( 
@@ -57,6 +57,8 @@ module Data.Generics (
 	-- * Generic operations such as show, equality, read
 	glength,
 	gcount,
+	garity,
+	gundefineds,
 	gnodecount,
 	gtypecount,
 	gshow,
@@ -64,8 +66,8 @@ module Data.Generics (
 	gzip,
 	gread,
 
-	-- * Miscellaneous
-	sameType, orElse
+	-- * Miscellaneous further combinators
+	sameType, orElse, recoverF, recoverQ, choiceF, choiceQ
 
 #ifndef __HADDOCK__
 	,
@@ -116,10 +118,10 @@ type GenericQ r = forall a. Data a => a -> r
 type GenericM m = forall a. Data a => a -> m a
 
 
--- | Generic generators with input i,
---   i.e., take an \"i\" and compute a tuple of type (a,i)
+-- | Generic builders with input i,
+--   i.e., take an \"i\" and compute a pair of type (a,i)
 --
-type GenericG m i = forall a. Data a => i -> m (a,i)
+type GenericB m i = forall a. Data a => i -> m (a,i)
 
 
 
@@ -178,16 +180,16 @@ mkF :: (Typeable a, Typeable b, Typeable (m a), Typeable (m b), MonadPlus m)
 mkF = maybe (const mzero) id . cast
 
 
--- | Make a generic generator;
+-- | Make a generic builder;
 --   start from a type-specific ase;
---   resort to empty generation otherwise
+--   resort to no build (i.e., mzero) otherwise
 --
-mkG :: (Typeable a, Typeable b,
+mkB :: (Typeable a, Typeable b,
 	Typeable i,
         Typeable (m (a,i)), Typeable (m (b,i)),
         MonadPlus m)
     => (i -> m (b,i)) -> i -> m (a,i)
-mkG = maybe (const mzero) id . cast
+mkB = maybe (const mzero) id . cast
 
 
 -- | Extend a generic transformation by a type-specific case
@@ -216,13 +218,13 @@ extF :: (Typeable a, Typeable b,
 extF = extM
 
 
--- | Extend a generic generator by a type-specific case
-extG :: (Typeable a, Typeable b,
+-- | Extend a generic builder by a type-specific case
+extB :: (Typeable a, Typeable b,
          Typeable i,
          Typeable (m (a,i)), Typeable (m (b,i)),
          MonadPlus m)
      => (i -> m (a,i)) -> (i -> m (b,i)) -> i -> m (a,i)
-extG f = maybe f id . cast
+extB f = maybe f id . cast
 
 
 
@@ -232,12 +234,66 @@ extG f = maybe f id . cast
 --
 ------------------------------------------------------------------------------
 
+{- 
+
+The Data class comprehends two important primitives "gfoldl" and
+"gunfold" for folding and unfolding constructor applications, say
+terms. Besides, there are helpers "conOf" and "consOf" for retrieving
+constructors from terms and types. Finally, typical ways of mapping
+over immediate subterms are defined as "gmap" combinators in terms
+of gfoldl. A generic programmer does not necessarily need to use
+the ingenious gfoldl/gunfold couple but rather the "gmap" combinators. 
+
+-}
+
 class Typeable a => Data a where
+
+{-
+
+Folding constructor applications ("gfoldl")
+
+The combinator takes two arguments "f" and "z" to fold over a term
+"x".  The result type is parametric via a type constructor "c" in the
+type of "gfoldl". The purpose of "z" is to define how the empty
+constructor application is folded. So "z" is like the neutral / start
+element for list folding. The purpose of "f" is to define how the
+nonempty constructor application is folded. That is, "f" takes the
+folded "tail" of the constructor application and its head, i.e., an
+immediate subterm, and combines them in some way. See the Data
+instances in this file which illustrate gfoldl. Conclusion: the type
+of gfoldl is a headache, but operationally it is simple generalisation
+of a list fold.
+
+-}
 
   -- | Left-associative fold operation for constructor applications
   gfoldl  :: (forall a b. Data a => c (a -> b) -> a -> c b)
           -> (forall g. g -> c g)
           -> a -> c a
+
+{-
+
+Unfolding constructor applications ("gunfold")
+
+The combinator takes alike "gfoldl" two arguments "f" and "z", but
+this time its about constructing (say, unfolding) constructor
+applications rather than folding. The input for unfolding is primarily
+an opaque representation of the desired constructor, which is
+essentially a string representation of the constructor. (It is in the
+responsibility of the programmer not to attempt unfolding invalid
+constructors.  This is like the side condition that a programmer must
+not apply the "head" function to the empty list.) Besides the
+constructor, we also have to provide the "input" for constructing
+immediate subterms. This is anticipated via the type constructor "c"
+in the type of "gunfold". For example, in the case of a generic read
+function, "c" models string-processing functions. So "z" defines how
+to construct the empty constructor application, and "f" takes an
+incomplete constructor application to add more immediate subterm.
+Conclusion: the type of gunfoldl and what it does is a headache, but
+operationally it is a simple generalisation of the underappreciated
+list unfold.
+
+-}
 
   -- | Unfold operation to build terms from constructors and others
   gunfold :: (forall a b. Data a => c (a -> b) -> c b)
@@ -255,6 +311,14 @@ class Typeable a => Data a where
 
   -- | List all constructors for a given type
   consOf  :: a -> [Constr]
+
+
+
+------------------------------------------------------------------------------
+--
+--	Typical generic maps defined in terms of gfoldl
+--
+------------------------------------------------------------------------------
 
 {-
 
@@ -355,7 +419,7 @@ newtype F m x = F { unF :: m (x, Bool) }
 ------------------------------------------------------------------------------
 
 -- | Description of datatype constructors
-data Constr = Constr { conString :: String }
+data Constr = Constr { conString :: String } deriving (Eq, Typeable)
 
 
 {-
@@ -363,20 +427,25 @@ data Constr = Constr { conString :: String }
 It is interesting to observe that we can determine the arity of a
 constructor without further meta-information. To this end, we use
 gunfold to construct a term from a given constructor while leaving the
-subterms undefined. Here we instantiate the type constructor c of the
-gunfold type by the identity type constructor ID. In a subsequent step
-we determine the number of subterms by folding as captured in the
-generic operation glength elsewhere in this module. Note that we need
-an extra argument to specify the intended type of the constructor.
+subterms undefined; see "gundefineds" below. Here we instantiate the
+type constructor c of the gunfold type by the identity type
+constructor ID. In a subsequent step we determine the number of
+subterms by folding as captured in the generic operation "glength"
+elsewhere in this module. Note that we need a type argument to specify
+the intended type of the constructor.
 
 -}
 
+
+-- | Compute arity of a constructor against a type argument
 garity :: Data a => (a -> ()) -> Constr -> Int
-garity (_::a->()) = glength 
-                  . (unID :: ID a -> a)
-                  . gunfold bottom ID
-  where
-    bottom = (\f -> ID (f undefined)) . unID
+garity ta = glength . gundefineds ta
+
+
+-- | Construct a term from a constructor with undefined subterms
+gundefineds :: Data a => (a -> ()) -> Constr -> a
+gundefineds (_::a -> ()) = (unID :: ID a -> a)
+                         . gunfold ((\f -> ID (f undefined)) . unID) ID
 
 
 
@@ -390,7 +459,7 @@ garity (_::a->()) = glength
 everywhere :: (forall a. Data a => a -> a)
            -> (forall a. Data a => a -> a)
 
--- use gmapT to recurse into immediate subterms;
+-- Use gmapT to recurse into immediate subterms;
 -- recall: gmapT preserves the outermost constructor;
 -- post-process recursively transformed result via f
 -- 
@@ -450,22 +519,6 @@ something :: GenericQ (Maybe u) -> GenericQ (Maybe u)
 -- when a suitable "choice" operator is used for reduction
 -- 
 something = everything orElse
-
-
--- Left-biased choice on maybes (non-strict in right argument)
-orElse :: Maybe a -> Maybe a -> Maybe a
-x `orElse` y = maybe y Just x
-
-
--- Another definition of orElse
--- where the folding over maybies as defined by maybe is inlined
--- to ease readability
--- 
-x `orElse'` y = case x of
-                  Just _  -> x
-                  Nothing -> y
-
-
 
 
 -- | Bottom-up synthesis of a data structure;
@@ -598,13 +651,14 @@ gshow = ( \t ->
 
 
 -- | Generic equality: an alternative to "deriving Eq"
-geq :: forall a. Data a => a -> a -> Bool
+geq :: Data a => a -> a -> Bool
 
 {-
 
-We establish the equality of the two top-level datatype constructors.
-We use a twin gmap combinator, namely tgmapQ, to compare the two lists
-of immediate subterms.
+Testing for equality of two terms goes like this. Firstly, we
+establish the equality of the two top-level datatype
+constructors. Secondly, we use a twin gmap combinator, namely tgmapQ,
+to compare the two lists of immediate subterms.
 
 (Note for the experts: the type of the worker geq' is rather general
 but precision is recovered via the restrictive type of the top-level
@@ -642,21 +696,25 @@ unGRead (GRead x) = x
 
 
 -- | Generic read: an alternative to "deriving Read"
-gread :: GenericG Maybe String
+gread :: GenericB Maybe String
 
 {-
 
 This is a read operation which insists on prefix notation.  (The
-Haskell 98 read deals with infix operators as well.)  We use gunfold
-to "parse" the input. To be precise, gunfold is used for all result
-type except String. A type-specific case is incorporated for
-String. Another source of customisation would be to properly deal with
+Haskell 98 read deals with infix operators as well. We will be able to
+deal with such special cases as well as sonn as we include fixity
+information into the definition of "Constr".)  We use gunfold to
+"parse" the input. To be precise, gunfold is used for all result types
+except String. The type-specific case for String uses basic String
+read. Another source of customisation would be to properly deal with
 infix operators subject to the capture of that information in the
-definition of Constr.
+definition of Constr. The "gread" combinator properly checks the 
+validity of constructors before invoking gunfold in order to rule
+out run-time errors.
 
 -}
 
-gread = gdefault `extG` scase
+gread = gdefault `extB` scase
 
  where
 
@@ -671,10 +729,17 @@ gread = gdefault `extG` scase
        guard (not (s' == ""))
        guard (head s' == '(')
        (c,s'')  <- prefixConstr (dropWhile ((==) ' ') (tail s'))
+       u <- return undefined 
+       guard (or [consOf u == [], c `elem` consOf u])
        (a,s''') <- unGRead (gunfold f z c) s''
+       _ <- return $ constrainTypes a u
        guard (not (s''' == "")) 
        guard (head s''' == ')')
-       return (a,tail s''')
+       return (a, tail s''')
+
+  -- To force two types to be the same
+  constrainTypes :: a -> a -> ()
+  constrainTypes _ _ = ()
 
   -- Argument f for unfolding
   f :: Data a => GRead String (a -> b) -> GRead String b
@@ -831,3 +896,49 @@ instance (Typeable a, Typeable b) => Data (a -> b) where
 -- | Test for two objects to agree on the type
 sameType :: (Typeable a, Typeable b) => a -> b -> Bool
 sameType (_::a) = maybe False (\(_::a) -> True) . cast
+
+
+-- | Left-biased choice on maybes (non-strict in right argument)
+orElse :: Maybe a -> Maybe a -> Maybe a
+x `orElse` y = maybe y Just x
+
+
+-- Another definition of orElse
+-- where the folding over maybies as defined by maybe is inlined
+-- to ease readability
+-- 
+x `orElse'` y = case x of
+                  Just _  -> x
+                  Nothing -> y
+
+
+{-
+
+The following variations take "orElse" to the function
+level. Furthermore, we generalise from "Maybe" to any
+"MonadPlus". This makes sense for monadic transformations and
+queries. We say that the resulting combinators modell choice. We also
+provide a prime example of choice, that is, recovery from failure. In
+the case of transformations, we recover via return whereas for
+queries a given constant is returned.
+
+-}
+
+-- | Choice for monadic transformations
+choiceF :: MonadPlus m => GenericM m -> GenericM m -> GenericM m
+choiceF f g x = f x `mplus` g x
+
+
+-- | Choice for monadic queries
+choiceQ :: MonadPlus m => GenericQ (m r) -> GenericQ (m r) -> GenericQ (m r)
+choiceQ f g x = f x `mplus` g x
+
+
+-- | Recover from the failure of monadic transformation by identity
+recoverF :: MonadPlus m => GenericM m -> GenericM m
+recoverF f = f `choiceF` return
+
+
+-- | Recover from the failure of monadic query by a constant
+recoverQ :: MonadPlus m => r -> GenericQ (m r) -> GenericQ (m r)
+recoverQ r f = f `choiceQ` const (return r)
