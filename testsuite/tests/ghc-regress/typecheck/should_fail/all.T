@@ -84,11 +84,7 @@ test('tcfail094', normal, compile_fail, [''])
 test('tcfail095', normal, compile_fail, [''])
 test('tcfail096', normal, compile_fail, [''])
 test('tcfail097', normal, compile_fail, [''])
-
-# The compiler should reject tc098, but it doesn't.  Hence
-# this is an expected failure.
-test('tcfail098', expect_fail, compile_fail, [''])
-
+test('tcfail098', normal, compile_fail, [''])
 test('tcfail099', normal, compile_fail, [''])
 test('tcfail100', normal, compile_fail, [''])
 test('tcfail101', normal, compile_fail, [''])
