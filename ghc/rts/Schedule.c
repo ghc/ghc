@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.159 2002/12/11 15:36:50 simonmar Exp $
+ * $Id: Schedule.c,v 1.160 2002/12/13 15:16:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1043,6 +1043,7 @@ schedule( void )
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     /* Run the current thread 
      */
+    run_thread:
     prev_what_next = t->what_next;
     switch (prev_what_next) {
     case ThreadKilled:
@@ -1235,9 +1236,6 @@ schedule( void )
        */
       IF_DEBUG(scheduler,
                if (t->what_next != prev_what_next) {
-		   /* ToDo: or maybe a timer expired when we were in Hugs?
-		    * or maybe someone hit ctrl-C
-                    */
 		   belch("--<< thread %ld (%s) stopped to switch evaluators", 
 			 t->id, whatNext_strs[t->what_next]);
                } else {
@@ -1246,12 +1244,20 @@ schedule( void )
                }
                );
 
-      threadPaused(t);
-
       IF_DEBUG(sanity,
 	       //belch("&& Doing sanity check on yielding TSO %ld.", t->id);
 	       checkTSO(t));
       ASSERT(t->link == END_TSO_QUEUE);
+
+      // Shortcut if we're just switching evaluators: don't bother
+      // doing stack squeezing (which can be expensive), just run the
+      // thread.
+      if (t->what_next != prev_what_next) {
+	  goto run_thread;
+      }
+
+      threadPaused(t);
+
 #if defined(GRAN)
       ASSERT(!is_on_queue(t,CurrentProc));
 
@@ -1259,6 +1265,7 @@ schedule( void )
 	       //belch("&& Doing sanity check on all ThreadQueues (and their TSOs).");
 	       checkThreadQsSanity(rtsTrue));
 #endif
+
 #if defined(PAR)
       if (RtsFlags.ParFlags.doFairScheduling) { 
 	/* this does round-robin scheduling; good for concurrency */
@@ -1268,14 +1275,10 @@ schedule( void )
 	PUSH_ON_RUN_QUEUE(t);
       }
 #else
-      if (t->what_next != prev_what_next) {
-	  // switching evaluators; don't context-switch
-	  PUSH_ON_RUN_QUEUE(t);
-      } else {
-	  // this does round-robin scheduling; good for concurrency
-	  APPEND_TO_RUN_QUEUE(t);
-      }
+      // this does round-robin scheduling; good for concurrency
+      APPEND_TO_RUN_QUEUE(t);
 #endif
+
 #if defined(GRAN)
       /* add a ContinueThread event to actually process the thread */
       new_event(CurrentProc, CurrentProc, CurrentTime[CurrentProc],
