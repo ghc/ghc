@@ -367,7 +367,7 @@ mkWWstr_one arg
 	  	-- Pass the arg, anyway, even if it is in theory discarded
 		-- Consider
 		--	f x y = x `seq` y
-		-- x gets a (Seq Drop []) demand, but if we fail to pass it to the worker
+		-- x gets a (Eval (Poly Abs)) demand, but if we fail to pass it to the worker
 		-- we ABSOLUTELY MUST record that x is evaluated in the wrapper.
 		-- Something like:
 		--	f x y = x `seq` fw y
