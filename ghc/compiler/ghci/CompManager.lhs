@@ -55,24 +55,23 @@ type ModHandle = String   -- ToDo: do better?
 
 
 -- Persistent state just for CM, excluding link & compile subsystems
-data PCMS
-   = PCMS { 
-        hst :: HST,   -- home symbol table
-        hit :: HIT,   -- home interface table
-        ui  :: UI,    -- the unlinked images
-        mg  :: MG     -- the module graph
+data PersistentCMState
+   = PersistentCMState {
+        hst :: HomeSymbolTable,    -- home symbol table
+        hit :: HomeInterfaceTable, -- home interface table
+        ui  :: UnlinkedImages,     -- the unlinked images
+        mg  :: ModuleGraph         -- the module graph
      }
 
-emptyPCMS :: PCMS
-emptyPCMS = PCMS { hst = emptyHST,
-                   hit = emptyHIT,
-                   ui  = emptyUI,
-                   mg  = emptyMG }
+emptyPCMS :: PersistentCMState
+emptyPCMS = PersistentCMState
+               { hmm = emptyHMM,
+                 hst = emptyHST, hit = emptyHIT,
+                 ui  = emptyUI,  mg  = emptyMG }
 
-emptyHIT :: HIT
+emptyHIT :: HomeInterfaceTable
 emptyHIT = emptyFM
-
-emptyHST :: HST
+emptyHST :: HomeSymbolTable
 emptyHST = emptyFM
 
 
@@ -80,11 +79,11 @@ emptyHST = emptyFM
 -- Persistent state for the entire system
 data CmState
    = CmState {
-        pcms   :: PCMS,      -- CM's persistent state
-        pcs    :: PCS,       -- compile's persistent state
-        pls    :: PLS,       -- link's persistent state
-        pci    :: PCI,       -- package config info, never changes
-        finder :: Finder     -- the module finder
+        pcms   :: PersistentCMState,       -- CM's persistent state
+        pcs    :: PersistentCompilerState, -- compile's persistent state
+        pls    :: PersistentLinkerState,   -- link's persistent state
+        pci    :: PackageConfigInfo,       -- package config info, never changes
+        finder :: Finder                   -- the module finder
      }
 
 emptyCmState :: String{-temp debugging hack-}
@@ -102,13 +101,12 @@ emptyCmState path_TMP_DEBUGGING_HACK raw_package_info
                            finder = finder })
 
 -- CM internal types
-type UI = [Linkable]	-- the unlinked images (should be a set, really)
-emptyUI :: UI
+type UnlinkedImage = [Linkable]	-- the unlinked images (should be a set, really)
+emptyUI :: UnlinkedImage
 emptyUI = []
 
-
-type MG = [SCC ModSummary]  -- the module graph, topologically sorted
-emptyMG :: MG
+type ModuleGraph = [SCC ModSummary]  -- the module graph, topologically sorted
+emptyMG :: ModuleGraph
 emptyMG = []
 
 \end{code}

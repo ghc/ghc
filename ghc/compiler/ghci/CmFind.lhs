@@ -4,8 +4,7 @@
 \section[CmFind]{Module finder for GHCI}
 
 \begin{code}
-module CmFind ( Path, ModName, PkgName,
-                ModLocation(..), ml_modname, isPackageLoc,
+module CmFind ( ModLocation(..), ml_modname, isPackageLoc,
 		Finder, newFinder )
 where
 
@@ -18,15 +17,16 @@ import Time		( ClockTime )
 import Directory	( doesFileExist, getModificationTime )
 import Outputable
 
-import Module		( Module )
-import CmStaticInfo	( PCI(..), Package(..), Path, ModName, PkgName )
+import Module		( Module, ModuleName, PackageName )
+import CmStaticInfo	( PCI(..), Package(..) )
 \end{code}
 
 \begin{code}
+-- make a product type, with Maybe return --> Module,lhs
 data ModLocation 
-   = SourceOnly ModName Path        -- .hs
-   | ObjectCode ModName Path Path   -- .o, .hi
-   | InPackage  ModName PkgName
+   = SourceOnly ModuleName Path        -- .hs
+   | ObjectCode ModuleName Path Path   -- .o, .hi
+   | InPackage  ModuleName PackageName
    | NotFound
 
 instance Outputable ModLocation where
@@ -40,7 +40,7 @@ instance Outputable ModLocation where
 
 
 
-type Finder = ModName -> IO ModLocation
+type Finder = ModuleName -> IO ModLocation
 
 ml_modname (SourceOnly nm _)   = nm
 ml_modname (ObjectCode nm _ _) = nm
@@ -49,7 +49,7 @@ ml_modname (InPackage  nm _)   = nm
 isPackageLoc (InPackage _ _) = True
 isPackageLoc _               = False
 
-mkFinder :: [(ModName,PkgName,Path)] -> [Path] -> Finder
+mkFinder :: [(ModuleName,PackageName,FilePath)] -> [FilePath] -> Finder
 mkFinder pkg_ifaces home_dirs modnm
    = do found <- mkFinderX pkg_ifaces home_dirs modnm
         putStrLn ("FINDER: request  = " ++ modnm ++ "\n" ++
@@ -57,7 +57,7 @@ mkFinder pkg_ifaces home_dirs modnm
         return found
 
 
-mkFinderX :: [(ModName,PkgName,Path)] -> [Path] -> Finder
+mkFinderX :: [(ModuleName,PackageName,FilePath)] -> [FilePath] -> Finder
 mkFinderX pkg_ifaces home_dirs modnm
    -- If the module exists both as package and home, emit a warning
    -- and (arbitrarily) choose the user's one.
@@ -86,7 +86,7 @@ mkFinderX pkg_ifaces home_dirs modnm
 
 -- See if a .hs or (.hi, .o) pair exist on the given path,
 -- and return a ModLocation for whichever is younger
-homeModuleExists :: ModName -> Path -> IO (Maybe (ModLocation, ClockTime))
+homeModuleExists :: ModuleName -> FilePath -> IO (Maybe (ModLocation, ClockTime))
 homeModuleExists modname path
    = do m_ths <- maybeTime nm_hs
         m_thi <- maybeTime nm_hi
@@ -121,7 +121,7 @@ homeModuleExists modname path
 
 
 
-newFinder :: String{-temp debugging hack-}
+newFinder :: FilePath{-temp debugging hack-}
           -> PCI -> IO Finder
 newFinder path pci
    = return (mkFinder (module_table pci) [path])
