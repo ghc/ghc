@@ -1,5 +1,5 @@
 
-include ($confdir ++ "/" ++ $conffile)
+include ($confdir ++ "/" ++ $conffilename)
 
 -----------------------------------------------------------------------
 --- Stuff to do with simple single-source-file tests.  We assume    ---
@@ -21,9 +21,9 @@ def qualify ( $_filename_frag )
 {
    if   $_filename_frag == ""
    then
-      return $testdir ++ "/" ++ $testroot
+      return $testdir ++ "/" ++ $testname
    else
-      return $testdir ++ "/" ++ $testroot ++ "." ++ $_filename_frag
+      return $testdir ++ "/" ++ $testname ++ "." ++ $_filename_frag
    fi
 }
 
@@ -185,21 +185,33 @@ def check_stderr_ok()
 
 
 -- top-level actions
-def vanilla-test ()
+def vanilla-test-actions ( $extra_compile_args, 
+                           $extra_run_args, 
+                           $allowable_nonzero_exit_code )
 {
    pretest_cleanup()
    simple_build_Main( $extra_compile_args )
    $res = simple_run_main( $extra_run_args )
    if   $res /= "0" && $res /= $allowable_nonzero_exit_code
-   then framefail "vanilla-test: unexpected exit code from testee" 
+   then print "vanilla-test: unexpected exit code (" ++ $res 
+              ++ ") from testee"
+        return False
    fi
    $test_passed = check_stdout_ok() && check_stderr_ok()
+   return $test_passed
 }
 
-
--- finally, define pass/fail clauses
-vanilla-test()
-expect pass
-pass when $test_passed
-fail when otherwise
+-- top-level
+def vt ( $extra_compile_args, 
+         $extra_run_args, 
+         $allowable_nonzero_exit_code )
+{
+   $test_passed 
+      = vanilla-test-actions ( $extra_compile_args, 
+                               $extra_run_args, 
+                               $allowable_nonzero_exit_code )
+   expect pass
+   pass when $test_passed
+   fail when otherwise
+}
 

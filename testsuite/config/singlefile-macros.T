@@ -1,5 +1,5 @@
 
-include ($confdir ++ "/" ++ $conffile)
+include ($confdir ++ "/" ++ $conffilename)
 
 -----------------------------------------------------------------------
 --- Stuff to do with simple single-source-file tests.  We assume    ---
@@ -12,9 +12,9 @@ def qualify ( $_filename_frag )
 {
    if   $_filename_frag == ""
    then
-      return $testdir ++ "/" ++ $testroot
+      return $testdir ++ "/" ++ $testname
    else
-      return $testdir ++ "/" ++ $testroot ++ "." ++ $_filename_frag
+      return $testdir ++ "/" ++ $testname ++ "." ++ $_filename_frag
    fi
 }
 
