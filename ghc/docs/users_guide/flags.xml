@@ -445,16 +445,22 @@
 	      <entry><option>-fno-allow-overlapping-instances</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-farrows</option></entry>
-	      <entry>Enable arrow notation extension</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-arrows</option></entry>
-	    </row>
-	    <row>
 	      <entry><option>-fallow-undecidable-instances</option></entry>
 	      <entry>Enable undecidable instances</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-allow-undecidable-instances</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fallow-incoherent-instances</option></entry>
+	      <entry>Enable incoherent instances</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-allow-incoherent-instances</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-farrows</option></entry>
+	      <entry>Enable arrow notation extension</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-arrows</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fcontext-stack</option><replaceable>n</replaceable></entry>

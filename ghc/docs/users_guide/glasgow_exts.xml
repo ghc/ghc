@@ -1701,95 +1701,58 @@ means
 <sect3>
 <title>Overlapping instances</title>
 <para>
-In general, <emphasis>instance declarations may not overlap</emphasis>.  The two instance
-declarations
-
-
+In general, <emphasis>GHC requires that that it be unambiguous which instance
+declaration
+should be used to resolve a type-class constraint</emphasis>. This behaviour
+can be modified by two flags: <option>-fallow-overlapping-instances</option>
+<indexterm><primary>-fallow-overlapping-instances
+</primary></indexterm> 
+and <option>-fallow-incoherent-instances</option>
+<indexterm><primary>-fallow-incoherent-instances
+</primary></indexterm>, as this section discusses.</para>
+<para>
+When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
+it tries to match every instance declaration against the
+constraint,
+by instantiating the head of the instance declaration.  For example, consider
+these declarations:
 <programlisting>
-  instance context1 => C type1 where ...
-  instance context2 => C type2 where ...
+  instance context1 => C Int a     where ...  -- (A)
+  instance context2 => C a   Bool  where ...  -- (B)
+  instance context3 => C Int [a]   where ...  -- (C)
+  instance context4 => C Int [Int] where ...  -- (D)
 </programlisting>
-
-"overlap" if <literal>type1</literal> and <literal>type2</literal> unify.
+The instances (A) and (B) match the constraint <literal>C Int Bool</literal>, but (C) and (D) do not.  When matching, GHC takes
+no account of the context of the instance declaration
+(<literal>context1</literal> etc).
+GHC's default behaviour is that <emphasis>exactly one instance must match the
+constraint it is trying to resolve</emphasis>.  
+It is fine for there to be a <emphasis>potential</emphasis> of overlap (by
+including both declarations (A) and (B), say); an error is only reported if a 
+particular constraint matches more than one.
 </para>
-<para>
-However, if you give the command line option
-<option>-fallow-overlapping-instances</option><indexterm><primary>-fallow-overlapping-instances
-option</primary></indexterm> then overlapping instance declarations are permitted.
-However, GHC arranges never to commit to using an instance declaration
-if another instance declaration also applies, either now or later.
-
-<itemizedlist>
-<listitem>
 
 <para>
- EITHER <literal>type1</literal> and <literal>type2</literal> do not unify
+The <option>-fallow-overlapping-instances</option> flag instructs GHC to allow
+more than one instance to match, provided there is a most specific one.  For
+example, the constraint <literal>C Int [Int]</literal> matches instances (A),
+(C) and (D), but the last is more specific, and hence is chosen.  If there is no
+most-specific match, the program is rejected.
 </para>
-</listitem>
-<listitem>
-
 <para>
- OR <literal>type2</literal> is a substitution instance of <literal>type1</literal>
-(but not identical to <literal>type1</literal>), or vice versa.
-</para>
-</listitem>
-</itemizedlist>
-Notice that these rules
-<itemizedlist>
-<listitem>
-
-<para>
- make it clear which instance decl to use
-(pick the most specific one that matches)
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- do not mention the contexts <literal>context1</literal>, <literal>context2</literal>
-Reason: you can pick which instance decl
-"matches" based on the type.
-</para>
-</listitem>
-
-</itemizedlist>
-However the rules are over-conservative.  Two instance declarations can overlap,
-but it can still be clear in particular situations which to use.  For example:
+However, GHC is conservative about committing to an overlapping instance.  For example:
 <programlisting>
-  instance C (Int,a) where ...
-  instance C (a,Bool) where ...
+  f :: [b] -> [b]
+  f x = ...
 </programlisting>
-These are rejected by GHC's rules, but it is clear what to do when trying
-to solve the constraint <literal>C (Int,Int)</literal> because the second instance
-cannot apply.  Yell if this restriction bites you.
-</para>
-<para>
-GHC is also conservative about committing to an overlapping instance.  For example:
-<programlisting>
-  class C a where { op :: a -> a }
-  instance C [Int] where ...
-  instance C a => C [a] where ...
-  
-  f :: C b => [b] -> [b]
-  f x = op x
-</programlisting>
-From the RHS of f we get the constraint <literal>C [b]</literal>.  But
-GHC does not commit to the second instance declaration, because in a particular
-call of f, b might be instantiate to Int, so the first instance declaration
-would be appropriate.  So GHC rejects the program.  If you add <option>-fallow-incoherent-instances</option>
-GHC will instead silently pick the second instance, without complaining about 
+Suppose that from the RHS of <literal>f</literal> we get the constraint
+<literal>C Int [b]</literal>.  But
+GHC does not commit to instance (C), because in a particular
+call of <literal>f</literal>, <literal>b</literal> might be instantiate 
+to <literal>Int</literal>, in which case instance (D) would be more specific still.
+So GHC rejects the program.  If you add the flag <option>-fallow-incoherent-instances</option>,
+GHC will instead pick (C), without complaining about 
 the problem of subsequent instantiations.
-</para>
-<para>
-Regrettably, GHC doesn't guarantee to detect overlapping instance
-declarations if they appear in different modules.  GHC can "see" the
-instance declarations in the transitive closure of all the modules
-imported by the one being compiled, so it can "see" all instance decls
-when it is compiling <literal>Main</literal>.  However, it currently chooses not
-to look at ones that can't possibly be of use in the module currently
-being compiled, in the interests of efficiency.  (Perhaps we should
-change that decision, at least for <literal>Main</literal>.)
 </para>
 </sect3>
 
