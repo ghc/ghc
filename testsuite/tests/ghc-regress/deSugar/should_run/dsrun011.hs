@@ -1,4 +1,5 @@
 -- Test desugaring of mutual recursion of many functions
+-- which generated a big-tuple link error in GHC 6.0
 
 module Main where
 
