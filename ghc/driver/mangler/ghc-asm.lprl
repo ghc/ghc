@@ -66,7 +66,11 @@ $ifile = $ARGV[0];
 $ofile = $ARGV[1];
 
 if ( $TargetPlatform =~ /^i386-/ ) {
-    $StolenX86Regs = $ARGV[2];
+    if ($ARGV[2] eq '') {
+	$StolenX86Regs = 4;
+    } else {
+        $StolenX86Regs = $ARGV[2];
+    }
 }
 
 &mangle_asm($ifile,$ofile);
