@@ -45,9 +45,9 @@ import PprCore		( pprCoreExpr )
 import Var		( Var, isId, isTyVar )
 import VarEnv
 import Name		( hashName )
-import Literal		( hashLiteral, literalType, litIsDupable )
+import Literal		( hashLiteral, literalType, litIsDupable, isZeroLit )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys, isExistentialDataCon, dataConTyCon )
-import PrimOp		( primOpOkForSpeculation, primOpIsCheap )
+import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, idLBVarInfo, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
 			  isDataConId_maybe, mkSysLocal, isDataConId, isBottomingId
@@ -474,28 +474,50 @@ side effects, and can't diverge or raise an exception.
 \begin{code}
 exprOkForSpeculation :: CoreExpr -> Bool
 exprOkForSpeculation (Lit _)    = True
+exprOkForSpeculation (Type _)   = True
 exprOkForSpeculation (Var v)    = isUnLiftedType (idType v)
 exprOkForSpeculation (Note _ e) = exprOkForSpeculation e
 exprOkForSpeculation other_expr
-  = go other_expr 0 True
+  = case collectArgs other_expr of
+	(Var f, args) -> spec_ok (globalIdDetails f) args
+	other	      -> False
+ 
   where
-    go (Var f) n_args args_ok 
-      = case globalIdDetails f of
-	  DataConId _ -> True	-- The strictness of the constructor has already
-				-- been expressed by its "wrapper", so we don't need
-				-- to take the arguments into account
+    spec_ok (DataConId _) args
+      = True	-- The strictness of the constructor has already
+		-- been expressed by its "wrapper", so we don't need
+		-- to take the arguments into account
 
-	  PrimOpId op -> primOpOkForSpeculation op && args_ok
+    spec_ok (PrimOpId op) args
+      | isDivOp op,		-- Special case for dividing operations that fail
+	[arg1, Lit lit] <- args	-- only if the divisor is zero
+      = not (isZeroLit lit) && exprOkForSpeculation arg1
+		-- Often there is a literal divisor, and this 
+		-- can get rid of a thunk in an inner looop
+
+      | otherwise
+      = primOpOkForSpeculation op && 
+	all exprOkForSpeculation args
 				-- A bit conservative: we don't really need
 				-- to care about lazy arguments, but this is easy
 
-	  other -> False
-	
-    go (App f a) n_args args_ok 
-	| not (isRuntimeArg a) = go f n_args 	   args_ok
-	| otherwise            = go f (n_args + 1) (exprOkForSpeculation a && args_ok)
+    spec_ok other args = False
 
-    go other n_args args_ok = False
+isDivOp :: PrimOp -> Bool
+-- True of dyadic operators that can fail 
+-- only if the second arg is zero
+-- This function probably belongs in PrimOp, or even in 
+-- an automagically generated file.. but it's such a 
+-- special case I thought I'd leave it here for now.
+isDivOp IntQuotOp	 = True
+isDivOp IntRemOp	 = True
+isDivOp WordQuotOp	 = True
+isDivOp WordRemOp	 = True
+isDivOp IntegerQuotRemOp = True
+isDivOp IntegerDivModOp  = True
+isDivOp FloatDivOp       = True
+isDivOp DoubleDivOp      = True
+isDivOp other		 = False
 \end{code}
 
 

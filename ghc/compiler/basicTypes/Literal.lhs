@@ -13,6 +13,7 @@ module Literal
 	, hashLiteral
 
 	, inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
+	, isZeroLit,
 
 	, word2IntLit, int2WordLit
 	, narrow8IntLit, narrow16IntLit, narrow32IntLit
@@ -163,6 +164,15 @@ inWordRange x = x >= 0		    && x <= tARGET_MAX_WORD
 
 inCharRange :: Int -> Bool
 inCharRange c =  c >= 0 && c <= tARGET_MAX_CHAR
+
+isZeroLit :: Literal -> Bool
+isZeroLit (MachInt    0) = True
+isZeroLit (MachInt64  0) = True
+isZeroLit (MachWord   0) = True
+isZeroLit (MachWord64 0) = True
+isZeroLit (MachFloat  0) = True
+isZeroLit (MachDouble 0) = True
+isZeroLit other		 = False
 \end{code}
 
 	Coercions
