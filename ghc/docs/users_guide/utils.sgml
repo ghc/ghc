@@ -290,18 +290,6 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>#option opt</literal></term>
-	  <listitem>
-	    <para>The specified Haskell compiler command-line option
-            is placed in the <literal>{-# OPTIONS #-}</literal> pragma
-            at the top of the Haskell file (see <xref
-            linkend="source-file-options">). This is needed because
-            <command>hsc2hs</command> emits its own <literal>OPTIONS</literal> pragma,
-            and only one such pragma is interpreted by GHC.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
 	  <term><literal>#def C_definition</literal></term>
 	  <listitem>
 	    <para>The definition (of a function, variable, struct or

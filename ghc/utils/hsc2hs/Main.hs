@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.8 2001/01/12 22:54:23 qrczak Exp $
+-- $Id: Main.hs,v 1.9 2001/01/13 12:11:00 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -271,10 +271,12 @@ outHeaderCProg = concatMap $ \(key, arg) -> case key of
 
 outHeaderHs :: [Flag] -> Maybe String -> [(String, String)] -> String
 outHeaderHs flags inH toks =
-    "    hsc_begin_options();\n"++
+    "#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
+    \    printf (\"{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d #-}\\n\", \
+    \__GLASGOW_HASKELL__);\n\
+    \#endif\n"++
     includeH++
-    concatMap outSpecial toks++
-    "    hsc_end_options();\n\n"
+    concatMap outSpecial toks
     where
     outSpecial (key, arg) = case key of
         "include" -> case inH of
@@ -283,7 +285,6 @@ outHeaderHs flags inH toks =
         "define" -> case inH of
             Nothing | goodForOptD arg -> outOption ("-optc-D"++toOptD arg)
             _ -> ""
-        "option" -> outOption arg
         _ | conditional key -> "#"++key++" "++arg++"\n"
         _ -> ""
     goodForOptD arg = case arg of
@@ -299,7 +300,8 @@ outHeaderHs flags inH toks =
         | name <- case inH of
             Nothing   -> [name | Include name <- flags]
             Just name -> ["\""++name++"\""]]
-    outOption s = "    hsc_option (\""++showCString s++"\");\n"
+    outOption s = "    printf (\"{-# OPTIONS %s #-}\\n\", \""++
+                  showCString s++"\");\n"
 
 outTokenHs :: Token -> String
 outTokenHs (Text s) = "    fputs (\""++showCString s++"\", stdout);\n"
@@ -307,7 +309,6 @@ outTokenHs (Special key arg) = case key of
     "include"           -> ""
     "define"            -> ""
     "undef"             -> ""
-    "option"            -> ""
     "def"               -> ""
     _ | conditional key -> "#"++key++" "++arg++"\n"
     "let"               -> ""

@@ -11,43 +11,6 @@
 #define offsetof(t, f) ((size_t) &((t *)0)->f)
 #endif
 
-#if __GLASGOW_HASKELL__
-
-static int hsc_options_started;
-
-static void hsc_begin_options (void)
-{
-#if __GLASGOW_HASKELL__ < 409
-    printf ("{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d", __GLASGOW_HASKELL__);
-    hsc_options_started = 1;
-#else
-    hsc_options_started = 0;
-#endif
-}
-
-static void hsc_option (const char *s)
-{
-    if (!hsc_options_started)
-    {
-        printf ("{-# OPTIONS");
-        hsc_options_started = 1;
-    }
-    printf (" %s", s);
-}
-
-static void hsc_end_options (void)
-{
-    if (hsc_options_started) printf (" #-}\n");
-}
-
-#else /* !__GLASGOW_HASKELL__ */
-
-#define hsc_begin_options()
-#define hsc_option(s)
-#define hsc_end_options()
-
-#endif /* !__GLASGOW_HASKELL__ */
-
 #define hsc_const(x)                        \
     if ((x) < 0)                            \
         printf ("%ld", (long)(x));          \
