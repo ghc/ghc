@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.48 2001/07/09 17:44:08 sof Exp $
+-- $Id: DriverState.hs,v 1.49 2001/07/17 15:28:30 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -248,8 +248,8 @@ buildCoreToDo = do
 		-- This gets foldr inlined before strictness analysis
 	]),
 
-	if strictness then CoreDoStrictness else CoreDoNothing,
 	if cpr        then CoreDoCPResult   else CoreDoNothing,
+	if strictness then CoreDoStrictness else CoreDoNothing,
 	CoreDoWorkerWrapper,
 	CoreDoGlomBinds,
 

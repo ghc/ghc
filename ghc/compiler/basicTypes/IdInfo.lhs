@@ -23,6 +23,10 @@ module IdInfo (
 	exactArity, atLeastArity, unknownArity, hasArity,
 	arityInfo, setArityInfo, ppArityInfo, arityLowerBound,
 
+	-- New demand and strictness info
+ 	newStrictnessInfo, setNewStrictnessInfo, mkNewStrictnessInfo,
+  	newDemandInfo, setNewDemandInfo, newDemand,
+
 	-- Strictness; imported from Demand
 	StrictnessInfo(..),
 	mkStrictnessInfo, noStrictnessInfo,
@@ -92,8 +96,10 @@ import ForeignCall	( ForeignCall )
 import FieldLabel	( FieldLabel )
 import Type		( usOnce, usMany )
 import Demand		-- Lots of stuff
+import qualified NewDemand
 import Outputable	
 import Util		( seqList )
+import List		( replicate )
 
 infixl 	1 `setDemandInfo`,
     	  `setTyGenInfo`,
@@ -108,9 +114,45 @@ infixl 	1 `setDemandInfo`,
 	  `setOccInfo`,
 	  `setCgInfo`,
 	  `setCafInfo`,
-	  `setCgArity`
+	  `setCgArity`,
+	  `setNewStrictnessInfo`,
+	  `setNewDemandInfo`
 	-- infixl so you can say (id `set` a `set` b)
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{New strictness info}
+%*									*
+%************************************************************************
+
+To be removed later
+
+\begin{code}
+mkNewStrictnessInfo :: Arity -> StrictnessInfo -> CprInfo -> NewDemand.StrictSig
+mkNewStrictnessInfo arity NoStrictnessInfo cpr
+  = NewDemand.mkStrictSig 
+	arity
+	(NewDemand.mkDmdFun (replicate arity NewDemand.Lazy) (newRes False cpr))
+
+mkNewStrictnessInfo arity (StrictnessInfo ds res) cpr
+  = NewDemand.mkStrictSig 
+	arity
+	(NewDemand.mkDmdFun (map newDemand ds) (newRes res cpr))
+
+newRes True  _ 	         = NewDemand.BotRes
+newRes False ReturnsCPR = NewDemand.RetCPR
+newRes False NoCPRInfo  = NewDemand.TopRes
+
+newDemand :: Demand -> NewDemand.Demand
+newDemand (WwLazy True)      = NewDemand.Abs
+newDemand (WwLazy False)     = NewDemand.Lazy
+newDemand WwStrict	     = NewDemand.Eval
+newDemand (WwUnpack unpk ds) = NewDemand.Seq NewDemand.Drop (map newDemand ds)
+newDemand WwPrim	     = NewDemand.Lazy
+newDemand WwEnum	     = NewDemand.Eval
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -185,7 +227,10 @@ data IdInfo
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
         lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
 	inlinePragInfo	:: InlinePragInfo,	-- Inline pragma
-	occInfo		:: OccInfo		-- How it occurs
+	occInfo		:: OccInfo,		-- How it occurs
+
+	newStrictnessInfo :: Maybe NewDemand.StrictSig,
+	newDemandInfo	  :: NewDemand.Demand
     }
 
 seqIdInfo :: IdInfo -> ()
@@ -246,6 +291,9 @@ setArityInfo	  info ar = info { arityInfo = ar  }
 setCgInfo         info cg = info { cgInfo = cg }
 setCprInfo        info cp = info { cprInfo = cp }
 setLBVarInfo      info lb = info { lbvarInfo = lb }
+
+setNewDemandInfo     info dd = info { newDemandInfo = dd }
+setNewStrictnessInfo info dd = info { newStrictnessInfo = Just dd }
 \end{code}
 
 
@@ -264,7 +312,9 @@ vanillaIdInfo
 	    cprInfo		= NoCPRInfo,
 	    lbvarInfo		= NoLBVarInfo,
 	    inlinePragInfo 	= NoInlinePragInfo,
-	    occInfo		= NoOccInfo
+	    occInfo		= NoOccInfo,
+	    newDemandInfo	= NewDemand.topDmd,
+	    newStrictnessInfo   = Nothing
 	   }
 
 noCafNoTyGenIdInfo = vanillaIdInfo `setTyGenInfo` TyGenNever

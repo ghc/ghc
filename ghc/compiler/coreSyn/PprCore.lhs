@@ -30,7 +30,8 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			  strictnessInfo, ppStrictnessInfo, cgInfo,
 			  cprInfo, ppCprInfo, 
 			  workerInfo, ppWorkerInfo,
-                          tyGenInfo, ppTyGenInfo
+                          tyGenInfo, ppTyGenInfo,
+			  newDemandInfo, newStrictnessInfo
 			)
 import DataCon		( dataConTyCon )
 import TyCon		( tupleTyConBoxity, isTupleTyCon )
@@ -328,7 +329,8 @@ pprIdBndr id = ppr id <+>
 	       (megaSeqIdInfo (idInfo id) `seq`
 			-- Useful for poking on black holes
 	        ifPprDebug (ppr (idInlinePragma id) <+> ppr (idOccInfo id) <+> 
-			    ppr (idDemandInfo id)) <+> ppr (idLBVarInfo id))
+			    ppr (idDemandInfo id)) <+> ppr (newDemandInfo (idInfo id)) <+>
+			    ppr (idLBVarInfo id))
 \end{code}
 
 
@@ -345,6 +347,7 @@ ppIdInfo b info
             ppTyGenInfo g,
 	    ppWorkerInfo (workerInfo info),
 	    ppStrictnessInfo s,
+	    ppr (newStrictnessInfo info),
 --	    pprCgInfo c,
             ppCprInfo m,
 	    pprCoreRules b p

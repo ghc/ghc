@@ -35,7 +35,7 @@ import Type		( splitFunTy_maybe, splitForAllTys )
 import Maybes		( maybeToBool, orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
-import Unique		( u2i )
+import Unique		( Unique )
 import UniqFM		( keysUFM )  
 import Util		( zipWithEqual, mapAndUnzip )
 import FastTypes
@@ -230,7 +230,7 @@ Bindings
 \begin{code}
 type IdWithOccInfo = Id			-- An Id with fresh PragmaInfo attached
 
-type Node details = (details, Int, [Int])	-- The Ints are gotten from the Unique,
+type Node details = (details, Unique, [Unique])	-- The Ints are gotten from the Unique,
 						-- which is gotten from the Id.
 type Details1	  = (Id, UsageDetails, CoreExpr)
 type Details2	  = (IdWithOccInfo, CoreExpr)
@@ -310,7 +310,7 @@ occAnalBind env (Rec pairs) body_usage
     ---- stuff for dependency analysis of binds -------------------------------
     edges :: [Node Details1]
     edges = _scc_ "occAnalBind.assoc"
-	    [ (details, iBox (u2i (idUnique id)), edges_from rhs_usage)
+	    [ (details, idUnique id, edges_from rhs_usage)
 	    | details@(id, rhs_usage, rhs) <- analysed_pairs
 	    ]
 
@@ -323,7 +323,7 @@ occAnalBind env (Rec pairs) body_usage
 	--		 maybeToBool (lookupVarEnv rhs_usage bndr)]
 	-- which has n**2 cost, and this meant that edges_from alone 
 	-- consumed 10% of total runtime!
-    edges_from :: UsageDetails -> [Int]
+    edges_from :: UsageDetails -> [Unique]
     edges_from rhs_usage = _scc_ "occAnalBind.edges_from"
 			   keysUFM rhs_usage
 

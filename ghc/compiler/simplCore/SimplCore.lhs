@@ -40,6 +40,7 @@ import Specialise	( specProgram)
 import SpecConstr	( specConstrProgram)
 import UsageSPInf       ( doUsageSPInf )
 import StrictAnal	( saBinds )
+import DmdAnal		( dmdAnalPgm )
 import WorkWrap	        ( wwTopBinds )
 import CprAnalyse       ( cprAnalyse )
 
@@ -154,7 +155,8 @@ doCorePass dfs rb us binds (CoreDoFloatOutwards f)
 doCorePass dfs rb us binds CoreDoStaticArgs	        
    = _scc_ "StaticArgs"    noStats dfs (doStaticArgs us binds)
 doCorePass dfs rb us binds CoreDoStrictness	        
-   = _scc_ "Stranal"       noStats dfs (saBinds dfs binds)
+   = _scc_ "Stranal"       noStats dfs (do { binds1 <- saBinds dfs binds ;
+					     dmdAnalPgm dfs binds1 })
 doCorePass dfs rb us binds CoreDoWorkerWrapper      
    = _scc_ "WorkWrap"      noStats dfs (wwTopBinds dfs us binds)
 doCorePass dfs rb us binds CoreDoSpecialising       

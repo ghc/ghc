@@ -117,7 +117,7 @@ lookupWithDefaultUFM
 lookupWithDefaultUFM_Directly
 		:: UniqFM elt -> elt -> Unique -> elt
 
-keysUFM		:: UniqFM elt -> [Int]		-- Get the keys
+keysUFM		:: UniqFM elt -> [Unique]	-- Get the keys
 eltsUFM		:: UniqFM elt -> [elt]
 ufmToList	:: UniqFM elt -> [(Unique, elt)]
 \end{code}
@@ -579,7 +579,7 @@ eltsUFM fm = foldUFM (:) [] fm
 
 ufmToList fm = fold_tree (\ iu elt rest -> (mkUniqueGrimily iu, elt) : rest) [] fm
 
-keysUFM fm = fold_tree (\ iu elt rest -> iBox iu : rest) [] fm
+keysUFM fm = fold_tree (\ iu elt rest -> mkUniqueGrimily iu : rest) [] fm
 
 fold_tree f a (NodeUFM _ _ t1 t2) = fold_tree f (fold_tree f a t2) t1
 fold_tree f a (LeafUFM iu obj)    = f iu obj a

@@ -58,7 +58,7 @@ import Name		( mkWiredInName, mkFCallName, Name )
 import OccName		( mkVarOcc )
 import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName )
 import ForeignCall	( ForeignCall )
-import Demand		( wwStrict, wwPrim, mkStrictnessInfo, 
+import Demand		( wwStrict, wwPrim, mkStrictnessInfo, noStrictnessInfo,
 			  StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
 import DataCon		( DataCon, 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
@@ -75,7 +75,8 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
 			  exactArity, setUnfoldingInfo, setCprInfo,
 			  setArityInfo, setSpecInfo,  setCgInfo,
-			  mkStrictnessInfo, setStrictnessInfo,
+			  setStrictnessInfo,
+			  mkNewStrictnessInfo, setNewStrictnessInfo,
 			  GlobalIdDetails(..), CafInfo(..), CprInfo(..), 
 			  CgInfo(..), setCgArity
 			)
@@ -143,11 +144,11 @@ mkDataConId work_name data_con
     info = noCafNoTyGenIdInfo
 	   `setCgArity`		arity
 	   `setArityInfo`	exactArity arity
-	   `setStrictnessInfo`	strict_info
 	   `setCprInfo`		cpr_info
+	   `setStrictnessInfo`	strict_info
+	   `setNewStrictnessInfo`	mkNewStrictnessInfo arity strict_info cpr_info
 
     arity = dataConRepArity data_con
-
     strict_info = mkStrictnessInfo (dataConRepStrictness data_con, False)
 
     tycon = dataConTyCon data_con
@@ -225,6 +226,7 @@ mkDataConWrapId data_con
 	   `setArityInfo`	exactArity arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
+	   `setNewStrictnessInfo` 	mkNewStrictnessInfo arity noStrictnessInfo cpr_info
 
     wrap_ty = mkForAllTys all_tyvars $
 	      mkFunTys all_arg_tys
@@ -604,6 +606,7 @@ mkPrimOpId prim_op
 	   `setCgArity` 	arity
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
+	   `setNewStrictnessInfo`	mkNewStrictnessInfo arity strict_info NoCPRInfo
 
     rules = maybe emptyCoreRules (addRule emptyCoreRules id)
 		(primOpRule prim_op)
@@ -635,6 +638,7 @@ mkFCallId uniq fcall ty
 	   `setCgArity` 	arity
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
+	   `setNewStrictnessInfo`	mkNewStrictnessInfo arity strict_info NoCPRInfo
 
     (_, tau) 	 = tcSplitForAllTys ty
     (arg_tys, _) = tcSplitFunTys tau
@@ -831,8 +835,11 @@ pcMiscPrelId key mod str ty info
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
+    strict_info = mkStrictnessInfo ([wwStrict], True)
     bottoming_info = noCafNoTyGenIdInfo 
-		     `setStrictnessInfo` mkStrictnessInfo ([wwStrict], True)
+		     `setStrictnessInfo`  strict_info
+	  	     `setNewStrictnessInfo`	mkNewStrictnessInfo 1 strict_info NoCPRInfo
+
 
 	-- these "bottom" out, no matter what their arguments
 
