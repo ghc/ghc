@@ -31,13 +31,13 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  getDictClassTys, getIPs, isTyVarDict,
 			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
-			  mkLIE, 
+			  mkLIE, plusLIE, isEmptyLIE,
 			  lieToList 
 			)
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 
-import TcType		( zonkTcTyVarsAndFV )
+import TcType		( zonkTcTyVarsAndFV, tcInstTyVars )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
 import Name		( Name )
@@ -50,7 +50,7 @@ import Type		( Type, ClassContext,
 			  mkTyVarTy, getTyVar, 
 			  isTyVarTy, splitSigmaTy, tyVarsOfTypes
 			)
-import Subst		( mkTopTyVarSubst, substClasses )
+import Subst		( mkTopTyVarSubst, substClasses, substTy )
 import PprType		( pprClassPred )
 import TysWiredIn	( unitTy )
 import VarSet
@@ -395,7 +395,7 @@ tcSimplifyInfer doc tau_tvs wanted_lie
 	-- Check for non-generalisable insts
     mapTc_ addCantGenErr (filter (not . instCanBeGeneralised) irreds)	`thenTc_`
 
-    returnTc (qtvs, mkLIE frees, binds, map instToId irreds)
+    returnTc (qtvs, frees, binds, map instToId irreds)
 
 inferLoop doc tau_tvs wanteds
   =   	-- Step 1
@@ -418,8 +418,30 @@ inferLoop doc tau_tvs wanteds
     if no_improvement then
 	    returnTc (varSetElems qtvs, frees, binds, irreds)
     else
-	    inferLoop doc tau_tvs wanteds
+		-- We start again with irreds, not wanteds
+		-- Using an instance decl might have introduced a fresh type variable
+		-- which might have been unified, so we'd get an infinite loop
+		-- if we started again with wanteds!  See example [LOOP]
+	    inferLoop doc tau_tvs irreds	`thenTc` \ (qtvs1, frees1, binds1, irreds1) ->
+	    returnTc (qtvs1, frees1 `plusLIE` frees, binds `AndMonoBinds` binds1, irreds1)
 \end{code}	
+
+Example [LOOP]
+
+	class If b t e r | b t e -> r
+	instance If T t e t
+	instance If F t e e
+	class Lte a b c | a b -> c where lte :: a -> b -> c
+	instance Lte Z b T
+	instance (Lte a b l,If l b a c) => Max a b c
+
+Wanted:	Max Z (S x) y
+
+Then we'll reduce using the Max instance to:
+	(Lte Z (S x) l, If l (S x) Z y)
+and improve by binding l->T, after which we can do some reduction 
+on both the Lte and If constraints.  What we *can't* do is start again
+with (Max Z (S x) y)!
 
 \begin{code}
 isFree qtvs inst
@@ -454,7 +476,7 @@ tcSimplifyCheck doc qtvs givens wanted_lie
     complainCheck doc givens irreds		`thenNF_Tc_`
 
 	-- Done
-    returnTc (mkLIE frees, binds)
+    returnTc (frees, binds)
 
 checkLoop doc qtvs givens wanteds
   =   	-- Step 1
@@ -474,7 +496,8 @@ checkLoop doc qtvs givens wanteds
     if no_improvement then
 	    returnTc (frees, binds, irreds)
     else
-	    checkLoop doc qtvs givens wanteds
+	    checkLoop doc qtvs givens irreds	`thenTc` \ (frees1, binds1, irreds1) ->
+	    returnTc (frees `plusLIE` frees1, binds `AndMonoBinds` binds1, irreds1)
 
 complainCheck doc givens irreds
   = mapNF_Tc zonkInst given_dicts			`thenNF_Tc` \ givens' ->
@@ -514,7 +537,7 @@ tcSimplifyInferCheck doc tau_tvs givens wanted
     complainCheck doc givens irreds		`thenNF_Tc_`
 
 	-- Done
-    returnTc (qtvs, mkLIE frees, binds)
+    returnTc (qtvs, frees, binds)
 
 inferCheckLoop doc tau_tvs givens wanteds
   =   	-- Step 1
@@ -550,7 +573,8 @@ inferCheckLoop doc tau_tvs givens wanteds
     if no_improvement then
 	    returnTc (varSetElems qtvs, frees, binds, irreds)
     else
-	    inferCheckLoop doc tau_tvs givens wanteds
+	    inferCheckLoop doc tau_tvs givens wanteds	`thenTc` \ (qtvs1, frees1, binds1, irreds1) ->
+	    returnTc (qtvs1, frees1 `plusLIE` frees, binds `AndMonoBinds` binds1, irreds1)
 \end{code}
 
 
@@ -588,7 +612,7 @@ tcSimplifyToDicts wanted_lie
   = simpleReduceLoop doc try_me wanteds		`thenTc` \ (frees, binds, irreds) ->
 	-- Since try_me doesn't look at types, we don't need to 
 	-- do any zonking, so it's safe to call reduceContext directly
-    ASSERT( null frees )
+    ASSERT( isEmptyLIE frees )
     returnTc (irreds, binds)
 
   where
@@ -622,7 +646,7 @@ tcSimplifyIPs ip_names wanted_lie
 	-- The irreducible ones should be a subset of the implicit
 	-- parameters we provided
     ASSERT( all here_ip irreds )
-    returnTc (mkLIE frees, binds)
+    returnTc (frees, binds)
     
   where
     doc	    = text "tcSimplifyIPs" <+> ppr ip_names
@@ -672,7 +696,7 @@ bindInstsOfLocalFuns init_lie local_ids
   | otherwise
   = simpleReduceLoop doc try_me wanteds		`thenTc` \ (frees, binds, irreds) -> 
     ASSERT( null irreds )
-    returnTc (mkLIE frees, binds)
+    returnTc (frees, binds)
   where
     doc		     = text "bindInsts" <+> ppr local_ids
     wanteds	     = lieToList init_lie
@@ -740,7 +764,8 @@ data Avail
 	TcExpr	 	-- The RHS
 	[Inst]		-- Insts free in the RHS; we need these too
 
-pprAvails avails = vcat (map pprAvail (eltsFM avails))
+pprAvails avails = vcat [ppr inst <+> equals <+> pprAvail avail
+			| (inst,avail) <- fmToList avails ]
 
 instance Outputable Avail where
     ppr = pprAvail
@@ -812,7 +837,7 @@ The "given" set is always empty.
 simpleReduceLoop :: SDoc
 	 	 -> (Inst -> WhatToDo)		-- What to do, *not* based on the quantified type variables
 		 -> [Inst]			-- Wanted
-		 -> TcM ([Inst],		-- Free
+		 -> TcM (LIE,			-- Free
 			 TcDictBinds,
 			 [Inst])		-- Irreducible
 
@@ -822,7 +847,8 @@ simpleReduceLoop doc try_me wanteds
     if no_improvement then
 	returnTc (frees, binds, irreds)
     else
-	simpleReduceLoop doc try_me wanteds
+	simpleReduceLoop doc try_me irreds	`thenTc` \ (frees1, binds1, irreds1) ->
+	returnTc (frees `plusLIE` frees1, binds `AndMonoBinds` binds1, irreds1)
 \end{code}	
 
 
@@ -833,13 +859,13 @@ reduceContext :: SDoc
 	      -> [Inst]			-- Given
 	      -> [Inst]			-- Wanted
 	      -> NF_TcM (Bool, 		-- True <=> improve step did no unification
-			 [Inst],	-- Free
+			 LIE,		-- Free
 			 TcDictBinds,	-- Dictionary bindings
 			 [Inst])	-- Irreducible
 
 reduceContext doc try_me givens wanteds
   =
-{-    traceTc (text "reduceContext" <+> (vcat [
+    traceTc (text "reduceContext" <+> (vcat [
 	     text "----------------------",
 	     doc,
 	     text "given" <+> ppr givens,
@@ -847,7 +873,6 @@ reduceContext doc try_me givens wanteds
 	     text "----------------------"
 	     ]))					`thenNF_Tc_`
 
--}
         -- Build the Avail mapping from "givens"
     foldlNF_Tc addGiven (emptyFM, []) givens		`thenNF_Tc` \ init_state ->
 
@@ -858,7 +883,6 @@ reduceContext doc try_me givens wanteds
 	-- In particular, avails includes all superclasses of everything
     tcImprove avails					`thenTc` \ no_improvement ->
 
-{-
     traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
 	     doc,
@@ -870,11 +894,10 @@ reduceContext doc try_me givens wanteds
 	     text "no_improvement =" <+> ppr no_improvement,
 	     text "----------------------"
 	     ])) 					`thenNF_Tc_`
--}
      let
 	(binds, irreds) = bindsAndIrreds avails wanteds
      in
-     returnTc (no_improvement, frees, binds, irreds)
+     returnTc (no_improvement, mkLIE frees, binds, irreds)
 
 tcImprove avails
  =  tcGetInstEnv 				`thenTc` \ inst_env ->
@@ -890,8 +913,14 @@ tcImprove avails
      if null eqns then
 	returnTc True
      else
-        mapTc_ (\ (t1,t2) -> unifyTauTy t1 t2) eqns	`thenTc_`
+	traceTc (ptext SLIT("Improve:") <+> vcat (map ppr_eqn eqns))	`thenNF_Tc_`
+        mapTc_ unify eqns	`thenTc_`
 	returnTc False
+  where
+    unify (qtvs, t1, t2) = tcInstTyVars (varSetElems qtvs)	`thenNF_Tc` \ (_, _, tenv) ->
+			   unifyTauTy (substTy tenv t1) (substTy tenv t2)
+    ppr_eqn (qtvs, t1, t2) = ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)) <+>
+			     ppr t1 <+> equals <+> ppr t2
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.
@@ -1143,7 +1172,7 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 tcSimplifyTop :: LIE -> TcM TcDictBinds
 tcSimplifyTop wanted_lie
   = simpleReduceLoop (text "tcSimplTop") try_me wanteds	`thenTc` \ (frees, binds, irreds) ->
-    ASSERT( null frees )
+    ASSERT( isEmptyLIE frees )
 
     let
 		-- All the non-std ones are definite errors
@@ -1235,7 +1264,7 @@ disambigGroup dicts
     unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenTc_`
     simpleReduceLoop (text "disambig" <+> ppr dicts)
 		     try_me dicts			`thenTc` \ (frees, binds, ambigs) ->
-    WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
+    WARN( not (isEmptyLIE frees && null ambigs), ppr frees $$ ppr ambigs )
     warnDefault dicts chosen_default_ty			`thenTc_`
     returnTc binds
 

@@ -7,7 +7,8 @@ This module contains a unifier and a matcher, both of which
 use an explicit substitution
 
 \begin{code}
-module Unify ( unifyTysX, unifyTyListsX, allDistinctTyVars,
+module Unify ( unifyTysX, unifyTyListsX, unifyExtendTysX,
+	       allDistinctTyVars,
 	       match, matchTy, matchTys,
   ) where 
 
@@ -83,6 +84,14 @@ unifyTysX :: TyVarSet		-- Template tyvars
           -> Maybe TyVarSubstEnv
 unifyTysX tmpl_tyvars ty1 ty2
   = uTysX ty1 ty2 (\(_,s) -> Just s) (tmpl_tyvars, emptySubstEnv)
+
+unifyExtendTysX :: TyVarSet		-- Template tyvars
+		-> TyVarSubstEnv	-- Substitution to start with
+		-> Type
+	        -> Type
+        	-> Maybe TyVarSubstEnv	-- Extended substitution
+unifyExtendTysX tmpl_tyvars subst ty1 ty2
+  = uTysX ty1 ty2 (\(_,s) -> Just s) (tmpl_tyvars, subst)
 
 unifyTyListsX :: TyVarSet -> [Type] -> [Type]
               -> Maybe TyVarSubstEnv

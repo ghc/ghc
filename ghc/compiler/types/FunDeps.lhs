@@ -16,11 +16,12 @@ import Var		( TyVar )
 import Class		( Class, FunDep, classTvsFds )
 import Type		( Type, ThetaType, PredType(..), predTyUnique, tyVarsOfTypes, tyVarsOfPred )
 import Subst		( mkSubst, emptyInScopeSet, substTy )
-import Unify		( unifyTyListsX )
+import Unify		( unifyTyListsX, unifyExtendTysX )
 import Outputable	( Outputable, SDoc, interppSP, ptext, empty, hsep, punctuate, comma )
 import VarSet
 import VarEnv
 import List		( tails )
+import Maybes		( maybeToBool )
 import ListSetOps	( equivClassesByUniq )
 \end{code}
 
@@ -142,8 +143,16 @@ grow preds fixed_tvs
 
 \begin{code}
 ----------
-type Equation = (Type,Type)	-- These two types should be equal
-				-- INVARIANT: they aren't already equal
+type Equation = (TyVarSet, Type,Type)	-- These two types should be equal, for some
+					-- substitution of the tyvars in the tyvar set
+	-- For example, ({a,b}, (a,Int,b), (Int,z,Bool))
+	-- We unify z with Int, but since a and b are quantified we do nothing to them
+	-- We usually act on an equation by instantiating the quantified type varaibles
+	-- to fresh type variables, and then calling the standard unifier.
+	-- 
+	-- INVARIANT: they aren't already equal
+
+
 
 ----------
 improve :: InstEnv a		-- Gives instances for given class
@@ -199,7 +208,7 @@ checkGroup :: InstEnv a -> [PredType] -> [Equation]
 
 checkGroup inst_env (IParam _ ty : ips)
   = 	-- For implicit parameters, all the types must match
-    [(ty, ty') | IParam _ ty' <- ips, ty /= ty']
+    [(emptyVarSet, ty, ty') | IParam _ ty' <- ips, ty /= ty']
 
 checkGroup inst_env clss@(Class cls tys : _)
   = 	-- For classes life is more complicated  
@@ -223,7 +232,7 @@ checkGroup inst_env clss@(Class cls tys : _)
 
 	-- NOTE that we iterate over the fds first; they are typically
 	-- empty, which aborts the rest of the loop.
-    pairwise_eqns :: [(Type,Type)]
+    pairwise_eqns :: [Equation]
     pairwise_eqns	-- This group comes from pairwise comparison
       = [ eqn | fd <- cls_fds,
 	      	Class _ tys1 : rest <- tails clss,
@@ -231,7 +240,7 @@ checkGroup inst_env clss@(Class cls tys : _)
 	      	eqn <- checkClsFD emptyVarSet fd cls_tvs tys1 tys2
 	]
 
-    instance_eqns :: [(Type,Type)]
+    instance_eqns :: [Equation]
     instance_eqns	-- This group comes from comparing with instance decls
       = [ eqn | fd <- cls_fds,
 	    	(qtvs, tys1, _) <- cls_inst_env,
@@ -252,13 +261,16 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- unifyTyListsX will only bind variables in qtvs, so it's OK!
   = case unifyTyListsX qtvs ls1 ls2 of
 	Nothing   -> []
-	Just unif -> [(sr1, sr2) | (r1,r2) <- rs1 `zip` rs2,
-				   let sr1 = substTy full_unif r1,
-				   let sr2 = substTy full_unif r2,
-				   sr1 /= sr2]
+	Just unif -> [ (qtvs', substTy full_unif r1, substTy full_unif r2)
+		     | (r1,r2) <- rs1 `zip` rs2,
+		       not (maybeToBool (unifyExtendTysX qtvs unif r1 r2))]
 		  where
 		    full_unif = mkSubst emptyInScopeSet unif
 			-- No for-alls in sight; hmm
+
+		    qtvs' = filterVarSet (\v -> not (v `elemSubstEnv` unif)) qtvs
+			-- qtvs' are the quantified type variables
+			-- that have not been substituted out
   where
     (ls1, rs1) = instFD fd clas_tvs tys1
     (ls2, rs2) = instFD fd clas_tvs tys2

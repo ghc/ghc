@@ -268,7 +268,9 @@ forkNF_Tc m down@(TcDown { tc_us = u_var }) env
 
 \begin{code}
 traceTc :: SDoc -> NF_TcM ()
-traceTc doc down env = printDump doc
+traceTc doc (TcDown { tc_dflags=dflags }) env 
+  | dopt Opt_D_dump_rn_trace dflags = printDump doc
+  | otherwise			    = return ()
 
 ioToTc :: IO a -> NF_TcM a
 ioToTc io down env = io
