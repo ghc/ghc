@@ -482,7 +482,7 @@ tycl_hdr :: { Located (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrNam
 decls 	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 	: decls ';' decl		{ LL (unLoc $1 `appOL` unLoc $3) }
 	| decls ';'			{ LL (unLoc $1) }
-	| decl				{ L1 (unLoc $1) }
+	| decl				{ $1 }
 	| {- empty -}			{ noLoc nilOL }
 
 
