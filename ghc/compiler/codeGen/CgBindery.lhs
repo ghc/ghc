@@ -416,36 +416,24 @@ rebindToStack name offset
 
 ToDo: remove the dependency on 32-bit words.
 
-There are two ways to build a liveness mask, and both appear to have
-problems.
+There are four kinds of things on the stack:
 
-  1) Find all the pointer words by searching through the binding list.
-     Invert this to find the non-pointer words and build the bitmap.
+	- pointer variables (bound in the environment)
+	- non-pointer variables (boudn in the environment)
+	- free slots (recorded in the stack free list)
+	- non-pointer data slots (recorded in the stack free list)
 
-  2) Find all the non-pointer words by searching through the binding list.
-     Merge this with the list of currently free slots.  Build the
-     bitmap.
+We build up a bitmap of non-pointer slots by looking down the
+environment for all the non-pointer variables, and merging this with
+the slots recorded in the stack free list.
 
-Method (1) conflicts with update frames - these contain pointers but
-have no bindings in the environment.  We could bind the updatee to its
-location in the update frame at the point when the update frame is
-pushed, but this binding would be dropped by the first case expression
-(nukeDeadBindings).
-
-Method (2) causes problems because we must make sure that every
-non-pointer word on the stack is either a free stack slot or has a
-binding in the environment.  Things like cost centres break this (but
-only for case-of-case expressions - because that's when there's a cost
-centre on the stack from the outer case and we need to generate a
-bitmap for the inner case's continuation).
-
-This method also works "by accident" for update frames: since all
-unaccounted for slots on the stack are assumed to be pointers, and an
-update frame always occurs at virtual Sp offsets 0-3 (i.e. the bottom
-of the stack frame), the bitmap will simply end at the start of the
-update frame.
-
-We use method (2) at the moment.
+There's a bit of a hack here to do with update frames: since nothing
+is recorded in either the environment or the stack free list for an
+update frame, the code below defaults to assuming the slots taken up
+by an update frame contain pointers.  Furthermore, update frames are
+always in slots 0-2 at the bottom of the stack.  The bitmap will
+therefore end at slot 3, which is what we want (the update frame info
+pointer has its own bitmap to describe the update frame).
 
 \begin{code}
 buildLivenessMask 
@@ -492,20 +480,6 @@ mergeSlots (c:cs) (n:ns)
 	n : mergeSlots (c:cs) ns
    else
 	panic ("mergeSlots: equal slots: " ++ show (c:cs) ++ show (n:ns))
-
-{- ALTERNATE version that doesn't work because update frames aren't
-   recorded in the environment.
-
-	-- find all boxed stack-resident ids
-	boxed_slots = 		   
-	  [ ofs | (MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
-	        isFollowableRep (idPrimRep id)
-	  ]
-	all_slots = [1..vsp]
-
-	-- invert to get unboxed slots
-	unboxed_slots = filter (`notElem` boxed_slots) all_slots
--}
 
 listToLivenessMask :: [Int] -> LivenessMask
 listToLivenessMask []    = []
