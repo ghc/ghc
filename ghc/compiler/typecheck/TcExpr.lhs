@@ -13,7 +13,7 @@ import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import Id		( Id )
 import TcType		( isTauTy )
 import TcEnv		( checkWellStaged )
-imoprt HsSyn		( nlHsApp )
+import HsSyn		( nlHsApp )
 import qualified DsMeta
 #endif
 
