@@ -14,6 +14,7 @@ import StixInteger
 
 import AbsCSyn 		hiding ( spRel )
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
+import Constants	( uF_UPDATEE )
 import SMRep		( fixedHdrSize )
 import Const		( Literal(..) )
 import CallConv		( cCallConv )
@@ -383,7 +384,9 @@ amodeToStix (CMacroExpr _ macro [arg])
 			[StInd WordRep (StPrim IntSubOp [amodeToStix arg,
 							 StInt 1]),
 			 StInt 16]
-
+      UPD_FRAME_UPDATEE
+         -> StInd PtrRep (StIndex PtrRep (amodeToStix arg) 
+                                         (StInt (toInteger uF_UPDATEE)))
 -- XXX!!!
 -- GET_TAG(info_ptr) is supposed to be  get_itbl(info_ptr)->srt_len,
 -- which we've had to hand-code here.

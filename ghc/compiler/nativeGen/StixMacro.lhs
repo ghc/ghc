@@ -136,12 +136,22 @@ macroCode PUSH_UPD_FRAME args
 macroCode PUSH_SEQ_FRAME args
    = let [arg_frame] = map amodeToStix args
          frame n = StInd PtrRep
-            (StIndex PtrRep arg_frame (StInt (toInteger n)))
+                     (StIndex PtrRep arg_frame (StInt (toInteger n)))
          a1 = StAssign PtrRep (frame 0) seq_frame_info
          a2 = StAssign PtrRep (frame 1) stgSu
          updSu = StAssign PtrRep stgSu arg_frame 
      in
      returnUs (\xs -> a1 : a2 : updSu : xs)
+
+
+macroCode UPDATE_SU_FROM_UPD_FRAME args
+   = let [arg_frame] = map amodeToStix args
+         frame n = StInd PtrRep
+                      (StIndex PtrRep arg_frame (StInt (toInteger n)))
+         updSu
+            = StAssign PtrRep stgSu (frame uF_SU)
+     in
+     returnUs (\xs -> updSu : xs)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -156,6 +166,18 @@ macroCode SET_TAG [tag]
     case stgReg tagreg of
       Always _ -> returnUs id
       Save   _ -> returnUs (\ xs -> set_tag : xs)
+
+macroCode other args
+   = case other of
+        ARGS_CHK -> error "foobarxyzzy1"
+        ARGS_CHK_LOAD_NODE -> error "foobarxyzzy2"
+        UPD_CAF -> error "foobarxyzzy3"
+        UPD_BH_UPDATABLE -> error "foobarxyzzy4"
+        UPD_BH_SINGLE_ENTRY -> error "foobarxyzzy5"
+        PUSH_UPD_FRAME -> error "foobarxyzzy6"
+        PUSH_SEQ_FRAME -> error "foobarxyzzy7"
+        UPDATE_SU_FROM_UPD_FRAME -> error "foobarxyzzy8"
+        SET_TAG -> error "foobarxyzzy9"
 
 \end{code}
 
