@@ -1032,7 +1032,8 @@ we generate
 
   $cT1 = mkDataCon $dT "T1" Prefix
   $cT2 = mkDataCon $dT "T2" Prefix
-  $dT  = mkDataType "Module.T" [$con_T1, $con_T2]
+  $dT  = mkDataType "Module.T" [] [$con_T1, $con_T2]
+  -- the [] is for field labels.
 
   instance (Data a, Data b) => Data (T a b) where
     gfoldl k z (T1 a b) = z T `k` a `k` b
@@ -1115,8 +1116,11 @@ gen_Data_binds fix_env tycon
 	 [ -- nlHsIntLit (toInteger (dataConTag dc)),		-- Tag
 	   nlHsVar data_type_name,				-- DataType
 	   nlHsLit (mkHsString (occNameUserString dc_occ)),	-- String name
+           nlList  labels,					-- Field labels
 	   nlHsVar fixity]					-- Fixity
 	where
+          labels   = map (nlHsLit . mkHsString . getOccString . fieldLabelName)
+                         (dataConFieldLabels dc)
 	  dc_occ   = getOccName dc
 	  is_infix = isDataSymOcc dc_occ
 	  fixity | is_infix  = infix_RDR
@@ -1126,9 +1130,9 @@ gfoldl_RDR     = varQual_RDR gENERICS_Name FSLIT("gfoldl")
 fromConstr_RDR = varQual_RDR gENERICS_Name FSLIT("fromConstr")
 toConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("toConstr")
 dataTypeOf_RDR = varQual_RDR gENERICS_Name FSLIT("dataTypeOf")
-mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkDataCon")
+mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkConstr")
 mkDataType_RDR = varQual_RDR gENERICS_Name FSLIT("mkDataType")
-conIndex_RDR   = varQual_RDR gENERICS_Name FSLIT("conIndex")
+conIndex_RDR   = varQual_RDR gENERICS_Name FSLIT("constrIndex")
 prefix_RDR     = dataQual_RDR gENERICS_Name FSLIT("Prefix")
 infix_RDR      = dataQual_RDR gENERICS_Name FSLIT("Infix")
 \end{code}
