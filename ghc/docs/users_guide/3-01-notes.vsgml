@@ -10,4 +10,6 @@ Changes made since 3.00:
 
 <item>  Fix some floating point conversion problems in @floatExtreme.lc@.
 
+<item>  New Hugs/GHC interface <tt/NumExts/ added and documented.
+
 </itemize>
