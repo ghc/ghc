@@ -347,8 +347,8 @@ ppIdInfo b info
             ppTyGenInfo g,
 	    ppWorkerInfo (workerInfo info),
 	    ppStrictnessInfo s,
-	    ppr (newStrictnessInfo info),
             ppCprInfo m,
+	    ppr (newStrictnessInfo info),
 	    pprCoreRules b p
 	-- Inline pragma, occ, demand, lbvar info
 	-- printed out with all binders (when debug is on); 

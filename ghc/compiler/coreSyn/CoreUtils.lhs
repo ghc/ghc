@@ -492,7 +492,7 @@ exprOkForSpeculation other_expr
 	  other -> False
 	
     go (App f a) n_args args_ok 
-	| not (isRuntimeArg a) = go f n_args 	  args_ok
+	| not (isRuntimeArg a) = go f n_args 	   args_ok
 	| otherwise            = go f (n_args + 1) (exprOkForSpeculation a && args_ok)
 
     go other n_args args_ok = False
