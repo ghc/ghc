@@ -61,6 +61,7 @@ module GlaExts
 
 import PrelGHC
 import PrelBase
+import PrelAddr   ( Addr(..) )
 import PrelST
 import IOExts
 import PrelIOBase

@@ -39,8 +39,9 @@ ifneq "$(way)" ""
 SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
-Int_HC_OPTS          += -H8m
+Int_HC_OPTS          += -H8m -fno-prune-tydecls
 Word_HC_OPTS         += -H8m
+NativeInfo_HC_OPTS   += -fno-prune-tydecls
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
