@@ -92,14 +92,9 @@ yield = IO $ \s ->
 seq :: a -> b -> b
 seq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
 
-par :: a -> b -> b
-
 {-# INLINE par  #-}
-#if defined(__PARALLEL_HASKELL__) || defined (__GRANSIM__)
+par :: a -> b -> b
 par  x y = case (par# x) of { 0# -> parError; _ -> y }
-#else
-par  _ y = y
-#endif
 \end{code}
 
 %************************************************************************
