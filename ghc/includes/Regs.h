@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.10 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: Regs.h,v 1.11 2002/01/24 00:40:28 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -69,9 +69,6 @@ typedef struct StgRegTable_ {
 #if defined(SMP) || defined(PAR)
   StgSparkPool   rSparks;	// per-task spark pool
 #endif
-#if defined(SMP)
-  struct StgRegTable_ *link;	// per-task register tables are linked together
-#endif
 } StgRegTable;
 
 
@@ -80,9 +77,12 @@ typedef struct StgRegTable_ {
  * structure, so that we can index both forwards and backwards to take
  * advantage of shorter instruction forms on some archs (eg. x86).
  */
-typedef struct {
+typedef struct Capability_ {
     StgFunTable f;
     StgRegTable r;
+#if defined(SMP)
+  struct Capability_ *link;	/* per-task register tables are linked together */
+#endif
 } Capability;
 
 /* No such thing as a MainRegTable under SMP - each thread must
