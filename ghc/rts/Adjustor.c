@@ -192,7 +192,13 @@ typedef struct AdjustorStub {
 #endif
 
 void*
-createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr, char *typeString)
+createAdjustor(int cconv, StgStablePtr hptr,
+	       StgFunPtr wptr,
+	       char *typeString
+#if !defined(powerpc_TARGET_ARCH) && !defined(powerpc64_TARGET_ARCH)
+	          STG_UNUSED
+#endif
+              )
 {
   void *adjustor = NULL;
 
