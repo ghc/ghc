@@ -560,8 +560,8 @@ idAppIsValue id n_val_args
 
 \begin{code}
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
-exprIsConApp_maybe (Note _ expr) = exprIsConApp_maybe expr
-exprIsConApp_maybe expr          = analyse (collectArgs expr)
+exprIsConApp_maybe (Note InlineMe expr) = exprIsConApp_maybe expr
+exprIsConApp_maybe expr                 = analyse (collectArgs expr)
   where
     analyse (Var fun, args)
 	| Just con <- isDataConId_maybe fun,
