@@ -8,7 +8,7 @@ data T a where
   K :: T Int
 
 -- Should fail
-i1 :: T  a -> a -> Int
+i1 :: T a -> a -> Int
 i1 t y = (\t1 y1 -> case t1 of K -> y1) t y
 
 -- No type signature; should type-check

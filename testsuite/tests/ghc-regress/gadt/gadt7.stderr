@@ -1,0 +1,8 @@
+
+gadt7.hs:12:42:
+    Couldn't match the rigid variable `a' against `Int'
+      `a' is bound by the type signature for `i1'
+      Expected type: Int
+      Inferred type: a
+    In the second argument of `(\ t1 y1 -> case t1 of K -> y1)', namely `y'
+    In the definition of `i1': i1 t y = (\ t1 y1 -> case t1 of K -> ...) t y
