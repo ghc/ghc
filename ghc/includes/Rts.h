@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.27 2004/09/06 11:10:34 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
  * Top-level include file for the RTS itself
  *
@@ -50,6 +49,8 @@ extern "C" {
 #else
 #define GNUC3_ATTRIBUTE(at)
 #endif
+
+#define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
 
 /* 
  * Empty structures isn't supported by all, so to define
@@ -240,29 +241,12 @@ extern void* GetFiberData ( void );
 #endif
 
 /* -----------------------------------------------------------------------------
-   Attributes
+   Useful macros and inline functions
    -------------------------------------------------------------------------- */
-
-#ifdef __GNUC__     /* Avoid spurious warnings                             */
-#if (__GNUC__ == 2 && __GNUC_MINOR__ >= 7) || __GNUC__ >= 3
-#define STG_NORETURN  __attribute__ ((noreturn))
-#define STG_UNUSED    __attribute__ ((unused))
-#else
-#define STG_NORETURN  
-#define STG_UNUSED
-#endif
-#else
-#define STG_NORETURN  
-#define STG_UNUSED
-#endif
 
 #if defined(__GNUC__)
 #define SUPPORTS_TYPEOF
 #endif
-
-/* -----------------------------------------------------------------------------
-   Useful macros and inline functions
-   -------------------------------------------------------------------------- */
 
 #if defined(SUPPORTS_TYPEOF)
 #define stg_min(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _a : _b; })
