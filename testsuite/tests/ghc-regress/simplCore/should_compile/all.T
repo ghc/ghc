@@ -1,7 +1,7 @@
 test('simpl001', normal, compile, [''])
 test('simpl002', normal, compile, [''])
 test('simpl003', normal, compile, [''])
-test('simpl004', normal, compile, ['-package lang'])
+test('simpl004', normal, compile, [''])
 test('simpl005', normal, compile, [''])
 
 # Missing:

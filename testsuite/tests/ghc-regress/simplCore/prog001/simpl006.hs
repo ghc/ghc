@@ -7,7 +7,7 @@
 
 module ShouldCompile where
 
-import Concurrent 
+import Control.Concurrent 
 import Simpl006Help
 
 after :: Int -> IO a -> IO a

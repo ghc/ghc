@@ -3,7 +3,7 @@
 module ShouldCompile where
 
 import Ix
-import GlaExts
+import GHC.Exts
 
 
 f ixs@(_, ix_end) frozen# =
