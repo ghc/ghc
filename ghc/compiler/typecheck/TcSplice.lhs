@@ -206,7 +206,10 @@ tcTopSplice expr res_ty
 
     showSplice "expression" 
 	       zonked_q_expr (ppr expr2)	`thenM_`
-    rnExpr expr2				`thenM` \ (exp3, fvs) ->
+
+	-- Rename it, but bale out if there are errors
+	-- otherwise the type checker just gives more spurious errors
+    checkNoErrs (rnExpr expr2)			`thenM` \ (exp3, fvs) ->
 
     tcMonoExpr exp3 res_ty
 
