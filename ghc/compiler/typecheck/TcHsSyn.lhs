@@ -64,12 +64,8 @@ import TysPrim	( voidTy )
 import CoreSyn  ( GenCoreExpr )
 import Unique	( Unique )		-- instances
 import UniqFM
-import PprStyle
-import Pretty
-
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-#endif
+import Pretty
 \end{code}
 
 
