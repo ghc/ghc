@@ -438,10 +438,16 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     unfolding = mkTopUnfolding sel_rhs
 
 	-- Allocate Ids.  We do it a funny way round because field_dict_tys is
-	-- almost always empty	
-    dict_ids	       = mkTemplateLocalsNum 1		    dict_tys
-    field_dict_ids     = mkTemplateLocalsNum (n_dict_tys+1) field_dict_tys
-    data_id	       = mkTemplateLocal     arity	    data_ty
+	-- almost always empty.  Also note that we use length_tycon_theta
+ 	-- rather than n_dict_tys, because the latter gives an infinite loop:
+	-- n_dict tys depends on the_alts, which depens on arg_ids, which depends
+	-- on arity, which depends on n_dict tys.  Sigh!  Mega sigh!
+    field_dict_base    = length tycon_theta + 1
+    dict_id_base       = field_dict_base + n_field_dict_tys
+    field_base	       = dict_id_base + 1
+    dict_ids	       = mkTemplateLocalsNum  1		      dict_tys
+    field_dict_ids     = mkTemplateLocalsNum  field_dict_base field_dict_tys
+    data_id	       = mkTemplateLocal      dict_id_base    data_ty
 
     alts      = map mk_maybe_alt data_cons
     the_alts  = catMaybes alts
@@ -471,7 +477,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	    	    (expr, real_args) = rebuildConArgs data_con arg_ids strict_marks body
 						       (length arg_ids + 1)
 	where
-            arg_ids = mkTemplateLocalsNum (arity+1) (dataConInstOrigArgTys data_con tyvar_tys)
+            arg_ids = mkTemplateLocalsNum field_base (dataConInstOrigArgTys data_con tyvar_tys)
 				-- arity+1 avoids all shadowing
     	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
     	    field_lbls	      = dataConFieldLabels data_con
