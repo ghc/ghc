@@ -130,8 +130,10 @@ restrictTo :: [HsName] -> HsDecl -> HsDecl
 restrictTo names decl = case decl of
      HsDataDecl loc ctxt n xs cons drv doc -> 
 	HsDataDecl loc ctxt n xs (restrictCons names cons) drv doc
-     HsNewTypeDecl loc ctxt n xs con drv doc ->
-	HsDataDecl loc ctxt n xs (restrictCons names [con]) drv	doc
+     decl@(HsNewTypeDecl loc ctxt n xs con drv doc) ->
+	case restrictCons names [con] of
+	   [] -> HsDataDecl loc ctxt n xs [] drv doc
+	   _  -> decl
      HsClassDecl loc ctxt n tys fds decls doc ->
 	HsClassDecl loc ctxt n tys fds (restrictDecls names decls) doc
      _ -> decl
