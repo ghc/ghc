@@ -13,9 +13,22 @@
     <title>User-visible library changes</title>
     <itemizedlist>
       <listitem>
+	<para>The <literal>SocketPrim</literal> and
+	<literal>BSD</literal> modules in the <literal>net</literal>
+	package have been re-written to use the FFI, be more portable,
+	and be more thread-safe.  There are minor user-visible
+	changes: the functions <function>writeSocket</function>,
+	<function>readSocket</function> and
+	<function>readSocketAll</function> have been removed (use
+	<function>socketToHandle</function> and
+	<literal>Handle</literal> operations instead).</para>
+      </listitem>
+
+      <listitem>
 	<para>New function: <function>Exception.throwDynTo</function>.
 	See <xref linkend="sec-Dynamic-Exceptions">.</para>
       </listitem>
+
     </itemizedlist>
   </sect2>
 
