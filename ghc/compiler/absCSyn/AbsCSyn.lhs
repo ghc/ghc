@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.51 2002/12/11 15:36:21 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.52 2003/05/14 09:13:52 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -51,7 +51,8 @@ import MachOp		( MachOp(..) )
 import Unique           ( Unique )
 import StgSyn		( StgOp )
 import TyCon		( TyCon )
-import BitSet				-- for liveness masks
+import Bitmap		( Bitmap, mAX_SMALL_BITMAP_SIZE )
+import SMRep		( StgWord, StgHalfWord )
 import FastTypes
 import FastString
 \end{code}
@@ -199,8 +200,15 @@ stored in a mixed type location.)
   | CSRT CLabel [CLabel]  	-- SRT declarations: basically an array of 
 				-- pointers to static closures.
   
-  | CBitmap Liveness		-- A bitmap to be emitted if and only if
-				-- it is larger than a target machine word.
+  | CBitmap Liveness		-- A "large" bitmap to be emitted
+
+  | CSRTDesc 			-- A "large" SRT descriptor (one that doesn't
+				-- fit into the half-word bitmap in the itbl).
+	!CLabel			-- Label for this SRT descriptor
+	!CLabel			-- Pointer to the SRT
+	!Int			-- Offset within the SRT
+	!Int			-- Length
+	!Bitmap			-- Bitmap
 
   | CClosureInfoAndCode
 	ClosureInfo		-- Explains placement and layout of closure
@@ -236,7 +244,7 @@ stored in a mixed type location.)
 -- we add a label for the table, and expect only the 'offset/length' form
 
 data C_SRT = NoC_SRT
-	   | C_SRT CLabel !Int{-offset-} !Int{-length-}
+	   | C_SRT !CLabel !Int{-offset-} !StgHalfWord{-bitmap or escape-}
 
 needsSRT :: C_SRT -> Bool
 needsSRT NoC_SRT       = False
@@ -365,10 +373,6 @@ data CAddrMode
     	!PrimRep    	-- the kind of the result
     	CExprMacro    	-- the macro to generate a value
 	[CAddrMode]   	-- and its arguments
-
-  | CBytesPerWord	-- Word size, in bytes, on this platform
-			-- required for: half-word loads (used in fishing tags
-			-- out of info tables), and sizeofByteArray#.
 \end{code}
 
 Various C macros for values which are dependent on the back-end layout.
@@ -391,6 +395,9 @@ Convenience functions:
 \begin{code}
 mkIntCLit :: Int -> CAddrMode
 mkIntCLit i = CLit (mkMachInt (toInteger i))
+
+mkWordCLit :: StgWord -> CAddrMode
+mkWordCLit wd = CLit (MachWord (fromIntegral wd))
 
 mkCString :: FastString -> CAddrMode
 mkCString s = CLit (MachStr s)
@@ -449,16 +456,15 @@ vectors to indicate the state of the stack for the garbage collector.
 
 In the compiled program, liveness bitmaps that fit inside a single
 word (StgWord) are stored as a single word, while larger bitmaps are
-stored as a pointer to an array of words.  When we compile via C
-(especially when we bootstrap via HC files), we generate identical C
-code regardless of whether words are 32- or 64-bit on the target
-machine, by postponing the decision of how to store each liveness
-bitmap to C compilation time (or rather, C preprocessing time).
+stored as a pointer to an array of words. 
 
 \begin{code}
-type LivenessMask = [BitSet]
+data Liveness = Liveness CLabel !Int Bitmap
 
-data Liveness = Liveness CLabel !Int LivenessMask
+maybeLargeBitmap :: Liveness -> AbstractC
+maybeLargeBitmap liveness@(Liveness _ size _)
+  | size <= mAX_SMALL_BITMAP_SIZE = AbsCNop
+  | otherwise                     = CBitmap liveness
 \end{code}
 
 %************************************************************************

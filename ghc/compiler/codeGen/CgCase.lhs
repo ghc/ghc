@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.61 2002/12/11 15:36:25 simonmar Exp $
+% $Id: CgCase.lhs,v 1.62 2003/05/14 09:13:53 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -53,7 +53,7 @@ import PrimOp		( primOpOutOfLine, PrimOp(..) )
 import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 			)
 import TyCon		( isEnumerationTyCon, isUnboxedTupleTyCon, tyConPrimRep	)
-import Name		( getName )
+import Name		( Name, getName )
 import Unique           ( Unique, Uniquable(..), newTagUnique )
 import Maybes		( maybeToBool )
 import Util		( only )
@@ -389,9 +389,9 @@ cgEvalAlts :: Maybe VirtualSpOffset	-- Offset of cost-centre to be restored, if 
 
 cgEvalAlts cc_slot bndr srt alts
   = 	
-    let uniq = getUnique bndr in
+    let uniq = getUnique bndr; name = getName bndr in
 
-    buildContLivenessMask (getName bndr)  `thenFC` \ liveness ->
+    buildContLivenessMask name  `thenFC` \ liveness ->
 
     case alts of
 
@@ -427,7 +427,7 @@ cgEvalAlts cc_slot bndr srt alts
          	lbl = mkReturnInfoLabel uniq
  	    in
 	    cgUnboxedTupleAlt uniq cc_slot True alt		`thenFC` \ abs_c ->
-	    getSRTInfo srt				 	`thenFC` \ srt_info -> 
+	    getSRTInfo name srt				 	`thenFC` \ srt_info -> 
 	    absC (CRetDirect uniq abs_c srt_info liveness) `thenC`
 	    returnFC (CaseAlts (CLbl lbl RetRep) Nothing False)
 
@@ -450,7 +450,7 @@ cgEvalAlts cc_slot bndr srt alts
       	cgAlgAlts GCMayHappen (not is_alg) uniq cc_slot use_labelled_alts
 		alts deflt True	`thenFC` \ (tagged_alt_absCs, deflt_absC) ->
 
-      	mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness 
+      	mkReturnVector name tagged_alt_absCs deflt_absC srt liveness 
 		ret_conv  `thenFC` \ return_vec ->
 
       	returnFC (CaseAlts return_vec semi_tagged_stuff False)
@@ -465,7 +465,7 @@ cgEvalAlts cc_slot bndr srt alts
     	getAbsC (cgPrimEvalAlts bndr tycon alts deflt) 	`thenFC` \ abs_c ->
 
     	-- Generate the labelled block, starting with restore-cost-centre
-    	getSRTInfo srt					`thenFC` \srt_info ->
+    	getSRTInfo name srt				`thenFC` \srt_info ->
     	absC (CRetDirect uniq (cc_restore `mkAbsCStmts` abs_c) 
 			 srt_info liveness)	`thenC`
 
@@ -810,7 +810,7 @@ Build a return vector, and return a suitable label addressing
 mode for it.
 
 \begin{code}
-mkReturnVector :: Unique
+mkReturnVector :: Name
 	       -> [(ConTag, AbstractC)] -- Branch codes
 	       -> AbstractC		-- Default case
 	       -> SRT			-- continuation's SRT
@@ -818,8 +818,8 @@ mkReturnVector :: Unique
 	       -> CtrlReturnConvention
 	       -> FCode CAddrMode
 
-mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
-  = getSRTInfo srt		`thenFC` \ srt_info ->
+mkReturnVector name tagged_alt_absCs deflt_absC srt liveness ret_conv
+  = getSRTInfo name srt		`thenFC` \ srt_info ->
     let
      (return_vec_amode, vtbl_body) = case ret_conv of {
 
@@ -858,6 +858,7 @@ mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
     returnFC return_vec_amode
     -- )
   where
+    uniq = getUnique name 
 
     vtbl_label = mkVecTblLabel uniq
     ret_label = mkReturnInfoLabel uniq

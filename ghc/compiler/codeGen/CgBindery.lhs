@@ -36,7 +36,7 @@ import CgStackery	( freeStackSlots, getStackFrame )
 import CLabel		( mkClosureLabel,
 			  mkBitmapLabel, pprCLabel )
 import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
-import BitSet
+import Bitmap
 import PrimRep		( isFollowableRep, getPrimRepSize )
 import Id		( Id, idPrimRep, idType )
 import Type		( typePrimRep )
@@ -443,7 +443,7 @@ with initially all bits set (up to the size of the stack frame).
 buildLivenessMask 
 	:: VirtualSpOffset	-- size of the stack frame
 	-> VirtualSpOffset	-- offset from which the bitmap should start
-	-> FCode LivenessMask	-- mask for free/unlifted slots
+	-> FCode Bitmap		-- mask for free/unlifted slots
 
 buildLivenessMask size sp = do {
     -- find all live stack-resident pointers
@@ -459,23 +459,8 @@ buildLivenessMask size sp = do {
     };
 
     ASSERT(all (>=0) rel_slots)
-     return (listToLivenessMask size rel_slots)
+     return (intsToReverseBitmap size rel_slots)
   }
-
--- make a bitmap where the slots specified are the *zeros* in the bitmap.
--- eg. [1,2,4], size 4 ==> 0x8  (we leave any bits outside the size as zero,
--- just to make the bitmap easier to read).
-listToLivenessMask :: Int -> [Int] -> [BitSet]
-listToLivenessMask size slots{- must be sorted -}
-  | size <= 0 = []
-  | otherwise = init `minusBS` mkBS these : 
-	listToLivenessMask (size - 32) (map (\x -> x - 32) rest)
-   where (these,rest) = span (<32) slots
-	 init
-	   | size >= 32 = all_ones
-	   | otherwise  = mkBS [0..size-1]
-
-	 all_ones = mkBS [0..31]
 
 -- In a continuation, we want a liveness mask that starts from just after
 -- the return address, which is on the stack at realSp.
@@ -493,7 +478,7 @@ buildContLivenessMask name = do
 	mask <- buildLivenessMask frame_size (realSp-1)
 
         let liveness = Liveness (mkBitmapLabel name) frame_size mask
-	absC (CBitmap liveness)
+	absC (maybeLargeBitmap liveness)
 	return liveness
 \end{code}
 

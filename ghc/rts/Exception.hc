@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.26 2002/12/11 15:36:42 simonmar Exp $
+ * $Id: Exception.hc,v 1.27 2003/05/14 09:13:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -280,7 +280,7 @@ CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_ret,RET_VEC(Sp[SP_OFF],7));
 
 VEC_POLY_INFO_TABLE(stg_catch_frame, \
 	MK_SMALL_BITMAP(CATCH_FRAME_WORDS, CATCH_FRAME_BITMAP), \
-	NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, CATCH_FRAME,, EF_);
+	NULL/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, CATCH_FRAME,, EF_);
 
 /* -----------------------------------------------------------------------------
  * The catch infotable

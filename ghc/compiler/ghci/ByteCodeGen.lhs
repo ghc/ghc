@@ -52,7 +52,8 @@ import Unique		( mkPseudoUnique3 )
 import FastString	( FastString(..), unpackFS )
 import Panic		( GhcException(..) )
 import PprType		( pprType )
-import SMRep		( arrWordsHdrSize, arrPtrsHdrSize )
+import SMRep		( arrWordsHdrSize, arrPtrsHdrSize, StgWord )
+import Bitmap		( intsToReverseBitmap, mkBitmap )
 import OrdList
 import Constants	( wORD_SIZE )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel )
@@ -205,32 +206,6 @@ argBits [] = []
 argBits (rep : args)
   | isFollowableRep rep = False : argBits args
   | otherwise = take (getPrimRepSize rep) (repeat True) ++ argBits args
-
-mkBitmap :: [Bool] -> [StgWord]
-mkBitmap [] = []
-mkBitmap stuff = chunkToLiveness chunk : mkBitmap rest
-  where (chunk, rest) = splitAt wORD_SIZE_IN_BITS stuff
-
-chunkToLiveness :: [Bool] -> StgWord
-chunkToLiveness chunk = 
-  foldr (.|.) 0 [ 1 `shiftL` n | (True,n) <- zip chunk [0..] ]
-
--- make a bitmap where the slots specified are the *zeros* in the bitmap.
--- eg. [1,2,4], size 4 ==> 0x8  (we leave any bits outside the size as zero,
--- just to make the bitmap easier to read).
-intsToBitmap :: Int -> [Int] -> [StgWord]
-intsToBitmap size slots{- must be sorted -}
-  | size <= 0 = []
-  | otherwise = 
-    (foldr xor init (map (1 `shiftL`) these)) : 
-	intsToBitmap (size - wORD_SIZE_IN_BITS) 
-	     (map (\x -> x - wORD_SIZE_IN_BITS) rest)
-   where (these,rest) = span (<wORD_SIZE_IN_BITS) slots
-	 init
-	   | size >= wORD_SIZE_IN_BITS = complement 0
-	   | otherwise                 = (1 `shiftL` size) - 1
-
-wORD_SIZE_IN_BITS = wORD_SIZE * 8 :: Int
 
 -- -----------------------------------------------------------------------------
 -- schemeTopBind
@@ -759,7 +734,7 @@ doCase d s p (_,scrut)
 	-- things that are pointers, whereas in CgBindery the code builds the
 	-- bitmap from the free slots and unboxed bindings.
 	-- (ToDo: merge?)
-	bitmap = intsToBitmap d{-size-} (sortLt (<) rel_slots)
+	bitmap = intsToReverseBitmap d{-size-} (sortLt (<) rel_slots)
 	  where
 	  binds = fmToList p
 	  rel_slots = concat (map spread binds)

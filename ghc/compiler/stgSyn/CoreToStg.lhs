@@ -174,14 +174,13 @@ coreTopBindToStg env body_fvs (NonRec id rhs)
 	env' 	  = extendVarEnv env id how_bound
 	how_bound = LetBound TopLet (manifestArity rhs)
 
-        (stg_rhs, fvs', lv_info) = 
+        (stg_rhs, fvs') = 
 	    initLne env (
               coreToTopStgRhs body_fvs (id,rhs)	`thenLne` \ (stg_rhs, fvs') ->
-	      freeVarsToLiveVars fvs'		`thenLne` \ lv_info ->
-	      returnLne (stg_rhs, fvs', lv_info)
+	      returnLne (stg_rhs, fvs')
            )
 	
-	bind = StgNonRec (mkSRT lv_info) id stg_rhs
+	bind = StgNonRec id stg_rhs
     in
     ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id)
     ASSERT2(consistentCafInfo id bind, ppr id)
@@ -196,16 +195,15 @@ coreTopBindToStg env body_fvs (Rec pairs)
 		     | (b, rhs) <- pairs ]
 	env' = extendVarEnvList env extra_env'
 
-        (stg_rhss, fvs', lv_info)
+        (stg_rhss, fvs')
 	  = initLne env' (
 	       mapAndUnzipLne (coreToTopStgRhs body_fvs) pairs
 						`thenLne` \ (stg_rhss, fvss') ->
 	       let fvs' = unionFVInfos fvss' in
-	       freeVarsToLiveVars fvs'			`thenLne` \ lv_info ->
-	       returnLne (stg_rhss, fvs', lv_info)
+	       returnLne (stg_rhss, fvs')
            )
 
-	bind = StgRec (mkSRT lv_info) (zip binders stg_rhss)
+	bind = StgRec (zip binders stg_rhss)
     in
     ASSERT2(and [manifestArity rhs == stgRhsArity stg_rhs | (rhs,stg_rhs) <- rhss `zip` stg_rhss], ppr binders)
     ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
@@ -237,29 +235,33 @@ coreToTopStgRhs
 
 coreToTopStgRhs scope_fv_info (bndr, rhs)
   = coreToStgExpr rhs 		`thenLne` \ (new_rhs, rhs_fvs, _) ->
-    returnLne (mkTopStgRhs upd rhs_fvs bndr_info new_rhs, rhs_fvs)
+    freeVarsToLiveVars rhs_fvs	`thenLne` \ lv_info ->
+    returnLne (mkTopStgRhs upd rhs_fvs (mkSRT lv_info) bndr_info new_rhs, rhs_fvs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
 
     upd  | rhsIsNonUpd rhs = SingleEntry
 	 | otherwise       = Updatable
 
-mkTopStgRhs :: UpdateFlag -> FreeVarsInfo -> StgBinderInfo -> StgExpr -> StgRhs
+mkTopStgRhs :: UpdateFlag -> FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr
+	-> StgRhs
 
-mkTopStgRhs upd rhs_fvs binder_info (StgLam _ bndrs body)
+mkTopStgRhs upd rhs_fvs srt binder_info (StgLam _ bndrs body)
   = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 		  ReEntrant
+		  srt
 		  bndrs body
 	
-mkTopStgRhs upd rhs_fvs binder_info (StgConApp con args)
+mkTopStgRhs upd rhs_fvs srt binder_info (StgConApp con args)
   | not (isUpdatable upd) -- StgConApps can be updatable (see isCrossDllConApp)
   = StgRhsCon noCCS con args
 
-mkTopStgRhs upd rhs_fvs binder_info rhs
+mkTopStgRhs upd rhs_fvs srt binder_info rhs
   = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 	          upd
+		  srt
 	          [] rhs
 \end{code}
 
@@ -647,14 +649,12 @@ coreToStgLet let_no_escape bind body
 					 
 
     vars_bind body_fvs (NonRec binder rhs)
-      = coreToStgRhs body_fvs (binder,rhs)
-				`thenLne` \ (rhs2, bind_fvs, escs) ->
-
-	freeVarsToLiveVars bind_fvs `thenLne` \ bind_lv_info ->
+      = coreToStgRhs body_fvs [] (binder,rhs)
+				`thenLne` \ (rhs2, bind_fvs, bind_lv_info, escs) ->
 	let
 	    env_ext_item = mk_binding bind_lv_info binder rhs
 	in
-	returnLne (StgNonRec (mkSRT bind_lv_info) binder rhs2, 
+	returnLne (StgNonRec binder rhs2, 
 		   bind_fvs, escs, bind_lv_info, [env_ext_item])
 
 
@@ -667,16 +667,14 @@ coreToStgLet let_no_escape bind body
 			  | (b,rhs) <- pairs ]
 	   in
 	   extendVarEnvLne env_ext (
-	      mapAndUnzip3Lne (coreToStgRhs rec_scope_fvs) pairs 
-					`thenLne` \ (rhss2, fvss, escss) ->
+	      mapAndUnzip4Lne (coreToStgRhs rec_scope_fvs binders) pairs 
+					`thenLne` \ (rhss2, fvss, lv_infos, escss) ->
 	      let
 			bind_fvs = unionFVInfos fvss
+			bind_lv_info = foldr unionLiveInfo emptyLiveInfo lv_infos
 			escs     = unionVarSets escss
 	      in
-	      freeVarsToLiveVars (binders `minusFVBinders` bind_fvs)
-					`thenLne` \ bind_lv_info ->
-
-	      returnLne (StgRec (mkSRT bind_lv_info) (binders `zip` rhss2), 
+	      returnLne (StgRec (binders `zip` rhss2),
 			 bind_fvs, escs, bind_lv_info, env_ext)
 	   )
 	)
@@ -689,32 +687,34 @@ is_join_var j = occNameUserString (getOccName j) == "$j"
 
 \begin{code}
 coreToStgRhs :: FreeVarsInfo		-- Free var info for the scope of the binding
+	     -> [Id]
 	     -> (Id,CoreExpr)
-  	     -> LneM (StgRhs, FreeVarsInfo, EscVarsSet)
+  	     -> LneM (StgRhs, FreeVarsInfo, LiveInfo, EscVarsSet)
 
-coreToStgRhs scope_fv_info (bndr, rhs)
+coreToStgRhs scope_fv_info binders (bndr, rhs)
   = coreToStgExpr rhs 		`thenLne` \ (new_rhs, rhs_fvs, rhs_escs) ->
     getEnvLne			`thenLne` \ env ->    
-    returnLne (mkStgRhs env rhs_fvs bndr_info new_rhs,
-	       rhs_fvs, rhs_escs)
+    freeVarsToLiveVars (binders `minusFVBinders` rhs_fvs) `thenLne` \ lv_info ->
+    returnLne (mkStgRhs rhs_fvs (mkSRT lv_info) bndr_info new_rhs,
+	       rhs_fvs, lv_info, rhs_escs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
 
-mkStgRhs :: IdEnv HowBound -> FreeVarsInfo -> StgBinderInfo -> StgExpr -> StgRhs
+mkStgRhs :: FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr -> StgRhs
 
-mkStgRhs env rhs_fvs binder_info (StgConApp con args)
+mkStgRhs rhs_fvs srt binder_info (StgConApp con args)
   = StgRhsCon noCCS con args
 
-mkStgRhs env rhs_fvs binder_info (StgLam _ bndrs body)
+mkStgRhs rhs_fvs srt binder_info (StgLam _ bndrs body)
   = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 		  ReEntrant
-		  bndrs body
+		  srt bndrs body
 	
-mkStgRhs env rhs_fvs binder_info rhs
+mkStgRhs rhs_fvs srt binder_info rhs
   = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
-	          upd_flag [] rhs
+	          upd_flag srt [] rhs
   where
    upd_flag = Updatable
   {-
@@ -895,6 +895,14 @@ mapAndUnzip3Lne f (x:xs)
   = f x		    	 `thenLne` \ (r1,  r2,  r3)  ->
     mapAndUnzip3Lne f xs `thenLne` \ (rs1, rs2, rs3) ->
     returnLne (r1:rs1, r2:rs2, r3:rs3)
+
+mapAndUnzip4Lne :: (a -> LneM (b,c,d,e)) -> [a] -> LneM ([b],[c],[d],[e])
+
+mapAndUnzip4Lne f []	= returnLne ([],[],[],[])
+mapAndUnzip4Lne f (x:xs)
+  = f x		    	 `thenLne` \ (r1,  r2,  r3, r4)  ->
+    mapAndUnzip4Lne f xs `thenLne` \ (rs1, rs2, rs3, rs4) ->
+    returnLne (r1:rs1, r2:rs2, r3:rs3, r4:rs4)
 
 fixLne :: (a -> LneM a) -> LneM a
 fixLne expr env lvs_cont

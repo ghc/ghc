@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.84 2003/03/27 13:54:32 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.85 2003/05/14 09:14:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -127,13 +127,13 @@ STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_6_ret);
 STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_7_ret);
 
 VEC_POLY_INFO_TABLE( stg_ctoi_ret_R1p, 0/* special layout */,
-		     0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, 
+		     0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, 
 		     RET_BCO,, EF_);
 
 // When the returned value is a pointer, but unlifted, in R1 ...
 INFO_TABLE_RET( stg_ctoi_ret_R1unpt_info, stg_ctoi_ret_R1unpt_entry,
 		0/* special layout */,
-		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+		0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, RET_BCO,, IF_, 0, 0);
 IF_(stg_ctoi_ret_R1unpt_entry)
 {
    FB_
@@ -147,7 +147,7 @@ IF_(stg_ctoi_ret_R1unpt_entry)
 // When the returned value is a non-pointer in R1 ...
 INFO_TABLE_RET( stg_ctoi_ret_R1n_info, stg_ctoi_ret_R1n_entry,
 		0/* special layout */,
-		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+		0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, RET_BCO,, IF_, 0, 0);
 IF_(stg_ctoi_ret_R1n_entry)
 {
    FB_
@@ -162,7 +162,7 @@ IF_(stg_ctoi_ret_R1n_entry)
 // When the returned value is in F1 ...
 INFO_TABLE_RET( stg_ctoi_ret_F1_info, stg_ctoi_ret_F1_entry, 
 		0/* special layout */,
-		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+		0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, RET_BCO,, IF_, 0, 0);
 IF_(stg_ctoi_ret_F1_entry)
 {
    FB_
@@ -176,7 +176,7 @@ IF_(stg_ctoi_ret_F1_entry)
 // When the returned value is in D1 ...
 INFO_TABLE_RET( stg_ctoi_ret_D1_info, stg_ctoi_ret_D1_entry,
 		0/* special layout */,
-		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+		0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, RET_BCO,, IF_, 0, 0);
 IF_(stg_ctoi_ret_D1_entry)
 {
    FB_
@@ -190,7 +190,7 @@ IF_(stg_ctoi_ret_D1_entry)
 // When the returned value is in L1 ...
 INFO_TABLE_RET( stg_ctoi_ret_L1_info, stg_ctoi_ret_L1_entry,
 		0/* special layout */,
-		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+		0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, RET_BCO,, IF_, 0, 0);
 IF_(stg_ctoi_ret_L1_entry)
 {
    FB_
@@ -204,7 +204,7 @@ IF_(stg_ctoi_ret_L1_entry)
 // When the returned value a VoidRep ...
 INFO_TABLE_RET( stg_ctoi_ret_V_info, stg_ctoi_ret_V_entry,
 		0/* special layout */,
-		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+		0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, RET_BCO,, IF_, 0, 0);
 IF_(stg_ctoi_ret_V_entry)
 {
    FB_
@@ -218,7 +218,7 @@ IF_(stg_ctoi_ret_V_entry)
 // should apply the BCO on the stack to its arguments, also on the stack.
 INFO_TABLE_RET( stg_apply_interp_info, stg_apply_interp_entry,
 		0/* special layout */,
-		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+		0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/, RET_BCO,, IF_, 0, 0);
 IF_(stg_apply_interp_entry)
 {
     FB_

@@ -142,9 +142,6 @@ amodeToStix am@(CVal rr CharRep)
 
 amodeToStix (CVal rr pk) = StInd pk (amodeToStix (CAddr rr))
 
-amodeToStix CBytesPerWord
-  = StInt (toInteger wORD_SIZE)
-
 amodeToStix (CAddr (SpRel off))
   = StIndex PtrRep (StReg stgSp) (StInt (toInteger (iBox off)))
 

@@ -38,6 +38,7 @@ import SMRep		( arrPtrsHdrSize, arrWordsHdrSize, fixedHdrSize )
 import Outputable
 import Panic		( panic )
 import FastTypes
+import Constants	( wORD_SIZE, wORD_SIZE_IN_BITS )
 
 import Maybe		( isJust )
 
@@ -419,6 +420,7 @@ flatAbsC (CSequential abcs)
 flatAbsC stmt@(CStaticClosure _ _ _ _) 		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CClosureTbl _)			= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CSRT _ _)	  		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CSRTDesc _ _ _ _ _)  		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CBitmap _)	  		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CCostCentreDecl _ _) 		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CCostCentreStackDecl _)		= returnFlt (AbsCNop, stmt)
@@ -605,27 +607,24 @@ rrConflictsWithRR s1b s2b rr1 rr2 = rr rr1 rr2
 -- why it needs to take into account endianness.
 --
 mkHalfWord_HIADDR res arg
-   = mkTemp IntRep			`thenFlt` \ t_hw_shift ->
-     mkTemp WordRep			`thenFlt` \ t_hw_mask1 ->
+   = mkTemp WordRep			`thenFlt` \ t_hw_mask1 ->
      mkTemp WordRep			`thenFlt` \ t_hw_mask2 ->
-     let a_hw_shift 
-            = CMachOpStmt t_hw_shift
-                          MO_Nat_Shl [CBytesPerWord, CLit (mkMachInt 2)] Nothing
+     let 
+	 hw_shift = mkIntCLit (wORD_SIZE_IN_BITS `quot` 2)
+
          a_hw_mask1
             = CMachOpStmt t_hw_mask1
-                          MO_Nat_Shl [CLit (mkMachWord 1), t_hw_shift] Nothing
+                          MO_Nat_Shl [CLit (mkMachWord 1), hw_shift] Nothing
          a_hw_mask2
             = CMachOpStmt t_hw_mask2
                           MO_Nat_Sub [t_hw_mask1, CLit (mkMachWord 1)] Nothing
          final
 #        if WORDS_BIGENDIAN
-            = CSequential [ a_hw_shift, a_hw_mask1, a_hw_mask2,
+            = CSequential [ a_hw_mask1, a_hw_mask2,
                  CMachOpStmt res MO_Nat_And [arg, t_hw_mask2] Nothing
               ]
 #        else
-            = CSequential [ a_hw_shift,
-                 CMachOpStmt res MO_Nat_Shr [arg, t_hw_shift] Nothing
-              ]
+            = CMachOpStmt res MO_Nat_Shr [arg, hw_shift] Nothing
 #        endif
      in
          returnFlt final
@@ -726,19 +725,6 @@ translateOp_dyadic_cast1 mop res cast_arg1_to arg1 arg2 vols
            (if isDefinitelyInlineMachOp mop then Nothing else Just vols)
      ]
 
-getBitsPerWordMinus1 :: FlatM (AbstractC, CAddrMode)
-getBitsPerWordMinus1
-   = mkTemps [IntRep, IntRep]		`thenFlt` \ [t1,t2] ->
-     returnFlt (
-        CSequential [
-           CMachOpStmt t1 MO_Nat_Shl 
-                       [CBytesPerWord, CLit (mkMachInt 3)] Nothing,
-           CMachOpStmt t2 MO_Nat_Sub
-                       [t1, CLit (mkMachInt 1)] Nothing
-        ],
-        t2
-     )
-
 -- IA64 mangler doesn't place tables next to code
 tablesNextToCode :: Bool
 #ifdef ia64_TARGET_ARCH
@@ -790,15 +776,14 @@ dscCOpStmt [res_r,res_c] IntAddCOp [aa,bb] vols
    c  = t4 >>unsigned BITS_IN(I_)-1
 -}
    = mkTemps [IntRep,IntRep,IntRep,IntRep]	`thenFlt` \ [t1,t2,t3,t4] ->
-     getBitsPerWordMinus1			`thenFlt` \ (bpw1_code,bpw1_t) ->
+     let bpw1 = mkIntCLit (wORD_SIZE_IN_BITS - 1) in
      (returnFlt . CSequential) [
         CMachOpStmt res_r MO_Nat_Add [aa,bb] Nothing,
         CMachOpStmt t1 MO_Nat_Xor [aa,bb] Nothing,
         CMachOpStmt t2 MO_Nat_Not [t1] Nothing,
         CMachOpStmt t3 MO_Nat_Xor [aa,res_r] Nothing,
         CMachOpStmt t4 MO_Nat_And [t2,t3] Nothing,
-        bpw1_code,
-        CMachOpStmt res_c MO_Nat_Shr [t4, bpw1_t] Nothing
+        CMachOpStmt res_c MO_Nat_Shr [t4, bpw1] Nothing
      ]
 
 
@@ -818,14 +803,13 @@ dscCOpStmt [res_r,res_c] IntSubCOp [aa,bb] vols
    c  = t3 >>unsigned BITS_IN(I_)-1
 -}
    = mkTemps [IntRep,IntRep,IntRep]		`thenFlt` \ [t1,t2,t3] ->
-     getBitsPerWordMinus1			`thenFlt` \ (bpw1_code,bpw1_t) ->
+     let bpw1 = mkIntCLit (wORD_SIZE_IN_BITS - 1) in
      (returnFlt . CSequential) [
         CMachOpStmt res_r MO_Nat_Sub [aa,bb] Nothing,
         CMachOpStmt t1 MO_Nat_Xor [aa,bb] Nothing,
         CMachOpStmt t2 MO_Nat_Xor [aa,res_r] Nothing,
         CMachOpStmt t3 MO_Nat_And [t1,t2] Nothing,
-        bpw1_code,
-        CMachOpStmt res_c MO_Nat_Shr [t3, bpw1_t] Nothing
+        CMachOpStmt res_c MO_Nat_Shr [t3, bpw1] Nothing
      ]
 
 
@@ -864,7 +848,7 @@ dscCOpStmt [res] SizeofByteArrayOp [arg] vols
    = mkTemp WordRep 			`thenFlt` \ w ->
      (returnFlt . CSequential) [
         CAssign w (mkDerefOff WordRep arg fixedHdrSize),
-        CMachOpStmt w MO_NatU_Mul [w, CBytesPerWord] (Just vols),
+        CMachOpStmt w MO_NatU_Mul [w, mkIntCLit wORD_SIZE] (Just vols),
         CAssign res w
      ]
 

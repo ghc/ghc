@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.28 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: InfoTables.h,v 1.29 2003/05/14 09:14:02 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-2002
  *
@@ -185,6 +185,29 @@ typedef struct {
   StgWord bitmap[FLEXIBLE_ARRAY];
 } StgLargeBitmap;
 
+/* -----------------------------------------------------------------------------
+   SRTs  (Static Reference Tables)
+
+   These tables are used to keep track of the static objects referred
+   to by the code for a closure or stack frame, so that we can follow
+   static data references from code and thus accurately
+   garbage-collect CAFs.
+   -------------------------------------------------------------------------- */
+
+// An SRT is just an array of closure pointers:
+typedef StgClosure* StgSRT[];
+
+// Each info table refers to some subset of the closure pointers in an
+// SRT.  It does this using a pair of an StgSRT pointer and a
+// half-word bitmap.  If the half-word bitmap isn't large enough, then
+// we fall back to a large SRT, including an unbounded bitmap.  If the
+// half-word bitmap is set to all ones (0xffff), then the StgSRT
+// pointer instead points to an StgLargeSRT:
+typedef struct StgLargeSRT_ {
+    StgSRT *srt;
+    StgLargeBitmap l;
+} StgLargeSRT;
+
 /* ----------------------------------------------------------------------------
    Info Tables
    ------------------------------------------------------------------------- */
@@ -211,11 +234,6 @@ typedef union {
 
 
 //
-// An SRT.
-//
-typedef StgClosure* StgSRT[];
-
-//
 // The "standard" part of an info table.  Every info table has this bit.
 //
 typedef struct _StgInfoTable {
@@ -240,7 +258,7 @@ typedef struct _StgInfoTable {
     StgClosureInfo  layout;	// closure layout info (one word)
 
     StgHalfWord     type;	// closure type
-    StgHalfWord     srt_len;    // number of entries in SRT (or constructor tag)
+    StgHalfWord     srt_bitmap;    // number of entries in SRT (or constructor tag)
 
 #ifdef TABLES_NEXT_TO_CODE
     StgCode         code[FLEXIBLE_ARRAY];
@@ -258,7 +276,7 @@ typedef struct _StgInfoTable {
       and bitmap fields may be left out (they are at the end, so omitting
       them doesn't affect the layout).
       
-   -  If srt_len (in the std info table part) is zero, then the srt
+   -  If srt_bitmap (in the std info table part) is zero, then the srt
       field may be omitted.  This only applies if the slow_apply and
       bitmap fields have also been omitted.
    -------------------------------------------------------------------------- */
@@ -286,7 +304,7 @@ typedef struct _StgFunInfoTable {
    -------------------------------------------------------------------------- */
 
 // When info tables are laid out backwards, we can omit the SRT
-// pointer iff srt_len is zero.
+// pointer iff srt_bitmap is zero.
 
 typedef struct _StgRetInfoTable {
 #if !defined(TABLES_NEXT_TO_CODE)
@@ -306,7 +324,7 @@ typedef struct _StgRetInfoTable {
    -------------------------------------------------------------------------- */
 
 // When info tables are laid out backwards, we can omit the SRT
-// pointer iff srt_len is zero.
+// pointer iff srt_bitmap is zero.
 
 typedef struct _StgThunkInfoTable {
 #if !defined(TABLES_NEXT_TO_CODE)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.30 2003/04/22 16:25:10 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.31 2003/05/14 09:13:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -112,7 +112,7 @@
 
 INFO_TABLE_RET( stg_enter_info, stg_enter_ret, 
 	       	MK_SMALL_BITMAP(1/*framesize*/, 0/*bitmap*/),
-	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 EXTFUN(stg_enter_ret)
 {
@@ -496,7 +496,7 @@ EXTFUN(stg_gc_noregs)
 
 INFO_TABLE_RET( stg_gc_void_info, stg_gc_void_ret, 
 	       	MK_SMALL_BITMAP(0/*framesize*/, 0/*bitmap*/),
-	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_void_ret)
@@ -511,7 +511,7 @@ EXTFUN(stg_gc_void_ret)
 
 INFO_TABLE_RET( stg_gc_unpt_r1_info, stg_gc_unpt_r1_ret, 
 	       	MK_SMALL_BITMAP(1/*framesize*/, 0/*bitmap*/),
-	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_unpt_r1_ret)
@@ -537,7 +537,7 @@ EXTFUN(stg_gc_unpt_r1)
 
 INFO_TABLE_RET(	stg_gc_unbx_r1_info, stg_gc_unbx_r1_ret, 
 	       	MK_SMALL_BITMAP(1/*framesize*/, 1/*bitmap*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 /* the 1 is a bitmap - i.e. 1 non-pointer word on the stack. */
@@ -565,7 +565,7 @@ EXTFUN(stg_gc_unbx_r1)
 
 INFO_TABLE_RET(	stg_gc_f1_info, stg_gc_f1_ret, 
 	       	MK_SMALL_BITMAP(1/*framesize*/, 1/*bitmap*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_f1_ret)
@@ -601,7 +601,7 @@ EXTFUN(stg_gc_f1)
 
 INFO_TABLE_RET(	stg_gc_d1_info, stg_gc_d1_ret, 
 	       	MK_SMALL_BITMAP(DBL_WORDS/*framesize*/, DBL_BITMAP/*bitmap*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_d1_ret)
@@ -638,7 +638,7 @@ EXTFUN(stg_gc_d1)
 
 INFO_TABLE_RET( stg_gc_l1_info, stg_gc_l1_ret, 
 	       	MK_SMALL_BITMAP(LLI_WORDS/*framesize*/, LLI_BITMAP/*bitmap*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_l1_ret)
@@ -664,7 +664,7 @@ EXTFUN(stg_gc_l1)
 
 INFO_TABLE_RET( stg_ut_1_0_unreg_info, stg_ut_1_0_unreg_ret, 
 		MK_SMALL_BITMAP(1/*size*/, 0/*BITMAP*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_ut_1_0_unreg_ret)
@@ -758,7 +758,7 @@ EXTFUN(__stg_gc_fun)
 
 INFO_TABLE_RET( stg_gc_fun_info,stg_gc_fun_ret,
 	       	MK_SMALL_BITMAP(0/*framesize*/, 0/*bitmap*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_FUN,, EF_, 0, 0);
 
 EXTFUN(stg_gc_fun_ret)
@@ -852,7 +852,7 @@ EXTFUN(stg_gc_fun_ret)
 
 INFO_TABLE_RET( stg_gc_gen_info, stg_gc_gen_ret, 
 		0/*bitmap*/,
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_DYN,, EF_, 0, 0);
 
 /* bitmap in the above info table is unused, the real one is on the stack. 
@@ -980,7 +980,7 @@ FN_(stg_block_1)
 
 INFO_TABLE_RET( stg_block_takemvar_info,  stg_block_takemvar_ret,
 	       	MK_SMALL_BITMAP(1/*framesize*/, 0/*bitmap*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, IF_, 0, 0);
 
 IF_(stg_block_takemvar_ret)
@@ -1004,7 +1004,7 @@ FN_(stg_block_takemvar)
 
 INFO_TABLE_RET( stg_block_putmvar_info,  stg_block_putmvar_ret,
 	       	MK_SMALL_BITMAP(2/*framesize*/, 0/*bitmap*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, IF_, 0, 0);
 
 IF_(stg_block_putmvar_ret)
@@ -1031,7 +1031,7 @@ FN_(stg_block_putmvar)
 #ifdef mingw32_TARGET_OS
 INFO_TABLE_RET( stg_block_async_info,  stg_block_async_ret,
 	       	MK_SMALL_BITMAP(0/*framesize*/, 0/*bitmap*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, IF_, 0, 0);
 
 IF_(stg_block_async_ret)

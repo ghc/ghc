@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.37 2003/01/07 14:31:20 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.38 2003/05/14 09:13:56 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -60,8 +60,10 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
 import Module		( Module )
 import DataCon		( ConTag )
 import Id		( Id )
+import Name		( Name )
 import VarEnv
 import PrimRep		( PrimRep(..) )
+import SMRep		( StgHalfWord, hALF_WORD )
 import FastString
 import Outputable
 
@@ -605,16 +607,25 @@ bindings use sub-sections of this SRT.  The label is passed down to
 the nested bindings via the monad.
 
 \begin{code}
-getSRTInfo :: SRT -> FCode C_SRT
-getSRTInfo NoSRT	 = return NoC_SRT
-getSRTInfo (SRT off len) = do srt_lbl <- getSRTLabel
-			      return (C_SRT srt_lbl off len)
+getSRTInfo :: Name -> SRT -> FCode C_SRT
+getSRTInfo id NoSRT = return NoC_SRT
+getSRTInfo id (SRT off len bmp)
+  | len > hALF_WORD || bmp == [fromIntegral srt_escape] = do 
+	srt_lbl <- getSRTLabel
+	let srt_desc_lbl = mkSRTDescLabel id
+	absC (CSRTDesc srt_desc_lbl srt_lbl off len bmp)
+	return (C_SRT srt_desc_lbl 0 srt_escape)
+  | otherwise = do
+	srt_lbl <- getSRTLabel
+	return (C_SRT srt_lbl off (fromIntegral (head bmp)))
+
+srt_escape = (-1) :: StgHalfWord
 
 getSRTLabel :: FCode CLabel	-- Used only by cgPanic
 getSRTLabel = do MkCgInfoDown _ _ srt_lbl _ _ <- getInfoDown
 		 return srt_lbl
 
-setSRTLabel :: CLabel -> Code -> Code
+setSRTLabel :: CLabel -> FCode a -> FCode a
 setSRTLabel srt_lbl code
   = do  MkCgInfoDown c_info statics _ ticky eob_info <- getInfoDown
 	withInfoDown code (MkCgInfoDown c_info statics srt_lbl ticky eob_info)

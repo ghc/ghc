@@ -61,6 +61,7 @@ module Constants (
 	wORD64_SIZE,
 	
 	wORD_SIZE,
+	wORD_SIZE_IN_BITS,
 
 	bLOCK_SIZE,
 	bLOCK_SIZE_W,
@@ -220,6 +221,7 @@ Size of a word, in bytes
 
 \begin{code}
 wORD_SIZE = (SIZEOF_HSWORD :: Int)
+wORD_SIZE_IN_BITS = wORD_SIZE * 8 :: Int
 \end{code}
 
 Size of a storage manager block (in bytes).

@@ -117,10 +117,10 @@ statBinding :: Bool -- True <=> top-level; False <=> nested
 	    -> StgBinding
 	    -> StatEnv
 
-statBinding top (StgNonRec _srt b rhs)
+statBinding top (StgNonRec b rhs)
   = statRhs top (b, rhs)
 
-statBinding top (StgRec _srt pairs)
+statBinding top (StgRec pairs)
   = combineSEs (map (statRhs top) pairs)
 
 statRhs :: Bool -> (Id, StgRhs) -> StatEnv
@@ -128,7 +128,7 @@ statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 statRhs top (b, StgRhsCon cc con args)
   = countOne (ConstructorBinds top)
 
-statRhs top (b, StgRhsClosure cc bi fv u args body)
+statRhs top (b, StgRhsClosure cc bi fv u _srt args body)
   = statExpr body			`combineSE`
     countN FreeVariables (length fv)	`combineSE`
     countOne (

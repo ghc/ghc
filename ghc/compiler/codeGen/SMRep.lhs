@@ -12,20 +12,21 @@ module SMRep (
 	isStaticRep,
 	fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize,
         stdItblSize, retItblSize,
-	getSMRepClosureTypeInt
+	getSMRepClosureTypeInt,
 
-	, rET_SMALL
-	, rET_VEC_SMALL
-	, rET_BIG
-	, rET_VEC_BIG
+	rET_SMALL, rET_VEC_SMALL, rET_BIG, rET_VEC_BIG,
 
+	StgWord, StgHalfWord, hALF_WORD,
     ) where
 
 #include "HsVersions.h"
+#include "../includes/MachDeps.h"
 
 import CmdLineOpts
 import Constants
 import Outputable
+
+import DATA_WORD
 \end{code}
 
 %************************************************************************
@@ -147,4 +148,20 @@ rET_SMALL     = (RET_SMALL     :: Int)
 rET_VEC_SMALL = (RET_VEC_SMALL :: Int)
 rET_BIG       = (RET_BIG       :: Int)
 rET_VEC_BIG   = (RET_VEC_BIG   :: Int)
+\end{code}
+
+A type representing an StgWord on the target platform.
+
+\begin{code}
+#if SIZEOF_HSWORD == 4
+type StgWord     = Word32
+type StgHalfWord = Word16
+hALF_WORD = 16 :: Int
+#elif SIZEOF_HSWORD == 8
+type StgWord     = Word64
+type StgHalfWord = Word32
+hALF_WORD = 32 :: Int
+#else
+#error unknown SIZEOF_HSWORD
+#endif
 \end{code}

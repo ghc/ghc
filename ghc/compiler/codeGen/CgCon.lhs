@@ -66,9 +66,8 @@ import List		( partition )
 cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> DataCon		-- Id
 	    -> [StgArg]		-- Args
-	    -> SRT
 	    -> FCode (Id, CgIdInfo)
-cgTopRhsCon id con args srt
+cgTopRhsCon id con args
   = ASSERT( not (isDllConApp con args) )	-- checks for litlit args too
     ASSERT( args `lengthIs` dataConRepArity con )
 
@@ -81,6 +80,7 @@ cgTopRhsCon id con args srt
     	closure_label = mkClosureLabel name
 	(closure_info, amodes_w_offsets) 
 		= layOutStaticConstr con getAmodeRep amodes
+	caffy = any stgArgHasCafRefs args
     in
 
 	-- BUILD THE OBJECT
@@ -89,7 +89,7 @@ cgTopRhsCon id con args srt
 	    closure_info
 	    dontCareCCS			-- because it's static data
 	    (map fst amodes_w_offsets)  -- Sorted into ptrs first, then nonptrs
-	    (nonEmptySRT srt)		-- has CAF refs
+	    caffy			-- has CAF refs
 	  )					`thenC`
 		-- NOTE: can't use idCafInfo instead of nonEmptySRT above,
 		-- because top-level constructors that were floated by

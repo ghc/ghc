@@ -9,6 +9,7 @@ module CLabel (
 
 	mkClosureLabel,
 	mkSRTLabel,
+	mkSRTDescLabel,
 	mkInfoTableLabel,
 	mkEntryLabel,
 	mkSlowEntryLabel,
@@ -151,6 +152,7 @@ data CLabel
 data IdLabelInfo
   = Closure		-- Label for (static???) closure
   | SRT                 -- Static reference table
+  | SRTDesc             -- Static reference table descriptor
   | InfoTbl		-- Info tables for closures; always read-only
   | Entry		-- entry point
   | Slow		-- slow entry point
@@ -223,6 +225,7 @@ data CLabelType
 \begin{code}
 mkClosureLabel	      	id 		= IdLabel id  Closure
 mkSRTLabel		id		= IdLabel id  SRT
+mkSRTDescLabel		id		= IdLabel id  SRTDesc
 mkInfoTableLabel  	id 		= IdLabel id  InfoTbl
 mkEntryLabel	      	id 		= IdLabel id  Entry
 mkSlowEntryLabel      	id 		= IdLabel id  Slow
@@ -320,6 +323,7 @@ let-no-escapes, which can be recursive.
   -- don't bother declaring SRT & Bitmap labels, we always make sure
   -- they are defined before use.
 needsCDecl (IdLabel _ SRT)		= False
+needsCDecl (IdLabel _ SRTDesc)		= False
 needsCDecl (IdLabel _ Bitmap)		= False
 needsCDecl (IdLabel _ _)		= True
 needsCDecl (CaseLabel _ CaseReturnPt)	= True
@@ -446,6 +450,7 @@ internal names. <type> is one of the following:
 
 	 info			Info table
 	 srt			Static reference table
+	 srtd			Static reference table descriptor
 	 entry			Entry code
 	 slow			Slow entry code (if any)
 	 ret			Direct return address	 
@@ -572,6 +577,7 @@ ppIdFlavor x = pp_cSEP <>
 	       (case x of
 		       Closure	    	-> ptext SLIT("closure")
 		       SRT		-> ptext SLIT("srt")
+		       SRTDesc		-> ptext SLIT("srtd")
 		       InfoTbl    	-> ptext SLIT("info")
 		       Entry	    	-> ptext SLIT("entry")
 		       Slow	    	-> ptext SLIT("slow")

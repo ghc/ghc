@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.39 2003/03/27 13:54:32 simonmar Exp $
+ * $Id: Updates.hc,v 1.40 2003/05/14 09:14:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -95,7 +95,7 @@ UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_7_ret,&stg_IND_7_info,RET_VEC(Sp[0],7));
 
 VEC_POLY_INFO_TABLE( stg_upd_frame, 
 		     MK_SMALL_BITMAP(UPD_FRAME_WORDS, UPD_FRAME_BITMAP),
-		     0/*srt*/, 0/*srt_off*/, 0/*srt_len*/,
+		     0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/,
 		     UPDATE_FRAME,, EF_);
 
 /*-----------------------------------------------------------------------------
@@ -128,7 +128,7 @@ IF_(stg_seq_frame_ret);
 
 VEC_POLY_INFO_TABLE( stg_seq_frame,
 		     MK_SMALL_BITMAP(0, 0),
-		     0/*srt*/, 0/*srt_off*/, 0/*srt_len*/,
+		     0/*srt*/, 0/*srt_off*/, 0/*srt_bitmap*/,
 		     RET_SMALL,, EF_);
 
 IF_(stg_seq_frame_ret)

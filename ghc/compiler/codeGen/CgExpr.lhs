@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.52 2002/12/11 15:36:26 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.53 2003/05/14 09:13:55 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -212,14 +212,14 @@ cgExpr (StgCase expr live_vars save_vars bndr srt alts)
 \subsection[let-and-letrec-codegen]{Converting @StgLet@ and @StgLetrec@}
 
 \begin{code}
-cgExpr (StgLet (StgNonRec srt name rhs) expr)
-  = cgRhs srt name rhs	`thenFC` \ (name, info) ->
+cgExpr (StgLet (StgNonRec name rhs) expr)
+  = cgRhs name rhs	`thenFC` \ (name, info) ->
     addBindC name info 	`thenC`
     cgExpr expr
 
-cgExpr (StgLet (StgRec srt pairs) expr)
+cgExpr (StgLet (StgRec pairs) expr)
   = fixC (\ new_bindings -> addBindsC new_bindings `thenC`
-			    listFCs [ cgRhs srt b e | (b,e) <- pairs ]
+			    listFCs [ cgRhs b e | (b,e) <- pairs ]
     ) `thenFC` \ new_bindings ->
 
     addBindsC new_bindings `thenC`
@@ -278,15 +278,15 @@ We rely on the support code in @CgCon@ (to do constructors) and
 in @CgClosure@ (to do closures).
 
 \begin{code}
-cgRhs :: SRT -> Id -> StgRhs -> FCode (Id, CgIdInfo)
+cgRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along so a binding can be set up
 
-cgRhs srt name (StgRhsCon maybe_cc con args)
+cgRhs name (StgRhsCon maybe_cc con args)
   = getArgAmodes args				`thenFC` \ amodes ->
     buildDynCon name maybe_cc con amodes	`thenFC` \ idinfo ->
     returnFC (name, idinfo)
 
-cgRhs srt name (StgRhsClosure cc bi fvs upd_flag args body)
+cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
   = mkRhsClosure name cc bi srt fvs upd_flag args body
 \end{code}
 
@@ -395,18 +395,17 @@ mkRhsClosure bndr cc bi srt fvs upd_flag args body
 %********************************************************
 \begin{code}
 cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot 
-	(StgNonRec srt binder rhs)
+	(StgNonRec binder rhs)
   = cgLetNoEscapeRhs live_in_rhss rhs_eob_info maybe_cc_slot 	
-			NonRecursive srt binder rhs 
+			NonRecursive binder rhs 
     	    	    	    	`thenFC` \ (binder, info) ->
     addBindC binder info
 
-cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot 
-	(StgRec srt pairs)
+cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgRec pairs)
   = fixC (\ new_bindings ->
 		addBindsC new_bindings 	`thenC`
 		listFCs [ cgLetNoEscapeRhs full_live_in_rhss 
-				rhs_eob_info maybe_cc_slot Recursive srt b e 
+				rhs_eob_info maybe_cc_slot Recursive b e 
 			| (b,e) <- pairs ]
     ) `thenFC` \ new_bindings ->
 
@@ -421,13 +420,12 @@ cgLetNoEscapeRhs
     -> EndOfBlockInfo
     -> Maybe VirtualSpOffset
     -> RecFlag
-    -> SRT
     -> Id
     -> StgRhs
     -> FCode (Id, CgIdInfo)
 
-cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec srt binder
-		 (StgRhsClosure cc bi _ upd_flag args body)
+cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
+		 (StgRhsClosure cc bi _ upd_flag srt args body)
   = -- We could check the update flag, but currently we don't switch it off
     -- for let-no-escaped things, so we omit the check too!
     -- case upd_flag of
@@ -439,9 +437,9 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec srt binder
 -- For a constructor RHS we want to generate a single chunk of code which
 -- can be jumped to from many places, which will return the constructor.
 -- It's easy; just behave as if it was an StgRhsClosure with a ConApp inside!
-cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec srt binder
+cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
     	    	 (StgRhsCon cc con args)
-  = cgLetNoEscapeClosure binder cc noBinderInfo{-safe-} srt
+  = cgLetNoEscapeClosure binder cc noBinderInfo{-safe-} NoSRT
 			 full_live_in_rhss rhs_eob_info maybe_cc_slot rec
 	[] 	--No args; the binder is data structure, not a function
 	(StgConApp con args)

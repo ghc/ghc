@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.35 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.36 2003/05/14 09:14:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -234,6 +234,6 @@ extern StgWord flip;
    -------------------------------------------------------------------------- */
 
 /* constructors don't have SRTs */
-#define GET_TAG(info) (INFO_PTR_TO_STRUCT(info)->srt_len)
+#define GET_TAG(info) (INFO_PTR_TO_STRUCT(info)->srt_bitmap)
 
 #endif /* CLOSUREMACROS_H */

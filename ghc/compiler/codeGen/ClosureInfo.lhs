@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.56 2002/12/12 11:53:11 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.57 2003/05/14 09:13:56 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -85,10 +85,9 @@ import FastString
 import Outputable
 import Literal
 import Constants
-import BitSet
+import Bitmap
 
 import Maybe		( isJust )
-import DATA_WORD
 import DATA_BITS
 \end{code}
 
@@ -1106,19 +1105,12 @@ argDescr nm [PtrRep,PtrRep,PtrRep,PtrRep,PtrRep,PtrRep] = ArgSpec ARG_PPPPPP
 argDescr name reps = ArgGen (mkSlowEntryLabel name) liveness
  where bitmap = argBits reps
        lbl = mkBitmapLabel name
-       liveness = Liveness lbl (length bitmap) 
-			(map chunkToLiveness (mkChunks bitmap))
+       liveness = Liveness lbl (length bitmap) (mkBitmap bitmap) 
 
 argBits [] = []
 argBits (rep : args)
   | isFollowableRep rep = False : argBits args
   | otherwise = take (getPrimRepSize rep) (repeat True) ++ argBits args
-
-mkChunks [] = []
-mkChunks stuff = chunk : mkChunks rest
-  where (chunk, rest) = splitAt 32 stuff
-
-chunkToLiveness chunk = mkBS [ n | (True,n) <- zip chunk [0..] ]
 \end{code}
 
 
@@ -1133,14 +1125,6 @@ Here we make a concrete info table, represented as a list of CAddrMode
 represented by a label+offset expression).
 
 \begin{code}
-#if SIZEOF_HSWORD == 4
-type StgWord = Word32
-#define HALF_WORD 16
-#elif SIZEOF_HSWORD == 8
-type StgWord = Word64
-#define HALF_WORD 32
-#endif
-
 mkInfoTable :: ClosureInfo -> [CAddrMode]
 mkInfoTable cl_info
  | opt_Unregisterised = std_info ++ extra_bits
@@ -1168,13 +1152,13 @@ mkInfoTable cl_info
     is_con = isJust semi_tag
 
     (srt_label,srt_len)
-	| Just tag <- semi_tag = (mkIntCLit 0, tag) -- constructor
+	| Just tag <- semi_tag = (mkIntCLit 0, fromIntegral tag) -- constructor
 	| otherwise = 
 	  case srt of
 	    NoC_SRT -> (mkIntCLit 0, 0)
-	    C_SRT lbl off len -> 
+	    C_SRT lbl off bitmap -> 
 	      (CAddr (CIndex (CLbl lbl DataPtrRep) (mkIntCLit off) WordRep),
-	       len)
+	       bitmap)
 
     ptrs  = closurePtrsSize cl_info
     nptrs = size - ptrs
@@ -1182,9 +1166,9 @@ mkInfoTable cl_info
 
     layout_info :: StgWord
 #ifdef WORDS_BIGENDIAN
-    layout_info = (fromIntegral ptrs `shiftL` HALF_WORD) .|. fromIntegral nptrs
+    layout_info = (fromIntegral ptrs `shiftL` hALF_WORD) .|. fromIntegral nptrs
 #else 
-    layout_info = (fromIntegral ptrs) .|. (fromIntegral nptrs `shiftL` HALF_WORD)
+    layout_info = (fromIntegral ptrs) .|. (fromIntegral nptrs `shiftL` hALF_WORD)
 #endif	     
 
     layout_amode = mkWordCLit layout_info
@@ -1215,10 +1199,10 @@ mkInfoTable cl_info
 	| otherwise = [fun_amode]
 
 #ifdef WORDS_BIGENDIAN
-    fun_desc = (fromIntegral fun_type `shiftL` HALF_WORD) .|. fromIntegral arity
+    fun_desc = (fromIntegral fun_type `shiftL` hALF_WORD) .|. fromIntegral arity
 #else 
-    fun_desc = (fromIntegral fun_type) .|. (fromIntegral arity `shiftL` HALF_WORD)
-#endif	     
+    fun_desc = (fromIntegral fun_type) .|. (fromIntegral arity `shiftL` hALF_WORD)
+#endif
 
     fun_amode = mkWordCLit fun_desc
 
@@ -1252,13 +1236,13 @@ mkBitmapInfoTable entry_amode srt liveness vector
 		cl_type srt_len liveness_amode
 
    liveness_amode = livenessToAddrMode liveness
-   
+
    (srt_label,srt_len) =
 	  case srt of
 	    NoC_SRT -> (mkIntCLit 0, 0)
-	    C_SRT lbl off len -> 
-	      (CAddr (CIndex (CLbl lbl DataPtrRep) (mkIntCLit off) WordRep),
-	       len)
+	    C_SRT lbl off bitmap -> 
+		    (CAddr (CIndex (CLbl lbl DataPtrRep) (mkIntCLit off) WordRep),
+	      	     bitmap)
 
    cl_type = case (null vector, isBigLiveness liveness) of
 		(True, True)   -> rET_BIG
@@ -1280,7 +1264,7 @@ mkStdInfoTable
    -> CAddrMode				-- closure type descr (profiling)
    -> CAddrMode				-- closure descr (profiling)
    -> Int				-- closure type
-   -> Int				-- SRT length
+   -> StgHalfWord			-- SRT length
    -> CAddrMode				-- layout field
    -> [CAddrMode]
 mkStdInfoTable entry_lbl type_descr closure_descr cl_type srt_len layout_amode
@@ -1307,11 +1291,11 @@ mkStdInfoTable entry_lbl type_descr closure_descr cl_type srt_len layout_amode
     -- ToDo: do this using .byte and .word directives.
     type_info :: StgWord
 #ifdef WORDS_BIGENDIAN
-    type_info = (fromIntegral cl_type `shiftL` HALF_WORD) .|.
+    type_info = (fromIntegral cl_type `shiftL` hALF_WORD) .|.
 		(fromIntegral srt_len)
 #else 
     type_info = (fromIntegral cl_type) .|.
-		(fromIntegral srt_len `shiftL` HALF_WORD)
+		(fromIntegral srt_len `shiftL` hALF_WORD)
 #endif
 
 isBigLiveness (Liveness _ size _) = size > mAX_SMALL_BITMAP_SIZE
@@ -1324,13 +1308,8 @@ livenessToAddrMode (Liveness lbl size bits)
 	  small = mkWordCLit (fromIntegral size .|. (small_bits `shiftL` bITMAP_BITS_SHIFT))
 	  small_bits = case bits of 
 			[]  -> 0
-			[b] -> fromIntegral (intBS b)
+			[b] -> fromIntegral b
 			_   -> panic "livenessToAddrMode"
-
-mAX_SMALL_BITMAP_SIZE = (wORD_SIZE * 8) - bITMAP_BITS_SHIFT
-
-mkWordCLit :: StgWord -> CAddrMode
-mkWordCLit wd = CLit (MachWord (fromIntegral wd)) 
 
 zero_amode = mkIntCLit 0
 \end{code}

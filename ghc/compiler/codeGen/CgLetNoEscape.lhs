@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.19 2002/12/11 15:36:26 simonmar Exp $
+% $Id: CgLetNoEscape.lhs,v 1.20 2003/05/14 09:13:56 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -33,7 +33,7 @@ import CLabel		( mkReturnInfoLabel )
 import ClosureInfo	( mkLFLetNoEscape )
 import CostCentre       ( CostCentreStack )
 import Name		( getName )
-import Id		( idPrimRep, Id )
+import Id		( Id, idPrimRep, idName )
 import Var		( idUnique )
 import PrimRep		( PrimRep(..), retPrimRepSize, isFollowableRep )
 import BasicTypes	( RecFlag(..) )
@@ -178,7 +178,7 @@ cgLetNoEscapeClosure
 	 buildContLivenessMask (getName binder)	`thenFC` \ liveness ->
      	 forkAbsC (cgLetNoEscapeBody binder cc args body uniq) 
 						`thenFC` \ code ->
-	 getSRTInfo srt				`thenFC` \ srt_info -> 
+	 getSRTInfo (idName binder) srt		`thenFC` \ srt_info -> 
 	 absC (CRetDirect uniq code srt_info liveness)
 		`thenC` returnFC ())
 	    	    	    	     	`thenFC` \ (vSp, _) ->

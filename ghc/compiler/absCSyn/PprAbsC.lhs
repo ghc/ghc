@@ -53,11 +53,9 @@ import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, UniqSet
 			)
 import StgSyn		( StgOp(..) )
-import BitSet		( BitSet, intBS )
 import Outputable
 import FastString
 import Util		( lengthExceeds )
-import Constants	( wORD_SIZE )
 
 #if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST
@@ -299,11 +297,14 @@ pprAbsC stmt@(CSRT lbl closures) c
   }
 
 pprAbsC stmt@(CBitmap liveness@(Liveness lbl size mask)) c
-  = pp_liveness_switch liveness semi $
-    hcat [ ptext SLIT("BITMAP"), lparen,
-           pprCLabel lbl, comma,
-           int size, comma,
-           pp_bitmap mask, rparen ]
+  = pprWordArray lbl (mkWordCLit (fromIntegral size) : bitmapAddrModes mask)
+
+pprAbsC stmt@(CSRTDesc desc_lbl srt_lbl off len bitmap) c
+  = pprWordArray desc_lbl (
+	CAddr (CIndex (CLbl srt_lbl DataPtrRep) (mkIntCLit off) WordRep) :
+	mkWordCLit (fromIntegral len) :
+	bitmapAddrModes bitmap
+     )
 
 pprAbsC (CSimultaneous abs_c) c
   = hcat [ptext SLIT("{{"), pprAbsC abs_c c, ptext SLIT("}}")]
@@ -460,7 +461,7 @@ pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 	rep  = getAmodeRep item
 
 pprAbsC stmt@(CClosureInfoAndCode cl_info entry) _
-  =  pprInfoTable info_lbl (mkInfoTable cl_info)
+  =  pprWordArray info_lbl (mkInfoTable cl_info)
   $$ let stuff = CCodeBlock entry_lbl entry in
      pprAbsC stuff (costs stuff)
   where
@@ -477,7 +478,7 @@ pprAbsC stmt@(CClosureTbl tycon) _
    ) $$ ptext SLIT("};")
 
 pprAbsC stmt@(CRetDirect uniq code srt liveness) _
-  =  pprInfoTable info_lbl (mkRetInfoTable entry_lbl srt liveness)
+  =  pprWordArray info_lbl (mkRetInfoTable entry_lbl srt liveness)
   $$ let stuff = CCodeBlock entry_lbl code in
      pprAbsC stuff (costs stuff)
   where
@@ -485,7 +486,7 @@ pprAbsC stmt@(CRetDirect uniq code srt liveness) _
      entry_lbl = mkReturnPtLabel uniq
 
 pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
-  = pprInfoTable lbl (mkVecInfoTable amodes srt liveness)
+  = pprWordArray lbl (mkVecInfoTable amodes srt liveness)
 
 pprAbsC stmt@(CModuleInitBlock plain_lbl lbl code) _
   = vcat [
@@ -504,12 +505,12 @@ Info tables... just arrays of words (the translation is done in
 ClosureInfo).
 
 \begin{code}
-pprInfoTable info_lbl amodes
+pprWordArray lbl amodes
   = (case snd (initTE (ppr_decls_Amodes amodes)) of
 	Just pp -> pp
 	Nothing -> empty)
-  $$ hcat [ ppLocalness info_lbl, ptext SLIT("StgWord "), 
-	    pprCLabel info_lbl, ptext SLIT("[] = {") ]
+  $$ hcat [ ppLocalness lbl, ptext SLIT("StgWord "), 
+	    pprCLabel lbl, ptext SLIT("[] = {") ]
   $$ hcat (punctuate comma (map (castToWord.pprAmode) amodes))
   $$ ptext SLIT("};")
 
@@ -1128,9 +1129,6 @@ That is, the indexing is done in units of kind1, but the resulting
 amode has kind2.
 
 \begin{code}
-ppr_amode CBytesPerWord
-  = text "(sizeof(void*))"
-
 ppr_amode (CVal reg_rel@(CIndex _ _ _) kind)
   = case (pprRegRelative False{-no sign wanted-} reg_rel) of
 	(pp_reg, Nothing)     -> panic "ppr_amode: CIndex"
@@ -1213,9 +1211,6 @@ cCheckMacroText	HP_CHK_L1		= SLIT("HP_CHK_L1")
 cCheckMacroText	HP_CHK_UNBX_TUPLE	= SLIT("HP_CHK_UNBX_TUPLE")
 \end{code}
 
-\begin{code}
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection[ppr-liveness-masks]{Liveness Masks}
@@ -1223,34 +1218,8 @@ cCheckMacroText	HP_CHK_UNBX_TUPLE	= SLIT("HP_CHK_UNBX_TUPLE")
 %************************************************************************
 
 \begin{code}
-pp_bitmap_switch :: Int -> SDoc -> SDoc -> SDoc
-pp_bitmap_switch size small large 
-  | size <= mAX_SMALL_BITMAP_SIZE = small
-  | otherwise = large
-
--- magic numbers, must agree with BITMAP_BITS_SHIFT in InfoTables.h
-mAX_SMALL_BITMAP_SIZE  | wORD_SIZE == 4 = 27
-		       | otherwise      = 58
-
-pp_liveness_switch :: Liveness -> SDoc -> SDoc -> SDoc
-pp_liveness_switch (Liveness _ size _) = pp_bitmap_switch size
-
-pp_bitset :: BitSet -> SDoc
-pp_bitset s
-    | i < -1    = int (i + 1) <> text "-1"
-    | otherwise = int i
-    where i = intBS s
-
-pp_bitmap :: [BitSet] -> SDoc
-pp_bitmap [] = int 0
-pp_bitmap ss = hcat (punctuate (ptext SLIT(" COMMA ")) (bundle ss)) where
-  bundle []         = []
-  bundle [s]        = [hcat bitmap32]
-     where bitmap32 = [ptext SLIT("BITMAP32"), lparen,
-                       pp_bitset s, rparen]
-  bundle (s1:s2:ss) = hcat bitmap64 : bundle ss
-     where bitmap64 = [ptext SLIT("BITMAP64"), lparen,
-                       pp_bitset s1, comma, pp_bitset s2, rparen]
+bitmapAddrModes [] = [mkWordCLit 0]
+bitmapAddrModes xs = map mkWordCLit xs
 \end{code}
 
 %************************************************************************

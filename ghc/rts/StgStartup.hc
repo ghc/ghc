@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.20 2002/12/11 15:36:54 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.21 2003/05/14 09:14:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -135,7 +135,7 @@ STGFUN(stg_returnToStackTop)
 
 INFO_TABLE_RET( stg_forceIO_info,stg_forceIO_ret,
 		MK_SMALL_BITMAP(0/*size*/, 0/*BITMAP*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 #ifdef REG_R1
@@ -168,7 +168,7 @@ STGFUN(stg_forceIO_ret)
 
 INFO_TABLE_RET( stg_noforceIO_info,stg_noforceIO_ret,
 		MK_SMALL_BITMAP(0/*size*/, 0/*BITMAP*/),
-		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_BITMAP*/, 
 		RET_SMALL,, EF_, 0, 0);
 
 #ifdef REG_R1

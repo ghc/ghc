@@ -29,7 +29,7 @@ import StgSyn
 import CgMonad
 import AbsCSyn
 import PrelNames	( gHC_PRIM )
-import CLabel		( CLabel, mkSRTLabel, mkClosureLabel, 
+import CLabel		( mkSRTLabel, mkClosureLabel, 
 			  mkPlainModuleInitLabel, mkModuleInitLabel )
 import PprAbsC		( dumpRealC )
 import AbsCUtils	( mkAbstractCs, flattenAbsC )
@@ -40,8 +40,7 @@ import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( DynFlags, DynFlag(..),
 			  opt_SccProfilingOn, opt_EnsureSplittableC )
-import HscTypes		( ModGuts(..), ModGuts, ForeignStubs(..), TypeEnv,
-			  typeEnvTyCons )
+import HscTypes		( ForeignStubs(..), TypeEnv, typeEnvTyCons )
 import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
 import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalName )
@@ -68,7 +67,7 @@ codeGen :: DynFlags
 	-> ForeignStubs
 	-> [Module]		-- directly-imported modules
 	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
-	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
+	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	-> IO AbstractC		-- Output
 
 codeGen dflags this_mod type_env foreign_stubs imported_mods 
@@ -202,43 +201,39 @@ style, with the increasing static environment being plumbed as a state
 variable.
 
 \begin{code}
-cgTopBinding :: (StgBinding,[Id]) -> Code
-cgTopBinding (StgNonRec srt_info id rhs, srt)
+cgTopBinding :: (StgBinding,[(Id,[Id])]) -> Code
+cgTopBinding (StgNonRec id rhs, srts)
   = absC maybeSplitCode	  	`thenC`
-    maybeExternaliseId id		`thenFC` \ id' ->
-    let
-	srt_label = mkSRTLabel (idName id')
-    in
-    mkSRT srt_label srt [] 	`thenC`
-    setSRTLabel srt_label (
-    cgTopRhs id' rhs srt_info  	`thenFC` \ (id, info) ->
-    addBindC id info	-- Add the un-externalised Id to the envt, so we
-			-- find it when we look up occurrences
-    )
+    maybeExternaliseId id	`thenFC` \ id' ->
+    mapM_ (mkSRT [id']) srts	`thenC`
+    cgTopRhs id' rhs 	  	`thenFC` \ (id, info) ->
+    addBindC id info		`thenC`
+	-- Add the un-externalised Id to the envt, so we
+	-- find it when we look up occurrences
+    nopC
 
-cgTopBinding (StgRec srt_info pairs, srt)
+cgTopBinding (StgRec pairs, srts)
   = absC maybeSplitCode		  	`thenC`
     let
         (bndrs, rhss) = unzip pairs
     in
-    mapFCs maybeExternaliseId bndrs	`thenFC` \ bndrs'@(id:_) ->
+    mapFCs maybeExternaliseId bndrs	`thenFC` \ bndrs' ->
     let
-	srt_label = mkSRTLabel (idName id)
-	pairs'    = zip bndrs' rhss
+	pairs' = zip bndrs' rhss
     in
-    mkSRT srt_label srt bndrs'		`thenC`
-    setSRTLabel srt_label (
-       fixC (\ new_binds -> 
+    mapM_ (mkSRT bndrs')  srts		`thenC`
+    fixC (\ new_binds -> 
 		addBindsC new_binds		`thenC`
-		mapFCs ( \ (b,e) -> cgTopRhs b e srt_info ) pairs'
-       )  `thenFC` \ new_binds -> nopC
-    )
+		mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs'
+     )  `thenFC` \ new_binds -> 
+     nopC
 
-mkSRT :: CLabel -> [Id] -> [Id] -> Code
-mkSRT lbl []  these = nopC
-mkSRT lbl ids these
+mkSRT :: [Id] -> (Id,[Id]) -> Code
+mkSRT these (id,[])  = nopC
+mkSRT these (id,ids)
   = mapFCs remap ids `thenFC` \ ids ->
-    absC (CSRT lbl (map (mkClosureLabel . idName) ids))
+    remap id	     `thenFC` \ id ->
+    absC (CSRT (mkSRTLabel (idName id)) (map (mkClosureLabel . idName) ids))
   where
 	-- sigh, better map all the ids against the environment in case they've
 	-- been externalised (see maybeExternaliseId below).
@@ -251,19 +246,21 @@ mkSRT lbl ids these
 -- to enclose the listFCs in cgTopBinding, but that tickled the
 -- statics "error" call in initC.  I DON'T UNDERSTAND WHY!
 
-cgTopRhs :: Id -> StgRhs -> SRT -> FCode (Id, CgIdInfo)
+cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- The Id is passed along for setting up a binding...
 	-- It's already been externalised if necessary
 
-cgTopRhs bndr (StgRhsCon cc con args) srt
-  = forkStatics (cgTopRhsCon bndr con args srt)
+cgTopRhs bndr (StgRhsCon cc con args)
+  = forkStatics (cgTopRhsCon bndr con args)
 
-cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag args body) srt
+cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag srt args body)
   = ASSERT(null fvs)    -- There should be no free variables
     let 
+	srt_label = mkSRTLabel (idName bndr)
 	lf_info = mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args
     in
-    forkStatics (cgTopRhsClosure bndr cc bi srt args body lf_info)
+    setSRTLabel srt_label $ 
+      forkStatics (cgTopRhsClosure bndr cc bi srt args body lf_info)
 \end{code}
 
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.59 2002/12/11 15:36:25 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.60 2003/05/14 09:13:53 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -70,8 +70,11 @@ cgTopRhsClosure :: Id
 
 cgTopRhsClosure id ccs binder_info srt args body lf_info
   = 
+    let
+    	name          = idName id
+    in
     -- LAY OUT THE OBJECT
-    getSRTInfo srt		`thenFC` \ srt_info ->
+    getSRTInfo name srt		`thenFC` \ srt_info ->
     moduleName			`thenFC` \ mod_name ->
     let
     	name          = idName id
@@ -177,10 +180,12 @@ cgRhsClosure binder cc binder_info srt fvs args body lf_info
 	reduced_fvs    = if binder_is_a_fv
 			 then fvs `minusList` [binder]
 			 else fvs
+
+	name = idName binder
     in
 
     mapFCs getCAddrModeAndInfo reduced_fvs	`thenFC` \ fvs_w_amodes_and_info ->
-    getSRTInfo srt				`thenFC` \ srt_info ->
+    getSRTInfo name srt				`thenFC` \ srt_info ->
     moduleName					`thenFC` \ mod_name ->
     let
 	descr = closureDescription mod_name (idName binder)
@@ -303,7 +308,7 @@ closureCodeBody binder_info closure_info cc all_args body
     --
     (case closureFunInfo closure_info of
 	Just (_, ArgGen slow_lbl liveness) -> 
-		absC (CBitmap liveness) `thenC`
+		absC (maybeLargeBitmap liveness) `thenC`
 		absC (mkSlowEntryCode name slow_lbl arg_regs arg_reps) `thenC`
 		returnFC (mkRegSaveCode arg_regs arg_reps)
 

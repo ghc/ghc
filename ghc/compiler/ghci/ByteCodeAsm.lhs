@@ -29,6 +29,7 @@ import PrimOp		( PrimOp )
 import PrimRep		( PrimRep(..), isFollowableRep, is64BitRep )
 import Constants	( wORD_SIZE )
 import FastString	( FastString(..), unpackFS )
+import SMRep		( StgWord )
 import FiniteMap
 import Outputable
 

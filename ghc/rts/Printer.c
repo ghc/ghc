@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.59 2003/04/22 16:25:12 simonmar Exp $
+ * $Id: Printer.c,v 1.60 2003/05/14 09:13:59 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -134,7 +134,7 @@ printClosure( StgClosure *obj )
 #else
             fprintf(stderr,"CONSTR(");
             printPtr((StgPtr)obj->header.info);
-            fprintf(stderr,"(tag=%d)",info->srt_len);
+            fprintf(stderr,"(tag=%d)",info->srt_bitmap);
 #endif
             for (i = 0; i < info->layout.payload.ptrs; ++i) {
 		fprintf(stderr,", ");

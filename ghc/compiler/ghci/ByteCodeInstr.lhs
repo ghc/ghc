@@ -5,11 +5,11 @@
 
 \begin{code}
 module ByteCodeInstr ( 
- 	BCInstr(..), ProtoBCO(..), StgWord, bciStackUse
+ 	BCInstr(..), ProtoBCO(..), bciStackUse
   ) where
 
 #include "HsVersions.h"
-#include "MachDeps.h"
+#include "../includes/MachDeps.h"
 
 import Outputable
 import Name		( Name )
@@ -21,19 +21,11 @@ import PrimRep		( PrimRep )
 import DataCon		( DataCon )
 import VarSet		( VarSet )
 import PrimOp		( PrimOp )
+import SMRep		( StgWord )
 import GHC.Ptr
-
-import Data.Word
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
-
--- The appropriate StgWord type for this platform (needed for bitmaps)
-#if SIZEOF_HSWORD == 4
-type StgWord = Word32
-#else
-type StgWord = Word64
-#endif
 
 data ProtoBCO a 
    = ProtoBCO { 

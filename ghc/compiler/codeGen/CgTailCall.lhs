@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.36 2002/12/11 15:36:27 simonmar Exp $
+% $Id: CgTailCall.lhs,v 1.37 2003/05/14 09:13:56 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -346,12 +346,6 @@ mkStaticAlgReturnCode con sequel
 
 	-- Generate the right jump or return
     (case sequel of
-	UpdateCode ->	-- Ha!  We can go direct to the update code,
-			-- (making sure to jump to the *correct* update
-			--  code.)
-    			absC (CReturn (CLbl mkUpdInfoLabel CodePtrRep)
-				      return_info)
-
 	CaseAlts _ (Just (alts, _)) False -> -- Ho! We know the constructor so
 					-- we can go right to the alternative
 
@@ -363,7 +357,8 @@ mkStaticAlgReturnCode con sequel
 				-- it's the subject of a wad of special-case 
 				-- code in cgReturnCon
 
-	other ->	-- OnStack, or (CaseAlts ret_amode Nothing)
+	other ->	-- OnStack, or (CaseAlts ret_amode Nothing),
+			-- or UpdateCode.
 		    sequelToAmode sequel	`thenFC` \ ret_amode ->
 		    absC (CReturn ret_amode return_info)
     )

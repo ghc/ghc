@@ -38,7 +38,6 @@ import Constants	( wORD_SIZE, bITMAP_BITS_SHIFT )
 import Name             ( NamedThing(..) )
 import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
 import Outputable	( assertPanic )
-import BitSet		( BitSet, intBS )
 
 -- DEBUGGING ONLY
 --import TRACE		( trace )
@@ -83,14 +82,9 @@ Here we handle top-level things, like @CCodeBlock@s and
 
  gentopcode stmt@(CStaticClosure lbl closure_info _ _)
   = genCodeStaticClosure stmt			`thenUs` \ code ->
-    returnUs (
-       if   opt_Static
-       then StSegment DataSegment 
-            : StLabel lbl : code []
-       else StSegment DataSegment 
-            : StData PtrRep [StInt 0] -- DLLised world, need extra zero word
-            : StLabel lbl : code []
-    )
+    returnUs ( StSegment DataSegment 
+             : StLabel lbl : code []
+             )
 
  gentopcode stmt@(CRetVector lbl amodes srt liveness)
   = returnUs ( StSegment TextSegment
@@ -139,18 +133,21 @@ Here we handle top-level things, like @CCodeBlock@s and
           = StCLbl label
 
  gentopcode stmt@(CBitmap l@(Liveness lbl size mask))
-  | isBigLiveness l
   = returnUs 
 	[ StSegment TextSegment 
 	, StLabel lbl 
-	, StData WordRep (map StInt (toInteger size : bitmapToIntegers mask))
+	, StData WordRep (map StInt (toInteger size : map toInteger mask))
 	]
-  | otherwise
-  = returnUs []
-  where
-    -- ToDo: translate out bitmaps earlier, like info tables
-    isBigLiveness (Liveness _ size _) = size > mAX_SMALL_BITMAP_SIZE
-    mAX_SMALL_BITMAP_SIZE = (wORD_SIZE * 8) - bITMAP_BITS_SHIFT
+
+ gentopcode stmt@(CSRTDesc lbl srt_lbl off len bitmap)
+  = returnUs 
+	[ StSegment TextSegment 
+	, StLabel lbl 
+	, StData WordRep (
+		StIndex PtrRep (StCLbl srt_lbl) (StInt (toInteger off)) :
+		map StInt (toInteger len : map toInteger bitmap)
+	    )
+	]
 
  gentopcode stmt@(CClosureTbl tycon)
   = returnUs [ StSegment TextSegment
@@ -654,25 +651,6 @@ mkJoin :: AbstractC -> CLabel -> AbstractC
 mkJoin code lbl
   | mightFallThrough code = mkAbsCStmts code (CJump (CLbl lbl PtrRep))
   | otherwise = code
-\end{code}
-
-%---------------------------------------------------------------------------
-
-\begin{code}
-bitmapToIntegers :: [BitSet] -> [Integer]
-bitmapToIntegers = bundle . map (toInteger . intBS)
-  where
-#if BYTES_PER_WORD == 4
-    bundle = id
-#else
-    bundle [] = []
-    bundle is = case splitAt (BYTES_PER_WORD/4) is of
-                (these, those) ->
-		    ( foldr1 (\x y -> x + 4294967296 * y)
-			     [x `mod` 4294967296 | x <- these]
-		    : bundle those
-		    )
-#endif
 \end{code}
 
 %---------------------------------------------------------------------------
