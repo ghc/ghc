@@ -243,6 +243,7 @@ tcBindWithSigs top_lvl mbind sigs is_rec
 			    Just sig -> tcSigPolyId sig			-- Signature
 			    Nothing  -> mkLocalId name forall_a_a      	-- No signature
 	in
+	traceTc (text "tcBindsWithSigs: error recovery" <+> ppr binder_names) 	`thenM_`
 	returnM (EmptyMonoBinds, poly_ids)
     )						$
 
