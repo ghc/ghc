@@ -63,14 +63,15 @@ collectTypedMonoBinders (AbsBinds _ _ exports _ _)
   = [global | (_, global, local) <- exports]
 
 collectTypedPatBinders :: TypecheckedPat -> [Id]
-collectTypedPatBinders (VarPat var)	     = [var]
-collectTypedPatBinders (LazyPat pat)	     = collectTypedPatBinders pat
-collectTypedPatBinders (AsPat a pat)	     = a : collectTypedPatBinders pat
-collectTypedPatBinders (ConPat _ _ _ _ pats) = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (ListPat t pats)      = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (TuplePat pats _)     = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (VarPat var)	       = [var]
+collectTypedPatBinders (LazyPat pat)	       = collectTypedPatBinders pat
+collectTypedPatBinders (AsPat a pat)	       = a : collectTypedPatBinders pat
+collectTypedPatBinders (ConPat _ _ _ _ pats)   = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (ListPat t pats)        = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (TuplePat pats _)       = concat (map collectTypedPatBinders pats)
 collectTypedPatBinders (RecPat _ _ _ _ fields) = concat (map (\ (f,pat,_) -> collectTypedPatBinders pat)
-							fields)
-collectTypedPatBinders (DictPat ds ms)	     = ds ++ ms
-collectTypedPatBinders any_other_pat	     = [ {-no binders-} ]
+							  fields)
+collectTypedPatBinders (DictPat ds ms)	       = ds ++ ms
+collectTypedPatBinders (NPlusKPat var _ _ _ _) = [var]
+collectTypedPatBinders any_other_pat	       = [ {-no binders-} ]
 \end{code}
