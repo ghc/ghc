@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.6 1997/05/19 06:02:14 sof Exp $
+# $Id: Makefile,v 1.7 1997/07/21 11:31:42 andre Exp $
 
 TOP=..
 CURRENT_DIR=ghc/driver
@@ -137,6 +137,7 @@ WAY_mt_HC_OPTS+=-fstack-check -fconcurrent -fticky-ticky -D__CONCURRENT_HASKELL_
 # Way `mp': 
 WAY_mp_NAME=parallel
 WAY_mp_HC_OPTS+=-fstack-check -fconcurrent -D__PARALLEL_HASKELL__ -DPAR -optcpp-D__PARALLEL_HASKELL__ -optc-DPAR -optc-DCONCURRENT
+# try WAY_mp_HC_OPTS+=-fstack-check -fconcurrent -D__PARALLEL_HASKELL__ -DPAR -optcpp-D__CONCURRENT_HASKELL__ -optc-DPAR -optc-DCONCURRENT
 
 #
 # Way `mg': 

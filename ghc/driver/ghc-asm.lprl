@@ -605,6 +605,7 @@ sub mangle_asm {
 	     $chk[$i] =~ s/\.tc EnterNodeCode\[TC\],EnterNodeCode/\.tc EnterNodeCode\[TC\],\.EnterNodeCode/; #CONC
 	     $chk[$i] =~ s/\.tc StackUnderflowEnterNode\[TC\],StackUnderflowEnterNode/\.tc StackUnderflowEnterNode\[TC\],\.StackUnderflowEnterNode/; #CONC
 	     $chk[$i] =~ s/\.tc stopThreadDirectReturn\[TC\],stopThreadDirectReturn/\.tc stopThreadDirectReturn\[TC\],\.stopThreadDirectReturn/; #CONC
+	     $chk[$i] =~ s/\.tc CommonUnderflow\[TC\],CommonUnderflow/\.tc CommonUnderflow\[TC\],\.CommonUnderflow/; #PAR
 	     $chk[$i] =~ s/\.tc IndUpdRetDir\[TC\],IndUpdRetDir/\.tc IndUpdRetDir\[TC\],\.IndUpdRetDir/;
 	     $chk[$i] =~ s/\t\.tc (_PRStart_\S+)\[TC\],_PRStart_\S+/\t\.tc \1\[TC\],\.\1/;
 
