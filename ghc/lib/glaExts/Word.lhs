@@ -73,7 +73,7 @@ instance Num Word8 where
     x - y         = to (binop (-) x y)
     negate        = to . negate . from
     x * y         = to (binop (*) x y)
-    abs           = absReal
+    abs x         = x
     signum        = signumReal
     fromInteger   = to . integer2Word
     fromInt       = intToWord8
@@ -113,7 +113,7 @@ instance Read Word8 where
     readsPrec p = readDec
 
 instance Show Word8 where
-    showsPrec p = showsPrec p . from
+    showsPrec p = showInt
 
 instance Bits Word8 where
   x .&. y       = to (binop (.&.) x y)
@@ -147,7 +147,7 @@ instance Num Word16 where
     x - y         = to (binop (-) x y)
     negate        = to . negate . from
     x * y         = to (binop (*) x y)
-    abs           = absReal
+    abs x         = x
     signum        = signumReal
     fromInteger   = to . integer2Word
     fromInt       = intToWord16
@@ -187,7 +187,7 @@ instance Read Word16 where
   readsPrec p = readDec
 
 instance Show Word16 where
-  showsPrec p x = showsPrec p (from x)
+  showsPrec p = showInt
 
 instance Bits Word16 where
   x .&. y       = to (binop (.&.) x y)
@@ -206,6 +206,9 @@ instance Bits Word16 where
 
 -----------------------------------------------------------------------------
 -- Word32
+--
+-- This code assumes that Word# is 32-bits - which is true on a 32-bit
+-- architecture, but will need to be updated for 64-bit architectures.
 -----------------------------------------------------------------------------
 
 data Word32 = W32# Word# deriving (Eq, Ord)
@@ -215,7 +218,7 @@ instance Num Word32 where
     (-) = intop (-)
     (*) = intop (*)
     negate (W32# x) = W32# (int2Word# (negateInt# (word2Int# x)))
-    abs             = absReal
+    abs x           = x
     signum          = signumReal
     fromInteger     = integer2Word
     fromInt (I# x)  = W32# (int2Word# x)
@@ -225,7 +228,7 @@ intop op x y = intToWord32 (word32ToInt x `op` word32ToInt y)
 
 instance Bounded Word32 where
     minBound = 0
-    maxBound = 0xffffffff
+    maxBound = minBound - 1
 
 instance Real Word32 where
     toRational x = toInteger x % 1
@@ -248,10 +251,8 @@ instance Integral Word32 where
 
 {-# INLINE quotWord #-}
 {-# INLINE remWord  #-}
-(W32# x) `quotWord` (W32# y) = 
-	W32# (int2Word# (word2Int# x `quotInt#` word2Int# y))
-(W32# x) `remWord`  (W32# y) = 
-	W32# (int2Word# (word2Int# x `remInt#`  word2Int# y))
+(W32# x) `quotWord` (W32# y) = W32# (x `quotWord#` y)
+(W32# x) `remWord`  (W32# y) = W32# (x `remWord#`  y)
 
 instance Ix Word32 where
     range (m,n)          = [m..n]
@@ -271,18 +272,18 @@ instance Read Word32 where
     readsPrec p = readDec
 
 instance Show Word32 where
-    showsPrec p x = showsPrec p (word32ToInt x)
+    showsPrec p = showInt
 
 instance Bits Word32 where
   (.&.)         = wordop and#
   (.|.)         = wordop or#
   xor           = wordop xor#
-  complement x  = (x `xor` maxBound) + 1
+  complement x  = x `xor` maxBound
   shift (W32# x) i@(I# i#)
 	| i > 0     = W32# (shiftL# x i#)
-	| otherwise = W32# (shiftRL# x (negateInt# i#))
+	| otherwise = W32# (shiftRA# x (negateInt# i#))
   --rotate
-  bit i             = 1 `shift` -i
+  bit i             = 1 `shift` i
   setBit x i        = x .|. bit i
   clearBit x i      = x .&. complement (bit i)
   complementBit x i = x `xor` bit i
@@ -344,11 +345,17 @@ integer2Word (J# a# s# d#) = W32# (int2Word# (integer2Int# a# s# d#))
 -- Code copied from the Prelude
 -----------------------------------------------------------------------------
 
-absReal x    | x >= 0    = x
-	     | otherwise = -x
-
 signumReal x | x == 0    =  0
 	     | x > 0     =  1
 	     | otherwise = -1
+
+-- showInt is used for positive numbers only
+-- stolen from Hugs prelude --SDM
+showInt    :: Integral a => a -> ShowS
+showInt n r | n < 0 = error "Word.showInt: can't show negative numbers"
+            | otherwise =
+              let (n',d) = quotRem n 10
+		  r'     = toEnum (fromEnum '0' + fromIntegral d) : r
+	      in  if n' == 0 then r' else showInt n' r'
 
 \end{code}
