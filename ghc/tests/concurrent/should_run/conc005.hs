@@ -6,11 +6,12 @@ import Concurrent
 
 main = do
   v <- newCVar
+  done <- newEmptyMVar
   let
 	reader = do
  	    c <- readCVar v
 	    if (c == '\n') 
-		then return () 
+		then putMVar done ()
 		else do putChar c; reader
 
 	writer []     = do writeCVar v '\n'; return ()
@@ -18,4 +19,5 @@ main = do
 
   forkIO reader
   writer "Hello World"
+  takeMVar done
   
