@@ -36,8 +36,8 @@
 
 ProjectName       = The Glorious Glasgow Haskell Compilation System
 ProjectNameShort  = ghc
-ProjectVersion    = 5.01
-ProjectVersionInt = 501
+ProjectVersion    = 5.03
+ProjectVersionInt = 503
 
 # Interface file version (hi-boot files only)
 #
