@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.30 2000/04/27 11:04:37 simonmar Exp $
+# $Id: Makefile,v 1.31 2000/05/25 13:11:17 panne Exp $
 
 # We create two driver scripts: 
 #	- one to run in-place in the build tree for building libraries
@@ -16,7 +16,6 @@ INSTALLING=1
 
 DYN_LOADABLE_BITS = \
 	ghc-asm.prl \
-	ghc-iface.prl \
 	ghc-consist.prl \
 	ghc-split.prl
 
