@@ -1,12 +1,11 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1997
 %
-\section{Primitive operations for packed strings}
+\section{Basic ops on packed representations}
 
-Core operations for working on a chunk of bytes.
-These operations is the core set needed by the
-GHC internally, the code generator and the prelude
-libraries.
+Some basic operations for working on packed representations of series
+of bytes (character strings). Used by the interface lexer input
+subsystem, mostly.
 
 \begin{code}
 #include "HsVersions.h"
@@ -18,9 +17,11 @@ module PrimPacked
         copySubStr,         -- :: _Addr -> Int -> Int -> _ByteArray Int
         copySubStrFO,       -- :: ForeignObj -> Int -> Int -> _ByteArray Int
         copySubStrBA,       -- :: _ByteArray Int -> Int -> Int -> _ByteArray Int
-	--packString2,      -- :: Addr -> Int -> _ByteArray Int
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205
         stringToByteArray,  -- :: String -> _ByteArray Int
 	byteArrayToString,  -- :: _ByteArray Int -> String
+#endif
 
         eqStrPrefix,        -- :: Addr# -> ByteArray# -> Int# -> Bool
         eqCharStrPrefix,    -- :: Addr# -> Addr# -> Int# -> Bool
@@ -42,9 +43,15 @@ import GHC
 import ArrBase
 import ST
 import STBase
-#if __GLASGOW_HASKELL__ == 202
+
+# if __GLASGOW_HASKELL__ == 202
 import PrelBase ( Char(..) )
-#endif
+# endif
+
+# if __GLASGOW_HASKELL__ >= 206
+import PackBase
+# endif
+
 #endif
 
 \end{code} 
@@ -73,10 +80,12 @@ copyPrefixStr (A# a) len@(I# length#) =
     (not forgetting the NUL at the end)
   -}
   (new_ps_array (length# +# 1#))             `thenPrimIO` \ ch_array ->
+{- Revert back to Haskell-only solution for the moment.
    _ccall_ memcpy ch_array (A# a) len        `thenPrimIO`  \ () ->
    write_ps_array ch_array length# (chr# 0#) `seqPrimIO`
+-}
    -- fill in packed string from "addr"
-  --fill_in ch_array 0#			     `seqPrimIO`
+  fill_in ch_array 0#			     `seqPrimIO`
    -- freeze the puppy:
   freeze_ps_array ch_array)
   where
@@ -100,7 +109,8 @@ Copying out a substring, assume a 0-indexed string:
 copySubStr :: _Addr -> Int -> Int -> _ByteArray Int
 copySubStr a start length =
   unsafePerformPrimIO (
-    _casm_ `` %r= (char *)((char *)%0 + (int)%1); '' a start `thenPrimIO` \ a_start ->
+    _casm_ `` %r= (char *)((char *)%0 + (int)%1); '' a start 
+                                                     `thenPrimIO` \ a_start ->
     returnPrimIO (copyPrefixStr a_start length))
 \end{code}
 
@@ -131,11 +141,17 @@ copySubStrFO (_ForeignObj fo) (I# start#) len@(I# length#) =
 	fill_in arr_in# (idx +# 1#) }
 
 {- ToDo: add FO primitives.. -}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <=205
 indexCharOffFO# :: ForeignObj# -> Int# -> Char#
 indexCharOffFO# fo# i# = 
   case unsafePerformPrimIO (_casm_ ``%r=(char)*((char *)%0 + (int)%1); '' (_ForeignObj fo#) (I# i#)) of
     C# c -> c
+#else
+indexCharOffFO# :: ForeignObj# -> Int# -> Char#
+indexCharOffFO# fo i = indexCharOffForeignObj# fo i
+#endif
 
+-- step on (char *) pointer by x units.
 addrOffset# :: Addr# -> Int# -> Addr# 
 addrOffset# a# i# =
   case unsafePerformPrimIO (_casm_ ``%r=(char *)((char *)%0 + (int)%1); '' (A# a#) (I# i#)) of
@@ -252,6 +268,7 @@ eqStrPrefixFO fo# barr# start# len# =
 \end{code}
 
 \begin{code}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205	
 byteArrayToString :: _ByteArray Int -> String
 byteArrayToString (_ByteArray (I# start#,I# end#) barr#) =
  unpack start#
@@ -261,12 +278,21 @@ byteArrayToString (_ByteArray (I# start#,I# end#) barr#) =
    | otherwise    = C# ch : unpack (nh# +# 1#)
      where
       ch = indexCharArray# barr# nh#
+#elif defined(__GLASGOW_HASKELL__)
+byteArrayToString :: _ByteArray Int -> String
+byteArrayToString = unpackCStringBA
+#else
+#error "byteArrayToString: cannot handle this!"
+#endif
 
 \end{code}
 
 
 \begin{code}
 stringToByteArray :: String -> (_ByteArray Int)
+#if __GLASGOW_HASKELL__ >= 206
+stringToByteArray = packString
+#elif defined(__GLASGOW_HASKELL__)
 stringToByteArray str = _runST (packStringST str)
 
 packStringST :: [Char] -> _ST s (_ByteArray Int)
@@ -295,7 +321,8 @@ packNCharsST len@(I# length#) str =
   fill_in arr_in# idx (C# c : cs) =
    write_ps_array arr_in# idx c	 `seqStrictlyST`
    fill_in arr_in# (idx +# 1#) cs
+#else
+#error "stringToByteArray: cannot handle this"
+#endif
 
 \end{code}
-
-
