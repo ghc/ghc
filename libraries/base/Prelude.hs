@@ -6,7 +6,7 @@
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  provisional
+-- Stability   :  stable
 -- Portability :  portable
 --
 -- The Prelude: a standard module imported by default into all Haskell

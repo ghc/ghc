@@ -304,3 +304,4 @@ castIOUArray :: IOUArray ix a -> IO (IOUArray ix b)
 castIOUArray (IOUArray marr) = stToIO $ do
     marr' <- castSTUArray marr
     return (IOUArray marr')
+

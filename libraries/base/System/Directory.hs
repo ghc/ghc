@@ -5,7 +5,7 @@
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  provisional
+-- Stability   :  stable
 -- Portability :  portable
 --
 -- System-independent interface to directory manipulation.

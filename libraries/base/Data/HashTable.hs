@@ -175,10 +175,14 @@ hLOAD = 4 :: Int32 -- Maximum average load of a single hash bucket
 -- -----------------------------------------------------------------------------
 -- Creating a new hash table
 
--- | Creates a new hash table
+-- | Creates a new hash table.  The following property should hold for the @eq@
+-- and @hash@ functions passed to 'new':
+--
+-- >   eq A B  =>  hash A == hash B
+--
 new
-  :: (key -> key -> Bool)    -- ^ An equality comparison on keys
-  -> (key -> Int32)	     -- ^ A hash function on keys
+  :: (key -> key -> Bool)    -- ^ @eq@: An equality comparison on keys
+  -> (key -> Int32)	     -- ^ @hash@: A hash function on keys
   -> IO (HashTable key val)  -- ^ Returns: an empty hash table
 
 new cmp hash_fn = do

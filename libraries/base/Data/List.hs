@@ -6,7 +6,7 @@
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  provisional
+-- Stability   :  stable
 -- Portability :  portable
 --
 -- Operations on lists.
