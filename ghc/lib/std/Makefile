@@ -117,7 +117,7 @@ ifeq "$(way)" "dll"
 PrelMain.dll_o : PrelMain.lhs
 	$(RM) ../PrelMain.lhs
 	$(CP) PrelMain.lhs ../
-	$(MAKE) -C .. PrelMain.dll_o way=dll HC=std/$(GHC_INPLACE) HC_OPTS="$(filter-out -fcompiling-prelude, $(patsubst -odir,,$(HC_OPTS)))"
+	$(MAKE) -C .. PrelMain.dll_o way=dll HC=std/$(GHC_INPLACE) HC_OPTS="$(filter-out -fcompiling-prelude -split-objs, $(patsubst -odir,,$(HC_OPTS)))"
 	$(MV) ../PrelMain.dll_o .
 	$(RM) ../PrelMain.lhs ../PrelMain.dll_hi
 endif
