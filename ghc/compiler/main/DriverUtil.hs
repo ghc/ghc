@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.38 2003/06/04 15:47:59 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.39 2003/08/20 15:07:57 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -51,9 +51,9 @@ getOptionsFromSource file
 		   | otherwise -> return []
 
 matchOptions s
-  | Just s1 <- my_prefix_match "{-#" s, -- -}
-    Just s2 <- my_prefix_match "OPTIONS" (remove_spaces s1),
-    Just s3 <- my_prefix_match "}-#" (reverse s2)
+  | Just s1 <- maybePrefixMatch "{-#" s, -- -}
+    Just s2 <- maybePrefixMatch "OPTIONS" (remove_spaces s1),
+    Just s3 <- maybePrefixMatch "}-#" (reverse s2)
   = Just (reverse s3)
   | otherwise
   = Nothing
@@ -108,13 +108,6 @@ my_partition p (a:as)
     case p a of
 	Nothing -> (bs,a:cs)
 	Just b  -> ((a,b):bs,cs)
-
-my_prefix_match :: String -> String -> Maybe String
-my_prefix_match []    rest = Just rest
-my_prefix_match (_:_) []   = Nothing
-my_prefix_match (p:pat) (r:rest)
-  | p == r    = my_prefix_match pat rest
-  | otherwise = Nothing
 
 later = flip finally
 

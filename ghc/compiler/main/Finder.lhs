@@ -278,7 +278,7 @@ mkHomeModLocation mod_name src_filename = do
    let mod_basename = dots_to_slashes (moduleNameUserString mod_name)
        (basename,extension) = splitFilename src_filename
 
-   case my_prefix_match (reverse mod_basename) (reverse basename) of
+   case maybePrefixMatch (reverse mod_basename) (reverse basename) of
 	Just ""   ->
 	   mkHomeModLocationSearched mod_name "."  mod_basename extension
 	Just rest -> do

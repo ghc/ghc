@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.119 2003/08/11 08:53:39 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.120 2003/08/20 15:07:56 simonmar Exp $
 --
 -- Driver flags
 --
@@ -127,7 +127,7 @@ findArg :: [(String,OptKind)] -> String -> Maybe (String,OptKind)
 findArg spec arg
   = case [ (remove_spaces rest, k) 
 	 | (pat,k)   <- spec, 
-	   Just rest <- [my_prefix_match pat arg],
+	   Just rest <- [maybePrefixMatch pat arg],
 	   arg_ok k rest arg ] 
     of
 	[]      -> Nothing
