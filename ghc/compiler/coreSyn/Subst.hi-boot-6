@@ -1,4 +1,0 @@
-module Subst where
-
-data Subst
-substTyWith :: [Var.TyVar] -> [TypeRep.Type] -> TypeRep.Type -> TypeRep.Type
