@@ -192,22 +192,7 @@ completePrim env op args
 
 	---------   Floats --------------
     oneFloatLit FloatNegOp  f 	= return_float (-f)
-#if __GLASGOW_HASKELL__ <= 22
-    oneFloatLit FloatExpOp  f	= return_float (exp f)
-    oneFloatLit FloatLogOp  f	= return_float (log f)
-    oneFloatLit FloatSqrtOp f	= return_float (sqrt f)
-    oneFloatLit FloatSinOp  f	= return_float (sin f)
-    oneFloatLit FloatCosOp  f	= return_float (cos f)
-    oneFloatLit FloatTanOp  f	= return_float (tan f)
-    oneFloatLit FloatAsinOp f	= return_float (asin f)
-    oneFloatLit FloatAcosOp f	= return_float (acos f)
-    oneFloatLit FloatAtanOp f	= return_float (atan f)
-    oneFloatLit FloatSinhOp f	= return_float (sinh f)
-    oneFloatLit FloatCoshOp f	= return_float (cosh f)
-    oneFloatLit FloatTanhOp f	= return_float (tanh f)
-#else
-    -- hard to do all that in Rationals ?? (WDP 94/10) ToDo
-#endif
+    -- hard to do float ops in Rationals ?? (WDP 94/10) ToDo
     oneFloatLit _	    _   = give_up
 
     twoFloatLits FloatGtOp    f1 f2	      = return_bool (f1 >  f2)

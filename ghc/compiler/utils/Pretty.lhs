@@ -165,17 +165,8 @@ allow you to use either GHC or Hugs.  To get GHC, just set the CPP variable
 #define DIV	`quotInt#`
 
 
-#if __GLASGOW_HASKELL__ >= 202
-			-- Haskell 1.3 stuff
 #define SHOW	Show
 #define MAXINT	maxBound
-
-#else
-			-- Haskell 1.2 stuff
-#define SHOW	Text
-#define MAXINT	maxInt
-#endif
-
 
 #else
 

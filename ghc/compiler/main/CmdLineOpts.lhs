@@ -514,21 +514,10 @@ lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCaseScrutinee)
 %************************************************************************
 
 \begin{code}
-#if __GLASGOW_HASKELL__ == 201
-# define ARRAY	    Array
-# define LIFT	    GHCbase.Lift
-# define SET_TO	    =:
-(=:) a b = (a,b)
-#elif __GLASGOW_HASKELL__ >= 202
 # define ARRAY	    Array
 # define LIFT	    Lift
 # define SET_TO	    =:
 (=:) a b = (a,b)
-#else
-# define ARRAY	    _Array
-# define LIFT	    _Lift
-# define SET_TO	    :=
-#endif
 
 isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
 

@@ -26,11 +26,7 @@ import Literal		( mkMachInt )
 import Name		( mkWiredInIdName, Module )
 import PragmaInfo
 import PrimOp		( PrimOp(..) )
-#if __GLASGOW_HASKELL__ >= 202
 import Type		
-#else
-import Type		( mkTyVarTy )
-#endif
 import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar, TyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )

@@ -127,15 +127,8 @@ copySubStrFO (ForeignObj fo) (I# start#) len@(I# length#) =
 	fill_in arr_in# (idx +# 1#) }
 
 {- ToDo: add FO primitives.. -}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <=205
-indexCharOffFO# :: ForeignObj# -> Int# -> Char#
-indexCharOffFO# fo# i# = 
-  case unsafePerformIO (_casm_ ``%r=(char)*((char *)%0 + (int)%1); '' (ForeignObj fo#) (I# i#)) of
-    C# c -> c
-#else
 indexCharOffFO# :: ForeignObj# -> Int# -> Char#
 indexCharOffFO# fo i = indexCharOffForeignObj# fo i
-#endif
 
 -- step on (char *) pointer by x units.
 addrOffset# :: Addr# -> Int# -> Addr# 

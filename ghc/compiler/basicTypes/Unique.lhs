@@ -385,25 +385,11 @@ A character-stingy way to read/write numbers (notably Uniques).
 The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
 Code stolen from Lennart.
 \begin{code}
-#if __GLASGOW_HASKELL__ == 201
-# define BYTE_ARRAY GHCbase.ByteArray
-# define RUN_ST	    GHCbase.runST
-# define AND_THEN   >>=
-# define AND_THEN_  >>
-# define RETURN	    return
-#elif __GLASGOW_HASKELL__ >= 202
 # define BYTE_ARRAY GlaExts.ByteArray
 # define RUN_ST	    ST.runST
 # define AND_THEN   >>=
 # define AND_THEN_  >>
 # define RETURN	    return
-#else
-# define BYTE_ARRAY _ByteArray
-# define RUN_ST	    _runST
-# define AND_THEN   `thenStrictlyST`
-# define AND_THEN_  `seqStrictlyST`
-# define RETURN	    returnStrictlyST
-#endif
 
 iToBase62 :: Int -> SDoc
 

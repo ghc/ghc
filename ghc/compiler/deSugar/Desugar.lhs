@@ -4,11 +4,7 @@
 \section[Desugar]{@deSugar@: the main function}
 
 \begin{code}
-module Desugar ( deSugar, pprDsWarnings
-#if __GLASGOW_HASKELL__ < 200
-		, DsMatchContext
-#endif
-	       ) where
+module Desugar ( deSugar, pprDsWarnings ) where
 
 #include "HsVersions.h"
 

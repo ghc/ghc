@@ -1,4 +1,5 @@
 # -----------------------------------------------------------------------------
+# $Id: Makefile,v 1.33 1998/01/12 14:44:37 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -62,10 +63,6 @@ HS_SRCS = $(SRCS_UGNHS) \
           $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs)) \
 	  rename/ParseIface.hs
 
-ifneq "$(Ghc2_0)" "YES"
-HS_SRCS += main/LoopHack.hc 
-endif
-
 # NB: it's no good to include *.hs in the top-line wildcard, because the .hs files
 #     in parser/ may not have been created at that point.
 
@@ -77,12 +74,8 @@ HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 # Haskell, source stubs just re-exporting info from the various .hi-boot files.
 # (Reason: we don't want to fiddle with the imports in the sources). We give them
 # the suffix .hs, since they're special and don't fall under the umbrella of $(HS_SRCS)
-# always (only when $(Ghc2_0) is equal to YES)
-ifeq "$(Ghc2_0)" "YES"
+
 MKDEPENDHS_SRCS = $(HS_SRCS)
-else
-LOOPS   = $(patsubst %.lhi, %.hi, $(wildcard */*.lhi))
-endif
  
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
@@ -133,21 +126,11 @@ SRC_HC_OPTS += \
   -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS))
 
-ifeq "$(Ghc2_0)" "NO"
-SRC_HC_OPTS += -fhaskell-1.3
-endif
-
 # -syslib ghc just needed for use of PackedString.hPutPS
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
 
-ifeq "$(Ghc2_0)" "NO"
-SRC_HC_OPTS += -fomit-derived-read -fomit-reexported-instances
-else
-SRC_HC_OPTS += -recomp
-endif
-
-SRC_HC_OPTS += $(GhcHcOpts)
+SRC_HC_OPTS += -recomp $(GhcHcOpts)
 
 # 	Special flags for particular modules
 #	The standard suffix rule for compiling a Haskell file
@@ -187,17 +170,11 @@ reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 # Heap was 6m with 2.10
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"' -H10m
 
-rename/ParseIface_HC_OPTS 	+= -Onot -H30m
-ifeq "$(Ghc2_0)" "YES"
-rename/ParseIface_HC_OPTS       += -fno-warn-incomplete-patterns
-endif
+rename/ParseIface_HC_OPTS 	+= -Onot -H30m -fno-warn-incomplete-patterns
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		= -fvia-C -O2 -O2-for-C
 else
-ifeq "$(Ghc2_0)" "NO"
-rename/RnMonad_HC_OPTS 		= -fvia-C
-endif
 endif
 rename/RnEnv_HC_OPTS 		= -fvia-C
 rename/RnSource_HC_OPTS		= -H12m
@@ -218,9 +195,6 @@ typecheck/TcHsSyn_HC_OPTS	= -H15m
 typecheck/TcExpr_HC_OPTS	= -H15m
 
 typecheck/TcEnv_HC_OPTS		= -H10m
-ifeq "$(Ghc2_0)" "NO"
-typecheck/TcMonad_HC_OPTS	= -fvia-C	
-endif
 utils/Argv_HC_OPTS 		= -fvia-C -monly-3-regs
 utils/SST_HC_OPTS 		= -fvia-C
 utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
@@ -228,12 +202,6 @@ utils/FastString_HC_OPTS	= -fvia-C -monly-3-regs
 utils/StringBuffer_HC_OPTS	= -fvia-C
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
 utils/Outputable_HC_OPTS	= -monly-3-regs
-
-# optimiser misbehaving in 0.29, occurrence analyser fails to terminate when
-# compiling lib/required/Time.lhs
-ifeq "$(Ghc2_0)" "NO"
-simplCore/OccurAnal_HC_OPTS	= -Onot
-endif
 
 # Strictness analyser misbehaving in 2.10, fails to terminate on
 # UpdAnal.lhs due to weird recursive datatype.  Bug was exposed by a
@@ -265,10 +233,6 @@ parser/hschooks.o : parser/hschooks.c
 # Interface-file parser uses Happy
 SRC_HAPPY_OPTS += +RTS -K2m -H10m -RTS
 
-ifeq ($(Ghc2_0),NO)
-SRC_HAPPY_OPTS+= -1.2
-endif
-
 rename/ParseIface.hs : rename/ParseIface.y
 	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
 	$(HAPPY) $(HAPPY_OPTS) -g rename/ParseIface.y
@@ -284,30 +248,6 @@ hsp: parser/printtree.o parser/main.o libhsp.a
 	$(CC) -o $@ $(CC_OPTS) $^
 
 CLEAN_FILES += hsp
-#-----------------------------------------------------------------------------
-# 		Interface files
-
-# LoopHack.lhc is an SLPJ addition to fix a profiling problem.  See comments
-# inside it. (compilation is handled by the suffix rules).
-
-#
-# Building the loop breakers from .lhi (0.2x) or .hi-boot (2.xx) files
-#
-ifeq "$(Ghc2_0)" "NO"
-hi-boot :: $(LOOPS)
-
-%.hi : %.lhi
-	$(RM) $@
-	$(UNLIT) $<  $@ || ( $(RM) $@ && exit 1 )
-	@chmod 444 $@
-
-boot :: hi-boot
-else
-# hi-boot not needed when using 2.04+ as HC, defining it here
-# to be consistent across setting of Ghc2_0
-hi-boot :
-	@echo "Done."
-endif
 
 #-----------------------------------------------------------------------------
 # 		Linking
@@ -326,15 +266,6 @@ INSTALL_LIBEXECS += hsc hsp
 #-----------------------------------------------------------------------------
 # 		depend
 
-# If we're using a 1.2 compiler to compile the compiler, need the old mkdepend stuff
-#
-# ToDo: define sep MKDEPENDHS_1.2 variable so that it can be readily overridden
-# in a build.mk file.
-#
-ifeq ($(Ghc2_0),NO)
-MKDEPENDHS      = $(MKDEPENDHS_1_2)
-endif
-
 #
 # Before doing `make depend', need to build all derived Haskell source files
 #
@@ -342,11 +273,8 @@ depend :: $(LOOPS) $(SRCS_UGNHS) rename/ParseIface.hs
 
 
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
-ifeq "$(Ghc2_0)" "NO"
-SRC_MKDEPENDHS_OPTS += -o hc
-else
 SRC_MKDEPENDHS_OPTS += -optdep-o -optdephc
-endif
+
 # When booting from .hc, (hackily) remove the suffix rule for 
 # .l?hs -> .o, so that the .hc -> .o is used instead.
 %.$(way_)o : %.lhs

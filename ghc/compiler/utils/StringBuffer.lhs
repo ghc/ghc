@@ -331,11 +331,7 @@ lexemeToString (StringBuffer fo _ start_pos# current#) =
  if start_pos# ==# current# then
     ""
  else
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205
-    byteArrayToString (copySubStr (A# fo) (I# start_pos#) (I# (current# -# start_pos#)))
-#else
     unpackCStringBA (copySubStr (A# fo) (I# start_pos#) (I# (current# -# start_pos#)))
-#endif
     
 lexemeToByteArray :: StringBuffer -> _ByteArray Int
 lexemeToByteArray (StringBuffer fo _ start_pos# current#) = 
