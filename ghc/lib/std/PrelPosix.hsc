@@ -64,14 +64,14 @@ type CStat = ()
 
 fdFileSize :: Int -> IO Integer
 fdFileSize fd = 
-  allocaBytes (#const sizeof(struct stat)) $ \ p_stat -> do
+  allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fileSize" $
 	c_fstat (fromIntegral fd) p_stat
-    c_mode <- (#peek struct stat, st_mode) p_stat :: IO CMode 
+    c_mode <- st_mode p_stat :: IO CMode 
     if not (s_isreg c_mode)
 	then return (-1)
 	else do
-    c_size <- (#peek struct stat, st_size) p_stat :: IO COff
+    c_size <- st_size p_stat :: IO COff
     return (fromIntegral c_size)
 
 data FDType  = Directory | Stream | RegularFile
@@ -81,10 +81,10 @@ data FDType  = Directory | Stream | RegularFile
 -- referring to file handles. i.e., it'll fail for socket FDs.
 fdType :: Int -> IO FDType
 fdType fd = 
-  allocaBytes (#const sizeof(struct stat)) $ \ p_stat -> do
+  allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fdType" $
 	c_fstat (fromIntegral fd) p_stat
-    c_mode <- (#peek struct stat, st_mode) p_stat :: IO CMode
+    c_mode <- st_mode p_stat :: IO CMode
     case () of
       _ |  s_isdir  c_mode  -> return Directory
         |  s_isfifo c_mode  -> return Stream
@@ -108,6 +108,7 @@ foreign import "s_isblk_PrelPosix_wrap" unsafe s_isblk :: CMode -> Bool
 
 #ifndef mingw32_TARGET_OS
 foreign import "s_issock_PrelPosix_wrap" unsafe s_issock :: CMode -> Bool
+
 #else
 s_issock :: CMode -> Bool
 s_issock cmode = False
@@ -137,44 +138,44 @@ type Termios = ()
 
 setEcho :: Int -> Bool -> IO ()
 setEcho fd on = do
-  allocaBytes (#const sizeof(struct termios))  $ \p_tios -> do
+  allocaBytes sizeof_termios  $ \p_tios -> do
     throwErrnoIfMinus1Retry "setEcho"
 	(c_tcgetattr (fromIntegral fd) p_tios)
-    c_lflag <- (#peek struct termios, c_lflag) p_tios :: IO CTcflag
-    let new_c_lflag | on        = c_lflag .|. (#const ECHO)
-	            | otherwise = c_lflag .&. complement (#const ECHO)
-    (#poke struct termios, c_lflag) p_tios (new_c_lflag :: CTcflag)
-    tcSetAttr fd (#const TCSANOW) p_tios
+    c_lflag <- c_lflag p_tios :: IO CTcflag
+    let new_c_lflag | on        = c_lflag .|. prel_echo
+	            | otherwise = c_lflag .&. complement prel_echo
+    poke_c_lflag p_tios (new_c_lflag :: CTcflag)
+    tcSetAttr fd prel_tcsanow p_tios
 
 getEcho :: Int -> IO Bool
 getEcho fd = do
-  allocaBytes (#const sizeof(struct termios))  $ \p_tios -> do
+  allocaBytes sizeof_termios  $ \p_tios -> do
     throwErrnoIfMinus1Retry "setEcho"
 	(c_tcgetattr (fromIntegral fd) p_tios)
-    c_lflag <- (#peek struct termios, c_lflag) p_tios :: IO CTcflag
-    return ((c_lflag .&. (#const ECHO)) /= 0)
+    c_lflag <- c_lflag p_tios :: IO CTcflag
+    return ((c_lflag .&. prel_echo) /= 0)
 
 setCooked :: Int -> Bool -> IO ()
 setCooked fd cooked = 
-  allocaBytes (#const sizeof(struct termios))  $ \p_tios -> do
+  allocaBytes sizeof_termios  $ \p_tios -> do
     throwErrnoIfMinus1Retry "setCooked"
 	(c_tcgetattr (fromIntegral fd) p_tios)
 
     -- turn on/off ICANON
-    c_lflag <- (#peek struct termios, c_lflag) p_tios :: IO CTcflag
-    let new_c_lflag | cooked    = c_lflag .|. (#const ICANON)
-	            | otherwise = c_lflag .&. complement (#const ICANON)
-    (#poke struct termios, c_lflag) p_tios (new_c_lflag :: CTcflag)
+    c_lflag <- c_lflag p_tios :: IO CTcflag
+    let new_c_lflag | cooked    = c_lflag .|. prel_icanon
+	            | otherwise = c_lflag .&. complement prel_icanon
+    poke_c_lflag p_tios (new_c_lflag :: CTcflag)
 
     -- set VMIN & VTIME to 1/0 respectively
     when cooked $ do
-	    let c_cc  = (#ptr struct termios, c_cc) p_tios
-		vmin  = c_cc `plusPtr` (#const VMIN)  :: Ptr Word8
-		vtime = c_cc `plusPtr` (#const VTIME) :: Ptr Word8
+            c_cc <- prel_ptr_c_cc p_tios
+	    let vmin  = c_cc `plusPtr` prel_vmin  :: Ptr Word8
+		vtime = c_cc `plusPtr` prel_vtime :: Ptr Word8
 	    poke vmin  1
 	    poke vtime 0
 
-    tcSetAttr fd (#const TCSANOW) p_tios
+    tcSetAttr fd prel_tcsanow p_tios
 
 -- tcsetattr() when invoked by a background process causes the process
 -- to be sent SIGTTOU regardless of whether the process has TOSTOP set
@@ -184,15 +185,29 @@ setCooked fd cooked =
 
 tcSetAttr :: FD -> CInt -> Ptr Termios -> IO ()
 tcSetAttr fd options p_tios = do
-  allocaBytes (#const sizeof(sigset_t)) $ \ p_sigset -> do
-  allocaBytes (#const sizeof(sigset_t)) $ \ p_old_sigset -> do
+  allocaBytes sizeof_sigset_t $ \ p_sigset -> do
+  allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
      c_sigemptyset p_sigset
-     c_sigaddset   p_sigset (#const SIGTTOU)
-     c_sigprocmask (#const SIG_BLOCK) p_sigset p_old_sigset
+     c_sigaddset   p_sigset prel_sigttou
+     c_sigprocmask prel_sig_block p_sigset p_old_sigset
      throwErrnoIfMinus1Retry_ "tcSetAttr" $
 	 c_tcsetattr (fromIntegral fd) options p_tios
-     c_sigprocmask (#const SIG_SETMASK) p_old_sigset nullPtr
+     c_sigprocmask prel_sig_setmask p_old_sigset nullPtr
 
+foreign import ccall "prel_lflag" c_lflag :: Ptr Termios -> IO CTcflag
+foreign import ccall "prel_poke_lflag" c_lflag :: Ptr Termios -> CTcflag -> IO ()
+foreign import ccall "prel_ptr_c_cc" ptr_c_cc  :: Ptr Termios -> IO Word8
+
+foreign import ccall "prel_echo"      unsafe prel_echo :: CInt
+foreign import ccall "prel_tcsanow"   unsafe prel_tcsanow :: CInt
+foreign import ccall "prel_icanon"    unsafe prel_icanon :: CInt
+foreign import ccall "prel_vmin"      unsafe prel_vmin   :: CInt
+foreign import ccall "prel_vtime"     unsafe prel_vtime  :: CInt
+foreign import ccall "prel_sigttou"   unsafe prel_sigttou :: CInt
+foreign import ccall "prel_sig_block" unsafe prel_sig_block :: CInt
+foreign import ccall "prel_sig_setmask" unsafe prel_sig_setmask :: CInt
+foreign import ccall "prel_f_getfl"     unsafe prel_f_getfl :: CInt
+foreign import ccall "prel_f_setfl"     unsafe prel_f_setfl :: CInt
 #else
 
 -- bogus defns for win32
@@ -214,12 +229,11 @@ getEcho fd = return False
 
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
-		 (fcntl_read (fromIntegral fd) (#const F_GETFL))
+		 (fcntl_read (fromIntegral fd) prel_f_getfl)
   -- An error when setting O_NONBLOCK isn't fatal: on some systems 
   -- there are certain file handles on which this will fail (eg. /dev/null
   -- on FreeBSD) so we throw away the return code from fcntl_write.
-  fcntl_write (fromIntegral fd) 
-	(#const F_SETFL) (flags .|. #const O_NONBLOCK)
+  fcntl_write (fromIntegral fd) prel_f_setfl (flags .|. o_NONBLOCK)
 #else
 
 -- bogus defns for win32
@@ -236,34 +250,34 @@ foreign import "stat" unsafe
 foreign import "fstat" unsafe
    c_fstat :: CInt -> Ptr CStat -> IO CInt
 
-#ifdef HAVE_LSTAT
-foreign import "lstat" unsafe
-   c_lstat :: CString -> Ptr CStat -> IO CInt
-#endif
-
 foreign import "open" unsafe
    c_open :: CString -> CInt -> CMode -> IO CInt
 
+foreign import ccall "prel_sizeof_stat" unsafe sizeof_stat :: Int
+foreign import ccall "prel_st_mtime" unsafe st_mtime :: Ptr CStat -> IO CTime
+foreign import ccall "prel_st_size" unsafe st_size :: Ptr CStat -> IO COff
+foreign import ccall "prel_st_mode" unsafe st_mode :: Ptr CStat -> IO CMode
+
+#ifndef mingw32_TARGET_OS
+foreign import ccall "prel_sizeof_termios" unsafe sizeof_termios :: Int
+foreign import ccall "prel_sizeof_sigset_t" unsafe sizeof_sigset_t :: Int
+#endif
+
 -- POSIX flags only:
-o_RDONLY    = (#const O_RDONLY)	   :: CInt
-o_WRONLY    = (#const O_WRONLY)	   :: CInt
-o_RDWR      = (#const O_RDWR)	   :: CInt
-o_APPEND    = (#const O_APPEND)	   :: CInt
-o_CREAT     = (#const O_CREAT)	   :: CInt
-o_EXCL	    = (#const O_EXCL)	   :: CInt
-o_TRUNC     = (#const O_TRUNC)	   :: CInt
+foreign import ccall "prel_o_rdonly" unsafe o_RDONLY :: CInt
+foreign import ccall "prel_o_wronly" unsafe o_WRONLY :: CInt
+foreign import ccall "prel_o_rdwr"   unsafe o_RDWR   :: CInt
+foreign import ccall "prel_o_append" unsafe o_APPEND :: CInt
+foreign import ccall "prel_o_creat"  unsafe o_CREAT  :: CInt
+foreign import ccall "prel_o_excl"   unsafe o_EXCL   :: CInt
+foreign import ccall "prel_o_trunc"  unsafe o_TRUNC  :: CInt
 
-#ifdef mingw32_TARGET_OS
-o_NOCTTY    = 0 :: CInt
-o_NONBLOCK  = 0 :: CInt
-#else
-o_NOCTTY    = (#const O_NOCTTY)	   :: CInt
-o_NONBLOCK  = (#const O_NONBLOCK)  :: CInt
-#endif
 
-#ifdef HAVE_O_BINARY
-o_BINARY    = (#const O_BINARY)	   :: CInt
-#endif
+-- non-POSIX flags.
+foreign import ccall "prel_o_noctty"   unsafe o_NOCTTY   :: CInt
+foreign import ccall "prel_o_nonblock" unsafe o_NONBLOCK :: CInt
+foreign import ccall "prel_o_binary" unsafe o_BINARY :: CInt
+
 
 foreign import "isatty" unsafe
    c_isatty :: CInt -> IO CInt

@@ -18,7 +18,7 @@ some operating systems, it may also be possible to have paths which
 are relative to the current directory.
 
 \begin{code}
-{-# OPTIONS -#include "dirUtils.h" #-}
+{-# OPTIONS -#include "dirUtils.h" -#include "PrelIOUtils.h" #-}
 module Directory 
    ( 
       Permissions		-- instance of (Eq, Ord, Read, Show)
@@ -513,16 +513,11 @@ withFileOrSymlinkStatus name f = do
         throwErrnoIfMinus1Retry_ "withFileOrSymlinkStatus" (lstat s p)
 	f p
 
-foreign import ccall "prel_sz_stat" unsafe sizeof_stat :: Int
-
 modificationTime :: Ptr CStat -> IO ClockTime
 modificationTime stat = do
     mtime <- st_mtime stat
     return (TOD (toInteger (mtime :: CTime)) 0)
     
-foreign import ccall "prel_st_mtime" unsafe st_mtime :: Ptr CStat -> IO CTime
-foreign import ccall "prel_st_mode" unsafe st_mode :: Ptr CStat -> IO CMode
-
 isDirectory :: Ptr CStat -> IO Bool
 isDirectory stat = do
   mode <- st_mode stat

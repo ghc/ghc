@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hs,v 1.7 2001/12/27 09:28:10 sof Exp $
+-- $Id: PrelHandle.hs,v 1.8 2001/12/27 11:30:10 sof Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -594,7 +594,7 @@ openFile' filepath ex_mode =
 	       | otherwise	   = False
 
       binary_flags
-	  | binary    = PrelHandle.o_BINARY -- is '0' if not supported.
+	  | binary    = o_BINARY -- is '0' if not supported.
 	  | otherwise = 0
 
       oflags = oflags1 .|. binary_flags
@@ -1217,6 +1217,5 @@ foreign import ccall "prel_bufsiz"   unsafe dEFAULT_BUFFER_SIZE :: Int
 foreign import ccall "prel_seek_cur" unsafe sEEK_CUR :: CInt
 foreign import ccall "prel_seek_set" unsafe sEEK_SET :: CInt
 foreign import ccall "prel_seek_end" unsafe sEEK_END :: CInt
-foreign import ccall "prel_o_binary" unsafe o_BINARY :: CInt
 
 
