@@ -13,11 +13,7 @@ IMPORT_DELOOPER(NcgLoop)		-- paranoia checking only
 #endif
 
 import MachMisc
-#if __GLASGOW_HASKELL__ >= 202
-import MachRegs hiding (Addr)
-#else
 import MachRegs
-#endif
 
 import AbsCSyn
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
