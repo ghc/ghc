@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.54 2001/07/26 03:13:37 ken Exp $
+ * $Id: Linker.c,v 1.55 2001/08/10 08:24:38 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -237,6 +237,7 @@ typedef struct _RtsSymbolVal {
       SymX(newArrayzh_fast)			\
       SymX(unsafeThawArrayzh_fast)		\
       SymX(newByteArrayzh_fast)			\
+      SymX(newPinnedByteArrayzh_fast)		\
       SymX(newMutVarzh_fast)			\
       SymX(quotRemIntegerzh_fast)		\
       SymX(quotIntegerzh_fast)			\
