@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.16 2000/04/12 17:33:16 simonmar Exp $
+ * $Id: openFile.c,v 1.17 2000/05/11 13:15:38 simonmar Exp $
  *
  * openFile Runtime Support
  */
@@ -94,22 +94,22 @@ openFile(StgByteArray file, StgInt how, StgInt binary)
 
     switch (how) {
       case OPENFILE_APPEND:
-        oflags = O_NONBLOCK | O_WRONLY | O_NOCTTY | O_APPEND; 
+        oflags = O_WRONLY | O_NOCTTY | O_APPEND; 
 	for_writing = 1;
 	flags |= FILEOBJ_WRITE;
 	break;
       case OPENFILE_WRITE:
-	oflags = O_NONBLOCK | O_WRONLY | O_NOCTTY;
+	oflags = O_WRONLY | O_NOCTTY;
 	flags |= FILEOBJ_WRITE;
 	for_writing = 1;
 	break;
     case OPENFILE_READ_ONLY:
-        oflags = O_NONBLOCK | O_RDONLY | O_NOCTTY;
+        oflags = O_RDONLY | O_NOCTTY;
 	flags |= FILEOBJ_READ;
 	for_writing = 0;
 	break;
     case OPENFILE_READ_WRITE:
-	oflags = O_NONBLOCK | O_RDWR | O_NOCTTY;
+	oflags = O_RDWR | O_NOCTTY;
 	flags |= FILEOBJ_READ | FILEOBJ_WRITE;
 	for_writing = 1;
 	break;
@@ -191,8 +191,17 @@ openFile(StgByteArray file, StgInt how, StgInt binary)
 	}
     }
 
-    /* Make sure that we aren't looking at a directory */
+    /* Set non-blocking mode *after* the open.  The reason is that
+     * when reading from a FIFO, if we open in non-blocking mode
+     * then any reads from the FIFO will return EOF straight away
+     * without waiting for a writing process.  If we set O_NONBLOCK
+     * after doing the open, then we apparently get to wait for a
+     * writer.  This broken behaviour has been observed on both Linux
+     * & Solaris.   --SDM
+     */
+    fcntl(fd, F_SETFL, oflags | O_NONBLOCK);
 
+    /* Make sure that we aren't looking at a directory */
     while (fstat(fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
