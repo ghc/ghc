@@ -306,8 +306,8 @@ lcm x y		=  abs ((x `quot` (gcd x y)) * y)
 
 
 {-# RULES
-"Int.gcd"      forall a b . gcd  a b = gcdInt a b
-"Integer.gcd"  forall a b . gcd  a b = gcdInteger  a b
-"Integer.lcm"  forall a b . lcm  a b = lcmInteger  a b
+"gcd/Int->Int->Int"             gcd = gcdInt
+"gcd/Integer->Integer->Integer" gcd = gcdInteger
+"lcm/Integer->Integer->Integer" lcm = lcmInteger
  #-}
 \end{code}
