@@ -259,10 +259,13 @@ SRC_DIST_FILES += \
 	mk/boilerplate.mk mk/config.h.in mk/config.mk.in mk/opts.mk \
 	mk/paths.mk mk/package.mk mk/suffix.mk mk/target.mk
 
+# Just provide a subset.
+GHC_SRC_DIST_DIRS= glafp-utils ghc libraries hslibs
+
 dist dist-manifest dist-package :: project-check
 
 # clean the tree first, leaving certain extra files in place (eg. configure)
-dist :: distclean
+#dist :: distclean
 
 dist ::
 	-rm -rf $(SRC_DIST_DIR)
@@ -299,7 +302,7 @@ hc-file-bundle : project-check
 	     $(ProjectNameShort)-$(ProjectVersion)/libraries \
 	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
-	@for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/driver $(ProjectNameShort)-$(ProjectVersion)/libraries $(ProjectNameShort)-$(ProjectVersion)/hslibs -name "*.hsc" -print` ""; do \
+	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/driver $(ProjectNameShort)-$(ProjectVersion)/libraries $(ProjectNameShort)-$(ProjectVersion)/hslibs -name "*.hsc" -print` ""; do \
 	     if test "x$$f" != "x" && test -e `echo "$$f" | sed 's/hsc$$/hs/g'`; then \
 	        echo `echo "$$f" | sed 's/hsc$$/hs/g' ` >> hc-files-to-go ; \
 	     fi; \
