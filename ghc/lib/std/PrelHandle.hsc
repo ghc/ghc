@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.10 2001/06/22 12:36:33 rrt Exp $
+-- $Id: PrelHandle.hsc,v 1.11 2001/06/29 12:45:39 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -22,8 +22,10 @@ module PrelHandle (
 
   stdin, stdout, stderr,
   IOMode(..), IOModeEx(..), openFile, openFileEx, openFd,
-  hClose, hFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
+  hFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
   hFlush, 
+
+  hClose, hClose_help,
 
   HandlePosn(..), hGetPosn, hSetPosn,
   SeekMode(..), hSeek,
@@ -127,9 +129,7 @@ but we might want to revisit this in the future --SDM ].
 {-# INLINE withHandle #-}
 withHandle :: String -> Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
 withHandle fun h@(FileHandle m)     act = withHandle' fun h m act
-withHandle fun h@(DuplexHandle r w) act = do 
-  withHandle' fun h r act
-  withHandle' fun h w act
+withHandle fun h@(DuplexHandle m _) act = withHandle' fun h m act
 
 withHandle' fun h m act = 
    block $ do
@@ -764,8 +764,9 @@ hClose h@(DuplexHandle r w) = do
 		  haType = ClosedHandle
 		 }
 
-hClose' h m =
-  withHandle__' "hClose" h m $ \ handle_ -> do
+hClose' h m = withHandle__' "hClose" h m $ hClose_help
+
+hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return handle_
       _ -> do
@@ -1164,18 +1165,20 @@ hIsTerminalDevice handle = do
 
 #ifdef _WIN32
 hSetBinaryMode handle bin = 
-  withHandle "hSetBinaryMode" handle $ \ handle_ ->
+  withAllHandles__ "hSetBinaryMode" handle $ \ handle_ ->
     do let flg | bin       = (#const O_BINARY)
 	       | otherwise = (#const O_TEXT)
        throwErrnoIfMinus1_ "hSetBinaryMode"
           (setmode (fromIntegral (haFD handle_)) flg)
-       return (handle_{haIsBin=bin}, ())
+       return handle_{haIsBin=bin}
+  return ()
 
 foreign import "setmode" setmode :: CInt -> CInt -> IO CInt
 #else
-hSetBinaryMode handle bin =
-  withHandle "hSetBinaryMode" handle $ \ handle_ ->
-    return (handle_{haIsBin=bin}, ())
+hSetBinaryMode handle bin = do
+  withAllHandles__ "hSetBinaryMode" handle $ \ handle_ ->
+    return handle_{haIsBin=bin}
+  return ()
 #endif
 
 -- -----------------------------------------------------------------------------
