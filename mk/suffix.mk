@@ -211,9 +211,9 @@ endif
 	@$(RM) $@
 	$(SGML2HTML) $(SGML2HTML_OPTS) $<
 
-%.ps : %.sgml
+%.html : %.tex
 	@$(RM) $@
-	$(SGML2PS) $(SGML2PS_OPTS) $<
+	$(LATEX2HTML) $(LATEX2HTML_OPTS) $<
 
 %.rtf : %.sgml
 	@$(RM) $@
