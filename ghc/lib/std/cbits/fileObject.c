@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.10 2000/04/14 16:26:53 rrt Exp $
+ * $Id: fileObject.c,v 1.11 2000/10/10 09:28:50 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -131,7 +131,7 @@ fill_up_line_buffer(IOFileObject* fo)
   len = fo->bufSize - fo->bufWPtr;
   p   = (unsigned char*)fo->buf + fo->bufWPtr;
 
-  if ((count = 
+  while ((count = 
          (
 #ifdef USE_WINSOCK
 	   fo->flags & FILEOBJ_WINSOCK ?
