@@ -63,7 +63,7 @@ if [ $# -eq 1 ]
 then
   if [ -d ${output}.junk ]
   then
-    /bin/rm -rf ${output}.junk
+    rm -rf ${output}.junk
   fi
   if [ -d ${output} ]
   then
