@@ -10,7 +10,7 @@ module HscTypes (
 	ModDetails(..),	ModIface(..), 
 	HomeSymbolTable, PackageTypeEnv,
 	HomeIfaceTable, PackageIfaceTable, emptyIfaceTable,
-	lookupTable, lookupTableByModName,
+	lookupIface, lookupIfaceByModName,
 	emptyModIface,
 
 	IfaceDecls(..), 
@@ -47,8 +47,9 @@ module HscTypes (
 import RdrName		( RdrNameEnv, emptyRdrEnv )
 import Name		( Name, NameEnv, NamedThing,
 			  emptyNameEnv, extendNameEnv, 
-			  lookupNameEnv, emptyNameEnv, getName, nameModule,
-			  nameSrcLoc, nameEnvElts )
+			  lookupNameEnv, emptyNameEnv, nameEnvElts,
+			  isLocallyDefined, getName, nameModule,
+			  nameSrcLoc )
 import NameSet		( NameSet )
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
@@ -200,16 +201,19 @@ emptyIfaceTable = emptyUFM
 Simple lookups in the symbol table.
 
 \begin{code}
-lookupTable :: ModuleEnv a -> ModuleEnv a -> Name -> Maybe a
--- We often have two Symbol- or IfaceTables, and want to do a lookup
-lookupTable ht pt name
-  = lookupModuleEnv ht mod `seqMaybe` lookupModuleEnv pt mod
+lookupIface :: HomeIfaceTable -> PackageIfaceTable
+	    -> Module -> Name		-- The module is to use for locally-defined names
+	    -> Maybe ModIface
+-- We often have two IfaceTables, and want to do a lookup
+lookupIface hit pit this_mod name
+  | isLocallyDefined name = lookupModuleEnv hit this_mod
+  | otherwise		  = lookupModuleEnv hit mod `seqMaybe` lookupModuleEnv pit mod
   where
     mod = nameModule name
 
-lookupTableByModName :: ModuleEnv a -> ModuleEnv a -> ModuleName -> Maybe a
+lookupIfaceByModName :: ModuleEnv a -> ModuleEnv a -> ModuleName -> Maybe a
 -- We often have two Symbol- or IfaceTables, and want to do a lookup
-lookupTableByModName ht pt mod
+lookupIfaceByModName ht pt mod
   = lookupModuleEnvByName ht mod `seqMaybe` lookupModuleEnvByName pt mod
 \end{code}
 
@@ -260,7 +264,8 @@ extendTypeEnvList env things
 \begin{code}
 lookupType :: HomeSymbolTable -> PackageTypeEnv -> Name -> Maybe TyThing
 lookupType hst pte name
-  = case lookupModuleEnv hst (nameModule name) of
+  = ASSERT2( not (isLocallyDefined name), ppr name )
+    case lookupModuleEnv hst (nameModule name) of
 	Just details -> lookupNameEnv (md_types details) name
 	Nothing	     -> lookupNameEnv pte name
 \end{code}

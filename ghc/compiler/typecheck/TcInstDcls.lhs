@@ -30,14 +30,14 @@ import TcDeriv		( tcDeriving )
 import TcEnv		( TcEnv, tcExtendGlobalValEnv, 
 			  tcExtendTyVarEnvForMeths, 
 			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
- 			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, simpleInstInfoTy, isLocalInst,
+ 			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, simpleInstInfoTy, 
 			  newDFunName, tcExtendTyVarEnv
 			)
 import InstEnv		( InstEnv, classDataCon, extendInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )
-import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, DFunId,
+import HscTypes		( HomeSymbolTable, DFunId,
 			  ModDetails(..), PackageInstEnv, PersistentRenamerState
 			)
 
@@ -48,18 +48,18 @@ import Maybes 		( maybeToBool )
 import MkId		( mkDictFunId )
 import Generics		( validGenericInstanceType )
 import Module		( Module, foldModuleEnv )
-import Name		( isLocallyDefined )
+import Name		( getSrcLoc )
 import NameSet		( emptyNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprConstraint, pprPred )
 import TyCon		( TyCon, isSynTyCon, tyConDerivings )
-import Type		( mkTyVarTys, splitDFunTy, isTyVarTy,
+import Type		( splitDFunTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy,
-			  splitAlgTyConApp_maybe, 
+			  splitAlgTyConApp_maybe, splitForAllTys,
 			  unUsgTy, tyVarsOfTypes, mkClassPred, mkTyVarTy,
 			  getClassTys_maybe
 			)
-import Subst		( mkTopTyVarSubst, substClasses, substTheta )
+import Subst		( mkTopTyVarSubst, substClasses )
 import VarSet		( mkVarSet, varSetElems )
 import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIResultTy )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
@@ -170,7 +170,7 @@ tcInstDecls1 :: PackageInstEnv
 	     -> [RenamedHsDecl]
 	     -> TcM (PackageInstEnv, InstEnv, [InstInfo], RenamedHsBinds)
 
-tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod local_tycons decls
+tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod tycons decls
   = let
 	inst_decls = [inst_decl | InstD inst_decl <- decls]
 	clas_decls = [clas_decl | TyClD clas_decl <- decls, isClassDecl clas_decl]
@@ -189,8 +189,7 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod local_tycons decls
 	--	e) generic instances					inst_env4
 	-- The result of (b) replaces the cached InstEnv in the PCS
     let
-	(local_inst_info, imported_inst_info)
-	   = partition (isLocalInst mod) (concat inst_infos)
+	(local_inst_info, imported_inst_info) = partition iLocal (concat inst_infos)
 
 	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . iDFunId) 
 			       imported_inst_info
@@ -206,8 +205,8 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod local_tycons decls
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hecne inst_env4
-    tcDeriving prs mod inst_env4 get_fixity local_tycons	`thenTc` \ (deriv_inst_info, deriv_binds) ->
-    addInstInfos inst_env4 deriv_inst_info			`thenNF_Tc` \ final_inst_env ->
+    tcDeriving prs mod inst_env4 get_fixity tycons	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    addInstInfos inst_env4 deriv_inst_info		`thenNF_Tc` \ final_inst_env ->
 
     returnTc (inst_env1, 
 	      final_inst_env, 
@@ -255,17 +254,18 @@ tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
 
 		-- Make the dfun id and return it
 	    newDFunName mod clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
-	    returnNF_Tc (True, mkDictFunId dfun_name clas tyvars inst_tys theta)
+	    returnNF_Tc (True, dfun_name)
 
 	Just dfun_name -> 	-- An interface-file instance declaration
     		-- Make the dfun id
-	    returnNF_Tc (False, mkDictFunId dfun_name clas tyvars inst_tys theta)
-    )						`thenNF_Tc` \ (is_local, dfun_id) ->
+	    returnNF_Tc (False, dfun_name)
+    )						`thenNF_Tc` \ (is_local, dfun_name) ->
 
-    returnTc [InstInfo { iLocal = is_local,
-			 iClass = clas, iTyVars = tyvars, iTys = inst_tys,
-			 iTheta = theta, iDFunId = dfun_id, 
-			 iBinds = binds, iLoc = src_loc, iPrags = uprags }]
+    let
+	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
+    in
+    returnTc [InstInfo { iLocal = is_local, iDFunId = dfun_id, 
+			 iBinds = binds,    iPrags = uprags }]
 \end{code}
 
 
@@ -334,15 +334,18 @@ get_generics mod decl@(ClassDecl context class_name tyvar_names
 	--	f {| x+y |} ... = ...
 	-- Then at this point we'll have an InstInfo for each
     let
-	bad_groups = [group | group <- equivClassesByUniq get_uniq inst_infos,
+	tc_inst_infos :: [(TyCon, InstInfo)]
+	tc_inst_infos = [(simpleInstInfoTyCon i, i) | i <- inst_infos]
+
+	bad_groups = [group | group <- equivClassesByUniq get_uniq tc_inst_infos,
 			      length group > 1]
-	get_uniq inst = getUnique (simpleInstInfoTyCon inst)
+	get_uniq (tc,_) = getUnique tc
     in
     mapTc (addErrTc . dupGenericInsts) bad_groups	`thenTc_`
 
 	-- Check that there is an InstInfo for each generic type constructor
     let
-	missing = genericTyCons `minusList` map simpleInstInfoTyCon inst_infos
+	missing = genericTyCons `minusList` [tc | (tc,_) <- tc_inst_infos]
     in
     checkTc (null missing) (missingGenericInstances missing)	`thenTc_`
 
@@ -399,10 +402,8 @@ mkGenericInstance mod clas loc (hs_ty, binds)
 	dfun_id    = mkDictFunId dfun_name clas tyvars inst_tys inst_theta
     in
 
-    returnTc (InstInfo { iLocal = True,
-			 iClass = clas, iTyVars = tyvars, iTys = inst_tys, 
-			 iTheta = inst_theta, iDFunId = dfun_id, iBinds = binds,
-			 iLoc = loc, iPrags = [] })
+    returnTc (InstInfo { iLocal = True, iDFunId = dfun_id, 
+		  	 iBinds = binds, iPrags = [] })
 \end{code}
 
 
@@ -496,16 +497,15 @@ First comes the easy case of a non-local instance decl.
 \begin{code}
 tcInstDecl2 :: InstInfo -> NF_TcM (LIE, TcMonoBinds)
 
-tcInstDecl2 (InstInfo { iClass = clas, iTyVars = inst_tyvars, iTys = inst_tys,
-			iTheta = inst_decl_theta, iDFunId = dfun_id,
-			iBinds = monobinds, iLoc = locn, iPrags = uprags })
-  | not (isLocallyDefined dfun_id)
+tcInstDecl2 (InstInfo { iLocal = is_local, iDFunId = dfun_id, 
+			iBinds = monobinds, iPrags = uprags })
+  | not is_local
   = returnNF_Tc (emptyLIE, EmptyMonoBinds)
 
   | otherwise
   =	 -- Prime error recovery
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))  $
-    tcAddSrcLoc locn					   $
+    tcAddSrcLoc (getSrcLoc dfun_id)			   $
 
 	-- Instantiate the instance decl with tc-style type variables
     tcInstId dfun_id		`thenNF_Tc` \ (inst_tyvars', dfun_theta', dict_ty') ->
@@ -518,15 +518,16 @@ tcInstDecl2 (InstInfo { iClass = clas, iTyVars = inst_tyvars, iTys = inst_tys,
 	dm_ids	  = [dm_id | (_, DefMeth dm_id) <- op_items]
 	sel_names = [idName sel_id | (sel_id, _) <- op_items]
 
-	-- Instantiate the theta found in the original instance decl
-	inst_decl_theta' = substTheta (mkTopTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars'))
-				      inst_decl_theta
-
         -- Instantiate the super-class context with inst_tys
 	sc_theta' = substClasses (mkTopTyVarSubst class_tyvars inst_tys') sc_theta
 
 	-- Find any definitions in monobinds that aren't from the class
 	bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
+
+	-- The type variable from the dict fun actually scope 
+	-- over the bindings.  They were gotten from
+	-- the original instance declaration
+	(inst_tyvars, _) = splitForAllTys (idType dfun_id)
     in
 	 -- Check that all the method bindings come from this class
     mapTc (addErrTc . badMethodErr clas) bad_bndrs		`thenNF_Tc_`
@@ -534,7 +535,6 @@ tcInstDecl2 (InstInfo { iClass = clas, iTyVars = inst_tyvars, iTys = inst_tys,
 	 -- Create dictionary Ids from the specified instance contexts.
     newClassDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
     newDicts origin dfun_theta'			`thenNF_Tc` \ (dfun_arg_dicts,  dfun_arg_dicts_ids)  ->
-    newDicts origin inst_decl_theta'		`thenNF_Tc` \ (inst_decl_dicts, _) ->
     newClassDicts origin [(clas,inst_tys')]	`thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
 
     tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
@@ -542,7 +542,7 @@ tcInstDecl2 (InstInfo { iClass = clas, iTyVars = inst_tyvars, iTys = inst_tys,
 		-- Default-method Ids may be mentioned in synthesised RHSs 
 
 	mapAndUnzip3Tc (tcMethodBind clas origin inst_tyvars' inst_tys'
-				     inst_decl_theta'
+				     dfun_theta'
 				     monobinds uprags True)
 		       op_items
     ))		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
@@ -585,20 +585,6 @@ tcInstDecl2 (InstInfo { iClass = clas, iTyVars = inst_tyvars, iTys = inst_tys,
 		 methods_lie
     )						 `thenTc` \ (const_lie1, lie_binds1) ->
     
-	-- Check that we *could* construct the superclass dictionaries,
-	-- even though we are *actually* going to pass the superclass dicts in;
-	-- the check ensures that the caller will never have 
-	--a problem building them.
-    tcAddErrCtxt superClassCtxt (
-      tcSimplifyAndCheck
-		 (ptext SLIT("instance declaration context"))
-		 inst_tyvars_set		-- Local tyvars
-		 inst_decl_dicts		-- The instance dictionaries available
-		 sc_dicts			-- The superclass dicationaries reqd
-    )					`thenTc` \ _ -> 
-    						-- Ignore the result; we're only doing
-						-- this to make sure it can be done.
-
 	-- Now do the simplification again, this time to get the
 	-- bindings; this time we use an enhanced "avails"
 	-- Ignore errors because they come from the *previous* tcSimplify
@@ -791,11 +777,13 @@ missingGenericInstances missing
 	  
 
 
-dupGenericInsts inst_infos
+dupGenericInsts tc_inst_infos
   = vcat [ptext SLIT("More than one type pattern for a single generic type constructor:"),
-	  nest 4 (vcat (map (ppr . simpleInstInfoTy) inst_infos)),
+	  nest 4 (vcat (map ppr_inst_ty tc_inst_infos)),
 	  ptext SLIT("All the type patterns for a generic type constructor must be identical")
     ]
+  where 
+    ppr_inst_ty (tc,inst) = ppr (simpleInstInfoTy inst)
 
 instTypeErr clas tys msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> quotes (pprConstraint clas tys),
@@ -814,7 +802,6 @@ nonBoxedPrimCCallErr clas inst_ty
     		        ppr inst_ty])
 
 methodCtxt     = ptext SLIT("When checking the methods of an instance declaration")
-superClassCtxt = ptext SLIT("When checking the superclasses of an instance declaration")
 \end{code}
 
  

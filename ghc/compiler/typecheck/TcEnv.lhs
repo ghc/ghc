@@ -11,7 +11,7 @@ module TcEnv(
 	-- Instance environment, and InstInfo type
 	tcGetInstEnv, tcSetInstEnv, 
 	InstInfo(..), pprInstInfo,
-	simpleInstInfoTy, simpleInstInfoTyCon, isLocalInst,
+	simpleInstInfoTy, simpleInstInfoTyCon, 
 
 	-- Global environment
 	tcExtendGlobalEnv, tcExtendGlobalValEnv, 
@@ -49,8 +49,8 @@ import IdInfo		( vanillaIdInfo )
 import MkId	 	( mkSpecPragmaId )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
-import Type		( Type, ThetaType,
-			  tyVarsOfTypes,
+import Type		( Type,
+			  tyVarsOfTypes, splitDFunTy,
 			  splitForAllTys, splitRhoTy,
 			  getDFunTyKey, splitTyConApp_maybe
 			)
@@ -60,7 +60,7 @@ import Class		( Class, ClassOpItem, ClassContext )
 import Subst		( substTy )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
-			  isLocallyDefined, nameModule_maybe,
+			  isLocalName, nameModule_maybe,
 			  NameEnv, lookupNameEnv, nameEnvElts, 
 			  extendNameEnvList, emptyNameEnv
 			)
@@ -151,7 +151,8 @@ initTcEnv hst pte
 		      	 tcTyVars = gtv_var
 	 })}
   where
-    lookup name = lookupType hst pte name
+    lookup name | isLocalName name = Nothing
+		| otherwise	   = lookupType hst pte name
 
 
 tcEnvClasses env = [cl | AClass cl <- nameEnvElts (tcGEnv env)]
@@ -508,16 +509,9 @@ The InstInfo type summarises the information in an instance declaration
 \begin{code}
 data InstInfo
   = InstInfo {
-      iClass :: Class,	        -- Class, k
-      iTyVars :: [TyVar],	-- Type variables, tvs
-      iTys    :: [Type],	-- The types at which the class is being instantiated
-      iTheta  :: ThetaType,	-- inst_decl_theta: the original context, c, from the
-				--   instance declaration.  It constrains (some of)
-				--   the TyVars above
-      iLocal  :: Bool,		-- True <=> it's defined in this module
+      iLocal  :: Bool,			-- True <=> it's defined in this module
       iDFunId :: DFunId,		-- The dfun id
       iBinds  :: RenamedMonoBinds,	-- Bindings, b
-      iLoc    :: SrcLoc,		-- Source location assoc'd with this instance's defn
       iPrags  :: [RenamedSig]		-- User pragmas recorded for generating specialised instances
     }
 
@@ -525,7 +519,8 @@ pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))
 			 nest 4 (ppr (iBinds info))]
 
 simpleInstInfoTy :: InstInfo -> Type
-simpleInstInfoTy (InstInfo {iTys = [ty]}) = ty
+simpleInstInfoTy info = case splitDFunTy (idType (iDFunId info)) of
+			  (_, _, _, [ty]) -> ty
 
 simpleInstInfoTyCon :: InstInfo -> TyCon
   -- Gets the type constructor for a simple instance declaration,
@@ -533,9 +528,6 @@ simpleInstInfoTyCon :: InstInfo -> TyCon
 simpleInstInfoTyCon inst
    = case splitTyConApp_maybe (simpleInstInfoTy inst) of 
 	Just (tycon, _) -> tycon
-
-isLocalInst :: Module -> InstInfo -> Bool
-isLocalInst mod info = isLocalThing mod (iDFunId info)
 \end{code}
 
 

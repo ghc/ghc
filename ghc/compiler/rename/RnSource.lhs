@@ -109,7 +109,7 @@ rnDecl (TyClD tycl_decl)
 rnDecl (InstD inst)
   = rnInstDecl inst		`thenRn` \ new_inst ->
     rnInstBinds inst new_inst	`thenRn` \ (new_inst', fvs) ->
-    returnRn (InstD new_inst, fvs `plusFV` instDeclFVs new_inst')
+    returnRn (InstD new_inst', fvs `plusFV` instDeclFVs new_inst')
 
 rnDecl (RuleD rule)
   | isIfaceRuleDecl rule

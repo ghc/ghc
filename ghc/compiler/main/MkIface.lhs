@@ -128,9 +128,6 @@ completeIface :: Maybe ModIface		-- The old interface, if we have it
 	-- NB: 'Nothing' means that even the usages havn't changed, so there's no
 	--     need to write a new interface file.  But even if the usages have
 	--     changed, the module version may not have.
-	--
-	-- The IO in the type is solely for debug output
-	-- In particular, dumping a record of what has changed
 completeIface maybe_old_iface new_iface mod_details 
   = addVersionInfo maybe_old_iface (new_iface { mi_decls = new_decls })
   where
@@ -628,14 +625,13 @@ pprIface iface
 	, vcat (map pprExport (mi_exports iface))
 	, vcat (map pprUsage (mi_usages iface))
 
-	, pprIfaceDecls (vers_decls version_info) 
-			(mi_fixities iface)
-			(mi_decls iface)
-
+	, pprFixities (mi_fixities iface) (dcl_tycl decls)
+	, pprIfaceDecls (vers_decls version_info) decls
 	, pprDeprecs (mi_deprecs iface)
 	]
   where
     version_info = mi_version iface
+    decls	 = mi_decls iface
     exp_vers     = vers_exports version_info
     rule_vers	 = vers_rules version_info
 
@@ -696,27 +692,27 @@ pprUsage (m, has_orphans, is_boot, whats_imported)
 \end{code}
 
 \begin{code}
-pprIfaceDecls version_map fixity_map decls
+pprIfaceDecls version_map decls
   = vcat [ vcat [ppr i <+> semi | i <- dcl_insts decls]
 	 , vcat (map ppr_decl (dcl_tycl decls))
 	 , pprRules (dcl_rules decls)
 	 ]
   where
-    ppr_decl d  = (ppr_vers d <+> ppr d <> semi) $$ ppr_fixes d
+    ppr_decl d  = ppr_vers d <+> ppr d <> semi
 
 	-- Print the version for the decl
     ppr_vers d = case lookupNameEnv version_map (tyClDeclName d) of
 		   Nothing -> empty
 		   Just v  -> int v
-
-	-- Print fixities relevant to the decl
-    ppr_fixes d = vcat [ ppr fix <+> ppr n <> semi
-		       | (n,_) <- tyClDeclNames d, 
-			 Just fix <- [lookupNameEnv fixity_map n]
-		       ]
 \end{code}
 
 \begin{code}
+pprFixities fixity_map decls
+  = hsep [ ppr fix <+> ppr n 
+	 | d <- decls, 
+	   (n,_) <- tyClDeclNames d, 
+	   Just fix <- [lookupNameEnv fixity_map n]] <> semi
+
 pprRules []    = empty
 pprRules rules = hsep [ptext SLIT("{-## __R"), vcat (map ppr rules), ptext SLIT("##-}")]
 

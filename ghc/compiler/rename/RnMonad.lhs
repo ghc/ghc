@@ -53,7 +53,7 @@ import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			  addListToRdrEnv, rdrEnvToList, rdrEnvElts
 			)
 import Name		( Name, OccName, NamedThing(..), getSrcLoc,
-			  isLocallyDefinedName, nameOccName,
+			  nameOccName,
 			  decode, mkLocalName, mkKnownKeyGlobal,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
 			  extendNameEnvList
@@ -68,7 +68,7 @@ import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
 import PrelNames	( mkUnboundName )
-import Maybes		( maybeToBool, seqMaybe )
+import Maybes		( maybeToBool )
 import ErrUtils		( printErrorsAndWarnings )
 
 infixr 9 `thenRn`, `thenRn_`
@@ -145,7 +145,7 @@ data RnDown
 data SDown = SDown {
 		  rn_mode :: RnMode,
 
-		  rn_genv :: GlobalRdrEnv,    	-- Global envt
+		  rn_genv :: GlobalRdrEnv,	-- Top level environment
 
 		  rn_lenv :: LocalRdrEnv,	-- Local name envt
 			--   Does *not* include global name envt; may shadow it
@@ -155,9 +155,10 @@ data SDown = SDown {
 			-- We still need the unsullied global name env so that
 			--   we can look up record field names
 
-		  rn_fixenv :: LocalFixityEnv	-- Local fixities
+		  rn_fixenv :: LocalFixityEnv	-- Local fixities (for non-top-level
+						-- declarations)
 			-- The global fixities are held in the
-			-- rn_ifaces field.  Why?  See the comments
+			-- HIT or PIT.  Why?  See the comments
 			-- with RnIfaces.lookupLocalFixity
 		}
 
@@ -360,9 +361,12 @@ initRn dflags hit hst pcs mod do_rn
 
 is_done :: HomeSymbolTable -> PackageTypeEnv -> Name -> Bool
 -- Returns True iff the name is in either symbol table
+-- The name is a Global, so it has a Module
 is_done hst pte n = maybeToBool (lookupType hst pte n)
 
 initRnMS rn_env fixity_env mode thing_inside rn_down g_down
+	-- The fixity_env appears in both the rn_fixenv field
+	-- and in the HIT.  See comments with RnHiFiles.lookupFixityRn
   = let
 	s_down = SDown { rn_genv = rn_env, rn_lenv = emptyRdrEnv, 
 			 rn_fixenv = fixity_env, rn_mode = mode }
@@ -373,7 +377,6 @@ initIfaceRnMS :: Module -> RnMS r -> RnM d r
 initIfaceRnMS mod thing_inside 
   = initRnMS emptyRdrEnv emptyNameEnv InterfaceMode $
     setModuleRn mod thing_inside
-
 \end{code}
 
 @renameSourceCode@ is used to rename stuff ``out-of-line'';
@@ -588,6 +591,7 @@ getHomeIfaceTableRn :: RnM d HomeIfaceTable
 getHomeIfaceTableRn down l_down = return (rn_hit down)
 
 checkAlreadyAvailable :: Name -> RnM d Bool
+	-- Name is a Global name
 checkAlreadyAvailable name down l_down = return (rn_done down name)
 \end{code}
 

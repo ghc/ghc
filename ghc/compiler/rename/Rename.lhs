@@ -36,7 +36,8 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
 			  mkModuleInThisPackage, mkModuleName, moduleEnvElts
 			)
-import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
+import Name		( Name, NamedThing(..), getSrcLoc,
+			  nameIsLocalOrFrom,
 			  nameOccName, nameModule,
 			  mkNameEnv, nameEnvElts, extendNameEnv
 			)
@@ -65,7 +66,7 @@ import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable,
 			  VersionInfo(..), ImportVersion, IfaceDecls(..),
 			  GlobalRdrEnv, AvailEnv, GenAvailInfo(..), AvailInfo, 
 			  Provenance(..), ImportReason(..), initialVersionInfo,
-			  Deprecations(..), lookupDeprec, lookupTable
+			  Deprecations(..), lookupDeprec, lookupIface
 			 )
 import List		( partition, nub )
 \end{code}
@@ -159,11 +160,9 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
     else
 
 	-- GENERATE THE VERSION/USAGE INFO
-    mkImportInfo mod_name imports 	`thenRn` \ my_usages ->
+    mkImportInfo mod_name imports 			`thenRn` \ my_usages ->
 
-	-- RETURN THE RENAMED MODULE
-    getNameSupplyRn			`thenRn` \ name_supply ->
-    getIfacesRn 			`thenRn` \ ifaces ->
+	-- BUILD THE MODULE INTERFACE
     let
 	-- We record fixities even for things that aren't exported,
 	-- so that we can change into the context of this moodule easily
@@ -171,23 +170,23 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 			     | FixitySig name fixity loc <- nameEnvElts local_fixity_env
 			     ]
 
-
 	-- Sort the exports to make them easier to compare for versions
 	my_exports = groupAvails this_module export_avails
 	
+	final_decls = rn_local_decls ++ rn_imp_decls
+	is_orphan   = any (isOrphanDecl this_module) rn_local_decls
+
 	mod_iface = ModIface {	mi_module   = this_module,
 				mi_version  = initialVersionInfo,
+				mi_usages = my_usages,
 				mi_boot	    = False,
-				mi_orphan   = any isOrphanDecl rn_local_decls,
+				mi_orphan   = is_orphan,
 				mi_exports  = my_exports,
 				mi_globals  = gbl_env,
-				mi_usages   = my_usages,
 				mi_fixities = fixities,
 				mi_deprecs  = my_deprecs,
 				mi_decls    = panic "mi_decls"
 		    }
-
-	final_decls = rn_local_decls ++ rn_imp_decls
     in
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
@@ -253,20 +252,21 @@ implicitFVs mod_name decls
 \end{code}
 
 \begin{code}
-isOrphanDecl (InstD (InstDecl inst_ty _ _ _ _))
-  = not (foldNameSet ((||) . isLocallyDefined) False (extractHsTyNames (removeContext inst_ty)))
+isOrphanDecl this_mod (InstD (InstDecl inst_ty _ _ _ _))
+  = not (foldNameSet ((||) . nameIsLocalOrFrom this_mod) False 
+		     (extractHsTyNames (removeContext inst_ty)))
 	-- The 'removeContext' is because of
 	--	instance Foo a => Baz T where ...
 	-- The decl is an orphan if Baz and T are both not locally defined,
 	--	even if Foo *is* locally defined
 
-isOrphanDecl (RuleD (HsRule _ _ _ lhs _ _))
+isOrphanDecl this_mod (RuleD (HsRule _ _ _ lhs _ _))
   = check lhs
   where
 	-- At the moment we just check for common LHS forms
 	-- Expand as necessary.  Getting it wrong just means
 	-- more orphans than necessary
-    check (HsVar v)   	  = not (isLocallyDefined v)
+    check (HsVar v)   	  = not (nameIsLocalOrFrom this_mod v)
     check (HsApp f a) 	  = check f && check a
     check (HsLit _)   	  = False
     check (HsOverLit _)	  = False
@@ -278,7 +278,7 @@ isOrphanDecl (RuleD (HsRule _ _ _ lhs _ _))
 
     check other	      	  = True 	-- Safe fall through
 
-isOrphanDecl other = False
+isOrphanDecl _ _  = False
 \end{code}
 
 
@@ -540,12 +540,14 @@ reportUnusedNames my_mod_iface imports avail_env
   = warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
     warnUnusedImports bad_imp_names				`thenRn_`
-    printMinimalImports my_mod_iface minimal_imports		`thenRn_`
-    warnDeprecations my_mod_iface really_used_names		`thenRn_`
+    printMinimalImports this_mod minimal_imports		`thenRn_`
+    warnDeprecations this_mod my_deprecs really_used_names	`thenRn_`
     returnRn ()
 
   where
+    this_mod   = mi_module my_mod_iface
     gbl_env    = mi_globals my_mod_iface
+    my_deprecs = mi_deprecs my_mod_iface
     
     -- Now, a use of C implies a use of T,
     -- if C was brought into scope by T(..) or T(C)
@@ -638,7 +640,7 @@ reportUnusedNames my_mod_iface imports avail_env
     module_unused mod = moduleName mod `elem` unused_imp_mods
 
 
-warnDeprecations my_mod_iface used_names
+warnDeprecations this_mod my_deprecs used_names
   = doptRn Opt_WarnDeprecations				`thenRn` \ warn_drs ->
     if not warn_drs then returnRn () else
 
@@ -653,15 +655,16 @@ warnDeprecations my_mod_iface used_names
     mapRn_ warnDeprec deprecs
 
   where
-    my_deprecs = mi_deprecs my_mod_iface
-    lookup_deprec hit pit n 
-	| isLocallyDefined n = lookupDeprec my_deprecs n
-	| otherwise	     = case lookupTable hit pit n of
-				 Just iface -> lookupDeprec (mi_deprecs iface) n
-				 Nothing    -> pprPanic "warnDeprecations:" (ppr n)
+    lookup_deprec hit pit n
+	| nameIsLocalOrFrom this_mod n
+	= lookupDeprec my_deprecs n 
+	| otherwise
+	= case lookupIface hit pit this_mod n of
+		Just iface -> lookupDeprec (mi_deprecs iface) n
+		Nothing    -> pprPanic "warnDeprecations:" (ppr n)
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
-printMinimalImports my_mod_iface imps
+printMinimalImports this_mod imps
   = doptRn Opt_D_dump_minimal_imports		`thenRn` \ dump_minimal ->
     if not dump_minimal then returnRn () else
 
@@ -671,8 +674,7 @@ printMinimalImports my_mod_iface imps
 	})					`thenRn_`
     returnRn ()
   where
-    filename = moduleNameUserString (moduleName (mi_module my_mod_iface)) 
-	       ++ ".imports"
+    filename = moduleNameUserString (moduleName this_mod) ++ ".imports"
     ppr_mod_ie (mod_name, ies) 
 	| mod_name == pRELUDE_Name 
 	= empty
@@ -706,7 +708,7 @@ rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
 rnDump imp_decls local_decls
   = doptRn Opt_D_dump_rn_trace 	`thenRn` \ dump_rn_trace ->
     doptRn Opt_D_dump_rn_stats 	`thenRn` \ dump_rn_stats ->
-    doptRn Opt_D_dump_rn 		`thenRn` \ dump_rn ->
+    doptRn Opt_D_dump_rn 	`thenRn` \ dump_rn ->
     getIfacesRn			`thenRn` \ ifaces ->
 
     ioToRnM (do { dumpIfSet (dump_rn_trace || dump_rn_stats || dump_rn)
@@ -735,12 +737,11 @@ getRnStats imported_decls ifaces
     n_mods = length [() | _ <- moduleEnvElts (iPIT ifaces)]
 	-- This is really only right for a one-shot compile
     
-    decls_read     = [decl | (avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
+    decls_read     = [decl | (avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces)
     			-- Data, newtype, and class decls are in the decls_fm
     			-- under multiple names; the tycon/class, and each
     			-- constructor/class op too.
     			-- The 'True' selects just the 'main' decl
-    			 not (isLocallyDefined (availName avail))
     		     ]
     
     (cd_rd, dd_rd, nd_rd, sd_rd, vd_rd)        = countTyClDecls decls_read

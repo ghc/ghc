@@ -42,7 +42,8 @@ import Class		( classTyVars, classBigSig, classSelIds, classTyCon, classTvsFds,
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
-import Name		( Name, isLocallyDefined, NamedThing(..),
+import Module		( Module )
+import Name		( Name, NamedThing(..), isFrom,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
 			  plusNameEnv, nameEnvElts )
 import NameSet		( emptyNameSet )
@@ -296,8 +297,8 @@ tcClassSig rec_env clas clas_tyvars fds dm_info
 and superclass dictionary.
 
 \begin{code}
-mkImplicitClassBinds :: [Class] -> NF_TcM ([Id], TcMonoBinds)
-mkImplicitClassBinds classes
+mkImplicitClassBinds :: Module -> [Class] -> NF_TcM ([Id], TcMonoBinds)
+mkImplicitClassBinds this_mod classes
   = returnNF_Tc (concat cls_ids_s, andMonoBindList binds_s)
 	-- The selector binds are already in the selector Id's unfoldings
 	-- We don't return the data constructor etc from the class,
@@ -308,8 +309,8 @@ mkImplicitClassBinds classes
     mk_implicit clas = (sel_ids, binds)
 		     where
 			sel_ids = classSelIds clas
-			binds | isLocallyDefined clas = idsToMonoBinds sel_ids
-			      | otherwise	      = EmptyMonoBinds
+			binds | isFrom this_mod clas = idsToMonoBinds sel_ids
+			      | otherwise 	     = EmptyMonoBinds
 \end{code}
 
 
@@ -379,14 +380,14 @@ The function @tcClassDecls2@ just arranges to apply @tcClassDecl2@ to
 each local class decl.
 
 \begin{code}
-tcClassDecls2 :: [RenamedHsDecl] -> NF_TcM (LIE, TcMonoBinds)
+tcClassDecls2 :: Module -> [RenamedHsDecl] -> NF_TcM (LIE, TcMonoBinds)
 
-tcClassDecls2 decls
+tcClassDecls2 this_mod decls
   = foldr combine
 	  (returnNF_Tc (emptyLIE, EmptyMonoBinds))
 	  [tcClassDecl2 cls_decl | TyClD cls_decl <- decls, 
 				   isClassDecl cls_decl,
-				   isLocallyDefined (tyClDeclName cls_decl)]
+				   isFrom this_mod (tyClDeclName cls_decl)]
   where
     combine tc1 tc2 = tc1 `thenNF_Tc` \ (lie1, binds1) ->
 		      tc2 `thenNF_Tc` \ (lie2, binds2) ->

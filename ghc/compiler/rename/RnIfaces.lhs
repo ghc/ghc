@@ -36,7 +36,7 @@ import Id		( idType )
 import Type		( namesOfType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule, isLocallyDefined, nameUnique,
+			  nameModule, isLocalName, nameUnique,
 			  NamedThing(..),
 			  elemNameEnv
 			 )
@@ -458,15 +458,14 @@ getSlurped
 
 recordSlurp ifaces@(Ifaces { iSlurp = slurped_names, iVSlurp = (imp_mods, imp_names) })
 	    avail
-  = let
-	new_slurped_names = addAvailToNameSet slurped_names avail
-	new_vslurp | isModuleInThisPackage mod = (imp_mods, addOneToNameSet imp_names name)
-		   | otherwise		       = (extendModuleSet imp_mods mod, imp_names)
-		   where
-		     mod = nameModule name
-		     name = availName avail
-    in
+  = ASSERT2( not (isLocalName (availName avail)), pprAvail avail )
     ifaces { iSlurp  = new_slurped_names, iVSlurp = new_vslurp }
+  where
+    main_name = availName avail
+    mod	      = nameModule main_name
+    new_slurped_names = addAvailToNameSet slurped_names avail
+    new_vslurp | isModuleInThisPackage mod = (imp_mods, addOneToNameSet imp_names main_name)
+    	       | otherwise		   = (extendModuleSet imp_mods mod, imp_names)
 
 recordLocalSlurps local_avails
   = getIfacesRn 	`thenRn` \ ifaces ->
@@ -647,7 +646,7 @@ data ImportDeclResult
 
 importDecl name
   = 	-- Check if it was loaded before beginning this module
-    if isLocallyDefined name then
+    if isLocalName name then
 	returnRn AlreadySlurped
     else
     checkAlreadyAvailable name		`thenRn` \ done ->
@@ -660,13 +659,6 @@ importDecl name
     if name `elemNameSet` iSlurp ifaces then	
 	returnRn AlreadySlurped	
     else 
-
-	-- Don't slurp in decls from this module's own interface file
-	-- (Indeed, this shouldn't happen.)
-    if isLocallyDefined name then
-	addWarnRn (importDeclWarn name) `thenRn_`
-	returnRn AlreadySlurped
-    else
 
 	-- When we find a wired-in name we must load its home
 	-- module so that we find any instance decls lurking therein
@@ -798,9 +790,8 @@ recompileRequired iface_path source_unchanged iface
 	returnRn outOfDate
     else
 
-	-- CHECK WHETHER WE HAVE AN OLD IFACE
 	-- Source code unchanged and no errors yet... carry on 
-	checkList [checkModUsage u | u <- mi_usages iface]
+    checkList [checkModUsage u | u <- mi_usages iface]
 
 checkList :: [RnMG RecompileRequired] -> RnMG RecompileRequired
 checkList []		 = returnRn upToDate
@@ -915,12 +906,4 @@ getDeclErr name
   = vcat [ptext SLIT("Failed to find interface decl for") <+> quotes (ppr name),
 	  ptext SLIT("from module") <+> quotes (ppr (nameModule name))
 	 ]
-
-importDeclWarn name
-  = sep [ptext SLIT(
-    "Compiler tried to import decl from interface file with same name as module."), 
-	 ptext SLIT(
-    "(possible cause: module name clashes with interface file already in scope.)")
-	] $$
-    hsep [ptext SLIT("name:"), quotes (ppr name)]
 \end{code}

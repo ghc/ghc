@@ -21,7 +21,7 @@ module Name (
 	toRdrName, hashName,
 
 	isUserExportedName,
-	nameSrcLoc, isLocallyDefinedName, isDllName,
+	nameSrcLoc, nameIsLocallyDefined, isDllName, nameIsFrom, nameIsLocalOrFrom,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
 	isTyVarName,
@@ -36,7 +36,8 @@ module Name (
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
-	getSrcLoc, isLocallyDefined, getOccString, toRdrName
+	getSrcLoc, isLocallyDefined, getOccString, toRdrName,
+	isFrom, isLocalOrFrom
     ) where
 
 #include "HsVersions.h"
@@ -121,7 +122,9 @@ nameModule_maybe name				= Nothing
 \end{code}
 
 \begin{code}
-isLocallyDefinedName	:: Name -> Bool
+nameIsLocallyDefined	:: Name -> Bool
+nameIsFrom		:: Module -> Name -> Bool
+nameIsLocalOrFrom	:: Module -> Name -> Bool
 isUserExportedName	:: Name -> Bool
 isLocalName		:: Name -> Bool		-- Not globals
 isGlobalName		:: Name -> Bool
@@ -133,14 +136,23 @@ isGlobalName other	                = False
 
 isLocalName name = not (isGlobalName name)
 
-isLocallyDefinedName name = isLocalName name
+nameIsLocallyDefined name = isLocalName name
+
+nameIsLocalOrFrom from (Name {n_sort = Global mod}) = mod == from
+nameIsLocalOrFrom from other			    = True
+
+nameIsFrom from (Name {n_sort = Global mod}) = mod == from
+nameIsFrom from other			     = pprPanic "nameIsFrom" (ppr other)
 
 -- Global names are by definition those that are visible
 -- outside the module, *as seen by the linker*.  Externally visible
--- does not mean visible at the source level (that's isExported).
+-- does not mean visible at the source level (that's isUserExported).
 isExternallyVisibleName name = isGlobalName name
 
+-- Constructors, selectors and suchlike Globals, and are all exported
+-- Other Local things may or may not be exported
 isUserExportedName (Name { n_sort = Exported }) = True
+isUserExportedName (Name { n_sort = Global _ }) = True
 isUserExportedName other		        = False
 
 isSystemName (Name {n_sort = System}) = True
@@ -354,7 +366,7 @@ ifaceNameRdrName n | isLocallyDefined n = mkRdrUnqual (nameOccName n)
 isDllName :: Name -> Bool
 	-- Does this name refer to something in a different DLL?
 isDllName nm = not opt_Static &&
-	       not (isLocallyDefinedName nm) &&		-- isLocallyDefinedName test needed 'cos
+	       not (nameIsLocallyDefined nm) &&			-- isLocallyDefinedName test needed 'cos
 	       not (isModuleInThisPackage (nameModule nm))	-- nameModule won't work on local names
 
 
@@ -494,11 +506,15 @@ getSrcLoc	    :: NamedThing a => a -> SrcLoc
 isLocallyDefined    :: NamedThing a => a -> Bool
 getOccString	    :: NamedThing a => a -> String
 toRdrName	    :: NamedThing a => a -> RdrName
+isFrom		    :: NamedThing a => Module -> a -> Bool
+isLocalOrFrom	    :: NamedThing a => Module -> a -> Bool
 
 getSrcLoc	    = nameSrcLoc	   . getName
-isLocallyDefined    = isLocallyDefinedName . getName
+isLocallyDefined    = nameIsLocallyDefined . getName
 getOccString 	    = occNameString	   . getOccName
 toRdrName	    = ifaceNameRdrName	   . getName
+isFrom mod x	    = nameIsFrom mod (getName x)
+isLocalOrFrom mod x = nameIsLocalOrFrom mod ( getName x)
 \end{code}
 
 \begin{code}

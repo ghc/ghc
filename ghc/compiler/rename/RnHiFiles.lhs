@@ -21,7 +21,7 @@ import CmdLineOpts	( DynFlag(..), opt_IgnoreIfacePragmas )
 import HscTypes		( ModuleLocation(..),
 			  ModIface(..), emptyModIface,
 			  VersionInfo(..),
-			  lookupTableByModName, 
+			  lookupIfaceByModName, 
 			  ImportVersion, WhetherHasOrphans, IsBootInterface,
 			  DeclsMap, GatedDecl, IfaceInsts, IfaceRules,
 			  AvailInfo, GenAvailInfo(..), Avails, Deprecations(..)
@@ -40,7 +40,7 @@ import RnMonad
 import ParseIface	( parseIface, IfaceStuff(..) )
 
 import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule, isLocallyDefined, 
+			  nameModule, isLocalName, nameIsLocalOrFrom,
 			  NamedThing(..),
 			  mkNameEnv, extendNameEnv
 			 )
@@ -76,7 +76,8 @@ import Monad		( when )
 \begin{code}
 loadHomeInterface :: SDoc -> Name -> RnM d ModIface
 loadHomeInterface doc_str name
-  = loadInterface doc_str (moduleName (nameModule name)) ImportBySystem
+  = ASSERT2( not (isLocalName name), ppr name <+> parens doc_str )
+    loadInterface doc_str (moduleName (nameModule name)) ImportBySystem
 
 loadOrphanModules :: [ModuleName] -> RnM d ()
 loadOrphanModules mods
@@ -110,7 +111,7 @@ tryLoadInterface doc_str mod_name from
    getIfacesRn 			`thenRn` \ ifaces@(Ifaces { iPIT = pit }) ->
 	
 	-- CHECK WHETHER WE HAVE IT ALREADY
-   case lookupTableByModName hit pit mod_name of {
+   case lookupIfaceByModName hit pit mod_name of {
 	Just iface  -> returnRn (iface, Nothing) ;	-- Already loaded
 	Nothing	    -> 
 
@@ -191,7 +192,7 @@ tryLoadInterface doc_str mod_name from
 			ImportByUser -> addModDeps mod is_loaded (pi_usages iface) mod_map
 			other        -> mod_map
 	mod_map2 = delFromFM mod_map1 mod_name
-	is_loaded m = maybeToBool (lookupTableByModName hit pit m)
+	is_loaded m = maybeToBool (lookupIfaceByModName hit pit m)
 
 	-- Now add info about this module to the PIT
 	has_orphans = pi_orphan iface
@@ -553,16 +554,32 @@ readIface tr file_path
 %*							*
 %*********************************************************
 
-This has to be in RnIfaces (or RnHiFiles) because it calls loadHomeInterface
+@lookupFixityRn@ has to be in RnIfaces (or RnHiFiles) because 
+it calls @loadHomeInterface@.
+
+lookupFixity is a bit strange.  
+
+* Nested local fixity decls are put in the local fixity env, which we
+  find with getFixtyEnv
+
+* Imported fixities are found in the HIT or PIT
+
+* Top-level fixity decls in this module may be for Names that are
+    either  Global	   (constructors, class operations)
+    or 	    Local/Exported (everything else)
+  (See notes with RnNames.getLocalDeclBinders for why we have this split.)
+  We put them all in the local fixity environment
 
 \begin{code}
 lookupFixityRn :: Name -> RnMS Fixity
 lookupFixityRn name
-  | isLocallyDefined name
-  = getFixityEnv			`thenRn` \ local_fix_env ->
-    returnRn (lookupLocalFixity local_fix_env name)
+  = getModuleRn				`thenRn` \ this_mod ->
+    if nameIsLocalOrFrom this_mod name
+    then	-- It's defined in this module
+	getFixityEnv			`thenRn` \ local_fix_env ->
+	returnRn (lookupLocalFixity local_fix_env name)
 
-  | otherwise	-- Imported
+    else	-- It's imported
       -- For imported names, we have to get their fixities by doing a loadHomeInterface,
       -- and consulting the Ifaces that comes back from that, because the interface
       -- file for the Name might not have been loaded yet.  Why not?  Suppose you import module A,
@@ -570,11 +587,10 @@ lookupFixityRn name
       -- right away (after all, it's possible that nothing from B will be used).
       -- When we come across a use of 'f', we need to know its fixity, and it's then,
       -- and only then, that we load B.hi.  That is what's happening here.
-  = getHomeIfaceTableRn 		`thenRn` \ hit ->
-    loadHomeInterface doc name		`thenRn` \ iface ->
-    returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
+  	loadHomeInterface doc name		`thenRn` \ iface ->
+	returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
   where
-    doc = ptext SLIT("Checking fixity for") <+> ppr name
+    doc      = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}
 
 

@@ -663,7 +663,7 @@ groupAvails this_mod avails
     ]
   where
     groupFM :: FiniteMap FastString Avails
-	-- Deliberatey use the FastString so we
+	-- Deliberately use the FastString so we
 	-- get a canonical ordering
     groupFM = foldl add emptyFM avails
 

@@ -55,7 +55,7 @@ import Bag		( isEmptyBag )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, HomeIfaceTable,
 			  PackageTypeEnv, DFunId, ModIface(..),
-			  TypeEnv, extendTypeEnvList, lookupTable,
+			  TypeEnv, extendTypeEnvList, lookupIface,
 		          TyThing(..), mkTypeEnv )
 import List		( partition )
 \end{code}
@@ -110,7 +110,7 @@ typecheckModule dflags this_mod pcs hst hit decls
     pit = pcs_PIT pcs
 
     get_fixity :: Name -> Maybe Fixity
-    get_fixity nm = lookupTable hit pit nm 	`thenMaybe` \ iface ->
+    get_fixity nm = lookupIface hit pit this_mod nm 	`thenMaybe` \ iface ->
 		    lookupNameEnv (mi_fixities iface) nm
 \end{code}
 
@@ -136,20 +136,14 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     tcTyAndClassDecls unf_env decls		`thenTc` \ env ->
     tcSetEnv env 				$
     let
-        classes       = tcEnvClasses env
-        tycons        = tcEnvTyCons env	-- INCLUDES tycons derived from classes
-        local_tycons  = [ tc | tc <- tycons,
-    			       isLocallyDefined tc,
-    			       not (isClassTyCon tc)
-  	  	        ]
-    			-- For local_tycons, filter out the ones derived from classes
-    			-- Otherwise the latter show up in interface files
+        classes = tcEnvClasses env
+        tycons  = tcEnvTyCons env	-- INCLUDES tycons derived from classes
     in
     
     	-- Typecheck the instance decls, includes deriving
     tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
 		 hst unf_env get_fixity this_mod 
-		 local_tycons decls		`thenTc` \ (new_pcs_insts, inst_env, local_inst_info, deriv_binds) ->
+		 tycons decls		`thenTc` \ (new_pcs_insts, inst_env, local_inst_info, deriv_binds) ->
     tcSetInstEnv inst_env			$
     
         -- Default declarations
@@ -173,8 +167,8 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     -- We don't create bindings for dictionary constructors;
     -- they are always fully applied, and the bindings are just there
     -- to support partial applications
-    mkImplicitDataBinds tycons			`thenTc`    \ (data_ids, imp_data_binds) ->
-    mkImplicitClassBinds classes		`thenNF_Tc` \ (cls_ids,  imp_cls_binds) ->
+    mkImplicitDataBinds  this_mod tycons	`thenTc`    \ (data_ids, imp_data_binds) ->
+    mkImplicitClassBinds this_mod classes	`thenNF_Tc` \ (cls_ids,  imp_cls_binds) ->
     
     -- Extend the global value environment with 
     --	(a) constructors
@@ -201,7 +195,7 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     	-- Second pass over class and instance declarations,
     	-- to compile the bindings themselves.
     tcInstDecls2  local_inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
-    tcClassDecls2 decls				`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
+    tcClassDecls2 this_mod decls		`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
     tcRules (pcs_rules pcs) this_mod decls	`thenNF_Tc` \ (new_pcs_rules, lie_rules, local_rules) ->
     
          -- Deal with constant or ambiguous InstIds.  How could
@@ -299,11 +293,7 @@ dump_sigs results	-- Print type signatures
     ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
 
     want_sig id | opt_PprStyle_Debug = True
-	        | otherwise	     = isLocallyDefined n && 
-				       isGlobalName n && 
-				       not (isSysOcc (nameOccName n))
-				     where
-				       n = idName id
+	        | otherwise	     = isLocallyDefined id
 
 ppr_gen_tycons tcs = vcat [ptext SLIT("{-# Generic type constructor details"),
 			   vcat (map ppr_gen_tycon (filter isLocallyDefined tcs)),

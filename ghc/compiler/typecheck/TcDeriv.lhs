@@ -31,21 +31,18 @@ import BasicTypes	( Fixity )
 import Class		( classKey, Class )
 import ErrUtils		( dumpIfSet_dyn, Message )
 import MkId		( mkDictFunId )
-import Id		( idType )
 import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
 import Module		( Module )
-import Name		( Name, isLocallyDefined, getSrcLoc )
+import Name		( Name, isFrom, getSrcLoc )
 import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, TyCon
 			)
-import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp,
-			  splitDFunTy, isUnboxedType
-			)
+import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp, isUnboxedType )
 import Var		( TyVar )
 import PrelNames
 import Util		( zipWithEqual, sortLt, thenCmp )
@@ -184,16 +181,16 @@ tcDeriving  :: PersistentRenamerState
 	    -> Module			-- name of module under scrutiny
 	    -> InstEnv			-- What we already know about instances
 	    -> (Name -> Maybe Fixity)	-- used in deriving Show and Read
-	    -> [TyCon]			-- "local_tycons" ???
+	    -> [TyCon]			-- All type constructors
 	    -> TcM ([InstInfo],		-- The generated "instance decls".
 		    RenamedHsBinds)	-- Extra generated bindings
 
-tcDeriving prs mod inst_env_in get_fixity local_tycons
+tcDeriving prs mod inst_env_in get_fixity tycons
   = recoverTc (returnTc ([], EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns mod local_tycons	    	`thenTc` \ eqns ->
+    makeDerivEqns mod tycons	    	`thenTc` \ eqns ->
     if null eqns then
 	returnTc ([], EmptyBinds)
     else
@@ -230,7 +227,7 @@ tcDeriving prs mod inst_env_in get_fixity local_tycons
 			returnRn (rn_method_binds_s, rn_extra_binds)
 		  )
 
-	new_inst_infos = map gen_inst_info (new_dfuns `zip` rn_method_binds_s)
+	new_inst_infos = zipWith gen_inst_info new_dfuns rn_method_binds_s
     in
 
     ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
@@ -244,16 +241,10 @@ tcDeriving prs mod inst_env_in get_fixity local_tycons
       where
 
 	-- Make a Real dfun instead of the dummy one we have so far
-    gen_inst_info :: (DFunId, RenamedMonoBinds) -> InstInfo
-    gen_inst_info (dfun, binds)
-      = InstInfo { iLocal = True,
-		   iClass = clas, iTyVars = tyvars, 
-		   iTys = tys, iTheta = theta, 
-		   iDFunId = dfun, 
-		   iBinds = binds,
-		   iLoc = getSrcLoc dfun, iPrags = [] }
-        where
-	 (tyvars, theta, clas, tys) = splitDFunTy (idType dfun)
+    gen_inst_info :: DFunId -> RenamedMonoBinds -> InstInfo
+    gen_inst_info dfun binds
+      = InstInfo { iLocal = True,  iDFunId = dfun, 
+		   iBinds = binds, iPrags = [] }
 
     rn_meths meths = rnMethodBinds [] meths `thenRn` \ (meths', _) -> returnRn meths'
 	-- Ignore the free vars returned
@@ -284,12 +275,12 @@ all those.
 \begin{code}
 makeDerivEqns :: Module -> [TyCon] -> TcM [DerivEqn]
 
-makeDerivEqns this_mod local_tycons
+makeDerivEqns this_mod tycons
   = let
-	think_about_deriving = need_deriving local_tycons
+	think_about_deriving = need_deriving tycons
 	(derive_these, _)    = removeDups cmp_deriv think_about_deriving
     in
-    if null local_tycons then
+    if null think_about_deriving then
 	returnTc []	-- Bale out now
     else
     mapTc mk_eqn derive_these `thenTc`	\ maybe_eqns ->
@@ -300,9 +291,9 @@ makeDerivEqns this_mod local_tycons
 	-- find the tycons that have `deriving' clauses;
 
     need_deriving tycons_to_consider
-      = foldr (\ tycon acc -> [(clas,tycon) | clas <- tyConDerivings tycon] ++ acc)
-	      []
-	      tycons_to_consider
+      = [ (clas,tycon) | tycon <- tycons_to_consider,
+			 isFrom this_mod tycon,
+			 clas <- tyConDerivings tycon ]
 
     ------------------------------------------------------------------
     cmp_deriv :: (Class, TyCon) -> (Class, TyCon) -> Ordering
@@ -525,7 +516,6 @@ the renamer.  What a great hack!
 --  names.)
 gen_bind :: (Name -> Maybe Fixity) -> DFunId -> RdrNameMonoBinds
 gen_bind get_fixity dfun
-  | not (isLocallyDefined tycon) = EmptyMonoBinds
   | clas `hasKey` showClassKey   = gen_Show_binds get_fixity tycon
   | clas `hasKey` readClassKey   = gen_Read_binds get_fixity tycon
   | otherwise

@@ -37,7 +37,8 @@ import DataCon		( DataCon, mkDataCon,
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import FieldLabel
 import Var		( Id, TyVar )
-import Name		( Name, isLocallyDefined, NamedThing(..) )
+import Module		( Module )
+import Name		( Name, NamedThing(..), isFrom )
 import Outputable
 import TyCon		( TyCon, isSynTyCon, isNewTyCon,
 			  tyConDataConsIfAvailable, tyConTyVars, tyConGenIds
@@ -216,15 +217,15 @@ getBangStrictness (Unpacked _) = markedUnboxed
 %************************************************************************
 
 \begin{code}
-mkImplicitDataBinds :: [TyCon] -> TcM ([Id], TcMonoBinds)
-mkImplicitDataBinds [] = returnTc ([], EmptyMonoBinds)
-mkImplicitDataBinds (tycon : tycons) 
-  | isSynTyCon tycon = mkImplicitDataBinds tycons
-  | otherwise	     = mkImplicitDataBinds_one tycon	`thenTc` \ (ids1, b1) ->
-		       mkImplicitDataBinds tycons	`thenTc` \ (ids2, b2) ->
+mkImplicitDataBinds :: Module -> [TyCon] -> TcM ([Id], TcMonoBinds)
+mkImplicitDataBinds this_mod [] = returnTc ([], EmptyMonoBinds)
+mkImplicitDataBinds this_mod (tycon : tycons) 
+  | isSynTyCon tycon = mkImplicitDataBinds this_mod tycons
+  | otherwise	     = mkImplicitDataBinds_one this_mod tycon	`thenTc` \ (ids1, b1) ->
+		       mkImplicitDataBinds this_mod tycons	`thenTc` \ (ids2, b2) ->
 		       returnTc (ids1++ids2, b1 `AndMonoBinds` b2)
 
-mkImplicitDataBinds_one tycon
+mkImplicitDataBinds_one this_mod tycon
   = mapTc (mkRecordSelector tycon) groups	`thenTc` \ sel_ids ->
     let
 	unf_ids = sel_ids ++ data_con_wrapper_ids ++ gen_ids
@@ -233,8 +234,8 @@ mkImplicitDataBinds_one tycon
 	-- For the locally-defined things
 	-- we need to turn the unfoldings inside the selector Ids into bindings,
 	-- and build bindigns for the constructor wrappers
-	binds | isLocallyDefined tycon = idsToMonoBinds unf_ids
-	      | otherwise	       = EmptyMonoBinds
+	binds | isFrom this_mod tycon = idsToMonoBinds unf_ids
+	      | otherwise 	      = EmptyMonoBinds
     in	
     returnTc (all_ids, binds)
   where
