@@ -12,7 +12,7 @@ module PprCore (
 	pprCoreExpr, pprParendExpr,
 	pprCoreBinding, pprCoreBindings, pprIdBndr,
 	pprCoreBinding, pprCoreBindings, pprCoreAlt,
-	pprCoreRules, pprCoreRule, pprIdCoreRule
+	pprIdRules, pprCoreRule
     ) where
 
 #include "HsVersions.h"
@@ -361,7 +361,7 @@ ppIdInfo b info
             ppCprInfo m,
 #endif
 	    ppr (newStrictnessInfo info),
-	    pprCoreRules b p
+	    vcat (map (pprCoreRule (ppr b)) (rulesRules p))
 	-- Inline pragma, occ, demand, lbvar info
 	-- printed out with all binders (when debug is on); 
 	-- see PprCore.pprIdBndr
@@ -378,11 +378,11 @@ ppIdInfo b info
 
 
 \begin{code}
-pprCoreRules :: Id -> CoreRules -> SDoc
-pprCoreRules var (Rules rules _) = vcat (map (pprCoreRule (ppr var)) rules)
+pprIdRules :: [IdCoreRule] -> SDoc
+pprIdRules rules = vcat (map pprIdRule rules)
 
-pprIdCoreRule :: IdCoreRule -> SDoc
-pprIdCoreRule (id,rule) = pprCoreRule (ppr id) rule
+pprIdRule :: IdCoreRule -> SDoc
+pprIdRule (id,rule) = pprCoreRule (ppr id) rule
 
 pprCoreRule :: SDoc -> CoreRule -> SDoc
 pprCoreRule pp_fn (BuiltinRule name _)

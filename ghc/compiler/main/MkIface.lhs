@@ -44,7 +44,7 @@ import Var              ( Var )
 import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
-import PprCore		( pprIdCoreRule )
+import PprCore		( pprIdRules )
 import Name		( getName, nameModule, toRdrName, isExternalName, 
 			  nameIsLocalOrFrom, Name, NamedThing(..) )
 import NameEnv
@@ -539,7 +539,7 @@ dump_sigs ids
 dump_rules :: [IdCoreRule] -> SDoc
 dump_rules [] = empty
 dump_rules rs = vcat [ptext SLIT("{-# RULES"),
-		      nest 4 (vcat (map pprIdCoreRule rs)),
+		      nest 4 (pprIdRules rs),
 		      ptext SLIT("#-}")]
 \end{code}
 

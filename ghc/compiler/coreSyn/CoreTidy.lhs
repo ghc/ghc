@@ -5,7 +5,7 @@
 
 \begin{code}
 module CoreTidy (
-	tidyCorePgm, tidyExpr, tidyCoreExpr,
+	tidyCorePgm, tidyExpr, tidyCoreExpr, tidyIdRules,
 	tidyBndr, tidyBndrs
     ) where
 
@@ -15,15 +15,14 @@ import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
 import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
-import PprCore		( pprIdCoreRule )
+import PprCore		( pprIdRules )
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprArity )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
-import Id		( idType, idInfo, idName, isExportedId, 
-			  idSpecialisation, idUnique, 
-			  mkVanillaGlobal, isLocalId, 
+import Id		( idType, idInfo, idName, idCoreRules, 
+			  isExportedId, idUnique, mkVanillaGlobal, isLocalId, 
 			  isImplicitId, mkUserLocal, setIdInfo
 			) 
 import IdInfo		{- loads of stuff -}
@@ -169,7 +168,7 @@ tidyCorePgm dflags mod pcs cg_info_env
 	       		= mapAccumL (tidyTopBind mod ext_ids cg_info_env) 
 				    init_tidy_env binds_in
 
-	; let tidy_rules = tidyIdRules (occ_env,subst_env) ext_rules
+	; let tidy_rules = tidyIdCoreRules (occ_env,subst_env) ext_rules
 
 	; let prs' = prs { prsOrig = orig_ns' }
 	      pcs' = pcs { pcs_PRS = prs' }
@@ -196,7 +195,7 @@ tidyCorePgm dflags mod pcs cg_info_env
    	; endPass dflags "Tidy Core" Opt_D_dump_simpl tidy_binds
 	; dumpIfSet_core dflags Opt_D_dump_simpl
 		"Tidy Core Rules"
-		(vcat (map pprIdCoreRule tidy_rules))
+		(pprIdRules tidy_rules)
 
 	; return (pcs', tidy_details)
 	}
@@ -255,11 +254,11 @@ findExternalRules binds orphan_rules ext_ids
   | otherwise
   = filter needed_rule (orphan_rules ++ local_rules)
   where
-    local_rules  = [ (id, rule)
+    local_rules  = [ rule
  		   | id <- bindersOfBinds binds,
 		     id `elemVarEnv` ext_ids,
-		     rule <- rulesRules (idSpecialisation id)
-		 ]
+		     rule <- idCoreRules id
+		   ]
     needed_rule (id, rule)
 	=  not (isBuiltinRule rule)
 	 	-- We can't print builtin rules in interface files
@@ -570,11 +569,14 @@ tidyWorker tidy_env other
   = NoWorker
 
 ------------  Rules  --------------
-tidyIdRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
-tidyIdRules env [] = []
-tidyIdRules env ((fn,rule) : rules)
+tidyIdRules :: Id -> [IdCoreRule]
+tidyIdRules id = tidyIdCoreRules emptyTidyEnv (idCoreRules id)
+
+tidyIdCoreRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
+tidyIdCoreRules env [] = []
+tidyIdCoreRules env ((fn,rule) : rules)
   = tidyRule env rule  		=: \ rule ->
-    tidyIdRules env rules 	=: \ rules ->
+    tidyIdCoreRules env rules 	=: \ rules ->
      ((tidyVarOcc env fn, rule) : rules)
 
 tidyRule :: TidyEnv -> CoreRule -> CoreRule

@@ -14,12 +14,13 @@ import CoreSyn
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, eqExpr, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
+import CoreTidy		( tidyIdRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
-import PprCore		( pprCoreRules )
+import PprCore		( pprIdRules )
 import Id		( Id, idName, idType, idSpecialisation,
-			  isDataConId_maybe,
+			  isDataConId_maybe, 
 			  mkUserLocal, mkSysLocal )
 import Var		( Var )
 import VarEnv
@@ -190,7 +191,7 @@ specConstrProgram dflags us binds
 			  go env' binds 	`thenUs` \ binds' ->
 			  returnUs (bind' : binds')
 
-dump_specs var = pprCoreRules var (idSpecialisation var)
+    dump_specs var = pprIdRules (tidyIdRules var)
 \end{code}
 
 

@@ -34,7 +34,7 @@ then
 then
 	PrimOp (PprType, TysWiredIn)
 then
-	CoreSyn
+	CoreSyn [does not import Id]
 then
 	IdInfo (CoreSyn.Unfolding, CoreSyn.CoreRules)
 then
@@ -49,9 +49,12 @@ then
 then
 	CoreUnfold (OccurAnal.occurAnalyseGlobalExpr)
 then
-	Rules (Unfolding), Subst (Unfolding, CoreFVs), CoreTidy (noUnfolding), Generics (mkTopUnfolding)
+	CoreTidy (CoreUnfold.noUnfolding)
+	Subst (Unfolding, CoreFVs)
+	Generics (mkTopUnfolding)
 then
-	MkId (CoreUnfold.mkUnfolding, Subst)
+	Rules (Unfolding, CoreTidy.tidyIdRules)
+	MkId (CoreUnfold.mkUnfolding, Subst, Rule.addRule)
 then
 	PrelInfo (MkId)
 

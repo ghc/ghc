@@ -16,7 +16,7 @@ import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
 import TcModule		( TcResults(..) )
 import Id		( Id )
 import CoreSyn
-import PprCore		( pprIdCoreRule, pprCoreExpr )
+import PprCore		( pprIdRules, pprCoreExpr )
 import Subst		( substExpr, mkSubst, mkInScopeSet )
 import DsMonad
 import DsExpr		( dsExpr )
@@ -150,7 +150,7 @@ dsProgram mod_name all_binds rules fo_decls
 ppr_ds_rules [] = empty
 ppr_ds_rules rules
   = text "" $$ text "-------------- DESUGARED RULES -----------------" $$
-    vcat (map pprIdCoreRule rules)
+    pprIdRules rules
 \end{code}
 
 

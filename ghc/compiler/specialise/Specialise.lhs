@@ -25,8 +25,9 @@ import VarEnv
 import CoreSyn
 import CoreUtils	( applyTypeToArgs )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
+import CoreTidy		( tidyIdRules )
 import CoreLint		( showPass, endPass )
-import PprCore		( pprCoreRules )
+import PprCore		( pprIdRules )
 import Rules		( addIdSpecialisations, lookupRule )
 
 import UniqSupply	( UniqSupply,
@@ -590,6 +591,8 @@ specProgram dflags us binds
 
 	return binds'
   where
+    dump_specs var = pprIdRules (tidyIdRules var)
+
 	-- We need to start with a Subst that knows all the things
 	-- that are in scope, so that the substitution engine doesn't
 	-- accidentally re-use a unique that's already in use
@@ -601,8 +604,6 @@ specProgram dflags us binds
     go (bind:binds) = go binds 				`thenSM` \ (binds', uds) ->
 		      specBind top_subst bind uds	`thenSM` \ (bind', uds') ->
 		      returnSM (bind' ++ binds', uds')
-
-dump_specs var = pprCoreRules var (idSpecialisation var)
 \end{code}
 
 %************************************************************************
