@@ -21,4 +21,8 @@ LIBRARY=libHSmisc_cbits.a
 LIBOBJS=$(C_OBJS)
 INSTALL_LIBS += $(LIBRARY)
 
+DLL_NAME = HSmisc_cbits.dll
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSmisc_cbits.def
+SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lHS_cbits_imp -lgmp -L. -L../../../rts/gmp -L../../../rts -L../../std/cbits
+
 include $(TOP)/mk/target.mk

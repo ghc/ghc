@@ -19,7 +19,11 @@ StgInt opt;
 {
   int level,optval, sz_optval,rc;
 
-  if ( opt == TCP_MAXSEG || opt == TCP_NODELAY ) {
+  if ( 
+#ifndef _WIN32
+       opt == TCP_MAXSEG ||
+#endif
+       opt == TCP_NODELAY ) {
      level = IPPROTO_TCP;
   } else {
      level = SOL_SOCKET;
@@ -45,7 +49,11 @@ StgInt val;
 {
   int level, optval,rc;
 
-  if ( opt == TCP_MAXSEG || opt == TCP_NODELAY ) {
+  if ( 
+#ifndef _WIN32
+       opt == TCP_MAXSEG || 
+#endif
+       opt == TCP_NODELAY ) {
      level = IPPROTO_TCP;
   } else {
      level = SOL_SOCKET;

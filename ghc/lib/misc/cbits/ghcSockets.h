@@ -1,6 +1,10 @@
 #ifndef GHC_SOCKETS_H
 #define GHC_SOCKETS_H
 
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
+#else
+
 #include <ctype.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -39,13 +43,15 @@
 #include <sys/uio.h>
 
 /* ToDo: featurise this */
-#ifndef cygwin32_TARGET_OS
+#if  !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
 #include <sys/un.h>
 #endif
 
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif
+
+#endif /* !HAVE_WINSOCK_H */
 
 /* acceptSocket.lc */
 StgInt	acceptSocket (StgInt, StgAddr, StgAddr);
@@ -87,5 +93,10 @@ StgInt	setSocketOption__ (StgInt, StgInt, StgInt);
 /* writeDescriptor.lc */
 StgInt	writeDescriptor (StgInt, StgAddr, StgInt);
 
+/* initWinSock.c */
+#ifdef _WIN32
+StgInt  initWinSock();
+void    shutdownWinSock();
+#endif
 
 #endif /* !GHC_SOCKETS_H */
