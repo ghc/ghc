@@ -285,10 +285,16 @@ sub mangle_command_line_args {
 	    } else {
 		push(@Src_files, $_);
 	    }
-
-	} elsif ($Dashdashes_seen == 1) { # where we ignore unknown options
-	    push(@Src_files, $_) if ! /^-/;
-	}
+        }
+        # Removed support for picking up plausible source file 
+        # names inside the ghc options chunk of the command
+        # line. It failed to deal with `option-value' stuff present
+        # on some invocations of ghc (e.g., "-ohi foo.baz").
+        #  -- sof 12/97
+	#
+	# } elsif ($Dashdashes_seen == 1) {
+	#     push(@Src_files, $_) if ! /^-/;
+	# }
     }
     @File_suffix = sort (@File_suffix);
 }
