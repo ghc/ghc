@@ -295,8 +295,8 @@ cssFile, iconFile, jsFile, plusFile,minusFile :: String
 cssFile   = "haddock.css"
 iconFile  = "haskell_icon.gif"
 jsFile    = "haddock.js"
-plusFile  = "plus.jpg"
-minusFile = "minus.jpg"
+plusFile  = "plus.gif"
+minusFile = "minus.gif"
 
 -----------------------------------------------------------------------------
 -- misc.

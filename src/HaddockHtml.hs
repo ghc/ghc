@@ -243,7 +243,7 @@ ppPrologue title (Just doc) =
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
   tda [theclass "section1"] << toHtml "Modules" </>
-  td <<  table ! [cellpadding 0, cellspacing 2] << htmlTable
+  td << vanillaTable << htmlTable
   where
     genTable htmlTable id []     = (htmlTable,id)
     genTable htmlTable id (x:xs) = genTable (htmlTable </> u) id' xs      
@@ -279,7 +279,7 @@ mkNode ss (Node s leaf pkg ts) id = htmlNode
     genSubTree :: HtmlTable -> Int -> [ModuleTree] -> (Html,Int)
     genSubTree htmlTable id [] = (sub_tree,id)
       where
-        sub_tree = table ! [identifier id_s, thestyle "display:none;", cellpadding 0, cellspacing 0, width "100%"] << htmlTable
+        sub_tree = vanillaTable ! [identifier id_s, thestyle "display:none;"] << htmlTable
     genSubTree htmlTable id (x:xs) = genSubTree (htmlTable </> u) id' xs      
       where
         (u,id') = mkNode (s:ss) x id
