@@ -44,7 +44,7 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConTheta, isProductTyCon, isDataTyCon, newTyConRhs,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
-import TcType		( TcType, ThetaType, mkTyVarTy, mkTyVarTys, mkTyConApp, 
+import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, 
 			  getClassPredTys_maybe, tcTyConAppTyCon,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, isArgTypeKind,
 			  tcEqTypes, tcSplitAppTys, mkAppTys, tcSplitDFunTy )
@@ -398,8 +398,7 @@ makeDerivEqns tycl_decls
 	--	newtype A = MkA B deriving( Num )
 	-- We want the Num instance of B, *not* the Num instance of Int,
 	-- when making the Num instance of A!
-	tyvars 		      = tyConTyVars tycon
-        rep_ty 		      = newTyConRhs tycon
+        (tyvars, rep_ty)      = newTyConRhs tycon
 	(rep_fn, rep_ty_args) = tcSplitAppTys rep_ty
 
 	n_tyvars_to_keep = tyConArity tycon  - n_args_to_drop
