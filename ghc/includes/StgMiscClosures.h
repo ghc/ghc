@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.24 2000/12/14 15:19:47 sewardj Exp $
+ * $Id: StgMiscClosures.h,v 1.25 2000/12/14 16:33:18 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -55,15 +55,15 @@ STGFUN(stg_dummy_ret_entry);
 
 #ifdef GHCI
 /* entry code for constructors created by the metacircular interpreter */
-STGFUN(stg_bco_constr_entry);
-STGFUN(stg_bco_constr1_entry);
-STGFUN(stg_bco_constr2_entry);
-STGFUN(stg_bco_constr3_entry);
-STGFUN(stg_bco_constr4_entry);
-STGFUN(stg_bco_constr5_entry);
-STGFUN(stg_bco_constr6_entry);
-STGFUN(stg_bco_constr7_entry);
-STGFUN(stg_bco_constr8_entry);
+STGFUN(stg_interp_constr_entry);
+STGFUN(stg_interp_constr1_entry);
+STGFUN(stg_interp_constr2_entry);
+STGFUN(stg_interp_constr3_entry);
+STGFUN(stg_interp_constr4_entry);
+STGFUN(stg_interp_constr5_entry);
+STGFUN(stg_interp_constr6_entry);
+STGFUN(stg_interp_constr7_entry);
+STGFUN(stg_interp_constr8_entry);
 #endif
 
 #if defined(PAR) || defined(GRAN)
