@@ -158,8 +158,6 @@ sub constructNewHiFile {
     print NEWHI $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
     print NEWHI $Stuff{'new:instances'} unless $Stuff{'new:instances'} eq '';
 
-    print STDERR @decl_names ;
-
     foreach $v (@decl_names) {
 	&printNewItemVersion(NEWHI, $v, $new_module_version, $show_hi_diffs);		# Print new version number
 	print NEWHI $Decl{"new:$v"};		# Print the new decl itself
