@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.15 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: Stable.c,v 1.16 2001/08/08 16:03:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -293,7 +293,9 @@ markStablePtrTable(evac_fn evac)
     for (p = stable_ptr_table+1; p < end_stable_ptr_table; p++) {
 	q = p->addr;
 
-	// internal pointers or NULL are free slots 
+	// Internal pointers are free slots.  If q == NULL, it's a
+	// stable name where the object has been GC'd, but the
+	// StableName object (sn_obj) is still alive.
 	if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
 
 	    // save the current addr away: we need to be able to tell
@@ -326,16 +328,14 @@ threadStablePtrTable( evac_fn evac )
     end_stable_ptr_table = &stable_ptr_table[SPT_size];
     
     for (p = stable_ptr_table+1; p < end_stable_ptr_table; p++) {
-	q = p->addr;
 	
-	// internal pointers or NULL are free slots
+	if (p->sn_obj != NULL) {
+	    evac((StgClosure **)&p->sn_obj);
+	}
+
+	q = p->addr;
 	if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
-	    if (p->weight != 0) {
-		evac((StgClosure **)&p->addr);
-	    }
-	    if (p->sn_obj != NULL) {
-		evac((StgClosure **)&p->sn_obj);
-	    }
+	    evac((StgClosure **)&p->addr);
 	}
     }
 }
@@ -370,6 +370,9 @@ gcStablePtrTable( void )
 	    p->sn_obj = isAlive(p->sn_obj);
 	}
 	
+	// Internal pointers are free slots.  If q == NULL, it's a
+	// stable name where the object has been GC'd, but the
+	// StableName object (sn_obj) is still alive.
 	q = p->addr;
 	if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
 
