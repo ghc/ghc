@@ -27,7 +27,7 @@ import TcHsSyn		( SYN_IE(TypecheckedPat),
 import DsHsSyn		( outPatType ) 
 import CoreSyn		
 
-import DsMonad		( DsMatchContext(..),
+import DsMonad		( SYN_IE(DsM), DsMatchContext(..),
 			  DsMatchKind(..)
                         )
 import DsUtils		( EquationInfo(..),
