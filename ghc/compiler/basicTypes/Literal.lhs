@@ -28,11 +28,10 @@ import TysPrim		( getPrimRepInfo,
 import CStrings		( stringToC, charToC, charToEasyHaskell )
 import TysWiredIn	( stringTy )
 import Pretty		-- pretty-printing stuff
-import PprStyle		( PprStyle(..), codeStyle, ifaceStyle )
-import Util		--( thenCmp, panic, pprPanic )
+import Outputable	( PprStyle(..), codeStyle, ifaceStyle, Outputable(..) )
+import Util		( thenCmp, panic, pprPanic, Ord3(..) )
 #if __GLASGOW_HASKELL__ >= 202
 import Type
-import Outputable
 #endif
 \end{code}
 
