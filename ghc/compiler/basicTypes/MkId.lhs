@@ -177,8 +177,10 @@ Notice that
 dataConInfo :: Id -> IdInfo
 
 dataConInfo con_id
-  = setInlinePragInfo IWantToBeINLINEd $
-	    	-- Always inline constructors if possible
+  = setInlinePragInfo IMustBeINLINEd $
+	    	-- Always inline constructors; we don't create a binding for them
+		-- (well, at least not for dict constructors, since they are 
+		--  always applied)
     setArityInfo (exactArity (length locals)) $
     setUnfoldingInfo unfolding $
     noIdInfo
