@@ -460,8 +460,11 @@ AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime m
 #
 dnl ** check whether this machine has GMP 2.0 installed
 #
-AC_CHECK_LIB(gmp, mpz_fdiv_qr, HaveLibGmp=YES, HaveLibGmp=NO)
+AC_CHECK_LIB(gmp,  mpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
+  AC_CHECK_LIB(gmp2, mpz_fdiv_qr,  HaveLibGmp=YES; LibGmp=gmp2,
+    HaveLibGmp=No; LibGmp=not-installed))
 AC_SUBST(HaveLibGmp)
+AC_SUBST(LibGmp)
 
 #
 dnl ** check whether this machine has BFD and liberty installed (used for debugging)
