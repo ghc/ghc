@@ -233,6 +233,15 @@ i[[3456]]86-next-nextstep3)
         HostVendor_CPP='next'
         HostOS_CPP='nextstep3'
         ;;
+m68k-*-openbsd*)
+	HostPlatform=m68k-unknown-openbsd
+	TargetPlatform=m68k-unknown-openbsd
+	BuildPlatform=m68k-unknown-openbsd
+        HostPlatform_CPP='m68k_unknown_openbsd'
+        HostArch_CPP='m68k'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
+        ;;
 m68k-sun-sunos4*)
 	HostPlatform=m68k-sun-sunos4
 	TargetPlatform=m68k-sun-sunos4 #hack
