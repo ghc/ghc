@@ -3,12 +3,9 @@ include ($confdir ++ "/../singlefile-macros.T")
 expect pass
 
 pretest_cleanup()
-$res = simple_compile_Main()
+simple_build_Main()
+$res = simple_run_Main()
 
-pass when 
-   $tool contains "ghc"
-   && contents("fndecl.comp.stdout") contains "Ambiguous type variable"
-
--- put a pass clause here for NHC
+pass when contents("fndecl.run.stdout") == contents("fndecl.expected.stdout")
 
 fail when otherwise

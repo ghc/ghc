@@ -7,4 +7,4 @@ infixr 5 <>
                   Nothing -> Nothing
                   Just a2 -> m2 a2
 
-main = print ((const Nothing <> Just) 1)
+main = print ((Just <> Just) 1)
