@@ -14,9 +14,9 @@ IMP_Ubiq()
 
 import CmdLineOpts	( opt_SourceUnchanged, opt_NoImplicitPrelude )
 import HsSyn	( HsModule(..), HsDecl(..), FixityDecl(..), Fixity, Fake, InPat, IE(..), HsTyVar,
-		  TyDecl, ClassDecl, InstDecl, DefaultDecl, ImportDecl(..), HsBinds, IfaceSig
+		  TyDecl, ClassDecl, InstDecl, DefaultDecl, ImportDecl(..), HsBinds, IfaceSig,
+		  collectTopBinders
 		)
-import HsBinds	( collectTopBinders )
 import HsImpExp	( ieName )
 import RdrHsSyn	( RdrNameHsDecl(..), RdrName(..), RdrNameIE(..), SYN_IE(RdrNameImportDecl),
 		  SYN_IE(RdrNameHsModule), SYN_IE(RdrNameFixityDecl),
@@ -33,11 +33,8 @@ import Bag	( Bag, bagToList )
 import Maybes	( maybeToBool, expectJust )
 import Name
 import Pretty
-import PprStyle	( PprStyle(..) )
+import Outputable	( Outputable(..), PprStyle(..) )
 import Util	( panic, pprTrace, assertPanic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
 \end{code}
 
 
@@ -93,7 +90,7 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 							`thenRn` \ (export_fn, export_env) ->
 
 	-- RECORD THAT LOCALLY DEFINED THINGS ARE AVAILABLE
-      mapRn (recordSlurp Nothing) local_avails		`thenRn_`
+      mapRn (recordSlurp Nothing Compulsory) local_avails	`thenRn_`
 
       returnRn (export_fn, Just (export_env, rn_env, explicit_names))
     )							`thenRn` \ (_, result) ->
@@ -128,14 +125,20 @@ checkEarlyExit mod
 	-- Found errors already, so exit now
 	returnRn True
     else
-    if not opt_SourceUnchanged then
+    traceRn (text "Considering whether compilation is required...")	`thenRn_`
+    (if not opt_SourceUnchanged then
 	-- Source code changed and no errors yet... carry on 
+	traceRn (nest 4 (text "source file changed"))			`thenRn_` 
 	returnRn False
-    else
+     else
 	-- Unchanged source, and no errors yet; see if usage info
 	-- up to date, and exit if so
-	checkUpToDate mod			`thenRn` \ up_to_date ->
-	returnRn up_to_date
+	checkUpToDate mod
+    )									`thenRn` \ up_to_date ->
+    traceRn (text "Hence, compilation" <+> 
+	     text (if up_to_date then "IS NOT" else "IS") <+>
+	     text "required")						`thenRn_`
+    returnRn up_to_date
 \end{code}
 	
 
