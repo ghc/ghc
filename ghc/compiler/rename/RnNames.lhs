@@ -23,14 +23,15 @@ import LoadIface	( loadSrcInterface )
 import TcRnMonad
 
 import FiniteMap
-import PrelNames	( pRELUDE_Name, isBuiltInSyntaxName, isUnboundName,
+import PrelNames	( pRELUDE_Name, isUnboundName,
 			  main_RDR_Unqual )
 import Module		( Module, ModuleName, moduleName, mkPackageModule,
 			  moduleNameUserString, isHomeModule,
 			  unitModuleEnvByName, unitModuleEnv, 
 			  lookupModuleEnvByName, moduleEnvElts )
 import Name		( Name, nameSrcLoc, nameOccName, nameModuleName, isWiredInName,
-			  nameParent, nameParent_maybe, isExternalName, nameModule )
+			  nameParent, nameParent_maybe, isExternalName, nameModule,
+			  isBuiltInSyntax )
 import NameSet
 import NameEnv
 import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv, 
@@ -336,10 +337,10 @@ importsFromLocalDecls group
 
  	avails' | implicit_prelude = filter not_built_in_syntax avails
 		| otherwise	   = avails
-	not_built_in_syntax a = not (all isBuiltInSyntaxName (availNames a))
+	not_built_in_syntax a = not (all isBuiltInSyntax (availNames a))
 		-- Only filter it if all the names of the avail are built-in
 		-- In particular, lists have (:) which is not built in syntax
-		-- so we don't filter it out.  [Sept 03: wrong: see isBuiltInSyntaxName]
+		-- so we don't filter it out.  [Sept 03: wrong: see isBuiltInSyntax]
 
 	avail_env = mkAvailEnv avails'
 	imports   = emptyImportAvails {

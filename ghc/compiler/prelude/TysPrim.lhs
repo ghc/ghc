@@ -45,7 +45,7 @@ module TysPrim(
 #include "HsVersions.h"
 
 import Var		( TyVar, mkTyVar )
-import Name		( Name, mkInternalName, mkWiredInName )
+import Name		( Name, BuiltInSyntax(..), mkInternalName, mkWiredInName )
 import OccName		( mkVarOcc, mkOccFS, tcName )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon,
 			  PrimRep(..) )
@@ -104,6 +104,7 @@ mkPrimTc fs uniq tycon
 		  uniq
 		  Nothing 		-- No parent object
 		  (ATyCon tycon)	-- Relevant TyCon
+		  UserSyntax		-- None are built-in syntax
 
 charPrimTyConName    	      = mkPrimTc FSLIT("Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName     	      = mkPrimTc FSLIT("Int#") intPrimTyConKey  intPrimTyCon

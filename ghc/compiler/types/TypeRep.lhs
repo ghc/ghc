@@ -34,7 +34,7 @@ import Kind
 import Var	  ( Id, TyVar, tyVarKind )
 import VarEnv     ( TyVarEnv )
 import VarSet     ( TyVarSet )
-import Name	  ( Name, NamedThing(..), mkWiredInName )
+import Name	  ( Name, NamedThing(..), BuiltInSyntax(..), mkWiredInName )
 import OccName	  ( mkOccFS, tcName )
 import BasicTypes ( IPName, tupleParens )
 import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon )
@@ -290,6 +290,7 @@ funTyConName = mkWiredInName gHC_PRIM
 			funTyConKey
 			Nothing 		-- No parent object
 			(ATyCon funTyCon)	-- Relevant TyCon
+			BuiltInSyntax
 \end{code}
 
 

@@ -89,7 +89,6 @@ import IfaceSyn		( IfaceInst, IfaceRule, IfaceDecl(ifName) )
 
 import FiniteMap	( FiniteMap )
 import CoreSyn		( IdCoreRule )
-import PrelNames	( isBuiltInSyntaxName )
 import Maybes		( orElse )
 import Outputable
 import SrcLoc		( SrcSpan )

@@ -58,7 +58,7 @@ import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
 import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar, Var )
 import VarSet		( isEmptyVarSet )
-import Name		( mkFCallName, mkWiredInName, Name )
+import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..) )
 import OccName		( mkOccFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
@@ -663,7 +663,7 @@ mkPrimOpId prim_op
     ty   = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op) 
 			 (mkPrimOpIdUnique (primOpTag prim_op))
-			 Nothing (AnId id) 
+			 Nothing (AnId id) UserSyntax
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 		
     info = noCafIdInfo
@@ -807,7 +807,7 @@ another gun with which to shoot yourself in the foot.
 
 \begin{code}
 mkWiredInIdName mod fs uniq id
- = mkWiredInName mod (mkOccFS varName fs) uniq Nothing (AnId id)
+ = mkWiredInName mod (mkOccFS varName fs) uniq Nothing (AnId id) UserSyntax
 
 unsafeCoerceName = mkWiredInIdName gHC_PRIM FSLIT("unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName     = mkWiredInIdName gHC_PRIM FSLIT("nullAddr#")	   nullAddrIdKey      nullAddrId

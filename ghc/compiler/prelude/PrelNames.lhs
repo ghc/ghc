@@ -91,25 +91,6 @@ isUnboundName name = name `hasKey` unboundKey
 
 %************************************************************************
 %*									*
-\subsection{Built-in-syntax names
-%*									*
-%************************************************************************
-
-Built-in syntax names are parsed directly into Exact RdrNames.
-This predicate just identifies them. 
-
-\begin{code}
-isBuiltInSyntaxName :: Name -> Bool
-isBuiltInSyntaxName n
-  =  isTupleKey uniq
-  || uniq `elem` [listTyConKey, nilDataConKey, consDataConKey,
-		  funTyConKey, parrTyConKey]
-  where
-     uniq = nameUnique n
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection{Known key Names}
 %*									*
 %************************************************************************

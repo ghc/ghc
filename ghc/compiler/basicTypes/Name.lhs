@@ -10,6 +10,7 @@ module Name (
 
 	-- The Name type
 	Name,					-- Abstract
+	BuiltInSyntax(..), 
 	mkInternalName, mkSystemName, 
 	mkSystemNameEncoded, mkSysTvName, 
 	mkFCallName, mkIPName,
@@ -23,7 +24,7 @@ module Name (
 	nameSrcLoc, nameParent, nameParent_maybe,
 
 	isSystemName, isInternalName, isExternalName,
-	isTyVarName, isDllName, isWiredInName,
+	isTyVarName, isDllName, isWiredInName, isBuiltInSyntax,
 	wiredInNameTyThing_maybe, 
 	nameIsLocalOrFrom, isHomePackageName,
 	
@@ -70,7 +71,7 @@ data NameSort
 	-- e.g. data constructor of a data type, method of a class
 	-- Nothing => not a subordinate
  
-  | WiredIn Module (Maybe Name) TyThing
+  | WiredIn Module (Maybe Name) TyThing BuiltInSyntax
 	-- A variant of External, for wired-in things
 
   | Internal		-- A user-defined Id or TyVar
@@ -78,6 +79,11 @@ data NameSort
 
   | System		-- A system-defined Id or TyVar.  Typically the
 			-- OccName is very uninformative (like 's')
+
+data BuiltInSyntax = BuiltInSyntax | UserSyntax
+-- BuiltInSyntax is for things like (:), [], tuples etc, 
+-- which have special syntactic forms.  They aren't "in scope"
+-- as such.
 \end{code}
 
 Notes about the NameSorts:
@@ -103,6 +109,14 @@ Notes about the NameSorts:
     If any desugarer sys-locals have survived that far, they get changed to
     "ds1", "ds2", etc.
 
+Built-in syntax => It's a syntactic form, not "in scope" (e.g. [])
+
+Wired-in thing  => The thing (Id, TyCon) is fully known to the compiler, 
+		   not read from an interface file. 
+		   E.g. Bool, True, Int, Float, and many others
+
+All built-in syntax is for wired-in things.
+
 \begin{code}
 nameUnique		:: Name -> Unique
 nameOccName		:: Name -> OccName 
@@ -123,23 +137,26 @@ isSystemName	  :: Name -> Bool
 isHomePackageName :: Name -> Bool
 isWiredInName	  :: Name -> Bool
 
-isWiredInName (Name {n_sort = WiredIn _ _ _}) = True
-isWiredInName other			      = False
+isWiredInName (Name {n_sort = WiredIn _ _ _ _}) = True
+isWiredInName other			        = False
 
 wiredInNameTyThing_maybe :: Name -> Maybe TyThing
-wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ _ thing}) = Just thing
-wiredInNameTyThing_maybe other				     = Nothing
+wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ _ thing _}) = Just thing
+wiredInNameTyThing_maybe other				       = Nothing
 
-isExternalName (Name {n_sort = External _ _})  = True
-isExternalName (Name {n_sort = WiredIn _ _ _}) = True
-isExternalName other	                       = False
+isBuiltInSyntax (Name {n_sort = WiredIn _ _ _ BuiltInSyntax}) = True
+isBuiltInSyntax other			 		      = False
+
+isExternalName (Name {n_sort = External _ _})    = True
+isExternalName (Name {n_sort = WiredIn _ _ _ _}) = True
+isExternalName other	                         = False
 
 isInternalName name = not (isExternalName name)
 
 nameParent_maybe :: Name -> Maybe Name
-nameParent_maybe (Name {n_sort = External _ p})  = p
-nameParent_maybe (Name {n_sort = WiredIn _ p _}) = p
-nameParent_maybe other	                         = Nothing
+nameParent_maybe (Name {n_sort = External _ p})    = p
+nameParent_maybe (Name {n_sort = WiredIn _ p _ _}) = p
+nameParent_maybe other	                           = Nothing
 
 nameParent :: Name -> Name
 nameParent name = case nameParent_maybe name of
@@ -149,9 +166,9 @@ nameParent name = case nameParent_maybe name of
 nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
 nameModuleName name = moduleName (nameModule name)
 
-nameModule_maybe (Name { n_sort = External mod _})  = Just mod
-nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
-nameModule_maybe name				    = Nothing
+nameModule_maybe (Name { n_sort = External mod _})    = Just mod
+nameModule_maybe (Name { n_sort = WiredIn mod _ _ _}) = Just mod
+nameModule_maybe name				      = Nothing
 
 nameIsLocalOrFrom from name
   | isExternalName name = from == nameModule name
@@ -195,10 +212,11 @@ mkExternalName uniq mod occ mb_parent loc
   = Name { n_uniq = uniq, n_sort = External mod mb_parent,
            n_occ = occ, n_loc = loc }
 
-mkWiredInName :: Module -> OccName -> Unique -> Maybe Name -> TyThing -> Name
-mkWiredInName mod occ uniq mb_parent thing 
+mkWiredInName :: Module -> OccName -> Unique 
+	      -> Maybe Name -> TyThing -> BuiltInSyntax -> Name
+mkWiredInName mod occ uniq mb_parent thing built_in
   = Name { n_uniq = uniq,
-	   n_sort = WiredIn mod mb_parent thing,
+	   n_sort = WiredIn mod mb_parent thing built_in,
 	   n_occ = occ, n_loc = wiredInSrcLoc }
 
 mkSystemName :: Unique -> UserFS -> Name
@@ -303,12 +321,14 @@ instance OutputableBndr Name where
 pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
-      External mod mb_p      -> pprExternal sty uniq mod occ mb_p False
-      WiredIn mod mb_p thing -> pprExternal sty uniq mod occ mb_p True
-      System   		     -> pprSystem sty uniq occ
-      Internal    	     -> pprInternal sty uniq occ
+      WiredIn mod _ _ BuiltInSyntax -> pprOccName occ	-- Built-in syntax is never qualified
+      WiredIn mod _ _ UserSyntax    -> pprExternal sty uniq mod occ True
+      External mod _  	            -> pprExternal sty uniq mod occ False
+      System   		 	    -> pprSystem sty uniq occ
+      Internal    	 	    -> pprInternal sty uniq occ
 
-pprExternal sty uniq mod occ mb_p is_wired
+pprExternal sty uniq mod occ is_wired
+  | unqualStyle sty mod_name occ = pprOccName occ
   | codeStyle sty        = ppr mod_name <> char '_' <> pprOccName occ
   | debugStyle sty       = sep [ppr mod_name <> dot <> pprOccName occ,
 				hsep [text "{-" 
@@ -318,7 +338,6 @@ pprExternal sty uniq mod occ mb_p is_wired
 --				 	 Nothing -> empty
 --					 Just n  -> brackets (ppr n)
 				     , text "-}"]]
-  | unqualStyle sty mod_name occ = pprOccName occ
   | otherwise		 	 = ppr mod_name <> dot <> pprOccName occ
   where
     mod_name = moduleName mod
