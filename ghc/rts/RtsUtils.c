@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.35 2003/08/22 22:24:16 sof Exp $
+ * $Id: RtsUtils.c,v 1.36 2003/10/21 11:51:15 stolz Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -249,7 +249,9 @@ setNonBlockingFd(int fd)
 
   /* clear the non-blocking flag on this file descriptor */
   fd_flags = fcntl(fd, F_GETFL);
-  fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
+  if (!(fd_flags & O_NONBLOCK)) {
+    fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
+  }
 }
 #else
 /* Stub defns -- async / non-blocking IO is not done 
