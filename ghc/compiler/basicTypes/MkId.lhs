@@ -701,10 +701,10 @@ templates, but we don't ever expect to generate code for it.
 \begin{code}
 eRROR_ID
   = pc_bottoming_Id errorIdKey pREL_ERR SLIT("error") errorTy
-rEC_SEL_ERROR_ID
-  = generic_ERROR_ID recSelErrIdKey SLIT("patError")
 pAT_ERROR_ID
   = generic_ERROR_ID patErrorIdKey SLIT("patError")
+rEC_SEL_ERROR_ID
+  = generic_ERROR_ID recSelErrIdKey SLIT("recSelError")
 rEC_CON_ERROR_ID
   = generic_ERROR_ID recConErrorIdKey SLIT("recConError")
 rEC_UPD_ERROR_ID
