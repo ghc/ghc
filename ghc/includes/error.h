@@ -1,12 +1,3 @@
-#if !defined(COMPILING_NCG) && !defined(__GLASGOW_HASKELL__)
-extern int ghc_errno;
-extern int ghc_errtype;
-extern char *ghc_errstr;
-
-void cvtErrno (void);
-void stdErrno (void);
-#endif
-
 #define ERR_ALREADYEXISTS 1
 #define ERR_HARDWAREFAULT 2
 #define ERR_ILLEGALOPERATION 3
