@@ -9,6 +9,12 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
+-- "ReadP" is a library of parser combinators, originally written by Koen Claessen.
+-- It parses all alternatives in parallel, so it never keeps hold of 
+-- the beginning of the input string, a common source of space leaks with
+-- other parsers.  The '(+++)' choice combinator is genuinely commutative;
+-- it makes no difference which branch is "shorter".
+
 -----------------------------------------------------------------------------
 
 module Text.ParserCombinators.ReadP
@@ -20,6 +26,7 @@ module Text.ParserCombinators.ReadP
   get,        -- :: ReadP Char
   look,       -- :: ReadP String
   (+++),      -- :: ReadP a -> ReadP a -> ReadP a
+  gather,     -- :: ReadP a -> ReadP (String, a)
   
   -- * Other operations
   pfail,      -- :: ReadP a
@@ -82,16 +89,32 @@ look = R (\k -> Look k)
 
 (+++) :: ReadP a -> ReadP a -> ReadP a
 R f1 +++ R f2 = R (\k -> f1 k >|< f2 k)
- where
-  Get f1     >|< Get f2     = Get (\c -> f1 c >|< f2 c)
-  Fail       >|< p          = p
-  p          >|< Fail       = p
-  Look f     >|< Look g     = Look (\s -> f s >|< g s)
-  Result x p >|< q          = Result x (p >|< q)
-  p          >|< Result x q = Result x (p >|< q)
-  Look f     >|< p          = Look (\s -> f s >|< p)
-  p          >|< Look f     = Look (\s -> p >|< f s)
-  p          >|< q          = ReadS (\s -> run p s ++ run q s)
+
+gather :: ReadP a -> ReadP (String, a)
+-- ^ Transforms a parser into one that does the same, but
+--   in addition returns the exact characters read.
+--   IMPORTANT NOTE: 'gather' gives a runtime error if its first argument
+--   is built using any occurrences of readS_to_P. 
+gather (R m) 
+  = R (\k -> gath id (m (\a -> Result (\s -> k (s,a)) Fail)))  
+  where
+    gath l (Get f)      = Get (\c -> gath (l.(c:)) (f c))
+    gath l Fail         = Fail
+    gath l (Look f)     = Look (\s -> gath l (f s))
+    gath l (Result k p) = k (l []) >|< gath l p
+    gath l (ReadS r)    = error "do not use ReadS in gather!"
+
+(>|<) :: P a -> P a -> P a
+-- Not exported!  Works over the representation type
+Get f1     >|< Get f2     = Get (\c -> f1 c >|< f2 c)
+Fail       >|< p          = p
+p          >|< Fail       = p
+Look f     >|< Look g     = Look (\s -> f s >|< g s)
+Result x p >|< q          = Result x (p >|< q)
+p          >|< Result x q = Result x (p >|< q)
+Look f     >|< p          = Look (\s -> f s >|< p)
+p          >|< Look f     = Look (\s -> p >|< f s)
+p          >|< q          = ReadS (\s -> run p s ++ run q s)
 
 run :: P a -> ReadS a
 run (Get f)      []    = []

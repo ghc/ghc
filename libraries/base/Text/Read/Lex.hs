@@ -15,22 +15,12 @@
 
 module Text.Read.Lex
   -- lexing types
-  ( LexP             -- :: *; = ReadP Lexeme
-  , Lexeme(..)       -- :: *; Show, Eq
+  ( Lexeme(..)       -- :: *; Show, Eq
   
   -- lexer
-  , lex              -- :: LexP
-  , lexLitChar	     -- :: LexP
+  , lex              -- :: ReadP Lexeme	-- Skips leading spaces
+  , hsLex	     -- :: ReadP String
   
-  -- numbers
-  , Number           -- :: *; Show, Eq
-  
-  , numberToInt      -- :: Number -> Maybe Int
-  , numberToInteger  -- :: Number -> Maybe Integer
-  , numberToRational -- :: Number -> Maybe Integer
-  , numberToFloat    -- :: Number -> Maybe Float
-  , numberToDouble   -- :: Number -> Maybe Double
-
   , readIntP         -- :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadP a
   , readOctP         -- :: Num a => ReadP a 
   , readDecP         -- :: Num a => ReadP a
@@ -61,50 +51,74 @@ import Control.Monad
 type LexP = ReadP Lexeme
 
 data Lexeme
-  = Char   Char
-  | String String
-  | Single Char
-  | Symbol String
-  | Ident  String
-  | Number Number
- deriving (Eq)
-
-instance Show Lexeme where
-  showsPrec n (Char c)   = showsPrec n c
-  showsPrec n (String s) = showsPrec n s
-  showsPrec _ (Single c) = showChar c
-  showsPrec _ (Ident s)  = showString s
-  showsPrec _ (Symbol s) = showString s
-  showsPrec n (Number x) = showsPrec n x
+  = Char   Char		-- Quotes removed, 
+  | String String	-- 	escapes interpreted
+  | Punc   String 	-- Punctuation, eg "(", "::"
+  | Ident  String	-- Haskell identifiers, e.g. foo, baz
+  | Symbol String	-- Haskell symbols, e.g. >>, %
+  | Int Integer
+  | Rat Rational
+  | EOF
+ deriving (Eq, Show)
 
 -- -----------------------------------------------------------------------------
 -- Lexing
 
-lex :: LexP
-lex =
-  do skipSpaces
-     (lexLitChar
-       +++ lexString
-         +++ lexSingle
-           +++ lexSymbol
-             +++ lexIdf
-               +++ lexNumber)
+lex :: ReadP Lexeme
+lex = skipSpaces >> lexToken
+
+hsLex :: ReadP String
+-- ^ Haskell lexer: returns the lexed string, rather than the lexeme
+hsLex = do skipSpaces 
+	   (s,_) <- gather lexToken
+	   return s
+
+lexToken :: ReadP Lexeme
+lexToken = lexEOF     +++
+      	   lexLitChar +++ 
+      	   lexString  +++ 
+      	   lexPunc    +++ 
+      	   lexSymbol  +++ 
+      	   lexId      +++ 
+      	   lexNumber
+
 
 -- ----------------------------------------------------------------------
--- symbols
+-- End of file
+lexEOF :: ReadP Lexeme
+lexEOF = do s <- look
+	    guard (null s)
+	    return EOF
 
-lexSymbol :: LexP
+-- ---------------------------------------------------------------------------
+-- Single character lexemes
+
+lexPunc :: ReadP Lexeme
+lexPunc =
+  do c <- satisfy isPuncChar
+     return (Punc [c])
+ where
+  isPuncChar c = c `elem` ",;()[]{}_`"
+
+-- ----------------------------------------------------------------------
+-- Symbols
+
+lexSymbol :: ReadP Lexeme
 lexSymbol =
   do s <- munch1 isSymbolChar
-     return (Symbol s)
+     if s `elem` reserved_ops then 
+	return (Punc s)		-- Reserved-ops count as punctuation
+      else
+	return (Symbol s)
  where
   isSymbolChar c = c `elem` "!@#$%&*+./<=>?\\^|:-~"
+  reserved_ops   = ["..", "::", "=", "\\", "|", "<-", "->", "@", "~", "=>"]
 
 -- ----------------------------------------------------------------------
 -- identifiers
 
-lexIdf :: LexP
-lexIdf =
+lexId :: ReadP Lexeme
+lexId =
   do c <- satisfy isAlpha
      s <- munch isIdfChar
      return (Ident (c:s))
@@ -114,7 +128,7 @@ lexIdf =
 -- ---------------------------------------------------------------------------
 -- Lexing character literals
 
-lexLitChar :: LexP
+lexLitChar :: ReadP Lexeme
 lexLitChar =
   do char '\''
      (c,esc) <- lexChar
@@ -243,7 +257,7 @@ lexChar =
 -- ---------------------------------------------------------------------------
 -- string literal
 
-lexString :: LexP
+lexString :: ReadP Lexeme
 lexString =
   do char '"'
      body id
@@ -252,7 +266,8 @@ lexString =
     do (c,esc) <- lexStrItem
        if c /= '"' || esc
          then body (f.(c:))
-         else return (String (f ""))
+         else let s = f "" in
+	      return (String s)
 
   lexStrItem =
     (lexEmpty >> lexStrItem)
@@ -267,60 +282,23 @@ lexString =
          _             -> do pfail
 
 -- ---------------------------------------------------------------------------
--- single character lexemes
-
-lexSingle :: LexP
-lexSingle =
-  do c <- satisfy isSingleChar
-     return (Single c)
- where
-  isSingleChar c = c `elem` ",;()[]{=}_`"
-
--- ---------------------------------------------------------------------------
 --  Lexing numbers
 
-data Number
-  = MkNumber
-    { value    :: Either Integer Rational
-    , base     :: Base
-    , digits   :: Digits
-    , fraction :: Maybe Digits
-    , exponent :: Maybe Integer
-    }
- deriving (Eq)
+infinity, notANumber :: Rational
+infinity   = 1 % 0
+notANumber = 0 % 0
 
 type Base   = Int
 type Digits = [Int]
-
-instance Show Number where
-  showsPrec _ x =
-      showsBase (base x)
-    . foldr (.) id (map showDigit (digits x))
-    . showsFrac (fraction x)
-    . showsExp (exponent x)
-   where
-    showsBase 8  = showString "0o"
-    showsBase 10 = id
-    showsBase 16 = showString "0x"
-   
-    showsFrac Nothing   = id
-    showsFrac (Just ys) =
-        showChar '.'
-      . foldr (.) id (map showDigit ys) 
-    
-    showsExp Nothing    = id
-    showsExp (Just exp) =
-        showChar 'e'
-      . shows exp
 
 showDigit :: Int -> ShowS
 showDigit n | n <= 9    = shows n
             | otherwise = showChar (chr (n + ord 'A' - 10))
 
-lexNumber :: LexP
-lexNumber =
-  do base <- lexBase
-     lexNumberBase base
+lexNumber :: ReadP Lexeme
+lexNumber = do { string "NaN";      return (Rat notANumber) } +++
+	    do { string "Infinity"; return (Rat infinity) } +++
+	    do { base <- lexBase ;  lexNumberBase base }
  where
   lexBase =
     do s <- look
@@ -331,36 +309,44 @@ lexNumber =
          '0':'X':_ -> do get; get; return 16
          _         -> do return 10
        
-lexNumberBase :: Base -> LexP
+lexNumberBase :: Base -> ReadP Lexeme
 lexNumberBase base =
   do xs    <- lexDigits base
      mFrac <- lexFrac base
      mExp  <- lexExp base
-     return (Number (MkNumber (value xs mFrac mExp) base xs mFrac mExp))
+     return (value xs mFrac mExp)
  where
-  value xs mFrac mExp = valueFracExp (val (fromIntegral base) 0 xs) mFrac mExp
+  baseInteger :: Integer
+  baseInteger = fromIntegral base
+
+  value xs mFrac mExp = valueFracExp (val baseInteger 0 xs) mFrac mExp
   
-  valueFracExp a Nothing   mExp 
-    | validIntExp mExp   = Left (valueExpInt a mExp)
-    | otherwise          = Right (valueExp (fromIntegral a) mExp)
-  valueFracExp a (Just fs) mExp =
-    Right (valueExp (fromInteger a + frac (fromIntegral base) 0 1 fs) mExp)
+  valueFracExp :: Integer -> Maybe Digits -> Maybe Integer 
+	       -> Lexeme
+  valueFracExp a Nothing Nothing	
+    = Int a						-- 43
+  valueFracExp a Nothing (Just exp)
+    | exp >= 0  = Int (a * (baseInteger ^ exp))		-- 43e7
+    | otherwise = Rat (valExp (fromInteger a) exp)	-- 43e-7
+  valueFracExp a (Just fs) mExp 
+     = case mExp of
+	 Nothing  -> Rat rat				-- 4.3
+	 Just exp -> Rat (valExp rat exp)		-- 4.3e-4
+     where
+	rat :: Rational
+	rat = fromInteger a + frac (fromIntegral base) 0 1 fs
 
-   -- only positive exponents allowed
-  validIntExp Nothing = True
-  validIntExp (Just e) = e >= 0
-
-  valueExpInt a Nothing    = a
-  valueExpInt a (Just exp) = a * ((fromIntegral base) ^ exp)
-
-  valueExp a Nothing    = a
-  valueExp a (Just exp) = a * ((fromIntegral base) ^^ exp)
+  valExp :: Rational -> Integer -> Rational
+  valExp rat exp = rat * (fromIntegral base ^^ exp)
 
 lexFrac :: Base -> ReadP (Maybe Digits)
 lexFrac base =
   do s <- look
      case s of
-       '.' : _ ->
+       '.' : d : _ | isJust (valDig base d) ->
+	-- The lookahead checks for point and at least one
+	-- valid following digit.  For example 1..n must
+	-- lex the "1" off rather than failing.
          do get
             frac <- lexDigits base
             return (Just frac)
@@ -389,6 +375,7 @@ lexExp base =
          do return Nothing
 
 lexDigits :: Int -> ReadP Digits
+-- Lex a non-empty sequence of digits in specified base
 lexDigits base =
   do s  <- look
      xs <- scan s id
@@ -406,6 +393,7 @@ lexInteger base =
      return (val (fromIntegral base) 0 xs)
 
 val :: Num a => a -> a -> Digits -> a
+-- val base y [d1,..,dn] = y ++ [d1,..,dn], as it were
 val base y []     = y
 val base y (x:xs) = y' `seq` val base y' xs
  where
@@ -432,42 +420,6 @@ valDig 16 c
   | 'a' <= c && c <= 'f' = Just (ord c - ord 'a' + 10)
   | 'A' <= c && c <= 'F' = Just (ord c - ord 'A' + 10)
   | otherwise            = Nothing
-
--- ----------------------------------------------------------------------
--- conversion
-
-numberToInt :: Number -> Maybe Int
-numberToInt x =
-  case numberToInteger x of
-    Just n | minBound' <= n && n <= maxBound' -> Just (fromInteger n)
-    _                                         -> Nothing
- where
-  minBound' = toInteger (minBound :: Int)
-  maxBound' = toInteger (maxBound :: Int)
-
-numberToInteger :: Number -> Maybe Integer
-numberToInteger x =
-  case value x of
-    Left n -> Just n
-    _      -> Nothing
-
-numberToRational :: Number -> Maybe Rational
-numberToRational x =
-  case value x of
-    Left n  -> Just (fromInteger n)
-    Right r -> Just r
-
-numberToFloat :: Number -> Maybe Float
-numberToFloat x =
-  case value x of
-    Left n  -> Just (fromInteger n)
-    Right r -> Just (fromRational r)
-
-numberToDouble :: Number -> Maybe Double
-numberToDouble x =
-  case value x of
-    Left n  -> Just (fromInteger n)
-    Right r -> Just (fromRational r)
 
 -- ----------------------------------------------------------------------
 -- other numeric lexing functions

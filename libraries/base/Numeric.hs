@@ -78,10 +78,11 @@ readFloat = readP_to_S readFloatP
 
 readFloatP :: RealFrac a => ReadP a
 readFloatP =
-  do L.Number x <- L.lex
-     case L.numberToRational x of
-       Nothing -> pfail
-       Just y  -> return (fromRational y)
+  do tok <- L.lex
+     case tok of
+       L.Rat y  -> return (fromRational y)
+       L.Int i  -> return (fromInteger i)
+       other    -> pfail
 
 -- It's turgid to have readSigned work using list comprehensions,
 -- but it's specified as a ReadS to ReadS transformer

@@ -55,14 +55,7 @@ import Text.ParserCombinators.ReadP
 
 import qualified Text.Read.Lex as L
 
-import Text.Read.Lex
-  ( Lexeme(..)
-  , Number(..)
-  , numberToInt
-  , numberToInteger
-  , numberToFloat
-  , numberToDouble
-  )
+import Text.Read.Lex  ( Lexeme(..) )
 
 import Text.ParserCombinators.ReadPrec
 
@@ -173,16 +166,15 @@ read s = either error id (readEither s)
 -- H98 compatibility
 
 lex :: ReadS String		-- As defined by H98
-lex "" = [("","")] -- ugly hack
-lex s  = readP_to_S (do { lexeme <- L.lex ;
-		          return (show lexeme) }) s
+lex s  = readP_to_S L.hsLex s
 
 lexLitChar :: ReadS String	-- As defined by H98
-lexLitChar = readP_to_S (do { lexeme <- L.lexLitChar ;
-			      return (show lexeme) })
+lexLitChar = readP_to_S (do { P.skipSpaces ;
+			      (s, Char _) <- P.gather L.lex ;
+			      return s })
 
 readLitChar :: ReadS Char	-- As defined by H98
-readLitChar = readP_to_S (do { Char c <- L.lexLitChar ;
+readLitChar = readP_to_S (do { Char c <- L.lex ;
 			       return c })
 
 lexDigits :: ReadS String
@@ -197,11 +189,10 @@ lexP = lift L.lex
 paren :: ReadPrec a -> ReadPrec a
 -- (paren p) parses (P0) 
 --	where p parses P0 in precedence context zero
-paren p =
-  do Single '(' <- lexP
-     x          <- reset p
-     Single ')' <- lexP
-     return x
+paren p = do Punc "(" <- lexP
+	     x        <- reset p
+	     Punc ")" <- lexP
+	     return x
 
 parens :: ReadPrec a -> ReadPrec a
 -- (parens p) parses P, (P0), ((P0)), etc, 
@@ -215,15 +206,15 @@ parens p = optional
 list :: ReadPrec a -> ReadPrec [a]
 list readx =
   parens
-  ( do Single '[' <- lexP
+  ( do Punc "[" <- lexP
        (listRest False +++ listNext)
   )
  where
   listRest started =
-    do Single c <- lexP
+    do Punc c <- lexP
        case c of
-         ']'           -> return []
-         ',' | started -> listNext
+         "]"           -> return []
+         "," | started -> listNext
          _             -> pfail
   
   listNext =
@@ -374,7 +365,7 @@ instance Read Lexeme where
 %*********************************************************
 
 \begin{code}
-readNumber :: Num a => (Number -> Maybe a) -> ReadPrec a
+readNumber :: Num a => (Lexeme -> Maybe a) -> ReadPrec a
 -- Read a signed number
 readNumber convert =
   parens
@@ -383,48 +374,37 @@ readNumber convert =
          Symbol "-" -> do n <- readNumber convert
                           return (negate n)
        
-         Number y   -> case convert y of
-                         Just n  -> return n
-                         Nothing -> pfail
-         
-         _          -> pfail
+         _   -> case convert x of
+                   Just n  -> return n
+                   Nothing -> pfail
   )
 
-readIEEENumber :: (RealFloat a) => (Number -> Maybe a) -> ReadPrec a
--- Read a Float/Double.
-readIEEENumber convert =
-  parens
-  ( do x <- lexP
-       case x of
-         Ident "NaN"      -> return (0/0)
-	 Ident "Infinity" -> return (1/0)
-         Symbol "-" -> do n <- readIEEENumber convert
-                          return (negate n)
-       
-         Number y   -> case convert y of
-                         Just n  -> return n
-                         Nothing -> pfail
-         
-         _          -> pfail
-  )
+convertInt :: Num a => Lexeme -> Maybe a
+convertInt (Int i) = Just (fromInteger i)
+convertInt _       = Nothing
+
+convertFrac :: Fractional a => Lexeme -> Maybe a
+convertFrac (Int i) = Just (fromInteger i)
+convertFrac (Rat r) = Just (fromRational r)
+convertFrac _       = Nothing
 
 instance Read Int where
-  readPrec     = readNumber numberToInt
+  readPrec     = readNumber convertInt
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance Read Integer where
-  readPrec     = readNumber numberToInteger
+  readPrec     = readNumber convertInt
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance Read Float where
-  readPrec     = readIEEENumber numberToFloat
+  readPrec     = readNumber convertFrac
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance Read Double where
-  readPrec     = readIEEENumber numberToDouble
+  readPrec     = readNumber convertFrac
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
@@ -467,7 +447,7 @@ instance (Read a, Read b) => Read (a,b) where
     parens
     ( paren
       ( do x <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            y <- readPrec
            return (x,y)
       )
@@ -482,9 +462,9 @@ instance (Read a, Read b, Read c) => Read (a, b, c) where
     parens
     ( paren
       ( do x <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            y <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            z <- readPrec
            return (x,y,z)
       )
@@ -498,11 +478,11 @@ instance (Read a, Read b, Read c, Read d) => Read (a, b, c, d) where
     parens
     ( paren
       ( do w <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            x <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            y <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            z <- readPrec
            return (w,x,y,z)
       )
@@ -516,13 +496,13 @@ instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
     parens
     ( paren
       ( do v <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            w <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            x <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            y <- readPrec
-           Single ',' <- lexP
+           Punc "," <- lexP
            z <- readPrec
            return (v,w,x,y,z)
       )
