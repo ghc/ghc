@@ -332,7 +332,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      newSysLocalDs ty					 `thenDs` \ fe_id ->
      let 
         -- hack: need to get at the name of the C stub we're about to generate.
-       fe_nm	   = toCName fe_id
+       fe_nm	   = moduleUserString mod_name ++ "_" ++ toCName fe_id
        fe_ext_name = ExtName (_PK_ fe_nm) Nothing
      in
      dsFExport  i export_ty mod_name fe_ext_name cconv True
@@ -434,7 +434,7 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
 	  -- create the application + perform it.
      ,   text "rc=rts_evalIO" <> 
                   parens (foldl appArg (text "(StgClosure*)&" <> h_nm) (zip args c_args) <> comma <> text "&ret") <> semi
-     ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (text mod_nm <> char '.' <> ptext c_nm) 
+     ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ptext c_nm)
 						<> comma <> text "rc") <> semi
      ,   text "return" <> return_what <> semi
      , rbrace
