@@ -15,7 +15,7 @@ import CmdLineOpts	( switchIsOn, opt_SimplDoEtaReduction,
 			)
 import SimplMonad
 import SimplUtils	( mkCase, tryRhsTyLam, tryEtaExpansion,
-			  simplBinder, simplBinders, simplIds, 
+			  simplBinder, simplBinders, simplRecIds, simplLetId,
 			  SimplCont(..), DupFlag(..), mkStop, mkRhsStop,
 			  contResultType, discardInline, countArgs, contIsDupable,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType
@@ -55,8 +55,8 @@ import Type		( mkTyVarTys, isUnLiftedType, seqType,
 			  mkFunTy, splitTyConApp_maybe, tyConAppArgs,
 			  funResultTy
 			)
-import Subst		( mkSubst, substTy, 
-			  isInScope, lookupIdSubst, substIdInfo
+import Subst		( mkSubst, substTy, substEnv,
+			  isInScope, lookupIdSubst, simplIdInfo
 			)
 import TyCon		( isDataTyCon, tyConDataConsIfAvailable	)
 import TysPrim		( realWorldStatePrimTy )
@@ -96,7 +96,7 @@ simplTopBinds binds
 	-- so that if a transformation rule has unexpectedly brought
 	-- anything into scope, then we don't get a complaint about that.
 	-- It's rather as if the top-level binders were imported.
-    simplIds (bindersOfBinds binds)	$ \ bndrs' -> 
+    simplRecIds (bindersOfBinds binds)	$ \ bndrs' -> 
     simpl_binds binds bndrs'		`thenSmpl` \ (binds', _) ->
     freeTick SimplifierDone		`thenSmpl_`
     returnSmpl (fromOL binds')
@@ -217,7 +217,7 @@ simplExprF (Case scrut bndr alts) cont
 
 
 simplExprF (Let (Rec pairs) body) cont
-  = simplIds (map fst pairs) 		$ \ bndrs' -> 
+  = simplRecIds (map fst pairs) 		$ \ bndrs' -> 
 	-- NB: bndrs' don't have unfoldings or spec-envs
 	-- We add them as we go down, using simplPrags
 
@@ -303,10 +303,10 @@ simplExprF (Note InlineMe e) cont
     keep_inline (ArgOf _ _ _) = True		-- about this predicate
     keep_inline other	      = False
 
--- A non-recursive let is dealt with by simplBeta
+-- A non-recursive let is dealt with by simplNonRecBind
 simplExprF (Let (NonRec bndr rhs) body) cont
   = getSubstEnv			`thenSmpl` \ se ->
-    simplBeta bndr rhs se (contResultType cont)	$
+    simplNonRecBind bndr rhs se (contResultType cont)	$
     simplExprF body cont
 \end{code}
 
@@ -331,7 +331,7 @@ simplLam fun cont
 	-- Ordinary beta reduction
     go (Lam bndr body) cont@(ApplyTo _ arg arg_se body_cont)
       = tick (BetaReduction bndr)			`thenSmpl_`
-	simplBeta zapped_bndr arg arg_se cont_ty
+	simplNonRecBind zapped_bndr arg arg_se cont_ty
 	(go body body_cont)
       where
 	zapped_bndr = zap_it bndr
@@ -416,42 +416,53 @@ simplType ty
 %*									*
 %************************************************************************
 
-@simplBeta@ is used for non-recursive lets in expressions, 
+@simplNonRecBind@ is used for non-recursive lets in expressions, 
 as well as true beta reduction.
 
 Very similar to @simplLazyBind@, but not quite the same.
 
 \begin{code}
-simplBeta :: InId 			-- Binder
+simplNonRecBind :: InId 		-- Binder
 	  -> InExpr -> SubstEnv		-- Arg, with its subst-env
 	  -> OutType			-- Type of thing computed by the context
 	  -> SimplM OutExprStuff	-- The body
 	  -> SimplM OutExprStuff
 #ifdef DEBUG
-simplBeta bndr rhs rhs_se cont_ty thing_inside
+simplNonRecBind bndr rhs rhs_se cont_ty thing_inside
   | isTyVar bndr
-  = pprPanic "simplBeta" (ppr bndr <+> ppr rhs)
+  = pprPanic "simplNonRecBind" (ppr bndr <+> ppr rhs)
 #endif
 
-simplBeta bndr rhs rhs_se cont_ty thing_inside
+simplNonRecBind bndr rhs rhs_se cont_ty thing_inside
   | preInlineUnconditionally False {- not black listed -} bndr
   = tick (PreInlineUnconditionally bndr)		`thenSmpl_`
     extendSubst bndr (ContEx rhs_se rhs) thing_inside
 
   | otherwise
-  =  	-- Simplify the RHS
-    simplBinder bndr					$ \ bndr' ->
+  =  	-- Simplify the binder.
+	-- Don't use simplBinder because that doesn't keep 
+	-- fragile occurrence in the substitution
+    simplLetId bndr					$ \ bndr' ->
+    getSubst						`thenSmpl` \ bndr_subst ->
     let
+	-- Substitute its IdInfo (which simplLetId does not)
+	-- The appropriate substitution env is the one right here,
+	-- not rhs_se.  Often they are the same, when all this 
+	-- has arisen from an application (\x. E) RHS, perhaps they aren't
+	bndr''    = simplIdInfo bndr_subst (idInfo bndr) bndr'
 	bndr_ty'  = idType bndr'
 	is_strict = isStrict (idDemandInfo bndr) || isStrictType bndr_ty'
     in
+    modifyInScope bndr'' bndr''				$
+
+	-- Simplify the argument
     simplValArg bndr_ty' is_strict rhs rhs_se cont_ty	$ \ rhs' ->
 
 	-- Now complete the binding and simplify the body
     if needsCaseBinding bndr_ty' rhs' then
-	addCaseBind bndr' rhs' thing_inside
+	addCaseBind bndr'' rhs' thing_inside
     else
-	completeBinding bndr bndr' False False rhs' thing_inside
+	completeBinding bndr bndr'' False False rhs' thing_inside
 \end{code}
 
 
@@ -584,13 +595,11 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
     thing_inside
 
   |  otherwise
-  = getSubst			`thenSmpl` \ subst ->
-    let
+  = let
 		-- We make new IdInfo for the new binder by starting from the old binder, 
 		-- doing appropriate substitutions.
 		-- Then we add arity and unfolding info to get the new binder
-  	new_bndr_info = substIdInfo subst old_info (idInfo new_bndr)
-		        `setArityInfo` arity_info
+  	new_bndr_info = idInfo new_bndr `setArityInfo` arity_info
 
 		-- Add the unfolding *only* for non-loop-breakers
 		-- Making loop breakers not have an unfolding at all 
@@ -657,13 +666,21 @@ simplLazyBind top_lvl bndr bndr' rhs thing_inside
     else
 
   	-- Simplify the RHS
-    getSubstEnv 					`thenSmpl` \ rhs_se ->
+    getSubst 					`thenSmpl` \ rhs_subst ->
+    let
+	-- Substitute IdInfo on binder, in the light of earlier
+	-- substitutions in this very letrec, and extend the in-scope
+	-- env so that it can see the new thing
+	bndr'' = simplIdInfo rhs_subst (idInfo bndr) bndr'
+    in
+    modifyInScope bndr'' bndr''				$
+
     simplRhs top_lvl False {- Not ok to float unboxed (conservative) -}
 	     (idType bndr')
-	     rhs rhs_se  				$ \ rhs' ->
+	     rhs (substEnv rhs_subst)			$ \ rhs' ->
 
 	-- Now compete the binding and simplify the body
-    completeBinding bndr bndr' top_lvl black_listed rhs' thing_inside
+    completeBinding bndr bndr'' top_lvl black_listed rhs' thing_inside
 \end{code}
 
 

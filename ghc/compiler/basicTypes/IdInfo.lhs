@@ -13,7 +13,8 @@ module IdInfo (
 	vanillaIdInfo, constantIdInfo, mkIdInfo, seqIdInfo, megaSeqIdInfo,
 
 	-- Zapping
-	zapFragileInfo,	zapLamInfo, zapSpecPragInfo, shortableIdInfo, copyIdInfo,
+	zapLamInfo, zapDemandInfo,
+	zapSpecPragInfo, shortableIdInfo, copyIdInfo,
 
 	-- Flavour
 	IdFlavour(..), flavourInfo,  makeConstantFlavour,
@@ -66,7 +67,7 @@ module IdInfo (
         CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
 
         -- Lambda-bound variable info
-        LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo
+        LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo, hasNoLBVarInfo
     ) where
 
 #include "HsVersions.h"
@@ -633,6 +634,9 @@ seqLBVar l = l `seq` ()
 \end{code}
 
 \begin{code}
+hasNoLBVarInfo NoLBVarInfo = True
+hasNoLBVarInfo other       = False
+
 noLBVarInfo = NoLBVarInfo
 
 -- not safe to print or parse LBVarInfo because it is not really a
@@ -660,58 +664,6 @@ instance Show LBVarInfo where
 %*									*
 %************************************************************************
 
-zapFragileInfo is used when cloning binders, mainly in the
-simplifier.  We must forget about used-once information because that
-isn't necessarily correct in the transformed program.
-Also forget specialisations and unfoldings because they would need
-substitution to be correct.  (They get pinned back on separately.)
-
-Hoever, we REMEMBER loop-breaker and dead-variable information.  The loop-breaker
-information is used (for example) in MkIface to avoid exposing the unfolding of
-a loop breaker.
-
-\begin{code}
-zapFragileInfo :: IdInfo -> Maybe IdInfo
-zapFragileInfo info@(IdInfo {occInfo		= occ, 
-			     workerInfo		= wrkr,
-			     specInfo		= rules, 
-			     unfoldingInfo	= unfolding})
-  |  not (isFragileOcc occ)
-        -- We must forget about whether it was marked safe-to-inline,
-	-- because that isn't necessarily true in the simplified expression.
-	-- This is important because expressions may  be re-simplified
-	-- We don't zap deadness or loop-breaker-ness.
-	-- The latter is important because it tells MkIface not to 
-	-- spit out an inlining for the thing.  The former doesn't
-	-- seem so important, but there's no harm.
-
-  && isEmptyCoreRules rules
-	-- Specialisations would need substituting.  They get pinned
-	-- back on separately.
-
-  && not (workerExists wrkr)
-
-  && not (hasUnfolding unfolding)
-	-- This is very important; occasionally a let-bound binder is used
-	-- as a binder in some lambda, in which case its unfolding is utterly
-	-- bogus.  Also the unfolding uses old binders so if we left it we'd
-	-- have to substitute it. Much better simply to give the Id a new
-	-- unfolding each time, which is what the simplifier does.
-  = Nothing
-
-  | otherwise
-  = Just (info {occInfo		= robust_occ_info,
-		workerInfo	= noWorkerInfo,
-		specInfo	= emptyCoreRules,
-		unfoldingInfo	= noUnfolding})
-  where
-	-- It's important to keep the loop-breaker info,
-	-- because the substitution doesn't remember it.
-    robust_occ_info = case occ of
-			OneOcc _ _ -> NoOccInfo
-			other	   -> occ
-\end{code}
-
 @zapLamInfo@ is used for lambda binders that turn out to to be
 part of an unsaturated lambda
 
@@ -733,6 +685,13 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
     safe_occ = case occ of
 		 OneOcc _ once -> OneOcc insideLam once
 		 other	       -> occ
+\end{code}
+
+\begin{code}
+zapDemandInfo :: IdInfo -> Maybe IdInfo
+zapDemandInfo info@(IdInfo {demandInfo = demand})
+  | not (isStrict demand) = Nothing
+  | otherwise		  = Just (info {demandInfo = wwLazy})
 \end{code}
 
 

@@ -23,8 +23,8 @@ module Subst (
 	bindSubst, unBindSubst, bindSubstList, unBindSubstList,
 
 	-- Binders
-	substBndr, substBndrs, substTyVar, substId, substIds,
-	substAndCloneId, substAndCloneIds,
+	simplBndr, simplBndrs, simplLetId, simplIdInfo,
+	substAndCloneId, substAndCloneIds, substAndCloneRecIds,
 
 	-- Type stuff
 	mkTyVarSubst, mkTopTyVarSubst, 
@@ -39,7 +39,7 @@ module Subst (
 import CmdLineOpts	( opt_PprStyle_Debug )
 import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			  CoreRules(..), CoreRule(..), 
-			  isEmptyCoreRules, seqRules
+			  isEmptyCoreRules, seqRules, hasUnfolding, noUnfolding
 			)
 import CoreFVs		( exprFreeVars, mustHaveLocalBinding )
 import TypeRep		( Type(..), TyNote(..) )  -- friend
@@ -49,15 +49,19 @@ import Type		( ThetaType, PredType(..), ClassContext,
 import VarSet
 import VarEnv
 import Var		( setVarUnique, isId )
-import Id		( idType, setIdType, idOccInfo, zapFragileIdInfo, maybeModifyIdInfo )
-import IdInfo		( IdInfo, isFragileOcc,
-			  specInfo, setSpecInfo, 
+import Id		( idType, idInfo, setIdInfo, setIdType, idOccInfo, maybeModifyIdInfo )
+import IdInfo		( IdInfo, mkIdInfo,
+			  occInfo, isFragileOcc, setOccInfo, 
+			  specInfo, setSpecInfo, flavourInfo,
+			  unfoldingInfo, setUnfoldingInfo,
+			  CafInfo(NoCafRefs),
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo,
-                          lbvarInfo, LBVarInfo(..), setLBVarInfo
+                          lbvarInfo, LBVarInfo(..), setLBVarInfo, hasNoLBVarInfo
 			)
-import Unique		( Uniquable(..), deriveUnique )
+import BasicTypes	( OccInfo(..) )
+import Unique		( Unique, Uniquable(..), deriveUnique )
 import UniqSet		( elemUniqSet_Directly )
-import UniqSupply	( UniqSupply, uniqFromSupply, splitUniqSupply )
+import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply )
 import Var		( Var, Id, TyVar, isTyVar )
 import Outputable
 import PprCore		()		-- Instances
@@ -189,9 +193,7 @@ type IdSubst    = Subst
 The general plan about the substitution and in-scope set for Ids is as follows
 
 * substId always adds new_id to the in-scope set.
-  new_id has a correctly-substituted type, but all its fragile IdInfo has been zapped.
-  That is added back in later.  So new_id is the minimal thing it's 
-  correct to substitute.
+  new_id has a correctly-substituted type, occ info
 
 * substId adds a binding (DoneId new_id occ) to the substitution if 
 	EITHER the Id's unique has changed
@@ -508,7 +510,7 @@ substExpr subst expr
 
     go (Let (Rec pairs) body) = Let (Rec pairs') (substExpr subst' body)
 			      where
-				(subst', bndrs') = substBndrs subst (map fst pairs)
+				(subst', bndrs') = substRecIds subst (map fst pairs)
 				pairs'	= bndrs' `zip` rhss'
 				rhss'	= map (substExpr subst' . snd) pairs
 
@@ -527,87 +529,160 @@ substExpr subst expr
 
 \end{code}
 
-Substituting in binders is a rather tricky part of the whole compiler.
 
-When we hit a binder we may need to
-  (a) apply the the type envt (if non-empty) to its type
-  (c) give it a new unique to avoid name clashes
+%************************************************************************
+%*									*
+\section{Substituting an Id binder}
+%*									*
+%************************************************************************
 
 \begin{code}
+-- simplBndr and simplLetId are used by the simplifier
+
+simplBndr :: Subst -> Var -> (Subst, Var)
+-- Used for lambda and case-bound variables
+-- Clone Id if necessary, substitute type
+-- Return with IdInfo already substituted, 
+-- but occurrence info zapped
+-- The substitution is extended only if the variable is cloned, because
+-- we don't need to use it to track occurrence info.
+simplBndr subst bndr
+  | isTyVar bndr  = substTyVar subst bndr
+  | otherwise     = subst_id isFragileOcc subst subst bndr
+
+simplBndrs :: Subst -> [Var] -> (Subst, [Var])
+simplBndrs subst bndrs = mapAccumL simplBndr subst bndrs
+
+simplLetId :: Subst -> Id -> (Subst, Id)
+-- Clone Id if necessary
+-- Substitute its type
+-- Return an Id with completely zapped IdInfo
+-- Augment the subtitution if the unique changed or if there's
+-- 	interesting occurrence info
+-- [A subsequent substIdInfo will restore its IdInfo]
+simplLetId subst@(Subst in_scope env) old_id
+  = (Subst (in_scope `extendInScopeSet` new_id) new_env, new_id)
+  where
+    old_info = idInfo old_id
+    id1	    = uniqAway in_scope old_id
+    id2     = substIdType subst id1
+    new_id  = id2 `setIdInfo` mkIdInfo (flavourInfo old_info) NoCafRefs
+		-- Zap the IdIno altogether, but preserve the flavour
+
+	-- Extend the substitution if the unique has changed,
+	-- or there's some useful occurrence information
+	-- See the notes with substTyVar for the delSubstEnv
+    occ_info = occInfo old_info
+    new_env | new_id /= old_id || isFragileOcc occ_info
+	    = extendSubstEnv env old_id (DoneId new_id occ_info)
+	    | otherwise 
+	    = delSubstEnv env old_id
+
+simplIdInfo :: Subst -> IdInfo -> Id -> Id
+  -- Used by the simplifier to compute new IdInfo for a let(rec) binder,
+  -- subsequent to simplLetId having zapped its IdInfo
+simplIdInfo subst old_info bndr
+  = case substIdInfo subst isFragileOcc old_info of 
+	Just new_info -> bndr `setIdInfo` new_info
+	Nothing       -> bndr `setIdInfo` old_info
+\end{code}
+
+\begin{code}
+-- substBndr and friends are used when doing expression substitution only
+-- In this case we can preserve occurrence information, and indeed we want
+-- to do so else lose useful occ info in rules.  Hence the calls to 
+-- simpl_id with keepOccInfo
+
 substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
   | isTyVar bndr  = substTyVar subst bndr
-  | otherwise     = substId    subst bndr
+  | otherwise     = subst_id keepOccInfo subst subst bndr
 
 substBndrs :: Subst -> [Var] -> (Subst, [Var])
 substBndrs subst bndrs = mapAccumL substBndr subst bndrs
 
+substRecIds :: Subst -> [Id] -> (Subst, [Id])
+-- Substitute a mutually recursive group
+substRecIds subst bndrs 
+  = (new_subst, new_bndrs)
+  where
+	-- Here's the reason we need to pass rec_subst to subst_id
+    (new_subst, new_bndrs) = mapAccumL (subst_id keepOccInfo new_subst) subst bndrs
 
-substIds :: Subst -> [Id] -> (Subst, [Id])
-substIds subst bndrs = mapAccumL substId subst bndrs
+keepOccInfo occ = False	-- Never fragile
+\end{code}
 
-substId :: Subst -> Id -> (Subst, Id)
-	-- Returns an Id with empty IdInfo
-	-- See the notes with the Subst data type decl at the
-	-- top of this module
 
-substId subst@(Subst in_scope env) old_id
+\begin{code}
+subst_id :: (OccInfo -> Bool)	-- True <=> the OccInfo is fragile
+	 -> Subst		-- Substitution to use for the IdInfo
+	 -> Subst -> Id 	-- Substitition and Id to transform
+	 -> (Subst, Id)		-- Transformed pair
+
+-- Returns with:
+--	* Unique changed if necessary
+--	* Type substituted
+-- 	* Unfolding zapped
+--	* Rules, worker, lbvar info all substituted 
+--	* Occurrence info zapped if is_fragile_occ returns True
+--	* The in-scope set extended with the returned Id
+--	* The substitution extended with a DoneId if unique changed
+--	  In this case, the var in the DoneId is the same as the
+--	  var returned
+
+subst_id is_fragile_occ rec_subst subst@(Subst in_scope env) old_id
   = (Subst (in_scope `extendInScopeSet` new_id) new_env, new_id)
   where
-    id_ty    = idType old_id
-    occ_info = idOccInfo old_id
+	-- id1 is cloned if necessary
+    id1 = uniqAway in_scope old_id
 
-       -- id1 has its type zapped
-    id1 |  noTypeSubst env
-	|| isEmptyVarSet (tyVarsOfType id_ty) = old_id
-			-- The tyVarsOfType is cheaper than it looks
-			-- because we cache the free tyvars of the type
-			-- in a Note in the id's type itself
-        | otherwise  = setIdType old_id (substTy subst id_ty)
+	-- id2 has its type zapped
+    id2 = substIdType subst id1
 
-	-- id2 has its IdInfo zapped
-    id2 = zapFragileIdInfo id1
+	-- new_id has the right IdInfo
+	-- The lazy-set is because we're in a loop here, with 
+	-- rec_subst, when dealing with a mutually-recursive group
+    new_id = maybeModifyIdInfo (substIdInfo rec_subst is_fragile_occ) id2
 
-        -- id3 has its LBVarInfo zapped
-    id3 = maybeModifyIdInfo (\ info -> go info (lbvarInfo info)) id2
-            where go info (LBVarInfo u@(TyVarTy _)) = Just $ setLBVarInfo info $
-                                                      LBVarInfo (subst_ty subst u)
-                  go info _                         = Nothing
-
-	-- new_id is cloned if necessary
-    new_id = uniqAway in_scope id3
-	-- Extend the substitution if the unique has changed,
-	-- or there's some useful occurrence information
+	-- Extend the substitution if the unique has changed
 	-- See the notes with substTyVar for the delSubstEnv
-    new_env | new_id /= old_id || isFragileOcc occ_info 
-	    = extendSubstEnv env old_id (DoneId new_id occ_info)
+    new_env | new_id /= old_id
+	    = extendSubstEnv env old_id (DoneId new_id (idOccInfo old_id))
 	    | otherwise 
 	    = delSubstEnv env old_id
 \end{code}
 
 Now a variant that unconditionally allocates a new unique.
+It also unconditionally zaps the OccInfo.
 
 \begin{code}
-substAndCloneIds :: Subst -> UniqSupply -> [Id] -> (Subst, UniqSupply, [Id])
-substAndCloneIds subst us [] = (subst, us, [])
-substAndCloneIds subst us (b:bs) = case substAndCloneId  subst  us  b  of { (subst1, us1, b') ->
-				   case substAndCloneIds subst1 us1 bs of { (subst2, us2, bs') ->
-				   (subst2, us2, (b':bs')) }}
-					
-substAndCloneId :: Subst -> UniqSupply -> Id -> (Subst, UniqSupply, Id)
-substAndCloneId subst@(Subst in_scope env) us old_id
-  = (Subst (in_scope `extendInScopeSet` new_id) 
-	   (extendSubstEnv env old_id (DoneEx (Var new_id))),
-     new_us,
-     new_id)
-  where
-    id_ty    = idType old_id
-    id1 | noTypeSubst env || isEmptyVarSet (tyVarsOfType id_ty) = old_id
-        | otherwise 						= setIdType old_id (substTy subst id_ty)
+subst_clone_id :: Subst			-- Substitution to use (lazily) for the rules and worker
+	       -> Subst -> (Id, Unique)	-- Substitition and Id to transform
+	       -> (Subst, Id)		-- Transformed pair
 
-    id2 	 = zapFragileIdInfo id1
-    new_id	 = setVarUnique id2 (uniqFromSupply us1)
-    (us1,new_us) = splitUniqSupply us
+subst_clone_id rec_subst subst@(Subst in_scope env) (old_id, uniq)
+  = (Subst (in_scope `extendInScopeSet` new_id) new_env, new_id)
+  where
+    id1	 = setVarUnique old_id uniq
+    id2  = substIdType subst id1
+
+    new_id  = maybeModifyIdInfo (substIdInfo rec_subst isFragileOcc) id2
+    new_env = extendSubstEnv env old_id (DoneId new_id NoOccInfo)
+
+substAndCloneIds :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
+substAndCloneIds subst us ids
+  = mapAccumL (subst_clone_id subst) subst (ids `zip` uniqsFromSupply (length ids) us)
+
+substAndCloneRecIds :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
+substAndCloneRecIds subst us ids
+  = (subst', ids')
+  where
+    (subst', ids') = mapAccumL (subst_clone_id subst') subst
+			       (ids `zip` uniqsFromSupply (length ids) us)
+
+substAndCloneId :: Subst -> UniqSupply -> Id -> (Subst, Id)
+substAndCloneId subst@(Subst in_scope env) us old_id
+  = subst_clone_id subst subst (old_id, uniqFromSupply us)
 \end{code}
 
 
@@ -619,29 +694,50 @@ substAndCloneId subst@(Subst in_scope env) us old_id
 
 \begin{code}
 substIdInfo :: Subst 
-	    -> IdInfo		-- Get un-substituted ones from here
-	    -> IdInfo		-- Substitute it and add it to here
-	    -> IdInfo		-- To give this
-	-- Seq'ing on the returned IdInfo is enough to cause all the 
-	-- substitutions to happen completely
+	    -> (OccInfo -> Bool)	-- True <=> zap the occurrence info
+	    -> IdInfo
+	    -> Maybe IdInfo
+-- Substitute the 
+--	rules
+--	worker info
+--	LBVar info
+-- Zap the unfolding 
+-- Zap the occ info if instructed to do so
+-- 
+-- Seq'ing on the returned IdInfo is enough to cause all the 
+-- substitutions to happen completely
 
-substIdInfo subst old_info new_info
-  = info2
-  where 
-    info1 | isEmptyCoreRules old_rules = new_info
-	  | otherwise		       = new_info `setSpecInfo` new_rules
+substIdInfo subst is_fragile_occ info
+  | nothing_to_do = Nothing
+  | otherwise     = Just (info `setOccInfo`    	  (if zap_occ then NoOccInfo else old_occ)
+			       `setSpecInfo`   	  substRules  subst old_rules
+			       `setWorkerInfo` 	  substWorker subst old_wrkr
+			       `setLBVarInfo`  	  substLBVar  subst old_lbv
+			       `setUnfoldingInfo` noUnfolding)
 			-- setSpecInfo does a seq
-	  where
-	    new_rules = substRules subst old_rules
- 
-    info2 | not (workerExists old_wrkr) = info1
-	  | otherwise			= info1 `setWorkerInfo` new_wrkr
 			-- setWorkerInfo does a seq
-	  where
-	    new_wrkr = substWorker subst old_wrkr
+  where
+    nothing_to_do = not zap_occ && 
+		    isEmptyCoreRules old_rules &&
+		    not (workerExists old_wrkr) &&
+		    hasNoLBVarInfo old_lbv &&
+		    not (hasUnfolding (unfoldingInfo info))
+    
+    zap_occ   = is_fragile_occ old_occ
+    old_occ   = occInfo info
+    old_rules = specInfo info
+    old_wrkr  = workerInfo info
+    old_lbv   = lbvarInfo info
 
-    old_rules = specInfo   old_info
-    old_wrkr  = workerInfo old_info
+substIdType :: Subst -> Id -> Id
+substIdType subst@(Subst in_scope env) id
+  |  noTypeSubst env || isEmptyVarSet (tyVarsOfType old_ty) = id
+  | otherwise						    = setIdType id (substTy subst old_ty)
+		-- The tyVarsOfType is cheaper than it looks
+		-- because we cache the free tyvars of the type
+		-- in a Note in the id's type itself
+  where
+    old_ty = idType id
 
 substWorker :: Subst -> WorkerInfo -> WorkerInfo
 	-- Seq'ing on the returned WorkerInfo is enough to cause all the 
@@ -686,4 +782,9 @@ substVarSet subst fvs
 			    DoneEx expr	    -> exprFreeVars expr
 			    DoneTy ty  	    -> tyVarsOfType ty 
 			    ContEx se' expr -> substVarSet (setSubstEnv subst se') (exprFreeVars expr)
+
+substLBVar subst NoLBVarInfo    = NoLBVarInfo
+substLBVar subst (LBVarInfo ty) = ty1 `seq` LBVarInfo ty1
+				where
+				  ty1 = substTy subst ty
 \end{code}

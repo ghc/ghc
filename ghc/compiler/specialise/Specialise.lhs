@@ -20,8 +20,10 @@ import Type		( Type, mkTyVarTy, splitSigmaTy,
 			  tyVarsOfTypes, tyVarsOfTheta, 
 			  mkForAllTys 
 			)
-import Subst		( Subst, mkSubst, substTy, mkSubst, substBndrs, extendSubstList, mkInScopeSet,
-			  substId, substAndCloneId, substAndCloneIds, lookupIdSubst, substInScope
+import Subst		( Subst, mkSubst, substTy, mkSubst, extendSubstList, mkInScopeSet,
+			  simplBndr, simplBndrs, 
+			  substAndCloneId, substAndCloneIds, substAndCloneRecIds,
+			  lookupIdSubst, substInScope
 			) 
 import VarSet
 import VarEnv
@@ -34,8 +36,8 @@ import PprCore		( pprCoreRules )
 import Rules		( addIdSpecialisations, lookupRule )
 
 import UniqSupply	( UniqSupply,
-			  UniqSM, initUs_, thenUs, thenUs, returnUs, getUniqueUs, 
-			  withUs, mapUs
+			  UniqSM, initUs_, thenUs, returnUs, getUniqueUs, 
+			  getUs, mapUs
 			)
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
 import FiniteMap
@@ -658,7 +660,7 @@ specExpr subst e@(Lam _ _)
     returnSM (mkLams bndrs' body'', filtered_uds)
   where
     (bndrs, body) = collectBinders e
-    (subst', bndrs') = substBndrs subst bndrs
+    (subst', bndrs') = simplBndrs subst bndrs
 	-- More efficient to collect a group of binders together all at once
 	-- and we don't want to split a lambda group with dumped bindings
 
@@ -667,7 +669,7 @@ specExpr subst (Case scrut case_bndr alts)
     mapAndCombineSM spec_alt alts	`thenSM` \ (alts', uds_alts) ->
     returnSM (Case scrut' case_bndr' alts', uds_scrut `plusUDs` uds_alts)
   where
-    (subst_alt, case_bndr') = substId subst case_bndr
+    (subst_alt, case_bndr') = simplBndr subst case_bndr
 	-- No need to clone case binder; it can't float like a let(rec)
 
     spec_alt (con, args, rhs)
@@ -677,7 +679,7 @@ specExpr subst (Case scrut case_bndr alts)
 	  in
 	  returnSM ((con, args', rhs''), uds')
 	where
-	  (subst_rhs, args') = substBndrs subst_alt args
+	  (subst_rhs, args') = simplBndrs subst_alt args
 
 ---------------- Finally, let is the interesting case --------------------
 specExpr subst (Let bind body)
@@ -1108,25 +1110,22 @@ cloneBindSM :: Subst -> CoreBind -> SpecM (Subst, Subst, CoreBind)
 -- Clone the binders of the bind; return new bind with the cloned binders
 -- Return the substitution to use for RHSs, and the one to use for the body
 cloneBindSM subst (NonRec bndr rhs)
-  = withUs 	$ \ us ->
+  = getUs 	`thenUs` \ us ->
     let
-	(subst', us', bndr') = substAndCloneId subst us bndr
+	(subst', bndr') = substAndCloneId subst us bndr
     in
-    ((subst, subst', NonRec bndr' rhs), us')
+    returnUs (subst, subst', NonRec bndr' rhs)
 
 cloneBindSM subst (Rec pairs)
-  = withUs	$ \ us ->
+  = getUs 	`thenUs` \ us ->
     let
-	(subst', us', bndrs') = substAndCloneIds subst us (map fst pairs)
+	(subst', bndrs') = substAndCloneRecIds subst us (map fst pairs)
     in
-    ((subst', subst', Rec (bndrs' `zip` map snd pairs)), us')
+    returnUs (subst', subst', Rec (bndrs' `zip` map snd pairs))
 
 cloneBinders subst bndrs
-  = withUs	$ \ us -> 
-    let
-	(subst', us', bndrs') = substAndCloneIds subst us bndrs
-    in
-    ((subst', bndrs'), us')
+  = getUs 	`thenUs` \ us ->
+    returnUs (substAndCloneIds subst us bndrs)
 
 newIdSM old_id new_ty
   = getUniqSM		`thenSM` \ uniq ->

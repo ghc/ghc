@@ -5,7 +5,7 @@
 
 \begin{code}
 module SimplUtils (
-	simplBinder, simplBinders, simplIds,
+	simplBinder, simplBinders, simplRecIds, simplLetId,
 	tryRhsTyLam, tryEtaExpansion,
 	mkCase,
 
@@ -25,9 +25,10 @@ import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
 import CoreSyn
 import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, 
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce,
-			  findDefault, findAlt
+			  findDefault
 			)
-import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, substExpr )
+import Subst		( InScopeSet, mkSubst, substExpr )
+import qualified Subst	( simplBndrs, simplBndr, simplLetId )
 import Id		( idType, idName, 
 			  idUnfolding, idStrictness,
 			  mkVanillaId, idInfo
@@ -45,7 +46,7 @@ import Type		( Type, mkForAllTys, seqType, repType,
 import TyCon		( tyConDataConsIfAvailable )
 import DataCon		( dataConRepArity )
 import VarEnv		( SubstEnv )
-import Util		( lengthExceeds )
+import Util		( lengthExceeds, mapAccumL )
 import Outputable
 \end{code}
 
@@ -428,7 +429,7 @@ simplBinders :: [InBinder] -> ([OutBinder] -> SimplM a) -> SimplM a
 simplBinders bndrs thing_inside
   = getSubst		`thenSmpl` \ subst ->
     let
-	(subst', bndrs') = substBndrs subst bndrs
+	(subst', bndrs') = Subst.simplBndrs subst bndrs
     in
     seqBndrs bndrs'	`seq`
     setSubst subst' (thing_inside bndrs')
@@ -437,23 +438,29 @@ simplBinder :: InBinder -> (OutBinder -> SimplM a) -> SimplM a
 simplBinder bndr thing_inside
   = getSubst		`thenSmpl` \ subst ->
     let
-	(subst', bndr') = substBndr subst bndr
+	(subst', bndr') = Subst.simplBndr subst bndr
     in
     seqBndr bndr'	`seq`
     setSubst subst' (thing_inside bndr')
 
 
--- Same semantics as simplBinders, but a little less 
--- plumbing and hence a little more efficient.
--- Maybe not worth the candle?
-simplIds :: [InBinder] -> ([OutBinder] -> SimplM a) -> SimplM a
-simplIds ids thing_inside
+simplRecIds :: [InBinder] -> ([OutBinder] -> SimplM a) -> SimplM a
+simplRecIds ids thing_inside
   = getSubst		`thenSmpl` \ subst ->
     let
-	(subst', bndrs') = substIds subst ids
+	(subst', ids') = mapAccumL Subst.simplLetId subst ids
     in
-    seqBndrs bndrs'	`seq`
-    setSubst subst' (thing_inside bndrs')
+    seqBndrs ids'	`seq`
+    setSubst subst' (thing_inside ids')
+
+simplLetId :: InBinder -> (OutBinder -> SimplM a) -> SimplM a
+simplLetId id thing_inside
+  = getSubst		`thenSmpl` \ subst ->
+    let
+	(subst', id') = Subst.simplLetId subst id
+    in
+    seqBndr id'	`seq`
+    setSubst subst' (thing_inside id')
 
 seqBndrs [] = ()
 seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs

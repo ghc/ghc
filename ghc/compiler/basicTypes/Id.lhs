@@ -19,7 +19,7 @@ module Id (
 	-- Modifying an Id
 	setIdName, setIdUnique, setIdType, setIdNoDiscard, 
 	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
-	zapFragileIdInfo, zapLamIdInfo,
+	zapLamIdInfo, zapDemandIdInfo,
 
 	-- Predicates
 	isImplicitId, isDeadBinder,
@@ -458,10 +458,8 @@ clearOneShotLambda id
 \end{code}
 
 \begin{code}
-zapFragileIdInfo :: Id -> Id
-zapFragileIdInfo id = maybeModifyIdInfo zapFragileInfo id
-
 zapLamIdInfo :: Id -> Id
 zapLamIdInfo id = maybeModifyIdInfo zapLamInfo id
-\end{code}
 
+zapDemandIdInfo id = maybeModifyIdInfo zapDemandInfo id
+\end{code}

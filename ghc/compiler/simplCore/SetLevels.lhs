@@ -57,18 +57,17 @@ import CoreSyn
 import CoreUtils	( exprType, exprIsTrivial, exprIsBottom, mkPiType )
 import CoreFVs		-- all of it
 import Subst
-import Id		( Id, idType, mkSysLocal, isOneShotLambda, modifyIdInfo, 
+import Id		( Id, idType, mkSysLocal, isOneShotLambda, zapDemandIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
-import IdInfo		( workerExists, vanillaIdInfo, demandInfo, setDemandInfo )
-import Var		( Var, setVarUnique )
+import IdInfo		( workerExists, vanillaIdInfo, )
+import Var		( Var )
 import VarSet
 import VarEnv
 import Name		( getOccName )
 import OccName		( occNameUserString )
 import Type		( isUnLiftedType, Type )
 import BasicTypes	( TopLevelFlag(..) )
-import Demand		( isStrict, wwLazy )
 import UniqSupply
 import Util		( sortLt, isSingleton, count )
 import Outputable
@@ -377,7 +376,7 @@ lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
 \begin{code}
 lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
   | null abs_vars
-  = cloneVars top_lvl env bndrs ctxt_lvl dest_lvl	`thenLvl` \ (new_env, new_bndrs) ->
+  = cloneRecVars top_lvl env bndrs ctxt_lvl dest_lvl	`thenLvl` \ (new_env, new_bndrs) ->
     mapLvl (lvlExpr ctxt_lvl new_env) rhss		`thenLvl` \ new_rhss ->
     returnLvl (Rec ((new_bndrs `zip` repeat dest_lvl) `zip` new_rhss), new_env)
 
@@ -594,10 +593,14 @@ extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
 
 -- extendCaseBndrLvlEnv adds the mapping case-bndr->scrut-var if it can
 -- (see point 4 of the module overview comment)
+extendCaseBndrLvlEnv (float_lams, lvl_env, subst, id_env) (Var scrut_var) case_bndr lvl
+  = (float_lams,
+     extendVarEnv lvl_env case_bndr lvl,
+     extendSubst subst case_bndr (DoneEx (Var scrut_var)),
+     extendVarEnv id_env case_bndr ([scrut_var], Var scrut_var))
+     
 extendCaseBndrLvlEnv env scrut case_bndr lvl
-  = case scrut of
-	Var v -> extendCloneLvlEnv lvl env [(case_bndr, v)]
-	other -> extendLvlEnv          env [(case_bndr,lvl)]
+  = extendLvlEnv          env [(case_bndr,lvl)]
 
 extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst, id_env) abs_vars bndr_pairs
   = (float_lams,
@@ -609,14 +612,13 @@ extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst, id_env) abs_vars bndr_pai
      add_subst env (v,v') = extendSubst  env v (DoneEx (mkVarApps (Var v') abs_vars))
      add_id    env (v,v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
-extendCloneLvlEnv lvl (float_lams, lvl_env, subst, id_env) bndr_pairs
+extendCloneLvlEnv lvl (float_lams, lvl_env, _, id_env) new_subst bndr_pairs
   = (float_lams,
      foldl add_lvl   lvl_env bndr_pairs,
-     foldl add_subst subst   bndr_pairs,
+     new_subst,
      foldl add_id    id_env  bndr_pairs)
   where
      add_lvl   env (v,v') = extendVarEnv env v' lvl
-     add_subst env (v,v') = extendSubst  env v (DoneEx (Var v'))
      add_id    env (v,v') = extendVarEnv env v ([v'], Var v')
 
 
@@ -706,38 +708,33 @@ newLvlVar str vars body_ty
 cloneVar :: TopLevelFlag -> LevelEnv -> Id -> Level -> Level -> LvlM (LevelEnv, Id)
 cloneVar TopLevel env v ctxt_lvl dest_lvl
   = returnUs (env, v)	-- Don't clone top level things
-cloneVar NotTopLevel env v ctxt_lvl dest_lvl
+cloneVar NotTopLevel env@(_,_,subst,_) v ctxt_lvl dest_lvl
   = ASSERT( isId v )
-    getUniqueUs	`thenLvl` \ uniq ->
+    getUs	`thenLvl` \ us ->
     let
-      v'	 = setVarUnique v uniq
-      v''	 = subst_id_info env ctxt_lvl dest_lvl v'
-      env'	 = extendCloneLvlEnv dest_lvl env [(v,v'')]
+      (subst', v1) = substAndCloneId subst us v
+      v2	   = zap_demand ctxt_lvl dest_lvl v1
+      env'	   = extendCloneLvlEnv dest_lvl env subst' [(v,v2)]
     in
-    returnUs (env', v'')
+    returnUs (env', v2)
 
-cloneVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> Level -> LvlM (LevelEnv, [Id])
-cloneVars TopLevel env vs ctxt_lvl dest_lvl 
+cloneRecVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> Level -> LvlM (LevelEnv, [Id])
+cloneRecVars TopLevel env vs ctxt_lvl dest_lvl 
   = returnUs (env, vs)	-- Don't clone top level things
-cloneVars NotTopLevel env vs ctxt_lvl dest_lvl
+cloneRecVars NotTopLevel env@(_,_,subst,_) vs ctxt_lvl dest_lvl
   = ASSERT( all isId vs )
-    getUniquesUs (length vs)	`thenLvl` \ uniqs ->
+    getUs 			`thenLvl` \ us ->
     let
-      vs'	 = zipWith setVarUnique vs uniqs
-      vs''	 = map (subst_id_info env' ctxt_lvl dest_lvl) vs'
-      env'	 = extendCloneLvlEnv dest_lvl env (vs `zip` vs'')
+      (subst', vs1) = substAndCloneRecIds subst us vs
+      vs2	    = map (zap_demand ctxt_lvl dest_lvl) vs1
+      env'	    = extendCloneLvlEnv dest_lvl env subst' (vs `zip` vs2)
     in
-    returnUs (env', vs'')
+    returnUs (env', vs2)
 
-subst_id_info (_, _, subst, _) ctxt_lvl dest_lvl v
-    = modifyIdInfo (\info -> substIdInfo subst info (zap_dmd info)) v
-  where
 	-- VERY IMPORTANT: we must zap the demand info 
 	-- if the thing is going to float out past a lambda
-    zap_dmd info
-	| stays_put || not (isStrict (demandInfo info)) = info
-	| otherwise					= setDemandInfo info wwLazy
-
-    stays_put = ctxt_lvl == dest_lvl
+zap_demand dest_lvl ctxt_lvl id
+  | ctxt_lvl == dest_lvl = id			-- Stays put
+  | otherwise		 = zapDemandIdInfo id	-- Floats out
 \end{code}
 	
