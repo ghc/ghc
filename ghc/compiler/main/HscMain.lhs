@@ -61,7 +61,7 @@ import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),
 			  HomeSymbolTable, 
-			  OrigNameEnv(..), PackageRuleBase, HomeIfaceTable, 
+			  NameSupply(..), PackageRuleBase, HomeIfaceTable, 
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
@@ -514,11 +514,11 @@ initPersistentCompilerState
         )
 
 initPersistentRenamerState :: IO PersistentRenamerState
-  = do ns <- mkSplitUniqSupply 'r'
+  = do us <- mkSplitUniqSupply 'r'
        return (
-        PRS { prsOrig  = Orig { origNS	   = ns,
-				origNames  = initOrigNames,
-			        origIParam = emptyFM },
+        PRS { prsOrig  = NameSupply { nsUniqs = us,
+				      nsNames = initOrigNames,
+			      	      nsIPs   = emptyFM },
 	      prsDecls = (emptyNameEnv, 0),
 	      prsInsts = (emptyBag, 0),
 	      prsRules = (emptyBag, 0)

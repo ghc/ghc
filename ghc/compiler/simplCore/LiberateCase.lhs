@@ -125,7 +125,7 @@ data LibCaseEnv
 				-- (top-level and imported things have
 				-- a level of zero)
 
-	(IdEnv CoreBind)-- Binds *only* recursively defined
+	(IdEnv CoreBind)	-- Binds *only* recursively defined
 				-- Ids, to their own binding group,
 				-- and *only* in their own RHSs
 
@@ -187,27 +187,11 @@ libCaseBind env (Rec pairs)
 	-- processing the rhs with an *un-extended* environment, so
 	-- that the same process doesn't occur for ever!
 
-    extended_env
-      = addRecBinds env [ (binder, libCase env_body rhs)
-			| (binder, rhs) <- pairs ]
-
-	-- Why "localiseId" above?  Because we're creating a new local
-	-- copy of the original binding.  In particular, the original
-	-- binding might have been for a top-level, and this copy clearly
-	-- will not be top-level!
-
-	-- It is enough to change just the binder, because subsequent
-	-- simplification will propagate the right info from the binder.
-
-	-- Why does it matter?  Because the codeGen keeps a separate
-	-- environment for top-level Ids, and it is disastrous for it
-	-- to think that something is top-level when it isn't.
-	--
-	-- [May 98: all this is now handled by SimplCore.tidyCore]
+    extended_env = addRecBinds env [ (binder, libCase env_body rhs)
+				   | (binder, rhs) <- pairs ]
 
     rhs_small_enough rhs = couldBeSmallEnoughToInline lIBERATE_BOMB_SIZE rhs
-
-    lIBERATE_BOMB_SIZE = bombOutSize env
+    lIBERATE_BOMB_SIZE   = bombOutSize env
 \end{code}
 
 
@@ -249,7 +233,7 @@ Ids
 \begin{code}
 libCaseId :: LibCaseEnv -> Id -> CoreExpr
 libCaseId env v
-  | maybeToBool maybe_rec_bind &&	-- It's a use of a recursive thing
+  | Just the_bind <- lookupRecId env v,	-- It's a use of a recursive thing
     there_are_free_scruts		-- with free vars scrutinised in RHS
   = Let the_bind (Var v)
 
@@ -257,12 +241,7 @@ libCaseId env v
   = Var v
 
   where
-    maybe_rec_bind :: Maybe CoreBind	-- The binding of the recursive thingy
-    maybe_rec_bind = lookupRecId env v
-    Just the_bind  = maybe_rec_bind
-
-    rec_id_level = lookupLevel env v
-
+    rec_id_level	  = lookupLevel env v
     there_are_free_scruts = freeScruts env rec_id_level
 \end{code}
 
@@ -325,5 +304,5 @@ freeScruts :: LibCaseEnv
 freeScruts (LibCaseEnv bomb lvl lvl_env rec_env scruts) rec_bind_lvl
   = not (null free_scruts)
   where
-    free_scruts = [v | (v,lvl) <- scruts, lvl > rec_bind_lvl]
+    free_scruts = [v | (v,lvl) <- scruts, lvl <= rec_bind_lvl]
 \end{code}

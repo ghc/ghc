@@ -37,7 +37,7 @@ import HsSyn
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
 import HscTypes		( AvailEnv, lookupType,
-			  OrigNameEnv(..), 
+			  NameSupply(..), 
 			  WhetherHasOrphans, ImportVersion, 
 			  PersistentRenamerState(..), IsBootInterface, Avails,
 			  DeclsMap, IfaceInsts, IfaceRules, 
@@ -141,7 +141,7 @@ data RnDown
 			-- so it has a Module, so it can be looked up
 
 	rn_errs    :: IORef Messages,
-	rn_ns      :: IORef OrigNameEnv,
+	rn_ns      :: IORef NameSupply,
 	rn_ifaces  :: IORef Ifaces
     }
 
@@ -402,7 +402,7 @@ renameDerivedCode dflags mod prs thing_inside
 	-- and that doesn't happen in pragmas etc
 
     do	{ us <- mkSplitUniqSupply 'r'
-	; names_var <- newIORef ((prsOrig prs) { origNS = us })
+	; names_var <- newIORef ((prsOrig prs) { nsUniqs = us })
 	; errs_var <- newIORef (emptyBag,emptyBag)
 
     	; let rn_down = RnDown { rn_dflags = dflags,
@@ -605,11 +605,11 @@ getTypeEnvRn down l_down = return (rn_done down)
 %=====================
 
 \begin{code}
-getNameSupplyRn :: RnM d OrigNameEnv
+getNameSupplyRn :: RnM d NameSupply
 getNameSupplyRn rn_down l_down
   = readIORef (rn_ns rn_down)
 
-setNameSupplyRn :: OrigNameEnv -> RnM d ()
+setNameSupplyRn :: NameSupply -> RnM d ()
 setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
   = writeIORef names_var names'
 
@@ -617,9 +617,9 @@ getUniqRn :: RnM d Unique
 getUniqRn (RnDown {rn_ns = names_var}) l_down
  = readIORef names_var >>= \ ns ->
    let
-     (us1,us') = splitUniqSupply (origNS ns)
+     (us1,us') = splitUniqSupply (nsUniqs ns)
    in
-   writeIORef names_var (ns {origNS = us'})	>>
+   writeIORef names_var (ns {nsUniqs = us'})	>>
    return (uniqFromSupply us1)
 \end{code}
 

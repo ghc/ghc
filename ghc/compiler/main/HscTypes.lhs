@@ -25,7 +25,7 @@ module HscTypes (
 	WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
 	IfaceInsts, IfaceRules, GatedDecl, IsExported,
-	OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
+	NameSupply(..), OrigNameCache, OrigIParamCache,
 	AvailEnv, AvailInfo, GenAvailInfo(..),
 	PersistentCompilerState(..),
 
@@ -457,14 +457,14 @@ type PackageRuleBase = RuleBase
 type PackageInstEnv  = InstEnv
 
 data PersistentRenamerState
-  = PRS { prsOrig  :: OrigNameEnv,
+  = PRS { prsOrig  :: NameSupply,
 	  prsDecls :: DeclsMap,
 	  prsInsts :: IfaceInsts,
 	  prsRules :: IfaceRules
     }
 \end{code}
 
-The OrigNameEnv makes sure that there is just one Unique assigned for
+The NameSupply makes sure that there is just one Unique assigned for
 each original name; i.e. (module-name, occ-name) pair.  The Name is
 always stored as a Global, and has the SrcLoc of its binding location.
 Actually that's not quite right.  When we first encounter the original
@@ -477,17 +477,17 @@ encounter the occurrence, we may not know the details of the module, so
 we just store junk.  Then when we find the binding site, we fix it up.
 
 \begin{code}
-data OrigNameEnv
- = Orig { origNS     :: UniqSupply,
+data NameSupply
+ = NameSupply { nsUniqs :: UniqSupply,
 		-- Supply of uniques
-	  origNames  :: OrigNameNameEnv,
+		nsNames :: OrigNameCache,
 		-- Ensures that one original name gets one unique
-	  origIParam :: OrigNameIParamEnv
+		nsIPs   :: OrigIParamCache
 		-- Ensures that one implicit parameter name gets one unique
    }
 
-type OrigNameNameEnv   = FiniteMap (ModuleName,OccName) Name
-type OrigNameIParamEnv = FiniteMap OccName Name
+type OrigNameCache   = FiniteMap (ModuleName,OccName) Name
+type OrigIParamCache = FiniteMap OccName Name
 \end{code}
 
 

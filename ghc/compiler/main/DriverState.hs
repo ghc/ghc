@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.18 2000/12/05 12:09:43 sewardj Exp $
+-- $Id: DriverState.hs,v 1.19 2000/12/08 12:32:15 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -23,8 +23,6 @@ import TmpFiles	( newTempName )
 import Directory ( removeFile )
 #endif
 
-import System
-import IO
 import List
 import Char  
 import Monad
@@ -287,7 +285,7 @@ buildCoreToDo = do
 	])
       ]
 
-    else {- level >= 1 -} return [ 
+    else {- opt_level >= 1 -} return [ 
 
 	-- initial simplify: mk specialiser happy: minimum effort please
 	CoreDoSimplify (isAmongSimpl [
@@ -359,6 +357,7 @@ buildCoreToDo = do
 		-- catch it.  For the record, the redex is 
 		--	  f_el22 (f_el21 r_midblock)
 
+
 -- Leave out lambda lifting for now
 --	  "-fsimplify",	-- Tidy up results of full laziness
 --	    "[", 
@@ -368,12 +367,8 @@ buildCoreToDo = do
 
 	-- We want CSE to follow the final full-laziness pass, because it may
 	-- succeed in commoning up things floated out by full laziness.
-	--
-	-- CSE must immediately follow a simplification pass, because it relies
-	-- on the no-shadowing invariant.  See comments at the top of CSE.lhs
-	-- So it must NOT follow float-inwards, which can give rise to shadowing,
-	-- even if its input doesn't have shadows.  Hence putting it between
-	-- the two passes.
+	-- CSE used to rely on the no-shadowing invariant, but it doesn't any more
+
 	if cse then CoreCSE else CoreDoNothing,
 
 	CoreDoFloatInwards,
@@ -381,11 +376,10 @@ buildCoreToDo = do
 -- Case-liberation for -O2.  This should be after
 -- strictness analysis and the simplification which follows it.
 
---	  ( ($OptLevel != 2)
---	  ? ""
---	  : "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
---
---	  "-fliberate-case",
+	if opt_level >= 2 then
+	   CoreLiberateCase
+	else
+	   CoreDoNothing,
 
 	-- Final clean-up simplification:
 	CoreDoSimplify (isAmongSimpl [

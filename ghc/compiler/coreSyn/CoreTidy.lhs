@@ -34,7 +34,7 @@ import Module		( Module, moduleName )
 import PrimOp		( PrimOp(..), setCCallUnique )
 import HscTypes		( PersistentCompilerState( pcs_PRS ), 
 			  PersistentRenamerState( prsOrig ),
-			  OrigNameEnv( origNames ), OrigNameNameEnv
+			  NameSupply( nsNames ), OrigNameCache
 			)
 import UniqSupply
 import FiniteMap	( lookupFM, addToFM )
@@ -122,7 +122,7 @@ tidyCorePgm dflags mod pcs binds_in orphans_in
 	; let (orphans_out, _) 
 		   = initUs us1 (tidyIdRules (occ_env,subst_env) orphans_in)
 
-	; let prs' = prs { prsOrig = orig { origNames = orig_env' } }
+	; let prs' = prs { prsOrig = orig { nsNames = orig_env' } }
 	      pcs' = pcs { pcs_PRS = prs' }
 
 	; endPass dflags "Tidy Core" Opt_D_dump_simpl binds_out
@@ -140,7 +140,7 @@ tidyCorePgm dflags mod pcs binds_in orphans_in
 	-- decl.  tidyTopId then does a no-op on exported binders.
     prs	 	     = pcs_PRS pcs
     orig	     = prsOrig prs
-    orig_env 	     = origNames orig
+    orig_env 	     = nsNames orig
 
     init_tidy_env us = (us, orig_env, initTidyOccEnv avoids, emptyVarEnv)
     avoids	     = [getOccName bndr | bndr <- bindersOfBinds binds_in,
@@ -248,7 +248,7 @@ addExternal (id,rhs) needed
 
 
 \begin{code}
-type TopTidyEnv = (UniqSupply, OrigNameNameEnv, TidyOccEnv, VarEnv Var)
+type TopTidyEnv = (UniqSupply, OrigNameCache, TidyOccEnv, VarEnv Var)
 
 -- TopTidyEnv: when tidying we need to know
 --   * orig_env: Any pre-ordained Names.  These may have arisen because the
