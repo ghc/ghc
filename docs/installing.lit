@@ -758,6 +758,7 @@ make them work, extend them consistently when adding new
 software, and lay hands on them gently when they don't work.
 
 \subsection{Your source tree}
+\label{source-tree}
 
 The source code is held in your {\em source tree}.
 The root directory of your source tree {\em must}
@@ -767,9 +768,9 @@ contain the following directories and files:
 \item @mk/@: the directory that contains the
 main Makefile code, shared by all the
 @fptools@ software.
-\item @configure.in@: a file that tells the GNU configuration 
-tools what @fptools@ needs to know about the host platform and
-operating system. 
+\item @configure.in@, @config.sub@, @config.guess@:
+these files support the configuration process.
+\item @install-sh@.
 \end{itemize}
 All the other directories are individual {\em projects} of the
 @fptools@ system --- for example, the Glasgow Haskell Compiler (@ghc@),
@@ -978,6 +979,7 @@ a fully-configured build tree from scratch.
 \item Get your source tree from somewhere (CVS repository or
 source distribution).  Say you call the root directory
 @myfptools@ (it does not have to be called @fptools@).
+Make sure that you have the essential files (see Section~\ref{source-tree}).
 
 \item Use @lndir@ or @mkshadowdir@ to create a build tree.
 \begin{verbatim}
