@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.55 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: Storage.c,v 1.56 2001/11/28 14:30:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -336,7 +336,6 @@ resetNurseries( void )
 #else
   for (bd = g0s0->blocks; bd; bd = bd->link) {
 #ifdef PROFILING
-    // @LDV profiling
     // Reset every word in the nursery to zero when doing LDV profiling.
     // This relieves the mutator of the burden of zeroing every new closure,
     // which is stored in the nursery.
@@ -854,6 +853,15 @@ checkSanity( void )
 	}
 	checkFreeListSanity();
     }
+}
+
+// handy function for use in gdb, because Bdescr() is inlined.
+extern bdescr *_bdescr( StgPtr p );
+
+bdescr *
+_bdescr( StgPtr p )
+{
+    return Bdescr(p);
 }
 
 #endif
