@@ -71,6 +71,14 @@ boot :: GHC/PrimopWrappers.hs
 EXTRA_SRCS  += GHC/PrimopWrappers.hs
 CLEAN_FILES += GHC/PrimopWrappers.hs
 
+# -----------------------------------------------------------------------------
+
+STUBOBJS += \
+   Control/Concurrent_stub.$(way_)o
+   
+CLEAN_FILES += $(STUBOBJS) \
+   Control/Concurrent_stub.[ch]
+
 #-----------------------------------------------------------------------------
 # 	Building the library for GHCi
 #
