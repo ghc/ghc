@@ -22,7 +22,10 @@ module Control.Arrow (
 		-- * Arrows
 		Arrow(..), Kleisli(..),
 		-- ** Derived combinators
-		returnA, (<<<),
+		returnA,
+		(^>>), (>>^),
+		-- ** Right-to-left variants
+		(<<<), (<<^), (^<<),
 		-- * Monoid operations
 		ArrowZero(..), ArrowPlus(..),
 		-- * Conditionals
@@ -43,8 +46,8 @@ infixr 3 ***
 infixr 3 &&&
 infixr 2 +++
 infixr 2 |||
-infixr 1 >>>
-infixr 1 <<<
+infixr 1 >>>, ^>>, >>^
+infixr 1 <<<, ^<<, <<^
 
 -- | The basic arrow class.
 --   Any instance must define either 'arr' or 'pure' (which are synonyms),
@@ -136,10 +139,25 @@ instance Monad m => Arrow (Kleisli m) where
 returnA :: Arrow a => a b b
 returnA = arr id
 
--- | Right-to-left composition, for a better fit with arrow notation.
+-- | Precomposition with a pure function.
+(^>>) :: Arrow a => (b -> c) -> a c d -> a b d
+f ^>> a = arr f >>> a
 
+-- | Postcomposition with a pure function.
+(>>^) :: Arrow a => a b c -> (c -> d) -> a b d
+a >>^ f = a >>> arr f
+
+-- | Right-to-left composition, for a better fit with arrow notation.
 (<<<) :: Arrow a => a c d -> a b c -> a b d
 f <<< g = g >>> f
+
+-- | Precomposition with a pure function (right-to-left variant).
+(<<^) :: Arrow a => a c d -> (b -> c) -> a b d
+a <<^ f = a <<< arr f
+
+-- | Postcomposition with a pure function (right-to-left variant).
+(^<<) :: Arrow a => (c -> d) -> a b c -> a b d
+f ^<< a = arr f <<< a
 
 class Arrow a => ArrowZero a where
 	zeroArrow :: a b c
