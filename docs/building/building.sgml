@@ -2652,7 +2652,8 @@ guide) before continuing to read these notes.
 <para>
 Before you start, make sure you've installed the Cygwin packages
 <filename>openssh</filename>, <filename>openssl</filename>,
-<filename>cvs</filename> and <filename>autoconf</filename>.
+<filename>cvs</filename>, <filename>m4</filename> and
+<filename>autoconf</filename>.
 </para>
 
 <Sect2><Title>Configuring ssh</Title>
