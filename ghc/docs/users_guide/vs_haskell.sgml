@@ -44,21 +44,6 @@
 	
       <itemizedlist>
 	<listitem>
-	  <para>GHC doesn't do fixity resolution on the left hand side
-	  of a binding before deciding which symbol is the function
-	  symbol.  For example, the following fails, because GHC makes
-	  the assumption that the function symbol is
-	  <literal>|-</literal>:</para>
-<programlisting>
-infix 5 |- 
-infix 9 :=
-
-data Equal = Char := Int
-
-0 |- x:=y = 1 |- x:=y      -- XXX fails here</programlisting>
-	</listitem>
-
-	<listitem>
 	  <para>GHC doesn't do fixity resolution in expressions during
 	  parsing.  For example, according to the Haskell report, the
 	  following expression is legal Haskell:
