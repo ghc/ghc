@@ -196,11 +196,6 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod decls
 			       imported_inst_info
 	hst_dfuns	 = foldModuleEnv ((++) . md_insts) [] hst
     in
-    traceTc (text "inst env before" <+> pprInstEnv inst_env0)	`thenNF_Tc_`
-    traceTc (vcat [text "imp" <+> ppr imported_dfuns, 
-		   text "hst" <+> ppr hst_dfuns, 
-		   text "local" <+> hsep (map pprInstInfo local_inst_info),
-		   text "gen" <+> hsep (map pprInstInfo generic_inst_info)]) `thenNF_Tc_`
     addInstDFuns inst_env0 imported_dfuns	`thenNF_Tc` \ inst_env1 ->
     addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->
     addInstInfos inst_env2 local_inst_info	`thenNF_Tc` \ inst_env3 ->
@@ -212,10 +207,8 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod decls
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hecne inst_env4
     tcDeriving prs mod inst_env4 get_fixity tycl_decls	`thenTc` \ (deriv_inst_info, deriv_binds) ->
-    traceTc (vcat [text "deriv" <+> hsep (map pprInstInfo deriv_inst_info)]) `thenNF_Tc_`
     addInstInfos inst_env4 deriv_inst_info		`thenNF_Tc` \ final_inst_env ->
 
-    traceTc (text "inst env after" <+> pprInstEnv final_inst_env)	`thenNF_Tc_`
     returnTc (inst_env1, 
 	      final_inst_env, 
 	      generic_inst_info ++ deriv_inst_info ++ local_inst_info,
@@ -230,7 +223,6 @@ addInstDFuns dfuns infos
     let
 	(inst_env', errs) = extendInstEnv dflags dfuns infos
     in
-    traceTc (text "addInstDFuns" <+> vcat errs)	`thenNF_Tc_`
     addErrsTc errs			`thenNF_Tc_` 
     returnTc inst_env'
 \end{code} 
