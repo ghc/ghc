@@ -6,20 +6,30 @@ import Utils
 
 import IO
 import System
-import Config
 import Package
 
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-        [ "install"  ] -> do { putStrLn (dumpPackages (package_details True)) }
-        [ "in-place" ] -> do { putStrLn (dumpPackages (package_details False)) }
-        _ -> do hPutStr stderr "usage: pkgconf (install | in-place)\n"
-                exitWith (ExitFailure 1)
+     ("install":rest)  -> do { putStrLn (dumpPackages (package_details True rest)) }
+     ("in-place":rest) -> do { putStrLn (dumpPackages (package_details False rest)) }
+     _ -> do hPutStr stderr "usage: pkgconf (install | in-place) ...\n"
+             exitWith (ExitFailure 1)
 
-package_details :: Bool -> [PackageConfig]
-package_details installing =
+package_details :: Bool -> [String] -> [PackageConfig]
+package_details installing
+ [ cTARGETPLATFORM
+ , cCURRENT_DIR
+ , cHaveLibGmp
+ , cLibsReadline
+ , clibdir
+ , cGHC_LIB_DIR
+ , cGHC_RUNTIME_DIR
+ , cGHC_UTILS_DIR
+ , cGHC_INCLUDE_DIR
+ , cFPTOOLS_TOP_ABS ] =
+
  [
         Package {
 	name           = "gmp",  -- GMP is at the bottom of the heap
@@ -383,6 +393,6 @@ package_details installing =
          extra_ld_opts  = []
         }
    ]
-
-ghc_src_dir :: String -> String
-ghc_src_dir path = cFPTOOLS_TOP_ABS ++ '/':cCURRENT_DIR ++ '/':path
+  where
+	ghc_src_dir :: String -> String
+	ghc_src_dir path = cFPTOOLS_TOP_ABS ++ '/':cCURRENT_DIR ++ '/':path
