@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.12 1999/03/02 19:44:10 sof Exp $
+ * $Id: InfoTables.h,v 1.13 1999/03/15 16:30:25 simonm Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -76,98 +76,6 @@ typedef struct {
 
 #endif /* DEBUG_CLOSURE */
 
-/* -----------------------------------------------------------------------------
-   Closure Types
-
-   If you add or delete any closure types, don't forget to update
-   ClosureTypes.h for the native code generator.  This is a temporary
-   measure (I hope).
-   -------------------------------------------------------------------------- */
-
-typedef enum {
-
-    INVALID_OBJECT /* Object tag 0 raises an internal error */
-
-    , CONSTR
-    , CONSTR_1_0
-    , CONSTR_0_1
-    , CONSTR_2_0
-    , CONSTR_1_1
-    , CONSTR_0_2
-    , CONSTR_INTLIKE
-    , CONSTR_CHARLIKE
-    , CONSTR_STATIC
-    , CONSTR_NOCAF_STATIC
-
-    , FUN
-    , FUN_1_0
-    , FUN_0_1
-    , FUN_2_0
-    , FUN_1_1
-    , FUN_0_2
-    , FUN_STATIC
-
-    , THUNK
-    , THUNK_1_0
-    , THUNK_0_1
-    , THUNK_2_0
-    , THUNK_1_1
-    , THUNK_0_2
-    , THUNK_STATIC
-    , THUNK_SELECTOR
-
-    , BCO
-    , AP_UPD
-
-    , PAP  /* should be called AP_NUPD */
-
-    , IND
-    , IND_OLDGEN
-    , IND_PERM
-    , IND_OLDGEN_PERM
-    , IND_STATIC
-
-    , CAF_UNENTERED
-    , CAF_ENTERED
-    , CAF_BLACKHOLE
-
-    , RET_BCO
-    , RET_SMALL
-    , RET_VEC_SMALL
-    , RET_BIG
-    , RET_VEC_BIG
-    , RET_DYN
-    , UPDATE_FRAME
-    , CATCH_FRAME
-    , STOP_FRAME
-    , SEQ_FRAME
-
-    , BLACKHOLE
-    , BLACKHOLE_BQ
-
-    , MVAR
-
-    , ARR_WORDS
-    , MUT_ARR_PTRS
-    , MUT_ARR_PTRS_FROZEN
-
-    , MUT_VAR
-
-    , WEAK
-    , FOREIGN
-    , STABLE_NAME
-
-    , TSO
-
-    , BLOCKED_FETCH
-    , FETCH_ME
-
-    , EVACUATED
-
-    , N_CLOSURE_TYPES		/* number of distinct closure types */
-
-} StgClosureType;
-
 /* The type flags provide quick access to certain properties of a closure. */
 
 #define _HNF (1<<0)  /* head normal form?  */
@@ -186,70 +94,15 @@ typedef enum {
 #define isUNPOINTED(flags) ((flags) &_UPT)
 #define hasSRT(flags)      ((flags) &_SRT)
 
-#define closure_STATIC(closure)       (  get_itbl(closure)->flags & _STA)
-#define closure_SHOULD_SPARK(closure) (!(get_itbl(closure)->flags & _NS))
-#define closure_MUTABLE(closure)      (  get_itbl(closure)->flags & _MUT)
-#define closure_UNPOINTED(closure)    (  get_itbl(closure)->flags & _UPT)
+extern StgWord16 closure_flags[];
 
-/*				    HNF  BTM   NS  STA  THU MUT UPT SRT */
-				                                    
-#define FLAGS_CONSTR  		   (_HNF|     _NS                        )	
-#define FLAGS_CONSTR_1_0	   (_HNF|     _NS                        )	
-#define FLAGS_CONSTR_0_1	   (_HNF|     _NS                        )	
-#define FLAGS_CONSTR_2_0	   (_HNF|     _NS                        )	
-#define FLAGS_CONSTR_1_1	   (_HNF|     _NS                        )	
-#define FLAGS_CONSTR_0_2	   (_HNF|     _NS                        )	
-#define FLAGS_CONSTR_STATIC	   (_HNF|     _NS|_STA                   )	
-#define FLAGS_CONSTR_NOCAF_STATIC  (_HNF|     _NS|_STA                   )	
-#define FLAGS_FUN		   (_HNF|     _NS|                  _SRT )	
-#define FLAGS_FUN_1_0		   (_HNF|     _NS                        )	
-#define FLAGS_FUN_0_1		   (_HNF|     _NS                        )	
-#define FLAGS_FUN_2_0		   (_HNF|     _NS                        )	
-#define FLAGS_FUN_1_1		   (_HNF|     _NS                        )	
-#define FLAGS_FUN_0_2		   (_HNF|     _NS                        )	
-#define FLAGS_FUN_STATIC	   (_HNF|     _NS|_STA|             _SRT )	
-#define FLAGS_THUNK		   (     _BTM|         _THU|        _SRT )	
-#define FLAGS_THUNK_1_0		   (     _BTM|         _THU|        _SRT )	
-#define FLAGS_THUNK_0_1		   (     _BTM|         _THU|        _SRT )	
-#define FLAGS_THUNK_2_0		   (     _BTM|         _THU|        _SRT )	
-#define FLAGS_THUNK_1_1		   (     _BTM|         _THU|        _SRT )	
-#define FLAGS_THUNK_0_2		   (     _BTM|         _THU|        _SRT )	
-#define FLAGS_THUNK_STATIC	   (     _BTM|    _STA|_THU|        _SRT )	
-#define FLAGS_THUNK_SELECTOR	   (     _BTM|         _THU|        _SRT )	
-#define FLAGS_BCO		   (_HNF|     _NS                        )	
-#define FLAGS_CAF_UNENTERED        0 /* Do we still use these? */
-#define FLAGS_CAF_ENTERED          0
-#define FLAGS_CAF_BLACKHOLE        ( 	 _BTM|_NS|              _UPT     )
-#define FLAGS_AP_UPD		   (     _BTM|         _THU              )	
-#define FLAGS_PAP		   (_HNF|     _NS                        )	
-#define FLAGS_IND		   0
-#define FLAGS_IND_OLDGEN	   0
-#define FLAGS_IND_PERM		   0
-#define FLAGS_IND_OLDGEN_PERM	   0
-#define FLAGS_IND_STATIC	   (              _STA                   )	
-#define FLAGS_EVACUATED		   0
-#define FLAGS_ARR_WORDS		   (_HNF|     _NS|              _UPT     )	
-#define FLAGS_MUT_ARR_PTRS	   (_HNF|     _NS|         _MUT|_UPT     )	
-#define FLAGS_MUT_ARR_PTRS_FROZEN  (_HNF|     _NS|         _MUT|_UPT     )	
-#define FLAGS_MUT_VAR		   (_HNF|     _NS|         _MUT|_UPT     )	
-#define FLAGS_FOREIGN		   (_HNF|     _NS|              _UPT     )	
-#define FLAGS_STABLE_NAME	   (_HNF|     _NS|              _UPT     )	
-#define FLAGS_WEAK		   (_HNF|     _NS|              _UPT     )	
-#define FLAGS_BLACKHOLE		   ( 	      _NS|              _UPT     )	
-#define FLAGS_BLACKHOLE_BQ	   ( 	      _NS|         _MUT|_UPT     )	
-#define FLAGS_MVAR		   (_HNF|     _NS|         _MUT|_UPT     )	
-#define FLAGS_FETCH_ME		   (_HNF|     _NS                        )	
-#define FLAGS_TSO                  (_HNF|     _NS|         _MUT|_UPT     )
-#define FLAGS_RET_BCO		   (     _BTM                            )
-#define FLAGS_RET_SMALL		   (     _BTM|                       _SRT)
-#define FLAGS_RET_VEC_SMALL	   (     _BTM|                       _SRT)
-#define FLAGS_RET_BIG		   (                                 _SRT)
-#define FLAGS_RET_VEC_BIG	   (                                 _SRT)
-#define FLAGS_RET_DYN		   (                                 _SRT)
-#define FLAGS_CATCH_FRAME	   (     _BTM                            )
-#define FLAGS_STOP_FRAME	   (     _BTM                            )
-#define FLAGS_SEQ_FRAME 	   (     _BTM                            )
-#define FLAGS_UPDATE_FRAME         (     _BTM                            )
+#define closureFlags(c)         (closure_flags[get_itbl(c)->type])
+
+#define closure_STATIC(c)       (  closureFlags(c) & _STA)
+#define closure_SHOULD_SPARK(c) (!(closureFlags(c) & _NS))
+#define closure_MUTABLE(c)      (  closureFlags(c) & _MUT)
+#define closure_UNPOINTED(c)    (  closureFlags(c) & _UPT)
+
 
 /* -----------------------------------------------------------------------------
    Info Tables
@@ -314,13 +167,11 @@ typedef struct _StgInfoTable {
 #endif
     StgClosureInfo  layout;	/* closure layout info (pointer-sized) */
 #if SIZEOF_VOID_P == 8
-    StgWord16       flags;	/* }                                   */
-    StgClosureType  type : 16;	/* } These 4 elements fit into 64 bits */
+    StgWord32       type;	/* } These 2 elements fit into 64 bits */
     StgWord32       srt_len;    /* }                                   */
 #else
-    StgWord8        flags;	/* }                                   */
-    StgClosureType  type : 8;	/* } These 4 elements fit into 32 bits */
-    StgWord16       srt_len;    /* }                                   */
+    StgWord         type : 16;	/* } These 2 elements fit into 32 bits */
+    StgWord         srt_len : 16; /* }                                   */
 #endif
 #if USE_MINIINTERPRETER
     StgFunPtr       (*vector)[];

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.4 1999/03/02 19:44:09 sof Exp $
+ * $Id: InfoMacros.h,v 1.5 1999/03/15 16:30:25 simonm Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -13,14 +13,12 @@
 #define STD_INFO(type_)				\
 		srt : 0,			\
 		srt_len : 0,			\
-		type : type_,			\
-		flags: FLAGS_##type_
+		type : type_
 
 #define SRT_INFO(type_,srt_,srt_off_,srt_len_)			\
 		srt : (StgSRT *)((StgClosure **)srt_+srt_off_),	\
 		srt_len : srt_len_,				\
-		type : type_,					\
-		flags: FLAGS_##type_
+		type : type_
 
 /* function/thunk info tables --------------------------------------------- */
 
@@ -87,7 +85,6 @@ INFO_TABLE_CONSTR(info, entry, ptrs, nptrs, tag_,type_,info_class, \
 		layout : { payload : {ptrs,nptrs} },	\
 		srt_len : tag_,				\
 		type : type_,				\
-		flags : FLAGS_##type_,			\
                 INIT_ENTRY(entry)                       \
 	}
 

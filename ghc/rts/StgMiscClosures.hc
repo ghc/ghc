@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.16 1999/03/09 14:24:45 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.17 1999/03/15 16:30:29 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -325,13 +325,15 @@ NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
 
    -------------------------------------------------------------------------- */
 
-#define ArrayInfo(type)							\
-INFO_TABLE(type##_info, type##_entry, 0, 0, type, const, EF_,0,0);	\
-NON_ENTERABLE_ENTRY_CODE(type);
+#define ArrayInfo(type)					\
+INFO_TABLE(type##_info, type##_entry, 0, 0, type, const, EF_,0,0);
 
 ArrayInfo(ARR_WORDS);
+NON_ENTERABLE_ENTRY_CODE(ARR_WORDS);
 ArrayInfo(MUT_ARR_PTRS);
+NON_ENTERABLE_ENTRY_CODE(MUT_ARR_PTRS);
 ArrayInfo(MUT_ARR_PTRS_FROZEN);
+NON_ENTERABLE_ENTRY_CODE(MUT_ARR_PTRS_FROZEN);
 
 #undef ArrayInfo
 

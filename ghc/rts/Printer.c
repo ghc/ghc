@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.9 1999/03/09 14:51:23 sewardj Exp $
+ * $Id: Printer.c,v 1.10 1999/03/15 16:30:29 simonm Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -40,6 +40,7 @@ static void    printZcoded   ( const char *raw );
  * ------------------------------------------------------------------------*/
 
 
+#ifdef INTERPRETER
 extern void* itblNames[];
 extern int   nItblNames;
 char* lookupHugsItblName ( void* v )
@@ -49,6 +50,7 @@ char* lookupHugsItblName ( void* v )
       if (itblNames[i] == v) return itblNames[i+1];
    return NULL;
 }
+#endif
 
 extern void printPtr( StgPtr p )
 {
@@ -59,9 +61,9 @@ extern void printPtr( StgPtr p )
 #ifdef INTERPRETER
     } else if ((raw = lookupHugsName(p)) != 0) {
         fprintf(stderr, "%s", raw);
-#endif
     } else if ((str = lookupHugsItblName(p)) != 0) {
         fprintf(stderr, "%p=%s", p, str);
+#endif
     } else {
         fprintf(stderr, "%p", p);
     }
@@ -348,6 +350,7 @@ StgPtr printStackObj( StgPtr sp )
     } else {
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
+#ifdef INTERPRETER
         if (c == &ret_bco_info) {
            fprintf(stderr, "\t\t");
            fprintf(stderr, "ret_bco_info\n" );
@@ -356,6 +359,7 @@ StgPtr printStackObj( StgPtr sp )
            fprintf(stderr, "\t\t\t");
            fprintf(stderr, "ConstrInfoTable\n" );
         } else
+#endif
         if (get_itbl(c)->type == BCO) {
            fprintf(stderr, "\t\t\t");
            fprintf(stderr, "BCO(...)\n"); 

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.9 1999/02/05 16:02:20 simonm Exp $
+ * $Id: ClosureTypes.h,v 1.10 1999/03/15 16:30:24 simonm Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -72,7 +72,8 @@
 #define STABLE_NAME	        56
 #define TSO		        57
 #define BLOCKED_FETCH	        58
-#define FETCH_ME                69
+#define FETCH_ME                59
 #define EVACUATED               60
+#define N_CLOSURE_TYPES         61
 
 #endif CLOSURETYPES_H

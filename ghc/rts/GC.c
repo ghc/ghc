@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.50 1999/03/11 09:31:53 simonm Exp $
+ * $Id: GC.c,v 1.51 1999/03/15 16:30:27 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2330,7 +2330,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
       {
 	StgUpdateFrame *frame = (StgUpdateFrame *)p;
 	StgClosure *to;
-	StgClosureType type = get_itbl(frame->updatee)->type;
+	nat type = get_itbl(frame->updatee)->type;
 
 	p += sizeofW(StgUpdateFrame);
 	if (type == EVACUATED) {

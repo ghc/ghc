@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.8 1999/03/03 19:28:23 sof Exp $
+ * $Id: Stg.h,v 1.9 1999/03/15 16:30:25 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -96,6 +96,7 @@ void _stgAssert (char *, unsigned int);
 
 /* Storage format definitions */
 #include "Closures.h"
+#include "ClosureTypes.h"
 #include "InfoTables.h"
 #include "TSO.h"
 
@@ -103,20 +104,6 @@ void _stgAssert (char *, unsigned int);
 #include "MachRegs.h"
 #include "Regs.h"
 #include "TailCalls.h"
-
-/**
- * Added by Ian McDonald 7/5/98 
- * XXX The position of this code is very
- * important - it must come after the 
- * Regs.h include
- **/
-#ifdef nemesis_TARGET_OS
-#define _NEMESIS_OS_
-#ifndef __LANGUAGE_C
-#define __LANGUAGE_C
-#endif
-#include <nemesis.h>
-#endif
 
 /* these are all ANSI C headers */
 #include <stdlib.h>
