@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.6 1999/07/15 16:11:29 panne Exp $
+ * $Id: StgTypes.h,v 1.7 2000/01/25 14:36:53 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,6 +27,7 @@
 /*
  * First, platform-dependent definitions of size-specific integers.
  * Assume for now that the int type is 32 bits.
+ * NOTE: Synch the following definitions with MachDeps.h!
  * ToDo: move these into a platform-dependent file.
  */
 
@@ -41,7 +42,7 @@ typedef unsigned short           StgWord16;
 typedef signed   int             StgInt32;
 typedef unsigned int             StgWord32;
 #else
-#error GHC untested on this architecture: sizeof(unisgned int) != 4
+#error GHC untested on this architecture: sizeof(unsigned int) != 4
 #endif
 
 /* This #define controls whether we need to support long longs on a particular
