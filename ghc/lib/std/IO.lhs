@@ -182,7 +182,7 @@ hWaitForInput handle msecs =
 @hGetChar hdl@ reads the next character from handle @hdl@,
 blocking until a character is available.
 
-]\begin{code}
+\begin{code}
 hGetChar :: Handle -> IO Char
 hGetChar handle = do
   c <- mayBlockRead "hGetChar" handle fileGetc
