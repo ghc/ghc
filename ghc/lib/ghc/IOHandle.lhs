@@ -19,13 +19,17 @@ import UnsafeST
 import STBase
 import ArrBase	( ByteArray(..) )
 import PrelRead	( Read )
+import PrelList (span)
 import Ix
 import IOBase
 import PrelTup
 import PrelBase
 import GHC
+
+#ifndef __PARALLEL_HASKELL__
 import Foreign  ( ForeignObj, Addr, makeForeignObj, writeForeignObj )
-import PrelList (span)
+#endif
+
 #if defined(__CONCURRENT_HASKELL__)
 import ConcBase
 #endif
@@ -69,7 +73,7 @@ writeHandle h v = stToIO (writeVar h v)
 %*********************************************************
 
 \begin{code}
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
 filePtr :: Handle__ -> ForeignObj
 #else
 filePtr :: Handle__ -> Addr
@@ -122,7 +126,7 @@ stdin = unsafePerformPrimIO (
     (case rc of
        0 -> new_handle ClosedHandle
        1 -> 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
             makeForeignObj (``stdin''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
 	    new_handle (ReadHandle fp Nothing False)
 #else
@@ -141,7 +145,7 @@ stdout = unsafePerformPrimIO (
     (case rc of
        0 -> new_handle ClosedHandle
        1 -> 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
             makeForeignObj (``stdout''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
 	    new_handle (WriteHandle fp Nothing False)
 #else
@@ -160,7 +164,7 @@ stderr = unsafePerformPrimIO (
     (case rc of
        0 -> new_handle ClosedHandle
        1 -> 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
             makeForeignObj (``stderr''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
             new_handle (WriteHandle fp (Just NoBuffering) False)	
 #else
@@ -190,7 +194,7 @@ openFile :: FilePath -> IOMode -> IO Handle
 openFile f m = 
     stToIO (_ccall_ openFile f m')		             >>= \ ptr ->
     if ptr /= ``NULL'' then
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
         makeForeignObj ptr ((``&freeFile'')::Addr)   `thenIO_Prim` \ fp ->
         newHandle (htype fp Nothing False)
 #else
@@ -272,7 +276,7 @@ hClose handle =
                      to avoid closing the file object when the ForeignObj
 	             is finalised.  -}
                 if rc == 0 then 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
 		  -- Mark the foreign object data value as gone to the finaliser (freeFile())
 		  writeForeignObj fp ``NULL''       `thenIO_Prim` \ () ->
 #endif
@@ -287,7 +291,7 @@ hClose handle =
 	  let fp = filePtr other in
           _ccall_ closeFile fp	    `thenIO_Prim` \ rc ->
           if rc == 0 then 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
 		  -- Mark the foreign object data
 		  writeForeignObj fp ``NULL''       `thenIO_Prim` \ () ->
 #endif
@@ -463,7 +467,7 @@ hSetBuffering handle mode =
               BlockBuffering Nothing -> -2
               BlockBuffering (Just n) -> n
 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
     hcon :: Handle__ -> (ForeignObj -> (Maybe BufferMode) -> Bool -> Handle__)
 #else
     hcon :: Handle__ -> (Addr -> (Maybe BufferMode) -> Bool -> Handle__)
