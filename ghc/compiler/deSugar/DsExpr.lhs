@@ -540,24 +540,6 @@ dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
     continue_with ((sel_id, rhs_atom) : rbinds')
 \end{code}	
 
-\begin{code}
--- do_unfold ty_env val_env (Lam (TyBinder tyvar) body) (TyArg ty : args)
---   = do_unfold (addToTyVarEnv ty_env tyvar ty) val_env body args
--- 
--- do_unfold ty_env val_env (Lam (ValBinder binder) body) (arg@(VarArg expr) : args)
---   = dsExprToAtom arg  $ \ arg_atom ->
---     do_unfold ty_env
---      (addOneToIdEnv val_env binder (argToExpr arg_atom))
---	      body args
---
--- do_unfold ty_env val_env body args
---   = 	-- Clone the remaining part of the template
---    uniqSMtoDsM (substCoreExpr val_env ty_env body)	`thenDs` \ body' ->
---
---	-- Apply result to remaining arguments
---    mkAppDs body' args
-\end{code}
-
 Basically does the translation given in the Haskell~1.3 report:
 \begin{code}
 dsDo	:: DoOrListComp

@@ -28,12 +28,13 @@ import Literal		( isNoRepLit, Literal{-instance Eq-} )
 import Maybes		( maybeToBool )
 import PrelVals		( voidId )
 import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
+import SimplVar		( simplBinder, simplBinders )
+import SimplUtils	( newId, newIds )
 import SimplEnv
 import SimplMonad
 import Type		( isUnpointedType, splitAlgTyConApp_maybe, splitAlgTyConApp, mkFunTy, mkFunTys )
 import TyCon		( isDataTyCon )
 import TysPrim		( voidTy )
-import Unique		( Unique{-instance Eq-} )
 import Util		( Eager, runEager, appEager,
 			  isIn, isSingleton, zipEqual, panic, assertPanic )
 \end{code}
@@ -359,7 +360,7 @@ completeCase env scrut alts rhs_c
     elim_deflt_binder (BindDefault used_binder rhs) 	 -- Binder used
 	= case scrut of
 		Var v -> 	-- Binder used, but can be eliminated in favour of scrut
-			   (True, [rhs], extendIdEnvWithAtom env used_binder (VarArg v))
+			   (True, [rhs], bindIdToAtom env used_binder (VarArg v))
 		non_var -> 	-- Binder used, and can't be elimd
 			   (False, [rhs], env)
 
@@ -453,9 +454,8 @@ bindLargeRhs env args rhs_ty rhs_c
 
   | otherwise
   =	-- Generate the rhs
-    cloneIds env used_args	`thenSmpl` \ used_args' ->
+    simplBinders env used_args	`thenSmpl` \ (new_env, used_args') ->
     let
-	new_env = extendIdEnvWithClones env used_args used_args'
 	rhs_fun_ty :: OutType
 	rhs_fun_ty = mkFunTys (map idType used_args') rhs_ty
     in
@@ -532,9 +532,8 @@ simplAlts env scrut (AlgAlts alts deflt) rhs_c
   where
     deflt_form = OtherCon [con | (con,_,_) <- alts]
     do_alt (con, con_args, rhs)
-      = cloneIds env con_args				`thenSmpl` \ con_args' ->
+      = simplBinders env con_args				`thenSmpl` \ (env1, con_args') ->
 	let
-	    env1    = extendIdEnvWithClones env con_args con_args'
 	    new_env = case scrut of
 		       Var v -> extendEnvGivenNewRhs env1 v (Con con args)
 			     where
@@ -603,9 +602,8 @@ simplDefault env scrut NoDefault form rhs_c
 -- Special case for variable scrutinee; see notes above.
 simplDefault env (Var scrut_var) (BindDefault binder@(_,occ_info) rhs) 
 	     info_from_this_case rhs_c
-  = cloneId env binder 	`thenSmpl` \ binder' ->
+  = simplBinder env binder 	`thenSmpl` \ (env1, binder') ->
     let
-      env1    = extendIdEnvWithClone env binder binder'
       env2    = extendEnvGivenRhsInfo env1 binder' occ_info info_from_this_case
 
 	-- Add form details for the default binder
@@ -618,9 +616,8 @@ simplDefault env (Var scrut_var) (BindDefault binder@(_,occ_info) rhs)
 
 simplDefault env scrut (BindDefault binder@(_,occ_info) rhs) 
 	     info_from_this_case rhs_c
-  = cloneId env binder 	`thenSmpl` \ binder' ->
+  = simplBinder env binder 	`thenSmpl` \ (env1, binder') ->
     let
-	env1    = extendIdEnvWithClone env binder binder'
 	new_env = extendEnvGivenRhsInfo env1 binder' occ_info info_from_this_case
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
@@ -660,7 +657,7 @@ completePrimCaseWithKnownLit env lit (PrimAlts alts deflt) rhs_c
 	  BindDefault binder rhs ->	-- OK, there's a default case
 					-- Just bind the Id to the atom and continue
 	    let
-		new_env = extendIdEnvWithAtom env binder (LitArg lit)
+		new_env = bindIdToAtom env binder (LitArg lit)
 	    in
 	    rhs_c new_env rhs
 \end{code}
@@ -691,8 +688,9 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
       | alt_con == con
       = 	-- Matching alternative!
 	let
-	    new_env = extendIdEnvWithAtoms env 
-				(zipEqual "SimplCase" alt_args (filter isValArg con_args))
+	    val_args = filter isValArg con_args
+	    new_env  = foldr bind env (zipEqual "SimplCase" alt_args val_args)
+	    bind (bndr, atom) env = bindIdToAtom env bndr atom
 	in
 	rhs_c new_env rhs
 
@@ -708,9 +706,8 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
 
 	  BindDefault binder@(_,occ_info) rhs ->	-- OK, there's a default case
 			-- let-bind the binder to the constructor
-		cloneId env binder		`thenSmpl` \ id' ->
+		simplBinder env binder		`thenSmpl` \ (env1, id') ->
 		let
-		    env1    = extendIdEnvWithClone env binder id'
 		    new_env = extendEnvGivenBinding env1 occ_info id' (Con con con_args)
 		in
 		rhs_c new_env rhs		`thenSmpl` \ rhs' ->

@@ -28,7 +28,7 @@ module Type (
 
 	tyVarsOfType, tyVarsOfTypes, namesOfType, typeKind,
 
-	instantiateTy, instantiateTauTy, instantiateThetaTy,
+	instantiateTy, instantiateTauTy, instantiateThetaTy, applyToTyVars,
 
 	showTypeCategory
     ) where
@@ -45,7 +45,7 @@ import TyCon	( mkFunTyCon, isFunTyCon, isEnumerationTyCon, isTupleTyCon, maybeTy
 		  tyConKind, tyConDataCons, getSynTyConDefn, 
 		  tyConPrimRep, tyConClass_maybe, TyCon )
 import TyVar	( GenTyVarSet, TyVarEnv, GenTyVar, TyVar,
-		  tyVarKind, emptyTyVarSet, unionTyVarSets, minusTyVarSet,
+		  tyVarKind, tyVarFlexi, emptyTyVarSet, unionTyVarSets, minusTyVarSet,
 		  unitTyVarSet, lookupTyVarEnv, delFromTyVarEnv, zipTyVarEnv, mkTyVarEnv,
 		  emptyTyVarEnv, isEmptyTyVarEnv, addToTyVarEnv )
 import Name	( NamedThing(..), 
@@ -510,20 +510,27 @@ instantiateTy tenv ty
 -- 	and when	       (b) all the type variables are being instantiated
 -- In return it is more polymorphic than instantiateTy
 
-instantiateTauTy tenv ty = go ty
-  where
-    go ty@(TyVarTy tv)   = case (lookupTyVarEnv tenv tv) of
-				      Just ty -> ty  -- Must succeed
-    go (TyConApp tc tys) = TyConApp tc (map go tys)
-    go (SynTy ty1 ty2)	 = SynTy (go ty1) (go ty2)
-    go (FunTy arg res)	 = FunTy (go arg) (go res)
-    go (AppTy fun arg)	 = mkAppTy (go fun) (go arg)
-    go (ForAllTy tv ty)  = panic "instantiateTauTy"
+instantiateTauTy tenv ty = applyToTyVars lookup ty
+                         where
+                           lookup tv = case lookupTyVarEnv tenv tv of
+                                          Just ty -> ty  -- Must succeed
 
 
 instantiateThetaTy :: TyVarEnv Type -> ThetaType -> ThetaType
 instantiateThetaTy tenv theta
  = [(clas, map (instantiateTauTy tenv) tys) | (clas, tys) <- theta]
+
+applyToTyVars :: (GenTyVar flexi1 -> GenType flexi2)
+              -> GenType flexi1
+              -> GenType flexi2
+applyToTyVars f ty = go ty
+  where
+    go (TyVarTy tv)      = f tv
+    go (TyConApp tc tys) = TyConApp tc (map go tys)
+    go (SynTy ty1 ty2)	 = SynTy (go ty1) (go ty2)
+    go (FunTy arg res)	 = FunTy (go arg) (go res)
+    go (AppTy fun arg)	 = mkAppTy (go fun) (go arg)
+    go (ForAllTy tv ty)  = panic "instantiateTauTy"
 \end{code}
 
 
@@ -586,15 +593,15 @@ types.  It also fails on nested foralls.
 types.
 
 \begin{code}
-matchTy :: GenType flexi1			-- Template
-	-> GenType flexi2			-- Proposed instance of template
-	-> Maybe (TyVarEnv (GenType flexi2))	-- Matching substitution
+matchTy :: GenType Bool 			-- Template
+	-> GenType flexi			-- Proposed instance of template
+	-> Maybe (TyVarEnv (GenType flexi))	-- Matching substitution
 					
 
-matchTys :: [GenType flexi1]			-- Templates
-	 -> [GenType flexi2]			-- Proposed instance of template
-	 -> Maybe (TyVarEnv (GenType flexi2),	-- Matching substitution
-		   [GenType flexi2])		-- Left over instance types
+matchTys :: [GenType Bool]			-- Templates
+	 -> [GenType flexi]			-- Proposed instance of template
+	 -> Maybe (TyVarEnv (GenType flexi),	-- Matching substitution
+		   [GenType flexi])		-- Left over instance types
 
 matchTy  ty1  ty2  = match      ty1  ty2  (\s  -> Just s)  emptyTyVarEnv
 matchTys tys1 tys2 = match_list tys1 tys2 (\pr -> Just pr) emptyTyVarEnv
@@ -603,27 +610,36 @@ matchTys tys1 tys2 = match_list tys1 tys2 (\pr -> Just pr) emptyTyVarEnv
 @match@ is the main function.
 
 \begin{code}
-match :: GenType flexi1 -> GenType flexi2		-- Current match pair
-      -> (TyVarEnv (GenType flexi2) -> Maybe result)	-- Continuation
-      -> TyVarEnv (GenType flexi2)			-- Current substitution
+match :: GenType Bool -> GenType flexi		        -- Current match pair
+      -> (TyVarEnv (GenType flexi) -> Maybe result)	-- Continuation
+      -> TyVarEnv (GenType flexi)			-- Current substitution
       -> Maybe result
 
 -- When matching against a type variable, see if the variable
 -- has already been bound.  If so, check that what it's bound to
 -- is the same as ty; if not, bind it and carry on.
 
-match (TyVarTy v) ty k = \s -> case lookupTyVarEnv s v of
-				 Nothing  -> k (addToTyVarEnv s v ty)
-				 Just ty' | ty' == ty -> k s	  -- Succeeds
-					  | otherwise -> Nothing  -- Fails
+match (TyVarTy v) ty k = \s -> if tyVarFlexi v then
+                                     -- v is a template variable
+                                     case lookupTyVarEnv s v of
+				       Nothing  -> k (addToTyVarEnv s v ty)
+				       Just ty' | ty' == ty -> k s      -- Succeeds
+					        | otherwise -> Nothing  -- Fails
+                               else
+                                     -- v is not a template variable; ty had better match
+                                     -- Can't use (==) because types differ
+                                     case ty of
+                                       TyVarTy v' | uniqueOf v == uniqueOf v'
+                                                  -> k s       -- Success
+                                       other      -> Nothing   -- Failure
 
-match (FunTy arg1 res1)   (FunTy arg2 res2)  k = match arg1 arg2 (match res1 res2 k)
-match (AppTy fun1 arg1)   (AppTy fun2 arg2)  k = match fun1 fun2 (match arg1 arg2 k)
+match (FunTy arg1 res1)   (FunTy arg2 res2)   k = match arg1 arg2 (match res1 res2 k)
+match (AppTy fun1 arg1)   (AppTy fun2 arg2)   k = match fun1 fun2 (match arg1 arg2 k)
 match (TyConApp tc1 tys1) (TyConApp tc2 tys2) k | tc1 == tc2
 					        = match_list tys1 tys2 ( \(s,tys2') ->
-						    if null tys2' then 
+						  if null tys2' then 
 							k s	-- Succeed
-						    else
+						  else
 							Nothing	-- Fail	
 						  )
 
@@ -631,8 +647,8 @@ match (TyConApp tc1 tys1) (TyConApp tc2 tys2) k | tc1 == tc2
 	-- same reasons as in the unifier.  Please see the
 	-- considerable commentary there before changing anything
 	-- here! (WDP 95/05)
-match (SynTy _ ty1)       ty2		     k = match ty1 ty2 k
-match ty1		  (SynTy _ ty2)      k = match ty1 ty2 k
+match (SynTy _ ty1) ty2           k = match ty1 ty2 k
+match ty1	    (SynTy _ ty2) k = match ty1 ty2 k
 
 -- Catch-all fails
 match _ _ _ = \s -> Nothing

@@ -54,7 +54,7 @@ import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 
 import CgRetConv	( CtrlReturnConvention(..), ctrlReturnConvAlg )
 import CStrings		( pp_cSEP )
-import Id		( externallyVisibleId, cmpId_withSpecDataCon,
+import Id		( externallyVisibleId,
 			  isDataCon, isDictFunId,
 			  isDefaultMethodId_maybe,
 			  fIRST_TAG,
@@ -117,7 +117,7 @@ instance Ord CLabelId where
     CLabelId a <  CLabelId b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
     CLabelId a >= CLabelId b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
     CLabelId a >  CLabelId b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare (CLabelId a) (CLabelId b) = a `cmpId_withSpecDataCon` b
+    compare (CLabelId a) (CLabelId b) = a `compare` b
 \end{code}
 
 \begin{code}

@@ -119,7 +119,7 @@ and make a jolly old mess.
 \begin{code}
 tRACE_ID
   = pcMiscPrelId traceIdKey pREL_IO_BASE SLIT("trace") traceTy
-	(noIdInfo `addSpecInfo` pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy)
+	(noIdInfo `setSpecInfo` pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy)
   where
     traceTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [mkListTy charTy, alphaTy] alphaTy)
 \end{code}
@@ -500,7 +500,7 @@ buildId
 		{-LATER:`addUnfoldInfo` mkMagicUnfolding buildIdKey-})
 		`addStrictnessInfo` mkStrictnessInfo [WwStrict] False)
 		`addArgUsageInfo` mkArgUsageInfo [ArgUsage 2])
-		`addSpecInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
+		`setSpecInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
 	-- cheating, but since _build never actually exists ...
   where
     -- The type of this strange object is:
@@ -569,7 +569,7 @@ foldrId = pcMiscPrelId foldrIdKey pREL_BASE SLIT("foldr")
 			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] False)
 			`addArityInfo` exactArity 3)
 			`addUpdateInfo` mkUpdateInfo [2,2,1])
-			`addSpecInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
+			`setSpecInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
 
 foldlId = pcMiscPrelId foldlIdKey pREL_LIST SLIT("foldl")
 		 foldlTy idInfo
@@ -583,7 +583,7 @@ foldlId = pcMiscPrelId foldlIdKey pREL_LIST SLIT("foldl")
 			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] False)
 			`addArityInfo` exactArity 3)
 			`addUpdateInfo` mkUpdateInfo [2,2,1])
-			`addSpecInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
+			`setSpecInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
 
 -- A bit of magic goes no here. We translate appendId into ++,
 -- you have to be carefull when you actually compile append:

@@ -16,6 +16,7 @@ module CmdLineOpts (
 
 	maybe_CompilingGhcInternals,
 	opt_AllStrict,
+        opt_AllowOverlappingInstances,
 	opt_AutoSccsOnAllToplevs,
 	opt_AutoSccsOnExportedToplevs,
 	opt_AutoSccsOnIndividualCafs,
@@ -209,9 +210,6 @@ data SimplifierSwitch
 
   | MaxSimplifierIterations Int
 
-  | KeepSpecPragmaIds	    -- We normally *toss* Ids we can do without
-  | KeepUnusedBindings
-
   | SimplNoLetFromCase	    -- used when turning off floating entirely
   | SimplNoLetFromApp	    -- (for experimentation only) WDP 95/10
   | SimplNoLetFromStrictLet
@@ -269,6 +267,7 @@ unpacked_opts = map _UNPK_ argv
 
 \begin{code}
 opt_AllStrict			= lookUp  SLIT("-fall-strict")
+opt_AllowOverlappingInstances   = lookUp  SLIT("-fallow-overlapping-instances")
 opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
@@ -450,8 +449,6 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fcase-merge"		    -> SIMPL_SW(SimplCaseMerge)
 	  "-flet-to-case"		    -> SIMPL_SW(SimplLetToCase)
 	  "-fpedantic-bottoms"		    -> SIMPL_SW(SimplPedanticBottoms)
-	  "-fkeep-spec-pragma-ids"	    -> SIMPL_SW(KeepSpecPragmaIds)
-	  "-fkeep-unused-bindings"	    -> SIMPL_SW(KeepUnusedBindings)
 	  "-fmay-delete-conjurable-ids"     -> SIMPL_SW(SimplMayDeleteConjurableIds)
 	  "-fessential-unfoldings-only"     -> SIMPL_SW(EssentialUnfoldingsOnly)
 	  "-fignore-inline-pragma"  	    -> SIMPL_SW(IgnoreINLINEPragma)
@@ -504,8 +501,6 @@ tagOf_SimplSwitch SimplDoLambdaEtaExpansion	= ILIT(16)
 tagOf_SimplSwitch EssentialUnfoldingsOnly	= ILIT(19)
 tagOf_SimplSwitch ShowSimplifierProgress	= ILIT(20)
 tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(21)
-tagOf_SimplSwitch KeepSpecPragmaIds		= ILIT(25)
-tagOf_SimplSwitch KeepUnusedBindings		= ILIT(26)
 tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(27)
 tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(28)
 tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(29)

@@ -12,7 +12,6 @@ module IdInfo (
 
 	noIdInfo,
 	ppIdInfo,
-	applySubstToIdInfo, apply_to_IdInfo,    -- not for general use, please
 
 	ArityInfo(..),
 	exactArity, atLeastArity, unknownArity,
@@ -30,7 +29,7 @@ module IdInfo (
 
 	unfoldInfo, addUnfoldInfo, 
 
-	IdSpecEnv, specInfo, addSpecInfo,
+	IdSpecEnv, specInfo, setSpecInfo,
 
 	UpdateInfo, UpdateSpec,
 	mkUpdateInfo, updateInfo, updateInfoMaybe, ppUpdateInfo, addUpdateInfo,
@@ -47,10 +46,11 @@ module IdInfo (
 
 import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding )
 import {-# SOURCE #-} CoreSyn	 ( SimplifiableCoreExpr )
+
 -- for mkdependHS, CoreSyn.hi-boot refers to it:
 import BinderInfo ( BinderInfo )
 
-import SpecEnv	        ( SpecEnv, emptySpecEnv, isEmptySpecEnv )
+import SpecEnv	        ( SpecEnv, emptySpecEnv )
 import BasicTypes	( NewOrData )
 
 import Demand
@@ -96,25 +96,6 @@ data IdInfo
 \begin{code}
 noIdInfo = IdInfo UnknownArity UnknownDemand emptySpecEnv NoStrictnessInfo noUnfolding
 		  NoUpdateInfo NoArgUsageInfo NoFBTypeInfo 
-\end{code}
-
-Simply turgid.  But BE CAREFUL: don't @apply_to_Id@ if that @Id@
-will in turn @apply_to_IdInfo@ of the self-same @IdInfo@.  (A very
-nasty loop, friends...)
-\begin{code}
-apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
-			      update arg_usage fb_ww)
-  | isEmptySpecEnv spec
-  = idinfo
-  | otherwise
-  = panic "IdInfo:apply_to_IdInfo"
-\end{code}
-
-Variant of the same thing for the typechecker.
-\begin{code}
-applySubstToIdInfo s0 (IdInfo arity demand spec strictness unfold
-			      update arg_usage fb_ww)
-  = panic "IdInfo:applySubstToIdInfo"
 \end{code}
 
 \begin{code}
@@ -250,8 +231,7 @@ where pi' :: Lift Int# is the specialised version of pi.
 specInfo :: IdInfo -> IdSpecEnv
 specInfo (IdInfo _ _ spec _ _ _ _ _) = spec
 
-addSpecInfo id_info spec | isEmptySpecEnv spec = id_info
-addSpecInfo (IdInfo a b _ d e f g h) spec   = IdInfo a b spec d e f g h
+setSpecInfo (IdInfo a b _ d e f g h) spec   = IdInfo a b spec d e f g h
 \end{code}
 
 

@@ -5,19 +5,21 @@
 
 \begin{code}
 module Specialise (
-	specProgram
+	specProgram, 
+	idSpecVars,
+	substSpecEnvRhs
     ) where
 
 #include "HsVersions.h"
 
 import Id		( Id, DictVar, idType, mkUserLocal,
 
-			  getIdSpecialisation, addIdSpecialisation, isSpecPragmaId,
+			  getIdSpecialisation, setIdSpecialisation,
 
 			  IdSet, mkIdSet, addOneToIdSet, intersectIdSets, isEmptyIdSet, 
 			         emptyIdSet, unionIdSets, minusIdSet, unitIdSet, elementOfIdSet,
 
-			  IdEnv, mkIdEnv, lookupIdEnv, addOneToIdEnv
+			  IdEnv, mkIdEnv, lookupIdEnv, addOneToIdEnv, delOneFromIdEnv
 			)
 
 import Type		( Type, mkTyVarTy, splitSigmaTy, instantiateTy, isDictTy,
@@ -27,19 +29,19 @@ import TyCon		( TyCon )
 import TyVar		( TyVar,
 			  TyVarSet, mkTyVarSet, isEmptyTyVarSet, intersectTyVarSets,
 			   	    elementOfTyVarSet, unionTyVarSets, emptyTyVarSet,
-			  TyVarEnv, mkTyVarEnv 
+			  TyVarEnv, mkTyVarEnv, delFromTyVarEnv
 			)
-import CoreSyn 
+import CoreSyn
 import OccurAnal	( occurAnalyseGlobalExpr )
 import Name		( NamedThing(..), getSrcLoc )
-import SpecEnv		( addToSpecEnv )
+import SpecEnv		( addToSpecEnv, lookupSpecEnv, specEnvValues )
 
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs, thenUs, returnUs, getUnique, mapUs
 			)
 
 import FiniteMap
-import Maybes		( MaybeErr(..) )
+import Maybes		( MaybeErr(..), maybeToBool )
 import Bag
 import List		( partition )
 import Util		( zipEqual )
@@ -834,24 +836,20 @@ specBind (NonRec bndr rhs) body_uds
     in
     returnSM ([], all_uds)
 
-  | isSpecPragmaId bndr
-	-- SpecPragmaIds are there solely to generate specialisations
-	-- Just drop the whole binding; keep only its usage details
-  = specExpr rhs				`thenSM` \ (rhs', rhs_uds) ->
-    returnSM ([], rhs_uds `plusUDs` body_uds)
-
   | otherwise
   =   -- Deal with the RHS, specialising it according
       -- to the calls found in the body
     specDefn (calls body_uds) (bndr,rhs)	`thenSM` \ ((bndr',rhs'), spec_defns, spec_uds) ->
     let
 	(all_uds, (dict_binds, dump_calls)) 
-		= splitUDs [ValBinder bndr'] (spec_uds `plusUDs` body_uds)
+		= splitUDs [ValBinder bndr] (spec_uds `plusUDs` body_uds)
+
+        -- If we make specialisations then we Rec the whole lot together
+        -- If not, leave it as a NonRec
+        new_bind | null spec_defns = NonRec bndr' rhs'
+                 | otherwise       = Rec ((bndr',rhs'):spec_defns)
     in
-    returnSM (    [NonRec bndr' rhs']
-	       ++ dict_binds
-	       ++ spec_defns,
-	       all_uds )
+    returnSM ( new_bind : dict_binds, all_uds )
 
 specBind (Rec pairs) body_uds
   = mapSM (specDefn (calls body_uds)) pairs	`thenSM` \ stuff ->
@@ -860,18 +858,16 @@ specBind (Rec pairs) body_uds
 	spec_defns = concat spec_defns_s
 	spec_uds   = plusUDList spec_uds_s
 	(all_uds, (dict_binds, dump_calls)) 
-		= splitUDs (map (ValBinder . fst) pairs') (spec_uds `plusUDs` body_uds) 
+		= splitUDs (map (ValBinder . fst) pairs) (spec_uds `plusUDs` body_uds)
+        new_bind = Rec (spec_defns ++ pairs')
     in
-    returnSM (	   [Rec pairs']
-		++ dict_binds
-		++ spec_defns,
-		all_uds )
+    returnSM (	new_bind : dict_binds, all_uds )
     
 specDefn :: CallDetails			-- Info on how it is used in its scope
 	 -> (Id, CoreExpr)		-- The thing being bound and its un-processed RHS
 	 -> SpecM ((Id, CoreExpr),	-- The thing and its processed RHS
 					-- 	the Id may now have specialisations attached
-		   [CoreBinding],	-- Extra, specialised bindings
+		   [(Id,CoreExpr)],	-- Extra, specialised bindings
 		   UsageDetails		-- Stuff to fling upwards from the RHS and its
 	    )				-- 	specialised versions
 
@@ -903,10 +899,14 @@ specDefn calls (fn, rhs)
     returnSM ((fn, rhs'), [], rhs_uds)
   
   where
-    fn_type		  = idType fn
-    (tyvars, theta, tau)  = splitSigmaTy fn_type
-    n_tyvars		  = length tyvars
-    n_dicts		  = length theta
+    fn_type		 = idType fn
+    (tyvars, theta, tau) = splitSigmaTy fn_type
+    n_tyvars		 = length tyvars
+    n_dicts		 = length theta
+    mk_spec_tys call_ts  = zipWith mk_spec_ty call_ts tyvars
+                         where
+                           mk_spec_ty (Just ty) _     = ty
+                           mk_spec_ty Nothing   tyvar = mkTyVarTy tyvar
 
     (rhs_tyvars, rhs_ids, rhs_body) = collectBinders rhs
     rhs_dicts = take n_dicts rhs_ids
@@ -918,13 +918,19 @@ specDefn calls (fn, rhs)
 			Nothing -> []
 			Just cs -> fmToList cs
 
+    -- Filter out calls for which we already have a specialisation
+    calls_to_spec        = filter spec_me calls_for_me
+    spec_me (call_ts, _) = not (maybeToBool (lookupSpecEnv id_spec_env (mk_spec_tys call_ts)))
+    id_spec_env          = getIdSpecialisation fn
+
+    ----------------------------------------------------------
 	-- Specialise to one particular call pattern
     spec_call :: ProtoUsageDetails          -- From the original body, captured by
 					    -- the dictionary lambdas
               -> ([Maybe Type], [DictVar])  -- Call instance
-              -> SpecM (CoreBinding,    	  -- Specialised definition
+              -> SpecM ((Id,CoreExpr),    	  -- Specialised definition
 	                UsageDetails,             -- Usage details from specialised body
-                	([Type], CoreExpr))       -- Info for the Id's SpecEnv
+                	([TyVar], [Type], CoreExpr))       -- Info for the Id's SpecEnv
     spec_call bound_uds (call_ts, call_ds)
       = ASSERT( length call_ts == n_tyvars && length call_ds == n_dicts )
 		-- Calls are only recorded for properly-saturated applications
@@ -936,36 +942,35 @@ specDefn calls (fn, rhs)
 		-- and the type of this binder
         let
            spec_tyvars = [tyvar | (tyvar, Nothing) <- tyvars `zip` call_ts]
-	   spec_tys    = zipWith mk_spec_ty call_ts tyvars
+	   spec_tys    = mk_spec_tys call_ts
 	   spec_rhs    = mkTyLam spec_tyvars $
                          mkGenApp rhs (map TyArg spec_tys ++ map VarArg call_ds)
-  	   spec_id_ty  = mkForAllTys spec_tyvars (applyTys fn_type spec_tys)
-
-           mk_spec_ty (Just ty) _     = ty
-           mk_spec_ty Nothing   tyvar = mkTyVarTy tyvar
+  	   spec_id_ty  = mkForAllTys spec_tyvars (instantiateTy ty_env tau)
+	   ty_env      = mkTyVarEnv (zipEqual "spec_call" tyvars spec_tys)
 	in
 	newIdSM fn spec_id_ty		`thenSM` \ spec_f ->
 
 
 		-- Construct the stuff for f's spec env
-		--	[t1,b,t3,d]  |->  \d1 d2 -> f1 b d
+		--	[b,d] [t1,b,t3,d]  |->  \d1 d2 -> f1 b d
 	let
 	   spec_env_rhs  = mkValLam call_ds $
 			   mkTyApp (Var spec_f) $
 			   map mkTyVarTy spec_tyvars
-           spec_env_info = (spec_tys, spec_env_rhs)
+           spec_env_info = (spec_tyvars, spec_tys, spec_env_rhs)
         in
 
 		-- Specialise the UDs from f's RHS
 	let
-	   tv_env   = [ (rhs_tyvar,ty) 
+		-- Only the overloaded tyvars should be free in the uds
+	   ty_env   = [ (rhs_tyvar,ty) 
 		      | (rhs_tyvar, Just ty) <- zipEqual "specUDs1" rhs_tyvars call_ts
 		      ]
 	   dict_env = zipEqual "specUDs2" rhs_dicts call_ds
 	in
-        specUDs tv_env dict_env bound_uds			`thenSM` \ spec_uds ->
+        specUDs ty_env dict_env bound_uds			`thenSM` \ spec_uds ->
 
-        returnSM (NonRec spec_f spec_rhs,
+        returnSM ((spec_f, spec_rhs),
 	          spec_uds,
 		  spec_env_info
 	)
@@ -1181,14 +1186,57 @@ addIdSpecialisations id spec_stuff
 	pprTrace "Duplicate specialisations" (vcat (map ppr errs))
      else \x -> x
     )
-    addIdSpecialisation id new_spec_env
+    setIdSpecialisation id new_spec_env
   where
     (new_spec_env, errs) = foldr add (getIdSpecialisation id, []) spec_stuff
 
-    add (tys, template) (spec_env, errs)
-	= case addToSpecEnv spec_env tys (occurAnalyseGlobalExpr template) of
+    add (tyvars, tys, template) (spec_env, errs)
+	= case addToSpecEnv True spec_env tyvars tys (occurAnalyseGlobalExpr template) of
 		Succeeded spec_env' -> (spec_env', errs)
 		Failed err 	    -> (spec_env, err:errs)
+
+-- Given an Id, isSpecVars returns all its specialisations.
+-- We extract these from its SpecEnv.
+-- This is used by the occurrence analyser and free-var finder;
+-- we regard an Id's specialisations as free in the Id's definition.
+
+idSpecVars :: Id -> [Id]
+idSpecVars id 
+  = map get_spec (specEnvValues (getIdSpecialisation id))
+  where
+    -- get_spec is another cheapo function like dictRhsFVs
+    -- It knows what these specialisation temlates look like,
+    -- and just goes for the jugular
+    get_spec (App f _) = get_spec f
+    get_spec (Lam _ b) = get_spec b
+    get_spec (Var v)   = v
+
+-- substSpecEnvRhs applies a substitution to the RHS's of a SpecEnv
+-- It's placed here because Specialise.lhs built that RHS, so
+-- it knows its structure.  (Fully general subst
+
+substSpecEnvRhs te ve rhs
+  = go te ve rhs
+  where
+    go te ve (App f (TyArg ty)) = App (go te ve f) (TyArg (instantiateTy te ty))
+    go te ve (App f (VarArg v)) = App (go te ve f) (case lookupIdEnv ve v of
+							Just arg' -> arg'
+							Nothing   -> VarArg v)
+    go te ve (Var v)		  = case lookupIdEnv ve v of
+						Just (VarArg v') -> Var v'
+						Just (LitArg l)  -> Lit l
+						Nothing 	 -> Var v
+
+	-- These equations are a bit half baked, because
+	-- they don't deal properly wih capture.
+	-- But I'm sure it'll never matter... sigh.
+    go te ve (Lam b@(TyBinder tyvar) e) = Lam b (go te' ve e)
+				        where
+					  te' = delFromTyVarEnv te tyvar
+
+    go te ve (Lam b@(ValBinder (v,_)) e) = Lam b (go te ve' e)
+				     where
+				       ve' = delOneFromIdEnv ve v
 
 ----------------------------------------
 type SpecM a = UniqSM a

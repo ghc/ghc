@@ -29,6 +29,7 @@ module Inst (
 
 #include "HsVersions.h"
 
+import CmdLineOpts ( opt_AllowOverlappingInstances )
 import HsSyn	( HsLit(..), HsExpr(..), MonoBinds )
 import RnHsSyn	( RenamedArithSeqInfo, RenamedHsExpr )
 import TcHsSyn	( TcExpr, TcIdOcc(..), TcIdBndr, 
@@ -52,9 +53,9 @@ import Id	( idType, mkUserLocal, mkSysLocal, Id,
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( OccName(..), Name, occNameString, getOccName )
 import PprType	( TyCon, pprConstraint )	
-import SpecEnv	( SpecEnv, matchSpecEnv, addToSpecEnv )
+import SpecEnv	( SpecEnv, lookupSpecEnv )
 import SrcLoc	( SrcLoc )
-import Type	( Type, ThetaType, instantiateTy, instantiateThetaTy, matchTys,
+import Type	( Type, ThetaType, instantiateTy, instantiateThetaTy,
 		  isTyVarTy, mkDictTy, splitForAllTys, splitSigmaTy,
 		  splitRhoTy, tyVarsOfType, tyVarsOfTypes,
 		  mkSynTy
@@ -467,7 +468,7 @@ lookupInst :: Inst s
 -- Dictionaries
 
 lookupInst dict@(Dict _ clas tys orig loc)
-  = case matchSpecEnv (classInstEnv clas) tys of
+  = case lookupSpecEnv (classInstEnv clas) tys of
 
       Just (tenv, dfun_id)
 	-> let
@@ -547,27 +548,13 @@ lookupSimpleInst :: ClassInstEnv
 	         -> NF_TcM s (Maybe ThetaType)		-- Here are the needed (c,t)s
 
 lookupSimpleInst class_inst_env clas tys
-  = case matchSpecEnv class_inst_env tys of
+  = case lookupSpecEnv class_inst_env tys of
       Nothing	 -> returnNF_Tc Nothing
 
       Just (tenv, dfun)
 	-> returnNF_Tc (Just (instantiateThetaTy tenv theta))
         where
 	   (_, theta, _) = splitSigmaTy (idType dfun)
-\end{code}
-
-
-\begin{code}
-addClassInst
-    :: ClassInstEnv		-- Incoming envt
-    -> [Type]			-- The instance types: inst_tys
-    -> Id			-- Dict fun id to apply. Free tyvars of inst_ty must
-				-- be the same as the forall'd tyvars of the dfun id.
-    -> MaybeErr
-	  ClassInstEnv		-- Success
-	  ([Type], Id)		-- Offending overlap
-
-addClassInst inst_env inst_tys dfun_id = addToSpecEnv inst_env inst_tys dfun_id
 \end{code}
 
 

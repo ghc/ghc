@@ -33,6 +33,7 @@ module UniqFM (
 	intersectUFM_C,
 	foldUFM,
 	mapUFM,
+	elemUFM,
 	filterUFM,
 	sizeUFM,
 	isNullUFM,
@@ -106,6 +107,7 @@ mapUFM		:: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
 
 sizeUFM		:: UniqFM elt -> Int
+elemUFM		:: Uniquable key => key -> UniqFM elt -> Bool
 
 lookupUFM	:: Uniquable key => UniqFM elt -> key -> Maybe elt
 lookupUFM_Directly  -- when you've got the Unique already
@@ -527,6 +529,10 @@ looking up in a hurry is the {\em whole point} of this binary tree lark.
 Lookup up a binary tree is easy (and fast).
 
 \begin{code}
+elemUFM key fm = case lookUp fm (u2i (uniqueOf key)) of
+			Nothing -> False
+			Just _  -> True
+
 lookupUFM	   fm key = lookUp fm (u2i (uniqueOf key))
 lookupUFM_Directly fm key = lookUp fm (u2i key)
 

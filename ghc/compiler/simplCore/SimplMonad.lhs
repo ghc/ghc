@@ -7,31 +7,29 @@
 module SimplMonad (
 	SmplM,
 	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
-	mapSmpl, mapAndUnzipSmpl,
+	mapSmpl, mapAndUnzipSmpl, mapAccumLSmpl,
+
+        -- Unique supply
+        getUniqueSmpl, getUniquesSmpl,
 
 	-- Counting
 	SimplCount{-abstract-}, TickType(..), tick, tickN, tickUnfold,
 	simplCount, detailedSimplCount,
-	zeroSimplCount, showSimplCount, combineSimplCounts,
-
-	-- Cloning
-	cloneId, cloneIds, cloneTyVarSmpl, newIds, newId
+	zeroSimplCount, showSimplCount, combineSimplCounts
     ) where
 
 #include "HsVersions.h"
-
--- import {-# SOURCE #-} Simplify
--- import {-# SOURCE #-} MagicUFs
 
 import Id		( GenId, mkSysLocal, mkIdWithNewUniq, Id )
 import CoreUnfold	( SimpleUnfolding )
 import SimplEnv
 import SrcLoc		( noSrcLoc )
-import TyVar		( cloneTyVar, TyVar )
+import TyVar		( TyVar )
 import Type             ( Type )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply,
 			  UniqSupply
 			)
+import Unique		( Unique )
 import Util		( zipWithEqual, Eager, appEager )
 import Outputable
 import Ix
@@ -96,6 +94,17 @@ mapAndUnzipSmpl f (x:xs)
   = f x			    `thenSmpl` \ (r1,  r2)  ->
     mapAndUnzipSmpl f xs    `thenSmpl` \ (rs1, rs2) ->
     returnSmpl (r1:rs1, r2:rs2)
+
+mapAccumLSmpl f acc []     = returnSmpl (acc, [])
+mapAccumLSmpl f acc (x:xs) = f acc x	`thenSmpl` \ (acc', x') ->
+			     mapAccumLSmpl f acc' xs	`thenSmpl` \ (acc'', xs') ->
+			     returnSmpl (acc'', x':xs')
+
+getUniqueSmpl :: SmplM Unique
+getUniqueSmpl us sc = (getUnique us, sc)
+
+getUniquesSmpl :: Int -> SmplM [Unique]
+getUniquesSmpl n us sc = (getUniques n us, sc)
 \end{code}
 
 
@@ -332,41 +341,3 @@ combineSimplCounts (SimplCount n1 stuff1 unf1) (SimplCount n2 stuff2 unf2)
 #endif
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Monad primitives}
-%*									*
-%************************************************************************
-
-\begin{code}
-newId :: Type -> SmplM Id
-newId ty us sc
-  = (mkSysLocal SLIT("s") uniq ty noSrcLoc, sc)
-  where
-    uniq = getUnique us
-
-newIds :: [Type] -> SmplM [Id]
-newIds tys us sc
-  = (zipWithEqual "newIds" mk_id tys uniqs, sc)
-  where
-    uniqs  = getUniques (length tys) us
-    mk_id ty uniq = mkSysLocal SLIT("s") uniq ty noSrcLoc
-
-cloneTyVarSmpl :: TyVar -> SmplM TyVar
-
-cloneTyVarSmpl tyvar us sc
-  = (new_tyvar, sc)
-  where
-   uniq = getUnique us
-   new_tyvar = cloneTyVar tyvar uniq
-
-cloneId :: SimplEnv -> InBinder -> SmplM OutId
-cloneId env (id,_) us sc
-  = simplTyInId env id	`appEager` \ id_with_new_ty ->
-    (mkIdWithNewUniq id_with_new_ty uniq, sc)
-  where
-    uniq = getUnique us
-
-cloneIds :: SimplEnv -> [InBinder] -> SmplM [OutId]
-cloneIds env binders = mapSmpl (cloneId env) binders
-\end{code}

@@ -2,8 +2,10 @@
 module TyVar (
 	GenTyVar(..), TyVar, 
 
-	mkTyVar, mkSysTyVar,
-	tyVarKind,		-- TyVar -> Kind
+	mkTyVar, mkSysTyVar, 
+	tyVarKind, 		-- TyVar -> Kind
+        tyVarFlexi,             -- GenTyVar flexi -> flexi
+        setTyVarFlexi,
 	cloneTyVar, nameTyVar,
 
 	openAlphaTyVar,
@@ -16,7 +18,7 @@ module TyVar (
 	growTyVarEnvList, isEmptyTyVarEnv, lookupTyVarEnv, delFromTyVarEnv,
 
 	GenTyVarSet, TyVarSet,
-	emptyTyVarSet, unitTyVarSet, unionTyVarSets,
+	emptyTyVarSet, unitTyVarSet, unionTyVarSets, addOneToTyVarSet,
 	unionManyTyVarSets, intersectTyVarSets, mkTyVarSet,
 	tyVarSetToList, elementOfTyVarSet, minusTyVarSet,
 	isEmptyTyVarSet
@@ -30,7 +32,7 @@ import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 -- others
 import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
-			  plusUFM, sizeUFM, delFromUFM, UniqFM
+			  plusUFM, sizeUFM, delFromUFM, isNullUFM, UniqFM
 			)
 import BasicTypes	( Unused, unused )
 import Name		( mkSysLocalName, mkLocalName, Name, NamedThing(..), OccName )
@@ -50,6 +52,12 @@ data GenTyVar flexi_slot
 				-- inference, and to contain usages.
 
 type TyVar   = GenTyVar Unused
+
+tyVarFlexi :: GenTyVar flexi -> flexi
+tyVarFlexi (TyVar _ _ _ flex) = flex
+
+setTyVarFlexi :: GenTyVar flexi1 -> flexi2 -> GenTyVar flexi2
+setTyVarFlexi (TyVar u k n _) flex = TyVar u k n flex
 \end{code}
 
 
@@ -105,7 +113,7 @@ type TyVarEnv elt = UniqFM elt
 emptyTyVarEnv	 :: TyVarEnv a
 mkTyVarEnv	 :: [(GenTyVar flexi, a)] -> TyVarEnv a
 zipTyVarEnv	 :: [GenTyVar flexi] -> [a] -> TyVarEnv a
-addToTyVarEnv :: TyVarEnv a -> GenTyVar flexi -> a -> TyVarEnv a
+addToTyVarEnv    :: TyVarEnv a -> GenTyVar flexi -> a -> TyVarEnv a
 growTyVarEnvList :: TyVarEnv a -> [(GenTyVar flexi, a)] -> TyVarEnv a
 isEmptyTyVarEnv	 :: TyVarEnv a -> Bool
 lookupTyVarEnv	 :: TyVarEnv a -> GenTyVar flexi -> Maybe a
@@ -118,10 +126,10 @@ addToTyVarEnv    = addToUFM
 lookupTyVarEnv   = lookupUFM
 delFromTyVarEnv  = delFromUFM
 plusTyVarEnv     = plusUFM
+isEmptyTyVarEnv  = isNullUFM
 
 zipTyVarEnv tyvars tys     = listToUFM (zipEqual "zipTyVarEnv" tyvars tys)
 growTyVarEnvList env pairs = plusUFM env (listToUFM pairs)
-isEmptyTyVarEnv   env	   = sizeUFM env == 0
 \end{code}
 
 Sets
@@ -140,9 +148,11 @@ elementOfTyVarSet :: GenTyVar flexi -> GenTyVarSet flexi -> Bool
 minusTyVarSet	  :: GenTyVarSet flexi -> GenTyVarSet flexi -> GenTyVarSet flexi
 isEmptyTyVarSet   :: GenTyVarSet flexi -> Bool
 mkTyVarSet	  :: [GenTyVar flexi] -> GenTyVarSet flexi
+addOneToTyVarSet  :: GenTyVarSet flexi -> GenTyVar flexi -> GenTyVarSet flexi
 
 emptyTyVarSet  	  = emptyUniqSet
-unitTyVarSet = unitUniqSet
+unitTyVarSet      = unitUniqSet
+addOneToTyVarSet  = addOneToUniqSet
 intersectTyVarSets= intersectUniqSets
 unionTyVarSets 	  = unionUniqSets
 unionManyTyVarSets= unionManyUniqSets

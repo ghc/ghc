@@ -16,10 +16,10 @@ import CoreSyn
 import CoreUnfold	( Unfolding, SimpleUnfolding )
 import Id		( idType )
 import Literal		( mkMachInt, mkMachWord, Literal(..) )
--- import MagicUFs		( MagicUnfoldingFun )
 import PrimOp		( PrimOp(..) )
 import SimplEnv
 import SimplMonad
+import SimplUtils	( newId )
 import TysWiredIn	( trueDataCon, falseDataCon )
 
 import Char		( ord, chr )

@@ -8,13 +8,11 @@ module SimplEnv (
 	nullSimplEnv, combineSimplEnv,
 	pprSimplEnv, -- debugging only
 
-	extendTyEnv, extendTyEnvList, extendTyEnvEnv,
-	simplTy, simplTyInId,
+	bindTyVar, bindTyVars, simplTy,
 
-	extendIdEnvWithAtom, extendIdEnvWithAtoms,
-	extendIdEnvWithClone, extendIdEnvWithClones,
-	lookupId,
+	lookupId, bindIdToAtom,
 
+	getSubstEnvs, setTyEnv, setIdEnv, notInScope,
 
 	markDangerousOccs,
 	lookupRhsInfo, lookupOutIdEnv, isEvaluated,
@@ -58,18 +56,17 @@ import CoreUnfold	( mkFormSummary, couldBeSmallEnoughToInline, whnfOrBottom,
 import CoreUtils	( coreExprCc )
 import CostCentre	( CostCentre, subsumedCosts, noCostCentreAttached )
 import FiniteMap	-- lots of things
-import Id		( applyTypeEnvToId, getInlinePragma,
-			  nullIdEnv, growIdEnvList, lookupIdEnv,
+import Id		( getInlinePragma,
+			  nullIdEnv, growIdEnvList, lookupIdEnv, delOneFromIdEnv,
 			  addOneToIdEnv, modifyIdEnv, modifyIdEnv_Directly,
-			  IdEnv, IdSet, GenId, Id )
+			  IdEnv, IdSet, Id )
 import Literal		( Literal{-instances-} )
 import Maybes		( expectJust )
 import OccurAnal	( occurAnalyseExpr )
 import PprCore		-- various instances
-import PprType		( GenType, GenTyVar )
 import Type		( instantiateTy, Type )
-import TyVar		( emptyTyVarEnv, plusTyVarEnv, addToTyVarEnv, growTyVarEnvList,
-			  TyVarEnv, GenTyVar{-instance Eq-} ,
+import TyVar		( TyVarEnv, emptyTyVarEnv, plusTyVarEnv, addToTyVarEnv, growTyVarEnvList,
+			  TyVarSet, emptyTyVarSet,
 			  TyVar
 			)
 import Unique		( Unique{-instance Outputable-}, Uniquable(..) )
@@ -128,6 +125,22 @@ Id.  Unfoldings in the Id itself are used only for imported things
 inside the Ids, etc.).
 
 \begin{code}
+type InTypeEnv = (TyVarSet,		-- In-scope tyvars (in result)
+		  TyVarEnv Type)	-- Type substitution
+	-- If t is in the in-scope set, it certainly won't be
+	-- in the domain of the substitution, and vice versa
+
+type InIdEnv = (IdEnv Id,		-- In-scope Ids (in result)
+		IdEnv OutArg)		-- Id substitution
+	-- The in-scope set is represented by an IdEnv, because
+	-- we use it to propagate pragma info etc from binding
+	-- site to occurrences.
+
+	-- The substitution usually maps an Id to its clone,
+	-- but if the orig defn is a let-binding, and
+	-- the RHS of the let simplifies to an atom,
+	-- we just add the binding to the substitution and elide the let.
+
 data SimplEnv
   = SimplEnv
 	SwitchChecker
@@ -141,7 +154,7 @@ data SimplEnv
 nullSimplEnv :: SwitchChecker -> SimplEnv
 
 nullSimplEnv sw_chkr
-  = SimplEnv sw_chkr subsumedCosts emptyTyVarEnv nullIdEnv nullIdEnv nullConApps
+  = SimplEnv sw_chkr subsumedCosts (emptyTyVarSet, emptyTyVarEnv) (nullIdEnv, nullIdEnv) nullIdEnv nullConApps
 
 combineSimplEnv :: SimplEnv -> SimplEnv -> SimplEnv
 combineSimplEnv env@(SimplEnv chkr _       _      _         out_id_env con_apps)
@@ -149,6 +162,17 @@ combineSimplEnv env@(SimplEnv chkr _       _      _         out_id_env con_apps)
   = SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps
 
 pprSimplEnv (SimplEnv _ _ ty_env in_id_env out_id_env con_apps) = panic "pprSimplEnv"
+
+getSubstEnvs :: SimplEnv -> (InTypeEnv, InIdEnv)
+getSubstEnvs (SimplEnv _ _ ty_env in_id_env _ _) = (ty_env, in_id_env)
+
+setTyEnv :: SimplEnv -> InTypeEnv -> SimplEnv
+setTyEnv (SimplEnv chkr encl_cc _ in_id_env out_id_env con_apps) ty_env
+  = SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps
+
+setIdEnv :: SimplEnv -> InIdEnv -> SimplEnv
+setIdEnv (SimplEnv chkr encl_cc ty_env _ out_id_env con_apps) id_env
+  = SimplEnv chkr encl_cc ty_env id_env out_id_env con_apps
 \end{code}
 
 
@@ -239,30 +263,25 @@ getEnclosingCC (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) = en
 %*									*
 %************************************************************************
 
+These two "bind" functions extend the tyvar substitution.
+They don't affect what tyvars are in scope.
+
 \begin{code}
-type TypeEnv = TyVarEnv Type
-type InTypeEnv = TypeEnv	-- Maps InTyVars to OutTypes
-
-extendTyEnv :: SimplEnv -> TyVar -> Type -> SimplEnv
-extendTyEnv (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) tyvar ty
-  = SimplEnv chkr encl_cc new_ty_env in_id_env out_id_env con_apps
+bindTyVar :: SimplEnv -> TyVar -> Type -> SimplEnv
+bindTyVar (SimplEnv chkr encl_cc (tyvars, ty_subst) in_id_env out_id_env con_apps) tyvar ty
+  = SimplEnv chkr encl_cc (tyvars, new_ty_subst) in_id_env out_id_env con_apps
   where
-    new_ty_env = addToTyVarEnv ty_env tyvar ty
+    new_ty_subst = addToTyVarEnv ty_subst tyvar ty
 
-extendTyEnvList :: SimplEnv -> [(TyVar,Type)] -> SimplEnv
-extendTyEnvList (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) pairs
-  = SimplEnv chkr encl_cc new_ty_env in_id_env out_id_env con_apps
+bindTyVars :: SimplEnv -> TyVarEnv Type -> SimplEnv
+bindTyVars (SimplEnv chkr encl_cc (tyvars, ty_subst) in_id_env out_id_env con_apps) extra_subst
+  = SimplEnv chkr encl_cc (tyvars, new_ty_subst) in_id_env out_id_env con_apps
   where
-    new_ty_env = growTyVarEnvList ty_env pairs
+    new_ty_subst = ty_subst `plusTyVarEnv` extra_subst
+\end{code}
 
-extendTyEnvEnv :: SimplEnv -> TypeEnv -> SimplEnv
-extendTyEnvEnv (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) new_ty_env
-  = SimplEnv chkr encl_cc new_ty_env in_id_env out_id_env con_apps
-  where
-    new_ty_env = ty_env `plusTyVarEnv` new_ty_env
-
-simplTy     (SimplEnv _ _ ty_env _ _ _) ty = returnEager (instantiateTy ty_env ty)
-simplTyInId (SimplEnv _ _ ty_env _ _ _) id = returnEager (applyTypeEnvToId ty_env id)
+\begin{code}
+simplTy (SimplEnv _ _ (_, ty_subst) _ _ _) ty = returnEager (instantiateTy ty_subst ty)
 \end{code}
 
 %************************************************************************
@@ -272,67 +291,47 @@ simplTyInId (SimplEnv _ _ ty_env _ _ _) id = returnEager (applyTypeEnvToId ty_en
 %************************************************************************
 
 \begin{code}
-type InIdEnv = IdEnv OutArg	-- Maps InIds to their value
-				-- Usually this is just the cloned Id, but if
-				-- if the orig defn is a let-binding, and
-				-- the RHS of the let simplifies to an atom,
-				-- we just bind the variable to that atom, and
-				-- elide the let.
-\end{code}
-
-\begin{code}
 lookupId :: SimplEnv -> Id -> Eager ans OutArg
 
-lookupId (SimplEnv _ _ _ in_id_env _ _) id
-  = case (lookupIdEnv in_id_env id) of
+lookupId (SimplEnv _ _ _ (in_scope_ids, id_subst) _ _) id
+  = case lookupIdEnv id_subst id of
       Just atom -> returnEager atom
-      Nothing   -> returnEager (VarArg id)
+      Nothing   -> case lookupIdEnv in_scope_ids id of
+			Just id' -> returnEager (VarArg id')
+			Nothing  -> returnEager (VarArg id)
 \end{code}
 
-\begin{code}
-extendIdEnvWithAtom
-	:: SimplEnv
-	-> InBinder
-        -> OutArg{-Val args only, please-}
-	-> SimplEnv
+notInScope forgets that the specified binder is in scope.
+It is used when we decide to bind a let(rec) bound thing to
+an atom, *after* the Id has been added to the in-scope mapping by simplBinder. 
 
-extendIdEnvWithAtom (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
+\begin{code}
+notInScope :: SimplEnv -> OutBinder -> SimplEnv
+notInScope (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) out_id_env con_apps) id
+  = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) out_id_env con_apps
+  where
+    new_in_scope_ids = delOneFromIdEnv in_scope_ids id
+\end{code}
+
+These "bind" functions extend the Id substitution.
+
+\begin{code}
+bindIdToAtom :: SimplEnv
+	     -> InBinder
+             -> OutArg 	-- Val args only, please
+	     -> SimplEnv
+
+bindIdToAtom (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) out_id_env con_apps)
 		    (in_id,occ_info) atom
   = case atom of
      LitArg _      -> SimplEnv chkr encl_cc ty_env new_in_id_env out_id_env con_apps
      VarArg out_id -> SimplEnv chkr encl_cc ty_env new_in_id_env 
-			       (modifyOccInfo out_id_env (uniqueOf out_id, occ_info)) con_apps
---SimplEnv chkr encl_cc ty_env new_in_id_env new_out_id_env con_apps
+			       (modifyOccInfo out_id_env (uniqueOf out_id, occ_info))
+			       con_apps
   where
-    new_in_id_env  = addOneToIdEnv in_id_env in_id atom
-{-
-    new_out_id_env = case atom of
-			LitArg _      -> out_id_env
-			VarArg out_id -> modifyOccInfo out_id_env (uniqueOf out_id, occ_info)
--}
-
-extendIdEnvWithAtoms :: SimplEnv -> [(InBinder, OutArg)] -> SimplEnv
-extendIdEnvWithAtoms = foldr (\ (bndr,val) env -> extendIdEnvWithAtom env bndr val)
-
-
-extendIdEnvWithClone :: SimplEnv -> InBinder -> OutId -> SimplEnv
-
-extendIdEnvWithClone (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
-		     (in_id,_) out_id
-  = SimplEnv chkr encl_cc ty_env new_in_id_env out_id_env con_apps
-  where
-    new_in_id_env = addOneToIdEnv in_id_env in_id (VarArg out_id)
-
-extendIdEnvWithClones :: SimplEnv -> [InBinder] -> [OutId] -> SimplEnv
-extendIdEnvWithClones (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
-		      in_binders out_ids
-  = SimplEnv chkr encl_cc ty_env new_in_id_env out_id_env con_apps
-  where
-    new_in_id_env = growIdEnvList in_id_env bindings
-    bindings      = zipEqual "extendIdEnvWithClones"
-		 	     [id | (id,_) <- in_binders]
-			     (map VarArg out_ids)
+    new_in_id_env  = (in_scope_ids, addOneToIdEnv id_subst in_id atom)
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -346,7 +345,6 @@ both locally-bound ones, and perhaps some imported ones too.
 
 \begin{code}
 type OutIdEnv = IdEnv (OutId, BinderInfo, RhsInfo)
-
 \end{code}
 
 The "Id" part is just so that we can recover the domain of the mapping, which
@@ -439,6 +437,7 @@ extendEnvGivenInlining env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env co
   where
     new_out_id_env = addToUFM out_id_env id (id, occ_info, InUnfolding env rhs)
 \end{code}
+
 
 %************************************************************************
 %*									*

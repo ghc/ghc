@@ -28,21 +28,17 @@ import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
 			  addOneToIdSet, IdSet,
 			  nullIdEnv, unitIdEnv, combineIdEnvs,
 			  delOneFromIdEnv, delManyFromIdEnv, isNullIdEnv, 
-			  mapIdEnv, lookupIdEnv, IdEnv, 
-			  GenId{-instance Eq-}
+			  mapIdEnv, lookupIdEnv, IdEnv 
 			)
+import Specialise       ( idSpecVars )
 import Name		( isExported, isLocallyDefined )
 import Type		( splitFunTy_maybe, splitForAllTys )
 import Maybes		( maybeToBool )
 import PprCore
-import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
-import TyVar		( GenTyVar{-instance Eq-} )
-import Unique		( Unique{-instance Eq-}, u2i )
+import Unique		( u2i )
 import UniqFM		( keysUFM )  
 import Util		( zipWithEqual )
 import Outputable
-
-isSpecPragmaId_maybe x = Nothing -- ToDo:!trace "OccurAnal.isSpecPragmaId_maybe"
 \end{code}
 
 
@@ -55,19 +51,6 @@ isSpecPragmaId_maybe x = Nothing -- ToDo:!trace "OccurAnal.isSpecPragmaId_maybe"
 \begin{code}
 data OccEnv =
   OccEnv
-    Bool	-- Keep-unused-bindings flag
-		-- False <=> OK to chuck away binding
-		-- 	     and ignore occurrences within it
-    Bool	-- Keep-spec-pragma-ids flag
-		-- False <=> OK to chuck away spec pragma bindings
-		-- 	     and ignore occurrences within it
-    Bool	-- Keep-conjurable flag
-		-- False <=> OK to throw away *dead*
-		-- "conjurable" Ids; at the moment, that
-		-- *only* means constant methods, which
-		-- are top-level.  A use of a "conjurable"
-		-- Id may appear out of thin air -- e.g.,
-		-- specialiser conjuring up refs to const methods.
     Bool	-- IgnoreINLINEPragma flag
 		-- False <=> OK to use INLINEPragma information
 		-- True  <=> ignore INLINEPragma information
@@ -79,15 +62,15 @@ data OccEnv =
 
 
 addNewCands :: OccEnv -> [Id] -> OccEnv
-addNewCands (OccEnv kd ks kc ip ifun cands) ids
-  = OccEnv kd ks kc ip ifun (cands `unionIdSets` mkIdSet ids)
+addNewCands (OccEnv ip ifun cands) ids
+  = OccEnv ip ifun (cands `unionIdSets` mkIdSet ids)
 
 addNewCand :: OccEnv -> Id -> OccEnv
-addNewCand (OccEnv ks kd kc ip ifun cands) id
-  = OccEnv kd ks kc ip ifun (addOneToIdSet cands id)
+addNewCand (OccEnv ip ifun cands) id
+  = OccEnv ip ifun (addOneToIdSet cands id)
 
 isCandidate :: OccEnv -> Id -> Bool
-isCandidate (OccEnv _ _ _ _ ifun cands) id = ifun id cands
+isCandidate (OccEnv _ ifun cands) id = ifun id cands
 
 inlineMe :: OccEnv -> Id -> Bool
 inlineMe env id
@@ -96,16 +79,6 @@ inlineMe env id
     -}
     idWantsToBeINLINEd id
 
-keepUnusedBinding :: OccEnv -> Id -> Bool
-keepUnusedBinding (OccEnv keep_dead keep_spec keep_conjurable _ _ _) binder
-  = keep_dead || (keep_spec && maybeToBool (isSpecPragmaId_maybe binder))
-
-{- UNUSED:
-keepBecauseConjurable :: OccEnv -> Id -> Bool
-keepBecauseConjurable (OccEnv _ _ keep_conjurable _ _ _) binder
-  = False
-    {- keep_conjurable && isConstMethodId binder -}
--}
 
 type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
 
@@ -168,17 +141,14 @@ tagBinder usage binder =
 
 
 usage_of usage binder
-  | isExported binder = noBinderInfo	-- Visible-elsewhere things count as many
+  | isExported binder
+  = noBinderInfo	-- Visible-elsewhere things count as many
   | otherwise
   = case (lookupIdEnv usage binder) of
       Nothing   -> deadOccurrence
       Just info -> info
 
-isNeeded env usage binder
-  = if isDeadOcc (usage_of usage binder) then
-	keepUnusedBinding env binder	-- Maybe keep it anyway
-    else
-	True
+isNeeded env usage binder = not (isDeadOcc (usage_of usage binder))
 \end{code}
 
 
@@ -204,10 +174,7 @@ occurAnalyseBinds binds simplifier_sw_chkr
   where
     (_, binds') = doo initial_env binds
 
-    initial_env = OccEnv (simplifier_sw_chkr KeepUnusedBindings)
-			 (simplifier_sw_chkr KeepSpecPragmaIds)
-			 (not (simplifier_sw_chkr SimplMayDeleteConjurableIds))
-			 (simplifier_sw_chkr IgnoreINLINEPragma)
+    initial_env = OccEnv (simplifier_sw_chkr IgnoreINLINEPragma)
 			 (\id in_scope -> isLocallyDefined id)	-- Anything local is interesting
 			 emptyIdSet				-- Not actually used
 
@@ -242,10 +209,7 @@ occurAnalyseExpr :: (Id -> Bool)	-- Tells if a variable is interesting
 occurAnalyseExpr interesting expr
   = occAnal initial_env expr
   where
-    initial_env = OccEnv False {- Drop unused bindings -}
-			 False {- Drop SpecPragmaId bindings -}
-			 True  {- Keep conjurable Ids -}
-			 False {- Do not ignore INLINE Pragma -}
+    initial_env = OccEnv False {- Do not ignore INLINE Pragma -}
 			 (\id locals -> interesting id || elementOfIdSet id locals)
 			 emptyIdSet
 
@@ -268,7 +232,7 @@ Bindings
 \begin{code}
 type Node details = (details, Int, [Int])	-- The Ints are gotten from the Unique,
 						-- which is gotten from the Id.
-type Details1	  = (Id, (UsageDetails, SimplifiableCoreExpr))
+type Details1	  = (Id, UsageDetails, SimplifiableCoreExpr)
 type Details2	  = ((Id, BinderInfo), SimplifiableCoreExpr)
 
 
@@ -337,7 +301,10 @@ occAnalBind env (Rec pairs) body_usage
     new_env = env `addNewCands` binders
 
     analysed_pairs :: [Details1]
-    analysed_pairs  = [(nukeNoInlinePragma bndr, occAnalRhs new_env bndr rhs) | (bndr,rhs) <- pairs]
+    analysed_pairs  = [ (nukeNoInlinePragma bndr, rhs_usage, rhs')
+		      | (bndr, rhs) <- pairs,
+			let (rhs_usage, rhs') = occAnalRhs new_env bndr rhs
+		      ]
 
     sccs :: [SCC (Node Details1)]
     sccs = _scc_ "occAnalBind.scc" stronglyConnCompR edges
@@ -346,8 +313,8 @@ occAnalBind env (Rec pairs) body_usage
     ---- stuff for dependency analysis of binds -------------------------------
     edges :: [Node Details1]
     edges = _scc_ "occAnalBind.assoc"
-	    [ (pair, IBOX(u2i (idUnique id)), edges_from rhs_usage)
-	    | pair@(id, (rhs_usage, rhs)) <- analysed_pairs
+	    [ (details, IBOX(u2i (idUnique id)), edges_from rhs_usage)
+	    | details@(id, rhs_usage, rhs) <- analysed_pairs
 	    ]
 
 	-- (a -> b) means a mentions b
@@ -366,7 +333,7 @@ occAnalBind env (Rec pairs) body_usage
     ---- stuff to "re-constitute" bindings from dependency-analysis info ------
 
 	-- Non-recursive SCC
-    do_final_bind (AcyclicSCC ((bndr, (rhs_usage, rhs')), _, _)) (body_usage, binds_so_far)
+    do_final_bind (AcyclicSCC ((bndr, rhs_usage, rhs'), _, _)) (body_usage, binds_so_far)
       | isNeeded env body_usage bndr
       = (combined_usage, new_bind : binds_so_far)	
       | otherwise
@@ -383,15 +350,15 @@ occAnalBind env (Rec pairs) body_usage
       | otherwise
       = (body_usage, binds_so_far)			-- Dead code
       where
-	pairs 				 = [pair      | (pair, _, _) <- cycle]
-	bndrs				 = [bndr      | (bndr, _)           <- pairs]
-	rhs_usages		         = [rhs_usage | (_, (rhs_usage, _)) <- pairs]
+	details				 = [details   | (details, _, _) <- cycle]
+	bndrs				 = [bndr      | (bndr, _, _)      <- details]
+	rhs_usages		         = [rhs_usage | (_, rhs_usage, _) <- details]
 	total_usage		         = foldr combineUsageDetails body_usage rhs_usages
 	(combined_usage, tagged_binders) = tagBinders total_usage bndrs
 	final_bind			 = Rec (reOrderRec env new_cycle)
 
 	new_cycle = CyclicSCC (zipWithEqual "occAnalBind" mk_new_bind tagged_binders cycle)
-	mk_new_bind tagged_bndr ((_, (_, rhs')), key, keys) = ((tagged_bndr, rhs'), key, keys)
+	mk_new_bind (bndr, occ_info) ((_, _, rhs'), key, keys) = (((bndr, occ_info), rhs'), key, keys)
 \end{code}
 
 @reOrderRec@ is applied to the list of (binder,rhs) pairs for a cyclic
@@ -453,13 +420,13 @@ reOrderRec
 			--	dontINLINE pragmas that there are no loops left.
 
 	-- Non-recursive case
-reOrderRec env (AcyclicSCC (pair, _, _)) = [pair]
+reOrderRec env (AcyclicSCC (bind, _, _)) = [bind]
 
 	-- Common case of simple self-recursion
 reOrderRec env (CyclicSCC [bind])
   = [((addNoInlinePragma bndr, occ_info), rhs)]
   where
-    (((bndr,occ_info), rhs), _, _) = bind
+    (((bndr, occ_info), rhs), _, _) = bind
 
 reOrderRec env (CyclicSCC binds)
   = 	-- Choose a loop breaker, mark it no-inline,
@@ -473,12 +440,12 @@ reOrderRec env (CyclicSCC binds)
     ((bndr,occ_info), rhs)  = chosen_pair
 
 	-- Choosing the loop breaker; heursitic
-    choose_loop_breaker (bind@(pair, _, _) : rest)
+    choose_loop_breaker (bind@(details, _, _) : rest)
 	|  not (null rest) &&
-	   bad_choice pair
+	   bad_choice details
 	=  (chosen, bind : unchosen)	-- Don't pick it
         | otherwise			-- Pick it
-	= (pair,rest)
+	= (details,rest)
 	where
 	  (chosen, unchosen) = choose_loop_breaker rest
 
@@ -519,6 +486,12 @@ ToDo: try using the occurrence info for the inline'd binder.
 
 [March 97] We do the same for atomic RHSs.  Reason: see notes with reOrderRec.
 
+[March 98] A new wrinkle is that if the binder has specialisations inside
+it then we count the specialised Ids as "extra rhs's".  That way
+the "parent" keeps the specialised "children" alive.  If the parent
+dies (because it isn't referenced any more), then the children will
+die too unless they are already referenced directly.
+
 \begin{code}
 occAnalRhs :: OccEnv
 	   -> Id -> CoreExpr	-- Binder and rhs
@@ -533,13 +506,15 @@ occAnalRhs env id (Var v)
 
 occAnalRhs env id rhs
   | inlineMe env id
-  = (mapIdEnv markMany rhs_usage, rhs')
+  = (mapIdEnv markMany total_usage, rhs')
 
   | otherwise
-  = (rhs_usage, rhs')
+  = (total_usage, rhs')
 
   where
     (rhs_usage, rhs') = occAnal env rhs
+    total_usage = foldr add rhs_usage (idSpecVars id)
+    add v u     = addOneOcc u v (argOccurrence 0)
 \end{code}
 
 Expressions

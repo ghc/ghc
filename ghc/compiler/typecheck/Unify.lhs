@@ -19,8 +19,9 @@ import TcMonad
 import Type	( GenType(..), Type, tyVarsOfType,
 		  typeKind, mkFunTy, splitFunTy_maybe, splitTyConApp_maybe )
 import TyCon	( TyCon, mkFunTyCon, isTupleTyCon, tyConArity, Arity )
-import TyVar	( GenTyVar(..), TyVar, tyVarKind, tyVarSetToList,
-		  TyVarEnv, lookupTyVarEnv, emptyTyVarEnv, addToTyVarEnv
+import TyVar	( TyVar(..), GenTyVar(..), tyVarKind, tyVarFlexi,
+		  TyVarEnv, lookupTyVarEnv, emptyTyVarEnv, addToTyVarEnv,
+		  tyVarSetToList
 		)
 import TcType	( TcType, TcMaybe(..), TcTauType, TcTyVar,
 		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
@@ -366,16 +367,19 @@ unify_tuple_ty_help arity ty
 Unify types with an explicit substitution and no monad.
 
 \begin{code}
-type Subst  = TyVarEnv Type	-- Not necessarily idempotent
+type Subst  = TyVarEnv (GenType Bool)	-- Not necessarily idempotent
 
-unifyTysX :: Type -> Type -> Maybe Subst
+unifyTysX :: GenType Bool
+          -> GenType Bool
+          -> Maybe Subst
 unifyTysX ty1 ty2 = uTysX ty1 ty2 (\s -> Just s) emptyTyVarEnv
 
-unifyTyListsX :: [Type] -> [Type] -> Maybe Subst
+unifyTyListsX :: [GenType Bool] -> [GenType Bool] -> Maybe Subst
 unifyTyListsX tys1 tys2 = uTyListsX tys1 tys2 (\s -> Just s) emptyTyVarEnv
 
 
-uTysX :: Type -> Type
+uTysX :: GenType Bool
+      -> GenType Bool
       -> (Subst -> Maybe Subst)
       -> Subst
       -> Maybe Subst
@@ -384,8 +388,15 @@ uTysX (SynTy _ ty1) ty2 k subst = uTysX ty1 ty2 k subst
 uTysX ty1 (SynTy _ ty2) k subst = uTysX ty1 ty2 k subst
 
 	-- Variables; go for uVar
-uTysX (TyVarTy tyvar1) ty2 k subst = uVarX tyvar1 ty2 k subst
-uTysX ty1 (TyVarTy tyvar2) k subst = uVarX tyvar2 ty1 k subst
+uTysX (TyVarTy tyvar1) (TyVarTy tyvar2) k subst 
+  | tyvar1 == tyvar2
+  = k subst
+uTysX (TyVarTy tyvar1) ty2 k subst 
+  | tyVarFlexi tyvar1
+  = uVarX tyvar1 ty2 k subst
+uTysX ty1 (TyVarTy tyvar2) k subst 
+  | tyVarFlexi tyvar2
+  = uVarX tyvar2 ty1 k subst
 
 	-- Functions; just check the two parts
 uTysX (FunTy fun1 arg1) (FunTy fun2 arg2) k subst
@@ -430,13 +441,11 @@ uTysX ty1 ty2 k subst = Nothing
 
 uTyListsX []         []         k subst = k subst
 uTyListsX (ty1:tys1) (ty2:tys2) k subst = uTysX ty1 ty2 (uTyListsX tys1 tys2 k) subst
-uTyListsX tys1	     tys2	k subst = Nothing   -- Fail if the lists are different lengths
+uTyListsX tys1	     tys2       k subst = Nothing   -- Fail if the lists are different lengths
 \end{code}
 
 \begin{code}
-uVarX tv1 (TyVarTy tv2) k subst | tv1 == tv2 = k subst
-      -- Binding a variable to itself is a no-op
-
+-- Invariant: tv1 is a unifiable variable
 uVarX tv1 ty2 k subst
   = case lookupTyVarEnv subst tv1 of
       Just ty1 ->    -- Already bound

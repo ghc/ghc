@@ -33,17 +33,17 @@ import FiniteMap	( FiniteMap, emptyFM )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
-import Id		( mkSysLocal, setIdVisibility, replaceIdInfo, 
+import Id		( mkSysLocal, mkUserId, setIdVisibility, replaceIdInfo, 
                           replacePragmaInfo, getIdDemandInfo, idType,
 			  getIdInfo, getPragmaInfo, mkIdWithNewUniq,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
  			  lookupIdEnv, IdEnv, omitIfaceSigForId,
-			  apply_to_Id,
-			  GenId{-instance Outputable-}, Id
+			  Id
 			)
 import IdInfo		( willBeDemanded, DemandInfo )
 import Name		( isExported, isLocallyDefined, 
 			  isLocalName, uniqToOccName,
+                          setNameVisibility,
 			  Module, NamedThing(..), OccName(..)
 			)
 import TyCon		( TyCon )
@@ -754,8 +754,16 @@ newId id thing_inside mod env (gus, local_uniq, floats)
   = let 
 	-- Give the Id a fresh print-name, *and* rename its type
 	local_uniq'  = incrUnique local_uniq	
-	rn_id        = setIdVisibility Nothing local_uniq id
-	id'          = apply_to_Id (nmbr_ty env local_uniq') rn_id
+	name'        = setNameVisibility Nothing local_uniq (getName id)
+        ty'          = nmbr_ty env local_uniq' (idType id)
+	id'          = mkUserId name' ty'
+                       -- NB: This throws away the IdInfo of the Id, which we
+                       -- no longer need.  That means we don't need to
+                       -- run over it with env, nor renumber it
+                       --
+                       -- NB: the Id's unique remains unchanged; it's only
+                       -- its print name that is affected by local_uniq
+
 	env'	     = addToUFM env id (ValBinder id')
     in
     thing_inside id' mod env' (gus, local_uniq', floats)

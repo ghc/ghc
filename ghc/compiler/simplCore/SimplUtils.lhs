@@ -6,6 +6,8 @@
 \begin{code}
 module SimplUtils (
 
+	newId, newIds,
+
 	floatExposesHNF,
 
 	etaCoreExpr, mkRhsTyLam,
@@ -23,9 +25,10 @@ import BinderInfo
 import CmdLineOpts	( opt_DoEtaReduction, SimplifierSwitch(..) )
 import CoreSyn
 import CoreUnfold	( SimpleUnfolding, mkFormSummary, exprIsTrivial, FormSummary(..) )
-import Id		( idType, isBottomingId, addInlinePragma, addIdDemandInfo,
+import Id		( idType, isBottomingId, mkSysLocal,
+			  addInlinePragma, addIdDemandInfo,
 			  idWantsToBeINLINEd, dataConArgTys, Id,
-			  getIdArity, GenId{-instance Eq-}
+			  getIdArity,
 			)
 import IdInfo		( ArityInfo(..), DemandInfo )
 import Maybes		( maybeToBool )
@@ -37,15 +40,40 @@ import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, getTyVar_maybe,
 			  splitAlgTyConApp_maybe, Type
 			)
 import TyCon		( isDataTyCon )
-import TyVar		( elementOfTyVarSet,
-			  GenTyVar{-instance Eq-} )
-import Util		( isIn, panic, assertPanic )
+import TyVar		( elementOfTyVarSet )
+import SrcLoc		( noSrcLoc )
+import Util		( isIn, zipWithEqual, panic, assertPanic )
 
 \end{code}
 
 
-Floating
-~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{New ids}
+%*									*
+%************************************************************************
+
+\begin{code}
+newId :: Type -> SmplM Id
+newId ty
+  = getUniqueSmpl     `thenSmpl`  \ uniq ->
+    returnSmpl (mkSysLocal SLIT("s") uniq ty noSrcLoc)
+
+newIds :: [Type] -> SmplM [Id]
+newIds tys
+  = getUniquesSmpl (length tys)    `thenSmpl`  \ uniqs ->
+    returnSmpl (zipWithEqual "newIds" mk_id tys uniqs)
+  where
+    mk_id ty uniq = mkSysLocal SLIT("s") uniq ty noSrcLoc
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Floating}
+%*									*
+%************************************************************************
+
 The function @floatExposesHNF@ tells whether let/case floating will
 expose a head normal form.  It is passed booleans indicating the
 desired strategy.

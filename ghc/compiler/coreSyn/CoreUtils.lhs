@@ -7,15 +7,13 @@
 module CoreUtils (
 	coreExprType, coreAltsType, coreExprCc,
 
-	substCoreExpr, substCoreBindings
-
-	, mkCoreIfThenElse
-	, argToExpr
-	, unTagBinders, unTagBindersAlts
-
-	, maybeErrorApp
-	, nonErrorRHSs
-	, squashableDictishCcExpr
+	mkCoreIfThenElse,
+	argToExpr,
+	unTagBinders, unTagBindersAlts,
+	
+	maybeErrorApp,
+	nonErrorRHSs,
+	squashableDictishCcExpr
     ) where
 
 #include "HsVersions.h"
@@ -24,7 +22,7 @@ import CoreSyn
 
 import CostCentre	( isDictCC, CostCentre, noCostCentre )
 import Id		( idType, mkSysLocal, isBottomingId,
-			  toplevelishId, mkIdWithNewUniq, applyTypeEnvToId,
+			  toplevelishId, mkIdWithNewUniq,
 			  dataConRepType,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
 			  isNullIdEnv, IdEnv, Id
@@ -411,230 +409,4 @@ squashableDictishCcExpr cc expr
     squashable (App f a)
       | notValArg a	    = squashable f
     squashable other	    = False
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Core-renaming utils}
-%*									*
-%************************************************************************
-
-\begin{code}
-substCoreBindings :: ValEnv
-		-> TypeEnv -- TyVar=>Type
-		-> [CoreBinding]
-		-> UniqSM [CoreBinding]
-
-substCoreExpr	:: ValEnv
-		-> TypeEnv -- TyVar=>Type
-		-> CoreExpr
-		-> UniqSM CoreExpr
-
-substCoreBindings venv tenv binds
-  -- if the envs are empty, then avoid doing anything
-  = if (isNullIdEnv venv && isEmptyTyVarEnv tenv) then
-       returnUs binds
-    else
-       do_CoreBindings venv tenv binds
-
-substCoreExpr venv tenv expr
-  = if (isNullIdEnv venv && isEmptyTyVarEnv tenv) then
-       returnUs expr
-    else
-       do_CoreExpr venv tenv expr
-\end{code}
-
-The equiv code for @Types@ is in @TyUtils@.
-
-Because binders aren't necessarily unique: we don't do @plusEnvs@
-(which check for duplicates); rather, we use the shadowing version,
-@growIdEnv@ (and shorthand @addOneToIdEnv@).
-
-@do_CoreBindings@ takes into account the semantics of a list of
-@CoreBindings@---things defined early in the list are visible later in
-the list, but not vice versa.
-
-\begin{code}
-type ValEnv  = IdEnv CoreExpr
-
-do_CoreBindings :: ValEnv
-		-> TypeEnv
-		-> [CoreBinding]
-		-> UniqSM [CoreBinding]
-
-do_CoreBinding :: ValEnv
-	       -> TypeEnv
-	       -> CoreBinding
-	       -> UniqSM (CoreBinding, ValEnv)
-
-do_CoreBindings venv tenv [] = returnUs []
-do_CoreBindings venv tenv (b:bs)
-  = do_CoreBinding  venv     tenv b	`thenUs` \ (new_b,  new_venv) ->
-    do_CoreBindings new_venv tenv bs	`thenUs` \  new_bs ->
-    returnUs (new_b : new_bs)
-
-do_CoreBinding venv tenv (NonRec binder rhs)
-  = do_CoreExpr venv tenv rhs	`thenUs` \ new_rhs ->
-
-    dup_binder tenv binder	`thenUs` \ (new_binder, (old, new)) ->
-    -- now plug new bindings into envs
-    let  new_venv = addOneToIdEnv venv old new  in
-
-    returnUs (NonRec new_binder new_rhs, new_venv)
-
-do_CoreBinding venv tenv (Rec binds)
-  = -- for letrec, we plug in new bindings BEFORE cloning rhss
-    mapAndUnzipUs (dup_binder tenv) binders `thenUs` \ (new_binders, new_maps) ->
-    let  new_venv = growIdEnvList venv new_maps in
-
-    mapUs (do_CoreExpr new_venv tenv) rhss `thenUs` \ new_rhss ->
-    returnUs (Rec (zipEqual "do_CoreBinding" new_binders new_rhss), new_venv)
-  where
-    (binders, rhss) = unzip binds
-\end{code}
-
-\begin{code}
-do_CoreArg :: ValEnv
-	    -> TypeEnv
-	    -> CoreArg
-	    -> UniqSM CoreArgOrExpr
-
-do_CoreArg venv tenv a@(VarArg v)
-  = returnUs (
-      case (lookupIdEnv venv v) of
-	Nothing   -> AnArg  a
-	Just expr -> AnExpr expr
-    )
-
-do_CoreArg venv tenv (TyArg ty)
-  = returnUs (AnArg (TyArg (instantiateTy tenv ty)))
-
-do_CoreArg venv tenv other_arg = returnUs (AnArg other_arg)
-\end{code}
-
-\begin{code}
-do_CoreExpr :: ValEnv
-	    -> TypeEnv
-	    -> CoreExpr
-	    -> UniqSM CoreExpr
-
-do_CoreExpr venv tenv orig_expr@(Var var)
-  = returnUs (
-      case (lookupIdEnv venv var) of
-	Nothing	    -> --false:ASSERT(toplevelishId var) (SIGH)
-		       orig_expr
-	Just expr   -> expr
-    )
-
-do_CoreExpr venv tenv e@(Lit _) = returnUs e
-
-do_CoreExpr venv tenv (Con con as)
-  = mapUs  (do_CoreArg venv tenv) as `thenUs`  \ new_as ->
-    mkCoCon con new_as
-
-do_CoreExpr venv tenv (Prim op as)
-  = mapUs  (do_CoreArg venv tenv) as 	`thenUs`  \ new_as ->
-    do_PrimOp op			`thenUs`  \ new_op ->
-    mkCoPrim new_op new_as
-  where
-    do_PrimOp (CCallOp label is_asm may_gc arg_tys result_ty)
-      = let
-	    new_arg_tys   = map (instantiateTy tenv) arg_tys
-	    new_result_ty = instantiateTy tenv result_ty
-	in
-	returnUs (CCallOp label is_asm may_gc new_arg_tys new_result_ty)
-
-    do_PrimOp other_op = returnUs other_op
-
-do_CoreExpr venv tenv (Lam (ValBinder binder) expr)
-  = dup_binder tenv binder `thenUs` \(new_binder, (old,new)) ->
-    let  new_venv = addOneToIdEnv venv old new  in
-    do_CoreExpr new_venv tenv expr  `thenUs` \ new_expr ->
-    returnUs (Lam (ValBinder new_binder) new_expr)
-
-do_CoreExpr venv tenv (Lam (TyBinder tyvar) expr)
-  = dup_tyvar tyvar	   `thenUs` \ (new_tyvar, (old, new)) ->
-    let
-	new_tenv = addToTyVarEnv tenv old new
-    in
-    do_CoreExpr venv new_tenv expr  `thenUs` \ new_expr ->
-    returnUs (Lam (TyBinder new_tyvar) new_expr)
-
-do_CoreExpr venv tenv (App expr arg)
-  = do_CoreExpr venv tenv expr	`thenUs` \ new_expr ->
-    do_CoreArg  venv tenv arg   `thenUs` \ new_arg  ->
-    mkCoApps new_expr [new_arg] -- ToDo: more efficiently?
-
-do_CoreExpr venv tenv (Case expr alts)
-  = do_CoreExpr venv tenv expr	    `thenUs` \ new_expr ->
-    do_alts venv tenv alts	    `thenUs` \ new_alts ->
-    returnUs (Case new_expr new_alts)
-  where
-    do_alts venv tenv (AlgAlts alts deflt)
-      = mapUs (do_boxed_alt venv tenv) alts `thenUs` \ new_alts ->
-    	do_default venv tenv deflt	    `thenUs` \ new_deflt ->
-	returnUs (AlgAlts new_alts new_deflt)
-      where
-	do_boxed_alt venv tenv (con, binders, expr)
-	  = mapAndUnzipUs (dup_binder tenv) binders `thenUs` \ (new_binders, new_vmaps) ->
-	    let  new_venv = growIdEnvList venv new_vmaps  in
-	    do_CoreExpr new_venv tenv expr  `thenUs` \ new_expr ->
-	    returnUs (con, new_binders, new_expr)
-
-
-    do_alts venv tenv (PrimAlts alts deflt)
-      = mapUs (do_unboxed_alt venv tenv) alts `thenUs` \ new_alts ->
-    	do_default venv tenv deflt	      `thenUs` \ new_deflt ->
-	returnUs (PrimAlts new_alts new_deflt)
-      where
-	do_unboxed_alt venv tenv (lit, expr)
-	  = do_CoreExpr venv tenv expr	`thenUs` \ new_expr ->
-	    returnUs (lit, new_expr)
-
-    do_default venv tenv NoDefault = returnUs NoDefault
-
-    do_default venv tenv (BindDefault binder expr)
-      =	dup_binder tenv binder		`thenUs` \ (new_binder, (old, new)) ->
-	let  new_venv = addOneToIdEnv venv old new  in
-	do_CoreExpr new_venv tenv expr	`thenUs` \ new_expr ->
-	returnUs (BindDefault new_binder new_expr)
-
-do_CoreExpr venv tenv (Let core_bind expr)
-  = do_CoreBinding venv tenv core_bind	`thenUs` \ (new_bind, new_venv) ->
-    -- and do the body of the let
-    do_CoreExpr new_venv tenv expr  	`thenUs` \ new_expr ->
-    returnUs (Let new_bind new_expr)
-
-do_CoreExpr venv tenv (SCC label expr)
-  = do_CoreExpr venv tenv expr	    	`thenUs` \ new_expr ->
-    returnUs (SCC label new_expr)
-
-do_CoreExpr venv tenv (Coerce c ty expr)
-  = do_CoreExpr venv tenv expr	    	`thenUs` \ new_expr ->
-    returnUs (Coerce c (instantiateTy tenv ty) new_expr)
-\end{code}
-
-\begin{code}
-dup_tyvar :: TyVar -> UniqSM (TyVar, (TyVar, Type))
-dup_tyvar tyvar
-  = getUnique			`thenUs` \ uniq ->
-    let  new_tyvar = cloneTyVar tyvar uniq  in
-    returnUs (new_tyvar, (tyvar, mkTyVarTy new_tyvar))
-
--- same thing all over again --------------------
-
-dup_binder :: TypeEnv -> Id -> UniqSM (Id, (Id, CoreExpr))
-dup_binder tenv b
-  = if (toplevelishId b) then
-	-- binder is "top-level-ish"; -- it should *NOT* be renamed
-	-- ToDo: it's unsavoury that we return something to heave in env
-	returnUs (b, (b, Var b))
-
-    else -- otherwise, the full business
-	getUnique			    `thenUs`  \ uniq ->
-	let
-	    new_b1 = mkIdWithNewUniq b uniq
-	    new_b2 = applyTypeEnvToId tenv new_b1
-	in
-	returnUs (new_b2, (b, Var new_b2))
 \end{code}

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.36 1998/03/05 13:12:20 sof Exp $
+# $Id: Makefile,v 1.37 1998/03/08 22:44:44 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -132,16 +132,13 @@ SRC_HC_OPTS += -recomp $(GhcHcOpts)
 #	The standard suffix rule for compiling a Haskell file
 #	adds these flags to the command line
 
-absCSyn/AbsCSyn_HC_OPTS 	= -fno-omit-reexported-instances
 absCSyn/CStrings_HC_OPTS 	= -monly-3-regs
 
 # Was 6m with 2.10
 absCSyn/PprAbsC_HC_OPTS 	= -H10m
 
 basicTypes/IdInfo_HC_OPTS 	= -K2m
-coreSyn/AnnCoreSyn_HC_OPTS 	= -fno-omit-reexported-instances
 hsSyn/HsExpr_HC_OPTS 		= -K2m
-hsSyn/HsSyn_HC_OPTS 		= -fno-omit-reexported-instances
 main/Main_HC_OPTS 		= -fvia-C -DPROJECTVERSION=$(GhcProjectVersion)
 main/MkIface_HC_OPTS            = -DPROJECTVERSION=$(GhcProjectVersionInt)
 main/CmdLineOpts_HC_OPTS 	= -fvia-C
@@ -179,10 +176,7 @@ rename/RnIfaces_HC_OPTS		= -H8m -fvia-C
 rename/RnExpr_HC_OPTS		= -H10m
 rename/RnNames_HC_OPTS		= -H12m
 rename/RnMonad_HC_OPTS		= -fvia-C
-# Urk!  Really big heap for ParseUnfolding
-#rename/ParseUnfolding_HC_OPTS	= -H45m		
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
-stgSyn/StgSyn_HC_OPTS 		= -fno-omit-reexported-instances
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
 
 # Was 10m for 2.10

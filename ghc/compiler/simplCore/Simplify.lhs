@@ -22,21 +22,18 @@ import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
 			)
 import Id		( idType, idMustBeINLINEd, idWantsToBeINLINEd, idMustNotBeINLINEd, 
 			  addIdArity, getIdArity,
-			  getIdDemandInfo, addIdDemandInfo,
-			  GenId{-instance NamedThing-}
+			  getIdDemandInfo, addIdDemandInfo
 			)
 import Name		( isExported )
 import IdInfo		( willBeDemanded, noDemandInfo, DemandInfo, ArityInfo(..),
 			  atLeastArity, unknownArity )
 import Literal		( isNoRepLit )
 import Maybes		( maybeToBool )
-import PprType		( GenType{-instance Outputable-}, GenTyVar{- instance Outputable -} )
 import PrimOp		( primOpOkForSpeculation, PrimOp(..) )
 import SimplCase	( simplCase, bindLargeRhs )
 import SimplEnv
 import SimplMonad
-import SimplVar		( completeVar )
-import Unique		( Unique )
+import SimplVar		( completeVar, simplBinder, simplBinders, simplTyBinder, simplTyBinders )
 import SimplUtils
 import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, applyTys,
 			  mkFunTys, splitAlgTyConApp_maybe,
@@ -197,8 +194,9 @@ simplTopBinds env binds
 
     simpl_top_binds env (NonRec binder@(in_id,occ_info) rhs : binds)
       =		--- No cloning necessary at top level
-        simplRhsExpr env binder rhs in_id				`thenSmpl` \ (rhs',arity) ->
-        completeNonRec env binder (in_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds1') ->
+        simplBinder env binder						`thenSmpl` \ (env1, out_id) ->
+        simplRhsExpr env binder rhs out_id				`thenSmpl` \ (rhs',arity) ->
+        completeNonRec env1 binder (out_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds1') ->
         simpl_top_binds new_env binds					`thenSmpl` \ binds2' ->
         returnSmpl (binds1' ++ binds2')
 
@@ -218,15 +216,10 @@ simplTopBinds env binds
 		--
 		-- Sure we could have made the indirection-shorting a bit cleverer, but
 		-- propagating pragma info is a Good Idea anyway.
-	let
-	    env1 = extendIdEnvWithClones env binders ids
-	in
-        simplRecursiveGroup env1 ids pairs 	`thenSmpl` \ (bind', new_env) ->
+	simplBinders env (map fst pairs)	`thenSmpl` \ (env1, out_ids) ->
+        simplRecursiveGroup env1 out_ids pairs 	`thenSmpl` \ (bind', new_env) ->
         simpl_top_binds new_env binds		`thenSmpl` \ binds' ->
         returnSmpl (Rec bind' : binds')
-      where
-	binders = map fst pairs
-        ids     = map fst binders
 \end{code}
 
 %************************************************************************
@@ -330,16 +323,14 @@ First the case when it's applied to an argument.
 \begin{code}
 simplExpr env (Lam (TyBinder tyvar) body) (TyArg ty : args) result_ty
   = tick TyBetaReduction	`thenSmpl_`
-    simplExpr (extendTyEnv env tyvar ty) body args result_ty
+    simplExpr (bindTyVar env tyvar ty) body args result_ty
 \end{code}
 
 \begin{code}
 simplExpr env tylam@(Lam (TyBinder tyvar) body) [] result_ty
-  = cloneTyVarSmpl tyvar		`thenSmpl` \ tyvar' ->
+  = simplTyBinder env tyvar 	`thenSmpl` \ (new_env, tyvar') ->
     let
-	new_ty  = mkTyVarTy tyvar'
-	new_env = extendTyEnv env tyvar new_ty
-	new_result_ty = applyTy result_ty new_ty
+	new_result_ty = applyTy result_ty (mkTyVarTy tyvar')
     in
     simplExpr new_env body [] new_result_ty		`thenSmpl` \ body' ->
     returnSmpl (Lam (TyBinder tyvar') body')
@@ -372,7 +363,7 @@ simplExpr env expr@(Lam (ValBinder binder) body) orig_args result_ty
     go n env (Lam (ValBinder binder) body) (val_arg : args)
       | isValArg val_arg		-- The lambda has an argument
       = tick BetaReduction	`thenSmpl_`
-        go (n+1) (extendIdEnvWithAtom env binder val_arg) body args
+        go (n+1) (bindIdToAtom env binder val_arg) body args
 
     go n env expr@(Lam (ValBinder binder) body) args
       	-- The lambda is un-saturated, so we must zap the occurrence info
@@ -505,11 +496,9 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
 
   | otherwise	-- OK, use the big hammer
   = 	-- Deal with the big lambda part
-    mapSmpl cloneTyVarSmpl tyvars			`thenSmpl` \ tyvars' ->
+    simplTyBinders env tyvars			`thenSmpl` \ (lam_env, tyvars') ->
     let
-	new_tys  = mkTyVarTys tyvars'
-	body_ty  = applyTys rhs_ty new_tys
-	lam_env  = extendTyEnvList rhs_env (zipEqual "simplRhsExpr" tyvars new_tys)
+	body_ty  = applyTys rhs_ty (mkTyVarTys tyvars')
     in
 	-- Deal with the little lambda part
 	-- Note that we call simplLam even if there are no binders,
@@ -635,11 +624,8 @@ simplValLam env expr min_no_of_args expr_ty
 
     null potential_extra_binder_tys		    ||	-- or ain't a function
     no_of_extra_binders <= 0				-- or no extra binders needed
-  = cloneIds env binders		`thenSmpl` \ binders' ->
-    let
-	new_env = extendIdEnvWithClones env binders binders'
-    in
-    simplExpr new_env body [] body_ty		`thenSmpl` \ body' ->
+  = simplBinders env binders		`thenSmpl` \ (new_env, binders') ->
+    simplExpr new_env body [] body_ty	`thenSmpl` \ body' ->
     returnSmpl (mkValLam binders' body', final_arity)
 
   | otherwise				-- Eta expansion possible
@@ -653,10 +639,7 @@ simplValLam env expr min_no_of_args expr_ty
     else \x -> x) $
 
     tick EtaExpansion			`thenSmpl_`
-    cloneIds env binders	 	`thenSmpl` \ binders' ->
-    let
-	new_env = extendIdEnvWithClones env binders binders'
-    in
+    simplBinders env binders	 	`thenSmpl` \ (new_env, binders') ->
     newIds extra_binder_tys						`thenSmpl` \ extra_binders' ->
     simplExpr new_env body (map VarArg extra_binders') etad_body_ty	`thenSmpl` \ body' ->
     returnSmpl (
@@ -973,9 +956,9 @@ simplNonRec env binder@(id,occ_info) rhs body_c body_ty
     simpl_bind env rhs = complete_bind env rhs
  
     complete_bind env rhs
-      = cloneId env binder			`thenSmpl` \ new_id ->
+      = simplBinder env binder			`thenSmpl` \ (env_w_clone, new_id) ->
 	simplRhsExpr env binder rhs new_id	`thenSmpl` \ (rhs',arity) ->
-	completeNonRec env binder 
+	completeNonRec env_w_clone binder 
 		(new_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds) ->
         body_c new_env				`thenSmpl` \ body' ->
         returnSmpl (mkCoLetsAny binds body')
@@ -1050,7 +1033,11 @@ completeNonRec env binder new_id new_rhs
 					-- its binding.
   && maybeToBool maybe_atomic_rhs
   = tick tick_type	`thenSmpl_`
-    returnSmpl (extendIdEnvWithAtom env binder rhs_arg, [])
+    let
+	env1 = notInScope env new_id
+	env2 = bindIdToAtom env1 binder rhs_arg
+    in
+    returnSmpl (env2, [])
   where
     Just (rhs_arg, tick_type) = maybe_atomic_rhs
     maybe_atomic_rhs 
@@ -1074,8 +1061,7 @@ completeNonRec env binder new_id new_rhs
 completeNonRec env binder@(id,occ_info) new_id new_rhs
   = returnSmpl (new_env , [NonRec new_id new_rhs])
   where
-    new_env = extendEnvGivenBinding (extendIdEnvWithClone env binder new_id)
-				    occ_info new_id new_rhs
+    new_env = extendEnvGivenBinding env occ_info new_id new_rhs
 \end{code}
 
 ----------------------------------------------------------------------------
@@ -1185,13 +1171,10 @@ simplRec env pairs body_c body_ty
     let
 	binders = map fst pairs'
     in
-    cloneIds env binders			`thenSmpl` \ ids' ->
-    let
-       env_w_clones = extendIdEnvWithClones env binders ids'
-    in
+    simplBinders env binders				`thenSmpl` \ (env_w_clones, ids') ->
     simplRecursiveGroup env_w_clones ids' pairs'	`thenSmpl` \ (pairs', new_env) ->
 
-    body_c new_env				`thenSmpl` \ body' ->
+    body_c new_env					`thenSmpl` \ body' ->
 
     returnSmpl (Let (Rec pairs') body')
 \end{code}
@@ -1229,7 +1212,10 @@ simplRecursiveGroup env (new_id : new_ids) ((binder@(id, occ_info), rhs) : pairs
 	  = env
 
 	  | is_atomic eta'd_rhs 		-- If rhs (after eta reduction) is atomic
-	  = extendIdEnvWithAtom env binder the_arg
+	  = let
+	       env1 = notInScope env new_id
+	    in
+    	    bindIdToAtom env1 binder the_arg
 
 	  | otherwise				-- Non-atomic
 	  = extendEnvGivenBinding env occ_info new_id new_rhs

@@ -387,7 +387,7 @@ newMonoIds names kind m
   = newTyVarTys no_of_names kind	`thenNF_Tc` \ tys ->
     let
 	new_ids       = zipWithEqual "newMonoIds" mk_id names tys
-	mk_id name ty = mkUserId name ty NoPragmaInfo
+	mk_id name ty = mkUserId name ty
     in
     tcExtendLocalValEnv names new_ids (m new_ids)
   where

@@ -6,14 +6,14 @@
 \begin{code}
 module SpecEnv (
 	SpecEnv,
-	emptySpecEnv, isEmptySpecEnv,
-	addToSpecEnv, matchSpecEnv, unifySpecEnv
+	emptySpecEnv, isEmptySpecEnv, specEnvValues,
+	addToSpecEnv, lookupSpecEnv, substSpecEnv
     ) where
 
 #include "HsVersions.h"
 
-import Type		( Type, GenType, matchTys, tyVarsOfTypes )
-import TyVar		( TyVarEnv, lookupTyVarEnv, tyVarSetToList )
+import Type		( Type, GenType, mkTyVarTy, matchTys, tyVarsOfTypes, applyToTyVars )
+import TyVar		( TyVar, TyVarEnv, tyVarFlexi, setTyVarFlexi, lookupTyVarEnv, tyVarSetToList )
 import Unify		( Subst, unifyTyListsX )
 import Maybes
 import Util		( assertPanic )
@@ -28,10 +28,34 @@ import Util		( assertPanic )
 %************************************************************************
 
 \begin{code}
+type TemplateType = GenType Bool
+      -- The Bool is True for template type variables;
+      -- that is, ones that can be bound
+
 data SpecEnv value 
   = EmptySE 
-  | SpecEnv [([Type], value)]	-- No pair of templates unify with each others
+  | SpecEnv [([TemplateType], value)]
+
+specEnvValues :: SpecEnv value -> [value]
+specEnvValues EmptySE         = []
+specEnvValues (SpecEnv alist) = map snd alist
 \end{code}
+
+In some SpecEnvs overlap is prohibited; that is, no pair of templates unify.
+
+In others, overlap is permitted, but only in such a way that one can make
+a unique choice when looking up.  That is, overlap is only permitted if
+one template matches the other, or vice versa.  So this is ok:
+
+  [a]  [Int]
+
+but this is not
+
+  (Int,a)  (b,Int)
+
+If overlap is permitted, the list is kept most specific first, so that
+the first lookup is the right choice.
+
 
 For now we just use association lists.
 
@@ -43,79 +67,85 @@ isEmptySpecEnv EmptySE = True
 isEmptySpecEnv _       = False
 \end{code}
 
-@lookupSpecEnv@ looks up in a @SpecEnv@.  Since no pair of templates
-unify, the first match must be the only one.
+@lookupSpecEnv@ looks up in a @SpecEnv@, using a one-way match.  Since the env is kept
+ordered, the first match must be the only one.
+The thing we are looking up can have an
+arbitrary "flexi" part.
 
 \begin{code}
-data SpecEnvResult val
-  = Match Subst	val	-- Match, instantiating only
-			-- type variables in the template
-
-  | CouldMatch		-- A match could happen if the
-			-- some of the type variables in the key
-			-- were further instantiated.
-
-  | NoMatch		-- No match possible, regardless of how
-			-- the key is further instantiated
-
--- If the key *unifies* with one of the templates, then the
--- result is Match or CouldMatch, depending on whether any of the 
--- type variables in the key had to be instantiated
-
-unifySpecEnv :: SpecEnv value	-- The envt
-	      -> [Type]		-- Key
-	      -> SpecEnvResult value
+lookupSpecEnv :: SpecEnv value	-- The envt
+	      -> [GenType flexi]		-- Key
+	      -> Maybe (TyVarEnv (GenType flexi), value)
 		     
-
-unifySpecEnv EmptySE key = NoMatch
-unifySpecEnv (SpecEnv alist) key
-  = find alist
-  where
-    find [] = NoMatch
-    find ((tpl, val) : rest)
-      = case unifyTyListsX tpl key of
-	  Nothing    -> find rest
-	  Just subst |  all uninstantiated (tyVarSetToList (tyVarsOfTypes key)) 
-		     -> Match subst val
-	             |  otherwise
-		     -> CouldMatch
-		     where
-		       uninstantiated tv = case lookupTyVarEnv subst tv of
-					     Just xx -> False
-					     Nothing -> True
-
--- matchSpecEnv does a one-way match only, but in return
--- it is more polymorphic than unifySpecEnv
-
-matchSpecEnv :: SpecEnv value	-- The envt
-	     -> [GenType flexi]		-- Key
-	     -> Maybe (TyVarEnv (GenType flexi), value)
-		     
-matchSpecEnv EmptySE key = Nothing
-matchSpecEnv (SpecEnv alist) key
+lookupSpecEnv EmptySE key = Nothing
+lookupSpecEnv (SpecEnv alist) key
   = find alist
   where
     find [] = Nothing
     find ((tpl, val) : rest)
       = case matchTys tpl key of
-	  Nothing    -> find rest
+	  Nothing                 -> find rest
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
 				     Just (subst, val)
 \end{code}
 
 @addToSpecEnv@ extends a @SpecEnv@, checking for overlaps.
 
-\begin{code}
-addToSpecEnv :: SpecEnv value			-- Envt
-	      -> [Type] -> value		-- New item
-	      -> MaybeErr (SpecEnv value)	-- Success...
-		          ([Type], value)	-- Failure: Offending overlap
+A boolean flag controls overlap reporting.
 
-addToSpecEnv EmptySE         key value = returnMaB (SpecEnv [(key, value)])
-addToSpecEnv (SpecEnv alist) key value
-  = case filter matches_key alist of
-      []        -> returnMaB (SpecEnv ((key,value) : alist))	-- No match
-      (bad : _) -> failMaB bad					-- At least one match
+True => overlap is permitted, but only if one template matches the other;
+        not if they unify but neither is 
+
+\begin{code}
+addToSpecEnv :: Bool                            -- True <=> overlap permitted
+             -> SpecEnv value			-- Envt
+	     -> [TyVar] -> [Type] -> value	-- New item
+	     -> MaybeErr (SpecEnv value)	        -- Success...
+		          ([TemplateType], value)	-- Failure: Offending overlap
+
+addToSpecEnv overlap_ok spec_env tvs tys value
+  = case spec_env of
+       EmptySE       -> returnMaB (SpecEnv [ins_item])
+       SpecEnv alist -> insert alist    `thenMaB` \ alist' ->
+                        returnMaB (SpecEnv alist')
   where
-    matches_key (tpl, val) = maybeToBool (unifyTyListsX tpl key)
+    ins_item = (ins_tys, value)
+    ins_tys  = map (applyToTyVars mk_tv) tys
+
+    mk_tv tv = mkTyVarTy (setTyVarFlexi tv (tv `elem` tvs))
+               -- tvs identifies the template variables
+
+    insert [] = returnMaB [ins_item]
+    insert alist@(cur_item@(cur_tys, _) : rest)
+      | unifiable && not overlap_ok             = failMaB cur_item
+      | unifiable && ins_item_more_specific     = returnMaB (ins_item : alist)
+      | unifiable && not cur_item_more_specific = failMaB cur_item
+      | otherwise                               = -- Less specific, or not unifiable... carry on
+                                                  insert rest     `thenMaB` \ rest' ->
+                                                  returnMaB (cur_item : rest')
+      where
+        unifiable = maybeToBool (unifyTyListsX cur_tys ins_tys)
+        ins_item_more_specific = maybeToBool (matchTys cur_tys ins_tys)
+        cur_item_more_specific = maybeToBool (matchTys ins_tys cur_tys)
+\end{code}
+
+Finally, during simplification we must apply the current substitution to
+the SpecEnv.
+
+\begin{code}
+substSpecEnv :: TyVarEnv Type -> (val -> val) -> SpecEnv val -> SpecEnv val
+substSpecEnv ty_env val_fn EmptySE = EmptySE
+substSpecEnv ty_env val_fn (SpecEnv alist)
+  = SpecEnv [(map ty_fn tys, val_fn val) | (tys, val) <- alist]
+  where
+    ty_fn = applyToTyVars tyvar_fn
+
+    -- Apply the substitution; but if we ever substitute
+    -- we need to convert a Type to a TemplateType
+    tyvar_fn tv | tyVarFlexi tv = mkTyVarTy tv
+                | otherwise     = case lookupTyVarEnv ty_env tv of
+                                    Nothing -> mkTyVarTy tv
+                                    Just ty -> applyToTyVars set_non_tpl ty
+
+    set_non_tpl tv = mkTyVarTy (setTyVarFlexi tv False)
 \end{code}

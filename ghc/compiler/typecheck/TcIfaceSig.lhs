@@ -245,7 +245,7 @@ tcCoreExpr (UfLet (UfRec pairs) body)
 tcCoreLamBndr (UfValBinder name ty) thing_inside
   = tcHsType ty			`thenTc` \ ty' ->
     let
-	id = mkUserId name ty' NoPragmaInfo
+	id = mkUserId name ty'
     in
     tcExtendGlobalValEnv [id] $
     thing_inside (ValBinder id)
@@ -260,7 +260,7 @@ tcCoreLamBndr (UfTyBinder name kind) thing_inside
 tcCoreValBndr (UfValBinder name ty) thing_inside
   = tcHsType ty			`thenTc` \ ty' ->
     let
-	id = mk_id name ty'
+	id = mkUserId name ty'
     in
     tcExtendGlobalValEnv [id] $
     thing_inside id
@@ -268,15 +268,13 @@ tcCoreValBndr (UfValBinder name ty) thing_inside
 tcCoreValBndrs bndrs thing_inside		-- Expect them all to be ValBinders
   = mapTc tcHsType tys			`thenTc` \ tys' ->
     let
-	ids = zipWithEqual "tcCoreValBndr" mk_id names tys'
+	ids = zipWithEqual "tcCoreValBndr" mkUserId names tys'
     in
     tcExtendGlobalValEnv ids $
     thing_inside ids
   where
     names = map (\ (UfValBinder name _) -> name) bndrs
     tys   = map (\ (UfValBinder _   ty) -> ty)   bndrs
-
-mk_id name ty = mkUserId name ty NoPragmaInfo
 \end{code}    
 
 \begin{code}
@@ -294,7 +292,7 @@ tcCoreAlts scrut_ty (UfAlgAlts alts deflt)
 	let
 	    arg_tys		    = dataConArgTys con' inst_tys
 	    (tycon, inst_tys, cons) = splitAlgTyConApp scrut_ty
-	    arg_ids		    = zipWithEqual "tcCoreAlts" mk_id names arg_tys
+	    arg_ids		    = zipWithEqual "tcCoreAlts" mkUserId names arg_tys
 	in
 	tcExtendGlobalValEnv arg_ids 	$
 	tcCoreExpr rhs			`thenTc` \ rhs' ->
@@ -311,7 +309,7 @@ tcCoreAlts scrut_ty (UfPrimAlts alts deflt)
 tcCoreDefault scrut_ty UfNoDefault = returnTc NoDefault
 tcCoreDefault scrut_ty (UfBindDefault name rhs)
   = let
-	deflt_id           = mk_id name scrut_ty
+	deflt_id = mkUserId name scrut_ty
     in
     tcExtendGlobalValEnv [deflt_id] 	$
     tcCoreExpr rhs			`thenTc` \ rhs' ->

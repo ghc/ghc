@@ -59,7 +59,7 @@ import Maybes		( assocMaybe, maybeToBool )
 
 -- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
 tcGenPragmas ty id ps = returnNF_Tc noIdInfo
-tcClassOpPragmas ty sel def spec ps = returnNF_Tc (noIdInfo `addSpecInfo` spec, 
+tcClassOpPragmas ty sel def spec ps = returnNF_Tc (noIdInfo `setSpecInfo` spec, 
 						   noIdInfo)
 \end{code}
 

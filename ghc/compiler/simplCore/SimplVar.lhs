@@ -2,10 +2,11 @@
 % (c) The AQUA Project, Glasgow University, 1993-1996
 %
 \section[SimplVar]{Simplifier stuff related to variables}
-
+				
 \begin{code}
 module SimplVar (
-	completeVar
+	completeVar,
+	simplBinder, simplBinders, simplTyBinder, simplTyBinders
     ) where
 
 #include "HsVersions.h"
@@ -18,19 +19,27 @@ import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..),
 			  SimpleUnfolding(..),
 			  FormSummary, whnfOrBottom,
 			  smallEnoughToInline )
+import Specialise	( substSpecEnvRhs )
 import BinderInfo	( BinderInfo, noBinderInfo, okToInline )
 
 import CostCentre	( CostCentre, isCurrentCostCentre )
-import Id		( idType, getIdInfo, getIdUnfolding, getIdSpecialisation,
-			  idMustBeINLINEd, GenId{-instance Outputable-}
+import Id		( idType, getIdInfo, getIdUnfolding, 
+			  getIdSpecialisation, setIdSpecialisation,
+			  idMustBeINLINEd, idHasNoFreeTyVars,
+			  mkIdWithNewUniq, mkIdWithNewType, 
+			  elemIdEnv, isNullIdEnv, addOneToIdEnv
 			)
-import SpecEnv		( matchSpecEnv )
+import SpecEnv		( lookupSpecEnv, substSpecEnv, isEmptySpecEnv )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
-import PprType		( GenType{-instance Outputable-} )
 import SimplEnv
 import SimplMonad
+import Type		( instantiateTy, mkTyVarTy )
 import TyCon		( tyConFamilySize )
+import TyVar		( TyVar, cloneTyVar,
+			  isEmptyTyVarEnv, addToTyVarEnv,
+			  addOneToTyVarSet, elementOfTyVarSet
+			)
 import Maybes		( maybeToBool )
 import Outputable
 \end{code}
@@ -49,6 +58,15 @@ completeVar env var args result_ty
   | maybeToBool maybe_magic_result
   = tick MagicUnfold	`thenSmpl_`
     magic_result
+
+	-- Look for existing specialisations before
+	-- trying inlining
+  | maybeToBool maybe_specialisation
+  = tick SpecialisationDone	`thenSmpl_`
+    simplExpr (bindTyVars env spec_bindings) 
+	      spec_template
+	      remaining_args
+	      result_ty
 
 	-- If there's an InUnfolding it means that there's no
 	-- let-binding left for the thing, so we'd better inline it!
@@ -69,15 +87,9 @@ completeVar env var args result_ty
     && ok_to_inline
     && costCentreOk (getEnclosingCC env) (getEnclosingCC unf_env)
     )
-  = unfold var unf_env unf_template args result_ty
+  = pprTrace "Unfolding" (ppr var) $
+    unfold var unf_env unf_template args result_ty
 
-
-  | maybeToBool maybe_specialisation
-  = tick SpecialisationDone	`thenSmpl_`
-    simplExpr (extendTyEnvEnv env spec_bindings) 
-	      spec_template
-	      remaining_args
-	      result_ty
 
   | otherwise
   = returnSmpl (mkGenApp (Var var) args)
@@ -114,7 +126,7 @@ completeVar env var args result_ty
 
     	---------- Specialisation stuff
     (ty_args, remaining_args) = initialTyArgs args
-    maybe_specialisation = matchSpecEnv (getIdSpecialisation var) ty_args
+    maybe_specialisation      = lookupSpecEnv (getIdSpecialisation var) ty_args
     Just (spec_bindings, spec_template) = maybe_specialisation
 
 
@@ -161,3 +173,96 @@ costCentreOk cc_encl cc_rhs
   = isCurrentCostCentre cc_encl || not (isCurrentCostCentre cc_rhs)
 \end{code}		   
 
+
+%************************************************************************
+%*									*
+\section{Dealing with a single binder}
+%*									*
+%************************************************************************
+
+When we hit a binder we may need to
+  (a) apply the the type envt (if non-empty) to its type
+  (b) apply the type envt and id envt to its SpecEnv (if it has one)
+  (c) give it a new unique to avoid name clashes
+
+\begin{code}
+simplBinder :: SimplEnv -> InBinder -> SmplM (SimplEnv, OutId)
+simplBinder env (id, _)
+  |  not_in_scope	 	-- Not in scope, so no need to clone
+  && empty_ty_subst 		-- No type substitution to do inside the Id
+  && isNullIdEnv id_subst	-- No id substitution to do inside the Id
+  = let 
+	env' = setIdEnv env (addOneToIdEnv in_scope_ids id id, id_subst)
+    in
+    returnSmpl (env', id)
+
+  | otherwise
+  = 
+#if DEBUG
+    -- I  reckon the empty-env thing should catch
+    -- most no-free-tyvars things, so this test should be redundant
+    (if idHasNoFreeTyVars id then pprTrace "applyEnvsToId" (ppr id) else (\x -> x))
+#endif
+    (let
+       -- id1 has its type zapped
+       id1 | empty_ty_subst = id
+           | otherwise      = mkIdWithNewType id ty'
+
+       -- id2 has its SpecEnv zapped
+       id2 | isEmptySpecEnv spec_env = id1
+           | otherwise               = setIdSpecialisation id spec_env'
+    in
+    if not_in_scope then
+	-- No need to clone
+	let
+	    env' = setIdEnv env (addOneToIdEnv in_scope_ids id id2, id_subst)
+	in
+	returnSmpl (env', id2)
+    else
+	-- Must clone
+	getUniqueSmpl         `thenSmpl` \ uniq ->
+	let
+	    id3 = mkIdWithNewUniq id2 uniq
+	    env' = setIdEnv env (addOneToIdEnv in_scope_ids id3 id3,
+				 addOneToIdEnv id_subst id (VarArg id3))
+	in
+	returnSmpl (env', id3)
+    )
+  where
+    ((in_scope_tyvars, ty_subst), (in_scope_ids, id_subst)) = getSubstEnvs env
+    empty_ty_subst   = isEmptyTyVarEnv ty_subst
+    not_in_scope     = not (id `elemIdEnv` in_scope_ids)
+
+    ty               = idType id
+    ty'              = instantiateTy ty_subst ty
+
+    spec_env         = getIdSpecialisation id
+    spec_env'        = substSpecEnv ty_subst (substSpecEnvRhs ty_subst id_subst) spec_env
+
+simplBinders :: SimplEnv -> [InBinder] -> SmplM (SimplEnv, [OutId])
+simplBinders env binders = mapAccumLSmpl simplBinder env binders
+\end{code}
+
+\begin{code}	
+simplTyBinder :: SimplEnv -> TyVar -> SmplM (SimplEnv, TyVar)
+simplTyBinder env tyvar
+  | not (tyvar `elementOfTyVarSet` tyvars)	-- No need to clone
+  = let
+	env' = setTyEnv env (tyvars `addOneToTyVarSet` tyvar, ty_subst)
+    in
+    returnSmpl (env', tyvar)
+
+  | otherwise					-- Need to clone
+  = getUniqueSmpl         `thenSmpl` \ uniq ->
+    let
+	tyvar' = cloneTyVar tyvar uniq
+	env'   = setTyEnv env (tyvars `addOneToTyVarSet` tyvar', 
+			       addToTyVarEnv ty_subst tyvar (mkTyVarTy tyvar'))
+    in
+    returnSmpl (env', tyvar')
+  where
+    ((tyvars, ty_subst), (ids, id_subst)) = getSubstEnvs env
+
+simplTyBinders :: SimplEnv -> [TyVar] -> SmplM (SimplEnv, [TyVar])
+simplTyBinders env binders = mapAccumLSmpl simplTyBinder env binders
+\end{code}

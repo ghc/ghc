@@ -50,9 +50,7 @@ module Id (
 
 	-- PREDICATES
 	omitIfaceSigForId,
-	cmpEqDataCon,
 	cmpId,
-	cmpId_withSpecDataCon,
 	externallyVisibleId,
 	idHasNoFreeTyVars,
 	idWantsToBeINLINEd, getInlinePragma, 
@@ -66,7 +64,6 @@ module Id (
 	isRecordSelector,
 	isDictSelId_maybe,
 	isNullaryDataCon,
-	isSpecPragmaId,
 	isPrimitiveId_maybe,
 	isSysLocalId,
 	isTupleCon,
@@ -74,18 +71,13 @@ module Id (
 	toplevelishId,
 	unfoldingUnfriendlyId,
 
-	-- SUBSTITUTION
-	applyTypeEnvToId,
-	apply_to_Id,
-	
 	-- PRINTING and RENUMBERING
 	pprId,
---	pprIdInUnfolding,
 	showId,
 
 	-- Specialialisation
 	getIdSpecialisation,
-	addIdSpecialisation,
+	setIdSpecialisation,
 
 	-- UNFOLDING, ARITY, UPDATE, AND STRICTNESS STUFF (etc)
 	addIdUnfolding,
@@ -118,11 +110,11 @@ module Id (
 	intersectIdSets,
 	isEmptyIdSet,
 	isNullIdEnv,
-	lookupIdEnv,
+	lookupIdEnv, lookupIdSubst,
 	lookupNoFailIdEnv,
 	mapIdEnv,
 	minusIdSet,
-	mkIdEnv,
+	mkIdEnv, elemIdEnv,
 	mkIdSet,
 	modifyIdEnv,
 	modifyIdEnv_Directly,
@@ -213,10 +205,7 @@ data IdDetails
 				-- as for LocalId
 
   | PrimitiveId PrimOp		-- The Id for a primitive operation
-
-  | SpecPragmaId 		-- Local name; introduced by the compiler
-		 (Maybe Id)	-- for explicit specid in pragma
-		 Bool		-- as for LocalId
+                                
 
   ---------------- Global values
 
@@ -260,14 +249,6 @@ data IdDetails
 				-- actually do comparisons that way, we kindly supply
 				-- a Unique for that purpose.
 
-  | SpecId			-- A specialisation of another Id
-		Id		-- Id of which this is a specialisation
-		[Maybe Type]	-- Types at which it is specialised;
-				-- A "Nothing" says this type ain't relevant.
-		Bool		-- True <=> no free type vars; it's not enough
-				-- to know about the unspec version, because
-				-- we may specialise to a type w/ free tyvars
-				-- (i.e., in one of the "Maybe Type" dudes).
 
 type ConTag	= Int
 type DictVar	= Id
@@ -299,38 +280,6 @@ generates
 	dfun.Foo.[Int] = ...
 \end{verbatim}
 The type variables in the name are irrelevant; we print them as stars.
-
-
-Constant method ids are generated from instance decls where
-there is no context; that is, no dictionaries are needed to
-construct the method.  Example
-\begin{verbatim}
-	instance Foo Int where
-	  op = ...
-\end{verbatim}
-Then we get a constant method
-\begin{verbatim}
-	Foo.op.Int = ...
-\end{verbatim}
-
-It is possible, albeit unusual, to have a constant method
-for an instance decl which has type vars:
-\begin{verbatim}
-	instance Foo [a] where
-	  op []     ys = True
-	  op (x:xs) ys = False
-\end{verbatim}
-We get the constant method
-\begin{verbatim}
-	Foo.op.[*] = ...
-\end{verbatim}
-So a constant method is identified by a class/op/type triple.
-The type variables in the type are irrelevant.
-
-
-For Ids whose names must be known/deducible in other modules, we have
-to conjure up their worker's names (and their worker's worker's
-names... etc) in a known systematic way.
 
 
 %************************************************************************
@@ -384,9 +333,6 @@ include dictionaries for the immediate superclasses of C at the type
 (T a b ..).
 
 %----------------------------------------------------------------------
-\item[@SpecId@:]
-
-%----------------------------------------------------------------------
 \item[@LocalId@:] A purely-local value, e.g., a function argument,
 something defined in a @where@ clauses, ... --- but which appears in
 the original program text.
@@ -395,11 +341,6 @@ the original program text.
 \item[@SysLocalId@:] Same as a @LocalId@, except does {\em not} appear in
 the original program text; these are introduced by the compiler in
 doing its thing.
-
-%----------------------------------------------------------------------
-\item[@SpecPragmaId@:] Introduced by the compiler to record
-Specialisation pragmas. It is dead code which MUST NOT be removed
-before specialisation.
 \end{description}
 
 Further remarks:
@@ -433,7 +374,6 @@ properties, but they may not.
 -- isDataCon returns False for @newtype@ constructors
 isDataCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tc) _ _) = isDataTyCon tc
 isDataCon (Id _ _ _ (TupleConId _) _ _)		        = True
-isDataCon (Id _ _ _ (SpecId unspec _ _) _ _)	        = isDataCon unspec
 isDataCon other					        = False
 
 isNewCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tc) _ _) = isNewTyCon tc
@@ -442,11 +382,9 @@ isNewCon other					       = False
 -- isAlgCon returns True for @data@ or @newtype@ constructors
 isAlgCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ _) _ _) = True
 isAlgCon (Id _ _ _ (TupleConId _) _ _)		      = True
-isAlgCon (Id _ _ _ (SpecId unspec _ _) _ _)	      = isAlgCon unspec
 isAlgCon other					      = False
 
 isTupleCon (Id _ _ _ (TupleConId _) _ _)	 = True
-isTupleCon (Id _ _ _ (SpecId unspec _ _) _ _)	 = isTupleCon unspec
 isTupleCon other				 = False
 \end{code}
 
@@ -470,11 +408,8 @@ toplevelishId (Id _ _ _ details _ _)
     chk (DictSelId _)		    = True
     chk (DefaultMethodId _)         = True
     chk (DictFunId     _ _)	    = True
-    chk (SpecId unspec _ _)	    = toplevelishId unspec
-				    -- depends what the unspecialised thing is
     chk (LocalId      _)	    = False
     chk (SysLocalId   _)	    = False
-    chk (SpecPragmaId _ _)	    = False
     chk (PrimitiveId _)		    = True
 
 idHasNoFreeTyVars (Id _ _ _ details _ info)
@@ -487,10 +422,8 @@ idHasNoFreeTyVars (Id _ _ _ details _ info)
     chk (DictSelId _)		  = True
     chk (DefaultMethodId _)       = True
     chk (DictFunId     _ _)	  = True
-    chk (SpecId _     _   no_free_tvs) = no_free_tvs
     chk (LocalId        no_free_tvs) = no_free_tvs
     chk (SysLocalId     no_free_tvs) = no_free_tvs
-    chk (SpecPragmaId _ no_free_tvs) = no_free_tvs
     chk (PrimitiveId _)		    = True
 
 -- omitIfaceSigForId tells whether an Id's info is implied by other declarations,
@@ -515,11 +448,11 @@ omitIfaceSigForId (Id _ name _ details _ _)
 	-- The dfun id must *not* be omitted, because it carries version info for
 	-- the instance decl
         (AlgConId _ _ _ _ _ _ _ _ _) -> True
-        (TupleConId _)    	  -> True
-        (RecordSelId _)   	  -> True
-        (DictSelId _)		  -> True
+        (TupleConId _)    	     -> True
+        (RecordSelId _)   	     -> True
+        (DictSelId _)		     -> True
 
-	other			  -> False	-- Don't omit!
+	other			     -> False	-- Don't omit!
 		-- NB DefaultMethodIds are not omitted
 \end{code}
 
@@ -531,15 +464,6 @@ isBottomingId (Id _ _ _ _ _ info) = bottomIsGuaranteed (strictnessInfo info)
 
 isSysLocalId (Id _ _ _ (SysLocalId _) _ _) = True
 isSysLocalId other			   = False
-
-isSpecPragmaId (Id _ _ _ (SpecPragmaId _ _) _ _) = True
-isSpecPragmaId other			         = False
-
-isSpecId_maybe (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
-  = ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
-    Just (unspec, ty_maybes)
-isSpecId_maybe other_id
-  = Nothing
 
 isDictSelId_maybe (Id _ _ _ (DictSelId cls) _ _) = Just cls
 isDictSelId_maybe _				 = Nothing
@@ -580,43 +504,6 @@ local-ness precisely so that the test here would be easy
 externallyVisibleId :: Id -> Bool
 externallyVisibleId id@(Id _ name _ _ _ _) = not (isLocalName name)
 		     -- not local => global => externally visible
-\end{code}
-
-CLAIM (not ASSERTed) for @applyTypeEnvToId@ and @applySubstToId@:
-`Top-levelish Ids'' cannot have any free type variables, so applying
-the type-env cannot have any effect.  (NB: checked in CoreLint?)
-
-\begin{code}
-type TypeEnv = TyVarEnv Type
-
-applyTypeEnvToId :: TypeEnv -> Id -> Id
-applyTypeEnvToId type_env id@(Id _ _ ty _ _ _)
-  = apply_to_Id ( \ ty ->
-	instantiateTy type_env ty
-    ) id
-\end{code}
-
-\begin{code}
-apply_to_Id :: (Type -> Type) -> Id -> Id
-
-apply_to_Id ty_fn id@(Id u n ty details prag info)
-  | idHasNoFreeTyVars id
-  = id
-  | otherwise
-  = Id u n (ty_fn ty) (apply_to_details details) prag (apply_to_IdInfo ty_fn info)
-  where
-    apply_to_details (SpecId unspec ty_maybes no_ftvs)
-      = let
-	    new_unspec = apply_to_Id ty_fn unspec
-	    new_maybes = map apply_to_maybe ty_maybes
-	in
-	SpecId new_unspec new_maybes (no_free_tvs ty)
-	-- ToDo: gratuitous recalc no_ftvs????
-      where
-	apply_to_maybe Nothing   = Nothing
-	apply_to_maybe (Just ty) = Just (ty_fn ty)
-
-    apply_to_details other = other
 \end{code}
 
 
@@ -711,9 +598,9 @@ mkSysLocal str uniq ty loc
 mkUserLocal occ uniq ty loc
   = Id uniq (mkLocalName uniq occ loc) ty (LocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
 
-mkUserId :: Name -> GenType flexi -> PragmaInfo -> GenId (GenType flexi)
-mkUserId name ty pragma_info
-  = Id (nameUnique name) name ty (LocalId (no_free_tvs ty)) pragma_info noIdInfo
+mkUserId :: Name -> GenType flexi -> GenId (GenType flexi)
+mkUserId name ty
+  = Id (nameUnique name) name ty (LocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
 \end{code}
 
 \begin{code}
@@ -733,21 +620,6 @@ mkIdWithNewName (Id _ _ ty details prag info) new_name
 mkIdWithNewType :: Id -> Type -> Id
 mkIdWithNewType (Id u name _ details pragma info) ty 
   = Id u name ty details pragma info
-
-{-
--- Specialised version of constructor: only used in STG and code generation
--- Note: The specialsied Id has the same unique as the unspeced Id
-
-mkSameSpecCon ty_maybes unspec@(Id u name ty details pragma info)
-  = ASSERT(isDataCon unspec)
-    ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
-    Id u name new_ty (SpecId unspec ty_maybes (no_free_tvs new_ty)) pragma info
-  where
-    new_ty = specialiseTy ty ty_maybes 0
-
-    -- pprTrace "SameSpecCon:Unique:"
-    --	        (ppSep (ppr unspec: [pprMaybeTy ty | ty <- ty_maybes]))
--}
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -866,7 +738,6 @@ isNullaryDataCon con = dataConNumFields con == 0 -- function of convenience
 dataConTag :: DataCon -> ConTag	-- will panic if not a DataCon
 dataConTag (Id _ _ _ (AlgConId tag _ _ _ _ _ _ _ _) _ _) = tag
 dataConTag (Id _ _ _ (TupleConId _) _ _)	      = fIRST_TAG
-dataConTag (Id _ _ _ (SpecId unspec _ _) _ _)	      = dataConTag unspec
 
 dataConTyCon :: DataCon -> TyCon	-- will panic if not a DataCon
 dataConTyCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tycon) _ _) = tycon
@@ -883,25 +754,6 @@ dataConSig (Id _ _ _ (TupleConId arity) _ _)
   where
     tyvars	= take arity alphaTyVars
     tyvar_tys	= mkTyVarTys tyvars
-
-dataConSig (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
-  = (spec_tyvars, spec_theta_ty, spec_con_tyvars, spec_con_theta, spec_arg_tys, spec_tycon)
-  where
-    (tyvars, theta_ty, con_tyvars, con_theta, arg_tys, tycon) = dataConSig unspec
-
-    ty_env = tyvars `zip` ty_maybes
-
-    spec_tyvars     = [tyvar | (tyvar, Nothing) <- ty_env]
-    spec_con_tyvars = [tyvar | (tyvar, Nothing) <- con_tyvars `zip` ty_maybes] -- Hmm..
-
-    spec_env = mkTyVarEnv [(tyvar, ty) | (tyvar, Just ty) <- ty_env]
-    spec_arg_tys = map (instantiateTauTy spec_env) arg_tys
-
-    spec_theta_ty  = if null theta_ty then []
-		     else panic "dataConSig:ThetaTy:SpecDataCon1"
-    spec_con_theta = if null con_theta then []
-		     else panic "dataConSig:ThetaTy:SpecDataCon2"
-    spec_tycon     = mkSpecTyCon tycon ty_maybes
 
 
 -- dataConRepType returns the type of the representation of a contructor
@@ -937,13 +789,11 @@ dataConFieldLabels x@(Id _ _ _ idt _ _) =
       LocalId _    -> "l"
       SysLocalId _ -> "sl"
       PrimitiveId _ -> "p"
-      SpecPragmaId _  _ -> "sp"
       ImportedId -> "i"
       RecordSelId _ -> "r"
       DictSelId _ -> "m"
       DefaultMethodId _ -> "d"
-      DictFunId _ _ -> "di"
-      SpecId _ _ _ -> "spec"))
+      DictFunId _ _ -> "di"))
 #endif
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
@@ -1097,9 +947,9 @@ addIdFBTypeInfo (Id u n ty info details) upd_info
 getIdSpecialisation :: Id -> IdSpecEnv
 getIdSpecialisation (Id _ _ _ _ _ info) = specInfo info
 
-addIdSpecialisation :: Id -> IdSpecEnv -> Id
-addIdSpecialisation (Id u n ty details prags info) spec_info
-  = Id u n ty details prags (info `addSpecInfo` spec_info)
+setIdSpecialisation :: Id -> IdSpecEnv -> Id
+setIdSpecialisation (Id u n ty details prags info) spec_info
+  = Id u n ty details prags (info `setSpecInfo` spec_info)
 \end{code}
 
 Strictness: we snaffle the info out of the IdInfo.
@@ -1138,32 +988,6 @@ instance Ord (GenId ty) where
     a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
     a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
     compare a b = cmpId a b
-\end{code}
-
-@cmpId_withSpecDataCon@ ensures that any spectys are taken into
-account when comparing two data constructors. We need to do this
-because a specialised data constructor has the same Unique as its
-unspecialised counterpart.
-
-\begin{code}
-cmpId_withSpecDataCon :: Id -> Id -> Ordering
-
-cmpId_withSpecDataCon id1 id2
-  | eq_ids && isDataCon id1 && isDataCon id2
-  = cmpEqDataCon id1 id2
-
-  | otherwise
-  = cmp_ids
-  where
-    cmp_ids = cmpId id1 id2
-    eq_ids  = case cmp_ids of { EQ -> True; other -> False }
-
-cmpEqDataCon (Id _ _ _ (SpecId _ mtys1 _) _ _) (Id _ _ _ (SpecId _ mtys2 _) _ _)
-  = panic "Id.cmpEqDataCon:cmpUniTypeMaybeList mtys1 mtys2"
-
-cmpEqDataCon _ (Id _ _ _ (SpecId _ _ _) _ _) = LT
-cmpEqDataCon (Id _ _ _ (SpecId _ _ _) _ _) _ = GT
-cmpEqDataCon _				   _ = EQ
 \end{code}
 
 %************************************************************************
@@ -1237,9 +1061,11 @@ rngIdEnv	  :: IdEnv a -> [a]
 isNullIdEnv	  :: IdEnv a -> Bool
 lookupIdEnv	  :: IdEnv a -> GenId ty -> Maybe a
 lookupNoFailIdEnv :: IdEnv a -> GenId ty -> a
+elemIdEnv	  :: Id -> IdEnv a -> Bool
 \end{code}
 
 \begin{code}
+elemIdEnv        = elemUFM
 addOneToIdEnv	 = addToUFM
 combineIdEnvs	 = plusUFM_C
 delManyFromIdEnv = delListFromUFM
@@ -1251,10 +1077,15 @@ mkIdEnv		 = listToUFM
 nullIdEnv	 = emptyUFM
 rngIdEnv	 = eltsUFM
 unitIdEnv	 = unitUFM
+isNullIdEnv	 = isNullUFM
 
 growIdEnvList	  env pairs = plusUFM env (listToUFM pairs)
-isNullIdEnv	  env	    = sizeUFM env == 0
 lookupNoFailIdEnv env id    = case (lookupIdEnv env id) of { Just xx -> xx }
+
+lookupIdSubst :: IdEnv Id -> Id -> Id
+lookupIdSubst env id = case lookupIdEnv env id of
+			 Just id' -> id'	-- Return original if 
+			 Nothing  -> id		-- it isn't in subst
 
 -- modifyIdEnv: Look up a thing in the IdEnv, then mash it with the
 -- modify function, and put it back.

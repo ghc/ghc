@@ -17,6 +17,7 @@ module TcInstUtil (
 
 import RnHsSyn		( RenamedMonoBinds, RenamedSig(..) )
 
+import CmdLineOpts	( opt_AllowOverlappingInstances )
 import TcMonad
 import Inst		( InstanceMapper )
 
@@ -161,7 +162,8 @@ addClassInstance
 	      dfun_id _ src_loc _)
     class_inst_env
   = 	-- Add the instance to the class's instance environment
-    case addToSpecEnv class_inst_env inst_tys dfun_id of
+    case addToSpecEnv opt_AllowOverlappingInstances 
+		      class_inst_env inst_tyvars inst_tys dfun_id of
 	Failed (ty', dfun_id')    -> addErrTc (dupInstErr clas (inst_tys, src_loc) 
 							       (ty', getSrcLoc dfun_id'))
 						`thenNF_Tc_`

@@ -898,7 +898,7 @@ valdef	:  vallhs
 		}
 	;
 
-get_line_no : 					{ $$ = startlineno }
+get_line_no : 					{ $$ = startlineno; }
 	    ;
 
 vallhs  : patk					{ $$ = $1; }

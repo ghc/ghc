@@ -460,8 +460,12 @@ smallEnoughToInline _ _ UnfoldAlways = True
 smallEnoughToInline _ _ UnfoldNever  = False
 smallEnoughToInline arg_is_evald_s result_is_scruted
 	      (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size scrut_discount)
-  = enough_args n_vals_wanted arg_is_evald_s &&
-    size - discount <= opt_UnfoldingUseThreshold
+  = if enough_args n_vals_wanted arg_is_evald_s &&
+       size - discount <= opt_UnfoldingUseThreshold
+    then
+       pprTrace "small enough" (int size <+> int discount) True
+    else
+       False
   where
 
     enough_args n [] | n > 0 = False	-- A function with no value args => don't unfold

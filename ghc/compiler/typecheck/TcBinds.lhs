@@ -44,7 +44,7 @@ import TcType		( TcType, TcThetaType, TcTauType,
 import Unify		( unifyTauTy, unifyTauTyLists )
 
 import Kind		( isUnboxedTypeKind, mkTypeKind, isTypeKind, mkBoxedTypeKind )
-import Id		( GenId, idType, mkUserId )
+import Id		( idType, mkUserId, replacePragmaInfo )
 import IdInfo		( noIdInfo )
 import Maybes		( maybeToBool, assocMaybe )
 import Name		( getOccName, getSrcLoc, Name )
@@ -240,7 +240,7 @@ tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
 	  poly_ids   = map mk_dummy binder_names
 	  mk_dummy name = case maybeSig tc_ty_sigs name of
 			    Just (TySigInfo _ poly_id _ _ _ _) -> poly_id	-- Signature
-			    Nothing -> mkUserId name forall_a_a NoPragmaInfo	-- No signature
+			    Nothing -> mkUserId name forall_a_a          	-- No signature
 	in
 	returnTc (EmptyMonoBinds, emptyLIE, poly_ids)
     ) $
@@ -339,7 +339,7 @@ tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
 	  where
 	    maybe_sig = maybeSig tc_ty_sigs binder_name
 	    Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _) = maybe_sig
-	    poly_id = mkUserId binder_name poly_ty (prag_info_fn binder_name)
+	    poly_id = replacePragmaInfo (mkUserId binder_name poly_ty) (prag_info_fn binder_name)
 	    poly_ty = mkForAllTys real_tyvars_to_gen_list $ mkFunTys dict_tys $ zonked_mono_id_ty
 				-- It's important to build a fully-zonked poly_ty, because
 				-- we'll slurp out its free type variables when extending the
@@ -630,7 +630,7 @@ tcTySig prag_info_fn (Sig v ty src_loc)
 	-- Convert from Type to TcType	
    tcInstSigType sigma_ty	`thenNF_Tc` \ sigma_tc_ty ->
    let
-     poly_id = mkUserId v sigma_tc_ty (prag_info_fn v)
+     poly_id = replacePragmaInfo (mkUserId v sigma_tc_ty) (prag_info_fn v)
    in
 	-- Instantiate this type
 	-- It's important to do this even though in the error-free case
