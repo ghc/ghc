@@ -159,7 +159,7 @@ coreTopBindToStg env body_fvs (NonRec id rhs)
 	caf_info = hasCafRefs env rhs
 	arity = exprArity rhs
 
-	env' = extendVarEnv env id (LetBound how_bound emptyVarSet arity)
+	env' = extendVarEnv env id (LetBound how_bound emptyLVS arity)
 
 	how_bound | mayHaveCafRefs caf_info = TopLevelHasCafs
 		  | otherwise               = TopLevelNoCafs
@@ -185,13 +185,13 @@ coreTopBindToStg env body_fvs (Rec pairs)
 	-- to calculate caf_info, we initially map all the binders to
 	-- TopLevelNoCafs.
 	env1 = extendVarEnvList env 
-		[ (b, LetBound TopLevelNoCafs emptyVarSet (error "no arity"))
+		[ (b, LetBound TopLevelNoCafs emptyLVS (error "no arity"))
 	        | b <- binders ]
 
 	caf_info = hasCafRefss env1{-NB: not env'-} rhss
 
 	env' = extendVarEnvList env 
-		[ (b, LetBound how_bound emptyVarSet (exprArity rhs)) 
+		[ (b, LetBound how_bound emptyLVS (exprArity rhs)) 
 	        | (b,rhs) <- pairs ]
 
 	how_bound | mayHaveCafRefs caf_info = TopLevelHasCafs
@@ -621,27 +621,28 @@ coreToStgLet
 				-- is among the escaping vars
 
 coreToStgLet let_no_escape bind body
-  = fixLne (\ ~(_, _, _, _, _, rec_body_fvs, _, _) ->
+  = fixLne (\ ~(_, _, _, _, _, _, rec_body_fvs, _, _) ->
 
 	-- Do the bindings, setting live_in_cont to empty if
 	-- we ain't in a let-no-escape world
 	getVarsLiveInCont		`thenLne` \ live_in_cont ->
 	setVarsLiveInCont (if let_no_escape 
 				then live_in_cont 
-				else (emptyVarSet,emptyVarSet))
+				else emptyLVS)
 			  (vars_bind rec_body_fvs bind)
-		  `thenLne` \ (bind2, bind_fvs, bind_escs, bind_lvs, env_ext) ->
+	    `thenLne` \ ( bind2, bind_fvs, bind_escs
+			, bind_lvs, bind_cafs, env_ext) ->
 
   	-- Do the body
 	extendVarEnvLne env_ext (
 	  coreToStgExpr body          `thenLne` \(body2, body_fvs, body_escs) ->
 	  freeVarsToLiveVars body_fvs `thenLne` \(body_lvs, _) ->
 
-  	  returnLne (bind2, bind_fvs, bind_escs, bind_lvs,
+  	  returnLne (bind2, bind_fvs, bind_escs, bind_lvs, bind_cafs,
 		     body2, body_fvs, body_escs, body_lvs)
 	)
 
-    ) `thenLne` (\ (bind2, bind_fvs, bind_escs, bind_lvs,
+    ) `thenLne` (\ (bind2, bind_fvs, bind_escs, bind_lvs, bind_cafs, 
 		    body2, body_fvs, body_escs, body_lvs) ->
 
 
@@ -695,15 +696,15 @@ coreToStgLet let_no_escape bind body
 			NonRec binder rhs -> [binder]
 			Rec pairs         -> map fst pairs
 
-    mk_binding bind_lvs binder rhs
+    mk_binding bind_lvs bind_cafs binder rhs
 	= (binder,  LetBound  NotTopLevelBound	-- Not top level
 			live_vars (exprArity rhs)
 	   )
 	where
 	   live_vars = if let_no_escape then
-			    extendVarSet bind_lvs binder
+			    (extendVarSet bind_lvs binder, bind_cafs)
 		       else
-			    unitVarSet binder
+			    (unitVarSet binder, emptyVarSet)
 
     vars_bind :: FreeVarsInfo		-- Free var info for body of binding
 	      -> CoreBind
@@ -711,6 +712,7 @@ coreToStgLet let_no_escape bind body
 		       FreeVarsInfo, 
 		       EscVarsSet,  	  -- free vars; escapee vars
 		       StgLiveVars,	  -- vars live in binding
+		       IdSet,		  -- CAFs live in binding
 		       [(Id, HowBound)])  -- extension to environment
 					 
 
@@ -720,18 +722,19 @@ coreToStgLet let_no_escape bind body
 
 	freeVarsToLiveVars bind_fvs `thenLne` \ (bind_lvs, bind_cafs) ->
 	let
-	    env_ext_item@(binder', _) = mk_binding bind_lvs binder rhs
+	    env_ext_item@(binder', _) = mk_binding bind_lvs bind_cafs binder rhs
 	in
 	returnLne (StgNonRec (SRTEntries bind_cafs) binder' rhs2, 
-			bind_fvs, escs, bind_lvs, [env_ext_item])
+			bind_fvs, escs, bind_lvs, bind_cafs, [env_ext_item])
 
 
     vars_bind body_fvs (Rec pairs)
-      = fixLne (\ ~(_, rec_rhs_fvs, _, bind_lvs, _) ->
+      = fixLne (\ ~(_, rec_rhs_fvs, _, bind_lvs, bind_cafs, _) ->
 	   let
 		rec_scope_fvs = unionFVInfo body_fvs rec_rhs_fvs
 	        binders = map fst pairs
-	        env_ext = [ mk_binding bind_lvs b rhs | (b,rhs) <- pairs ]
+	        env_ext = [ mk_binding bind_lvs bind_cafs b rhs 
+			  | (b,rhs) <- pairs ]
 	   in
 	   extendVarEnvLne env_ext (
 	      mapAndUnzip3Lne (coreToStgRhs rec_scope_fvs NotTopLevel) pairs 
@@ -742,8 +745,9 @@ coreToStgLet let_no_escape bind body
 	      in
 	      freeVarsToLiveVars (binders `minusFVBinders` bind_fvs)
 					`thenLne` \ (bind_lvs, bind_cafs) ->
+
 	      returnLne (StgRec (SRTEntries bind_cafs) (binders `zip` rhss2), 
-				bind_fvs, escs, bind_lvs, env_ext)
+				bind_fvs, escs, bind_lvs, bind_cafs, env_ext)
 	   )
 	)
 
@@ -774,8 +778,8 @@ data HowBound
   | LambdaBound
   | LetBound
 	TopLevelCafInfo
-	StgLiveVars	-- Live vars... see notes below
- 	Arity		-- its arity (local Ids don't have arity info at this point)
+	(StgLiveVars, IdSet) -- (Live vars, Live CAFs)... see notes below
+ 	Arity  	   -- its arity (local Ids don't have arity info at this point)
 
 isLetBound (LetBound _ _ _) = True
 isLetBound other 	    = False
@@ -795,7 +799,9 @@ variables in it.
 The std monad functions:
 \begin{code}
 initLne :: IdEnv HowBound -> LneM a -> a
-initLne env m = m env (emptyVarSet,emptyVarSet)
+initLne env m = m env emptyLVS
+
+emptyLVS = (emptyVarSet,emptyVarSet)
 
 {-# INLINE thenLne #-}
 {-# INLINE returnLne #-}
@@ -865,28 +871,29 @@ lookupVarLne v env lvs_cont
 
 freeVarsToLiveVars :: FreeVarsInfo -> LneM (StgLiveVars, IdSet)
 freeVarsToLiveVars fvs env live_in_cont
-  = returnLne (lvs `unionVarSet` lvs_cont,
-	       mkVarSet cafs `unionVarSet` cafs_cont)
-	 env live_in_cont
+  = returnLne (lvs, cafs) env live_in_cont
   where
     (lvs_cont, cafs_cont) = live_in_cont -- not a strict pattern match!
     (local, global) = partition isLocalId (allFVs fvs)
 
-    cafs = filter is_caf_one global
-    lvs  = unionVarSets (map do_one local)
+    (lvs_from_fvs, caf_extras) = unzip (map do_one local)
+
+    lvs = unionVarSets lvs_from_fvs
+		`unionVarSet` lvs_cont
+
+    cafs = mkVarSet (filter is_caf_one global) 
+		`unionVarSet` (unionVarSets caf_extras)
+		`unionVarSet` cafs_cont
 
     do_one v
-      = if isLocalId v then
-	    case (lookupVarEnv env v) of
-	      Just (LetBound _ lvs _) -> extendVarSet lvs v
-	      Just _		      -> unitVarSet v
+      = case (lookupVarEnv env v) of
+	      Just (LetBound _ (lvs,cafs) _) -> (extendVarSet lvs v, cafs)
+	      Just _		             -> (unitVarSet v, emptyVarSet)
 	      Nothing -> pprPanic "lookupLiveVarsForSet/do_one:" (ppr v)
-	else
-	    emptyVarSet
 
     is_caf_one v
 	 = case lookupVarEnv env v of
-		Just (LetBound TopLevelHasCafs lvs _) ->
+		Just (LetBound TopLevelHasCafs (lvs,_) _) ->
 		    ASSERT( isEmptyVarSet lvs ) True
 	        Just (LetBound _ _ _) -> False
 		_otherwise 	    -> mayHaveCafRefs (idCafInfo v)
