@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.23 2001/08/29 17:24:25 qrczak Exp $
+ * $Id: TSO.h,v 1.24 2002/02/13 07:46:42 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -143,6 +143,9 @@ typedef enum {
 #if defined(PAR)
   , BlockedOnGA  // blocked on a remote closure represented by a Global Address
   , BlockedOnGA_NoSend // same as above but without sending a Fetch message
+#endif
+#if defined(RTS_SUPPORTS_THREADS)
+  , BlockedOnCCall
 #endif
 } StgTSOBlockReason;
 
