@@ -288,7 +288,10 @@ instance  Show Integer  where
 
 
 instance  Ix Integer  where
-    range (m,n)		=  [m..n]
+    range (m,n)		
+      | m <= n          =  [m..n]
+      | otherwise       =  []
+
     index b@(m,_) i
 	| inRange b i	=  fromInteger (i - m)
 	| otherwise	=  indexIntegerError i b

@@ -56,17 +56,21 @@ class  ({-Show a,-} Ord a) => Ix a  where
 
 \begin{code}
 instance  Ix Char  where
-    range (c,c')	=  [c..c']
+    range (c,c')
+      | c <= c'  	=  [c..c']
+      | otherwise       =  []
     index b@(c,_) ci
 	| inRange b ci	=  fromEnum ci - fromEnum c
 	| otherwise	=  indexError ci b "Char"
     inRange (m,n) i	=  m <= i && i <= n
 
 instance  Ix Int  where
-    range (m,n)		=  [m..n]
+    range (m,n)		
+      | m <= n	        =  [m..n]
+      | otherwise       =  []
     index b@(m,_) i
-	| inRange b i	=  i - m
-	| otherwise	=  indexError i b "Int"
+      | inRange b i	=  i - m
+      | otherwise	=  indexError i b "Int"
     inRange (m,n) i	=  m <= i && i <= n
 
 -- abstract these errors from the relevant index functions so that
@@ -84,13 +88,17 @@ indexError i rng tp
 
 ----------------------------------------------------------------------
 instance Ix Bool where -- as derived
-    range   (l,u)   = map toEnum [fromEnum l .. fromEnum u]
+    range   (l,u) 
+      | l <= u    = map toEnum [fromEnum l .. fromEnum u]
+      | otherwise = []
     index   (l,_) i = fromEnum i - fromEnum l
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
 instance Ix Ordering where -- as derived
-    range   (l,u)   = map toEnum [fromEnum l .. fromEnum u]
+    range   (l,u)
+      | l <= u    = map toEnum [fromEnum l .. fromEnum u]
+      | otherwise = []
     index   (l,_) i = fromEnum i - fromEnum l
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
@@ -183,7 +191,10 @@ in the range for an @Ix@ pair:
 {-# SPECIALISE rangeSize :: (Int,Int) -> Int #-}
 rangeSize :: (Ix a) => (a,a) -> Int
 rangeSize b@(l,h)
- | l > h     = 0
- | otherwise = index b h + 1
+ | l > h  || isnull (range b) = 0
+ | otherwise		      = index b h + 1
+ where
+  isnull [] = True
+  isnull _  = False
 
 \end{code}
