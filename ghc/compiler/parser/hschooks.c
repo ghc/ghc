@@ -74,18 +74,18 @@ PostTraceHook (long fd)
 }
 
 void
-OutOfHeapHook (unsigned long request_size, unsigned long heap_size)
-  /* both in bytes */
+OutOfHeapHook (unsigned long request_size/* always zero these days */, 
+	       unsigned long heap_size)
+    /* both in bytes */
 {
-    fprintf(stderr, "GHC's heap exhausted;\nwhile trying to allocate %lu bytes in a %lu-byte heap;\nuse the `-H<size>' option to increase the total heap size.\n",
-	request_size,
+    fprintf(stderr, "GHC's heap exhausted: current limit is %lu bytes;\nUse the `-H<size>' option to increase the total heap size.\n",
 	heap_size);
 }
 
 void
 StackOverflowHook (unsigned long stack_size)    /* in bytes */
 {
-    fprintf(stderr, "GHC stack-space overflow: current size %ld bytes.\nUse the `-K<size>' option to increase it.\n", stack_size);
+    fprintf(stderr, "GHC stack-space overflow: current limit is %ld bytes.\nUse the `-K<size>' option to increase it.\n", stack_size);
 }
 
 HsInt
