@@ -13,9 +13,9 @@ import TcRnDriver	( tcTopSrcDecls )
 	-- These imports are the reason that TcSplice 
 	-- is very high up the module hierarchy
 
-import qualified Language.Haskell.TH.THSyntax as TH
-import qualified Language.Haskell.TH.THLib    as TH
+import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
+import qualified Language.Haskell.TH.Syntax as TH
 
 import HsSyn		( HsBracket(..), HsExpr(..), HsSplice(..), LHsExpr, LHsDecl, 
 		   	  HsType, LHsType )

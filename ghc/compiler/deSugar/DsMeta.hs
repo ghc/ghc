@@ -1154,7 +1154,7 @@ repOverloadedLiteral :: HsOverLit -> DsM (Core TH.Lit)
 repOverloadedLiteral (HsIntegral i _)   = do { lit <- mk_integer  i; repLiteral lit }
 repOverloadedLiteral (HsFractional f _) = do { lit <- mk_rational f; repLiteral lit }
 	-- The type Rational will be in the environment, becuase 
-	-- the smart constructor 'THSyntax.rationalL' uses it in its type,
+	-- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
 	-- and rationalL is sucked in when any TH stuff is used
               
 --------------- Miscellaneous -------------------
@@ -1271,11 +1271,11 @@ templateHaskellNames = [
     varStrictTypeQTyConName, typeQTyConName, expTyConName, decTyConName,
     typeTyConName, matchTyConName, clauseTyConName]
 
-tH_SYN_Name = mkModuleName "Language.Haskell.TH.THSyntax"
-tH_LIB_Name = mkModuleName "Language.Haskell.TH.THLib"
+tH_SYN_Name = mkModuleName "Language.Haskell.TH.Syntax"
+tH_LIB_Name = mkModuleName "Language.Haskell.TH.Lib"
 
 thSyn :: Module
--- NB: the THSyntax module comes from the "haskell-src" package
+-- NB: the TH.Syntax module comes from the "haskell-src" package
 thSyn = mkModule thPackage  tH_SYN_Name
 thLib = mkModule thPackage  tH_LIB_Name
 
@@ -1288,7 +1288,7 @@ libTc  = mk_known_key_name thLib OccName.tcName
 thFun  = mk_known_key_name thSyn OccName.varName
 thTc   = mk_known_key_name thSyn OccName.tcName
 
--------------------- THSyntax -----------------------
+-------------------- TH.Syntax -----------------------
 qTyConName        = thTc FSLIT("Q")             qTyConKey
 nameTyConName      = thTc FSLIT("Name")           nameTyConKey
 fieldExpTyConName = thTc FSLIT("FieldExp")      fieldExpTyConKey
@@ -1312,7 +1312,7 @@ mkNameG_tcName = thFun FSLIT("mkNameG_tc") mkNameG_tcIdKey
 mkNameUName    = thFun FSLIT("mkNameU")    mkNameUIdKey
 
 
--------------------- THLib -----------------------
+-------------------- TH.Lib -----------------------
 -- data Lit = ...
 charLName       = libFun FSLIT("charL")       charLIdKey
 stringLName     = libFun FSLIT("stringL")     stringLIdKey

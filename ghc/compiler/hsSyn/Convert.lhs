@@ -10,8 +10,8 @@ module Convert( convertToHsExpr, convertToHsDecls, convertToHsType ) where
 
 #include "HsVersions.h"
 
-import Language.Haskell.TH.THSyntax as TH
-import Language.Haskell.TH.THLib    as TH	-- Pretty printing
+import Language.Haskell.TH as TH
+import Language.Haskell.TH.Syntax as TH
 
 import HsSyn as Hs
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, nameRdrName, getRdrName )
