@@ -73,7 +73,7 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 			  mkTemplateLocals, mkTemplateLocalsNum,
 			  mkTemplateLocal, idNewStrictness, idName
 			)
-import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
+import IdInfo		( IdInfo, noCafIdInfo,
 			  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo, setCafInfo,
 			  setAllStrictnessInfo,
@@ -156,7 +156,7 @@ mkDataConId :: Name -> DataCon -> Id
 mkDataConId work_name data_con
   = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
   where
-    info = noCafNoTyGenIdInfo
+    info = noCafIdInfo
 	   `setArityInfo`		arity
 	   `setAllStrictnessInfo`	Just strict_sig
 
@@ -243,9 +243,9 @@ mkDataConWrapId data_con
   where
     work_id = dataConWorkId data_con
 
-    info = noCafNoTyGenIdInfo
+    info = noCafIdInfo
 	   `setUnfoldingInfo`	wrap_unf
-		-- The NoCaf-ness is set by noCafNoTyGenIdInfo
+		-- The NoCaf-ness is set by noCafIdInfo
 	   `setArityInfo`	arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
@@ -455,7 +455,7 @@ mkRecordSelId tycon field_label
 	-- Use the demand analyser to work out strictness.
 	-- With all this unpackery it's not easy!
 
-    info = noCafNoTyGenIdInfo
+    info = noCafIdInfo
 	   `setCafInfo`		  caf_info
 	   `setArityInfo`	  arity
 	   `setUnfoldingInfo`     mkTopUnfolding rhs_w_str
@@ -606,7 +606,7 @@ mkDictSelId name clas
     field_lbl = mkFieldLabel name tycon sel_ty tag
     tag       = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` allFieldLabelTags) name
 
-    info      = noCafNoTyGenIdInfo
+    info      = noCafIdInfo
 		`setArityInfo`	    	1
 		`setUnfoldingInfo`  	mkTopUnfolding rhs
 		`setAllStrictnessInfo`	Just strict_sig
@@ -666,7 +666,7 @@ mkPrimOpId prim_op
     name = mkPrimOpIdName prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 		
-    info = noCafNoTyGenIdInfo
+    info = noCafIdInfo
 	   `setSpecInfo`	rules
 	   `setArityInfo` 	arity
 	   `setAllStrictnessInfo` Just strict_sig
@@ -696,7 +696,7 @@ mkFCallId uniq fcall ty
 
     name = mkFCallName uniq occ_str
 
-    info = noCafNoTyGenIdInfo
+    info = noCafIdInfo
 	   `setArityInfo` 		arity
 	   `setAllStrictnessInfo`	Just strict_sig
 
@@ -740,7 +740,7 @@ BUT make sure they are *exported* LocalIds (setIdLocalExported) so
 that they aren't discarded by the occurrence analyser.
 
 \begin{code}
-mkDefaultMethodId dm_name ty = mkVanillaGlobal dm_name ty noCafNoTyGenIdInfo
+mkDefaultMethodId dm_name ty = mkVanillaGlobal dm_name ty noCafIdInfo
 
 mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Class 
@@ -750,7 +750,7 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Id
 
 mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
-  = mkVanillaGlobal dfun_name dfun_ty noCafNoTyGenIdInfo
+  = mkVanillaGlobal dfun_name dfun_ty noCafIdInfo
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 
@@ -810,7 +810,7 @@ another gun with which to shoot yourself in the foot.
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceIdKey gHC_PRIM FSLIT("unsafeCoerce#") ty info
   where
-    info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+    info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
 
     ty  = mkForAllTys [openAlphaTyVar,openBetaTyVar]
@@ -825,13 +825,13 @@ unsafeCoerceId
 nullAddrId 
   = pcMiscPrelId nullAddrIdKey gHC_PRIM FSLIT("nullAddr#") addrPrimTy info
   where
-    info = noCafNoTyGenIdInfo `setUnfoldingInfo` 
+    info = noCafIdInfo `setUnfoldingInfo` 
 	   mkCompulsoryUnfolding (Lit nullAddrLit)
 
 seqId
   = pcMiscPrelId seqIdKey gHC_PRIM FSLIT("seq") ty info
   where
-    info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+    info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
 
     ty  = mkForAllTys [alphaTyVar,betaTyVar]
@@ -847,7 +847,7 @@ evaluate its argument and call the dataToTag# primitive.
 getTagId
   = pcMiscPrelId getTagIdKey gHC_PRIM FSLIT("getTag#") ty info
   where
-    info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+    info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	-- We don't provide a defn for this; you must inline it
 
     ty = mkForAllTys [alphaTyVar] (mkFunTy alphaTy intPrimTy)
@@ -872,7 +872,7 @@ This comes up in strictness analysis
 realWorldPrimId	-- :: State# RealWorld
   = pcMiscPrelId realWorldPrimIdKey gHC_PRIM FSLIT("realWorld#")
 		 realWorldStatePrimTy
-		 (noCafNoTyGenIdInfo `setUnfoldingInfo` mkOtherCon [])
+		 (noCafIdInfo `setUnfoldingInfo` mkOtherCon [])
 	-- The mkOtherCon makes it look that realWorld# is evaluated
 	-- which in turn makes Simplify.interestingArg return True,
 	-- which in turn makes INLINE things applied to realWorld# likely
@@ -966,7 +966,7 @@ pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
     strict_sig	   = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
-    bottoming_info = noCafNoTyGenIdInfo `setAllStrictnessInfo` Just strict_sig
+    bottoming_info = noCafIdInfo `setAllStrictnessInfo` Just strict_sig
 	-- these "bottom" out, no matter what their arguments
 
 (openAlphaTyVar:openBetaTyVar:_) = openAlphaTyVars

@@ -46,7 +46,6 @@ module Id (
 	setIdArity,
 	setIdNewDemandInfo, 
 	setIdNewStrictness, zapIdNewStrictness,
-        setIdTyGenInfo,
 	setIdWorkerInfo,
 	setIdSpecialisation,
 	setIdCgInfo,
@@ -64,7 +63,6 @@ module Id (
 	idArity, 
 	idNewDemandInfo, idNewDemandInfo_maybe,
 	idNewStrictness, idNewStrictness_maybe, 
-        idTyGenInfo,
 	idWorkerInfo,
 	idUnfolding,
 	idSpecialisation, idCoreRules,
@@ -118,7 +116,6 @@ infixl 	1 `setIdUnfolding`,
 	  `setIdArity`,
 	  `setIdNewDemandInfo`,
 	  `setIdNewStrictness`,
-	  `setIdTyGenInfo`,
 	  `setIdWorkerInfo`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
@@ -348,14 +345,6 @@ setIdNewStrictness id sig = modifyIdInfo (`setNewStrictnessInfo` Just sig) id
 
 zapIdNewStrictness :: Id -> Id
 zapIdNewStrictness id = modifyIdInfo (`setNewStrictnessInfo` Nothing) id
-
-	---------------------------------
-	-- TYPE GENERALISATION
-idTyGenInfo :: Id -> TyGenInfo
-idTyGenInfo id = tyGenInfo (idInfo id)
-
-setIdTyGenInfo :: Id -> TyGenInfo -> Id
-setIdTyGenInfo id tygen_info = modifyIdInfo (`setTyGenInfo` tygen_info) id
 
 	---------------------------------
 	-- WORKER ID

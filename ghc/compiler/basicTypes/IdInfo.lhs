@@ -11,7 +11,7 @@ module IdInfo (
 	GlobalIdDetails(..), notGlobalId, 	-- Not abstract
 
 	IdInfo,		-- Abstract
-	vanillaIdInfo, noCafNoTyGenIdInfo,
+	vanillaIdInfo, noCafIdInfo,
 	seqIdInfo, megaSeqIdInfo,
 
 	-- Zapping
@@ -32,11 +32,6 @@ module IdInfo (
 	mkStrictnessInfo, noStrictnessInfo,
 	ppStrictnessInfo,isBottomingStrictness, 
 	setAllStrictnessInfo,
-
-        -- Usage generalisation
-        TyGenInfo(..),
-        tyGenInfo, setTyGenInfo,
-        noTyGenInfo, isNoTyGenInfo, ppTyGenInfo, tyGenInfoString,
 
         -- Worker
         WorkerInfo(..), workerExists, wrapperArity, workerId,
@@ -109,8 +104,7 @@ import Maybe		( isJust )
 import List		( replicate )
 
 -- infixl so you can say (id `set` a `set` b)
-infixl 	1 `setTyGenInfo`,
-	  `setSpecInfo`,
+infixl 	1 `setSpecInfo`,
 	  `setArityInfo`,
 	  `setInlinePragInfo`,
 	  `setUnfoldingInfo`,
@@ -286,7 +280,6 @@ data IdInfo
   = IdInfo {
 	arityInfo 	:: !ArityInfo,		-- Its arity
 	specInfo 	:: CoreRules,		-- Specialisations of this function which exist
-        tyGenInfo       :: TyGenInfo,           -- Restrictions on usage-generalisation of this Id
 #ifdef OLD_STRICTNESS
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
 	demandInfo 	:: Demand.Demand,	-- Whether or not it is definitely demanded
@@ -315,7 +308,6 @@ seqIdInfo (IdInfo {}) = ()
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
   = seqRules (specInfo info)			`seq`
-    seqTyGenInfo (tyGenInfo info)               `seq`
     seqWorker (workerInfo info)			`seq`
 
 -- Omitting this improves runtimes a little, presumably because
@@ -343,7 +335,6 @@ Setters
 \begin{code}
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
 setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
-setTyGenInfo      info tg = tg `seq` info { tyGenInfo = tg }
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo	  info oc = oc `seq` info { occInfo = oc }
 #ifdef OLD_STRICTNESS
@@ -396,7 +387,6 @@ vanillaIdInfo
 	    strictnessInfo	= NoStrictnessInfo,
 #endif
 	    specInfo		= emptyCoreRules,
-            tyGenInfo		= noTyGenInfo,
 	    workerInfo		= NoWorker,
 	    unfoldingInfo	= noUnfolding,
 	    lbvarInfo		= NoLBVarInfo,
@@ -406,8 +396,7 @@ vanillaIdInfo
 	    newStrictnessInfo   = Nothing
 	   }
 
-noCafNoTyGenIdInfo = vanillaIdInfo `setTyGenInfo` TyGenNever
-			      	   `setCgInfo`    CgInfo NoCafRefs
+noCafIdInfo = vanillaIdInfo `setCgInfo`    CgInfo NoCafRefs
 	-- Used for built-in type Ids in MkId.
 	-- Many built-in things have fixed types, so we shouldn't
 	-- run around generalising them
@@ -454,81 +443,6 @@ type InlinePragInfo = Activation
 	--
 	-- If there was an INLINE pragma, then as a separate matter, the
 	-- RHS will have been made to look small with a CoreSyn Inline Note
-\end{code}
-
-
-%************************************************************************
-%*                                                                    *
-\subsection[TyGen-IdInfo]{Type generalisation info about an @Id@}
-%*                                                                    *
-%************************************************************************
-
-Certain passes (notably usage inference) may change the type of an
-identifier, modifying all in-scope uses of that identifier
-appropriately to maintain type safety.
-
-However, some identifiers must not have their types changed in this
-way, because their types are conjured up in the front end of the
-compiler rather than being read from the interface file.  Default
-methods, dictionary functions, record selectors, and others are in
-this category.  (see comment at TcClassDcl.tcClassSig).
-
-To indicate this property, such identifiers are marked TyGenNever.
-
-Furthermore, if the usage inference generates a usage-specialised
-variant of a function, we must NOT re-infer a fully-generalised type
-at the next inference.  This finer property is indicated by a
-TyGenUInfo on the identifier.
-
-\begin{code}
-data TyGenInfo
-  = NoTyGenInfo              -- no restriction on type generalisation
-
-  | TyGenUInfo [Maybe Type]  -- restrict generalisation of this Id to
-                             -- preserve specified usage annotations
-
-  | TyGenNever               -- never generalise the type of this Id
-\end{code}
-
-For TyGenUInfo, the list has one entry for each usage annotation on
-the type of the Id, in left-to-right pre-order (annotations come
-before the type they annotate).  Nothing means no restriction; Just
-usOnce or Just usMany forces that annotation to that value.  Other
-usage annotations are illegal.
-
-\begin{code}
-seqTyGenInfo :: TyGenInfo -> ()
-seqTyGenInfo  NoTyGenInfo    = ()
-seqTyGenInfo (TyGenUInfo us) = seqList us ()
-seqTyGenInfo  TyGenNever     = ()
-
-noTyGenInfo :: TyGenInfo
-noTyGenInfo = NoTyGenInfo
-
-isNoTyGenInfo :: TyGenInfo -> Bool
-isNoTyGenInfo NoTyGenInfo = True
-isNoTyGenInfo _           = False
-
--- NB: There's probably no need to write this information out to the interface file.
--- Why?  Simply because imported identifiers never get their types re-inferred.
--- But it's definitely nice to see in dumps, it for debugging purposes.
-
-ppTyGenInfo :: TyGenInfo -> SDoc
-ppTyGenInfo  NoTyGenInfo    = empty
-ppTyGenInfo (TyGenUInfo us) = ptext SLIT("__G") <+> text (tyGenInfoString us)
-ppTyGenInfo  TyGenNever     = ptext SLIT("__G N")
-
-tyGenInfoString us = map go us
-  where go  Nothing              	 = 'x'  -- for legibility, choose
-        go (Just u) | u `eqUsage` usOnce = '1'  -- chars with identity
-                    | u `eqUsage` usMany = 'M'  -- Z-encoding.
-        go other = pprPanic "IdInfo.tyGenInfoString: unexpected annotation" (ppr other)
-
-instance Outputable TyGenInfo where
-  ppr = ppTyGenInfo
-
-instance Show TyGenInfo where
-  showsPrec p c = showsPrecSDoc p (ppr c)
 \end{code}
 
 

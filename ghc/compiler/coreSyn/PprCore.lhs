@@ -32,7 +32,6 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			  arityInfo, ppArityInfo, 
 			  specInfo, ppStrictnessInfo, 
 			  workerInfo, ppWorkerInfo,
-                          tyGenInfo, ppTyGenInfo,
 			  newStrictnessInfo,
 #ifdef OLD_STRICTNESS
 			  cprInfo, ppCprInfo, 
@@ -354,7 +353,6 @@ pprIdDetails id | isGlobalId id     = ppr (globalIdDetails id)
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo b info
   = hsep [  ppArityInfo a,
-            ppTyGenInfo g,
 	    ppWorkerInfo (workerInfo info),
 #ifdef OLD_STRICTNESS
 	    ppStrictnessInfo s,
@@ -368,7 +366,6 @@ ppIdInfo b info
 	]
   where
     a = arityInfo info
-    g = tyGenInfo info
 #ifdef OLD_STRICTNESS
     s = strictnessInfo info
     m = cprInfo info
