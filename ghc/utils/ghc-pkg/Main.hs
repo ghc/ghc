@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.9 2001/04/07 22:30:01 qrczak Exp $
+-- $Id: Main.hs,v 1.10 2001/06/04 06:20:35 qrczak Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -86,7 +86,6 @@ listPackages :: [PackageConfig] -> IO ()
 listPackages details = do 
   hPutStr stdout (listPkgs details)
   hPutChar stdout '\n'
-  exitWith ExitSuccess
 
 showPackage :: [PackageConfig] -> FilePath -> String
 	 -> [PackageConfig->[String]] -> IO ()
@@ -110,9 +109,8 @@ addPackage details pkgconf = do
 	then die ("package `" ++ name new_pkg ++ "' already installed")
 	else do
   savePackageConfig pkgconf
-  maybeRestoreOldConfig pkgconf $ do
-  writeNewConfig pkgconf (details ++ [new_pkg])
-  exitWith ExitSuccess
+  maybeRestoreOldConfig pkgconf $
+    writeNewConfig pkgconf (details ++ [new_pkg])
 
 removePackage :: [PackageConfig] -> FilePath -> String -> IO ()
 removePackage details pkgconf pkg = do  
@@ -121,9 +119,8 @@ removePackage details pkgconf pkg = do
 	then die ("package `" ++ pkg ++ "' not installed")
 	else do
   savePackageConfig pkgconf
-  maybeRestoreOldConfig pkgconf $ do
-  writeNewConfig pkgconf (filter ((/= pkg) . name) details)
-  exitWith ExitSuccess
+  maybeRestoreOldConfig pkgconf $
+    writeNewConfig pkgconf (filter ((/= pkg) . name) details)
 
 checkConfigAccess :: FilePath -> IO ()
 checkConfigAccess pkgconf = do
