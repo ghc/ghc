@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.140 2003/11/12 15:45:49 sof Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -230,6 +229,7 @@ typedef struct _RtsSymbolVal {
 #define RTS_MINGW_ONLY_SYMBOLS                  \
       SymX(asyncReadzh_fast)			\
       SymX(asyncWritezh_fast)			\
+      SymX(asyncDoProczh_fast)			\
       SymX(memset)                              \
       SymX(inet_ntoa)                           \
       SymX(inet_addr)                           \
@@ -554,6 +554,13 @@ typedef struct _RtsSymbolVal {
 #define RTS_LONG_LONG_SYMS /* nothing */
 #endif
 
+#ifdef HAVE_TERMIOS_H
+#define RTS_TERMIOS_SYMS                        \
+      Sym(saved_termios)
+#else
+#define RTS_TERMIOS_SYMS /* nothing */
+#endif
+
 // 64-bit support functions in libgcc.a
 #if defined(__GNUC__) && SIZEOF_VOID_P <= 4
 #define RTS_LIBGCC_SYMBOLS			\
@@ -595,6 +602,7 @@ RTS_LONG_LONG_SYMS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_CYGWIN_ONLY_SYMBOLS
+RTS_TERMIOS_SYMS
 RTS_LIBGCC_SYMBOLS
 #undef Sym
 #undef SymX
