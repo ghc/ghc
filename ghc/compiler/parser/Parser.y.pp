@@ -27,7 +27,8 @@ import ForeignCall	( Safety(..), CExportSpec(..),
 import OccName		( UserFS, varName, dataName, tcClsName, tvName )
 import DataCon		( DataCon, dataConName )
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc, combineSrcSpans,
-			  SrcSpan, combineLocs, mkGeneralSrcSpan, srcLocFile )
+			  SrcSpan, combineLocs, srcLocFile, 
+			  mkSrcLoc, mkSrcSpan )
 import Module
 import CmdLineOpts	( opt_SccProfilingOn )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
@@ -1554,8 +1555,12 @@ comb4 a b c d = combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
 sL :: SrcSpan -> a -> Located a
 sL span a = span `seq` L span a
 
--- Make a source location that is just the filename.  This seems slightly
--- neater than trying to construct the span of the text within the file.
+-- Make a source location for the file.  We're a bit lazy here and just
+-- make a point SrcSpan at line 1, column 0.  Strictly speaking we should
+-- try to find the span of the whole file (ToDo).
 fileSrcSpan :: P SrcSpan
-fileSrcSpan = do l <- getSrcLoc; return (mkGeneralSrcSpan (srcLocFile l))
+fileSrcSpan = do 
+  l <- getSrcLoc; 
+  let loc = mkSrcLoc (srcLocFile l) 1 0;
+  return (mkSrcSpan loc loc)
 }
