@@ -17,7 +17,7 @@ import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
 			  getClassDeclSysNames, placeHolderType
 			)
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
-import RnHsSyn		( RenamedTyClDecl, 
+import RnHsSyn		( RenamedTyClDecl, RenamedSig,
 			  RenamedClassOpSig, RenamedMonoBinds,
 			  maybeGenericMatch
 			)
@@ -46,11 +46,11 @@ import Class		( classTyVars, classBigSig, classTyCon,
 import TyCon		( tyConGenInfo )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon )
-import Id		( Id, idType, idName, setIdLocalExported )
+import Id		( Id, idType, idName, setIdLocalExported, setInlinePragma )
 import Module		( Module )
 import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv )
-import NameSet		( emptyNameSet )
+import NameSet		( emptyNameSet, unitNameSet )
 import Outputable
 import Var		( TyVar )
 import CmdLineOpts
@@ -385,7 +385,7 @@ tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
 
     mkMethodBind origin clas inst_tys binds_in op_item	`thenTc` \ (dm_inst, meth_info) ->
     tcMethodBind xtve clas_tyvars theta 
-		 [this_dict] meth_info			`thenTc` \ (defm_bind, insts_needed) ->
+		 [this_dict] prags meth_info		`thenTc` \ (defm_bind, insts_needed) ->
     
     tcAddErrCtxt (defltMethCtxt clas) $
     
@@ -436,10 +436,11 @@ tcMethodBind
 	-> TcThetaType		-- Available theta; it's just used for the error message
 	-> [Inst]		-- Available from context, used to simplify constraints 
 				-- 	from the method body
+	-> [RenamedSig]		-- Pragmas (e.g. inline pragmas)
 	-> (Id, TcSigInfo, RenamedMonoBinds)	-- Details of this method
 	-> TcM (TcMonoBinds, LIE)
 
-tcMethodBind xtve inst_tyvars inst_theta avail_insts
+tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
 	     (sel_id, meth_sig, meth_bind)
   =  
 	-- Check the bindings; first adding inst_tyvars to the envt
@@ -473,11 +474,22 @@ tcMethodBind xtve inst_tyvars inst_theta avail_insts
      checkSigTyVars all_tyvars				`thenTc` \ all_tyvars' ->
 
      let
+		-- Attach inline pragmas as appropriate
+	(final_meth_id, inlines) 
+	   | (InlineSig inl _ phase _ : _) <- filter is_inline prags
+	   = (meth_id `setInlinePragma` phase,
+	      if inl then unitNameSet (idName meth_id) else emptyNameSet)
+	   | otherwise
+	   = (meth_id, emptyNameSet)
+
+	is_inline (InlineSig _ name _ _) = name == idName sel_id
+	is_inline other		         = False
+
 	meth_tvs'      = take (length meth_tvs) all_tyvars'
 	poly_meth_bind = AbsBinds meth_tvs'
 				  (map instToId meth_dicts)
-     				  [(meth_tvs', meth_id, local_meth_id)]
-				  emptyNameSet	-- Inlines?
+     				  [(meth_tvs', final_meth_id, local_meth_id)]
+				  inlines
 				  (lie_binds `andMonoBinds` meth_bind)
      in
      returnTc (poly_meth_bind, lie)

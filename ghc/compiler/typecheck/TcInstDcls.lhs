@@ -569,7 +569,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		      sc_dicts    ++ meth_insts
 
 	xtve    = inst_tyvars `zip` inst_tyvars'
-	tc_meth = tcMethodBind xtve inst_tyvars' dfun_theta' avail_insts
+	tc_meth = tcMethodBind xtve inst_tyvars' dfun_theta' avail_insts uprags
     in
     mapAndUnzipTc tc_meth meth_infos 		`thenTc` \ (meth_binds_s, meth_lie_s) ->
 
