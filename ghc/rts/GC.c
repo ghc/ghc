@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.78 2000/04/11 16:36:53 sewardj Exp $
+ * $Id: GC.c,v 1.79 2000/04/14 15:18:06 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -52,8 +52,6 @@
 #  include "ParallelDebug.h"
 # endif
 #endif
-
-StgCAF* enteredCAFs;
 
 //@node STATIC OBJECT LIST, Static function declarations, Includes
 //@subsection STATIC OBJECT LIST
@@ -486,9 +484,11 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
    */
   gcStablePtrTable(major_gc);
 
+#if 0
   /* revert dead CAFs and update enteredCAFs list */
   revert_dead_CAFs();
-  
+#endif
+
 #if defined(PAR)
   /* Reconstruct the Global Address tables used in GUM */
   rebuildGAtables(major_gc);
@@ -2757,7 +2757,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
   const StgInfoTable* info;
   StgWord32 bitmap;
 
-  IF_DEBUG(sanity, belch("  scavenging stack between %p and %p", p, stack_end));
+  //IF_DEBUG(sanity, belch("  scavenging stack between %p and %p", p, stack_end));
 
   /* 
    * Each time around this loop, we are looking at a chunk of stack
@@ -3086,18 +3086,32 @@ zero_mutable_list( StgMutClosure *first )
 
 void RevertCAFs(void)
 {
-  while (enteredCAFs != END_CAF_LIST) {
-    StgCAF* caf = enteredCAFs;
-    
-    enteredCAFs = caf->link;
-    ASSERT(get_itbl(caf)->type == CAF_ENTERED);
-    SET_INFO(caf,&CAF_UNENTERED_info);
-    caf->value = (StgClosure *)0xdeadbeef;
-    caf->link  = (StgCAF *)0xdeadbeef;
-  }
-  enteredCAFs = END_CAF_LIST;
+#ifdef INTERPRETER
+   StgInt i;
+
+   /* Deal with CAFs created by compiled code. */
+   for (i = 0; i < usedECafTable; i++) {
+      SET_INFO( (StgInd*)(ecafTable[i].closure), ecafTable[i].origItbl );
+      ((StgInd*)(ecafTable[i].closure))->indirectee = 0;
+   }
+
+   /* Deal with CAFs created by the interpreter. */
+   while (ecafList != END_ECAF_LIST) {
+      StgCAF* caf  = ecafList;
+      ecafList     = caf->link;
+      ASSERT(get_itbl(caf)->type == CAF_ENTERED);
+      SET_INFO(caf,&CAF_UNENTERED_info);
+      caf->value   = (StgClosure *)0xdeadbeef;
+      caf->link    = (StgCAF *)0xdeadbeef;
+   }
+
+   /* Empty out both the table and the list. */
+   clearECafTable();
+   ecafList = END_ECAF_LIST;
+#endif
 }
 
+#if 0
 //@cindex revert_dead_CAFs
 
 void revert_dead_CAFs(void)
@@ -3120,6 +3134,7 @@ void revert_dead_CAFs(void)
         caf = next;
     }
 }
+#endif
 
 //@node Sanity code for CAF garbage collection, Lazy black holing, Reverting CAFs
 //@subsection Sanity code for CAF garbage collection

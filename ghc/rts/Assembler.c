@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.25 $
- * $Date: 2000/04/11 20:44:19 $
+ * $Revision: 1.26 $
+ * $Date: 2000/04/14 15:18:06 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -191,7 +191,7 @@ static void asmResolveRef( AsmObject obj, AsmNat i, AsmClosure reference )
                 ap->fun = reference;
             } else {
                 ASSERT(ap->payload[i-1] == NULL);
-                ap->payload[i-1] = reference;
+                ap->payload[i-1] = (StgPtr)reference;
             }
             break;
         }
@@ -1430,7 +1430,9 @@ AsmPrim ccall_stdcall_IO
    = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_stdcall_IO };
 
 #ifdef DEBUG
-void checkBytecodeCount( void ) {
+void checkBytecodeCount( void );
+void checkBytecodeCount( void ) 
+{
   if (MAX_Primop1 >= 255) {
     printf("Too many Primop1 bytecodes (%d)\n",MAX_Primop1);
   }

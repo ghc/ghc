@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.24 2000/04/12 09:37:19 sewardj Exp $
+ * $Id: Printer.c,v 1.25 2000/04/14 15:18:06 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -152,7 +152,7 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,", ");
             printPtr((StgPtr)caf->value); /* should be null */
             fprintf(stderr,", ");
-            printPtr((StgPtr)caf->link);  /* should be null */
+            printPtr((StgPtr)caf->link);
             fprintf(stderr,")\n"); 
             break;
         }

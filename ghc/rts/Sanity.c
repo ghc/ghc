@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.20 2000/04/12 09:34:46 sewardj Exp $
+ * $Id: Sanity.c,v 1.21 2000/04/14 15:18:06 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -482,7 +482,7 @@ checkHeap(bdescr *bd, StgPtr start)
     nat xxx = 0; // tmp -- HWL
 
     if (start == NULL) {
-      p = bd->start;
+      if (bd != NULL) p = bd->start;
     } else {
       p = start;
     }

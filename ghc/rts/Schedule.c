@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.66 2000/04/11 16:36:53 sewardj Exp $
+ * $Id: Schedule.c,v 1.67 2000/04/14 15:18:07 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1066,7 +1066,7 @@ schedule( void )
       break;
       
     default:
-      barf("doneThread: invalid thread return code");
+      barf("schedule: invalid thread return code %d", (int)ret);
     }
     
 #ifdef SMP
@@ -1572,7 +1572,10 @@ initScheduler(void)
   context_switch = 0;
   interrupted    = 0;
 
-  enteredCAFs = END_CAF_LIST;
+  ecafList = END_ECAF_LIST;
+#ifdef INTERPRETER
+  clearECafTable();
+#endif
 
   /* Install the SIGHUP handler */
 #ifdef SMP
@@ -1701,6 +1704,33 @@ exitScheduler( void )
  * main thread has completed, we'll be woken up and the status/result
  * will be in the main_thread struct.
  * -------------------------------------------------------------------------- */
+
+int 
+howManyThreadsAvail ( void )
+{
+   int i = 0;
+   StgTSO* q;
+   for (q = run_queue_hd; q != END_TSO_QUEUE; q = q->link)
+      i++;
+   for (q = blocked_queue_hd; q != END_TSO_QUEUE; q = q->link)
+      i++;
+   return i;
+}
+
+void
+finishAllThreads ( void )
+{
+   do {
+      while (run_queue_hd != END_TSO_QUEUE) {
+         waitThread ( run_queue_hd, NULL );
+      }
+      while (blocked_queue_hd != END_TSO_QUEUE) {
+         waitThread ( blocked_queue_hd, NULL );
+      }
+   } while 
+      (blocked_queue_hd != END_TSO_QUEUE || 
+        run_queue_hd != END_TSO_QUEUE);
+}
 
 SchedulerStatus
 waitThread(StgTSO *tso, /*out*/StgClosure **ret)

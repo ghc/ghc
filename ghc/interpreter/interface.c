@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.53 $
- * $Date: 2000/04/12 09:43:10 $
+ * $Revision: 1.54 $
+ * $Date: 2000/04/14 15:18:06 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -18,7 +18,6 @@
 #include "object.h"
 
 #include "Assembler.h"  /* for wrapping GHC objects */
-
 
 /*#define DEBUG_IFACE*/
 #define VERBOSE FALSE

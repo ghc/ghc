@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.70 $
- * $Date: 2000/04/12 09:37:19 $
+ * $Revision: 1.71 $
+ * $Date: 2000/04/14 15:18:06 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1640,11 +1640,13 @@ void nukeModule ( Module m )
 
    if (!isModule(m)) internal("nukeModule");
 
+   /* fprintf ( stderr, "NUKE MODULE %s\n", textToStr(module(m).text) ); */
+
    /* see comment in compiler.c about this, 
       and interaction with info tables */
    if (nukeModule_needs_major_gc) {
       /* fprintf ( stderr, "doing major GC in nukeModule\n"); */
-      performMajorGC();
+      /* performMajorGC(); */
       nukeModule_needs_major_gc = FALSE;
    }
 
@@ -1663,14 +1665,20 @@ void nukeModule ( Module m )
 
    for (i = NAME_BASE_ADDR; i < NAME_BASE_ADDR+tabNameSz; i++)
       if (tabName[i-NAME_BASE_ADDR].inUse && name(i).mod == m) {
-         if (name(i).itbl) free(name(i).itbl);
+         if (name(i).itbl && 
+             module(name(i).mod).mode == FM_SOURCE) {
+            free(name(i).itbl);
+         }
          name(i).itbl = NULL;
          freeName(i);
       }
 
    for (i = TYCON_BASE_ADDR; i < TYCON_BASE_ADDR+tabTyconSz; i++)
       if (tabTycon[i-TYCON_BASE_ADDR].inUse && tycon(i).mod == m) {
-	 if (tycon(i).itbl) free(tycon(i).itbl);
+         if (tycon(i).itbl &&
+             module(tycon(i).mod).mode == FM_SOURCE) {
+            free(tycon(i).itbl);
+         }
          tycon(i).itbl = NULL;
          freeTycon(i);
       }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.17 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: Schedule.h,v 1.18 2000/04/14 15:18:07 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -31,6 +31,7 @@ void exitScheduler( void );
 #ifdef SMP
 void startTasks( void );
 #endif
+
 
 //@cindex awakenBlockedQueue
 /* awakenBlockedQueue()
@@ -193,7 +194,7 @@ void print_bq (StgClosure *node);
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&END_TSO_QUEUE_closure)
 /* this is the NIL ptr for a list CAFs */
-#define END_CAF_LIST   ((StgCAF *)(void*)&END_TSO_QUEUE_closure)
+#define END_ECAF_LIST   ((StgCAF *)(void*)&END_TSO_QUEUE_closure)
 #if defined(PAR) || defined(GRAN)
 /* this is the NIL ptr for a blocking queue */
 # define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&END_TSO_QUEUE_closure)

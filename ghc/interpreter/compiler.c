@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/04/11 16:36:53 $
+ * $Revision: 1.28 $
+ * $Date: 2000/04/14 15:18:06 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1528,29 +1528,44 @@ Void evalExp ( void ) {             /* compile and run input expression    */
         switch (status) {
         case Deadlock:
                 printf("{Deadlock or Blackhole}");
-                if (doRevertCAFs) RevertCAFs();
                 break;
         case Interrupted:
                 printf("{Interrupted}");
-                if (doRevertCAFs) RevertCAFs();
                 break;
         case Killed:
                 printf("{Interrupted or Killed}");
-                if (doRevertCAFs) RevertCAFs();
                 break;
         case Success:
-	        if (doRevertCAFs) RevertCAFs();
                 break;
         default:
                 internal("evalExp: Unrecognised SchedulerStatus");
         }
-        deleteAllThreads();
+
+        /* Begin heap cleanup sequence */
+        do {
+           /* fprintf ( stderr, "finalisation loop START\n" ); */
+           finishAllThreads();
+           finalizeWeakPointersNow();
+           /* fprintf ( stderr, "finalisation loop END %d\n", 
+                                howManyThreadsAvail() ); */
+        } 
+           while (howManyThreadsAvail() > 0);
+
+        RevertCAFs();
+        performMajorGC();
+        if (combined && SPT_size != 0) {
+           FPrintf ( stderr, 
+             "hugs: fatal: stable pointers are not yet allowed in combined mode" );
+           internal("evalExp");
+        }
+        /* End heap cleanup sequence */
+
         fflush(stdout);
         fflush(stderr);
     }
-#ifdef CRUDE_PROFILING
+#   ifdef CRUDE_PROFILING
     cp_show();
-#endif
+#   endif
 
 }
 

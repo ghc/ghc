@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.23 2000/02/14 10:58:05 sewardj Exp $
+ * $Id: Storage.c,v 1.24 2000/04/14 15:18:07 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -195,6 +195,11 @@ exitStorage (void)
   stat_exit(calcAllocated());
 }
 
+
+/* -----------------------------------------------------------------------------
+   CAF management.
+   -------------------------------------------------------------------------- */
+
 void
 newCAF(StgClosure* caf)
 {
@@ -206,23 +211,77 @@ newCAF(StgClosure* caf)
    * any more and can use it as a STATIC_LINK.
    */
   ACQUIRE_LOCK(&sm_mutex);
+
+  ASSERT( ((StgMutClosure*)caf)->mut_link == NULL );
   ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
   oldest_gen->mut_once_list = (StgMutClosure *)caf;
 
-#ifdef DEBUG
-  { 
-    const StgInfoTable *info;
-    
-    info = get_itbl(caf);
-    ASSERT(info->type == IND_STATIC);
-#if 0
-    STATIC_LINK2(info,caf) = caf_list;
-    caf_list = caf;
+#ifdef INTERPRETER
+  /* If we're Hugs, we also have to put it in the CAF table, so that
+     the CAF can be reverted.  When reverting, CAFs created by compiled
+     code are recorded in the CAF table, which lives outside the
+     heap, in mallocville.  CAFs created by interpreted code are
+     chained together via the link fields in StgCAFs, and are not
+     recorded in the CAF table.
+  */
+  ASSERT( get_itbl(caf)->type == THUNK_STATIC );
+  addToECafTable ( caf, get_itbl(caf) );
 #endif
-  }
-#endif
+
   RELEASE_LOCK(&sm_mutex);
 }
+
+#ifdef INTERPRETER
+void
+newCAF_made_by_Hugs(StgCAF* caf)
+{
+  ACQUIRE_LOCK(&sm_mutex);
+
+  ASSERT( get_itbl(caf)->type == CAF_ENTERED );
+  recordOldToNewPtrs((StgMutClosure*)caf);
+  caf->link = ecafList;
+  ecafList = caf->link;
+
+  RELEASE_LOCK(&sm_mutex);
+}
+#endif
+
+#ifdef INTERPRETER
+/* These initialisations are critical for correct operation
+   on the first call of addToECafTable. 
+*/
+StgCAF*         ecafList      = END_ECAF_LIST;
+StgCAFTabEntry* ecafTable     = NULL;
+StgInt          usedECafTable = 0;
+StgInt          sizeECafTable = 0;
+
+
+void clearECafTable ( void )
+{
+   usedECafTable = 0;
+}
+
+void addToECafTable ( StgClosure* closure, StgInfoTable* origItbl )
+{
+   StgInt          i;
+   StgCAFTabEntry* et2;
+   if (usedECafTable == sizeECafTable) {
+      /* Make the initial table size be 8 */
+      sizeECafTable *= 2;
+      if (sizeECafTable == 0) sizeECafTable = 8;
+      et2 = stgMallocBytes ( 
+               sizeECafTable * sizeof(StgCAFTabEntry),
+               "addToECafTable" );
+      for (i = 0; i < usedECafTable; i++) 
+         et2[i] = ecafTable[i];
+      if (ecafTable) free(ecafTable);
+      ecafTable = et2;
+   }
+   ecafTable[usedECafTable].closure  = closure;
+   ecafTable[usedECafTable].origItbl = origItbl;
+   usedECafTable++;
+}
+#endif
 
 /* -----------------------------------------------------------------------------
    Nursery management.
@@ -653,8 +712,8 @@ extern void
 checkSanity(nat N)
 {
   nat g, s;
-
-  if (RtsFlags.GcFlags.generations == 1) {
+fprintf(stderr, "--- checkSanity %d\n", N );
+  if (0&&RtsFlags.GcFlags.generations == 1) {
     checkHeap(g0s0->to_space, NULL);
     checkChain(g0s0->large_objects);
   } else {

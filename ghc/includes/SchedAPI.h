@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.9 2000/01/13 14:34:01 hwloidl Exp $
+ * $Id: SchedAPI.h,v 1.10 2000/04/14 15:18:05 sewardj Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -90,14 +90,17 @@ createStrictIOThread(nat stack_size,  StgClosure *closure) {
 /* 
  * Killing threads
  */
-
-void    deleteThread(StgTSO *tso);
-void    deleteAllThreads ( void );
+extern void deleteThread(StgTSO *tso);
+extern void deleteAllThreads ( void );
+extern int  howManyThreadsAvail ( void );
+/*
+ * Run until there are no more threads.
+ */
+extern void finishAllThreads ( void );
 
 /*
  * Reverting CAFs
  */
-
-void RevertCAFs(void);
+extern void RevertCAFs ( void );
 
 #endif

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.47 $
- * $Date: 2000/04/11 20:44:19 $
+ * $Revision: 1.48 $
+ * $Date: 2000/04/14 15:18:06 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1356,22 +1356,19 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 xPushCPtr(obj); /* code to restart with */
                 RETURN(StackOverflow);
             }
-            /* ToDo: look for xSp==xSu && stackInt(0) == UPD_FRAME 
-               and insert an indirection immediately */
             SSS; bh = (StgBlockingQueue*)grabHpUpd(BLACKHOLE_sizeW()); LLL;
             SET_INFO(bh,&CAF_BLACKHOLE_info);
             bh->blocking_queue = EndTSOQueue;
             IF_DEBUG(gccafs,
-                     fprintf(stderr,"Created CAF_BLACKHOLE %p for CAF %p in evaluator\n",bh,caf));
+                     fprintf(stderr,"Created CAF_BLACKHOLE %p for CAF %p"
+                                    " in evaluator\n",bh,caf));
             SET_INFO(caf,&CAF_ENTERED_info);
             caf->value = (StgClosure*)bh;
-            if (caf->mut_link == NULL) { 
-               SSS; recordOldToNewPtrs((StgMutClosure*)caf); LLL; 
-            }
+
+            SSS; newCAF_made_by_Hugs(caf); LLL;
+
             xPushUpdateFrame(bh,0);
             xSp -= sizeofW(StgUpdateFrame);
-            caf->link = enteredCAFs;
-            enteredCAFs = caf;
             obj = caf->body;
             goto enterLoop;
         }

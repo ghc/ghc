@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.16 2000/01/13 14:34:01 hwloidl Exp $
+ * $Id: Updates.h,v 1.17 2000/04/14 15:18:05 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -212,13 +212,21 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable Upd_frame_info;
 
 extern void newCAF(StgClosure*);
 
+/* newCAF must be called before the itbl ptr is overwritten, since
+   newCAF records the old itbl ptr in order to do CAF reverting
+   (which Hugs needs to do in order that combined mode works right.)
+*/
 #define UPD_CAF(cafptr, bhptr)						\
   {									\
     LOCK_CLOSURE(cafptr);						\
+    STGCALL1(newCAF,(StgClosure *)cafptr);				\
     ((StgInd *)cafptr)->indirectee   = (StgClosure *)(bhptr);		\
     SET_INFO((StgInd *)cafptr,(const StgInfoTable*)&IND_STATIC_info);	\
-    STGCALL1(newCAF,(StgClosure *)cafptr);				\
   }
+
+#ifdef INTERPRETER
+extern void newCAF_made_by_Hugs(StgCAF*);
+#endif
 
 /* -----------------------------------------------------------------------------
    Update-related prototypes

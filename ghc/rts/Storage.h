@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.15 2000/04/11 16:36:54 sewardj Exp $
+ * $Id: Storage.h,v 1.16 2000/04/14 15:18:07 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -172,11 +172,24 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
 #endif
 
 /* -----------------------------------------------------------------------------
-   The CAF list - used to let us revert CAFs
+   The CAF table - used to let us revert CAFs
 
    -------------------------------------------------------------------------- */
 
-extern StgCAF* enteredCAFs;
+#if defined(INTERPRETER)
+typedef struct StgCAFTabEntry_ {
+    StgClosure*   closure;
+    StgInfoTable* origItbl;
+} StgCAFTabEntry;
+
+extern void addToECafTable ( StgClosure* closure, StgInfoTable* origItbl );
+extern void clearECafTable ( void );
+
+extern StgCAF*         ecafList;
+extern StgCAFTabEntry* ecafTable;
+extern StgInt          usedECafTable;
+extern StgInt          sizeECafTable;
+#endif
 
 #if defined(DEBUG)
 void printMutOnceList(generation *gen);
