@@ -285,13 +285,15 @@ getPkgDatabases modify flags = do
 	-- 	--user means overlap with the user database
 	-- 	--global means reset to just the global database
 	--	-f <file> means overlap with <file>
-	addDB dbs FlagUser       = if user_conf `elem` dbs 
-					then dbs 
-					else user_conf : dbs
+	addDB dbs FlagUser
+	   | user_conf `elem` dbs     = dbs
+	   | modify || user_exists    = user_conf : dbs
 	addDB dbs FlagGlobal     = [global_conf]
 	addDB dbs (FlagConfig f) = f : dbs
 	addDB dbs _		 = dbs
 
+  -- we create the user database iff (a) we're modifying, and (b) the
+  -- user asked to use it by giving the --user flag.
   when (not user_exists && user_conf `elem` databases) $ do
 	putStrLn ("Creating user package database in " ++ user_conf)
 	createDirectoryIfMissing True archdir
