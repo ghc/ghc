@@ -679,11 +679,11 @@ matchSeparator RecUpd       = panic "When is this used?"
 \end{code}
 
 \begin{code}
-pprMatchContext (FunRhs fun) = ptext SLIT("in the definition of function") <+> quotes (ppr fun)
-pprMatchContext CaseAlt	     = ptext SLIT("in a group of case alternatives beginning")
-pprMatchContext RecUpd	     = ptext SLIT("in a record-update construct")
-pprMatchContext PatBindRhs   = ptext SLIT("in a pattern binding")
-pprMatchContext LambdaExpr   = ptext SLIT("in a lambda abstraction")
-pprMatchContext DoExpr       = ptext SLIT("in a `do' expression pattern binding")
-pprMatchContext ListComp     = ptext SLIT("in a `list comprension' pattern binding")
+pprMatchContext (FunRhs fun) = ptext SLIT("In the definition of") <+> quotes (ppr fun)
+pprMatchContext CaseAlt	     = ptext SLIT("In a group of case alternatives beginning")
+pprMatchContext RecUpd	     = ptext SLIT("In a record-update construct")
+pprMatchContext PatBindRhs   = ptext SLIT("In a pattern binding")
+pprMatchContext LambdaExpr   = ptext SLIT("In a lambda abstraction")
+pprMatchContext DoExpr       = ptext SLIT("In a 'do' expression pattern binding")
+pprMatchContext ListComp     = ptext SLIT("In a 'list comprension' pattern binding")
 \end{code}
