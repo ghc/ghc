@@ -350,13 +350,13 @@ foreign import ccall unsafe "HsBase.h getcwd"
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h lseek"
+foreign import ccall unsafe "HsBase.h __hscore_lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
 
 foreign import ccall unsafe "HsBase.h __hscore_lstat"
    lstat :: CString -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe "HsBase.h open"
+foreign import ccall unsafe "HsBase.h __hscore_open"
    c_open :: CString -> CInt -> CMode -> IO CInt
 
 foreign import ccall unsafe "HsBase.h opendir" 
@@ -367,9 +367,6 @@ foreign import ccall unsafe "HsBase.h __hscore_mkdir"
 
 foreign import ccall unsafe "HsBase.h read" 
    c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
-
-foreign import ccall unsafe "HsBase.h readdir" 
-   c_readdir :: Ptr CDir -> IO (Ptr CDirent)
 
 foreign import ccall unsafe "dirUtils.h __hscore_renameFile"
    c_rename :: CString -> CString -> IO CInt
