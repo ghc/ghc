@@ -574,17 +574,18 @@ Here's how to install Cygwin.
 <ListItem>
 <Para>
 Install Cygwin 1.1 from <ULink
-URL="http://sources.redhat.com/cygwin/">sources.redhat.com</ULink> Install
-this into your root directory (<Filename>C:\</Filename>), despite the
-warnings (but you may want to back up <Filename>C:\bin</Filename>,
-<Filename>C:\etc</Filename>, <Filename>C:\lib</Filename>,
-<Filename>C:\usr</Filename> and <Filename>C:\var</Filename> first) and
-choose DOS text mode. If you're upgrading from Cygwin B20.1, running
-<Command>mount --import-old-mounts</Command> immediately after installation
-may help. Either way, you want to end up with your main drive mounted in
-<Emphasis><Constant>textmode</Constant></Emphasis>, and only the
-<Filename>bin</Filename> directories mounted in <Constant>binmode</Constant>
-(you can check by running <Command>mount</Command>).
+URL="http://sources.redhat.com/cygwin/">sources.redhat.com</ULink>. If you
+have an earlier version, you must deinstall this first. Choose DOS text
+mode. After installation, start up a Cygwin shell and issue the following
+commands:
+
+<Screen>
+mount -f c: /
+mount c:\\cygwin\\usr\\include /usr/include
+</Screen>
+
+assuming you installed Cygwin at <Filename>C:\cygwin</Filename>; otherwise
+change the drive and directory as appropriate.
 </Para>
 </ListItem>
 
