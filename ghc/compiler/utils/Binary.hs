@@ -227,8 +227,8 @@ writeBinMem (BinMem _ ix_r sz_r arr_r) fn = do
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
   hPutArray h arr ix
-#if __GLASGOW_HASKELL__ < 500
-  -- workaround a bug in ghc 4.08's implementation of hPutBuf (it doesn't
+#if __GLASGOW_HASKELL__ <= 500
+  -- workaround a bug in old implementation of hPutBuf (it doesn't
   -- set the FILEOBJ_RW_WRITTEN flag on the file object, so the file doens't
   -- get flushed properly).  Adding an extra '\0' doens't do any harm.
   hPutChar h '\0'
