@@ -424,7 +424,7 @@ pprCostCentreDecl is_local cc
 	hcat [
 	    ptext SLIT("CC_DECLARE"),char '(',
 	    cc_ident, 		  				comma,
-	    text (costCentreUserName cc),			comma,
+	    doubleQuotes (text (costCentreUserName cc)),	comma,
 	    doubleQuotes (text (moduleUserString mod_name)),	comma,
 	    doubleQuotes (ptext grp_name),			comma,
 	    ptext is_subsumed,					comma,
