@@ -186,9 +186,9 @@ doIt (core_cmds, stg_cmds)
 --	simplifier, which for reasons I don't understand, persists
 --	thoroughout code generation
 
-    ifaceDecls if_handle local_tycons local_classes 
-	       inst_info final_ids tidy_binds imp_rule_ids	>>
-    endIface if_handle						>>
+    ifaceDecls if_handle local_tycons local_classes inst_info
+	       final_ids tidy_binds imp_rule_ids iface_file_stuff	>>
+    endIface if_handle							>>
 	    -- We are definitely done w/ interface-file stuff at this point:
 	    -- (See comments near call to "startIface".)
 

@@ -76,6 +76,10 @@ We then have one-function-per-block-of-interface-stuff, e.g.,
 @ifaceExportList@ produces the @__exports__@ section; it appends
 to the handle provided by @startIface@.
 
+NOTE: ALWAYS remember that ghc-iface.lprl rewrites the interface file,
+so you have to keep it in synch with the code below. Otherwise you'll
+lose the happiest years of your life, believe me...  -- SUP
+
 \begin{code}
 startIface  :: Module -> InterfaceDetails
 	    -> IO (Maybe Handle) -- Nothing <=> don't do an interface
@@ -86,6 +90,7 @@ ifaceDecls :: Maybe Handle
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
 	   -> [CoreBind]	-- In dependency order, later depend on earlier
 	   -> [ProtoCoreRule]	-- Rules
+	   -> InterfaceDetails
 	   -> IO ()
 
 endIface    :: Maybe Handle -> IO ()
@@ -115,12 +120,14 @@ endIface (Just if_hdl)	= hPutStr if_hdl "\n" >> hClose if_hdl
 
 
 \begin{code}
-ifaceDecls Nothing tycons classes inst_info final_ids simplified rules = return ()
+ifaceDecls Nothing tycons classes inst_info final_ids simplified rules _ = return ()
 ifaceDecls (Just hdl)
 	   tycons classes
 	   inst_infos
-	   final_ids binds
+	   final_ids
+	   binds
 	   orphan_rules		-- Rules defined locally for an Id that is *not* defined locally
+	   (InterfaceDetails _ _ _ deprecations)
   | null_decls = return ()		 
 	--  You could have a module with just (re-)exports/instances in it
   | otherwise
@@ -130,19 +137,21 @@ ifaceDecls (Just hdl)
     ifaceBinds hdl (inst_ids `unionVarSet` orphan_rule_ids)
 	       final_ids binds			>>= \ emitted_ids ->
     ifaceRules hdl orphan_rules emitted_ids	>>
-    return ()
+    ifaceDeprecations hdl deprecations
   where
      orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
 				    | ProtoCoreRule _ _ rule <- orphan_rules]
 
-     null_decls = null binds      && 
-		  null tycons     &&
-	          null classes    && 
-	          isEmptyBag inst_infos &&
-		  null orphan_rules
+     null_decls = null binds		&& 
+		  null tycons		&&
+	          null classes		&& 
+	          isEmptyBag inst_infos	&&
+		  null orphan_rules	&&
+		  null deprecations
 \end{code}
 
 \begin{code}
+ifaceImports :: Handle -> VersionInfo Name -> IO ()
 ifaceImports if_hdl import_usages
   = hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
   where
@@ -162,6 +171,7 @@ ifaceImports if_hdl import_usages
     upp_import_versions (Specifically nvs)
       = dcolon <+> hsep [ hsep [ppr_unqual_name n, int v] | (n,v) <- sort_versions nvs ]
 
+{- SUP: What's this??
 ifaceModuleDeps if_hdl [] = return ()
 ifaceModuleDeps if_hdl mod_deps
   = let 
@@ -172,7 +182,9 @@ ifaceModuleDeps if_hdl mod_deps
     in 
     printForIface if_hdl (ptext SLIT("__depends") <+> vcat lines <> ptext SLIT(" ;")) >>
     hPutStr if_hdl "\n"
+-}
 
+ifaceExports :: Handle -> Avails -> IO ()
 ifaceExports if_hdl [] = return ()
 ifaceExports if_hdl avails
   = hPutCol if_hdl do_one_module (fmToList export_fm)
@@ -193,25 +205,22 @@ ifaceExports if_hdl avails
 		hsep (map upp_avail (sortLt lt_avail avails))
 	  ] <> semi
 
+ifaceFixities :: Handle -> Fixities -> IO ()
 ifaceFixities if_hdl [] = return ()
 ifaceFixities if_hdl fixities 
   = hPutCol if_hdl upp_fixity fixities
 
+ifaceRules :: Handle -> [ProtoCoreRule] -> IdSet -> IO ()
 ifaceRules if_hdl rules emitted
   | null orphan_rule_pretties && null local_id_pretties
   = return ()
   | otherwise
-  = do	printForIface if_hdl (vcat [
+  = printForIface if_hdl (vcat [
 		ptext SLIT("{-## __R"),
-
 		vcat orphan_rule_pretties,
-
 		vcat local_id_pretties,
-
 		ptext SLIT("##-}")
-          ])
-	
-	return ()
+       ])
   where
     orphan_rule_pretties =  [ pprCoreRule (Just fn) rule
 			    | ProtoCoreRule _ fn rule <- rules
@@ -220,8 +229,20 @@ ifaceRules if_hdl rules emitted
  		        | fn <- varSetElems emitted, 
 			  rule <- rulesRules (getIdSpecialisation fn),
 			  all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
-				-- Spit out a rule only if all its lhs free vars are eemitted
+				-- Spit out a rule only if all its lhs free vars are emitted
 		        ]
+
+ifaceDeprecations :: Handle -> [Deprecation Name] -> IO ()
+ifaceDeprecations if_hdl [] = return ()
+ifaceDeprecations if_hdl deprecations
+  = printForIface if_hdl (vcat [
+		ptext SLIT("{-## __D"),
+		vcat [ pprIfaceDeprec d <> semi | d <- deprecations ],
+		ptext SLIT("##-}")
+       ])
+  where
+    pprIfaceDeprec (DeprecMod    txt) =           doubleQuotes (ppr txt) 
+    pprIfaceDeprec (DeprecName n txt) = ppr n <+> doubleQuotes (ppr txt)
 \end{code}
 
 %************************************************************************
