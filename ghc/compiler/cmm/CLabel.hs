@@ -569,12 +569,15 @@ maybe_underscore doc
   | underscorePrefix = pp_cSEP <> doc
   | otherwise        = doc
 
+#ifdef mingw32_TARGET_OS
 -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
 -- (The C compiler does this itself).
 pprAsmCLbl (ForeignLabel fs (Just sz) _)
    = ftext fs <> char '@' <> int sz
+#else
 pprAsmCLbl lbl
    = pprCLbl lbl
+#endif
 
 pprCLbl (StringLitLabel u)
   = pprUnique u <> ptext SLIT("_str")
