@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.111 2003/09/02 09:20:05 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.112 2003/09/12 16:32:13 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1627,7 +1627,7 @@ FN_(delayzh_fast)
   nat target;
 #endif
   FB_
-    /* args: R1.i */
+    /* args: R1.i (microsecond delay amount) */
     ASSERT(CurrentTSO->why_blocked == NotBlocked);
     CurrentTSO->why_blocked = BlockedOnDelay;
 
