@@ -102,6 +102,11 @@ changequote([, ])dnl
 else
    ac_cv_happy_version="";
 fi;
+if expr "$ac_cv_happy_version" "<" 1.4 > /dev/null 2>&1; then
+   echo
+   echo "Happy version 1.4 or later is required to compile GHC."
+   exit 1;
+fi;
 ])
 HappyVersion=$ac_cv_happy_version;
 AC_SUBST(HappyVersion)
