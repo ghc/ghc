@@ -9,5 +9,5 @@ import Language.Haskell.THSyntax
 class C a where
   m :: a -> Int
 
-decl_C :: Decl
+decl_C :: DecQ
 decl_C = reifyDecl C

@@ -5,20 +5,26 @@ where
 
 import Language.Haskell.THSyntax
 
-intExpr :: Expr
+integralExpr :: ExpQ
+integralExpr = [| 42 |]
+
+intExpr :: ExpQ
 intExpr = [| 42 :: Int |]
 
-integerExpr :: Expr
+integerExpr :: ExpQ
 integerExpr = [| 42 :: Integer |]
 
-charExpr :: Expr
+charExpr :: ExpQ
 charExpr = [| 'x' |]
 
-stringExpr :: Expr
+stringExpr :: ExpQ
 stringExpr = [| "A String" |]
 
-floatExpr :: Expr
+fractionalExpr :: ExpQ
+fractionalExpr = [| 1.2 |]
+
+floatExpr :: ExpQ
 floatExpr = [| 1.2 :: Float |]
 
-doubleExpr :: Expr
+doubleExpr :: ExpQ
 doubleExpr = [| 1.2 :: Double |]

@@ -5,5 +5,5 @@ where
 
 import Language.Haskell.THSyntax
 
-type_length :: Type
+type_length :: TypQ
 type_length = reifyType length

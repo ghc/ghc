@@ -7,4 +7,4 @@ import Language.Haskell.THSyntax
 
 
 -- splice a simple data declaration
-$(return [Data "T" [] [Constr "C" []] []])
+$(return [Data [] "T" [] [Constr "C" []] []])

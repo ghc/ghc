@@ -5,6 +5,7 @@ setTestOpts(f)
 setTestOpts(only_ways(['normal']));
 
 test('TH_repE1', normal, compile, [''])
+test('TH_repE2', normal, compile_and_run, [''])
 
 test('TH_reifyDecl1', normal, compile, [''])
 test('TH_reifyDecl2', normal, compile, [''])
