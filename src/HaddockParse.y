@@ -3,21 +3,18 @@ module HaddockParse (parseParas, parseString) where
 
 import HaddockLex
 import HsSyn
-import HsLexer hiding (Token)
-import HsParseMonad
 }
 
 %tokentype { Token }
 
-%token 	SQUO	{ TokSpecial '\'' }
-	BQUO	{ TokSpecial '`' }
-	DQUO 	{ TokSpecial '\"' }
-	'/'	{ TokSpecial '/' }
+%token	'/'	{ TokSpecial '/' }
 	'@'	{ TokSpecial '@' }
+	DQUO 	{ TokSpecial '\"' }
 	URL	{ TokURL $$ }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
 	'>'	{ TokBirdTrack }
+	IDENT   { TokIdent $$ }
 	PARA    { TokPara }
 	STRING	{ TokString $$ }
 
@@ -69,12 +66,8 @@ elem1	:: { Doc }
 	: STRING		{ DocString $1 }
 	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
 	| URL			{ DocURL $1 }
-	| squo STRING squo	{ strToHsQNames $2 }
+	| IDENT			{ DocIdentifier $1 }
 	| DQUO STRING DQUO	{ DocModule $2 }
-
-squo :: { () }
-	: SQUO			{ () }
-	| BQUO			{ () }
 
 {
 happyError :: [Token] -> Either String a
@@ -88,30 +81,4 @@ instance Monad (Either String) where
 	Left  l >>= _ = Left l
 	Right r >>= k = k r
 	fail msg      = Left msg
-
-strToHsQNames :: String -> Doc
-strToHsQNames str
- = case lexer (\t -> returnP t) str (SrcLoc 1 1) 1 1 [] of
-	Ok _ (VarId str)
-	   -> DocIdentifier [ UnQual (HsVarName (HsIdent str)) ]
-        Ok _ (QVarId (mod,str))
- 	   -> DocIdentifier [ Qual (Module mod) (HsVarName (HsIdent str)) ]
-	Ok _ (ConId str)
-	   -> DocIdentifier [ UnQual (HsTyClsName (HsIdent str)),
-			      UnQual (HsVarName (HsIdent str)) ]
-        Ok _ (QConId (mod,str))
-	   -> DocIdentifier [ Qual (Module mod) (HsTyClsName (HsIdent str)),
-			      Qual (Module mod) (HsVarName (HsIdent str)) ]
-        Ok _ (VarSym str)
-	   -> DocIdentifier [ UnQual (HsVarName (HsSymbol str)) ]
-        Ok _ (ConSym str)
-	   -> DocIdentifier [ UnQual (HsTyClsName (HsSymbol str)),
-		     	      UnQual (HsVarName (HsSymbol str)) ]
-        Ok _ (QVarSym (mod,str))
-	   -> DocIdentifier [ Qual (Module mod) (HsVarName (HsSymbol str)) ]
-        Ok _ (QConSym (mod,str))
-	   -> DocIdentifier [ Qual (Module mod) (HsTyClsName (HsSymbol str)),
-		     	      Qual (Module mod) (HsVarName (HsSymbol str)) ]
-	other
-	   -> DocString str
 }
