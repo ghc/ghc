@@ -280,6 +280,9 @@ bagToFM = foldBag plusFM (\ (k,v) -> unitFM k v) emptyFM
 instance (Show k, Show e) => Show (FiniteMap k e) where
   showsPrec p m = showsPrec p (fmToList m)
 
+instance Functor (FiniteMap k) where
+  fmap f = mapFM (const f)
+
 -- ---------------------------------------------------------------------------
 -- Adding to and deleting from @FiniteMaps@
 
