@@ -45,7 +45,7 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
 			  tcSplitFunTys, tcSplitForAllTys, mkPredTy
 			)
 import Module		( Module )
-import CoreUtils	( exprType, mkInlineMe )
+import CoreUtils	( mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Literal		( Literal(..) )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
@@ -59,29 +59,29 @@ import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
-			  dataConArgTys, dataConRepType, dataConRepStrictness, 
+			  dataConArgTys, dataConRepType, 
 			  dataConInstOrigArgTys,
                           dataConName, dataConTheta,
 			  dataConSig, dataConStrictMarks, dataConId,
 			  splitProductType
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
-			  mkLocalIdWithInfo, setIdNoDiscard,
 			  mkTemplateLocals, mkTemplateLocalsNum,
 			  mkTemplateLocal, idNewStrictness, idName
 			)
 import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
-			  exactArity, setUnfoldingInfo, setCprInfo,
+			  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo,  setCgInfo,
 			  mkNewStrictnessInfo, setNewStrictnessInfo,
 			  GlobalIdDetails(..), CafInfo(..), CprInfo(..), 
 			  CgInfo(..), setCgArity
 			)
 import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
-			  mkTopDmdType, topDmd, evalDmd )
+			  mkTopDmdType, topDmd, evalDmd, Demand(..), Keepity(..) )
 import FieldLabel	( mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
 			)
+import DmdAnal		( dmdAnalTopRhs )
 import CoreSyn
 import Unique		( mkBuiltinUnique )
 import Maybes
@@ -139,16 +139,15 @@ mkDataConId :: Name -> DataCon -> Id
 	-- Makes the *worker* for the data constructor; that is, the function
 	-- that takes the reprsentation arguments and builds the constructor.
 mkDataConId work_name data_con
-  = id 
+  = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
   where
-    id = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
     info = noCafNoTyGenIdInfo
 	   `setCgArity`			arity
 	   `setArityInfo`		arity
 	   `setNewStrictnessInfo`	Just strict_sig
 
     arity = dataConRepArity data_con
-    strict_sig = mkStrictSig id arity (mkTopDmdType (replicate arity topDmd) cpr_info)
+    strict_sig = mkStrictSig (mkTopDmdType (replicate arity topDmd) cpr_info)
 
     tycon = dataConTyCon data_con
     cpr_info | isProductTyCon tycon && 
@@ -210,9 +209,8 @@ Notice that
 
 \begin{code}
 mkDataConWrapId data_con
-  = wrap_id
+  = mkGlobalId (DataConWrapId data_con) (dataConName data_con) wrap_ty info
   where
-    wrap_id = mkGlobalId (DataConWrapId data_con) (dataConName data_con) wrap_ty info
     work_id = dataConId data_con
 
     info = noCafNoTyGenIdInfo
@@ -229,7 +227,7 @@ mkDataConWrapId data_con
 	      result_ty
 
     res_info = strictSigResInfo (idNewStrictness work_id)
-    wrap_sig = mkStrictSig wrap_id arity (mkTopDmdType (replicate arity topDmd) res_info)
+    wrap_sig = mkStrictSig (mkTopDmdType (replicate arity topDmd) res_info)
 	-- The Cpr info can be important inside INLINE rhss, where the
 	-- wrapper constructor isn't inlined
 	-- But we are sloppy about the argument demands, because we expect 
@@ -412,13 +410,17 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 		   mkFunTy data_ty field_tau
       
     arity = 1 + n_dict_tys + n_field_dict_tys
-    info = noCafNoTyGenIdInfo
-	   `setCgInfo`		(CgInfo arity caf_info)
-	   `setArityInfo`	arity
-	   `setUnfoldingInfo`	unfolding	
-	-- ToDo: consider adding further IdInfo
 
-    unfolding = mkTopUnfolding sel_rhs
+    (strict_sig, rhs_w_str) = dmdAnalTopRhs sel_rhs
+	-- Use the demand analyser to work out strictness.
+	-- With all this unpackery it's not easy!
+
+    info = noCafNoTyGenIdInfo
+	   `setCgInfo`		  CgInfo arity caf_info
+	   `setArityInfo`	  arity
+	   `setUnfoldingInfo`     mkTopUnfolding rhs_w_str
+	   `setNewStrictnessInfo` Just strict_sig
+	-- Unfolding and strictness added by dmdAnalTopId
 
 	-- Allocate Ids.  We do it a funny way round because field_dict_tys is
 	-- almost always empty.  Also note that we use length_tycon_theta
@@ -552,14 +554,22 @@ mkDictSelId name clas
     tag       = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` allFieldLabelTags) name
 
     info      = noCafNoTyGenIdInfo
-		`setCgArity` 	    1
-		`setArityInfo`	    1
-		`setUnfoldingInfo`  unfolding
-		
+		`setCgArity` 	    	1
+		`setArityInfo`	    	1
+		`setUnfoldingInfo`  	mkTopUnfolding rhs
+		`setNewStrictnessInfo`	Just strict_sig
+
 	-- We no longer use 'must-inline' on record selectors.  They'll
 	-- inline like crazy if they scrutinise a constructor
 
-    unfolding = mkTopUnfolding rhs
+	-- The strictness signature is of the form U(AAAVAAAA) -> T
+ 	-- where the V depends on which item we are selecting
+	-- It's worth giving one, so that absence info etc is generated
+	-- even if the selector isn't inlined
+    strict_sig = mkStrictSig (mkTopDmdType [arg_dmd] TopRes)
+    arg_dmd | isNewTyCon tycon = Eval
+	    | otherwise	       = Seq Drop [ if the_arg_id == id then Eval else Abs
+					  | id <- arg_ids ]
 
     tyvars  = classTyVars clas
 
@@ -627,9 +637,8 @@ mkFCallId uniq fcall ty
   = ASSERT( isEmptyVarSet (tyVarsOfType ty) )
 	-- A CCallOpId should have no free type variables; 
 	-- when doing substitutions won't substitute over it
-    id
+    mkGlobalId (FCallId fcall) name ty info
   where
-    id = mkGlobalId (FCallId fcall) name ty info
     occ_str = showSDocIface (braces (ppr fcall <+> ppr ty))
 	-- The "occurrence name" of a ccall is the full info about the
 	-- ccall; it is encoded, but may have embedded spaces etc!
@@ -644,7 +653,7 @@ mkFCallId uniq fcall ty
     (_, tau) 	 = tcSplitForAllTys ty
     (arg_tys, _) = tcSplitFunTys tau
     arity	 = length arg_tys
-    strict_sig   = mkStrictSig id arity (mkTopDmdType (replicate arity evalDmd) TopRes)
+    strict_sig   = mkStrictSig (mkTopDmdType (replicate arity evalDmd) TopRes)
 \end{code}
 
 
@@ -654,9 +663,34 @@ mkFCallId uniq fcall ty
 %*									*
 %************************************************************************
 
+Important notes about dict funs and default methods
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dict funs and default methods are *not* ImplicitIds.  Their definition
+involves user-written code, so we can't figure out their strictness etc
+based on fixed info, as we can for constructors and record selectors (say).
+
+We build them as GlobalIds, but when in the module where they are
+bound, we turn the Id at the *binding site* into an exported LocalId.
+This ensures that they are taken to account by free-variable finding
+and dependency analysis (e.g. CoreFVs.exprFreeVars).   The simplifier
+will propagate the LocalId to all occurrence sites. 
+
+Why shouldn't they be bound as GlobalIds?  Because, in particular, if
+they are globals, the specialiser floats dict uses above their defns,
+which prevents good simplifications happening.  Also the strictness
+analyser treats a occurrence of a GlobalId as imported and assumes it
+contains strictness in its IdInfo, which isn't true if the thing is
+bound in the same module as the occurrence.
+
+It's OK for dfuns to be LocalIds, because we form the instance-env to
+pass on to the next module (md_insts) in CoreTidy, afer tidying
+and globalising the top-level Ids.
+
+BUT make sure they are *exported* LocalIds (setIdLocalExported) so 
+that they aren't discarded by the occurrence analyser.
+
 \begin{code}
-mkDefaultMethodId dm_name ty
-  = mkVanillaGlobal dm_name ty noCafNoTyGenIdInfo
+mkDefaultMethodId dm_name ty = mkVanillaGlobal dm_name ty noCafNoTyGenIdInfo
 
 mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Class 
@@ -666,19 +700,7 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Id
 
 mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
-  = setIdNoDiscard (mkLocalIdWithInfo dfun_name dfun_ty noCafNoTyGenIdInfo)
-	-- NB: It's important that dict funs are *local* Ids
-	-- This ensures that they are taken to account by free-variable finding
-	-- and dependency analysis (e.g. CoreFVs.exprFreeVars).  
-	-- In particular, if they are globals, the
-	-- specialiser floats dict uses above their defns, which prevents
-	-- good simplifications happening.
-	--
-	-- It's OK for them to be locals, because we form the instance-env to
-	-- pass on to the next module (md_insts) in CoreTidy, afer tdying
-	-- and globalising the top-level Ids.
-	--
-	-- BUT Make sure it's an exported Id (setIdNoDiscard) so that it's not dropped!
+  = mkVanillaGlobal dfun_name dfun_ty noCafNoTyGenIdInfo
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 
@@ -849,11 +871,11 @@ pcMiscPrelId key mod str ty info
     -- will be in "the right place" to be in scope.
 
 pc_bottoming_Id key mod name ty
- = id
+ = pcMiscPrelId key mod name ty bottoming_info
  where
-    id = pcMiscPrelId key mod name ty bottoming_info
+    
     arity	   = 1
-    strict_sig	   = mkStrictSig id arity (mkTopDmdType [evalDmd] BotRes)
+    strict_sig	   = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
     bottoming_info = noCafNoTyGenIdInfo `setNewStrictnessInfo` Just strict_sig
 	-- these "bottom" out, no matter what their arguments
 
