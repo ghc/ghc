@@ -415,16 +415,16 @@ scanNumLit acc (StringBuffer fo l# s# c#) =
          | otherwise        -> (acc,StringBuffer fo l# s# c#)
 
 
-expandUntilMatch :: StringBuffer -> String -> StringBuffer
+expandUntilMatch :: StringBuffer -> String -> Maybe StringBuffer
 expandUntilMatch (StringBuffer fo l# s# c#) str =
   loop c# str
   where
-   loop c# [] = StringBuffer fo l# s# c#
-   loop c# ((C# x#):xs)
-      | indexCharOffAddr# fo c# `eqChar#` x#
-      = loop (c# +# 1#) xs
-      | otherwise 
-      = loop (c# +# 1#) str
+   loop c# [] = Just (StringBuffer fo l# s# c#)
+   loop c# ((C# x#):xs) =
+    case indexCharOffAddr# fo c# of
+      ch# | ch# `eqChar#` '\NUL'# && c# >=# l# -> Nothing
+	  | ch# `eqChar#` x# -> loop (c# +# 1#) xs
+          | otherwise        -> loop (c# +# 1#) str
 	
 \end{code}
 

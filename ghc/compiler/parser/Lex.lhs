@@ -369,7 +369,8 @@ lexer cont buf s@(PState{
 		})
 
 	-- first, start a new lexeme and lose all the whitespace
-  = tab line bol atbol (stepOverLexeme buf)
+  =  _scc_ "Lexer" 
+  tab line bol atbol (stepOverLexeme buf)
   where
 	line = srcLocLine loc
 
@@ -509,7 +510,6 @@ lexBOL cont buf s@(PState{
 lexToken :: (Token -> P a) -> Int# -> P a
 lexToken cont glaexts buf =
  --trace "lexToken" $
- _scc_ "Lexer" 
   case currentChar# buf of
 
     -- special symbols ----------------------------------------------------
@@ -864,9 +864,10 @@ after_lexnum cont glaexts i buf
 
 lex_cstring cont buf =
  case expandUntilMatch (stepOverLexeme buf) "\'\'" of
-   buf' -> cont (ITlitlit (lexemeToFastString 
+   Just buf' -> cont (ITlitlit (lexemeToFastString 
 				(setCurrentPos# buf' (negateInt# 2#))))
-           	(mergeLexemes buf buf')
+           	   (mergeLexemes buf buf')
+   Nothing   -> lexError "unterminated ``" buf
 
 ------------------------------------------------------------------------------
 -- Character Classes
