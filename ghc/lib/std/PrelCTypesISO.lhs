@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCTypesISO.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelCTypesISO.lhs,v 1.2 2001/01/12 15:48:09 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -51,7 +51,7 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
  #-}
 
 NUMERIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
-NUMERIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
+INTEGRAL_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
 -- TODO: Instances. But which...?  :-}
 
