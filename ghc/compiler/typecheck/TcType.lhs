@@ -41,7 +41,7 @@ module TcType (
   ---------------------------------
   -- Predicates. 
   -- Again, newtypes are opaque
-  tcEqType, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred,
+  tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred,
   isSigmaTy, isOverloadedTy, 
   isDoubleTy, isFloatTy, isIntTy,
   isIntegerTy, isAddrTy, isBoolTy, isUnitTy, isForeignPtrTy, 
@@ -574,6 +574,9 @@ But ignoring usage types
 \begin{code}
 tcEqType :: Type -> Type -> Bool
 tcEqType ty1 ty2 = case ty1 `tcCmpType` ty2 of { EQ -> True; other -> False }
+
+tcEqTypes :: [Type] -> [Type] -> Bool
+tcEqTypes ty1 ty2 = case ty1 `tcCmpTypes` ty2 of { EQ -> True; other -> False }
 
 tcEqPred :: PredType -> PredType -> Bool
 tcEqPred p1 p2 = case p1 `tcCmpPred` p2 of { EQ -> True; other -> False }

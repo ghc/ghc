@@ -43,11 +43,11 @@ import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
-			  isEnumerationTyCon, TyCon, isRecursiveTyCon
+			  isEnumerationTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
-			  tcSplitTyConApp_maybe )
+			  tcSplitTyConApp_maybe, tcEqTypes )
 import Var		( TyVar, tyVarKind )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
@@ -386,12 +386,12 @@ makeDerivEqns tycl_decls
 	Just (rep_tc, rep_ty_args) = maybe_rep_app
 
 	n_tyvars_to_keep = tyConArity tycon  - n_args_to_drop
-	tyvars_to_keep = ASSERT( n_tyvars_to_keep >= 0 && n_tyvars_to_keep <= length tyvars )
-			 take n_tyvars_to_keep tyvars	-- Kind checking should ensure this
+	tyvars_to_drop   = drop n_tyvars_to_keep tyvars
+	tyvars_to_keep   = take n_tyvars_to_keep tyvars
 
 	n_args_to_keep = tyConArity rep_tc - n_args_to_drop
- 	args_to_keep   = ASSERT( n_args_to_keep >= 0 && n_args_to_keep <= length rep_ty_args )
-			 take n_args_to_keep rep_ty_args
+	args_to_drop   = drop n_args_to_keep rep_ty_args
+ 	args_to_keep   = take n_args_to_keep rep_ty_args
 
 	ctxt_pred = mkClassPred clas (tys ++ [mkTyConApp rep_tc args_to_keep])
 
@@ -405,10 +405,19 @@ makeDerivEqns tycl_decls
 	can_derive_via_isomorphism
 	   =  not (clas `hasKey` readClassKey)	-- Never derive Read,Show this way
 	   && not (clas `hasKey` showClassKey)
-	   && not (isRecursiveTyCon tycon)	-- Newtype isn't recursive
+	   && n_tyvars_to_keep >= 0		-- Well kinded; 
+						-- eg not: newtype T = T Int deriving( Monad )
 	   && isJust maybe_rep_app	 	-- The rep type is a type constructor app
-	   && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
-						-- and the tyvars are all in scope
+	   && n_args_to_keep   >= 0		-- Well kinded: 
+						-- eg not: newtype T a = T Int deriving( Monad )
+	   && eta_ok				-- Eta reduction works
+
+	-- Check that eta reduction is OK
+	-- 	(a) the dropped-off args are identical
+	--	(b) the remaining type args mention 
+	--	    only the remaining type variables
+	eta_ok = (args_to_drop `tcEqTypes` mkTyVarTys tyvars_to_drop)
+	      && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
 
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
 					   SLIT("too hard for cunning newtype deriving")
