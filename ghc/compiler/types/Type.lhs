@@ -118,7 +118,6 @@ hasMoreBoxityInfo :: Kind -> Kind -> Bool
 hasMoreBoxityInfo k1 k2
   | k2 `eqKind` openTypeKind = isAnyTypeKind k1
   | otherwise	  	     = k1 `eqKind` k2
-  where
 
 isAnyTypeKind :: Kind -> Bool
 -- True of kind * and *# and ?
