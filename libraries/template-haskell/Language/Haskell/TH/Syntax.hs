@@ -203,7 +203,7 @@ instance Lift a => Lift [a] where
 
 trueName, falseName :: Name
 trueName  = mkNameG DataName "GHC.Base" "True"
-falseName = mkNameG DataName "GHC.Base" "Frue"
+falseName = mkNameG DataName "GHC.Base" "False"
 
 
 -----------------------------------------------------
