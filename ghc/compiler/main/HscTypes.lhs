@@ -13,7 +13,7 @@ module HscTypes (
 	HomeSymbolTable, emptySymbolTable,
 	PackageTypeEnv,
 	HomeIfaceTable, PackageIfaceTable, emptyIfaceTable,
-	lookupIface, lookupIfaceByModName,
+	lookupIface, lookupIfaceByModName, moduleNameToModule,
 	emptyModIface,
 
 	InteractiveContext(..),
@@ -80,11 +80,12 @@ import CoreSyn		( IdCoreRule )
 
 import FiniteMap
 import Bag		( Bag )
-import Maybes		( seqMaybe, orElse )
+import Maybes		( seqMaybe, orElse, expectJust )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
-import Util		( thenCmp, sortLt, unJust )
+import Util		( thenCmp, sortLt )
 import UniqSupply	( UniqSupply )
+import Maybe		( fromJust )
 \end{code}
 
 %************************************************************************
@@ -123,9 +124,9 @@ instance Outputable ModuleLocation where
 showModMsg :: Bool -> Module -> ModuleLocation -> String
 showModMsg use_object mod location =
     mod_str ++ replicate (max 0 (16 - length mod_str)) ' '
-    ++" ( " ++ unJust "showModMsg" (ml_hs_file location) ++ ", "
+    ++" ( " ++ expectJust "showModMsg" (ml_hs_file location) ++ ", "
     ++ (if use_object
-	  then unJust "showModMsg" (ml_obj_file location)
+	  then expectJust "showModMsg" (ml_obj_file location)
 	  else "interpreted")
     ++ " )"
  where mod_str = moduleUserString mod
@@ -295,6 +296,14 @@ lookupIfaceByModName :: HomeIfaceTable -> PackageIfaceTable -> ModuleName -> May
 -- We often have two IfaceTables, and want to do a lookup
 lookupIfaceByModName hit pit mod
   = lookupModuleEnvByName hit mod `seqMaybe` lookupModuleEnvByName pit mod
+
+-- Use instead of Finder.findModule if possible: this way doesn't
+-- require filesystem operations, and it is guaranteed not to fail
+-- when the IfaceTables are properly populated (i.e. after the renamer).
+moduleNameToModule :: HomeIfaceTable -> PackageIfaceTable -> ModuleName
+   -> Module
+moduleNameToModule hit pit mod 
+   = mi_module (fromJust (lookupIfaceByModName hit pit mod))
 \end{code}
 
 

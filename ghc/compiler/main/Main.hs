@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.104 2002/04/05 23:24:29 sof Exp $
+-- $Id: Main.hs,v 1.105 2002/05/01 09:30:05 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -18,7 +18,7 @@ module Main (main) where
 
 
 #ifdef GHCI
-import InteractiveUI(ghciWelcomeMsg, interactiveUI)
+import InteractiveUI
 #endif
 
 
@@ -328,7 +328,7 @@ beginInteractive fileish_args
   = do minus_ls <- readIORef v_Cmdline_libraries
 
        let (objs, mods) = partition objish_file fileish_args
-	   libs = map Left objs ++ map Right minus_ls
+	   libs = map Object objs ++ map DLL minus_ls
 
        state <- cmInit Interactive
        interactiveUI state mods libs

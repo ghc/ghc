@@ -73,7 +73,6 @@ import CmdLineOpts
 import DriverState	( v_HCHeader )
 import DriverPhases     ( isExtCore_file )
 import ErrUtils		( dumpIfSet_dyn, showPass, printError )
-import Util		( unJust )
 import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( consBag, emptyBag )
@@ -86,6 +85,8 @@ import Name		( Name, nameModule, nameOccName, getName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import Module		( Module )
 import FastString
+import Maybes		( expectJust )
+import Util		( seqList )
 
 import IOExts		( newIORef, readIORef, writeIORef, 
 			  unsafePerformIO )
@@ -224,6 +225,20 @@ hscRecomp ghci_mode dflags have_object
 	    Right (this_mod, rdr_module, 
 	    	   dont_discard, new_iface, 
 	    	   pcs_tc, ds_details, foreign_stuff) -> do {
+
+	  let {
+ 	    imported_module_names = 
+		filter (/= gHC_PRIM_Name) $
+		map ideclName (hsModuleImports rdr_module);
+
+            imported_modules = 
+		map (moduleNameToModule hit (pcs_PIT pcs_tc))
+			imported_module_names;
+	  }
+
+	-- force this out now, so we don't keep a hold of rdr_module or pcs_tc
+	; seqList imported_modules `seq` return ()
+
  	    -------------------
  	    -- FLATTENING
  	    -------------------
@@ -251,6 +266,7 @@ hscRecomp ghci_mode dflags have_object
 	-- 	foreign_stuff
 	-- 	ds_details
 	--	new_iface		
+	-- 	imported_modules
 
  	    -------------------
  	    -- SIMPLIFY
@@ -305,15 +321,6 @@ hscRecomp ghci_mode dflags have_object
 	    local_tycons     = typeEnvTyCons  env_tc
 	    local_classes    = typeEnvClasses env_tc
 
- 	    imported_module_names = 
-		filter (/= gHC_PRIM_Name) $
-		map ideclName (hsModuleImports rdr_module)
-		-- eek! doesn't this keep rdr_module live until code generation?
-		-- SDM 3/2002
-
-	    mod_name_to_Module nm
-		 = do m <- findModule nm ; return (fst (fromJust m))
-
 	    (h_code, c_code, headers, fe_binders) = foreign_stuff
 
 	    -- turn the list of headers requested in foreign import
@@ -331,8 +338,6 @@ hscRecomp ghci_mode dflags have_object
 	  --
         ; fhdrs <- readIORef v_HCHeader
         ; writeIORef v_HCHeader (fhdrs ++ foreign_headers)
-
-        ; imported_modules <- mapM mod_name_to_Module imported_module_names
 
 	; (stub_h_exists, stub_c_exists, maybe_bcos, final_iface )
 	   <- if toInterp
@@ -403,7 +408,7 @@ hscCoreFrontEnd ghci_mode dflags location hst hit pcs_ch = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
-	; inp <- readFile (unJust "hscCoreFrontEnd:hspp" (ml_hspp_file location))
+	; inp <- readFile (expectJust "hscCoreFrontEnd:hspp" (ml_hspp_file location))
 	; case parseCore inp 1 of
 	    FailP s        -> hPutStrLn stderr s >> return (Left (HscFail pcs_ch));
 	    OkP rdr_module -> do {
@@ -442,7 +447,7 @@ hscFrontEnd ghci_mode dflags location hst hit pcs_ch = do {
  	    -- PARSE
  	    -------------------
 	; maybe_parsed <- myParseModule dflags 
-                             (unJust "hscRecomp:hspp" (ml_hspp_file location))
+                             (expectJust "hscRecomp:hspp" (ml_hspp_file location))
 	; case maybe_parsed of {
       	     Nothing -> return (Left (HscFail pcs_ch));
       	     Just rdr_module -> do {

@@ -28,9 +28,6 @@ module Util (
 	-- for-loop
 	nTimes,
 
-	-- maybe-ish
-	unJust,
-
 	-- sorting
 	IF_NOT_GHC(quicksort COMMA stableSortLt COMMA mergesort COMMA)
 	sortLt,
@@ -131,18 +128,6 @@ nTimes :: Int -> (a -> a) -> (a -> a)
 nTimes 0 _ = id
 nTimes 1 f = f
 nTimes n f = f . nTimes (n-1) f
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Maybe-ery}
-%*									*
-%************************************************************************
-
-\begin{code}
-unJust :: String -> Maybe a -> a
-unJust who (Just x) = x
-unJust who Nothing  = panic ("unJust of Nothing, called by " ++ who)
 \end{code}
 
 %************************************************************************

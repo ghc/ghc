@@ -44,6 +44,7 @@ import CmdLineOpts
 import Config
 import Panic
 import Util
+import Maybes		( expectJust )
 
 import ParserCoreUtils ( getCoreModuleName )
 
@@ -551,7 +552,7 @@ run_phase Hsc basename suff input_fn output_fn
 		   -- THIS COMPILATION, then use that to determine if the 
 		   -- source is unchanged.
 		| Just x <- expl_o_file, todo == StopBefore Ln  =  x
-		| otherwise = unJust "source_unchanged" (ml_obj_file location)
+		| otherwise = expectJust "source_unchanged" (ml_obj_file location)
 
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
@@ -1071,8 +1072,8 @@ compile ghci_mode summary source_unchanged have_object
 
    let verb	  = verbosity dyn_flags
    let location   = ms_location summary
-   let input_fn   = unJust "compile:hs" (ml_hs_file location) 
-   let input_fnpp = unJust "compile:hspp" (ml_hspp_file location)
+   let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
+   let input_fnpp = expectJust "compile:hspp" (ml_hspp_file location)
 
    when (verb >= 2) (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
 

@@ -73,7 +73,7 @@ import HscMain		( initPersistentCompilerState, hscThing,
 #else
 import HscMain		( initPersistentCompilerState )
 #endif
-import HscTypes
+import HscTypes hiding ( moduleNameToModule )
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
 			  isHomePackageName, isExternalName )
 import NameEnv
@@ -90,6 +90,7 @@ import Util
 import Outputable
 import Panic
 import CmdLineOpts	( DynFlags(..), getDynFlags )
+import Maybes		( expectJust )
 
 import IOExts
 
@@ -1037,7 +1038,7 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
 		 retainInTopLevelEnvs reachable_only (hst1,hit1,[])
 
             old_linkable 
-               = unJust "upsweep_mod:old_linkable" maybe_old_linkable
+               = expectJust "upsweep_mod:old_linkable" maybe_old_linkable
 
 	    have_object 
 	       | Just l <- maybe_old_linkable, isObjectLinkable l = True
@@ -1244,7 +1245,7 @@ summarise :: Module -> ModuleLocation -> Maybe ModSummary
 summarise mod location old_summary
    | not (isHomeModule mod) = return Nothing
    | otherwise
-   = do let hs_fn = unJust "summarise" (ml_hs_file location)
+   = do let hs_fn = expectJust "summarise" (ml_hs_file location)
 
         case ml_hs_file location of {
            Nothing -> noHsFileErr mod;
