@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.82 2001/07/23 22:52:33 ken Exp $
+dnl $Id: aclocal.m4,v 1.83 2001/09/20 14:08:13 sewardj Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -363,14 +363,28 @@ AC_DEFUN(FPTOOLS_HAVE_GCC,
     fptools_cv_have_gcc='no'
 else
 changequote(, )dnl
-    cmd_string="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 20 \\\< \1 \\\* 10 + \2/g' `"
+    is_gcc_v1="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 2000 \\\>= \1 \\\* 1000 + \2/g' `"
+    is_gcc_v3="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 3000 \\\<= \1 \\\* 1000 + \2/g' `"
 changequote([, ])dnl
-    if test `eval $cmd_string 2>/dev/null` != "1"; then
-	echo ''
-        echo "I'm not sure if your version of gcc will work,"
-        echo "but it's worth a shot, eh?"
-    fi
     fptools_cv_have_gcc='yes'
+    if test `eval $is_gcc_v1 2>/dev/null` = "1"; then
+        fptools_cv_have_gcc='no'
+        echo ""
+	echo "your gcc version appears to be ..."
+        $CC --version
+        echo "gcc prior to 2.0 and have never worked with ghc."
+        echo "we recommend 2.95.3, although versions back to 2.7.2 should be ok."
+        AC_MSG_ERROR([gcc 1.X has never been supported])
+    fi
+    if test `eval $is_gcc_v3 2>/dev/null` = "1"; then
+        fptools_cv_have_gcc='no'
+        echo ""
+	echo "your gcc version appears to be ..."
+        $CC --version
+        echo "gcc versions 3.0 and above are not yet supported."
+        echo "we recommend 2.95.3, although versions back to 2.7.2 should be ok."
+        AC_MSG_ERROR([gcc 3.0 and above is not currently supported])
+    fi
 fi
 ])
 HaveGcc=`echo $fptools_cv_have_gcc | sed 'y/yesno/YESNO/'`
