@@ -246,7 +246,7 @@ StripLibraries=NO
 # Include compiler support for letting the compiler (optionally) report
 # your compilation to a central server for generation of fun stats.
 #
-GhcReportCompiles=YES
+GhcReportCompiles=NO
 
 #################################################################################
 #
