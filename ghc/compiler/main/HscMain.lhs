@@ -13,14 +13,16 @@ module HscMain ( HscResult(..), hscMain,
 #include "HsVersions.h"
 
 #ifdef GHCI
-import RdrHsSyn		( RdrNameStmt )
-import Rename		( renameStmt )
 import ByteCodeGen	( byteCodeGen )
+import CoreTidy		( tidyCoreExpr )
+import CorePrep		( corePrepExpr )
+import Rename		( renameStmt )
+import RdrHsSyn		( RdrNameStmt )
+import Type		( Type )
 import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
 import HscTypes		( InteractiveContext(..), TyThing(..) )
-import PrelNames	( iINTERACTIVE )
-import CoreTidy		( tidyCoreExpr )
+import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 #endif
 
@@ -528,11 +530,11 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 		-- Tidy it (temporary, until coreSat does cloning)
 	; tidy_expr <- tidyCoreExpr simpl_expr
 
-		-- Saturate it
-	; sat_expr <- coreSatExpr dflags tidy_expr
+		-- Prepare for codegen
+	; prepd_expr <- corePrepExpr dflags tidy_expr
 
 		-- Convert to BCOs
-	; bcos <- coreExprToBCOs dflags sat_expr
+	; bcos <- coreExprToBCOs dflags prepd_expr
 
 	; let
 		-- Make all the bound ids "global" ids, now that
