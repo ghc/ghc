@@ -847,7 +847,7 @@ gen_Read_binds fixities tycon
 						as_needed bs_needed))
               | otherwise =
 		  snd $
-		  mapAccumL mk_qual c_Expr
+		  mapAccumL mk_qual d_Expr
 			(zipEqual "bs_needed"	     
 			   ((str_qual "{":
 			     concat (
