@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.3 1998/12/02 13:20:38 simonm Exp $
+% $Id: glasgow_exts.vsgml,v 1.4 1999/02/11 12:30:38 simonm Exp $
 %
 % GHC Language Extensions.
 %
@@ -46,6 +46,13 @@ name="Local universal quantification" id="universal-quantification">.
 Some or all of the type variables in a datatype declaration may be
 <em>existentially quantified</em>.  More details in Section <ref
 name="Existential Quantification" id="existential-quantification">.
+
+<tag>Scoped type variables:</tag>
+
+Scoped type variables enable the programmer to supply type signatures
+for some nested declarations, where this would not be legal in Haskell
+98.  Details in Section <ref name="Scoped Type Variables"
+id="scoped-type-variables">.
 
 <tag>Calling out to C:</tag> 
 
@@ -1442,4 +1449,284 @@ because the <tt>data</tt> version does carry an implementation cost,
 but single-field existentially quantified constructors aren't much
 use.  So the simple restriction (no existential stuff on <tt>newtype</tt>)
 stands, unless there are convincing reasons to change it.
+</itemize>
+
+% -----------------------------------------------------------------------------
+<sect1>Scoped Type Variables
+<label id="scoped-type-variables">
+<p>
+
+A <em/pattern type signature/ can introduce a <em/scoped type
+variable/.  For example
+
+<tscreen><verb>
+f (xs::[a]) = ys ++ ys
+	   where
+	      ys :: [a]
+	      ys = reverse xs 
+</verb></tscreen>
+
+The pattern @(xs::[a])@ includes a type signature for @xs@.
+This brings the type variable @a@ into scope; it scopes over
+all the patterns and right hand sides for this equation for @f@.
+In particular, it is in scope at the type signature for @y@.
+
+At ordinary type signatures, such as that for @ys@, any type variables
+mentioned in the type signature <em/that are not in scope/ are
+implicitly universally quantified.  (If there are no type variables in
+scope, all type variables mentioned in the signature are universally
+quantified, which is just as in Haskell 98.)  In this case, since @a@
+is in scope, it is not universally quantified, so the type of @ys@ is
+the same as that of @xs@.  In Haskell 98 it is not possible to declare
+a type for @ys@; a major benefit of scoped type variables is that
+it becomes possible to do so.
+
+Scoped type variables are implemented in both GHC and Hugs.  Where the
+implementations differ from the specification below, those differences
+are noted.
+
+So much for the basic idea.  Here are the details.
+
+<sect2>Scope and implicit quantification
+<p>
+
+<itemize>
+<item> All the type variables mentioned in the patterns for a single 
+function definition equation, that are not already in scope,
+are brought into scope by the patterns.  We describe this set as
+the <em/type variables bound by the equation/.
+
+<item> The type variables thus brought into scope may be mentioned
+in ordinary type signatures or pattern type signatures anywhere within
+their scope.
+
+<item> In ordinary type signatures, any type variable mentioned in the
+signature that is in scope is <em/not/ universally quantified.
+
+<item> Ordinary type signatures do not bring any new type variables
+into scope (except in the type signature itself!). So this is illegal:
+
+<tscreen><verb>
+  f :: a -> a
+  f x = x::a
+</verb></tscreen>
+
+It's illegal because @a@ is not in scope in the body of @f@,
+so the ordinary signature @x::a@ is equivalent to @x::forall a.a@;
+and that is an incorrect typing.
+
+<item> There is no implicit universal quantification on pattern type
+signatures, nor may one write an explicit @forall@ type in a pattern
+type signature.  The pattern type signature is a monotype.
+
+<item> 
+The type variables in the head of a @class@ or @instance@ declaration
+scope over the methods defined in the @where@ part.  For example:
+
+<tscreen><verb>
+  class C a where
+    op :: [a] -> a
+
+    op xs = let ys::[a]
+		ys = reverse xs
+	    in
+	    head ys
+</verb></tscreen>
+
+(Not implemented in Hugs yet, Dec 98).
+</itemize>
+
+<sect2>Polymorphism
+<p>
+
+<itemize>
+<item> Pattern type signatures are completely orthogonal to ordinary, separate
+type signatures.  The two can be used independently or together.  There is
+no scoping associated with the names of the type variables in a separate type signature.
+
+<tscreen><verb>
+   f :: [a] -> [a]
+   f (xs::[b]) = reverse xs
+</verb></tscreen>
+
+<item> The function must be polymorphic in the type variables
+bound by all its equations.  Operationally, the type variables bound
+by one equation must not:
+
+<itemize>
+<item> Be unified with a type (such as @Int@, or @[a]@).
+<item> Be unified with a type variable free in the environment.
+<item> Be unified with each other.  (They may unify with the type variables 
+bound by another equation for the same function, of course.)
+</itemize>
+
+For example, the following all fail to type check:
+
+<tscreen><verb>
+  f (x::a) (y::b) = [x,y]	-- a unifies with b
+
+  g (x::a) = x + 1::Int		-- a unifies with Int
+
+  h x = let k (y::a) = [x,y]	-- a is free in the
+	in k x			-- environment
+
+  k (x::a) True    = ...	-- a unifies with Int
+  k (x::Int) False = ...
+
+  w :: [b] -> [b]
+  w (x::a) = x			-- a unifies with [b]
+</verb></tscreen>
+
+<item> The pattern-bound type variable may, however, be constrained
+by the context of the principal type, thus:
+
+<tscreen><verb>
+  f (x::a) (y::a) = x+y*2
+</verb></tscreen>
+
+gets the inferred type: @forall a. Num a => a -> a -> a@.
+</itemize>
+
+<sect2>Result type signatures
+<p>
+
+<itemize>
+<item> The result type of a function can be given a signature,
+thus:
+
+<tscreen><verb>
+  f (x::a) :: [a] = [x,x,x]
+</verb></tscreen>
+
+The final @":: [a]"@ after all the patterns gives a signature to the
+result type.  Sometimes this is the only way of naming the type variable
+you want:
+
+<tscreen><verb>
+  f :: Int -> [a] -> [a]
+  f n :: ([a] -> [a]) = let g (x::a, y::a) = (y,x)
+			in \xs -> map g (reverse xs `zip` xs)
+</verb></tscreen>
+
+</itemize>
+
+Result type signatures are not yet implemented in Hugs.
+
+<sect2>Pattern signatures on other constructs
+<p>
+
+<itemize>
+<item> A pattern type signature can be on an arbitrary sub-pattern, not
+just on a variable:
+
+<tscreen><verb>
+  f ((x,y)::(a,b)) = (y,x) :: (b,a)
+</verb></tscreen>
+
+<item> Pattern type signatures, including the result part, can be used
+in lambda abstractions:
+
+<tscreen><verb>
+  (\ (x::a, y) :: a -> x)
+</verb></tscreen>
+
+Type variables bound by these patterns must be polymorphic in
+the sense defined above.
+For example:
+
+<tscreen><verb>
+  f1 (x::c) = f1 x	-- ok
+  f2 = \(x::c) -> f2 x	-- not ok
+</verb></tscreen>
+
+Here, @f1@ is OK, but @f2@ is not, because @c@ gets unified
+with a type variable free in the environment, in this
+case, the type of @f2@, which is in the environment when
+the lambda abstraction is checked.
+
+<item> Pattern type signatures, including the result part, can be used
+in @case@ expressions:
+
+<tscreen><verb>
+  case e of { (x::a, y) :: a -> x } 
+</verb></tscreen>
+
+The pattern-bound type variables must, as usual, 
+be polymorphic in the following sense: each case alternative,
+considered as a lambda abstraction, must be polymorphic.
+Thus this is OK:
+
+<tscreen><verb>
+  case (True,False) of { (x::a, y) -> x }
+</verb></tscreen>
+
+Even though the context is that of a pair of booleans, 
+the alternative itself is polymorphic.  Of course, it is
+also OK to say:
+
+<tscreen><verb>
+  case (True,False) of { (x::Bool, y) -> x }
+</verb></tscreen>
+
+<item>
+To avoid ambiguity, the type after the ``@::@'' in a result
+pattern signature on a lambda or @case@ must be atomic (i.e. a single
+token or a parenthesised type of some sort).  To see why, 
+consider how one would parse this:
+
+<tscreen><verb>
+  \ x :: a -> b -> x
+</verb></tscreen>
+
+<item> Pattern type signatures that bind new type variables
+may not be used in pattern bindings at all.
+So this is illegal:
+
+<tscreen><verb>
+  f x = let (y, z::a) = x in ...
+</verb></tscreen>
+
+But these are OK, because they do not bind fresh type variables:
+
+<tscreen><verb>
+  f1 x            = let (y, z::Int) = x in ...
+  f2 (x::(Int,a)) = let (y, z::a)   = x in ...
+</verb></tscreen>
+
+However a single variable is considered a degenerate function binding,
+rather than a degerate pattern binding, so this is permitted, even
+though it binds a type variable:
+
+<tscreen><verb>
+  f :: (b->b) = \(x::b) -> x
+</verb></tscreen>
+
+</itemize>
+Such degnerate function bindings do not fall under the monomorphism
+restriction.  Thus:
+
+<tscreen><verb>
+  g :: a -> a -> Bool = \x y. x==y
+</verb></tscreen>
+
+Here @g@ has type @forall a. Eq a => a -> a -> Bool@, just as if
+@g@ had a separate type signature.  Lacking a type signature, @g@
+would get a monomorphic type.
+
+<sect2>Existentials
+<p>
+
+<itemize>
+<item> Pattern type signatures can bind existential type variables.
+For example:
+
+<tscreen><verb>
+  data T = forall a. MkT [a]
+
+  f :: T -> T
+  f (MkT [t::a]) = MkT t3
+		 where
+		   t3::[a] = [t,t,t]
+</verb></tscreen>
+
 </itemize>
