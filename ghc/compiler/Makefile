@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.200 2001/11/09 17:39:45 sof Exp $
+# $Id: Makefile,v 1.201 2001/11/09 18:17:48 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -108,19 +108,14 @@ DIRS += javaGen
 SRC_HC_OPTS += -DJAVA
 endif
 
-#
-# Canonicalized GHC version number for easy version comparisons.
-#
-CANON_HC_VERSION=$(GhcMajVersion)$(GhcMinVersion)$(GhcPatchLevel)
-
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
 bootstrapped = YES
 compiling_with_4xx=NO
 else
-bootstrapped = $(shell if (test $(CANON_HC_VERSION) -ge $(ProjectVersionInt)0); then echo YES; else echo NO; fi)
-compiling_with_4xx = $(shell if (test $(CANON_HC_VERSION) -lt 5000); then echo YES; else echo NO; fi)
-ghc_502_at_least = $(shell if (test $(CANON_HC_VERSION) -ge 5020); then echo YES; else echo NO; fi)
+bootstrapped = $(shell if (test $(GhcCanonVersion) -ge $(ProjectVersionInt)0); then echo YES; else echo NO; fi)
+compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 5000); then echo YES; else echo NO; fi)
+ghc_502_at_least = $(shell if (test $(GhcCanonVersion) -ge 5020); then echo YES; else echo NO; fi)
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
@@ -138,7 +133,7 @@ HS_SRCS += $(CONFIG_HS)
 # Enable code that assumes a MSDOSish subshell. See mk/config.mk.in
 # for explanatory comment as to what this does.
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -ge 5010); then echo YES; else echo NO; fi)
+ghc_501_at_least = $(shell if (test $(GhcVanonVersion) -ge 5010); then echo YES; else echo NO; fi)
 
 # -----------------------------------------------
 # GHCi calls the C procedure 'rawSystem'; but alas GHC 4.08 

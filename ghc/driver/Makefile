@@ -1,5 +1,4 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.68 2001/08/04 06:09:24 ken Exp $
 #
 
 TOP=..
@@ -25,15 +24,17 @@ PKGCONF_OPTS = "$(TARGETPLATFORM)"		\
 	       "$(GHC_UTILS_DIR)"		\
 	       "$(GHC_INCLUDE_DIR)"
 
-ghc_407_at_least = $(shell expr "$(GhcVersion)" \>= 4.07)
-ifeq "$(ghc_407_at_least)" "1"
+SRC_HC_OPTS += -fglasgow-exts -cpp 
+
+ghc_407_at_least = $(shell if (test $(GhcCanonVersion) -ge 4070); then echo YES; else echo NO; fi)
+
+ifeq "$(ghc_407_at_least)" "YES"
+SRC_HC_OPTS += -package concurrent -package text
 ifneq "$(mingw32_TARGET_OS)" "1"
-SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package posix -package text
-else
-SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package text
+SRC_HC_OPTS += -package posix
 endif
 else
-SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
+SRC_HC_OPTS += -syslib concurrent -syslib posix -syslib misc
 endif
 
 SRC_HC_OPTS += -DWANT_PRETTY

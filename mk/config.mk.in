@@ -614,6 +614,8 @@ GhcVersion	= @GhcVersion@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 GhcPatchLevel	= @GhcPatchLevel@
+# Canonicalised ghc version number, used for easy (integer) version comparisons.
+GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)$(GhcPatchLevel)
 
 HBC		= @HBC@
 NHC		= @NHC@
