@@ -281,7 +281,11 @@ data Name = Name OccName NameFlavour
 
 data NameFlavour
   = NameS 			-- Just a string; dynamically bound
+				-- The string can have a '.', thus "Foo.baz",
+				-- giving a dynamically-bound qualified name
+
   | NameU Int#			-- A unique local name
+
   | NameG NameSpace ModName	-- An original name (occurrences only, not binders)
 				-- Need the namespace too to be sure which 
 				-- thing we are naming
