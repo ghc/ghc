@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.95 2000/10/12 12:31:11 sewardj Exp $
+# $Id: Makefile,v 1.96 2000/10/27 09:17:20 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -26,6 +26,7 @@ endif
 # -----------------------------------------------------------------------------
 # Create compiler configuration
 
+CURRENT_DIR=ghc/compiler
 CONFIG_HS = main/Config.hs
 boot :: $(CONFIG_HS)
 
@@ -106,9 +107,10 @@ endif
 
 HS_SRCS = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
 
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
-HS_SRCS += rename/ParseIface.hs parser/Parser.hs
-endif
+# ToDo: not clear why this is here -- messes up linking
+#ifneq "$(GhcWithHscBuiltViaC)" "YES"
+#HS_SRCS += rename/ParseIface.hs parser/Parser.hs
+#endif
 
 HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 
