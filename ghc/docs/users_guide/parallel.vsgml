@@ -47,6 +47,7 @@ Some details about Concurrent and Parallel Haskell follow.
 %************************************************************************
 %*                                                                      *
 <sect2>Language features specific to Concurrent Haskell
+<label id="concurrent-haskell">
 <p>
 <nidx>Concurrent Haskell---features</nidx>
 %*                                                                      *

@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.11 1999/05/18 15:41:32 simonpj Exp $
+% $Id: glasgow_exts.vsgml,v 1.12 1999/07/14 11:33:10 simonmar Exp $
 %
 % GHC Language Extensions.
 %
@@ -2000,7 +2000,7 @@ Section <ref name="Rewrite Rules"
 id="rewrite-rules">.
 
 %-----------------------------------------------------------------------------
-<sect1>Rewrite rules</sect1>
+<sect1>Rewrite rules
 <label id="rewrite-rules">
 <nidx>RULES pagma</nidx>
 <nidx>pragma, RULES</nidx>
@@ -2017,7 +2017,8 @@ Here is an example:
   #-}
 </verb></tscreen>
 
-<sect2>Syntax</sect2>
+<sect2>Syntax
+<p>
 
 From a syntactic point of view:
 <itemize>
@@ -2051,7 +2052,8 @@ variables it mentions, though of course they need to be in scope.
 <item> Rules are automatically exported from a module, just as instance declarations are.
 </itemize>
 
-<sect2>Semantics</sect2>
+<sect2>Semantics
+<p>
 
 From a semantic point of view:
 <itemize>
@@ -2121,7 +2123,8 @@ policy is controlled by the per-simplification-pass flag @-finline-phase@n.
 </itemize>
 
 
-<sect2>Controlling what's going on</sect2>
+<sect2>Controlling what's going on
+<p>
 
 <itemize>
 <item> Use @-fddump-rules@ to see what transformation rules GHC is using.

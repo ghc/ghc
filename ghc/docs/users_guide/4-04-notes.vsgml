@@ -1,0 +1,94 @@
+<sect1>Release notes for version~4.04---7/99
+<label id="release-4-04">
+<p>
+
+<itemize>
+<item> <tt/Weak/ library changes:
+	<itemize>
+	<item> Finalise is now spelt finalize in all function names.
+	<item> <tt/finalize/ now runs the finalizer immediately, and
+	       waits for it to complete before returning.
+	<item> <tt/mkWeak/ now takes a <tt/Maybe (IO ())/ for the finalizer,
+	       and <tt/mkWeakNoFinalizer/ is removed.
+	<item> A weak pointer whose key is itself a weak pointer will now do
+	 	the right thing.
+	</itemize>
+
+<item> Changed representation of <tt/Integer/ type to speed up
+computations on small integers.  The performance of <tt/Integer/ is now
+only slightly slower than <tt/Int/ for values between <tt/minBound::Int/
+and <tt/maxBound::Int/.
+
+<item> On Win32 platforms, added support for using (and producing) dynamic
+link libraries (DLLs) containing ghc-compiled code.
+
+<item> Added @-funbox-strict-fields@ for unboxing/unpacking strict
+constructor fields.
+
+<item> GHC now has a license!  Check out <tt>fptools/ghc/LICENSE/</tt>.
+
+<item> Added CPR analysis, which reduces allocation by unboxing
+function results (thanks to Kevin Glynn <tt>&lt;keving@@cs.mu.OZ.AU&gt;</tt>).
+
+<item> UsageSP analysis added, but not yet functional.
+
+<item> Added a simple common sub-expression analysis pass.
+
+<item> Implemented update-in-place for certain very restricted cases.
+
+<item> Replaced GHC's old and worn yacc/lex parser with a new one
+based on Happy.  Fixed several Haskell 98 non-conformance issues in
+the process.
+
+<item> Added <tt>Concurrent.yield :: IO ()</tt>.
+
+<item> Added RULES pragms - transformation rules for Haskell source.
+This is used for list fusion: now intermediate lists between map,
+foldr, list comprehensions are removed automatically.
+
+<item> Unregisterised/unmangled builds now work.
+
+<item> Much performance tuning: GHC 4.04 produces faster code than all
+previous compilers.
+
+<item> GHC now defines <tt/__HASKELL98__/ when compiling files with
+<tt/-cpp/.
+
+<item> <tt/hppa1.1-hp-hpux/ port reinstated.
+
+<item> New operations for unsafely thawing byte arrays:
+<tt/unsafeThaw{Byte,ST,IO}Array/.
+
+<item> <tt/mkdependHS/ now lives in GHC's lib directory, not the
+binary directory.  It isn't intended to be run standalone, only via
+<tt/ghc -M/.
+
+<item> Asynchronous exceptions are now supported (see Section <ref name="The Concurrent Library" id="concurrent-interface">).  New operations:
+
+  <itemize> <item> <tt/Exception.killThread/ now raises an exception 
+	(<tt/AsyncException.KilledThread/) in the killed thread.
+       <item> <tt/Exception.raiseInThread/ allows a thread to raise an
+	exception in another thread.
+       <item> <tt/Concurrent.myThreadId/ returns the <tt/ThreadId/ of the 
+	calling thread.
+       <item> Stack overflow results in <tt/AsyncException.StackOverflow/
+	being raised in the offending thread.
+  </itemize>
+
+<item> Assertion failures now raise an <tt/AssertionFailed/ exception.
+
+<item> Added simple high-level interface to the Regex library, see
+Section <ref name="The RegexString Library" id="RegexString">.
+
+<item> <tt/forkIO/ now handles any uncaught exceptions cleanly.
+
+<item> <tt/integer2Int#/ isn't sign preserving any longer, but modulo
+<tt/(maxBound::Int + 1) * 2/.
+
+<item> <tt/-ddump-rdr/ is now called <tt/-ddump-parsed/.
+
+<item> Signal handling with the <tt/Posix/ library now works.
+
+<item> Many, many bugs fixed.
+
+</itemize>

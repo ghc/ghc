@@ -504,15 +504,18 @@ installHandler :: Signal
                -> IO Handler            -- old handler
 </verb></tscreen>
 
-@installHandler int handler iset@ calls @sigaction@ to install
-an interrupt handler for signal @int@.  If @handler@ is
-@Default@, @SIG_DFL@ is installed; if @handler@ is
-@Ignore@, @SIG_IGN@ is installed; if @handler@ is
-@Catch action@, a handler is installed which will invoke @action@ as a
-replacement for @main@.  If @iset@ is @Just s@, then the
-@sa_mask@ of the @sigaction@ structure is set to @s@;
-otherwise it is cleared.  The previously installed signal handler for
-@int@ is returned.
+@installHandler int handler iset@ calls @sigaction@ to install an
+interrupt handler for signal @int@.  If @handler@ is @Default@,
+@SIG_DFL@ is installed; if @handler@ is @Ignore@, @SIG_IGN@ is
+installed; if @handler@ is @Catch action@, a handler is installed
+which will invoke @action@ in a new thread when (or shortly after) the
+signal is received.  See Section <ref name="Concurrent Haskell"
+id="concurrent-haskell"> for details on how to communicate between
+threads.
+
+If @iset@ is @Just s@, then the @sa_mask@ of the @sigaction@ structure
+is set to @s@; otherwise it is cleared.  The previously installed
+signal handler for @int@ is returned.
 
 <tscreen><verb>
 getSignalMask :: IO SignalSet
@@ -557,10 +560,12 @@ awaitSignal :: Maybe SignalSet -> IO ()
 </verb></tscreen>
 
 @awaitSignal iset@ suspends execution until an interrupt is received.
-If @iset@ is @Just s@, @awaitSignal@ calls 
-@sigsuspend@, installing @s@ as the new signal mask before
-suspending execution; otherwise, it calls @pause@.  If successful,
-@awaitSignal@ does not return.
+If @iset@ is @Just s@, @awaitSignal@ calls @sigsuspend@, installing
+@s@ as the new signal mask before suspending execution; otherwise, it
+calls @pause@.  @awaitSignal@ returns on receipt of a signal.  If you
+have installed any signal handlers with @installHandler@, it may be
+wise to call @yield@ directly after @awaitSignal@ to ensure that the
+signal handler runs as promptly.
 
 <tscreen><verb>
 scheduleAlarm :: Int -> IO Int
