@@ -56,7 +56,7 @@ ghc/ArrBase_HC_OPTS	     += -monly-2-regs
 glaExts/PackedString_HC_OPTS += -monly-3-regs
 required/Directory_HC_OPTS   += -monly-3-regs 
 concurrent/Parallel_HC_OPTS  += -fglasgow-exts
-required/Time_HC_OPTS        += -monly-3-regs -H12m
+required/Time_HC_OPTS        += -monly-3-regs -H16m
 
 # Far too much heap is needed to compile PrelNum with -O at the
 # moment, but there you go..
@@ -69,11 +69,12 @@ ghc/PrelNum_HC_OPTS          += -H30m
 ghc/Unsafe_HC_OPTS           += -Onot
 
 ghc/PrelBase_HC_OPTS         += -H12m
-ghc/PrelRead_HC_OPTS         += -H8m
+ghc/PrelRead_HC_OPTS         += -H12m
 ghc/PrelTup_HC_OPTS          += -H8m
 ghc/ArrBase_HC_OPTS          += -H8m
-ghc/IOHandle_HC_OPTS         += -H8m
+ghc/IOHandle_HC_OPTS         += -H12m
 required/Time_HC_OPTS        += -H8m
+required/Complex_HC_OPTS     += -H10m
 glaExts/Int_HC_OPTS          += -H8m
 glaExts/Word_HC_OPTS         += -H8m
 
