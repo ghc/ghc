@@ -690,11 +690,11 @@ hasBetterProv _					  _			       = False
 pprNameProvenance :: Name -> Provenance -> SDoc
 pprNameProvenance name LocalDef   	 = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance name (NonLocalDef why) = sep [ppr_reason why, 
-					        nest 2 (parens (ppr_defn (nameSrcLoc name)))]
+					        nest 2 (ppr_defn (nameSrcLoc name))]
 
 ppr_reason ImplicitImport	  = ptext SLIT("implicitly imported")
 ppr_reason (UserImport mod loc _) = ptext SLIT("imported from") <+> ppr mod <+> ptext SLIT("at") <+> ppr loc
 
-ppr_defn loc | isGoodSrcLoc loc = ptext SLIT("at") <+> ppr loc
+ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("at") <+> ppr loc)
 	     | otherwise	= empty
 \end{code}
