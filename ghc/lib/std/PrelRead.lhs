@@ -246,11 +246,13 @@ lexLitChar ('\\':s)     =  do
         lexEsc _                                   = mzero
 
         fromAsciiLab (x:y:z:ls) | isUpper y && (isUpper z || isDigit z) &&
-				   [x,y,z] `elem` asciiTab = return ([x,y,z], ls)
+				   [x,y,z] `elem` asciiEscTab = return ([x,y,z], ls)
         fromAsciiLab (x:y:ls)   | isUpper y &&
-				   [x,y]   `elem` asciiTab = return ([x,y], ls)
-        fromAsciiLab _					   = mzero
+				   [x,y]   `elem` asciiEscTab = return ([x,y], ls)
+        fromAsciiLab _					      = mzero
 				   
+        asciiEscTab = "DEL" : asciiTab
+
 
 lexLitChar (c:s)        =  return ([c],s)
 lexLitChar ""           =  mzero
