@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.4 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: HsFFI.h,v 1.5 2000/08/18 18:08:48 qrczak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -14,6 +14,7 @@
 #define HSFFI_H
 
 /* get types from GHC's runtime system */
+#include "config.h"
 #include "StgTypes.h"
 
 /* get limits for integral types */
