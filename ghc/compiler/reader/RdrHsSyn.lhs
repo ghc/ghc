@@ -57,7 +57,7 @@ import HsSyn
 import Lex
 import BasicTypes	( Module(..), IfaceFlavour(..), Unused )
 import Name		( pprModule, OccName(..), pprOccName, 
-			  prefixOccName, NamedThing )
+			  prefixOccName, NamedThing(..) )
 import Util		( thenCmp )
 import HsPragmas	( GenPragmas, ClassPragmas, DataPragmas, ClassOpPragmas, InstancePragmas )
 import List		( nub )
