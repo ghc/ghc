@@ -120,12 +120,7 @@ instance MonadPlus P where
 -- ---------------------------------------------------------------------------
 -- The ReadP type
 
--- newtype temporarily turned into data
--- until compiler bug as found on 26 July 2003 is fixed;
--- contact SPJ or ralf@cwi.nl
---
-data ReadP a = R (forall b . (a -> P b) -> P b)
--- newtype ReadP a = R (forall b . (a -> P b) -> P b)
+newtype ReadP a = R (forall b . (a -> P b) -> P b)
 
 -- Functor, Monad, MonadPlus
 
