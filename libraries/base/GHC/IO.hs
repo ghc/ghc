@@ -93,7 +93,7 @@ hWaitForInput h msecs = do
 			   (fromIntegral msecs) (haIsStream handle_)
 		return (r /= 0)
 
-foreign import ccall unsafe "inputReady"
+foreign import ccall safe "inputReady"
   inputReady :: CInt -> CInt -> Bool -> IO CInt
 
 -- ---------------------------------------------------------------------------
