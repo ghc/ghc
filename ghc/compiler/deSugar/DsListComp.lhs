@@ -30,8 +30,7 @@ import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type,
 			  splitTyConApp_maybe )
 import TysPrim		( alphaTyVar )
 import TysWiredIn	( nilDataCon, consDataCon, trueDataConId, falseDataConId, 
-			  unitDataConId, unitTy,
-			  mkListTy, mkTupleTy )
+			  unitDataConId, unitTy, mkListTy )
 import Match		( matchSimply )
 import PrelNames	( foldrName, buildName, replicatePName, mapPName, 
 			  filterPName, zipPName, crossPName, parrTyConName ) 
@@ -159,7 +158,7 @@ deListComp (ParStmtOut bndrstmtss : quals) list
 	  = dsListComp (stmts ++ [ResultStmt (mk_hs_tuple_expr bndrs) noSrcLoc])
 		       (mk_bndrs_tys bndrs)
 
-	mk_bndrs_tys bndrs = mk_tuple_ty (map idType bndrs)
+	mk_bndrs_tys bndrs = mkCoreTupTy (map idType bndrs)
 
 	-- Last: the one to return
 deListComp [ResultStmt expr locn] list	-- Figure 7.4, SLPJ, p 135, rule C above
@@ -237,17 +236,12 @@ mkZipBind elt_tys
     returnDs (zip_fn, mkLams ass zip_body)
   where
     list_tys   = map mkListTy elt_tys
-    ret_elt_ty = mk_tuple_ty elt_tys
+    ret_elt_ty = mkCoreTupTy elt_tys
     zip_fn_ty  = mkFunTys list_tys (mkListTy ret_elt_ty)
 
     mk_case (as, a', as') rest
 	  = Case (Var as) as [(DataAlt nilDataCon,  [],        mkNilExpr ret_elt_ty),
 			      (DataAlt consDataCon, [a', as'], rest)]
-
--- Helper function 
-mk_tuple_ty :: [Type] -> Type
-mk_tuple_ty [ty] = ty
-mk_tuple_ty tys  = mkTupleTy Boxed (length tys) tys
 
 -- Helper functions that makes an HsTuple only for non-1-sized tuples
 mk_hs_tuple_expr :: [Id] -> TypecheckedHsExpr

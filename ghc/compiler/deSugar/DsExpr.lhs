@@ -15,7 +15,7 @@ import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall )
 import DsListComp	( dsListComp, dsPArrComp )
-import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr, selectMatchVar )
+import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr, mkCoreTupTy, selectMatchVar )
 import DsMonad
 
 #ifdef GHCI
@@ -674,8 +674,8 @@ dsRecStmt m_ty ids@[return_id, _, _, _, mfix_id] vars stmts rets
 
 	tup_expr | one_var   = ret1
 		 | otherwise = ExplicitTuple rets Boxed
-	tup_ty   | one_var   = idType var1
-		 | otherwise = mkTupleTy Boxed (length vars) (map idType vars)
+	tup_ty   	     = mkCoreTupTy (map idType vars)
+					-- Deals with singleton case
 	tup_pat  | one_var   = VarPat var1
 		 | otherwise = LazyPat (TuplePat (map VarPat vars) Boxed)
 

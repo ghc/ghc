@@ -24,7 +24,8 @@ module DsUtils (
 	mkIntExpr, mkCharExpr,
 	mkStringLit, mkStringLitFS, mkIntegerExpr, 
 
-	mkSelectorBinds, mkTupleExpr, mkTupleSelector, mkCoreTup,
+	mkSelectorBinds, mkTupleExpr, mkTupleSelector, 
+	mkCoreTup, mkCoreSel, mkCoreTupTy,
 
 	selectMatchVar
     ) where
@@ -646,7 +647,7 @@ mkTupleSelector vars the_var scrut_var scrut
     mk_tup_sel vars_s the_var = mkCoreSel group the_var tpl_v $
 				mk_tup_sel (chunkify tpl_vs) tpl_v
 	where
-	  tpl_tys = [mkTupleTy Boxed (length gp) (map idType gp) | gp <- vars_s]
+	  tpl_tys = [mkCoreTupTy (map idType gp) | gp <- vars_s]
 	  tpl_vs  = mkTemplateLocals tpl_tys
 	  [(tpl_v, group)] = [(tpl,gp) | (tpl,gp) <- zipEqual "mkTupleSelector" tpl_vs vars_s,
 					 the_var `elem` gp ]
@@ -672,6 +673,13 @@ mkConsExpr ty hd tl = mkConApp consDataCon [Type ty, hd, tl]
 mkListExpr :: Type -> [CoreExpr] -> CoreExpr
 mkListExpr ty xs = foldr (mkConsExpr ty) (mkNilExpr ty) xs
 			    
+
+-- The next three functions make tuple types, constructors and selectors,
+-- with the rule that a 1-tuple is represented by the thing itselg
+mkCoreTupTy :: [Type] -> Type
+mkCoreTupTy [ty] = ty
+mkCoreTupTy tys  = mkTupleTy Boxed (length tys) tys
+
 mkCoreTup :: [CoreExpr] -> CoreExpr			    
 -- Builds exactly the specified tuple.
 -- No fancy business for big tuples
