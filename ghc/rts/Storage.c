@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.68 2002/08/16 13:20:36 simonmar Exp $
+ * $Id: Storage.c,v 1.69 2002/10/15 11:02:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -533,7 +533,15 @@ allocate( nat n )
 lnat
 allocated_bytes( void )
 {
-  return (alloc_blocks * BLOCK_SIZE_W - (alloc_HpLim - alloc_Hp));
+    lnat allocated;
+
+    allocated = alloc_blocks * BLOCK_SIZE_W - (alloc_HpLim - alloc_Hp);
+    if (pinned_object_block != NULL) {
+	allocated -= (pinned_object_block->start + BLOCK_SIZE_W) - 
+	    pinned_object_block->free;
+    }
+	
+    return allocated;
 }
 
 /* ---------------------------------------------------------------------------
