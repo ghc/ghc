@@ -377,8 +377,8 @@ repTys tys = mapM repTy tys
 -- represent a type
 --
 repTy :: HsType Name -> DsM (Core M.TypeQ)
-repTy (HsForAllTy bndrs ctxt ty)  = 
-  addTyVarBinds (fromMaybe [] bndrs) $ \bndrs' -> do
+repTy (HsForAllTy _ bndrs ctxt ty)  = 
+  addTyVarBinds bndrs $ \bndrs' -> do
     ctxt'  <- repContext ctxt
     ty'    <- repTy ty
     repTForall (coreList' stringTy bndrs') ctxt' ty'
