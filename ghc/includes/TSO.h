@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.40 2005/01/28 12:55:53 simonmar Exp $
+ * $Id: TSO.h,v 1.41 2005/02/10 13:02:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -126,7 +126,6 @@ typedef struct StgTSO_ {
   StgHeader          header;
 
   struct StgTSO_*    link;	     // Links threads onto blocking queues */
-  StgMutClosure *    mut_link;	     // TSO's are mutable of course! */
   struct StgTSO_*    global_link;    // Links all threads together */
   
   StgWord16           what_next;  // Values defined in Constants.h

@@ -276,7 +276,6 @@ checkClosure( StgClosure* p )
     case FOREIGN:
     case STABLE_NAME:
     case MUT_VAR:
-    case MUT_CONS:
     case CONSTR_INTLIKE:
     case CONSTR_CHARLIKE:
     case CONSTR_STATIC:
@@ -320,7 +319,7 @@ checkClosure( StgClosure* p )
 
     case THUNK_SELECTOR:
 	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
-	    return sizeofW(StgHeader) + MIN_UPD_SIZE;
+	    return THUNK_SELECTOR_sizeW();
 
     case IND:
 	{ 
@@ -762,41 +761,16 @@ checkGlobalTSOList (rtsBool checkTSOs)
    -------------------------------------------------------------------------- */
 
 void
-checkMutableList( StgMutClosure *p, nat gen )
+checkMutableList( bdescr *mut_bd, nat gen )
 {
     bdescr *bd;
+    StgPtr q;
+    StgClosure *p;
 
-    for (; p != END_MUT_LIST; p = p->mut_link) {
-	bd = Bdescr((P_)p);
-	ASSERT(closure_MUTABLE(p));
-	ASSERT(bd->gen_no == gen);
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->mut_link));
-    }
-}
-
-void
-checkMutOnceList( StgMutClosure *p, nat gen )
-{
-    bdescr *bd;
-    StgInfoTable *info;
-
-    for (; p != END_MUT_LIST; p = p->mut_link) {
-	bd = Bdescr((P_)p);
-	info = get_itbl(p);
-
-	ASSERT(!closure_MUTABLE(p));
-	ASSERT(ip_STATIC(info) || bd->gen_no == gen);
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->mut_link));
-
-	switch (info->type) {
-	case IND_STATIC:
-	case IND_OLDGEN:
-	case IND_OLDGEN_PERM:
-	case MUT_CONS:
-	    break;
-	default:
-	    barf("checkMutOnceList: strange closure %p (%s)", 
-		 p, info_type((StgClosure *)p));
+    for (bd = mut_bd; bd != NULL; bd = bd->link) {
+	for (q = bd->start; q < bd->free; q++) {
+	    p = (StgClosure *)*q;
+	    ASSERT(!HEAP_ALLOCED(p) || Bdescr((P_)p)->gen_no == gen);
 	}
     }
 }

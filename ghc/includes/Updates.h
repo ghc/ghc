@@ -294,11 +294,8 @@ DEBUG_FILL_SLOP(StgClosure *p)
     } else {							\
       if (info != stg_BLACKHOLE_BQ_info) {			\
         DEBUG_FILL_SLOP(p1);					\
-        W_ __mut_once_list;					\
-        __mut_once_list = generation(TO_W_(bdescr_gen_no(bd))) +	\
-                             OFFSET_generation_mut_once_list;	\
-        StgMutClosure_mut_link(p1) = W_[__mut_once_list];	\
-        W_[__mut_once_list] = p1;				\
+        foreign "C" recordMutableGen(p1 "ptr", 			\
+		 generation(TO_W_(bdescr_gen_no(bd))) "ptr");	\
       }								\
       StgInd_indirectee(p1) = p2;				\
       SET_INFO(p1, stg_IND_OLDGEN_info);			\
@@ -323,10 +320,9 @@ DEBUG_FILL_SLOP(StgClosure *p)
     } else {								\
       if (_info != &stg_BLACKHOLE_BQ_info) {				\
         DEBUG_FILL_SLOP(p1);						\
-        ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;	\
-        generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;    \
+        recordMutableGen(p1, &generations[bd->gen_no]);			\
       }									\
-      ((StgIndOldGen *)p1)->indirectee = p2;				\
+      ((StgInd *)p1)->indirectee = p2;					\
       SET_INFO(p1, &stg_IND_OLDGEN_info);				\
       TICK_UPD_OLD_IND();						\
       and_then;								\
@@ -362,10 +358,9 @@ updateWithPermIndirection(const StgInfoTable *info,
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
     if (info != &stg_BLACKHOLE_BQ_info) {
-      ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;
-      generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;
+	recordMutableGen(p1, &generations[bd->gen_no]);
     }
-    ((StgIndOldGen *)p1)->indirectee = p2;
+    ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1, &stg_IND_OLDGEN_PERM_info);
     // @LDV profiling
     // We have just created a new closure.

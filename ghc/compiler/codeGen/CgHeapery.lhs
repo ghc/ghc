@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.42 2004/11/26 16:20:09 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.43 2005/02/10 13:01:53 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -34,9 +34,8 @@ import CgTicky		( staticTickyHdr, tickyDynAlloc, tickyAllocHeap )
 import CgParallel	( staticGranHdr, staticParHdr, doGranAllocate )
 import CgStackery	( getFinalStackHW, getRealSp )
 import CgCallConv	( mkRegLiveness )
-import ClosureInfo	( closureSize, closureUpdReqd,
-			  staticClosureNeedsLink, 
-			  mkConInfo, 
+import ClosureInfo	( closureSize, staticClosureNeedsLink, 
+			  mkConInfo,  closureNeedsUpdSpace,
 			  infoTableLabelFromCI, closureLabelFromCI,
 			  nodeMustPointToIt, closureLFInfo, 			
 			  ClosureInfo )
@@ -189,26 +188,37 @@ mkStaticClosureFields
 	-> [CmmLit]		-- Payload
 	-> [CmmLit]		-- The full closure
 mkStaticClosureFields cl_info ccs caf_refs payload
-  = mkStaticClosure info_lbl ccs payload padding_wds static_link_field
+  = mkStaticClosure info_lbl ccs payload padding_wds 
+	static_link_field saved_info_field
   where
     info_lbl = infoTableLabelFromCI cl_info
 
-    upd_reqd = closureUpdReqd cl_info
+    -- CAFs must have consistent layout, regardless of whether they
+    -- are actually updatable or not.  The layout of a CAF is:
+    --
+    --        3 saved_info
+    --        2 static_link
+    --        1 indirectee
+    --        0 info ptr
+    --
+    -- the static_link and saved_info fields must always be in the same
+    -- place.  So we use closureNeedsUpdSpace rather than
+    -- closureUpdReqd here:
 
-    -- for the purposes of laying out the static closure, we consider all
-    -- thunks to be "updatable", so that the static link field is always
-    -- in the same place.
+    is_caf = closureNeedsUpdSpace cl_info
+
     padding_wds
-	| not upd_reqd = []
-	| otherwise    = replicate n (mkIntCLit 0) -- a bunch of 0s
+	| not is_caf = []
+	| otherwise  = replicate n (mkIntCLit 0) -- a bunch of 0s
 	where n = max 0 (mIN_UPD_SIZE - length payload)
 
-	-- We always have a static link field for a thunk, it's used to
-	-- save the closure's info pointer when we're reverting CAFs
-	-- (see comment in Storage.c)
     static_link_field
-	| upd_reqd || staticClosureNeedsLink cl_info = [static_link_value]
-	| otherwise 	     		             = []
+	| is_caf || staticClosureNeedsLink cl_info = [static_link_value]
+	| otherwise				   = []
+
+    saved_info_field
+	| is_caf     = [mkIntCLit 0]
+	| otherwise  = []
 
 	-- for a static constructor which has NoCafRefs, we set the
 	-- static link field to a non-zero value so the garbage
@@ -218,13 +228,14 @@ mkStaticClosureFields cl_info ccs caf_refs payload
 	| otherwise	= mkIntCLit 1
 
 mkStaticClosure :: CLabel -> CostCentreStack -> [CmmLit]
-  -> [CmmLit] -> [CmmLit] -> [CmmLit]
-mkStaticClosure info_lbl ccs payload padding_wds static_link_field
+  -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
+mkStaticClosure info_lbl ccs payload padding_wds static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ variable_header_words
   ++ payload
   ++ padding_wds
   ++ static_link_field
+  ++ saved_info_field
   where
     variable_header_words
 	=  staticGranHdr

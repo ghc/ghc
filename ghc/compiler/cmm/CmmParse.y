@@ -186,7 +186,7 @@ static 	:: { ExtFCode [CmmStatic] }
 		{ do lits <- sequence $4;
 		     return $ map CmmStaticLit $
 		       mkStaticClosure (mkRtsInfoLabelFS $3) 
-			 dontCareCCS (map getLit lits) [] [] }
+			 dontCareCCS (map getLit lits) [] [] [] }
 	-- arrays of closures required for the CHARLIKE & INTLIKE arrays
 
 lits	:: { [ExtFCode CmmExpr] }
@@ -712,7 +712,7 @@ funInfo name ptrs nptrs cl_type desc_str ty_str fun_type = do
 staticClosure :: FastString -> FastString -> [CmmLit] -> ExtCode
 staticClosure cl_label info payload
   = code $ emitDataLits (mkRtsDataLabelFS cl_label) lits
-  where  lits = mkStaticClosure (mkRtsInfoLabelFS info) dontCareCCS payload [] []
+  where  lits = mkStaticClosure (mkRtsInfoLabelFS info) dontCareCCS payload [] [] []
 
 foreignCall
 	:: String

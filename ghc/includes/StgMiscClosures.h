@@ -122,10 +122,10 @@ RTS_INFO(stg_ARR_WORDS_info);
 RTS_INFO(stg_MUT_ARR_WORDS_info);
 RTS_INFO(stg_MUT_ARR_PTRS_info);
 RTS_INFO(stg_MUT_ARR_PTRS_FROZEN_info);
+RTS_INFO(stg_MUT_ARR_PTRS_FROZEN0_info);
 RTS_INFO(stg_MUT_VAR_info);
 RTS_INFO(stg_END_TSO_QUEUE_info);
 RTS_INFO(stg_MUT_CONS_info);
-RTS_INFO(stg_END_MUT_LIST_info);
 RTS_INFO(stg_catch_info);
 RTS_INFO(stg_PAP_info);
 RTS_INFO(stg_AP_info);
@@ -185,7 +185,6 @@ RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN_entry);
 RTS_ENTRY(stg_MUT_VAR_entry);
 RTS_ENTRY(stg_END_TSO_QUEUE_entry);
 RTS_ENTRY(stg_MUT_CONS_entry);
-RTS_ENTRY(stg_END_MUT_LIST_entry);
 RTS_ENTRY(stg_catch_entry);
 RTS_ENTRY(stg_PAP_entry);
 RTS_ENTRY(stg_AP_entry);
@@ -214,7 +213,6 @@ RTS_ENTRY(stg_raise_entry);
 /* closures */
 
 RTS_CLOSURE(stg_END_TSO_QUEUE_closure);
-RTS_CLOSURE(stg_END_MUT_LIST_closure);
 RTS_CLOSURE(stg_NO_FINALIZER_closure);
 RTS_CLOSURE(stg_dummy_ret_closure);
 RTS_CLOSURE(stg_forceIO_closure);

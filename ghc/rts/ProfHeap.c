@@ -907,7 +907,6 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case FOREIGN:
 	    case STABLE_NAME:
 	    case MUT_VAR:
-	    case MUT_CONS:
 		prim = rtsTrue;
 		size = sizeW_fromITBL(info);
 		break;

@@ -542,7 +542,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case STABLE_NAME:
     case IND_PERM:
     case MUT_VAR:
-    case MUT_CONS:
     case CAF_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
     case SE_BLACKHOLE:
@@ -582,8 +581,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
     
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
-	thread((StgPtr)&((StgIndOldGen *)p)->indirectee);
-	return p + sizeofW(StgIndOldGen);
+	thread((StgPtr)&((StgInd *)p)->indirectee);
+	return p + sizeofW(StgInd);
 
     case THUNK_SELECTOR:
     { 
@@ -841,7 +840,7 @@ update_bkwd_compact( step *stp )
 
 	    // Rebuild the mutable list for the old generation.
 	    if (ip_MUTABLE(info)) {
-		recordMutable((StgMutClosure *)free);
+		recordMutable((StgClosure *)free);
 	    }
 
 	    // relocate TSOs
@@ -868,19 +867,6 @@ update_bkwd_compact( step *stp )
     return free_blocks;
 }
 
-static void
-thread_mut_once_list( generation *g )
-{
-    StgMutClosure *p, *next;
-
-    for (p = g->mut_once_list; p != END_MUT_LIST; p = next) {
-	next = p->mut_link;
-	thread((StgPtr)&p->mut_link);
-    }
-    
-    thread((StgPtr)&g->mut_once_list);
-}
-
 void
 compact( void (*get_roots)(evac_fn) )
 {
@@ -900,8 +886,13 @@ compact( void (*get_roots)(evac_fn) )
 
     // mutable lists
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-	thread((StgPtr)&generations[g].mut_list);
-	thread_mut_once_list(&generations[g]);
+	bdescr *bd;
+	StgPtr p;
+	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
+	    for (p = bd->start; p < bd->free; p++) {
+		thread(p);
+	    }
+	}
     }
 
     // the global thread list

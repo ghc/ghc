@@ -118,8 +118,6 @@ newArrayzh_fast
 
 unsafeThawArrayzh_fast
 {
-  SET_INFO(R1,stg_MUT_ARR_PTRS_info);
-
   // SUBTLETY TO DO WITH THE OLD GEN MUTABLE LIST
   //
   // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN 
@@ -127,14 +125,20 @@ unsafeThawArrayzh_fast
   // it on the mutable list for the GC to remove (removing something from
   // the mutable list is not easy, because the mut_list is only singly-linked).
   // 
+  // So that we can tell whether a MUT_ARR_PTRS_FROZEN is on the mutable list,
+  // when we freeze it we set the info ptr to be MUT_ARR_PTRS_FROZEN0 to indicate
+  // that it is still on the mutable list.
+
   // So, when we thaw a MUT_ARR_PTRS_FROZEN, we must cope with two cases:
   // either it is on a mut_list, or it isn't.  We adopt the convention that
   // the mut_link field is NULL if it isn't on a mut_list, and the GC
   // maintains this invariant.
   //
-  if (StgMutClosure_mut_link(R1) == NULL) {
+  if (%INFO_TYPE(%GET_STD_INFO(R1)) != HALF_W_(MUT_ARR_PTRS_FROZEN0)) {
 	foreign "C" recordMutable(R1 "ptr");
   }
+
+  SET_INFO(R1,stg_MUT_ARR_PTRS_info);
 
   RET_P(R1);
 }

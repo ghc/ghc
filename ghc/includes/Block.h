@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.17 2004/08/13 13:09:09 simonmar Exp $
+ * $Id: Block.h,v 1.18 2005/02/10 13:02:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -142,9 +142,11 @@ INLINE_HEADER bdescr *Bdescr(StgPtr p)
    (1 + (W_)MBLOCK_ROUND_UP((n-BLOCKS_PER_MBLOCK) * BLOCK_SIZE) / MBLOCK_SIZE)
 
 
+#ifndef CMINUSMINUS 
+// to the end...
+
 /* Double-linked block lists: --------------------------------------------- */
 
-#ifndef CMINUSMINUS
 INLINE_HEADER void
 dbl_link_onto(bdescr *bd, bdescr **list)
 {
@@ -155,6 +157,37 @@ dbl_link_onto(bdescr *bd, bdescr **list)
   }
   *list = bd;
 }
-#endif
 
+/* Initialisation ---------------------------------------------------------- */
+
+extern void initBlockAllocator(void);
+
+/* Allocation -------------------------------------------------------------- */
+
+extern bdescr *allocGroup(nat n);
+extern bdescr *allocBlock(void);
+
+/* De-Allocation ----------------------------------------------------------- */
+
+extern void freeGroup(bdescr *p);
+extern void freeChain(bdescr *p);
+
+/* Round a value to megablocks --------------------------------------------- */
+
+#define WORDS_PER_MBLOCK  (BLOCKS_PER_MBLOCK * BLOCK_SIZE_W)
+
+INLINE_HEADER nat
+round_to_mblocks(nat words)
+{
+  if (words > WORDS_PER_MBLOCK) {
+    if ((words % WORDS_PER_MBLOCK) < (WORDS_PER_MBLOCK / 2)) {
+      words = (words / WORDS_PER_MBLOCK) * WORDS_PER_MBLOCK;
+    } else {
+      words = ((words / WORDS_PER_MBLOCK) + 1) * WORDS_PER_MBLOCK;
+    }
+  }
+  return words;
+}
+
+#endif /* !CMINUSMINUS */
 #endif /* BLOCK_H */

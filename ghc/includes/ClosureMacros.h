@@ -174,16 +174,9 @@
 /* These macros are optimised versions of the above for certain
  * closure types.  They *must* be equivalent to the generic
  * STATIC_LINK.
- *
- * You may be surprised that the STATIC_LINK field for a THUNK_STATIC
- * is at offset 2; that's because a THUNK_STATIC always has two words
- * of (non-ptr) padding, to make room for the IND_STATIC that is
- * going to overwrite it.  It doesn't do any harm, because a
- * THUNK_STATIC needs this extra word for the IND_STATIC's saved_info
- * field anyhow.  Hmm, this is all rather delicate. --SDM
  */
 #define FUN_STATIC_LINK(p)   ((p)->payload[0])
-#define THUNK_STATIC_LINK(p) ((p)->payload[2])
+#define THUNK_STATIC_LINK(p) ((p)->payload[1])
 #define IND_STATIC_LINK(p)   ((p)->payload[1])
 
 #define STATIC_LINK2(info,p)							\

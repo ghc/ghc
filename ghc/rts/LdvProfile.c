@@ -134,7 +134,6 @@ processHeapClosureForDead( StgClosure *c )
 
     case WEAK:
     case MUT_VAR:
-    case MUT_CONS:
     case FOREIGN:
     case BCO:
     case STABLE_NAME:
@@ -190,11 +189,8 @@ processHeapClosureForDead( StgClosure *c )
 	break;
 
     case IND_PERM:
-	size = sizeofW(StgInd);
-	break;
-
     case IND_OLDGEN_PERM:
-	size = sizeofW(StgIndOldGen);
+	size = sizeofW(StgInd);
 	break;
 
 	/*
@@ -207,11 +203,8 @@ processHeapClosureForDead( StgClosure *c )
 	// because they will perish before the next census at any
 	// rate.
     case IND:
-	size = sizeofW(StgInd);
-	return size;
-
     case IND_OLDGEN:
-	size = sizeofW(StgIndOldGen);
+	size = sizeofW(StgInd);
 	return size;
 
     case EVACUATED:

@@ -771,22 +771,20 @@ stat_exit(int alloc)
 void
 statDescribeGens(void)
 {
-  nat g, s, mut, mut_once, lge, live;
-  StgMutClosure *m;
+  nat g, s, mut, lge, live;
   bdescr *bd;
   step *step;
 
-  debugBelch("     Gen    Steps      Max   Mutable  Mut-Once  Step   Blocks     Live    Large\n                    Blocks  Closures  Closures                          Objects\n");
+  debugBelch("     Gen    Steps      Max   Mutable  Step   Blocks     Live    Large\n                    Blocks  Closures  Closures                          Objects\n");
 
+  mut = 0;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    for (m = generations[g].mut_list, mut = 0; m != END_MUT_LIST; 
-	 m = m->mut_link) 
-      mut++;
-    for (m = generations[g].mut_once_list, mut_once = 0; m != END_MUT_LIST; 
-	 m = m->mut_link) 
-      mut_once++;
-    debugBelch("%8d %8d %8d %9d %9d", g, generations[g].n_steps,
-	    generations[g].max_blocks, mut, mut_once);
+      for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
+	  mut += bd->free - bd->start;
+      }
+
+    debugBelch("%8d %8d %8d %9d", g, generations[g].n_steps,
+	    generations[g].max_blocks, mut);
 
     for (s = 0; s < generations[g].n_steps; s++) {
       step = &generations[g].steps[s];

@@ -236,7 +236,7 @@ INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
     jump %GET_ENTRY(R1);
 }
 
-INFO_TABLE(stg_IND_PERM,1,1,IND_PERM,"IND_PERM","IND_PERM")
+INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
 {
     /* Don't add INDs to granularity cost */
 
@@ -278,7 +278,7 @@ INFO_TABLE(stg_IND_PERM,1,1,IND_PERM,"IND_PERM","IND_PERM")
 }  
 
 
-INFO_TABLE(stg_IND_OLDGEN,1,1,IND_OLDGEN,"IND_OLDGEN","IND_OLDGEN")
+INFO_TABLE(stg_IND_OLDGEN,1,0,IND_OLDGEN,"IND_OLDGEN","IND_OLDGEN")
 {
     TICK_ENT_STATIC_IND();	/* tick */
     R1 = StgInd_indirectee(R1);
@@ -286,7 +286,7 @@ INFO_TABLE(stg_IND_OLDGEN,1,1,IND_OLDGEN,"IND_OLDGEN","IND_OLDGEN")
     jump %GET_ENTRY(R1);
 }
 
-INFO_TABLE(stg_IND_OLDGEN_PERM,1,1,IND_OLDGEN_PERM,"IND_OLDGEN_PERM","IND_OLDGEN_PERM")
+INFO_TABLE(stg_IND_OLDGEN_PERM,1,0,IND_OLDGEN_PERM,"IND_OLDGEN_PERM","IND_OLDGEN_PERM")
 {
     /* Don't: TICK_ENT_STATIC_IND(Node); for ticky-ticky; 
        this ind is here only to help profiling */
@@ -331,7 +331,7 @@ INFO_TABLE(stg_IND_OLDGEN_PERM,1,1,IND_OLDGEN_PERM,"IND_OLDGEN_PERM","IND_OLDGEN
  * for the blocking queue in a BQ), which should be big enough for an
  * old-generation indirection. 
  */
-INFO_TABLE(stg_BLACKHOLE,0,2,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
+INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 {
 #if defined(GRAN)
     /* Before overwriting TSO_LINK */
@@ -374,7 +374,7 @@ INFO_TABLE(stg_BLACKHOLE,0,2,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     jump stg_block_1;
 }
 
-INFO_TABLE(stg_BLACKHOLE_BQ,1,1,BLACKHOLE_BQ,"BLACKHOLE_BQ","BLACKHOLE_BQ")
+INFO_TABLE(stg_BLACKHOLE_BQ,1,0,BLACKHOLE_BQ,"BLACKHOLE_BQ","BLACKHOLE_BQ")
 {
 #if defined(GRAN)
     /* Before overwriting TSO_LINK */
@@ -445,7 +445,7 @@ INFO_TABLE(stg_RBH_Save_2,2,0,CONSTR,"RBH_Save_2","RBH_Save_2");
 #endif /* defined(PAR) || defined(GRAN) */
 
 /* identical to BLACKHOLEs except for the infotag */
-INFO_TABLE(stg_CAF_BLACKHOLE,0,2,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
+INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
 {
 #if defined(GRAN)
     /* mainly statistics gathering for GranSim simulation */
@@ -476,14 +476,14 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,2,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
 }
 
 #ifdef EAGER_BLACKHOLING
-INFO_TABLE(stg_SE_BLACKHOLE_info, stg_SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,,IF_,"SE_BLACKHOLE","SE_BLACKHOLE");
+INFO_TABLE(stg_SE_BLACKHOLE_info, stg_SE_BLACKHOLE_entry,0,1,SE_BLACKHOLE,,IF_,"SE_BLACKHOLE","SE_BLACKHOLE");
 IF_(stg_SE_BLACKHOLE_entry)
 {
     STGCALL3(fprintf,stderr,"SE_BLACKHOLE at %p entered!\n",R1);
     STGCALL1(shutdownHaskellAndExit,EXIT_FAILURE);
 }
 
-INFO_TABLE(stg_SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,IF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
+INFO_TABLE(stg_SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,1,SE_CAF_BLACKHOLE,,IF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
 IF_(stg_SE_CAF_BLACKHOLE_entry)
 {
     STGCALL3(fprintf,stderr,"SE_CAF_BLACKHOLE at %p entered!\n",R1);
@@ -561,10 +561,10 @@ INFO_TABLE(stg_STABLE_NAME,0,1,STABLE_NAME,"STABLE_NAME","STABLE_NAME")
    and entry code for each type.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_FULL_MVAR,4,0,MVAR,"MVAR","MVAR")
+INFO_TABLE(stg_FULL_MVAR,3,0,MVAR,"MVAR","MVAR")
 { foreign "C" barf("FULL_MVAR object entered!"); }
 
-INFO_TABLE(stg_EMPTY_MVAR,4,0,MVAR,"MVAR","MVAR")
+INFO_TABLE(stg_EMPTY_MVAR,3,0,MVAR,"MVAR","MVAR")
 { foreign "C" barf("EMPTY_MVAR object entered!"); }
 
 /* -----------------------------------------------------------------------------
@@ -611,22 +611,6 @@ INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_TSO_QUEUE","E
 CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
 
 /* ----------------------------------------------------------------------------
-   Mutable lists
-
-   Mutable lists (used by the garbage collector) consist of a chain of
-   StgMutClosures connected through their mut_link fields, ending in
-   an END_MUT_LIST closure.
-   ------------------------------------------------------------------------- */
-
-INFO_TABLE_CONSTR(stg_END_MUT_LIST,0,0,0,CONSTR_NOCAF_STATIC,"END_MUT_LIST","END_MUT_LIST")
-{ foreign "C" barf("END_MUT_LIST object entered!"); }
-
-CLOSURE(stg_END_MUT_LIST_closure,stg_END_MUT_LIST);
-
-INFO_TABLE(stg_MUT_CONS, 1, 1, MUT_CONS, "MUT_CONS", "MUT_CONS")
-{ foreign "C" barf("MUT_CONS object entered!"); }
-
-/* ----------------------------------------------------------------------------
    Exception lists
    ------------------------------------------------------------------------- */
 
@@ -662,11 +646,14 @@ INFO_TABLE(stg_MUT_ARR_PTRS, 0, 0, MUT_ARR_PTRS, "MUT_ARR_PTRS", "MUT_ARR_PTRS")
 INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN, 0, 0, MUT_ARR_PTRS_FROZEN, "MUT_ARR_PTRS_FROZEN", "MUT_ARR_PTRS_FROZEN")
 { foreign "C" barf("MUT_ARR_PTRS_FROZEN object entered!"); }
 
+INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN0, 0, 0, MUT_ARR_PTRS_FROZEN0, "MUT_ARR_PTRS_FROZEN0", "MUT_ARR_PTRS_FROZEN0")
+{ foreign "C" barf("MUT_ARR_PTRS_FROZEN0 object entered!"); }
+
 /* ----------------------------------------------------------------------------
    Mutable Variables
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_MUT_VAR, 1, 1, MUT_VAR, "MUT_VAR", "MUT_VAR")
+INFO_TABLE(stg_MUT_VAR, 1, 0, MUT_VAR, "MUT_VAR", "MUT_VAR")
 { foreign "C" barf("MUT_VAR object entered!"); }
 
 /* ----------------------------------------------------------------------------

@@ -213,7 +213,7 @@ main(int argc, char *argv[])
     struct_field(bdescr, link);
 
     struct_size(generation);
-    struct_field(generation, mut_once_list);
+    struct_field(generation, mut_list);
 
     struct_field(CostCentreStack, ccsID);
     struct_field(CostCentreStack, mem_alloc);
@@ -245,7 +245,6 @@ main(int argc, char *argv[])
     closure_payload(StgArrWords, payload);
 
     closure_field(StgTSO, link);
-    closure_field(StgTSO, mut_link);
     closure_field(StgTSO, global_link);
     closure_field(StgTSO, what_next);
     closure_field(StgTSO, why_blocked);
@@ -294,7 +293,6 @@ main(int argc, char *argv[])
     closure_payload(StgAP_STACK, payload);
 
     closure_field(StgInd, indirectee);
-    closure_field(StgMutClosure, mut_link);
 
     closure_size(StgMutVar);
     closure_field(StgMutVar, var);

@@ -106,8 +106,7 @@ initStorage( void )
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
     gen = &generations[g];
     gen->no = g;
-    gen->mut_list = END_MUT_LIST;
-    gen->mut_once_list = END_MUT_LIST;
+    gen->mut_list = allocBlock();
     gen->collections = 0;
     gen->failed_promotions = 0;
     gen->max_blocks = 0;
@@ -270,8 +269,8 @@ newCAF(StgClosure* caf)
   ACQUIRE_SM_LOCK;
 
   ((StgIndStatic *)caf)->saved_info = NULL;
-  ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
-  oldest_gen->mut_once_list = (StgMutClosure *)caf;
+
+  recordMutableGen(caf, oldest_gen);
 
   RELEASE_SM_LOCK;
 
@@ -791,25 +790,28 @@ memInventory(void)
   /* count the blocks we current have */
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
-      stp = &generations[g].steps[s];
-      total_blocks += stp->n_blocks;
-      if (RtsFlags.GcFlags.generations == 1) {
-	/* two-space collector has a to-space too :-) */
-	total_blocks += g0s0->n_to_blocks;
+      for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
+	  total_blocks += bd->blocks;
       }
-      for (bd = stp->large_objects; bd; bd = bd->link) {
-	total_blocks += bd->blocks;
-	/* hack for megablock groups: they have an extra block or two in
-	   the second and subsequent megablocks where the block
-	   descriptors would normally go.
-	*/
-	if (bd->blocks > BLOCKS_PER_MBLOCK) {
-	  total_blocks -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
-	                  * (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
-	}
+      for (s = 0; s < generations[g].n_steps; s++) {
+	  stp = &generations[g].steps[s];
+	  total_blocks += stp->n_blocks;
+	  if (RtsFlags.GcFlags.generations == 1) {
+	      /* two-space collector has a to-space too :-) */
+	      total_blocks += g0s0->n_to_blocks;
+	  }
+	  for (bd = stp->large_objects; bd; bd = bd->link) {
+	      total_blocks += bd->blocks;
+	      /* hack for megablock groups: they have an extra block or two in
+		 the second and subsequent megablocks where the block
+		 descriptors would normally go.
+	      */
+	      if (bd->blocks > BLOCKS_PER_MBLOCK) {
+		  total_blocks -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
+		      * (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
+	      }
+	  }
       }
-    }
   }
 
   /* any blocks held by allocate() */
@@ -872,7 +874,6 @@ checkSanity( void )
 		checkChain(generations[g].steps[s].large_objects);
 		if (g > 0) {
 		    checkMutableList(generations[g].mut_list, g);
-		    checkMutOnceList(generations[g].mut_once_list, g);
 		}
 	    }
 	}

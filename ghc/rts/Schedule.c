@@ -1064,7 +1064,6 @@ run_thread:
 #endif
       
       ready_to_gc = rtsTrue;
-      context_switch = 1;		/* stop other threads ASAP */
       PUSH_ON_RUN_QUEUE(t);
       /* actual GC is done at the end of the while loop */
       break;
@@ -2350,7 +2349,6 @@ threadStackOverflow(StgTSO *tso)
   tso->link = dest;
   tso->sp = (P_)&(tso->stack[tso->stack_size]);
   tso->why_blocked = NotBlocked;
-  dest->mut_link = NULL;
 
   IF_PAR_DEBUG(verbose,
 	       debugBelch("@@ threadStackOverflow of TSO %d (now at %p): stack size increased to %ld\n",

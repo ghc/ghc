@@ -528,6 +528,7 @@ typedef struct _RtsSymbolVal {
       SymX(stg_IND_STATIC_info)			\
       SymX(stg_INTLIKE_closure)			\
       SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
+      SymX(stg_MUT_ARR_PTRS_FROZEN0_info)	\
       SymX(stg_WEAK_info)                       \
       SymX(stg_ap_0_info)			\
       SymX(stg_ap_v_info)			\

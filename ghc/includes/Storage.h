@@ -80,11 +80,10 @@ typedef struct _generation {
   step *         steps;			/* steps */
   unsigned int   n_steps;		/* number of steps */
   unsigned int   max_blocks;		/* max blocks in step 0 */
-  StgMutClosure *mut_list;      	/* mut objects in this gen (not G0)*/
-  StgMutClosure *mut_once_list; 	/* objects that point to younger gens */
+  bdescr        *mut_list;      	/* mut objects in this gen (not G0)*/
 
   /* temporary use during GC: */
-  StgMutClosure * saved_mut_list;
+  bdescr        *saved_mut_list;
 
   /* stats information */
   unsigned int collections;
@@ -200,37 +199,33 @@ extern Mutex sm_mutex;
 #define RELEASE_SM_LOCK
 #endif
 
-/* ToDo: shouldn't recordMutable and recordOldToNewPtrs acquire some
- * kind of lock in the SMP case?
+/* ToDo: shouldn't recordMutable acquire some
+ * kind of lock in the SMP case?  Or do we need per-processor
+ * mutable lists?
  */
 INLINE_HEADER void
-recordMutable(StgMutClosure *p)
+recordMutableGen(StgClosure *p, generation *gen)
 {
-  bdescr *bd;
+    bdescr *bd;
 
-#ifdef SMP
-  ASSERT(p->header.info == &stg_WHITEHOLE_info || closure_MUTABLE(p));
-#else
-  ASSERT(closure_MUTABLE(p));
-#endif
-
-  bd = Bdescr((P_)p);
-  if (bd->gen_no > 0) {
-    p->mut_link = RTS_DEREF(generations)[bd->gen_no].mut_list;
-    RTS_DEREF(generations)[bd->gen_no].mut_list = p;
-  }
+    bd = gen->mut_list;
+    if (bd->free >= bd->start + BLOCK_SIZE_W) {
+	bdescr *new_bd;
+	new_bd = allocBlock();
+	new_bd->link = bd;
+	bd = new_bd;
+	gen->mut_list = bd;
+    }
+    *bd->free++ = (StgWord)p;
 }
 
 INLINE_HEADER void
-recordOldToNewPtrs(StgMutClosure *p)
+recordMutable(StgClosure *p)
 {
-  bdescr *bd;
-  
-  bd = Bdescr((P_)p);
-  if (bd->gen_no > 0) {
-    p->mut_link = RTS_DEREF(generations)[bd->gen_no].mut_once_list;
-    RTS_DEREF(generations)[bd->gen_no].mut_once_list = p;
-  }
+    bdescr *bd;
+    ASSERT(closure_MUTABLE(p));
+    bd = Bdescr((P_)p);
+    if (bd->gen_no > 0) recordMutableGen(p, &RTS_DEREF(generations)[bd->gen_no]);
 }
 
 /* -----------------------------------------------------------------------------
@@ -277,10 +272,10 @@ INLINE_HEADER StgOffset CONSTR_sizeW( nat p, nat np )
 { return sizeofW(StgHeader) + p + np; }
 
 INLINE_HEADER StgOffset THUNK_SELECTOR_sizeW ( void )
-{ return sizeofW(StgHeader) + MIN_UPD_SIZE; }
+{ return stg_max(sizeofW(StgHeader)+MIN_UPD_SIZE, sizeofW(StgSelector)); }
 
 INLINE_HEADER StgOffset BLACKHOLE_sizeW ( void )
-{ return sizeofW(StgHeader) + MIN_UPD_SIZE; }
+{ return stg_max(sizeofW(StgHeader)+MIN_UPD_SIZE, sizeofW(StgBlockingQueue)); }
 
 /* --------------------------------------------------------------------------
    Sizes of closures
@@ -352,14 +347,6 @@ extern void     resetNurseries ( void );
 extern bdescr * allocNursery   ( bdescr *last_bd, nat blocks );
 extern void     resizeNursery  ( nat blocks );
 extern void     tidyAllocateLists ( void );
-
-/* -----------------------------------------------------------------------------
-   MUTABLE LISTS
-   A mutable list is ended with END_MUT_LIST, so that we can use NULL
-   as an indication that an object is not on a mutable list.
-   ------------------------------------------------------------------------- */
-
-#define END_MUT_LIST ((StgMutClosure *)(void *)&stg_END_MUT_LIST_closure)
 
 /* -----------------------------------------------------------------------------
    Functions from GC.c 

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.27 2004/11/18 09:56:19 tharris Exp $
+ * $Id: Constants.h,v 1.28 2005/02/10 13:02:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -21,12 +21,12 @@
 /* -----------------------------------------------------------------------------
    Minimum closure sizes
 
-   Here we define the minimum size for updatable closures. This must be at
-   least 2, to allow for cons cells and linked indirections. All updates
+   Here we define the minimum size for updatable closures. All updates
    will be performed on closures of this size. For non-updatable closures
    the minimum size is 1 to allow for a forwarding pointer.
 
-   Linked indirections are UPD_OLDGEN things: see Closures.h
+   When we used to keep the mutable list threaded through closures on
+   the heap, MIN_UPD_SIZE used to be 2.  Now it's 1.
 
    o MIN_UPD_SIZE doesn't apply to stack closures, static closures
      or non-updateable objects like PAPs or CONSTRs
@@ -42,7 +42,7 @@
      o EVACUATED
    -------------------------------------------------------------------------- */
 
-#define MIN_UPD_SIZE	2
+#define MIN_UPD_SIZE	1
 #define MIN_NONUPD_SIZE 1
 
 /* -----------------------------------------------------------------------------

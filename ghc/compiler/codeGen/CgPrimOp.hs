@@ -175,7 +175,7 @@ emitPrimOp [res] DataToTagOp [arg] live
 
 -- #define unsafeFreezzeArrayzh(r,a)
 --	{
---        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN_info);
+--        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN0_info);
 --	  r = a;
 --	}
 emitPrimOp [res] UnsafeFreezeArrayOp [arg] live

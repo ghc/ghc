@@ -29,7 +29,8 @@ module ClosureInfo (
 
 	closureName, infoTableLabelFromCI,
 	closureLabelFromCI, closureSRT,
-	closureLFInfo, closureSMRep, closureUpdReqd,
+	closureLFInfo, closureSMRep, closureUpdReqd, 
+	closureNeedsUpdSpace,
 	closureSingleEntry, closureReEntrant, isConstrClosure_maybe,
 	closureFunInfo,	isStandardFormThunk, isKnownFun,
 

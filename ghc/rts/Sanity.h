@@ -26,8 +26,7 @@ extern void checkStackChunk    ( StgPtr sp, StgPtr stack_end );
 extern StgOffset checkStackFrame ( StgPtr sp );
 extern StgOffset checkClosure  ( StgClosure* p );
 
-extern void checkMutableList   ( StgMutClosure *p, nat gen );
-extern void checkMutOnceList   ( StgMutClosure *p, nat gen );
+extern void checkMutableList   ( bdescr *bd, nat gen );
 
 #if defined(GRAN)
 extern void checkTSOsSanity(void);

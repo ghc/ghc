@@ -345,7 +345,7 @@ mkUpdInfoLabel			= RtsLabel (RtsInfo SLIT("stg_upd_frame"))
 mkSeqInfoLabel			= RtsLabel (RtsInfo SLIT("stg_seq_frame"))
 mkIndStaticInfoLabel		= RtsLabel (RtsInfo SLIT("stg_IND_STATIC"))
 mkMainCapabilityLabel		= RtsLabel (RtsData SLIT("MainCapability"))
-mkMAP_FROZEN_infoLabel		= RtsLabel (RtsInfo SLIT("stg_MUT_ARR_PTRS_FROZEN"))
+mkMAP_FROZEN_infoLabel		= RtsLabel (RtsInfo SLIT("stg_MUT_ARR_PTRS_FROZEN0"))
 mkEMPTY_MVAR_infoLabel		= RtsLabel (RtsInfo SLIT("stg_EMPTY_MVAR"))
 
 mkTopTickyCtrLabel		= RtsLabel (RtsData SLIT("top_ct"))

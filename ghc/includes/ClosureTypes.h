@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.19 2004/11/18 09:56:17 tharris Exp $
+ * $Id: ClosureTypes.h,v 1.20 2005/02/10 13:02:02 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -66,9 +66,9 @@
 #define MVAR		        50
 #define ARR_WORDS	        51
 #define MUT_ARR_PTRS	        52
-#define MUT_ARR_PTRS_FROZEN     53
-#define MUT_VAR		        54
-#define MUT_CONS                55
+#define MUT_ARR_PTRS_FROZEN0    53
+#define MUT_ARR_PTRS_FROZEN     54
+#define MUT_VAR		        55
 #define WEAK		        56
 #define FOREIGN		        57
 #define STABLE_NAME	        58
@@ -87,5 +87,5 @@
 #define CATCH_RETRY_FRAME       71
 #define CATCH_STM_FRAME         72
 #define N_CLOSURE_TYPES         73
-				
+
 #endif /* CLOSURETYPES_H */

@@ -51,7 +51,8 @@ initGroup(nat n, bdescr *head)
 
   if (n != 0) {
     head->blocks = n;
-    head->free = head->start;
+    head->free   = head->start;
+    head->link   = NULL;
     for (i=1, bd = head+1; i < n; i++, bd++) {
       bd->free = 0;
       bd->blocks = 0;
@@ -78,9 +79,8 @@ allocGroup(nat n)
       *last = bd->link;
       /* no initialisation necessary - this is already a
        * self-contained block group. */
-#ifdef DEBUG
       bd->free = bd->start;	/* block isn't free now */
-#endif
+      bd->link = NULL;
       return bd;
     }
     if (bd->blocks >  n) {	/* block too big... */
@@ -226,13 +226,12 @@ freeGroup(bdescr *p)
     return;
   }
 
-#ifdef DEBUG
+
   p->free = (void *)-1;  /* indicates that this block is free */
   p->step = NULL;
   p->gen_no = 0;
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(sanity,memset(p->start, 0xaa, p->blocks * BLOCK_SIZE));
-#endif
 
   /* find correct place in free list to place new group */
   last = NULL;

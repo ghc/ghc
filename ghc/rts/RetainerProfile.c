@@ -464,7 +464,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
 	// one child (fixed), no SRT
     case MUT_VAR:
-    case MUT_CONS:
 	*first_child = ((StgMutVar *)c)->var;
 	return;
     case BLACKHOLE_BQ:
@@ -478,7 +477,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case IND_PERM:
     case IND_OLDGEN_PERM:
     case IND_OLDGEN:
-	*first_child = ((StgIndOldGen *)c)->indirectee;
+	*first_child = ((StgInd *)c)->indirectee;
 	return;
     case CONSTR_1_0:
     case CONSTR_1_1:
@@ -895,7 +894,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case ARR_WORDS:
 	    // one child (fixed), no SRT
 	case MUT_VAR:
-	case MUT_CONS:
 	case BLACKHOLE_BQ:
 	case THUNK_SELECTOR:
 	case IND_PERM:
@@ -997,7 +995,6 @@ isRetainer( StgClosure *c )
 	// mutable objects
     case MVAR:
     case MUT_VAR:
-    case MUT_CONS:
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
 
@@ -1749,7 +1746,8 @@ computeRetainerSet( void )
     StgWeak *weak;
     RetainerSet *rtl;
     nat g;
-    StgMutClosure *ml;
+    StgPtr ml;
+    bdescr *bd;
 #ifdef DEBUG_RETAINER
     RetainerSet tmpRetainerSet;
 #endif
@@ -1772,81 +1770,44 @@ computeRetainerSet( void )
     // object (computing sumOfNewCostExtra and updating costArray[] when
     // debugging retainer profiler).
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	ASSERT(g != 0 ||
-	       (generations[g].mut_list == END_MUT_LIST &&
-		generations[g].mut_once_list == END_MUT_LIST));
+	ASSERT(g != 0 || (generations[g].mut_list == NULL))
 
-	// Todo:
-	// I think traversing through mut_list is unnecessary.
-	// Think about removing this part.
-	for (ml = generations[g].mut_list; ml != END_MUT_LIST;
-	     ml = ml->mut_link) {
-
-	    maybeInitRetainerSet((StgClosure *)ml);
-	    rtl = retainerSetOf((StgClosure *)ml);
-
-#ifdef DEBUG_RETAINER
-	    if (rtl == NULL) {
-		// first visit to *ml
-		// This is a violation of the interface rule!
-		RSET(ml) = (RetainerSet *)((StgWord)(&tmpRetainerSet) | flip);
-
-		switch (get_itbl((StgClosure *)ml)->type) {
-		case IND_STATIC:
-		    // no cost involved
-		    break;
-		case CONSTR_INTLIKE:
-		case CONSTR_CHARLIKE:
-		case CONSTR_NOCAF_STATIC:
-		case CONSTR_STATIC:
-		case THUNK_STATIC:
-		case FUN_STATIC:
-		    barf("Invalid object in computeRetainerSet(): %d", get_itbl((StgClosure*)ml)->type);
-		    break;
-		default:
-		    // dynamic objects
-		    costArray[get_itbl((StgClosure *)ml)->type] += cost((StgClosure *)ml);
-		    sumOfNewCostExtra += cost((StgClosure *)ml);
-		    break;
-		}
-	    }
-#endif
-	}
-
-	// Traversing through mut_once_list is, in contrast, necessary
+	// Traversing through mut_list is necessary
 	// because we can find MUT_VAR objects which have not been
 	// visited during retainer profiling.
-	for (ml = generations[g].mut_once_list; ml != END_MUT_LIST;
-	     ml = ml->mut_link) {
+	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
+	    for (ml = bd->start; ml < bd->free; ml++) {
 
-	    maybeInitRetainerSet((StgClosure *)ml);
-	    rtl = retainerSetOf((StgClosure *)ml);
+		maybeInitRetainerSet((StgClosure *)ml);
+		rtl = retainerSetOf((StgClosure *)ml);
+
 #ifdef DEBUG_RETAINER
-	    if (rtl == NULL) {
-		// first visit to *ml
-		// This is a violation of the interface rule!
-		RSET(ml) = (RetainerSet *)((StgWord)(&tmpRetainerSet) | flip);
-
-		switch (get_itbl((StgClosure *)ml)->type) {
-		case IND_STATIC:
-		    // no cost involved
-		    break;
-		case CONSTR_INTLIKE:
-		case CONSTR_CHARLIKE:
-		case CONSTR_NOCAF_STATIC:
-		case CONSTR_STATIC:
-		case THUNK_STATIC:
-		case FUN_STATIC:
-		    barf("Invalid object in computeRetainerSet(): %d", get_itbl((StgClosure*)ml)->type);
-		    break;
-		default:
-		    // dynamic objects
-		    costArray[get_itbl((StgClosure *)ml)->type] += cost((StgClosure *)ml);
-		    sumOfNewCostExtra += cost((StgClosure *)ml);
-		    break;
+		if (rtl == NULL) {
+		    // first visit to *ml
+		    // This is a violation of the interface rule!
+		    RSET(ml) = (RetainerSet *)((StgWord)(&tmpRetainerSet) | flip);
+		    
+		    switch (get_itbl((StgClosure *)ml)->type) {
+		    case IND_STATIC:
+			// no cost involved
+			break;
+		    case CONSTR_INTLIKE:
+		    case CONSTR_CHARLIKE:
+		    case CONSTR_NOCAF_STATIC:
+		    case CONSTR_STATIC:
+		    case THUNK_STATIC:
+		    case FUN_STATIC:
+			barf("Invalid object in computeRetainerSet(): %d", get_itbl((StgClosure*)ml)->type);
+			break;
+		    default:
+			// dynamic objects
+			costArray[get_itbl((StgClosure *)ml)->type] += cost((StgClosure *)ml);
+			sumOfNewCostExtra += cost((StgClosure *)ml);
+			break;
+		    }
 		}
-	    }
 #endif
+	    }
 	}
     }
 }
@@ -2137,7 +2098,6 @@ sanityCheckHeapClosure( StgClosure *c )
     case FUN_0_2:
     case WEAK:
     case MUT_VAR:
-    case MUT_CONS:
     case CAF_BLACKHOLE:
     case BLACKHOLE:
     case SE_BLACKHOLE:

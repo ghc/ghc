@@ -66,19 +66,6 @@ struct StgClosure_ {
     struct StgClosure_ *payload[FLEXIBLE_ARRAY];
 };
 
-/* What a stroke of luck - all our mutable closures follow the same
- * basic layout, with the mutable link field as the second field after
- * the header.  This means the following structure is the supertype of
- * mutable closures.
- */
-
-typedef struct StgMutClosure_ {
-    StgHeader   header;
-    StgWord     padding;
-    struct StgMutClosure_ *mut_link;
-    struct StgClosure_ *payload[FLEXIBLE_ARRAY];
-} StgMutClosure;
-
 typedef struct {
     StgHeader   header;
     StgClosure *selectee;
@@ -108,12 +95,6 @@ typedef struct {
 } StgInd;
 
 typedef struct {
-    StgHeader   header;
-    StgClosure *indirectee;
-    StgMutClosure *mut_link;
-} StgIndOldGen;
-
-typedef struct {
     StgHeader     header;
     StgClosure   *indirectee;
     StgClosure   *static_link;
@@ -129,14 +110,12 @@ typedef struct {
 typedef struct {
     StgHeader   header;
     StgWord     ptrs;
-    StgMutClosure *mut_link;	/* mutable list */
     StgClosure *payload[FLEXIBLE_ARRAY];
 } StgMutArrPtrs;
 
 typedef struct {
     StgHeader   header;
     StgClosure *var;
-    StgMutClosure *mut_link;
 } StgMutVar;
 
 typedef struct _StgUpdateFrame {
@@ -303,7 +282,6 @@ typedef struct {
 typedef struct {
   StgHeader       header;
   struct StgTSO_ *head;
-  StgMutClosure  *mut_link;
   struct StgTSO_ *tail;
   StgClosure*     value;
 } StgMVar;
@@ -329,7 +307,6 @@ typedef struct {
 typedef struct StgTVarWaitQueue_ {
   StgHeader                  header;
   struct StgTSO_            *waiting_tso;
-  StgMutClosure             *mut_link;
   struct StgTVarWaitQueue_  *next_queue_entry;
   struct StgTVarWaitQueue_  *prev_queue_entry;
 } StgTVarWaitQueue;
@@ -337,7 +314,6 @@ typedef struct StgTVarWaitQueue_ {
 typedef struct {
   StgHeader                  header;
   StgClosure                *current_value;
-  StgMutClosure             *mut_link;
   StgTVarWaitQueue          *first_wait_queue_entry;
 } StgTVar;
 
@@ -354,7 +330,6 @@ typedef struct {
 typedef struct StgTRecChunk_ {
   StgHeader                  header;
   struct StgTRecChunk_      *prev_chunk;
-  StgMutClosure             *mut_link;
   StgWord                    next_entry_idx;
   TRecEntry                  entries[TREC_CHUNK_NUM_ENTRIES];
 } StgTRecChunk;
@@ -371,7 +346,6 @@ typedef enum {
 typedef struct StgTRecHeader_ {
   StgHeader                  header;
   TRecState                  state;
-  StgMutClosure             *mut_link;
   struct StgTRecHeader_     *enclosing_trec;
   StgTRecChunk              *current_chunk;
 } StgTRecHeader;
@@ -401,8 +375,7 @@ typedef struct {
   of closures that can be found on a blocking queue: StgTSO, StgRBHSave,
   StgBlockedFetch.  (StgRBHSave can only appear at the end of a blocking
   queue).  Logically, this is a union type, but defining another struct
-  with a common layout is easier to handle in the code (same as for
-  StgMutClosures).  
+  with a common layout is easier to handle in the code.  
   Note that in the standard setup only StgTSOs can be on a blocking queue.
   This is one of the main reasons for slightly different code in files
   such as Schedule.c.
@@ -410,7 +383,6 @@ typedef struct {
 typedef struct StgBlockingQueueElement_ {
   StgHeader                         header;
   struct StgBlockingQueueElement_  *link;      /* next elem in BQ */
-  StgMutClosure                    *mut_link;  /* next elem in mutable list */
   struct StgClosure_               *payload[FLEXIBLE_ARRAY];/* contents of the closure */
 } StgBlockingQueueElement;
 
@@ -418,7 +390,6 @@ typedef struct StgBlockingQueueElement_ {
 typedef struct StgBlockingQueue_ {
   StgHeader                 header;
   struct StgBlockingQueueElement_ *blocking_queue; /* start of the BQ */
-  StgMutClosure            *mut_link;              /* next elem in mutable list */
 } StgBlockingQueue;
 
 /* this closure is hanging at the end of a blocking queue in (see RBH.c) */
@@ -430,7 +401,6 @@ typedef struct StgRBHSave_ {
 typedef struct StgRBH_ {
   StgHeader                         header;
   struct StgBlockingQueueElement_  *blocking_queue; /* start of the BQ */
-  StgMutClosure                    *mut_link;       /* next elem in mutable list */
 } StgRBH;
 
 #else
@@ -438,7 +408,6 @@ typedef struct StgRBH_ {
 typedef struct StgBlockingQueue_ {
   StgHeader          header;
   struct StgTSO_    *blocking_queue;
-  StgMutClosure     *mut_link;
 } StgBlockingQueue;
 
 #endif
@@ -448,14 +417,12 @@ typedef struct StgBlockingQueue_ {
 typedef struct StgFetchMe_ {
   StgHeader              header;
   globalAddr            *ga;        /* ptr to unique id for a closure */
-  StgMutClosure         *mut_link;  /* next elem in mutable list */
 } StgFetchMe;
 
 /* same contents as an ordinary StgBlockingQueue */
 typedef struct StgFetchMeBlockingQueue_ {
   StgHeader                          header;
   struct StgBlockingQueueElement_   *blocking_queue; /* start of the BQ */
-  StgMutClosure                     *mut_link;       /* next elem in mutable list */
 } StgFetchMeBlockingQueue;
 
 /* This is an entry in a blocking queue. It indicates a fetch request from a 
@@ -467,7 +434,6 @@ typedef struct StgFetchMeBlockingQueue_ {
 typedef struct StgBlockedFetch_ {
   StgHeader                         header;
   struct StgBlockingQueueElement_  *link;     /* next elem in the BQ */
-  StgMutClosure                    *mut_link; /* next elem in mutable list */
   StgClosure                       *node;     /* node to fetch */
   globalAddr                        ga;       /* where to send the result to */
 } StgBlockedFetch;                            /* NB: not just a ptr to a GA */

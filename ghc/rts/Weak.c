@@ -75,7 +75,6 @@ scheduleFinalizers(StgWeak *list)
     arr = (StgMutArrPtrs *)allocate(sizeofW(StgMutArrPtrs) + n);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
     SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
-    arr->mut_link = NULL;
     arr->ptrs = n;
 
     n = 0;
