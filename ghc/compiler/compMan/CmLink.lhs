@@ -42,6 +42,7 @@ import IO
 data PersistentLinkerState 
    = PersistentLinkerState {
 
+
 #ifdef GHCI
 	-- Current global mapping from RdrNames to closure addresses
         closure_env :: ClosureEnv,
@@ -51,7 +52,11 @@ data PersistentLinkerState
 	-- When a new Unlinked is linked into the running image, or an existing
 	-- module in the image is replaced, the itbl_env must be updated
 	-- appropriately.
-        itbl_env    :: ItblEnv
+        itbl_env    :: ItblEnv,
+
+	-- list of objects we've loaded (we'll need to unload them again
+	-- before re-loading the same module).
+	objects_loaded :: [FilePath]
 
 	-- notionally here, but really lives in the C part of the linker:
 	--            object_symtab :: FiniteMap String Addr
@@ -76,7 +81,8 @@ findModuleLinkable_maybe lis mod
 emptyPLS :: IO PersistentLinkerState
 #ifdef GHCI
 emptyPLS = return (PersistentLinkerState { closure_env = emptyFM, 
-                                           itbl_env    = emptyFM })
+                                           itbl_env    = emptyFM,
+					   objects_loaded = [] })
 #else
 emptyPLS = return (PersistentLinkerState {})
 #endif
@@ -135,14 +141,14 @@ link' Batch dflags batch_attempt_linking linkables pls1
         return (LinkOK pls1)
    where
       verb = verbosity dflags
-      getOfiles (LP _)    = panic "CmLink.link(getOfiles): shouldn't get package linkables"
+      getOfiles (LP _)    = panic "CmLink.link(getOfiles): found package linkable"
       getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 
 link' Interactive dflags batch_attempt_linking linkables pls1
     = do showPass dflags "Linking"
 	 pls2 <- unload pls1
-	 linkObjs linkables pls2
-
+	 linkObjs linkables [] pls2
+	 	-- reverse the linkables, to get the leaves of the tree first.
 
 ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC
@@ -174,29 +180,30 @@ linkObjs      = panic "CmLink.linkObjs: no interpreter"
 unload        = panic "CmLink.unload: no interpreter"
 lookupClosure = panic "CmLink.lookupClosure: no interpreter"
 #else
-linkObjs [] pls = linkFinish pls [] []
-linkObjs (l@(LM _ _ uls) : ls) pls
+linkObjs [] mods pls = linkFinish pls [] []
+linkObjs (l@(LM _ m uls) : ls) mods pls
    | all isObject uls = do
-	mapM_ loadObj [ file | DotO file <- uls ] 
-	linkObjs ls pls
-   | all isInterpretable uls  = linkInterpretedCode (l:ls) [] [] pls
+	let objs = [ file | DotO file <- uls ] 
+	mapM_ loadObj objs
+	linkObjs ls (m:mods) pls{objects_loaded = objs++objects_loaded pls}
+   | all isInterpretable uls  = linkInterpretedCode (l:ls) mods [] pls
    | otherwise                = invalidLinkable
-linkObjs _ pls = 
-   throwDyn (OtherError "CmLink.linkObjs: found package linkable")
+linkObjs _ _ _ = 
+   panic "CmLink.linkObjs: found package linkable"
 
  
 linkInterpretedCode [] mods ul_trees pls = linkFinish pls mods ul_trees
 linkInterpretedCode (LM _ m uls : ls) mods ul_trees pls
    | all isInterpretable uls = 
 	linkInterpretedCode ls (m:mods) (uls++ul_trees) pls
-        
    | any isObject uls
-        = throwDyn (OtherError "can't link object code that depends on interpreted code")
+        = throwDyn (OtherError 
+	     "can't link object code that depends on interpreted code")
    | otherwise = invalidLinkable
 linkInterpretedCode _ _ _ pls = 
-   throwDyn (OtherError "CmLink.linkInterpretedCode: found package linkable")
+   panic "CmLink.linkInterpretedCode: found package linkable"
 
-invalidLinkable = throwDyn (OtherError "linkable doesn't contain entirely objects interpreted code")
+invalidLinkable = panic "CmLink: linkable doesn't contain entirely objects or interpreted code"
 
 
 -- link all the interpreted code in one go.  We first remove from the
@@ -210,15 +217,18 @@ linkFinish pls mods ul_bcos = do
    (ibinds, new_itbl_env, new_closure_env) <-
 	linkIModules itbl_env' closure_env' stuff
 
-   let new_pls = PersistentLinkerState {
-				  closure_env = new_closure_env,
-				  itbl_env    = new_itbl_env
-			}
+   let new_pls = pls { closure_env = new_closure_env,
+		       itbl_env    = new_itbl_env
+		     }
    return (LinkOK new_pls)
 
 -- purge the current "linked image"
 unload :: PersistentLinkerState -> IO PersistentLinkerState
-unload pls = return pls{ closure_env = emptyFM, itbl_env = emptyFM }
+unload pls = do
+   mapM unloadObj (objects_loaded pls)
+   return pls{ closure_env = emptyFM, 
+	       itbl_env = emptyFM,
+	       objects_loaded = [] }
 
 linkExpr :: PersistentLinkerState -> UnlinkedBCOExpr -> IO HValue
 linkExpr PersistentLinkerState{ itbl_env = ie, closure_env = ce } bcos
