@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.16 2002/04/30 14:40:56 simonmar Exp $
+# $Id: Makefile,v 1.17 2002/05/29 22:11:59 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -13,15 +13,14 @@ INSTALLING=1
 SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -package lang \
 		    -package util -package text
 
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = ghc-pkg.bin
 INSTALL_LIBEXECS += $(HS_PROG)
-else
+
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = ghc-pkg.exe
 INSTALL_PROGS    += $(HS_PROG)
 SRC_HC_OPTS      += -package win32
 endif
-
 
 # -----------------------------------------------------------------------------
 # ghc-pkg script
@@ -39,7 +38,7 @@ GHCPKGBIN=$(FPTOOLS_TOP_ABS)/ghc/utils/ghc-pkg/$(HS_PROG)
 PKGCONF=$(FPTOOLS_TOP_ABS)/ghc/driver/package.conf.inplace
 endif
 
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALLED_SCRIPT_PROG  = ghc-pkg-$(ProjectVersion)
 endif
 INPLACE_SCRIPT_PROG    = ghc-pkg-inplace
@@ -47,14 +46,14 @@ INPLACE_SCRIPT_PROG    = ghc-pkg-inplace
 SCRIPT_OBJS	  = ghc-pkg.sh
 INTERP		  = $(SHELL)
 SCRIPT_SUBST_VARS = GHCPKGBIN PKGCONFOPT
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 endif
 PKGCONFOPT 	  = -f $(PKGCONF)
 
 ifeq "$(INSTALLING)" "1"
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 LINK 		=  ghc-pkg
 endif
 else

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.22 2002/04/22 14:20:41 simonmar Exp $
+-- $Id: Main.hs,v 1.23 2002/05/29 22:11:58 sof Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -24,7 +24,7 @@ import List ( isPrefixOf )
 
 #include "../../includes/config.h"
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 import Win32DLL
 #endif
 
@@ -75,7 +75,7 @@ flags = [
 	"Automatically build libs for GHCi (with -a)"
   ]
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 subst a b ls = map (\ x -> if x == a then b else x) ls
 
 unDosifyPath xs = subst '\\' '/' xs
@@ -85,7 +85,7 @@ runit clis = do
   conf_file <- 
      case [ f | Config f <- clis ] of
         fs@(_:_)  -> return (last fs)
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 	[] -> die "missing -f option, location of package.conf unknown"
 #else
 	[] -> do h <- getModuleHandle Nothing
