@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.131 2001/01/09 17:43:57 rrt Exp $
+# $Id: Makefile,v 1.132 2001/01/16 10:49:13 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -161,7 +161,7 @@ empty:=
 space:= $(empty) $(empty)
 
 SRC_HC_OPTS += \
-  -cpp -fglasgow-exts \
+  -cpp -fglasgow-exts -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS)) 
 
