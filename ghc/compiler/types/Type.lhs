@@ -5,23 +5,13 @@
 
 \begin{code}
 module Type (
-        -- re-exports from TypeRep:
-	TyThing(..),
-	Type, PredType(..), ThetaType,
-	Kind, TyVarSubst, 
-
-	superKind, superBoxity,				-- KX and BX respectively
-	liftedBoxity, unliftedBoxity, 			-- :: BX
-	openKindCon, 					-- :: KX
-	typeCon,					-- :: BX -> KX
-	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
-	isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, isSuperKind,
-	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
-	isTypeKind, isAnyTypeKind,
+        -- re-exports from TypeRep
+	TyThing(..), Type, PredType(..), ThetaType, TyVarSubst, 
 	funTyCon,
 
-        -- exports from this module:
-        hasMoreBoxityInfo, defaultKind,
+	-- Re-exports from Kind
+	module Kind,
+
 
 	mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, isTyVarTy,
 
@@ -63,13 +53,12 @@ module Type (
 	tidyTopType,   tidyPred,
 
 	-- Comparison
-	eqType, eqKind, 
+	eqType, 
 
 	-- Seq
 	seqType, seqTypes,
 
 	-- Pretty-printing
-	pprKind, pprParendKind,
 	pprType, pprParendType,
 	pprPred, pprTheta, pprThetaArrow, pprClassPred
     ) where
@@ -86,6 +75,7 @@ import TypeRep
 import {-# SOURCE #-}   Subst  ( substTyWith )
 
 -- friends:
+import Kind
 import Var	( TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
@@ -109,38 +99,6 @@ import Util		( mapAccumL, seqList, lengthIs, snocView )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 import Maybe		( isJust )
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Stuff to do with kinds.}
-%*									*
-%************************************************************************
-
-\begin{code}
-hasMoreBoxityInfo :: Kind -> Kind -> Bool
--- (k1 `hasMoreBoxityInfo` k2) checks that k1 <: k2
-hasMoreBoxityInfo k1 k2
-  | k2 `eqKind` openTypeKind = isAnyTypeKind k1
-  | otherwise	  	     = k1 `eqKind` k2
-
-isAnyTypeKind :: Kind -> Bool
--- True of kind * and *# and ?
-isAnyTypeKind (TyConApp tc _) = tc == typeCon || tc == openKindCon
-isAnyTypeKind (NoteTy _ k)    = isAnyTypeKind k
-isAnyTypeKind other	      = False
-
-isTypeKind :: Kind -> Bool
--- True of kind * and *#
-isTypeKind (TyConApp tc _) = tc == typeCon
-isTypeKind (NoteTy _ k)    = isTypeKind k
-isTypeKind other	   = False
-
-defaultKind :: Kind -> Kind
--- Used when generalising: default kind '?' to '*'
-defaultKind kind | kind `eqKind` openTypeKind = liftedTypeKind
-	         | otherwise	 	      = kind
 \end{code}
 
 
@@ -622,26 +580,13 @@ new_type_rep new_tycon tys = ASSERT( tys `lengthIs` tyConArity new_tycon )
 typeKind :: Type -> Kind
 
 typeKind (TyVarTy tyvar)	= tyVarKind tyvar
-typeKind (TyConApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) tys
-typeKind (NewTcApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) tys
+typeKind (TyConApp tycon tys)	= foldr (\_ k -> kindFunResult k) (tyConKind tycon) tys
+typeKind (NewTcApp tycon tys)	= foldr (\_ k -> kindFunResult k) (tyConKind tycon) tys
 typeKind (NoteTy _ ty)		= typeKind ty
 typeKind (PredTy _)		= liftedTypeKind -- Predicates are always 
 						 -- represented by lifted types
-typeKind (AppTy fun arg)	= funResultTy (typeKind fun)
-
-typeKind (FunTy arg res)	= fix_up (typeKind res)
-				where
-				  fix_up (TyConApp tycon _) |  tycon == typeCon
-							    || tycon == openKindCon = liftedTypeKind
-				  fix_up (NoteTy _ kind) = fix_up kind
-				  fix_up kind	         = kind
-		-- The basic story is 
-		-- 	typeKind (FunTy arg res) = typeKind res
-		-- But a function is lifted regardless of its result type
-		-- Hence the strange fix-up.
-		-- Note that 'res', being the result of a FunTy, can't have 
-		-- a strange kind like (*->*).
-
+typeKind (AppTy fun arg)	= kindFunResult (typeKind fun)
+typeKind (FunTy arg res)	= liftedTypeKind
 typeKind (ForAllTy tv ty)	= typeKind ty
 \end{code}
 
@@ -707,8 +652,7 @@ It doesn't change the uniques at all, just the print names.
 tidyTyVarBndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
 tidyTyVarBndr (tidy_env, subst) tyvar
   = case tidyOccName tidy_env (getOccName name) of
-      (tidy', occ') -> 	-- New occname reqd
-			((tidy', subst'), tyvar')
+      (tidy', occ') -> 	((tidy', subst'), tyvar')
 		    where
 			subst' = extendVarEnv subst tyvar tyvar'
 			tyvar' = setTyVarName tyvar name'
@@ -903,7 +847,6 @@ I don't think this is harmful, but it's soemthing to watch out for.
 
 \begin{code}
 eqType t1 t2 = eq_ty emptyVarEnv t1 t2
-eqKind  = eqType	-- No worries about looking 
 
 -- Look through Notes
 eq_ty env (NoteTy _ t1)       t2	  	  = eq_ty env t1 t2

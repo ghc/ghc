@@ -14,7 +14,7 @@ module TcMType (
   newTyVar, newSigTyVar,
   newTyVarTy,		-- Kind -> TcM TcType
   newTyVarTys,		-- Int -> Kind -> TcM [TcType]
-  newKindVar, newKindVars, newOpenTypeKind,
+  newKindVar, newKindVars, 
   putTcTyVar, getTcTyVar,
   newMutTyVar, readMutTyVar, writeMutTyVar, 
 
@@ -35,7 +35,9 @@ module TcMType (
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, 
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
   zonkTcPredType, zonkTcTyVarToTyVar, 
-  zonkTcKindToKind
+  zonkTcKindToKind, zonkTcKind,
+
+  readKindVar, writeKindVar
 
   ) where
 
@@ -49,31 +51,31 @@ import TypeRep		( Type(..), PredType(..), TyNote(..),	 -- Friend; can see repres
 			) 
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TyVarDetails(..),
-			  tcEqType, tcCmpPred, isClassPred, mkTyConApp, typeCon,
+			  tcEqType, tcCmpPred, isClassPred, 
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, tcIsTyVarTy,
 			  isUnLiftedType, isIPPred, 
-
+			  typeKind,
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
-
-			  liftedTypeKind, defaultKind, superKind,
-			  superBoxity, liftedBoxity, typeKind,
 			  tyVarsOfType, tyVarsOfTypes, 
-			  eqKind, isTypeKind, 
 			  pprPred, pprTheta, pprClassPred )
+import Kind		( Kind(..), KindVar(..), mkKindVar,
+			  isLiftedTypeKind, isArgTypeKind, isOpenTypeKind,
+			  liftedTypeKind
+			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import Class		( Class, classArity, className )
 import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
 			  tyConArity, tyConName )
 import Var		( TyVar, tyVarKind, tyVarName, isTyVar, 
-			  mkTyVar, mkMutTyVar, isMutTyVar, mutTyVarRef )
+			  mkTyVar, mkTcTyVar, tcTyVarRef, isTcTyVar )
 
 -- others:
 import TcRnMonad          -- TcType, amongst others
 import FunDeps		( grow )
-import Name		( Name, setNameUnique, mkSystemTvNameEncoded )
+import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
 import CmdLineOpts	( dopt, DynFlag(..) )
 import Util		( nOfThem, isSingleton, equalLength, notNull )
@@ -93,23 +95,23 @@ import Outputable
 newMutTyVar :: Name -> Kind -> TyVarDetails -> TcM TyVar
 newMutTyVar name kind details
   = do { ref <- newMutVar Nothing ;
-	 return (mkMutTyVar name kind details ref) }
+	 return (mkTcTyVar name kind details ref) }
 
 readMutTyVar :: TyVar -> TcM (Maybe Type)
-readMutTyVar tyvar = readMutVar (mutTyVarRef tyvar)
+readMutTyVar tyvar = readMutVar (tcTyVarRef tyvar)
 
 writeMutTyVar :: TyVar -> Maybe Type -> TcM ()
-writeMutTyVar tyvar val = writeMutVar (mutTyVarRef tyvar) val
+writeMutTyVar tyvar val = writeMutVar (tcTyVarRef tyvar) val
 
 newTyVar :: Kind -> TcM TcTyVar
 newTyVar kind
   = newUnique 	`thenM` \ uniq ->
-    newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("t")) kind VanillaTv
+    newMutTyVar (mkSysTvName uniq FSLIT("t")) kind VanillaTv
 
 newSigTyVar :: Kind -> TcM TcTyVar
 newSigTyVar kind
   = newUnique 	`thenM` \ uniq ->
-    newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("s")) kind SigTv
+    newMutTyVar (mkSysTvName uniq FSLIT("s")) kind SigTv
 
 newTyVarTy  :: Kind -> TcM TcType
 newTyVarTy kind
@@ -120,23 +122,12 @@ newTyVarTys :: Int -> Kind -> TcM [TcType]
 newTyVarTys n kind = mappM newTyVarTy (nOfThem n kind)
 
 newKindVar :: TcM TcKind
-newKindVar
-  = newUnique 							`thenM` \ uniq ->
-    newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("k")) superKind VanillaTv	`thenM` \ kv ->
-    returnM (TyVarTy kv)
+newKindVar = do	{ uniq <- newUnique
+		; ref <- newMutVar Nothing
+		; return (KindVar (mkKindVar uniq ref)) }
 
 newKindVars :: Int -> TcM [TcKind]
 newKindVars n = mappM (\ _ -> newKindVar) (nOfThem n ())
-
-newBoxityVar :: TcM TcKind	-- Really TcBoxity
-  = newUnique 						  `thenM` \ uniq ->
-    newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("bx")) 
-		superBoxity VanillaTv			  `thenM` \ kv ->
-    returnM (TyVarTy kv)
-
-newOpenTypeKind :: TcM TcKind
-newOpenTypeKind = newBoxityVar	`thenM` \ bx_var ->
-		  returnM (mkTyConApp typeCon [bx_var])
 \end{code}
 
 
@@ -211,12 +202,12 @@ Putting is easy:
 
 \begin{code}
 putTcTyVar tyvar ty 
-  | not (isMutTyVar tyvar)
+  | not (isTcTyVar tyvar)
   = pprTrace "putTcTyVar" (ppr tyvar) $
     returnM ty
 
   | otherwise
-  = ASSERT( isMutTyVar tyvar )
+  = ASSERT( isTcTyVar tyvar )
     writeMutTyVar tyvar (Just ty)	`thenM_`
     returnM ty
 \end{code}
@@ -235,12 +226,12 @@ We return Nothing iff the original box was unbound.
 
 \begin{code}
 getTcTyVar tyvar
-  | not (isMutTyVar tyvar)
+  | not (isTcTyVar tyvar)
   = pprTrace "getTcTyVar" (ppr tyvar) $
     returnM (Just (mkTyVarTy tyvar))
 
   | otherwise
-  = ASSERT2( isMutTyVar tyvar, ppr tyvar )
+  = ASSERT2( isTcTyVar tyvar, ppr tyvar )
     readMutTyVar tyvar				`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> short_out ty				`thenM` \ ty' ->
@@ -251,7 +242,7 @@ getTcTyVar tyvar
 
 short_out :: TcType -> TcM TcType
 short_out ty@(TyVarTy tyvar)
-  | not (isMutTyVar tyvar)
+  | not (isTcTyVar tyvar)
   = returnM ty
 
   | otherwise
@@ -317,18 +308,6 @@ zonkTcPredType (IParam n t)
 		     are used at the end of type checking
 
 \begin{code}
-zonkTcKindToKind :: TcKind -> TcM Kind
-zonkTcKindToKind tc_kind 
-  = zonkType zonk_unbound_kind_var tc_kind
-  where
-	-- When zonking a kind, we want to
-	--	zonk a *kind* variable to (Type *)
-	--	zonk a *boxity* variable to *
-    zonk_unbound_kind_var kv 
-	| tyVarKind kv `eqKind` superKind   = putTcTyVar kv liftedTypeKind
-	| tyVarKind kv `eqKind` superBoxity = putTcTyVar kv liftedBoxity
-	| otherwise		 	    = pprPanic "zonkKindEnv" (ppr kv)
-			
 -- zonkTcTyVarToTyVar is applied to the *binding* occurrence 
 -- of a type variable, at the *end* of type checking.  It changes
 -- the *mutable* type variable into an *immutable* one.
@@ -342,7 +321,8 @@ zonkTcTyVarToTyVar tv
   = let
 		-- Make an immutable version, defaulting 
 		-- the kind to lifted if necessary
-	immut_tv    = mkTyVar (tyVarName tv) (defaultKind (tyVarKind tv))
+	immut_tv    = mkTyVar (tyVarName tv) (tyVarKind tv)
+		-- was: defaultKind (tyVarKind tv), but I don't 
 	immut_tv_ty = mkTyVarTy immut_tv
 
         zap tv = putTcTyVar tv immut_tv_ty
@@ -401,8 +381,6 @@ All very silly.   I think its harmless to ignore the problem.
 %************************************************************************
 
 \begin{code}
--- zonkType is used for Kinds as well
-
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable
 --	type variable and zonks the kind too
@@ -455,7 +433,7 @@ zonkType unbound_var_fn ty
 zonkTyVar :: (TcTyVar -> TcM Type)		-- What to do for an unbound mutable variable
 	  -> TcTyVar -> TcM TcType
 zonkTyVar unbound_var_fn tyvar 
-  | not (isMutTyVar tyvar)	-- Not a mutable tyvar.  This can happen when
+  | not (isTcTyVar tyvar)	-- Not a mutable tyvar.  This can happen when
 				-- zonking a forall type, when the bound type variable
 				-- needn't be mutable
   = ASSERT( isTyVar tyvar )		-- Should not be any immutable kind vars
@@ -470,6 +448,44 @@ zonkTyVar unbound_var_fn tyvar
 
 
 
+%************************************************************************
+%*									*
+			Zonking kinds
+%*									*
+%************************************************************************
+
+\begin{code}
+readKindVar  :: KindVar -> TcM (Maybe TcKind)
+writeKindVar :: KindVar -> TcKind -> TcM ()
+readKindVar  (KVar _ ref)     = readMutVar ref
+writeKindVar (KVar _ ref) val = writeMutVar ref (Just val)
+
+-------------
+zonkTcKind :: TcKind -> TcM TcKind
+zonkTcKind (FunKind k1 k2) = do { k1' <- zonkTcKind k1
+				; k2' <- zonkTcKind k2
+				; returnM (FunKind k1' k2') }
+zonkTcKind k@(KindVar kv) = do { mb_kind <- readKindVar kv 
+			       ; case mb_kind of
+				    Nothing -> returnM k
+				    Just k  -> zonkTcKind k }
+zonkTcKind other_kind = returnM other_kind
+
+-------------
+zonkTcKindToKind :: TcKind -> TcM Kind
+zonkTcKindToKind (FunKind k1 k2) = do { k1' <- zonkTcKindToKind k1
+				      ; k2' <- zonkTcKindToKind k2
+				      ; returnM (FunKind k1' k2') }
+
+zonkTcKindToKind (KindVar kv) = do { mb_kind <- readKindVar kv 
+				   ; case mb_kind of
+				       Nothing -> return liftedTypeKind
+				       Just k  -> zonkTcKindToKind k }
+
+zonkTcKindToKind OpenTypeKind = returnM liftedTypeKind	-- An "Open" kind defaults to *
+zonkTcKindToKind other_kind   = returnM other_kind
+\end{code}
+			
 %************************************************************************
 %*									*
 \subsection{Checking a user type}
@@ -573,13 +589,13 @@ checkValidType ctxt ty
 
 	actual_kind = typeKind ty
 
-	actual_kind_is_lifted = actual_kind `eqKind` liftedTypeKind
-
 	kind_ok = case ctxt of
 			TySynCtxt _  -> True	-- Any kind will do
-			GenPatCtxt   -> actual_kind_is_lifted
-			ForSigCtxt _ -> actual_kind_is_lifted
-			other	     -> isTypeKind actual_kind
+			ResSigCtxt   -> isOpenTypeKind 	 actual_kind
+			ExprSigCtxt  -> isOpenTypeKind 	 actual_kind
+			GenPatCtxt   -> isLiftedTypeKind actual_kind
+			ForSigCtxt _ -> isLiftedTypeKind actual_kind
+			other	     -> isArgTypeKind       actual_kind
 	
 	ubx_tup | not gla_exts = UT_NotOk
 		| otherwise    = case ctxt of
@@ -706,8 +722,8 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   = doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
     checkTc (ubx_tup_ok gla_exts) ubx_tup_msg	`thenM_`
     mappM_ (check_tau_type (Rank 0) UT_Ok) tys	
-			-- Args are allowed to be unlifted, or
-			-- more unboxed tuples, so can't use check_arg_ty
+		-- Args are allowed to be unlifted, or
+		-- more unboxed tuples, so can't use check_arg_ty
 
   | otherwise
   = mappM_ check_arg_type tys

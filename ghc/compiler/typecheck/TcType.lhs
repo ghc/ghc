@@ -85,9 +85,9 @@ module TcType (
   -- Rexported from Type
   Kind, 	-- Stuff to do with kinds is insensitive to pre/post Tc
   unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds, 
-  isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, isSuperKind,
-  superBoxity, liftedBoxity, hasMoreBoxityInfo, defaultKind, superKind,
-  isTypeKind, isAnyTypeKind, typeCon,
+  isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, 
+  isSubKind, defaultKind, 
+  isArgTypeKind, isOpenTypeKind, 
 
   Type, PredType(..), ThetaType, 
   mkForAllTy, mkForAllTys, 
@@ -101,7 +101,7 @@ module TcType (
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
   tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars,
-  typeKind, eqKind,
+  typeKind, 
 
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
 
@@ -119,12 +119,12 @@ import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 			  tyVarsOfTheta, Kind, Type, PredType(..),
-			  ThetaType, unliftedTypeKind, typeCon,
+			  ThetaType, unliftedTypeKind, 
 			  liftedTypeKind, openTypeKind, mkArrowKind,
 		  	  isLiftedTypeKind, isUnliftedTypeKind, 
-			  isOpenTypeKind, isSuperKind,
+			  isOpenTypeKind, 
 			  mkArrowKinds, mkForAllTy, mkForAllTys,
-			  defaultKind, isTypeKind, isAnyTypeKind,
+			  defaultKind, isArgTypeKind, isOpenTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
 			  mkTyConApp, mkGenTyConApp, mkAppTy,
 			  mkAppTys, mkSynTy, applyTy, applyTys,
@@ -135,19 +135,17 @@ import Type		(	-- Re-exports
 			  tidyTopType, tidyType, tidyPred, tidyTypes,
 			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar,
-			  tidyOpenTyVars, eqKind, 
-			  hasMoreBoxityInfo, liftedBoxity,
-			  superBoxity, typeKind, superKind, repType,
+			  tidyOpenTyVars, 
+			  isSubKind, 
+			  typeKind, repType,
 			  pprKind, pprParendKind,
 			  pprType, pprParendType,
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
 import TyCon		( TyCon, isUnLiftedTyCon, tyConUnique )
 import Class		( Class )
-import Var		( TyVar, tyVarKind, isMutTyVar, mutTyVarDetails )
-import ForeignCall	( Safety, playSafe
-			  , DNType(..)
-			)
+import Var		( TyVar, tyVarKind, tcTyVarDetails )
+import ForeignCall	( Safety, playSafe, DNType(..) )
 import VarEnv
 import VarSet
 
@@ -203,9 +201,6 @@ tau ::= tyvar
 -- provided it expands to the required form.
 
 \begin{code}
-type TcTyVar    = TyVar		-- Might be a mutable tyvar
-type TcTyVarSet = TyVarSet
-
 type TcType = Type 		-- A TcType can have mutable type variables
 	-- Invariant on ForAllTy in TcTypes:
 	-- 	forall a. T
@@ -217,7 +212,8 @@ type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
 type TcRhoType      = TcType
 type TcTauType      = TcType
-type TcKind         = TcType
+
+type TcKind         = Kind
 \end{code}
 
 
@@ -233,11 +229,12 @@ It's knot-tied back to Var.lhs.  There is no reason in principle
 why Var.lhs shouldn't actually have the definition, but it "belongs" here.
 
 \begin{code}
+type TcTyVar = TyVar  	-- Used only during type inference
+
 data TyVarDetails
   = SigTv	-- Introduced when instantiating a type signature,
 		-- prior to checking that the defn of a fn does 
 		-- have the expected type.  Should not be instantiated.
-		--
 		-- 	f :: forall a. a -> a
 		-- 	f = e
 		-- When checking e, with expected type (a->a), we 
@@ -249,30 +246,26 @@ data TyVarDetails
    | InstTv	-- Ditto, but instance decl
 
    | PatSigTv	-- Scoped type variable, introduced by a pattern
-		-- type signature
-		--	\ x::a -> e
+		-- type signature	\ x::a -> e
 
    | VanillaTv	-- Everything else
 
 isUserTyVar :: TcTyVar -> Bool	-- Avoid unifying these if possible
-isUserTyVar tv = case mutTyVarDetails tv of
+isUserTyVar tv = case tcTyVarDetails tv of
 		   VanillaTv -> False
 		   other     -> True
 
 isSkolemTyVar :: TcTyVar -> Bool
-isSkolemTyVar tv = case mutTyVarDetails tv of
+isSkolemTyVar tv = case tcTyVarDetails tv of
 		      SigTv  -> True
 		      ClsTv  -> True
 		      InstTv -> True
 		      oteher -> False
 
-tyVarBindingInfo :: TyVar -> SDoc	-- Used in checkSigTyVars
+tyVarBindingInfo :: TcTyVar -> SDoc	-- Used in checkSigTyVars
 tyVarBindingInfo tv
-  | isMutTyVar tv
-  = sep [ptext SLIT("is bound by the") <+> details (mutTyVarDetails tv),
+  = sep [ptext SLIT("is bound by the") <+> details (tcTyVarDetails tv),
 	 ptext SLIT("at") <+> ppr (getSrcLoc tv)]
-  | otherwise
-  = empty
   where
     details SigTv     = ptext SLIT("type signature")
     details ClsTv     = ptext SLIT("class declaration")
@@ -281,6 +274,9 @@ tyVarBindingInfo tv
     details VanillaTv = ptext SLIT("//vanilla//")	-- Ditto
 \end{code}
 
+\begin{code}
+type TcTyVarSet = TyVarSet
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1046,7 +1042,7 @@ uVarX tv1 ty2 k subst@(tmpls, env)
 		     uTysX ty1 ty2 k subst
 
       Nothing	     -- Not already bound
-	       |  typeKind ty2 `eqKind` tyVarKind tv1
+	       |  typeKind ty2 == tyVarKind tv1
 	       && occur_check_ok ty2
 	       ->     -- No kind mismatch nor occur check
                   k (tmpls, extendSubstEnv env tv1 (DoneTy ty2))
@@ -1116,7 +1112,7 @@ match (TyVarTy v) ty tmpls k senv
   | v `elemVarSet` tmpls
   =     -- v is a template variable
     case lookupSubstEnv senv v of
-	Nothing | typeKind ty `eqKind` tyVarKind v	
+	Nothing | typeKind ty == tyVarKind v	
 			-- We do a kind check, just as in the uVarX above
 			-- The kind check is needed to avoid bogus matches
 			-- of (a b) with (c d), where the kinds don't match

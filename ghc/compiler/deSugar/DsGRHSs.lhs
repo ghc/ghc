@@ -12,7 +12,7 @@ import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLet )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
 import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), 
-			  HsMatchContext(..), Pat(..), LStmt )
+			  HsMatchContext(..), Pat(..) )
 import CoreSyn		( CoreExpr )
 import Type		( Type )
 import Var		( Id )

@@ -11,8 +11,8 @@ module Name (
 	-- The Name type
 	Name,					-- Abstract
 	mkInternalName, mkSystemName, 
-	mkSystemNameEncoded, mkSystemTvNameEncoded, mkFCallName,
-	mkIPName,
+	mkSystemNameEncoded, mkSysTvName, 
+	mkFCallName, mkIPName,
 	mkExternalName, mkWiredInName,
 
 	nameUnique, setNameUnique,
@@ -212,10 +212,10 @@ mkSystemNameEncoded uniq fs = Name { n_uniq = uniq, n_sort = System,
 			             n_occ = mkSysOccFS varName fs, 
 				     n_loc = noSrcLoc }
 
-mkSystemTvNameEncoded :: Unique -> EncodedFS -> Name
-mkSystemTvNameEncoded uniq fs = Name { n_uniq = uniq, n_sort = System, 
-			               n_occ = mkSysOccFS tvName fs, 
-				       n_loc = noSrcLoc }
+mkSysTvName :: Unique -> EncodedFS -> Name
+mkSysTvName uniq fs = Name { n_uniq = uniq, n_sort = System, 
+		             n_occ = mkSysOccFS tvName fs, 
+			     n_loc = noSrcLoc }
 
 mkFCallName :: Unique -> EncodedString -> Name
 	-- The encoded string completely describes the ccall

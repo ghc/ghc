@@ -26,8 +26,8 @@ import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupLocatedDataCon, tcLookupId )
 import TcMType 		( newTyVarTy, arityErr )
-import TcType		( TcType, TcTyVar, TcSigmaType, 
-			  mkClassPred, liftedTypeKind )
+import TcType		( TcType, TcTyVar, TcSigmaType, mkClassPred )
+import Kind		( argTypeKind, liftedTypeKind )
 import TcUnify		( tcSubOff, Expected(..), readExpectedType, zapExpectedType, 
 			  unifyTauTy, zapToListTy, zapToPArrTy, zapToTupleTy )  
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
@@ -69,7 +69,7 @@ tcMonoPatBndr :: BinderChecker
   -- so there's no polymorphic guy to worry about
 
 tcMonoPatBndr binder_name pat_ty 
-  = zapExpectedType pat_ty	`thenM` \ pat_ty' ->
+  = zapExpectedType pat_ty argTypeKind	`thenM` \ pat_ty' ->
 	-- If there are *no constraints* on the pattern type, we
 	-- revert to good old H-M typechecking, making
 	-- the type of the binder into an *ordinary* 
@@ -146,9 +146,16 @@ tc_pat tc_bndr pat_in@(AsPat (L nm_loc name) pat) pat_ty
 	      tvs, (name, bndr_id) `consBag` ids, lie_avail)
 
 tc_pat tc_bndr (WildPat _) pat_ty
-  = zapExpectedType pat_ty		`thenM` \ pat_ty' ->
+  = zapExpectedType pat_ty argTypeKind		`thenM` \ pat_ty' ->
 	-- We might have an incoming 'hole' type variable; no annotation
 	-- so zap it to a type.  Rather like tcMonoPatBndr.
+	-- Note argTypeKind, so that
+	--	f _ = 3
+	-- is rejected when f applied to an unboxed tuple
+	-- However, this means that 
+	--	(case g x of _ -> ...)
+	-- is rejected g returns an unboxed tuple, which is perhpas
+	-- annoying.  I suppose we could pass the context into tc_pat...
     returnM (WildPat pat_ty', emptyBag, emptyBag, [])
 
 tc_pat tc_bndr (ParPat parend_pat) pat_ty
@@ -248,19 +255,19 @@ tc_pat tc_bndr pat_in@(ConPatIn con_name arg_pats) pat_ty
 
 \begin{code}
 tc_pat tc_bndr pat@(LitPat lit@(HsString _)) pat_ty
-  = zapExpectedType pat_ty		`thenM` \ pat_ty' ->
-    unifyTauTy pat_ty' stringTy		`thenM_` 
-    tcLookupId eqStringName		`thenM` \ eq_id ->
+  = zapExpectedType pat_ty liftedTypeKind	`thenM` \ pat_ty' ->
+    unifyTauTy pat_ty' stringTy			`thenM_` 
+    tcLookupId eqStringName			`thenM` \ eq_id ->
     returnM (NPatOut lit stringTy (nlHsVar eq_id `HsApp` nlHsLit lit), 
 	    emptyBag, emptyBag, [])
 
 tc_pat tc_bndr (LitPat simple_lit) pat_ty
-  = zapExpectedType pat_ty			`thenM` \ pat_ty' ->
+  = zapExpectedType pat_ty argTypeKind		`thenM` \ pat_ty' ->
     unifyTauTy pat_ty' (hsLitType simple_lit)	`thenM_` 
     returnM (LitPat simple_lit, emptyBag, emptyBag, [])
 
 tc_pat tc_bndr pat@(NPatIn over_lit mb_neg) pat_ty
-  = zapExpectedType pat_ty			`thenM` \ pat_ty' ->
+  = zapExpectedType pat_ty liftedTypeKind	`thenM` \ pat_ty' ->
     newOverloadedLit origin over_lit pat_ty'	`thenM` \ pos_lit_expr ->
     newMethodFromName origin pat_ty' eqName	`thenM` \ eq ->
     (case mb_neg of

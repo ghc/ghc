@@ -353,15 +353,14 @@ data TcTyThing
   = AGlobal TyThing			-- Used only in the return type of a lookup
   | ATcId   TcId ThLevel ProcLevel 	-- Ids defined in this module; may not be fully zonked
   | ATyVar  TyVar 			-- Type variables
-  | ARecTyCon TcKind 			-- Used temporarily, during kind checking, for the
-  | ARecClass TcKind			--	tycons and clases in this recursive group
+  | AThing  TcKind 			-- Used temporarily, during kind checking, for the
+					--	tycons and clases in this recursive group
 
 instance Outputable TcTyThing where	-- Debugging only
    ppr (AGlobal g)      = text "AGlobal" <+> ppr g
    ppr (ATcId g tl pl)  = text "ATcId" <+> ppr g <+> ppr tl <+> ppr pl
    ppr (ATyVar t)       = text "ATyVar" <+> ppr t
-   ppr (ARecTyCon k)    = text "ARecTyCon" <+> ppr k
-   ppr (ARecClass k)    = text "ARecClass" <+> ppr k
+   ppr (AThing k)       = text "AThing" <+> ppr k
 \end{code}
 
 \begin{code}

@@ -27,7 +27,7 @@ import TyCon		( TyCon, tyConName )
 import Class		( Class )
 import DataCon		( DataCon, dataConWorkId, dataConName )
 import Var		( TyVar, Id, varName )
-import Name		( Name, nameUnique, nameModule, nameModuleName,
+import Name		( Name, nameUnique, nameModule, 
 			  nameOccName, nameSrcLoc,
 			  getOccName, nameParent_maybe,
 		  	  isWiredInName, nameIsLocalOrFrom, mkIPName,

@@ -25,6 +25,7 @@ import CoreSyn
 import Var
 import IdInfo
 import Id	( idUnfolding )
+import Kind
 import CoreTidy	( tidyExpr )
 import VarEnv	( emptyTidyEnv )
 import Literal
@@ -118,14 +119,14 @@ make_tbind :: TyVar -> C.Tbind
 make_tbind tv = (make_var_id (tyVarName tv), make_kind (tyVarKind tv))
     
 make_vbind :: Var -> C.Vbind
-make_vbind v = (make_var_id  (Var.varName v), make_ty (varType v))
+make_vbind v = (make_var_id  (Var.varName v), make_ty (idType v))
 
 make_vdef :: CoreBind -> C.Vdefg
 make_vdef b = 
   case b of
     NonRec v e -> C.Nonrec (f (v,e))
     Rec ves -> C.Rec (map f ves)
-  where f (v,e) = (make_var_id (Var.varName v), make_ty (varType v),make_exp e)
+  where f (v,e) = (make_var_id (Var.varName v), make_ty (idType v),make_exp e)
 	-- Top level bindings are unqualified now
 
 make_exp :: CoreExpr -> C.Exp
@@ -133,7 +134,7 @@ make_exp (Var v) =
   case globalIdDetails v of
      -- a DataConId represents the Id of a worker, which is a varName. -- sof 4/02
 --    DataConId _ -> C.Dcon (make_con_qid (Var.varName v))
-    FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (unpackFS nm) (make_ty (varType v))
+    FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (unpackFS nm) (make_ty (idType v))
     FCallId _ -> error "MkExternalCore died: can't handle non-static-C foreign call"
     _ -> C.Var (make_var_qid (Var.varName v))
 make_exp (Lit (l@(MachLabel s _))) = error "MkExternalCore died: can't handle \"foreign label\" declarations"
@@ -205,10 +206,10 @@ make_ty (NoteTy _ t) 	= make_ty t
 
 
 make_kind :: Kind -> C.Kind
-make_kind (FunTy k1 k2) = C.Karrow (make_kind k1) (make_kind k2)
-make_kind k | k `eqKind` liftedTypeKind = C.Klifted
-make_kind k | k `eqKind` unliftedTypeKind = C.Kunlifted
-make_kind k | k `eqKind` openTypeKind = C.Kopen
+make_kind (FunKind k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
+make_kind LiftedTypeKind   = C.Klifted
+make_kind UnliftedTypeKind = C.Kunlifted
+make_kind OpenTypeKind     = C.Kopen
 make_kind _ = error "MkExternalCore died: make_kind"
 
 {- Id generation. -}

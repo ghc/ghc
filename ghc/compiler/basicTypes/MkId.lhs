@@ -69,8 +69,8 @@ import DataCon		( DataCon, DataConIds(..),
 			  dataConSig, dataConStrictMarks, dataConExStricts, 
 			  splitProductType
 			)
-import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, mkLocalId,
-			  mkTemplateLocals, mkTemplateLocalsNum, setIdLocalExported,
+import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, 
+			  mkTemplateLocals, mkTemplateLocalsNum, mkExportedLocalId,
 			  mkTemplateLocal, idName
 			)
 import IdInfo		( IdInfo, noCafIdInfo,  setUnfoldingInfo, 
@@ -740,8 +740,7 @@ BUT make sure they are *exported* LocalIds (setIdLocalExported) so
 that they aren't discarded by the occurrence analyser.
 
 \begin{code}
-mkDefaultMethodId dm_name ty 
-  = setIdLocalExported (mkLocalId dm_name ty)
+mkDefaultMethodId dm_name ty = mkExportedLocalId dm_name ty
 
 mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> [TyVar]
@@ -751,7 +750,7 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Id
 
 mkDictFunId dfun_name inst_tyvars dfun_theta clas inst_tys
-  = setIdLocalExported (mkLocalId dfun_name dfun_ty)
+  = mkExportedLocalId dfun_name dfun_ty
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 

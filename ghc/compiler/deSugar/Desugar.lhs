@@ -39,7 +39,6 @@ import CoreFVs		( ruleRhsFreeVars )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
 			  mkWarnMsg, errorsFound, WarnMsg )
 import Outputable
-import qualified Pretty
 import UniqSupply	( mkSplitUniqSupply )
 import SrcLoc		( Located(..), SrcSpan, unLoc )
 import DATA_IOREF	( readIORef )

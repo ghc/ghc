@@ -45,8 +45,7 @@ import Subst		( substTyWith )
 import MkId		( mkDefaultMethodId, mkDictFunId )
 import Id		( Id, idType, idName, mkUserLocal, setInlinePragma )
 import Name		( Name, NamedThing(..) )
-import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv,
-			  plusNameEnv, mkNameEnv )
+import NameEnv		( NameEnv, lookupNameEnv, mkNameEnv )
 import NameSet		( emptyNameSet, unitNameSet, nameSetToList )
 import OccName		( reportIfUnused, mkDefaultMethodOcc )
 import RdrName		( RdrName, mkDerivedRdrName )
@@ -59,7 +58,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import Util		( count, lengthIs, isSingleton, lengthExceeds )
 import Unique		( Uniquable(..) )
 import ListSetOps	( equivClassesByUniq, minusList	)
-import SrcLoc		( SrcLoc, Located(..), srcSpanStart, unLoc, noLoc )
+import SrcLoc		( Located(..), srcSpanStart, unLoc, noLoc )
 import Maybes		( seqMaybe, isJust, mapCatMaybes )
 import List		( partition )
 import Bag
@@ -611,7 +610,7 @@ gives rise to the instance declarations
 \begin{code}
 getGenericInstances :: [LTyClDecl Name] -> TcM [InstInfo] 
 getGenericInstances class_decls
-  = do	{ gen_inst_infos <- mappM get_generics class_decls
+  = do	{ gen_inst_infos <- mappM (addLocM get_generics) class_decls
 	; let { gen_inst_info = concat gen_inst_infos }
 
 	-- Return right away if there is no generic stuff
@@ -624,7 +623,7 @@ getGenericInstances class_decls
 	 	   (vcat (map pprInstInfoDetails gen_inst_info)))	
 	; returnM gen_inst_info }}
 
-get_generics decl@(L loc (ClassDecl {tcdLName = class_name, tcdMeths = def_methods}))
+get_generics decl@(ClassDecl {tcdLName = class_name, tcdMeths = def_methods})
   | null generic_binds
   = returnM [] -- The comon case: no generic default methods
 
@@ -638,8 +637,7 @@ get_generics decl@(L loc (ClassDecl {tcdLName = class_name, tcdMeths = def_metho
     let
 	groups = groupWith listToBag generic_binds
     in
-    mappM (mkGenericInstance clas (srcSpanStart loc)) groups
-						`thenM` \ inst_infos ->
+    mappM (mkGenericInstance clas) groups		`thenM` \ inst_infos ->
 
 	-- Check that there is only one InstInfo for each type constructor
   	-- The main way this can fail is if you write
@@ -704,11 +702,11 @@ eqPatType t1		     (HsParTy t2)	= t1 `eqPatType` unLoc t2
 eqPatType _ _ = False
 
 ---------------------------------
-mkGenericInstance :: Class -> SrcLoc
+mkGenericInstance :: Class
 		  -> (HsType Name, LHsBinds Name)
 		  -> TcM InstInfo
 
-mkGenericInstance clas loc (hs_ty, binds)
+mkGenericInstance clas (hs_ty, binds)
   -- Make a generic instance declaration
   -- For example:	instance (C a, C b) => C (a+b) where { binds }
 
@@ -728,7 +726,8 @@ mkGenericInstance clas loc (hs_ty, binds)
 	    (badGenericInstanceType binds)	`thenM_`
 
 	-- Make the dictionary function.
-    newDFunName clas [inst_ty] loc		`thenM` \ dfun_name ->
+    getSrcSpanM						`thenM` \ span -> 
+    newDFunName clas [inst_ty] (srcSpanStart span)	`thenM` \ dfun_name ->
     let
 	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
 	dfun_id    = mkDictFunId dfun_name tyvars inst_theta clas [inst_ty]
@@ -745,10 +744,8 @@ mkGenericInstance clas loc (hs_ty, binds)
 %************************************************************************
 
 \begin{code}
-tcAddDeclCtxt (L loc decl) thing_inside
-  = addSrcSpan loc 	$
-    addErrCtxt ctxt 	$
-    thing_inside
+tcAddDeclCtxt decl thing_inside
+  = addErrCtxt ctxt thing_inside
   where
      thing = case decl of
 	   	ClassDecl {}		  -> "class"

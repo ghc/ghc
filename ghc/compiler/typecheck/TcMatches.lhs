@@ -32,7 +32,7 @@ import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendLocalValEnv, tcExten
 import TcPat		( tcPat, tcMonoPatBndr )
 import TcMType		( newTyVarTy, newTyVarTys, zonkTcType ) 
 import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType,
-			  tyVarsOfTypes, tidyOpenTypes, isSigmaTy,
+			  tyVarsOfTypes, tidyOpenTypes, isSigmaTy, typeKind,
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind, 
 			  mkArrowKind, mkAppTy )
 import TcBinds		( tcBindsAndThen )
@@ -103,10 +103,8 @@ tcMatchesCase :: TcMatchCtxt		-- Case context
 		      [LMatch TcId]) 	-- Translated alternatives
 
 tcMatchesCase ctxt matches (Check expr_ty)
-  = 	-- This case is a bit yukky, because it prevents the
-	-- scrutinee being higher-ranked, which might just possible
-	-- matter if we were seq'ing on it.  But it's awkward to fix.
-    newTyVarTy openTypeKind 						`thenM` \ scrut_ty ->
+  = newTyVarTy openTypeKind 					`thenM` \ scrut_ty ->
+	-- openTypeKind because the scrutinee can be an unboxed type
     tcMatches ctxt matches (Check (mkFunTy scrut_ty expr_ty))	`thenM` \ matches' ->
     returnM (scrut_ty, matches')
 
@@ -231,7 +229,7 @@ tcGRHSs ctxt (GRHSs [L loc1 (GRHS [L loc2 (ResultStmt rhs)])] binds _) exp_ty
 
 tcGRHSs ctxt (GRHSs grhss binds _) exp_ty
   = tcBindsAndThen glueBindsOnGRHSs binds 	$
-    zapExpectedType exp_ty			`thenM` \ exp_ty' ->
+    zapExpectedType exp_ty openTypeKind		`thenM` \ exp_ty' ->
 	-- Even if there is only one guard, we zap the RHS type to
 	-- a monotype.  Reason: it makes tcStmts much easier,
 	-- and even a one-armed guard has a notional second arm
@@ -333,6 +331,8 @@ tc_match_pats ((pat,pat_ty):pats) thing_inside
 		-- of the existential Ids used in checkExistentialPat
     in
     tcExtendLocalValEnv2 xve 			$
+    traceTc (text "tc_match_pats" <+> (ppr xve $$ ppr (map (idType . snd) xve) $$ 
+					ppr (map (typeKind . idType . snd) xve))) `thenM_`
     tc_match_pats pats thing_inside	`thenM` \ (pats', exs_tvs, exs_ids, exs_lie, answer) ->
     returnM (	pat':pats',
 		ex_tvs `unionBags` exs_tvs,
@@ -521,7 +521,7 @@ tcStmtAndThen combine ctxt (L src_loc stmt@(ExprStmt exp _)) thing_inside
     	addErrCtxt (stmtCtxt ctxt stmt) $
 	if isDoExpr (sc_what ctxt)
 	then	-- do or mdo; the expression is a computation
-		newTyVarTy openTypeKind 	`thenM` \ any_ty ->
+		newTyVarTy liftedTypeKind 	`thenM` \ any_ty ->
 		sc_rhs ctxt exp any_ty		`thenM` \ exp' ->
 		returnM (L src_loc (ExprStmt exp' any_ty))
 	else	-- List comprehensions, pattern guards; expression is a boolean

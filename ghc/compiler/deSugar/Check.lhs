@@ -23,7 +23,7 @@ import TysWiredIn
 import PrelNames	( unboundKey )
 import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
 import BasicTypes	( Boxity(..) )
-import SrcLoc		( noSrcLoc, Located(..), getLoc, unLoc, noLoc )
+import SrcLoc		( noSrcLoc, Located(..), unLoc, noLoc )
 import UniqSet
 import Util             ( takeList, splitAtList, notNull )
 import Outputable

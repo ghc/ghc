@@ -31,9 +31,8 @@ import TcPat		( tcPat, tcSubPat, tcMonoPatBndr )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcMType		( newTyVar, newTyVarTy, zonkTcTyVarToTyVar )
 import TcType		( TcTyVar, mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
-			  mkPredTy, mkForAllTy, isUnLiftedType, 
-			  unliftedTypeKind, liftedTypeKind, openTypeKind, eqKind
-			)
+			  mkPredTy, mkForAllTy, isUnLiftedType )
+import Kind		( liftedTypeKind, argTypeKind, isUnliftedTypeKind )
 
 import CoreFVs		( idFreeTyVars )
 import Id		( mkLocalId, mkSpecPragmaId, setInlinePragma )
@@ -128,7 +127,7 @@ tc_bind_and_then top_lvl combiner (HsIPBinds binds) do_next
 	-- Consider	?x = 4
 	--		?y = ?x + 1
     tc_ip_bind (IPBind ip expr)
-      = newTyVarTy openTypeKind			`thenM` \ ty ->
+      = newTyVarTy argTypeKind			`thenM` \ ty ->
   	newIPDict (IPBindOrigin ip) ip ty	`thenM` \ (ip', ip_inst) ->
   	tcCheckRho expr ty			`thenM` \ expr' ->
   	returnM (ip_inst, (IPBind ip' expr'))
@@ -143,105 +142,58 @@ tc_bind_and_then top_lvl combiner (HsBindGroup binds sigs is_rec) do_next
           --       b) the bindings in the group
           --       c) the scope of the binding group (the "in" part)
       tcAddScopedTyVars (collectSigTysFromHsBinds (bagToList binds))  $
-      tcBindWithSigs top_lvl binds sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
  
       case top_lvl of
           TopLevel       -- For the top level don't bother will all this
                          --  bindInstsOfLocalFuns stuff. All the top level 
                          -- things are rec'd together anyway, so it's fine to
                          -- leave them to the tcSimplifyTop, and quite a bit faster too
-                         --
-                         -- Subtle (and ugly) point: furthermore at top level we
-                         -- return the TcLclEnv, which contains the LIE var; we
-                         -- don't want to return the wrong one!
-		-> tc_body poly_ids                         `thenM` \ (prag_binds, thing) ->
+		-> tcBindWithSigs top_lvl binds sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
+		   tc_body poly_ids				`thenM` \ (prag_binds, thing) ->
 		   returnM (combiner (HsBindGroup
 					(poly_binds `unionBags` prag_binds)
                                         [] -- no sigs
                                         Recursive)
                                      thing)
  
-          NotTopLevel   -- For nested bindings we must do the 
-			-- bindInstsOfLocalFuns thing.   We must include 
-			-- the LIE from the RHSs too -- polymorphic recursion!
-                   -> getLIE (tc_body poly_ids)		`thenM` \ ((prag_binds, thing), lie) ->
+          NotTopLevel   -- For nested bindings we must do the bindInstsOfLocalFuns thing.
+		| not (isRec is_rec)		-- Non-recursive group
+		-> 	-- We want to keep non-recursive things non-recursive
+                        -- so that we desugar unlifted bindings correctly
+		    tcBindWithSigs top_lvl binds sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
+                    getLIE (tc_body poly_ids)			`thenM` \ ((prag_binds, thing), lie) ->
  
                              -- Create specialisations of functions bound here
-                       bindInstsOfLocalFuns lie poly_ids `thenM` \ lie_binds ->
+		    bindInstsOfLocalFuns lie poly_ids `thenM` \ lie_binds ->
  
-                             -- We want to keep non-recursive things non-recursive
-                             -- so that we desugar unlifted bindings correctly
-		   if isRec is_rec then
-                     returnM (
-			combiner (HsBindGroup
-                                        (poly_binds `unionBags` 
-					 lie_binds  `unionBags`
-					 prag_binds)
-                                        [] Recursive) thing
-		     )
-                   else
-		     returnM (
+		    returnM (
 			combiner (HsBindGroup poly_binds [] NonRecursive) $
 			combiner (HsBindGroup prag_binds [] NonRecursive) $
 			combiner (HsBindGroup lie_binds  [] Recursive)    $
 			 -- NB: the binds returned by tcSimplify and
 			 -- bindInstsOfLocalFuns aren't guaranteed in
-			 -- dependency order (though we could change
-			 -- that); hence the Recursive marker.
+			 -- dependency order (though we could change that);
+			 -- hence the Recursive marker.
                         thing)
 
-{-
-   =   	-- BRING ANY SCOPED TYPE VARIABLES INTO SCOPE
-	-- Notice that they scope over 
-	--	a) the type signatures in the binding group
-	--	b) the bindings in the group
-	--	c) the scope of the binding group (the "in" part)
-      tcAddScopedTyVars (collectSigTysFromHsBinds (bagToList binds))	$
+		| otherwise
+	        -> 	-- NB: polymorphic recursion means that a function
+ 			-- may use an instance of itself, we must look at the LIE arising
+ 			-- from the function's own right hand side.  Hence the getLIE
+ 			-- encloses the tcBindWithSigs.
 
-      tcBindWithSigs top_lvl binds sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
-  
-      case top_lvl of
-	TopLevel	-- For the top level don't bother will all this
-			--  bindInstsOfLocalFuns stuff. All the top level 
-			-- things are rec'd together anyway, so it's fine to
-			-- leave them to the tcSimplifyTop, and quite a bit faster too
-			--
-			-- Subtle (and ugly) point: furthermore at top level we
-			-- return the TcLclEnv, which contains the LIE var; we
-			-- don't want to return the wrong one!
-		-> tc_body poly_ids			`thenM` \ (prag_binds, thing) ->
-		   returnM (combiner (HsBindGroup
-					(poly_binds `unionBags` prag_binds)
-					[] -- no sigs
-					Recursive)
-				     thing)
+ 		   getLIE (
+ 		      tcBindWithSigs top_lvl binds sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
+ 		      tc_body poly_ids 				`thenM` \ (prag_binds, thing) ->
+ 		      returnM (poly_ids, poly_binds `unionBags` prag_binds, thing)
+                   )   `thenM` \ ((poly_ids, extra_binds, thing), lie) ->
+ 
+ 	 	   bindInstsOfLocalFuns lie poly_ids	`thenM` \ lie_binds ->
 
-	NotTopLevel	-- For nested bindings we must do teh bindInstsOfLocalFuns thing
-		-> getLIE (tc_body poly_ids)		`thenM` \ ((prag_binds, thing), lie) ->
-
-			-- Create specialisations of functions bound here
-		    bindInstsOfLocalFuns lie poly_ids	`thenM` \ lie_binds ->
-
-			-- We want to keep non-recursive things non-recursive
-			-- so that we desugar unlifted bindings correctly
-		   if isRec is_rec then
-		     returnM (
-			combiner (HsBindGroup (
-					poly_binds `unionBags`
-					lie_binds  `unionBags`
-					prag_binds)
-				     [] Recursive) thing
-		     )
-		   else
-		     returnM (
-			combiner (HsBindGroup poly_binds [] NonRecursive) $
-			combiner (HsBindGroup prag_binds [] NonRecursive) $
-			combiner (HsBindGroup lie_binds  [] Recursive)     $
-				-- NB: the binds returned by tcSimplify and bindInstsOfLocalFuns
-				-- aren't guaranteed in dependency order (though we could change
-				-- that); hence the Recursive marker.
-			thing)
--}
+                   returnM (combiner (HsBindGroup
+                                        (extra_binds `unionBags` lie_binds)
+                                        [] Recursive) thing
+		   )
   where
     tc_body poly_ids 	-- Type check the pragmas and "thing inside"
       =   -- Extend the environment to bind the new polymorphic Ids
@@ -420,7 +372,7 @@ attachInlinePhase inline_phases bndr
 --	d) not a multiple-binding group (more or less implied by (a))
 
 checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind
-  = ASSERT( not (any ((eqKind unliftedTypeKind) . tyVarKind) real_tyvars_to_gen) )
+  = ASSERT( not (any (isUnliftedTypeKind . tyVarKind) real_tyvars_to_gen) )
 		-- The instCantBeGeneralised stuff in tcSimplify should have
 		-- already raised an error if we're trying to generalise an 
 		-- unboxed tyvar (NB: unboxed tyvars are always introduced 
@@ -741,7 +693,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
       		-- So we must use an ordinary H-M type variable
 		-- which means the variable gets an inferred tau-type
 	newLocalName name		`thenM` \ mono_name ->
-	newTyVarTy openTypeKind		`thenM` \ mono_ty ->
+	newTyVarTy argTypeKind		`thenM` \ mono_ty ->
 	let
 	   mono_id     = mkLocalId mono_name mono_ty
 	   complete_it = tcMatchesFun name matches (Check mono_ty)	`thenM` \ matches' ->

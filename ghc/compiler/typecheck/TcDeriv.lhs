@@ -40,14 +40,14 @@ import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
 import NameSet		( NameSet, emptyNameSet, duDefs )
 import Unique		( Unique, getUnique )
-
+import Kind		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConTheta, isProductTyCon, isDataTyCon,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTy, mkTyVarTys, mkTyConApp, 
 			  getClassPredTys_maybe, tcTyConAppTyCon,
-			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, isTypeKind,
+			  isUnLiftedType, mkClassPred, tyVarsOfTypes, isArgTypeKind,
 			  tcEqTypes, tcSplitAppTys, mkAppTys, tcSplitDFunTy )
 import Var		( TyVar, tyVarKind, idType, varName )
 import VarSet		( mkVarSet, subVarSet )
@@ -391,7 +391,7 @@ makeDerivEqns tycl_decls
 		-- Kind of the thing we want to instance
 		--   e.g. argument kind of Monad, *->*
 
-	(arg_kinds, _) = tcSplitFunTys kind
+	(arg_kinds, _) = splitKindFunTys kind
 	n_args_to_drop = length arg_kinds	
 		-- Want to drop 1 arg from (T s a) and (ST s a)
 		-- to get 	instance Monad (ST s) => Monad (T s)
@@ -600,7 +600,7 @@ cond_isProduct (gla_exts, tycon)
 
 cond_allTypeKind :: Condition
 cond_allTypeKind (gla_exts, tycon)
-  | all (isTypeKind . tyVarKind) (tyConTyVars tycon) = Nothing
+  | all (isArgTypeKind . tyVarKind) (tyConTyVars tycon) = Nothing
   | otherwise	  				     = Just why
   where
     why  = quotes (ppr tycon) <+> ptext SLIT("is parameterised over arguments of kind other than `*'")

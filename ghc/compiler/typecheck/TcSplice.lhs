@@ -17,7 +17,6 @@ import qualified Language.Haskell.TH.THSyntax as TH
 import qualified Language.Haskell.TH.THLib    as TH
 -- THSyntax gives access to internal functions and data types
 
-import HscTypes		( HscEnv(..) )
 import HsSyn		( HsBracket(..), HsExpr(..), HsSplice(..), LHsExpr, LHsDecl, 
 		   	  HsType, LHsType )
 import Convert		( convertToHsExpr, convertToHsDecls, convertToHsType )
@@ -29,7 +28,7 @@ import TcExpr		( tcCheckRho, tcMonoExpr )
 import TcHsSyn		( mkHsLet, zonkTopLExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
-import TcType		( TcType, TcKind, openTypeKind, mkAppTy, tcSplitSigmaTy )
+import TcType		( TcType, TcKind, liftedTypeKind, mkAppTy, tcSplitSigmaTy )
 import TcEnv		( spliceOK, tcMetaTy, bracketOK, tcLookup )
 import TcMType		( newTyVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType, zonkTcTyVar )
 import TcHsType		( tcHsSigType, kcHsType )
@@ -37,7 +36,6 @@ import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
 import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName, mkInternalName )
 import OccName
 import Var		( Id, TyVar, idType )
-import RdrName		( RdrName )
 import Module		( moduleUserString, mkModuleName )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
@@ -54,12 +52,10 @@ import ErrUtils		( Message )
 import SrcLoc		( noLoc, unLoc, getLoc, noSrcLoc )
 import Outputable
 import Unique		( Unique, Uniquable(..), getKey, mkUniqueGrimily )
-import IOEnv		( IOEnv )
+
 import BasicTypes	( StrictnessMark(..), Fixity(..), FixityDirection(..) )
-import Module		( moduleUserString )
 import Panic		( showException )
-import FastString	( LitString, mkFastString )
-import FastTypes	( iBox )
+import FastString	( LitString )
 
 import GHC.Base		( unsafeCoerce#, Int#, Int(..) )	-- Should have a better home in the module hierarchy
 import Monad 		( liftM )
@@ -122,7 +118,7 @@ tc_bracket (VarBr v)
 	-- Result type is Var (not Q-monadic)
 
 tc_bracket (ExpBr expr) 
-  = newTyVarTy openTypeKind	`thenM` \ any_ty ->
+  = newTyVarTy liftedTypeKind	`thenM` \ any_ty ->
     tcCheckRho expr any_ty	`thenM_`
     tcMetaTy expQTyConName
 	-- Result type is Expr (= Q Exp)
@@ -169,7 +165,7 @@ tcSpliceExpr (HsSplice name expr) res_ty
 	-- Here (h 4) :: Q Exp
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
-    zapExpectedType res_ty			`thenM_`
+    zapExpectedType res_ty liftedTypeKind	`thenM_`
     tcMetaTy expQTyConName			`thenM` \ meta_exp_ty ->
     setStage (Splice next_level) (
 	setLIEVar lie_var	   $

@@ -13,12 +13,12 @@ import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import Id		( Id )
 import TcType		( isTauTy )
 import TcEnv		( checkWellStaged )
+imoprt HsSyn		( nlHsApp )
 import qualified DsMeta
 #endif
 
 import HsSyn		( HsExpr(..), LHsExpr, HsLit(..), ArithSeqInfo(..), recBindFields,
-			  HsMatchContext(..), HsRecordBinds, mkHsApp, nlHsVar,
-			  nlHsApp )
+			  HsMatchContext(..), HsRecordBinds, mkHsApp, nlHsVar )
 import TcHsSyn		( hsLitType, mkHsDictApp, mkHsTyApp, (<$>) )
 import TcRnMonad
 import TcUnify		( Expected(..), newHole, zapExpectedType, zapExpectedTo, tcSubExp, tcGen,
@@ -42,9 +42,10 @@ import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkFunTys,
 			  mkTyConApp, tyVarsOfTypes, isLinearPred,
-			  liftedTypeKind, openTypeKind, 
 			  tcSplitSigmaTy, tidyOpenType
 			)
+import Kind		( openTypeKind, liftedTypeKind, argTypeKind )
+
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
 import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, dataConWrapId )
@@ -145,7 +146,8 @@ tc_expr (HsIPVar ip) res_ty
 	-- type scheme.  We enforce this by creating a fresh
 	-- type variable as its type.  (Because res_ty may not
 	-- be a tau-type.)
-    newTyVarTy openTypeKind		`thenM` \ ip_ty ->
+    newTyVarTy argTypeKind		`thenM` \ ip_ty ->
+	-- argTypeKind: it can't be an unboxed tuple
     newIPDict (IPOccOrigin ip) ip ip_ty `thenM` \ (ip', inst) ->
     extendLIE inst			`thenM_`
     tcSubExp res_ty ip_ty		`thenM` \ co_fn ->
@@ -161,7 +163,7 @@ tc_expr (HsIPVar ip) res_ty
 
 \begin{code}
 tc_expr in_expr@(ExprWithTySig expr poly_ty) res_ty
- = addErrCtxt (exprSigCtxt in_expr)			$
+ = addErrCtxt (exprCtxt in_expr)			$
    tcHsSigType ExprSigCtxt poly_ty			`thenM` \ sig_tc_ty ->
    tcThingWithSig sig_tc_ty (tcCheckRho expr) res_ty	`thenM` \ (co_fn, expr') ->
    returnM (co_fn <$> unLoc expr')
@@ -194,7 +196,7 @@ tc_expr (HsCoreAnn lbl expr) res_ty = tcMonoExpr expr res_ty `thenM` \ expr' -> 
 tc_expr (HsLit lit) res_ty  = tcLit lit res_ty
 
 tc_expr (HsOverLit lit) res_ty  
-  = zapExpectedType res_ty	`thenM` \ res_ty' ->
+  = zapExpectedType res_ty liftedTypeKind		`thenM` \ res_ty' ->
     newOverloadedLit (LiteralOrigin lit) lit res_ty'	`thenM` \ lit_expr ->
     returnM (unLoc lit_expr) 	-- ToDo: nasty unLoc
 
@@ -286,7 +288,7 @@ tc_expr (HsIf pred b1 b2) res_ty
   = addErrCtxt (predCtxt pred) (
     tcCheckRho pred boolTy	)	`thenM`    \ pred' ->
 
-    zapExpectedType res_ty		`thenM`    \ res_ty' ->
+    zapExpectedType res_ty openTypeKind	`thenM`    \ res_ty' ->
 	-- C.f. the call to zapToType in TcMatches.tcMatches
 
     tcCheckRho b1 res_ty'		`thenM`    \ b1' ->
@@ -294,8 +296,8 @@ tc_expr (HsIf pred b1 b2) res_ty
     returnM (HsIf pred' b1' b2')
 
 tc_expr (HsDo do_or_lc stmts method_names _) res_ty
-  = zapExpectedType res_ty				`thenM` \ res_ty' ->
-	-- All comprehensions yield a monotype
+  = zapExpectedType res_ty liftedTypeKind		`thenM` \ res_ty' ->
+	-- All comprehensions yield a monotype of kind *
     tcDoStmts do_or_lc stmts method_names res_ty'	`thenM` \ (stmts', methods') ->
     returnM (HsDo do_or_lc stmts' methods' res_ty')
 
@@ -988,10 +990,6 @@ caseCtxt expr
 
 caseScrutCtxt expr
   = hang (ptext SLIT("In the scrutinee of a case expression:")) 4 (ppr expr)
-
-exprSigCtxt expr
-  = hang (ptext SLIT("In the type signature of the expression:"))
-	 4 (ppr expr)
 
 exprCtxt expr
   = hang (ptext SLIT("In the expression:")) 4 (ppr expr)

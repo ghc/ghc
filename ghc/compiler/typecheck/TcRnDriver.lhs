@@ -50,7 +50,7 @@ import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
 import PprCore		( pprIdRules, pprCoreBindings )
 import CoreSyn		( IdCoreRule, bindersOfBinds )
 import ErrUtils		( mkDumpDoc, showPass )
-import Id		( mkLocalId, isLocalId, idName, idType, setIdLocalExported )
+import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( mkHomeModule, mkModuleName, moduleName, moduleEnvElts )
 import OccName		( mkVarOcc )
@@ -933,7 +933,7 @@ check_main ghci_mode tcg_env main_mod main_fn
 	; (main_expr, ty) <- addSrcSpan (srcLocSpan (getSrcLoc main_name)) $
 			     tcInferRho rhs
 
-	; let { root_main_id = setIdLocalExported (mkLocalId rootMainName ty) ;
+	; let { root_main_id = mkExportedLocalId rootMainName ty ;
 	        main_bind    = noLoc (VarBind root_main_id main_expr) }
 
 	; return (tcg_env { tcg_binds = tcg_binds tcg_env 

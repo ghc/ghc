@@ -66,7 +66,6 @@ import Module		( Module, ModuleName, moduleName, mkModuleName, isHomeModule,
 			  extendModuleEnvList, extendModuleEnv,
 			  moduleNameUserString,
 			  ModLocation(..) )
-import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
 import GetImports
 import UniqFM
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
@@ -85,6 +84,7 @@ import DATA_IOREF	( readIORef )
 import HscMain		( hscThing, hscStmt, hscTcExpr )
 import TcRnDriver	( mkExportEnv, getModuleContents )
 import IfaceSyn		( IfaceDecl )
+import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
 import Name		( Name )
 import NameEnv
 import Id		( idType )

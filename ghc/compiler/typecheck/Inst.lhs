@@ -39,7 +39,7 @@ module Inst (
 
 import {-# SOURCE #-}	TcExpr( tcCheckSigma )
 
-import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..), LHsExpr, nlHsVar, mkHsApp )
+import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..), LHsExpr, mkHsApp )
 import TcHsSyn	( TcId, TcIdSet, 
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId, 
 		  mkCoercion, ExprCoFn
@@ -80,7 +80,7 @@ import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
-import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
+import SrcLoc	( mkSrcSpan, noLoc, Located(..) )
 import CmdLineOpts( DynFlags, DynFlag( Opt_AllowUndecidableInstances ), dopt )
 import Maybes	( isJust )
 import Outputable

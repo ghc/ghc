@@ -32,10 +32,10 @@ import Name		( Name, nameSrcLoc, nameOccName, nameModuleName,
 			  nameParent, nameParent_maybe, isExternalName )
 import NameSet
 import NameEnv
-import OccName		( OccName, srcDataName, isTcOcc, OccEnv, elemOccEnv,
+import OccName		( srcDataName, isTcOcc, OccEnv, 
 			  mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo, Avails, GhciMode(..),
-			  IsBootInterface, IfaceExport, 
+			  IfaceExport, 
 			  availName, availNames, availsToNameSet, unQualInScope, 
 			  Deprecs(..), ModIface(..), Dependencies(..)
 			)

@@ -6,7 +6,7 @@
 \begin{code}
 module TcIface ( 
 	tcImportDecl, typecheckIface,
-	tcIfaceKind, loadImportedInsts, loadImportedRules,
+	loadImportedInsts, loadImportedRules,
 	tcExtCoreBindings
  ) where
 #include "HsVersions.h"
@@ -612,13 +612,6 @@ tcIfaceRule (IfaceBuiltinRule fn_rdr core_rule)
 %************************************************************************
 
 \begin{code}
-tcIfaceKind :: IfaceKind -> Kind
-tcIfaceKind IfaceOpenTypeKind     = openTypeKind
-tcIfaceKind IfaceLiftedTypeKind   = liftedTypeKind
-tcIfaceKind IfaceUnliftedTypeKind = unliftedTypeKind
-tcIfaceKind (IfaceFunKind k1 k2)  = mkArrowKind (tcIfaceKind k1) (tcIfaceKind k2)
-
------------------------------------------
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType (IfaceTyVar n)        = do { tv <- tcIfaceTyVar n; return (TyVarTy tv) }
 tcIfaceType (IfaceAppTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (AppTy t1' t2') }
@@ -969,5 +962,5 @@ bindIfaceTyVars bndrs thing_inside
   where
     (occs,kinds) = unzip bndrs
 
-mk_iface_tyvar name kind = mkTyVar name (tcIfaceKind kind)
+mk_iface_tyvar name kind = mkTyVar name kind
 \end{code}

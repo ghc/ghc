@@ -18,12 +18,13 @@ module TcEnv(
 	getInGlobalScope,
 
 	-- Local environment
-	tcExtendTyVarKindEnv,
+	tcExtendKindEnv,
 	tcExtendTyVarEnv,    tcExtendTyVarEnv2, 
 	tcExtendLocalValEnv, tcExtendLocalValEnv2, 
 	tcLookup, tcLookupLocated, tcLookupLocalIds,
 	tcLookupId, tcLookupTyVar,
 	lclEnvElts, getInLocalScope, findGlobals, 
+	wrongThingErr,
 
 	tcExtendRecEnv,    	-- For knot-tying
 
@@ -46,19 +47,18 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import HsSyn		( LRuleDecl, , HsTyVarBndr(..), LHsTyVarBndr, LHsBinds,
-			  LSig )
+import HsSyn		( LRuleDecl, LHsBinds, LSig )
 import TcIface		( tcImportDecl )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVar, zonkTcTyVarsAndFV )
-import TcType		( Type, TcTyVar, TcTyVarSet, 
+import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, 
 			  tyVarsOfType, tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
 			  getDFunTyKey, tcTyConAppTyCon, tyVarBindingInfo, 
 			  tidyOpenType, tidyOpenTyVar
 			)
 import qualified Type	( getTyVar_maybe )
 import Id		( idName, isLocalId )
-import Var		( TyVar, Id, mkTyVar, idType )
+import Var		( TyVar, Id, idType )
 import VarSet
 import VarEnv
 import RdrName		( extendLocalRdrEnv )
@@ -69,7 +69,7 @@ import Name		( Name, NamedThing(..), getSrcLoc, mkInternalName, nameIsLocalOrFro
 import NameEnv
 import OccName		( mkDFunOcc, occNameString )
 import HscTypes		( DFunId, extendTypeEnvList, lookupType,
-			  TyThing(..), tyThingId, tyThingTyCon, tyThingClass, tyThingDataCon,
+			  TyThing(..), tyThingId, tyThingDataCon,
 			  ExternalPackageState(..) )
 
 import SrcLoc		( SrcLoc, Located(..) )
@@ -129,12 +129,16 @@ tcLookupDataCon con_name
 tcLookupClass :: Name -> TcM Class
 tcLookupClass name
   = tcLookupGlobal name		`thenM` \ thing ->
-    return (tyThingClass thing)
+    case thing of
+	AClass cls -> return cls
+	other	   -> wrongThingErr "class" (AGlobal thing) name
 	
 tcLookupTyCon :: Name -> TcM TyCon
 tcLookupTyCon name
   = tcLookupGlobal name		`thenM` \ thing ->
-    return (tyThingTyCon thing)
+    case thing of
+	ATyCon tc -> return tc
+	other	  -> wrongThingErr "type constructor" (AGlobal thing) name
 
 tcLookupLocatedGlobalId :: Located Name -> TcM Id
 tcLookupLocatedGlobalId = addLocM tcLookupId
@@ -188,16 +192,13 @@ getInGlobalScope
 
 
 \begin{code}
-tcExtendRecEnv :: [(Name,TyThing)]	-- Global bindings
-	       -> [(Name,TcTyThing)] 	-- Local bindings
-	       -> TcM r -> TcM r
--- Extend both local and global environments for the type/class knot tying game
-tcExtendRecEnv gbl_stuff lcl_stuff thing_inside
- = do { (gbl_env, lcl_env) <- getEnvs
-      ; let { ge' = extendNameEnvList (tcg_type_env gbl_env) gbl_stuff
-	    ; le' = extendNameEnvList (tcl_env lcl_env)      lcl_stuff }
-      ; setEnvs (gbl_env {tcg_type_env = ge'}, lcl_env {tcl_env = le'}) 
-		thing_inside }
+tcExtendRecEnv :: [(Name,TyThing)] -> TcM r -> TcM r
+-- Extend the global environments for the type/class knot tying game
+tcExtendRecEnv gbl_stuff thing_inside
+ = updGblEnv upd thing_inside
+ where
+   upd env = env { tcg_type_env = extend (tcg_type_env env) }
+   extend env = extendNameEnvList env gbl_stuff
 \end{code}
 
 
@@ -261,15 +262,12 @@ getInLocalScope = getLclEnv	`thenM` \ env ->
 \end{code}
 
 \begin{code}
-tcExtendTyVarKindEnv :: [LHsTyVarBndr Name] -> TcM r -> TcM r
--- The tyvars are all kinded
-tcExtendTyVarKindEnv tvs thing_inside
+tcExtendKindEnv :: [(Name, TcKind)] -> TcM r -> TcM r
+tcExtendKindEnv things thing_inside
   = updLclEnv upd thing_inside
   where
     upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
-    extend env  = extendNameEnvList env [(n, ATyVar (mkTyVar n k)) 
-					| L _ (KindedTyVar n k) <- tvs]
-	-- No need to extend global tyvars for kind checking
+    extend env  = extendNameEnvList env [(n, AThing k) | (n,k) <- things]
 
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
@@ -626,4 +624,15 @@ simpleInstInfoTyCon inst = tcTyConAppTyCon (simpleInstInfoTy inst)
 \begin{code}
 notFound wheRe name = failWithTc (text wheRe <> colon <+> quotes (ppr name) <+> 
 				  ptext SLIT("is not in scope"))
+
+wrongThingErr expected thing name
+  = failWithTc (pp_thing thing <+> quotes (ppr name) <+> 
+		ptext SLIT("used as a") <+> text expected)
+  where
+    pp_thing (AGlobal (ATyCon _))   = ptext SLIT("Type constructor")
+    pp_thing (AGlobal (AClass _))   = ptext SLIT("Class")
+    pp_thing (AGlobal (AnId   _))   = ptext SLIT("Identifier")
+    pp_thing (AGlobal (ADataCon _)) = ptext SLIT("Data constructor")
+    pp_thing (ATyVar _) 	    = ptext SLIT("Type variable")
+    pp_thing (ATcId _ _ _)  	    = ptext SLIT("Local identifier")
 \end{code}

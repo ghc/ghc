@@ -14,7 +14,6 @@ module MachCode ( stmtsToInstrs, InstrBlock ) where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-import Unique		( Unique )
 import MachMisc		-- may differ per-platform
 import MachRegs
 import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
@@ -37,10 +36,9 @@ import Stix		( getNatLabelNCG, StixStmt(..), StixExpr(..),
 			  StixReg(..), pprStixReg, StixVReg(..), CodeSegment(..), 
                           DestInfo, hasDestInfo,
                           pprStixExpr, repOfStixExpr,
-                          liftStrings,
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
-                          getDeltaNat, setDeltaNat, getUniqueNat,
+                          getDeltaNat, setDeltaNat, 
 			  IF_ARCH_powerpc(addImportNat COMMA,)
                           ncgPrimopMoan,
 			  ncg_target_is_32bit

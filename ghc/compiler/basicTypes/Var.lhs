@@ -5,49 +5,47 @@
 
 \begin{code}
 module Var (
-	Var, VarDetails,		-- Abstract
-	varName, varUnique, varInfo, varType,
-	setVarName, setVarUnique, setVarType, setVarOcc,
+	Var, 
+	varName, varUnique, 
+	setVarName, setVarUnique, setVarOcc,
 
 	-- TyVars
-	TyVar,
+	TyVar, mkTyVar, mkTcTyVar,
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique,
-	mkTyVar, mkSysTyVar, 
-	mkMutTyVar, mutTyVarRef, makeTyVarImmutable, 
+	tcTyVarRef, tcTyVarDetails,
 
 	-- Ids
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
-	setIdName, setIdUnique, setIdInfo, lazySetIdInfo, 
+	setIdName, setIdUnique, setIdType, setIdInfo, lazySetIdInfo, 
 	setIdLocalExported, zapSpecPragmaId,
 
 	globalIdDetails, setGlobalIdDetails, 
 
-	mkLocalId, mkGlobalId, mkSpecPragmaId,
+	mkLocalId, mkExportedLocalId, mkSpecPragmaId,
+	mkGlobalId, 
 
-	isTyVar, isMutTyVar, mutTyVarDetails,
-	isId, isLocalVar, isLocalId,
+	isTyVar, isTcTyVar, isId, isLocalVar, isLocalId,
 	isGlobalId, isExportedId, isSpecPragmaId,
 	mustHaveLocalBinding
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TypeRep( Type, Kind )
+import {-# SOURCE #-}	TypeRep( Type )
 import {-# SOURCE #-}	TcType( TyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId,
 				IdInfo, seqIdInfo )
 
 import Name		( Name, OccName, NamedThing(..),
-			  setNameUnique, setNameOcc, nameUnique, 
-			  mkSystemTvNameEncoded,
+			  setNameUnique, setNameOcc, nameUnique
 			)
+import Kind		( Kind )
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey# )
 import FastTypes
 import Outputable
-
-import DATA_IOREF	( IORef )
+import DATA_IOREF
 \end{code}
 
 
@@ -65,34 +63,33 @@ in its @VarDetails@.
 
 \begin{code}
 data Var
-  = Var {
+  = TyVar {
 	varName    :: !Name,
 	realUnique :: FastInt,		-- Key for fast comparison
 					-- Identical to the Unique in the name,
 					-- cached here for speed
-	varType    :: Type,
-	varDetails :: VarDetails,
-	varInfo    :: IdInfo		-- Only used for Ids at the moment
-    }
+	tyVarKind :: Kind }
 
-data VarDetails
-  = LocalId 		-- Used for locally-defined Ids (see NOTE below)
-	LocalIdDetails
+  | TcTyVar { 			-- Used only during type inference
+	varName        :: !Name,	-- Could we get away without a Name?
+	realUnique     :: FastInt,
+	tyVarKind      :: Kind,
+	tcTyVarRef     :: IORef (Maybe Type),
+	tcTyVarDetails :: TyVarDetails }
 
-  | GlobalId 		-- Used for imported Ids, dict selectors etc
-	GlobalIdDetails
+  | GlobalId { 			-- Used for imported Ids, dict selectors etc
+	varName    :: !Name,
+	realUnique :: FastInt,
+   	idType     :: Type,
+	idInfo     :: IdInfo,
+	gblDetails :: GlobalIdDetails }
 
-  | TyVar
-  | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
-	     TyVarDetails
-	-- TODO: the IORef should be unboxed here, but we don't want to unbox
-  	-- the Name above.
-
-	-- For a long time I tried to keep mutable Vars statically
-	-- type-distinct from immutable Vars, but I've finally given
-	-- up.  It's just too painful.  After type checking there are
-	-- no MutTyVars left, but there's no static check of that
-	-- fact.
+  | LocalId { 			-- Used for locally-defined Ids (see NOTE below)
+	varName    :: !Name,
+	realUnique :: FastInt,
+   	idType     :: Type,
+	idInfo     :: IdInfo,
+	lclDetails :: LocalIdDetails }
 
 data LocalIdDetails 
   = NotExported	-- Not exported
@@ -143,23 +140,21 @@ instance Ord Var where
 
 \begin{code}
 varUnique :: Var -> Unique
-varUnique (Var {realUnique = uniq}) = mkUniqueGrimily (iBox uniq)
+varUnique var = mkUniqueGrimily (iBox (realUnique var))
 
 setVarUnique :: Var -> Unique -> Var
-setVarUnique var@(Var {varName = name}) uniq 
-  = var {realUnique = getKey# uniq, 
-	 varName = setNameUnique name uniq}
+setVarUnique var uniq 
+  = var { realUnique = getKey# uniq, 
+	  varName = setNameUnique (varName var) uniq }
 
 setVarName :: Var -> Name -> Var
 setVarName var new_name
-  = var { realUnique = getKey# (getUnique new_name), varName = new_name }
+  = var { realUnique = getKey# (getUnique new_name), 
+   	  varName = new_name }
 
 setVarOcc :: Var -> OccName -> Var
 setVarOcc var new_occ
   = var { varName = setNameOcc (varName var) new_occ }
-
-setVarType :: Var -> Type -> Var
-setVarType var ty = var {varType = ty}
 \end{code}
 
 
@@ -171,11 +166,8 @@ setVarType var ty = var {varType = ty}
 
 \begin{code}
 type TyVar = Var
-\end{code}
 
-\begin{code}
 tyVarName = varName
-tyVarKind = varType
 
 setTyVarUnique = setVarUnique
 setTyVarName   = setVarName
@@ -183,40 +175,19 @@ setTyVarName   = setVarName
 
 \begin{code}
 mkTyVar :: Name -> Kind -> TyVar
-mkTyVar name kind = Var { varName    = name
-			, realUnique = getKey# (nameUnique name)
-			, varType    = kind
-			, varDetails = TyVar
-			, varInfo    = pprPanic "mkTyVar" (ppr name)
+mkTyVar name kind = TyVar { varName    = name
+			  , realUnique = getKey# (nameUnique name)
+			  , tyVarKind  = kind
 			}
 
-mkSysTyVar :: Unique -> Kind -> TyVar
-mkSysTyVar uniq kind = Var { varName    = name
-			   , realUnique = getKey# uniq
-			   , varType    = kind
-			   , varDetails = TyVar
-			   , varInfo    = pprPanic "mkSysTyVar" (ppr name)
-			   }
-		     where
-		       name = mkSystemTvNameEncoded uniq FSLIT("t")
-
-mkMutTyVar :: Name -> Kind -> TyVarDetails -> IORef (Maybe Type) -> TyVar
-mkMutTyVar name kind details ref
-  = Var { varName    = name
-	, realUnique = getKey# (nameUnique name)
-	, varType    = kind
-	, varDetails = MutTyVar ref details
-	, varInfo    = pprPanic "newMutTyVar" (ppr name)
+mkTcTyVar :: Name -> Kind -> TyVarDetails -> IORef (Maybe Type) -> TyVar
+mkTcTyVar name kind details ref
+  = TcTyVar {	varName    = name,
+		realUnique = getKey# (nameUnique name),
+		tyVarKind  = kind,
+		tcTyVarRef = ref,
+		tcTyVarDetails = details
 	}
-
-mutTyVarRef :: TyVar -> IORef (Maybe Type)
-mutTyVarRef (Var {varDetails = MutTyVar loc _}) = loc
-
-makeTyVarImmutable :: TyVar -> TyVar
-makeTyVarImmutable tyvar = tyvar { varDetails = TyVar}
-
-mutTyVarDetails :: TyVar -> TyVarDetails
-mutTyVarDetails (Var {varDetails = MutTyVar _ details}) = details
 \end{code}
 
 
@@ -235,9 +206,7 @@ type DictId = Id
 
 \begin{code}
 idName    = varName
-idType    = varType
 idUnique  = varUnique
-idInfo	  = varInfo
 
 setIdUnique :: Id -> Unique -> Id
 setIdUnique = setVarUnique
@@ -245,33 +214,41 @@ setIdUnique = setVarUnique
 setIdName :: Id -> Name -> Id
 setIdName = setVarName
 
+setIdType :: Id -> Type -> Id
+setIdType id ty = id {idType = ty}
+
 setIdLocalExported :: Id -> Id
-setIdLocalExported id = id { varDetails = LocalId Exported }
+-- It had better be a LocalId already
+setIdLocalExported id = id { lclDetails = Exported }
+
+setGlobalIdDetails :: Id -> GlobalIdDetails -> Id
+-- It had better be a GlobalId already
+setGlobalIdDetails id details = id { gblDetails = details }
 
 zapSpecPragmaId :: Id -> Id
-zapSpecPragmaId id 
-  = case varDetails id of
-	LocalId SpecPragma -> id { varDetails = LocalId NotExported }
-	other		   -> id
+zapSpecPragmaId id
+  | isSpecPragmaId id = id {lclDetails = NotExported}
+  | otherwise         = id
 
 lazySetIdInfo :: Id -> IdInfo -> Id
-lazySetIdInfo var info = var {varInfo = info}
+lazySetIdInfo id info = id {idInfo = info}
 
 setIdInfo :: Id -> IdInfo -> Id
-setIdInfo var info = seqIdInfo info `seq` var {varInfo = info}
+setIdInfo id info = seqIdInfo info `seq` id {idInfo = info}
 	-- Try to avoid spack leaks by seq'ing
 
 modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
-modifyIdInfo fn var@(Var {varInfo = info})
-  = seqIdInfo new_info `seq` var {varInfo = new_info}
+modifyIdInfo fn id
+  = seqIdInfo new_info `seq` id {idInfo = new_info}
   where
-    new_info = fn info
+    new_info = fn (idInfo id)
 
 -- maybeModifyIdInfo tries to avoid unnecesary thrashing
 maybeModifyIdInfo :: (IdInfo -> Maybe IdInfo) -> Id -> Id
-maybeModifyIdInfo fn var@(Var {varInfo = info}) = case fn info of
-							Nothing       -> var
-							Just new_info -> var {varInfo = new_info}
+maybeModifyIdInfo fn id
+  = case fn (idInfo id) of
+	Nothing       -> id
+	Just new_info -> id {idInfo = new_info}
 \end{code}
 
 %************************************************************************
@@ -281,56 +258,57 @@ maybeModifyIdInfo fn var@(Var {varInfo = info}) = case fn info of
 %************************************************************************
 
 \begin{code}
-mkId :: Name -> Type -> VarDetails -> IdInfo -> Id
-mkId name ty details info
-  = Var { varName    = name, 
-	  realUnique = getKey# (nameUnique name), 	-- Cache the unique
-	  varType    = ty,	
-	  varDetails = details,
-	  varInfo    = info }
+mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
+mkGlobalId details name ty info 
+  = GlobalId {	varName    = name, 
+		realUnique = getKey# (nameUnique name), 	-- Cache the unique
+		idType     = ty,	
+		gblDetails = details,
+		idInfo     = info }
+
+mk_local_id :: Name -> Type -> LocalIdDetails -> IdInfo -> Id
+mk_local_id name ty details info
+  = LocalId {	varName    = name, 
+		realUnique = getKey# (nameUnique name), 	-- Cache the unique
+		idType     = ty,	
+		lclDetails = details,
+		idInfo     = info }
 
 mkLocalId :: Name -> Type -> IdInfo -> Id
-mkLocalId name ty info = mkId name ty (LocalId NotExported) info
+mkLocalId name ty info = mk_local_id name ty NotExported info
+
+mkExportedLocalId :: Name -> Type -> IdInfo -> Id
+mkExportedLocalId name ty info = mk_local_id name ty Exported info
 
 mkSpecPragmaId :: Name -> Type -> IdInfo -> Id
-mkSpecPragmaId name ty info = mkId name ty (LocalId SpecPragma) info
-
-mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
-mkGlobalId details name ty info = mkId name ty (GlobalId details) info
+mkSpecPragmaId name ty info = mk_local_id name ty SpecPragma info
 \end{code}
 
 \begin{code}
-isTyVar, isMutTyVar			 :: Var -> Bool
+isTyVar, isTcTyVar			 :: Var -> Bool
 isId, isLocalVar, isLocalId    		 :: Var -> Bool
 isGlobalId, isExportedId, isSpecPragmaId :: Var -> Bool
 mustHaveLocalBinding			 :: Var -> Bool
 
-isTyVar var = case varDetails var of
-		TyVar        -> True
-		MutTyVar _ _ -> True
-		other	     -> False
+isTyVar (TyVar {})   = True
+isTyVar (TcTyVar {}) = True
+isTyVar other	     = False
 
-isMutTyVar (Var {varDetails = MutTyVar _ _}) = True
-isMutTyVar other			     = False
+isTcTyVar (TcTyVar {}) = True
+isTcTyVar other	       = False
 
+isId (LocalId {})  = True
+isId (GlobalId {}) = True
+isId other	   = False
 
-isId var = case varDetails var of
-		LocalId _  -> True
-		GlobalId _ -> True
-		other	   -> False
-
-isLocalId var = case varDetails var of
-		  LocalId _  -> True
-		  other	     -> False
+isLocalId (LocalId {}) = True
+isLocalId other	       = False
 
 -- isLocalVar returns True for type variables as well as local Ids
 -- These are the variables that we need to pay attention to when finding free
 -- variables, or doing dependency analysis.
-isLocalVar var = case varDetails var of
-		    LocalId _  	 -> True
-		    TyVar      	 -> True
-		    MutTyVar _ _ -> True
-		    other	 -> False
+isLocalVar (GlobalId {}) = False 
+isLocalVar other	 = True
 
 -- mustHaveLocalBinding returns True of Ids and TyVars
 -- that must have a binding in this module.  The converse
@@ -339,29 +317,26 @@ isLocalVar var = case varDetails var of
 -- because it's only used for assertions
 mustHaveLocalBinding var = isLocalVar var
 
-isGlobalId var = case varDetails var of
-		   GlobalId _ -> True
-		   other      -> False
+isGlobalId (GlobalId {}) = True
+isGlobalId other	 = False
 
 -- isExportedId means "don't throw this away"
-isExportedId var = case varDetails var of
-			LocalId Exported   -> True
-			LocalId SpecPragma -> True
-			GlobalId _	   -> True
-			other		   -> False
+isExportedId (GlobalId {}) = True
+isExportedId (LocalId {lclDetails = details}) 
+  = case details of
+	Exported   -> True
+	SpecPragma -> True
+	other	   -> False
+isExportedId other = False
 
-isSpecPragmaId var = case varDetails var of
-			LocalId SpecPragma -> True
-			other		   -> False
+isSpecPragmaId (LocalId {lclDetails = SpecPragma}) = True
+isSpecPragmaId other = False
 \end{code}
 
 \begin{code}
 globalIdDetails :: Var -> GlobalIdDetails
 -- Works OK on local Ids too, returning notGlobalId
-globalIdDetails var = case varDetails var of
-			  GlobalId details -> details
-			  other		   -> notGlobalId
-setGlobalIdDetails :: Id -> GlobalIdDetails -> Id
-setGlobalIdDetails id details = id { varDetails = GlobalId details }
+globalIdDetails (GlobalId {gblDetails = details}) = details
+globalIdDetails other				  = notGlobalId
 \end{code}
 

@@ -6,17 +6,16 @@
 
 \begin{code}
 module IfaceType (
-	IfaceType(..), IfaceKind(..), IfacePredType(..), IfaceTyCon(..),
+	IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr,
 
 	IfaceExtName(..), mkIfaceExtName, ifaceTyConName, 
 
 	-- Conversion from Type -> IfaceType
-	toIfaceType, toIfaceKind, toIfacePred, toIfaceContext, 
+	toIfaceType, toIfacePred, toIfaceContext, 
 	toIfaceBndr, toIfaceIdBndr, toIfaceTvBndrs, 
 
 	-- Printing
-	pprIfaceKind, pprParendIfaceKind, 
 	pprIfaceType, pprParendIfaceType, pprIfaceContext, 
 	pprIfaceIdBndr, pprIfaceTvBndr, pprIfaceTvBndrs, pprIfaceBndrs,
 	getIfaceExt,
@@ -26,8 +25,7 @@ module IfaceType (
 
 #include "HsVersions.h"
 
-import Type		( openTypeKind, liftedTypeKind, unliftedTypeKind,
-			  splitFunTy_maybe, eqKind, pprType )
+import Kind		( Kind(..) )
 import TypeRep		( Type(..), TyNote(..), PredType(..), Kind, ThetaType )
 import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
 import Var		( isId, tyVarKind, idType )
@@ -85,14 +83,8 @@ type IfaceIdBndr  = (OccName, IfaceType)	-- OccName, because always local
 type IfaceTvBndr  = (OccName, IfaceKind)
 
 -------------------------------
-data IfaceKind 
-  = IfaceLiftedTypeKind 
-  | IfaceOpenTypeKind
-  | IfaceUnliftedTypeKind
-  | IfaceFunKind IfaceKind IfaceKind
-  deriving( Eq )
+type IfaceKind = Kind			-- Re-use the Kind type, but no KindVars in it
 
--------------------------------
 data IfaceType
   = IfaceTyVar    OccName		-- Type variable only, not tycon
   | IfaceAppTy    IfaceType IfaceType
@@ -216,8 +208,8 @@ pprIfaceBndrs bs = sep (map ppr bs)
 pprIfaceIdBndr (name, ty) = hsep [ppr name, dcolon, ppr ty]
 
 pprIfaceTvBndr :: IfaceTvBndr -> SDoc
-pprIfaceTvBndr (tv, IfaceLiftedTypeKind) = ppr tv
-pprIfaceTvBndr (tv, kind) 		 = parens (ppr tv <> dcolon <> ppr kind)
+pprIfaceTvBndr (tv, LiftedTypeKind) = ppr tv
+pprIfaceTvBndr (tv, kind) 	    = parens (ppr tv <> dcolon <> ppr kind)
 
 pprIfaceTvBndrs :: [IfaceTvBndr] -> SDoc
 pprIfaceTvBndrs tyvars = hsep (map pprIfaceTvBndr tyvars)
@@ -226,19 +218,6 @@ pprIfaceTvBndrs tyvars = hsep (map pprIfaceTvBndr tyvars)
 ----------------------------- Printing IfaceType ------------------------------------
 
 \begin{code}
----------------------------------
-instance Outputable IfaceKind where
-  ppr k = pprIfaceKind tOP_PREC k
-
-pprParendIfaceKind :: IfaceKind -> SDoc
-pprParendIfaceKind k = pprIfaceKind tYCON_PREC k
-
-pprIfaceKind prec IfaceLiftedTypeKind   = ptext SLIT("*")
-pprIfaceKind prec IfaceUnliftedTypeKind = ptext SLIT("#")
-pprIfaceKind prec IfaceOpenTypeKind     = ptext SLIT("?")
-pprIfaceKind prec (IfaceFunKind k1 k2)  = maybeParen prec fUN_PREC $
-				          sep [ pprIfaceKind fUN_PREC k1, arrow <+> ppr k2]
-
 ---------------------------------
 instance Outputable IfaceType where
   ppr ty = ppr_ty ty
@@ -321,25 +300,13 @@ pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 
 \begin{code}
 ----------------
-toIfaceTvBndr tyvar   = (getOccName tyvar, toIfaceKind (tyVarKind tyvar))
+toIfaceTvBndr tyvar   = (getOccName tyvar, tyVarKind tyvar)
 toIfaceIdBndr ext id  = (getOccName id,    toIfaceType ext (idType id))
 toIfaceTvBndrs tyvars = map toIfaceTvBndr tyvars
 
 toIfaceBndr ext var
   | isId var  = IfaceIdBndr (toIfaceIdBndr ext var)
   | otherwise = IfaceTvBndr (toIfaceTvBndr var)
-
----------------------
-toIfaceKind :: Kind -> IfaceKind
-toIfaceKind k 
-  | k `eqKind` openTypeKind     = IfaceOpenTypeKind
-  | k `eqKind` liftedTypeKind   = IfaceLiftedTypeKind
-  | k `eqKind` unliftedTypeKind = IfaceUnliftedTypeKind
-  | Just (arg,res) <- splitFunTy_maybe k 
-  = IfaceFunKind (toIfaceKind arg) (toIfaceKind res)
-#ifdef DEBUG
-  | otherwise = pprTrace "toIfaceKind" (pprType k) IfaceOpenTypeKind
-#endif
 
 ---------------------
 toIfaceType :: (Name -> IfaceExtName) -> Type -> IfaceType

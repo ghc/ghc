@@ -14,18 +14,13 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			)
 import CoreSyn
 import TcIface		( loadImportedRules )
-import HscTypes		( HscEnv(..), GhciMode(..),
-			  ModGuts(..), ModGuts, Avails, 
-			  ModDetails(..),
-			  HomeModInfo(..), ExternalPackageState(..), hscEPS
-			)
+import HscTypes		( HscEnv(..), ModGuts(..), ModGuts, 
+			  ModDetails(..), HomeModInfo(..) )
 import CSE		( cseProgram )
-import Rules		( RuleBase, emptyRuleBase, ruleBaseIds, 
+import Rules		( RuleBase, ruleBaseIds, 
 			  extendRuleBaseList, pprRuleBase, getLocalRules,
 			  ruleCheckProgram )
 import Module		( moduleEnvElts )
-import Name		( Name, isExternalName )
-import NameSet		( elemNameSet )
 import PprCore		( pprCoreBindings, pprCoreExpr, pprIdRules )
 import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
 import CoreUtils	( coreBindsSize )
@@ -36,7 +31,7 @@ import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idName, idIsFrom, idSpecialisation, setIdSpecialisation )
+import Id		( idIsFrom, idSpecialisation, setIdSpecialisation )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -54,7 +49,6 @@ import IO		( hPutStr, stderr )
 import Outputable
 
 import Maybes		( orElse )
-import List             ( partition )
 \end{code}
 
 %************************************************************************

@@ -12,6 +12,7 @@ module TcUnify (
 	-- Various unifications
   unifyTauTy, unifyTauTyList, unifyTauTyLists, 
   unifyKind, unifyKinds, unifyFunKind, 
+  checkExpectedKind,
 
   --------------------------------
   -- Holes
@@ -30,7 +31,7 @@ module TcUnify (
 import HsSyn		( HsExpr(..) )
 import TcHsSyn		( mkHsLet, mkHsDictLam,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
-import TypeRep		( Type(..), PredType(..), TyNote(..), openKindCon, isSuperKind )
+import TypeRep		( Type(..), PredType(..), TyNote(..) )
 
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
@@ -42,12 +43,16 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys,
 			  isSkolemTyVar, isUserTyVar, 
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
-			  eqKind, openTypeKind, liftedTypeKind, isTypeKind, mkArrowKind,
-			  hasMoreBoxityInfo, allDistinctTyVars, pprType, pprKind )
+			  allDistinctTyVars, pprType )
+import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
+			  openTypeKind, liftedTypeKind, mkArrowKind, 
+			  isOpenTypeKind, argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
+			  isSubKind, pprKind, splitKindFunTys )
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, newKindVar,
-			  newTyVarTy, newTyVarTys, newOpenTypeKind,
-			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV )
+			  newTyVarTy, newTyVarTys, zonkTcKind,
+			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV, 
+			  readKindVar,writeKindVar )
 import TcSimplify	( tcSimplifyCheck )
 import TysWiredIn	( listTyCon, parrTyCon, tupleTyCon )
 import TcEnv		( tcGetGlobalTyVars, findGlobals )
@@ -85,14 +90,22 @@ readExpectedType :: Expected ty -> TcM ty
 readExpectedType (Infer hole) = readMutVar hole
 readExpectedType (Check ty)   = returnM ty
 
-zapExpectedType :: Expected TcType -> TcM TcTauType
+zapExpectedType :: Expected TcType -> Kind -> TcM TcTauType
 -- In the inference case, ensure we have a monotype
-zapExpectedType (Infer hole)
-  = do { ty <- newTyVarTy openTypeKind ;
+-- (including an unboxed tuple)
+zapExpectedType (Infer hole) kind
+  = do { ty <- newTyVarTy kind ;
 	 writeMutVar hole ty ;
 	 return ty }
 
-zapExpectedType (Check ty) = return ty
+zapExpectedType (Check ty) kind 
+  | typeKind ty `isSubKind` kind = return ty
+  | otherwise			 = do { ty1 <- newTyVarTy kind
+				      ; unifyTauTy ty1 ty
+				      ; return ty }
+	-- The unify is to ensure that 'ty' has the desired kind
+	-- For example, in (case e of r -> b) we push an OpenTypeKind
+	-- type variable 
 
 zapExpectedTo :: Expected TcType -> TcTauType -> TcM ()
 zapExpectedTo (Infer hole) ty2 = writeMutVar hole ty2
@@ -101,7 +114,7 @@ zapExpectedTo (Check ty1)  ty2 = unifyTauTy ty1 ty2
 zapExpectedBranches :: [a] -> Expected TcType -> TcM (Expected TcType)
 -- Zap the expected type to a monotype if there is more than one branch
 zapExpectedBranches branches exp_ty
-  | lengthExceeds branches 1 = zapExpectedType exp_ty 	`thenM` \ exp_ty' -> 
+  | lengthExceeds branches 1 = zapExpectedType exp_ty openTypeKind 	`thenM` \ exp_ty' -> 
 			       return (Check exp_ty')
   | otherwise		     = returnM exp_ty		
 
@@ -177,7 +190,7 @@ unifyFunTy ty
 	Nothing 	 -> unify_fun_ty_help ty
 
 unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
-  = newTyVarTy openTypeKind	`thenM` \ arg ->
+  = newTyVarTy argTypeKind	`thenM` \ arg ->
     newTyVarTy openTypeKind	`thenM` \ res ->
     unifyTauTy ty (mkFunTy arg res)	`thenM_`
     returnM (arg,res)
@@ -256,7 +269,8 @@ new_tuple_ty boxity arity
   where
     tup_tc = tupleTyCon boxity arity
     kind | isBoxed boxity = liftedTypeKind
-	 | otherwise      = openTypeKind
+	 | otherwise      = argTypeKind		-- Components of an unboxed tuple
+						-- can be unboxed, but not unboxed tuples
 \end{code}
 
 
@@ -461,7 +475,7 @@ imitateFun tv ty
     checkM (not (isSkolemTyVar tv))
 	   (failWithTcM (unifyWithSigErr tv ty))	`thenM_`
 
-    newTyVarTy openTypeKind		`thenM` \ arg ->
+    newTyVarTy argTypeKind		`thenM` \ arg ->
     newTyVarTy openTypeKind		`thenM` \ res ->
     putTcTyVar tv (mkFunTy arg res)	`thenM_`
     returnM (arg,res)
@@ -630,12 +644,6 @@ uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
   | con1 == con2 && equalLength tys1 tys2
   = unifyTauTyLists tys1 tys2
 
-  | con1 == openKindCon
-	-- When we are doing kind checking, we might match a kind '?' 
-	-- against a kind '*' or '#'.  Notably, CCallable :: ? -> *, and
-	-- (CCallable Int) and (CCallable Int#) are both OK
-  = unifyTypeKind ps_ty2
-
 	-- Applications need a bit of care!
 	-- They can match FunTy and TyConApp, so use splitAppTy_maybe
 	-- NB: we've already dealt with type variables and Notes,
@@ -737,42 +745,46 @@ uVar swapped tv1 ps_ty2 ty2
     case maybe_ty1 of
 	Just ty1 | swapped   -> uTys ps_ty2 ty2 ty1 ty1	-- Swap back
 		 | otherwise -> uTys ty1 ty1 ps_ty2 ty2	-- Same order
-	other       -> uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2
+	other       -> uUnboundVar swapped tv1 ps_ty2 ty2
 
 	-- Expand synonyms; ignore FTVs
-uUnboundVar swapped tv1 maybe_ty1 ps_ty2 (NoteTy n2 ty2)
-  = uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2
+uUnboundVar swapped tv1 ps_ty2 (NoteTy n2 ty2)
+  = uUnboundVar swapped tv1 ps_ty2 ty2
 
 
 	-- The both-type-variable case
-uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
+uUnboundVar swapped tv1 ps_ty2 ty2@(TyVarTy tv2)
 
 	-- Same type variable => no-op
   | tv1 == tv2
   = returnM ()
 
 	-- Distinct type variables
-	-- ASSERT maybe_ty1 /= Just
   | otherwise
   = getTcTyVar tv2	`thenM` \ maybe_ty2 ->
     case maybe_ty2 of
-	Just ty2' -> uUnboundVar swapped tv1 maybe_ty1 ty2' ty2'
+	Just ty2' -> uUnboundVar swapped tv1 ty2' ty2'
 
 	Nothing | update_tv2
+		-- It should always be the case that either k1 <: k2 or k2 <: k1
+		-- Reason: a type variable never gets the kinds (#) or #
 
-		-> WARN( not (k1 `hasMoreBoxityInfo` k2), (ppr tv1 <+> ppr k1) $$ (ppr tv2 <+> ppr k2) )
+		-> ASSERT2( k1 `isSubKind` k2, (ppr tv1 <+> ppr k1) $$ (ppr tv2 <+> ppr k2) )
 		   putTcTyVar tv2 (TyVarTy tv1)		`thenM_`
 		   returnM ()
-		|  otherwise
 
-		-> WARN( not (k2 `hasMoreBoxityInfo` k1), (ppr tv2 <+> ppr k2) $$ (ppr tv1 <+> ppr k1) )
+		|  otherwise
+		-> ASSERT2( k2 `isSubKind` k1, (ppr tv2 <+> ppr k2) $$ (ppr tv1 <+> ppr k1) )
                    putTcTyVar tv1 ps_ty2		`thenM_`
 	  	   returnM ()
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
-    update_tv2 = (k2 `eqKind` openTypeKind) || (not (k1 `eqKind` openTypeKind) && nicer_to_update_tv2)
-			-- Try to get rid of open type variables as soon as poss
+    update_tv2 = k1 `isSubKind` k2 && (k1 /= k2 || nicer_to_update_tv2)
+	-- Update the variable with least kind info
+	-- See notes on type inference in Kind.lhs
+	-- The "nicer to" part only applies if the two kinds are the same,
+	-- so we can choose which to do.
 
     nicer_to_update_tv2 =  isUserTyVar tv1
 				-- Don't unify a signature type variable if poss
@@ -780,7 +792,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 				-- Try to update sys-y type variables in preference to sig-y ones
 
 	-- Second one isn't a type variable
-uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
+uUnboundVar swapped tv1 ps_ty2 non_var_ty2
   = 	-- Check that tv1 isn't a type-signature type variable
     checkM (not (isSkolemTyVar tv1))
 	   (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenM_`
@@ -803,7 +815,7 @@ checkKinds swapped tv1 ty2
 -- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
 -- ty2 has been zonked at this stage, which ensures that
 -- its kind has as much boxity information visible as possible.
-  | tk2 `hasMoreBoxityInfo` tk1 = returnM ()
+  | tk2 `isSubKind` tk1 = returnM ()
 
   | otherwise
 	-- Either the kinds aren't compatible
@@ -811,7 +823,7 @@ checkKinds swapped tv1 ty2
 	-- or we are unifying a lifted type variable with an
 	-- 	unlifted type: e.g.  (id 3#) is illegal
   = addErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
-    unifyMisMatch k1 k2
+    unifyKindMisMatch k1 k2
 
   where
     (k1,k2) | swapped   = (tk2,tk1)
@@ -894,59 +906,130 @@ okToUnifyWith tv ty
 
 %************************************************************************
 %*									*
-\subsection{Kind unification}
+		Kind unification
 %*									*
 %************************************************************************
+
+Unifying kinds is much, much simpler than unifying types.
 
 \begin{code}
 unifyKind :: TcKind		    -- Expected
 	  -> TcKind		    -- Actual
 	  -> TcM ()
-unifyKind k1 k2 = uTys k1 k1 k2 k2
+unifyKind LiftedTypeKind   LiftedTypeKind   = returnM ()
+unifyKind UnliftedTypeKind UnliftedTypeKind = returnM ()
+
+unifyKind OpenTypeKind k2 | isOpenTypeKind k2 = returnM ()
+unifyKind ArgTypeKind  k2 | isArgTypeKind k2    = returnM ()
+  -- Respect sub-kinding
+
+unifyKind (FunKind a1 r1) (FunKind a2 r2)
+ = do { unifyKind a2 a1; unifyKind r1 r2 }
+		-- Notice the flip in the argument,
+		-- so that the sub-kinding works right
+
+unifyKind (KindVar kv1) k2 = uKVar False kv1 k2
+unifyKind k1 (KindVar kv2) = uKVar True kv2 k1
+unifyKind k1 k2 = unifyKindMisMatch k1 k2
 
 unifyKinds :: [TcKind] -> [TcKind] -> TcM ()
 unifyKinds []       []       = returnM ()
 unifyKinds (k1:ks1) (k2:ks2) = unifyKind k1 k2 	`thenM_`
 			       unifyKinds ks1 ks2
-unifyKinds _ _ = panic "unifyKinds: length mis-match"
-\end{code}
+unifyKinds _ _ 		     = panic "unifyKinds: length mis-match"
 
-\begin{code}
-unifyTypeKind :: TcKind -> TcM ()	
--- Ensures that the argument kind is a liftedTypeKind or unliftedTypeKind
--- If it's a kind variable, make it (Type bx), for a fresh boxity variable bx
+----------------
+uKVar :: Bool -> KindVar -> TcKind -> TcM ()
+uKVar swapped kv1 k2
+  = do 	{ mb_k1 <- readKindVar kv1
+	; case mb_k1 of
+	    Nothing -> uUnboundKVar swapped kv1 k2
+	    Just k1 | swapped   -> unifyKind k2 k1
+		    | otherwise -> unifyKind k1 k2 }
 
-unifyTypeKind ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyTypeKind ty'
-	Nothing	 -> newOpenTypeKind		`thenM` \ kind -> 
-		    putTcTyVar tyvar kind	`thenM_`
-		    returnM ()
-	
-unifyTypeKind ty
-  | isTypeKind ty = returnM ()
-  | otherwise 	-- Failure
-  = zonkTcType ty	`thenM` \ ty1 ->
-    failWithTc (ptext SLIT("Type expected but") <+> quotes (ppr ty1) <+> ptext SLIT("found"))
+----------------
+uUnboundKVar :: Bool -> KindVar -> TcKind -> TcM ()
+uUnboundKVar swapped kv1 k2@(KindVar kv2)
+  | kv1 == kv2 = returnM ()
+  | otherwise	-- Distinct kind variables
+  = do	{ mb_k2 <- readKindVar kv2
+	; case mb_k2 of
+	    Just k2 -> uUnboundKVar swapped kv1 k2
+	    Nothing -> writeKindVar kv1 k2 }
+
+uUnboundKVar swapped kv1 non_var_k2
+  = do	{ k2' <- zonkTcKind non_var_k2
+	; kindOccurCheck kv1 k2'
+	; k2'' <- kindSimpleKind swapped k2'
+		-- KindVars must be bound only to simple kinds
+		-- Polarities: (kindSimpleKind True ?) succeeds 
+		-- returning *, corresponding to unifying
+		--	expected: ?
+		--	actual:   kind-ver
+	; writeKindVar kv1 k2'' }
+
+----------------
+kindOccurCheck kv1 k2	-- k2 is zonked
+  = checkTc (not_in k2) (kindOccurCheckErr kv1 k2)
+  where
+    not_in (KindVar kv2)   = kv1 /= kv2
+    not_in (FunKind a2 r2) = not_in a2 && not_in r2
+    not_in other	   = True
+
+kindSimpleKind :: Bool -> Kind -> TcM SimpleKind
+-- (kindSimpleKind True k) returns a simple kind sk such that sk <: k
+-- If the flag is False, it requires k <: sk
+-- E.g. 	kindSimpleKind False ?? = *
+-- What about (kv -> *) :=: ?? -> *
+kindSimpleKind orig_swapped orig_kind
+  = go orig_swapped orig_kind
+  where
+    go sw (FunKind k1 k2) = do { k1' <- go (not sw) k1
+			       ; k2' <- go sw k2
+			       ; return (FunKind k1' k2') }
+    go True OpenTypeKind = return liftedTypeKind
+    go True ArgTypeKind  = return liftedTypeKind
+    go sw LiftedTypeKind  = return liftedTypeKind
+    go sw k@(KindVar _)	  = return k	-- KindVars are always simple
+    go swapped kind = failWithTc (ptext SLIT("Unexpected kind unification failure:")
+				  <+> ppr orig_swapped <+> ppr orig_kind)
+	-- I think this can't actually happen
+
+-- T v = MkT v		 v must be a type 
+-- T v w = MkT (v -> w)	 v must not be an umboxed tuple
+
+----------------
+kindOccurCheckErr tyvar ty
+  = hang (ptext SLIT("Occurs check: cannot construct the infinite kind:"))
+       2 (sep [ppr tyvar, char '=', ppr ty])
+
+unifyKindMisMatch ty1 ty2
+  = zonkTcKind ty1	`thenM` \ ty1' ->
+    zonkTcKind ty2	`thenM` \ ty2' ->
+    let
+	msg = hang (ptext SLIT("Couldn't match kind"))
+		   2 (sep [quotes (ppr ty1'), 
+			   ptext SLIT("against"), 
+			   quotes (ppr ty2')])
+    in
+    failWithTc msg
 \end{code}
 
 \begin{code}
 unifyFunKind :: TcKind -> TcM (Maybe (TcKind, TcKind))
 -- Like unifyFunTy, but does not fail; instead just returns Nothing
 
-unifyFunKind (TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
-    case maybe_ty of
+unifyFunKind (KindVar kvar)
+  = readKindVar kvar	`thenM` \ maybe_kind ->
+    case maybe_kind of
 	Just fun_kind -> unifyFunKind fun_kind
-	Nothing       -> newKindVar	`thenM` \ arg_kind ->
-			 newKindVar	`thenM` \ res_kind ->
-			 putTcTyVar tyvar (mkArrowKind arg_kind res_kind)	`thenM_`
-			 returnM (Just (arg_kind,res_kind))
+	Nothing       -> do { arg_kind <- newKindVar
+			    ; res_kind <- newKindVar
+			    ; writeKindVar kvar (mkArrowKind arg_kind res_kind)
+			    ; returnM (Just (arg_kind,res_kind)) }
     
-unifyFunKind (FunTy arg_kind res_kind) = returnM (Just (arg_kind,res_kind))
-unifyFunKind (NoteTy _ ty)	       = unifyFunKind ty
-unifyFunKind other	   	       = returnM Nothing
+unifyFunKind (FunKind arg_kind res_kind) = returnM (Just (arg_kind,res_kind))
+unifyFunKind other	   	         = returnM Nothing
 \end{code}
 
 %************************************************************************
@@ -965,7 +1048,7 @@ unifyCtxt s ty1 ty2 tidy_env	-- ty1 expected, ty2 inferred
     returnM (err ty1' ty2')
   where
     err ty1 ty2 = (env1, 
-		   nest 4 
+		   nest 2 
 			(vcat [
 			   text "Expected" <+> text s <> colon <+> ppr tidy_ty1,
 			   text "Inferred" <+> text s <> colon <+> ppr tidy_ty2
@@ -974,44 +1057,42 @@ unifyCtxt s ty1 ty2 tidy_env	-- ty1 expected, ty2 inferred
 		    (env1, [tidy_ty1,tidy_ty2]) = tidyOpenTypes tidy_env [ty1,ty2]
 
 unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
-	-- tv1 is zonked already
-  = zonkTcType ty2	`thenM` \ ty2' ->
-    returnM (err ty2')
+	-- tv1 and ty2 are zonked already
+  = returnM msg
   where
-    err ty2 = (env2, ptext SLIT("When matching types") <+> 
-		     sep [quotes pp_expected, ptext SLIT("and"), quotes pp_actual])
-	    where
-	      (pp_expected, pp_actual) | swapped   = (pp2, pp1)
-				       | otherwise = (pp1, pp2)
-	      (env1, tv1') = tidyOpenTyVar tidy_env tv1
-	      (env2, ty2') = tidyOpenType  env1 ty2
-	      pp1 = ppr tv1'
-	      pp2 = ppr ty2'
+    msg = (env2, ptext SLIT("When matching types") <+> 
+		 sep [quotes pp_expected <+> ptext SLIT("and"), quotes pp_actual])
+
+    (pp_expected, pp_actual) | swapped   = (pp2, pp1)
+		             | otherwise = (pp1, pp2)
+    (env1, tv1') = tidyOpenTyVar tidy_env tv1
+    (env2, ty2') = tidyOpenType  env1 ty2
+    pp1 = ppr tv1' <+> dcolon <+> ppr (tyVarKind tv1)
+    pp2 = ppr ty2' <+> dcolon <+> ppr (typeKind ty2)
 
 unifyMisMatch ty1 ty2
   = zonkTcType ty1	`thenM` \ ty1' ->
     zonkTcType ty2	`thenM` \ ty2' ->
     let
     	(env, [tidy_ty1, tidy_ty2]) = tidyOpenTypes emptyTidyEnv [ty1',ty2']
-	ppr | isSuperKind (typeKind ty1) = pprKind
-	    | otherwise			 = pprType
 	msg = hang (ptext SLIT("Couldn't match"))
-		   4 (sep [quotes (ppr tidy_ty1), 
+		   2 (sep [quotes (ppr tidy_ty1), 
 			   ptext SLIT("against"), 
 			   quotes (ppr tidy_ty2)])
     in
     failWithTcM (env, msg)
 
+
 unifyWithSigErr tyvar ty
   = (env2, hang (ptext SLIT("Cannot unify the type-signature variable") <+> quotes (ppr tidy_tyvar))
-	      4 (ptext SLIT("with the type") <+> quotes (ppr tidy_ty)))
+	      2 (ptext SLIT("with the type") <+> quotes (ppr tidy_ty)))
   where
     (env1, tidy_tyvar) = tidyOpenTyVar emptyTidyEnv tyvar
     (env2, tidy_ty)    = tidyOpenType  env1         ty
 
 unifyCheck problem tyvar ty
   = (env2, hang msg
-	      4 (sep [ppr tidy_tyvar, char '=', ppr tidy_ty]))
+	      2 (sep [ppr tidy_tyvar, char '=', ppr tidy_ty]))
   where
     (env1, tidy_tyvar) = tidyOpenTyVar emptyTidyEnv tyvar
     (env2, tidy_ty)    = tidyOpenType  env1         ty
@@ -1022,6 +1103,64 @@ unifyCheck problem tyvar ty
 \end{code}
 
 
+%************************************************************************
+%*									*
+	Checking kinds
+%*									*
+%************************************************************************
+
+---------------------------
+-- We would like to get a decent error message from
+--   (a) Under-applied type constructors
+--		f :: (Maybe, Maybe)
+--   (b) Over-applied type constructors
+--		f :: Int x -> Int x
+--
+
+\begin{code}
+checkExpectedKind :: Outputable a => a -> TcKind -> TcKind -> TcM ()
+-- A fancy wrapper for 'unifyKind', which tries 
+-- to give decent error messages.
+checkExpectedKind ty act_kind exp_kind
+  | act_kind `isSubKind` exp_kind -- Short cut for a very common case
+  = returnM ()
+  | otherwise
+  = tryTc (unifyKind exp_kind act_kind)	`thenM` \ (errs, mb_r) ->
+    case mb_r of {
+	Just _  -> returnM () ;	-- Unification succeeded
+	Nothing ->
+
+	-- So there's definitely an error
+	-- Now to find out what sort
+    zonkTcKind exp_kind		`thenM` \ exp_kind ->
+    zonkTcKind act_kind		`thenM` \ act_kind ->
+
+    let (exp_as, _) = splitKindFunTys exp_kind
+        (act_as, _) = splitKindFunTys act_kind
+	n_exp_as = length exp_as
+	n_act_as = length act_as
+
+	err | n_exp_as < n_act_as	-- E.g. [Maybe]
+	    = quotes (ppr ty) <+> ptext SLIT("is not applied to enough type arguments")
+
+		-- Now n_exp_as >= n_act_as. In the next two cases, 
+		-- n_exp_as == 0, and hence so is n_act_as
+	    | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
+	    = ptext SLIT("Expecting a lifted type, but") <+> quotes (ppr ty)
+		<+> ptext SLIT("is unlifted")
+
+	    | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
+	    = ptext SLIT("Expecting an unlifted type, but") <+> quotes (ppr ty)
+		<+> ptext SLIT("is lifted")
+
+	    | otherwise 		-- E.g. Monad [Int]
+	    = sep [ ptext SLIT("Expecting kind") <+> quotes (pprKind exp_kind) <> comma,
+		    ptext SLIT("but") <+> quotes (ppr ty) <+> 
+		    ptext SLIT("has kind") <+> quotes (pprKind act_kind)]
+   in
+   failWithTc (ptext SLIT("Kind error:") <+> err) 
+   }
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1126,7 +1265,7 @@ check_sig_tyvars extra_tvs sig_tvs
 	       (env2, emptyVarEnv, [])
 	       (tidy_tvs `zip` tidy_tys)	`thenM` \ (env3, _, msgs) ->
 
-        failWithTcM (env3, main_msg $$ nest 4 (vcat msgs))
+        failWithTcM (env3, main_msg $$ nest 2 (vcat msgs))
       where
 	(env1, tidy_tvs) = tidyOpenTyVars emptyTidyEnv sig_tvs
 	(env2, tidy_tys) = tidyOpenTypes  env1	       sig_tys
@@ -1201,7 +1340,7 @@ sigCtxt id sig_tvs sig_theta sig_tau tidy_env
 		        ptext SLIT("Type to generalise:") <+> pprType tidy_actual_tau
 		   ]
  	msg = vcat [ptext SLIT("When trying to generalise the type inferred for") <+> quotes (ppr id),
-		    nest 4 sub_msg]
+		    nest 2 sub_msg]
     in
     returnM (env3, msg)
 \end{code}

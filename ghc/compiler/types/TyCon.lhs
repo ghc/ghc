@@ -5,7 +5,7 @@
 
 \begin{code}
 module TyCon(
-	TyCon, KindCon, SuperKindCon, ArgVrcs, 
+	TyCon, ArgVrcs, 
 
 	AlgTyConFlavour(..), 
 	DataConDetails(..), visibleDataCons,
@@ -25,14 +25,12 @@ module TyCon(
 	mkLiftedPrimTyCon,
 	mkTupleTyCon,
 	mkSynTyCon,
-	mkKindCon,
-	mkSuperKindCon,
 
 	tyConName,
 	tyConKind,
 	tyConUnique,
 	tyConTyVars,
-	tyConArgVrcs_maybe, tyConArgVrcs,
+	tyConArgVrcs,
 	tyConDataConDetails, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
 	tyConSelIds,
 	tyConTheta,
@@ -50,7 +48,7 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TypeRep ( Type, PredType, Kind, SuperKind )
+import {-# SOURCE #-} TypeRep ( Type, PredType )
  -- Should just be Type(Type), but this fails due to bug present up to
  -- and including 4.02 involving slurping of hi-boot files.  Bug is now fixed.
 
@@ -59,11 +57,12 @@ import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
 import Var   		( TyVar, Id )
 import Class		( Class )
+import Kind		( Kind )
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Name		( Name, nameUnique, NamedThing(getName) )
-import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
-import PrimRep		( PrimRep(..), isFollowableRep )
-import Maybes		( orElse, expectJust )
+import PrelNames	( Unique, Uniquable(..) )
+import PrimRep		( PrimRep(..) )
+import Maybes		( orElse )
 import Outputable
 import FastString
 \end{code}
@@ -75,9 +74,6 @@ import FastString
 %************************************************************************
 
 \begin{code}
-type KindCon      = TyCon
-type SuperKindCon = TyCon
-
 data TyCon
   = FunTyCon {
 	tyConUnique :: Unique,
@@ -153,18 +149,6 @@ data TyCon
 	argVrcs :: ArgVrcs
     }
 
-  | KindCon {		-- Type constructor at the kind level
-	tyConUnique :: Unique,
-	tyConName   :: Name,
-	tyConKind   :: SuperKind,
-	tyConArity  :: Arity
-    }
-
-  | SuperKindCon	{		-- The type of kind variables or boxity variables,
-	tyConUnique :: Unique,
-	tyConName   :: Name
-    }
-
 type ArgVrcs = [(Bool,Bool)]  -- Tyvar variance info: [(occPos,occNeg)]
 	-- [] means "no information, assume the worst"
 
@@ -212,21 +196,6 @@ module mutual-recursion.  And they aren't called from many places.
 So we compromise, and move their Kind calculation to the call site.
 
 \begin{code}
-mkSuperKindCon :: Name -> SuperKindCon
-mkSuperKindCon name = SuperKindCon {
-			tyConUnique = nameUnique name,
-			tyConName = name
-		      }
-
-mkKindCon :: Name -> SuperKind -> KindCon
-mkKindCon name kind
-  = KindCon { 
-	tyConUnique = nameUnique name,
-	tyConName = name,
-	tyConArity = 0,
-	tyConKind = kind
-     }
-
 mkFunTyCon :: Name -> Kind -> TyCon
 mkFunTyCon name kind 
   = FunTyCon { 
@@ -496,15 +465,11 @@ actually computed (in another file).
 
 \begin{code}
 tyConArgVrcs :: TyCon -> ArgVrcs
-tyConArgVrcs tc = expectJust "tyConArgVrcs" (tyConArgVrcs_maybe tc)
-
-tyConArgVrcs_maybe :: TyCon -> Maybe ArgVrcs
-tyConArgVrcs_maybe (FunTyCon   {})		     = Just [(False,True),(True,False)]
-tyConArgVrcs_maybe (AlgTyCon   {argVrcs = oi})       = Just oi
-tyConArgVrcs_maybe (PrimTyCon  {argVrcs = oi})       = Just oi
-tyConArgVrcs_maybe (TupleTyCon {tyConArity = arity}) = Just (replicate arity (True,False))
-tyConArgVrcs_maybe (SynTyCon   {argVrcs = oi})       = Just oi
-tyConArgVrcs_maybe _                                 = Nothing
+tyConArgVrcs (FunTyCon   {})		       = [(False,True),(True,False)]
+tyConArgVrcs (AlgTyCon   {argVrcs = oi})       = oi
+tyConArgVrcs (PrimTyCon  {argVrcs = oi})       = oi
+tyConArgVrcs (TupleTyCon {tyConArity = arity}) = (replicate arity (True,False))
+tyConArgVrcs (SynTyCon   {argVrcs = oi})       = oi
 \end{code}
 
 \begin{code}

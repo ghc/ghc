@@ -39,9 +39,8 @@ import HsUtils
 -- others:
 import IfaceSyn		( IfaceBinding )
 import Outputable
-import SrcLoc		( Located(..), unLoc, noLoc )
+import SrcLoc		( Located(..) )
 import Module		( Module )
-import Bag		( Bag, foldrBag )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.

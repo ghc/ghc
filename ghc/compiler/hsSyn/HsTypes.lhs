@@ -30,8 +30,9 @@ module HsTypes (
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
-import TcType		( Type, Kind, liftedTypeKind, eqKind )
-import Type		( {- instance Outputable Kind -}, pprParendKind, pprKind )
+import Type		( Type )
+import Kind		( {- instance Outputable Kind -}, Kind,
+			  pprParendKind, pprKind, isLiftedTypeKind )
 import Name		( Name, mkInternalName )
 import OccName		( mkVarOcc )
 import BasicTypes	( IPName, Boxity, tupleParens )
@@ -262,8 +263,8 @@ instance OutputableBndr name => Outputable (HsPred name) where
     ppr (HsIParam n ty)    = hsep [ppr n, dcolon, ppr ty]
 
 pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
-pprHsTyVarBndr name kind | kind `eqKind` liftedTypeKind = ppr name
-			 | otherwise 	  	        = hsep [ppr name, dcolon, pprParendKind kind]
+pprHsTyVarBndr name kind | isLiftedTypeKind kind = ppr name
+			 | otherwise 	  	 = hsep [ppr name, dcolon, pprParendKind kind]
 
 pprHsForAll exp tvs cxt 
   | show_forall = forall_part <+> pprHsContext (unLoc cxt)

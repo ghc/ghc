@@ -8,10 +8,10 @@ module Id (
 	Id, DictId,
 
 	-- Simple construction
-	mkGlobalId, mkLocalId, mkSpecPragmaId, mkLocalIdWithInfo,
+	mkGlobalId, mkLocalId, mkSpecPragmaId, mkLocalIdWithInfo, 
 	mkSysLocal, mkSysLocalUnencoded, mkUserLocal, mkVanillaGlobal,
 	mkTemplateLocals, mkTemplateLocalsNum, mkWildId, mkTemplateLocal,
-	mkWorkerId,
+	mkWorkerId, mkExportedLocalId,
 
 	-- Taking an Id apart
 	idName, idType, idUnique, idInfo,
@@ -19,7 +19,7 @@ module Id (
 	recordSelectorFieldLabel,
 
 	-- Modifying an Id
-	setIdName, setIdUnique, setIdType, setIdLocalExported, setGlobalIdDetails,
+	setIdName, setIdUnique, Id.setIdType, setIdLocalExported, setGlobalIdDetails,
 	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
 	zapLamIdInfo, zapDemandIdInfo, 
 
@@ -83,12 +83,12 @@ import BasicTypes	( Arity )
 import Var		( Id, DictId,
 			  isId, isExportedId, isSpecPragmaId, isLocalId,
 			  idName, idType, idUnique, idInfo, isGlobalId,
-			  setIdName, setVarType, setIdUnique, setIdLocalExported,
+			  setIdName, setIdType, setIdUnique, setIdLocalExported,
 			  setIdInfo, lazySetIdInfo, modifyIdInfo, 
 			  maybeModifyIdInfo,
 			  globalIdDetails, setGlobalIdDetails
 			)
-import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId )
+import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId, mkExportedLocalId )
 import Type		( Type, typePrimRep, addFreeTyVars, seqType)
 
 import IdInfo 
@@ -145,6 +145,9 @@ mkLocalIdWithInfo name ty info = Var.mkLocalId name (addFreeTyVars ty) info
 
 mkSpecPragmaId :: Name -> Type -> Id
 mkSpecPragmaId name ty = Var.mkSpecPragmaId name (addFreeTyVars ty) vanillaIdInfo
+
+mkExportedLocalId :: Name -> Type -> Id
+mkExportedLocalId name ty = Var.mkExportedLocalId name (addFreeTyVars ty) vanillaIdInfo
 
 mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId details name ty info = Var.mkGlobalId details name (addFreeTyVars ty) info
@@ -209,7 +212,7 @@ mkTemplateLocal i ty = mkSysLocal FSLIT("tpl") (mkBuiltinUnique i) ty
 \begin{code}
 setIdType :: Id -> Type -> Id
 	-- Add free tyvar info to the type
-setIdType id ty = seqType ty `seq` setVarType id (addFreeTyVars ty)
+setIdType id ty = seqType ty `seq` Var.setIdType id (addFreeTyVars ty)
 
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep (idType id)

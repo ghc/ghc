@@ -28,24 +28,23 @@ import RnHsSyn		( extractHsTyVars )
 import TcHsSyn		( TcId )
 
 import TcRnMonad
-import TcEnv		( tcExtendTyVarEnv, tcExtendTyVarKindEnv,
+import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv,
 			  tcLookup, tcLookupClass, tcLookupTyCon,
 		 	  TyThing(..), TcTyThing(..), 
-			  getInLocalScope
+			  getInLocalScope, wrongThingErr
 			)
-import TcMType		( newKindVar, newOpenTypeKind, tcInstType, newMutTyVar, 
-			  zonkTcType, zonkTcKindToKind,
+import TcMType		( newKindVar, tcInstType, newMutTyVar, 
+			  zonkTcKindToKind, 
 			  checkValidType, UserTypeCtxt(..), pprHsSigCtxt
 			)
-import TcUnify		( unifyKind, unifyFunKind )
+import TcUnify		( unifyFunKind, checkExpectedKind )
 import TcType		( Type, PredType(..), ThetaType, TyVarDetails(..),
 			  TcTyVar, TcKind, TcThetaType, TcTauType,
-			  mkTyVarTy, mkTyVarTys, mkFunTy, isTypeKind,
+			  mkTyVarTy, mkTyVarTys, mkFunTy, 
 		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy,
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
-			  liftedTypeKind, unliftedTypeKind, eqKind,
-			  tcSplitFunTy_maybe, tcSplitForAllTys, pprKind )
-import qualified Type	( splitFunTys )
+			  tcSplitFunTy_maybe, tcSplitForAllTys )
+import Kind 		( liftedTypeKind, ubxTupleKind, openTypeKind, argTypeKind )
 import Inst		( Inst, InstOrigin(..), newMethod, instToId )
 
 import Id		( mkLocalId, idName, idType )
@@ -207,26 +206,20 @@ kcLiftedType ty = kcCheckHsType ty liftedTypeKind
     
 ---------------------------
 kcTypeType :: LHsType Name -> TcM (LHsType Name)
--- The type ty must be a *type*, but it can be lifted or unlifted
--- Be sure to use checkExpectedKind, rather than simply unifying 
--- with (Type bx), because it gives better error messages
-kcTypeType ty
-  = kcHsType ty			`thenM` \ (ty', kind) ->
-    if isTypeKind kind then
-	return ty'
-    else
-    newOpenTypeKind				`thenM` \ type_kind ->
-    traceTc (text "kcTypeType" $$ nest 2 (ppr ty $$ ppr ty' $$ ppr kind $$ ppr type_kind)) `thenM_`
-    checkExpectedKind ty kind type_kind		`thenM_`
-    returnM ty'
+-- The type ty must be a *type*, but it can be lifted or 
+-- unlifted or an unboxed tuple.
+kcTypeType ty = kcCheckHsType ty openTypeKind
 
 ---------------------------
 kcCheckHsType :: LHsType Name -> TcKind -> TcM (LHsType Name)
 -- Check that the type has the specified kind
-kcCheckHsType ty exp_kind 
-  = kcHsType ty					`thenM` \ (ty', act_kind) ->
+-- Be sure to use checkExpectedKind, rather than simply unifying 
+-- with OpenTypeKind, because it gives better error messages
+kcCheckHsType (L span ty) exp_kind 
+  = addSrcSpan span				$
+    kc_hs_type ty				`thenM` \ (ty', act_kind) ->
     checkExpectedKind ty act_kind exp_kind	`thenM_`
-    returnM ty'
+    returnM (L span ty')
 \end{code}
 
 	Here comes the main function
@@ -276,11 +269,11 @@ kc_hs_type (HsTupleTy Boxed tys)
 
 kc_hs_type (HsTupleTy Unboxed tys)
   = mappM kcTypeType tys	`thenM` \ tys' ->
-    returnM (HsTupleTy Unboxed tys', unliftedTypeKind)
+    returnM (HsTupleTy Unboxed tys', ubxTupleKind)
 
 kc_hs_type (HsFunTy ty1 ty2)
-  = kcTypeType ty1	`thenM` \ ty1' ->
-    kcTypeType ty2	`thenM` \ ty2' ->
+  = kcCheckHsType ty1 argTypeKind	`thenM` \ ty1' ->
+    kcTypeType ty2			`thenM` \ ty2' ->
     returnM (HsFunTy ty1' ty2', liftedTypeKind)
 
 kc_hs_type ty@(HsOpTy ty1 op ty2)
@@ -345,10 +338,11 @@ kcApps fun_kind ppr_fun args
 kcHsContext :: LHsContext Name -> TcM (LHsContext Name)
 kcHsContext ctxt = wrapLocM (mappM kcHsPred) ctxt
 
-kcHsPred pred		-- Checks that the result is of kind liftedType
-  = wrapLocFstM kc_pred pred			`thenM` \ (pred', kind) ->
+kcHsPred (L span pred)		-- Checks that the result is of kind liftedType
+  = addSrcSpan span $
+    kc_pred pred				`thenM` \ (pred', kind) ->
     checkExpectedKind pred kind liftedTypeKind	`thenM_` 
-    returnM pred'
+    returnM (L span pred')
     
 ---------------------------
 kc_pred :: HsPred Name -> TcM (HsPred Name, TcKind)	
@@ -366,81 +360,24 @@ kc_pred pred@(HsClassP cls tys)
 ---------------------------
 kcTyVar :: Name -> TcM TcKind
 kcTyVar name	-- Could be a tyvar or a tycon
-  = tcLookup name	`thenM` \ thing ->
+  = traceTc (text "lk1" <+> ppr name) 	`thenM_`
+    tcLookup name	`thenM` \ thing ->
+    traceTc (text "lk2" <+> ppr name <+> ppr thing) 	`thenM_`
     case thing of 
 	ATyVar tv	    	-> returnM (tyVarKind tv)
-	ARecTyCon kind		-> returnM kind
+	AThing kind		-> returnM kind
 	AGlobal (ATyCon tc) 	-> returnM (tyConKind tc) 
-	other			-> failWithTc (wrongThingErr "type" thing name)
+	other			-> wrongThingErr "type" thing name
 
 kcClass :: Name -> TcM TcKind
 kcClass cls	-- Must be a class
   = tcLookup cls 				`thenM` \ thing -> 
     case thing of
-	ARecClass kind		-> returnM kind
+	AThing kind		-> returnM kind
 	AGlobal (AClass cls)    -> returnM (tyConKind (classTyCon cls))
-	other		        -> failWithTc (wrongThingErr "class" thing cls)
+	other		        -> wrongThingErr "class" thing cls
 \end{code}
 
-	Helper functions
-
-
-\begin{code}
----------------------------
--- We would like to get a decent error message from
---   (a) Under-applied type constructors
---		f :: (Maybe, Maybe)
---   (b) Over-applied type constructors
---		f :: Int x -> Int x
---
-
-
-checkExpectedKind :: Outputable a => Located a -> TcKind -> TcKind -> TcM TcKind
--- A fancy wrapper for 'unifyKind', which tries to give 
--- decent error messages.
--- Returns the same kind that it is passed, exp_kind
-checkExpectedKind (L span ty) act_kind exp_kind
-  | act_kind `eqKind` exp_kind -- Short cut for a very common case
-  = returnM exp_kind	
-  | otherwise
-  = tryTc (unifyKind exp_kind act_kind)	`thenM` \ (errs, mb_r) ->
-    case mb_r of {
-	Just _  -> returnM exp_kind ;	-- Unification succeeded
-	Nothing ->
-
-	-- So there's definitely an error
-	-- Now to find out what sort
-    addSrcSpan span		$
-    zonkTcType exp_kind		`thenM` \ exp_kind ->
-    zonkTcType act_kind		`thenM` \ act_kind ->
-
-    let (exp_as, _) = Type.splitFunTys exp_kind
-        (act_as, _) = Type.splitFunTys act_kind
-		-- Use the Type versions for kinds	
-	n_exp_as = length exp_as
-	n_act_as = length act_as
-
-	err | n_exp_as < n_act_as	-- E.g. [Maybe]
-	    = quotes (ppr ty) <+> ptext SLIT("is not applied to enough type arguments")
-
-		-- Now n_exp_as >= n_act_as. In the next two cases, 
-		-- n_exp_as == 0, and hence so is n_act_as
-	    | exp_kind `eqKind` liftedTypeKind && act_kind `eqKind` unliftedTypeKind
-	    = ptext SLIT("Expecting a lifted type, but") <+> quotes (ppr ty) 
-		<+> ptext SLIT("is unlifted")
-
-	    | exp_kind `eqKind` unliftedTypeKind && act_kind `eqKind` liftedTypeKind
-	    = ptext SLIT("Expecting an unlifted type, but") <+> quotes (ppr ty) 
-		<+> ptext SLIT("is lifted")
-
-	    | otherwise 		-- E.g. Monad [Int]
-	    = sep [ ptext SLIT("Expecting kind") <+> quotes (pprKind exp_kind) <> comma,
-		    ptext SLIT("but") <+> quotes (ppr ty) <+> 
-		        ptext SLIT("has kind") <+> quotes (pprKind act_kind)]
-   in
-   failWithTc (ptext SLIT("Kind error:") <+> err) 
-   }
-\end{code}
 
 %************************************************************************
 %*									*
@@ -533,7 +470,7 @@ ds_var_app name arg_tys
     case thing of
 	ATyVar tv 	     -> returnM (mkAppTys (mkTyVarTy tv) arg_tys)
 	AGlobal (ATyCon tc)  -> returnM (mkGenTyConApp tc arg_tys)
-	ARecTyCon _ 	     -> tcLookupTyCon name	`thenM` \ tc ->
+	AThing _ 	     -> tcLookupTyCon name	`thenM` \ tc ->
 			        returnM (mkGenTyConApp tc arg_tys)
 	other -> pprPanic "ds_app_type" (ppr name <+> ppr arg_tys)
 \end{code}
@@ -570,8 +507,8 @@ kcHsTyVars :: [LHsTyVarBndr Name]
 	   -> TcM r
 kcHsTyVars tvs thing_inside 
   = mappM (wrapLocM kcHsTyVar) tvs	`thenM` \ bndrs ->
-    tcExtendTyVarKindEnv bndrs 		$
-    thing_inside bndrs
+    tcExtendKindEnv [(n,k) | L _ (KindedTyVar n k) <- bndrs]
+		    (thing_inside bndrs)
 
 kcHsTyVar :: HsTyVarBndr Name -> TcM (HsTyVarBndr Name)
 	-- Return a *kind-annotated* binder, and a tyvar with a mutable kind in it	
@@ -823,23 +760,3 @@ hoistForAllTys ty
 	| otherwise = ([], [], ty)
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{Errors and contexts}
-%*									*
-%************************************************************************
-
-\begin{code}
-wrongThingErr expected thing name
-  = pp_thing thing <+> quotes (ppr name) <+> ptext SLIT("used as a") <+> text expected
-  where
-    pp_thing (AGlobal (ATyCon _))   = ptext SLIT("Type constructor")
-    pp_thing (AGlobal (AClass _))   = ptext SLIT("Class")
-    pp_thing (AGlobal (AnId   _))   = ptext SLIT("Identifier")
-    pp_thing (AGlobal (ADataCon _)) = ptext SLIT("Data constructor")
-    pp_thing (ATyVar _) 	    = ptext SLIT("Type variable")
-    pp_thing (ATcId _ _ _)  	    = ptext SLIT("Local identifier")
-    pp_thing (ARecTyCon _) 	    = ptext SLIT("Rec tycon")
-    pp_thing (ARecClass _) 	    = ptext SLIT("Rec class")
-\end{code}

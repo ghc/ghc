@@ -13,14 +13,15 @@ files for imported data types.
 \begin{code}
 module TcTyDecls(
         calcTyConArgVrcs,
-	calcRecFlags, calcCycleErrs,
+	calcRecFlags, 
+	calcClassCycles, calcSynCycles,
 	newTyConRhs
     ) where
 
 #include "HsVersions.h"
 
 import TypeRep          ( Type(..), TyNote(..), PredType(..) )  -- friend
-import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl )
+import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl, isClassDecl )
 import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep )
 import BuildTyCl	( newTyConRhs )
@@ -37,7 +38,7 @@ import NameEnv
 import NameSet
 import Digraph 		( SCC(..), stronglyConnComp, stronglyConnCompR )
 import BasicTypes	( RecFlag(..) )
-import SrcLoc		( Located(..) )
+import SrcLoc		( Located(..), unLoc )
 import Outputable
 \end{code}
 
@@ -107,23 +108,25 @@ synTyConsOfType ty
 ---------------------------------------- END NOTE ]
 
 \begin{code}
-calcCycleErrs :: [LTyClDecl Name] -> ([[Name]],	-- Recursive type synonym groups
-			             [[Name]])	-- Ditto classes
-calcCycleErrs decls
-  = (findCyclics syn_edges, findCyclics cls_edges)
+calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
+calcSynCycles decls
+  = stronglyConnComp syn_edges
   where
-	--------------- Type synonyms ----------------------
-    syn_edges 	     = [ (name, mk_syn_edges rhs) | 
-			  L _ (TySynonym { tcdLName  = L _ name, 
-					   tcdSynRhs = rhs }) <- decls ]
+    syn_edges = [ (ldecl, unLoc (tcdLName decl), 
+			  mk_syn_edges (tcdSynRhs decl))
+		| ldecl@(L _ decl) <- decls ]
 
     mk_syn_edges rhs = [ tc | tc <- nameSetToList (extractHsTyNames rhs), 
 			      not (isTyVarName tc) ]
 
-	--------------- Classes ----------------------
-    cls_edges = [ (name, mk_cls_edges ctxt) | 
-		  L _ (ClassDecl { tcdLName = L _ name, 
-			           tcdCtxt  = L _ ctxt }) <- decls ]
+
+calcClassCycles :: [LTyClDecl Name] -> [[LTyClDecl Name]]
+calcClassCycles decls
+  = [decls | CyclicSCC decls <- stronglyConnComp cls_edges]
+  where
+    cls_edges = [ (ldecl, unLoc (tcdLName decl), 	
+			  mk_cls_edges (unLoc (tcdCtxt decl)))
+		| ldecl@(L _ decl) <- decls, isClassDecl decl ]
 
     mk_cls_edges ctxt = [ cls | L _ (HsClassP cls _) <- ctxt ]
 \end{code}
@@ -262,12 +265,6 @@ findLoopBreakers deps
     go edges = [ name
 	       | CyclicSCC ((tc,_,_) : edges') <- stronglyConnCompR edges,
 		 name <- tyConName tc : go edges']
-
-findCyclics :: [(Name,[Name])] -> [[Name]]
-findCyclics deps
-  = [names | CyclicSCC names <- stronglyConnComp edges]
-  where
-    edges = [(name,name,ds) | (name,ds) <- deps]
 \end{code}
 
 These two functions know about type representations, so they could be

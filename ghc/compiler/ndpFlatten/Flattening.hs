@@ -69,10 +69,10 @@ import ErrUtils     (dumpIfSet_dyn)
 import UniqSupply   (mkSplitUniqSupply)
 import CmdLineOpts  (DynFlag(..))
 import Literal      (Literal, literalType)
-import Var	    (Var(..))
+import Var	    (Var(..), idType, isTyVar)
+import Id	    (setIdType)
 import DataCon	    (DataCon, dataConTag)
 import TypeRep      (Type(..))
-import Type         (isTypeKind)
 import HscTypes	    ( ModGuts(..), ModGuts, HscEnv(..), hscEPS )
 import CoreFVs	    (exprFreeVars)
 import CoreSyn	    (Expr(..), Bind(..), Alt(..), AltCon(..), Note(..),
@@ -192,7 +192,7 @@ vectoriseBind (Rec bindings)   =
     vectoriseOne (b, expr) = 
       do
 	(vexpr, ty) <- vectorise expr
-	return (b{varType = ty}, vexpr)
+	return (setIdType b ty, vexpr)
 
 
 -- Searches for function definitions and creates a lifted version for 
@@ -217,9 +217,9 @@ vectoriseBind (Rec bindings)   =
 vectorise:: CoreExpr -> Flatten (CoreExpr, Type)
 vectorise (Var id)  =  
   do 
-    let varTy  = varType id
+    let varTy  = idType id
     let vecTy  = vectoriseTy varTy
-    return ((Var id{varType = vecTy}), vecTy)
+    return (Var (setIdType id vecTy), vecTy)
 
 vectorise (Lit lit) =  
   return ((Lit lit), literalType lit) 
@@ -234,7 +234,7 @@ vectorise  (App (Lam b expr) arg) =
   do
     (varg, argTy)    <- vectorise arg
     (vexpr, vexprTy) <- vectorise expr
-    let vb            = b{varType = argTy} 
+    let vb            = setIdType b argTy
     return ((App (Lam vb  vexpr) varg), 
             applyTypeToArg (mkPiType vb vexprTy) varg)
 
@@ -265,14 +265,14 @@ vectorise (App expr arg) =
     
 
 vectorise  e@(Lam b expr)
-  | isTypeKind (varType b) = 
-      do
+  | isTyVar b
+  =  do
         (vexpr, vexprTy) <- vectorise expr          -- don't vectorise 'b'!
         return ((Lam b vexpr), mkPiType b vexprTy)
   | otherwise =
      do          
        (vexpr, vexprTy)  <- vectorise expr
-       let vb             = b{varType = vectoriseTy (varType b)}
+       let vb             = setIdType b (vectoriseTy (idType b))
        let ve             =  Lam  vb  vexpr 
        (lexpr, lexprTy)  <- lift e
        let veTy = mkPiType vb vexprTy  
@@ -289,7 +289,7 @@ vectorise (Case expr b alts) =
   do 
     (vexpr, vexprTy) <- vectorise expr
     valts <- mapM vectorise' alts
-    return (Case vexpr b{varType = vexprTy} (map fst valts), snd (head valts))
+    return (Case vexpr (setIdType b vexprTy) (map fst valts), snd (head valts))
   where vectorise' (con, bs, expr) = 
           do 
             (vexpr, vexprTy) <- vectorise expr
@@ -353,7 +353,7 @@ liftTy  t              = mkPArrTy t
 --  lift type, don't change name (incl unique) nor IdInfo. IdInfo looks ok,
 --  but I'm not entirely sure about some fields (e.g., strictness info)
 liftBinderType:: CoreBndr ->  Flatten CoreBndr
-liftBinderType bndr = return $  bndr {varType = liftTy (varType bndr)}
+liftBinderType bndr = return $  setIdType bndr (liftTy (idType bndr))
 
 -- lift: lifts an expression (a -> [:a:])
 -- If the expression is a simple expression, it is treated like a constant
@@ -364,7 +364,7 @@ lift:: CoreExpr -> Flatten (CoreExpr, Type)
 lift cExpr@(Var id)    = 
   do
     lVar@(Var lId) <- liftVar id
-    return (lVar, varType lId)
+    return (lVar, idType lId)
 
 lift cExpr@(Lit lit)   = 
   do
@@ -374,7 +374,7 @@ lift cExpr@(Lit lit)   =
 
 lift (Lam b expr)
   | isSimpleExpr expr      =  liftSimpleFun b expr
-  | isTypeKind (varType b) = 
+  | isTyVar b = 
     do
       (lexpr, lexprTy) <- lift expr  -- don't lift b!
       return (Lam b lexpr, mkPiType b lexprTy)
@@ -502,7 +502,7 @@ liftSingleDataCon:: CoreBndr -> DataCon -> [CoreBndr] -> CoreExpr ->
 liftSingleDataCon b dcon bnds expr =
   do 
     let dconId           = dataConTag dcon
-    indexExpr           <- mkIndexOfExprDCon (varType b)  b dconId
+    indexExpr           <- mkIndexOfExprDCon (idType b)  b dconId
     (bb, bbind)         <- mkBind FSLIT("is") indexExpr
     lbnds               <- mapM liftBinderType bnds
     ((lExpr, _), bnds') <- packContext  bb (extendContext lbnds (lift expr))
@@ -518,7 +518,7 @@ liftCaseDataConDefault:: CoreBndr -> (Alt CoreBndr) ->  [Alt CoreBndr]
 liftCaseDataConDefault b (_, _, def) alts =
   do
     let dconIds        = map (\(DataAlt d, _, _) -> dataConTag d) alts
-    indexExpr         <- mkIndexOfExprDConDft (varType b) b dconIds
+    indexExpr         <- mkIndexOfExprDConDft (idType b) b dconIds
     (bb, bbind)       <- mkBind FSLIT("is") indexExpr
     ((lDef, _), bnds) <- packContext  bb (lift def)     
     (_, vbind)        <- mkBind FSLIT("r") lDef
@@ -549,7 +549,7 @@ liftCaseLitDefault:: CoreBndr -> (Alt CoreBndr) ->  [Alt CoreBndr]
 liftCaseLitDefault b (_, _, def) alts =
   do
     let lits           = map (\(LitAlt l, _, _) -> l) alts
-    indexExpr         <- mkIndexOfExprDft (varType b) b lits
+    indexExpr         <- mkIndexOfExprDft (idType b) b lits
     (bb, bbind)       <- mkBind FSLIT("is") indexExpr
     ((lDef, _), bnds) <- packContext  bb (lift def)     
     (_, vbind)        <- mkBind FSLIT("r") lDef
@@ -588,7 +588,7 @@ liftSingleCaseLit:: CoreBndr -> Literal -> CoreExpr  ->
   Flatten (CoreBind, CoreBind, [CoreBind])
 liftSingleCaseLit b lit expr =
  do 
-   indexExpr          <- mkIndexOfExpr (varType b) b lit -- (a)
+   indexExpr          <- mkIndexOfExpr (idType b) b lit -- (a)
    (bb, bbind)        <- mkBind FSLIT("is") indexExpr
    ((lExpr, t), bnds) <- packContext  bb (lift expr)     -- (b)         
    (_, vbind)         <- mkBind FSLIT("r") lExpr
@@ -645,7 +645,7 @@ dftbpBinders indexBnds exprBnds =
 	let iVar = getVarOfBind i
 	let eVar = getVarOfBind e
 	let cVar = getVarOfBind cBind
-        let ty   = varType eVar
+        let ty   = idType eVar
 	newBnd  <- mkDftBackpermute ty iVar eVar cVar
 	((fBnd, restBnds), _) <- dftbpBinders' is es newBnd
 	return ((fBnd, (newBnd:restBnds)), liftTy ty)
@@ -676,7 +676,7 @@ liftSimpleFun b expr =
   do
     bndVars <- collectBoundVars expr
     let bndVars'     = b:bndVars
-        bndVarsTuple = mkTuple (map varType bndVars') (map Var bndVars')
+        bndVarsTuple = mkTuple (map idType bndVars') (map Var bndVars')
 	lamExpr      = mkLams (b:bndVars) expr     -- FIXME: should be tuple
                                                    -- here 
     let (t1, t2)     = funTyArgs . exprType $ lamExpr
@@ -697,11 +697,11 @@ collectBoundVars  expr =
 --   indexOf (mapP (\x -> x == lit) b) b
 --
 mkIndexOfExpr:: Type -> CoreBndr -> Literal -> Flatten CoreExpr
-mkIndexOfExpr  varType b lit =
+mkIndexOfExpr  idType b lit =
   do 
-    eqExpr        <- mk'eq  varType (Var b) (Lit lit)
+    eqExpr        <- mk'eq idType (Var b) (Lit lit)
     let lambdaExpr = (Lam b eqExpr)
-    mk'indexOfP varType  lambdaExpr (Var b)
+    mk'indexOfP idType  lambdaExpr (Var b)
 
 -- there is FlattenMonad.mk'indexOfP as well as
 -- CoreSyn.mkApps and CoreSyn.mkLam, all of which should help here
@@ -715,12 +715,12 @@ mkIndexOfExpr  varType b lit =
 -- indexOfP (\x -> x == dconId) b)
 --
 mkIndexOfExprDCon::Type -> CoreBndr -> Int -> Flatten CoreExpr
-mkIndexOfExprDCon  varType b dId = 
+mkIndexOfExprDCon  idType b dId = 
   do 
     let intExpr    = mkIntLitInt dId
-    eqExpr        <- mk'eq  varType (Var b) intExpr
+    eqExpr        <- mk'eq  idType (Var b) intExpr
     let lambdaExpr = (Lam b intExpr)
-    mk'indexOfP varType lambdaExpr (Var b) 
+    mk'indexOfP idType lambdaExpr (Var b) 
 
   
 
@@ -733,23 +733,23 @@ mkIndexOfExprDCon  varType b dId =
 -- indexOfP (\x -> x != dconId_1 && ....) b)
 --
 mkIndexOfExprDConDft:: Type -> CoreBndr -> [Int] -> Flatten CoreExpr
-mkIndexOfExprDConDft varType b dId  = 
+mkIndexOfExprDConDft idType b dId  = 
   do 
     let intExprs   = map mkIntLitInt dId
-    bExpr         <- foldM (mk'neq varType) (head intExprs) (tail intExprs)
+    bExpr         <- foldM (mk'neq idType) (head intExprs) (tail intExprs)
     let lambdaExpr = (Lam b bExpr)
-    mk'indexOfP varType (Var b) bExpr
+    mk'indexOfP idType (Var b) bExpr
   
 
 -- mkIndexOfExprDef b [lit1, lit2,...] ->
 --   indexOf (\x -> not (x == lit1 || x == lit2 ....) b
 mkIndexOfExprDft:: Type -> CoreBndr -> [Literal] -> Flatten CoreExpr
-mkIndexOfExprDft varType b lits = 
+mkIndexOfExprDft idType b lits = 
   do 
     let litExprs   = map (\l-> Lit l)  lits
-    bExpr         <- foldM (mk'neq varType) (head litExprs) (tail litExprs)
+    bExpr         <- foldM (mk'neq idType) (head litExprs) (tail litExprs)
     let lambdaExpr = (Lam b bExpr)
-    mk'indexOfP varType bExpr (Var b) 
+    mk'indexOfP idType bExpr (Var b) 
 
 
 -- create a back-permute binder

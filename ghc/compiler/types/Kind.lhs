@@ -1,0 +1,201 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1998
+%
+
+\begin{code}
+module Kind (
+	Kind(..), KindVar(..), SimpleKind,
+	openTypeKind, liftedTypeKind, unliftedTypeKind, 
+	argTypeKind, ubxTupleKind,
+
+	isLiftedTypeKind, isUnliftedTypeKind, 
+	isArgTypeKind, isOpenTypeKind,
+	mkArrowKind, mkArrowKinds,
+
+        isSubKind, defaultKind, 
+	kindFunResult, splitKindFunTys, mkKindVar,
+
+	pprKind, pprParendKind
+     ) where
+
+#include "HsVersions.h"
+
+import Unique	( Unique )
+import Outputable
+import DATA_IOREF
+\end{code}
+
+Kinds
+~~~~~
+There's a little subtyping at the kind level:  
+
+		 ?
+		/ \
+	       /   \
+	      ??   (#)
+	     /  \
+            *   #
+
+where	*    [LiftedTypeKind]   means boxed type
+	#    [UnliftedTypeKind] means unboxed type
+	(#)  [UbxTupleKind]     means unboxed tuple
+	??   [ArgTypeKind]      is the lub of *,#
+	?    [OpenTypeKind]	means any type at all
+
+In particular:
+
+	error :: forall a:<any>. String -> a
+	(->)  :: ?? -> ? -> *
+	(\(x::t) -> ...)	Here t::<any> (i.e. not unboxed tuple)
+
+\begin{code}
+data Kind 
+  = LiftedTypeKind 	-- *
+  | OpenTypeKind	-- ?
+  | UnliftedTypeKind	-- #
+  | UbxTupleKind	-- (##)
+  | ArgTypeKind		-- ??
+  | FunKind Kind Kind	-- k1 -> k2
+  | KindVar KindVar
+  deriving( Eq )
+
+data KindVar = KVar Unique (IORef (Maybe SimpleKind))
+  -- INVARIANT: a KindVar can only be instantaited by a SimpleKind
+
+type SimpleKind = Kind	
+  -- A SimpleKind has no ? or # kinds in it:
+  -- sk ::= * | sk1 -> sk2 | kvar
+
+instance Eq KindVar where
+  (KVar u1 _) == (KVar u2 _) = u1 == u2
+
+mkKindVar :: Unique -> IORef (Maybe Kind) -> KindVar
+mkKindVar = KVar
+\end{code}
+
+Kind inference
+~~~~~~~~~~~~~~
+During kind inference, a kind variable unifies only with 
+a "simple kind", sk
+	sk ::= * | sk1 -> sk2
+For example 
+	data T a = MkT a (T Int#)
+fails.  We give T the kind (k -> *), and the kind variable k won't unify
+with # (the kind of Int#).
+
+Type inference
+~~~~~~~~~~~~~~
+When creating a fresh internal type variable, we give it a kind to express 
+constraints on it.  E.g. in (\x->e) we make up a fresh type variable for x, 
+with kind ??.  
+
+During unification we only bind an internal type variable to a type
+whose kind is lower in the sub-kind hierarchy than the kind of the tyvar.
+
+When unifying two internal type variables, we collect their kind constraints by
+finding the GLB of the two.  Since the partial order is a tree, they only
+have a glb if one is a sub-kind of the other.  In that case, we bind the
+less-informative one to the more informative one.  Neat, eh?
+
+In the olden days, when we generalise, we make generic type variables
+whose kind is simple.  So generic type variables (other than built-in
+constants like 'error') always have simple kinds.  But I don't see any
+reason to do that any more (TcMType.zapTcTyVarToTyVar).
+
+
+\begin{code}
+liftedTypeKind   = LiftedTypeKind
+unliftedTypeKind = UnliftedTypeKind
+openTypeKind     = OpenTypeKind
+argTypeKind      = ArgTypeKind
+ubxTupleKind	 = UbxTupleKind
+
+mkArrowKind :: Kind -> Kind -> Kind
+mkArrowKind k1 k2 = k1 `FunKind` k2
+
+mkArrowKinds :: [Kind] -> Kind -> Kind
+mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
+\end{code}
+
+%************************************************************************
+%*									*
+	Functions over Kinds		
+%*									*
+%************************************************************************
+
+\begin{code}
+kindFunResult :: Kind -> Kind
+kindFunResult (FunKind _ k) = k
+kindFunResult k = pprPanic "kindFunResult" (ppr k)
+
+splitKindFunTys :: Kind -> ([Kind],Kind)
+splitKindFunTys (FunKind k1 k2) = case splitKindFunTys k2 of
+				    (as, r) -> (k1:as, r)
+splitKindFunTys k = ([], k)
+
+isLiftedTypeKind, isUnliftedTypeKind :: Kind -> Bool
+isLiftedTypeKind LiftedTypeKind = True
+isLiftedTypeKind other		= False
+
+isUnliftedTypeKind UnliftedTypeKind = True
+isUnliftedTypeKind other	    = False
+
+isArgTypeKind :: Kind -> Bool
+-- True of any sub-kind of ArgTypeKind 
+isArgTypeKind LiftedTypeKind   = True
+isArgTypeKind UnliftedTypeKind = True
+isArgTypeKind ArgTypeKind      = True
+isArgTypeKind other	       = False
+
+isOpenTypeKind :: Kind -> Bool
+-- True of any sub-kind of OpenTypeKind (i.e. anything except arrow)
+isOpenTypeKind (FunKind _ _) = False
+isOpenTypeKind other	     = True
+
+isSubKind :: Kind -> Kind -> Bool
+-- (k1 `isSubKind` k2) checks that k1 <: k2
+isSubKind LiftedTypeKind   LiftedTypeKind   = True
+isSubKind UnliftedTypeKind UnliftedTypeKind = True
+isSubKind UbxTupleKind     UbxTupleKind     = True
+isSubKind k1 		   OpenTypeKind     = isOpenTypeKind k1
+isSubKind k1 		   ArgTypeKind      = isArgTypeKind k1
+isSubKind (FunKind a1 r1) (FunKind a2 r2)
+  = (a2 `isSubKind` a1) && (r1 `isSubKind` r2)
+isSubKind k1 k2 = False
+
+defaultKind :: Kind -> Kind
+-- Used when generalising: default kind '?' and '??' to '*'
+defaultKind OpenTypeKind = LiftedTypeKind
+defaultKind ArgTypeKind  = LiftedTypeKind
+defaultKind kind	 = kind
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Pretty printing
+%*									*
+%************************************************************************
+
+\begin{code}
+instance Outputable KindVar where
+  ppr (KVar uniq _) = text "k_" <> ppr uniq
+
+instance Outputable Kind where
+  ppr k = pprKind k
+
+pprParendKind :: Kind -> SDoc
+pprParendKind k@(FunKind _ _) = parens (pprKind k)
+pprParendKind k		      = pprKind k
+
+pprKind (KindVar v)      = ppr v
+pprKind LiftedTypeKind   = ptext SLIT("*")
+pprKind UnliftedTypeKind = ptext SLIT("#")
+pprKind OpenTypeKind     = ptext SLIT("?")
+pprKind ArgTypeKind      = ptext SLIT("??")
+pprKind UbxTupleKind     = ptext SLIT("(#)")
+pprKind (FunKind k1 k2)  = sep [ pprKind k1, arrow <+> pprParendKind k2]
+\end{code}
+
+
+

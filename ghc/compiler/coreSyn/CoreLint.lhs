@@ -32,7 +32,7 @@ import Type		( Type, tyVarsOfType, eqType,
 			  splitForAllTy_maybe, splitTyConApp_maybe, splitTyConApp,
 			  isUnLiftedType, typeKind, 
 			  isUnboxedTupleType,
-			  hasMoreBoxityInfo
+			  isSubKind
 			)
 import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), isNonRec )
@@ -333,7 +333,7 @@ lintTyApp ty arg_ty
 	    tyvar_kind = tyVarKind tyvar
 	    argty_kind = typeKind arg_ty
 	in
-	if argty_kind `hasMoreBoxityInfo` tyvar_kind
+	if argty_kind `isSubKind` tyvar_kind
 		-- Arg type might be boxed for a function with an uncommitted
 		-- tyvar; notably this is used so that we can give
 		-- 	error :: forall a:*. String -> a
@@ -406,8 +406,8 @@ lintCoreAlt scrut_ty alt@(LitAlt lit, args, rhs)
 lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
   = addLoc (CaseAlt alt) (
 
-    mapL (\arg -> checkL (not (isUnboxedTupleType (idType arg)))
-			(mkUnboxedTupleMsg arg)) args `seqL`
+    mapL (\arg -> checkL (not (isId arg && isUnboxedTupleType (idType arg)))
+			 (mkUnboxedTupleMsg arg)) args `seqL`
 
     addInScopeVars args (
 

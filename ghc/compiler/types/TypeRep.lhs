@@ -12,20 +12,17 @@ module TypeRep (
  	Kind, ThetaType,		-- Synonyms
 	TyVarSubst,
 
-	superKind, superBoxity,				-- KX and BX respectively
-	liftedBoxity, unliftedBoxity, 			-- :: BX
-	openKindCon, 					-- :: KX
-	typeCon,					-- :: BX -> KX
-	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
-	isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, isSuperKind,
-	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
-
 	funTyCon,
 
 	-- Pretty-printing
-	pprKind, pprParendKind,
 	pprType, pprParendType,
-	pprPred, pprTheta, pprThetaArrow, pprClassPred
+	pprPred, pprTheta, pprThetaArrow, pprClassPred,
+
+	-- Re-export fromKind
+	liftedTypeKind, unliftedTypeKind, openTypeKind,
+	isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, 
+	mkArrowKind, mkArrowKinds,
+	pprKind, pprParendKind
     ) where
 
 #include "HsVersions.h"
@@ -33,23 +30,18 @@ module TypeRep (
 import {-# SOURCE #-} DataCon( DataCon, dataConName )
 
 -- friends:
+import Kind
 import Var	  ( Id, TyVar, tyVarKind )
 import VarEnv     ( TyVarEnv )
 import VarSet     ( TyVarSet )
-import Name	  ( Name, NamedThing(..), mkWiredInName, mkInternalName )
-import OccName	  ( mkOccFS, mkKindOccFS, tcName )
+import Name	  ( Name, NamedThing(..), mkWiredInName )
+import OccName	  ( mkOccFS, tcName )
 import BasicTypes ( IPName, tupleParens )
-import TyCon	  ( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon, isNewTyCon,
-		    tyConArity, tupleTyConBoxity, isTupleTyCon, tyConName )
+import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon )
 import Class	  ( Class )
 
 -- others
-import PrelNames	( gHC_PRIM, kindConKey, boxityConKey, liftedConKey, 
-			  unliftedConKey, typeConKey, anyBoxConKey, 
-			  funTyConKey, listTyConKey, parrTyConKey,
-			  hasKey
-			)
-import SrcLoc		( noSrcLoc )
+import PrelNames	( gHC_PRIM, funTyConKey, listTyConKey, parrTyConKey, hasKey )
 import Outputable
 \end{code}
 
@@ -154,13 +146,10 @@ to cut all loops.  The other members of the loop may be marked 'non-recursive'.
 
 
 \begin{code}
-type SuperKind = Type
-type Kind      = Type
-
 type TyVarSubst = TyVarEnv Type
 
 data Type
-  = TyVarTy TyVar
+  = TyVarTy TyVar	
 
   | AppTy
 	Type		-- Function is *not* a TyConApp
@@ -250,135 +239,6 @@ represented by evidence (a dictionary, for example, of type (predRepTy p).
 
 %************************************************************************
 %*									*
-\subsection{Kinds}
-%*									*
-%************************************************************************
-
-Kinds
-~~~~~
-kind :: KX = kind -> kind
-
-           | Type liftedness	-- (Type *) is printed as just *
-				-- (Type #) is printed as just #
-
-           | OpenKind		-- Can be lifted or unlifted
-				-- Printed '?'
-
-           | kv			-- A kind variable; *only* happens during kind checking
-
-boxity :: BX = *	-- Lifted
-	     | #	-- Unlifted
-	     | bv	-- A boxity variable; *only* happens during kind checking
-
-There's a little subtyping at the kind level:  
-	forall b. Type b <: OpenKind
-
-That is, a type of kind (Type b) is OK in a context requiring an OpenKind
-
-OpenKind, written '?', is used as the kind for certain type variables,
-in two situations:
-
-1.  The universally quantified type variable(s) for special built-in 
-    things like error :: forall (a::?). String -> a. 
-    Here, the 'a' can be instantiated to a lifted or unlifted type.  
-
-2.  Kind '?' is also used when the typechecker needs to create a fresh
-    type variable, one that may very well later be unified with a type.
-    For example, suppose f::a, and we see an application (f x).  Then a
-    must be a function type, so we unify a with (b->c).  But what kind
-    are b and c?  They can be lifted or unlifted types, or indeed type schemes,
-    so we give them kind '?'.
-
-    When the type checker generalises over a bunch of type variables, it
-    makes any that still have kind '?' into kind '*'.  So kind '?' is never
-    present in an inferred type.
-
-
-------------------------------------------
-Define  KX, the type of a kind
-	BX, the type of a boxity
-
-\begin{code}
-superKindName    = kindQual FSLIT("KX") kindConKey
-superBoxityName  = kindQual FSLIT("BX") boxityConKey
-liftedConName    = kindQual FSLIT("*") liftedConKey
-unliftedConName  = kindQual FSLIT("#") unliftedConKey
-openKindConName  = kindQual FSLIT("?") anyBoxConKey
-typeConName	 = kindQual FSLIT("Type") typeConKey
-
-kindQual str uq = mkInternalName uq (mkKindOccFS tcName str) noSrcLoc
-	-- Kinds are not z-encoded in interface file, hence mkKindOccFS
-	-- And they don't come from any particular module; indeed we always
-	-- want to print them unqualified.  Hence the InternalName.
-\end{code}
-
-\begin{code}
-superKind :: SuperKind 		-- KX, the type of all kinds
-superKind = TyConApp (mkSuperKindCon superKindName) []
-
-superBoxity :: SuperKind		-- BX, the type of all boxities
-superBoxity = TyConApp (mkSuperKindCon superBoxityName) []
-\end{code}
-
-------------------------------------------
-Define boxities: @*@ and @#@
-
-\begin{code}
-liftedBoxity, unliftedBoxity :: Kind		-- :: BX
-liftedBoxity   = TyConApp liftedBoxityCon   []
-unliftedBoxity = TyConApp unliftedBoxityCon []
-
-liftedBoxityCon   = mkKindCon liftedConName superBoxity
-unliftedBoxityCon = mkKindCon unliftedConName superBoxity
-\end{code}
-
-------------------------------------------
-Define kinds: Type, Type *, Type #, OpenKind
-
-\begin{code}
-typeCon :: KindCon	-- :: BX -> KX
-typeCon     = mkKindCon typeConName (superBoxity `FunTy` superKind)
-
-liftedTypeKind, unliftedTypeKind, openTypeKind :: Kind	-- Of superkind superKind
-
-liftedTypeKind   = TyConApp typeCon [liftedBoxity]
-unliftedTypeKind = TyConApp typeCon [unliftedBoxity]
-
-openKindCon     = mkKindCon openKindConName superKind
-openTypeKind    = TyConApp openKindCon []
-\end{code}
-
-\begin{code}
-isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind :: Kind -> Bool
-isLiftedTypeKind (TyConApp tc [TyConApp bc []])   = tyConName tc == typeConName && 
-						    tyConName bc == liftedConName
-isLiftedTypeKind other = False
-
-isUnliftedTypeKind (TyConApp tc [TyConApp bc []]) = tyConName tc == typeConName && 
-						    tyConName bc == unliftedConName
-isUnliftedTypeKind other = False
-
-isOpenTypeKind (TyConApp tc []) = tyConName tc == openKindConName
-isOpenTypeKind other = False
-
-isSuperKind (TyConApp tc []) = tyConName tc == superKindName
-isSuperKind other = False
-\end{code}
-
-------------------------------------------
-Define arrow kinds
-
-\begin{code}
-mkArrowKind :: Kind -> Kind -> Kind
-mkArrowKind k1 k2 = k1 `FunTy` k2
-
-mkArrowKinds :: [Kind] -> Kind -> Kind
-mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
-\end{code}
-
-
-%************************************************************************
-%*									*
 			TyThing
 %*									*
 %************************************************************************
@@ -416,8 +276,8 @@ instance NamedThing TyThing where	-- Can't put this with the type
 We define a few wired-in type constructors here to avoid module knots
 
 \begin{code}
-funTyCon = mkFunTyCon funTyConName (mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind)
-	-- You might think that (->) should have type (? -> ? -> *), and you'd be right
+funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] liftedTypeKind)
+	-- You might think that (->) should have type (?? -> ? -> *), and you'd be right
 	-- But if we do that we get kind errors when saying
 	--	instance Control.Arrow (->)
 	-- becuase the expected kind is (*->*->*).  The trouble is that the
@@ -459,11 +319,6 @@ maybeParen ctxt_prec inner_prec pretty
 pprType, pprParendType :: Type -> SDoc
 pprType       ty = ppr_type TopPrec   ty
 pprParendType ty = ppr_type TyConPrec ty
-
-------------------
-pprKind, pprParendKind :: Kind -> SDoc
-pprKind       k = ppr_kind TopPrec k
-pprParendKind k = ppr_kind TyConPrec k
 
 ------------------
 pprPred :: PredType -> SDoc
@@ -552,17 +407,5 @@ pprTvBndr tv | isLiftedTypeKind kind = ppr tv
 	     | otherwise	     = parens (ppr tv <+> dcolon <+> pprKind kind)
 	     where
 	       kind = tyVarKind tv
-
-
--------------------
-ppr_kind :: Prec -> Kind -> SDoc
-ppr_kind p k
-  | isOpenTypeKind k     = ptext SLIT("?")
-  | isLiftedTypeKind k   = ptext SLIT("*")
-  | isUnliftedTypeKind k = ptext SLIT("#")
-ppr_kind p (TyVarTy tv)  = ppr tv
-ppr_kind p (FunTy k1 k2) = maybeParen p FunPrec $
-			 	  sep [ ppr_kind FunPrec k1, arrow <+> pprKind k2]
-ppr_kind p other = ptext SLIT("STRANGE KIND:") <+> ppr_type p other
 \end{code}
 

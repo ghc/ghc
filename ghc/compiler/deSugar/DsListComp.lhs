@@ -8,7 +8,7 @@ module DsListComp ( dsListComp, dsPArrComp ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLet )
+import {-# SOURCE #-} DsExpr ( dsLExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
 import HsSyn
@@ -31,7 +31,7 @@ import Match		( matchSimply )
 import PrelNames	( foldrName, buildName, replicatePName, mapPName, 
 			  filterPName, zipPName, crossPName ) 
 import PrelInfo		( pAT_ERROR_ID )
-import SrcLoc		( noLoc, Located(..), unLoc )
+import SrcLoc		( noLoc, unLoc )
 import Panic		( panic )
 \end{code}
 

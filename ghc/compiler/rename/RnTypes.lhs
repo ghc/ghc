@@ -16,7 +16,7 @@ import CmdLineOpts	( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts) )
 import HsSyn
 import RdrHsSyn		( extractHsRhoRdrTyVars )
 import RnHsSyn		( extractHsTyNames, parrTyCon_name, tupleTyCon_name, 
-			  listTyCon_name, charTyCon_name
+			  listTyCon_name
 			)
 import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
 			  lookupLocatedOccRn, lookupLocatedBndrRn,
@@ -25,15 +25,12 @@ import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
 			  newIPNameRn, bindPatSigTyVarsFV, bindLocatedLocalsFV )
 import TcRnMonad
 import RdrName		( RdrName, elemLocalRdrEnv )
-import PrelNames	( eqStringName, eqClassName, integralClassName, 
+import PrelNames	( eqClassName, integralClassName, 
 		  	  negateName, minusName, lengthPName, indexPName,
 			  plusIntegerName, fromIntegerName, timesIntegerName,
 			  ratioDataConName, fromRationalName )
 import Constants	( mAX_TUPLE_SIZE )
-import TysWiredIn	( intTyCon )
-import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
-			  floatPrimTyCon, doublePrimTyCon )
-import Name		( Name, NamedThing(..) )
+import Name		( Name )
 import SrcLoc		( Located(..), unLoc )
 import NameSet
 

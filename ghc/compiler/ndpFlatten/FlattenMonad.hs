@@ -274,7 +274,7 @@ packContext perm m  = Flatten $ \state ->
     -- generate a binding for the packed variant of a context variable
     --
     mkCoreBind var    = let
-			  rhs = fst $ unFlatten (mk'bpermuteP (varType var) 
+			  rhs = fst $ unFlatten (mk'bpermuteP (idType var) 
 							      (Var perm) 
 							      (Var var)
 						) state
@@ -301,9 +301,9 @@ liftVar     :: Var -> Flatten CoreExpr
 liftVar var  = Flatten $ \s ->
   let 
     v          = ctxtVarErr s
-    v'elemType = parrElemTy . varType $ v
+    v'elemType = parrElemTy . idType $ v
     len        = fst $ unFlatten (mk'lengthP v'elemType (Var v)) s
-    replicated = fst $ unFlatten (mk'replicateP (varType var) len (Var var)) s
+    replicated = fst $ unFlatten (mk'replicateP (idType var) len (Var var)) s
   in case lookupVarEnv (ctxtEnv s) var of
     Just liftedVar -> (Var liftedVar, 
 		       s {usedVars = usedVars s `extendVarSet` var})
@@ -318,7 +318,7 @@ liftConst   :: CoreExpr -> Flatten CoreExpr
 liftConst e  = Flatten $ \s ->
   let
      v          = ctxtVarErr s
-     v'elemType = parrElemTy . varType $ v
+     v'elemType = parrElemTy . idType $ v
      len        = fst $ unFlatten (mk'lengthP v'elemType (Var v)) s
   in 
   (fst $ unFlatten (mk'replicateP (exprType e) len e ) s, s)

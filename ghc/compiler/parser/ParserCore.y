@@ -4,10 +4,10 @@ module ParserCore ( parseCore ) where
 import IfaceSyn
 import ForeignCall
 import RdrHsSyn
-import TcIface ( tcIfaceKind )
 import HsSyn
 import RdrName
 import OccName
+import Kind( Kind(..) )
 import Name( nameOccName, nameModuleName )
 import Module
 import ParserCoreUtils
@@ -183,7 +183,7 @@ id_bndrs :: { [IfaceIdBndr] }
 	| id_bndr id_bndrs	{ $1:$2 }
 
 tv_bndr	:: { IfaceTvBndr }
-	:  tv_occ                    { ($1, IfaceLiftedTypeKind) }
+	:  tv_occ                    { ($1, LiftedTypeKind) }
 	|  '(' tv_occ '::' akind ')' { ($2, $4) }
 
 tv_bndrs 	:: { [IfaceTvBndr] }
@@ -191,14 +191,14 @@ tv_bndrs 	:: { [IfaceTvBndr] }
 	| tv_bndr tv_bndrs	{ $1:$2 }
 
 akind	:: { IfaceKind }
-	: '*' 		   { IfaceLiftedTypeKind   }	
-	| '#'		   { IfaceUnliftedTypeKind }
-	| '?'		   { IfaceOpenTypeKind     }
+	: '*' 		   { LiftedTypeKind   }	
+	| '#'		   { UnliftedTypeKind }
+	| '?'		   { OpenTypeKind     }
         | '(' kind ')'	   { $2 }
 
 kind 	:: { IfaceKind }
 	: akind 	   { $1 }
-	| akind '->' kind  { IfaceFunKind $1 $3 }
+	| akind '->' kind  { FunKind $1 $3 }
 
 -----------------------------------------
 --             Expressions
@@ -314,7 +314,7 @@ toHsType (IfaceTyConApp (IfaceTc tc) ts) = foldl mkHsAppTy (noLoc $ HsTyVar (ifa
 toHsType (IfaceForAllTy tv t)            = add_forall (toHsTvBndr tv) (toHsType t)
 
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
-toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual tv) (tcIfaceKind k)
+toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual tv) k
 
 ifaceExtRdrName :: IfaceExtName -> RdrName
 ifaceExtRdrName (ExtPkg mod occ) = mkOrig mod occ

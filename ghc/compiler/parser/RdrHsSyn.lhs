@@ -57,6 +57,7 @@ import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc,
 			  setRdrNameSpace, rdrNameModule )
 import BasicTypes	( RecFlag(..), mapIPName, maxPrecedence, initialVersion )
 import Lexer		( P, failSpanMsgP )
+import Kind		( liftedTypeKind )
 import HscTypes		( GenAvailInfo(..) )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
@@ -318,8 +319,8 @@ hs_tc_app ty args 	   = foldl IfaceAppTy (hsIfaceType ty) args
 hsIfaceTvs tvs = map (hsIfaceTv.unLoc) tvs
 
 -----------
-hsIfaceTv (UserTyVar n)     = (rdrNameOcc n, IfaceLiftedTypeKind)
-hsIfaceTv (KindedTyVar n k) = (rdrNameOcc n, toIfaceKind k)
+hsIfaceTv (UserTyVar n)     = (rdrNameOcc n, liftedTypeKind)
+hsIfaceTv (KindedTyVar n k) = (rdrNameOcc n, k)
 
 -----------
 hsIfaceFDs :: [([RdrName], [RdrName])] -> [([OccName], [OccName])]
@@ -715,8 +716,6 @@ checkAPat loc e = case e of
 -- Generics 
    HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc
-
-checkAPat loc _ = patFail loc
 
 checkPatField :: (Located RdrName, LHsExpr RdrName) -> P (Located RdrName, LPat RdrName)
 checkPatField (n,e) = do

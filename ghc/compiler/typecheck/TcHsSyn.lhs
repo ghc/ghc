@@ -37,8 +37,8 @@ import Id	( idType, setIdType, Id )
 
 import TcRnMonad
 import Type	  ( Type )
-import TcType	  ( TcType, TcTyVar, eqKind, isTypeKind, mkTyVarTy,
-		    tcGetTyVar, isAnyTypeKind, mkTyConApp )
+import TcType	  ( TcType, TcTyVar, mkTyVarTy, tcGetTyVar, mkTyConApp )
+import Kind	  ( isLiftedTypeKind, liftedTypeKind, isSubKind )
 import qualified  Type
 import TcMType	  ( zonkTcTyVarToTyVar, zonkType, zonkTcType, zonkTcTyVars,
 		    putTcTyVar )
@@ -49,6 +49,7 @@ import TysWiredIn ( charTy, stringTy, intTy,
 		    mkListTy, mkPArrTy, mkTupleTy, unitTy,
 		    voidTy, listTyCon, tupleTyCon )
 import TyCon	  ( mkPrimTyCon, tyConKind )
+import Kind	  ( splitKindFunTys )
 import PrimRep	  ( PrimRep(VoidRep) )
 import Name	  ( getOccName, mkInternalName, mkDerivedTyConOcc )
 import Var	  ( Var, isId, isLocalVar, tyVarKind )
@@ -914,16 +915,16 @@ mkArbitraryType :: TcTyVar -> Type
 -- Make up an arbitrary type whose kind is the same as the tyvar.
 -- We'll use this to instantiate the (unbound) tyvar.
 mkArbitraryType tv 
-  | isAnyTypeKind kind = voidTy		-- The vastly common case
-  | otherwise	       = mkTyConApp tycon []
+  | liftedTypeKind `isSubKind` kind = voidTy		-- The vastly common case
+  | otherwise			    = mkTyConApp tycon []
   where
     kind       = tyVarKind tv
-    (args,res) = Type.splitFunTys kind	-- Kinds are simple; use Type.splitFunTys
+    (args,res) = splitKindFunTys kind
 
-    tycon | kind `eqKind` tyConKind listTyCon 	-- *->*
+    tycon | kind == tyConKind listTyCon 	-- *->*
 	  = listTyCon				-- No tuples this size
 
-	  | all isTypeKind args && isTypeKind res
+	  | all isLiftedTypeKind args && isLiftedTypeKind res
 	  = tupleTyCon Boxed (length args)	-- *-> ... ->*->*
 
 	  | otherwise

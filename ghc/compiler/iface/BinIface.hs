@@ -18,9 +18,9 @@ import TyCon		( DataConDetails(..) )
 import Class		( DefMeth(..) )
 import CostCentre
 import Module		( moduleName, mkModule )
-import OccName		( OccName )
 import DriverState	( v_Build_tag )
 import CmdLineOpts	( opt_HiVersion )
+import Kind		( Kind(..) )
 import Panic
 import Binary
 import Util
@@ -570,23 +570,29 @@ instance Binary IfaceBndr where
 	      _ -> do ab <- get bh
 		      return (IfaceTvBndr ab)
 
-instance Binary IfaceKind where
-    put_ bh IfaceLiftedTypeKind   = putByte bh 0
-    put_ bh IfaceUnliftedTypeKind = putByte bh 1
-    put_ bh IfaceOpenTypeKind     = putByte bh 2
-    put_ bh (IfaceFunKind k1 k2)  = do 
-	    putByte bh 3
+instance Binary Kind where
+    put_ bh LiftedTypeKind   = putByte bh 0
+    put_ bh UnliftedTypeKind = putByte bh 1
+    put_ bh OpenTypeKind     = putByte bh 2
+    put_ bh ArgTypeKind      = putByte bh 3
+    put_ bh UbxTupleKind     = putByte bh 4
+    put_ bh (FunKind k1 k2)  = do 
+	    putByte bh 5
 	    put_ bh k1
 	    put_ bh k2
+    put_ bh (KindVar kv) = pprPanic "BinIface.put_: kind var" (ppr kv)
+
     get bh = do
 	    h <- getByte bh
 	    case h of
-	      0 -> return IfaceLiftedTypeKind 
-	      1 -> return IfaceUnliftedTypeKind
-	      2 -> return IfaceOpenTypeKind
+	      0 -> return LiftedTypeKind 
+	      1 -> return UnliftedTypeKind
+	      2 -> return OpenTypeKind
+	      3 -> return ArgTypeKind
+	      4 -> return UbxTupleKind
 	      _ -> do k1 <- get bh
 		      k2 <- get bh
-		      return (IfaceFunKind k1 k2)
+		      return (FunKind k1 k2)
 
 instance Binary IfaceType where
     put_ bh (IfaceForAllTy aa ab) = do

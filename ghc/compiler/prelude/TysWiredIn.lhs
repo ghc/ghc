@@ -72,8 +72,8 @@ import TyCon		( TyCon, AlgTyConFlavour(..), DataConDetails(..), tyConDataCons,
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..) )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys, 
-			  mkArrowKinds, liftedTypeKind, unliftedTypeKind,
 			  ThetaType, TyThing(..) )
+import Kind		( mkArrowKinds, liftedTypeKind, ubxTupleKind )
 import Unique		( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
 import PrelNames
@@ -240,7 +240,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
 				Nothing (ATyCon tycon)
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
 	res_kind | isBoxed boxity = liftedTypeKind
-		 | otherwise	  = unliftedTypeKind
+		 | otherwise	  = ubxTupleKind
 
 	tyvars   | isBoxed boxity = take arity alphaTyVars
 		 | otherwise	  = take arity openAlphaTyVars

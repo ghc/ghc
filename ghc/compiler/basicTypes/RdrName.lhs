@@ -38,20 +38,20 @@ module RdrName (
 
 #include "HsVersions.h"
 
-import OccName	( NameSpace, tcName, varName,
-		  OccName, UserFS, EncodedFS,
-		  mkSysOccFS, setOccNameSpace,
-		  mkOccFS, mkVarOcc, occNameFlavour,
+import OccName	( NameSpace, varName,
+		  OccName, UserFS, 
+		  setOccNameSpace,
+		  mkOccFS, occNameFlavour,
 		  isDataOcc, isTvOcc, isTcOcc,
 		  OccEnv, emptyOccEnv, extendOccEnvList, lookupOccEnv, 
 		  elemOccEnv, plusOccEnv_C, extendOccEnv_C, foldOccEnv,
 		  occEnvElts
 		)
-import Module   ( ModuleName, mkSysModuleNameFS, mkModuleNameFS	)
+import Module   ( ModuleName, mkModuleNameFS	)
 import Name	( Name, NamedThing(getName), nameModuleName, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
 import Maybes	( seqMaybe )
-import SrcLoc	( SrcLoc, isGoodSrcLoc, SrcSpan )
+import SrcLoc	( isGoodSrcLoc, SrcSpan )
 import BasicTypes( DeprecTxt )
 import Outputable
 import Util	( thenCmp )

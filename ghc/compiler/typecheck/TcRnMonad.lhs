@@ -27,7 +27,7 @@ import InstEnv		( InstEnv, emptyInstEnv, extendInstEnv )
 import VarSet		( emptyVarSet )
 import VarEnv		( TidyEnv, emptyTidyEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
-			  mkErrMsg, mkWarnMsg, printErrorsAndWarnings )
+			  mkErrMsg, mkWarnMsg, printErrorsAndWarnings, mkLocMessage )
 import SrcLoc		( mkGeneralSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
 import NameSet		( emptyDUs, emptyNameSet )
@@ -309,7 +309,12 @@ dumpOptIf flag doc = ifOptM flag $
 		     ioToIOEnv (printForUser stderr alwaysQualify doc)
 
 dumpOptTcRn :: DynFlag -> SDoc -> TcRn ()
-dumpOptTcRn flag doc = ifOptM flag (dumpTcRn doc)
+dumpOptTcRn flag doc = ifOptM flag $ do
+			{ ctxt <- getErrCtxt
+			; loc  <- getSrcSpanM
+			; ctxt_msgs <- do_ctxt emptyTidyEnv ctxt 
+			; let real_doc = mkLocMessage loc (vcat (doc : ctxt_to_use ctxt_msgs))
+			; dumpTcRn real_doc }
 
 dumpTcRn :: SDoc -> TcRn ()
 dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv ;

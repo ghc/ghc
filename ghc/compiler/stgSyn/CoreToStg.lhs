@@ -18,7 +18,7 @@ import StgSyn
 import Type
 import TyCon		( isAlgTyCon )
 import Id
-import Var		( Var, globalIdDetails, varType )
+import Var		( Var, globalIdDetails, idType )
 import TyCon		( isUnboxedTupleTyCon, isPrimTyCon, isFunTyCon )
 #ifdef ILX
 import MkId		( unsafeCoerceId )
@@ -445,7 +445,7 @@ coreToStgApp maybe_thunk_body f args
             -- Here the free variables are "f", "x" AND the type variable "a"
             -- coreToStgArgs will deal with the arguments recursively
             if opt_RuntimeTypes then
-	      fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType (varType f))
+	      fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType (idType f))
 	    else fvs
 
 	-- Mostly, the arity info of a function is in the fn's IdInfo

@@ -39,10 +39,11 @@ import Type		( Type, seqType, splitFunTys, dropForAlls, isStrictType,
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys
 			)
 import TcType		( isDictTy )
+import Name		( mkSysTvName )
 import OccName		( EncodedFS )
 import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConExistentialTyVars, dataConArgTys )
-import Var		( mkSysTyVar, tyVarKind )
+import Var		( tyVarKind, mkTyVar )
 import VarSet
 import Util		( lengthExceeds, mapAccumL )
 import Outputable
@@ -907,7 +908,7 @@ mk_args missing_con inst_tys
     let
 	ex_tyvars   = dataConExistentialTyVars missing_con
 	ex_tyvars'  = zipWith mk tv_uniqs ex_tyvars
-	mk uniq tv  = mkSysTyVar uniq (tyVarKind tv)
+	mk uniq tv  = mkTyVar (mkSysTvName uniq FSLIT("t")) (tyVarKind tv)
 	arg_tys     = dataConArgTys missing_con (inst_tys ++ mkTyVarTys ex_tyvars')
 	arg_ids     = zipWith (mkSysLocal FSLIT("a")) id_uniqs arg_tys
     in 

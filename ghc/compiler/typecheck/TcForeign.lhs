@@ -27,7 +27,7 @@ import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcExpr		( tcCheckSigma )			
 
 import ErrUtils		( Message )
-import Id		( Id, mkLocalId, setIdLocalExported )
+import Id		( Id, mkLocalId, mkExportedLocalId )
 import OccName		( mkForeignExportOcc )
 import Name		( Name, NamedThing(..), mkExternalName )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
@@ -220,7 +220,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec isDeprec) =
    let
         gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) 
 			      Nothing (srcSpanStart loc)
-	id   = setIdLocalExported (mkLocalId gnm sig_ty)
+	id   = mkExportedLocalId gnm sig_ty
 	bind = L loc (VarBind id rhs)
    in
    returnM (bind, ForeignExport (L loc id) undefined spec isDeprec)
