@@ -26,9 +26,10 @@ import qualified Outputable
 
 #if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST
-import Data.Word	( Word8 )
+import Data.Word	( Word8, Word16 )
 #else
 import MutableArray
+import Word             ( Word16 )
 #endif
 
 import MONAD_ST
@@ -1982,10 +1983,10 @@ pprInstr (AND reg1 reg2 (RIImm imm)) = hcat [
 	ptext SLIT(", "),
 	pprImm imm
     ]
-pprInstr (AND reg1 reg2 ri) = pprLogic SLIT("and") reg1 reg2 ri
+pprInstr (AND reg1 reg2 ri) = pprLogic SLIT("and") reg1 reg2 (toUI16 ri)
 
-pprInstr (OR reg1 reg2 ri) = pprLogic SLIT("or") reg1 reg2 ri
-pprInstr (XOR reg1 reg2 ri) = pprLogic SLIT("xor") reg1 reg2 ri
+pprInstr (OR reg1 reg2 ri) = pprLogic SLIT("or") reg1 reg2 (toUI16 ri)
+pprInstr (XOR reg1 reg2 ri) = pprLogic SLIT("xor") reg1 reg2 (toUI16 ri)
 
 pprInstr (XORIS reg1 reg2 imm) = hcat [
 	char '\t',
@@ -2066,6 +2067,16 @@ pprRI (RIImm r) = pprImm r
 
 pprFSize DF = empty
 pprFSize F = char 's'
+
+-- hack to ensure that negative vals come out in non-negative form
+-- (assuming that fromIntegral{Int->Word16} will do a 'c-style'
+-- conversion, and not throw a fit/exception.)
+toUI16 :: RI -> RI
+toUI16 (RIImm (ImmInt x)) 
+  | x < 0 = RIImm (ImmInt (fromIntegral ((fromIntegral x) :: Word16)))
+toUI16 (RIImm (ImmInteger x)) 
+  | x < 0 = RIImm (ImmInt (fromIntegral ((fromIntegral x) :: Word16)))
+toUI16 x = x
 
 {-
   The Mach-O object file format used in Darwin/Mac OS X needs a so-called
