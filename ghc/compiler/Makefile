@@ -132,6 +132,8 @@ SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
 
 ifeq "$(Ghc2_0)" "NO"
 SRC_HC_OPTS += -fomit-derived-read -fomit-reexported-instances
+else
+SRC_HC_OPTS += -recomp
 endif
 
 ifeq ($(GhcWithDeforester),NO)
@@ -152,7 +154,7 @@ basicTypes/IdInfo_HC_OPTS 	= -K2m
 coreSyn/AnnCoreSyn_HC_OPTS 	= -fno-omit-reexported-instances
 hsSyn/HsExpr_HC_OPTS 		= -K2m
 hsSyn/HsSyn_HC_OPTS 		= -fno-omit-reexported-instances
-main/Main_HC_OPTS 		= -fvia-C
+main/Main_HC_OPTS 		= -fvia-C -DPROJECTVERSION=$(GhcProjectVersion)
 main/CmdLineOpts_HC_OPTS 	= -fvia-C
 nativeGen/PprMach_HC_OPTS 	= -K2m
 nativeGen/MachMisc_HC_OPTS 	= -K2m -fvia-C
@@ -196,6 +198,8 @@ rename/RnSource_HC_OPTS		= -H12m
 rename/RnIfaces_HC_OPTS		= -H8m -fvia-C
 rename/RnNames_HC_OPTS		= -H12m
 rename/RnMonad_HC_OPTS		= -fvia-C
+# Urk!  Really big heap for ParseUnfolding
+rename/ParseUnfolding_HC_OPTS	= -H45m		
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
 stgSyn/StgSyn_HC_OPTS 		= -fno-omit-reexported-instances
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
