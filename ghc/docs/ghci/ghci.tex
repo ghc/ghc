@@ -170,7 +170,7 @@ updated, presumably by a compile run outside of the GHCI session.
 Hence the two-stage type:
 \begin{verbatim}
    type Finder = ModName -> IO ModLocation
-   newFinder :: [PCI] -> IO Finder
+   newFinder :: PCI -> IO Finder
 \end{verbatim}
 @newFinder@ examines the package information right at the start, but 
 returns an @IO@-typed function which can inspect home module changes
@@ -327,10 +327,78 @@ inspecting them.
 
    Records, for CM's purposes, the current module graph,
    up-to-dateness and summaries.  More details when I get to them.
+   Only contains home modules.
+\end{itemize}
+Probably all this stuff is rolled together into the Persistent CM
+State (PCMS):
+\begin{verbatim}
+  data PCMS = PCMS HST HIT UI MG
+  emptyPCMS :: IO PCMS
+\end{verbatim}
+
+\subsubsection{What CM implements}
+It pretty much implements the HEP interface.  First, though, define a 
+containing structure for the state of the entire CM system and its
+subsystems @compile@ and @link@:
+\begin{verbatim}
+   data SysState 
+      = SysState PCMS      -- CM's stuff
+                 PCS       -- compile's stuff
+                 PLS       -- link's stuff
+                 SI        -- the static info, never changes
+                 Finder    -- the finder
+\end{verbatim}
+
+Then @SysState@ is threaded through the HEP interface.  In reality
+this might be done using @IORef@s, but for clarity:
+\begin{verbatim}
+  type ModHandle = ... (opaque to CM/HEP clients) ...
+  type HValue    = ... (opaque to CM/HEP clients) ...
+
+  cmInit       :: FLAGS 
+               -> [PkgInfo]
+               -> IO SysState
+
+  cmLoadModule :: SysState 
+               -> ModName 
+               -> IO (SysState, Either [SDoc] ModHandle)
+
+  cmGetExpr    :: ModHandle 
+               -> SysState 
+               -> String -> IO (SysState, Either [SDoc] HValue)
+
+  cmRunExpr    :: HValue -> IO ()   -- don't need SysState here
+\end{verbatim}
+Almost all the huff and puff in this document pertains to @cmLoadModule@.
+
+
+\subsubsection{Implementing \mbox{\tt cmInit}}
+@cmInit@ creates an empty @SysState@ using @emptyPCMS@, @emptyPCS@,
+@emptyPLS@, making SI from the supplied flags and package info, and 
+by supplying the package info the @newFinder@.
+
+
+\subsubsection{Implementing \mbox{\tt cmLoadModule}}
+
+\begin{itemize}
+\item {\bf Downsweep:} using @finder@ and @summarise@, chase from 
+      the given module to
+      establish the new home module graph (MG).  Do not chase into
+      package modules.
+\item Remove from the old module graph the upward closure of 
+      all modules which are now out of date.  Also remove any 
+      modules which wouldn't be reachable from the new root module.
+      \ToDo{De-woollify this.}
+
+      Removing a module means also removing it from HST, UI and PLS,
+      but not from HIT.
+
+      Result: an up-to-date module graph, partitioned into 
+      modules which are in-date, and those needing recompiling.
+
+      Burble burble.
 \end{itemize}
 
-
-\subsubsection{What CM does}
 Pretty much as before.  \ToDo{... and what was Before?}
 
 Plus: detect module cycles during the downsweep.  During the upsweep,
