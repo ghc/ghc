@@ -108,9 +108,11 @@ stgMassageForProfiling mod_name us stg_binds
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
     do_top_rhs binder (StgRhsClosure _ bi srt fv u [] (StgSCC cc (StgConApp con args)))
-      | not (isSccCountCostCentre cc)
+      | not (isSccCountCostCentre cc) && not (isDllConApp con args)
 	-- Trivial _scc_ around nothing but static data
 	-- Eliminate _scc_ ... and turn into StgRhsCon
+
+	-- isDllConApp checks for LitLit args too
       = returnMM (StgRhsCon dontCareCCS con args)
 
 {- Can't do this one with cost-centre stacks:  --SDM
