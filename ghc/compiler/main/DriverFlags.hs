@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.109 2003/01/08 13:03:25 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.110 2003/01/09 11:39:20 simonmar Exp $
 --
 -- Driver flags
 --
@@ -277,6 +277,8 @@ static_flags =
   ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
 
         ------- Specific phases  --------------------------------------------
+  ,  ( "pgmL"           , HasArg setPgmL )
+  ,  ( "pgmP"           , HasArg setPgmP )
   ,  ( "pgmP"           , HasArg setPgmP )
   ,  ( "pgmF"           , HasArg setPgmF )
   ,  ( "pgmc"           , HasArg setPgmc )

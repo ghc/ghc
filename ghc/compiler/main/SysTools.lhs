@@ -11,7 +11,8 @@ module SysTools (
 	-- Initialisation
 	initSysTools,
 
-	setPgmP,		-- String -> IO ()
+	setPgmL,		-- String -> IO ()
+	setPgmP,
 	setPgmF,
 	setPgmc,
 	setPgmm,
@@ -439,6 +440,7 @@ like
 is used to override a particular program with a new one
 
 \begin{code}
+setPgmL = writeIORef v_Pgm_L
 setPgmP = writeIORef v_Pgm_P
 setPgmF = writeIORef v_Pgm_F
 setPgmc = writeIORef v_Pgm_c
