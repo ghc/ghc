@@ -37,6 +37,7 @@ import TyCon		( TyCon )
 import PrelMods		( mAIN, pREL_MAIN )
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
 import PrelInfo		( ioTyCon_NAME, thinAirIdNames )
+import Type		( funTyCon )
 import ErrUtils		( pprBagOfErrors, pprBagOfWarnings,
 			  doIfSet, dumpIfSet, ghcExit
 			)
@@ -174,7 +175,11 @@ addImplicits mod_name
 	-- are the types to which ambigious type variables may be defaulted by
 	-- the type checker; so they won't always appear explicitly.
 	-- [The () one is a GHC extension for defaulting CCall results.]
-    default_tys = [getName intTyCon, getName doubleTyCon, getName unitTyCon ]
+	-- ALSO: funTyCon, since it occurs implicitly everywhere!
+	--  	 (we don't want to be bothered with addImplicitOcc at every
+	--	  function application)
+    default_tys = [getName intTyCon, getName doubleTyCon,
+		   getName unitTyCon, getName funTyCon]
 
 	-- Add occurrences for IO or PrimIO
     implicit_main |  mod_name == mAIN
