@@ -727,6 +727,9 @@ install:: $(INSTALL_PROGS)
 	@for i in $(INSTALL_PROGS); do \
 		    echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir); \
 		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir) ;  \
+                    if `test $(darwin_TARGET_OS) == 1` ; \
+                    then sh $(FPTOOLS_TOP)/mk/fix_install_names.sh $(libdir) $(bindir)/$$i ; \
+                    fi ; \
 	done
 endif
 
