@@ -111,7 +111,7 @@ module Data.Set  (
 	delFromSet,    	-- :: Ord a => Set a -> a -> Set a
             ) where
 
-import Prelude hiding (filter,foldr,foldl,null,map)
+import Prelude hiding (filter,foldr,null,map)
 import Data.Monoid
 import qualified Data.List as List
 import Data.Typeable
@@ -240,7 +240,7 @@ isProperSubsetOf s1 s2
 
 
 -- | /O(n+m)/. Is this a subset?
--- @(s1 `isSubsetOf` s2)@ tells whether s1 is a subset of s2.
+-- @(s1 `isSubsetOf` s2)@ tells whether @s1@ is a subset of @s2@.
 isSubsetOf :: Ord a => Set a -> Set a -> Bool
 isSubsetOf t1 t2
   = (size t1 <= size t2) && (isSubsetOfX t1 t2)
@@ -284,7 +284,7 @@ deleteMax Tip             = Tip
 {--------------------------------------------------------------------
   Union. 
 --------------------------------------------------------------------}
--- | The union of a list of sets: (@unions == foldl union empty@).
+-- | The union of a list of sets: (@'unions' == 'foldl' 'union' 'empty'@).
 unions :: Ord a => [Set a] -> Set a
 unions ts
   = foldlStrict union empty ts
@@ -379,7 +379,7 @@ partition p (Bin _ x l r)
 ----------------------------------------------------------------------}
 
 -- | /O(n*log n)/. 
--- @map f s@ is the set obtained by applying @f@ to each element of @s@.
+-- @'map' f s@ is the set obtained by applying @f@ to each element of @s@.
 -- 
 -- It's worth noting that the size of the result may be smaller if,
 -- for some @(x,y)@, @x \/= y && f x == f y@
@@ -389,7 +389,7 @@ map f = fromList . List.map f . toList
 
 -- | /O(n)/. The 
 --
--- @mapMonotonic f s == 'map' f s@, but works only when @f@ is monotonic.
+-- @'mapMonotonic' f s == 'map' f s@, but works only when @f@ is monotonic.
 -- /The precondition is not checked./
 -- Semi-formally, we have:
 -- 
@@ -603,7 +603,7 @@ filterLt cmp (Bin sx x l r)
 {--------------------------------------------------------------------
   Split
 --------------------------------------------------------------------}
--- | /O(log n)/. The expression (@split x set@) is a pair @(set1,set2)@
+-- | /O(log n)/. The expression (@'split' x set@) is a pair @(set1,set2)@
 -- where all elements in @set1@ are lower than @x@ and all elements in
 -- @set2@ larger than @x@. @x@ is not found in neither @set1@ nor @set2@.
 split :: Ord a => a -> Set a -> (Set a,Set a)
@@ -831,7 +831,7 @@ showTree s
 {- | /O(n)/. The expression (@showTreeWith hang wide map@) shows
  the tree that implements the set. If @hang@ is
  @True@, a /hanging/ tree is shown otherwise a rotated tree is shown. If
- @wide@ is true, an extra wide version is shown.
+ @wide@ is 'True', an extra wide version is shown.
 
 > Set> putStrLn $ showTreeWith True False $ fromDistinctAscList [1..5]
 > 4

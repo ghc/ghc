@@ -188,7 +188,7 @@ shiftRL x i   = shiftR x i
   Operators
 --------------------------------------------------------------------}
 
--- | /O(min(n,W))/. Find the value of a key. Calls @error@ when the element can not be found.
+-- | /O(min(n,W))/. Find the value of a key. Calls 'error' when the element can not be found.
 
 (!) :: IntMap a -> Key -> a
 m ! k    = find' k m
@@ -272,8 +272,9 @@ find' k m
       Just x  -> x
 
 
--- | /O(min(n,W))/. The expression @(findWithDefault def k map)@ returns the value of key @k@ or returns @def@ when
--- the key is not an element of the map.
+-- | /O(min(n,W))/. The expression @('findWithDefault' def k map)@
+-- returns the value of key @k@ or returns @def@ when the key is not an
+-- element of the map.
 findWithDefault :: a -> Key -> IntMap a -> a
 findWithDefault def k m
   = case lookup k m of
@@ -332,9 +333,9 @@ insertWithKey f k x t
       Nil -> Tip k x
 
 
--- | /O(min(n,W))/. The expression (@insertLookupWithKey f k x map@) is a pair where
--- the first element is equal to (@lookup k map@) and the second element
--- equal to (@insertWithKey f k x map@).
+-- | /O(min(n,W))/. The expression (@'insertLookupWithKey' f k x map@)
+-- is a pair where the first element is equal to (@'lookup' k map@)
+-- and the second element equal to (@'insertWithKey' f k x map@).
 insertLookupWithKey :: (Key -> a -> a -> a) -> Key -> a -> IntMap a -> (Maybe a, IntMap a)
 insertLookupWithKey f k x t
   = case t of
@@ -378,16 +379,16 @@ adjustWithKey ::  (Key -> a -> a) -> Key -> IntMap a -> IntMap a
 adjustWithKey f k m
   = updateWithKey (\k x -> Just (f k x)) k m
 
--- | /O(min(n,W))/. The expression (@update f k map@) updates the value @x@
--- at @k@ (if it is in the map). If (@f x@) is @Nothing@, the element is
--- deleted. If it is (@Just y@), the key @k@ is bound to the new value @y@.
+-- | /O(min(n,W))/. The expression (@'update' f k map@) updates the value @x@
+-- at @k@ (if it is in the map). If (@f x@) is 'Nothing', the element is
+-- deleted. If it is (@'Just' y@), the key @k@ is bound to the new value @y@.
 update ::  (a -> Maybe a) -> Key -> IntMap a -> IntMap a
 update f k m
   = updateWithKey (\k x -> f x) k m
 
--- | /O(min(n,W))/. The expression (@update f k map@) updates the value @x@
--- at @k@ (if it is in the map). If (@f k x@) is @Nothing@, the element is
--- deleted. If it is (@Just y@), the key @k@ is bound to the new value @y@.
+-- | /O(min(n,W))/. The expression (@'update' f k map@) updates the value @x@
+-- at @k@ (if it is in the map). If (@f k x@) is 'Nothing', the element is
+-- deleted. If it is (@'Just' y@), the key @k@ is bound to the new value @y@.
 updateWithKey ::  (Key -> a -> Maybe a) -> Key -> IntMap a -> IntMap a
 updateWithKey f k t
   = case t of
@@ -512,8 +513,8 @@ differenceWith f m1 m2
 
 -- | /O(n+m)/. Difference with a combining function. When two equal keys are
 -- encountered, the combining function is applied to the key and both values.
--- If it returns @Nothing@, the element is discarded (proper set difference). If
--- it returns (@Just y@), the element is updated with a new value @y@. 
+-- If it returns 'Nothing', the element is discarded (proper set difference).
+-- If it returns (@'Just' y@), the element is updated with a new value @y@. 
 differenceWithKey :: (Key -> a -> b -> Maybe a) -> IntMap a -> IntMap b -> IntMap a
 differenceWithKey f t1@(Bin p1 m1 l1 r1) t2@(Bin p2 m2 l2 r2)
   | shorter m1 m2  = difference1
@@ -607,22 +608,22 @@ intersectionWithKey f t Nil = Nil
   Submap
 --------------------------------------------------------------------}
 -- | /O(n+m)/. Is this a proper submap? (ie. a submap but not equal). 
--- Defined as (@isProperSubmapOf = isProperSubmapOfBy (==)@).
+-- Defined as (@'isProperSubmapOf' = 'isProperSubmapOfBy' (==)@).
 isProperSubmapOf :: Eq a => IntMap a -> IntMap a -> Bool
 isProperSubmapOf m1 m2
   = isProperSubmapOfBy (==) m1 m2
 
 {- | /O(n+m)/. Is this a proper submap? (ie. a submap but not equal).
- The expression (@isProperSubmapOfBy f m1 m2@) returns @True@ when
+ The expression (@'isProperSubmapOfBy' f m1 m2@) returns 'True' when
  @m1@ and @m2@ are not equal,
- all keys in @m1@ are in @m2@, and when @f@ returns @True@ when
+ all keys in @m1@ are in @m2@, and when @f@ returns 'True' when
  applied to their respective values. For example, the following 
- expressions are all @True@.
+ expressions are all 'True':
  
   > isProperSubmapOfBy (==) (fromList [(1,1)]) (fromList [(1,1),(2,2)])
   > isProperSubmapOfBy (<=) (fromList [(1,1)]) (fromList [(1,1),(2,2)])
 
- But the following are all @False@:
+ But the following are all 'False':
  
   > isProperSubmapOfBy (==) (fromList [(1,1),(2,2)]) (fromList [(1,1),(2,2)])
   > isProperSubmapOfBy (==) (fromList [(1,1),(2,2)]) (fromList [(1,1)])
@@ -660,22 +661,23 @@ submapCmp pred (Tip k x) t
 submapCmp pred Nil Nil = EQ
 submapCmp pred Nil t   = LT
 
--- | /O(n+m)/. Is this a submap? Defined as (@isSubmapOf = isSubmapOfBy (==)@).
+-- | /O(n+m)/. Is this a submap?
+-- Defined as (@'isSubmapOf' = 'isSubmapOfBy' (==)@).
 isSubmapOf :: Eq a => IntMap a -> IntMap a -> Bool
 isSubmapOf m1 m2
   = isSubmapOfBy (==) m1 m2
 
 {- | /O(n+m)/. 
- The expression (@isSubmapOfBy f m1 m2@) returns @True@ if
- all keys in @m1@ are in @m2@, and when @f@ returns @True@ when
+ The expression (@'isSubmapOfBy' f m1 m2@) returns 'True' if
+ all keys in @m1@ are in @m2@, and when @f@ returns 'True' when
  applied to their respective values. For example, the following 
- expressions are all @True@.
+ expressions are all 'True':
  
   > isSubmapOfBy (==) (fromList [(1,1)]) (fromList [(1,1),(2,2)])
   > isSubmapOfBy (<=) (fromList [(1,1)]) (fromList [(1,1),(2,2)])
   > isSubmapOfBy (==) (fromList [(1,1),(2,2)]) (fromList [(1,1),(2,2)])
 
- But the following are all @False@:
+ But the following are all 'False':
  
   > isSubmapOfBy (==) (fromList [(1,2)]) (fromList [(1,1),(2,2)])
   > isSubmapOfBy (<) (fromList [(1,1)]) (fromList [(1,1),(2,2)])
@@ -710,19 +712,19 @@ mapWithKey f t
       Tip k x     -> Tip k (f k x)
       Nil         -> Nil
 
--- | /O(n)/. The function @mapAccum@ threads an accumulating
+-- | /O(n)/. The function @'mapAccum'@ threads an accumulating
 -- argument through the map in an unspecified order.
 mapAccum :: (a -> b -> (a,c)) -> a -> IntMap b -> (a,IntMap c)
 mapAccum f a m
   = mapAccumWithKey (\a k x -> f a x) a m
 
--- | /O(n)/. The function @mapAccumWithKey@ threads an accumulating
+-- | /O(n)/. The function @'mapAccumWithKey'@ threads an accumulating
 -- argument through the map in an unspecified order.
 mapAccumWithKey :: (a -> Key -> b -> (a,c)) -> a -> IntMap b -> (a,IntMap c)
 mapAccumWithKey f a t
   = mapAccumL f a t
 
--- | /O(n)/. The function @mapAccumL@ threads an accumulating
+-- | /O(n)/. The function @'mapAccumL'@ threads an accumulating
 -- argument through the map in pre-order.
 mapAccumL :: (a -> Key -> b -> (a,c)) -> a -> IntMap b -> (a,IntMap c)
 mapAccumL f a t
@@ -734,7 +736,7 @@ mapAccumL f a t
       Nil         -> (a,Nil)
 
 
--- | /O(n)/. The function @mapAccumR@ threads an accumulating
+-- | /O(n)/. The function @'mapAccumR'@ threads an accumulating
 -- argument throught the map in post-order.
 mapAccumR :: (a -> Key -> b -> (a,c)) -> a -> IntMap b -> (a,IntMap c)
 mapAccumR f a t
@@ -787,7 +789,7 @@ partitionWithKey pred t
       Nil -> (Nil,Nil)
 
 
--- | /O(log n)/. The expression (@split k map@) is a pair @(map1,map2)@
+-- | /O(log n)/. The expression (@'split' k map@) is a pair @(map1,map2)@
 -- where all keys in @map1@ are lower than @k@ and all keys in
 -- @map2@ larger than @k@. Any key equal to @k@ is found in neither @map1@ nor @map2@.
 split :: Key -> IntMap a -> (IntMap a,IntMap a)
@@ -1006,10 +1008,10 @@ showTree s
   = showTreeWith True False s
 
 
-{- | /O(n)/. The expression (@showTreeWith hang wide map@) shows
+{- | /O(n)/. The expression (@'showTreeWith' hang wide map@) shows
  the tree that implements the map. If @hang@ is
- @True@, a /hanging/ tree is shown otherwise a rotated tree is shown. If
- @wide@ is true, an extra wide version is shown.
+ 'True', a /hanging/ tree is shown otherwise a rotated tree is shown. If
+ @wide@ is 'True', an extra wide version is shown.
 -}
 showTreeWith :: Show a => Bool -> Bool -> IntMap a -> String
 showTreeWith hang wide t

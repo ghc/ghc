@@ -405,7 +405,7 @@ subsetCmp Nil Nil = EQ
 subsetCmp Nil t   = LT
 
 -- | /O(n+m)/. Is this a subset?
--- @(s1 `isSubsetOf` s2)@ tells whether s1 is a subset of s2.
+-- @(s1 `isSubsetOf` s2)@ tells whether @s1@ is a subset of @s2@.
 
 isSubsetOf :: IntSet -> IntSet -> Bool
 isSubsetOf t1@(Bin p1 m1 l1 r1) t2@(Bin p2 m2 l2 r2)
@@ -446,7 +446,7 @@ partition pred t
       Nil -> (Nil,Nil)
 
 
--- | /O(log n)/. The expression (@split x set@) is a pair @(set1,set2)@
+-- | /O(log n)/. The expression (@'split' x set@) is a pair @(set1,set2)@
 -- where all elements in @set1@ are lower than @x@ and all elements in
 -- @set2@ larger than @x@.
 --
@@ -482,7 +482,7 @@ splitMember x t
 ----------------------------------------------------------------------}
 
 -- | /O(n*min(n,W))/. 
--- @map f s@ is the set obtained by applying @f@ to each element of @s@.
+-- @'map' f s@ is the set obtained by applying @f@ to each element of @s@.
 -- 
 -- It's worth noting that the size of the result may be smaller if,
 -- for some @(x,y)@, @x \/= y && f x == f y@
@@ -620,10 +620,10 @@ showTree s
   = showTreeWith True False s
 
 
-{- | /O(n)/. The expression (@showTreeWith hang wide map@) shows
+{- | /O(n)/. The expression (@'showTreeWith' hang wide map@) shows
  the tree that implements the set. If @hang@ is
- @True@, a /hanging/ tree is shown otherwise a rotated tree is shown. If
- @wide@ is true, an extra wide version is shown.
+ 'True', a /hanging/ tree is shown otherwise a rotated tree is shown. If
+ @wide@ is 'True', an extra wide version is shown.
 -}
 showTreeWith :: Bool -> Bool -> IntSet -> String
 showTreeWith hang wide t

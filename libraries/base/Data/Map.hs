@@ -171,7 +171,7 @@ import Data.Generics.Instances
 --------------------------------------------------------------------}
 infixl 9 !,\\ --
 
--- | /O(log n)/. Find the value of a key. Calls @error@ when the element can not be found.
+-- | /O(log n)/. Find the value of a key. Calls 'error' when the element can not be found.
 (!) :: Ord k => Map k a -> k -> a
 m ! k    = find k m
 
@@ -241,15 +241,15 @@ member k m
       Nothing -> False
       Just x  -> True
 
--- | /O(log n)/. Find the value of a key. Calls @error@ when the element can not be found.
+-- | /O(log n)/. Find the value of a key. Calls 'error' when the element can not be found.
 find :: Ord k => k -> Map k a -> a
 find k m
   = case lookup k m of
       Nothing -> error "Map.find: element not in the map"
       Just x  -> x
 
--- | /O(log n)/. The expression @(findWithDefault def k map)@ returns the value of key @k@ or returns @def@ when
--- the key is not in the map.
+-- | /O(log n)/. The expression @('findWithDefault' def k map)@ returns
+-- the value of key @k@ or returns @def@ when the key is not in the map.
 findWithDefault :: Ord k => a -> k -> Map k a -> a
 findWithDefault def k m
   = case lookup k m of
@@ -302,9 +302,9 @@ insertWithKey f kx x t
                GT -> balance ky y l (insertWithKey f kx x r)
                EQ -> Bin sy ky (f ky x y) l r
 
--- | /O(log n)/. The expression (@insertLookupWithKey f k x map@) is a pair where
--- the first element is equal to (@lookup k map@) and the second element
--- equal to (@insertWithKey f k x map@).
+-- | /O(log n)/. The expression (@'insertLookupWithKey' f k x map@)
+-- is a pair where the first element is equal to (@'lookup' k map@)
+-- and the second element equal to (@'insertWithKey' f k x map@).
 insertLookupWithKey :: Ord k => (k -> a -> a -> a) -> k -> a -> Map k a -> (Maybe a,Map k a)
 insertLookupWithKey f kx x t
   = case t of
@@ -343,16 +343,17 @@ adjustWithKey :: Ord k => (k -> a -> a) -> k -> Map k a -> Map k a
 adjustWithKey f k m
   = updateWithKey (\k x -> Just (f k x)) k m
 
--- | /O(log n)/. The expression (@update f k map@) updates the value @x@
--- at @k@ (if it is in the map). If (@f x@) is @Nothing@, the element is
--- deleted. If it is (@Just y@), the key @k@ is bound to the new value @y@.
+-- | /O(log n)/. The expression (@'update' f k map@) updates the value @x@
+-- at @k@ (if it is in the map). If (@f x@) is 'Nothing', the element is
+-- deleted. If it is (@'Just' y@), the key @k@ is bound to the new value @y@.
 update :: Ord k => (a -> Maybe a) -> k -> Map k a -> Map k a
 update f k m
   = updateWithKey (\k x -> f x) k m
 
--- | /O(log n)/. The expression (@update f k map@) updates the value @x@
--- at @k@ (if it is in the map). If (@f k x@) is @Nothing@, the element is
--- deleted. If it is (@Just y@), the key @k@ is bound to the new value @y@.
+-- | /O(log n)/. The expression (@'updateWithKey' f k map@) updates the
+-- value @x@ at @k@ (if it is in the map). If (@f k x@) is 'Nothing',
+-- the element is deleted. If it is (@'Just' y@), the key @k@ is bound
+-- to the new value @y@.
 updateWithKey :: Ord k => (k -> a -> Maybe a) -> k -> Map k a -> Map k a
 updateWithKey f k t
   = case t of
@@ -429,7 +430,8 @@ updateAt f i (Bin sx kx x l r)
   where
     sizeL = size l
 
--- | /O(log n)/. Delete the element at /index/. Defined as (@deleteAt i map = updateAt (\k x -> Nothing) i map@).
+-- | /O(log n)/. Delete the element at /index/.
+-- Defined as (@'deleteAt' i map = 'updateAt' (\k x -> 'Nothing') i map@).
 deleteAt :: Int -> Map k a -> Map k a
 deleteAt i map
   = updateAt (\k x -> Nothing) i map
@@ -497,20 +499,22 @@ updateMaxWithKey f t
 {--------------------------------------------------------------------
   Union. 
 --------------------------------------------------------------------}
--- | The union of a list of maps: (@unions == foldl union empty@).
+-- | The union of a list of maps:
+--   (@'unions' == 'Prelude.foldl' 'union' 'empty'@).
 unions :: Ord k => [Map k a] -> Map k a
 unions ts
   = foldlStrict union empty ts
 
 -- | The union of a list of maps, with a combining operation:
---   (@unionsWith f == foldl (unionWith f) empty@).
+--   (@'unionsWith' f == 'Prelude.foldl' ('unionWith' f) 'empty'@).
 unionsWith :: Ord k => (a->a->a) -> [Map k a] -> Map k a
 unionsWith f ts
   = foldlStrict (unionWith f) empty ts
 
 -- | /O(n+m)/.
 -- The expression (@'union' t1 t2@) takes the left-biased union of @t1@ and @t2@. 
--- It prefers @t1@ when duplicate keys are encountered, ie. (@union == unionWith const@).
+-- It prefers @t1@ when duplicate keys are encountered,
+-- i.e. (@'union' == 'unionWith' 'const'@).
 -- The implementation uses the efficient /hedge-union/ algorithm.
 -- Hedge-union is more efficient on (bigset `union` smallset)?
 union :: Ord k => Map k a -> Map k a -> Map k a
@@ -610,8 +614,8 @@ differenceWith f m1 m2
 
 -- | /O(n+m)/. Difference with a combining function. When two equal keys are
 -- encountered, the combining function is applied to the key and both values.
--- If it returns @Nothing@, the element is discarded (proper set difference). If
--- it returns (@Just y@), the element is updated with a new value @y@. 
+-- If it returns 'Nothing', the element is discarded (proper set difference). If
+-- it returns (@'Just' y@), the element is updated with a new value @y@. 
 -- The implementation uses an efficient /hedge/ algorithm comparable with /hedge-union/.
 differenceWithKey :: Ord k => (k -> a -> b -> Maybe a) -> Map k a -> Map k b -> Map k a
 differenceWithKey f Tip t2  = Tip
@@ -641,7 +645,7 @@ hedgeDiffWithKey f cmplo cmphi t (Bin _ kx x l r)
   Intersection
 --------------------------------------------------------------------}
 -- | /O(n+m)/. Intersection of two maps. The values in the first
--- map are returned, i.e. (@intersection m1 m2 == intersectionWith const m1 m2@).
+-- map are returned, i.e. (@'intersection' m1 m2 == 'intersectionWith' 'const' m1 m2@).
 intersection :: Ord k => Map k a -> Map k b -> Map k a
 intersection m1 m2
   = intersectionWithKey (\k x y -> x) m1 m2
@@ -679,22 +683,22 @@ intersectWithKey f t (Bin _ kx x l r)
   Submap
 --------------------------------------------------------------------}
 -- | /O(n+m)/. 
--- This function is defined as (@submap = submapBy (==)@).
+-- This function is defined as (@'isSubmapOf' = 'isSubmapOfBy' (==)@).
 isSubmapOf :: (Ord k,Eq a) => Map k a -> Map k a -> Bool
 isSubmapOf m1 m2
   = isSubmapOfBy (==) m1 m2
 
 {- | /O(n+m)/. 
- The expression (@isSubmapOfBy f t1 t2@) returns @True@ if
- all keys in @t1@ are in tree @t2@, and when @f@ returns @True@ when
+ The expression (@'isSubmapOfBy' f t1 t2@) returns 'True' if
+ all keys in @t1@ are in tree @t2@, and when @f@ returns 'True' when
  applied to their respective values. For example, the following 
- expressions are all @True@.
+ expressions are all 'True':
  
  > isSubmapOfBy (==) (fromList [('a',1)]) (fromList [('a',1),('b',2)])
  > isSubmapOfBy (<=) (fromList [('a',1)]) (fromList [('a',1),('b',2)])
  > isSubmapOfBy (==) (fromList [('a',1),('b',2)]) (fromList [('a',1),('b',2)])
 
- But the following are all @False@:
+ But the following are all 'False':
  
  > isSubmapOfBy (==) (fromList [('a',2)]) (fromList [('a',1),('b',2)])
  > isSubmapOfBy (<)  (fromList [('a',1)]) (fromList [('a',1),('b',2)])
@@ -714,22 +718,22 @@ submap' f (Bin _ kx x l r) t
     (found,lt,gt) = splitLookup kx t
 
 -- | /O(n+m)/. Is this a proper submap? (ie. a submap but not equal). 
--- Defined as (@isProperSubmapOf = isProperSubmapOfBy (==)@).
+-- Defined as (@'isProperSubmapOf' = 'isProperSubmapOfBy' (==)@).
 isProperSubmapOf :: (Ord k,Eq a) => Map k a -> Map k a -> Bool
 isProperSubmapOf m1 m2
   = isProperSubmapOfBy (==) m1 m2
 
 {- | /O(n+m)/. Is this a proper submap? (ie. a submap but not equal).
- The expression (@isProperSubmapOfBy f m1 m2@) returns @True@ when
+ The expression (@'isProperSubmapOfBy' f m1 m2@) returns 'True' when
  @m1@ and @m2@ are not equal,
- all keys in @m1@ are in @m2@, and when @f@ returns @True@ when
+ all keys in @m1@ are in @m2@, and when @f@ returns 'True' when
  applied to their respective values. For example, the following 
- expressions are all @True@.
+ expressions are all 'True':
  
   > isProperSubmapOfBy (==) (fromList [(1,1)]) (fromList [(1,1),(2,2)])
   > isProperSubmapOfBy (<=) (fromList [(1,1)]) (fromList [(1,1),(2,2)])
 
- But the following are all @False@:
+ But the following are all 'False':
  
   > isProperSubmapOfBy (==) (fromList [(1,1),(2,2)]) (fromList [(1,1),(2,2)])
   > isProperSubmapOfBy (==) (fromList [(1,1),(2,2)]) (fromList [(1,1)])
@@ -789,19 +793,19 @@ mapWithKey f Tip = Tip
 mapWithKey f (Bin sx kx x l r) 
   = Bin sx kx (f kx x) (mapWithKey f l) (mapWithKey f r)
 
--- | /O(n)/. The function @mapAccum@ threads an accumulating
+-- | /O(n)/. The function 'mapAccum' threads an accumulating
 -- argument through the map in an unspecified order.
 mapAccum :: (a -> b -> (a,c)) -> a -> Map k b -> (a,Map k c)
 mapAccum f a m
   = mapAccumWithKey (\a k x -> f a x) a m
 
--- | /O(n)/. The function @mapAccumWithKey@ threads an accumulating
+-- | /O(n)/. The function 'mapAccumWithKey' threads an accumulating
 -- argument through the map in unspecified order. (= ascending pre-order)
 mapAccumWithKey :: (a -> k -> b -> (a,c)) -> a -> Map k b -> (a,Map k c)
 mapAccumWithKey f a t
   = mapAccumL f a t
 
--- | /O(n)/. The function @mapAccumL@ threads an accumulating
+-- | /O(n)/. The function 'mapAccumL' threads an accumulating
 -- argument throught the map in (ascending) pre-order.
 mapAccumL :: (a -> k -> b -> (a,c)) -> a -> Map k b -> (a,Map k c)
 mapAccumL f a t
@@ -813,7 +817,7 @@ mapAccumL f a t
                  (a3,r') = mapAccumL f a2 r
              in (a3,Bin sx kx x' l' r')
 
--- | /O(n)/. The function @mapAccumR@ threads an accumulating
+-- | /O(n)/. The function 'mapAccumR' threads an accumulating
 -- argument throught the map in (descending) post-order.
 mapAccumR :: (a -> k -> b -> (a,c)) -> a -> Map k b -> (a,Map k c)
 mapAccumR f a t
@@ -826,7 +830,7 @@ mapAccumR f a t
              in (a3,Bin sx kx x' l' r')
 
 -- | /O(n*log n)/. 
--- @mapKeys f s@ is the map obtained by applying @f@ to each key of @s@.
+-- @'mapKeys' f s@ is the map obtained by applying @f@ to each key of @s@.
 -- 
 -- It's worth noting that the size of the result may be smaller if,
 -- for some @(x,y)@, @x \/= y && f x == f y@
@@ -835,7 +839,7 @@ mapKeys :: Ord k2 => (k1->k2) -> Map k1 a -> Map k2 a
 mapKeys = mapKeysWith (\x y->x)
 
 -- | /O(n*log n)/. 
--- @mapKeysWith c f s@ is the map obtained by applying @f@ to each key of @s@.
+-- @'mapKeysWith' c f s@ is the map obtained by applying @f@ to each key of @s@.
 -- 
 -- It's worth noting that the size of the result may be smaller if,
 -- for some @(x,y)@, @x \/= y && f x == f y@
@@ -846,14 +850,13 @@ mapKeysWith c f = fromListWith c . List.map fFirst . toList
     where fFirst (x,y) = (f x, y)
 
 
--- | /O(n)/. The 
---
--- @mapMonotonic f s == 'map' f s@, but works only when @f@ is monotonic.
+-- | /O(n)/.
+-- @'mapKeysMonotonic' f s == 'mapKeys' f s@, but works only when @f@ is monotonic.
 -- /The precondition is not checked./
 -- Semi-formally, we have:
 -- 
 -- > and [x < y ==> f x < f y | x <- ls, y <- ls] 
--- >                     ==> mapMonotonic f s == map f s
+-- >                     ==> mapKeysMonotonic f s == mapKeys f s
 -- >     where ls = keys s
 
 mapKeysMonotonic :: (k1->k2) -> Map k1 a -> Map k2 a
@@ -966,7 +969,8 @@ fromAscListWith :: Eq k => (a -> a -> a) -> [(k,a)] -> Map k a
 fromAscListWith f xs
   = fromAscListWithKey (\k x y -> f x y) xs
 
--- | /O(n)/. Build a map from an ascending list in linear time with a combining function for equal keys
+-- | /O(n)/. Build a map from an ascending list in linear time with a
+-- combining function for equal keys.
 -- /The precondition (input list is ascending) is not checked./
 fromAscListWithKey :: Eq k => (k -> a -> a -> a) -> [(k,a)] -> Map k a 
 fromAscListWithKey f xs
@@ -986,7 +990,6 @@ fromAscListWithKey f xs
 
 
 -- | /O(n)/. Build a map from an ascending list of distinct elements in linear time.
---
 -- /The precondition is not checked./
 fromDistinctAscList :: [(k,a)] -> Map k a 
 fromDistinctAscList xs
@@ -1073,7 +1076,7 @@ filterLt cmp (Bin sx kx x l r)
 {--------------------------------------------------------------------
   Split
 --------------------------------------------------------------------}
--- | /O(log n)/. The expression (@split k map@) is a pair @(map1,map2)@ where
+-- | /O(log n)/. The expression (@'split' k map@) is a pair @(map1,map2)@ where
 -- the keys in @map1@ are smaller than @k@ and the keys in @map2@ larger than @k@. Any key equal to @k@ is found in neither @map1@ nor @map2@.
 split :: Ord k => k -> Map k a -> (Map k a,Map k a)
 split k Tip = (Tip,Tip)
@@ -1083,8 +1086,8 @@ split k (Bin sx kx x l r)
       GT -> let (lt,gt) = split k r in (join kx x l lt,gt)
       EQ -> (l,r)
 
--- | /O(log n)/. The expression (@splitLookup k map@) splits a map just
--- like 'split' but also returns @lookup k map@.
+-- | /O(log n)/. The expression (@'splitLookup' k map@) splits a map just
+-- like 'split' but also returns @'lookup' k map@.
 splitLookup :: Ord k => k -> Map k a -> (Maybe a,Map k a,Map k a)
 splitLookup k Tip = (Nothing,Tip,Tip)
 splitLookup k (Bin sx kx x l r)
@@ -1315,10 +1318,10 @@ showTree m
     showElem k x  = show k ++ ":=" ++ show x
 
 
-{- | /O(n)/. The expression (@showTreeWith showelem hang wide map@) shows
+{- | /O(n)/. The expression (@'showTreeWith' showelem hang wide map@) shows
  the tree that implements the map. Elements are shown using the @showElem@ function. If @hang@ is
- @True@, a /hanging/ tree is shown otherwise a rotated tree is shown. If
- @wide@ is true, an extra wide version is shown.
+ 'True', a /hanging/ tree is shown otherwise a rotated tree is shown. If
+ @wide@ is 'True', an extra wide version is shown.
 
 >  Map> let t = fromDistinctAscList [(x,()) | x <- [1..5]]
 >  Map> putStrLn $ showTreeWith (\k x -> show (k,x)) True False t
