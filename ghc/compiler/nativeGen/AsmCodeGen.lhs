@@ -112,13 +112,13 @@ nativeCodeGen absC us
 
 absCtoNat :: AbstractC -> UniqSM (SDoc, SDoc)
 absCtoNat absC
-   = genCodeAbstractC absC                `thenUs` \ stixRaw ->
-     genericOpt stixRaw                   `bind`   \ stixOpt ->
-     genMachCode stixOpt                  `thenUs` \ pre_regalloc ->
-     regAlloc pre_regalloc                `bind`   \ almost_final ->
-     x86fp_kludge almost_final            `bind`   \ final_mach_code ->
-     vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
-     pprStixTrees stixOpt                 `bind`   \ stix_sdoc ->
+   = _scc_ "genCodeAbstractC" genCodeAbstractC absC                `thenUs` \ stixRaw ->
+     _scc_ "genericOpt" genericOpt stixRaw                   `bind`   \ stixOpt ->
+     _scc_ "genMachCode" genMachCode stixOpt                  `thenUs` \ pre_regalloc ->
+     _scc_ "regAlloc" regAlloc pre_regalloc                `bind`   \ almost_final ->
+     _scc_ "x86fp_kludge" x86fp_kludge almost_final            `bind`   \ final_mach_code ->
+     _scc_ "vcat" vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
+     _scc_ "pprStixTrees" pprStixTrees stixOpt                 `bind`   \ stix_sdoc ->
      returnUs (stix_sdoc, final_sdoc)
      where
         bind f x = x f
