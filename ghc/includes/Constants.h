@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.20 2001/11/28 14:31:27 simonmar Exp $
+ * $Id: Constants.h,v 1.21 2002/09/23 14:33:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -98,10 +98,6 @@
 
 /* You can change these constants (I hope) but be sure to modify
    rts/StgMiscClosures.hs accordingly. */
-
-/*---- Minimum number of words left in heap after GC to carry on */
-
-#define HEAP_HWM_WORDS	1024
 
 /* -----------------------------------------------------------------------------
    Semi-Tagging constants
