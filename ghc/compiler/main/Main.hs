@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.55 2001/02/27 12:36:37 rrt Exp $
+-- $Id: Main.hs,v 1.56 2001/02/27 15:25:18 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -32,7 +32,7 @@ import DriverFlags
 import DriverMkDepend
 import DriverUtil
 import Panic
-import DriverPhases	( Phase(..), haskellish_file )
+import DriverPhases	( Phase(..), haskellish_file, objish_file )
 import CmdLineOpts
 import TmpFiles
 import Finder		( initFinder )
@@ -49,7 +49,6 @@ import Exception
 import IO
 import Monad
 import List
-import Char		( toLower )
 import System
 import Maybe
 
@@ -309,8 +308,11 @@ setTopDir args = do
   return others
 
 beginMake :: [String] -> IO ()
-beginMake mods
-  = do case mods of
+beginMake fileish_args
+  = do let (objs, mods) = partition objish_file fileish_args
+       mapM (add v_Ld_inputs) objs
+
+       case mods of
 	 []    -> throwDyn (UsageError "no input files")
 	 [mod] -> do state <- cmInit Batch
 		     cmLoadModule state mod
@@ -324,17 +326,14 @@ beginInteractive = throwDyn (OtherError "not built for interactive use")
 #else
 beginInteractive fileish_args
   = do minus_ls <- readIORef v_Cmdline_libraries
-       let is_libraryish nm
-              = let nmr = map toLower (reverse nm)
-                    in take 2 nmr == "o."
-           libs = map Left (filter is_libraryish fileish_args)
-                  ++ map Right minus_ls
-           mods = filter (not.is_libraryish) fileish_args
-           mod = case mods of
-	            []    -> Nothing
-	            [mod] -> Just mod
-	            _     -> throwDyn (UsageError 
-                                       "only one module allowed with --interactive")
+
+       let (objs, mods) = partition objish_file fileish_args
+	   libs = map Left objs ++ map Right minus_ls
+
        state <- cmInit Interactive
-       interactiveUI state mod libs
+       case mods of
+	  []    -> interactiveUI state Nothing    libs
+	  [mod] -> interactiveUI state (Just mod) libs
+	  _     -> throwDyn (UsageError 
+                             "only one module allowed with --interactive")
 #endif

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.5 2001/02/27 12:36:37 rrt Exp $
+-- $Id: DriverPhases.hs,v 1.6 2001/02/27 15:25:18 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -12,10 +12,9 @@ module DriverPhases (
    startPhase,		-- :: String -> Phase
    phaseInputExt, 	-- :: Phase -> String
 
-   haskellish_file,
-   haskellish_suffix,
-   cish_file,
-   cish_suffix
+   haskellish_file, haskellish_suffix,
+   objish_file, objish_suffix,
+   cish_file, cish_suffix
  ) where
 
 import DriverUtil
@@ -85,6 +84,12 @@ phaseInputExt MkDependHS  = "dep"
 haskellish_suffix = (`elem` [ "hs", "hspp", "lhs", "hc" ])
 cish_suffix       = (`elem` [ "c", "s", "S" ])  -- maybe .cc et al.??
 
-haskellish_file f = haskellish_suffix suf where (_,suf) = splitFilename f
-cish_file f       = cish_suffix suf       where (_,suf) = splitFilename f
+#if mingw32_TARGET_OS || cygwin32_TARGET_OS
+objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
+#else
+objish_suffix     = (`elem` [ "o" ])
+#endif
 
+haskellish_file f = haskellish_suffix suf where (_,suf) = splitFilename f
+cish_file       f = cish_suffix       suf where (_,suf) = splitFilename f
+objish_file     f = objish_suffix     suf where (_,suf) = splitFilename f
