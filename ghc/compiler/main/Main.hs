@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.80 2001/07/04 15:43:38 simonmar Exp $
+-- $Id: Main.hs,v 1.81 2001/07/11 19:48:07 sof Exp $
 --
 -- GHC Driver program
 --
@@ -45,7 +45,7 @@ import DriverMkDepend	( beginMkDependHS, endMkDependHS )
 import DriverPhases	( Phase(Hsc, HCc), haskellish_src_file, objish_file )
 
 import DriverUtil	( add, handle, handleDyn, later, splitFilename,
-			  unknownFlagErr )
+			  unknownFlagErr, getFileSuffix )
 import CmdLineOpts	( dynFlag, defaultDynFlags, restoreDynFlags,
 			  saveDynFlags, setDynFlags, 
 			  DynFlags(..), HscLang(..), v_Static_hsc_opts
@@ -288,18 +288,20 @@ main =
 	  let (basename, suffix) = splitFilename src
 
 	  -- just preprocess (Haskell source only)
+   	  let src_and_suff = (src, getFileSuffix src)
 	  pp <- if not (haskellish_src_file src) || mode == StopBefore Hsc
-			then return src else do
+			then return src_and_suff else do
 		phases <- genPipeline (StopBefore Hsc) stop_flag
-			    False{-not persistent-} defaultHscLang src
-	  	pipeLoop phases src False{-no linking-} False{-no -o flag-}
+			    False{-not persistent-} defaultHscLang
+			    src_and_suff
+	  	pipeLoop phases src_and_suff False{-no linking-} False{-no -o flag-}
 			basename suffix
 
 	  -- rest of compilation
 	  hsc_lang <- dynFlag hscLang
-	  phases <- genPipeline mode stop_flag True hsc_lang pp
-	  r <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL) True{-use -o flag-}
-			basename suffix
+	  phases   <- genPipeline mode stop_flag True hsc_lang pp
+	  (r,_)    <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL)
+	  			      True{-use -o flag-} basename suffix
 	  return r
 
    o_files <- mapM compileFile srcs

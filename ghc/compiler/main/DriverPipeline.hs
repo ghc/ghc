@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.88 2001/07/11 14:50:49 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.89 2001/07/11 19:48:07 sof Exp $
 --
 -- GHC Driver
 --
@@ -120,18 +120,18 @@ data IntermediateFileType
   deriving (Eq, Show)
 
 genPipeline
-   :: GhcMode		-- when to stop
-   -> String		-- "stop after" flag (for error messages)
-   -> Bool		-- True => output is persistent
-   -> HscLang		-- preferred output language for hsc
-   -> String		-- original filename
+   :: GhcMode		 -- when to stop
+   -> String		 -- "stop after" flag (for error messages)
+   -> Bool		 -- True => output is persistent
+   -> HscLang		 -- preferred output language for hsc
+   -> (FilePath, String) -- original filename & its suffix 
    -> IO [ 		-- list of phases to run for this file
 	     (Phase,
 	      IntermediateFileType,  -- keep the output from this phase?
 	      String)   	     -- output file suffix
          ]	
 
-genPipeline todo stop_flag persistent_output lang filename 
+genPipeline todo stop_flag persistent_output lang (filename,suffix)
  = do
    split      <- readIORef v_Split_object_files
    mangle     <- readIORef v_Do_asm_mangling
@@ -143,8 +143,6 @@ genPipeline todo stop_flag persistent_output lang filename
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
-    (_basename, suffix) = splitFilename filename
-
     start = startPhase suffix
 
       -- special case for mkdependHS: .hspp files go through MkDependHS
@@ -256,18 +254,18 @@ genPipeline todo stop_flag persistent_output lang filename
 
 runPipeline
   :: [ (Phase, IntermediateFileType, String) ] -- phases to run
-  -> String			-- input file
+  -> (String,String)		-- input file
   -> Bool			-- doing linking afterward?
   -> Bool			-- take into account -o when generating output?
-  -> IO String			-- return final filename
+  -> IO (String, String)	-- return final filename
 
-runPipeline pipeline input_fn do_linking use_ofile
-  = pipeLoop pipeline input_fn do_linking use_ofile basename suffix
-  where (basename, suffix) = splitFilename input_fn
+runPipeline pipeline (input_fn,suffix) do_linking use_ofile
+  = pipeLoop pipeline (input_fn,suffix) do_linking use_ofile basename suffix
+  where (basename, _) = splitFilename input_fn
 
 pipeLoop [] input_fn _ _ _ _ = return input_fn
 pipeLoop ((phase, keep, o_suffix):phases) 
-	input_fn do_linking use_ofile orig_basename orig_suffix
+	(input_fn,real_suff) do_linking use_ofile orig_basename orig_suffix
   = do
 
      output_fn <- outputFileName (null phases) keep o_suffix
@@ -279,9 +277,28 @@ pipeLoop ((phase, keep, o_suffix):phases)
        Nothing -> do
 	      let (_,keep,final_suffix) = last phases
 	      ofile <- outputFileName True keep final_suffix
-	      return ofile
+	      return (ofile, final_suffix)
           -- carry on ...
-       Just fn -> pipeLoop phases fn do_linking use_ofile orig_basename orig_suffix
+       Just fn -> 
+              {-
+	       Notice that in order to keep the invariant that we can
+	       determine a compilation pipeline's 'start phase' just
+	       by looking at the input filename, the input filename
+	       to the next stage/phase is associated here with the suffix
+	       of the output file, *even* if it does not have that
+	       suffix in reality.
+	       
+	       Why is this important? Because we may run a compilation
+	       pipeline in stages (cf. Main.main.compileFile's two stages),
+	       so when generating the next stage we need to be precise
+	       about what kind of file (=> suffix) is given as input.
+
+	       [Not having to generate a pipeline in stages seems like
+	        the right way to go, but I've punted on this for now --sof]
+	       
+	      -}
+              pipeLoop phases (fn, o_suffix) do_linking use_ofile
+       			orig_basename orig_suffix
   where
      outputFileName last_phase keep suffix
   	= do o_file <- readIORef v_Output_file
@@ -868,8 +885,10 @@ preprocess filename =
   ASSERT(haskellish_src_file filename) 
   do restoreDynFlags	-- Restore to state of last save
      pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
-			     defaultHscLang filename
-     runPipeline pipeline filename False{-no linking-} False{-no -o flag-}
+			     defaultHscLang (filename, getFileSuffix filename)
+     (fn,_)   <- runPipeline pipeline (filename,getFileSuffix filename)
+     	                     False{-no linking-} False{-no -o flag-}
+     return fn
 
 -----------------------------------------------------------------------------
 -- Compile a single module, under the control of the compilation manager.
@@ -988,13 +1007,15 @@ compile ghci_mode summary source_unchanged have_object
 
 		-- we're in batch mode: finish the compilation pipeline.
 		_other -> do pipe <- genPipeline (StopBefore Ln) "" True 
-					hsc_lang output_fn
+					hsc_lang (output_fn, getFileSuffix output_fn)
                              -- runPipeline takes input_fn so it can split off 
                              -- the base name and use it as the base of 
                              -- the output object file.
                              let (basename, suffix) = splitFilename input_fn
-			     o_file <- pipeLoop pipe output_fn False False 
-                                                basename suffix
+			     (o_file,_) <- 
+			         pipeLoop pipe (output_fn, getFileSuffix output_fn)
+			     		       False False 
+                                               basename suffix
                              o_time <- getModificationTime o_file
 			     return ([DotO o_file], o_time)
 
@@ -1012,8 +1033,7 @@ compileStub dflags stub_c_exists
   | stub_c_exists = do
 	-- compile the _stub.c file w/ gcc
 	let stub_c = hscStubCOutName dflags
-	pipeline <- genPipeline (StopBefore Ln) "" True defaultHscLang stub_c
-	stub_o <- runPipeline pipeline stub_c False{-no linking-} 
-			False{-no -o option-}
-
+	pipeline   <- genPipeline (StopBefore Ln) "" True defaultHscLang (stub_c,"c")
+	(stub_o,_) <- runPipeline pipeline (stub_c,"c") False{-no linking-} 
+			          False{-no -o option-}
 	return (Just stub_o)
