@@ -247,16 +247,16 @@ testEnumUnit = do
   printTest ((fromEnum ()))
 
    -- enumFrom:
-  printTest (([()..]))
+  printTest ((take 7 [()..]))
 
    -- enumFromThen:
-  printTest (([(),()..]))
+  printTest ((take 7 [(),()..]))
 
    -- enumFromTo
-  printTest (([()..()]))
+  printTest ((take 7 [()..()]))
 
    -- enumFromThenTo
-  printTest (([(),()..()]))
+  printTest ((take 7 [(),()..()]))
 
 testEnumOrdering :: IO ()
 testEnumOrdering = do
@@ -511,6 +511,9 @@ testEnumRatioInt = do
 
 
 mayBomb x = catchJust errorCalls x (\e -> putStrLn ("error " ++ show e))
+   `Control.Exception.catch` (\e -> case e of
+       PatternMatchFail _ -> putStrLn "Fail: pattern match failure"
+       _ -> putStrLn ("Fail: " ++ show e))
 
 test :: Show a => String -> String -> a -> IO ()
 test test_nm expected val = do
