@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: renameFile.c,v 1.6 2000/04/05 17:05:50 rrt Exp $
+ * $Id: renameFile.c,v 1.7 2000/04/06 10:26:09 rrt Exp $
  *
  * renameFile Runtime Support
  */
@@ -58,7 +58,7 @@ StgByteArray npath;
 	    ghc_errstr = "file is a directory";
 	    return -1;
         }
-        while (chmod(npath, S_IWRITE) != 0) {
+        while (chmod(npath, S_IWUSR) != 0) {
 	    if (errno != EINTR) {
                 cvtErrno();
                 stdErrno();
