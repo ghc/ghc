@@ -327,6 +327,30 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^powerpc64-.*-linux/ ) {
+				# PowerPC 64 Linux
+    $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = '\.'; # _ if symbols have an underscore on the front
+    $T_PRE_APP	    = '^#'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^\.LC\d+:'; # regexp for what such a lbl looks like
+    $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,\s*0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+\s*,\s*\d+|\.ident.*|\.local.*)\n)';
+    $T_COPY_DIRVS   = '^\s*\.(globl|type|size|local)';
+
+    $T_DOT_WORD	    = '\.(long|short|byte|fill|space)';
+    $T_DOT_GLOBAL   = '\.globl';
+    $T_HDR_toc      = "\.toc\n";
+    $T_HDR_literal  = "\t\.section\t\".toc\",\"aw\"\n";
+    $T_HDR_misc	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
+    $T_HDR_rodata   = "\t\.section\t.rodata\n\t\.align 2\n";
+    $T_HDR_closure  = "\t\.data\n\t\.align 2\n";
+    $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
+
+    #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^sparc-.*-(solaris2|openbsd)/ ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
@@ -616,7 +640,9 @@ sub mangle_asm {
 
 	} elsif ( /^${T_US}[A-Za-z0-9_]/o
 		&& ( $TargetPlatform !~ /^hppa/ # need to avoid local labels in this case
-		   || ! /^L\$\d+$/ ) ) {
+		   || ! /^L\$\d+$/ ) 
+		&& ( $TargetPlatform !~ /^powerpc64/ # we need to avoid local labels in this case
+		   || ! /^\.L\d+:$/ ) ) {
 	    local($thing);
 	    chop($thing = $_);
 	    $thing =~ s/:$//;
@@ -823,6 +849,30 @@ sub mangle_asm {
 		    # I have no idea why, and I don't think it is necessary, so let's toss it.
 		    $p =~ s/^\tli \d+,0\n//g;
 		    $p =~ s/^\tstw \d+,\d+\(1\)\n//g;
+		} elsif ($TargetPlatform =~ /^powerpc64-.*-linux/) {
+		    $p =~ s/^\tmr 31,1\n//;
+		    $p =~ s/^\tmflr 0\n//;
+		    $p =~ s/^\tstmw \d+,\d+\(1\)\n//;
+   		    $p =~ s/^\tstfd \d+,-?\d+\(1\)\n//g;
+ 		    $p =~ s/^\tstd r0,8\(1\)\n//;
+  		    $p =~ s/^\tstdu 1,-\d+\(1\)\n//; 
+  		    $p =~ s/^\tstd \d+,-?\d+\(1\)\n//g; 
+                    
+                        # GCC's "large-model" PIC (-fPIC)
+		    $pcrel_label = $p;
+		    $pcrel_label =~ s/(.|\n)*^.LCF(\d+):\n(.|\n)*/$2/ or $pcrel_label = "";
+
+                    $p =~ s/^\tbcl 20,31,.LCF\d+\n//;
+                    $p =~ s/^.LCF\d+:\n//;
+                    $p =~ s/^\tmflr 30\n//;
+                    $p =~ s/^\tlwz 0,\.LCL\d+-\.LCF\d+\(30\)\n//;
+                    $p =~ s/^\tadd 30,0,30\n//;
+
+		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
+		    # under some circumstances, only when generating position dependent code.
+		    # I have no idea why, and I don't think it is necessary, so let's toss it.
+		    $p =~ s/^\tli \d+,0\n//g;
+		    $p =~ s/^\tstd \d+,\d+\(1\)\n//g;
 		} else {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
@@ -890,6 +940,21 @@ sub mangle_asm {
  		    $e =~ s/^\tmtlr r0\n//;
   		    $e =~ s/^\tblr\n//;
   		    $e =~ s/^\tb restFP ;.*\n//;
+ 		} elsif ($TargetPlatform =~ /^powerpc64-.*-linux/) {
+		    $e =~ s/^\tmr 3,0\n//;
+		    $e =~ s/^\taddi 1,1,\d+\n//;
+		    $e =~ s/^\tld 0,16\(1\)\n//;
+		    $e =~ s/^\tmtlr 0\n//;
+
+		    # callee-save registers
+		    $e =~ s/^\tld \d+,-?\d+\(1\)\n//g;
+		    $e =~ s/^\tlfd \d+,-?\d+\(1\)\n//g;
+
+		    # get rid of the debug junk along with the blr
+		    $e =~ s/^\tblr\n\t.long .*\n\t.byte .*\n//;
+
+		    # incase we missed it with the last one get the blr alone
+		    $e =~ s/^\tblr\n//;
 		} else {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
@@ -921,6 +986,7 @@ sub mangle_asm {
 	$c =~ s/^\tjsr\s+\$26\s*,\s*${T_US}__DISCARD__\n//go if $TargetPlatform =~ /^alpha-/;
 	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-.*/;
 	$c =~ s/^\tbl\s+__DISCARD__(\@plt)?\n//go if $TargetPlatform =~ /^powerpc-.*-linux/;
+	$c =~ s/^\tbl\s+\.__DISCARD__\n\s+nop\n//go if $TargetPlatform =~ /^powerpc64-.*-linux/;
 
 	# IA64: mangle tailcalls into jumps here
 	if ($TargetPlatform =~ /^ia64-/) {
