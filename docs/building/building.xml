@@ -3819,7 +3819,7 @@ GhcBootLibs = YES</programlisting>
 	      <listitem>
 		<para>Touch the generated configuration files, just to make
 		sure they don't get replaced during the build:</para>
-<screen>$ touch <filename><replaceable>H</replaceable></filename>/ghc/includes/{ghcautoconf.h,DerivedConstants.h.GHCConstants.h.mkDerivedConstants.c.mkDerivedConstantsHdr.mkDerivedConstants.o,mkGHCConstants,mkGHCConstants.o}
+<screen>$ touch <filename><replaceable>H</replaceable></filename>/ghc/includes/{ghcautoconf.h,DerivedConstants.h.GHCConstants.h.mkDerivedConstants.c,mkDerivedConstantsHdr,mkDerivedConstants.o,mkGHCConstants,mkGHCConstants.o}
 	      </listitem>
 
 	    <listitem>
