@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.52 $
- * $Date: 2000/05/10 09:00:20 $
+ * $Revision: 1.53 $
+ * $Date: 2000/05/18 09:54:47 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -260,7 +260,7 @@ void      SloppifyIntegerEnd ( StgPtr );
 {                                                                 \
    StgUpdateFrame *__frame;                                       \
    __frame = (StgUpdateFrame *)(xSp + (xSp_offset)) - 1;          \
-   SET_INFO(__frame, (StgInfoTable *)&Upd_frame_info);            \
+   SET_INFO(__frame, (StgInfoTable *)&upd_frame_info);            \
    __frame->link = xSu;                                           \
    __frame->updatee = (StgClosure *)(target);                     \
    xSu = __frame;                                                 \
