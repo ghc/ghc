@@ -1,7 +1,0 @@
-__interface HsMatches 1 0 where
-__export HsMatches Match GRHSs pprMatch pprMatches pprGRHSs ;
-1 data Match a b ;
-1 data GRHSs a b ;
-1 pprGRHSs :: __forall [i p] {Outputable.Outputable i, Outputable.Outputable p} => PrelBase.Bool -> HsMatches.GRHSs i p -> Outputable.SDoc ;
-1 pprMatch :: __forall [i p] {Outputable.Outputable i, Outputable.Outputable p} => (PrelBase.Bool, Outputable.SDoc) -> HsMatches.Match i p -> Outputable.SDoc ;
-1 pprMatches :: __forall [i p] {Outputable.Outputable i, Outputable.Outputable p} => (PrelBase.Bool, Outputable.SDoc) -> [HsMatches.Match i p] -> Outputable.SDoc ;
