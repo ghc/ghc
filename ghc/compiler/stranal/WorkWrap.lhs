@@ -10,8 +10,6 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 import CoreSyn
 import CoreUnfold	( Unfolding, certainlyWillInline )
-import CmdLineOpts	( DynFlags,
-			  dopt_D_verbose_core2core, dopt_D_dump_worker_wrapper )
 import CoreLint		( beginPass, endPass )
 import CoreUtils	( exprType, exprEtaExpandArity )
 import MkId		( mkWorkerId )
@@ -25,6 +23,7 @@ import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
 			)
 import Demand           ( Demand, wwLazy )
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
+import CmdLineOpts
 import WwLib
 import Outputable
 \end{code}
@@ -71,8 +70,8 @@ wwTopBinds dflags us binds
 	let { binds' = workersAndWrappers us binds };
 
 	endPass dflags "Worker Wrapper binds" 
-		(dopt_D_dump_worker_wrapper dflags || 
-                    dopt_D_verbose_core2core dflags) 
+		(dopt Opt_D_dump_worker_wrapper dflags || 
+                    dopt Opt_D_verbose_core2core dflags) 
                 binds'
     }
 \end{code}

@@ -19,31 +19,28 @@ module TcInstUtil (
 #include "HsVersions.h"
 
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
-import HsTypes		( toHsType )
 
-import CmdLineOpts	( DynFlags, dopt_AllowOverlappingInstances )
-import TcMonad
-import Bag		( bagToList, Bag )
+import HscTypes		( InstEnv, ClsInstEnv, DFunId )
 import Class		( Class )
-import Var		( TyVar, Id, idName )
+import Var		( TyVar, Id )
 import VarSet		( unionVarSet, mkVarSet )
 import VarEnv		( TyVarSubstEnv )
 import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
-import Name		( getSrcLoc, nameModule, isLocallyDefined, toRdrName )
+import Name		( getSrcLoc )
 import SrcLoc		( SrcLoc )
 import Type		( Type, ThetaType, splitTyConApp_maybe, 
-			  mkSigmaTy, splitSigmaTy, mkDictTy, splitDictTy,
+			  splitSigmaTy, splitDictTy,
 			  tyVarsOfTypes )
-import PprType		( pprConstraint )
+import PprType		( )
 import Class		( classTyCon )
 import DataCon		( DataCon )
 import TyCon		( TyCon, tyConDataCons )
 import Outputable
-import HscTypes		( InstEnv, ClsInstEnv, DFunId )
 import Unify		( matchTys, unifyTyListsX )
 import UniqFM		( lookupWithDefaultUFM, addToUFM, emptyUFM )
 import Id		( idType )
 import ErrUtils		( Message )
+import CmdLineOpts
 \end{code}
 
 
@@ -369,7 +366,7 @@ addToInstEnv dflags inst_env dfun_id
 	-- (b) they unify, and any sort of overlap is prohibited,
 	-- (c) they unify but neither is more specific than t'other
       |  identical 
-      || (unifiable && not (dopt_AllowOverlappingInstances dflags))
+      || (unifiable && not (dopt Opt_AllowOverlappingInstances dflags))
       || (unifiable && not (ins_item_more_specific || cur_item_more_specific))
       =  failMaB val
 

@@ -28,7 +28,6 @@ import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( dataConSig, dataConFieldLabels, 
 			  dataConSourceArity
 			)
-import Id		( isDataConWrapId_maybe )
 import Type		( isTauTy, mkTyConApp, mkClassPred, boxedTypeKind )
 import Subst		( substTy, substClasses )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,

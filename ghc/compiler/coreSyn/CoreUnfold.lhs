@@ -36,7 +36,7 @@ import CmdLineOpts	( opt_UF_CreationThreshold,
 			  opt_UF_FunAppDiscount,
 		  	  opt_UF_KeenessFactor,
 			  opt_UF_DearOp, opt_UnfoldCasms,
-			  DynFlags, dopt_D_dump_inlinings
+			  DynFlags, DynFlag(..), dopt
 			)
 import CoreSyn
 import PprCore		( pprCoreExpr )
@@ -613,7 +613,7 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
 		
     in    
 #ifdef DEBUG
-    if dopt_D_dump_inlinings dflags then
+    if dopt Opt_D_dump_inlinings dflags then
 	pprTrace "Considering inlining"
 		 (ppr id <+> vcat [text "black listed:" <+> ppr black_listed,
 				   text "occ info:" <+> ppr occ,

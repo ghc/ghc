@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.1 2000/10/11 15:31:43 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.2 2000/10/17 13:22:10 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -16,9 +16,9 @@ import DriverState
 import DriverUtil
 import DriverFlags
 import TmpFiles
+import Module
 import Config
 import Util
-import CmdLineOpts
 
 import IOExts
 import Exception
@@ -173,8 +173,8 @@ findDependency mod imp = do
    let
      (imp_mod, is_source) = 
 	case imp of
-	   MINormal str -> (str, False)
-	   MISource str -> (str, True )	
+	   MINormal str -> (moduleNameString str, False)
+	   MISource str -> (moduleNameString str, True )	
 
      imp_hi = imp_mod ++ '.':hisuf
      imp_hiboot = imp_mod ++ ".hi-boot"

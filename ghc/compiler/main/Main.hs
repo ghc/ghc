@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.5 2000/10/11 16:26:04 simonmar Exp $
+-- $Id: Main.hs,v 1.6 2000/10/17 13:22:11 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -161,6 +161,9 @@ main =
 
 	-- the rest of the arguments are "dynamic"
    srcs <- processArgs dynamic_flags non_static []
+	-- save the "initial DynFlags" away
+   dyn_flags <- readIORef v_DynFlags
+   writeIORef v_InitDynFlags dyn_flags
 
     	-- complain about any unknown flags
    let unknown_flags = [ f | ('-':f) <- srcs ]

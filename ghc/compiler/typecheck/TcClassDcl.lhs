@@ -39,7 +39,6 @@ import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import Class		( classTyVars, classBigSig, classSelIds, classTyCon, Class, ClassOpItem,
 			  DefMeth (..) )
 import Bag		( bagToList )
-import CmdLineOpts      ( dopt_GlasgowExts, opt_WarnMissingMethods, opt_PprStyle_Debug )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
@@ -52,6 +51,7 @@ import Type		( Type, ClassContext, mkTyVarTys, mkDictTys, mkSigmaTy, mkClassPred
 			)
 import Var		( TyVar )
 import VarSet		( mkVarSet, emptyVarSet )
+import CmdLineOpts
 import ErrUtils		( dumpIfSet )
 import Util		( count )
 import Maybes		( seqMaybe, maybeToBool, orElse )
@@ -105,7 +105,7 @@ tcClassDecl1 rec_env
 			tyvar_names fundeps class_sigs def_methods pragmas 
 			sys_names src_loc)
   = 	-- CHECK ARITY 1 FOR HASKELL 1.4
-    doptsTc dopt_GlasgowExts				`thenTc` \ glaExts ->
+    doptsTc Opt_GlasgowExts				`thenTc` \ glaExts ->
     checkTc (glaExts || length tyvar_names == 1)
 	    (classArityErr class_name)			`thenTc_`
 
@@ -211,7 +211,7 @@ tcSuperClasses clas context sc_sel_names
 	-- only the type variable of the class decl.
 
 	-- For std Haskell check that the context constrains only tyvars
-    doptsTc dopt_GlasgowExts			`thenTc` \ glaExts ->
+    doptsTc Opt_GlasgowExts			`thenTc` \ glaExts ->
     (if glaExts then
 	returnTc ()
      else
@@ -561,7 +561,8 @@ mkDefMethRhs is_inst_decl clas inst_tys sel_id loc (DefMeth dm_id)
 mkDefMethRhs is_inst_decl clas inst_tys sel_id loc NoDefMeth
   =  	-- No default method
 	-- Warn only if -fwarn-missing-methods
-    warnTc (is_inst_decl && opt_WarnMissingMethods)
+    doptsTc Opt_WarnMissingMethods  `thenNF_Tc` \ warn -> 
+    warnTc (is_inst_decl && warn)
    	   (omittedMethodWarn sel_id clas)		`thenNF_Tc_`
     returnTc error_rhs
   where

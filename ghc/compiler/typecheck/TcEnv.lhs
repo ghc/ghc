@@ -47,7 +47,6 @@ import Var		( TyVar, Id, setVarName,
 			  idType, lazySetIdInfo, idInfo, tyVarKind, UVar,
 			)
 import VarSet
-import VarEnv		( TyVarSubstEnv )
 import Type		( Kind, Type, superKind,
 			  tyVarsOfType, tyVarsOfTypes,
 			  splitForAllTys, splitRhoTy, splitFunTys,
@@ -65,7 +64,6 @@ import Name		( Name, OccName, NamedThing(..),
 			)
 import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
 import Module		( Module )
-import Unify		( unifyTyListsX, matchTys )
 import HscTypes		( ModDetails(..), InstEnv, lookupTypeEnv, TyThing(..),
 			  GlobalSymbolTable, Provenance(..) )
 import Unique		( pprUnique10, Unique, Uniquable(..) )
@@ -74,7 +72,6 @@ import Unique		( Uniquable(..) )
 import Util		( zipEqual, zipWith3Equal, mapAccumL )
 import SrcLoc		( SrcLoc )
 import FastString	( FastString )
-import Maybes
 import Outputable
 import TcInstUtil	( emptyInstEnv )
 

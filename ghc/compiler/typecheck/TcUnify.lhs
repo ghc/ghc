@@ -17,15 +17,15 @@ module TcUnify ( unifyTauTy, unifyTauTyList, unifyTauTyLists,
 -- friends: 
 import TcMonad
 import TypeRep	( Type(..), PredType(..) )  -- friend
-import Type	( funTyCon, Kind, unboxedTypeKind, boxedTypeKind, openTypeKind, 
-		  superBoxity, typeCon, openKindCon, hasMoreBoxityInfo, 
+import Type	( unboxedTypeKind, boxedTypeKind, openTypeKind, 
+		  typeCon, openKindCon, hasMoreBoxityInfo, 
 		  tyVarsOfType, typeKind,
-		  mkTyVarTy, mkFunTy, splitFunTy_maybe, splitTyConApp_maybe,
+		  mkFunTy, splitFunTy_maybe, splitTyConApp_maybe,
                   isNotUsgTy, splitAppTy_maybe, mkTyConApp, 
 	   	  tidyOpenType, tidyOpenTypes, tidyTyVar
 		)
 import TyCon	( TyCon, isTupleTyCon, tupleTyConBoxity, tyConArity )
-import Var	( TyVar, tyVarKind, varName, isSigTyVar )
+import Var	( tyVarKind, varName, isSigTyVar )
 import VarSet	( varSetElems )
 import TcType	( TcType, TcTauType, TcTyVar, TcKind, newBoxityVar,
 		  newTyVarTy, newTyVarTys, tcGetTyVar, tcPutTyVar, zonkTcType

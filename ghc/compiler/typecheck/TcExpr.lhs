@@ -57,7 +57,6 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTys, ipName_maybe,
 			)
 import TyCon		( TyCon, tyConTyVars )
 import Subst		( mkTopTyVarSubst, substClasses, substTy )
-import UsageSPUtils     ( unannotTy )
 import VarSet		( elemVarSet, mkVarSet )
 import TysWiredIn	( boolTy )
 import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
@@ -71,7 +70,7 @@ import Outputable
 import Maybes		( maybeToBool, mapMaybe )
 import ListSetOps	( minusList )
 import Util
-import CmdLineOpts      ( opt_WarnMissingFields )
+import CmdLineOpts
 import HscTypes		( TyThing(..) )
 
 \end{code}
@@ -419,7 +418,8 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
     let
       missing_fields = missingFields rbinds data_con
     in
-    checkTcM (not (opt_WarnMissingFields && not (null missing_fields)))
+    doptsTc Opt_WarnMissingFields `thenNF_Tc` \ warn ->
+    checkTcM (not (warn && not (null missing_fields)))
 	(mapNF_Tc ((warnTc True) . missingFieldCon con_name) missing_fields `thenNF_Tc_`
 	 returnNF_Tc ())  `thenNF_Tc_`
 

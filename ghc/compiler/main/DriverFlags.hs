@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.4 2000/10/16 14:26:26 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.5 2000/10/17 13:22:10 simonmar Exp $
 --
 -- Driver flags
 --
@@ -297,7 +297,8 @@ static_flags =
 -----------------------------------------------------------------------------
 -- parse the dynamic arguments
 
-GLOBAL_VAR(v_DynFlags, error "no dynFlags", DynFlags)
+GLOBAL_VAR(v_InitDynFlags, error "no InitDynFlags", DynFlags)
+GLOBAL_VAR(v_DynFlags, error "no DynFlags", DynFlags)
 
 setDynFlag f = do
    dfs <- readIORef v_DynFlags
@@ -363,6 +364,23 @@ dynamic_flags = [
   ,  ( "DoCoreLinting",       	 NoArg (setDynFlag Opt_DoCoreLinting) )
   ,  ( "DoStgLinting",        	 NoArg (setDynFlag Opt_DoStgLinting) )
   ,  ( "DoUSPLinting",        	 NoArg (setDynFlag Opt_DoUSPLinting) )
+
+	------ Warnings ----------------------------------------------------
+
+  ,  ( "-fwarn-duplicate-exports", NoArg (setDynFlag Opt_WarnDuplicateExports) )
+  ,  ( "-fwarn-hi-shadowing",      NoArg (setDynFlag Opt_WarnHiShadows) )
+  ,  ( "-fwarn-incomplete-patterns",  NoArg (setDynFlag Opt_WarnIncompletePatterns) )
+  ,  ( "-fwarn-missing-fields",    NoArg (setDynFlag Opt_WarnMissingFields) )
+  ,  ( "-fwarn-missing-methods",   NoArg (setDynFlag Opt_WarnMissingMethods))
+  ,  ( "-fwarn-missing-signatures", NoArg (setDynFlag Opt_WarnMissingSigs) )
+  ,  ( "-fwarn-name-shadowing",    NoArg (setDynFlag Opt_WarnNameShadowin) )
+  ,  ( "-fwarn-overlapping-patterns", NoArg (setDynFlag Opt_WarnOverlappingPatterns )) )
+  ,  ( "-fwarn-simple-patterns",   NoArg (setDynFlag Opt_WarnSimplePatterns))
+  ,  ( "-fwarn-type-defaults",     NoArg (setDynFlag Opt_WarnTypeDefaults) )
+  ,  ( "-fwarn-unused-binds",      NoArg (setDynFlag Opt_WarnUnusedBinds) )
+  ,  ( "-fwarn-unused-imports",    NoArg (setDynFlag Opt_WarnUnusedImports) )
+  ,  ( "-fwarn-unused-matches",    NoArg (setDynFlag Opt_WarnUnusedMatches) )
+  ,  ( "-fwarn-deprecations",      NoArg (setDynFlag Opt_WarnDeprecations) )
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
 
@@ -447,12 +465,6 @@ build_hsc_opts = do
 
   static <- (do s <- readIORef static; if s then return "-static" else return "")
 
-  l <- readIORef hsc_lang
-  let lang = case l of
-		HscC    -> "-olang=C"
-		HscAsm  -> "-olang=asm"
-		HscJava -> "-olang=java"
-
   -- get hi-file suffix
   hisuf <- readIORef hi_suf
 
@@ -466,27 +478,8 @@ build_hsc_opts = do
   import_dirs <- readIORef import_paths
   package_import_dirs <- getPackageImportPath
   
-  let hi_map = "-himap=" ++
-		makeHiMap import_dirs hisuf 
-			 package_import_dirs package_hisuf
-		   	 split_marker
-
-      hi_map_sep = "-himap-sep=" ++ [split_marker]
-
   return 
 	(  
 	filtered_opts
-	++ [ hi_vers, static, verb, lang, hi_map, hi_map_sep ]
+	++ [ hi_vers, static, verb ]
 	)
-
-makeHiMap 
-  (import_dirs         :: [String])
-  (hi_suffix           :: String)
-  (package_import_dirs :: [String])
-  (package_hi_suffix   :: String)   
-  (split_marker        :: Char)
-  = foldr (add_dir hi_suffix) 
-	(foldr (add_dir package_hi_suffix) "" package_import_dirs)
-	import_dirs
-  where
-     add_dir hisuf dir str = dir ++ "%." ++ hisuf ++ split_marker : str

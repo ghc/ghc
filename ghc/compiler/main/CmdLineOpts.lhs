@@ -18,67 +18,15 @@ module CmdLineOpts (
 	switchIsOn,
 	isStaticHscFlag,
 
-	-- debugging opts
-	dopt_D_dump_absC,
-	dopt_D_dump_asm,
-	dopt_D_dump_cpranal,
-	dopt_D_dump_cse,
-	dopt_D_dump_deriv,
-	dopt_D_dump_ds,
-	dopt_D_dump_flatC,
-	dopt_D_dump_foreign,
-	dopt_D_dump_hi_diffs,
-	dopt_D_dump_inlinings,
-	dopt_D_dump_occur_anal,
-	dopt_D_dump_parsed,
-	dopt_D_dump_realC,
-	dopt_D_dump_rn,
-	dopt_D_dump_rules,
-	dopt_D_dump_simpl,
-	dopt_D_dump_simpl_iterations,
-	dopt_D_dump_simpl_stats,
-	dopt_D_dump_spec,
-	dopt_D_dump_stg,
-	dopt_D_dump_stranal,
-	dopt_D_dump_tc,
-	dopt_D_dump_types,
-        dopt_D_dump_usagesp,
-	dopt_D_dump_worker_wrapper,
-	dopt_D_show_passes,
-	dopt_D_dump_rn_trace,
-	dopt_D_dump_rn_stats,
-        dopt_D_dump_stix,
-	dopt_D_dump_minimal_imports,
-	dopt_D_source_stats,
-	dopt_D_verbose_core2core,
-	dopt_D_verbose_stg2stg,
-	dopt_DoCoreLinting,
-	dopt_DoStgLinting,
-        dopt_DoUSPLinting,
-
 	opt_PprStyle_NoPrags,
 	opt_PprUserLength,
 	opt_PprStyle_Debug,
 
+	dopt,
+
 	-- other dynamic flags
 	dopt_CoreToDo,
 	dopt_StgToDo,
-
-	-- warning opts
-	opt_WarnDuplicateExports,
-	opt_WarnHiShadows,
-	opt_WarnIncompletePatterns,
-	opt_WarnMissingFields,
-	opt_WarnMissingMethods,
-	opt_WarnMissingSigs,
-	opt_WarnNameShadowing,
-	opt_WarnOverlappingPatterns,
-	opt_WarnSimplePatterns,
-	opt_WarnTypeDefaults,
-	opt_WarnUnusedBinds,
-	opt_WarnUnusedImports,
-	opt_WarnUnusedMatches,
-	opt_WarnDeprecations,
 
 	-- profiling opts
 	opt_AutoSccsOnAllToplevs,
@@ -92,9 +40,6 @@ module CmdLineOpts (
 	opt_AllStrict,
 	opt_DictsStrict,
         opt_MaxContextReductionDepth,
-        dopt_AllowOverlappingInstances,
- 	dopt_AllowUndecidableInstances,
-	dopt_GlasgowExts,
 	opt_Generics,
 	opt_IrrefutableTuples,
 	opt_NumbersStrict,
@@ -237,7 +182,7 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
   | CoreDoUSPInf
-  | CoreDoCPResult 
+  | CoreDoCPResult
   | CoreDoGlomBinds
   | CoreCSE
 
@@ -312,6 +257,21 @@ data DynFlag
    | Opt_DoStgLinting
    | Opt_DoUSPLinting
 
+   | Opt_WarnDuplicateExports
+   | Opt_WarnHiShadows
+   | Opt_WarnIncompletePatterns
+   | Opt_WarnMissingFields
+   | Opt_WarnMissingMethods
+   | Opt_WarnMissingSigs
+   | Opt_WarnNameShadowing
+   | Opt_WarnOverlappingPatterns
+   | Opt_WarnSimplePatterns
+   | Opt_WarnTypeDefaults
+   | Opt_WarnUnusedBinds
+   | Opt_WarnUnusedImports
+   | Opt_WarnUnusedMatches
+   | Opt_WarnDeprecations
+
    -- language opts
    | Opt_AllowOverlappingInstances
    | Opt_AllowUndecidableInstances
@@ -325,51 +285,8 @@ data DynFlags = DynFlags {
   flags    :: [DynFlag]
  }
 
-boolOpt :: DynFlag -> DynFlags -> Bool
-boolOpt f dflags  = f `elem` (flags dflags)
-
-dopt_D_dump_all              = boolOpt Opt_D_dump_all
-dopt_D_dump_most             = boolOpt Opt_D_dump_most
-dopt_D_dump_absC             = boolOpt Opt_D_dump_absC
-dopt_D_dump_asm              = boolOpt Opt_D_dump_asm
-dopt_D_dump_cpranal          = boolOpt Opt_D_dump_cpranal
-dopt_D_dump_deriv            = boolOpt Opt_D_dump_deriv
-dopt_D_dump_ds               = boolOpt Opt_D_dump_ds
-dopt_D_dump_flatC            = boolOpt Opt_D_dump_flatC
-dopt_D_dump_foreign          = boolOpt Opt_D_dump_foreign
-dopt_D_dump_inlinings        = boolOpt Opt_D_dump_inlinings
-dopt_D_dump_occur_anal       = boolOpt Opt_D_dump_occur_anal
-dopt_D_dump_parsed           = boolOpt Opt_D_dump_parsed
-dopt_D_dump_realC            = boolOpt Opt_D_dump_realC
-dopt_D_dump_rn               = boolOpt Opt_D_dump_rn
-dopt_D_dump_simpl            = boolOpt Opt_D_dump_simpl
-dopt_D_dump_simpl_iterations = boolOpt Opt_D_dump_simpl_iterations
-dopt_D_dump_spec             = boolOpt Opt_D_dump_spec
-dopt_D_dump_stg              = boolOpt Opt_D_dump_stg
-dopt_D_dump_stranal          = boolOpt Opt_D_dump_stranal
-dopt_D_dump_tc               = boolOpt Opt_D_dump_tc
-dopt_D_dump_types            = boolOpt Opt_D_dump_types
-dopt_D_dump_rules            = boolOpt Opt_D_dump_rules
-dopt_D_dump_usagesp          = boolOpt Opt_D_dump_usagesp
-dopt_D_dump_cse              = boolOpt Opt_D_dump_cse
-dopt_D_dump_worker_wrapper   = boolOpt Opt_D_dump_worker_wrapper
-dopt_D_show_passes           = boolOpt Opt_D_show_passes
-dopt_D_dump_rn_trace         = boolOpt Opt_D_dump_rn_trace
-dopt_D_dump_rn_stats         = boolOpt Opt_D_dump_rn_stats
-dopt_D_dump_stix             = boolOpt Opt_D_dump_stix
-dopt_D_dump_simpl_stats      = boolOpt Opt_D_dump_simpl_stats
-dopt_D_source_stats          = boolOpt Opt_D_source_stats
-dopt_D_verbose_core2core     = boolOpt Opt_D_verbose_core2core
-dopt_D_verbose_stg2stg       = boolOpt Opt_D_verbose_stg2stg
-dopt_D_dump_hi_diffs         = boolOpt Opt_D_dump_hi_diffs
-dopt_D_dump_minimal_imports  = boolOpt Opt_D_dump_minimal_imports
-dopt_DoCoreLinting           = boolOpt Opt_DoCoreLinting
-dopt_DoStgLinting            = boolOpt Opt_DoStgLinting
-dopt_DoUSPLinting            = boolOpt Opt_DoUSPLinting
-
-dopt_AllowOverlappingInstances = boolOpt Opt_AllowOverlappingInstances
-dopt_AllowUndecidableInstances = boolOpt Opt_AllowUndecidableInstances
-dopt_GlasgowExts               = boolOpt Opt_GlasgowExts
+dopt :: DynFlag -> DynFlags -> Bool
+dopt f dflags  = f `elem` (flags dflags)
 
 dopt_CoreToDo :: DynFlags -> CoreToDo
 dopt_CoreToDo = coreToDo
@@ -381,6 +298,7 @@ data HscLang
   = HscC
   | HscAsm
   | HscJava
+  | HscInterpreter
   deriving Eq
 
 dopt_HscLang :: DynFlags -> HscLang
@@ -451,22 +369,6 @@ opt_PprStyle_NoPrags		= lookUp  SLIT("-dppr-noprags")
 opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 
--- warning opts
-opt_WarnDuplicateExports	= lookUp  SLIT("-fwarn-duplicate-exports")
-opt_WarnHiShadows		= lookUp  SLIT("-fwarn-hi-shadowing")
-opt_WarnIncompletePatterns	= lookUp  SLIT("-fwarn-incomplete-patterns")
-opt_WarnMissingFields		= lookUp  SLIT("-fwarn-missing-fields")
-opt_WarnMissingMethods		= lookUp  SLIT("-fwarn-missing-methods")
-opt_WarnMissingSigs		= lookUp  SLIT("-fwarn-missing-signatures")
-opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
-opt_WarnOverlappingPatterns	= lookUp  SLIT("-fwarn-overlapping-patterns")
-opt_WarnSimplePatterns	     	= lookUp  SLIT("-fwarn-simple-patterns")
-opt_WarnTypeDefaults		= lookUp  SLIT("-fwarn-type-defaults")
-opt_WarnUnusedBinds		= lookUp  SLIT("-fwarn-unused-binds")
-opt_WarnUnusedImports		= lookUp  SLIT("-fwarn-unused-imports")
-opt_WarnUnusedMatches		= lookUp  SLIT("-fwarn-unused-matches")
-opt_WarnDeprecations		= lookUp  SLIT("-fwarn-deprecations")
-
 -- profiling opts
 opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
@@ -495,7 +397,7 @@ opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
 opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
 
 {-
-   The optional '-inpackage=P' flag tells what package 
+   The optional '-inpackage=P' flag tells what package
    we are compiling this module for.
    The Prelude, for example is compiled with '-package prelude'
 -}
@@ -561,22 +463,8 @@ opt_UseLongRegs    | opt_Unregisterised = 0
 %************************************************************************
 
 \begin{code}
-isStaticHscFlag f = 
+isStaticHscFlag f =
   f `elem` [
-	"-fwarn-duplicate-exports",
-	"-fwarn-hi-shadowing",
-	"-fwarn-incomplete-patterns",
-	"-fwarn-missing-fields",
-	"-fwarn-missing-methods",
-	"-fwarn-missing-signatures",
-	"-fwarn-name-shadowing",
-	"-fwarn-overlapping-patterns",
-	"-fwarn-simple-patterns",
-	"-fwarn-type-defaults",
-	"-fwarn-unused-binds",
-	"-fwarn-unused-imports",
-	"-fwarn-unused-matches",
-	"-fwarn-deprecations",
 	"-fauto-sccs-on-all-toplevs",
 	"-fauto-sccs-on-exported-toplevs",
 	"-fauto-sccs-on-individual-cafs",
@@ -701,7 +589,7 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 #endif
     }
   where
-    mk_assoc_elem k@(MaxSimplifierIterations lvl) 
+    mk_assoc_elem k@(MaxSimplifierIterations lvl)
 	= (iBox (tagOf_SimplSwitch k), SwInt lvl)
     mk_assoc_elem k@(SimplInlinePhase n)
 	= (iBox (tagOf_SimplSwitch k), SwInt n)

@@ -110,7 +110,7 @@ import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys,
 			  TauType, ClassContext )
 import Unique		( incrUnique, mkTupleTyConUnique, mkTupleDataConUnique )
 import PrelNames
-import CmdLineOpts      ( DynFlags, dopt_GlasgowExts )
+import CmdLineOpts
 import Array
 
 alpha_tyvar	  = [alphaTyVar]
@@ -481,7 +481,7 @@ legalOutgoingTyCon dflags be_safe tc
   = marshalableTyCon dflags tc
 
 marshalableTyCon dflags tc
-  =  (dopt_GlasgowExts dflags && isUnLiftedTyCon tc)
+  =  (dopt Opt_GlasgowExts dflags && isUnLiftedTyCon tc)
   || boxedMarshalableTyCon tc
 
 boxedMarshalableTyCon tc

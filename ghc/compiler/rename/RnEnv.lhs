@@ -8,8 +8,6 @@ module RnEnv where		-- Export everything
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_WarnNameShadowing, opt_WarnUnusedMatches,
-			  opt_WarnUnusedBinds, opt_WarnUnusedImports )
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
@@ -40,6 +38,7 @@ import ListSetOps	( removeDups, equivClasses )
 import Util		( thenCmp, sortLt )
 import List		( nub )
 import PrelNames	( mkUnboundName )
+import CmdLineOpts
 \end{code}
 
 
@@ -319,9 +318,11 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 	-- Check for duplicate names
     checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
 
+    doptRn Opt_WarnNameShadowing `thenRn` \ warn_shadow ->
+
     	-- Warn about shadowing, but only in source modules
     (case mode of
-	SourceMode | opt_WarnNameShadowing -> mapRn_ (check_shadow name_env) rdr_names_w_loc
+	SourceMode | warn_shadow -> mapRn_ (check_shadow name_env) rdr_names_w_loc
 	other				   -> returnRn ()
     )					`thenRn_`
 	
@@ -683,8 +684,9 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 \begin{code}
 warnUnusedModules :: [Module] -> RnM d ()
 warnUnusedModules mods
-  | not opt_WarnUnusedImports = returnRn ()
-  | otherwise 		      = mapRn_ (addWarnRn . unused_mod . moduleName) mods
+  = doptRn Opt_WarnUnusedImports `thenRn` \ warn ->
+    if warn then mapRn_ (addWarnRn . unused_mod . moduleName) mods
+	    else returnRn ()
   where
     unused_mod m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
 			   text "is imported, but nothing from it is used",
@@ -693,19 +695,19 @@ warnUnusedModules mods
 
 warnUnusedImports :: [(Name,Provenance)] -> RnM d ()
 warnUnusedImports names
-  | not opt_WarnUnusedImports
-  = returnRn () 	-- Don't force names unless necessary
-  | otherwise
-  = warnUnusedBinds names
+  = doptRn Opt_WarnUnusedImports `thenRn` \ warn ->
+    if warn then warnUnusedBinds names else return ()
 
 warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM d ()
 warnUnusedLocalBinds names
-  | not opt_WarnUnusedBinds = returnRn ()
-  | otherwise		    = warnUnusedBinds [(n,LocalDef) | n<-names]
+  = doptRn Opt_WarnUnusedBinds `thenRn` \ warn ->
+    if warn then warnUnusedBinds [(n,LocalDef) | n<-names]
+	    else returnRn ()
 
 warnUnusedMatches names
-  | opt_WarnUnusedMatches = warnUnusedGroup [(n,LocalDef) | n<-names]
-  | otherwise 		  = returnRn ()
+  = doptRn Opt_WarnUnusedMatches `thenRn` \ warn ->
+    if warn then warnUnusedGroup [(n,LocalDef) | n<-names]
+	    else returnRn ()
 
 -------------------------
 

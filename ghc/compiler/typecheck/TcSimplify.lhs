@@ -123,7 +123,6 @@ module TcSimplify (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_MaxContextReductionDepth, dopt_GlasgowExts, opt_WarnTypeDefaults )
 import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
 import TcHsSyn		( TcExpr, TcId, 
 			  TcMonoBinds, TcDictBinds
@@ -167,6 +166,7 @@ import Util		( zipEqual, mapAccumL )
 import List		( partition )
 import Maybe		( fromJust )
 import Maybes		( maybeToBool )
+import CmdLineOpts
 \end{code}
 
 
@@ -848,7 +848,7 @@ tcSimplifyThetas :: ClassContext		-- Wanted
 	       	 -> TcM ClassContext		-- Needed
 
 tcSimplifyThetas wanteds
-  = doptsTc dopt_GlasgowExts 		`thenNF_Tc` \ glaExts ->
+  = doptsTc Opt_GlasgowExts 		`thenNF_Tc` \ glaExts ->
     reduceSimple [] wanteds		`thenNF_Tc` \ irreds ->
     let
 	-- For multi-param Haskell, check that the returned dictionaries
@@ -1226,11 +1226,9 @@ addAmbigErr ambig_tv_fn dict
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 warnDefault dicts default_ty
-  | not opt_WarnTypeDefaults
-  = returnNF_Tc ()
+  = doptsTc Opt_WarnTypeDefaults  `thenTc` \ warn ->
+    if warn then warnTc True msg else returnNF_Tc ()
 
-  | otherwise
-  = warnTc True msg
   where
     msg | length dicts > 1 
 	= (ptext SLIT("Defaulting the following constraint(s) to type") <+> quotes (ppr default_ty))

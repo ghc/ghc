@@ -51,7 +51,7 @@ import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			)
 import Module		( Module, ModuleName, WhereFrom, moduleName )
 import NameSet		
-import CmdLineOpts	( DynFlags, dopt_D_dump_rn_trace )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import SrcLoc		( SrcLoc, generatedSrcLoc )
 import Unique		( Unique )
 import FiniteMap	( FiniteMap, emptyFM, listToFM, plusFM )
@@ -85,7 +85,7 @@ ioToRnM io rn_down g_down = (io >>= \ ok -> return (Right ok))
 	    
 traceRn :: SDoc -> RnM d ()
 traceRn msg
-   = doptsRn dopt_D_dump_rn_trace `thenRn` \b ->
+   = doptRn Opt_D_dump_rn_trace `thenRn` \b ->
      if b then putDocRn msg else returnRn ()
 
 putDocRn :: SDoc -> RnM d ()
@@ -514,9 +514,9 @@ checkErrsRn (RnDown {rn_errs = errs_var}) l_down
   = readIORef  errs_var  				 	>>=  \ (warns,errs) ->
     return (isEmptyBag errs)
 
-doptsRn :: (DynFlags -> Bool) -> RnM d Bool
-doptsRn dopt (RnDown { rn_dflags = dflags}) l_down
-   = return (dopt dflags)
+doptRn :: DynFlag -> RnM d Bool
+doptRn dflag (RnDown { rn_dflags = dflags}) l_down
+   = return (dopt dflag dflags)
 \end{code}
 
 

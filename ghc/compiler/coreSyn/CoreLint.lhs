@@ -14,8 +14,6 @@ module CoreLint (
 
 import IO		( hPutStr, hPutStrLn, stdout )
 
-import CmdLineOpts      ( DynFlags, dopt_D_show_passes, dopt_DoCoreLinting, 
-			  opt_PprStyle_Debug )
 import CoreSyn
 import Rules            ( RuleBase, pprRuleBase )
 import CoreFVs		( idFreeVars, mustHaveLocalBinding )
@@ -42,6 +40,7 @@ import Type		( Type, tyVarsOfType,
 			)
 import TyCon		( TyCon, isPrimTyCon, tyConDataCons )
 import BasicTypes	( RecFlag(..), isNonRec )
+import CmdLineOpts
 import Maybe
 import Outputable
 
@@ -61,7 +60,7 @@ and do Core Lint when necessary.
 \begin{code}
 beginPass :: DynFlags -> String -> IO ()
 beginPass dflags pass_name
-  | dopt_D_show_passes dflags
+  | dopt Opt_D_show_passes dflags
   = hPutStrLn stdout ("*** " ++ pass_name)
   | otherwise
   = return ()
@@ -81,7 +80,7 @@ endPassWithRules dflags pass_name dump_flag binds rules
 
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
-	if dopt_D_show_passes dflags then
+	if dopt Opt_D_show_passes dflags then
 	   hPutStrLn stdout ("    Result size = " ++ show (coreBindsSize binds))
 	 else
 	   return ()
@@ -134,7 +133,7 @@ Outstanding issues:
 lintCoreBindings :: DynFlags -> String -> [CoreBind] -> IO ()
 
 lintCoreBindings dflags whoDunnit binds
-  | not (dopt_DoCoreLinting dflags)
+  | not (dopt Opt_DoCoreLinting dflags)
   = return ()
 
 lintCoreBindings dflags whoDunnit binds
@@ -157,7 +156,7 @@ lintCoreBindings dflags whoDunnit binds
 				  returnL ()
     lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
 
-    done_lint = doIfSet_dyn dflags dopt_D_show_passes
+    done_lint = doIfSet_dyn dflags (dopt Opt_D_show_passes)
 		        (hPutStr stdout ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
     warn warnings
       = vcat [
@@ -198,7 +197,7 @@ lintUnfolding :: DynFlags
 	      -> (Maybe Message, Maybe Message)		-- (Nothing,_) => OK
 
 lintUnfolding dflags locn vars expr
-  | not (dopt_DoCoreLinting dflags)
+  | not (dopt Opt_DoCoreLinting dflags)
   = (Nothing, Nothing)
 
   | otherwise

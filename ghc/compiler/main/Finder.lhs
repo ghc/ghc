@@ -7,7 +7,8 @@
 module Finder (
     Finder, 		-- =  ModuleName -> IO (Maybe (Module, ModuleLocation))
     newFinder, 		-- :: PackageConfigInfo -> IO Finder, 
-    ModuleLocation(..)
+    ModuleLocation(..),
+    mkHomeModuleLocn
   ) where
 
 #include "HsVersions.h"
@@ -116,28 +117,28 @@ maybeHomeModule mod_name = do
        lhs = basename ++ ".lhs"
 
    case lookupFM home_cache hs of {
-	Just path -> mkHomeModuleLocn mod_name basename path hs;
+	Just path -> mkHomeModuleLocn mod_name (path ++ '/':basename) hs;
 	Nothing ->
 
    case lookupFM home_cache lhs of {
-	Just path ->  mkHomeModuleLocn mod_name basename path lhs;
+	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename) lhs;
 	Nothing -> return Nothing
 
    }}
 
-mkHomeModuleLocn mod_name basename path source_fn = do
+mkHomeModuleLocn mod_name basename source_fn = do
 
    -- figure out the .hi file name: it lives in the same dir as the
    -- source, unless there's a -ohi flag on the command line.
    ohi    <- readIORef output_hi
    hisuf  <- readIORef hi_suf
    let hifile = case ohi of
-		   Nothing -> path ++ '/':basename ++ hisuf
+		   Nothing -> basename ++ hisuf
 		   Just fn -> fn
 
    -- figure out the .o file name.  It also lives in the same dir
    -- as the source, but can be overriden by a -odir flag.
-   o_file <- odir_ify (path ++ '/':basename ++ '.':phaseInputExt Ln)
+   o_file <- odir_ify (basename ++ '.':phaseInputExt Ln)
 
    return (Just (mkHomeModule mod_name,
                  ModuleLocation{

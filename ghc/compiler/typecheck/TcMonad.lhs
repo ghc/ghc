@@ -51,7 +51,6 @@ import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr, RenamedHsOverL
 import Type		( Type, Kind, PredType, ThetaType, RhoType, TauType,
 			)
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
-import CmdLineOpts      ( DynFlags, opt_PprStyle_Debug )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
@@ -63,13 +62,12 @@ import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, 
 			  splitUniqSupply, mkSplitUniqSupply,
 			  UniqSM, initUs_ )
-import SrcLoc		( SrcLoc, noSrcLoc )
+import SrcLoc		( SrcLoc )
 import FiniteMap	( FiniteMap, lookupFM, addToFM, emptyFM )
-import UniqFM		( UniqFM, emptyUFM )
+import UniqFM		( emptyUFM )
 import Unique		( Unique )
-import BasicTypes	( Unused )
+import CmdLineOpts
 import Outputable
-import FastString	( FastString )
 
 import IOExts		( IORef, newIORef, readIORef, writeIORef,
 			  unsafeInterleaveIO, fixIO
@@ -636,9 +634,9 @@ getErrCtxt (TcDown{tc_ctxt=ctxt}) = ctxt
 setErrCtxt down msg = down{tc_ctxt=[msg]}
 addErrCtxt down msg = down{tc_ctxt = msg : tc_ctxt down}
 
-doptsTc :: (DynFlags -> Bool) -> TcM Bool
-doptsTc dopt (TcDown{tc_dflags=dflags}) env_down
-   = return (dopt dflags)
+doptsTc :: DynFlag -> TcM Bool
+doptsTc dflag (TcDown{tc_dflags=dflags}) env_down
+   = return (dopt dflag dflags)
 
 getDOptsTc :: TcM DynFlags
 getDOptsTc (TcDown{tc_dflags=dflags}) env_down
