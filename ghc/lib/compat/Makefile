@@ -12,6 +12,9 @@ ALL_DIRS = \
 
 LIBRARY = libghccompat.a
 
+# We don't want this installed
+NO_INSTALL_LIBRARY = YES
+
 # Just to silence warnings
 MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
