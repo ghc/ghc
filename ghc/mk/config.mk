@@ -1,7 +1,9 @@
 #
 # GHC project configuration
 #
-#  
+# This file can only be included from the top of
+# an fptools/ build tree, since the version.mk 'include'
+# reaches in and grabs the project-specific settings.
 
 # what to include in a binary distribution
 GhcMainDir = ghc
@@ -11,4 +13,4 @@ GhcBinDistPrlScripts = ghc-$(ProjectVersion) stat2resid hstags mkdependHS
 GhcBinDistLibPrlScripts = hscpp
 GhcBinDistBins = hp2ps
 
-include version.mk
+include $(GhcMainDir)/mk/version.mk
