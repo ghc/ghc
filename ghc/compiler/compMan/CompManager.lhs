@@ -1127,7 +1127,8 @@ downsweep dflags roots old_summaries
 
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc mod_nm err
-  = ProgramError (showSDoc (noIfaceErr dflags mod_nm err))
+  = ProgramError (showSDoc (hang (text loc <> colon) 4 $
+				noIfaceErr dflags mod_nm err))
 
 -----------------------------------------------------------------------------
 -- Summarising modules
