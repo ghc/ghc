@@ -6,6 +6,9 @@
 /* Define as the return type of signal handlers (int or void).  */
 #undef RETSIGTYPE
 
+/* Define as the type of timezone.  */
+#undef TYPE_TIMEZONE
+
 /* Define if you have the ANSI C header files.  */
 #undef STDC_HEADERS
 
