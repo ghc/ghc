@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.49 2001/09/26 15:11:50 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.50 2001/10/03 13:59:22 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -741,6 +741,3 @@ chooseDynCostCentres ccs args fvs body
     in
     (use_cc, blame_cc)
 \end{code}
-
-
-
