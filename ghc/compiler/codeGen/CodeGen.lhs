@@ -83,7 +83,7 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
 	mkAbstractCs [
 		mkAbstractCs [mkAbstractCs (map (CCostCentreDecl True)  local_CCs),
 				   mkAbstractCs (map (CCostCentreDecl False) extern_CCs),
-				   mkCcRegister local_CCs import_names]],
+				   mkCcRegister local_CCs import_names],
 		genStaticConBits cinfo gen_tycons tycon_specs,
 		initC cinfo (cgTopBindings maybe_split stg_pgm) ]
   where
