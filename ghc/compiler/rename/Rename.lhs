@@ -89,7 +89,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls loc
 
 
 \begin{code}
-rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
+rename this_mod@(HsModule mod_name vers _ imports local_decls loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
 
@@ -130,8 +130,8 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
     else
 
 	-- GENERATE THE VERSION/USAGE INFO
-    getImportVersions mod_name exports			`thenRn` \ my_usages ->
-    getNameSupplyRn					`thenRn` \ name_supply ->
+    getImportVersions mod_name export_env	`thenRn` \ my_usages ->
+    getNameSupplyRn				`thenRn` \ name_supply ->
 
 	-- REPORT UNUSED NAMES
     reportUnusedNames gbl_env global_avail_env
@@ -211,9 +211,20 @@ isOrphanDecl (InstD (InstDecl inst_ty _ _ _ _))
 isOrphanDecl (RuleD (RuleDecl _ _ _ lhs _ _))
   = check lhs
   where
-    check (HsVar v)   = not (isLocallyDefined v)
-    check (HsApp f a) = check f && check a
-    check other	      = True
+	-- At the moment we just check for common LHS forms
+	-- Expand as necessary.  Getting it wrong just means
+	-- more orphans than necessary
+    check (HsVar v)   	  = not (isLocallyDefined v)
+    check (HsApp f a) 	  = check f && check a
+    check (HsLit _)   	  = False
+    check (OpApp l o _ r) = check l && check o && check r
+    check (NegApp e _)    = check e
+    check (HsPar e)	  = check e
+    check (SectionL e o)  = check e && check o
+    check (SectionR o e)  = check e && check o
+
+    check other	      	  = True 	-- Safe fall through
+
 isOrphanDecl other = False
 \end{code}
 
@@ -479,7 +490,7 @@ getInstDeclGates other				    = emptyFVs
 %*********************************************************
 
 \begin{code}
-reportUnusedNames gbl_env avail_env (ExportEnv export_avails _) mentioned_names
+reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_names
   = let
 	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
 

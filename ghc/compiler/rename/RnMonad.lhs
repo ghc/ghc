@@ -218,7 +218,10 @@ type RnNameSupply
 
 
 --------------------------------
-data ExportEnv	  = ExportEnv Avails Fixities
+data ExportEnv	  = ExportEnv Avails Fixities [ModuleName]
+			-- The list of modules is the modules exported
+			-- with 'module M' in the export list
+
 type Avails	  = [AvailInfo]
 type Fixities	  = [(Name, Fixity)]
 
@@ -287,7 +290,7 @@ type InterfaceDetails = (WhetherHasOrphans,
 
 -- needed by Main to fish out the fixities assoc list.
 getIfaceFixities :: InterfaceDetails -> Fixities
-getIfaceFixities (_, _, ExportEnv _ fs) = fs
+getIfaceFixities (_, _, ExportEnv _ fs _) = fs
 
 
 type RdrNamePragma = ()				-- Fudge for now
@@ -453,7 +456,9 @@ renameSourceCode mod_name name_supply m
     	let
 	    rn_down = RnDown { rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
 			       rn_errs = errs_var, rn_hi_maps = himaps,
-			       rn_mod = mod_name }
+			       rn_mod = mod_name, 
+			       rn_ifaces = panic "rnameSourceCode: rn_ifaces"  -- Not required
+			     }
 	    s_down = SDown { rn_mode = InterfaceMode,
 			       -- So that we can refer to PrelBase.True etc
 			     rn_genv = emptyRdrEnv, rn_lenv = emptyRdrEnv,

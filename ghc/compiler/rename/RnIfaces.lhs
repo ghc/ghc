@@ -40,7 +40,7 @@ import RnMonad
 import RnHsSyn          ( RenamedHsDecl )
 import ParseIface	( parseIface, IfaceStuff(..) )
 
-import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM,
+import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM, listToFM,
 			  lookupFM, addToFM, addToFM_C, addListToFM, 
 			  fmToList, elemFM, foldFM
 			)
@@ -630,13 +630,13 @@ lookupFixity name
 %*							*
 %*********************************************************
 
-getImportVersions figures out
-what the ``usage information'' for this moudule is;
-that is, what it must record in its interface file as the things it uses.
-It records:
+getImportVersions figures out what the ``usage information'' for this
+moudule is; that is, what it must record in its interface file as the
+things it uses.  It records:
+
 \begin{itemize}
-\item anything reachable from its body code
-\item any module exported with a @module Foo@.
+\item	anything reachable from its body code
+\item	any module exported with a @module Foo@.
 \end{itemize}
 %
 Why the latter?  Because if @Foo@ changes then this module's export list
@@ -650,92 +650,121 @@ What about this?
 	  import B( f )		|	  f = h 3
 	  g = ...		|	  h = ...
 \end{verbatim}
-Should we record @B.f@ in @A@'s usages?  In fact we don't.  Certainly, if
-anything about @B.f@ changes than anyone who imports @A@ should be recompiled;
-they'll get an early exit if they don't use @B.f@.  However, even if @B.f@
-doesn't change at all, @B.h@ may do so, and this change may not be reflected
-in @f@'s version number.  So there are two things going on when compiling module @A@:
-\begin{enumerate}
-\item Are @A.o@ and @A.hi@ correct?  Then we can bale out early.
-\item Should modules that import @A@ be recompiled?
-\end{enumerate}
-For (1) it is slightly harmful to record @B.f@ in @A@'s usages,
-because a change in @B.f@'s version will provoke full recompilation of @A@,
-producing an identical @A.o@,
-and @A.hi@ differing only in its usage-version of @B.f@
-(and this usage-version info isn't used by any importer).
 
-For (2), because of the tricky @B.h@ question above,
-we ensure that @A.hi@ is touched
-(even if identical to its previous version)
-if A's recompilation was triggered by an imported @.hi@ file date change.
+Should we record @B.f@ in @A@'s usages?  In fact we don't.  Certainly,
+if anything about @B.f@ changes than anyone who imports @A@ should be
+recompiled; they'll get an early exit if they don't use @B.f@.
+However, even if @B.f@ doesn't change at all, @B.h@ may do so, and
+this change may not be reflected in @f@'s version number.  So there
+are two things going on when compiling module @A@:
+
+\begin{enumerate}
+\item	Are @A.o@ and @A.hi@ correct?  Then we can bale out early.
+\item	Should modules that import @A@ be recompiled?
+\end{enumerate}
+
+For (1) it is slightly harmful to record @B.f@ in @A@'s usages,
+because a change in @B.f@'s version will provoke full recompilation of
+@A@, producing an identical @A.o@, and @A.hi@ differing only in its
+usage-version of @B.f@ (and this usage-version info isn't used by any
+importer).
+
+For (2), because of the tricky @B.h@ question above, we ensure that
+@A.hi@ is touched (even if identical to its previous version) if A's
+recompilation was triggered by an imported @.hi@ file date change.
 Given that, there's no need to record @B.f@ in @A@'s usages.
 
-On the other hand, if @A@ exports @module B@,
-then we {\em do} count @module B@ among @A@'s usages,
-because we must recompile @A@ to ensure that @A.hi@ changes appropriately.
+On the other hand, if @A@ exports @module B@, then we {\em do} count
+@module B@ among @A@'s usages, because we must recompile @A@ to ensure
+that @A.hi@ changes appropriately.
+
+HOWEVER, we *do* record the usage
+	import B <n> :: ;
+in A.hi, to record the fact that A does import B.  This is used to decide
+to look to look for B.hi rather than B.hi-boot when compiling a module that
+imports A.  This line says that A imports B, but uses nothing in it.
+So we'll get an early bale-out when compiling A if B's version changes.
 
 \begin{code}
 getImportVersions :: ModuleName			-- Name of this module
-		  -> Maybe [IE any]		-- Export list for this module
+		  -> ExportEnv			-- Info about exports 
 		  -> RnMG (VersionInfo Name)	-- Version info for these names
 
-getImportVersions this_mod exports
+getImportVersions this_mod (ExportEnv export_avails _ export_all_mods)
   = getIfacesRn					`thenRn` \ ifaces ->
     let
 	mod_map   = iImpModInfo ifaces
 	imp_names = iVSlurp     ifaces
 
+	export_mods :: FiniteMap ModuleName ()		-- Set of home modules for
+							-- things in the export list
+	export_mods = listToFM [(moduleName (nameModule (availName a)), ()) | a <- export_avails]
+	
 	-- mv_map groups together all the things imported from a particular module.
-	mv_map1, mv_map2 :: FiniteMap ModuleName (WhatsImported Name)
-
-		-- mv_map1 records all the modules that have a "module M"
-		-- in this module's export list with an "Everything" 
-	mv_map1 = foldr add_mod emptyFM export_mods
-
-		-- mv_map2 adds the version numbers of things exported individually
-	mv_map2 = foldr add_mv mv_map1 imp_names
+	mv_map :: FiniteMap ModuleName [(Name,Version)]
+	mv_map = foldr add_mv emptyFM imp_names
 
 	-- Build the result list by adding info for each module.
-	-- For (a) library modules
-	--     (b) source-imported modules
-	-- we do something special.  We don't want to record detailed usage information.
-	-- Indeed we don't want to record them at all unless they contain orphans,
-	-- which we must never lose track of.
-	mk_version_info mod_name (version, has_orphans, cts) so_far
-	   | lib_or_source_imported && not has_orphans
-	   = so_far	-- Don't record any usage info for this module
+	-- For (a) a library module, we don't record it at all unless it contains orphans
+	-- 	   (We must never lose track of orphans.)
+	-- 
+	--     (b) a source-imported module, don't record the dependency at all
+	--	
+	-- (b) may seem a bit strange.  The idea is that the usages in a .hi file records
+	-- *all* the module's dependencies other than the loop-breakers.  We use
+	-- this info in findAndReadInterface to decide whether to look for a .hi file or
+	-- a .hi-boot file.  
+	--
+	-- This means we won't track version changes, or orphans, from .hi-boot files.
+	-- The former is potentially rather bad news.  It could be fixed by recording
+	-- whether something is a boot file along with the usage info for it, but 
+	-- I can't be bothered just now.
+
+	mk_version_info mod_name (version, has_orphans, Nothing) so_far
+	   = ASSERT( not has_orphans )	-- If has_orphans is true we will have opened it
+	     so_far	-- We didn't even read this module's interface 
+			-- so don't record dependency on it.
+
+	mk_version_info mod_name (version, has_orphans, Just (mod, boot_import, _)) so_far
+	   |  boot_import			-- Don't record any usage info for this module
+	   || (is_lib_module && not has_orphans)
+	   = so_far		
 	   
-	   | lib_or_source_imported	-- Has orphans; record the module but not
-					-- detailed version information for the imports
-	   = (mod_name, version, has_orphans, Specifically []) : so_far
+	   |  is_lib_module 			-- Record the module but not
+	   || mod_name `elem` export_all_mods	-- detailed version information for the imports
+	   = go_for_it Everything
 
-	   | otherwise 
-	   = (mod_name, version, has_orphans, whats_imported) : so_far
+	   |  otherwise
+	   = case lookupFM mv_map mod_name of
+		Just whats_imported
+		  -> go_for_it (Specifically whats_imported)
+
+		Nothing		-- This happens if you have
+				--	import Foo
+				-- but don't actually *use* anything from Foo
+		  |  has_orphans 			-- Check for (a) orphans (we must never forget them)
+		  || mod_name `elemFM` export_mods	-- or (b) something from the module is exported
+		  -> 	-- ...in which case record an empty dependency list
+		     go_for_it (Specifically [])
+
+		  | otherwise   -> so_far 	-- No point in recording any dependency
 	   where
-	     whats_imported = case lookupFM mv_map2 mod_name of
-				Just wi -> wi
-				Nothing -> Specifically []
+	     is_lib_module     = isLibModule mod
+	     go_for_it exports = (mod_name, version, has_orphans, exports) : so_far
 
-	     lib_or_source_imported = case cts of
-					Just (mod, boot_import, _) -> isLibModule mod || boot_import
-					Nothing			   -> False
     in
+	-- A module shouldn't load its own interface
+	-- This seems like a convenient place to check
+    WARN( maybeToBool (lookupFM mod_map this_mod), 
+	  ptext SLIT("Wierd:") <+> ppr this_mod <+> ptext SLIT("loads its own interface") )
+
     returnRn (foldFM mk_version_info [] mod_map)
   where
-     export_mods = case exports of
-			Nothing -> []
-			Just es -> [mod | IEModuleContents mod <- es, mod /= this_mod]
-
      add_mv v@(name, version) mv_map
-      = addToFM_C add_item mv_map mod (Specifically [v]) 
-	where
+      = addToFM_C add_item mv_map mod [v] 
+      where
 	 mod = moduleName (nameModule name)
-
-         add_item Everything        _ = Everything
-         add_item (Specifically xs) _ = Specifically (v:xs)
-
-     add_mod mod mv_map = addToFM mv_map mod Everything
+         add_item vs _ = (v:vs)
 \end{code}
 
 \begin{code}

@@ -142,8 +142,7 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 					  isQual rdr_name])	`thenRn_`
 
 	-- PROCESS EXPORT LISTS
-      exportsFromAvail this_mod exports all_avails gbl_env 
-      `thenRn` \ exported_avails ->
+      exportsFromAvail this_mod exports all_avails gbl_env      `thenRn` \ exported_avails ->
 
 	-- DONE
       returnRn (gbl_env, exported_avails, Just all_avails)
@@ -164,14 +163,17 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 			    | FixitySig name fixity _ <- nameEnvElts local_fixity_env,
 			      isLocallyDefined name
 			    ]
+
+	-- CONSTRUCT RESULTS
+	export_mods = case exports of
+			Nothing -> []
+			Just es -> [mod | IEModuleContents mod <- es, mod /= this_mod]
+
+	export_env	      = ExportEnv exported_avails exported_fixities export_mods
+	(_, global_avail_env) = all_avails
    in
    traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts local_fixity_env)))	`thenRn_`
 
-	--- TIDY UP 
-   let
-	export_env	      = ExportEnv exported_avails exported_fixities
-	(_, global_avail_env) = all_avails
-   in
    returnRn (Just (export_env, gbl_env, local_fixity_env, global_avail_env))
    }
   where

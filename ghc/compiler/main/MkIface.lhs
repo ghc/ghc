@@ -91,7 +91,7 @@ endIface    :: Maybe Handle -> IO ()
 \end{code}
 
 \begin{code}
-startIface mod (has_orphans, import_usages, ExportEnv avails fixities)
+startIface mod (has_orphans, import_usages, ExportEnv avails fixities _)
   = case opt_ProduceHi of
       Nothing -> return Nothing ; -- not producing any .hi file
 
