@@ -1,7 +1,8 @@
-# $Id: Makefile,v 1.13 2004/11/10 11:27:54 simonmar Exp $
+# $Id: Makefile,v 1.14 2005/02/01 00:52:22 ross Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
+-include ../config.mk
 
 HC = $(GHC_INPLACE)
 

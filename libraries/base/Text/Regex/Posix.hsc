@@ -14,7 +14,7 @@
 
 -- ToDo: should have an interface using PackedStrings.
 #ifndef __NHC__
-#include "ghcconfig.h"
+#include "HsBaseConfig.h"
 #else
 #define HAVE_REGEX_H 1
 #define HAVE_REGCOMP 1

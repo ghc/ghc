@@ -1,8 +1,9 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 2004/10/05 07:43:07 mthomas Exp $
+# $Id: Makefile,v 1.5 2005/02/01 00:52:22 ross Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
+-include ../config.mk
 
 H_FILES = $(wildcard *.h)
 

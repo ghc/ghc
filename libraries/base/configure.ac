@@ -15,6 +15,11 @@ AC_CHECK_HEADERS([ctype.h fcntl.h signal.h sys/resource.h termios.h time.h])
 # rlim_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
+dnl ** check for POSIX regex
+HavePosixRegex=NO
+AC_CHECK_HEADERS([regex.h], [AC_CHECK_FUNCS(regcomp, [HavePosixRegex=YES])])
+AC_SUBST(HavePosixRegex)
+
 dnl ** check for wide-char classifications
 dnl FreeBSD has an emtpy wctype.h, so test one of the affected
 dnl functions if it's really there.
@@ -85,6 +90,6 @@ case "$target" in
 esac
 AC_SUBST([EXTRA_LIBS])
 
-AC_CONFIG_FILES([base.buildinfo])
+AC_CONFIG_FILES([config.mk base.buildinfo])
 
 AC_OUTPUT
