@@ -40,7 +40,7 @@ import IdInfo		( StrictnessInfo, ArityInfo,
 import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding), GenCoreExpr, GenCoreBinding(..) )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding )
 import FreeVars		( addExprFVs )
-import Name		( isLocallyDefined, isWiredInName, modAndOcc, getName, nameModule, pprOccName,
+import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule, pprOccName,
 			  OccName, occNameString, nameOccName, nameString, isExported,
 			  Name {-instance NamedThing-}, Provenance, NamedThing(..)
 			)
