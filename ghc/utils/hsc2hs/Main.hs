@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.36 2002/02/12 15:17:24 simonmar Exp $
+-- $Id: Main.hs,v 1.37 2002/02/13 10:39:36 simonpj Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -93,14 +93,25 @@ main = do
             exitFailure
 
 processFile :: [Flag] -> String -> IO ()
-processFile flags name = do
-    s <- readFile name
-    case parser of
-        Parser p -> case p (SourcePos name 1) s of
-            Success _ _ _ toks -> output flags name toks
-            Failure (SourcePos name' line) msg -> do
-                putStrLn (name'++":"++show line++": "++msg)
-                exitFailure
+processFile flags name 
+  = do let file_name = dosifyPath name
+       s <- readFile file_name
+       case parser of
+    	   Parser p -> case p (SourcePos file_name 1) s of
+    	       Success _ _ _ toks -> output flags file_name toks
+    	       Failure (SourcePos name' line) msg -> do
+    		   putStrLn (name'++":"++show line++": "++msg)
+    		   exitFailure
+
+------------------------------------------------------------------------
+-- Convert paths foo/baz to foo\baz on Windows
+
+#if defined(mingw32_TARGET_OS)
+subst a b ls = map (\ x -> if x == a then b else x) ls
+dosifyPath xs = subst '/' '\\' xs
+#else
+dosifyPath xs = xs
+#endif
 
 ------------------------------------------------------------------------
 -- A deterministic parser which remembers the text which has been parsed.
