@@ -45,6 +45,16 @@ If you want to build a GUI-only application, with no console window, use the fla
 <literal>-optl-mwindows</literal> in the link step.
 </para>
 
+<para>       <emphasis>Warning:</emphasis> Windows GUI-only programs have no
+        stdin, stdout or stderr so using the ordinary Haskell
+        input/output functions will cause your program to fail with an
+        IO exception, such as:
+<screen>
+      Fail: &lt;stdout&gt;: hPutChar: failed (Bad file descriptor)
+</screen>
+        However using Debug.Trace.trace is alright because it uses
+        Windows debugging output support rather than stderr.</para>
+
 <para>For some reason, Mingw ships with the <literal>readline</literal> library,
 but not with the <literal>readline</literal> headers. As a result, GHC (like Hugs) does not
 use <literal>readline</literal> for interactive input on Windows.
