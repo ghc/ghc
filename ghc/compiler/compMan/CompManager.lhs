@@ -4,6 +4,7 @@
 \section[CompManager]{The Compilation Manager}
 
 \begin{code}
+{-# OPTIONS -fvia-C #-}
 module CompManager ( 
     cmInit, 	  -- :: GhciMode -> IO CmState
 
@@ -18,7 +19,8 @@ module CompManager (
 #ifdef GHCI
     cmInfoThing,  -- :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
 
-    cmRunStmt,	  -- :: CmState -> DynFlags -> String -> IO (CmState, [Name])
+    CmRunResult(..),
+    cmRunStmt,	  -- :: CmState -> DynFlags -> String -> IO (CmState, CmRunResult)
 
     cmTypeOfExpr, -- :: CmState -> DynFlags -> String
 		  -- -> IO (CmState, Maybe String)
@@ -38,6 +40,7 @@ import CmLink
 import CmTypes
 import DriverPipeline
 import DriverFlags	( getDynFlags )
+import DriverState	( v_Output_file )
 import DriverPhases
 import DriverUtil
 import Finder
@@ -77,7 +80,9 @@ import PrelGHC		( unsafeCoerce# )
 #endif
 
 -- lang
-import Exception	( throwDyn )
+import Foreign
+import CForeign
+import Exception	( Exception, try, throwDyn )
 
 -- std
 import Directory        ( getModificationTime, doesFileExist )
@@ -207,10 +212,15 @@ cmInfoThing cmstate dflags id
 -- cmRunStmt:  Run a statement/expr.
 
 #ifdef GHCI
-cmRunStmt :: CmState -> DynFlags -> String
-	-> IO (CmState,			-- new state
-	       [Name])			-- names bound by this evaluation
-cmRunStmt cmstate dflags expr
+data CmRunResult
+  = CmRunOk [Name] 		-- names bound by this evaluation
+  | CmRunFailed 
+  | CmRunDeadlocked		-- statement deadlocked
+  | CmRunException Exception	-- statement raised an exception
+
+cmRunStmt :: CmState -> DynFlags -> String -> IO (CmState, CmRunResult)		
+cmRunStmt cmstate@CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext }
+          dflags expr
    = do 
 	let InteractiveContext { 
 	       	ic_rn_env = rn_env, 
@@ -221,7 +231,7 @@ cmRunStmt cmstate dflags expr
 	    <- hscStmt dflags hst hit pcs icontext expr False{-stmt-}
 
         case maybe_stuff of
-	   Nothing -> return (cmstate{ pcs=new_pcs }, [])
+	   Nothing -> return (cmstate{ pcs=new_pcs }, CmRunFailed)
 	   Just (ids, _, bcos) -> do
 
 		-- update the interactive context
@@ -248,17 +258,56 @@ cmRunStmt cmstate dflags expr
 
 		-- run it!
 		let thing_to_run = unsafeCoerce# hval :: IO [HValue]
-		hvals <- thing_to_run
+		either_hvals <- sandboxIO thing_to_run
+		case either_hvals of
+		   Left err
+			| err == dEADLOCKED
+			-> return ( cmstate{ pcs=new_pcs, ic=new_ic }, 
+				    CmRunDeadlocked )
+			| otherwise
+			-> do hPutStrLn stderr ("unknown failure, code " ++ show err)
+			      return ( cmstate{ pcs=new_pcs, ic=new_ic }, CmRunFailed )
 
-		-- Get the newly bound things, and bind them.  Don't forget
-		-- to delete any shadowed bindings from the closure_env, lest
-		-- we end up with a space leak.
-		pls <- delListFromClosureEnv pls shadowed
-		new_pls <- addListToClosureEnv pls (zip names hvals)
+		   Right maybe_hvals ->
+		     case maybe_hvals of
+			Left e -> 
+			    return ( cmstate{ pcs=new_pcs, ic=new_ic }, 
+				     CmRunException e )
+			Right hvals -> do
+			     -- Get the newly bound things, and bind them.  
+			     -- Don't forget to delete any shadowed bindings from the
+			     -- closure_env, lest we end up with a space leak.
+			     pls <- delListFromClosureEnv pls shadowed
+			     new_pls <- addListToClosureEnv pls (zip names hvals)
+	     
+			     return (cmstate{ pcs=new_pcs, pls=new_pls, ic=new_ic }, 
+				     CmRunOk names)
 
-	        return (cmstate{ pcs=new_pcs, pls=new_pls, ic=new_ic }, names)
-   where
-       CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
+-- We run the statement in a "sandbox", which amounts to calling into
+-- the RTS to request a new main thread.  The main benefit is that we
+-- get to detect a deadlock this way, but also there's no danger that
+-- exceptions raised by the expression can affect the interpreter.
+
+sandboxIO :: IO a -> IO (Either Int (Either Exception a))
+sandboxIO thing = do
+  st_thing <- newStablePtr (Exception.try thing)
+  alloca $ \ p_st_result -> do
+    stat <- rts_evalStableIO st_thing p_st_result
+    freeStablePtr st_thing
+    if stat == 1
+	then do st_result <- peek p_st_result
+		result <- deRefStablePtr st_result
+		freeStablePtr st_result
+		return (Right result)
+	else do
+		return (Left (fromIntegral stat))
+
+-- ToDo: slurp this in from ghc/includes/RtsAPI.h somehow
+dEADLOCKED = 4 :: Int
+
+foreign import "rts_evalStableIO"  {- safe -}
+  rts_evalStableIO :: StablePtr (IO a) -> Ptr (StablePtr a) -> IO CInt
+  -- more informative than the C type!
 #endif
 
 -----------------------------------------------------------------------------
@@ -517,6 +566,13 @@ cmLoadModule cmstate1 rootnames
 
 	      -- clean up after ourselves
 	      cleanTempFilesExcept verb (ppFilesFromSummaries modsDone)
+
+	      -- issue a warning for the confusing case where the user said '-o foo'
+	      -- but we're not going to do any linking.
+	      ofile <- readIORef v_Output_file
+	      when (ghci_mode == Batch && isJust ofile && not a_root_is_Main
+		     && verb > 0) $
+	         hPutStrLn stderr "Warning: output was redirected with -o, but no output will be generated\nbecause there is no Main module."
 
 	      -- link everything together
               linkresult <- link ghci_mode dflags a_root_is_Main ui3 pls2

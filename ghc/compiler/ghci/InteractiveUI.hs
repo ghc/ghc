@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.97 2001/10/22 16:16:27 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.98 2001/10/23 11:42:21 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -335,28 +335,28 @@ showException other_exception
 
 doCommand (':' : command) = specialCommand command
 doCommand stmt
-   = do timeIt (do stuff <- runStmt stmt; finishEvalExpr stuff)
+   = do timeIt (do nms <- runStmt stmt; finishEvalExpr nms)
         return False
 
--- Returns True if the expr was successfully parsed, renamed and
--- typechecked.
-runStmt :: String -> GHCi (Maybe [Name])
+runStmt :: String -> GHCi [Name]
 runStmt stmt
- | null (filter (not.isSpace) stmt)
- = return Nothing
+ | null (filter (not.isSpace) stmt) = return []
  | otherwise
  = do st <- getGHCiState
       dflags <- io getDynFlags
       let dflags' = dopt_unset dflags Opt_WarnUnusedBinds
-      (new_cmstate, names) <- 
+      (new_cmstate, result) <- 
 	io $ withProgName (progname st) $ withArgs (args st) $
 	cmRunStmt (cmstate st) dflags' stmt
       setGHCiState st{cmstate = new_cmstate}
-      return (Just names)
+      case result of
+	CmRunFailed      -> return []
+	CmRunException e -> showException e >> return []
+	CmRunDeadlocked  -> io (putStrLn "Deadlocked.") >> return []
+	CmRunOk names    -> return names
 
 -- possibly print the type and revert CAFs after evaluating an expression
-finishEvalExpr Nothing = return False
-finishEvalExpr (Just names)
+finishEvalExpr names
  = do b <- isOptionSet ShowType
       st <- getGHCiState
       when b (mapM_ (showTypeOfName (cmstate st)) names)
