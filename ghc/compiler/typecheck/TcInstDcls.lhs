@@ -198,7 +198,10 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
 	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . iDFunId) 
 			       imported_inst_info
 	hst_dfuns	 = foldModuleEnv ((++) . md_insts) [] hst
-    in
+    in 
+
+--    pprTrace "tcInstDecls" (vcat [ppr imported_dfuns, ppr hst_dfuns]) $
+
     addInstDFuns inst_env0 imported_dfuns	`thenNF_Tc` \ inst_env1 ->
     addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->
     addInstInfos inst_env2 local_inst_info	`thenNF_Tc` \ inst_env3 ->
