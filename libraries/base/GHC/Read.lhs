@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Read.lhs,v 1.5 2002/04/13 05:08:55 sof Exp $
+% $Id: Read.lhs,v 1.6 2002/04/13 14:59:06 panne Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -168,8 +168,9 @@ read s = either error id (readEither s)
 -- H98 compatibility
 
 lex :: ReadS String		-- As defined by H98
-lex = readP_to_S (do { lexeme <- L.lex ;
-		       return (show lexeme) })
+lex "" = [("","")] -- ugly hack
+lex s  = readP_to_S (do { lexeme <- L.lex ;
+		          return (show lexeme) }) s
 
 lexLitChar :: ReadS String	-- As defined by H98
 lexLitChar = readP_to_S (do { lexeme <- L.lexLitChar ;
