@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.123 2000/12/20 10:44:17 simonmar Exp $
+# $Id: Makefile,v 1.124 2000/12/20 10:46:12 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -212,12 +212,10 @@ ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
 endif
 
-rename/RnEnv_HC_OPTS 		= 
 rename/RnSource_HC_OPTS		= -H12m
 rename/RnIfaces_HC_OPTS		= -H8m 
 rename/RnExpr_HC_OPTS		= -H10m
 rename/RnNames_HC_OPTS		= -H12m
-rename/RnMonad_HC_OPTS		= 
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
 simplCore/Simplify_HC_OPTS	= -H15m	
 simplCore/OccurAnal_HC_OPTS	= -H10m
@@ -243,20 +241,13 @@ typecheck/TcExpr_HC_OPTS	= -H15m
 typecheck/TcBinds_HC_OPTS       = -H10m
 
 typecheck/TcEnv_HC_OPTS		= -H10m
-utils/SST_HC_OPTS 		= 
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts 
-utils/DirUtils_HC_OPTS 		= 
 
 # temporary, due to bug in NCG (x86 spiller fails because a basic block
 # contains both multiply and divide insns, probably soaking up all spill
 # regs) (SDM, 1/6/2000), augmented by JRS 27 Oct 00.
 utils/FastString_HC_OPTS	= -fvia-C
-
-ifeq "$(alpha_HOST_ARCH)" "1"
-# "stbu" bug in alpha native code generator...
-basicTypes/Unique_HC_OPTS	= 
-endif
 
 # flags for PrimPacked:
 #
