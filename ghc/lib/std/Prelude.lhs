@@ -9,7 +9,6 @@ module Prelude (
 
 	-- Everything from these modules
     module PrelList,
-    module PrelIO,
     module PrelTup,
 
 	-- From PrelBase
@@ -40,7 +39,12 @@ module Prelude (
     ReadS, Read(readsPrec, readList),
     reads, read, lex, readParen, 
 
-	-- From PrelShow
+        -- From IO
+    IO, FilePath, IOError,
+    fail, userError, catch,
+    putChar, putStr, putStrLn, print,
+    getChar, getLine, getContents, interact,
+    readFile, writeFile, appendFile, readIO, readLn,
 
 	-- From PrelNum
     Ratio, Rational, 
@@ -62,7 +66,6 @@ module Prelude (
 
 import PrelBase
 import PrelList
-import PrelIO
 import PrelRead
 import PrelNum
 import PrelTup
@@ -72,6 +75,7 @@ import PrelBounded
 import Monad
 import Maybe
 import PrelErr   ( error, seqError )
+import IO
 
 -- These can't conveniently be defined in PrelBase because they use numbers,
 -- or I/O, so here's a convenient place to do them.
