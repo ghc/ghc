@@ -607,7 +607,9 @@ closeIfaceDecls dflags hit hst pcs
 
 	-- Do the transitive closure
     lookupOrigNames implicit_occs	`thenRn` \ implicit_names ->
-    closeDecls decls (needed `plusFV` implicit_names)
+    closeDecls decls (needed `plusFV` implicit_names) `thenRn` \closed_decls ->
+    rnDump [] closed_decls `thenRn_`
+    returnRn closed_decls
   where
     implicit_occs = string_occs	-- Data type decls with record selectors,
 				-- which may appear in the decls, need unpackCString
