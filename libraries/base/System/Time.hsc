@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.9 2002/02/14 07:32:17 sof Exp $
+-- $Id: Time.hsc,v 1.10 2002/03/19 10:59:01 simonmar Exp $
 --
 -- The standard Time library.
 --
@@ -317,10 +317,10 @@ gmtoff x    = (#peek struct tm,tm_gmtoff) x
 #   define tzname _tzname
 #  endif
 #  ifndef mingw32_TARGET_OS
-foreign label tzname :: Ptr (Ptr CChar)
+foreign import ccall "&tzname" :: Ptr (Ptr CChar)
 #  else
-foreign import "__hscore_timezone" unsafe timezone :: Ptr CLong
-foreign import "__hscore_tzname" unsafe tzname :: Ptr (Ptr CChar)
+foreign import ccall unsafe "__hscore_timezone" timezone :: Ptr CLong
+foreign import ccall unsafe "__hscore_tzname"   tzname :: Ptr (Ptr CChar)
 #  endif
 zone x = do 
   dst <- (#peek struct tm,tm_isdst) x
@@ -336,8 +336,8 @@ zone x = do
 #endif
 
 # if HAVE_ALTZONE
-foreign label altzone  :: Ptr CTime
-foreign label timezone :: Ptr CTime
+foreign import ccall "&altzone"  :: Ptr CTime
+foreign import ccall "&timezone" :: Ptr CTime
 gmtoff x = do 
   dst <- (#peek struct tm,tm_isdst) x
   tz <- if dst then peek altzone else peek timezone
@@ -617,28 +617,28 @@ formatTimeDiff l fmt td@(TimeDiff year month day hour min sec _)
 type CTm = () -- struct tm
 
 #if HAVE_LOCALTIME_R
-foreign import unsafe localtime_r :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
+foreign import ccall unsafe localtime_r :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
 #else
-foreign import unsafe localtime   :: Ptr CTime -> IO (Ptr CTm)
+foreign import ccall unsafe localtime   :: Ptr CTime -> IO (Ptr CTm)
 #endif
 #if HAVE_GMTIME_R
-foreign import unsafe gmtime_r    :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
+foreign import ccall unsafe gmtime_r    :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
 #else
-foreign import unsafe gmtime      :: Ptr CTime -> IO (Ptr CTm)
+foreign import ccall unsafe gmtime      :: Ptr CTime -> IO (Ptr CTm)
 #endif
-foreign import unsafe mktime      :: Ptr CTm   -> IO CTime
-foreign import unsafe time        :: Ptr CTime -> IO CTime
+foreign import ccall unsafe mktime      :: Ptr CTm   -> IO CTime
+foreign import ccall unsafe time        :: Ptr CTime -> IO CTime
 
 #if HAVE_GETTIMEOFDAY
 type CTimeVal = ()
-foreign import unsafe gettimeofday :: Ptr CTimeVal -> Ptr () -> IO CInt
+foreign import ccall unsafe gettimeofday :: Ptr CTimeVal -> Ptr () -> IO CInt
 #endif
 
 #if HAVE_FTIME
 type CTimeB = ()
 #ifndef mingw32_TARGET_OS
-foreign import unsafe ftime :: Ptr CTimeB -> IO CInt
+foreign import ccall unsafe ftime :: Ptr CTimeB -> IO CInt
 #else
-foreign import unsafe ftime :: Ptr CTimeB -> IO ()
+foreign import ccall unsafe ftime :: Ptr CTimeB -> IO ()
 #endif
 #endif
