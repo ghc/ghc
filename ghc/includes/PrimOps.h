@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.76 2001/03/22 03:51:09 hwloidl Exp $
+ * $Id: PrimOps.h,v 1.77 2001/07/13 11:39:48 rrt Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -912,8 +912,7 @@ EXTFUN_RTS(mkForeignObjzh_fast);
 #define writeForeignObjzh(res,datum) \
    (ForeignObj_CLOSURE_DATA(res) = (P_)(datum))
 
-#define eqForeignObj(f1,f2)  ((f1)==(f2))
-
+#define eqForeignObjzh(f1,f2)                   ((f1)==(f2))
 #define indexCharOffForeignObjzh(r,fo,i)	indexCharOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexWideCharOffForeignObjzh(r,fo,i)	indexWideCharOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexIntOffForeignObjzh(r,fo,i)		indexIntOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)

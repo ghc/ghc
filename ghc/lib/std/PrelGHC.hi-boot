@@ -336,6 +336,7 @@ __export PrelGHC
   writeWord32OffAddrzh
   writeWord64OffAddrzh
 
+  eqForeignObjzh
   indexCharOffForeignObjzh
   indexWideCharOffForeignObjzh
   indexIntOffForeignObjzh

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.20 2001/05/04 14:43:49 simonmar Exp $
+-- $Id: primops.txt,v 1.21 2001/07/13 11:39:48 rrt Exp $
 --
 -- Primitive Operations
 --
@@ -739,6 +739,10 @@ primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> Word64#
 
 
+primop EqForeignObj "eqForeignObj#" GenPrimOp
+   ForeignObj# -> ForeignObj# -> Bool
+   with commutable = True
+
 primop IndexOffForeignObjOp_Char "indexCharOffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Char#
 
@@ -1296,10 +1300,7 @@ primop  ParAtForNowOp  "parAtForNow#" GenPrimOp
    usage            = { mangle ParAtForNowOp [mkO, mkZ, mkP, mkP, mkP, mkP, mkM] mkM }
    has_side_effects = True
 
--- copyable# and noFollow# have no corresponding entry in
--- PrelGHC.hi-boot, so I don't know whether they should still
--- be here or not.  JRS, 15 Jan 01
--- not implemented; please, keep the comment as reminder -- HWL 12/3/01
+-- copyable# and noFollow# are yet to be implemented (for GpH)
 --
 --primop  CopyableOp  "copyable#" GenPrimOp
 --   a -> Int#
