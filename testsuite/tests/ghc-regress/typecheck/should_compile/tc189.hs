@@ -18,6 +18,7 @@ module ShouldCompile where
   q :: b
   (p,q,r) = ([q,r], r, head p)
 
-  p :: a
-  q :: b
-  (p,q,r) = (r,r,p)
+-------------
+  t :: a
+  u :: b
+  (t,u,v) = (v,v,t)
