@@ -2,6 +2,7 @@
 
 Package {
         name           = "base",
+	auto	       = True,
 #ifdef INSTALLING
 	import_dirs    = [ "$libdir/imports/base" ],
 #else
