@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.26 2000/04/03 19:39:17 panne Exp $
+ * $Id: Updates.hc,v 1.27 2000/04/19 10:52:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -142,7 +142,7 @@ VEC_POLY_INFO_TABLE(Upd_frame,UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*sr
    really an optimisation? --SDM)
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(PAP_info,PAP_entry,/*special layout*/0,0,PAP,,EF_,0,0);
+INFO_TABLE(PAP_info,PAP_entry,/*special layout*/0,0,PAP,,EF_,"PAP","PAP");
 STGFUN(PAP_entry)
 {
   nat Words;
@@ -413,7 +413,7 @@ EXTFUN(stg_update_PAP)
    -------------------------------------------------------------------------- */
 
 
-INFO_TABLE(AP_UPD_info,AP_UPD_entry,/*special layout*/0,0,AP_UPD,,EF_,0,0);
+INFO_TABLE(AP_UPD_info,AP_UPD_entry,/*special layout*/0,0,AP_UPD,,EF_,"AP_UPD","AP_UPD");
 STGFUN(AP_UPD_entry)
 {
   nat Words;
