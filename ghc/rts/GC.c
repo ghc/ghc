@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.9 1999/01/15 17:57:08 simonm Exp $
+ * $Id: GC.c,v 1.10 1999/01/18 12:23:04 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -383,6 +383,26 @@ void GarbageCollect(void (*get_roots)(void))
     }
   }
 
+  /* Set the maximum blocks for the oldest generation, based on twice
+   * the amount of live data now, adjusted to fit the maximum heap
+   * size if necessary.  
+   *
+   * This is an approximation, since in the worst case we'll need
+   * twice the amount of live data plus whatever space the other
+   * generations need.
+   */
+  oldest_gen->max_blocks = 
+    stg_max(oldest_gen->steps[0].to_blocks * 2,
+	    RtsFlags.GcFlags.minAllocAreaSize * 4);
+  if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
+    oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
+    if (((int)oldest_gen->max_blocks - (int)oldest_gen->steps[0].to_blocks) < 
+	(RtsFlags.GcFlags.pcFreeHeap *
+	 RtsFlags.GcFlags.maxHeapSize / 200)) {
+      heapOverflow();
+    }
+  }
+  
   /* run through all the generations/steps and tidy up 
    */
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -436,24 +456,22 @@ void GarbageCollect(void (*get_roots)(void))
 	}
 	step->large_objects = step->scavenged_large_objects;
 
-	/* Set the maximum blocks for this generation,
-	 * using an arbitrary factor of the no. of blocks in step 0.
+	/* Set the maximum blocks for this generation, interpolating
+	 * between the maximum size of the oldest and youngest
+	 * generations.
+	 *
+	 * max_blocks = alloc_area_size +  
+	 *                 (oldgen_max_blocks - alloc_area_size) * G
+	 *                 -----------------------------------------
+	 *                              oldest_gen
 	 */
 	if (g != 0) {
-	  generation *gen = &generations[g];
-	  gen->max_blocks = 
-	    stg_max(gen->steps[s].n_blocks * 2,
-		    RtsFlags.GcFlags.minAllocAreaSize * 4);
-	  if (gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
-	    gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
-	    if (((int)gen->max_blocks - (int)gen->steps[0].n_blocks) < 
-		(RtsFlags.GcFlags.pcFreeHeap *
-		 RtsFlags.GcFlags.maxHeapSize / 200)) {
-	      heapOverflow();
-	    }
-	  }
+	  generations[g].max_blocks = 
+	    RtsFlags.GcFlags.minAllocAreaSize +
+	     (((oldest_gen->max_blocks - RtsFlags.GcFlags.minAllocAreaSize) * g)
+	       / (RtsFlags.GcFlags.generations-1));
 	}
-	
+
       /* for older generations... */
       } else {
 	
@@ -1666,6 +1684,16 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
       }
       continue;
       
+    case MVAR:
+      {
+	StgMVar *mvar = (StgMVar *)p;
+	(StgClosure *)mvar->head = evacuate((StgClosure *)mvar->head);
+	(StgClosure *)mvar->tail = evacuate((StgClosure *)mvar->tail);
+	(StgClosure *)mvar->value = evacuate((StgClosure *)mvar->value);
+	prev = &p->mut_link;
+	continue;
+      }
+
     case TSO:
       /* follow ptrs and remove this from the mutable list */
       { 
