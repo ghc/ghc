@@ -1054,9 +1054,7 @@ staticLink o_files dep_packages = do
 	 	      ++ pkg_framework_path_opts
 	 	      ++ pkg_framework_opts
 #endif
-	              ++ if static && not no_hs_main then
-			    [ "-u", prefixUnderscore "Main_zdmain_closure"] 
-			 else []))
+		    ))
 
     -- parallel only: move binary to another dir -- HWL
     ways_ <- readIORef v_Ways
