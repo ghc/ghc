@@ -21,7 +21,7 @@ module BinderInfo (
 	getBinderInfoArity,
 	setBinderInfoArityToZero,
 
-	isFun, isDupDanger -- for Simon Marlow deforestation
+	inlineUnconditionally, isFun, isDupDanger -- for Simon Marlow deforestation
     ) where
 
 IMP_Ubiq(){-uitous-}
@@ -117,8 +117,6 @@ isDupDanger _ = False
 definitely be inlined.
 
 \begin{code}
-{-	NOT USED
-
 inlineUnconditionally :: Bool -> BinderInfo -> Bool
 
 --inlineUnconditionally ok_to_dup DeadCode = True
@@ -129,7 +127,6 @@ inlineUnconditionally ok_to_dup (OneOcc FunOcc NoDupDanger NotInsideSCC n_alt_oc
 	    -- damage, e.g., limit to M alternatives.
 
 inlineUnconditionally _ _ = False
--}
 \end{code}
 
 
