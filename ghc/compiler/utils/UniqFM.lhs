@@ -11,13 +11,7 @@ Basically, the things need to be in class @Uniquable@, and we use the
 (A similar thing to @UniqSet@, as opposed to @Set@.)
 
 \begin{code}
-#if defined(COMPILING_GHC)
 #include "HsVersions.h"
-#define IF_NOT_GHC(a) {--}
-#else
-#define ASSERT(e) {--}
-#define IF_NOT_GHC(a) a
-#endif
 
 module UniqFM (
 	UniqFM,   -- abstract type
@@ -38,8 +32,8 @@ module UniqFM (
 	plusUFM_C,
 	minusUFM,
 	intersectUFM,
-	IF_NOT_GHC(intersectUFM_C COMMA)
-	IF_NOT_GHC(foldUFM COMMA)
+	intersectUFM_C,
+	foldUFM,
 	mapUFM,
 	filterUFM,
 	sizeUFM,
@@ -48,19 +42,15 @@ module UniqFM (
 	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
 	eltsUFM, keysUFM,
 	ufmToList
-#if defined(COMPILING_GHC)
 	,FAST_STRING
-#endif
     ) where
 
 IMP_Ubiq()
 
-#if defined(COMPILING_GHC)
-# if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER( SpecLoop )
-# else
+#else
 import {-# SOURCE #-} Name
-# endif
 #endif
 
 import Unique		( Uniquable(..), Unique, u2i, mkUniqueGrimily )

@@ -4,26 +4,8 @@
 \section[Util]{Highly random utility functions}
 
 \begin{code}
-#if defined(COMPILING_GHC)
-# include "HsVersions.h"
-# define IF_NOT_GHC(a) {--}
-#else
-# define panic error
-# define TAG_ Ordering
-# define LT_ LT
-# define EQ_ EQ
-# define GT_ GT
-# define _LT LT
-# define _EQ EQ
-# define _GT GT
-# define GT__ _
-# define tagCmp_ compare
-# define _tagCmp compare
-# define FAST_STRING String
-# define ASSERT(x) {-nothing-}
-# define IF_NOT_GHC(a) a
-# define COMMA ,
-#endif
+#include "HsVersions.h"
+#define IF_NOT_GHC(a) {--}
 
 #ifndef __GLASGOW_HASKELL__
 # undef TAG_
@@ -48,10 +30,8 @@ module Util (
         zipLazy,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, lengthExceeds, isSingleton,
-#if defined(COMPILING_GHC)
 	startsWith, endsWith,
 	isIn, isn'tIn,
-#endif
 
 	-- association lists
 	assoc, assocUsing, assocDefault, assocDefaultUsing,
@@ -72,12 +52,8 @@ module Util (
 	mapAccumL, mapAccumR, mapAccumB,
 
 	-- comparisons
-#if defined(COMPILING_GHC)
 	Ord3(..), thenCmp, cmpList,
 	cmpPString, FAST_STRING,
-#else
-	cmpString,
-#endif
 
 	-- pairs
 	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
@@ -85,22 +61,14 @@ module Util (
 	unzipWith
 
 	-- error handling
-#if defined(COMPILING_GHC)
 	, panic, panic#, pprPanic, pprPanic#, pprError, pprTrace
 	, assertPanic, assertPprPanic
-#endif {- COMPILING_GHC -}
 
     ) where
-
-#if defined(COMPILING_GHC)
 
 CHK_Ubiq() -- debugging consistency check
 IMPORT_1_3(List(zipWith4))
 import Pretty	
-
-#else
-import List(zipWith4)
-#endif
 
 infixr 9 `thenCmp`
 \end{code}
@@ -266,7 +234,6 @@ endsWith cs ss
 
 Debugging/specialising versions of \tr{elem} and \tr{notElem}
 \begin{code}
-#if defined(COMPILING_GHC)
 isIn, isn'tIn :: (Eq a) => String -> a -> [a] -> Bool
 
 # ifndef DEBUG
@@ -299,7 +266,6 @@ isn'tIn msg x ys
 
 # endif {- DEBUG -}
 
-#endif {- COMPILING_GHC -}
 \end{code}
 
 %************************************************************************
@@ -344,11 +310,7 @@ hasNoDups xs = f [] xs
 			   else
 				f (x:seen_so_far) xs
 
-#if defined(COMPILING_GHC)
     is_elem = isIn "hasNoDups"
-#else
-    is_elem = elem
-#endif
 \end{code}
 
 \begin{code}
@@ -766,11 +728,7 @@ cmpString (x:xs) (y:ys) = if	  x == y then cmpString xs ys
 cmpString []     ys	= LT_
 cmpString xs     []	= GT_
 
-#ifdef COMPILING_GHC
 cmpString _ _ = panic# "cmpString"
-#else
-cmpString _ _ = error "cmpString"
-#endif
 \end{code}
 
 \begin{code}
@@ -824,7 +782,6 @@ unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
 %************************************************************************
 
 \begin{code}
-#if defined(COMPILING_GHC)
 panic x = error ("panic! (the `impossible' happened):\n\t"
 	      ++ x ++ "\n\n"
 	      ++ "Please report it as a compiler bug "
@@ -832,13 +789,13 @@ panic x = error ("panic! (the `impossible' happened):\n\t"
 
 pprPanic heading pretty_msg = panic (heading++ " " ++ (show pretty_msg))
 pprError heading pretty_msg = error (heading++ " " ++ (show pretty_msg))
-#if __GLASGOW_HASKELL__ == 201
+# if __GLASGOW_HASKELL__ == 201
 pprTrace heading pretty_msg = GHCbase.trace (heading++" "++(show pretty_msg))
-#elif __GLASGOW_HASKELL__ >= 202
+# elif __GLASGOW_HASKELL__ >= 202
 pprTrace heading pretty_msg = GlaExts.trace (heading++" "++(show pretty_msg))
-#else
+# else
 pprTrace heading pretty_msg = trace (heading++" "++(show pretty_msg))
-#endif
+# endif
 
 -- #-versions because panic can't return an unboxed int, and that's
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)
@@ -859,5 +816,4 @@ assertPprPanic file line msg
 			   text "line", int line], 
 		      msg]))
 
-#endif {- COMPILING_GHC -}
 \end{code}
