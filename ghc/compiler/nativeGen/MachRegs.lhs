@@ -25,7 +25,6 @@ module MachRegs (
 	baseRegOffset,
 	callClobberedRegs,
 	callerSaves,
-	dblImmLit,
 	extractMappedRegNos,
 	freeMappedRegs,
 	freeReg, freeRegs,
@@ -83,17 +82,12 @@ data Imm
   | ImmLab	SDoc    -- Simple string label (underscore-able)
   | ImmLit	SDoc    -- Simple string
   | ImmIndex    CLabel Int
+  | ImmDouble	Rational
   IF_ARCH_sparc(
   | LO Imm		    -- Possible restrictions...
   | HI Imm
   ,)
 strImmLit s = ImmLit (text s)
-dblImmLit r
-  = strImmLit (
-	 IF_ARCH_alpha({-prepend nothing-}
-	,IF_ARCH_i386( '0' : 'd' :
-	,IF_ARCH_sparc('0' : 'r' :,)))
-	showSDoc (rational r))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

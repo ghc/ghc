@@ -20,9 +20,13 @@ import MachMisc
 import CLabel		( pprCLabel_asm, externallyVisibleCLabel )
 import CStrings		( charToC )
 import Maybes		( maybeToBool )
-import Stix		( CodeSegment(..) )
+import Stix		( CodeSegment(..), StixTree(..) )
 import Char		( isPrint, isDigit )
 import Outputable
+
+import ST
+import MutableArray
+import Char		( ord )
 \end{code}
 
 %************************************************************************
@@ -403,20 +407,12 @@ pprInstr (SEGMENT TextSegment)
 	,IF_ARCH_i386((_PK_ ".text\n\t.align 4") {-needs per-OS variation!-}
 	,)))
 
-#if 0
-	,IF_ARCH_i386((_PK_ ".text\n\t.align 2\x2c\&0x90") {-needs per-OS variation!-}
-#endif
-
 pprInstr (SEGMENT DataSegment)
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT("\t.data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
 	,)))
-
-#if 0
-	,IF_ARCH_i386(SLIT(".data\n\t.align 2")
-#endif
 
 pprInstr (LABEL clab)
   = let
@@ -454,6 +450,7 @@ pprInstr (ASCII True str)
       | isDigit d = (<>) (text (charToC c)) (asciify cs 0)
       | otherwise = (<>) (text (charToC c)) (asciify cs (n-1))
 
+#if 0
 pprInstr (DATA s xs)
   = vcat [(<>) (ptext pp_size) (pprImm x) | x <- xs]
   where
@@ -461,25 +458,75 @@ pprInstr (DATA s xs)
 #if alpha_TARGET_ARCH
 	    B  -> SLIT("\t.byte\t")
 	    BU -> SLIT("\t.byte\t")
---UNUSED:   W  -> SLIT("\t.word\t")
---UNUSED:   WU -> SLIT("\t.word\t")
---UNUSED:   L  -> SLIT("\t.long\t")
 	    Q  -> SLIT("\t.quad\t")
---UNUSED:   FF -> SLIT("\t.f_floating\t")
---UNUSED:   DF -> SLIT("\t.d_floating\t")
---UNUSED:   GF -> SLIT("\t.g_floating\t")
---UNUSED:   SF -> SLIT("\t.s_floating\t")
 	    TF -> SLIT("\t.t_floating\t")
 #endif
 #if i386_TARGET_ARCH
 	    B  -> SLIT("\t.byte\t")
---UNUSED:   HB -> SLIT("\t.byte\t")
---UNUSED:   S  -> SLIT("\t.word\t")
 	    L  -> SLIT("\t.long\t")
 	    F  -> SLIT("\t.float\t")
     	    DF -> SLIT("\t.double\t")
 #endif
 #if sparc_TARGET_ARCH
+	    B  -> SLIT("\t.byte\t")
+	    BU -> SLIT("\t.byte\t")
+	    W  -> SLIT("\t.word\t")
+    	    DF -> SLIT("\t.double\t")
+#endif
+#endif
+
+
+pprInstr (DATA s xs)
+  = vcat (concatMap (ppr_item s) xs)
+    where
+#if alpha_TARGET_ARCH
+            This needs to be fixed.
+	    B  -> SLIT("\t.byte\t")
+	    BU -> SLIT("\t.byte\t")
+	    Q  -> SLIT("\t.quad\t")
+	    TF -> SLIT("\t.t_floating\t")
+#endif
+#if i386_TARGET_ARCH
+	ppr_item B  x = [text "\t.byte\t" <> pprImm x]
+	ppr_item L  x = [text "\t.long\t" <> pprImm x]
+	ppr_item F  (ImmDouble r)
+           = let bs = floatToBytes (fromRational r)
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+    	ppr_item DF (ImmDouble r)
+           = let bs = doubleToBytes (fromRational r)
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+
+        floatToBytes :: Float -> [Int]
+        floatToBytes f
+           = runST (do
+                arr <- newFloatArray ((0::Int),3)
+                writeFloatArray arr 0 f
+                i0 <- readCharArray arr 0
+                i1 <- readCharArray arr 1
+                i2 <- readCharArray arr 2
+                i3 <- readCharArray arr 3
+                return (map ord [i0,i1,i2,i3])
+             )
+
+        doubleToBytes :: Double -> [Int]
+        doubleToBytes d
+           = runST (do
+                arr <- newDoubleArray ((0::Int),7)
+                writeDoubleArray arr 0 d
+                i0 <- readCharArray arr 0
+                i1 <- readCharArray arr 1
+                i2 <- readCharArray arr 2
+                i3 <- readCharArray arr 3
+                i4 <- readCharArray arr 4
+                i5 <- readCharArray arr 5
+                i6 <- readCharArray arr 6
+                i7 <- readCharArray arr 7
+                return (map ord [i0,i1,i2,i3,i4,i5,i6,i7])
+             )
+
+#endif
+#if sparc_TARGET_ARCH
+            This needs to be fixed.
 	    B  -> SLIT("\t.byte\t")
 	    BU -> SLIT("\t.byte\t")
 	    W  -> SLIT("\t.word\t")

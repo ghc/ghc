@@ -69,7 +69,7 @@ stmt2Instrs stmt = case stmt of
 	getData :: StixTree -> UniqSM (InstrBlock, Imm)
 
 	getData (StInt i)    = returnUs (id, ImmInteger i)
-	getData (StDouble d) = returnUs (id, dblImmLit d)
+	getData (StDouble d) = returnUs (id, ImmDouble d)
 	getData (StLitLbl s) = returnUs (id, ImmLab s)
 	getData (StCLbl l)   = returnUs (id, ImmCLbl l)
 	getData (StString s) =
@@ -499,7 +499,7 @@ getRegister (StDouble d)
     let code dst = mkSeqInstrs [
     	    SEGMENT DataSegment,
 	    LABEL lbl,
-	    DATA DF [dblImmLit d],
+	    DATA DF [ImmDouble d],
 	    SEGMENT TextSegment,
 	    FLD DF (OpImm (ImmCLbl lbl))
 	    ]
@@ -911,7 +911,7 @@ getRegister (StDouble d)
     let code dst = mkSeqInstrs [
     	    SEGMENT DataSegment,
 	    LABEL lbl,
-	    DATA DF [dblImmLit d],
+	    DATA DF [ImmDouble d],
 	    SEGMENT TextSegment,
 	    SETHI (HI (ImmCLbl lbl)) tmp,
 	    LD DF (AddrRegImm tmp (LO (ImmCLbl lbl))) dst]
