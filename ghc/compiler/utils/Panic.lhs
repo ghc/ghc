@@ -33,13 +33,13 @@ import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
 # endif /* GHC > 504 */
 
 import CONCURRENT	( myThreadId )
+#endif /* mingw32_HOST_OS */
 
 # if __GLASGOW_HASKELL__ < 500
 import EXCEPTION        ( raiseInThread )
 # else
 import EXCEPTION	( throwTo )
 # endif /* GHC < 500 */
-#endif /* mingw32_HOST_OS */
 
 #if __GLASGOW_HASKELL__ > 408
 import EXCEPTION	( catchJust, tryJust, ioErrors )
