@@ -76,10 +76,10 @@ indexError rng i tp
 
 ----------------------------------------------------------------------
 instance  Ix Char  where
-    range (m,n)
-      | m <= n  	=  [m..n]
-      | otherwise       =  []
+    {-# INLINE range #-}
+    range (m,n) = [m..n]
 
+    {-# INLINE unsafeIndex #-}
     unsafeIndex (m,n) i = fromEnum i - fromEnum m
 
     index b i | inRange b i =  unsafeIndex b i
@@ -89,10 +89,12 @@ instance  Ix Char  where
 
 ----------------------------------------------------------------------
 instance  Ix Int  where
-    range (m,n)
-      | m <= n	        =  [m..n]
-      | otherwise       =  []
+    {-# INLINE range #-}
+	-- The INLINE stops the build in the RHS from getting inlined,
+	-- so that callers can fuse with the result of range
+    range (m,n) = [m..n]
 
+    {-# INLINE unsafeIndex #-}
     unsafeIndex (m,n) i = i - m
 
     index b i | inRange b i =  unsafeIndex b i
@@ -103,10 +105,10 @@ instance  Ix Int  where
 
 ----------------------------------------------------------------------
 instance  Ix Integer  where
-    range (m,n)		
-      | m <= n          =  [m..n]
-      | otherwise       =  []
+    {-# INLINE range #-}
+    range (m,n) = [m..n]
 
+    {-# INLINE unsafeIndex #-}
     unsafeIndex (m,n) i   = fromInteger (i - m)
 
     index b i | inRange b i =  unsafeIndex b i
@@ -117,10 +119,10 @@ instance  Ix Integer  where
 
 ----------------------------------------------------------------------
 instance Ix Bool where -- as derived
-    range   (l,u) 
-      | l <= u    = map toEnum [fromEnum l .. fromEnum u]
-      | otherwise = []
+    {-# INLINE range #-}
+    range (m,n) = [m..n]
 
+    {-# INLINE unsafeIndex #-}
     unsafeIndex (l,_) i = fromEnum i - fromEnum l
 
     index b i | inRange b i =  unsafeIndex b i
@@ -130,12 +132,15 @@ instance Ix Bool where -- as derived
 
 ----------------------------------------------------------------------
 instance Ix Ordering where -- as derived
-    range   (l,u)
-      | l <= u    = map toEnum [fromEnum l .. fromEnum u]
-      | otherwise = []
+    {-# INLINE range #-}
+    range (m,n) = [m..n]
+
+    {-# INLINE unsafeIndex #-}
     unsafeIndex (l,_) i = fromEnum i - fromEnum l
+
     index b i | inRange b i =  unsafeIndex b i
 	      | otherwise   =  indexError b i "Ordering"
+
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
