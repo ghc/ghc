@@ -4,7 +4,7 @@
 \section[WwLib]{A library for the ``worker/wrapper'' back-end to the strictness analyser}
 
 \begin{code}
-module WwLib ( mkWwBodies ) where
+module WwLib ( mkWwBodies, mkWWstr ) where
 
 #include "HsVersions.h"
 
@@ -18,7 +18,7 @@ import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
 import NewDemand	( Demand(..), Keepity(..), DmdResult(..) ) 
 import DmdAnal		( both )
-import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID, eRROR_CSTRING_ID )
+import PrelInfo		( eRROR_CSTRING_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
@@ -124,11 +124,12 @@ mkWwBodies :: Type				-- Type of original function
 mkWwBodies fun_ty demands res_info one_shots
   = mkWWargs fun_ty demands one_shots'	`thenUs` \ (wrap_args,   wrap_fn_args, work_fn_args, res_ty) ->
     mkWWcpr res_ty res_info      	`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) ->
-    mkWWstr cpr_res_ty wrap_args	`thenUs` \ (work_dmds,   wrap_fn_str,  work_fn_str) ->
+    mkWWstr wrap_args			`thenUs` \ (work_args,   wrap_fn_str,  work_fn_str) ->
+    hackWorkArgs work_args cpr_res_ty	`thenUs` \ work_args' ->
 
-    returnUs (work_dmds,
-	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . Var,
-	      work_fn_str . work_fn_cpr . work_fn_args)
+    returnUs ([idNewDemandInfo v | v <- work_args, isId v],
+	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_args' . Var,
+	      mkLams work_args' . work_fn_str . work_fn_cpr . work_fn_args)
 	-- We use an INLINE unconditionally, even if the wrapper turns out to be
 	-- something trivial like
 	--	fw = ...
@@ -138,6 +139,24 @@ mkWwBodies fun_ty demands res_info one_shots
 	-- fw from being inlined into f's RHS
   where
     one_shots' = one_shots ++ repeat False
+
+	-- Horrid special case.  If the worker would have no arguments, and the
+	-- function returns a primitive type value, that would make the worker into
+	-- an unboxed value.  We box it by passing a dummy void argument, thus:
+	--
+	--	f = /\abc. \xyz. fw abc void
+	-- 	fw = /\abc. \v. body
+	--
+	-- We use the state-token type which generates no code
+hackWorkArgs work_args res_ty
+  | any isId work_args || not (isUnLiftedType res_ty) 
+  = returnUs work_args
+  | otherwise
+  = getUniqueUs 		`thenUs` \ void_arg_uniq ->
+    let
+	void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
+    in
+    returnUs (work_args ++ [void_arg])
 \end{code}
 
 
@@ -258,60 +277,32 @@ mk_wrap_arg uniq ty dmd one_shot
 %************************************************************************
 
 \begin{code}
-mkWWstr :: Type					-- Result type
-	-> [Var]				-- Wrapper args; have their demand info on them
+mkWWstr :: [Var]				-- Wrapper args; have their demand info on them
 						-- *Includes type variables*
-        -> UniqSM ([Demand],			-- Demand on worker (value) args
+        -> UniqSM ([Var],			-- Worker args
 		   CoreExpr -> CoreExpr,	-- Wrapper body, lacking the worker call
 						-- and without its lambdas 
-						-- This fn adds the unboxing, and makes the
-						-- call passing the unboxed things
+						-- This fn adds the unboxing
 				
 		   CoreExpr -> CoreExpr)	-- Worker body, lacking the original body of the function,
-						-- but *with* lambdas
-
-mkWWstr res_ty wrap_args
-  = mk_ww_str_s wrap_args		`thenUs` \ (work_args, take_apart, put_together) ->
-    let
-	work_dmds = [idNewDemandInfo v | v <- work_args, isId v]
-	apply_to args fn = mkVarApps fn args
-    in
-    if not (null work_dmds && isUnLiftedType res_ty) then
-	returnUs ( work_dmds, 
-		   take_apart . applyToVars work_args,
-		   mkLams work_args . put_together)
-    else
- 	-- Horrid special case.  If the worker would have no arguments, and the
-	-- function returns a primitive type value, that would make the worker into
-	-- an unboxed value.  We box it by passing a dummy void argument, thus:
-	--
-	--	f = /\abc. \xyz. fw abc void
-	-- 	fw = /\abc. \v. body
-	--
-	-- We use the state-token type which generates no code
-    getUniqueUs 		`thenUs` \ void_arg_uniq ->
-    let
-	void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
-    in
-    returnUs ([Lazy],		
-	      take_apart . applyToVars [realWorldPrimId] . apply_to work_args,
-	      mkLams work_args . Lam void_arg . put_together)
+						-- and lacking its lambdas.
+						-- This fn does the reboxing
 
 ----------------------
 nop_fn body = body
 
 ----------------------
-mk_ww_str_s []
+mkWWstr []
   = returnUs ([], nop_fn, nop_fn)
 
-mk_ww_str_s (arg : args)
-  = mk_ww_str arg		`thenUs` \ (args1, wrap_fn1, work_fn1) ->
-    mk_ww_str_s args		`thenUs` \ (args2, wrap_fn2, work_fn2) ->
+mkWWstr (arg : args)
+  = mkWWstr_one arg		`thenUs` \ (args1, wrap_fn1, work_fn1) ->
+    mkWWstr args		`thenUs` \ (args2, wrap_fn2, work_fn2) ->
     returnUs (args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
 
 ----------------------
-mk_ww_str arg
+mkWWstr_one arg
   | isTyVar arg
   = returnUs ([arg],  nop_fn, nop_fn)
 
@@ -352,7 +343,7 @@ mk_ww_str arg
 	-> getUniquesUs 		`thenUs` \ uniqs ->
 	   let
 	     unpk_args	    = zipWith mk_ww_local uniqs inst_con_arg_tys
-	     unpk_args_w_ds = zipWithEqual "mk_ww_str" set_worker_arg_info unpk_args cs'
+	     unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs'
 	     unbox_fn       = mk_unpk_case arg unpk_args data_con arg_tycon
 	     rebox_fn	    = Let (NonRec arg con_app) 
 	     con_app	    = mkConApp data_con (map Type tycon_arg_tys ++ map Var unpk_args)
@@ -364,7 +355,7 @@ mk_ww_str arg
 								-- 	S(LA) -->  U(LL)
 			Drop -> cs
 	   in
-	   mk_ww_str_s unpk_args_w_ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
+	   mkWWstr unpk_args_w_ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
 
 --	   case keep of
 --	     Keep -> returnUs (arg : worker_args, unbox_fn . wrap_fn, work_fn)

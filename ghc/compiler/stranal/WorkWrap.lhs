@@ -11,17 +11,21 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 import CoreSyn
 import CoreUnfold	( certainlyWillInline )
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprType )
-import Id		( Id, idType, idNewStrictness, idArity, isOneShotLambda,
-			  setIdNewStrictness, zapIdNewStrictness, idInlinePragma, mkWorkerId,
-			  setIdWorkerInfo, setInlinePragma )
+import CoreUtils	( exprType, exprIsValue )
+import Id		( Id, idType, isOneShotLambda,
+			  setIdNewStrictness, mkWorkerId,
+			  setIdWorkerInfo, setInlinePragma,
+			  idInfo )
 import Type		( Type )
-import IdInfo		( WorkerInfo(..) )
-import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
-			  mkTopDmdType, isBotRes, returnsCPR
+import IdInfo		( WorkerInfo(..), arityInfo,
+			  newDemandInfo, newStrictnessInfo, unfoldingInfo, inlinePragInfo
+			)
+import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), Keepity(..),
+			  mkTopDmdType, isBotRes, returnsCPR, topSig
 			)
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
-import BasicTypes	( RecFlag(..), isNonRec, Activation(..), isNeverActive )
+import BasicTypes	( RecFlag(..), isNonRec, Activation(..) )
+import Maybes		( orElse )
 import CmdLineOpts
 import WwLib
 import Outputable
@@ -182,29 +186,7 @@ tryWW	:: RecFlag
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW is_rec fn_id rhs
-  | isNeverActive inline_prag
-	-- Don't split NOINLINE things, because they will never be inlined
-	-- Furthermore, zap the strictess info in the Id.  Why?  Because
-	-- the NOINLINE says "don't expose any of the inner workings at the call 
-	-- site" and the strictness is certainly an inner working.
-	--
-	-- More concretely, the demand analyser discovers the following strictness
-	-- for unsafePerformIO:  C(U(AV))
-	-- But then consider
-	--	unsafePerformIO (\s -> let r = f x in 
-	--			       case writeIORef v r s of (# s1, _ #) ->
-	--			       (# s1, r #)
-	-- The strictness analyser will find that the binding for r is strict,
-	-- (becuase of uPIO's strictness sig), and so it'll evaluate it before 
-	-- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
-	-- get a deadlock!  
-	--
-	-- Solution: don't expose the strictness of unsafePerformIO.
-  = returnUs [ (zapIdNewStrictness fn_id, rhs) ]
-
-  |  arity == 0
-	-- Don't worker-wrapper thunks
-  || isNonRec is_rec && certainlyWillInline fn_id
+  |  isNonRec is_rec && certainlyWillInline unfolding
 	-- No point in worker/wrappering a function that is going to be
 	-- INLINEd wholesale anyway.  If the strictness analyser is run
 	-- twice, this test also prevents wrappers (which are INLINEd)
@@ -218,12 +200,33 @@ tryWW is_rec fn_id rhs
 	--	fw = \ab -> (__inline (\x -> E)) (a,b)
 	-- and the original __inline now vanishes, so E is no longer
 	-- inside its __inline wrapper.  Death!  Disaster!
-  || not (worthSplitting strict_sig)
-	-- Strictness info suggests not to w/w
   = returnUs [ (fn_id, rhs) ]
 
-  | otherwise		-- Do w/w split!
-  = WARN( arity /= length wrap_dmds, ppr fn_id <+> (ppr arity $$ ppr strict_sig) )
+  | is_thunk && worthSplittingThunk fn_dmd res_info
+  = ASSERT( isNonRec is_rec )	-- The thunk must be non-recursive
+    splitThunk fn_id rhs
+
+  | is_fun && worthSplittingFun wrap_dmds res_info
+  = splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
+
+  | otherwise
+  = returnUs [ (fn_id, rhs) ]
+
+  where
+    fn_info   	= idInfo fn_id
+    fn_dmd    	= newDemandInfo fn_info
+    unfolding 	= unfoldingInfo fn_info
+    inline_prag = inlinePragInfo fn_info
+    strict_sig  = newStrictnessInfo fn_info `orElse` topSig
+
+    StrictSig (DmdType _ wrap_dmds res_info) = strict_sig
+
+    is_fun    = not (null wrap_dmds)
+    is_thunk  = not is_fun && not (exprIsValue rhs)
+
+---------------------
+splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
+  = WARN( arity /= length wrap_dmds, ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) )
 	-- The arity should match the signature
     mkWwBodies fun_ty wrap_dmds res_info one_shots 	`thenUs` \ (work_demands, wrap_fn, work_fn) ->
     getUniqueUs						`thenUs` \ work_uniq ->
@@ -236,22 +239,19 @@ tryWW is_rec fn_id rhs
 				-- it's ok to give it an empty DmdEnv
 
 	wrap_rhs = wrap_fn work_id
-	wrap_id  = fn_id `setIdWorkerInfo`	HasWorker work_id arity
-			 `setInlinePragma`	AlwaysActive	-- Zap any inline pragma;
-								-- Put it on the worker instead
+	wrap_id  = fn_id `setIdWorkerInfo` HasWorker work_id arity
+			 `setInlinePragma` AlwaysActive	-- Zap any inline pragma;
+							-- Put it on the worker instead
     in
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
 	-- mkWwBodies has already built a wrap_rhs with an INLINE pragma wrapped around it
   where
     fun_ty = idType fn_id
-    arity  = idArity fn_id	-- The arity is set by the simplifier using exprEtaExpandArity
+
+    arity  = arityInfo fn_info	-- The arity is set by the simplifier using exprEtaExpandArity
 				-- So it may be more than the number of top-level-visible lambdas
 
-    inline_prag = idInlinePragma fn_id
-    strict_sig  = idNewStrictness fn_id
-
-    StrictSig (DmdType _ wrap_dmds res_info) = strict_sig
     work_res_info | isBotRes res_info = BotRes	-- Cpr stuff done by wrapper
 		  | otherwise	      = TopRes
 
@@ -268,6 +268,54 @@ get_one_shots (Note _ e) = get_one_shots e
 get_one_shots other	 = noOneShotInfo
 \end{code}
 
+Thunk splitting
+~~~~~~~~~~~~~~~
+Suppose x is used strictly (never mind whether it has the CPR
+property).  
+
+      let
+	x* = x-rhs
+      in body
+
+splitThunk transforms like this:
+
+      let
+	x* = case x-rhs of { I# a -> I# a }
+      in body
+
+Now simplifier will transform to
+
+      case x-rhs of 
+	I# a ->	let x* = I# b 
+	        in body
+
+which is what we want. Now suppose x-rhs is itself a case:
+
+	x-rhs = case e of { T -> I# a; F -> I# b }
+
+The join point will abstract over a, rather than over (which is
+what would have happened before) which is fine.
+
+Notice that x certainly has the CPR property now!
+
+In fact, splitThunk uses the function argument w/w splitting 
+function, so that if x's demand is deeper (say U(U(L,L),L))
+then the splitting will go deeper too.
+
+\begin{code}
+-- splitThunk converts the *non-recursive* binding
+--	x = e
+-- into
+--	x = let x = e
+--	    in case x of 
+--		 I# y -> let x = I# y in x }
+-- See comments above. Is it not beautifully short?
+
+splitThunk fn_id rhs
+  = mkWWstr [fn_id]		`thenUs` \ (_, wrap_fn, work_fn) ->
+    returnUs [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -276,12 +324,12 @@ get_one_shots other	 = noOneShotInfo
 %************************************************************************
 
 \begin{code}
-worthSplitting :: StrictSig -> Bool
+worthSplittingFun :: [Demand] -> DmdResult -> Bool
 		-- True <=> the wrapper would not be an identity function
-worthSplitting (StrictSig (DmdType _ ds res))
+worthSplittingFun ds res
   = any worth_it ds || returnsCPR res
 	-- worthSplitting returns False for an empty list of demands,
-	-- and hence do_strict_ww is False if arity is zero
+	-- and hence do_strict_ww is False if arity is zero and there is no CPR
 
 	-- We used not to split if the result is bottom.
 	-- [Justification:  there's no efficiency to be gained.]
@@ -297,6 +345,20 @@ worthSplitting (StrictSig (DmdType _ ds res))
     worth_it Abs	= True	-- Absent arg
     worth_it (Seq _ ds) = True	-- Arg to evaluate
     worth_it other	= False
+
+worthSplittingThunk :: Demand		-- Demand on the thunk
+		    -> DmdResult	-- CPR info for the thunk
+		    -> Bool
+worthSplittingThunk dmd res
+  = worth_it dmd || returnsCPR res
+  where
+	-- Split if the thing is unpacked
+    worth_it (Seq Defer ds) = False
+    worth_it (Seq _     ds) = any not_abs ds
+    worth_it other	    = False
+
+    not_abs Abs   = False
+    not_abs other = True
 \end{code}
 
 
