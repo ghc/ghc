@@ -37,6 +37,7 @@ PrelGHC
   parAtForNow#
 
   SynchVar#
+  sameMVar#
   newSynchVar#
   takeMVar#
   putMVar#
