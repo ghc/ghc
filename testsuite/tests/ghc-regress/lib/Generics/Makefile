@@ -37,6 +37,7 @@ clean:
 	rm -f bits/bits
 	rm -f gzip/gzip
 	rm -f freeNames/freeNames
+	rm -f findepth/findepth
 	rm -f geq/geq
 	rm -f gmapQ-assoc
 	rm -f gread
