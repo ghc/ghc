@@ -453,26 +453,36 @@ simplLazyBind :: SimplEnv
 	      -> SimplM (FloatsWith SimplEnv)
 
 simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
-  =	-- Substitute the rules for this binder in the light
-	-- of earlier substitutions in this very letrec group,
-	-- add the substituted rules to the IdInfo, and 
-	-- extend the in-scope env, so that the IdInfo for this 
-	-- binder extends  over the RHS for the binder itself.
+  = let	-- Transfer the IdInfo of the original binder to the new binder
+	-- This is crucial: we must preserve
+	--	strictness
+	--	rules
+	--	worker info
+	-- etc.  To do this we must apply the current substitution, 
+	-- which incorporates earlier substitutions in this very letrec group.
 	--
+	-- NB 1.  We do this *before* processing the RHS of the binder, so that
+	-- its substituted rules are visible in its own RHS.
 	-- This is important.  Manuel found cases where he really, really
 	-- wanted a RULE for a recursive function to apply in that function's
  	-- own right-hand side.
 	--
-	-- NB: does no harm for non-recursive bindings
-	--
-	-- NB2: just rules!  In particular, the arity of an Id is not visible
+	-- NB 2: We do not transfer the arity (see Subst.substIdInfo)
+	-- The arity of an Id should not be visible
 	-- in its own RHS, else we eta-reduce
 	--	f = \x -> f x
 	-- to
 	--	f = f
 	-- which isn't sound.  And it makes the arity in f's IdInfo greater than
 	-- the manifest arity, which isn't good.
-    let
+	-- The arity will get added later.
+	--
+	-- NB 3: It's important that we *do* transer the loop-breaker OccInfo,
+	-- because that's what stops the Id getting inlined infinitely, in the body
+	-- of the letrec.
+
+	-- NB 4: does no harm for non-recursive bindings
+
 	bndr2  	  	  = bndr1 `setIdInfo` simplIdInfo (getSubst env) (idInfo bndr)
 	env1	     	  = modifyInScope env bndr2 bndr2
 	rhs_env      	  = setInScope rhs_se env1

@@ -56,7 +56,7 @@ import Id		( idType, idInfo, setIdInfo, setIdType,
 import IdInfo		( IdInfo, vanillaIdInfo,
 			  occInfo, isFragileOcc, setOccInfo, 
 			  specInfo, setSpecInfo, 
-			  setArityInfo, unknownArity,
+			  setArityInfo, unknownArity, arityInfo,
 			  unfoldingInfo, setUnfoldingInfo,
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo,
                           lbvarInfo, LBVarInfo(..), setLBVarInfo, hasNoLBVarInfo
@@ -533,7 +533,7 @@ substExpr subst expr
 
     go (Let (Rec pairs) body) = Let (Rec pairs') (substExpr subst' body)
 			      where
-				(subst', bndrs') = substRecIds subst (map fst pairs)
+				(subst', bndrs') = substRecBndrs subst (map fst pairs)
 				pairs'	= bndrs' `zip` rhss'
 				rhss'	= map (substExpr subst' . snd) pairs
 
@@ -570,7 +570,7 @@ simplBndr :: Subst -> Var -> (Subst, Var)
 -- we *don't* need to use it to track occurrence info.
 simplBndr subst bndr
   | isTyVar bndr  = substTyVar subst bndr
-  | otherwise     = subst_id isFragileOcc subst subst bndr
+  | otherwise     = subst_id False subst subst bndr
 
 simplBndrs :: Subst -> [Var] -> (Subst, [Var])
 simplBndrs subst bndrs = mapAccumL simplBndr subst bndrs
@@ -589,7 +589,7 @@ simplLamBndr subst bndr
   = (subst', bndr' `setIdUnfolding` substUnfolding subst old_unf)
   where
     old_unf = idUnfolding bndr
-    (subst', bndr') = subst_id isFragileOcc subst subst bndr
+    (subst', bndr') = subst_id False subst subst bndr
 		
 
 simplLetId :: Subst -> Id -> (Subst, Id)
@@ -622,13 +622,9 @@ simplIdInfo :: Subst -> IdInfo -> IdInfo
   -- Used by the simplifier to compute new IdInfo for a let(rec) binder,
   -- subsequent to simplLetId having zapped its IdInfo
 simplIdInfo subst old_info
-  = case substIdInfo subst isFragileOcc zapped_old_info of 
+  = case substIdInfo False subst old_info of 
 	Just new_info -> new_info
 	Nothing       -> old_info
-  where
-    zapped_old_info = old_info `setArityInfo` unknownArity
-	-- Like unfolding, arity gets set later
-	-- Maybe we should do this in substIdInfo?
 \end{code}
 
 \begin{code}
@@ -640,25 +636,26 @@ simplIdInfo subst old_info
 substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
   | isTyVar bndr  = substTyVar subst bndr
-  | otherwise     = subst_id keepOccInfo subst subst bndr
+  | otherwise     = subst_id True {- keep fragile info -} subst subst bndr
 
 substBndrs :: Subst -> [Var] -> (Subst, [Var])
 substBndrs subst bndrs = mapAccumL substBndr subst bndrs
 
-substRecIds :: Subst -> [Id] -> (Subst, [Id])
+substRecBndrs :: Subst -> [Id] -> (Subst, [Id])
 -- Substitute a mutually recursive group
-substRecIds subst bndrs 
+substRecBndrs subst bndrs 
   = (new_subst, new_bndrs)
   where
 	-- Here's the reason we need to pass rec_subst to subst_id
-    (new_subst, new_bndrs) = mapAccumL (subst_id keepOccInfo new_subst) subst bndrs
+    (new_subst, new_bndrs) = mapAccumL (subst_id True {- keep fragile info -} new_subst) 
+			 	       subst bndrs
 
 keepOccInfo occ = False	-- Never fragile
 \end{code}
 
 
 \begin{code}
-subst_id :: (OccInfo -> Bool)	-- True <=> the OccInfo is fragile
+subst_id :: Bool		-- True <=> keep fragile info
 	 -> Subst		-- Substitution to use for the IdInfo
 	 -> Subst -> Id 	-- Substitition and Id to transform
 	 -> (Subst, Id)		-- Transformed pair
@@ -674,7 +671,7 @@ subst_id :: (OccInfo -> Bool)	-- True <=> the OccInfo is fragile
 --	  In this case, the var in the DoneId is the same as the
 --	  var returned
 
-subst_id is_fragile_occ rec_subst subst@(Subst in_scope env) old_id
+subst_id keep_fragile rec_subst subst@(Subst in_scope env) old_id
   = (Subst (in_scope `extendInScopeSet` new_id) new_env, new_id)
   where
 	-- id1 is cloned if necessary
@@ -686,7 +683,7 @@ subst_id is_fragile_occ rec_subst subst@(Subst in_scope env) old_id
 	-- new_id has the right IdInfo
 	-- The lazy-set is because we're in a loop here, with 
 	-- rec_subst, when dealing with a mutually-recursive group
-    new_id = maybeModifyIdInfo (substIdInfo rec_subst is_fragile_occ) id2
+    new_id = maybeModifyIdInfo (substIdInfo keep_fragile rec_subst) id2
 
 	-- Extend the substitution if the unique has changed
 	-- See the notes with substTyVar for the delSubstEnv
@@ -710,7 +707,7 @@ subst_clone_id rec_subst subst@(Subst in_scope env) (old_id, uniq)
     id1	 = setVarUnique old_id uniq
     id2  = substIdType subst id1
 
-    new_id  = maybeModifyIdInfo (substIdInfo rec_subst isFragileOcc) id2
+    new_id  = maybeModifyIdInfo (substIdInfo False rec_subst) id2
     new_env = extendSubstEnv env old_id (DoneId new_id NoOccInfo)
 
 substAndCloneIds :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
@@ -737,35 +734,47 @@ substAndCloneId subst@(Subst in_scope env) us old_id
 %************************************************************************
 
 \begin{code}
-substIdInfo :: Subst 
-	    -> (OccInfo -> Bool)	-- True <=> zap the occurrence info
+substIdInfo :: Bool	-- True <=> keep even fragile info
+	    -> Subst 
 	    -> IdInfo
 	    -> Maybe IdInfo
+-- The keep_fragile flag is True when we are running a simple expression
+-- substitution that preserves all structure, so that arity and occurrence
+-- info are unaffected.  The False state is used more often.
+--
 -- Substitute the 
 --	rules
 --	worker info
 --	LBVar info
 -- Zap the unfolding 
--- Zap the occ info if instructed to do so
+-- If keep_fragile then
+--	keep OccInfo
+--	keep Arity
+-- else
+--	keep only 'robust' OccInfo
+--	zap Arity
 -- 
 -- Seq'ing on the returned IdInfo is enough to cause all the 
 -- substitutions to happen completely
 
-substIdInfo subst is_fragile_occ info
+substIdInfo keep_fragile subst info
   | nothing_to_do = Nothing
-  | otherwise     = Just (info `setOccInfo`    	  (if zap_occ then NoOccInfo else old_occ)
+  | otherwise     = Just (info `setOccInfo`    	  (if keep_occ then old_occ else NoOccInfo)
+			       `setArityInfo`     (if keep_arity then old_arity else unknownArity)
 			       `setSpecInfo`   	  substRules  subst old_rules
 			       `setWorkerInfo` 	  substWorker subst old_wrkr
 			       `setUnfoldingInfo` noUnfolding)
 			-- setSpecInfo does a seq
 			-- setWorkerInfo does a seq
   where
-    nothing_to_do = not zap_occ && 
+    nothing_to_do = keep_occ && keep_arity &&
 		    isEmptyCoreRules old_rules &&
 		    not (workerExists old_wrkr) &&
 		    not (hasUnfolding (unfoldingInfo info))
     
-    zap_occ   = is_fragile_occ old_occ
+    keep_occ   = keep_fragile || not (isFragileOcc old_occ)
+    keep_arity = keep_fragile || old_arity == unknownArity
+    old_arity = arityInfo info
     old_occ   = occInfo info
     old_rules = specInfo info
     old_wrkr  = workerInfo info
