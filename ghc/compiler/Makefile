@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.129 2001/01/05 17:57:07 rrt Exp $
+# $Id: Makefile,v 1.130 2001/01/06 12:52:58 panne Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -39,7 +39,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cProjectName          = \"$(ProjectName)\"" >> $(CONFIG_HS)
 	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> $(CONFIG_HS)
 	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> $(CONFIG_HS)
-	@echo "cBooterVersion	     = \"$(GhcVersion)\"" >> $(CONFIG_HS)
+	@echo "cBooterVersion        = \"$(GhcVersion)\"" >> $(CONFIG_HS)
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> $(CONFIG_HS)
 	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> $(CONFIG_HS)
@@ -96,9 +96,10 @@ SRC_HC_OPTS += -DILX
 endif
 endif
 
+ghc_411_at_least = $(shell expr "$(GhcMinVersion)" \>= 11)
+
 # Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter)" "YES"
-ghc_411_at_least = $(shell expr "$(GhcMinVersion)" \>= 11)
 ifeq "$(ghc_411_at_least)" "1"
 SRC_HC_OPTS += -DGHCI -optc-DGHCI
 DIRS += ghci
@@ -204,9 +205,9 @@ prelude/PrimOp_HC_OPTS 		= -H12m -no-recomp
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
 
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
 
-parser/Parser_HC_OPTS 		+= -Onot -K2m -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
 # seem to be necessary anymore for the modules below.
