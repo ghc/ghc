@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.32 2000/01/14 11:45:21 hwloidl Exp $
+ * $Id: StgMiscClosures.hc,v 1.33 2000/01/14 13:22:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -209,9 +209,18 @@ STGFUN(BLACKHOLE_entry)
 #endif
 
 #ifdef SMP
-    CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
+    {
+      bdescr *bd = Bdescr(R1.p);
+      if (bd->back != (bdescr *)BaseReg) {
+	if (bd->gen->no >= 1 || bd->step->no >= 1) {
+	  CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
+	} else {
+	  EXTFUN_RTS(stg_gc_enter_1_hponly);
+	  JMP_(stg_gc_enter_1_hponly);
+	}
+      }
+    }
 #endif
-
     TICK_ENT_BH();
 
     /* Put ourselves on the blocking queue for this black hole */
@@ -265,7 +274,17 @@ STGFUN(BLACKHOLE_BQ_entry)
 #endif
 
 #ifdef SMP
-    CMPXCHG(R1.cl->header.info, &BLACKHOLE_BQ_info, &WHITEHOLE_info);
+    {
+      bdescr *bd = Bdescr(R1.p);
+      if (bd->back != (bdescr *)BaseReg) {
+	if (bd->gen->no >= 1 || bd->step->no >= 1) {
+	  CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
+	} else {
+	  EXTFUN_RTS(stg_gc_enter_1_hponly);
+	  JMP_(stg_gc_enter_1_hponly);
+	}
+      }
+    }
 #endif
 
     TICK_ENT_BH();
@@ -380,7 +399,17 @@ STGFUN(CAF_BLACKHOLE_entry)
 #endif
 
 #ifdef SMP
-    CMPXCHG(R1.cl->header.info, &CAF_BLACKHOLE_info, &WHITEHOLE_info);
+    {
+      bdescr *bd = Bdescr(R1.p);
+      if (bd->back != (bdescr *)BaseReg) {
+	if (bd->gen->no >= 1 || bd->step->no >= 1) {
+	  CMPXCHG(R1.cl->header.info, &CAF_BLACKHOLE_info, &WHITEHOLE_info);
+	} else {
+	  EXTFUN_RTS(stg_gc_enter_1_hponly);
+	  JMP_(stg_gc_enter_1_hponly);
+	}
+      }
+    }
 #endif
 
     TICK_ENT_BH();
