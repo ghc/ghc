@@ -42,7 +42,7 @@ IOWorkerProc(PVOID param)
     WorkQueue* pq = iom->workQueue;
     WorkItem*  work;
     int        len = 0, fd = 0;
-    DWORD      errCode;
+    DWORD      errCode = 0;
     void*      complData;
 
     hWaits[0] = (HANDLE)iom->hExitEvent;
@@ -96,9 +96,40 @@ IOWorkerProc(PVOID param)
 			    errCode = WSAGetLastError();
 			}
 		    } else {
+			DWORD dw;
+
+			/* Do the read(), with extra-special handling for Ctrl+C */
 			len = read(work->workData.ioData.fd,
 				   work->workData.ioData.buf,
 				   work->workData.ioData.len);
+			if ( len == 0 && work->workData.ioData.len != 0 ) {
+			    /* Given the following scenario:
+			     *     - a console handler has been registered that handles Ctrl+C
+			     *       events.
+			     *     - we've not tweaked the 'console mode' settings to turn on
+			     *       ENABLE_PROCESSED_INPUT.
+			     *     - we're blocked waiting on input from standard input.
+			     *     - the user hits Ctrl+C.
+			     *
+			     * The OS will invoke the console handler (in a separate OS thread),
+			     * and the above read() (i.e., under the hood, a ReadFile() op) returns
+			     * 0, with the error set to ERROR_OPERATION_ABORTED. We don't
+			     * want to percolate this non-EOF condition too far back up, but ignore
+			     * it. However, we do want to give the RTS an opportunity to deliver the
+			     * console event.
+			     * 
+			     * Hence, we set 'errorCode' to (-2), which we then look out for in
+			     * GHC.Conc.asyncRead.
+			     */
+			    dw = GetLastError();
+			    if ( dw == ERROR_OPERATION_ABORTED ) {
+				/* Only do the retry when dealing with the standard input handle. */
+				HANDLE h  = (HANDLE)GetStdHandle(STD_INPUT_HANDLE);
+				if ( _get_osfhandle(work->workData.ioData.fd) == (long)h ) {
+				    errCode = (DWORD)-2;
+				}
+			    }
+			}
 			if (len == -1) { errCode = errno; }
 		    }
 		    complData = work->workData.ioData.buf;

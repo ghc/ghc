@@ -50,9 +50,11 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
 {
     switch (dwCtrlType) {
     
+    case CTRL_CLOSE_EVENT:
+	/* see generic_handler() comment re: this event */
+	return FALSE;
     case CTRL_C_EVENT:
     case CTRL_BREAK_EVENT:
-    case CTRL_CLOSE_EVENT:
 
 	// If we're already trying to interrupt the RTS, terminate with
 	// extreme prejudice.  So the first ^C tries to exit the program
@@ -185,12 +187,23 @@ void handleSignalsInThisThread(void)
 static BOOL WINAPI generic_handler(DWORD dwCtrlType)
 {
     /* Ultra-simple -- up the counter + signal a switch. */
-    if ( stg_pending_events < N_PENDING_EVENTS ) {
-	stg_pending_buf[stg_pending_events] = dwCtrlType;
-	stg_pending_events++;
+    switch(dwCtrlType) {
+    case CTRL_CLOSE_EVENT:
+	/* Don't support the delivery of this event; if we
+	 * indicate that we've handled it here and the Haskell handler
+	 * doesn't take proper action (e.g., terminate the OS process),
+	 * the user of the app will be unable to kill/close it. Not
+	 * good, so disable the delivery for now.
+	 */
+	return FALSE;
+    default:
+	if ( stg_pending_events < N_PENDING_EVENTS ) {
+	    stg_pending_buf[stg_pending_events] = dwCtrlType;
+	    stg_pending_events++;
+	}
+	context_switch = 1;
+	return TRUE;
     }
-    context_switch = 1;
-    return TRUE;
 }
 
 
