@@ -40,9 +40,9 @@ ppHH2Contents odir doctitle maybe_package tree = do
 	ppModuleTree _  []     = error "HaddockHH2.ppHH2Contents.ppModuleTree: no module trees given"
 
 	ppNode :: [String] -> ModuleTree -> Doc
-	ppNode ss (Node s leaf _pkg []) =
+	ppNode ss (Node s leaf _pkg _short []) =
 	  text "<HelpTOCNode"  <+> ppAttributes leaf (s:ss) <> text "/>"
-	ppNode ss (Node s leaf _pkg ts) =
+	ppNode ss (Node s leaf _pkg _short ts) =
 	  text "<HelpTOCNode" <+> ppAttributes leaf (s:ss) <> text ">" $$
 	  nest 4 (ppModuleTree (s:ss) ts) $+$
 	  text "</HelpTOCNode>"

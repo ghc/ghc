@@ -20,7 +20,8 @@ import HaddockTypes
 ppDevHelpFile :: FilePath -> String -> Maybe String -> [(Module,Interface)] -> IO ()
 ppDevHelpFile odir doctitle maybe_package ifaces = do
   let devHelpFile = package++".devhelp"
-      tree = mkModuleTree [(mod,iface_package iface) | (mod,iface) <- ifaces]
+      tree = mkModuleTree [ (mod, iface_package iface, toDescription iface)
+			  | (mod, iface) <- ifaces ]
       doc =
         text "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>" $$
         (text "<book xmlns=\"http://www.devhelp.net/book\" title=\""<>text doctitle<>
@@ -42,7 +43,7 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
     ppModuleTree _  []     = error "HaddockHH.ppHHContents.fn: no module trees given"
 
     ppNode :: [String] -> ModuleTree -> Doc
-    ppNode ss (Node s leaf _pkg ts) =
+    ppNode ss (Node s leaf _pkg _short ts) =
         case ts of
           [] -> text "<sub"<+>ppAttribs<>text "/>"
           ts -> 
