@@ -277,6 +277,11 @@ def test( name, setup, func, args ):
         ways = config.compile_ways
     elif func == compile_and_run or func == multimod_compile_and_run:
         ways = config.run_ways
+    elif func == ghci_script:
+        if 'ghci' in config.run_ways:
+            ways = ['ghci']
+        else:
+            ways = []
     else:
         ways = ['normal']
 
