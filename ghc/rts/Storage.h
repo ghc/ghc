@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.26 2001/02/08 14:36:21 simonmar Exp $
+ * $Id: Storage.h,v 1.27 2001/02/09 10:33:22 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -185,8 +185,10 @@ recordOldToNewPtrs(StgMutClosure *p)
           StgInfoTable *inf = get_itbl(p1);				\
 	  nat np = inf->layout.payload.ptrs,				\
 	      nw = inf->layout.payload.nptrs, i;			\
-	  for (i = np; i < np + nw; i++) {				\
-	     ((StgClosure *)p1)->payload[i] = 0;			\
+          if (inf->type != THUNK_SELECTOR) {                            \
+             for (i = np; i < np + nw; i++) {				\
+	        ((StgClosure *)p1)->payload[i] = 0;			\
+             }                                                          \
           }								\
         }								\
         ACQUIRE_LOCK(&sm_mutex);					\
