@@ -249,7 +249,7 @@ setOccNameSpace sp (OccName _ occ) = OccName sp occ
 
 -- occNameFlavour is used only to generate good error messages
 occNameFlavour :: OccName -> String
-occNameFlavour (OccName DataName _)  = "Real data constructor"
+occNameFlavour (OccName DataName _)  = "Data constructor"
 occNameFlavour (OccName TvName _)    = "Type variable"
 occNameFlavour (OccName TcClsName _) = "Type constructor or class"
 occNameFlavour (OccName VarName s)   = "Variable"
