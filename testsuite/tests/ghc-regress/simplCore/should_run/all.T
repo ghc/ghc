@@ -11,4 +11,4 @@ setTestOpts(f)
 
 test('simplrun001', normal, compile_and_run, [''])
 test('simplrun002', normal, compile_and_run, [''])
-test('simplrun003', normal, compile_and_run, ['-O2'])
+test('simplrun003', normal, compile_and_run, [''])
