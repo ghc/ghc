@@ -1,0 +1,4 @@
+
+rnfail041.hs:4: Variable not in scope: `h'
+
+rnfail041.hs:5: Variable not in scope: `j'

@@ -40,3 +40,4 @@ test('rnfail038', normal, compile_fail, [''])
 test('rnfail039', normal, compile_fail, [''])
 
 test('rnfail040', normal, multimod_compile_fail, ['rnfail040', '-v0'])
+test('rnfail041', normal, compile_fail, [''])
