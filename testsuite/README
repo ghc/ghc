@@ -214,6 +214,23 @@ these steps:
 				Compile and run a multi-module
 				program.
 
+		run_command
+				Just run an arbitrary command.  The
+ 				output is checked against T.stdout and
+ 				T.stderr, and the stdin and expected
+ 				exit code can be changed in the same
+ 				way as for compile_and_run.
+
+		run_command_ignore_output
+				Same as run_command, except the output
+				(both stdout and stderr) from the
+				command is ignored.
+
+		ghci_script
+				Runs the current compiler, passing
+				--interactive and using the specified
+				script as standard input.
+
 	<args>  is a list of arguments to be passed to <test-fn>.
 
 		For compile, compile_fail and compile_and_run, <args>
@@ -350,6 +367,9 @@ The following <test-fn>s are provided at the moment:
 	   multimod_compile
 	   multimod_compile_fail
 	   multimod_compile_and_run
+	   run_command
+	   run_command_ignore_output
+	   ghci_script
 
 and obviously others can be defined.  The function should return
 either 'pass' or 'fail' indicating that the test passed or failed
