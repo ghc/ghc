@@ -153,8 +153,9 @@ tryLoadInterface doc_str mod_name from
 	-- Check that we aren't importing ourselves. 
 	-- That only happens in Rename.checkOldIface, 
 	-- which doesn't call tryLoadInterface
-   warnCheckRn	(moduleName this_mod /= mod_name)
-		(warnSelfImport this_mod)		`thenRn_`
+   warnCheckRn	
+	(not (isHomeModule this_mod) || moduleName this_mod /= mod_name)
+	(warnSelfImport this_mod)		`thenRn_`
 
 	-- READ THE MODULE IN
    findAndReadIface doc_str mod_name hi_boot_file   `thenRn` \ read_result ->
