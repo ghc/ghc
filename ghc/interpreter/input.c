@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.20 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.21 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -78,51 +78,51 @@ String preprocessor  = 0;
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Void local initCharTab     Args((Void));
-static Void local fileInput       Args((String,Long));
-static Bool local literateMode    Args((String));
-static Bool local linecmp         Args((String,String));
-static Int  local nextLine        Args((Void));
-static Void local skip            Args((Void));
-static Void local thisLineIs      Args((Int));
-static Void local newlineSkip     Args((Void));
-static Void local closeAnyInput   Args((Void));
+static Void local initCharTab     ( Void );
+static Void local fileInput       ( String,Long );
+static Bool local literateMode    ( String );
+static Bool local linecmp         ( String,String );
+static Int  local nextLine        ( Void );
+static Void local skip            ( Void );
+static Void local thisLineIs      ( Int );
+static Void local newlineSkip     ( Void );
+static Void local closeAnyInput   ( Void );
 
-       Int  yyparse         Args((Void)); /* can't stop yacc making this   */
+       Int  yyparse               ( Void ); /* can't stop yacc making this   */
                                           /* public, but don't advertise   */
                                           /* it in a header file.          */
 
-static Void local endToken        Args((Void));
-static Text local readOperator    Args((Void));
-static Text local readIdent       Args((Void));
-static Cell local readRadixNumber Args((Int));
-static Cell local readNumber      Args((Void));
-static Cell local readChar        Args((Void));
-static Cell local readString      Args((Void));
-static Void local saveStrChr      Args((Char));
-static Cell local readAChar       Args((Bool));
+static Void local endToken        ( Void );
+static Text local readOperator    ( Void );
+static Text local readIdent       ( Void );
+static Cell local readRadixNumber ( Int );
+static Cell local readNumber      ( Void );
+static Cell local readChar        ( Void );
+static Cell local readString      ( Void );
+static Void local saveStrChr      ( Char );
+static Cell local readAChar       ( Bool );
 
-static Bool local lazyReadMatches Args((String));
-static Cell local readEscapeChar  Args((Bool));
-static Void local skipGap         Args((Void));
-static Cell local readCtrlChar    Args((Void));
-static Cell local readOctChar     Args((Void));
-static Cell local readHexChar     Args((Void));
-static Int  local readHexDigit    Args((Char));
-static Cell local readDecChar     Args((Void));
+static Bool local lazyReadMatches ( String );
+static Cell local readEscapeChar  ( Bool );
+static Void local skipGap         ( Void );
+static Cell local readCtrlChar    ( Void );
+static Cell local readOctChar     ( Void );
+static Cell local readHexChar     ( Void );
+static Int  local readHexDigit    ( Char );
+static Cell local readDecChar     ( Void );
 
-static Void local goOffside       Args((Int));
-static Void local unOffside       Args((Void));
-static Bool local canUnOffside    Args((Void));
+static Void local goOffside       ( Int );
+static Void local unOffside       ( Void );
+static Bool local canUnOffside    ( Void );
 
-static Void local skipWhitespace  Args((Void));
-static Int  local yylex           Args((Void));
-static Int  local repeatLast      Args((Void));
+static Void local skipWhitespace  ( Void );
+static Int  local yylex           ( Void );
+static Int  local repeatLast      ( Void );
 
-static Cell local parseInput      Args((Int));
+static Cell local parseInput      ( Int );
 
-static Bool local doesNotExceed   Args((String,Int,Int));
-static Int  local stringToInt     Args((String,Int));
+static Bool local doesNotExceed   ( String,Int,Int );
+static Int  local stringToInt     ( String,Int );
 
 
 /* --------------------------------------------------------------------------

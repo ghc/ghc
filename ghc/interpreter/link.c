@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.49 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.50 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -269,7 +269,7 @@ static Name predefinePrim ( String s )
  * 
  * ------------------------------------------------------------------------*/
 
-/* In standalone mode, linkPreludeTC, linkPreludeCM and linkPrimitiveNames
+/* In standalone mode, linkPreludeTC, linkPreludeCM and linkPrimNames
    are called, in that order, during static analysis of Prelude.hs.
    In combined mode such an analysis does not happen.  Instead these
    calls will be made as a result of a call link(POSTPREL).
@@ -428,7 +428,7 @@ Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
     }
 }
 
-Void linkPrimitiveNames(void) {        /* Hook to names defined in Prelude */
+Void linkPrimNames ( void ) {        /* Hook to names defined in Prelude */
     static Bool initialised = FALSE;
 
     if (!initialised) {
@@ -521,7 +521,7 @@ Int what; {
            setCurrModule(modulePrelude);
            linkPreludeTC();
            linkPreludeCM();
-           linkPrimitiveNames();
+           linkPrimNames();
 
            nameUnpackString = linkName("hugsprimUnpackString");
            namePMFail       = linkName("hugsprimPmFail");

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/03/10 20:03:37 $
+ * $Revision: 1.28 $
+ * $Date: 2000/03/13 11:37:17 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -25,11 +25,11 @@
 
 /* ---------------------------------------------------------------- */
 
-static StgVar  local stgOffset       Args((Offset,List));
-static StgVar  local stgText         Args((Text,List));
-static StgRhs  local stgRhs          Args((Cell,Int,List,StgExpr));
-static StgCaseAlt local stgCaseAlt   Args((Cell,Int,List,StgExpr));
-static StgExpr local stgExpr         Args((Cell,Int,List,StgExpr));
+static StgVar     local stgOffset    ( Offset,List );
+static StgVar     local stgText      ( Text,List );
+static StgRhs     local stgRhs       ( Cell,Int,List,StgExpr );
+static StgCaseAlt local stgCaseAlt   ( Cell,Int,List,StgExpr );
+static StgExpr    local stgExpr      ( Cell,Int,List,StgExpr );
 
 /* ---------------------------------------------------------------- */
 
@@ -37,9 +37,7 @@ static StgExpr local stgExpr         Args((Cell,Int,List,StgExpr));
 /* dictionaries, tuples, etc                                        */
 List stgGlobals = NIL;
 
-static StgVar local getSTGTupleVar  Args((Cell));
-
-static StgVar local getSTGTupleVar( Cell d )
+static StgVar local getSTGTupleVar ( Cell d )
 {
     Pair p = cellAssoc(d,stgGlobals);
     /* Yoiks - only the Prelude sees Tuple decls! */

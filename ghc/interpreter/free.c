@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: free.c,v $
- * $Revision: 1.9 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.10 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -23,11 +23,11 @@
  * Local functions
  * ------------------------------------------------------------------------*/
 
-static List freeVarsAlt     Args((List, StgCaseAlt));
-static List freeVarsPrimAlt Args((List, StgPrimAlt));
-static List freeVarsExpr    Args((List, StgExpr));
-static List freeVarsAtom    Args((List, StgAtom));
-static List freeVarsVar     Args((List, StgVar));
+static List freeVarsAlt     ( List, StgCaseAlt );
+static List freeVarsPrimAlt ( List, StgPrimAlt );
+static List freeVarsExpr    ( List, StgExpr );
+static List freeVarsAtom    ( List, StgAtom );
+static List freeVarsVar     ( List, StgVar );
 
 /* --------------------------------------------------------------------------
  * Free variable analysis

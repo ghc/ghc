@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.21 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.22 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -29,52 +29,52 @@
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Cell local translate             Args((Cell));
-static Void local transPair             Args((Pair));
-static Void local transTriple           Args((Triple));
-static Void local transAlt              Args((Cell));
-static Void local transCase             Args((Cell));
-static List local transBinds            Args((List));
-static Cell local transRhs              Args((Cell));
-static Cell local mkConsList            Args((List));
-static Cell local expandLetrec          Args((Cell));
-static Cell local transComp             Args((Cell,List,Cell));
-static Cell local transDo               Args((Cell,Cell,List));
-static Cell local transConFlds          Args((Cell,List));
-static Cell local transUpdFlds          Args((Cell,List,List));
+static Cell local translate             ( Cell );
+static Void local transPair             ( Pair );
+static Void local transTriple           ( Triple );
+static Void local transAlt              ( Cell );
+static Void local transCase             ( Cell );
+static List local transBinds            ( List );
+static Cell local transRhs              ( Cell );
+static Cell local mkConsList            ( List );
+static Cell local expandLetrec          ( Cell );
+static Cell local transComp             ( Cell,List,Cell );
+static Cell local transDo               ( Cell,Cell,List );
+static Cell local transConFlds          ( Cell,List );
+static Cell local transUpdFlds          ( Cell,List,List );
 
-static Cell local refutePat             Args((Cell));
-static Cell local refutePatAp           Args((Cell));
-static Cell local matchPat              Args((Cell));
-static List local remPat                Args((Cell,Cell,List));
-static List local remPat1               Args((Cell,Cell,List));
+static Cell local refutePat             ( Cell );
+static Cell local refutePatAp           ( Cell );
+static Cell local matchPat              ( Cell );
+static List local remPat                ( Cell,Cell,List );
+static List local remPat1               ( Cell,Cell,List );
 
-static Cell local pmcTerm               Args((Int,List,Cell));
-static Cell local pmcPair               Args((Int,List,Pair));
-static Cell local pmcTriple             Args((Int,List,Triple));
-static Cell local pmcVar                Args((List,Text));
-static Void local pmcLetrec             Args((Int,List,Pair));
-static Cell local pmcVarDef             Args((Int,List,List));
-static Void local pmcFunDef             Args((Int,List,Triple));
-static List local altsMatch             Args((Int,Int,List,List));
-static Cell local match                 Args((Int,List));
-static Cell local joinMas               Args((Int,List));
-static Bool local canFail               Args((Cell));
-static List local addConTable           Args((Cell,Cell,List));
-static Void local advance               Args((Int,Int,Cell));
-static Bool local emptyMatch            Args((Cell));
-static Cell local maDiscr               Args((Cell));
-static Bool local isNumDiscr            Args((Cell));
-static Bool local eqNumDiscr            Args((Cell,Cell));
+static Cell local pmcTerm               ( Int,List,Cell );
+static Cell local pmcPair               ( Int,List,Pair );
+static Cell local pmcTriple             ( Int,List,Triple );
+static Cell local pmcVar                ( List,Text );
+static Void local pmcLetrec             ( Int,List,Pair );
+static Cell local pmcVarDef             ( Int,List,List );
+static Void local pmcFunDef             ( Int,List,Triple );
+static List local altsMatch             ( Int,Int,List,List );
+static Cell local match                 ( Int,List );
+static Cell local joinMas               ( Int,List );
+static Bool local canFail               ( Cell );
+static List local addConTable           ( Cell,Cell,List );
+static Void local advance               ( Int,Int,Cell );
+static Bool local emptyMatch            ( Cell );
+static Cell local maDiscr               ( Cell );
+static Bool local isNumDiscr            ( Cell );
+static Bool local eqNumDiscr            ( Cell,Cell );
 #if TREX
-static Bool local isExtDiscr            Args((Cell));
-static Bool local eqExtDiscr            Args((Cell,Cell));
+static Bool local isExtDiscr            ( Cell );
+static Bool local eqExtDiscr            ( Cell,Cell );
 #endif
 
-static Void local compileGlobalFunction Args((Pair));
-static Void local compileGenFunction    Args((Name));
-static Name local compileSelFunction    Args((Pair));
-static List local addStgVar             Args((List,Pair));
+static Void local compileGlobalFunction ( Pair );
+static Void local compileGenFunction    ( Name );
+static Name local compileSelFunction    ( Pair );
+static List local addStgVar             ( List,Pair );
 
 static Name currentName;               /* Top level name being processed   */
 
@@ -1448,7 +1448,7 @@ void eval_ctrlbrk ( int dunnowhat )
    signal(SIGINT, eval_ctrlbrk);
 }
 
-Void evalExp() {                    /* compile and run input expression    */
+Void evalExp ( void ) {             /* compile and run input expression    */
     /* ToDo: this name (and other names generated during pattern match?)
      * get inserted in the symbol table but never get removed.
      */

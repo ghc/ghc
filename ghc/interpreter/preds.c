@@ -9,51 +9,51 @@
  * included in the distribution.
  *
  * $RCSfile: preds.c,v $
- * $Revision: 1.10 $
- * $Date: 2000/03/06 08:38:04 $
+ * $Revision: 1.11 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Cell   local assumeEvid        Args((Cell,Int));
+static Cell   local assumeEvid        ( Cell,Int );
 #if IPARAM
-static Cell   local findIPEvid	      Args((Text));
-static Void   local removeIPEvid      Args((Text));
+static Cell   local findIPEvid	      ( Text );
+static Void   local removeIPEvid      ( Text );
 #endif
-static List   local makePredAss       Args((List,Int));
-static List   local copyPreds         Args((List));
-static Void   local qualify           Args((List,Cell));
-static Void   local qualifyBinding    Args((List,Cell));
-static Cell   local qualifyExpr       Args((Int,List,Cell));
-static Void   local overEvid          Args((Cell,Cell));
+static List   local makePredAss       ( List,Int );
+static List   local copyPreds         ( List );
+static Void   local qualify           ( List,Cell );
+static Void   local qualifyBinding    ( List,Cell );
+static Cell   local qualifyExpr       ( Int,List,Cell );
+static Void   local overEvid          ( Cell,Cell );
 
-static Void   local cutoffExceeded    Args((Cell,Int,List));
-static Cell   local scFind            Args((Cell,Cell,Int,Cell,Int,Int));
-static Cell   local scEntail          Args((List,Cell,Int,Int));
-static Cell   local entail            Args((List,Cell,Int,Int));
-static Cell   local inEntail          Args((List,Cell,Int,Int));
+static Void   local cutoffExceeded    ( Cell,Int,List );
+static Cell   local scFind            ( Cell,Cell,Int,Cell,Int,Int );
+static Cell   local scEntail          ( List,Cell,Int,Int );
+static Cell   local entail            ( List,Cell,Int,Int );
+static Cell   local inEntail          ( List,Cell,Int,Int );
 #if MULTI_INST
-static Cell   local inEntails	      Args((List,Cell,Int,Int));
-static Bool   local instCompare	      Args((Inst, Inst));
+static Cell   local inEntails	      ( List,Cell,Int,Int );
+static Bool   local instCompare	      ( Inst, Inst );
 #endif
 #if TREX
-static Cell   local lacksNorm         Args((Type,Int,Cell));
+static Cell   local lacksNorm         ( Type,Int,Cell );
 #endif
 
-static List   local scSimplify        Args((List));
-static Void   local elimTauts         Args((Void));
-static Bool   local anyGenerics       Args((Type,Int));
-static List   local elimOuterPreds    Args((List));
-static List   local elimPredsUsing    Args((List,List));
-static Void   local reducePreds       Args((Void));
-static Void   local normPreds         Args((Int));
+static List   local scSimplify        ( List );
+static Void   local elimTauts         ( Void );
+static Bool   local anyGenerics       ( Type,Int );
+static List   local elimOuterPreds    ( List );
+static List   local elimPredsUsing    ( List,List );
+static Void   local reducePreds       ( Void );
+static Void   local normPreds         ( Int );
 
-static Bool   local resolveDefs       Args((List));
-static Bool   local resolveVar        Args((Int));
-static Class  local classConstraining Args((Int,Cell,Int));
-static Bool   local instComp_         Args((Inst,Inst));
+static Bool   local resolveDefs       ( List );
+static Bool   local resolveVar        ( Int );
+static Class  local classConstraining ( Int,Cell,Int );
+static Bool   local instComp_         ( Inst,Inst );
 
 /* --------------------------------------------------------------------------
  * Predicate assignments:

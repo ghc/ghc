@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.15 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.16 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -26,30 +26,30 @@
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Void local put            Args((Int,Cell));
-static Void local putFlds        Args((Cell,List));
-static Void local putComp        Args((Cell,List));
-static Void local putQual        Args((Cell));
-static Bool local isDictVal      Args((Cell));
-static Cell local maySkipDict    Args((Cell));
-static Void local putAp          Args((Int,Cell));
-static Void local putOverInfix   Args((Int,Text,Syntax,Cell));
-static Void local putInfix       Args((Int,Text,Syntax,Cell,Cell));
-static Void local putSimpleAp    Args((Cell,Int));
-static Void local putTuple       Args((Int,Cell));
-static Int  local unusedTups     Args((Int,Cell));
-static Void local unlexOp        Args((Text));
+static Void local put            ( Int,Cell );
+static Void local putFlds        ( Cell,List );
+static Void local putComp        ( Cell,List );
+static Void local putQual        ( Cell );
+static Bool local isDictVal      ( Cell );
+static Cell local maySkipDict    ( Cell );
+static Void local putAp          ( Int,Cell );
+static Void local putOverInfix   ( Int,Text,Syntax,Cell );
+static Void local putInfix       ( Int,Text,Syntax,Cell,Cell );
+static Void local putSimpleAp    ( Cell,Int );
+static Void local putTuple       ( Int,Cell );
+static Int  local unusedTups     ( Int,Cell );
+static Void local unlexOp        ( Text );
 
-static Void local putSigType     Args((Cell));
-static Void local putContext     Args((List,List,Int));
-static Void local putPred        Args((Cell,Int));
-static Void local putType        Args((Cell,Int,Int));
-static Void local putTyVar       Args((Int));
-static Bool local putTupleType   Args((Cell,Int));
-static Void local putApType      Args((Type,Int,Int));
+static Void local putSigType     ( Cell );
+static Void local putContext     ( List,List,Int );
+static Void local putPred        ( Cell,Int );
+static Void local putType        ( Cell,Int,Int );
+static Void local putTyVar       ( Int );
+static Bool local putTupleType   ( Cell,Int );
+static Void local putApType      ( Type,Int,Int );
 
-static Void local putKind        Args((Kind));
-static Void local putKinds       Args((Kinds));
+static Void local putKind        ( Kind );
+static Void local putKinds       ( Kinds );
 
 
 /* --------------------------------------------------------------------------
@@ -925,8 +925,7 @@ Kinds ks; {
  * Main drivers:
  * ------------------------------------------------------------------------*/
 
-extern FILE *mystdout Args((Void));
-FILE *mystdout() {
+FILE *mystdout ( Void ) {
   /* We use this from the gdb command line when debugging */
   return stdout;
 }

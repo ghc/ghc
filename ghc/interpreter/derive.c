@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.12 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.13 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -25,25 +25,25 @@ List cfunSfuns;                        /* List of (Cfun,[SelectorVar])    */
  * local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static List  local getDiVars            Args((Int));
-static Cell  local mkBind               Args((String,List));
-static Cell  local mkVarAlts            Args((Int,Cell));
-static List  local makeDPats2           Args((Cell,Int));
-static Bool  local isEnumType           Args((Tycon));
-static Pair   local mkAltEq             Args((Int,List));
-static Pair   local mkAltOrd            Args((Int,List));
-static Cell   local prodRange           Args((Int,List,Cell,Cell,Cell));
-static Cell   local prodIndex           Args((Int,List,Cell,Cell,Cell));
-static Cell   local prodInRange         Args((Int,List,Cell,Cell,Cell));
-static List   local mkIxBinds           Args((Int,Cell,Int));
-static Cell   local mkAltShow           Args((Int,Cell,Int));
-static Cell   local showsPrecRhs        Args((Cell,Cell,Int));
-static Cell   local mkReadCon           Args((Name,Cell,Cell));
-static Cell   local mkReadPrefix        Args((Cell));
-static Cell   local mkReadInfix         Args((Cell));
-static Cell   local mkReadTuple         Args((Cell));
-static Cell   local mkReadRecord        Args((Cell,List));
-static List   local mkBndBinds          Args((Int,Cell,Int));
+static List   local getDiVars           ( Int );
+static Cell   local mkBind              ( String,List );
+static Cell   local mkVarAlts           ( Int,Cell );
+static List   local makeDPats2          ( Cell,Int );
+static Bool   local isEnumType          ( Tycon );
+static Pair   local mkAltEq             ( Int,List );
+static Pair   local mkAltOrd            ( Int,List );
+static Cell   local prodRange           ( Int,List,Cell,Cell,Cell );
+static Cell   local prodIndex           ( Int,List,Cell,Cell,Cell );
+static Cell   local prodInRange         ( Int,List,Cell,Cell,Cell );
+static List   local mkIxBinds           ( Int,Cell,Int );
+static Cell   local mkAltShow           ( Int,Cell,Int );
+static Cell   local showsPrecRhs        ( Cell,Cell,Int );
+static Cell   local mkReadCon           ( Name,Cell,Cell );
+static Cell   local mkReadPrefix        ( Cell );
+static Cell   local mkReadInfix         ( Cell );
+static Cell   local mkReadTuple         ( Cell );
+static Cell   local mkReadRecord        ( Cell,List );
+static List   local mkBndBinds          ( Int,Cell,Int );
 
 
 /* --------------------------------------------------------------------------
@@ -128,7 +128,7 @@ Tycon t; {                      /* type (i.e. all constructors arity == 0) */
  * constructors in the datatype definition.
  * ------------------------------------------------------------------------*/
 
-static Pair  local mkAltEq              Args((Int,List));
+static Pair  local mkAltEq              ( Int,List );
 
 List deriveEq(t)                        /* generate binding for derived == */
 Type t; {                               /* for some TUPLE or DATATYPE t    */
@@ -168,7 +168,7 @@ List pats; {                            /* arguments                       */
 }
 
 
-static Pair  local mkAltOrd             Args((Int,List));
+static Pair  local mkAltOrd             ( Int,List );
 
 List deriveOrd(t)                       /* make binding for derived compare*/
 Type t; {                               /* for some TUPLE or DATATYPE t    */
@@ -257,11 +257,11 @@ Tycon t; {
 }
 
 
-static List  local mkIxBindsEnum        Args((Tycon));
-static List  local mkIxBinds            Args((Int,Cell,Int));
-static Cell  local prodRange            Args((Int,List,Cell,Cell,Cell));
-static Cell  local prodIndex            Args((Int,List,Cell,Cell,Cell));
-static Cell  local prodInRange          Args((Int,List,Cell,Cell,Cell));
+static List  local mkIxBindsEnum        ( Tycon );
+static List  local mkIxBinds            ( Int,Cell,Int );
+static Cell  local prodRange            ( Int,List,Cell,Cell,Cell );
+static Cell  local prodIndex            ( Int,List,Cell,Cell,Cell );
+static Cell  local prodInRange          ( Int,List,Cell,Cell,Cell );
 
 List deriveIx(t)                /* Construct definition of indexing        */
 Tycon t; {

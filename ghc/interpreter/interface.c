@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.37 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.38 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -118,54 +118,52 @@ viz, the entire Prelude at once:
  * local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Void startGHCValue       Args((Int,VarId,Type));
-static Void finishGHCValue      Args((VarId));
+static Void startGHCValue       ( Int,VarId,Type );
+static Void finishGHCValue      ( VarId );
 
-static Void startGHCSynonym     Args((Int,Cell,List,Type));
-static Void finishGHCSynonym    Args((Tycon)); 
+static Void startGHCSynonym     ( Int,Cell,List,Type );
+static Void finishGHCSynonym    ( Tycon ); 
 
-static Void  startGHCClass      Args((Int,List,Cell,List,List));
-static Class finishGHCClass     Args((Class)); 
+static Void  startGHCClass      ( Int,List,Cell,List,List );
+static Class finishGHCClass     ( Class ); 
 
-static Inst startGHCInstance    Args((Int,List,Pair,VarId));
-static Void finishGHCInstance   Args((Inst));
+static Inst startGHCInstance    ( Int,List,Pair,VarId );
+static Void finishGHCInstance   ( Inst );
 
-static Void startGHCImports     Args((ConId,List));
-static Void finishGHCImports    Args((ConId,List));
+static Void startGHCImports     ( ConId,List );
+static Void finishGHCImports    ( ConId,List );
 
-static Void startGHCExports     Args((ConId,List));
-static Void finishGHCExports    Args((ConId,List));
+static Void startGHCExports     ( ConId,List );
+static Void finishGHCExports    ( ConId,List );
 
 static Void finishGHCFixdecl    ( Cell prec, Cell assoc, ConVarId name );
 
-static Void finishGHCModule     Args((Cell));
-static Void startGHCModule      Args((Text, Int, Text));
+static Void finishGHCModule     ( Cell );
+static Void startGHCModule      ( Text, Int, Text );
 
-static Void startGHCDataDecl    Args((Int,List,Cell,List,List));
+static Void startGHCDataDecl    ( Int,List,Cell,List,List );
 static List finishGHCDataDecl   ( ConId tyc );
+/* Supporting stuff for {start|finish}GHCDataDecl */
+static List startGHCConstrs     ( Int,List,List );
+static Name startGHCSel         ( Int,Pair );
+static Name startGHCConstr      ( Int,Int,Triple );
 
-static Void startGHCNewType     Args((Int,List,Cell,List,Cell));
+static Void startGHCNewType     ( Int,List,Cell,List,Cell );
 static Void finishGHCNewType    ( ConId tyc );
 
 
-/* Supporting stuff for {start|finish}GHCDataDecl */
-static List startGHCConstrs Args((Int,List,List));
-static Name startGHCSel     Args((Int,Pair));
-static Name startGHCConstr  Args((Int,Int,Triple));
 
-
-
-static Kinds tvsToKind             Args((List));
-static Int   arityFromType         Args((Type));
-static Int   arityInclDictParams   Args((Type));
-static Bool  allTypesKnown ( Type type, List aktys /* [QualId] */, ConId thisMod );
+static Kinds tvsToKind             ( List );
+static Int   arityFromType         ( Type );
+static Int   arityInclDictParams   ( Type );
+static Bool  allTypesKnown         ( Type type, 
+                                     List aktys /* [QualId] */,
+                                     ConId thisMod );
                                          
-static List       ifTyvarsIn       Args((Type));
-
-static Type       tvsToOffsets       Args((Int,Type,List));
-static Type       conidcellsToTycons Args((Int,Type));
-
-static void*      lookupObjName ( char* );
+static List  ifTyvarsIn            ( Type );
+static Type  tvsToOffsets          ( Int,Type,List );
+static Type  conidcellsToTycons    ( Int,Type );
+static void* lookupObjName         ( char* );
 
 
 

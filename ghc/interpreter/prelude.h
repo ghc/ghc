@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: prelude.h,v $
- * $Revision: 1.8 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.9 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #define NON_POSIX_SOURCE
@@ -112,12 +112,6 @@ extern HWND             hWndMain;       /* main window handle              */
  *  dynamic linking declarations
  *-------------------------------------------------------------------------*/
 
-#if HAVE_PROTOTYPES       /* To enable use of prototypes whenever possible */
-#define Args(x) x
-#else
-#define Args(x) ()
-#endif
-
 /* local = prefix for locally defined functions */
 /* far   = prefix for far pointers              */
 #if DOS
@@ -204,14 +198,14 @@ extern  int     stricmp    Args((const char *, const char*));
  *-------------------------------------------------------------------------*/
 
 #if !DOS && VOID_INT_SIGNALS
-# define sigProto(nm)   void nm Args((int))
+# define sigProto(nm)   void nm ( int )
 # define sigRaise(nm)   nm(1)
-# define sigHandler(nm) void nm(sig_arg) int sig_arg;
+# define sigHandler(nm) void nm ( sig_arg ) int sig_arg;
 # define sigResume      return
 #else
-# define sigProto(nm)   int nm Args((Void))
+# define sigProto(nm)   int nm ( Void )
 # define sigRaise(nm)   nm()
-# define sigHandler(nm) int nm(Void)
+# define sigHandler(nm) int nm ( Void )
 # define sigResume      return 1
 #endif
 
@@ -305,15 +299,15 @@ extern int vsnprintf  Args((char*, int, const char*, va_list));
 
 #if REDIRECT_OUTPUT
 
-extern Void   hugsPrintf            Args((const char *, ...));
-extern Void   hugsPutchar           Args((int));
-extern Void   hugsFlushStdout       Args((Void));
-extern Void   hugsEnableOutput      Args((Bool));
-extern String hugsClearOutputBuffer Args((Void));
+extern Void   hugsPrintf            ( const char *, ... );
+extern Void   hugsPutchar           ( int );
+extern Void   hugsFlushStdout       ( Void );
+extern Void   hugsEnableOutput      ( Bool );
+extern String hugsClearOutputBuffer ( Void );
                             
-extern Void   hugsFFlush            Args((FILE*));
-extern Void   hugsFPrintf           Args((FILE*, const char*, ...));
-extern Void   hugsPutc              Args((int, FILE*));
+extern Void   hugsFFlush            ( FILE* );
+extern Void   hugsFPrintf           ( FILE*, const char*, ... );
+extern Void   hugsPutc              ( int, FILE* );
 
 #define Printf               hugsPrintf
 #define Putchar              hugsPutchar

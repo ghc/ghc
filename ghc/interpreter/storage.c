@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.50 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.51 $
+ * $Date: 2000/03/13 11:37:17 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -26,22 +26,21 @@
  * local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Int  local hash                  Args((String));
-static Int  local saveText              Args((Text));
-static Module local findQualifier       Args((Text));
-static Void local hashTycon             Args((Tycon));
-static List local insertTycon           Args((Tycon,List));
-static Void local hashName              Args((Name));
-static List local insertName            Args((Name,List));
-static Void local patternError          Args((String));
-static Bool local stringMatch           Args((String,String));
-static Bool local typeInvolves          Args((Type,Type));
-static Cell local markCell              Args((Cell));
-static Void local markSnd               Args((Cell));
-static Cell local lowLevelLastIn        Args((Cell));
-static Cell local lowLevelLastOut       Args((Cell));
-       Module local moduleOfScript      Args((Script));
-       Script local scriptThisFile      Args((Text));
+static Int  local hash                  ( String );
+static Int  local saveText              ( Text );
+static Module local findQualifier       ( Text );
+static Void local hashTycon             ( Tycon );
+static List local insertTycon           ( Tycon,List );
+static Void local hashName              ( Name );
+static List local insertName            ( Name,List );
+static Void local patternError          ( String );
+static Bool local stringMatch           ( String,String );
+static Bool local typeInvolves          ( Type,Type );
+static Cell local markCell              ( Cell );
+static Void local markSnd               ( Cell );
+static Cell local lowLevelLastIn        ( Cell );
+static Cell local lowLevelLastOut       ( Cell );
+
 
 /* --------------------------------------------------------------------------
  * Text storage:
@@ -1130,7 +1129,7 @@ Inst newInst() {                       /* Add new instance to table        */
 }
 
 #ifdef DEBUG_DICTS
-extern Void printInst Args((Inst));
+extern Void printInst ( Inst));
 
 Void printInst(in)
 Inst in; {
@@ -2129,10 +2128,8 @@ register Cell c; {
  * robust and can be used on any data structure irrespective of
  * its type.
  */
-Void print Args((Cell, Int));
-Void print(c, depth)
-Cell c;
-Int  depth; {
+Void print ( Cell c, Int depth )
+{
     if (0 == depth) {
         Printf("...");
     } else {
@@ -3085,7 +3082,7 @@ void dumpInst ( Int i )
  * ------------------------------------------------------------------------*/
 
 #if DYN_TABLES
-static void far* safeFarCalloc Args((Int,Int));
+static void far* safeFarCalloc ( Int,Int));
 static void far* safeFarCalloc(n,s)     /* allocate table storage and check*/
 Int n, s; {                             /* for non-null return             */
     void far* tab = farCalloc(n,s);

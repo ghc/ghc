@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.13 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.14 $
+ * $Date: 2000/03/13 11:37:17 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -158,17 +158,16 @@ StgVar mkStgVar( StgRhs rhs, Cell info )
  * Local functions
  * ------------------------------------------------------------------------*/
 
-static Void local pIndent        Args((Int));
-
-static Void local putStgVar       Args((StgVar));
-static Void local putStgVars      Args((List));
-static Void local putStgAtom      Args((StgAtom a));
-static Void local putStgAtoms     Args((List as));
-static Void local putStgBinds     Args((List));
-static Void local putStgExpr      Args((StgExpr));
-static Void local putStgRhs       Args((StgRhs));
-static Void local putStgPat       Args((StgCaseAlt));
-static Void local putStgPrimPat   Args((StgPrimAlt));
+static Void local pIndent         ( Int );
+static Void local putStgVar       ( StgVar );
+static Void local putStgVars      ( List );
+static Void local putStgAtom      ( StgAtom a );
+static Void local putStgAtoms     ( List as );
+static Void local putStgBinds     ( List );
+static Void local putStgExpr      ( StgExpr );
+static Void local putStgRhs       ( StgRhs );
+static Void local putStgPat       ( StgCaseAlt );
+static Void local putStgPrimPat   ( StgPrimAlt );
 
 
 

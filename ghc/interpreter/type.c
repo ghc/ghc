@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.29 $
- * $Date: 2000/03/10 20:03:37 $
+ * $Revision: 1.30 $
+ * $Date: 2000/03/13 11:37:17 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -31,77 +31,77 @@
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Void   local emptyAssumption   Args((Void));
-static Void   local enterBindings     Args((Void));
-static Void   local leaveBindings     Args((Void));
-static Int    local defType           Args((Cell));
-static Type   local useType           Args((Cell));
-static Void   local markAssumList     Args((List));
-static Cell   local findAssum         Args((Text));
-static Pair   local findInAssumList   Args((Text,List));
-static List   local intsIntersect     Args((List,List));
-static List   local genvarAllAss      Args((List));
-static List   local genvarAnyAss      Args((List));
-static Int    local newVarsBind       Args((Cell));
-static Void   local newDefnBind       Args((Cell,Type));
+static Void   local emptyAssumption   ( Void );
+static Void   local enterBindings     ( Void );
+static Void   local leaveBindings     ( Void );
+static Int    local defType           ( Cell );
+static Type   local useType           ( Cell );
+static Void   local markAssumList     ( List );
+static Cell   local findAssum         ( Text );
+static Pair   local findInAssumList   ( Text,List );
+static List   local intsIntersect     ( List,List );
+static List   local genvarAllAss      ( List );
+static List   local genvarAnyAss      ( List );
+static Int    local newVarsBind       ( Cell );
+static Void   local newDefnBind       ( Cell,Type );
 
-static Void   local enterPendingBtyvs Args((Void));
-static Void   local leavePendingBtyvs Args((Void));
-static Cell   local patBtyvs          Args((Cell));
-static Void   local doneBtyvs         Args((Int));
-static Void   local enterSkolVars     Args((Void));
-static Void   local leaveSkolVars     Args((Int,Type,Int,Int));
+static Void   local enterPendingBtyvs ( Void );
+static Void   local leavePendingBtyvs ( Void );
+static Cell   local patBtyvs          ( Cell );
+static Void   local doneBtyvs         ( Int );
+static Void   local enterSkolVars     ( Void );
+static Void   local leaveSkolVars     ( Int,Type,Int,Int );
 
-static Void   local typeError         Args((Int,Cell,Cell,String,Type,Int));
-static Void   local reportTypeError   Args((Int,Cell,Cell,String,Type,Type));
-static Void   local cantEstablish     Args((Int,String,Cell,Type,List));
-static Void   local tooGeneral        Args((Int,Cell,Type,Type));
+static Void   local typeError         ( Int,Cell,Cell,String,Type,Int );
+static Void   local reportTypeError   ( Int,Cell,Cell,String,Type,Type );
+static Void   local cantEstablish     ( Int,String,Cell,Type,List );
+static Void   local tooGeneral        ( Int,Cell,Type,Type );
 
-static Cell   local typeExpr          Args((Int,Cell));
+static Cell   local typeExpr          ( Int,Cell );
 
-static Cell   local typeAp            Args((Int,Cell));
-static Type   local typeExpected      Args((Int,String,Cell,Type,Int,Int,Bool));
-static Void   local typeAlt           Args((String,Cell,Cell,Type,Int,Int));
-static Int    local funcType          Args((Int));
-static Void   local typeCase          Args((Int,Int,Cell));
-static Void   local typeComp          Args((Int,Type,Cell,List));
-static Cell   local typeMonadComp     Args((Int,Cell));
-static Void   local typeDo            Args((Int,Cell));
-static Void   local typeConFlds       Args((Int,Cell));
-static Void   local typeUpdFlds       Args((Int,Cell));
+static Cell   local typeAp            ( Int,Cell );
+static Type   local typeExpected      ( Int,String,Cell,Type,Int,Int,Bool );
+static Void   local typeAlt           ( String,Cell,Cell,Type,Int,Int );
+static Int    local funcType          ( Int );
+static Void   local typeCase          ( Int,Int,Cell );
+static Void   local typeComp          ( Int,Type,Cell,List );
+static Cell   local typeMonadComp     ( Int,Cell );
+static Void   local typeDo            ( Int,Cell );
+static Void   local typeConFlds       ( Int,Cell );
+static Void   local typeUpdFlds       ( Int,Cell );
 #if IPARAM
-static Cell   local typeWith	      Args((Int,Cell));
+static Cell   local typeWith	      ( Int,Cell );
 #endif
-static Cell   local typeFreshPat      Args((Int,Cell));
+static Cell   local typeFreshPat      ( Int,Cell );
 
-static Void   local typeBindings      Args((List));
-static Void   local removeTypeSigs    Args((Cell));
+static Void   local typeBindings      ( List );
+static Void   local removeTypeSigs    ( Cell );
 
-static Void   local monorestrict      Args((List));
-static Void   local restrictedBindAss Args((Cell));
-static Void   local restrictedAss     Args((Int,Cell,Type));
+static Void   local monorestrict      ( List );
+static Void   local restrictedBindAss ( Cell );
+static Void   local restrictedAss     ( Int,Cell,Type );
 
-static Void   local unrestricted      Args((List));
-static List   local itbscc            Args((List));
-static Void   local addEvidParams     Args((List,Cell));
+static Void   local unrestricted      ( List );
+static List   local itbscc            ( List );
+static Void   local addEvidParams     ( List,Cell );
 
-static Void   local typeClassDefn     Args((Class));
-static Void   local typeInstDefn      Args((Inst));
-static Void   local typeMember        Args((String,Name,Cell,List,Cell,Int));
+static Void   local typeClassDefn     ( Class );
+static Void   local typeInstDefn      ( Inst );
+static Void   local typeMember        ( String,Name,Cell,List,Cell,Int );
 
-static Void   local typeBind          Args((Cell));
-static Void   local typeDefAlt        Args((Int,Cell,Pair));
-static Cell   local typeRhs           Args((Cell));
-static Void   local guardedType       Args((Int,Cell));
+static Void   local typeBind          ( Cell );
+static Void   local typeDefAlt        ( Int,Cell,Pair );
+static Cell   local typeRhs           ( Cell );
+static Void   local guardedType       ( Int,Cell );
 
-static Void   local genBind           Args((List,Cell));
-static Void   local genAss            Args((Int,List,Cell,Type));
-static Type   local genTest           Args((Int,Cell,List,Type,Type,Int));
-static Type   local generalize        Args((List,Type));
-static Bool   local equalTypes        Args((Type,Type));
+static Void   local genBind           ( List,Cell );
+static Void   local genAss            ( Int,List,Cell,Type );
+static Type   local genTest           ( Int,Cell,List,Type,Type,Int );
+static Type   local generalize        ( List,Type );
+static Bool   local equalTypes        ( Type,Type );
 
-static Void   local typeDefnGroup     Args((List));
-static Pair   local typeSel           Args((Name));
+static Void   local typeDefnGroup     ( List );
+static Pair   local typeSel           ( Name );
 
 
 
@@ -541,7 +541,7 @@ Type dt, it; {
 static int tcMode = EXPRESSION;
 
 #ifdef DEBUG_TYPES
-static Cell local mytypeExpr    Args((Int,Cell));
+static Cell local mytypeExpr    ( Int,Cell));
 static Cell local typeExpr(l,e)
 Int l;
 Cell e; {
@@ -2555,7 +2555,7 @@ Name s; {                               /* particular selector, s.         */
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Type local basicType Args((Char));
+static Type local basicType ( Char );
 
 
 static Type stateVar = NIL;

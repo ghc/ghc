@@ -9,12 +9,12 @@
  * included in the distribution.
  *
  * $RCSfile: errors.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/10/16 02:17:28 $
+ * $Revision: 1.6 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
-extern Void internal     Args((String)) HUGS_noreturn;
-extern Void fatal        Args((String)) HUGS_noreturn;
+extern Void internal     ( String) HUGS_noreturn;
+extern Void fatal        ( String) HUGS_noreturn;
 
 #if HUGS_FOR_WINDOWS
 #define Hilite()         WinTextcolor(hWndText,RED);
@@ -38,20 +38,20 @@ extern Void fatal        Args((String)) HUGS_noreturn;
 #define ERRKINDS(ks)     Hilite(); printKinds(errorStream,ks); Lolite()
 #define ERRFD(fd)	 Hilite(); printFD(errorStream,fd); Lolite()
 
-extern Void errHead      Args((Int));              /* in main.c            */
-extern Void errFail      Args((Void)) HUGS_noreturn;
-extern Void errAbort     Args((Void));
+extern Void errHead      ( Int );                  /* in main.c            */
+extern Void errFail      ( Void) HUGS_noreturn;
+extern Void errAbort     ( Void );
 
 extern sigProto(breakHandler);
 
-extern Bool breakOn      Args((Bool));             /* in machdep.c         */
+extern Bool breakOn      ( Bool );                 /* in machdep.c         */
 
-extern Void printExp     Args((FILE *,Cell));      /* in output.c          */
-extern Void printType    Args((FILE *,Cell));
-extern Void printContext Args((FILE *,List));
-extern Void printPred    Args((FILE *,Cell));
-extern Void printKind    Args((FILE *,Kind));
-extern Void printKinds   Args((FILE *,Kinds));
-extern Void printFD	 Args((FILE *,Pair));
+extern Void printExp     ( FILE *,Cell );          /* in output.c          */
+extern Void printType    ( FILE *,Cell );
+extern Void printContext ( FILE *,List );
+extern Void printPred    ( FILE *,Cell );
+extern Void printKind    ( FILE *,Kind );
+extern Void printKinds   ( FILE *,Kinds );
+extern Void printFD	 ( FILE *,Pair );
 
 /*-------------------------------------------------------------------------*/

@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/09 06:14:38 $
+ * $Revision: 1.25 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -33,21 +33,21 @@
 #define yyerror(s)               /* errors handled elsewhere */
 #define YYSTYPE                  Cell
 
-static Cell   local gcShadow     Args((Int,Cell));
-static Void   local syntaxError  Args((String));
-static String local unexpected   Args((Void));
-static Cell   local checkPrec    Args((Cell));
-static Void   local fixDefn      Args((Syntax,Cell,Cell,List));
-static Cell   local buildTuple   Args((List));
-static List   local checkCtxt    Args((List));
-static Cell   local checkPred    Args((Cell));
-static Pair   local checkDo      Args((List));
-static Cell   local checkTyLhs   Args((Cell));
+static Cell   local gcShadow     ( Int,Cell );
+static Void   local syntaxError  ( String );
+static String local unexpected   ( Void );
+static Cell   local checkPrec    ( Cell );
+static Void   local fixDefn      ( Syntax,Cell,Cell,List );
+static Cell   local buildTuple   ( List );
+static List   local checkCtxt    ( List );
+static Cell   local checkPred    ( Cell );
+static Pair   local checkDo      ( List );
+static Cell   local checkTyLhs   ( Cell );
 #if !TREX
-static Void   local noTREX       Args((String));
+static Void   local noTREX       ( String );
 #endif
 #if !IPARAM
-static Void   local noIP	 Args((String));
+static Void   local noIP	 ( String );
 #endif
 
 /* For the purposes of reasonably portable garbage collection, it is

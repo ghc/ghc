@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.41 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.42 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -41,54 +41,54 @@ Bool multiInstRes = FALSE;
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Void   local initialize        Args((Int,String []));
-static Void   local promptForInput    Args((String));
-static Void   local interpreter       Args((Int,String []));
-static Void   local menu              Args((Void));
-static Void   local guidance          Args((Void));
-static Void   local forHelp           Args((Void));
-static Void   local set               Args((Void));
-static Void   local changeDir         Args((Void));
-static Void   local load              Args((Void));
-static Void   local project           Args((Void));
-static Void   local readScripts       Args((Int));
-static Void   local whatScripts       Args((Void));
-static Void   local editor            Args((Void));
-static Void   local find              Args((Void));
-static Bool   local startEdit         Args((Int,String));
-static Void   local runEditor         Args((Void));
-static Void   local setModule         Args((Void));
-static Module local findEvalModule    Args((Void));
-static Void   local evaluator         Args((Void));
-static Void   local stopAnyPrinting   Args((Void));
-static Void   local showtype          Args((Void));
-static String local objToStr          Args((Module, Cell));
-static Void   local info              Args((Void));
-static Void   local printSyntax       Args((Name));
-static Void   local showInst          Args((Inst));
-static Void   local describe          Args((Text));
-static Void   local listNames         Args((Void));
+static Void   local initialize        ( Int,String [] );
+static Void   local promptForInput    ( String );
+static Void   local interpreter       ( Int,String [] );
+static Void   local menu              ( Void );
+static Void   local guidance          ( Void );
+static Void   local forHelp           ( Void );
+static Void   local set               ( Void );
+static Void   local changeDir         ( Void );
+static Void   local load              ( Void );
+static Void   local project           ( Void );
+static Void   local readScripts       ( Int );
+static Void   local whatScripts       ( Void );
+static Void   local editor            ( Void );
+static Void   local find              ( Void );
+static Bool   local startEdit         ( Int,String );
+static Void   local runEditor         ( Void );
+static Void   local setModule         ( Void );
+static Module local findEvalModule    ( Void );
+static Void   local evaluator         ( Void );
+static Void   local stopAnyPrinting   ( Void );
+static Void   local showtype          ( Void );
+static String local objToStr          ( Module, Cell );
+static Void   local info              ( Void );
+static Void   local printSyntax       ( Name );
+static Void   local showInst          ( Inst );
+static Void   local describe          ( Text );
+static Void   local listNames         ( Void );
 
-static Void   local toggleSet         Args((Char,Bool));
-static Void   local togglesIn         Args((Bool));
-static Void   local optionInfo        Args((Void));
+static Void   local toggleSet         ( Char,Bool );
+static Void   local togglesIn         ( Bool );
+static Void   local optionInfo        ( Void );
 #if USE_REGISTRY || HUGS_FOR_WINDOWS
-static String local optionsToStr      Args((Void));
+static String local optionsToStr      ( Void );
 #endif
-static Void   local readOptions       Args((String));
-static Bool   local processOption     Args((String));
-static Void   local setHeapSize       Args((String));
-static Int    local argToInt          Args((String));
+static Void   local readOptions       ( String );
+static Bool   local processOption     ( String );
+static Void   local setHeapSize       ( String );
+static Int    local argToInt          ( String );
 
-static Void   local loadProject       Args((String));
-static Void   local clearProject      Args((Void));
-static Bool   local addScript         Args((Int));
-static Void   local forgetScriptsFrom Args((Script));
-static Void   local setLastEdit       Args((String,Int));
-static Void   local failed            Args((Void));
-static String local strCopy           Args((String));
-static Void   local browseit	      Args((Module,String,Bool));
-static Void   local browse	      Args((Void));
+static Void   local loadProject       ( String );
+static Void   local clearProject      ( Void );
+static Bool   local addScript         ( Int );
+static Void   local forgetScriptsFrom ( Script );
+static Void   local setLastEdit       ( String,Int );
+static Void   local failed            ( Void );
+static String local strCopy           ( String );
+static Void   local browseit	      ( Module,String,Bool );
+static Void   local browse	      ( Void );
 
 /* --------------------------------------------------------------------------
  * Machine dependent code for Hugs interpreter:
@@ -130,8 +130,8 @@ typedef
    }
    ScriptInfo;
 
-static Void   local makeStackEntry    Args((ScriptInfo*,String));
-static Void   local addStackEntry     Args((String));
+static Void   local makeStackEntry    ( ScriptInfo*,String );
+static Void   local addStackEntry     ( String );
 
 static ScriptInfo scriptInfo[NUM_SCRIPTS];
 
@@ -202,7 +202,7 @@ return;
 
 #ifndef NO_MAIN /* we omit main when building the "Hugs server" */
  
-Main main Args((Int, String []));       /* now every func has a prototype  */
+Main main ( Int, String [] );       /* now every func has a prototype  */
 
 Main main(argc,argv)
 int  argc;
@@ -483,7 +483,7 @@ ToDo
 #define PUTStr(c,s)                     \
     next=PUTStr_aux(next,c,s)
 
-static String local PUTStr_aux Args((String,Char, String));
+static String local PUTStr_aux ( String,Char, String));
 
 static String local PUTStr_aux(next,c,s)
 String next;
@@ -2307,9 +2307,9 @@ typedef struct _HugsStream {
     Int  next;                        /* next space in buffer              */
 } HugsStream;
 
-static Void   local vBufferedPrintf  Args((HugsStream*, const char*, va_list));
-static Void   local bufferedPutchar  Args((HugsStream*, Char));
-static String local bufferClear      Args((HugsStream *stream));
+static Void   local vBufferedPrintf  ( HugsStream*, const char*, va_list );
+static Void   local bufferedPutchar  ( HugsStream*, Char );
+static String local bufferClear      ( HugsStream *stream );
 
 static Void local vBufferedPrintf(stream, fmt, ap)
 HugsStream* stream;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: scc.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/10/15 21:40:54 $
+ * $Revision: 1.6 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #ifndef SCC_C
@@ -20,10 +20,8 @@
 static Cell daSccs = NIL;
 static Int  daCount;
 
-static Int local sccMin Args((Int,Int));
-
-static Int local sccMin(x,y)            /* calculate minimum of x,y        */
-Int x, y; {                             /* (unless y is zero)              */
+static Int local sccMin ( Int x, Int y) /* calculate minimum of x,y        */
+{                                       /* (unless y is zero)              */
     return (x<=y || y==0) ? x : y;
 }
 #endif
@@ -44,9 +42,8 @@ Int x, y; {                             /* (unless y is zero)              */
  * This would probably have been a good application for C++ templates ...
  * ------------------------------------------------------------------------*/
 
-static Int local LOWLINK Args((Cell));  /* local function                  */
-static Int local LOWLINK(v)             /* calculate `lowlink' of v        */
-Cell v; {
+static Int local LOWLINK( Cell v )      /* calculate `lowlink' of v        */
+{
     Int  low = daCount;
     Int  dfn = daCount;                 /* depth first search no. of v     */
     List ws  = DEPENDS(v);              /* adjacency list for v            */

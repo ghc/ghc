@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.19 $
- * $Date: 2000/02/24 14:05:55 $
+ * $Revision: 1.20 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -65,7 +65,7 @@
 extern HCURSOR HandCursor;            /* Forward references to cursors   */
 extern HCURSOR GarbageCursor;
 extern HCURSOR SaveCursor;
-static void    local DrawStatusLine     Args((HWND));
+static void    local DrawStatusLine     ( HWND );
 #endif
 
 #if DOS
@@ -118,15 +118,15 @@ int allow_break_count = 0;
 #define HugsRoot ("SOFTWARE\\Haskell\\Hugs\\" HUGS_VERSION "\\")
 #define ProjectRoot ("SOFTWARE\\Haskell\\Projects\\")
 
-static Bool   local createKey      Args((HKEY, String, PHKEY, REGSAM));
-static Bool   local queryValue     Args((HKEY, String, String, LPDWORD, LPBYTE, DWORD));
-static Bool   local setValue       Args((HKEY, String, String, DWORD, LPBYTE, DWORD));
-static String local readRegString  Args((HKEY, String, String, String));
-static Int    local readRegInt     Args((String,Int));
-static Bool   local writeRegString Args((String,String));
-static Bool   local writeRegInt    Args((String,Int));
+static Bool   local createKey      ( HKEY, String, PHKEY, REGSAM );
+static Bool   local queryValue     ( HKEY, String, String, LPDWORD, LPBYTE, DWORD );
+static Bool   local setValue       ( HKEY, String, String, DWORD, LPBYTE, DWORD );
+static String local readRegString  ( HKEY, String, String, String );
+static Int    local readRegInt     ( String,Int );
+static Bool   local writeRegString ( String,String );
+static Bool   local writeRegInt    ( String,Int );
 
-static String local readRegChildStrings Args((HKEY, String, String, Char, String));
+static String local readRegChildStrings ( HKEY, String, String, Char, String );
 #endif /* USE_REGISTRY */
 
 /* --------------------------------------------------------------------------
@@ -145,8 +145,8 @@ typedef time_t Time;
 #define timeEarlier(earlier,now)  (earlier < now)
 #endif
 
-static Bool local readable      Args((String));
-static Void local getFileInfo   Args((String, Time *, Long *));
+static Bool local readable      ( String );
+static Void local getFileInfo   ( String, Time *, Long * );
 
 static Void local getFileInfo(f,tm,sz)  /* find time stamp and size of file*/
 String f;
@@ -241,16 +241,15 @@ String f; {
  * Search for script files on the HUGS path:
  * ------------------------------------------------------------------------*/
 
-static String local hugsdir       Args((Void));
+static String local hugsdir       ( Void );
 #if HSCRIPT
-static String local hscriptDir    Args((Void));
+static String local hscriptDir    ( Void );
 #endif
-//static String local RealPath      Args((String));
-static int    local pathCmp       Args((String, String));
-static String local normPath      Args((String));
-static Void   local searchChr     Args((Int));
-static Void   local searchStr     Args((String));
-static Bool   local tryEndings    Args((String));
+static int    local pathCmp       ( String, String );
+static String local normPath      ( String );
+static Void   local searchChr     ( Int );
+static Void   local searchStr     ( String );
+static Bool   local tryEndings    ( String );
 
 #if DOS_FILENAMES
 # define SLASH                   '\\'
@@ -813,7 +812,7 @@ String getExtraObjectInfo ( String primaryObjectName,
  * eg substPath("a:b:c::d:e","x:y:z") = "a:b:c:x:y:z:d:e"
  * ------------------------------------------------------------------------*/
 
-static String local substPath Args((String,String));
+static String local substPath ( String,String );
 
 static String local substPath(new,sub) /* substitute sub path into new path*/
 String new;
@@ -1196,7 +1195,7 @@ Int readTerminalChar() {                /* read character from terminal    */
 Bool    broken         = FALSE;
 static  Bool breakReqd = FALSE;
 static  sigProto(ignoreBreak);
-static  Void local installHandlers Args((Void));
+static  Void local installHandlers ( Void );
 
 Bool breakOn(reqd)                      /* set break trapping on if reqd,  */
 Bool reqd; {                            /* or off otherwise, returning old */
@@ -1454,9 +1453,9 @@ int snprintf(char* buffer, int count, const char* fmt, ...) {
 
 #define HugsRoot ("SOFTWARE\\Haskell\\Hugs\\" HUGS_VERSION "\\")
 
-static Bool   local createKey      Args((HKEY, PHKEY, REGSAM));
-static Bool   local queryValue     Args((HKEY, String, LPDWORD, LPBYTE, DWORD));
-static Bool   local setValue       Args((HKEY, String, DWORD, LPBYTE, DWORD));
+static Bool   local createKey      ( HKEY, PHKEY, REGSAM );
+static Bool   local queryValue     ( HKEY, String, LPDWORD, LPBYTE, DWORD );
+static Bool   local setValue       ( HKEY, String, DWORD, LPBYTE, DWORD );
 
 static Bool local createKey(hKey, phRootKey, samDesired)
 HKEY    hKey;

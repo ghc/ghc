@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.27 $
- * $Date: 2000/03/10 19:50:45 $
+ * $Revision: 1.28 $
+ * $Date: 2000/03/13 11:37:16 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -209,14 +209,10 @@ extern Type typeIO;
 extern Type typeException;
 
 
-
 extern Module modulePrelude;
 
-extern  Kind  starToStar;                /* Type -> Type                    */
 
-
-
-
+extern Kind   starToStar;                /* Type -> Type                    */
 
 
 #if TREX
@@ -248,17 +244,16 @@ extern Cell  predFractional;            /* Fractional (mkOffset(0))        */
 extern Cell  predIntegral;              /* Integral (mkOffset(0))          */
 extern Cell  predMonad;                 /* Monad (mkOffset(0))             */
 
-
 extern Type  arrow;                     /* mkOffset(0) -> mkOffset(1)      */
-extern       Type  boundPair;;                 /* (mkOffset(0),mkOffset(0))       */
-extern       Type  listof;;                    /* [ mkOffset(0) ]                 */
-extern       Type  typeVarToVar;;              /* mkOffset(0) -> mkOffset(0)      */
+extern Type  boundPair;                 /* (mkOffset(0),mkOffset(0))       */
+extern Type  listof;                    /* [ mkOffset(0) ]                 */
+extern Type  typeVarToVar;              /* mkOffset(0) -> mkOffset(0)      */
 
-extern       Cell  predNum;;                   /* Num (mkOffset(0))               */
-extern       Cell  predFractional;;            /* Fractional (mkOffset(0))        */
-extern       Cell  predIntegral;;              /* Integral (mkOffset(0))          */
-extern       Kind  starToStar;;                /* Type -> Type                    */
-extern       Cell  predMonad;;                 /* Monad (mkOffset(0))             */
+extern Cell  predNum;                   /* Num (mkOffset(0))               */
+extern Cell  predFractional;            /* Fractional (mkOffset(0))        */
+extern Cell  predIntegral;              /* Integral (mkOffset(0))          */
+extern Kind  starToStar;                /* Type -> Type                    */
+extern Cell  predMonad;                 /* Monad (mkOffset(0))             */
 
 #define fn(from,to)  ap(ap(typeArrow,from),to)  /* make type: from -> to   */
 
@@ -271,53 +266,53 @@ extern Type boundPair;                  /* (mkOffset(0),mkOffset(0))       */
  * Umm ....
  * ------------------------------------------------------------------------*/
 
-extern Bool  haskell98;                 /* TRUE => Haskell 98 compatibility*/
-extern Bool  combined;                  /* TRUE => combined operation      */
-extern Bool  debugSC;			/* TRUE => print SC to screen  */
-extern Bool  kindExpert;                /* TRUE => display kind errors in  */
+extern Bool   haskell98;                /* TRUE => Haskell 98 compatibility*/
+extern Bool   combined;                 /* TRUE => combined operation      */
+extern Bool   debugSC;			/* TRUE => print SC to screen  */
+extern Bool   kindExpert;               /* TRUE => display kind errors in  */
                                         /*         full detail             */
-extern Bool  allowOverlap;              /* TRUE => allow overlapping insts */
+extern Bool   allowOverlap;             /* TRUE => allow overlapping insts */
 
 extern String repeatStr;                /* Repeat last command string      */
 extern String hugsEdit;                 /* String for editor command       */
 extern String hugsPath;                 /* String for file search path     */
 extern String projectPath;              /* String for project search path  */
 
-extern Cell  *CStackBase;               /* pointer to base of C stack      */
+extern Cell*  CStackBase;               /* pointer to base of C stack      */
 
-extern List  tyconDefns;                /* list of type constructor defns  */
-extern List  typeInDefns;               /* list of synonym restrictions    */
-extern List  valDefns;                  /* list of value definitions       */
-extern List  classDefns;                /* list of class definitions       */
-extern List  instDefns;                 /* list of instance definitions    */
-extern List  selDefns;                  /* list of selector lists          */
-extern List  genDefns;                  /* list of generated defns         */
-extern List  primDefns;                 /* list of primitive definitions   */
-extern List  unqualImports;             /* unqualified import list         */
-extern List  defaultDefns;              /* default definitions (if any)    */
-extern Int   defaultLine;               /* line in which default defs occur*/
-extern List  evalDefaults;              /* defaults for evaluator          */
-extern Cell  inputExpr;                 /* evaluator input expression      */
-extern Cell  inputContext;		/* evaluator input expression      */
+extern List   tyconDefns;               /* list of type constructor defns  */
+extern List   typeInDefns;              /* list of synonym restrictions    */
+extern List   valDefns;                 /* list of value definitions       */
+extern List   classDefns;               /* list of class definitions       */
+extern List   instDefns;                /* list of instance definitions    */
+extern List   selDefns;                 /* list of selector lists          */
+extern List   genDefns;                 /* list of generated defns         */
+extern List   primDefns;                /* list of primitive definitions   */
+extern List   unqualImports;            /* unqualified import list         */
+extern List   defaultDefns;             /* default definitions (if any)    */
+extern Int    defaultLine;              /* line in which default defs occur*/
+extern List   evalDefaults;             /* defaults for evaluator          */
+extern Cell   inputExpr;                /* evaluator input expression      */
+extern Cell   inputContext;		/* evaluator input expression      */
 
-extern Cell  whnfHead;                  /* head of term in whnf            */
-extern Int   whnfInt;                   /* integer value of term in whnf   */
-extern Float whnfFloat;                 /* float value of term in whnf     */
-extern Long  numCells;                  /* number of cells allocated       */
-extern Int   numGcs;                    /* number of garbage collections   */
-extern Bool  broken;                    /* indicates interrupt received    */
-extern Bool  preludeLoaded;             /* TRUE => prelude has been loaded */
+extern Cell   whnfHead;                 /* head of term in whnf            */
+extern Int    whnfInt;                  /* integer value of term in whnf   */
+extern Float  whnfFloat;                /* float value of term in whnf     */
+extern Long   numCells;                 /* number of cells allocated       */
+extern Int    numGcs;                   /* number of garbage collections   */
+extern Bool   broken;                   /* indicates interrupt received    */
+extern Bool   preludeLoaded;            /* TRUE => prelude has been loaded */
 
-extern Bool  gcMessages;                /* TRUE => print GC messages       */
-extern Bool  literateScripts;           /* TRUE => default lit scripts     */
-extern Bool  literateErrors;            /* TRUE => report errs in lit scrs */
-extern Bool  showInstRes;               /*TRUE => show instance resolution */
+extern Bool   gcMessages;               /* TRUE => print GC messages       */
+extern Bool   literateScripts;          /* TRUE => default lit scripts     */
+extern Bool   literateErrors;           /* TRUE => report errs in lit scrs */
+extern Bool   showInstRes;              /*TRUE => show instance resolution */
 
-extern Int   cutoff;                    /* Constraint Cutoff depth         */
+extern Int    cutoff;                   /* Constraint Cutoff depth         */
 
-extern List diVars;                     /* deriving: cache of names        */
-extern Int  diNum;                      /* also for deriving               */
-extern List cfunSfuns;                  /* List of (Cfun,[SelectorVar])    */
+extern List   diVars;                   /* deriving: cache of names        */
+extern Int    diNum;                    /* also for deriving               */
+extern List   cfunSfuns;                /* List of (Cfun,[SelectorVar])    */
 
 #if USE_PREPROCESSOR
 extern String preprocessor;             /* preprocessor command            */
@@ -341,143 +336,146 @@ extern String preprocessor;             /* preprocessor command            */
 /* PREPREL was formerly called INSTALL.  POSTPREL doesn't have an analogy
    in the old Hugs. 
 */
-extern Void everybody Args((Int));
-extern  Void   linkControl      Args((Int));
-extern  Void   deriveControl    Args((Int));
-extern  Void   translateControl Args((Int));
-extern  Void   codegen          Args((Int));
-extern  Void   machdep          Args((Int));
-extern Void liftControl ( Int what );
-extern  Void   substitution     Args((Int));
-extern  Void   typeChecker      Args((Int));
-extern Void  interface        Args((Int));
+extern  Void   everybody        ( Int );
+extern  Void   linkControl      ( Int );
+extern  Void   deriveControl    ( Int );
+extern  Void   translateControl ( Int );
+extern  Void   codegen          ( Int );
+extern  Void   machdep          ( Int );
+extern  Void   liftControl      ( Int );
+extern  Void   substitution     ( Int );
+extern  Void   typeChecker      ( Int );
+extern  Void   interface        ( Int );
+extern  Void   storage          ( Int );
 
 
 
 typedef long   Target;
-extern  Void   setGoal          Args((String, Target));
-extern  Void   soFar            Args((Target));
-extern  Void   done             Args((Void));
-extern  String fromEnv          Args((String,String));
-extern  Bool   chase            Args((List));
+extern  Void   setGoal          ( String, Target );
+extern  Void   soFar            ( Target );
+extern  Void   done             ( Void );
+extern  String fromEnv          ( String,String );
+extern  Bool   chase            ( List );
 
-extern  Void   storage          Args((Int));
-
-extern  Void   input            Args((Int));
-extern  Void   consoleInput     Args((String));
-extern  Void   projInput        Args((String));
-extern  Void   stringInput      Args((String));
-extern  Void   parseScript      Args((String,Long));
-extern  Void   parseExp         Args((Void));
+extern  Void   input            ( Int );
+extern  Void   consoleInput     ( String );
+extern  Void   projInput        ( String );
+extern  Void   stringInput      ( String );
+extern  Void   parseScript      ( String,Long );
+extern  Void   parseExp         ( Void );
 #if EXPLAIN_INSTANCE_RESOLUTION
-extern  Void   parseContext     Args((Void));
+extern  Void   parseContext     ( Void );
 #endif
-extern  String readFilename     Args((Void));
-extern  String readLine         Args((Void));
-extern  Syntax defaultSyntax    Args((Text));
-extern  Syntax syntaxOf         Args((Name));
-extern  String unlexChar        Args((Char,Char));
-extern  Void   printString      Args((String));
+extern  String readFilename     ( Void );
+extern  String readLine         ( Void );
+extern  Syntax defaultSyntax    ( Text );
+extern  Syntax syntaxOf         ( Name );
+extern  String unlexChar        ( Char,Char );
+extern  Void   printString      ( String );
 
 
-extern  Void   staticAnalysis   Args((Int));
-extern  Void   startModule      Args((Cell));
-extern  Void   setExportList    Args((List));
-extern  Void   setExports       Args((List));
-extern  Void   addQualImport    Args((Text,Text));
-extern  Void   addUnqualImport  Args((Text,List));
+extern  Void   staticAnalysis   ( Int );
+extern  Void   startModule      ( Cell );
+extern  Void   setExportList    ( List );
+extern  Void   setExports       ( List );
+extern  Void   addQualImport    ( Text,Text );
+extern  Void   addUnqualImport  ( Text,List );
 
-extern  Void   tyconDefn        Args((Int,Cell,Cell,Cell));
-extern  Void   setTypeIns       Args((List));
-extern  Void   clearTypeIns     Args((Void));
-extern  Type   fullExpand       Args((Type));
-extern  Bool   isAmbiguous      Args((Type));
-extern  Void   ambigError       Args((Int,String,Cell,Type));
-extern  Void   classDefn	Args((Int,Cell,List,List));
-extern  Void   instDefn         Args((Int,Cell,Cell));
-extern  Void   addTupInst       Args((Class,Int));
-extern  Name   newDSel             Args((Class,Int));
+extern  Void   tyconDefn        ( Int,Cell,Cell,Cell );
+extern  Void   setTypeIns       ( List );
+extern  Void   clearTypeIns     ( Void );
+extern  Type   fullExpand       ( Type );
+extern  Bool   isAmbiguous      ( Type );
+extern  Void   ambigError       ( Int,String,Cell,Type );
+extern  Void   classDefn	( Int,Cell,List,List );
+extern  Void   instDefn         ( Int,Cell,Cell );
+extern  Void   addTupInst       ( Class,Int );
+extern  Name   newDSel          ( Class,Int );
 #if TREX
-extern  Inst   addRecShowInst   Args((Class,Ext));
-extern  Inst   addRecEqInst     Args((Class,Ext));
+extern  Inst   addRecShowInst   ( Class,Ext );
+extern  Inst   addRecEqInst     ( Class,Ext );
 #endif
-extern List offsetTyvarsIn          Args((Type,List));
+extern  List   offsetTyvarsIn   ( Type,List );
 
 
-extern  List   typeVarsIn	Args((Cell,List,List,List));
-extern  List   oclose		Args((List,List));
-extern  List   zonkTyvarsIn	Args((Type,List));
-extern  Type   zonkTyvar	Args((Int));
-extern  Type   zonkType		Args((Type,Int));
-extern  Void   primDefn         Args((Cell,List,Cell));
-extern  Void   defaultDefn      Args((Int,List));
-extern  Void   checkExp         Args((Void));
-extern  Type   conToTagType     Args((Tycon));
-extern  Type   tagToConType     Args((Tycon));
-extern Int          visitClass          Args((Class));
+extern  List   typeVarsIn	( Cell,List,List,List );
+extern  List   oclose		( List,List );
+extern  List   zonkTyvarsIn	( Type,List );
+extern  Type   zonkTyvar	( Int );
+extern  Type   zonkType		( Type,Int );
+extern  Void   primDefn         ( Cell,List,Cell );
+extern  Void   defaultDefn      ( Int,List );
+extern  Void   checkExp         ( Void );
+extern  Type   conToTagType     ( Tycon );
+extern  Type   tagToConType     ( Tycon );
+extern  Int    visitClass       ( Class );
 
 #if EXPLAIN_INSTANCE_RESOLUTION
-extern  Void   checkContext	Args((Void));
+extern  Void   checkContext	( Void );
 #endif
-extern  Void   checkDefns       Args((Void));
-extern  Bool   h98Pred          Args((Bool,Cell));
-extern  Cell   h98Context       Args((Bool,List));
-extern  Void   h98CheckCtxt     Args((Int,String,Bool,List,Inst));
-extern  Void   h98CheckType     Args((Int,String,Cell,Type));
-extern  Void   h98DoesntSupport Args((Int,String));
+extern  Void   checkDefns       ( Void );
+extern  Bool   h98Pred          ( Bool,Cell );
+extern  Cell   h98Context       ( Bool,List );
+extern  Void   h98CheckCtxt     ( Int,String,Bool,List,Inst );
+extern  Void   h98CheckType     ( Int,String,Cell,Type );
+extern  Void   h98DoesntSupport ( Int,String );
 
-extern Int     userArity           Args((Name));
-extern List    deriveEq            Args((Tycon));
-extern List    deriveOrd           Args((Tycon));
-extern List    deriveEnum          Args((Tycon));
-extern List    deriveIx            Args((Tycon));
-extern List    deriveShow          Args((Tycon));
-extern List    deriveRead          Args((Cell));
-extern List    deriveBounded       Args((Tycon));
-extern List    checkPrimDefn       Args((Triple));
+extern Int     userArity        ( Name );
+extern List    deriveEq         ( Tycon );
+extern List    deriveOrd        ( Tycon );
+extern List    deriveEnum       ( Tycon );
+extern List    deriveIx         ( Tycon );
+extern List    deriveShow       ( Tycon );
+extern List    deriveRead       ( Cell );
+extern List    deriveBounded    ( Tycon );
+extern List    checkPrimDefn    ( Triple );
 
-extern  Void  foreignImport    Args((Cell,Text,Pair,Cell,Cell));
-extern  List  foreignImports;            /* foreign import declarations     */
-extern  Void  implementForeignImport Args((Name));
-extern  Void  foreignExport   Args((Cell,Text,Cell,Cell,Cell));
+extern  Void  foreignImport     ( Cell,Text,Pair,Cell,Cell );
+extern  Void  foreignExport     ( Cell,Text,Cell,Cell,Cell );
+
+extern  Void  implementForeignImport ( Name );
+extern  Void  implementForeignExport ( Name );
+
 extern  List  foreignExports;            /* foreign export declarations     */
-extern  Void  implementForeignExport Args((Name));
+extern  List  foreignImports;            /* foreign import declarations     */
 
-extern Type primType( Int /*AsmMonad*/ monad, String a_kinds, String r_kinds );
+extern  Type   primType         ( Int /*AsmMonad*/ monad, 
+                                  String a_kinds, String r_kinds );
 
-extern  Type   typeCheckExp     Args((Bool));
-extern  Void   typeCheckDefns   Args((Void));
-extern  Cell   provePred        Args((Kinds,List,Cell));
-extern  List   simpleContext    Args((List,Int));
-extern  Cell   rhsExpr          Args((Cell));
-extern  Int    rhsLine          Args((Cell));
-extern  Bool   isProgType       Args((List,Type));
-extern  Cell   superEvid        Args((Cell,Class,Class));
-extern  Void   linkPreludeTC    Args((Void));
-extern  Void   linkPreludeCM    Args((Void));
-extern  Void   linkPrimitiveNames(void);
+extern  Type   typeCheckExp     ( Bool );
+extern  Void   typeCheckDefns   ( Void );
+extern  Cell   provePred        ( Kinds,List,Cell );
+extern  List   simpleContext    ( List,Int );
+extern  Cell   rhsExpr          ( Cell );
+extern  Int    rhsLine          ( Cell );
+extern  Bool   isProgType       ( List,Type );
+extern  Cell   superEvid        ( Cell,Class,Class );
+extern  Void   linkPreludeTC    ( Void );
+extern  Void   linkPreludeCM    ( Void );
+extern  Void   linkPrimNames    ( Void );
 
-extern  Void   compiler         Args((Int));
-extern  Void   compileDefns     Args((Void));
-extern  Void   compileExp       Args((Void));
-extern  Bool   failFree         Args((Cell));
-extern  Int    discrArity       Args((Cell));
+extern  Void   compiler         ( Int );
+extern  Void   compileDefns     ( Void );
+extern  Void   compileExp       ( Void );
+extern  Bool   failFree         ( Cell );
+extern  Int    discrArity       ( Cell );
 
-extern  Addr   codeGen          Args((Name,Int,Cell));
-extern  Int    shellEsc         Args((String));
-extern  Int    getTerminalWidth Args((Void));
-extern  Void   normalTerminal   Args((Void));
-extern  Void   noechoTerminal   Args((Void));
-extern  Int    readTerminalChar Args((Void));
-extern  Void   gcStarted        Args((Void));
-extern  Void   gcScanning       Args((Void));
-extern  Void   gcRecovered      Args((Int));
-extern  Void   gcCStack         Args((Void));
-extern  Void   needPrims        Args((Int)); 
-extern  List   calcFunDepsPreds Args((List));
-extern  Inst   findInstFor      Args((Cell,Int));
+extern  Addr   codeGen          ( Name,Int,Cell );
+extern  Void   evalExp          ( Void );
+extern  Int    shellEsc         ( String );
+extern  Int    getTerminalWidth ( Void );
+extern  Void   normalTerminal   ( Void );
+extern  Void   noechoTerminal   ( Void );
+extern  Int    readTerminalChar ( Void );
+extern  Void   gcStarted        ( Void );
+extern  Void   gcScanning       ( Void );
+extern  Void   gcRecovered      ( Int );
+extern  Void   gcCStack         ( Void );
+extern  Void   needPrims        ( Int ); 
+extern  List   calcFunDepsPreds ( List );
+extern  Inst   findInstFor      ( Cell,Int );
 #if MULTI_INST
-extern  List   findInstsFor     Args((Cell,Int));
+extern  List   findInstsFor     ( Cell,Int );
 #endif
 
 
@@ -485,30 +483,31 @@ extern  List   findInstsFor     Args((Cell,Int));
  * Debugging printers, and output-ery
  *-------------------------------------------------------------------------*/
 
-extern Void ppScripts ( Void );
-extern Void ppModules ( Void );
+extern Void ppScripts           ( Void );
+extern Void ppModules           ( Void );
 
-extern Void printStg( FILE *fp, Cell /*StgVar*/ b);
+extern Void printStg            ( FILE *fp, Cell /*StgVar*/ b);
             
-extern Void ppStg        ( Cell /*StgVar*/ v );
-extern Void ppStgExpr    ( Cell /*StgExpr*/ e );
-extern Void ppStgRhs     ( Cell /*StgRhs*/ rhs );
-extern Void ppStgAlts    ( List alts );
-extern Void ppStgPrimAlts( List alts );
-extern Void ppStgVars    ( List vs );
+extern Void ppStg               ( Cell /*StgVar*/ v );
+extern Void ppStgExpr           ( Cell /*StgExpr*/ e );
+extern Void ppStgRhs            ( Cell /*StgRhs*/ rhs );
+extern Void ppStgAlts           ( List alts );
+extern Void ppStgPrimAlts       ( List alts );
+extern Void ppStgVars           ( List vs );
 
-extern Void putChr  Args((Int));
-extern Void putStr  Args((String));
-extern Void putInt  Args((Int));
-extern Void putPtr  Args((Ptr));
+extern Void putChr              ( Int );
+extern Void putStr              ( String );
+extern Void putInt              ( Int );
+extern Void putPtr              ( Ptr );
 
-extern Void unlexCharConst Args((Cell));
+extern Void unlexCharConst      ( Cell );
+extern Void unlexStrConst       ( Text );
+extern Void unlexVar            ( Text );
+extern Void unlexVarStr         ( String );
+
 extern FILE *outputStream;             /* current output stream            */
 extern Int  outColumn;                 /* current output column number     */
 
-extern Void unlexStrConst  Args((Text));
-extern Void unlexVar       Args((Text));
-extern Void unlexVarStr    Args((String));
 
 
 /*---------------------------------------------------------------------------
@@ -516,11 +515,11 @@ extern Void unlexVarStr    Args((String));
  *-------------------------------------------------------------------------*/
 
 #ifdef CRUDE_PROFILING
-extern void cp_init ( void );
-extern void cp_enter ( Cell /*StgVar*/ );
-extern void cp_bill_words ( int );
-extern void cp_bill_insns ( int );
-extern void cp_show ( void );
+extern void cp_init             ( void );
+extern void cp_enter            ( Cell /*StgVar*/ );
+extern void cp_bill_words       ( int );
+extern void cp_bill_insns       ( int );
+extern void cp_show             ( void );
 #endif
 
 
@@ -528,8 +527,8 @@ extern void cp_show ( void );
  * For dynamic.c and general object-related stuff
  *-------------------------------------------------------------------------*/
 
-extern void*      getDLLSymbol   Args((Int,String,String));
-extern Bool       stdcallAllowed Args((void));
+extern void*     getDLLSymbol   ( Int,String,String );
+extern Bool      stdcallAllowed ( void );
 
 #if LEADING_UNDERSCORE
 #define MAYBE_LEADING_UNDERSCORE(sss)     _##sss
@@ -544,7 +543,7 @@ extern Bool       stdcallAllowed Args((void));
  * Interrupting execution (signals, allowBreak):
  *-------------------------------------------------------------------------*/
 
-extern Bool breakOn      Args((Bool));
+extern Bool breakOn             ( Bool );
 extern Bool broken;                     /* indicates interrupt received    */
 
 #ifndef SIGBREAK /* Sigh, not defined in cygwin32 beta release 16 */
@@ -593,10 +592,10 @@ extern int allow_break_count;
 /* #define USE_REGISTRY (HAVE_WINDOWS_H && !__MSDOS__) */
 
 #ifdef USE_REGISTRY
-Bool 	writeRegString Args((String var, String val));
-String 	readRegString  Args((String var, String def));
-Int 	readRegInt     Args((String var, Int def));
-Bool 	writeRegInt    Args((String var, Int val));
+Bool 	writeRegString          ( String var, String val );
+String 	readRegString           ( String var, String def );
+Int 	readRegInt              ( String var, Int def );
+Bool 	writeRegInt             ( String var, Int val );
 #endif
 
 #define N_INSTALLDIR 200
@@ -611,15 +610,15 @@ extern char installDir[N_INSTALLDIR];
 # include <sys/types.h>
 # include <unistd.h>
 #elif !HUGS_FOR_WINDOWS
-extern int      chdir      Args((const char*));
+extern int      chdir           ( const char* );
 #endif
 
 #if HAVE_STDLIB_H
 # include <stdlib.h>
 #else
-extern int      system     Args((const char *));
-extern double   atof       Args((const char *));
-extern void     exit       Args((int));
+extern int      system          ( const char * );
+extern double   atof            ( const char * );
+extern void     exit            ( int );
 #endif
 
 #ifndef FILENAME_MAX       /* should already be defined in an ANSI compiler*/
@@ -681,45 +680,37 @@ extern void     exit       Args((int));
  * Function prototypes for code in machdep.c
  *-------------------------------------------------------------------------*/
 
-extern  String findMPathname    Args((String,String,String));
-extern  String findPathname     Args((String,String));
-
-extern  Int    shellEsc         Args((String));
-extern  Int    getTerminalWidth Args((Void));
-extern  Void   normalTerminal   Args((Void));
-extern  Void   noechoTerminal   Args((Void));
-extern  Int    readTerminalChar Args((Void));
-extern  Void   gcStarted        Args((Void));
-extern  Void   gcScanning       Args((Void));
-extern  Void   gcRecovered      Args((Int));
-extern  Void   gcCStack         Args((Void));
+extern  String findMPathname    ( String,String,String );
+extern  String findPathname     ( String,String );
+extern  Int    shellEsc         ( String );
+extern  Int    getTerminalWidth ( Void );
+extern  Void   normalTerminal   ( Void );
+extern  Void   noechoTerminal   ( Void );
+extern  Int    readTerminalChar ( Void );
+extern  Void   gcStarted        ( Void );
+extern  Void   gcScanning       ( Void );
+extern  Void   gcRecovered      ( Int );
+extern  Void   gcCStack         ( Void );
 
 
 /*---------------------------------------------------------------------------
  * To do with reading interface and object files
  *-------------------------------------------------------------------------*/
 
-extern Cell parseInterface        Args((String,Long));
-extern ZPair readInterface      Args((String,Long));
-extern Bool  processInterfaces  Args((Void));
-
-
-extern Void getFileSize       Args((String, Long *));
-
-extern void  ifLinkConstrItbl ( Name n );
-
+extern Cell   parseInterface        ( String,Long );
+extern ZPair  readInterface         ( String,Long );
+extern Bool   processInterfaces     ( Void );
+extern Void   getFileSize           ( String, Long * );
+extern Void   ifLinkConstrItbl      ( Name n );
+extern Void   hi_o_namesFromSrcName ( String,String*,String* oName );
+extern String getExtraObjectInfo    ( String primaryObjectName,
+                                      String extraFileName,
+                                      Int*   extraFileSize );
 
 extern List /* of ZTriple(I_INTERFACE, 
                           Text--name of obj file, 
                           Int--size of obj file) */
              ifaces_outstanding;
-
-
-extern Void hi_o_namesFromSrcName Args((String,String*,String* oName));
-
-extern String getExtraObjectInfo ( String primaryObjectName,
-                                   String extraFileName,
-                                   Int*   extraFileSize );
 
 
 /* --------------------------------------------------------------------------
@@ -733,7 +724,7 @@ struct cmd {
     Command cmdCode;
 };
 
-extern Command readCommand Args((struct cmd *, Char, Char));
+extern Command readCommand      ( struct cmd *, Char, Char );
 
 #define EDIT    0
 #define FIND    1
@@ -864,18 +855,18 @@ typedef Cell   StgRep;  /* PTR_REP | .. DOUBLE_REP */
  * Utility functions for manipulating STG syntax trees.
  * ------------------------------------------------------------------------*/
 
-extern int stgConTag  ( StgDiscr d );
-extern void* stgConInfo ( StgDiscr d );
-extern int stgDiscrTag( StgDiscr d );
+extern int     stgConTag        ( StgDiscr d );
+extern void*   stgConInfo       ( StgDiscr d );
+extern int     stgDiscrTag      ( StgDiscr d );
 
-extern List    makeArgs      ( Int );
-extern StgExpr makeStgLambda ( List args,  StgExpr body );
-extern StgExpr makeStgApp    ( StgVar fun, List args );
-extern StgExpr makeStgLet    ( List binds, StgExpr body );
-extern StgExpr makeStgIf     ( StgExpr cond, StgExpr e1, StgExpr e2 );
-extern Bool    isStgVar      ( StgRhs rhs );
-extern Bool    isAtomic      ( StgRhs rhs );
-extern StgVar  mkStgVar      ( StgRhs rhs, Cell info );
+extern List    makeArgs         ( Int );
+extern StgExpr makeStgLambda    ( List args,  StgExpr body );
+extern StgExpr makeStgApp       ( StgVar fun, List args );
+extern StgExpr makeStgLet       ( List binds, StgExpr body );
+extern StgExpr makeStgIf        ( StgExpr cond, StgExpr e1, StgExpr e2 );
+extern Bool    isStgVar         ( StgRhs rhs );
+extern Bool    isAtomic         ( StgRhs rhs );
+extern StgVar  mkStgVar         ( StgRhs rhs, Cell info );
 
 #define mkStgRep(c) mkChar(c)
 
@@ -884,31 +875,31 @@ extern StgVar  mkStgVar      ( StgRhs rhs, Cell info );
  * STG/backendish functions
  * ------------------------------------------------------------------------*/
 
-extern Void stgDefn       Args(( Name n, Int arity, Cell e ));
+extern  Void  stgDefn                ( Name n, Int arity, Cell e );
 
-extern  Void   implementForeignImport Args((Name));
-extern  Void   implementForeignExport Args((Name));
-extern  Void   implementCfun          Args((Name, List));
-extern  Void   implementConToTag Args((Tycon));
-extern  Void   implementTagToCon Args((Tycon));
-extern  Void   implementPrim     Args((Name));
-extern  Void   implementTuple    Args((Int));
+extern  Void  implementForeignImport ( Name );
+extern  Void  implementForeignExport ( Name );
+extern  Void  implementCfun          ( Name, List );
+extern  Void  implementConToTag      ( Tycon );
+extern  Void  implementTagToCon      ( Tycon );
+extern  Void  implementPrim          ( Name );
+extern  Void  implementTuple         ( Int );
 #if TREX                         
-extern  Name   implementRecShw   Args((Text));
-extern  Name   implementRecEq    Args((Text));
+extern  Name  implementRecShw        ( Text );
+extern  Name  implementRecEq         ( Text );
 #endif
 
 /* Association list storing globals assigned to dictionaries, tuples, etc */
 extern List stgGlobals;
 
-extern List liftBinds( List binds );
-extern StgExpr substExpr ( List sub, StgExpr e );
-extern List freeVarsBind Args((List, StgVar));
+extern List    liftBinds        ( List binds );
+extern StgExpr substExpr        ( List sub, StgExpr e );
+extern List    freeVarsBind     ( List, StgVar );
 
 
-extern Void  cgBinds       Args((StgRhs));
-extern void* closureOfVar  Args((StgVar));
-extern char* lookupHugsName Args((void*));
+extern Void    cgBinds          ( StgRhs );
+extern void*   closureOfVar     ( StgVar );
+extern char*   lookupHugsName   ( void* );
 
 
 /* --------------------------------------------------------------------------
@@ -953,69 +944,69 @@ extern  List            btyvars;        /* explicitly scoped type vars     */
 
 extern  char            *unifyFails;    /* Unification error message       */
 
-extern Void  emptySubstitution  Args((Void));
-extern Int   newTyvars          Args((Int));
+extern Void  emptySubstitution  ( Void );
+extern Int   newTyvars          ( Int );
 #define      newKindvars(n)     newTyvars(n)
-extern Int   newKindedVars      Args((Kind));
-extern Kind  simpleKind         Args((Int));
-extern Void  instantiate        Args((Type));
+extern Int   newKindedVars      ( Kind );
+extern Kind  simpleKind         ( Int );
+extern Void  instantiate        ( Type );
 
-extern Pair  findBtyvs          Args((Text));
-extern Void  markBtyvs          Args((Void));
-extern Type  localizeBtyvs      Args((Type));
+extern Pair  findBtyvs          ( Text );
+extern Void  markBtyvs          ( Void );
+extern Type  localizeBtyvs      ( Type );
 
-extern Tyvar *getTypeVar        Args((Type,Int));
-extern Void  tyvarType          Args((Int));
-extern Void  bindTv             Args((Int,Type,Int));
-extern Cell  getDerefHead       Args((Type,Int));
-extern Void  expandSyn          Args((Tycon, Int, Type *, Int *));
+extern Tyvar *getTypeVar        ( Type,Int );
+extern Void  tyvarType          ( Int );
+extern Void  bindTv             ( Int,Type,Int );
+extern Cell  getDerefHead       ( Type,Int );
+extern Void  expandSyn          ( Tycon, Int, Type *, Int * );
 
-extern Void  clearMarks         Args((Void));
-extern Void  markAllVars        Args((Void));
-extern Void  resetGenerics      Args((Void));
-extern Void  markTyvar          Args((Int));
-extern Void  markType           Args((Type,Int));
-extern Void  markPred           Args((Cell));
+extern Void  clearMarks         ( Void );
+extern Void  markAllVars        ( Void );
+extern Void  resetGenerics      ( Void );
+extern Void  markTyvar          ( Int );
+extern Void  markType           ( Type,Int );
+extern Void  markPred           ( Cell );
 
-extern Type  copyTyvar          Args((Int));
-extern Type  copyType           Args((Type,Int));
-extern Cell  copyPred           Args((Cell,Int));
-extern Type  dropRank2          Args((Type,Int,Int));
-extern Type  dropRank1          Args((Type,Int,Int));
-extern Void  liftRank2Args      Args((List,Int,Int));
-extern Type  liftRank2          Args((Type,Int,Int));
-extern Type  liftRank1          Args((Type,Int,Int));
+extern Type  copyTyvar          ( Int );
+extern Type  copyType           ( Type,Int );
+extern Cell  copyPred           ( Cell,Int );
+extern Type  dropRank2          ( Type,Int,Int );
+extern Type  dropRank1          ( Type,Int,Int );
+extern Void  liftRank2Args      ( List,Int,Int );
+extern Type  liftRank2          ( Type,Int,Int );
+extern Type  liftRank1          ( Type,Int,Int );
 #ifdef DEBUG_TYPES
-extern Type  debugTyvar         Args((Int));
-extern Type  debugType          Args((Type,Int));
+extern Type  debugTyvar         ( Int );
+extern Type  debugType          ( Type,Int );
 #endif
-extern Kind  copyKindvar        Args((Int));
-extern Kind  copyKind           Args((Kind,Int));
+extern Kind  copyKindvar        ( Int );
+extern Kind  copyKind           ( Kind,Int );
 
-extern Bool  eqKind             Args((Kind,Kind));
-extern Kind  getKind            Args((Cell,Int));
+extern Bool  eqKind             ( Kind,Kind );
+extern Kind  getKind            ( Cell,Int );
 
-extern List  genvarTyvar        Args((Int,List));
-extern List  genvarType         Args((Type,Int,List));
+extern List  genvarTyvar        ( Int,List );
+extern List  genvarType         ( Type,Int,List );
 
-extern Bool  doesntOccurIn      Args((Tyvar*,Type,Int));
-extern Bool  unify              Args((Type,Int,Type,Int));
-extern Bool  kunify             Args((Kind,Int,Kind,Int));
+extern Bool  doesntOccurIn      ( Tyvar*,Type,Int );
+extern Bool  unify              ( Type,Int,Type,Int );
+extern Bool  kunify             ( Kind,Int,Kind,Int );
 
-extern Void  typeTuple          Args((Cell));
-extern Void  varKind            Args((Int));
+extern Void  typeTuple          ( Cell );
+extern Void  varKind            ( Int );
 
-extern Bool  samePred           Args((Cell,Int,Cell,Int));
-extern Bool  matchPred          Args((Cell,Int,Cell,Int));
-extern Bool  unifyPred          Args((Cell,Int,Cell,Int));
-extern Inst  findInstFor        Args((Cell,Int));
+extern Bool  samePred           ( Cell,Int,Cell,Int );
+extern Bool  matchPred          ( Cell,Int,Cell,Int );
+extern Bool  unifyPred          ( Cell,Int,Cell,Int );
+extern Inst  findInstFor        ( Cell,Int );
 
-extern Void  improve		Args((Int,List,List));
-extern Void  improve1		Args((Int,List,Cell,Int));
+extern Void  improve		( Int,List,List );
+extern Void  improve1		( Int,List,Cell,Int );
 
-extern Bool  sameSchemes	Args((Type,Type));
-extern Bool  sameType		Args((Type,Int,Type,Int));
-extern Bool  matchType		Args((Type,Int,Type,Int));
-extern Bool  typeMatches        Args((Type,Type));
+extern Bool  sameSchemes	( Type,Type );
+extern Bool  sameType		( Type,Int,Type,Int );
+extern Bool  matchType		( Type,Int,Type,Int );
+extern Bool  typeMatches        ( Type,Type );
 
 /*-------------------------------------------------------------------------*/
