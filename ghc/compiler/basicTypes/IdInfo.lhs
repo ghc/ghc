@@ -181,6 +181,7 @@ instance Outputable InlinePragInfo where
   ppr IMustNotBeINLINEd 	= ptext SLIT("__Unot")
   ppr IAmALoopBreaker   	= ptext SLIT("__Ux")
   ppr IAmDead			= ptext SLIT("__Ud")
+  ppr (ICanSafelyBeINLINEd InsideLam _) = ptext SLIT("__Ul")
   ppr (ICanSafelyBeINLINEd _ _) = ptext SLIT("__Us")
   ppr IAmASpecPragmaId 		= ptext SLIT("__US")
 
