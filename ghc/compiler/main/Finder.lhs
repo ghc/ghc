@@ -7,7 +7,7 @@
 module Finder (
     initFinder, 	-- :: [PackageConfig] -> IO (), 
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-    mkHomeModuleLocn,	-- :: ModuleName -> String -> FilePath 
+    mkHomeModuleLocn,	-- :: ModuleName -> String -> Maybe FilePath 
 			--	-> IO ModuleLocation
     emptyHomeDirCache,	-- :: IO ()
     flushPackageCache   -- :: [PackageConfig] -> IO ()
@@ -22,12 +22,14 @@ import DriverState
 import DriverUtil
 import Module
 import FiniteMap
+import FastString
 import Util
 import Panic		( panic )
 import Config
 
 import IOExts
 import List
+import Directory
 import IO
 import Monad
 import Outputable
@@ -39,28 +41,15 @@ lives in, so it can make a Module from a ModuleName, and (b) where the
 source, interface, and object files for a module live.
 
 \begin{code}
-
--- v_PkgDirCache caches contents of package directories, never expunged
-GLOBAL_VAR(v_PkgDirCache, panic "no pkg cache!", 
-           FiniteMap String (PackageName, FilePath))
-
--- v_HomeDirCache caches contents of home directories, 
--- expunged whenever we create a new finder.
-GLOBAL_VAR(v_HomeDirCache, Nothing, Maybe (FiniteMap String FilePath))
-
-
 initFinder :: [PackageConfig] -> IO ()
-initFinder pkgs 
-   = do emptyHomeDirCache
-	flushPackageCache pkgs
+initFinder pkgs = return ()
 
 -- empty, and lazilly fill in the package cache
 flushPackageCache :: [PackageConfig] -> IO ()
-flushPackageCache pkgs = writeIORef v_PkgDirCache 
-			    (unsafePerformIO (newPkgCache pkgs))
+flushPackageCache pkgs = return ()
 
 emptyHomeDirCache :: IO ()
-emptyHomeDirCache = writeIORef v_HomeDirCache Nothing
+emptyHomeDirCache = return ()
 
 findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 findModule name
@@ -72,78 +61,73 @@ findModule name
 
 maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 maybeHomeModule mod_name = do
-   home_cache <- readIORef v_HomeDirCache
+   home_path <- readIORef v_Import_paths
 
-   home_map <- 
-     case home_cache of
-	Nothing -> do
-	   -- populate the home dir cache, using the import path (the import 
-	   -- path is changed by -i flags on the command line, and defaults 
-	   -- to ["."]).
-	   home_imports <- readIORef v_Import_paths
-	   let extendFM fm path = do
-		   contents <- softGetDirectoryContents path
-                   let clean_contents = filter isUsefulFile contents
-		   return (addListToFM fm (zip clean_contents (repeat path)))
-	   home_map <- foldM extendFM emptyFM (reverse home_imports)
-	   writeIORef v_HomeDirCache (Just home_map)
-	   return home_map
-
-        Just home_map -> return home_map
-
-   let basename = moduleNameUserString mod_name 
+   let mod_str  = moduleNameUserString mod_name 
+       basename = map (\c -> if c == '.' then '/' else c) mod_str
        hs  = basename ++ ".hs"
        lhs = basename ++ ".lhs"
 
-   case lookupFM home_map hs of {
+   found <- findOnPath home_path hs
+   case found of {
 	  -- special case to avoid getting "./foo.hs" all the time
-	Just "."  -> mkHomeModuleLocn mod_name basename hs;
+	Just "."  -> mkHomeModuleLocn mod_name basename (Just hs);
 	Just path -> mkHomeModuleLocn mod_name 
-			(path ++ '/':basename) (path ++ '/':hs);
-	Nothing ->
+			(path ++ '/':basename) (Just (path ++ '/':hs));
+	Nothing -> do
 
-   case lookupFM home_map lhs of {
+   found <- findOnPath home_path lhs
+   case found of {
 	  -- special case to avoid getting "./foo.hs" all the time
-	Just "."  -> mkHomeModuleLocn mod_name basename lhs;
+	Just "."  -> mkHomeModuleLocn mod_name basename (Just lhs);
 	Just path ->  mkHomeModuleLocn mod_name
-			(path ++ '/':basename) (path ++ '/':lhs);
+			(path ++ '/':basename) (Just (path ++ '/':lhs));
 	Nothing -> do
 
    -- can't find a source file anywhere, check for a lone .hi file.
    hisuf <- readIORef v_Hi_suf
    let hi = basename ++ '.':hisuf
-   case lookupFM home_map hi of {
-	Just path ->  mkHomeModuleLocn mod_name
-			(path ++ '/':basename) (path ++ '/':hs);
+   found <- findOnPath home_path hi
+   case found of {
+	Just path ->  mkHiOnlyModuleLocn mod_name hi;
 	Nothing -> do
 
    -- last chance: .hi-boot-<ver> and .hi-boot
    let hi_boot = basename ++ ".hi-boot"
    let hi_boot_ver = basename ++ ".hi-boot-" ++ cHscIfaceFileVersion
-   case lookupFM home_map hi_boot_ver of {
-	Just path ->  mkHomeModuleLocn mod_name
-			(path ++ '/':basename) (path ++ '/':hs);
+   found <- findOnPath home_path hi_boot_ver
+   case found of {
+	Just path -> mkHiOnlyModuleLocn mod_name hi;
 	Nothing -> do
-   case lookupFM home_map hi_boot of {
-	Just path ->  mkHomeModuleLocn mod_name 
-			(path ++ '/':basename) (path ++ '/':hs);
+   found <- findOnPath home_path hi_boot
+   case found of {
+	Just path -> mkHiOnlyModuleLocn mod_name hi;
 	Nothing -> return Nothing
    }}}}}
 
+
+mkHiOnlyModuleLocn mod_name hi_file = do
+   return (Just (mkHomeModule mod_name,
+                 ModuleLocation{
+                    ml_hspp_file = Nothing,
+		    ml_hs_file   = Nothing,
+		    ml_hi_file   = hi_file,
+		    ml_obj_file  = Nothing
+	         }
+	))
 
 -- The .hi file always follows the module name, whereas the object
 -- file may follow the name of the source file in the case where the
 -- two differ (see summariseFile in compMan/CompManager.lhs).
 
-mkHomeModuleLocn mod_name basename source_fn = do
+mkHomeModuleLocn mod_name basename maybe_source_fn = do
 
    hisuf  <- readIORef v_Hi_suf
    hidir  <- readIORef v_Hi_dir
 
-   let dir | Just d <- hidir = d
-	   | otherwise       = getdir basename 
-
-       hifile = dir ++ '/':moduleNameUserString mod_name ++ '.':hisuf
+   let hi_rest = basename ++ '.':hisuf
+       hi_file | Just d <- hidir = d ++ '/':hi_rest
+	       | otherwise       = hi_rest
 
    -- figure out the .o file name.  It also lives in the same dir
    -- as the source, but can be overriden by a -odir flag.
@@ -152,31 +136,16 @@ mkHomeModuleLocn mod_name basename source_fn = do
    return (Just (mkHomeModule mod_name,
                  ModuleLocation{
                     ml_hspp_file = Nothing,
-		    ml_hs_file   = Just source_fn,
-		    ml_hi_file   = hifile,
+		    ml_hs_file   = maybe_source_fn,
+		    ml_hi_file   = hi_file,
 		    ml_obj_file  = Just o_file
 	         }
 	))
 
 
-newPkgCache :: [PackageConfig] -> IO (FiniteMap String (PackageName, FilePath))
-newPkgCache pkgs = do
-    let extendFM fm pkg = do
-    	    let dirs = import_dirs pkg
-    		pkg_name = _PK_ (name pkg)
-    	    let addDir fm dir = do
-    		    contents <- softGetDirectoryContents dir
-    		    return (addListToFM fm (zip contents 
-    					       (repeat (pkg_name,dir))))
-    	    foldM addDir fm dirs
-    
-    pkg_map <- foldM extendFM emptyFM pkgs
-    return pkg_map
-
-
 maybePackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 maybePackageModule mod_name = do
-  pkg_cache <- readIORef v_PkgDirCache
+  pkgs <- getPackageInfo
 
   -- hi-suffix for packages depends on the build tag.
   package_hisuf <-
@@ -188,19 +157,36 @@ maybePackageModule mod_name = do
   let basename = moduleNameUserString mod_name
       hi = basename ++ '.':package_hisuf
 
-  case lookupFM pkg_cache hi of
+  found <- findOnPackagePath pkgs hi
+  case found of
 	Nothing -> return Nothing
 	Just (pkg_name,path) -> 
 	    return (Just (mkModule mod_name pkg_name,
 			  ModuleLocation{ 
                                 ml_hspp_file = Nothing,
 				ml_hs_file   = Nothing,
-				ml_hi_file   = path ++ '/':hi,
+				ml_hi_file   = path,
 				ml_obj_file  = Nothing
 			   }
 		   ))
 
-isUsefulFile fn
-   = let suffix = (reverse . takeWhile (/= '.') . reverse) fn
-     in  suffix `elem` ["hi", "hs", "lhs", "hi-boot", "hi-boot-5"]
+findOnPackagePath :: [PackageConfig] -> String
+   -> IO (Maybe (PackageName,FilePath))
+findOnPackagePath pkgs file = loop pkgs
+ where
+  loop [] = return Nothing
+  loop (p:ps) = do
+    found <- findOnPath (import_dirs p) file
+    case found of
+	Nothing -> loop ps
+	Just f  -> return (Just (mkFastString (name p), f))
+
+findOnPath :: [String] -> String -> IO (Maybe FilePath)
+findOnPath path s = loop path
+ where
+  loop [] = return Nothing
+  loop (d:ds) = do
+    let file = d ++ '/':s
+    b <- doesFileExist file
+    if b then return (Just d) else loop ds
 \end{code}

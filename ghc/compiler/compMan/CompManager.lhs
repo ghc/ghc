@@ -390,6 +390,9 @@ cmLoadModule cmstate1 rootname
 	-- See getValidLinkables below for details.
 	valid_linkables <- getValidLinkables ui1 mg2unsorted_names 
 				mg2_with_srcimps
+	-- when (verb >= 2) $
+        --    putStrLn (showSDoc (text "Valid linkables:" 
+        --                       <+> ppr valid_linkables))
 
         -- Figure out a stable set of modules which can be retained
         -- the top level envs, to avoid upsweeping them.  Goes to a
@@ -1015,7 +1018,7 @@ summariseFile file
         let (path, basename, ext) = splitFilename3 file
 
 	Just (mod, location)
-	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) file
+	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) (Just file)
 
         src_timestamp
            <- case ml_hs_file location of 
@@ -1030,13 +1033,22 @@ summariseFile file
 summarise :: Module -> ModuleLocation -> Maybe ModSummary
 	 -> IO (Maybe ModSummary)
 summarise mod location old_summary
-   | isHomeModule mod
+   | not (isHomeModule mod) = return Nothing
+   | otherwise
    = do let hs_fn = unJust "summarise" (ml_hs_file location)
 
-        src_timestamp
-           <- case ml_hs_file location of 
-                 Nothing     -> noHsFileErr mod
-                 Just src_fn -> getModificationTime src_fn
+        case ml_hs_file location of {
+           Nothing -> do {
+		dflags <- getDynFlags;
+		when (verbosity dflags >= 1) $
+		    hPutStrLn stderr ("WARNING: module `" ++ 
+			moduleUserString mod ++ "' has no source file.");
+		return Nothing;
+	     };
+
+           Just src_fn -> do
+
+        src_timestamp <- getModificationTime src_fn
 
 	-- return the cached summary if the source didn't change
 	case old_summary of {
@@ -1055,11 +1067,11 @@ summarise mod location old_summary
         return (Just (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
                                  srcimps imps src_timestamp))
         }
+      }
 
-   | otherwise = return Nothing
 
 noHsFileErr mod
-  = panic (showSDoc (text "no source file for module" <+> quotes (ppr mod)))
+  = throwDyn (CmdLineError (showSDoc (text "no source file for module" <+> quotes (ppr mod))))
 
 packageModErr mod
   = throwDyn (CmdLineError (showSDoc (text "module" <+>

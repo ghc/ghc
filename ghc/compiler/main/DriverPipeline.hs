@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.74 2001/06/01 17:14:08 apt Exp $
+-- $Id: DriverPipeline.hs,v 1.75 2001/06/07 11:03:07 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -464,7 +464,7 @@ run_phase Hsc basename suff input_fn output_fn
 
   -- build a ModuleLocation to pass to hscMain.
 	Just (mod, location')
-	   <- mkHomeModuleLocn mod_name basename (basename ++ '.':suff)
+	   <- mkHomeModuleLocn mod_name basename (Just (basename ++ '.':suff))
 
   -- take -ohi into account if present
 	ohi <- readIORef v_Output_hi
