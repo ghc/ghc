@@ -431,15 +431,6 @@ sub process_stats_file {
     $MutElapsed =~ s/,//g;
     $GcTime =~ s/,//g;
     $GcElapsed =~ s/,//g;
-
-    # if timings are negative (I've seen -0.00s) then set to 0
-    $InitTime           = 0 unless $InitTime >= 0;
-    $InitElapsed        = 0 unless $InitElapsed >= 0; 
-    $MutTime            = 0 unless $MutTime >= 0;
-    $MutElapsed         = 0 unless $MutElapsed >= 0;
-    $GcTime             = 0 unless $GcTime >= 0;
-    $GcElapsed          = 0 unless $GcElapsed >= 0;
-    
 }
 
 sub process_cacheprof_files {
