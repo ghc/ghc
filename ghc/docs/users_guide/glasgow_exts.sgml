@@ -3177,11 +3177,13 @@ instances is most interesting.
 <sect1 id="template-haskell">
 <title>Template Haskell</title>
 
-<para>Template Haskell allows you to do compile-time meta-programming in Haskell.  The background 
-the main technical innovations are discussed in "<ulink
+<para>Template Haskell allows you to do compile-time meta-programming in Haskell.  There is a "home page" for
+Template Haskell at <ulink url="http://www.haskell.org/th/">
+http://www.haskell.org/th/</ulink>, while
+the background to
+the main technical innovations is discussed in "<ulink
 url="http://research.microsoft.com/~simonpj/papers/meta-haskell">
-Template Meta-programming for Haskell</ulink>", in 
-Proc Haskell Workshop 2002.
+Template Meta-programming for Haskell</ulink>" (Proc Haskell Workshop 2002).
 </para>
 
 <para> The first example from that paper is set out below as a worked example to help get you started. 
