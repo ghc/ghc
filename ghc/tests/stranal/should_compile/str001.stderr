@@ -1,0 +1,17 @@
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+Addr ArrBase Foreign IO PrelBounded PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d10 1 $d13 1 $d15 1 $d2 1 $d21 1 $d26 1 $d27 1 $d29 1 $d3 1 $d30 1 $d31 1 $d33 1 $d34 1 $d36 1 $d38 1 $d4 1 $d42 1 $d7 1 $d8 1 $g0 1 $g1E 1 $g1R 1 $g1T 1 $g1U 1 $g1V 1 $g1W 1 $g1X 1 $g1Y 1 $g1Z 1 $g1s 1 $g1t 1 $g20 1 $g23 1 $g24 1 $g28 1 $g29 1 $g2A 1 $g2F 1 $g2I 1 $g2J 1 $g2K 1 $g2L 1 $g2R 1 $g2S 1 $g2T 1 $g2X 1 $g2Y 1 $g2Z 1 $g2u 1 $g2z 1 $g30 1 $g31 1 $g33 1 $g36 1 $g37 1 $g38 1 $g39 1 $g3D 1 $g3E 1 $g3F 1 $g3G 1 $g3Y 1 $g3Z 1 $g40 1 $g41 1 $g42 1 $g43 1 $g44 1 $g46 1 $g6 1 $gb 1 $m- 1 $m/= 1 $mfromInt 1 $mshowList 1 itos 1 showList__ 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1 $g1B 1 $g1C 1 $g1D 1 $g1E 1 $g1F 1 $g1a 1 $g1b 1 $g1c 1 $g1e 1 $g2V 1 $g2W 1 $g2X 1 $g2Y 1 $g2w 1 $g3T 1 $g4 1 $g46 1 $g47 1 $g48 1 $g49 1 $g4o 1 $g4p 1 $g4s 1 $g5 1 $gD 1 $gK 1 $gg 1 $gh 1 $gi 1 $gj 1 $gk 1 $gl 1 minExpt 1;
+PrelTup 1 :: $d13 1 $d4 1 $d9 1 $g0 1 $g1 1 $g3 1;
+_exports_
+ShouldSucceed area2 Point2(Point2);
+_instances_
+instance _forall_ [a] => {PrelBase.Eval (Point2 a)} = $d1;
+_declarations_
+1 $d1 _:_ _forall_ [a] => {PrelBase.Eval (Point2 a)} ;; _A_ 0 _bot_ ;;
+1 $warea2 _:_ _forall_ [ta] => (ta -> ta -> ta) -> (ta -> ta -> ta) -> ta -> ta -> (ta, ta) -> (ta, ta) -> ta ;; _A_ 6 _S_ SLLLu(LL)u(LL) _U_ _/\_ $x0 -> \ $x1 :: ($x0 -> $x0 -> $x0) $x2 :: ($x0 -> $x0 -> $x0) $x3 :: $x0 $x4 :: $x0 $x5 :: ($x0, $x0) $x6 :: ($x0, $x0) -> case $x5 of { PrelTup.(,) $x7 $x8  -> case $x6 of { PrelTup.(,) $x9 $xa  -> let { $xd :: $x0 = let { $xb :: $x0 = $x1 $x3 $x7 } in let { $xc :: $x0 = $x1 $x4 $xa } in  $x2 $xb $xc } in let { $xg :: $x0 = let { $xe :: $x0 = $x1 $x4 $x8 } in let { $xf :: $x0 = $x1 $x3 $x9 } in  $x2 $xe $xf } in $x1 $xd $xg;};} ;;
+1 newtype {PrelBase.Num a} => Point2 a = Point2 (a, a) ;
+1 area2 _:_ _forall_ [ta] {PrelBase.Num ta} => Point2 ta -> Point2 ta -> Point2 ta -> ta ;; _A_ 4 _S_ U(AAAASLAAAAA)N(U(LL))N(u(LL))N(u(LL)) $warea2 {PrelTup.(,) PrelTup.(,,,,,,,,,,) Point2} ;;
