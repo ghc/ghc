@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.30 2002/02/28 18:45:51 sof Exp $
+ * $Id: StgCRun.c,v 1.31 2002/03/26 10:35:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -450,4 +450,39 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 
 #endif /* hppa1_1_TARGET_ARCH */
 
+/* -----------------------------------------------------------------------------
+   PowerPC architecture
+
+   We can use a simple function call as a tail call (the bl instruction places
+   the return address in the Link Register, and we ignore it).
+   We make GCC do the register saving. GCC does a good job
+   and saves all general purpose registers with a single stmw
+   (store multiple words) instruction.
+   
+   -------------------------------------------------------------------------- */
+
+#ifdef powerpc_TARGET_ARCH
+
+StgThreadReturnCode
+StgRun(StgFunPtr f, StgRegTable *basereg) {
+
+    unsigned char space[RESERVED_C_STACK_BYTES];
+
+    f();
+    __asm__ volatile (
+	    ".align 4\n"
+            ".globl " STG_RETURN "\n"
+       	    STG_RETURN ":"
+	    : : : 
+			"r14","r15","r16","r17","r18","r19","r20","r21","r22","r23","r24","r25","r26",
+			"r27","r28","r29","r30","r31",
+			"fr14","fr15","fr16","fr17","fr18","fr19","fr20",
+			"fr21","fr22","fr23","fr24","fr25","fr26","fr27","fr28","fr29","fr30","fr31");
+	   
+    return (StgThreadReturnCode)R1.i;
+}
+
+#endif
+
 #endif /* !USE_MINIINTERPRETER */
+
