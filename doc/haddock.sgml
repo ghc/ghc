@@ -1139,6 +1139,25 @@ module A where
 	it, the URL will be turned into a hyperlink when
 	rendered.</para>
       </section>
+
+      <section>
+	<title>Anchors</title>
+
+	<para>Sometimes it is useful to be able to link to a point in
+	the documentation which doesn't correspond to a particular
+	entity.  For that purpose, we allow <emph>anchors</emph> to be
+	included in a documentation comment.  The syntax is
+	<literal>#<replaceable>label</replaceable>#</literal>, where
+	<replaceable>label</replaceable> is the name of the anchor.
+	An anchor is invisible in the generated documentation.</para>
+	
+	<para>To link to an anchor from elsewhere, use the syntax
+	<literal>"<replaceable>module</replaceable>#<replaceable>label</replaceable>"</literal>
+	where <replaceable>module</replaceable> is the module name
+	containing the anchor, and <replaceable>label</replaceable> is
+	the anchor label.  The module does not have to be local, it
+	can be imported via an interface.</para>
+      </section>
     </section>
   </chapter>
 </book>
