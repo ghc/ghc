@@ -1,5 +1,5 @@
 
-include ($confdir ++ "/../std-macros.T")
+include ($confdir ++ "/../singlefile-macros.T")
 expect pass
 
 pretest_cleanup()
@@ -9,6 +9,6 @@ $res = simple_run_main_no_stdin()
 
 pass when 
    $tool contains "ghc"
-   && contents("run.stderr") contains "Prelude.chr: bad argument"
+   && contents("chr1.run.stderr") contains "Prelude.chr: bad argument"
 
 fail when otherwise
