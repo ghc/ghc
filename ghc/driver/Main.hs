@@ -161,9 +161,13 @@ instance Typeable BarfKind where
 -- Temporary files
 
 GLOBAL_VAR(files_to_clean, [], [String])
+GLOBAL_VAR(keep_tmp_files, False, Bool)
 
 cleanTempFiles :: IO ()
 cleanTempFiles = do
+  forget_it <- readIORef keep_tmp_files
+  if forget_it then return () else do
+
   fs <- readIORef files_to_clean
   verb <- readIORef verbose
 
@@ -1763,6 +1767,7 @@ opts =
   ,  ( "keep-hc-file"   , AnySuffix (\_ -> writeIORef keep_hc_files True) )
   ,  ( "keep-s-file"    , AnySuffix (\_ -> writeIORef keep_s_files  True) )
   ,  ( "keep-raw-s-file", AnySuffix (\_ -> writeIORef keep_raw_s_files  True) )
+  ,  ( "keep-tmp-files" , AnySuffix (\_ -> writeIORef keep_tmp_files True) )
 
   ,  ( "split-objs"	, NoArg (if can_split
 				    then do writeIORef split_object_files True
