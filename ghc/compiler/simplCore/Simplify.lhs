@@ -772,6 +772,7 @@ completeCall var occ cont
   = getBlackList		`thenSmpl` \ black_list_fn ->
     getInScope			`thenSmpl` \ in_scope ->
     getContArgs var cont	`thenSmpl` \ (args, call_cont, inline_call) ->
+    getDOptsSmpl		`thenSmpl` \ dflags ->
     let
 	black_listed       = black_list_fn var
 	arg_infos	   = [ interestingArg in_scope arg subst 
@@ -784,7 +785,7 @@ completeCall var occ cont
 	inline_cont | inline_call = discardInline cont
 		    | otherwise   = cont
 
-	maybe_inline = callSiteInline black_listed inline_call occ
+	maybe_inline = callSiteInline dflags black_listed inline_call occ
 				      var arg_infos interesting_cont
     in
 	-- First, look for an inlining

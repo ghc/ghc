@@ -13,6 +13,7 @@ module SimplMonad (
 	SimplM,
 	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
 	mapSmpl, mapAndUnzipSmpl, mapAccumLSmpl,
+	getDOptsSmpl,
 
 	-- The inlining black-list
 	setBlackList, getBlackList, noInlineBlackList,
@@ -68,7 +69,8 @@ import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			)
 import FiniteMap
 import CmdLineOpts	( SimplifierSwitch(..), SwitchResult(..),
-			  opt_PprStyle_Debug, opt_HistorySize, opt_D_dump_simpl_stats,
+			  DynFlags, DynFlag(..), dopt,
+			  opt_PprStyle_Debug, opt_HistorySize,
 			  intSwitchSet
 			)
 import Unique		( Unique )
@@ -161,9 +163,10 @@ For the simplifier monad, we want to {\em thread} a unique supply and a counter.
 (Command-line switches move around through the explicitly-passed SimplEnv.)
 
 \begin{code}
-type SimplM result		-- We thread the unique supply because
-  =  SimplEnv			-- constantly splitting it is rather expensive
-  -> UniqSupply
+type SimplM result
+  =  DynFlags
+  -> SimplEnv		-- We thread the unique supply because
+  -> UniqSupply		-- constantly splitting it is rather expensive
   -> SimplCount 
   -> (result, UniqSupply, SimplCount)
 
@@ -195,15 +198,17 @@ data SimplEnv
 \end{code}
 
 \begin{code}
-initSmpl :: SwitchChecker
+initSmpl :: DynFlags
+	 -> SwitchChecker
 	 -> UniqSupply		-- No init count; set to 0
 	 -> VarSet		-- In scope (usually empty, but useful for nested calls)
 	 -> BlackList		-- Black-list function
 	 -> SimplM a
 	 -> (a, SimplCount)
 
-initSmpl chkr us in_scope black_list m
-  = case m (emptySimplEnv chkr in_scope black_list) us zeroSimplCount of 
+initSmpl dflags chkr us in_scope black_list m
+  = case m dflags (emptySimplEnv chkr in_scope black_list) us 
+	   (zeroSimplCount dflags) of 
 	(result, _, count) -> (result, count)
 
 
@@ -212,18 +217,18 @@ initSmpl chkr us in_scope black_list m
 {-# INLINE returnSmpl #-}
 
 returnSmpl :: a -> SimplM a
-returnSmpl e env us sc = (e, us, sc)
+returnSmpl e dflags env us sc = (e, us, sc)
 
 thenSmpl  :: SimplM a -> (a -> SimplM b) -> SimplM b
 thenSmpl_ :: SimplM a -> SimplM b -> SimplM b
 
-thenSmpl m k env us0 sc0
-  = case (m env us0 sc0) of 
-	(m_result, us1, sc1) -> k m_result env us1 sc1
+thenSmpl m k dflags env us0 sc0
+  = case (m dflags env us0 sc0) of 
+	(m_result, us1, sc1) -> k m_result dflags env us1 sc1
 
-thenSmpl_ m k env us0 sc0
-  = case (m env us0 sc0) of 
-	(_, us1, sc1) -> k env us1 sc1
+thenSmpl_ m k dflags env us0 sc0
+  = case (m dflags env us0 sc0) of 
+	(_, us1, sc1) -> k dflags env us1 sc1
 \end{code}
 
 
@@ -258,12 +263,18 @@ mapAccumLSmpl f acc (x:xs) = f acc x	`thenSmpl` \ (acc', x') ->
 
 \begin{code}
 getUniqueSmpl :: SimplM Unique
-getUniqueSmpl env us sc = case splitUniqSupply us of
-				(us1, us2) -> (uniqFromSupply us1, us2, sc)
+getUniqueSmpl dflags env us sc 
+   = case splitUniqSupply us of
+        (us1, us2) -> (uniqFromSupply us1, us2, sc)
 
 getUniquesSmpl :: Int -> SimplM [Unique]
-getUniquesSmpl n env us sc = case splitUniqSupply us of
-				(us1, us2) -> (uniqsFromSupply n us1, us2, sc)
+getUniquesSmpl n dflags env us sc 
+   = case splitUniqSupply us of
+        (us1, us2) -> (uniqsFromSupply n us1, us2, sc)
+
+getDOptsSmpl :: SimplM DynFlags
+getDOptsSmpl dflags env us sc 
+   = (dflags, us, sc)
 \end{code}
 
 
@@ -275,25 +286,27 @@ getUniquesSmpl n env us sc = case splitUniqSupply us of
 
 \begin{code}
 getSimplCount :: SimplM SimplCount
-getSimplCount env us sc = (sc, us, sc)
+getSimplCount dflags env us sc = (sc, us, sc)
 
 tick :: Tick -> SimplM ()
-tick t env us sc = sc' `seq` ((), us, sc')
-		 where
-		   sc' = doTick t sc
+tick t dflags env us sc 
+   = sc' `seq` ((), us, sc')
+     where
+        sc' = doTick t sc
 
 freeTick :: Tick -> SimplM ()
 -- Record a tick, but don't add to the total tick count, which is
 -- used to decide when nothing further has happened
-freeTick t env us sc = sc' `seq` ((), us, sc')
-		 where
-		   sc' = doFreeTick t sc
+freeTick t dflags env us sc 
+   = sc' `seq` ((), us, sc')
+        where
+           sc' = doFreeTick t sc
 \end{code}
 
 \begin{code}
 verboseSimplStats = opt_PprStyle_Debug		-- For now, anyway
 
-zeroSimplCount	   :: SimplCount
+zeroSimplCount	   :: DynFlags -> SimplCount
 isZeroSimplCount   :: SimplCount -> Bool
 pprSimplCount	   :: SimplCount -> SDoc
 doTick, doFreeTick :: Tick -> SimplCount -> SimplCount
@@ -315,11 +328,14 @@ data SimplCount = VerySimplZero		-- These two are used when
 
 type TickCounts = FiniteMap Tick Int
 
-zeroSimplCount	-- This is where we decide whether to do
+zeroSimplCount dflags
+		-- This is where we decide whether to do
 		-- the VerySimpl version or the full-stats version
-  | opt_D_dump_simpl_stats = SimplCount {ticks = 0, details = emptyFM,
-			   		 n_log = 0, log1 = [], log2 = []}
-  | otherwise		   = VerySimplZero
+  | dopt Opt_D_dump_simpl_stats dflags
+  = SimplCount {ticks = 0, details = emptyFM,
+                n_log = 0, log1 = [], log2 = []}
+  | otherwise
+  = VerySimplZero
 
 isZeroSimplCount VerySimplZero    	    = True
 isZeroSimplCount (SimplCount { ticks = 0 }) = True
@@ -531,7 +547,7 @@ cmpEqTick other1			other2				= EQ
 
 \begin{code}
 getSwitchChecker :: SimplM SwitchChecker
-getSwitchChecker env us sc = (seChkr env, us, sc)
+getSwitchChecker dflags env us sc = (seChkr env, us, sc)
 
 getSimplIntSwitch :: SwitchChecker -> (Int-> SimplifierSwitch) -> Int
 getSimplIntSwitch chkr switch
@@ -592,10 +608,11 @@ knowing when something is evaluated.
 
 \begin{code}
 setBlackList :: BlackList -> SimplM a -> SimplM a
-setBlackList black_list m env us sc = m (env { seBlackList = black_list }) us sc
+setBlackList black_list m dflags env us sc 
+   = m dflags (env { seBlackList = black_list }) us sc
 
 getBlackList :: SimplM BlackList
-getBlackList env us sc = (seBlackList env, us, sc)
+getBlackList dflags env us sc = (seBlackList env, us, sc)
 
 noInlineBlackList :: BlackList
 	-- Inside inlinings, black list anything that is in scope or imported.
@@ -620,10 +637,10 @@ noInlineBlackList v = not (isCompulsoryUnfolding (idUnfolding v)) &&
 
 \begin{code}
 getEnclosingCC :: SimplM CostCentreStack
-getEnclosingCC env us sc = (seCC env, us, sc)
+getEnclosingCC dflags env us sc = (seCC env, us, sc)
 
 setEnclosingCC :: CostCentreStack -> SimplM a -> SimplM a
-setEnclosingCC cc m env us sc = m (env { seCC = cc }) us sc
+setEnclosingCC cc m dflags env us sc = m dflags (env { seCC = cc }) us sc
 \end{code}
 
 
@@ -644,77 +661,80 @@ emptySimplEnv sw_chkr in_scope black_list
 	-- The top level "enclosing CC" is "SUBSUMED".
 
 getEnv :: SimplM SimplEnv
-getEnv env us sc = (env, us, sc)
+getEnv dflags env us sc = (env, us, sc)
 
 setAllExceptInScope :: SimplEnv -> SimplM a -> SimplM a
-setAllExceptInScope new_env@(SimplEnv {seSubst = new_subst}) m 
+setAllExceptInScope new_env@(SimplEnv {seSubst = new_subst}) m dflags
 		    	    (SimplEnv {seSubst = old_subst}) us sc 
-  = m (new_env {seSubst = Subst.setInScope new_subst (substInScope old_subst)}) us sc
+  = m dflags (new_env {seSubst = Subst.setInScope new_subst (substInScope old_subst)}) 
+             us sc
 
 getSubst :: SimplM Subst
-getSubst env us sc = (seSubst env, us, sc)
+getSubst dflags env us sc = (seSubst env, us, sc)
 
 setSubst :: Subst -> SimplM a -> SimplM a
-setSubst subst m env us sc = m (env {seSubst = subst}) us sc
+setSubst subst m dflags env us sc = m dflags (env {seSubst = subst}) us sc
 
 getSubstEnv :: SimplM SubstEnv
-getSubstEnv env us sc = (substEnv (seSubst env), us, sc)
+getSubstEnv dflags env us sc = (substEnv (seSubst env), us, sc)
 
 addNewInScopeIds :: [CoreBndr] -> SimplM a -> SimplM a
 	-- The new Ids are guaranteed to be freshly allocated
-addNewInScopeIds  vs m env@(SimplEnv {seSubst = subst}) us sc
-  = m (env {seSubst = Subst.extendNewInScopeList subst vs}) us sc
+addNewInScopeIds vs m dflags env@(SimplEnv {seSubst = subst}) us sc
+  = m dflags (env {seSubst = Subst.extendNewInScopeList subst vs}) us sc
 
 getInScope :: SimplM InScopeSet
-getInScope env us sc = (substInScope (seSubst env), us, sc)
+getInScope dflags env us sc = (substInScope (seSubst env), us, sc)
 
 setInScope :: InScopeSet -> SimplM a -> SimplM a
-setInScope in_scope m env@(SimplEnv {seSubst = subst}) us sc
-  = m (env {seSubst = Subst.setInScope subst in_scope}) us sc
+setInScope in_scope m dflags env@(SimplEnv {seSubst = subst}) us sc
+  = m dflags (env {seSubst = Subst.setInScope subst in_scope}) us sc
 
 modifyInScope :: CoreBndr -> CoreBndr -> SimplM a -> SimplM a
-modifyInScope v v' m env@(SimplEnv {seSubst = subst}) us sc 
-  = m (env {seSubst = Subst.modifyInScope subst v v'}) us sc
+modifyInScope v v' m dflags env@(SimplEnv {seSubst = subst}) us sc 
+  = m dflags (env {seSubst = Subst.modifyInScope subst v v'}) us sc
 
 extendSubst :: CoreBndr -> SubstResult -> SimplM a -> SimplM a
-extendSubst var res m env@(SimplEnv {seSubst = subst}) us sc
-  = m (env { seSubst = Subst.extendSubst subst var res  }) us sc
+extendSubst var res m dflags env@(SimplEnv {seSubst = subst}) us sc
+  = m dflags (env { seSubst = Subst.extendSubst subst var res  }) us sc
 
 extendSubstList :: [CoreBndr] -> [SubstResult] -> SimplM a -> SimplM a
-extendSubstList vars ress m env@(SimplEnv {seSubst = subst}) us sc
-  = m (env { seSubst = Subst.extendSubstList subst vars ress  }) us sc
+extendSubstList vars ress m dflags env@(SimplEnv {seSubst = subst}) us sc
+  = m dflags (env { seSubst = Subst.extendSubstList subst vars ress  }) us sc
 
 setSubstEnv :: SubstEnv -> SimplM a -> SimplM a
-setSubstEnv senv m env@(SimplEnv {seSubst = subst}) us sc
-  = m (env {seSubst = Subst.setSubstEnv subst senv}) us sc
+setSubstEnv senv m dflags env@(SimplEnv {seSubst = subst}) us sc
+  = m dflags (env {seSubst = Subst.setSubstEnv subst senv}) us sc
 
 zapSubstEnv :: SimplM a -> SimplM a
-zapSubstEnv m env@(SimplEnv {seSubst = subst}) us sc
-  = m (env {seSubst = Subst.zapSubstEnv subst}) us sc
+zapSubstEnv m dflags env@(SimplEnv {seSubst = subst}) us sc
+  = m dflags (env {seSubst = Subst.zapSubstEnv subst}) us sc
 
 getSimplBinderStuff :: SimplM (Subst, UniqSupply)
-getSimplBinderStuff (SimplEnv {seSubst = subst}) us sc
+getSimplBinderStuff dflags (SimplEnv {seSubst = subst}) us sc
   = ((subst, us), us, sc)
 
 setSimplBinderStuff :: (Subst, UniqSupply) -> SimplM a -> SimplM a
-setSimplBinderStuff (subst, us) m env _ sc
-  = m (env {seSubst = subst}) us sc
+setSimplBinderStuff (subst, us) m dflags env _ sc
+  = m dflags (env {seSubst = subst}) us sc
 \end{code}
 
 
 \begin{code}
 newId :: UserFS -> Type -> (Id -> SimplM a) -> SimplM a
 	-- Extends the in-scope-env too
-newId fs ty m env@(SimplEnv {seSubst = subst}) us sc
+newId fs ty m dflags env@(SimplEnv {seSubst = subst}) us sc
   =  case splitUniqSupply us of
-	(us1, us2) -> m v (env {seSubst = Subst.extendNewInScope subst v}) us2 sc
+	(us1, us2) -> m v dflags (env {seSubst = Subst.extendNewInScope subst v}) 
+			us2 sc
 		   where
 		      v = mkSysLocal fs (uniqFromSupply us1) ty
 
 newIds :: UserFS -> [Type] -> ([Id] -> SimplM a) -> SimplM a
-newIds fs tys m env@(SimplEnv {seSubst = subst}) us sc
+newIds fs tys m dflags env@(SimplEnv {seSubst = subst}) us sc
   =  case splitUniqSupply us of
-	(us1, us2) -> m vs (env {seSubst = Subst.extendNewInScopeList subst vs}) us2 sc
+	(us1, us2) -> m vs dflags (env {seSubst = Subst.extendNewInScopeList subst vs}) 
+			us2 sc
 		   where
 		      vs = zipWithEqual "newIds" (mkSysLocal fs) 
 					(uniqsFromSupply (length tys) us1) tys

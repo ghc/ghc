@@ -11,7 +11,7 @@ module StrictAnal ( saBinds ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_stranal, opt_D_dump_simpl_stats,  opt_D_verbose_core2core )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import Id		( setIdStrictness, setInlinePragma, 
 			  idDemandInfo, setIdDemandInfo, isBottomingId,
@@ -19,12 +19,13 @@ import Id		( setIdStrictness, setInlinePragma,
 			)
 import IdInfo		( neverInlinePrag )
 import CoreLint		( beginPass, endPass )
-import ErrUtils		( dumpIfSet )
+import ErrUtils		( dumpIfSet_dyn )
 import SaAbsInt
 import SaLib
 import Demand		( Demand, wwStrict, isStrict, isLazy )
 import Util		( zipWith3Equal, stretchZipWith )
 import Outputable
+import FastTypes
 \end{code}
 
 %************************************************************************
@@ -78,23 +79,24 @@ worker-wrapper pass can use this info to create wrappers and
 strict workers.
 
 \begin{code}
-saBinds ::[CoreBind]
-	   -> IO [CoreBind]
+saBinds :: DynFlags -> [CoreBind] -> IO [CoreBind]
 
-saBinds binds
+saBinds dflags binds
   = do {
-	beginPass "Strictness analysis";
+	beginPass dflags "Strictness analysis";
 
 	-- Mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS
 	let { (binds_w_strictness, sa_stats) = saTopBinds binds nullSaStats };
-	dumpIfSet opt_D_dump_simpl_stats "Strictness analysis statistics"
+	dumpIfSet_dyn dflags Opt_D_dump_simpl_stats "Strictness analysis statistics"
 		  (pp_stats sa_stats);
 #else
 	let { binds_w_strictness = saTopBindsBinds binds };
 #endif
 
-	endPass "Strictness analysis" (opt_D_dump_stranal || opt_D_verbose_core2core) binds_w_strictness
+	endPass dflags "Strictness analysis" 
+	        (dopt Opt_D_dump_stranal dflags || dopt Opt_D_verbose_core2core dflags)
+		binds_w_strictness
     }
 \end{code}
 
@@ -395,7 +397,7 @@ data SaStats
 	    FastInt FastInt	-- total/marked-demanded let-bound
 				-- (excl. top-level; excl. letrecs)
 
-nullSaStats = SaStats ILIT(0) ILIT(0) ILIT(0) ILIT(0) ILIT(0) ILIT(0)
+nullSaStats = SaStats (_ILIT 0) (_ILIT 0) (_ILIT 0) (_ILIT 0) (_ILIT 0) (_ILIT 0)
 
 thenSa	      :: SaM a -> (a -> SaM b) -> SaM b
 thenSa_	      :: SaM a -> SaM b -> SaM b
@@ -423,15 +425,21 @@ thenSa_ expr cont stats
 returnSa x stats = (x, stats)
 
 tickLambda var (SaStats tlam dlam tc dc tlet dlet)
-  = case (tick_demanded var (0,0)) of { (IBOX(tot), IBOX(demanded)) ->
+  = case (tick_demanded var (0,0)) of { (totB, demandedB) ->
+    let tot = iUnbox totB ; demanded = iUnbox demandedB 
+    in
     ((), SaStats (tlam +# tot) (dlam +# demanded) tc dc tlet dlet) }
 
 tickCases vars (SaStats tlam dlam tc dc tlet dlet)
-  = case (foldr tick_demanded (0,0) vars) of { (IBOX(tot), IBOX(demanded)) ->
+  = case (foldr tick_demanded (0,0) vars) of { (totB, demandedB) ->
+    let tot = iUnbox totB ; demanded = iUnbox demandedB 
+    in
     ((), SaStats tlam dlam (tc +# tot) (dc +# demanded) tlet dlet) }
 
 tickLet var (SaStats tlam dlam tc dc tlet dlet)
-  = case (tick_demanded var (0,0))        of { (IBOX(tot),IBOX(demanded)) ->
+  = case (tick_demanded var (0,0))        of { (totB, demandedB) ->
+    let tot = iUnbox totB ; demanded = iUnbox demandedB 
+    in
     ((), SaStats tlam dlam tc dc (tlet +# tot) (dlet +# demanded)) }
 
 tick_demanded var (tot, demanded)
@@ -443,9 +451,9 @@ tick_demanded var (tot, demanded)
      else demanded)
 
 pp_stats (SaStats tlam dlam tc dc tlet dlet)
-      = hcat [ptext SLIT("Lambda vars: "), int IBOX(dlam), char '/', int IBOX(tlam),
-		    ptext SLIT("; Case vars: "), int IBOX(dc),   char '/', int IBOX(tc),
-		    ptext SLIT("; Let vars: "),  int IBOX(dlet), char '/', int IBOX(tlet)
+      = hcat [ptext SLIT("Lambda vars: "), int (iBox dlam), char '/', int (iBox tlam),
+	      ptext SLIT("; Case vars: "), int (iBox dc),   char '/', int (iBox tc),
+	      ptext SLIT("; Let vars: "),  int (iBox dlet), char '/', int (iBox tlet)
 	]
 
 #else {-OMIT_STRANAL_STATS-}

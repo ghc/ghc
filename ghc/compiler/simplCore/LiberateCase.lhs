@@ -8,7 +8,7 @@ module LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_verbose_core2core, opt_LiberateCaseThreshold )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_LiberateCaseThreshold )
 import CoreLint		( beginPass, endPass )
 import CoreSyn
 import CoreUnfold	( couldBeSmallEnoughToInline )
@@ -148,13 +148,14 @@ bombOutSize (LibCaseEnv bomb_size _ _ _ _) = bomb_size
 Programs
 ~~~~~~~~
 \begin{code}
-liberateCase :: [CoreBind] -> IO [CoreBind]
-liberateCase binds
+liberateCase :: DynFlags -> [CoreBind] -> IO [CoreBind]
+liberateCase dflags binds
   = do {
-	beginPass "Liberate case" ;
+	beginPass dflags "Liberate case" ;
 	let { binds' = do_prog (initEnv opt_LiberateCaseThreshold) binds } ;
-	endPass "Liberate case" 
-	 	opt_D_verbose_core2core		{- no specific flag for dumping -} 
+	endPass dflags "Liberate case" 
+	 	(dopt Opt_D_verbose_core2core dflags)
+				{- no specific flag for dumping -} 
 		binds'
     }
   where

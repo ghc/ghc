@@ -8,7 +8,7 @@ module Specialise ( specProgram ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_spec, opt_D_dump_rules )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import Id		( Id, idName, idType, mkTemplateLocals, mkUserLocal,
 			  idSpecialisation, setIdNoDiscard, isExportedId,
 			  modifyIdInfo, idUnfolding
@@ -42,7 +42,7 @@ import UniqSupply	( UniqSupply,
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
 import FiniteMap
 import Maybes		( MaybeErr(..), catMaybes, maybeToBool )
-import ErrUtils		( dumpIfSet )
+import ErrUtils		( dumpIfSet_dyn )
 import Bag
 import List		( partition )
 import Util		( zipEqual, zipWithEqual, mapAccumL )
@@ -579,17 +579,19 @@ Hence, the invariant is this:
 %************************************************************************
 
 \begin{code}
-specProgram :: UniqSupply -> [CoreBind] -> IO [CoreBind]
-specProgram us binds
+specProgram :: DynFlags -> UniqSupply -> [CoreBind] -> IO [CoreBind]
+specProgram dflags us binds
   = do
-	beginPass "Specialise"
+	beginPass dflags "Specialise"
 
 	let binds' = initSM us (go binds 	`thenSM` \ (binds', uds') ->
 			        returnSM (dumpAllDictBinds uds' binds'))
 
-	endPass "Specialise" (opt_D_dump_spec || opt_D_verbose_core2core) binds'
+	endPass dflags "Specialise" 
+                       (dopt Opt_D_dump_spec dflags 
+                          || dopt Opt_D_verbose_core2core dflags) binds'
 
-	dumpIfSet opt_D_dump_rules "Top-level specialisations"
+	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
 		  (vcat (map dump_specs (concat (map bindersOf binds'))))
 
 	return binds'

@@ -16,7 +16,7 @@ module FloatIn ( floatInwards ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_verbose_core2core )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import CoreUtils	( exprIsValue, exprIsDupable )
 import CoreLint		( beginPass, endPass )
@@ -33,14 +33,15 @@ Top-level interface function, @floatInwards@.  Note that we do not
 actually float any bindings downwards from the top-level.
 
 \begin{code}
-floatInwards :: [CoreBind] -> IO [CoreBind]
+floatInwards :: DynFlags -> [CoreBind] -> IO [CoreBind]
 
-floatInwards binds
+floatInwards dflags binds
   = do {
-	beginPass "Float inwards";
+	beginPass dflags "Float inwards";
 	let { binds' = map fi_top_bind binds };
-	endPass "Float inwards" 
-	 	opt_D_verbose_core2core		{- no specific flag for dumping float-in -} 
+	endPass dflags "Float inwards" 
+	 	(dopt Opt_D_verbose_core2core dflags)
+				{- no specific flag for dumping float-in -} 
 		binds'	
     }
 			  

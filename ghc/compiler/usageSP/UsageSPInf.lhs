@@ -39,9 +39,9 @@ import UniqSupply       ( UniqSupply, UniqSM,
 import Outputable
 import Maybes           ( expectJust )
 import List             ( unzip4 )
-import CmdLineOpts	( opt_D_dump_usagesp, opt_DoUSPLinting, opt_UsageSPOn )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_UsageSPOn )
 import CoreLint		( beginPass, endPass )
-import ErrUtils		( doIfSet, dumpIfSet )
+import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn )
 import PprCore          ( pprCoreBindings )
 \end{code}
 
@@ -89,12 +89,13 @@ The inference is done over a set of @CoreBind@s, and inside the IO
 monad.
 
 \begin{code}
-doUsageSPInf :: UniqSupply
+doUsageSPInf :: DynFlags 
+	     -> UniqSupply
              -> [CoreBind]
              -> RuleBase
              -> IO [CoreBind]
 
-doUsageSPInf us binds local_rules
+doUsageSPInf dflags us binds local_rules
   | not opt_UsageSPOn
   = do { printErrs (text "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on") ;
 	 return binds
@@ -104,14 +105,14 @@ doUsageSPInf us binds local_rules
   = do
         let binds1 = doUnAnnotBinds binds
 
-	beginPass "UsageSPInf"
+	beginPass dflags "UsageSPInf"
 
-        dumpIfSet opt_D_dump_usagesp "UsageSPInf unannot'd" $
+        dumpIfSet_dyn dflags Opt_D_dump_usagesp "UsageSPInf unannot'd" $
                              pprCoreBindings binds1
 
         let ((binds2,ucs,_),_) = initUs us (uniqSMMToUs (usgInfBinds emptyVarEnv binds1))
 
-        dumpIfSet opt_D_dump_usagesp "UsageSPInf annot'd" $
+        dumpIfSet_dyn dflags Opt_D_dump_usagesp "UsageSPInf annot'd" $
           pprCoreBindings binds2
 	
         let ms     = solveUCS ucs
@@ -120,12 +121,12 @@ doUsageSPInf us binds local_rules
                        Nothing -> panic "doUsageSPInf: insol. conset!"
             binds3 = appUSubstBinds s binds2
 	
-        doIfSet opt_DoUSPLinting $
+        doIfSet_dyn dflags Opt_DoUSPLinting $
           do doLintUSPAnnotsBinds binds3     -- lint check 1
              doLintUSPConstBinds  binds3     -- lint check 2 (force solution)
              doCheckIfWorseUSP binds binds3  -- check for worsening of usages
 	
-        endPass "UsageSPInf" opt_D_dump_usagesp binds3
+        endPass dflags "UsageSPInf" (dopt Opt_D_dump_usagesp dflags) binds3
 	
         return binds3
 \end{code}

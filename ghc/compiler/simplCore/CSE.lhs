@@ -10,12 +10,13 @@ module CSE (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_cse, opt_D_verbose_core2core )
+import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import Id		( Id, idType )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr )
 import DataCon		( isUnboxedTupleCon )
 import Type		( splitTyConApp_maybe )
-import Subst		( InScopeSet, uniqAway, emptyInScopeSet, extendInScopeSet, elemInScopeSet )
+import Subst		( InScopeSet, uniqAway, emptyInScopeSet, 
+			  extendInScopeSet, elemInScopeSet )
 import CoreSyn
 import VarEnv	
 import CoreLint		( beginPass, endPass )
@@ -102,14 +103,14 @@ to the substitution
 %************************************************************************
 
 \begin{code}
-cseProgram :: [CoreBind] -> IO [CoreBind]
+cseProgram :: DynFlags -> [CoreBind] -> IO [CoreBind]
 
-cseProgram binds
+cseProgram dflags binds
   = do {
-	beginPass "Common sub-expression";
+	beginPass dflags "Common sub-expression";
 	let { binds' = cseBinds emptyCSEnv binds };
-	endPass "Common sub-expression" 
-	 	(opt_D_dump_cse || opt_D_verbose_core2core)
+	endPass dflags "Common sub-expression" 
+	 	(dopt Opt_D_dump_cse dflags || dopt Opt_D_verbose_core2core dflags)
 		binds'	
     }
 

@@ -13,8 +13,8 @@ module FloatOut ( floatOutwards ) where
 import CoreSyn
 import CoreUtils	( mkSCC )
 
-import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_simpl_stats )
-import ErrUtils		( dumpIfSet )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id, idType )
 import VarEnv
@@ -75,30 +75,32 @@ type FloatBinds    = [FloatBind]
 %************************************************************************
 
 \begin{code}
-floatOutwards :: Bool 		-- True <=> float lambdas to top level
+floatOutwards :: DynFlags
+	      -> Bool 		-- True <=> float lambdas to top level
 	      -> UniqSupply 
 	      -> [CoreBind] -> IO [CoreBind]
 
-floatOutwards float_lams us pgm
+floatOutwards dflags float_lams us pgm
   = do {
-	beginPass float_msg ;
+	beginPass dflags float_msg ;
 
 	let { annotated_w_levels = setLevels float_lams pgm us ;
 	      (fss, binds_s')    = unzip (map floatTopBind annotated_w_levels)
 	    } ;
 
-	dumpIfSet opt_D_verbose_core2core "Levels added:"
+	dumpIfSet_dyn dflags Opt_D_verbose_core2core "Levels added:"
 	          (vcat (map ppr annotated_w_levels));
 
 	let { (tlets, ntlets, lams) = get_stats (sum_stats fss) };
 
-	dumpIfSet opt_D_dump_simpl_stats "FloatOut stats:"
+	dumpIfSet_dyn dflags Opt_D_dump_simpl_stats "FloatOut stats:"
 		(hcat [	int tlets,  ptext SLIT(" Lets floated to top level; "),
 			int ntlets, ptext SLIT(" Lets floated elsewhere; from "),
 			int lams,   ptext SLIT(" Lambda groups")]);
 
-	endPass float_msg
-	 	opt_D_verbose_core2core		{- no specific flag for dumping float-out -} 
+	endPass dflags float_msg
+	 	(dopt Opt_D_verbose_core2core dflags)
+			{- no specific flag for dumping float-out -} 
 		(concat binds_s')
     }
   where
