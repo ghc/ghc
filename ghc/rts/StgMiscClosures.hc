@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.70 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.71 2001/12/10 18:07:35 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -423,8 +423,8 @@ STGFUN(stg_BLACKHOLE_entry)
 #ifdef SMP
     {
       bdescr *bd = Bdescr(R1.p);
-      if (bd->back != (bdescr *)BaseReg) {
-	if (bd->gen->no >= 1 || bd->step->no >= 1) {
+      if (bd->u.back != (bdescr *)BaseReg) {
+	if (bd->gen_no >= 1 || bd->step->no >= 1) {
 	  CMPXCHG(R1.cl->header.info, &stg_BLACKHOLE_info, &stg_WHITEHOLE_info);
 	} else {
 	  EXTFUN_RTS(stg_gc_enter_1_hponly);
@@ -487,8 +487,8 @@ STGFUN(stg_BLACKHOLE_BQ_entry)
 #ifdef SMP
     {
       bdescr *bd = Bdescr(R1.p);
-      if (bd->back != (bdescr *)BaseReg) {
-	if (bd->gen->no >= 1 || bd->step->no >= 1) {
+      if (bd->u.back != (bdescr *)BaseReg) {
+	if (bd->gen_no >= 1 || bd->step->no >= 1) {
 	  CMPXCHG(R1.cl->header.info, &stg_BLACKHOLE_info, &stg_WHITEHOLE_info);
 	} else {
 	  EXTFUN_RTS(stg_gc_enter_1_hponly);
@@ -579,7 +579,7 @@ STGFUN(stg_CAF_BLACKHOLE_entry)
 #ifdef SMP
     {
       bdescr *bd = Bdescr(R1.p);
-      if (bd->back != (bdescr *)BaseReg) {
+      if (bd->u.back != (bdescr *)BaseReg) {
 	if (bd->gen_no >= 1 || bd->step->no >= 1) {
 	  CMPXCHG(R1.cl->header.info, &stg_CAF_BLACKHOLE_info, &stg_WHITEHOLE_info);
 	} else {

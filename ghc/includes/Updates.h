@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.26 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Updates.h,v 1.27 2001/12/10 18:07:09 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,7 +39,7 @@
 #define UPD_REAL_IND(updclosure, heapptr)				\
    {									\
 	const StgInfoTable *info;					\
-	if (Bdescr((P_)updclosure)->back != (bdescr *)BaseReg) {	\
+	if (Bdescr((P_)updclosure)->u.back != (bdescr *)BaseReg) {	\
 		info = LOCK_CLOSURE(updclosure);			\
 	} else {							\
 		info = updclosure->header.info;				\

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.44 2001/12/10 17:55:40 sewardj Exp $
+ * $Id: StgMacros.h,v 1.45 2001/12/10 18:06:50 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -410,8 +410,8 @@ EXTINFO_RTS(stg_gen_chk_info);
         TICK_UPD_BH_UPDATABLE();				\
         { 							\
 	  bdescr *bd = Bdescr(R1.p);				\
-          if (bd->back != (bdescr *)BaseReg) {			\
-             if (bd->gen->no >= 1 || bd->step->no >= 1) {	\
+          if (bd->u.back != (bdescr *)BaseReg) {		\
+             if (bd->gen_no >= 1 || bd->step->no >= 1) {	\
         	 LOCK_THUNK(info);				\
              } else {						\
 	         EXTFUN_RTS(stg_gc_enter_1_hponly);		\
@@ -424,8 +424,8 @@ EXTINFO_RTS(stg_gen_chk_info);
         TICK_UPD_BH_SINGLE_ENTRY();				\
         {							\
 	  bdescr *bd = Bdescr(R1.p);				\
-          if (bd->back != (bdescr *)BaseReg) {			\
-             if (bd->gen->no >= 1 || bd->step->no >= 1) {	\
+          if (bd->u.back != (bdescr *)BaseReg) {		\
+             if (bd->gen_no >= 1 || bd->step->no >= 1) {	\
         	 LOCK_THUNK(info);				\
              } else {						\
 	         EXTFUN_RTS(stg_gc_enter_1_hponly);		\
