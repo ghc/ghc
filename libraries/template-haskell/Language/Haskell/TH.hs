@@ -20,7 +20,7 @@ module Language.Haskell.TH(
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
-	Strict(..), Foreign(..), Callconv(..), Safety(..),
+	Strict(..), Foreign(..), Callconv(..), Safety(..), FunDep(..),
 	Info(..), 
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 

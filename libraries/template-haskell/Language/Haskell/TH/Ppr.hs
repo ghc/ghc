@@ -208,13 +208,18 @@ instance Ppr Dec where
           else nest nestDepth
              $ text "deriving"
            <+> parens (hsep $ punctuate comma $ map ppr decs)
-    ppr (ClassD ctxt c xs ds) = text "class" <+> pprCxt ctxt
-                            <+> ppr c <+> hsep (map ppr xs)
-                             $$ where_clause ds
+    ppr (ClassD ctxt c xs fds ds) = text "class" <+> pprCxt ctxt
+                                <+> ppr c <+> hsep (map ppr xs) <+> ppr fds
+                                 $$ where_clause ds
     ppr (InstanceD ctxt i ds) = text "instance" <+> pprCxt ctxt <+> ppr i
                              $$ where_clause ds
     ppr (SigD f t) = ppr f <+> text "::" <+> ppr t
     ppr (ForeignD f) = ppr f
+
+------------------------------
+instance Ppr FunDep where
+    ppr (FunDep xs ys) = hsep (map ppr xs) <+> text "->" <+> hsep (map ppr ys)
+    ppr_list xs = char '|' <+> sep (punctuate (text ", ") (map ppr xs))
 
 ------------------------------
 instance Ppr Foreign where

@@ -29,7 +29,7 @@ module Language.Haskell.TH.Syntax(
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..),
-	StrictType, VarStrictType, 
+	StrictType, VarStrictType, FunDep(..),
 	Info(..), 
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
@@ -507,11 +507,15 @@ data Dec
          Con [Name]               -- { newtype Cxt x => T x = A (B x)
                                   --       deriving (Z,W)}
   | TySynD Name [Name] Type       -- { type T x = (x,x) }
-  | ClassD Cxt Name [Name] [Dec]  -- { class Eq a => Ord a where ds }
+  | ClassD Cxt Name [Name] [FunDep] [Dec]
+                                  -- { class Eq a => Ord a where ds }
   | InstanceD Cxt Type [Dec]      -- { instance Show w => Show [w]
                                   --       where ds }
   | SigD Name Type                -- { length :: [a] -> Int }
   | ForeignD Foreign
+  deriving( Show, Eq )
+
+data FunDep = FunDep [Name] [Name]
   deriving( Show, Eq )
 
 data Foreign = ImportF Callconv Safety String Name Type

@@ -292,12 +292,12 @@ newtypeD ctxt tc tvs con derivs =
     con1 <- con
     return (NewtypeD ctxt1 tc tvs con1 derivs)
 
-classD :: CxtQ -> Name -> [Name] -> [DecQ] -> DecQ
-classD ctxt cls tvs decs =
+classD :: CxtQ -> Name -> [Name] -> [FunDep] -> [DecQ] -> DecQ
+classD ctxt cls tvs fds decs =
   do 
     decs1 <- sequence decs
     ctxt1 <- ctxt
-    return $ ClassD ctxt1 cls tvs decs1
+    return $ ClassD ctxt1 cls tvs fds decs1
 
 instanceD :: CxtQ -> TypeQ -> [DecQ] -> DecQ
 instanceD ctxt ty decs =
@@ -388,6 +388,12 @@ unsafe, safe, threadsafe :: Safety
 unsafe = Unsafe
 safe = Safe
 threadsafe = Threadsafe
+
+-------------------------------------------------------------------------------
+--     FunDep
+
+funDep :: [Name] -> [Name] -> FunDep
+funDep = FunDep
 
 --------------------------------------------------------------
 -- Useful helper functions
