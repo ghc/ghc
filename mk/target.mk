@@ -1024,7 +1024,7 @@ distclean:: extraclean
 maintainer-clean:: extraclean
 	@echo 'This command is intended for maintainers to use; it'
 	@echo 'deletes files that may need special tools to rebuild.'
-	rm -f $(MOSTLY_CLEAN_FILES) $(CLEAN_FILES) $(MAINTAINER_CLEAN_FILES)
+	rm -f $(MOSTLY_CLEAN_FILES) $(CLEAN_FILES) $(DIST_CLEAN_FILES) $(MAINTAINER_CLEAN_FILES)
 
 #################################################################################
 #
