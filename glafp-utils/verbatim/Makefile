@@ -12,4 +12,6 @@ override SRC_FLEX_OPTS=-8
 #
 SRC_DIST_FILES += verbatim.c
 
+CLEAN_FILES += verbatim.c
+
 include $(TOP)/mk/target.mk
