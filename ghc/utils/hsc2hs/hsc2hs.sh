@@ -1,6 +1,7 @@
 
 for arg do
     case "$arg" in
+        -c*)    HSC2HS_EXTRA=;;
         --cc=*) HSC2HS_EXTRA=;;
         --)     break;;
     esac
