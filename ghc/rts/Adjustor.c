@@ -46,12 +46,45 @@ Haskell side.
 #include <windows.h>
 #endif
 
-#if defined(i386_TARGET_ARCH)
-static rtsBool execPage (void* addr, int writable);
-#endif
-
 /* Heavily arch-specific, I'm afraid.. */
 
+/*
+ * Function: execPage()
+ *
+ * Set the executable bit on page containing addr. CURRENTLY DISABLED.
+ *
+ * TODO: Can the code span more than one page? If yes, we need to make two
+ * pages executable!
+ */
+static rtsBool
+execPage (void* addr, int writable)
+{
+#if defined(i386_TARGET_ARCH) && defined(_WIN32) && 0
+    SYSTEM_INFO sInfo;
+    DWORD dwOldProtect = 0;
+
+    /* doesn't return a result, so presumably it can't fail... */
+    GetSystemInfo(&sInfo);
+    
+    if ( VirtualProtect ( (void*)((unsigned long)addr & (sInfo.dwPageSize - 1)),
+			  sInfo.dwPageSize,
+			  ( writable ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ),
+			  &dwOldProtect) == 0 ) {
+# if 1
+	DWORD rc = GetLastError();
+	fprintf(stderr, "execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
+# endif
+	return rtsFalse;
+    }
+    return rtsTrue;
+#else
+    (void)addr;   (void)writable;   /* keep gcc -Wall happy */
+    return rtsTrue;
+#endif
+}
+
+
+static unsigned char __obscure_ccall_ret_code [] = 
 #if defined(i386_TARGET_ARCH)
 /* Now here's something obscure for you:
 
@@ -72,10 +105,12 @@ static rtsBool execPage (void* addr, int writable);
    For this to work we make the assumption that bytes in .data
    are considered executable.
 */
-static unsigned char __obscure_ccall_ret_code [] = 
   { 0x83, 0xc4, 0x04 /* addl $0x4, %esp */
   , 0xc3             /* ret */
   };
+#else
+/* No such mind-twisters on non-Intel platforms */
+  { };
 #endif
 
 #if defined(alpha_TARGET_ARCH)
@@ -154,10 +189,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 	adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
 	adj_code[0x0d] = (unsigned char)0xe0;
 	
-#if 0
-	/* not yet */
 	execPage(adjustor,rtsTrue);
-#endif
     }
 #endif
     break;
@@ -203,10 +235,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
 
-#if 0
-	/* not yet */
 	execPage(adjustor,rtsTrue);
-#endif
     }
 #elif defined(sparc_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of the following
@@ -544,51 +573,16 @@ freeHaskellFunctionPtr(void* ptr)
  stgFree(ptr);
 }
 
-#if defined(i386_TARGET_ARCH)
-/*
- * Function: execPage()
- *
- * Set the executable bit on page containin
- */
-static
-rtsBool
-execPage (void* addr, int writable)
-{
-#if defined(_WIN32)
-    SYSTEM_INFO sInfo;
-    DWORD dwOldProtect = 0;
-
-    /* doesn't return a result, so presumably it can't fail... */
-    GetSystemInfo(&sInfo);
-    
-    if ( VirtualProtect ( (void*)((unsigned long)addr & (sInfo.dwPageSize - 1)),
-			  sInfo.dwPageSize,
-			  ( writable ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ),
-			  &dwOldProtect) == 0 ) {
-# if 1
-	DWORD rc = GetLastError();
-	fprintf(stderr, "execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
-# endif
-	return rtsFalse;
-    }
-    return rtsTrue;
-#else
-    return rtsTrue;
-#endif
-}
-#endif
 
 /*
  * Function: initAdjustor()
  *
  * Perform initialisation of adjustor thunk layer (if needed.)
+ *
+ * TODO: Call this at RTS initialisation time.
  */
 rtsBool
 initAdjustor(void)
 {
-#if defined(i386_TARGET_ARCH) && defined(_WIN32)
     return execPage(__obscure_ccall_ret_code, rtsFalse);
-#else
-    return rtsTrue;
-#endif
 }
