@@ -2,302 +2,175 @@
 
 ================================================================================
 Typechecked:
-{- nonrec -}
-{- nonrec -}
-E1{-r3B,x-}{i} =
-    _/\_ a{-r3t-} ->
-	E1{-r3B,x-}{i}
-	    {_@_ a{-r3t-}}
-{- nonrec -}
+E1{-r3D,x-}{i} = _/\_ a_tr3t -> E1{-r3D,x-}{i} {_@_ a_tr3t}
 C1{-r6,x-}{i} =
-    _/\_ a{-r3v-} b{-r3w-} -> \ tpl_B1 ->
-	C1{-r6,x-}{i}
-	    {_@_ a{-r3v-} _@_ b{-r3w-} tpl_B1}
+    _/\_ a_tr3v b_tr3w -> \ tpl_B1 ->
+	C1{-r6,x-}{i} {_@_ a_tr3v _@_ b_tr3w tpl_B1}
 C2{-r5,x-}{i} =
-    _/\_ a{-r3v-} b{-r3w-} -> \ tpl_B1 ->
-	C2{-r5,x-}{i}
-	    {_@_ a{-r3v-} _@_ b{-r3w-} tpl_B1}
-{- rec -}
-AbsBinds [a{-a1a9-}] [] [([a{-a1a9-}], $d3{-r1ag,x-}, d.Eval_a14Q)]
-    d.Eval_a14Q =
-	({-dict-} [] [])
-{- rec -}
+    _/\_ a_tr3v b_tr3w -> \ tpl_B1 ->
+	C2{-r5,x-}{i} {_@_ a_tr3v _@_ b_tr3w tpl_B1}
+AbsBinds [ta13t] [] [([ta13t], $d3{-r13E,x-}, d.Eval_aYx)]
+    d.Eval_aYx = ({-dict-} [] [])
 AbsBinds
-[a{-a1aa-}, b{-a1ab-}]
+[ta13u, ta13v]
 []
-[([a{-a1aa-}, b{-a1ab-}], $d4{-r1aw,x-}, d.Eval_a14X)]
-    d.Eval_a14X =
-	({-dict-} [] [])
-{- rec -}
+[([ta13u, ta13v], $d4{-r13F,x-}, d.Eval_aYE)]
+    d.Eval_aYE = ({-dict-} [] [])
 AbsBinds
-[a{-a16r-}, b{-a16s-}]
-[d.Eq_a16W]
-[([a{-a16r-}, b{-a16s-}], $d5{-r1ax,x-}, d.Read_a154)]
-    d.Eq_a17c =
-	d.Eq_a16W
-    d.Read_a17a =
-	$d1{-r1aD,x-}
-	    a{-a16r-}
-	    d.Eq_a17c
-    readsPrec_a1aC =
-	PrelRead.readsPrec{-r62,p-}
-	    (T{-r3C,x-} a{-a16r-})
-	    d.Read_a17a
-    d.Eq_a17p =
-	d.Eq_a16W
-    d.Eq_a17n =
-	PrelBase.$d27{-rf7,p-}
-	    a{-a16r-}
-	    d.Eq_a17p
-    d.Read_a17l =
-	$d5{-r1ax,x-}
-	    [[a{-a16r-}], [b{-a16s-}]]
-	    d.Eq_a17n
-    readsPrec_a1aB =
-	PrelRead.readsPrec{-r62,p-}
-	    (Z{-r3D,x-} [a{-a16r-}] [b{-a16s-}])
-	    d.Read_a17l
-    readsPrec_a1aA =
-	readsPrec_a1az
-    AbsBinds [] [] [([], readsPrec_a1az, readsPrec_a157)]
-	>_a1aK =
-	    >_a1au
-	lit_a1aJ =
-	    lit_a1as
-	==_a1aI =
-	    ==_a1ar
-	lit_a1aH =
-	    lit_a1ap
-	>>=_a1aG =
-	    >>=_a1ao
-	return_a1aF =
-	    return_a1an
-	zero_a1aE =
-	    zero_a1am
-	readsPrec_a157
-	    a_r12I b_r12K
-		    =   ++_a1av
-			    (Z{-r3D,x-} a{-a16r-} b{-a16s-}, PrelBase.String{-r7r,p-})
-			    (PrelRead.readParen{-r6E,p-}
-				 (Z{-r3D,x-} a{-a16r-} b{-a16s-})
-				 a_r12I >_a1au lit_a1as
-				 \ c_r12M  ->  [ (C1{-r6,x-}{i}
-						      [a{-a16r-}, b{-a16s-}]
-						      a1_r12Q,
-						  b1_r12R) |
-						   ("C1", d_r12O) <- PrelRead.lex{-r6r,p-}
-									 c_r12M, (a1_r12Q, b1_r12R) <- readsPrec_a1aC
-													   lit_a1ap
-													   d_r12O
-						   ]
-				 b_r12K)
-			    (PrelRead.readParen{-r6E,p-}
-				 (Z{-r3D,x-} a{-a16r-} b{-a16s-})
-				 a_r12I >_a1aK lit_a1aJ
-				 \ c_r12T  ->  [ (C2{-r5,x-}{i}
-						      [a{-a16r-}, b{-a16s-}]
-						      a1_r12X,
-						  b1_r12Y) |
-						   ("C2", d_r12V) <- PrelRead.lex{-r6r,p-}
-									 c_r12T, (a1_r12X, b1_r12Y) <- readsPrec_a1aB
-													   lit_a1aH
-													   d_r12V
-						   ]
-				 b_r12K)
-    AbsBinds [] [] [([], readList_a1ay, readList_a16R)]
-	readList_a16R
-		    =   PrelRead.readList__{-r3A,p-}
-			    (Z{-r3D,x-} a{-a16r-} b{-a16s-})
-			    readsPrec_a1aA
-				lit_a1ak
-    d.Read_a154 =
-	({-dict-} [] [readsPrec_a1az, readList_a1ay])
-{- rec -}
+[taYZ, taZ0]
+[d.Eq_a10G]
+[([taYZ, taZ0], $d5{-r13G,x-}, d.Read_aYL)]
+    d.Eq_a10S = d.Eq_a10G
+    d.Read_a10Q = $d1{-r13I,x-} taYZ d.Eq_a10S
+    readsPrec_a13T =
+	PrelRead.readsPrec{-r6M,p-} (T{-r3B,x-} taYZ) d.Read_a10Q
+    d.Eq_a114 = d.Eq_a10G
+    d.Eq_a112 = PrelBase.$d28{-re2,p-} taYZ d.Eq_a114
+    d.Read_a110 = $d5{-r13G,x-} [[taYZ], [taZ0]] d.Eq_a112
+    readsPrec_a13U =
+	PrelRead.readsPrec{-r6M,p-} (Z{-r3C,x-} [taYZ] [taZ0]) d.Read_a110
+    readsPrec_a13V = readsPrec_a13W
+    AbsBinds [] [] [([], readsPrec_a13W, readsPrec_aYP)]
+	>_a13Y = >_a13L
+	lit_a13Z = lit_a13M
+	==_a140 = ==_a13N
+	>>=_a141 = >>=_a13O
+	return_a142 = return_a13P
+	zero_a143 = zero_a13Q
+	readsPrec_aYP a_rWJ b_rWK
+		      = ++_a13K (Z{-r3C,x-} taYZ taZ0, PrelBase.String{-r79,p-})
+			    (PrelRead.readParen{-r72,p-} (Z{-r3C,x-} taYZ taZ0) a_rWJ
+										>_a13L lit_a13M
+										\ c_rWM
+										  -> [(C1{-r6,x-}{i}
+											   [taYZ, taZ0] a1_rWQ,
+										       b1_rWR) |
+											  ("C1", d_rWO) <- PrelRead.lex{-r6P,p-} c_rWM, (a1_rWQ, b1_rWR) <- readsPrec_a13T PrelBase.I#{-5b,w-}{i} 10#
+																					   d_rWO]
+										b_rWK)
+			    (PrelRead.readParen{-r72,p-} (Z{-r3C,x-} taYZ taZ0) a_rWJ
+										>_a13Y lit_a13Z
+										\ c_rWT
+										  -> [(C2{-r5,x-}{i}
+											   [taYZ, taZ0] a1_rWX,
+										       b1_rWY) |
+											  ("C2", d_rWV) <- PrelRead.lex{-r6P,p-} c_rWT, (a1_rWX, b1_rWY) <- readsPrec_a13U PrelBase.I#{-5b,w-}{i} 10#
+																					   d_rWV]
+										b_rWK)
+    AbsBinds [] [] [([], readList_a13X, readList_a10B)]
+	readList_a10B = PrelRead.readList__{-r3A,p-}
+			    (Z{-r3C,x-} taYZ taZ0) readsPrec_a13V PrelBase.I#{-5b,w-}{i} 0#
+    d.Read_aYL = ({-dict-} [] [readsPrec_a13W, readList_a13X])
 AbsBinds
-[a{-a17H-}, b{-a17K-}]
-[d.Eq_a18v]
-[([a{-a17H-}, b{-a17K-}], $d6{-r1aL,x-}, d.Show_a17y)]
-    d.Eq_a18H =
-	d.Eq_a18v
-    d.Show_a18F =
-	$d2{-r1aR,x-}
-	    a{-a17H-}
-	    d.Eq_a18H
-    showsPrec_a1aQ =
-	PrelBase.showsPrec{-rgT,p-}
-	    (T{-r3C,x-} a{-a17H-})
-	    d.Show_a18F
-    d.Eq_a18N =
-	d.Eq_a18v
-    d.Eq_a18L =
-	PrelBase.$d27{-rf7,p-}
-	    a{-a17H-}
-	    d.Eq_a18N
-    d.Show_a18J =
-	$d6{-r1aL,x-}
-	    [[a{-a17H-}], [b{-a17K-}]]
-	    d.Eq_a18L
-    showsPrec_a1aP =
-	PrelBase.showsPrec{-rgT,p-}
-	    (Z{-r3D,x-} [a{-a17H-}] [b{-a17K-}])
-	    d.Show_a18J
-    showsPrec_a1aO =
-	showsPrec_a1aN
-    AbsBinds [] [] [([], showsPrec_a1aN, showsPrec_a17B)]
-	lit_a1aV =
-	    lit_a1ai
-	>=_a1aU =
-	    >=_a1aj
-	lit_a1aT =
-	    lit_a1ai
-	lit_a1aS =
-	    lit_a1ai
-	showsPrec_a17B
-	    a_r135 (C1{-r6,x-}{i} b1_r137)
-		    =   PrelBase.showParen{-rlt,p-}
-			    a_r135 >=_a1aj lit_a1ai
-			    PrelBase..{-rgC,p-}
-				[PrelBase.String{-r7r,p-}, PrelBase.String{-r7r,p-}, PrelBase.String{-r7r,p-}]
-				PrelBase.showString{-rlw,p-}
-				    "C1 "
-				showsPrec_a1aQ
-				    lit_a1aV b1_r137
-	showsPrec_a17B
-	    a_r139 (C2{-r5,x-}{i} b1_r13b)
-		    =   PrelBase.showParen{-rlt,p-}
-			    a_r139 >=_a1aU lit_a1aT
-			    PrelBase..{-rgC,p-}
-				[PrelBase.String{-r7r,p-}, PrelBase.String{-r7r,p-}, PrelBase.String{-r7r,p-}]
-				PrelBase.showString{-rlw,p-}
-				    "C2 "
-				showsPrec_a1aP
-				    lit_a1aS b1_r13b
-    AbsBinds [] [] [([], showList_a1aM, showList_a18q)]
-	showList_a18q
-		    =   PrelBase.showList__{-rlr,p-}
-			    (Z{-r3D,x-} a{-a17H-} b{-a17K-})
-			    showsPrec_a1aO
-				lit_a1ah
-    d.Show_a17y =
-	({-dict-} [] [showsPrec_a1aN, showList_a1aM])
-{- rec -}
+[ta11m, ta11p]
+[d.Eq_a120]
+[([ta11m, ta11p], $d6{-r13H,x-}, d.Show_a11c)]
+    d.Eq_a128 = d.Eq_a120
+    d.Show_a126 = $d2{-r13J,x-} ta11m d.Eq_a128
+    showsPrec_a144 =
+	PrelBase.showsPrec{-rjf,p-} (T{-r3B,x-} ta11m) d.Show_a126
+    d.Eq_a12e = d.Eq_a120
+    d.Eq_a12c = PrelBase.$d28{-re2,p-} ta11m d.Eq_a12e
+    d.Show_a12a = $d6{-r13H,x-} [[ta11m], [ta11p]] d.Eq_a12c
+    showsPrec_a145 =
+	PrelBase.showsPrec{-rjf,p-} (Z{-r3C,x-} [ta11m] [ta11p])
+	    d.Show_a12a
+    showsPrec_a146 = showsPrec_a147
+    AbsBinds [] [] [([], showsPrec_a147, showsPrec_a11g)]
+	>=_a149 = >=_a13R
+	lit_a14a = lit_a13S
+	showsPrec_a11g a_rX6 (C1{-r6,x-}{i} b1_rX7)
+		       = PrelBase.showParen{-rk3,p-} a_rX6 >=_a13R lit_a13S
+						     PrelBase..{-riV,p-}
+							 [PrelBase.String{-r79,p-}, PrelBase.String{-r79,p-}, PrelBase.String{-r79,p-}] PrelBase.showString{-rk6,p-} "C1 "
+																	showsPrec_a144 PrelBase.I#{-5b,w-}{i} 10#
+																		       b1_rX7
+	showsPrec_a11g a_rX9 (C2{-r5,x-}{i} b1_rXa)
+		       = PrelBase.showParen{-rk3,p-} a_rX9 >=_a149 lit_a14a
+						     PrelBase..{-riV,p-}
+							 [PrelBase.String{-r79,p-}, PrelBase.String{-r79,p-}, PrelBase.String{-r79,p-}] PrelBase.showString{-rk6,p-} "C2 "
+																	showsPrec_a145 PrelBase.I#{-5b,w-}{i} 10#
+																		       b1_rXa
+    AbsBinds [] [] [([], showList_a148, showList_a11V)]
+	showList_a11V = PrelBase.showList__{-rk1,p-}
+			    (Z{-r3C,x-} ta11m ta11p) showsPrec_a146 PrelBase.I#{-5b,w-}{i} 0#
+    d.Show_a11c = ({-dict-} [] [showsPrec_a147, showList_a148])
 AbsBinds
-[a{-a191-}]
-[d.Eq_a199]
-[([a{-a191-}], $d1{-r1aD,x-}, d.Read_a18V)]
-    d.Read_a19d =
-	d.Read_a18V
-    $mreadList_a1aX =
-	PrelRead.$mreadList{-r5Y,p-}
-	    (T{-r3C,x-} a{-a191-})
-	    d.Read_a19d
-    AbsBinds [] [] [([], readsPrec_a1aW, readsPrec_a18Y)]
-	readsPrec_a18Y
-	    =   IOBase.error{-87,p-}
-		    (PrelBase.Int{-3g,p-}
-		     -> PrelBase.String{-r7r,p-}
-		     -> [(T{-r3C,x-} a{-a191-}, PrelBase.String{-r7r,p-})])
-		    "read"
-    AbsBinds [] [] [([], readList_a194, readList_a196)]
-	readList_a196
-	    =   $mreadList_a1aX
-    d.Read_a18V =
-	({-dict-} [] [readsPrec_a1aW, readList_a194])
-{- rec -}
+[ta12s]
+[d.Eq_a12B]
+[([ta12s], $d1{-r13I,x-}, d.Read_a12l)]
+    d.Read_a12F = d.Read_a12l
+    $mreadList_a14b =
+	PrelRead.$mreadList{-r6K,p-} (T{-r3B,x-} ta12s) d.Read_a12F
+    AbsBinds [] [] [([], readsPrec_a14c, readsPrec_a12p)]
+	readsPrec_a12p
+	    = IOBase.error{-87,w-}
+		  (PrelBase.Int{-3g,W-}
+		   -> PrelBase.String{-r79,p-}
+		   -> [(T{-r3B,x-} ta12s, PrelBase.String{-r79,p-})]) "read"
+    AbsBinds [] [] [([], readList_a14d, readList_a12y)]
+	readList_a12y = $mreadList_a14b
+    d.Read_a12l = ({-dict-} [] [readsPrec_a14c, readList_a14d])
 AbsBinds
-[a{-a19q-}]
-[d.Eq_a19y]
-[([a{-a19q-}], $d2{-r1aR,x-}, d.Show_a19k)]
-    d.Show_a19C =
-	d.Show_a19k
-    $mshowList_a1aZ =
-	PrelBase.$mshowList{-rgb,p-}
-	    (T{-r3C,x-} a{-a19q-})
-	    d.Show_a19C
-    AbsBinds [] [] [([], showsPrec_a1aY, showsPrec_a19n)]
-	showsPrec_a19n
-	    =   IOBase.error{-87,p-}
-		    (PrelBase.Int{-3g,p-}
-		     -> T{-r3C,x-} a{-a19q-}
-		     -> PrelBase.String{-r7r,p-}
-		     -> PrelBase.String{-r7r,p-})
-		    "show"
-    AbsBinds [] [] [([], showList_a19t, showList_a19v)]
-	showList_a19v
-	    =   $mshowList_a1aZ
-    d.Show_a19k =
-	({-dict-} [] [showsPrec_a1aY, showList_a19t])
-{- nonrec -}
-d.MonadPlus_a19F =
-    PrelBase.$d22{-rf2,p-}
-++_a1av =
-    PrelBase.++{-rjn,p-}
-	PrelBase.[]{-3j,p-}
-	d.MonadPlus_a19F
-d.Ord_a19I =
-    PrelBase.$d6{-rfF,p-}
->_a1au =
-    PrelBase.>{-rgQ,p-}
-	PrelBase.Int{-3g,p-}
-	d.Ord_a19I
-d.Num_a19M =
-    PrelBase.$d3{-rfa,p-}
-fromInt_a1at =
-    PrelBase.fromInt{-8R,p-}
-	PrelBase.Int{-3g,p-}
-	d.Num_a19M
-lit_a1as =
-    fromInt_a1at
-	PrelBase.I#{-5b,p-}{i}
-	    9#
-d.Eq_a19R =
-    PrelBase.$d33{-rfe,p-}
-d.Eq_a19P =
-    PrelBase.$d27{-rf7,p-}
-	PrelBase.Char{-38,p-}
-	d.Eq_a19R
-==_a1ar =
-    PrelBase.=={-8Y,p-}
-	[PrelBase.Char{-38,p-}]
-	d.Eq_a19P
-fromInt_a1aq =
-    fromInt_a1at
-lit_a1ap =
-    fromInt_a1aq
-	PrelBase.I#{-5b,p-}{i}
-	    10#
-d.Monad_a19V =
-    PrelBase.$d24{-rf4,p-}
->>=_a1ao =
-    PrelBase.>>={-811,p-}
-	PrelBase.[]{-3j,p-}
-	d.Monad_a19V
-d.Monad_a19Y =
-    d.Monad_a19V
-return_a1an =
-    PrelBase.return{-816,p-}
-	PrelBase.[]{-3j,p-}
-	d.Monad_a19Y
-d.MonadZero_a1a0 =
-    PrelBase.$d23{-rf3,p-}
-zero_a1am =
-    PrelBase.zero{-810,p-}
-	PrelBase.[]{-3j,p-}
-	d.MonadZero_a1a0
-fromInt_a1al =
-    fromInt_a1at
-lit_a1ak =
-    fromInt_a1al
-	PrelBase.I#{-5b,p-}{i}
-	    0#
-d.Ord_a1a4 =
-    d.Ord_a19I
->=_a1aj =
-    PrelBase.>={-8Z,p-}
-	PrelBase.Int{-3g,p-}
-	d.Ord_a1a4
-lit_a1ai =
-    lit_a1ap
-lit_a1ah =
-    lit_a1ak
+[ta12T]
+[d.Eq_a132]
+[([ta12T], $d2{-r13J,x-}, d.Show_a12M)]
+    d.Show_a136 = d.Show_a12M
+    $mshowList_a14e =
+	PrelBase.$mshowList{-riS,p-} (T{-r3B,x-} ta12T) d.Show_a136
+    AbsBinds [] [] [([], showsPrec_a14f, showsPrec_a12Q)]
+	showsPrec_a12Q
+	    = IOBase.error{-87,w-}
+		  (PrelBase.Int{-3g,W-}
+		   -> T{-r3B,x-} ta12T
+		   -> PrelBase.String{-r79,p-}
+		   -> PrelBase.String{-r79,p-}) "show"
+    AbsBinds [] [] [([], showList_a14g, showList_a12Z)]
+	showList_a12Z = $mshowList_a14e
+    d.Show_a12M = ({-dict-} [] [showsPrec_a14f, showList_a14g])
+d.MonadPlus_a139 = PrelBase.$d23{-rdX,p-}
+++_a13K = PrelBase.++{-rj3,p-} PrelBase.[]{-3j,W-} d.MonadPlus_a139
+d.Ord_a13c = PrelBase.$d7{-reB,p-}
+>_a13L = PrelBase.>{-rjc,p-} PrelBase.Int{-3g,W-} d.Ord_a13c
+lit_a13M = PrelBase.I#{-5b,w-}{i} 9#
+d.Eq_a13h = PrelBase.$d34{-re9,p-}
+d.Eq_a13f = PrelBase.$d28{-re2,p-} PrelBase.Char{-38,W-} d.Eq_a13h
+==_a13N = PrelBase.=={-8Y,p-} [PrelBase.Char{-38,W-}] d.Eq_a13f
+d.Monad_a13k = PrelBase.$d25{-rdZ,p-}
+>>=_a13O = PrelBase.>>={-811,p-} PrelBase.[]{-3j,W-} d.Monad_a13k
+d.Monad_a13n = d.Monad_a13k
+return_a13P =
+    PrelBase.return{-816,p-} PrelBase.[]{-3j,W-} d.Monad_a13n
+d.MonadZero_a13p = PrelBase.$d24{-rdY,p-}
+zero_a13Q =
+    PrelBase.zero{-810,p-} PrelBase.[]{-3j,W-} d.MonadZero_a13p
+d.Ord_a13s = d.Ord_a13c
+>=_a13R = PrelBase.>={-8Z,p-} PrelBase.Int{-3g,W-} d.Ord_a13s
+lit_a13S = PrelBase.I#{-5b,w-}{i} 10#
 ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d12 1 $d15 1 $d16 1 $d2 1 $d22 1 $d23 1 $d24 1 $d25 1 $d27 1 $d28 1 $d3 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 . 1 showList__ 1 showParen 1 showSpace 1 showString 1 Eq 1 Eval 1 Monad 1 MonadPlus 1 MonadZero 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d17 1 $d18 1 $d29 1 $d33 1 $d34 1 $d35 1;
+PrelRead 1 :: $d10 1 $d11 1 $d14 1 $d15 1 $d16 1 $d4 1 $d5 1 $d6 1 $d8 1 $mreadList 1 lex 1 readList__ 1 readParen 1 Read 1 ReadS 1;
+PrelTup 1 :: $d13 1 $d4 1 $d49 1 $d9 1;
+_exports_
+ShouldSucceed T(E1) Z(C1 C2);
+_instances_
+instance _forall_ [a] {PrelBase.Eq a} => {PrelRead.Read (T a)} = $d1;
+instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Show (T a)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (T a)} = $d3;
+instance _forall_ [a b] => {PrelBase.Eval (Z a b)} = $d4;
+instance _forall_ [a b] {PrelBase.Eq a} => {PrelRead.Read (Z a b)} = $d5;
+instance _forall_ [a b] {PrelBase.Eq a} => {PrelBase.Show (Z a b)} = $d6;
+_declarations_
+1 $d1 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelRead.Read (T a)} ;;
+1 $d2 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Show (T a)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (T a)} ;;
+1 $d4 _:_ _forall_ [a b] => {PrelBase.Eval (Z a b)} ;;
+1 $d5 _:_ _forall_ [a b] {PrelBase.Eq a} => {PrelRead.Read (Z a b)} ;;
+1 $d6 _:_ _forall_ [a b] {PrelBase.Eq a} => {PrelBase.Show (Z a b)} ;;
+1 data T a = E1 ;
+1 data Z a b = C1 (T a) |  C2 (Z [a] [b]) ;

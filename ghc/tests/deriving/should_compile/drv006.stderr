@@ -2,404 +2,224 @@
 
 ================================================================================
 Typechecked:
-{- nonrec -}
-{- nonrec -}
-MkBar{-r4H,x-}{i} =
-    _/\_ a{-r4B-} b{-r4C-} -> \ tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 ->
-	MkBar{-r4H,x-}{i}
-	    {_@_ a{-r4B-} _@_ b{-r4C-} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5}
-{- nonrec -}
-Foo1{-r4t,x-}{i} =
-    Foo1{-r4t,x-}{i}
-	{}
-Foo2{-r4s,x-}{i} =
-    Foo2{-r4s,x-}{i}
-	{}
-Foo3{-r4u,x-}{i} =
-    Foo3{-r4u,x-}{i}
-	{}
-Foo4{-r4v,x-}{i} =
-    Foo4{-r4v,x-}{i}
-	{}
-Foo5{-r4w,x-}{i} =
-    Foo5{-r4w,x-}{i}
-	{}
-Foo6{-r4x,x-}{i} =
-    Foo6{-r4x,x-}{i}
-	{}
-Foo7{-r4y,x-}{i} =
-    Foo7{-r4y,x-}{i}
-	{}
-Foo8{-r4z,x-}{i} =
-    Foo8{-r4z,x-}{i}
-	{}
-{- rec -}
-AbsBinds [] [] [([], $d1{-r193,x-}, d.Eq_a14i)]
-    ==_a19a =
-	==_a199
-    AbsBinds [] [] [([], ==_a199, ==_a14l)]
-	==_a14l
-	    a_r10n b_r10p
-		    =   case
-			    con2tag_Foo#_r101
-				a_r10n
-			of
-			  a#_r10r ->  case
-					  con2tag_Foo#_r101
-					      b_r10p
-				      of
-					b#_r10t ->  if a#_r10r GHC.==#{-79,p-}{I} b#_r10t then
-							PrelBase.True{-5E,p-}{i}
-						    else
-							PrelBase.False{-58,p-}{i}
-    AbsBinds [] [] [([], /=_a198, /=_a14x)]
-	/=_a14x
-	    a_r10x b_r10z
-		    =   PrelBase.not{-rho,p-}
-			    ==_a19a
-				a_r10x b_r10z
-    d.Eq_a14i =
-	({-dict-} [] [==_a199, /=_a198])
-{- rec -}
+MkBar{-r4A,x-}{i} =
+    _/\_ a_tr4s b_tr4t -> \ tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 ->
+	MkBar{-r4A,x-}{i}
+	    {_@_ a_tr4s _@_ b_tr4t tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5}
+Foo1{-r6,x-}{i} = Foo1{-r6,x-}{i} {}
+Foo2{-r5,x-}{i} = Foo2{-r5,x-}{i} {}
+Foo3{-r8,x-}{i} = Foo3{-r8,x-}{i} {}
+Foo4{-ra,x-}{i} = Foo4{-ra,x-}{i} {}
+Foo5{-rc,x-}{i} = Foo5{-rc,x-}{i} {}
+Foo6{-re,x-}{i} = Foo6{-re,x-}{i} {}
+Foo7{-rg,x-}{i} = Foo7{-rg,x-}{i} {}
+Foo8{-ri,x-}{i} = Foo8{-ri,x-}{i} {}
+AbsBinds [] [] [([], con2tag_Foo#_rUI, con2tag_Foo#_aYg)]
+    con2tag_Foo#_aYg Foo1{-r6,x-}{i} = 0#
+    con2tag_Foo#_aYg Foo2{-r5,x-}{i} = 1#
+    con2tag_Foo#_aYg Foo3{-r8,x-}{i} = 2#
+    con2tag_Foo#_aYg Foo4{-ra,x-}{i} = 3#
+    con2tag_Foo#_aYg Foo5{-rc,x-}{i} = 4#
+    con2tag_Foo#_aYg Foo6{-re,x-}{i} = 5#
+    con2tag_Foo#_aYg Foo7{-rg,x-}{i} = 6#
+    con2tag_Foo#_aYg Foo8{-ri,x-}{i} = 7#
+AbsBinds [] [] [([], maxtag_Foo#_rUH, maxtag_Foo#_aYl)]
+    maxtag_Foo#_aYl = PrelBase.I#{-5b,w-}{i} 7#
+AbsBinds [] [] [([], tag2con_Foo#_rUG, tag2con_Foo#_aYo)]
+    tag2con_Foo#_aYo (PrelBase.I#{-5b,w-}{i} 0#) = Foo1{-r6,x-}{i}
+    tag2con_Foo#_aYo (PrelBase.I#{-5b,w-}{i} 1#) = Foo2{-r5,x-}{i}
+    tag2con_Foo#_aYo (PrelBase.I#{-5b,w-}{i} 2#) = Foo3{-r8,x-}{i}
+    tag2con_Foo#_aYo (PrelBase.I#{-5b,w-}{i} 3#) = Foo4{-ra,x-}{i}
+    tag2con_Foo#_aYo (PrelBase.I#{-5b,w-}{i} 4#) = Foo5{-rc,x-}{i}
+    tag2con_Foo#_aYo (PrelBase.I#{-5b,w-}{i} 5#) = Foo6{-re,x-}{i}
+    tag2con_Foo#_aYo (PrelBase.I#{-5b,w-}{i} 6#) = Foo7{-rg,x-}{i}
+    tag2con_Foo#_aYo (PrelBase.I#{-5b,w-}{i} 7#) = Foo8{-ri,x-}{i}
+    tag2con_Foo#_aYo _
+		     = IOBase.error{-87,w-} Foo{-r4z,x-} "Urk! in TcGenDeriv"
+AbsBinds [] [] [([], $d1{-r13o,x-}, d.Eq_aYA)]
+    ==_a13w = ==_a13x
+    AbsBinds [] [] [([], ==_a13x, ==_aYE)]
+	==_aYE a_rV5 b_rV6
+	       = case con2tag_Foo#_rUI a_rV5 of
+		   a#_rV8
+		   -> case con2tag_Foo#_rUI b_rV6 of
+			b#_rVa
+			-> if a#_rV8 GHC.==#{-79,w-}{I} b#_rVa then
+			       PrelBase.True{-5E,w-}{i}
+			   else
+			       PrelBase.False{-58,w-}{i}
+    AbsBinds [] [] [([], /=_a13y, /=_aYT)]
+	/=_aYT a_rVe b_rVf = PrelBase.not{-ri1,p-} ==_a13w a_rVe b_rVf
+    d.Eq_aYA = ({-dict-} [] [==_a13x, /=_a13y])
 AbsBinds
-[a{-a191-}, b{-a192-}]
+[ta13m, ta13n]
 []
-[([a{-a191-}, b{-a192-}], $d2{-r19b,x-}, d.Eval_a14N)]
-    d.Eval_a14N =
-	({-dict-} [] [])
-{- rec -}
-AbsBinds [] [] [([], $d3{-r19c,x-}, d.Eval_a14S)]
-    d.Eval_a14S =
-	({-dict-} [] [])
-{- rec -}
-AbsBinds [] [] [([], $d4{-r19d,x-}, d.Ord_a14X)]
-    d.Eq_a16H =
-	$d1{-r193,x-}
-    compare_a19q =
-	compare_a19k
-    compare_a19p =
-	compare_a19k
-    compare_a19o =
-	compare_a19k
-    compare_a19n =
-	compare_a19k
-    compare_a19m =
-	compare_a19k
-    compare_a19l =
-	compare_a19k
-    AbsBinds [] [] [([], compare_a19k, compare_a150)]
-	compare_a150
-	    a_r11y b_r11A
-		    =   case
-			    con2tag_Foo#_r101
-				a_r11y
-			of
-			  a#_r11G ->  case
-					  con2tag_Foo#_r101
-					      b_r11A
-				      of
-					b#_r11I ->  if a#_r11G GHC.==#{-79,p-}{I} b#_r11I then
-							PrelBase.EQ{-rbX,p-}{i}
-						    else
-							if a#_r11G GHC.<#{-7b,p-}{I} b#_r11I then
-							    PrelBase.LT{-rbY,p-}{i}
-							else
-							    PrelBase.GT{-rbZ,p-}{i}
+[([ta13m, ta13n], $d2{-r13p,x-}, d.Eval_aZ7)]
+    d.Eval_aZ7 = ({-dict-} [] [])
+AbsBinds [] [] [([], $d3{-r13q,x-}, d.Eval_aZc)]
+    d.Eval_aZc = ({-dict-} [] [])
+AbsBinds [] [] [([], $d4{-r13r,x-}, d.Ord_aZh)]
+    d.Eq_a110 = $d1{-r13o,x-}
+    compare_a13z = compare_a13F
+    compare_a13A = compare_a13F
+    compare_a13B = compare_a13F
+    compare_a13C = compare_a13F
+    compare_a13D = compare_a13F
+    compare_a13E = compare_a13F
+    AbsBinds [] [] [([], compare_a13F, compare_aZl)]
+	compare_aZl a_rW8 b_rW9
+		    = case con2tag_Foo#_rUI a_rW8 of
+			a#_rWe
+			-> case con2tag_Foo#_rUI b_rW9 of
+			     b#_rWg
+			     -> if a#_rWe GHC.==#{-79,w-}{I} b#_rWg then
+				    PrelBase.EQ{-rb0,p-}{i}
+				else
+				    if a#_rWe GHC.<#{-7b,w-}{I} b#_rWg then
+					PrelBase.LT{-rb1,p-}{i}
+				    else
+					PrelBase.GT{-rb2,p-}{i}
 		    where
 			{- nonrec -}
-			AbsBinds
-			[t{-a15e-}, t{-a15g-}]
-			[]
-			[([t{-a15e-}, t{-a15g-}], cmp_eq_r11C, cmp_eq_a154)]
-			    cmp_eq_a154
-				_ _     =   PrelBase.EQ{-rbX,p-}{i}
+			AbsBinds [taZE, taZG] [] [([taZE, taZG], cmp_eq_rWb, cmp_eq_aZp)]
+			    cmp_eq_aZp _ _ = PrelBase.EQ{-rb0,p-}{i}
 			{- nonrec -}
-    AbsBinds [] [] [([], <_a19j, <_a15q)]
-	<_a15q
-	    a_r10G b_r10I
-		    =   case
-			    compare_a19q
-				a_r10G b_r10I
-			of
-			  PrelBase.LT{-rbY,p-}{i}
-				  ->  PrelBase.True{-5E,p-}{i}
-			  PrelBase.EQ{-rbX,p-}{i}
-				  ->  PrelBase.False{-58,p-}{i}
-			  PrelBase.GT{-rbZ,p-}{i}
-				  ->  PrelBase.False{-58,p-}{i}
-    AbsBinds [] [] [([], <=_a19i, <=_a15D)]
-	<=_a15D
-	    a_r10P b_r10R
-		    =   case
-			    compare_a19p
-				a_r10P b_r10R
-			of
-			  PrelBase.LT{-rbY,p-}{i}
-				  ->  PrelBase.True{-5E,p-}{i}
-			  PrelBase.EQ{-rbX,p-}{i}
-				  ->  PrelBase.True{-5E,p-}{i}
-			  PrelBase.GT{-rbZ,p-}{i}
-				  ->  PrelBase.False{-58,p-}{i}
-    AbsBinds [] [] [([], >=_a19h, >=_a15Q)]
-	>=_a15Q
-	    a_r10Y b_r110
-		    =   case
-			    compare_a19o
-				a_r10Y b_r110
-			of
-			  PrelBase.LT{-rbY,p-}{i}
-				  ->  PrelBase.False{-58,p-}{i}
-			  PrelBase.EQ{-rbX,p-}{i}
-				  ->  PrelBase.True{-5E,p-}{i}
-			  PrelBase.GT{-rbZ,p-}{i}
-				  ->  PrelBase.True{-5E,p-}{i}
-    AbsBinds [] [] [([], >_a19g, >_a163)]
-	>_a163
-	    a_r117 b_r119
-		    =   case
-			    compare_a19n
-				a_r117 b_r119
-			of
-			  PrelBase.LT{-rbY,p-}{i}
-				  ->  PrelBase.False{-58,p-}{i}
-			  PrelBase.EQ{-rbX,p-}{i}
-				  ->  PrelBase.False{-58,p-}{i}
-			  PrelBase.GT{-rbZ,p-}{i}
-				  ->  PrelBase.True{-5E,p-}{i}
-    AbsBinds [] [] [([], max_a19f, max_a16g)]
-	max_a16g
-	    a_r11g b_r11i
-		    =   case
-			    compare_a19m
-				a_r11g b_r11i
-			of
-			  PrelBase.LT{-rbY,p-}{i}
-				  ->  b_r11i
-			  PrelBase.EQ{-rbX,p-}{i}
-				  ->  a_r11g
-			  PrelBase.GT{-rbZ,p-}{i}
-				  ->  a_r11g
-    AbsBinds [] [] [([], min_a19e, min_a16v)]
-	min_a16v
-	    a_r11p b_r11r
-		    =   case
-			    compare_a19l
-				a_r11p b_r11r
-			of
-			  PrelBase.LT{-rbY,p-}{i}
-				  ->  a_r11p
-			  PrelBase.EQ{-rbX,p-}{i}
-				  ->  b_r11r
-			  PrelBase.GT{-rbZ,p-}{i}
-				  ->  b_r11r
-    d.Ord_a14X =
+			{- nonrec -}
+    AbsBinds [] [] [([], <_a13G, <_aZT)]
+	<_aZT a_rVm b_rVn
+	      = case compare_a13z a_rVm b_rVn of
+		  PrelBase.LT{-rb1,p-}{i} -> PrelBase.True{-5E,w-}{i}
+		  PrelBase.EQ{-rb0,p-}{i} -> PrelBase.False{-58,w-}{i}
+		  PrelBase.GT{-rb2,p-}{i} -> PrelBase.False{-58,w-}{i}
+    AbsBinds [] [] [([], <=_a13H, <=_a105)]
+	<=_a105 a_rVu b_rVv
+		= case compare_a13A a_rVu b_rVv of
+		    PrelBase.LT{-rb1,p-}{i} -> PrelBase.True{-5E,w-}{i}
+		    PrelBase.EQ{-rb0,p-}{i} -> PrelBase.True{-5E,w-}{i}
+		    PrelBase.GT{-rb2,p-}{i} -> PrelBase.False{-58,w-}{i}
+    AbsBinds [] [] [([], >=_a13I, >=_a10h)]
+	>=_a10h a_rVC b_rVD
+		= case compare_a13B a_rVC b_rVD of
+		    PrelBase.LT{-rb1,p-}{i} -> PrelBase.False{-58,w-}{i}
+		    PrelBase.EQ{-rb0,p-}{i} -> PrelBase.True{-5E,w-}{i}
+		    PrelBase.GT{-rb2,p-}{i} -> PrelBase.True{-5E,w-}{i}
+    AbsBinds [] [] [([], >_a13J, >_a10t)]
+	>_a10t a_rVK b_rVL
+	       = case compare_a13C a_rVK b_rVL of
+		   PrelBase.LT{-rb1,p-}{i} -> PrelBase.False{-58,w-}{i}
+		   PrelBase.EQ{-rb0,p-}{i} -> PrelBase.False{-58,w-}{i}
+		   PrelBase.GT{-rb2,p-}{i} -> PrelBase.True{-5E,w-}{i}
+    AbsBinds [] [] [([], max_a13K, max_a10F)]
+	max_a10F a_rVS b_rVT
+		 = case compare_a13D a_rVS b_rVT of
+		     PrelBase.LT{-rb1,p-}{i} -> b_rVT
+		     PrelBase.EQ{-rb0,p-}{i} -> a_rVS
+		     PrelBase.GT{-rb2,p-}{i} -> a_rVS
+    AbsBinds [] [] [([], min_a13L, min_a10R)]
+	min_a10R a_rW0 b_rW1
+		 = case compare_a13E a_rW0 b_rW1 of
+		     PrelBase.LT{-rb1,p-}{i} -> a_rW0
+		     PrelBase.EQ{-rb0,p-}{i} -> b_rW1
+		     PrelBase.GT{-rb2,p-}{i} -> b_rW1
+    d.Ord_aZh =
 	({-dict-}
-	 [d.Eq_a16H]
-	 [compare_a19k, <_a19j, <=_a19i, >=_a19h, >_a19g, max_a19f, min_a19e])
-{- rec -}
-AbsBinds [] [] [([], $d5{-r19r,x-}, d.Show_a16O)]
-    showsPrec_a19u =
-	showsPrec_a19t
-    AbsBinds [] [] [([], showsPrec_a19t, showsPrec_a16R)]
-	showsPrec_a16R
-	    a_r11N Foo1{-r4t,x-}{i}
-		    =   PrelBase.showString{-rjF,p-}
-			    "Foo1"
-	showsPrec_a16R
-	    a_r11Q Foo2{-r4s,x-}{i}
-		    =   PrelBase.showString{-rjF,p-}
-			    "Foo2"
-	showsPrec_a16R
-	    a_r11T Foo3{-r4u,x-}{i}
-		    =   PrelBase.showString{-rjF,p-}
-			    "Foo3"
-	showsPrec_a16R
-	    a_r11W Foo4{-r4v,x-}{i}
-		    =   PrelBase.showString{-rjF,p-}
-			    "Foo4"
-	showsPrec_a16R
-	    a_r11Z Foo5{-r4w,x-}{i}
-		    =   PrelBase.showString{-rjF,p-}
-			    "Foo5"
-	showsPrec_a16R
-	    a_r122 Foo6{-r4x,x-}{i}
-		    =   PrelBase.showString{-rjF,p-}
-			    "Foo6"
-	showsPrec_a16R
-	    a_r125 Foo7{-r4y,x-}{i}
-		    =   PrelBase.showString{-rjF,p-}
-			    "Foo7"
-	showsPrec_a16R
-	    a_r128 Foo8{-r4z,x-}{i}
-		    =   PrelBase.showString{-rjF,p-}
-			    "Foo8"
-    AbsBinds [] [] [([], showList_a19s, showList_a173)]
-	showList_a173
-		    =   PrelBase.showList__{-r4G,p-}
-			    Foo{-r4J,x-}
-			    showsPrec_a19u
-				lit_a196
-    d.Show_a16O =
-	({-dict-} [] [showsPrec_a19t, showList_a19s])
-{- rec -}
-AbsBinds [] [] [([], $d6{-r19v,x-}, d.Ix_a17k)]
-    d.Show_a18G =
-	$d5{-r19r,x-}
-    d.Ord_a18H =
-	$d4{-r19d,x-}
-    inRange_a19z =
-	inRange_a19w
-    AbsBinds [] [] [([], range_a19y, range_a17n)]
-	range_a17n
-	    (a_r12g, b_r12h)
-		    =   case
-			    con2tag_Foo#_r101
-				a_r12g
-			of
-			  a#_r12j ->  case
-					  con2tag_Foo#_r101
-					      b_r12h
-				      of
-					b#_r12l ->  map_a195
-							[PrelBase.Int{-3g,p-}, Foo{-r4J,x-}]
-							tag2con_Foo#_rZZ
-							enumFromTo_a194
-							    PrelBase.I#{-5b,p-}{i}
-								a#_r12j
-							    PrelBase.I#{-5b,p-}{i}
-								b#_r12l
-    AbsBinds [] [] [([], index_a19x, index_a17V)]
-	index_a17V
-	    (c_r12p@(a_r12q, b_r12r)) d_r12t
-		    =   if inRange_a19z
-			       c_r12p d_r12t then
-			    case
-				con2tag_Foo#_r101
-				    a_r12q
-			    of
-			      a#_r12v ->  case
-					      con2tag_Foo#_r101
-						  d_r12t
-					  of
-					    d#_r12x ->  case d#_r12x GHC.-#{-7E,p-}{I} a#_r12v of
-							  c_r12z  ->  PrelBase.I#{-5b,p-}{i}
-									  c_r12z
-			else
-			    IOBase.error{-87,p-}
-				PrelBase.Int{-3g,p-}
-				"Ix.Foo.index: out of range\n"
-    AbsBinds [] [] [([], inRange_a19w, inRange_a18o)]
-	inRange_a18o
-	    (a_r12D, b_r12E) c_r12G
-		    =   case
-			    con2tag_Foo#_r101
-				a_r12D
-			of
-			  a#_r12I ->  case
-					  con2tag_Foo#_r101
-					      b_r12E
-				      of
-					b#_r12K ->  case
-							con2tag_Foo#_r101
-							    c_r12G
-						    of
-						      c#_r12M ->  if c#_r12M
-								     GHC.>=#{-78,p-}{I} a#_r12I then
-								      c#_r12M
-								      GHC.<=#{-7c,p-}{I} b#_r12K
-								  else
-								      PrelBase.False{-58,p-}{i}
-    d.Ix_a17k =
+	 [d.Eq_a110]
+	 [compare_a13F, <_a13G, <=_a13H, >=_a13I, >_a13J, max_a13K, min_a13L])
+AbsBinds [] [] [([], $d5{-r13s,x-}, d.Show_a117)]
+    showsPrec_a13M = showsPrec_a13N
+    AbsBinds [] [] [([], showsPrec_a13N, showsPrec_a11b)]
+	showsPrec_a11b a_rWl Foo1{-r6,x-}{i}
+		       = PrelBase.showString{-rif,p-} "Foo1"
+	showsPrec_a11b a_rWn Foo2{-r5,x-}{i}
+		       = PrelBase.showString{-rif,p-} "Foo2"
+	showsPrec_a11b a_rWp Foo3{-r8,x-}{i}
+		       = PrelBase.showString{-rif,p-} "Foo3"
+	showsPrec_a11b a_rWr Foo4{-ra,x-}{i}
+		       = PrelBase.showString{-rif,p-} "Foo4"
+	showsPrec_a11b a_rWt Foo5{-rc,x-}{i}
+		       = PrelBase.showString{-rif,p-} "Foo5"
+	showsPrec_a11b a_rWv Foo6{-re,x-}{i}
+		       = PrelBase.showString{-rif,p-} "Foo6"
+	showsPrec_a11b a_rWx Foo7{-rg,x-}{i}
+		       = PrelBase.showString{-rif,p-} "Foo7"
+	showsPrec_a11b a_rWz Foo8{-ri,x-}{i}
+		       = PrelBase.showString{-rif,p-} "Foo8"
+    AbsBinds [] [] [([], showList_a13O, showList_a11o)]
+	showList_a11o = PrelBase.showList__{-r4x,p-}
+			    Foo{-r4z,x-} showsPrec_a13M PrelBase.I#{-5b,w-}{i} 0#
+    d.Show_a117 = ({-dict-} [] [showsPrec_a13N, showList_a13O])
+AbsBinds [] [] [([], $d6{-r13t,x-}, d.Ix_a11z)]
+    d.Show_a136 = $d5{-r13s,x-}
+    d.Ord_a137 = $d4{-r13r,x-}
+    inRange_a13P = inRange_a13S
+    AbsBinds [] [] [([], range_a13Q, range_a11D)]
+	range_a11D (a_rWH, b_rWI)
+		   = case con2tag_Foo#_rUI a_rWH of
+		       a#_rWK
+		       -> case con2tag_Foo#_rUI b_rWI of
+			    b#_rWM
+			    -> map_a13u [PrelBase.Int{-3g,W-}, Foo{-r4z,x-}] tag2con_Foo#_rUG
+									     enumFromTo_a13v PrelBase.I#{-5b,w-}{i} a#_rWK
+											     PrelBase.I#{-5b,w-}{i} b#_rWM
+    AbsBinds [] [] [([], index_a13R, index_a12d)]
+	index_a12d (c_rWQ@(a_rWR, b_rWS)) d_rWT
+		   = if inRange_a13P c_rWQ d_rWT then
+			 case con2tag_Foo#_rUI a_rWR of
+			   a#_rWV
+			   -> case con2tag_Foo#_rUI d_rWT of
+				d#_rWX
+				-> case d#_rWX GHC.-#{-7E,w-}{I} a#_rWV of
+				     c_rWZ -> PrelBase.I#{-5b,w-}{i} c_rWZ
+		     else
+			 IOBase.error{-87,w-}
+			     PrelBase.Int{-3g,W-} "Ix.Foo.index: out of range\n"
+    AbsBinds [] [] [([], inRange_a13S, inRange_a12K)]
+	inRange_a12K (a_rX3, b_rX4) c_rX5
+		     = case con2tag_Foo#_rUI a_rX3 of
+			 a#_rX7
+			 -> case con2tag_Foo#_rUI b_rX4 of
+			      b#_rX9
+			      -> case con2tag_Foo#_rUI c_rX5 of
+				   c#_rXb
+				   -> if c#_rXb GHC.>=#{-78,w-}{I} a#_rX7 then
+					  c#_rXb GHC.<=#{-7c,w-}{I} b#_rX9
+				      else
+					  PrelBase.False{-58,w-}{i}
+    d.Ix_a11z =
 	({-dict-}
-	 [d.Show_a18G, d.Ord_a18H]
-	 [range_a19y, index_a19x, inRange_a19w])
-{- nonrec -}
-d.Num_a18U =
-    PrelBase.$d3{-rdj,p-}
-fromInt_a197 =
-    PrelBase.fromInt{-8R,p-}
-	PrelBase.Int{-3g,p-}
-	d.Num_a18U
-lit_a196 =
-    fromInt_a197
-	PrelBase.I#{-5b,p-}{i}
-	    0#
-d.Functor_a18X =
-    PrelBase.$d25{-rde,p-}
-map_a195 =
-    PrelBase.map{-reK,p-}
-	PrelBase.[]{-3j,p-}
-	d.Functor_a18X
-d.Enum_a190 =
-    PrelBase.$d5{-rdF,p-}
-enumFromTo_a194 =
-    PrelBase.enumFromTo{-8W,p-}
-	PrelBase.Int{-3g,p-}
-	d.Enum_a190
-{- nonrec -}
-AbsBinds [] [] [([], con2tag_Foo#_r101, con2tag_Foo#_a141)]
-    con2tag_Foo#_a141
-	Foo1{-r4t,x-}{i}
-		=   0#
-    con2tag_Foo#_a141
-	Foo2{-r4s,x-}{i}
-		=   1#
-    con2tag_Foo#_a141
-	Foo3{-r4u,x-}{i}
-		=   2#
-    con2tag_Foo#_a141
-	Foo4{-r4v,x-}{i}
-		=   3#
-    con2tag_Foo#_a141
-	Foo5{-r4w,x-}{i}
-		=   4#
-    con2tag_Foo#_a141
-	Foo6{-r4x,x-}{i}
-		=   5#
-    con2tag_Foo#_a141
-	Foo7{-r4y,x-}{i}
-		=   6#
-    con2tag_Foo#_a141
-	Foo8{-r4z,x-}{i}
-		=   7#
-{- nonrec -}
-{- nonrec -}
-AbsBinds [] [] [([], maxtag_Foo#_r100, maxtag_Foo#_a145)]
-    maxtag_Foo#_a145
-		=   PrelBase.I#{-5b,p-}{i}
-			7#
-{- nonrec -}
-{- nonrec -}
-AbsBinds [] [] [([], tag2con_Foo#_rZZ, tag2con_Foo#_a149)]
-    tag2con_Foo#_a149
-	(PrelBase.I#{-5b,p-}{i} 0#)
-		=   Foo1{-r4t,x-}{i}
-    tag2con_Foo#_a149
-	(PrelBase.I#{-5b,p-}{i} 1#)
-		=   Foo2{-r4s,x-}{i}
-    tag2con_Foo#_a149
-	(PrelBase.I#{-5b,p-}{i} 2#)
-		=   Foo3{-r4u,x-}{i}
-    tag2con_Foo#_a149
-	(PrelBase.I#{-5b,p-}{i} 3#)
-		=   Foo4{-r4v,x-}{i}
-    tag2con_Foo#_a149
-	(PrelBase.I#{-5b,p-}{i} 4#)
-		=   Foo5{-r4w,x-}{i}
-    tag2con_Foo#_a149
-	(PrelBase.I#{-5b,p-}{i} 5#)
-		=   Foo6{-r4x,x-}{i}
-    tag2con_Foo#_a149
-	(PrelBase.I#{-5b,p-}{i} 6#)
-		=   Foo7{-r4y,x-}{i}
-    tag2con_Foo#_a149
-	(PrelBase.I#{-5b,p-}{i} 7#)
-		=   Foo8{-r4z,x-}{i}
-    tag2con_Foo#_a149
-	_       =   IOBase.error{-87,p-}
-			Foo{-r4J,x-}
-			"Urk! in TcGenDeriv"
-{- nonrec -}
+	 [d.Show_a136, d.Ord_a137]
+	 [range_a13Q, index_a13R, inRange_a13S])
+d.Functor_a13i = PrelBase.$d26{-rc9,p-}
+map_a13u = PrelBase.map{-rh9,p-} PrelBase.[]{-3j,W-} d.Functor_a13i
+d.Enum_a13l = PrelBase.$d6{-rcJ,p-}
+enumFromTo_a13v =
+    PrelBase.enumFromTo{-8W,p-} PrelBase.Int{-3g,W-} d.Enum_a13l
 
 NOTE: Simplifier still going after 4 iterations; bailing out.
 ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+Ix 1 :: $d4 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 Ix 1;
+PrelBase 1 :: $d1 1 $d11 1 $d12 1 $d14 1 $d15 1 $d16 1 $d2 1 $d22 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d3 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d6 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 && 1 . 1 not 1 showList__ 1 showParen 1 showSpace 1 showString 1 Enum 1 Eq 1 Eval 1 Functor 1 Monad 1 MonadZero 1 Num 1 Ord 1 Ordering 1 Ordering 1 Show 1 ShowS 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d17 1 $d18 1 $d28 1 $d29 1 $d30 1 $d33 1 $d34 1 $d35 1 $d8 1;
+PrelTup 1 :: $d13 1 $d4 1 $d49 1 $d9 1;
+_exports_
+ShouldSucceed Bar(MkBar) Foo(Foo1 Foo2 Foo3 Foo4 Foo5 Foo6 Foo7 Foo8);
+_instances_
+instance {PrelBase.Eq Foo} = $d1;
+instance _forall_ [a b] => {PrelBase.Eval (Bar a b)} = $d2;
+instance {PrelBase.Eval Foo} = $d3;
+instance {PrelBase.Ord Foo} = $d4;
+instance {PrelBase.Show Foo} = $d5;
+instance {Ix.Ix Foo} = $d6;
+_declarations_
+1 $d1 _:_ {PrelBase.Eq Foo} ;;
+1 $d2 _:_ _forall_ [a b] => {PrelBase.Eval (Bar a b)} ;;
+1 $d3 _:_ {PrelBase.Eval Foo} ;;
+1 $d4 _:_ {PrelBase.Ord Foo} ;;
+1 $d5 _:_ {PrelBase.Show Foo} ;;
+1 $d6 _:_ {Ix.Ix Foo} ;;
+1 data Bar a b = MkBar a PrelBase.Int b PrelBase.Integer a ;
+1 data Foo = Foo1 |  Foo2 |  Foo3 |  Foo4 |  Foo5 |  Foo6 |  Foo7 |  Foo8 ;

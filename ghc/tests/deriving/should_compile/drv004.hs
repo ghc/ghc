@@ -1,8 +1,9 @@
---!!! simple example of deriving Ord (and, implicitly, Eq)
+--!!! simple example of deriving Ord and Eq simultaneously
 --
 module ShouldSucceed where
 
-data Foo a b
+data Foo a b c
   = C1 a Int
   | C2 b Double
-  deriving Ord
+  | C3 c String
+  deriving (Eq, Ord)

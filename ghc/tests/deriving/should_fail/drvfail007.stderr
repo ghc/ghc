@@ -1,0 +1,10 @@
+ 
+drvfail007.hs:2: No instance for `PrelBase.Eq PrelBase.Int
+					      -> PrelBase.Int'
+ 
+drvfail007.hs:4: No instance for: `PrelBase.Eq (PrelBase.Int
+						-> PrelBase.Int)'
+    arising from use of `PrelBase.==' at drvfail007.hs:4
+
+
+Compilation had errors

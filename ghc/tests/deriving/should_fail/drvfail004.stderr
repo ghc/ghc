@@ -1,0 +1,7 @@
+ 
+drvfail004.hs:5: No instance for: `PrelBase.Eq (Foo taDH taDI)'
+    arising from an instance declaration at drvfail004.hs:5
+    When checking superclass constraints of an instance declaration
+
+
+Compilation had errors
