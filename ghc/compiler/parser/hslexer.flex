@@ -329,10 +329,6 @@ NL  	    	    	[\n\r]
 			      PUSH_STATE(UserPragma);
 			      RETURN(MAGIC_UNFOLDING_UPRAGMA);
 			    }
-<Code,GlaExt>"{-#"{WS}*"DEFOREST" {
-                              PUSH_STATE(UserPragma);
-                              RETURN(DEFOREST_UPRAGMA);
-			    }
 <Code,GlaExt>"{-#"{WS}*"GENERATE_SPECS" {
 			      /* these are handled by hscpp */
 			      nested_comments =1;

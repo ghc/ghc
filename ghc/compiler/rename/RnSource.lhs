@@ -275,11 +275,6 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
 	lookupBndrRn op			`thenRn` \ op_name ->
 	returnRn (InlineSig op_name locn)
 
-    rn_uprag (DeforestSig op locn)
-      = pushSrcLocRn locn $
-	lookupBndrRn op			`thenRn` \ op_name ->
-	returnRn (DeforestSig op_name locn)
-
     rn_uprag (MagicUnfoldingSig op str locn)
       = pushSrcLocRn locn $
 	lookupBndrRn op			`thenRn` \ op_name ->
@@ -562,7 +557,6 @@ rnIdInfo (HsArity arity)	= returnRn (HsArity arity)
 rnIdInfo (HsUpdate update)	= returnRn (HsUpdate update)
 rnIdInfo (HsFBType fb)		= returnRn (HsFBType fb)
 rnIdInfo (HsArgUsage au)	= returnRn (HsArgUsage au)
-rnIdInfo (HsDeforest df)	= returnRn (HsDeforest df)
 
 rnStrict (HsStrictnessInfo demands (Just (worker,cons)))
 	-- The sole purpose of the "cons" field is so that we can mark the constructors

@@ -185,7 +185,7 @@ BOOLEAN inpat;
 
 %token  INTERFACE_UPRAGMA SPECIALISE_UPRAGMA
 %token  INLINE_UPRAGMA MAGIC_UNFOLDING_UPRAGMA
-%token  DEFOREST_UPRAGMA END_UPRAGMA 
+%token  END_UPRAGMA 
 %token  SOURCE_UPRAGMA
 
 /**********************************************************************
@@ -611,12 +611,6 @@ decl	: qvarsk DCOLON sigtype
 		{
 		  $$ = mkmagicuf_uprag($2, $3, startlineno);
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
-		}
-
-        |  DEFOREST_UPRAGMA qvark END_UPRAGMA
-                {
-		  $$ = mkdeforest_uprag($2, startlineno);
- 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
 		}
 
 	/* end of user-specified pragmas */

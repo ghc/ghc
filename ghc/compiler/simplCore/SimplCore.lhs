@@ -92,12 +92,6 @@ import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
 import Bag
 import Maybes
 
-
-#ifndef OMIT_DEFORESTER
-import Deforest		( deforestProgram )
-import DefUtils		( deforestable )
-#endif
-
 \end{code}
 
 \begin{code}
@@ -221,16 +215,6 @@ core2core core_todos module_name us local_tycons tycon_specs binds
 
 		   end_pass us2 p spec_data2 simpl_stats "Specialise"
 	       }
-
-	  CoreDoDeforest
-#if OMIT_DEFORESTER
-	    -> error "ERROR: CoreDoDeforest: not built into compiler\n"
-#else
-	    -> _scc_ "Deforestation"
-	       begin_pass "Deforestation" >>
-	       case (deforestProgram binds us1) of { binds2 ->
-	       end_pass us2 binds2 spec_data simpl_stats "Deforestation" }
-#endif
 
 	  CoreDoPrintCore	-- print result of last pass
 	    -> dumpIfSet (not opt_D_verbose_core2core) "Print Core"

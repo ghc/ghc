@@ -24,7 +24,7 @@ import HeapOffs		( HeapOffset )
 import HsPat		( OutPat )
 import HsPragmas	( ClassOpPragmas, ClassPragmas, DataPragmas, GenPragmas, InstancePragmas )
 import Id		( StrictnessMark, GenId, Id(..) )
-import IdInfo		( IdInfo, ArityInfo, DeforestInfo, StrictnessInfo, UpdateInfo )
+import IdInfo		( IdInfo, ArityInfo, StrictnessInfo, UpdateInfo )
 import Demand		( Demand )
 import Kind		( Kind )
 import Literal		( Literal )
@@ -78,7 +78,6 @@ data ClosureInfo
 data Coercion
 data CostCentre
 data DataPragmas a
-data DeforestInfo
 data Demand
 data ExportFlag
 data FieldLabel

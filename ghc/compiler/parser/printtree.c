@@ -534,11 +534,6 @@ prbind(b)
 			  plineno(ginline_line(b));
 			  pqid(ginline_id(b));
 			  break;
-	case deforest_uprag:
-			  PUTTAGSTR("Sd");
-			  plineno(gdeforest_line(b));
-			  pqid(gdeforest_id(b));
-			  break;
 	case magicuf_uprag:
 			  PUTTAGSTR("Su");
 			  plineno(gmagicuf_line(b));
@@ -744,7 +739,6 @@ ppragma(p)
       case igen_pragma:		PUTTAGSTR("Pg");
 				ppragma(gprag_arity(p));
 				ppragma(gprag_update(p));
-				ppragma(gprag_deforest(p));
 				ppragma(gprag_strictness(p));
 				ppragma(gprag_unfolding(p));
 				plist(ppragma, gprag_specs(p));
@@ -754,8 +748,6 @@ ppragma(p)
 				break;
       case iupdate_pragma:	PUTTAGSTR("Pu");
 				pid(gprag_update_val(p));
-				break;
-      case ideforest_pragma:	PUTTAGSTR("PD");
 				break;
       case istrictness_pragma:	PUTTAGSTR("PS");
 				print_string(gprag_strict_spec(p));

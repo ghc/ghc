@@ -246,9 +246,6 @@ data Sig name
   | InlineSig	name		  -- INLINE f
 		SrcLoc
 
-  | DeforestSig name            -- Deforest using this function definition
-	      	SrcLoc
-
   | MagicUnfoldingSig
 		name		-- Associate the "name"d function with
 		FAST_STRING	-- the compiler-builtin unfolding (known
@@ -267,9 +264,6 @@ ppr_sig sty (Sig var ty _)
 ppr_sig sty (ClassOpSig var _ ty _)
       = sep [ppr sty (getOccName var) <+> ptext SLIT("::"),
 	     nest 4 (ppr sty ty)]
-
-ppr_sig sty (DeforestSig var _)
-      = hsep [text "{-# DEFOREST", ppr sty var, text "#-}"]
 
 ppr_sig sty (SpecSig var ty using _)
       = sep [ hsep [text "{-# SPECIALIZE", ppr sty var, ptext SLIT("::")],

@@ -91,7 +91,6 @@ data GenPragmas name
   = NoGenPragmas
   | GenPragmas	(Maybe Int)		-- arity (maybe)
 		(Maybe UpdateInfo)	-- update info (maybe)
-		DeforestInfo		-- deforest info
 		(ImpStrictness name)	-- strictness, worker-wrapper
 		(ImpUnfolding name)	-- unfolding (maybe)
 		[([Maybe (HsType name)], -- Specialisations: types to which spec'd;

@@ -37,9 +37,6 @@ module IdInfo (
 	UpdateInfo, SYN_IE(UpdateSpec),
 	mkUpdateInfo, updateInfo, updateInfoMaybe, ppUpdateInfo, addUpdateInfo,
 
-	DeforestInfo(..),
-	deforestInfo, ppDeforestInfo, addDeforestInfo,
-
 	ArgUsageInfo, ArgUsage(..), SYN_IE(ArgUsageType),
 	mkArgUsageInfo, argUsageInfo, addArgUsageInfo, getArgUsage,
 
@@ -109,9 +106,6 @@ data IdInfo
 
 	UpdateInfo		-- Which args should be updated
 
-	DeforestInfo            -- Whether its definition should be
-				-- unfolded during deforestation
-
 	ArgUsageInfo		-- how this Id uses its arguments
 
 	FBTypeInfo		-- the Foldr/Build W/W property of this function.
@@ -119,7 +113,7 @@ data IdInfo
 
 \begin{code}
 noIdInfo = IdInfo UnknownArity UnknownDemand nullSpecEnv NoStrictnessInfo noUnfolding
-		  NoUpdateInfo Don'tDeforest NoArgUsageInfo NoFBTypeInfo 
+		  NoUpdateInfo NoArgUsageInfo NoFBTypeInfo 
 \end{code}
 
 Simply turgid.  But BE CAREFUL: don't @apply_to_Id@ if that @Id@
@@ -127,7 +121,7 @@ will in turn @apply_to_IdInfo@ of the self-same @IdInfo@.  (A very
 nasty loop, friends...)
 \begin{code}
 apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
-			      update deforest arg_usage fb_ww)
+			      update arg_usage fb_ww)
   | isNullSpecEnv spec
   = idinfo
   | otherwise
@@ -137,7 +131,7 @@ apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
 Variant of the same thing for the typechecker.
 \begin{code}
 applySubstToIdInfo s0 (IdInfo arity demand spec strictness unfold
-			      update deforest arg_usage fb_ww)
+			      update arg_usage fb_ww)
   = panic "IdInfo:applySubstToIdInfo"
 \end{code}
 
@@ -148,12 +142,11 @@ ppIdInfo :: PprStyle
 	 -> Doc
 
 ppIdInfo sty specs_please
-    	 (IdInfo arity demand specenv strictness unfold update deforest arg_usage fbtype)
+    	 (IdInfo arity demand specenv strictness unfold update arg_usage fbtype)
   = hsep [
 		    -- order is important!:
 		    ppArityInfo sty arity,
 		    ppUpdateInfo sty update,
-		    ppDeforestInfo sty deforest,
 
 		    ppStrictnessInfo sty strictness,
 
@@ -186,9 +179,9 @@ exactArity   = ArityExactly
 atLeastArity = ArityAtLeast
 unknownArity = UnknownArity
 
-arityInfo (IdInfo arity _ _ _ _ _ _ _ _) = arity
+arityInfo (IdInfo arity _ _ _ _ _ _ _) = arity
 
-addArityInfo (IdInfo _ a c d e f g h i) arity	     = IdInfo arity a c d e f g h i
+addArityInfo (IdInfo _ a b c d e f g) arity	     = IdInfo arity a b c d e f g
 
 ppArityInfo sty UnknownArity	     = empty
 ppArityInfo sty (ArityExactly arity) = hsep [ptext SLIT("_A_"), int arity]
@@ -226,9 +219,9 @@ willBeDemanded _		      = False
 \end{code}
 
 \begin{code}
-demandInfo (IdInfo _ demand _ _ _ _ _ _ _) = demand
+demandInfo (IdInfo _ demand _ _ _ _ _ _) = demand
 
-addDemandInfo (IdInfo a _ c d e f g h i) demand = IdInfo a demand c d e f g h i
+addDemandInfo (IdInfo a _ c d e f g h) demand = IdInfo a demand c d e f g h
 
 ppDemandInfo PprInterface _	      = empty
 ppDemandInfo sty UnknownDemand	      = text "{-# L #-}"
@@ -244,10 +237,10 @@ ppDemandInfo sty (DemandedAsPer info) = hsep [text "{-#", text (showList [info] 
 See SpecEnv.lhs
 
 \begin{code}
-specInfo (IdInfo _ _ spec _ _ _ _ _ _) = spec
+specInfo (IdInfo _ _ spec _ _ _ _ _) = spec
 
 addSpecInfo id_info spec | isNullSpecEnv spec = id_info
-addSpecInfo (IdInfo a b _ d e f g h i) spec   = IdInfo a b spec d e f g h i
+addSpecInfo (IdInfo a b _ d e f g h) spec   = IdInfo a b spec d e f g h
 \end{code}
 
 %************************************************************************
@@ -307,10 +300,10 @@ mkBottomStrictnessInfo = BottomGuaranteed
 bottomIsGuaranteed BottomGuaranteed = True
 bottomIsGuaranteed other    	    = False
 
-strictnessInfo (IdInfo _ _ _ strict _ _ _ _ _) = strict
+strictnessInfo (IdInfo _ _ _ strict _ _ _ _) = strict
 
 addStrictnessInfo id_info 		     NoStrictnessInfo = id_info
-addStrictnessInfo (IdInfo a b d _ e f g h i) strict	      = IdInfo a b d strict e f g h i
+addStrictnessInfo (IdInfo a b d _ e f g h) strict	      = IdInfo a b d strict e f g h
 
 ppStrictnessInfo sty NoStrictnessInfo = empty
 ppStrictnessInfo sty BottomGuaranteed = ptext SLIT("_bot_")
@@ -334,9 +327,9 @@ workerExists other			      = False
 %************************************************************************
 
 \begin{code}
-unfoldInfo (IdInfo _ _ _ _ unfolding _ _ _ _) = unfolding
+unfoldInfo (IdInfo _ _ _ _ unfolding _ _ _) = unfolding
 
-addUnfoldInfo (IdInfo a b d e _ f g h i) uf = IdInfo a b d e uf f g h i
+addUnfoldInfo (IdInfo a b d e _ f g h) uf = IdInfo a b d e uf f g h
 \end{code}
 
 %************************************************************************
@@ -378,41 +371,14 @@ instance Text UpdateInfo where
 	ok_digit c | c >= '0' && c <= '2' = ord c - ord '0'
 		   | otherwise = panic "IdInfo: not a digit while reading update pragma"
 
-updateInfo (IdInfo _ _ _ _ _ update _ _ _) = update
+updateInfo (IdInfo _ _ _ _ _ update _ _) = update
 
 addUpdateInfo id_info			 NoUpdateInfo = id_info
-addUpdateInfo (IdInfo a b d e f _ g h i) upd_info     = IdInfo a b d e f upd_info g h i
+addUpdateInfo (IdInfo a b d e f _ g h) upd_info     = IdInfo a b d e f upd_info g h
 
 ppUpdateInfo sty NoUpdateInfo	       = empty
 ppUpdateInfo sty (SomeUpdateInfo [])   = empty
 ppUpdateInfo sty (SomeUpdateInfo spec) = (<>) (ptext SLIT("_U_ ")) (hcat (map int spec))
-\end{code}
-
-%************************************************************************
-%*                                                                    *
-\subsection[deforest-IdInfo]{Deforestation info about an @Id@}
-%*                                                                    *
-%************************************************************************
-
-The deforest info says whether this Id is to be unfolded during
-deforestation.  Therefore, when the deforest pragma is true, we must
-also have the unfolding information available for this Id.
-
-\begin{code}
-data DeforestInfo
-  = Don'tDeforest                     -- just a bool, might extend this
-  | DoDeforest                                -- later.
-  -- deriving (Eq, Ord)
-\end{code}
-
-\begin{code}
-deforestInfo (IdInfo _ _ _ _ _ _ deforest _ _) = deforest
-
-addDeforestInfo id_info 		   Don'tDeforest = id_info
-addDeforestInfo (IdInfo a b d e f g _ h i) deforest	 = IdInfo a b d e f g deforest h i
-
-ppDeforestInfo sty Don'tDeforest = empty
-ppDeforestInfo sty DoDeforest    = ptext SLIT("_DEFOREST_")
 \end{code}
 
 %************************************************************************
@@ -442,10 +408,10 @@ getArgUsage (SomeArgUsageInfo u)  = u
 \end{code}
 
 \begin{code}
-argUsageInfo (IdInfo _ _ _ _ _  _ _ au _) = au
+argUsageInfo (IdInfo _ _ _ _ _ _ au _) = au
 
 addArgUsageInfo id_info			   NoArgUsageInfo = id_info
-addArgUsageInfo (IdInfo a b d e f g h _ i) au_info	  = IdInfo a b d e f g h au_info i
+addArgUsageInfo (IdInfo a b d e f g _ h) au_info	  = IdInfo a b d e f g au_info h
 
 ppArgUsageInfo sty NoArgUsageInfo	  = empty
 ppArgUsageInfo sty (SomeArgUsageInfo aut) = (<>) (ptext SLIT("_L_ ")) (ppArgUsageType aut)
@@ -485,10 +451,10 @@ getFBType (SomeFBTypeInfo u)  = Just u
 \end{code}
 
 \begin{code}
-fbTypeInfo (IdInfo _ _ _ _ _ _ _ _ fb) = fb
+fbTypeInfo (IdInfo _ _ _ _ _ _ _ fb) = fb
 
 addFBTypeInfo id_info NoFBTypeInfo = id_info
-addFBTypeInfo (IdInfo a b d e f g h i _) fb_info = IdInfo a b d e f g h i fb_info
+addFBTypeInfo (IdInfo a b d e f g h _) fb_info = IdInfo a b d e f g h fb_info
 
 ppFBTypeInfo sty NoFBTypeInfo = empty
 ppFBTypeInfo sty (SomeFBTypeInfo (FBType cons prod))

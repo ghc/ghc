@@ -49,7 +49,6 @@ cvClassOpSig (RdrTySig vars poly_ty src_loc)
 
 cvInstDeclSig (RdrSpecValSig        sigs) = sigs
 cvInstDeclSig (RdrInlineValSig      sig)  = [ sig ]
-cvInstDeclSig (RdrDeforestSig	    sig)  = [ sig ]
 cvInstDeclSig (RdrMagicUnfoldingSig sig)  = [ sig ]
 \end{code}
 
@@ -96,7 +95,6 @@ cvMonoBindsAndSigs sf sig_cvtr fb
 
     mangle_bind (b_acc, s_acc) (RdrSpecValSig	     sig) = (b_acc, sig ++ s_acc)
     mangle_bind (b_acc, s_acc) (RdrInlineValSig      sig) = (b_acc, sig : s_acc)
-    mangle_bind (b_acc, s_acc) (RdrDeforestSig       sig) = (b_acc, sig : s_acc)
     mangle_bind (b_acc, s_acc) (RdrMagicUnfoldingSig sig) = (b_acc, sig : s_acc)
 
     mangle_bind (b_acc, s_acc)

@@ -74,9 +74,6 @@ type binding;
 	inline_uprag: <	ginline_id   : qid;
 			ginline_line : long; >;
 
-	deforest_uprag: < gdeforest_id : qid;
-			gdeforest_line : long; >;
-
 	magicuf_uprag:< gmagicuf_id   : qid;
 			gmagicuf_str  : stringId;
 			gmagicuf_line : long; >;

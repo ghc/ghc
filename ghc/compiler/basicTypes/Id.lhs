@@ -98,7 +98,6 @@ module Id (
 	addIdDemandInfo,
 	addIdStrictness,
 	addIdUpdateInfo,
-	addIdDeforestInfo,
 	getIdArity,
 	getIdDemandInfo,
 	getIdInfo,
@@ -843,18 +842,6 @@ getIdArity id@(Id _ _ _ _ _ id_info)
 addIdArity :: Id -> ArityInfo -> Id
 addIdArity (Id u n ty details pinfo info) arity
   = Id u n ty details pinfo (info `addArityInfo` arity)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[Id-arities]{Deforestation related functions}
-%*									*
-%************************************************************************
-
-\begin{code}
-addIdDeforestInfo :: Id -> DeforestInfo -> Id
-addIdDeforestInfo (Id u n ty details pinfo info) def_info
-  = Id u n ty details pinfo (info `addDeforestInfo` def_info)
 \end{code}
 
 %************************************************************************

@@ -44,10 +44,6 @@ DIRS = \
   reader profiling parser
 
 
-ifeq ($(GhcWithDeforester),YES)
-  DIRS += deforest
-endif
-
 ifeq ($(GhcWithNativeCodeGen),YES)
 DIRS += nativeGen
 else
@@ -143,13 +139,6 @@ ifeq "$(Ghc2_0)" "NO"
 SRC_HC_OPTS += -fomit-derived-read -fomit-reexported-instances
 else
 SRC_HC_OPTS += -recomp
-endif
-
-ifeq ($(GhcWithDeforester),NO)
- ifeq "$(Ghc2_0)" "NO"
-  SRC_MKDEPENDHS_OPTS += -DOMIT_DEFORESTER
- endif
-SRC_HC_OPTS += -DOMIT_DEFORESTER
 endif
 
 SRC_HC_OPTS += $(GhcHcOpts)

@@ -33,7 +33,6 @@ import Id		( idType, getIdInfo, getIdUnfolding, getIdSpecialisation,
 			  idMustBeINLINEd, GenId{-instance Outputable-}
 			)
 import SpecEnv		( SpecEnv, lookupSpecEnv )
-import IdInfo		( DeforestInfo(..) )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
 import Outputable	( Outputable(..), PprStyle(..) )

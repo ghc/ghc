@@ -94,7 +94,6 @@ tcIdInfo unf_env name ty info info_ins
     go info (HsUpdate upd : rest)  = go (info `addUpdateInfo` upd)  rest
     go info (HsFBType fb : rest)   = go (info `addFBTypeInfo` fb)   rest
     go info (HsArgUsage au : rest) = go (info `addArgUsageInfo` au) rest
-    go info (HsDeforest df : rest) = go (info `addDeforestInfo` df) rest
 
     go info (HsUnfold inline expr : rest) = tcUnfolding unf_env name expr 	`thenNF_Tc` \ unfold_info ->
 					    go (info `addUnfoldInfo` unfold_info) rest

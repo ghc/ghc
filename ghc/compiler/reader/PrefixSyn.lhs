@@ -63,7 +63,6 @@ data RdrBinding
   -- user pragmas come in in a Sig-ish way/form...
   | RdrSpecValSig   	[RdrNameSig]
   | RdrInlineValSig 	RdrNameSig
-  | RdrDeforestSig 	RdrNameSig
   | RdrMagicUnfoldingSig RdrNameSig
   | RdrSpecInstSig  	RdrNameSpecInstSig
   | RdrSpecDataSig   	RdrNameSpecDataSig

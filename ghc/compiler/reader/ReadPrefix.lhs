@@ -683,12 +683,6 @@ wlk_sig_thing (U_inline_uprag ivar srcline)
     wlkVarId	ivar		`thenUgn` \ var     ->
     returnUgn (RdrInlineValSig (InlineSig var src_loc))
 
-	-- "deforest me" user-pragma
-wlk_sig_thing (U_deforest_uprag ivar srcline)
-  = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkVarId	ivar		`thenUgn` \ var     ->
-    returnUgn (RdrDeforestSig (DeforestSig var src_loc))
-
 	-- "magic" unfolding user-pragma
 wlk_sig_thing (U_magicuf_uprag ivar str srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->

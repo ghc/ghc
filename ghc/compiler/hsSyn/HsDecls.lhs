@@ -381,7 +381,6 @@ data HsIdInfo name
   | HsStrictness	(HsStrictnessInfo name)
   | HsUnfold		Bool (UfExpr name)	-- True <=> INLINE pragma
   | HsUpdate		UpdateInfo
-  | HsDeforest		DeforestInfo
   | HsArgUsage		ArgUsageInfo
   | HsFBType		FBTypeInfo
 	-- ToDo: specialisations

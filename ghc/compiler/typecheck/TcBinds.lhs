@@ -693,8 +693,6 @@ tcPragmaSigs sigs
 Here are the easy cases for tcPragmaSigs
 
 \begin{code}
-tcPragmaSig (DeforestSig name loc)
-  = returnTc ((name, addDeforestInfo DoDeforest),EmptyBinds,emptyLIE)
 tcPragmaSig (InlineSig name loc)
   = returnTc ((name, addUnfoldInfo (iWantToBeINLINEd UnfoldAlways)), EmptyBinds, emptyLIE)
 tcPragmaSig (MagicUnfoldingSig name string loc)

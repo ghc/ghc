@@ -498,11 +498,6 @@ renameSig (InlineSig v src_loc)
     lookupBndrRn v		`thenRn` \ new_v ->
     returnRn (InlineSig new_v src_loc)
 
-renameSig (DeforestSig v src_loc)
-  = pushSrcLocRn src_loc $
-    lookupBndrRn v        `thenRn` \ new_v ->
-    returnRn (DeforestSig new_v src_loc)
-
 renameSig (MagicUnfoldingSig v str src_loc)
   = pushSrcLocRn src_loc $
     lookupBndrRn v		`thenRn` \ new_v ->
@@ -529,7 +524,6 @@ sig_tag (Sig n1 _ _)    	   = (ILIT(1) :: FAST_INT)
 sig_tag (SpecSig n1 _ _ _)    	   = ILIT(2)
 sig_tag (InlineSig n1 _)  	   = ILIT(3)
 sig_tag (MagicUnfoldingSig n1 _ _) = ILIT(4)
-sig_tag (DeforestSig n1 _)         = ILIT(5)
 sig_tag _			   = panic# "tag(RnBinds)"
 
 sig_name (Sig        n _ _) 	   = n

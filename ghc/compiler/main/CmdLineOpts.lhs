@@ -25,7 +25,6 @@ module CmdLineOpts (
 	opt_CompilingGhcInternals,
 	opt_D_dump_absC,
 	opt_D_dump_asm,
-	opt_D_dump_deforest,
 	opt_D_dump_deriv,
 	opt_D_dump_ds,
 	opt_D_dump_flatC,
@@ -170,7 +169,6 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoStaticArgs
   | CoreDoStrictness
   | CoreDoSpecialising
-  | CoreDoDeforest
   | CoreDoFoldrBuildWorkerWrapper
   | CoreDoFoldrBuildWWAnal
 \end{code}
@@ -279,7 +277,6 @@ opt_CompilingGhcInternals	= maybeToBool maybe_CompilingGhcInternals
 maybe_CompilingGhcInternals	= lookup_str "-fcompiling-ghc-internals="
 opt_D_dump_absC			= lookUp  SLIT("-ddump-absC")
 opt_D_dump_asm			= lookUp  SLIT("-ddump-asm")
-opt_D_dump_deforest		= lookUp  SLIT("-ddump-deforest")
 opt_D_dump_deriv		= lookUp  SLIT("-ddump-deriv")
 opt_D_dump_ds			= lookUp  SLIT("-ddump-ds")
 opt_D_dump_flatC		= lookUp  SLIT("-ddump-flatC")
@@ -412,7 +409,6 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fstatic-args"    -> CORE_TD(CoreDoStaticArgs)
 	  "-fstrictness"     -> CORE_TD(CoreDoStrictness)
 	  "-fspecialise"     -> CORE_TD(CoreDoSpecialising)
-	  "-fdeforest"	     -> CORE_TD(CoreDoDeforest)
 	  "-ffoldr-build-worker-wrapper"  -> CORE_TD(CoreDoFoldrBuildWorkerWrapper)
 	  "-ffoldr-build-ww-anal"  -> CORE_TD(CoreDoFoldrBuildWWAnal)
 
