@@ -214,13 +214,13 @@ void releaseCapability(Capability* cap
  * Function: grabReturnCapability(Capability**)
  *
  * Purpose:  when an OS thread returns from an external call,
- * it calls grabReturningCapability() (via Schedule.resumeThread())
+ * it calls grabReturnCapability() (via Schedule.resumeThread())
  * to wait for permissions to enter the RTS & communicate the
- * result of the ext. call back to the Haskell thread that
+ * result of the external call back to the Haskell thread that
  * made it.
  *
- * Pre-condition:  pMutex isn't held.
- * Post-condition: pMutex is held and a capability has
+ * Pre-condition:  pMutex is held.
+ * Post-condition: pMutex is still held and a capability has
  *                 been assigned to the worker thread.
  */
 void
@@ -228,7 +228,6 @@ grabReturnCapability(Mutex* pMutex, Capability** pCap)
 {
   IF_DEBUG(scheduler,
 	   fprintf(stderr,"worker (%ld): returning, waiting for lock.\n", osThreadId()));
-  ACQUIRE_LOCK(pMutex);
   rts_n_waiting_workers++;
   IF_DEBUG(scheduler,
 	   fprintf(stderr,"worker (%ld): returning; workers waiting: %d\n",
@@ -276,6 +275,8 @@ yieldToReturningWorker(Mutex* pMutex, Capability* cap)
 
     /* Re-grab the mutex */
     ACQUIRE_LOCK(pMutex);
+    /* And wait for work */
+    waitForWorkCapability(pMutex, cap, rtsFalse);
   }
   return;
 }
