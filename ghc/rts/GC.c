@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.54 1999/03/17 16:28:34 sewardj Exp $
+ * $Id: GC.c,v 1.55 1999/03/18 17:57:21 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1654,8 +1654,6 @@ scavenge(step *step)
     case WEAK:
     case FOREIGN:
     case STABLE_NAME:
-    case IND_PERM:
-    case IND_OLDGEN_PERM:
       {
 	StgPtr end;
 
@@ -1666,6 +1664,21 @@ scavenge(step *step)
 	p += info->layout.payload.nptrs;
 	break;
       }
+
+    case IND_PERM:
+      if (step->gen->no != 0) {
+	SET_INFO(((StgClosure *)p), &IND_OLDGEN_PERM_info);
+      }
+      /* fall through */
+    case IND_OLDGEN_PERM:
+      ((StgIndOldGen *)p)->indirectee = 
+	evacuate(((StgIndOldGen *)p)->indirectee);
+      if (failed_to_evac) {
+	failed_to_evac = rtsFalse;
+	recordOldToNewPtrs((StgMutClosure *)p);
+      }
+      p += sizeofW(StgIndOldGen);
+      break;
 
     case CAF_UNENTERED:
       {
@@ -2776,7 +2789,8 @@ threadSqueezeStack(StgTSO *tso)
    */
   
   next_frame = NULL;
-  while ((P_)frame < bottom - 1) {  /* bottom - 1 is the STOP_FRAME */
+  /* bottom - sizeof(StgStopFrame) is the STOP_FRAME */
+  while ((P_)frame < bottom - sizeofW(StgStopFrame)) {  
     prev_frame = frame->link;
     frame->link = next_frame;
     next_frame = frame;

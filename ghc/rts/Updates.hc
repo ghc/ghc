@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.9 1999/02/05 16:03:03 simonm Exp $
+ * $Id: Updates.hc,v 1.10 1999/03/18 17:57:24 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -333,25 +333,29 @@ EXTFUN(stg_update_PAP)
        * either the new PAP or Node.
        */
       
-      Updatee = Su->updatee; 
-      UPD_IND(Updatee,PapClosure);
-      
-      if (Words != 0) {
-	TICK_UPD_PAP_IN_NEW(Words+1);
-	
-      } else {
-	TICK_UPD_PAP_IN_PLACE();
-	
+      Updatee = Su->updatee;
+
 #if defined(PROFILING)
-	/* 
-	 * Lexical scoping requires a *permanent* indirection, and we
+      if (Words != 0) {
+        UPD_IND(Updatee,PapClosure);
+	TICK_UPD_PAP_IN_NEW(Words+1);
+      } else {
+	/* Lexical scoping requires a *permanent* indirection, and we
 	 * also have to set the cost centre for the indirection.
 	 */
-	SET_INFO(Updatee, &IND_PERM_info);
+	UPD_PERM_IND(Updatee,PapClosure);
+	TICK_UPD_PAP_IN_PLACE();
 	Updatee->header.prof.ccs = CCS_pap;
-#endif /* PROFILING */
       }
-      
+#else
+      UPD_IND(Updatee,PapClosure);
+      if (Words != 0) {
+	TICK_UPD_PAP_IN_NEW(Words+1);
+      } else {
+	TICK_UPD_PAP_IN_PLACE();
+      }
+#endif	
+
 #if defined(PROFILING)
       /* 
        * Restore the Cost Centre too (if required); again see Sansom

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.8 1999/03/02 19:44:23 sof Exp $
+ * $Id: Updates.h,v 1.9 1999/03/18 17:57:20 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -30,6 +30,13 @@
         AWAKEN_BQ(updclosure);                                  \
 	updateWithIndirection((StgClosure *)updclosure,         \
 			      (StgClosure *)heapptr);
+
+#ifdef PROFILING
+#define UPD_PERM_IND(updclosure, heapptr)                       \
+        AWAKEN_BQ(updclosure);                                  \
+	updateWithPermIndirection((StgClosure *)updclosure,     \
+			          (StgClosure *)heapptr);
+#endif
 
 /* -----------------------------------------------------------------------------
    Awaken any threads waiting on this computation

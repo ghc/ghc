@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.18 1999/03/16 13:20:17 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.19 1999/03/18 17:57:23 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,7 +48,7 @@ STGFUN(IND_STATIC_entry)
     FE_
 }
 
-INFO_TABLE(IND_PERM_info,IND_PERM_entry,1,0,IND_PERM,const,EF_,0,0);
+INFO_TABLE(IND_PERM_info,IND_PERM_entry,1,1,IND_PERM,const,EF_,0,0);
 STGFUN(IND_PERM_entry)
 {
     FB_

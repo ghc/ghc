@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.13 1999/03/15 16:30:25 simonm Exp $
+ * $Id: InfoTables.h,v 1.14 1999/03/18 17:57:19 simonm Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -160,7 +160,7 @@ typedef struct _StgInfoTable {
     StgParInfo	    par;
 #endif
 #ifdef PROFILING
-    StgProfInfo     prof;
+  /* StgProfInfo     prof; */
 #endif
 #ifdef DEBUG_CLOSURE
     StgDebugInfo    debug;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.7 1999/02/05 16:03:01 simonm Exp $
+ * $Id: Storage.h,v 1.8 1999/03/18 17:57:23 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -137,6 +137,27 @@ updateWithIndirection(StgClosure *p1, StgClosure *p2)
     TICK_UPD_OLD_IND();
   }
 }
+
+#ifdef PROFILING
+static inline void
+updateWithPermIndirection(StgClosure *p1, StgClosure *p2) 
+{
+  bdescr *bd;
+
+  bd = Bdescr((P_)p1);
+  if (bd->gen->no == 0) {
+    SET_INFO(p1,&IND_PERM_info);
+    ((StgInd *)p1)->indirectee = p2;
+    TICK_UPD_NEW_IND();
+  } else {
+    SET_INFO(p1,&IND_OLDGEN_PERM_info);
+    ((StgIndOldGen *)p1)->indirectee = p2;
+    ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
+    bd->gen->mut_once_list = (StgMutClosure *)p1;
+    TICK_UPD_OLD_IND();
+  }
+}
+#endif
 
 /* -----------------------------------------------------------------------------
    The CAF list - used to let us revert CAFs

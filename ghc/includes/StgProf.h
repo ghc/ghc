@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.2 1998/12/02 13:21:39 simonm Exp $
+ * $Id: StgProf.h,v 1.3 1999/03/18 17:57:19 simonm Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -123,7 +123,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 /* For grabbing the cost centre from a closure */
 #define CCS_HDR(closure)   ((StgClosure *)(closure))->header.prof.ccs
 
-/* Restore the CCCS from a stack fram.
+/* Restore the CCCS from a stack frame.
  * (addr should always be Sp->header.prof.ccs) 
  */
 #define RESTORE_CCCS(addr)   (CCCS = (CostCentreStack *)(addr))
