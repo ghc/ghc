@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.32 2003/03/25 16:50:18 simonmar Exp $
+-- $Id: Main.hs,v 1.33 2003/05/16 08:35:49 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -54,7 +54,9 @@ main = do
 data Flag 
   = Config FilePath
   | Input FilePath
-  | List | Add Bool {- True => replace existing info -}
+  | List
+  | ListLocal
+  | Add Bool {- True => replace existing info -}
   | Remove String | Show String 
   | Field String | AutoGHCiLibs | Force
   deriving (Eq)
@@ -72,7 +74,9 @@ flags = [
   Option ['f'] ["config-file"] (ReqArg Config "FILE")
 	"Use the specified package config file",
   Option ['l'] ["list-packages"] (NoArg List)
- 	"List the currently installed packages",
+ 	"List packages in all config files",
+  Option ['L'] ["list-packages-local"] (NoArg ListLocal)
+ 	"List packages in the specified config file",
   Option ['a'] ["add-package"] (NoArg (Add False))
  	"Add a new package",
   Option ['u'] ["update-package"] (NoArg (Add True))
@@ -138,7 +142,8 @@ runit clis = do
       force = Force `elem` clis
 
   case [ c | c <- clis, isAction c ] of
-    [ List ]     -> listPackages pkg_confs conf_filenames
+    [ List ]      -> listPackages pkg_confs conf_filenames
+    [ ListLocal ] -> listPackages [head pkg_confs] [""]
     [ Add upd ]  -> addPackage pkg_confs conf_filename input_file 
 			auto_ghci_libs upd force
     [ Remove p ] -> removePackage pkg_confs conf_filename p
@@ -150,10 +155,12 @@ listPackages :: [[PackageConfig]] -> [FilePath] -> IO ()
 listPackages pkg_confs conf_filenames = do
   zipWithM_ show_pkgconf pkg_confs conf_filenames
   where show_pkgconf pkg_conf filename =
-	  hPutStrLn stdout (render (vcat
-		[text (filename ++ ":"), 
-		 nest 4 (fsep (punctuate comma (map (text . name) pkg_conf)))
-		]))
+	  hPutStrLn stdout (render $
+		if null filename 
+			then packages	
+			else text (filename ++ ":") $$ nest 4 packages
+		)
+	   where packages = fsep (punctuate comma (map (text . name) pkg_conf))
 
 showPackage :: [[PackageConfig]]
 	    -> FilePath
