@@ -16,20 +16,19 @@ More information on GHC can be found on its web page
 
 	http://www.haskell.org/ghc/
 
-GHC documentation of interest:
+Documentation
+=============
 
-* docs/installing.{dvi,html}: How to configure, build, and
-  install the system.
+In a binary distribution, pre-formatted documentation can be found in
+the html and ps directories.  Pre-formatted HTML documentation is also
+available on the GHC web page.
 
-  The document, as with many others, is in TeX-produced DVI format
-  (.dvi suffix), or HTML.
+In a source distribution, the unformatted (SGML) documentation is in
+the following places:
 
-* ghc/docs/users_guide/user.{dvi,html}: How to use GHC; e.g., what
-  options are available, how to cope with common problems, how to use
-  the profiling facilities, etc.
-
-* ghc/docs/libraries/libs.{dvi,html}: Several libraries that are
-  provided by both GHC and Hugs.
+  * fptools/ghc/docs/users_guide  Users' Guide.
+  * hslibs/doc/hslibs		  Library documentation.
+  * fptools/docs  		  Build System Guide.
 
 We welcome your comments and suggestions about this software!  Please
 do not suffer or grumble in silence.  The "bug reports" section of the
