@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.117 2002/02/05 10:06:24 simonmar Exp $
+ * $Id: Schedule.c,v 1.118 2002/02/06 01:29:27 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -266,10 +266,11 @@ Mutex     term_mutex        = INIT_MUTEX_VAR;
 #if defined(THREADED_RTS)
 /*
  * The rts_mutex is the 'big lock' that the active native
- * thread within the RTS holds while executing code
- * within the RTS. It is given up when the thread makes a
- * transition out of the RTS (e.g., to perform an external
- * C call), hopefully for another thread to enter the RTS.
+ * thread within the RTS holds while executing code.
+ * It is given up when the thread makes a transition out of
+ * the RTS (e.g., to perform an external C call), hopefully
+ * for another thread to take over its chores and enter
+ * the RTS.
  *
  */
 Mutex     rts_mutex         = INIT_MUTEX_VAR;
@@ -279,10 +280,9 @@ Mutex     rts_mutex         = INIT_MUTEX_VAR;
  * (Haskell) thread that made the call. Do this as follows:
  *
  *  - in resumeThread(), the thread increments the counter
- *    ext_threads_waiting, and then blocks on the
- *    'big' RTS lock.
+ *    threads_waiting, and then blocks on the 'big' RTS lock.
  *  - upon entry to the scheduler, the thread that's currently
- *    holding the RTS lock checks ext_threads_waiting. If there
+ *    holding the RTS lock checks threads_waiting. If there
  *    are native threads waiting, it gives up its RTS lock
  *    and tries to re-grab the RTS lock [perhaps after having
  *    waited for a bit..?]
@@ -291,7 +291,7 @@ Mutex     rts_mutex         = INIT_MUTEX_VAR;
  *    
  */
 
-static nat ext_threads_waiting = 0;
+static nat threads_waiting = 0;
 /*
  * thread_ready_aux_mutex is used to handle the scenario where the
  * the RTS executing thread runs out of work, but there are
@@ -359,6 +359,7 @@ taskStart(void)
      them grab the RTS lock. */
 #if defined(THREADED_RTS)
   ACQUIRE_LOCK(&rts_mutex);
+  taskNotAvailable();
 #endif
   schedule();
 }
@@ -430,13 +431,16 @@ schedule( void )
   
 #if defined(THREADED_RTS)
   /* ToDo: consider SMP support */
-  if (ext_threads_waiting > 0) {
-    /* (At least) one external thread is waiting to
-     * to deposit the result of an external call.
-     * Give way to one of them by giving up the RTS
-     * lock.
+  if (threads_waiting > 0) {
+    /* (At least) one native thread is waiting to
+     * deposit the result of an external call. So,
+     * give up our RTS executing privileges and let
+     * one of them continue.
+     * 
      */
+    taskAvailable();
     RELEASE_LOCK(&sched_mutex);
+    IF_DEBUG(scheduler, sched_belch("worker thread (%d): giving up RTS token (threads_waiting=%d)\n", osThreadId(), threads_waiting));
     RELEASE_LOCK(&rts_mutex);
     /* ToDo: come up with mechanism that guarantees that
      * the main thread doesn't loop here.
@@ -735,17 +739,19 @@ schedule( void )
    if ( run_queue_hd == END_TSO_QUEUE ) {
      /* no work available, wait for external calls to complete. */
      IF_DEBUG(scheduler, sched_belch("worker thread (%d): waiting for external thread to complete..", osThreadId()));
+     taskAvailable();
      RELEASE_LOCK(&sched_mutex);
      RELEASE_LOCK(&rts_mutex);
+
      /* Sigh - need to have a mutex locked in order to wait on the
         condition variable. */
      ACQUIRE_LOCK(&thread_ready_aux_mutex);
      waitCondition(&thread_ready_cond, &thread_ready_aux_mutex);
      RELEASE_LOCK(&thread_ready_aux_mutex);
+
      IF_DEBUG(scheduler, sched_belch("worker thread (%d): re-awakened from no-work slumber..\n", osThreadId()));
      /* ToDo: longjmp() */
      taskStart();
-   
    }
 #endif
 
@@ -1519,8 +1525,16 @@ suspendThread( StgRegTable *reg )
   releaseCapability(&cap);
   
 #if defined(RTS_SUPPORTS_THREADS) && !defined(SMP)
-  IF_DEBUG(scheduler, sched_belch("thread %d leaving RTS\n", tok));
+  /* Preparing to leave the RTS, so ensure there's a native thread/task
+     waiting to take over.
+     
+     ToDo: optimise this and only create a new task if there's a need
+     for one (i.e., if there's only one Concurrent Haskell thread alive,
+     there's no need to create a new task).
+  */
+  IF_DEBUG(scheduler, sched_belch("worker thread (%d): leaving RTS\n", tok));
   startTask(taskStart);
+
 #endif
   
   RELEASE_LOCK(&sched_mutex);
@@ -1537,13 +1551,14 @@ resumeThread( StgInt tok )
 #if defined(THREADED_RTS)
   IF_DEBUG(scheduler, sched_belch("thread %d returning, waiting for sched. lock.\n", tok));
   ACQUIRE_LOCK(&sched_mutex);
-  ext_threads_waiting++;
-  IF_DEBUG(scheduler, sched_belch("thread %d returning, ext_thread count: %d.\n", tok, ext_threads_waiting));
+  threads_waiting++;
+  IF_DEBUG(scheduler, sched_belch("thread %d returning, threads waiting: %d.\n", tok, threads_waiting));
   RELEASE_LOCK(&sched_mutex);
   
   IF_DEBUG(scheduler, sched_belch("thread %d waiting for RTS lock...\n", tok));
   ACQUIRE_LOCK(&rts_mutex);
-  ext_threads_waiting--;
+  threads_waiting--;
+  taskNotAvailable();
   IF_DEBUG(scheduler, sched_belch("thread %d acquired RTS lock...\n", tok));
 #endif
 
