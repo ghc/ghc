@@ -35,10 +35,7 @@ real_handler :: Exception -> IO ()
 real_handler ex =
   case ex of
 	ErrorCall s -> reportError s
-	other       -> hPutStr stderr (showsPrec 0 other "\n") >>
-		       _ccall_ stg_exit (1::Int)
-
--- calls to 'error' are treated slightly differently...
+	other       -> reportError (showsPrec 0 other "\n")
 
 reportError :: String -> IO ()
 reportError str = do
