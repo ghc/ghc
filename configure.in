@@ -840,7 +840,7 @@ fi
 
 if test $HaveLibTermcap = YES && test x"$HaveLibReadline" = xYES ; then
   AC_DEFINE(HAVE_READLINE_LIBS,1)
-  LibsReadline="-lreadline -l$LibTermcap"
+  LibsReadline="readline $LibTermcap"
 else
   AC_DEFINE(HAVE_READLINE_LIBS,0)
   LibsReadline=

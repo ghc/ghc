@@ -299,7 +299,7 @@ package_details installing
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/util"
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/util/cbits" ],
          hs_libraries      = [ "HSutil" ],
-	 extra_libraries   = [ "HSutil_cbits" ],
+	 extra_libraries   = [ "HSutil_cbits" ] ++ words cLibsReadline,
          include_dirs   = if installing
                              then []
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/util/cbits" ],
@@ -311,7 +311,7 @@ package_details installing
 			  ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
-         extra_ld_opts  = words cLibsReadline
+         extra_ld_opts  = []
         },
 
         -- no cbits at the moment, we'll need to add one if this library
