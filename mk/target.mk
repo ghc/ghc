@@ -623,11 +623,11 @@ $(LINK) : $(LINK_TARGET)
 install ::
 	@$(INSTALL_DIR) $(bindir)
 	@if ( $(PERL) -e '$$fn="$(bindir)/$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
-	   echo "Creating a symbol link from $(LINK_TARGET) to $(LINK) in $(bindir)"; \
+	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK) in $(bindir)"; \
 	   $(RM) $(bindir)/$(LINK); \
 	   $(LN_S) $(LINK_TARGET) $(bindir)/$(LINK); \
 	 else \
-	   echo "Creating a symbol link from $(LINK_TARGET) to $(LINK) in $(bindir) failed: \`$(bindir)/$(LINK)' already exists"; \
+	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK) in $(bindir) failed: \`$(bindir)/$(LINK)' already exists"; \
 	   echo "Perhaps remove \`$(bindir)/$(LINK)' manually?"; \
 	   exit 1; \
 	 fi;
