@@ -88,12 +88,14 @@ instance MonadPlus Maybe where
 -- mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 #else
 sequence       :: Monad m => [m a] -> m [a] 
-sequence []     = return []
-sequence (m:ms) = do { x <- m; xs <- sequence ms; return (x:xs) }
+{-# INLINE sequence #-}
+sequence ms = foldr k (return []) ms
+	    where
+	      k m m' = do { x <- m; xs <- m'; return (x:xs) }
 
 sequence_        :: Monad m => [m a] -> m () 
 {-# INLINE sequence_ #-}
-sequence_        =  foldr (>>) (return ())
+sequence_ ms     =  foldr (>>) (return ()) ms
 
 mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
 {-# INLINE mapM #-}
