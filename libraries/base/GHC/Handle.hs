@@ -441,7 +441,8 @@ flushReadBuffer fd buf
      return buf{ bufWPtr=0, bufRPtr=0 }
 
 flushWriteBuffer :: FD -> Bool -> Buffer -> IO Buffer
-flushWriteBuffer fd is_stream buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
+flushWriteBuffer fd is_stream buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  =
+  seq fd $ do -- strictness hack
   let bytes = w - r
 #ifdef DEBUG_DUMP
   puts ("flushWriteBuffer, fd=" ++ show fd ++ ", bytes=" ++ show bytes ++ "\n")
