@@ -1,10 +1,10 @@
   <sect1 id="separate-compilation">
     <title>Filenames and separate compilation</title>
-    
+
     <indexterm><primary>separate compilation</primary></indexterm>
     <indexterm><primary>recompilation checker</primary></indexterm>
     <indexterm><primary>make and recompilation</primary></indexterm>
-    
+
     <para>This section describes what files GHC expects to find, what
     files it creates, where these files are stored, and what options
     affect this behaviour.</para>
@@ -28,7 +28,7 @@
 
     <sect2 id="source-files">
       <title>Haskell source files</title>
-    
+
       <para>Each Haskell source module should be placed in a file on
       its own.</para>
 
@@ -48,7 +48,7 @@
       <indexterm><primary><literal>.hi</literal> files</primary></indexterm>
       <indexterm><primary>object files</primary></indexterm>
       <indexterm><primary><literal>.o</literal> files</primary></indexterm>
-      
+
       <para>When asked to compile a source file, GHC normally
       generates two files: an <firstterm>object file</firstterm>, and
       an <firstterm>interface file</firstterm>. </para>
@@ -305,7 +305,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
             example.</para>
 	  </listitem>
 	</varlistentry>
-      
+
 	<varlistentry>
 	  <term><option>-hidir</option>  <replaceable>dir</replaceable></term>
 	  <indexterm><primary><option>-hidir</option></primary>
@@ -552,7 +552,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	  </listitem>
 	</varlistentry>
       </variablelist>
-      
+
       <para>In the olden days, GHC compared the newly-generated
       <filename>.hi</filename> file with the previous version; if they
       were identical, it left the old one alone and didn't change its
@@ -751,9 +751,9 @@ A.o : B.hi-boot
 <screen>
 ghc -M -optdep-f -optdep.depend ...
 </screen>
-      
+
 	The options which affect dependency generation are:</para>
-	
+
 	<variablelist>
 	  <varlistentry>
 	    <term><option>-w</option></term>
@@ -761,7 +761,7 @@ ghc -M -optdep-f -optdep.depend ...
 	      <para>Turn off warnings about interface file shadowing.</para>
 	    </listitem>
 	  </varlistentry>
-	  
+
 	  <varlistentry>
 	    <term><option>-f</option> <replaceable>file</replaceable></term>
 	    <listitem>
@@ -778,6 +778,7 @@ ghc -M -optdep-f -optdep.depend ...
 	    </listitem>
 	  </varlistentry>
 
+<!-- Retired with the move away from 'mkdependHS'.
 	  <varlistentry>
 	    <term><option>-o &lt;osuf&gt;</option></term>
 	    <listitem>
@@ -789,7 +790,7 @@ ghc -M -optdep-f -optdep.depend ...
               and <filename>.o</filename> files.</para>
 	    </listitem>
 	  </varlistentry>
-
+-->
 	  <varlistentry>
 	    <term><option>-s &lt;suf&gt;</option></term>
 	    <listitem>
@@ -965,17 +966,17 @@ module A where
 	    This is the most common form of data type declaration, because it's easy to get right.</para>
 	  <para>
 	  You <emphasis>can</emphasis> also write out the constructors but, if you do so, you must write
-	  it out precisely as in its real definition. 
-	    It is especially delicate if you use a strictness annotation "!", 
+	  it out precisely as in its real definition.
+	    It is especially delicate if you use a strictness annotation "!",
 	  with or without an <literal>{-# UNPACK #-}</literal> pragma.  In a source file
 	  GHC may or may not choose to unbox the argument, but in an hi-boot file it's
-	  assumed that you express the <emphasis>outcome</emphasis> of this decision.  
+	  assumed that you express the <emphasis>outcome</emphasis> of this decision.
 	    (So in the cases where GHC decided not to unpack, you must not use the pragma.)
 	    Tread with care.</para>
 	  <para>
-	    Regardless of whether you write the constructors, you must write all the type parameters, 
-	    <emphasis>including their kinds</emphasis> 
-	    if they are not '*'.  (You can give explicit kinds in source files too (<xref linkend="sec-kinding">), 
+	    Regardless of whether you write the constructors, you must write all the type parameters,
+	    <emphasis>including their kinds</emphasis>
+	    if they are not '*'.  (You can give explicit kinds in source files too (<xref linkend="sec-kinding">),
 	    but you <emphasis>must</emphasis> do so in hi-boot files.)</para>
 	</listitem>
 
@@ -1024,18 +1025,18 @@ Here, neither D nor T is declared in module Orphan.
 We call such modules ``orphan modules'',
 defined thus:</para>
 <itemizedlist>
-  <listitem> <para> An <emphasis>orphan module</emphasis> 
+  <listitem> <para> An <emphasis>orphan module</emphasis>
   <indexterm><primary>orphan module</primary></indexterm>
-  contains at least one <emphasis>orphan instance</emphasis> or at 
+  contains at least one <emphasis>orphan instance</emphasis> or at
   least one <emphasis>orphan rule</emphasis>.</para> </listitem>
 
   <listitem><para> An instance declaration in a module M is an <emphasis>orphan instance</emphasis> if
   <indexterm><primary>orphan instance</primary></indexterm>
   none of the type constructors
   or classes mentioned in the instance head (the part after the ``<literal>=&gt;</literal>'') are declared
-  in M.</para> 
+  in M.</para>
 
-  <para> Only the instance head counts.  In the example above, it is not good enough for C's declaration 
+  <para> Only the instance head counts.  In the example above, it is not good enough for C's declaration
   to be in module A; it must be the declaration of D or T.</para>
   </listitem>
 
