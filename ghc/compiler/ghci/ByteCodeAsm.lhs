@@ -172,11 +172,11 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
 
 mkBitmapArray :: Int -> [StgWord] -> UArray Int StgWord
 mkBitmapArray bsize bitmap
-  = listArray (0, 1 + length bitmap) (fromIntegral bsize : bitmap)
+  = listArray (0, length bitmap) (fromIntegral bsize : bitmap)
 
 mkInstrArray :: Int -> [Word16]	-> UArray Int Word16
 mkInstrArray n_insns asm_insns
-  = listArray (0, 1 + n_insns) (fromIntegral n_insns : asm_insns)
+  = listArray (0, n_insns) (fromIntegral n_insns : asm_insns)
 
 -- instrs nonptrs ptrs itbls
 type AsmState = (SizedSeq Word16, 
