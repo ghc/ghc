@@ -23,6 +23,7 @@ module PrelPack
 	packNBytesST,      -- :: Int -> [Char] -> ST s (ByteArray Int)
 
 	unpackCString,     -- :: Addr -> [Char]
+	unpackCStringST,   -- :: Addr -> ST s [Char]
 	unpackNBytes,      -- :: Addr -> Int -> [Char]
 	unpackNBytesST,    -- :: Addr -> Int -> ST s [Char]
 	unpackNBytesAccST, -- :: Addr -> Int -> [Char] -> ST s [Char]
@@ -66,11 +67,22 @@ sequence of bytes into a list of @Char@s:
 
 \begin{code}
 unpackCString  :: Addr{- ptr. to NUL terminated string-} -> [Char]
-unpackCString a@(A# addr) = 
-  if a == ``NULL'' then
-     []
-  else
-     unpackCString# addr
+unpackCString a@(A# addr)
+  | a == nullAddr  = []
+  | otherwise	   = unpackCString# addr
+     
+unpackCStringST  :: Addr{- ptr. to NUL terminated string-} -> ST s [Char]
+unpackCStringST a@(A# addr)
+  | a == nullAddr  = return []
+  | otherwise	   = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = return []
+      | otherwise	   = do
+		ls <- unpack (nh +# 1#)
+		return ((C# ch ) : ls)
+      where
+	ch = indexCharOffAddr# addr nh
 
 unpackCString# :: Addr#  -> [Char]
 unpackCString# addr 
