@@ -1,4 +1,4 @@
-% $Id: Memo.lhs,v 1.2 1999/02/11 17:54:36 simonm Exp $
+% $Id: Memo.lhs,v 1.3 1999/02/26 17:43:55 simonm Exp $
 %
 % (c) The GHC Team, 1999
 %
@@ -65,38 +65,54 @@ default_table_size = 1001
 
 memo_sized :: Int -> (a -> b) -> a -> b
 memo_sized size f =
-   let table = unsafePerformIO (do
-	          tbl <- newIOArray (0,1001) []; 
-		  newMVar (size,tbl))
-   in  memo' f table
+   let (table,weak) = unsafePerformIO (
+		do { tbl <- newIOArray (0,1001) []
+		   ; mvar <- newMVar (size,tbl)
+		   ; weak <- mkWeakPtr mvar (Just (table_finalizer tbl size))
+		   ; return (mvar,weak)
+		   })
+   in  memo' f table weak
 
-memo' :: (a -> b) -> MemoTable a b -> a -> b
-memo' f ref = \x -> unsafePerformIO $ do
-   stable_key <- makeStableName x
+table_finalizer :: IOArray Int [(StableName key, Weak val)] -> Int -> IO ()
+table_finalizer table size = 
+   sequence_ [ finalizeBucket i | i <- [0..size] ]
+ where
+   finalizeBucket i = do
+      bucket <- readIOArray table i 
+      sequence_ [ finalize w | (_,w) <- bucket ]
+
+memo' :: (a -> b) -> MemoTable a b -> Weak (MemoTable a b) -> a -> b
+memo' f ref weak_ref = \k -> unsafePerformIO $ do
+   stable_key <- makeStableName k
    (size, table) <- takeMVar ref
    let hash_key = hashStableName stable_key `mod` size
    bucket <- readIOArray table hash_key
    lkp <- lookupSN stable_key bucket
 
    case lkp of
-	Just result -> do
-		putMVar ref (size,table)
-		return result
-	Nothing -> do
-	   	let result = f x
-	   	weak <- mkWeak x result (Just finalizer)
-		writeIOArray table hash_key ((stable_key,weak):bucket)
-	   	putMVar ref (size,table)
-		return result
+     Just result -> do
+	putMVar ref (size,table)
+	return result
+     Nothing -> do
+	let result = f k
+	weak <- mkWeak k result (Just (finalizer hash_key stable_key weak_ref))
+	writeIOArray table hash_key ((stable_key,weak):bucket)
+	putMVar ref (size,table)
+	return result
 
-	    where finalizer = do
-			(size,table) <- takeMVar ref
-			bucket <- readIOArray table hash_key
-			let new_bucket = [ (sn,weak) 
-				         | (sn,weak) <- bucket, 
-					   sn /= stable_key ]
-			writeIOArray table hash_key new_bucket
-			putMVar ref (size,table)
+finalizer :: Int -> StableName a -> Weak (MemoTable a b) -> IO ()
+finalizer hash_key stable_key weak_ref = 
+  do r <- deRefWeak weak_ref 
+     case r of
+	Nothing -> return ()
+	Just mvar -> do
+        	(size,table) <- takeMVar mvar
+		bucket <- readIOArray table hash_key
+		let new_bucket = [ (sn,weak) 
+				 | (sn,weak) <- bucket, 
+				   sn /= stable_key ]
+		writeIOArray table hash_key new_bucket
+		putMVar mvar (size,table)
 
 lookupSN :: StableName key -> [(StableName key, Weak val)] -> IO (Maybe val)
 lookupSN sn [] = return Nothing
