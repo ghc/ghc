@@ -1,6 +1,5 @@
-module GHCmain ( mainPrimIO ) where
+module GHCmain ( mainIO ) where
 
-import GlaExts
 import PrelBase
 
 data CList = CNil | CCons Int# CList
@@ -14,7 +13,7 @@ clen :: CList -> Int#
 clen CNil = 0#
 clen (CCons _ cl) = 1# +# (clen cl)
 
-mainPrimIO = case (clen list4) of
+mainIO = case (clen list4) of
 		len4 ->
 		  case (len4 +# len4) of
 		    8# -> finish 65#	-- 'A'
@@ -22,5 +21,5 @@ mainPrimIO = case (clen list4) of
       where
       list4	= mk 4#
 
-finish :: Int# -> PrimIO ()
-finish n = _ccall_ putchar (C# (chr# n)) `seqPrimIO` returnPrimIO ()
+finish :: Int# -> IO ()
+finish n = _ccall_ putchar (C# (chr# n)) >> return ()

@@ -3,7 +3,9 @@
 module Main ( main ) where
 
 import PrelBase --ghc1.3
-import GlaExts
+import IOExts
+import ByteArray
+import MutableArray
 import ST
 
 import Ratio   -- 1.3
@@ -37,7 +39,7 @@ test_doubles
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
-	then returnST ()
+	then return ()
 	else writeDoubleArray arr_in# (I# first#) ((fromInt (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 

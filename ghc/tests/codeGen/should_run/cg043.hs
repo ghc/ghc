@@ -3,10 +3,8 @@
 --!!! when converting CoreSyn.App)
 
 module Main where
-import GlaExts
 
-
-getData :: String -> PrimIO ()
+getData :: String -> IO ()
 getData filename = case leng filename of {0 -> return ()}
 leng :: String -> Int
 leng [] = 0 --case ls of {[] -> 0 ; (_:xs) -> 1 + leng xs }
@@ -16,6 +14,5 @@ f [] [] = []
 f xs ys = f xs ys
 
 main =
-    primIOToIO (
-     (return ())  >>= \ _ ->
-     case f [] [] of { [] -> getData [] })
+     return ()  >>= \ _ ->
+     case f [] [] of { [] -> getData [] }

@@ -2,12 +2,15 @@
 --
 module Main ( main ) where
 
-import PrelBase --ghc1.3
-import GlaExts
+import PrelBase
 import ST
+import IOExts
+import MutableArray
+import ByteArray
+import Addr
 
-import Ratio   -- 1.3
-import Array   -- 1.3
+import Ratio
+import Array
 
 main = putStr
 	 (test_chars	++ "\n"  ++
@@ -25,9 +28,9 @@ test_chars :: String
 test_chars
   = let str = reverse "Now is the time for all good men to come to...\n"
     in
-    unsafePerformPrimIO (
+    unsafePerformIO (
 	_ccall_ fprintf (``stdout''::Addr) "%d %s\n" 93 str >>
-	returnPrimIO ""
+	return ""
 	)
 
 -- Arr# Int# -------------------------------------------
@@ -56,7 +59,7 @@ test_ints
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
-	then returnST ()
+	then return ()
 	else writeIntArray arr_in# (I# first#) (I# (first# *# first#)) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
@@ -93,7 +96,7 @@ test_addrs
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
-	then returnST ()
+	then return ()
 	else writeAddrArray arr_in# (I# first#)
 			    (A# (int2Addr# (first# *# first#))) >>
 	     fill_in arr_in# (first# +# 1#) last#
@@ -134,7 +137,7 @@ test_floats
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
-	then returnST ()
+	then return ()
 {-	else let e = ((fromInt (I# first#)) * pi)
 	     in trace (show e) $ writeFloatArray arr_in# (I# first#) e >>
 	     fill_in arr_in# (first# +# 1#) last#
@@ -175,7 +178,7 @@ test_doubles
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
-	then returnST ()
+	then return ()
 	else writeDoubleArray arr_in# (I# first#) ((fromInt (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
@@ -209,7 +212,7 @@ test_ptrs
 
     fill_in arr_in# first last
       = if (first > last)
-	then returnST ()
+	then return ()
 	else writeArray arr_in# first (fromInt (first * first)) >>
 	     fill_in  arr_in# (first + 1) last
 
