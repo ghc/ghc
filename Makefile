@@ -16,6 +16,9 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 # be preferable..
 CURRENT_TARGET = $@
 SUBDIRS = $(shell if (test x$(CURRENT_TARGET) = xinstall) ; then echo $(ProjectsToInstall); else echo $(ProjectsToBuild); fi)
+PROJECT_CONFIG_MK = $(shell if (test x$(CURRENT_TARGET) = xbinary-dist) ; then echo inlude $(Project)/mk/config.mk; else echo ''; fi)
+
+$(PROJECT_CONFIG_MK)
 
 #
 # Files to include in fptools source distribution
