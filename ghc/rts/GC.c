@@ -1240,7 +1240,7 @@ traverse_weak_ptr_list(void)
 	  prev = &old_all_threads;
 	  for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
 	      
-	      (StgClosure *)tmp = isAlive((StgClosure *)t);
+	      tmp = (StgTSO *)isAlive((StgClosure *)t);
 	      
 	      if (tmp != NULL) {
 		  t = tmp;
@@ -1287,7 +1287,7 @@ traverse_weak_ptr_list(void)
 	  StgTSO *t, *tmp, *next;
 	  for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
 	      next = t->global_link;
-	      (StgClosure *)tmp = evacuate((StgClosure *)t);
+	      tmp = (StgTSO *)evacuate((StgClosure *)t);
 	      tmp->global_link = resurrected_threads;
 	      resurrected_threads = tmp;
 	  }
@@ -1326,7 +1326,7 @@ mark_weak_ptr_list ( StgWeak **list )
       // w might be WEAK, EVACUATED, or DEAD_WEAK (actually CON_STATIC) here
       ASSERT(w->header.info == &stg_DEAD_WEAK_info 
 	     || get_itbl(w)->type == WEAK || get_itbl(w)->type == EVACUATED);
-      (StgClosure *)w = evacuate((StgClosure *)w);
+      w = (StgWeak *)evacuate((StgClosure *)w);
       *last_w = w;
       last_w = &(w->link);
   }
@@ -2351,7 +2351,7 @@ static void
 scavengeTSO (StgTSO *tso)
 {
     // chase the link field for any TSOs on the same queue 
-    (StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
+    tso->link = (StgTSO *)evacuate((StgClosure *)tso->link);
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnException
@@ -2368,7 +2368,7 @@ scavengeTSO (StgTSO *tso)
     }
     
     // scavange current transaction record
-    (StgClosure *)tso->trec = evacuate((StgClosure *)tso->trec);
+    tso->trec = (StgTRecHeader *)evacuate((StgClosure *)tso->trec);
     
     // scavenge this thread's stack 
     scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
@@ -2403,7 +2403,7 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     small_bitmap:
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
-		(StgClosure *)*p = evacuate((StgClosure *)*p);
+		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	    }
 	    p++;
 	    bitmap = bitmap >> 1;
@@ -2446,7 +2446,7 @@ scavenge_PAP (StgPAP *pap)
 	size = pap->n_args;
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
-		(StgClosure *)*p = evacuate((StgClosure *)*p);
+		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	    }
 	    p++;
 	    bitmap = bitmap >> 1;
@@ -2511,9 +2511,9 @@ scavenge(step *stp)
     { 
 	StgMVar *mvar = ((StgMVar *)p);
 	evac_gen = 0;
-	(StgClosure *)mvar->head = evacuate((StgClosure *)mvar->head);
-	(StgClosure *)mvar->tail = evacuate((StgClosure *)mvar->tail);
-	(StgClosure *)mvar->value = evacuate((StgClosure *)mvar->value);
+	mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
+	mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
+	mvar->value = evacuate((StgClosure *)mvar->value);
 	evac_gen = saved_evac_gen;
 	recordMutable((StgMutClosure *)mvar);
 	failed_to_evac = rtsFalse; // mutable.
@@ -2602,7 +2602,7 @@ scavenge(step *stp)
 
 	end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
 	for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
 	p += info->layout.payload.nptrs;
 	break;
@@ -2610,10 +2610,10 @@ scavenge(step *stp)
 
     case BCO: {
 	StgBCO *bco = (StgBCO *)p;
-	(StgClosure *)bco->instrs = evacuate((StgClosure *)bco->instrs);
-	(StgClosure *)bco->literals = evacuate((StgClosure *)bco->literals);
-	(StgClosure *)bco->ptrs = evacuate((StgClosure *)bco->ptrs);
-	(StgClosure *)bco->itbls = evacuate((StgClosure *)bco->itbls);
+	bco->instrs = (StgArrWords *)evacuate((StgClosure *)bco->instrs);
+	bco->literals = (StgArrWords *)evacuate((StgClosure *)bco->literals);
+	bco->ptrs = (StgMutArrPtrs *)evacuate((StgClosure *)bco->ptrs);
+	bco->itbls = (StgArrWords *)evacuate((StgClosure *)bco->itbls);
 	p += bco_sizeW(bco);
 	break;
     }
@@ -2670,8 +2670,8 @@ scavenge(step *stp)
     case BLACKHOLE_BQ:
     { 
 	StgBlockingQueue *bh = (StgBlockingQueue *)p;
-	(StgClosure *)bh->blocking_queue = 
-	    evacuate((StgClosure *)bh->blocking_queue);
+	bh->blocking_queue = 
+	    (StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
 	recordMutable((StgMutClosure *)bh);
 	failed_to_evac = rtsFalse;
 	p += BLACKHOLE_sizeW();
@@ -2715,7 +2715,7 @@ scavenge(step *stp)
 	evac_gen = 0;		// repeatedly mutable 
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
 	evac_gen = saved_evac_gen;
 	recordMutable((StgMutClosure *)q);
@@ -2735,7 +2735,7 @@ scavenge(step *stp)
 
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
 	// it's tempting to recordMutable() if failed_to_evac is
 	// false, but that breaks some assumptions (eg. every
@@ -2826,9 +2826,9 @@ scavenge(step *stp)
       {
 	StgTVarWaitQueue *wq = ((StgTVarWaitQueue *) p);
 	evac_gen = 0;
-	(StgClosure *)wq->waiting_tso = evacuate((StgClosure*)wq->waiting_tso);
-	(StgClosure *)wq->next_queue_entry = evacuate((StgClosure*)wq->next_queue_entry);
-	(StgClosure *)wq->prev_queue_entry = evacuate((StgClosure*)wq->prev_queue_entry);
+	wq->waiting_tso = (StgTSO *)evacuate((StgClosure*)wq->waiting_tso);
+	wq->next_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)wq->next_queue_entry);
+	wq->prev_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
 	evac_gen = saved_evac_gen;
 	recordMutable((StgMutClosure *)wq);
 	failed_to_evac = rtsFalse; // mutable
@@ -2840,8 +2840,8 @@ scavenge(step *stp)
       {
 	StgTVar *tvar = ((StgTVar *) p);
 	evac_gen = 0;
-	(StgClosure *)tvar->current_value = evacuate((StgClosure*)tvar->current_value);
-	(StgClosure *)tvar->first_wait_queue_entry = evacuate((StgClosure*)tvar->first_wait_queue_entry);
+	tvar->current_value = evacuate((StgClosure*)tvar->current_value);
+	tvar->first_wait_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)tvar->first_wait_queue_entry);
 	evac_gen = saved_evac_gen;
 	recordMutable((StgMutClosure *)tvar);
 	failed_to_evac = rtsFalse; // mutable
@@ -2853,8 +2853,8 @@ scavenge(step *stp)
       {
         StgTRecHeader *trec = ((StgTRecHeader *) p);
         evac_gen = 0;
-	(StgClosure *)trec->enclosing_trec = evacuate((StgClosure*)trec->enclosing_trec);
-	(StgClosure *)trec->current_chunk = evacuate((StgClosure*)trec->current_chunk);
+	trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
+	trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
 	evac_gen = saved_evac_gen;
 	recordMutable((StgMutClosure *)trec);
 	failed_to_evac = rtsFalse; // mutable
@@ -2868,11 +2868,11 @@ scavenge(step *stp)
 	StgTRecChunk *tc = ((StgTRecChunk *) p);
 	TRecEntry *e = &(tc -> entries[0]);
 	evac_gen = 0;
-	(StgClosure *)tc->prev_chunk = evacuate((StgClosure*)tc->prev_chunk);
+	tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
 	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	  (StgClosure *)e->tvar = evacuate((StgClosure*)e->tvar);
-	  (StgClosure *)e->expected_value = evacuate((StgClosure*)e->expected_value);
-	  (StgClosure *)e->new_value = evacuate((StgClosure*)e->new_value);
+	  e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
+	  e->expected_value = evacuate((StgClosure*)e->expected_value);
+	  e->new_value = evacuate((StgClosure*)e->new_value);
 	}
 	evac_gen = saved_evac_gen;
 	recordMutable((StgMutClosure *)tc);
@@ -2935,9 +2935,9 @@ linear_scan:
 	{
 	    StgMVar *mvar = ((StgMVar *)p);
 	    evac_gen = 0;
-	    (StgClosure *)mvar->head = evacuate((StgClosure *)mvar->head);
-	    (StgClosure *)mvar->tail = evacuate((StgClosure *)mvar->tail);
-	    (StgClosure *)mvar->value = evacuate((StgClosure *)mvar->value);
+	    mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
+	    mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
+	    mvar->value = evacuate((StgClosure *)mvar->value);
 	    evac_gen = saved_evac_gen;
 	    failed_to_evac = rtsFalse; // mutable.
 	    break;
@@ -3002,17 +3002,17 @@ linear_scan:
 	    
 	    end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
 	    for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
-		(StgClosure *)*p = evacuate((StgClosure *)*p);
+		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	    }
 	    break;
 	}
 
 	case BCO: {
 	    StgBCO *bco = (StgBCO *)p;
-	    (StgClosure *)bco->instrs = evacuate((StgClosure *)bco->instrs);
-	    (StgClosure *)bco->literals = evacuate((StgClosure *)bco->literals);
-	    (StgClosure *)bco->ptrs = evacuate((StgClosure *)bco->ptrs);
-	    (StgClosure *)bco->itbls = evacuate((StgClosure *)bco->itbls);
+	    bco->instrs = (StgArrWords *)evacuate((StgClosure *)bco->instrs);
+	    bco->literals = (StgArrWords *)evacuate((StgClosure *)bco->literals);
+	    bco->ptrs = (StgMutArrPtrs *)evacuate((StgClosure *)bco->ptrs);
+	    bco->itbls = (StgArrWords *)evacuate((StgClosure *)bco->itbls);
 	    break;
 	}
 
@@ -3054,8 +3054,8 @@ linear_scan:
 	case BLACKHOLE_BQ:
 	{ 
 	    StgBlockingQueue *bh = (StgBlockingQueue *)p;
-	    (StgClosure *)bh->blocking_queue = 
-		evacuate((StgClosure *)bh->blocking_queue);
+	    bh->blocking_queue = 
+		(StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
 	    failed_to_evac = rtsFalse;
 	    break;
 	}
@@ -3090,7 +3090,7 @@ linear_scan:
 	    evac_gen = 0;		// repeatedly mutable 
 	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-		(StgClosure *)*p = evacuate((StgClosure *)*p);
+		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	    }
 	    evac_gen = saved_evac_gen;
 	    failed_to_evac = rtsFalse; // mutable anyhow.
@@ -3109,7 +3109,7 @@ linear_scan:
 
 	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-		(StgClosure *)*p = evacuate((StgClosure *)*p);
+		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	    }
 	    break;
 	}
@@ -3133,8 +3133,8 @@ linear_scan:
 	    StgInfoTable *rip = get_closure_info(p, &size, &ptrs, &nonptrs, &vhs, str);
 #endif
 	    StgRBH *rbh = (StgRBH *)p;
-	    (StgClosure *)rbh->blocking_queue = 
-		evacuate((StgClosure *)rbh->blocking_queue);
+	    bh->blocking_queue = 
+		(StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
 	    recordMutable((StgMutClosure *)rbh);
 	    failed_to_evac = rtsFalse;  // mutable anyhow.
 	    IF_DEBUG(gc,
@@ -3189,9 +3189,9 @@ linear_scan:
 	  {
 	    StgTVarWaitQueue *wq = ((StgTVarWaitQueue *) p);
 	    evac_gen = 0;
-	    (StgClosure *)wq->waiting_tso = evacuate((StgClosure*)wq->waiting_tso);
-	    (StgClosure *)wq->next_queue_entry = evacuate((StgClosure*)wq->next_queue_entry);
-	    (StgClosure *)wq->prev_queue_entry = evacuate((StgClosure*)wq->prev_queue_entry);
+	    wq->waiting_tso = (StgTSO *)evacuate((StgClosure*)wq->waiting_tso);
+	    wq->next_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)wq->next_queue_entry);
+	    wq->prev_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
 	    evac_gen = saved_evac_gen;
 	    recordMutable((StgMutClosure *)wq);
 	    failed_to_evac = rtsFalse; // mutable
@@ -3202,8 +3202,8 @@ linear_scan:
 	  {
 	    StgTVar *tvar = ((StgTVar *) p);
 	    evac_gen = 0;
-	    (StgClosure *)tvar->current_value = evacuate((StgClosure*)tvar->current_value);
-	    (StgClosure *)tvar->first_wait_queue_entry = evacuate((StgClosure*)tvar->first_wait_queue_entry);
+	    tvar->current_value = evacuate((StgClosure*)tvar->current_value);
+	    tvar->first_wait_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)tvar->first_wait_queue_entry);
 	    evac_gen = saved_evac_gen;
 	    recordMutable((StgMutClosure *)tvar);
 	    failed_to_evac = rtsFalse; // mutable
@@ -3216,11 +3216,11 @@ linear_scan:
 	    StgTRecChunk *tc = ((StgTRecChunk *) p);
 	    TRecEntry *e = &(tc -> entries[0]);
 	    evac_gen = 0;
-	    (StgClosure *)tc->prev_chunk = evacuate((StgClosure*)tc->prev_chunk);
+	    tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
 	    for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	      (StgClosure *)e->tvar = evacuate((StgClosure*)e->tvar);
-	      (StgClosure *)e->expected_value = evacuate((StgClosure*)e->expected_value);
-	      (StgClosure *)e->new_value = evacuate((StgClosure*)e->new_value);
+	      e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
+	      e->expected_value = evacuate((StgClosure*)e->expected_value);
+	      e->new_value = evacuate((StgClosure*)e->new_value);
 	    }
 	    evac_gen = saved_evac_gen;
 	    recordMutable((StgMutClosure *)tc);
@@ -3232,8 +3232,8 @@ linear_scan:
 	  {
 	    StgTRecHeader *trec = ((StgTRecHeader *) p);
 	    evac_gen = 0;
-	    (StgClosure *)trec->enclosing_trec = evacuate((StgClosure*)trec->enclosing_trec);
-	    (StgClosure *)trec->current_chunk = evacuate((StgClosure*)trec->current_chunk);
+	    trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
+	    trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
 	    evac_gen = saved_evac_gen;
 	    recordMutable((StgMutClosure *)trec);
 	    failed_to_evac = rtsFalse; // mutable
@@ -3341,7 +3341,7 @@ scavenge_one(StgPtr p)
 	
 	end = (StgPtr)((StgClosure *)p)->payload + info->layout.payload.ptrs;
 	for (q = (StgPtr)((StgClosure *)p)->payload; q < end; q++) {
-	    (StgClosure *)*q = evacuate((StgClosure *)*q);
+	    *q = (StgWord)(StgPtr)evacuate((StgClosure *)*q);
 	}
 	break;
     }
@@ -3372,7 +3372,7 @@ scavenge_one(StgPtr p)
 	recordMutable((StgMutClosure *)p);
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
 	evac_gen = saved_evac_gen;
 	failed_to_evac = rtsFalse;
@@ -3391,7 +3391,7 @@ scavenge_one(StgPtr p)
 
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
 	break;
     }
@@ -3581,7 +3581,7 @@ scavenge_mutable_list(generation *gen)
 	
 	end = (P_)p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (q = (P_)((StgMutArrPtrs *)p)->payload; q < end; q++) {
-	  (StgClosure *)*q = evacuate((StgClosure *)*q);
+	    *q = (StgWord)(StgPtr)evacuate((StgClosure *)*q);
 	}
 	continue;
       }
@@ -3594,7 +3594,7 @@ scavenge_mutable_list(generation *gen)
 	evac_gen = gen->no;
 	end = (P_)p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (q = (P_)((StgMutArrPtrs *)p)->payload; q < end; q++) {
-	  (StgClosure *)*q = evacuate((StgClosure *)*q);
+	    *q = (StgWord)(StgPtr)evacuate((StgClosure *)*q);
 	}
 	evac_gen = 0;
 	// Set the mut_link field to NULL, so that we will put this
@@ -3617,9 +3617,9 @@ scavenge_mutable_list(generation *gen)
     case MVAR:
       {
 	StgMVar *mvar = (StgMVar *)p;
-	(StgClosure *)mvar->head = evacuate((StgClosure *)mvar->head);
-	(StgClosure *)mvar->tail = evacuate((StgClosure *)mvar->tail);
-	(StgClosure *)mvar->value = evacuate((StgClosure *)mvar->value);
+	mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
+	mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
+	mvar->value = evacuate((StgClosure *)mvar->value);
 	p->mut_link = gen->mut_list;
 	gen->mut_list = p;
 	continue;
@@ -3643,8 +3643,8 @@ scavenge_mutable_list(generation *gen)
     case BLACKHOLE_BQ:
       { 
 	StgBlockingQueue *bh = (StgBlockingQueue *)p;
-	(StgClosure *)bh->blocking_queue = 
-	  evacuate((StgClosure *)bh->blocking_queue);
+	bh->blocking_queue = 
+	    (StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
 	p->mut_link = gen->mut_list;
 	gen->mut_list = p;
 	continue;
@@ -3733,9 +3733,9 @@ scavenge_mutable_list(generation *gen)
     case TVAR_WAIT_QUEUE:
       {
 	StgTVarWaitQueue *wq = ((StgTVarWaitQueue *) p);
-	(StgClosure *)wq->waiting_tso = evacuate((StgClosure*)wq->waiting_tso);
-	(StgClosure *)wq->next_queue_entry = evacuate((StgClosure*)wq->next_queue_entry);
-	(StgClosure *)wq->prev_queue_entry = evacuate((StgClosure*)wq->prev_queue_entry);
+	wq->waiting_tso = (StgTSO *)evacuate((StgClosure*)wq->waiting_tso);
+	wq->next_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)wq->next_queue_entry);
+	wq->prev_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
 	p->mut_link = gen->mut_list;
 	gen->mut_list = p;
 	continue;
@@ -3744,8 +3744,8 @@ scavenge_mutable_list(generation *gen)
     case TVAR:
       {
 	StgTVar *tvar = ((StgTVar *) p);
-	(StgClosure *)tvar->current_value = evacuate((StgClosure*)tvar->current_value);
-	(StgClosure *)tvar->first_wait_queue_entry = evacuate((StgClosure*)tvar->first_wait_queue_entry);
+	tvar->current_value = evacuate((StgClosure*)tvar->current_value);
+	tvar->first_wait_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)tvar->first_wait_queue_entry);
 	p->mut_link = gen->mut_list;
 	gen->mut_list = p;
 	continue;
@@ -3756,11 +3756,11 @@ scavenge_mutable_list(generation *gen)
 	StgWord i;
 	StgTRecChunk *tc = ((StgTRecChunk *) p);
 	TRecEntry *e = &(tc -> entries[0]);
-	(StgClosure *)tc->prev_chunk = evacuate((StgClosure*)tc->prev_chunk);
+	tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
 	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	  (StgClosure *)e->tvar = evacuate((StgClosure*)e->tvar);
-	  (StgClosure *)e->expected_value = evacuate((StgClosure*)e->expected_value);
-	  (StgClosure *)e->new_value = evacuate((StgClosure*)e->new_value);
+	    e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
+	    e->expected_value = evacuate((StgClosure*)e->expected_value);
+	    e->new_value = evacuate((StgClosure*)e->new_value);
 	}
 	p->mut_link = gen->mut_list;
 	gen->mut_list = p;
@@ -3770,8 +3770,8 @@ scavenge_mutable_list(generation *gen)
     case TREC_HEADER:
       {
 	StgTRecHeader *trec = ((StgTRecHeader *) p);
-	(StgClosure *)trec->enclosing_trec = evacuate((StgClosure*)trec->enclosing_trec);
-	(StgClosure *)trec->current_chunk = evacuate((StgClosure*)trec->current_chunk);
+	trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
+	trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
 	p->mut_link = gen->mut_list;
 	gen->mut_list = p;
 	continue;
@@ -3850,7 +3850,7 @@ scavenge_static(void)
 	next = (P_)p->payload + info->layout.payload.ptrs;
 	// evacuate the pointers 
 	for (q = (P_)p->payload; q < next; q++) {
-	  (StgClosure *)*q = evacuate((StgClosure *)*q);
+	    *q = (StgWord)(StgPtr)evacuate((StgClosure *)*q);
 	}
 	break;
       }
@@ -3883,7 +3883,7 @@ scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
     bitmap = large_bitmap->bitmap[b];
     for (i = 0; i < size; ) {
 	if ((bitmap & 1) == 0) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
 	i++;
 	p++;
@@ -3901,7 +3901,7 @@ scavenge_small_bitmap (StgPtr p, nat size, StgWord bitmap)
 {
     while (size > 0) {
 	if ((bitmap & 1) == 0) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
 	p++;
 	bitmap = bitmap >> 1;
@@ -3966,7 +3966,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	nat size;
 
 	p++;
-	(StgClosure *)*p = evacuate((StgClosure *)*p);
+	*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	bco = (StgBCO *)*p;
 	p++;
 	size = BCO_BITMAP_SIZE(bco);
@@ -4009,7 +4009,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	
 	// follow the ptr words
 	for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	    p++;
 	}
 	continue;
@@ -4253,7 +4253,7 @@ threadLazyBlackHole(StgTSO *tso)
 	    
 	    // normal stack frames; do nothing except advance the pointer
 	default:
-	    (StgPtr)frame += stack_frame_sizeW(frame);
+	    frame = (StgClosure *)((StgPtr)frame + stack_frame_sizeW(frame));
 	}
     }
 }
@@ -4457,7 +4457,7 @@ done_traversing:
 	    next_gap_start = (void *)((unsigned char*)gap + sizeof(StgUpdateFrame));
 
 	    chunk_size = (unsigned char*)gap_end - (unsigned char*)next_gap_start;
-	    (unsigned char*)sp -= chunk_size;
+	    sp -= chunk_size;
 	    memmove(sp, next_gap_start, chunk_size);
 	}
 

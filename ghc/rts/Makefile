@@ -146,6 +146,9 @@ SUBDIRS += dotnet
 LIBOBJS += dotnet/Invoke.o
 endif
 
+# Suppress uninitialized variable warnings for GC.c
+GC_CC_OPTS 	+= -Wno-uninitialized
+
 #-----------------------------------------------------------------------------
 # Include the Front panel code?
 

@@ -114,7 +114,7 @@ static StgTRecHeader *cached_trec_headers = NO_TREC;
 static StgTRecChunk *cached_trec_chunks = END_STM_CHUNK_LIST;
 static StgTVarWaitQueue *cached_tvar_wait_queues = END_STM_WAIT_QUEUE;
 
-static void recycle_tvar_wait_queue(StgTVarWaitQueue *q) {
+static void recycle_tvar_wait_queue(StgTVarWaitQueue *q STG_UNUSED) {
 #if 0
   if (shake()) {
     TRACE("Shake: not re-using wait queue %p\n", q);
@@ -126,7 +126,7 @@ static void recycle_tvar_wait_queue(StgTVarWaitQueue *q) {
 #endif
 }
 
-static void recycle_closures_from_trec (StgTRecHeader *t) {
+static void recycle_closures_from_trec (StgTRecHeader *t STG_UNUSED) {
 #if 0
   if (shake()) {
     TRACE("Shake: not re-using closures from %p\n", t);
