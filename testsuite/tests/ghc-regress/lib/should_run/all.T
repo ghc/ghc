@@ -12,6 +12,7 @@ test "dynamic002"  	{ lang_vtr("","","") }
 test "enum01"  		{ lang_vtr("-cpp","","") }
 test "enum02"  		{ lang_vtr("-cpp","","") }
 test "enum03"  		{ lang_vtr("-cpp","","") }
+test "enum04"  		{ $expect = "fail" lang_vtr("","","") }
 test "exceptions001"  	{ lang_vtr("","","") }
 test "list001"		{ lang_vtr("","","") }
 test "memo001"		{ lang_vtr("-package util","+RTS -A10k -G1 -RTS","") }
