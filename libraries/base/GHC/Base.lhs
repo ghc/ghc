@@ -669,13 +669,13 @@ data (:*:) a b = a :*: b
 \begin{code}
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y#
-	-- careful NOT to overflow if we do any additional arithmetic
+	-- Be careful NOT to overflow if we do any additional arithmetic
 	-- on the arguments...  the following  previous version of this
 	-- code has problems with overflow:
 --    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
 --    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
-    | (x# ># 0#) && (y# <# 0#) = (x# -# 1#) `quotInt#` y# -# 1#
-    | (x# <# 0#) && (y# ># 0#) = (x# +# 1#) `quotInt#` y# -# 1#
+    | (x# ># 0#) && (y# <# 0#) = ((x# -# 1#) `quotInt#` y#) -# 1#
+    | (x# <# 0#) && (y# ># 0#) = ((x# +# 1#) `quotInt#` y#) -# 1#
     | otherwise                = x# `quotInt#` y#
 
 modInt# :: Int# -> Int# -> Int#
