@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.7 2001/08/02 17:01:33 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.8 2001/08/09 11:19:16 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -53,7 +53,7 @@
 #define bci_STKCHECK  26
 #define bci_JMP       27
 #define bci_CCALL     28
-
+#define bci_SWIZZLE   29
 
 /* If a BCO definitely requires less than this many words of stack,
    don't include an explicit STKCHECK insn in it.  The interpreter

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.27 $
- * $Date: 2001/08/07 09:02:02 $
+ * $Revision: 1.28 $
+ * $Date: 2001/08/09 11:19:16 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -37,7 +37,7 @@
    scheduler.  Ie normally you don't want REFERENCE_INTERPRETER to be
    defined. */
 
-/* #define REFERENCE_INTERPRETER */
+#define REFERENCE_INTERPRETER
 
 /* Gather stats about entry, opcode, opcode-pair frequencies.  For
    tuning the interpreter. */
@@ -762,6 +762,12 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                         RETURN(ThreadYielding);
                      }
                  }
+              }
+              case bci_SWIZZLE: {
+                 int stkoff = BCO_NEXT;
+                 signed short n = (signed short)(BCO_NEXT);
+                 StackWord(stkoff) += (W_)n;
+                 goto nextInsn;
               }
               case bci_CCALL: {
                  StgInt tok;

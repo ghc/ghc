@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.43 2001/08/04 06:09:24 ken Exp $
+ * $Id: Printer.c,v 1.44 2001/08/09 11:19:16 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -120,6 +120,12 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n");
             break;
         }
+
+    case FOREIGN:
+            fprintf(stderr,"FOREIGN("); 
+            printPtr((StgPtr)( ((StgForeignObj*)obj)->data ));
+            fprintf(stderr,")\n"); 
+            break;
 
     case IND:
             fprintf(stderr,"IND("); 
@@ -341,6 +347,7 @@ void printClosure( StgClosure *obj )
             //barf("printClosure %d",get_itbl(obj)->type);
             fprintf(stderr, "*** printClosure: unknown type %d ****\n",
                     get_itbl(obj)->type );
+            barf("printClosure %d",get_itbl(obj)->type);
             return;
     }
 }
