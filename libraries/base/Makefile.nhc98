@@ -11,6 +11,7 @@ SRCS	= \
 	Data/HashTable.hs Data/Typeable.hs Data/Dynamic.hs \
 	Data/Monoid.hs Data/Queue.hs Data/Tree.hs \
 	Data/Map.hs Data/IntMap.hs Data/IntSet.hs Data/FunctorM.hs \
+	Data/Eq.hs Data/Ord.hs \
 	Control/Monad.hs Control/Monad/Fix.hs \
 	Control/Arrow.hs Debug/Trace.hs \
 	NHC/SizedTypes.hs \
