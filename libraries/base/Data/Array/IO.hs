@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: IO.hs,v 1.5 2002/02/07 11:13:29 simonmar Exp $
+-- $Id: IO.hs,v 1.6 2002/03/26 17:11:15 simonmar Exp $
 --
 -- Mutable boxed/unboxed arrays in the IO monad.
 --
@@ -454,16 +454,16 @@ hPutArray handle (IOUArray (STUArray l u raw)) count
 -- ---------------------------------------------------------------------------
 -- Internal Utils
 
-foreign import "__hscore_memcpy_dst_off" unsafe 
+foreign import ccall unsafe "__hscore_memcpy_dst_off"
    memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
-foreign import "__hscore_memcpy_src_off" unsafe 
+foreign import ccall unsafe "__hscore_memcpy_src_off"
    memcpy_ba_baoff :: RawBuffer -> RawBuffer -> Int -> CSize -> IO (Ptr ())
 
 illegalBufferSize :: Handle -> String -> Int -> IO a
-illegalBufferSize handle fn (sz :: Int) = 
+illegalBufferSize handle fn sz = 
 	ioException (IOError (Just handle)
 			    InvalidArgument  fn
-			    ("illegal buffer size " ++ showsPrec 9 sz [])
+			    ("illegal buffer size " ++ showsPrec 9 (sz::Int) [])
 			    Nothing)
 
 #endif /* __GLASGOW_HASKELL__ */
