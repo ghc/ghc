@@ -61,7 +61,13 @@ IOWorkerProc(PVOID param)
 	 */
 	iom->workersIdle++;
 	LeaveCriticalSection(&iom->manLock);
-
+	
+	/*
+	 * A possible future refinement is to make long-term idle threads
+	 * wake up and decide to shut down should the number of idle threads
+	 * be above some threshold.
+	 *
+	 */
 	rc = WaitForMultipleObjects( 2, hWaits, FALSE, INFINITE );
 
 	EnterCriticalSection(&iom->manLock);
@@ -206,6 +212,79 @@ StartIOManager(void)
 }
 
 /*
+ * Function: depositWorkItem()
+ *
+ * Local function which deposits a WorkItem onto a work queue,
+ * deciding in the process whether or not the thread pool needs
+ * to be augmented with another thread to handle the new request.
+ *
+ */
+static
+int
+depositWorkItem( unsigned int reqID,
+		 WorkItem* wItem )
+{
+    EnterCriticalSection(&ioMan->manLock);
+
+#if 0
+    fprintf(stderr, "depositWorkItem: %d/%d\n", ioMan->workersIdle, ioMan->numWorkers); 
+    fflush(stderr);
+#endif
+    /* A new worker thread is created when there are fewer idle threads
+     * than non-consumed queue requests. This ensures that requests will
+     * be dealt with in a timely manner.
+     *
+     * [Long explanation of why the previous thread pool policy lead to 
+     * trouble]
+     *
+     * Previously, the thread pool was augmented iff no idle worker threads
+     * were available. That strategy runs the risk of repeatedly adding to
+     * the request queue without expanding the thread pool to handle this
+     * sudden spike in queued requests. 
+     * [How? Assume workersIdle is 1, and addIORequest() is called. No new 
+     * thread is created and the request is simply queued. If addIORequest()
+     * is called again _before the OS schedules a worker thread to pull the
+     * request off the queue_, workersIdle is still 1 and another request is 
+     * simply added to the queue. Once the worker thread is run, only one
+     * request is de-queued, leaving the 2nd request in the queue]
+     * 
+     * Assuming none of the queued requests take an inordinate amount of to 
+     * complete, the request queue would eventually be drained. But if that's 
+     * not the case, the later requests will end up languishing in the queue 
+     * indefinitely. The non-timely handling of requests may cause CH applications
+     * to misbehave / hang; bad.
+     *
+     */
+    ioMan->queueSize++;
+    if ( (ioMan->workersIdle < ioMan->queueSize) ) {
+	/* see if giving up our quantum ferrets out some idle threads.
+	 */
+	LeaveCriticalSection(&ioMan->manLock);
+	Sleep(0);
+	EnterCriticalSection(&ioMan->manLock);
+	if ( (ioMan->workersIdle < ioMan->queueSize) ) {
+	    /* No, go ahead and create another. */
+	    ioMan->numWorkers++;
+	    LeaveCriticalSection(&ioMan->manLock);
+	    NewIOWorkerThread(ioMan);
+	} else {
+	    LeaveCriticalSection(&ioMan->manLock);
+	}
+    } else {
+	LeaveCriticalSection(&ioMan->manLock);
+    }
+  
+    if (SubmitWork(ioMan->workQueue,wItem)) {
+	/* Note: the work item has potentially been consumed by a worker thread
+	 *       (and freed) at this point, so we cannot use wItem's requestID.
+	 */
+	return reqID;
+    } else {
+	return 0;
+    }
+}
+
+/*
  * Function: AddIORequest()
  *
  * Conduit to underlying WorkQueue's SubmitWork(); adds IO
@@ -234,58 +313,7 @@ AddIORequest ( int   fd,
     wItem->onCompletion        = onCompletion;
     wItem->requestID           = reqID;
   
-    EnterCriticalSection(&ioMan->manLock);
-    /* If there are no worker threads available, create one.
-     *
-     * If this turns out to be too aggressive a policy, refine.
-     */
-#if 0
-    fprintf(stderr, "AddIORequest: %d\n", ioMan->workersIdle); 
-    fflush(stderr);
-#endif
-    /* A new worker thread is created when there are fewer idle threads
-     * than non-consumed queue requests. This ensures that requests will
-     * be dealt with in a timely manner.
-     *
-     * [Long explanation of why the previous thread pool policy lead to 
-     * trouble]
-     *
-     * Previously, the thread pool was augmented iff no idle worker threads
-     * were available. That strategy runs the risk of repeatedly adding to
-     * the request queue without expanding the thread pool to handle this
-     * sudden spike in queued requests. 
-     * [How? Assume workersIdle is 1, and addIORequest() is called. No new 
-     * thread is created and the, returning without blocking.
- request is simply queued. If addIORequest()
-     * is called again _before the OS schedules a worker thread to pull the
-     * request off the queue_, workersIdle is still 1 and another request is 
-     * simply added to the queue. Once the worker thread is run, only one
-     * request is de-queued, leaving the 2nd request in the queue]
-     * 
-     * Assuming none of the queued requests take an inordinate amount of to 
-     * complete, the request queue would eventually be drained. But if that's 
-     * not the case, the later requests will end up languishing in the queue 
-     * indefinitely. The non-timely handling of requests may cause CH applications
-     * to misbehave / hang; bad.
-     *
-     */
-    ioMan->queueSize++;
-    if ( ioMan->workersIdle < ioMan->queueSize ) {
-	ioMan->numWorkers++;
-	LeaveCriticalSection(&ioMan->manLock);
-	NewIOWorkerThread(ioMan);
-    } else {
-	LeaveCriticalSection(&ioMan->manLock);
-    }
-    
-    if (SubmitWork(ioMan->workQueue,wItem)) {
-	/* Note: the work item has potentially been consumed by a worker thread
-	 *       (and freed) at this point, so we cannot use wItem's requestID.
-	 */
-	return reqID;
-    } else {
-	return 0;
-    }
+    return depositWorkItem(reqID, wItem);
 }       
 
 /*
@@ -308,29 +336,7 @@ AddDelayRequest ( unsigned int   msecs,
     wItem->onCompletion = onCompletion;
     wItem->requestID    = reqID;
 
-    EnterCriticalSection(&ioMan->manLock);
-#if 0
-    fprintf(stderr, "AddDelayRequest: %d\n", ioMan->workersIdle);
-    fflush(stderr);
-#endif
-    /* See AddIORequest() for comments regarding policy
-     * for augmenting the worker thread pool.
-     */
-    ioMan->queueSize++;
-    if ( ioMan->workersIdle < ioMan->queueSize ) {
-	ioMan->numWorkers++;
-	LeaveCriticalSection(&ioMan->manLock);
-	NewIOWorkerThread(ioMan);
-    } else {
-	LeaveCriticalSection(&ioMan->manLock);
-    }
-  
-  if (SubmitWork(ioMan->workQueue,wItem)) {
-      /* See AddIORequest() comment */
-      return reqID;
-  } else {
-      return 0;
-  }
+    return depositWorkItem(reqID, wItem);
 }
 
 /*
@@ -354,29 +360,7 @@ AddProcRequest ( void* proc,
     wItem->onCompletion = onCompletion;
     wItem->requestID    = reqID;
 
-    EnterCriticalSection(&ioMan->manLock);
-#if 0
-    fprintf(stderr, "AddProcRequest: %d\n", ioMan->workersIdle);
-    fflush(stderr);
-#endif
-    /* See AddIORequest() for comments regarding policy
-     * for augmenting the worker thread pool.
-     */
-    ioMan->queueSize++;
-    if ( ioMan->workersIdle < ioMan->queueSize ) {
-	ioMan->numWorkers++;
-	LeaveCriticalSection(&ioMan->manLock);
-	NewIOWorkerThread(ioMan);
-    } else {
-	LeaveCriticalSection(&ioMan->manLock);
-    }
-  
-    if (SubmitWork(ioMan->workQueue,wItem)) {
-	/* See AddIORequest() comment */
-	return reqID;
-    } else {
-	return 0;
-    }
+    return depositWorkItem(reqID, wItem);
 }
 
 void ShutdownIOManager()
