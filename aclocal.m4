@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.92 2002/01/07 20:46:52 sof Exp $
+dnl $Id: aclocal.m4,v 1.93 2002/01/17 09:52:18 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -321,34 +321,41 @@ dnl On Digital UNIX, we test for the -Z (compress) and
 dnl -input (take list of files from external file) flags.
 dnl 
 AC_DEFUN(FPTOOLS_PROG_AR_AND_RANLIB,
-[AC_PATH_PROG(ArCmd,ar)
-if test -z "$ArCmd"; then
+[AC_PATH_PROG(ArCmdRaw,ar)
+if test -z "$ArCmdRaw"; then
     echo "You don't seem to have ar in your PATH...I have no idea how to make a library"
     exit 1;
 fi
-if $ArCmd clqsZ conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd clqsZ"
+if $ArCmdRaw clqsZ conftest.a >/dev/null 2>/dev/null; then
+    ArCmdArgs="clqsZ"
     NeedRanLib=''
-elif $ArCmd clqs conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd clqs"
+elif $ArCmdRaw clqs conftest.a >/dev/null 2>/dev/null; then
+    ArCmdArgs="clqs"
     NeedRanLib=''
-elif $ArCmd cqs conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd cqs"
+elif $ArCmdRaw cqs conftest.a >/dev/null 2>/dev/null; then
+    ArCmdArgs="cqs"
     NeedRanLib=''
-elif $ArCmd clq conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd clq"
+elif $ArCmdRaw clq conftest.a >/dev/null 2>/dev/null; then
+    ArCmdArgs="clq"
     NeedRanLib='YES'
-elif $ArCmd cq conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd cq"
+elif $ArCmdRaw cq conftest.a >/dev/null 2>/dev/null; then
+    ArCmdArgs="cq"
     NeedRanLib='YES'
-elif $ArCmd cq conftest.a 2>&1 | grep 'no archive members specified' >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd cq"
+elif $ArCmdRaw cq conftest.a 2>&1 | grep 'no archive members specified' >/dev/null 2>/dev/null; then
+    ArCmdArgs="cq"
     NeedRanLib='YES'
 else
     echo "I can't figure out how to use your $ArCmd"
     exit 1
 fi
 rm -rf conftest*
+case $HostPlatform in
+ *mingw32) 
+ 	  ArCmd="`cygpath -w ${ArCmdRaw} | sed -e 's@\\\\@/@g' ` ${ArCmdArgs}"
+ 	  ;;
+ *) ArCmd="${ArCmdRaw} ${ArCmdArgs}"
+    ;;
+esac
 test -n "$ArCmd" && test -n "$verbose" && echo "        setting ArCmd to $ArCmd"
 AC_SUBST(ArCmd)
 if $ArCmd conftest.a -input /dev/null >/dev/null 2>/dev/null; then

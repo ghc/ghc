@@ -579,7 +579,6 @@ AC_DEFINE(HAVE_BIN_SH)
 dnl ** how to invoke `ar' and `ranlib'
 FPTOOLS_PROG_AR_AND_RANLIB
 
-
 dnl ** Check to see whether ln -s works
 AC_PROG_LN_S
 
@@ -1008,7 +1007,14 @@ dnl ** code before data?
 FPTOOLS_CODE_BEFORE_DATA
 
 dnl ** check for ld, and whether ld has -x option
-AC_PATH_PROG(LdCmd, ld)
+AC_PATH_PROG(LdCmdRaw, ld)
+case $HostOS_CPP in
+ mingw32) LdCmd=`cygpath -w ${LdCmdRaw} | sed -e 's@\\\\@/@g' `
+ 	   ;;
+ *) LdCmd=${LdCmdRaw}
+    ;;
+esac
+AC_SUBST(LdCmd)
 FPTOOLS_LD_X
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
