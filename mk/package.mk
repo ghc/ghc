@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.16 2002/07/23 10:12:01 simonmar Exp $
+# $Id: package.mk,v 1.17 2002/07/23 11:23:55 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -16,11 +16,24 @@ $(PACKAGE).conf.installed : $(PACKAGE).conf.in
 	$(CPP) $(RAWCPP_FLAGS) -I$(GHC_INCLUDE_DIR) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
 		| sed 's/^#.*$$//g' >$@
 
-boot all :: $(PACKAGE).conf.inplace $(PACKAGE).conf.installed
+# we could be more accurate here and add a dependency on
+# ghc/driver/package.conf, but that doesn't work too well because of
+# make's limited accuracy with modification times: when doing 'make
+# boot' in multiple packages, make won't detect that the package
+# configuration needs updating if it was updated already in the last
+# second.
+#
+STAMP_PKG_CONF = stamp-pkg-conf
+CLEAN_FILES += $(STAMP_PKG_CONF)
+
+boot all :: $(STAMP_PKG_CONF)
+
+$(STAMP_PKG_CONF) : $(PACKAGE).conf.inplace $(PACKAGE).conf.installed
 	$(GHC_PKG_INPLACE) --update-package <$(PACKAGE).conf.inplace
 	$(GHC_PKG_INPLACE)  -f $(GHC_DRIVER_DIR)/package.conf --update-package <$(PACKAGE).conf.installed
+	@touch $(STAMP_PKG_CONF)
 
-CLEAN_FILES += $(PACKAGE).conf.installed $(PACKAGE).conf.inplace
+CLEAN_FILES += $(PACKAGE).conf.installed $(PACKAGE).conf.inplace 
 
 endif # $(way) == ""
 
