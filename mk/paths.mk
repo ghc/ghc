@@ -132,7 +132,7 @@ HS_HCS      = $(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
 HS_SS       = $(addsuffix .$(way_)s,$(basename $(HS_SRCS)))
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
-HSC_C_OBJS  = $(patsubst %.hsc, %_hsc.o, $(HSC_SRCS))
+HSC_C_OBJS  = $(patsubst %.hsc, %_hsc.o, $(filter %.hsc, $(SRCS)))
 
 C_SRCS      = $(filter %.c,$(SRCS)) 
 C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
