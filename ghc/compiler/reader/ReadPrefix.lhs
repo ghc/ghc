@@ -608,7 +608,7 @@ wlkBinding binding
 	  wlkHsType ty				   `thenUgn` \ h_ty ->
 	  wlkExtName ext_name			   `thenUgn` \ h_ext_name ->
 	  rdCallConv cconv		           `thenUgn` \ h_cconv ->
-	  rdImpExp imp_exp (cvFlag unsafe_flag)    `thenUgn` \ h_imp_exp ->
+	  rdForKind imp_exp (cvFlag unsafe_flag)    `thenUgn` \ h_imp_exp ->
  	  returnUgn (RdrForeignDecl (ForeignDecl h_id h_imp_exp h_ty h_ext_name h_cconv src_loc))
 
       a_sig_we_hope ->
@@ -967,8 +967,9 @@ rdCallConv x = returnUgn x
 rdForKind :: Int -> Bool -> UgnM ForKind
 rdForKind 0 isUnsafe = -- foreign import
   returnUgn (FoImport isUnsafe)
-rdImpExp 1 _ = -- foreign export
+rdForKind 1 _ = -- foreign export
   returnUgn FoExport
-rdImpExp 2 _ = -- foreign label
+rdForKind 2 _ = -- foreign label
   returnUgn FoLabel
+
 \end{code}

@@ -555,6 +555,8 @@ callconv: STDCALL 	{ $$ = CALLCONV_STDCALL;  }
 	| C_CALL        { $$ = CALLCONV_CCALL;    }
 	| PASCAL        { $$ = CALLCONV_PASCAL;   }
 	| FASTCALL      { $$ = CALLCONV_FASTCALL; }
+/* If you leave out the specification of a calling convention, you'll get C's. */
+        | /*empty*/     { $$ = CALLCONV_CCALL;    }
 	;
 
 ext_name: STRING	{ $$ = mkjust(lsing($1)); }
