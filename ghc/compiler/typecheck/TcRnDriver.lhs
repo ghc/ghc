@@ -101,6 +101,7 @@ import LoadIface	( loadSrcInterface )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
 			  IfaceExtName(..), IfaceConDecls(..), IfaceInst(..),
 			  tyThingToIfaceDecl, dfunToIfaceInst )
+import IfaceEnv		( lookupOrig )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( Id, isImplicitId, globalIdDetails )
 import MkId		( unsafeCoerceId )
@@ -117,7 +118,7 @@ import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, retu
 import Module		( Module, lookupModuleEnv )
 import HscTypes		( InteractiveContext(..), ExternalPackageState( eps_PTE ),
 			  HomeModInfo(..), typeEnvElts, typeEnvClasses,
-			  availNames, icPrintUnqual,
+			  availNames, availName, icPrintUnqual, ModIface(..),
 			  ModDetails(..), Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Bag		( unitBag )
@@ -332,7 +333,11 @@ tcRnSrcDecls :: [LHsDecl RdrName] -> TcM TcGblEnv
 	-- Returns the variables free in the decls
 	-- Reason: solely to report unused imports and bindings
 tcRnSrcDecls decls
- = do { boot_names <- loadHiBootInterface ;
+ = do { 	-- Load the hi-boot interface for this module, if any
+		-- We do this now so that the boot_names can be passed
+		-- to tcTyAndClassDecls, because the boot_names are 
+		-- automatically considered to be loop breakers
+	boot_names <- loadHiBootInterface ;
 
 	  	-- Do all the declarations
 	(tc_envs, lie) <- getLIE (tc_rn_src_decls boot_names decls) ;
@@ -970,9 +975,9 @@ getModuleExports mod
 	; loadOrphanModules (dep_orphs (mi_deps iface))
 			-- Load any orphan-module interfaces,
 			-- so their instances are visible
-	; avails <- exportsToAvails (mi_exports iface)
+	; names <- exportsToAvails (mi_exports iface)
 	; let { gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
-			| avail <- nameSetToList avails ] }
+			| name <- nameSetToList names ] }
 	; returnM (mkGlobalRdrEnv gres) }
 
 vanillaProv :: Module -> Provenance
