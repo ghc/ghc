@@ -348,8 +348,9 @@
 /* The value of EXDEV.  */
 #undef CCONST_EXDEV
 
-/* Define if time.h or sys/time.h define the altzone variable */
-#undef HAVE_ALTZONE
+/* Define to 1 if you have the declaration of `altzone', and to 0 if you
+   don't. */
+#undef HAVE_DECL_ALTZONE
 
 /* Define if you have /bin/sh */
 #undef HAVE_BIN_SH

@@ -3,11 +3,15 @@
 # To be a good autoconf citizen, names of local macros have prefixed with FP_ to
 # ensure we don't clash with any pre-supplied autoconf ones.
 
-dnl *** Is altzone available? ***
-dnl 
-AC_DEFUN(FPTOOLS_ALTZONE,
-[AC_CACHE_CHECK([altzone], fptools_cv_altzone,
-[AC_TRY_LINK([#if TIME_WITH_SYS_TIME
+
+# FP_ALTZONE
+# -------------------
+# Defines HAVE_DECL_ALTZONE to 1 if declared, 0 otherwise.
+# Used by base package.
+AC_DEFUN([FP_ALTZONE],
+[AC_REQUIRE([AC_HEADER_TIME])dnl
+AC_CHECK_HEADERS([sys/time.h])
+AC_CHECK_DECLS([altzone], [], [],[#if TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
 #else
@@ -16,13 +20,9 @@ AC_DEFUN(FPTOOLS_ALTZONE,
 # else
 #  include <time.h>
 # endif
-#endif
-], [return altzone;], 
-fptools_cv_altzone=yes, fptools_cv_altzone=no)])
-if test "$fptools_cv_altzone" = yes; then
-  AC_DEFINE(HAVE_ALTZONE)
-fi
-])
+#endif])
+])# FP_ALTZONE
+
 
 
 dnl *** Does libc contain GNU regex? ***

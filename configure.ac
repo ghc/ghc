@@ -848,7 +848,7 @@ dnl ** how do we get a timezone name, and UTC offset ?
 AC_STRUCT_TIMEZONE
 
 dnl ** do we have altzone?
-FPTOOLS_ALTZONE
+FP_ALTZONE
 
 dnl ** does struct stat contain st_blksize?
 AC_STRUCT_ST_BLKSIZE
