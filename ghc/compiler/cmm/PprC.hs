@@ -336,7 +336,7 @@ pprMachOpApp :: MachOp -> [CmmExpr] -> SDoc
 
 pprMachOpApp op args
   | isMulMayOfloOp op
-  = ptext SLIT("mulIntMayOflo") <> parens (commafy (map pprExpr args)) <> semi
+  = ptext SLIT("mulIntMayOflo") <> parens (commafy (map pprExpr args))
   where isMulMayOfloOp (MO_U_MulMayOflo _) = True
 	isMulMayOfloOp (MO_S_MulMayOflo _) = True
 	isMulMayOfloOp _ = False
