@@ -58,7 +58,8 @@ import CmdLineOpts	( FloatOutSwitches(..) )
 import CoreUtils	( exprType, exprIsTrivial, exprIsCheap, mkPiTypes )
 import CoreFVs		-- all of it
 import Subst
-import Id		( Id, idType, mkSysLocal, isOneShotLambda, zapDemandIdInfo,
+import Id		( Id, idType, mkSysLocalUnencoded, 
+			  isOneShotLambda, zapDemandIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
 import IdInfo		( workerExists, vanillaIdInfo, )
@@ -771,7 +772,7 @@ newPolyBndrs dest_lvl env abs_vars bndrs
     in
     returnLvl (extendPolyLvlEnv dest_lvl env abs_vars (bndrs `zip` new_bndrs), new_bndrs)
   where
-    mk_poly_bndr bndr uniq = mkSysLocal (mkFastString str) uniq poly_ty
+    mk_poly_bndr bndr uniq = mkSysLocalUnencoded (mkFastString str) uniq poly_ty
 			   where
 			     str     = "poly_" ++ occNameUserString (getOccName bndr)
 			     poly_ty = mkPiTypes abs_vars (idType bndr)
@@ -782,7 +783,7 @@ newLvlVar :: String
 	  -> LvlM Id
 newLvlVar str vars body_ty 	
   = getUniqueUs	`thenLvl` \ uniq ->
-    returnUs (mkSysLocal (mkFastString str) uniq (mkPiTypes vars body_ty))
+    returnUs (mkSysLocalUnencoded (mkFastString str) uniq (mkPiTypes vars body_ty))
     
 -- The deeply tiresome thing is that we have to apply the substitution
 -- to the rules inside each Id.  Grr.  But it matters.

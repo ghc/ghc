@@ -10,7 +10,8 @@ module Name (
 
 	-- The Name type
 	Name,					-- Abstract
-	mkInternalName, mkSystemName, mkFCallName,
+	mkInternalName, mkSystemName, 
+	mkSystemNameEncoded, mkSystemTvNameEncoded, mkFCallName,
 	mkIPName,
 	mkExternalName, mkKnownKeyExternalName, mkWiredInName,
 
@@ -175,9 +176,21 @@ mkKnownKeyExternalName rdr_name uniq
 mkWiredInName :: Module -> OccName -> Unique -> Name
 mkWiredInName mod occ uniq = mkExternalName uniq mod occ builtinSrcLoc
 
-mkSystemName :: Unique -> EncodedFS -> Name
+mkSystemName :: Unique -> UserFS -> Name
 mkSystemName uniq fs = Name { n_uniq = uniq, n_sort = System, 
-				n_occ = mkVarOcc fs, n_loc = noSrcLoc }
+			      n_occ = mkVarOcc fs, n_loc = noSrcLoc }
+
+-- Use this version when the string is already encoded.  Avoids duplicating
+-- the string each time a new name is created.
+mkSystemNameEncoded :: Unique -> EncodedFS -> Name
+mkSystemNameEncoded uniq fs = Name { n_uniq = uniq, n_sort = System, 
+			             n_occ = mkSysOccFS varName fs, 
+				     n_loc = noSrcLoc }
+
+mkSystemTvNameEncoded :: Unique -> EncodedFS -> Name
+mkSystemTvNameEncoded uniq fs = Name { n_uniq = uniq, n_sort = System, 
+			               n_occ = mkSysOccFS tvName fs, 
+				       n_loc = noSrcLoc }
 
 mkFCallName :: Unique -> EncodedString -> Name
 	-- The encoded string completely describes the ccall

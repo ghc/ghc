@@ -82,8 +82,9 @@ import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import ForeignCall	( Safety(..) )
 import FunDeps		( grow )
 import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
-import Name		( Name, NamedThing(..), setNameUnique, mkSystemName,
-			  mkInternalName, mkDerivedTyConOcc
+import Name		( Name, NamedThing(..), setNameUnique, 
+			  mkInternalName, mkDerivedTyConOcc, 
+			  mkSystemTvNameEncoded,
 			)
 import VarSet
 import BasicTypes	( Boxity(Boxed) )
@@ -106,7 +107,7 @@ import Outputable
 newTyVar :: Kind -> NF_TcM TcTyVar
 newTyVar kind
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSystemName uniq FSLIT("t")) kind VanillaTv
+    tcNewMutTyVar (mkSystemTvNameEncoded uniq FSLIT("t")) kind VanillaTv
 
 newTyVarTy  :: Kind -> NF_TcM TcType
 newTyVarTy kind
@@ -119,7 +120,7 @@ newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
 newKindVar :: NF_TcM TcKind
 newKindVar
   = tcGetUnique 							`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSystemName uniq FSLIT("k")) superKind VanillaTv	`thenNF_Tc` \ kv ->
+    tcNewMutTyVar (mkSystemTvNameEncoded uniq FSLIT("k")) superKind VanillaTv	`thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 
 newKindVars :: Int -> NF_TcM [TcKind]
@@ -128,7 +129,7 @@ newKindVars n = mapNF_Tc (\ _ -> newKindVar) (nOfThem n ())
 newBoxityVar :: NF_TcM TcKind
 newBoxityVar
   = tcGetUnique 							  `thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSystemName uniq FSLIT("bx")) superBoxity VanillaTv  `thenNF_Tc` \ kv ->
+    tcNewMutTyVar (mkSystemTvNameEncoded uniq FSLIT("bx")) superBoxity VanillaTv  `thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 \end{code}
 
@@ -142,7 +143,7 @@ newBoxityVar
 \begin{code}
 newHoleTyVarTy :: NF_TcM TcType
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSystemName uniq FSLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
+    tcNewMutTyVar (mkSystemTvNameEncoded uniq FSLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
     returnNF_Tc (TyVarTy tv)
 
 readHoleResult :: TcType -> NF_TcM TcType

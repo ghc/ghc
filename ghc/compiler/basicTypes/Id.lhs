@@ -9,7 +9,7 @@ module Id (
 
 	-- Simple construction
 	mkGlobalId, mkLocalId, mkSpecPragmaId, mkLocalIdWithInfo,
-	mkSysLocal, mkUserLocal, mkVanillaGlobal,
+	mkSysLocal, mkSysLocalUnencoded, mkUserLocal, mkVanillaGlobal,
 	mkTemplateLocals, mkTemplateLocalsNum, mkWildId, mkTemplateLocal,
 	mkWorkerId,
 
@@ -99,7 +99,7 @@ import IdInfo
 import qualified Demand	( Demand )
 import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
 import Name	 	( Name, OccName,
-			  mkSystemName, mkInternalName,
+			  mkSystemName, mkSystemNameEncoded, mkInternalName,
 			  getOccName, getSrcLoc
 			) 
 import OccName		( EncodedFS, mkWorkerOcc )
@@ -162,7 +162,11 @@ mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
 
 -- for SysLocal, we assume the base name is already encoded, to avoid
 -- re-encoding the same string over and over again.
-mkSysLocal  fs uniq ty      = mkLocalId (mkSystemName uniq fs)      ty
+mkSysLocal          fs uniq ty = mkLocalId (mkSystemNameEncoded uniq fs) ty
+
+-- version to use when the faststring needs to be encoded
+mkSysLocalUnencoded fs uniq ty = mkLocalId (mkSystemName uniq fs)        ty
+
 mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName    uniq occ loc) ty
 mkVanillaGlobal 	    = mkGlobalId VanillaGlobal
 \end{code}

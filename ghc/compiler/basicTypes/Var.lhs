@@ -41,7 +41,7 @@ import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId,
 
 import Name		( Name, OccName, NamedThing(..),
 			  setNameUnique, setNameOcc, nameUnique, 
-			  mkSystemName
+			  mkSystemTvNameEncoded,
 			)
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import FastTypes
@@ -195,7 +195,7 @@ mkSysTyVar uniq kind = Var { varName    = name
 			   , varInfo    = pprPanic "mkSysTyVar" (ppr name)
 			   }
 		     where
-		       name = mkSystemName uniq FSLIT("t")
+		       name = mkSystemTvNameEncoded uniq FSLIT("t")
 
 newMutTyVar :: Name -> Kind -> TyVarDetails -> IO TyVar
 newMutTyVar name kind details 
