@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: Handle.hs,v 1.1 2001/12/21 15:07:22 simonmar Exp $
+-- $Id: Handle.hs,v 1.2 2002/01/02 14:40:10 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -333,19 +333,19 @@ newEmptyBuffer b state size
   = Buffer{ bufBuf=b, bufRPtr=0, bufWPtr=0, bufSize=size, bufState=state }
 
 allocateBuffer :: Int -> BufferState -> IO Buffer
-allocateBuffer sz@(I## size) state = IO $ \s -> 
-  case newByteArray## size s of { (## s, b ##) ->
-  (## s, newEmptyBuffer b state sz ##) }
+allocateBuffer sz@(I# size) state = IO $ \s -> 
+  case newByteArray# size s of { (# s, b #) ->
+  (# s, newEmptyBuffer b state sz #) }
 
 writeCharIntoBuffer :: RawBuffer -> Int -> Char -> IO Int
-writeCharIntoBuffer slab (I## off) (C## c)
-  = IO $ \s -> case writeCharArray## slab off c s of 
-		 s -> (## s, I## (off +## 1##) ##)
+writeCharIntoBuffer slab (I# off) (C# c)
+  = IO $ \s -> case writeCharArray# slab off c s of 
+		 s -> (# s, I# (off +# 1#) #)
 
 readCharFromBuffer :: RawBuffer -> Int -> IO (Char, Int)
-readCharFromBuffer slab (I## off)
-  = IO $ \s -> case readCharArray## slab off s of 
-		 (## s, c ##) -> (## s, (C## c, I## (off +## 1##)) ##)
+readCharFromBuffer slab (I# off)
+  = IO $ \s -> case readCharArray# slab off s of 
+		 (# s, c #) -> (# s, (C# c, I# (off +# 1#)) #)
 
 getBuffer :: FD -> BufferState -> IO (IORef Buffer, BufferMode)
 getBuffer fd state = do
@@ -403,7 +403,7 @@ flushReadBuffer fd buf
      puts ("flushReadBuffer: new file offset = " ++ show off ++ "\n")
 #    endif
      throwErrnoIfMinus1Retry "flushReadBuffer"
-   	 (c_lseek (fromIntegral fd) (fromIntegral off) sSEEK_CUR)
+   	 (c_lseek (fromIntegral fd) (fromIntegral off) sEEK_CUR)
      return buf{ bufWPtr=0, bufRPtr=0 }
 
 flushWriteBuffer :: FD -> Bool -> Buffer -> IO Buffer
@@ -580,7 +580,7 @@ openFile' filepath ex_mode =
 	       | otherwise	   = False
 
       binary_flags
-	  | binary    = PrelHandle.o_BINARY
+	  | binary    = GHC.Handle.o_BINARY
 	  | otherwise = 0
 
       oflags = oflags1 .|. binary_flags

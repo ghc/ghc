@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Environment.hs,v 1.3 2001/12/21 15:07:26 simonmar Exp $
+-- $Id: Environment.hs,v 1.4 2002/01/02 14:40:11 simonmar Exp $
 --
 -- Miscellaneous information about the system environment.
 --
@@ -25,6 +25,7 @@ import Prelude
 
 import Foreign
 import Foreign.C
+import Control.Monad
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase

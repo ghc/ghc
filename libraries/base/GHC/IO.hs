@@ -3,22 +3,13 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: IO.hs,v 1.1 2001/12/21 15:07:23 simonmar Exp $
+-- $Id: IO.hs,v 1.2 2002/01/02 14:40:10 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
--- Module GHC.IO
-
--- This module defines all basic IO operations.
--- These are needed for the IO operations exported by Prelude,
--- but as it happens they also do everything required by library
--- module IO.
 
 module GHC.IO ( 
-   putChar, putStr, putStrLn, print, getChar, getLine, getContents,
-   interact, readFile, writeFile, appendFile, readLn, readIO, hReady,
    hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
-   hPutStrLn, hPrint,
    commitBuffer',	-- hack, see below
    hGetcBuffered,	-- needed by ghc/compiler/utils/StringBuffer.lhs
    hGetBuf, hPutBuf, slurpFile
@@ -55,7 +46,7 @@ import GHC.Conc
 
 hWaitForInput :: Handle -> Int -> IO Bool
 hWaitForInput h msecs = do
-  wantReadableHandle "hReady" h $ \ handle_ -> do
+  wantReadableHandle "hWaitForInput" h $ \ handle_ -> do
   let ref = haBuffer handle_
   buf <- readIORef ref
 
@@ -63,7 +54,7 @@ hWaitForInput h msecs = do
 	then return True
 	else do
 
-  r <- throwErrnoIfMinus1Retry "hReady"
+  r <- throwErrnoIfMinus1Retry "hWaitForInput"
 	  (inputReady (fromIntegral (haFD handle_)) (fromIntegral msecs) (haIsStream handle_))
   return (r /= 0)
 
@@ -195,13 +186,13 @@ maybeFillReadBuffer fd is_line is_stream buf
 
 unpack :: RawBuffer -> Int -> Int -> IO [Char]
 unpack buf r 0   = return ""
-unpack buf (I## r) (I## len) = IO $ \s -> unpack [] (len -## 1##) s
+unpack buf (I# r) (I# len) = IO $ \s -> unpack [] (len -# 1#) s
    where
     unpack acc i s
-     | i <## r  = (## s, acc ##)
+     | i <# r  = (# s, acc #)
      | otherwise = 
-          case readCharArray## buf i s of
-	    (## s, ch ##) -> unpack (C## ch : acc) (i -## 1##) s
+          case readCharArray# buf i s of
+	    (# s, ch #) -> unpack (C# ch : acc) (i -# 1#) s
 
 
 hGetLineUnBuffered :: Handle -> IO String
@@ -313,13 +304,13 @@ lazyReadHaveBuffer h handle_ fd ref buf = do
 
 unpackAcc :: RawBuffer -> Int -> Int -> [Char] -> IO [Char]
 unpackAcc buf r 0 acc  = return ""
-unpackAcc buf (I## r) (I## len) acc = IO $ \s -> unpack acc (len -## 1##) s
+unpackAcc buf (I# r) (I# len) acc = IO $ \s -> unpack acc (len -# 1#) s
    where
     unpack acc i s
-     | i <## r  = (## s, acc ##)
+     | i <# r  = (# s, acc #)
      | otherwise = 
-          case readCharArray## buf i s of
-	    (## s, ch ##) -> unpack (C## ch : acc) (i -## 1##) s
+          case readCharArray# buf i s of
+	    (# s, ch #) -> unpack (C# ch : acc) (i -# 1#) s
 
 -- ---------------------------------------------------------------------------
 -- hPutChar
@@ -429,7 +420,7 @@ writeLines hdl Buffer{ bufBuf=raw, bufSize=len } s =
 	return ()
    shoveString n (c:cs) = do
 	n' <- writeCharIntoBuffer raw n c
-      if (c == '\n') 
+        if (c == '\n') 
          then do 
               new_buf <- commitBuffer hdl raw len n' True{-needs flush-} False
               writeLines hdl new_buf cs
@@ -484,7 +475,7 @@ commitBuffer
 	-> Bool 			-- release the buffer?
 	-> IO Buffer
 
-commitBuffer hdl raw sz@(I## _) count@(I## _) flush release = do
+commitBuffer hdl raw sz@(I# _) count@(I# _) flush release = do
   wantWritableHandle "commitAndReleaseBuffer" hdl $
      commitBuffer' hdl raw sz count flush release
 
@@ -499,7 +490,7 @@ commitBuffer hdl raw sz@(I## _) count@(I## _) flush release = do
 --
 -- This hack is a fairly big win for hPutStr performance.  --SDM 18/9/2001
 --
-commitBuffer' hdl raw sz@(I## _) count@(I## _) flush release
+commitBuffer' hdl raw sz@(I# _) count@(I# _) flush release
   handle_@Handle__{ haFD=fd, haBuffer=ref, haBuffers=spare_buf_ref } = do
 
 #ifdef DEBUG_DUMP
@@ -606,7 +597,7 @@ hPutBuf handle ptr count
   | count <= 0 = illegalBufferSize handle "hPutBuf" count
   | otherwise = 
     wantWritableHandle "hPutBuf" handle $ 
-      \ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
+      \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
 
         old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
 	  <- readIORef ref
@@ -620,7 +611,7 @@ hPutBuf handle ptr count
 		    return ()
 
 		-- else, we have to flush
-	    else do flushed_buf <- flushWriteBuffer fd old_buf
+	    else do flushed_buf <- flushWriteBuffer fd is_stream old_buf
 		    writeIORef ref flushed_buf
 		    -- ToDo: should just memcpy instead of writing if possible
 		    writeChunk fd ptr count
@@ -665,7 +656,7 @@ hGetBuf handle ptr count
 		let remaining = count - copied
 		if remaining > 0 
 		   then do rest <- readChunk fd (ptr `plusPtr` copied) remaining
-			   return (rest + count)
+			   return (rest + copied)
 		   else return count
 		
 readChunk :: FD -> Ptr a -> Int -> IO Int

@@ -6,11 +6,9 @@
 #ifndef __DIRUTILS_H__
 #define __DIRUTILS_H__
 
-#include <sys/stat.h>
-#include <dirent.h>
+#include "HsCore.h"
+
 #include <limits.h>
-#include <errno.h>
-#include <unistd.h>
 
 extern HsInt prel_mkdir(HsAddr pathName, HsInt mode);
 extern HsInt prel_lstat(HsAddr fname, HsAddr st);

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hsc,v 1.4 2001/12/21 15:07:25 simonmar Exp $
+-- $Id: Posix.hsc,v 1.5 2002/01/02 14:40:11 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -224,7 +224,7 @@ setNonBlockingFD fd = do
   -- An error when setting O_NONBLOCK isn't fatal: on some systems 
   -- there are certain file handles on which this will fail (eg. /dev/null
   -- on FreeBSD) so we throw away the return code from fcntl_write.
-  fcntl_write (fromIntegral fd) 
+  c_fcntl_write (fromIntegral fd) 
 	(#const F_SETFL) (flags .|. #const O_NONBLOCK)
 #else
 

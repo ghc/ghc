@@ -1,3 +1,4 @@
+{-# OPTIONS -#include "HsCore.h" #-}
 -----------------------------------------------------------------------------
 -- 
 -- Module      :  Data.Array.IO
@@ -8,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: IO.hs,v 1.2 2001/09/14 11:25:23 simonmar Exp $
+-- $Id: IO.hs,v 1.3 2002/01/02 14:40:10 simonmar Exp $
 --
 -- Mutable boxed/unboxed arrays in the IO monad.
 --
@@ -377,10 +378,10 @@ hGetArray handle (IOUArray (STUArray l u ptr)) count
   = illegalBufferSize handle "hGetArray" count
   | otherwise = do
       wantReadableHandle "hGetArray" handle $ 
-	\ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
+	\ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
 	buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r } <- readIORef ref
 	if bufferEmpty buf
-	   then readChunkBA fd ptr 0 count
+	   then readChunk fd is_stream ptr 0 count
 	   else do 
 		let avail = w - r
 		copied <- if (count >= avail)
@@ -395,18 +396,18 @@ hGetArray handle (IOUArray (STUArray l u ptr)) count
 
 		let remaining = count - copied
 		if remaining > 0 
-		   then do rest <- readChunkBA fd ptr copied remaining
+		   then do rest <- readChunk fd is_stream ptr copied remaining
 			   return (rest + count)
 		   else return count
-		
-readChunkBA :: FD -> RawBuffer -> Int -> Int -> IO Int
-readChunkBA fd ptr init_off bytes = loop init_off bytes 
+
+readChunk :: FD -> Bool -> RawBuffer -> Int -> Int -> IO Int
+readChunk fd is_stream ptr init_off bytes = loop init_off bytes 
  where
   loop :: Int -> Int -> IO Int
   loop off bytes | bytes <= 0 = return (off - init_off)
   loop off bytes = do
     r' <- throwErrnoIfMinus1RetryMayBlock "readChunk"
-	    (readBA (fromIntegral fd) ptr 
+	    (read_off (fromIntegral fd) is_stream ptr 
 		(fromIntegral off) (fromIntegral bytes))
 	    (threadWaitRead fd)
     let r = fromIntegral r'
@@ -414,10 +415,7 @@ readChunkBA fd ptr init_off bytes = loop init_off bytes
 	then return (off - init_off)
 	else loop (off + r) (bytes - r)
 
-foreign import "read_ba_wrap" unsafe
-   readBA :: FD -> RawBuffer -> Int -> CInt -> IO CInt
-
- -----------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
 -- hPutArray
 
 hPutArray
@@ -431,7 +429,7 @@ hPutArray handle (IOUArray (STUArray l u raw)) count
   = illegalBufferSize handle "hPutArray" count
   | otherwise
    = do wantWritableHandle "hPutArray" handle $ 
-          \ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
+          \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=stream } -> do
 
           old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
 	    <- readIORef ref
@@ -445,20 +443,20 @@ hPutArray handle (IOUArray (STUArray l u raw)) count
 		    return ()
 
 		-- else, we have to flush
-	    else do flushed_buf <- flushWriteBuffer fd old_buf
+	    else do flushed_buf <- flushWriteBuffer fd stream old_buf
 		    writeIORef ref flushed_buf
 		    let this_buf = 
 			    Buffer{ bufBuf=raw, bufState=WriteBuffer, 
 				    bufRPtr=0, bufWPtr=count, bufSize=count }
-		    flushWriteBuffer fd this_buf
+		    flushWriteBuffer fd stream this_buf
 		    return ()
 
------------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
 -- Internal Utils
 
-foreign import "memcpy_wrap_dst_off" unsafe 
+foreign import "__hscore_memcpy_dst_off" unsafe 
    memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
-foreign import "memcpy_wrap_src_off" unsafe 
+foreign import "__hscore_memcpy_src_off" unsafe 
    memcpy_ba_baoff :: RawBuffer -> RawBuffer -> Int -> CSize -> IO (Ptr ())
 
 illegalBufferSize :: Handle -> String -> Int -> IO a

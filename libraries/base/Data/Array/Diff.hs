@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Diff.hs,v 1.1 2001/07/04 10:48:39 simonmar Exp $
+-- $Id: Diff.hs,v 1.2 2002/01/02 14:40:10 simonmar Exp $
 --
 -- Functional arrays with constant-time update.
 --
@@ -104,6 +104,51 @@ type DiffUArray = IOToDiffArray IOUArray
 -- -fallow-undecidable-instances, so each instance is separate here.
 
 ------------------------------------------------------------------------
+-- Showing DiffArrays
+
+instance (Ix ix, Show ix, Show e) => Show (DiffArray ix e) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Char) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Int) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Word) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Float) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Double) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Int8) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Int16) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Int32) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Int64) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Word8) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Word16) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Word32) where
+  showsPrec = showsIArray
+
+instance (Ix ix, Show ix) => Show (DiffUArray ix Word64) where
+  showsPrec = showsIArray
+
+------------------------------------------------------------------------
 -- Boring instances.
 
 instance HasBounds a => HasBounds (IOToDiffArray a) where
@@ -193,6 +238,8 @@ instance IArray (IOToDiffArray IOUArray) Word64 where
     unsafeArray   lu ies = unsafePerformIO $ newDiffArray lu ies
     unsafeAt      a i    = unsafePerformIO $ a `readDiffArray` i
     unsafeReplace a ies  = unsafePerformIO $ a `replaceDiffArray` ies
+
+
 
 ------------------------------------------------------------------------
 -- The important stuff.

@@ -1,5 +1,5 @@
 /* 
- * (c) The University of Glasgow 2001
+ * (c) The University of Glasgow 2002
  *
  * static versions of the inline functions in HsCore.h
  */

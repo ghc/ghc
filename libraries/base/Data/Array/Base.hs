@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Base.hs,v 1.4 2001/07/31 14:36:19 simonmar Exp $
+-- $Id: Base.hs,v 1.5 2002/01/02 14:40:10 simonmar Exp $
 --
 -- Basis for IArray and MArray.  Not intended for external consumption;
 -- use IArray or MArray instead.
@@ -319,9 +319,16 @@ cmpIntUArray arr1@(UArray l1 u1 _) arr2@(UArray l2 u2 _) =
 
 {-# RULES "cmpUArray/Int" cmpUArray = cmpIntUArray #-}
 
-showsUArray :: (IArray UArray e, Ix i, Show i, Show e)
-            => Int -> UArray i e -> ShowS
-showsUArray p a =
+-----------------------------------------------------------------------------
+-- Showing IArrays
+
+{-# SPECIALISE 
+    showsIArray :: (IArray UArray e, Ix i, Show i, Show e) => 
+		   Int -> UArray i e -> ShowS
+  #-}
+
+showsIArray :: (IArray a e, Ix i, Show i, Show e) => Int -> a i e -> ShowS
+showsIArray p a =
     showParen (p > 9) $
     showString "array " .
     shows (bounds a) .
@@ -481,12 +488,7 @@ instance IArray UArray Int64 where
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
     {-# INLINE unsafeAt #-}
-    unsafeAt (UArray _ _ arr#) (I# i#) =
-#if WORD_SIZE_IN_BYTES == 4
-        I64# (indexInt64Array# arr# i#)
-#else
-        I64# (indexIntArray# arr# i#)
-#endif
+    unsafeAt (UArray _ _ arr#) (I# i#) = I64# (indexInt64Array# arr# i#)
     {-# INLINE unsafeReplace #-}
     unsafeReplace arr ies = runST (unsafeReplaceUArray arr ies)
     {-# INLINE unsafeAccum #-}
@@ -534,12 +536,7 @@ instance IArray UArray Word64 where
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
     {-# INLINE unsafeAt #-}
-    unsafeAt (UArray _ _ arr#) (I# i#) =
-#if WORD_SIZE_IN_BYTES == 4
-        W64# (indexWord64Array# arr# i#)
-#else
-        W64# (indexWordArray# arr# i#)
-#endif
+    unsafeAt (UArray _ _ arr#) (I# i#) = W64# (indexWord64Array# arr# i#)
     {-# INLINE unsafeReplace #-}
     unsafeReplace arr ies = runST (unsafeReplaceUArray arr ies)
     {-# INLINE unsafeAccum #-}
@@ -647,46 +644,46 @@ instance Ix ix => Ord (UArray ix Word64) where
     compare = cmpUArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Bool) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Char) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Int) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Word) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Float) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Double) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Int8) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Int16) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Int32) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Int64) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Word8) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Word16) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Word32) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 instance (Ix ix, Show ix) => Show (UArray ix Word64) where
-    showsPrec = showsUArray
+    showsPrec = showsIArray
 
 -----------------------------------------------------------------------------
 -- Mutable arrays
@@ -1016,20 +1013,12 @@ instance MArray (STUArray s) Int64 (ST s) where
         case newByteArray# (n# *# 8#) s1# of { (# s2#, marr# #) ->
         (# s2#, STUArray l u marr# #) }}
     {-# INLINE unsafeRead #-}
-    unsafeRead (STUArray _ _ marr#) (I# i#) = ST $ \s1# ->
-#if WORD_SIZE_IN_BYTES == 4
+    unsafeRead (STUArray _ _ marr#) (I# i#) = ST $ \s1# -> 
         case readInt64Array# marr# i# s1# of { (# s2#, e# #) ->
-#else
-        case readIntArray# marr# i# s1# of { (# s2#, e# #) ->
-#endif
         (# s2#, I64# e# #) }
     {-# INLINE unsafeWrite #-}
     unsafeWrite (STUArray _ _ marr#) (I# i#) (I64# e#) = ST $ \s1# ->
-#if WORD_SIZE_IN_BYTES == 4
         case writeInt64Array# marr# i# e# s1# of { s2# ->
-#else
-        case writeIntArray# marr# i# e# s1# of { s2# ->
-#endif
         (# s2#, () #) }
 
 instance MArray (STUArray s) Word8 (ST s) where
@@ -1085,19 +1074,11 @@ instance MArray (STUArray s) Word64 (ST s) where
         (# s2#, STUArray l u marr# #) }}
     {-# INLINE unsafeRead #-}
     unsafeRead (STUArray _ _ marr#) (I# i#) = ST $ \s1# ->
-#if WORD_SIZE_IN_BYTES == 4
         case readWord64Array# marr# i# s1# of { (# s2#, e# #) ->
-#else
-        case readWordArray# marr# i# s1# of { (# s2#, e# #) ->
-#endif
         (# s2#, W64# e# #) }
     {-# INLINE unsafeWrite #-}
     unsafeWrite (STUArray _ _ marr#) (I# i#) (W64# e#) = ST $ \s1# ->
-#if WORD_SIZE_IN_BYTES == 4
         case writeWord64Array# marr# i# e# s1# of { s2# ->
-#else
-        case writeWordArray# marr# i# e# s1# of { s2# ->
-#endif
         (# s2#, () #) }
 
 -----------------------------------------------------------------------------
@@ -1105,24 +1086,24 @@ instance MArray (STUArray s) Word64 (ST s) where
 
 bOOL_SCALE, bOOL_WORD_SCALE,
   wORD_SCALE, dOUBLE_SCALE, fLOAT_SCALE :: Int# -> Int#
-bOOL_SCALE n# = (n# +# last#) `iShiftRA#` 3#
-  where I# last# = WORD_SIZE_IN_BYTES * 8 - 1
+bOOL_SCALE n# = (n# +# last#) `uncheckedIShiftRA#` 3#
+  where I# last# = SIZEOF_HSWORD * 8 - 1
 bOOL_WORD_SCALE n# = bOOL_INDEX (n# +# last#)
-  where I# last# = WORD_SIZE_IN_BYTES * 8 - 1
-wORD_SCALE   n# = scale# *# n# where I# scale# = WORD_SIZE_IN_BYTES
-dOUBLE_SCALE n# = scale# *# n# where I# scale# = DOUBLE_SIZE_IN_BYTES
-fLOAT_SCALE  n# = scale# *# n# where I# scale# = FLOAT_SIZE_IN_BYTES
+  where I# last# = SIZEOF_HSWORD * 8 - 1
+wORD_SCALE   n# = scale# *# n# where I# scale# = SIZEOF_HSWORD
+dOUBLE_SCALE n# = scale# *# n# where I# scale# = SIZEOF_HSDOUBLE
+fLOAT_SCALE  n# = scale# *# n# where I# scale# = SIZEOF_HSFLOAT
 
 bOOL_INDEX :: Int# -> Int#
-#if WORD_SIZE_IN_BYTES == 4
-bOOL_INDEX i# = i# `iShiftRA#` 5#
-#elif WORD_SIZE_IN_BYTES == 8
-bOOL_INDEX i# = i# `iShiftRA#` 6#
+#if SIZEOF_HSWORD == 4
+bOOL_INDEX i# = i# `uncheckedIShiftRA#` 5#
+#elif SIZEOF_HSWORD == 8
+bOOL_INDEX i# = i# `uncheckedIShiftRA#` 6#
 #endif
 
 bOOL_BIT, bOOL_NOT_BIT :: Int# -> Word#
-bOOL_BIT     n# = int2Word# 1# `shiftL#` (word2Int# (int2Word# n# `and#` mask#))
-  where W# mask# = WORD_SIZE_IN_BYTES * 8 - 1
+bOOL_BIT     n# = int2Word# 1# `uncheckedShiftL#` (word2Int# (int2Word# n# `and#` mask#))
+  where W# mask# = SIZEOF_HSWORD * 8 - 1
 bOOL_NOT_BIT n# = bOOL_BIT n# `xor#` mb# where W# mb# = maxBound
 
 -----------------------------------------------------------------------------

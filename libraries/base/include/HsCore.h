@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsCore.h,v 1.5 2001/12/21 15:07:26 simonmar Exp $
+ * $Id: HsCore.h,v 1.6 2002/01/02 14:40:11 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -12,6 +12,8 @@
 
 #include "config.h"
 #include "HsFFI.h"
+
+#include <stdio.h>
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -91,7 +93,6 @@
 #include "lockFile.h"
 #include "dirUtils.h"
 #include "errUtils.h"
-#include "PrelIOUtils.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -128,9 +129,11 @@ INLINE int __hscore_s_ischr(m)  { return S_ISCHR(m);  }
 INLINE int __hscore_s_issock(m) { return S_ISSOCK(m); }
 #endif
 
+#ifndef mingw32_TARGET_OS
 INLINE void
 __hscore_sigemptyset( sigset_t *set )
 { sigemptyset(set); }
+#endif
 
 INLINE void *
 __hscore_memcpy_dst_off( char *dst, int dst_off, char *src, size_t sz )
