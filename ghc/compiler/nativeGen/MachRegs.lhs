@@ -276,7 +276,7 @@ getNewRegNCG pk
   = getUniqueNat `thenNat` \ u ->
     returnNat (UnmappedReg u pk)
 
-instance Text Reg where
+instance Show Reg where
     showsPrec _ (FixedReg i)	= showString "%"  . shows IBOX(i)
     showsPrec _ (MappedReg i)	= showString "%"  . shows IBOX(i)
     showsPrec _ (MemoryReg i _) = showString "%M"  . shows i
