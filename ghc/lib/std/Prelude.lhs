@@ -75,7 +75,28 @@ import PrelBounded
 import Monad
 import Maybe
 import PrelErr   ( error, seqError )
-import IO
+import IO  ( IO, FilePath, IOError,
+	     fail, userError, catch,
+	     putChar, putStr, putStrLn, print,
+	     getChar, getLine, getContents, interact,
+	     readFile, writeFile, appendFile, readIO, readLn
+	   )
+
+{- Declared elsewhere:
+PrelBase: infixr 9 .
+PrelNum:  infixr 8 ^, ^^, **
+PrelBase: infixl *
+PrelNum:  infixl 7 /, %, `quot`, `rem`, `div`, `mod`
+PrelBase: infixl 6 +, -
+PrelBase: infixr 5 :, ++
+PrelBase: infix  4 ==, /=, <. <=, >=, >
+PrelBase: infixr 3 &&
+PrelBase: infixr 2 ||
+PrelBase: infixl >>, >>=
+PrelBase: infixr $
+-}
+infixr 0 `seq`
+
 
 -- These can't conveniently be defined in PrelBase because they use numbers,
 -- or I/O, so here's a convenient place to do them.
