@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.62 2001/12/05 00:08:27 sof Exp $
+-- $Id: DriverState.hs,v 1.63 2001/12/10 14:08:14 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -159,7 +159,9 @@ GLOBAL_VAR(v_MaxSimplifierIterations,   4,     Int)
 GLOBAL_VAR(v_StgStats,                  False, Bool)
 GLOBAL_VAR(v_UsageSPInf,  	     	False, Bool)  -- Off by default
 GLOBAL_VAR(v_Strictness,  		True,  Bool)
+#ifdef DEBUG
 GLOBAL_VAR(v_CPR,         		True,  Bool)
+#endif
 GLOBAL_VAR(v_CSE,         		True,  Bool)
 GLOBAL_VAR(v_RuleCheck,       		Nothing,  Maybe String)
 
@@ -199,7 +201,9 @@ buildCoreToDo = do
    max_iter   <- readIORef v_MaxSimplifierIterations
    usageSP    <- readIORef v_UsageSPInf
    strictness <- readIORef v_Strictness
+#ifdef DEBUG
    cpr        <- readIORef v_CPR
+#endif
    cse        <- readIORef v_CSE
    rule_check <- readIORef v_RuleCheck
 
@@ -275,7 +279,9 @@ buildCoreToDo = do
 	],
 	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
 
+#ifdef DEBUG
 	if cpr        then CoreDoCPResult   else CoreDoNothing,
+#endif
 	if strictness then CoreDoStrictness else CoreDoNothing,
 	CoreDoWorkerWrapper,
 	CoreDoGlomBinds,
@@ -356,8 +362,11 @@ addToDirList :: IORef [String] -> String -> IO ()
 addToDirList ref path
   = do paths           <- readIORef ref
        shiny_new_ones  <- splitUp path
-       writeIORef ref (paths ++ shiny_new_ones)
-
+       writeIORef ref (paths ++ filter (not.null) shiny_new_ones)
+		-- empty paths are ignored: there might be a trailing
+		-- ':' in the initial list, for example.  Empty paths can
+		-- cause confusion when they are translated into -I options
+		-- for passing to gcc.
   where
     splitUp ::String -> IO [String]
 #ifdef mingw32_TARGET_OS
