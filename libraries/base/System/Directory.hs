@@ -28,7 +28,9 @@ module System.Directory
     -- * Actions on files
     , removeFile		-- :: FilePath -> IO ()
     , renameFile                -- :: FilePath -> FilePath -> IO ()
+#ifdef __GLASGOW_HASKELL__
     , copyFile                  -- :: FilePath -> FilePath -> IO ()
+#endif
 
     -- * Existence tests
     , doesFileExist		-- :: FilePath -> IO Bool
