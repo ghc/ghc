@@ -1,5 +1,0 @@
-
-cc001.hs:2:
-    Ambiguous type variable `t' in the top-level constraint:
-      `GHC.Prim.CCallable t'
-	arising from an argument in the _ccall_ to `foo', namely `(undefined ())' at cc001.hs:5
