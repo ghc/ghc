@@ -1321,36 +1321,36 @@ Read words out of mutable memory:
 
 \begin{code}
 readWord8OffAddr :: Addr -> Int -> IO Word8
-readWord8OffAddr a i = _casm_ `` %r=(StgNat8)(((StgNat8*)%0)[(StgInt)%1]); '' a i
+readWord8OffAddr a i = _casm_ `` %r=((StgWord8*)%0)[(StgInt)%1]; '' a i
 
 readWord16OffAddr  :: Addr -> Int -> IO Word16
-readWord16OffAddr a i = _casm_ `` %r=(StgNat16)(((StgNat16*)%0)[(StgInt)%1]); '' a i
+readWord16OffAddr a i = _casm_ `` %r=((StgWord16*)%0)[(StgInt)%1]; '' a i
 
 readWord32OffAddr  :: Addr -> Int -> IO Word32
-readWord32OffAddr a i = _casm_ `` %r=(StgNat32)(((StgNat32*)%0)[(StgInt)%1]); '' a i
+readWord32OffAddr a i = _casm_ `` %r=((StgWord32*)%0)[(StgInt)%1]; '' a i
 
 readWord64OffAddr  :: Addr -> Int -> IO Word64
 #if WORD_SIZE_IN_BYTES==8
-readWord64OffAddr a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a i
+readWord64OffAddr a i = _casm_ `` %r=((StgWord*)%0)[(StgInt)%1]; '' a i
 #else
-readWord64OffAddr a i = _casm_ `` %r=(StgNat64)(((StgNat64*)%0)[(StgInt)%1]); '' a i
+readWord64OffAddr a i = _casm_ `` %r=((StgWord64*)%0)[(StgInt)%1]; '' a i
 #endif
 
 #ifndef __PARALLEL_HASKELL__
 readWord8OffForeignObj :: ForeignObj -> Int -> IO Word8
-readWord8OffForeignObj fo i = _casm_ `` %r=(StgNat8)(((StgNat8*)%0)[(StgInt)%1]); '' fo i
+readWord8OffForeignObj fo i = _casm_ `` %r=((StgWord8*)%0)[(StgInt)%1]; '' fo i
 
 readWord16OffForeignObj  :: ForeignObj -> Int -> IO Word16
-readWord16OffForeignObj fo i = _casm_ `` %r=(StgNat16)(((StgNat16*)%0)[(StgInt)%1]); '' fo i
+readWord16OffForeignObj fo i = _casm_ `` %r=((StgWord16*)%0)[(StgInt)%1]; '' fo i
 
 readWord32OffForeignObj  :: ForeignObj -> Int -> IO Word32
-readWord32OffForeignObj fo i = _casm_ `` %r=(StgNat32)(((StgNat32*)%0)[(StgInt)%1]); '' fo i
+readWord32OffForeignObj fo i = _casm_ `` %r=((StgWord32*)%0)[(StgInt)%1]; '' fo i
 
 readWord64OffForeignObj  :: ForeignObj -> Int -> IO Word64
 #if WORD_SIZE_IN_BYTES==8
-readWord64OffForeignObj fo i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' fo i
+readWord64OffForeignObj fo i = _casm_ `` %r=((StgWord*)%0)[(StgInt)%1]; '' fo i
 #else
-readWord64OffForeignObj fo i = _casm_ `` %r=(StgNat64)(((StgNat64*)%0)[(StgInt)%1]); '' fo i
+readWord64OffForeignObj fo i = _casm_ `` %r=((StgWord64*)%0)[(StgInt)%1]; '' fo i
 #endif
 
 #endif 
@@ -1366,7 +1366,7 @@ writeWord8OffAddr (A# a#) (I# i#) (W8# w#) = IO $ \ s# ->
       case (writeCharOffAddr# a# i# (chr# (word2Int# w#)) s#) of s2# -> (# s2#, () #)
 
 writeWord16OffAddr :: Addr -> Int -> Word16 -> IO ()
-writeWord16OffAddr a i e = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' a i e
+writeWord16OffAddr a i e = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgWord16)%2; '' a i e
 
 writeWord32OffAddr :: Addr -> Int -> Word32 -> IO ()
 writeWord32OffAddr (A# a#) i (W32# w#) = IO $ \ s# ->
@@ -1392,13 +1392,13 @@ writeWord64OffAddr (A# a#) (I# i#) (W64# w#) = IO $ \ s# ->
 #ifndef __PARALLEL_HASKELL__
 
 writeWord8OffForeignObj  :: ForeignObj -> Int -> Word8  -> IO ()
-writeWord8OffForeignObj fo i w = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' fo i w
+writeWord8OffForeignObj fo i w = _casm_ `` (((StgWord8*)%0)[(StgInt)%1])=(StgWord8)%2; '' fo i w
 
 writeWord16OffForeignObj :: ForeignObj -> Int -> Word16 -> IO ()
-writeWord16OffForeignObj fo i w = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' fo i w
+writeWord16OffForeignObj fo i w = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgWord16)%2; '' fo i w
 
 writeWord32OffForeignObj :: ForeignObj -> Int -> Word32 -> IO ()
-writeWord32OffForeignObj fo i w = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' fo i' w
+writeWord32OffForeignObj fo i w = _casm_ `` (((StgWord32*)%0)[(StgInt)%1])=(StgWord32)%2; '' fo i' w
  where
    -- adjust index to be in Word units, not Word32 ones.
   i' 
@@ -1412,7 +1412,7 @@ writeWord64OffForeignObj :: ForeignObj -> Int -> Word64 -> IO ()
 # if WORD_SIZE_IN_BYTES==8
 writeWord64OffForeignObj fo i e = _casm_ `` (((StgWord*)%0)[(StgInt)%1])=(StgWord)%2; '' fo i e
 # else
-writeWord64OffForeignObj fo i e = _casm_ `` (((StgNat64*)%0)[(StgInt)%1])=(StgNat64)%2; '' fo i e
+writeWord64OffForeignObj fo i e = _casm_ `` (((StgWord64*)%0)[(StgInt)%1])=(StgWord64)%2; '' fo i e
 # endif
 
 #endif
