@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.11 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: HsFFI.h,v 1.12 2000/12/13 11:57:19 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -79,7 +79,8 @@ typedef StgFloat		HsFloat;
 typedef StgDouble		HsDouble;
 typedef StgBool			HsBool;
 typedef void*			HsAddr;         /* this should better match StgAddr */
-typedef void*			HsForeignObj;   /* ... and this StgForeignPtr       */
+typedef void*			HsForeignPtr;   /* ... and this StgForeignPtr       */
+typedef void*			HsForeignObj;   /* DEPRECATED */
 typedef void*			HsStablePtr;
 
 /* this should correspond to the type of StgChar in StgTypes.h */
