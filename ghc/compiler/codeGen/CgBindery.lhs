@@ -91,7 +91,7 @@ voidIdInfo id = CgIdInfo { cg_id = id, cg_vol = NoVolatileLoc
 			 , cg_rep = VoidArg }
 	-- Used just for VoidRep things
 
-data VolatileLoc
+data VolatileLoc	-- These locations die across a call
   = NoVolatileLoc
   | RegLoc	CmmReg		   -- In one of the registers (global or local)
   | VirHpLoc	VirtualHpOffset  -- Hp+offset (address of closure)

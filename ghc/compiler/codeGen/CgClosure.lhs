@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.65 2004/11/26 16:20:03 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.66 2004/12/08 14:32:29 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -237,7 +237,7 @@ So it should set up an update frame (if it is shared).
 NB: Thunks cannot have a primitive type!
 
 \begin{code}
-closureCodeBody binder_info cl_info cc [] body = do
+closureCodeBody binder_info cl_info cc [{- No args i.e. thunk -}] body = do
   { body_absC <- getCgStmts $ do
 	{ tickyEnterThunk cl_info
 	; ldvEnter (CmmReg nodeReg)  -- NB: Node always points when profiling
@@ -261,8 +261,9 @@ argSatisfactionCheck (by calling fetchAndReschedule).  There info if
 Node points to closure is available. -- HWL
 
 \begin{code}
-closureCodeBody binder_info cl_info cc args body = do
-  {   	-- Get the current virtual Sp (it might not be zero, 
+closureCodeBody binder_info cl_info cc args body 
+  = ASSERT( length args > 0 )
+  do { 	-- Get the current virtual Sp (it might not be zero, 
 	-- eg. if we're compiling a let-no-escape).
     vSp <- getVirtSp
   ; let (reg_args, other_args) = assignCallRegs (addIdReps args)

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.42 2004/11/26 16:20:10 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.43 2004/12/08 14:32:31 simonpj Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -280,7 +280,7 @@ data StackUsage
 	 hwSp :: VirtualSpOffset
   }		   -- Highest value ever taken by virtSp
 
--- INVARAINT: The environment contains no Stable references to
+-- INVARIANT: The environment contains no Stable references to
 -- 	      stack slots below (lower offset) frameSp
 --	      It can contain volatile references to this area though.
 

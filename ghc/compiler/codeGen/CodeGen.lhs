@@ -295,7 +295,7 @@ cgTopBinding dflags (StgRec pairs, srts)
 	; bndrs' <- mapFCs maybeExternaliseId bndrs
 	; let pairs' = zip bndrs' rhss
 	; mapM_ (mkSRT dflags bndrs')  srts
-	; new_binds <- fixC (\ new_binds -> do 
+	; _new_binds <- fixC (\ new_binds -> do 
 		{ addBindsC new_binds
 		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
 	; nopC }
