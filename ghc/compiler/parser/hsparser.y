@@ -75,6 +75,7 @@ static int Fixity = 0, Precedence = 0;
 char *ineg PROTO((char *));
 
 long    source_version = 0;
+BOOLEAN pat_check=TRUE;
 
 %}
 
@@ -982,7 +983,7 @@ dexp	:  MINUS kexp				{ $$ = mknegate($2); }
 
 /*
   We need to factor out a leading let expression so we can set
-  inpat=TRUE when parsing (non let) expressions inside stmts and quals
+  pat_check=FALSE when parsing (non let) expressions inside stmts and quals
 */
 expLno 	: oexpLno DCOLON ctype			{ $$ = mkrestr($1,$3); }
 	| oexpLno
@@ -1098,9 +1099,9 @@ aexp	:  qvar					{ $$ = mkident($1); }
 
 	/* only in patterns ... */
 	/* these add 2 S/R conflict with with  aexp . OCURLY rbinds CCURLY */
-	|  qvar AT aexp				{ $$ = mkas($1,$3); }
-	|  LAZY aexp				{ $$ = mklazyp($2); }
-	|  WILDCARD				{ $$ = mkwildp();   }
+	|  qvar AT aexp				{ checkinpat(); $$ = mkas($1,$3); }
+	|  LAZY aexp				{ checkinpat(); $$ = mklazyp($2); }
+	|  WILDCARD				{ checkinpat(); $$ = mkwildp();   }
 	;
 
 	/* ccall arguments */
@@ -1167,32 +1168,63 @@ list_rest : 	exp				{ $$ = lsing($1); }
 	   at it, it *will* do the wrong thing [WDP 94/06])
 	*/
 
-letdecls:  LET ocurly decls ccurly		{ $$ = $3; }
-	|  LET vocurly decls vccurly		{ $$ = $3; }
+letdecls:  LET { pat_check = TRUE; } ocurly decls ccurly		{ $$ = $4; }
+	|  LET { pat_check = TRUE; } vocurly decls vccurly		{ $$ = $4; }
 	;
 
-quals	:  qual					{ $$ = lsing($1); }
-	|  quals COMMA qual			{ $$ = lapp($1,$3); }
+/*
+ When parsing patterns inside do stmt blocks or quals, we have
+ to tentatively parse them as expressions, since we don't know at
+ the time of parsing `p' whether it will be part of "p <- e" (pat)
+ or "p" (expr). When we eventually can tell the difference, the parse
+ of `p' is examined to see if it consitutes a syntactically legal pattern
+ or expression.
+
+ The expr rule used to parse the pattern/expression do contain
+ pattern-special productions (e.g., _ , a@pat, etc.), which are
+ illegal in expressions. Since we don't know whether what
+ we're parsing is an expression rather than a pattern, we turn off
+ the check and instead do it later.
+ 
+ The rather clumsy way that this check is turned on/off is there
+ to work around a Bison feature/shortcoming. Turning the flag 
+ on/off just around the relevant nonterminal by decorating it
+ with simple semantic actions, e.g.,
+
+    {pat_check = FALSE; } expLNo { pat_check = TRUE; }
+
+ causes Bison to generate a parser where in one state it either
+ has to reduce/perform a semantic action ( { pat_check = FALSE; })
+ or reduce an error (the error production used to implement
+ vccurly.) Bison picks the semantic action, which it ideally shouldn't.
+ The work around is to lift out the setting of { pat_check = FALSE; }
+ and then later reset pat_check. Not pretty.
+
+*/
+
+
+quals	:  { pat_check = FALSE;} qual 	           { pat_check = TRUE; $$ = lsing($2); }
+	|  quals COMMA { pat_check = FALSE; } qual { pat_check = TRUE; $$ = lapp($1,$4); }
 	;
 
-qual	:  letdecls				{ $$ = mkseqlet($1); }
-	|  expL					{ $$ = $1; }
-	|  expLno leftexp
-		{ if ($2 == NULL) {
-		      expORpat(LEGIT_EXPR,$1);
-		      $$ = mkguard($1);
-		  } else {
-		      expORpat(LEGIT_PATT,$1);
-		      $$ = mkqual($1,$2);
-		  }
-		}
+qual	:  letdecls	                        { $$ = mkseqlet($1); }
+	|  expL					{ expORpat(LEGIT_EXPR,$1); $$ = $1; }
+ 	|  expLno { pat_check = TRUE; } leftexp
+ 						{ if ($3 == NULL) {
+ 		      				     expORpat(LEGIT_EXPR,$1);
+ 		      				     $$ = mkguard($1);
+		  				  } else {
+		      				     expORpat(LEGIT_PATT,$1);
+ 		      				     $$ = mkqual($1,$3);
+		  				  }
+						}
 	;
 
 alts	:  alt					{ $$ = $1; }
 	|  alts SEMI alt			{ $$ = lconc($1,$3); }
 	;
 
-alt	:  pat { PREVPATT = $1; } altrest	{ expORpat(LEGIT_PATT,$1); $$ = lsing($3); PREVPATT = NULL; }
+alt	:  pat { PREVPATT = $1; } altrest	{ $$ = lsing($3); PREVPATT = NULL; }
 	|  /* empty */				{ $$ = Lnil; }
 	;
 
@@ -1204,23 +1236,24 @@ gdpat	:  gd RARROW exp			{ $$ = lsing(mkpgdexp($1,$3)); }
 	|  gd RARROW exp gdpat			{ $$ = mklcons(mkpgdexp($1,$3),$4);  }
 	;
 
-stmts	:  stmt 				{ $$ = $1; }
-	|  stmts SEMI stmt			{ $$ = lconc($1,$3); }
+stmts	:  {pat_check = FALSE;} stmt 	      {pat_check=TRUE; $$ = $2; }
+	|  stmts SEMI {pat_check=FALSE;} stmt {pat_check=TRUE; $$ = lconc($1,$4); }
 	;
 
 stmt	: /* empty */				{ $$ = Lnil; } 
-	| letdecls				{ $$ = lsing(mkseqlet($1)); }
-	|  expL					{ $$ = lsing(mkdoexp($1,hsplineno)); }
-        |  expLno leftexp
-		{ if ($2 == NULL) {
-		      expORpat(LEGIT_EXPR,$1);
-		      $$ = lsing(mkdoexp($1,endlineno));
-		  } else {
-		      expORpat(LEGIT_PATT,$1);
-		      $$ = lsing(mkdobind($1,$2,endlineno));
-		  }
-		}
+	| letdecls		                { $$ = lsing(mkseqlet($1)); }
+	| expL					{ expORpat(LEGIT_EXPR,$1); $$ = lsing(mkdoexp($1,hsplineno)); }
+ 	| expLno {pat_check=TRUE;} leftexp
+ 						{ if ($3 == NULL) {
+ 		      				     expORpat(LEGIT_EXPR,$1);
+ 		      				     $$ = lsing(mkdoexp($1,endlineno));
+		  				  } else {
+		      				     expORpat(LEGIT_PATT,$1);
+		      				     $$ = lsing(mkdobind($1,$3,endlineno));
+		  				  }
+						}
 	;
+
 
 leftexp	:  LARROW exp				{ $$ = $2; }
         |  /* empty */				{ $$ = NULL; }
@@ -1599,14 +1632,12 @@ vccurly1:
 **********************************************************************/
 
 
-/*
 void
 checkinpat()
 {
-  if(!inpat)
+  if(pat_check)
     hsperror("pattern syntax used in expression");
 }
-*/
 
 /* The parser calls "hsperror" when it sees a
    `report this and die' error.  It sets the stage
@@ -1643,7 +1674,7 @@ yyerror(s)
     /* We want to be able to distinguish 'error'-raised yyerrors
        from yyerrors explicitly coded by the parser hacker.
     */
-    if (expect_ccurly && ! error_and_I_mean_it ) {
+    if ( expect_ccurly && ! error_and_I_mean_it ) {
 	/*NOTHING*/;
 
     } else {
