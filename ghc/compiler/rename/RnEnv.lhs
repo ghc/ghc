@@ -80,7 +80,7 @@ newTopBinder mod rdr_name loc
     	-- There should never be a qualified name in a binding position (except in instance decls)
 	-- The parser doesn't check this because the same parser parses instance decls
     (if isQual rdr_name then
-	qualNameErr (text "its declaration") (rdr_name,loc)
+	qualNameErr (text "In its declaration") (rdr_name,loc)
      else
 	returnRn ()
     )				`thenRn_`
