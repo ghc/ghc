@@ -1,18 +1,15 @@
-
 /* --------------------------------------------------------------------------
  * Assembly code to call C and Haskell functions 
  *
- * Copyright (c) 1994-1999.
+ * Copyright (c) 1994-2001.
  *
- * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.9 $
- * $Date: 1999/11/17 13:19:36 $
+ * $Id: universal_call_c.S,v 1.10 2001/02/09 17:15:20 simonmar Exp $
  * ------------------------------------------------------------------------*/
 	
+#if 0 /* later:	 GHCI */
+
 #include "config.h"
-#include "options.h"	
 	
-#ifdef INTERPRETER
 	.file "universal_call_c.S"
 
 #if 0
@@ -225,4 +222,4 @@ ADD_UNDERSCORE(universal_call_c_x86_stdcall:)
 
 #endif /* i386_TARGET_ARCH */
 	
-#endif /* INTERPRETER */
+#endif /* GHCI */
