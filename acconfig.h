@@ -354,9 +354,6 @@
 /* Define as the symbol which marks the end of the data section */
 #undef DATA_SECTION_END_MARKER
 
-/* Define as the symbol which marks the end of the data section */
-#undef DATA_SECTION_WIBBLE
-
 /* Define as the decl which terminates the data section */
 #undef DATA_SECTION_END_MARKER_DECL
 
