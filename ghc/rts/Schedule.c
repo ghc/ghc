@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.139 2002/04/23 09:56:28 stolz Exp $
+ * $Id: Schedule.c,v 1.140 2002/04/23 14:20:18 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1445,7 +1445,8 @@ StgInt forkProcess(StgTSO* tso) {
   }
   return pid;
 #else /* mingw32 */
-  barf("forkProcess#: primop not implemented for mingw32, sorry!");
+  barf("forkProcess#: primop not implemented for mingw32, sorry! (%u)\n", tso->id);
+  /* pointlessly printing out the TSOs 'id' to avoid CC unused warning. */
   return -1;
 #endif /* mingw32 */
 }
