@@ -52,11 +52,92 @@ import GHC.List	( (!!),
 %*********************************************************
 
 \begin{code}
+-- | The @shows@ functions return a function that prepends the
+-- output 'String' to an existing 'String'.  This allows constant-time
+-- concatenation of results using function composition.
 type ShowS = String -> String
 
+-- | Conversion of values to readable 'String's.
+--
+-- Minimal complete definition: 'showsPrec' or 'show'.
+--
+-- Derived instances of 'Show' have the following properties, which
+-- are compatible with derived instances of 'Text.Read.Read':
+--
+-- * The result of 'show' is a syntactically correct Haskell
+--   expression containing only constants, given the fixity
+--   declarations in force at the point where the type is declared.
+--   It contains only the constructor names defined in the data type,
+--   parentheses, and spaces.  When labelled constructor fields are
+--   used, braces, commas, field names, and equal signs are also used.
+--
+-- * If the constructor is defined to be an infix operator, then
+--   'showsPrec' will produce infix applications of the constructor.
+--
+-- * the representation will be enclosed in parentheses if the
+--   precedence of the top-level constructor in @x@ is less than @d@
+--   (associativity is ignored).  Thus, if @d@ is @0@ then the result
+--   is never surrounded in parentheses; if @d@ is @11@ it is always
+--   surrounded in parentheses, unless it is an atomic expression.
+--
+-- * If the constructor is defined using record syntax, then 'show'
+--   will produce the record-syntax form, with the fields given in the
+--   same order as the original declaration.
+--
+-- For example, given the declarations
+--
+-- > infixr 5 :^:
+-- > data Tree a =  Leaf a  |  Tree a :^: Tree a
+--
+-- the derived instance of 'Show' is equivalent to
+--
+-- > instance (Show a) => Show (Tree a) where
+-- >
+-- >        showsPrec d (Leaf m) = showParen (d > app_prec) $
+-- >             showString "Leaf " . showsPrec (app_prec+1) m
+-- >          where app_prec = 10
+-- >
+-- >        showsPrec d (u :^: v) = showParen (d > up_prec) $
+-- >             showsPrec (up_prec+1) u . 
+-- >             showString " :^: "      .
+-- >             showsPrec (up_prec+1) v
+-- >          where up_prec = 5
+--
+-- Note that right-associativity of @:^:@ is ignored.  For example,
+--
+-- * @'show' (Leaf 1 :^: Leaf 2 :^: Leaf 3)@ produces the string
+--   @\"Leaf 1 :^: (Leaf 2 :^: Leaf 3)\"@.
+
 class  Show a  where
-    showsPrec :: Int -> a -> ShowS
+    -- | Convert a value to a readable 'String'.
+    --
+    -- 'showsPrec' should satisfy the law
+    --
+    -- > showsPrec d x r ++ s  ==  showsPrec d x (r ++ s)
+    --
+    -- Derived instances of 'Text.Read.Read' and 'Show' satisfy the following:
+    --
+    -- * @(x,\"\")@ is an element of
+    --   @('Text.Read.readsPrec' d ('showsPrec' d x \"\"))@.
+    --
+    -- That is, 'Text.Read.readsPrec' parses the string produced by
+    -- 'showsPrec', and delivers the value that 'showsPrec' started with.
+
+    showsPrec :: Int	-- ^ the operator precedence of the enclosing
+			-- context (a number from @0@ to @11@).
+			-- Function application has precedence @10@.
+	      -> a	-- ^ the value to be converted to a 'String'
+	      -> ShowS
+
+    -- | A specialised variant of 'showsPrec', using precedence context
+    -- zero, and returning an ordinary 'String'.
     show      :: a   -> String
+
+    -- | The method 'showList' is provided to allow the programmer to
+    -- give a specialised way of showing lists of values.
+    -- For example, this is used by the predefined 'Show' instance of
+    -- the 'Char' type, where values of type 'String' should be shown
+    -- in double quotes, rather than between square brackets.
     showList  :: [a] -> ShowS
 
     showsPrec _ x s = show x ++ s
@@ -181,15 +262,22 @@ instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
 %*********************************************************
 
 \begin{code}
+-- | equivalent to 'showsPrec' with a precedence of 0.
 shows           :: (Show a) => a -> ShowS
 shows           =  showsPrec zeroInt
 
+-- | utility function converting a 'Char' to a show function that
+-- simply prepends the character unchanged.
 showChar        :: Char -> ShowS
 showChar        =  (:)
 
+-- | utility function converting a 'String' to a show function that
+-- simply prepends the string unchanged.
 showString      :: String -> ShowS
 showString      =  (++)
 
+-- | utility function that surrounds the inner show function with
+-- parentheses when the 'Bool' parameter is 'True'.
 showParen       :: Bool -> ShowS -> ShowS
 showParen b p   =  if b then showChar '(' . p . showChar ')' else p
 

@@ -8,18 +8,15 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- The standard Time library.
---
+-- The standard Time library, providing standard functionality for clock
+-- times, including timezone information (i.e, the functionality of
+-- \"@time.h@\", adapted to the Haskell environment).  It follows RFC
+-- 1129 in its use of Coordinated Universal Time (UTC).
 -----------------------------------------------------------------------------
 
 {-
 Haskell 98 Time of Day Library
 ------------------------------
-
-The Time library provides standard functionality for clock times,
-including timezone information (i.e, the functionality of "time.h",
-adapted to the Haskell environment), It follows RFC 1129 in its use of
-Coordinated Universal Time (UTC).
 
 2000/06/17 <michael.weber@post.rwth-aachen.de>:
 RESTRICTIONS:
@@ -69,14 +66,15 @@ TODO:
 
 module System.Time
      (
-        Month(..)
-     ,  Day(..)
+	-- * Clock times
 
-     ,  ClockTime(..) -- non-standard, lib. report gives this as abstract
+        ClockTime(..) -- non-standard, lib. report gives this as abstract
 	-- instance Eq, Ord
 	-- instance Show (non-standard)
 
      ,	getClockTime
+
+	-- * Time differences
 
      ,  TimeDiff(..)
      ,  noTimeDiff      -- non-standard (but useful when constructing TimeDiff vals.)
@@ -87,7 +85,11 @@ module System.Time
      ,  timeDiffToString  -- non-standard
      ,  formatTimeDiff    -- non-standard
 
+	-- * Calendar times
+
      ,  CalendarTime(..)
+     ,  Month(..)
+     ,  Day(..)
      ,	toCalendarTime
      ,  toUTCTime
      ,  toClockTime
@@ -125,23 +127,31 @@ import Foreign.C
 
 -- One way to partition and give name to chunks of a year and a week:
 
+-- | A month of the year.
+
 data Month
  = January   | February | March    | April
  | May       | June     | July     | August
  | September | October  | November | December
  deriving (Eq, Ord, Enum, Bounded, Ix, Read, Show)
 
+-- | A day of the week.
+
 data Day 
  = Sunday   | Monday | Tuesday | Wednesday
  | Thursday | Friday | Saturday
  deriving (Eq, Ord, Enum, Bounded, Ix, Read, Show)
 
--- @ClockTime@ is an abstract type, used for the internal clock time.
+-- | A representation of the internal clock time.
 -- Clock times may be compared, converted to strings, or converted to an
--- external calendar time @CalendarTime@.
+-- external calendar time 'CalendarTime' for I\/O or other manipulations.
 
-data ClockTime = TOD Integer 		-- Seconds since 00:00:00 on 1 Jan 1970
-		     Integer		-- Picoseconds with the specified second
+data ClockTime = TOD Integer Integer
+		-- ^ Construct a clock time.  The arguments are a number
+		-- of seconds since 00:00:00 (UTC) on 1 January 1970,
+		-- and an additional number of picoseconds.
+		--
+		-- In Haskell 98, the 'ClockTime' type is abstract.
 	       deriving (Eq, Ord)
 
 -- When a ClockTime is shown, it is converted to a CalendarTime in the current
@@ -153,49 +163,47 @@ instance Show ClockTime where
 	  			 (unsafePerformIO (toCalendarTime t)))
 
 {-
-@CalendarTime@ is a user-readable and manipulable
-representation of the internal $ClockTime$ type.  The
-numeric fields have the following ranges.
+The numeric fields have the following ranges.
 
 \begin{verbatim}
 Value         Range             Comments
 -----         -----             --------
 
 year    -maxInt .. maxInt       [Pre-Gregorian dates are inaccurate]
-mon           0 .. 11           [Jan = 0, Dec = 11]
 day           1 .. 31
 hour          0 .. 23
 min           0 .. 59
 sec           0 .. 61           [Allows for two leap seconds]
 picosec       0 .. (10^12)-1    [This could be over-precise?]
-wday          0 .. 6            [Sunday = 0, Saturday = 6]
 yday          0 .. 365          [364 in non-Leap years]
 tz       -43200 .. 43200        [Variation from UTC in seconds]
 \end{verbatim}
-
-The {\em tzname} field is the name of the time zone.  The {\em isdst}
-field indicates whether Daylight Savings Time would be in effect.
 -}
+
+-- | 'CalendarTime' is a user-readable and manipulable
+-- representation of the internal 'ClockTime' type.
 
 data CalendarTime 
  = CalendarTime  {
-     ctYear    :: Int,
-     ctMonth   :: Month,
-     ctDay     :: Int,
-     ctHour    :: Int,
-     ctMin     :: Int,
-     ctSec     :: Int,
-     ctPicosec :: Integer,
-     ctWDay    :: Day,
-     ctYDay    :: Int,
-     ctTZName  :: String,
-     ctTZ      :: Int,
-     ctIsDST   :: Bool
+       ctYear    :: Int		-- ^ Year (pre-Gregorian dates are inaccurate)
+     , ctMonth   :: Month	-- ^ Month of the year
+     , ctDay     :: Int		-- ^ Day of the month (1 to 31)
+     , ctHour    :: Int		-- ^ Hour of the day (0 to 23)
+     , ctMin     :: Int		-- ^ Minutes (0 to 59)
+     , ctSec     :: Int		-- ^ Seconds (0 to 61, allowing for up to
+				-- two leap seconds)
+     , ctPicosec :: Integer	-- ^ Picoseconds
+     , ctWDay    :: Day		-- ^ Day of the week
+     , ctYDay    :: Int		-- ^ Day of the year
+				-- (0 to 364, or 365 in leap years)
+     , ctTZName  :: String	-- ^ Name of the time zone
+     , ctTZ      :: Int		-- ^ Variation from UTC in seconds
+     , ctIsDST   :: Bool	-- ^ 'True' if Daylight Savings Time would
+				-- be in effect, and 'False' otherwise
  }
  deriving (Eq,Ord,Read,Show)
 
--- The @TimeDiff@ type records the difference between two clock times in
--- a user-readable way.
+-- | records the difference between two clock times in a user-readable way.
 
 data TimeDiff
  = TimeDiff {
@@ -209,11 +217,13 @@ data TimeDiff
    }
    deriving (Eq,Ord,Read,Show)
 
+-- | null time difference.
+
 noTimeDiff :: TimeDiff
 noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 
 -- -----------------------------------------------------------------------------
--- getClockTime returns the current time in its internal representation.
+-- | returns the current time in its internal representation.
 
 getClockTime :: IO ClockTime
 #ifdef __HUGS__
@@ -248,10 +258,9 @@ getClockTime = do
 #endif
 
 -- -----------------------------------------------------------------------------
--- addToClockTime d t adds a time difference d and a
--- clock time t to yield a new clock time.  The difference d
--- may be either positive or negative.  diffClockTimes t1 t2 returns 
--- the difference between two clock times t1 and t2 as a TimeDiff.
+-- | @'addToClockTime' d t@ adds a time difference @d@ and a
+-- clock time @t@ to yield a new clock time.  The difference @d@
+-- may be either positive or negative.
 
 addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
@@ -277,6 +286,9 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
 	in
 	toClockTime cal{ctMonth=month', ctYear=year'}
 
+-- | @'diffClockTimes' t1 t2@ returns the difference between two clock
+-- times @t1@ and @t2@ as a 'TimeDiff'.
+
 diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
 -- diffClockTimes is meant to be the dual to `addToClockTime'.
 -- If you want to have the TimeDiff properly splitted, use
@@ -289,6 +301,8 @@ diffClockTimes (TOD sa pa) (TOD sb pb) =
               , tdPicosec = pa - pb
               }
 
+
+-- | converts a time difference to normal form.
 
 normalizeTimeDiff :: TimeDiff -> TimeDiff
 -- FIXME: handle psecs properly
@@ -386,12 +400,10 @@ gmtoff x = do
 #endif /* ! __HUGS__ */
 
 -- -----------------------------------------------------------------------------
--- toCalendarTime t converts t to a local time, modified by
--- the current timezone and daylight savings time settings.  toUTCTime
--- t converts t into UTC time.  toClockTime l converts l into the 
--- corresponding internal ClockTime.  The wday, yday, tzname, and isdst fields
--- are ignored.
-
+-- | converts an internal clock time to a local time, modified by the
+-- timezone and daylight savings time settings in force at the time
+-- of conversion.  Because of this dependence on the local environment,
+-- 'toCalendarTime' is in the 'IO' monad.
 
 toCalendarTime :: ClockTime -> IO CalendarTime
 #ifdef __HUGS__
@@ -401,6 +413,9 @@ toCalendarTime =  clockToCalendarTime_reentrant (throwAwayReturnPointer localtim
 #else
 toCalendarTime =  clockToCalendarTime_static localtime False
 #endif
+
+-- | converts an internal clock time into a 'CalendarTime' in standard
+-- UTC format.
 
 toUTCTime :: ClockTime -> CalendarTime
 #ifdef __HUGS__
@@ -488,6 +503,10 @@ clockToCalendarTime_aux is_utc p_tm psec = do
 		(if is_utc then False else isdst /= 0))
 #endif /* ! __HUGS__ */
 
+-- | converts a 'CalendarTime' into the corresponding internal
+-- 'ClockTime', ignoring the contents of the  'ctWDay', 'ctYDay',
+-- 'ctTZName' and 'ctIsDST' fields.
+
 toClockTime :: CalendarTime -> ClockTime
 #ifdef __HUGS__
 toClockTime (CalendarTime yr mon mday hour min sec psec
@@ -543,8 +562,14 @@ toClockTime (CalendarTime year mon mday hour min sec psec
 -- -----------------------------------------------------------------------------
 -- Converting time values to strings.
 
+-- | formats calendar times using local conventions.
+
 calendarTimeToString  :: CalendarTime -> String
 calendarTimeToString  =  formatCalendarTime defaultTimeLocale "%c"
+
+-- | formats calendar times using local conventions and a formatting string.
+-- The formatting string is that understood by the ISO C @strftime()@
+-- function.
 
 formatCalendarTime :: TimeLocale -> String -> CalendarTime -> String
 formatCalendarTime l fmt (CalendarTime year mon day hour min sec _
@@ -624,8 +649,14 @@ to12 h = let h' = h `mod` 12 in if h' == 0 then 12 else h'
 
 -- Useful extensions for formatting TimeDiffs.
 
+-- | formats time differences using local conventions.
+
 timeDiffToString :: TimeDiff -> String
 timeDiffToString = formatTimeDiff defaultTimeLocale "%c"
+
+-- | formats time differences using local conventions and a formatting string.
+-- The formatting string is that understood by the ISO C @strftime()@
+-- function.
 
 formatTimeDiff :: TimeLocale -> String -> TimeDiff -> String
 formatTimeDiff l fmt td@(TimeDiff year month day hour min sec _)

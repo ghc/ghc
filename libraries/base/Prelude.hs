@@ -111,11 +111,15 @@ module Prelude (
     lines, words, unlines, unwords,
 
     -- * Converting to and from @String@
-    ReadS, ShowS,
-    Read(readsPrec, readList),
+    -- ** Converting to @String@
+    ShowS,
     Show(showsPrec, showList, show),
-    reads, shows, read, lex, 
-    showChar, showString, readParen, showParen,
+    shows,
+    showChar, showString, showParen,
+    -- ** Converting from @String@
+    ReadS,
+    Read(readsPrec, readList),
+    reads, readParen, read, lex, 
     
     -- * Basic Input and output
     IO,

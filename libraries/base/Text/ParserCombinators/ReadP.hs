@@ -66,7 +66,10 @@ infixr 5 +++, <++
 -- ReadS
 
 -- | A parser for a type @a@, represented as a function that takes a
--- 'String' and returns a list of possible parses @(a,'String')@ pairs.
+-- 'String' and returns a list of possible parses as @(a,'String')@ pairs.
+--
+-- Note that this kind of backtracking parser is very inefficient;
+-- reading a large structure may be quite slow (cf 'ReadP').
 type ReadS a = String -> [(a,String)]
 #endif
 

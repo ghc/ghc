@@ -9,6 +9,8 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (uses Text.ParserCombinators.ReadP)
 --
+-- Converting strings to values.
+--
 -- The "Text.Read" library is the canonical library to import for
 -- 'Read'-class facilities.  For GHC only, it offers an extended and much
 -- improved 'Read' class, which constitutes a proposed alternative to the 

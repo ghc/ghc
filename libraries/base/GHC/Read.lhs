@@ -79,6 +79,11 @@ import GHC.Arr
 
 
 \begin{code}
+-- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
+-- parentheses.
+--
+-- @'readParen' 'False' p@ parses what @p@ parses, but optionally
+-- surrounded with parentheses.
 readParen       :: Bool -> ReadS a -> ReadS a
 -- A Haskell 98 function
 readParen b g   =  if b then mandatory else optional
@@ -101,11 +106,82 @@ readParen b g   =  if b then mandatory else optional
 ------------------------------------------------------------------------
 -- class Read
 
+-- | Parsing of 'String's, producing values.
+--
+-- Minimal complete definition: 'readsPrec' (or, for GHC only, 'readPrec')
+--
+-- Derived instances of 'Read' make the following assumptions, which
+-- derived instances of 'Text.Show.Show' obey:
+--
+-- * If the constructor is defined to be an infix operator, then the
+--   derived 'Read' instance will parse only infix applications of
+--   the constructor (not the prefix form).
+--
+-- * Associativity is not used to reduce the occurrence of parentheses,
+--   although precedence may be.
+--
+-- * If the constructor is defined using record syntax, the derived 'Read'
+--   will parse only the record-syntax form, and furthermore, the fields
+--   must be given in the same order as the original declaration.
+--
+-- * The derived 'Read' instance allows arbitrary Haskell whitespace
+--   between tokens of the input string.  Extra parentheses are also
+--   allowed.
+--
+-- For example, given the declarations
+--
+-- > infixr 5 :^:
+-- > data Tree a =  Leaf a  |  Tree a :^: Tree a
+--
+-- the derived instance of 'Read' is equivalent to
+--
+-- > instance (Read a) => Read (Tree a) where
+-- >
+-- >         readsPrec d r =  readParen (d > up_prec)
+-- >                          (\r -> [(u:^:v,w) |
+-- >                                  (u,s) <- readsPrec (up_prec+1) r,
+-- >                                  (":^:",t) <- lex s,
+-- >                                  (v,w) <- readsPrec (up_prec+1) t]) r
+-- >
+-- >                       ++ readParen (d > app_prec)
+-- >                          (\r -> [(Leaf m,t) |
+-- >                                  ("Leaf",s) <- lex r,
+-- >                                  (m,t) <- readsPrec (app_prec+1) s]) r
+-- >
+-- >           where up_prec = 5
+-- >                 app_prec = 10
+--
+-- Note that right-associativity of @:^:@ is unused.
+
 class Read a where
-  readsPrec    :: Int -> ReadS a
+  -- | attempts to parse a value from the front of the string, returning
+  -- a list of (parsed value, remaining string) pairs.  If there is no
+  -- successful parse, the returned list is empty.
+  --
+  -- Derived instances of 'Read' and 'Text.Show.Show' satisfy the following:
+  --
+  -- * @(x,\"\")@ is an element of
+  --   @('readsPrec' d ('Text.Show.showsPrec' d x \"\"))@.
+  --
+  -- That is, 'readsPrec' parses the string produced by
+  -- 'Text.Show.showsPrec', and delivers the value that
+  -- 'Text.Show.showsPrec' started with.
+
+  readsPrec    :: Int	-- ^ the operator precedence of the enclosing
+			-- context (a number from @0@ to @11@).
+			-- Function application has precedence @10@.
+	        -> ReadS a
+
+  -- | The method 'readList' is provided to allow the programmer to
+  -- give a specialised way of parsing lists of values.
+  -- For example, this is used by the predefined 'Read' instance of
+  -- the 'Char' type, where values of type 'String' should be are
+  -- expected to use double quotes, rather than square brackets.
   readList     :: ReadS [a]
+
   -- | Proposed replacement for 'readsPrec' using new-style parsers (GHC only).
   readPrec     :: ReadPrec a
+
   -- | Proposed replacement for 'readList' using new-style parsers (GHC only).
   readListPrec :: ReadPrec [a]
   
@@ -128,6 +204,7 @@ readListPrecDefault = list readPrec
 ------------------------------------------------------------------------
 -- utility functions
 
+-- | equivalent to 'readsPrec' with a precedence of 0.
 reads :: Read a => ReadS a
 reads = readsPrec minPrec
 
@@ -146,12 +223,29 @@ readEither s =
        lift P.skipSpaces
        return x
 
+-- | The 'read' function reads input from a string, which must be
+-- completely consumed by the input process.
 read :: Read a => String -> a
 read s = either error id (readEither s)
 
 ------------------------------------------------------------------------
 -- H98 compatibility
 
+-- | The 'lex' function reads a single lexeme from the input, discarding
+-- initial white space, and returning the characters that constitute the
+-- lexeme.  If the input string contains only white space, 'lex' returns a
+-- single successful \`lexeme\' consisting of the empty string.  (Thus
+-- @'lex' \"\" = [(\"\",\"\")]@.)  If there is no legal lexeme at the
+-- beginning of the input string, 'lex' fails (i.e. returns @[]@).
+--
+-- This lexer is not completely faithful to the Haskell lexical syntax
+-- in the following respects:
+--
+-- * Qualified names are not handled properly
+--
+-- * Octal and hexadecimal numerics are not recognized as a single token
+--
+-- * Comments are not treated properly
 lex :: ReadS String		-- As defined by H98
 lex s  = readP_to_S L.hsLex s
 

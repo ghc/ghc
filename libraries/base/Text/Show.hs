@@ -9,7 +9,8 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- The Show class and associated functions.
+-- Converting values to readable strings:
+-- the 'Show' class and associated functions.
 --
 -----------------------------------------------------------------------------
 
@@ -31,6 +32,8 @@ module Text.Show (
 import GHC.Show
 #endif   
 
+-- | Show a list (using square brackets and commas), given a function
+-- for showing elements.
 showListWith :: (a -> ShowS) -> [a] -> ShowS 
 showListWith = showList__
 
