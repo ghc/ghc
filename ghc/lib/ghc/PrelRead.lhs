@@ -2,7 +2,7 @@
 % (c) The AQUA Project, Glasgow University, 1994-1996
 %
 
-\section[PrelRead]{Module @Prelread@}
+\section[PrelRead]{Module @PrelRead@}
 
 The @Read@ class and many of its instances.
 
@@ -309,8 +309,6 @@ readRational r
 		    lexDotDigits ('.':s) = lex0Digits s
 		    lexDotDigits s       = [("",s)]
 
-{- ToDo: remove completely
-
 readRational__ :: String -> Rational -- we export this one (non-std)
 				    -- NB: *does* handle a leading "-"
 readRational__ top_s
@@ -323,7 +321,7 @@ readRational__ top_s
 	  [x] -> x
 	  []  -> error ("readRational__: no parse:"        ++ top_s)
 	  _   -> error ("readRational__: ambiguous parse:" ++ top_s)
--}
+
 -- The number of decimal digits m below is chosen to guarantee 
 -- read (show x) == x.  See
 --	Matula, D. W.  A formalization of floating-point numeric base
