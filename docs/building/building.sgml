@@ -4534,7 +4534,8 @@ Win95/Win98 behave the same, and WinNT/Win2k behave the same.
 <para>
 Make sure you read the preceding section on platforms (<xref linkend="platforms">)
 before reading section.
-</para>
+You don't need Cygwin or MSYS to <emphasis>use</emphasis> GHC, 
+but you do need one or the other to <emphasis>build</emphasis> GHC.</para>
 
 
 <Sect2><Title>Installing and configuring MSYS</Title>
@@ -4591,39 +4592,41 @@ file has too-liberal permissinos.
 
 </itemizedlist>
 </para>
+<para>Here are some points to bear in mind when using MSYS:
+<itemizedlist>
+<listitem> <para> MSYS does some kind of special magic to binaries stored in 
+<filename>/bin</filename> and <filename>/usr/bin</filename>, which are by default both mapped
+to <filename>c:/msys/1.0/bin</filename> (assuming you installed MSYS in <filename>c:/msys</filename>).
+Do not put any other binaries (such as GHC or Alex) in this directory or its sub-directories: 
+they fail in mysterious ways.  However, it's fine to put other binaries in <filename>/usr/local/bin</filename>,
+which maps to <filename>c:/msys/1.0/local/bin</filename>.</para></listitem>
+
+<listitem> <para> MSYS seems to implement symbolic links by copying, so sharing is lost.
+</para></listitem>
+
+<listitem> <para>
+Win32 has a <command>find</command> command which is not the same as MSYS's find.
+You will probably discover that the Win32 <command>find</command> appears in your <constant>PATH</constant>
+before the MSYS one, because it's in the <emphasis>system</emphasis> <constant>PATH</constant> 
+environment variable, whereas you have probably modified the <emphasis>user</emphasis> <constant>PATH</constant> 
+variable.  You can always invoke <command>find</command> with an absolute path, or rename it.
+</para></listitem>
+</itemizedlist>
+</para>
 </sect2>
 
 <Sect2><Title>Installing and configuring Cygwin</Title>
 
-<para>You don't need Cygwin to <emphasis>use</emphasis> GHC, 
-but you do need it or MSYS to <emphasis>build</emphasis> GHC.</para>
-
 <para> Install Cygwin from <ulink url="http://www.cygwin.com/">http://www.cygwin.com/</ulink>.
 The installation process is straightforward; we install it in <Filename>c:/cygwin</Filename>.
 During the installation dialogue, make sure that you select all of the following:
-<itemizedlist>
-<listitem><para>
 	      <command>cvs</command>, 
-</para></listitem>
-<listitem><para>
 	      <command>openssh</command>,
-</para></listitem>
-<listitem><para>
 	      <command>autoconf</command>,
-</para></listitem>
-<listitem><para>
 	      <command>binutils</command> (includes ld and (I think) ar),
-</para></listitem>
-<listitem><para>
 	      <command>gcc</command>,
-</para></listitem>
-<listitem><para>
 	      <command>flex</command>,
-</para></listitem>
-<listitem><para>
 	      <command>make</command>.
-</para></listitem>
-</itemizedlist>
 If you miss out any of these, strange things will happen to you.   To see thse packages, 
 click on the "View" button in the "Select Packages" 
 stage of Cygwin's installation dialogue, until the view says "Full".  The default view, which is
@@ -4750,7 +4753,7 @@ you install Cygwin.  (If not, the installer lets you update easily.)  Look for <
        </Screen> </para>
 </listitem>
 
-<listitem><para>
+<listitem><para> (Cygwin-only problem, I think.)
 <command>ssh</command> needs to access your directory <filename>.ssh</filename>, in your home directory.  
 To determine your home directory <command>ssh</command> first looks in 
 <filename>c:/cygwin/etc/passwd</filename> (or wherever you have Cygwin installed).  If there's an entry
@@ -4799,7 +4802,15 @@ you do that, <command>ssh</command> uses the $HOME environment variable instead.
 
 <Sect2><Title>Other things you need to install</Title>
 
-<para>You have to install the following other things to build GHC:
+<para>You have to install the following other things to build GHC, listed below.</para>
+
+<para>On Windows you often install executables in directories with spaces, such as 
+"<filename>Program Files</filename>". However, the <literal>make</literal> system for fptools doesn't 
+deal with this situation (it'd have to do more quoting of binaries), so you are strongly advised
+to put binaries for all tools in places with no spaces in their path.
+On both MSYS and Cygwin, it's perfectly OK to install such programs in the standard Unixy places,
+<filename>/usr/local/bin</filename> and <filename>/usr/local/lib</filename>.  But it doesn't matter,
+provided they are in your path.
 <itemizedlist>
 <listitem>
 <para>
@@ -4894,22 +4905,6 @@ Solution: delete <filename>configure</filename> first.
 </para></listitem>
 
 <listitem>
-<para>
-You either need to add <filename>ghc</filename> to your
-<constant>PATH</constant> before you invoke
-<Command>configure</Command>, or use the <Command>configure</Command>
-option <option>--with-ghc=c:/ghc/ghc-some-version/bin/ghc</option>.
-</para>
-</listitem>
-
-<listitem><para>
-If you are paranoid, delete <filename>config.cache</filename> if it exists.
-This file occasionally remembers out-of-date configuration information, which 
-can be really confusing.
-</para>
-</listitem>
-
-<listitem>
   <para> 
     After <command>autoreconf</command> run <command>./configure</command> in
     <filename>fptools/</filename> thus:
@@ -4955,6 +4950,13 @@ you'll have to do something more like:
 <Screen>
   ./configure --with-gcc=...the Cygwin gcc...
 </Screen>
+</para>
+</listitem>
+
+<listitem><para>
+If you are paranoid, delete <filename>config.cache</filename> if it exists.
+This file occasionally remembers out-of-date configuration information, which 
+can be really confusing.
 </para>
 </listitem>
 
