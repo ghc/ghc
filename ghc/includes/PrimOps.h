@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.4 1999/01/14 11:57:48 sewardj Exp $
+ * $Id: PrimOps.h,v 1.5 1999/01/14 18:36:18 sof Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -607,6 +607,9 @@ EF_(newMutVarZh_fast);
    -------------------------------------------------------------------------- */
 
 #define sameMVarZh(r,a,b)        r=(I_)((a)==(b))
+
+/* Assume external decl of EMPTY_MVAR_info is in scope by now */
+#define isEmptyMVarZh(r,a)       r=(I_)((GET_INFO((StgMVar*)(a))) == &EMPTY_MVAR_info )
 EF_(newMVarZh_fast);
 EF_(takeMVarZh_fast);
 EF_(putMVarZh_fast);
