@@ -57,24 +57,21 @@ rawSystem(HsAddr cmd)
   PROCESS_INFORMATION pInfo;
   DWORD retCode;
 
-  sInfo.cb              = sizeof(STARTUPINFO);
-  sInfo.lpReserved      = NULL;
-  sInfo.lpReserved2     = NULL;
-  sInfo.cbReserved2     = 0;
-  sInfo.lpDesktop       = NULL;
-  sInfo.lpTitle         = NULL;
-  sInfo.dwFlags         = 0;
+  ZeroMemory(&sInfo, sizeof(sInfo));
+  sInfo.cb = sizeof(sInfo);
 
-  if (!CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &sInfo, &pInfo))
+  if (!CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &sInfo, &pInfo)) {
     /* The 'TRUE' says that the created process should share
        handles with the current process.  This is vital to ensure
        that error messages sent to stderr actually appear on the screen.
        Since we are going to wait for the process to terminate anyway,
        there is no problem with such sharing. */
 
-    return -1;
+      return -1;
+  }
   WaitForSingleObject(pInfo.hProcess, INFINITE);
   if (GetExitCodeProcess(pInfo.hProcess, &retCode) == 0) return -1;
+
   CloseHandle(pInfo.hProcess);
   CloseHandle(pInfo.hThread);
   return retCode;
