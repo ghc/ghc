@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.41 2003/01/23 12:13:12 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.42 2003/01/23 16:39:30 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -894,6 +894,10 @@ heapCensusChain( Census *census, bdescr *bd )
 		
 	    case TSO:
 		prim = rtsTrue;
+#ifdef DEBUG_HEAP_PROF
+		size = tso_sizeW((StgTSO *)p);
+		break;
+#else
 		if (RtsFlags.ProfFlags.includeTSOs) {
 		    size = tso_sizeW((StgTSO *)p);
 		    break;
@@ -902,7 +906,8 @@ heapCensusChain( Census *census, bdescr *bd )
 		    p += tso_sizeW((StgTSO *)p);
 		    continue;
 		}
-		
+#endif
+
 	    default:
 		barf("heapCensus");
 	    }
