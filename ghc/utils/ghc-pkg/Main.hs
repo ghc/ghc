@@ -372,8 +372,14 @@ autoBuildGHCiLib dir batch_file ghci_file = do
   system("ld -r -x -o " ++ ghci_lib_file ++ 
 	 " -all_load " ++ batch_lib_file)
 #else
+#ifdef mingw32_HOST_OS
+  execDir <- getExecDir "/bin/ghc-pkg.exe"
+  system (maybe "" (++"/gcc-lib/") execDir++"ld -r -x -o " ++ ghci_lib_file ++ 
+	 " --whole-archive " ++ batch_lib_file)
+#else
   system("ld -r -x -o " ++ ghci_lib_file ++ 
 	 " --whole-archive " ++ batch_lib_file)
+#endif
 #endif
   hPutStrLn stderr (" done.")
 
