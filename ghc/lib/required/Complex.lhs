@@ -12,6 +12,7 @@ module Complex (
 	cis, polar, magnitude, phase
     )  where
 
+import Prelude
 
 infix  6  :+
 \end{code}

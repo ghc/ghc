@@ -336,7 +336,7 @@ stuff.  If we simplify only at the f-binding (not the xs-binding)
 we'll know that the literals are all Ints, and we can just produce
 Int literals!
 
-Find all the type variables involved in overloading, the "constrained_tyvars"
+Find all the type variables involved in overloading, the "constrained_tyvars".
 These are the ones we *aren't* going to generalise.
 We must be careful about doing this:
  (a) If we fail to generalise a tyvar which is not actually

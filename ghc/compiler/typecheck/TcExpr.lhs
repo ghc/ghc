@@ -6,15 +6,15 @@
 \begin{code}
 #include "HsVersions.h"
 
-module TcExpr ( tcExpr ) where
+module TcExpr ( tcExpr, tcId ) where
 
 IMP_Ubiq()
 
 import HsSyn		( HsExpr(..), Qualifier(..), Stmt(..),
 			  HsBinds(..), Bind(..), MonoBinds(..), 
 			  ArithSeqInfo(..), HsLit(..), Sig, GRHSsAndBinds,
-			  Match, Fake, InPat, OutPat, HsType,
-			  failureFreePat, collectPatBinders )
+			  Match, Fake, InPat, OutPat, HsType, Fixity,
+			  pprParendExpr, failureFreePat, collectPatBinders )
 import RnHsSyn		( SYN_IE(RenamedHsExpr), SYN_IE(RenamedQual),
 			  SYN_IE(RenamedStmt), SYN_IE(RenamedRecordBinds)
 			)
@@ -187,9 +187,9 @@ tcExpr (HsApp e1 e2) = accum e1 [e2]
 	returnTc (foldl HsApp fun' args', lie, res_ty)
 
 -- equivalent to (op e1) e2:
-tcExpr (OpApp arg1 op arg2)
+tcExpr (OpApp arg1 op fix arg2)
   = tcApp op [arg1,arg2]	`thenTc` \ (op', [arg1', arg2'], lie, res_ty) ->
-    returnTc (OpApp arg1' op' arg2', lie, res_ty)
+    returnTc (OpApp arg1' op' fix arg2', lie, res_ty)
 \end{code}
 
 Note that the operators in sections are expected to be binary, and
@@ -928,8 +928,9 @@ sectionLAppCtxt expr sty
   = ppHang (ppStr "In a left section:") 4 (ppr sty expr)
 
 funAppCtxt fun arg_no arg sty
-  = ppHang (ppCat [ ppStr "In the", speakNth arg_no, ppStr "argument of", ppr sty fun])
-	 4 (ppCat [ppStr "namely", ppr sty arg])
+  = ppHang (ppCat [ ppStr "In the", speakNth arg_no, ppStr "argument of", 
+		    ppr sty fun `ppBeside` ppStr ", namely"])
+	 4 (pprParendExpr sty arg)
 
 qualCtxt qual sty
   = ppHang (ppStr "In a list-comprehension qualifer:") 

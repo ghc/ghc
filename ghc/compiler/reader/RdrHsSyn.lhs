@@ -52,7 +52,8 @@ module RdrHsSyn (
 	dummyRdrVarName, dummyRdrTcName,
 	isUnqual, isQual,
 	showRdr, rdrNameOcc,
-	cmpRdr
+	cmpRdr,
+	mkOpApp
 
     ) where
 
@@ -132,7 +133,15 @@ extractHsTyVars ty
 				  | otherwise	     = other : acc
 \end{code}
 
-   
+
+A useful function for building @OpApps@.  The operator is always a variable,
+and we don't know the fixity yet.
+
+\begin{code}
+mkOpApp e1 op e2 = OpApp e1 (HsVar op) (error "mkOpApp:fixity") e2
+\end{code}
+
+
 %************************************************************************
 %*									*
 \subsection[RdrName]{The @RdrName@ datatype; names read from files}

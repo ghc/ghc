@@ -510,7 +510,7 @@ mkPrimIoTy a = mkStateTransformerTy realWorldTy a
 
 primIoTyCon
   = pcSynTyCon
-     primIoTyConKey iO_BASE SLIT("PrimIO")
+     primIoTyConKey sT_BASE SLIT("PrimIO")
      (mkBoxedTypeKind `mkArrowKind` mkBoxedTypeKind)
      1 alpha_tyvar (mkPrimIoTy alphaTy)
 \end{code}

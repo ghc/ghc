@@ -20,7 +20,7 @@ module HsPat (
 IMP_Ubiq()
 
 -- friends:
-import HsLit		( HsLit )
+import HsBasic			( HsLit, Fixity )
 IMPORT_DELOOPER(HsLoop)		( HsExpr )
 
 -- others:
@@ -47,6 +47,7 @@ data InPat name
 		    [InPat name]
   | ConOpPatIn	    (InPat name)
 		    name
+		    Fixity		-- c.f. OpApp in HsExpr
 		    (InPat name)
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
@@ -127,7 +128,7 @@ pprInPat sty (ConPatIn c pats)
    else
       ppCat [ppr sty c, interppSP sty pats] -- ParPats put in the parens
 
-pprInPat sty (ConOpPatIn pat1 op pat2)
+pprInPat sty (ConOpPatIn pat1 op fixity pat2)
  = ppCat [ppr sty pat1, ppr sty op, ppr sty pat2] -- ParPats put in parens
 
 	-- ToDo: use pprSym to print op (but this involves fiddling various
@@ -290,16 +291,16 @@ collected is important; see @HsBinds.lhs@.
 \begin{code}
 collectPatBinders :: InPat a -> [a]
 
-collectPatBinders WildPatIn	      = []
-collectPatBinders (VarPatIn var)      = [var]
-collectPatBinders (LitPatIn _)	      = []
-collectPatBinders (LazyPatIn pat)     = collectPatBinders pat
-collectPatBinders (AsPatIn a pat)     = a : collectPatBinders pat
-collectPatBinders (ConPatIn c pats)   = concat (map collectPatBinders pats)
-collectPatBinders (ConOpPatIn p1 c p2)= collectPatBinders p1 ++ collectPatBinders p2
-collectPatBinders (NegPatIn  pat)     = collectPatBinders pat
-collectPatBinders (ParPatIn  pat)     = collectPatBinders pat
-collectPatBinders (ListPatIn pats)    = concat (map collectPatBinders pats)
-collectPatBinders (TuplePatIn pats)   = concat (map collectPatBinders pats)
-collectPatBinders (RecPatIn c fields) = concat (map (\ (f,pat,_) -> collectPatBinders pat) fields)
+collectPatBinders WildPatIn	      	 = []
+collectPatBinders (VarPatIn var)      	 = [var]
+collectPatBinders (LitPatIn _)	      	 = []
+collectPatBinders (LazyPatIn pat)     	 = collectPatBinders pat
+collectPatBinders (AsPatIn a pat)     	 = a : collectPatBinders pat
+collectPatBinders (ConPatIn c pats)   	 = concat (map collectPatBinders pats)
+collectPatBinders (ConOpPatIn p1 c f p2) = collectPatBinders p1 ++ collectPatBinders p2
+collectPatBinders (NegPatIn  pat)     	 = collectPatBinders pat
+collectPatBinders (ParPatIn  pat)     	 = collectPatBinders pat
+collectPatBinders (ListPatIn pats)    	 = concat (map collectPatBinders pats)
+collectPatBinders (TuplePatIn pats)   	 = concat (map collectPatBinders pats)
+collectPatBinders (RecPatIn c fields) 	 = concat (map (\ (f,pat,_) -> collectPatBinders pat) fields)
 \end{code}

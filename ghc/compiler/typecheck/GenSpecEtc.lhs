@@ -158,7 +158,7 @@ genBinds binder_names mono_ids bind lie sig_infos prag_info_fn
     resolveOverloading tyvars_to_gen lie bind tysig_vars (head thetas)
 		 `thenTc` \ (lie', reduced_tyvars_to_gen, dict_binds, dicts_bound) ->
 
-	-- Check for generaliseation over unboxed types, and
+	-- Check for generalisation over unboxed types, and
 	-- default any TypeKind TyVars to BoxedTypeKind
     let
 	tyvars = tyVarSetToList reduced_tyvars_to_gen	-- Commit to a particular order

@@ -26,6 +26,7 @@ module Channel
 
        ) where
 
+import Prelude
 import IOBase	( IO(..) )		-- Suspicious!
 import ConcBase
 import STBase

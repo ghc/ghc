@@ -373,11 +373,11 @@ zonkExpr te ve (HsApp e1 e2)
     zonkExpr te ve e2	`thenNF_Tc` \ new_e2 ->
     returnNF_Tc (HsApp new_e1 new_e2)
 
-zonkExpr te ve (OpApp e1 op e2)
+zonkExpr te ve (OpApp e1 op fixity e2)
   = zonkExpr te ve e1	`thenNF_Tc` \ new_e1 ->
     zonkExpr te ve op	`thenNF_Tc` \ new_op ->
     zonkExpr te ve e2	`thenNF_Tc` \ new_e2 ->
-    returnNF_Tc (OpApp new_e1 new_op new_e2)
+    returnNF_Tc (OpApp new_e1 new_op fixity new_e2)
 
 zonkExpr te ve (NegApp _ _) = panic "zonkExpr te ve:NegApp"
 zonkExpr te ve (HsPar _)    = panic "zonkExpr te ve:HsPar"

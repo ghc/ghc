@@ -57,7 +57,7 @@ import Pretty		( ppHang, ppCat, ppStr, ppAboves, ppBesides,
 import PrimOp		( PrimOp(..) )
 import SpecUtils
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, getAppDataTyConExpandingDicts,
-			  tyVarsOfTypes, applyTypeEnvToTy, isUnboxedType
+			  tyVarsOfTypes, applyTypeEnvToTy, isUnboxedType, isDictTy
 			)
 import TyCon		( TyCon{-instance Eq-} )
 import TyVar		( cloneTyVar, mkSysTyVar,
@@ -82,7 +82,6 @@ addIdSpecialisation = panic "Specialise.addIdSpecialisation (ToDo)"
 cmpUniTypeMaybeList = panic "Specialise.cmpUniTypeMaybeList (ToDo)"
 getIdSpecialisation = panic "Specialise.getIdSpecialisation (ToDo)"
 isClassOpId = panic "Specialise.isClassOpId (ToDo)"
-isDictTy = panic "Specialise.isDictTy (ToDo)"
 isLocalGenTyCon = panic "Specialise.isLocalGenTyCon (ToDo)"
 isLocalSpecTyCon = panic "Specialise.isLocalSpecTyCon (ToDo)"
 isSpecId_maybe = panic "Specialise.isSpecId_maybe (ToDo)"

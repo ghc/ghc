@@ -22,6 +22,7 @@ import HsTypes
 import IdInfo
 import SpecEnv		( SpecEnv )
 import HsCore		( UfExpr )
+import HsBasic		( Fixity )
 
 -- others:
 import Name		( pprSym, pprNonSym, getOccName, OccName )
@@ -84,26 +85,6 @@ data FixityDecl name  = FixityDecl name Fixity SrcLoc
 
 instance Outputable name => Outputable (FixityDecl name) where
   ppr sty (FixityDecl name fixity loc) = ppSep [ppr sty fixity, ppr sty name]
-\end{code}
-
-It's convenient to keep the source location in the @Fixity@; it makes error reporting
-in the renamer easier.
-
-\begin{code}
-data Fixity = Fixity Int FixityDirection
-data FixityDirection = InfixL | InfixR | InfixN 
-		     deriving(Eq)
-
-instance Outputable Fixity where
-    ppr sty (Fixity prec dir) = ppBesides [ppr sty dir, ppSP, ppInt prec]
-
-instance Outputable FixityDirection where
-    ppr sty InfixL = ppStr "infixl"
-    ppr sty InfixR = ppStr "infixr"
-    ppr sty InfixN = ppStr "infix"
-
-instance Eq Fixity where		-- Used to determine if two fixities conflict
-  (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
 \end{code}
 
 
@@ -252,7 +233,10 @@ instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
 	pp_field (ns, ty) = ppCat [ppCat (map (ppr sty . getOccName) ns), 
 				   ppPStr SLIT("::"), ppr_bang sty ty]
 
-ppr_bang sty (Banged   ty) = ppBeside (ppChar '!') (pprParendHsType sty ty)
+ppr_bang sty (Banged   ty) = ppBeside (ppStr "! ") (pprParendHsType sty ty)
+				-- The extra space helps the lexical analyser that lexes
+				-- interface files; it doesn't make the rigid operator/identifier
+				-- distinction, so "!a" is a valid identifier so far as it is concerned
 ppr_bang sty (Unbanged ty) = pprParendHsType sty ty
 \end{code}
 

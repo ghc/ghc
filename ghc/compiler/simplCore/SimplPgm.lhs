@@ -10,7 +10,7 @@ module SimplPgm ( simplifyPgm ) where
 
 IMP_Ubiq(){-uitous-}
 
-import CmdLineOpts	( opt_D_verbose_core2core,
+import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_simpl_iterations,
 			  switchIsOn, SimplifierSwitch(..)
 			)
 import CoreSyn
@@ -68,10 +68,13 @@ simplifyPgm binds s_sw_chkr simpl_stats us
 	simplCount				`thenSmpl` \ r ->
 	detailedSimplCount			`thenSmpl` \ dr ->
 	let
-	    show_status = pprTrace "NewSimpl: " (ppAboves [
-		ppBesides [ppInt iterations, ppChar '/', ppInt max_simpl_iterations],
-		ppStr (showSimplCount dr)
--- DEBUG		, ppAboves (map (pprCoreBinding PprDebug) new_pgm)
+	    show_status = pprTrace "Simplifer run: " (ppAboves [
+		ppBesides [ppStr "iteration ", ppInt iterations, ppStr " out of ", ppInt max_simpl_iterations],
+		ppStr (showSimplCount dr),
+		if opt_D_dump_simpl_iterations then
+			ppAboves (map (pprCoreBinding PprDebug) new_pgm)
+		else
+			ppNil
 		])
 	in
 
@@ -81,10 +84,12 @@ simplifyPgm binds s_sw_chkr simpl_stats us
 	 else id)
 
 	(let stop_now = r == n {-nothing happened-}
-		     || (if iterations > max_simpl_iterations then
+		     || (if iterations >= max_simpl_iterations then
 			    (if max_simpl_iterations > 1 {-otherwise too boring-} then
 				trace
-				("NOTE: Simplifier still going after "++show max_simpl_iterations++" iterations; bailing out.")
+				("NOTE: Simplifier still going after " ++ 
+				  show max_simpl_iterations ++ 
+				  " iterations; baling out.")
 			     else id)
 			    True
 			 else

@@ -251,7 +251,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
   = Nothing 		-- Well, that was easy!
 
 ifaceId get_idinfo needed_ids is_rec id rhs
-  = Just (ppCat [sig_pretty, prag_pretty, ppSemi], new_needed_ids)
+  = Just (ppCat [sig_pretty, prag_pretty, ppStr ";;"], new_needed_ids)
   where
     idinfo        = get_idinfo id
     inline_pragma = idWantsToBeINLINEd id 
@@ -383,9 +383,9 @@ upp_export names = uppBesides [uppStr "(",
 			       uppIntersperse uppSP (map (upp_occname . getOccName) names), 
 			       uppStr ")"]
 
-upp_fixity (occ, Fixity prec dir, prov) = uppBesides [upp_dir dir, uppSP, 
-						      uppInt prec, uppSP, 
-					       	      upp_occname occ, uppSemi]
+upp_fixity (occ, (Fixity prec dir, prov)) = uppBesides [upp_dir dir, uppSP, 
+						        uppInt prec, uppSP, 
+					       	        upp_occname occ, uppSemi]
 upp_dir InfixR = uppStr "infixr"				 
 upp_dir InfixL = uppStr "infixl"				 
 upp_dir InfixN = uppStr "infix"				 

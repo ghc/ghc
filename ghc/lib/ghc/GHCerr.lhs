@@ -14,6 +14,7 @@ with what the typechecker figures out.
 \begin{code}
 module GHCerr where
 
+import Prelude
 import IOBase
 
 ---------------------------------------------------------------

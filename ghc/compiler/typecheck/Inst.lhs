@@ -31,7 +31,7 @@ module Inst (
 IMP_Ubiq()
 IMPORT_1_3(Ratio(Rational))
 
-import HsSyn	( HsLit(..), HsExpr(..), HsBinds, 
+import HsSyn	( HsLit(..), HsExpr(..), HsBinds, Fixity,
 		  InPat, OutPat, Stmt, Qualifier, Match,
 		  ArithSeqInfo, HsType, Fake )
 import RnHsSyn	( SYN_IE(RenamedArithSeqInfo), SYN_IE(RenamedHsExpr) )

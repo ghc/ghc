@@ -1,26 +1,2 @@
 # Modules that the user is allowed to mention.
 # 'mkdependHS' consults this list.
-Array
-Channel
-ChannelVar
-Char
-Complex
-Concurrent
-Directory
-GHCbase
-GHCio
-GHCmain
-GHCps
-IO
-Ix
-List
-Maybe
-Merge
-Monad
-Parallel
-Prelude
-PreludeGlaST
-Ratio
-SampleVar
-Semaphore
-System

@@ -291,7 +291,8 @@ We print type-variable binders with their kinds in interface files.
 \begin{code}
 pprTyVarBndr sty@PprInterface tyvar@(TyVar uniq kind name usage)
   | not (isBoxedTypeKind kind)
-  = ppBesides [pprGenTyVar sty tyvar, ppStr "::", pprParendKind kind]
+  = ppBesides [pprGenTyVar sty tyvar, ppStr " :: ", pprParendKind kind]
+	-- See comments with ppDcolon in PprCore.lhs
 
 pprTyVarBndr sty tyvar = pprGenTyVar sty tyvar
 \end{code}

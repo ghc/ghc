@@ -31,15 +31,19 @@ import TcBinds		( tcBindsAndThen )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, getEnv_LocalIds,
-			  getEnv_TyCons, getEnv_Classes,
-			  tcLookupLocalValueByKey, tcLookupTyConByKey )
+			  getEnv_TyCons, getEnv_Classes, tcLookupLocalValue,
+			  tcLookupLocalValueByKey, tcLookupTyCon,
+			  tcLookupGlobalValueByKeyMaybe )
 import SpecEnv		( SpecEnv )
+import TcExpr		( tcId )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcInstUtil	( buildInstanceEnvs, InstInfo )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls1 )
 import TcTyDecls	( mkDataBinds )
+import TcType		( SYN_IE(TcType), tcInstType )
+import TcKind		( TcKind )
 
 import RnMonad		( RnNameSupply(..) )
 import Bag		( listToBag )
@@ -47,17 +51,21 @@ import Class		( GenClass, classSelIds )
 import ErrUtils		( SYN_IE(Warning), SYN_IE(Error) )
 import Id		( idType, GenId, SYN_IE(IdEnv), nullIdEnv )
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined )
+import Name		( Name, isLocallyDefined, pprModule )
 import Pretty
-import TyCon		( TyCon )
-import Type		( applyTyCon )
-import TysWiredIn	( unitTy, mkPrimIoTy )
-import TyVar		( SYN_IE(TyVarEnv), nullTyVarEnv )
+import TyCon		( TyCon, isSynTyCon )
+import Type		( applyTyCon, mkSynTy )
+import PprType		( GenType, GenTyVar )
+import TysWiredIn	( unitTy )
+import PrelMods		( gHC_MAIN, mAIN )
+import PrelInfo		( main_NAME, mainPrimIO_NAME, ioTyCon_NAME, primIoTyCon_NAME )
+import TyVar		( GenTyVar, SYN_IE(TyVarEnv), nullTyVarEnv )
 import Unify		( unifyTauTy )
 import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
 		          filterUFM, eltsUFM )
-import Unique		( iOTyConKey )
+import Unique		( Unique  )
 import Util
+import Bag		( Bag, isEmptyBag )
 
 import FiniteMap	( emptyFM, FiniteMap )
 tycon_specs = emptyFM
@@ -200,6 +208,7 @@ tcModule rn_name_supply
 	    -- trace "tc8" $
 	    tcInstDecls2  inst_info	`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
 	    tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
+	    tcCheckMainSig mod_name	`thenTc_` 
 	    tcGetEnv			`thenNF_Tc` \ env ->
 	    returnTc ( (EmptyBinds, (inst_binds, cls_binds, env)),
 		       lie_instdecls `plusLIE` lie_clasdecls,
@@ -215,6 +224,7 @@ tcModule rn_name_supply
 	-- during the generalisation step.)
     -- trace "tc9" $
     tcSimplifyTop lie_alldecls			`thenTc` \ const_insts ->
+
 
 	-- Backsubstitution.  Monomorphic top-level decls may have
 	-- been instantiated by subsequent decls, and the final
@@ -253,4 +263,57 @@ tcModule rn_name_supply
     )))
 
 get_val_decls decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
+\end{code}
+
+
+\begin{code}
+tcCheckMainSig mod_name
+  | not is_main && not is_ghc_main
+  = returnTc ()		-- A non-main module
+
+  | otherwise
+  = 	-- Check that main is defined
+    tcLookupTyCon tycon_name			`thenTc` \ (_,_,tycon) ->
+    tcLookupLocalValue main_name		`thenNF_Tc` \ maybe_main_id ->
+    case maybe_main_id of {
+	Nothing	 -> failTc (noMainErr mod_name main_name);
+	Just main_id   ->
+
+	-- Check that it has the right type (or a more general one)
+    let
+	expected_ty | isSynTyCon tycon = mkSynTy tycon [unitTy]
+		    | otherwise	       = applyTyCon tycon [unitTy]
+		-- This is bizarre.  There ought to be a suitable function in Type.lhs!
+    in
+    tcInstType [] expected_ty			`thenNF_Tc` \ expected_tau ->
+    tcId main_name				`thenNF_Tc` \ (_, lie, main_tau) ->
+    tcSetErrCtxt (mainTyCheckCtxt main_name) $
+    unifyTauTy expected_tau
+	       main_tau				`thenTc_`
+    checkTc (isEmptyBag lie) (mainTyMisMatch main_name expected_ty (idType main_id))
+    }
+  where
+    is_main     = mod_name == mAIN
+    is_ghc_main = mod_name == gHC_MAIN
+
+    main_name | is_main   = main_NAME
+	      | otherwise = mainPrimIO_NAME
+
+    tycon_name | is_main   = ioTyCon_NAME
+	       | otherwise = primIoTyCon_NAME
+
+mainTyCheckCtxt main_name sty
+  = ppCat [ppStr "When checking that", ppr sty main_name, ppStr "has the required type"]
+
+noMainErr mod_name main_name sty
+  = ppCat [ppStr "Module", pprModule sty mod_name, 
+	   ppStr "must include a definition for", ppr sty main_name]
+
+mainTyMisMatch :: Name -> Type -> TcType s -> Error
+mainTyMisMatch main_name expected actual sty
+  = ppHang (ppCat [ppr sty main_name, ppStr "has the wrong type"])
+	 4 (ppAboves [
+			ppCat [ppStr "Expected:", ppr sty expected],
+			ppCat [ppStr "Inferred:", ppr sty actual]
+		     ])
 \end{code}

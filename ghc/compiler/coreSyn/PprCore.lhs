@@ -267,7 +267,7 @@ ppr_expr pe expr@(Lam _ _)
 	(uvars, tyvars, vars, body) = collectBinders expr
     in
     ppHang (ppCat [pp_vars SLIT("/u\\") (pUVar    pe) uvars,
-		   pp_vars SLIT("/\\")  (pTyVarB  pe) tyvars,
+		   pp_vars SLIT("_/\\_")  (pTyVarB  pe) tyvars,
 		   pp_vars SLIT("\\")   (pMinBndr pe) vars])
 	 4 (ppr_expr pe body)
   where
@@ -393,7 +393,7 @@ ppr_default pe (BindDefault val_bdr expr)
 \begin{code}
 ppr_arg pe (LitArg   lit) = pLit pe lit
 ppr_arg pe (VarArg   v)	  = pOcc pe v
-ppr_arg pe (TyArg    ty)  = ppStr "@ " `ppBeside` pTy pe ty
+ppr_arg pe (TyArg    ty)  = ppStr "_@_ " `ppBeside` pTy pe ty
 ppr_arg pe (UsageArg use) = pUse pe use
 \end{code}
 
@@ -405,9 +405,8 @@ pprBigCoreBinder sty binder
   = ppAboves [sig, pragmas, ppr sty binder]
   where
     sig = ifnotPprShowAll sty (
-	    ppHang (ppCat [ppr sty binder, ppStr "::"])
+	    ppHang (ppCat [ppr sty binder, ppDcolon])
 		 4 (ppr sty (idType binder)))
-
     pragmas =
 	ifnotPprForUser sty
 	 (ppIdInfo sty False{-no specs, thanks-} (getIdInfo binder))
@@ -424,5 +423,9 @@ pprBabyCoreBinder sty binder
 		-- ppStr ("{- " ++ (showList xx "") ++ " -}")
 
 pprTypedCoreBinder sty binder
-  = ppBesides [ppr sty binder, ppStr "::", pprParendGenType sty (idType binder)]
+  = ppBesides [ppr sty binder, ppDcolon, pprParendGenType sty (idType binder)]
+
+ppDcolon = ppStr " :: "
+		-- The space before the :: is important; it helps the lexer
+		-- when reading inferfaces.  Otherwise it would lex "a::b" as one thing.
 \end{code}

@@ -15,6 +15,7 @@ module TcEnv(
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
 	tcLookupGlobalValue, tcLookupGlobalValueByKey, tcLookupGlobalValueMaybe,
+	tcLookupGlobalValueByKeyMaybe, 
 
 	newMonoIds, newLocalIds, newLocalId,
 	tcGetGlobalTyVars, tcExtendGlobalTyVars
@@ -275,6 +276,10 @@ tcLookupGlobalValueByKey uniq
     def = panic "tcLookupGlobalValueByKey"
 #endif
 
+tcLookupGlobalValueByKeyMaybe :: Unique -> NF_TcM s (Maybe Id)
+tcLookupGlobalValueByKeyMaybe uniq
+  = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+    returnNF_Tc (lookupUFM_Directly gve uniq)
 \end{code}
 
 

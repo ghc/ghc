@@ -207,7 +207,7 @@ which are filled in later, using these.
 These are the default values, which may be changed by user flags.
 \begin{code}
 $Oopt_UnfoldingUseThreshold	= '-funfolding-use-threshold8';
-$Oopt_MaxSimplifierIterations	= '-fmax-simplifier-iterations4';
+$Oopt_MaxSimplifierIterations	= '-fmax-simplifier-iterations5';
 $Oopt_PedanticBottoms		= '-fpedantic-bottoms'; # ON by default
 $Oopt_MonadEtaExpansion		= '';
 $Oopt_FinalStgProfilingMassage	= '';
@@ -2170,7 +2170,7 @@ sub runHscAndProcessInterfaces {
      $i_atime,$i_mtime,$i_ctime,$i_blksize,$i_blocks) = stat($ifile);
 
     if ( ! -f $ofile_target ) {
-	print STDERR "$Pgm:compile:Output file $ofile_target doesn't exist\n";
+#	print STDERR "$Pgm:compile:Output file $ofile_target doesn't exist\n";
 	$source_unchanged = 0;
     }
 
@@ -2178,7 +2178,7 @@ sub runHscAndProcessInterfaces {
      $o_atime,$o_mtime,$o_ctime,$o_blksize,$o_blocks) = stat(_); # stat info from -f test
 
     if ( ! -f $hifile_target ) {
-	print STDERR "$Pgm:compile:Interface file $hifile_target doesn't exist\n";
+#	print STDERR "$Pgm:compile:Interface file $hifile_target doesn't exist\n";
 	$source_unchanged = 0;
     }
 
@@ -2186,7 +2186,7 @@ sub runHscAndProcessInterfaces {
      $hi_atime,$hi_mtime,$hi_ctime,$hi_blksize,$hi_blocks) = stat(_); # stat info from -f test
 
     if ($i_mtime > $o_mtime) {
-	print STDERR "$Pgm:recompile:Input file $ifile newer than $ofile_target\n";
+#	print STDERR "$Pgm:recompile:Input file $ifile newer than $ofile_target\n";
 	$source_unchanged = 0;
     }
 

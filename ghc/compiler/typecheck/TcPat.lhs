@@ -11,7 +11,7 @@ module TcPat ( tcPat ) where
 IMP_Ubiq(){-uitous-}
 
 import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
-			  Match, HsBinds, Qualifier, HsType,
+			  Match, HsBinds, Qualifier, HsType, Fixity,
 			  ArithSeqInfo, Stmt, Fake )
 import RnHsSyn		( SYN_IE(RenamedPat) )
 import TcHsSyn		( SYN_IE(TcPat), TcIdOcc(..) )
@@ -174,7 +174,7 @@ tcPat pat_in@(ConPatIn name pats)
 	      lie, 
 	      data_ty)
 
-tcPat pat_in@(ConOpPatIn pat1 op pat2) 	-- in binary-op form...
+tcPat pat_in@(ConOpPatIn pat1 op _ pat2) 	-- in binary-op form...
   = tcPat pat1				`thenTc` \ (pat1', lie1, ty1) ->
     tcPat pat2				`thenTc` \ (pat2', lie2, ty2) ->
 

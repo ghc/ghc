@@ -24,6 +24,7 @@ module Directory (
     getCurrentDirectory, setCurrentDirectory
   ) where
 
+import Prelude
 import Foreign
 import IOBase
 import STBase		( PrimIO )

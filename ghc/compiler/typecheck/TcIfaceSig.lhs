@@ -11,7 +11,7 @@ module TcIfaceSig ( tcInterfaceSigs ) where
 IMP_Ubiq()
 
 import TcMonad
-import TcMonoType	( tcHsType )
+import TcMonoType	( tcHsType, tcHsTypeKind )
 import TcEnv		( tcLookupGlobalValue, tcExtendTyVarEnv, tcExtendGlobalValEnv,
 			  tcLookupTyConByKey, tcLookupGlobalValueMaybe, tcLookupLocalValue
 			)
@@ -218,7 +218,7 @@ tcCoreExpr (UfSCC cc expr)
 
 tcCoreExpr(UfCoerce coercion ty body)
   = tcCoercion coercion		`thenTc` \ coercion' ->
-    tcHsType ty			`thenTc` \ ty' ->
+    tcHsTypeKind ty		`thenTc` \ (_,ty') ->
     tcCoreExpr body		`thenTc` \ body' ->
     returnTc (Coerce coercion' ty' body')
 
@@ -284,7 +284,7 @@ tcCoreValBndrs bndrs thing_inside		-- Expect them all to be ValBinders
 
 \begin{code}
 tcCoreArg (UfVarArg v)	 = tcVar v 		`thenTc` \ v' -> returnTc (VarArg v')
-tcCoreArg (UfTyArg ty)	 = tcHsType ty		`thenTc` \ ty' -> returnTc (TyArg ty')
+tcCoreArg (UfTyArg ty)	 = tcHsTypeKind ty	`thenTc` \ (_,ty') -> returnTc (TyArg ty')
 tcCoreArg (UfLitArg lit) = returnTc (LitArg lit)
 tcCoreArg (UfUsageArg u) = error "tcCoreArg: usage"
 

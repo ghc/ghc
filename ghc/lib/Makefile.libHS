@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile.libHS,v 1.6 1997/01/07 13:20:35 simonm Exp $
+# $Id: Makefile.libHS,v 1.7 1997/01/18 10:04:27 simonpj Exp $
 
 TOP = ../..
 include $(TOP)/ghc/mk/ghc.mk
@@ -42,12 +42,12 @@ ifneq ($(GhcWithHscBuiltViaC),YES)
 	$(LIB_GHC) $($*_flags) $*.lhs
 
 %.$(suffix)_o : %.lhs
-	$(LIB_GHC) $(GHC_OPTS_$(suffix)) $($*_flags) $*.hs
+	$(LIB_GHC) $(GHC_OPTS_$(suffix)) $($*_flags) $*.lhs
 
 else # $(GhcWithHscBuiltViaC) == YES
 
 %.$(suffix)_o : %.hc
-	$(LIB_GHC) $(GHC_OPTS_$(suffix)) $($*_flags) $*.hs
+	$(LIB_GHC) $(GHC_OPTS_$(suffix)) $($*_flags) $*.hc
 endif
 
 #-----------------------------------------------------------------------------
@@ -59,8 +59,12 @@ else
 ARCHIVE = libHS_$(suffix).a
 endif
 
-SRCS 	= $(wildcard prelude/*.hs required/*.hs concurrent/*.hs)
-LIBOBJS = $(SRCS:.hs=.$(suffix)_o)
+SRCS 	= $(wildcard ghc/*.lhs glaExts/*.lhs required/*.lhs concurrent/*.lhs)
+ifeq ($(suffix), norm)
+LIBOBJS = $(SRCS:.lhs=.o)
+else
+LIBOBJS = $(SRCS:.lhs=.$(suffix)_o)
+endif
 DESTDIR = $(INSTLIBDIR_GHC)
 
 include $(TOP)/mk/lib.mk
@@ -74,6 +78,10 @@ include $(TOP)/mk/lib.mk
 ghc/PackedString_flags	 = '-\#include"cbits/stgio.h"' -monly-3-regs
 required/Directory_flags = '-\#include"cbits/stgio.h"' -monly-3-regs
 required/System_flags 	 = '-\#include"cbits/stgio.h"'
+
+concurrent/Merge_flags = -iconcurrent
+concurrent/Parallel_flags = -fglasgow-exts
+concurrent/Concurrent_flags = -iconcurrent
 
 ghc/ArrBase_flags	= '-fno-implicit-prelude'
 ghc/IOBase_flags	= '-fno-implicit-prelude'
@@ -96,9 +104,6 @@ required/Maybe_flags	= '-fno-implicit-prelude'
 required/Monad_flags	= '-fno-implicit-prelude'
 required/Ratio_flags	= '-fno-implicit-prelude'
 
-concurrent/Merge_flags = -iconcurrent
-concurrent/Parallel_flags = -fglasgow-exts
-concurrent/Concurrent_flags = -iconcurrent
 
 #-----------------------------------------------------------------------------
 # Depend and install stuff
@@ -111,13 +116,19 @@ MKDEPENDHS_OPTS += $(foreach way,$(WAY_SUFFIXES),-s .$(way))
 depend :: $(SRCS)
 	$(MKDEPENDHS) $(MKDEPENDHSFLAGS) -- $(GHCFLAGS) -- -f .depend $(SRCS)
 
+# Copy the crucial IOBase hi file over
+hiboot ::
+	cp ghc/IOBase.hi-boot ghc/IOBase.hi
+	cp ghc/Main.hi-boot ghc/Main.hi
+	cp ghc/GHC.hi-boot ghc/GHC.hi
+	
 #-----------------------------------------------------------------------------
 # install hi files
 
 ifeq ($(suffix),norm)
-HI_FILES = $(SRCS:.hs=.hi)
+HI_FILES = $(SRCS:.lhs=.hi)
 else
-HI_FILES = $(SRCS:.hs=.$(suffix)_hi)
+HI_FILES = $(SRCS:.lhs=.$(suffix)_hi)
 endif
 
 install :: $(HI_FILES)

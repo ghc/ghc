@@ -10,6 +10,7 @@ module System (
     getArgs, getProgName, getEnv, system, exitWith
   ) where
 
+import Prelude
 import Foreign		( Addr )
 import IOBase		( IOError(..), thenIO_Prim, constructErrorAndFail )
 import ArrBase		( indexAddrOffAddr )

@@ -20,7 +20,7 @@ import HsSyn		( HsDecl(..), InstDecl(..), TyDecl, ClassDecl, DefaultDecl,
 			  SpecInstSig(..), HsBinds(..), Bind(..),
 			  MonoBinds(..), GRHSsAndBinds, Match, 
 			  InPat(..), OutPat(..), HsExpr(..), HsLit(..),
-			  Stmt, Qualifier, ArithSeqInfo, Fake,
+			  Stmt, Qualifier, ArithSeqInfo, Fake, Fixity,
 			  HsType(..), HsTyVar )
 import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedMonoBinds),
 			  SYN_IE(RenamedInstDecl), SYN_IE(RenamedFixityDecl),

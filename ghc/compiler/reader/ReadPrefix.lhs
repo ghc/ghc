@@ -121,7 +121,7 @@ rdModule
     wlkBinding		hmodlist `thenUgn` \ binding	->
 
     let
-	val_decl    = ValD (add_main_sig modname (cvBinds srcfile cvValSig binding))
+	val_decl    = ValD (cvBinds srcfile cvValSig binding)
 	other_decls = cvOtherDecls binding
     in
     returnUgn (modname,
@@ -133,28 +133,6 @@ rdModule
 			  (val_decl: other_decls)
 	      		  src_loc
        		)
-  where
-    add_main_sig modname binds
-      = if modname == mAIN then
-	    let
-	       s = Sig (varUnqual SLIT("main")) (io_ty SLIT("IO")) mkGeneratedSrcLoc
-	    in
-	    add_sig binds s
-
-	else if modname == gHC_MAIN then
-	    let
-	       s = Sig (varUnqual SLIT("mainPrimIO")) (io_ty SLIT("PrimIO"))  mkGeneratedSrcLoc
-	    in
-	    add_sig binds s
-
-	else -- add nothing
-	    binds
-      where
-	add_sig (SingleBind b)  s = BindWith b [s]
-	add_sig (BindWith b ss) s = BindWith b (s:ss)
-	add_sig _		_ = panic "rdModule:add_sig"
-
-	io_ty t = MonoTyApp (MonoTyVar (Unqual (TCOcc t))) (MonoTupleTy dummyRdrTcName [])
 \end{code}
 
 %************************************************************************
@@ -335,7 +313,7 @@ wlkExpr expr
 	wlkVarId  fun	`thenUgn` \ op    ->
 	wlkExpr arg1	`thenUgn` \ expr1 ->
 	wlkExpr arg2	`thenUgn` \ expr2 ->
-	returnUgn (OpApp expr1 (HsVar op) expr2)
+	returnUgn (mkOpApp expr1 op expr2)
 
       U_negate nexp ->	 		-- prefix negation
 	wlkExpr nexp	`thenUgn` \ expr ->
@@ -426,9 +404,9 @@ wlkPat pat
 	wlkPat r	  	`thenUgn` \ rpat	 ->
 	collect_pats l [rpat] 	`thenUgn` \ (lpat,lpats) ->
 	(case lpat of
-	    VarPatIn x        -> returnUgn (x,  lpats)
-	    ConPatIn x []     -> returnUgn (x,  lpats)
-	    ConOpPatIn x op y -> returnUgn (op, x:y:lpats)
+	    VarPatIn x          -> returnUgn (x,  lpats)
+	    ConPatIn x []       -> returnUgn (x,  lpats)
+	    ConOpPatIn x op _ y -> returnUgn (op, x:y:lpats)
 	    _ -> getSrcLocUgn 	`thenUgn` \ loc ->
 		 let
 		     err = addErrLoc loc "Illegal pattern `application'"
@@ -460,7 +438,7 @@ wlkPat pat
 	wlkVarId fun	`thenUgn` \ op   ->
 	wlkPat arg1	`thenUgn` \ pat1 ->
 	wlkPat arg2	`thenUgn` \ pat2 ->
-	returnUgn (ConOpPatIn pat1 op pat2)
+	returnUgn (ConOpPatIn pat1 op (error "ConOpPatIn:fixity") pat2)
 
       U_negate npat ->	 		-- negated pattern
 	wlkPat npat	`thenUgn` \ pat ->

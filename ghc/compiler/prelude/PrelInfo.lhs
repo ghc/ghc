@@ -8,7 +8,7 @@
 
 module PrelInfo (
 	-- finite maps for built-in things (for the renamer and typechecker):
-	builtinNames, builtinKeys, derivingOccurrences,
+	builtinNames, derivingOccurrences,
 	SYN_IE(BuiltinNames),
 
 	maybeCharLikeTyCon, maybeIntLikeTyCon,
@@ -26,6 +26,8 @@ module PrelInfo (
 
 	numClass_RDR, fractionalClass_RDR, eqClass_RDR, ccallableClass_RDR, creturnableClass_RDR,
 	monadZeroClass_RDR, enumClass_RDR, evalClass_RDR, ordClass_RDR,
+
+	main_NAME, mainPrimIO_NAME, ioTyCon_NAME, primIoTyCon_NAME,
 
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, isNoDictClass,
 	isNumericClass, isStandardClass, isCcallishClass
@@ -82,7 +84,7 @@ builtinNames
     listToBag (map (getName.primOpName) allThePrimOps)	`unionBags`
 
 	-- Other names with magic keys
-    listToBag builtinKeys
+    listToBag knownKeyNames
 \end{code}
 
 
@@ -243,58 +245,62 @@ wired_in_ids
 Ids, Synonyms, Classes and ClassOps with builtin keys. 
 
 \begin{code}
-getKeyOrig :: (Module, OccName, Unique) -> Name
-getKeyOrig (mod, occ, uniq) = mkGlobalName uniq mod occ VanillaDefn Implicit
+mkKnownKeyGlobal :: (RdrName, Unique) -> Name
+mkKnownKeyGlobal (Qual mod occ, uniq) = mkGlobalName uniq mod occ VanillaDefn Implicit
 
-builtinKeys :: [Name]
-builtinKeys
-  = map getKeyOrig
+main_NAME	 = mkKnownKeyGlobal (main_RDR,	     mainKey)
+mainPrimIO_NAME  = mkKnownKeyGlobal (mainPrimIO_RDR, mainPrimIoKey)
+ioTyCon_NAME     = mkKnownKeyGlobal (ioTyCon_RDR,    iOTyConKey)
+primIoTyCon_NAME = getName primIoTyCon
+
+knownKeyNames :: [Name]
+knownKeyNames
+  = [main_NAME, mainPrimIO_NAME, ioTyCon_NAME]
+    ++
+    map mkKnownKeyGlobal
     [
 	-- Type constructors (synonyms especially)
-      (iO_BASE,		TCOcc SLIT("IO"),       iOTyConKey)
-    , (pREL_BASE,	TCOcc SLIT("Ordering"), orderingTyConKey)
-    , (pREL_NUM,	TCOcc SLIT("Rational"), rationalTyConKey)
-    , (pREL_NUM,	TCOcc SLIT("Ratio"),    ratioTyConKey)
-
+      (orderingTyCon_RDR,  orderingTyConKey)
+    , (rationalTyCon_RDR,  rationalTyConKey)
+    , (ratioTyCon_RDR,     ratioTyConKey)
 
 	--  Classes.  *Must* include:
 	--  	classes that are grabbed by key (e.g., eqClassKey)
 	--  	classes in "Class.standardClassKeys" (quite a few)
-    , (pREL_BASE, TCOcc SLIT("Eq"),		eqClassKey)		-- mentioned, derivable
-    , (pREL_BASE, TCOcc SLIT("Eval"),		evalClassKey)		-- mentioned
-    , (pREL_BASE, TCOcc SLIT("Ord"),		ordClassKey)		-- derivable
-    , (pREL_BASE, TCOcc SLIT("Bounded"),	boundedClassKey)	-- derivable
-    , (pREL_BASE, TCOcc SLIT("Num"),		numClassKey)		-- mentioned, numeric
-    , (pREL_BASE, TCOcc SLIT("Enum"),		enumClassKey)		-- derivable
-    , (pREL_BASE, TCOcc SLIT("Monad"),		monadClassKey)
-    , (pREL_BASE, TCOcc SLIT("MonadZero"),		monadZeroClassKey)
-    , (pREL_BASE, TCOcc SLIT("MonadPlus"),		monadPlusClassKey)
-    , (pREL_BASE, TCOcc SLIT("Functor"),		functorClassKey)
-    , (pREL_BASE, TCOcc SLIT("Show"),		showClassKey)		-- derivable
-    , (pREL_NUM, TCOcc SLIT("Real"),		realClassKey)		-- numeric
-    , (pREL_NUM, TCOcc SLIT("Integral"),	integralClassKey)	-- numeric
-    , (pREL_NUM, TCOcc SLIT("Fractional"),	fractionalClassKey)	-- numeric
-    , (pREL_NUM, TCOcc SLIT("Floating"),	floatingClassKey)	-- numeric
-    , (pREL_NUM, TCOcc SLIT("RealFrac"),	realFracClassKey)	-- numeric
-    , (pREL_NUM, TCOcc SLIT("RealFloat"),	realFloatClassKey)	-- numeric
-    , (pREL_READ, TCOcc SLIT("Read"),		readClassKey)		-- derivable
-    , (iX,	TCOcc SLIT("Ix"),		ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
-    , (fOREIGN,	TCOcc SLIT("CCallable"),	cCallableClassKey)	-- mentioned, ccallish
-    , (fOREIGN,   TCOcc SLIT("CReturnable"), 	cReturnableClassKey)	-- mentioned, ccallish
-
+    , (eqClass_RDR,		eqClassKey)		-- mentioned, derivable
+    , (ordClass_RDR,		ordClassKey)		-- derivable
+    , (evalClass_RDR,		evalClassKey)		-- mentioned
+    , (boundedClass_RDR, 	boundedClassKey)	-- derivable
+    , (numClass_RDR, 		numClassKey)		-- mentioned, numeric
+    , (enumClass_RDR,		enumClassKey)		-- derivable
+    , (monadClass_RDR,		monadClassKey)
+    , (monadZeroClass_RDR,	monadZeroClassKey)
+    , (monadPlusClass_RDR,	monadPlusClassKey)
+    , (functorClass_RDR,	functorClassKey)
+    , (showClass_RDR, 		showClassKey)		-- derivable
+    , (realClass_RDR, 		realClassKey)		-- numeric
+    , (integralClass_RDR,	integralClassKey)	-- numeric
+    , (fractionalClass_RDR,	fractionalClassKey)	-- numeric
+    , (floatingClass_RDR,	floatingClassKey)	-- numeric
+    , (realFracClass_RDR,	realFracClassKey)	-- numeric
+    , (realFloatClass_RDR,	realFloatClassKey)	-- numeric
+    , (readClass_RDR,		readClassKey)		-- derivable
+    , (ixClass_RDR,		ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
+    , (ccallableClass_RDR, 	cCallableClassKey)	-- mentioned, ccallish
+    , (creturnableClass_RDR, 	cReturnableClassKey)	-- mentioned, ccallish
 
 	-- ClassOps 
-    , (pREL_BASE, VarOcc SLIT("fromInt"),	fromIntClassOpKey)
-    , (pREL_BASE, VarOcc SLIT("fromInteger"),	fromIntegerClassOpKey)
-    , (pREL_BASE, VarOcc SLIT("enumFrom"),	enumFromClassOpKey)
-    , (pREL_BASE, VarOcc SLIT("enumFromThen"),	enumFromThenClassOpKey)
-    , (pREL_BASE, VarOcc SLIT("enumFromTo"),	enumFromToClassOpKey)
-    , (pREL_BASE, VarOcc SLIT("enumFromThenTo"), enumFromThenToClassOpKey)
-    , (pREL_BASE, VarOcc SLIT("fromEnum"),	fromEnumClassOpKey)
-    , (pREL_BASE, VarOcc SLIT("=="),		eqClassOpKey)
-    , (pREL_BASE, VarOcc SLIT(">>="),		thenMClassOpKey)
-    , (pREL_BASE, VarOcc SLIT("zero"),		zeroClassOpKey)
-    , (pREL_NUM, VarOcc SLIT("fromRational"),	fromRationalClassOpKey)
+    , (fromInt_RDR,		fromIntClassOpKey)
+    , (fromInteger_RDR,		fromIntegerClassOpKey)
+    , (enumFrom_RDR,		enumFromClassOpKey)
+    , (enumFromThen_RDR,	enumFromThenClassOpKey)
+    , (enumFromTo_RDR,		enumFromToClassOpKey)
+    , (enumFromThenTo_RDR,	enumFromThenToClassOpKey)
+    , (fromEnum_RDR,		fromEnumClassOpKey)
+    , (eq_RDR,			eqClassOpKey)
+    , (thenM_RDR,		thenMClassOpKey)
+    , (zeroM_RDR,		zeroClassOpKey)
+    , (fromRational_RDR,	fromRationalClassOpKey)
     ]
 \end{code}
 
@@ -318,15 +324,45 @@ to write them all down in one place.
 \begin{code}
 prelude_primop op = qual (modAndOcc (primOpName op))
 
+intTyCon_RDR		= qual (modAndOcc intTyCon)
+ioTyCon_RDR		= tcQual (iO_BASE,   SLIT("IO"))
+orderingTyCon_RDR	= tcQual (pREL_BASE, SLIT("Ordering"))
+rationalTyCon_RDR	= tcQual (pREL_NUM,  SLIT("Rational"))
+ratioTyCon_RDR		= tcQual (pREL_NUM,  SLIT("Ratio"))
+
 eqClass_RDR		= tcQual (pREL_BASE, SLIT("Eq"))
 ordClass_RDR		= tcQual (pREL_BASE, SLIT("Ord"))
 evalClass_RDR 		= tcQual (pREL_BASE, SLIT("Eval"))
-monadZeroClass_RDR	= tcQual (pREL_BASE, SLIT("MonadZero"))
-enumClass_RDR 		= tcQual (pREL_BASE, SLIT("Enum"))
+boundedClass_RDR	= tcQual (pREL_BASE, SLIT("Bounded"))
 numClass_RDR		= tcQual (pREL_BASE, SLIT("Num"))
+enumClass_RDR 		= tcQual (pREL_BASE, SLIT("Enum"))
+monadClass_RDR		= tcQual (pREL_BASE, SLIT("Monad"))
+monadZeroClass_RDR	= tcQual (pREL_BASE, SLIT("MonadZero"))
+monadPlusClass_RDR	= tcQual (pREL_BASE, SLIT("MonadPlus"))
+functorClass_RDR	= tcQual (pREL_BASE, SLIT("Functor"))
+showClass_RDR		= tcQual (pREL_BASE, SLIT("Show"))
+realClass_RDR		= tcQual (pREL_NUM,  SLIT("Real"))
+integralClass_RDR	= tcQual (pREL_NUM,  SLIT("Integral"))
 fractionalClass_RDR	= tcQual (pREL_NUM,  SLIT("Fractional"))
+floatingClass_RDR	= tcQual (pREL_NUM,  SLIT("Floating"))
+realFracClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFrac"))
+realFloatClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFloat"))
+readClass_RDR		= tcQual (pREL_READ, SLIT("Read"))
+ixClass_RDR		= tcQual (iX,	     SLIT("Ix"))
 ccallableClass_RDR	= tcQual (fOREIGN,   SLIT("CCallable"))
 creturnableClass_RDR	= tcQual (fOREIGN,   SLIT("CReturnable"))
+
+fromInt_RDR	   = varQual (pREL_BASE, SLIT("fromInt"))
+fromInteger_RDR	   = varQual (pREL_BASE, SLIT("fromInteger"))
+fromEnum_RDR	   = varQual (pREL_BASE, SLIT("fromEnum"))
+enumFrom_RDR	   = varQual (pREL_BASE, SLIT("enumFrom"))
+enumFromTo_RDR	   = varQual (pREL_BASE, SLIT("enumFromTo"))
+enumFromThen_RDR   = varQual (pREL_BASE, SLIT("enumFromThen"))
+enumFromThenTo_RDR = varQual (pREL_BASE, SLIT("enumFromThenTo"))
+
+thenM_RDR	   = varQual (pREL_BASE, SLIT(">>="))
+zeroM_RDR	   = varQual (pREL_BASE, SLIT("zero"))
+fromRational_RDR   = varQual (pREL_NUM, SLIT("fromRational"))
 
 negate_RDR	   = varQual (pREL_BASE, SLIT("negate"))
 eq_RDR		   = varQual (pREL_BASE, SLIT("=="))
@@ -368,11 +404,6 @@ readParen_RDR	   = varQual (pREL_READ, SLIT("readParen"))
 lex_RDR		   = varQual (pREL_READ,  SLIT("lex"))
 readList___RDR     = varQual (pREL_READ,  SLIT("readList__"))
 
-fromEnum_RDR	   = varQual (pREL_BASE, SLIT("fromEnum"))
-enumFrom_RDR	   = varQual (pREL_BASE, SLIT("enumFrom"))
-enumFromTo_RDR	   = varQual (pREL_BASE, SLIT("enumFromTo"))
-enumFromThen_RDR   = varQual (pREL_BASE, SLIT("enumFromThen"))
-enumFromThenTo_RDR = varQual (pREL_BASE, SLIT("enumFromThenTo"))
 plus_RDR	   = varQual (pREL_BASE, SLIT("+"))
 times_RDR	   = varQual (pREL_BASE, SLIT("*"))
 mkInt_RDR	   = varQual (pREL_BASE, SLIT("I#"))
@@ -395,7 +426,8 @@ geH_RDR		= prelude_primop IntGeOp
 leH_RDR		= prelude_primop IntLeOp
 minusH_RDR	= prelude_primop IntSubOp
 
-intType_RDR = qual (modAndOcc intTyCon)
+main_RDR	= varQual (mAIN,     SLIT("main"))
+mainPrimIO_RDR	= varQual (gHC_MAIN, SLIT("mainPrimIO"))
 \end{code}
 
 %************************************************************************
@@ -423,18 +455,18 @@ derivingOccurrences = listToUFM deriving_occ_info
 derivableClassKeys  = map fst deriving_occ_info
 
 deriving_occ_info
-  = [ (eqClassKey, 	[intType_RDR, and_RDR, not_RDR])
-    , (ordClassKey, 	[intType_RDR, compose_RDR])
-    , (enumClassKey, 	[intType_RDR, map_RDR])
-    , (evalClassKey,	[intType_RDR])
-    , (boundedClassKey,	[intType_RDR])
-    , (showClassKey,	[intType_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
+  = [ (eqClassKey, 	[intTyCon_RDR, and_RDR, not_RDR])
+    , (ordClassKey, 	[intTyCon_RDR, compose_RDR])
+    , (enumClassKey, 	[intTyCon_RDR, map_RDR])
+    , (evalClassKey,	[intTyCon_RDR])
+    , (boundedClassKey,	[intTyCon_RDR])
+    , (showClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
 			 showParen_RDR, showSpace_RDR, showList___RDR])
-    , (readClassKey,	[intType_RDR, numClass_RDR, ordClass_RDR, append_RDR, 
+    , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, append_RDR, 
 			 lex_RDR, readParen_RDR, readList___RDR])
-    , (ixClassKey,	[intType_RDR, numClass_RDR, and_RDR, map_RDR])
+    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR])
     ]
-	-- intType: Practically any deriving needs Int, either for index calculations, 
+	-- intTyCon: Practically any deriving needs Int, either for index calculations, 
 	--		or for taggery.
 	-- ordClass: really it's the methods that are actually used.
 	-- numClass: for Int literals

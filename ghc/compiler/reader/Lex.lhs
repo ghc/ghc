@@ -20,6 +20,7 @@ module Lex (
 
 IMPORT_1_3(Char(isDigit, isAlpha, isAlphanum, isUpper))
 
+import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Demand		( Demand {- instance Read -} )
 import FiniteMap	( FiniteMap, listToFM, lookupFM )
 import Maybes		( Maybe(..), MaybeErr(..) )
@@ -210,7 +211,6 @@ lexIface input
       ','		    : cs -> ITcomma	: lexIface cs
       ':' : ':'		    : cs -> ITdcolon    : lexIface cs
       ';'		    : cs -> ITsemi	: lexIface cs
-      '@'		    : cs -> ITatsign	: lexIface cs
       '\"'		    : cs -> case reads input of
 					[(str, rest)] -> ITstring (_PK_ (str::String)) : lexIface rest
       '\''		    : cs -> case reads input of
@@ -254,11 +254,13 @@ lexIface input
       = case (span is_kwd_mod_char str)    of { (kw, rest) ->
 	case (lookupFM ifaceKeywordsFM kw) of
 	  Nothing -> panic ("lex_keyword:"++str)
-	  Just xx -> xx : lexIface rest
+
+	  Just xx | startDiscard xx && 
+		    opt_IgnoreIfacePragmas -> lexIface (doDiscard rest)
+		  | otherwise	    	   -> xx : lexIface rest
 	}
 
-    is_kwd_mod_char '_' = True
-    is_kwd_mod_char c   = isAlphanum c
+    is_kwd_mod_char c   = isAlphanum c || c `elem` "_@/\\"
 
     -----------
     lex_cstring so_far ('\'' : '\'' : cs) = ITstring (_PK_ (reverse (so_far::String))) : lexIface cs
@@ -272,10 +274,8 @@ lexIface input
 		   go n (')':cs) = end_lex_id module_dot (ITconid (mkTupNameStr n)) cs
 		   go n other    = panic ("lex_tuple" ++ orig_cs)
 
-	-- NB: ':' isn't valid inside an identifier, only at the start.
-	-- otherwise we get confused by a::t!
 	-- Similarly ' itself is ok inside an identifier, but not at the start
-    is_id_char c = isAlphanum c || c `elem` "_'!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
+    is_id_char c = isAlphanum c || c `elem` ":_'!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
 
     lex_id cs = go [] cs
 	where
@@ -319,7 +319,9 @@ lexIface input
     ------------
     ifaceKeywordsFM :: FiniteMap String IfaceToken
     ifaceKeywordsFM = listToFM [
-	("interface_",	 	ITinterface)
+        ("/\\_",		ITbiglam)
+       ,("@_",			ITatsign)
+       ,("interface_",	 	ITinterface)
        ,("usages_",		ITusages)
        ,("versions_",		ITversions)
        ,("exports_",		ITexports)
@@ -333,8 +335,6 @@ lexIface input
        ,("A_",			ITarity)
        ,("coerce_in_",		ITcoerce_in)
        ,("coerce_out_",		ITcoerce_out)
-       ,("A_",			ITarity)
-       ,("A_",			ITarity)
        ,("bot_",		ITbottom)
        ,("integer_",		ITinteger_lit)
        ,("rational_",		ITrational_lit)
@@ -368,12 +368,22 @@ lexIface input
 
        ,("->",			ITrarrow)
        ,("\\",			ITlam)
-       ,("/\\",			ITbiglam)
        ,("|",			ITvbar)
        ,("!",			ITbang)
        ,("=>",			ITdarrow)
        ,("=",			ITequal)
        ]
+
+startDiscard ITarity  = True
+startDiscard ITunfold = True
+startDiscard ITstrict = True
+startDiscard other    = False
+
+-- doDiscard rips along really fast looking for a double semicolon, 
+-- indicating the end of the pragma we're skipping
+doDiscard rest@(';' : ';' : _) = rest
+doDiscard ( _  : rest) 	       = doDiscard rest
+doDiscard []		       = []
 \end{code}
 
 

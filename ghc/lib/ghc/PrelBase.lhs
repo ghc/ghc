@@ -13,7 +13,7 @@ import {-# SOURCE #-}	IOBase	( error )
 import GHC
 
 infixr 9  ., !!
-infixl 7  *, /
+infixl 7  *
 infixl 6  +, -
 infixr 5  ++, :
 infix  4  ==, /=, <, <=, >=, >

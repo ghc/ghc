@@ -34,7 +34,7 @@ import Maybes	( maybeToBool, expectJust )
 import Name
 import Pretty
 import PprStyle	( PprStyle(..) )
-import Util	( panic, pprTrace )
+import Util	( panic, pprTrace, assertPanic )
 \end{code}
 
 
@@ -111,18 +111,19 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 	
 \begin{code}
 checkEarlyExit mod
-  = if not opt_SourceUnchanged then
-	-- Source code changed; look no further
+  = checkErrsRn				`thenRn` \ no_errs_so_far ->
+    if not no_errs_so_far then
+	-- Found errors already, so exit now
+	returnRn True
+    else
+    if not opt_SourceUnchanged then
+	-- Source code changed and no errors yet... carry on 
 	returnRn False
     else
-	-- Unchanged source; look further
-	-- We check for 
-	-- 	(a) errors so far.  These can arise if a module imports
-	--	    something that's no longer exported by the imported module
-	--	(b) usage information up to date
-	checkErrsRn				`thenRn` \ no_errs_so_far ->
+	-- Unchanged source, and no errors yet; see if usage info
+	-- up to date, and exit if so
 	checkUpToDate mod			`thenRn` \ up_to_date ->
-	returnRn (no_errs_so_far && up_to_date)
+	returnRn up_to_date
 \end{code}
 	
 
@@ -138,7 +139,7 @@ importsFromImportDecl (ImportDecl mod qual_only as_mod import_spec loc)
 	filtered_avails' = [ Avail (set_name_prov n) (map set_name_prov ns)
 			   | Avail n ns <- filtered_avails
 			   ]
-	fixities'        = [ (occ,fixity,provenance) | (occ,fixity) <- fixities ]
+	fixities'        = [ (occ,(fixity,provenance)) | (occ,fixity) <- fixities ]
     in
     qualifyImports mod 
 		   True 		-- Want qualified names
@@ -293,7 +294,7 @@ qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities)
 				  both	      = unqual_only 	`thenRn` \ env' ->
 						add_fn env' (Qual qual_mod occ) thing
 			
-    add_fixity name_env fixity_env (occ_name, fixity, provenance)
+    add_fixity name_env fixity_env (occ_name, (fixity, provenance))
 	| maybeToBool (lookupFM name_env rdr_name)	-- It's imported
 	= add_to_env addOneToFixityEnvRn fixity_env occ_name (fixity,provenance)
 	| otherwise					-- It ain't imported
@@ -320,10 +321,10 @@ unQualify fm = addListToFM fm [(Unqual occ, elt) | (Qual _ occ, elt) <- fmToList
 
 
 \begin{code}
-fixityFromFixDecl :: RdrNameFixityDecl -> RnMG (OccName, Fixity, Provenance)
+fixityFromFixDecl :: RdrNameFixityDecl -> RnMG (OccName, (Fixity, Provenance))
 
 fixityFromFixDecl (FixityDecl rdr_name fixity loc)
-  = returnRn (rdrNameOcc rdr_name, fixity, LocalDef (panic "export-flag") loc)
+  = returnRn (rdrNameOcc rdr_name, (fixity, LocalDef (panic "export-flag") loc))
 \end{code}
 
 
@@ -426,12 +427,46 @@ exportsFromAvail this_mod (Just export_items) all_avails (RnEnv name_env fixity_
 	  enough_avail	  = case export_avail of {NotAvailable -> False; other -> True}
 
 	-- We export a fixity iff we export a thing with the same (qualified) RdrName
-    mk_exported_fixities :: NameSet -> [(OccName, Fixity, Provenance)]
+    mk_exported_fixities :: NameSet -> [(OccName, (Fixity, Provenance))]
     mk_exported_fixities exports
-	= [ (rdrNameOcc rdr_name, fixity, prov)
-	  | (rdr_name, (fixity, prov)) <- fmToList fixity_env,
-	     export_fixity name_env exports rdr_name
- 	  ]
+	= fmToList (foldr (perhaps_add_fixity exports) 
+			  emptyFM
+			  (fmToList fixity_env))
+
+    perhaps_add_fixity :: NameSet -> (RdrName, (Fixity, Provenance))
+		       -> FiniteMap OccName (Fixity,Provenance)
+		       -> FiniteMap OccName (Fixity,Provenance)
+    perhaps_add_fixity exports (rdr_name, (fixity, prov)) fix_env
+      =  let
+	    do_nothing = fix_env		-- The default is to pass on the env unchanged
+	 in
+      	 	-- Step 1: check whether the rdr_name is in scope; if so find its Name
+	 case lookupFM name_env rdr_name of {
+	   Nothing 	    -> do_nothing;
+	   Just fixity_name -> 
+
+		-- Step 2: check whether the fixity thing is exported
+	 if not (fixity_name `elemNameSet` exports) then
+		do_nothing
+	 else
+	
+		-- Step 3: check whether we already have a fixity for the
+		-- Name's OccName in the fix_env we are building up.  This can easily
+		-- happen.  the original fixity_env might contain bindings for
+		--	M.a and N.a, if a was imported via M and N.
+		-- If this does happen, we expect the fixity to be the same either way.
+	let
+	    occ_name = rdrNameOcc rdr_name
+	in
+	case lookupFM fix_env occ_name of {
+	  Just (fixity1, prov1) -> 	-- Got it already
+				   ASSERT( fixity == fixity1 )
+				   do_nothing;
+	  Nothing -> 
+
+		-- Step 3: add it to the outgoing fix_env
+	addToFM fix_env occ_name (fixity,prov)
+	}}
 
 mk_export_fn :: [AvailInfo] -> (Name -> ExportFlag)
 mk_export_fn avails
@@ -441,14 +476,6 @@ mk_export_fn avails
   where
     exported_names :: NameSet
     exported_names = availsToNameSet avails
-
-export_fixity :: NameEnv -> NameSet -> RdrName -> Bool
-export_fixity name_env exports rdr_name
-  = case lookupFM name_env rdr_name of
-	Just fixity_name -> fixity_name `elemNameSet` exports
-				-- Check whether the exported thing is
-				-- the one to which the fixity attaches
-	other   -> False	-- Not even in scope
 \end{code}				  
 
 

@@ -13,7 +13,7 @@ IMPORT_DELOOPER(DsLoop)		-- partly to get dsBinds, partly to chk dsExpr
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
-			  Stmt(..), Match(..), Qualifier, HsBinds, HsType,
+			  Stmt(..), Match(..), Qualifier, HsBinds, HsType, Fixity,
 			  GRHSsAndBinds
 			)
 import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
@@ -188,8 +188,8 @@ dsExpr expr@(HsLam a_Match)
   = matchWrapper LambdaMatch [a_Match] "lambda"	`thenDs` \ (binders, matching_code) ->
     returnDs ( mkValLam binders matching_code )
 
-dsExpr expr@(HsApp e1 e2)    = dsApp expr []
-dsExpr expr@(OpApp e1 op e2) = dsApp expr []
+dsExpr expr@(HsApp e1 e2)      = dsApp expr []
+dsExpr expr@(OpApp e1 op _ e2) = dsApp expr []
 \end{code}
 
 Operator sections.  At first it looks as if we can convert
@@ -549,7 +549,7 @@ dsApp (HsApp e1 e2) args
   = dsExpr e2			`thenDs` \ core_e2 ->
     dsApp  e1 (VarArg core_e2 : args)
 
-dsApp (OpApp e1 op e2) args
+dsApp (OpApp e1 op _ e2) args
   = dsExpr e1			`thenDs` \ core_e1 ->
     dsExpr e2			`thenDs` \ core_e2 ->
     dsApp  op (VarArg core_e1 : VarArg core_e2 : args)

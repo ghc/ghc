@@ -12,7 +12,7 @@ IMP_Ubiq()
 
 import HsSyn		( HsDecl(..), ClassDecl(..), HsBinds(..), Bind(..), MonoBinds(..),
 			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..), 
-			  DefaultDecl, TyDecl, InstDecl, IfaceSig,
+			  DefaultDecl, TyDecl, InstDecl, IfaceSig, Fixity,
 			  HsLit(..), OutPat(..), Sig(..), HsType(..), HsTyVar,
 			  Stmt, Qualifier, ArithSeqInfo, InPat, Fake )
 import HsTypes		( getTyVarName )

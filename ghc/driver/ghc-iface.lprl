@@ -22,14 +22,15 @@ sub postprocessHiFile {
 	  $going_interactive) = @_;
 
     local($new_hi) = "$Tmp_prefix.hi-new";
+    local($show_hi_diffs) = $HiDiff_flag && ! $HiOnStdout && ! $going_interactive && -f $hifile_target;
 
 #    print STDERR "*** New hi file follows...\n";
 #    print STDERR `$Cat $hsc_hi`;
 
-    &constructNewHiFile($hsc_hi, $hifile_target, $new_hi);
+    &constructNewHiFile($hsc_hi, $hifile_target, $new_hi, $show_hi_diffs);
 
     # run diff if they asked for it
-    if ($HiDiff_flag && ! $HiOnStdout && ! $going_interactive && -f $hifile_target) {
+    if ($show_hi_diffs) {
 	if ( $HiDiff_flag eq 'usages' ) {
 	    # lots of near-useless info; but if you want it...
 	    &run_something("$Cmp -s $hifile_target $new_hi || $Diff $hifile_target $new_hi 1>&2 || exit 0",
@@ -90,7 +91,8 @@ sub deUsagifyHi {
 sub constructNewHiFile {
     local($hsc_hi,	    # The iface info produced by hsc.
 	  $hifile_target,   # Pre-existing .hi filename (if it exists)
-	  $new_hi) = @_;    # Filename for new one
+	  $new_hi,	    # Filename for new one
+	  $show_hi_diffs) = @_;
 
     &readHiFile('old',$hifile_target) unless $HiHasBeenRead{'old'} == 1;
     &readHiFile('new',$hsc_hi)	      unless $HiHasBeenRead{'new'} == 1;
@@ -128,7 +130,7 @@ sub constructNewHiFile {
 
     print NEWHI "_declarations_\n";
     foreach $v (@decl_names) {
-	&printNewItemVersion(NEWHI, $v, $new_module_version);		# Print new version number
+	&printNewItemVersion(NEWHI, $v, $new_module_version, $show_hi_diffs);		# Print new version number
 	print NEWHI $Decl{"new:$v"};		# Print the new decl itself
     }
 
@@ -287,24 +289,24 @@ sub mv_change {
 }
 
 sub printNewItemVersion {
-    local($hifile, $item, $mod_version) = @_;
+    local($hifile, $item, $mod_version, $show_hi_diffs) = @_;
     local($idecl) = $Decl{"new:$item"};
 
     if (! defined($Decl{"old:$item"})) {	# Old decl doesn't exist
-	print STDERR "new: $item\n";
+	if ($show_hi_diffs) {print STDERR "new: $item\n";}
 	print $hifile  "$mod_version ";		# Use module version
 
     } elsif ($idecl ne $Decl{"old:$item"})  {	# Old decl differs from new decl
 	local($odecl) = $Decl{"old:$item"};
-#	print STDERR "changed: $item\nOld: $odecl\nNew: $idecl\n";
+	if ($show_hi_diffs) {print STDERR "changed: $item\nOld: $odecl\nNew: $idecl\n";}
 	print $hifile  "$mod_version ";		# Use module version
 
     } elsif (! defined($OldVersion{"$item"}) ) {
-	print STDERR "$item: no old version?!\n";
+	if ($show_hi_diffs) {print STDERR "$item: no old version?!\n";}
 	print $hifile  "$mod_version ";			# Use module version
 
     } else {					# Identical decls, so use old version number
-	print STDERR "$item: unchanged\n";
+	if ($show_hi_diffs) {print STDERR "$item: unchanged\n";}
 	print $hifile  $OldVersion{"$item"}, " ";
     }
     return;

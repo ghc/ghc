@@ -272,7 +272,6 @@ addImplicitOccRn name = addOccurrenceName Compulsory name
 addImplicitOccsRn :: [Name] -> RnM s d ()
 addImplicitOccsRn names = addOccurrenceNames Compulsory names
 
-intType_RDR	= qual (modAndOcc (getName intTyCon))
 listType_RDR	= qual (modAndOcc listType_name)
 tupleType_RDR n	= qual (modAndOcc (tupleType_name n))
 

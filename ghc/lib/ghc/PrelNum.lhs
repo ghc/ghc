@@ -24,7 +24,7 @@ import PrelBase
 import GHC
 
 infixr 8  ^, ^^, **
-infixl 7  %, `quot`, `rem`, `div`, `mod`
+infixl 7  /, %, `quot`, `rem`, `div`, `mod`
 \end{code}
 
 

@@ -19,6 +19,7 @@ module ConcBase(
 	MVar, newMVar, newEmptyMVar, takeMVar, putMVar, readMVar, swapMVar
     ) where
 
+import Prelude
 import STBase	( PrimIO(..), ST(..), State(..), StateAndPtr#(..) )
 import IOBase	( IO(..) )
 import GHCerr	( parError )

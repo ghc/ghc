@@ -20,7 +20,7 @@ module HsSyn (
 	EXP_MODULE(HsDecls) ,
 	EXP_MODULE(HsExpr) ,
 	EXP_MODULE(HsImpExp) ,
-	EXP_MODULE(HsLit) ,
+	EXP_MODULE(HsBasic) ,
 	EXP_MODULE(HsMatches) ,
 	EXP_MODULE(HsPat) ,
 	EXP_MODULE(HsTypes)
@@ -32,14 +32,14 @@ IMP_Ubiq()
 import HsBinds
 import HsDecls		( HsDecl(..), TyDecl(..), InstDecl(..), ClassDecl(..), 
 			  DefaultDecl(..), 
-			  FixityDecl(..), Fixity(..), FixityDirection(..), 
+			  FixityDecl(..), 
 			  ConDecl(..), BangType(..),
 			  IfaceSig(..), HsIdInfo,  SpecDataSig(..), SpecInstSig(..),
 			  hsDeclName
 			)
 import HsExpr
 import HsImpExp
-import HsLit
+import HsBasic
 import HsMatches
 import HsPat
 import HsTypes
@@ -63,8 +63,6 @@ instance Outputable Fake
 
 All we actually declare here is the top-level structure for a module.
 \begin{code}
-type Version = Int
-
 data HsModule tyvar uvar name pat
   = HsModule
 	Module			-- module name

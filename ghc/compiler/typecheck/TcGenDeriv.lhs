@@ -32,8 +32,8 @@ IMPORT_1_3(List(partition))
 
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
 			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Qualifier(..), Stmt,
-			  ArithSeqInfo, Sig, HsType, FixityDecl, Fake )
-import RdrHsSyn		( RdrName(..), varQual, varUnqual,
+			  ArithSeqInfo, Sig, HsType, FixityDecl, Fixity, Fake )
+import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
 			  SYN_IE(RdrNameMonoBinds), SYN_IE(RdrNameHsExpr), SYN_IE(RdrNamePat)
 			)
 -- import RnHsSyn		( RenamedFixityDecl(..) )
@@ -175,7 +175,7 @@ gen_Eq_binds tycon
       where
 	nested_eq_expr []  [] [] = true_Expr
 	nested_eq_expr tys as bs
-	  = foldr1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
+	  = foldl1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
 	  where
 	    nested_eq ty a b = HsPar (eq_Expr ty (HsVar a) (HsVar b))
 \end{code}
@@ -553,7 +553,7 @@ gen_Ix_binds tycon
 		grhs = [OtherwiseGRHS (mk_easy_App mkInt_RDR [c_RDR]) tycon_loc]
 	   in
 	   HsCase
-	     (HsPar (OpApp (HsVar dh_RDR) (HsVar minusH_RDR) (HsVar ah_RDR)))
+	     (genOpApp (HsVar dh_RDR) minusH_RDR (HsVar ah_RDR))
 	     [PatMatch (VarPatIn c_RDR)
 				(GRHSMatch (GRHSsAndBindsIn grhs EmptyBinds))]
 	     tycon_loc
@@ -568,8 +568,8 @@ gen_Ix_binds tycon
 	  untag_Expr tycon [(a_RDR, ah_RDR)] (
 	  untag_Expr tycon [(b_RDR, bh_RDR)] (
 	  untag_Expr tycon [(c_RDR, ch_RDR)] (
-	  HsIf (HsPar (OpApp (HsVar ch_RDR) (HsVar geH_RDR) (HsVar ah_RDR))) (
-	     (OpApp (HsVar ch_RDR) (HsVar leH_RDR) (HsVar bh_RDR))
+	  HsIf (genOpApp (HsVar ch_RDR) geH_RDR (HsVar ah_RDR)) (
+	     (genOpApp (HsVar ch_RDR) leH_RDR (HsVar bh_RDR))
 	  ) {-else-} (
 	     false_Expr
 	  ) tycon_loc))))
@@ -610,19 +610,19 @@ gen_Ix_binds tycon
 	foldl mk_index (HsLit (HsInt 0)) (zip3 as_needed bs_needed cs_needed))
       where
 	mk_index multiply_by (l, u, i)
-	  =OpApp (
+	  = genOpApp (
 		(HsApp (HsApp (HsVar index_RDR) (ExplicitTuple [HsVar l, HsVar u])) (HsVar i))
-	   ) (HsVar plus_RDR) (
-		OpApp (
+	   ) plus_RDR (
+		genOpApp (
 		    (HsApp (HsVar rangeSize_RDR) (ExplicitTuple [HsVar l, HsVar u]))
-		) (HsVar times_RDR) multiply_by
+		) times_RDR multiply_by
 	   )
 
 	range_size
 	  = mk_easy_FunMonoBind tycon_loc rangeSize_RDR [TuplePatIn [a_Pat, b_Pat]] [] (
-		OpApp (
+		genOpApp (
 		    (HsApp (HsApp (HsVar index_RDR) (ExplicitTuple [a_Expr, b_Expr])) b_Expr)
-		) (HsVar plus_RDR) (HsLit (HsInt 1)))
+		) plus_RDR (HsLit (HsInt 1)))
 
     ------------------
     single_con_inRange
@@ -659,7 +659,7 @@ gen_Read_binds tycon
 	      = map read_con (tyConDataCons tycon)
 	in
 	mk_easy_FunMonoBind tycon_loc readsPrec_RDR [a_Pat, b_Pat] [] (
-	      foldl1 append_Expr read_con_comprehensions
+	      foldr1 append_Expr read_con_comprehensions
 	)
       where
 	read_con data_con   -- note: "b" is the string being "read"
@@ -683,7 +683,7 @@ gen_Read_binds tycon
 		  = if nullary_con then -- must be False (parens are surely optional)
 		       false_Expr
 		    else -- parens depend on precedence...
-		       HsPar (OpApp a_Expr (HsVar gt_RDR) (HsLit (HsInt 9)))
+		       HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt 9)))
 	    in
 	    HsApp (
 	      readParen_Expr read_paren_arg $ HsPar $
@@ -747,7 +747,7 @@ gen_Show_binds tycon
 		([a_Pat, con_pat], show_con)
 	    else
 		([a_Pat, con_pat],
-		    showParen_Expr (HsPar (OpApp a_Expr (HsVar ge_RDR) (HsLit (HsInt 10))))
+		    showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt 10))))
 				   (HsPar (nested_compose_Expr show_thingies)))
 	  where
 	    spacified []     = []
@@ -912,9 +912,9 @@ careful_compare_Case ty lt eq gt a b
        compare_gen_Case compare_RDR lt eq gt a b
 
     else -- we have to do something special for primitive things...
-       HsIf (HsPar (OpApp a (HsVar relevant_eq_op) b))
+       HsIf (genOpApp a relevant_eq_op b)
 	    eq
-	    (HsIf (HsPar (OpApp a (HsVar relevant_lt_op) b)) lt gt mkGeneratedSrcLoc)
+	    (HsIf (genOpApp a relevant_lt_op b) lt gt mkGeneratedSrcLoc)
 	    mkGeneratedSrcLoc
   where
     relevant_eq_op = assoc_ty_id eq_op_tbl ty
@@ -948,17 +948,17 @@ lt_op_tbl =
 
 and_Expr, append_Expr :: RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
 
-and_Expr    a b = OpApp a (HsVar and_RDR)    b
-append_Expr a b = OpApp a (HsVar append_RDR) b
+and_Expr    a b = genOpApp a and_RDR    b
+append_Expr a b = genOpApp a append_RDR b
 
 -----------------------------------------------------------------------
 
 eq_Expr :: Type -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
 eq_Expr ty a b
   = if not (isPrimType ty) then
-       OpApp a (HsVar eq_RDR)  b
+       genOpApp a eq_RDR  b
     else -- we have to do something special for primitive things...
-       OpApp a (HsVar relevant_eq_op) b
+       genOpApp a relevant_eq_op b
   where
     relevant_eq_op = assoc_ty_id eq_op_tbl ty
 \end{code}
@@ -981,7 +981,7 @@ cmp_tags_Expr :: RdrName 		-- Comparison op
 	     -> RdrNameHsExpr
 
 cmp_tags_Expr op a b true_case false_case
-  = HsIf (HsPar (OpApp (HsVar a) (HsVar op) (HsVar b))) true_case false_case mkGeneratedSrcLoc
+  = HsIf (genOpApp (HsVar a) op (HsVar b)) true_case false_case mkGeneratedSrcLoc
 
 enum_from_to_Expr
 	:: RdrNameHsExpr -> RdrNameHsExpr
@@ -1008,6 +1008,13 @@ nested_compose_Expr (e:es)
 
 parenify e@(HsVar _) = e
 parenify e	     = HsPar e
+
+-- genOpApp wraps brackets round the operator application, so that the
+-- renamer won't subsequently try to re-associate it. 
+-- For some reason the renamer doesn't reassociate it right, and I can't
+-- be bothered to find out why just now.
+
+genOpApp e1 op e2 = mkOpApp e1 op e2
 \end{code}
 
 \begin{code}
@@ -1050,26 +1057,4 @@ con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 con2tag_RDR tycon = varUnqual (SLIT("con2tag_") _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
 tag2con_RDR tycon = varUnqual (SLIT("tag2con_") _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
 maxtag_RDR tycon  = varUnqual (SLIT("maxtag_")  _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
-
-
-{- 	OLD, and wrong; the renamer doesn't like qualified names for locals.
-
-con2tag_RDR tycon
-  = let	(mod, nm) = modAndOcc tycon
-	con2tag	  = SLIT("con2tag_") _APPEND_ occNameString nm _APPEND_ SLIT("#")
-    in
-    varQual (mod, con2tag)
-
-tag2con_RDR tycon
-  = let	(mod, nm) = modAndOcc tycon
-	tag2con	  = SLIT("tag2con_") _APPEND_ occNameString nm _APPEND_ SLIT("#")
-    in
-    varQual (mod, tag2con)
-
-maxtag_RDR tycon
-  = let	(mod, nm) = modAndOcc tycon
-	maxtag	  = SLIT("maxtag_") _APPEND_ occNameString nm _APPEND_ SLIT("#")
-    in
-    varQual (mod, maxtag)
--}
 \end{code}

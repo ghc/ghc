@@ -41,7 +41,8 @@ import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
 			  SYN_IE(UniqSet)
 			)
-import Util		( Ord3(..), removeDups, panic )
+import PprStyle		( PprStyle(..) )
+import Util		( Ord3(..), removeDups, panic, pprPanic, assertPanic )
 \end{code}
 
 
@@ -79,8 +80,12 @@ rnPat (ConPatIn con pats)
     mapRn rnPat pats  	`thenRn` \ patslist ->
     returnRn (ConPatIn con' patslist)
 
-rnPat (ConOpPatIn pat1 con pat2)
-  = rnOpPat pat1 con pat2
+rnPat (ConOpPatIn pat1 con _ pat2)
+  = rnPat pat1		`thenRn` \ pat1' ->
+    lookupRn con	`thenRn` \ con' ->
+    lookupFixity con	`thenRn` \ fixity ->
+    rnPat pat2		`thenRn` \ pat2' ->
+    mkConOpPatRn pat1' con' fixity pat2'
 
 -- Negated patters can only be literals, and they are dealt with
 -- by negating the literal at compile time, not by using the negation
@@ -217,9 +222,28 @@ rnExpr (HsApp fun arg)
     rnExpr arg		`thenRn` \ (arg',fvArg) ->
     returnRn (HsApp fun' arg', fvFun `unionNameSets` fvArg)
 
-rnExpr (OpApp e1 (HsVar op) e2) = rnOpApp e1 op e2
+rnExpr (OpApp e1 op@(HsVar op_name) _ e2) 
+  = rnExpr e1				`thenRn` \ (e1', fv_e1) ->
+    rnExpr e2				`thenRn` \ (e2', fv_e2) ->
+    rnExpr op				`thenRn` \ (op', fv_op) ->
 
-rnExpr (NegApp e n) = completeNegApp (rnExpr e)
+	-- Deal wth fixity
+    lookupFixity op_name		`thenRn` \ fixity ->
+    getModeRn				`thenRn` \ mode -> 
+    (case mode of
+	SourceMode    -> mkOpAppRn e1' op' fixity e2'
+	InterfaceMode -> returnRn (OpApp e1' op' fixity e2')
+    )					`thenRn` \ final_e -> 
+
+    returnRn (final_e,
+	      fv_e1 `unionNameSets` fv_op `unionNameSets` fv_e2)
+
+rnExpr (NegApp e n)
+  = rnExpr e				`thenRn` \ (e', fv_e) ->
+    lookupImplicitOccRn negate_RDR	`thenRn` \ neg ->
+    getModeRn				`thenRn` \ mode -> 
+    mkNegAppRn mode e' (HsVar neg)	`thenRn` \ final_e ->
+    returnRn (final_e, fv_e)
 
 rnExpr (HsPar e)
   = rnExpr e 		`thenRn` \ (e', fvs_e) ->
@@ -467,85 +491,94 @@ rnStmt (LetStmt binds) thing_inside
 %*									*
 %************************************************************************
 
-@rnOpApp@ deals with operator applications.  It does some rearrangement of
-the expression so that the precedences are right.  This must be done on the
-expression *before* renaming, because fixity info applies to the things
-the programmer actually wrote.
+@mkOpAppRn@ deals with operator fixities.  The argument expressions
+are assumed to be already correctly arranged.  It needs the fixities
+recorded in the OpApp nodes, because fixity info applies to the things
+the programmer actually wrote, so you can't find it out from the Name.
+
+Furthermore, the second argument is guaranteed not to be another
+operator application.  Why? Because the parser parses all
+operator appications left-associatively.
 
 \begin{code}
-rnOpApp (NegApp e11 n) op e2
-  = lookupFixity op		`thenRn` \ (Fixity op_prec op_dir) ->
-    if op_prec > 6 then		
-	-- negate precedence 6 wired in
-	-- (-x)*y  ==> -(x*y)
-	completeNegApp (rnOpApp e11 op e2)
-    else
-	completeOpApp (completeNegApp (rnExpr e11)) op (rnExpr e2)
+mkOpAppRn :: RenamedHsExpr -> RenamedHsExpr -> Fixity -> RenamedHsExpr
+	  -> RnMS s RenamedHsExpr
 
-rnOpApp (OpApp e11 (HsVar op1) e12) op e2
-  = lookupFixity op		 `thenRn` \ op_fix@(Fixity op_prec  op_dir) ->
-    lookupFixity op1		 `thenRn` \ op1_fix@(Fixity op1_prec op1_dir) ->
-    -- pprTrace "rnOpApp:" (ppCat [ppr PprDebug op, ppInt op_prec, ppr PprDebug op1, ppInt op1_prec]) $
-    case (op1_prec `cmp` op_prec) of
-      LT_  -> rearrange
-      EQ_  -> case (op1_dir, op_dir) of
-		(InfixR, InfixR) -> rearrange
-		(InfixL, InfixL) -> dont_rearrange
-		_ -> addErrRn (precParseErr (op1,op1_fix) (op,op_fix))	`thenRn_`
-		     dont_rearrange
-      GT__ -> dont_rearrange
+mkOpAppRn e1@(OpApp e11 op1 fix1 e12) 
+	  op2 fix2 e2
+  | nofix_error
+  = addErrRn (precParseErr (get op1,fix1) (get op2,fix2))	`thenRn_`
+    returnRn (OpApp e1 op2 fix2 e2)
+
+  | rearrange_me
+  = mkOpAppRn e12 op2 fix2 e2		`thenRn` \ new_e ->
+    returnRn (OpApp e11 op1 fix1 new_e)
   where
-    rearrange      = rnOpApp e11 op1 (OpApp e12 (HsVar op) e2)
-    dont_rearrange = completeOpApp (rnOpApp e11 op1 e12) op (rnExpr e2)
+    (nofix_error, rearrange_me) = compareFixity fix1 fix2
+    get (HsVar n) = n
 
-rnOpApp e1 op e2 = completeOpApp (rnExpr e1) op (rnExpr e2)
+mkOpAppRn e1@(NegApp neg_arg neg_id) 
+	  op2 
+	  fix2@(Fixity prec2 dir2)
+	  e2
+  | prec2 > 6 	-- Precedence of unary - is wired in as 6!
+  = mkOpAppRn neg_arg op2 fix2 e2	`thenRn` \ new_e ->
+    returnRn (NegApp new_e neg_id)
 
-completeOpApp rn_e1 op rn_e2
-  = rn_e1		`thenRn` \ (e1', fvs1) ->
-    rn_e2		`thenRn` \ (e2', fvs2) ->
-    rnExpr (HsVar op)	`thenRn` \ (op', fvs3) ->
-    returnRn (OpApp e1' op' e2', fvs1 `unionNameSets` fvs2 `unionNameSets` fvs3)
+mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
+  = ASSERT( right_op_ok fix e2 )
+    returnRn (OpApp e1 op fix e2)
 
-completeNegApp rn_expr
-  = rn_expr				`thenRn` \ (e', fvs_e) ->
-    lookupImplicitOccRn negate_RDR	`thenRn` \ neg ->
-    returnRn (NegApp e' (HsVar neg), fvs_e)
+-- Parser left-associates everything, but 
+-- derived instances may have correctly-associated things to
+-- in the right operarand.  So we just check that the right operand is OK
+right_op_ok fix1 (OpApp _ _ fix2 _)
+  = not error_please && associate_right
+  where
+    (error_please, associate_right) = compareFixity fix1 fix2
+right_op_ok fix1 other
+  = True
+
+-- Parser initially makes negation bind more tightly than any other operator
+mkNegAppRn mode neg_arg neg_id
+  = ASSERT( not_op_app mode neg_arg )
+    returnRn (NegApp neg_arg neg_id)
+
+not_op_app SourceMode (OpApp _ _ _ _) = False
+not_op_app mode other	 	      = True
 \end{code}
 
 \begin{code}
-rnOpPat p1@(NegPatIn p11) op p2
-  = lookupFixity op		`thenRn` \ op_fix@(Fixity op_prec op_dir) ->
-    if op_prec > 6 then	
-	-- negate precedence 6 wired in
-	addErrRn (precParseNegPatErr (op,op_fix))	`thenRn_`
-	rnOpPat p11 op p2				`thenRn` \ op_pat ->
-	returnRn (NegPatIn op_pat)
-    else
-	completeOpPat (rnPat p1) op (rnPat p2)
+mkConOpPatRn :: RenamedPat -> Name -> Fixity -> RenamedPat
+	     -> RnMS s RenamedPat
 
-rnOpPat (ConOpPatIn p11 op1 p12) op p2
-  = lookupFixity op		 `thenRn` \  op_fix@(Fixity op_prec  op_dir) ->
-    lookupFixity op1		 `thenRn` \ op1_fix@(Fixity op1_prec op1_dir) ->
-    case (op1_prec `cmp` op_prec) of
-      LT_  -> rearrange
-      EQ_  -> case (op1_dir, op_dir) of
-		(InfixR, InfixR) -> rearrange
-		(InfixL, InfixL) -> dont_rearrange
-		_ -> addErrRn (precParseErr (op1,op1_fix) (op,op_fix))	`thenRn_`
-		     dont_rearrange
-      GT__ -> dont_rearrange
+mkConOpPatRn p1@(ConOpPatIn p11 op1 fix1 p12) 
+	     op2 fix2 p2
+  | nofix_error
+  = addErrRn (precParseErr (op1,fix1) (op2,fix2))	`thenRn_`
+    returnRn (ConOpPatIn p1 op2 fix2 p2)
+
+  | rearrange_me
+  = mkConOpPatRn p12 op2 fix2 p2		`thenRn` \ new_p ->
+    returnRn (ConOpPatIn p11 op1 fix1 new_p)
+
   where
-    rearrange      = rnOpPat p11 op1 (ConOpPatIn p12 op p2)
-    dont_rearrange = completeOpPat (rnOpPat p11 op1 p12) op (rnPat p2)
+    (nofix_error, rearrange_me) = compareFixity fix1 fix2
 
+mkConOpPatRn p1@(NegPatIn neg_arg) 
+	  op2 
+	  fix2@(Fixity prec2 dir2)
+	  p2
+  | prec2 > 6 	-- Precedence of unary - is wired in as 6!
+  = addErrRn (precParseNegPatErr (op2,fix2))	`thenRn_`
+    returnRn (ConOpPatIn p1 op2 fix2 p2)
 
-rnOpPat p1 op p2 = completeOpPat (rnPat p1) op (rnPat p2)
+mkConOpPatRn p1 op fix p2 			-- Default case, no rearrangment
+  = ASSERT( not_op_pat p2 )
+    returnRn (ConOpPatIn p1 op fix p2)
 
-completeOpPat rn_p1 op rn_p2
-  = rn_p1		`thenRn` \ p1' ->
-    rn_p2		`thenRn` \ p2' -> 
-    lookupRn op		`thenRn` \ op' ->
-    returnRn (ConOpPatIn p1' op' p2')
+not_op_pat (ConOpPatIn _ _ _ _) = False
+not_op_pat other   	        = True
 \end{code}
 
 \begin{code}
@@ -559,7 +592,7 @@ checkPrecMatch True op (PatMatch p1 (PatMatch p2 (GRHSMatch _)))
 checkPrecMatch True op _
   = panic "checkPrecMatch"
 
-checkPrec op (ConOpPatIn _ op1 _) right
+checkPrec op (ConOpPatIn _ op1 _ _) right
   = lookupFixity op	`thenRn` \  op_fix@(Fixity op_prec  op_dir) ->
     lookupFixity op1	`thenRn` \ op1_fix@(Fixity op1_prec op1_dir) ->
     let
@@ -580,6 +613,30 @@ checkPrec op (NegPatIn _) right
 
 checkPrec op pat right
   = returnRn ()
+\end{code}
+
+Consider
+	a `op1` b `op2` c
+
+(compareFixity op1 op2) tells which way to arrange appication, or
+whether there's an error.
+
+\begin{code}
+compareFixity :: Fixity -> Fixity
+	      -> (Bool,		-- Error please
+		  Bool)		-- Associate to the right: a op1 (b op2 c)
+compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
+  = case prec1 `cmp` prec2 of
+	GT_ -> left
+	LT_ -> right
+	EQ_ -> case (dir1, dir2) of
+			(InfixR, InfixR) -> right
+			(InfixL, InfixL) -> left
+			_		 -> error_please
+  where
+    right	 = (False, True)
+    left         = (False, False)
+    error_please = (True,  False)
 \end{code}
 
 %************************************************************************

@@ -5,6 +5,8 @@ module ParseIface ( parseIface ) where
 
 IMP_Ubiq(){-uitous-}
 
+import CmdLineOpts	( opt_IgnoreIfacePragmas )
+
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
 import HsDecls		( HsIdInfo(..) )
@@ -223,8 +225,12 @@ topdecl		:  TYPE  tc_name tv_bndrs EQUAL type SEMI
 			{ TyD (TyNew $2 $3 $4 $6 $7 noDataPragmas mkIfaceSrcLoc) }
 		|  CLASS decl_context tc_name tv_bndr csigs SEMI
 			{ ClD (ClassDecl $2 $3 $4 $5 EmptyMonoBinds noClassPragmas mkIfaceSrcLoc) }
-		|  var_name DCOLON type id_info SEMI
-			{ SigD (IfaceSig $1 $3 $4 mkIfaceSrcLoc) }
+		|  var_name DCOLON type id_info SEMI SEMI
+			{ 	{- Double semicolon allows easy pragma discard in lexer -}
+			  let
+				id_info = if opt_IgnoreIfacePragmas then [] else $4
+			  in
+  		 	  SigD (IfaceSig $1 $3 id_info mkIfaceSrcLoc) }
 
 decl_context	:: { RdrNameContext }
 decl_context	:  					{ [] }

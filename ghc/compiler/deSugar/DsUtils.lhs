@@ -30,7 +30,7 @@ module DsUtils (
 IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
 
-import HsSyn		( HsExpr(..), OutPat(..), HsLit(..),
+import HsSyn		( HsExpr(..), OutPat(..), HsLit(..), Fixity,
 			  Match, HsBinds, Stmt, Qualifier, HsType, ArithSeqInfo )
 import TcHsSyn		( SYN_IE(TypecheckedPat) )
 import DsHsSyn		( outPatType )

@@ -145,7 +145,7 @@ emptyFixityEnv	        = emptyFM
 
 data ExportEnv		= ExportEnv Avails Fixities
 type Avails		= [AvailInfo]
-type Fixities		= [(OccName, Fixity, Provenance)]
+type Fixities		= [(OccName, (Fixity, Provenance))]
 	-- Can contain duplicates, if one module defines the same fixity,
 	-- or the same type/class/id, more than once.   Hence a boring old list.
 	-- This allows us to report duplicates in just one place, namely plusRnEnv.

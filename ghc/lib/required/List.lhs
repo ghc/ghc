@@ -20,6 +20,7 @@ module List (
     union, intersect
   ) where
 
+import Prelude
 \end{code}
 
 %*********************************************************

@@ -15,7 +15,7 @@ module TcSimplify (
 IMP_Ubiq()
 
 import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit, 
-			  Match, HsBinds, Qualifier, HsType, ArithSeqInfo,
+			  Match, HsBinds, Qualifier, HsType, ArithSeqInfo, Fixity,
 			  GRHSsAndBinds, Stmt, Fake )
 import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcExpr), SYN_IE(TcMonoBinds) )
 

@@ -6,13 +6,30 @@
 \begin{code}
 #include "HsVersions.h"
 
-module HsLit where
+module HsBasic where
 
 IMP_Ubiq(){-uitous-}
 IMPORT_1_3(Ratio(Rational))
 
 import Pretty
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[Version]{Module and identifier version numbers}
+%*									*
+%************************************************************************
+
+\begin{code}
+type Version = Int
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[HsLit]{Literals}
+%*									*
+%************************************************************************
+
 
 \begin{code}
 data HsLit
@@ -59,3 +76,27 @@ instance Outputable HsLit where
     ppr sty (HsIntPrim i)	= ppBeside (ppInteger i) (ppChar '#')
     ppr sty (HsLitLit s)	= ppBesides [ppStr "``", ppPStr s, ppStr "''"]
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[Fixity]{Fixity info}
+%*									*
+%************************************************************************
+
+\begin{code}
+data Fixity = Fixity Int FixityDirection
+data FixityDirection = InfixL | InfixR | InfixN 
+		     deriving(Eq)
+
+instance Outputable Fixity where
+    ppr sty (Fixity prec dir) = ppBesides [ppr sty dir, ppSP, ppInt prec]
+
+instance Outputable FixityDirection where
+    ppr sty InfixL = ppStr "infixl"
+    ppr sty InfixR = ppStr "infixr"
+    ppr sty InfixN = ppStr "infix"
+
+instance Eq Fixity where		-- Used to determine if two fixities conflict
+  (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
+\end{code}
+

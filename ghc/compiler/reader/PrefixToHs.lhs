@@ -150,9 +150,9 @@ cvFunMonoBind sf matches
     get_mdef (RdrMatch_NoGuard _ sfun pat _ _) = get_pdef pat
     get_mdef (RdrMatch_Guards  _ sfun pat _ _) = get_pdef pat
 
-    get_pdef (ConPatIn fn _)     = (fn, False)
-    get_pdef (ConOpPatIn _ op _) = (op, True)
-    get_pdef (ParPatIn pat)	 = get_pdef pat
+    get_pdef (ConPatIn fn _)       = (fn, False)
+    get_pdef (ConOpPatIn _ op _ _) = (op, True)
+    get_pdef (ParPatIn pat)	   = get_pdef pat
 
 
 cvMatches :: SrcFile -> Bool -> [RdrMatch] -> [RdrNameMatch]
@@ -172,9 +172,9 @@ cvMatch sf is_case rdr_match
 	  (if is_case then -- just one pattern: leave it untouched...
 	      [pat]
 	   else		   -- function pattern; extract arg patterns...
-	      case pat of ConPatIn fn pats    -> pats
-			  ConOpPatIn p1 op p2 -> [p1,p2]
-			  ParPatIn pat	      -> panic "PrefixToHs.cvMatch:ParPatIn"
+	      case pat of ConPatIn fn pats      -> pats
+			  ConOpPatIn p1 op _ p2 -> [p1,p2]
+			  ParPatIn pat	        -> panic "PrefixToHs.cvMatch:ParPatIn"
 	  )
   where
     (pat, binding, guarded_exprs)

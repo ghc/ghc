@@ -13,7 +13,7 @@ IMPORT_DELOOPER(HsLoop) -- for paranoia checking
 
 -- friends:
 import HsBinds		( HsBinds )
-import HsLit		( HsLit )
+import HsBasic		( HsLit, Fixity(..), FixityDirection(..) )
 import HsMatches	( pprMatches, pprMatch, Match )
 import HsTypes		( HsType )
 
@@ -54,6 +54,7 @@ data HsExpr tyvar uvar id pat
 
   | OpApp	(HsExpr tyvar uvar id pat)	-- left operand
 		(HsExpr tyvar uvar id pat)	-- operator
+		Fixity				-- Renamer adds fixity; bottom until then
 		(HsExpr tyvar uvar id pat)	-- right operand
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
@@ -208,13 +209,13 @@ pprExpr sty expr@(HsApp e1 e2)
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)
 
-pprExpr sty (OpApp e1 op e2)
+pprExpr sty (OpApp e1 op fixity e2)
   = case op of
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
   where
-    pp_e1 = pprExpr sty e1
-    pp_e2 = pprExpr sty e2
+    pp_e1 = pprParendExpr sty e1		-- Add parens to make precedence clear
+    pp_e2 = pprParendExpr sty e2
 
     pp_prefixly
       = ppHang (pprExpr sty op) 4 (ppSep [pp_e1, pp_e2])
@@ -374,10 +375,13 @@ pprParendExpr sty expr
     case expr of
       HsLit l		    -> ppr sty l
       HsLitOut l _	    -> ppr sty l
+
       HsVar _		    -> pp_as_was
       ExplicitList _	    -> pp_as_was
       ExplicitListOut _ _   -> pp_as_was
       ExplicitTuple _	    -> pp_as_was
+      HsPar _		    -> pp_as_was
+
       _			    -> ppParens pp_as_was
 \end{code}
 

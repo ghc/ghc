@@ -18,6 +18,7 @@ module ChannelVar
 
        ) where
 
+import Prelude
 import ConcBase
 \end{code}
 

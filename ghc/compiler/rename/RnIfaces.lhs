@@ -22,6 +22,7 @@ module RnIfaces (
 IMP_Ubiq()
 
 
+-- import CmdLineOpts	( opt_HiSuffix )
 import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..), HsTyVar, Bind, HsExpr, Sig(..), 
 			  HsBinds(..), MonoBinds, DefaultDecl, ConDecl(..), HsType, BangType, IfaceSig(..),
 			  FixityDecl(..), Fixity, Fake, InPat, InstDecl(..), SYN_IE(Version), HsIdInfo
@@ -572,7 +573,7 @@ mkSearchPath (Just s)
 
 \begin{code}
 noIfaceErr mod sty
-  = ppBesides [ppStr "Could not find interface for ", ppQuote (pprModule sty mod)]
+  = ppBesides [ppStr "Could not find valid interface file for ", ppQuote (pprModule sty mod)]
 --	, ppStr " in"]) 4 (ppAboves (map ppStr dirs))
 
 cannaeReadFile file err sty

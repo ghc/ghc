@@ -113,6 +113,7 @@ module Unique (
 	liftTyConKey,
 	listTyConKey,
 	ltDataConKey,
+	mainKey, mainPrimIoKey,
 	monadClassKey,
 	monadPlusClassKey,
 	monadZeroClassKey,
@@ -669,4 +670,7 @@ thenMClassOpKey		= mkPreludeMiscIdUnique 63 -- (>>=)
 unboundKey		= mkPreludeMiscIdUnique 64	-- Just a place holder for unbound
 							-- variables produced by the renamer
 fromEnumClassOpKey	= mkPreludeMiscIdUnique 65
+
+mainKey			= mkPreludeMiscIdUnique 66
+mainPrimIoKey		= mkPreludeMiscIdUnique 67
 \end{code}

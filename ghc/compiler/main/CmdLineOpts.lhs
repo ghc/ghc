@@ -34,6 +34,7 @@ module CmdLineOpts (
 	opt_D_dump_realC,
 	opt_D_dump_rn,
 	opt_D_dump_simpl,
+	opt_D_dump_simpl_iterations,
 	opt_D_dump_spec,
 	opt_D_dump_stg,
 	opt_D_dump_stranal,
@@ -56,6 +57,7 @@ module CmdLineOpts (
 	opt_GranMacros,
 	opt_Haskell_1_3,
 	opt_HiMap,
+	opt_HiSuffix,
 	opt_IgnoreIfacePragmas,
 	opt_IgnoreStrictnessPragmas,
 	opt_IrrefutableEverything,
@@ -267,6 +269,7 @@ opt_D_dump_rdr			= lookUp  SLIT("-ddump-rdr")
 opt_D_dump_realC		= lookUp  SLIT("-ddump-realC")
 opt_D_dump_rn			= lookUp  SLIT("-ddump-rn")
 opt_D_dump_simpl		= lookUp  SLIT("-ddump-simpl")
+opt_D_dump_simpl_iterations	= lookUp  SLIT("-ddump-simpl_iterations")
 opt_D_dump_spec			= lookUp  SLIT("-ddump-spec")
 opt_D_dump_stg			= lookUp  SLIT("-ddump-stg")
 opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
@@ -289,6 +292,7 @@ opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_Haskell_1_3			= lookUp  SLIT("-fhaskell-1.3")
 opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
+opt_HiSuffix			= lookup_str "-hisuf="
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
 opt_IrrefutableEverything	= lookUp  SLIT("-firrefutable-everything")

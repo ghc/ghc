@@ -24,14 +24,17 @@ import RnSource		( rnDecl )
 import RnIfaces		( getImportedInstDecls, getDecl, getImportVersions, getSpecialInstModules,
 			  mkSearchPath, getWiredInDecl
 			)
-import RnEnv		( availsToNameSet, addAvailToNameSet, addImplicitOccsRn )
+import RnEnv		( availsToNameSet, addAvailToNameSet, 
+			  addImplicitOccsRn, lookupImplicitOccRn )
 import Id		( GenId {- instance NamedThing -} )
 import Name		( Name, Provenance, ExportFlag(..), isLocallyDefined,
 			  NameSet(..), elemNameSet, mkNameSet, unionNameSets, nameSetToList,
 			  isWiredInName, modAndOcc
 			)
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
+import PrelInfo		( ioTyCon_NAME, primIoTyCon_NAME )
 import TyCon		( TyCon )
+import PrelMods		( mAIN, gHC_MAIN )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, FiniteMap )
 import Pretty
@@ -72,14 +75,10 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
 	Just (export_env, rn_env, local_avails) ->
 
 	-- RENAME THE SOURCE
-	-- We also add occurrences for Int, Double, and (), because they
-	-- are the types to which ambigious type variables may be defaulted by
-	-- the type checker; so they won't every appear explicitly.
-	-- [The () one is a GHC extension for defaulting CCall results.]
-    initRnMS rn_env mod_name SourceMode (mapRn rnDecl local_decls)	`thenRn` \ rn_local_decls ->
-    addImplicitOccsRn [getName intTyCon, 
-		       getName doubleTyCon, 
-		       getName unitTyCon]		`thenRn_` 
+    initRnMS rn_env mod_name SourceMode (
+	addImplicits mod_name				`thenRn_`
+	mapRn rnDecl local_decls
+    )							`thenRn` \ rn_local_decls ->
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
 	-- Notice that the rnEnv starts empty
@@ -93,7 +92,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
 	-- We do another closeDecls, so that we can slurp info for the dictionary functions
 	-- for the instance declaration.  These are *not* optional because the version number on
 	-- the dfun acts as the version number for the instance declaration itself; if the
-	-- instance decl changes, so will it's dfun version number.
+	-- instance decl changes, so will its dfun version number.
     getImportedInstDecls 				`thenRn` \ imported_insts ->
     let
 	all_big_names = mkNameSet [name | Avail name _ <- local_avails]    `unionNameSets` 
@@ -147,6 +146,26 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
     trashed_imports  = {-trace "rnSource:trashed_imports"-} []
     trashed_fixities = []
 \end{code}
+
+@addImplicits@ forces the renamer to slurp in some things which aren't
+mentioned explicitly, but which might be needed by the type checker.
+
+\begin{code}
+addImplicits mod_name
+  = addImplicitOccsRn (implicit_main ++ default_tys)
+  where
+	-- Add occurrences for Int, Double, and (), because they
+	-- are the types to which ambigious type variables may be defaulted by
+	-- the type checker; so they won't every appear explicitly.
+	-- [The () one is a GHC extension for defaulting CCall results.]
+    default_tys = [getName intTyCon, getName doubleTyCon, getName unitTyCon]
+
+	-- Add occurrences for IO or PrimIO
+    implicit_main | mod_name == mAIN     = [ioTyCon_NAME]
+		  | mod_name == gHC_MAIN = [primIoTyCon_NAME]
+		  | otherwise 		 = []
+\end{code}
+
 
 \begin{code}
 closeDecls :: [RenamedHsDecl]			-- Declarations got so far
