@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.85 2000/12/19 16:38:15 sewardj Exp $
+ * $Id: Schedule.c,v 1.86 2001/01/16 11:59:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3016,7 +3016,7 @@ detectBlackHoles( void )
 	    break;
 	}
 
-    done:
+    done: ;
     }   
 }
 
