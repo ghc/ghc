@@ -4,7 +4,7 @@ if [ ! -f "$DOCBOOK_CATALOG" ] && [ ! -f "$SGML_CATALOG_FILES" ] ; then
 fi
 
 if [ -f "$DOCBOOK_CATALOG" ] ; then
-  CATALOG_OPTION=-c $DOCBOOK_CATALOG
+  CATALOG_OPTION="-c $DOCBOOK_CATALOG"
 fi
 
 output=db2rtf.rtf
