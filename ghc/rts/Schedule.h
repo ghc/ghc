@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.10 1999/11/09 15:46:55 simonmar Exp $
+ * $Id: Schedule.h,v 1.11 1999/11/11 17:24:49 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -106,6 +106,10 @@ typedef struct {
 
 extern task_info *task_ids;
 #endif
+
+/* Needed by Hugs.
+ */
+void interruptStgRts ( void );
 
 /* -----------------------------------------------------------------------------
  * Some convenient macros...
