@@ -148,6 +148,25 @@ mkJumpToAddr a
            0x81C0C000,
            0x01000000 ]
 
+#elif powerpc_TARGET_ARCH
+-- We'll use r12, for no particular reason.
+-- 0xDEADBEEF stands for the adress:
+-- 3D80DEAD lis r12,0xDEAD
+-- 618CBEEF ori r12,r12,0xBEEF
+-- 7D8903A6 mtctr r12
+-- 4E800420 bctr
+
+type ItblCode = Word32
+mkJumpToAddr a =
+    let w32 = fromIntegral (ptrToInt a)
+	hi16 x = (x `shiftR` 16) .&. 0xFFFF
+	lo16 x = x .&. 0xFFFF
+    in	[
+	0x3D800000 .|. hi16 w32,
+	0x618C0000 .|. lo16 w32,
+	0x7D8903A6, 0x4E800420
+	]
+
 #elif i386_TARGET_ARCH
 -- Let the address to jump to be 0xWWXXYYZZ.
 -- Generate   movl $0xWWXXYYZZ,%eax  ;  jmp *%eax

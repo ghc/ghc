@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.94 2002/06/11 08:06:33 matthewc Exp $
+ * $Id: Linker.c,v 1.95 2002/06/12 22:29:43 wolfgang Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -59,6 +59,11 @@
 #elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
 #  define OBJFORMAT_PEi386
 #  include <windows.h>
+#elif defined(darwin_TARGET_OS)
+#  define OBJFORMAT_MACHO
+#  include <mach-o/loader.h>
+#  include <mach-o/nlist.h>
+#  include <mach-o/reloc.h>
 #endif
 
 /* Hash table mapping symbol names to Symbol */
@@ -72,6 +77,10 @@ static int ocResolve_ELF        ( ObjectCode* oc );
 static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
+#elif defined(OBJFORMAT_MACHO)
+static int ocVerifyImage_MachO    ( ObjectCode* oc );
+static int ocGetNames_MachO       ( ObjectCode* oc );
+static int ocResolve_MachO        ( ObjectCode* oc );
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -265,6 +274,34 @@ typedef struct _RtsSymbolVal {
       Sym(__udivdi3)                            \
       Sym(__moddi3)                             \
       Sym(__umoddi3)
+#endif
+
+#ifdef darwin_TARGET_OS
+#define RTS_DARWIN_ONLY_SYMBOLS                 \
+      Sym(__divdi3)                             \
+      Sym(__udivdi3)                            \
+      Sym(__moddi3)                             \
+      Sym(__umoddi3)							\
+	  Sym(__ashldi3)							\
+	  Sym(__ashrdi3)							\
+	  Sym(__lshrdi3)							\
+	  SymX(stg_gc_enter_2)						\
+	  SymX(stg_gc_enter_3)						\
+	  SymX(stg_gc_enter_4)						\
+	  SymX(stg_gc_enter_5)						\
+	  SymX(stg_gc_enter_6)						\
+	  SymX(stg_gc_enter_7)						\
+	  SymX(stg_gc_enter_8)						\
+	  SymX(stg_chk_2)							\
+	  SymX(stg_chk_3)							\
+	  SymX(stg_chk_4)							\
+	  SymX(stg_chk_5)							\
+	  SymX(stg_chk_6)							\
+	  SymX(stg_chk_7)							\
+	  SymX(stg_chk_8)							\
+
+#else
+#define RTS_DARWIN_ONLY_SYMBOLS
 #endif
 
 #ifndef SMP
@@ -504,6 +541,7 @@ RTS_EXTRA_SYMBOLS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_CYGWIN_ONLY_SYMBOLS
+RTS_DARWIN_ONLY_SYMBOLS
 #undef Sym
 #undef SymX
 
@@ -524,6 +562,7 @@ static RtsSymbolVal rtsSyms[] = {
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
       RTS_CYGWIN_ONLY_SYMBOLS
+	  RTS_DARWIN_ONLY_SYMBOLS
       { 0, 0 } /* sentinel */
 };
 
@@ -564,7 +603,7 @@ static void ghciInsertStrHashTable ( char* obj_name,
 /* -----------------------------------------------------------------------------
  * initialize the object linker
  */
-#if defined(OBJFORMAT_ELF)
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 static void *dl_prog_handle;
 #endif
 
@@ -580,7 +619,7 @@ initLinker( void )
 	ghciInsertStrHashTable("(GHCi built-in symbols)",
                                symhash, sym->lbl, sym->addr);
     }
-#   if defined(OBJFORMAT_ELF)
+#   if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
 #   endif
 }
@@ -617,7 +656,7 @@ static OpenedDLL* opened_dlls = NULL;
 char *
 addDLL( char *dll_name )
 {
-#  if defined(OBJFORMAT_ELF)
+#  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
    void *hdl;
    char *errmsg;
 
@@ -687,7 +726,7 @@ lookupSymbol( char *lbl )
     val = lookupStrHashTable(symhash, lbl);
 
     if (val == NULL) {
-#       if defined(OBJFORMAT_ELF)
+#       if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 	return dlsym(dl_prog_handle, lbl);
 #       elif defined(OBJFORMAT_PEi386)
         OpenedDLL* o_dll;
@@ -824,6 +863,8 @@ loadObj( char *path )
    oc->formatName = "ELF";
 #  elif defined(OBJFORMAT_PEi386)
    oc->formatName = "PEi386";
+#  elif defined(OBJFORMAT_MACHO)
+   oc->formatName = "Mach-O";
 #  else
    free(oc);
    barf("loadObj: not implemented on this platform");
@@ -897,6 +938,8 @@ loadObj( char *path )
    r = ocVerifyImage_ELF ( oc );
 #  elif defined(OBJFORMAT_PEi386)
    r = ocVerifyImage_PEi386 ( oc );
+#  elif defined(OBJFORMAT_MACHO)
+   r = ocVerifyImage_MachO ( oc );
 #  else
    barf("loadObj: no verify method");
 #  endif
@@ -907,6 +950,8 @@ loadObj( char *path )
    r = ocGetNames_ELF ( oc );
 #  elif defined(OBJFORMAT_PEi386)
    r = ocGetNames_PEi386 ( oc );
+#  elif defined(OBJFORMAT_MACHO)
+   r = ocGetNames_MachO ( oc );
 #  else
    barf("loadObj: no getNames method");
 #  endif
@@ -935,6 +980,8 @@ resolveObjs( void )
 	    r = ocResolve_ELF ( oc );
 #           elif defined(OBJFORMAT_PEi386)
 	    r = ocResolve_PEi386 ( oc );
+#           elif defined(OBJFORMAT_MACHO)
+	    r = ocResolve_MachO ( oc );
 #           else
 	    barf("resolveObjs: not implemented on this platform");
 #           endif
@@ -2699,7 +2746,6 @@ ocResolve_ELF ( ObjectCode* oc )
    return 1;
 }
 
-
 /*
  * IA64 specifics
  * Instructions are 41 bits long, packed into 128 bit bundles with a 5-bit template
@@ -2793,3 +2839,290 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
 #endif /* ia64 */
 
 #endif /* ELF */
+
+/* --------------------------------------------------------------------------
+ * Mach-O specifics
+ * ------------------------------------------------------------------------*/
+
+#if defined(OBJFORMAT_MACHO)
+
+/*
+  Initial support for MachO linking on Darwin/MacOS X on PowerPC chips
+  by Wolfgang Thaller (wolfgang.thaller@gmx.net)
+  
+  I hereby formally apologize for the hackish nature of this code.
+  Things that need to be done:
+  *) get common symbols and .bss sections to work properly.
+	Haskell modules seem to work, but C modules can cause problems
+  *) implement ocVerifyImage_MachO
+  *) add more sanity checks. The current code just has to segfault if there's a
+     broken .o file.
+*/
+
+static int ocVerifyImage_MachO(ObjectCode* oc)
+{
+    // FIXME: do some verifying here
+    return 1;
+}
+
+static void resolveImports(
+    char *image,
+    struct symtab_command *symLC,
+    struct section *sect,    // ptr to lazy or non-lazy symbol pointer section
+    unsigned long *indirectSyms,
+    struct nlist *nlist)
+{
+    unsigned i;
+    
+    for(i=0;i*4<sect->size;i++)
+    {
+	// according to otool, reserved1 contains the first index into the indirect symbol table
+	struct nlist *symbol = &nlist[indirectSyms[sect->reserved1+i]];
+	char *nm = image + symLC->stroff + symbol->n_un.n_strx;
+	void *addr = NULL;
+	
+	if((symbol->n_type & N_TYPE) == N_UNDF
+	    && (symbol->n_type & N_EXT) && (symbol->n_value != 0))
+	    addr = (void*) (symbol->n_value);
+	else
+	    addr = lookupSymbol(nm);
+	if(!addr)
+	{
+	    fprintf(stderr, "not found: %s\n", nm);
+	    abort();
+	}
+	ASSERT(addr);
+	((void**)(image + sect->offset))[i] = addr;
+    }
+}
+
+static void relocateSection(char *image, 
+    struct symtab_command *symLC, struct nlist *nlist,
+    struct section* sections, struct section *sect)
+{
+    struct relocation_info *relocs;
+    int i,n;
+    
+    if(!strcmp(sect->sectname,"__la_symbol_ptr"))
+	return;
+    else if(!strcmp(sect->sectname,"__nl_symbol_ptr"))
+	return;
+
+    n = sect->nreloc;
+    relocs = (struct relocation_info*) (image + sect->reloff);
+    
+    for(i=0;i<n;i++)
+    {
+	if(relocs[i].r_address & R_SCATTERED)
+	{
+	    struct scattered_relocation_info *scat =
+		(struct scattered_relocation_info*) &relocs[i];
+	    
+	    if(!scat->r_pcrel)
+	    {
+		if(scat->r_length == 2 && scat->r_type == GENERIC_RELOC_VANILLA)
+		{
+		    unsigned long* word = (unsigned long*) (image + sect->offset + scat->r_address);
+		    
+		    *word = scat->r_value + sect->offset + ((long) image);
+		}
+	    }
+	    
+	    continue; // FIXME: I hope it's OK to ignore all the others.
+	}
+	else
+	{
+	    struct relocation_info *reloc = &relocs[i];
+	    if(reloc->r_pcrel && !reloc->r_extern)
+		continue;
+		
+	    if(!reloc->r_pcrel
+		&& reloc->r_length == 2
+		&& reloc->r_type == GENERIC_RELOC_VANILLA)
+	    {
+		unsigned long* word = (unsigned long*) (image + sect->offset + reloc->r_address);
+		
+		if(!reloc->r_extern)
+		{
+		    long delta = 
+			sections[reloc->r_symbolnum-1].offset
+			- sections[reloc->r_symbolnum-1].addr
+			+ ((long) image);
+		    
+		    *word += delta;
+		}
+		else
+		{
+		    struct nlist *symbol = &nlist[reloc->r_symbolnum];
+		    char *nm = image + symLC->stroff + symbol->n_un.n_strx;
+		    *word = lookupSymbol(nm);
+		    ASSERT(*word);
+		}
+		continue;
+	    }
+	    fprintf(stderr, "unknown reloc\n");
+	    abort();
+	    ASSERT(2 + 2 == 5);
+	}
+    }
+}
+
+static int ocGetNames_MachO(ObjectCode* oc)
+{
+    char *image = (char*) oc->image;
+    struct mach_header *header = (struct mach_header*) image;
+    struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
+    int i,curSymbol;
+    struct segment_command *segLC = NULL;
+    struct section *sections, *la_ptrs = NULL, *nl_ptrs = NULL;
+    struct symtab_command *symLC = NULL;
+    struct dysymtab_command *dsymLC = NULL;
+    struct nlist *nlist;
+    unsigned long commonSize = 0;
+    char    *commonStorage = NULL;
+    unsigned long commonCounter;
+
+    for(i=0;i<header->ncmds;i++)
+    {
+	if(lc->cmd == LC_SEGMENT)
+	    segLC = (struct segment_command*) lc;
+	else if(lc->cmd == LC_SYMTAB)
+	    symLC = (struct symtab_command*) lc;
+	else if(lc->cmd == LC_DYSYMTAB)
+	    dsymLC = (struct dysymtab_command*) lc;
+	lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
+    }
+
+    sections = (struct section*) (segLC+1); 
+    nlist = (struct nlist*) (image + symLC->symoff);
+
+    for(i=0;i<segLC->nsects;i++)
+    {
+	if(!strcmp(sections[i].sectname,"__la_symbol_ptr"))
+	    la_ptrs = &sections[i];
+	else if(!strcmp(sections[i].sectname,"__nl_symbol_ptr"))
+	    nl_ptrs = &sections[i];
+	    
+	    // for now, only add __text and __const to the sections table
+	else if(!strcmp(sections[i].sectname,"__text"))
+	    addSection(oc, SECTIONKIND_CODE_OR_RODATA, 
+		(void*) (image + sections[i].offset),
+		(void*) (image + sections[i].offset + sections[i].size));
+	else if(!strcmp(sections[i].sectname,"__const"))
+	    addSection(oc, SECTIONKIND_RWDATA, 
+		(void*) (image + sections[i].offset),
+		(void*) (image + sections[i].offset + sections[i].size));
+	else if(!strcmp(sections[i].sectname,"__data"))
+	    addSection(oc, SECTIONKIND_RWDATA, 
+		(void*) (image + sections[i].offset),
+		(void*) (image + sections[i].offset + sections[i].size));
+    }
+
+	// count external symbols defined here
+    oc->n_symbols = 0;
+    for(i=dsymLC->iextdefsym;i<dsymLC->iextdefsym+dsymLC->nextdefsym;i++)
+    {
+	if((nlist[i].n_type & N_TYPE) == N_SECT)
+	    oc->n_symbols++;
+    }
+    for(i=0;i<symLC->nsyms;i++)
+    {
+	if((nlist[i].n_type & N_TYPE) == N_UNDF
+		&& (nlist[i].n_type & N_EXT) && (nlist[i].n_value != 0))
+	{
+	    commonSize += nlist[i].n_value;
+	    oc->n_symbols++;
+	}
+    }
+    oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
+				   "ocGetNames_MachO(oc->symbols)");
+    
+	// insert symbols into hash table
+    for(i=dsymLC->iextdefsym,curSymbol=0;i<dsymLC->iextdefsym+dsymLC->nextdefsym;i++)
+    {
+	if((nlist[i].n_type & N_TYPE) == N_SECT)
+	{
+	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
+	    ghciInsertStrHashTable(oc->fileName, symhash, nm, image + 
+		sections[nlist[i].n_sect-1].offset
+		- sections[nlist[i].n_sect-1].addr
+		+ nlist[i].n_value);
+	    oc->symbols[curSymbol++] = nm;
+	}
+    }
+    
+    commonStorage = stgCallocBytes(1,commonSize,"ocGetNames_MachO(common symbols)");
+    commonCounter = (unsigned long)commonStorage;
+    for(i=0;i<symLC->nsyms;i++)
+    {
+	if((nlist[i].n_type & N_TYPE) == N_UNDF
+		&& (nlist[i].n_type & N_EXT) && (nlist[i].n_value != 0))
+	{
+	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
+	    unsigned long sz = nlist[i].n_value;
+	    
+	    nlist[i].n_value = commonCounter;
+	    
+	    ghciInsertStrHashTable(oc->fileName, symhash, nm, nlist[i].n_value);
+	    oc->symbols[curSymbol++] = nm;
+	    
+	    commonCounter += sz;
+	}
+    }
+    return 1;
+}
+
+static int ocResolve_MachO(ObjectCode* oc)
+{
+    char *image = (char*) oc->image;
+    struct mach_header *header = (struct mach_header*) image;
+    struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
+    int i;
+    struct segment_command *segLC = NULL;
+    struct section *sections, *la_ptrs = NULL, *nl_ptrs = NULL;
+    struct symtab_command *symLC = NULL;
+    struct dysymtab_command *dsymLC = NULL;
+    struct nlist *nlist;
+    unsigned long *indirectSyms;
+
+    for(i=0;i<header->ncmds;i++)
+    {
+	if(lc->cmd == LC_SEGMENT)
+	    segLC = (struct segment_command*) lc;
+	else if(lc->cmd == LC_SYMTAB)
+	    symLC = (struct symtab_command*) lc;
+	else if(lc->cmd == LC_DYSYMTAB)
+	    dsymLC = (struct dysymtab_command*) lc;
+	lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
+    }
+    
+    sections = (struct section*) (segLC+1); 
+    nlist = (struct nlist*) (image + symLC->symoff);
+
+    for(i=0;i<segLC->nsects;i++)
+    {
+	if(!strcmp(sections[i].sectname,"__la_symbol_ptr"))
+	    la_ptrs = &sections[i];
+	else if(!strcmp(sections[i].sectname,"__nl_symbol_ptr"))
+	    nl_ptrs = &sections[i];
+    }
+    
+    indirectSyms = (unsigned long*) (image + dsymLC->indirectsymoff);
+
+    if(la_ptrs)
+	resolveImports(image,symLC,la_ptrs,indirectSyms,nlist);
+    if(nl_ptrs)
+	resolveImports(image,symLC,nl_ptrs,indirectSyms,nlist);
+    
+    for(i=0;i<segLC->nsects;i++)
+    {
+	relocateSection(image,symLC,nlist,sections,&sections[i]);
+    }
+
+    /* Free the local symbol table; we won't need it again. */
+    freeHashTable(oc->lochash, NULL);
+    oc->lochash = NULL;
+    return 1;
+}
+
+#endif
