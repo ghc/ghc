@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.31 2001/01/26 14:17:31 simonpj Exp $
+ * $Id: ClosureMacros.h,v 1.32 2001/02/06 11:41:04 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -126,7 +126,7 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
    Static closures are defined as follows:
 
 
-   SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
+   SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,closure_class,info_class);
 
    The info argument must have type 'StgInfoTable' or
    'StgSRTInfoTable', since we use '&' to get its address in the macro.
