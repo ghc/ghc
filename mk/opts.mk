@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.1 1997/03/14 08:02:27 simonpj Exp $
+# 	$Id: opts.mk,v 1.2 1997/03/23 22:31:29 sof Exp $
 #
 #################################################################################
 
@@ -52,7 +52,7 @@ SRC_FLEX_OPTS	+= -s -8
 # Make sure we install things with group 'grasp' at Glasgow
 # At Glasgow, we would rather the installed binaries were stripped.
 # (Delete if you feel otherwise.)
-SRC_INSTALL_OPTS	+= -s
+SRC_INSTALL_BIN_OPTS	+= -s
 ifeq ($(AT_GLASGOW),1)
 SRC_INSTALL_OPTS	+= -g grasp
 endif
@@ -96,6 +96,7 @@ FLEX_OPTS          = $(SRC_FLEX_OPTS) $(WAY$(_way)_FLEX_OPTS) $(EXTRA_FLEX_OPTS)
 HAPPY_OPTS         = $(SRC_HAPPY_OPTS) $(WAY$(_way)_HAPPY_OPTS) $($*_HAPPY_OPTS) $(EXTRA_HAPPY_OPTS)
 HSTAGS_OPTS        = $(SRC_HSTAGS_OPTS) $(WAY$(_way)_HSTAGS_OPTS) $(EXTRA_HSTAGS_OPTS)
 INSTALL_OPTS       = $(SRC_INSTALL_OPTS) $(WAY$(_way)_INSTALL_OPTS) $(EXTRA_INSTALL_OPTS)
+INSTALL_BIN_OPTS   = $(INSTALL_OPTS) $(SRC_INSTALL_BIN_OPTS)
 LD_OPTS            = $(SRC_LD_OPTS) $(WAY$(_way)_LD_OPTS) $(EXTRA_LD_OPTS)
 LINT_OPTS          = $(SRC_LINT_OPTS) $(WAY$(_way)_LINT_OPTS) $(EXTRA_LINT_OPTS)
 LIT2CHANGELOG_OPTS = $(SRC_LIT2CHANGELOG_OPTS) $(WAY$(_way)_LIT2CHANGELOG_OPTS) \
