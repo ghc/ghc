@@ -42,6 +42,8 @@ module StgInterp (
    - converting string literals to Addr# is horrible and introduces
      a memory leak.  See if something can be done about this.
 
+   - lots of assumptions about word size vs. double size etc.
+
 ----------------------------------------------------------------------------- -}
 
 #include "HsVersions.h"
@@ -63,7 +65,7 @@ import UniqSet
 
 import {-# SOURCE #-} MCI_make_constr
 
-import IOExts		( unsafePerformIO ) -- ToDo: remove
+import IOExts		( unsafePerformIO, unsafeInterleaveIO, fixIO ) -- ToDo: remove
 import PrelGHC		--( unsafeCoerce#, dataToTag#,
 			--  indexPtrOffClosure#, indexWordOffClosure# )
 import PrelAddr 	( Addr(..) )
@@ -107,7 +109,9 @@ filterRdrNameEnv mods env
 -- ---------------------------------------------------------------------------
 
 iExprToHValue :: ItblEnv -> ClosureEnv -> UnlinkedIExpr -> IO HValue
-iExprToHValue ie ce expr = return (interp (linkIExpr ie ce expr))
+iExprToHValue ie ce expr
+   = do linked_expr <- linkIExpr ie ce expr
+	return (interp linked_expr)
 
 -- ---------------------------------------------------------------------------
 -- Convert STG to an unlinked interpretable
@@ -152,7 +156,8 @@ rhs2expr ie (StgRhsClosure ccs binfo srt fvs uflag args rhs)
         rhsExpr = stg2expr (addListToUniqSet ie args) rhs
         rhsRep  = repOfStgExpr rhs
         mkLambdas [] = rhsExpr
-        mkLambdas (v:vs) = mkLam (repOfId v) rhsRep v (mkLambdas vs)
+	mkLambdas [v] = mkLam (repOfId v) rhsRep v rhsExpr
+        mkLambdas (v:vs) = mkLam (repOfId v) RepP v (mkLambdas vs)
 rhs2expr ie (StgRhsCon ccs dcon args)
    = conapp2expr ie dcon args
 
@@ -325,6 +330,8 @@ stg2expr ie stgexpr
                          bndr (stg2expr ie scrut) 
                               (map (doPrimAlt ie') alts) 
                               (def2expr ie' def)
+           | otherwise ->
+		pprPanic "stg2expr(StgCase,prim)" (ppr (repOfStgExpr scrut) $$ (case scrut of (StgApp v _) -> ppr v <+> ppr (idType v) <+> ppr (idPrimRep v)) $$ ppr stgexpr)
 	   where ie' = addOneToUniqSet ie bndr
 
         StgCase scrut live liveR bndr srt (StgAlgAlts tycon alts def)
@@ -335,9 +342,9 @@ stg2expr ie stgexpr
                              (def2expr ie' def)
 	   where ie' = addOneToUniqSet ie bndr
 
+
         StgPrimApp op args res_ty
-           -> mkPrimOp (repOfStgExpr stgexpr)
-                       op (map (arg2expr ie) args)
+           -> mkPrimOp (repOfStgExpr stgexpr) op (map (arg2expr ie) args)
 
         StgConApp dcon args
            -> conapp2expr ie dcon args
@@ -433,11 +440,15 @@ linkIModules gie gce mods = do
       top_level_binders = map (toRdrName.binder) binds
       final_gie = foldr plusFM gie ies
   
-  let {-rec-}
-      new_gce = addListToFM gce (zip top_level_binders new_rhss)
-      new_rhss = map (\b -> evalP (bindee b) emptyUFM) new_binds
-    --vvvvvvvvv----------------------------------------^^^^^^^^^-- circular
-      new_binds = linkIBinds final_gie new_gce binds
+  (new_binds, new_gce) <-
+    fixIO (\ ~(new_binds, new_gce) -> do
+
+      new_binds <- linkIBinds final_gie new_gce binds
+
+      let new_rhss = map (\b -> evalP (bindee b) emptyUFM) new_binds
+      let new_gce = addListToFM gce (zip top_level_binders new_rhss)
+
+      return (new_binds, new_gce))
 
   return (new_binds, final_gie, new_gce)
 
@@ -448,76 +459,65 @@ linkIModules gie gce mods = do
 -- up and not cache them in the source symbol tables.  The interpreted
 -- code will still be referenced in the source symbol tables.
 
-linkIBinds :: ItblEnv -> ClosureEnv -> [UnlinkedIBind] -> [LinkedIBind]
-linkIBinds ie ce binds = map (linkIBind ie ce) binds
+linkIBinds :: ItblEnv -> ClosureEnv -> [UnlinkedIBind] -> IO [LinkedIBind]
+linkIBinds ie ce binds = mapM (linkIBind ie ce) binds
 
-linkIBind ie ce (IBind bndr expr) = IBind bndr (linkIExpr ie ce expr)
+linkIBind ie ce (IBind bndr expr)
+   = do expr <- linkIExpr ie ce expr
+	return (IBind bndr expr)
 
-linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedIExpr -> LinkedIExpr
+linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedIExpr -> IO LinkedIExpr
 linkIExpr ie ce expr = case expr of
 
-   CaseAlgP  bndr expr alts dflt -> 
-	CaseAlgP bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
-	   		(linkDefault ie ce dflt)
+   CaseAlgP  bndr expr alts dflt -> linkAlgCase ie ce bndr expr alts dflt CaseAlgP
+   CaseAlgI  bndr expr alts dflt -> linkAlgCase ie ce bndr expr alts dflt CaseAlgI
+   CaseAlgF  bndr expr alts dflt -> linkAlgCase ie ce bndr expr alts dflt CaseAlgF
+   CaseAlgD  bndr expr alts dflt -> linkAlgCase ie ce bndr expr alts dflt CaseAlgD
 
-   CaseAlgI  bndr expr alts dflt ->
-	CaseAlgI bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
-	   		(linkDefault ie ce dflt)
+   CasePrimP  bndr expr alts dflt -> linkPrimCase ie ce bndr expr alts dflt CasePrimP
+   CasePrimI  bndr expr alts dflt -> linkPrimCase ie ce bndr expr alts dflt CasePrimI
+   CasePrimF  bndr expr alts dflt -> linkPrimCase ie ce bndr expr alts dflt CasePrimF
+   CasePrimD  bndr expr alts dflt -> linkPrimCase ie ce bndr expr alts dflt CasePrimD
 
-   CaseAlgF  bndr expr alts dflt ->
-	CaseAlgF bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
-	   		(linkDefault ie ce dflt)
+   ConApp con -> lookupNullaryCon ie con
 
-   CaseAlgD  bndr expr alts dflt ->
-	CaseAlgD bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
-	   		(linkDefault ie ce dflt)
+   ConAppI con arg0 -> do
+	con' <- lookupCon ie con
+	arg' <- linkIExpr ie ce arg0
+	return (ConAppI con' arg')
 
-   CasePrimP bndr expr alts dflt ->
-	CasePrimP bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
-	   		(linkDefault ie ce dflt)
+   ConAppP con arg0 -> do
+	con' <- lookupCon ie con
+	arg' <- linkIExpr ie ce arg0
+	return (ConAppP con' arg')
 
-   CasePrimI bndr expr alts dflt ->
-	CasePrimI bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
-	   		(linkDefault ie ce dflt)
+   ConAppPP con arg0 arg1 -> do
+	con' <- lookupCon ie con
+	arg0' <- linkIExpr ie ce arg0
+	arg1' <- linkIExpr ie ce arg1
+	return (ConAppPP con' arg0' arg1')
+
+   ConAppGen con args -> do
+	con <- lookupCon ie con
+	args <- mapM (linkIExpr ie ce) args
+	return (ConAppGen con args)
    
-   CasePrimF bndr expr alts dflt ->
-	CasePrimF bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
-	   		(linkDefault ie ce dflt)
+   PrimOpI op args -> linkPrimOp ie ce PrimOpI op args
+   PrimOpP op args -> linkPrimOp ie ce PrimOpP op args
    
-   CasePrimD bndr expr alts dflt ->
-	CasePrimD bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
-	   		(linkDefault ie ce dflt)
-   
-   ConApp con -> 
-	lookupNullaryCon ie con
+   NonRecP bind expr  -> linkNonRec ie ce NonRecP bind expr
+   NonRecI bind expr  -> linkNonRec ie ce NonRecI bind expr
+   NonRecF bind expr  -> linkNonRec ie ce NonRecF bind expr
+   NonRecD bind expr  -> linkNonRec ie ce NonRecD bind expr
 
-   ConAppI   con arg0 -> 
-	ConAppI (lookupCon ie con) (linkIExpr ie ce arg0)
+   RecP binds expr  -> linkRec ie ce RecP binds expr
+   RecI binds expr  -> linkRec ie ce RecI binds expr
+   RecF binds expr  -> linkRec ie ce RecF binds expr
+   RecD binds expr  -> linkRec ie ce RecD binds expr
 
-   ConAppP   con arg0 ->
-	ConAppP (lookupCon ie con) (linkIExpr ie ce arg0)
-
-   ConAppPP  con arg0 arg1 -> 
-	ConAppPP (lookupCon ie con) (linkIExpr ie ce arg0) (linkIExpr ie ce arg1)
-   ConAppGen con args -> ConAppGen (lookupCon ie con) 
-					(map (linkIExpr ie ce) args)
-   
-   PrimOpI op args -> PrimOpI op (map (linkIExpr ie ce) args)
-   PrimOpP op args -> PrimOpP op (map (linkIExpr ie ce) args)
-   
-   NonRecP bind expr  -> NonRecP (linkIBind ie ce bind) (linkIExpr ie ce expr)
-   NonRecI bind expr  -> NonRecI (linkIBind ie ce bind) (linkIExpr ie ce expr)
-   NonRecF bind expr  -> NonRecF (linkIBind ie ce bind) (linkIExpr ie ce expr)
-   NonRecD bind expr  -> NonRecD (linkIBind ie ce bind) (linkIExpr ie ce expr)
-
-   RecP    binds expr -> RecP (linkIBinds ie ce binds) (linkIExpr ie ce expr)
-   RecI    binds expr -> RecI (linkIBinds ie ce binds) (linkIExpr ie ce expr)
-   RecF    binds expr -> RecF (linkIBinds ie ce binds) (linkIExpr ie ce expr)
-   RecD    binds expr -> RecD (linkIBinds ie ce binds) (linkIExpr ie ce expr)
-   
-   LitI i -> LitI i
-   LitF i -> LitF i
-   LitD i -> LitD i
+   LitI i -> return (LitI i)
+   LitF i -> return (LitF i)
+   LitD i -> return (LitD i)
 
    Native var -> lookupNative ce var
    
@@ -526,79 +526,132 @@ linkIExpr ie ce expr = case expr of
    VarF v -> lookupVar ce VarF v
    VarD v -> lookupVar ce VarD v
    
-   LamPP  bndr expr -> LamPP bndr (linkIExpr ie ce expr)
-   LamPI  bndr expr -> LamPI bndr (linkIExpr ie ce expr)
-   LamPF  bndr expr -> LamPF bndr (linkIExpr ie ce expr)
-   LamPD  bndr expr -> LamPD bndr (linkIExpr ie ce expr)
-   LamIP  bndr expr -> LamIP bndr (linkIExpr ie ce expr)
-   LamII  bndr expr -> LamII bndr (linkIExpr ie ce expr)
-   LamIF  bndr expr -> LamIF bndr (linkIExpr ie ce expr)
-   LamID  bndr expr -> LamID bndr (linkIExpr ie ce expr)
-   LamFP  bndr expr -> LamFP bndr (linkIExpr ie ce expr)
-   LamFI  bndr expr -> LamFI bndr (linkIExpr ie ce expr)
-   LamFF  bndr expr -> LamFF bndr (linkIExpr ie ce expr)
-   LamFD  bndr expr -> LamFD bndr (linkIExpr ie ce expr)
-   LamDP  bndr expr -> LamDP bndr (linkIExpr ie ce expr)
-   LamDI  bndr expr -> LamDI bndr (linkIExpr ie ce expr)
-   LamDF  bndr expr -> LamDF bndr (linkIExpr ie ce expr)
-   LamDD  bndr expr -> LamDD bndr (linkIExpr ie ce expr)
+   LamPP  bndr expr -> linkLam ie ce LamPP bndr expr
+   LamPI  bndr expr -> linkLam ie ce LamPI bndr expr
+   LamPF  bndr expr -> linkLam ie ce LamPF bndr expr
+   LamPD  bndr expr -> linkLam ie ce LamPD bndr expr
+   LamIP  bndr expr -> linkLam ie ce LamIP bndr expr
+   LamII  bndr expr -> linkLam ie ce LamII bndr expr
+   LamIF  bndr expr -> linkLam ie ce LamIF bndr expr
+   LamID  bndr expr -> linkLam ie ce LamID bndr expr
+   LamFP  bndr expr -> linkLam ie ce LamFP bndr expr
+   LamFI  bndr expr -> linkLam ie ce LamFI bndr expr
+   LamFF  bndr expr -> linkLam ie ce LamFF bndr expr
+   LamFD  bndr expr -> linkLam ie ce LamFD bndr expr
+   LamDP  bndr expr -> linkLam ie ce LamDP bndr expr
+   LamDI  bndr expr -> linkLam ie ce LamDI bndr expr
+   LamDF  bndr expr -> linkLam ie ce LamDF bndr expr
+   LamDD  bndr expr -> linkLam ie ce LamDD bndr expr
    
-   AppPP  fun arg -> AppPP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppPI  fun arg -> AppPI (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppPF  fun arg -> AppPF (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppPD  fun arg -> AppPD (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppIP  fun arg -> AppIP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppII  fun arg -> AppII (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppIF  fun arg -> AppIF (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppID  fun arg -> AppID (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppFP  fun arg -> AppFP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppFI  fun arg -> AppFI (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppFF  fun arg -> AppFF (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppFD  fun arg -> AppFD (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppDP  fun arg -> AppDP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppDI  fun arg -> AppDI (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppDF  fun arg -> AppDF (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-   AppDD  fun arg -> AppDD (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppPP  fun arg -> linkApp ie ce AppPP fun arg
+   AppPI  fun arg -> linkApp ie ce AppPI fun arg
+   AppPF  fun arg -> linkApp ie ce AppPF fun arg
+   AppPD  fun arg -> linkApp ie ce AppPD fun arg
+   AppIP  fun arg -> linkApp ie ce AppIP fun arg
+   AppII  fun arg -> linkApp ie ce AppII fun arg
+   AppIF  fun arg -> linkApp ie ce AppIF fun arg
+   AppID  fun arg -> linkApp ie ce AppID fun arg
+   AppFP  fun arg -> linkApp ie ce AppFP fun arg
+   AppFI  fun arg -> linkApp ie ce AppFI fun arg
+   AppFF  fun arg -> linkApp ie ce AppFF fun arg
+   AppFD  fun arg -> linkApp ie ce AppFD fun arg
+   AppDP  fun arg -> linkApp ie ce AppDP fun arg
+   AppDI  fun arg -> linkApp ie ce AppDI fun arg
+   AppDF  fun arg -> linkApp ie ce AppDF fun arg
+   AppDD  fun arg -> linkApp ie ce AppDD fun arg
    
+linkAlgCase ie ce bndr expr alts dflt con
+   = do expr <- linkIExpr ie ce expr
+	alts <- mapM (linkAlgAlt ie ce) alts
+	dflt <- linkDefault ie ce dflt
+	return (con bndr expr alts dflt)
+
+linkPrimCase ie ce bndr expr alts dflt con
+   = do expr <- linkIExpr ie ce expr
+	alts <- mapM (linkPrimAlt ie ce) alts
+	dflt <- linkDefault ie ce dflt
+	return (con bndr expr alts dflt)
+
+linkAlgAlt ie ce (AltAlg tag args rhs) 
+  = do rhs <- linkIExpr ie ce rhs
+       return (AltAlg tag args rhs)
+
+linkPrimAlt ie ce (AltPrim lit rhs) 
+  = do rhs <- linkIExpr ie ce rhs
+       lit <- linkIExpr ie ce lit
+       return (AltPrim lit rhs)
+
+linkDefault ie ce Nothing = return Nothing
+linkDefault ie ce (Just expr) 
+   = do expr <- linkIExpr ie ce expr
+	return (Just expr)
+
+linkNonRec ie ce con bind expr 
+   = do expr <- linkIExpr ie ce expr
+	bind <- linkIBind ie ce bind
+        return (con bind expr)
+
+linkRec ie ce con binds expr 
+   = do expr <- linkIExpr ie ce expr
+	binds <- linkIBinds ie ce binds
+        return (con binds expr)
+
+linkLam ie ce con bndr expr
+   = do expr <- linkIExpr ie ce expr
+        return (con bndr expr)
+
+linkApp ie ce con fun arg
+   = do fun <- linkIExpr ie ce fun
+        arg <- linkIExpr ie ce arg
+	return (con fun arg)
+
+linkPrimOp ie ce con op args
+   = do args <- mapM (linkIExpr ie ce) args
+	return (con op args)
+
 lookupCon ie con = 
   case lookupFM ie con of
-    Just (Ptr addr) -> addr
-    Nothing   -> 
+    Just (Ptr addr) -> return addr
+    Nothing   -> do
 	-- try looking up in the object files.
-	case {-HACK!!!-}
-		unsafePerformIO (lookupSymbol (rdrNameToCLabel con "con_info")) of
-	    Just addr -> addr
-	    Nothing   -> pprPanic "linkIExpr" (ppr con)
+        m <- lookupSymbol (rdrNameToCLabel con "con_info")
+	case m of
+	    Just addr -> return addr
+  	    Nothing   -> pprPanic "linkIExpr" (ppr con)
 
 -- nullary constructors don't have normal _con_info tables.
 lookupNullaryCon ie con =
   case lookupFM ie con of
-    Just (Ptr addr) -> ConApp addr
-    Nothing -> 
+    Just (Ptr addr) -> return (ConApp addr)
+    Nothing -> do
 	-- try looking up in the object files.
-	case {-HACK!!!-}
-		unsafePerformIO (lookupSymbol (rdrNameToCLabel con "closure")) of
-	    Just (A# addr) -> Native (unsafeCoerce# addr)
+	m <- lookupSymbol (rdrNameToCLabel con "closure")
+	case m of
+	    Just (A# addr) -> return (Native (unsafeCoerce# addr))
 	    Nothing   -> pprPanic "lookupNullaryCon" (ppr con)
 
 
 lookupNative ce var =
-  case lookupFM ce var of
-    Just e  -> Native e
-    Nothing -> 
-        -- try looking up in the object files.
-	let lbl = (rdrNameToCLabel var "closure")
-	    addr = unsafePerformIO (lookupSymbol lbl) in
-	case {- trace (lbl ++ " -> " ++ show addr) $ -} addr of
-	    Just (A# addr) -> Native (unsafeCoerce# addr)
-	    Nothing   -> pprPanic "linkIExpr" (ppr var)
+  unsafeInterleaveIO (do
+      case lookupFM ce var of
+    	Just e  -> return (Native e)
+    	Nothing -> do
+    	    -- try looking up in the object files.
+    	    let lbl = (rdrNameToCLabel var "closure")
+    	    m <- lookupSymbol lbl
+    	    case m of
+    		Just (A# addr) -> return (Native (unsafeCoerce# addr))
+    		Nothing   -> pprPanic "linkIExpr" (ppr var)
+  )
 
 -- some VarI/VarP refer to top-level interpreted functions; we change
 -- them into Natives here.
 lookupVar ce f v =
-  case lookupFM ce (toRdrName v) of
-	Nothing -> f v
-	Just e  -> Native e
+  unsafeInterleaveIO (do
+     case lookupFM ce (toRdrName v) of
+	Nothing -> return (f v)
+	Just e  -> return (Native e)
+  )
 
 -- HACK!!!  ToDo: cleaner
 rdrNameToCLabel :: RdrName -> String{-suffix-} -> String
@@ -607,16 +660,6 @@ rdrNameToCLabel rn suffix
   | otherwise =
   _UNPK_(moduleNameFS (rdrNameModule rn)) 
   ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
-
-linkAlgAlts ie ce = map (linkAlgAlt ie ce)
-linkAlgAlt ie ce (AltAlg tag args rhs) = AltAlg tag args (linkIExpr ie ce rhs)
-
-linkPrimAlts ie ce = map (linkPrimAlt ie ce)
-linkPrimAlt ie ce (AltPrim lit rhs)
-   = AltPrim (linkIExpr ie ce lit) (linkIExpr ie ce rhs)
-
-linkDefault ie ce Nothing = Nothing
-linkDefault ie ce (Just expr) = Just (linkIExpr ie ce expr)
 
 -- ---------------------------------------------------------------------------
 -- The interpreter proper
@@ -730,19 +773,24 @@ evalP (ConAppPP (A# itbl) a1 a2) de
      in  mci_make_constrPP itbl p1 p2
 
 evalP (ConAppGen itbl args) de
-   = loop args
+   = let c = case itbl of A# a# -> mci_make_constr a# in
+     c `seq` loop c 1#{-leave room for hdr-} args
      where
-        -- This appalling hack suggested (gleefully) by SDM
-        -- It is not well typed (needless to say?)
-        loop :: [LinkedIExpr] -> boxed
-        loop [] 
-           = case itbl of A# addr# -> unsafeCoerce# (mci_make_constr addr#)
-        loop (a:as) 
+        loop :: a{-closure-} -> Int# -> [LinkedIExpr] -> a
+        loop c off [] = c
+        loop c off (a:as)
            = case repOf a of
-                RepP -> let p = evalP a de in loop as p
-                RepI -> case evalI a de of i# -> loop as i#
-	        RepF -> case evalF a de of f# -> loop as f#
-	        RepD -> case evalD a de of d# -> loop as d#
+                RepP -> let c' = setPtrOffClosure c off (evalP a de)
+			in c' `seq` loop c' (off +# 1#) as
+                RepI -> case evalI a de of { i# -> 
+			let c' = setIntOffClosure c off i#
+			in c' `seq` loop c' (off +# 1#) as }
+	        RepF -> case evalF a de of { f# -> 
+			let c' = setFloatOffClosure c off f# 
+			in c' `seq` loop c' (off +# 1#) as }
+	        RepD -> case evalD a de of { d# -> 
+			let c' = setDoubleOffClosure c off d#
+			in c' `seq` loop c' (off +# 2#) as }
 
 evalP other de
    = error ("evalP: unhandled case: " ++ showExprTag other)
@@ -1104,6 +1152,9 @@ select_altPrim ((AltPrim lit rhs):alts) def literal
 
 eqLits (LitI i1#) (LitI i2#) = i1# ==# i2#
 
+-- ----------------------------------------------------------------------
+-- Grotty inspection and creation of closures
+-- ----------------------------------------------------------------------
 
 -- a is a constructor
 indexPtrOffClosure :: a -> Int -> b
@@ -1116,7 +1167,24 @@ indexIntOffClosure con (I# offset)
 
 indexFloatOffClosure :: a -> Int -> Float#
 indexFloatOffClosure con (I# offset)
-   = unsafeCoerce# (indexWordOffClosure# con offset) -- eek!
+   = unsafeCoerce# (indexWordOffClosure# con offset) 
+	-- TOCK TOCK TOCK! Those GHC developers are crazy.
+
+indexDoubleOffClosure :: a -> Int -> Double#
+indexDoubleOffClosure con (I# offset)
+   = unsafeCoerce# (panic "indexDoubleOffClosure")
+
+setPtrOffClosure :: a -> Int# -> b -> a
+setPtrOffClosure a i b = case setPtrOffClosure# a i b of (# c #) -> c
+
+setIntOffClosure :: a -> Int# -> Int# -> a
+setIntOffClosure a i b = case setWordOffClosure# a i (int2Word# b) of (# c #) -> c
+
+setFloatOffClosure :: a -> Int# -> Float# -> a
+setFloatOffClosure a i b = case setWordOffClosure# a i (unsafeCoerce# b) of (# c #) -> c
+
+setDoubleOffClosure :: a -> Int# -> Double# -> a
+setDoubleOffClosure a i b = unsafeCoerce# (panic "setDoubleOffClosure")
 
 ------------------------------------------------------------------------
 --- Manufacturing of info tables for DataCons defined in this module ---

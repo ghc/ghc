@@ -265,8 +265,10 @@ pprAltPrim (AltPrim tag rhs)
    = pprIExpr tag <+> text "->" <+> pprIExpr rhs
 
 instance Outputable Rep where
-   ppr RepI = text "I"
    ppr RepP = text "P"
+   ppr RepI = text "I"
+   ppr RepF = text "F"
+   ppr RepD = text "D"
 
 instance Outputable Addr where
    ppr addr = text (show addr)
