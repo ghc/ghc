@@ -21,13 +21,14 @@ module TcMonad(
 	listNF_Tc, mapAndUnzipNF_Tc, mapBagNF_Tc,
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
-	failTc, failWithTc, addErrTc, addErrsTc, warnTc, recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
+	failTc, failWithTc, addErrTc, addErrsTc, warnTc, 
+	recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
 	addErrTcM, addInstErrTcM, failWithTcM,
 
 	tcGetEnv, tcSetEnv,
 	tcGetDefaultTys, tcSetDefaultTys,
 	tcGetUnique, tcGetUniques, tcGetDFunUniq,
-	doptsTc,
+	doptsTc, getDOptsTc,
 
 	tcAddSrcLoc, tcGetSrcLoc, tcGetInstLoc,
 	tcAddErrCtxtM, tcSetErrCtxtM,
@@ -112,9 +113,6 @@ type TcKind      = TcType
 \begin{code}
 type NF_TcM r =  TcDown -> TcEnv -> IO r	-- Can't raise UserError
 type TcM    r =  TcDown -> TcEnv -> IO r	-- Can raise UserError
-	-- ToDo: nuke the 's' part
-	-- The difference between the two is
-	-- now for documentation purposes only
 
 type Either_TcM r =  TcDown -> TcEnv -> IO r	-- Either NF_TcM or TcM
 	-- Used only in this file for type signatures which
@@ -641,6 +639,10 @@ addErrCtxt down msg = down{tc_ctxt = msg : tc_ctxt down}
 doptsTc :: (DynFlags -> Bool) -> TcM Bool
 doptsTc dopt (TcDown{tc_dflags=dflags}) env_down
    = return (dopt dflags)
+
+getDOptsTc :: TcM DynFlags
+getDOptsTc (TcDown{tc_dflags=dflags}) env_down
+   = return dflags
 \end{code}
 
 

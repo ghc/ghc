@@ -11,7 +11,7 @@ module ErrUtils (
 	dontAddErrLoc,
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 	ghcExit,
-	doIfSet, dumpIfSet
+	doIfSet, dumpIfSet, dumpIfSet_dyn
     ) where
 
 #include "HsVersions.h"
@@ -99,14 +99,21 @@ doIfSet flag action | flag      = action
 \end{code}
 
 \begin{code}
-dumpIfSet :: DynFlags -> (DynFlags -> Bool) -> String -> SDoc -> IO ()
-dumpIfSet dflags flag hdr doc
+dumpIfSet :: Bool -> String -> SDoc -> IO ()
+dumpIfSet flag hdr doc
+  | not flag   = return ()
+  | otherwise  = printDump (dump hdr doc)
+
+dumpIfSet_dyn :: DynFlags -> (DynFlags -> Bool) -> String -> SDoc -> IO ()
+dumpIfSet_dyn dflags flag hdr doc
   | not (flag dflags)  = return ()
-  | otherwise          = printDump dump
-  where
-    dump = vcat [text "", 
-		 line <+> text hdr <+> line,
-		 doc,
-		 text ""]
-    line = text (take 20 (repeat '='))
+  | otherwise          = printDump (dump hdr doc)
+
+dump hdr doc 
+   = vcat [text "", 
+	   line <+> text hdr <+> line,
+	   doc,
+	   text ""]
+     where 
+        line = text (take 20 (repeat '='))
 \end{code}

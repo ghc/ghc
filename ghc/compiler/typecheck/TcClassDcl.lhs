@@ -39,7 +39,7 @@ import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import Class		( classTyVars, classBigSig, classSelIds, classTyCon, Class, ClassOpItem,
 			  DefMeth (..) )
 import Bag		( bagToList )
-import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods, opt_PprStyle_Debug )
+import CmdLineOpts      ( dopt_GlasgowExts, opt_WarnMissingMethods, opt_PprStyle_Debug )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
@@ -105,7 +105,8 @@ tcClassDecl1 rec_env
 			tyvar_names fundeps class_sigs def_methods pragmas 
 			sys_names src_loc)
   = 	-- CHECK ARITY 1 FOR HASKELL 1.4
-    checkTc (opt_GlasgowExts || length tyvar_names == 1)
+    doptsTc dopt_GlasgowExts				`thenTc` \ glaExts ->
+    checkTc (glaExts || length tyvar_names == 1)
 	    (classArityErr class_name)			`thenTc_`
 
 	-- LOOK THINGS UP IN THE ENVIRONMENT
@@ -210,11 +211,12 @@ tcSuperClasses clas context sc_sel_names
 	-- only the type variable of the class decl.
 
 	-- For std Haskell check that the context constrains only tyvars
-    (if opt_GlasgowExts then
+    doptsTc dopt_GlasgowExts			`thenTc` \ glaExts ->
+    (if glaExts then
 	returnTc ()
      else
 	mapTc_ check_constraint context
-    )					`thenTc_`
+    )						`thenTc_`
 
 	-- Context is already kind-checked
     tcClassContext context			`thenTc` \ sc_theta ->
@@ -576,7 +578,7 @@ mkDefMethRhs is_inst_decl clas inst_tys sel_id loc GenDefMeth
 	-- 	(checkTc, so False provokes the error)
      checkTc (not is_inst_decl || simple_inst)
 	     (badGenericInstance sel_id clas)			`thenTc_`
-		
+
      ioToTc (dumpIfSet opt_PprStyle_Debug "Generic RHS" stuff)	`thenNF_Tc_`
      returnTc rhs
   where

@@ -34,46 +34,48 @@ module TcEnv(
 #include "HsVersions.h"
 
 import TcMonad
-import TcType	( TcKind,  TcType, TcTyVar, TcTyVarSet, TcThetaType,
-		  tcInstTyVars, zonkTcTyVars,
-		)
-import Id	( mkUserLocal, isDataConWrapId_maybe )
-import IdInfo	( vanillaIdInfo )
-import MkId 	( mkSpecPragmaId )
-import Var	( TyVar, Id, setVarName,
-		  idType, lazySetIdInfo, idInfo, tyVarKind, UVar,
-		)
+import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, TcThetaType,
+			  tcInstTyVars, zonkTcTyVars,
+			)
+import Id		( mkUserLocal, isDataConWrapId_maybe )
+import IdInfo		( vanillaIdInfo )
+import MkId	 	( mkSpecPragmaId )
+import Var		( TyVar, Id, setVarName,
+			  idType, lazySetIdInfo, idInfo, tyVarKind, UVar,
+			)
 import VarSet
-import VarEnv	( TyVarSubstEnv )
-import Type	( Kind, Type, superKind,
-		  tyVarsOfType, tyVarsOfTypes,
-		  splitForAllTys, splitRhoTy, splitFunTys,
-		  splitAlgTyConApp_maybe, getTyVar, getDFunTyKey
-		)
-import DataCon	( DataCon )
-import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon )
-import Class	( Class, ClassOpItem, ClassContext, classTyCon )
-import Subst	( substTy )
-import Name	( Name, OccName, NamedThing(..), 
-		  nameOccName, nameModule, getSrcLoc, mkGlobalName,
-		  isLocallyDefined,
-		  NameEnv, emptyNameEnv, lookupNameEnv, nameEnvElts, 
-		  extendNameEnv, extendNameEnvList
-		)
-import OccName	( mkDFunOcc, mkDefaultMethodOcc, occNameString )
-import Module	( Module )
-import Unify	( unifyTyListsX, matchTys )
-import HscTypes	( ModDetails(..), InstEnv, lookupTypeEnv, TyThing(..),
-		  GlobalSymbolTable, Provenance(..) )
-import Unique	( pprUnique10, Unique, Uniquable(..) )
+import VarEnv		( TyVarSubstEnv )
+import Type		( Kind, Type, superKind,
+			  tyVarsOfType, tyVarsOfTypes,
+			  splitForAllTys, splitRhoTy, splitFunTys,
+			  splitAlgTyConApp_maybe, getTyVar, getDFunTyKey
+			)
+import DataCon		( DataCon )
+import TyCon		( TyCon, tyConKind, tyConArity, isSynTyCon )
+import Class		( Class, ClassOpItem, ClassContext, classTyCon )
+import Subst		( substTy )
+import Name		( Name, OccName, NamedThing(..), 
+			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
+			  isLocallyDefined,
+			  NameEnv, emptyNameEnv, lookupNameEnv, nameEnvElts, 
+			  extendNameEnv, extendNameEnvList
+			)
+import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
+import Module		( Module )
+import Unify		( unifyTyListsX, matchTys )
+import HscTypes		( ModDetails(..), InstEnv, lookupTypeEnv, TyThing(..),
+			  GlobalSymbolTable, Provenance(..) )
+import Unique		( pprUnique10, Unique, Uniquable(..) )
 import UniqFM
-import Unique	( Uniquable(..) )
-import Util	( zipEqual, zipWith3Equal, mapAccumL )
-import SrcLoc	( SrcLoc )
+import Unique		( Uniquable(..) )
+import Util		( zipEqual, zipWith3Equal, mapAccumL )
+import SrcLoc		( SrcLoc )
 import FastString	( FastString )
 import Maybes
 import Outputable
-import IOExts	( newIORef )
+import TcInstUtil	( emptyInstEnv )
+
+import IOExts		( newIORef )
 \end{code}
 
 %************************************************************************
@@ -142,7 +144,7 @@ data TcTyThing
 --	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
 
 initTcEnv :: GlobalSymbolTable -> IO TcEnv
-initTcEnv gst inst_env
+initTcEnv gst
   = do { gtv_var <- newIORef emptyVarSet ;
 	 return (TcEnv { tcGST    = gst,
 		      	 tcGEnv   = emptyNameEnv,

@@ -91,12 +91,29 @@ data ModDetails
         md_rules    :: RuleEnv		-- Domain may include Ids from other modules
      }
 
+-- ModIFace is nearly the same as RnMonad.ParsedIface.
+-- Right now it's identical :)
+data ModIFace 
+   = ModIFace {
+        mi_mod       :: Module,                   -- Complete with package info
+        mi_vers      :: Version,                  -- Module version number
+        mi_orphan    :: WhetherHasOrphans,        -- Whether this module has orphans
+        mi_usages    :: [ImportVersion OccName],  -- Usages
+        mi_exports   :: [ExportItem],             -- Exports
+        mi_insts     :: [RdrNameInstDecl],        -- Local instance declarations
+        mi_decls     :: [(Version, RdrNameHsDecl)],    -- Local definitions
+        mi_fixity    :: (Version, [RdrNameFixitySig]), -- Local fixity declarations, 
+                                                       -- with their version
+        mi_rules     :: (Version, [RdrNameRuleDecl]),  -- Rules, with their version
+        mi_deprecs   :: [RdrNameDeprecation]           -- Deprecations
+     }
+
 \end{code}
 
 \begin{code}
 emptyModDetails :: Module -> ModDetails
 emptyModDetails mod
-  = ModDetails { md_id       = mod,
+  = ModDetails { md_module   = mod,
 		 md_exports  = [],
 		 md_globals  = emptyRdrEnv,
 		 md_fixities = emptyNameEnv,
