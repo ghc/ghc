@@ -18,7 +18,7 @@ module GHC.Exts
         Int(..),Word(..),Float(..),Double(..),Integer(..),Char(..),
 
         -- * Primitive operations
-        module GHC.Prim
+        module GHC.Prim,
 	shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
 
 	-- * Fusion
