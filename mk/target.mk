@@ -376,6 +376,9 @@ endef
 ifneq "$(HS_SRCS)" ""
 ifeq "$(SplitObjs)" "YES"
 
+# can't split objs in way 'u', so we disable it here
+ifneq "$(way)" "u"
+
 SRC_HC_OPTS += -split-objs
 
 define BUILD_LIB
@@ -404,6 +407,7 @@ extraclean ::
 	$(FIND) $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
 	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS)) > /dev/null 2>&1
 
+endif # $(way) == u
 endif # $(SplitObjs)
 endif # $(HS_SRCS)
 
