@@ -65,3 +65,11 @@ else
 GHC_OPT_HILEV_ASM 		= $(CC)
 endif
 
+#
+# There's no need to compute dependencies when booting from .hc files
+#
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
+MKDEPENDHS_SRCS = $(HS_SRCS)
+else
+MKDEPENDHS_SRCS =
+endif

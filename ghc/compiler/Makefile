@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.35 1998/03/05 09:21:47 sof Exp $
+# $Id: Makefile,v 1.36 1998/03/05 13:12:20 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -68,14 +68,6 @@ HS_SRCS = $(SRCS_UGNHS) \
 
 HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 
-#
-# There's no need to compute dependencies when booting from .hc files
-#
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
-MKDEPENDHS_SRCS = $(HS_SRCS)
-else
-MKDEPENDHS_SRCS =
-endif
 
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
@@ -112,9 +104,15 @@ SRC_DIST_FILES += rename/ParseIface.hs \
 # -----------------------------------------------------------------------------
 # 		Haskell compilations
 
-# Compiler to use for building hsc
 #
+# Compiler to use for building hsc, use the build tree
+# driver when booting.
+#
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
 HC=$(WithGhcHc)
+else
+HC=$(GHC_DRIVER_DIR)/ghc
+endif
 
 # magic from GNU make manual to convert a list of values
 # into a colon-separated list
@@ -198,7 +196,7 @@ utils/Argv_HC_OPTS 		= -fvia-C -monly-3-regs
 utils/SST_HC_OPTS 		= -fvia-C
 utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
 utils/FastString_HC_OPTS	= -fvia-C -monly-3-regs
-utils/StringBuffer_HC_OPTS	= -fvia-C
+utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
 utils/Outputable_HC_OPTS	= -monly-3-regs
 
@@ -214,10 +212,12 @@ SRC_C_OPTS     += -O -Iparser -I. -IcodeGen
 
 
 # ----------------------------------------------------------------------------
-#		Parsers
+#		Parsers/lexers
 
 # Main parser uses Yacc/Bison
 SRC_YACC_OPTS  += -d -v
+# Suppress the generation of a default rule
+SRC_FLEX_OPTS += -s
 
 #
 # Want to keep the intermediate (included in src distribs).
@@ -269,17 +269,6 @@ INSTALL_LIBEXECS += hsc hsp
 # Before doing `make depend', need to build all derived Haskell source files
 #
 depend :: $(LOOPS) $(SRCS_UGNHS) rename/ParseIface.hs
-
-
-ifeq "$(GhcWithHscBuiltViaC)" "YES"
-SRC_MKDEPENDHS_OPTS += -optdep-o -optdephc
-
-# When booting from .hc, (hackily) remove the suffix rule for 
-# .l?hs -> .o, so that the .hc -> .o is used instead.
-%.$(way_)o : %.lhs
-%.$(way_)o : %.hs
-endif
-
 
 #-----------------------------------------------------------------------------
 # 		clean
