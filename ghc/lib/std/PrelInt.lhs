@@ -4,6 +4,8 @@
 \section[PrelInt]{Module @PrelInt@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 #include "MachDeps.h"
 
 module PrelInt (
@@ -18,6 +20,7 @@ import PrelRead
 import PrelArr
 import PrelBits
 import PrelWord
+import PrelShow
 
 ------------------------------------------------------------------------
 -- type Int8

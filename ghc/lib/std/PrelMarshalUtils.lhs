@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalUtils.lhs,v 1.2 2001/03/15 20:35:49 qrczak Exp $
+% $Id: PrelMarshalUtils.lhs,v 1.3 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -7,6 +7,8 @@
 Utilities for primitive marshaling
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelMarshalUtils (
 
   -- combined allocation and marshalling
@@ -40,13 +42,17 @@ module PrelMarshalUtils (
   moveBytes      -- :: Ptr a -> Ptr a -> Int -> IO ()
 ) where
 
-import Monad	    	( liftM )
-
+#ifdef __GLASGOW_HASKELL__
 import PrelPtr	        ( Ptr, nullPtr )
 import PrelStorable	( Storable(poke,destruct) )
 import PrelCTypesISO    ( CSize )
 import PrelMarshalAlloc ( malloc, alloca )
-
+import PrelIOBase
+import PrelMaybe
+import PrelReal		( fromIntegral )
+import PrelNum
+import PrelBase
+#endif
 
 -- combined allocation and marshalling
 -- -----------------------------------
@@ -112,7 +118,7 @@ maybeWith  = maybe ($ nullPtr)
 --
 maybePeek                           :: (Ptr a -> IO b) -> Ptr a -> IO (Maybe b)
 maybePeek peek ptr | ptr == nullPtr  = return Nothing
-		   | otherwise       = liftM Just $ peek ptr
+		   | otherwise       = do a <- peek ptr; return (Just a)
 
 
 -- marshalling lists of storable objects

@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.10 2001/04/02 16:10:32 rrt Exp $
+-- $Id: Directory.hsc,v 1.11 2001/05/18 16:54:04 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -54,12 +54,12 @@ import Prelude		-- Just to get it in the dependencies
 
 import Time             ( ClockTime(..) )
 
+import PrelPosix
 import PrelStorable
 import PrelCString
 import PrelMarshalAlloc
 import PrelCTypesISO
 import PrelCTypes
-import PrelPosixTypes
 import PrelCError
 import PrelPtr
 import PrelIOBase
@@ -555,4 +555,3 @@ foreign import ccall unsafe closedir :: Ptr CDir -> IO CInt
 foreign import ccall unsafe stat     :: UCString -> Ptr CStat -> IO CInt
 
 type CDirent = ()
-type CStat   = ()

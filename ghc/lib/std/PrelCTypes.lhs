@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCTypes.lhs,v 1.3 2001/02/22 16:48:24 qrczak Exp $
+% $Id: PrelCTypes.lhs,v 1.4 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -9,6 +9,8 @@ A mapping of C types to corresponding Haskell types. A cool hack...
 #include "cbits/CTypes.h"
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelCTypes
 	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
@@ -23,7 +25,13 @@ module PrelCTypes
 \end{code}
 
 \begin{code}
-import PrelBase	( unsafeCoerce# )
+import PrelBase
+import PrelFloat
+import PrelEnum
+import PrelReal
+import PrelShow
+import PrelRead
+import PrelNum
 import PrelBits	( Bits(..) )
 import PrelInt	( Int8,  Int16,  Int32,  Int64  )
 import PrelWord	( Word8, Word16, Word32, Word64 )

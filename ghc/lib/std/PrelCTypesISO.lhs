@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCTypesISO.lhs,v 1.5 2001/02/22 16:48:24 qrczak Exp $
+% $Id: PrelCTypesISO.lhs,v 1.6 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -10,6 +10,8 @@ types. Like CTypes, this is a cool hack...
 #include "cbits/CTypes.h"
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelCTypesISO
 	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
@@ -24,6 +26,13 @@ module PrelCTypesISO
 \end{code}
 
 \begin{code}
+import PrelBase
+import PrelFloat
+import PrelEnum
+import PrelReal
+import PrelShow
+import PrelRead
+import PrelNum
 import PrelBase	( unsafeCoerce# )
 import PrelBits	( Bits(..) )
 import PrelInt	( Int8,  Int16,  Int32,  Int64  )

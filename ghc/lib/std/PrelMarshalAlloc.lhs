@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalAlloc.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelMarshalAlloc.lhs,v 1.2 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -7,6 +7,8 @@
 Marshalling support: basic routines for memory allocation
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelMarshalAlloc (
   malloc,       -- :: Storable a =>        IO (Ptr a)
   mallocBytes,  -- ::               Int -> IO (Ptr a)
@@ -19,13 +21,17 @@ module PrelMarshalAlloc (
   free          -- :: Ptr a -> IO ()
 ) where
 
+#ifdef __GLASGOW_HASKELL__
 import PrelException 	( bracket )
 import PrelPtr	 	( Ptr, nullPtr )
 import PrelStorable  	( Storable(sizeOf) )
 import PrelCTypesISO 	( CSize )
-
-#ifdef __GLASGOW_HASKELL__
-import PrelIOBase hiding (malloc, _malloc)
+import PrelIOBase
+import PrelMaybe
+import PrelReal
+import PrelNum
+import PrelErr
+import PrelBase
 #endif
 
 

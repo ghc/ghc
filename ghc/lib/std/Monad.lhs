@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Monad.lhs,v 1.12 2001/04/04 06:51:46 qrczak Exp $
+% $Id: Monad.lhs,v 1.13 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -7,6 +7,8 @@
 \section[Monad]{Module @Monad@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module Monad 
     ( MonadPlus (   -- class context: Monad
 	  mzero     -- :: (MonadPlus m) => m a
@@ -40,7 +42,41 @@ module Monad
     , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
     ) where
 
-import Prelude
+import PrelList
+import PrelMaybe
+import PrelBase
+
+infixr 1 =<<
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Prelude monad functions}
+%*							*
+%*********************************************************
+
+\begin{code}
+{-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
+(=<<)           :: Monad m => (a -> m b) -> m a -> m b
+f =<< x		= x >>= f
+
+sequence       :: Monad m => [m a] -> m [a] 
+{-# INLINE sequence #-}
+sequence ms = foldr k (return []) ms
+	    where
+	      k m m' = do { x <- m; xs <- m'; return (x:xs) }
+
+sequence_        :: Monad m => [m a] -> m () 
+{-# INLINE sequence_ #-}
+sequence_ ms     =  foldr (>>) (return ()) ms
+
+mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
+{-# INLINE mapM #-}
+mapM f as       =  sequence (map f as)
+
+mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
+{-# INLINE mapM_ #-}
+mapM_ f as      =  sequence_ (map f as)
 \end{code}
 
 %*********************************************************

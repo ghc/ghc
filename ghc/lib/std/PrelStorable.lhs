@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.6 2001/04/14 22:28:22 qrczak Exp $
+% $Id: PrelStorable.lhs,v 1.7 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -7,6 +7,8 @@
 A class for primitive marshaling
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 #include "MachDeps.h"
 
 module PrelStorable
@@ -28,6 +30,7 @@ import Monad		( liftM )
 
 #ifdef __GLASGOW_HASKELL__
 import PrelStable	( StablePtr )
+import PrelNum
 import PrelInt
 import PrelWord
 import PrelCTypes
@@ -35,6 +38,7 @@ import PrelCTypesISO
 import PrelStable
 import PrelPtr
 import PrelFloat
+import PrelErr
 import PrelIOBase
 import PrelBase
 #endif

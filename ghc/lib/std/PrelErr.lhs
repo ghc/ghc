@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelErr.lhs,v 1.18 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelErr.lhs,v 1.19 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -31,6 +31,7 @@ module PrelErr
        , error		           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
        
+       , undefined		   -- :: a
        ) where
 
 import PrelBase
@@ -48,6 +49,13 @@ import PrelException
 -- error stops execution and displays an error message
 error :: String -> a
 error s = throw (ErrorCall s)
+
+-- It is expected that compilers will recognize this and insert error
+-- messages which are more appropriate to the context in which undefined 
+-- appears. 
+
+undefined :: a
+undefined =  error "Prelude.undefined"
 \end{code}
 
 %*********************************************************

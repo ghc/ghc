@@ -8,11 +8,11 @@ See library document for details on the semantics of the
 individual operations.
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
 #include "MachDeps.h"
 
 module PrelBits where
 
-import Prelude		-- To generate the dependency
 #ifdef __GLASGOW_HASKELL__
 import PrelGHC
 import PrelBase

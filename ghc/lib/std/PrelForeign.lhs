@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelForeign.lhs,v 1.18 2001/03/22 03:51:09 hwloidl Exp $
+% $Id: PrelForeign.lhs,v 1.19 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -12,6 +12,7 @@
 module PrelForeign where
 
 import PrelIOBase
+import PrelNum			-- for fromInteger
 import PrelBase
 import PrelPtr
 \end{code}
@@ -23,6 +24,19 @@ import PrelPtr
 %*********************************************************
 
 \begin{code}
+data ForeignPtr a = ForeignPtr ForeignObj#
+instance CCallable (ForeignPtr a)
+
+eqForeignPtr :: ForeignPtr a -> ForeignPtr a -> Bool
+eqForeignPtr mp1 mp2
+  = unsafePerformIO (primEqForeignPtr mp1 mp2) /= (0::Int)
+
+foreign import "eqForeignObj" unsafe 
+  primEqForeignPtr :: ForeignPtr a -> ForeignPtr a -> IO Int
+
+instance Eq (ForeignPtr a) where 
+    p == q = eqForeignPtr p q
+    p /= q = not (eqForeignPtr p q)
 
 newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 newForeignPtr p finalizer

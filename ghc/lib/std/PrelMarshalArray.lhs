@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalArray.lhs,v 1.2 2001/03/15 20:35:49 qrczak Exp $
+% $Id: PrelMarshalArray.lhs,v 1.3 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -8,6 +8,8 @@ Marshalling support: routines allocating, storing, and retrieving Haskell
 lists that are represented as arrays in the foreign language
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelMarshalArray (
 
   -- allocation
@@ -56,13 +58,21 @@ module PrelMarshalArray (
   advancePtr      -- :: Storable a => Ptr a -> Int -> Ptr a
 ) where
 
-import Monad	    (zipWithM_)
+import Monad
 
+#ifdef __GLASGOW_HASKELL__
 import PrelPtr	        (Ptr, plusPtr)
 import PrelStorable     (Storable(sizeOf,peekElemOff,pokeElemOff,destruct))
 import PrelMarshalAlloc (mallocBytes, allocaBytes, reallocBytes)
 import PrelMarshalUtils (copyBytes, moveBytes)
-
+import PrelIOBase
+import PrelMaybe
+import PrelReal		( fromIntegral )
+import PrelNum
+import PrelList
+import PrelErr
+import PrelBase
+#endif
 
 -- allocation
 -- ----------

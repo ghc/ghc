@@ -4,6 +4,8 @@
 \section[PrelWord]{Module @PrelWord@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 #include "MachDeps.h"
 
 module PrelWord (
@@ -18,6 +20,7 @@ import PrelReal
 import PrelRead
 import PrelArr
 import PrelBits
+import PrelShow
 
 ------------------------------------------------------------------------
 -- Helper functions

@@ -1,0 +1,8 @@
+illegal operation
+Action: hGetChar
+Handle: {loc=<stdin>,type=semi-closed,buffering=block (8192)}
+File: <stdin>
+illegal operation
+Action: hGetChar
+Handle: {loc=<stdin>,type=semi-closed,buffering=block (8192)}
+File: <stdin>

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Prelude.lhs,v 1.25 2001/02/28 00:01:03 qrczak Exp $
+% $Id: Prelude.lhs,v 1.26 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -28,10 +28,12 @@ module Prelude (
     showChar, showString, readParen, showParen,
     
         -- Everything corresponding to the Report's PreludeIO
-    FilePath, IOError,
     ioError, userError, catch,
-    putChar, putStr, putStrLn, print,
-    getChar, getLine, getContents, interact,
+    FilePath, IOError,
+    putChar,
+    putStr, putStrLn, print,
+    getChar,
+    getLine, getContents, interact,
     readFile, writeFile, appendFile, readIO, readLn,
 
     Bool(..),
@@ -75,6 +77,8 @@ module Prelude (
 
   ) where
 
+import Monad
+
 import PrelBase
 import PrelList
 #ifndef USE_REPORT_PRELUDE
@@ -92,9 +96,8 @@ import PrelTup
 import PrelMaybe
 import PrelShow
 import PrelConc
-import PrelErr   ( error )
+import PrelErr   ( error, undefined )
 
-infixr 1 =<<
 infixr 0 $!
 \end{code}
 
@@ -108,13 +111,6 @@ infixr 0 $!
 \begin{code}
 ($!)    :: (a -> b) -> a -> b
 f $! x  = x `seq` f x
-
--- It is expected that compilers will recognize this and insert error
--- messages which are more appropriate to the context in which undefined 
--- appears. 
-
-undefined               :: a
-undefined               =  error "Prelude.undefined"
 \end{code}
 
 
@@ -149,33 +145,3 @@ product	l	= prod l 1
 #endif
 \end{code}
 
-
-%*********************************************************
-%*							*
-\subsection{Prelude monad functions}
-%*							*
-%*********************************************************
-
-\begin{code}
-{-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
-(=<<)           :: Monad m => (a -> m b) -> m a -> m b
-f =<< x		= x >>= f
-
-sequence       :: Monad m => [m a] -> m [a] 
-{-# INLINE sequence #-}
-sequence ms = foldr k (return []) ms
-	    where
-	      k m m' = do { x <- m; xs <- m'; return (x:xs) }
-
-sequence_        :: Monad m => [m a] -> m () 
-{-# INLINE sequence_ #-}
-sequence_ ms     =  foldr (>>) (return ()) ms
-
-mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
-{-# INLINE mapM #-}
-mapM f as       =  sequence (map f as)
-
-mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
-{-# INLINE mapM_ #-}
-mapM_ f as      =  sequence_ (map f as)
-\end{code}

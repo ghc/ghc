@@ -1,59 +1,31 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.37 2001/02/27 13:38:58 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.38 2001/05/18 16:54:05 simonmar Exp $
 % 
-% (c) The University of Glasgow, 1994-2000
+% (c) The University of Glasgow, 1994-2001
 %
 
-\section[PrelIOBase]{Module @PrelIOBase@}
-
-Definitions for the @IO@ monad and its friends.  Everything is exported
-concretely; the @IO@ module itself exports abstractly.
+% Definitions for the @IO@ monad and its friends.  Everything is exported
+% concretely; the @IO@ module itself exports abstractly.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 #include "config.h"
-#include "cbits/stgerror.h"
 
-#ifndef __HUGS__ /* Hugs just includes this in PreludeBuiltin so no header needed */
 module PrelIOBase where
 
-import {-# SOURCE #-} PrelErr ( error )
-
 import PrelST
+import PrelArr
 import PrelBase
 import PrelNum	-- To get fromInteger etc, needed because of -fno-implicit-prelude
 import PrelMaybe  ( Maybe(..) )
 import PrelShow
 import PrelList
 import PrelDynamic
-import PrelPtr
-import PrelPack ( unpackCString )
 
-#if !defined(__CONCURRENT_HASKELL__)
-import PrelArr	  ( MutableVar, readVar )
-#endif
-#endif
+-- ---------------------------------------------------------------------------
+-- The IO Monad
 
-#ifdef __HUGS__
-#define __CONCURRENT_HASKELL__
-#define stToIO id
-#define unpackCString primUnpackString
-#endif
-
-#ifndef __PARALLEL_HASKELL__
-#define FILE_OBJECT	    (ForeignPtr ())
-#else
-#define FILE_OBJECT	    (Ptr ())
-
-#endif
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{The @IO@ monad}
-%*							*
-%*********************************************************
-
+{-
 The IO Monad is just an instance of the ST monad, where the state is
 the real world.  We use the exception mechanism (in PrelException) to
 implement IO exceptions.
@@ -74,9 +46,8 @@ Prelude   - PrelIOBase.lhs, and several other places including
 Libraries - parts of hslibs/lang.
 
 --SDM
+-}
 
-\begin{code}
-#ifndef __HUGS__
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 
 unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
@@ -109,36 +80,20 @@ bindIO (IO m) k = IO ( \ s ->
 
 returnIO :: a -> IO a
 returnIO x = IO (\ s -> (# s, x #))
-#endif
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Coercions to @ST@}
-%*							*
-%*********************************************************
+-- ---------------------------------------------------------------------------
+-- Coercions between IO and ST
 
-\begin{code}
-#ifdef __HUGS__
-/* Hugs doesn't distinguish these types so no coercion required) */
-#else
--- stToIO     :: (forall s. ST s a) -> IO a
+--stToIO        :: (forall s. ST s a) -> IO a
 stToIO	      :: ST RealWorld a -> IO a
 stToIO (ST m) = IO m
 
 ioToST	      :: IO a -> ST RealWorld a
 ioToST (IO m) = (ST m)
-#endif
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Unsafe @IO@ operations}
-%*							*
-%*********************************************************
+-- ---------------------------------------------------------------------------
+-- Unsafe IO operations
 
-\begin{code}
-#ifndef __HUGS__
 {-# NOINLINE unsafePerformIO #-}
 unsafePerformIO	:: IO a -> a
 unsafePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
@@ -150,131 +105,232 @@ unsafeInterleaveIO (IO m)
 		   r = case m s of (# _, res #) -> res
 		in
 		(# s, r #))
-#endif
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Types @Handle@, @Handle__@}
-%*							*
-%*********************************************************
+-- ---------------------------------------------------------------------------
+-- Handle type
 
-The type for @Handle@ is defined rather than in @IOHandle@
-module, as the @IOError@ type uses it..all operations over
-a handles reside in @IOHandle@.
-
-\begin{code}
-
-#ifndef __HUGS__
-{-
- Sigh, the MVar ops in ConcBase depend on IO, the IO
- representation here depend on MVars for handles (when
- compiling in a concurrent way). Break the cycle by having
- the definition of MVars go here:
-
--}
 data MVar a = MVar (MVar# RealWorld a)
 
 -- pull in Eq (Mvar a) too, to avoid PrelConc being an orphan-instance module
 instance Eq (MVar a) where
 	(MVar mvar1#) == (MVar mvar2#) = sameMVar# mvar1# mvar2#
 
-{-
-  Double sigh - ForeignPtr is needed here too to break a cycle.
--}
-data ForeignPtr a = ForeignPtr ForeignObj#
-instance CCallable (ForeignPtr a)
+--  A Handle is represented by (a reference to) a record 
+--  containing the state of the I/O port/device. We record
+--  the following pieces of info:
 
-eqForeignPtr :: ForeignPtr a -> ForeignPtr a -> Bool
-eqForeignPtr mp1 mp2
-  = unsafePerformIO (primEqForeignPtr mp1 mp2) /= (0::Int)
+--    * type (read,write,closed etc.)
+--    * the underlying file descriptor
+--    * buffering mode 
+--    * buffer, and spare buffers
+--    * user-friendly name (usually the
+--	FilePath used when IO.openFile was called)
 
-foreign import "eqForeignObj" unsafe 
-  primEqForeignPtr :: ForeignPtr a -> ForeignPtr a -> IO Int
+-- Note: when a Handle is garbage collected, we want to flush its buffer
+-- and close the OS file handle, so as to free up a (precious) resource.
 
-instance Eq (ForeignPtr a) where 
-    p == q = eqForeignPtr p q
-    p /= q = not (eqForeignPtr p q)
-#endif /* ndef __HUGS__ */
+data Handle 
+  = FileHandle				-- A normal handle to a file
+	!(MVar Handle__)
 
-#if defined(__CONCURRENT_HASKELL__)
-newtype Handle = Handle (MVar Handle__)
-#else
-newtype Handle = Handle (MutableVar RealWorld Handle__)
-#endif
+  | DuplexHandle			-- A handle to a read/write stream
+	!(MVar Handle__)		-- The read side
+	!(MVar Handle__)		-- The write side
+
+-- NOTES:
+--    * A 'FileHandle' is seekable.  A 'DuplexHandle' may or may not be
+--      seekable.
 
 instance Eq Handle where
- (Handle h1) == (Handle h2) = h1 == h2
+ (FileHandle h1)     == (FileHandle h2)     = h1 == h2
+ (DuplexHandle h1 _) == (DuplexHandle h2 _) = h1 == h2
+ _ == _ = False 
 
-{-
-  A Handle is represented by (a reference to) a record 
-  containing the state of the I/O port/device. We record
-  the following pieces of info:
+type FD = Int -- XXX ToDo: should be CInt
 
-    * type (read,write,closed etc.)
-    * pointer to the external file object.
-    * buffering mode 
-    * user-friendly name (usually the
-      FilePath used when IO.openFile was called)
-
-Note: when a Handle is garbage collected, we want to flush its buffer
-and close the OS file handle, so as to free up a (precious) resource.
--}
 data Handle__
   = Handle__ {
-      haFO__	      :: FILE_OBJECT,
-      haType__        :: Handle__Type,
-      haBufferMode__  :: BufferMode,
-      haFilePath__    :: FilePath,
-      haBuffers__     :: [Ptr ()]
+      haFD	    :: !FD,
+      haType        :: HandleType,
+      haBufferMode  :: BufferMode,
+      haFilePath    :: FilePath,
+      haBuffer	    :: !(IORef Buffer),
+      haBuffers     :: !(IORef BufferList)
     }
 
-{-
-  Internally, we classify handles as being one
-  of the following:
--}
-data Handle__Type
+-- ---------------------------------------------------------------------------
+-- Buffers
+
+-- The buffer is represented by a mutable variable containing a
+-- record, where the record contains the raw buffer and the start/end
+-- points of the filled portion.  We use a mutable variable so that
+-- the common operation of writing (or reading) some data from (to)
+-- the buffer doesn't need to modify, and hence copy, the handle
+-- itself, it just updates the buffer.  
+
+-- There will be some allocation involved in a simple hPutChar in
+-- order to create the new Buffer structure (below), but this is
+-- relatively small, and this only has to be done once per write
+-- operation.
+
+-- The buffer contains its size - we could also get the size by
+-- calling sizeOfMutableByteArray# on the raw buffer, but that tends
+-- to be rounded up to the nearest Word.
+
+type RawBuffer = MutableByteArray# RealWorld
+
+-- INVARIANTS on a Buffer:
+--
+--   * A handle *always* has a buffer, even if it is only 1 character long
+--     (an unbuffered handle needs a 1 character buffer in order to support
+--      hLookAhead and hIsEOF).
+--   * r <= w
+--   * if r == w, then r == 0 && w == 0
+--   * if state == WriteBuffer, then r == 0
+--   * a write buffer is never full.  If an operation
+--     fills up the buffer, it will always flush it before 
+--     returning.
+--   * a read buffer may be full as a result of hLookAhead.  In normal
+--     operation, a read buffer always has at least one character of space.
+
+data Buffer 
+  = Buffer {
+	bufBuf   :: RawBuffer,
+	bufRPtr  :: !Int,
+	bufWPtr  :: !Int,
+	bufSize  :: !Int,
+	bufState :: BufferState
+  }
+
+data BufferState = ReadBuffer | WriteBuffer deriving (Eq)
+
+-- we keep a few spare buffers around in a handle to avoid allocating
+-- a new one for each hPutStr.  These buffers are *guaranteed* to be the
+-- same size as the main buffer.
+data BufferList 
+  = BufferListNil 
+  | BufferListCons RawBuffer BufferList
+
+
+bufferIsWritable :: Buffer -> Bool
+bufferIsWritable Buffer{ bufState=WriteBuffer } = True
+bufferIsWritable _other = False
+
+bufferEmpty :: Buffer -> Bool
+bufferEmpty Buffer{ bufRPtr=r, bufWPtr=w } | r == w = True
+bufferEmpty _other = False
+
+-- only makes sense for a write buffer
+bufferFull :: Buffer -> Bool
+bufferFull b@Buffer{ bufWPtr=w } = w >= bufSize b
+
+--  Internally, we classify handles as being one
+--  of the following:
+
+data HandleType
  = ClosedHandle
  | SemiClosedHandle
  | ReadHandle
  | WriteHandle
  | AppendHandle
  | ReadWriteHandle
-
+ | ReadSideHandle  !(MVar Handle__)	-- read side of a duplex handle
 
 -- File names are specified using @FilePath@, a OS-dependent
 -- string that (hopefully, I guess) maps to an accessible file/object.
 
 type FilePath = String
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection[Show-Handle]{Show instance for Handles}
-%*							*
-%*********************************************************
+-- ---------------------------------------------------------------------------
+-- Buffering modes
 
-\begin{code}
--- handle types are 'show'ed when printing error msgs, so
+-- Three kinds of buffering are supported: line-buffering, 
+-- block-buffering or no-buffering.  These modes have the following
+-- effects. For output, items are written out from the internal
+-- buffer according to the buffer mode:
+--
+-- * line-buffering  the entire output buffer is written
+--   out whenever a newline is output, the output buffer overflows, 
+--   a flush is issued, or the handle is closed.
+--
+-- * block-buffering the entire output buffer is written out whenever 
+--   it overflows, a flush is issued, or the handle
+--   is closed.
+--
+-- * no-buffering output is written immediately, and never stored
+--   in the output buffer.
+--
+-- The output buffer is emptied as soon as it has been written out.
+
+-- Similarly, input occurs according to the buffer mode for handle {\em hdl}.
+
+-- * line-buffering when the input buffer for the handle is not empty,
+--   the next item is obtained from the buffer;
+--   otherwise, when the input buffer is empty,
+--   characters up to and including the next newline
+--   character are read into the buffer.  No characters
+--   are available until the newline character is
+--   available.
+--
+-- * block-buffering when the input buffer for the handle becomes empty,
+--   the next block of data is read into this buffer.
+--
+-- * no-buffering the next input item is read and returned.
+
+-- For most implementations, physical files will normally be block-buffered 
+-- and terminals will normally be line-buffered. (the IO interface provides
+-- operations for changing the default buffering of a handle tho.)
+
+data BufferMode  
+ = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
+   deriving (Eq, Ord, Show)
+   {- Read instance defined in IO. -}
+
+-- ---------------------------------------------------------------------------
+-- IORefs
+
+newtype IORef a = IORef (STRef RealWorld a) deriving Eq
+
+newIORef    :: a -> IO (IORef a)
+newIORef v = stToIO (newSTRef v) >>= \ var -> return (IORef var)
+
+readIORef   :: IORef a -> IO a
+readIORef  (IORef var) = stToIO (readSTRef var)
+
+writeIORef  :: IORef a -> a -> IO ()
+writeIORef (IORef var) v = stToIO (writeSTRef var v)
+
+modifyIORef :: IORef a -> (a -> a) -> IO ()
+modifyIORef ref f = readIORef ref >>= \x -> writeIORef ref (f x)
+
+-- deprecated, use modifyIORef
+updateIORef :: IORef a -> (a -> a) -> IO ()
+updateIORef = modifyIORef
+
+-- ---------------------------------------------------------------------------
+-- Show instance for Handles
+
+-- handle types are 'show'n when printing error msgs, so
 -- we provide a more user-friendly Show instance for it
 -- than the derived one.
-instance Show Handle__Type where
+
+instance Show HandleType where
   showsPrec p t =
     case t of
       ClosedHandle      -> showString "closed"
       SemiClosedHandle  -> showString "semi-closed"
       ReadHandle        -> showString "readable"
-      WriteHandle       -> showString "writeable"
-      AppendHandle      -> showString "writeable (append)"
-      ReadWriteHandle   -> showString "read-writeable"
+      WriteHandle       -> showString "writable"
+      AppendHandle      -> showString "writable (append)"
+      ReadWriteHandle   -> showString "read-writable"
+      ReadSideHandle _  -> showString "read-writable (duplex)"
 
 instance Show Handle where 
-  showsPrec p (Handle h) = 
+  showsPrec p (FileHandle   h)   = showHandle p h
+  showsPrec p (DuplexHandle h _) = showHandle p h
+   
+showHandle p h =
     let
-#if defined(__CONCURRENT_HASKELL__)
-#ifdef __HUGS__
-     hdl_ = unsafePerformIO (primTakeMVar h)
-#else
      -- (Big) SIGH: unfolded defn of takeMVar to avoid
      -- an (oh-so) unfortunate module loop with PrelConc.
      hdl_ = unsafePerformIO (IO $ \ s# ->
@@ -282,25 +338,21 @@ instance Show Handle where
 	     case takeMVar# h# s#   of { (# s2# , r #) -> 
 	     case putMVar# h# r s2# of { s3# ->
 	     (# s3#, r #) }}})
-#endif
-#else
-     hdl_ = unsafePerformIO (stToIO (readVar h))
-#endif
     in
     showChar '{' . 
-    showHdl (haType__ hdl_) 
-	    (showString "loc=" . showString (haFilePath__ hdl_) . showChar ',' .
-	     showString "type=" . showsPrec p (haType__ hdl_) . showChar ',' .
-	     showString "buffering=" . showBufMode (haFO__ hdl_) (haBufferMode__ hdl_) . showString "}\n" )
+    showHdl (haType hdl_) 
+	    (showString "loc=" . showString (haFilePath hdl_) . showChar ',' .
+	     showString "type=" . showsPrec p (haType hdl_) . showChar ',' .
+	     showString "buffering=" . showBufMode (unsafePerformIO (readIORef (haBuffer hdl_))) (haBufferMode hdl_) . showString "}" )
    where
-    showHdl :: Handle__Type -> ShowS -> ShowS
+    showHdl :: HandleType -> ShowS -> ShowS
     showHdl ht cont = 
        case ht of
-        ClosedHandle  -> showsPrec p ht . showString "}\n"
+        ClosedHandle  -> showsPrec p ht . showString "}"
 	_ -> cont
        
-    showBufMode :: FILE_OBJECT -> BufferMode -> ShowS
-    showBufMode fo bmo =
+    showBufMode :: Buffer -> BufferMode -> ShowS
+    showBufMode buf bmo =
       case bmo of
         NoBuffering   -> showString "none"
 	LineBuffering -> showString "line"
@@ -308,93 +360,11 @@ instance Show Handle where
 	BlockBuffering Nothing  -> showString "block " . showParen True (showsPrec p def)
       where
        def :: Int 
-       def = unsafePerformIO (getBufSize fo)
-\end{code}
+       def = bufSize buf
 
-%*********************************************************
-%*							*
-\subsection[BufferMode]{Buffering modes}
-%*							*
-%*********************************************************
+-- ------------------------------------------------------------------------
+-- Exception datatype and operations
 
-Three kinds of buffering are supported: line-buffering, 
-block-buffering or no-buffering.  These modes have the following
-effects. For output, items are written out from the internal
-buffer according to the buffer mode:
-
-\begin{itemize}
-\item[line-buffering]  the entire output buffer is written
-out whenever a newline is output, the output buffer overflows, 
-a flush is issued, or the handle is closed.
-
-\item[block-buffering] the entire output buffer is written out whenever 
-it overflows, a flush is issued, or the handle
-is closed.
-
-\item[no-buffering] output is written immediately, and never stored
-in the output buffer.
-\end{itemize}
-
-The output buffer is emptied as soon as it has been written out.
-
-Similarly, input occurs according to the buffer mode for handle {\em hdl}.
-\begin{itemize}
-\item[line-buffering] when the input buffer for {\em hdl} is not empty,
-the next item is obtained from the buffer;
-otherwise, when the input buffer is empty,
-characters up to and including the next newline
-character are read into the buffer.  No characters
-are available until the newline character is
-available.
-\item[block-buffering] when the input buffer for {\em hdl} becomes empty,
-the next block of data is read into this buffer.
-\item[no-buffering] the next input item is read and returned.
-\end{itemize}
-
-For most implementations, physical files will normally be block-buffered 
-and terminals will normally be line-buffered. (the IO interface provides
-operations for changing the default buffering of a handle tho.)
-
-\begin{code}
-data BufferMode  
- = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
-   deriving (Eq, Ord, Show)
-   {- Read instance defined in IO. -}
-
-\end{code}
-
-Foreign import declarations to helper routines:
-
-\begin{code}
-foreign import "libHS_cbits" "getErrStr__"  unsafe getErrStr__  :: IO (Ptr ())
-foreign import "libHS_cbits" "getErrNo__"   unsafe getErrNo__   :: IO Int  
-foreign import "libHS_cbits" "getErrType__" unsafe getErrType__ :: IO Int  
-  
--- ToDo: use mallocBytes from PrelMarshal?
-malloc :: Int -> IO (Ptr ())
-malloc sz = do
-  a <- _malloc sz
-  if (a == nullPtr)
-	then ioException (IOError Nothing ResourceExhausted
-	    "malloc" "out of memory" Nothing)
-	else return a
-
-foreign import "malloc" unsafe _malloc :: Int -> IO (Ptr ())
-
-foreign import "libHS_cbits" "getBufSize"  unsafe
-           getBufSize       :: FILE_OBJECT -> IO Int
-foreign import "libHS_cbits" "setBuf" unsafe
-           setBuf       :: FILE_OBJECT -> Ptr () -> Int -> IO ()
-
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Exception datatype and operations}
-%*							*
-%*********************************************************
-
-\begin{code}
 data Exception
   = IOException 	IOException	-- IO exceptions
   | ArithException  	ArithException	-- Arithmetic exceptions
@@ -473,15 +443,10 @@ instance Show Exception where
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
   showsPrec _ (UserError err)            = showString err
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Primitive throw}
-%*							*
-%*********************************************************
+-- --------------------------------------------------------------------------
+-- Primitive throw
 
-\begin{code}
 throw :: Exception -> a
 throw exception = raise# exception
 
@@ -490,20 +455,15 @@ ioError err	=  IO $ \s -> throw err s
 
 ioException	:: IOException -> IO a
 ioException err =  IO $ \s -> throw (IOException err) s
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Type @IOError@}
-%*							*
-%*********************************************************
+-- ---------------------------------------------------------------------------
+-- IOError type
 
-A value @IOError@ encode errors occurred in the @IO@ monad.
-An @IOError@ records a more specific error type, a descriptive
-string and maybe the handle that was used when the error was
-flagged.
+-- A value @IOError@ encode errors occurred in the @IO@ monad.
+-- An @IOError@ records a more specific error type, a descriptive
+-- string and maybe the handle that was used when the error was
+-- flagged.
 
-\begin{code}
 type IOError = Exception
 
 data IOException
@@ -565,11 +525,9 @@ instance Show IOErrorType where
 
 userError       :: String  -> IOError
 userError str	=  UserError str
-\end{code}
 
-Predicates on IOError; little effort made on these so far...
-
-\begin{code}
+-- ---------------------------------------------------------------------------
+-- Predicates on IOError
 
 isAlreadyExistsError :: IOError -> Bool
 isAlreadyExistsError (IOException (IOError _ AlreadyExists _ _ _)) = True
@@ -602,108 +560,23 @@ isDoesNotExistError _                                           = False
 isUserError :: IOError -> Bool
 isUserError (UserError _) = True
 isUserError _             = False
-\end{code}
 
-Showing @IOError@s
+-- ---------------------------------------------------------------------------
+-- Showing IOErrors
 
-\begin{code}
-#ifdef __HUGS__
--- For now we give a fairly uninformative error message which just happens to
--- be like the ones that Hugs used to give.
-instance Show IOException where
-    showsPrec p (IOError _ _ _ s _) = showString s . showChar '\n'
-#else
 instance Show IOException where
     showsPrec p (IOError hdl iot loc s fn) =
       showsPrec p iot .
       (case loc of
          "" -> id
 	 _  -> showString "\nAction: " . showString loc) .
-      showHdl .
+      (case hdl of
+        Nothing -> id
+	Just h  -> showString "\nHandle: " . showsPrec p h) .
       (case s of
 	 "" -> id
 	 _  -> showString "\nReason: " . showString s) .
       (case fn of
 	 Nothing -> id
 	 Just name -> showString "\nFile: " . showString name)
-     where
-      showHdl = 
-       case hdl of
-        Nothing -> id
-	Just h  -> showString "\nHandle: " . showsPrec p h
-
-#endif
-\end{code}
-
-The @String@ part of an @IOError@ is platform-dependent.  However, to
-provide a uniform mechanism for distinguishing among errors within
-these broad categories, each platform-specific standard shall specify
-the exact strings to be used for particular errors.  For errors not
-explicitly mentioned in the standard, any descriptive string may be
-used.
-
-\begin{code}
-constructErrorAndFail :: String -> IO a
-constructErrorAndFail call_site
-  = constructError call_site >>= \ io_error ->
-    ioError (IOException io_error)
-
-constructErrorAndFailWithInfo :: String -> String -> IO a
-constructErrorAndFailWithInfo call_site fn
-  = constructErrorMsg call_site (Just fn) >>= \ io_error ->
-    ioError (IOException io_error)
-
-\end{code}
-
-This doesn't seem to be documented/spelled out anywhere,
-so here goes: (SOF)
-
-The implementation of the IO prelude uses various C stubs
-to do the actual interaction with the OS. The bandwidth
-\tr{C<->Haskell} is somewhat limited, so the general strategy
-for flaggging any errors (apart from possibly using the
-return code of the external call), is to set the @ghc_errtype@
-to a value that is one of the \tr{#define}s in @includes/error.h@.
-@ghc_errstr@ holds a character string providing error-specific
-information. Error constructing functions will then reach out
-and grab these values when generating
-
-\begin{code}
-constructError	      :: String -> IO IOException
-constructError call_site = constructErrorMsg call_site Nothing
-
-constructErrorMsg	      :: String -> Maybe String -> IO IOException
-constructErrorMsg call_site fn =
- getErrType__            >>= \ errtype ->
- getErrStr__             >>= \ str ->
- let
-  iot =
-   case (errtype::Int) of
-     ERR_ALREADYEXISTS	         -> AlreadyExists
-     ERR_HARDWAREFAULT	         -> HardwareFault
-     ERR_ILLEGALOPERATION	 -> IllegalOperation
-     ERR_INAPPROPRIATETYPE	 -> InappropriateType
-     ERR_INTERRUPTED	         -> Interrupted
-     ERR_INVALIDARGUMENT	 -> InvalidArgument
-     ERR_NOSUCHTHING	         -> NoSuchThing
-     ERR_OTHERERROR		 -> OtherError
-     ERR_PERMISSIONDENIED	 -> PermissionDenied
-     ERR_PROTOCOLERROR	         -> ProtocolError
-     ERR_RESOURCEBUSY	         -> ResourceBusy
-     ERR_RESOURCEEXHAUSTED	 -> ResourceExhausted
-     ERR_RESOURCEVANISHED	 -> ResourceVanished
-     ERR_SYSTEMERROR	         -> SystemError
-     ERR_TIMEEXPIRED	         -> TimeExpired
-     ERR_UNSATISFIEDCONSTRAINTS  -> UnsatisfiedConstraints
-     ERR_UNSUPPORTEDOPERATION    -> UnsupportedOperation
-     ERR_EOF		         -> EOF
-     _			         -> OtherError
-
-  msg = 
-   unpackCString str ++
-   (case iot of
-     OtherError -> "(error code: " ++ show errtype ++ ")"
-     _ -> "")
- in
- return (IOError Nothing iot call_site msg fn)
 \end{code}

@@ -43,9 +43,19 @@ BOOT_SRCS += PrelPrimopWrappers.hs
 
 SRC_HC_OPTS += -cpp -fvia-C -fglasgow-exts $(GhcLibHcOpts) $(PACKAGE)
 
+SRC_HSC2HS_OPTS += -Icbits
+
 ifdef USE_REPORT_PRELUDE
 SRC_HC_OPTS += -DUSE_REPORT_PRELUDE=1
 endif
+
+# ESSENTIAL, for getting reasonable performance from the I/O library:
+PrelIOBase_HC_OPTS   = -funbox-strict-fields 
+
+# debugging...
+PrelIOBase_HC_OPTS   += -fno-ignore-asserts
+PrelHandle_HC_OPTS   += -fno-ignore-asserts
+PrelIO_HC_OPTS       += -fno-ignore-asserts
 
 # Special options
 PrelStorable_HC_OPTS = -monly-3-regs

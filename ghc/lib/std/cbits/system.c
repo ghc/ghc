@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.11 2001/02/20 03:41:31 qrczak Exp $
+ * $Id: system.c,v 1.12 2001/05/18 16:54:06 simonmar Exp $
  *
  * system Runtime Support
  */
@@ -9,42 +9,10 @@
 /* The itimer stuff in this module is non-posix */
 #define NON_POSIX_SOURCE
 
-#include "Rts.h"
-#include "stgio.h"
+#include "HsStd.h"
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
-#if TIME_WITH_SYS_TIME
-# include <sys/time.h>
-# include <time.h>
-#else
-# if HAVE_SYS_TIME_H
-#  include <sys/time.h>
-# else
-#  include <time.h>
-# endif
-#endif
-
-#ifndef mingw32_TARGET_OS
-# ifdef HAVE_SYS_WAIT_H
-#  include <sys/wait.h>
-# endif
-#else
-# include <windows.h> /* for Sleep */
-#endif
-
-#ifdef HAVE_VFORK_H
-#include <vfork.h>
-#endif
-
-#ifdef HAVE_VFORK
-#define fork vfork
-#endif
-
-StgInt
-systemCmd(StgByteArray cmd)
+HsInt
+systemCmd(HsAddr cmd)
 {
 #if defined(mingw32_TARGET_OS)
    /* There's no fork() under Windows, so we fall back on using libc's
@@ -65,8 +33,6 @@ systemCmd(StgByteArray cmd)
     switch(pid = fork()) {
     case -1:
 	if (errno != EINTR) {
-	    cvtErrno();
-	    stdErrno();
 	    return -1;
 	}
     case 0:
@@ -92,8 +58,6 @@ systemCmd(StgByteArray cmd)
 
     while (waitpid(pid, &wstat, 0) < 0) {
 	if (errno != EINTR) {
-	    cvtErrno();
-	    stdErrno();
 	    return -1;
 	}
     }
@@ -101,13 +65,10 @@ systemCmd(StgByteArray cmd)
     if (WIFEXITED(wstat))
 	return WEXITSTATUS(wstat);
     else if (WIFSIGNALED(wstat)) {
-	ghc_errtype = ERR_INTERRUPTED;
-	ghc_errstr = "system command interrupted";
+	errno = EINTR;
     }
     else {
 	/* This should never happen */
-	ghc_errtype = ERR_OTHERERROR;
-	ghc_errstr = "internal error (process neither exited nor signalled)";
     }
     return -1;
 #endif

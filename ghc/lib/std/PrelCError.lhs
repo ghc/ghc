@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.7 2001/03/16 21:47:41 qrczak Exp $
+% $Id: PrelCError.lhs,v 1.8 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -7,7 +7,7 @@
 C-specific Marshalling support: Handling of C "errno" error codes
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude -#include "cbits/ghc_errno.h" #-}
+{-# OPTIONS -fno-implicit-prelude -#include "HsStd.h" #-}
 
 -- this is were we get the CCONST_XXX definitions from that configure
 -- calculated for us
@@ -59,6 +59,7 @@ module PrelCError (
   throwErrnoIf_,        -- :: (a -> Bool) -> String -> IO a       -> IO ()
   throwErrnoIfRetry,    -- :: (a -> Bool) -> String -> IO a       -> IO a
   throwErrnoIfRetry_,   -- :: (a -> Bool) -> String -> IO a       -> IO ()
+  throwErrnoIfRetry_,   -- :: (a -> Bool) -> String -> IO a       -> IO ()
   throwErrnoIfMinus1,   -- :: Num a 
 			-- =>                String -> IO a       -> IO a
   throwErrnoIfMinus1_,  -- :: Num a 
@@ -70,7 +71,13 @@ module PrelCError (
 			-- :: Num a 
 			-- =>                String -> IO a       -> IO ()
   throwErrnoIfNull,	-- ::                String -> IO (Ptr a) -> IO (Ptr a)
-  throwErrnoIfNullRetry -- ::                String -> IO (Ptr a) -> IO (Ptr a)
+  throwErrnoIfNullRetry,-- ::                String -> IO (Ptr a) -> IO (Ptr a)
+
+  throwErrnoIfRetryMayBlock, 
+  throwErrnoIfRetryMayBlock_,
+  throwErrnoIfMinus1RetryMayBlock,
+  throwErrnoIfMinus1RetryMayBlock_,  
+  throwErrnoIfNullRetryMayBlock
 ) where
 
 
@@ -80,18 +87,12 @@ module PrelCError (
 -- GHC allows us to get at the guts inside IO errors/exceptions
 --
 #if __GLASGOW_HASKELL__
-#if __GLASGOW_HASKELL__ < 409
-import PrelIOBase (IOError(..), IOErrorType(..))
-#else
 import PrelIOBase (Exception(..), IOException(..), IOErrorType(..))
-#endif
 #endif /* __GLASGOW_HASKELL__ */
 
 
 -- regular imports
 -- ---------------
-
-import Monad        (liftM)
 
 #if __GLASGOW_HASKELL__
 import PrelStorable
@@ -265,8 +266,7 @@ isValidErrno (Errno errno)  = errno /= -1
 -- yield the current thread's "errno" value
 --
 getErrno :: IO Errno
-getErrno  = liftM Errno (peek _errno)
-
+getErrno  = do e <- peek _errno; return (Errno e)
 
 -- set the current thread's "errno" value to 0
 --
@@ -319,10 +319,33 @@ throwErrnoIfRetry pred loc f  =
 	  else throwErrno loc
       else return res
 
+-- as `throwErrnoIfRetry', but checks for operations that would block and
+-- executes an alternative action in that case.
+
+throwErrnoIfRetryMayBlock  :: (a -> Bool) -> String -> IO a -> IO b -> IO a
+throwErrnoIfRetryMayBlock pred loc f on_block  = 
+  do
+    res <- f
+    if pred res
+      then do
+	err <- getErrno
+	if err == eINTR
+	  then throwErrnoIfRetryMayBlock pred loc f on_block
+          else if err == eWOULDBLOCK || err == eAGAIN
+	         then do on_block; throwErrnoIfRetryMayBlock pred loc f on_block
+                 else throwErrno loc
+      else return res
+
 -- as `throwErrnoIfRetry', but discards the result
 --
 throwErrnoIfRetry_            :: (a -> Bool) -> String -> IO a -> IO ()
 throwErrnoIfRetry_ pred loc f  = void $ throwErrnoIfRetry pred loc f
+
+-- as `throwErrnoIfRetryMayBlock', but discards the result
+--
+throwErrnoIfRetryMayBlock_ :: (a -> Bool) -> String -> IO a -> IO b -> IO ()
+throwErrnoIfRetryMayBlock_ pred loc f on_block 
+  = void $ throwErrnoIfRetryMayBlock pred loc f on_block
 
 -- throws "errno" if a result of "-1" is returned
 --
@@ -345,6 +368,16 @@ throwErrnoIfMinus1Retry  = throwErrnoIfRetry (== -1)
 throwErrnoIfMinus1Retry_ :: Num a => String -> IO a -> IO ()
 throwErrnoIfMinus1Retry_  = throwErrnoIfRetry_ (== -1)
 
+-- as throwErrnoIfMinus1Retry, but checks for operations that would block
+--
+throwErrnoIfMinus1RetryMayBlock :: Num a => String -> IO a -> IO b -> IO a
+throwErrnoIfMinus1RetryMayBlock  = throwErrnoIfRetryMayBlock (== -1)
+
+-- as `throwErrnoIfMinus1RetryMayBlock', but discards the result
+--
+throwErrnoIfMinus1RetryMayBlock_ :: Num a => String -> IO a -> IO b -> IO ()
+throwErrnoIfMinus1RetryMayBlock_  = throwErrnoIfRetryMayBlock_ (== -1)
+
 -- throws "errno" if a result of a NULL pointer is returned
 --
 throwErrnoIfNull :: String -> IO (Ptr a) -> IO (Ptr a)
@@ -356,6 +389,10 @@ throwErrnoIfNull  = throwErrnoIf (== nullPtr)
 throwErrnoIfNullRetry :: String -> IO (Ptr a) -> IO (Ptr a)
 throwErrnoIfNullRetry  = throwErrnoIfRetry (== nullPtr)
 
+-- as throwErrnoIfNullRetry, but checks for operations that would block
+--
+throwErrnoIfNullRetryMayBlock :: String -> IO (Ptr a) -> IO b -> IO (Ptr a)
+throwErrnoIfNullRetryMayBlock  = throwErrnoIfRetryMayBlock (== nullPtr)
 
 -- conversion of an "errno" value into IO error
 -- --------------------------------------------

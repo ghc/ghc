@@ -7,8 +7,8 @@ data T = T !Int
 t (T i) = i + 1
 
 -- test 2: mutual recursion (should back off from unboxing either field)
-data R = R !R
-data S = S !S
+data R = R !S
+data S = S !R
 
 r (R s) = s
 
@@ -34,3 +34,8 @@ data F a b = F { x :: !Int, y :: !(Float,Float), z :: !(a,b) }
 l F{x = a} = a
 m (F a b c) = a
 n F{z = (a,b)} = a
+
+-- test 7: newtypes
+newtype G a b = G (F a b)
+data H a b = H !Int !(G a b) !Int
+o (H y (G (F{ x=x })) z) = x + z

@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.2 2001/05/08 17:33:57 qrczak Exp $
+-- $Id: CPUTime.hsc,v 1.3 2001/05/18 16:54:04 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -24,41 +24,7 @@ import PrelIOBase	( IOException(..),
 			  unsafePerformIO, stToIO, ioException )
 import Ratio
 
-#include "config.h"
-
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
-#ifndef mingw32_TARGET_OS
-# ifdef HAVE_SYS_TIMES_H
-#  include <sys/times.h>
-# endif
-#endif
-
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
-
-#if !defined(mingw32_TARGET_OS) && !defined(irix_TARGET_OS)
-# if defined(HAVE_SYS_RESOURCE_H)
-#  include <sys/resource.h>
-# endif
-#endif
-
-#ifdef hpux_TARGET_OS
-#include <sys/syscall.h>
-#define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
-#define HAVE_GETRUSAGE
-#endif
-
-#ifdef HAVE_WINDOWS_H
-# include <windows.h>
-#endif
+#include "HsStd.h"
 
 -- -----------------------------------------------------------------------------
 -- Computation `getCPUTime' returns the number of picoseconds CPU time

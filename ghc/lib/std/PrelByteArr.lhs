@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelByteArr.lhs,v 1.13 2001/02/22 16:48:24 qrczak Exp $
+% $Id: PrelByteArr.lhs,v 1.14 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -48,19 +48,6 @@ instance Eq (MutableByteArray s ix) where
 \subsection{Operations on mutable arrays}
 %*							*
 %*********************************************************
-
-Idle ADR question: What's the tradeoff here between flattening these
-datatypes into @MutableArray ix ix (MutableArray# s elt)@ and using
-it as is?  As I see it, the former uses slightly less heap and
-provides faster access to the individual parts of the bounds while the
-code used has the benefit of providing a ready-made @(lo, hi)@ pair as
-required by many array-related functions.  Which wins? Is the
-difference significant (probably not).
-
-Idle AJG answer: When I looked at the outputted code (though it was 2
-years ago) it seems like you often needed the tuple, and we build
-it frequently. Now we've got the overloading specialiser things
-might be different, though.
 
 \begin{code}
 newCharArray, newIntArray, newFloatArray, newDoubleArray

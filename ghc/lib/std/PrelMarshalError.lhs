@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalError.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelMarshalError.lhs,v 1.2 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -7,6 +7,7 @@
 Marshalling support: Handling of common error conditions
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelMarshalError (
 
@@ -26,6 +27,8 @@ module PrelMarshalError (
 ) where
 
 import PrelPtr
+import PrelIOBase
+import PrelNum
 import PrelBase
 
 -- exported functions

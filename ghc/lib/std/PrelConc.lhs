@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelConc.lhs,v 1.23 2001/02/15 10:02:43 simonmar Exp $
+% $Id: PrelConc.lhs,v 1.24 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -36,6 +36,7 @@ module PrelConc
 	, tryTakeMVar   -- :: MVar a -> IO (Maybe a)
 	, tryPutMVar  	-- :: MVar a -> a -> IO Bool
 	, isEmptyMVar	-- :: MVar a -> IO Bool
+	, addMVarFinalizer -- :: MVar a -> IO () -> IO ()
 
     ) where
 
@@ -166,6 +167,11 @@ isEmptyMVar :: MVar a -> IO Bool
 isEmptyMVar (MVar mv#) = IO $ \ s# -> 
     case isEmptyMVar# mv# s# of
         (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
+
+-- Like addForeignPtrFinalizer, but for MVars
+addMVarFinalizer :: MVar a -> IO () -> IO ()
+addMVarFinalizer (MVar m) finalizer = 
+  IO $ \s -> case mkWeak# m () finalizer s of { (# s1, w #) -> (# s1, () #) }
 \end{code}
 
 

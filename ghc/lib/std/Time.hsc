@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.12 2001/04/25 14:36:48 simonmar Exp $
+-- $Id: Time.hsc,v 1.13 2001/05/18 16:54:05 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -92,34 +92,7 @@ module Time
 
      ) where
 
-#include "config.h"
-
-#if defined(HAVE_GETTIMEOFDAY)
-#  ifdef HAVE_SYS_TIME_H
-#   include <sys/time.h>
-#  endif
-#elif defined(HAVE_GETCLOCK)
-# ifdef HAVE_SYS_TIMERS_H
-#  define POSIX_4D9 1
-#  include <sys/timers.h>
-# endif
-#endif
-
-#if defined(HAVE_TIME_H)
-# include <time.h>
-#endif
-
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-
-#ifdef HAVE_SYS_TIMEB_H
-#include <sys/timeb.h>
-#endif
-
-#ifdef HAVE_WINDOWS_H
-#include <windows.h>
-#endif
+#include "HsStd.h"
 
 import Ix
 import Locale

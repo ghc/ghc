@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCString.lhs,v 1.3 2001/04/14 22:28:46 qrczak Exp $
+% $Id: PrelCString.lhs,v 1.4 2001/05/18 16:54:05 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -7,10 +7,11 @@
 Utilities for primitive marshaling
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelCString where
 
-import Monad
-
+#ifdef __GLASGOW_HASKELL__
 import PrelMarshalArray
 import PrelPtr
 import PrelStorable
@@ -18,10 +19,11 @@ import PrelCTypes
 import PrelWord
 import PrelByteArr
 import PrelPack
+import PrelList
+import PrelReal
+import PrelNum
+import PrelIOBase
 import PrelBase
-
-#ifdef __GLASGOW_HASKELL__
-import PrelIOBase hiding (malloc, _malloc)
 #endif
 
 -----------------------------------------------------------------------------
@@ -49,12 +51,12 @@ type CStringLen = (CString, Int)	-- strings with explicit length
 -- marshal a NUL terminated C string into a Haskell string 
 --
 peekCString    :: CString -> IO String
-peekCString cp  = liftM cCharsToChars $ peekArray0 nUL cp
+peekCString cp  = do cs <- peekArray0 nUL cp; return (cCharsToChars cs)
 
 -- marshal a C string with explicit length into a Haskell string 
 --
 peekCStringLen           :: CStringLen -> IO String
-peekCStringLen (cp, len)  = liftM cCharsToChars $ peekArray len cp
+peekCStringLen (cp, len)  = do cs <- peekArray len cp; return (cCharsToChars cs)
 
 -- marshal a Haskell string into a NUL terminated C strings
 --
@@ -71,7 +73,8 @@ newCString  = newArray0 nUL . charsToCChars
 -- * new storage is allocated for the C string and must be explicitly freed
 --
 newCStringLen     :: String -> IO CStringLen
-newCStringLen str  = liftM (pairLength str) $ newArray (charsToCChars str)
+newCStringLen str  = do a <- newArray (charsToCChars str)
+			return (pairLength str a)
 
 -- marshal a Haskell string into a NUL terminated C strings using temporary
 -- storage

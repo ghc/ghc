@@ -492,8 +492,8 @@ mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray") m
 -- Forign objects and weak pointers
 foreignObjTyConName   = tcQual   fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjTyConKey
 foreignObjDataConName = dataQual fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjDataConKey
-foreignPtrTyConName   = tcQual   pREL_IO_BASE_Name SLIT("ForeignPtr") foreignPtrTyConKey
-foreignPtrDataConName = dataQual pREL_IO_BASE_Name SLIT("ForeignPtr") foreignPtrDataConKey
+foreignPtrTyConName   = tcQual   pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrTyConKey
+foreignPtrDataConName = dataQual pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrDataConKey
 stablePtrTyConName    = tcQual   pREL_STABLE_Name SLIT("StablePtr") stablePtrTyConKey
 stablePtrDataConName  = dataQual pREL_STABLE_Name SLIT("StablePtr") stablePtrDataConKey
 deRefStablePtrName    = varQual  pREL_STABLE_Name SLIT("deRefStablePtr") deRefStablePtrIdKey
