@@ -1,5 +1,7 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.41 2002/10/27 10:38:33 mthomas Exp $
+-- $Id: Main.hs,v 1.42 2002/10/28 10:11:17 simonpj Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -25,24 +27,10 @@ import List          (intersperse)
 #include "../../includes/config.h"
 
 #ifdef mingw32_HOST_OS
--- import Win32DLL
-import Foreign.C.String (CString, peekCString)
-import Foreign.C.Types
-import Foreign.Ptr (nullPtr)
-import Foreign.Marshal.Alloc (mallocBytes, free)
-
-foreign import stdcall "GetModuleHandle" c_GetModuleHandle :: CString -> IO CUInt
-foreign import stdcall "GetModuleFileName" c_GetModuleFilename :: CUInt -> CString -> CUInt -> IO CUInt
-
-ourName :: IO String
-ourName = do h <- c_GetModuleHandle nullPtr
-	     cstr <- mallocBytes cstr_len
-	     rv <- c_GetModuleFilename h cstr (CUInt (fromIntegral cstr_len))
-	     str <- peekCString cstr
-	     free cstr
-	     return str
-    where cstr_len = 512
+import Foreign.C.String
+import Foreign
 #endif
+
 
 version :: String
 version = "hsc2hs-0.65"
@@ -59,6 +47,9 @@ data Flag
     | Include   String
     | Define    String (Maybe String)
     | Output    String
+
+template_flag (Template _) = True
+template_flag _		   = False
 
 include :: String -> Flag
 include s@('\"':_) = Include s
@@ -91,26 +82,33 @@ main = do
     prog <- getProgName
     let header = "Usage: "++prog++" [OPTIONS] INPUT.hsc [...]"
     args <- getArgs
-    let opts@(flags, files, errs) = getOpt Permute options args
-#ifdef mingw32_HOST_OS
-    n <- ourName
-    let tempName = reverse (drop (length "\\bin\\hsc2hs.exe") (reverse n)) ++ "\\template-hsc.h"
-    let fflags = if [t | Template t <- flags] /= [] then flags else (Template tempName) : flags
-    let opts = (fflags, files, errs)
-#endif
-    case opts of
-        (flags, _, _)
-            | any isHelp    flags -> putStrLn (usageInfo header options)
-            | any isVersion flags -> putStrLn version
+    let (flags, files, errs) = getOpt Permute options args
+
+	-- If there is no Template flag explicitly specified, try
+	-- to find one by looking near the executable.  This only
+	-- works on Win32 (getExecDir). On Unix, there's a wrapper 
+	-- script which specifies an explicit template flag.
+    flags_w_tpl <- if any template_flag flags then
+			return flags
+		   else	
+			do { mb_path <- getExecDir "/bin/hsc2hs.exe" ;
+			     case mb_path of
+				Nothing   -> return flags
+
+				Just path -> return (Template path : flags) }
+
+    case (files, errs) of
+        (_, _)
+            | any isHelp    flags_w_tpl -> putStrLn (usageInfo header options)
+            | any isVersion flags_w_tpl -> putStrLn version
             where
             isHelp    Help    = True; isHelp    _ = False
             isVersion Version = True; isVersion _ = False
-        (_,     [],    [])   -> putStrLn (prog++": No input files")
-        (flags, files, [])   -> mapM_ (processFile flags) files
-        (_,     _,     errs) -> do
-            mapM_ putStrLn errs
-            putStrLn (usageInfo header options)
-            exitFailure
+        ([],    []) -> putStrLn (prog++": No input files")
+        (files, []) -> mapM_ (processFile flags_w_tpl) files
+        (_,   errs) -> do { mapM_ putStrLn errs ;
+			    putStrLn (usageInfo header options) ;
+		            exitFailure }
 
 processFile :: [Flag] -> String -> IO ()
 processFile flags name 
@@ -122,16 +120,6 @@ processFile flags name
     	       Failure (SourcePos name' line) msg -> do
     		   putStrLn (name'++":"++show line++": "++msg)
     		   exitFailure
-
-------------------------------------------------------------------------
--- Convert paths foo/baz to foo\baz on Windows
-
-#if defined(mingw32_HOST_OS)
-subst a b ls = map (\ x -> if x == a then b else x) ls
-dosifyPath xs = subst '/' '\\' xs
-#else
-dosifyPath xs = xs
-#endif
 
 ------------------------------------------------------------------------
 -- A deterministic parser which remembers the text which has been parsed.
@@ -760,3 +748,39 @@ showCString = concatMap showCChar
                       intToDigit (ord c `quot` 8 `mod` 8),
                       intToDigit (ord c          `mod` 8)]
 
+
+
+-----------------------------------------
+--	Cut and pasted from ghc/compiler/SysTools
+-- Convert paths foo/baz to foo\baz on Windows
+
+
+#if defined(mingw32_HOST_OS)
+subst a b ls = map (\ x -> if x == a then b else x) ls
+unDosifyPath xs = subst '\\' '/' xs
+dosifyPath xs = subst '/' '\\' xs
+
+getExecDir :: String -> IO (Maybe String)
+-- (getExecDir cmd) returns the directory in which the current
+--	  	    executable, which should be called 'cmd', is running
+-- So if the full path is /a/b/c/d/e, and you pass "d/e" as cmd,
+-- you'll get "/a/b/c" back as the result
+getExecDir cmd
+  = allocaArray len $ \buf -> do
+	ret <- getModuleFileName nullPtr buf len
+	if ret == 0 then return Nothing
+	            else do s <- peekCString buf
+			    return (Just (reverse (drop (length cmd) 
+							(reverse (unDosifyPath s)))))
+  where
+    len = 2048::Int -- Plenty, PATH_MAX is 512 under Win32.
+
+foreign import stdcall "GetModuleFileNameA" unsafe 
+  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+
+#else
+dosifyPath xs = xs
+
+getExecDir :: String -> IO (Maybe String) 
+getExecDir s = do return Nothing
+#endif
