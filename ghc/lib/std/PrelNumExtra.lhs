@@ -61,7 +61,14 @@ instance  Num Float  where
     signum x | x == 0.0	 = 0
 	     | x > 0.0	 = 1
 	     | otherwise = negate 1
+
+    {-# INLINE fromInteger #-}
     fromInteger n	=  encodeFloat n 0
+	-- It's important that encodeFloat inlines here, and that 
+	-- fromInteger in turn inlines,
+	-- so that if fromInteger is applied to an (S# i) the right thing happens
+
+    {-# INLINE fromInt #-}
     fromInt i		=  int2Float i
 
 instance  Real Float  where
@@ -144,6 +151,7 @@ foreign import ccall "__encodeFloat" unsafe
 foreign import ccall "__int_encodeFloat" unsafe 
 	int_encodeFloat# :: Int# -> Int -> Float
 
+
 foreign import ccall "isFloatNaN" unsafe isFloatNaN :: Float -> Int
 foreign import ccall "isFloatInfinite" unsafe isFloatInfinite :: Float -> Int
 foreign import ccall "isFloatDenormalized" unsafe isFloatDenormalized :: Float -> Int
@@ -210,6 +218,9 @@ instance  Num Double  where
     signum x | x == 0.0	 = 0
 	     | x > 0.0	 = 1
 	     | otherwise = negate 1
+
+    {-# INLINE fromInteger #-}
+	-- See comments with Num Float
     fromInteger n	=  encodeFloat n 0
     fromInt (I# n#)	=  case (int2Double# n#) of { d# -> D# d# }
 

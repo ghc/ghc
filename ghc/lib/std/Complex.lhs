@@ -89,6 +89,8 @@ phase (x:+y)	 = atan2 y x
 
 \begin{code}
 instance  (RealFloat a) => Num (Complex a)  where
+    {-# SPECIALISE instance Num (Complex Float) #-}
+    {-# SPECIALISE instance Num (Complex Double) #-}
     (x:+y) + (x':+y')	=  (x+x') :+ (y+y')
     (x:+y) - (x':+y')	=  (x-x') :+ (y-y')
     (x:+y) * (x':+y')	=  (x*x'-y*y') :+ (x*y'+y*x')
@@ -99,6 +101,8 @@ instance  (RealFloat a) => Num (Complex a)  where
     fromInteger n	=  fromInteger n :+ 0
 
 instance  (RealFloat a) => Fractional (Complex a)  where
+    {-# SPECIALISE instance Fractional (Complex Float) #-}
+    {-# SPECIALISE instance Fractional (Complex Double) #-}
     (x:+y) / (x':+y')	=  (x*x''+y*y'') / d :+ (y*x''-x*y'') / d
 			   where x'' = scaleFloat k x'
 				 y'' = scaleFloat k y'
@@ -108,6 +112,8 @@ instance  (RealFloat a) => Fractional (Complex a)  where
     fromRational a	=  fromRational a :+ 0
 
 instance  (RealFloat a) => Floating (Complex a)	where
+    {-# SPECIALISE instance Floating (Complex Float) #-}
+    {-# SPECIALISE instance Floating (Complex Double) #-}
     pi             =  pi :+ 0
     exp (x:+y)     =  expx * cos y :+ expx * sin y
                       where expx = exp x

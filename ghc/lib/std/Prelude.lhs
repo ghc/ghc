@@ -102,7 +102,9 @@ down the compilation chain to "see" the Num class.
 \begin{code}
 -- sum and product compute the sum or product of a finite list of numbers.
 {-# SPECIALISE sum     :: [Int] -> Int #-}
+{-# SPECIALISE sum     :: [Integer] -> Integer #-}
 {-# SPECIALISE product :: [Int] -> Int #-}
+{-# SPECIALISE product :: [Integer] -> Integer #-}
 sum, product            :: (Num a) => [a] -> a
 #ifdef USE_REPORT_PRELUDE
 sum                     =  foldl (+) 0  
