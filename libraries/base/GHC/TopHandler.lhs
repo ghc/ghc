@@ -29,7 +29,7 @@ import GHC.Prim (unsafeCoerce#)
 
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is
 -- called in the program).  It catches otherwise uncaught exceptions,
--- and also flushes stdout/stderr before exiting.
+-- and also flushes stdout\/stderr before exiting.
 runMainIO :: IO a -> IO a
 runMainIO main = (do a <- main; cleanUp; return a) `catchException` topHandler
 
