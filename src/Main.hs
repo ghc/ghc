@@ -125,16 +125,19 @@ run flags files = do
 		  	[] -> Nothing
 		  	fs -> Just (last fs)
 
-      ifaces_to_read = [str | Flag_ReadInterface str <- flags]
+      ifaces_to_read = [ parseIfaceOption str 
+		       | Flag_ReadInterface str <- flags ]
 
       no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
 
   prologue <- getPrologue flags
 
-  writeIORef saved_flags flags
-  parsed_mods <- sequence (map parse_file files)
+  read_ifaces_s <- mapM readIface (map snd ifaces_to_read)
 
-  read_ifaces_s <- mapM readIface ifaces_to_read  
+  updateHTMLXRefs (map fst ifaces_to_read) read_ifaces_s
+
+  writeIORef saved_flags flags
+  parsed_mods <- mapM parse_file files
 
   let read_ifaces = concat read_ifaces_s
       external_mods = map fst read_ifaces
@@ -180,6 +183,12 @@ run flags files = do
 	prepared_ifaces = [ (mod, fmToList (iface_env iface))
 		          | (mod, iface) <- these_mod_ifaces ]
 
+parseIfaceOption :: String -> (FilePath,FilePath)
+parseIfaceOption s = 
+  case break (==',') s of
+	(path,',':file) -> (path,file)
+	(_, file)       -> ("", file)
+
 readIface :: FilePath -> IO [(Module,Interface)]
 readIface filename = do
   bh <- readBinMem filename
@@ -200,6 +209,16 @@ readIface filename = do
 		}
       	  )
 		
+
+updateHTMLXRefs :: [FilePath] -> [[(Module,Interface)]] -> IO ()
+updateHTMLXRefs paths ifaces_s =
+  writeIORef html_xrefs_ref (listToFM mapping)
+ where
+  mapping = [ (mod,path) 
+	    | (path, ifaces) <- zip paths ifaces_s,
+	      (mod, _iface) <- ifaces
+	    ]
+
 
 parse_file file = do
   bracket 

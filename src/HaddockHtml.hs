@@ -13,7 +13,7 @@ import HaddockUtil
 import HsSyn
 
 import IO
-import Maybe	( fromJust, isNothing, isJust )
+import Maybe	( fromJust, isJust )
 import FiniteMap
 import List 	( sortBy )
 import Char	( toUpper, toLower )
@@ -71,8 +71,9 @@ ppHtml title source_url ifaces odir maybe_css libdir inst_maps prologue =  do
   ppHtmlIndex odir title visible_ifaces
   mapM_ (ppHtmlModule odir title source_url inst_maps) visible_ifaces
 
-moduleHtmlFile :: String -> FilePath
-moduleHtmlFile mod = mod ++ ".html" -- ToDo: Z-encode filename?
+moduleHtmlFile :: FilePath -> String -> FilePath
+moduleHtmlFile "" mod  = mod ++ ".html" -- ToDo: Z-encode filename?
+moduleHtmlFile dir mod = dir ++ pathSeparator : mod ++ ".html"
 
 contentsHtmlFile = "index.html"
 indexHtmlFile    = "doc-index.html"
@@ -99,7 +100,7 @@ parent_button mod =
   case span (/= '.') (reverse mod) of
    (m, '.':rest) -> 
        topButBox (
-  	 anchor ! [href (moduleHtmlFile (reverse rest))] << toHtml "Parent")
+  	 anchor ! [href (moduleHtmlFile "" (reverse rest))] << toHtml "Parent")
    _ -> 
 	Html.emptyTable
 
@@ -138,9 +139,10 @@ pageHeader mod iface title source_url =
 	)
     )
 
-moduleInfo iface 
-  | Nothing   <- iface_info iface = Html.emptyTable
-  | Just info <- iface_info iface =
+moduleInfo iface = 
+  case iface_info iface of
+    Nothing   -> Html.emptyTable
+    Just info ->
           tda [align "right"] << narrowTable << (
         	  (tda [theclass "infohead"] << toHtml "Portability") <->
         	  (tda [theclass "infoval"] << toHtml (portability info)) </>
@@ -191,7 +193,7 @@ mkNode ss (Node s leaf ts) =
      vanillaTable (toHtml (aboves (map (mkNode (s:ss)) ts))))
 
 mkLeaf s ss False = toHtml s
-mkLeaf s ss True  = anchor ! [href (moduleHtmlFile mod)] << toHtml s
+mkLeaf s ss True  = anchor ! [href (moduleHtmlFile "" mod)] << toHtml s
   where mod = foldr (++) "" (s' : map ('.':) ss')
 	(s':ss') = reverse (s:ss)
 	 -- reconstruct the module name
@@ -283,7 +285,7 @@ ppHtmlIndex odir title ifaces = do
     where cmp (n1,_) (n2,_) = n1 `compare` n2
     
   iface_indices f = map (getIfaceIndex f) ifaces
-  full_index f = foldr1 (plusFM_C (++)) (iface_indices f)
+  full_index f = foldr (plusFM_C (++)) emptyFM (iface_indices f)
 
   getIfaceIndex f (mod,iface) = listToFM
     [ (name, [(mod, mod == mod')]) 
@@ -294,9 +296,10 @@ ppHtmlIndex odir title ifaces = do
   indexElt (nm, entries) = 
      td << ppHsName nm
      <-> td << (hsep [ if defining then
-			 bold << anchor ! [href (linkId mod nm)] << toHtml mod
+			 bold << anchor ! [href (linkId (Module mod) nm)]
+			   << toHtml mod
 		       else
-			 anchor ! [href (linkId mod nm)] << toHtml mod
+			 anchor ! [href (linkId (Module mod) nm)] << toHtml mod
 	             | (Module mod, defining) <- entries ])
 
 nameBeginsWith (HsTyClsName id) c = idBeginsWith id c
@@ -321,7 +324,7 @@ ppHtmlModule odir title source_url inst_maps (Module mod,iface) = do
 	    ifaceToHtml mod iface inst_maps </> s15 </>
 	    footer
          )
-  writeFile (odir ++ pathSeparator:moduleHtmlFile mod) (renderHtml html)
+  writeFile (moduleHtmlFile odir mod) (renderHtml html)
 
 ifaceToHtml :: String -> Interface -> InstMaps -> HtmlTable
 ifaceToHtml mod iface inst_maps
@@ -463,14 +466,6 @@ doDecl summary inst_maps x decl = do_decl decl
 
 ppTypeSig summary nm ty = ppHsBinder summary nm <+> toHtml "::" <+> ppHsType ty
 
-
-keepDecl HsTypeSig{}     = True
-keepDecl HsTypeDecl{}    = True
-keepDecl HsNewTypeDecl{} = True
-keepDecl HsDataDecl{}    = True
-keepDecl HsClassDecl{}   = True
-keepDecl _ = False
-
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
 
@@ -520,8 +515,6 @@ ppHsDataDecl summary (_, ty_inst_map) is_newty
 			 aboves (map ppSideBySideConstr cons)
 			)
 
-	no_constr_docs = all constr_has_no_doc cons
-
 	instances = lookupFM ty_inst_map x
 
 	instances_bit
@@ -533,12 +526,6 @@ ppHsDataDecl summary (_, ty_inst_map) is_newty
 		 tda [theclass "body"] << spacedTable1 << (
 			aboves (map (declBox.ppInstHead) is)
 		  )
-
-constr_has_no_doc (HsConDecl _ _ _ _ _ doc) = isNothing doc
-constr_has_no_doc (HsRecDecl _ _ _ _ fields doc)
-  = isNothing doc && all field_has_no_doc fields
-
-field_has_no_doc (HsFieldDecl nms _ doc) = isNothing doc
 
 isRecDecl (HsRecDecl pos nm tvs ctxt fields maybe_doc) = True
 isRecDecl _ = False
@@ -654,7 +641,6 @@ ppShortClassDecl summary inst_maps
           )
          
    where
-	Just c = declMainBinder decl
 	hdr = ppClassHdr summary ctxt nm tvs fds
 
 ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c 
@@ -668,8 +654,6 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 		)
 
    where 
-	Just c = declMainBinder decl
-
 	header
 	   | null decls = declBox hdr
 	   | otherwise  = declBox (hdr <+> keyword "where")
@@ -702,8 +686,6 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 
 	instances = lookupFM cls_inst_map orig_c
 
-	kept_decls = filter keepDecl decls
-        decl_has_no_doc decl = isNothing (declDoc decl)
 
 ppInstHead	       :: InstHead -> Html
 ppInstHead ([],asst)   =  ppHsAsst asst
@@ -800,8 +782,8 @@ linkTarget :: HsName -> Html
 linkTarget nm = anchor ! [name (hsNameStr nm)] << toHtml ""
 
 ppHsQName :: HsQName -> Html
-ppHsQName (UnQual str)			= ppHsName str
-ppHsQName n@(Qual (Module mod) str)
+ppHsQName (UnQual str) = ppHsName str
+ppHsQName n@(Qual mod str)
   | n == unit_con_name	= ppHsName str
   | isSpecial str	= ppHsName str
   | otherwise		= anchor ! [href (linkId mod str)] << ppHsName str
@@ -834,11 +816,17 @@ ppHsBindIdent (HsIdent str)   =  toHtml str
 ppHsBindIdent (HsSymbol str)  =  parens (toHtml str)
 ppHsBindIdent (HsSpecial str) =  toHtml str
 
-linkId :: String -> HsName -> String
-linkId mod str = moduleHtmlFile mod ++ '#': hsNameStr str
+linkId :: Module -> HsName -> String
+linkId (Module mod) str = moduleHtmlFile fp mod ++ '#': hsNameStr str
+  where fp = case lookupFM html_xrefs (Module mod) of
+		Just fp -> fp 
+		Nothing -> ""
 
 ppHsModule :: String -> Html
-ppHsModule mod = anchor ! [href (moduleHtmlFile mod)] << toHtml mod
+ppHsModule mod = anchor ! [href (moduleHtmlFile fp mod)] << toHtml mod
+  where fp = case lookupFM html_xrefs (Module mod) of
+		Just fp -> fp 
+		Nothing -> ""
 
 -- -----------------------------------------------------------------------------
 -- * Doc Markup
@@ -913,10 +901,6 @@ text   = strAttr "TEXT"
 -- a box for displaying code
 declBox :: Html -> HtmlTable
 declBox html = tda [theclass "decl"] << html
-
--- a horrible hack to keep a box from expanding width-wise
-narrowDeclBox :: Html -> HtmlTable
-narrowDeclBox html = tda [theclass "decl", width "1"] << html
 
 -- a box for displaying documentation, 
 -- indented and with a little padding at the top

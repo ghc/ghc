@@ -16,12 +16,15 @@ module HaddockUtil (
   isPathSeparator, pathSeparator,
 
   -- * Miscellaneous utilities
-  die, dieMsg, mapSnd, mapMaybeM
+  die, dieMsg, mapSnd, mapMaybeM,
 
+  -- * HTML cross reference mapping
+  html_xrefs_ref, html_xrefs,
  ) where
 
 import HsSyn
 
+import FiniteMap
 import List	( intersect )
 import IO	( hPutStr, stderr )
 import System
@@ -69,9 +72,6 @@ conDeclBinders (HsRecDecl _ n _ _ fields _) =
   n : concat (map fieldDeclBinders fields)
 
 fieldDeclBinders (HsFieldDecl ns _ _) = ns
-
-exQtNm (HsForAllType _ _ t) = nameOfQName (fst (splitTyConApp t))
-exQtNm t = nameOfQName (fst (splitTyConApp t))
 
 splitTyConApp :: HsType -> (HsQName, [HsType])
 splitTyConApp t = split t []
@@ -221,6 +221,24 @@ mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
 mapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
 mapMaybeM f Nothing = return Nothing
 mapMaybeM f (Just a) = f a >>= return . Just
+
+-----------------------------------------------------------------------------
+-- HTML cross references
+
+-- For each module, we need to know where its HTML documentation lives
+-- so that we can point hyperlinks to it.  It is extremely
+-- inconvenient to plumb this information to all the places that need
+-- it (basically every function in HaddockHtml), and furthermore the
+-- mapping is constant for any single run of Haddock.  So for the time
+-- being I'm going to use a write-once global variable.
+
+{-# NOINLINE html_xrefs_ref #-}
+html_xrefs_ref :: IORef (FiniteMap Module FilePath)
+html_xrefs_ref = unsafePerformIO (newIORef (error "module_map"))
+
+{-# NOINLINE html_xrefs #-}
+html_xrefs :: FiniteMap Module FilePath
+html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
 
 -----------------------------------------------------------------------------
 -- Binary instances for stuff
