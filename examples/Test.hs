@@ -40,7 +40,6 @@ module Test (
 	-- * Function types
 	f, g,
 
-	-- $aux2
 	-- * Auxiliary stuff
 
 	-- $aux1
@@ -68,7 +67,7 @@ module Test (
 	-- | This is some inline documentation in the export list
 	--
 	-- > a code block using bird-tracks
-	-- > each line must begin with > (which isn\'t significant unless it
+	-- > each line must begin with > (which isn't significant unless it
 	-- > is at the beginning of the line).
 
 	-- * A hidden module
@@ -91,8 +90,11 @@ module Test (
 
 {-|
  > a literal line
+
  $ a non /literal/ line $
 -}
+
+	p,
    ) where
 
 import Hidden
@@ -324,6 +326,7 @@ aux11:
 
 >test3
 >test4
+
 @
 test1
 test2
@@ -365,3 +368,5 @@ foreign import ccall unsafe
  o :: Float  -- ^ The input float
    -> IO Float  -- ^ The output float
 
+-- | We should be able to escape this: \#\#\#
+p :: Int
