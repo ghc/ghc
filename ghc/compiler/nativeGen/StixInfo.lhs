@@ -26,7 +26,7 @@ import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..),
 import Stix		-- all of it
 import StixPrim		( amodeToStix )
 import UniqSupply	( returnUs, SYN_IE(UniqSM) )
-import Unpretty		( uppBesides, uppPStr, uppInt, uppChar )
+import Pretty		( hcat, ptext, int, char )
 \end{code}
 
 Generating code for info tables (arrays of data).
@@ -79,21 +79,21 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ upd cl_descr _)
 		tag]
 
 	    SpecialisedRep _ _ _ updatable ->
-		let rtbl = uppBesides (
+		let rtbl = hcat (
 		       if is_selector then
-			  [uppPStr SLIT("Select__"),
-			   uppInt select_word,
-			   uppPStr SLIT("_rtbl")]
+			  [ptext SLIT("Select__"),
+			   int select_word,
+			   ptext SLIT("_rtbl")]
 		       else
-			  [uppPStr (case updatable of
+			  [ptext (case updatable of
 				    SMNormalForm -> SLIT("Spec_N_")
 				    SMSingleEntry -> SLIT("Spec_S_")
 				    SMUpdatable -> SLIT("Spec_U_")
 				   ),
-			   uppInt size,
-			   uppChar '_',
-			   uppInt ptrs,
-			   uppPStr SLIT("_rtbl")])
+			   int size,
+			   char '_',
+			   int ptrs,
+			   ptext SLIT("_rtbl")])
 		in
 		    case updatable of
 			SMNormalForm -> [upd_code, StLitLbl rtbl, tag]

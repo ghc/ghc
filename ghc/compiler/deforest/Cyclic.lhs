@@ -97,7 +97,7 @@ of the expression being returned.
 >   	loop ls (Var (Label e e1))
 >   	    =
 >	     d2c e `thenUs` \core_e ->
->--	     trace ("loop:\n" ++ ppShow 80 (ppr PprDebug core_e)) $
+>--	     trace ("loop:\n" ++ show (ppr PprDebug core_e)) $
 
 >	     mapUs (\(f,e',val_args,ty_args) ->
 >	             renameExprs e' e	`thenUs` \r ->
@@ -172,8 +172,8 @@ new function...
 >		   if f `elem` ls' then
 >			d2c e'			`thenUs` \core_e' ->
 >			trace ("In Forward Loop " ++
->				ppShow 80 (ppr PprDebug f) ++ "\n" ++
->				ppShow 80 (ppr PprDebug core_e')) $
+>				show (ppr PprDebug f) ++ "\n" ++
+>				show (ppr PprDebug core_e')) $
 >		   	if f `notElem` (freeVars (head back_loops)) then
 >				returnUs (ls', bs, bls, head back_loops)
 >			else
@@ -241,7 +241,7 @@ Comment out the next block to disable back-loops.  ToDo: trace all of them.
 >	   if not (null back_loops) then
 >		d2c e'	`thenUs` \core_e ->
 >		trace ("Floating back loop:\n"
->			++ ppShow 80 (ppr PprDebug core_e))
+>			++ show (ppr PprDebug core_e))
 >		returnUs (ls', bs, back_loops ++ bls, e')
 >	   else
 > 		returnUs res
@@ -350,7 +350,7 @@ expressions and function right hand sides that call this function.
 >		          t = foldl App (Var (DefArgVar new_id))
 >			  			(map mkVar fvs)
 > 		      in
->		      trace ("adding " ++ show (length fvs) ++ " args to " ++ ppShow 80 (ppr PprDebug id)) $
+>		      trace ("adding " ++ show (length fvs) ++ " args to " ++ show (ppr PprDebug id)) $
 >		      ((new_id, mkValLam fvs e), [(id,t)])
 >	where
 >		fvs = case e of

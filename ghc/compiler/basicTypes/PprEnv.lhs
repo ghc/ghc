@@ -25,10 +25,20 @@ module PprEnv (
 
 IMP_Ubiq(){-uitous-}
 
-import Pretty		( SYN_IE(Pretty) )
-import Unique		( initRenumberingUniques )
-import UniqFM		( emptyUFM )
+import Pretty		( Doc )
+import Outputable
+import Unique		( initRenumberingUniques, Unique )
+import UniqFM		( emptyUFM, UniqFM )
 import Util		( panic )
+#if __GLASGOW_HASKELL__ >= 202
+IMPORT_DELOOPER(TyLoop)
+import PprStyle         ( PprStyle )
+import Literal          ( Literal )
+import Usage            ( GenUsage, SYN_IE(Usage) )
+import {-# SOURCE #-}   PrimOp (PrimOp)
+import {-# SOURCE #-}   CostCentre ( CostCentre )
+#endif
+
 \end{code}
 
 For tyvars and uvars, we {\em do} normally use these homogenized
@@ -40,39 +50,39 @@ uncontrollably from changing Unique-based names.
 data PprEnv tyvar uvar bndr occ
   = PE	PprStyle		-- stored for safe keeping
 
-	(Literal    -> Pretty)	-- Doing these this way saves
-	(Id    -> Pretty)	-- carrying around a PprStyle
-	(PrimOp     -> Pretty)
-	(CostCentre -> Pretty)
+	(Literal    -> Doc)	-- Doing these this way saves
+	(Id    -> Doc)	-- carrying around a PprStyle
+	(PrimOp     -> Doc)
+	(CostCentre -> Doc)
 
-	(tyvar -> Pretty)	-- to print tyvar binders
-	(tyvar -> Pretty)	-- to print tyvar occurrences
+	(tyvar -> Doc)	-- to print tyvar binders
+	(tyvar -> Doc)	-- to print tyvar occurrences
 
-	(uvar -> Pretty)	-- to print usage vars
+	(uvar -> Doc)	-- to print usage vars
 
-	(bndr -> Pretty)	-- to print "major" val_bdrs
-	(bndr -> Pretty)	-- to print "minor" val_bdrs
-	(occ  -> Pretty)	-- to print bindees
+	(bndr -> Doc)	-- to print "major" val_bdrs
+	(bndr -> Doc)	-- to print "minor" val_bdrs
+	(occ  -> Doc)	-- to print bindees
 
-	(GenType tyvar uvar -> Pretty)
-	(GenUsage uvar -> Pretty)
+	(GenType tyvar uvar -> Doc)
+	(GenUsage uvar -> Doc)
 \end{code}
 
 \begin{code}
 initPprEnv
 	:: PprStyle
-	-> Maybe (Literal -> Pretty)
-	-> Maybe (Id -> Pretty)
-	-> Maybe (PrimOp  -> Pretty)
-	-> Maybe (CostCentre -> Pretty)
-	-> Maybe (tyvar -> Pretty)
-	-> Maybe (tyvar -> Pretty)
-	-> Maybe (uvar -> Pretty)
-	-> Maybe (bndr -> Pretty)
-	-> Maybe (bndr -> Pretty)
-	-> Maybe (occ -> Pretty)
-	-> Maybe (GenType tyvar uvar -> Pretty)
-	-> Maybe (GenUsage uvar -> Pretty)
+	-> Maybe (Literal -> Doc)
+	-> Maybe (Id -> Doc)
+	-> Maybe (PrimOp  -> Doc)
+	-> Maybe (CostCentre -> Doc)
+	-> Maybe (tyvar -> Doc)
+	-> Maybe (tyvar -> Doc)
+	-> Maybe (uvar -> Doc)
+	-> Maybe (bndr -> Doc)
+	-> Maybe (bndr -> Doc)
+	-> Maybe (occ -> Doc)
+	-> Maybe (GenType tyvar uvar -> Doc)
+	-> Maybe (GenUsage uvar -> Doc)
 	-> PprEnv tyvar uvar bndr occ
 
 -- you can specify all the printers individually; if
@@ -103,7 +113,7 @@ initPprEnv sty pmaj pmin pocc
   = PE	(ppr sty)   -- for a Literal
 	(ppr sty)   -- for a DataCon
 	(ppr sty)   -- for a PrimOp
-	(\ cc -> ppStr (showCostCentre sty True cc)) -- CostCentre
+	(\ cc -> text (showCostCentre sty True cc)) -- CostCentre
 
 	(ppr sty)   -- for a tyvar
 	(ppr sty)   -- for a usage var

@@ -11,7 +11,11 @@ IMP_Ubiq(){-uitous-}
 IMPORT_1_3(IO(Handle))
 
 import MachMisc
+#if __GLASGOW_HASKELL__ >= 202
+import MachRegs         hiding (Addr)
+#else
 import MachRegs
+#endif
 import MachCode
 import PprMach
 
@@ -23,8 +27,9 @@ import PrimOp		( commutableOp, PrimOp(..) )
 import PrimRep		( PrimRep{-instance Eq-} )
 import RegAllocInfo	( mkMRegsState, MRegsState )
 import Stix		( StixTree(..), StixReg(..), CodeSegment )
-import UniqSupply	( returnUs, thenUs, mapUs, SYN_IE(UniqSM) )
-import Unpretty		( uppPutStr, uppShow, uppAboves, SYN_IE(Unpretty) )
+import UniqSupply	( returnUs, thenUs, mapUs, SYN_IE(UniqSM), UniqSupply )
+import Outputable	( printDoc )
+import Pretty		( Doc, vcat, Mode(..) )
 \end{code}
 
 The 96/03 native-code generator has machine-independent and
@@ -59,7 +64,7 @@ The machine-dependent bits break down as follows:
     machine instructions.
 
 \item[@PprMach@:] @pprInstr@ turns an @Instr@ into text (well, really
-    an @Unpretty@).
+    an @Doc@).
 
 \item[@RegAllocInfo@:] In the register allocator, we manipulate
     @MRegsState@s, which are @BitSet@s, one bit per machine register.
@@ -75,13 +80,11 @@ The machine-dependent bits break down as follows:
 So, here we go:
 \begin{code}
 writeRealAsm :: Handle -> AbstractC -> UniqSupply -> IO ()
-
 writeRealAsm handle absC us
-  = _scc_ "writeRealAsm" (uppPutStr handle 80 (runNCG absC us))
+  = _scc_ "writeRealAsm" (printDoc LeftMode handle (runNCG absC us))
 
 dumpRealAsm :: AbstractC -> UniqSupply -> String
-
-dumpRealAsm absC us = uppShow 80 (runNCG absC us)
+dumpRealAsm absC us = show (runNCG absC us)
 
 runNCG absC
   = genCodeAbstractC absC	`thenUs` \ treelists ->
@@ -93,14 +96,14 @@ runNCG absC
 
 @codeGen@ is the top-level code-generation function:
 \begin{code}
-codeGen :: [[StixTree]] -> UniqSM Unpretty
+codeGen :: [[StixTree]] -> UniqSM Doc
 
 codeGen trees
   = mapUs genMachCode trees	`thenUs` \ dynamic_codes ->
     let
 	static_instrs = scheduleMachCode dynamic_codes
     in
-    returnUs (uppAboves (map pprInstr static_instrs))
+    returnUs (vcat (map pprInstr static_instrs))
 \end{code}
 
 Top level code generator for a chunk of stix code:

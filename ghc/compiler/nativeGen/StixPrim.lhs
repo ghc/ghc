@@ -11,7 +11,11 @@ IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(NcgLoop)		-- paranoia checking only
 
 import MachMisc
+#if __GLASGOW_HASKELL__ >= 202
+import MachRegs hiding (Addr)
+#else
 import MachRegs
+#endif
 
 import AbsCSyn
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
@@ -30,7 +34,7 @@ import Stix
 import StixMacro	( heapCheck )
 import StixInteger	{- everything -}
 import UniqSupply	( returnUs, thenUs, SYN_IE(UniqSM) )
-import Unpretty		( uppBeside, uppPStr, uppInt )
+import Pretty		( (<>), ptext, int )
 import Util		( panic )
 
 #ifdef REALLY_HASKELL_1_3
@@ -233,7 +237,7 @@ primCode [lhs] ReadArrayOp [obj, ix]
     in
     returnUs (\xs -> assign : xs)
 
-primCode [lhs] WriteArrayOp [obj, ix, v]
+primCode [] WriteArrayOp [obj, ix, v]
   = let
 	obj' = amodeToStix obj
     	ix' = amodeToStix ix
@@ -469,7 +473,7 @@ simplePrim [lhs] op rest
 	       ReturnsPrim pk -> pk
 	       _ -> simplePrim_error op
 
-simplePrim _ op _ = simplePrim_error op
+simplePrim as op bs = simplePrim_error op
 
 simplePrim_error op
     = error ("ERROR: primitive operation `"++showPrimOp PprDebug op++"'cannot be handled\nby the native-code generator.  Workaround: use -fvia-C.\n(Perhaps you should report it as a GHC bug, also.)\n")
@@ -523,7 +527,7 @@ amodeToStix (CTableEntry base off pk)
  -- For CharLike and IntLike, we attempt some trivial constant-folding here.
 
 amodeToStix (CCharLike (CLit (MachChar c)))
-  = StLitLbl (uppBeside (uppPStr SLIT("CHARLIKE_closures+")) (uppInt off))
+  = StLitLbl ((<>) (ptext SLIT("CHARLIKE_closures+")) (int off))
   where
     off = charLikeSize * ord c
 

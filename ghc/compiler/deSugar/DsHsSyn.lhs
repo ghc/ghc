@@ -10,12 +10,13 @@ module DsHsSyn where
 
 IMP_Ubiq()
 
-import HsSyn		( OutPat(..), HsBinds(..), Bind(..), MonoBinds(..),
+import HsSyn		( OutPat(..), HsBinds(..), MonoBinds(..),
 			  Sig, HsExpr, GRHSsAndBinds, Match, HsLit )
-import TcHsSyn		( SYN_IE(TypecheckedPat), SYN_IE(TypecheckedBind), 
+import TcHsSyn		( SYN_IE(TypecheckedPat),
 			  SYN_IE(TypecheckedMonoBinds) )
 
-import Id		( idType )
+import Id		( idType, SYN_IE(Id) )
+import Type             ( SYN_IE(Type) )
 import TysWiredIn	( mkListTy, mkTupleTy, unitTy )
 import Util		( panic )
 \end{code}
@@ -53,11 +54,6 @@ the same order as they appear in the tuple.
 collectTypedBinders and collectedTypedPatBinders are the exportees.
 
 \begin{code}
-collectTypedBinders :: TypecheckedBind -> [Id]
-collectTypedBinders EmptyBind	    = []
-collectTypedBinders (NonRecBind bs) = collectTypedMonoBinders bs
-collectTypedBinders (RecBind    bs) = collectTypedMonoBinders bs
-
 collectTypedMonoBinders :: TypecheckedMonoBinds -> [Id]
 collectTypedMonoBinders EmptyMonoBinds	      = []
 collectTypedMonoBinders (PatMonoBind pat _ _) = collectTypedPatBinders pat
@@ -66,6 +62,8 @@ collectTypedMonoBinders (VarMonoBind v _)     = [v]
 collectTypedMonoBinders (CoreMonoBind v _)     = [v]
 collectTypedMonoBinders (AndMonoBinds bs1 bs2)
  = collectTypedMonoBinders bs1 ++ collectTypedMonoBinders bs2
+collectTypedMonoBinders (AbsBinds _ _ exports _)
+  = [global | (_, global, local) <- exports]
 
 collectTypedPatBinders :: TypecheckedPat -> [Id]
 collectTypedPatBinders (VarPat var)	    = [var]

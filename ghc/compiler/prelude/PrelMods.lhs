@@ -14,8 +14,6 @@ defined here so as to avod
 
 module PrelMods
         (
-	 isPreludeModule,   -- :: Module -> Bool
-
          gHC__, pRELUDE, pREL_BASE,
          pREL_READ , pREL_NUM, pREL_LIST,
 	 pREL_TUP  , pACKED_STRING, cONC_BASE,
@@ -33,9 +31,6 @@ Predicate used by RnIface to decide whether or not to
 append a special suffix for prelude modules:
 
 \begin{code}
-isPreludeModule :: Module -> Bool
-isPreludeModule mod = mod `elementOfUniqSet` preludeNames
-
 preludeNames :: UniqSet FAST_STRING
 preludeNames =
  mkUniqSet

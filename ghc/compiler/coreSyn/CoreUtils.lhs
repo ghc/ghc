@@ -38,16 +38,17 @@ import Maybes		( catMaybes, maybeToBool )
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instances-} )
-import Pretty		( ppAboves, ppStr )
-import PrelVals		( augmentId, buildId )
+import Pretty		( vcat, text )
 import PrimOp		( primOpType, PrimOp(..) )
 import SrcLoc		( noSrcLoc )
 import TyVar		( cloneTyVar,
-			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv)
+			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv),
+			  SYN_IE(TyVar)
 			)
 import Type		( mkFunTy, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 			  getFunTyExpandingDicts_maybe, applyTy, isPrimType,
-			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy
+			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy,
+			  SYN_IE(Type)
 			)
 import TysWiredIn	( trueDataCon, falseDataCon )
 import UniqSupply	( initUs, returnUs, thenUs,
@@ -85,8 +86,8 @@ coreExprType (Coerce _ ty _)	= ty -- that's the whole point!
 -- a Prim is <ditto> of a PrimOp
 
 coreExprType (Con con args) = 
---			      pprTrace "appTyArgs" (ppCat [ppr PprDebug con, ppSemi, 
---						 	   ppr PprDebug con_ty, ppSemi,
+--			      pprTrace "appTyArgs" (hsep [ppr PprDebug con, semi, 
+--						 	   ppr PprDebug con_ty, semi,
 --							   ppr PprDebug args]) $
     			      applyTypeToArgs con_ty args
 			    where
@@ -105,7 +106,7 @@ coreExprType (Lam (UsageBinder uvar) expr)
 
 coreExprType (App expr (TyArg ty))
   = 
---  pprTrace "appTy1" (ppCat [ppr PprDebug fun_ty, ppSP, ppr PprDebug ty]) $
+--  pprTrace "appTy1" (hsep [ppr PprDebug fun_ty, space, ppr PprDebug ty]) $
     applyTy fun_ty ty
   where
     fun_ty = coreExprType expr
@@ -122,7 +123,7 @@ coreExprType (App expr val_arg)
 	  Just (_, result_ty) -> result_ty
 #ifdef DEBUG
 	  Nothing -> pprPanic "coreExprType:\n"
-		(ppAboves [ppr PprDebug fun_ty,
+		(vcat [ppr PprDebug fun_ty,
 			   ppr PprShowAll (App expr val_arg)])
 #endif
 \end{code}
@@ -372,7 +373,7 @@ maybeErrorApp
 					-- *pretend* that the result ty won't be
 					-- primitive -- somebody later must
 					-- ensure this.
-	-> Maybe (GenCoreExpr a Id TyVar UVar)
+	-> Maybe (GenCoreExpr b Id TyVar UVar)
 
 maybeErrorApp expr result_ty_maybe
   = case (collectArgs expr) of

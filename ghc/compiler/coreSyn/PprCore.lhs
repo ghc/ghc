@@ -28,8 +28,9 @@ IMP_Ubiq(){-uitous-}
 import CoreSyn
 import CostCentre	( showCostCentre )
 import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
-			  nullIdEnv, SYN_IE(DataCon), GenId{-instances-}
-			)
+			  nullIdEnv, SYN_IE(DataCon), GenId{-instances-},
+			  SYN_IE(Id)
+			) 
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
 import Literal		( Literal{-instances-} )
 import Name		( OccName, parenInCode )
@@ -57,7 +58,7 @@ function for ``major'' val_bdrs (those next to equal signs :-),
 usually be called through some intermediary.
 
 The binder/occ printers take the default ``homogenized'' (see
-@PprEnv@...) @Pretty@ and the binder/occ.  They can either use the
+@PprEnv@...) @Doc@ and the binder/occ.  They can either use the
 homogenized one, or they can ignore it completely.  In other words,
 the things passed in act as ``hooks'', getting the last word on how to
 print something.
@@ -65,7 +66,7 @@ print something.
 @pprParendCoreExpr@ puts parens around non-atomic Core expressions.
 
 \begin{code}
-pprCoreBinding :: PprStyle -> CoreBinding -> Pretty
+pprCoreBinding :: PprStyle -> CoreBinding -> Doc
 
 pprGenCoreBinding
 	:: (Eq tyvar,  Outputable tyvar,
@@ -73,11 +74,11 @@ pprGenCoreBinding
 	    Outputable bndr,
 	    Outputable occ)
 	=> PprStyle
-	-> (bndr -> Pretty)	-- to print "major" val_bdrs
-	-> (bndr -> Pretty)	-- to print "minor" val_bdrs
-	-> (occ  -> Pretty)	-- to print bindees
+	-> (bndr -> Doc)	-- to print "major" val_bdrs
+	-> (bndr -> Doc)	-- to print "minor" val_bdrs
+	-> (occ  -> Doc)	-- to print bindees
 	-> GenCoreBinding bndr occ tyvar uvar
-	-> Pretty
+	-> Doc
 
 pprGenCoreBinding sty pbdr1 pbdr2 pocc bind
   = ppr_bind (init_ppr_env sty (ppr sty) pbdr1 pbdr2 pocc) bind
@@ -87,7 +88,7 @@ init_ppr_env sty tvbndr pbdr1 pbdr2 pocc
 	(Just (ppr sty)) -- literals
 	(Just ppr_con)		-- data cons
 	(Just ppr_prim)		-- primops
-	(Just (\ cc -> ppStr (showCostCentre sty True cc)))
+	(Just (\ cc -> text (showCostCentre sty True cc)))
 	(Just tvbndr)	 	-- tyvar binders
 	(Just (ppr sty)) 	-- tyvar occs
 	(Just (ppr sty))	-- usage vars
@@ -107,38 +108,38 @@ init_ppr_env sty tvbndr pbdr1 pbdr2 pocc
 	-- to distinguish them from ordinary applications.  But not when
 	-- printing for interfaces, where they are treated as ordinary applications
     ppr_con con | ifaceStyle sty = ppr sty con
-	        | otherwise	 = ppr sty con `ppBeside` ppChar '!'
+	        | otherwise	 = ppr sty con <> char '!'
 -}
 
 	-- We add a "!" to distinguish Primitive applications from ordinary applications.  
 	-- But not when printing for interfaces, where they are treated 
 	-- as ordinary applications
     ppr_prim prim | ifaceStyle sty = ppr sty prim
-		  | otherwise	   = ppr sty prim `ppBeside` ppChar '!'
+		  | otherwise	   = ppr sty prim <> char '!'
 
 --------------
 pprCoreBinding sty (NonRec binder expr)
-  = ppHang (ppCat [pprBigCoreBinder sty binder, ppEquals])
+  = hang (hsep [pprBigCoreBinder sty binder, equals])
     	 4 (pprCoreExpr sty (pprBigCoreBinder sty) (pprBabyCoreBinder sty) (ppr sty) expr)
 
 pprCoreBinding sty (Rec binds)
-  = ppAboves [ifPprDebug sty (ppPStr SLIT("{- plain Rec -}")),
-	      ppAboves (map ppr_bind binds),
-	      ifPprDebug sty (ppPStr SLIT("{- end plain Rec -}"))]
+  = vcat [ptext SLIT("Rec {"),
+	      vcat (map ppr_bind binds),
+	      ptext SLIT("end Rec }")]
   where
     ppr_bind (binder, expr)
-      = ppHang (ppCat [pprBigCoreBinder sty binder, ppEquals])
+      = hang (hsep [pprBigCoreBinder sty binder, equals])
 	     4 (pprCoreExpr sty (pprBigCoreBinder sty) (pprBabyCoreBinder sty) (ppr sty) expr)
 \end{code}
 
 \begin{code}
 pprCoreExpr
 	:: PprStyle
-	-> (Id -> Pretty) -- to print "major" val_bdrs
-	-> (Id -> Pretty) -- to print "minor" val_bdrs
-	-> (Id  -> Pretty) -- to print bindees
+	-> (Id -> Doc) -- to print "major" val_bdrs
+	-> (Id -> Doc) -- to print "minor" val_bdrs
+	-> (Id  -> Doc) -- to print bindees
 	-> CoreExpr
-	-> Pretty
+	-> Doc
 pprCoreExpr = pprGenCoreExpr
 
 pprGenCoreExpr, pprParendCoreExpr
@@ -147,11 +148,11 @@ pprGenCoreExpr, pprParendCoreExpr
 	    Outputable bndr,
 	    Outputable occ)
 	=> PprStyle
-	-> (bndr -> Pretty) -- to print "major" val_bdrs
-	-> (bndr -> Pretty) -- to print "minor" val_bdrs
-	-> (occ  -> Pretty) -- to print bindees
+	-> (bndr -> Doc) -- to print "major" val_bdrs
+	-> (bndr -> Doc) -- to print "minor" val_bdrs
+	-> (occ  -> Doc) -- to print bindees
 	-> GenCoreExpr bndr occ tyvar uvar
-	-> Pretty
+	-> Doc
 
 pprGenCoreExpr sty pbdr1 pbdr2 pocc expr
   = ppr_expr (init_ppr_env sty (ppr sty) pbdr1 pbdr2 pocc) expr
@@ -162,12 +163,12 @@ pprParendCoreExpr sty pbdr1 pbdr2 pocc expr
 	  = case expr of
 	      Var _ -> id	-- leave unchanged
 	      Lit _ -> id
-	      _	    -> ppParens	-- wraps in parens
+	      _	    -> parens	-- wraps in parens
     in
     parenify (pprGenCoreExpr sty pbdr1 pbdr2 pocc expr)
 
 -- Printer for unfoldings in interfaces
-pprIfaceUnfolding :: CoreExpr -> Pretty
+pprIfaceUnfolding :: CoreExpr -> Doc
 pprIfaceUnfolding = ppr_expr env 
   where
     env = init_ppr_env PprInterface (pprTyVarBndr PprInterface)
@@ -197,34 +198,39 @@ instance
    Eq uvar, Outputable uvar)
  =>
   Outputable (GenCoreBinding bndr occ tyvar uvar) where
-    ppr sty bind = pprGenCoreBinding sty (ppr sty) (ppr sty) (ppr sty) bind
+    ppr sty bind = pprQuote sty $ \sty -> 
+		   pprGenCoreBinding sty (ppr sty) (ppr sty) (ppr sty) bind
 
 instance
   (Outputable bndr, Outputable occ, Eq tyvar, Outputable tyvar,
    Eq uvar, Outputable uvar)
  =>
   Outputable (GenCoreExpr bndr occ tyvar uvar) where
-    ppr sty expr = pprGenCoreExpr sty (ppr sty) (ppr sty) (ppr sty) expr
+    ppr sty expr = pprQuote sty $ \sty -> 
+		   pprGenCoreExpr sty (ppr sty) (ppr sty) (ppr sty) expr
 
 instance
   (Outputable occ, Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
  =>
   Outputable (GenCoreArg occ tyvar uvar) where
-    ppr sty arg = ppr_core_arg sty (ppr sty) arg
+    ppr sty arg = pprQuote sty $ \sty -> 
+		  ppr_core_arg sty (ppr sty) arg
 
 instance
   (Outputable bndr, Outputable occ, Eq tyvar, Outputable tyvar,
    Eq uvar, Outputable uvar)
  =>
   Outputable (GenCoreCaseAlts bndr occ tyvar uvar) where
-    ppr sty alts = ppr_core_alts sty (ppr sty) (ppr sty) (ppr sty) alts
+    ppr sty alts = pprQuote sty $ \sty -> 
+		   ppr_core_alts sty (ppr sty) (ppr sty) (ppr sty) alts
 
 instance
   (Outputable bndr, Outputable occ, Eq tyvar, Outputable tyvar,
    Eq uvar, Outputable uvar)
  =>
   Outputable (GenCoreCaseDefault bndr occ tyvar uvar) where
-    ppr sty deflt  = ppr_core_default sty (ppr sty) (ppr sty) (ppr sty) deflt
+    ppr sty deflt  = pprQuote sty $ \sty -> 
+		     ppr_core_default sty (ppr sty) (ppr sty) (ppr sty) deflt
 \end{code}
 
 %************************************************************************
@@ -235,15 +241,15 @@ instance
 
 \begin{code}
 ppr_bind pe (NonRec val_bdr expr)
-  = ppHang (ppCat [pMajBndr pe val_bdr, ppEquals])
+  = hang (hsep [pMajBndr pe val_bdr, equals])
 	 4 (ppr_expr pe expr)
 
 ppr_bind pe (Rec binds)
-  = ppAboves (map ppr_pair binds)
+  = vcat (map ppr_pair binds)
   where
     ppr_pair (val_bdr, expr)
-      = ppHang (ppCat [pMajBndr pe val_bdr, ppEquals])
-	     4 (ppr_expr pe expr `ppBeside` ppSemi)
+      = hang (hsep [pMajBndr pe val_bdr, equals])
+	     4 (ppr_expr pe expr <> semi)
 \end{code}
 
 \begin{code}
@@ -253,7 +259,7 @@ ppr_parend_expr pe expr
 	  = case expr of
 	      Var _ -> id	-- leave unchanged
 	      Lit _ -> id
-	      _	    -> ppParens	-- wraps in parens
+	      _	    -> parens	-- wraps in parens
     in
     parenify (ppr_expr pe expr)
 \end{code}
@@ -263,25 +269,25 @@ ppr_expr pe (Var name)   = pOcc pe name
 ppr_expr pe (Lit lit)    = pLit pe lit
 
 ppr_expr pe (Con con args)
-  = ppHang (pCon pe con)
-	 4 (ppCurlies $ ppSep (map (ppr_arg pe) args))
+  = hang (pCon pe con)
+	 4 (braces $ sep (map (ppr_arg pe) args))
 
 ppr_expr pe (Prim prim args)
-  = ppHang (pPrim pe prim)
-	 4 (ppSep (map (ppr_arg pe) args))
+  = hang (pPrim pe prim)
+	 4 (sep (map (ppr_arg pe) args))
 
 ppr_expr pe expr@(Lam _ _)
   = let
 	(uvars, tyvars, vars, body) = collectBinders expr
     in
-    ppHang (ppCat [pp_vars SLIT("/u\\") (pUVar    pe) uvars,
+    hang (hsep [pp_vars SLIT("/u\\") (pUVar    pe) uvars,
 		   pp_vars SLIT("_/\\_")  (pTyVarB  pe) tyvars,
 		   pp_vars SLIT("\\")   (pMajBndr pe) vars])
 	 4 (ppr_expr pe body)
   where
-    pp_vars lam pp [] = ppNil
+    pp_vars lam pp [] = empty
     pp_vars lam pp vs
-      = ppCat [ppPStr lam, ppInterleave ppSP (map pp vs), ppPStr SLIT("->")]
+      = hsep [ptext lam, hsep (map pp vs), ptext SLIT("->")]
 
 ppr_expr pe expr@(App fun arg)
   = let
@@ -289,7 +295,7 @@ ppr_expr pe expr@(App fun arg)
 	go (App fun arg) args_so_far = go fun (arg:args_so_far)
 	go fun		 args_so_far = (fun, args_so_far)
     in
-    ppHang (ppr_parend_expr pe final_fun) 4 (ppSep (map (ppr_arg pe) final_args))
+    hang (ppr_parend_expr pe final_fun) 4 (sep (map (ppr_arg pe) final_args))
 
 ppr_expr pe (Case expr alts)
   | only_one_alt alts
@@ -297,12 +303,12 @@ ppr_expr pe (Case expr alts)
     -- and no indent; all sane persons agree with him.
   = let
 
-	ppr_alt (AlgAlts  [] (BindDefault n _)) = ppBeside (pMinBndr pe n) ppr_arrow
-	ppr_alt (PrimAlts [] (BindDefault n _)) = ppBeside (pMinBndr pe n) ppr_arrow
-	ppr_alt (PrimAlts ((l, _):[]) NoDefault)= ppBeside (pLit pe l)	   ppr_arrow
+	ppr_alt (AlgAlts  [] (BindDefault n _)) = (<>) (pMinBndr pe n) ppr_arrow
+	ppr_alt (PrimAlts [] (BindDefault n _)) = (<>) (pMinBndr pe n) ppr_arrow
+	ppr_alt (PrimAlts ((l, _):[]) NoDefault)= (<>) (pLit pe l)	   ppr_arrow
 	ppr_alt (AlgAlts  ((con, params, _):[]) NoDefault)
-	  = ppCat [pCon pe con,
-		   ppInterleave ppSP (map (pMinBndr pe) params),
+	  = hsep [pCon pe con,
+		   hsep (map (pMinBndr pe) params),
 		   ppr_arrow]
 
 	ppr_rhs (AlgAlts [] (BindDefault _ expr))   = ppr_expr pe expr
@@ -311,58 +317,58 @@ ppr_expr pe (Case expr alts)
 	ppr_rhs (PrimAlts ((_,expr):[]) NoDefault)  = ppr_expr pe expr
 
 
-        ppr_arrow = ppPStr SLIT(" ->")
+        ppr_arrow = ptext SLIT(" ->")
     in 
-    ppSep
-    [ppSep [pp_keyword, ppNest 4 (ppr_expr pe expr), ppStr "of {", ppr_alt alts],
-	    ppBeside (ppr_rhs alts) (ppStr ";}")]
+    sep
+    [sep [pp_keyword, nest 4 (ppr_expr pe expr), text "of {", ppr_alt alts],
+	    (<>) (ppr_rhs alts) (text ";}")]
 
   | otherwise -- default "case" printing
-  = ppSep
-    [ppSep [pp_keyword, ppNest 4 (ppr_expr pe expr), ppPStr SLIT("of {")],
-     ppNest 2 (ppr_alts pe alts),
-     ppStr "}"]
+  = sep
+    [sep [pp_keyword, nest 4 (ppr_expr pe expr), ptext SLIT("of {")],
+     nest 2 (ppr_alts pe alts),
+     text "}"]
   where
     pp_keyword = case alts of
-		  AlgAlts _ _  -> ppPStr SLIT("case")
-		  PrimAlts _ _ -> ppPStr SLIT("case#")
+		  AlgAlts _ _  -> ptext SLIT("case")
+		  PrimAlts _ _ -> ptext SLIT("case#")
 
 -- special cases: let ... in let ...
 -- ("disgusting" SLPJ)
 
 ppr_expr pe (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
-  = ppAboves [
-      ppCat [ppPStr SLIT("let {"), pMajBndr pe val_bdr, ppEquals],
-      ppNest 2 (ppr_expr pe rhs),
-      ppPStr SLIT("} in"),
+  = vcat [
+      hsep [ptext SLIT("let {"), pMajBndr pe val_bdr, equals],
+      nest 2 (ppr_expr pe rhs),
+      ptext SLIT("} in"),
       ppr_expr pe body ]
 
 ppr_expr pe (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
-  = ppAbove
-      (ppHang (ppPStr SLIT("let {"))
-	    2 (ppCat [ppHang (ppCat [pMajBndr pe val_bdr, ppEquals])
+  = ($$)
+      (hang (ptext SLIT("let {"))
+	    2 (hsep [hang (hsep [pMajBndr pe val_bdr, equals])
 			   4 (ppr_expr pe rhs),
-       ppPStr SLIT("} in")]))
+       ptext SLIT("} in")]))
       (ppr_expr pe expr)
 
 -- general case (recursive case, too)
 ppr_expr pe (Let bind expr)
-  = ppSep [ppHang (ppPStr keyword) 2 (ppr_bind pe bind),
-	   ppHang (ppPStr SLIT("} in ")) 2 (ppr_expr pe expr)]
+  = sep [hang (ptext keyword) 2 (ppr_bind pe bind),
+	   hang (ptext SLIT("} in ")) 2 (ppr_expr pe expr)]
   where
     keyword = case bind of
-		Rec _      -> SLIT("letrec {")
+		Rec _      -> SLIT("_letrec_ {")
 		NonRec _ _ -> SLIT("let {")
 
 ppr_expr pe (SCC cc expr)
-  = ppSep [ppCat [ppPStr SLIT("_scc_"), pSCC pe cc],
+  = sep [hsep [ptext SLIT("_scc_"), pSCC pe cc],
 	   ppr_parend_expr pe expr ]
 
 ppr_expr pe (Coerce c ty expr)
-  = ppSep [pp_coerce c, pTy pe ty, ppr_expr pe expr]
+  = sep [pp_coerce c, pTy pe ty, ppr_expr pe expr]
   where
-    pp_coerce (CoerceIn  v) = ppBeside (ppPStr SLIT("_coerce_in_ "))  (ppr (pStyle pe) v)
-    pp_coerce (CoerceOut v) = ppBeside (ppPStr SLIT("_coerce_out_ ")) (ppr (pStyle pe) v)
+    pp_coerce (CoerceIn  v) = (<>) (ptext SLIT("_coerce_in_ "))  (ppr (pStyle pe) v)
+    pp_coerce (CoerceOut v) = (<>) (ptext SLIT("_coerce_out_ ")) (ppr (pStyle pe) v)
 
 only_one_alt (AlgAlts []     (BindDefault _ _)) = True
 only_one_alt (AlgAlts (_:[])  NoDefault) 	= True
@@ -373,41 +379,41 @@ only_one_alt _					= False
 
 \begin{code}
 ppr_alts pe (AlgAlts alts deflt)
-  = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]
+  = vcat [ vcat (map ppr_alt alts), ppr_default pe deflt ]
   where
-    ppr_arrow = ppPStr SLIT("->")
+    ppr_arrow = ptext SLIT("->")
 
     ppr_alt (con, params, expr)
-      = ppHang (if isTupleCon con then
-		    ppCat [ppParens (ppInterleave ppComma (map (pMinBndr pe) params)),
-			   ppr_arrow]
+      = hang (if isTupleCon con then
+		    hsep [parens (hsep (punctuate comma (map (pMinBndr pe) params))),
+			  ppr_arrow]
 		else
-		    ppCat [pCon pe con,
-			   ppInterleave ppSP (map (pMinBndr pe) params),
+		    hsep [pCon pe con,
+			  hsep (map (pMinBndr pe) params),
 			   ppr_arrow]
 	       )
-	     4 (ppr_expr pe expr `ppBeside` ppSemi)
+	     4 (ppr_expr pe expr <> semi)
 
 ppr_alts pe (PrimAlts alts deflt)
-  = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]
+  = vcat [ vcat (map ppr_alt alts), ppr_default pe deflt ]
   where
     ppr_alt (lit, expr)
-      = ppHang (ppCat [pLit pe lit, ppPStr SLIT("->")])
-	     4 (ppr_expr pe expr `ppBeside` ppSemi)
+      = hang (hsep [pLit pe lit, ptext SLIT("->")])
+	     4 (ppr_expr pe expr <> semi)
 \end{code}
 
 \begin{code}
-ppr_default pe NoDefault = ppNil
+ppr_default pe NoDefault = empty
 
 ppr_default pe (BindDefault val_bdr expr)
-  = ppHang (ppCat [pMinBndr pe val_bdr, ppPStr SLIT("->")])
-	 4 (ppr_expr pe expr `ppBeside` ppSemi)
+  = hang (hsep [pMinBndr pe val_bdr, ptext SLIT("->")])
+	 4 (ppr_expr pe expr <> semi)
 \end{code}
 
 \begin{code}
 ppr_arg pe (LitArg   lit) = pLit pe lit
 ppr_arg pe (VarArg   v)	  = pOcc pe v
-ppr_arg pe (TyArg    ty)  = ppPStr SLIT("_@_ ") `ppBeside` pTy pe ty
+ppr_arg pe (TyArg    ty)  = ptext SLIT("_@_ ") <> pTy pe ty
 ppr_arg pe (UsageArg use) = pUse pe use
 \end{code}
 
@@ -416,30 +422,30 @@ and @pprCoreExpr@ functions.
 
 \begin{code}
 pprBigCoreBinder sty binder
-  = ppAboves [sig, pragmas, ppr sty binder]
+  = vcat [sig, pragmas, ppr sty binder]
   where
     sig = ifnotPprShowAll sty (
-	    ppHang (ppCat [ppr sty binder, ppDcolon])
+	    hang (hsep [ppr sty binder, ppDcolon])
 		 4 (ppr sty (idType binder)))
     pragmas =
 	ifnotPprForUser sty
 	 (ppIdInfo sty False{-no specs, thanks-} (getIdInfo binder))
 
 pprBabyCoreBinder sty binder
-  = ppCat [ppr sty binder, pp_strictness]
+  = hsep [ppr sty binder, pp_strictness]
   where
     pp_strictness
       = case (getIdStrictness binder) of
-	  NoStrictnessInfo    -> ppNil
-	  BottomGuaranteed    -> ppPStr SLIT("{- _!_ -}")
+	  NoStrictnessInfo    -> empty
+	  BottomGuaranteed    -> ptext SLIT("{- _!_ -}")
 	  StrictnessInfo xx _ ->
 		panic "PprCore:pp_strictness:StrictnessInfo:ToDo"
-		-- ppStr ("{- " ++ (showList xx "") ++ " -}")
+		-- text ("{- " ++ (showList xx "") ++ " -}")
 
 pprTypedCoreBinder sty binder
-  = ppBesides [ppr sty binder, ppDcolon, pprParendGenType sty (idType binder)]
+  = hcat [ppr sty binder, ppDcolon, pprParendGenType sty (idType binder)]
 
-ppDcolon = ppPStr SLIT(" :: ")
+ppDcolon = ptext SLIT(" :: ")
 		-- The space before the :: is important; it helps the lexer
 		-- when reading inferfaces.  Otherwise it would lex "a::b" as one thing.
 \end{code}

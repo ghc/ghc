@@ -19,8 +19,11 @@ module SMRep (
 
 IMP_Ubiq(){-uitous-}
 
-import Pretty		( ppStr )
+import Pretty		( text )
 import Util		( panic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 \end{code}
 
 %************************************************************************
@@ -218,7 +221,7 @@ instance Text SMRep where
 	   MuTupleRep _	            	 	 -> "MUTUPLE")
 
 instance Outputable SMRep where
-    ppr sty rep = ppStr (show rep)
+    ppr sty rep = text (show rep)
 
 getSMInfoStr :: SMRep -> String
 getSMInfoStr (StaticRep _ _)				= "STATIC"

@@ -13,7 +13,7 @@ module Name (
 
 	-- The OccName type
 	OccName(..),
-	pprOccName, pprSymOcc, pprNonSymOcc, occNameString, occNameFlavour, 
+	pprOccName, occNameString, occNameFlavour, 
 	isTvOcc, isTCOcc, isVarOcc, prefixOccName,
 	quoteInText, parenInCode,
 
@@ -27,8 +27,10 @@ module Name (
 	maybeWiredInIdName, maybeWiredInTyConName,
 	isWiredInName,
 
-	nameUnique, changeUnique, setNameProvenance, setNameVisibility,
-	nameOccName, nameString,
+	nameUnique, changeUnique, setNameProvenance, getNameProvenance,
+	setNameVisibility,
+	nameOccName, nameString, nameModule,
+
 	isExportedName,	nameSrcLoc,
 	isLocallyDefinedName,
 
@@ -37,7 +39,7 @@ module Name (
         pprNameProvenance,
 
 	-- Sets of Names
-	NameSet(..),
+	SYN_IE(NameSet),
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
 	minusNameSet, elemNameSet, nameSetToList, addListToNameSet, isEmptyNameSet,
 
@@ -49,13 +51,11 @@ module Name (
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
 	modAndOcc, isExported, 
-	getSrcLoc, isLocallyDefined, getOccString,
-
-	pprSym, pprNonSym
+	getSrcLoc, isLocallyDefined, getOccString
     ) where
 
 IMP_Ubiq()
-import TyLoop		( GenId, Id(..), TyCon )			-- Used inside Names
+import TyLoop		--( GenId, Id(..), TyCon )			-- Used inside Names
 import CStrings		( identToC, modnameToC, cSEP )
 import CmdLineOpts	( opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
@@ -65,11 +65,13 @@ import PrelMods		( gHC__ )
 import Pretty
 import Lex		( isLexSym, isLexConId )
 import SrcLoc		( noSrcLoc, SrcLoc )
+import Usage            ( SYN_IE(UVar), SYN_IE(Usage) )
 import Unique		( pprUnique, showUnique, Unique )
 import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, isEmptyUniqSet,
 		 	  unionManyUniqSets, minusUniqSet, mkUniqSet, elementOfUniqSet, addListToUniqSet )
-import UniqFM		( UniqFM )
-import Util		( cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
+import UniqFM		( UniqFM, SYN_IE(Uniquable) )
+import Util		--( cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
+
 \end{code}
 
 
@@ -89,14 +91,13 @@ data OccName  = VarOcc  FAST_STRING	-- Variables and data constructors
 moduleString :: Module -> String
 moduleString mod = _UNPK_ mod
 
-pprModule :: PprStyle -> Module -> Pretty
-pprModule sty m = ppPStr m
+pprModule :: PprStyle -> Module -> Doc
+pprModule sty m = ptext m
 
-pprOccName :: PprStyle -> OccName -> Pretty
-pprOccName PprDebug n = ppCat [ppPStr (occNameString n), ppBracket (ppStr (occNameFlavour n))]
+pprOccName :: PprStyle -> OccName -> Doc
 pprOccName sty      n = if codeStyle sty 
 			then identToC (occNameString n)
-			else ppPStr (occNameString n)
+			else ptext (occNameString n)
 
 occNameString :: OccName -> FAST_STRING
 occNameString (VarOcc s)  = s
@@ -161,19 +162,6 @@ parenInCode, quoteInText :: OccName -> Bool
 parenInCode occ = isLexSym (occNameString occ)
 
 quoteInText occ = not (isLexSym (occNameString occ))
-
--- print `vars`, (op) correctly
-pprSymOcc, pprNonSymOcc :: PprStyle -> OccName -> Pretty
-
-pprSymOcc sty var
-  = if quoteInText var
-    then ppQuote (pprOccName sty var)
-    else pprOccName sty var
-
-pprNonSymOcc sty var
-  = if parenInCode var
-    then ppParens (pprOccName sty var)
-    else pprOccName sty var
 \end{code}
 
 %************************************************************************
@@ -274,6 +262,10 @@ setNameProvenance :: Name -> Provenance -> Name		-- Implicit Globals only
 setNameProvenance (Global uniq mod occ def Implicit) prov = Global uniq mod occ def prov
 setNameProvenance other_name 			     prov = other_name
 
+getNameProvenance :: Name -> Provenance
+getNameProvenance (Global uniq mod occ def prov) = prov
+getNameProvenance (Local uniq occ locn) 	 = LocalDef NotExported locn
+
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached
 -- one in the thing it's the name of.  If you know what I mean.
@@ -314,6 +306,7 @@ all_toplev_ids_visible = not opt_OmitInterfacePragmas ||  -- Pragmas can make th
 nameUnique		:: Name -> Unique
 nameModAndOcc		:: Name -> (Module, OccName)	-- Globals only
 nameOccName		:: Name -> OccName 
+nameModule		:: Name -> Module
 nameString		:: Name -> FAST_STRING		-- A.b form
 nameSrcLoc		:: Name -> SrcLoc
 isLocallyDefinedName	:: Name -> Bool
@@ -328,6 +321,8 @@ nameUnique (Global u _ _ _ _) = u
 
 nameOccName (Local _ occ _)      = occ
 nameOccName (Global _ _ occ _ _) = occ
+
+nameModule (Global _ mod occ _ _) = mod
 
 nameModAndOcc (Global _ mod occ _ _) = (mod,occ)
 
@@ -414,37 +409,47 @@ instance NamedThing Name where
 
 \begin{code}
 instance Outputable Name where
+    ppr PprQuote name@(Local _ _ _) = quotes (ppr PprForUser name)
+    ppr PprForUser (Local _ n _)    = ptext (occNameString n)
+
     ppr sty (Local u n _) | codeStyle sty ||
 			    ifaceStyle sty = pprUnique u
-    ppr PprForUser (Local _ n _) = ppPStr (occNameString n)
-    ppr other_sty  (Local u n _) = ppBesides [ppPStr (occNameString n), ppPStr SLIT("_"), pprUnique u]
 
-    ppr sty name@(Global u m n _ _) = ppBesides [pp_name, pp_debug sty name]
-			       where
-				 pp_name | codeStyle sty = identToC qual_name
-				         | otherwise     = ppBesides[ ppPStr m, ppChar '.', ppPStr pk_n]
-		                 pk_n = occNameString n
-				 qual_name = m _APPEND_ SLIT(".") _APPEND_ pk_n
+    ppr sty  (Local u n _) = hcat [ptext (occNameString n), ptext SLIT("_"), pprUnique u]
 
-pp_debug PprDebug (Global uniq m n _ prov) = ppBesides [ppStr "{-", pprUnique uniq, ppChar ',', 
-						        pp_prov prov, ppStr "-}"]
+    ppr PprQuote name@(Global _ _ _ _ _) = quotes (ppr PprForUser name)
+
+    ppr sty name@(Global u m n _ _)
+	| codeStyle sty
+	= identToC (m _APPEND_ SLIT(".") _APPEND_ occNameString n)
+
+    ppr sty name@(Global u m n _ prov)
+	= hcat [pp_mod, ptext (occNameString n), pp_debug sty name]
+	where
+	  pp_mod = case prov of				--- Omit home module qualifier
+			LocalDef _ _ -> empty
+			other	     -> pprModule PprForUser m <> char '.'
+
+
+pp_debug PprDebug (Global uniq m n _ prov) = hcat [text "{-", pprUnique uniq, char ',', 
+						        pp_prov prov, text "-}"]
 					where
-						pp_prov (LocalDef Exported _)    = ppChar 'x'
-						pp_prov (LocalDef NotExported _) = ppChar 'l'
-						pp_prov (Imported _ _) = ppChar 'i'
-						pp_prov Implicit       = ppChar 'p'
-pp_debug other    name 		        = ppNil
+						pp_prov (LocalDef Exported _)    = char 'x'
+						pp_prov (LocalDef NotExported _) = char 'l'
+						pp_prov (Imported _ _) = char 'i'
+						pp_prov Implicit       = char 'p'
+pp_debug other    name 		        = empty
 
 -- pprNameProvenance is used in error messages to say where a name came from
-pprNameProvenance :: PprStyle -> Name -> Pretty
+pprNameProvenance :: PprStyle -> Name -> Doc
 pprNameProvenance sty (Local _ _ loc)       = pprProvenance sty (LocalDef NotExported loc)
 pprNameProvenance sty (Global _ _ _ _ prov) = pprProvenance sty prov
 
-pprProvenance :: PprStyle -> Provenance -> Pretty
+pprProvenance :: PprStyle -> Provenance -> Doc
 pprProvenance sty (Imported mod loc)
-  = ppSep [ppPStr SLIT("Imported from"), pprModule sty mod, ppPStr SLIT("at"), ppr sty loc]
+  = sep [ptext SLIT("Imported from"), pprModule sty mod, ptext SLIT("at"), ppr sty loc]
 pprProvenance sty (LocalDef _ loc) 
-  = ppSep [ppPStr SLIT("Defined at"), ppr sty loc]
+  = sep [ptext SLIT("Defined at"), ppr sty loc]
 pprProvenance sty Implicit
   = panic "pprNameProvenance: Implicit"
 \end{code}
@@ -499,17 +504,17 @@ class NamedThing a where
 
 \begin{code}
 modAndOcc	    :: NamedThing a => a -> (Module, OccName)
+getModule	    :: NamedThing a => a -> Module
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
 isLocallyDefined    :: NamedThing a => a -> Bool
 isExported	    :: NamedThing a => a -> Bool
 getOccString	    :: NamedThing a => a -> String
 
 modAndOcc	    = nameModAndOcc	   . getName
+getModule	    = nameModule	   . getName
 isExported	    = isExportedName 	   . getName
 getSrcLoc	    = nameSrcLoc	   . getName
 isLocallyDefined    = isLocallyDefinedName . getName
-pprSym sty	    = pprSymOcc sty        . getOccName
-pprNonSym sty	    = pprNonSymOcc sty     . getOccName
 getOccString x	    = _UNPK_ (occNameString (getOccName x))
 \end{code}
 

@@ -15,7 +15,7 @@ module PrelInfo (
 
 	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, compare_RDR, 
 	minBound_RDR, maxBound_RDR, enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, 
-	enumFromThenTo_RDR, fromEnum_RDR, toEnum_RDR,
+	enumFromThenTo_RDR, fromEnum_RDR, toEnum_RDR, ratioDataCon_RDR,
 	range_RDR, index_RDR, inRange_RDR, readsPrec_RDR, readList_RDR, 
 	showsPrec_RDR, showList_RDR, plus_RDR, times_RDR, ltTag_RDR, eqTag_RDR, gtTag_RDR, 
 	eqH_Char_RDR, ltH_Char_RDR, eqH_Word_RDR, ltH_Word_RDR, eqH_Addr_RDR, ltH_Addr_RDR, 
@@ -27,14 +27,18 @@ module PrelInfo (
 	numClass_RDR, fractionalClass_RDR, eqClass_RDR, ccallableClass_RDR, creturnableClass_RDR,
 	monadZeroClass_RDR, enumClass_RDR, evalClass_RDR, ordClass_RDR,
 
-	main_NAME, mainPrimIO_NAME, ioTyCon_NAME, primIoTyCon_NAME,
+	main_NAME, mainPrimIO_NAME, ioTyCon_NAME, primIoTyCon_NAME, allClass_NAME,
 
-	needsDataDeclCtxtClassKeys, cCallishClassKeys, isNoDictClass,
+	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, isNoDictClass,
 	isNumericClass, isStandardClass, isCcallishClass
     ) where
 
 IMP_Ubiq()
+#if __GLASGOW_HASKELL__ >= 202
+import IdUtils ( primOpName )
+#else
 IMPORT_DELOOPER(PrelLoop) ( primOpName )
+#endif
 -- IMPORT_DELOOPER(IdLoop)	  ( SpecEnv )
 
 -- friends:
@@ -56,7 +60,7 @@ import TyCon		( tyConDataCons, mkFunTyCon, TyCon )
 import Type
 import Bag
 import Unique		-- *Key stuff
-import UniqFM		( UniqFM, listToUFM ) 
+import UniqFM		( UniqFM, listToUFM, Uniquable(..) ) 
 import Util		( isIn )
 \end{code}
 
@@ -248,6 +252,7 @@ Ids, Synonyms, Classes and ClassOps with builtin keys.
 mkKnownKeyGlobal :: (RdrName, Unique) -> Name
 mkKnownKeyGlobal (Qual mod occ, uniq) = mkGlobalName uniq mod occ VanillaDefn Implicit
 
+allClass_NAME    = mkKnownKeyGlobal (allClass_RDR,   allClassKey)
 main_NAME	 = mkKnownKeyGlobal (main_RDR,	     mainKey)
 mainPrimIO_NAME  = mkKnownKeyGlobal (mainPrimIO_RDR, mainPrimIoKey)
 ioTyCon_NAME     = mkKnownKeyGlobal (ioTyCon_RDR,    iOTyConKey)
@@ -255,14 +260,18 @@ primIoTyCon_NAME = getName primIoTyCon
 
 knownKeyNames :: [Name]
 knownKeyNames
-  = [main_NAME, mainPrimIO_NAME, ioTyCon_NAME]
+  = [main_NAME, mainPrimIO_NAME, ioTyCon_NAME, allClass_NAME]
     ++
     map mkKnownKeyGlobal
     [
 	-- Type constructors (synonyms especially)
       (orderingTyCon_RDR,  orderingTyConKey)
     , (rationalTyCon_RDR,  rationalTyConKey)
+    , (ratioDataCon_RDR,   ratioDataConKey)
     , (ratioTyCon_RDR,     ratioTyConKey)
+    , (byteArrayTyCon_RDR, byteArrayTyConKey)
+    , (mutableByteArrayTyCon_RDR, mutableByteArrayTyConKey)
+
 
 	--  Classes.  *Must* include:
 	--  	classes that are grabbed by key (e.g., eqClassKey)
@@ -336,7 +345,12 @@ ioTyCon_RDR		= tcQual (iO_BASE,   SLIT("IO"))
 orderingTyCon_RDR	= tcQual (pREL_BASE, SLIT("Ordering"))
 rationalTyCon_RDR	= tcQual (pREL_NUM,  SLIT("Rational"))
 ratioTyCon_RDR		= tcQual (pREL_NUM,  SLIT("Ratio"))
+ratioDataCon_RDR	= varQual (pREL_NUM, SLIT(":%"))
 
+byteArrayTyCon_RDR		= tcQual (aRR_BASE,  SLIT("ByteArray"))
+mutableByteArrayTyCon_RDR	= tcQual (aRR_BASE,  SLIT("MutableByteArray"))
+
+allClass_RDR		= tcQual (gHC__,     SLIT("All"))
 eqClass_RDR		= tcQual (pREL_BASE, SLIT("Eq"))
 ordClass_RDR		= tcQual (pREL_BASE, SLIT("Ord"))
 evalClass_RDR 		= tcQual (pREL_BASE, SLIT("Eval"))
@@ -372,7 +386,7 @@ enumFromThenTo_RDR = varQual (pREL_BASE, SLIT("enumFromThenTo"))
 thenM_RDR	   = varQual (pREL_BASE, SLIT(">>="))
 returnM_RDR	   = varQual (pREL_BASE, SLIT("return"))
 zeroM_RDR	   = varQual (pREL_BASE, SLIT("zero"))
-fromRational_RDR   = varQual (pREL_NUM, SLIT("fromRational"))
+fromRational_RDR   = varQual (pREL_NUM,  SLIT("fromRational"))
 
 negate_RDR	   = varQual (pREL_BASE, SLIT("negate"))
 eq_RDR		   = varQual (pREL_BASE, SLIT("=="))
@@ -468,7 +482,9 @@ derivableClassKeys  = map fst deriving_occ_info
 
 deriving_occ_info
   = [ (eqClassKey, 	[intTyCon_RDR, and_RDR, not_RDR])
-    , (ordClassKey, 	[intTyCon_RDR, compose_RDR])
+    , (ordClassKey, 	[intTyCon_RDR, compose_RDR, eqTag_RDR])
+				-- EQ (from Ordering) is needed to force in the constructors
+				-- as well as the type constructor.
     , (enumClassKey, 	[intTyCon_RDR, map_RDR])
     , (evalClassKey,	[intTyCon_RDR])
     , (boundedClassKey,	[intTyCon_RDR])
@@ -513,6 +529,10 @@ needsDataDeclCtxtClassKeys -- see comments in TcDeriv
     ]
 
 cCallishClassKeys = [ cCallableClassKey, cReturnableClassKey ]
+
+	-- Renamer always imports these data decls replete with constructors
+	-- so that desugarer can always see the constructor.  Ugh!
+cCallishTyKeys = [ addrTyConKey, wordTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ]
 
 standardClassKeys
   = derivableClassKeys ++ numericClassKeys ++ cCallishClassKeys

@@ -87,8 +87,10 @@ module TysWiredIn (
 --import Kind
 
 IMP_Ubiq()
-IMPORT_DELOOPER(TyLoop)	( mkDataCon, mkTupleCon, StrictnessMark(..) )
-IMPORT_DELOOPER(IdLoop)	( SpecEnv )
+IMPORT_DELOOPER(TyLoop)	--( mkDataCon, mkTupleCon, StrictnessMark(..) )
+IMPORT_DELOOPER(IdLoop)	( SpecEnv, nullSpecEnv, 
+		          mkTupleCon, mkDataCon, 
+			  StrictnessMark(..) )
 
 -- friends:
 import PrelMods
@@ -96,9 +98,9 @@ import TysPrim
 
 -- others:
 import Kind		( mkBoxedTypeKind, mkArrowKind )
-import Name		( mkWiredInTyConName, mkWiredInIdName, mkTupNameStr )
+import Name		--( mkWiredInTyConName, mkWiredInIdName, mkTupNameStr )
 import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
-			  NewOrData(..), TyCon
+			  NewOrData(..), TyCon, SYN_IE(Arity)
 			)
 import Type		( mkTyConTy, applyTyCon, mkSigmaTy, mkTyVarTys, 
 			  mkFunTy, mkFunTys, maybeAppTyCon,
@@ -108,7 +110,7 @@ import Lex		( mkTupNameStr )
 import Unique
 import Util		( assoc, panic )
 
-nullSpecEnv =  error "TysWiredIn:nullSpecEnv =  "
+--nullSpecEnv =  error "TysWiredIn:nullSpecEnv =  "
 addOneToSpecEnv =  error "TysWiredIn:addOneToSpecEnv =  "
 pc_gen_specs = error "TysWiredIn:pc_gen_specs  "
 mkSpecInfo = error "TysWiredIn:SpecInfo"
@@ -147,12 +149,12 @@ pcDataCon key mod str tyvars context arg_tys tycon specenv
     data_con = mkDataCon name 
 		[ NotMarkedStrict | a <- arg_tys ]
 		[ {- no labelled fields -} ]
-		tyvars context arg_tys tycon
+		tyvars context [] [] arg_tys tycon
     name = mkWiredInIdName key mod str data_con
 
 pcGenerateDataSpecs :: Type -> SpecEnv
 pcGenerateDataSpecs ty
-  = pc_gen_specs False err err err ty
+  = pc_gen_specs --False err err err ty
   where
     err = panic "PrelUtils:GenerateDataSpecs"
 \end{code}
@@ -222,14 +224,14 @@ intDataCon = pcDataCon intDataConKey pREL_BASE SLIT("I#") [] [] [intPrimTy] intT
 wordTy = mkTyConTy wordTyCon
 
 wordTyCon = pcDataTyCon wordTyConKey   fOREIGN SLIT("Word") [] [wordDataCon]
-wordDataCon = pcDataCon wordDataConKey gHC__ SLIT("W#") [] [] [wordPrimTy] wordTyCon nullSpecEnv
+wordDataCon = pcDataCon wordDataConKey fOREIGN SLIT("W#") [] [] [wordPrimTy] wordTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
 addrTy = mkTyConTy addrTyCon
 
 addrTyCon = pcDataTyCon addrTyConKey   fOREIGN SLIT("Addr") [] [addrDataCon]
-addrDataCon = pcDataCon addrDataConKey gHC__ SLIT("A#") [] [] [addrPrimTy] addrTyCon nullSpecEnv
+addrDataCon = pcDataCon addrDataConKey fOREIGN SLIT("A#") [] [] [addrPrimTy] addrTyCon nullSpecEnv
 \end{code}
 
 \begin{code}

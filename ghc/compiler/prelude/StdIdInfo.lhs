@@ -23,7 +23,7 @@ IMP_Ubiq()
 import Type
 import CoreSyn
 import Literal
-import CoreUnfold	( mkUnfolding )
+import CoreUnfold	( mkUnfolding, PragmaInfo(..) )
 import TysWiredIn	( tupleCon )
 import Id		( GenId, mkTemplateLocals, idType,
 			  dataConStrictMarks, dataConFieldLabels, dataConArgTys,
@@ -31,7 +31,8 @@ import Id		( GenId, mkTemplateLocals, idType,
 			  StrictnessMark(..),
 			  isDataCon, isMethodSelId_maybe, isSuperDictSelId_maybe,
 			  isRecordSelector, isPrimitiveId_maybe, 
-			  addIdUnfolding, addIdArity
+			  addIdUnfolding, addIdArity,
+			  SYN_IE(Id)
 			)
 import IdInfo		( ArityInfo, exactArity )
 import Class		( GenClass, GenClassOp, classSig, classOpLocalType )
@@ -44,6 +45,9 @@ import Pretty
 import Util		( assertPanic, pprTrace, 
 			  assoc
 			)
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 \end{code}		
 
 
@@ -86,14 +90,16 @@ addStandardIdInfo con_id
   = con_id `addIdUnfolding` unfolding
 	   `addIdArity` exactArity (length locals)
   where
-        unfolding = mkUnfolding True {- Always inline constructors -} con_rhs
+        unfolding = mkUnfolding IWantToBeINLINEd {- Always inline constructors -} con_rhs
 
-	(tyvars,theta,arg_tys,tycon) = dataConSig con_id
-	dict_tys	     	     = [mkDictTy clas ty | (clas,ty) <- theta]
-	n_dicts	 	     	     = length dict_tys
-	result_ty		     = applyTyCon tycon (mkTyVarTys tyvars)
+	(tyvars, theta, con_tyvars, con_theta, arg_tys, tycon) = dataConSig con_id
 
-	locals        = mkTemplateLocals (dict_tys ++ arg_tys)
+	dict_tys     = [mkDictTy clas ty | (clas,ty) <- theta]
+	con_dict_tys = [mkDictTy clas ty | (clas,ty) <- con_theta]
+	n_dicts	     = length dict_tys
+	result_ty    = applyTyCon tycon (mkTyVarTys tyvars)
+
+	locals        = mkTemplateLocals (dict_tys ++ con_dict_tys ++ arg_tys)
 	data_args     = drop n_dicts locals
 	(data_arg1:_) = data_args		-- Used for newtype only
 	strict_marks  = dataConStrictMarks con_id
@@ -144,7 +150,7 @@ addStandardIdInfo sel_id
 	   `addIdArity` exactArity 1 
 	-- ToDo: consider adding further IdInfo
   where
-	unfolding = mkUnfolding False {- Don't inline every selector -} sel_rhs
+	unfolding = mkUnfolding NoPragmaInfo {- Don't inline every selector -} sel_rhs
 
 	(tyvars, theta, tau)  = splitSigmaTy (idType sel_id)
 	field_lbl	      = recordSelectorFieldLabel sel_id
@@ -169,7 +175,7 @@ addStandardIdInfo sel_id
 	    maybe_the_arg_id = assocMaybe (field_lbls `zip` arg_ids) field_lbl
 
 	error_expr = mkApp (Var pAT_ERROR_ID) [] [rhs_ty] [LitArg msg_lit]
- 	full_msg   = ppShow 80 (ppSep [ppStr "No match in record selector", ppr PprForUser sel_id]) 
+ 	full_msg   = show (sep [text "No match in record selector", ppr PprForUser sel_id]) 
 	msg_lit    = NoRepStr (_PK_ full_msg)
 \end{code}
 
@@ -189,7 +195,7 @@ addStandardIdInfo sel_id
     maybe_sc_sel_id    = isSuperDictSelId_maybe sel_id
     Just (cls, the_sc) = maybe_sc_sel_id
 
-    unfolding = mkUnfolding True {- Always inline selectors -} rhs
+    unfolding = mkUnfolding IWantToBeINLINEd {- Always inline selectors -} rhs
     rhs	      = mk_dict_selector [tyvar] dict_id arg_ids the_arg_id
 
     (tyvar, scs, ops)  = classSig cls
@@ -207,7 +213,7 @@ addStandardIdInfo sel_id
     maybe_meth_sel_id  = isMethodSelId_maybe sel_id
     Just (cls, the_op) = maybe_meth_sel_id
 
-    unfolding = mkUnfolding True {- Always inline selectors -} rhs
+    unfolding = mkUnfolding IWantToBeINLINEd {- Always inline selectors -} rhs
     rhs       = mk_dict_selector [tyvar] dict_id arg_ids the_arg_id
 
     (tyvar, scs, ops) = classSig cls
@@ -236,7 +242,7 @@ addStandardIdInfo prim_id
     maybe_prim_id = isPrimitiveId_maybe prim_id
     Just prim_op  = maybe_prim_id
 
-    unfolding = mkUnfolding True {- Always inline PrimOps -} rhs
+    unfolding = mkUnfolding IWantToBeINLINEd {- Always inline PrimOps -} rhs
 
     (tyvars, tau) = splitForAllTy (idType prim_id)
     (arg_tys, _)  = splitFunTy tau

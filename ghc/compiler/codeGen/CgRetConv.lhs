@@ -35,7 +35,8 @@ import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			)
 import CmdLineOpts	( opt_ReturnInRegsThreshold )
 import Id		( isDataCon, dataConRawArgTys,
-			  SYN_IE(DataCon), GenId{-instance Eq-}
+			  SYN_IE(DataCon), GenId{-instance Eq-},
+			  SYN_IE(Id)
 			)
 import Maybes		( catMaybes )
 import PprStyle		( PprStyle(..) )
@@ -47,9 +48,13 @@ import PrimOp		( primOpCanTriggerGC,
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import TyCon		( tyConDataCons, tyConFamilySize )
 import Type		( typePrimRep )
+import Pretty		( Doc )
 import Util		( zipWithEqual, mapAccumL, isn'tIn,
 			  pprError, pprTrace, panic, assertPanic
 			)
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
 \end{code}
 
 %************************************************************************

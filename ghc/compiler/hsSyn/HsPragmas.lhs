@@ -53,16 +53,16 @@ noClassOpPragmas = NoClassOpPragmas
 isNoClassOpPragmas NoClassOpPragmas = True
 
 instance Outputable name => Outputable (ClassPragmas name) where
-    ppr sty NoClassPragmas = ppNil
+    ppr sty NoClassPragmas = empty
 
 instance Outputable name => Outputable (ClassOpPragmas name) where
-    ppr sty NoClassOpPragmas = ppNil
+    ppr sty NoClassOpPragmas = empty
 
 instance Outputable name => Outputable (InstancePragmas name) where
-    ppr sty NoInstancePragmas = ppNil
+    ppr sty NoInstancePragmas = empty
 
 instance Outputable name => Outputable (GenPragmas name) where
-    ppr sty NoGenPragmas = ppNil
+    ppr sty NoGenPragmas = empty
 \end{code}
 
 ========================= OLD CODE SCEDULED FOR DELETION SLPJ Nov 96 ==============
@@ -171,69 +171,69 @@ isNoInstancePragmas _                 = False
 Some instances for printing (just for debugging, really)
 \begin{code}
 instance Outputable name => Outputable (ClassPragmas name) where
-    ppr sty NoClassPragmas = ppNil
+    ppr sty NoClassPragmas = empty
     ppr sty (SuperDictPragmas sdsel_prags)
-      = ppAbove (ppPStr SLIT("{-superdict pragmas-}"))
+      = ($$) (ptext SLIT("{-superdict pragmas-}"))
 		(ppr sty sdsel_prags)
 
 instance Outputable name => Outputable (ClassOpPragmas name) where
-    ppr sty NoClassOpPragmas = ppNil
+    ppr sty NoClassOpPragmas = empty
     ppr sty (ClassOpPragmas op_prags defm_prags)
-      = ppAbove (ppCat [ppPStr SLIT("{-meth-}"), ppr sty op_prags])
-		(ppCat [ppPStr SLIT("{-defm-}"), ppr sty defm_prags])
+      = ($$) (hsep [ptext SLIT("{-meth-}"), ppr sty op_prags])
+		(hsep [ptext SLIT("{-defm-}"), ppr sty defm_prags])
 
 instance Outputable name => Outputable (InstancePragmas name) where
-    ppr sty NoInstancePragmas = ppNil
+    ppr sty NoInstancePragmas = empty
     ppr sty (SimpleInstancePragma dfun_pragmas)
-      = ppCat [ppPStr SLIT("{-dfun-}"), ppr sty dfun_pragmas]
+      = hsep [ptext SLIT("{-dfun-}"), ppr sty dfun_pragmas]
     ppr sty (ConstantInstancePragma dfun_pragmas name_pragma_pairs)
-      = ppAbove (ppCat [ppPStr SLIT("{-constm-}"), ppr sty dfun_pragmas])
-	    	(ppAboves (map pp_pair name_pragma_pairs))
+      = ($$) (hsep [ptext SLIT("{-constm-}"), ppr sty dfun_pragmas])
+	    	(vcat (map pp_pair name_pragma_pairs))
       where
 	pp_pair (n, prags)
-	  = ppCat [ppr sty n, ppEquals, ppr sty prags]
+	  = hsep [ppr sty n, equals, ppr sty prags]
 
     ppr sty (SpecialisedInstancePragma dfun_pragmas spec_pragma_info)
-      = ppAbove (ppCat [ppPStr SLIT("{-spec'd-}"), ppr sty dfun_pragmas])
-	    	(ppAboves (map pp_info spec_pragma_info))
+      = ($$) (hsep [ptext SLIT("{-spec'd-}"), ppr sty dfun_pragmas])
+	    	(vcat (map pp_info spec_pragma_info))
       where
 	pp_info (ty_maybes, num_dicts, prags)
-	  = ppBesides [ppLbrack, ppInterleave ppSP (map pp_ty ty_maybes), ppRbrack,
-		       ppLparen, ppInt num_dicts, ppRparen, ppEquals, ppr sty prags]
-	pp_ty Nothing = ppPStr SLIT("_N_")
+	  = hcat [brackets (hsep (map pp_ty ty_maybes)),
+		       parens (int num_dicts), equals, ppr sty prags]
+	pp_ty Nothing = ptext SLIT("_N_")
 	pp_ty (Just t)= ppr sty t
 
 instance Outputable name => Outputable (GenPragmas name) where
-    ppr sty NoGenPragmas = ppNil
+    ppr sty NoGenPragmas = empty
     ppr sty (GenPragmas arity_maybe upd_maybe def strictness unfolding specs)
-      = ppCat [pp_arity arity_maybe, pp_upd upd_maybe, -- ToDo: print def?
+      = hsep [pp_arity arity_maybe, pp_upd upd_maybe, -- ToDo: print def?
 	       pp_str strictness, pp_unf unfolding,
 	       pp_specs specs]
       where
-    	pp_arity Nothing  = ppNil
-	pp_arity (Just i) = ppBeside (ppPStr SLIT("ARITY=")) (ppInt i)
+    	pp_arity Nothing  = empty
+	pp_arity (Just i) = (<>) (ptext SLIT("ARITY=")) (int i)
 
-	pp_upd Nothing  = ppNil
+	pp_upd Nothing  = empty
 	pp_upd (Just u) = ppUpdateInfo sty u
 
-	pp_str NoImpStrictness = ppNil
+	pp_str NoImpStrictness = empty
 	pp_str (ImpStrictness is_bot demands wrkr_prags)
-	  = ppBesides [ppPStr SLIT("IS_BOT="), ppr sty is_bot,
-		       ppPStr SLIT("STRICTNESS="), ppStr (showList demands ""),
-		       ppPStr SLIT(" {"), ppr sty wrkr_prags, ppChar '}']
+	  = hcat [ptext SLIT("IS_BOT="), ppr sty is_bot,
+		       ptext SLIT("STRICTNESS="), text (showList demands ""),
+		       ptext SLIT(" {"), ppr sty wrkr_prags, char '}']
 
-	pp_unf NoImpUnfolding = ppPStr SLIT("NO_UNFOLDING")
-	pp_unf (ImpMagicUnfolding m) = ppBeside (ppPStr SLIT("MAGIC=")) (ppPStr m)
-	pp_unf (ImpUnfolding g core) = ppBeside (ppPStr SLIT("UNFOLD=")) (ppr sty core)
+	pp_unf NoImpUnfolding = ptext SLIT("NO_UNFOLDING")
+	pp_unf (ImpMagicUnfolding m) = (<>) (ptext SLIT("MAGIC=")) (ptext m)
+	pp_unf (ImpUnfolding g core) = (<>) (ptext SLIT("UNFOLD=")) (ppr sty core)
 
-	pp_specs [] = ppNil
+	pp_specs [] = empty
 	pp_specs specs
-	  = ppBesides [ppPStr SLIT("SPECS=["), ppInterleave ppSP (map pp_spec specs), ppChar ']']
+	  = hcat [ptext SLIT("SPECS=["), hsep (map pp_spec specs), char ']']
 	  where
 	    pp_spec (ty_maybes, num_dicts, gprags)
-	      = ppCat [ppLbrack, ppInterleave ppSP (map pp_MaB ty_maybes), ppRbrack, ppInt num_dicts, ppr sty gprags]
+	      = hsep [brackets (hsep (map pp_MaB ty_maybes)), int num_dicts, ppr sty gprags]
 
-	    pp_MaB Nothing  = ppPStr SLIT("_N_")
+	    pp_MaB Nothing  = ptext SLIT("_N_")
 	    pp_MaB (Just x) = ppr sty x
 \end{code}
 

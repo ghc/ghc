@@ -51,7 +51,15 @@ module RegAllocInfo (
 	freeRegSet
     ) where
 
+#if __GLASGOW_HASKELL__ >= 202
+import qualified GlaExts (Addr(..))
+import GlaExts hiding (Addr(..))
+import FastString
+import Ubiq
+#else
 IMP_Ubiq(){-uitous-}
+import Pretty ( Doc )
+#endif
 IMPORT_1_3(List(partition))
 
 import MachMisc
@@ -66,7 +74,6 @@ import OrdList		( mkUnitList, OrdList )
 import PrimRep		( PrimRep(..) )
 import Stix		( StixTree, CodeSegment )
 import UniqSet		-- quite a bit of it
-import Unpretty		( uppShow )
 \end{code}
 
 %************************************************************************
@@ -533,7 +540,7 @@ regLiveness instr info@(RL live future@(FL all env))
 	lookup lbl
 	  = case (lookupFM env lbl) of
 	    Just rs -> rs
-	    Nothing -> trace ("Missing " ++ (uppShow 80 (pprCLabel_asm lbl)) ++
+	    Nothing -> trace ("Missing " ++ (show (pprCLabel_asm lbl)) ++
 			      " in future?") emptyRegSet
     in
     case instr of -- the rest is machine-specific...

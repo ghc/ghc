@@ -1,0 +1,5 @@
+_interface_ PrimOp 1
+_exports_
+PrimOp PrimOp;
+_declarations_
+1 data PrimOp;

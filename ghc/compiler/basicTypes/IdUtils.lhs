@@ -17,9 +17,9 @@ import CoreUnfold	( UnfoldingGuidance(..), Unfolding, mkUnfolding )
 import Id		( mkPrimitiveId, mkTemplateLocals )
 import IdInfo		-- quite a few things
 import StdIdInfo
-import Name		( mkWiredInIdName )
+import Name		( mkWiredInIdName, Name )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
-			  PrimOpInfo(..), PrimOpResultInfo(..) )
+			  PrimOpInfo(..), PrimOpResultInfo(..), PrimOp )
 import PrelMods		( gHC__ )
 import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyVarTy, applyTyCon )
 import TysWiredIn	( boolTy )

@@ -22,7 +22,11 @@ IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(AbsCLoop)		-- break its dependence on ClosureInfo
 IMPORT_1_3(IO(Handle))
 IMPORT_1_3(Char(isDigit,isPrint))
+#if __GLASGOW_HASKELL__ == 201
 IMPORT_1_3(GHCbase(Addr(..)) ) -- to see innards
+#elif __GLASGOW_HASKELL__ >= 202
+import GlaExts (Addr(..))
+#endif
 
 import AbsCSyn
 
@@ -43,7 +47,7 @@ import HeapOffs		( isZeroOff, subOff, pprHeapOffset )
 import Literal		( showLiteral, Literal(..) )
 import Maybes		( maybeToBool, catMaybes )
 import PprStyle		( PprStyle(..) )
-import Pretty		( prettyToUn )
+import Pretty
 import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..) )
 import PrimRep		( isFloatingRep, showPrimRep, PrimRep(..) )
 import SMRep		( getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr,
@@ -53,7 +57,7 @@ import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, SYN_IE(UniqSet)
 			)
-import Unpretty		-- ********** NOTE **********
+import Outputable	( printDoc )
 import Util		( nOfThem, panic, assertPanic )
 
 infixr 9 `thenTE`
@@ -66,35 +70,27 @@ call to a cost evaluation function @GRAN_EXEC@. For that,
 
 \begin{code}
 writeRealC :: Handle -> AbstractC -> IO ()
-
-writeRealC handle absC
-  = uppPutStr handle 80 (
-      uppAbove (pprAbsC PprForC absC (costs absC)) (uppChar '\n')
-    )
+writeRealC handle absC = printDoc LeftMode handle (pprAbsC PprForC absC (costs absC))
 
 dumpRealC :: AbstractC -> String
-
-dumpRealC absC
-  = uppShow 80 (
-      uppAbove (pprAbsC PprForC absC (costs absC)) (uppChar '\n')
-    )
+dumpRealC absC = show (pprAbsC PprForC absC (costs absC))
 \end{code}
 
 This emits the macro,  which is used in GrAnSim  to compute the total costs
 from a cost 5 tuple. %%  HWL
 
 \begin{code}
-emitMacro :: CostRes -> Unpretty
+emitMacro :: CostRes -> Doc
 
 -- ToDo: Check a compile time flag to decide whether a macro should be emitted
 emitMacro (Cost (i,b,l,s,f))
-  = uppBesides [ uppPStr SLIT("GRAN_EXEC"), uppChar '(',
-                          uppInt i, uppComma, uppInt b, uppComma, uppInt l, uppComma,
-	                  uppInt s, uppComma, uppInt f, pp_paren_semi ]
+  = hcat [ ptext SLIT("GRAN_EXEC"), char '(',
+                          int i, comma, int b, comma, int l, comma,
+	                  int s, comma, int f, pp_paren_semi ]
 \end{code}
 
 \begin{code}
-pp_paren_semi = uppStr ");"
+pp_paren_semi = text ");"
 
 -- ---------------------------------------------------------------------------
 -- New type: Now pprAbsC also takes the costs for evaluating the Abstract C
@@ -102,10 +98,10 @@ pp_paren_semi = uppStr ");"
 -- which must be done before the return i.e. inside absC code)   HWL
 -- ---------------------------------------------------------------------------
 
-pprAbsC :: PprStyle -> AbstractC -> CostRes -> Unpretty
+pprAbsC :: PprStyle -> AbstractC -> CostRes -> Doc
 
-pprAbsC sty AbsCNop _ = uppNil
-pprAbsC sty (AbsCStmts s1 s2) c = uppAbove (pprAbsC sty s1 c) (pprAbsC sty s2 c)
+pprAbsC sty AbsCNop _ = empty
+pprAbsC sty (AbsCStmts s1 s2) c = ($$) (pprAbsC sty s1 c) (pprAbsC sty s2 c)
 
 pprAbsC sty (CClosureUpdInfo info) c
   = pprAbsC sty info c
@@ -113,27 +109,27 @@ pprAbsC sty (CClosureUpdInfo info) c
 pprAbsC sty (CAssign dest src) _ = pprAssign sty (getAmodeRep dest) dest src
 
 pprAbsC sty (CJump target) c
-  = uppAbove (uppBesides [emitMacro c {-WDP:, uppStr "/* <--++  CJump */"-} ])
-	     (uppBesides [ uppStr jmp_lit, pprAmode sty target, pp_paren_semi ])
+  = ($$) (hcat [emitMacro c {-WDP:, text "/* <--++  CJump */"-} ])
+	     (hcat [ text jmp_lit, pprAmode sty target, pp_paren_semi ])
 
 pprAbsC sty (CFallThrough target) c
-  = uppAbove (uppBesides [emitMacro c {-WDP:, uppStr "/* <--++  CFallThrough */"-} ])
-	     (uppBesides [ uppStr jmp_lit, pprAmode sty target, pp_paren_semi ])
+  = ($$) (hcat [emitMacro c {-WDP:, text "/* <--++  CFallThrough */"-} ])
+	     (hcat [ text jmp_lit, pprAmode sty target, pp_paren_semi ])
 
 -- --------------------------------------------------------------------------
 -- Spit out GRAN_EXEC macro immediately before the return                 HWL
 
 pprAbsC sty (CReturn am return_info)  c
-  = uppAbove (uppBesides [emitMacro c {-WDP:, uppStr "/* <----  CReturn */"-} ])
-	     (uppBesides [uppStr jmp_lit, target, pp_paren_semi ])
+  = ($$) (hcat [emitMacro c {-WDP:, text "/* <----  CReturn */"-} ])
+	     (hcat [text jmp_lit, target, pp_paren_semi ])
   where
    target = case return_info of
-    	DirectReturn -> uppBesides [uppPStr SLIT("DIRECT"),uppChar '(', pprAmode sty am, uppRparen]
+    	DirectReturn -> hcat [ptext SLIT("DIRECT"),char '(', pprAmode sty am, rparen]
 	DynamicVectoredReturn am' -> mk_vector (pprAmode sty am')
-	StaticVectoredReturn n -> mk_vector (uppInt n)	-- Always positive
-   mk_vector x = uppBesides [uppLparen, pprAmode sty am, uppStr ")[RVREL(", x, uppStr ")]"]
+	StaticVectoredReturn n -> mk_vector (int n)	-- Always positive
+   mk_vector x = hcat [parens (pprAmode sty am), brackets (text "RVREL" <> parens x)]
 
-pprAbsC sty (CSplitMarker) _ = uppPStr SLIT("/* SPLIT */")
+pprAbsC sty (CSplitMarker) _ = ptext SLIT("/* SPLIT */")
 
 -- we optimise various degenerate cases of CSwitches.
 
@@ -172,25 +168,25 @@ pprAbsC sty (CSwitch discrim alts deflt) c -- general case
   | isFloatingRep (getAmodeRep discrim)
     = pprAbsC sty (foldr ( \ a -> CSwitch discrim [a]) deflt alts) c
   | otherwise
-    = uppAboves [
-	uppBesides [uppStr "switch (", pp_discrim, uppStr ") {"],
-	uppNest 2 (uppAboves (map (ppr_alt sty) alts)),
+    = vcat [
+	hcat [text "switch (", pp_discrim, text ") {"],
+	nest 2 (vcat (map (ppr_alt sty) alts)),
 	(case (nonemptyAbsC deflt) of
-	   Nothing -> uppNil
+	   Nothing -> empty
 	   Just dc ->
-	    uppNest 2 (uppAboves [uppPStr SLIT("default:"),
+	    nest 2 (vcat [ptext SLIT("default:"),
 				  pprAbsC sty dc (c + switch_head_cost
 						    + costs dc),
-				  uppPStr SLIT("break;")])),
-	uppChar '}' ]
+				  ptext SLIT("break;")])),
+	char '}' ]
   where
     pp_discrim
       = pprAmode sty discrim
 
     ppr_alt sty (lit, absC)
-      = uppAboves [ uppBesides [uppPStr SLIT("case "), pprBasicLit sty lit, uppChar ':'],
-		   uppNest 2 (uppAbove (pprAbsC sty absC (c + switch_head_cost + costs absC))
-				       (uppPStr SLIT("break;"))) ]
+      = vcat [ hcat [ptext SLIT("case "), pprBasicLit sty lit, char ':'],
+		   nest 2 (($$) (pprAbsC sty absC (c + switch_head_cost + costs absC))
+				       (ptext SLIT("break;"))) ]
 
     -- Costs for addressing header of switch and cond. branching        -- HWL
     switch_head_cost = addrModeCosts discrim Rhs + (Cost (0, 1, 0, 0, 0))
@@ -212,7 +208,7 @@ pprAbsC sty stmt@(COpStmt results op args liveness_mask vol_regs) _
     in
     case (ppr_vol_regs sty vol_regs) of { (pp_saves, pp_restores) ->
     if primOpNeedsWrapper op then
-    	uppAboves [  pp_saves,
+    	vcat [  pp_saves,
     	    	    the_op,
     	    	    pp_restores
     	    	 ]
@@ -221,10 +217,10 @@ pprAbsC sty stmt@(COpStmt results op args liveness_mask vol_regs) _
     }
   where
     ppr_op_call results args
-      = uppBesides [ prettyToUn (pprPrimOp sty op), uppLparen,
-	uppIntersperse uppComma (map ppr_op_result results),
-	if null results || null args then uppNil else uppComma,
-	uppIntersperse uppComma (map (pprAmode sty) args),
+      = hcat [ pprPrimOp sty op, lparen,
+	hcat (punctuate comma (map ppr_op_result results)),
+	if null results || null args then empty else comma,
+	hcat (punctuate comma (map (pprAmode sty) args)),
 	pp_paren_semi ]
 
     ppr_op_result r = ppr_amode sty r
@@ -232,78 +228,78 @@ pprAbsC sty stmt@(COpStmt results op args liveness_mask vol_regs) _
       -- hence we can toss the provided cast...
 
 pprAbsC sty (CSimultaneous abs_c) c
-  = uppBesides [uppPStr SLIT("{{"), pprAbsC sty abs_c c, uppPStr SLIT("}}")]
+  = hcat [ptext SLIT("{{"), pprAbsC sty abs_c c, ptext SLIT("}}")]
 
 pprAbsC sty stmt@(CMacroStmt macro as) _
-  = uppBesides [uppStr (show macro), uppLparen,
-	uppIntersperse uppComma (map (ppr_amode sty) as),pp_paren_semi] -- no casting
+  = hcat [text (show macro), lparen,
+	hcat (punctuate comma (map (ppr_amode sty) as)),pp_paren_semi] -- no casting
 pprAbsC sty stmt@(CCallProfCtrMacro op as) _
-  = uppBesides [uppPStr op, uppLparen,
-	uppIntersperse uppComma (map (ppr_amode sty) as),pp_paren_semi]
+  = hcat [ptext op, lparen,
+	hcat (punctuate comma (map (ppr_amode sty) as)),pp_paren_semi]
 pprAbsC sty stmt@(CCallProfCCMacro op as) _
-  = uppBesides [uppPStr op, uppLparen,
-	uppIntersperse uppComma (map (ppr_amode sty) as),pp_paren_semi]
+  = hcat [ptext op, lparen,
+	hcat (punctuate comma (map (ppr_amode sty) as)),pp_paren_semi]
 
 pprAbsC sty (CCodeBlock label abs_C) _
   = ASSERT( maybeToBool(nonemptyAbsC abs_C) )
     case (pprTempAndExternDecls abs_C) of { (pp_temps, pp_exts) ->
-    uppAboves [
-	uppBesides [uppStr (if (externallyVisibleCLabel label)
+    vcat [
+	hcat [text (if (externallyVisibleCLabel label)
 			  then "FN_("	-- abbreviations to save on output
 			  else "IFN_("),
-		   pprCLabel sty label, uppStr ") {"],
+		   pprCLabel sty label, text ") {"],
 	case sty of
-	  PprForC -> uppAbove pp_exts pp_temps
-	  _ -> uppNil,
-	uppNest 8 (uppPStr SLIT("FB_")),
-	uppNest 8 (pprAbsC sty abs_C (costs abs_C)),
-	uppNest 8 (uppPStr SLIT("FE_")),
-	uppChar '}' ]
+	  PprForC -> ($$) pp_exts pp_temps
+	  _ -> empty,
+	nest 8 (ptext SLIT("FB_")),
+	nest 8 (pprAbsC sty abs_C (costs abs_C)),
+	nest 8 (ptext SLIT("FE_")),
+	char '}' ]
     }
 
 pprAbsC sty (CInitHdr cl_info reg_rel cost_centre inplace_upd) _
-  = uppBesides [ pp_init_hdr, uppStr "_HDR(",
-		ppr_amode sty (CAddr reg_rel), uppComma,
-		pprCLabel sty info_lbl, uppComma,
-		if_profiling sty (pprAmode sty cost_centre), uppComma,
-		pprHeapOffset sty size, uppComma, uppInt ptr_wds, pp_paren_semi ]
+  = hcat [ pp_init_hdr, text "_HDR(",
+		ppr_amode sty (CAddr reg_rel), comma,
+		pprCLabel sty info_lbl, comma,
+		if_profiling sty (pprAmode sty cost_centre), comma,
+		pprHeapOffset sty size, comma, int ptr_wds, pp_paren_semi ]
   where
     info_lbl	= infoTableLabelFromCI cl_info
     sm_rep	= closureSMRep	   cl_info
     size	= closureSizeWithoutFixedHdr cl_info
     ptr_wds	= closurePtrsSize  cl_info
 
-    pp_init_hdr = uppStr (if inplace_upd then
+    pp_init_hdr = text (if inplace_upd then
 			    getSMUpdInplaceHdrStr sm_rep
 		  	else
 			    getSMInitHdrStr sm_rep)
 
 pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
   = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
-    uppAboves [
+    vcat [
 	case sty of
 	  PprForC -> pp_exts
-	  _ -> uppNil,
-	uppBesides [
-		uppPStr SLIT("SET_STATIC_HDR"),uppChar '(',
-		pprCLabel sty closure_lbl,			uppComma,
-		pprCLabel sty info_lbl,				uppComma,
-		if_profiling sty (pprAmode sty cost_centre),	uppComma,
-		ppLocalness closure_lbl,			uppComma,
+	  _ -> empty,
+	hcat [
+		ptext SLIT("SET_STATIC_HDR"),char '(',
+		pprCLabel sty closure_lbl,			comma,
+		pprCLabel sty info_lbl,				comma,
+		if_profiling sty (pprAmode sty cost_centre),	comma,
+		ppLocalness closure_lbl,			comma,
 		ppLocalnessMacro False{-for data-} info_lbl,
-		uppChar ')'
+		char ')'
 		],
-	uppNest 2 (uppBesides (map (ppr_item sty) amodes)),
-	uppNest 2 (uppBesides (map (ppr_item sty) padding_wds)),
-	uppPStr SLIT("};") ]
+	nest 2 (hcat (map (ppr_item sty) amodes)),
+	nest 2 (hcat (map (ppr_item sty) padding_wds)),
+	ptext SLIT("};") ]
     }
   where
     info_lbl = infoTableLabelFromCI cl_info
 
     ppr_item sty item
       = if getAmodeRep item == VoidRep
-	then uppStr ", (W_) 0" -- might not even need this...
-	else uppBeside (uppStr ", (W_)") (ppr_amode sty item)
+	then text ", (W_) 0" -- might not even need this...
+	else (<>) (text ", (W_)") (ppr_amode sty item)
 
     padding_wds =
 	if not (closureUpdReqd cl_info) then
@@ -325,41 +321,41 @@ pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 -}
 
 pprAbsC sty stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liveness) _
-  = uppAboves [
-	uppBesides [
+  = vcat [
+	hcat [
 	    pp_info_rep,
-	    uppPStr SLIT("_ITBL"),uppChar '(',
-	    pprCLabel sty info_lbl,			uppComma,
+	    ptext SLIT("_ITBL"),char '(',
+	    pprCLabel sty info_lbl,			comma,
 
 		-- CONST_ITBL needs an extra label for
 		-- the static version of the object.
 	    if isConstantRep sm_rep
-	    then uppBeside (pprCLabel sty (closureLabelFromCI cl_info)) uppComma
-	    else uppNil,
+	    then (<>) (pprCLabel sty (closureLabelFromCI cl_info)) comma
+	    else empty,
 
-	    pprCLabel sty slow_lbl,	uppComma,
-    	    pprAmode sty upd,		uppComma,
-	    uppInt liveness,		uppComma,
+	    pprCLabel sty slow_lbl,	comma,
+    	    pprAmode sty upd,		comma,
+	    int liveness,		comma,
 
-	    pp_tag,			uppComma,
-	    pp_size, 			uppComma,
-	    pp_ptr_wds,			uppComma,
+	    pp_tag,			comma,
+	    pp_size, 			comma,
+	    pp_ptr_wds,			comma,
 
-	    ppLocalness info_lbl,				uppComma,
-	    ppLocalnessMacro True{-function-} slow_lbl,		uppComma,
+	    ppLocalness info_lbl,				comma,
+	    ppLocalnessMacro True{-function-} slow_lbl,		comma,
 
 	    if is_selector
-	    then uppBeside (uppInt select_word_i) uppComma
-	    else uppNil,
+	    then (<>) (int select_word_i) comma
+	    else empty,
 
-	    if_profiling sty pp_kind, uppComma,
-	    if_profiling sty pp_descr, uppComma,
+	    if_profiling sty pp_kind, comma,
+	    if_profiling sty pp_descr, comma,
 	    if_profiling sty pp_type,
-	    uppStr ");"
+	    text ");"
 	],
 	pp_slow,
 	case maybe_fast of
-	    Nothing -> uppNil
+	    Nothing -> empty
 	    Just fast -> let stuff = CCodeBlock fast_lbl fast in
 			 pprAbsC sty stuff (costs stuff)
     ]
@@ -370,7 +366,7 @@ pprAbsC sty stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liven
 
     (slow_lbl, pp_slow)
       = case (nonemptyAbsC slow) of
-	  Nothing -> (mkErrorStdEntryLabel, uppNil)
+	  Nothing -> (mkErrorStdEntryLabel, empty)
 	  Just xx -> (entryLabelFromCI cl_info,
 		       let stuff = CCodeBlock slow_lbl xx in
 		       pprAbsC sty stuff (costs stuff))
@@ -380,77 +376,77 @@ pprAbsC sty stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liven
     (Just (_, select_word_i)) = maybe_selector
 
     pp_info_rep	    -- special stuff if it's a selector; otherwise, just the SMrep
-      = uppStr (if is_selector then "SELECT" else (getSMInfoStr sm_rep))
+      = text (if is_selector then "SELECT" else (getSMInfoStr sm_rep))
 
-    pp_tag = uppInt (closureSemiTag cl_info)
+    pp_tag = int (closureSemiTag cl_info)
 
     is_phantom = isPhantomRep sm_rep
 
     pp_size = if isSpecRep sm_rep then	-- exploiting: SPEC_VHS == 0 (always)
-		 uppInt (closureNonHdrSize cl_info)
+		 int (closureNonHdrSize cl_info)
 
 	      else if is_phantom then	-- do not have sizes for these
-		 uppNil
+		 empty
 	      else
 		 pprHeapOffset sty (closureSizeWithoutFixedHdr cl_info)
 
     pp_ptr_wds	= if is_phantom then
-		     uppNil
+		     empty
 		  else
-		     uppInt (closurePtrsSize cl_info)
+		     int (closurePtrsSize cl_info)
 
-    pp_kind  = uppStr (closureKind cl_info)
-    pp_descr = uppBesides [uppChar '"', uppStr (stringToC cl_descr), uppChar '"']
-    pp_type  = uppBesides [uppChar '"', uppStr (stringToC (closureTypeDescr cl_info)), uppChar '"']
+    pp_kind  = text (closureKind cl_info)
+    pp_descr = hcat [char '"', text (stringToC cl_descr), char '"']
+    pp_type  = hcat [char '"', text (stringToC (closureTypeDescr cl_info)), char '"']
 
 pprAbsC sty (CRetVector lbl maybes deflt) c
-  = uppAboves [ uppPStr SLIT("{ // CRetVector (lbl????)"),
-	       uppNest 8 (uppSep (map (ppr_maybe_amode sty) maybes)),
-	       uppStr "} /*default=*/ {", pprAbsC sty deflt c,
-	       uppChar '}']
+  = vcat [ ptext SLIT("{ // CRetVector (lbl????)"),
+	       nest 8 (sep (map (ppr_maybe_amode sty) maybes)),
+	       text "} /*default=*/ {", pprAbsC sty deflt c,
+	       char '}']
   where
-    ppr_maybe_amode sty Nothing  = uppPStr SLIT("/*default*/")
+    ppr_maybe_amode sty Nothing  = ptext SLIT("/*default*/")
     ppr_maybe_amode sty (Just a) = pprAmode sty a
 
 pprAbsC sty stmt@(CRetUnVector label amode) _
-  = uppBesides [uppPStr SLIT("UNVECTBL"),uppChar '(', pp_static, uppComma, pprCLabel sty label, uppComma,
-	    pprAmode sty amode, uppRparen]
+  = hcat [ptext SLIT("UNVECTBL"),char '(', pp_static, comma, pprCLabel sty label, comma,
+	    pprAmode sty amode, rparen]
   where
-    pp_static = if externallyVisibleCLabel label then uppNil else uppPStr SLIT("static")
+    pp_static = if externallyVisibleCLabel label then empty else ptext SLIT("static")
 
 pprAbsC sty stmt@(CFlatRetVector label amodes) _
   =	case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
-	uppAboves [
+	vcat [
 	    case sty of
 	      PprForC -> pp_exts
-	      _ -> uppNil,
-	    uppBesides [ppLocalness label, uppPStr SLIT(" W_ "),
-    	    	       pprCLabel sty label, uppStr "[] = {"],
-	    uppNest 2 (uppInterleave uppComma (map (ppr_item sty) amodes)),
-	    uppStr "};" ] }
+	      _ -> empty,
+	    hcat [ppLocalness label, ptext SLIT(" W_ "),
+    	    	       pprCLabel sty label, text "[] = {"],
+	    nest 2 (sep (punctuate comma (map (ppr_item sty) amodes))),
+	    text "};" ] }
   where
-    ppr_item sty item = uppBeside (uppStr "(W_) ") (ppr_amode sty item)
+    ppr_item sty item = (<>) (text "(W_) ") (ppr_amode sty item)
 
 pprAbsC sty (CCostCentreDecl is_local cc) _ = uppCostCentreDecl sty is_local cc
 \end{code}
 
 \begin{code}
 ppLocalness label
-  = uppBeside static const
+  = (<>) static const
   where
-    static = if (externallyVisibleCLabel label) then uppNil else uppPStr SLIT("static ")
-    const  = if not (isReadOnly label)	        then uppNil else uppPStr SLIT("const")
+    static = if (externallyVisibleCLabel label) then empty else ptext SLIT("static ")
+    const  = if not (isReadOnly label)	        then empty else ptext SLIT("const")
 
 ppLocalnessMacro for_fun{-vs data-} clabel
-  = uppBesides [ uppChar (if externallyVisibleCLabel clabel then 'E' else 'I'),
+  = hcat [ char (if externallyVisibleCLabel clabel then 'E' else 'I'),
                  if for_fun then 
-                    uppPStr SLIT("F_") 
+                    ptext SLIT("F_") 
                  else 
-                    uppBeside (uppPStr SLIT("D_"))
+                    (<>) (ptext SLIT("D_"))
                               (if isReadOnly clabel then 
-			          uppPStr SLIT("RO_") 
+			          ptext SLIT("RO_") 
 			       else 
-			          uppNil)]
+			          empty)]
 \end{code}
 
 \begin{code}
@@ -466,9 +462,9 @@ non_void amode
 \end{code}
 
 \begin{code}
-ppr_vol_regs :: PprStyle -> [MagicId] -> (Unpretty, Unpretty)
+ppr_vol_regs :: PprStyle -> [MagicId] -> (Doc, Doc)
 
-ppr_vol_regs sty [] = (uppNil, uppNil)
+ppr_vol_regs sty [] = (empty, empty)
 ppr_vol_regs sty (VoidReg:rs) = ppr_vol_regs sty rs
 ppr_vol_regs sty (r:rs)
   = let pp_reg = case r of
@@ -476,8 +472,8 @@ ppr_vol_regs sty (r:rs)
     	    	    _ -> pprMagicId sty r
 	(more_saves, more_restores) = ppr_vol_regs sty rs
     in
-    (uppAbove (uppBeside (uppPStr SLIT("CALLER_SAVE_"))    pp_reg) more_saves,
-     uppAbove (uppBeside (uppPStr SLIT("CALLER_RESTORE_")) pp_reg) more_restores)
+    (($$) ((<>) (ptext SLIT("CALLER_SAVE_"))    pp_reg) more_saves,
+     ($$) ((<>) (ptext SLIT("CALLER_RESTORE_")) pp_reg) more_restores)
 
 -- pp_basic_{saves,restores}: The BaseReg, SpA, SuA, SpB, SuB, Hp and
 -- HpLim (see StgRegs.lh) may need to be saved/restored around CCalls,
@@ -485,30 +481,30 @@ ppr_vol_regs sty (r:rs)
 -- other registers.)  Just be *sure* BaseReg is OK before trying to do
 -- anything else.
 pp_basic_saves
-  = uppAboves [
-	uppPStr SLIT("CALLER_SAVE_Base"),
-	uppPStr SLIT("CALLER_SAVE_SpA"),
-	uppPStr SLIT("CALLER_SAVE_SuA"),
-	uppPStr SLIT("CALLER_SAVE_SpB"),
-	uppPStr SLIT("CALLER_SAVE_SuB"),
-	uppPStr SLIT("CALLER_SAVE_Ret"),
---	uppPStr SLIT("CALLER_SAVE_Activity"),
-	uppPStr SLIT("CALLER_SAVE_Hp"),
-	uppPStr SLIT("CALLER_SAVE_HpLim") ]
+  = vcat [
+	ptext SLIT("CALLER_SAVE_Base"),
+	ptext SLIT("CALLER_SAVE_SpA"),
+	ptext SLIT("CALLER_SAVE_SuA"),
+	ptext SLIT("CALLER_SAVE_SpB"),
+	ptext SLIT("CALLER_SAVE_SuB"),
+	ptext SLIT("CALLER_SAVE_Ret"),
+--	ptext SLIT("CALLER_SAVE_Activity"),
+	ptext SLIT("CALLER_SAVE_Hp"),
+	ptext SLIT("CALLER_SAVE_HpLim") ]
 
 pp_basic_restores
-  = uppAboves [
-	uppPStr SLIT("CALLER_RESTORE_Base"), -- must be first!
-	uppPStr SLIT("CALLER_RESTORE_SpA"),
-	uppPStr SLIT("CALLER_RESTORE_SuA"),
-	uppPStr SLIT("CALLER_RESTORE_SpB"),
-	uppPStr SLIT("CALLER_RESTORE_SuB"),
-	uppPStr SLIT("CALLER_RESTORE_Ret"),
---	uppPStr SLIT("CALLER_RESTORE_Activity"),
-	uppPStr SLIT("CALLER_RESTORE_Hp"),
-	uppPStr SLIT("CALLER_RESTORE_HpLim"),
-	uppPStr SLIT("CALLER_RESTORE_StdUpdRetVec"),
-	uppPStr SLIT("CALLER_RESTORE_StkStub") ]
+  = vcat [
+	ptext SLIT("CALLER_RESTORE_Base"), -- must be first!
+	ptext SLIT("CALLER_RESTORE_SpA"),
+	ptext SLIT("CALLER_RESTORE_SuA"),
+	ptext SLIT("CALLER_RESTORE_SpB"),
+	ptext SLIT("CALLER_RESTORE_SuB"),
+	ptext SLIT("CALLER_RESTORE_Ret"),
+--	ptext SLIT("CALLER_RESTORE_Activity"),
+	ptext SLIT("CALLER_RESTORE_Hp"),
+	ptext SLIT("CALLER_RESTORE_HpLim"),
+	ptext SLIT("CALLER_RESTORE_StdUpdRetVec"),
+	ptext SLIT("CALLER_RESTORE_StkStub") ]
 \end{code}
 
 \begin{code}
@@ -516,7 +512,7 @@ if_profiling sty pretty
   = case sty of
       PprForC -> if  opt_SccProfilingOn
 		 then pretty
-		 else uppChar '0' -- leave it out!
+		 else char '0' -- leave it out!
 
       _ -> {-print it anyway-} pretty
 
@@ -535,8 +531,8 @@ do_if_stmt sty discrim tag alt_code deflt c
 				      deflt alt_code
 				      (addrModeCosts discrim Rhs) c
       other              -> let
-			       cond = uppBesides [ pprAmode sty discrim,
-					  uppPStr SLIT(" == "),
+			       cond = hcat [ pprAmode sty discrim,
+					  ptext SLIT(" == "),
 					  pprAmode sty (CLit tag) ]
 			    in
 			    ppr_if_stmt sty cond
@@ -544,16 +540,16 @@ do_if_stmt sty discrim tag alt_code deflt c
 					 (addrModeCosts discrim Rhs) c
 
 ppr_if_stmt sty pp_pred then_part else_part discrim_costs c
-  = uppAboves [
-      uppBesides [uppStr "if (", pp_pred, uppStr ") {"],
-      uppNest 8 (pprAbsC sty then_part 	(c + discrim_costs +
+  = vcat [
+      hcat [text "if (", pp_pred, text ") {"],
+      nest 8 (pprAbsC sty then_part 	(c + discrim_costs +
 				       	(Cost (0, 2, 0, 0, 0)) +
 					costs then_part)),
-      (case nonemptyAbsC else_part of Nothing -> uppNil; Just _ -> uppStr "} else {"),
-      uppNest 8 (pprAbsC sty else_part  (c + discrim_costs +
+      (case nonemptyAbsC else_part of Nothing -> empty; Just _ -> text "} else {"),
+      nest 8 (pprAbsC sty else_part  (c + discrim_costs +
 					(Cost (0, 1, 0, 0, 0)) +
 					costs else_part)),
-      uppChar '}' ]
+      char '}' ]
     {- Total costs = inherited costs (before if) + costs for accessing discrim
 		     + costs for cond branch ( = (0, 1, 0, 0, 0) )
 		     + costs for that alternative
@@ -617,27 +613,27 @@ Amendment to the above: if we can GC, we have to:
 \begin{code}
 pprCCall sty op@(CCallOp op_str is_asm may_gc _ _) args results liveness_mask vol_regs
   = if (may_gc && liveness_mask /= noLiveRegsMask)
-    then panic ("Live register in _casm_GC_ \"" ++ casm_str ++ "\" " ++ (uppShow 80 (uppCat pp_non_void_args)) ++ "\n")
+    then panic ("Live register in _casm_GC_ \"" ++ casm_str ++ "\" " ++ (show (hsep pp_non_void_args)) ++ "\n")
     else
-    uppAboves [
-      uppChar '{',
+    vcat [
+      char '{',
       declare_local_vars,   -- local var for *result*
-      uppAboves local_arg_decls,
-      -- if is_asm then uppNil else declareExtern,
+      vcat local_arg_decls,
+      -- if is_asm then empty else declareExtern,
       pp_save_context,
       process_casm local_vars pp_non_void_args casm_str,
       pp_restore_context,
       assign_results,
-      uppChar '}'
+      char '}'
     ]
   where
     (pp_saves, pp_restores) = ppr_vol_regs sty vol_regs
     (pp_save_context, pp_restore_context) =
 	if may_gc
-	then (	uppStr "extern StgInt inCCallGC; SaveAllStgRegs(); inCCallGC++;",
-		uppStr "inCCallGC--; RestoreAllStgRegs();")
-	else (	pp_basic_saves `uppAbove` pp_saves,
-		pp_basic_restores `uppAbove` pp_restores)
+	then (	text "extern StgInt inCCallGC; SaveAllStgRegs(); inCCallGC++;",
+		text "inCCallGC--; RestoreAllStgRegs();")
+	else (	pp_basic_saves $$ pp_saves,
+		pp_basic_restores $$ pp_restores)
 
     non_void_args =
 	let nvas = tail args
@@ -663,17 +659,17 @@ pprCCall sty op@(CCallOp op_str is_asm may_gc _ _) args results liveness_mask vo
 
     -- Remainder only used for ccall
 
-    ccall_str = uppShow 80
-	(uppBesides [
+    ccall_str = show
+	(hcat [
 		if null non_void_results
-		  then uppNil
-		  else uppStr "%r = ",
-		uppLparen, uppPStr op_str, uppLparen,
-		  uppIntersperse uppComma ccall_args,
-		uppStr "));"
+		  then empty
+		  else text "%r = ",
+		lparen, ptext op_str, lparen,
+		  hcat (punctuate comma ccall_args),
+		text "));"
 	])
     num_args = length non_void_args
-    ccall_args = take num_args [ uppBeside (uppChar '%') (uppInt i) | i <- [0..] ]
+    ccall_args = take num_args [ (<>) (char '%') (int i) | i <- [0..] ]
 \end{code}
 
 If the argument is a heap object, we need to reach inside and pull out
@@ -681,7 +677,7 @@ the bit the C world wants to see.  The only heap objects which can be
 passed are @Array@s, @ByteArray@s and @ForeignObj@s.
 
 \begin{code}
-ppr_casm_arg :: PprStyle -> CAddrMode -> Int -> (Unpretty, Unpretty)
+ppr_casm_arg :: PprStyle -> CAddrMode -> Int -> (Doc, Doc)
     -- (a) decl and assignment, (b) local var to be used later
 
 ppr_casm_arg sty amode a_num
@@ -690,7 +686,7 @@ ppr_casm_arg sty amode a_num
 	pp_amode = pprAmode sty amode
 	pp_kind  = pprPrimKind sty a_kind
 
-	local_var  = uppBeside (uppPStr SLIT("_ccall_arg")) (uppInt a_num)
+	local_var  = (<>) (ptext SLIT("_ccall_arg")) (int a_num)
 
 	(arg_type, pp_amode2)
 	  = case a_kind of
@@ -698,18 +694,18 @@ ppr_casm_arg sty amode a_num
 	      -- for array arguments, pass a pointer to the body of the array
 	      -- (PTRS_ARR_CTS skips over all the header nonsense)
 	      ArrayRep	    -> (pp_kind,
-				uppBesides [uppPStr SLIT("PTRS_ARR_CTS"),uppChar '(', pp_amode, uppRparen])
+				hcat [ptext SLIT("PTRS_ARR_CTS"),char '(', pp_amode, rparen])
 	      ByteArrayRep -> (pp_kind,
-				uppBesides [uppPStr SLIT("BYTE_ARR_CTS"),uppChar '(', pp_amode, uppRparen])
+				hcat [ptext SLIT("BYTE_ARR_CTS"),char '(', pp_amode, rparen])
 
 	      -- for ForeignObj, use FOREIGN_OBJ_DATA to fish out the contents.
-	      ForeignObjRep -> (uppPStr SLIT("StgForeignObj"),
-				uppBesides [uppPStr SLIT("ForeignObj_CLOSURE_DATA"),uppChar '(', 
-					    pp_amode, uppChar ')'])
+	      ForeignObjRep -> (ptext SLIT("StgForeignObj"),
+				hcat [ptext SLIT("ForeignObj_CLOSURE_DATA"),char '(', 
+					    pp_amode, char ')'])
 	      other	    -> (pp_kind, pp_amode)
 
 	declare_local_var
-	  = uppBesides [ arg_type, uppSP, local_var, uppEquals, pp_amode2, uppSemi ]
+	  = hcat [ arg_type, space, local_var, equals, pp_amode2, semi ]
     in
     (declare_local_var, local_var)
 \end{code}
@@ -729,21 +725,21 @@ For l-values, the critical questions are:
 ppr_casm_results ::
 	PprStyle	-- style
 	-> [CAddrMode]	-- list of results (length <= 1)
-	-> Unpretty	-- liveness mask
+	-> Doc	-- liveness mask
 	->
-	( Unpretty,	-- declaration of any local vars
-	  [Unpretty],	-- list of result vars (same length as results)
-	  Unpretty )	-- assignment (if any) of results in local var to registers
+	( Doc,	-- declaration of any local vars
+	  [Doc],	-- list of result vars (same length as results)
+	  Doc )	-- assignment (if any) of results in local var to registers
 
 ppr_casm_results sty [] liveness
-  = (uppNil, [], uppNil) 	-- no results
+  = (empty, [], empty) 	-- no results
 
 ppr_casm_results sty [r] liveness
   = let
 	result_reg = ppr_amode sty r
 	r_kind	   = getAmodeRep r
 
-	local_var  = uppPStr SLIT("_ccall_result")
+	local_var  = ptext SLIT("_ccall_result")
 
 	(result_type, assign_result)
 	  = case r_kind of
@@ -756,18 +752,18 @@ ppr_casm_results sty [r] liveness
    with makeForeignObj#.
 
 	      ForeignObjRep ->
-		(uppPStr SLIT("StgForeignObj"),
-		 uppBesides [ uppPStr SLIT("constructForeignObj"),uppChar '(',
-				liveness, uppComma,
-				result_reg, uppComma,
+		(ptext SLIT("StgForeignObj"),
+		 hcat [ ptext SLIT("constructForeignObj"),char '(',
+				liveness, comma,
+				result_reg, comma,
 				local_var,
 			     pp_paren_semi ]) 
 -}
 	      _ ->
 		(pprPrimKind sty r_kind,
-		 uppBesides [ result_reg, uppEquals, local_var, uppSemi ])
+		 hcat [ result_reg, equals, local_var, semi ])
 
-	declare_local_var = uppBesides [ result_type, uppSP, local_var, uppSemi ]
+	declare_local_var = hcat [ result_type, space, local_var, semi ]
     in
     (declare_local_var, [local_var], assign_result)
 
@@ -784,15 +780,15 @@ ToDo: Any chance of giving line numbers when process-casm fails?
 
 \begin{code}
 process_casm ::
-	[Unpretty]		-- results (length <= 1)
-	-> [Unpretty]		-- arguments
+	[Doc]		-- results (length <= 1)
+	-> [Doc]		-- arguments
 	-> String		-- format string (with embedded %'s)
 	->
-	Unpretty			-- code being generated
+	Doc			-- code being generated
 
 process_casm results args string = process results args string
  where
-  process []    _ "" = uppNil
+  process []    _ "" = empty
   process (_:_) _ "" = error ("process_casm: non-void result not assigned while processing _casm_ \"" ++ string ++ "\"\n(Try changing result type to PrimIO ()\n")
 
   process ress args ('%':cs)
@@ -801,12 +797,12 @@ process_casm results args string = process results args string
 	    error ("process_casm: lonely % while processing _casm_ \"" ++ string ++ "\".\n")
 
 	('%':css) ->
-	    uppBeside (uppChar '%') (process ress args css)
+	    (<>) (char '%') (process ress args css)
 
 	('r':css)  ->
 	  case ress of
 	    []  -> error ("process_casm: no result to match %r while processing _casm_ \"" ++ string ++ "\".\nTry deleting %r or changing result type from PrimIO ()\n")
-	    [r] -> uppBeside r (process [] args css)
+	    [r] -> (<>) r (process [] args css)
 	    _   -> panic ("process_casm: casm with many results while processing _casm_ \"" ++ string ++ "\".\n")
 
 	other ->
@@ -817,13 +813,13 @@ process_casm results args string = process results args string
 	  case (read_int other) of
 	    [(num,css)] ->
 		  if 0 <= num && num < length args
-		  then uppBeside (uppParens (args !! num))
+		  then (<>) (parens (args !! num))
 				 (process ress args css)
 		    else error ("process_casm: no such arg #:"++(show num)++" while processing \"" ++ string ++ "\".\n")
 	    _ -> error ("process_casm: not %<num> while processing _casm_ \"" ++ string ++ "\".\n")
 
   process ress args (other_c:cs)
-    = uppBeside (uppChar other_c) (process ress args cs)
+    = (<>) (char other_c) (process ress args cs)
 \end{code}
 
 %************************************************************************
@@ -840,19 +836,19 @@ of the source addressing mode.)  If the kind of the assignment is of
 @VoidRep@, then don't generate any code at all.
 
 \begin{code}
-pprAssign :: PprStyle -> PrimRep -> CAddrMode -> CAddrMode -> Unpretty
+pprAssign :: PprStyle -> PrimRep -> CAddrMode -> CAddrMode -> Doc
 
-pprAssign sty VoidRep dest src = uppNil
+pprAssign sty VoidRep dest src = empty
 \end{code}
 
 Special treatment for floats and doubles, to avoid unwanted conversions.
 
 \begin{code}
 pprAssign sty FloatRep dest@(CVal reg_rel _) src
-  = uppBesides [ uppPStr SLIT("ASSIGN_FLT"),uppChar '(', ppr_amode sty (CAddr reg_rel), uppComma, pprAmode sty src, pp_paren_semi ]
+  = hcat [ ptext SLIT("ASSIGN_FLT"),char '(', ppr_amode sty (CAddr reg_rel), comma, pprAmode sty src, pp_paren_semi ]
 
 pprAssign sty DoubleRep dest@(CVal reg_rel _) src
-  = uppBesides [ uppPStr SLIT("ASSIGN_DBL"),uppChar '(', ppr_amode sty (CAddr reg_rel), uppComma, pprAmode sty src, pp_paren_semi ]
+  = hcat [ ptext SLIT("ASSIGN_DBL"),char '(', ppr_amode sty (CAddr reg_rel), comma, pprAmode sty src, pp_paren_semi ]
 \end{code}
 
 Lastly, the question is: will the C compiler think the types of the
@@ -868,33 +864,33 @@ of fixed type.
 
 \begin{code}
 pprAssign sty kind (CReg (VanillaReg _ dest)) (CReg (VanillaReg _ src))
-  = uppBesides [ pprVanillaReg dest, uppEquals,
-		pprVanillaReg src, uppSemi ]
+  = hcat [ pprVanillaReg dest, equals,
+		pprVanillaReg src, semi ]
 
 pprAssign sty kind dest src
   | mixedTypeLocn dest
     -- Add in a cast to StgWord (a.k.a. W_) iff the destination is mixed
-  = uppBesides [ ppr_amode sty dest, uppEquals,
-		uppStr "(W_)(",	-- Here is the cast
+  = hcat [ ppr_amode sty dest, equals,
+		text "(W_)(",	-- Here is the cast
 		ppr_amode sty src, pp_paren_semi ]
 
 pprAssign sty kind dest src
   | mixedPtrLocn dest && getAmodeRep src /= PtrRep
     -- Add in a cast to StgPtr (a.k.a. P_) iff the destination is mixed
-  = uppBesides [ ppr_amode sty dest, uppEquals,
-		uppStr "(P_)(",	-- Here is the cast
+  = hcat [ ppr_amode sty dest, equals,
+		text "(P_)(",	-- Here is the cast
 		ppr_amode sty src, pp_paren_semi ]
 
 pprAssign sty ByteArrayRep dest src
   | mixedPtrLocn src
     -- Add in a cast to StgPtr (a.k.a. B_) iff the source is mixed
-  = uppBesides [ ppr_amode sty dest, uppEquals,
-		uppStr "(B_)(",	-- Here is the cast
+  = hcat [ ppr_amode sty dest, equals,
+		text "(B_)(",	-- Here is the cast
 		ppr_amode sty src, pp_paren_semi ]
 
 pprAssign sty kind other_dest src
-  = uppBesides [ ppr_amode sty other_dest, uppEquals,
-		pprAmode  sty src, uppSemi ]
+  = hcat [ ppr_amode sty other_dest, equals,
+		pprAmode  sty src, semi ]
 \end{code}
 
 
@@ -909,7 +905,7 @@ pprAssign sty kind other_dest src
 @pprAmode@.
 
 \begin{code}
-pprAmode, ppr_amode :: PprStyle -> CAddrMode -> Unpretty
+pprAmode, ppr_amode :: PprStyle -> CAddrMode -> Doc
 \end{code}
 
 For reasons discussed above under assignments, @CVal@ modes need
@@ -921,9 +917,9 @@ question.)
 
 \begin{code}
 pprAmode sty (CVal reg_rel FloatRep)
-  = uppBesides [ uppStr "PK_FLT(", ppr_amode sty (CAddr reg_rel), uppRparen ]
+  = hcat [ text "PK_FLT(", ppr_amode sty (CAddr reg_rel), rparen ]
 pprAmode sty (CVal reg_rel DoubleRep)
-  = uppBesides [ uppStr "PK_DBL(", ppr_amode sty (CAddr reg_rel), uppRparen ]
+  = hcat [ text "PK_DBL(", ppr_amode sty (CAddr reg_rel), rparen ]
 \end{code}
 
 Next comes the case where there is some other cast need, and the
@@ -932,7 +928,7 @@ no-cast case:
 \begin{code}
 pprAmode sty amode
   | mixedTypeLocn amode
-  = uppParens (uppBesides [ pprPrimKind sty (getAmodeRep amode), uppPStr SLIT(")("),
+  = parens (hcat [ pprPrimKind sty (getAmodeRep amode), ptext SLIT(")("),
 		ppr_amode sty amode ])
   | otherwise	-- No cast needed
   = ppr_amode sty amode
@@ -943,56 +939,56 @@ Now the rest of the cases for ``workhorse'' @ppr_amode@:
 \begin{code}
 ppr_amode sty (CVal reg_rel _)
   = case (pprRegRelative sty False{-no sign wanted-} reg_rel) of
-	(pp_reg, Nothing)     -> uppBeside  (uppChar '*') pp_reg
-	(pp_reg, Just offset) -> uppBesides [ pp_reg, uppBracket offset ]
+	(pp_reg, Nothing)     -> (<>)  (char '*') pp_reg
+	(pp_reg, Just offset) -> hcat [ pp_reg, brackets offset ]
 
 ppr_amode sty (CAddr reg_rel)
   = case (pprRegRelative sty True{-sign wanted-} reg_rel) of
 	(pp_reg, Nothing)     -> pp_reg
-	(pp_reg, Just offset) -> uppBeside pp_reg offset
+	(pp_reg, Just offset) -> (<>) pp_reg offset
 
 ppr_amode sty (CReg magic_id) = pprMagicId sty magic_id
 
-ppr_amode sty (CTemp uniq kind) = prettyToUn (pprUnique uniq)
+ppr_amode sty (CTemp uniq kind) = pprUnique uniq
 
 ppr_amode sty (CLbl label kind) = pprCLabel sty label
 
 ppr_amode sty (CUnVecLbl direct vectored)
-  = uppBesides [uppChar '(',uppPStr SLIT("StgRetAddr"),uppChar ')', uppPStr SLIT("UNVEC"),uppChar '(', pprCLabel sty direct, uppComma,
-	       pprCLabel sty vectored, uppRparen]
+  = hcat [char '(',ptext SLIT("StgRetAddr"),char ')', ptext SLIT("UNVEC"),char '(', pprCLabel sty direct, comma,
+	       pprCLabel sty vectored, rparen]
 
-ppr_amode sty (CCharLike char)
-  = uppBesides [uppPStr SLIT("CHARLIKE_CLOSURE"),uppChar '(', pprAmode sty char, uppRparen ]
+ppr_amode sty (CCharLike ch)
+  = hcat [ptext SLIT("CHARLIKE_CLOSURE"), char '(', pprAmode sty ch, rparen ]
 ppr_amode sty (CIntLike int)
-  = uppBesides [uppPStr SLIT("INTLIKE_CLOSURE"),uppChar '(', pprAmode sty int, uppRparen ]
+  = hcat [ptext SLIT("INTLIKE_CLOSURE"), char '(', pprAmode sty int, rparen ]
 
-ppr_amode sty (CString str) = uppBesides [uppChar '"', uppStr (stringToC (_UNPK_ str)), uppChar '"']
+ppr_amode sty (CString str) = hcat [char '"', text (stringToC (_UNPK_ str)), char '"']
   -- ToDo: are these *used* for anything?
 
 ppr_amode sty (CLit lit) = pprBasicLit sty lit
 
-ppr_amode sty (CLitLit str _) = uppPStr str
+ppr_amode sty (CLitLit str _) = ptext str
 
 ppr_amode sty (COffset off) = pprHeapOffset sty off
 
 ppr_amode sty (CCode abs_C)
-  = uppAboves [ uppPStr SLIT("{ -- CCode"), uppNest 8 (pprAbsC sty abs_C (costs abs_C)), uppChar '}' ]
+  = vcat [ ptext SLIT("{ -- CCode"), nest 8 (pprAbsC sty abs_C (costs abs_C)), char '}' ]
 
 ppr_amode sty (CLabelledCode label abs_C)
-  = uppAboves [ uppBesides [pprCLabel sty label, uppPStr SLIT(" = { -- CLabelledCode")],
-	       uppNest 8 (pprAbsC sty abs_C (costs abs_C)), uppChar '}' ]
+  = vcat [ hcat [pprCLabel sty label, ptext SLIT(" = { -- CLabelledCode")],
+	       nest 8 (pprAbsC sty abs_C (costs abs_C)), char '}' ]
 
 ppr_amode sty (CJoinPoint _ _)
   = panic "ppr_amode: CJoinPoint"
 
 ppr_amode sty (CTableEntry base index kind)
-  = uppBesides [uppStr "((", pprPrimKind sty kind, uppStr " *)(",
-	       ppr_amode sty base, uppStr "))[(I_)(", ppr_amode sty index,
-    	       uppPStr SLIT(")]")]
+  = hcat [text "((", pprPrimKind sty kind, text " *)(",
+	       ppr_amode sty base, text "))[(I_)(", ppr_amode sty index,
+    	       ptext SLIT(")]")]
 
 ppr_amode sty (CMacroExpr pk macro as)
-  = uppBesides [uppLparen, pprPrimKind sty pk, uppStr ")(", uppStr (show macro), uppLparen,
-	       uppIntersperse uppComma (map (pprAmode sty) as), uppStr "))"]
+  = hcat [lparen, pprPrimKind sty pk, text ")(", text (show macro), lparen,
+	       hcat (punctuate comma (map (pprAmode sty) as)), text "))"]
 
 ppr_amode sty (CCostCentre cc print_as_string)
   = uppCostCentre sty print_as_string cc
@@ -1004,25 +1000,25 @@ ppr_amode sty (CCostCentre cc print_as_string)
 %*									*
 %************************************************************************
 
-@pprRegRelative@ returns a pair of the @Unpretty@ for the register
-(some casting may be required), and a @Maybe Unpretty@ for the offset
+@pprRegRelative@ returns a pair of the @Doc@ for the register
+(some casting may be required), and a @Maybe Doc@ for the offset
 (zero offset gives a @Nothing@).
 
 \begin{code}
-addPlusSign :: Bool -> Unpretty -> Unpretty
+addPlusSign :: Bool -> Doc -> Doc
 addPlusSign False p = p
-addPlusSign True  p = uppBeside (uppChar '+') p
+addPlusSign True  p = (<>) (char '+') p
 
-pprSignedInt :: Bool -> Int -> Maybe Unpretty	-- Nothing => 0
+pprSignedInt :: Bool -> Int -> Maybe Doc	-- Nothing => 0
 pprSignedInt sign_wanted n
  = if n == 0 then Nothing else
-   if n > 0  then Just (addPlusSign sign_wanted (uppInt n))
-   else 	  Just (uppInt n)
+   if n > 0  then Just (addPlusSign sign_wanted (int n))
+   else 	  Just (int n)
 
 pprRegRelative :: PprStyle
 	       -> Bool		-- True <=> Print leading plus sign (if +ve)
 	       -> RegRelative
-	       -> (Unpretty, Maybe Unpretty)
+	       -> (Doc, Maybe Doc)
 
 pprRegRelative sty sign_wanted (SpARel spA off)
   = (pprMagicId sty SpA, pprSignedInt sign_wanted (spARelToInt spA off))
@@ -1037,7 +1033,7 @@ pprRegRelative sty sign_wanted r@(HpRel hp off)
     if isZeroOff to_print then
 	(pp_Hp, Nothing)
     else
-	(pp_Hp, Just (uppBeside (uppChar '-') (pprHeapOffset sty to_print)))
+	(pp_Hp, Just ((<>) (char '-') (pprHeapOffset sty to_print)))
 				-- No parens needed because pprHeapOffset
 				-- does them when necessary
 
@@ -1056,53 +1052,53 @@ represented by a discriminated union (@StgUnion@), so we use the @PrimRep@
 to select the union tag.
 
 \begin{code}
-pprMagicId :: PprStyle -> MagicId -> Unpretty
+pprMagicId :: PprStyle -> MagicId -> Doc
 
-pprMagicId sty BaseReg	    	    = uppPStr SLIT("BaseReg")
-pprMagicId sty StkOReg		    = uppPStr SLIT("StkOReg")
+pprMagicId sty BaseReg	    	    = ptext SLIT("BaseReg")
+pprMagicId sty StkOReg		    = ptext SLIT("StkOReg")
 pprMagicId sty (VanillaReg pk n)
-				    = uppBesides [ pprVanillaReg n, uppChar '.',
+				    = hcat [ pprVanillaReg n, char '.',
 						  pprUnionTag pk ]
-pprMagicId sty (FloatReg  n)        = uppBeside (uppPStr SLIT("FltReg")) (uppInt IBOX(n))
-pprMagicId sty (DoubleReg n)	    = uppBeside (uppPStr SLIT("DblReg")) (uppInt IBOX(n))
-pprMagicId sty TagReg		    = uppPStr SLIT("TagReg")
-pprMagicId sty RetReg		    = uppPStr SLIT("RetReg")
-pprMagicId sty SpA		    = uppPStr SLIT("SpA")
-pprMagicId sty SuA		    = uppPStr SLIT("SuA")
-pprMagicId sty SpB		    = uppPStr SLIT("SpB")
-pprMagicId sty SuB		    = uppPStr SLIT("SuB")
-pprMagicId sty Hp		    = uppPStr SLIT("Hp")
-pprMagicId sty HpLim		    = uppPStr SLIT("HpLim")
-pprMagicId sty LivenessReg	    = uppPStr SLIT("LivenessReg")
-pprMagicId sty StdUpdRetVecReg      = uppPStr SLIT("StdUpdRetVecReg")
-pprMagicId sty StkStubReg	    = uppPStr SLIT("StkStubReg")
-pprMagicId sty CurCostCentre	    = uppPStr SLIT("CCC")
+pprMagicId sty (FloatReg  n)        = (<>) (ptext SLIT("FltReg")) (int IBOX(n))
+pprMagicId sty (DoubleReg n)	    = (<>) (ptext SLIT("DblReg")) (int IBOX(n))
+pprMagicId sty TagReg		    = ptext SLIT("TagReg")
+pprMagicId sty RetReg		    = ptext SLIT("RetReg")
+pprMagicId sty SpA		    = ptext SLIT("SpA")
+pprMagicId sty SuA		    = ptext SLIT("SuA")
+pprMagicId sty SpB		    = ptext SLIT("SpB")
+pprMagicId sty SuB		    = ptext SLIT("SuB")
+pprMagicId sty Hp		    = ptext SLIT("Hp")
+pprMagicId sty HpLim		    = ptext SLIT("HpLim")
+pprMagicId sty LivenessReg	    = ptext SLIT("LivenessReg")
+pprMagicId sty StdUpdRetVecReg      = ptext SLIT("StdUpdRetVecReg")
+pprMagicId sty StkStubReg	    = ptext SLIT("StkStubReg")
+pprMagicId sty CurCostCentre	    = ptext SLIT("CCC")
 pprMagicId sty VoidReg		    = panic "pprMagicId:VoidReg!"
 
-pprVanillaReg :: FAST_INT -> Unpretty
+pprVanillaReg :: FAST_INT -> Doc
 
-pprVanillaReg n = uppBeside (uppChar 'R') (uppInt IBOX(n))
+pprVanillaReg n = (<>) (char 'R') (int IBOX(n))
 
-pprUnionTag :: PrimRep -> Unpretty
+pprUnionTag :: PrimRep -> Doc
 
-pprUnionTag PtrRep		= uppChar 'p'
-pprUnionTag CodePtrRep	    	= uppPStr SLIT("fp")
-pprUnionTag DataPtrRep	    	= uppChar 'd'
-pprUnionTag RetRep 	    	= uppChar 'r'
+pprUnionTag PtrRep		= char 'p'
+pprUnionTag CodePtrRep	    	= ptext SLIT("fp")
+pprUnionTag DataPtrRep	    	= char 'd'
+pprUnionTag RetRep 	    	= char 'r'
 pprUnionTag CostCentreRep	= panic "pprUnionTag:CostCentre?"
 
-pprUnionTag CharRep		= uppChar 'c'
-pprUnionTag IntRep		= uppChar 'i'
-pprUnionTag WordRep		= uppChar 'w'
-pprUnionTag AddrRep		= uppChar 'v'
-pprUnionTag FloatRep		= uppChar 'f'
+pprUnionTag CharRep		= char 'c'
+pprUnionTag IntRep		= char 'i'
+pprUnionTag WordRep		= char 'w'
+pprUnionTag AddrRep		= char 'v'
+pprUnionTag FloatRep		= char 'f'
 pprUnionTag DoubleRep		= panic "pprUnionTag:Double?"
 
-pprUnionTag StablePtrRep	= uppChar 'i'
-pprUnionTag ForeignObjRep	= uppChar 'p'
+pprUnionTag StablePtrRep	= char 'i'
+pprUnionTag ForeignObjRep	= char 'p'
 
-pprUnionTag ArrayRep		= uppChar 'p'
-pprUnionTag ByteArrayRep	= uppChar 'b'
+pprUnionTag ArrayRep		= char 'p'
+pprUnionTag ByteArrayRep	= char 'b'
 
 pprUnionTag _                   = panic "pprUnionTag:Odd kind"
 \end{code}
@@ -1111,34 +1107,34 @@ pprUnionTag _                   = panic "pprUnionTag:Odd kind"
 Find and print local and external declarations for a list of
 Abstract~C statements.
 \begin{code}
-pprTempAndExternDecls :: AbstractC -> (Unpretty{-temps-}, Unpretty{-externs-})
-pprTempAndExternDecls AbsCNop = (uppNil, uppNil)
+pprTempAndExternDecls :: AbstractC -> (Doc{-temps-}, Doc{-externs-})
+pprTempAndExternDecls AbsCNop = (empty, empty)
 
 pprTempAndExternDecls (AbsCStmts stmt1 stmt2)
   = initTE (ppr_decls_AbsC stmt1	`thenTE` \ (t_p1, e_p1) ->
 	    ppr_decls_AbsC stmt2	`thenTE` \ (t_p2, e_p2) ->
 	    case (catMaybes [t_p1, t_p2])	 of { real_temps ->
 	    case (catMaybes [e_p1, e_p2])	 of { real_exts ->
-	    returnTE (uppAboves real_temps, uppAboves real_exts) }}
+	    returnTE (vcat real_temps, vcat real_exts) }}
 	   )
 
 pprTempAndExternDecls other_stmt
   = initTE (ppr_decls_AbsC other_stmt `thenTE` \ (maybe_t, maybe_e) ->
 	    returnTE (
 		case maybe_t of
-		  Nothing -> uppNil
+		  Nothing -> empty
 		  Just pp -> pp,
 
 		case maybe_e of
-		  Nothing -> uppNil
+		  Nothing -> empty
 		  Just pp -> pp )
 	   )
 
-pprBasicLit :: PprStyle -> Literal -> Unpretty
-pprPrimKind :: PprStyle -> PrimRep -> Unpretty
+pprBasicLit :: PprStyle -> Literal -> Doc
+pprPrimKind :: PprStyle -> PrimRep -> Doc
 
-pprBasicLit  sty lit = uppStr (showLiteral  sty lit)
-pprPrimKind  sty k   = uppStr (showPrimRep k)
+pprBasicLit  sty lit = text (showLiteral  sty lit)
+pprPrimKind  sty k   = text (showPrimRep k)
 \end{code}
 
 
@@ -1211,15 +1207,15 @@ labelSeenTE label env@(seen_uniqs, seen_labels)
 \end{code}
 
 \begin{code}
-pprTempDecl :: Unique -> PrimRep -> Unpretty
+pprTempDecl :: Unique -> PrimRep -> Doc
 pprTempDecl uniq kind
-  = uppBesides [ pprPrimKind PprDebug kind, uppSP, prettyToUn (pprUnique uniq), uppSemi ]
+  = hcat [ pprPrimKind PprDebug kind, space, pprUnique uniq, semi ]
 
-pprExternDecl :: CLabel -> PrimRep -> Unpretty
+pprExternDecl :: CLabel -> PrimRep -> Doc
 
 pprExternDecl clabel kind
   = if not (needsCDecl clabel) then
-	uppNil -- do not print anything for "known external" things (e.g., < PreludeCore)
+	empty -- do not print anything for "known external" things (e.g., < PreludeCore)
     else
 	case (
 	    case kind of
@@ -1227,19 +1223,19 @@ pprExternDecl clabel kind
 	      _		 -> ppLocalnessMacro False{-data-}    clabel
 	) of { pp_macro_str ->
 
-	uppBesides [ pp_macro_str, uppLparen, pprCLabel PprForC clabel, pp_paren_semi ]
+	hcat [ pp_macro_str, lparen, pprCLabel PprForC clabel, pp_paren_semi ]
 	}
 \end{code}
 
 \begin{code}
-ppr_decls_AbsC :: AbstractC -> TeM (Maybe Unpretty{-temps-}, Maybe Unpretty{-externs-})
+ppr_decls_AbsC :: AbstractC -> TeM (Maybe Doc{-temps-}, Maybe Doc{-externs-})
 
 ppr_decls_AbsC AbsCNop		= returnTE (Nothing, Nothing)
 
 ppr_decls_AbsC (AbsCStmts stmts_1 stmts_2)
   = ppr_decls_AbsC stmts_1  `thenTE` \ p1 ->
     ppr_decls_AbsC stmts_2  `thenTE` \ p2 ->
-    returnTE (maybe_uppAboves [p1, p2])
+    returnTE (maybe_vcat [p1, p2])
 
 ppr_decls_AbsC (CClosureUpdInfo info)
   = ppr_decls_AbsC info
@@ -1249,7 +1245,7 @@ ppr_decls_AbsC (CSplitMarker) = returnTE (Nothing, Nothing)
 ppr_decls_AbsC (CAssign dest source)
   = ppr_decls_Amode dest    `thenTE` \ p1 ->
     ppr_decls_Amode source  `thenTE` \ p2 ->
-    returnTE (maybe_uppAboves [p1, p2])
+    returnTE (maybe_vcat [p1, p2])
 
 ppr_decls_AbsC (CJump target) = ppr_decls_Amode target
 
@@ -1261,7 +1257,7 @@ ppr_decls_AbsC (CSwitch discrim alts deflt)
   = ppr_decls_Amode discrim	`thenTE` \ pdisc ->
     mapTE ppr_alt_stuff alts	`thenTE` \ palts  ->
     ppr_decls_AbsC deflt	`thenTE` \ pdeflt ->
-    returnTE (maybe_uppAboves (pdisc:pdeflt:palts))
+    returnTE (maybe_vcat (pdisc:pdeflt:palts))
   where
     ppr_alt_stuff (_, absC) = ppr_decls_AbsC absC
 
@@ -1300,7 +1296,7 @@ ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast upd_lbl _ _)
     (case maybe_fast of
 	Nothing   -> returnTE (Nothing, Nothing)
 	Just fast -> ppr_decls_AbsC fast)	`thenTE` \ p3 ->
-    returnTE (maybe_uppAboves [p1, p2, p3])
+    returnTE (maybe_vcat [p1, p2, p3])
   where
     entry_lbl = CLbl slow_lbl CodePtrRep
     slow_lbl    = case (nonemptyAbsC slow) of
@@ -1310,14 +1306,14 @@ ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast upd_lbl _ _)
 ppr_decls_AbsC (CRetVector label maybe_amodes absC)
   = ppr_decls_Amodes (catMaybes maybe_amodes)	`thenTE` \ p1 ->
     ppr_decls_AbsC   absC			`thenTE` \ p2 ->
-    returnTE (maybe_uppAboves [p1, p2])
+    returnTE (maybe_vcat [p1, p2])
 
 ppr_decls_AbsC (CRetUnVector   _ amode)  = ppr_decls_Amode amode
 ppr_decls_AbsC (CFlatRetVector _ amodes) = ppr_decls_Amodes amodes
 \end{code}
 
 \begin{code}
-ppr_decls_Amode :: CAddrMode -> TeM (Maybe Unpretty, Maybe Unpretty)
+ppr_decls_Amode :: CAddrMode -> TeM (Maybe Doc, Maybe Doc)
 ppr_decls_Amode (CVal _ _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CAddr _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CReg _)	= returnTE (Nothing, Nothing)
@@ -1355,13 +1351,13 @@ ppr_decls_Amode (CUnVecLbl direct vectored)
   = labelSeenTE direct   `thenTE` \ dlbl_seen ->
     labelSeenTE vectored `thenTE` \ vlbl_seen ->
     let
-	ddcl = if dlbl_seen then uppNil else pprExternDecl direct CodePtrRep
-	vdcl = if vlbl_seen then uppNil else pprExternDecl vectored DataPtrRep
+	ddcl = if dlbl_seen then empty else pprExternDecl direct CodePtrRep
+	vdcl = if vlbl_seen then empty else pprExternDecl vectored DataPtrRep
     in
     returnTE (Nothing,
     	    	if (dlbl_seen || not (needsCDecl direct)) &&
     	    	   (vlbl_seen || not (needsCDecl vectored)) then Nothing
-    	        else Just (uppBesides [uppPStr SLIT("UNVEC"),uppChar '(', ddcl, uppComma, vdcl, uppRparen]))
+    	        else Just (hcat [ptext SLIT("UNVEC"),char '(', ddcl, comma, vdcl, rparen]))
 -}
 
 ppr_decls_Amode (CUnVecLbl direct vectored)
@@ -1371,18 +1367,18 @@ ppr_decls_Amode (CUnVecLbl direct vectored)
     --labelSeenTE direct   `thenTE` \ dlbl_seen ->
     --labelSeenTE vectored `thenTE` \ vlbl_seen ->
     let
-	ddcl = {-if dlbl_seen then uppNil else-} pprExternDecl direct CodePtrRep
-	vdcl = {-if vlbl_seen then uppNil else-} pprExternDecl vectored DataPtrRep
+	ddcl = {-if dlbl_seen then empty else-} pprExternDecl direct CodePtrRep
+	vdcl = {-if vlbl_seen then empty else-} pprExternDecl vectored DataPtrRep
     in
     returnTE (Nothing,
     	    	if ({-dlbl_seen ||-} not (needsCDecl direct)) &&
     	    	   ({-vlbl_seen ||-} not (needsCDecl vectored)) then Nothing
-    	        else Just (uppBesides [uppPStr SLIT("UNVEC"),uppChar '(', ddcl, uppComma, vdcl, uppRparen]))
+    	        else Just (hcat [ptext SLIT("UNVEC"),char '(', ddcl, comma, vdcl, rparen]))
 
 ppr_decls_Amode (CTableEntry base index _)
   = ppr_decls_Amode base    `thenTE` \ p1 ->
     ppr_decls_Amode index   `thenTE` \ p2 ->
-    returnTE (maybe_uppAboves [p1, p2])
+    returnTE (maybe_vcat [p1, p2])
 
 ppr_decls_Amode (CMacroExpr _ _ amodes)
   = ppr_decls_Amodes amodes
@@ -1390,19 +1386,19 @@ ppr_decls_Amode (CMacroExpr _ _ amodes)
 ppr_decls_Amode other = returnTE (Nothing, Nothing)
 
 
-maybe_uppAboves :: [(Maybe Unpretty, Maybe Unpretty)] -> (Maybe Unpretty, Maybe Unpretty)
-maybe_uppAboves ps
+maybe_vcat :: [(Maybe Doc, Maybe Doc)] -> (Maybe Doc, Maybe Doc)
+maybe_vcat ps
   = case (unzip ps)	of { (ts, es) ->
     case (catMaybes ts)	of { real_ts  ->
     case (catMaybes es)	of { real_es  ->
-    (if (null real_ts) then Nothing else Just (uppAboves real_ts),
-     if (null real_es) then Nothing else Just (uppAboves real_es))
+    (if (null real_ts) then Nothing else Just (vcat real_ts),
+     if (null real_es) then Nothing else Just (vcat real_es))
     } } }
 \end{code}
 
 \begin{code}
-ppr_decls_Amodes :: [CAddrMode] -> TeM (Maybe Unpretty, Maybe Unpretty)
+ppr_decls_Amodes :: [CAddrMode] -> TeM (Maybe Doc, Maybe Doc)
 ppr_decls_Amodes amodes
   = mapTE ppr_decls_Amode amodes `thenTE` \ ps ->
-    returnTE ( maybe_uppAboves ps )
+    returnTE ( maybe_vcat ps )
 \end{code}

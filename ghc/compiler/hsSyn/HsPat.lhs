@@ -21,17 +21,21 @@ IMP_Ubiq()
 
 -- friends:
 import HsBasic			( HsLit, Fixity )
+IMPORT_DELOOPER(IdLoop)
 IMPORT_DELOOPER(HsLoop)		( HsExpr )
 
+
 -- others:
-import Id		( dataConTyCon, GenId )
+import Id		--( dataConTyCon, GenId )
 import Maybes		( maybeToBool )
-import Name		( pprSym, pprNonSym )
-import Outputable	( interppSP, interpp'SP, ifPprShowAll )
-import PprStyle		( PprStyle(..) )
+import Outputable	--( interppSP, interpp'SP, ifPprShowAll )
+import PprStyle		( PprStyle(..), userStyle )
 import Pretty
 import TyCon		( maybeTyConSingleCon )
 import PprType		( GenType )
+#if __GLASGOW_HASKELL__ >= 202
+import Name
+#endif
 \end{code}
 
 Patterns come in distinct before- and after-typechecking flavo(u)rs.
@@ -125,23 +129,23 @@ data OutPat tyvar uvar id
 instance (Outputable name, NamedThing name) => Outputable (InPat name) where
     ppr = pprInPat
 
-pprInPat :: (Outputable name, NamedThing name) => PprStyle -> InPat name -> Pretty
+pprInPat :: (Outputable name, NamedThing name) => PprStyle -> InPat name -> Doc
 
-pprInPat sty (WildPatIn)	= ppChar '_'
+pprInPat sty (WildPatIn)	= char '_'
 pprInPat sty (VarPatIn var)	= ppr sty var
 pprInPat sty (LitPatIn s)	= ppr sty s
-pprInPat sty (LazyPatIn pat)	= ppBeside (ppChar '~') (ppr sty pat)
+pprInPat sty (LazyPatIn pat)	= (<>) (char '~') (ppr sty pat)
 pprInPat sty (AsPatIn name pat)
-    = ppBesides [ppLparen, ppr sty name, ppChar '@', ppr sty pat, ppRparen]
+    = parens (hcat [ppr sty name, char '@', ppr sty pat])
 
 pprInPat sty (ConPatIn c pats)
  = if null pats then
       ppr sty c
    else
-      ppCat [ppr sty c, interppSP sty pats] -- ParPats put in the parens
+      hsep [ppr sty c, interppSP sty pats] -- ParPats put in the parens
 
 pprInPat sty (ConOpPatIn pat1 op fixity pat2)
- = ppCat [ppr sty pat1, ppr sty op, ppr sty pat2] -- ParPats put in parens
+ = hsep [ppr sty pat1, ppr sty op, ppr sty pat2] -- ParPats put in parens
 
 	-- ToDo: use pprSym to print op (but this involves fiddling various
 	-- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
@@ -150,27 +154,27 @@ pprInPat sty (NegPatIn pat)
   = let
 	pp_pat = pprInPat sty pat
     in
-    ppBeside (ppChar '-') (
+    (<>) (char '-') (
     case pat of
       LitPatIn _ -> pp_pat
-      _          -> ppParens pp_pat
+      _          -> parens pp_pat
     )
 
 pprInPat sty (ParPatIn pat)
-  = ppParens (pprInPat sty pat)
+  = parens (pprInPat sty pat)
 
 pprInPat sty (ListPatIn pats)
-  = ppBesides [ppLbrack, interpp'SP sty pats, ppRbrack]
+  = brackets (interpp'SP sty pats)
 pprInPat sty (TuplePatIn pats)
-  = ppParens (interpp'SP sty pats)
+  = parens (interpp'SP sty pats)
 pprInPat sty (NPlusKPatIn n k)
-  = ppBesides [ppLparen, ppr sty n, ppChar '+', ppr sty k, ppRparen]
+  = parens (hcat [ppr sty n, char '+', ppr sty k])
 
 pprInPat sty (RecPatIn con rpats)
-  = ppCat [ppr sty con, ppCurlies (ppIntersperse pp'SP (map (pp_rpat sty) rpats))]
+  = hsep [ppr sty con, braces (hsep (punctuate comma (map (pp_rpat sty) rpats)))]
   where
-    pp_rpat PprForUser (v, _, True) = ppr PprForUser v
-    pp_rpat sty        (v, p, _)    = ppCat [ppr sty v, ppChar '=', ppr sty p]
+    pp_rpat sty (v, _, True) | userStyle sty = ppr PprForUser v
+    pp_rpat sty (v, p, _)    		     = hsep [ppr sty v, char '=', ppr sty p]
 \end{code}
 
 \begin{code}
@@ -180,47 +184,46 @@ instance (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar, Outputable id)
 \end{code}
 
 \begin{code}
-pprOutPat sty (WildPat ty)	= ppChar '_'
+pprOutPat sty (WildPat ty)	= char '_'
 pprOutPat sty (VarPat var)	= ppr sty var
-pprOutPat sty (LazyPat pat)	= ppBesides [ppChar '~', ppr sty pat]
+pprOutPat sty (LazyPat pat)	= hcat [char '~', ppr sty pat]
 pprOutPat sty (AsPat name pat)
-  = ppBesides [ppLparen, ppr sty name, ppChar '@', ppr sty pat, ppRparen]
+  = parens (hcat [ppr sty name, char '@', ppr sty pat])
 
 pprOutPat sty (ConPat name ty [])
-  = ppBeside (ppr sty name)
+  = (<>) (ppr sty name)
 	(ifPprShowAll sty (pprConPatTy sty ty))
 
 pprOutPat sty (ConPat name ty pats)
-  = ppBesides [ppLparen, ppr sty name, ppSP,
-    	 interppSP sty pats, ppRparen,
-    	 ifPprShowAll sty (pprConPatTy sty ty) ]
+  = hcat [parens (hcat [ppr sty name, space, interppSP sty pats]),
+	       ifPprShowAll sty (pprConPatTy sty ty) ]
 
 pprOutPat sty (ConOpPat pat1 op pat2 ty)
-  = ppBesides [ppLparen, ppr sty pat1, ppSP, pprSym sty op, ppSP, ppr sty pat2, ppRparen]
+  = parens (hcat [ppr sty pat1, space, ppr sty op, space, ppr sty pat2])
 
 pprOutPat sty (ListPat ty pats)
-  = ppBesides [ppLbrack, interpp'SP sty pats, ppRbrack]
+  = brackets (interpp'SP sty pats)
 pprOutPat sty (TuplePat pats)
-  = ppParens (interpp'SP sty pats)
+  = parens (interpp'SP sty pats)
 
 pprOutPat sty (RecPat con ty rpats)
-  = ppBesides [ppr sty con, ppCurlies (ppIntersperse pp'SP (map (pp_rpat sty) rpats))]
+  = hcat [ppr sty con, braces (hsep (punctuate comma (map (pp_rpat sty) rpats)))]
   where
-    pp_rpat PprForUser (v, _, True) = ppr PprForUser v
-    pp_rpat sty (v, p, _)           = ppCat [ppr sty v, ppChar '=', ppr sty p]
+    pp_rpat sty (v, _, True) | userStyle sty = ppr PprForUser v
+    pp_rpat sty (v, p, _)           	     = hsep [ppr sty v, char '=', ppr sty p]
 
 pprOutPat sty (LitPat l ty) 	= ppr sty l	-- ToDo: print more
 pprOutPat sty (NPat   l ty e)	= ppr sty l	-- ToDo: print more
 pprOutPat sty (NPlusKPat n k ty e1 e2)		-- ToDo: print more
-  = ppBesides [ppLparen, ppr sty n, ppChar '+', ppr sty k, ppRparen]
+  = parens (hcat [ppr sty n, char '+', ppr sty k])
 
 pprOutPat sty (DictPat dicts methods)
- = ppSep [ppBesides [ppLparen, ppPStr SLIT("{-dict-}")],
-	  ppBracket (interpp'SP sty dicts),
-	  ppBesides [ppBracket (interpp'SP sty methods), ppRparen]]
+ = parens (sep [ptext SLIT("{-dict-}"),
+		  brackets (interpp'SP sty dicts),
+		  brackets (interpp'SP sty methods)])
 
 pprConPatTy sty ty
- = ppParens (ppr sty ty)
+ = parens (ppr sty ty)
 \end{code}
 
 %************************************************************************

@@ -24,7 +24,7 @@ import Pretty
 import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )
 import Type		( isPrimType, maybeAppDataTyConExpandingDicts, maybeAppTyCon,
-			  eqTy, maybeBoxedPrimType )
+			  eqTy, maybeBoxedPrimType, SYN_IE(Type) )
 import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( getStatePairingConInfo,
@@ -32,6 +32,10 @@ import TysWiredIn	( getStatePairingConInfo,
 			  stringTy
 			)
 import Util		( pprPanic, pprError, panic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
+
 \end{code}
 
 Desugaring of @ccall@s consists of adding some state manipulation,
@@ -172,7 +176,7 @@ unboxArg arg
 
 can't_see_datacons_error thing ty
   = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
-	     (ppBesides [ppStr thing, ppStr "; type: ", ppr PprForUser ty])
+	     (hcat [text thing, text "; type: ", ppr PprForUser ty])
 \end{code}
 
 

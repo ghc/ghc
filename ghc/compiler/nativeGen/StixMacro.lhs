@@ -11,7 +11,11 @@ IMP_Ubiq(){-uitious-}
 IMPORT_DELOOPER(NcgLoop)		( amodeToStix )
 
 import MachMisc
+#if __GLASGOW_HASKELL__ >= 202
+import MachRegs hiding (Addr)
+#else
 import MachRegs
+#endif
 
 import AbsCSyn		( CStmtMacro(..), MagicId(..), mkIntCLit, CAddrMode )
 import Constants	( uF_RET, uF_SUA, uF_SUB, uF_UPDATEE,

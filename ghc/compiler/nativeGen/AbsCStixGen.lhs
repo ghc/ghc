@@ -14,12 +14,17 @@ import AbsCSyn
 import Stix
 
 import MachMisc
+#if __GLASGOW_HASKELL__ >= 202
+import MachRegs hiding (Addr)
+#else
 import MachRegs
+#endif
 
 import AbsCUtils	( getAmodeRep, mixedTypeLocn,
 			  nonemptyAbsC, mkAbsCStmts, mkAbsCStmtList
 			)
 import Constants   	( mIN_UPD_SIZE )
+import CLabel           ( CLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd
 			)

@@ -7,14 +7,17 @@ import RdrHsSyn		( RdrNameHsBinds(..), RdrNameHsType(..) )
 import RnHsSyn		( RenamedHsBinds(..), RenamedHsType(..) )
 import RnBinds		( rnBinds )
 import RnMonad		( RnMS(..), FreeVars )
-import RnSource		( rnHsType )
+import RnSource		( rnHsSigType )
 import UniqSet		( UniqSet(..) )
+import PprStyle		( PprStyle )
+import Pretty		( Doc )
 import Name		( Name )
 
 rnBinds :: RdrNameHsBinds 
 	-> (RenamedHsBinds -> RnMS s (result, FreeVars))
 	-> RnMS s (result, FreeVars)
 
-rnHsType :: RdrNameHsType
-	 -> RnMS s RenamedHsType
+rnHsSigType :: (PprStyle -> Doc)
+	    -> RdrNameHsType
+	    -> RnMS s RenamedHsType
 \end{code}

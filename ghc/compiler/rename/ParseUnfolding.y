@@ -13,7 +13,7 @@ import Literal
 import PrimRep          ( decodePrimRep )
 import HsPragmas	( noGenPragmas, noDataPragmas, noClassPragmas, noClassOpPragmas, noInstancePragmas )
 import IdInfo		( exactArity, mkStrictnessInfo, mkBottomStrictnessInfo,
-			  ArgUsageInfo, FBTypeInfo
+			  ArgUsageInfo, FBTypeInfo, ArityInfo, StrictnessInfo
 			)
 import Kind		( Kind, mkArrowKind, mkTypeKind )
 import Lex		
@@ -23,10 +23,10 @@ import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
-import Name		( OccName(..), isTCOcc, Provenance )
+import Name		( OccName(..), isTCOcc, Provenance, SYN_IE(Module) )
 import SrcLoc		( mkIfaceSrcLoc )
 import Util		( panic{-, pprPanic ToDo:rm-} )
-import Pretty           ( ppShow )
+import Pretty           ( Doc )
 import PprStyle         -- PprDebug for panic
 import Maybes           ( MaybeErr(..) )
 
@@ -38,7 +38,7 @@ parseUnfolding ls =
     case parseUnfold ls of
       v@(Succeeded _) -> v
         -- ill-formed unfolding, crash and burn.
-      Failed err      -> panic (ppShow 80 (err PprDebug))
+      Failed err      -> panic (show (err PprDebug))
   in
   res
 }
@@ -135,10 +135,10 @@ strict_info	: DEMAND any_var_name				{ mkStrictnessInfo $1 (Just $2) }
 
 core_expr	:: { UfExpr RdrName }
 core_expr	: any_var_name					{ UfVar $1 }
-		| qdata_name					{ UfVar $1 }
+		| data_name					{ UfVar $1 }
 		| core_lit					{ UfLit $1 }
 		| OPAREN core_expr CPAREN			{ $2 }
-		| qdata_name OCURLY data_args CCURLY		{ UfCon $1 $3 }
+		| data_name OCURLY data_args CCURLY		{ UfCon $1 $3 }
 
 		| core_expr ATSIGN atype			{ UfApp $1 (UfTyArg $3) }
 		| core_expr core_arg				{ UfApp $1 $2 }
@@ -165,15 +165,15 @@ core_expr	: any_var_name					{ UfVar $1 }
 								  UfPrim (UfCCallOp $2 is_casm may_gc $5 $4)
 									 $7
 								}
-		| SCC OPAREN core_expr CPAREN	{  UfSCC $1 $3	}
+		| SCC core_expr 	                        {  UfSCC $1 $2	}
 
 rec_binds	:: { [(UfBinder RdrName, UfExpr RdrName)] }
 		:						{ [] }
 		| core_val_bndr EQUAL core_expr SEMI rec_binds	{ ($1,$3) : $5 }
 
 coerce		:: { UfCoercion RdrName }
-coerce		: COERCE_IN  qdata_name				{ UfIn  $2 }
-		| COERCE_OUT qdata_name				{ UfOut $2 }
+coerce		: COERCE_IN  data_name				{ UfIn  $2 }
+		| COERCE_OUT data_name				{ UfOut $2 }
 		
 prim_alts	:: { [(Literal,UfExpr RdrName)] }
 		:						{ [] }
@@ -181,7 +181,7 @@ prim_alts	:: { [(Literal,UfExpr RdrName)] }
 
 alg_alts	:: { [(RdrName, [RdrName], UfExpr RdrName)] }
 		: 						{ [] }
-		| qdata_name var_names RARROW 
+		| data_name var_names RARROW 
 			core_expr SEMI alg_alts			{ ($1,$2,$4) : $6 }
 
 core_default	:: { UfDefault RdrName }
@@ -189,9 +189,8 @@ core_default	:: { UfDefault RdrName }
 		| var_name RARROW core_expr SEMI		{ UfBindDefault $1 $3 }
 
 core_arg	:: { UfArg RdrName }
-		: var_name					{ UfVarArg $1 }
-		| qvar_name					{ UfVarArg $1 }
-		| qdata_name					{ UfVarArg $1 }
+		: any_var_name					{ UfVarArg $1 }
+		| data_name					{ UfVarArg $1 }
 		| core_lit					{ UfLitArg $1 }
 
 core_args	:: { [UfArg RdrName] }
@@ -254,9 +253,11 @@ var_occ		: VARID			{ VarOcc $1 }
 		| VARSYM		{ VarOcc $1 }
 		| BANG  		{ VarOcc SLIT("!") {-sigh, double-sigh-} }
 
-qdata_name	:: { RdrName }
-qdata_name	:  QCONID		{ varQual $1 }
+data_name	:: { RdrName }
+data_name	:  QCONID		{ varQual $1 }
 		|  QCONSYM		{ varQual $1 }
+		|  CONID		{ Unqual (VarOcc $1) }
+		|  CONSYM		{ Unqual (VarOcc $1) }
 
 qvar_name	:: { RdrName }
 		:  QVARID		{ varQual $1 }
@@ -286,15 +287,12 @@ context_list1	: class					{ [$1] }
 		| class COMMA context_list1 		{ $1 : $3 }
 
 class		:: { (RdrName, RdrNameHsType) }
-class		:  qtc_name atype			{ ($1, $2) }
+class		:  tc_name atype			{ ($1, $2) }
 
 type		:: { RdrNameHsType }
 type		: FORALL forall context DARROW type	{ mkHsForAllTy $2 $3 $5 }
-		| tautype				{ $1 }
-
-tautype		:: { RdrNameHsType }
-tautype		:  btype				{ $1 }
-		|  btype RARROW tautype			{ MonoFunTy $1 $3 }
+		|  btype RARROW type			{ MonoFunTy $1 $3 }
+		|  btype				{ $1 }
 
 types2		:: { [RdrNameHsType] 			{- Two or more -}  }	
 types2		:  type COMMA type			{ [$1,$3] }
@@ -305,11 +303,11 @@ btype		:  atype				{ $1 }
 		|  btype atype				{ MonoTyApp $1 $2 }
 
 atype		:: { RdrNameHsType }
-atype		:  qtc_name 			  	{ MonoTyVar $1 }
+atype		:  tc_name 			  	{ MonoTyVar $1 }
 		|  tv_name			  	{ MonoTyVar $1 }
 		|  OPAREN types2 CPAREN	  		{ MonoTupleTy dummyRdrTcName $2 }
 		|  OBRACK type CBRACK		  	{ MonoListTy  dummyRdrTcName $2 }
-		|  OCURLY qtc_name atype CCURLY		{ MonoDictTy $2 $3 }
+		|  OCURLY tc_name atype CCURLY		{ MonoDictTy $2 $3 }
 		|  OPAREN type CPAREN		  	{ $2 }
 
 atypes		:: { [RdrNameHsType] 	{-  Zero or more -} }
@@ -340,5 +338,9 @@ tv_name		:  VARID 		{ Unqual (TvOcc $1) }
 tv_names	:: { [RdrName] }
 		:  			{ [] }
 		| tv_name tv_names	{ $1 : $2 }
-qtc_name	:: { RdrName }
-qtc_name	:  QCONID		{ tcQual $1 }
+
+tc_name		:: { RdrName }
+tc_name		:  QCONID		{ tcQual $1 }
+		|  CONID		{ Unqual (TCOcc $1) }
+		|  CONSYM		{ Unqual (TCOcc $1) }
+		|  OPAREN RARROW CPAREN	{ Unqual (TCOcc SLIT("->")) }

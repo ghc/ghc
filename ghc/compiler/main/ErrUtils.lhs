@@ -17,43 +17,46 @@ module ErrUtils (
 
 IMP_Ubiq(){-uitous-}
 
-import Bag		( bagToList )
+import Bag		--( bagToList )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import SrcLoc		( noSrcLoc, SrcLoc{-instance-} )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 \end{code}
 
 \begin{code}
-type Error   = PprStyle -> Pretty
-type Warning = PprStyle -> Pretty
-type Message = PprStyle -> Pretty
+type Error   = PprStyle -> Doc
+type Warning = PprStyle -> Doc
+type Message = PprStyle -> Doc
 
 addErrLoc :: SrcLoc -> String -> Error -> Error
 addErrLoc locn title rest_of_err_msg sty
-  = ppHang (ppBesides [ppr PprForUser locn,
-		       if null title then ppNil else ppStr (": " ++ title),
-		       ppChar ':'])
+  = hang (hcat [ppr PprForUser locn,
+		if null title then empty else text (": " ++ title),
+		char ':'])
     	 4 (rest_of_err_msg sty)
 
 addShortErrLocLine, addShortWarnLocLine :: SrcLoc -> Error -> Error
 
 addShortErrLocLine locn rest_of_err_msg sty
-  = ppHang (ppBeside (ppr PprForUser locn) (ppChar ':'))
+  = hang ((<>) (ppr PprForUser locn) (char ':'))
 	 4 (rest_of_err_msg sty)
 
 addShortWarnLocLine locn rest_of_err_msg sty
-  = ppHang (ppBeside (ppr PprForUser locn) (ppPStr SLIT(":warning:")))
+  = hang ((<>) (ppr PprForUser locn) (ptext SLIT(":warning:")))
 	 4 (rest_of_err_msg sty)
 
 dontAddErrLoc :: String -> Error -> Error
 dontAddErrLoc title rest_of_err_msg sty
-  = ppHang (ppBesides [ppStr title, ppChar ':'])
+  = hang (hcat [text title, char ':'])
     	 4 (rest_of_err_msg sty)
 
-pprBagOfErrors :: PprStyle -> Bag Error -> Pretty
+pprBagOfErrors :: PprStyle -> Bag Error -> Doc
 pprBagOfErrors sty bag_of_errors
   = let  pretties = map ( \ e -> e sty ) (bagToList bag_of_errors)  in
-    ppAboves (map (\ p -> ppAbove ppSP p) pretties)
+    vcat (map (\ p -> ($$) space p) pretties)
 \end{code}
 
 \begin{code}

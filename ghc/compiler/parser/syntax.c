@@ -127,6 +127,7 @@ expORpat(int wanted, tree e)
 
 	  case clitlit:
 	    error_if_patt_wanted(wanted, "``literal-literal'' in pattern");
+	    break;
 
 	  default: /* the others only occur in pragmas */
 	    hsperror("not a valid literal pattern or expression");

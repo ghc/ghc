@@ -10,7 +10,7 @@
 \begin{code}
 #include "HsVersions.h"
 
-module SrcLoc (
+module SrcLoc {- (
 	SrcLoc,			-- Abstract
 
 	mkSrcLoc,
@@ -22,12 +22,14 @@ module SrcLoc (
 	mkBuiltinSrcLoc,	-- Something wired into the compiler
 
 	mkGeneratedSrcLoc	-- Code generated within the compiler
-    ) where
+    ) -} where
 
 IMP_Ubiq()
 
-import PprStyle		( PprStyle(..) )
+import Outputable
+import PprStyle		( PprStyle(..), userStyle )
 import Pretty
+
 \end{code}
 
 %************************************************************************
@@ -80,19 +82,20 @@ isNoSrcLoc other    = False
 
 \begin{code}
 instance Outputable SrcLoc where
-    ppr PprForUser (SrcLoc src_file src_line)
-      = ppBesides [ ppPStr src_file, ppChar ':', ppStr (show IBOX(src_line)) ]
-
     ppr sty (SrcLoc src_file src_line)
-      = ppBesides [ppStr "{-# LINE ", ppStr (show IBOX(src_line)), ppSP,
-		   ppChar '\"', ppPStr src_file, ppStr " #-}"]
-    ppr sty (UnhelpfulSrcLoc s) = ppPStr s
+      | userStyle sty
+      = hcat [ ptext src_file, char ':', text (show IBOX(src_line)) ]
 
-    ppr sty NoSrcLoc = ppStr "<NoSrcLoc>"
+      | otherwise
+      = hcat [text "{-# LINE ", text (show IBOX(src_line)), space,
+		   char '\"', ptext src_file, text " #-}"]
+    ppr sty (UnhelpfulSrcLoc s) = ptext s
+
+    ppr sty NoSrcLoc = text "<NoSrcLoc>"
 \end{code}
 
 {-
-      = ppBesides [ppPStr SLIT("{-# LINE "), ppStr (show IBOX(src_line)), ppSP,
-		   ppChar '"', ppPStr src_file, ppPStr SLIT(" #-}")]
- --ppPStr SLIT("\" #-}")]
+      = hcat [ptext SLIT("{-# LINE "), text (show IBOX(src_line)), space,
+		   char '"', ptext src_file, ptext SLIT(" #-}")]
+ --ptext SLIT("\" #-}")]
 -}

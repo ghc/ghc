@@ -21,8 +21,9 @@ import DsUtils
 
 import CmdLineOpts	( opt_FoldrBuildOn )
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
+import Id               ( SYN_IE(Id) )
 import PrelVals		( mkBuild, foldrId )
-import Type		( mkTyVarTy, mkForAllTy, mkFunTys, mkFunTy )
+import Type		( mkTyVarTy, mkForAllTy, mkFunTys, mkFunTy, SYN_IE(Type) )
 import TysPrim		( alphaTy )
 import TysWiredIn	( nilDataCon, consDataCon, listTyCon )
 import TyVar		( alphaTyVar )

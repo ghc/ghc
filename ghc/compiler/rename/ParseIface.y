@@ -14,7 +14,7 @@ import HsCore
 import Literal
 import HsPragmas	( noGenPragmas, noDataPragmas, noClassPragmas, noClassOpPragmas, noInstancePragmas )
 import IdInfo		( exactArity, mkStrictnessInfo, mkBottomStrictnessInfo,
-			  ArgUsageInfo, FBTypeInfo
+			  ArgUsageInfo, FBTypeInfo, ArityInfo, StrictnessInfo
 			)
 import Kind		( Kind, mkArrowKind, mkTypeKind )
 import Lex		
@@ -24,7 +24,7 @@ import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
-import Name		( OccName(..), isTCOcc, Provenance )
+import Name		( OccName(..), isTCOcc, Provenance, SYN_IE(Module) )
 import SrcLoc		( mkIfaceSrcLoc )
 import Util		( panic{-, pprPanic ToDo:rm-} )
 import ParseType        ( parseType )
@@ -232,9 +232,9 @@ topdecl		:: { RdrNameHsDecl }
 topdecl		:  TYPE  tc_name tv_bndrs EQUAL type SEMI
 			{ TyD (TySynonym $2 $3 $5 mkIfaceSrcLoc) }
 		|  DATA decl_context tc_name tv_bndrs constrs deriving SEMI
-			{ TyD (TyData $2 $3 $4 $5 $6 noDataPragmas mkIfaceSrcLoc) }
-		|  NEWTYPE decl_context tc_name tv_bndrs EQUAL constr1 deriving SEMI
-			{ TyD (TyNew $2 $3 $4 $6 $7 noDataPragmas mkIfaceSrcLoc) }
+			{ TyD (TyData DataType $2 $3 $4 $5 $6 noDataPragmas mkIfaceSrcLoc) }
+		|  NEWTYPE decl_context tc_name tv_bndrs newtype_constr deriving SEMI
+			{ TyD (TyData NewType $2 $3 $4 $5 $6 noDataPragmas mkIfaceSrcLoc) }
 		|  CLASS decl_context tc_name tv_bndr csigs SEMI
 			{ ClD (ClassDecl $2 $3 $4 $5 EmptyMonoBinds noClassPragmas mkIfaceSrcLoc) }
 		|  var_name TYPE_PART id_info
@@ -266,7 +266,7 @@ csig		:  var_name DCOLON type 	{ ClassOpSig $1 $1 $3 mkIfaceSrcLoc
 ----------------------------------------------------------------
 			 			 }
 
-constrs		:: { [RdrNameConDecl] }
+constrs		:: { [RdrNameConDecl] {- empty for handwritten abstract -} }
 		: 				{ [] }
 		| EQUAL constrs1		{ $2 }
 
@@ -275,15 +275,16 @@ constrs1	:  constr		{ [$1] }
 		|  constr VBAR constrs1	{ $1 : $3 }
 
 constr		:: { RdrNameConDecl }
-constr		:  data_name batypes			{ ConDecl $1 $2 mkIfaceSrcLoc }
-		|  data_name OCURLY fields1 CCURLY	{ RecConDecl $1 $3 mkIfaceSrcLoc }
+constr		:  data_name batypes			{ ConDecl $1 [] (VanillaCon $2) mkIfaceSrcLoc }
+		|  data_name OCURLY fields1 CCURLY	{ ConDecl $1 [] (RecCon $3)     mkIfaceSrcLoc }
 
-constr1		:: { RdrNameConDecl 	{- For a newtype -} }
-constr1		:  data_name atype			{ NewConDecl $1 $2 mkIfaceSrcLoc }
+newtype_constr	:: { [RdrNameConDecl] {- Empty if handwritten abstract -} }
+newtype_constr	:  				{ [] }
+		| EQUAL data_name atype		{ [ConDecl $2 [] (NewCon $3) mkIfaceSrcLoc] }
 
 deriving	:: { Maybe [RdrName] }
 		: 					{ Nothing }
-		| DERIVING OPAREN qtc_names1 CPAREN	{ Just $3 }
+		| DERIVING OPAREN tc_names1 CPAREN	{ Just $3 }
 
 batypes		:: { [RdrNameBangType] }
 batypes		:  					{ [] }
@@ -315,15 +316,12 @@ context_list1	: class					{ [$1] }
 		| class COMMA context_list1 		{ $1 : $3 }
 
 class		:: { (RdrName, RdrNameHsType) }
-class		:  qtc_name atype			{ ($1, $2) }
+class		:  tc_name atype			{ ($1, $2) }
 
 type		:: { RdrNameHsType }
 type		: FORALL forall context DARROW type	{ mkHsForAllTy $2 $3 $5 }
-		| tautype				{ $1 }
-
-tautype		:: { RdrNameHsType }
-tautype		:  btype				{ $1 }
-		|  btype RARROW tautype			{ MonoFunTy $1 $3 }
+		|  btype RARROW type			{ MonoFunTy $1 $3 }
+		|  btype				{ $1 }
 
 types2		:: { [RdrNameHsType] 			{- Two or more -}  }	
 types2		:  type COMMA type			{ [$1,$3] }
@@ -334,11 +332,11 @@ btype		:  atype				{ $1 }
 		|  btype atype				{ MonoTyApp $1 $2 }
 
 atype		:: { RdrNameHsType }
-atype		:  qtc_name 			  	{ MonoTyVar $1 }
+atype		:  tc_name 			  	{ MonoTyVar $1 }
 		|  tv_name			  	{ MonoTyVar $1 }
 		|  OPAREN types2 CPAREN	  		{ MonoTupleTy dummyRdrTcName $2 }
 		|  OBRACK type CBRACK		  	{ MonoListTy  dummyRdrTcName $2 }
-		|  OCURLY qtc_name atype CCURLY		{ MonoDictTy $2 $3 }
+		|  OCURLY tc_name atype CCURLY		{ MonoDictTy $2 $3 }
 		|  OPAREN type CPAREN		  	{ $2 }
 
 atypes		:: { [RdrNameHsType] 	{-  Zero or more -} }
@@ -399,15 +397,13 @@ data_name	:  CONID		{ Unqual (VarOcc $1) }
 		|  CONSYM		{ Unqual (VarOcc $1) }
 
 
-qtc_name	:: { RdrName }
-qtc_name	:  QCONID		{ tcQual $1 }
-
-qtc_names1	:: { [RdrName] }
-		: qtc_name			{ [$1] }
-		| qtc_name COMMA qtc_names1	{ $1 : $3 }
+tc_names1	:: { [RdrName] }
+		: tc_name			{ [$1] }
+		| tc_name COMMA tc_names1	{ $1 : $3 }
 
 tc_name		:: { RdrName }
 tc_name		: tc_occ			{ Unqual $1 }
+		| QCONID			{ tcQual $1 }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }

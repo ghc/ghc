@@ -19,14 +19,16 @@ import HsTypes		( HsType )
 
 -- others:
 import Id		( SYN_IE(DictVar), GenId, SYN_IE(Id) )
-import Name		( pprNonSym, pprSym )
-import Outputable	( interppSP, interpp'SP, ifnotPprForUser )
+import Outputable	--( interppSP, interpp'SP, ifnotPprForUser )
 import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )
 import Pretty
-import PprStyle		( PprStyle(..) )
+import PprStyle		( PprStyle(..), userStyle )
 import SrcLoc		( SrcLoc )
 import Usage		( GenUsage{-instance-} )
 --import Util		( panic{-ToDo:rm eventually-} )
+#if __GLASGOW_HASKELL__ >= 202
+import Name
+#endif
 \end{code}
 
 %************************************************************************
@@ -116,6 +118,8 @@ data HsExpr tyvar uvar id pat
 		(HsRecordBinds tyvar uvar id pat)
 
   | RecordUpdOut (HsExpr tyvar uvar id pat)	-- TRANSLATION
+		 (GenType tyvar uvar)		-- Type of *result* record (may differ from
+						-- type of input record)
 		 [id]				-- Dicts needed for construction
 		 (HsRecordBinds tyvar uvar id pat)
 
@@ -191,7 +195,7 @@ A @Dictionary@, unless of length 0 or 1, becomes a tuple.  A
 instance (NamedThing id, Outputable id, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
 		Outputable (HsExpr tyvar uvar id pat) where
-    ppr = pprExpr
+    ppr sty expr = pprQuote sty $ \ sty -> pprExpr sty expr
 \end{code}
 
 \begin{code}
@@ -201,11 +205,11 @@ pprExpr sty (HsLit    lit)   = ppr sty lit
 pprExpr sty (HsLitOut lit _) = ppr sty lit
 
 pprExpr sty (HsLam match)
-  = ppCat [ppChar '\\', ppNest 2 (pprMatch sty True match)]
+  = hsep [char '\\', nest 2 (pprMatch sty True match)]
 
 pprExpr sty expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
-    ppHang (pprExpr sty fun) 4 (ppSep (map (pprExpr sty) args))
+    hang (pprExpr sty fun) 4 (sep (map (pprExpr sty) args))
   where
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)
@@ -219,16 +223,16 @@ pprExpr sty (OpApp e1 op fixity e2)
     pp_e2 = pprParendExpr sty e2
 
     pp_prefixly
-      = ppHang (pprExpr sty op) 4 (ppSep [pp_e1, pp_e2])
+      = hang (pprExpr sty op) 4 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = ppSep [pp_e1, ppCat [ppr sty v, pp_e2]]
+      = sep [pp_e1, hsep [ppr sty v, pp_e2]]
 
 pprExpr sty (NegApp e _)
-  = ppBeside (ppChar '-') (pprParendExpr sty e)
+  = (<>) (char '-') (pprParendExpr sty e)
 
 pprExpr sty (HsPar e)
-  = ppParens (pprExpr sty e)
+  = parens (pprExpr sty e)
 
 pprExpr sty (SectionL expr op)
   = case op of
@@ -237,11 +241,9 @@ pprExpr sty (SectionL expr op)
   where
     pp_expr = pprParendExpr sty expr
 
-    pp_prefixly = ppHang (ppCat [ppStr " \\ x_ ->", ppr sty op])
-		       4 (ppCat [pp_expr, ppPStr SLIT("x_ )")])
-    pp_infixly v
-      = ppSep [ ppBeside ppLparen pp_expr,
-	    	ppBeside (ppr sty v) ppRparen ]
+    pp_prefixly = hang (hsep [text " \\ x_ ->", ppr sty op])
+		       4 (hsep [pp_expr, ptext SLIT("x_ )")])
+    pp_infixly v = parens (sep [pp_expr, ppr sty v])
 
 pprExpr sty (SectionR op expr)
   = case op of
@@ -250,110 +252,106 @@ pprExpr sty (SectionR op expr)
   where
     pp_expr = pprParendExpr sty expr
 
-    pp_prefixly = ppHang (ppCat [ppStr "( \\ x_ ->", ppr sty op, ppPStr SLIT("x_")])
-		       4 (ppBeside pp_expr ppRparen)
+    pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr sty op, ptext SLIT("x_")])
+		       4 ((<>) pp_expr rparen)
     pp_infixly v
-      = ppSep [ ppBeside ppLparen (ppr sty v),
-		ppBeside pp_expr  ppRparen ]
+      = parens (sep [ppr sty v, pp_expr])
 
 pprExpr sty (HsCase expr matches _)
-  = ppSep [ ppSep [ppPStr SLIT("case"), ppNest 4 (pprExpr sty expr), ppPStr SLIT("of")],
-	    ppNest 2 (pprMatches sty (True, ppNil) matches) ]
+  = sep [ sep [ptext SLIT("case"), nest 4 (pprExpr sty expr), ptext SLIT("of")],
+	    nest 2 (pprMatches sty (True, empty) matches) ]
 
 pprExpr sty (HsIf e1 e2 e3 _)
-  = ppSep [ppCat [ppPStr SLIT("if"), ppNest 2 (pprExpr sty e1), ppPStr SLIT("then")],
-	   ppNest 4 (pprExpr sty e2),
-	   ppPStr SLIT("else"),
-	   ppNest 4 (pprExpr sty e3)]
+  = sep [hsep [ptext SLIT("if"), nest 2 (pprExpr sty e1), ptext SLIT("then")],
+	   nest 4 (pprExpr sty e2),
+	   ptext SLIT("else"),
+	   nest 4 (pprExpr sty e3)]
 
 -- special case: let ... in let ...
 pprExpr sty (HsLet binds expr@(HsLet _ _))
-  = ppSep [ppHang (ppPStr SLIT("let")) 2 (ppCat [ppr sty binds, ppPStr SLIT("in")]),
+  = sep [hang (ptext SLIT("let")) 2 (hsep [ppr sty binds, ptext SLIT("in")]),
 	   ppr sty expr]
 
 pprExpr sty (HsLet binds expr)
-  = ppSep [ppHang (ppPStr SLIT("let")) 2 (ppr sty binds),
-	   ppHang (ppPStr SLIT("in"))  2 (ppr sty expr)]
+  = sep [hang (ptext SLIT("let")) 2 (ppr sty binds),
+	   hang (ptext SLIT("in"))  2 (ppr sty expr)]
 
 pprExpr sty (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp sty stmts
 pprExpr sty (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp sty stmts
 
 pprExpr sty (ExplicitList exprs)
-  = ppBracket (ppInterleave ppComma (map (pprExpr sty) exprs))
+  = brackets (fsep (punctuate comma (map (pprExpr sty) exprs)))
 pprExpr sty (ExplicitListOut ty exprs)
-  = ppBesides [ ppBracket (ppInterleave ppComma (map (pprExpr sty) exprs)),
-		ifnotPprForUser sty (ppBeside ppSP (ppParens (pprGenType sty ty))) ]
+  = hcat [ brackets (fsep (punctuate comma (map (pprExpr sty) exprs))),
+	   ifnotPprForUser sty ((<>) space (parens (pprGenType sty ty))) ]
 
 pprExpr sty (ExplicitTuple exprs)
-  = ppParens (ppInterleave ppComma (map (pprExpr sty) exprs))
+  = parens (sep (punctuate comma (map (pprExpr sty) exprs)))
 
 pprExpr sty (RecordCon con  rbinds)
   = pp_rbinds sty (ppr sty con) rbinds
 
 pprExpr sty (RecordUpd aexp rbinds)
   = pp_rbinds sty (pprParendExpr sty aexp) rbinds
-pprExpr sty (RecordUpdOut aexp _ rbinds)
+pprExpr sty (RecordUpdOut aexp _ _ rbinds)
   = pp_rbinds sty (pprParendExpr sty aexp) rbinds
 
 pprExpr sty (ExprWithTySig expr sig)
-  = ppHang (ppBeside (ppNest 2 (pprExpr sty expr)) (ppPStr SLIT(" ::")))
+  = hang ((<>) (nest 2 (pprExpr sty expr)) (ptext SLIT(" ::")))
 	 4 (ppr sty sig)
 
 pprExpr sty (ArithSeqIn info)
-  = ppBracket (ppr sty info)
+  = brackets (ppr sty info)
 pprExpr sty (ArithSeqOut expr info)
-  = case sty of
-  	PprForUser ->
-    	  ppBracket (ppr sty info)
-	_   	   ->
-    	  ppBesides [ppLbrack, ppParens (ppr sty expr), ppSP, ppr sty info, ppRbrack]
+  | userStyle sty = brackets (ppr sty info)
+  | otherwise     = brackets (hcat [parens (ppr sty expr), space, ppr sty info])
 
 pprExpr sty (CCall fun args _ is_asm result_ty)
-  = ppHang (if is_asm
-	    then ppBesides [ppPStr SLIT("_casm_ ``"), ppPStr fun, ppPStr SLIT("''")]
-	    else ppBeside  (ppPStr SLIT("_ccall_ ")) (ppPStr fun))
-	 4 (ppSep (map (pprParendExpr sty) args))
+  = hang (if is_asm
+	    then hcat [ptext SLIT("_casm_ ``"), ptext fun, ptext SLIT("''")]
+	    else (<>)  (ptext SLIT("_ccall_ ")) (ptext fun))
+	 4 (sep (map (pprParendExpr sty) args))
 
 pprExpr sty (HsSCC label expr)
-  = ppSep [ ppBeside (ppPStr SLIT("_scc_ ")) (ppBesides [ppChar '"', ppPStr label, ppChar '"']),
+  = sep [ (<>) (ptext SLIT("_scc_ ")) (hcat [char '"', ptext label, char '"']),
 	    pprParendExpr sty expr ]
 
 pprExpr sty (TyLam tyvars expr)
-  = ppHang (ppCat [ppPStr SLIT("/\\"), interppSP sty tyvars, ppPStr SLIT("->")])
+  = hang (hsep [ptext SLIT("/\\"), interppSP sty tyvars, ptext SLIT("->")])
 	 4 (pprExpr sty expr)
 
 pprExpr sty (TyApp expr [ty])
-  = ppHang (pprExpr sty expr) 4 (pprParendGenType sty ty)
+  = hang (pprExpr sty expr) 4 (pprParendGenType sty ty)
 
 pprExpr sty (TyApp expr tys)
-  = ppHang (pprExpr sty expr)
-	 4 (ppBracket (interpp'SP sty tys))
+  = hang (pprExpr sty expr)
+	 4 (brackets (interpp'SP sty tys))
 
 pprExpr sty (DictLam dictvars expr)
-  = ppHang (ppCat [ppPStr SLIT("\\{-dict-}"), interppSP sty dictvars, ppPStr SLIT("->")])
+  = hang (hsep [ptext SLIT("\\{-dict-}"), interppSP sty dictvars, ptext SLIT("->")])
 	 4 (pprExpr sty expr)
 
 pprExpr sty (DictApp expr [dname])
-  = ppHang (pprExpr sty expr) 4 (ppr sty dname)
+  = hang (pprExpr sty expr) 4 (ppr sty dname)
 
 pprExpr sty (DictApp expr dnames)
-  = ppHang (pprExpr sty expr)
-	 4 (ppBracket (interpp'SP sty dnames))
+  = hang (pprExpr sty expr)
+	 4 (brackets (interpp'SP sty dnames))
 
 pprExpr sty (ClassDictLam dicts methods expr)
-  = ppHang (ppCat [ppPStr SLIT("\\{-classdict-}"),
-		   ppBracket (interppSP sty dicts),
-		   ppBracket (interppSP sty methods),
-		   ppPStr SLIT("->")])
+  = hang (hsep [ptext SLIT("\\{-classdict-}"),
+		   brackets (interppSP sty dicts),
+		   brackets (interppSP sty methods),
+		   ptext SLIT("->")])
 	 4 (pprExpr sty expr)
 
 pprExpr sty (Dictionary dicts methods)
-  = ppSep [ppBesides [ppLparen, ppPStr SLIT("{-dict-}")],
-	   ppBracket (interpp'SP sty dicts),
-	   ppBesides [ppBracket (interpp'SP sty methods), ppRparen]]
+  = parens (sep [ptext SLIT("{-dict-}"),
+		   brackets (interpp'SP sty dicts),
+		   brackets (interpp'SP sty methods)])
 
 pprExpr sty (SingleDict dname)
-  = ppCat [ppPStr SLIT("{-singleDict-}"), ppr sty dname]
+  = hsep [ptext SLIT("{-singleDict-}"), ppr sty dname]
 
 \end{code}
 
@@ -361,7 +359,7 @@ Parenthesize unless very simple:
 \begin{code}
 pprParendExpr :: (NamedThing id, Outputable id, Outputable pat,
 		  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	      => PprStyle -> HsExpr tyvar uvar id pat -> Pretty
+	      => PprStyle -> HsExpr tyvar uvar id pat -> Doc
 
 pprParendExpr sty expr
   = let
@@ -377,7 +375,7 @@ pprParendExpr sty expr
       ExplicitTuple _	    -> pp_as_was
       HsPar _		    -> pp_as_was
 
-      _			    -> ppParens pp_as_was
+      _			    -> parens pp_as_was
 \end{code}
 
 %************************************************************************
@@ -389,15 +387,15 @@ pprParendExpr sty expr
 \begin{code}
 pp_rbinds :: (NamedThing id, Outputable id, Outputable pat,
 		  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	      => PprStyle -> Pretty 
-	      -> HsRecordBinds tyvar uvar id pat -> Pretty
+	      => PprStyle -> Doc 
+	      -> HsRecordBinds tyvar uvar id pat -> Doc
 
 pp_rbinds sty thing rbinds
-  = ppHang thing 
-	 4 (ppCurlies (ppIntersperse pp'SP (map (pp_rbind sty) rbinds)))
+  = hang thing 
+	 4 (braces (hsep (punctuate comma (map (pp_rbind sty) rbinds))))
   where
-    pp_rbind PprForUser (v, _, True) = ppr PprForUser v
-    pp_rbind sty        (v, e, _)    = ppCat [ppr sty v, ppChar '=', ppr sty e]
+    pp_rbind sty (v, _, True) | userStyle sty = ppr sty v
+    pp_rbind sty (v, e, _)    		      = hsep [ppr sty v, char '=', ppr sty e]
 \end{code}
 
 %************************************************************************
@@ -410,10 +408,10 @@ pp_rbinds sty thing rbinds
 data DoOrListComp = DoStmt | ListComp
 
 pprDo DoStmt sty stmts
-  = ppHang (ppPStr SLIT("do")) 2 (ppAboves (map (ppr sty) stmts))
+  = hang (ptext SLIT("do")) 2 (vcat (map (ppr sty) stmts))
 pprDo ListComp sty stmts
-  = ppHang (ppCat [ppLbrack, pprExpr sty expr, ppChar '|'])
-	 4 (ppSep [interpp'SP sty quals, ppRbrack])
+  = hang (hsep [lbrack, pprExpr sty expr, char '|'])
+	 4 (sep [interpp'SP sty quals, rbrack])
   where
     ReturnStmt expr = last stmts	-- Last stmt should be a ReturnStmt for list comps
     quals	    = init stmts
@@ -440,16 +438,18 @@ data Stmt tyvar uvar id pat
 instance (NamedThing id, Outputable id, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
 		Outputable (Stmt tyvar uvar id pat) where
-    ppr sty (BindStmt pat expr _)
-     = ppCat [ppr sty pat, ppPStr SLIT("<-"), ppr sty expr]
-    ppr sty (LetStmt binds)
-     = ppCat [ppPStr SLIT("let"), ppr sty binds]
-    ppr sty (ExprStmt expr _)
-     = ppr sty expr
-    ppr sty (GuardStmt expr _)
-     = ppr sty expr
-    ppr sty (ReturnStmt expr)
-     = ppCat [ppPStr SLIT("return"), ppr sty expr]    
+    ppr sty stmt = pprQuote sty $ \ sty -> pprStmt sty stmt
+
+pprStmt sty (BindStmt pat expr _)
+ = hsep [ppr sty pat, ptext SLIT("<-"), ppr sty expr]
+pprStmt sty (LetStmt binds)
+ = hsep [ptext SLIT("let"), ppr sty binds]
+pprStmt sty (ExprStmt expr _)
+ = ppr sty expr
+pprStmt sty (GuardStmt expr _)
+ = ppr sty expr
+pprStmt sty (ReturnStmt expr)
+ = hsep [ptext SLIT("return"), ppr sty expr]    
 \end{code}
 
 %************************************************************************
@@ -474,11 +474,11 @@ data ArithSeqInfo  tyvar uvar id pat
 instance (NamedThing id, Outputable id, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
 		Outputable (ArithSeqInfo tyvar uvar id pat) where
-    ppr sty (From e1)		= ppBesides [ppr sty e1, pp_dotdot]
-    ppr sty (FromThen e1 e2)	= ppBesides [ppr sty e1, pp'SP, ppr sty e2, pp_dotdot]
-    ppr sty (FromTo e1 e3)	= ppBesides [ppr sty e1, pp_dotdot, ppr sty e3]
+    ppr sty (From e1)		= hcat [ppr sty e1, pp_dotdot]
+    ppr sty (FromThen e1 e2)	= hcat [ppr sty e1, comma, space, ppr sty e2, pp_dotdot]
+    ppr sty (FromTo e1 e3)	= hcat [ppr sty e1, pp_dotdot, ppr sty e3]
     ppr sty (FromThenTo e1 e2 e3)
-      = ppBesides [ppr sty e1, pp'SP, ppr sty e2, pp_dotdot, ppr sty e3]
+      = hcat [ppr sty e1, comma, space, ppr sty e2, pp_dotdot, ppr sty e3]
 
-pp_dotdot = ppPStr SLIT(" .. ")
+pp_dotdot = ptext SLIT(" .. ")
 \end{code}

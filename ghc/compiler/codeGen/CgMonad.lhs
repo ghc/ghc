@@ -57,22 +57,28 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling,
 			  opt_OmitBlackHoling
 			)
 import HeapOffs		( maxOff,
-			  SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset)
+			  SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset),
+			  HeapOffset
 			)
+import CLabel           ( CLabel )
 import Id		( idType,
 			  nullIdEnv, mkIdEnv, addOneToIdEnv,
 			  modifyIdEnv, lookupIdEnv, rngIdEnv, SYN_IE(IdEnv),
-			  SYN_IE(ConTag), GenId{-instance Outputable-}
+			  SYN_IE(ConTag), GenId{-instance Outputable-},
+			  SYN_IE(Id)
 			)
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
-import Pretty		( ppAboves, ppCat, ppPStr )
+import Pretty		( Doc, vcat, hsep, ptext )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import StgSyn		( SYN_IE(StgLiveVars) )
 import Type		( typePrimRep )
 import UniqSet		( elementOfUniqSet )
 import Util		( sortLt, panic, pprPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
 
 infixr 9 `thenC`	-- Right-associative!
 infixr 9 `thenFC`
@@ -688,13 +694,13 @@ lookupBindC name info_down@(MkCgInfoDown _ static_binds _)
 		   Just this -> this
 		   Nothing
 		     -> pprPanic "lookupBindC:no info!\n"
-			(ppAboves [
-			    ppCat [ppPStr SLIT("for:"), ppr PprShowAll name],
-			    ppPStr SLIT("(probably: data dependencies broken by an optimisation pass)"),
-			    ppPStr SLIT("static binds for:"),
-			    ppAboves [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv static_binds ],
-			    ppPStr SLIT("local binds for:"),
-			    ppAboves [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv local_binds ]
+			(vcat [
+			    hsep [ptext SLIT("for:"), ppr PprShowAll name],
+			    ptext SLIT("(probably: data dependencies broken by an optimisation pass)"),
+			    ptext SLIT("static binds for:"),
+			    vcat [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv static_binds ],
+			    ptext SLIT("local binds for:"),
+			    vcat [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv local_binds ]
 			 ])
 \end{code}
 

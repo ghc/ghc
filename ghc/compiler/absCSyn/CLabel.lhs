@@ -61,16 +61,20 @@ import Id		( externallyVisibleId, cmpId_withSpecDataCon,
 			  isConstMethodId_maybe,
 			  isDefaultMethodId_maybe,
 			  isSuperDictSelId_maybe, fIRST_TAG,
-			  SYN_IE(ConTag), GenId{-instance Outputable-}
+			  SYN_IE(ConTag), GenId{-instance Outputable-},
+			  SYN_IE(Id)
 			)
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( showTyCon, GenType{-instance Outputable-} )
-import Pretty		( prettyToUn{-, ppPStr ToDo:rm-} )
 import TyCon		( TyCon{-instance Eq-} )
 import Unique		( showUnique, pprUnique, Unique{-instance Eq-} )
-import Unpretty		-- NOTE!! ********************
-import Util		( assertPanic{-, pprTraceToDo:rm-} )
+import Pretty
+import Util		( assertPanic{-, pprTraceToDo:rm-}, Ord3(..) )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
+
 \end{code}
 
 things we want to find out:
@@ -316,92 +320,92 @@ duplicate declarations in generating C (see @labelSeenTE@ in
 pprCLabel_asm = pprCLabel (PprForAsm underscorePrefix fmtAsmLbl)
 #endif
 
-pprCLabel :: PprStyle -> CLabel -> Unpretty
+pprCLabel :: PprStyle -> CLabel -> Doc
 
 pprCLabel (PprForAsm _ fmtAsmLbl) (AsmTempLabel u)
-  = uppStr (fmtAsmLbl (_UNPK_ (showUnique u)))
+  = text (fmtAsmLbl (_UNPK_ (showUnique u)))
 
 pprCLabel (PprForAsm prepend_cSEP _) lbl
   = if prepend_cSEP
-    then uppBeside pp_cSEP prLbl
+    then (<>) pp_cSEP prLbl
     else prLbl
   where
     prLbl = pprCLabel PprForC lbl
 
 pprCLabel sty (TyConLabel tc UnvecConUpdCode)
-  = uppBesides [uppPStr SLIT("ret"), pp_cSEP, ppr_tycon sty tc,
-	       pp_cSEP, uppPStr SLIT("upd")]
+  = hcat [ptext SLIT("ret"), pp_cSEP, ppr_tycon sty tc,
+	       pp_cSEP, ptext SLIT("upd")]
 
 pprCLabel sty (TyConLabel tc (VecConUpdCode tag))
-  = uppBesides [uppPStr SLIT("ret"), pp_cSEP, ppr_tycon sty tc, pp_cSEP,
-		     uppInt tag, pp_cSEP, uppPStr SLIT("upd")]
+  = hcat [ptext SLIT("ret"), pp_cSEP, ppr_tycon sty tc, pp_cSEP,
+		     int tag, pp_cSEP, ptext SLIT("upd")]
 
 pprCLabel sty (TyConLabel tc (StdUpdCode tag))
   = case (ctrlReturnConvAlg tc) of
-	UnvectoredReturn _ -> uppPStr SLIT("IndUpdRetDir")
-    	VectoredReturn _ -> uppBeside (uppPStr SLIT("IndUpdRetV")) (uppInt (tag - fIRST_TAG))
+	UnvectoredReturn _ -> ptext SLIT("IndUpdRetDir")
+    	VectoredReturn _ -> (<>) (ptext SLIT("IndUpdRetV")) (int (tag - fIRST_TAG))
 
 pprCLabel sty (TyConLabel tc InfoTblVecTbl)
-  = uppBesides [ppr_tycon sty tc, pp_cSEP, uppPStr SLIT("itblvtbl")]
+  = hcat [ppr_tycon sty tc, pp_cSEP, ptext SLIT("itblvtbl")]
 
 pprCLabel sty (TyConLabel tc StdUpdVecTbl)
-  = uppBesides [uppPStr SLIT("vtbl"), pp_cSEP, ppr_tycon sty tc,
-    	       pp_cSEP, uppPStr SLIT("upd")]
+  = hcat [ptext SLIT("vtbl"), pp_cSEP, ppr_tycon sty tc,
+    	       pp_cSEP, ptext SLIT("upd")]
 
 pprCLabel sty (CaseLabel u CaseReturnPt)
-  = uppBesides [uppPStr SLIT("ret"), pp_cSEP, ppr_u u]
+  = hcat [ptext SLIT("ret"), pp_cSEP, ppr_u u]
 pprCLabel sty (CaseLabel u CaseVecTbl)
-  = uppBesides [uppPStr SLIT("vtbl"), pp_cSEP, ppr_u u]
+  = hcat [ptext SLIT("vtbl"), pp_cSEP, ppr_u u]
 pprCLabel sty (CaseLabel u (CaseAlt tag))
-  = uppBesides [uppPStr SLIT("djn"), pp_cSEP, ppr_u u, pp_cSEP, uppInt tag]
+  = hcat [ptext SLIT("djn"), pp_cSEP, ppr_u u, pp_cSEP, int tag]
 pprCLabel sty (CaseLabel u CaseDefault)
-  = uppBesides [uppPStr SLIT("djn"), pp_cSEP, ppr_u u]
+  = hcat [ptext SLIT("djn"), pp_cSEP, ppr_u u]
 
-pprCLabel sty (RtsLabel RtsShouldNeverHappenCode) = uppPStr SLIT("StdErrorCode")
+pprCLabel sty (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("StdErrorCode")
 
-pprCLabel sty (RtsLabel RtsBlackHoleInfoTbl) = uppPStr SLIT("BH_UPD_info")
+pprCLabel sty (RtsLabel RtsBlackHoleInfoTbl) = ptext SLIT("BH_UPD_info")
 
 pprCLabel sty (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
-  = uppBesides [uppPStr SLIT("__sel_info_"), uppStr (show offset),
-		uppPStr (if upd_reqd then SLIT("upd") else SLIT("noupd")),
-		uppPStr SLIT("__")]
+  = hcat [ptext SLIT("__sel_info_"), text (show offset),
+		ptext (if upd_reqd then SLIT("upd") else SLIT("noupd")),
+		ptext SLIT("__")]
 
 pprCLabel sty (RtsLabel (RtsSelectorEntry upd_reqd offset))
-  = uppBesides [uppPStr SLIT("__sel_entry_"), uppStr (show offset),
-		uppPStr (if upd_reqd then SLIT("upd") else SLIT("noupd")),
-		uppPStr SLIT("__")]
+  = hcat [ptext SLIT("__sel_entry_"), text (show offset),
+		ptext (if upd_reqd then SLIT("upd") else SLIT("noupd")),
+		ptext SLIT("__")]
 
 pprCLabel sty (IdLabel (CLabelId id) flavor)
-  = uppBeside (prettyToUn (ppr sty id)) (ppFlavor flavor)
+  = (<>) (ppr sty id) (ppFlavor flavor)
 
-ppr_u u = prettyToUn (pprUnique u)
+ppr_u u = pprUnique u
 
 ppr_tycon sty tc
   = let
 	str = showTyCon sty tc
     in
-    --pprTrace "ppr_tycon:" (ppStr str) $
-    uppStr str
+    --pprTrace "ppr_tycon:" (text str) $
+    text str
 
-ppFlavor :: IdLabelInfo -> Unpretty
+ppFlavor :: IdLabelInfo -> Doc
 
-ppFlavor x = uppBeside pp_cSEP
+ppFlavor x = (<>) pp_cSEP
 	     	      (case x of
-		       Closure	    	-> uppPStr SLIT("closure")
-		       InfoTbl	    	-> uppPStr SLIT("info")
-		       EntryStd	    	-> uppPStr SLIT("entry")
+		       Closure	    	-> ptext SLIT("closure")
+		       InfoTbl	    	-> ptext SLIT("info")
+		       EntryStd	    	-> ptext SLIT("entry")
 		       EntryFast arity	-> --false:ASSERT (arity > 0)
-					   uppBeside (uppPStr SLIT("fast")) (uppInt arity)
-		       StaticClosure   	-> uppPStr SLIT("static_closure")
-		       ConEntry	    	-> uppPStr SLIT("con_entry")
-		       ConInfoTbl    	-> uppPStr SLIT("con_info")
-		       StaticConEntry  	-> uppPStr SLIT("static_entry")
-		       StaticInfoTbl 	-> uppPStr SLIT("static_info")
-		       PhantomInfoTbl 	-> uppPStr SLIT("inregs_info")
-		       VapInfoTbl True  -> uppPStr SLIT("vap_info")
-		       VapInfoTbl False -> uppPStr SLIT("vap_noupd_info")
-		       VapEntry True    -> uppPStr SLIT("vap_entry")
-		       VapEntry False   -> uppPStr SLIT("vap_noupd_entry")
-		       RednCounts	-> uppPStr SLIT("ct")
+					   (<>) (ptext SLIT("fast")) (int arity)
+		       StaticClosure   	-> ptext SLIT("static_closure")
+		       ConEntry	    	-> ptext SLIT("con_entry")
+		       ConInfoTbl    	-> ptext SLIT("con_info")
+		       StaticConEntry  	-> ptext SLIT("static_entry")
+		       StaticInfoTbl 	-> ptext SLIT("static_info")
+		       PhantomInfoTbl 	-> ptext SLIT("inregs_info")
+		       VapInfoTbl True  -> ptext SLIT("vap_info")
+		       VapInfoTbl False -> ptext SLIT("vap_noupd_info")
+		       VapEntry True    -> ptext SLIT("vap_entry")
+		       VapEntry False   -> ptext SLIT("vap_noupd_entry")
+		       RednCounts	-> ptext SLIT("ct")
 		      )
 \end{code}

@@ -23,7 +23,7 @@ module HsTypes (
 
 IMP_Ubiq()
 
-import Outputable	( interppSP, ifnotPprForUser )
+import Outputable	--( interppSP, ifnotPprForUser )
 import Kind		( Kind {- instance Outputable -} )
 import Name		( nameOccName )
 import Pretty
@@ -104,7 +104,7 @@ instance (Outputable name) => Outputable (HsType name) where
 
 instance (Outputable name) => Outputable (HsTyVar name) where
     ppr sty (UserTyVar name) = ppr_hs_tyname sty name
-    ppr sty (IfaceTyVar name kind) = ppCat [ppr_hs_tyname sty name, ppPStr SLIT("::"), ppr sty kind]
+    ppr sty (IfaceTyVar name kind) = hsep [ppr_hs_tyname sty name, ptext SLIT("::"), ppr sty kind]
 
 
 -- Here comes a rather gross hack.  
@@ -118,16 +118,17 @@ ppr_hs_tyname other_sty    tv_name = ppr other_sty tv_name
 ppr_forall sty ctxt_prec [] [] ty
    = ppr_mono_ty sty ctxt_prec ty
 ppr_forall sty ctxt_prec tvs ctxt ty
-   = ppSep [ppPStr SLIT("_forall_"), ppBracket (interppSP sty tvs),
-	    pprContext sty ctxt,  ppPStr SLIT("=>"),
+   = maybeParen (ctxt_prec >= pREC_FUN) $
+     sep [ptext SLIT("_forall_"), brackets (interppSP sty tvs),
+	    pprContext sty ctxt,  ptext SLIT("=>"),
 	    pprHsType sty ty]
 
-pprContext :: (Outputable name) => PprStyle -> (Context name) -> Pretty
-pprContext sty []	        = ppNil
+pprContext :: (Outputable name) => PprStyle -> (Context name) -> Doc
+pprContext sty []	        = empty
 pprContext sty context
-  = ppCat [ppCurlies (ppIntersperse pp'SP (map ppr_assert context))]
+  = hsep [braces (hsep (punctuate comma (map ppr_assert context)))]
   where
-    ppr_assert (clas, ty) = ppCat [ppr sty clas, ppr sty ty]
+    ppr_assert (clas, ty) = hsep [ppr sty clas, ppr sty ty]
 \end{code}
 
 \begin{code}
@@ -135,13 +136,13 @@ pREC_TOP = (0 :: Int)
 pREC_FUN = (1 :: Int)
 pREC_CON = (2 :: Int)
 
-maybeParen :: Bool -> Pretty -> Pretty
-maybeParen True  p = ppParens p
+maybeParen :: Bool -> Doc -> Doc
+maybeParen True  p = parens p
 maybeParen False p = p
 	
 -- printing works more-or-less as for Types
 
-pprHsType, pprParendHsType :: (Outputable name) => PprStyle -> HsType name -> Pretty
+pprHsType, pprParendHsType :: (Outputable name) => PprStyle -> HsType name -> Doc
 
 pprHsType sty ty       = ppr_mono_ty sty pREC_TOP ty
 pprParendHsType sty ty = ppr_mono_ty sty pREC_CON ty
@@ -156,20 +157,20 @@ ppr_mono_ty sty ctxt_prec (MonoFunTy ty1 ty2)
 	p2 = ppr_mono_ty sty pREC_TOP ty2
     in
     maybeParen (ctxt_prec >= pREC_FUN)
-	       (ppSep [p1, ppBeside (ppPStr SLIT("-> ")) p2])
+	       (sep [p1, (<>) (ptext SLIT("-> ")) p2])
 
 ppr_mono_ty sty ctxt_prec (MonoTupleTy _ tys)
- = ppParens (ppInterleave ppComma (map (ppr sty) tys))
+ = parens (sep (punctuate comma (map (ppr sty) tys)))
 
 ppr_mono_ty sty ctxt_prec (MonoListTy _ ty)
- = ppBesides [ppLbrack, ppr_mono_ty sty pREC_TOP ty, ppRbrack]
+ = brackets (ppr_mono_ty sty pREC_TOP ty)
 
 ppr_mono_ty sty ctxt_prec (MonoTyApp fun_ty arg_ty)
   = maybeParen (ctxt_prec >= pREC_CON)
-	       (ppCat [ppr_mono_ty sty pREC_FUN fun_ty, ppr_mono_ty sty pREC_CON arg_ty])
+	       (hsep [ppr_mono_ty sty pREC_FUN fun_ty, ppr_mono_ty sty pREC_CON arg_ty])
 
 ppr_mono_ty sty ctxt_prec (MonoDictTy clas ty)
-  = ppCurlies (ppCat [ppr sty clas, ppr_mono_ty sty pREC_CON ty])
+  = braces (hsep [ppr sty clas, ppr_mono_ty sty pREC_CON ty])
 	-- Curlies are temporary
 \end{code}
 
@@ -186,8 +187,8 @@ wrong}, so be careful!
 
 \begin{code}
 cmpHsTyVar :: (a -> a -> TAG_) -> HsTyVar a -> HsTyVar a -> TAG_
-cmpHsType :: (a -> a -> TAG_) -> HsType a -> HsType a -> TAG_
-cmpContext  :: (a -> a -> TAG_) -> Context  a -> Context  a -> TAG_
+--cmpHsType :: (a -> a -> TAG_) -> HsType a -> HsType a -> TAG_
+--cmpContext  :: (a -> a -> TAG_) -> Context  a -> Context  a -> TAG_
 
 cmpHsTyVar cmp (UserTyVar v1)    (UserTyVar v2)    = v1 `cmp` v2
 cmpHsTyVar cmp (IfaceTyVar v1 _) (IfaceTyVar v2 _) = v1 `cmp` v2

@@ -12,12 +12,17 @@ module HsMatches where
 
 IMP_Ubiq(){-uitous-}
 
-IMPORT_DELOOPER(HsLoop)		( HsExpr, nullBinds, HsBinds )
-import Outputable	( ifPprShowAll )
+IMPORT_DELOOPER(HsLoop)		( HsExpr, Stmt, nullBinds, HsBinds )
+import Outputable	--( ifPprShowAll )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty
 import SrcLoc		( SrcLoc{-instances-} )
 import Util		( panic )
+#if __GLASGOW_HASKELL__ >= 202
+import Name
+import PprStyle
+#endif
+       
 \end{code}
 
 %************************************************************************
@@ -70,7 +75,7 @@ data GRHSsAndBinds tyvar uvar id pat
 			(GenType tyvar uvar)
 
 data GRHS tyvar uvar id pat
-  = GRHS	    (HsExpr tyvar uvar id pat)	-- guard(ed)...
+  = GRHS	    [Stmt tyvar uvar id pat]	-- guard(ed)...
 		    (HsExpr tyvar uvar id pat)	-- ... right-hand side
 		    SrcLoc
 
@@ -88,25 +93,25 @@ We know the list must have at least one @Match@ in it.
 \begin{code}
 pprMatches :: (NamedThing id, Outputable id, Outputable pat,
 	       Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		PprStyle -> (Bool, Pretty) -> [Match tyvar uvar id pat] -> Pretty
+		PprStyle -> (Bool, Doc) -> [Match tyvar uvar id pat] -> Doc
 
 pprMatches sty print_info@(is_case, name) [match]
   = if is_case then
     	pprMatch sty is_case match
     else
-    	ppHang name 4 (pprMatch sty is_case match)
+    	hang name 4 (pprMatch sty is_case match)
 
 pprMatches sty print_info (match1 : rest)
- = ppAbove (pprMatches sty print_info [match1])
+ = ($$) (pprMatches sty print_info [match1])
 	   (pprMatches sty print_info rest)
 
 ---------------------------------------------
 pprMatch :: (NamedThing id, Outputable id, Outputable pat,
 	       Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-	PprStyle -> Bool -> Match tyvar uvar id pat -> Pretty
+	PprStyle -> Bool -> Match tyvar uvar id pat -> Doc
 
 pprMatch sty is_case first_match
- = ppHang (ppSep (map (ppr sty) row_of_pats))
+ = hang (sep (map (ppr sty) row_of_pats))
 	8 grhss_etc_stuff
  where
     (row_of_pats, grhss_etc_stuff) = ppr_match sty is_case first_match
@@ -120,35 +125,39 @@ pprMatch sty is_case first_match
       = ([], pprGRHSsAndBinds sty is_case grhss_n_binds)
 
     ppr_match sty is_case (SimpleMatch expr)
-      = ([], ppHang (ppStr (if is_case then "->" else "="))
+      = ([], hang (text (if is_case then "->" else "="))
 		 4 (ppr sty expr))
 
 ----------------------------------------------------------
 
 pprGRHSsAndBinds sty is_case (GRHSsAndBindsIn grhss binds)
- = ppAbove (ppAboves (map (pprGRHS sty is_case) grhss))
+ = ($$) (vcat (map (pprGRHS sty is_case) grhss))
 	   (if (nullBinds binds)
-	    then ppNil
-	    else ppAboves [ ppStr "where", ppNest 4 (ppr sty binds) ])
+	    then empty
+	    else vcat [ text "where", nest 4 (ppr sty binds) ])
 
 pprGRHSsAndBinds sty is_case (GRHSsAndBindsOut grhss binds ty)
- = ppAbove (ppAboves (map (pprGRHS sty is_case) grhss))
+ = ($$) (vcat (map (pprGRHS sty is_case) grhss))
 	   (if (nullBinds binds)
-	    then ppNil
-	    else ppAboves [ ifPprShowAll sty
-				(ppCat [ppStr "{- ty:", ppr sty ty, ppStr "-}"]),
-			    ppStr "where", ppNest 4 (ppr sty binds) ])
+	    then empty
+	    else vcat [ ifPprShowAll sty
+				(hsep [text "{- ty:", ppr sty ty, text "-}"]),
+			    text "where", nest 4 (ppr sty binds) ])
 
 ---------------------------------------------
 pprGRHS :: (NamedThing id, Outputable id, Outputable pat,
 	    Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	=> PprStyle -> Bool -> GRHS tyvar uvar id pat -> Pretty
+	=> PprStyle -> Bool -> GRHS tyvar uvar id pat -> Doc
+
+pprGRHS sty is_case (GRHS [] expr locn)
+ =  hang (text (if is_case then "->" else "="))
+	 4 (ppr sty expr)
 
 pprGRHS sty is_case (GRHS guard expr locn)
- = ppHang (ppCat [ppChar '|', ppr sty guard, ppStr (if is_case then "->" else "=")])
+ = hang (hsep [char '|', ppr sty guard, text (if is_case then "->" else "=")])
         4 (ppr sty expr)
 
 pprGRHS sty is_case (OtherwiseGRHS  expr locn)
-  = ppHang (ppStr (if is_case then "->" else "="))
+  = hang (text (if is_case then "->" else "="))
 	 4 (ppr sty expr)
 \end{code}

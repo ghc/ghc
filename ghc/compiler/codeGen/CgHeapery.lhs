@@ -24,10 +24,10 @@ import CgUsages		( getVirtAndRealHp, setVirtHp, setRealHp,
 			  initHeapUsage
 			)
 import ClosureInfo	( closureSize, closureHdrSize, closureGoodStuffSize,
-			  slopSize, allocProfilingMsg, closureKind
+			  slopSize, allocProfilingMsg, closureKind, ClosureInfo
 			)
 import HeapOffs		( isZeroOff, addOff, intOff,
-			  SYN_IE(VirtualHeapOffset)
+			  SYN_IE(VirtualHeapOffset), HeapOffset
 			)
 import PrimRep		( PrimRep(..) )
 \end{code}

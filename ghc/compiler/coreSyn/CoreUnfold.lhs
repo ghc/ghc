@@ -19,20 +19,23 @@ module CoreUnfold (
 	SimpleUnfolding(..), Unfolding(..), UnfoldingGuidance(..), -- types
 	UfExpr,	RdrName, -- For closure (delete in 1.3)
 
-	FormSummary(..), mkFormSummary, whnfOrBottom, exprSmallEnoughToDup,
+	FormSummary(..), mkFormSummary, whnfOrBottom, exprSmallEnoughToDup, exprIsTrivial,
 
 	noUnfolding, mkMagicUnfolding, mkUnfolding, getUnfoldingTemplate,
 
 	smallEnoughToInline, couldBeSmallEnoughToInline, certainlySmallEnoughToInline,
 	okToInline,
 
-	calcUnfoldingGuidance
+	calcUnfoldingGuidance,
+
+	PragmaInfo(..)		-- Re-export
     ) where
 
 IMP_Ubiq()
 IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking;
 		 -- and also to get mkMagicUnfoldingFun
 IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
+IMPORT_DELOOPER(SmplLoop)
 
 import Bag		( emptyBag, unitBag, unionBags, Bag )
 
@@ -45,13 +48,14 @@ import Constants	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_NOREP_LIT_COST
 			)
 import BinderInfo	( BinderInfo(..), FunOrArg, DuplicationDanger, InsideSCC, isDupDanger )
+import PragmaInfo	( PragmaInfo(..) )
 import CoreSyn
 import CoreUtils	( unTagBinders )
 import HsCore		( UfExpr )
 import RdrHsSyn		( RdrName )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( coreExprType )
-import CostCentre	( ccMentionsId )
+--import CostCentre	( ccMentionsId )
 import Id		( idType, getIdArity,  isBottomingId, isDataCon, isPrimitiveId_maybe,
 			  SYN_IE(IdSet), GenId{-instances-} )
 import PrimOp		( primOpCanTriggerGC, fragilePrimOp, PrimOp(..) )
@@ -60,13 +64,17 @@ import Literal		( isNoRepLit, isLitLitLit )
 import Pretty
 import TyCon		( tyConFamilySize )
 import Type		( maybeAppDataTyConExpandingDicts )
+import Unique           ( Unique )
 import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  addOneToUniqSet, unionUniqSets
 			)
 import Usage		( SYN_IE(UVar) )
 import Maybes		( maybeToBool )
 import Util		( isIn, panic, assertPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
 
+#endif
 \end{code}
 
 %************************************************************************
@@ -95,10 +103,10 @@ data SimpleUnfolding
 
 noUnfolding = NoUnfolding
 
-mkUnfolding inline_me expr
+mkUnfolding inline_prag expr
   = let
      -- strictness mangling (depends on there being no CSE)
-     ufg = calcUnfoldingGuidance inline_me opt_UnfoldingCreationThreshold expr
+     ufg = calcUnfoldingGuidance inline_prag opt_UnfoldingCreationThreshold expr
      occ = occurAnalyseGlobalExpr expr
      cuf = CoreUnfolding (SimpleUnfolding (mkFormSummary expr) ufg occ)
 					  
@@ -124,23 +132,29 @@ data UnfoldingGuidance
 
   | UnfoldIfGoodArgs	Int	-- if "m" type args 
 			Int	-- and "n" value args
+
 			[Int]	-- Discount if the argument is evaluated.
 				-- (i.e., a simplification will definitely
 				-- be possible).  One elt of the list per *value* arg.
+
 			Int	-- The "size" of the unfolding; to be elaborated
 				-- later. ToDo
+
+			Int	-- Scrutinee discount: the discount to substract if the thing is in
+				-- a context (case (thing args) of ...),
+				-- (where there are the right number of arguments.)
 \end{code}
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
-    ppr sty UnfoldAlways    	= ppPStr SLIT("_ALWAYS_")
---    ppr sty EssentialUnfolding	= ppPStr SLIT("_ESSENTIAL_") -- shouldn't appear in an iface
-    ppr sty (UnfoldIfGoodArgs t v cs size)
-      = ppCat [ppPStr SLIT("_IF_ARGS_"), ppInt t, ppInt v,
+    ppr sty UnfoldAlways    	= ptext SLIT("_ALWAYS_")
+    ppr sty (UnfoldIfGoodArgs t v cs size discount)
+      = hsep [ptext SLIT("_IF_ARGS_"), int t, int v,
 	       if null cs	-- always print *something*
-	       	then ppChar 'X'
-		else ppBesides (map (ppStr . show) cs),
-	       ppInt size ]
+	       	then char 'X'
+		else hcat (map (text . show) cs),
+	       int size,
+	       int discount ]
 \end{code}
 
 
@@ -159,10 +173,10 @@ data FormSummary
   | OtherForm		-- Anything else
 
 instance Outputable FormSummary where
-   ppr sty VarForm    = ppPStr SLIT("Var")
-   ppr sty ValueForm  = ppPStr SLIT("Value")
-   ppr sty BottomForm = ppPStr SLIT("Bot")
-   ppr sty OtherForm  = ppPStr SLIT("Other")
+   ppr sty VarForm    = ptext SLIT("Var")
+   ppr sty ValueForm  = ptext SLIT("Value")
+   ppr sty BottomForm = ptext SLIT("Bot")
+   ppr sty OtherForm  = ptext SLIT("Other")
 
 mkFormSummary ::GenCoreExpr bndr Id tyvar uvar -> FormSummary
 
@@ -174,6 +188,9 @@ mkFormSummary expr
     go n (Prim _ _)	= OtherForm
     go n (SCC _ e)      = go n e
     go n (Coerce _ _ e) = go n e
+
+    go n (Let (NonRec b r) e) | exprIsTrivial r = go n e	-- let f = f' alpha in (f,g) 
+								-- should be treated as a value
     go n (Let _ e)      = OtherForm
     go n (Case _ _)     = OtherForm
 
@@ -200,6 +217,15 @@ whnfOrBottom e = case mkFormSummary e of
 			OtherForm  -> False
 \end{code}
 
+@exprIsTrivial@ is true of expressions we are unconditionally happy to duplicate;
+simple variables and constants, and type applications.
+
+\begin{code}
+exprIsTrivial (Var v) 		= True
+exprIsTrivial (Lit lit)         = not (isNoRepLit lit)
+exprIsTrivial (App e (TyArg _)) = exprIsTrivial e
+exprIsTrivial other		= False
+\end{code}
 
 \begin{code}
 exprSmallEnoughToDup (Con _ _)   = True	-- Could check # of args
@@ -208,24 +234,12 @@ exprSmallEnoughToDup (Lit lit)   = not (isNoRepLit lit)
 exprSmallEnoughToDup expr
   = case (collectArgs expr) of { (fun, _, _, vargs) ->
     case fun of
-      Var v | length vargs == 0 -> True
+      Var v | length vargs <= 4 -> True
       _				-> False
     }
 
-{- LATER:
-WAS: MORE CLEVER:
-exprSmallEnoughToDup expr  -- for now, just: <var> applied to <args>
-  = case (collectArgs expr) of { (fun, _, _, vargs) ->
-    case fun of
-      Var v -> v /= buildId
-		 && v /= augmentId
-		 && length vargs <= 6 -- or 10 or 1 or 4 or anything smallish.
-      _       -> False
-    }
--}
 \end{code}
-Question (ADR): What is the above used for?  Is a _ccall_ really small
-enough?
+
 
 %************************************************************************
 %*									*
@@ -235,25 +249,28 @@ enough?
 
 \begin{code}
 calcUnfoldingGuidance
-	:: Bool		    	-- True <=> there's an INLINE pragma on this thing
+	:: PragmaInfo	    	-- INLINE pragma stuff
 	-> Int		    	-- bomb out if size gets bigger than this
 	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
 
-calcUnfoldingGuidance True bOMB_OUT_SIZE expr = UnfoldAlways	-- Always inline if the INLINE pragma says so
+calcUnfoldingGuidance IMustBeINLINEd    bOMB_OUT_SIZE expr = UnfoldAlways	-- Always inline if the INLINE pragma says so
+calcUnfoldingGuidance IWantToBeINLINEd  bOMB_OUT_SIZE expr = UnfoldAlways	-- Always inline if the INLINE pragma says so
+calcUnfoldingGuidance IMustNotBeINLINEd bOMB_OUT_SIZE expr = UnfoldNever	-- ...and vice versa...
 
-calcUnfoldingGuidance False bOMB_OUT_SIZE expr
+calcUnfoldingGuidance NoPragmaInfo bOMB_OUT_SIZE expr
   = case collectBinders expr of { (use_binders, ty_binders, val_binders, body) ->
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
-      Nothing -> UnfoldNever
+      TooBig -> UnfoldNever
 
-      Just (size, cased_args)
+      SizeIs size cased_args scrut_discount
 	-> UnfoldIfGoodArgs
 			(length ty_binders)
 			(length val_binders)
 			(map discount_for val_binders)
-			size  
+			(I# size)
+			(I# scrut_discount)
 	where        
 	    discount_for b
 	         | is_data && b `is_elem` cased_args = tyConFamilySize tycon
@@ -272,44 +289,23 @@ sizeExpr :: Int 	    -- Bomb out if it gets bigger than this
 	 -> [Id]	    -- Arguments; we're interested in which of these
 			    -- get case'd
 	 -> CoreExpr
-	 -> Maybe (Int,	    -- Size
-		   [Id]	    -- Subset of args which are cased
-	    )
+	 -> ExprSize
 
-sizeExpr bOMB_OUT_SIZE args expr
-
-  | data_or_prim fun
--- We are very keen to inline literals, constructors, or primitives
--- including their slightly-disguised forms as applications (the latter
--- can show up in the bodies of things imported from interfaces).
-  = Just (0, [])
-
-  | otherwise
+sizeExpr (I# bOMB_OUT_SIZE) args expr
   = size_up expr
   where
-    (fun, _) = splitCoreApps expr
-    data_or_prim (Var v)    = maybeToBool (isPrimitiveId_maybe v) ||
-			      isDataCon v
-    data_or_prim (Con _ _)  = True
-    data_or_prim (Prim _ _) = True
-    data_or_prim (Lit _)    = True
-    data_or_prim other	    = False
-			
-    size_up (Var v)        = sizeZero
-    size_up (App fun arg)  = size_up fun `addSize` size_up_arg arg `addSizeN` 1
-				-- 1 for application node
-
-    size_up (Lit lit)      = if isNoRepLit lit
-			     then sizeN uNFOLDING_NOREP_LIT_COST
-			     else sizeZero
-
--- I don't understand this hack so I'm removing it!  SLPJ Nov 96
---    size_up (SCC _ (Con _ _)) = Nothing -- **** HACK *****
+    size_up (Var v)        	       = sizeZero
+    size_up (Lit lit) | isNoRepLit lit = sizeN uNFOLDING_NOREP_LIT_COST
+		      | otherwise      = sizeZero
 
     size_up (SCC lbl body)    = size_up body		-- SCCs cost nothing
     size_up (Coerce _ _ body) = size_up body		-- Coercions cost nothing
 
-    size_up (Con con args) = sizeN (numValArgs args)
+    size_up (App fun arg)  = size_up fun `addSize` size_up_arg arg
+				-- NB Zero cost for for type applications;
+				-- others cost 1 or more
+
+    size_up (Con con args) = conSizeN (numValArgs args)
 			     -- We don't count 1 for the constructor because we're
 			     -- quite keen to get constructors into the open
 			     
@@ -328,32 +324,34 @@ sizeExpr bOMB_OUT_SIZE args expr
 	size_up body `addSizeN` length args
 
     size_up (Let (NonRec binder rhs) body)
-      = size_up rhs
+      = nukeScrutDiscount (size_up rhs)
 		`addSize`
 	size_up body
-		`addSizeN`
-	1
 
     size_up (Let (Rec pairs) body)
-      = foldr addSize sizeZero [size_up rhs | (_,rhs) <- pairs]
+      = nukeScrutDiscount (foldr addSize sizeZero [size_up rhs | (_,rhs) <- pairs])
 		`addSize`
 	size_up body
-		`addSizeN`
-	length pairs
 
     size_up (Case scrut alts)
-      = size_up_scrut scrut
+      = nukeScrutDiscount (size_up scrut)
+		`addSize`
+	arg_discount scrut
 		`addSize`
 	size_up_alts (coreExprType scrut) alts
 	    -- We charge for the "case" itself in "size_up_alts"
 
     ------------
+	-- In an application we charge	0 for type application
+	-- 				1 for most anything else
+	--				N for norep_lits
     size_up_arg (LitArg lit) | isNoRepLit lit = sizeN uNFOLDING_NOREP_LIT_COST
-    size_up_arg other			      = sizeZero
+    size_up_arg (TyArg _)		      = sizeZero
+    size_up_arg other			      = sizeOne
 
     ------------
     size_up_alts scrut_ty (AlgAlts alts deflt)
-      = foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts 
+      = (foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts)
 	`addSizeN`
 	alt_cost
       where
@@ -370,8 +368,7 @@ sizeExpr bOMB_OUT_SIZE args expr
 
 	alt_cost :: Int
 	alt_cost
-	  = --trace "CoreUnfold.getAppDataTyConExpandingDicts:2" $ 
-	    case (maybeAppDataTyConExpandingDicts scrut_ty) of
+	  = case (maybeAppDataTyConExpandingDicts scrut_ty) of
 	      Nothing       -> 1
 	      Just (tc,_,_) -> tyConFamilySize tc
 
@@ -382,47 +379,59 @@ sizeExpr bOMB_OUT_SIZE args expr
 	size_prim_alt (lit,rhs) = size_up rhs
 
     ------------
-    size_up_deflt NoDefault = sizeZero
+    size_up_deflt NoDefault		   = sizeZero
     size_up_deflt (BindDefault binder rhs) = size_up rhs
 
     ------------
-	-- Scrutinees.  There are two things going on here.
-	-- First, we want to record if we're case'ing an argument
-	-- Second, we want to charge nothing for the srutinee if it's just
-	-- a variable.  That way wrapper-like things look cheap.
-    size_up_scrut (Var v) | v `is_elem` args = Just (0, [v])
-			  | otherwise	     = Just (0, [])
-    size_up_scrut other			     = size_up other
+	-- We want to record if we're case'ing an argument
+    arg_discount (Var v) | v `is_elem` args = scrutArg v
+    arg_discount other			    = sizeZero
 
     is_elem :: Id -> [Id] -> Bool
     is_elem = isIn "size_up_scrut"
 
     ------------
-    sizeZero  = Just (0, [])
-    sizeOne   = Just (1, [])
-    sizeN n   = Just (n, [])
+	-- These addSize things have to be here because
+	-- I don't want to give them bOMB_OUT_SIZE as an argument
 
-    addSizeN Nothing _ = Nothing
-    addSizeN (Just (n, xs)) m
-      | tot < bOMB_OUT_SIZE = Just (tot, xs)
-      | otherwise = Nothing
+    addSizeN TooBig          _ = TooBig
+    addSizeN (SizeIs n xs d) (I# m)
+      | n_tot -# d <# bOMB_OUT_SIZE = SizeIs n_tot xs d
+      | otherwise 		    = TooBig
       where
-	tot = n+m
-
-    addSize Nothing _ = Nothing
-    addSize _ Nothing = Nothing
-    addSize (Just (n, xs)) (Just (m, ys))
-      | tot < bOMB_OUT_SIZE = Just (tot, xys)
-      | otherwise  = Nothing
+	n_tot = n +# m
+    
+    addSize TooBig _ = TooBig
+    addSize _ TooBig = TooBig
+    addSize (SizeIs n1 xs d1) (SizeIs n2 ys d2)
+      | (n_tot -# d_tot) <# bOMB_OUT_SIZE = SizeIs n_tot xys d_tot
+      | otherwise 			  = TooBig
       where
-	tot = n+m
-	xys = xs ++ ys
+	n_tot = n1 +# n2
+	d_tot = d1 +# d2
+	xys   = xs ++ ys
 
-splitCoreApps e
-  = go e []
-  where
-    go (App fun arg) args = go fun (arg:args)
-    go fun           args = (fun,args)
+
+\end{code}
+
+Code for manipulating sizes
+
+\begin{code}
+
+data ExprSize = TooBig
+	      | SizeIs Int#	-- Size found
+		       [Id]	-- Arguments cased herein
+		       Int#	-- Size to subtract if result is scrutinised 
+				-- by a case expression
+
+sizeZero     	= SizeIs 0# [] 0#
+sizeOne      	= SizeIs 1# [] 0#
+sizeN (I# n) 	= SizeIs n  [] 0#
+conSizeN (I# n) = SizeIs n [] n
+scrutArg v	= SizeIs 0# [v] 0#
+
+nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs 0#
+nukeScrutDiscount TooBig	  = TooBig
 \end{code}
 
 %************************************************************************
@@ -437,7 +446,8 @@ purposes here, we assume we've got those.  (2)~A ``size'' or ``cost,''
 a single integer.  (3)~An ``argument info'' vector.  For this, what we
 have at the moment is a Boolean per argument position that says, ``I
 will look with great favour on an explicit constructor in this
-position.''
+position.'' (4)~The ``discount'' to subtract if the expression
+is being scrutinised. 
 
 Assuming we have enough type- and value arguments (if not, we give up
 immediately), then we see if the ``discounted size'' is below some
@@ -446,25 +456,44 @@ position where we're looking for a constructor AND WE HAVE ONE in our
 hands, we get a (again, semi-arbitrary) discount [proportion to the
 number of constructors in the type being scrutinized].
 
+If we're in the context of a scrutinee ( \tr{(case <expr > of A .. -> ...;.. )})
+and the expression in question will evaluate to a constructor, we use
+the computed discount size *for the result only* rather than
+computing the argument discounts. Since we know the result of
+the expression is going to be taken apart, discounting its size
+is more accurate (see @sizeExpr@ above for how this discount size
+is computed).
+
 \begin{code}
 smallEnoughToInline :: [Bool]			-- Evaluated-ness of value arguments
+		    -> Bool			-- Result is scrutinised
 		    -> UnfoldingGuidance
 		    -> Bool			-- True => unfold it
 
-smallEnoughToInline _ UnfoldAlways = True
-smallEnoughToInline _ UnfoldNever  = False
-smallEnoughToInline arg_is_evald_s
-	      (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size)
+smallEnoughToInline _ _ UnfoldAlways = True
+smallEnoughToInline _ _ UnfoldNever  = False
+smallEnoughToInline arg_is_evald_s result_is_scruted
+	      (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size scrut_discount)
   = enough_args n_vals_wanted arg_is_evald_s &&
     discounted_size <= opt_UnfoldingUseThreshold
   where
+
+    enough_args n [] | n > 0 = False	-- A function with no value args => don't unfold
+    enough_args _ _	     = True	-- Otherwise it's ok to try
+
+{-	OLD: require saturated args
     enough_args 0 evals  = True
     enough_args n []     = False
     enough_args n (e:es) = enough_args (n-1) es
 	-- NB: don't take the length of arg_is_evald_s because when
 	-- called from couldBeSmallEnoughToInline it is infinite!
+-}
 
-    discounted_size = size - sum (zipWith arg_discount discount_vec arg_is_evald_s)
+    discounted_size = size - args_discount - result_discount
+
+    args_discount = sum (zipWith arg_discount discount_vec arg_is_evald_s)
+    result_discount | result_is_scruted = scrut_discount
+		    | otherwise		= 0
 
     arg_discount no_of_constrs is_evald
       | is_evald  = 1 + no_of_constrs * opt_UnfoldingConDiscount
@@ -476,11 +505,12 @@ use'' on the other side.  Can be overridden w/ flaggery.
 Just the same as smallEnoughToInline, except that it has no actual arguments.
 
 \begin{code}
+--UNUSED?
 couldBeSmallEnoughToInline :: UnfoldingGuidance -> Bool
-couldBeSmallEnoughToInline guidance = smallEnoughToInline (repeat True) guidance
+couldBeSmallEnoughToInline guidance = smallEnoughToInline (repeat True) True guidance
 
 certainlySmallEnoughToInline :: UnfoldingGuidance -> Bool
-certainlySmallEnoughToInline guidance = smallEnoughToInline (repeat False) guidance
+certainlySmallEnoughToInline guidance = smallEnoughToInline (repeat False) False guidance
 \end{code}
 
 Predicates

@@ -23,15 +23,15 @@ IMP_Ubiq(){-uitous-}
 
 import AbsCSyn
 
-import CLabel		( mkReturnPtLabel )
-import Digraph		( stronglyConnComp )
+import CLabel		( mkReturnPtLabel, CLabel )
+import Digraph		( stronglyConnComp, SCC(..) )
 import HeapOffs		( possiblyEqualHeapOffset )
 import Id		( fIRST_TAG, SYN_IE(ConTag) )
 import Literal		( literalPrimRep, Literal(..) )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )
-import UniqSupply	( getUnique, getUniques, splitUniqSupply )
-import Util		( panic )
+import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
+import Util		( assocDefaultUsing, panic, Ord3(..) )
 
 infixr 9 `thenFlt`
 \end{code}
@@ -628,38 +628,22 @@ sameAmode other1		     other2		     = False
 doSimultaneously1 :: [CVertex] -> FlatM AbstractC
 doSimultaneously1 vertices
   = let
-	edges :: [CEdge]
-	edges = concat (map edges_from vertices)
-
-	edges_from :: CVertex -> [CEdge]
-	edges_from v1 = [(v1,v2) | v2 <- vertices, v1 `should_follow` v2]
-
-	should_follow :: CVertex -> CVertex -> Bool
-	(n1, CAssign dest1 _) `should_follow` (n2, CAssign _ src2)
-	  = dest1 `conflictsWith` src2
-	(n1, COpStmt dests1 _ _ _ _) `should_follow` (n2, CAssign _ src2)
-	  = or [dest1 `conflictsWith` src2 | dest1 <- dests1]
-	(n1, CAssign dest1 _)`should_follow` (n2, COpStmt _ _ srcs2 _ _)
-	  = or [dest1 `conflictsWith` src2 | src2 <- srcs2]
-	(n1, COpStmt dests1 _ _ _ _) `should_follow` (n2, COpStmt _ _ srcs2 _ _)
-	  = or [dest1 `conflictsWith` src2 | dest1 <- dests1, src2 <- srcs2]
-
---	(_, COpStmt _ _ _ _ _) `should_follow` (_, CCallProfCtrMacro _ _) = False
---	(_, CCallProfCtrMacro _ _) `should_follow` (_, COpStmt _ _ _ _ _) = False
-
-	eq_vertex :: CVertex -> CVertex -> Bool
-	(n1, _) `eq_vertex` (n2, _) = n1 == n2
-
-	components = stronglyConnComp eq_vertex edges vertices
+	edges = [ (vertex, key1, edges_from stmt1)
+		| vertex@(key1, stmt1) <- vertices
+		]
+	edges_from stmt1 = [ key2 | (key2, stmt2) <- vertices, 
+				    stmt1 `should_follow` stmt2
+			   ]
+	components = stronglyConnComp edges
 
 	-- do_components deal with one strongly-connected component
-	do_component :: [CVertex] -> FlatM AbstractC
+		-- Not cyclic, or singleton?  Just do it
+	do_component (AcyclicSCC (n,abs_c))  = returnFlt abs_c
+	do_component (CyclicSCC [(n,abs_c)]) = returnFlt abs_c
 
-	-- A singleton?  Then just do it.
-	do_component [(n,abs_c)] = returnFlt abs_c
-
-	-- Two or more?  Then go via temporaries.
-	do_component ((n,first_stmt):rest)
+		-- Cyclic?  Then go via temporaries.  Pick one to
+		-- break the loop and try again with the rest.
+	do_component (CyclicSCC ((n,first_stmt) : rest))
 	  = doSimultaneously1 rest	`thenFlt` \ abs_cs ->
 	    go_via_temps first_stmt	`thenFlt` \ (to_temps, from_temps) ->
 	    returnFlt (mkAbstractCs [to_temps, abs_cs, from_temps])
@@ -681,6 +665,22 @@ doSimultaneously1 vertices
     in
     mapFlt do_component components `thenFlt` \ abs_cs ->
     returnFlt (mkAbstractCs abs_cs)
+
+  where
+    should_follow :: AbstractC -> AbstractC -> Bool
+    (CAssign dest1 _) `should_follow` (CAssign _ src2)
+      = dest1 `conflictsWith` src2
+    (COpStmt dests1 _ _ _ _) `should_follow` (CAssign _ src2)
+      = or [dest1 `conflictsWith` src2 | dest1 <- dests1]
+    (CAssign dest1 _)`should_follow` (COpStmt _ _ srcs2 _ _)
+      = or [dest1 `conflictsWith` src2 | src2 <- srcs2]
+    (COpStmt dests1 _ _ _ _) `should_follow` (COpStmt _ _ srcs2 _ _)
+      = or [dest1 `conflictsWith` src2 | dest1 <- dests1, src2 <- srcs2]
+
+--    (COpStmt _ _ _ _ _) `should_follow` (CCallProfCtrMacro _ _) = False
+--    (CCallProfCtrMacro _ _) `should_follow` (COpStmt _ _ _ _ _) = False
+
+
 \end{code}
 
 

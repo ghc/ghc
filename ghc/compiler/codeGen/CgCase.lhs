@@ -45,16 +45,19 @@ import CLabel		( mkVecTblLabel, mkReturnPtLabel, mkDefaultLabel,
 			)
 import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynCon )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
-import CostCentre	( useCurrentCostCentre )
+import CostCentre	( useCurrentCostCentre, CostCentre )
 import HeapOffs		( SYN_IE(VirtualSpBOffset), SYN_IE(VirtualHeapOffset) )
 import Id		( idPrimRep, toplevelishId,
 			  dataConTag, fIRST_TAG, SYN_IE(ConTag),
 			  isDataCon, SYN_IE(DataCon),
-			  idSetToList, GenId{-instance Uniquable,Eq-}
+			  idSetToList, GenId{-instance Uniquable,Eq-}, SYN_IE(Id)
 			)
+import Literal          ( Literal )
 import Maybes		( catMaybes )
+import Outputable       ( Outputable(..) )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
+import Pretty		( Doc )
 import PrimOp		( primOpCanTriggerGC, PrimOp(..),
 			  primOpStackRequired, StackRequirement(..)
 			)
@@ -64,11 +67,15 @@ import PrimRep		( getPrimRepSize, isFollowableRep, retPrimRepSize,
 import TyCon		( isEnumerationTyCon )
 import Type		( typePrimRep,
 			  getAppSpecDataTyConExpandingDicts,
-			  maybeAppSpecDataTyConExpandingDicts
+			  maybeAppSpecDataTyConExpandingDicts,
+			  SYN_IE(Type)
 			)
+import Unique           ( Unique )
+import UniqFM           ( Uniquable(..) )
 import Util		( sortLt, isIn, isn'tIn, zipEqual,
 			  pprError, panic, assertPanic
 			)
+
 \end{code}
 
 \begin{code}

@@ -38,17 +38,20 @@ import TysWiredIn
 import CStrings		( identToC )
 import Constants   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
-import PprStyle		( codeStyle, ifaceStyle )
+import PprStyle		--( codeStyle, ifaceStyle )
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import TyCon		( TyCon{-instances-} )
-import Type		( getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts,
+import Type	{-	( getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts,
 			  mkForAllTys, mkFunTy, mkFunTys, applyTyCon, typePrimRep
-			)
-import TyVar		( alphaTyVar, betaTyVar, gammaTyVar, GenTyVar{-instance Eq-} )
+			) -}
+import TyVar		--( alphaTyVar, betaTyVar, gammaTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
 import Util		( panic#, assoc, panic{-ToDo:rm-} )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 \end{code}
 
 %************************************************************************
@@ -766,6 +769,7 @@ primOpInfo IntQuotOp = Dyadic SLIT("quotInt#")	 intPrimTy
 primOpInfo IntRemOp  = Dyadic SLIT("remInt#")	 intPrimTy
 
 primOpInfo IntNegOp  = Monadic SLIT("negateInt#") intPrimTy
+primOpInfo IntAbsOp  = Monadic SLIT("absInt#") intPrimTy
 \end{code}
 
 %************************************************************************
@@ -1771,11 +1775,10 @@ compare_fun_ty ty = mkFunTys [ty, ty] boolTy
 
 Output stuff:
 \begin{code}
-pprPrimOp  :: PprStyle -> PrimOp -> Pretty
+pprPrimOp  :: PprStyle -> PrimOp -> Doc
 showPrimOp :: PprStyle -> PrimOp -> String
 
-showPrimOp sty op
-  = ppShow 1000{-random-} (pprPrimOp sty op)
+showPrimOp sty op = render (pprPrimOp sty op)
 
 pprPrimOp sty (CCallOp fun is_casm may_gc arg_tys res_ty)
   = let
@@ -1786,22 +1789,22 @@ pprPrimOp sty (CCallOp fun is_casm may_gc arg_tys res_ty)
 	       if may_gc then "_ccall_GC_ " else "_ccall_ "
 
 	after
-	  = if is_casm then ppStr "''" else ppNil
+	  = if is_casm then text "''" else empty
 
 	pp_tys
-	  = ppCat (map (pprParendGenType sty) (res_ty:arg_tys))
+	  = hsep (map (pprParendGenType sty) (res_ty:arg_tys))
     in
-    ppBesides [ppStr before, ppPStr fun, after, ppSP, ppLbrack, pp_tys, ppRbrack]
+    hcat [text before, ptext fun, after, space, brackets pp_tys]
 
 pprPrimOp sty other_op
   | codeStyle sty 	-- For C just print the primop itself
   = identToC str
 
   | ifaceStyle sty	-- For interfaces Print it qualified with GHC.
-  = ppPStr SLIT("GHC.") `ppBeside` ppPStr str
+  = ptext SLIT("GHC.") <> ptext str
 
   | otherwise		-- Unqualified is good enough
-  = ppPStr str
+  = ptext str
   where
     str = primOp_str other_op
 

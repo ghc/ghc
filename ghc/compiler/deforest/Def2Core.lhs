@@ -153,4 +153,4 @@ XXX - in here becuase if it goes in DefUtils we've got mutual recursion.
 > defPanic :: String -> String -> DefExpr -> UniqSM a
 > defPanic modl fun expr =
 > 	d2c expr	`thenUs` \expr ->
-> 	panic (modl ++ "(" ++ fun ++ "): " ++ ppShow 80 (ppr PprDebug expr))
+> 	panic (modl ++ "(" ++ fun ++ "): " ++ show (ppr PprDebug expr))

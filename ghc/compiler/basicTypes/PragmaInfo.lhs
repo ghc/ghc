@@ -14,5 +14,11 @@ IMP_Ubiq()
 \begin{code}
 data PragmaInfo
   = NoPragmaInfo
+
   | IWantToBeINLINEd
+
+  | IMustNotBeINLINEd	-- Used by the simplifier to prevent looping
+			-- on recursive definitions
+
+  | IMustBeINLINEd	-- Absolutely must inline; used for PrimOps only
 \end{code}

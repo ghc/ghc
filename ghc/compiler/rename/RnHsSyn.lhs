@@ -11,6 +11,9 @@ module RnHsSyn where
 IMP_Ubiq()
 
 import HsSyn
+#if __GLASGOW_HASKELL__ >= 202
+import HsPragmas
+#endif
 
 import Id		( GenId, SYN_IE(Id) )
 import Name		( Name )
@@ -28,7 +31,6 @@ import Util		( panic, pprPanic{-, pprTrace ToDo:rm-} )
 
 \begin{code}
 type RenamedArithSeqInfo	= ArithSeqInfo		Fake Fake Name RenamedPat
-type RenamedBind		= Bind			Fake Fake Name RenamedPat
 type RenamedClassDecl		= ClassDecl		Fake Fake Name RenamedPat
 type RenamedClassOpSig		= Sig			Name
 type RenamedConDecl		= ConDecl		Name

@@ -35,10 +35,15 @@ import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( opt_SccProfilingOn, opt_CompilingGhcInternals,
 			  opt_EnsureSplittableC, opt_SccGroup
 			)
+import CostCentre       ( CostCentre )
 import CStrings		( modnameToC )
 import FiniteMap	( FiniteMap )
+import Id               ( SYN_IE(Id) )
 import Maybes		( maybeToBool )
+import Name             ( SYN_IE(Module) )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
+import Type             ( SYN_IE(Type) )
+import TyCon            ( TyCon )
 import Util		( panic, assertPanic )
 \end{code}
 

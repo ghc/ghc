@@ -35,16 +35,18 @@ import CgTailCall	( cgTailCall, performReturn,
 			  mkDynamicAlgReturnCode, mkPrimReturnCode
 			)
 import CLabel		( mkPhantomInfoTableLabel, mkInfoTableVecTblLabel )
-import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo, mkVapLFInfo, lfArity_maybe,
+import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo, mkVapLFInfo,
 			  layOutDynCon )
 import CostCentre	( sccAbleCostCentre, isDictCC, isSccCountCostCentre )
 import HeapOffs		( SYN_IE(VirtualSpBOffset), intOffsetIntoGoods )
 import Id		( dataConTyCon, idPrimRep, getIdArity, 
-			  mkIdSet, unionIdSets, GenId{-instance Outputable-}
+			  mkIdSet, unionIdSets, GenId{-instance Outputable-},
+			  SYN_IE(Id)
 			)
 import IdInfo		( ArityInfo(..) )
 import Name		( isLocallyDefined )
 import PprStyle		( PprStyle(..) )
+import Pretty		( Doc )
 import PrimOp		( primOpCanTriggerGC, primOpHeapReq, HeapRequirement(..),
 			  getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..)
 			)
@@ -52,6 +54,9 @@ import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, maybeTyConSingleCon  )
 import Maybes		( assocMaybe, maybeToBool )
 import Util		( panic, isIn, pprPanic, assertPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
 \end{code}
 
 This module provides the support code for @StgToAbstractC@ to deal
@@ -312,8 +317,10 @@ cgRhs name (StgRhsCon maybe_cc con args)
     zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag args body)
-  = mkRhsLFInfo fvs upd_flag args body 	`thenFC` \ lf_info ->
-    cgRhsClosure name cc bi fvs args body lf_info
+  = cgRhsClosure name cc bi fvs args body lf_info
+  where
+    lf_info = mkRhsLFInfo fvs upd_flag args body
+    
 \end{code}
 
 mkRhsLFInfo looks for two special forms of the right-hand side:
@@ -322,8 +329,13 @@ mkRhsLFInfo looks for two special forms of the right-hand side:
 
 If neither happens, it just calls mkClosureLFInfo.  You might think
 that mkClosureLFInfo should do all this, but
+
 	(a) it seems wrong for the latter to look at the structure 
 		of an expression
+
+	[March 97: item (b) is no longer true, but I've left mkRhsLFInfo here
+	 anyway because of (a).]
+
 	(b) mkRhsLFInfo has to be in the monad since it looks up in
 		the environment, and it's very tiresome for mkClosureLFInfo to
 		be.  Apart from anything else it would make a loop between
@@ -355,7 +367,7 @@ mkRhsLFInfo	[the_fv]   		-- Just one free var
   && maybeToBool offset_into_int_maybe
   && offset_into_int <= mAX_SPEC_SELECTEE_SIZE	-- Offset is small enough
   = -- ASSERT(is_single_constructor) 		-- Should be true, but causes error for SpecTyCon
-    returnFC (mkSelectorLFInfo scrutinee con offset_into_int)
+    mkSelectorLFInfo scrutinee con offset_into_int
   where
     (_, params_w_offsets) = layOutDynCon con idPrimRep params
     maybe_offset	  = assocMaybe params_w_offsets selectee
@@ -381,26 +393,13 @@ mkRhsLFInfo 	fvs
 		[]			-- No args; a thunk
 		(StgApp (StgVarArg fun_id) args _)
   | isLocallyDefined fun_id		-- Must be defined in this module
-  = 	-- Get the arity of the fun_id.  We could find out from the
-	-- looking in the Id, but it's more certain just to look in the code
-	-- generator's environment.
-
-----------------------------------------------
--- Sadly, looking in the environment, as suggested above,
--- causes a black hole (because cgRhsClosure depends on the LFInfo 
--- returned here to determine its control flow.
--- So I wimped out and went back to looking at the arity inside the Id.
--- That means beefing up Core2Stg to propagate it.  Sigh.
---     getCAddrModeAndInfo fun_id		`thenFC` \ (_, fun_lf_info) ->
---     let arity_maybe = lfArity_maybe fun_lf_info
-----------------------------------------------
-
+  = 	-- Get the arity of the fun_id.  It's guaranteed to be correct (by setStgVarInfo).
      let
 	arity_maybe = case getIdArity fun_id of
 			ArityExactly n  -> Just n
 			other		-> Nothing
      in
-     returnFC (case arity_maybe of
+     case arity_maybe of
 		Just arity
 		    | arity > 0 &&			-- It'd better be a function!
 		      arity == length args		-- Saturated application
@@ -408,8 +407,6 @@ mkRhsLFInfo 	fvs
 			mkVapLFInfo fvs upd_flag fun_id args store_fun_in_vap
 
 		other -> mkClosureLFInfo False{-not top level-} fvs upd_flag []
-     )
-
   where	
 	-- If the function is a free variable then it must be stored
 	-- in the thunk too; if it isn't a free variable it must be
@@ -422,7 +419,7 @@ The default case
 ~~~~~~~~~~~~~~~~
 \begin{code}
 mkRhsLFInfo fvs upd_flag args body
-  = returnFC (mkClosureLFInfo False{-not top level-} fvs upd_flag args)
+  = mkClosureLFInfo False{-not top level-} fvs upd_flag args
 \end{code}
 
 

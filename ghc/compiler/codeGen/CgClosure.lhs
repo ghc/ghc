@@ -49,24 +49,24 @@ import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_ForConcurrent, opt_GranMacros )
 import CostCentre	( useCurrentCostCentre, currentOrSubsumedCosts,
 			  noCostCentreAttached, costsAreSubsumed,
-			  isCafCC, isDictCC, overheadCostCentre, showCostCentre
+			  isCafCC, isDictCC, overheadCostCentre, showCostCentre,
+			  CostCentre
 			)
 import HeapOffs		( SYN_IE(VirtualHeapOffset) )
 import Id		( idType, idPrimRep, 
 			  showId, getIdStrictness, dataConTag,
 			  emptyIdSet,
-			  GenId{-instance Outputable-}
+			  GenId{-instance Outputable-}, SYN_IE(Id)
 			)
 import ListSetOps	( minusList )
 import Maybes		( maybeToBool )
 import Outputable	( Outputable(..){-instances-} ) -- ToDo:rm
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, TyCon{-ditto-} )
-import Pretty		( prettyToUn, ppBesides, ppChar, ppPStr, ppCat, ppStr )
+import Pretty		( Doc, hcat, char, ptext, hsep, text )
 import PrimRep		( isFollowableRep, PrimRep(..) )
 import TyCon		( isPrimTyCon, tyConDataCons )
 import Type             ( showTypeCategory )
-import Unpretty		( uppShow )
 import Util		( isIn, panic, pprPanic, assertPanic, pprTrace{-ToDo:rm-} )
 
 getWrapperArgTypeCategories = panic "CgClosure.getWrapperArgTypeCategories (ToDo)"
@@ -602,7 +602,7 @@ enterCostCentreCode closure_info cc is_thunk
 	if costsAreSubsumed cc then
 	    --ASSERT(isToplevClosure closure_info)
 	    --ASSERT(is_thunk == IsFunction)
-	    (if isToplevClosure closure_info && is_thunk == IsFunction then \x->x else pprTrace "enterCostCenterCode:" (ppCat [ppr PprDebug (is_thunk == IsFunction){-, ppr PprDebug closure_info-}, ppStr (showCostCentre PprDebug False cc)])) $
+	    (if isToplevClosure closure_info && is_thunk == IsFunction then \x->x else pprTrace "enterCostCenterCode:" (hsep [ppr PprDebug (is_thunk == IsFunction){-, ppr PprDebug closure_info-}, text (showCostCentre PprDebug False cc)])) $
 	    costCentresC SLIT("ENTER_CC_FSUB") []
 
 	else if currentOrSubsumedCosts cc then 
@@ -915,12 +915,12 @@ closureDescription :: FAST_STRING	-- Module
 	-- CgConTbls.lhs with a description generated from the data constructor
 
 closureDescription mod_name name args body
-  = uppShow 0 (prettyToUn (
-	ppBesides [ppChar '<',
-		   ppPStr mod_name,
-		   ppChar '.',
+  = show (
+	hcat [char '<',
+		   ptext mod_name,
+		   char '.',
 		   ppr PprDebug name,
-		   ppChar '>']))
+		   char '>'])
 \end{code}
 
 \begin{code}

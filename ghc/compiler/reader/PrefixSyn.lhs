@@ -28,6 +28,7 @@ IMPORT_1_3(Char(isDigit))
 import HsSyn
 import RdrHsSyn
 import Util		( panic )
+import SrcLoc           ( SrcLoc )
 
 #ifdef REALLY_HASKELL_1_3
 ord = fromEnum :: Char -> Int
@@ -80,7 +81,7 @@ data RdrMatch
   | RdrMatch_Guards
 	     SrcLine SrcFun
 	     RdrNamePat
-	     [(RdrNameHsExpr, RdrNameHsExpr)]
+	     [([RdrNameStmt], RdrNameHsExpr)]
 	     -- (guard,         expr)
 	     RdrBinding
 \end{code}

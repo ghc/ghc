@@ -16,8 +16,8 @@ IMP_Ubiq(){-uitous-}
 import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import Name		( mkWiredInTyConName )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
-import TyCon		( mkPrimTyCon, mkDataTyCon, NewOrData(..) )
-import Type		( applyTyCon, mkTyVarTys, mkTyConTy )
+import TyCon		--( mkPrimTyCon, mkDataTyCon, NewOrData(..) )
+import Type		--( applyTyCon, mkTyVarTys, mkTyConTy )
 import TyVar		( GenTyVar(..), alphaTyVars )
 import Usage		( usageOmega )
 import PrelMods		( gHC__ )

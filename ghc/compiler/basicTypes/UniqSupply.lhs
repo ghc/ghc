@@ -26,11 +26,16 @@ IMP_Ubiq(){-uitous-}
 import Unique
 import Util
 
-import PreludeGlaST
 
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
+import PreludeGlaST
 # define WHASH	    GHCbase.W#
+#elif __GLASGOW_HASKELL__ >= 202
+import GlaExts
+import STBase
+# define WHASH      GlaExts.W#
 #else
+import PreludeGlaST
 # define WHASH	    W#
 #endif
 
@@ -92,11 +97,13 @@ mkSplitUniqSupply (C# c#)
 	    -- this is the single-most-hammered bit of code
 	    -- in the compiler....
 	    -- Too bad it's not 1.3-portable...
-	    unsafe_interleave m s
-	      = let
-		    (r, new_s) = m s
-		in
-		(r, s)
+	    unsafe_interleave m =
+	       MkST ( \ s ->
+	        let
+		    (MkST m') = m
+		    (r, new_s) = m' s
+	        in
+	        (r, s))
 --
 
 	mk_unique = _ccall_ genSymZh		`thenPrimIO` \ (WHASH u#) ->
@@ -120,7 +127,7 @@ getUniques (I# i) supply = i `get_from` supply
   where
     get_from 0# _ = []
     get_from n (MkSplitUniqSupply (I# u) _ s2)
-      = mkUniqueGrimily u : get_from (n `minusInt#` 1#) s2
+      = mkUniqueGrimily u : get_from (n -# 1#) s2
 \end{code}
 
 %************************************************************************

@@ -1,0 +1,5 @@
+_interface_ CLabel 1
+_exports_
+CLabel CLabel;
+_declarations_
+1 data CLabel;

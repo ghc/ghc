@@ -23,7 +23,8 @@ module HsSyn (
 	EXP_MODULE(HsBasic) ,
 	EXP_MODULE(HsMatches) ,
 	EXP_MODULE(HsPat) ,
-	EXP_MODULE(HsTypes)
+	EXP_MODULE(HsTypes),
+	NewOrData(..)
      ) where
 
 IMP_Ubiq()
@@ -33,7 +34,7 @@ import HsBinds
 import HsDecls		( HsDecl(..), TyDecl(..), InstDecl(..), ClassDecl(..), 
 			  DefaultDecl(..), 
 			  FixityDecl(..), 
-			  ConDecl(..), BangType(..),
+			  ConDecl(..), ConDetails(..), BangType(..),
 			  IfaceSig(..), HsIdInfo,  SpecDataSig(..), SpecInstSig(..),
 			  hsDeclName
 			)
@@ -46,12 +47,16 @@ import HsTypes
 import HsPragmas	( ClassPragmas, ClassOpPragmas,
 			  DataPragmas, GenPragmas, InstancePragmas )
 import HsCore
+import TyCon		( NewOrData(..) )
 
 -- others:
 import FiniteMap	( FiniteMap )
 import Outputable	( ifPprShowAll, ifnotPprForUser, interpp'SP, Outputable(..) )
 import Pretty
 import SrcLoc		( SrcLoc )
+#if __GLASGOW_HASKELL__ >= 202
+import Name
+#endif
 \end{code}
 
 @Fake@ is a placeholder type; for when tyvars and uvars aren't used.
@@ -86,24 +91,24 @@ instance (NamedThing name, Outputable name, Outputable pat,
 
     ppr sty (HsModule name iface_version exports imports fixities
 		      decls src_loc)
-      = ppAboves [
+      = vcat [
 	    ifPprShowAll sty (ppr sty src_loc),
 	    ifnotPprForUser sty (pp_iface_version iface_version),
 	    case exports of
-	      Nothing -> ppCat [ppPStr SLIT("module"), ppPStr name, ppPStr SLIT("where")]
-	      Just es -> ppAboves [
-			    ppCat [ppPStr SLIT("module"), ppPStr name, ppLparen],
-			    ppNest 8 (interpp'SP sty es),
-			    ppNest 4 (ppPStr SLIT(") where"))
+	      Nothing -> hsep [ptext SLIT("module"), ptext name, ptext SLIT("where")]
+	      Just es -> vcat [
+			    hsep [ptext SLIT("module"), ptext name, lparen],
+			    nest 8 (interpp'SP sty es),
+			    nest 4 (ptext SLIT(") where"))
 			  ],
 	    pp_nonnull imports,
 	    pp_nonnull fixities,
 	    pp_nonnull decls
 	]
       where
-	pp_nonnull [] = ppNil
-	pp_nonnull xs = ppAboves (map (ppr sty) xs)
+	pp_nonnull [] = empty
+	pp_nonnull xs = vcat (map (ppr sty) xs)
 
-	pp_iface_version Nothing  = ppNil
-	pp_iface_version (Just n) = ppCat [ppStr "{-# INTERFACE", ppInt n, ppStr "#-}"]
+	pp_iface_version Nothing  = empty
+	pp_iface_version (Just n) = hsep [text "{-# INTERFACE", int n, text "#-}"]
 \end{code}

@@ -35,6 +35,10 @@ type constr;
 			gconnty	    : ttype;
 			gconnline   : long; >;
 
+	/* constr with a prefixed context C => ... */
+	constrcxt   : < gconcxt	    : list;
+			gconcon	    : constr; >;
+			
 	field	    : < gfieldn	    : list;
 			gfieldt	    : ttype; >;
 end;

@@ -2,25 +2,28 @@
 
 interface HsLoop where
 
-import HsExpr	( HsExpr )
-import HsBinds	( Bind, HsBinds, MonoBinds, Sig, nullBinds, nullMonoBinds )
+import HsExpr	( HsExpr, Stmt )
+import HsBinds	( HsBinds, MonoBinds, Sig, nullBinds, nullMonoBinds )
 import HsDecls	( ConDecl )
 import Name	( NamedThing )
 import Outputable ( Outputable )
 
 -- HsExpr outputs
 data HsExpr tyvar uvar id pat
+data Stmt   tyvar uvar id pat
 
 instance (NamedThing id, Outputable id, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
   => Outputable (HsExpr tyvar uvar id pat)
 
+instance (NamedThing id, Outputable id, Outputable pat,
+	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
+  => Outputable (Stmt tyvar uvar id pat)
+
 
 -- HsBinds outputs
 data Sig id
 instance (NamedThing name, Outputable name) => Outputable (Sig name)
-
-data Bind tyvar uvar id pat
 
 data HsBinds tyvar uvar id pat
 

@@ -14,12 +14,21 @@ module UgenUtil (
 
 IMP_Ubiq()
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST
+#else
+import GlaExts
+import Name
+#endif
 
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 # define ADDR	    GHCbase.Addr
 # define PACK_STR   packCString
 # define PACK_BYTES packCBytes
+#elif __GLASGOW_HASKELL >= 202
+# define ADDR       GHC.Addr
+# define PACK_STR   mkFastCharString
+# define PACK_BYTES mkFastCharString2
 #else
 # define ADDR	    _Addr
 # define PACK_STR   mkFastCharString

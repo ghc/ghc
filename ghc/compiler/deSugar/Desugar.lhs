@@ -6,18 +6,25 @@
 \begin{code}
 #include "HsVersions.h"
 
-module Desugar ( deSugar, DsMatchContext, pprDsWarnings, 
-                 DsWarnFlavour -- removed when compiling with 1.4
+module Desugar ( deSugar, pprDsWarnings
+#if __GLASGOW_HASKELL__ < 200
+		, DsMatchContext
+	        , DsWarnFlavour -- fluff needed for closure, 
+				 -- removed when compiling with 1.4
+#endif
 	       ) where
 
 IMP_Ubiq(){-uitous-}
 
-import HsSyn		( HsBinds, HsExpr )
-import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr) )
+import HsSyn		( HsBinds, HsExpr, MonoBinds,
+			  SYN_IE(RecFlag), nonRecursive
+			)
+import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr)
+			)
 import CoreSyn
 import Name             ( isExported )
 import DsMonad
-import DsBinds		( dsBinds, dsInstBinds )
+import DsBinds		( dsBinds, dsMonoBinds )
 import DsUtils
 
 import Bag		( unionBags )
@@ -27,9 +34,10 @@ import CmdLineOpts	( opt_DoCoreLinting, opt_AutoSccsOnAllToplevs,
 import CostCentre       ( IsCafCC(..), mkAutoCC )
 import CoreLift		( liftCoreBindings )
 import CoreLint		( lintCoreBindings )
-import Id		( nullIdEnv, mkIdEnv, idType, SYN_IE(DictVar), GenId )
+import Id		( nullIdEnv, mkIdEnv, idType, 
+			  SYN_IE(DictVar), GenId, SYN_IE(Id) )
 import PprStyle		( PprStyle(..) )
-import UniqSupply	( splitUniqSupply )
+import UniqSupply	( splitUniqSupply, UniqSupply )
 \end{code}
 
 The only trick here is to get the @DsMonad@ stuff off to a good
@@ -43,13 +51,13 @@ deSugar :: UniqSupply		-- name supply
 	    TypecheckedHsBinds, --   bindings; see "tcModule" (which produces
 	    TypecheckedHsBinds,	--   them)
 	    TypecheckedHsBinds,
-	    [(Id, TypecheckedHsExpr)])
+	    TypecheckedHsBinds)
 -- ToDo: handling of const_inst thingies is certainly WRONG ***************************
 
 	-> ([CoreBinding],	-- output
 	    DsWarnings)	    -- Shadowing complaints
 
-deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst_pairs)
+deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst_binds)
   = let
 	(us0, us0a) = splitUniqSupply us
 	(us1, us1a) = splitUniqSupply us0a
@@ -63,25 +71,24 @@ deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst
 		    	Just xx -> _PK_ xx
 		    	Nothing -> mod_name	-- default: module name
 
-	((core_const_prs, consts_pairs), shadows1)
-	    = initDs us0 nullIdEnv mod_name (dsInstBinds [] const_inst_pairs)
-
-	consts_env = mkIdEnv consts_pairs
+	(core_const_binds, shadows1)
+	    = initDs us0 nullIdEnv mod_name (dsBinds const_inst_binds)
+	core_const_prs = pairsFromCoreBinds core_const_binds
 
 	(core_clas_binds, shadows2)
-			= initDs us1 consts_env mod_name (dsBinds clas_binds)
+			= initDs us1 nullIdEnv mod_name (dsBinds clas_binds)
 	core_clas_prs	= pairsFromCoreBinds core_clas_binds
 
 	(core_inst_binds, shadows3)
-			= initDs us2 consts_env mod_name (dsBinds inst_binds)
+			= initDs us2 nullIdEnv mod_name (dsBinds inst_binds)
 	core_inst_prs	= pairsFromCoreBinds core_inst_binds
 
 	(core_val_binds, shadows4)
-			= initDs us3 consts_env mod_name (dsBinds val_binds)
+			= initDs us3 nullIdEnv mod_name (dsBinds val_binds)
 	core_val_pairs	= map (addAutoScc module_and_group) (pairsFromCoreBinds core_val_binds)
 
 	(core_recsel_binds, shadows5)
-			= initDs us4 consts_env mod_name (dsBinds recsel_binds)
+			= initDs us4 nullIdEnv mod_name (dsBinds recsel_binds)
 	core_recsel_prs	= pairsFromCoreBinds core_recsel_binds
 
     	final_binds

@@ -10,11 +10,13 @@ module HsImpExp where
 
 IMP_Ubiq()
 
-import Name		( pprNonSym )
 import Outputable
 import PprStyle		( PprStyle(..) )
 import Pretty
 import SrcLoc		( SrcLoc )
+#if __GLASGOW_HASKELL__ >= 202
+import Name
+#endif
 \end{code}
 
 %************************************************************************
@@ -36,20 +38,20 @@ data ImportDecl name
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) where
     ppr sty (ImportDecl mod qual as spec _)
-      = ppHang (ppCat [ppPStr SLIT("import"), pp_qual qual, ppPStr mod, pp_as as])
+      = hang (hsep [ptext SLIT("import"), pp_qual qual, ptext mod, pp_as as])
 	     4 (pp_spec spec)
       where
-	pp_qual False   = ppNil
-	pp_qual True	= ppPStr SLIT("qualified")
+	pp_qual False   = empty
+	pp_qual True	= ptext SLIT("qualified")
 
-	pp_as Nothing   = ppNil
-	pp_as (Just a)  = ppBeside (ppPStr SLIT("as ")) (ppPStr a)
+	pp_as Nothing   = empty
+	pp_as (Just a)  = (<>) (ptext SLIT("as ")) (ptext a)
 
-	pp_spec Nothing = ppNil
+	pp_spec Nothing = empty
 	pp_spec (Just (False, spec))
-			= ppParens (interpp'SP sty spec)
+			= parens (interpp'SP sty spec)
 	pp_spec (Just (True, spec))
-			= ppBeside (ppPStr SLIT("hiding ")) (ppParens (interpp'SP sty spec))
+			= (<>) (ptext SLIT("hiding ")) (parens (interpp'SP sty spec))
 \end{code}
 
 %************************************************************************
@@ -77,14 +79,14 @@ ieName (IEThingAll  n)   = n
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (IE name) where
-    ppr sty (IEVar	var)	= pprNonSym sty var
+    ppr sty (IEVar	var)	= ppr sty var
     ppr sty (IEThingAbs	thing)	= ppr sty thing
     ppr sty (IEThingAll	thing)
-	= ppBesides [ppr sty thing, ppStr "(..)"]
+	= hcat [ppr sty thing, text "(..)"]
     ppr sty (IEThingWith thing withs)
-	= ppBeside (ppr sty thing)
-	    (ppParens (ppInterleave ppComma (map (pprNonSym sty) withs)))
+	= (<>) (ppr sty thing)
+	    (parens (fsep (punctuate comma (map (ppr sty) withs))))
     ppr sty (IEModuleContents mod)
-	= ppBeside (ppPStr SLIT("module ")) (ppPStr mod)
+	= (<>) (ptext SLIT("module ")) (ptext mod)
 \end{code}
 

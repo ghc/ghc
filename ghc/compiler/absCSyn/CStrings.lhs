@@ -17,13 +17,8 @@ module CStrings(
 CHK_Ubiq() -- debugging consistency check
 
 import Pretty
-import Unpretty( uppChar )
 
-IMPORT_1_3(Char (isAlphanum))
-#ifdef REALLY_HASKELL_1_3
-ord = fromEnum :: Char -> Int
-chr = toEnum   :: Int -> Char
-#endif
+IMPORT_1_3(Char (isAlphanum,ord,chr))
 \end{code}
 
 
@@ -42,9 +37,9 @@ Prelude<x>	ZP<x>
 
 \begin{code}
 cSEP    = SLIT("_")	-- official C separator
-pp_cSEP = uppChar '_'
+pp_cSEP = char '_'
 
-identToC    :: FAST_STRING -> Pretty
+identToC    :: FAST_STRING -> Doc
 modnameToC  :: FAST_STRING -> FAST_STRING
 stringToC   :: String -> String
 charToC, charToEasyHaskell :: Char -> String
@@ -105,36 +100,36 @@ identToC ps
   = let
 	str = _UNPK_ ps
     in
-    ppBeside
+    (<>)
 	(case str of
 	   's':'t':'d':_ -> -- avoid "stdin", "stdout", and "stderr"...
-			    ppChar 'Z'
-	   _	         -> ppNil)
+			    char 'Z'
+	   _	         -> empty)
 
 	(if (all isAlphanum str) -- we gamble that this test will succeed...
-	 then ppPStr ps
-	 else ppIntersperse ppNil (map char_to_c str))
+	 then ptext ps
+	 else hcat (map char_to_c str))
   where
-    char_to_c 'Z'  = ppPStr SLIT("ZZ")
-    char_to_c '&'  = ppPStr SLIT("Za")
-    char_to_c '|'  = ppPStr SLIT("Zb")
-    char_to_c ':'  = ppPStr SLIT("Zc")
-    char_to_c '/'  = ppPStr SLIT("Zd")
-    char_to_c '='  = ppPStr SLIT("Ze")
-    char_to_c '>'  = ppPStr SLIT("Zg")
-    char_to_c '#'  = ppPStr SLIT("Zh")
-    char_to_c '<'  = ppPStr SLIT("Zl")
-    char_to_c '-'  = ppPStr SLIT("Zm")
-    char_to_c '!'  = ppPStr SLIT("Zn")
-    char_to_c '.'  = ppPStr SLIT("_")
-    char_to_c '+'  = ppPStr SLIT("Zp")
-    char_to_c '\'' = ppPStr SLIT("Zq")
-    char_to_c '*'  = ppPStr SLIT("Zt")
-    char_to_c '_'  = ppPStr SLIT("Zu")
+    char_to_c 'Z'  = ptext SLIT("ZZ")
+    char_to_c '&'  = ptext SLIT("Za")
+    char_to_c '|'  = ptext SLIT("Zb")
+    char_to_c ':'  = ptext SLIT("Zc")
+    char_to_c '/'  = ptext SLIT("Zd")
+    char_to_c '='  = ptext SLIT("Ze")
+    char_to_c '>'  = ptext SLIT("Zg")
+    char_to_c '#'  = ptext SLIT("Zh")
+    char_to_c '<'  = ptext SLIT("Zl")
+    char_to_c '-'  = ptext SLIT("Zm")
+    char_to_c '!'  = ptext SLIT("Zn")
+    char_to_c '.'  = ptext SLIT("_")
+    char_to_c '+'  = ptext SLIT("Zp")
+    char_to_c '\'' = ptext SLIT("Zq")
+    char_to_c '*'  = ptext SLIT("Zt")
+    char_to_c '_'  = ptext SLIT("Zu")
 
     char_to_c c    = if isAlphanum c
-		     then ppChar c
-		     else ppBeside (ppChar 'Z') (ppInt (ord c))
+		     then char c
+		     else (<>) (char 'Z') (int (ord c))
 \end{code}
 
 For \tr{modnameToC}, we really only have to worry about \tr{'}s (quote

@@ -59,11 +59,19 @@ module MachRegs (
 #endif
     ) where
 
+#if __GLASGOW_HASKELL__ >= 202
+import GlaExts hiding (Addr)
+import FastString
+import Ubiq
+#else
 IMP_Ubiq(){-uitous-}
+#endif
 
 import AbsCSyn		( MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
-import Pretty		( ppStr, ppRational, ppShow )
+import CLabel           ( CLabel )
+import Outputable       ( Outputable(..) )
+import Pretty		( Doc, text, rational )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix		( sStLitLbl, StixTree(..), StixReg(..),
@@ -73,8 +81,7 @@ import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
 			  Unique{-instance Ord3-}
 			)
 import UniqSupply	( getUnique, returnUs, thenUs, SYN_IE(UniqSM) )
-import Unpretty		( uppStr, SYN_IE(Unpretty) )
-import Util		( panic )
+import Util		( panic, Ord3(..) )
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -84,20 +91,20 @@ data Imm
   = ImmInt	Int
   | ImmInteger	Integer	    -- Sigh.
   | ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
-  | ImmLab	Unpretty    -- Simple string label (underscore-able)
-  | ImmLit	Unpretty    -- Simple string
+  | ImmLab	Doc    -- Simple string label (underscore-able)
+  | ImmLit	Doc    -- Simple string
   IF_ARCH_sparc(
   | LO Imm		    -- Possible restrictions...
   | HI Imm
   ,)
 
-strImmLit s = ImmLit (uppStr s)
+strImmLit s = ImmLit (text s)
 dblImmLit r
   = strImmLit (
 	 IF_ARCH_alpha({-prepend nothing-}
 	,IF_ARCH_i386( '0' : 'd' :
 	,IF_ARCH_sparc('0' : 'r' :,)))
-	ppShow 80 (ppRational r))
+	show (rational r))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -307,7 +314,7 @@ instance Text Reg where
 
 #ifdef DEBUG
 instance Outputable Reg where
-    ppr sty r = ppStr (show r)
+    ppr sty r = text (show r)
 #endif
 
 cmpReg (FixedReg i)      (FixedReg i')      = cmp_ihash i i'

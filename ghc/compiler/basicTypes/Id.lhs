@@ -19,7 +19,7 @@ module Id (
 	mkDataCon,
 	mkDefaultMethodId,
 	mkDictFunId,
-	mkIdWithNewUniq,
+	mkIdWithNewUniq, mkIdWithNewName,
 	mkImported,
 	mkInstId,
 	mkMethodSelId,
@@ -41,7 +41,6 @@ module Id (
 
 	dataConRepType,
 	dataConArgTys,
-	dataConArity,
 	dataConNumFields,
 	dataConFieldLabels,
 	dataConRawArgTys,
@@ -59,8 +58,8 @@ module Id (
 	cmpId_withSpecDataCon,
 	externallyVisibleId,
 	idHasNoFreeTyVars,
-	idWantsToBeINLINEd,
-	idMustBeINLINEd,
+	idWantsToBeINLINEd, getInlinePragma,
+	idMustBeINLINEd, idMustNotBeINLINEd,
 	isBottomingId,
 	isConstMethodId,
 	isConstMethodId_maybe,
@@ -111,7 +110,7 @@ module Id (
 	getIdUpdateInfo,
 	getPragmaInfo,
 	replaceIdInfo,
-	addInlinePragma,
+	addInlinePragma, nukeNoInlinePragma, addNoInlinePragma,
 
 	-- IdEnvs AND IdSets
 	SYN_IE(IdEnv), SYN_IE(GenIdSet), SYN_IE(IdSet),
@@ -145,25 +144,30 @@ module Id (
     ) where
 
 IMP_Ubiq()
+
 IMPORT_DELOOPER(IdLoop)   -- for paranoia checking
 IMPORT_DELOOPER(TyLoop)   -- for paranoia checking
+
 
 import Bag
 import Class		( classOpString, SYN_IE(Class), GenClass, SYN_IE(ClassOp), GenClassOp )
 import IdInfo
 import Maybes		( maybeToBool )
-import Name		( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
+import Name	{- 	( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
 			  mkCompoundName, mkInstDeclName,
 			  isLocallyDefinedName, occNameString, modAndOcc,
 			  isLocallyDefined, changeUnique, isWiredInName,
 			  nameString, getOccString, setNameVisibility,
 			  isExported, ExportFlag(..), DefnInfo, Provenance,
 			  OccName(..), Name
-			)
+			) -}
 import PrelMods		( pREL_TUP, pREL_BASE )
 import Lex		( mkTupNameStr )
 import FieldLabel	( fieldLabelName, FieldLabel(..){-instances-} )
 import PragmaInfo	( PragmaInfo(..) )
+#if __GLASGOW_HASKELL__ >= 202
+import PrimOp	        ( PrimOp )
+#endif
 import PprEnv		-- ( SYN_IE(NmbrM), NmbrEnv(..) )
 import PprType		( getTypeString, specMaybeTysSuffix,
 			  nmbrType, nmbrTyVar,
@@ -172,15 +176,15 @@ import PprType		( getTypeString, specMaybeTysSuffix,
 import PprStyle
 import Pretty
 import MatchEnv		( MatchEnv )
-import SrcLoc		( mkBuiltinSrcLoc )
+import SrcLoc		--( mkBuiltinSrcLoc )
 import TysWiredIn	( tupleTyCon )
-import TyCon		( TyCon, tyConDataCons )
-import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
+import TyCon		--( TyCon, tyConDataCons )
+import Type	{-	( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
 			  applyTyCon, instantiateTy, mkForAllTys,
 			  tyVarsOfType, applyTypeEnvToTy, typePrimRep,
 			  GenType, SYN_IE(ThetaType), SYN_IE(TauType), SYN_IE(Type)
-			)
-import TyVar		( alphaTyVars, isEmptyTyVarSet, SYN_IE(TyVarEnv) )
+			) -}
+import TyVar		--( alphaTyVars, isEmptyTyVarSet, SYN_IE(TyVarEnv) )
 import Usage		( SYN_IE(UVar) )
 import UniqFM
 import UniqSet		-- practically all of it
@@ -188,9 +192,10 @@ import Unique		( getBuiltinUniques, pprUnique, showUnique,
 			  incrUnique, 
 			  Unique{-instance Ord3-}
 			)
-import Util		( mapAccumL, nOfThem, zipEqual, assoc,
+import Outputable	( ifPprDebug, Outputable(..) )
+import Util	{-	( mapAccumL, nOfThem, zipEqual, assoc,
 			  panic, panic#, pprPanic, assertPanic
-			)
+			) -}
 \end{code}
 
 Here are the @Id@ and @IdDetails@ datatypes; also see the notes that
@@ -241,11 +246,15 @@ data IdDetails
 
   | DataConId	ConTag
 		[StrictnessMark] -- Strict args; length = arity
-		[FieldLabel]	-- Field labels for this constructor
+		[FieldLabel]	-- Field labels for this constructor; 
+				--length = 0 (not a record) or arity
 
-		[TyVar] [(Class,Type)] [Type] TyCon
+		[TyVar] [(Class,Type)] 	-- Type vars and context for the data type decl
+		[TyVar] [(Class,Type)] 	-- Ditto for the context of the constructor, 
+					-- the existentially quantified stuff
+		[Type] TyCon		-- Args and result tycon
 				-- the type is:
-				-- forall tyvars . theta_ty =>
+				-- forall tyvars1 ++ tyvars2. theta1 ++ theta2 =>
 				--    unitype_1 -> ... -> unitype_n -> tycon tyvars
 
   | TupleConId	Int		-- Its arity
@@ -477,10 +486,10 @@ properties, but they may not.
 %************************************************************************
 
 \begin{code}
-isDataCon (Id _ _ _ (DataConId _ _ _ _ _ _ _) _ _) = True
-isDataCon (Id _ _ _ (TupleConId _) _ _)		   = True
-isDataCon (Id _ _ _ (SpecId unspec _ _) _ _)	   = isDataCon unspec
-isDataCon other					   = False
+isDataCon (Id _ _ _ (DataConId _ __ _ _ _ _ _ _) _ _) = True
+isDataCon (Id _ _ _ (TupleConId _) _ _)		      = True
+isDataCon (Id _ _ _ (SpecId unspec _ _) _ _)	      = isDataCon unspec
+isDataCon other					      = False
 
 isTupleCon (Id _ _ _ (TupleConId _) _ _)	 = True
 isTupleCon (Id _ _ _ (SpecId unspec _ _) _ _)	 = isTupleCon unspec
@@ -513,7 +522,7 @@ idHasNoFreeTyVars :: Id -> Bool
 toplevelishId (Id _ _ _ details _ _)
   = chk details
   where
-    chk (DataConId _ _ _ _ _ _ _)   = True
+    chk (DataConId _ __ _ _ _ _ _ _)   = True
     chk (TupleConId _)    	    = True
     chk (RecordSelId _)   	    = True
     chk ImportedId	    	    = True
@@ -534,7 +543,7 @@ toplevelishId (Id _ _ _ details _ _)
 idHasNoFreeTyVars (Id _ _ _ details _ info)
   = chk details
   where
-    chk (DataConId _ _ _ _ _ _ _) = True
+    chk (DataConId _ _ _ _ _ _ _ _ _) = True
     chk (TupleConId _)    	  = True
     chk (RecordSelId _)   	  = True
     chk ImportedId	    	  = True
@@ -572,7 +581,7 @@ omitIfaceSigForId (Id _ name _ details _ _)
 	-- remember that all type and class decls appear in the interface file.
 	-- The dfun id must *not* be omitted, because it carries version info for
 	-- the instance decl
-        (DataConId _ _ _ _ _ _ _) -> True
+        (DataConId _ _ _ _ _ _ _ _ _) -> True
         (TupleConId _)    	  -> True
         (RecordSelId _)   	  -> True
         (SuperDictSelId _ _)	  -> True
@@ -821,7 +830,7 @@ mkWorkerId u unwrkr ty info
     name_fn wkr_str = SLIT("$w") _APPEND_ wkr_str
 
 mkInstId u ty name 
-  = Id u (changeUnique name u) ty (InstId (no_free_tvs ty)) NoPragmaInfo noIdInfo
+  = Id u name ty (InstId (no_free_tvs ty)) NoPragmaInfo noIdInfo
 
 {-LATER:
 getConstMethodId clas op ty
@@ -832,12 +841,12 @@ getConstMethodId clas op ty
     in
     case (lookupConstMethodId (getIdSpecialisation sel_id) ty) of
       Just xx -> xx
-      Nothing -> pprError "ERROR: getConstMethodId:" (ppAboves [
-	ppCat [ppr PprDebug ty, ppr PprDebug ops, ppr PprDebug op_ids,
+      Nothing -> pprError "ERROR: getConstMethodId:" (vcat [
+	hsep [ppr PprDebug ty, ppr PprDebug ops, ppr PprDebug op_ids,
 	       ppr PprDebug sel_id],
-	ppStr "(This can arise if an interface pragma refers to an instance",
-	ppStr "but there is no imported interface which *defines* that instance.",
-	ppStr "The info above, however ugly, should indicate what else you need to import."
+	text "(This can arise if an interface pragma refers to an instance",
+	text "but there is no imported interface which *defines* that instance.",
+	text "The info above, however ugly, should indicate what else you need to import."
 	])
 -}
 
@@ -861,8 +870,9 @@ mkImported  n ty info = Id (nameUnique n) n ty ImportedId NoPragmaInfo info
 
 mkPrimitiveId n ty primop 
   = addStandardIdInfo $
-    Id (nameUnique n) n ty (PrimitiveId primop) NoPragmaInfo noIdInfo
-
+    Id (nameUnique n) n ty (PrimitiveId primop) IMustBeINLINEd noIdInfo
+	-- The pragma @IMustBeINLINEd@ says that this Id absolutely must be inlined.
+	-- It's only true for primitives, because we don't want to make a closure for each of them.
 \end{code}
 
 \begin{code}
@@ -928,6 +938,10 @@ setIdVisibility mod (Id uniq name ty details prag info)
 mkIdWithNewUniq :: Id -> Unique -> Id
 mkIdWithNewUniq (Id _ n ty details prag info) u
   = Id u (changeUnique n u) ty details prag info
+
+mkIdWithNewName :: Id -> Name -> Id
+mkIdWithNewName (Id _ _ ty details prag info) new_name
+  = Id (uniqueOf new_name) new_name ty details prag info
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -976,21 +990,6 @@ getIdArity id@(Id _ _ _ _ _ id_info)
   = --ASSERT( not (isDataCon id))
     arityInfo id_info
 
-dataConArity, dataConNumFields :: DataCon -> Int
-
-dataConArity id@(Id _ _ _ _ _ id_info)
-  = ASSERT(isDataCon id)
-    case arityInfo id_info of
-      ArityExactly a -> a
-      other	     -> pprPanic "dataConArity:Nothing:" (pprId PprDebug id)
-
-dataConNumFields id
-  = ASSERT(isDataCon id)
-    case (dataConSig id) of { (_, _, arg_tys, _) ->
-    length arg_tys }
-
-isNullaryDataCon con = dataConNumFields con == 0 -- function of convenience
-
 addIdArity :: Id -> ArityInfo -> Id
 addIdArity (Id u n ty details pinfo info) arity
   = Id u n ty details pinfo (info `addArityInfo` arity)
@@ -1005,11 +1004,13 @@ addIdArity (Id u n ty details pinfo info) arity
 \begin{code}
 mkDataCon :: Name
 	  -> [StrictnessMark] -> [FieldLabel]
-	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon
+	  -> [TyVar] -> ThetaType
+	  -> [TyVar] -> ThetaType
+	  -> [TauType] -> TyCon
 	  -> Id
   -- can get the tag and all the pieces of the type from the Type
 
-mkDataCon n stricts fields tvs ctxt args_tys tycon
+mkDataCon n stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon
   = ASSERT(length stricts == length args_tys)
     addStandardIdInfo data_con
   where
@@ -1019,7 +1020,7 @@ mkDataCon n stricts fields tvs ctxt args_tys tycon
       = Id (nameUnique n)
 	   n
 	   data_con_ty
-	   (DataConId data_con_tag stricts fields tvs ctxt args_tys tycon)
+	   (DataConId data_con_tag stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon)
 	   IWantToBeINLINEd	-- Always inline constructors if possible
 	   noIdInfo
 
@@ -1027,7 +1028,7 @@ mkDataCon n stricts fields tvs ctxt args_tys tycon
     data_con_family = tyConDataCons tycon
 
     data_con_ty
-      = mkSigmaTy tvs ctxt
+      = mkSigmaTy (tvs++con_tvs) (ctxt++con_ctxt)
 	(mkFunTys args_tys (applyTyCon tycon (mkTyVarTys tvs)))
 
 
@@ -1044,24 +1045,39 @@ fIRST_TAG :: ConTag
 fIRST_TAG =  1	-- Tags allocated from here for real constructors
 \end{code}
 
+dataConNumFields gives the number of actual fields in the
+{\em representation} of the data constructor.  This may be more than appear
+in the source code; the extra ones are the existentially quantified
+dictionaries
+
+\begin{code}
+dataConNumFields id
+  = ASSERT(isDataCon id)
+    case (dataConSig id) of { (_, _, _, con_theta, arg_tys, _) ->
+    length con_theta + length arg_tys }
+
+isNullaryDataCon con = dataConNumFields con == 0 -- function of convenience
+\end{code}
+
+
 \begin{code}
 dataConTag :: DataCon -> ConTag	-- will panic if not a DataCon
-dataConTag (Id _ _ _ (DataConId tag _ _ _ _ _ _) _ _) = tag
+dataConTag (Id _ _ _ (DataConId tag _ _ _ _ _ _ _ _) _ _) = tag
 dataConTag (Id _ _ _ (TupleConId _) _ _)	      = fIRST_TAG
 dataConTag (Id _ _ _ (SpecId unspec _ _) _ _)	      = dataConTag unspec
 
 dataConTyCon :: DataCon -> TyCon	-- will panic if not a DataCon
-dataConTyCon (Id _ _ _ (DataConId _ _ _ _ _ _ tycon) _ _) = tycon
+dataConTyCon (Id _ _ _ (DataConId _ _ _ _ _ _ _ _ tycon) _ _) = tycon
 dataConTyCon (Id _ _ _ (TupleConId a) _ _)	          = tupleTyCon a
 
-dataConSig :: DataCon -> ([TyVar], ThetaType, [TauType], TyCon)
+dataConSig :: DataCon -> ([TyVar], ThetaType, [TyVar], ThetaType, [TauType], TyCon)
 					-- will panic if not a DataCon
 
-dataConSig (Id _ _ _ (DataConId _ _ _ tyvars theta_ty arg_tys tycon) _ _)
-  = (tyvars, theta_ty, arg_tys, tycon)
+dataConSig (Id _ _ _ (DataConId _ _ _ tyvars theta con_tyvars con_theta arg_tys tycon) _ _)
+  = (tyvars, theta, con_tyvars, con_theta, arg_tys, tycon)
 
 dataConSig (Id _ _ _ (TupleConId arity) _ _)
-  = (tyvars, [], tyvar_tys, tupleTyCon arity)
+  = (tyvars, [], [], [], tyvar_tys, tupleTyCon arity)
   where
     tyvars	= take arity alphaTyVars
     tyvar_tys	= mkTyVarTys tyvars
@@ -1086,16 +1102,16 @@ dataConRepType con
     (tyvars, theta, tau) = splitSigmaTy (idType con)
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConFieldLabels (Id _ _ _ (DataConId _ _ fields _ _ _ _) _ _) = fields
+dataConFieldLabels (Id _ _ _ (DataConId _ _ fields _ _ _ _ _ _) _ _) = fields
 dataConFieldLabels (Id _ _ _ (TupleConId _)		    _ _) = []
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
-dataConStrictMarks (Id _ _ _ (DataConId _ stricts _ _ _ _ _) _ _) = stricts
+dataConStrictMarks (Id _ _ _ (DataConId _ stricts _ _ _ _ _ _ _) _ _) = stricts
 dataConStrictMarks (Id _ _ _ (TupleConId arity)		     _ _) 
   = nOfThem arity NotMarkedStrict
 
 dataConRawArgTys :: DataCon -> [TauType] -- a function of convenience
-dataConRawArgTys con = case (dataConSig con) of { (_,_, arg_tys,_) -> arg_tys }
+dataConRawArgTys con = case (dataConSig con) of { (_,_, _, _, arg_tys,_) -> arg_tys }
 
 dataConArgTys :: DataCon 
 	      -> [Type] 	-- Instantiated at these types
@@ -1103,8 +1119,8 @@ dataConArgTys :: DataCon
 dataConArgTys con_id inst_tys
  = map (instantiateTy tenv) arg_tys
  where
-    (tyvars, _, arg_tys, _) = dataConSig con_id
-    tenv 		    = zipEqual "dataConArgTys" tyvars inst_tys
+    (tyvars, _, _, _, arg_tys, _) = dataConSig con_id
+    tenv 		          = zipEqual "dataConArgTys" tyvars inst_tys
 \end{code}
 
 \begin{code}
@@ -1159,24 +1175,35 @@ The inline pragma tells us to be very keen to inline this Id, but it's still
 OK not to if optimisation is switched off.
 
 \begin{code}
+getInlinePragma :: Id -> PragmaInfo
+getInlinePragma (Id _ _ _ _ prag _) = prag
+
 idWantsToBeINLINEd :: Id -> Bool
 
 idWantsToBeINLINEd (Id _ _ _ _ IWantToBeINLINEd _) = True
+idWantsToBeINLINEd (Id _ _ _ _ IMustBeINLINEd   _) = True
 idWantsToBeINLINEd _				   = False
+
+idMustNotBeINLINEd (Id _ _ _ _ IMustNotBeINLINEd _) = True
+idMustNotBeINLINEd _				    = False
+
+idMustBeINLINEd (Id _ _ _ _ IMustBeINLINEd _) = True
+idMustBeINLINEd _			      = False
 
 addInlinePragma :: Id -> Id
 addInlinePragma (Id u sn ty details _ info)
   = Id u sn ty details IWantToBeINLINEd info
+
+nukeNoInlinePragma :: Id -> Id
+nukeNoInlinePragma id@(Id u sn ty details IMustNotBeINLINEd info)
+  = Id u sn ty details NoPragmaInfo info
+nukeNoInlinePragma id@(Id u sn ty details _ info) = id		-- Otherwise no-op
+
+addNoInlinePragma :: Id -> Id
+addNoInlinePragma id@(Id u sn ty details _ info)
+  = Id u sn ty details IMustNotBeINLINEd info
 \end{code}
 
-
-The predicate @idMustBeINLINEd@ says that this Id absolutely must be inlined.
-It's only true for primitives, because we don't want to make a closure for each of them.
-
-\begin{code}
-idMustBeINLINEd (Id _ _ _ (PrimitiveId primop) _ _) = True
-idMustBeINLINEd other				    = False
-\end{code}
 
 
 %************************************************************************
@@ -1316,14 +1343,22 @@ instance Outputable {-Id, i.e.:-}(GenId Type) where
     ppr sty id = pprId sty id
 
 showId :: PprStyle -> Id -> String
-showId sty id = ppShow 80 (pprId sty id)
+showId sty id = show (pprId sty id)
 \end{code}
 
 Default printing code (not used for interfaces):
 \begin{code}
-pprId :: Outputable ty => PprStyle -> GenId ty -> Pretty
+pprId :: Outputable ty => PprStyle -> GenId ty -> Doc
 
-pprId sty (Id u n _ _ _ _) = ppr sty n
+pprId sty (Id u n _ _ prags _)
+  = hcat [ppr sty n, pp_prags]
+  where
+    pp_prags = ifPprDebug sty (case prags of
+				IMustNotBeINLINEd -> text "{n}"
+				IWantToBeINLINEd  -> text "{i}"
+				IMustBeINLINEd    -> text "{I}"
+				other		  -> empty)
+
   -- WDP 96/05/06: We can re-elaborate this as we go along...
 \end{code}
 
@@ -1475,7 +1510,8 @@ nmbrId id@(Id u n ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
 nmbrDataCon id@(Id _ _ _ (TupleConId _) _ _) nenv
   = (nenv, id) -- nothing to do for tuples
 
-nmbrDataCon id@(Id u n ty (DataConId tag marks fields tvs theta arg_tys tc) prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
+nmbrDataCon id@(Id u n ty (DataConId tag marks fields tvs theta con_tvs con_theta arg_tys tc) prag info)
+	    nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
   = case (lookupUFM_Directly idenv u) of
       Just xx -> trace "nmbrDataCon: in env???\n" (nenv, xx)
       Nothing ->
@@ -1483,7 +1519,7 @@ nmbrDataCon id@(Id u n ty (DataConId tag marks fields tvs theta arg_tys tc) prag
 	    (nenv2, new_fields)  = (mapNmbr nmbrField  fields)  nenv
 	    (nenv3, new_arg_tys) = (mapNmbr nmbrType   arg_tys) nenv2
 
-	    new_det = DataConId tag marks new_fields (bottom "tvs") (bottom "theta") new_arg_tys tc
+	    new_det = DataConId tag marks new_fields (bottom "tvs") (bottom "theta") (bottom "tvs") (bottom "theta") new_arg_tys tc
 	    new_id  = Id u n (bottom "ty") new_det prag info
 	in
 	(nenv3, new_id)
@@ -1493,12 +1529,14 @@ nmbrDataCon id@(Id u n ty (DataConId tag marks fields tvs theta arg_tys tc) prag
 ------------
 nmbr_details :: IdDetails -> NmbrM IdDetails
 
-nmbr_details (DataConId tag marks fields tvs theta arg_tys tc)
+nmbr_details (DataConId tag marks fields tvs theta con_tvs con_theta arg_tys tc)
   = mapNmbr nmbrTyVar  tvs	`thenNmbr` \ new_tvs ->
+    mapNmbr nmbrTyVar  con_tvs	`thenNmbr` \ new_con_tvs ->
     mapNmbr nmbrField  fields	`thenNmbr` \ new_fields ->
     mapNmbr nmbr_theta theta	`thenNmbr` \ new_theta ->
+    mapNmbr nmbr_theta con_theta	`thenNmbr` \ new_con_theta ->
     mapNmbr nmbrType   arg_tys	`thenNmbr` \ new_arg_tys ->
-    returnNmbr (DataConId tag marks new_fields new_tvs new_theta new_arg_tys tc)
+    returnNmbr (DataConId tag marks new_fields new_tvs new_theta new_con_tvs new_con_theta new_arg_tys tc)
   where
     nmbr_theta (c,t)
       = --nmbrClass c	`thenNmbr` \ new_c ->

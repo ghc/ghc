@@ -21,19 +21,25 @@ import Name		( Name, OccName(..), Provenance(..), DefnInfo(..), ExportFlag(..),
 			  occNameString, occNameFlavour,
 			  SYN_IE(NameSet), emptyNameSet, addListToNameSet,
 			  mkLocalName, mkGlobalName, modAndOcc, isLocallyDefinedName,
-			  isWiredInName, nameOccName, setNameProvenance, isVarOcc, 
-			  pprProvenance, pprOccName, pprModule, pprNonSymOcc, pprNameProvenance
+			  nameOccName, setNameProvenance, isVarOcc, getNameProvenance,
+			  pprProvenance, pprOccName, pprModule, pprNameProvenance,
+			  NamedThing(..)
 			)
 import TyCon		( TyCon )
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon, intTyCon )
 import FiniteMap
+import Outputable
 import Unique		( Unique, unboundKey )
+import UniqFM           ( Uniquable(..) )
 import Maybes		( maybeToBool )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Pretty
 import PprStyle		( PprStyle(..) )
-import Util		( panic, removeDups, pprTrace, assertPanic )
+import Util		--( panic, removeDups, pprTrace, assertPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import List (nub)
+#endif
 \end{code}
 
 
@@ -83,14 +89,26 @@ newLocallyDefinedGlobalName mod occ rec_exp_fn loc
 	-- If it's not in the cache we put it there with the correct provenance.
 	-- The idea is that, after all this, the cache
 	-- will contain a Name with the correct Provenance (i.e. Local)
+	--
+	-- Actually, there's a catch.  If this is the *second* binding for something
+	-- we want to allocate a *fresh* unique, rather than using the same Name as before.
+	-- Otherwise we don't detect conflicting definitions of the same top-level name!
+	-- So the only time we re-use a Name already in the cache is when it's one of
+	-- the Implicit magic-unique ones mentioned in the previous para
     let
 	provenance = LocalDef (rec_exp_fn new_name) loc
 	(us', us1) = splitUniqSupply us
 	uniq   	   = getUnique us1
         key        = (mod,occ)
 	new_name   = case lookupFM cache key of
-		         Just name -> setNameProvenance name provenance
-		         Nothing   -> mkGlobalName uniq mod occ VanillaDefn provenance
+		         Just name | is_implicit_prov
+				   -> setNameProvenance name provenance
+				   where
+				      is_implicit_prov = case getNameProvenance name of
+							    Implicit -> True
+							    other    -> False
+		         other   -> mkGlobalName uniq mod occ VanillaDefn provenance
+
 	new_cache  = addToFM cache key new_name
     in
     setNameSupplyRn (us', inst_ns, new_cache)		`thenRn_`
@@ -157,15 +175,12 @@ isUnboundName name = uniqueOf name == unboundKey
 \end{code}
 
 \begin{code}
-bindLocatedLocalsRn :: String		-- Documentation string for error message
+bindLocatedLocalsRn :: (PprStyle -> Doc)		-- Documentation string for error message
 	   	    -> [(RdrName,SrcLoc)]
 	    	    -> ([Name] -> RnMS s a)
 	    	    -> RnMS s a
 bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
-  = 	-- Check for use of qualified names
-    mapRn (qualNameErr doc_str) quals 	`thenRn_`
-	-- Check for dupicated names in a binding group
-    mapRn (dupNamesErr doc_str) dups  	`thenRn_`
+  = checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
 
     getNameEnv			`thenRn` \ name_env ->
     (if opt_WarnNameShadowing
@@ -181,8 +196,6 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
     in
     setNameEnv new_name_env (enclosed_scope names)
   where
-    quals	  = filter (isQual.fst) rdr_names_w_loc
-    (these, dups) = removeDups (\(n1,l1) (n2,l2) -> n1 `cmp` n2) rdr_names_w_loc
     check_shadow name_env (rdr_name,loc)
 	= case lookupFM name_env rdr_name of
 		Nothing   -> returnRn ()
@@ -191,7 +204,9 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 
 bindLocalsRn doc_str rdr_names enclosed_scope
   = getSrcLocRn		`thenRn` \ loc ->
-    bindLocatedLocalsRn doc_str (rdr_names `zip` repeat loc) enclosed_scope
+    bindLocatedLocalsRn (\_ -> text doc_str)
+			(rdr_names `zip` repeat loc)
+		 	enclosed_scope
 
 bindTyVarsRn doc_str tyvar_names enclosed_scope
   = getSrcLocRn					`thenRn` \ loc ->
@@ -200,6 +215,25 @@ bindTyVarsRn doc_str tyvar_names enclosed_scope
     in
     bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
     enclosed_scope (zipWith replaceTyVarName tyvar_names names)
+
+	-- Works in any variant of the renamer monad
+checkDupOrQualNames, checkDupNames :: (PprStyle -> Doc)
+				   -> [(RdrName, SrcLoc)]
+				   -> RnM s d ()
+
+checkDupOrQualNames doc_str rdr_names_w_loc
+  =	-- Check for use of qualified names
+    mapRn (qualNameErr doc_str) quals 	`thenRn_`
+    checkDupNames doc_str rdr_names_w_loc
+  where
+    quals = filter (isQual.fst) rdr_names_w_loc
+    
+checkDupNames doc_str rdr_names_w_loc
+  = 	-- Check for dupicated names in a binding group
+    mapRn (dupNamesErr doc_str) dups	`thenRn_`
+    returnRn ()
+  where
+    (_, dups) = removeDups (\(n1,l1) (n2,l2) -> n1 `cmp` n2) rdr_names_w_loc
 \end{code}
 
 
@@ -337,13 +371,14 @@ plusNameEnvRn n1 n2
   = mapRn (addErrRn.nameClashErr) (conflictsFM (/=) n1 n2)		`thenRn_`
     returnRn (n1 `plusFM` n2)
 
-addOneToNameEnvRn :: NameEnv -> RdrName -> Name -> RnM s d NameEnv
-addOneToNameEnvRn env rdr_name name
-  = mapRn (addErrRn.nameClashErr) (conflictFM (/=) env rdr_name name)	`thenRn_`
-    returnRn (addToFM env rdr_name name)
+addOneToNameEnv :: NameEnv -> RdrName -> Name -> NameEnv
+addOneToNameEnv env rdr_name name = addToFM env rdr_name name
 
 lookupNameEnv :: NameEnv -> RdrName -> Maybe Name
 lookupNameEnv = lookupFM
+
+delOneFromNameEnv :: NameEnv -> RdrName -> NameEnv 
+delOneFromNameEnv env rdr_name = delFromFM env rdr_name
 \end{code}
 
 ===============  FixityEnv  ================
@@ -352,9 +387,7 @@ plusFixityEnvRn f1 f2
   = mapRn (addErrRn.fixityClashErr) (conflictsFM bad_fix f1 f2)		`thenRn_`
     returnRn (f1 `plusFM` f2)
 
-addOneToFixityEnvRn env rdr_name fixity
-  = mapRn (addErrRn.fixityClashErr) (conflictFM bad_fix env rdr_name fixity)	`thenRn_`
-    returnRn (addToFM env rdr_name fixity)
+addOneToFixityEnv env rdr_name fixity = addToFM env rdr_name fixity
 
 lookupFixityEnv env rdr_name 
   = case lookupFM env rdr_name of
@@ -364,7 +397,7 @@ lookupFixityEnv env rdr_name
 bad_fix :: (Fixity, Provenance) -> (Fixity, Provenance) -> Bool
 bad_fix (f1,_) (f2,_) = f1 /= f2
 
-pprFixityProvenance :: PprStyle -> (Fixity,Provenance) -> Pretty
+pprFixityProvenance :: PprStyle -> (Fixity,Provenance) -> Doc
 pprFixityProvenance sty (fixity, prov) = pprProvenance sty prov
 \end{code}
 
@@ -388,6 +421,10 @@ plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
 plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n1 (nub (ns1 ++ ns2))
 plusAvail a NotAvailable = a
 plusAvail NotAvailable a = a
+-- Added SOF 4/97
+#ifdef DEBUG
+plusAvail a1 a2 = panic ("RnEnv.plusAvail " ++ (show (hsep [pprAvail PprDebug a1,pprAvail PprDebug a2])))
+#endif
 
 addAvailToNameSet :: NameSet -> AvailInfo -> NameSet
 addAvailToNameSet names avail = addListToNameSet names (availNames avail)
@@ -423,7 +460,7 @@ filterAvail :: RdrNameIE	-- Wanted
 
 filterAvail ie@(IEThingWith want wants) avail@(AvailTC n ns)
   | sub_names_ok = AvailTC n (filter is_wanted ns)
-  | otherwise    = pprTrace "filterAvail" (ppCat [ppr PprDebug ie, pprAvail PprDebug avail]) $
+  | otherwise    = pprTrace "filterAvail" (hsep [ppr PprDebug ie, pprAvail PprDebug avail]) $
 		   NotAvailable
   where
     is_wanted name = nameOccName name `elem` wanted_occs
@@ -449,7 +486,7 @@ filterAvail (IEThingAll _) avail@(AvailTC _ _)  = avail
 
 filterAvail ie avail = NotAvailable 
 
-
+{- 	OLD	to be deleted
 hideAvail :: RdrNameIE		-- Hide this
 	  -> AvailInfo		-- Available
 	  -> AvailInfo		-- Resulting available;
@@ -481,15 +518,19 @@ hideAvail ie (AvailTC n ns)
 			       where
 				  keep n    = nameOccName n `notElem` hide_occs
 				  hide_occs = map rdrNameOcc (hide : hides)
+-}
 
+-- In interfaces, pprAvail gets given the OccName of the "host" thing
+pprAvail PprInterface avail = ppr_avail (pprOccName PprInterface . nameOccName) avail
+pprAvail sty          avail = ppr_avail (ppr sty) avail
 
--- pprAvail gets given the OccName of the "host" thing
-pprAvail sty NotAvailable = ppPStr SLIT("NotAvailable")
-pprAvail sty (AvailTC n ns) = ppCat [pprOccName sty (nameOccName n),
-				     ppChar '(',
-				     ppInterleave ppComma (map (pprOccName sty.nameOccName) ns),
-				     ppChar ')']
-pprAvail sty (Avail n) = pprOccName sty (nameOccName n)
+ppr_avail pp_name NotAvailable = ptext SLIT("NotAvailable")
+ppr_avail pp_name (AvailTC n ns) = hsep [
+				     pp_name n,
+				     parens  $ hsep $ punctuate comma $
+				     map pp_name ns
+				   ]
+ppr_avail pp_name (Avail n) = pp_name n
 \end{code}
 
 
@@ -533,35 +574,36 @@ conflictFM bad fm key elt
 
 \begin{code}
 nameClashErr (rdr_name, (name1,name2)) sty
-  = ppHang (ppCat [ppPStr SLIT("Conflicting definitions for: "), ppr sty rdr_name])
-	4 (ppAboves [pprNameProvenance sty name1,
+  = hang (hsep [ptext SLIT("Conflicting definitions for: "), ppr sty rdr_name])
+	4 (vcat [pprNameProvenance sty name1,
 		     pprNameProvenance sty name2])
 
 fixityClashErr (rdr_name, (fp1,fp2)) sty
-  = ppHang (ppCat [ppPStr SLIT("Conflicting fixities for: "), ppr sty rdr_name])
-	4 (ppAboves [pprFixityProvenance sty fp1,
+  = hang (hsep [ptext SLIT("Conflicting fixities for: "), ppr sty rdr_name])
+	4 (vcat [pprFixityProvenance sty fp1,
 		     pprFixityProvenance sty fp2])
 
 shadowedNameWarn shadow sty
-  = ppBesides [ppPStr SLIT("This binding for"), 
-	       ppQuote (ppr sty shadow), 
-	       ppPStr SLIT("shadows an existing binding")]
+  = hcat [ptext SLIT("This binding for"), 
+	       ppr sty shadow,
+	       ptext SLIT("shadows an existing binding")]
 
 unknownNameErr name sty
-  = ppSep [ppStr flavour, ppPStr SLIT("not in scope:"), ppr sty name]
+  = sep [text flavour, ptext SLIT("not in scope:"), ppr sty name]
   where
     flavour = occNameFlavour (rdrNameOcc name)
 
 qualNameErr descriptor (name,loc)
   = pushSrcLocRn loc $
-    addErrRn (\sty -> ppBesides [ppPStr SLIT("invalid use of qualified "), 
-				 ppStr descriptor, ppPStr SLIT(": "), 
-				 pprNonSymOcc sty (rdrNameOcc name) ])
+    addErrRn (\sty -> hsep [ ptext SLIT("invalid use of qualified name"), 
+			     ppr sty name,
+			     ptext SLIT("in"),
+			     descriptor sty])
 
 dupNamesErr descriptor ((name,loc) : dup_things)
   = pushSrcLocRn loc $
-    addErrRn (\sty -> ppBesides [ppPStr SLIT("duplicate bindings of `"), 
-				 ppr sty name, ppPStr SLIT("' in "), 
-				 ppStr descriptor])
+    addErrRn (\sty -> hsep [ptext SLIT("duplicate bindings of"), 
+			    ppr sty name, 
+			    ptext SLIT("in"), descriptor sty])
 \end{code}
 

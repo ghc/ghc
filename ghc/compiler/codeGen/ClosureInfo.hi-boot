@@ -1,0 +1,18 @@
+_interface_ ClosureInfo 1
+_exports_
+ClosureInfo ClosureInfo closureKind closureLabelFromCI closureNonHdrSize closurePtrsSize closureSMRep closureSemiTag closureSizeWithoutFixedHdr closureTypeDescr closureUpdReqd entryLabelFromCI fastLabelFromCI infoTableLabelFromCI maybeSelectorInfo;
+_declarations_
+1 data ClosureInfo;
+1 closureKind _:_ ClosureInfo -> PrelBase.String ;;
+1 closureLabelFromCI _:_ ClosureInfo -> CLabel.CLabel ;;
+1 closureNonHdrSize _:_ ClosureInfo -> PrelBase.Int ;;
+1 closurePtrsSize _:_ ClosureInfo -> PrelBase.Int ;;
+1 closureSMRep _:_ ClosureInfo -> SMRep.SMRep ;;
+1 closureSemiTag _:_ ClosureInfo -> PrelBase.Int ;;
+1 closureSizeWithoutFixedHdr _:_ ClosureInfo -> HeapOffs.HeapOffset ;;
+1 closureTypeDescr _:_ ClosureInfo -> PrelBase.String ;;
+1 closureUpdReqd _:_ ClosureInfo -> PrelBase.Bool ;;
+1 entryLabelFromCI _:_ ClosureInfo -> CLabel.CLabel ;;
+1 fastLabelFromCI _:_ ClosureInfo -> CLabel.CLabel ;;
+1 infoTableLabelFromCI _:_ ClosureInfo -> CLabel.CLabel ;;
+1 maybeSelectorInfo _:_ ClosureInfo -> PrelBase.Maybe (Id.Id, PrelBase.Int) ;;

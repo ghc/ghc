@@ -28,14 +28,14 @@ import CoreSyn
 import Id		( idType, getIdArity, isBottomingId,
 			  emptyIdSet, unitIdSet, mkIdSet,
 			  elementOfIdSet, minusIdSet, unionManyIdSets,
-			  SYN_IE(IdSet)
+			  SYN_IE(IdSet), SYN_IE(Id)
 			)
 import IdInfo		( ArityInfo(..) )
 import PrimOp		( PrimOp(..) )
-import Type		( tyVarsOfType )
+import Type		( tyVarsOfType, SYN_IE(Type) )
 import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
 			  intersectTyVarSets,
-			  SYN_IE(TyVarSet)
+			  SYN_IE(TyVarSet), SYN_IE(TyVar)
 			)
 import UniqSet		( unionUniqSets )
 import Usage		( SYN_IE(UVar) )

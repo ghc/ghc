@@ -56,10 +56,16 @@ module CoreSyn (
 IMP_Ubiq(){-uitous-}
 
 import CostCentre	( showCostCentre, CostCentre )
-import Id		( idType, GenId{-instance Eq-} )
-import Type		( isUnboxedType )
-import Usage		( SYN_IE(UVar) )
+import Id		( idType, GenId{-instance Eq-}, SYN_IE(Id) )
+import Type		( isUnboxedType,GenType, SYN_IE(Type) )
+import TyVar		( GenTyVar, SYN_IE(TyVar) )
+import Usage		( SYN_IE(UVar),GenUsage,SYN_IE(Usage) )
 import Util		( panic, assertPanic {-pprTrace:ToDo:rm-} )
+#if __GLASGOW_HASKELL__ >= 202
+import Literal          ( Literal )
+import BinderInfo       ( BinderInfo )
+import PrimOp           ( PrimOp )
+#endif
 \end{code}
 
 %************************************************************************

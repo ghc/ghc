@@ -219,12 +219,25 @@ module Unique (
 	, parGlobalIdKey
 	, parLocalIdKey
 	, unboundKey
+	, byteArrayTyConKey
+	, mutableByteArrayTyConKey
+	, allClassKey
     ) where
 
+#if __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST
+#else
+import GlaExts
+import ST
+#endif
 
 IMP_Ubiq(){-uitous-}
 
+#if __GLASGOW_HASKELL__ >= 202
+import {-# SOURCE #-} UniqFM ( Uniquable(..) )
+#endif
+
+import Outputable
 import Pretty
 import Util
 \end{code}
@@ -323,7 +336,7 @@ instance Uniquable Unique where
 
 We do sometimes make strings with @Uniques@ in them:
 \begin{code}
-pprUnique, pprUnique10 :: Unique -> Pretty
+pprUnique, pprUnique10 :: Unique -> Doc
 
 pprUnique uniq
   = case unpkUnique uniq of
@@ -331,24 +344,24 @@ pprUnique uniq
 
 pprUnique10 uniq	-- in base-10, dudes
   = case unpkUnique uniq of
-      (tag, u) -> finish_ppr tag u (ppInt u)
+      (tag, u) -> finish_ppr tag u (int u)
 
 finish_ppr tag u pp_u
   = if tag /= 't' -- this is just to make v common tyvars, t1, t2, ...
 		  -- come out as a, b, ... (shorter, easier to read)
     then pp_all
     else case u of
-	   1 -> ppChar 'a'
-	   2 -> ppChar 'b'
-	   3 -> ppChar 'c'
-	   4 -> ppChar 'd'
-	   5 -> ppChar 'e'
+	   1 -> char 'a'
+	   2 -> char 'b'
+	   3 -> char 'c'
+	   4 -> char 'd'
+	   5 -> char 'e'
 	   _ -> pp_all
   where
-    pp_all = ppBeside (ppChar tag) pp_u
+    pp_all = (<>) (char tag) pp_u
 
 showUnique :: Unique -> FAST_STRING
-showUnique uniq = _PK_ (ppShow 80 (pprUnique uniq))
+showUnique uniq = _PK_ (show (pprUnique uniq))
 
 instance Outputable Unique where
     ppr sty u = pprUnique u
@@ -367,9 +380,15 @@ A character-stingy way to read/write numbers (notably Uniques).
 The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
 Code stolen from Lennart.
 \begin{code}
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 # define BYTE_ARRAY GHCbase.ByteArray
 # define RUN_ST	    GHCbase.runST
+# define AND_THEN   >>=
+# define AND_THEN_  >>
+# define RETURN	    return
+#elif __GLASGOW_HASKELL__ >= 202
+# define BYTE_ARRAY GlaExts.ByteArray
+# define RUN_ST	    ST.runST
 # define AND_THEN   >>=
 # define AND_THEN_  >>
 # define RETURN	    return
@@ -381,7 +400,7 @@ Code stolen from Lennart.
 # define RETURN	    returnStrictlyST
 #endif
 
-iToBase62 :: Int -> Pretty
+iToBase62 :: Int -> Doc
 
 iToBase62 n@(I# n#)
   = ASSERT(n >= 0)
@@ -390,11 +409,11 @@ iToBase62 n@(I# n#)
     in
     if n# <# 62# then
 	case (indexCharArray# bytes n#) of { c ->
-	ppChar (C# c) }
+	char (C# c) }
     else
 	case (quotRem n 62)		of { (q, I# r#) ->
 	case (indexCharArray# bytes r#) of { c  ->
-	ppBeside (iToBase62 q) (ppChar (C# c)) }}
+	(<>) (iToBase62 q) (char (C# c)) }}
 
 -- keep this at top level! (bug on 94/10/24 WDP)
 chars62 :: BYTE_ARRAY Int
@@ -485,6 +504,7 @@ cCallableClassKey	= mkPreludeClassUnique 19
 cReturnableClassKey	= mkPreludeClassUnique 20
 
 ixClassKey		= mkPreludeClassUnique 21
+allClassKey		= mkPreludeClassUnique 22	-- Pseudo class used for universal quantification
 \end{code}
 
 %************************************************************************
@@ -541,10 +561,10 @@ stateAndStablePtrPrimTyConKey		= mkPreludeTyConUnique 45
 stateAndWordPrimTyConKey		= mkPreludeTyConUnique 46
 statePrimTyConKey			= mkPreludeTyConUnique 47
 stateTyConKey				= mkPreludeTyConUnique 48
-								-- 49 is spare
+mutableByteArrayTyConKey		= mkPreludeTyConUnique 49
 stTyConKey				= mkPreludeTyConUnique 50
 primIoTyConKey				= mkPreludeTyConUnique 51
-								-- 52 is spare
+byteArrayTyConKey			= mkPreludeTyConUnique 52
 wordPrimTyConKey			= mkPreludeTyConUnique 53
 wordTyConKey				= mkPreludeTyConUnique 54
 voidTyConKey				= mkPreludeTyConUnique 55

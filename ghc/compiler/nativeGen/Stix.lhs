@@ -20,9 +20,12 @@ IMPORT_1_3(Ratio(Rational))
 
 import AbsCSyn		( node, infoptr, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
-import CLabel		( mkAsmTempLabel )
+import CLabel		( mkAsmTempLabel, CLabel )
+import PrimRep          ( PrimRep )
+import PrimOp           ( PrimOp )
+import Unique           ( Unique )
 import UniqSupply	( returnUs, thenUs, getUnique, SYN_IE(UniqSM) )
-import Unpretty		( uppPStr, SYN_IE(Unpretty) )
+import Pretty		( ptext, Doc )
 \end{code}
 
 Here is the tag at the nodes of our @StixTree@.	 Notice its
@@ -39,7 +42,7 @@ data StixTree
   | StInt	Integer	    -- ** add Kind at some point
   | StDouble	Rational
   | StString	FAST_STRING
-  | StLitLbl	Unpretty    -- literal labels
+  | StLitLbl	Doc    -- literal labels
 			    -- (will be _-prefixed on some machines)
   | StLitLit	FAST_STRING -- innards from CLitLit
   | StCLbl	CLabel	    -- labels that we might index into
@@ -100,7 +103,7 @@ data StixTree
   | StComment FAST_STRING
 
 sStLitLbl :: FAST_STRING -> StixTree
-sStLitLbl s = StLitLbl (uppPStr s)
+sStLitLbl s = StLitLbl (ptext s)
 \end{code}
 
 Stix registers can have two forms.  They {\em may} or {\em may not}

@@ -8,28 +8,37 @@
 
 module Rename ( renameModule ) where
 
+#if __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST	( thenPrimIO )
+#else
+import GlaExts
+import IO
+#endif
 
 IMP_Ubiq()
 IMPORT_1_3(List(partition))
 
 import HsSyn
-import RdrHsSyn		( RdrName, SYN_IE(RdrNameHsModule), SYN_IE(RdrNameImportDecl) )
+import RdrHsSyn		( RdrName(..), SYN_IE(RdrNameHsModule), SYN_IE(RdrNameImportDecl) )
 import RnHsSyn		( SYN_IE(RenamedHsModule), SYN_IE(RenamedHsDecl), extractHsTyNames )
 
-import CmdLineOpts	( opt_HiMap )
+import CmdLineOpts	( opt_HiMap, opt_WarnNameShadowing, opt_D_show_rn_trace,
+			  opt_D_dump_rn, opt_D_show_passes
+		        )
 import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnDecl )
 import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpecialInstModules,
-			  mkSearchPath
+			  getDeferredDataDecls,
+			  mkSearchPath, getSlurpedNames, getRnStats
 			)
 import RnEnv		( availsToNameSet, addAvailToNameSet, 
 			  addImplicitOccsRn, lookupImplicitOccRn )
 import Id		( GenId {- instance NamedThing -} )
 import Name		( Name, Provenance, ExportFlag(..), isLocallyDefined,
-			  NameSet(..), elemNameSet, mkNameSet, unionNameSets, nameSetToList,
-			  isWiredInName, modAndOcc
+			  NameSet(..), elemNameSet, mkNameSet, unionNameSets, 
+			  nameSetToList, minusNameSet, NamedThing(..),
+			  modAndOcc, pprModule, pprOccName, nameOccName
 			)
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
 import PrelInfo		( ioTyCon_NAME, primIoTyCon_NAME )
@@ -39,7 +48,10 @@ import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, FiniteMap )
 import Pretty
 import PprStyle		( PprStyle(..) )
-import Util		( panic, assertPanic, pprTrace )
+import Util		( cmpPString, equivClasses, panic, assertPanic, pprTrace )
+#if __GLASGOW_HASKELL__ >= 202
+import UniqSupply
+#endif
 \end{code}
 
 
@@ -69,10 +81,11 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
 
     case global_name_info of {
 	Nothing -> 	-- Everything is up to date; no need to recompile further
+			rnStats []		`thenRn_`
 			returnRn Nothing ;
 
 			-- Otherwise, just carry on
-	Just (export_env, rn_env, local_avails) ->
+	Just (export_env, rn_env, explicit_names) ->
 
 	-- RENAME THE SOURCE
     initRnMS rn_env mod_name SourceMode (
@@ -88,6 +101,8 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
     getImportVersions mod_name exports			`thenRn` \ import_versions ->
     getNameSupplyRn					`thenRn` \ name_supply ->
 
+	-- REPORT UNUSED NAMES
+    reportUnusedNames explicit_names			`thenRn_`
 
 	-- GENERATE THE SPECIAL-INSTANCE MODULE LIST
 	-- The "special instance" modules are those modules that contain instance
@@ -103,7 +118,6 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
     in
 		  
     
-
 	-- RETURN THE RENAMED MODULE
     let
 	import_mods = [mod | ImportDecl mod _ _ _ _ <- imports]
@@ -113,6 +127,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
 				  rn_all_decls
 			          loc
     in
+    rnStats rn_all_decls	`thenRn_`
     returnRn (Just (renamed_module, 
 		    (import_versions, export_env, special_inst_mods),
 		     name_supply,
@@ -155,31 +170,35 @@ closeDecls decls
     case maybe_unresolved of
 
 	-- No more unresolved names
-	Nothing ->	-- Slurp instance declarations
+	Nothing ->	-- Instance decls still pending?
 		   getImportedInstDecls			`thenRn` \ inst_decls ->
-		   traceRn (ppSep [ppPStr SLIT("Slurped"), ppInt (length inst_decls), ppPStr SLIT("instance decls")])
+		   traceRn (sep [ptext SLIT("Slurped"), int (length inst_decls), ptext SLIT("instance decls")])
 							`thenRn_`
+		   if not (null inst_decls) then
+		       mapRn rn_inst_decl inst_decls	`thenRn` \ new_inst_decls ->
+    
+			    -- We *must* loop again here.  Why?  Two reasons:
+			    -- (a) an instance decl will give rise to an unresolved dfun, whose
+			    --	decl we must slurp to get its version number; that's the version
+			    -- 	number for the whole instance decl.  (And its unfolding might mention new
+			    --  unresolved names.)
+			    -- (b) an instance decl might give rise to a new unresolved class,
+			    -- 	whose decl we must slurp, which might let in some new instance decls,
+			    --	and so on.  Example:  instance Foo a => Baz [a] where ...
+	    
+		       closeDecls (new_inst_decls ++ decls)
+		   else
 
-			-- None?  then at last we are done
-		   if null inst_decls then
-			returnRn decls
-		   else	
-		   mapRn rn_inst_decl inst_decls	`thenRn` \ new_inst_decls ->
-
-			-- We *must* loop again here.  Why?  Two reasons:
-			-- (a) an instance decl will give rise to an unresolved dfun, whose
-			--	decl we must slurp to get its version number; that's the version
-			-- 	number for the whole instance decl.
-			-- (b) an instance decl might give rise to a new unresolved class,
-			-- 	whose decl we must slurp, which might let in some new instance decls,
-			--	and so on.  Example:  instance Foo a => Baz [a] where ...
-	
-		   closeDecls (new_inst_decls ++ decls)
+			-- No more instance decls, so all we have left is
+			-- to deal with the deferred data type decls.
+		  getDeferredDataDecls			`thenRn` \ data_decls ->
+		  mapRn rn_data_decl data_decls		`thenRn` \ rn_data_decls ->
+		  returnRn (rn_data_decls ++ decls)
 			
 	-- An unresolved name
 	Just (name,necessity)
 	  -> 	-- Slurp its declaration, if any
---	     traceRn (ppSep [ppPStr SLIT("Considering"), ppr PprDebug name])	`thenRn_`
+--	     traceRn (sep [ptext SLIT("Considering"), ppr PprDebug name])	`thenRn_`
 	     importDecl name necessity		`thenRn` \ maybe_decl ->
 	     case maybe_decl of
 
@@ -189,13 +208,61 @@ closeDecls decls
 		-- Found a declaration... rename it
 		Just decl -> rn_iface_decl mod_name decl	`thenRn` \ new_decl ->
 			     closeDecls (new_decl : decls)
-		     where
-		         (mod_name,_) = modAndOcc name
-  where
-					-- Notice that the rnEnv starts empty
-    rn_iface_decl mod_name decl  = initRnMS emptyRnEnv mod_name InterfaceMode (rnDecl decl)
-    rn_inst_decl (mod_name,decl) = rn_iface_decl mod_name (InstD decl)
+			 where
+		           (mod_name,_) = modAndOcc name
 
+
+rn_iface_decl mod_name decl       = initRnMS emptyRnEnv mod_name InterfaceMode (rnDecl decl)
+					-- Notice that the rnEnv starts empty
+
+rn_inst_decl (mod_name,decl)      = rn_iface_decl mod_name (InstD decl)
+
+rn_data_decl (tycon_name,ty_decl) = rn_iface_decl mod_name (TyD ty_decl)
+				  where
+				    (mod_name, _) = modAndOcc tycon_name
 \end{code}
 
+\begin{code}
+reportUnusedNames explicit_avail_names
+  | not opt_WarnNameShadowing
+  = returnRn ()
+
+  | otherwise
+  = getSlurpedNames			`thenRn` \ slurped_names ->
+    let
+	unused	      = explicit_avail_names `minusNameSet` slurped_names
+	(local_unused, imported_unused) = partition isLocallyDefined (nameSetToList unused)
+	imports_by_module = equivClasses cmp imported_unused
+	name1 `cmp` name2 = nameModule name1 `_CMP_STRING_` nameModule name2 
+
+	pp_imp sty = sep [text "For information: the following unqualified imports are unused:",
+			    nest 4 (vcat (map (pp_group sty) imports_by_module))]
+	pp_group sty (n:ns) = sep [hcat [text "Module ", pprModule PprForUser (nameModule n), char ':'],
+				     nest 4 (sep (map (pprOccName sty . nameOccName) (n:ns)))]
+
+	pp_local sty = sep [text "For information: the following local top-level definitions are unused:",
+			      nest 4 (sep (map (pprOccName sty . nameOccName) local_unused))]
+    in
+    (if null imported_unused 
+     then returnRn ()
+     else addWarnRn pp_imp)	`thenRn_`
+
+    (if null local_unused
+     then returnRn ()
+     else addWarnRn pp_local)
+
+nameModule n = fst (modAndOcc n)
+
+rnStats :: [RenamedHsDecl] -> RnMG ()
+rnStats all_decls
+        | opt_D_show_rn_trace ||
+	  opt_D_dump_rn ||
+	  opt_D_show_passes
+ 	= getRnStats all_decls		        `thenRn` \ msg ->
+	  ioToRnMG (hPutStr stderr (show msg) >> 
+		    hPutStr stderr "\n")	`thenRn_`
+	  returnRn ()
+
+	| otherwise = returnRn ()
+\end{code}
 

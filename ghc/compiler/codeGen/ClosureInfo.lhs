@@ -28,7 +28,7 @@ module ClosureInfo (
 	mkVirtHeapOffsets,
 
 	nodeMustPointToIt, getEntryConvention,
-	blackHoleOnEntry, lfArity_maybe,
+	blackHoleOnEntry,
 
 	staticClosureRequired,
 	slowFunEntryCodeRequired, funInfoTableRequired,
@@ -75,14 +75,14 @@ import CLabel		( mkStdEntryLabel, mkFastEntryLabel,
 			)
 import CmdLineOpts	( opt_SccProfilingOn, opt_ForConcurrent )
 import HeapOffs		( intOff, addOff, totHdrSize, varHdrSize,
-			  SYN_IE(VirtualHeapOffset)
+			  SYN_IE(VirtualHeapOffset), HeapOffset
 			)
 import Id		( idType, getIdArity,
 			  externallyVisibleId,
 			  dataConTag, fIRST_TAG,
-			  isDataCon, isNullaryDataCon, dataConTyCon, dataConArity,
+			  isDataCon, isNullaryDataCon, dataConTyCon,
 			  isTupleCon, SYN_IE(DataCon),
-			  GenId{-instance Eq-}
+			  GenId{-instance Eq-}, SYN_IE(Id)
 			)
 import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
@@ -91,13 +91,17 @@ import PprStyle		( PprStyle(..) )
 import PprType		( getTyDescription, GenType{-instance Outputable-} )
 import Pretty		--ToDo:rm
 import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
-import PrimRep		( getPrimRepSize, separateByPtrFollowness )
+import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
 import SMRep		-- all of it
 import TyCon		( TyCon{-instance NamedThing-} )
 import Type		( isPrimType, splitForAllTy, splitFunTyExpandingDictsAndPeeking,
-			  mkFunTys, maybeAppSpecDataTyConExpandingDicts
+			  mkFunTys, maybeAppSpecDataTyConExpandingDicts,
+			  SYN_IE(Type)
 			)
 import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
 \end{code}
 
 The ``wrapper'' data type for closure information:
@@ -1018,10 +1022,18 @@ noUpdVapRequired binder_info
 @lfArity@ extracts the arity of a function from its LFInfo
 
 \begin{code}
+{- Not needed any more
+
 lfArity_maybe (LFReEntrant _ arity _) = Just arity
-lfArity_maybe (LFCon con _)	      = Just (dataConArity con)
-lfArity_maybe (LFTuple con _)	      = Just (dataConArity con)
+
+-- Removed SLPJ March 97. I don't believe these two; 
+-- LFCon is used for construcor *applications*, not constructors!
+--
+-- lfArity_maybe (LFCon con _)	      = Just (dataConArity con)
+-- lfArity_maybe (LFTuple con _)	      = Just (dataConArity con)
+
 lfArity_maybe other		      = Nothing
+-}
 \end{code}
 
 %************************************************************************
@@ -1099,7 +1111,7 @@ fun_result_ty arity id
 	(arg_tys, res_ty)  = splitFunTyExpandingDictsAndPeeking (idType id)
     in
 --    ASSERT(arity >= 0 && length arg_tys >= arity)
-    (if (arity >= 0 && length arg_tys >= arity) then (\x->x) else pprPanic "fun_result_ty:" (ppCat [ppInt arity, ppr PprShowAll id, ppr PprDebug (idType id)])) $
+    (if (arity >= 0 && length arg_tys >= arity) then (\x->x) else pprPanic "fun_result_ty:" (hsep [int arity, ppr PprShowAll id, ppr PprDebug (idType id)])) $
     mkFunTys (drop arity arg_tys) res_ty
 \end{code}
 
@@ -1128,9 +1140,16 @@ Label generation.
 \begin{code}
 fastLabelFromCI :: ClosureInfo -> CLabel
 fastLabelFromCI (MkClosureInfo id lf_info _)
+{- 	[SLPJ Changed March 97]
+	 (was ok, but is the only call to lfArity, 
+	  and the id should guarantee to have the correct arity in it.
+
   = case lfArity_maybe lf_info of
-	Just arity -> mkFastEntryLabel id arity
-	other	   -> pprPanic "fastLabelFromCI" (ppr PprDebug id)
+	Just arity -> 
+-}
+  = case getIdArity id of
+	ArityExactly arity -> mkFastEntryLabel id arity
+	other	    	   -> pprPanic "fastLabelFromCI" (ppr PprDebug id)
 
 infoTableLabelFromCI :: ClosureInfo -> CLabel
 infoTableLabelFromCI (MkClosureInfo id lf_info rep)

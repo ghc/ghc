@@ -25,19 +25,19 @@ import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
 import Name		( OccName(..), isTCOcc, Provenance )
 import SrcLoc		( mkIfaceSrcLoc )
 import Util		( panic{-, pprPanic ToDo:rm-} )
-import Pretty           ( ppShow )
+import Pretty		( Doc )
 import PprStyle         -- PprDebug for panic
 import Maybes           ( MaybeErr(..) )
 
 ------------------------------------------------------------------
 
-parseType :: [IfaceToken] -> MaybeErr RdrNameHsType (PprStyle -> Int -> Bool -> PrettyRep)
+parseType :: [IfaceToken] -> MaybeErr RdrNameHsType (PprStyle -> Doc)
 parseType ls =
   let
    res =
     case parseT ls of
       v@(Succeeded _) -> v
-      Failed err      -> panic (ppShow 80 (err PprDebug))
+      Failed err      -> panic (show (err PprDebug))
   in
   res
 
@@ -71,7 +71,8 @@ parseType ls =
 
 type		:: { RdrNameHsType }
 type		: FORALL forall context DARROW type	{ mkHsForAllTy $2 $3 $5 }
-		| tautype				{ $1 }
+		|  btype RARROW type			{ MonoFunTy $1 $3 }
+		|  btype				{ $1 }
 
 forall		: OBRACK tv_bndrs CBRACK		{ $2 }
 
@@ -84,12 +85,8 @@ context_list1	: class					{ [$1] }
 		| class COMMA context_list1 		{ $1 : $3 }
 
 class		:: { (RdrName, RdrNameHsType) }
-class		:  qtc_name atype			{ ($1, $2) }
+class		:  tc_name atype			{ ($1, $2) }
 
-
-tautype		:: { RdrNameHsType }
-tautype		:  btype				{ $1 }
-		|  btype RARROW tautype			{ MonoFunTy $1 $3 }
 
 types2		:: { [RdrNameHsType] 			{- Two or more -}  }	
 types2		:  type COMMA type			{ [$1,$3] }
@@ -100,11 +97,11 @@ btype		:  atype				{ $1 }
 		|  btype atype				{ MonoTyApp $1 $2 }
 
 atype		:: { RdrNameHsType }
-atype		:  qtc_name 			  	{ MonoTyVar $1 }
+atype		:  tc_name 			  	{ MonoTyVar $1 }
 		|  tv_name			  	{ MonoTyVar $1 }
 		|  OPAREN types2 CPAREN	  		{ MonoTupleTy dummyRdrTcName $2 }
 		|  OBRACK type CBRACK		  	{ MonoListTy  dummyRdrTcName $2 }
-		|  OCURLY qtc_name atype CCURLY		{ MonoDictTy $2 $3 }
+		|  OCURLY tc_name atype CCURLY		{ MonoDictTy $2 $3 }
 		|  OPAREN type CPAREN		  	{ $2 }
 
 atypes		:: { [RdrNameHsType] 	{-  Zero or more -} }
@@ -135,6 +132,10 @@ tv_name		:  VARID 		{ Unqual (TvOcc $1) }
 tv_names	:: { [RdrName] }
 		:  			{ [] }
 		| tv_name tv_names	{ $1 : $2 }
-qtc_name	:: { RdrName }
-qtc_name	:  QCONID		{ tcQual $1 }
+
+tc_name		:: { RdrName }
+tc_name		:  QCONID		{ tcQual $1 }
+		|  CONID		{ Unqual (TCOcc $1) }
+		|  CONSYM		{ Unqual (TCOcc $1) }
+		|  OPAREN RARROW CPAREN	{ Unqual (TCOcc SLIT("->")) }
 

@@ -35,6 +35,9 @@ import Name
 import Pretty
 import PprStyle	( PprStyle(..) )
 import Util	( panic, pprTrace, assertPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 \end{code}
 
 
@@ -47,8 +50,11 @@ import Util	( panic, pprTrace, assertPanic )
 
 \begin{code}
 getGlobalNames :: RdrNameHsModule
-	       -> RnMG (Maybe (ExportEnv, RnEnv, [AvailInfo]))
+	       -> RnMG (Maybe (ExportEnv, RnEnv, NameSet))
 			-- Nothing <=> no need to recompile
+			-- The NameSet is the set of names that are
+			--	either locally defined,
+			--	or explicitly imported
 
 getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
   = fixRn (\ ~(rec_exp_fn, _) ->
@@ -56,11 +62,11 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 	-- PROCESS LOCAL DECLS
 	-- Do these *first* so that the correct provenance gets
 	-- into the global name cache.
-      importsFromLocalDecls rec_exp_fn m	`thenRn` \ (local_rn_env, local_mod_avails) ->
+      importsFromLocalDecls rec_exp_fn m	`thenRn` \ (local_rn_env, local_mod_avails, local_avails) ->
 
 	-- PROCESS IMPORT DECLS
-      mapAndUnzipRn importsFromImportDecl all_imports
-						`thenRn` \ (imp_rn_envs, imp_avails_s) ->
+      mapAndUnzip3Rn importsFromImportDecl all_imports
+						`thenRn` \ (imp_rn_envs, imp_avails_s, explicit_imports_s) ->
 
 	-- CHECK FOR EARLY EXIT
       checkEarlyExit this_mod			`thenRn` \ early_exit ->
@@ -76,7 +82,10 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
       let
 	 all_avails :: ModuleAvails
 	 all_avails = foldr plusModuleAvails local_mod_avails imp_avails_s
-	 local_avails = expectJust "getGlobalNames" (lookupModuleAvails local_mod_avails this_mod)
+
+	 explicit_names :: NameSet 	-- locally defined or explicitly imported
+	 explicit_names = foldr add_on emptyNameSet (local_avails : explicit_imports_s)
+	 add_on avails names = foldr (unionNameSets . mkNameSet . availNames) names avails
       in
   
 	-- PROCESS EXPORT LISTS
@@ -86,7 +95,7 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 	-- RECORD THAT LOCALLY DEFINED THINGS ARE AVAILABLE
       mapRn (recordSlurp Nothing) local_avails		`thenRn_`
 
-      returnRn (export_fn, Just (export_env, rn_env, local_avails))
+      returnRn (export_fn, Just (export_env, rn_env, explicit_names))
     )							`thenRn` \ (_, result) ->
     returnRn result
   where
@@ -132,12 +141,12 @@ checkEarlyExit mod
 
 \begin{code}
 importsFromImportDecl :: RdrNameImportDecl
-		      -> RnMG (RnEnv, ModuleAvails)
+		      -> RnMG (RnEnv, ModuleAvails, [AvailInfo])
 
 importsFromImportDecl (ImportDecl mod qual_only as_mod import_spec loc)
   = pushSrcLocRn loc $
     getInterfaceExports mod			`thenRn` \ (avails, fixities) ->
-    filterImports mod import_spec avails	`thenRn` \ filtered_avails ->
+    filterImports mod import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
     let
 	filtered_avails' = map set_avail_prov filtered_avails
 	fixities'        = [ (occ,(fixity,provenance)) | (occ,fixity) <- fixities ]
@@ -147,6 +156,9 @@ importsFromImportDecl (ImportDecl mod qual_only as_mod import_spec loc)
 		   (not qual_only)	-- Maybe want unqualified names
 		   as_mod
 		   (ExportEnv filtered_avails' fixities')
+		   hides
+							`thenRn` \ (rn_env, mod_avails) ->
+    returnRn (rn_env, mod_avails, explicits)
   where
     set_avail_prov NotAvailable   = NotAvailable
     set_avail_prov (Avail n)      = Avail (set_name_prov n) 
@@ -165,6 +177,9 @@ importsFromLocalDecls rec_exp_fn (HsModule mod _ _ _ fix_decls decls _)
 		   True		-- Want unqualified names
 		   Nothing	-- No "as M" part
 		   (ExportEnv avails fixities)
+		   []		-- Hide nothing
+							`thenRn` \ (rn_env, mod_avails) ->
+    returnRn (rn_env, mod_avails, avails)
   where
     newLocalName rdr_name loc
       = newLocallyDefinedGlobalName mod (rdrNameOcc rdr_name) rec_exp_fn loc
@@ -197,44 +212,45 @@ available, and filters it through the import spec (if any).
 filterImports :: Module
 	      -> Maybe (Bool, [RdrNameIE])		-- Import spec; True => hidin
 	      -> [AvailInfo]				-- What's available
-	      -> RnMG [AvailInfo]			-- What's actually imported
-	-- Complains if import spec mentions things the
-	-- module doesn't export
+	      -> RnMG ([AvailInfo],			-- What's actually imported
+		       [AvailInfo],			-- What's to be hidden (the unqualified version, that is)
+		       [AvailInfo])			-- What was imported explicitly
+
+	-- Complains if import spec mentions things that the module doesn't export
 
 filterImports mod Nothing imports
-  = returnRn imports
+  = returnRn (imports, [], [])
 
 filterImports mod (Just (want_hiding, import_items)) avails
-  = foldlRn (filter_item want_hiding) initial_avails import_items
-  where
-    initial_avails | want_hiding = avails
-		   | otherwise   = []
+  = mapRn check_item import_items		`thenRn` \ item_avails ->
+    if want_hiding 
+    then	
+	returnRn (avails, item_avails, [])	-- All imported; item_avails to be hidden
+    else
+	returnRn (item_avails, [], item_avails)	-- Just item_avails imported; nothing to be hidden
 
+  where
     import_fm :: FiniteMap OccName AvailInfo
     import_fm = listToFM [ (nameOccName name, avail) 
 			 | avail <- avails,
 			   name  <- availEntityNames avail]
 
-    filter_item want_hiding avails_so_far item@(IEModuleContents _)
+    check_item item@(IEModuleContents _)
       = addErrRn (badImportItemErr mod item)	`thenRn_`
-	returnRn avails_so_far
+	returnRn NotAvailable
 
-    filter_item want_hiding avails_so_far item
+    check_item item
       | not (maybeToBool maybe_in_import_avails) ||
 	(case filtered_avail of { NotAvailable -> True; other -> False })
       = addErrRn (badImportItemErr mod item)	`thenRn_`
-	returnRn avails_so_far
+	returnRn NotAvailable
 
-      | want_hiding = returnRn (foldr hide_it [] avails_so_far)
-      | otherwise   = returnRn (filtered_avail : avails_so_far)	-- Explicit import list
+      | otherwise   = returnRn filtered_avail
 		
       where
 	maybe_in_import_avails = lookupFM import_fm (ieOcc item)
 	Just avail	       = maybe_in_import_avails
 	filtered_avail	       = filterAvail item avail
-        hide_it avail avails   = case hideAvail item avail of
-					NotAvailable -> avails
-					avail'       -> avail' : avails
 \end{code}
 
 
@@ -256,48 +272,54 @@ qualifyImports :: Module				-- Imported module
 	       -> Bool					-- True <=> want unqualified import
 	       -> Maybe Module				-- Optional "as M" part 
 	       -> ExportEnv				-- What's imported
+	       -> [AvailInfo]				-- What's to be hidden
 	       -> RnMG (RnEnv, ModuleAvails)
 
-qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities)
-  = 	-- Make the qualified-name environments, checking of course for clashes
-    foldlRn add_name emptyNameEnv avails			`thenRn` \ name_env ->
-    foldlRn (add_fixity name_env) emptyFixityEnv fixities	`thenRn` \ fixity_env ->
-    returnRn (RnEnv name_env fixity_env, mod_avail_env)
-  where
-    show_it (rdr, (fix,prov)) = ppSep [ppLbrack, ppr PprDebug rdr, ppr PprDebug fix, pprProvenance PprDebug prov, ppRbrack]
+qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities) hides
+  = let
+ 	-- Make the name environment.  Since we're talking about a single import module
+	-- there can't be name clashes, so we don't need to be in the monad
+	name_env1 = foldl add_avail emptyNameEnv avails
 
+	-- Delete things that are hidden
+	name_env2 = foldl del_avail name_env1 hides
+
+	-- Create the fixity env
+	fixity_env = foldl (add_fixity name_env2) emptyFixityEnv fixities
+
+	-- The "module M" syntax only applies to *unqualified* imports (1.4 Report, Section 5.1.1)
+	mod_avail_env | unqual_imp = unitFM qual_mod avails
+		      | otherwise  = emptyFM
+    in
+    returnRn (RnEnv name_env2 fixity_env, mod_avail_env)
+  where
     qual_mod = case as_mod of
 		  Nothing  	    -> this_mod
 		  Just another_name -> another_name
 
-    mod_avail_env  = unitFM qual_mod avails
+    add_avail env avail = foldl add_name env (availNames avail)
+    add_name env name   = env2
+			where
+			  env1 | qual_imp   = addOneToNameEnv env  (Qual qual_mod occ) name
+			       | otherwise  = env
+			  env2 | unqual_imp = addOneToNameEnv env1 (Unqual occ)	       name
+			       | otherwise  = env1
+			  occ  = nameOccName name
 
-    add_name name_env avail = foldlRn add_one name_env (availNames avail)
-
-    add_one :: NameEnv -> Name -> RnMG NameEnv
-    add_one env name = add_to_env addOneToNameEnvRn env occ_name name
-		     where
-			occ_name = nameOccName name
-
-    add_to_env add_fn env occ thing | qual_imp && unqual_imp = both
-				    | qual_imp		     = qual_only
-				    | unqual_imp	     = unqual_only
-				where
-				  unqual_only = add_fn env  (Unqual occ)        thing
-				  qual_only   = add_fn env  (Qual qual_mod occ) thing
-				  both	      = unqual_only 	`thenRn` \ env' ->
-						add_fn env' (Qual qual_mod occ) thing
+    del_avail env avail = foldl delOneFromNameEnv env rdr_names
+			where
+			  rdr_names = map (Unqual . nameOccName) (availNames avail)
 			
-    add_fixity name_env fixity_env (occ_name, (fixity, provenance))
-	| maybeToBool (lookupFM name_env rdr_name)	-- It's imported
-	= add_to_env addOneToFixityEnvRn fixity_env occ_name (fixity,provenance)
-	| otherwise					-- It ain't imported
-	= returnRn fixity_env
-	where
-		-- rdr_name is a name by which the thing is guaranteed to be known,
-		-- *if it is imported at all*
-	  rdr_name | qual_imp  = Qual qual_mod occ_name
-		   | otherwise = Unqual occ_name
+    add_fixity name_env fix_env (occ_name, (fixity, provenance))
+	= add qual $ add unqual $ fix_env
+ 	where
+	  qual   = Qual qual_mod occ_name
+	  unqual = Unqual occ_name
+
+	  add rdr_name fix_env | maybeToBool (lookupFM name_env rdr_name)
+			       = addOneToFixityEnv fix_env rdr_name (fixity,provenance)
+			       | otherwise
+			       = fix_env
 \end{code}
 
 unQualify adds an Unqual binding for every existing Qual binding.
@@ -489,21 +511,21 @@ mk_export_fn avails
 
 \begin{code}
 badImportItemErr mod ie sty
-  = ppSep [ppPStr SLIT("Module"), pprModule sty mod, ppPStr SLIT("does not export"), ppr sty ie]
+  = sep [ptext SLIT("Module"), pprModule sty mod, ptext SLIT("does not export"), ppr sty ie]
 
 modExportErr mod sty
-  = ppCat [ ppPStr SLIT("Unknown module in export list: module"), ppPStr mod]
+  = hsep [ ptext SLIT("Unknown module in export list: module"), ptext mod]
 
 exportItemErr export_item NotAvailable sty
-  = ppSep [ ppPStr SLIT("Export item not in scope:"), ppr sty export_item ]
+  = sep [ ptext SLIT("Export item not in scope:"), ppr sty export_item ]
 
 exportItemErr export_item avail sty
-  = ppHang (ppPStr SLIT("Export item not fully in scope:"))
-	   4 (ppAboves [ppCat [ppPStr SLIT("Wanted:    "), ppr sty export_item],
-			ppCat [ppPStr SLIT("Available: "), ppr sty (ieOcc export_item), pprAvail sty avail]])
+  = hang (ptext SLIT("Export item not fully in scope:"))
+	   4 (vcat [hsep [ptext SLIT("Wanted:    "), ppr sty export_item],
+			hsep [ptext SLIT("Available: "), ppr sty (ieOcc export_item), pprAvail sty avail]])
 
 availClashErr (occ_name, ((ie1,avail1), (ie2,avail2))) sty
-  = ppHang (ppCat [ppPStr SLIT("Conflicting exports for local name: "), ppr sty occ_name])
-	4 (ppAboves [ppr sty ie1, ppr sty ie2])
+  = hang (hsep [ptext SLIT("Conflicting exports for local name: "), ppr sty occ_name])
+	4 (vcat [ppr sty ie1, ppr sty ie2])
 \end{code}
 

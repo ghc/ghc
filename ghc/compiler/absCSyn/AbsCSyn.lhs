@@ -36,6 +36,7 @@ module AbsCSyn {- (
     )-} where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(AbsCLoop)
 
 import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  mAX_Double_REG, lIVENESS_R1, lIVENESS_R2,
@@ -43,10 +44,15 @@ import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  lIVENESS_R6, lIVENESS_R7, lIVENESS_R8
 			)
 import HeapOffs		( SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset),
-			  SYN_IE(VirtualHeapOffset)
+			  SYN_IE(VirtualHeapOffset), HeapOffset
 			)
-import Literal		( mkMachInt )
+import CLabel           ( CLabel )
+import CostCentre       ( CostCentre )
+import Literal		( mkMachInt, Literal )
 import PrimRep		( isFollowableRep, PrimRep(..) )
+import PrimOp           ( PrimOp )
+import Unique           ( Unique )
+
 \end{code}
 
 @AbstractC@ is a list of Abstract~C statements, but the data structure

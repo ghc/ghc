@@ -236,7 +236,7 @@ BOOLEAN inpat;
 		maybefixes fixes fix ops
 		dtyclses dtycls_list
   		gdrhs gdpat valrhs
-  		lampats	cexps
+  		lampats	cexps gd
 
 %type <umaybe>  maybeexports impspec deriving
 
@@ -244,7 +244,7 @@ BOOLEAN inpat;
 
 %type <utree>	exp oexp dexp kexp fexp aexp rbind texps
 		expL oexpL kexpL expLno oexpLno dexpLno kexpLno
-		vallhs funlhs qual gd leftexp
+		vallhs funlhs qual leftexp
  		pat cpat bpat apat apatc conpat rpat
           		patk bpatk apatck conpatk
 
@@ -269,12 +269,12 @@ BOOLEAN inpat;
 
 %type <upbinding> valrhs1 altrest
 
-%type <uttype>    simple ctype type atype btype
+%type <uttype>    simple ctype sigtype sigarrowtype type atype bigatype btype
 		  gtyconvars 
-		  bbtype batype bxtype bang_atype
-		  class tyvar
+		  bbtype batype bxtype wierd_atype
+		  class tyvar contype
 
-%type <uconstr>	  constr field
+%type <uconstr>	  constr constr_after_context field
 
 %type <ustring>   FLOAT INTEGER INTPRIM
 		  FLOATPRIM DOUBLEPRIM CLITLIT
@@ -570,7 +570,7 @@ decls	: decl
     to real mischief (ugly, but likely to work).
 */
 
-decl	: qvarsk DCOLON ctype
+decl	: qvarsk DCOLON sigtype
 		{ $$ = mksbind($1,$3,startlineno);
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
 		}
@@ -662,18 +662,34 @@ type_and_maybe_id :
     context.  Blaach!
 */
 
+/* A sigtype is a rank 2 type; it can have for-alls as function args:
+  	f :: All a => (All b => ...) -> Int
+*/
+sigtype	: type DARROW sigarrowtype		{ $$ = mkcontext(type2context($1),$3); }
+	| sigarrowtype 
+	;
+
+sigarrowtype : bigatype RARROW sigarrowtype	{ $$ = mktfun($1,$3); }
+	     | btype RARROW sigarrowtype	{ $$ = mktfun($1,$3); }
+	     | btype
+	     ;
+
+/* A "big" atype can be a forall-type in brackets.  */
+bigatype: OPAREN type DARROW type CPAREN	{ $$ = mkcontext(type2context($2),$4); }
+	;
+
 	/* 1 S/R conflict at DARROW -> shift */
 ctype   : type DARROW type			{ $$ = mkcontext(type2context($1),$3); }
 	| type
 	;
 
 	/* 1 S/R conflict at RARROW -> shift */
-type	:  btype				{ $$ = $1; }
-	|  btype RARROW type			{ $$ = mktfun($1,$3); }
+type	:  btype RARROW type			{ $$ = mktfun($1,$3); }
+	|  btype				{ $$ = $1; }
 	;
 
-btype	:  atype				{ $$ = $1; }
-	|  btype atype				{ $$ = mktapp($1,$2); }
+btype	:  btype atype				{ $$ = mktapp($1,$2); }
+	|  atype				{ $$ = $1; }
 	;
 
 atype  	:  gtycon				{ $$ = mktname($1); }
@@ -733,12 +749,11 @@ constrs	:  constr				{ $$ = lsing($1); }
 	|  constrs VBAR constr			{ $$ = lapp($1,$3); }
 	;
 
-constr	:  btype				{ qid tyc; list tys;
-						  splittyconapp($1, &tyc, &tys);
-					          $$ = mkconstrpre(tyc,tys,hsplineno); }
-	| bxtype 				{ qid tyc; list tys;
-						  splittyconapp($1, &tyc, &tys);
-					          $$ = mkconstrpre(tyc,tys,hsplineno); }
+constr	:  constr_after_context
+	|  type DARROW constr_after_context	{ $$ = mkconstrcxt ( type2context($1), $3 ); }
+	;
+
+constr_after_context :
 
 	/* We have to parse the constructor application as a *type*, else we get
 	   into terrible ambiguity problems.  Consider the difference between
@@ -752,31 +767,50 @@ constr	:  btype				{ qid tyc; list tys;
 	   second.
 	*/
 
-	| btype qconop bbtype			{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
-	| bang_atype qconop bbtype		{ $$ = mkconstrinf( $1, $2, $3, hsplineno ); }
+/* Con !Int (Tree a) */
+	   contype				{ qid tyc; list tys;
+						  splittyconapp($1, &tyc, &tys);
+					          $$ = mkconstrpre(tyc,tys,hsplineno); }
 
+/* !Int `Con` Tree a */
+	|  bbtype qconop bbtype			{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
 
+/* (::) (Tree a) Int */
 	|  OPAREN qconsym CPAREN batypes	{ $$ = mkconstrpre($2,$4,hsplineno); }
+
+/* Con { op1 :: Int } */
 	|  gtycon OCURLY fields CCURLY		{ $$ = mkconstrrec($1,$3,hsplineno); }
 		/* 1 S/R conflict on OCURLY -> shift */
 	;
 
-/* S !Int Bool */
-bxtype	: btype bang_atype				{ $$ = mktapp($1, $2); }
-	| bxtype bbtype					{ $$ = mktapp($1, $2); }
+
+/* contype has to reduce to a btype unless there are !'s, so that
+   we don't get reduce/reduce conflicts with the second production of constr.
+   But as soon as we see a ! we must switch to using bxtype. */
+
+contype : btype					{ $$ = $1 }
+	| bxtype				{ $$ = $1 }
 	;
 
+/* S !Int Bool; at least one ! */
+bxtype	: btype wierd_atype			{ $$ = mktapp($1, $2); }
+	| bxtype batype				{ $$ = mktapp($1, $2); }
+	;
 
 bbtype	:  btype				{ $$ = $1; }
-	|  bang_atype				{ $$ = $1; }
+	|  wierd_atype				{ $$ = $1; }
 	;
 
 batype	:  atype				{ $$ = $1; }
-	|  bang_atype				{ $$ = $1; }
+	|  wierd_atype				{ $$ = $1; }
 	;
 
-bang_atype : BANG atype				{ $$ = mktbang( $2 ) }
-	;
+/* A wierd atype is one that isn't a regular atype;
+   it starts with a "!", or with a forall. */
+wierd_atype : BANG bigatype			{ $$ = mktbang( $2 ) }
+	    | BANG atype			{ $$ = mktbang( $2 ) }
+	    | bigatype 
+	    ;
 
 batypes	:  					{ $$ = Lnil; }
 	|  batypes batype			{ $$ = lapp($1,$2); }
@@ -787,8 +821,9 @@ fields	: field					{ $$ = lsing($1); }
 	| fields COMMA field			{ $$ = lapp($1,$3); }
 	;
 
-field	:  qvars_list DCOLON type		{ $$ = mkfield($1,$3); }
+field	:  qvars_list DCOLON ctype		{ $$ = mkfield($1,$3); }
 	|  qvars_list DCOLON BANG atype		{ $$ = mkfield($1,mktbang($4)); }
+ 	|  qvars_list DCOLON BANG bigatype	{ $$ = mkfield($1,mktbang($4)); }
 	; 
 
 constr1 :  gtycon atype				{ $$ = lsing(mkconstrnew($1,$2,hsplineno)); }
@@ -912,7 +947,7 @@ maybe_where:
 	|  /* empty */				{ $$ = mknullbind(); }
 	;
 
-gd	:  VBAR oexp				{ $$ = $2; }
+gd	:  VBAR quals				{ $$ = $2; }
 	;
 
 
@@ -1130,7 +1165,8 @@ quals	:  qual					{ $$ = lsing($1); }
 
 qual	:  letdecls				{ $$ = mkseqlet($1); }
 	|  expL					{ $$ = $1; }
-	|  {inpat=TRUE;} expLno {inpat=FALSE;}leftexp
+	|  {inpat=TRUE;} expLno 
+	   {inpat=FALSE;} leftexp
 		{ if ($4 == NULL) {
 		      expORpat(LEGIT_EXPR,$2);
 		      $$ = mkguard($2);

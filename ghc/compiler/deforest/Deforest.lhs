@@ -78,7 +78,7 @@ for xs as unfoldable, too.
 >
 > defProg sw p (NonRec v e : bs) =
 > 	trace ("Processing: `" ++
->		     	ppShow 80 (ppr PprDebug v) ++ "'\n") (
+>		     	show (ppr PprDebug v) ++ "'\n") (
 >	tran sw p nullTyVarEnv e []	 	`thenUs` \e ->
 >	mkLoops e				`thenUs` \(extracted,e) ->
 >	let e' = mkDefLetrec extracted e in
@@ -112,17 +112,17 @@ for xs as unfoldable, too.
 >
 > defRecBind sw p (v,e) =
 > 	trace ("Processing: `" ++
->		     	ppShow 80 (ppr PprDebug v) ++ "'\n") (
+>		     	show (ppr PprDebug v) ++ "'\n") (
 > 	tran sw p nullTyVarEnv e []		`thenUs` \e' ->
 >	mkLoops e'				`thenUs` \(bs,e') ->
 >	let e'' = mkDefLetrec bs e' in
 >
 >	d2c e'' `thenUs` \core_e ->
->	let showBind (v,e) = ppShow 80 (ppr PprDebug v) ++
->		"=\n" ++ ppShow 80 (ppr PprDebug e) ++ "\n"
+>	let showBind (v,e) = show (ppr PprDebug v) ++
+>		"=\n" ++ show (ppr PprDebug e) ++ "\n"
 >	in
 >	trace ("Extracting from `" ++
->		ppShow 80 (ppr PprDebug v) ++ "'\n"
+>		show (ppr PprDebug v) ++ "'\n"
 >		++ "{ result:\n" ++ showBind (v,core_e) ++ "}\n") $
 >
 >	if deforestable v

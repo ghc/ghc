@@ -16,15 +16,18 @@ IMP_Ubiq()
 import CoreSyn
 
 import Bag
-import Kind		( hasMoreBoxityInfo, Kind{-instance-} )
+import Kind		( hasMoreBoxityInfo, Kind{-instance-}, 
+			  isTypeKind, isBoxedTypeKind {- TEMP --SOF -} )
 import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId, dataConRepType,
 			  dataConArgTys, GenId{-instances-},
 			  emptyIdSet, mkIdSet, intersectIdSets,
-			  unionIdSets, elementOfIdSet, SYN_IE(IdSet)
+			  unionIdSets, elementOfIdSet, SYN_IE(IdSet),
+			  SYN_IE(Id)
 			)
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-} )
+import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-},
+			  NamedThing(..) )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprCore
 import PprStyle		( PprStyle(..) )
@@ -38,7 +41,7 @@ import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,mkForAllTys,getForAllTy_maybe,
 			  getForAllTyExpandingDicts_maybe,
 			  isPrimType,typeKind,instantiateTy,splitSigmaTy,
 			  mkForAllUsageTy,getForAllUsageTy,instantiateUsage,
-			  maybeAppDataTyConExpandingDicts, eqTy
+			  maybeAppDataTyConExpandingDicts, eqTy, SYN_IE(Type)
 --			  ,expandTy -- ToDo:rm
 			)
 import TyCon		( isPrimTyCon )
@@ -91,12 +94,12 @@ lintCoreBindings sty whoDunnit spec_done binds
   = case (initL (lint_binds binds) spec_done) of
       Nothing  -> binds
       Just msg ->
-	pprPanic "" (ppAboves [
-	  ppStr ("*** Core Lint Errors: in " ++ whoDunnit ++ " ***"),
+	pprPanic "" (vcat [
+	  text ("*** Core Lint Errors: in " ++ whoDunnit ++ " ***"),
 	  msg sty,
-	  ppPStr SLIT("*** Offending Program ***"),
-	  ppAboves (map (pprCoreBinding sty) binds),
-	  ppPStr SLIT("*** End of Offense ***")
+	  ptext SLIT("*** Offending Program ***"),
+	  vcat (map (pprCoreBinding sty) binds),
+	  ptext SLIT("*** End of Offense ***")
 	])
   where
     lint_binds [] = returnL ()
@@ -125,10 +128,10 @@ lintUnfolding locn expr
       Nothing  -> Just expr
       Just msg ->
         pprTrace "WARNING: Discarded bad unfolding from interface:\n"
-	(ppAboves [msg PprForUser,
-		   ppPStr SLIT("*** Bad unfolding ***"),
+	(vcat [msg PprForUser,
+		   ptext SLIT("*** Bad unfolding ***"),
 		   ppr PprDebug expr,
-		   ppPStr SLIT("*** End unfolding ***")])
+		   ptext SLIT("*** End unfolding ***")])
 	Nothing
 \end{code}
 
@@ -284,7 +287,8 @@ lintCoreArg e ty a@(TyArg arg_ty)
 	    tyvar_kind = tyVarKind tyvar
 	    argty_kind = typeKind arg_ty
 	in
-	if argty_kind `hasMoreBoxityInfo` tyvar_kind
+	if argty_kind `hasMoreBoxityInfo` tyvar_kind || -- Should the args be swapped here?
+	   (isTypeKind argty_kind && isBoxedTypeKind tyvar_kind) -- (hackily) added SOF
 		-- Arg type might be boxed for a function with an uncommitted
 		-- tyvar; notably this is used so that we can give
 		-- 	error :: forall a:*. String -> a
@@ -292,7 +296,7 @@ lintCoreArg e ty a@(TyArg arg_ty)
 	 then
 	    returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
 	else
-	    pprTrace "lintCoreArg:kinds:" (ppCat [ppr PprDebug tyvar_kind, ppr PprDebug argty_kind]) $
+	    pprTrace "lintCoreArg:kinds:" (hsep [ppr PprDebug tyvar_kind, ppr PprDebug argty_kind]) $
 	    addErrL (mkTyAppMsg SLIT("Kinds not right in") ty arg_ty e) `seqL` returnL Nothing
 	
 lintCoreArg e ty (UsageArg u)
@@ -403,7 +407,7 @@ type LintM a = Bool		-- True <=> specialisation has been done
 	    -> Bag ErrMsg	-- Error messages so far
 	    -> (a, Bag ErrMsg)	-- Result and error messages (if any)
 
-type ErrMsg = PprStyle -> Pretty
+type ErrMsg = PprStyle -> Doc
 
 data LintLocInfo
   = RhsOf Id		-- The variable bound
@@ -413,24 +417,24 @@ data LintLocInfo
 
 instance Outputable LintLocInfo where
     ppr sty (RhsOf v)
-      = ppBesides [ppr sty (getSrcLoc v), ppPStr SLIT(": [RHS of "), pp_binders sty [v], ppChar ']']
+      = hcat [ppr sty (getSrcLoc v), ptext SLIT(": [RHS of "), pp_binders sty [v], char ']']
 
     ppr sty (LambdaBodyOf b)
-      = ppBesides [ppr sty (getSrcLoc b),
-		ppPStr SLIT(": [in body of lambda with binder "), pp_binder sty b, ppChar ']']
+      = hcat [ppr sty (getSrcLoc b),
+		ptext SLIT(": [in body of lambda with binder "), pp_binder sty b, char ']']
 
     ppr sty (BodyOfLetRec bs)
-      = ppBesides [ppr sty (getSrcLoc (head bs)),
-		ppPStr SLIT(": [in body of letrec with binders "), pp_binders sty bs, ppChar ']']
+      = hcat [ppr sty (getSrcLoc (head bs)),
+		ptext SLIT(": [in body of letrec with binders "), pp_binders sty bs, char ']']
 
     ppr sty (ImportedUnfolding locn)
-      = ppBeside (ppr sty locn) (ppPStr SLIT(": [in an imported unfolding]"))
+      = (<>) (ppr sty locn) (ptext SLIT(": [in an imported unfolding]"))
 
-pp_binders :: PprStyle -> [Id] -> Pretty
-pp_binders sty bs = ppInterleave ppComma (map (pp_binder sty) bs)
+pp_binders :: PprStyle -> [Id] -> Doc
+pp_binders sty bs = sep (punctuate comma (map (pp_binder sty) bs))
 
-pp_binder :: PprStyle -> Id -> Pretty
-pp_binder sty b = ppCat [ppr sty b, ppStr "::", ppr sty (idType b)]
+pp_binder :: PprStyle -> Id -> Doc
+pp_binder sty b = hsep [ppr sty b, text "::", ppr sty (idType b)]
 \end{code}
 
 \begin{code}
@@ -441,7 +445,7 @@ initL m spec_done
 	Nothing
     else
 	Just ( \ sty ->
-	  ppAboves [ msg sty | msg <- bagToList errs ]
+	  vcat [ msg sty | msg <- bagToList errs ]
 	)
     }
 
@@ -507,7 +511,7 @@ addErr :: Bag ErrMsg -> ErrMsg -> [LintLocInfo] -> Bag ErrMsg
 addErr errs_so_far msg locs
   = ASSERT (not (null locs))
     errs_so_far `snocBag` ( \ sty ->
-    ppHang (ppr sty (head locs)) 4 (msg sty)
+    hang (ppr sty (head locs)) 4 (msg sty)
     )
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
@@ -541,7 +545,7 @@ checkInScope id spec loc scope errs
 	id_name = getName id
     in
     if isLocallyDefined id_name && not (id `elementOfIdSet` scope) then
-      ((),addErr errs (\sty -> ppCat [ppr sty id, ppPStr SLIT("is out of scope")]) loc)
+      ((),addErr errs (\sty -> hsep [ppr sty id, ptext SLIT("is out of scope")]) loc)
     else
       ((),errs)
 
@@ -553,113 +557,113 @@ checkTys ty1 ty2 msg spec loc scope errs
 \begin{code}
 mkCaseAltMsg :: CoreCaseAlts -> ErrMsg
 mkCaseAltMsg alts sty
-  = ppAbove (ppPStr SLIT("Type of case alternatives not the same:"))
+  = ($$) (ptext SLIT("Type of case alternatives not the same:"))
 	    (ppr sty alts)
 
 mkCaseDataConMsg :: CoreExpr -> ErrMsg
 mkCaseDataConMsg expr sty
-  = ppAbove (ppPStr SLIT("A case scrutinee not of data constructor type:"))
+  = ($$) (ptext SLIT("A case scrutinee not of data constructor type:"))
 	    (pp_expr sty expr)
 
 mkCaseNotPrimMsg :: TyCon -> ErrMsg
 mkCaseNotPrimMsg tycon sty
-  = ppAbove (ppPStr SLIT("A primitive case on a non-primitive type:"))
+  = ($$) (ptext SLIT("A primitive case on a non-primitive type:"))
 	    (ppr sty tycon)
 
 mkCasePrimMsg :: TyCon -> ErrMsg
 mkCasePrimMsg tycon sty
-  = ppAbove (ppPStr SLIT("An algebraic case on a primitive type:"))
+  = ($$) (ptext SLIT("An algebraic case on a primitive type:"))
 	    (ppr sty tycon)
 
 mkCaseAbstractMsg :: TyCon -> ErrMsg
 mkCaseAbstractMsg tycon sty
-  = ppAbove (ppPStr SLIT("An algebraic case on some weird type:"))
+  = ($$) (ptext SLIT("An algebraic case on some weird type:"))
 	    (ppr sty tycon)
 
 mkDefltMsg :: CoreCaseDefault -> ErrMsg
 mkDefltMsg deflt sty
-  = ppAbove (ppPStr SLIT("Binder in case default doesn't match type of scrutinee:"))
+  = ($$) (ptext SLIT("Binder in case default doesn't match type of scrutinee:"))
 	    (ppr sty deflt)
 
 mkAppMsg :: Type -> Type -> CoreExpr -> ErrMsg
 mkAppMsg fun arg expr sty
-  = ppAboves [ppPStr SLIT("Argument value doesn't match argument type:"),
-	      ppHang (ppPStr SLIT("Fun type:")) 4 (ppr sty fun),
-	      ppHang (ppPStr SLIT("Arg type:")) 4 (ppr sty arg),
-	      ppHang (ppPStr SLIT("Expression:")) 4 (pp_expr sty expr)]
+  = vcat [ptext SLIT("Argument value doesn't match argument type:"),
+	      hang (ptext SLIT("Fun type:")) 4 (ppr sty fun),
+	      hang (ptext SLIT("Arg type:")) 4 (ppr sty arg),
+	      hang (ptext SLIT("Expression:")) 4 (pp_expr sty expr)]
 
 mkTyAppMsg :: FAST_STRING -> Type -> Type -> CoreExpr -> ErrMsg
 mkTyAppMsg msg ty arg expr sty
-  = ppAboves [ppCat [ppPStr msg, ppPStr SLIT("type application:")],
-	      ppHang (ppPStr SLIT("Exp type:"))   4 (ppr sty ty),
-	      ppHang (ppPStr SLIT("Arg type:"))   4 (ppr sty arg),
-	      ppHang (ppPStr SLIT("Expression:")) 4 (pp_expr sty expr)]
+  = vcat [hsep [ptext msg, ptext SLIT("type application:")],
+	      hang (ptext SLIT("Exp type:"))   4 (ppr sty ty),
+	      hang (ptext SLIT("Arg type:"))   4 (ppr sty arg),
+	      hang (ptext SLIT("Expression:")) 4 (pp_expr sty expr)]
 
 mkUsageAppMsg :: Type -> Usage -> CoreExpr -> ErrMsg
 mkUsageAppMsg ty u expr sty
-  = ppAboves [ppPStr SLIT("Illegal usage application:"),
-	      ppHang (ppPStr SLIT("Exp type:")) 4 (ppr sty ty),
-	      ppHang (ppPStr SLIT("Usage exp:")) 4 (ppr sty u),
-	      ppHang (ppPStr SLIT("Expression:")) 4 (pp_expr sty expr)]
+  = vcat [ptext SLIT("Illegal usage application:"),
+	      hang (ptext SLIT("Exp type:")) 4 (ppr sty ty),
+	      hang (ptext SLIT("Usage exp:")) 4 (ppr sty u),
+	      hang (ptext SLIT("Expression:")) 4 (pp_expr sty expr)]
 
 mkAlgAltMsg1 :: Type -> ErrMsg
 mkAlgAltMsg1 ty sty
-  = ppAbove (ppStr "In some case statement, type of scrutinee is not a data type:")
+  = ($$) (text "In some case statement, type of scrutinee is not a data type:")
 	    (ppr sty ty)
---	    (ppAbove (ppr sty ty) (ppr sty (expandTy ty))) -- ToDo: rm
+--	    (($$) (ppr sty ty) (ppr sty (expandTy ty))) -- ToDo: rm
 
 mkAlgAltMsg2 :: Type -> Id -> ErrMsg
 mkAlgAltMsg2 ty con sty
-  = ppAboves [
-	ppStr "In some algebraic case alternative, constructor is not a constructor of scrutinee type:",
+  = vcat [
+	text "In some algebraic case alternative, constructor is not a constructor of scrutinee type:",
 	ppr sty ty,
 	ppr sty con
     ]
 
 mkAlgAltMsg3 :: Id -> [Id] -> ErrMsg
 mkAlgAltMsg3 con alts sty
-  = ppAboves [
-	ppStr "In some algebraic case alternative, number of arguments doesn't match constructor:",
+  = vcat [
+	text "In some algebraic case alternative, number of arguments doesn't match constructor:",
 	ppr sty con,
 	ppr sty alts
     ]
 
 mkAlgAltMsg4 :: Type -> Id -> ErrMsg
 mkAlgAltMsg4 ty arg sty
-  = ppAboves [
-	ppStr "In some algebraic case alternative, type of argument doesn't match data constructor:",
+  = vcat [
+	text "In some algebraic case alternative, type of argument doesn't match data constructor:",
 	ppr sty ty,
 	ppr sty arg
     ]
 
 mkPrimAltMsg :: (Literal, CoreExpr) -> ErrMsg
 mkPrimAltMsg alt sty
-  = ppAbove
-    (ppStr "In a primitive case alternative, type of literal doesn't match type of scrutinee:")
+  = ($$)
+    (text "In a primitive case alternative, type of literal doesn't match type of scrutinee:")
 	    (ppr sty alt)
 
 mkRhsMsg :: Id -> Type -> ErrMsg
 mkRhsMsg binder ty sty
-  = ppAboves
-    [ppCat [ppPStr SLIT("The type of this binder doesn't match the type of its RHS:"),
+  = vcat
+    [hsep [ptext SLIT("The type of this binder doesn't match the type of its RHS:"),
 	    ppr sty binder],
-     ppCat [ppPStr SLIT("Binder's type:"), ppr sty (idType binder)],
-     ppCat [ppPStr SLIT("Rhs type:"), ppr sty ty]]
+     hsep [ptext SLIT("Binder's type:"), ppr sty (idType binder)],
+     hsep [ptext SLIT("Rhs type:"), ppr sty ty]]
 
 mkRhsPrimMsg :: Id -> CoreExpr -> ErrMsg
 mkRhsPrimMsg binder rhs sty
-  = ppAboves [ppCat [ppPStr SLIT("The type of this binder is primitive:"),
+  = vcat [hsep [ptext SLIT("The type of this binder is primitive:"),
 		     ppr sty binder],
-	      ppCat [ppPStr SLIT("Binder's type:"), ppr sty (idType binder)]
+	      hsep [ptext SLIT("Binder's type:"), ppr sty (idType binder)]
 	     ]
 
 mkSpecTyAppMsg :: CoreArg -> ErrMsg
 mkSpecTyAppMsg arg sty
-  = ppAbove
-      (ppPStr SLIT("Unboxed types in a type application (after specialisation):"))
+  = ($$)
+      (ptext SLIT("Unboxed types in a type application (after specialisation):"))
       (ppr sty arg)
 
-pp_expr :: PprStyle -> CoreExpr -> Pretty
+pp_expr :: PprStyle -> CoreExpr -> Doc
 pp_expr sty expr
   = pprCoreExpr sty (pprBigCoreBinder sty) (pprTypedCoreBinder sty) (pprTypedCoreBinder sty) expr
 \end{code}

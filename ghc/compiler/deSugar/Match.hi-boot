@@ -1,0 +1,6 @@
+_interface_ Match 1
+_exports_
+Match match matchSimply;
+_declarations_
+1 match _:_ [Id.Id] -> [DsUtils.EquationInfo] -> [DsUtils.EquationInfo] -> DsMonad.DsM DsUtils.MatchResult ;;
+1 matchSimply _:_ CoreSyn.CoreExpr -> TcHsSyn.TypecheckedPat -> Type.Type -> CoreSyn.CoreExpr -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr ;;

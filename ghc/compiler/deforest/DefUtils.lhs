@@ -340,8 +340,8 @@ or otherwise global ids.
 >				d2c (strip u)	`thenUs` \u ->
 >				d2c (strip u')  `thenUs` \u' ->
 >				trace ("failed consistency check:\n" ++
->				       ppShow 80 (ppr PprDebug u) ++ "\n" ++
->				       ppShow 80 (ppr PprDebug u'))
+>				       show (ppr PprDebug u) ++ "\n" ++
+>				       show (ppr PprDebug u'))
 >				(returnUs (InconsistentRenaming r))
 >			else
 >				trace "Renaming!" (returnUs (IsRenaming r))

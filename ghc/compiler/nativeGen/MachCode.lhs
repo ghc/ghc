@@ -17,23 +17,34 @@ module MachCode ( stmt2Instrs, asmVoid, SYN_IE(InstrList) ) where
 IMP_Ubiq(){-uitious-}
 
 import MachMisc		-- may differ per-platform
+#if __GLASGOW_HASKELL__ >= 202
+import MachRegs hiding (Addr(..))
+import qualified MachRegs (Addr(..))
+#define MachRegsAddr MachRegs.Addr
+#define MachRegsAddrRegImm MachRegs.AddrRegImm
+#define MachRegsAddrRegReg MachRegs.AddrRegReg
+#else
 import MachRegs
+#define MachRegsAddr Addr
+#define MachRegsAddrRegImm AddrRegImm
+#define MachRegsAddrRegReg AddrRegReg
+#endif
 
 import AbsCSyn		( MagicId )
 import AbsCUtils	( magicIdPrimRep )
-import CLabel		( isAsmTemp )
+import CLabel		( isAsmTemp, CLabel )
 import Maybes		( maybeToBool, expectJust )
 import OrdList		-- quite a bit of it
-import Pretty		( prettyToUn, ppRational )
+import PprStyle
+import Pretty		( ptext, rational )
 import PrimRep		( isFloatingRep, PrimRep(..) )
-import PrimOp		( PrimOp(..) )
+import PrimOp		( PrimOp(..), showPrimOp )
 import Stix		( getUniqLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..)
 			)
 import UniqSupply	( returnUs, thenUs, mapUs, mapAndUnzipUs,
 			  mapAccumLUs, SYN_IE(UniqSM)
 			)
-import Unpretty		( uppPStr )
 import Util		( panic, assertPanic )
 \end{code}
 
@@ -274,7 +285,7 @@ getRegister (StDouble d)
     let code dst = mkSeqInstrs [
     	    SEGMENT DataSegment,
 	    LABEL lbl,
-	    DATA TF [ImmLab (prettyToUn (ppRational d))],
+	    DATA TF [ImmLab (rational d)],
 	    SEGMENT TextSegment,
 	    LDA tmp (AddrImm (ImmCLbl lbl)),
 	    LD TF dst (AddrReg tmp)]
@@ -674,7 +685,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    src1 = registerName register tmp
 	    src2 = ImmInt (fromInteger y)
 	    code__2 dst = code .
-			  mkSeqInstr (LEA sz (OpAddr (Addr (Just src1) Nothing src2)) (OpReg dst))
+			  mkSeqInstr (LEA sz (OpAddr (MachRegsAddr (Just src1) Nothing src2)) (OpReg dst))
 	in
 	returnUs (Any IntRep code__2)
 
@@ -731,7 +742,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    code2 = registerCode register2 tmp2 asmVoid
 	    src2  = registerName register2 tmp2
 	    code__2 dst = asmParThen [code1, code2] .
-			  mkSeqInstr (LEA sz (OpAddr (Addr (Just src1) (Just (src2,1)) (ImmInt 0))) (OpReg dst))
+			  mkSeqInstr (LEA sz (OpAddr (MachRegsAddr (Just src1) (Just (src2,1)) (ImmInt 0))) (OpReg dst))
 	in
 	returnUs (Any IntRep code__2)
 
@@ -746,7 +757,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    src1 = registerName register tmp
 	    src2 = ImmInt (-(fromInteger y))
 	    code__2 dst = code .
-			  mkSeqInstr (LEA sz (OpAddr (Addr (Just src1) Nothing src2)) (OpReg dst))
+			  mkSeqInstr (LEA sz (OpAddr (MachRegsAddr (Just src1) Nothing src2)) (OpReg dst))
 	in
 	returnUs (Any IntRep code__2)
 
@@ -789,10 +800,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    src2    = ImmInt (fromInteger i)
 	    code__2 = asmParThen [code1] .
 		      mkSeqInstrs [-- we put src2 in (ebx)
-				   MOV L (OpImm src2) (OpAddr (Addr (Just ebx) Nothing (ImmInt OFFSET_R1))),
+				   MOV L (OpImm src2) (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt OFFSET_R1))),
 				   MOV L (OpReg src1) (OpReg eax),
 				   CLTD,
-				   IDIV sz (OpAddr (Addr (Just ebx) Nothing (ImmInt OFFSET_R1)))]
+				   IDIV sz (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt OFFSET_R1)))]
 	in
 	returnUs (Fixed IntRep (if is_division then eax else edx) code__2)
 
@@ -812,10 +823,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 					 CLTD,
 					 IDIV sz (OpReg src2)]
 		      else mkSeqInstrs [ -- we put src2 in (ebx)
-					 MOV L (OpReg src2) (OpAddr (Addr (Just ebx) Nothing (ImmInt OFFSET_R1))),
+					 MOV L (OpReg src2) (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt OFFSET_R1))),
 					 MOV L (OpReg src1) (OpReg eax),
 					 CLTD,
-					 IDIV sz (OpAddr (Addr (Just ebx) Nothing (ImmInt OFFSET_R1)))]
+					 IDIV sz (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt OFFSET_R1)))]
 	in
 	returnUs (Fixed IntRep (if is_division then eax else edx) code__2)
 	-----------------------
@@ -864,7 +875,7 @@ getRegister (StDouble d)
 	    DATA DF [dblImmLit d],
 	    SEGMENT TextSegment,
 	    SETHI (HI (ImmCLbl lbl)) tmp,
-	    LD DF (AddrRegImm tmp (LO (ImmCLbl lbl))) dst]
+	    LD DF (MachRegsAddrRegImm tmp (LO (ImmCLbl lbl))) dst]
     in
     	returnUs (Any DoubleRep code)
 
@@ -872,10 +883,10 @@ getRegister (StPrim primop [x]) -- unary PrimOps
   = case primop of
       IntNegOp -> trivialUCode (SUB False False g0) x
       IntAbsOp -> absIntCode x
-
       NotOp    -> trivialUCode (XNOR False g0) x
 
       FloatNegOp  -> trivialUFCode FloatRep (FNEG F) x
+
       DoubleNegOp -> trivialUFCode DoubleRep (FNEG DF) x
 
       Double2FloatOp -> trivialUFCode FloatRep  (FxTOy DF F) x
@@ -901,6 +912,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	  = case primop of
 	      FloatExpOp    -> (True,  SLIT("exp"))
 	      FloatLogOp    -> (True,  SLIT("log"))
+	      FloatSqrtOp   -> (True,  SLIT("sqrt"))
 
 	      FloatSinOp    -> (True,  SLIT("sin"))
 	      FloatCosOp    -> (True,  SLIT("cos"))
@@ -916,6 +928,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 
 	      DoubleExpOp   -> (False, SLIT("exp"))
 	      DoubleLogOp   -> (False, SLIT("log"))
+	      DoubleSqrtOp  -> (True,  SLIT("sqrt"))
 
 	      DoubleSinOp   -> (False, SLIT("sin"))
 	      DoubleCosOp   -> (False, SLIT("cos"))
@@ -928,6 +941,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      DoubleSinhOp  -> (False, SLIT("sinh"))
 	      DoubleCoshOp  -> (False, SLIT("cosh"))
 	      DoubleTanhOp  -> (False, SLIT("tanh"))
+	      _             -> panic ("Monadic PrimOp not handled: " ++ showPrimOp PprDebug primop)
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
@@ -1048,7 +1062,7 @@ getRegister leaf
 
 @Amode@s: Memory addressing modes passed up the tree.
 \begin{code}
-data Amode = Amode Addr InstrBlock
+data Amode = Amode MachRegsAddr InstrBlock
 
 amodeAddr (Amode addr _) = addr
 amodeCode (Amode _ code) = code
@@ -1072,7 +1086,7 @@ getAmode (StPrim IntSubOp [x, StInt i])
     	reg  = registerName register tmp
     	off  = ImmInt (-(fromInteger i))
     in
-    returnUs (Amode (AddrRegImm reg off) code)
+    returnUs (Amode (MachRegsAddrRegImm reg off) code)
 
 getAmode (StPrim IntAddOp [x, StInt i])
   = getNewRegNCG PtrRep		`thenUs` \ tmp ->
@@ -1082,7 +1096,7 @@ getAmode (StPrim IntAddOp [x, StInt i])
     	reg  = registerName register tmp
     	off  = ImmInt (fromInteger i)
     in
-    returnUs (Amode (AddrRegImm reg off) code)
+    returnUs (Amode (MachRegsAddrRegImm reg off) code)
 
 getAmode leaf
   | maybeToBool imm
@@ -1112,7 +1126,7 @@ getAmode (StPrim IntSubOp [x, StInt i])
     	reg  = registerName register tmp
     	off  = ImmInt (-(fromInteger i))
     in
-    returnUs (Amode (Addr (Just reg) Nothing off) code)
+    returnUs (Amode (MachRegsAddr (Just reg) Nothing off) code)
 
 getAmode (StPrim IntAddOp [x, StInt i])
   | maybeToBool imm
@@ -1132,7 +1146,7 @@ getAmode (StPrim IntAddOp [x, StInt i])
     	reg  = registerName register tmp
     	off  = ImmInt (fromInteger i)
     in
-    returnUs (Amode (Addr (Just reg) Nothing off) code)
+    returnUs (Amode (MachRegsAddr (Just reg) Nothing off) code)
 
 getAmode (StPrim IntAddOp [x, y])
   = getNewRegNCG PtrRep		`thenUs` \ tmp1 ->
@@ -1146,7 +1160,7 @@ getAmode (StPrim IntAddOp [x, y])
     	reg2  = registerName register2 tmp2
     	code__2 = asmParThen [code1, code2]
     in
-    returnUs (Amode (Addr (Just reg1) (Just (reg2,4)) (ImmInt 0)) code__2)
+    returnUs (Amode (MachRegsAddr (Just reg1) (Just (reg2,4)) (ImmInt 0)) code__2)
 
 getAmode leaf
   | maybeToBool imm
@@ -1166,7 +1180,7 @@ getAmode other
     	reg  = registerName register tmp
     	off  = Nothing
     in
-    returnUs (Amode (Addr (Just reg) Nothing (ImmInt 0)) code)
+    returnUs (Amode (MachRegsAddr (Just reg) Nothing (ImmInt 0)) code)
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1181,7 +1195,7 @@ getAmode (StPrim IntSubOp [x, StInt i])
     	reg  = registerName register tmp
     	off  = ImmInt (-(fromInteger i))
     in
-    returnUs (Amode (AddrRegImm reg off) code)
+    returnUs (Amode (MachRegsAddrRegImm reg off) code)
 
 
 getAmode (StPrim IntAddOp [x, StInt i])
@@ -1193,7 +1207,7 @@ getAmode (StPrim IntAddOp [x, StInt i])
     	reg  = registerName register tmp
     	off  = ImmInt (fromInteger i)
     in
-    returnUs (Amode (AddrRegImm reg off) code)
+    returnUs (Amode (MachRegsAddrRegImm reg off) code)
 
 getAmode (StPrim IntAddOp [x, y])
   = getNewRegNCG PtrRep    	`thenUs` \ tmp1 ->
@@ -1207,7 +1221,7 @@ getAmode (StPrim IntAddOp [x, y])
     	reg2  = registerName register2 tmp2
     	code__2 = asmParThen [code1, code2]
     in
-    returnUs (Amode (AddrRegReg reg1 reg2) code__2)
+    returnUs (Amode (MachRegsAddrRegReg reg1 reg2) code__2)
 
 getAmode leaf
   | maybeToBool imm
@@ -1215,7 +1229,7 @@ getAmode leaf
     let
     	code = mkSeqInstr (SETHI (HI imm__2) tmp)
     in
-    returnUs (Amode (AddrRegImm tmp (LO imm__2)) code)
+    returnUs (Amode (MachRegsAddrRegImm tmp (LO imm__2)) code)
   where
     imm    = maybeImm leaf
     imm__2 = case imm of Just x -> x
@@ -1228,7 +1242,7 @@ getAmode other
     	reg  = registerName register tmp
     	off  = ImmInt 0
     in
-    returnUs (Amode (AddrRegImm reg off) code)
+    returnUs (Amode (MachRegsAddrRegImm reg off) code)
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
@@ -1923,7 +1937,7 @@ genJump tree
     	code   = registerCode register tmp
     	target = registerName register tmp
     in
-    returnSeq code [JMP (AddrRegReg target g0), NOP]
+    returnSeq code [JMP (MachRegsAddrRegReg target g0), NOP]
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
@@ -2164,7 +2178,7 @@ genCCall fn kind args
     	code = asmParThen (map ($ asmVoid) argCode)
     in
     	returnSeq code [
-    	    LDA pv (AddrImm (ImmLab (uppPStr fn))),
+    	    LDA pv (AddrImm (ImmLab (ptext fn))),
     	    JSR ra (AddrReg pv) nRegs,
     	    LDGP gp (AddrReg ra)]
   where
@@ -2231,8 +2245,8 @@ genCCall fn kind [StInt i]
 	call = [MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
 		MOV L (OpImm (ImmCLbl lbl))
 		      -- this is hardwired
-		      (OpAddr (Addr (Just ebx) Nothing (ImmInt 104))),
-		JMP (OpImm (ImmLit (uppPStr (if underscorePrefix then (SLIT ("_PerformGC_wrapper")) else (SLIT ("PerformGC_wrapper")))))),
+		      (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt 104))),
+		JMP (OpImm (ImmLit (ptext (if underscorePrefix then (SLIT ("_PerformGC_wrapper")) else (SLIT ("PerformGC_wrapper")))))),
 		LABEL lbl]
     in
     returnInstrs call
@@ -2241,14 +2255,14 @@ genCCall fn kind args
   = mapUs get_call_arg args `thenUs` \ argCode ->
     let
 	nargs = length args
-	code1 = asmParThen [asmSeq [ -- MOV L (OpReg esp) (OpAddr (Addr (Just ebx) Nothing (ImmInt 80))),
-			MOV L (OpAddr (Addr (Just ebx) Nothing (ImmInt 100))) (OpReg esp)
+	code1 = asmParThen [asmSeq [ -- MOV L (OpReg esp) (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt 80))),
+			MOV L (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt 100))) (OpReg esp)
 				   ]
 			   ]
 	code2 = asmParThen (map ($ asmVoid) (reverse argCode))
 	call = [CALL fn__2 -- ,
 		-- ADD L (OpImm (ImmInt (nargs * 4))) (OpReg esp),
-		-- MOV L (OpAddr (Addr (Just ebx) Nothing (ImmInt 80))) (OpReg esp)
+		-- MOV L (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt 80))) (OpReg esp)
 		]
     in
     returnSeq (code1 . code2) call
@@ -2258,8 +2272,8 @@ genCCall fn kind args
     -- underscore prefix
     -- ToDo:needed (WDP 96/03) ???
     fn__2 = case (_HEAD_ fn) of
-	      '.' -> ImmLit (uppPStr fn)
-	      _   -> ImmLab (uppPStr fn)
+	      '.' -> ImmLit (ptext fn)
+	      _   -> ImmLab (ptext fn)
 
     ------------
     get_call_arg :: StixTree{-current argument-} -> UniqSM InstrBlock	-- code
@@ -2316,8 +2330,8 @@ genCCall fn kind args
     -- underscore prefix
     -- ToDo:needed (WDP 96/03) ???
     fn__2 = case (_HEAD_ fn) of
-	      '.' -> ImmLit (uppPStr fn)
-	      _   -> ImmLab (uppPStr fn)
+	      '.' -> ImmLit (ptext fn)
+	      _   -> ImmLab (ptext fn)
 
     ------------------------------------
     {-  Try to get a value into a specific register (or registers) for
@@ -3045,8 +3059,8 @@ coerceInt2FP pk x
 
     	code__2 dst = code . mkSeqInstrs [
 	-- to fix: should spill instead of using R1
-    	              MOV L (OpReg src) (OpAddr (Addr (Just ebx) Nothing (ImmInt OFFSET_R1))),
-    	              FILD (primRepToSize pk) (Addr (Just ebx) Nothing (ImmInt OFFSET_R1)) dst]
+    	              MOV L (OpReg src) (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt OFFSET_R1))),
+    	              FILD (primRepToSize pk) (MachRegsAddr (Just ebx) Nothing (ImmInt OFFSET_R1)) dst]
     in
     returnUs (Any pk code__2)
 
@@ -3062,8 +3076,8 @@ coerceFP2Int x
     	code__2 dst = let
 		      in code . mkSeqInstrs [
     	                        FRNDINT,
-    	                        FIST L (Addr (Just ebx) Nothing (ImmInt OFFSET_R1)),
-    	                        MOV L (OpAddr (Addr (Just ebx) Nothing (ImmInt OFFSET_R1))) (OpReg dst)]
+    	                        FIST L (MachRegsAddr (Just ebx) Nothing (ImmInt OFFSET_R1)),
+    	                        MOV L (OpAddr (MachRegsAddr (Just ebx) Nothing (ImmInt OFFSET_R1))) (OpReg dst)]
     in
     returnUs (Any IntRep code__2)
 

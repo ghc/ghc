@@ -310,7 +310,7 @@ should an unfolding be required.
 
 >			{- panic
 >		       		("DefExpr(tran): Deforestable id `"
->		     		++ ppShow 80 (ppr PprDebug id)
+>		     		++ show (ppr PprDebug id)
 >				++ "' doesn't have an unfolding.") -}
 
 -----------------------------------------------------------------------------
@@ -449,14 +449,14 @@ and substitute the new function calls throughout the function set.
 >		      		++ showIds evs
 >				++ "\n{ input:\n" ++ (concat (map showBind (zip vs' es'))) ++ "}\n"
 >				++ "{ result:\n" ++ (concat  (map showBind (zip evs ees))) ++ "}\n") res
->		   where showBind (v,e) = ppShow 80 (ppr PprDebug v) ++ "=\n" ++ ppShow 80 (ppr PprDebug e) ++ "\n"
+>		   where showBind (v,e) = show (ppr PprDebug v) ++ "=\n" ++ show (ppr PprDebug e) ++ "\n"
 
 > tranRecBind sw p t (id,e) =
 >	tran sw p t e []			`thenUs` \e ->
 >	returnUs (applyTypeEnvToId t id,e)
 
 > showIds :: [Id] -> String
-> showIds ids = "(" ++ concat (map ((' ' :) . ppShow 80 . ppr PprDebug) ids)
+> showIds ids = "(" ++ concat (map ((' ' :) . show . ppr PprDebug) ids)
 > 	++ " )"
 
 -----------------------------------------------------------------------------

@@ -23,7 +23,11 @@ IMP_Ubiq()
 
 import Pretty		-- pretty-printing code
 import Util
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 
+-- Oh dear.
 #include "../../includes/GhcConstants.h"
 \end{code}
 
@@ -146,17 +150,17 @@ retPrimRepSize = getPrimRepSize RetRep
 
 \begin{code}
 instance Outputable PrimRep where
-    ppr sty kind = ppStr (showPrimRep kind)
+    ppr sty kind = text (showPrimRep kind)
 
 showPrimRep  :: PrimRep -> String
 -- dumping PrimRep tag for unfoldings
-ppPrimRep  :: PrimRep -> Pretty
+ppPrimRep  :: PrimRep -> Doc
 
 guessPrimRep :: String -> PrimRep	-- a horrible "inverse" function
 decodePrimRep :: Char  -> PrimRep       -- of equal nature
 
 ppPrimRep k =
- ppChar 
+ char 
   (case k of
      PtrRep        -> 'P'
      CodePtrRep    -> 'p'

@@ -32,7 +32,7 @@ import CgRetConv	( dataReturnConvPrim, dataReturnConvAlg,
 			)
 import CgStackery	( adjustRealSps, mkStkAmodes )
 import CgUsages		( getSpARelOffset )
-import CLabel		( mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel )
+import CLabel		( mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel, CLabel )
 import ClosureInfo	( nodeMustPointToIt,
 			  getEntryConvention, EntryConvention(..),
 			  LambdaFormInfo
@@ -40,13 +40,14 @@ import ClosureInfo	( nodeMustPointToIt,
 import CmdLineOpts	( opt_DoSemiTagging )
 import HeapOffs		( zeroOff, SYN_IE(VirtualSpAOffset) )
 import Id		( idType, dataConTyCon, dataConTag,
-			  fIRST_TAG
+			  fIRST_TAG, SYN_IE(Id)
 			)
 import Literal		( mkMachInt )
 import Maybes		( assocMaybe )
 import PrimRep		( PrimRep(..) )
 import StgSyn		( SYN_IE(StgArg), GenStgArg(..), SYN_IE(StgLiveVars) )
 import Type		( isPrimType )
+import TyCon            ( TyCon )
 import Util		( zipWithEqual, panic, assertPanic )
 \end{code}
 

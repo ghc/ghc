@@ -17,7 +17,7 @@ import DsHsSyn		( outPatType )
 import DsMonad
 import DsUtils
 
-import Id		( isDataCon, GenId{-instances-} )
+import Id		( isDataCon, GenId{-instances-}, SYN_IE(Id) )
 import Util		( panic, assertPanic )
 \end{code}
 

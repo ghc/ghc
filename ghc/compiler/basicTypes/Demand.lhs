@@ -10,7 +10,7 @@ module Demand where
 
 import PprStyle		( PprStyle )
 import Outputable
-import Pretty		( SYN_IE(Pretty), PrettyRep, ppStr )
+import Pretty		( Doc, text )
 import Util		( panic )
 \end{code}
 
@@ -124,7 +124,7 @@ instance Show Demand where
 					ch = if wu then "U" else "u"
 
 instance Outputable Demand where
-    ppr sty si = ppStr (showList [si] "")
+    ppr sty si = text (showList [si] "")
 \end{code}
 
 

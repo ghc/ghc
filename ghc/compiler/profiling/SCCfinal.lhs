@@ -35,12 +35,13 @@ import CmdLineOpts	( opt_AutoSccsOnIndividualCafs,
 			  opt_CompilingGhcInternals
 			)
 import CostCentre	-- lots of things
-import Id		( idType, mkSysLocal, emptyIdSet )
+import Id		( idType, mkSysLocal, emptyIdSet, SYN_IE(Id) )
 import Maybes		( maybeToBool )
 import PprStyle		-- ToDo: rm
 import SrcLoc		( noSrcLoc )
 import Type		( splitSigmaTy, getFunTy_maybe )
-import UniqSupply	( getUnique, splitUniqSupply )
+import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )
+import Unique           ( Unique )
 import Util		( removeDups, assertPanic )
 
 infixr 9 `thenMM`, `thenMM_`

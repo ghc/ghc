@@ -33,10 +33,9 @@ IMP_Ubiq(){-uitous-}
 import Id		( externallyVisibleId, GenId, showId, SYN_IE(Id) )
 import CStrings		( identToC, stringToC )
 import Name		( OccName, getOccString, moduleString )
-import Pretty		( ppShow, prettyToUn )
-import PprStyle		( PprStyle(..) )
+import PprStyle		( PprStyle(..), codeStyle, ifaceStyle )
 import UniqSet
-import Unpretty
+import Pretty
 import Util
 
 pprIdInUnfolding = panic "Whoops"
@@ -320,38 +319,40 @@ cmp_caf IsCafCC    IsNotCafCC  = GT_
 
 \begin{code}
 showCostCentre    :: PprStyle -> Bool -> CostCentre -> String
-uppCostCentre	  :: PprStyle -> Bool -> CostCentre -> Unpretty
-uppCostCentreDecl :: PprStyle -> Bool -> CostCentre -> Unpretty
+uppCostCentre	  :: PprStyle -> Bool -> CostCentre -> Doc
+uppCostCentreDecl :: PprStyle -> Bool -> CostCentre -> Doc
 
+{- 	PprUnfolding is gone now
 showCostCentre PprUnfolding print_as_string cc
   = ASSERT(not print_as_string) -- we never "print as string w/ Unfolding"
     ASSERT(not (noCostCentreAttached cc))
     ASSERT(not (currentOrSubsumedCosts cc))
     uppShow 80 (upp_cc_uf cc)
+-}
 
 showCostCentre sty print_as_string cc
-  = uppShow 80 (uppCostCentre sty print_as_string cc)
+  = show (uppCostCentre sty print_as_string cc)
 
 uppCostCentre sty print_as_string NoCostCentre
-  | friendly_style sty	= uppNil
-  | print_as_string	= uppStr "\"NO_CC\""
-  | otherwise		= uppPStr SLIT("NO_CC")
+  | friendly_style sty	= empty
+  | print_as_string	= text "\"NO_CC\""
+  | otherwise		= ptext SLIT("NO_CC")
 
 uppCostCentre sty print_as_string SubsumedCosts
-  | print_as_string 	= uppStr "\"SUBSUMED\""
-  | otherwise		= uppPStr SLIT("CC_SUBSUMED")
+  | print_as_string 	= text "\"SUBSUMED\""
+  | otherwise		= ptext SLIT("CC_SUBSUMED")
 
 uppCostCentre sty print_as_string CurrentCC
-  | print_as_string 	= uppStr "\"CURRENT_CC\""
-  | otherwise		= uppPStr SLIT("CCC")
+  | print_as_string 	= text "\"CURRENT_CC\""
+  | otherwise		= ptext SLIT("CCC")
 
 uppCostCentre sty print_as_string OverheadCC
-  | print_as_string	= uppStr "\"OVERHEAD\""
-  | otherwise		= uppPStr SLIT("CC_OVERHEAD")
+  | print_as_string	= text "\"OVERHEAD\""
+  | otherwise		= ptext SLIT("CC_OVERHEAD")
 
 uppCostCentre sty print_as_string cc
   = let
-	prefix_CC = uppPStr SLIT("CC_")
+	prefix_CC = ptext SLIT("CC_")
 
 	basic_thing = do_cc cc
 
@@ -359,13 +360,12 @@ uppCostCentre sty print_as_string cc
 	  = if friendly_sty then basic_thing else stringToC basic_thing
     in
     if print_as_string then
-    	uppBesides [uppChar '"', uppStr basic_thing_string, uppChar '"']
+    	hcat [char '"', text basic_thing_string, char '"']
 
     else if friendly_sty then
-	uppStr basic_thing
+	text basic_thing
     else
-	uppBesides [prefix_CC,
-		    prettyToUn (identToC (_PK_ basic_thing))]
+	hcat [prefix_CC, identToC (_PK_ basic_thing)]
   where
     friendly_sty = friendly_style sty
 
@@ -413,11 +413,7 @@ uppCostCentre sty print_as_string cc
     do_dupd _	    str = str
 
 friendly_style sty -- i.e., probably for human consumption
-  = case sty of
-      PprForUser -> True
-      PprDebug   -> True
-      PprShowAll -> True
-      _ 	 -> False
+  = not (codeStyle sty || ifaceStyle sty)
 \end{code}
 
 Printing unfoldings is sufficiently weird that we do it separately.
@@ -428,37 +424,37 @@ Dict \tr{_scc_}s may cross module boundaries to show ``scope'' info;
 even if we won't ultimately do a \tr{SET_CCC} from it.
 \begin{code}
 upp_cc_uf (PreludeDictsCC d)
-  = uppCat [uppPStr SLIT("_PRELUDE_DICTS_CC_"), upp_dupd d]
+  = hsep [ptext SLIT("_PRELUDE_DICTS_CC_"), upp_dupd d]
 upp_cc_uf (AllDictsCC m g d)
-  = uppCat [uppPStr SLIT("_ALL_DICTS_CC_"), 
-            uppChar '"',uppPStr m,uppChar '"',
-            uppChar '"',uppPStr g,uppChar '"',
+  = hsep [ptext SLIT("_ALL_DICTS_CC_"), 
+            char '"',ptext m,char '"',
+            char '"',ptext g,char '"',
             upp_dupd d]
 
 upp_cc_uf cc@(NormalCC cc_kind m g is_dupd is_caf)
   = ASSERT(sccAbleCostCentre cc)
-    uppCat [pp_kind cc_kind, 
-            uppChar '"', uppPStr m, uppChar '"', 
-            uppChar '"', uppPStr g, uppChar '"',
+    hsep [pp_kind cc_kind, 
+            char '"', ptext m, char '"', 
+            char '"', ptext g, char '"',
 	    upp_dupd is_dupd, pp_caf is_caf]
   where
-    pp_kind (UserCC name) = uppBesides [uppPStr SLIT("_USER_CC_ "), uppChar '"', uppPStr name, uppChar '"']
-    pp_kind (AutoCC id)   = uppBeside (uppPStr SLIT("_AUTO_CC_ ")) (show_id id)
-    pp_kind (DictCC id)	  = uppBeside (uppPStr SLIT("_DICT_CC_ ")) (show_id id)
+    pp_kind (UserCC name) = hcat [ptext SLIT("_USER_CC_ "), char '"', ptext name, char '"']
+    pp_kind (AutoCC id)   = (<>) (ptext SLIT("_AUTO_CC_ ")) (show_id id)
+    pp_kind (DictCC id)	  = (<>) (ptext SLIT("_DICT_CC_ ")) (show_id id)
 
-    show_id id = prettyToUn (pprIdInUnfolding no_in_scopes id)
+    show_id id = pprIdInUnfolding no_in_scopes id
 	where
 	  no_in_scopes = emptyUniqSet
 
-    pp_caf IsCafCC    = uppPStr SLIT("_CAF_CC_")
-    pp_caf IsNotCafCC = uppPStr SLIT("_N_")
+    pp_caf IsCafCC    = ptext SLIT("_CAF_CC_")
+    pp_caf IsNotCafCC = ptext SLIT("_N_")
 
 #ifdef DEBUG
 upp_cc_uf other = panic ("upp_cc_uf:"++(showCostCentre PprDebug True other))
 #endif
 
-upp_dupd AnOriginalCC = uppPStr SLIT("_N_")
-upp_dupd ADupdCC      = uppPStr SLIT("_D_")
+upp_dupd AnOriginalCC = ptext SLIT("_N_")
+upp_dupd ADupdCC      = ptext SLIT("_D_")
 \end{code}
 
 \begin{code}
@@ -469,22 +465,21 @@ uppCostCentreDecl sty is_local cc
   | otherwise
 #endif
   = if is_local then
-	uppBesides [
-	    uppPStr SLIT("CC_DECLARE"),uppChar '(',
-	    upp_ident, uppComma,
-	    uppCostCentre sty True {-as String!-} cc, uppComma,
-	    pp_str mod_name, uppComma,
-	    pp_str grp_name, uppComma,
-	    uppStr is_subsumed, uppComma,
-	    if externally_visible then uppNil else uppPStr SLIT("static"),
-	    uppStr ");"]
+	hcat [
+	    ptext SLIT("CC_DECLARE"),char '(',
+	    upp_ident, comma,
+	    uppCostCentre sty True {-as String!-} cc, comma,
+	    pp_str mod_name, comma,
+	    pp_str grp_name, comma,
+	    text is_subsumed, comma,
+	    if externally_visible then empty else ptext SLIT("static"),
+	    text ");"]
     else
-	uppBesides [ uppPStr SLIT("CC_EXTERN"),uppChar '(', upp_ident, uppStr ");" ]
+	hcat [ ptext SLIT("CC_EXTERN"),char '(', upp_ident, text ");" ]
   where
     upp_ident = uppCostCentre sty False{-as identifier!-} cc
 
-    pp_str s  = uppBesides [uppChar '"',uppPStr s, uppChar '"' ]
-    pp_char c = uppBesides [uppChar '\'', uppPStr c, uppChar '\'']
+    pp_str s  = doubleQuotes (ptext s)
 
     (mod_name, grp_name, is_subsumed, externally_visible)
       = case cc of

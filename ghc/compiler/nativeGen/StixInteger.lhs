@@ -15,7 +15,11 @@ IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(NcgLoop)		( amodeToStix )
 
 import MachMisc
+#if __GLASGOW_HASKELL__ >= 202
+import MachRegs hiding (Addr)
+#else
 import MachRegs
+#endif
 
 import AbsCSyn		-- bits and bobs...
 import Constants	( mIN_MP_INT_SIZE )

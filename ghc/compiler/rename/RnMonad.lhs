@@ -25,7 +25,17 @@ module RnMonad(
 IMP_Ubiq(){-uitous-}
 
 import SST
+#if __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST	( SYN_IE(ST), thenStrictlyST, returnStrictlyST )
+#define MkIO
+#else
+import GlaExts
+import IO
+import ST
+import IOBase
+#define IOError13 IOError
+#define MkIO IO
+#endif
 
 import HsSyn		
 import RdrHsSyn
@@ -48,6 +58,9 @@ import FiniteMap	( FiniteMap, emptyFM, bagToFM )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSet
 import Util
+#if __GLASGOW_HASKELL__ >= 202
+import UniqSupply
+#endif
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -69,15 +82,16 @@ infixr 9 `thenRn`, `thenRn_`
 
 \begin{code}
 sstToIO :: SST REAL_WORLD r -> IO r
-sstToIO sst 
-  = sstToST sst 	`thenStrictlyST` \ r -> 
-    returnStrictlyST (Right r)
+sstToIO sst =
+    MkIO (
+    sstToST sst 	`thenStrictlyST` \ r -> 
+    returnStrictlyST (Right r))
 
 ioToRnMG :: IO r -> RnMG (Either IOError13 r)
-ioToRnMG io rn_down g_down = stToSST io
+ioToRnMG (MkIO io) rn_down g_down = stToSST io
 
-traceRn :: Pretty -> RnMG ()
-traceRn msg | opt_D_show_rn_trace = ioToRnMG (hPutStr stderr (ppShow 80 msg) >> 
+traceRn :: Doc -> RnMG ()
+traceRn msg | opt_D_show_rn_trace = ioToRnMG (hPutStr stderr (show msg) >> 
 					      hPutStr stderr "\n")	`thenRn_`
 				    returnRn ()
 	    | otherwise		  = returnRn ()
@@ -128,7 +142,8 @@ data SDown s = SDown
 data RnSMode	= SourceMode
 		| InterfaceMode
 
-type SearchPath = [String]		-- List of directories to seach for interface files
+type SearchPath = [(String,String)]	-- List of (directory,suffix) pairs to search 
+                                        -- for interface files.
 type FreeVars	= NameSet
 \end{code}
 
@@ -171,7 +186,7 @@ data AvailInfo		= NotAvailable
 			| AvailTC Name 		-- The name of the type or class
 				  [Name]	-- The available pieces of type/class. NB: If the type or
 						-- class is itself to be in scope, it must be in this list.
-						-- Thus, typically: Avail Eq [Eq, ==, /=]
+						-- Thus, typically: AvailTC Eq [Eq, ==, /=]
 \end{code}
 
 ===================================================
@@ -212,15 +227,23 @@ data Ifaces = Ifaces
 					-- whether locally defined or not) that have been slurped in so far.
 
 		[(Name,Version)]	-- All the (a) non-wired-in (b) "big" (c) non-locally-defined names that 
-					-- have been slurped in so far, with their versions.  Subset of
-					-- the previous field.  This is used to generate the "usage" information
-					-- for this module.
+					-- have been slurped in so far, with their versions. 
+					-- This is used to generate the "usage" information for this module.
+					-- Subset of the previous field.
 
-		(Bag IfaceInst)		-- Un-slurped instance decls; this bag is depleted when we
+		(Bag IfaceInst)		-- The as-yet un-slurped instance decls; this bag is depleted when we
 					-- slurp an instance decl so that we don't slurp the same one twice.
+
+		(FiniteMap Name RdrNameTyDecl)
+					-- Deferred data type declarations; each has the following properties
+					--	* it's a data type decl
+					--	* its TyCon is needed
+					--	* the decl may or may not have been slurped, depending on whether any
+					--	  of the constrs are needed.
 
 		[Module]		-- Set of modules with "special" instance declarations
 					-- Excludes this module
+
 
 type DeclsMap    = FiniteMap Name (Version, AvailInfo, RdrNameHsDecl)
 type IfaceInst   = ((Module, RdrNameInstDecl),	-- Instance decl
@@ -268,7 +291,7 @@ initRnMS rn_env@(RnEnv name_env _) mod_name mode m rn_down g_down
 
 
 emptyIfaces :: Module -> Ifaces
-emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyFM emptyNameSet [] emptyBag []
+emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyFM emptyNameSet [] emptyBag emptyFM []
 
 builtins :: FiniteMap (Module,OccName) Name
 builtins = bagToFM (mapBag (\ name -> (modAndOcc name, name)) builtinNames)
@@ -326,7 +349,7 @@ renameSourceCode mod_name name_supply m
 	returnSST result
     )
   where
-    display errs = ppShow 80 (pprBagOfErrors PprDebug errs)
+    display errs = show (pprBagOfErrors PprDebug errs)
 
 {-# INLINE thenRn #-}
 {-# INLINE thenRn_ #-}

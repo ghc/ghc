@@ -1,0 +1,5 @@
+_interface_ StixPrim 1
+_exports_
+StixPrim amodeToStix;
+_declarations_
+1 amodeToStix _:_ AbsCSyn.CAddrMode -> Stix.StixTree ;;

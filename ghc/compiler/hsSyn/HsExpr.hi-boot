@@ -1,0 +1,11 @@
+_interface_ HsExpr 1
+_exports_
+HsExpr HsExpr Stmt;
+_instances_
+instance _forall_ [a b c d] => {Outputable.Outputable (HsExpr a b c d)} = $d1;
+instance _forall_ [a b c d] => {Outputable.Outputable (Stmt a b c d)} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a b c d] => {Outputable.Outputable (HsExpr a b c d)} ;;
+1 $d2 _:_ _forall_ [a b c d] => {Outputable.Outputable (Stmt a b c d)} ;;
+1 data HsExpr a b c d;
+1 data Stmt a b c d;

@@ -26,7 +26,7 @@ import DsMonad
 import DsCCall		( dsCCall )
 import DsHsSyn		( outPatType )
 import DsListComp	( dsListComp )
-import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom,
+import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom, mkTupleExpr,
 			  mkErrorAppDs, showForErr, EquationInfo,
 			  MatchResult, SYN_IE(DsCoreArg)
 			)
@@ -38,18 +38,18 @@ import CostCentre	( mkUserCC )
 import FieldLabel	( fieldLabelType, FieldLabel )
 import Id		( idType, nullIdEnv, addOneToIdEnv,
 			  dataConArgTys, dataConFieldLabels,
-			  recordSelectorFieldLabel
+			  recordSelectorFieldLabel, SYN_IE(Id)
 			)
 import Literal		( mkMachInt, Literal(..) )
 import Name		( Name{--O only-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType )
 import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, voidId )
-import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
+import Pretty		( Doc, hcat, ptext, text )
 import TyCon		( isDataTyCon, isNewTyCon )
 import Type		( splitSigmaTy, splitFunTy, typePrimRep, 
 			  getAppDataTyConExpandingDicts, maybeAppTyCon, getAppTyCon, applyTy,
-			  maybeBoxedPrimType, splitAppTy
+			  maybeBoxedPrimType, splitAppTy, SYN_IE(Type)
 			)
 import TysPrim		( voidTy )
 import TysWiredIn	( mkTupleTy, tupleCon, nilDataCon, consDataCon, listTyCon,
@@ -59,6 +59,10 @@ import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
 import Usage		( SYN_IE(UVar) )
 import Maybes		( maybeToBool )
 import Util		( zipEqual, pprError, panic, assertPanic )
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 
 mk_nil_con ty = mkCon nilDataCon [] [ty] []  -- micro utility...
 \end{code}
@@ -150,7 +154,7 @@ dsExpr (HsLitOut (HsLitLit s) ty)
 	    -> (boxing_data_con, typePrimRep prim_ty)
 	  Nothing
 	    -> pprError "ERROR: ``literal-literal'' not a single-constructor type: "
-			(ppBesides [ppPStr s, ppStr "; type: ", ppr PprDebug ty])
+			(hcat [ptext s, text "; type: ", ppr PprDebug ty])
 
 dsExpr (HsLitOut (HsInt i) ty)
   = returnDs (Lit (NoRepInteger i ty))
@@ -268,18 +272,25 @@ dsExpr (HsLet binds expr)
     returnDs ( mkCoLetsAny core_binds core_expr )
 
 dsExpr (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty src_loc)
-  | maybeToBool maybe_list_comp		-- Special case for list comprehensions
-  = putSrcLocDs src_loc $
+  | maybeToBool maybe_list_comp
+  =	-- Special case for list comprehensions
+    putSrcLocDs src_loc $
     dsListComp stmts elt_ty
 
   | otherwise
   = putSrcLocDs src_loc $
     dsDo do_or_lc stmts return_id then_id zero_id result_ty
   where
-    maybe_list_comp = case maybeAppTyCon result_ty of
-			Just (tycon, [elt_ty]) | tycon == listTyCon
-					       -> Just elt_ty
-			other		       -> Nothing
+    maybe_list_comp 
+	= case (do_or_lc, maybeAppTyCon result_ty) of
+	    (ListComp, Just (tycon, [elt_ty]))
+		  | tycon == listTyCon
+		 -> Just elt_ty
+	    other -> Nothing
+	-- We need the ListComp form to use deListComp (rather than the "do" form)
+	-- because the "return" in a do block is a call to "PrelBase.return", and
+	-- not a ReturnStmt.  Only the ListComp form has ReturnStmts
+
     Just elt_ty = maybe_list_comp
 
 dsExpr (HsIf guard_expr then_expr else_expr src_loc)
@@ -405,20 +416,20 @@ might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
 \begin{code}
-dsExpr (RecordUpdOut record_expr dicts rbinds)
+dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
   = dsExpr record_expr	 `thenDs` \ record_expr' ->
 
 	-- Desugar the rbinds, and generate let-bindings if
 	-- necessary so that we don't lose sharing
     dsRbinds rbinds		$ \ rbinds' ->
     let
-	record_ty		= coreExprType record_expr'
-	(tycon, inst_tys, cons) = --trace "DsExpr.getAppDataTyConExpandingDicts" $
-				  getAppDataTyConExpandingDicts record_ty
-	cons_to_upd  	 	= filter has_all_fields cons
+	record_in_ty		   = coreExprType record_expr'
+	(tycon, in_inst_tys, cons) = getAppDataTyConExpandingDicts record_in_ty
+	(_,     out_inst_tys, _)   = getAppDataTyConExpandingDicts record_out_ty
+	cons_to_upd  	 	   = filter has_all_fields cons
 
 	-- initial_args are passed to every constructor
-	initial_args		= map TyArg inst_tys ++ map VarArg dicts
+	initial_args		= map TyArg out_inst_tys ++ map VarArg dicts
 		
 	mk_val_arg (field, arg_id) 
 	  = case [arg | (f, arg) <- rbinds',
@@ -428,7 +439,7 @@ dsExpr (RecordUpdOut record_expr dicts rbinds)
 	      []	 -> VarArg arg_id
 
 	mk_alt con
-	  = newSysLocalsDs (dataConArgTys con inst_tys)	`thenDs` \ arg_ids ->
+	  = newSysLocalsDs (dataConArgTys con in_inst_tys)	`thenDs` \ arg_ids ->
 	    let 
 		val_args = map mk_val_arg (zipEqual "dsExpr:RecordUpd" (dataConFieldLabels con) arg_ids)
 	    in
@@ -438,8 +449,8 @@ dsExpr (RecordUpdOut record_expr dicts rbinds)
 	  | length cons_to_upd == length cons 
 	  = returnDs NoDefault
 	  | otherwise			    
-	  = newSysLocalDs record_ty			`thenDs` \ deflt_id ->
-	    mkErrorAppDs rEC_UPD_ERROR_ID record_ty ""	`thenDs` \ err ->
+	  = newSysLocalDs record_in_ty				`thenDs` \ deflt_id ->
+	    mkErrorAppDs rEC_UPD_ERROR_ID record_out_ty ""	`thenDs` \ err ->
 	    returnDs (BindDefault deflt_id err)
     in
     mapDs mk_alt cons_to_upd	`thenDs` \ alts ->
@@ -480,27 +491,15 @@ of length 0 or 1.
 \end{verbatim}
 \begin{code}
 dsExpr (SingleDict dict)	-- just a local
-  = lookupEnvWithDefaultDs dict (Var dict)
+  = lookupEnvDs dict	`thenDs` \ dict' ->
+    returnDs (Var dict')
+
+dsExpr (Dictionary [] [])	-- Empty dictionary represented by void,
+  = returnDs (Var voidId)	-- (not, as would happen if we took the next case, by ())
 
 dsExpr (Dictionary dicts methods)
-  = -- hey, these things may have been substituted away...
-    zipWithDs lookupEnvWithDefaultDs
-	      dicts_and_methods dicts_and_methods_exprs
-			`thenDs` \ core_d_and_ms ->
-
-    (case num_of_d_and_ms of
-      0 -> returnDs (Var voidId)
-
-      1 -> returnDs (head core_d_and_ms) -- just a single Id
-
-      _ ->	    -- tuple 'em up
-	   mkConDs (tupleCon num_of_d_and_ms)
-		   (map (TyArg . coreExprType) core_d_and_ms ++ map VarArg core_d_and_ms)
-    )
-  where
-    dicts_and_methods	    = dicts ++ methods
-    dicts_and_methods_exprs = map Var dicts_and_methods
-    num_of_d_and_ms	    = length dicts_and_methods
+  = mapDs lookupEnvDs (dicts ++ methods)	`thenDs` \ d_and_ms' ->
+    returnDs (mkTupleExpr d_and_ms')
 
 dsExpr (ClassDictLam dicts methods expr)
   = dsExpr expr		`thenDs` \ core_expr ->
@@ -563,10 +562,8 @@ dsApp (OpApp e1 op _ e2) args
     dsApp  op (VarArg core_e1 : VarArg core_e2 : args)
 
 dsApp (DictApp expr dicts) args
-  =	-- now, those dicts may have been substituted away...
-    zipWithDs lookupEnvWithDefaultDs dicts (map Var dicts)
-				`thenDs` \ core_dicts ->
-    dsApp expr (map VarArg core_dicts ++ args)
+  = mapDs lookupEnvDs dicts	`thenDs` \ core_dicts ->
+    dsApp expr (map (VarArg . Var) core_dicts ++ args)
 
 dsApp (TyApp expr tys) args
   = dsApp expr (map TyArg tys ++ args)
@@ -578,8 +575,8 @@ dsApp anything_else args
     mkAppDs core_expr args
 
 dsId v
-  = lookupEnvDs v	`thenDs` \ maybe_expr -> 
-    returnDs (case maybe_expr of { Nothing -> Var v; Just expr -> expr })
+  = lookupEnvDs v	`thenDs` \ v' ->
+    returnDs (Var v')
 \end{code}
 
 \begin{code}

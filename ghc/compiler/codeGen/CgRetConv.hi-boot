@@ -1,0 +1,7 @@
+_interface_ CgRetConv 1
+_exports_
+CgRetConv CtrlReturnConvention(VectoredReturn UnvectoredReturn) ctrlReturnConvAlg;
+_declarations_
+1 data CtrlReturnConvention = VectoredReturn PrelBase.Int | UnvectoredReturn PrelBase.Int;
+1 ctrlReturnConvAlg _:_ TyCon.TyCon -> CgRetConv.CtrlReturnConvention ;;
+

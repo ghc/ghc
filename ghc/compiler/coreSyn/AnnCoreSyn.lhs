@@ -21,6 +21,13 @@ module AnnCoreSyn (
 IMP_Ubiq(){-uitous-}
 
 import CoreSyn
+
+import Id         ( SYN_IE(Id) )
+import Literal    ( Literal )
+import PrimOp     ( PrimOp )
+import CostCentre ( CostCentre )
+import Type       ( GenType )
+
 \end{code}
 
 \begin{code}

@@ -12,7 +12,6 @@ they are used somewhat later on in the compiler...)
 module RdrHsSyn (
 	SYN_IE(RdrNameArithSeqInfo),
 	SYN_IE(RdrNameBangType),
-	SYN_IE(RdrNameBind),
 	SYN_IE(RdrNameClassDecl),
 	SYN_IE(RdrNameClassOpSig),
 	SYN_IE(RdrNameConDecl),
@@ -61,17 +60,21 @@ IMP_Ubiq()
 import HsSyn
 import Lex
 import PrelMods		( pRELUDE )
-import Name		( ExportFlag(..), Module(..), pprModule,
-			  OccName(..), pprOccName, prefixOccName )
+import Name	{-	( ExportFlag(..), Module(..), pprModule,
+			  OccName(..), pprOccName, prefixOccName ) -}
 import Pretty		
 import PprStyle		( PprStyle(..) )
-import Util		( cmpPString, panic, thenCmp )
+import Util		--( cmpPString, panic, thenCmp )
+import Outputable
+#if __GLASGOW_HASKELL__ >= 202
+import CoreSyn   ( GenCoreExpr )
+import HsPragmas ( GenPragmas, ClassPragmas, DataPragmas, ClassOpPragmas, InstancePragmas )
+#endif
 \end{code}
 
 \begin{code}
 type RdrNameArithSeqInfo	= ArithSeqInfo		Fake Fake RdrName RdrNamePat
 type RdrNameBangType		= BangType		RdrName
-type RdrNameBind		= Bind			Fake Fake RdrName RdrNamePat
 type RdrNameClassDecl		= ClassDecl		Fake Fake RdrName RdrNamePat
 type RdrNameClassOpSig		= Sig			RdrName
 type RdrNameConDecl		= ConDecl		RdrName
@@ -190,7 +193,7 @@ ieOcc :: RdrNameIE -> OccName
 ieOcc ie = rdrNameOcc (ieName ie)
 
 instance Text RdrName where -- debugging
-    showsPrec _ rn = showString (ppShow 80 (ppr PprDebug rn))
+    showsPrec _ rn = showString (show (ppr PprDebug rn))
 
 instance Eq RdrName where
     a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
@@ -206,13 +209,13 @@ instance Ord3 RdrName where
     cmp = cmpRdr
 
 instance Outputable RdrName where
-    ppr sty (Unqual n) = pprOccName sty n
-    ppr sty (Qual m n) = ppBesides [pprModule sty m, ppChar '.', pprOccName sty n]
+    ppr sty (Unqual n) = pprQuote sty $ \ sty -> pprOccName sty n
+    ppr sty (Qual m n) = pprQuote sty $ \ sty -> hcat [pprModule sty m, char '.', pprOccName sty n]
 
 instance NamedThing RdrName where		-- Just so that pretty-printing of expressions works
     getOccName = rdrNameOcc
     getName = panic "no getName for RdrNames"
 
-showRdr sty rdr = ppShow 100 (ppr sty rdr)
+showRdr sty rdr = render (ppr sty rdr)
 \end{code}
 

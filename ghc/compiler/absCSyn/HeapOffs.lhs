@@ -38,8 +38,9 @@ IMPORT_DELOOPER(AbsCLoop)		( fixedHdrSizeInWords, varHdrSizeInWords )
 
 import Maybes		( catMaybes )
 import SMRep
-import Unpretty		-- ********** NOTE **********
+import Pretty		-- ********** NOTE **********
 import Util		( panic )
+import PprStyle         ( PprStyle )
 \end{code}
 
 %************************************************************************
@@ -264,19 +265,19 @@ print either a single value, or a parenthesised value.  No need for
 the caller to parenthesise.
 
 \begin{code}
-pprHeapOffset :: PprStyle -> HeapOffset -> Unpretty
+pprHeapOffset :: PprStyle -> HeapOffset -> Doc
 
-pprHeapOffset sty ZeroHeapOffset = uppChar '0'
+pprHeapOffset sty ZeroHeapOffset = char '0'
 
 pprHeapOffset sty (MaxHeapOffset off1 off2)
-  = uppBeside (uppPStr SLIT("STG_MAX"))
-      (uppParens (uppBesides [pprHeapOffset sty off1, uppComma, pprHeapOffset sty off2]))
+  = (<>) (ptext SLIT("STG_MAX"))
+      (parens (hcat [pprHeapOffset sty off1, comma, pprHeapOffset sty off2]))
 
 pprHeapOffset sty (AddHeapOffset off1 off2)
-  = uppParens (uppBesides [pprHeapOffset sty off1, uppChar '+',
+  = parens (hcat [pprHeapOffset sty off1, char '+',
 			pprHeapOffset sty off2])
 pprHeapOffset sty (SubHeapOffset off1 off2)
-  = uppParens (uppBesides [pprHeapOffset sty off1, uppChar '-',
+  = parens (hcat [pprHeapOffset sty off1, char '-',
 			pprHeapOffset sty off2])
 
 pprHeapOffset sty (MkHeapOffset int_offs fxdhdr_offs varhdr_offs tothdr_offs)
@@ -289,44 +290,44 @@ pprHeapOffsetPieces :: PprStyle
 		    -> FAST_INT		-- Fixed hdrs
 		    -> [SMRep__Int]	-- Var hdrs
 		    -> [SMRep__Int]	-- Tot hdrs
-		    -> Unpretty
+		    -> Doc
 
-pprHeapOffsetPieces sty n ILIT(0) [] [] = uppInt IBOX(n) -- Deals with zero case too
+pprHeapOffsetPieces sty n ILIT(0) [] [] = int IBOX(n) -- Deals with zero case too
 
 pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
   = let pp_int_offs =
 	    if int_offs _EQ_ ILIT(0)
 	    then Nothing
-	    else Just (uppInt IBOX(int_offs))
+	    else Just (int IBOX(int_offs))
 
 	pp_fxdhdr_offs =
 	    if fxdhdr_offs _EQ_ ILIT(0) then
 		Nothing
 	    else if fxdhdr_offs _EQ_ ILIT(1) then
-		Just (uppPStr SLIT("_FHS"))
+		Just (ptext SLIT("_FHS"))
 	    else
-		Just (uppBesides [uppChar '(', uppPStr SLIT("_FHS*"), uppInt IBOX(fxdhdr_offs), uppChar ')'])
+		Just (hcat [char '(', ptext SLIT("_FHS*"), int IBOX(fxdhdr_offs), char ')'])
 
-	pp_varhdr_offs = pp_hdrs (uppPStr SLIT("_VHS")) varhdr_offs
+	pp_varhdr_offs = pp_hdrs (ptext SLIT("_VHS")) varhdr_offs
 
-	pp_tothdr_offs = pp_hdrs (uppPStr SLIT("_HS")) tothdr_offs
+	pp_tothdr_offs = pp_hdrs (ptext SLIT("_HS")) tothdr_offs
     in
     case (catMaybes [pp_tothdr_offs, pp_varhdr_offs, pp_fxdhdr_offs, pp_int_offs]) of
-	[]   -> uppChar '0'
+	[]   -> char '0'
 	[pp] -> pp	-- Each blob is parenthesised if necessary
-	pps  -> uppParens (uppIntersperse (uppChar '+') pps)
+	pps  -> parens (cat (punctuate (char '+') pps))
   where
     pp_hdrs hdr_pp [] = Nothing
-    pp_hdrs hdr_pp [SMRI(rep, n)] | n _EQ_ ILIT(1) = Just (uppBeside (uppStr (show rep)) hdr_pp)
-    pp_hdrs hdr_pp hdrs = Just (uppParens (uppInterleave (uppChar '+')
-						(map (pp_hdr hdr_pp) hdrs)))
+    pp_hdrs hdr_pp [SMRI(rep, n)] | n _EQ_ ILIT(1) = Just ((<>) (text (show rep)) hdr_pp)
+    pp_hdrs hdr_pp hdrs = Just (parens (sep (punctuate (char '+')
+						(map (pp_hdr hdr_pp) hdrs))))
 
-    pp_hdr :: Unpretty -> SMRep__Int -> Unpretty
+    pp_hdr :: Doc -> SMRep__Int -> Doc
     pp_hdr pp_str (SMRI(rep, n))
       = if n _EQ_ ILIT(1) then
-	  uppBeside (uppStr (show rep)) pp_str
+	  (<>) (text (show rep)) pp_str
 	else
-	  uppBesides [uppInt IBOX(n), uppChar '*', uppStr (show rep), pp_str]
+	  hcat [int IBOX(n), char '*', text (show rep), pp_str]
 \end{code}
 
 %************************************************************************

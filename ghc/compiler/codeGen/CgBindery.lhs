@@ -27,7 +27,7 @@ module CgBindery (
     ) where
 
 IMP_Ubiq(){-uitous-}
-IMPORT_DELOOPER(CgLoop1)		-- here for paranoia-checking
+--IMPORT_DELOOPER(CgLoop1)		-- here for paranoia-checking
 
 import AbsCSyn
 import CgMonad
@@ -41,16 +41,21 @@ import HeapOffs		( SYN_IE(VirtualHeapOffset),
 import Id		( idPrimRep, toplevelishId, isDataCon,
 			  mkIdEnv, rngIdEnv, SYN_IE(IdEnv),
 			  idSetToList,
-			  GenId{-instance NamedThing-}
+			  GenId{-instance NamedThing-}, SYN_IE(Id)
 			)
+import Literal          ( Literal )
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined, isWiredInName, Name{-instance NamedThing-} )
+import Name		( isLocallyDefined, isWiredInName,
+			  Name{-instance NamedThing-}, NamedThing(..) )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
 import PprStyle		( PprStyle(..) )
+import Pretty		( Doc )
+import PrimRep          ( PrimRep )
 import StgSyn		( SYN_IE(StgArg), SYN_IE(StgLiveVars), GenStgArg(..) )
-import Unpretty		( uppShow )
+import Unique           ( Unique )
+import UniqFM           ( Uniquable(..) )
 import Util		( zipWithEqual, panic )
 \end{code}
 
@@ -197,7 +202,7 @@ getCAddrModeAndInfo :: Id -> FCode (CAddrMode, LambdaFormInfo)
 getCAddrModeAndInfo id
   | not (isLocallyDefined name) || isWiredInName name
     {- Why the "isWiredInName"?
-	Imagine you are compiling GHCbase.hs (a module that
+	Imagine you are compiling PrelBase.hs (a module that
 	supplies some of the wired-in values).  What can
 	happen is that the compiler will inject calls to
 	(e.g.) GHCbase.unpackPS, where-ever it likes -- it
@@ -410,7 +415,7 @@ bindNewPrimToAmode name (CVal (NodeRel offset) _)
 
 #ifdef DEBUG
 bindNewPrimToAmode name amode
-  = panic ("bindNew...:"++(uppShow 80 (pprAmode PprDebug  amode)))
+  = panic ("bindNew...:"++(show (pprAmode PprDebug  amode)))
 #endif
 \end{code}
 

@@ -17,14 +17,14 @@ import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
 			  SYN_IE(TypecheckedPat)
 			)
 import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding), GenCoreExpr(..), GenCoreBinding(..) )
-import Id		( GenId {- instance Eq -} )
+import Id		( GenId {- instance Eq -}, SYN_IE(Id) )
 
 import DsMonad
 import DsUtils
 
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
-import Type		( isPrimType )
+import Type		( isPrimType, SYN_IE(Type) )
 import Util		( panic, assertPanic )
 \end{code}
 

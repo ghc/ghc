@@ -23,6 +23,7 @@ module DsUtils (
 	mkSelectorBinds,
 	mkTupleBind,
 	mkTupleExpr,
+	mkTupleSelector,
 	selectMatchVars,
 	showForErr
     ) where
@@ -33,7 +34,7 @@ IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
 import HsSyn		( HsExpr(..), OutPat(..), HsLit(..), Fixity,
 			  Match, HsBinds, Stmt, DoOrListComp, HsType, ArithSeqInfo )
 import TcHsSyn		( SYN_IE(TypecheckedPat) )
-import DsHsSyn		( outPatType )
+import DsHsSyn		( outPatType, collectTypedPatBinders )
 import CoreSyn
 
 import DsMonad
@@ -41,18 +42,19 @@ import DsMonad
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PprStyle		( PprStyle(..) )
 import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
-import Pretty		( ppShow, ppBesides, ppStr )
+import Pretty		( Doc, hcat, text )
 import Id		( idType, dataConArgTys, 
 --			  pprId{-ToDo:rm-},
 			  SYN_IE(DataCon), SYN_IE(DictVar), SYN_IE(Id), GenId )
 import Literal		( Literal(..) )
 import PprType		( GenType, GenTyVar )
+import PrimOp           ( PrimOp )
 import TyCon		( isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTy,
 			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon,
-			  GenType {- instances -}
+			  GenType {- instances -}, SYN_IE(Type)
 			)
-import TyVar		( GenTyVar {- instances -} )
+import TyVar		( GenTyVar {- instances -}, SYN_IE(TyVar) )
 import TysPrim		( voidTy )
 import TysWiredIn	( tupleTyCon, unitDataCon, tupleCon )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, SYN_IE(UniqSet) )
@@ -60,7 +62,36 @@ import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
 import Unique		( Unique )
 import Usage		( SYN_IE(UVar) )
 import SrcLoc		( SrcLoc {- instance Outputable -} )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
+
 \end{code}
+
+
+%************************************************************************
+%*									*
+%* Selecting match variables
+%*									*
+%************************************************************************
+
+We're about to match against some patterns.  We want to make some
+@Ids@ to use as match variables.  If a pattern has an @Id@ readily at
+hand, which should indeed be bound to the pattern as a whole, then use it;
+otherwise, make one up.
+
+\begin{code}
+selectMatchVars :: [TypecheckedPat] -> DsM [Id]
+selectMatchVars pats
+  = mapDs var_from_pat_maybe pats
+  where
+    var_from_pat_maybe (VarPat var)	= returnDs var
+    var_from_pat_maybe (AsPat var pat)	= returnDs var
+    var_from_pat_maybe (LazyPat pat)	= var_from_pat_maybe pat
+    var_from_pat_maybe other_pat
+      = newSysLocalDs (outPatType other_pat) -- OK, better make up one...
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -305,7 +336,7 @@ mkPrimDs op args
 
 \begin{code}
 showForErr :: Outputable a => a -> String		-- Boring but useful
-showForErr thing = ppShow 80 (ppr PprForUser thing)
+showForErr thing = show (ppr PprQuote thing)
 
 mkErrorAppDs :: Id 		-- The error function
 	     -> Type		-- Type to which it should be applied
@@ -315,7 +346,7 @@ mkErrorAppDs :: Id 		-- The error function
 mkErrorAppDs err_id ty msg
   = getSrcLocDs			`thenDs` \ src_loc ->
     let
-	full_msg = ppShow 80 (ppBesides [ppr PprForUser src_loc, ppStr "|", ppStr msg])
+	full_msg = show (hcat [ppr PprForUser src_loc, text "|", text msg])
 	msg_lit  = NoRepStr (_PK_ full_msg)
     in
     returnDs (mkApp (Var err_id) [] [ty] [LitArg msg_lit])
@@ -344,23 +375,25 @@ even more helpful.  Something very similar happens for pattern-bound
 expressions.
 
 \begin{code}
-mkSelectorBinds :: [TyVar]	    -- Variables wrt which the pattern is polymorphic
-		-> TypecheckedPat   -- The pattern
-		-> [(Id,Id)]	    -- Monomorphic and polymorphic binders for
-				    -- the pattern
-		-> CoreExpr    -- Expression to which the pattern is bound
+mkSelectorBinds :: TypecheckedPat	-- The pattern
+		-> CoreExpr    		-- Expression to which the pattern is bound
 		-> DsM [(Id,CoreExpr)]
 
-mkSelectorBinds tyvars pat locals_and_globals val_expr
-  = if is_simple_tuple_pat pat then
-	mkTupleBind tyvars [] locals_and_globals val_expr
-    else
-	mkErrorAppDs iRREFUT_PAT_ERROR_ID res_ty pat_string	`thenDs` \ error_msg ->
-	matchSimply val_expr pat res_ty local_tuple error_msg `thenDs` \ tuple_expr ->
-	mkTupleBind tyvars [] locals_and_globals tuple_expr
+mkSelectorBinds (VarPat v) val_expr
+  = returnDs [(v, val_expr)]
+
+mkSelectorBinds pat val_expr
+  | is_simple_tuple_pat pat 
+  = mkTupleBind binders val_expr
+
+  | otherwise
+  = mkErrorAppDs iRREFUT_PAT_ERROR_ID res_ty pat_string		`thenDs` \ error_msg ->
+    matchSimply val_expr pat res_ty local_tuple error_msg	`thenDs` \ tuple_expr ->
+    mkTupleBind binders tuple_expr
+
   where
-    locals	= [local | (local, _) <- locals_and_globals]
-    local_tuple = mkTupleExpr locals
+    binders	= collectTypedPatBinders pat
+    local_tuple = mkTupleExpr binders
     res_ty      = coreExprType local_tuple
 
     is_simple_tuple_pat (TuplePat ps) = all is_var_pat ps
@@ -369,111 +402,28 @@ mkSelectorBinds tyvars pat locals_and_globals val_expr
     is_var_pat (VarPat v) = True
     is_var_pat other      = False -- Even wild-card patterns aren't acceptable
 
-    pat_string = ppShow 80 (ppr PprForUser pat)
+    pat_string = show (ppr PprForUser pat)
 \end{code}
 
-We're about to match against some patterns.  We want to make some
-@Ids@ to use as match variables.  If a pattern has an @Id@ readily at
-hand, which should indeed be bound to the pattern as a whole, then use it;
-otherwise, make one up.
-\begin{code}
-selectMatchVars :: [TypecheckedPat] -> DsM [Id]
-selectMatchVars pats
-  = mapDs var_from_pat_maybe pats
-  where
-    var_from_pat_maybe (VarPat var)	= returnDs var
-    var_from_pat_maybe (AsPat var pat)	= returnDs var
-    var_from_pat_maybe (LazyPat pat)	= var_from_pat_maybe pat
-    var_from_pat_maybe other_pat
-      = newSysLocalDs (outPatType other_pat) -- OK, better make up one...
-\end{code}
 
 \begin{code}
-mkTupleBind :: [TyVar]	    -- Abstract wrt these...
-	-> [DictVar]	    -- ... and these
+mkTupleBind :: [Id]			-- Names of tuple components
+	    -> CoreExpr			-- Expr whose value is a tuple of correct type
+	    -> DsM [(Id, CoreExpr)]	-- Bindings for the globals
 
-	-> [(Id, Id)]	    -- Local, global pairs, equal in number
-			    -- to the size of the tuple.  The types
-			    -- of the globals is the generalisation of
-			    -- the corresp local, wrt the tyvars and dicts
 
-	-> CoreExpr    -- Expr whose value is a tuple; the expression
-			    -- may mention the tyvars and dicts
+mkTupleBind [local] tuple_expr
+  = returnDs [(local, tuple_expr)]
 
-	-> DsM [(Id, CoreExpr)]	-- Bindings for the globals
+mkTupleBind locals tuple_expr
+  = newSysLocalDs (coreExprType tuple_expr)	`thenDs` \ tuple_var ->
+    let
+	mk_bind local = (local, mkTupleSelector locals local (Var tuple_var))
+    in
+    returnDs ( (tuple_var, tuple_expr) :
+	       map mk_bind locals )
 \end{code}
 
-The general call is
-\begin{verbatim}
-	mkTupleBind tyvars dicts [(l1,g1), ..., (ln,gn)] tup_expr
-\end{verbatim}
-If $n=1$, the result is:
-\begin{verbatim}
-	g1 = /\ tyvars -> \ dicts -> rhs
-\end{verbatim}
-Otherwise, the result is:
-\begin{verbatim}
-	tup = /\ tyvars -> \ dicts -> tup_expr
-	g1  = /\ tyvars -> \ dicts -> case (tup tyvars dicts) of
-					(l1, ..., ln) -> l1
-	...etc...
-\end{verbatim}
-
-\begin{code}
-mkTupleBind tyvars dicts [(local,global)] tuple_expr
-  = returnDs [(global, mkLam tyvars dicts tuple_expr)]
-\end{code}
-
-The general case:
-
-\begin{code}
-mkTupleBind tyvars dicts local_global_prs tuple_expr
-  = --pprTrace "mkTupleBind:\n" (ppAboves [ppCat (map (pprId PprShowAll) locals), ppCat (map (pprId PprShowAll) globals), {-ppr PprDebug local_tuple, pprType PprDebug res_ty,-} ppr PprDebug tuple_expr]) $
-
-    newSysLocalDs tuple_var_ty	`thenDs` \ tuple_var ->
-
-    zipWithDs (mk_selector (Var tuple_var))
-	      local_global_prs
-	      [(0::Int) .. (length local_global_prs - 1)]
-				`thenDs` \ tup_selectors ->
-    returnDs (
-	(tuple_var, mkLam tyvars dicts tuple_expr)
-	: tup_selectors
-    )
-  where
-    locals, globals :: [Id]
-    locals  = [local  | (local,global) <- local_global_prs]
-    globals = [global | (local,global) <- local_global_prs]
-
-    no_of_binders = length local_global_prs
-    tyvar_tys = mkTyVarTys tyvars
-
-    tuple_var_ty :: Type
-    tuple_var_ty
-      = mkForAllTys tyvars $
-	mkRhoTy theta	   $
-	applyTyCon (tupleTyCon no_of_binders)
-		   (map idType locals)
-      where
-	theta = mkTheta (map idType dicts)
-
-    mk_selector :: CoreExpr -> (Id, Id) -> Int -> DsM (Id, CoreExpr)
-
-    mk_selector tuple_var_expr (local, global) which_local
-      = mapDs duplicateLocalDs locals{-the whole bunch-} `thenDs` \ binders ->
-	let
-	    selected = binders !! which_local
-	in
-	returnDs (
-	    global,
-	    mkLam tyvars dicts (
-		mkTupleSelector
-		    (mkValApp (mkTyApp tuple_var_expr tyvar_tys)
-			      (map VarArg dicts))
-		    binders
-		    selected)
-	)
-\end{code}
 
 @mkTupleExpr@ builds a tuple; the inverse to @mkTupleSelector@.  If it
 has only one element, it is the identity function.
@@ -499,19 +449,19 @@ If there is just one id in the ``tuple'', then the selector is
 just the identity.
 
 \begin{code}
-mkTupleSelector :: CoreExpr	-- Scrutinee
-		-> [Id]			-- The tuple args
+mkTupleSelector :: [Id]			-- The tuple args
 		-> Id			-- The selected one
+		-> CoreExpr		-- Scrutinee
 		-> CoreExpr
 
-mkTupleSelector expr [] the_var = panic "mkTupleSelector"
+mkTupleSelector [] the_var scrut = panic "mkTupleSelector"
 
-mkTupleSelector expr [var] should_be_the_same_var
+mkTupleSelector [var] should_be_the_same_var scrut
   = ASSERT(var == should_be_the_same_var)
-    expr
+    scrut
 
-mkTupleSelector expr vars the_var
- = Case expr (AlgAlts [(tupleCon arity, vars, Var the_var)]
+mkTupleSelector vars the_var scrut
+ = Case scrut (AlgAlts [(tupleCon arity, vars, Var the_var)]
 			  NoDefault)
  where
    arity = length vars

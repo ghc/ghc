@@ -22,13 +22,14 @@ import CoreSyn
 import CoreUtils	( coreExprType )
 import Id		( idType, mkSysLocal,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv),
-			  GenId{-instances-}
+			  GenId{-instances-}, SYN_IE(Id)
 			)
 import Name		( isLocallyDefined, getSrcLoc, getOccString )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
 import Type		( maybeAppDataTyConExpandingDicts, eqTy )
 import TysPrim		( statePrimTyCon )
 import TysWiredIn	( liftDataCon, mkLiftTy )
+import Unique           ( Unique )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
 import Util		( zipEqual, zipWithEqual, assertPanic, panic )
 

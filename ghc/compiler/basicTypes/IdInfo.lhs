@@ -195,11 +195,11 @@ applySubstToIdInfo s0 (IdInfo arity demand spec strictness unfold
 ppIdInfo :: PprStyle
 	 -> Bool	-- True <=> print specialisations, please
 	 -> IdInfo
-	 -> Pretty
+	 -> Doc
 
 ppIdInfo sty specs_please
     	 (IdInfo arity demand specenv strictness unfold update deforest arg_usage fbtype)
-  = ppCat [
+  = hsep [
 		    -- order is important!:
 		    ppArityInfo sty arity,
 		    ppUpdateInfo sty update,
@@ -208,9 +208,9 @@ ppIdInfo sty specs_please
 		    ppStrictnessInfo sty strictness,
 
 		    if specs_please
-		    then ppNil -- ToDo -- sty (not (isDataCon for_this_id))
+		    then empty -- ToDo -- sty (not (isDataCon for_this_id))
 					 -- better_id_fn inline_env (mEnvToList specenv)
-		    else ppNil,
+		    else empty,
 
 		    -- DemandInfo needn't be printed since it has no effect on interfaces
 		    ppDemandInfo sty demand,
@@ -238,12 +238,11 @@ unknownArity = UnknownArity
 
 arityInfo (IdInfo arity _ _ _ _ _ _ _ _) = arity
 
-addArityInfo id_info			UnknownArity = id_info
 addArityInfo (IdInfo _ a c d e f g h i) arity	     = IdInfo arity a c d e f g h i
 
-ppArityInfo sty UnknownArity	     = ppNil
-ppArityInfo sty (ArityExactly arity) = ppCat [ppPStr SLIT("_A_"), ppInt arity]
-ppArityInfo sty (ArityAtLeast arity) = ppCat [ppPStr SLIT("_A>_"), ppInt arity]
+ppArityInfo sty UnknownArity	     = empty
+ppArityInfo sty (ArityExactly arity) = hsep [ptext SLIT("_A_"), int arity]
+ppArityInfo sty (ArityAtLeast arity) = hsep [ptext SLIT("_A>_"), int arity]
 \end{code}
 
 %************************************************************************
@@ -281,9 +280,9 @@ demandInfo (IdInfo _ demand _ _ _ _ _ _ _) = demand
 
 addDemandInfo (IdInfo a _ c d e f g h i) demand = IdInfo a demand c d e f g h i
 
-ppDemandInfo PprInterface _	      = ppNil
-ppDemandInfo sty UnknownDemand	      = ppStr "{-# L #-}"
-ppDemandInfo sty (DemandedAsPer info) = ppCat [ppStr "{-#", ppStr (showList [info] ""), ppStr "#-}"]
+ppDemandInfo PprInterface _	      = empty
+ppDemandInfo sty UnknownDemand	      = text "{-# L #-}"
+ppDemandInfo sty (DemandedAsPer info) = hsep [text "{-#", text (showList [info] ""), text "#-}"]
 \end{code}
 
 %************************************************************************
@@ -353,14 +352,14 @@ strictnessInfo (IdInfo _ _ _ strict _ _ _ _ _) = strict
 addStrictnessInfo id_info 		     NoStrictnessInfo = id_info
 addStrictnessInfo (IdInfo a b d _ e f g h i) strict	      = IdInfo a b d strict e f g h i
 
-ppStrictnessInfo sty NoStrictnessInfo = ppNil
-ppStrictnessInfo sty BottomGuaranteed = ppPStr SLIT("_bot_")
+ppStrictnessInfo sty NoStrictnessInfo = empty
+ppStrictnessInfo sty BottomGuaranteed = ptext SLIT("_bot_")
 
 ppStrictnessInfo sty (StrictnessInfo wrapper_args wrkr_maybe)
-  = ppCat [ppPStr SLIT("_S_"), ppStr (showList wrapper_args ""), pp_wrkr]
+  = hsep [ptext SLIT("_S_"), text (showList wrapper_args ""), pp_wrkr]
   where
     pp_wrkr = case wrkr_maybe of
-		 Nothing   -> ppNil
+		 Nothing   -> empty
 		 Just wrkr -> ppr sty wrkr
 \end{code}
 
@@ -432,9 +431,9 @@ updateInfo (IdInfo _ _ _ _ _ update _ _ _) = update
 addUpdateInfo id_info			 NoUpdateInfo = id_info
 addUpdateInfo (IdInfo a b d e f _ g h i) upd_info     = IdInfo a b d e f upd_info g h i
 
-ppUpdateInfo sty NoUpdateInfo	       = ppNil
-ppUpdateInfo sty (SomeUpdateInfo [])   = ppNil
-ppUpdateInfo sty (SomeUpdateInfo spec) = ppBeside (ppPStr SLIT("_U_ ")) (ppBesides (map ppInt spec))
+ppUpdateInfo sty NoUpdateInfo	       = empty
+ppUpdateInfo sty (SomeUpdateInfo [])   = empty
+ppUpdateInfo sty (SomeUpdateInfo spec) = (<>) (ptext SLIT("_U_ ")) (hcat (map int spec))
 \end{code}
 
 %************************************************************************
@@ -460,8 +459,8 @@ deforestInfo (IdInfo _ _ _ _ _ _ deforest _ _) = deforest
 addDeforestInfo id_info 		   Don'tDeforest = id_info
 addDeforestInfo (IdInfo a b d e f g _ h i) deforest	 = IdInfo a b d e f g deforest h i
 
-ppDeforestInfo sty Don'tDeforest = ppNil
-ppDeforestInfo sty DoDeforest    = ppPStr SLIT("_DEFOREST_")
+ppDeforestInfo sty Don'tDeforest = empty
+ppDeforestInfo sty DoDeforest    = ptext SLIT("_DEFOREST_")
 \end{code}
 
 %************************************************************************
@@ -496,16 +495,16 @@ argUsageInfo (IdInfo _ _ _ _ _  _ _ au _) = au
 addArgUsageInfo id_info			   NoArgUsageInfo = id_info
 addArgUsageInfo (IdInfo a b d e f g h _ i) au_info	  = IdInfo a b d e f g h au_info i
 
-ppArgUsageInfo sty NoArgUsageInfo	  = ppNil
-ppArgUsageInfo sty (SomeArgUsageInfo aut) = ppBeside (ppPStr SLIT("_L_ ")) (ppArgUsageType aut)
+ppArgUsageInfo sty NoArgUsageInfo	  = empty
+ppArgUsageInfo sty (SomeArgUsageInfo aut) = (<>) (ptext SLIT("_L_ ")) (ppArgUsageType aut)
 
-ppArgUsage (ArgUsage n)      = ppInt n
-ppArgUsage (UnknownArgUsage) = ppChar '-'
+ppArgUsage (ArgUsage n)      = int n
+ppArgUsage (UnknownArgUsage) = char '-'
 
-ppArgUsageType aut = ppBesides
-	[ ppChar '"' ,
-	  ppIntersperse ppComma (map ppArgUsage aut),
-	  ppChar '"' ]
+ppArgUsageType aut = hcat
+	[ char '"' ,
+	  hcat (punctuate comma (map ppArgUsage aut)),
+	  char '"' ]
 \end{code}
 
 %************************************************************************
@@ -539,15 +538,15 @@ fbTypeInfo (IdInfo _ _ _ _ _ _ _ _ fb) = fb
 addFBTypeInfo id_info NoFBTypeInfo = id_info
 addFBTypeInfo (IdInfo a b d e f g h i _) fb_info = IdInfo a b d e f g h i fb_info
 
-ppFBTypeInfo sty NoFBTypeInfo = ppNil
+ppFBTypeInfo sty NoFBTypeInfo = empty
 ppFBTypeInfo sty (SomeFBTypeInfo (FBType cons prod))
-      = ppBeside (ppPStr SLIT("_F_ ")) (ppFBType cons prod)
+      = (<>) (ptext SLIT("_F_ ")) (ppFBType cons prod)
 
-ppFBType cons prod = ppBesides
-	([ ppChar '"' ] ++ map ppCons cons ++ [ ppChar '-', ppProd prod, ppChar '"' ])
+ppFBType cons prod = hcat
+	([ char '"' ] ++ map ppCons cons ++ [ char '-', ppProd prod, char '"' ])
   where
-	ppCons FBGoodConsum = ppChar 'G'
-	ppCons FBBadConsum  = ppChar 'B'
-	ppProd FBGoodProd   = ppChar 'G'
-	ppProd FBBadProd    = ppChar 'B'
+	ppCons FBGoodConsum = char 'G'
+	ppCons FBBadConsum  = char 'B'
+	ppProd FBGoodProd   = char 'G'
+	ppProd FBBadProd    = char 'B'
 \end{code}

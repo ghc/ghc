@@ -29,21 +29,22 @@ import CLabel		( mkConEntryLabel, mkStaticClosureLabel,
 import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			  layOutPhantomClosure, closurePtrsSize,
 			  fitsMinUpdSize, mkConLFInfo,
-			  infoTableLabelFromCI, dataConLiveness
+			  infoTableLabelFromCI, dataConLiveness,
+			  ClosureInfo
 			)
-import CostCentre	( dontCareCostCentre )
+import CostCentre	( dontCareCostCentre, CostCentre )
 import FiniteMap	( fmToList, FiniteMap )
 import HeapOffs		( zeroOff, SYN_IE(VirtualHeapOffset) )
 import Id		( dataConTag, dataConRawArgTys,
 			  dataConNumFields, fIRST_TAG,
 			  emptyIdSet,
-			  GenId{-instance NamedThing-}
+			  GenId{-instance NamedThing-}, SYN_IE(Id)
 			)
 import Name		( getOccString )
 import PrelInfo		( maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
-import TyCon		( tyConDataCons, mkSpecTyCon )
-import Type		( typePrimRep )
+import TyCon		( tyConDataCons, mkSpecTyCon, TyCon )
+import Type		( typePrimRep, SYN_IE(Type) )
 import Util		( panic )
 
 mkSameSpecCon = panic "CgConTbls.mkSameSpecCon (ToDo)"

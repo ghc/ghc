@@ -12,7 +12,8 @@ IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		-- here for paranoia-checking reasons
 			-- and to break dsExpr/dsBinds-ish loop
 
-import HsSyn		hiding ( collectBinders{-also from CoreSyn-} )
+import CmdLineOpts	( opt_WarnIncompletePatterns )
+import HsSyn		
 import TcHsSyn		( SYN_IE(TypecheckedPat), SYN_IE(TypecheckedMatch),
 			  SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr)	)
 import DsHsSyn		( outPatType, collectTypedPatBinders )
@@ -28,16 +29,17 @@ import MatchLit		( matchLiterals )
 import FieldLabel	( FieldLabel {- Eq instance -} )
 import Id		( idType, dataConFieldLabels,
 			  dataConArgTys, recordSelectorFieldLabel,
-			  GenId{-instance-}
+			  GenId{-instance-}, SYN_IE(Id)
 			)
 import Name		( Name {--O only-} )
 import PprStyle		( PprStyle(..) )
-import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )
+import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )        
+import Pretty		( Doc )
 import PrelVals		( pAT_ERROR_ID )
 import Type		( isPrimType, eqTy, getAppDataTyConExpandingDicts,
-			  instantiateTauTy
+			  instantiateTauTy, SYN_IE(Type)
 			)
-import TyVar		( GenTyVar{-instance Eq-} )
+import TyVar		( GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
 			  addrPrimTy, wordPrimTy
 			)
@@ -49,6 +51,10 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			)
 import Unique		( Unique{-instance Eq-} )
 import Util		( panic, pprPanic, assertPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
+
 \end{code}
 
 The function @match@ is basically the same as in the Wadler chapter,
@@ -316,12 +322,9 @@ tidy1 v (WildPat ty) match_result
 -}
 
 tidy1 v (LazyPat pat) match_result
-  = mkSelectorBinds [] pat l_to_l (Var v)	`thenDs` \ sel_binds ->
+  = mkSelectorBinds pat (Var v)		`thenDs` \ sel_binds ->
     returnDs (WildPat (idType v),
 	      mkCoLetsMatchResult [NonRec b rhs | (b,rhs) <- sel_binds] match_result)
-  where
-    l_to_l = binders `zip` binders 	-- Boring
-    binders = collectTypedPatBinders pat
 
 -- re-express <con-something> as (ConPat ...) [directly]
 
@@ -631,8 +634,10 @@ matchWrapper kind matches error_string
 
 	-- Check for incomplete pattern match
     (case match_result of
-	MatchResult CanFail result_ty match_fn cxt -> dsIncompleteWarn cxt
-	other					   -> returnDs ()
+	MatchResult CanFail result_ty match_fn cxt 
+		| opt_WarnIncompletePatterns
+		-> dsIncompleteWarn cxt
+	other	-> returnDs ()
     )							`thenDs` \ _ ->
 
     extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
@@ -730,3 +735,4 @@ flattenMatches kind (match : matches)
 	 pats = reverse pats_so_far	-- They've accumulated in reverse order
 
 \end{code}
+

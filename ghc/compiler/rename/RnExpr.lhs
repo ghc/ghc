@@ -25,9 +25,10 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnEnv
+import CmdLineOpts	( opt_GlasgowExts )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, ccallableClass_RDR,
 			  creturnableClass_RDR, monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
-			  negate_RDR
+			  ratioDataCon_RDR, negate_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
@@ -37,7 +38,6 @@ import Id		( GenId )
 import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name
 import Pretty
-import Unique		( Unique, otherwiseIdKey )
 import UniqFM		( lookupUFM{-, ufmToList ToDo:rm-} )
 import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
@@ -45,6 +45,8 @@ import UniqSet		( emptyUniqSet, unitUniqSet,
 			)
 import PprStyle		( PprStyle(..) )
 import Util		( Ord3(..), removeDups, panic, pprPanic, assertPanic )
+import Outputable
+
 \end{code}
 
 
@@ -136,7 +138,7 @@ rnPat (RecPatIn con rpats)
 ************************************************************************
 
 \begin{code}
-rnMatch :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
+--rnMatch :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
 
 rnMatch (PatMatch pat match)
   = bindLocalsRn "pattern" binders	$ \ new_binders ->
@@ -158,7 +160,7 @@ rnMatch (GRHSMatch grhss_and_binds)
 %************************************************************************
 
 \begin{code}
-rnGRHSsAndBinds :: RdrNameGRHSsAndBinds -> RnMS s (RenamedGRHSsAndBinds, FreeVars)
+--rnGRHSsAndBinds :: RdrNameGRHSsAndBinds -> RnMS s (RenamedGRHSsAndBinds, FreeVars)
 
 rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
   = rnBinds binds		$ \ binds' ->
@@ -174,22 +176,30 @@ rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
 
     rnGRHS (GRHS guard expr locn)
       = pushSrcLocRn locn $		    
-	rnExpr guard	`thenRn` \ (guard', fvsg) ->
-	rnExpr expr	`thenRn` \ (expr',  fvse) ->
+	(if not (opt_GlasgowExts || is_standard_guard guard) then
+		addWarnRn (nonStdGuardErr guard)
+	 else
+		returnRn ()
+	)		`thenRn_`
 
-	-- Turn an "otherwise" guard into an OtherwiseGRHS.
-	-- This is the first moment that we can be sure we havn't got a shadowed binding
-	-- of "otherwise".
-	let grhs' = case guard' of
-			HsVar v | uniqueOf v == otherwiseIdKey -> OtherwiseGRHS expr' locn
-			other				       -> GRHS guard' expr' locn			   
-	in
-	returnRn (grhs', fvsg `unionNameSets` fvse)
+	(rnStmts rnExpr guard	$ \ guard' ->
+		-- This nested thing deals with scope and
+		-- the free vars of the guard, and knocking off the
+		-- free vars of the rhs that are bound by the guard
+
+	rnExpr expr	`thenRn` \ (expr',  fvse) ->
+	returnRn (GRHS guard' expr' locn, fvse))
 
     rnGRHS (OtherwiseGRHS expr locn)
       = pushSrcLocRn locn $
 	rnExpr expr	`thenRn` \ (expr', fvs) ->
-	returnRn (OtherwiseGRHS expr' locn, fvs)
+	returnRn (GRHS [] expr' locn, fvs)
+
+	-- Standard Haskell 1.4 guards are just a single boolean
+	-- expression, rather than a list of qualifiers as in the
+	-- Glasgow extension
+    is_standard_guard [GuardStmt _ _] = True
+    is_standard_guard other	      = False
 \end{code}
 
 %************************************************************************
@@ -199,7 +209,7 @@ rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
 %************************************************************************
 
 \begin{code}
-rnExprs :: [RdrNameHsExpr] -> RnMS s ([RenamedHsExpr], FreeVars)
+--rnExprs :: [RdrNameHsExpr] -> RnMS s ([RenamedHsExpr], FreeVars)
 rnExprs ls =
  rnExprs' ls [] `thenRn` \  (exprs, fvExprs) ->
  returnRn (exprs, unionManyNameSets fvExprs)
@@ -301,8 +311,8 @@ rnExpr (HsLet binds expr)
 rnExpr (HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
     lookupImplicitOccRn monadZeroClass_RDR	`thenRn_`	-- Forces Monad to come too
-    rnStmts stmts				`thenRn` \ (stmts', fvStmts) ->
-    returnRn (HsDo do_or_lc stmts' src_loc, fvStmts)
+    (rnStmts rnExpr stmts			$ \ stmts' ->
+    returnRn (HsDo do_or_lc stmts' src_loc, emptyNameSet))
 
 rnExpr (ExplicitList exps)
   = addImplicitOccRn listType_name	`thenRn_` 
@@ -325,8 +335,8 @@ rnExpr (RecordUpd expr rbinds)
     returnRn (RecordUpd expr' rbinds', fvExpr `unionNameSets` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)
-  = rnExpr expr			 	`thenRn` \ (expr', fvExpr) ->
-    rnHsType pty			`thenRn` \ pty' ->
+  = rnExpr expr			 			`thenRn` \ (expr', fvExpr) ->
+    rnHsSigType (\ sty -> text "an expression") pty	`thenRn` \ pty' ->
     returnRn (ExprWithTySig expr' pty', fvExpr)
 
 rnExpr (HsIf p b1 b2 src_loc)
@@ -413,22 +423,27 @@ be @{r}@, and the free var set for the entire Quals will be @{r}@. This
 Quals.
 
 \begin{code}
-rnStmts :: [RdrNameStmt] -> RnMS s ([RenamedStmt], FreeVars)
+type RnExprTy s = RdrNameHsExpr -> RnMS s (RenamedHsExpr, FreeVars)
 
-rnStmts [] = returnRn ([], emptyNameSet)
+rnStmts :: RnExprTy s
+	-> [RdrNameStmt] 
+	-> ([RenamedStmt] -> RnMS s (a, FreeVars))
+	-> RnMS s (a, FreeVars)
 
-rnStmts (stmt:stmts)
-  = rnStmt stmt				$ \ stmt' ->
-    rnStmts stmts			`thenRn` \ (stmts', fv_stmts) ->
-    returnRn (stmt':stmts', fv_stmts)
+rnStmts rn_expr [] thing_inside 
+  = thing_inside []
 
+rnStmts rn_expr (stmt:stmts) thing_inside
+  = rnStmt rn_expr stmt				$ \ stmt' ->
+    rnStmts rn_expr stmts			$ \ stmts' ->
+    thing_inside (stmt' : stmts')
 
--- rnStmt :: RdrNameStmt -> (RenamedStmt -> RnMS s (a, FreeVars)) -> RnMS s (a, FreeVars)
--- Because of mutual recursion the actual type is a bit less general than this [Haskell 1.2]
+rnStmt :: RnExprTy s -> RdrNameStmt -> (RenamedStmt -> RnMS s (a, FreeVars)) -> RnMS s (a, FreeVars)
+-- Because of mutual recursion we have to pass in rnExpr.
 
-rnStmt (BindStmt pat expr src_loc) thing_inside
+rnStmt rn_expr (BindStmt pat expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
-    rnExpr expr			 			`thenRn` \ (expr', fv_expr) ->
+    rn_expr expr		 			`thenRn` \ (expr', fv_expr) ->
     bindLocalsRn "pattern in do binding" binders	$ \ new_binders ->
     rnPat pat					 	`thenRn` \ pat' ->
 
@@ -437,24 +452,24 @@ rnStmt (BindStmt pat expr src_loc) thing_inside
   where
     binders = collectPatBinders pat
 
-rnStmt (ExprStmt expr src_loc) thing_inside
+rnStmt rn_expr (ExprStmt expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
-    rnExpr expr	 				`thenRn` \ (expr', fv_expr) ->
+    rn_expr expr 				`thenRn` \ (expr', fv_expr) ->
     thing_inside (ExprStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
     returnRn (result, fv_expr `unionNameSets` fvs)
 
-rnStmt (GuardStmt expr src_loc) thing_inside
+rnStmt rn_expr (GuardStmt expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
-    rnExpr expr	 				`thenRn` \ (expr', fv_expr) ->
+    rn_expr expr 				`thenRn` \ (expr', fv_expr) ->
     thing_inside (GuardStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
     returnRn (result, fv_expr `unionNameSets` fvs)
 
-rnStmt (ReturnStmt expr) thing_inside
-  = rnExpr expr	 				`thenRn` \ (expr', fv_expr) ->
+rnStmt rn_expr (ReturnStmt expr) thing_inside
+  = rn_expr expr				`thenRn` \ (expr', fv_expr) ->
     thing_inside (ReturnStmt expr')		`thenRn` \ (result, fvs) ->
     returnRn (result, fv_expr `unionNameSets` fvs)
 
-rnStmt (LetStmt binds) thing_inside
+rnStmt rn_expr (LetStmt binds) thing_inside
   = rnBinds binds		$ \ binds' ->
     thing_inside (LetStmt binds')
 \end{code}
@@ -489,19 +504,27 @@ mkOpAppRn e1@(OpApp e11 op1 fix1 e12)
     returnRn (OpApp e11 op1 fix1 new_e)
   where
     (nofix_error, rearrange_me) = compareFixity fix1 fix2
-    get (HsVar n) = n
 
-mkOpAppRn e1@(NegApp neg_arg neg_id) 
+mkOpAppRn e1@(NegApp neg_arg neg_op) 
 	  op2 
 	  fix2@(Fixity prec2 dir2)
 	  e2
-  | prec2 > 6 	-- Precedence of unary - is wired in as 6!
+  | nofix_error
+  = addErrRn (precParseErr (get neg_op,fix_neg) (get op2,fix2))	`thenRn_`
+    returnRn (OpApp e1 op2 fix2 e2)
+
+  | rearrange_me
   = mkOpAppRn neg_arg op2 fix2 e2	`thenRn` \ new_e ->
-    returnRn (NegApp new_e neg_id)
+    returnRn (NegApp new_e neg_op)
+  where
+    fix_neg = Fixity 6 InfixL  	-- Precedence of unary negate is wired in as infixl 6!
+    (nofix_error, rearrange_me) = compareFixity fix_neg fix2
 
 mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
   = ASSERT( right_op_ok fix e2 )
     returnRn (OpApp e1 op fix e2)
+
+get (HsVar n) = n
 
 -- Parser left-associates everything, but 
 -- derived instances may have correctly-associated things to
@@ -514,9 +537,9 @@ right_op_ok fix1 other
   = True
 
 -- Parser initially makes negation bind more tightly than any other operator
-mkNegAppRn mode neg_arg neg_id
+mkNegAppRn mode neg_arg neg_op
   = ASSERT( not_op_app mode neg_arg )
-    returnRn (NegApp neg_arg neg_id)
+    returnRn (NegApp neg_arg neg_op)
 
 not_op_app SourceMode (OpApp _ _ _ _) = False
 not_op_app mode other	 	      = True
@@ -640,8 +663,12 @@ litOccurrence (HsInt _)
   = lookupImplicitOccRn numClass_RDR			-- Int and Integer are forced in by Num
 
 litOccurrence (HsFrac _)
-  = lookupImplicitOccRn fractionalClass_RDR		-- ... similarly Rational
-
+  = lookupImplicitOccRn fractionalClass_RDR	`thenRn_`
+    lookupImplicitOccRn ratioDataCon_RDR
+	-- We have to make sure that the Ratio type is imported with
+	-- its constructor, because literals of type Ratio t are
+	-- built with that constructor. 
+    
 litOccurrence (HsIntPrim _)
   = addImplicitOccRn (getName intPrimTyCon)
 
@@ -664,23 +691,27 @@ litOccurrence (HsLitLit _)
 
 \begin{code}
 dupFieldErr str (dup:rest) sty
-  = ppBesides [ppPStr SLIT("duplicate field name `"), 
+  = hcat [ptext SLIT("duplicate field name `"), 
                ppr sty dup, 
-	       ppPStr SLIT("' in record "), ppStr str]
+	       ptext SLIT("' in record "), text str]
 
 negPatErr pat  sty
-  = ppSep [ppPStr SLIT("prefix `-' not applied to literal in pattern"), ppr sty pat]
+  = sep [ptext SLIT("prefix `-' not applied to literal in pattern"), ppr sty pat]
 
 precParseNegPatErr op sty 
-  = ppHang (ppPStr SLIT("precedence parsing error"))
-      4 (ppBesides [ppPStr SLIT("prefix `-' has lower precedence than "), 
+  = hang (ptext SLIT("precedence parsing error"))
+      4 (hcat [ptext SLIT("prefix `-' has lower precedence than "), 
 		    pp_op sty op, 
-		    ppPStr SLIT(" in pattern")])
+		    ptext SLIT(" in pattern")])
 
 precParseErr op1 op2  sty
-  = ppHang (ppPStr SLIT("precedence parsing error"))
-      4 (ppBesides [ppPStr SLIT("cannot mix "), pp_op sty op1, ppPStr SLIT(" and "), pp_op sty op2,
-	 	    ppPStr SLIT(" in the same infix expression")])
+  = hang (ptext SLIT("precedence parsing error"))
+      4 (hcat [ptext SLIT("cannot mix "), pp_op sty op1, ptext SLIT(" and "), pp_op sty op2,
+	 	    ptext SLIT(" in the same infix expression")])
 
-pp_op sty (op, fix) = ppBesides [pprSym sty op, ppLparen, ppr sty fix, ppRparen]
+nonStdGuardErr guard sty
+  = hang (ptext SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)"))
+      4 (ppr sty guard)
+
+pp_op sty (op, fix) = hcat [ppr sty op, space, parens (ppr sty fix)]
 \end{code}

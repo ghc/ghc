@@ -58,8 +58,6 @@ module CmdLineOpts (
 	opt_GranMacros,
 	opt_Haskell_1_3,
 	opt_HiMap,
-	opt_HiSuffix,
-	opt_HiSuffixPrelude,
 	opt_IgnoreIfacePragmas,
 	opt_IgnoreStrictnessPragmas,
 	opt_IrrefutableEverything,
@@ -98,12 +96,19 @@ module CmdLineOpts (
 
 	opt_Verbose,
 	opt_WarnNameShadowing,
-	opt_NoWarnIncompletePatterns
-
+	opt_WarnUnusedNames,
+	opt_WarnIncompletePatterns,
+	opt_TyConPruning
     ) where
 
 IMPORT_1_3(Array(array, (//)))
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST	-- bad bad bad boy, Will (_Array internals)
+#else
+import GlaExts
+import ArrBase
+import PrelBase (Lift(..))
+#endif
 import Argv
 
 CHK_Ubiq() -- debugging consistency check
@@ -224,6 +229,10 @@ data SimplifierSwitch
 			-- (Sigh, what a HACK, Andy.  WDP 96/01)
 
   | SimplCaseMerge
+  | SimplCaseScrutinee	-- This flag tells that the expression being simplified is
+			-- the scrutinee of a case expression, so we should
+			-- apply the scrutinee discount when considering inlinings.
+			-- See SimplVar.lhs
 \end{code}
 
 %************************************************************************
@@ -273,7 +282,7 @@ opt_D_dump_rdr			= lookUp  SLIT("-ddump-rdr")
 opt_D_dump_realC		= lookUp  SLIT("-ddump-realC")
 opt_D_dump_rn			= lookUp  SLIT("-ddump-rn")
 opt_D_dump_simpl		= lookUp  SLIT("-ddump-simpl")
-opt_D_dump_simpl_iterations	= lookUp  SLIT("-ddump-simpl_iterations")
+opt_D_dump_simpl_iterations	= lookUp  SLIT("-ddump-simpl-iterations")
 opt_D_dump_spec			= lookUp  SLIT("-ddump-spec")
 opt_D_dump_stg			= lookUp  SLIT("-ddump-stg")
 opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
@@ -297,8 +306,6 @@ opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_Haskell_1_3			= lookUp  SLIT("-fhaskell-1.3")
 opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
-opt_HiSuffix			= lookup_str "-hisuf="
-opt_HiSuffixPrelude		= lookup_str "-hisuf-prelude="
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
 opt_IrrefutableEverything	= lookUp  SLIT("-firrefutable-everything")
@@ -337,7 +344,9 @@ opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDIN
 			
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
 opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
-opt_NoWarnIncompletePatterns	= lookUp  SLIT("-fno-warn-incomplete-patterns")
+opt_WarnIncompletePatterns	= not (lookUp  SLIT("-fno-warn-incomplete-patterns"))
+opt_WarnUnusedNames		= lookUp  SLIT("-fwarn-unused-names")
+opt_TyConPruning		= not (lookUp SLIT("-fno-tycon-pruning"))
 
 -- opt_UnfoldingUseThreshold	= lookup_int "-funfolding-use-threshold"
 -- opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
@@ -496,11 +505,13 @@ tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(28)
 tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(29)
 tagOf_SimplSwitch SimplDontFoldBackAppend       = ILIT(30)
 tagOf_SimplSwitch SimplCaseMerge		= ILIT(31)
+tagOf_SimplSwitch SimplCaseScrutinee		= ILIT(32)
+
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
 tagOf_SimplSwitch _ = panic# "tagOf_SimplSwitch"
 
-lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCaseMerge)
+lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCaseScrutinee)
 \end{code}
 
 %************************************************************************
@@ -510,9 +521,14 @@ lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCaseMerge)
 %************************************************************************
 
 \begin{code}
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 # define ARRAY	    Array
 # define LIFT	    GHCbase.Lift
+# define SET_TO	    =:
+(=:) a b = (a,b)
+#elif __GLASGOW_HASKELL__ >= 202
+# define ARRAY	    Array
+# define LIFT	    Lift
 # define SET_TO	    =:
 (=:) a b = (a,b)
 #else

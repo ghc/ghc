@@ -1,0 +1,10 @@
+_interface_ HsBinds 1
+_exports_
+HsBinds HsBinds nullBinds;
+_instances_
+instance _forall_ [a b c d] => {Outputable.Outputable (HsBinds.HsBinds a b c d)} = $d1;
+_declarations_
+1 $d1 _:_ _forall_ [a b c d] => {Outputable.Outputable (HsBinds.HsBinds a b c d)} ;;
+1 data HsBinds a b c d ;
+1 nullBinds _:_ _forall_ [a b c d] => HsBinds.HsBinds a b c d -> PrelBase.Bool ;;
+

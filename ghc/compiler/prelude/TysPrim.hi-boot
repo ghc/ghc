@@ -1,0 +1,5 @@
+_interface_ TysPrim 1
+_exports_
+TysPrim voidTy;
+_declarations_
+1 voidTy _:_ Type.Type ;;

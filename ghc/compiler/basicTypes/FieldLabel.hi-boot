@@ -1,0 +1,5 @@
+_interface_ FieldLabel 1
+_exports_
+FieldLabel FieldLabel;
+_declarations_
+1 data FieldLabel;

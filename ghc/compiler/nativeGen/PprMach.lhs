@@ -13,9 +13,18 @@ We start with the @pprXXX@s with some cross-platform commonality
 
 module PprMach ( pprInstr ) where
 
-IMP_Ubiq(){-uitious-}
 IMPORT_1_3(Char(isPrint,isDigit))
-IMPORT_1_3(qualified GHCbase(Addr(..))) -- to see innards
+#if __GLASGOW_HASKELL__ == 201
+import qualified GHCbase(Addr(..)) -- to see innards
+IMP_Ubiq(){-uitious-}
+#elif __GLASGOW_HASKELL__ >= 202
+import qualified GlaExts (Addr(..))
+import GlaExts hiding (Addr(..))
+import FastString
+import Ubiq
+#else
+IMP_Ubiq(){-uitious-}
+#endif
 
 import MachRegs		-- may differ per-platform
 import MachMisc
@@ -26,11 +35,14 @@ import CStrings		( charToC )
 import Maybes		( maybeToBool )
 import OrdList		( OrdList )
 import Stix		( CodeSegment(..), StixTree )
-import Unpretty		-- all of it
+import Pretty		-- all of it
 
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 a_HASH   x = GHCbase.A# x
 pACK_STR x = packCString x
+#elif __GLASGOW_HASKELL__ >= 202
+a_HASH   x = GlaExts.A# x
+pACK_STR x = mkFastCharString x
 #else
 a_HASH   x = A# x
 pACK_STR x = mkFastCharString x --_packCString x
@@ -46,17 +58,17 @@ pACK_STR x = mkFastCharString x --_packCString x
 For x86, the way we print a register name depends
 on which bit of it we care about.  Yurgh.
 \begin{code}
-pprReg :: IF_ARCH_i386(Size ->,) Reg -> Unpretty
+pprReg :: IF_ARCH_i386(Size ->,) Reg -> Doc
 
 pprReg IF_ARCH_i386(s,) r
   = case r of
       FixedReg  i -> ppr_reg_no IF_ARCH_i386(s,) i
       MappedReg i -> ppr_reg_no IF_ARCH_i386(s,) i
-      other	  -> uppStr (show other)   -- should only happen when debugging
+      other	  -> text (show other)   -- should only happen when debugging
   where
 #if alpha_TARGET_ARCH
-    ppr_reg_no :: FAST_REG_NO -> Unpretty
-    ppr_reg_no i = uppPStr
+    ppr_reg_no :: FAST_REG_NO -> Doc
+    ppr_reg_no i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("$0");   ILIT( 1) -> SLIT("$1");
 	ILIT( 2) -> SLIT("$2");   ILIT( 3) -> SLIT("$3");
@@ -94,8 +106,8 @@ pprReg IF_ARCH_i386(s,) r
       })
 #endif
 #if i386_TARGET_ARCH
-    ppr_reg_no :: Size -> FAST_REG_NO -> Unpretty
-    ppr_reg_no B i = uppPStr
+    ppr_reg_no :: Size -> FAST_REG_NO -> Doc
+    ppr_reg_no B i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%al");  ILIT( 1) -> SLIT("%bl");
 	ILIT( 2) -> SLIT("%cl");  ILIT( 3) -> SLIT("%dl");
@@ -103,7 +115,7 @@ pprReg IF_ARCH_i386(s,) r
       })
 
     {- UNUSED:
-    ppr_reg_no HB i = uppPStr
+    ppr_reg_no HB i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%ah");  ILIT( 1) -> SLIT("%bh");
 	ILIT( 2) -> SLIT("%ch");  ILIT( 3) -> SLIT("%dh");
@@ -112,7 +124,7 @@ pprReg IF_ARCH_i386(s,) r
     -}
 
 {- UNUSED:
-    ppr_reg_no S i = uppPStr
+    ppr_reg_no S i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%ax");  ILIT( 1) -> SLIT("%bx");
 	ILIT( 2) -> SLIT("%cx");  ILIT( 3) -> SLIT("%dx");
@@ -122,7 +134,7 @@ pprReg IF_ARCH_i386(s,) r
       })
 -}
 
-    ppr_reg_no L i = uppPStr
+    ppr_reg_no L i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%eax");  ILIT( 1) -> SLIT("%ebx");
 	ILIT( 2) -> SLIT("%ecx");  ILIT( 3) -> SLIT("%edx");
@@ -131,7 +143,7 @@ pprReg IF_ARCH_i386(s,) r
 	_ -> SLIT("very naughty I386 double word register")
       })
 
-    ppr_reg_no F i = uppPStr
+    ppr_reg_no F i = ptext
       (case i of {
 	--ToDo: rm these (???)
 	ILIT( 8) -> SLIT("%st(0)");  ILIT( 9) -> SLIT("%st(1)");
@@ -141,7 +153,7 @@ pprReg IF_ARCH_i386(s,) r
 	_ -> SLIT("very naughty I386 float register")
       })
 
-    ppr_reg_no DF i = uppPStr
+    ppr_reg_no DF i = ptext
       (case i of {
 	--ToDo: rm these (???)
 	ILIT( 8) -> SLIT("%st(0)");  ILIT( 9) -> SLIT("%st(1)");
@@ -152,8 +164,8 @@ pprReg IF_ARCH_i386(s,) r
       })
 #endif
 #if sparc_TARGET_ARCH
-    ppr_reg_no :: FAST_REG_NO -> Unpretty
-    ppr_reg_no i = uppPStr
+    ppr_reg_no :: FAST_REG_NO -> Doc
+    ppr_reg_no i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%g0");  ILIT( 1) -> SLIT("%g1");
 	ILIT( 2) -> SLIT("%g2");  ILIT( 3) -> SLIT("%g3");
@@ -199,9 +211,9 @@ pprReg IF_ARCH_i386(s,) r
 %************************************************************************
 
 \begin{code}
-pprSize :: Size -> Unpretty
+pprSize :: Size -> Doc
 
-pprSize x = uppPStr (case x of
+pprSize x = ptext (case x of
 #if alpha_TARGET_ARCH
 	 B  -> SLIT("b")
 	 BU -> SLIT("bu")
@@ -232,6 +244,17 @@ pprSize x = uppPStr (case x of
 	F   -> SLIT("")
 --	D   -> SLIT("d") UNUSED
 	DF  -> SLIT("d")
+    )
+pprStSize :: Size -> Doc
+pprStSize x = ptext (case x of
+	B   -> SLIT("b")
+	BU  -> SLIT("b")
+--	HW  -> SLIT("hw") UNUSED
+--	HWU -> SLIT("uhw") UNUSED
+	W   -> SLIT("")
+	F   -> SLIT("")
+--	D   -> SLIT("d") UNUSED
+	DF  -> SLIT("d")
 #endif
     )
 \end{code}
@@ -243,9 +266,9 @@ pprSize x = uppPStr (case x of
 %************************************************************************
 
 \begin{code}
-pprCond :: Cond -> Unpretty
+pprCond :: Cond -> Doc
 
-pprCond c = uppPStr (case c of {
+pprCond c = ptext (case c of {
 #if alpha_TARGET_ARCH
 	EQQ  -> SLIT("eq");
 	LTT  -> SLIT("lt");
@@ -285,26 +308,26 @@ pprCond c = uppPStr (case c of {
 %************************************************************************
 
 \begin{code}
-pprImm :: Imm -> Unpretty
+pprImm :: Imm -> Doc
 
-pprImm (ImmInt i)     = uppInt i
-pprImm (ImmInteger i) = uppInteger i
+pprImm (ImmInt i)     = int i
+pprImm (ImmInteger i) = integer i
 pprImm (ImmCLbl l)    = pprCLabel_asm l
 pprImm (ImmLit s)     = s
 
-pprImm (ImmLab s) | underscorePrefix = uppBeside (uppChar '_') s
+pprImm (ImmLab s) | underscorePrefix = (<>) (char '_') s
 		  | otherwise	     = s
 
 #if sparc_TARGET_ARCH
 pprImm (LO i)
-  = uppBesides [ pp_lo, pprImm i, uppRparen ]
+  = hcat [ pp_lo, pprImm i, rparen ]
   where
-    pp_lo = uppPStr (pACK_STR (a_HASH "%lo("#))
+    pp_lo = ptext (pACK_STR (a_HASH "%lo("#))
 
 pprImm (HI i)
-  = uppBesides [ pp_hi, pprImm i, uppRparen ]
+  = hcat [ pp_hi, pprImm i, rparen ]
   where
-    pp_hi = uppPStr (pACK_STR (a_HASH "%hi("#))
+    pp_hi = ptext (pACK_STR (a_HASH "%hi("#))
 #endif
 \end{code}
 
@@ -315,13 +338,13 @@ pprImm (HI i)
 %************************************************************************
 
 \begin{code}
-pprAddr :: Addr -> Unpretty
+pprAddr :: Addr -> Doc
 
 #if alpha_TARGET_ARCH
-pprAddr (AddrReg r) = uppParens (pprReg r)
+pprAddr (AddrReg r) = parens (pprReg r)
 pprAddr (AddrImm i) = pprImm i
 pprAddr (AddrRegImm r1 i)
-  = uppBeside (pprImm i) (uppParens (pprReg r1))
+  = (<>) (pprImm i) (parens (pprReg r1))
 #endif
 
 -------------------
@@ -334,23 +357,23 @@ pprAddr (ImmAddr imm off)
     if (off == 0) then
 	pp_imm
     else if (off < 0) then
-	uppBeside pp_imm (uppInt off)
+	(<>) pp_imm (int off)
     else
-	uppBesides [pp_imm, uppChar '+', uppInt off]
+	hcat [pp_imm, char '+', int off]
 
 pprAddr (Addr base index displacement)
   = let
 	pp_disp  = ppr_disp displacement
-	pp_off p = uppBeside pp_disp (uppParens p)
+	pp_off p = (<>) pp_disp (parens p)
 	pp_reg r = pprReg L r
     in
     case (base,index) of
       (Nothing, Nothing)    -> pp_disp
       (Just b,  Nothing)    -> pp_off (pp_reg b)
-      (Nothing, Just (r,i)) -> pp_off (uppBesides [pp_reg r, uppComma, uppInt i])
-      (Just b,  Just (r,i)) -> pp_off (uppBesides [pp_reg b, uppComma, pp_reg r, uppComma, uppInt i])
+      (Nothing, Just (r,i)) -> pp_off (hcat [pp_reg r, comma, int i])
+      (Just b,  Just (r,i)) -> pp_off (hcat [pp_reg b, comma, pp_reg r, comma, int i])
   where
-    ppr_disp (ImmInt 0) = uppNil
+    ppr_disp (ImmInt 0) = empty
     ppr_disp imm        = pprImm imm
 #endif
 
@@ -360,24 +383,24 @@ pprAddr (Addr base index displacement)
 pprAddr (AddrRegReg r1 (FixedReg ILIT(0))) = pprReg r1
 
 pprAddr (AddrRegReg r1 r2)
-  = uppBesides [ pprReg r1, uppChar '+', pprReg r2 ]
+  = hcat [ pprReg r1, char '+', pprReg r2 ]
 
 pprAddr (AddrRegImm r1 (ImmInt i))
   | i == 0 = pprReg r1
   | not (fits13Bits i) = largeOffsetError i
-  | otherwise = uppBesides [ pprReg r1, pp_sign, uppInt i ]
+  | otherwise = hcat [ pprReg r1, pp_sign, int i ]
   where
-    pp_sign = if i > 0 then uppChar '+' else uppNil
+    pp_sign = if i > 0 then char '+' else empty
 
 pprAddr (AddrRegImm r1 (ImmInteger i))
   | i == 0 = pprReg r1
   | not (fits13Bits i) = largeOffsetError i
-  | otherwise  = uppBesides [ pprReg r1, pp_sign, uppInteger i ]
+  | otherwise  = hcat [ pprReg r1, pp_sign, integer i ]
   where
-    pp_sign = if i > 0 then uppChar '+' else uppNil
+    pp_sign = if i > 0 then char '+' else empty
 
 pprAddr (AddrRegImm r1 imm)
-  = uppBesides [ pprReg r1, uppChar '+', pprImm imm ]
+  = hcat [ pprReg r1, char '+', pprImm imm ]
 #endif
 \end{code}
 
@@ -388,22 +411,22 @@ pprAddr (AddrRegImm r1 imm)
 %************************************************************************
 
 \begin{code}
-pprInstr :: Instr -> Unpretty
+pprInstr :: Instr -> Doc
 
-pprInstr (COMMENT s) = uppNil -- nuke 'em
---alpha:  = uppBeside (uppPStr SLIT("\t# ")) (uppPStr s)
---i386 :  = uppBeside (uppPStr SLIT("# "))   (uppPStr s)
---sparc:  = uppBeside (uppPStr SLIT("! "))   (uppPStr s)
+pprInstr (COMMENT s) = empty -- nuke 'em
+--alpha:  = (<>) (ptext SLIT("\t# ")) (ptext s)
+--i386 :  = (<>) (ptext SLIT("# "))   (ptext s)
+--sparc:  = (<>) (ptext SLIT("! "))   (ptext s)
 
 pprInstr (SEGMENT TextSegment)
-    = uppPStr
+    = ptext
 	 IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
 	,IF_ARCH_sparc(SLIT("\t.text\n\t.align 4") {-word boundary-}
 	,IF_ARCH_i386((_PK_ ".text\n\t.align 2\x2c\&0x90") {-needs per-OS variation!-}
 	,)))
 
 pprInstr (SEGMENT DataSegment)
-    = uppPStr
+    = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT("\t.data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".data\n\t.align 2")
@@ -413,41 +436,40 @@ pprInstr (LABEL clab)
   = let
 	pp_lab = pprCLabel_asm clab
     in
-    uppBesides [
+    hcat [
 	if not (externallyVisibleCLabel clab) then
-	    uppNil
+	    empty
 	else
-	    uppBesides [uppPStr
+	    hcat [ptext
 			 IF_ARCH_alpha(SLIT("\t.globl\t")
 		        ,IF_ARCH_i386(SLIT(".globl ")
 			,IF_ARCH_sparc(SLIT("\t.global\t")
 			,)))
-			, pp_lab, uppChar '\n'],
+			, pp_lab, char '\n'],
 	pp_lab,
-	uppChar ':'
+	char ':'
     ]
 
 pprInstr (ASCII False{-no backslash conversion-} str)
-  = uppBesides [ uppPStr SLIT("\t.asciz "), uppChar '\"', uppStr str, uppChar '"' ]
+  = hcat [ ptext SLIT("\t.asciz "), char '\"', text str, char '"' ]
 
 pprInstr (ASCII True str)
-  = uppBeside (uppStr "\t.ascii \"") (asciify str 60)
+  = (<>) (text "\t.ascii \"") (asciify str 60)
   where
-    asciify :: String -> Int -> Unpretty
+    asciify :: String -> Int -> Doc
 
-    asciify [] _ = uppStr "\\0\""
-    asciify s     n | n <= 0 = uppBeside (uppStr "\"\n\t.ascii \"") (asciify s 60)
-    asciify ('\\':cs)      n = uppBeside (uppStr "\\\\") (asciify cs (n-1))
-    asciify ('\"':cs)      n = uppBeside (uppStr "\\\"") (asciify cs (n-1))
-    asciify (c:cs) n | isPrint c = uppBeside (uppChar c) (asciify cs (n-1))
-    asciify [c]            _ = uppBeside (uppStr (charToC c)) (uppStr ("\\0\""))
+    asciify [] _ = text "\\0\""
+    asciify s     n | n <= 0 = (<>) (text "\"\n\t.ascii \"") (asciify s 60)
+    asciify ('\\':cs)      n = (<>) (text "\\\\") (asciify cs (n-1))
+    asciify ('\"':cs)      n = (<>) (text "\\\"") (asciify cs (n-1))
+    asciify (c:cs) n | isPrint c = (<>) (char c) (asciify cs (n-1))
+    asciify [c]            _ = (<>) (text (charToC c)) (text ("\\0\""))
     asciify (c:(cs@(d:_))) n
-      | isDigit d = uppBeside (uppStr (charToC c)) (asciify cs 0)
-      | otherwise = uppBeside (uppStr (charToC c)) (asciify cs (n-1))
+      | isDigit d = (<>) (text (charToC c)) (asciify cs 0)
+      | otherwise = (<>) (text (charToC c)) (asciify cs (n-1))
 
 pprInstr (DATA s xs)
-  = uppInterleave (uppChar '\n')
-		  [uppBeside (uppPStr pp_size) (pprImm x) | x <- xs]
+  = vcat [(<>) (ptext pp_size) (pprImm x) | x <- xs]
   where
     pp_size = case s of
 #if alpha_TARGET_ARCH
@@ -491,177 +513,177 @@ pprInstr (DATA s xs)
 #if alpha_TARGET_ARCH
 
 pprInstr (LD size reg addr)
-  = uppBesides [
-	uppPStr SLIT("\tld"),
+  = hcat [
+	ptext SLIT("\tld"),
 	pprSize size,
-	uppChar '\t',
+	char '\t',
 	pprReg reg,
-	uppComma,
+	comma,
 	pprAddr addr
     ]
 
 pprInstr (LDA reg addr)
-  = uppBesides [
-	uppPStr SLIT("\tlda\t"),
+  = hcat [
+	ptext SLIT("\tlda\t"),
 	pprReg reg,
-	uppComma,
+	comma,
 	pprAddr addr
     ]
 
 pprInstr (LDAH reg addr)
-  = uppBesides [
-	uppPStr SLIT("\tldah\t"),
+  = hcat [
+	ptext SLIT("\tldah\t"),
 	pprReg reg,
-	uppComma,
+	comma,
 	pprAddr addr
     ]
 
 pprInstr (LDGP reg addr)
-  = uppBesides [
-	uppPStr SLIT("\tldgp\t"),
+  = hcat [
+	ptext SLIT("\tldgp\t"),
 	pprReg reg,
-	uppComma,
+	comma,
 	pprAddr addr
     ]
 
 pprInstr (LDI size reg imm)
-  = uppBesides [
-	uppPStr SLIT("\tldi"),
+  = hcat [
+	ptext SLIT("\tldi"),
 	pprSize size,
-	uppChar '\t',
+	char '\t',
 	pprReg reg,
-	uppComma,
+	comma,
 	pprImm imm
     ]
 
 pprInstr (ST size reg addr)
-  = uppBesides [
-	uppPStr SLIT("\tst"),
+  = hcat [
+	ptext SLIT("\tst"),
 	pprSize size,
-	uppChar '\t',
+	char '\t',
 	pprReg reg,
-	uppComma,
+	comma,
 	pprAddr addr
     ]
 
 pprInstr (CLR reg)
-  = uppBesides [
-	uppPStr SLIT("\tclr\t"),
+  = hcat [
+	ptext SLIT("\tclr\t"),
 	pprReg reg
     ]
 
 pprInstr (ABS size ri reg)
-  = uppBesides [
-	uppPStr SLIT("\tabs"),
+  = hcat [
+	ptext SLIT("\tabs"),
 	pprSize size,
-	uppChar '\t',
+	char '\t',
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg
     ]
 
 pprInstr (NEG size ov ri reg)
-  = uppBesides [
-	uppPStr SLIT("\tneg"),
+  = hcat [
+	ptext SLIT("\tneg"),
 	pprSize size,
-	if ov then uppPStr SLIT("v\t") else uppChar '\t',
+	if ov then ptext SLIT("v\t") else char '\t',
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg
     ]
 
 pprInstr (ADD size ov reg1 ri reg2)
-  = uppBesides [
-	uppPStr SLIT("\tadd"),
+  = hcat [
+	ptext SLIT("\tadd"),
 	pprSize size,
-	if ov then uppPStr SLIT("v\t") else uppChar '\t',
+	if ov then ptext SLIT("v\t") else char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (SADD size scale reg1 ri reg2)
-  = uppBesides [
-	uppPStr (case scale of {{-UNUSED:L -> SLIT("\ts4");-} Q -> SLIT("\ts8")}),
-	uppPStr SLIT("add"),
+  = hcat [
+	ptext (case scale of {{-UNUSED:L -> SLIT("\ts4");-} Q -> SLIT("\ts8")}),
+	ptext SLIT("add"),
 	pprSize size,
-	uppChar '\t',
+	char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (SUB size ov reg1 ri reg2)
-  = uppBesides [
-	uppPStr SLIT("\tsub"),
+  = hcat [
+	ptext SLIT("\tsub"),
 	pprSize size,
-	if ov then uppPStr SLIT("v\t") else uppChar '\t',
+	if ov then ptext SLIT("v\t") else char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (SSUB size scale reg1 ri reg2)
-  = uppBesides [
-	uppPStr (case scale of {{-UNUSED:L -> SLIT("\ts4");-} Q -> SLIT("\ts8")}),
-	uppPStr SLIT("sub"),
+  = hcat [
+	ptext (case scale of {{-UNUSED:L -> SLIT("\ts4");-} Q -> SLIT("\ts8")}),
+	ptext SLIT("sub"),
 	pprSize size,
-	uppChar '\t',
+	char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (MUL size ov reg1 ri reg2)
-  = uppBesides [
-	uppPStr SLIT("\tmul"),
+  = hcat [
+	ptext SLIT("\tmul"),
 	pprSize size,
-	if ov then uppPStr SLIT("v\t") else uppChar '\t',
+	if ov then ptext SLIT("v\t") else char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (DIV size uns reg1 ri reg2)
-  = uppBesides [
-	uppPStr SLIT("\tdiv"),
+  = hcat [
+	ptext SLIT("\tdiv"),
 	pprSize size,
-	if uns then uppPStr SLIT("u\t") else uppChar '\t',
+	if uns then ptext SLIT("u\t") else char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (REM size uns reg1 ri reg2)
-  = uppBesides [
-	uppPStr SLIT("\trem"),
+  = hcat [
+	ptext SLIT("\trem"),
 	pprSize size,
-	if uns then uppPStr SLIT("u\t") else uppChar '\t',
+	if uns then ptext SLIT("u\t") else char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (NOT ri reg)
-  = uppBesides [
-	uppPStr SLIT("\tnot"),
-	uppChar '\t',
+  = hcat [
+	ptext SLIT("\tnot"),
+	char '\t',
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg
     ]
 
@@ -679,41 +701,41 @@ pprInstr (SRA reg1 ri reg2) = pprRegRIReg SLIT("sra") reg1 ri reg2
 pprInstr (ZAP reg1 ri reg2) = pprRegRIReg SLIT("zap") reg1 ri reg2
 pprInstr (ZAPNOT reg1 ri reg2) = pprRegRIReg SLIT("zapnot") reg1 ri reg2
 
-pprInstr (NOP) = uppPStr SLIT("\tnop")
+pprInstr (NOP) = ptext SLIT("\tnop")
 
 pprInstr (CMP cond reg1 ri reg2)
-  = uppBesides [
-	uppPStr SLIT("\tcmp"),
+  = hcat [
+	ptext SLIT("\tcmp"),
 	pprCond cond,
-	uppChar '\t',
+	char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (FCLR reg)
-  = uppBesides [
-	uppPStr SLIT("\tfclr\t"),
+  = hcat [
+	ptext SLIT("\tfclr\t"),
 	pprReg reg
     ]
 
 pprInstr (FABS reg1 reg2)
-  = uppBesides [
-	uppPStr SLIT("\tfabs\t"),
+  = hcat [
+	ptext SLIT("\tfabs\t"),
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (FNEG size reg1 reg2)
-  = uppBesides [
-	uppPStr SLIT("\tneg"),
+  = hcat [
+	ptext SLIT("\tneg"),
 	pprSize size,
-	uppChar '\t',
+	char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
@@ -723,94 +745,94 @@ pprInstr (FMUL size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("mul") size reg1 reg
 pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("sub") size reg1 reg2 reg3
 
 pprInstr (CVTxy size1 size2 reg1 reg2)
-  = uppBesides [
-	uppPStr SLIT("\tcvt"),
+  = hcat [
+	ptext SLIT("\tcvt"),
 	pprSize size1,
-	case size2 of {Q -> uppPStr SLIT("qc"); _ -> pprSize size2},
-	uppChar '\t',
+	case size2 of {Q -> ptext SLIT("qc"); _ -> pprSize size2},
+	char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (FCMP size cond reg1 reg2 reg3)
-  = uppBesides [
-	uppPStr SLIT("\tcmp"),
+  = hcat [
+	ptext SLIT("\tcmp"),
 	pprSize size,
 	pprCond cond,
-	uppChar '\t',
+	char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprReg reg2,
-	uppComma,
+	comma,
 	pprReg reg3
     ]
 
 pprInstr (FMOV reg1 reg2)
-  = uppBesides [
-	uppPStr SLIT("\tfmov\t"),
+  = hcat [
+	ptext SLIT("\tfmov\t"),
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
 pprInstr (BI ALWAYS reg lab) = pprInstr (BR lab)
 
-pprInstr (BI NEVER reg lab) = uppNil
+pprInstr (BI NEVER reg lab) = empty
 
 pprInstr (BI cond reg lab)
-  = uppBesides [
-	uppPStr SLIT("\tb"),
+  = hcat [
+	ptext SLIT("\tb"),
 	pprCond cond,
-	uppChar '\t',
+	char '\t',
 	pprReg reg,
-	uppComma,
+	comma,
 	pprImm lab
     ]
 
 pprInstr (BF cond reg lab)
-  = uppBesides [
-	uppPStr SLIT("\tfb"),
+  = hcat [
+	ptext SLIT("\tfb"),
 	pprCond cond,
-	uppChar '\t',
+	char '\t',
 	pprReg reg,
-	uppComma,
+	comma,
 	pprImm lab
     ]
 
 pprInstr (BR lab)
-  = uppBeside (uppPStr SLIT("\tbr\t")) (pprImm lab)
+  = (<>) (ptext SLIT("\tbr\t")) (pprImm lab)
 
 pprInstr (JMP reg addr hint)
-  = uppBesides [
-	uppPStr SLIT("\tjmp\t"),
+  = hcat [
+	ptext SLIT("\tjmp\t"),
 	pprReg reg,
-	uppComma,
+	comma,
 	pprAddr addr,
-	uppComma,
-	uppInt hint
+	comma,
+	int hint
     ]
 
 pprInstr (BSR imm n)
-  = uppBeside (uppPStr SLIT("\tbsr\t")) (pprImm imm)
+  = (<>) (ptext SLIT("\tbsr\t")) (pprImm imm)
 
 pprInstr (JSR reg addr n)
-  = uppBesides [
-	uppPStr SLIT("\tjsr\t"),
+  = hcat [
+	ptext SLIT("\tjsr\t"),
 	pprReg reg,
-	uppComma,
+	comma,
 	pprAddr addr
     ]
 
 pprInstr (FUNBEGIN clab)
-  = uppBesides [
+  = hcat [
 	if (externallyVisibleCLabel clab) then
-	    uppBesides [uppPStr SLIT("\t.globl\t"), pp_lab, uppChar '\n']
+	    hcat [ptext SLIT("\t.globl\t"), pp_lab, char '\n']
 	else
-	    uppNil,
-	uppPStr SLIT("\t.ent "),
+	    empty,
+	ptext SLIT("\t.ent "),
 	pp_lab,
-	uppChar '\n',
+	char '\n',
 	pp_lab,
 	pp_ldgp,
 	pp_lab,
@@ -819,46 +841,46 @@ pprInstr (FUNBEGIN clab)
     where
 	pp_lab = pprCLabel_asm clab
 
-	pp_ldgp  = uppPStr (pACK_STR (a_HASH ":\n\tldgp $29,0($27)\n"#))
-	pp_frame = uppPStr (pACK_STR (a_HASH "..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1"#))
+	pp_ldgp  = ptext (pACK_STR (a_HASH ":\n\tldgp $29,0($27)\n"#))
+	pp_frame = ptext (pACK_STR (a_HASH "..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1"#))
 
 pprInstr (FUNEND clab)
-  = uppBeside (uppPStr SLIT("\t.align 4\n\t.end ")) (pprCLabel_asm clab)
+  = (<>) (ptext SLIT("\t.align 4\n\t.end ")) (pprCLabel_asm clab)
 \end{code}
 
 Continue with Alpha-only printing bits and bobs:
 \begin{code}
-pprRI :: RI -> Unpretty
+pprRI :: RI -> Doc
 
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprRegRIReg :: FAST_STRING -> Reg -> RI -> Reg -> Unpretty
+pprRegRIReg :: FAST_STRING -> Reg -> RI -> Reg -> Doc
 
 pprRegRIReg name reg1 ri reg2
-  = uppBesides [
- 	uppChar '\t',
-	uppPStr name,
-	uppChar '\t',
+  = hcat [
+ 	char '\t',
+	ptext name,
+	char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Unpretty
+pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
 
 pprSizeRegRegReg name size reg1 reg2 reg3
-  = uppBesides [
-	uppChar '\t',
-	uppPStr name,
+  = hcat [
+	char '\t',
+	ptext name,
 	pprSize size,
-	uppChar '\t',
+	char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprReg reg2,
-	uppComma,
+	comma,
 	pprReg reg3
     ]
 
@@ -876,7 +898,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 
 pprInstr (MOV size (OpReg src) (OpReg dst)) -- hack
   | src == dst
-  = uppPStr SLIT("")
+  = ptext SLIT("")
 pprInstr (MOV size src dst)
   = pprSizeOpOp SLIT("mov") size src dst
 pprInstr (MOVZX size src dst) = pprSizeOpOpCoerce SLIT("movzx") L size src dst
@@ -919,171 +941,171 @@ pprInstr (TEST size src dst) = pprSizeOpOp SLIT("test")  size src dst
 pprInstr (PUSH size op) = pprSizeOp SLIT("push") size op
 pprInstr (POP size op) = pprSizeOp SLIT("pop") size op
 
-pprInstr (NOP) = uppPStr SLIT("\tnop")
-pprInstr (CLTD) = uppPStr SLIT("\tcltd")
+pprInstr (NOP) = ptext SLIT("\tnop")
+pprInstr (CLTD) = ptext SLIT("\tcltd")
 
 pprInstr (SETCC cond op) = pprCondInstr SLIT("set") cond (pprOperand B op)
 
 pprInstr (JXX cond lab) = pprCondInstr SLIT("j") cond (pprCLabel_asm lab)
 
-pprInstr (JMP (OpImm imm)) = uppBeside (uppPStr SLIT("\tjmp ")) (pprImm imm)
-pprInstr (JMP op) = uppBeside (uppPStr SLIT("\tjmp *")) (pprOperand L op)
+pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
+pprInstr (JMP op) = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
 
 pprInstr (CALL imm)
-  = uppBesides [ uppPStr SLIT("\tcall "), pprImm imm ]
+  = hcat [ ptext SLIT("\tcall "), pprImm imm ]
 
-pprInstr SAHF = uppPStr SLIT("\tsahf")
-pprInstr FABS = uppPStr SLIT("\tfabs")
+pprInstr SAHF = ptext SLIT("\tsahf")
+pprInstr FABS = ptext SLIT("\tfabs")
 
 pprInstr (FADD sz src@(OpAddr _))
-  = uppBesides [uppPStr SLIT("\tfadd"), pprSize sz, uppSP, pprOperand sz src]
+  = hcat [ptext SLIT("\tfadd"), pprSize sz, space, pprOperand sz src]
 pprInstr (FADD sz src)
-  = uppPStr SLIT("\tfadd")
+  = ptext SLIT("\tfadd")
 pprInstr FADDP
-  = uppPStr SLIT("\tfaddp")
+  = ptext SLIT("\tfaddp")
 pprInstr (FMUL sz src)
-  = uppBesides [uppPStr SLIT("\tfmul"), pprSize sz, uppSP, pprOperand sz src]
+  = hcat [ptext SLIT("\tfmul"), pprSize sz, space, pprOperand sz src]
 pprInstr FMULP
-  = uppPStr SLIT("\tfmulp")
+  = ptext SLIT("\tfmulp")
 pprInstr (FIADD size op) = pprSizeAddr SLIT("fiadd") size op
-pprInstr FCHS = uppPStr SLIT("\tfchs")
+pprInstr FCHS = ptext SLIT("\tfchs")
 pprInstr (FCOM size op) = pprSizeOp SLIT("fcom") size op
-pprInstr FCOS = uppPStr SLIT("\tfcos")
+pprInstr FCOS = ptext SLIT("\tfcos")
 pprInstr (FIDIV size op) = pprSizeAddr SLIT("fidiv") size op
 pprInstr (FDIV sz src)
-  = uppBesides [uppPStr SLIT("\tfdiv"), pprSize sz, uppSP, pprOperand sz src]
+  = hcat [ptext SLIT("\tfdiv"), pprSize sz, space, pprOperand sz src]
 pprInstr FDIVP
-  = uppPStr SLIT("\tfdivp")
+  = ptext SLIT("\tfdivp")
 pprInstr (FDIVR sz src)
-  = uppBesides [uppPStr SLIT("\tfdivr"), pprSize sz, uppSP, pprOperand sz src]
+  = hcat [ptext SLIT("\tfdivr"), pprSize sz, space, pprOperand sz src]
 pprInstr FDIVRP
-  = uppPStr SLIT("\tfdivpr")
+  = ptext SLIT("\tfdivpr")
 pprInstr (FIDIVR size op) = pprSizeAddr SLIT("fidivr") size op
 pprInstr (FICOM size op) = pprSizeAddr SLIT("ficom") size op
 pprInstr (FILD sz op reg) = pprSizeAddrReg SLIT("fild") sz op reg
 pprInstr (FIST size op) = pprSizeAddr SLIT("fist") size op
 pprInstr (FLD sz (OpImm (ImmCLbl src)))
-  = uppBesides [uppPStr SLIT("\tfld"),pprSize sz,uppSP,pprCLabel_asm src]
+  = hcat [ptext SLIT("\tfld"),pprSize sz,space,pprCLabel_asm src]
 pprInstr (FLD sz src)
-  = uppBesides [uppPStr SLIT("\tfld"),pprSize sz,uppSP,pprOperand sz src]
-pprInstr FLD1 = uppPStr SLIT("\tfld1")
-pprInstr FLDZ = uppPStr SLIT("\tfldz")
+  = hcat [ptext SLIT("\tfld"),pprSize sz,space,pprOperand sz src]
+pprInstr FLD1 = ptext SLIT("\tfld1")
+pprInstr FLDZ = ptext SLIT("\tfldz")
 pprInstr (FIMUL size op) = pprSizeAddr SLIT("fimul") size op
-pprInstr FRNDINT = uppPStr SLIT("\tfrndint")
-pprInstr FSIN = uppPStr SLIT("\tfsin")
-pprInstr FSQRT = uppPStr SLIT("\tfsqrt")
+pprInstr FRNDINT = ptext SLIT("\tfrndint")
+pprInstr FSIN = ptext SLIT("\tfsin")
+pprInstr FSQRT = ptext SLIT("\tfsqrt")
 pprInstr (FST sz dst)
-  = uppBesides [uppPStr SLIT("\tfst"), pprSize sz, uppSP, pprOperand sz dst]
+  = hcat [ptext SLIT("\tfst"), pprSize sz, space, pprOperand sz dst]
 pprInstr (FSTP sz dst)
-  = uppBesides [uppPStr SLIT("\tfstp"), pprSize sz, uppSP, pprOperand sz dst]
+  = hcat [ptext SLIT("\tfstp"), pprSize sz, space, pprOperand sz dst]
 pprInstr (FISUB size op) = pprSizeAddr SLIT("fisub") size op
 pprInstr (FSUB sz src)
-  = uppBesides [uppPStr SLIT("\tfsub"), pprSize sz, uppSP, pprOperand sz src]
+  = hcat [ptext SLIT("\tfsub"), pprSize sz, space, pprOperand sz src]
 pprInstr FSUBP
-  = uppPStr SLIT("\tfsubp")
+  = ptext SLIT("\tfsubp")
 pprInstr (FSUBR size src)
   = pprSizeOp SLIT("fsubr") size src
 pprInstr FSUBRP
-  = uppPStr SLIT("\tfsubpr")
+  = ptext SLIT("\tfsubpr")
 pprInstr (FISUBR size op)
   = pprSizeAddr SLIT("fisubr") size op
-pprInstr FTST = uppPStr SLIT("\tftst")
+pprInstr FTST = ptext SLIT("\tftst")
 pprInstr (FCOMP sz op)
-  = uppBesides [uppPStr SLIT("\tfcomp"), pprSize sz, uppSP, pprOperand sz op]
-pprInstr FUCOMPP = uppPStr SLIT("\tfucompp")
-pprInstr FXCH = uppPStr SLIT("\tfxch")
-pprInstr FNSTSW = uppPStr SLIT("\tfnstsw %ax")
-pprInstr FNOP = uppPStr SLIT("")
+  = hcat [ptext SLIT("\tfcomp"), pprSize sz, space, pprOperand sz op]
+pprInstr FUCOMPP = ptext SLIT("\tfucompp")
+pprInstr FXCH = ptext SLIT("\tfxch")
+pprInstr FNSTSW = ptext SLIT("\tfnstsw %ax")
+pprInstr FNOP = ptext SLIT("")
 \end{code}
 
 Continue with I386-only printing bits and bobs:
 \begin{code}
-pprDollImm :: Imm -> Unpretty
+pprDollImm :: Imm -> Doc
 
-pprDollImm i     = uppBesides [ uppPStr SLIT("$"), pprImm i]
+pprDollImm i     = hcat [ ptext SLIT("$"), pprImm i]
 
-pprOperand :: Size -> Operand -> Unpretty
+pprOperand :: Size -> Operand -> Doc
 pprOperand s (OpReg r) = pprReg s r
 pprOperand s (OpImm i) = pprDollImm i
 pprOperand s (OpAddr ea) = pprAddr ea
 
-pprSizeOp :: FAST_STRING -> Size -> Operand -> Unpretty
+pprSizeOp :: FAST_STRING -> Size -> Operand -> Doc
 pprSizeOp name size op1
-  = uppBesides [
-    	uppChar '\t',
-	uppPStr name,
+  = hcat [
+    	char '\t',
+	ptext name,
     	pprSize size,
-	uppSP,
+	space,
 	pprOperand size op1
     ]
 
-pprSizeOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Unpretty
+pprSizeOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
 pprSizeOpOp name size op1 op2
-  = uppBesides [
-    	uppChar '\t',
-	uppPStr name,
+  = hcat [
+    	char '\t',
+	ptext name,
     	pprSize size,
-	uppSP,
+	space,
 	pprOperand size op1,
-	uppComma,
+	comma,
 	pprOperand size op2
     ]
 
-pprSizeOpReg :: FAST_STRING -> Size -> Operand -> Reg -> Unpretty
+pprSizeOpReg :: FAST_STRING -> Size -> Operand -> Reg -> Doc
 pprSizeOpReg name size op1 reg
-  = uppBesides [
-    	uppChar '\t',
-	uppPStr name,
+  = hcat [
+    	char '\t',
+	ptext name,
     	pprSize size,
-	uppSP,
+	space,
 	pprOperand size op1,
-	uppComma,
+	comma,
 	pprReg size reg
     ]
 
-pprSizeAddr :: FAST_STRING -> Size -> Addr -> Unpretty
+pprSizeAddr :: FAST_STRING -> Size -> Addr -> Doc
 pprSizeAddr name size op
-  = uppBesides [
-    	uppChar '\t',
-	uppPStr name,
+  = hcat [
+    	char '\t',
+	ptext name,
     	pprSize size,
-	uppSP,
+	space,
 	pprAddr op
     ]
 
-pprSizeAddrReg :: FAST_STRING -> Size -> Addr -> Reg -> Unpretty
+pprSizeAddrReg :: FAST_STRING -> Size -> Addr -> Reg -> Doc
 pprSizeAddrReg name size op dst
-  = uppBesides [
-    	uppChar '\t',
-	uppPStr name,
+  = hcat [
+    	char '\t',
+	ptext name,
     	pprSize size,
-	uppSP,
+	space,
 	pprAddr op,
-	uppComma,
+	comma,
 	pprReg size dst
     ]
 
-pprOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Unpretty
+pprOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
 pprOpOp name size op1 op2
-  = uppBesides [
-    	uppChar '\t',
-	uppPStr name, uppSP,
+  = hcat [
+    	char '\t',
+	ptext name, space,
 	pprOperand size op1,
-	uppComma,
+	comma,
 	pprOperand size op2
     ]
 
-pprSizeOpOpCoerce :: FAST_STRING -> Size -> Size -> Operand -> Operand -> Unpretty
+pprSizeOpOpCoerce :: FAST_STRING -> Size -> Size -> Operand -> Operand -> Doc
 pprSizeOpOpCoerce name size1 size2 op1 op2
-  = uppBesides [ uppChar '\t', uppPStr name, uppSP,
+  = hcat [ char '\t', ptext name, space,
 	pprOperand size1 op1,
-	uppComma,
+	comma,
 	pprOperand size2 op2
     ]
 
-pprCondInstr :: FAST_STRING -> Cond -> Unpretty -> Unpretty
+pprCondInstr :: FAST_STRING -> Cond -> Doc -> Doc
 pprCondInstr name cond arg
-  = uppBesides [ uppChar '\t', uppPStr name, pprCond cond, uppSP, arg]
+  = hcat [ char '\t', ptext name, pprCond cond, space, arg]
 
 #endif {-i386_TARGET_ARCH-}
 \end{code}
@@ -1100,13 +1122,13 @@ pprCondInstr name cond arg
 -- a clumsy hack for now, to handle possible double alignment problems
 
 pprInstr (LD DF addr reg) | maybeToBool off_addr
-  = uppBesides [
+  = hcat [
 	pp_ld_lbracket,
 	pprAddr addr,
 	pp_rbracket_comma,
 	pprReg reg,
 
-	uppChar '\n',
+	char '\n',
 	pp_ld_lbracket,
 	pprAddr addr2,
 	pp_rbracket_comma,
@@ -1117,11 +1139,11 @@ pprInstr (LD DF addr reg) | maybeToBool off_addr
     addr2 = case off_addr of Just x -> x
 
 pprInstr (LD size addr reg)
-  = uppBesides [
-	uppPStr SLIT("\tld"),
+  = hcat [
+	ptext SLIT("\tld"),
 	pprSize size,
-	uppChar '\t',
-	uppLbrack,
+	char '\t',
+	lbrack,
 	pprAddr addr,
 	pp_rbracket_comma,
 	pprReg reg
@@ -1130,44 +1152,48 @@ pprInstr (LD size addr reg)
 -- The same clumsy hack as above
 
 pprInstr (ST DF reg addr) | maybeToBool off_addr
-  = uppBesides [
-	uppPStr SLIT("\tst\t"),
+  = hcat [
+	ptext SLIT("\tst\t"),
 	pprReg reg,
 	pp_comma_lbracket,
 	pprAddr addr,
 
-	uppPStr SLIT("]\n\tst\t"),
+	ptext SLIT("]\n\tst\t"),
 	pprReg (fPair reg),
 	pp_comma_lbracket,
 	pprAddr addr2,
-	uppRbrack
+	rbrack
     ]
   where
     off_addr = addrOffset addr 4
     addr2 = case off_addr of Just x -> x
 
+-- no distinction is made between signed and unsigned bytes on stores for the
+-- Sparc opcodes (at least I cannot see any, and gas is nagging me --SOF),
+-- so we call a special-purpose pprSize for ST..
+
 pprInstr (ST size reg addr)
-  = uppBesides [
-	uppPStr SLIT("\tst"),
-	pprSize size,
-	uppChar '\t',
+  = hcat [
+	ptext SLIT("\tst"),
+	pprStSize size,
+	char '\t',
 	pprReg reg,
 	pp_comma_lbracket,
 	pprAddr addr,
-	uppRbrack
+	rbrack
     ]
 
 pprInstr (ADD x cc reg1 ri reg2)
   | not x && not cc && riZero ri
-  = uppBesides [ uppPStr SLIT("\tmov\t"), pprReg reg1, uppComma, pprReg reg2 ]
+  = hcat [ ptext SLIT("\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
   | otherwise
   = pprRegRIReg (if x then SLIT("addx") else SLIT("add")) cc reg1 ri reg2
 
 pprInstr (SUB x cc reg1 ri reg2)
   | not x && cc && reg2 == g0
-  = uppBesides [ uppPStr SLIT("\tcmp\t"), pprReg reg1, uppComma, pprRI ri ]
+  = hcat [ ptext SLIT("\tcmp\t"), pprReg reg1, comma, pprRI ri ]
   | not x && not cc && riZero ri
-  = uppBesides [ uppPStr SLIT("\tmov\t"), pprReg reg1, uppComma, pprReg reg2 ]
+  = hcat [ ptext SLIT("\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
   | otherwise
   = pprRegRIReg (if x then SLIT("subx") else SLIT("sub")) cc reg1 ri reg2
 
@@ -1176,7 +1202,7 @@ pprInstr (ANDN b reg1 ri reg2) = pprRegRIReg SLIT("andn") b reg1 ri reg2
 
 pprInstr (OR b reg1 ri reg2)
   | not b && reg1 == g0
-  = uppBesides [ uppPStr SLIT("\tmov\t"), pprRI ri, uppComma, pprReg reg2 ]
+  = hcat [ ptext SLIT("\tmov\t"), pprRI ri, comma, pprReg reg2 ]
   | otherwise
   = pprRegRIReg SLIT("or") b reg1 ri reg2
 
@@ -1190,20 +1216,20 @@ pprInstr (SRL reg1 ri reg2) = pprRegRIReg SLIT("srl") False reg1 ri reg2
 pprInstr (SRA reg1 ri reg2) = pprRegRIReg SLIT("sra") False reg1 ri reg2
 
 pprInstr (SETHI imm reg)
-  = uppBesides [
-	uppPStr SLIT("\tsethi\t"),
+  = hcat [
+	ptext SLIT("\tsethi\t"),
 	pprImm imm,
-	uppComma,
+	comma,
 	pprReg reg
     ]
 
-pprInstr NOP = uppPStr SLIT("\tnop")
+pprInstr NOP = ptext SLIT("\tnop")
 
 pprInstr (FABS F reg1 reg2) = pprSizeRegReg SLIT("fabs") F reg1 reg2
 pprInstr (FABS DF reg1 reg2)
-  = uppBeside (pprSizeRegReg SLIT("fabs") F reg1 reg2)
-    (if (reg1 == reg2) then uppNil
-     else uppBeside (uppChar '\n')
+  = (<>) (pprSizeRegReg SLIT("fabs") F reg1 reg2)
+    (if (reg1 == reg2) then empty
+     else (<>) (char '\n')
     	  (pprSizeRegReg SLIT("fmov") F (fPair reg1) (fPair reg2)))
 
 pprInstr (FADD size reg1 reg2 reg3)
@@ -1215,9 +1241,9 @@ pprInstr (FDIV size reg1 reg2 reg3)
 
 pprInstr (FMOV F reg1 reg2) = pprSizeRegReg SLIT("fmov") F reg1 reg2
 pprInstr (FMOV DF reg1 reg2)
-  = uppBeside (pprSizeRegReg SLIT("fmov") F reg1 reg2)
-    (if (reg1 == reg2) then uppNil
-     else uppBeside (uppChar '\n')
+  = (<>) (pprSizeRegReg SLIT("fmov") F reg1 reg2)
+    (if (reg1 == reg2) then empty
+     else (<>) (char '\n')
     	  (pprSizeRegReg SLIT("fmov") F (fPair reg1) (fPair reg2)))
 
 pprInstr (FMUL size reg1 reg2 reg3)
@@ -1225,114 +1251,114 @@ pprInstr (FMUL size reg1 reg2 reg3)
 
 pprInstr (FNEG F reg1 reg2) = pprSizeRegReg SLIT("fneg") F reg1 reg2
 pprInstr (FNEG DF reg1 reg2)
-  = uppBeside (pprSizeRegReg SLIT("fneg") F reg1 reg2)
-    (if (reg1 == reg2) then uppNil
-     else uppBeside (uppChar '\n')
+  = (<>) (pprSizeRegReg SLIT("fneg") F reg1 reg2)
+    (if (reg1 == reg2) then empty
+     else (<>) (char '\n')
     	  (pprSizeRegReg SLIT("fmov") F (fPair reg1) (fPair reg2)))
 
 pprInstr (FSQRT size reg1 reg2)     = pprSizeRegReg SLIT("fsqrt") size reg1 reg2
 pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("fsub") size reg1 reg2 reg3
 pprInstr (FxTOy size1 size2 reg1 reg2)
-  = uppBesides [
-    	uppPStr SLIT("\tf"),
-	uppPStr
+  = hcat [
+    	ptext SLIT("\tf"),
+	ptext
     	(case size1 of
     	    W  -> SLIT("ito")
     	    F  -> SLIT("sto")
     	    DF -> SLIT("dto")),
-	uppPStr
+	ptext
     	(case size2 of
     	    W  -> SLIT("i\t")
     	    F  -> SLIT("s\t")
     	    DF -> SLIT("d\t")),
-	pprReg reg1, uppComma, pprReg reg2
+	pprReg reg1, comma, pprReg reg2
     ]
 
 
 pprInstr (BI cond b lab)
-  = uppBesides [
-	uppPStr SLIT("\tb"), pprCond cond,
-	if b then pp_comma_a else uppNil,
-	uppChar '\t',
+  = hcat [
+	ptext SLIT("\tb"), pprCond cond,
+	if b then pp_comma_a else empty,
+	char '\t',
 	pprImm lab
     ]
 
 pprInstr (BF cond b lab)
-  = uppBesides [
-	uppPStr SLIT("\tfb"), pprCond cond,
-	if b then pp_comma_a else uppNil,
-	uppChar '\t',
+  = hcat [
+	ptext SLIT("\tfb"), pprCond cond,
+	if b then pp_comma_a else empty,
+	char '\t',
 	pprImm lab
     ]
 
-pprInstr (JMP addr) = uppBeside (uppPStr SLIT("\tjmp\t")) (pprAddr addr)
+pprInstr (JMP addr) = (<>) (ptext SLIT("\tjmp\t")) (pprAddr addr)
 
 pprInstr (CALL imm n _)
-  = uppBesides [ uppPStr SLIT("\tcall\t"), pprImm imm, uppComma, uppInt n ]
+  = hcat [ ptext SLIT("\tcall\t"), pprImm imm, comma, int n ]
 \end{code}
 
 Continue with SPARC-only printing bits and bobs:
 \begin{code}
-pprRI :: RI -> Unpretty
+pprRI :: RI -> Doc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Unpretty
+pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Doc
 pprSizeRegReg name size reg1 reg2
-  = uppBesides [
-    	uppChar '\t',
-	uppPStr name,
+  = hcat [
+    	char '\t',
+	ptext name,
     	(case size of
-    	    F  -> uppPStr SLIT("s\t")
-    	    DF -> uppPStr SLIT("d\t")),
+    	    F  -> ptext SLIT("s\t")
+    	    DF -> ptext SLIT("d\t")),
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Unpretty
+pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
-  = uppBesides [
-    	uppChar '\t',
-	uppPStr name,
+  = hcat [
+    	char '\t',
+	ptext name,
     	(case size of
-    	    F  -> uppPStr SLIT("s\t")
-    	    DF -> uppPStr SLIT("d\t")),
+    	    F  -> ptext SLIT("s\t")
+    	    DF -> ptext SLIT("d\t")),
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprReg reg2,
-	uppComma,
+	comma,
 	pprReg reg3
     ]
 
-pprRegRIReg :: FAST_STRING -> Bool -> Reg -> RI -> Reg -> Unpretty
+pprRegRIReg :: FAST_STRING -> Bool -> Reg -> RI -> Reg -> Doc
 pprRegRIReg name b reg1 ri reg2
-  = uppBesides [
-	uppChar '\t',
-	uppPStr name,
-	if b then uppPStr SLIT("cc\t") else uppChar '\t',
+  = hcat [
+	char '\t',
+	ptext name,
+	if b then ptext SLIT("cc\t") else char '\t',
 	pprReg reg1,
-	uppComma,
+	comma,
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg2
     ]
 
-pprRIReg :: FAST_STRING -> Bool -> RI -> Reg -> Unpretty
+pprRIReg :: FAST_STRING -> Bool -> RI -> Reg -> Doc
 pprRIReg name b ri reg1
-  = uppBesides [
-	uppChar '\t',
-	uppPStr name,
-	if b then uppPStr SLIT("cc\t") else uppChar '\t',
+  = hcat [
+	char '\t',
+	ptext name,
+	if b then ptext SLIT("cc\t") else char '\t',
 	pprRI ri,
-	uppComma,
+	comma,
 	pprReg reg1
     ]
 
-pp_ld_lbracket    = uppPStr (pACK_STR (a_HASH "\tld\t["#))
-pp_rbracket_comma = uppPStr (pACK_STR (a_HASH "],"#))
-pp_comma_lbracket = uppPStr (pACK_STR (a_HASH ",["#))
-pp_comma_a	  = uppPStr (pACK_STR (a_HASH ",a"#))
+pp_ld_lbracket    = ptext (pACK_STR (a_HASH "\tld\t["#))
+pp_rbracket_comma = ptext (pACK_STR (a_HASH "],"#))
+pp_comma_lbracket = ptext (pACK_STR (a_HASH ",["#))
+pp_comma_a	  = ptext (pACK_STR (a_HASH ",a"#))
 
 #endif {-sparc_TARGET_ARCH-}
 \end{code}

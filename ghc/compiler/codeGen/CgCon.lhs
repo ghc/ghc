@@ -41,11 +41,11 @@ import ClosureInfo	( mkClosureLFInfo, mkConLFInfo, mkLFArgument,
 			  layOutStaticClosure
 			)
 import CostCentre	( currentOrSubsumedCosts, useCurrentCostCentre,
-			  dontCareCostCentre
+			  dontCareCostCentre, CostCentre
 			)
 import Id		( idPrimRep, dataConTag, dataConTyCon,
 			  isDataCon, SYN_IE(DataCon),
-			  emptyIdSet
+			  emptyIdSet, SYN_IE(Id)
 			)
 import Literal		( Literal(..) )
 import Maybes		( maybeToBool )

@@ -67,9 +67,7 @@ analyser.
 cvBinds :: SrcFile -> SigConverter -> RdrBinding -> RdrNameHsBinds
 cvBinds sf sig_cvtr binding
   = case (cvMonoBindsAndSigs sf sig_cvtr binding) of { (mbs, sigs) ->
-    if (null sigs)
-    then SingleBind (RecBind mbs)
-    else BindWith   (RecBind mbs) sigs
+    MonoBind mbs sigs recursive
     }
 \end{code}
 
@@ -182,7 +180,7 @@ cvMatch sf is_case rdr_match
 	  RdrMatch_NoGuard ln b c expr    d -> (c,d, [OtherwiseGRHS expr (mkSrcLoc sf ln)])
 	  RdrMatch_Guards  ln b c gd_exps d -> (c,d, map (cvGRHS sf ln) gd_exps)
 
-cvGRHS :: SrcFile -> SrcLine -> (RdrNameHsExpr, RdrNameHsExpr) -> RdrNameGRHS
+cvGRHS :: SrcFile -> SrcLine -> ([RdrNameStmt], RdrNameHsExpr) -> RdrNameGRHS
 cvGRHS sf sl (g, e) = GRHS g e (mkSrcLoc sf sl)
 \end{code}
 

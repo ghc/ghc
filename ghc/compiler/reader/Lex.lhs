@@ -19,7 +19,7 @@ module Lex (
     ) where
 
 
-IMPORT_1_3(Char(isDigit, isAlpha, isAlphanum, isUpper))
+IMPORT_1_3(Char(isDigit, isAlpha, isAlphanum, isUpper,isLower, isSpace, ord))
 IMPORT_DELOOPER(Ubiq)
 IMPORT_DELOOPER(IdLoop)    -- get the CostCentre type&constructors from here
 
@@ -27,9 +27,12 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
 --import FiniteMap	( FiniteMap, listToFM, lookupFM )
+#if __GLASGOW_HASKELL__ >= 202
+import Maybes		( MaybeErr(..) )
+#else
 import Maybes		( Maybe(..), MaybeErr(..) )
+#endif
 import Pretty
-import CharSeq		( CSeq )
 
 
 
@@ -41,8 +44,11 @@ import Util		( nOfThem, panic )
 import FastString
 import StringBuffer
 
+#if __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST 
-
+#else
+import GlaExts
+#endif
 \end{code}
 
 %************************************************************************
@@ -302,8 +308,7 @@ lexIface buf =
 		            lex_demand (stepOnUntil (not . isSpace) 
 			                            (stepOnBy# buf 3#)) -- past _S_
 	   's'# -> case prefixMatch (stepOnBy# buf 2#) "cc_" of
-		     Just buf' -> lex_scc (stepOnUntil (not . isSpace) 
-		     				       (stepOverLexeme buf'))
+		     Just buf' -> lex_scc (stepOnUntil (not . isSpace) (stepOverLexeme buf'))
 		     Nothing   -> lex_keyword (stepOnBy# buf 1#) -- drop the '_' and assume
 								 -- it is a keyword.
 	   _    -> lex_keyword (stepOn buf)
@@ -374,7 +379,7 @@ lex_scc buf =
                  Just buf' ->
 	          case untilChar# (stepOverLexeme buf') '\"'# of
 	           buf'' -> ITscc (mkAllCafsCC ({-module-}lexemeToFastString buf'') _NIL_): 
-	                    lexIface (stepOverLexeme buf'')
+	                    lexIface (stepOn (stepOverLexeme buf''))
                  Nothing ->
                   case prefixMatch (stepOn buf) "DICTs_in_...\"" of
                    Just buf' -> ITscc (preludeDictsCostCentre True) : lexIface (stepOverLexeme buf')
@@ -383,17 +388,17 @@ lex_scc buf =
                      Just buf' ->
 	              case untilChar# (stepOverLexeme buf') '\"'# of
 	               buf'' -> ITscc (mkAllDictsCC (lexemeToFastString buf'') _NIL_ True): 
-	                        lexIface (stepOverLexeme buf'')
+	                        lexIface (stepOn (stepOverLexeme buf''))
                      Nothing ->
                       case prefixMatch (stepOn buf) "CAF:" of
                        Just buf' ->		  
 	                case untilChar# (stepOverLexeme buf') '\"'# of
 	                 buf'' -> ITscc (cafifyCC (mkUserCC (lexemeToFastString buf'') _NIL_ _NIL_)): 
-	                          lexIface (stepOverLexeme buf'')
+	                          lexIface (stepOn (stepOverLexeme buf''))
                        Nothing ->
 	                case untilChar# (stepOn buf) '\"'# of
 	                   buf' -> ITscc (mkUserCC (lexemeToFastString buf') _NIL_ _NIL_): 
-	                           lexIface (stepOverLexeme buf')
+                                   lexIface (stepOn (stepOverLexeme buf'))
   c -> ITunknown [C# c] : lexIface (stepOn buf)
 
 
@@ -526,12 +531,12 @@ is_id_char (C# c#) =
 
 is_sym c#=
  case c# of {
-   ':'# -> True; '_'# -> True; '\''# -> True; '!'# -> True; 
-   '#'# -> True; '$'# -> True; ':'# -> True;  '%'# -> True; 
-   '&'# -> True; '*'# -> True; '+'# -> True; '.'# -> True; 
-   '/'# -> True; '<'# -> True; '='# -> True; '>'# -> True; 
-   '?'# -> True; '\\'# -> True; '^'# -> True; '|'# -> True; 
-   '-'# -> True; '~'# -> True; '@'# -> True; _ -> False }
+   ':'# -> True; '_'#  -> True; '\''# -> True; '!'# -> True; 
+   '#'# -> True; '$'#  -> True; ':'#  -> True; '%'# -> True; 
+   '&'# -> True; '*'#  -> True; '+'#  -> True; '.'# -> True; 
+   '/'# -> True; '<'#  -> True; '='#  -> True; '>'# -> True; 
+   '?'# -> True; '\\'# -> True; '^'#  -> True; '|'# -> True; 
+   '-'# -> True; '~'#  -> True; '@'#  -> True; _    -> False }
 
 --isAlphanum c || c `elem` ":_'!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
 
@@ -706,6 +711,7 @@ ifaceKeywordsFM = listToUFM $
       map (\ (x,y) -> (_PK_ x,y))
        [("/\\_",		ITbiglam)
        ,("@_",			ITatsign)
+       ,("letrec_",		ITletrec)
        ,("interface_",	 	ITinterface)
        ,("usages_",		ITusages)
        ,("versions_",		ITversions)
@@ -749,7 +755,6 @@ haskellKeywordsFM = listToUFM $
        ,("of",			ITof)
        ,("in",			ITin)
        ,("let",			ITlet)
-       ,("letrec",		ITletrec)
        ,("deriving",		ITderiving)
 
        ,("->",			ITrarrow)
@@ -774,9 +779,20 @@ doDiscard inStr buf =
      else
        doDiscard inStr (incLexeme buf)
    '"'# ->
+       let
+        odd_slashes buf flg i# =
+          case lookAhead# buf i# of
+	   '\\'# -> odd_slashes buf (not flg) (i# -# 1#)
+	   _     -> flg
+       in
        case lookAhead# buf (negateInt# 1#) of --backwards, actually
-	 '\\'# -> -- false alarm, escaped. 
-	    doDiscard inStr (incLexeme buf)
+	 '\\'# -> -- escaping something..
+	   if odd_slashes buf True (negateInt# 2#) then
+	       -- odd number of slashes, " is escaped.
+	      doDiscard inStr (incLexeme buf)
+	   else
+	       -- even number of slashes, \ is escaped.
+	      doDiscard (not inStr) (incLexeme buf)
          _ -> case inStr of -- forced to avoid build-up
 	       True  -> doDiscard False (incLexeme buf)
                False -> doDiscard True  (incLexeme buf)
@@ -822,5 +838,5 @@ happyError ln toks = Failed (ifaceParseErr ln toks)
 -----------------------------------------------------------------
 
 ifaceParseErr ln toks sty
-  = ppCat [ppPStr SLIT("Interface-file parse error: line"), ppInt ln, ppPStr SLIT("toks="), ppStr (show (take 10 toks))]
+  = hsep [ptext SLIT("Interface-file parse error: line"), int ln, ptext SLIT("toks="), text (show (take 10 toks))]
 \end{code}

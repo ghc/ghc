@@ -1,0 +1,6 @@
+_interface_ Unique 1
+_exports_
+Unique Unique mkUniqueGrimily;
+_declarations_
+1 data Unique;
+1 mkUniqueGrimily _:_ GHC.Int# -> Unique.Unique ;;

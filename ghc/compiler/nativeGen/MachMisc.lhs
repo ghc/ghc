@@ -48,11 +48,21 @@ IMPORT_1_3(Char(isDigit))
 
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )
+import CLabel           ( CLabel )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Literal		( mkMachInt, Literal(..) )
 import MachRegs		( stgReg, callerSaves, RegLoc(..),
-			  Imm(..), Reg(..), Addr
+			  Imm(..), Reg(..)
+#if __GLASGOW_HASKELL__ >= 202
+		        )
+import qualified MachRegs (Addr)
+#define MachRegsAddr MachRegs.Addr
+#else
+			, Addr(..)
 			)
+#define MachRegsAddr Addr
+#endif
+
 import OrdList		( OrdList )
 import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
@@ -436,12 +446,12 @@ data Instr
 
 -- Loads and stores.
 
-	      |	LD	      Size Reg Addr -- size, dst, src
-	      | LDA	      Reg Addr	    -- dst, src
-	      | LDAH	      Reg Addr	    -- dst, src
-	      | LDGP	      Reg Addr	    -- dst, src
+	      |	LD	      Size Reg MachRegsAddr -- size, dst, src
+	      | LDA	      Reg MachRegsAddr	    -- dst, src
+	      | LDAH	      Reg MachRegsAddr	    -- dst, src
+	      | LDGP	      Reg MachRegsAddr	    -- dst, src
 	      | LDI	      Size Reg Imm  -- size, dst, src
-	      | ST	      Size Reg Addr -- size, src, dst
+	      | ST	      Size Reg MachRegsAddr -- size, src, dst
 
 -- Int Arithmetic.
 
@@ -496,9 +506,9 @@ data Instr
 	      | BI	      Cond Reg Imm
 	      | BF	      Cond Reg Imm
 	      | BR	      Imm
-	      | JMP	      Reg Addr Int
+	      | JMP	      Reg MachRegsAddr Int
 	      | BSR	      Imm Int
-	      | JSR	      Reg Addr Int
+	      | JSR	      Reg MachRegsAddr Int
 
 -- Alpha-specific pseudo-ops.
 
@@ -559,25 +569,25 @@ data RI
     	      | FABS
 	      | FADD	      Size Operand -- src
 	      | FADDP
-	      | FIADD	      Size Addr -- src
+	      | FIADD	      Size MachRegsAddr -- src
     	      | FCHS
     	      | FCOM	      Size Operand -- src
     	      | FCOS
 	      | FDIV	      Size Operand -- src
 	      | FDIVP
-	      | FIDIV	      Size Addr -- src
+	      | FIDIV	      Size MachRegsAddr -- src
 	      | FDIVR	      Size Operand -- src
 	      | FDIVRP
-	      | FIDIVR	      Size Addr -- src
-    	      | FICOM	      Size Addr -- src
-    	      | FILD	      Size Addr Reg -- src, dst
-    	      | FIST	      Size Addr -- dst
+	      | FIDIVR	      Size MachRegsAddr -- src
+    	      | FICOM	      Size MachRegsAddr -- src
+    	      | FILD	      Size MachRegsAddr Reg -- src, dst
+    	      | FIST	      Size MachRegsAddr -- dst
     	      | FLD	      Size Operand -- src
     	      | FLD1
     	      | FLDZ
     	      | FMUL	      Size Operand -- src
     	      | FMULP
-    	      | FIMUL	      Size Addr -- src
+    	      | FIMUL	      Size MachRegsAddr -- src
     	      | FRNDINT
     	      | FSIN
     	      | FSQRT
@@ -585,10 +595,10 @@ data RI
     	      | FSTP	      Size Operand -- dst
 	      | FSUB	      Size Operand -- src
 	      | FSUBP
-	      | FISUB	      Size Addr -- src
+	      | FISUB	      Size MachRegsAddr -- src
 	      | FSUBR	      Size Operand -- src
 	      | FSUBRP
-	      | FISUBR	      Size Addr -- src
+	      | FISUBR	      Size MachRegsAddr -- src
 	      | FTST
     	      | FCOMP	      Size Operand -- src
     	      | FUCOMPP
@@ -618,9 +628,9 @@ data RI
 	      | CLTD -- sign extend %eax into %edx:%eax
 
 data Operand
-  = OpReg  Reg	-- register
-  | OpImm  Imm	-- immediate value
-  | OpAddr Addr	-- memory reference
+  = OpReg  Reg	        -- register
+  | OpImm  Imm	        -- immediate value
+  | OpAddr MachRegsAddr	-- memory reference
 
 #endif {- i386_TARGET_ARCH -}
 \end{code}
@@ -632,8 +642,8 @@ data Operand
 
 -- Loads and stores.
 
-	      | LD	      Size Addr Reg -- size, src, dst
-	      | ST	      Size Reg Addr -- size, src, dst
+	      | LD	      Size MachRegsAddr Reg -- size, src, dst
+	      | ST	      Size Reg MachRegsAddr -- size, src, dst
 
 -- Int Arithmetic.
 
@@ -675,7 +685,7 @@ data Operand
 	      | BI	      Cond Bool Imm -- cond, annul?, target
     	      | BF  	      Cond Bool Imm -- cond, annul?, target
 
-	      | JMP	      Addr -- target
+	      | JMP	      MachRegsAddr -- target
 	      | CALL	      Imm Int Bool -- target, args, terminal
 
 data RI = RIReg Reg

@@ -10,25 +10,36 @@ module ReadPrefix ( rdModule )  where
 
 IMP_Ubiq()
 IMPORT_1_3(IO(hPutStr, stderr))
-IMPORT_1_3(GHCio(stThen))
+#if __GLASGOW_HASKELL__ == 201
+import GHCio(stThen)
+#elif __GLASGOW_HASKELL__ >= 202
+import GlaExts
+import IOBase
+import PrelRead
+#endif
 
 import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
 import HsSyn
 import HsTypes		( HsTyVar(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas, noGenPragmas )
-import RdrHsSyn
+import RdrHsSyn         
 import PrefixToHs
 
 import ErrUtils		( addErrLoc, ghcExit )
 import FiniteMap	( elemFM, FiniteMap )
-import Name		( RdrName(..), OccName(..) )
+import Name		( OccName(..), SYN_IE(Module) )
 import Lex		( isLexConId )
 import PprStyle		( PprStyle(..) )
 import PrelMods
 import Pretty
 import SrcLoc		( mkGeneratedSrcLoc, noSrcLoc, SrcLoc )
 import Util		( nOfThem, pprError, panic )
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
+
 \end{code}
 
 %************************************************************************
@@ -91,19 +102,19 @@ cvFlag 1 = True
 %************************************************************************
 
 \begin{code}
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 # define PACK_STR packCString
-# define CCALL_THEN `stThen`
+#elif __GLASGOW_HASKELL__ >= 202
+# define PACK_STR mkFastCharString
 #else
 # define PACK_STR mkFastCharString
-# define CCALL_THEN `thenPrimIO`
 #endif
 
 rdModule :: IO (Module,		    -- this module's name
 	        RdrNameHsModule)    -- the main goods
 
 rdModule
-  = _ccall_ hspmain CCALL_THEN \ pt -> -- call the Yacc parser!
+  = _ccall_ hspmain `CCALL_THEN` \ pt -> -- call the Yacc parser!
     let
 	srcfile  = PACK_STR ``input_filename'' -- What A Great Hack! (TM)
     in
@@ -248,34 +259,9 @@ wlkExpr expr
 
       U_comprh cexp cquals -> -- list comprehension
 	wlkExpr cexp		`thenUgn` \ expr  ->
-	wlkList rd_qual cquals	`thenUgn` \ quals ->
+	wlkQuals cquals 	`thenUgn` \ quals ->
 	getSrcLocUgn 		`thenUgn` \ loc ->
 	returnUgn (HsDo ListComp (quals ++ [ReturnStmt expr]) loc)
-	where
-	  rd_qual pt
-	    = rdU_tree pt	`thenUgn` \ qual ->
-	      wlk_qual qual
-
-	  wlk_qual qual
-	    = case qual of
-		U_guard exp ->
-		  wlkExpr exp  	`thenUgn` \ expr ->
-		  getSrcLocUgn 	`thenUgn` \ loc ->
-		  returnUgn (GuardStmt expr loc)
-
-		U_qual qpat qexp ->
-		  wlkPat  qpat  `thenUgn` \ pat  ->
-		  wlkExpr qexp  `thenUgn` \ expr ->
-		  getSrcLocUgn 	`thenUgn` \ loc ->
-		  returnUgn (BindStmt pat expr loc)
-
-		U_seqlet seqlet ->
-		  wlkBinding seqlet	`thenUgn` \ bs ->
-		  getSrcFileUgn		`thenUgn` \ sf ->
-		  let
-		      binds = cvBinds sf cvValSig bs
-		  in
-		  returnUgn (LetStmt binds)
 
       U_eenum efrom estep eto -> -- arithmetic sequence
 	wlkExpr efrom		`thenUgn` \ e1  ->
@@ -363,6 +349,34 @@ rdRbind pt
 	Nothing -> (rvar, HsVar rvar, True{-pun-})
 	Just re -> (rvar, re,	      False)
     )
+
+wlkQuals cquals
+  = wlkList rd_qual cquals
+  where
+	  rd_qual pt
+	    = rdU_tree pt	`thenUgn` \ qual ->
+	      wlk_qual qual
+
+	  wlk_qual qual
+	    = case qual of
+		U_guard exp ->
+		  wlkExpr exp  	`thenUgn` \ expr ->
+		  getSrcLocUgn 	`thenUgn` \ loc ->
+		  returnUgn (GuardStmt expr loc)
+
+		U_qual qpat qexp ->
+		  wlkPat  qpat  `thenUgn` \ pat  ->
+		  wlkExpr qexp  `thenUgn` \ expr ->
+		  getSrcLocUgn 	`thenUgn` \ loc ->
+		  returnUgn (BindStmt pat expr loc)
+
+		U_seqlet seqlet ->
+		  wlkBinding seqlet	`thenUgn` \ bs ->
+		  getSrcFileUgn		`thenUgn` \ sf ->
+		  let
+		      binds = cvBinds sf cvValSig bs
+		  in
+		  returnUgn (LetStmt binds)
 \end{code}
 
 Patterns: just bear in mind that lists of patterns are represented as
@@ -418,12 +432,15 @@ wlkPat pat
 	    _ -> getSrcLocUgn 	`thenUgn` \ loc ->
 		 let
 		     err = addErrLoc loc "Illegal pattern `application'"
-			             (\sty -> ppInterleave ppSP (map (ppr sty) (lpat:lpats)))
-		     msg = ppShow 100 (err PprForUser)
+			             (\sty -> hsep (map (ppr sty) (lpat:lpats)))
+		     msg = show (err PprForUser)
 		 in
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 	         ioToUgnM  (GHCbase.ioToPrimIO (hPutStr stderr msg)) `thenUgn` \ _ ->
 		 ioToUgnM  (GHCbase.ioToPrimIO (ghcExit 1))	     `thenUgn` \ _ ->
+#elif __GLASGOW_HASKELL__ >= 202
+	         ioToUgnM  (IOBase.ioToPrimIO (hPutStr stderr msg)) `thenUgn` \ _ ->
+		 ioToUgnM  (IOBase.ioToPrimIO (ghcExit 1))	     `thenUgn` \ _ ->
 #else
 	         ioToUgnM  (hPutStr stderr msg) `thenUgn` \ _ ->
 		 ioToUgnM  (ghcExit 1)		`thenUgn` \ _ ->
@@ -496,8 +513,10 @@ wlkLiteral ulit
   where
     as_char s     = _HEAD_ s
     as_integer s  = readInteger (_UNPK_ s)
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
     as_rational s = GHCbase.readRational__ (_UNPK_ s) -- non-std
+#elif __GLASGOW_HASKELL__ >= 202
+    as_rational s = case readRational (_UNPK_ s) of { [(a,_)] -> a } -- ToDo, use non-std readRational__
 #else
     as_rational s = _readRational (_UNPK_ s) -- non-std
 #endif
@@ -532,16 +551,16 @@ wlkBinding binding
 	wlkTyConAndTyVars  ttype    `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  tcons    `thenUgn` \ cons	    ->
 	wlkDerivings	   tderivs  `thenUgn` \ derivings   ->
-	returnUgn (RdrTyDecl (TyData ctxt tycon tyvars cons derivings noDataPragmas src_loc))
+	returnUgn (RdrTyDecl (TyData DataType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
 
 	-- "newtype" declaration
       U_ntbind ntctxt nttype ntcon ntderivs srcline ->
 	mkSrcLocUgn	   srcline  	    $ \ src_loc	    ->
 	wlkContext	   ntctxt   `thenUgn` \ ctxt	    ->
 	wlkTyConAndTyVars  nttype   `thenUgn` \ (tycon, tyvars) ->
-	wlkList rdConDecl  ntcon    `thenUgn` \ [con]	    ->
+	wlkList rdConDecl  ntcon    `thenUgn` \ cons	    ->
 	wlkDerivings	   ntderivs `thenUgn` \ derivings   ->
-	returnUgn (RdrTyDecl (TyNew ctxt tycon tyvars con derivings noDataPragmas src_loc))
+	returnUgn (RdrTyDecl (TyData NewType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
 
 	-- "type" declaration
       U_nbind nbindid nbindas srcline -> 		
@@ -697,6 +716,12 @@ wlkHsType ttype
 
 wlkMonoType ttype
   = case ttype of
+		-- Glasgow extension: nested polymorhism
+      U_context tcontextl tcontextt -> -- context
+	wlkContext  tcontextl	`thenUgn` \ ctxt ->
+	wlkMonoType tcontextt	`thenUgn` \ ty	 ->
+	returnUgn (HsPreForAllTy ctxt ty)
+
       U_namedtvar tv -> -- type variable
 	wlkTvId tv	`thenUgn` \ tyvar ->
 	returnUgn (MonoTyVar tyvar)
@@ -765,30 +790,35 @@ rdConDecl pt
 
 wlkConDecl :: U_constr -> UgnM RdrNameConDecl
 
+wlkConDecl (U_constrcxt ccxt ccdecl)
+  = wlkContext ccxt		`thenUgn` \ theta ->
+    wlkConDecl ccdecl		`thenUgn` \ (ConDecl con _ details loc) ->
+    returnUgn (ConDecl con theta details loc)
+
 wlkConDecl (U_constrpre ccon ctys srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkDataId	ccon		`thenUgn` \ con	    ->
     wlkList     rdBangType ctys	`thenUgn` \ tys	    ->
-    returnUgn (ConDecl con tys src_loc)
+    returnUgn (ConDecl con [] (VanillaCon tys) src_loc)
 
 wlkConDecl (U_constrinf cty1 cop cty2 srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkBangType cty1		`thenUgn` \ ty1	    ->
     wlkDataId	cop		`thenUgn` \ op	    ->
     wlkBangType cty2		`thenUgn` \ ty2	    ->
-    returnUgn (ConOpDecl ty1 op ty2 src_loc)
+    returnUgn (ConDecl op [] (InfixCon ty1 ty2) src_loc)
 
 wlkConDecl (U_constrnew ccon cty srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkDataId	ccon		`thenUgn` \ con	    ->
     wlkMonoType cty		`thenUgn` \ ty	    ->
-    returnUgn (NewConDecl con ty src_loc)
+    returnUgn (ConDecl con [] (NewCon ty) src_loc)
 
 wlkConDecl (U_constrrec ccon cfields srcline)
   = mkSrcLocUgn srcline			$ \ src_loc      ->
     wlkDataId	ccon		`thenUgn` \ con		 ->
     wlkList rd_field cfields	`thenUgn` \ fields_lists ->
-    returnUgn (RecConDecl con fields_lists src_loc)
+    returnUgn (ConDecl con [] (RecCon fields_lists) src_loc)
   where
     rd_field :: ParseTree -> UgnM ([RdrName], BangType RdrName)
     rd_field pt
@@ -836,7 +866,7 @@ rdMatch pt
   where
     rd_gd_expr pt
       = rdU_pbinding pt `thenUgn` \ (U_pgdexp g e) ->
-	wlkExpr      g  `thenUgn` \ guard ->
+	wlkQuals     g  `thenUgn` \ guard ->
 	wlkExpr	     e  `thenUgn` \ expr  ->
 	returnUgn (guard, expr)
 \end{code}

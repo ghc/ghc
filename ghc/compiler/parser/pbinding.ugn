@@ -26,6 +26,7 @@ type pbinding;
 
 	pnoguards : < gpnoguard : tree; >;
 	pguards   : < gpguards  : list; >;
-	pgdexp	  : < gpguard	: tree;
+
+	pgdexp	  : < gpguard	: list;		/* Experimental change: guards are lists of quals */
 	              gpexp     : tree; >;
 end;

@@ -9,7 +9,7 @@
 module PrelVals where
 
 IMP_Ubiq()
-IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..), nullSpecEnv, SpecEnv )
+IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..), mkUnfolding, nullSpecEnv, SpecEnv )
 import Id		( SYN_IE(Id), GenId, mkImported, mkTemplateLocals )
 IMPORT_DELOOPER(PrelLoop)
 
@@ -23,17 +23,24 @@ import CmdLineOpts	( maybe_CompilingGhcInternals )
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
 import Literal		( mkMachInt )
-import Name		( mkWiredInIdName )
+import Name		( mkWiredInIdName, SYN_IE(Module) )
 import PragmaInfo
 import PrimOp		( PrimOp(..) )
+#if __GLASGOW_HASKELL__ >= 202
+import Type		
+#else
 import Type		( mkTyVarTy )
-import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar )
+#endif
+import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar, SYN_IE(TyVar) )
 import Unique		-- lots of *Keys
 import Util		( panic )
 \end{code}
 
 \begin{code}
 -- only used herein:
+
+mk_inline_unfolding = mkUnfolding IWantToBeINLINEd
+
 pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
 
 pcMiscPrelId key mod occ ty info
@@ -211,7 +218,7 @@ integerMinusOneId
 seqId = pcMiscPrelId seqIdKey pRELUDE SLIT("seq")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True seq_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding seq_template))
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -246,7 +253,7 @@ seqId = pcMiscPrelId seqIdKey pRELUDE SLIT("seq")
 parId = pcMiscPrelId parIdKey cONC_BASE SLIT("par")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True par_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding par_template))
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -269,7 +276,7 @@ parId = pcMiscPrelId parIdKey cONC_BASE SLIT("par")
 forkId = pcMiscPrelId forkIdKey cONC_BASE SLIT("fork")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True fork_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding fork_template))
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -293,7 +300,7 @@ GranSim ones:
 parLocalId = pcMiscPrelId parLocalIdKey cONC_BASE SLIT("parLocal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parLocal_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parLocal_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, x, y, z]
@@ -317,7 +324,7 @@ parLocalId = pcMiscPrelId parLocalIdKey cONC_BASE SLIT("parLocal")
 parGlobalId = pcMiscPrelId parGlobalIdKey cONC_BASE SLIT("parGlobal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parGlobal_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parGlobal_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, x, y, z]
@@ -343,7 +350,7 @@ parAtId = pcMiscPrelId parAtIdKey cONC_BASE SLIT("parAt")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
 		               alphaTy, betaTy, gammaTy] gammaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parAt_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parAt_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -368,7 +375,7 @@ parAtId = pcMiscPrelId parAtIdKey cONC_BASE SLIT("parAt")
 parAtAbsId = pcMiscPrelId parAtAbsIdKey cONC_BASE SLIT("parAtAbs")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parAtAbs_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parAtAbs_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -393,7 +400,7 @@ parAtAbsId = pcMiscPrelId parAtAbsIdKey cONC_BASE SLIT("parAtAbs")
 parAtRelId = pcMiscPrelId parAtRelIdKey cONC_BASE SLIT("parAtRel")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parAtRel_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parAtRel_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -419,7 +426,7 @@ parAtForNowId = pcMiscPrelId parAtForNowIdKey cONC_BASE SLIT("parAtForNow")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
 				alphaTy, betaTy, gammaTy] gammaTy))
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parAtForNow_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parAtForNow_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -447,7 +454,7 @@ parAtForNowId = pcMiscPrelId parAtForNowIdKey cONC_BASE SLIT("parAtForNow")
 copyableId = pcMiscPrelId copyableIdKey cONC_BASE SLIT("copyable")
 		  (mkSigmaTy [alphaTyVar] []
 		    alphaTy)
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True copyable_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding copyable_template))
   where
     -- Annotations: x: closure that's tagged to by copyable
     [x, z]
@@ -462,7 +469,7 @@ copyableId = pcMiscPrelId copyableIdKey cONC_BASE SLIT("copyable")
 noFollowId = pcMiscPrelId noFollowIdKey cONC_BASE SLIT("noFollow")
 		  (mkSigmaTy [alphaTyVar] []
 		    alphaTy)
-		  (noIdInfo `addUnfoldInfo` (mkUnfolding True noFollow_template))
+		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding noFollow_template))
   where
     -- Annotations: x: closure that's tagged to not follow
     [x, z]
@@ -511,7 +518,7 @@ runSTId
 	`addArityInfo` exactArity 1
 	`addStrictnessInfo` mkStrictnessInfo [WwStrict] Nothing
 	`addArgUsageInfo` mkArgUsageInfo [ArgUsage 1]
-	-- ABSOLUTELY NO UNFOLDING, e.g.: (mkUnfolding True run_ST_template)
+	-- ABSOLUTELY NO UNFOLDING, e.g.: (mk_inline_unfolding run_ST_template)
 	-- see example below
 {- OUT:
     [m, t, r, wild]

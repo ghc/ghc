@@ -20,7 +20,11 @@ import RnMonad		( ExportEnv )
 
 import MkIface		-- several functions
 import TcModule		( typecheckModule )
-import Desugar		( deSugar, DsMatchContext, pprDsWarnings, DsWarnFlavour {-TEMP!-} )
+import Desugar		( deSugar, pprDsWarnings
+#if __GLASGOW_HASKELL__ <= 200
+		          , DsMatchContext, DsWarnFlavour 
+#endif
+			)
 import SimplCore	( core2core )
 import CoreToStg	( topCoreBindsToStg )
 import StgSyn		( collectFinalStgBinders )
@@ -53,6 +57,9 @@ import Name		( Name )		-- instances
 import PprType		( GenType, GenTyVar )	-- instances
 import TyVar		( GenTyVar )		-- instances
 import Unique		( Unique )		-- instances
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
 \end{code}
 
 \begin{code}
@@ -69,7 +76,7 @@ main =
 doIt :: ([CoreToDo], [StgToDo]) -> String -> IO ()
 
 doIt (core_cmds, stg_cmds) input_pgm
-  = doDump opt_Verbose "Glasgow Haskell Compiler, version 2.02, for Haskell 1.3" "" >>
+  = doDump opt_Verbose "Glasgow Haskell Compiler, version 2.03, for Haskell 1.4" "" >>
 
     -- ******* READER
     show_pass "Reader"	>>
@@ -145,15 +152,15 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     case tc_results
     of {  (typechecked_quint@(recsel_binds, class_binds, inst_binds, val_binds, const_binds),
-	   local_tycons, inst_info, pragma_tycon_specs,
+	   local_tycons, local_classes, inst_info, pragma_tycon_specs,
 	   ddump_deriv) ->
 
     doDump opt_D_dump_tc "Typechecked:"
-	(pp_show (ppAboves [
+	(pp_show (vcat [
 	    ppr pprStyle recsel_binds,
 	    ppr pprStyle class_binds,
 	    ppr pprStyle inst_binds,
-	    ppAboves (map (\ (i,e) -> ppr pprStyle (VarMonoBind i e)) const_binds),
+	    ppr pprStyle const_binds,
 	    ppr pprStyle val_binds]))   	>>
 
     doDump opt_D_dump_deriv "Derived instances:"
@@ -169,11 +176,11 @@ doIt (core_cmds, stg_cmds) input_pgm
     (if isEmptyBag ds_warnings then
 	return ()
      else
-	hPutStr stderr (ppShow pprCols (pprDsWarnings pprErrorsStyle ds_warnings))
+	hPutStr stderr (pp_show (pprDsWarnings pprErrorsStyle ds_warnings))
 	>> hPutStr stderr "\n"
     ) 						>>
 
-    doDump opt_D_dump_ds "Desugared:" (pp_show (ppAboves
+    doDump opt_D_dump_ds "Desugared:" (pp_show (vcat
 	(map (pprCoreBinding pprStyle) desugared)))
 						>>
 
@@ -190,7 +197,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	 \ (simplified,
 	    SpecData _ _ _ gen_tycons all_tycon_specs _ _ _) ->
 
-    doDump opt_D_dump_simpl "Simplified:" (pp_show (ppAboves
+    doDump opt_D_dump_simpl "Simplified:" (pp_show (vcat
 	(map (pprCoreBinding pprStyle) simplified)))
 						>>
 
@@ -209,7 +216,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	\ (stg_binds2, cost_centre_info) ->
 
     doDump opt_D_dump_stg "STG syntax:"
-	(pp_show (ppAboves (map (pprPlainStgBinding pprStyle) stg_binds2)))
+	(pp_show (vcat (map (pprPlainStgBinding pprStyle) stg_binds2)))
 						>>
 
 	-- Dump instance decls and type signatures into the interface file
@@ -217,7 +224,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	final_ids = collectFinalStgBinders stg_binds2
     in
     _scc_     "Interface"
-    ifaceDecls if_handle rn_mod inst_info final_ids simplified	>>
+    ifaceDecls if_handle local_tycons local_classes inst_info final_ids simplified	>>
     endIface if_handle						>>
     -- We are definitely done w/ interface-file stuff at this point:
     -- (See comments near call to "startIface".)
@@ -242,6 +249,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     doDump opt_D_dump_flatC "Flat Abstract C:"
 	(dumpRealC flat_abstractC)		>>
 
+    _scc_     "CodeOutput"
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
     -- flat_abstractC.  WDP 94/10]
@@ -297,7 +305,8 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     doDump switch hdr string
       = if switch
-	then hPutStr stderr hdr		    >>
+	then hPutStr stderr ("\n\n" ++ (take 80 $ repeat '=')) >>
+	     hPutStr stderr ('\n': hdr)	    >>
 	     hPutStr stderr ('\n': string)  >>
 	     hPutStr stderr "\n"
 	else return ()
@@ -308,28 +317,28 @@ pprCols = (80 :: Int) -- could make configurable
 (pprStyle, pprErrorsStyle)
   | opt_PprStyle_All   = (PprShowAll, PprShowAll)
   | opt_PprStyle_Debug = (PprDebug,   PprDebug)
-  | opt_PprStyle_User  = (PprForUser, PprForUser)
-  | otherwise	       = (PprDebug,   PprForUser)
+  | opt_PprStyle_User  = (PprQuote,   PprQuote)
+  | otherwise	       = (PprDebug,   PprQuote)
 
-pp_show p = ppShow {-WAS:pprCols-}10000{-random-} p
+pp_show p = show p	-- ToDo: use pprCols
 
 checkErrors errs_bag warns_bag
   | not (isEmptyBag errs_bag)
-  = 	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle errs_bag))
+  = 	hPutStr stderr (pp_show (pprBagOfErrors pprErrorsStyle errs_bag))
 	>> hPutStr stderr "\n" >>
-	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle warns_bag))
+	hPutStr stderr (pp_show (pprBagOfErrors pprErrorsStyle warns_bag))
 	>> hPutStr stderr "\n" >>
 	ghcExit 1
 
   | not (isEmptyBag warns_bag)
-  = hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle warns_bag))	>> 
+  = hPutStr stderr (pp_show (pprBagOfErrors pprErrorsStyle warns_bag))	>> 
     hPutStr stderr "\n"
  
   | otherwise = return ()
 
 
 ppSourceStats (HsModule name version exports imports fixities decls src_loc)
- = ppAboves (map pp_val
+ = vcat (map pp_val
 	       [("ExportAll        ", export_all), -- 1 if no export list
 		("ExportDecls      ", export_ds),
 		("ExportModules    ", export_ms),
@@ -362,13 +371,13 @@ ppSourceStats (HsModule name version exports imports fixities decls src_loc)
 	      	("SpecialisedBinds ", bind_specs)
 	       ])
   where
-    pp_val (str, 0) = ppNil
-    pp_val (str, n) = ppBesides [ppStr str, ppInt n]
+    pp_val (str, 0) = empty
+    pp_val (str, n) = hcat [text str, int n]
 
     fixity_ds   = length fixities
     type_decls 	= [d | TyD d@(TySynonym _ _ _ _)    <- decls]
-    data_decls 	= [d | TyD d@(TyData _ _ _ _ _ _ _) <- decls]
-    newt_decls 	= [d | TyD d@(TyNew  _ _ _ _ _ _ _) <- decls]
+    data_decls 	= [d | TyD d@(TyData DataType _ _ _ _ _ _ _) <- decls]
+    newt_decls 	= [d | TyD d@(TyData NewType  _ _ _ _ _ _ _) <- decls]
     type_ds	= length type_decls
     data_ds	= length data_decls
     newt_ds	= length newt_decls
@@ -400,14 +409,8 @@ ppSourceStats (HsModule name version exports imports fixities decls src_loc)
 
     count_binds EmptyBinds        = (0,0,0,0,0)
     count_binds (ThenBinds b1 b2) = count_binds b1 `add5` count_binds b2
-    count_binds (SingleBind b)    = case count_bind b of
-				      (vs,fs) -> (vs,fs,0,0,0)
-    count_binds (BindWith b sigs) = case (count_bind b, count_sigs sigs) of
-				      ((vs,fs),(ts,_,ss,is)) -> (vs,fs,ts,ss,is)
-
-    count_bind EmptyBind      = (0,0)
-    count_bind (NonRecBind b) = count_monobinds b
-    count_bind (RecBind b)    = count_monobinds b
+    count_binds (MonoBind b sigs _) = case (count_monobinds b, count_sigs sigs) of
+				        ((vs,fs),(ts,_,ss,is)) -> (vs,fs,ts,ss,is)
 
     count_monobinds EmptyMonoBinds	  = (0,0)
     count_monobinds (AndMonoBinds b1 b2)  = count_monobinds b1 `add2` count_monobinds b2
@@ -433,10 +436,8 @@ ppSourceStats (HsModule name version exports imports fixities decls src_loc)
     spec_info (Just (False, _)) = (0,0,0,0,1,0)
     spec_info (Just (True, _))  = (0,0,0,0,0,1)
 
-    data_info (TyData _ _ _ constrs derivs _ _)
+    data_info (TyData _ _ _ _ constrs derivs _ _)
 	= (length constrs, case derivs of {Nothing -> 0; Just ds -> length ds})
-    data_info (TyNew _ _ _ constr derivs _ _)
-	= (1, case derivs of {Nothing -> 0; Just ds -> length ds})
 
     class_info (ClassDecl _ _ _ meth_sigs def_meths _ _)
 	= case count_sigs meth_sigs of

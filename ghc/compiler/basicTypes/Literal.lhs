@@ -29,7 +29,11 @@ import CStrings		( stringToC, charToC, charToEasyHaskell )
 import TysWiredIn	( stringTy )
 import Pretty		-- pretty-printing stuff
 import PprStyle		( PprStyle(..), codeStyle, ifaceStyle )
-import Util		( thenCmp, panic, pprPanic )
+import Util		--( thenCmp, panic, pprPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import Type
+import Outputable
+#endif
 \end{code}
 
 So-called @Literals@ are {\em either}:
@@ -167,9 +171,9 @@ literalPrimRep (NoRepStr _)	   = panic "literalPrimRep:NoRepString"
 
 The boring old output stuff:
 \begin{code}
-ppCast :: PprStyle -> FAST_STRING -> Pretty
-ppCast PprForC cast = ppPStr cast
-ppCast _       _    = ppNil
+ppCast :: PprStyle -> FAST_STRING -> Doc
+ppCast PprForC cast = ptext cast
+ppCast _       _    = empty
 
 -- MachX (i.e. unboxed) things are printed unadornded (e.g. 3, 'a', "foo")
 -- 	exceptions: MachFloat and MachAddr get an initial keyword prefix
@@ -186,22 +190,22 @@ instance Outputable Literal where
 		  PprInterface	-> charToEasyHaskell ch
 		  _		-> [ch]
 	in
-	ppBesides [ppCast sty SLIT("(C_)"), ppChar '\'', ppStr char_encoding, ppChar '\'']
+	hcat [ppCast sty SLIT("(C_)"), char '\'', text char_encoding, char '\'']
 
     ppr sty (MachStr s)
-      | codeStyle sty = ppBesides [ppChar '"', ppStr (stringToC (_UNPK_ s)), ppChar '"']
-      | otherwise     = ppBesides [ppChar '"', ppPStr s, ppChar '"']
+      | codeStyle sty = hcat [char '"', text (stringToC (_UNPK_ s)), char '"']
+      | otherwise     = text (show (_UNPK_ s))
 
     ppr sty lit@(NoRepStr s)
       | codeStyle sty = pprPanic "NoRep in code style" (ppr PprDebug lit)
-      | otherwise     = ppBesides [ppPStr SLIT("_string_"), ppChar '"', ppPStr s,ppChar '"']
+      | otherwise     = hcat [ptext SLIT("_string_ "), text (show (_UNPK_ s))]
 
     ppr sty (MachInt i signed)
       | codeStyle sty && out_of_range
       = panic ("ERROR: Int " ++ show i ++ " out of range [" ++
 		show range_min ++ " .. " ++ show range_max ++ "]\n")
 
-      | otherwise = ppInteger i
+      | otherwise = integer i
 
       where
 	range_min = if signed then minInt else 0
@@ -209,28 +213,28 @@ instance Outputable Literal where
         out_of_range = not (i >= toInteger range_min && i <= toInteger range_max)
 
     ppr sty (MachFloat f)  
-       | codeStyle sty = ppBesides [ppCast sty SLIT("(StgFloat)"), ppRational f]
-       | otherwise     = ppBesides [ppPStr SLIT("_float_"), ppRational f]
+       | codeStyle sty = hcat [ppCast sty SLIT("(StgFloat)"), rational f]
+       | otherwise     = hcat [ptext SLIT("_float_ "), rational f]
 
-    ppr sty (MachDouble d) = ppRational d
+    ppr sty (MachDouble d) = rational d
 
     ppr sty (MachAddr p) 
-       | codeStyle sty = ppBesides [ppCast sty SLIT("(void*)"), ppInteger p]
-       | otherwise     = ppBesides [ppPStr SLIT("_addr_"), ppInteger p]
+       | codeStyle sty = hcat [ppCast sty SLIT("(void*)"), integer p]
+       | otherwise     = hcat [ptext SLIT("_addr_ "), integer p]
 
     ppr sty lit@(NoRepInteger i _)
       | codeStyle sty  = pprPanic "NoRep in code style" (ppr PprDebug lit)
-      | otherwise      = ppCat [ppPStr SLIT("_integer_"), ppInteger i]
+      | otherwise      = hsep [ptext SLIT("_integer_ "), integer i]
 
     ppr sty lit@(NoRepRational r _)
       | codeStyle sty = pprPanic "NoRep in code style" (ppr PprDebug lit)
-      | otherwise     = ppCat [ppPStr SLIT("_rational_"), ppInteger (numerator r), ppInteger (denominator r)]
+      | otherwise     = hsep [ptext SLIT("_rational_ "), integer (numerator r), integer (denominator r)]
 
     ppr sty (MachLitLit s k)
-      | codeStyle  sty = ppPStr s
-      | otherwise      = ppBesides [ppPStr SLIT("_litlit_ "), ppPrimRep k, ppStr " \"", ppPStr s, ppChar '"']
+      | codeStyle  sty = ptext s
+      | otherwise      = hcat [ptext SLIT("_litlit_ "), ppPrimRep k, char ' ', text (show (_UNPK_ s))]
 
 showLiteral :: PprStyle -> Literal -> String
-showLiteral sty lit = ppShow 80 (ppr sty lit)
+showLiteral sty lit = show (ppr sty lit)
 \end{code}
 

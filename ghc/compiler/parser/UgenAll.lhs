@@ -24,7 +24,11 @@ module UgenAll (
 	EXP_MODULE(U_ttype)
     ) where
 
+#if __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST
+#else
+import GlaExts
+#endif
 
 IMP_Ubiq(){-uitous-}
 
