@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfRts.h,v 1.8 2000/02/17 17:19:42 simonmar Exp $
+ * $Id: ProfRts.h,v 1.9 2000/03/07 11:53:12 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Support for profiling
  *
@@ -10,6 +10,8 @@
 #if defined(PROFILING) || defined(DEBUG)
 void initProfiling ( void );
 void endProfiling  ( void );
+
+extern FILE *prof_file;
 #endif
 
 #ifdef PROFILING

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.14 2000/03/01 11:09:05 simonmar Exp $
+ * $Id: Profiling.c,v 1.15 2000/03/07 11:53:12 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Support for profiling
  *
@@ -51,7 +51,7 @@ static lnat total_alloc, total_prof_ticks;
 /* Globals for opening the profiling log file
  */
 static char *prof_filename; /* prof report file name = <program>.prof */
-static FILE *prof_file;
+FILE *prof_file;
 
 /* The Current Cost Centre Stack (for attributing costs)
  */
@@ -224,7 +224,7 @@ initProfilingLogFile(void)
     RtsFlags.CcFlags.doCostCentres = 0;
     return;
   }
-  
+
   if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
     /* dump the time, and the profiling interval */
     fprintf(prof_file, "\"%s\"\n", time_str());
