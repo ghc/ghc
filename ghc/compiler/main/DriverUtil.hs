@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.39 2003/08/20 15:07:57 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.40 2003/11/10 12:04:25 simonpj Exp $
 --
 -- Utils for the driver
 --
@@ -100,6 +100,9 @@ unknownFlagErr f = throwDyn (UsageError ("unrecognised flag: " ++ f))
 
 unknownFlagsErr :: [String] -> a
 unknownFlagsErr fs = throwDyn (UsageError ("unrecognised flags: " ++ unwords fs))
+
+missingArgErr :: String -> a
+missingArgErr f = throwDyn (UsageError ("missing argument for flag: " ++ f))
 
 my_partition :: (a -> Maybe b) -> [a] -> ([(a,b)],[a])
 my_partition _ [] = ([],[])

@@ -93,7 +93,7 @@ processOneArg action rest (dash_arg@('-':arg):args) =
 		if rest /= "" 
 			then fio rest >> return args
 			else case args of
-				[] -> unknownFlagErr dash_arg
+				[] -> missingArgErr dash_arg
 				(arg1:args1) -> fio arg1 >> return args1
 
 	SepArg fio -> 
