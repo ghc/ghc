@@ -58,6 +58,7 @@ module CmdLineOpts (
 	opt_IrrefutableTuples,
 	opt_LiberateCaseThreshold,
 	opt_MultiParamClasses,
+        opt_NoHiCheck,
 	opt_NoImplicitPrelude,
 	opt_NumbersStrict,
 	opt_OmitBlackHoling,
@@ -270,6 +271,24 @@ lookup_def_float sw def = case (lookup_str sw) of
 
 assoc_opts    = assocMaybe [ (a, True) | a <- argv ]
 unpacked_opts = map _UNPK_ argv
+
+{-
+ Putting the compiler options into temporary at-files
+ may turn out to be necessary later on if we turn hsc into
+ a pure Win32 application where I think there's a command-line
+ length limit of 255. unpacked_opts understands the @ option.
+
+assoc_opts    = assocMaybe [ (_PK_ a, True) | a <- unpacked_opts ]
+
+unpacked_opts :: [String]
+unpacked_opts =
+  concat $
+  map (expandAts) $
+  map _UNPK_ argv
+  where
+   expandAts ('@':fname) = words (unsafePerformIO (readFile fname))
+   expandAts l = [l]
+-}
 \end{code}
 
 \begin{code}
@@ -373,7 +392,7 @@ classifyOpts :: ([CoreToDo],	-- Core-to-Core processing spec
 
 classifyOpts = sep argv [] [] -- accumulators...
   where
-    sep :: [FAST_STRING]			 -- cmd-line opts (input)
+    sep :: [FAST_STRING]	         -- cmd-line opts (input)
 	-> [CoreToDo] -> [StgToDo]	 -- to_do accumulators
 	-> ([CoreToDo], [StgToDo])	 -- result
 
@@ -382,13 +401,10 @@ classifyOpts = sep argv [] [] -- accumulators...
 
 #	define CORE_TD(to_do) sep opts (to_do:core_td) stg_td
 #	define STG_TD(to_do)  sep opts core_td (to_do:stg_td)
-#	define IGNORE_ARG()   sep opts core_td stg_td
 
     sep (opt1:opts) core_td stg_td
-      =
-	case (_UNPK_ opt1) of -- the non-"just match a string" options are at the end...
-
-	  ',' : _	-> IGNORE_ARG() -- it is for the parser
+      = case (_UNPK_ opt1) of -- the non-"just match a string" options are at the end...
+	  ',' : _	-> sep opts core_td stg_td -- it is for the parser
 
 	  "-fsimplify"  -> -- gather up SimplifierSwitches specially...
 			   simpl_sep opts defaultSimplSwitches core_td stg_td
@@ -412,14 +428,14 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fmassage-stg-for-profiling" -> STG_TD(StgDoMassageForProfiling)
 
 	  _ -> -- NB: the driver is really supposed to handle bad options
-	       IGNORE_ARG()
+	       sep opts core_td stg_td
 
     ----------------
 
-    simpl_sep :: [FAST_STRING]	    -- cmd-line opts (input)
-	-> [SimplifierSwitch]	    -- simplifier-switch accumulator
-	-> [CoreToDo] -> [StgToDo]  -- to_do accumulators
-	-> ([CoreToDo], [StgToDo])  -- result
+    simpl_sep :: [FAST_STRING]            -- cmd-line opts (input)
+	      -> [SimplifierSwitch]	  -- simplifier-switch accumulator
+	      -> [CoreToDo] -> [StgToDo]  -- to_do accumulators
+	      -> ([CoreToDo], [StgToDo])  -- result
 
 	-- "simpl_sep" tailcalls "sep" once it's seen one set
 	-- of SimplifierSwitches for a CoreDoSimplify.
@@ -533,11 +549,6 @@ lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCloneBinds)
 %************************************************************************
 
 \begin{code}
-# define ARRAY	    Array
-# define LIFT	    Lift
-# define SET_TO	    =:
-(=:) a b = (a,b)
-
 isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
 
 isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
@@ -553,20 +564,20 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 			all_undefined)
 		 // defined_elems
 
-	all_undefined = [ i SET_TO SwBool False | i <- [0 .. lAST_SIMPL_SWITCH_TAG ] ]
+	all_undefined = [ (i, SwBool False) | i <- [0 .. lAST_SIMPL_SWITCH_TAG ] ]
 
 	defined_elems = map mk_assoc_elem tidied_on_switches
     in
     -- (avoid some unboxing, bounds checking, and other horrible things:)
-    case sw_tbl of { ARRAY bounds_who_needs_'em stuff ->
+    case sw_tbl of { Array bounds_who_needs_'em stuff ->
     \ switch ->
 	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
-	  LIFT v -> v
+	  Lift v -> v
     }
   where
-    mk_assoc_elem k@(MaxSimplifierIterations lvl)       = IBOX(tagOf_SimplSwitch k) SET_TO SwInt lvl
+    mk_assoc_elem k@(MaxSimplifierIterations lvl)       = (IBOX(tagOf_SimplSwitch k), SwInt lvl)
 
-    mk_assoc_elem k = IBOX(tagOf_SimplSwitch k) SET_TO SwBool   True -- I'm here, Mom!
+    mk_assoc_elem k = (IBOX(tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
 
     -- cannot have duplicates if we are going to use the array thing
     rm_dups switches_so_far switch

@@ -38,7 +38,7 @@ import List             ( isSuffixOf )
 
 import {-# SOURCE #-} CostCentre
 
-import CmdLineOpts	( opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_NoHiCheck )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
 import BasicTypes	( NewOrData(..), IfaceFlavour(..) )
@@ -149,7 +149,7 @@ all of an interface file before it can continue. But only a fraction
 of the information contained in the file turns out to be useful, so
 delaying as much as possible of the scanning and parsing of an
 interface file Makes Sense (Heap profiles of the compiler 
-show at a reduction in heap usage by at least a factor of two,
+show a reduction in heap usage by at least a factor of two,
 post-renamer). 
 
 Hence, the interface file lexer spots when value declarations are
@@ -335,12 +335,10 @@ lex_comment cont buf =
 
 ------------------
 lex_demand cont buf = 
--- _trace ("demand: "++[C# (currentChar# buf)]) $
  case read_em [] buf of { (ls,buf') -> cont (ITstrict ls) (stepOverLexeme buf')}
  where
    -- code snatched from Demand.lhs
   read_em acc buf = 
---   _trace ("read_em: "++[C# (currentChar# buf)]) $
    case currentChar# buf of
     'L'# -> read_em (WwLazy False : acc) (stepOn buf)
     'A'# -> read_em (WwLazy True  : acc) (stepOn buf)
@@ -360,7 +358,6 @@ lex_demand cont buf =
 
 ------------------
 lex_scc cont buf =
--- _trace ("scc: "++[C# (currentChar# buf)]) $
  case currentChar# buf of
   '"'# ->
       -- YUCK^2
@@ -522,14 +519,12 @@ is_kwd_char c@(C# c#) =
 
 -----------
 lex_cstring cont buf =
--- _trace ("lex_cstring: "++[C# (currentChar# buf)]) $
  case expandUntilMatch buf "\'\'" of
    buf' -> cont (ITstring (lexemeToFastString (setCurrentPos# buf' (negateInt# 2#))))
            (stepOverLexeme buf')
 	
 -----------
 lex_tuple cont module_dot buf =
--- _trace ("lex_tuple: "++[C# (currentChar# buf)]) $
   go 2 buf
   where
    go n buf =
@@ -663,7 +658,6 @@ lex_id2 cont module_dot buf =
 -- Dealt with [], (), : special cases
 
 lex_id3 cont module_dot buf =
--- _trace ("lex_id3: "++[C# (currentChar# buf)]) $
  case expandWhile (is_id_char) buf of
   buf' ->
     case module_dot of
@@ -678,29 +672,7 @@ lex_id3 cont module_dot buf =
      new_buf = stepOverLexeme buf'
 
 
-{- OLD:
-lex_id2 module_dot [] ('[': ']': cs) = end_lex_id module_dot (ITconid SLIT("[]")) cs
-lex_id2 module_dot [] ('(': ')': cs) = end_lex_id module_dot (ITconid SLIT("()")) cs
-lex_id2 module_dot [] ('(': ',': cs) = lex_tuple module_dot cs
-lex_id2 module_dot [] (':' : cs)     = lex_id3 module_dot [':'] cs
-lex_id2 module_dot xs cs 	     = lex_id3 module_dot xs cs
--}
-
 -- Dealt with [], (), : special cases
-
-{-
-lex_id3 module_dot len_xs xs cs =
- case my_span' (is_id_char) cs of
-   (xs1,len_xs1,rest) ->
-    case module_dot of
-     Just m  -> end_lex_id (Just m) (mk_var_token rxs) rest --OLD:_PK_ (reverse xs))) rest
-     Nothing -> 
-      case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM rxs of
-       Just kwd_token -> kwd_token	    : lexIface rest
-       other 	      -> token : lexIface cs end_lex_id Nothing (mk_var_token rxs) rest
-    where
-     rxs = packNChars (len_xs+len_xs1) (xs++xs1) -- OLD: _PK_ (reverse xs)
--}
 mk_var_token pk_str =
      let
       f = _HEAD_ pk_str
@@ -716,15 +688,6 @@ mk_var_token pk_str =
      else if isUpperISO f then ITconid pk_str
      else ITvarsym pk_str
 
-{-
-    mk_var_token xs@(f:_) | isUpper f || isUpperISO f = ITconid n
-		    	  | f == ':'		  = ITconsym n
-		      	  | isAlpha f		  = ITvarid n
-		    	  | otherwise		  = ITvarsym n 
-		where
-		      n = _PK_ xs
--}
-			    
 end_lex_id cont Nothing token buf  = cont token buf
 end_lex_id cont (Just (m,hif)) token buf =
  case token of
@@ -886,18 +849,23 @@ happyError s l = Failed (ifaceParseErr l ([]::[IfaceToken]){-Todo-})
 
 
 {- 
- Note that if the file we're processing ends with `hi-boot',
- we accept it on faith as having the right version.
- This is done so that .hi-boot files  that comes with hsc
- don't have to be updated before every release, and it
- allows us to share .hi-boot files with versions of hsc
- that don't have .hi version checking (e.g., ghc-2.10's)
+ Note that if the name of the file we're processing ends
+ with `hi-boot', we accept it on faith as having the right
+ version. This is done so that .hi-boot files that comes
+ with hsc don't have to be updated before every release,
+ *and* it allows us to share .hi-boot files with versions
+ of hsc that don't have .hi version checking (e.g., ghc-2.10's)
 
  If the version number is 0, the checking is also turned off.
+ (needed to deal with GHC.hi only!)
+
+ Once we can assume we're compiling with a version of ghc that
+ supports interface file checking, we can drop the special
+ pleading
 -}
 checkVersion :: Maybe Integer -> IfM ()
 checkVersion mb@(Just v) s l
- | (v==0) || (v == PROJECTVERSION) = Succeeded ()
+ | (v==0) || (v == PROJECTVERSION) || opt_NoHiCheck = Succeeded ()
  | otherwise = Failed (ifaceVersionErr mb l ([]::[IfaceToken]){-Todo-})
 checkVersion mb@Nothing  s l 
  | "hi-boot" `isSuffixOf` (_UNPK_ (srcLocFile l)) = Succeeded ()
