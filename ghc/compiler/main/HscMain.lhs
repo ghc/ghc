@@ -28,7 +28,7 @@ import HscTypes		( InteractiveContext(..) )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import FastString       ( mkFastString )
-import Char		( isLower )
+import Char		( isUpper )
 import DriverUtil	( split_longest_prefix )
 #endif
 
@@ -630,8 +630,10 @@ hscThing dflags hst hit pcs0 icontext str
 		   fmod = mkFastString mod
 		   fvar = mkFastString var
 		   fstr = mkFastString str
-	  	   namespaces s | isLower (head s) = [ varName ]
-			        | otherwise        = [ tcClsName, dataName ]
+	  	   namespaces s 
+			| isUpper c || c == ':' = [ tcClsName, dataName ]
+			| otherwise             = [ varName ]
+		        where c = head s
 
 	(pcs, unqual, maybe_rn_result) <- 
 	   renameRdrName dflags hit hst pcs0 scope_mod scope_mod 
