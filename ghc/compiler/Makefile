@@ -512,10 +512,18 @@ primop-usage.hs-incl: prelude/primops.txt
 ifeq "$(stage)" "1"
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
-SRC_MKDEPENDHS_OPTS += -optdep--exclude-module=Compat.RawSystem
+
+# This is horrible.  We ought to be able to omit the entire directory
+# from mkDependHS.
+SRC_MKDEPENDHS_OPTS += \
+	-optdep--exclude-module=Compat.RawSystem \
+	-optdep--exclude-module=Data.Version \
+	-optdep--exclude-module=Distribution.Package \
+	-optdep--exclude-module=Distribution.InstalledPackageInfo \
+	-optdep--exclude-module=Distribution.Package
 endif
 
-SRC_LD_OPTS += -no-link-chk 
+SRC_LD_OPTS += -no-link-chk
 
 # -----------------------------------------------------------------------------
 # create ghc-inplace, a convenient way to run ghc from the build tree...
