@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.11 2001/01/13 20:33:51 qrczak Exp $
+-- $Id: Main.hs,v 1.12 2001/01/13 23:10:45 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -272,19 +272,20 @@ onlyOne what = do
 
 outHeaderCProg :: [(SourcePos, String, String)] -> String
 outHeaderCProg =
-    concatMap $ \(pos, key, arg) -> outCLine pos ++ case key of
-        "include"           -> "#include "++arg++"\n"
-        "define"            -> "#define "++arg++"\n"
-        "undef"             -> "#undef "++arg++"\n"
+    concatMap $ \(pos, key, arg) -> case key of
+        "include"           -> outCLine pos++"#include "++arg++"\n"
+        "define"            -> outCLine pos++"#define "++arg++"\n"
+        "undef"             -> outCLine pos++"#undef "++arg++"\n"
         "def"               -> case arg of
-            's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
-            't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
+            's':'t':'r':'u':'c':'t':' ':_ -> outCLine pos++arg++"\n"
+            't':'y':'p':'e':'d':'e':'f':' ':_ -> outCLine pos++arg++"\n"
             _ -> ""
-        _ | conditional key -> "#"++key++" "++arg++"\n"
+        _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         "let"               -> case break (== '=') arg of
             (_,      "")     -> ""
             (header, _:body) -> case break isSpace header of
                 (name, args) ->
+                    outCLine pos++
                     "#define hsc_"++name++"("++dropWhile isSpace args++") \
                     \printf ("++joinLines body++");\n"
         _ -> ""
@@ -300,14 +301,14 @@ outHeaderHs flags inH toks =
     includeH++
     concatMap outSpecial toks
     where
-    outSpecial (pos, key, arg) = outCLine pos ++ case key of
+    outSpecial (pos, key, arg) = case key of
         "include" -> case inH of
             Nothing -> outOption ("-#include "++arg)
             Just _  -> ""
         "define" -> case inH of
             Nothing | goodForOptD arg -> outOption ("-optc-D"++toOptD arg)
             _ -> ""
-        _ | conditional key -> "#"++key++" "++arg++"\n"
+        _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         _ -> ""
     goodForOptD arg = case arg of
         ""              -> True
@@ -336,22 +337,22 @@ outTokenHs (Text pos text) =
     where
     outText s = "    fputs (\""++showCString s++"\", stdout);\n"
 outTokenHs (Special pos key arg) =
-    outCLine pos ++ case key of
+    case key of
         "include"           -> ""
         "define"            -> ""
         "undef"             -> ""
         "def"               -> ""
-        _ | conditional key -> "#"++key++" "++arg++"\n"
+        _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         "let"               -> ""
-        _                   -> "    hsc_"++key++" ("++arg++");\n"
+        _                   -> outCLine pos++"    hsc_"++key++" ("++arg++");\n"
 
 outTokenH :: (SourcePos, String, String) -> String
 outTokenH (pos, key, arg) =
-    outCLine pos ++ case key of
-        "include" -> "#include "++arg++"\n"
-        "define"  -> "#define " ++arg++"\n"
-        "undef"   -> "#undef "  ++arg++"\n"
-        "def"     -> case arg of
+    case key of
+        "include" -> outCLine pos++"#include "++arg++"\n"
+        "define"  -> outCLine pos++"#define " ++arg++"\n"
+        "undef"   -> outCLine pos++"#undef "  ++arg++"\n"
+        "def"     -> outCLine pos++case arg of
             's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
             't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
             'i':'n':'l':'i':'n':'e':' ':_ ->
@@ -361,16 +362,17 @@ outTokenH (pos, key, arg) =
                 arg++"\n"
             _ -> "extern "++header++";\n"
             where header = takeWhile (\c -> c/='{' && c/='=') arg
-        _ | conditional key -> "#"++key++" "++arg++"\n"
+        _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         _ -> ""
 
 outTokenC :: (SourcePos, String, String) -> String
 outTokenC (pos, key, arg) =
-    outCLine pos ++ case key of
+    case key of
         "def" -> case arg of
             's':'t':'r':'u':'c':'t':' ':_ -> ""
             't':'y':'p':'e':'d':'e':'f':' ':_ -> ""
             'i':'n':'l':'i':'n':'e':' ':_ ->
+                outCLine pos++
                 "#ifndef __GNUC__\n\
                 \extern\n\
                 \#endif\n"++
@@ -380,9 +382,9 @@ outTokenC (pos, key, arg) =
                 \#else\n"++
                 body++
                 "\n#endif\n"
-            _ -> arg++"\n"
+            _ -> outCLine pos++arg++"\n"
             where (header, body) = span (\c -> c/='{' && c/='=') arg
-        _ | conditional key -> "#"++key++" "++arg++"\n"
+        _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         _ -> ""
 
 conditional :: String -> Bool
