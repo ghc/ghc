@@ -42,7 +42,6 @@ freeEntries(char **entries, int count)
  * operations, we collect the entire list in one atomic operation,
  * rather than reading the directory lazily.
  */
-
 StgAddr
 getDirectoryContents(path)
 StgByteArray path;
@@ -51,7 +50,7 @@ StgByteArray path;
     DIR *dir;
     struct dirent *d;
     char **entries;
-    int alloc, count;
+    int alloc, count, len;
 
     /* Check for an actual directory */
     while (stat(path, &sb) != 0) {
@@ -100,7 +99,8 @@ StgByteArray path;
 	    }
 	    errno = 0;
 	}
-	if ((entries[count] = malloc(strlen(d->d_name))) == NULL) {
+        len = strlen(d->d_name);
+	if ((entries[count] = malloc(len+1)) == NULL) {
 	    ghc_errtype = ERR_RESOURCEEXHAUSTED;
 	    ghc_errstr = "not enough virtual memory";
 	    freeEntries(entries, count);
@@ -108,6 +108,8 @@ StgByteArray path;
 	    return NULL;
 	}
 	strcpy(entries[count], d->d_name);
+	/* Terminate the sucker */
+	*(entries[count] + len) = 0;
 	if (++count == alloc) {
 	    alloc += LINK_MAX;
 	    if ((entries = (char **) realloc(entries, alloc * sizeof(char *))) == NULL) {
