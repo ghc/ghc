@@ -232,13 +232,6 @@ runMeta expr
 
 	print_unqual = unQualInScope rdr_env
     in
-    if (ghci_mode == OneShot) then
-	failWithTc (ptext SLIT("You must use --make or --interactive to run splice expressions"))
-	-- The reason for this is that the demand-linker doesn't have
-	-- enough information available to link all the things that
-	-- are needed when you try to run a splice
-    else
-
     ioToTcRn (HscMain.compileExpr hsc_env pcs this_mod 
 				  print_unqual expr) `thenM` \ hval ->
 
