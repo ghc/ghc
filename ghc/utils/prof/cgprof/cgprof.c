@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: cgprof.c,v 1.4 2003/08/01 14:58:47 panne Exp $
+ * $Id: cgprof.c,v 1.5 2004/07/09 16:47:59 sof Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -728,16 +728,16 @@ void produce_HEAP_PROFILE(FILE *HEAP_PROFILE, TheHeap *th, heap_object_matrix *h
   fprintf(HEAP_PROFILE,"option add *TextMarker.Font		*Helvetica-Bold-R*14*\n");
   fprintf(HEAP_PROFILE,"set visual [winfo screenvisual .] \nif { $visual != \"staticgray\" && $visual != \"grayscale\" } {\n    option add *print.background	yellow\n    option add *quit.background		red\n    option add *quit.activeBackground	red2\n}\n");
   fprintf(HEAP_PROFILE,"htext .title -text {\n    Heap profile\n}\n");
-  fprintf(HEAP_PROFILE,"htext .header -text {\n    \%%\% \n");
+  fprintf(HEAP_PROFILE,"htext .header -text {\n    %%%% \n");
   fprintf(HEAP_PROFILE,"      radiobutton .header.stacked -text stacked -variable barMode \\\n            -anchor w -value \"stacked\" -selectcolor red -command {\n            .graph configure -barmode $barMode\n        } \n        .header append .header.stacked -width 1.5i -anchor w\n");
-  fprintf(HEAP_PROFILE,"    \%%\%      Heap usage stacked: overall height is the sum of the heap used. \n    \%%\% \n");
+  fprintf(HEAP_PROFILE,"    %%%%      Heap usage stacked: overall height is the sum of the heap used. \n    %%%% \n");
   fprintf(HEAP_PROFILE,"        radiobutton .header.aligned -text aligned -variable barMode \\\n          -anchor w -value \"aligned\" -selectcolor yellow -command {\n            .graph configure -barmode $barMode        }\n        .header append .header.aligned -width 1.5i -fill x\n");
-  fprintf(HEAP_PROFILE,"    \%%\%      Heap usage components displayed side-by-side.\n    \%%\%\n");
+  fprintf(HEAP_PROFILE,"    %%%%      Heap usage components displayed side-by-side.\n    %%%%\n");
   fprintf(HEAP_PROFILE,"        radiobutton .header.overlap -text \"overlap\" -variable barMode \\\n            -anchor w -value \"overlap\" -selectcolor green -command {\n            .graph configure -barmode $barMode\n        }\n         .header append .header.overlap -width 1.5i -fill x\n");
-  fprintf(HEAP_PROFILE,"    \%%\%      Heap  usage shown as an overlapped histogram.\n    \%%\%\n");
+  fprintf(HEAP_PROFILE,"    %%%%      Heap  usage shown as an overlapped histogram.\n    %%%%\n");
   fprintf(HEAP_PROFILE,"        radiobutton .header.normal -text \"normal\" -variable barMode \\\n            -anchor w -value \"normal\" -selectcolor blue -command {\n            .graph configure -barmode $barMode\n        }\n         .header append .header.normal -width 1.5i -fill x\n");
-  fprintf(HEAP_PROFILE,"    \%%\%      Heap components overlayed one on top of the next. \n}\n");
-  fprintf(HEAP_PROFILE,"htext .footer -text { To create a postscript file \"heap_profile.ps\", press the \%%\%\n  button $htext(widget).print -text print -command {\n        puts stderr [time {.graph postscript output heap_profile.ps}]\n  }\n  $htext(widget) append $htext(widget).print\n\%%\% button.}\n");
+  fprintf(HEAP_PROFILE,"    %%%%      Heap components overlayed one on top of the next. \n}\n");
+  fprintf(HEAP_PROFILE,"htext .footer -text { To create a postscript file \"heap_profile.ps\", press the %%%%\n  button $htext(widget).print -text print -command {\n        puts stderr [time {.graph postscript output heap_profile.ps}]\n  }\n  $htext(widget) append $htext(widget).print\n%%%% button.}\n");
   fprintf(HEAP_PROFILE,"barchart .graph -tile bgTexture\n");
 
   // This is where the actual data comes in
@@ -761,7 +761,7 @@ void produce_HEAP_PROFILE(FILE *HEAP_PROFILE, TheHeap *th, heap_object_matrix *h
   fprintf(HEAP_PROFILE,"table . \\\n    0,0 .title -fill x \\\n    1,0 .header -fill x  \\\n    2,0 .graph -fill both \\\n    3,0 .xbar -fill x \\\n    5,0 .footer -fill x\n");
   fprintf(HEAP_PROFILE,"table configure . r0 r1 r3 r4 r5 -resize none\n");
   fprintf(HEAP_PROFILE,"Blt_ZoomStack .graph\nBlt_Crosshairs .graph\nBlt_ActiveLegend .graph\nBlt_ClosestPoint .graph\n");
-  fprintf(HEAP_PROFILE,".graph marker bind all <B2-Motion> {\n    set coords [\%W invtransform \%%x \%y]\n    catch { \%W marker configure [\%W marker get current] -coords $coords }\n}\n.graph marker bind all <Enter> {\n    set marker [\%W marker get current]\n    catch { %W marker configure $marker -bg green}\n}\n.graph marker bind all <Leave> {\n    set marker [\%W marker get current]\n    catch { %W marker configure $marker -bg \"\"}\n}\n");
+  fprintf(HEAP_PROFILE,".graph marker bind all <B2-Motion> {\n    set coords [%%W invtransform %%x %%y]\n    catch { %%W marker configure [%%W marker get current] -coords $coords }\n}\n.graph marker bind all <Enter> {\n    set marker [%%W marker get current]\n    catch { %%W marker configure $marker -bg green}\n}\n.graph marker bind all <Leave> {\n    set marker [%%W marker get current]\n    catch { %%W marker configure $marker -bg \"\"}\n}\n");
 
 }
 
