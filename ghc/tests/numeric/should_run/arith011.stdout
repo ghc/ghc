@@ -1062,40 +1062,76 @@ complement 1 = -2
 complement 2 = -3
 complement 3 = -4
 #
--3 `shift` 0 = -3
--3 `shift` 1 = -6
--3 `shift` 2 = -12
--3 `shift` 3 = -24
+-3 `shiftL` 0 = -3
+-3 `shiftL` 1 = -6
+-3 `shiftL` 2 = -12
+-3 `shiftL` 3 = -24
  
--2 `shift` 0 = -2
--2 `shift` 1 = -4
--2 `shift` 2 = -8
--2 `shift` 3 = -16
+-2 `shiftL` 0 = -2
+-2 `shiftL` 1 = -4
+-2 `shiftL` 2 = -8
+-2 `shiftL` 3 = -16
  
--1 `shift` 0 = -1
--1 `shift` 1 = -2
--1 `shift` 2 = -4
--1 `shift` 3 = -8
+-1 `shiftL` 0 = -1
+-1 `shiftL` 1 = -2
+-1 `shiftL` 2 = -4
+-1 `shiftL` 3 = -8
  
-0 `shift` 0 = 0
-0 `shift` 1 = 0
-0 `shift` 2 = 0
-0 `shift` 3 = 0
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
  
-1 `shift` 0 = 1
-1 `shift` 1 = 2
-1 `shift` 2 = 4
-1 `shift` 3 = 8
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
  
-2 `shift` 0 = 2
-2 `shift` 1 = 4
-2 `shift` 2 = 8
-2 `shift` 3 = 16
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
  
-3 `shift` 0 = 3
-3 `shift` 1 = 6
-3 `shift` 2 = 12
-3 `shift` 3 = 24
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+ 
+#
+-3 `shiftR` 0 = -3
+-3 `shiftR` 1 = -2
+-3 `shiftR` 2 = -1
+-3 `shiftR` 3 = -1
+ 
+-2 `shiftR` 0 = -2
+-2 `shiftR` 1 = -1
+-2 `shiftR` 2 = -1
+-2 `shiftR` 3 = -1
+ 
+-1 `shiftR` 0 = -1
+-1 `shiftR` 1 = -1
+-1 `shiftR` 2 = -1
+-1 `shiftR` 3 = -1
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
  
 #
 -3 `rotate` -3 = -65
@@ -2385,40 +2421,76 @@ complement 1 = -2
 complement 2 = -3
 complement 3 = -4
 #
--3 `shift` 0 = -3
--3 `shift` 1 = -6
--3 `shift` 2 = -12
--3 `shift` 3 = -24
+-3 `shiftL` 0 = -3
+-3 `shiftL` 1 = -6
+-3 `shiftL` 2 = -12
+-3 `shiftL` 3 = -24
  
--2 `shift` 0 = -2
--2 `shift` 1 = -4
--2 `shift` 2 = -8
--2 `shift` 3 = -16
+-2 `shiftL` 0 = -2
+-2 `shiftL` 1 = -4
+-2 `shiftL` 2 = -8
+-2 `shiftL` 3 = -16
  
--1 `shift` 0 = -1
--1 `shift` 1 = -2
--1 `shift` 2 = -4
--1 `shift` 3 = -8
+-1 `shiftL` 0 = -1
+-1 `shiftL` 1 = -2
+-1 `shiftL` 2 = -4
+-1 `shiftL` 3 = -8
  
-0 `shift` 0 = 0
-0 `shift` 1 = 0
-0 `shift` 2 = 0
-0 `shift` 3 = 0
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
  
-1 `shift` 0 = 1
-1 `shift` 1 = 2
-1 `shift` 2 = 4
-1 `shift` 3 = 8
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
  
-2 `shift` 0 = 2
-2 `shift` 1 = 4
-2 `shift` 2 = 8
-2 `shift` 3 = 16
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
  
-3 `shift` 0 = 3
-3 `shift` 1 = 6
-3 `shift` 2 = 12
-3 `shift` 3 = 24
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+ 
+#
+-3 `shiftR` 0 = -3
+-3 `shiftR` 1 = -2
+-3 `shiftR` 2 = -1
+-3 `shiftR` 3 = -1
+ 
+-2 `shiftR` 0 = -2
+-2 `shiftR` 1 = -1
+-2 `shiftR` 2 = -1
+-2 `shiftR` 3 = -1
+ 
+-1 `shiftR` 0 = -1
+-1 `shiftR` 1 = -1
+-1 `shiftR` 2 = -1
+-1 `shiftR` 3 = -1
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
  
 #
 -3 `rotate` -3 = -24545
@@ -3708,40 +3780,76 @@ complement 1 = -2
 complement 2 = -3
 complement 3 = -4
 #
--3 `shift` 0 = -3
--3 `shift` 1 = -6
--3 `shift` 2 = -12
--3 `shift` 3 = -24
+-3 `shiftL` 0 = -3
+-3 `shiftL` 1 = -6
+-3 `shiftL` 2 = -12
+-3 `shiftL` 3 = -24
  
--2 `shift` 0 = -2
--2 `shift` 1 = -4
--2 `shift` 2 = -8
--2 `shift` 3 = -16
+-2 `shiftL` 0 = -2
+-2 `shiftL` 1 = -4
+-2 `shiftL` 2 = -8
+-2 `shiftL` 3 = -16
  
--1 `shift` 0 = -1
--1 `shift` 1 = -2
--1 `shift` 2 = -4
--1 `shift` 3 = -8
+-1 `shiftL` 0 = -1
+-1 `shiftL` 1 = -2
+-1 `shiftL` 2 = -4
+-1 `shiftL` 3 = -8
  
-0 `shift` 0 = 0
-0 `shift` 1 = 0
-0 `shift` 2 = 0
-0 `shift` 3 = 0
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
  
-1 `shift` 0 = 1
-1 `shift` 1 = 2
-1 `shift` 2 = 4
-1 `shift` 3 = 8
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
  
-2 `shift` 0 = 2
-2 `shift` 1 = 4
-2 `shift` 2 = 8
-2 `shift` 3 = 16
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
  
-3 `shift` 0 = 3
-3 `shift` 1 = 6
-3 `shift` 2 = 12
-3 `shift` 3 = 24
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+ 
+#
+-3 `shiftR` 0 = -3
+-3 `shiftR` 1 = -2
+-3 `shiftR` 2 = -1
+-3 `shiftR` 3 = -1
+ 
+-2 `shiftR` 0 = -2
+-2 `shiftR` 1 = -1
+-2 `shiftR` 2 = -1
+-2 `shiftR` 3 = -1
+ 
+-1 `shiftR` 0 = -1
+-1 `shiftR` 1 = -1
+-1 `shiftR` 2 = -1
+-1 `shiftR` 3 = -1
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
  
 #
 -3 `rotate` -3 = -1342177281
@@ -5031,40 +5139,76 @@ complement 1 = 254
 complement 2 = 253
 complement 3 = 252
 #
-253 `shift` 0 = 253
-253 `shift` 1 = 250
-253 `shift` 2 = 244
-253 `shift` 3 = 232
+253 `shiftL` 0 = 253
+253 `shiftL` 1 = 250
+253 `shiftL` 2 = 244
+253 `shiftL` 3 = 232
  
-254 `shift` 0 = 254
-254 `shift` 1 = 252
-254 `shift` 2 = 248
-254 `shift` 3 = 240
+254 `shiftL` 0 = 254
+254 `shiftL` 1 = 252
+254 `shiftL` 2 = 248
+254 `shiftL` 3 = 240
  
-255 `shift` 0 = 255
-255 `shift` 1 = 254
-255 `shift` 2 = 252
-255 `shift` 3 = 248
+255 `shiftL` 0 = 255
+255 `shiftL` 1 = 254
+255 `shiftL` 2 = 252
+255 `shiftL` 3 = 248
  
-0 `shift` 0 = 0
-0 `shift` 1 = 0
-0 `shift` 2 = 0
-0 `shift` 3 = 0
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
  
-1 `shift` 0 = 1
-1 `shift` 1 = 2
-1 `shift` 2 = 4
-1 `shift` 3 = 8
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
  
-2 `shift` 0 = 2
-2 `shift` 1 = 4
-2 `shift` 2 = 8
-2 `shift` 3 = 16
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
  
-3 `shift` 0 = 3
-3 `shift` 1 = 6
-3 `shift` 2 = 12
-3 `shift` 3 = 24
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+ 
+#
+253 `shiftR` 0 = 253
+253 `shiftR` 1 = 126
+253 `shiftR` 2 = 63
+253 `shiftR` 3 = 31
+ 
+254 `shiftR` 0 = 254
+254 `shiftR` 1 = 127
+254 `shiftR` 2 = 63
+254 `shiftR` 3 = 31
+ 
+255 `shiftR` 0 = 255
+255 `shiftR` 1 = 127
+255 `shiftR` 2 = 63
+255 `shiftR` 3 = 31
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
  
 #
 253 `rotate` -3 = 191
@@ -6354,40 +6498,76 @@ complement 1 = 65534
 complement 2 = 65533
 complement 3 = 65532
 #
-65533 `shift` 0 = 65533
-65533 `shift` 1 = 65530
-65533 `shift` 2 = 65524
-65533 `shift` 3 = 65512
+65533 `shiftL` 0 = 65533
+65533 `shiftL` 1 = 65530
+65533 `shiftL` 2 = 65524
+65533 `shiftL` 3 = 65512
  
-65534 `shift` 0 = 65534
-65534 `shift` 1 = 65532
-65534 `shift` 2 = 65528
-65534 `shift` 3 = 65520
+65534 `shiftL` 0 = 65534
+65534 `shiftL` 1 = 65532
+65534 `shiftL` 2 = 65528
+65534 `shiftL` 3 = 65520
  
-65535 `shift` 0 = 65535
-65535 `shift` 1 = 65534
-65535 `shift` 2 = 65532
-65535 `shift` 3 = 65528
+65535 `shiftL` 0 = 65535
+65535 `shiftL` 1 = 65534
+65535 `shiftL` 2 = 65532
+65535 `shiftL` 3 = 65528
  
-0 `shift` 0 = 0
-0 `shift` 1 = 0
-0 `shift` 2 = 0
-0 `shift` 3 = 0
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
  
-1 `shift` 0 = 1
-1 `shift` 1 = 2
-1 `shift` 2 = 4
-1 `shift` 3 = 8
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
  
-2 `shift` 0 = 2
-2 `shift` 1 = 4
-2 `shift` 2 = 8
-2 `shift` 3 = 16
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
  
-3 `shift` 0 = 3
-3 `shift` 1 = 6
-3 `shift` 2 = 12
-3 `shift` 3 = 24
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+ 
+#
+65533 `shiftR` 0 = 65533
+65533 `shiftR` 1 = 32766
+65533 `shiftR` 2 = 16383
+65533 `shiftR` 3 = 8191
+ 
+65534 `shiftR` 0 = 65534
+65534 `shiftR` 1 = 32767
+65534 `shiftR` 2 = 16383
+65534 `shiftR` 3 = 8191
+ 
+65535 `shiftR` 0 = 65535
+65535 `shiftR` 1 = 32767
+65535 `shiftR` 2 = 16383
+65535 `shiftR` 3 = 8191
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
  
 #
 65533 `rotate` -3 = 49151
@@ -7677,40 +7857,76 @@ complement 1 = 4294967294
 complement 2 = 4294967293
 complement 3 = 4294967292
 #
-4294967293 `shift` 0 = 4294967293
-4294967293 `shift` 1 = 4294967290
-4294967293 `shift` 2 = 4294967284
-4294967293 `shift` 3 = 4294967272
+4294967293 `shiftL` 0 = 4294967293
+4294967293 `shiftL` 1 = 4294967290
+4294967293 `shiftL` 2 = 4294967284
+4294967293 `shiftL` 3 = 4294967272
  
-4294967294 `shift` 0 = 4294967294
-4294967294 `shift` 1 = 4294967292
-4294967294 `shift` 2 = 4294967288
-4294967294 `shift` 3 = 4294967280
+4294967294 `shiftL` 0 = 4294967294
+4294967294 `shiftL` 1 = 4294967292
+4294967294 `shiftL` 2 = 4294967288
+4294967294 `shiftL` 3 = 4294967280
  
-4294967295 `shift` 0 = 4294967295
-4294967295 `shift` 1 = 4294967294
-4294967295 `shift` 2 = 4294967292
-4294967295 `shift` 3 = 4294967288
+4294967295 `shiftL` 0 = 4294967295
+4294967295 `shiftL` 1 = 4294967294
+4294967295 `shiftL` 2 = 4294967292
+4294967295 `shiftL` 3 = 4294967288
  
-0 `shift` 0 = 0
-0 `shift` 1 = 0
-0 `shift` 2 = 0
-0 `shift` 3 = 0
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
  
-1 `shift` 0 = 1
-1 `shift` 1 = 2
-1 `shift` 2 = 4
-1 `shift` 3 = 8
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
  
-2 `shift` 0 = 2
-2 `shift` 1 = 4
-2 `shift` 2 = 8
-2 `shift` 3 = 16
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
  
-3 `shift` 0 = 3
-3 `shift` 1 = 6
-3 `shift` 2 = 12
-3 `shift` 3 = 24
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+ 
+#
+4294967293 `shiftR` 0 = 4294967293
+4294967293 `shiftR` 1 = 2147483646
+4294967293 `shiftR` 2 = 1073741823
+4294967293 `shiftR` 3 = 536870911
+ 
+4294967294 `shiftR` 0 = 4294967294
+4294967294 `shiftR` 1 = 2147483647
+4294967294 `shiftR` 2 = 1073741823
+4294967294 `shiftR` 3 = 536870911
+ 
+4294967295 `shiftR` 0 = 4294967295
+4294967295 `shiftR` 1 = 2147483647
+4294967295 `shiftR` 2 = 1073741823
+4294967295 `shiftR` 3 = 536870911
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
  
 #
 4294967293 `rotate` -3 = 3221225471

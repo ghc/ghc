@@ -125,7 +125,8 @@ testBits zero = do
   table2 ".|.  "            (.|.)         xs ys
   table2 "`xor`"            xor           xs ys
   table1 "complement"       complement    xs
-  table2 "`shift`"          shift         xs [0..3] 
+  table2 "`shiftL`"         shiftL        xs [0..3] 
+  table2 "`shiftR`"         shiftR        xs [0..3] 
   table2 "`rotate`"         rotate        xs ([-3..3])
   table1 "bit"              (\ x -> (bit x) `asTypeOf` zero)   [(0::Int)..3]
   table2 "`setBit`"         setBit        xs [0..3]
