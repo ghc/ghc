@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.25 $
- * $Date: 2000/03/24 14:32:03 $
+ * $Revision: 1.26 $
+ * $Date: 2000/04/06 14:23:55 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -847,7 +847,7 @@ List lds; {
                          }
 
         case DICTVAR   : /* shouldn't really occur */
-                         assert(0); /* so let's test for it then! ADR */
+	  //assert(0); /* so let's test for it then! ADR */
         case VARIDCELL :
         case VAROPCELL : return addEqn(pat,expr,lds);
 
@@ -865,10 +865,15 @@ List lds; {
                          /* intentional fall-thru */
         case TUPLE     : {   List ps = getArgs(pat);
 
+                             /* get rid of leading dictionaries in args */
+                             if (isName(c) && isCfun(c)) {
+                                Int i = numQualifiers(name(c).type);
+                                for (; i > 0; i--) ps = tl(ps);
+                             }
+
                              if (nonNull(ps)) {
                                  Cell nv, sel;
                                  Int  i;
-
                                  if (isVar(expr) || isName(expr))
                                      nv  = expr;
                                  else {

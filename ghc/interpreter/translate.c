@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.31 $
- * $Date: 2000/04/05 10:25:09 $
+ * $Revision: 1.32 $
+ * $Date: 2000/04/06 14:23:55 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -454,11 +454,15 @@ Void stgDefn( Name n, Int arity, Cell e )
 Void implementCfun(c,scs)               /* Build implementation for constr */
 Name c;                                 /* fun c.  scs lists integers (1..)*/
 List scs; {                             /* in incr order of strict fields. */
-    Int a = name(c).arity;
+    Int  a  = name(c).arity;               /* arity, not incl dictionaries */
+    Int  ad = numQualifiers(name(c).type);   /* the number of dictionaries */
+    Type t  = name(c).type;
 
-    if (a > 0) {
+    /* a+ad is total arity for this fn */
+    if (a+ad > 0) {
         StgVar  vcurr, e1, v, vsi;
         List    args  = makeArgs(a);
+        List    argsd = makeArgs(ad);
         StgVar  v0    = mkStgVar(mkStgCon(c,args),NIL);
         List    binds = singleton(v0);
 
@@ -470,7 +474,7 @@ List scs; {                             /* in incr order of strict fields. */
         }
         binds = rev(binds);
         e1    = mkStgLet(binds,vcurr);
-        v     = mkStgVar(mkStgLambda(args,e1),NIL);
+        v     = mkStgVar(mkStgLambda(dupOnto(argsd,args),e1),NIL);
         name(c).stgVar = v;
     } else {
         StgVar v = mkStgVar(mkStgCon(c,NIL),NIL);

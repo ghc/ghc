@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.40 $
- * $Date: 2000/04/05 16:57:18 $
+ * $Revision: 1.41 $
+ * $Date: 2000/04/06 14:23:55 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE               /* a moderate level of sanity checking */
@@ -688,11 +688,11 @@ struct strTycon {
 extern struct strTycon* tabTycon;
 extern Int              tabTyconSz;
 
-extern Tycon newTycon     ( Text );
-extern Tycon findTycon    ( Text );
-extern Tycon addTycon     ( Tycon );
+extern Tycon newTycon      ( Text );
+extern Tycon findTycon     ( Text );
+extern Tycon addTycon      ( Tycon );
 extern Tycon findQualTycon ( Cell );
-extern Tycon addPrimTycon ( Text,Kind,Int,Cell,Cell );
+extern Tycon addPrimTycon  ( Text,Kind,Int,Cell,Cell );
 
 #define isSynonym(h)    (isTycon(h) && tycon(h).what==SYNONYM)
 #define isQualType(t)	(isPair(t) && fst(t)==QUAL)
@@ -704,6 +704,9 @@ extern Tycon addPrimTycon ( Text,Kind,Int,Cell,Cell );
 #define bang(t)         ap(BANG,t)
 
 extern Tycon findQualTyconWithoutConsultingExportList ( QualId q );
+
+extern Int numQualifiers   ( Type );
+
 
 /* --------------------------------------------------------------------------
  * Globally defined name values:

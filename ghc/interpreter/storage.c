@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.64 $
- * $Date: 2000/04/06 00:01:27 $
+ * $Revision: 1.65 $
+ * $Date: 2000/04/06 14:23:55 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -523,7 +523,7 @@ static Bool debugStorageExtra = FALSE;
             newTab[i].inUse = FALSE;                                    \
             newTab[i].nextFree = i-1+TAB_BASE_ADDR;                     \
          }                                                              \
-         if (debugStorageExtra)                                         \
+         if (0 && debugStorageExtra)                                    \
             fprintf(stderr, "Expanding " #type_name                     \
                             "table to size %d\n", newSz );              \
          newTab[tab_size].nextFree = TAB_BASE_ADDR-1;                   \
@@ -1532,6 +1532,15 @@ List getAllKnownTyconsAndClasses ( void )
    return xs;
 }
 
+Int numQualifiers ( Type t )
+{
+   if (isPolyType(t)) t = monotypeOf(t);
+   if (isQualType(t)) 
+       return length ( fst(snd(t)) ); else
+       return 0;
+}
+
+
 /* Purely for debugging. */
 void locateSymbolByName ( Text t )
 {
@@ -2013,7 +2022,7 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
     everybody(GCDONE);
 
 #if defined(DEBUG_STORAGE) || defined(DEBUG_STORAGE_EXTRA)
-    fprintf(stderr, "\n--- GC recovered %d\n",recovered );
+    /* fprintf(stderr, "\n--- GC recovered %d\n",recovered ); */
 #endif
 
     /* can only return if freeList is nonempty on return. */

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.33 $
- * $Date: 2000/04/06 00:01:27 $
+ * $Revision: 1.34 $
+ * $Date: 2000/04/06 14:23:55 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -800,7 +800,7 @@ Cell e; {                               /* requires polymorphism, qualified*/
         for (; nonNull(predsAre); predsAre=tl(predsAre)) {
             evs = cons(assumeEvid(hd(predsAre),typeOff),evs);
         }
-        if (!isName(h) || !isCfun(h)) {
+        /* we now _always_ do this: if (!isName(h) || !isCfun(h)) */ {
             h = applyToArgs(h,rev(evs));
         }
     }
