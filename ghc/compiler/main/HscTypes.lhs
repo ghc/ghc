@@ -21,10 +21,12 @@ module HscTypes (
 
 	WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
-	IfaceInsts, IfaceRules, Deprecations(..), GatedDecl,
+	IfaceInsts, IfaceRules, GatedDecl,
 	OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
 	AvailEnv, AvailInfo, GenAvailInfo(..),
 	PersistentCompilerState(..),
+
+	Deprecations(..), lookupDeprec,
 
 	InstEnv, ClsInstEnv, DFunId,
 
@@ -265,6 +267,13 @@ data Deprecations = NoDeprecs
 	 	  | DeprecAll DeprecTxt			-- Whole module deprecated
 		  | DeprecSome (NameEnv DeprecTxt)	-- Some things deprecated
 							-- Just "big" names
+
+lookupDeprec :: ModIface -> Name -> Maybe DeprecTxt
+lookupDeprec iface name
+  = case mi_deprecs iface of
+	NoDeprecs      -> Nothing
+	DeprecAll txt  -> Just txt
+	DeprecSome env -> lookupNameEnv env name
 
 type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
 type ClsInstEnv = [(TyVarSet, [Type], DFunId)]	-- The instances for a particular class

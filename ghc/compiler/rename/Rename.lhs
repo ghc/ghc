@@ -66,7 +66,9 @@ import IO		( openFile, IOMode(..) )
 import HscTypes		( Finder, PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
 			  ModIface(..), TyThing(..),
 			  GlobalRdrEnv, AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
-			  Provenance(..), pprNameProvenance, ImportReason(..) )
+			  Provenance(..), pprNameProvenance, ImportReason(..),
+			  lookupDeprec
+			 )
 import List		( partition, nub )
 \end{code}
 
@@ -765,8 +767,8 @@ reportUnusedNames mod_name direct_import_mods
     		       not (maybeToBool (lookupFM minimal_imports m)),
     		       m /= pRELUDE_Name]
     
-    module_unused :: ModuleName -> Bool
-    module_unused mod = mod `elem` unused_imp_mods
+    module_unused :: Module -> Bool
+    module_unused mod = moduleName mod `elem` unused_imp_mods
 
 
 warnDeprecations used_names
@@ -786,14 +788,12 @@ warnDeprecations used_names
   where
     lookup_deprec hit pit n
 	= case lookupModuleEnv hit mod of
-		Just iface -> lookup_iface iface n
+		Just iface -> lookupDeprec iface n
 		Nothing	   -> case lookupModuleEnv pit mod of
-				Just iface -> lookup_iface iface n
+				Just iface -> lookupDeprec iface n
 				Nothing	   -> pprPanic "warnDeprecations:" (ppr n)
 	where
 	  mod = nameModule n
-
-    lookup_iface iface n = lookupNameEnv (mi_deprecs iface) n
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports mod_name imps
