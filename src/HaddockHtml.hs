@@ -312,9 +312,7 @@ ppHtmlModule odir title source_url inst_maps (Module mod,iface) = do
 
 ifaceToHtml :: String -> Interface -> InstMaps -> HtmlTable
 ifaceToHtml mod iface inst_maps
-  | null exports = Html.emptyTable
-  | otherwise    = 
-	abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: body)
+  = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: body)
   where 
 	exports = numberSectionHeadings (iface_exports iface)
 
@@ -349,6 +347,7 @@ ifaceToHtml mod iface inst_maps
 	maybe_doc_hdr
 	     | not (no_doc_at_all) = 
 		case exports of
+		   [] -> Html.emptyTable
 		   ExportGroup _ _ _ : _ -> Html.emptyTable
 		   _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 	     | otherwise  = Html.emptyTable
