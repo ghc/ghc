@@ -20,6 +20,8 @@ module Channel
 	dupChan,	 -- :: Chan a -> IO (Chan a)
 	unGetChan,	 -- :: Chan a -> a -> IO ()
 
+	isEmptyChan,     -- :: Chan a -> IO Bool
+
 	 {- stream interface -}
 	getChanContents, -- :: Chan a -> IO [a]
 	writeList2Chan	 -- :: Chan a -> [a] -> IO ()
@@ -95,6 +97,14 @@ unGetChan (Chan read write) val = do
    read_end     <- takeMVar read
    putMVar new_read_end (ChItem val read_end)
    putMVar read new_read_end
+
+isEmptyChan :: Chan a -> IO Bool
+isEmptyChan (Chan read write) = do
+   r <- takeMVar read
+   w <- readMVar write
+   let eq = r == w
+   eq `seq` putMVar read r
+   return eq
 
 \end{code}
 
