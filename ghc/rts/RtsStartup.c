@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.78 2003/09/26 12:12:35 panne Exp $
+ * $Id: RtsStartup.c,v 1.79 2004/02/27 13:35:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -324,13 +324,13 @@ hs_exit(void)
     /* start timing the shutdown */
     stat_startExit();
     
-    /* stop all running tasks */
-    exitScheduler();
-    
 #if !defined(GRAN)
     /* Finalize any remaining weak pointers */
     finalizeWeakPointersNow();
 #endif
+    
+    /* stop all running tasks */
+    exitScheduler();
     
 #if defined(GRAN)
     /* end_gr_simulation prints global stats if requested -- HWL */
