@@ -146,7 +146,7 @@ sub init_TARGET_STUFF {
     $T_X86_PRE_LLBL	    = 'L';
     $T_X86_BADJMP   = '^\tjmp [^L\*]';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.stab[^n].*|\.type\s+.*|\.size\s+.*|\.lcomm.*)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s.*|\.globl\s+\S+|\.text|\.data|\.stab[^n].*|\.type\s+.*|\.size\s+.*|\.lcomm.*)\n)';
     $T_COPY_DIRVS   = '\.(globl|stab|lcomm)';
     $T_DOT_WORD	    = '\.(long|word|value|byte|space)';
     $T_DOT_GLOBAL   = '\.globl';
@@ -172,7 +172,7 @@ sub init_TARGET_STUFF {
     $T_X86_PRE_LLBL	    = '.L';
     $T_X86_BADJMP   = '^\tjmp\s+[^\.\*]';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,\s*0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+\s*,\s*\d+|\.ident.*|\.local.*)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s.*|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+\s*,\s*\d+|\.ident.*|\.local.*)\n)';
     $T_COPY_DIRVS   = '^\s*\.(globl|type|size|local)';
 
     $T_DOT_WORD	    = '\.(long|value|word|byte|zero)';
@@ -1362,8 +1362,16 @@ sub print_doctored {
     #   movl $_blah,<bad-reg>
     #   jmp  *<bad-reg>
     #
+    s/^\tmovl\s+\$${T_US}(.*),\s*(\%e[acd]x)\n\tjmp\s+\*\2/\tjmp $T_US$1/g;
 
-    s/^\tmovl\s+\$${T_US}(.*),\s*(\%e[abcd]x)\n\tjmp\s+\*\2/\tjmp $T_US$1/g;
+    # Catch things like
+    #
+    #    movl -4(%ebx), %eax
+    #    jmp  *%eax
+    # 
+    # and optimise:
+    #
+    s/^\tmovl\s+(-?\d*\(\%e(bx|si)\)),\s*(\%e[acd]x)\n\tjmp\s+\*\3/\tjmp\t\*$1/g;
 
     if ($StolenX86Regs <= 2 ) { # YURGH! spurious uses of esi?
 	s/^\tmovl\s+(.*),\s*\%esi\n\tjmp\s+\*%esi\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
