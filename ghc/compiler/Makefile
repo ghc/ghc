@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.191 2001/08/17 22:29:06 sof Exp $
+# $Id: Makefile,v 1.192 2001/10/12 14:27:28 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -18,7 +18,11 @@ WAYS=$(GhcCompilerWays)
 # equivalent of `env' if it doesn't exist locally).
 #
 ifneq "$(way)" "dll"
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HS_PROG=ghc$(_way)-$(ProjectVersion)
+else
+HS_PROG=ghc$(_way)
+endif
 else
 HS_PROG=ghc-$(ProjectVersion)
 endif
@@ -400,7 +404,11 @@ CLEAN_FILES += ghc-inplace
 # but put it together with the libraries.
 # Also don't want any interface files intstalled
 
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_LIBEXECS += $(HS_PROG)
+else
+INSTALL_PROGS += $(HS_PROG)
+endif
 
 #-----------------------------------------------------------------------------
 # 		clean
