@@ -964,9 +964,11 @@ wlkExtName (U_just pt)
 rdCallConv :: Int -> UgnM CallConv
 rdCallConv x = returnUgn x
 
-rdImpExp :: Int -> Bool -> UgnM (Maybe Bool)
-rdImpExp 0 isUnsafe = -- foreign import
-  returnUgn (Just isUnsafe)
+rdForKind :: Int -> Bool -> UgnM ForKind
+rdForKind 0 isUnsafe = -- foreign import
+  returnUgn (FoImport isUnsafe)
 rdImpExp 1 _ = -- foreign export
-  returnUgn Nothing
+  returnUgn FoExport
+rdImpExp 2 _ = -- foreign label
+  returnUgn FoLabel
 \end{code}

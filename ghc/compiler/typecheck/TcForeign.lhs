@@ -21,7 +21,7 @@ module TcForeign
 
 import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
 			  ExtName(..), isDynamic, MonoBinds(..),
-			  OutPat(..)
+			  OutPat(..), ForKind(..)
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
@@ -79,20 +79,22 @@ tcForeignExports decls =
 
 -- defines a binding
 isForeignImport :: ForeignDecl name -> Bool
-isForeignImport (ForeignDecl _ (Just _) _ _ _ _)      = True
-isForeignImport (ForeignDecl _ Nothing _ Dynamic _ _) = True
-isForeignImport _				      = False
+isForeignImport (ForeignDecl _ k _ dyn _ _) =
+  case k of
+    FoImport _ -> True
+    FoExport   -> case dyn of { Dynamic -> True ; _ -> False }
+    FoLabel    -> True
 
 -- exports a binding
 isForeignExport :: ForeignDecl name -> Bool
-isForeignExport (ForeignDecl _ Nothing _ ext_nm _ _) = not (isDynamic ext_nm)
-isForeignExport _				     = False
+isForeignExport (ForeignDecl _ FoExport _ ext_nm _ _) = not (isDynamic ext_nm)
+isForeignExport _				      = False
 
 \end{code}
 
 \begin{code}
 tcFImport :: RenamedForeignDecl -> TcM s (Id, TypecheckedForeignDecl)
-tcFImport fo@(ForeignDecl nm Nothing hs_ty Dynamic cconv src_loc) =
+tcFImport fo@(ForeignDecl nm FoExport hs_ty Dynamic cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
    tcHsType hs_ty		    `thenTc`	\ sig_ty ->
@@ -105,7 +107,20 @@ tcFImport fo@(ForeignDecl nm Nothing hs_ty Dynamic cconv src_loc) =
      (arg_tys, res_ty) -> 
 	checkForeignExport True t_ty arg_tys res_ty `thenTc_`
 	let i = (mkUserId nm sig_ty) in
-	returnTc (i, (ForeignDecl i Nothing undefined Dynamic cconv src_loc))
+	returnTc (i, (ForeignDecl i FoExport undefined Dynamic cconv src_loc))
+
+tcFImport fo@(ForeignDecl nm FoLabel hs_ty ext_nm cconv src_loc) =
+   tcAddSrcLoc src_loc		     $
+   tcAddErrCtxt (foreignDeclCtxt fo) $
+   tcHsType hs_ty		    `thenTc`	\ sig_ty ->
+   let
+      -- drop the foralls before inspecting the structure
+      -- of the foreign type.
+    (_, t_ty) = splitForAllTys sig_ty
+   in
+   check (isAddrTy t_ty) (illegalForeignTyErr False{-result-} sig_ty) `thenTc_`
+   let i = (mkUserId nm sig_ty) in
+   returnTc (i, (ForeignDecl i FoLabel undefined ext_nm cconv src_loc))
 
 tcFImport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $

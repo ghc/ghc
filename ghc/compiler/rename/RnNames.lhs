@@ -16,7 +16,7 @@ import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports,
 
 import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..), 
 		  IE(..), ieName, 
-		  ForeignDecl(..), ExtName(..),
+		  ForeignDecl(..), ExtName(..), ForKind(..),
 		  FixityDecl(..),
 		  collectTopBinders
 		)
@@ -226,12 +226,17 @@ importsFromLocalDecls rec_exp_fn (HsModule mod _ _ _ fix_decls decls _)
 	returnRn (val_avails ++ avails)
 
     -- foreign import declaration
-    getLocalDeclBinders avails (ForD (ForeignDecl nm (Just _) _ _ _ loc))
+    getLocalDeclBinders avails (ForD (ForeignDecl nm (FoImport _) _ _ _ loc))
+      = do_one (nm,loc)			    `thenRn` \ for_avail ->
+	returnRn (for_avail : avails)
+
+    -- foreign import declaration
+    getLocalDeclBinders avails (ForD (ForeignDecl nm FoLabel _ _ _ loc))
       = do_one (nm,loc)			    `thenRn` \ for_avail ->
 	returnRn (for_avail : avails)
 
     -- foreign export dynamic declaration
-    getLocalDeclBinders avails (ForD (ForeignDecl nm Nothing _ Dynamic _ loc))
+    getLocalDeclBinders avails (ForD (ForeignDecl nm FoExport _ Dynamic _ loc))
       = do_one (nm,loc)			    `thenRn` \ for_avail ->
 	returnRn (for_avail : avails)
 

@@ -354,7 +354,7 @@ instance (NamedThing name, Outputable name)
 data ForeignDecl name = 
    ForeignDecl 
         name 
-	(Maybe Bool)   -- Nothing => foreign export; Just unsafe => foreign import unsafe
+	ForKind   
 	(HsType name)
 	ExtName
 	CallConv
@@ -369,8 +369,16 @@ instance (NamedThing name, Outputable name)
         where
          (ppr_imp_exp, ppr_unsafe) =
 	   case imp_exp of
-	     Nothing -> (ptext SLIT("export"), empty)
-	     Just us -> (ptext SLIT("import"), ptext SLIT("unsafe"))
+	     FoLabel     -> (ptext SLIT("label"), empty)
+	     FoExport    -> (ptext SLIT("export"), empty)
+	     FoImport us 
+		| us        -> (ptext SLIT("import"), ptext SLIT("unsafe"))
+		| otherwise -> (ptext SLIT("import"), empty)
+
+data ForKind
+ = FoLabel
+ | FoExport
+ | FoImport Bool -- True  => unsafe call.
 
 data ExtName
  = Dynamic 

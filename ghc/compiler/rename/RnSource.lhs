@@ -35,7 +35,9 @@ import FiniteMap	( lookupFM )
 import Id		( GenId{-instance NamedThing-} )
 import IdInfo		( FBTypeInfo, ArgUsageInfo )
 import Lex		( isLexCon )
-import PrelInfo		( derivingOccurrences, evalClass_RDR, numClass_RDR, allClass_NAME )
+import PrelInfo		( derivingOccurrences, evalClass_RDR, numClass_RDR, allClass_NAME,
+			  ioOkDataCon_NAME
+			)
 import Maybes		( maybeToBool )
 import Bag		( bagToList )
 import Outputable
@@ -309,15 +311,22 @@ rnDecl (DefD (DefaultDecl tys src_loc))
 rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
   = pushSrcLocRn src_loc $
     lookupBndrRn name		        `thenRn` \ name' ->
-    (if is_export then
+    (if is_import then
         addImplicitOccRn name'
      else
 	returnRn name')			`thenRn_`
     rnHsSigType fo_decl_msg ty		`thenRn` \ ty' ->
+     -- hack: force the constructors of IO to be slurped in,
+     -- since we need 'em when desugaring a foreign decl.
+    addImplicitOccRn ioOkDataCon_NAME   `thenRn_`
     returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc))
  where
   fo_decl_msg = ptext SLIT("a foreign declaration")
-  is_export   = not (maybeToBool imp_exp) && not (isDynamic ext_nm)
+  is_import   = 
+     not (isDynamic ext_nm) &&
+     case imp_exp of
+       FoImport _ -> True
+       _          -> False
 
 \end{code}
 

@@ -19,7 +19,7 @@ import DsCCall		( getIoOkDataCon, boxResult, unboxArg,
 import DsMonad
 import DsUtils
 
-import HsSyn		( ExtName(..), ForeignDecl(..), isDynamic )
+import HsSyn		( ExtName(..), ForeignDecl(..), isDynamic, ForKind(..) )
 import CallConv
 import TcHsSyn		( maybeBoxedPrimType, TypecheckedForeignDecl )
 import CoreUtils	( coreExprType )
@@ -51,7 +51,8 @@ import TysWiredIn	( getStatePairingConInfo,
 			  realWorldStateTy, stateDataCon,
 			  isFFIArgumentTy, unitTy,
 			  addrTy, stablePtrTyCon,
-			  stateAndPtrPrimDataCon
+			  stateAndPtrPrimDataCon,
+			  addrDataCon
 			)
 import Outputable
 \end{code}
@@ -83,6 +84,9 @@ dsForeigns fos = foldlDs combine ([],[],empty,empty,empty) fos
     | isForeignImport = 
         dsFImport i (idType i) uns ext_nm cconv  `thenDs` \ b -> 
 	returnDs (b:acc_fi, acc_fe, acc_hc, acc_h, acc_c)
+    | isForeignLabel = 
+        dsFLabel i ext_nm `thenDs` \ b -> 
+	returnDs (b:acc_fi, acc_fe, acc_hc, acc_h, acc_c)
     | isDynamic ext_nm =
         dsFExportDynamic i (idType i) ext_nm cconv  `thenDs` \ (fi,fe,hc,h,c) -> 
 	returnDs (fi:acc_fi, fe:acc_fe, hc $$ acc_hc, h $$ acc_h, c $$ acc_c)
@@ -91,8 +95,17 @@ dsForeigns fos = foldlDs combine ([],[],empty,empty,empty) fos
 	returnDs (acc_fi, fe:acc_fe, hc $$ acc_hc, h $$ acc_h, c $$ acc_c)
 
    where
-    isForeignImport = maybeToBool imp_exp
-    (Just uns)      = imp_exp
+    isForeignImport = 
+	case imp_exp of
+	  FoImport _ -> True
+	  _          -> False
+
+    isForeignLabel = 
+	case imp_exp of
+	  FoLabel -> True
+	  _       -> False
+
+    (FoImport uns)   = imp_exp
 
 \end{code}
 
@@ -148,6 +161,21 @@ mkArgs ty =
    (tvs, sans_foralls) = splitForAllTys ty
         
 \end{code}
+
+
+\begin{code}
+dsFLabel :: Id -> ExtName -> DsM CoreBinding
+dsFLabel nm ext_name =
+    returnDs (NonRec nm fo_rhs)
+  where
+   fo_rhs = mkCon addrDataCon [] [LitArg (MachLitLit enm AddrRep)]
+   enm    =
+    case ext_name of
+      ExtName f _ -> f
+
+\end{code}
+
+
 
 \begin{code}
 dsFExport :: Id

@@ -197,7 +197,6 @@ cvOtherDecls b
     go acc (RdrClassDecl d)	  = ClD d   : acc
     go acc (RdrInstDecl d)	  = InstD d : acc 
     go acc (RdrDefaultDecl d)     = DefD d  : acc
---    go acc (RdrForeignDecl d)     = ForD d  : acc
     go acc other		  = acc
 	-- Ignore value bindings
 
