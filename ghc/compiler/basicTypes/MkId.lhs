@@ -42,7 +42,7 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 			)
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
-import Rules		( addRule )
+import Rules		( addRules )
 import Type		( TyThing(..) )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
 			  mkTyConApp, mkTyVarTys, mkClassPred, tcEqPred,
@@ -669,7 +669,7 @@ mkPrimOpId prim_op
 	   `setArityInfo` 	arity
 	   `setAllStrictnessInfo` Just strict_sig
 
-    rules = foldl (addRule id) emptyCoreRules (primOpRules prim_op)
+    rules = addRules id emptyCoreRules (primOpRules prim_op)
 
 
 -- For each ccall we manufacture a separate CCallOpId, giving it

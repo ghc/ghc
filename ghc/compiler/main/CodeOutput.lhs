@@ -19,7 +19,6 @@ import IlxGen		( ilxGen )
 
 #ifdef JAVA
 import JavaGen		( javaGen )
-import OccurAnal	( occurAnalyseBinds )
 import qualified PrintJava
 import OccurAnal	( occurAnalyseBinds )
 #endif

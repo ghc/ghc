@@ -321,7 +321,8 @@ pprIdDetails id | isGlobalId id     = ppr (globalIdDetails id)
 
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo b info
-  = hsep [  ppArityInfo a,
+  = brackets $
+    vcat [  ppArityInfo a,
 	    ppWorkerInfo (workerInfo info),
 	    ppCafInfo (cafInfo info),
 #ifdef OLD_STRICTNESS
@@ -329,7 +330,8 @@ ppIdInfo b info
             ppCprInfo m,
 #endif
 	    pprNewStrictness (newStrictnessInfo info),
-	    vcat (map (pprCoreRule (ppr b)) (rulesRules p))
+	    if null rules then empty
+	    else ptext SLIT("RULES:") <+> vcat (map (pprCoreRule (ppr b)) rules)
 	-- Inline pragma, occ, demand, lbvar info
 	-- printed out with all binders (when debug is on); 
 	-- see PprCore.pprIdBndr
@@ -340,7 +342,7 @@ ppIdInfo b info
     s = strictnessInfo info
     m = cprInfo info
 #endif
-    p = specInfo info
+    rules = rulesRules (specInfo info)
 \end{code}
 
 

@@ -9,7 +9,7 @@ module Rules (
 	extendRuleBaseList, 
 	ruleBaseIds, pprRuleBase, ruleCheckProgram,
 
-        lookupRule, addRule, addIdSpecialisations
+        lookupRule, addRule, addRules, addIdSpecialisations
     ) where
 
 #include "HsVersions.h"
@@ -347,7 +347,8 @@ match_ty menv (tv_subst, id_subst) ty1 ty2
 %************************************************************************
 
 \begin{code}
-addRule :: Id -> CoreRules -> CoreRule -> CoreRules
+addRules :: Id -> CoreRules -> [CoreRule] -> CoreRules
+addRule  :: Id -> CoreRules -> CoreRule -> CoreRules
 
 -- Add a new rule to an existing bunch of rules.
 -- The rules are for the given Id; the Id argument is needed only
@@ -360,6 +361,8 @@ addRule :: Id -> CoreRules -> CoreRule -> CoreRules
 --
 -- We make no check for rules that unify without one dominating
 -- the other.   Arguably this would be a bug.
+
+addRules id rules rule_list = foldl (addRule id) rules rule_list
 
 addRule id (Rules rules rhs_fvs) rule@(BuiltinRule _ _)
   = Rules (rule:rules) rhs_fvs
@@ -393,7 +396,7 @@ addIdSpecialisations :: Id -> [CoreRule] -> Id
 addIdSpecialisations id rules
   = setIdSpecialisation id new_specs
   where
-    new_specs = foldl (addRule id) (idSpecialisation id) rules
+    new_specs = addRules id (idSpecialisation id) rules
 \end{code}
 
 

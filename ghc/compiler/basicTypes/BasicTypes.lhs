@@ -374,11 +374,11 @@ isFragileOcc other	  = False
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
   ppr NoOccInfo  			  	  = empty
-  ppr IAmALoopBreaker 				  = ptext SLIT("_Kx")
-  ppr IAmDead					  = ptext SLIT("_Kd")
-  ppr (OneOcc inside_lam one_branch) | inside_lam = ptext SLIT("_Kl")
-				     | one_branch = ptext SLIT("_Ks")
-				     | otherwise  = ptext SLIT("_Ks*")
+  ppr IAmALoopBreaker 				  = ptext SLIT("LoopBreaker")
+  ppr IAmDead					  = ptext SLIT("Dead")
+  ppr (OneOcc inside_lam one_branch) | inside_lam = ptext SLIT("OnceInLam")
+				     | one_branch = ptext SLIT("Once")
+				     | otherwise  = ptext SLIT("OnceEachBranch")
 
 instance Show OccInfo where
   showsPrec p occ = showsPrecSDoc p (ppr occ)

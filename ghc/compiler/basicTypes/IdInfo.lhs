@@ -16,7 +16,6 @@ module IdInfo (
 
 	-- Zapping
 	zapLamInfo, zapDemandInfo,
-	shortableIdInfo, copyIdInfo,
 
 	-- Arity
 	ArityInfo,
@@ -481,7 +480,7 @@ seqWorker (HasWorker id a) = id `seq` a `seq` ()
 seqWorker NoWorker	   = ()
 
 ppWorkerInfo NoWorker            = empty
-ppWorkerInfo (HasWorker wk_id _) = ptext SLIT("__P") <+> ppr wk_id
+ppWorkerInfo (HasWorker wk_id _) = ptext SLIT("Worker") <+> ppr wk_id
 
 workerExists :: WorkerInfo -> Bool
 workerExists NoWorker        = False
@@ -654,70 +653,3 @@ zapDemandInfo info@(IdInfo {newDemandInfo = dmd})
   | otherwise  = Nothing
 \end{code}
 
-
-copyIdInfo is used when shorting out a top-level binding
-	f_local = BIG
-	f = f_local
-where f is exported.  We are going to swizzle it around to
-	f = BIG
-	f_local = f
-
-BUT (a) we must be careful about messing up rules
-    (b) we must ensure f's IdInfo ends up right
-
-(a) Messing up the rules
-~~~~~~~~~~~~~~~~~~~~
-The example that went bad on me was this one:
-	
-    iterate :: (a -> a) -> a -> [a]
-    iterate = iterateList
-    
-    iterateFB c f x = x `c` iterateFB c f (f x)
-    iterateList f x =  x : iterateList f (f x)
-    
-    {-# RULES
-    "iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
-    "iterateFB" 		iterateFB (:) = iterateList
-     #-}
-
-This got shorted out to:
-
-    iterateList :: (a -> a) -> a -> [a]
-    iterateList = iterate
-    
-    iterateFB c f x = x `c` iterateFB c f (f x)
-    iterate f x =  x : iterate f (f x)
-    
-    {-# RULES
-    "iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
-    "iterateFB" 		iterateFB (:) = iterate
-     #-}
-
-And now we get an infinite loop in the rule system 
-	iterate f x -> build (\cn -> iterateFB c f x)
-		    -> iterateFB (:) f x
-		    -> iterate f x
-
-Tiresome solution: don't do shorting out if f has rewrite rules.
-Hence shortableIdInfo.
-
-(b) Keeping the IdInfo right
-~~~~~~~~~~~~~~~~~~~~~~~~
-We want to move strictness/worker info from f_local to f, but keep the rest.
-Hence copyIdInfo.
-
-\begin{code}
-shortableIdInfo :: IdInfo -> Bool
-shortableIdInfo info = isEmptyCoreRules (specInfo info)
-
-copyIdInfo :: IdInfo	-- f_local
-  	   -> IdInfo	-- f (the exported one)
-	   -> IdInfo	-- New info for f
-copyIdInfo f_local f = f { newStrictnessInfo = newStrictnessInfo f_local,
-#ifdef OLD_STRICTNESS
-			   strictnessInfo = strictnessInfo f_local,
-			   cprInfo        = cprInfo        f_local,
-#endif
-			   workerInfo     = workerInfo     f_local
-			  }
-\end{code}

@@ -12,7 +12,7 @@ core expression with (hopefully) improved usage information.
 
 \begin{code}
 module OccurAnal (
-	occurAnalyseBinds, occurAnalyseGlobalExpr, occurAnalyseRule
+	occurAnalysePgm, occurAnalyseGlobalExpr, occurAnalyseRule, 
     ) where
 
 #include "HsVersions.h"
@@ -22,11 +22,9 @@ import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
 import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo,
-			  isExportedId, modifyIdInfo, idInfo, idArity,
-			  idSpecialisation, isLocalId,
+			  isExportedId, idArity, idSpecialisation, 
 			  idType, idUnique, Id
 			)
-import IdInfo		( copyIdInfo )
 import BasicTypes	( OccInfo(..), isOneOcc )
 
 import VarSet
@@ -52,6 +50,20 @@ import Outputable
 Here's the externally-callable interface:
 
 \begin{code}
+occurAnalysePgm :: [CoreBind] -> [CoreBind]
+occurAnalysePgm binds
+  = snd (go (initOccEnv emptyVarSet) binds)
+  where
+    go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
+    go env [] 
+	= (emptyDetails, [])
+    go env (bind:binds) 
+	= (final_usage, bind' ++ binds')
+	where
+	   new_env	        = env `addNewCands` (bindersOf bind)
+	   (bs_usage, binds')   = go new_env binds
+	   (final_usage, bind') = occAnalBind env bind bs_usage
+
 occurAnalyseGlobalExpr :: CoreExpr -> CoreExpr
 occurAnalyseGlobalExpr expr
   = 	-- Top level expr, so no interesting free vars, and
@@ -66,149 +78,6 @@ occurAnalyseRule (Rule str act tpl_vars tpl_args rhs)
   where
     (rhs_uds, rhs') = occAnal (initOccEnv (mkVarSet tpl_vars)) rhs
     (_, tpl_vars')  = tagBinders rhs_uds tpl_vars
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Top level stuff}
-%*									*
-%************************************************************************
-
-In @occAnalTop@ we do indirection-shorting.  That is, if we have this:
-
-	x_local = <expression>
-	...
-	x_exported = loc
-
-where exp is exported, and loc is not, then we replace it with this:
-
-	x_local = x_exported
-	x_exported = <expression>
-	...
-
-Without this we never get rid of the x_exported = x_local thing.  This
-save a gratuitous jump (from \tr{x_exported} to \tr{x_local}), and
-makes strictness information propagate better.  This used to happen in
-the final phase, but it's tidier to do it here.
-
-If more than one exported thing is equal to a local thing (i.e., the
-local thing really is shared), then we do one only:
-\begin{verbatim}
-	x_local = ....
-	x_exported1 = x_local
-	x_exported2 = x_local
-==>
-	x_exported1 = ....
-
-	x_exported2 = x_exported1
-\end{verbatim}
-
-We rely on prior eta reduction to simplify things like
-\begin{verbatim}
-	x_exported = /\ tyvars -> x_local tyvars
-==>
-	x_exported = x_local
-\end{verbatim}
-Hence,there's a possibility of leaving unchanged something like this:
-\begin{verbatim}
-	x_local = ....
-	x_exported1 = x_local Int
-\end{verbatim}
-By the time we've thrown away the types in STG land this 
-could be eliminated.  But I don't think it's very common
-and it's dangerous to do this fiddling in STG land 
-because we might elminate a binding that's mentioned in the
-unfolding for something.
-
-\begin{code}
-occurAnalyseBinds :: [CoreBind] -> [CoreBind]
-
-occurAnalyseBinds binds
-  = binds'
-  where
-    (_, _, binds') = go (initOccEnv emptyVarSet) binds
-
-    go :: OccEnv -> [CoreBind]
-       -> (UsageDetails, 	-- Occurrence info
-	   IdEnv Id,		-- Indirection elimination info
-				--   Maps local-id -> exported-id, but it embodies
-				--   bindings of the form exported-id = local-id in
-				--   the argument to go
-	   [CoreBind])		-- Occ-analysed bindings, less the exported-id=local-id ones
-
-    go env [] = (emptyDetails, emptyVarEnv, [])
-
-    go env (bind : binds)
-      = let
-	    new_env			   = env `addNewCands` (bindersOf bind)
-	    (scope_usage, ind_env, binds') = go new_env binds
-	    (final_usage, new_binds)       = occAnalBind env (zapBind ind_env bind) scope_usage
-						-- NB: I zap before occur-analysing, so
-						-- I don't need to worry about getting the
-						-- occ info on the new bindings right.
-	in
-        case bind of
-	    NonRec exported_id (Var local_id) 
-		| shortMeOut ind_env exported_id local_id
-		-- Special case for eliminating indirections
-		--   Note: it's a shortcoming that this only works for
-		--	   non-recursive bindings.  Elminating indirections
-		--	   makes perfect sense for recursive bindings too, but
-		--	   it's more complicated to implement, so I haven't done so
-		-> (scope_usage, ind_env', binds')
-		where
-		   ind_env' = extendVarEnv ind_env local_id exported_id
-
-	    other -> 	-- Ho ho! The normal case
-		     (final_usage, ind_env, new_binds ++ binds')
-		   
-
--- Deal with any indirections
-zapBind ind_env (NonRec bndr rhs) 
-  | bndr `elemVarEnv` ind_env 			   = Rec (zap ind_env (bndr,rhs))
-		-- The Rec isn't strictly necessary, but it's convenient
-zapBind ind_env (Rec pairs)
-  | or [id `elemVarEnv` ind_env | (id,_) <- pairs] = Rec (concat (map (zap ind_env) pairs))
-
-zapBind ind_env bind = bind
-
-zap ind_env pair@(local_id,rhs)
-  = case lookupVarEnv ind_env local_id of
-	Nothing          -> [pair]
-	Just exported_id -> [(local_id, Var exported_id),
-			     (exported_id', rhs)]
-			 where
-			    exported_id' = modifyIdInfo (copyIdInfo (idInfo local_id)) exported_id
-			
-shortMeOut ind_env exported_id local_id
--- The if-then-else stuff is just so I can get a pprTrace to see
--- how often I don't get shorting out becuase of IdInfo stuff
-  = if isExportedId exported_id &&		-- Only if this is exported
-
-       isLocalId local_id &&			-- Only if this one is defined in this
-						-- 	module, so that we *can* change its
-				 	 	-- 	binding to be the exported thing!
-
-       not (isExportedId local_id) &&		-- Only if this one is not itself exported,
-					   	--	since the transformation will nuke it
-   
-       not (local_id `elemVarEnv` ind_env)	-- Only if not already substituted for
-    then
-	True
-
-{- No longer needed
-	if shortableIdInfo (idInfo exported_id) 	-- Only if its IdInfo is 'shortable'
-							-- (see the defn of IdInfo.shortableIdInfo)
-	then True
-	else 
-#ifdef DEBUG 
-          pprTrace "shortMeOut:" (ppr exported_id)
-#endif
-                                                False
--}
-    else
-	False
 \end{code}
 
 
@@ -537,11 +406,16 @@ occAnalRhs env id rhs
 	-- dies (because it isn't referenced any more), then the children will
 	-- die too unless they are already referenced directly.
 
-    final_usage = foldVarSet add rhs_usage (idRuleVars id)
+    final_usage = addRuleUsage rhs_usage id
+
+addRuleUsage :: UsageDetails -> Id -> UsageDetails
+-- Add the usage from RULES in Id to the usage
+addRuleUsage usage id
+  = foldVarSet add usage (idRuleVars id)
+  where
     add v u = addOneOcc u v NoOccInfo		-- Give a non-committal binder info
 						-- (i.e manyOcc) because many copies
 						-- of the specialised thing can appear
-
 \end{code}
 
 Expressions

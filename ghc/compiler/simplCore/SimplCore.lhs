@@ -15,14 +15,16 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 import CoreSyn
 import TcIface		( loadImportedRules )
 import HscTypes		( HscEnv(..), ModGuts(..), ExternalPackageState(..),
-			  ModDetails(..), HomeModInfo(..), HomePackageTable, Dependencies( dep_mods ), 
+			  Dependencies( dep_mods ), 
 			  hscEPS, hptRules )
 import CSE		( cseProgram )
 import Rules		( RuleBase, ruleBaseIds, emptyRuleBase,
 			  extendRuleBaseList, pprRuleBase, ruleCheckProgram )
-import Module		( elemModuleEnv, lookupModuleEnv )
 import PprCore		( pprCoreBindings, pprCoreExpr, pprIdRules )
-import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
+import OccurAnal	( occurAnalysePgm, occurAnalyseGlobalExpr )
+import IdInfo		( setNewStrictnessInfo, newStrictnessInfo, 
+			  setWorkerInfo, workerInfo,
+			  setSpecInfo, specInfo )
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplEnv		( SimplEnv, simplBinders, mkSimplEnv, setInScopeSet )
@@ -32,8 +34,11 @@ import CoreLint		( endPass )
 import VarEnv		( mkInScopeSet )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idIsFrom, idSpecialisation, setIdSpecialisation )
+import Id		( Id, modifyIdInfo, idInfo, idIsFrom, isExportedId, isLocalId,
+			  idSpecialisation, setIdSpecialisation )
+import Rules		( addRules )
 import VarSet
+import VarEnv
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
@@ -49,7 +54,7 @@ import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
 import Outputable
 import List		( partition )
-import Maybes		( orElse, fromJust )
+import Maybes		( orElse )
 \end{code}
 
 %************************************************************************
@@ -444,7 +449,11 @@ simplifyPgm mode switches hsc_env us rule_base guts
       | let sz = coreBindsSize (mg_binds guts) in sz == sz
       = do {
 		-- Occurrence analysis
-	   let { tagged_binds = _scc_ "OccAnal" occurAnalyseBinds (mg_binds guts) } ;
+	   let { short_inds   = _scc_ "ZapInd" shortOutIndirections (mg_binds guts) ;
+		 tagged_binds = _scc_ "OccAnal" occurAnalysePgm short_inds } ;
+
+	   dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Short indirections"
+		     (pprCoreBindings short_inds);
 
 	   dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
@@ -503,4 +512,197 @@ simplifyPgm mode switches hsc_env us rule_base guts
 	}  } } }
       where
   	  (us1, us2) = splitUniqSupply us
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Top-level occurrence analysis
+	[In here, not OccurAnal, because it uses 
+ 	 Rules.lhs, which depends on OccurAnal]
+%*									*
+%************************************************************************
+
+In @occAnalPgm@ we do indirection-shorting.  That is, if we have this:
+
+	x_local = <expression>
+	...bindings...
+	x_exported = x_local
+
+where x_exported is exported, and x_local is not, then we replace it with this:
+
+	x_exported = <expression>
+	x_local = x_exported
+	...bindings...
+
+Without this we never get rid of the x_exported = x_local thing.  This
+save a gratuitous jump (from \tr{x_exported} to \tr{x_local}), and
+makes strictness information propagate better.  This used to happen in
+the final phase, but it's tidier to do it here.
+
+STRICTNESS: if we have done strictness analysis, we want the strictness info on
+x_local to transfer to x_exported.  Hence the copyIdInfo call.
+
+RULES: we want to *add* any RULES for x_local to x_exported.
+
+Note [Rules and indirection-zapping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Problem: what if x_exported has a RULE that mentions something in ...bindings...?
+Then the things mentioned can be out of scope!  Solution
+ a) Make sure that in this pass the usage-info from x_exported is 
+	available for ...bindings...
+ b) If there are any such RULES, rec-ify the entire top-level. 
+    It'll get sorted out next time round
+
+Messing up the rules
+~~~~~~~~~~~~~~~~~~~~
+The example that went bad on me at one stage was this one:
+	
+    iterate :: (a -> a) -> a -> [a]
+	[Exported]
+    iterate = iterateList	
+    
+    iterateFB c f x = x `c` iterateFB c f (f x)
+    iterateList f x =  x : iterateList f (f x)
+    	[Not exported]
+    
+    {-# RULES
+    "iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
+    "iterateFB" 		iterateFB (:) = iterateList
+     #-}
+
+This got shorted out to:
+
+    iterateList :: (a -> a) -> a -> [a]
+    iterateList = iterate
+    
+    iterateFB c f x = x `c` iterateFB c f (f x)
+    iterate f x =  x : iterate f (f x)
+    
+    {-# RULES
+    "iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
+    "iterateFB" 		iterateFB (:) = iterate
+     #-}
+
+And now we get an infinite loop in the rule system 
+	iterate f x -> build (\cn -> iterateFB c f x)
+		    -> iterateFB (:) f x
+		    -> iterate f x
+
+Tiresome old solution: 
+	don't do shorting out if f has rewrite rules (see shortableIdInfo)
+
+New solution (I think): 
+	use rule switching-off pragmas to get rid 
+	of iterateList in the first place
+
+
+Other remarks
+~~~~~~~~~~~~~
+If more than one exported thing is equal to a local thing (i.e., the
+local thing really is shared), then we do one only:
+\begin{verbatim}
+	x_local = ....
+	x_exported1 = x_local
+	x_exported2 = x_local
+==>
+	x_exported1 = ....
+
+	x_exported2 = x_exported1
+\end{verbatim}
+
+We rely on prior eta reduction to simplify things like
+\begin{verbatim}
+	x_exported = /\ tyvars -> x_local tyvars
+==>
+	x_exported = x_local
+\end{verbatim}
+Hence,there's a possibility of leaving unchanged something like this:
+\begin{verbatim}
+	x_local = ....
+	x_exported1 = x_local Int
+\end{verbatim}
+By the time we've thrown away the types in STG land this 
+could be eliminated.  But I don't think it's very common
+and it's dangerous to do this fiddling in STG land 
+because we might elminate a binding that's mentioned in the
+unfolding for something.
+
+\begin{code}
+type IndEnv = IdEnv Id		-- Maps local_id -> exported_id
+
+shortOutIndirections :: [CoreBind] -> [CoreBind]
+shortOutIndirections binds
+  | isEmptyVarEnv ind_env = binds
+  | no_need_to_flatten	  = binds'
+  | otherwise 		  = [Rec (flattenBinds binds')]	-- See Note [Rules and indirect-zapping]
+  where
+    ind_env 	       = makeIndEnv binds
+    exp_ids 	       = varSetElems ind_env
+    exp_id_set	       = mkVarSet exp_ids
+    no_need_to_flatten = all (null . rulesRules . idSpecialisation) exp_ids
+    binds' 	       = concatMap zap binds
+
+    zap (NonRec bndr rhs) = [NonRec b r | (b,r) <- zapPair (bndr,rhs)]
+    zap (Rec pairs)	  = [Rec (concatMap zapPair pairs)]
+
+    zapPair (bndr, rhs)
+	| bndr `elemVarSet` exp_id_set 		   = []
+	| Just exp_id <- lookupVarEnv ind_env bndr = [(transferIdInfo exp_id bndr, rhs),
+						      (bndr, Var exp_id)]
+	| otherwise				   = [(bndr,rhs)]
+			     
+makeIndEnv :: [CoreBind] -> IndEnv
+makeIndEnv binds
+  = foldr add_bind emptyVarEnv binds
+  where
+    add_bind :: CoreBind -> IndEnv -> IndEnv
+    add_bind (NonRec exported_id rhs) env = add_pair (exported_id, rhs) env
+    add_bind (Rec pairs)	      env = foldr add_pair env pairs
+
+    add_pair :: (Id,CoreExpr) -> IndEnv -> IndEnv
+    add_pair (exported_id, Var local_id) env
+	| shortMeOut env exported_id local_id = extendVarEnv env local_id exported_id
+    add_pair (exported_id, rhs) env
+	= env
+			
+shortMeOut ind_env exported_id local_id
+-- The if-then-else stuff is just so I can get a pprTrace to see
+-- how often I don't get shorting out becuase of IdInfo stuff
+  = if isExportedId exported_id &&		-- Only if this is exported
+
+       isLocalId local_id &&			-- Only if this one is defined in this
+						-- 	module, so that we *can* change its
+				 	 	-- 	binding to be the exported thing!
+
+       not (isExportedId local_id) &&		-- Only if this one is not itself exported,
+					   	--	since the transformation will nuke it
+   
+       not (local_id `elemVarEnv` ind_env)	-- Only if not already substituted for
+    then
+	True
+
+{- No longer needed
+	if isEmptyCoreRules (specInfo (idInfo exported_id)) 	-- Only if no rules
+	then True	-- See note on "Messing up rules"
+	else 
+#ifdef DEBUG 
+          pprTrace "shortMeOut:" (ppr exported_id)
+#endif
+                                                False
+-}
+    else
+	False
+
+
+-----------------
+transferIdInfo :: Id -> Id -> Id
+transferIdInfo exported_id local_id
+  = modifyIdInfo transfer exported_id
+  where
+    local_info = idInfo local_id
+    transfer exp_info = exp_info `setNewStrictnessInfo` newStrictnessInfo local_info
+				 `setWorkerInfo`        workerInfo local_info
+				 `setSpecInfo`	        addRules exported_id (specInfo exp_info)
+					 		         (rulesRules (specInfo local_info))
 \end{code}
