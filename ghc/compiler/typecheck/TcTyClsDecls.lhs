@@ -16,6 +16,7 @@ import HsSyn		( TyClDecl(..),
 			  isTypeOrClassDecl, isClassDecl, isSynDecl, isClassOpSig
 			)
 import RnHsSyn		( RenamedTyClDecl, tyClDeclFVs )
+import RnEnv		( lookupSysName )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 import HscTypes		( implicitTyThings )
 
@@ -41,13 +42,14 @@ import TysWiredIn	( unitTy )
 import Subst		( substTyWith )
 import DataCon		( dataConOrigArgTys )
 import Var		( varName )
+import OccName		( mkClassTyConOcc )
 import FiniteMap
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name )
 import NameEnv
 import NameSet
 import Outputable
-import Maybes		( mapMaybe )
+import Maybes		( mapMaybe, orElse, catMaybes )
 \end{code}
 
 
@@ -64,16 +66,18 @@ tcTyAndClassDecls :: [RenamedTyClDecl]
 		  -> TcM TcGblEnv	-- Returns extended environment
 
 tcTyAndClassDecls decls
-  = tcGroups (stronglyConnComp edges)
+  = do { edge_map <- mkEdgeMap tc_decls ;
+	 let { edges = mkEdges edge_map tc_decls } ;
+	 tcGroups edge_map (stronglyConnComp edges) }
   where
-    edges = map mkEdges (filter isTypeOrClassDecl decls)
+    tc_decls = filter isTypeOrClassDecl decls
 
-tcGroups [] = getGblEnv
+tcGroups edge_map [] = getGblEnv
 
-tcGroups (group:groups)
-  = tcGroup group	`thenM` \ env ->
-    setGblEnv env	$
-    tcGroups groups
+tcGroups edge_map (group:groups)
+  = tcGroup edge_map group	`thenM` \ env ->
+    setGblEnv env		$
+    tcGroups edge_map groups
 \end{code}
 
 Dealing with a group
@@ -120,11 +124,11 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: SCC RenamedTyClDecl 
+tcGroup :: EdgeMap -> SCC RenamedTyClDecl 
 	-> TcM TcGblEnv 	-- Input env extended by types and classes 
 				-- and their implicit Ids,DataCons
 					
-tcGroup scc
+tcGroup edge_map scc
   = 	-- Step 1
     mappM getInitialKind decls 		`thenM` \ initial_kinds ->
 
@@ -136,7 +140,7 @@ tcGroup scc
 
 	-- Check for loops; if any are found, bale out now
 	-- because the compiler itself will loop otherwise!
-    checkNoErrs (checkLoops scc)	`thenM` \ is_rec_tycon ->
+    checkNoErrs (checkLoops edge_map scc)	`thenM` \ is_rec_tycon ->
 
 	-- Tie the knot
     traceTc (text "starting" <+> ppr final_kinds)		`thenM_`
@@ -435,21 +439,21 @@ mkNewTyConRep tc
 Dependency analysis
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-checkLoops :: SCC RenamedTyClDecl
+checkLoops :: EdgeMap -> SCC RenamedTyClDecl
 	   -> TcM (Name -> AlgTyConFlavour -> RecFlag)
--- Check for illegal loops, 
+-- Check for illegal loops in a single strongly-connected component
 --	a) type synonyms
 --	b) superclass hierarchy
 --
 -- Also return a function that says which tycons are recursive.
 -- Remember: 
 --	a newtype is recursive if it is part of a recursive
---		group consisting only of newtype and synonyms
+--	group consisting only of newtype and synonyms
 
-checkLoops (AcyclicSCC _)
+checkLoops edge_map (AcyclicSCC _)
   = returnM (\ _ _ -> NonRecursive)
 
-checkLoops (CyclicSCC decls)
+checkLoops edge_map (CyclicSCC decls)
   = let		-- CHECK FOR CLASS CYCLES
 	cls_edges  = mapMaybe mkClassEdges decls
 	cls_cycles = findCycles cls_edges
@@ -457,13 +461,13 @@ checkLoops (CyclicSCC decls)
     mapM_ (cycleErr "class") cls_cycles		`thenM_`
 
     let		-- CHECK FOR SYNONYM CYCLES
-	syn_edges  = map mkEdges (filter isSynDecl decls)
+	syn_edges  = mkEdges edge_map (filter isSynDecl decls)
 	syn_cycles = findCycles syn_edges
     in
     mapM_ (cycleErr "type synonym") syn_cycles	`thenM_`
 
     let 	-- CHECK FOR NEWTYPE CYCLES
-	newtype_edges  = map mkEdges (filter is_nt_cycle_decl decls)
+	newtype_edges  = mkEdges edge_map (filter is_nt_cycle_decl decls)
 	newtype_cycles = findCycles newtype_edges
 	rec_newtypes   = mkNameSet [tcdName d | ds <- newtype_cycles, d <- ds]
 
@@ -487,8 +491,44 @@ is_nt_cycle_decl other					     = False
 findCycles edges = [ ds | CyclicSCC ds <- stronglyConnComp edges]
 
 ----------------------------------------------------
-mkEdges :: RenamedTyClDecl -> (RenamedTyClDecl, Name, [Name])
-mkEdges decl = (decl, tyClDeclName decl, nameSetToList (tyClDeclFVs decl))
+--		Building edges for SCC analysis
+--
+-- When building the edges, we treat the 'main name' of the declaration as the
+-- key for the node, but when dealing with External Core we may come across 
+-- references to one of the implicit names for the declaration.  For example:
+--	class Eq a where ....			
+--	data :TSig a = :TSig (:TEq a) ....
+-- The first decl is sucked in from an interface file; the second
+-- is in an External Core file, generated from a class decl for Sig.  
+-- We have to recognise that the reference to :TEq represents a 
+-- dependency on the class Eq declaration, else the SCC stuff won't work right.
+-- 
+-- This complication can only happen when consuming an External Core file
+-- 
+-- Solution: keep an "EdgeMap" (bad name) that maps :TEq -> Eq.
+-- Don't worry about data constructors, because we're only building
+-- SCCs for type and class declarations here.  So the tiresome mapping
+-- is need only to map   [class tycon -> class]
+
+type EdgeMap = NameEnv Name
+
+mkEdgeMap :: [RenamedTyClDecl] -> TcM EdgeMap
+mkEdgeMap decls = do { mb_pairs <- mapM mk_mb_pair decls ;
+		       return (mkNameEnv (catMaybes mb_pairs)) }
+		where
+		  mk_mb_pair (ClassDecl { tcdName = cls_name })
+			= do { tc_name <- lookupSysName cls_name mkClassTyConOcc ;
+			       return (Just (tc_name, cls_name)) }
+		  mk_mb_pair other = return Nothing
+
+mkEdges :: EdgeMap -> [RenamedTyClDecl] -> [(RenamedTyClDecl, Name, [Name])]
+-- We use the EdgeMap to map any implicit names to 
+-- the 'main name' for the declaration
+mkEdges edge_map decls 
+  = [ (decl, tyClDeclName decl, get_refs decl) | decl <- decls ]
+  where
+    get_refs decl = [ lookupNameEnv edge_map n `orElse` n 
+		    | n <- nameSetToList (tyClDeclFVs decl) ]
 
 ----------------------------------------------------
 -- mk_cls_edges looks only at the context of class decls
