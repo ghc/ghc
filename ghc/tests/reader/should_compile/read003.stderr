@@ -1,0 +1,21 @@
+ 
+read003.hs:8: Cannot construct the infinite type (occur check)
+		  `t{-aK8-}' = `(t{-aK8-}, t{-aKb-}, t{-aKe-})'
+    Expected: `(t{-aK8-}, [a{-aKm-}], [a{-aKo-}])'
+    Inferred: `t{-aK8-}'
+    In a pattern binding:
+	~(`a', `b', `c')
+	    | [`nullity
+		    b'] =
+		`a'
+	    | [`nullity
+		    c'] =
+		`a'
+	    | [`PrelBase.otherwise'] =
+		`a'
+	    where
+		`nullity'
+		    =   `PrelList.null'
+
+
+Compilation had errors

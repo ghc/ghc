@@ -1,0 +1,2 @@
+read004.hs:19:1: Illegal character: `.' in a string gap
+read004.hs:19:1:  on input: "."

@@ -1,0 +1,15 @@
+interface OneA where
+
+import OneB ( fB ) renaming ( fB to fBa )
+
+type SynA = Float
+
+data DataAA
+data (Ord a) => DataAB a = ConAB1 a | ConAB2 deriving Text
+
+class (Ord a) => ClassA a where
+    clsA :: a -> String
+
+instance ClassA Int
+
+fA :: a -> a
