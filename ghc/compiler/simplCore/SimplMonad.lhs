@@ -68,7 +68,7 @@ import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			)
 import FiniteMap
 import CmdLineOpts	( SimplifierSwitch(..), SwitchResult(..),
-			  opt_PprStyle_Debug, opt_HistorySize,
+			  opt_PprStyle_Debug, opt_HistorySize, opt_D_dump_simpl_stats,
 			  intSwitchSet
 			)
 import Unique		( Unique )
@@ -252,7 +252,6 @@ freeTick t env us sc = sc' `seq` ((), us, sc')
 \begin{code}
 verboseSimplStats = opt_PprStyle_Debug		-- For now, anyway
 
--- Defined both with and without debugging
 zeroSimplCount	   :: SimplCount
 isZeroSimplCount   :: SimplCount -> Bool
 pprSimplCount	   :: SimplCount -> SDoc
@@ -261,29 +260,11 @@ plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
 \end{code}
 
 \begin{code}
-#ifndef DEBUG
-----------------------------------------------------------
---			Debugging OFF
-----------------------------------------------------------
-type SimplCount = Int
+data SimplCount = VerySimplZero		-- These two are used when 
+		| VerySimplNonZero	-- we are only interested in 
+					-- termination info
 
-zeroSimplCount = 0
-
-isZeroSimplCount n = n==0
-
-doTick     t n = n+1	-- Very basic when not debugging
-doFreeTick t n = n	-- Don't count leaf visits
-
-pprSimplCount n = ptext SLIT("Total ticks:") <+> int n
-
-plusSimplCount n m = n+m
-
-#else
-----------------------------------------------------------
---			Debugging ON
-----------------------------------------------------------
-
-data SimplCount = SimplCount	{
+		| SimplCount	{
 			ticks   :: !Int,		-- Total ticks
 			details :: !TickCounts,		-- How many of each type
 			n_log	:: !Int,		-- N
@@ -293,15 +274,21 @@ data SimplCount = SimplCount	{
 
 type TickCounts = FiniteMap Tick Int
 
-zeroSimplCount = SimplCount {ticks = 0, details = emptyFM,
-			     n_log = 0, log1 = [], log2 = []}
+zeroSimplCount	-- This is where we decide whether to do
+		-- the VerySimpl version or the full-stats version
+  | opt_D_dump_simpl_stats = SimplCount {ticks = 0, details = emptyFM,
+			   		 n_log = 0, log1 = [], log2 = []}
+  | otherwise		   = VerySimplZero
 
-isZeroSimplCount sc = ticks sc == 0
+isZeroSimplCount VerySimplZero    	    = True
+isZeroSimplCount (SimplCount { ticks = 0 }) = True
+isZeroSimplCount other			    = False
 
 doFreeTick tick sc@SimplCount { details = dts } 
   = dts' `seqFM` sc { details = dts' }
   where
     dts' = dts `addTick` tick 
+doFreeTick tick sc = sc 
 
 -- Gross hack to persuade GHC 3.03 to do this important seq
 seqFM fm x | isEmptyFM fm = x
@@ -313,6 +300,9 @@ doTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1, l
   where
     sc1 = sc { ticks = tks+1, details = dts `addTick` tick }
 
+doTick tick sc = VerySimplNonZero	-- The very simple case
+
+
 -- Don't use plusFM_C because that's lazy, and we want to 
 -- be pretty strict here!
 addTick :: TickCounts -> Tick -> TickCounts
@@ -321,6 +311,7 @@ addTick fm tick = case lookupFM fm tick of
 			Just n  -> n1 `seq` addToFM fm tick n1
 				where
 				   n1 = n+1
+
 
 plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
 	       sc2@(SimplCount { ticks = tks2, details = dts2 })
@@ -331,7 +322,11 @@ plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
 	     | null (log2 sc2) = sc2 { log2 = log1 sc1 }
 	     | otherwise       = sc2
 
+plusSimplCount VerySimplZero VerySimplZero = VerySimplZero
+plusSimplCount sc1	     sc2	   = VerySimplNonZero
 
+pprSimplCount VerySimplZero    = ptext SLIT("Total ticks: ZERO!")
+pprSimplCount VerySimplNonZero = ptext SLIT("Total ticks: NON-ZERO!")
 pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
   = vcat [ptext SLIT("Total ticks:    ") <+> int tks,
 	  text "",
@@ -362,7 +357,6 @@ pprTCDetails ticks@((tick,_):_)
   = nest 4 (vcat [int n <+> pprTickCts tick | (tick,n) <- ticks])
   | otherwise
   = empty
-#endif
 \end{code}
 
 %************************************************************************
