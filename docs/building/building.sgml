@@ -1080,8 +1080,8 @@ $ cvs checkout nofib/spectral
 	  <term>ia64-unknown-linux</term>
 	  <indexterm><primary>ia64-unknown-linux</primary></indexterm>
 	  <listitem>
-	    <para>GHC currently works unregisterised.  A registerised
-	    port is in progress.</para>
+	    <para>Supported, except there is no native code
+	    generator.</para>
 	  </listitem>
 	</varlistentry>
 
