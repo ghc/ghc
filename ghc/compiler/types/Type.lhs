@@ -490,17 +490,18 @@ applyTy (ForAllTy tv ty) arg = substTyWith [tv] [arg] ty
 applyTy other		 arg = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
-applyTys fun_ty arg_tys
+applyTys orig_fun_ty arg_tys
  = substTyWith tvs arg_tys ty
  where
-   (mu, tvs, ty) = split fun_ty arg_tys
+   (tvs, ty) = split orig_fun_ty arg_tys
    
-   split fun_ty               []         = (Nothing, [], fun_ty)
+   split fun_ty               []         = ([], fun_ty)
    split (NoteTy _ fun_ty)    args       = split fun_ty args
    split (SourceTy p)	      args       = split (sourceTypeRep p) args
    split (ForAllTy tv fun_ty) (arg:args) = case split fun_ty args of
-						  (mu, tvs, ty) -> (mu, tv:tvs, ty)
+						  (tvs, ty) -> (tv:tvs, ty)
    split other_ty             args       = panic "applyTys"
+	-- No show instance for Type yet
 \end{code}
 
 
