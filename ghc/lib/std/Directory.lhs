@@ -1,6 +1,9 @@
+% -----------------------------------------------------------------------------
+% $Id: Directory.lhs,v 1.19 2000/07/07 11:03:57 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1999
+% (c) The University of Glasgow, 1994-2000
 %
+
 \section[Directory]{Directory interface}
 
 A directory contains a series of entries, each of which is a named
@@ -60,10 +63,10 @@ import PrelGHC		( RealWorld, or#, and# )
 import PrelByteArr	( ByteArray, MutableByteArray,
 			  newWordArray, readWordArray, newCharArray )
 import PrelArrExtra	( unsafeFreezeByteArray )
-import PrelPack		( unpackNBytesST, packString, unpackCStringST )
+import PrelPack		( packString, unpackCStringST )
 import PrelIOBase	( stToIO,
 			  constructErrorAndFail, constructErrorAndFailWithInfo,
-			  IOError(IOError), IOErrorType(SystemError) )
+			  IOException(..), ioException, IOErrorType(SystemError) )
 import Time             ( ClockTime(..) )
 import PrelAddr		( Addr, nullAddr, Word(..), wordToInt, intToWord )
 #endif
@@ -481,7 +484,7 @@ setPermissions name (Permissions r w e s) = do
     rc <- primChmod (primPackString name) mode
     if rc == 0
 	then return ()
-	else ioError (IOError Nothing SystemError "setPermissions" "insufficient permissions")
+	else ioException (IOError Nothing SystemError "setPermissions" "insufficient permissions")
 \end{code}
 
 (Sigh)..copied from Posix.Files to avoid dep. on posix library
@@ -499,7 +502,7 @@ getFileStatus name = do
 #else
 	then stToIO (unsafeFreezeByteArray bytes)
 #endif
-     	else ioError (IOError Nothing SystemError "getFileStatus" "")
+     	else ioException (IOError Nothing SystemError "getFileStatus" "")
 
 #ifndef __HUGS__
 modificationTime :: FileStatus -> IO ClockTime

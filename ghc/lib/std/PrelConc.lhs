@@ -1,5 +1,7 @@
+% -----------------------------------------------------------------------------
+% $Id: PrelConc.lhs,v 1.20 2000/07/07 11:03:58 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The University of Glasgow, 1994-2000
 %
 
 \section[PrelConc]{Module @PrelConc@}
@@ -15,7 +17,7 @@ module PrelConc
 	-- Forking and suchlike
 	, myThreadId 	-- :: IO ThreadId
 	, killThread	-- :: ThreadId -> IO ()
-	, raiseInThread -- :: ThreadId -> Exception -> IO ()
+	, throwTo       -- :: ThreadId -> Exception -> IO ()
 	, par  		-- :: a -> b -> b
 	, seq  		-- :: a -> b -> b
 	, yield         -- :: IO ()
@@ -41,8 +43,7 @@ module PrelConc
 import PrelBase
 import PrelMaybe
 import PrelErr ( parError, seqError )
-import PrelST	  	( liftST )
-import PrelIOBase	( IO(..), MVar(..), unsafePerformIO )
+import PrelIOBase	( IO(..), MVar(..) )
 import PrelBase		( Int(..) )
 import PrelException    ( Exception(..), AsyncException(..) )
 
@@ -67,8 +68,8 @@ killThread :: ThreadId -> IO ()
 killThread (ThreadId id) = IO $ \ s ->
    case (killThread# id (AsyncException ThreadKilled) s) of s1 -> (# s1, () #)
 
-raiseInThread :: ThreadId -> Exception -> IO ()
-raiseInThread (ThreadId id) ex = IO $ \ s ->
+throwTo :: ThreadId -> Exception -> IO ()
+throwTo (ThreadId id) ex = IO $ \ s ->
    case (killThread# id ex s) of s1 -> (# s1, () #)
 
 myThreadId :: IO ThreadId

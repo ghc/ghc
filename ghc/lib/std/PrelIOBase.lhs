@@ -1,7 +1,7 @@
-% -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.25 2000/05/30 14:28:13 simonmar Exp $
+% ------------------------------------------------------------------------------
+% $Id: PrelIOBase.lhs,v 1.26 2000/07/07 11:03:58 simonmar Exp $
 % 
-% (c) The AQUA Project, Glasgow University, 1994-1998
+% (c) The University of Glasgow, 1994-2000
 %
 
 \section[PrelIOBase]{Module @PrelIOBase@}
@@ -11,8 +11,8 @@ concretely; the @IO@ module itself exports abstractly.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
-#include "cbits/stgerror.h"
 #include "config.h"
+#include "cbits/stgerror.h"
 
 #ifndef __HUGS__ /* Hugs just includes this in PreludeBuiltin so no header needed */
 module PrelIOBase where
@@ -21,11 +21,12 @@ import {-# SOURCE #-} PrelErr ( error )
 
 import PrelST
 import PrelBase
-import {-# SOURCE #-} PrelException ( ioError )
 import PrelMaybe  ( Maybe(..) )
-import PrelAddr	  ( Addr(..), nullAddr )
-import PrelPack ( unpackCString )
+import PrelAddr	  ( Addr(..) )
 import PrelShow
+import PrelList
+import PrelDynamic
+import PrelPack ( unpackCString )
 
 #if !defined(__CONCURRENT_HASKELL__)
 import PrelArr	  ( MutableVar, readVar )
@@ -143,228 +144,6 @@ unsafeInterleaveIO = stToIO . unsafeInterleaveST . ioToST
 
 %*********************************************************
 %*							*
-\subsection{Type @IOError@}
-%*							*
-%*********************************************************
-
-A value @IOError@ encode errors occurred in the @IO@ monad.
-An @IOError@ records a more specific error type, a descriptive
-string and maybe the handle that was used when the error was
-flagged.
-
-\begin{code}
-data IOError 
- = IOError 
-     (Maybe Handle)  -- the handle used by the action flagging the
-		     -- the error.
-     IOErrorType     -- what it was.
-     String	     -- location
-     String          -- error type specific information.
-
-instance Eq IOError where
-  (IOError h1 e1 loc1 str1) == (IOError h2 e2 loc2 str2) = 
-    e1==e2 && str1==str2 && h1==h2 && loc1 == loc2
-
-data IOErrorType
-  = AlreadyExists        | HardwareFault
-  | IllegalOperation     | InappropriateType
-  | Interrupted          | InvalidArgument
-  | NoSuchThing          | OtherError
-  | PermissionDenied     | ProtocolError
-  | ResourceBusy         | ResourceExhausted
-  | ResourceVanished     | SystemError
-  | TimeExpired          | UnsatisfiedConstraints
-  | UnsupportedOperation | UserError
-  | EOF
-#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
-  | ComError Int           -- HRESULT
-#endif
-  deriving (Eq)
-
-instance Show IOErrorType where
-  showsPrec _ e =
-    showString $
-    case e of
-      AlreadyExists	-> "already exists"
-      HardwareFault	-> "hardware fault"
-      IllegalOperation	-> "illegal operation"
-      InappropriateType -> "inappropriate type"
-      Interrupted       -> "interrupted"
-      InvalidArgument   -> "invalid argument"
-      NoSuchThing       -> "does not exist"
-      OtherError        -> "failed"
-      PermissionDenied  -> "permission denied"
-      ProtocolError     -> "protocol error"
-      ResourceBusy      -> "resource busy"
-      ResourceExhausted -> "resource exhausted"
-      ResourceVanished  -> "resource vanished"
-      SystemError	-> "system error"
-      TimeExpired       -> "timeout"
-      UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
-      UserError         -> "failed"
-      UnsupportedOperation -> "unsupported operation"
-      EOF		-> "end of file"
-#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
-      ComError _	-> "COM error"
-#endif
-
-
-
-userError       :: String  -> IOError
-userError str	=  IOError Nothing UserError "" str
-\end{code}
-
-Predicates on IOError; little effort made on these so far...
-
-\begin{code}
-
-isAlreadyExistsError :: IOError -> Bool
-isAlreadyExistsError (IOError _ AlreadyExists _ _) = True
-isAlreadyExistsError _		                   = False
-
-isAlreadyInUseError :: IOError -> Bool
-isAlreadyInUseError (IOError _ ResourceBusy _ _) = True
-isAlreadyInUseError _		                 = False
-
-isFullError :: IOError -> Bool
-isFullError (IOError _ ResourceExhausted _ _) = True
-isFullError _			              = False
-
-isEOFError :: IOError -> Bool
-isEOFError (IOError _ EOF _ _) = True
-isEOFError _                   = False
-
-isIllegalOperation :: IOError -> Bool
-isIllegalOperation (IOError _ IllegalOperation _ _) = True
-isIllegalOperation _			            = False
-
-isPermissionError :: IOError -> Bool
-isPermissionError (IOError _ PermissionDenied _ _) = True
-isPermissionError _			           = False
-
-isDoesNotExistError :: IOError -> Bool
-isDoesNotExistError (IOError _ NoSuchThing _ _) = True
-isDoesNotExistError _                           = False
-
-isUserError :: IOError -> Bool
-isUserError (IOError _ UserError _ _) = True
-isUserError _		              = False
-\end{code}
-
-Showing @IOError@s
-
-\begin{code}
-#ifdef __HUGS__
--- For now we give a fairly uninformative error message which just happens to
--- be like the ones that Hugs used to give.
-instance Show IOError where
-    showsPrec p (IOError hdl iot loc s) = showString s . showChar '\n'
-#else
-instance Show IOError where
-    showsPrec p (IOError hdl iot loc s) =
-      showsPrec p iot .
-      showChar '\n' .
-      (case loc of
-         "" -> id
-	 _  -> showString "Action: " . showString loc . showChar '\n') .
-      showHdl .
-      (case s of
-	 "" -> id
-	 _  -> showString "Reason: " . showString s)
-     where
-      showHdl = 
-       case hdl of
-        Nothing -> id
-	Just h  -> showString "Handle: " . showsPrec p h
-
-#endif
-\end{code}
-
-The @String@ part of an @IOError@ is platform-dependent.  However, to
-provide a uniform mechanism for distinguishing among errors within
-these broad categories, each platform-specific standard shall specify
-the exact strings to be used for particular errors.  For errors not
-explicitly mentioned in the standard, any descriptive string may be
-used.
-
-\begin{code}
-constructErrorAndFail :: String -> IO a
-constructErrorAndFail call_site
-  = constructError call_site >>= \ io_error ->
-    ioError io_error
-
-constructErrorAndFailWithInfo :: String -> String -> IO a
-constructErrorAndFailWithInfo call_site reason
-  = constructErrorMsg call_site (Just reason) >>= \ io_error ->
-    ioError io_error
-
-\end{code}
-
-This doesn't seem to be documented/spelled out anywhere,
-so here goes: (SOF)
-
-The implementation of the IO prelude uses various C stubs
-to do the actual interaction with the OS. The bandwidth
-\tr{C<->Haskell} is somewhat limited, so the general strategy
-for flaggging any errors (apart from possibly using the
-return code of the external call), is to set the @ghc_errtype@
-to a value that is one of the \tr{#define}s in @includes/error.h@.
-@ghc_errstr@ holds a character string providing error-specific
-information. Error constructing functions will then reach out
-and grab these values when generating
-
-\begin{code}
-constructError	      :: String -> IO IOError
-constructError call_site = constructErrorMsg call_site Nothing
-
-constructErrorMsg	      :: String -> Maybe String -> IO IOError
-constructErrorMsg call_site reason =
- getErrType__            >>= \ errtype ->
- getErrStr__             >>= \ str ->
- let
-  iot =
-   case (errtype::Int) of
-     ERR_ALREADYEXISTS	         -> AlreadyExists
-     ERR_HARDWAREFAULT	         -> HardwareFault
-     ERR_ILLEGALOPERATION	 -> IllegalOperation
-     ERR_INAPPROPRIATETYPE	 -> InappropriateType
-     ERR_INTERRUPTED	         -> Interrupted
-     ERR_INVALIDARGUMENT	 -> InvalidArgument
-     ERR_NOSUCHTHING	         -> NoSuchThing
-     ERR_OTHERERROR		 -> OtherError
-     ERR_PERMISSIONDENIED	 -> PermissionDenied
-     ERR_PROTOCOLERROR	         -> ProtocolError
-     ERR_RESOURCEBUSY	         -> ResourceBusy
-     ERR_RESOURCEEXHAUSTED	 -> ResourceExhausted
-     ERR_RESOURCEVANISHED	 -> ResourceVanished
-     ERR_SYSTEMERROR	         -> SystemError
-     ERR_TIMEEXPIRED	         -> TimeExpired
-     ERR_UNSATISFIEDCONSTRAINTS -> UnsatisfiedConstraints
-     ERR_UNSUPPORTEDOPERATION   -> UnsupportedOperation
-     ERR_EOF		         -> EOF
-     _			         -> OtherError
-
-  msg = 
-   unpackCString str ++
-   (case iot of
-     OtherError -> "(error code: " ++ show errtype ++ ")"
-     _ -> "") ++
-   (case reason of
-      Nothing -> ""
-      Just m  -> ' ':m)
- in
- return (IOError Nothing iot call_site msg)
-\end{code}
-
-File names are specified using @FilePath@, a OS-dependent
-string that (hopefully, I guess) maps to an accessible file/object.
-
-\begin{code}
-type FilePath = String
-\end{code}
-
-%*********************************************************
-%*							*
 \subsection{Types @Handle@, @Handle__@}
 %*							*
 %*********************************************************
@@ -443,7 +222,7 @@ data Handle__
   of the following:
 -}
 data Handle__Type
- = ErrorHandle  IOError
+ = ErrorHandle  IOException
  | ClosedHandle
  | SemiClosedHandle
  | ReadHandle
@@ -452,6 +231,19 @@ data Handle__Type
  | ReadWriteHandle
 
 
+-- File names are specified using @FilePath@, a OS-dependent
+-- string that (hopefully, I guess) maps to an accessible file/object.
+
+type FilePath = String
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection[Show-Handle]{Show instance for Handles}
+%*							*
+%*********************************************************
+
+\begin{code}
 -- handle types are 'show'ed when printing error msgs, so
 -- we provide a more user-friendly Show instance for it
 -- than the derived one.
@@ -507,19 +299,6 @@ instance Show Handle where
       where
        def :: Int 
        def = unsafePerformIO (getBufSize fo)
-
-mkBuffer__ :: FILE_OBJECT -> Int -> IO ()
-mkBuffer__ fo sz_in_bytes = do
- chunk <- 
-  case sz_in_bytes of
-    0 -> return nullAddr  -- this has the effect of overwriting the pointer to the old buffer.
-    _ -> do
-     chunk <- allocMemory__ sz_in_bytes
-     if chunk == nullAddr
-      then ioError (IOError Nothing ResourceExhausted "mkBuffer__" "not enough virtual memory")
-      else return chunk
- setBuf fo chunk sz_in_bytes
-
 \end{code}
 
 %*********************************************************
@@ -588,4 +367,325 @@ foreign import "libHS_cbits" "getBufSize"  unsafe
 foreign import "libHS_cbits" "setBuf" unsafe
            setBuf       :: FILE_OBJECT -> Addr -> Int -> IO ()
 
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Exception datatype and operations}
+%*							*
+%*********************************************************
+
+\begin{code}
+data Exception
+  = IOException 	IOException	-- IO exceptions
+  | ArithException  	ArithException	-- Arithmetic exceptions
+  | ArrayException	ArrayException  -- Array-related exceptions
+  | ErrorCall		String		-- Calls to 'error'
+  | NoMethodError       String		-- A non-existent method was invoked
+  | PatternMatchFail	String		-- A pattern match / guard failure
+  | RecSelError		String		-- Selecting a non-existent field
+  | RecConError		String		-- Field missing in record construction
+  | RecUpdError		String		-- Record doesn't contain updated field
+  | AssertionFailed	String		-- Assertions
+  | DynException	Dynamic		-- Dynamic exceptions
+  | AsyncException	AsyncException	-- Externally generated errors
+  | PutFullMVar 			-- Put on a full MVar
+  | BlockedOnDeadMVar			-- Blocking on a dead MVar
+  | NonTermination
+  | UserError		String
+
+data ArithException
+  = Overflow
+  | Underflow
+  | LossOfPrecision
+  | DivideByZero
+  | Denormal
+  deriving (Eq, Ord)
+
+data AsyncException
+  = StackOverflow
+  | HeapOverflow
+  | ThreadKilled
+  deriving (Eq, Ord)
+
+data ArrayException
+  = IndexOutOfBounds  	String		-- out-of-range array access
+  | UndefinedElement	String		-- evaluating an undefined element
+  deriving (Eq, Ord)
+
+stackOverflow, heapOverflow :: Exception -- for the RTS
+stackOverflow = AsyncException StackOverflow
+heapOverflow  = AsyncException HeapOverflow
+
+instance Show ArithException where
+  showsPrec _ Overflow        = showString "arithmetic overflow"
+  showsPrec _ Underflow       = showString "arithmetic underflow"
+  showsPrec _ LossOfPrecision = showString "loss of precision"
+  showsPrec _ DivideByZero    = showString "divide by zero"
+  showsPrec _ Denormal        = showString "denormal"
+
+instance Show AsyncException where
+  showsPrec _ StackOverflow   = showString "stack overflow"
+  showsPrec _ HeapOverflow    = showString "heap overflow"
+  showsPrec _ ThreadKilled    = showString "thread killed"
+
+instance Show ArrayException where
+  showsPrec _ (IndexOutOfBounds s)
+	= showString "array index out of range"
+	. (if not (null s) then showString ": " . showString s
+			   else id)
+  showsPrec _ (UndefinedElement s)
+	= showString "undefined array element"
+	. (if not (null s) then showString ": " . showString s
+			   else id)
+
+instance Show Exception where
+  showsPrec _ (IOException err)	         = shows err
+  showsPrec _ (ArithException err)       = shows err
+  showsPrec _ (ArrayException err)       = shows err
+  showsPrec _ (ErrorCall err)	         = showString err
+  showsPrec _ (NoMethodError err)        = showString err
+  showsPrec _ (PatternMatchFail err)     = showString err
+  showsPrec _ (RecSelError err)	         = showString err
+  showsPrec _ (RecConError err)	         = showString err
+  showsPrec _ (RecUpdError err)	         = showString err
+  showsPrec _ (AssertionFailed err)      = showString err
+  showsPrec _ (AsyncException e)	 = shows e
+  showsPrec _ (DynException _err)        = showString "unknown exception"
+  showsPrec _ (PutFullMVar)		 = showString "putMVar: full MVar"
+  showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
+  showsPrec _ (NonTermination)           = showString "<<loop>>"
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Primitive throw}
+%*							*
+%*********************************************************
+
+\begin{code}
+throw :: Exception -> a
+throw exception = raise# exception
+
+ioError         :: Exception -> IO a 
+ioError err	=  IO $ \s -> throw err s
+
+ioException	:: IOException -> IO a
+ioException err =  IO $ \s -> throw (IOException err) s
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Type @IOError@}
+%*							*
+%*********************************************************
+
+A value @IOError@ encode errors occurred in the @IO@ monad.
+An @IOError@ records a more specific error type, a descriptive
+string and maybe the handle that was used when the error was
+flagged.
+
+\begin{code}
+type IOError = Exception
+
+data IOException
+ = IOError
+     (Maybe Handle)  -- the handle used by the action flagging the
+		     -- the error.
+     IOErrorType     -- what it was.
+     String	     -- location
+     String          -- error type specific information.
+
+instance Eq IOException where
+  (IOError h1 e1 loc1 str1) == (IOError h2 e2 loc2 str2) = 
+    e1==e2 && str1==str2 && h1==h2 && loc1 == loc2
+
+data IOErrorType
+  = AlreadyExists        | HardwareFault
+  | IllegalOperation     | InappropriateType
+  | Interrupted          | InvalidArgument
+  | NoSuchThing          | OtherError
+  | PermissionDenied     | ProtocolError
+  | ResourceBusy         | ResourceExhausted
+  | ResourceVanished     | SystemError
+  | TimeExpired          | UnsatisfiedConstraints
+  | UnsupportedOperation
+  | EOF
+#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
+  | ComError Int           -- HRESULT
+#endif
+  deriving (Eq)
+
+instance Show IOErrorType where
+  showsPrec _ e =
+    showString $
+    case e of
+      AlreadyExists	-> "already exists"
+      HardwareFault	-> "hardware fault"
+      IllegalOperation	-> "illegal operation"
+      InappropriateType -> "inappropriate type"
+      Interrupted       -> "interrupted"
+      InvalidArgument   -> "invalid argument"
+      NoSuchThing       -> "does not exist"
+      OtherError        -> "failed"
+      PermissionDenied  -> "permission denied"
+      ProtocolError     -> "protocol error"
+      ResourceBusy      -> "resource busy"
+      ResourceExhausted -> "resource exhausted"
+      ResourceVanished  -> "resource vanished"
+      SystemError	-> "system error"
+      TimeExpired       -> "timeout"
+      UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
+      UnsupportedOperation -> "unsupported operation"
+      EOF		-> "end of file"
+#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
+      ComError _	-> "COM error"
+#endif
+
+
+
+userError       :: String  -> IOError
+userError str	=  UserError str
+\end{code}
+
+Predicates on IOError; little effort made on these so far...
+
+\begin{code}
+
+isAlreadyExistsError :: IOError -> Bool
+isAlreadyExistsError (IOException (IOError _ AlreadyExists _ _)) = True
+isAlreadyExistsError _		                   		 = False
+
+isAlreadyInUseError :: IOError -> Bool
+isAlreadyInUseError (IOException (IOError _ ResourceBusy _ _)) = True
+isAlreadyInUseError _		                 	       = False
+
+isFullError :: IOError -> Bool
+isFullError (IOException (IOError _ ResourceExhausted _ _)) = True
+isFullError _			             		    = False
+
+isEOFError :: IOError -> Bool
+isEOFError (IOException (IOError _ EOF _ _)) = True
+isEOFError _                   		     = False
+
+isIllegalOperation :: IOError -> Bool
+isIllegalOperation (IOException (IOError _ IllegalOperation _ _)) = True
+isIllegalOperation _			            		  = False
+
+isPermissionError :: IOError -> Bool
+isPermissionError (IOException (IOError _ PermissionDenied _ _)) = True
+isPermissionError _			          		 = False
+
+isDoesNotExistError :: IOError -> Bool
+isDoesNotExistError (IOException (IOError _ NoSuchThing _ _)) = True
+isDoesNotExistError _                           	      = False
+
+isUserError :: IOError -> Bool
+isUserError (UserError _) = True
+isUserError _		  = False
+\end{code}
+
+Showing @IOError@s
+
+\begin{code}
+#ifdef __HUGS__
+-- For now we give a fairly uninformative error message which just happens to
+-- be like the ones that Hugs used to give.
+instance Show IOException where
+    showsPrec p (IOError hdl iot loc s) = showString s . showChar '\n'
+#else
+instance Show IOException where
+    showsPrec p (IOError hdl iot loc s) =
+      showsPrec p iot .
+      showChar '\n' .
+      (case loc of
+         "" -> id
+	 _  -> showString "Action: " . showString loc . showChar '\n') .
+      showHdl .
+      (case s of
+	 "" -> id
+	 _  -> showString "Reason: " . showString s)
+     where
+      showHdl = 
+       case hdl of
+        Nothing -> id
+	Just h  -> showString "Handle: " . showsPrec p h
+
+#endif
+\end{code}
+
+The @String@ part of an @IOError@ is platform-dependent.  However, to
+provide a uniform mechanism for distinguishing among errors within
+these broad categories, each platform-specific standard shall specify
+the exact strings to be used for particular errors.  For errors not
+explicitly mentioned in the standard, any descriptive string may be
+used.
+
+\begin{code}
+constructErrorAndFail :: String -> IO a
+constructErrorAndFail call_site
+  = constructError call_site >>= \ io_error ->
+    ioError (IOException io_error)
+
+constructErrorAndFailWithInfo :: String -> String -> IO a
+constructErrorAndFailWithInfo call_site reason
+  = constructErrorMsg call_site (Just reason) >>= \ io_error ->
+    ioError (IOException io_error)
+
+\end{code}
+
+This doesn't seem to be documented/spelled out anywhere,
+so here goes: (SOF)
+
+The implementation of the IO prelude uses various C stubs
+to do the actual interaction with the OS. The bandwidth
+\tr{C<->Haskell} is somewhat limited, so the general strategy
+for flaggging any errors (apart from possibly using the
+return code of the external call), is to set the @ghc_errtype@
+to a value that is one of the \tr{#define}s in @includes/error.h@.
+@ghc_errstr@ holds a character string providing error-specific
+information. Error constructing functions will then reach out
+and grab these values when generating
+
+\begin{code}
+constructError	      :: String -> IO IOException
+constructError call_site = constructErrorMsg call_site Nothing
+
+constructErrorMsg	      :: String -> Maybe String -> IO IOException
+constructErrorMsg call_site reason =
+ getErrType__            >>= \ errtype ->
+ getErrStr__             >>= \ str ->
+ let
+  iot =
+   case (errtype::Int) of
+     ERR_ALREADYEXISTS	         -> AlreadyExists
+     ERR_HARDWAREFAULT	         -> HardwareFault
+     ERR_ILLEGALOPERATION	 -> IllegalOperation
+     ERR_INAPPROPRIATETYPE	 -> InappropriateType
+     ERR_INTERRUPTED	         -> Interrupted
+     ERR_INVALIDARGUMENT	 -> InvalidArgument
+     ERR_NOSUCHTHING	         -> NoSuchThing
+     ERR_OTHERERROR		 -> OtherError
+     ERR_PERMISSIONDENIED	 -> PermissionDenied
+     ERR_PROTOCOLERROR	         -> ProtocolError
+     ERR_RESOURCEBUSY	         -> ResourceBusy
+     ERR_RESOURCEEXHAUSTED	 -> ResourceExhausted
+     ERR_RESOURCEVANISHED	 -> ResourceVanished
+     ERR_SYSTEMERROR	         -> SystemError
+     ERR_TIMEEXPIRED	         -> TimeExpired
+     ERR_UNSATISFIEDCONSTRAINTS -> UnsatisfiedConstraints
+     ERR_UNSUPPORTEDOPERATION   -> UnsupportedOperation
+     ERR_EOF		         -> EOF
+     _			         -> OtherError
+
+  msg = 
+   unpackCString str ++
+   (case iot of
+     OtherError -> "(error code: " ++ show errtype ++ ")"
+     _ -> "") ++
+   (case reason of
+      Nothing -> ""
+      Just m  -> ' ':m)
+ in
+ return (IOError Nothing iot call_site msg)
 \end{code}

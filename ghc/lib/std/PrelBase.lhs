@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.32 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelBase.lhs,v 1.33 2000/07/07 11:03:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -82,10 +82,6 @@ module PrelBase
 				-- having to import it explicitly
   ) 
 	where
-
-import {-# SOURCE #-} PrelErr ( error )
-import {-# SOURCE #-} PrelNum ( addr2Integer )
-  -- Otherwise the system import of addr2Integer looks for PrelNum.hi
 
 import PrelGHC
 

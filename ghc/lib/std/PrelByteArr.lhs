@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelByteArr.lhs,v 1.7 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelByteArr.lhs,v 1.8 2000/07/07 11:03:58 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -16,11 +16,9 @@ module PrelByteArr where
 import {-# SOURCE #-} PrelErr ( error )
 import PrelArr
 import PrelFloat
-import PrelList (foldl)
 import PrelST
 import PrelBase
 import PrelAddr
-import PrelGHC
 
 \end{code}
 

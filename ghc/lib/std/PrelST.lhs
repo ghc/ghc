@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelST.lhs,v 1.15 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelST.lhs,v 1.16 2000/07/07 11:03:58 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -13,7 +13,6 @@ module PrelST where
 
 import PrelShow
 import PrelBase
-import PrelGHC
 import PrelNum ()	-- So that we get the .hi file for system imports
 
 default ()

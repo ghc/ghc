@@ -1,7 +1,9 @@
+% -----------------------------------------------------------------------------
+% $Id: CPUTime.lhs,v 1.24 2000/07/07 11:03:57 simonmar Exp $
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-1997
+% (c) The University of Glasgow, 1995-2000
 %
-\section[CPUTime]{Haskell 1.4 CPU Time Library}
+\section[CPUTime]{Haskell 98 CPU Time Library}
 
 \begin{code}
 {-# OPTIONS -#include "cbits/stgio.h" #-}
@@ -23,8 +25,9 @@ import PrelBase		( Int(..) )
 import PrelByteArr  	( ByteArray(..), newIntArray )
 import PrelArrExtra     ( unsafeFreezeByteArray )
 import PrelNum		( fromInt )
-import PrelIOBase	( IOError(..), IOErrorType( UnsupportedOperation ), 
-			  unsafePerformIO, stToIO )
+import PrelIOBase	( IOError(..), IOException(..), 
+			  IOErrorType( UnsupportedOperation ), 
+			  unsafePerformIO, stToIO, ioException )
 import Ratio
 \end{code}
 
@@ -50,7 +53,7 @@ getCPUTime = do
 		 fromIntegral (I# (indexIntArray# frozen# 2#)) * 1000000000 + 
                  fromIntegral (I# (indexIntArray# frozen# 3#))) * 1000)
      else
-	ioError (IOError Nothing UnsupportedOperation 
+	ioException (IOError Nothing UnsupportedOperation 
 			 "getCPUTime"
 		         "can't get CPU time")
 

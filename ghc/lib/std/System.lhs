@@ -1,5 +1,7 @@
+% -----------------------------------------------------------------------------
+% $Id: System.lhs,v 1.26 2000/07/07 11:03:58 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1999
+% (c) The University of Glasgow, 1994-2000
 %
 
 \section[System]{Module @System@}
@@ -23,7 +25,8 @@ module System
 \begin{code}
 import Prelude
 import PrelAddr
-import PrelIOBase	( IOError(..), IOErrorType(..), constructErrorAndFailWithInfo, stToIO )
+import PrelIOBase	( IOException(..), ioException, 
+			  IOErrorType(..), constructErrorAndFailWithInfo, stToIO )
 import PrelPack    	( unpackCString, unpackCStringST, packString )
 import PrelByteArr	( ByteArray )
 
@@ -90,8 +93,8 @@ getEnv name = do
     litstring <- primGetEnv (primPackString name)
     if litstring /= nullAddr
 	then primUnpackCString litstring
-        else ioError (IOError Nothing NoSuchThing "getEnv"
-			("environment variable: " ++ name))
+        else ioException (IOError Nothing NoSuchThing "getEnv"
+			    ("environment variable: " ++ name))
 
 foreign import ccall "libHS_cbits.so" "getenv" unsafe primGetEnv :: PrimByteArray -> IO Addr
 \end{code}
@@ -111,7 +114,7 @@ The implementation does not support system calls.
 
 \begin{code}
 system        		:: String -> IO ExitCode
-system "" = ioError (IOError Nothing InvalidArgument "system" "null command")
+system "" = ioException (IOError Nothing InvalidArgument "system" "null command")
 system cmd = do
     status <- primSystem (primPackString cmd)
     case status of
@@ -129,13 +132,13 @@ Before it terminates, any open or semi-closed handles are first closed.
 exitWith   		:: ExitCode -> IO a
 exitWith ExitSuccess = do
     primExit 0
-    ioError (IOError Nothing OtherError "exitWith" "exit should not return")
+    ioException (IOError Nothing OtherError "exitWith" "exit should not return")
 
 exitWith (ExitFailure n) 
-  | n == 0 = ioError (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0")
+  | n == 0 = ioException (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0")
   | otherwise = do
     primExit n
-    ioError (IOError Nothing OtherError "exitWith" "exit should not return")
+    ioException (IOError Nothing OtherError "exitWith" "exit should not return")
 
 -- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
 -- re-enter Haskell land through finalizers.
@@ -243,12 +246,12 @@ exitWith c
         nh_stdout >>= nh_flush
         nh_stdin  >>= nh_close
         nh_exitwith (fromExitCode c)
-        (ioError.IOError) "System.exitWith: should not return"
+        (ioException . IOError) "System.exitWith: should not return"
 
 system :: String -> IO ExitCode
 system cmd
    | null cmd
-   = (ioError.IOError) "System.system: null command"
+   = (ioException.IOError) "System.system: null command"
    | otherwise
    = do str    <- copy_String_to_cstring cmd
         status <- nh_system str

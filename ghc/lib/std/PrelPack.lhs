@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelPack.lhs,v 1.13 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelPack.lhs,v 1.14 2000/07/07 11:03:58 simonmar Exp $
 %
 % (c) The University of Glasgow, 1997-2000
 %
@@ -55,7 +55,6 @@ import {-# SOURCE #-} PrelErr ( error )
 import PrelList ( length )
 import PrelST
 import PrelNum
-import PrelArr
 import PrelByteArr
 import PrelAddr
 

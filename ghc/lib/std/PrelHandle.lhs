@@ -1,5 +1,7 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelHandle.lhs,v 1.59 2000/07/07 11:03:58 simonmar Exp $
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-2000
 %
 
 \section[PrelHandle]{Module @PrelHandle@}
@@ -17,12 +19,12 @@ module PrelHandle where
 import PrelArr
 import PrelBase
 import PrelAddr		( Addr, nullAddr )
-import PrelByteArr	( ByteArray(..), MutableByteArray(..) )
+import PrelByteArr	( ByteArray(..) )
 import PrelRead		( Read )
 import PrelList 	( span )
 import PrelIOBase
-import PrelException
 import PrelMaybe	( Maybe(..) )
+import PrelException
 import PrelEnum
 import PrelNum		( toBig, Integer(..), Num(..) )
 import PrelShow
@@ -51,6 +53,20 @@ import PrelForeign  ( makeForeignObj, mkForeignObj )
 #else
 #define FILE_OBJECT	    Addr
 #endif
+\end{code}
+
+\begin{code}
+mkBuffer__ :: FILE_OBJECT -> Int -> IO ()
+mkBuffer__ fo sz_in_bytes = do
+ chunk <- 
+  case sz_in_bytes of
+    0 -> return nullAddr  -- this has the effect of overwriting the pointer to the old buffer.
+    _ -> do
+     chunk <- allocMemory__ sz_in_bytes
+     if chunk == nullAddr
+      then ioException (IOError Nothing ResourceExhausted "mkBuffer__" "not enough virtual memory")
+      else return chunk
+ setBuf fo chunk sz_in_bytes
 \end{code}
 
 %*********************************************************
@@ -147,7 +163,7 @@ mkClosedHandle__ =
 	     haBuffers__    = []
 	   }
 
-mkErrorHandle__ :: IOError -> Handle__
+mkErrorHandle__ :: IOException -> Handle__
 mkErrorHandle__ ioe =
   Handle__ { haFO__         =  nullFile__,
 	     haType__       = (ErrorHandle ioe),
@@ -379,7 +395,7 @@ hClose :: Handle -> IO ()
 hClose handle =
     withHandle__ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> return handle_
       _ -> do
           rc      <- closeFile (haFO__ handle_)
@@ -424,7 +440,7 @@ hFileSize :: Handle -> IO Integer
 hFileSize handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError 	-> ioError theError
+      ErrorHandle theError 	-> ioException theError
       ClosedHandle 		-> ioe_closedHandle "hFileSize" handle
       SemiClosedHandle 		-> ioe_closedHandle "hFileSize" handle
 #ifdef __HUGS__
@@ -515,15 +531,16 @@ hSetBuffering :: Handle -> BufferMode -> IO ()
 hSetBuffering handle mode =
     case mode of
       BlockBuffering (Just n) 
-        | n <= 0 -> ioError
+        | n <= 0 -> ioException
 		         (IOError (Just handle)
 				  InvalidArgument
 			          "hSetBuffering"
-				  ("illegal buffer size " ++ showsPrec 9 n []))  -- 9 => should be parens'ified.
+				  ("illegal buffer size " ++ showsPrec 9 n []))  
+					-- 9 => should be parens'ified.
       _ ->
           withHandle__ handle $ \ handle_ -> do
           case haType__ handle_ of
-	     ErrorHandle theError -> ioError theError
+	     ErrorHandle theError -> ioException theError
              ClosedHandle 	  -> ioe_closedHandle "hSetBuffering" handle
              _ -> do
 	        {- Note:
@@ -697,7 +714,7 @@ hIsOpen :: Handle -> IO Bool
 hIsOpen handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle         -> return False
       SemiClosedHandle     -> return False
       _ 		   -> return True
@@ -706,7 +723,7 @@ hIsClosed :: Handle -> IO Bool
 hIsClosed handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> return True
       _ 		   -> return False
 
@@ -724,7 +741,7 @@ hIsReadable :: Handle -> IO Bool
 hIsReadable handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hIsReadable" handle
       SemiClosedHandle 	   -> ioe_closedHandle "hIsReadable" handle
       htype 		   -> return (isReadable htype)
@@ -737,7 +754,7 @@ hIsWritable :: Handle -> IO Bool
 hIsWritable handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hIsWritable" handle
       SemiClosedHandle 	   -> ioe_closedHandle "hIsWritable" handle
       htype 		   -> return (isWritable htype)
@@ -769,7 +786,7 @@ hGetBuffering :: Handle -> IO BufferMode
 hGetBuffering handle = 
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hGetBuffering" handle
       _ -> 
 	  {-
@@ -784,7 +801,7 @@ hIsSeekable :: Handle -> IO Bool
 hIsSeekable handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hIsSeekable" handle
       SemiClosedHandle 	   -> ioe_closedHandle "hIsSeekable" handle
       AppendHandle 	   -> return False
@@ -815,7 +832,7 @@ hSetEcho handle on = do
      else
       withHandle_ handle $ \ handle_ -> do
       case haType__ handle_ of 
-         ErrorHandle theError -> ioError theError
+         ErrorHandle theError -> ioException theError
          ClosedHandle	      -> ioe_closedHandle "hSetEcho" handle
          _ -> do
             rc <- setTerminalEcho (haFO__ handle_) (if on then 1 else 0)  -- ConcHask: SAFE, won't block
@@ -831,7 +848,7 @@ hGetEcho handle = do
      else
        withHandle_ handle $ \ handle_ -> do
        case haType__ handle_ of 
-         ErrorHandle theError -> ioError theError
+         ErrorHandle theError -> ioException theError
          ClosedHandle	      -> ioe_closedHandle "hGetEcho" handle
          _ -> do
             rc <- getTerminalEcho (haFO__ handle_)  -- ConcHask: SAFE, won't block
@@ -844,7 +861,7 @@ hIsTerminalDevice :: Handle -> IO Bool
 hIsTerminalDevice handle = do
     withHandle_ handle $ \ handle_ -> do
      case haType__ handle_ of 
-       ErrorHandle theError -> ioError theError
+       ErrorHandle theError -> ioException theError
        ClosedHandle	    -> ioe_closedHandle "hIsTerminalDevice" handle
        _ -> do
           rc <- isTerminalDevice (haFO__ handle_)   -- ConcHask: SAFE, won't block
@@ -923,7 +940,7 @@ getHandleFd :: Handle -> IO Int
 getHandleFd handle =
     withHandle_ handle $ \ handle_ -> do
     case (haType__ handle_) of
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "getHandleFd" handle
       _ -> do
           fd <- getFileFd (haFO__ handle_)
@@ -946,17 +963,20 @@ ioeGetFileName        :: IOError -> Maybe FilePath
 ioeGetErrorString     :: IOError -> String
 ioeGetHandle          :: IOError -> Maybe Handle
 
-ioeGetHandle   (IOError h _ _ _)   = h
-ioeGetErrorString (IOError _ iot _ str) =
+ioeGetHandle   (IOException (IOError h _ _ _))   = h
+ioeGetHandle   _ = error "IO.ioeGetHandle: not an IO error"
+
+ioeGetErrorString (IOException (IOError _ iot _ str)) =
  case iot of
    EOF -> "end of file"
    _   -> str
+ioeGetErrorString   _ = error "IO.ioeGetErrorString: not an IO error"
 
-ioeGetFileName (IOError _ _  _ str) = 
+ioeGetFileName (IOException (IOError _ _  _ str)) = 
  case span (/=':') str of
    (_,[])  -> Nothing
    (fs,_)  -> Just fs
-
+ioeGetFileName   _ = error "IO.ioeGetFileName: not an IO error"
 \end{code}
 
 'Top-level' IO actions want to catch exceptions (e.g., forkIO and 
@@ -1019,11 +1039,11 @@ wantReadableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantReadableHandle fun handle act = 
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
-      AppendHandle 	   -> ioError not_readable_error
-      WriteHandle 	   -> ioError not_readable_error
+      AppendHandle 	   -> ioException not_readable_error
+      WriteHandle 	   -> ioException not_readable_error
       _ 		   -> act handle_
   where
    not_readable_error = 
@@ -1042,21 +1062,21 @@ wantWriteableHandle_ fun handle act =
 
 checkWriteableHandle fun handle handle_ act
   = case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioError (IOException theError)
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
       ReadHandle 	   -> ioError not_writeable_error
       _ 		   -> act
   where
    not_writeable_error = 
-	   IOError (Just handle) IllegalOperation fun
-		   ("handle is not open for writing")
+	   IOException (IOError (Just handle) IllegalOperation fun
+		   			("handle is not open for writing"))
 
 wantRWHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantRWHandle fun handle act = 
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
       _ 		   -> act handle_
@@ -1065,15 +1085,15 @@ wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantSeekableHandle fun handle act =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle	   -> ioe_closedHandle fun handle
       _ 		   -> act handle_
   where
    not_seekable_error = 
-	   IOError (Just handle) 
-	           IllegalOperation fun
-		   ("handle is not seekable")
+	   IOException (IOError (Just handle) 
+	           		IllegalOperation fun
+		   		("handle is not seekable"))
 
 \end{code}
 
@@ -1082,7 +1102,8 @@ access to a closed file.
 
 \begin{code}
 ioe_closedHandle :: String -> Handle -> IO a
-ioe_closedHandle fun h = ioError (IOError (Just h) IllegalOperation fun "handle is closed")
+ioe_closedHandle fun h = ioError (IOException (IOError (Just h) IllegalOperation fun 
+					"handle is closed"))
 \end{code}
 
 Internal helper functions for Concurrent Haskell implementation

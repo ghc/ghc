@@ -1,6 +1,9 @@
+% ------------------------------------------------------------------------------
+% $Id: PrelIO.lhs,v 1.14 2000/07/07 11:03:58 simonmar Exp $
 %
-% (c) The GRAP/AQUA Project, Glasgow University, 1992-1996
+% (c) The University of Glasgow, 1992-2000
 %
+
 \section[PrelIO]{Module @PrelIO@}
 
 This module defines all basic IO operations.
@@ -20,15 +23,13 @@ import PrelIOBase
 import PrelHandle	-- much of the real stuff is in here
 
 import PrelNum
-import PrelRead         ( readParen, Read(..), reads, lex, readIO )
+import PrelRead         ( Read(..), readIO )
 import PrelShow
-import PrelMaybe	( Either(..), Maybe(..) )
+import PrelMaybe	( Maybe(..) )
 import PrelAddr		( Addr(..), AddrOff(..), nullAddr, plusAddr )
 import PrelList		( concat, reverse, null )
-import PrelByteArr	( ByteArray )
 import PrelPack		( unpackNBytesST, unpackNBytesAccST )
-import PrelException    ( ioError, catch, catchException, throw, 
-			  blockAsyncExceptions )
+import PrelException    ( ioError, catch, catchException, throw )
 import PrelConc
 \end{code}
 
@@ -228,11 +229,11 @@ hGetContents handle =
 	-- the handle.
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioError theError
+      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hGetContents" handle
       SemiClosedHandle 	   -> ioe_closedHandle "hGetContents" handle
-      AppendHandle 	   -> ioError not_readable_error
-      WriteHandle 	   -> ioError not_readable_error
+      AppendHandle 	   -> ioException not_readable_error
+      WriteHandle 	   -> ioException not_readable_error
       _ -> do
     	  {- 
     	    To avoid introducing an extra layer of buffering here,

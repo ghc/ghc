@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelArr.lhs,v 1.23 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelArr.lhs,v 1.24 2000/07/07 11:03:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -17,13 +17,10 @@ For byte-arrays see @PrelByteArr@.
 module PrelArr where
 
 import {-# SOURCE #-} PrelErr ( error )
-import PrelList (foldl)
 import PrelEnum
 import PrelNum
 import PrelST
 import PrelBase
-import PrelAddr
-import PrelGHC
 import PrelShow
 
 infixl 9  !, //

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.11 2000/06/15 13:23:52 daan Exp $
+ * $Id: Prelude.h,v 1.12 2000/07/07 11:03:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -21,11 +21,11 @@ extern DLL_IMPORT const StgClosure PrelPack_unpackCString_closure;
 extern DLL_IMPORT const StgClosure PrelWeak_runFinalizzerBatch_closure;
 extern const StgClosure PrelMain_mainIO_closure;
 
-extern DLL_IMPORT const StgClosure PrelException_stackOverflow_closure;
-extern DLL_IMPORT const StgClosure PrelException_heapOverflow_closure;
-extern DLL_IMPORT const StgClosure PrelException_PutFullMVar_closure;
-extern DLL_IMPORT const StgClosure PrelException_BlockedOnDeadMVar_closure;
-extern DLL_IMPORT const StgClosure PrelException_NonTermination_closure;
+extern DLL_IMPORT const StgClosure PrelIOBase_stackOverflow_closure;
+extern DLL_IMPORT const StgClosure PrelIOBase_heapOverflow_closure;
+extern DLL_IMPORT const StgClosure PrelIOBase_PutFullMVar_closure;
+extern DLL_IMPORT const StgClosure PrelIOBase_BlockedOnDeadMVar_closure;
+extern DLL_IMPORT const StgClosure PrelIOBase_NonTermination_closure;
 
 extern DLL_IMPORT const StgInfoTable PrelBase_Czh_static_info;
 extern DLL_IMPORT const StgInfoTable PrelBase_Izh_static_info;
@@ -50,11 +50,11 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 #define runFinalizerBatch_closure (&PrelWeak_runFinalizzerBatch_closure)
 #define mainIO_closure            (&PrelMain_mainIO_closure)
 
-#define stackOverflow_closure     (&PrelException_stackOverflow_closure)
-#define heapOverflow_closure      (&PrelException_heapOverflow_closure)
-#define PutFullMVar_closure       (&PrelException_PutFullMVar_closure)
-#define BlockedOnDeadMVar_closure (&PrelException_BlockedOnDeadMVar_closure)
-#define NonTermination_closure    (&PrelException_NonTermination_closure)
+#define stackOverflow_closure     (&PrelIOBase_stackOverflow_closure)
+#define heapOverflow_closure      (&PrelIOBase_heapOverflow_closure)
+#define PutFullMVar_closure       (&PrelIOBase_PutFullMVar_closure)
+#define BlockedOnDeadMVar_closure (&PrelIOBase_BlockedOnDeadMVar_closure)
+#define NonTermination_closure    (&PrelIOBase_NonTermination_closure)
 
 #define Czh_static_info           (&PrelBase_Czh_static_info)
 #define Izh_static_info           (&PrelBase_Izh_static_info)
