@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# Running 'binary-dist' gives us a tree which
+# isn't quite right for the purposes of creating
+# a mingw/win32 install tree.  This script rejigs
+# the tree.
+#
+# To use:
+#
+#   foo$ cd <top of fptools build tree>
+#   foo$ make binary-dist Project=Ghc 
+#   foo$ cd ghc-<version>
+#   foo$ ../distrib/prep-bin-dist-mingw
+#
+export gcc_lib=c:/ghc/ghc-5.02.2/gcc-lib
+export perl_dir=c:/ghc/ghc-5.02.2
+export mingw_include=c:/ghc/ghc-5.02.2/include/mingw
+
+echo "Removing configure script files...not needed"
+rm -f config.guess config.sub configure configure.in mkdirhier
+rm -f Makefile-bin.in Makefile.in aclocal.m4 install-sh
+
+# For reasons unknown, duplicate copies of misc file in share/
+rm -rf share/
+
+echo "rejig bin/"
+mv bin/i386-unknown-mingw32/* bin/
+rmdir bin/i386-unknown-mingw32
+strip bin/ghc.exe
+
+echo "rejig lib/"
+mv lib/i386-unknown-mingw32/* .
+rmdir lib/i386-unknown-mingw32
+rmdir lib
+mv ghc-asm.prl ghc-asm
+mv ghc-split.prl ghc-split
+
+echo "copy in gcc-lib/"
+cp -Rf $gcc_lib .
+
+echo "extra header files inside of include/"
+mkdir include/mingw
+cp -Rf $mingw_include include/
+
+
+echo "copy in perl too"
+cp ${perl_dir}/perl.exe .
+cp ${perl_dir}/perl56.dll .
+cp ${perl_dir}/gcc.exe .
+
+echo "formatting documentation"
+mkdir doc
+mkdir doc/user-guide
+cp -Rf html/* doc/user-guide/
+cp pdf/set.pdf doc/
+rm -rf html/
+rm -rf pdf/
+
+
+
+
