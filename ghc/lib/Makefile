@@ -4,7 +4,7 @@
 #
 #		Makefile for building the GHC Prelude libraries umpteen ways
 #
-# 	$Id: Makefile,v 1.8 1997/03/25 21:21:56 sof Exp $
+# 	$Id: Makefile,v 1.9 1997/05/18 04:27:38 sof Exp $
 #
 #	
 #################################################################################
@@ -84,8 +84,14 @@ SRC_MKDEPENDHS_OPTS += -ighc:required:glaExts:concurrent -I$(GHC_INCLUDE_DIR)
 
 HIBOOTS=GHC Main IOBase
 
+# Use variable to control this, so that we can generate
+# new boot interface files for new ways without having
+# to re-generate the old lot (followed by complete recompile).
+#
+HIBOOT_WAYS = norm $(WAYS)
+
 hi-boot :
-	@for i in norm $(WAYS); do \
+	@for i in $(HIBOOT_WAYS); do \
 		echo "Booting interface files for way $$i "; \
 		if [ "$$i" != "norm" ]; then \
 		   j="$${i}_hi"; \
