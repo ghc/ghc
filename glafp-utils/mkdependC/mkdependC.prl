@@ -13,8 +13,8 @@ $Status  = 0; # just used for exit() status
 $Verbose = 0;
 $Dashdashes_seen = 0;
 
-$Begin_magic_str = "# DO NOT DELETE: Beginning of C dependencies\n";
-$End_magic_str = "# DO NOT DELETE: End of C dependencies\n";
+$Begin_magic_str = "# DO NOT DELETE: Beginning of C dependencies";
+$End_magic_str = "# DO NOT DELETE: End of C dependencies";
 $Obj_suffix = 'o';
 @Defines = ();
 $Include_dirs = '';
@@ -72,6 +72,15 @@ foreach $sf (@Src_files) {
     &slurp_file($sf, 'fh00');
 }
 
+# Tiresome EOL termination issues
+if ( ${BUILDPLATFORM} eq "i386-unknown-mingw32" ) {
+    $Begin_magic_str = $Begin_magic_str . "\r\n";
+    $End_magic_str = $End_magic_str . "\r\n";
+} else {
+    $Begin_magic_str = $Begin_magic_str . "\n";
+    $End_magic_str = $End_magic_str . "\n";
+}
+
 # OK, mangle the Makefile
 unlink("$Makefile.bak");
 rename($Makefile,"$Makefile.bak");
@@ -125,9 +134,9 @@ sub mangle_command_line_args {
 		local($suff)	=  &grab_arg_arg($_);
 		push(@File_suffix, $suff);
 	    } elsif ( /^-bs/ ) {
-		$Begin_magic_str = &grab_arg_arg($_) . "\n";
+		$Begin_magic_str = &grab_arg_arg($_);
 	    } elsif ( /^-es/ ) {
-		$End_magic_str = &grab_arg_arg($_) . "\n";
+		$End_magic_str = &grab_arg_arg($_);
 	    } elsif ( /^-w/ ) {
 		$Width	= &grab_arg_arg($_);
 	    } elsif ( /^-/ ) {
