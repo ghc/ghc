@@ -181,8 +181,7 @@ checkCode macro args assts
 	join = StLabel ulbl_pass
 
         -- see includes/StgMacros.h for explaination of these magic consts
-        aLL_NON_PTRS
-           = IF_ARCH_alpha(16383,65535)
+        aLL_NON_PTRS = 0xff
 
         assign_liveness ptr_regs 
            = StAssignReg WordRep stgR9
