@@ -57,9 +57,6 @@ type2context(t)
 	return(lsing(t));
 
       case namedtvar:
-	fprintf(stderr, "namedtvar: %d %s\n", hashIds, gnamedtvar(t));
-        if (strcmp("()", gnamedtvar(t)) == 0)
-	       return (Lnil);
     	hsperror ("type2context: unexpected namedtvar found in a context");
 
       case tllist:
