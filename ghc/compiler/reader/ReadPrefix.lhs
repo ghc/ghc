@@ -374,6 +374,15 @@ wlkQuals cquals
 		      binds = cvBinds sf cvValSig bs
 		  in
 		  returnUgn (LetStmt binds)
+	        U_let letvdefs letvexpr -> 
+		    wlkBinding letvdefs	`thenUgn` \ binding ->
+		    wlkExpr    letvexpr	`thenUgn` \ expr    ->
+		    getSrcLocUgn 	`thenUgn` \ loc ->
+		    getSrcFileUgn	`thenUgn` \ sf	    ->
+		    let
+		     binds = cvBinds sf cvValSig binding
+		    in
+		    returnUgn (GuardStmt (HsLet binds expr) loc)
 \end{code}
 
 Patterns: just bear in mind that lists of patterns are represented as
