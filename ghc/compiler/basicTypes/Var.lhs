@@ -170,24 +170,19 @@ mkSysTyVar uniq kind = Var { varName    = name
 		       name = mkSysLocalName uniq SLIT("t")
 
 newMutTyVar :: Name -> Kind -> IO TyVar
-newMutTyVar name kind = 
-  do loc <- newIORef Nothing
-     return (Var { varName    = name
-		 , realUnique = getKey (nameUnique name)
-		 , varType    = kind
-		 , varDetails = MutTyVar loc False
-		 , varInfo    = pprPanic "newMutTyVar" (ppr name)
-		 })
+newMutTyVar name kind = newTyVar name kind False
 
 newSigTyVar :: Name -> Kind -> IO TyVar
-newSigTyVar name kind = 
-  do loc <- newIORef Nothing
-     return (Var { varName    = name 
-		 , realUnique = getKey (nameUnique name)
-		 , varType    = kind
-		 , varDetails = MutTyVar loc True
-		 , varInfo    = pprPanic "newSigTyVar" (ppr name)
-		 })
+newSigTyVar name kind = newTyVar name kind True
+
+newTyVar name kind is_sig
+ = do loc <- newIORef Nothing
+      return (Var { varName    = name
+		  , realUnique = getKey (nameUnique name)
+		  , varType    = kind
+		  , varDetails = MutTyVar loc is_sig
+		  , varInfo    = pprPanic "newMutTyVar" (ppr name)
+		  })
 
 readMutTyVar :: TyVar -> IO (Maybe Type)
 readMutTyVar (Var {varDetails = MutTyVar loc _}) = readIORef loc
