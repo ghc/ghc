@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.87 2001/12/06 13:05:03 sewardj Exp $
+ * $Id: PrimOps.hc,v 1.88 2002/01/25 12:22:27 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1163,19 +1163,18 @@ FN_(tryTakeMVarzh_fast)
       /* unlock in the SMP case */
       SET_INFO(mvar,&stg_FULL_MVAR_info);
 #endif
-      TICK_RET_UNBOXED_TUP(1);
-      RET_P(val);
   } else {
       /* No further putMVars, MVar is now empty */
+      mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
 
       /* do this last... we might have locked the MVar in the SMP case,
        * and writing the info pointer will unlock it.
        */
       SET_INFO(mvar,&stg_EMPTY_MVAR_info);
-      mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
-      TICK_RET_UNBOXED_TUP(1);
-      RET_P(val);
   }
+
+  TICK_RET_UNBOXED_TUP(1);
+  RET_NP((I_)1, val);
   FE_
 }
 
