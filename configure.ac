@@ -1121,7 +1121,10 @@ else
 fi
 
 dnl ** check for math library
-AC_CHECK_LIB([m], [atan], [LIBS="-lm $LIBS"; LIBM="-lm"], [LIBM=])
+AC_CHECK_FUNC(atan,[fp_libm_not_needed=yes;LIBM=],[fp_libm_not_needed=dunno])
+if test x"$fp_libm_not_needed" = xdunno; then
+   AC_CHECK_LIB([m], [atan], [LIBS="-lm $LIBS"; LIBM="-lm"],[LIBM=])
+fi
 AC_SUBST([LIBM])
 
 dnl ################################################################
@@ -1263,6 +1266,7 @@ AC_TRY_COMPILE(,[__asm__ (".subsections_via_symbols");],
             [Define to 1 if Apple-style dead-stripping is supported.])
     ],
     [
+        AC_MSG_RESULT(no)
         AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[0],
             [Define to 1 if Apple-style dead-stripping is supported.])
     ])
