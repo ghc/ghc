@@ -34,7 +34,7 @@ import Pretty
 import FastString
 import qualified Outputable
 
-import CmdLineOpts      ( opt_PIC )
+import CmdLineOpts      ( opt_PIC, opt_Static )
 
 #if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST
@@ -511,6 +511,15 @@ pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 
 -- -----------------------------------------------------------------------------
 -- pprData: print a 'CmmStatic'
+
+#if defined(linux_TARGET_OS)
+#if defined(powerpc_TARGET_ARCH) || defined(i386_TARGET_ARCH)
+    -- Hack to make dynamic linking work
+pprSectionHeader ReadOnlyData
+    | not opt_PIC && not opt_Static
+    = pprSectionHeader Data
+#endif
+#endif
 
 pprSectionHeader Text
     = ptext

@@ -63,7 +63,7 @@ import MachRegs
 import MachInstrs
 import NCGMonad         ( NatM, getNewRegNat, getNewLabelNat )
 
-import CmdLineOpts      ( opt_PIC )
+import CmdLineOpts      ( opt_PIC, opt_Static )
 
 import Pretty
 import qualified Outputable
@@ -195,46 +195,30 @@ howToAccessLabel False lbl
     | opt_PIC && externallyVisibleCLabel lbl = AccessViaSymbolPtr
 howToAccessLabel _ _ = AccessDirectly
 
-#elif linux_TARGET_OS && powerpc_TARGET_ARCH
--- PowerPC Linux
---
--- PowerPC Linux is just plain broken.
--- While it's theoretically possible to use GOT offsets larger
--- than 16 bit, the standard crt*.o files don't, which leads to
--- linker errors as soon as the GOT size exceeds 16 bit.
--- Also, the assembler doesn't support @gotoff labels.
--- In order to be able to use a larger GOT, we circumvent the
--- entire GOT mechanism and do it ourselves (this is what GCC does).
+#elif linux_TARGET_OS && powerpc64_TARGET_ARCH
+-- ELF PPC64 (powerpc64-linux), AIX, MacOS 9, BeOS/PPC
 
--- In this scheme, we need to do _all data references_ (even refs
--- to static data) via a SymbolPtr when we are generating PIC.
--- Luckily, the PLT works as expected, so we can simply access
--- dynamically linked code via the PLT.
-
-howToAccessLabel _ _ | not opt_PIC = AccessDirectly
-howToAccessLabel True lbl
-    = if labelDynamic lbl then AccessViaStub
-                          else AccessDirectly
-howToAccessLabel False lbl
-    = AccessViaSymbolPtr
+howToAccessLabel True lbl = AccessDirectly -- actually, .label instead of label
+howToAccessLabel _ lbl = AccessViaSymbolPtr
 
 #elif linux_TARGET_OS
 -- ELF (Linux)
 --
+-- ELF tries to pretend to the main application code that dynamic linking does 
+-- not exist. While this may sound convenient, it tends to mess things up in
+-- very bad ways, so we have to be careful when we generate code for the main
+-- program (-dynamic but no -fPIC).
+--
 -- Indirect access is required for references to imported symbols
--- from position independent code.
--- It is always possible to access something indirectly,
--- even when it's not necessary.
-
--- For code, we can use a relative jump to a piece of
--- stub code instead (this allows lazy binding of imported symbols).
+-- from position independent code. It is also required from the main program
+-- when dynamic libraries containing Haskell code are used.
 
 howToAccessLabel isJump lbl
-        -- no PIC -> the dynamic linker does everything for us
-   | not opt_PIC = AccessDirectly
-        -- if it's not imported, we need no indirection
-        -- ("foo" will end up being accessed as "foo@GOTOFF")
-   | not (labelDynamic lbl) = AccessDirectly
+	-- no PIC -> the dynamic linker does everything for us;
+	--           if we don't dynamically link to Haskell code,
+	--           it actually manages to do so without messing thins up.
+    | not opt_PIC && opt_Static = AccessDirectly
+   
 #if !i386_TARGET_ARCH
 -- for Intel, we temporarily disable the use of the
 -- Procedure Linkage Table, because PLTs on intel require the
@@ -242,9 +226,35 @@ howToAccessLabel isJump lbl
 -- a jump through the PLT is made.
 -- TODO: make the i386 NCG ensure this before jumping to a
 --       CodeStub label, so we can remove this special case.
-   | isJump = AccessViaStub
+
+	-- As long as we're in a shared library ourselves,
+	-- we can use the plt.
+	-- NOTE: We might want to disable this, because this
+	--       prevents -fPIC code from being linked statically.
+    | isJump && labelDynamic lbl && opt_PIC = AccessViaStub
+
+    	-- TODO: it would be OK to access non-Haskell code via a stub
+--  | isJump && labelDynamic lbl && not isHaskellCode lbl = AccessViaStub
+
+	-- Using code stubs for jumps from the main program to an entry
+	-- label in a dynamic library is deadly; this will cause the dynamic
+	-- linker to replace all references (even data references) to that
+	-- label by references to the stub, so we won't find our info tables
+	-- any more.
 #endif
-   | otherwise = AccessViaSymbolPtr
+
+    	-- A dynamic label needs to be accessed via a symbol pointer.
+	-- NOTE: It would be OK to jump to foreign code via a PLT stub.
+    | labelDynamic lbl = AccessViaSymbolPtr
+    
+#if powerpc_ARGET_ARCH
+ 	-- For PowerPC32 -fPIC, we have to access even static data
+	-- via a symbol pointer (see below for an explanation why
+	-- PowerPC32 Linux is especially broken).
+    | opt_PIC && not isJump = AccessViaSymbolPtr
+#endif
+
+    | otherwise = AccessDirectly
 
 #else
 --
@@ -375,8 +385,22 @@ pprImportedSymbol importedLbl
 
 #elif powerpc_TARGET_ARCH && linux_TARGET_OS
 
--- For PowerPC linux, we don't do anything unless we're generating PIC.
-needImportedSymbols = opt_PIC
+-- PowerPC Linux
+--
+-- PowerPC Linux is just plain broken.
+-- While it's theoretically possible to use GOT offsets larger
+-- than 16 bit, the standard crt*.o files don't, which leads to
+-- linker errors as soon as the GOT size exceeds 16 bit.
+-- Also, the assembler doesn't support @gotoff labels.
+-- In order to be able to use a larger GOT, we circumvent the
+-- entire GOT mechanism and do it ourselves (this is what GCC does).
+
+-- In this scheme, we need to do _all data references_ (even refs
+-- to static data) via a SymbolPtr when we are generating PIC.
+
+-- We need to do this whenever we explicitly access something via
+-- a symbol pointer.
+needImportedSymbols = opt_PIC || not opt_Static
 
 -- If we're generating PIC, we need to create our own "fake GOT".
 
