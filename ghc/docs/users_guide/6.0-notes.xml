@@ -31,7 +31,7 @@
 	<para>Non-blocking I/O is now supported on Windows.</para>
       </listitem>
       <listitem>
-	<para>The <ulink url="../base/Data.Dynamic.html#Typeable"><literal>Typeable</literal></ulink> class can now be
+	<para>The <ulink url="../libraries/base/Data.Dynamic.html#Typeable"><literal>Typeable</literal></ulink> class can now be
 	derived, and the implementation of <literal>Typeable</literal>
 	is now more efficient.</para>
       </listitem>
@@ -73,7 +73,7 @@
 	<literal>System.Posix</literal>, and has some additions aimed
 	at supporting the latest revision of the POSIX standard (IEEE
 	Std 1003.1-2001).  See the <ulink
-	url="../unix/index.html"><literal>unix</literal>
+	url="../libraries/unix/index.html"><literal>unix</literal>
 	package</ulink> for details.</para>
 
 	<para>The old <literal>posix</literal> package is still
@@ -82,29 +82,29 @@
       </listitem>
 
       <listitem>
-	<para><ulink url="../base/Data.IORef.html"><literal>Data.IORef</literal></ulink>: Added <literal>atomicModifyIORef</literal>.</para>
+	<para><ulink url="../libraries/base/Data.IORef.html"><literal>Data.IORef</literal></ulink>: Added <literal>atomicModifyIORef</literal>.</para>
       </listitem>
 
       <listitem>
-	<para><ulink url="../base/System.Cmd.html"><literal>System.Cmd</literal></ulink>: Added <literal>rawSystem</literal>.</para>
+	<para><ulink url="../libraries/base/System.Cmd.html"><literal>System.Cmd</literal></ulink>: Added <literal>rawSystem</literal>.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../base/System.Environment.html"><literal>System.Environment</literal></ulink>:
+	url="../libraries/base/System.Environment.html"><literal>System.Environment</literal></ulink>:
 	Added <literal>withArgs</literal> and <literal>withProgName</literal>.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../network/Network.Socket.html"><literal>Network.Socket</literal></ulink>:
+	url="../libraries/network/Network.Socket.html"><literal>Network.Socket</literal></ulink>:
 	Added <literal>sendFd</literal> and <literal>recvFd</literal>.</para>
       </listitem>
 
       <listitem>
 	<para>The <literal>Readline</literal> library has moved to
 	<ulink
-	url="../readline/System.Console.Readline.html"><literal>System.Console.Readline</literal></ulink>,
+	url="../libraries/readline/System.Console.Readline.html"><literal>System.Console.Readline</literal></ulink>,
 	and is in a package of its own
 	(<literal>readline</literal>).</para>
       </listitem>
@@ -119,7 +119,7 @@
 
       <listitem>
 	<para><ulink
-	url="../network/Network.BSD.html"><literal>Network.BSD</literal></ulink>:
+	url="../libraries/network/Network.BSD.html"><literal>Network.BSD</literal></ulink>:
 	<literal>symlink</literal> and <literal>readline</literal> are
 	now deprecated; use
 	<literal>System.Posix.createSymbolicLink</literal> and
@@ -129,13 +129,13 @@
 
       <listitem>
 	<para><ulink
-	url="../base/Control.Exception.html"><literal>Control.Exception</literal></ulink>:
+	url="../libraries/base/Control.Exception.html"><literal>Control.Exception</literal></ulink>:
 	Added <literal>mapException</literal>.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../base/Data.Dynamic.html"><literal>Data.Dynamic</literal></ulink>:
+	url="../libraries/base/Data.Dynamic.html"><literal>Data.Dynamic</literal></ulink>:
 	various changes to make the implementation of
 	<literal>Typeable</literal> more efficient.  This entails some
 	changes to the interface, and affects how instances of
@@ -144,19 +144,19 @@
 
       <listitem>
 	<para><ulink
-	url="../base/Data.Tree.html"><literal>Data.Tree</literal></ulink>
+	url="../libraries/base/Data.Tree.html"><literal>Data.Tree</literal></ulink>
 	is a new library for trees.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../base/Data.Graph.html"><literal>Data.Graph</literal></ulink>
+	url="../libraries/base/Data.Graph.html"><literal>Data.Graph</literal></ulink>
 	is a new library for graphs.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../base/System.IO.html"><literal>System.IO</literal></ulink>:
+	url="../libraries/base/System.IO.html"><literal>System.IO</literal></ulink>:
 	Removed <literal>bracket</literal> and
 	<literal>bracket_</literal> (use the versions from
 	<literal>Control.Exception</literal> instead).</para>
@@ -164,7 +164,7 @@
 
       <listitem>
 	<para><ulink
-	url="../base/System.IO.html"><literal>System.IO</literal></ulink>:
+	url="../libraries/base/System.IO.html"><literal>System.IO</literal></ulink>:
 	The <literal>IOError</literal> type is now a synonym for
 	<literal>IOException</literal>, whereas previously it was a
 	synonym for <literal>Exception</literal>.  This has various
@@ -176,47 +176,47 @@
 
       <listitem>
 	<para><ulink
-	url="../base/System.IO.Error.html"><literal>System.IO.Error</literal></ulink>:
+	url="../libraries/base/System.IO.Error.html"><literal>System.IO.Error</literal></ulink>:
 	added <literal>annotateIOError</literal>,
 	<literal>modifyIOError</literal>, and <literal>ioeSet{ErrorType,ErrorString,Handle,FileName}</literal>.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../base/Text.ParserCombinators.ReadP.html"><literal>Text.ParserCombinators.ReadP</literal></ulink>:
+	url="../libraries/base/Text.ParserCombinators.ReadP.html"><literal>Text.ParserCombinators.ReadP</literal></ulink>:
 	lots of updates.</para>
       </listitem>
 
       <listitem>
-	<para><literal>Control.Monad.Monoid</literal> is now <ulink url="../base/Data.Monoid.html"><literal>Data.Monoid</literal></ulink>.</para>
+	<para><literal>Control.Monad.Monoid</literal> is now <ulink url="../libraries/base/Data.Monoid.html"><literal>Data.Monoid</literal></ulink>.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../base/Data.PackedString.html"><literal>Data.PackedString</literal></ulink>:
+	url="../libraries/base/Data.PackedString.html"><literal>Data.PackedString</literal></ulink>:
 	added <literal>joinPS</literal>, <literal>unwordsPS</literal>
 	and <literal>unlinesPS</literal>.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../base/Data.HashTable.html"><literal>Data.HashTable</literal></ulink>
+	url="../libraries/base/Data.HashTable.html"><literal>Data.HashTable</literal></ulink>
 	is a new dynamic hash-table implementation.</para>
       </listitem>
 
       <listitem>
 	<para>Added <ulink
-	url="../unix/System.Sendfile.html"><literal>System.Sendfile</literal></ulink>.</para>
+	url="../libraries/unix/System.Sendfile.html"><literal>System.Sendfile</literal></ulink>.</para>
       </listitem>
 
       <listitem>
 	<para>Added <ulink
-	url="../base/Foreign.Marshal.Pool.html"><literal>Foreign.Marshal.Pool</literal></ulink>.</para>
+	url="../libraries/base/Foreign.Marshal.Pool.html"><literal>Foreign.Marshal.Pool</literal></ulink>.</para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	url="../base/Data.Bits.html"><literal>Data.Bits</literal></ulink>:
+	url="../libraries/base/Data.Bits.html"><literal>Data.Bits</literal></ulink>:
 	<literal>shiftL</literal>, <literal>shiftR</literal>,
 	<literal>rotateL</literal>, and <literal>rotateR</literal> are
 	now methods of the <literal>Bite</literal> class.</para>
@@ -228,7 +228,7 @@
 	<itemizedlist>
 	  <listitem>
 	    <para>Added <ulink
-	    url="../base/Foreign.ForeignPtr.html#mallocForeignPtr"><literal>Foreign.ForeignPtr.mallocForeignPtr</literal></ulink>
+	    url="../libraries/base/Foreign.ForeignPtr.html#mallocForeignPtr"><literal>Foreign.ForeignPtr.mallocForeignPtr</literal></ulink>
 	    and friends.</para>
 	  </listitem>
 	  <listitem>
@@ -240,7 +240,7 @@
 	  <listitem>
 	    <para><literal>Foreign.C.TypesISO</literal> has been
 	    merged into <ulink
-	    url="../base/Foreign.C.Types.html"><literal>Foreign.C.Types</literal></ulink>.</para>
+	    url="../libraries/base/Foreign.C.Types.html"><literal>Foreign.C.Types</literal></ulink>.</para>
 	  </listitem>
 	</itemizedlist>
       </listitem>
@@ -253,7 +253,7 @@
       <listitem>
 	<para>The <literal>Data</literal> class provides for generic
 	data traversals and folds; see <ulink
-	url="../base/Data.Generics.html"><literal>Data.Generics</literal></ulink>.
+	url="../libraries/base/Data.Generics.html"><literal>Data.Generics</literal></ulink>.
 	<literal>Data</literal> can be derived for arbitrary
 	datatypes.  The <literal>Data</literal> class is still
 	experimental, so its contents may change in the future.</para>
