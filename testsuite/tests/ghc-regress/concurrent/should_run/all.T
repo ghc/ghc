@@ -40,8 +40,14 @@ test('conc029', normal, compile_and_run, [''])
 test('conc030', extra_run_opts('+RTS -K2M -RTS'), compile_and_run, [''])
 test('conc031', normal, compile_and_run, [''])
 test('conc032', normal, compile_and_run, [''])
-test('conc033', normal, compile_and_run, [''])
-test('conc034', extra_run_opts('+RTS -C0 -RTS'), compile_and_run, [''])
+
+# Omit for GHCi, because it just sits there waiting for you to press ^C
+test('conc033', omit_ways(['ghci']), compile_and_run, [''])
+
+# Omit for GHCi, because it just sits there waiting for you to press ^C
+test('conc034', compose(omit_ways(['ghci']), extra_run_opts('+RTS -C0 -RTS')),
+	compile_and_run, [''])
+
 test('conc035', normal, compile_and_run, [''])
 test('conc036', normal, compile_and_run, [''])
 
@@ -51,4 +57,5 @@ test('conc036', normal, compile_and_run, [''])
 test('conc037', skip, compile_and_run, [''])
 test('conc038', skip, compile_and_run, [''])
 
-test('conc039', normal, compile_and_run, [''])
+# Omit for GHCi, uses foreign export:
+test('conc039', omit_ways(['ghci']), compile_and_run, [''])
