@@ -527,7 +527,7 @@ SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Distribution.ParseUtils \
 	-optdep--exclude-module=Distribution.Setup \
 	-optdep--exclude-module=Distribution.Version \
-	-optdep--exclude-module=System.FilePath
+	-optdep--exclude-module=System.Directory.Internals
 endif
 
 SRC_LD_OPTS += -no-link-chk

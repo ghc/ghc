@@ -21,7 +21,7 @@ ghc_603_plus = $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else
 ifeq "$(ghc_603_plus)" "YES"
 # These modules are all provided in GHC 6.3+
 EXCLUDED_SRCS += \
-	System/FilePath.hs \
+	System/Directory/Internals.hs \
 	Distribution/Compat/ReadP.hs \
 	Distribution/Extension.hs \
 	Distribution/GetOpt.hs \
@@ -34,7 +34,7 @@ EXCLUDED_SRCS += \
 endif
 
 # Some explicit dependencies
-System/FilePath.$(way_)o : $(FPTOOLS_TOP)/libraries/base/System/FilePath.hs
+System/Directory/Internals.$(way_)o : $(FPTOOLS_TOP)/libraries/base/System/Directory/Internals.hs
 Distribution/Compat/ReadP.$(way_) : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/ReadP.hs
 Distribution/Extension.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Extension.hs
 Distribution/GetOpt.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/GetOpt.hs

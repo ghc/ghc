@@ -26,7 +26,7 @@ module Compat.Directory (
 #endif
 
 import System.Environment (getEnv)
-import System.FilePath
+import System.Directory.Internals
 #if __GLASGOW_HASKELL__ > 600
 import Control.Exception	( bracket )
 import Control.Monad		( when )
