@@ -461,6 +461,11 @@ $Only_preprocess_hc = 0;  # ditto
 $Only_generate_deps = 0;  # "
 $PostprocessCcOutput = 0;
 
+# Win32 only:
+#    static /= 0 => produce code for DLLs (when compiling/linking.)
+$Static = 1;
+$Static = 0 if ($TargetPlatform =~ /-mingw32$/);
+
 # native code-gen or via C?
 $HaveNativeCodeGen = $GhcWithNativeCodeGen;
 $HscOut = '-C='; # '-C=' ==> .hc output; '-S=' ==> .s output; '-N=' ==> neither
@@ -1206,6 +1211,7 @@ sub setupLinkOpts {
     unshift(@Ld_flags, ('-Xlinker -bbigtoc')); 
   }
 
+
 } # end of setupLinkOpts
 
 \end{code}
@@ -1274,7 +1280,7 @@ if ($LibGmp eq 'not-installed') {
   push(@SysLibrary, "-l$LibGmp");
 }
 
-push(@SysLibrary, '-lm');
+push(@SysLibrary, '-lm') if !( $TargetPlatform =~ /^.*(cygwin32|mingw32)$/ );
 \end{code}
 
 %************************************************************************
@@ -1386,6 +1392,20 @@ if ($Do_lnkr) {
     local($output) = ($Specific_output_file ne '') ? "-o $Specific_output_file" : '';
     @Files_to_tidy = ($Specific_output_file ne '') ? $Specific_output_file : 'a.out'; 
 
+    #
+    # Win32 DLLs - link with import libraries, not the real archives.
+    # 
+    if ( $TargetPlatform =~ /-mingw32$/ && !$Static ) {
+       foreach $a ( @SysLibrary ) {
+	  next if ($a eq '-lm');
+          $a = "${a}_imp" if ($a =~ /^-l/);
+       }
+       push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/Main.o"
+			                 : "$TopPwd/$CURRENT_DIR/$GHC_RUNTIME_DIR/Main.o");
+       push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/PrelMain.o"
+			                 : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/PrelMain.o");
+       push(@Ld_flags,  "-mno-cygwin");
+    }
     local($to_do) = "$lnkr $Verbose @Ld_flags $output @Link_file $TopClosureFile $libdirs @UserLibrary @SysLibrary";
     &run_something($to_do, 'Linker');
 
@@ -1853,6 +1873,10 @@ sub runHscAndProcessInterfaces {
 	push(@HsC_flags, '-fsource-unchanged');	
     }	
 
+    # Indicate whether we're static or not.
+    # This will only ever 
+    push(@HsC_flags, '-static') if $Static;
+
     # Run the compiler
 
     &runHsc($ifile_root, $hsc_out, $hsc_hi, $hsc_out_c_stub, $hsc_out_h_stub, $going_interactive);
@@ -1942,7 +1966,7 @@ sub runHsc {
 
     if ( $going_interactive ) {
 	# don't need .hi unless we're going to show it on stdout:
-	$ProduceHi = '-nohifile=' if ! $HiOnStdout;
+	$ProduceHi = '-nohifile=' if ! ($HiOnStdout || $Specific_hi_file ne '' );
 	$do_cc = 0; $do_as = 0; $Do_lnkr = 0; # and we won't go any further...
     }
 
@@ -2080,7 +2104,7 @@ sub runGcc {
     local($c_flags) = "@CcBoth_flags";
     local($ddebug_flag) = ( $DEBUGging ) ? '-DDEBUG' : '';
 
-    $c_flags .= "-mno-cygwin" if ( $TargetPlatform =~ /-mingw32$/ );
+    $c_flags .= " -mno-cygwin" if ( $TargetPlatform =~ /-mingw32$/ );
 
     # "input" files to use that are not in some weird directory;
     # to help C compilers grok .hc files [ToDo: de-hackify]
@@ -2827,8 +2851,8 @@ arg: while($_ = $Args[0]) {
     # stop after generating .o files
 
     /^-link-chk$/    && do { $LinkChk = 1; next arg; };
-    /^-no-link-chk$/ && do { $LinkChk = 0; next arg; };
     # don't do consistency-checking after a link
+    /^-no-link-chk$/ && do { $LinkChk = 0; next arg; };
 
     /^-tmpdir$/ && do { $Tmp_prefix = &grab_arg_arg(*Args,'-tmpdir', '');
 			$Tmp_prefix = "$Tmp_prefix/ghc$$";
@@ -2889,6 +2913,7 @@ arg: while($_ = $Args[0]) {
 				    $Status++;
 				}
 			    }
+			    $ProduceHi='-hifile=';
 			    next arg; };
 
     # The suffix to use when looking for interface files
@@ -3058,7 +3083,7 @@ arg: while($_ = $Args[0]) {
 			}
 			next arg; };
 
-    /^-fno-asm-mangling$/ && do { $DoAsmMangling = 0; next arg; };
+    /^-fno-asm-mangling$/   && do { $DoAsmMangling = 0; next arg; };
 
     /^-fallow-overlapping-instances$/ && do { push(@HsC_flags, $_); next arg; };
     /^-fallow-undecidable-instances$/ && do { push(@HsC_flags, $_); next arg; };
@@ -3265,7 +3290,7 @@ arg: while($_ = $Args[0]) {
 
     #---------- Linker (gcc, really) ---------------------------------------
 
-    /^-static$/		&& do { push(@HsC_flags, $_); push(@Ld_flags, $_); next arg; };
+    /^-static$/		&& do { $Static=1; push(@Ld_flags, $_); next arg; };
     /^-no-hs-main$/	&& do { $NoHaskellMain=1; next arg;    };
 
     #---------- mixed cc and linker magic ----------------------------------
