@@ -610,8 +610,7 @@ getValidLinkable old_linkables objects_allowed new_linkables summary
 		    Just l | not (isObjectLinkable l) || stillThere l 
 				-> old_linkable
 				-- ToDo: emit a warning if not (stillThere l)
-			   | otherwise
-				-> Nothing
+                    other -> Nothing
 
 	   -- make sure that if we had an old disk linkable around, that it's
 	   -- still there on the disk (in case we need to re-link it).
