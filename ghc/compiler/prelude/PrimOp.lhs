@@ -11,22 +11,21 @@ module PrimOp (
 	tagOf_PrimOp, -- ToDo: rm
 	primOp_str,   -- sigh
 	primOpType, isCompareOp,
+	commutableOp,
 
 	PrimOpResultInfo(..),
 	getPrimOpResultInfo,
 
---MOVE:	primOpCanTriggerGC, primOpNeedsWrapper,
---MOVE:	primOpOkForSpeculation, primOpIsCheap,
---MOVE:	fragilePrimOp,
---MOVE:	HeapRequirement(..), primOpHeapReq,
+	primOpCanTriggerGC, primOpNeedsWrapper,
+	primOpOkForSpeculation, primOpIsCheap,
+	fragilePrimOp,
+	HeapRequirement(..), primOpHeapReq,
 
        -- export for the Native Code Generator
 	primOpInfo, -- needed for primOpNameInfo
 	PrimOpInfo(..),
 
 	pprPrimOp, showPrimOp
-
-	-- and to make the interface self-sufficient....
     ) where
 
 import Ubiq{-uitous-}
@@ -37,19 +36,19 @@ import TysWiredIn
 
 import CStrings		( identToC )
 import CgCompInfo   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
+import HeapOffs		( addOff, intOff, totHdrSize )
 import NameTypes	( mkPreludeCoreName, FullName, ShortName )
 import PprStyle		( codeStyle )
+import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import TyCon		( TyCon{-instances-} )
 import Type		( getAppDataTyCon, maybeAppDataTyCon,
-			  mkForAllTys, mkFunTys, applyTyCon )
-import TyVar		( alphaTyVar, betaTyVar )
+			  mkForAllTys, mkFunTys, applyTyCon, typePrimRep
+			)
+import TyVar		( alphaTyVar, betaTyVar, GenTyVar{-instance Eq-} )
+import Unique		( Unique{-instance Eq-} )
 import Util		( panic#, assoc, panic{-ToDo:rm-} )
-
-glueTyArgs = panic "PrimOp:glueTyArgs"
-pprParendType = panic "PrimOp:pprParendType"
-primRepFromType = panic "PrimOp:primRepFromType"
 \end{code}
 
 %************************************************************************
@@ -1305,7 +1304,6 @@ unfortunate few, some unknown amount of heap is required (these are the
 ops which can trigger GC).
 
 \begin{code}
-{- MOVE:
 data HeapRequirement
     = NoHeapRequired
     | FixedHeapRequired HeapOffset
@@ -1395,7 +1393,6 @@ primOpHeapReq ParLocalOp	= trace "primOpHeapReq:ParLocalOp:verify!" (
 #endif {-GRAN-}
 
 primOpHeapReq other_op	    	= NoHeapRequired
--}
 \end{code}
 
 Primops which can trigger GC have to be called carefully.
@@ -1403,9 +1400,8 @@ In particular, their arguments are guaranteed to be in registers,
 and a liveness mask tells which regs are live.
 
 \begin{code}
-{- MOVE:
-primOpCanTriggerGC op =
-    case op of
+primOpCanTriggerGC op
+  = case op of
     	TakeMVarOp  -> True
     	ReadIVarOp  -> True
 	DelayOp     -> True
@@ -1414,7 +1410,6 @@ primOpCanTriggerGC op =
 	    case primOpHeapReq op of
     	    	VariableHeapRequired -> True
     	    	_                    -> False
--}
 \end{code}
 
 Sometimes we may choose to execute a PrimOp even though it isn't
@@ -1429,7 +1424,6 @@ There should be no worries about side effects; that's all taken care
 of by data dependencies.
 
 \begin{code}
-{- MOVE:
 primOpOkForSpeculation :: PrimOp -> Bool
 
 -- Int.
@@ -1470,24 +1464,20 @@ primOpOkForSpeculation ParLocalOp	= False	    	-- Could be expensive!
 
 -- The default is "yes it's ok for speculation"
 primOpOkForSpeculation other_op		= True
--}
 \end{code}
 
 @primOpIsCheap@, as used in \tr{SimplUtils.lhs}.  For now (HACK
 WARNING), we just borrow some other predicates for a
 what-should-be-good-enough test.
 \begin{code}
-{-MOVE:
 primOpIsCheap op
   = primOpOkForSpeculation op && not (primOpCanTriggerGC op)
--}
 \end{code}
 
 And some primops have side-effects and so, for example, must not be
 duplicated.
 
 \begin{code}
-{- MOVE:
 fragilePrimOp :: PrimOp -> Bool
 
 fragilePrimOp ParOp = True
@@ -1504,14 +1494,12 @@ fragilePrimOp NoFollowOp = trace "fragilePrimOp:NoFollowOp" True  -- Possibly no
 #endif {-GRAN-}
 
 fragilePrimOp other = False
--}
 \end{code}
 
 Primitive operations that perform calls need wrappers to save any live variables
 that are stored in caller-saves registers
 
 \begin{code}
-{- MOVE:
 primOpNeedsWrapper :: PrimOp -> Bool
 
 primOpNeedsWrapper (CCallOp _ _ _ _ _) 	= True
@@ -1574,7 +1562,6 @@ primOpNeedsWrapper DelayOp	    	= True
 primOpNeedsWrapper WaitOp		= True
 
 primOpNeedsWrapper other_op 	    	= False
--}
 \end{code}
 
 \begin{code}
@@ -1601,10 +1588,10 @@ primOpType op
       Coerce str ty1 ty2 -> mkFunTys [ty1] ty2
 
       PrimResult str tyvars arg_tys prim_tycon kind res_tys ->
-	mkForAllTys tyvars (glueTyArgs arg_tys (applyTyCon prim_tycon res_tys))
+	mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon prim_tycon res_tys))
 
       AlgResult str tyvars arg_tys tycon res_tys ->
-	mkForAllTys tyvars (glueTyArgs arg_tys (applyTyCon tycon res_tys))
+	mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon tycon res_tys))
 \end{code}
 
 \begin{code}
@@ -1619,10 +1606,10 @@ getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
 
 getPrimOpResultInfo op
   = case (primOpInfo op) of
-      Dyadic  _ ty		 -> ReturnsPrim (primRepFromType ty)
-      Monadic _ ty		 -> ReturnsPrim (primRepFromType ty)
+      Dyadic  _ ty		 -> ReturnsPrim (typePrimRep ty)
+      Monadic _ ty		 -> ReturnsPrim (typePrimRep ty)
       Compare _ ty		 -> ReturnsAlg  boolTyCon
-      Coerce  _ _ ty		 -> ReturnsPrim (primRepFromType ty)
+      Coerce  _ _ ty		 -> ReturnsPrim (typePrimRep ty)
       PrimResult _ _ _ _ kind _	 -> ReturnsPrim kind
       AlgResult _ _ _ tycon _	 -> ReturnsAlg  tycon
 
@@ -1632,6 +1619,33 @@ isCompareOp op
   = case primOpInfo op of
       Compare _ _ -> True
       _	    	  -> False
+\end{code}
+
+The commutable ops are those for which we will try to move constants
+to the right hand side for strength reduction.
+
+\begin{code}
+commutableOp :: PrimOp -> Bool
+
+commutableOp CharEqOp	  = True
+commutableOp CharNeOp 	  = True
+commutableOp IntAddOp 	  = True
+commutableOp IntMulOp 	  = True
+commutableOp AndOp	  = True
+commutableOp OrOp	  = True
+commutableOp IntEqOp	  = True
+commutableOp IntNeOp	  = True
+commutableOp IntegerAddOp = True
+commutableOp IntegerMulOp = True
+commutableOp FloatAddOp	  = True
+commutableOp FloatMulOp	  = True
+commutableOp FloatEqOp	  = True
+commutableOp FloatNeOp	  = True
+commutableOp DoubleAddOp  = True
+commutableOp DoubleMulOp  = True
+commutableOp DoubleEqOp	  = True
+commutableOp DoubleNeOp	  = True
+commutableOp _		  = False
 \end{code}
 
 Utils:
@@ -1662,8 +1676,8 @@ pprPrimOp sty (CCallOp fun is_casm may_gc arg_tys res_ty)
 
 	pp_tys
 	  = ppBesides [ppStr " { [",
-		ppIntersperse pp'SP{-'-} (map (pprParendType sty) arg_tys),
-		ppRbrack, ppSP, pprParendType sty res_ty, ppStr " })"]
+		ppIntersperse pp'SP{-'-} (map (pprParendGenType sty) arg_tys),
+		ppRbrack, ppSP, pprParendGenType sty res_ty, ppStr " })"]
 
     in
     ppBesides [ppStr before, ppPStr fun, after, pp_tys]

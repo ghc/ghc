@@ -13,7 +13,7 @@ module Type (
 	mkForAllUsageTy, getForAllUsageTy,
 	applyTy,
 
-	isPrimType,
+	isPrimType, isUnboxedType, typePrimRep,
 
 	RhoType(..), SigmaType(..), ThetaType(..),
 	mkDictTy,
@@ -26,7 +26,8 @@ module Type (
 
 	matchTy, matchTys, eqTy, eqSimpleTy, eqSimpleTheta,
 
-	instantiateTy,instantiateUsage,
+	instantiateTy, instantiateTauTy, instantiateUsage,
+	applyTypeEnvToTy,
 
 	isTauTy,
 
@@ -43,17 +44,18 @@ import PrelLoop  -- for paranoia checking
 -- friends:
 import Class	( getClassSig, getClassOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind )
-import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon, isPrimTyCon,
-		  getTyConKind, getTyConDataCons, TyCon )
+import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon, isPrimTyCon, isDataTyCon, tyConArity,
+		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
 import TyVar	( getTyVarKind, GenTyVar{-instances-}, GenTyVarSet(..),
 		  emptyTyVarSet, unionTyVarSets, minusTyVarSet,
-		  singletonTyVarSet, nullTyVarEnv, lookupTyVarEnv,
+		  unitTyVarSet, nullTyVarEnv, lookupTyVarEnv,
 		  addOneToTyVarEnv, TyVarEnv(..) )
 import Usage	( usageOmega, GenUsage, Usage(..), UVar(..), UVarEnv(..),
 		  nullUVarEnv, addOneToUVarEnv, lookupUVarEnv, eqUVar,
 		  eqUsage )
 
 -- others
+import PrimRep	( PrimRep(..) )
 import Util	( thenCmp, zipEqual, panic, panic#, assertPanic,
 		  Ord3(..){-instances-}
 		)
@@ -233,7 +235,9 @@ getTyCon_maybe other_ty		 = Nothing
 
 \begin{code}
 mkSynTy syn_tycon tys
-  = SynTy syn_tycon tys (panic "Type.mkSynTy:expansion")
+  = SynTy syn_tycon tys (instantiateTauTy (zipEqual tyvars tys) body)
+  where
+    (tyvars, body) = getSynTyConDefn syn_tycon
 \end{code}
 
 Tau stuff
@@ -344,11 +348,12 @@ maybeAppDataTyCon
 
 maybeAppDataTyCon ty
   = case (getTyCon_maybe app_ty) of
-	Nothing    -> Nothing
-	Just tycon | isFunTyCon tycon
-		   -> Nothing
-		   | otherwise
-		   -> Just (tycon, arg_tys, getTyConDataCons tycon)
+	Just tycon |  isDataTyCon tycon && 
+		      tyConArity tycon == length arg_tys
+			-- Must be saturated for ty to be a data type
+		   -> Just (tycon, arg_tys, tyConDataCons tycon)
+
+	other      -> Nothing
   where
     (app_ty, arg_tys) = splitAppTy ty
 
@@ -397,7 +402,7 @@ Finding the kind of a type
 \begin{code}
 getTypeKind :: GenType (GenTyVar any) u -> Kind
 getTypeKind (TyVarTy tyvar) 		= getTyVarKind tyvar
-getTypeKind (TyConTy tycon usage)	= getTyConKind tycon
+getTypeKind (TyConTy tycon usage)	= tyConKind tycon
 getTypeKind (SynTy _ _ ty)		= getTypeKind ty
 getTypeKind (FunTy fun arg _)		= mkBoxedTypeKind
 getTypeKind (DictTy clas arg _)	 	= mkBoxedTypeKind
@@ -412,13 +417,13 @@ Free variables of a type
 \begin{code}
 tyVarsOfType :: GenType (GenTyVar flexi) uvar -> GenTyVarSet flexi
 
-tyVarsOfType (TyVarTy tv)		= singletonTyVarSet tv
+tyVarsOfType (TyVarTy tv)		= unitTyVarSet tv
 tyVarsOfType (TyConTy tycon usage)	= emptyTyVarSet
 tyVarsOfType (SynTy _ tys ty)		= tyVarsOfTypes tys
 tyVarsOfType (FunTy arg res _)		= tyVarsOfType arg `unionTyVarSets` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionTyVarSets` tyVarsOfType arg
 tyVarsOfType (DictTy clas ty _)		= tyVarsOfType ty
-tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusTyVarSet` singletonTyVarSet tyvar
+tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusTyVarSet` unitTyVarSet tyvar
 tyVarsOfType (ForAllUsageTy _ _ ty)	= tyVarsOfType ty
 
 tyVarsOfTypes :: [GenType (GenTyVar flexi) uvar] -> GenTyVarSet flexi
@@ -453,17 +458,84 @@ instantiateTy tenv ty
 
     go (ForAllUsageTy uvar bds ty) = ForAllUsageTy uvar bds (go ty)
 
+
+-- instantiateTauTy works only (a) on types with no ForAlls,
+-- 	and when	       (b) all the type variables are being instantiated
+-- In return it is more polymorphic than instantiateTy
+
+instantiateTauTy :: Eq t => [(t, GenType t' u)] -> GenType t u -> GenType t' u
+instantiateTauTy tenv ty 
+  = go ty
+  where
+    go (TyVarTy tv)		= case [ty | (tv',ty) <- tenv, tv==tv'] of
+				  (ty:_) -> ty
+				  []     -> panic "instantiateTauTy"
+    go (TyConTy tycon usage)    = TyConTy tycon usage
+    go (SynTy tycon tys ty)	= SynTy tycon (map go tys) (go ty)
+    go (FunTy arg res usage)	= FunTy (go arg) (go res) usage
+    go (AppTy fun arg)		= AppTy (go fun) (go arg)
+    go (DictTy clas ty usage)	= DictTy clas (go ty) usage
+
 instantiateUsage
 	:: Ord3 u => [(u, GenType t u')] -> GenType t u -> GenType t u'
 instantiateUsage = error "instantiateUsage: not implemented"
 \end{code}
 
 \begin{code}
-isPrimType :: GenType tyvar uvar -> Bool
+type TypeEnv = TyVarEnv Type
+
+applyTypeEnvToTy :: TypeEnv -> SigmaType -> SigmaType
+applyTypeEnvToTy tenv ty
+  = mapOverTyVars v_fn ty
+  where
+    v_fn v = case (lookupTyVarEnv tenv v) of
+                Just ty -> ty
+		Nothing -> TyVarTy v
+\end{code}
+
+@mapOverTyVars@ is a local function which actually does the work.  It
+does no cloning or other checks for shadowing, so be careful when
+calling this on types with Foralls in them.
+
+\begin{code}
+mapOverTyVars :: (TyVar -> Type) -> Type -> Type
+
+mapOverTyVars v_fn ty
+  = let
+	mapper = mapOverTyVars v_fn
+    in
+    case ty of
+      TyVarTy v		-> v_fn v
+      SynTy c as e	-> SynTy c (map mapper as) (mapper e)
+      FunTy a r u	-> FunTy (mapper a) (mapper r) u
+      AppTy f a		-> AppTy (mapper f) (mapper a)
+      DictTy c t u	-> DictTy c (mapper t) u
+      ForAllTy v t	-> ForAllTy v (mapper t)
+      tc@(TyConTy _ _)	-> tc
+\end{code}
+
+At present there are no unboxed non-primitive types, so
+isUnboxedType is the same as isPrimType.
+
+\begin{code}
+isPrimType, isUnboxedType :: GenType tyvar uvar -> Bool
+
 isPrimType (AppTy ty _)      = isPrimType ty
 isPrimType (SynTy _ _ ty)    = isPrimType ty
 isPrimType (TyConTy tycon _) = isPrimTyCon tycon
 isPrimType _ 		     = False
+
+isUnboxedType = isPrimType
+\end{code}
+
+This is *not* right: it is a placeholder (ToDo 96/03 WDP):
+\begin{code}
+typePrimRep :: GenType tyvar uvar -> PrimRep
+
+typePrimRep (SynTy _ _ ty)  = typePrimRep ty
+typePrimRep (TyConTy tc _)  = if isPrimTyCon tc then panic "typePrimRep:PrimTyCon" else PtrRep
+typePrimRep (AppTy ty _)    = typePrimRep ty
+typePrimRep _		    = PtrRep -- the "default"
 \end{code}
 
 %************************************************************************

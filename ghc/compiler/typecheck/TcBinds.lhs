@@ -182,7 +182,7 @@ tcBindAndSigs binder_names bind sigs prag_info_fn
 	-- If typechecking the binds fails, then return with each
 	-- binder given type (forall a.a), to minimise subsequent
 	-- error messages
-	newTcTyVar Nothing mkBoxedTypeKind		`thenNF_Tc` \ alpha_tv ->
+	newTcTyVar mkBoxedTypeKind		`thenNF_Tc` \ alpha_tv ->
 	let
 	  forall_a_a = mkForAllTy alpha_tv (mkTyVarTy alpha_tv)
 	  poly_ids   = [ mkUserId name forall_a_a (prag_info_fn name)
@@ -271,13 +271,15 @@ tcTySigs :: [RenamedSig] -> TcM s [TcSigInfo s]
 tcTySigs (Sig v ty _ src_loc : other_sigs)
  = tcAddSrcLoc src_loc (
 	tcPolyType ty			`thenTc` \ sigma_ty ->
-	tcInstType [] sigma_ty		`thenNF_Tc` \ tc_sigma_ty ->
+	tcInstType [] sigma_ty		`thenNF_Tc` \ sigma_ty' ->
 	let
-	    (tyvars, theta, tau_ty) = splitSigmaTy tc_sigma_ty
+	    (tyvars', theta', tau') = splitSigmaTy sigma_ty'
 	in
+
 	tcLookupLocalValueOK "tcSig1" v	`thenNF_Tc` \ val ->
-	unifyTauTy (idType val) tau_ty	`thenTc_`
-	returnTc (TySigInfo val tyvars theta tau_ty src_loc)
+	unifyTauTy (idType val) tau'	`thenTc_`
+
+	returnTc (TySigInfo val tyvars' theta' tau' src_loc)
    )		`thenTc` \ sig_info1 ->
 
    tcTySigs other_sigs	`thenTc` \ sig_infos ->
@@ -386,7 +388,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 
 	-- Get and instantiate its alleged specialised type
     tcPolyType poly_ty				`thenTc` \ sig_sigma ->
-    tcInstType [] (idType sig_sigma)		`thenNF_Tc` \ sig_ty ->
+    tcInstType [] sig_sigma			`thenNF_Tc` \ sig_ty ->
     let
 	(sig_tyvars, sig_theta, sig_tau) = splitSigmaTy sig_ty
 	origin = ValSpecOrigin name
@@ -407,8 +409,8 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 
 	-- Check that the specialised type is indeed an instance of
 	-- the type of the main function.
-    unifyTauTy sig_tau main_tau			`thenTc_`
-    checkSigTyVars sig_tyvars sig_tau main_tau	`thenTc_`
+    unifyTauTy sig_tau main_tau		`thenTc_`
+    checkSigTyVars sig_tyvars sig_tau	`thenTc_`
 
 	-- Check that the type variables of the polymorphic function are
 	-- either left polymorphic, or instantiate to ground type.
@@ -447,8 +449,8 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 
 		-- Check that it has the correct type, and doesn't constrain the
 		-- signature variables at all
-	unifyTauTy sig_tau spec_tau   	  		`thenTc_`
-	checkSigTyVars sig_tyvars sig_tau spec_tau	`thenTc_`
+	unifyTauTy sig_tau spec_tau   	 	`thenTc_`
+	checkSigTyVars sig_tyvars sig_tau	`thenTc_`
 
 	    -- Make a local SpecId to bind to applied spec_id
 	newSpecId main_id main_arg_tys sig_ty	`thenNF_Tc` \ local_spec_id ->

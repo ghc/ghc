@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[StgLint]{A ``lint'' pass to check for Stg correctness}
 
@@ -8,25 +8,34 @@
 
 module StgLint ( lintStgBindings ) where
 
-import PrelInfo		( primOpType, mkFunTy, PrimOp(..), PrimRep
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Type
-import Bag
-import Literal		( literalType, Literal )
-import Id		( idType, isDataCon,
-			  getInstantiatedDataConSig
-			)
-import Maybes
-import Outputable
-import Pretty
-import SrcLoc		( SrcLoc )
+import Ubiq{-uitous-}
+
 import StgSyn
-import UniqSet
-import Util
+
+import Bag		( emptyBag, isEmptyBag, snocBag, foldBag )
+import Id		( idType, isDataCon,
+			  emptyIdSet, isEmptyIdSet, elementOfIdSet,
+			  mkIdSet, intersectIdSets,
+			  unionIdSets, idSetToList, IdSet(..),
+			  GenId{-instanced NamedThing-}
+			)
+import Literal		( literalType, Literal{-instance Outputable-} )
+import Maybes		( catMaybes )
+import Outputable	( Outputable(..){-instance * []-} )
+import PprType		( GenType{-instance Outputable-}, TyCon )
+import Pretty		-- quite a bit of it
+import PrimOp		( primOpType )
+import SrcLoc		( SrcLoc{-instance Outputable-} )
+import Type		( mkFunTys, splitFunTy, maybeAppDataTyCon,
+			  isTyVarTy, eqTy
+			)
+import Util		( zipEqual, pprPanic, panic, panic# )
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
+
+getInstantiatedDataConSig = panic "StgLint.getInstantiatedDataConSig (ToDo)"
+splitTypeWithDictsAsArgs = panic "StgLint.splitTypeWithDictsAsArgs (ToDo)"
+unDictifyTy = panic "StgLint.unDictifyTy (ToDo)"
 \end{code}
 
 Checks for
@@ -114,7 +123,7 @@ lintStgRhs (StgRhsClosure _ _ _ _ binders expr)
   = addLoc (LambdaBodyOf binders) (
     addInScopeVars binders (
 	lintStgExpr expr   `thenMaybeL` \ body_ty ->
-	returnL (Just (foldr (mkFunTy . idType) body_ty binders))
+	returnL (Just (mkFunTys (map idType binders) body_ty))
     ))
 
 lintStgRhs (StgRhsCon _ con args)
@@ -193,7 +202,6 @@ lintStgAlts :: StgCaseAlts
 lintStgAlts alts scrut_ty case_tycon
   = (case alts of
 	 StgAlgAlts _ alg_alts deflt ->
-	   chk_non_abstract_type case_tycon	`thenL_`
 	   mapL (lintAlgAlt scrut_ty) alg_alts 	`thenL` \ maybe_alt_tys ->
 	   lintDeflt deflt scrut_ty		`thenL` \ maybe_deflt_ty ->
 	   returnL (maybe_deflt_ty : maybe_alt_tys)
@@ -211,11 +219,6 @@ lintStgAlts alts scrut_ty case_tycon
 			returnL (Just first_ty)
 	where
 	  check ty = checkTys first_ty ty (mkCaseAltMsg alts)
-  where
-    chk_non_abstract_type tycon
-      = case (getTyConFamilySize tycon) of
-	  Nothing -> addErrL (mkCaseAbstractMsg tycon)
-	  Just  _ -> returnL () -- that's cool
 
 lintAlgAlt scrut_ty (con, args, _, rhs)
   = (case maybeAppDataTyCon scrut_ty of
@@ -264,7 +267,7 @@ lintDeflt deflt@(StgBindDefault binder _ rhs) scrut_ty
 
 \begin{code}
 type LintM a = [LintLocInfo] 	-- Locations
-	    -> UniqSet Id	-- Local vars in scope
+	    -> IdSet		-- Local vars in scope
 	    -> Bag ErrMsg	-- Error messages so far
 	    -> (a, Bag ErrMsg)	-- Result and error messages (if any)
 
@@ -298,12 +301,12 @@ pp_binders sty bs
 \begin{code}
 initL :: LintM a -> Maybe ErrMsg
 initL m
-  = case (m [] emptyUniqSet emptyBag) of { (_, errs) ->
+  = case (m [] emptyIdSet emptyBag) of { (_, errs) ->
     if isEmptyBag errs then
 	Nothing
     else
 	Just ( \ sty ->
-	  ppAboves [ msg sty | msg <- bagToList errs ]
+	  foldBag ppAbove ( \ msg -> msg sty ) ppNil errs
 	)
     }
 
@@ -374,17 +377,16 @@ addInScopeVars ids m loc scope errs
     -- For now, it's just a "trace"; we may make
     -- a real error out of it...
     let
-	new_set = mkUniqSet ids
+	new_set = mkIdSet ids
 
-	shadowed = scope `intersectUniqSets` new_set
+	shadowed = scope `intersectIdSets` new_set
     in
 --  After adding -fliberate-case, Simon decided he likes shadowed
 --  names after all.  WDP 94/07
---  (if isEmptyUniqSet shadowed
+--  (if isEmptyIdSet shadowed
 --  then id
---  else pprTrace "Shadowed vars:" (ppr PprDebug (uniqSetToList shadowed))) (
-    m loc (scope `unionUniqSets` new_set) errs
---  )
+--  else pprTrace "Shadowed vars:" (ppr PprDebug (idSetToList shadowed))) $
+    m loc (scope `unionIdSets` new_set) errs
 \end{code}
 
 \begin{code}
@@ -399,38 +401,38 @@ checkFunApp fun_ty arg_tys msg loc scope errs
     (_, expected_arg_tys, res_ty) = splitTypeWithDictsAsArgs fun_ty
 
     cfa res_ty expected []	-- Args have run out; that's fine
-      = (Just (glueTyArgs expected res_ty), errs)
+      = (Just (mkFunTys expected res_ty), errs)
 
     cfa res_ty [] arg_tys	-- Expected arg tys ran out first;
 				-- first see if res_ty is a tyvar template;
 				-- otherwise, maybe res_ty is a
 				-- dictionary type which is actually a function?
-      | isTyVarTemplateTy res_ty
+      | isTyVarTy res_ty
       = (Just res_ty, errs)
       | otherwise
-      = case splitTyArgs (unDictifyTy res_ty) of
+      = case splitFunTy (unDictifyTy res_ty) of
 	  ([], _) 		  -> (Nothing, addErr errs msg loc)	-- Too many args
 	  (new_expected, new_res) -> cfa new_res new_expected arg_tys
 
     cfa res_ty (expected_arg_ty:expected_arg_tys) (arg_ty:arg_tys)
-      = case (sleazy_cmp_ty expected_arg_ty arg_ty) of
-	  EQ_ -> cfa res_ty expected_arg_tys arg_tys
-	  _   -> (Nothing, addErr errs msg loc) -- Arg mis-match
+      = if (sleazy_eq_ty expected_arg_ty arg_ty)
+	then cfa res_ty expected_arg_tys arg_tys
+	else (Nothing, addErr errs msg loc) -- Arg mis-match
 \end{code}
 
 \begin{code}
 checkInScope :: Id -> LintM ()
 checkInScope id loc scope errs
-  = if isLocallyDefined id && not (isDataCon id) && not (id `elementOfUniqSet` scope) then
+  = if isLocallyDefined id && not (isDataCon id) && not (id `elementOfIdSet` scope) then
 	((), addErr errs (\ sty -> ppCat [ppr sty id, ppStr "is out of scope"]) loc)
     else
 	((), errs)
 
 checkTys :: Type -> Type -> ErrMsg -> LintM ()
 checkTys ty1 ty2 msg loc scope errs
-  = case (sleazy_cmp_ty ty1 ty2) of
-      EQ_   -> ((), errs)
-      other -> ((), addErr errs msg loc)
+  = if (sleazy_eq_ty ty1 ty2)
+    then ((), errs)
+    else ((), addErr errs msg loc)
 \end{code}
 
 \begin{code}
@@ -520,14 +522,15 @@ mkRhsMsg binder ty sty
 pp_expr :: PprStyle -> StgExpr -> Pretty
 pp_expr sty expr = ppr sty expr
 
-sleazy_cmp_ty ty1 ty2
+sleazy_eq_ty ty1 ty2
 	-- NB: probably severe overkill (WDP 95/04)
   = case (splitTypeWithDictsAsArgs ty1) of { (_,tyargs1,tyres1) ->
     case (splitTypeWithDictsAsArgs ty2) of { (_,tyargs2,tyres2) ->
     let
-	ty11 = glueTyArgs tyargs1 tyres1
-	ty22 = glueTyArgs tyargs2 tyres2
+	ty11 = mkFunTys tyargs1 tyres1
+	ty22 = mkFunTys tyargs2 tyres2
     in
-    cmpUniType False{-!!!NOT PROPERLY!!!-} ty11 ty22
+    trace "StgLint.sleazy_cmp_ty" $
+    ty11 `eqTy` ty22
     }}
 \end{code}

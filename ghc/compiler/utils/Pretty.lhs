@@ -94,7 +94,7 @@ ppNest		:: Int -> Pretty -> Pretty
 ppShow		:: Int -> Pretty -> [Char]
 
 #if defined(COMPILING_GHC)
-ppAppendFile	:: _FILE -> Int -> Pretty -> PrimIO ()
+ppAppendFile	:: _FILE -> Int -> Pretty -> IO ()
 #endif
 \end{code}
 

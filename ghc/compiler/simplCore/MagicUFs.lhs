@@ -14,6 +14,7 @@ module MagicUFs (
     ) where
 
 import Ubiq{-uitous-}
+import IdLoop		-- paranoia checking
 
 import CoreSyn
 import PrelInfo		( mkListTy )
@@ -317,8 +318,8 @@ foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:rest_args)
 foldr_fun _ _ = returnSmpl Nothing
 
 isConsFun :: SimplEnv -> CoreArg -> Bool
-isConsFun env (VarArg v) =
-    case lookupUnfolding env v of
+isConsFun env (VarArg v)
+  = case lookupUnfolding env v of
 	GenForm _ _ (Lam (x,_) (Lam (y,_)
 			(Con con tys [VarArg x',VarArg y']))) _
 			| con == consDataCon && x==x' && y==y'
@@ -327,8 +328,8 @@ isConsFun env (VarArg v) =
 isConsFun env _ = False
 
 isNilForm :: SimplEnv -> CoreArg -> Bool
-isNilForm env (VarArg v) =
-    case lookupUnfolding env v of
+isNilForm env (VarArg v)
+  = case lookupUnfolding env v of
 	GenForm _ _ (CoTyApp (Var id) _) _
 	  | id == nilDataCon -> True
 	ConForm id _ _
@@ -338,8 +339,8 @@ isNilForm env (VarArg v) =
 isNilForm env _ = False
 
 getBuildForm :: SimplEnv -> CoreArg -> Maybe Id
-getBuildForm env (VarArg v) =
-    case lookupUnfolding env v of
+getBuildForm env (VarArg v)
+  = case lookupUnfolding env v of
 	GenForm False _ _ _ -> Nothing
 					-- not allowed to inline :-(
 	GenForm _ _ (App (CoTyApp (Var bld) _) (VarArg g)) _
@@ -353,8 +354,8 @@ getBuildForm env _ = Nothing
 
 
 getAugmentForm :: SimplEnv -> CoreArg -> Maybe (Id,CoreArg)
-getAugmentForm env (VarArg v) =
-    case lookupUnfolding env v of
+getAugmentForm env (VarArg v)
+  = case lookupUnfolding env v of
 	GenForm False _ _ _ -> Nothing
 				-- not allowed to inline :-(
 	GenForm _ _ (App (App (CoTyApp (Var bld) _)
@@ -387,8 +388,8 @@ getListForm
 	:: SimplEnv
 	-> CoreArg
 	-> Maybe ([CoreArg],CoreArg)
-getListForm env (VarArg v) =
-    case lookupUnfolding env v of
+getListForm env (VarArg v)
+  = case lookupUnfolding env v of
        ConForm id _ [head,tail]
 	  | id == consDataCon ->
 		case getListForm env tail of
@@ -398,8 +399,8 @@ getListForm env (VarArg v) =
 getListForm env _ = Nothing
 
 isInterestingArg :: SimplEnv -> CoreArg -> Bool
-isInterestingArg env (VarArg v) =
-    case lookupUnfolding env v of
+isInterestingArg env (VarArg v)
+  = case lookupUnfolding env v of
        GenForm False _ _ UnfoldNever -> False
        GenForm _ _ exp guide -> True
        _ -> False

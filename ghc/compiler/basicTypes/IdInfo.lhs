@@ -76,7 +76,7 @@ import IdLoop		-- IdInfo is a dependency-loop ranch, and
 
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( firstJust )
-import MatchEnv		( nullMEnv, mEnvToList )
+import MatchEnv		( nullMEnv, isEmptyMEnv, mEnvToList )
 import Outputable	( ifPprInterface, Outputable(..){-instances-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
@@ -85,7 +85,6 @@ import Type		( eqSimpleTy )
 import Util		( mapAccumL, panic, assertPanic, pprPanic )
 
 applySubstToTy = panic "IdInfo.applySubstToTy"
-isUnboxedDataType = panic "IdInfo.isUnboxedDataType"
 splitTypeWithDictsAsArgs = panic "IdInfo.splitTypeWithDictsAsArgs"
 showTypeCategory = panic "IdInfo.showTypeCategory"
 mkFormSummary = panic "IdInfo.mkFormSummary"
@@ -180,8 +179,11 @@ Simply turgid.  But BE CAREFUL: don't @apply_to_Id@ if that @Id@
 will in turn @apply_to_IdInfo@ of the self-same @IdInfo@.  (A very
 nasty loop, friends...)
 \begin{code}
-apply_to_IdInfo ty_fn (IdInfo arity demand spec strictness unfold
+apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
 			      update deforest arg_usage fb_ww srcloc)
+  | isEmptyMEnv spec
+  = idinfo
+  | otherwise
   = panic "IdInfo:apply_to_IdInfo"
 {- LATER:
     let

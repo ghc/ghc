@@ -17,8 +17,6 @@ import Outputable	( ifPprShowAll )
 import PprType
 import Pretty
 import SrcLoc		( SrcLoc{-instances-} )
-import TyVar		( GenTyVar{-instances-} )
-import Unique		( Unique{-instances-} )
 import Util		( panic )
 \end{code}
 

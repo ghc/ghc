@@ -1,10 +1,26 @@
 Breaks the loop between SimplEnv and MagicUFs, by telling SimplEnv all
 it needs to know about MagicUFs (not much).
 
+Also break the loop between SimplVar/SimplCase (which use
+Simplify.simplExpr) and SimplExpr (which uses whatever
+SimplVar/SimplCase cough up).
+
 \begin{code}
 interface SmplLoop where
 
-import MagicUFs (MagicUnfoldingFun )
+import MagicUFs	    ( MagicUnfoldingFun )
+import SimplEnv	    ( SimplEnv, InBinding(..), InExpr(..),
+		      OutArg(..), OutExpr(..), OutType(..)
+		    )
+import Simplify	    ( simplExpr, simplBind )
+import SimplMonad   ( SmplM(..) )
 
 data MagicUnfoldingFun
+
+simplExpr :: SimplEnv -> InExpr -> [OutArg] -> SmplM OutExpr
+simplBind :: SimplEnv
+	  -> InBinding
+	  -> (SimplEnv -> SmplM OutExpr)
+	  -> OutType
+	  -> SmplM OutExpr
 \end{code}

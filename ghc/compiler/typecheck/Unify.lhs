@@ -9,20 +9,21 @@ updatable substitution).
 \begin{code}
 #include "HsVersions.h"
 
-module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists ) where
+module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy ) where
 
 import Ubiq
 
 -- friends: 
 import TcMonad
-import Type	( GenType(..), getTypeKind )
-import TyCon	( TyCon(..), ConsVisible, NewOrData )
-import TyVar	( GenTyVar(..), TyVar(..) )
+import Type	( GenType(..), getTypeKind, mkFunTy, getFunTy_maybe )
+import TyCon	( TyCon, mkFunTyCon )
+import TyVar	( GenTyVar(..), TyVar(..), getTyVarKind )
 import TcType	( TcType(..), TcMaybe(..), TcTauType(..), TcTyVar(..),
-		  tcReadTyVar, tcWriteTyVar
+		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
 		)
 -- others:
-import Kind	( Kind, isSubKindOf )
+import Kind	( Kind, isSubKindOf, mkTypeKind )
+import Usage	( duffUsage )
 import PprType	( GenTyVar, GenType )	-- instances
 import Pretty
 import Unique	( Unique )		-- instances
@@ -44,7 +45,7 @@ Unify two @TauType@s.  Dead straightforward.
 \begin{code}
 unifyTauTy :: TcTauType s -> TcTauType s -> TcM s ()
 unifyTauTy ty1 ty2 
-  = tcAddErrCtxt (unifyCtxt ty1 ty2) $
+  = tcAddErrCtxtM (unifyCtxt ty1 ty2) $
     uTys ty1 ty1 ty2 ty2
 \end{code}
 
@@ -99,8 +100,21 @@ uTys ps_ty1 ty1 ps_ty2 (TyVarTy tyvar2) = uVar tyvar2 ps_ty1 ty1
 	-- Applications and functions; just check the two parts
 uTys _ (FunTy fun1 arg1 _) _ (FunTy fun2 arg2 _)
   = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
-uTys _ (AppTy fun1 arg1) _ (AppTy fun2 arg2)
-  = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
+uTys _ (AppTy s1 t1) _ (AppTy s2 t2)
+  = uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
+
+	-- Special case: converts  a -> b to (->) a b
+uTys _ (AppTy s1 t1) _ (FunTy fun2 arg2 _)
+  = uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
+  where
+    s2 = AppTy (TyConTy mkFunTyCon duffUsage) fun2
+    t2 = arg2
+
+uTys _ (FunTy fun1 arg1 _) _ (AppTy s2 t2)
+  = uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
+  where
+    s1 = AppTy (TyConTy mkFunTyCon duffUsage) fun1
+    t1 = arg1
 
 	-- Type constructors must match
 uTys ps_ty1 (TyConTy con1 _) ps_ty2 (TyConTy con2 _)
@@ -110,91 +124,8 @@ uTys ps_ty1 (TyConTy con1 _) ps_ty2 (TyConTy con2 _)
 uTys ps_ty1 (SynTy con1 args1 ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
 uTys ps_ty1 ty1 ps_ty2 (SynTy con2 args2 ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
 
-	-- Special case: converts  (->) a b  to  a -> b
-uTys ps_ty1 (AppTy (AppTy (TyConTy FunTyCon u) fun) arg) ps_ty2 ty2
-  = uTys ps_ty1 (FunTy fun arg u) ps_ty2 ty2
-uTys ps_ty1 ty1 ps_ty2 (AppTy (AppTy (TyConTy FunTyCon u) fun) arg)
-  = uTys ps_ty1 ty1 ps_ty2 (FunTy fun arg u)
-
 	-- Anything else fails
 uTys ps_ty1 ty1 ps_ty2 ty2  = failTc (unifyMisMatch ps_ty1 ps_ty2)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[Unify-uVar]{@uVar@: unifying with a type variable}
-%*									*
-%************************************************************************
-
-@uVar@ is called when at least one of the types being unified is a
-variable.  It does {\em not} assume that the variable is a fixed point
-of the substitution; rather, notice that @bindTo@ (defined below) nips
-back into @uTys@ if it turns out that the variable is already bound.
-
-There is a slight worry that one might try to @bindTo@ a (say) Poly
-tyvar (as tv1) with an Open tyvar (as ty2) which is already unified to
-an unboxed type.  In fact this can't happen, because the Open ones are
-always the ones which are unified away.
-
-\begin{code}
-uVar :: TcTyVar s
-     -> TcTauType s -> TcTauType s	-- printing and real versions
-     -> TcM s ()
-
-uVar tv1 ps_ty2 ty2
-  = tcReadTyVar tv1	`thenNF_Tc` \ maybe_ty1 ->
-    case maybe_ty1 of
-	BoundTo ty1 -> uTys ty1 ty1 ps_ty2 ty2
-	UnBound  -> uUnboundVar tv1 ps_ty2 ty2
-
-	-- Expand synonyms
-uUnboundVar tv1 ps_ty2 (SynTy _ _ ty2) = uUnboundVar tv1 ps_ty2 ty2
-
-
-	-- The both-type-variable case
-uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
-	    ps_ty2
-	    ty2@(TyVarTy tv2@(TyVar uniq2 kind2 name2 box2))
-
-	-- Same type variable => no-op
-  | uniq1 == uniq2
-  = returnTc ()
-
-	-- Distinct type variables
-  | otherwise
-  = tcReadTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
-    case maybe_ty2 of
-	BoundTo ty2' -> uUnboundVar tv1 ty2' ty2'
-	UnBound   -> if kind2 `isSubKindOf` kind1 then
-			tcWriteTyVar tv1 ty2		`thenNF_Tc_` returnTc ()
-		     else if kind1 `isSubKindOf` kind2 then
-			tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
-		     else
-			failTc (unifyKindErr tv1 ps_ty2)
-
-	-- Second one isn't a type variable
-uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1) ps_ty2 non_var_ty2
-  = occur_check non_var_ty2			`thenTc_`
-    checkTc (getTypeKind non_var_ty2 `isSubKindOf` kind1)
-	    (unifyKindErr tv1 ps_ty2)		`thenTc_`
-    tcWriteTyVar tv1 non_var_ty2		`thenNF_Tc_`
-    returnTc ()
-  where
-    occur_check (TyVarTy tv2@(TyVar uniq2 _ _ box2))
-       | uniq1 == uniq2		-- Same tyvar; fail
-       = failTc (unifyOccurCheck tv1 ps_ty2)
-
-       | otherwise		-- A different tyvar
-       = tcReadTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
-	 case maybe_ty2 of
-		BoundTo ty2' -> occur_check ty2'
-		UnBound   -> returnTc ()
-
-    occur_check (AppTy fun arg)   = occur_check fun `thenTc_` occur_check arg
-    occur_check (FunTy fun arg _) = occur_check fun `thenTc_` occur_check arg
-    occur_check (TyConTy _ _)	  = returnTc ()
-    occur_check (SynTy _ _ ty2)   = occur_check ty2
-    occur_check other		  = panic "Unexpected Dict or ForAll in occurCheck"
 \end{code}
 
 Notes on synonyms
@@ -249,26 +180,168 @@ user.
 \end{quotation}
 
 
+%************************************************************************
+%*									*
+\subsection[Unify-uVar]{@uVar@: unifying with a type variable}
+%*									*
+%************************************************************************
+
+@uVar@ is called when at least one of the types being unified is a
+variable.  It does {\em not} assume that the variable is a fixed point
+of the substitution; rather, notice that @bindTo@ (defined below) nips
+back into @uTys@ if it turns out that the variable is already bound.
+
+There is a slight worry that one might try to @bindTo@ a (say) Poly
+tyvar (as tv1) with an Open tyvar (as ty2) which is already unified to
+an unboxed type.  In fact this can't happen, because the Open ones are
+always the ones which are unified away.
+
+\begin{code}
+uVar :: TcTyVar s
+     -> TcTauType s -> TcTauType s	-- printing and real versions
+     -> TcM s ()
+
+uVar tv1 ps_ty2 ty2
+  = tcReadTyVar tv1	`thenNF_Tc` \ maybe_ty1 ->
+    case maybe_ty1 of
+	BoundTo ty1 -> uTys ty1 ty1 ps_ty2 ty2
+	other       -> uUnboundVar tv1 maybe_ty1 ps_ty2 ty2
+
+	-- Expand synonyms
+uUnboundVar tv1 maybe_ty1 ps_ty2 (SynTy _ _ ty2)
+  = uUnboundVar tv1 maybe_ty1 ps_ty2 ty2
+
+
+	-- The both-type-variable case
+uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
+	    maybe_ty1
+	    ps_ty2
+	    ty2@(TyVarTy tv2@(TyVar uniq2 kind2 name2 box2))
+
+	-- Same type variable => no-op
+  | uniq1 == uniq2
+  = returnTc ()
+
+	-- Distinct type variables
+	-- ASSERT maybe_ty1 /= BoundTo
+  | otherwise
+  = tcReadTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
+    case (maybe_ty1, maybe_ty2) of
+	(_, BoundTo ty2') -> uUnboundVar tv1 maybe_ty1 ty2' ty2'
+
+	(DontBind,DontBind) 
+		     -> failTc (unifyDontBindErr tv1 ps_ty2)
+
+	(UnBound, _) |  kind2 `isSubKindOf` kind1
+		     -> tcWriteTyVar tv1 ty2		`thenNF_Tc_` returnTc ()
+	
+	(_, UnBound) |  kind1 `isSubKindOf` kind2
+		     -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
+
+	other	     -> failTc (unifyKindErr tv1 ps_ty2)
+
+	-- Second one isn't a type variable
+uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1) maybe_ty1 ps_ty2 non_var_ty2
+  = case maybe_ty1 of
+	DontBind -> failTc (unifyDontBindErr tv1 ps_ty2)
+
+	UnBound	 |  getTypeKind non_var_ty2 `isSubKindOf` kind1
+		 -> occur_check non_var_ty2			`thenTc_`
+		    tcWriteTyVar tv1 ps_ty2			`thenNF_Tc_`
+		    returnTc ()
+
+	other	 -> failTc (unifyKindErr tv1 ps_ty2)
+  where
+    occur_check (TyVarTy tv2@(TyVar uniq2 _ _ box2))
+       | uniq1 == uniq2		-- Same tyvar; fail
+       = failTc (unifyOccurCheck tv1 ps_ty2)
+
+       | otherwise		-- A different tyvar
+       = tcReadTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
+	 case maybe_ty2 of
+		BoundTo ty2' -> occur_check ty2'
+		other	     -> returnTc ()
+
+    occur_check (AppTy fun arg)   = occur_check fun `thenTc_` occur_check arg
+    occur_check (FunTy fun arg _) = occur_check fun `thenTc_` occur_check arg
+    occur_check (TyConTy _ _)	  = returnTc ()
+    occur_check (SynTy _ _ ty2)   = occur_check ty2
+    occur_check other		  = panic "Unexpected Dict or ForAll in occurCheck"
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[Unify-fun]{@unifyFunTy@}
+%*									*
+%************************************************************************
+
+@unifyFunTy@ is used to avoid the fruitless creation of type variables.
+
+\begin{code}
+unifyFunTy :: TcType s	 			-- Fail if ty isn't a function type
+	   -> TcM s (TcType s, TcType s)	-- otherwise return arg and result types
+
+unifyFunTy ty@(TyVarTy tyvar)
+  = tcReadTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of
+	BoundTo ty' -> unifyFunTy ty'
+
+	UnBound	    -> newTyVarTy mkTypeKind			`thenNF_Tc` \ arg ->
+		       newTyVarTy mkTypeKind			`thenNF_Tc` \ res ->
+		       tcWriteTyVar tyvar (mkFunTy arg res)	`thenNF_Tc_`
+		       returnTc (arg,res)
+
+	DontBind    -> failTc (expectedFunErr ty)
+
+unifyFunTy other_ty
+  = case getFunTy_maybe other_ty of
+	Just arg_and_res -> returnTc arg_and_res
+	Nothing 	 -> failTc (expectedFunErr other_ty)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[Unify-context]{Errors and contexts}
+%*									*
+%************************************************************************
+
 Errors
 ~~~~~~
 
 \begin{code}
-unifyCtxt ty1 ty2 sty
-  = ppAboves [
-	ppCat [ppStr "Expected:", ppr sty ty1],
-	ppCat [ppStr "  Actual:", ppr sty ty2]
-    ]
+unifyCtxt ty1 ty2
+  = zonkTcType ty1	`thenNF_Tc` \ ty1' ->
+    zonkTcType ty2	`thenNF_Tc` \ ty2' ->
+    returnNF_Tc (err ty1' ty2')
+  where
+    err ty1' ty2' sty = ppAboves [
+			   ppCat [ppStr "When matching:", ppr sty ty1'],
+			   ppCat [ppStr "      against:", ppr sty ty2']
+		        ]
 
 unifyMisMatch ty1 ty2 sty
   = ppHang (ppStr "Couldn't match the type")
 	 4 (ppSep [ppr sty ty1, ppStr "against", ppr sty ty2])
 
+expectedFunErr ty sty
+  = ppHang (ppStr "Function type expected, but found the type")
+	 4 (ppr sty ty)
+
 unifyKindErr tyvar ty sty
-  = ppHang (ppStr "Kind mis-match between")
-	 4 (ppSep [ppr sty tyvar, ppStr "and", ppr sty ty])
+  = ppHang (ppStr "Compiler bug: kind mis-match between")
+	 4 (ppSep [ppr sty tyvar, ppLparen, ppr sty (getTyVarKind tyvar), ppRparen,
+		   ppStr "and", 
+		   ppr sty ty, ppLparen, ppr sty (getTypeKind ty), ppRparen])
+
+unifyDontBindErr tyvar ty sty
+  = ppHang (ppStr "Couldn't match the *signature/existential* type variable")
+	 4 (ppSep [ppr sty tyvar,
+		   ppStr "with the type", 
+		   ppr sty ty])
 
 unifyOccurCheck tyvar ty sty
-  = ppHang (ppStr "Occur check: cannot construct the infinite type")
+  = ppHang (ppStr "Cannot construct the infinite type (occur check)")
 	 4 (ppSep [ppr sty tyvar, ppStr "=", ppr sty ty])
 \end{code}
 

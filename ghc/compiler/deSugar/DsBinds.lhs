@@ -31,14 +31,13 @@ import CoreUtils	( escErrorMsg )
 import CostCentre	( mkAllDictsCC, preludeDictsCostCentre )
 import Id		( idType, DictVar(..), GenId )
 import ListSetOps	( minusList, intersectLists )
-import PprType		( GenType, GenTyVar )
+import PprType		( GenType )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppShow )
 import Type		( mkTyVarTys, splitSigmaTy,
 			  tyVarsOfType, tyVarsOfTypes
 			)
-import TyVar		( tyVarSetToList, GenTyVar )
-import Unique		( Unique )
+import TyVar		( tyVarSetToList, GenTyVar{-instance Eq-} )
 import Util		( isIn, panic )
 
 isDictTy = panic "DsBinds.isDictTy"
@@ -290,35 +289,28 @@ dsInstBinds :: [TyVar]				-- Abstract wrt these
 do_nothing    = ([], []) -- out here to avoid dsInstBinds CAF (sigh)
 prel_dicts_cc = preludeDictsCostCentre False{-not dupd-} -- ditto
 
-dsInstBinds tyvars []
-  = returnDs do_nothing
-
-dsInstBinds _ _ = panic "DsBinds.dsInstBinds:maybe we want something different?"
-
-{- LATER
+dsInstBinds tyvars [] = returnDs do_nothing
 
 dsInstBinds tyvars ((inst, expr@(HsVar _)) : bs)
-  = dsExpr expr				`thenDs` ( \ rhs ->
+  = dsExpr expr				`thenDs` \ rhs ->
     let	-- Need to apply dsExpr to the variable in case it
 	-- has a substitution in the current environment
 	subst_item = (inst, rhs)
     in
     extendEnvDs [subst_item] (
 	dsInstBinds tyvars bs
-    )					`thenDs` (\ (binds, subst_env) ->
+    )					`thenDs` \ (binds, subst_env) ->
     returnDs (binds, subst_item : subst_env)
-    ))
 
 dsInstBinds tyvars ((inst, expr@(HsLit _)) : bs)
-  = dsExpr expr				`thenDs` ( \ core_lit ->
+  = dsExpr expr				`thenDs` \ core_lit ->
     let
 	subst_item = (inst, core_lit)
     in
     extendEnvDs [subst_item]	 (
 	dsInstBinds tyvars bs
-    )				 	`thenDs` (\ (binds, subst_env) ->
+    )				 	`thenDs` \ (binds, subst_env) ->
     returnDs (binds, subst_item : subst_env)
-    ))
 
 dsInstBinds tyvars ((inst, expr) : bs)
   | null abs_tyvars
@@ -351,7 +343,7 @@ dsInstBinds tyvars ((inst, expr) : bs)
 	      subst_item : subst_env)
   where
     inst_ty    = idType inst
-    abs_tyvars = tyVarsOfType inst_ty `intersectLists` tyvars
+    abs_tyvars = tyVarSetToList{-???sigh-} (tyVarsOfType inst_ty) `intersectLists` tyvars
     abs_tys    = mkTyVarTys abs_tyvars
     (_, poly_inst_ty) = quantifyTy abs_tyvars inst_ty
 
@@ -359,26 +351,23 @@ dsInstBinds tyvars ((inst, expr) : bs)
     -- Wrap a desugared expression in `_scc_ "DICT" <expr>' if
     -- appropriate.  Uses "inst"'s type.
 
+       -- if profiling, wrap the dict in "_scc_ DICT <dict>":
     ds_dict_cc expr
-      = -- if profiling, wrap the dict in "_scc_ DICT <dict>":
-	let
-	    doing_profiling   = opt_SccProfilingOn
-	    compiling_prelude = opt_CompilingPrelude
-	in
-	if not doing_profiling
-	|| not (isDictTy inst_ty) then -- that's easy: do nothing
-	    returnDs expr
-	else if compiling_prelude then
-	    returnDs (SCC prel_dicts_cc expr)
-	else
-	    getModuleAndGroupDs 	`thenDs` \ (mod_name, grp_name) ->
+      | not opt_SccProfilingOn ||
+	not (isDictTy inst_ty) 
+      = returnDs expr	-- that's easy: do nothing
+
+      | opt_CompilingPrelude
+      = returnDs (SCC prel_dicts_cc expr)
+
+      | otherwise
+      = getModuleAndGroupDs 	`thenDs` \ (mod_name, grp_name) ->
 	    -- ToDo: do -dicts-all flag (mark dict things
 	    -- with individual CCs)
-	    let
+	let
 		dict_cc = mkAllDictsCC mod_name grp_name False{-not dupd-}
-	    in
-	    returnDs (SCC dict_cc expr)
--}
+	in
+	returnDs (SCC dict_cc expr)
 \end{code}
 
 %************************************************************************

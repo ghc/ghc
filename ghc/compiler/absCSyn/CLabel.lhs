@@ -39,40 +39,35 @@ module CLabel (
 
 	needsCDecl, isReadOnly, isAsmTemp, externallyVisibleCLabel,
 
-	pprCLabel
+	pprCLabel, pprCLabel_asm
 
 #ifdef GRAN
 	, isSlowEntryCCodeBlock
 #endif
-
-	-- and to make the interface self-sufficient...
     ) where
 
 import Ubiq{-uitous-}
+import AbsCLoop		( CtrlReturnConvention(..),
+			  ctrlReturnConvAlg
+			)
+import NcgLoop		( underscorePrefix, fmtAsmLbl )
 
+import CStrings		( pp_cSEP )
 import Id		( externallyVisibleId, cmpId_withSpecDataCon,
 			  isDataCon, isDictFunId,
-			  isConstMethodId_maybe, isClassOpId,
+			  isConstMethodId_maybe,
 			  isDefaultMethodId_maybe,
 			  isSuperDictSelId_maybe, fIRST_TAG,
-			  DataCon(..), ConTag(..), Id
+			  ConTag(..), GenId{-instance Outputable-}
 			)
 import Maybes		( maybeToBool )
+import PprStyle		( PprStyle(..) )
+import PprType		( showTyCon, GenType{-instance Outputable-} )
+import Pretty		( prettyToUn )
+import TyCon		( TyCon{-instance Eq-} )
+import Unique		( showUnique, pprUnique, Unique{-instance Eq-} )
 import Unpretty		-- NOTE!! ********************
-{-
-import Outputable
-import Pretty		( ppNil, ppChar, ppStr, ppPStr, ppDouble, ppInt,
-			  ppInteger, ppBeside, ppIntersperse, prettyToUn
-			)
-#ifdef USE_ATTACK_PRAGMAS
-import CharSeq
-#endif
-import Unique		( pprUnique, showUnique, Unique )
-import Util
-
--- Sigh...  Shouldn't this file (CLabel) live in codeGen?
-import CgRetConv    	( CtrlReturnConvention(..), ctrlReturnConvAlg )
--}
+import Util		( assertPanic )
 \end{code}
 
 things we want to find out:
@@ -290,14 +285,13 @@ externallyVisibleCLabel (IdLabel (CLabelId id) _)
   | isDataCon id 	  = True
   | is_ConstMethodId id   = True  -- These are here to ensure splitting works
   | isDictFunId id 	  = True  -- when these values have not been exported
-  | isClassOpId id	  = True
   | is_DefaultMethodId id = True
   | is_SuperDictSelId id  = True
   | otherwise    	  = externallyVisibleId id
   where
-    is_ConstMethodId id   = maybeToBool (isConstMethodId_maybe id)
+    is_ConstMethodId   id = maybeToBool (isConstMethodId_maybe   id)
     is_DefaultMethodId id = maybeToBool (isDefaultMethodId_maybe id)
-    is_SuperDictSelId id  = maybeToBool (isSuperDictSelId_maybe id)
+    is_SuperDictSelId  id = maybeToBool (isSuperDictSelId_maybe  id)
 \end{code}
 
 These GRAN functions are needed for spitting out GRAN_FETCH() at the
@@ -319,17 +313,20 @@ duplicate declarations in generating C (see @labelSeenTE@ in
 @PprAbsC@).
 
 \begin{code}
+-- specialised for PprAsm: saves lots of arg passing in NCG
+pprCLabel_asm = pprCLabel (PprForAsm underscorePrefix fmtAsmLbl)
+
 pprCLabel :: PprStyle -> CLabel -> Unpretty
 
-pprCLabel (PprForAsm _ _ fmtAsmLbl) (AsmTempLabel u)
+pprCLabel (PprForAsm _ fmtAsmLbl) (AsmTempLabel u)
   = uppStr (fmtAsmLbl (_UNPK_ (showUnique u)))
 
-pprCLabel (PprForAsm sw_chker prepend_cSEP _) lbl
+pprCLabel (PprForAsm prepend_cSEP _) lbl
   = if prepend_cSEP
     then uppBeside pp_cSEP prLbl
     else prLbl
   where
-    prLbl = pprCLabel (PprForC sw_chker) lbl
+    prLbl = pprCLabel PprForC lbl
 
 pprCLabel sty (TyConLabel tc UnvecConUpdCode)
   = uppBesides [uppPStr SLIT("ret"), pp_cSEP, uppStr (showTyCon sty tc),
@@ -399,4 +396,3 @@ ppFlavor x = uppBeside pp_cSEP
 		       RednCounts	-> uppPStr SLIT("ct")
 		      )
 \end{code}
-

@@ -17,10 +17,10 @@ import Id		( externallyVisibleId, isDataCon, isWorkerId, isWrapperId,
 			)
 import IdInfo		( IdInfo )
 import Literal		( Literal )
-import MagicUFs		( MagicUnfoldingFun )
+import MagicUFs		( mkMagicUnfoldingFun, MagicUnfoldingFun )
 import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle )
-import PprType		( pprParendType )
+import PprType		( pprParendGenType )
 import Pretty		( PrettyRep )
 import Type		( GenType )
 import TyVar		( GenTyVar )
@@ -39,8 +39,10 @@ getIdInfo		:: Id	    -> IdInfo
 nullIdEnv		:: UniqFM a
 lookupIdEnv		:: UniqFM b -> GenId a -> Maybe b
 mAX_WORKER_ARGS		:: Int
-pprParendType		:: (Eq a, Outputable a, Eq b, Outputable b) => PprStyle -> GenType a b -> Int -> Bool -> PrettyRep
+pprParendGenType		:: (Eq a, Outputable a, Eq b, Outputable b) => PprStyle -> GenType a b -> Int -> Bool -> PrettyRep
 unTagBinders :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), a) b c d -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) b c d
+
+mkMagicUnfoldingFun	:: Unique -> MagicUnfoldingFun
 
 type IdEnv a = UniqFM a
 type CoreExpr = GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique))

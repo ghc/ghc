@@ -16,20 +16,17 @@ import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 import TcHsSyn		( TypecheckedGRHSsAndBinds(..), TypecheckedGRHS(..),
 			  TypecheckedPat(..), TypecheckedHsBinds(..),
 			  TypecheckedHsExpr(..)	)
-import CoreSyn		( CoreBinding(..), CoreExpr(..) )
+import CoreSyn		( CoreBinding(..), CoreExpr(..), mkCoLetsAny )
 
 import DsMonad
 import DsUtils
 
-import CoreUtils	( escErrorMsg, mkErrorApp )
+import CoreUtils	( escErrorMsg, mkErrorApp, mkCoreIfThenElse )
 import PrelInfo		( stringTy )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppShow )
 import SrcLoc		( SrcLoc{-instance-} )
 import Util		( panic )
-
-mkCoLetsAny = panic "DsGRHSs.mkCoLetsAny"
-mkCoreIfThenElse = panic "DsGRHSs.mkCoreIfThenElse"
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.

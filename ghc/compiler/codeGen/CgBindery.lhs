@@ -8,7 +8,7 @@
 
 module CgBindery (
 	CgBindings(..), CgIdInfo(..){-dubiously concrete-},
-	StableLoc, VolatileLoc, LambdaFormInfo{-re-exported-},
+	StableLoc, VolatileLoc,
 
 	maybeAStkLoc, maybeBStkLoc,
 
@@ -20,25 +20,35 @@ module CgBindery (
 	bindNewToAStack, bindNewToBStack,
 	bindNewToNode, bindNewToReg, bindArgsToRegs,
 	bindNewToTemp, bindNewPrimToAmode,
-	getAtomAmode, getAtomAmodes,
+	getArgAmode, getArgAmodes,
 	getCAddrModeAndInfo, getCAddrMode,
 	getCAddrModeIfVolatile, getVolatileRegs,
 	rebindToAStack, rebindToBStack
-
-	-- and to make a self-sufficient interface...
     ) where
+
+import Ubiq{-uitous-}
+import CgLoop1		-- here for paranoia-checking
 
 import AbsCSyn
 import CgMonad
 
 import CgUsages		( getHpRelOffset, getSpARelOffset, getSpBRelOffset )
-import CLabel	( mkClosureLabel, CLabel )
-import ClosureInfo
-import Id		( getIdPrimRep, toplevelishId, isDataCon, Id )
-import Maybes		( catMaybes, Maybe(..) )
-import UniqSet		-- ( setToList )
-import StgSyn
-import Util
+import CLabel		( mkClosureLabel )
+import ClosureInfo	( mkLFImported, mkConLFInfo, mkLFArgument )
+import HeapOffs		( VirtualHeapOffset(..),
+			  VirtualSpAOffset(..), VirtualSpBOffset(..)
+			)
+import Id		( idPrimRep, toplevelishId, isDataCon,
+			  mkIdEnv, rngIdEnv, IdEnv(..),
+			  idSetToList,
+			  GenId{-instance NamedThing-}
+			)
+import Maybes		( catMaybes )
+import PprAbsC		( pprAmode )
+import PprStyle		( PprStyle(..) )
+import StgSyn		( StgArg(..), StgLiveVars(..), GenStgArg(..) )
+import Unpretty		( uppShow )
+import Util		( zipWithEqual, panic )
 \end{code}
 
 
@@ -113,13 +123,13 @@ newTempAmodeAndIdInfo name lf_info
   = (temp_amode, temp_idinfo)
   where
     uniq       	= getItsUnique name
-    temp_amode	= CTemp uniq (getIdPrimRep name)
+    temp_amode	= CTemp uniq (idPrimRep name)
     temp_idinfo = tempIdInfo name uniq lf_info
 
-idInfoToAmode :: PrimKind -> CgIdInfo -> FCode CAddrMode
+idInfoToAmode :: PrimRep -> CgIdInfo -> FCode CAddrMode
 idInfoToAmode kind (MkCgIdInfo _ vol stab _) = idInfoPiecesToAmode kind vol stab
 
-idInfoPiecesToAmode :: PrimKind -> VolatileLoc -> StableLoc -> FCode CAddrMode
+idInfoPiecesToAmode :: PrimRep -> VolatileLoc -> StableLoc -> FCode CAddrMode
 
 idInfoPiecesToAmode kind (TempVarLoc uniq) stable_loc   = returnFC (CTemp uniq kind)
 idInfoPiecesToAmode kind (RegLoc magic_id) stable_loc   = returnFC (CReg magic_id)
@@ -195,7 +205,7 @@ getCAddrModeAndInfo name
     returnFC (amode, lf_info)
   where
     global_amode = CLbl (mkClosureLabel name) kind
-    kind = getIdPrimRep name
+    kind = idPrimRep name
 
 getCAddrMode :: Id -> FCode CAddrMode
 getCAddrMode name
@@ -211,7 +221,7 @@ getCAddrModeIfVolatile name
   = lookupBindC name `thenFC` \ ~(MkCgIdInfo _ volatile_loc stable_loc lf_info) ->
     case stable_loc of
 	NoStableLoc ->	-- Aha!  So it is volatile!
-	    idInfoPiecesToAmode (getIdPrimRep name) volatile_loc NoStableLoc `thenFC` \ amode ->
+	    idInfoPiecesToAmode (idPrimRep name) volatile_loc NoStableLoc `thenFC` \ amode ->
 	    returnFC (Just amode)
 
 	a_stable_loc -> returnFC Nothing
@@ -228,7 +238,7 @@ forget the volatile one.
 getVolatileRegs :: StgLiveVars -> FCode [MagicId]
 
 getVolatileRegs vars
-  = mapFCs snaffle_it (uniqSetToList vars) `thenFC` \ stuff ->
+  = mapFCs snaffle_it (idSetToList vars) `thenFC` \ stuff ->
     returnFC (catMaybes stuff)
   where
     snaffle_it var
@@ -262,17 +272,17 @@ getVolatileRegs vars
 \end{code}
 
 \begin{code}
-getAtomAmodes :: [StgArg] -> FCode [CAddrMode]
-getAtomAmodes [] = returnFC []
-getAtomAmodes (atom:atoms)
-  = getAtomAmode  atom  `thenFC` \ amode ->
-    getAtomAmodes atoms `thenFC` \ amodes ->
+getArgAmodes :: [StgArg] -> FCode [CAddrMode]
+getArgAmodes [] = returnFC []
+getArgAmodes (atom:atoms)
+  = getArgAmode  atom  `thenFC` \ amode ->
+    getArgAmodes atoms `thenFC` \ amodes ->
     returnFC ( amode : amodes )
 
-getAtomAmode :: StgArg -> FCode CAddrMode
+getArgAmode :: StgArg -> FCode CAddrMode
 
-getAtomAmode (StgVarArg var) = getCAddrMode var
-getAtomAmode (StgLitArg lit) = returnFC (CLit lit)
+getArgAmode (StgVarArg var) = getCAddrMode var
+getArgAmode (StgLitArg lit) = returnFC (CLit lit)
 \end{code}
 
 %************************************************************************

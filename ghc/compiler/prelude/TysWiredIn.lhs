@@ -100,7 +100,8 @@ import NameTypes	( mkPreludeCoreName, mkShortName )
 import Kind		( mkBoxedTypeKind, mkArrowKind )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
-			  ConsVisible(..), NewOrData(..), TyCon	)
+			  NewOrData(..), TyCon
+			)
 import Type		( mkTyConTy, applyTyCon, mkSynTy, mkSigmaTy,
 			  mkFunTys, maybeAppDataTyCon,
 			  GenType(..), ThetaType(..), TauType(..) )
@@ -117,7 +118,7 @@ pcDataTyCon :: Unique{-TyConKey-} -> FAST_STRING -> FAST_STRING -> [TyVar] -> [I
 pcDataTyCon key mod name tyvars cons
   = mkDataTyCon key tycon_kind full_name tyvars
 		[{-no context-}] cons [{-no derivings-}]
-		ConsVisible DataType
+		DataType
   where
     full_name = mkPreludeCoreName mod name
     tycon_kind = foldr (mkArrowKind . getTyVarKind) mkBoxedTypeKind tyvars

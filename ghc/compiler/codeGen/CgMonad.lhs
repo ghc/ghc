@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CgMonad]{The code generation monad}
 
@@ -34,8 +34,6 @@ module CgMonad (
 --	addFreeASlots,	-- no need to export it
 	addFreeBSlots,	-- ToDo: Belong elsewhere
 
-	isSwitchSetC, isStringSwitchSetC, getIntSwitchChkrC,
-
 	noBlackHolingFlag,
 	profCtrC,
 
@@ -45,31 +43,35 @@ module CgMonad (
 	sequelToAmode,
 
 	-- out of general friendliness, we also export ...
-	CgBindings(..),
 	CgInfoDownwards(..), CgState(..),	-- non-abstract
-	CgIdInfo, -- abstract
-	CompilationInfo(..), IntSwitchChecker(..),
-
-	stableAmodeIdInfo, heapIdInfo
-
-	-- and to make the interface self-sufficient...
+	CompilationInfo(..)
     ) where
 
+import Ubiq{-uitous-}
+import CgLoop1		-- stuff from CgBindery and CgUsages
+
 import AbsCSyn
-import Type		( primRepFromType, Type
-			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
+import AbsCUtils	( mkAbsCStmts )
+import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling,
+			  opt_OmitBlackHoling
 			)
-import CgBindery
-import CgUsages         ( getSpBRelOffset )
-import CmdLineOpts	( GlobalSwitch(..) )
-import Id		( idType, ConTag(..), DataCon(..) )
-import Maybes		( catMaybes, maybeToBool, Maybe(..) )
-import Pretty		-- debugging only?
-import PrimRep		( getPrimRepSize, retPrimRepSize )
-import UniqSet		-- ( elementOfUniqSet, UniqSet(..) )
-import CostCentre	-- profiling stuff
-import StgSyn		( StgArg(..), StgLiveVars(..) )
-import Util
+import HeapOffs		( maxOff,
+			  VirtualSpAOffset(..), VirtualSpBOffset(..)
+			)
+import Id		( idType,
+			  nullIdEnv, mkIdEnv, addOneToIdEnv,
+			  modifyIdEnv, lookupIdEnv, rngIdEnv, IdEnv(..),
+			  ConTag(..), GenId{-instance Outputable-}
+			)
+import Maybes		( maybeToBool )
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instance Outputable-} )
+import Pretty		( ppAboves, ppCat, ppStr )
+import PrimRep		( getPrimRepSize, PrimRep(..) )
+import StgSyn		( StgLiveVars(..) )
+import Type		( typePrimRep )
+import UniqSet		( elementOfUniqSet )
+import Util		( sortLt, panic, pprPanic )
 
 infixr 9 `thenC`	-- Right-associative!
 infixr 9 `thenFC`
@@ -108,43 +110,42 @@ data CgState
 	CgStksAndHeapUsage
 \end{code}
 
-@EndOfBlockInfo@ tells what to do at the end of this block of code
-or, if the expression is a @case@, what to do at the end of each alternative.
+@EndOfBlockInfo@ tells what to do at the end of this block of code or,
+if the expression is a @case@, what to do at the end of each
+alternative.
 
 \begin{code}
 data EndOfBlockInfo
   = EndOfBlockInfo
-	VirtualSpAOffset	-- Args SpA: trim the A stack to this point at a return;
-				-- push arguments starting just above this point on
-				-- a tail call.
-
-				-- This is therefore the A-stk ptr as seen
-				-- by a case alternative.
-
-				-- Args SpA is used when we want to stub any
-				-- currently-unstubbed dead A-stack (ptr) slots;
-				-- we want to know what SpA in the continuation is
-				-- so that we don't stub any slots which are off the
-				-- top of the continuation's stack!
-
-	VirtualSpBOffset	-- Args SpB: Very similar to Args SpA.
-
-				-- Two main differences:
-				--  1.  If Sequel isn't OnStack, then Args SpB points
-				-- 	just below the slot in which the return address
-				--	should be put.  In effect, the Sequel is
-				--	a pending argument.  If it is OnStack, Args SpB
-    	    	    	    	--      points to the top word of the return address.
-				--
-				--  2.  It ain't used for stubbing because there are
-				--	no ptrs on B stk.
-
+	VirtualSpAOffset  -- Args SpA: trim the A stack to this point at a
+			  -- return; push arguments starting just
+			  -- above this point on a tail call.
+			  
+			  -- This is therefore the A-stk ptr as seen
+			  -- by a case alternative.
+			  
+			  -- Args SpA is used when we want to stub any
+			  -- currently-unstubbed dead A-stack (ptr)
+			  -- slots; we want to know what SpA in the
+			  -- continuation is so that we don't stub any
+			  -- slots which are off the top of the
+			  -- continuation's stack!
+			  
+	VirtualSpBOffset  -- Args SpB: Very similar to Args SpA.
+			  -- Two main differences:
+			  --  1. If Sequel isn't OnStack, then Args SpB points
+			  -- 	 just below the slot in which the return address
+			  --	 should be put.  In effect, the Sequel
+			  --	 is a pending argument.  If it is
+			  --	 OnStack, Args SpB
+    	    	    	  --     points to the top word of the return
+			  --	 address.
+			  --
+			  --  2. It ain't used for stubbing because there are
+			  --	 no ptrs on B stk.
 	Sequel
 
-
 initEobInfo = EndOfBlockInfo 0 0 InRetReg
-
-
 \end{code}
 
 Any addressing modes inside @Sequel@ must be ``robust,'' in the sense
@@ -153,21 +154,21 @@ block.
 
 \begin{code}
 data Sequel
-	= InRetReg              -- The continuation is in RetReg
+  = InRetReg              -- The continuation is in RetReg
 
-	| OnStack VirtualSpBOffset
-				-- Continuation is on the stack, at the
-				-- specified location
+  | OnStack VirtualSpBOffset
+			  -- Continuation is on the stack, at the
+			  -- specified location
 
-	| UpdateCode CAddrMode	-- May be standard update code, or might be
-				-- the data-type-specific one.
+  | UpdateCode CAddrMode  -- May be standard update code, or might be
+			  -- the data-type-specific one.
 
-	| CaseAlts
-		CAddrMode   -- Jump to this; if the continuation is for a vectored
-			    -- case this might be the label of a return vector
-			    -- Guaranteed to be a non-volatile addressing mode (I think)
-
-		SemiTaggingStuff
+  | CaseAlts
+	  CAddrMode   -- Jump to this; if the continuation is for a vectored
+		      -- case this might be the label of a return
+		      -- vector Guaranteed to be a non-volatile
+		      -- addressing mode (I think)
+	  SemiTaggingStuff
 
 type SemiTaggingStuff
   = Maybe			    -- Maybe[1] we don't have any semi-tagging stuff...
@@ -182,17 +183,17 @@ type SemiTaggingStuff
 type JoinDetails
   = (AbstractC, CLabel)		-- Code to load regs from heap object + profiling macros,
 				-- and join point label
--- The abstract C is executed only from a successful
--- semitagging venture, when a case has looked at a variable, found
--- that it's evaluated, and wants to load up the contents and go to the
--- join point.
 
+-- The abstract C is executed only from a successful semitagging
+-- venture, when a case has looked at a variable, found that it's
+-- evaluated, and wants to load up the contents and go to the join
+-- point.
 
 -- DIRE WARNING.
--- The OnStack case of sequelToAmode delivers an Amode which is only valid
--- just before the final control transfer, because it assumes that
--- SpB is pointing to the top word of the return address.
--- This seems unclean but there you go.
+-- The OnStack case of sequelToAmode delivers an Amode which is only
+-- valid just before the final control transfer, because it assumes
+-- that SpB is pointing to the top word of the return address.  This
+-- seems unclean but there you go.
 
 sequelToAmode :: Sequel -> FCode CAddrMode
 
@@ -576,17 +577,15 @@ nothing.
 \begin{code}
 costCentresC :: FAST_STRING -> [CAddrMode] -> Code
 
-costCentresC macro args (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _)
-			state@(MkCgState absC binds usage)
-  = if sw_chkr SccProfilingOn
+costCentresC macro args _ state@(MkCgState absC binds usage)
+  = if opt_SccProfilingOn
     then MkCgState (mkAbsCStmts absC (CCallProfCCMacro macro args)) binds usage
     else state
 
 profCtrC :: FAST_STRING -> [CAddrMode] -> Code
 
-profCtrC macro args (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _)
-			state@(MkCgState absC binds usage)
-  = if not (sw_chkr DoTickyProfiling)
+profCtrC macro args _ state@(MkCgState absC binds usage)
+  = if not opt_DoTickyProfiling
     then state
     else MkCgState (mkAbsCStmts absC (CCallProfCtrMacro macro args)) binds usage
 
@@ -616,17 +615,14 @@ getAbsC code info_down (MkCgState absC binds usage)
 \begin{code}
 noBlackHolingFlag, costCentresFlag :: FCode Bool
 
-noBlackHolingFlag (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _) state
-  = (sw_chkr OmitBlackHoling, state)
-
-costCentresFlag	  (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _) state
-  = (sw_chkr SccProfilingOn, state)
+noBlackHolingFlag _ state = (opt_OmitBlackHoling, state)
+costCentresFlag	  _ state = (opt_SccProfilingOn, state)
 \end{code}
 
 \begin{code}
 
 moduleName :: FCode FAST_STRING
-moduleName (MkCgInfoDown (MkCompInfo _ _ mod_name) _ _) state
+moduleName (MkCgInfoDown (MkCompInfo mod_name) _ _) state
   = (mod_name, state)
 
 \end{code}
@@ -802,7 +798,7 @@ dead_slots live_vars fbs das dbs ((v,i):bs)
 	_ -> dead_slots live_vars fbs das dbs bs
   where
     size :: Int
-    size = (getPrimRepSize . primRepFromType . idType) v
+    size = (getPrimRepSize . typePrimRep . idType) v
 
 -- addFreeSlots expects *both* args to be in increasing order
 addFreeASlots :: [(Int,StubFlag)] -> [(Int,StubFlag)] -> [(Int,StubFlag)]

@@ -8,7 +8,7 @@
 
 module SimplStg ( stg2stg ) where
 
-IMPORT_Trace
+import Ubiq{-uitous-}
 
 import StgSyn
 import StgUtils
@@ -16,36 +16,43 @@ import StgUtils
 import LambdaLift	( liftProgram )
 import SCCfinal		( stgMassageForProfiling )
 import SatStgRhs	( satStgRhs )
+import StgLint		( lintStgBindings )
+import StgSAT		( doStaticArgs )
 import StgStats	        ( showStgStats )
 import StgVarInfo	( setStgVarInfo )
 import UpdAnal		( updateAnalyse )
 
-import CmdLineOpts
-import Id		( unlocaliseId )
-import MainMonad
-import Maybes		( maybeToBool, Maybe(..) )
-import Outputable
-import Pretty
-import StgLint		( lintStgBindings )
-import StgSAT		( doStaticArgs )
-import UniqSet
-import UniqSupply
-import Util
+import CmdLineOpts	( opt_EnsureSplittableC, opt_SccGroup,
+			  opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
+			  StgToDo(..)
+			)
+import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
+			  growIdEnvList, isNullIdEnv, IdEnv(..),
+			  GenId{-instance Eq/Outputable -}
+			)
+import MainMonad	( writeMn, thenMn_, thenMn, returnMn, MainIO(..) )
+import Maybes		( maybeToBool )
+import Outputable	( isExported )
+import PprType		( GenType{-instance Outputable-} )
+import Pretty		( ppShow, ppAbove, ppAboves, ppStr )
+import UniqSupply	( splitUniqSupply )
+import Util		( mapAccumL, panic, assertPanic )
+
+unlocaliseId = panic "SimplStg.unlocaliseId (ToDo)"
 \end{code}
 
 \begin{code}
-stg2stg :: [StgToDo]			-- spec of what stg-to-stg passes to do
-	-> (GlobalSwitch -> SwitchResult)-- access to all global cmd-line opts
-	-> FAST_STRING			-- module name (profiling only)
-	-> PprStyle			-- printing style (for debugging only)
+stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
+	-> FAST_STRING		-- module name (profiling only)
+	-> PprStyle		-- printing style (for debugging only)
 	-> UniqSupply		-- a name supply
 	-> [StgBinding]		-- input...
 	-> MainIO
-	    ([StgBinding],		-- output program...
-	     ([CostCentre],		-- local cost-centres that need to be decl'd
-	      [CostCentre]))		-- "extern" cost-centres
+	    ([StgBinding],	-- output program...
+	     ([CostCentre],	-- local cost-centres that need to be decl'd
+	      [CostCentre]))	-- "extern" cost-centres
 
-stg2stg stg_todos sw_chkr module_name ppr_style us binds
+stg2stg stg_todos module_name ppr_style us binds
   = BSCC("Stg2Stg")
     case (splitUniqSupply us)	of { (us4now, us4later) ->
 
@@ -98,18 +105,16 @@ stg2stg stg_todos sw_chkr module_name ppr_style us binds
     }}
     ESCC
   where
-    switch_is_on = switchIsOn sw_chkr
-
-    do_let_no_escapes  = switch_is_on StgDoLetNoEscapes
-    do_verbose_stg2stg = switch_is_on D_verbose_stg2stg
+    do_let_no_escapes  = opt_StgDoLetNoEscapes
+    do_verbose_stg2stg = opt_D_verbose_stg2stg
 
     (do_unlocalising, unlocal_tag)
-      = case (stringSwitchSet sw_chkr EnsureSplittableC) of
+      = case (opt_EnsureSplittableC) of
 	      Nothing  -> (False, panic "tag")
-	      Just tag -> (True,  _PK_ tag)
+	      Just tag -> (True,  tag)
 
-    grp_name  = case (stringSwitchSet sw_chkr SccGroup) of
-		  Just xx -> _PK_ xx
+    grp_name  = case (opt_SccGroup) of
+		  Just xx -> xx
 		  Nothing -> module_name -- default: module name
 
     -------------
@@ -158,7 +163,7 @@ stg2stg stg_todos sw_chkr module_name ppr_style us binds
 	     BSCC("ProfMassage")
 	     let
 		 (collected_CCs, binds3)
-		   = stgMassageForProfiling module_name grp_name us1 switch_is_on binds
+		   = stgMassageForProfiling module_name grp_name us1 binds
 	     in
 	     end_pass us2 "ProfMassage" collected_CCs binds3
 	     ESCC

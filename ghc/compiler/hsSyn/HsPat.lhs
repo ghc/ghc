@@ -24,16 +24,13 @@ import HsLit		( HsLit )
 import HsLoop		( HsExpr )
 
 -- others:
-import Id		( GenId, getDataConSig )
+import Id		( GenId, dataConSig )
 import Maybes		( maybeToBool )
 import Outputable
 import PprStyle		( PprStyle(..) )
 import Pretty
 import TyCon		( maybeTyConSingleCon )
-import TyVar		( GenTyVar )
-import PprType		( GenType, GenTyVar )
-import Unique		( Unique )
-
+import PprType		( GenType )
 \end{code}
 
 Patterns come in distinct before- and after-typechecking flavo(u)rs.
@@ -55,7 +52,7 @@ data InPat name
   | TuplePatIn	    [InPat name]	-- tuple
 
   | RecPatIn	    name 		-- record
-		    [(name, Maybe (InPat name))]
+		    [(name, InPat name, Bool)]	-- True <=> source used punning
 
 data OutPat tyvar uvar id
   = WildPat	    (GenType tyvar uvar)	 	    	-- wild card
@@ -82,8 +79,9 @@ data OutPat tyvar uvar id
   | TuplePat	    [(OutPat tyvar uvar id)]	-- tuple
 						-- UnitPat is TuplePat []
 
-  | RecPat	    id 				-- record
-		    [(id, Maybe (OutPat tyvar uvar id))]
+  | RecPat	    Id 				-- record constructor
+		    (GenType tyvar uvar)    	-- the type of the pattern
+		    [(id, OutPat tyvar uvar id, Bool)]	-- True <=> source used punning
 
   | LitPat	    -- Used for *non-overloaded* literal patterns:
 		    -- Int#, Char#, Int, Char, String, etc.
@@ -137,8 +135,8 @@ pprInPat sty (TuplePatIn pats)
 pprInPat sty (RecPatIn con rpats)
   = ppBesides [ppr sty con, ppSP, ppChar '{', ppInterleave ppComma (map pp_rpat rpats), ppChar '}']
   where
-    pp_rpat (v, Nothing) = ppr sty v
-    pp_rpat (v, Just p)  = ppCat [ppr sty v, ppStr "<-", ppr sty p]
+    pp_rpat (v, _, True{-pun-}) = ppr sty v
+    pp_rpat (v, p, _) = ppCat [ppr sty v, ppStr "<-", ppr sty p]
 \end{code}
 
 \begin{code}
@@ -172,11 +170,11 @@ pprOutPat sty (ListPat ty pats)
 pprOutPat sty (TuplePat pats)
   = ppBesides [ppLparen, interpp'SP sty pats, ppRparen]
 
-pprOutPat sty (RecPat con rpats)
+pprOutPat sty (RecPat con ty rpats)
   = ppBesides [ppr sty con, ppChar '{', ppInterleave ppComma (map pp_rpat rpats), ppChar '}']
   where
-    pp_rpat (v, Nothing) = ppr sty v
-    pp_rpat (v, Just p)  = ppBesides [ppr sty v, ppStr "<-", ppr sty p]
+--  pp_rpat (v, _, True{-pun-}) = ppr sty v
+    pp_rpat (v, p, _) = ppBesides [ppr sty v, ppStr "<-", ppr sty p]
 
 pprOutPat sty (LitPat l ty) 	= ppr sty l	-- ToDo: print more
 pprOutPat sty (NPat   l ty e)	= ppr sty l	-- ToDo: print more
@@ -266,7 +264,7 @@ irrefutablePat other_pat		  = False   -- Literals, NPat
 
 only_con con = maybeToBool (maybeTyConSingleCon tycon)
  	       where
-		 (_,_,_,tycon) = getDataConSig con
+		 (_,_,_,tycon) = dataConSig con
 \end{code}
 
 This function @collectPatBinders@ works with the ``collectBinders''

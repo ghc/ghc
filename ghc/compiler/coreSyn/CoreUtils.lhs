@@ -9,19 +9,19 @@
 module CoreUtils (
 	coreExprType, coreAltsType,
 
-	substCoreExpr
+	substCoreExpr, substCoreBindings
 
 	, mkCoreIfThenElse
 	, mkErrorApp, escErrorMsg
 	, argToExpr
 	, unTagBinders, unTagBindersAlts
 	, manifestlyWHNF, manifestlyBottom
+	, maybeErrorApp
+	, nonErrorRHSs
+	, squashableDictishCcExpr
 {-	exprSmallEnoughToDup,
 	coreExprArity,
 	isWrapperFor,
-	maybeErrorApp,
-	nonErrorRHSs,
-	squashableDictishCcExpr,
 
 -}  ) where
 
@@ -38,10 +38,10 @@ import Id		( idType, mkSysLocal, getIdArity, isBottomingId,
 			)
 import IdInfo		( arityMaybe )
 import Literal		( literalType, isNoRepLit, Literal(..) )
-import Maybes		( catMaybes )
+import Maybes		( catMaybes, maybeToBool )
 import PprCore		( GenCoreExpr{-instances-}, GenCoreArg{-instances-} )
 import PprStyle		( PprStyle(..) )
-import PprType		( GenType{-instances-}, GenTyVar{-instance-} )
+import PprType		( GenType{-instances-} )
 import Pretty		( ppAboves )
 import PrelInfo		( trueDataCon, falseDataCon,
 			  augmentId, buildId,
@@ -49,21 +49,21 @@ import PrelInfo		( trueDataCon, falseDataCon,
 			)
 import PrimOp		( primOpType, PrimOp(..) )
 import SrcLoc		( mkUnknownSrcLoc )
-import TyVar		( isNullTyVarEnv, TyVarEnv(..), GenTyVar{-instances-} )
-import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy,
-			  getFunTy_maybe, applyTy, splitSigmaTy
+import TyVar		( isNullTyVarEnv, TyVarEnv(..) )
+import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
+			  getFunTy_maybe, applyTy, isPrimType,
+			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy
 			)
-import Unique		( Unique{-instances-} )
 import UniqSupply	( initUs, returnUs, thenUs,
 			  mapUs, mapAndUnzipUs,
 			  UniqSM(..), UniqSupply
 			)
+import Usage		( UVar(..) )
 import Util		( zipEqual, panic, pprPanic, assertPanic )
 
 type TypeEnv = TyVarEnv Type
 applyUsage = panic "CoreUtils.applyUsage:ToDo"
 dup_binder = panic "CoreUtils.dup_binder"
-applyTypeEnvToTy = panic "CoreUtils.applyTypeEnvToTy"
 \end{code}
 
 %************************************************************************
@@ -253,11 +253,11 @@ exprSmallEnoughToDup (Prim op _ _) = not (fragilePrimOp op)	-- Could check # of 
 exprSmallEnoughToDup (Lit lit) = not (isNoRepLit lit)
 
 exprSmallEnoughToDup expr  -- for now, just: <var> applied to <args>
-  = case (collectArgs expr) of { (fun, args) ->
+  = case (collectArgs expr) of { (fun, _, _, vargs) ->
     case fun of
       Var v -> v /= buildId
 		 && v /= augmentId
-		 && length args <= 6 -- or 10 or 1 or 4 or anything smallish.
+		 && length vargs <= 6 -- or 10 or 1 or 4 or anything smallish.
       _       -> False
     }
 -}
@@ -280,14 +280,13 @@ manifestlyWHNF (SCC _ e)  = manifestlyWHNF e
 manifestlyWHNF (Let _ e)  = False
 manifestlyWHNF (Case _ _) = False
 
-manifestlyWHNF (Lam (ValBinder _) _) = True
-manifestlyWHNF (Lam other_binder  e) = manifestlyWHNF e
+manifestlyWHNF (Lam x e)  = if isValBinder x then True else manifestlyWHNF e
 
 manifestlyWHNF other_expr   -- look for manifest partial application
-  = case (collectArgs other_expr) of { (fun, args) ->
+  = case (collectArgs other_expr) of { (fun, _, _, vargs) ->
     case fun of
       Var f ->  let
-		    num_val_args = numValArgs args
+		    num_val_args = length vargs
 		in
 		num_val_args == 0 -- Just a type application of
 				  -- a variable (f t1 t2 t3);
@@ -317,8 +316,7 @@ manifestlyBottom (SCC _ e)   = manifestlyBottom e
 manifestlyBottom (Let _ e)   = manifestlyBottom e
 
   -- We do not assume \x.bottom == bottom:
-manifestlyBottom (Lam (ValBinder _) _) = False
-manifestlyBottom (Lam other_binder  e) = manifestlyBottom e
+manifestlyBottom (Lam x e) = if isValBinder x then False else manifestlyBottom e
 
 manifestlyBottom (Case e a)
   = manifestlyBottom e
@@ -335,7 +333,7 @@ manifestlyBottom (Case e a)
     mbdef (BindDefault _ e') = manifestlyBottom e'
 
 manifestlyBottom other_expr   -- look for manifest partial application
-  = case (collectArgs other_expr) of { (fun, args) ->
+  = case (collectArgs other_expr) of { (fun, _, _, _) ->
     case fun of
       Var f | isBottomingId f -> True
 		-- Application of a function which always gives
@@ -389,11 +387,11 @@ expr `isWrapperFor` var
 
     --------------
     unravel_casing case_ables (Case scrut alts)
-      = case (collectArgs scrut) of { (fun, args) ->
+      = case (collectArgs scrut) of { (fun, _, _, vargs) ->
 	case fun of
 	  Var scrut_var -> let
 				answer =
-				     scrut_var /= var && all (doesn't_mention var) args
+				     scrut_var /= var && all (doesn't_mention var) vargs
 				  && scrut_var `is_elem` case_ables
 				  && unravel_alts case_ables alts
 			     in
@@ -403,15 +401,15 @@ expr `isWrapperFor` var
 	}
 
     unravel_casing case_ables other_expr
-      = case (collectArgs other_expr) of { (fun, args) ->
+      = case (collectArgs other_expr) of { (fun, _, _, vargs) ->
 	case fun of
 	  Var wrkr -> let
 			    answer =
 				-- DOESN'T WORK: wrkr == var's_worker
 				wrkr /= var
 			     && isWorkerId wrkr
-			     && all (doesn't_mention var)  args
-			     && all (only_from case_ables) args
+			     && all (doesn't_mention var)  vargs
+			     && all (only_from case_ables) vargs
 			in
 			answer
 
@@ -508,23 +506,24 @@ Example:
 Notice that the \tr{<alts>} don't get duplicated.
 
 \begin{code}
-{- LATER:
-nonErrorRHSs :: GenCoreCaseAlts binder Id -> [GenCoreExpr binder Id]
+nonErrorRHSs :: GenCoreCaseAlts a Id TyVar UVar -> [GenCoreExpr a Id TyVar UVar]
 
-nonErrorRHSs alts = filter not_error_app (find_rhss alts)
+nonErrorRHSs alts
+  = filter not_error_app (find_rhss alts)
   where
-    find_rhss (AlgAlts  alts deflt) = [rhs | (_,_,rhs) <- alts] ++ deflt_rhs deflt
-    find_rhss (PrimAlts alts deflt) = [rhs | (_,rhs)   <- alts] ++ deflt_rhs deflt
+    find_rhss (AlgAlts  as deflt) = [rhs | (_,_,rhs) <- as] ++ deflt_rhs deflt
+    find_rhss (PrimAlts as deflt) = [rhs | (_,rhs)   <- as] ++ deflt_rhs deflt
 
     deflt_rhs NoDefault           = []
     deflt_rhs (BindDefault _ rhs) = [rhs]
 
-    not_error_app rhs = case maybeErrorApp rhs Nothing of
-			 Just _  -> False
-			 Nothing -> True
+    not_error_app rhs
+      = case (maybeErrorApp rhs Nothing) of
+	  Just _  -> False
+	  Nothing -> True
 \end{code}
 
-maybeErrorApp checkes whether an expression is of the form
+maybeErrorApp checks whether an expression is of the form
 
 	error ty args
 
@@ -540,24 +539,24 @@ Here's where it is useful:
  ===>
 		error ty' "Foo"
 
-where ty' is the type of any of the alternatives.
-You might think this never occurs, but see the comments on
-the definition of @singleAlt@.
+where ty' is the type of any of the alternatives.  You might think
+this never occurs, but see the comments on the definition of
+@singleAlt@.
 
-Note: we *avoid* the case where ty' might end up as a
-primitive type: this is very uncool (totally wrong).
+Note: we *avoid* the case where ty' might end up as a primitive type:
+this is very uncool (totally wrong).
 
-NOTICE: in the example above we threw away e1 and e2, but
-not the string "Foo".  How did we know to do that?
+NOTICE: in the example above we threw away e1 and e2, but not the
+string "Foo".  How did we know to do that?
 
-Answer: for now anyway, we only handle the case of a function
-whose type is of form
+Answer: for now anyway, we only handle the case of a function whose
+type is of form
 
 	bottomingFn :: forall a. t1 -> ... -> tn -> a
 	    	    	      ^---------------------^ NB!
 
-Furthermore, we only count a bottomingApp if the function is
-applied to more than n args.  If so, we transform:
+Furthermore, we only count a bottomingApp if the function is applied
+to more than n args.  If so, we transform:
 
 	bottomingFn ty e1 ... en en+1 ... em
 to
@@ -566,47 +565,47 @@ to
 That is, we discard en+1 .. em
 
 \begin{code}
-maybeErrorApp :: GenCoreExpr bndr Id   -- Expr to look at
-	      -> Maybe Type	    -- Just ty => a result type *already cloned*;
-				    -- Nothing => don't know result ty; we
-				    -- *pretend* that the result ty won't be
-				    -- primitive -- somebody later must
-				    -- ensure this.
-	       -> Maybe (GenCoreExpr bndr Id)
+maybeErrorApp
+	:: GenCoreExpr a Id TyVar UVar	-- Expr to look at
+	-> Maybe Type			-- Just ty => a result type *already cloned*;
+					-- Nothing => don't know result ty; we
+					-- *pretend* that the result ty won't be
+					-- primitive -- somebody later must
+					-- ensure this.
+	-> Maybe (GenCoreExpr a Id TyVar UVar)
 
 maybeErrorApp expr result_ty_maybe
-  = case collectArgs expr of
-      (Var fun, (TypeArg ty : other_args))
+  = case (collectArgs expr) of
+      (Var fun, [{-no usage???-}], [ty], other_args)
 	| isBottomingId fun
 	&& maybeToBool result_ty_maybe -- we *know* the result type
 				       -- (otherwise: live a fairy-tale existence...)
 	&& not (isPrimType result_ty) ->
-	case splitSigmaTy (idType fun) of
-	  ([tyvar_tmpl], [], tau_ty) ->
-	      case (splitTyArgs tau_ty) of { (arg_tys, res_ty) ->
+
+	case (splitSigmaTy (idType fun)) of
+	  ([tyvar], [], tau_ty) ->
+	      case (splitFunTy tau_ty) of { (arg_tys, res_ty) ->
 	      let
 		  n_args_to_keep = length arg_tys
 		  args_to_keep   = take n_args_to_keep other_args
 	      in
-	      if  res_ty == mkTyVarTemplateTy tyvar_tmpl &&
-		  n_args_to_keep <= length other_args
+	      if  (res_ty `eqTy` mkTyVarTy tyvar)
+	       && n_args_to_keep <= length other_args
 	      then
 		    -- Phew!  We're in business
-		  Just (mkGenApp (Var fun)
-			      (TypeArg result_ty : args_to_keep))
+		  Just (mkGenApp (Var fun) (TyArg result_ty : args_to_keep))
 	      else
 		  Nothing
 	      }
 
-	  other -> 	-- Function type wrong shape
-		    Nothing
+	  other -> Nothing  -- Function type wrong shape
       other -> Nothing
   where
     Just result_ty = result_ty_maybe
 \end{code}
 
 \begin{code}
-squashableDictishCcExpr :: CostCentre -> GenCoreExpr a b -> Bool
+squashableDictishCcExpr :: CostCentre -> GenCoreExpr a b c d -> Bool
 
 squashableDictishCcExpr cc expr
   = if not (isDictCC cc) then
@@ -615,11 +614,11 @@ squashableDictishCcExpr cc expr
 	squashable expr -- note: quite like the "atomic_rhs" stuff in simplifier
   where
     squashable (Var _)      = True
-    squashable (CoTyApp f _)  = squashable f
-    squashable (Con _ _ _)  = True -- I think so... WDP 94/09
-    squashable (Prim _ _ _) = True -- ditto
-    squashable other	      = False
--}
+    squashable (Con  _ _)   = True -- I think so... WDP 94/09
+    squashable (Prim _ _)   = True -- ditto
+    squashable (App f a)
+      | notValArg a	    = squashable f
+    squashable other	    = False
 \end{code}
 
 %************************************************************************
@@ -629,13 +628,24 @@ squashableDictishCcExpr cc expr
 %************************************************************************
 
 \begin{code}
+substCoreBindings :: ValEnv
+		-> TypeEnv -- TyVar=>Type
+		-> [CoreBinding]
+		-> UniqSM [CoreBinding]
+
 substCoreExpr	:: ValEnv
 		-> TypeEnv -- TyVar=>Type
 		-> CoreExpr
 		-> UniqSM CoreExpr
 
-substCoreExpr venv tenv expr
+substCoreBindings venv tenv binds
   -- if the envs are empty, then avoid doing anything
+  = if (isNullIdEnv venv && isNullTyVarEnv tenv) then
+       returnUs binds
+    else
+       do_CoreBindings venv tenv binds
+
+substCoreExpr venv tenv expr
   = if (isNullIdEnv venv && isNullTyVarEnv tenv) then
        returnUs expr
     else

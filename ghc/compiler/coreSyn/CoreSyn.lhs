@@ -17,7 +17,7 @@ module CoreSyn (
 	mkApp, mkCon, mkPrim,
 	mkValLam, mkTyLam, mkUseLam,
 	mkLam,
-	collectBinders,
+	collectBinders, isValBinder, notValBinder,
 	
 	collectArgs, isValArg, notValArg, numValArgs,
 
@@ -57,13 +57,10 @@ module CoreSyn (
 import Ubiq{-uitous-}
 
 import CostCentre	( showCostCentre, CostCentre )
-import Id		( idType )
+import Id		( idType, GenId{-instance Eq-} )
+import Type		( isUnboxedType )
 import Usage		( UVar(..) )
 import Util		( panic, assertPanic )
-
-isUnboxedDataType = panic "CoreSyn.isUnboxedDataType"
---eqId :: Id -> Id -> Bool
-eqId = panic "CoreSyn.eqId"
 \end{code}
 
 %************************************************************************
@@ -197,12 +194,13 @@ being bound has unboxed type. We have different variants ...
 				(unboxed bindings in a letrec are still prohibited)
 
 \begin{code}
-mkCoLetAny :: GenCoreBinding val_bdr val_occ tyvar uvar
-	   -> GenCoreExpr    val_bdr val_occ tyvar uvar
-	   -> GenCoreExpr    val_bdr val_occ tyvar uvar
-mkCoLetsAny :: [GenCoreBinding val_bdr val_occ tyvar uvar] ->
-		GenCoreExpr val_bdr val_occ tyvar uvar ->
-		GenCoreExpr val_bdr val_occ tyvar uvar
+mkCoLetAny :: GenCoreBinding Id Id tyvar uvar
+	   -> GenCoreExpr    Id Id tyvar uvar
+	   -> GenCoreExpr    Id Id tyvar uvar
+mkCoLetsAny :: [GenCoreBinding Id Id tyvar uvar] ->
+		GenCoreExpr Id Id tyvar uvar ->
+		GenCoreExpr Id Id tyvar uvar
+
 mkCoLetrecAny :: [(val_bdr, GenCoreExpr val_bdr val_occ tyvar uvar)]
 	      -> GenCoreExpr val_bdr val_occ tyvar uvar
 	      -> GenCoreExpr val_bdr val_occ tyvar uvar
@@ -216,7 +214,7 @@ mkCoLetsAny binds expr = foldr mkCoLetAny expr binds
 mkCoLetAny bind@(Rec binds) body = mkCoLetrecAny binds body
 mkCoLetAny bind@(NonRec binder rhs) body
   = case body of
-      Var binder2 | binder `eqId` binder2
+      Var binder2 | binder == binder2
 	 -> rhs   -- hey, I have the rhs
       other
 	 -> Let bind body
@@ -231,9 +229,9 @@ mkCoLetAny bind@(NonRec binder rhs) body
 mkCoLetNoUnboxed bind@(Rec binds) body
   = mkCoLetrecNoUnboxed binds body
 mkCoLetNoUnboxed bind@(NonRec binder rhs) body
-  = --ASSERT (not (isUnboxedDataType (idType binder)))
+  = --ASSERT (not (isUnboxedType (idType binder)))
     case body of
-      Var binder2 | binder `eqId` binder2
+      Var binder2 | binder == binder2
 	 -> rhs   -- hey, I have the rhs
       other
 	 -> Let bind body
@@ -251,7 +249,7 @@ mkCoLetrecNoUnboxed binds body
     Let (Rec binds) body
   where
     is_boxed_bind (binder, rhs)
-      = (not . isUnboxedDataType . idType) binder
+      = (not . isUnboxedType . idType) binder
 \end{code}
 
 \begin{code}
@@ -264,10 +262,10 @@ mkCoLetUnboxedToCase bind@(Rec binds) body
   = mkCoLetrecNoUnboxed binds body
 mkCoLetUnboxedToCase bind@(NonRec binder rhs) body
   = case body of
-      Var binder2 | binder `eqId` binder2
+      Var binder2 | binder == binder2
 	 -> rhs   -- hey, I have the rhs
       other
-	 -> if (not (isUnboxedDataType (idType binder))) then
+	 -> if (not (isUnboxedType (idType binder))) then
 		Let bind body		 -- boxed...
 	    else
 		Case rhs		  -- unboxed...
@@ -341,6 +339,11 @@ data GenCoreBinder val_bdr tyvar uvar
   = ValBinder	val_bdr
   | TyBinder	tyvar
   | UsageBinder	uvar
+
+isValBinder (ValBinder _) = True
+isValBinder _		  = False
+
+notValBinder = not . isValBinder
 \end{code}
 
 Clump Lams together if possible.
@@ -379,42 +382,25 @@ collectBinders ::
   GenCoreExpr val_bdr val_occ tyvar uvar ->
   ([uvar], [tyvar], [val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
 
-collectBinders (Lam (UsageBinder u) body)
-  = let
-	(uvars, tyvars, args, final_body) = collectBinders body
-    in
-    (u:uvars, tyvars, args, final_body)
-
-collectBinders other
-  = let
-	(tyvars, args, body) = dig_for_tyvars other
-    in
-    ([], tyvars, args, body)
+collectBinders expr
+  = usages expr []
   where
-    dig_for_tyvars (Lam (TyBinder tv) body)
-      = let
-	    (tyvars, args, body2) = dig_for_tyvars body
-	in
-	(tv : tyvars, args, body2)
+    usages (Lam (UsageBinder u) body) uacc = usages body (u:uacc)
+    usages other uacc
+      = case (tyvars other []) of { (tacc, vacc, expr) ->
+	(reverse uacc, tacc, vacc, expr) }
 
-    dig_for_tyvars body
-      = ASSERT(not (usage_lambda body))
-	let
-	    (args, body2) = dig_for_valvars body
-	in
-	([], args, body2)
+    tyvars (Lam (TyBinder t)    body) tacc = tyvars body (t:tacc)
+    tyvars other tacc
+      = ASSERT(not (usage_lambda other))
+	case (valvars other []) of { (vacc, expr) ->
+	(reverse tacc, vacc, expr) }
 
-    ---------------------------------------
-    dig_for_valvars (Lam (ValBinder v) body)
-      = let
-	    (args, body2) = dig_for_valvars body
-	in
-	(v : args, body2)
-
-    dig_for_valvars body
-      = ASSERT(not (usage_lambda body))
-	ASSERT(not (tyvar_lambda body))
-	([], body)
+    valvars (Lam (ValBinder v)  body) vacc = valvars body (v:vacc)
+    valvars other vacc
+      = ASSERT(not (usage_lambda other))
+	ASSERT(not (tyvar_lambda other))
+	(reverse vacc, other)
 
     ---------------------------------------
     usage_lambda (Lam (UsageBinder _) _) = True
@@ -489,13 +475,36 @@ and the arguments to which it is applied.
 \begin{code}
 collectArgs :: GenCoreExpr val_bdr val_occ tyvar uvar
 	    -> (GenCoreExpr val_bdr val_occ tyvar uvar,
-	        [GenCoreArg val_occ tyvar uvar])
+		[GenUsage uvar],
+		[GenType tyvar uvar],
+	        [GenCoreArg val_occ tyvar uvar]{-ValArgs-})
 
 collectArgs expr
-  = collect expr []
+  = usages expr []
   where
-    collect (App fun arg) args = collect fun (arg : args)
-    collect fun		  args = (fun, args)
+    usages (App fun (UsageArg u)) uacc = usages fun (u:uacc)
+    usages fun uacc
+      = case (tyvars fun []) of { (expr, tacc, vacc) ->
+	(expr, uacc, tacc, vacc) }
+
+    tyvars (App fun (TyArg t))    tacc = tyvars fun (t:tacc)
+    tyvars fun tacc
+      = ASSERT(not (usage_app fun))
+	case (valvars fun []) of { (expr, vacc) ->
+	(expr, tacc, vacc) }
+
+    valvars (App fun v) vacc | isValArg v = valvars fun (v:vacc)
+    valvars fun vacc
+      = ASSERT(not (usage_app fun))
+	ASSERT(not (ty_app    fun))
+	(fun, vacc)
+
+    ---------------------------------------
+    usage_app (App _ (UsageArg _)) = True
+    usage_app _			   = False
+
+    ty_app    (App _ (TyArg _))    = True
+    ty_app    _			   = False
 \end{code}
 
 %************************************************************************

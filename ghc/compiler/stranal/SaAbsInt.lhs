@@ -15,30 +15,37 @@ module SaAbsInt (
 	isBot
     ) where
 
-IMPORT_Trace		-- ToDo: rm
-import Pretty
---import FiniteMap
-import Outputable
+import Ubiq{-uitous-}
 
-import PrelInfo		( PrimOp(..),
-			  intTyCon, integerTyCon, doubleTyCon,
-			  floatTyCon, wordTyCon, addrTyCon,
-			  PrimRep
-			)
-import Type		( isPrimType, maybeAppDataTyCon,
-			  maybeSingleConstructorTyCon,
-			  returnsRealWorld,
-			  isEnumerationTyCon, TyVarTemplate, TyCon
-			)
+import CoreSyn
+import CoreUnfold	( UnfoldingDetails(..), FormSummary )
 import CoreUtils	( unTagBinders )
-import Id		( getIdStrictness, idType, getIdUnfolding,
-			  getDataConSig, getInstantiatedDataConSig,
-			  DataCon(..), isBottomingId
+import Id		( idType, getIdStrictness, getIdUnfolding,
+			  dataConSig
 			)
-import IdInfo		-- various bits
-import Maybes		( maybeToBool, Maybe(..) )
+import IdInfo		( StrictnessInfo(..), Demand(..),
+			  wwPrim, wwStrict, wwEnum, wwUnpack
+			)
+import MagicUFs		( MagicUnfoldingFun )
+import Maybes		( maybeToBool )
+import Outputable	( Outputable(..){-instance * []-} )
+import PprStyle		( PprStyle(..) )
+import PrelInfo		( intTyCon, integerTyCon, doubleTyCon,
+			  floatTyCon, wordTyCon, addrTyCon
+			)
+import Pretty		( ppStr )
+import PrimOp		( PrimOp(..) )
 import SaLib
-import Util
+import TyCon		( maybeTyConSingleCon, isEnumerationTyCon,
+			  TyCon{-instance Eq-}
+			)
+import Type		( maybeAppDataTyCon, isPrimType )
+import Util		( isIn, isn'tIn, nOfThem, zipWithEqual,
+			  pprTrace, panic, pprPanic, assertPanic
+			)
+
+getInstantiatedDataConSig = panic "SaAbsInt.getInstantiatedDataConSig (ToDo)"
+returnsRealWorld = panic "SaAbsInt.returnsRealWorld (ToDo)"
 \end{code}
 
 %************************************************************************
@@ -390,7 +397,7 @@ absId anal var env
 	(Nothing, NoStrictnessInfo, LitForm _) ->
 			AbsTop 	-- Literals all terminate, and have no poison
 
-	(Nothing, NoStrictnessInfo, ConForm _ _ _) ->
+	(Nothing, NoStrictnessInfo, ConForm _ _) ->
 			AbsTop -- An imported constructor won't have
 			       -- bottom components, nor poison!
 
@@ -474,12 +481,13 @@ Things are a little different for absence analysis, because we want
 to make sure that any poison (?????)
 
 \begin{code}
-absEval StrAnal (Prim SeqOp [t] [e]) env
-  = if isBot (absEvalAtom StrAnal e env) then AbsBot else AbsTop
+absEval StrAnal (Prim SeqOp [TyArg _, e]) env
+  = ASSERT(isValArg e)
+    if isBot (absEvalAtom StrAnal e env) then AbsBot else AbsTop
 	-- This is a special case to ensure that seq# is strict in its argument.
 	-- The comments below (for most normal PrimOps) do not apply.
 
-absEval StrAnal (Prim op ts es) env = AbsTop
+absEval StrAnal (Prim op es) env = AbsTop
 	-- The arguments are all of unboxed type, so they will already
 	-- have been eval'd.  If the boxed version was bottom, we'll
 	-- already have returned bottom.
@@ -490,15 +498,15 @@ absEval StrAnal (Prim op ts es) env = AbsTop
 	-- uses boxed args and we don't know whether or not it's
     	-- strict, so we assume laziness. (JSM)
 
-absEval AbsAnal (Prim op ts as) env
-  = if any anyBot [absEvalAtom AbsAnal a env | a <- as]
+absEval AbsAnal (Prim op as) env
+  = if any anyBot [absEvalAtom AbsAnal a env | a <- as, isValArg a]
     then AbsBot
     else AbsTop
 	-- For absence analysis, we want to see if the poison shows up...
 
-absEval anal (Con con ts as) env
+absEval anal (Con con as) env
   | has_single_con
-  = AbsProd [absEvalAtom anal a env | a <- as]
+  = AbsProd [absEvalAtom anal a env | a <- as, isValArg a]
 
   | otherwise	-- Not single-constructor
   = case anal of
@@ -507,22 +515,22 @@ absEval anal (Con con ts as) env
 	AbsAnal -> 	-- In the absence case we need to be more
 			-- careful: look to see if there's any
 			-- poison in the components
-		   if any anyBot [absEvalAtom AbsAnal a env | a <- as]
+		   if any anyBot [absEvalAtom AbsAnal a env | a <- as, isValArg a]
 		   then AbsBot
 		   else AbsTop
   where
-    (_,_,_, tycon) = getDataConSig con
-    has_single_con = maybeToBool (maybeSingleConstructorTyCon tycon)
+    (_,_,_, tycon) = dataConSig con
+    has_single_con = maybeToBool (maybeTyConSingleCon tycon)
 \end{code}
 
 \begin{code}
-absEval anal (Lam binder body) env
+absEval anal (Lam (ValBinder binder) body) env
   = AbsFun [binder] body env
-absEval anal (CoTyLam ty expr) env
+absEval anal (Lam other_binder expr) env
   = absEval  anal expr env
-absEval anal (App e1 e2) env
-  = absApply anal (absEval anal e1 env) (absEvalAtom anal e2 env)
-absEval anal (CoTyApp expr ty) env
+absEval anal (App f a) env | isValArg a
+  = absApply anal (absEval anal f env) (absEvalAtom anal a env)
+absEval anal (App expr _) env
   = absEval anal expr env
 \end{code}
 

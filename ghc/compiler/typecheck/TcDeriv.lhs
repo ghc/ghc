@@ -35,8 +35,8 @@ import RnBinds4		( rnMethodBinds, rnTopBinds )
 
 import Bag		( Bag, isEmptyBag, unionBags, listToBag )
 import Class		( GenClass, getClassKey )
-import ErrUtils		( pprBagOfErrors, addErrLoc, TcError(..) )
-import Id		( getDataConSig, getDataConArity )
+import ErrUtils		( pprBagOfErrors, addErrLoc )
+import Id		( dataConSig, dataConArity )
 import Maybes		( assocMaybe, maybeToBool, Maybe(..) )
 import Name		( Name(..) )
 import NameTypes	( mkPreludeCoreName, Provenance(..) )
@@ -46,7 +46,7 @@ import PprStyle
 import Pretty
 import ProtoName	( eqProtoName, ProtoName(..), Name )
 import SrcLoc		( mkGeneratedSrcLoc, mkUnknownSrcLoc, SrcLoc )
-import TyCon		( getTyConTyVars, getTyConDataCons, getTyConDerivings,
+import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  maybeTyConSingleCon, isEnumerationTyCon, TyCon )
 import Type		( GenType(..), TauType(..), mkTyVarTys, applyTyCon,
 			  mkSigmaTy, mkDictTy, isPrimType, instantiateTy,
@@ -266,7 +266,7 @@ makeDerivEqns
 
     need_deriving tycons_to_consider
       = foldr ( \ tycon acc ->
-		   case (getTyConDerivings tycon) of
+		   case (tyConDerivings tycon) of
 		     [] -> acc
 		     cs -> [ (clas,tycon) | clas <- cs ] ++ acc
 	      )
@@ -303,9 +303,9 @@ makeDerivEqns
     mk_eqn (clas, tycon)
       = (clas, tycon, tyvars, constraints)
       where
-	tyvars    = getTyConTyVars tycon	-- ToDo: Do we need new tyvars ???
+	tyvars    = tyConTyVars tycon	-- ToDo: Do we need new tyvars ???
 	tyvar_tys = mkTyVarTys tyvars
-	data_cons = getTyConDataCons tycon
+	data_cons = tyConDataCons tycon
 	constraints = concat (map mk_constraints data_cons)
 
 	mk_constraints data_con
@@ -314,7 +314,7 @@ makeDerivEqns
 	       not (isPrimType arg_ty)	-- No constraints for primitive types
 	     ]
 	   where
-	     (con_tyvars, _, arg_tys, _) = getDataConSig data_con
+	     (con_tyvars, _, arg_tys, _) = dataConSig data_con
 	     inst_env = con_tyvars `zipEqual` tyvar_tys
 	                -- same number of tyvars in data constr and type constr!
 \end{code}
@@ -638,7 +638,7 @@ gen_taggery_Names eqns
   where
     do_con2tag acc_Names tycon
       = if (we_are_deriving eqClassKey tycon
-	    && any ( (== 0).getDataConArity ) (getTyConDataCons tycon))
+	    && any ( (== 0).dataConArity ) (tyConDataCons tycon))
 	|| (we_are_deriving ordClassKey  tycon
 	    && not (maybeToBool (maybeTyConSingleCon tycon)))
 	|| (we_are_deriving enumClassKey tycon)

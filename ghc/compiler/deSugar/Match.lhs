@@ -25,9 +25,13 @@ import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 
 import CoreUtils	( escErrorMsg, mkErrorApp )
-import Id		( idType, mkTupleCon, GenId{-instance-} )
+import FieldLabel	( allFieldLabelTags, fieldLabelTag )
+import Id		( idType, mkTupleCon, dataConSig,
+			  recordSelectorFieldLabel,
+			  GenId{-instance-}
+			)
 import PprStyle		( PprStyle(..) )
-import PprType		( GenTyVar{-instance-}, GenType{-instance-} )
+import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )
 import PrelInfo		( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  charTy, charDataCon, intTy, intDataCon,
 			  floatTy, floatDataCon, doubleTy, doubleDataCon,
@@ -35,10 +39,12 @@ import PrelInfo		( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  floatPrimTy, doublePrimTy, stringTy,
 			  addrTy, addrPrimTy, addrDataCon,
 			  wordTy, wordPrimTy, wordDataCon )
-import Type		( isPrimType, eqTy )
-import TyVar		( GenTyVar )
-import Unique		( Unique )
-import Util		( panic, pprPanic )
+import Type		( isPrimType, eqTy, getAppDataTyCon,
+			  instantiateTauTy
+			)
+import TyVar		( GenTyVar{-instance Eq-} )
+import Unique		( Unique{-instance Eq-} )
+import Util		( panic, pprPanic, assertPanic )
 \end{code}
 
 The function @match@ is basically the same as in the Wadler chapter,
@@ -319,6 +325,27 @@ tidy1 v (LazyPat pat) match_result
 
 tidy1 v (ConOpPat pat1 id pat2 ty) match_result
   = returnDs (ConPat id ty [pat1, pat2], match_result)
+
+tidy1 v (RecPat con_id pat_ty rpats) match_result
+  = returnDs (ConPat con_id pat_ty pats, match_result)
+  where
+    pats 		    = map mk_pat tagged_arg_tys
+
+	-- Boring stuff to find the arg-tys of the constructor
+    (tyvars, _, arg_tys, _) = dataConSig con_id
+    (_, inst_tys, _) 	    = getAppDataTyCon pat_ty
+    tenv 		    = tyvars `zip` inst_tys
+    con_arg_tys'	    = map (instantiateTauTy tenv) arg_tys
+    tagged_arg_tys	    = con_arg_tys' `zip` allFieldLabelTags
+
+	-- mk_pat picks a WildPat of the appropriate type for absent fields,
+	-- and the specified pattern for present fields
+    mk_pat (arg_ty, tag) = case [pat | (sel_id,pat,_) <- rpats,
+					fieldLabelTag (recordSelectorFieldLabel sel_id) == tag 
+				] of
+				(pat:pats) -> ASSERT( null pats )
+					      pat
+				[]	   -> WildPat arg_ty
 
 tidy1 v (ListPat ty pats) match_result
   = returnDs (list_ConPat, match_result)

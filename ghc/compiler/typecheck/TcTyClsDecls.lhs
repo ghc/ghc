@@ -14,8 +14,9 @@ import Ubiq{-uitous-}
 
 import HsSyn		( TyDecl(..),  ConDecl(..), BangType(..),
 			  ClassDecl(..), MonoType(..), PolyType(..),
-			  Sig(..), MonoBinds, Fake, InPat )
+			  Sig(..), MonoBinds, Fake, InPat, HsBinds(..), Bind, HsExpr )
 import RnHsSyn		( RenamedTyDecl(..), RenamedClassDecl(..) )
+import TcHsSyn		( TcHsBinds(..), TcIdOcc(..) )
 
 import TcMonad
 import Inst		( InstanceMapper(..) )
@@ -24,7 +25,7 @@ import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv,
 			  tcExtendGlobalValEnv, 
 			  tcTyVarScope, tcGetEnv )
 import TcKind		( TcKind, newKindVars )
-import TcTyDecls	( tcTyDecl )
+import TcTyDecls	( tcTyDecl, tcRecordSelectors )
 
 import Bag	
 import Class		( Class(..), getClassSelIds )
@@ -33,10 +34,10 @@ import Name		( Name, isTyConName )
 import PprStyle
 import Pretty
 import UniqSet		( UniqSet(..), emptyUniqSet,
-			  singletonUniqSet, unionUniqSets, 
+			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import SrcLoc		( SrcLoc )
-import TyCon		( TyCon, getTyConDataCons )
+import TyCon		( TyCon, tyConDataCons )
 import Unique		( Unique )
 import Util		( panic, pprTrace )
 
@@ -49,7 +50,7 @@ data Decl = TyD RenamedTyDecl | ClD RenamedClassDecl
 
 tcTyAndClassDecls1 :: InstanceMapper
 		   -> Bag RenamedTyDecl -> Bag RenamedClassDecl
-		   -> TcM s (TcEnv s)
+		   -> TcM s (TcEnv s, TcHsBinds s)
 
 tcTyAndClassDecls1 inst_mapper rnty_decls rncls_decls
   = sortByDependency syn_decls cls_decls decls `thenTc` \ groups ->
@@ -65,22 +66,24 @@ tcTyAndClassDecls1 inst_mapper rnty_decls rncls_decls
 
 tcGroups inst_mapper []
   = tcGetEnv		`thenNF_Tc` \ env ->
-    returnTc env
+    returnTc (env, EmptyBinds)
 
 tcGroups inst_mapper (group:groups)
-  = tcGroup inst_mapper group	`thenTc` \ new_env ->
+  = tcGroup inst_mapper group	`thenTc` \ (new_env, binds1) ->
 
 	-- Extend the environment using the new tycons and classes
     tcSetEnv new_env $
 
 	-- Do the remaining groups
-    tcGroups inst_mapper groups
+    tcGroups inst_mapper groups	`thenTc` \ (final_env, binds2) ->
+
+    returnTc (final_env, binds1 `ThenBinds` binds2)
 \end{code}
 
 Dealing with a group
 ~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcGroup :: InstanceMapper -> Bag Decl -> TcM s (TcEnv s)
+tcGroup :: InstanceMapper -> Bag Decl -> TcM s (TcEnv s, TcHsBinds s)
 tcGroup inst_mapper decls
   = pprTrace "tcGroup: " (ppCat (map (fst.fmt_decl) (bagToList decls))) $
 
@@ -94,11 +97,6 @@ tcGroup inst_mapper decls
 		-- extend-env things work properly.  A bit UGH-ish.
       tcExtendTyConEnv tycon_names_w_arities tycons		  $
       tcExtendClassEnv class_names classes			  $
-      tcExtendGlobalValEnv (concat (map getTyConDataCons tycons)) $
-      tcExtendGlobalValEnv (concat (map getClassSelIds classes))  $
-
-		-- SNAFFLE ENV TO RETURN
-      tcGetEnv					`thenNF_Tc` \ final_env ->
 
 		-- DEAL WITH TYPE VARIABLES
       tcTyVarScope tyvar_names 			( \ tyvars ->
@@ -107,11 +105,34 @@ tcGroup inst_mapper decls
 	foldBag combine (tcDecl inst_mapper)
 		(returnTc (emptyBag, emptyBag))
 		decls
-      )						`thenTc` \ (tycons,classes) ->
+      )						`thenTc` \ (tycon_bag,class_bag) ->
+      let
+	tycons = bagToList tycon_bag
+	classes = bagToList class_bag
+      in 
 
-      returnTc (bagToList tycons, bagToList classes, final_env)
-    ) `thenTc` \ (_, _, final_env) ->
-    returnTc final_env
+		-- SNAFFLE ENV TO RETURN
+      tcGetEnv					`thenNF_Tc` \ final_env ->
+
+      returnTc (tycons, classes, final_env)
+    ) `thenTc` \ (tycons, classes, final_env) ->
+
+
+	-- Create any necessary record selector Ids and their bindings
+    mapAndUnzipTc tcRecordSelectors tycons	`thenTc` \ (sel_ids_s, binds) ->
+	
+	-- Extend the global value environment with 
+	--	a) constructors
+	--	b) record selectors
+	--	c) class op selectors
+
+    tcSetEnv final_env						$
+    tcExtendGlobalValEnv (concat (map tyConDataCons tycons))	$
+    tcExtendGlobalValEnv (concat sel_ids_s)			$
+    tcExtendGlobalValEnv (concat (map getClassSelIds classes))  $
+    tcGetEnv			`thenNF_Tc` \ really_final_env ->
+
+    returnTc (really_final_env, foldr ThenBinds EmptyBinds binds)
 
   where
     (tyvar_names, tycon_names_w_arities, class_names) = get_binders decls
@@ -170,8 +191,14 @@ sortByDependency syn_decls cls_decls decls
    bag_acyclic (AcyclicSCC scc) = unitBag scc
    bag_acyclic (CyclicSCC sccs) = sccs
 
-fmt_decl (TyD (TySynonym name _ _ _))       = (ppr PprForUser name, getSrcLoc name)
-fmt_decl (ClD (ClassDecl _ name _ _ _ _ _)) = (ppr PprForUser name, getSrcLoc name)
+fmt_decl decl
+  = (ppr PprForUser name, getSrcLoc name)
+  where
+    name = get_name decl
+    get_name (TyD (TyData _ name _ _ _ _ _))    = name
+    get_name (TyD (TyNew  _ name _ _ _ _ _))    = name
+    get_name (TyD (TySynonym name _ _ _))       = name
+    get_name (ClD (ClassDecl _ name _ _ _ _ _)) = name
 \end{code}
 
 Edges in Type/Class decls
@@ -230,7 +257,7 @@ get_sigs sigs
     get_sig (ClassOpSig _ ty _ _) = get_pty ty
     get_sig other = panic "TcTyClsDecls:get_sig"
 
-set_name name = singletonUniqSet (getItsUnique name)
+set_name name = unitUniqSet (getItsUnique name)
 
 set_to_bag set = listToBag (uniqSetToList set)
 \end{code}

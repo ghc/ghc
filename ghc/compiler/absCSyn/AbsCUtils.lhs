@@ -10,31 +10,28 @@ module AbsCUtils (
 	nonemptyAbsC,
 	mkAbstractCs, mkAbsCStmts,
 	mkAlgAltsCSwitch,
-	kindFromMagicId,
+	magicIdPrimRep,
 	getAmodeRep, amodeCanSurviveGC,
 	mixedTypeLocn, mixedPtrLocn,
 	flattenAbsC,
 	mkAbsCStmtList
 
 	-- printing/forcing stuff comes from PprAbsC
-
-	-- and for interface self-sufficiency...
     ) where
+
+import Ubiq{-uitous-}
 
 import AbsCSyn
 
-import PrelInfo		( PrimOp(..)
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Literal		( literalPrimRep )
-import CLabel	( CLabel, mkReturnPtLabel, mkVecTblLabel )
+import CLabel		( mkReturnPtLabel )
 import Digraph		( stronglyConnComp )
-import Id		( fIRST_TAG, ConTag(..), DataCon(..), Id )
-import Maybes		( Maybe(..) )
-import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..) )
-import UniqSupply
-import StgSyn		( GenStgArg )
+import HeapOffs		( possiblyEqualHeapOffset )
+import Id		( fIRST_TAG, ConTag(..) )
+import Literal		( literalPrimRep, Literal(..) )
+import PrimRep		( getPrimRepSize, PrimRep(..) )
+import Unique		( Unique{-instance Eq-} )
+import UniqSupply	( getUnique, getUniques, splitUniqSupply )
+import Util		( panic )
 
 infixr 9 `thenFlt`
 \end{code}
@@ -148,24 +145,24 @@ mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
 %************************************************************************
 
 \begin{code}
-kindFromMagicId BaseReg		    = PtrRep
-kindFromMagicId StkOReg		    = PtrRep
-kindFromMagicId (VanillaReg kind _) = kind
-kindFromMagicId (FloatReg _)	    = FloatRep
-kindFromMagicId (DoubleReg _)	    = DoubleRep
-kindFromMagicId TagReg		    = IntRep
-kindFromMagicId RetReg		    = RetRep
-kindFromMagicId SpA		    = PtrRep
-kindFromMagicId SuA		    = PtrRep
-kindFromMagicId SpB		    = PtrRep
-kindFromMagicId SuB		    = PtrRep
-kindFromMagicId Hp		    = PtrRep
-kindFromMagicId HpLim		    = PtrRep
-kindFromMagicId LivenessReg	    = IntRep
-kindFromMagicId StdUpdRetVecReg	    = PtrRep
-kindFromMagicId StkStubReg	    = PtrRep
-kindFromMagicId CurCostCentre	    = CostCentreRep
-kindFromMagicId VoidReg		    = VoidRep
+magicIdPrimRep BaseReg		    = PtrRep
+magicIdPrimRep StkOReg		    = PtrRep
+magicIdPrimRep (VanillaReg kind _) = kind
+magicIdPrimRep (FloatReg _)	    = FloatRep
+magicIdPrimRep (DoubleReg _)	    = DoubleRep
+magicIdPrimRep TagReg		    = IntRep
+magicIdPrimRep RetReg		    = RetRep
+magicIdPrimRep SpA		    = PtrRep
+magicIdPrimRep SuA		    = PtrRep
+magicIdPrimRep SpB		    = PtrRep
+magicIdPrimRep SuB		    = PtrRep
+magicIdPrimRep Hp		    = PtrRep
+magicIdPrimRep HpLim		    = PtrRep
+magicIdPrimRep LivenessReg	    = IntRep
+magicIdPrimRep StdUpdRetVecReg	    = PtrRep
+magicIdPrimRep StkStubReg	    = PtrRep
+magicIdPrimRep CurCostCentre	    = CostCentreRep
+magicIdPrimRep VoidReg		    = VoidRep
 \end{code}
 
 %************************************************************************
@@ -183,7 +180,7 @@ getAmodeRep :: CAddrMode -> PrimRep
 
 getAmodeRep (CVal _ kind)	    	    = kind
 getAmodeRep (CAddr _)		    	    = PtrRep
-getAmodeRep (CReg magic_id)	    	    = kindFromMagicId magic_id
+getAmodeRep (CReg magic_id)	    	    = magicIdPrimRep magic_id
 getAmodeRep (CTemp uniq kind)	    	    = kind
 getAmodeRep (CLbl label kind)	    	    = kind
 getAmodeRep (CUnVecLbl _ _)	    	    = PtrRep

@@ -5,6 +5,7 @@ module TyVar (
 	GenTyVar(..), TyVar(..),
 	mkTyVar,
 	getTyVarKind,		-- TyVar -> Kind
+	cloneTyVar,
 
 	alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 
@@ -15,7 +16,7 @@ module TyVar (
 	growTyVarEnvList, isNullTyVarEnv, lookupTyVarEnv,
 
 	GenTyVarSet(..), TyVarSet(..),
-	emptyTyVarSet, singletonTyVarSet, unionTyVarSets,
+	emptyTyVarSet, unitTyVarSet, unionTyVarSets,
 	unionManyTyVarSets, intersectTyVarSets, mkTyVarSet,
 	tyVarSetToList, elementOfTyVarSet, minusTyVarSet,
 	isEmptyTyVarSet
@@ -67,6 +68,9 @@ mkTyVar name uniq kind = TyVar  uniq
 
 getTyVarKind :: GenTyVar flexi -> Kind
 getTyVarKind (TyVar _ kind _ _) = kind
+
+cloneTyVar :: GenTyVar flexi -> Unique -> GenTyVar flexi
+cloneTyVar (TyVar _ k n x) u = TyVar u k n x
 \end{code}
 
 
@@ -112,14 +116,14 @@ intersectTyVarSets:: GenTyVarSet flexi -> GenTyVarSet flexi -> GenTyVarSet flexi
 unionTyVarSets    :: GenTyVarSet flexi -> GenTyVarSet flexi -> GenTyVarSet flexi
 unionManyTyVarSets:: [GenTyVarSet flexi] -> GenTyVarSet flexi
 tyVarSetToList    :: GenTyVarSet flexi -> [GenTyVar flexi]
-singletonTyVarSet :: GenTyVar flexi -> GenTyVarSet flexi
+unitTyVarSet :: GenTyVar flexi -> GenTyVarSet flexi
 elementOfTyVarSet :: GenTyVar flexi -> GenTyVarSet flexi -> Bool
 minusTyVarSet	  :: GenTyVarSet flexi -> GenTyVarSet flexi -> GenTyVarSet flexi
 isEmptyTyVarSet   :: GenTyVarSet flexi -> Bool
 mkTyVarSet	  :: [GenTyVar flexi] -> GenTyVarSet flexi
 
 emptyTyVarSet  	  = emptyUniqSet
-singletonTyVarSet = singletonUniqSet
+unitTyVarSet = unitUniqSet
 intersectTyVarSets= intersectUniqSets
 unionTyVarSets 	  = unionUniqSets
 unionManyTyVarSets= unionManyUniqSets

@@ -9,38 +9,24 @@
 module WwLib (
 	WwBinding(..),
 
-	mkWwBodies, mAX_WORKER_ARGS,
-
-	-- our friendly worker/wrapper monad:
-	WwM(..),
-	returnWw, thenWw, mapWw,
-	getUniqueWw, uniqSMtoWwM
-
-	-- and to make the interface self-sufficient...
+	mkWwBodies, mAX_WORKER_ARGS
     ) where
 
 import Ubiq{-uitous-}
 
+import CoreSyn
+import Id		( idType, mkSysLocal )
+import IdInfo		( mkStrictnessInfo, nonAbsentArgs, Demand(..) )
 import PrelInfo		( aBSENT_ERROR_ID )
-{-
-import Id		( mkWorkerId, mkSysLocal, idType,
-			  getInstantiatedDataConSig, getIdInfo,
-			  replaceIdInfo, addIdStrictness, DataCon(..)
-			)
-import IdInfo		-- lots of things
-import Maybes		( maybeToBool, Maybe(..), MaybeErr )
-import SaLib
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( mkTyVarTys, mkFunTys, isPrimType,
-			  maybeAppDataTyCon, quantifyTy
+import Type		( isPrimType, mkTyVarTys, mkFunTys, maybeAppDataTyCon )
+import UniqSupply	( returnUs, thenUs, thenMaybeUs,
+			  getUniques, UniqSM(..)
 			)
-import UniqSupply
--}
-import Util		( panic )
-
-infixr 9 `thenWw`
+import Util		( zipWithEqual, assertPanic, panic )
 
 quantifyTy = panic "WwLib.quantifyTy"
+getInstantiatedDataConSig = panic "WwLib.getInstantiatedDataConSig"
 \end{code}
 
 %************************************************************************
@@ -221,7 +207,7 @@ mkWwBodies body_ty tyvars args arg_infos
 
     else -- the rest...
     mk_ww_arg_processing args arg_infos (mAX_WORKER_ARGS - nonAbsentArgs arg_infos)
-		`thenUsMaybe` \ (wrap_frag, work_args_info, work_frag) ->
+		`thenMaybeUs` \ (wrap_frag, work_args_info, work_frag) ->
     let
 	(work_args, wrkr_demands) = unzip work_args_info
 
@@ -230,7 +216,7 @@ mkWwBodies body_ty tyvars args arg_infos
 	wrapper_w_hole = \ worker_id ->
 				mkLam tyvars args (
 				wrap_frag (
-				mkCoTyApps (Var worker_id) (mkTyVarTys tyvars)
+				mkTyApp (Var worker_id) (mkTyVarTys tyvars)
 			 ))
 
 	worker_w_hole = \ orig_body ->
@@ -302,7 +288,7 @@ mk_ww_arg_processing (arg : args) (WwLazy True : infos) max_extra_args
     mk_ww_arg_processing args infos max_extra_args
 				    -- we've already discounted for absent args,
 				    -- so we don't change max_extra_args
-		   `thenUsMaybe` \ (wrap_rest, work_args_info, work_rest) ->
+		   `thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
 
        		-- wrapper doesn't pass this arg to worker:
     returnUs (Just (
@@ -317,7 +303,7 @@ mk_ww_arg_processing (arg : args) (WwLazy True : infos) max_extra_args
   where
     mk_absent_let arg arg_ty body
       = if not (isPrimType arg_ty) then
-	    Let (NonRec arg (mkCoTyApp (Var aBSENT_ERROR_ID) arg_ty)) body
+	    Let (NonRec arg (mkTyApp (Var aBSENT_ERROR_ID) [arg_ty])) body
 	else -- quite horrible
 	    panic "WwLib: haven't done mk_absent_let for primitives yet"
 
@@ -354,7 +340,7 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 		-- In processing the rest, push the sub-component args
 		-- and infos on the front of the current bunch
 	    mk_ww_arg_processing (unpk_args ++ args) (cmpnt_infos ++ infos) new_max_extra_args
-			`thenUsMaybe` \ (wrap_rest, work_args_info, work_rest) ->
+			`thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
 
 	    returnUs (Just (
 	      -- wrapper: unpack the value
@@ -383,7 +369,8 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 	)
 
     mk_pk_let arg boxing_con con_tys unpk_args body
-      = Let (NonRec arg (Con boxing_con con_tys [VarArg a | a <- unpk_args]))
+      = Let (NonRec arg (Con boxing_con
+			    (map TyArg con_tys ++ map VarArg unpk_args)))
 	      body
 
 mk_ww_arg_processing (arg : args) (arg_demand : infos) max_extra_args
@@ -394,7 +381,7 @@ mk_ww_arg_processing (arg : args) (arg_demand : infos) max_extra_args
 
 	-- Finish args to the right...
     mk_ww_arg_processing args infos max_extra_args
-			`thenUsMaybe` \ (wrap_rest, work_args_info, work_rest) ->
+			`thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
 
     returnUs (Just (
 	      -- wrapper:
@@ -405,56 +392,4 @@ mk_ww_arg_processing (arg : args) (arg_demand : infos) max_extra_args
 	      \ hole -> work_rest hole
     ))
     --)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[monad-WwLib]{Simple monad for worker/wrapper}
-%*									*
-%************************************************************************
-
-In this monad, we thread a @UniqueSupply@, and we carry a
-@GlobalSwitch@-lookup function downwards.
-
-\begin{code}
-type WwM result
-  =  UniqSupply
-  -> (GlobalSwitch -> Bool)
-  -> result
-
-{-# INLINE thenWw #-}
-{-# INLINE returnWw #-}
-
-returnWw :: a -> WwM a
-thenWw	 :: WwM a -> (a -> WwM b) -> WwM b
-mapWw	 :: (a -> WwM b) -> [a] -> WwM [b]
-
-returnWw expr ns sw = expr
-
-thenWw m k us sw_chk
-  = case splitUniqSupply us	of { (s1, s2) ->
-    case (m s1 sw_chk)	    	of { m_res ->
-    k m_res s2 sw_chk }}
-
-mapWw f []     = returnWw []
-mapWw f (x:xs)
-  = f x		`thenWw` \ x'  ->
-    mapWw f xs	`thenWw` \ xs' ->
-    returnWw (x':xs')
-\end{code}
-
-\begin{code}
-getUniqueWw :: WwM Unique
-uniqSMtoWwM :: UniqSM a -> WwM a
-
-getUniqueWw us sw_chk = getUnique us
-
-uniqSMtoWwM u_obj us sw_chk = u_obj us
-
-thenUsMaybe :: UniqSM (Maybe a) -> (a -> UniqSM (Maybe b)) -> UniqSM (Maybe b)
-thenUsMaybe m k
-  = m	`thenUs` \ result ->
-    case result of
-      Nothing -> returnUs Nothing
-      Just x  -> k x
 \end{code}

@@ -7,14 +7,20 @@ import PreludePS(_PackedString)
 
 import Bag		( Bag )
 import BinderInfo	( BinderInfo )
+import CgBindery	( CgIdInfo )
+import CharSeq		( CSeq )
+import CLabel		( CLabel )
 import Class		( GenClass, GenClassOp, Class(..), ClassOp )
+import ClosureInfo	( ClosureInfo, LambdaFormInfo )
 import CmdLineOpts	( SimplifierSwitch, SwitchResult )
 import CoreSyn		( GenCoreArg, GenCoreBinder, GenCoreBinding, GenCoreExpr,
 			  GenCoreCaseAlts, GenCoreCaseDefault
 			)
 import CoreUnfold	( UnfoldingDetails, UnfoldingGuidance )
 import CostCentre	( CostCentre )
+import FieldLabel	( FieldLabel )
 import FiniteMap	( FiniteMap )
+import HeapOffs		( HeapOffset )
 import HsCore		( UnfoldingCoreExpr )
 import HsPat		( OutPat )
 import HsPragmas	( ClassOpPragmas, ClassPragmas, DataPragmas, GenPragmas,
@@ -35,6 +41,7 @@ import Pretty		( PrettyRep )
 import PrimOp		( PrimOp )
 import PrimRep		( PrimRep )
 import ProtoName	( ProtoName )
+import SMRep		( SMRep )
 import SrcLoc		( SrcLoc )
 import TcType		( TcMaybe )
 import TyCon		( TyCon, Arity(..) )
@@ -75,13 +82,18 @@ class Outputable a where
 data ArityInfo
 data Bag a
 data BinderInfo
+data CgIdInfo
+data CLabel
 data ClassOpPragmas a
 data ClassPragmas a
+data ClosureInfo
 data CostCentre
+data CSeq
 data DataPragmas a
 data DeforestInfo
 data Demand
 data ExportFlag
+data FieldLabel
 data FiniteMap a b
 data FullName	-- NB: fails the optimisation criterion
 data GenClass a b
@@ -97,9 +109,11 @@ data GenPragmas a
 data GenTyVar a	-- NB: fails the optimisation criterion
 data GenType  a b
 data GenUsage a
+data HeapOffset
 data IdInfo
 data InstancePragmas a
 data Kind
+data LambdaFormInfo
 data Literal
 data MaybeErr a b
 data MatchEnv a b
@@ -113,6 +127,7 @@ data PrimRep	-- NB: an enumeration
 data ProtoName
 data ShortName	-- NB: fails the optimisation criterion
 data SimplifierSwitch
+data SMRep
 data SrcLoc
 data StrictnessInfo
 data StrictnessMark

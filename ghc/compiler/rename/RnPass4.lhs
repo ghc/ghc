@@ -292,7 +292,12 @@ rnInstDecl (InstDecl cname ty mbinds from_here modname uprags pragmas src_loc)
     in
     mkTyVarNamesEnv src_loc tyvars     	`thenRn4` \ (tv_env,_) ->
     lookupClass cname 		     	`thenRn4` \ cname' ->
-    rnPolyType False{-no invisibles-} tv_env ty
+
+    rnPolyType False{-no invisibles-} [] ty
+	-- The "[]" was tv_env, but that means the InstDecl's tyvars aren't
+	-- pinned on the HsForAllType, which they should be.
+	-- Urgh!  Improve in the new renamer!
+
 					`thenRn4` \ ty' ->
     rnMethodBinds cname' mbinds	`thenRn4` \ mbinds' ->
     mapRn4 (rn_uprag cname') uprags	`thenRn4` \ new_uprags ->

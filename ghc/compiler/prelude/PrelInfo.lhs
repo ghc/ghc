@@ -101,7 +101,7 @@ import FiniteMap
 import Id		( mkTupleCon, GenId{-instances-} )
 import Name		( Name(..) )
 import NameTypes	( mkPreludeCoreName, FullName, ShortName )
-import TyCon		( getTyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon{-instances-} )
+import TyCon		( tyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon{-instances-} )
 import Type
 import Unique		-- *Key stuff
 import Util		( nOfThem, panic )
@@ -401,5 +401,5 @@ pcTyConNameInfo tc = (getOccurrenceName tc, WiredInTyCon tc)
 pcDataConNameInfo :: TyCon -> [(FAST_STRING, Name)]
 pcDataConNameInfo tycon
   = -- slurp out its data constructors...
-    [ (getOccurrenceName con, WiredInVal con) | con <- getTyConDataCons tycon ]
+    [ (getOccurrenceName con, WiredInVal con) | con <- tyConDataCons tycon ]
 \end{code}

@@ -12,20 +12,24 @@
 
 module CgLetNoEscape ( cgLetNoEscapeClosure ) where
 
+import Ubiq{-uitious-}
+import CgLoop2		( cgExpr )
+
 import StgSyn
 import CgMonad
 import AbsCSyn
 
-import CgBindery	-- various things
-import CgExpr		( cgExpr )
+import CgBindery	( letNoEscapeIdInfo, bindArgsToRegs,
+			  bindNewToAStack, bindNewToBStack
+			)
 import CgHeapery	( heapCheck )
 import CgRetConv	( assignRegs )
 import CgStackery	( mkVirtStkOffsets )
 import CgUsages		( setRealAndVirtualSps, getVirtSps )
-import CLabel	( mkStdEntryLabel )
+import CLabel		( mkStdEntryLabel )
 import ClosureInfo	( mkLFLetNoEscape )
-import Id		( getIdPrimRep )
-import Util
+import HeapOffs		( VirtualSpBOffset(..) )
+import Id		( idPrimRep )
 \end{code}
 
 %************************************************************************
@@ -164,10 +168,9 @@ cgLetNoEscapeBody :: [Id]		-- Args
 
 cgLetNoEscapeBody all_args rhs
   = getVirtSps		`thenFC` \ (vA, vB) ->
-    getIntSwitchChkrC	`thenFC` \ isw_chkr ->
     let
-	arg_kinds	= map getIdPrimRep all_args
-	(arg_regs, _)	= assignRegs isw_chkr [{-nothing live-}] arg_kinds
+	arg_kinds	= map idPrimRep all_args
+	(arg_regs, _)	= assignRegs [{-nothing live-}] arg_kinds
     	stk_args	= drop (length arg_regs) all_args
 
     	-- stk_args is the args which are passed on the stack at the fast-entry point
@@ -175,7 +178,7 @@ cgLetNoEscapeBody all_args rhs
     	(spA_stk_args, spB_stk_args, stk_bxd_w_offsets, stk_ubxd_w_offsets)
 	  = mkVirtStkOffsets
 		vA vB 		-- Initial virtual SpA, SpB
-		getIdPrimRep
+		idPrimRep
 		stk_args
     in
 

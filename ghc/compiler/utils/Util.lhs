@@ -77,7 +77,7 @@ module Util (
 
 	-- error handling
 #if defined(COMPILING_GHC)
-	, panic, panic#, pprPanic, pprPanic#, pprTrace
+	, panic, panic#, pprPanic, pprPanic#, pprError, pprTrace
 # ifdef DEBUG
 	, assertPanic
 # endif
@@ -807,6 +807,7 @@ panic x = error ("panic! (the `impossible' happened):\n\t"
 	      ++ "to glasgow-haskell-bugs@dcs.glasgow.ac.uk.\n\n" )
 
 pprPanic heading pretty_msg = panic (heading++(ppShow 80 pretty_msg))
+pprError heading pretty_msg = error (heading++(ppShow 80 pretty_msg))
 pprTrace heading pretty_msg = trace (heading++(ppShow 80 pretty_msg))
 
 -- #-versions because panic can't return an unboxed int, and that's

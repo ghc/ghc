@@ -26,18 +26,16 @@ import Ubiq{-uitous-}
 
 import SmplLoop		-- well, cheating sort of
 
-import Id		( mkSysLocal )
+import Id		( mkSysLocal, mkIdWithNewUniq )
 import SimplEnv
 import SrcLoc		( mkUnknownSrcLoc )
+import TyVar		( cloneTyVar )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply,
 			  UniqSupply
 			)
 import Util		( zipWithEqual, panic )
 
 infixr 9  `thenSmpl`, `thenSmpl_`
-
-cloneTyVar = panic "cloneTyVar (SimplMonad)"
-mkIdWithNewUniq = panic "mkIdWithNewUniq (SimplMonad)"
 \end{code}
 
 %************************************************************************

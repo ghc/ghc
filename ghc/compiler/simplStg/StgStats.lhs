@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[StgStats]{Gathers statistical information about programs}
 
@@ -25,11 +25,11 @@ The program gather statistics about
 
 module StgStats ( showStgStats ) where
 
+import Ubiq{-uitous-}
+
 import StgSyn
 
-import FiniteMap
-
-import Util
+import FiniteMap	( emptyFM, plusFM_C, unitFM, fmToList )
 \end{code}
 
 \begin{code}
@@ -63,10 +63,10 @@ combineSEs :: [StatEnv] -> StatEnv
 combineSEs = foldr combineSE emptySE
 
 countOne :: CounterType -> StatEnv
-countOne c = singletonFM c 1
+countOne c = unitFM c 1
 
 countN :: CounterType -> Int -> StatEnv
-countN = singletonFM
+countN = unitFM
 \end{code}
 
 %************************************************************************

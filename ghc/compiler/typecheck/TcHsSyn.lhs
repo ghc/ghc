@@ -10,16 +10,21 @@ checker.
 module TcHsSyn (
 	TcIdBndr(..), TcIdOcc(..),
 	
-	TcMonoBinds(..), TcHsBinds(..), TcBind(..), TcPat(..), TcExpr(..), TcGRHSsAndBinds(..),
-	TcGRHS(..), TcMatch(..), TcQual(..), TcStmt(..), TcArithSeqInfo(..), TcHsModule(..),
+	TcMonoBinds(..), TcHsBinds(..), TcBind(..), TcPat(..),
+	TcExpr(..), TcGRHSsAndBinds(..), TcGRHS(..), TcMatch(..),
+	TcQual(..), TcStmt(..), TcArithSeqInfo(..), TcRecordBinds(..),
+	TcHsModule(..),
 	
-	TypecheckedHsBinds(..),	TypecheckedBind(..), TypecheckedMonoBinds(..),
-	TypecheckedPat(..), TypecheckedHsExpr(..), TypecheckedArithSeqInfo(..),
-	TypecheckedQual(..), TypecheckedStmt(..), TypecheckedMatch(..), 
-	TypecheckedHsModule(..), TypecheckedGRHSsAndBinds(..), TypecheckedGRHS(..),
+	TypecheckedHsBinds(..), TypecheckedBind(..),
+	TypecheckedMonoBinds(..), TypecheckedPat(..),
+	TypecheckedHsExpr(..), TypecheckedArithSeqInfo(..),
+	TypecheckedQual(..), TypecheckedStmt(..),
+	TypecheckedMatch(..), TypecheckedHsModule(..),
+	TypecheckedGRHSsAndBinds(..), TypecheckedGRHS(..),
 
 	mkHsTyApp, mkHsDictApp,
 	mkHsTyLam, mkHsDictLam,
+	tcIdType,
 
 	zonkBinds,
 	zonkInst,
@@ -32,7 +37,7 @@ import Ubiq{-uitous-}
 -- friends:
 import HsSyn	-- oodles of it
 import Id	( GenId(..), IdDetails, PragmaInfo,	-- Can meddle modestly with Ids
-		  DictVar(..)
+		  DictVar(..), idType
 		)
 
 -- others:
@@ -76,6 +81,7 @@ type TcMatch s		= Match (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcQual s		= Qual (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcStmt s		= Stmt (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcArithSeqInfo s	= ArithSeqInfo (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
+type TcRecordBinds s	= HsRecordBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcHsModule s	= HsModule (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 
 type TypecheckedPat		= OutPat	TyVar UVar Id
@@ -104,6 +110,10 @@ mkHsTyLam tyvars expr = TyLam tyvars expr
 
 mkHsDictLam []    expr = expr
 mkHsDictLam dicts expr = DictLam dicts expr
+
+tcIdType :: TcIdOcc s -> TcType s
+tcIdType (TcId id) = idType id
+tcIdType other     = panic "tcIdType"
 \end{code}
 
 

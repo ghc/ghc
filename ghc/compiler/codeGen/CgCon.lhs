@@ -1,5 +1,5 @@
 %
-% (c) The GRASP Project, Glasgow University, 1992-1995
+% (c) The GRASP Project, Glasgow University, 1992-1996
 %
 \section[CgCon]{Code generation for constructors}
 
@@ -11,55 +11,50 @@ with {\em constructors} on the RHSs of let(rec)s.  See also
 #include "HsVersions.h"
 
 module CgCon (
-	-- it's all exported, actually...
 	cgTopRhsCon, buildDynCon,
 	bindConArgs,
 	cgReturnDataCon
-
-	-- and to make the interface self-sufficient...
     ) where
 
-import StgSyn
+import Ubiq{-uitous-}
+
 import CgMonad
 import AbsCSyn
+import StgSyn
 
-import Type		( maybeCharLikeTyCon, maybeIntLikeTyCon, TyVar,
-			  TyCon, Class, Type
-			)
-import CgBindery	( getAtomAmode, getAtomAmodes, bindNewToNode,
-			  bindArgsToRegs, newTempAmodeAndIdInfo, idInfoToAmode
+import AbsCUtils	( mkAbstractCs, getAmodeRep )
+import CgBindery	( getArgAmodes, bindNewToNode,
+			  bindArgsToRegs, newTempAmodeAndIdInfo,
+			  idInfoToAmode, stableAmodeIdInfo,
+			  heapIdInfo
 			)
 import CgClosure	( cgTopRhsClosure )
-import CgHeapery	( allocDynClosure, heapCheck
-#ifdef GRAN
-			  , fetchAndReschedule  -- HWL
-#endif  {- GRAN -}
-			)
 import CgCompInfo	( mAX_INTLIKE, mIN_INTLIKE )
-
-import CgRetConv	( dataReturnConvAlg, mkLiveRegsBitMask,
-			  CtrlReturnConvention(..), DataReturnConvention(..)
-			)
+import CgHeapery	( allocDynClosure )
+import CgRetConv	( dataReturnConvAlg, DataReturnConvention(..) )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
-import CgUsages		( getHpRelOffset )
-import CLabel	( CLabel, mkClosureLabel, mkInfoTableLabel,
+import CLabel		( mkClosureLabel, mkInfoTableLabel,
 			  mkPhantomInfoTableLabel,
 			  mkConEntryLabel, mkStdEntryLabel
 			)
-import ClosureInfo	-- hiding ( auxInfoTableLabelFromCI ) -- I hate pragmas
-			{-( mkConLFInfo, mkLFArgument, closureLFInfo,
+import ClosureInfo	( mkClosureLFInfo, mkConLFInfo, mkLFArgument,
 			  layOutDynCon, layOutDynClosure,
-			  layOutStaticClosure, UpdateFlag(..),
-			  mkClosureLFInfo, layOutStaticNoFVClosure
-			)-}
-import Id		( getIdPrimRep, getDataConTag, getDataConTyCon,
-			  isDataCon, fIRST_TAG, DataCon(..), ConTag(..)
+			  layOutStaticClosure
 			)
-import Maybes		( maybeToBool, Maybe(..) )
-import PrimRep		( PrimRep(..), isFloatingRep, getPrimRepSize )
-import CostCentre
-import UniqSet		-- ( emptyUniqSet, UniqSet(..) )
-import Util
+import CostCentre	( currentOrSubsumedCosts, useCurrentCostCentre,
+			  dontCareCostCentre
+			)
+import Id		( idPrimRep, dataConTag, dataConTyCon,
+			  isDataCon, DataCon(..),
+			  emptyIdSet
+			)
+import Literal		( Literal(..) )
+import Maybes		( maybeToBool )
+import PrimRep		( isFloatingRep, PrimRep(..) )
+import Util		( isIn, zipWithEqual, panic, assertPanic )
+
+maybeCharLikeTyCon = panic "CgCon.maybeCharLikeTyCon (ToDo)"
+maybeIntLikeTyCon  = panic "CgCon.maybeIntLikeTyCon  (ToDo)"
 \end{code}
 
 %************************************************************************
@@ -71,7 +66,7 @@ import Util
 \begin{code}
 cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> DataCon		-- Id
-	    -> [StgArg]	-- Args
+	    -> [StgArg]		-- Args
 	    -> Bool		-- All zero-size args (see buildDynCon)
 	    -> FCode (Id, CgIdInfo)
 \end{code}
@@ -130,7 +125,7 @@ cgTopRhsCon name con args all_zero_size_args
   || any isLitLitArg args
   = cgTopRhsClosure name top_cc NoStgBinderInfo [] body lf_info
   where
-    body = StgCon con args emptyUniqSet{-emptyLiveVarSet-}
+    body = StgCon con args emptyIdSet{-emptyLiveVarSet-}
     lf_info = mkClosureLFInfo True {- Top level -} [] ReEntrant [] body
 \end{code}
 
@@ -142,7 +137,7 @@ cgTopRhsCon name con args all_zero_size_args
     ASSERT(isDataCon con)
 
 	-- LAY IT OUT
-    getAtomAmodes args		`thenFC` \ amodes ->
+    getArgAmodes args		`thenFC` \ amodes ->
 
     let
 	(closure_info, amodes_w_offsets)
@@ -163,13 +158,13 @@ cgTopRhsCon name con args all_zero_size_args
 	-- RETURN
     returnFC (name, stableAmodeIdInfo name (CLbl closure_label PtrRep) lf_info)
   where
-    con_tycon	    = getDataConTyCon con
-    lf_info	    = mkConLFInfo con
+    con_tycon	    = dataConTyCon con
+    lf_info	    = mkConLFInfo     con
 
-    closure_label   = mkClosureLabel  name
+    closure_label   = mkClosureLabel   name
     info_label      = mkInfoTableLabel con
-    con_entry_label = mkConEntryLabel con
-    entry_label	    = mkStdEntryLabel name
+    con_entry_label = mkConEntryLabel  con
+    entry_label	    = mkStdEntryLabel  name
 \end{code}
 
 The general case is:
@@ -314,10 +309,10 @@ buildDynCon binder cc con [arg_amode] all_zero_size_args@False
   = ASSERT(isDataCon con)
     returnFC (stableAmodeIdInfo binder (CIntLike arg_amode) (mkConLFInfo con))
   where
-    tycon = getDataConTyCon con
+    tycon = dataConTyCon con
     (temp_amode, temp_id_info) = newTempAmodeAndIdInfo binder (mkConLFInfo con)
 
-    in_range_int_lit (CLit (MachInt val _)) = (val <= mAX_INTLIKE) && (val >= mIN_INTLIKE)
+    in_range_int_lit (CLit (MachInt val _)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
     in_range_int_lit other_amode	    = False
 \end{code}
 
@@ -357,13 +352,11 @@ found a $con$.
 bindConArgs :: DataCon -> [Id] -> Code
 bindConArgs con args
   = ASSERT(isDataCon con)
-    getIntSwitchChkrC	`thenFC` \ isw_chkr ->
-
-    case (dataReturnConvAlg isw_chkr con) of
+    case (dataReturnConvAlg con) of
       ReturnInRegs rs  -> bindArgsToRegs args rs
       ReturnInHeap     ->
 	  let
-	      (_, args_w_offsets) = layOutDynCon con getIdPrimRep args
+	      (_, args_w_offsets) = layOutDynCon con idPrimRep args
 	  in
 	  mapCs bind_arg args_w_offsets
    where
@@ -385,13 +378,12 @@ cgReturnDataCon :: DataCon -> [CAddrMode] -> Bool -> StgLiveVars -> Code
 
 cgReturnDataCon con amodes all_zero_size_args live_vars
   = ASSERT(isDataCon con)
-    getIntSwitchChkrC	`thenFC` \ isw_chkr ->
     getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_spa args_spb sequel) ->
 
     case sequel of
 
       CaseAlts _ (Just (alts, Just (maybe_deflt_binder, (_,deflt_lbl))))
-	| not (getDataConTag con `is_elem` map fst alts)
+	| not (dataConTag con `is_elem` map fst alts)
 	->
 		-- Special case!  We're returning a constructor to the default case
 		-- of an enclosing case.  For example:
@@ -423,7 +415,7 @@ cgReturnDataCon con amodes all_zero_size_args live_vars
 		-- Ignore the sequel: we've already looked at it above
 
       other_sequel ->	-- The usual case
-	    case (dataReturnConvAlg isw_chkr con) of
+	    case (dataReturnConvAlg con) of
 
 	      ReturnInHeap	    ->
 			-- BUILD THE OBJECT IN THE HEAP

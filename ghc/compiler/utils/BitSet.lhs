@@ -18,7 +18,7 @@ Integer and get virtually unlimited sets.
 
 module BitSet (
 	BitSet,		-- abstract type
-	mkBS, listBS, emptyBS, singletonBS,
+	mkBS, listBS, emptyBS, unitBS,
 	unionBS, minusBS
 #if ! defined(COMPILING_GHC)
 	, elementBS, intersectBS, isEmptyBS
@@ -45,10 +45,10 @@ emptyBS :: BitSet
 emptyBS = MkBS (int2Word# 0#)
 
 mkBS :: [Int] -> BitSet
-mkBS xs = foldr (unionBS . singletonBS) emptyBS xs
+mkBS xs = foldr (unionBS . unitBS) emptyBS xs
 
-singletonBS :: Int -> BitSet
-singletonBS x = case x of
+unitBS :: Int -> BitSet
+unitBS x = case x of
     I# i# -> MkBS ((int2Word# 1#) `shiftL#` i#)
 
 unionBS :: BitSet -> BitSet -> BitSet
@@ -60,8 +60,8 @@ minusBS (MkBS x#) (MkBS y#) = MkBS (x# `and#` (not# y#))
 #if ! defined(COMPILING_GHC)
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
-isEmptyBS (MkBS s#) =
-    case word2Int# s# of
+isEmptyBS (MkBS s#)
+  = case word2Int# s# of
     	0# -> True
     	_  -> False
 
@@ -95,10 +95,10 @@ emptyBS :: BitSet
 emptyBS = MkBS 0
 
 mkBS :: [Int] -> BitSet
-mkBS xs = foldr (unionBS . singletonBS) emptyBS xs
+mkBS xs = foldr (unionBS . unitBS) emptyBS xs
 
-singletonBS :: Int -> BitSet
-singletonBS x = MkBS (1 `ashInt` x)
+unitBS :: Int -> BitSet
+unitBS x = MkBS (1 `ashInt` x)
 
 unionBS :: BitSet -> BitSet -> BitSet
 unionBS (MkBS x) (MkBS y) = MkBS (x `logiorInt` y)
@@ -106,8 +106,8 @@ unionBS (MkBS x) (MkBS y) = MkBS (x `logiorInt` y)
 #if ! defined(COMPILING_GHC)
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
-isEmptyBS (MkBS s) =
-    case s of
+isEmptyBS (MkBS s)
+  = case s of
     	0 -> True
     	_ -> False
 
@@ -115,8 +115,8 @@ intersectBS :: BitSet -> BitSet -> BitSet
 intersectBS (MkBS x) (MkBS y) = MkBS (x `logandInt` y)
 
 elementBS :: Int -> BitSet -> Bool
-elementBS x (MkBS s) =
-    case logbitpInt x s of
+elementBS x (MkBS s)
+  = case logbitpInt x s of
     	0 -> False
     	_ -> True
 #endif
@@ -144,10 +144,10 @@ emptyBS :: BitSet
 emptyBS = MkBS 0
 
 mkBS :: [Int] -> BitSet
-mkBS xs = foldr (unionBS . singletonBS) emptyBS xs
+mkBS xs = foldr (unionBS . unitBS) emptyBS xs
 
-singletonBS :: Int -> BitSet
-singletonBS x = MkBS (1 `bitLsh` x)
+unitBS :: Int -> BitSet
+unitBS x = MkBS (1 `bitLsh` x)
 
 unionBS :: BitSet -> BitSet -> BitSet
 unionBS (MkBS x) (MkBS y) = MkBS (x `bitOr` y)
@@ -155,8 +155,8 @@ unionBS (MkBS x) (MkBS y) = MkBS (x `bitOr` y)
 #if ! defined(COMPILING_GHC)
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
-isEmptyBS (MkBS s) =
-    case s of
+isEmptyBS (MkBS s)
+  = case s of
     	0 -> True
     	_ -> False
 
@@ -164,8 +164,8 @@ intersectBS :: BitSet -> BitSet -> BitSet
 intersectBS (MkBS x) (MkBS y) = MkBS (x `bitAnd` y)
 
 elementBS :: Int -> BitSet -> Bool
-elementBS x (MkBS s) =
-    case (1 `bitLsh` x) `bitAnd` s of
+elementBS x (MkBS s)
+  = case (1 `bitLsh` x) `bitAnd` s of
     	0 -> False
     	_ -> True
 #endif

@@ -1,24 +1,32 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1995
+% (c) The AQUA Project, Glasgow University, 1993-1996
 %
 
 \begin{code}
 #include "HsVersions.h"
 
-module StixInfo (
-	genCodeInfoTable
-    ) where
+module StixInfo ( genCodeInfoTable ) where
 
-import AbsCSyn
-import ClosureInfo
-import MachDesc
-import Maybes		( maybeToBool, Maybe(..) )
-import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
-import Stix
-import UniqSupply
-import Unpretty
-import Util
+import Ubiq{-uitious-}
 
+import AbsCSyn		( AbstractC(..), CAddrMode, ReturnInfo,
+			  RegRelative, MagicId, CStmtMacro
+			)
+import ClosureInfo	( closurePtrsSize, closureSizeWithoutFixedHdr,
+			  closureNonHdrSize, closureSemiTag, maybeSelectorInfo,
+			  closureSMRep, closureLabelFromCI,
+			  infoTableLabelFromCI
+			)
+import HeapOffs		( hpRelToInt )
+import Maybes		( maybeToBool )
+import PrimRep		( PrimRep(..) )
+import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..),
+			  isSpecRep
+			)
+import Stix		-- all of it
+import StixPrim		( amodeToStix )
+import UniqSupply	( returnUs, UniqSM(..) )
+import Unpretty		( uppBesides, uppPStr, uppInt, uppChar )
 \end{code}
 
 Generating code for info tables (arrays of data).
@@ -36,14 +44,11 @@ data___rtbl	= sStLitLbl SLIT("Data___rtbl")
 dyn___rtbl	= sStLitLbl SLIT("Dyn___rtbl")
 
 genCodeInfoTable
-    :: {-Target-}
-       (HeapOffset -> Int)	-- needed bit of Target
-    -> (CAddrMode -> StixTree)	-- ditto
-    -> AbstractC
+    :: AbstractC
     -> UniqSM StixTreeList
 
-genCodeInfoTable hp_rel amode2stix (CClosureInfoAndCode cl_info _ _ upd cl_descr _) =
-    returnUs (\xs -> info : lbl : xs)
+genCodeInfoTable (CClosureInfoAndCode cl_info _ _ upd cl_descr _)
+  = returnUs (\xs -> info : lbl : xs)
 
     where
 	info = StData PtrRep table
@@ -133,11 +138,10 @@ genCodeInfoTable hp_rel amode2stix (CClosureInfoAndCode cl_info _ _ upd cl_descr
 
 	size	= if isSpecRep sm_rep
 		  then closureNonHdrSize cl_info
-		  else hp_rel (closureSizeWithoutFixedHdr cl_info)
+		  else hpRelToInt (closureSizeWithoutFixedHdr cl_info)
 	ptrs	= closurePtrsSize cl_info
 
-	upd_code = amode2stix upd
+	upd_code = amodeToStix upd
 
 	info_unused = StInt (-1)
-
 \end{code}

@@ -1,5 +1,5 @@
 
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -43,35 +43,61 @@ module ClosureInfo (
 
 	closureKind, closureTypeDescr,		-- profiling
 
-	isConstantRep, isSpecRep, isPhantomRep, -- ToDo: Should be in SMRep, perhaps?
 	isStaticClosure, allocProfilingMsg,
 	blackHoleClosureInfo,
-	getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr,
-	ltSMRepHdr,
 	maybeSelectorInfo,
 
     	dataConLiveness				-- concurrency
-
-	-- and to make the interface self-sufficient...
     ) where
 
-import AbsCSyn
-import CgMonad
-import SMRep
-import StgSyn
+import Ubiq{-uitous-}
+import AbsCLoop		-- here for paranoia-checking
 
-import Type
-import CgCompInfo	-- some magic constants
-import CgRetConv
-import CLabel	-- Lots of label-making things
-import CmdLineOpts	( GlobalSwitch(..) )
-import Id
-import IdInfo		-- SIGH
-import Maybes		( maybeToBool, assocMaybe, Maybe(..) )
-import Outputable	-- needed for INCLUDE_FRC_METHOD
-import Pretty		-- ( ppStr, Pretty(..) )
-import PrimRep		( PrimRep, getPrimRepSize, separateByPtrFollowness )
-import Util
+import AbsCSyn
+import StgSyn
+import CgMonad
+
+import CgCompInfo	( mAX_SPEC_SELECTEE_SIZE,
+			  mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject,
+			  mAX_SPEC_ALL_PTRS, mAX_SPEC_MIXED_FIELDS,
+			  mAX_SPEC_ALL_NONPTRS,
+			  oTHER_TAG
+			)
+import CgRetConv	( assignRegs, dataReturnConvAlg,
+			  DataReturnConvention(..)
+			)
+import CLabel		( mkStdEntryLabel, mkFastEntryLabel,
+			  mkPhantomInfoTableLabel, mkInfoTableLabel,
+			  mkBlackHoleInfoTableLabel, mkVapInfoTableLabel,
+			  mkStaticInfoTableLabel, mkStaticConEntryLabel,
+			  mkConEntryLabel, mkClosureLabel, mkVapEntryLabel
+			)
+import CmdLineOpts	( opt_SccProfilingOn, opt_ForConcurrent )
+import HeapOffs		( intOff, addOff, totHdrSize, varHdrSize,
+			  intOffsetIntoGoods,
+			  VirtualHeapOffset(..)
+			)
+import Id		( idType, idPrimRep, getIdArity,
+			  externallyVisibleId, dataConSig,
+			  dataConTag, fIRST_TAG,
+			  isDataCon, dataConArity, dataConTyCon,
+			  isTupleCon, DataCon(..),
+			  GenId{-instance Eq-}
+			)
+import IdInfo		( arityMaybe )
+import Maybes		( assocMaybe, maybeToBool )
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instance Outputable-} )
+import PrimRep		( getPrimRepSize, separateByPtrFollowness )
+import SMRep		-- all of it
+import TyCon		( maybeTyConSingleCon, TyCon{-instance NamedThing-} )
+import Type		( isPrimType, splitForAllTy, splitFunTy, mkFunTys )
+import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
+
+maybeCharLikeTyCon = panic "ClosureInfo.maybeCharLikeTyCon (ToDo)"
+maybeIntLikeTyCon = panic "ClosureInfo.maybeIntLikeTyCon (ToDo)"
+getDataSpecTyCon_maybe = panic "ClosureInfo.getDataSpecTyCon_maybe (ToDo)"
+getTyDescription = panic "ClosureInfo.getTyDescription (ToDo)"
 \end{code}
 
 The ``wrapper'' data type for closure information:
@@ -392,13 +418,13 @@ mkClosureLFInfo False	    -- don't bother if at top-level
     -- ASSERT(is_single_constructor) 		-- Should be true, by causes error for SpecTyCon
     LFThunk False False True (SelectorThunk scrutinee con offset_into_int)
   where
-    (_, params_w_offsets) = layOutDynCon con getIdPrimRep params
+    (_, params_w_offsets) = layOutDynCon con idPrimRep params
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset
     offset_into_int_maybe = intOffsetIntoGoods the_offset
     Just offset_into_int  = offset_into_int_maybe
-    is_single_constructor = maybeToBool (maybeSingleConstructorTyCon tycon)
-    (_,_,_, tycon)	  = getDataConSig con
+    is_single_constructor = maybeToBool (maybeTyConSingleCon tycon)
+    (_,_,_, tycon)	  = dataConSig con
 \end{code}
 
 Same kind of thing, looking for vector-apply thunks, of the form:
@@ -452,7 +478,7 @@ mkConLFInfo :: DataCon -> LambdaFormInfo
 mkConLFInfo con
   = ASSERT(isDataCon con)
     let
-	arity = getDataConArity con
+	arity = dataConArity con
     in
     if isTupleCon con then
 	LFTuple con (arity == 0)
@@ -691,7 +717,7 @@ chooseDynSMRep lf_info tot_wds ptr_wds
 			     else if maybeToBool (maybeIntLikeTyCon tycon) then IntLikeRep
 			     else SpecRep
 			     where
-			     tycon = getDataConTyCon con
+			     tycon = dataConTyCon con
 
 	   _ 		  -> SpecRep
 	in
@@ -712,14 +738,15 @@ smaller offsets than the unboxed things, and furthermore, the offsets in
 the result list
 
 \begin{code}
-mkVirtHeapOffsets :: SMRep		-- Representation to be used by storage manager
+mkVirtHeapOffsets :: SMRep	-- Representation to be used by storage manager
 	  -> (a -> PrimRep)	-- To be able to grab kinds;
-					--  	w/ a kind, we can find boxedness
-	  -> [a]			-- Things to make offsets for
-	  -> (Int,			-- *Total* number of words allocated
-	      Int,			-- Number of words allocated for *pointers*
-	      [(a, VirtualHeapOffset)])	-- Things with their offsets from start of object
-					-- 	in order of increasing offset
+				--  	w/ a kind, we can find boxedness
+	  -> [a]		-- Things to make offsets for
+	  -> (Int,		-- *Total* number of words allocated
+	      Int,		-- Number of words allocated for *pointers*
+	      [(a, VirtualHeapOffset)])
+				-- Things with their offsets from start of object
+				-- 	in order of increasing offset
 
 -- First in list gets lowest offset, which is initial offset + 1.
 
@@ -748,8 +775,9 @@ Be sure to see the stg-details notes about these...
 \begin{code}
 nodeMustPointToIt :: LambdaFormInfo -> FCode Bool
 nodeMustPointToIt lf_info
-  = isSwitchSetC SccProfilingOn		`thenFC` \ do_profiling  ->
-
+  = let
+	do_profiling = opt_SccProfilingOn
+    in
     case lf_info of
 	LFReEntrant top arity no_fvs -> returnFC (
 	    not no_fvs ||   -- Certainly if it has fvs we need to point to it
@@ -843,8 +871,9 @@ getEntryConvention :: Id			-- Function being applied
 
 getEntryConvention id lf_info arg_kinds
  =  nodeMustPointToIt lf_info	`thenFC` \ node_points ->
-    isSwitchSetC ForConcurrent	`thenFC` \ is_concurrent ->
-    getIntSwitchChkrC		`thenFC` \ isw_chkr ->
+    let
+	is_concurrent = opt_ForConcurrent
+    in
     returnFC (
 
     if (node_points && is_concurrent) then ViaNode else
@@ -857,7 +886,7 @@ getEntryConvention id lf_info arg_kinds
 	    else
 		DirectEntry (mkFastEntryLabel id arity) arity arg_regs
 	  where
-	    (arg_regs, _) = assignRegs isw_chkr live_regs (take arity arg_kinds)
+	    (arg_regs, _) = assignRegs live_regs (take arity arg_kinds)
     	    live_regs = if node_points then [node] else []
 
 	LFCon con zero_arity
@@ -887,7 +916,7 @@ getEntryConvention id lf_info arg_kinds
 	  -> ASSERT(arity == length arg_kinds)
 	     DirectEntry (mkStdEntryLabel id) arity arg_regs
 	 where
-	    (arg_regs, _) = assignRegs isw_chkr live_regs arg_kinds
+	    (arg_regs, _) = assignRegs live_regs arg_kinds
     	    live_regs     = if node_points then [node] else []
     )
 
@@ -1067,21 +1096,6 @@ noUpdVapRequired binder_info
 %************************************************************************
 
 \begin{code}
-isConstantRep, isSpecRep, isStaticRep, isPhantomRep, isIntLikeRep :: SMRep -> Bool
-isConstantRep (SpecialisedRep ConstantRep _ _ _)   = True
-isConstantRep other				   = False
-
-isSpecRep (SpecialisedRep kind _ _ _)	= True	  -- All the kinds of Spec closures
-isSpecRep other				= False   -- True indicates that the _VHS is 0 !
-
-isStaticRep (StaticRep _ _) = True
-isStaticRep _		    = False
-
-isPhantomRep PhantomRep	= True
-isPhantomRep _		= False
-
-isIntLikeRep (SpecialisedRep IntLikeRep _ _ _)   = True
-isIntLikeRep other				 = False
 
 isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure  (MkClosureInfo _ _ rep) = isStaticRep  rep
@@ -1121,11 +1135,9 @@ closureType :: ClosureInfo -> Maybe (TyCon, [Type], [Id])
 -- rather than take it from the Id. The Id is probably just "f"!
 
 closureType (MkClosureInfo id (LFThunk _ _ _ (VapThunk fun_id args _)) _)
-  = getUniDataSpecTyCon_maybe (funResultTy de_foralld_ty (length args))
-  where
-    (_, de_foralld_ty) = splitForalls (idType fun_id)
+  = getDataSpecTyCon_maybe (fun_result_ty (length args) fun_id)
 
-closureType (MkClosureInfo id lf _) = getUniDataSpecTyCon_maybe (idType id)
+closureType (MkClosureInfo id lf _) = getDataSpecTyCon_maybe (idType id)
 \end{code}
 
 @closureReturnsUnboxedType@ is used to check whether a closure, {\em
@@ -1140,13 +1152,20 @@ overflow checks.
 closureReturnsUnboxedType :: ClosureInfo -> Bool
 
 closureReturnsUnboxedType (MkClosureInfo fun_id (LFReEntrant _ arity _) _)
-  = isPrimType (funResultTy de_foralld_ty arity)
-  where
-    (_, de_foralld_ty) = splitForalls (idType fun_id)
+  = isPrimType (fun_result_ty arity fun_id)
 
 closureReturnsUnboxedType other_closure = False
 	-- All non-function closures aren't functions,
 	-- and hence are boxed, since they are heap alloc'd
+
+-- ToDo: need anything like this in Type.lhs?
+fun_result_ty arity id
+  = let
+	(_, de_foralld_ty) = splitForAllTy (idType id)
+	(arg_tys, res_ty)  = splitFunTy{-w/ dicts as args?-} de_foralld_ty
+    in
+    ASSERT(arity >= 0 && length arg_tys >= arity)
+    mkFunTys (drop arity arg_tys) res_ty
 \end{code}
 
 \begin{code}
@@ -1154,7 +1173,7 @@ closureSemiTag :: ClosureInfo -> Int
 
 closureSemiTag (MkClosureInfo _ lf_info _)
   = case lf_info of
-      LFCon data_con _ -> getDataConTag data_con - fIRST_TAG
+      LFCon data_con _ -> dataConTag data_con - fIRST_TAG
       LFTuple _ _      -> 0
       _	    	       -> fromInteger oTHER_TAG
 \end{code}
@@ -1248,26 +1267,26 @@ allocProfilingMsg (MkClosureInfo _ lf_info _)
       LFImported		-> panic "ALLOC_IMP"
 \end{code}
 
-We need a black-hole closure info to pass to @allocDynClosure@
-when we want to allocate the black hole on entry to a CAF.
+We need a black-hole closure info to pass to @allocDynClosure@ when we
+want to allocate the black hole on entry to a CAF.
 
 \begin{code}
-blackHoleClosureInfo (MkClosureInfo id _ _) = MkClosureInfo id LFBlackHole BlackHoleRep
+blackHoleClosureInfo (MkClosureInfo id _ _)
+  = MkClosureInfo id LFBlackHole BlackHoleRep
 \end{code}
 
-The register liveness when returning from a constructor.  For simplicity,
-we claim just [node] is live for all but PhantomRep's.  In truth, this means
-that non-constructor info tables also claim node, but since their liveness
-information is never used, we don't care.
+The register liveness when returning from a constructor.  For
+simplicity, we claim just [node] is live for all but PhantomRep's.  In
+truth, this means that non-constructor info tables also claim node,
+but since their liveness information is never used, we don't care.
 
 \begin{code}
-
-dataConLiveness isw_chkr (MkClosureInfo con _ PhantomRep)
-  = case (dataReturnConvAlg isw_chkr con) of
-      ReturnInRegs regs -> mkLiveRegsBitMask regs
+dataConLiveness (MkClosureInfo con _ PhantomRep)
+  = case (dataReturnConvAlg con) of
+      ReturnInRegs regs -> mkLiveRegsMask regs
       ReturnInHeap -> panic "dataConLiveness:PhantomRep in heap???"
 
-dataConLiveness _ _ = mkLiveRegsBitMask [node]
+dataConLiveness _ = mkLiveRegsMask [node]
 \end{code}
 
 %************************************************************************
@@ -1303,8 +1322,7 @@ closureKind (MkClosureInfo _ lf _)
 closureTypeDescr :: ClosureInfo -> String
 closureTypeDescr (MkClosureInfo id lf _)
   = if (isDataCon id) then			-- DataCon has function types
-	_UNPK_ (getOccurrenceName (getDataConTyCon id))	-- We want the TyCon not the ->
+	_UNPK_ (getOccurrenceName (dataConTyCon id))	-- We want the TyCon not the ->
     else
-	getUniTyDescription (idType id)
+	getTyDescription (idType id)
 \end{code}
-

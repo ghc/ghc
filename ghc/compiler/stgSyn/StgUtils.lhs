@@ -1,5 +1,5 @@
 x%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[StgUtils]{Utility functions for @STG@ programs}
 
@@ -8,11 +8,11 @@ x%
 
 module StgUtils ( mapStgBindeesRhs ) where
 
+import Ubiq{-uitous-}
+
+import Id		( GenId{-instanced NamedThing-} )
 import StgSyn
-
 import UniqSet
-
-import Util
 \end{code}
 
 This utility function simply applies the given function to every
@@ -36,21 +36,21 @@ mapStgBindeesRhs fn (StgRhsClosure cc bi fvs u args expr)
 	(mapStgBindeesExpr fn expr)
 
 mapStgBindeesRhs fn (StgRhsCon cc con atoms)
-  = StgRhsCon cc con (map (mapStgBindeesAtom fn) atoms)
+  = StgRhsCon cc con (map (mapStgBindeesArg fn) atoms)
 
 ------------------
 mapStgBindeesExpr :: (Id -> Id) -> StgExpr -> StgExpr
 
 mapStgBindeesExpr fn (StgApp f args lvs)
-  = StgApp (mapStgBindeesAtom fn f)
-	   (map (mapStgBindeesAtom fn) args)
+  = StgApp (mapStgBindeesArg fn f)
+	   (map (mapStgBindeesArg fn) args)
 	   (mapUniqSet fn lvs)
 
 mapStgBindeesExpr fn (StgCon con atoms lvs)
-  = StgCon con (map (mapStgBindeesAtom fn) atoms) (mapUniqSet fn lvs)
+  = StgCon con (map (mapStgBindeesArg fn) atoms) (mapUniqSet fn lvs)
 
 mapStgBindeesExpr fn (StgPrim op atoms lvs)
-  = StgPrim op (map (mapStgBindeesAtom fn) atoms) (mapUniqSet fn lvs)
+  = StgPrim op (map (mapStgBindeesArg fn) atoms) (mapUniqSet fn lvs)
 
 mapStgBindeesExpr fn (StgLet bind expr)
   = StgLet (mapStgBindeesBind fn bind) (mapStgBindeesExpr fn expr)
@@ -83,8 +83,8 @@ mapStgBindeesExpr fn (StgCase expr lvs1 lvs2 uniq alts)
     mapStgBindeesDeflt (StgBindDefault b used expr) = StgBindDefault b used (mapStgBindeesExpr fn expr)
 
 ------------------
-mapStgBindeesAtom :: (Id -> Id) -> StgArg -> StgArg
+mapStgBindeesArg :: (Id -> Id) -> StgArg -> StgArg
 
-mapStgBindeesAtom fn a@(StgLitArg _)	= a
-mapStgBindeesAtom fn a@(StgVarArg id)  = StgVarArg (fn id)
+mapStgBindeesArg fn a@(StgLitArg _)	= a
+mapStgBindeesArg fn a@(StgVarArg id)  = StgVarArg (fn id)
 \end{code}

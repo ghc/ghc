@@ -665,7 +665,7 @@ tcDataPragmas rec_tce tve rec_tycon new_tyvars (DataPragmas con_decls specs)
 				      (length new_tyvars) maybe_tys locn)
 				`thenB_Tc_`
 
-	checkB_Tc (not (all isUnboxedDataType (catMaybes maybe_tys)))
+	checkB_Tc (not (all isUnboxedType (catMaybes maybe_tys)))
 		(badSpecialisationErr "data" "not all unboxed types"
 				      (length new_tyvars) maybe_tys locn)
 				`thenB_Tc_`

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1994-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1994-1996
 %     Hans Wolfgang Loidl
 %
 % ---------------------------------------------------------------------------
@@ -57,12 +57,9 @@ module Costs( costs,
 	      addrModeCosts, CostRes(Cost), nullCosts, Side(..)
     ) where
 
-import AbsCUtils
+import Ubiq{-uitous-}
+
 import AbsCSyn
-import PrelInfo
-import PrimOp
-import TyCon
-import Util
 
 -- --------------------------------------------------------------------------
 #ifndef GRAN

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[SCCfinal]{Modify and collect code generation for final STG program}
 
@@ -27,35 +27,35 @@ This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
 
 module SCCfinal ( stgMassageForProfiling ) where
 
-import Pretty		-- ToDo: rm (debugging only)
+import Ubiq{-uitous-}
 
-import Type		( isFunType, getTauType )
-import CmdLineOpts
-import CostCentre
-import Id		( mkSysLocal, idType )
-import SrcLoc		( mkUnknownSrcLoc )
 import StgSyn
-import UniqSupply
-import UniqSet		( emptyUniqSet
-			  IF_ATTACK_PRAGMAS(COMMA emptyUFM)
+
+import CmdLineOpts	( opt_AutoSccsOnIndividualCafs,
+			  opt_CompilingPrelude
 			)
-import Util
+import CostCentre	-- lots of things
+import Id		( idType, mkSysLocal, emptyIdSet )
+import Maybes		( maybeToBool )
+import SrcLoc		( mkUnknownSrcLoc )
+import Type		( splitSigmaTy, getFunTy_maybe )
+import UniqSupply	( getUnique, splitUniqSupply )
+import Util		( removeDups, assertPanic )
 
 infixr 9 `thenMM`, `thenMM_`
 \end{code}
 
 \begin{code}
-type CollectedCCs = ([CostCentre],  	    -- locally defined ones
-		     [CostCentre])	    -- ones needing "extern" decls
+type CollectedCCs = ([CostCentre],	-- locally defined ones
+		     [CostCentre])	-- ones needing "extern" decls
 
 stgMassageForProfiling
-	:: FAST_STRING -> FAST_STRING	    -- module name, group name
-	-> UniqSupply		    -- unique supply
-	-> (GlobalSwitch -> Bool)	    -- command-line opts checker
-	-> [StgBinding]		    -- input
+	:: FAST_STRING -> FAST_STRING	-- module name, group name
+	-> UniqSupply		    	-- unique supply
+	-> [StgBinding]		    	-- input
 	-> (CollectedCCs, [StgBinding])
 
-stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
+stgMassageForProfiling mod_name grp_name us stg_binds
   = let
 	((local_ccs, extern_ccs),
 	 stg_binds2)
@@ -71,8 +71,8 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
     in
     ((fixed_ccs ++ local_ccs_no_dups, extern_ccs_no_dups), stg_binds2)
   where
-    do_auto_sccs_on_cafs  = sw_chkr AutoSccsOnIndividualCafs  -- only use!
-    doing_prelude	  = sw_chkr CompilingPrelude
+    do_auto_sccs_on_cafs  = opt_AutoSccsOnIndividualCafs  -- only use!
+    doing_prelude	  = opt_CompilingPrelude
 
     all_cafs_cc = if doing_prelude
 		  then preludeCafsCostCentre
@@ -298,7 +298,9 @@ boxHigherOrderArgs almost_expr args live_vars
 	    in
 	    returnMM ( (new_var, old_var) : bindings, StgVarArg new_var )
       where
-	is_fun_type ty = isFunType (getTauType ty)
+	is_fun_type ty
+	  = case (splitSigmaTy ty) of { (_, _, tau_ty) ->
+	    maybeToBool (getFunTy_maybe tau_ty) }
 
     ---------------
     mk_stg_let :: CostCentre -> (Id, Id) -> StgExpr -> StgExpr
@@ -313,7 +315,7 @@ boxHigherOrderArgs almost_expr args live_vars
 	in
 	StgLet (StgNonRec new_var rhs) body
       where
-	bOGUS_LVs = emptyUniqSet -- easier to print than: panic "mk_stg_let: LVs"
+	bOGUS_LVs = emptyIdSet -- easier to print than: panic "mk_stg_let: LVs"
 \end{code}
 
 %************************************************************************

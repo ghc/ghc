@@ -30,7 +30,7 @@ import RnMonad4
 import Name		( Name(..) )
 import NameTypes	( FullName{-instances-} )
 import Outputable	( isConop )
-import UniqSet		( emptyUniqSet, singletonUniqSet,
+import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
 			  UniqSet(..)
 			)
@@ -193,11 +193,11 @@ rnExpr (HsVar v)
   = lookupValue v	`thenRn4` \ vname ->
     returnRn4 (HsVar vname, fv_set vname)
   where
-    fv_set n@(Short uniq sname)	    = singletonUniqSet n
+    fv_set n@(Short uniq sname)	    = unitUniqSet n
     fv_set n@(ValName uniq fname)
 	  | isLocallyDefined fname
 	  && not (isConop (getOccurrenceName fname))
-				    = singletonUniqSet n
+				    = unitUniqSet n
     fv_set other  		    = emptyUniqSet
 
 rnExpr (HsLit lit)  = returnRn4 (HsLit lit, emptyUniqSet)

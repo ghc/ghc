@@ -26,7 +26,7 @@ import Id		( idType, mkSysLocal,
 			  GenId{-instances-}
 			)
 import PrelInfo		( liftDataCon, mkLiftTy, statePrimTyCon )
-import TyCon		( TyCon{-instance-} )
+import TyCon		( isBoxedTyCon, TyCon{-instance-} )
 import Type		( maybeAppDataTyCon, eqTy )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
 import Util		( zipEqual, zipWithEqual, assertPanic, panic )
@@ -34,7 +34,6 @@ import Util		( zipEqual, zipWithEqual, assertPanic, panic )
 infixr 9 `thenL`
 
 updateIdType = panic "CoreLift.updateIdType"
-isBoxedTyCon = panic "CoreLift.isBoxedTyCon"
 \end{code}
 
 %************************************************************************

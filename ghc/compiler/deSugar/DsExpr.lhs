@@ -32,17 +32,15 @@ import Id		( mkTupleCon, idType, nullIdEnv, addOneToIdEnv,
 import Literal		( mkMachInt, Literal(..) )
 import MagicUFs		( MagicUnfoldingFun )
 import PprStyle		( PprStyle(..) )
-import PprType		( GenType, GenTyVar )
+import PprType		( GenType )
 import PrelInfo		( mkTupleTy, unitTy, nilDataCon, consDataCon,
 			  charDataCon, charTy )
-import Pretty		( ppShow )
-import Type		( splitSigmaTy )
-import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar )
-import Unique		( Unique )
+import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
+import Type		( splitSigmaTy, typePrimRep )
+import TyVar		( nullTyVarEnv, addOneToTyVarEnv )
 import Usage		( UVar(..) )
-import Util		( panic )
+import Util		( pprError, panic )
 
-primRepFromType = panic "DsExpr.primRepFromType"
 maybeBoxedPrimType = panic "DsExpr.maybeBoxedPrimType"
 splitTyArgs = panic "DsExpr.splitTyArgs"
 
@@ -103,8 +101,8 @@ dsExpr (HsLitOut (HsString s) _)
 -- "str" ==> build (\ c n -> foldr charTy T c n "str")
 
 {- LATER:
-dsExpr (HsLitOut (HsString str) _) =
-    newTyVarsDs [alphaTyVar]		`thenDs` \ [new_tyvar] ->
+dsExpr (HsLitOut (HsString str) _)
+  = newTyVarsDs [alphaTyVar]		`thenDs` \ [new_tyvar] ->
     let
  	new_ty = mkTyVarTy new_tyvar
     in
@@ -132,10 +130,11 @@ dsExpr (HsLitOut (HsLitLit s) ty)
   where
     (data_con, kind)
       = case (maybeBoxedPrimType ty) of
-	  Nothing
-	    -> error ("ERROR: ``literal-literal'' not a single-constructor type: "++ _UNPK_ s ++"; type: "++(ppShow 80 (ppr PprDebug ty)))
 	  Just (boxing_data_con, prim_ty)
-	    -> (boxing_data_con, primRepFromType prim_ty)
+	    -> (boxing_data_con, typePrimRep prim_ty)
+	  Nothing
+	    -> pprError "ERROR: ``literal-literal'' not a single-constructor type: "
+			(ppBesides [ppPStr s, ppStr "; type: ", ppr PprDebug ty])
 
 dsExpr (HsLitOut (HsInt i) _)
   = returnDs (Lit (NoRepInteger i))
@@ -317,6 +316,9 @@ dsExpr (ArithSeqOut expr (FromThenTo from thn two))
     mkAppDs expr2 [] [from2, thn2, two2]
 \end{code}
 
+
+Type lambda and application
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 dsExpr (TyLam tyvars expr)
   = dsExpr expr `thenDs` \ core_expr ->
@@ -325,6 +327,31 @@ dsExpr (TyLam tyvars expr)
 dsExpr expr@(TyApp e tys) = dsApp expr []
 \end{code}
 
+
+Record construction and update
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+{-
+dsExpr (RecordCon con_expr rbinds)
+  = dsExpr con_expr	`thenDs` \ con_expr' ->
+    let
+	con_args = map mk_arg (arg_tys `zip` fieldLabelTags)
+	(arg_tys, data_ty) = splitFunTy (coreExprType con_expr')
+
+	mk_arg (arg_ty, tag) = case [  | (sel_id,rhs) <- rbinds,
+					 fieldLabelTag (recordSelectorFieldLabel sel_id) == tag
+				    ] of
+				 (rhs:rhss) -> ASSERT( null rhss )
+					       dsExpr rhs
+
+				 [] -> returnDs ......GONE HOME!>>>>>
+
+    mkAppDs con_expr [] con_args
+-}
+\end{code}
+
+Dictionary lambda and application
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @DictLam@ and @DictApp@ turn into the regular old things.
 (OLD:) @DictFunApp@ also becomes a curried application, albeit slightly more
 complicated; reminiscent of fully-applied constructors.

@@ -8,29 +8,36 @@
 
 module AnalFBWW ( analFBWW ) where
 
-import Util
-import Id               	( addIdFBTypeInfo )
-import IdInfo
-import PrelInfo          ( foldrId, buildId,
-			  nilDataCon, consDataCon, mkListTy, mkFunTy,
-			  unpackCStringAppendId
-			)
-import BinderInfo
-import SimplEnv		-- everything
-import OccurAnal	-- OLD: was NewOccurAnal
-import Maybes
+import Ubiq{-uitous-}
 
+import CoreSyn		( CoreBinding(..) )
+import Util		( panic{-ToDo:rm-} )
+
+--import Util
+--import Id               	( addIdFBTypeInfo )
+--import IdInfo
+--import PrelInfo          ( foldrId, buildId,
+--			  nilDataCon, consDataCon, mkListTy, mkFunTy,
+--			  unpackCStringAppendId
+--			)
+--import BinderInfo
+--import SimplEnv		-- everything
+--import OccurAnal	-- OLD: was NewOccurAnal
+--import Maybes
 \end{code}
 
 \begin{code}
 analFBWW
-	:: (GlobalSwitch -> Bool)
+	:: [CoreBinding]
 	-> [CoreBinding]
-	-> [CoreBinding]
-analFBWW switch top_binds = trace "ANALFBWW" (snd anno)
+
+analFBWW = panic "analFBWW (ToDo)"
+
+{- LATER:
+analFBWW top_binds = trace "ANALFBWW" (snd anno)
  where
 	anals :: [InBinding]
-	anals = newOccurAnalyseBinds top_binds switch (const False)
+	anals = newOccurAnalyseBinds top_binds (const False)
 	anno = mapAccumL annotateBindingFBWW nullIdEnv anals
 \end{code}
 
@@ -136,14 +143,14 @@ analExprFBWW (SCC lab e) env   = analExprFBWW e env
 analExprFBWW (Let binds e) env = analExprFBWW e (analBind binds env)
 analExprFBWW (Case e alts) env = foldl1 joinFBType (analAltsFBWW alts env)
 
-analAltsFBWW (AlgAlts alts deflt) env =
-    case analDefFBWW deflt env of
+analAltsFBWW (AlgAlts alts deflt) env
+  = case analDefFBWW deflt env of
 	Just ty -> ty : tys
 	Nothing -> tys
    where
      tys = map (\(con,binders,e) -> analExprFBWW e (delManyFromIdEnv env (map fst binders))) alts
-analAltsFBWW (PrimAlts alts deflt) env =
-    case analDefFBWW deflt env of
+analAltsFBWW (PrimAlts alts deflt) env
+  = case analDefFBWW deflt env of
 	Just ty -> ty : tys
 	Nothing -> tys
    where
@@ -162,8 +169,8 @@ Only add a type info if:
 
 \begin{code}
 analBindExpr :: BinderInfo -> InExpr -> IdEnv OurFBType -> OurFBType
-analBindExpr bnd expr env =
-       case analExprFBWW expr env of
+analBindExpr bnd expr env
+  =    case analExprFBWW expr env of
 	      IsFB ty@(FBType [] _) ->
 		   if oneSafeOcc False bnd
 		   then IsFB ty
@@ -246,4 +253,5 @@ annotateBindingFBWW env bnds = (env',bnds')
 		    | not (null xs) -> pprTrace "ADDED to:" (ppr PprDebug v)
 					(addIdFBTypeInfo v (mkFBTypeInfo ty))
 		   _ -> v)
+-}
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %********************************************************
 %*							*
@@ -10,48 +10,66 @@
 \begin{code}
 #include "HsVersions.h"
 
-module CgCase (
-	cgCase,
-    	saveVolatileVarsAndRegs
+module CgCase (	cgCase, saveVolatileVarsAndRegs ) where
 
-	-- and to make the interface self-sufficient...
-    ) where
+import Ubiq{-uitous-}
+import CgLoop2		( cgExpr, getPrimOpArgAmodes )
 
-import StgSyn
 import CgMonad
+import StgSyn
 import AbsCSyn
 
-import PrelInfo		( PrimOp(..), primOpCanTriggerGC
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
+import AbsCUtils	( mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
+			  magicIdPrimRep, getAmodeRep
 			)
-import Type		( primRepFromType, getTyConDataCons,
-			  getUniDataSpecTyCon, getUniDataSpecTyCon_maybe,
-			  isEnumerationTyCon,
-			  Type
+import CgBindery	( getVolatileRegs, getArgAmode, getArgAmodes,
+			  bindNewToReg, bindNewToTemp,
+			  bindNewPrimToAmode,
+			  rebindToAStack, rebindToBStack,
+			  getCAddrModeAndInfo, getCAddrModeIfVolatile,
+			  idInfoToAmode
 			)
-import CgBindery	-- all of it
 import CgCon		( buildDynCon, bindConArgs )
-import CgExpr		( cgExpr, getPrimOpArgAmodes )
 import CgHeapery	( heapCheck )
-import CgRetConv	-- lots of stuff
-import CgStackery	-- plenty
-import CgTailCall	( tailCallBusiness, performReturn )
-import CgUsages		-- and even more
-import CLabel	-- bunches of things...
-import ClosureInfo	{-( blackHoleClosureInfo, mkConLFInfo, mkLFArgument,
-			  layOutDynCon
-			)-}
-import CostCentre	( useCurrentCostCentre, CostCentre )
-import Literal		( literalPrimRep )
-import Id		( getDataConTag, getIdPrimRep, fIRST_TAG, isDataCon,
-			  toplevelishId, getInstantiatedDataConSig,
-			  ConTag(..), DataCon(..)
+import CgRetConv	( dataReturnConvAlg, dataReturnConvPrim,
+			  ctrlReturnConvAlg,
+			  DataReturnConvention(..), CtrlReturnConvention(..),
+			  assignPrimOpResultRegs,
+			  makePrimOpArgsRobust
 			)
-import Maybes		( catMaybes, Maybe(..) )
-import PrimRep		( getPrimRepSize, isFollowableRep, retPrimRepSize, PrimRep(..) )
-import UniqSet		-- ( uniqSetToList, UniqSet(..) )
-import Util
+import CgStackery	( allocAStack, allocBStack )
+import CgTailCall	( tailCallBusiness, performReturn )
+import CgUsages		( getSpARelOffset, getSpBRelOffset, freeBStkSlot )
+import CLabel		( mkVecTblLabel, mkReturnPtLabel, mkDefaultLabel,
+			  mkAltLabel, mkClosureLabel
+			)
+import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynCon )
+import CmdLineOpts	( opt_SccProfilingOn )
+import CostCentre	( useCurrentCostCentre )
+import HeapOffs		( VirtualSpBOffset(..), VirtualHeapOffset(..) )
+import Id		( idPrimRep, toplevelishId,
+			  dataConTag, fIRST_TAG, ConTag(..),
+			  isDataCon, DataCon(..),
+			  idSetToList, GenId{-instance NamedThing,Eq-}
+			)
+import Maybes		( catMaybes )
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instance Outputable-} )
+import PrimOp		( primOpCanTriggerGC, PrimOp(..) )
+import PrimRep		( getPrimRepSize, isFollowableRep, retPrimRepSize,
+			  PrimRep(..)
+			)
+import TyCon		( isEnumerationTyCon )
+import Type		( typePrimRep,
+			  getDataSpecTyCon, getDataSpecTyCon_maybe,
+			  isEnumerationTyCon
+			)
+import Util		( sortLt, isIn, isn'tIn, zipEqual,
+			  pprError, panic, assertPanic
+			)
+
+getDataSpecTyCon = panic "CgCase.getDataSpecTyCon (ToDo)"
+getDataSpecTyCon_maybe = panic "CgCase.getDataSpecTyCon_maybe (ToDo)"
 \end{code}
 
 \begin{code}
@@ -193,18 +211,17 @@ cgCase (StgPrim op args _) live_in_whole_case live_in_alts uniq alts
 
   | otherwise	-- *Can* trigger GC
   = getPrimOpArgAmodes op args	`thenFC` \ arg_amodes ->
---NO:  getIntSwitchChkrC	`thenFC` \ isw_chkr   ->
 
    	-- Get amodes for the arguments and results, and assign to regs
 	-- (Can-trigger-gc primops guarantee to have their (nonRobust)
 	--  args in regs)
     let
-	op_result_regs = assignPrimOpResultRegs {-NO:isw_chkr-} op
+	op_result_regs = assignPrimOpResultRegs op
 
     	op_result_amodes = map CReg op_result_regs
 
 	(op_arg_amodes, liveness_mask, arg_assts)
-	  = makePrimOpArgsRobust {-NO:isw_chkr-} op arg_amodes
+	  = makePrimOpArgsRobust op arg_amodes
 
 	liveness_arg  = mkIntCLit liveness_mask
     in
@@ -275,7 +292,7 @@ eliminate a heap check altogether.
 
 \begin{code}
 cgCase (StgApp v [] _) live_in_whole_case live_in_alts uniq (StgPrimAlts ty alts deflt)
-  = getAtomAmode v		`thenFC` \ amode ->
+  = getArgAmode v		`thenFC` \ amode ->
     cgPrimAltsGivenScrutinee NoGC amode alts deflt
 \end{code}
 
@@ -288,7 +305,7 @@ cgCase (StgApp (StgVarArg fun) args _ {-lvs must be same as live_in_alts-})
 	live_in_whole_case live_in_alts uniq alts@(StgAlgAlts _ _ _)
   =
     getCAddrModeAndInfo fun		`thenFC` \ (fun_amode, lf_info) ->
-    getAtomAmodes args			`thenFC` \ arg_amodes ->
+    getArgAmodes args			`thenFC` \ arg_amodes ->
 
 	-- Squish the environment
     nukeDeadBindings live_in_alts	`thenC`
@@ -368,7 +385,7 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts (StgBindDefault _ True {- used -
     -- A temporary variable to hold the tag; this is unaffected by GC because
     -- the heap-checks in the branches occur after the switch
     tag_amode     = CTemp uniq IntRep
-    (spec_tycon, _, _) = getUniDataSpecTyCon ty
+    (spec_tycon, _, _) = getDataSpecTyCon ty
 
 getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
 	-- Default is either StgNoDefault or StgBindDefault with unused binder
@@ -383,14 +400,14 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
     -- Sort alternatives into canonical order; there must be a complete
     -- set because there's no default case.
     sorted_alts = sortLt lt alts
-    (con1,_,_,_) `lt` (con2,_,_,_) = getDataConTag con1 < getDataConTag con2
+    (con1,_,_,_) `lt` (con2,_,_,_) = dataConTag con1 < dataConTag con2
 
     arg_amodes :: [CAddrMode]
 
     -- Turn them into amodes
     arg_amodes = concat (map mk_amodes sorted_alts)
     mk_amodes (con, args, use_mask, rhs)
-      = [ CTemp (getItsUnique arg) (getIdPrimRep arg) | arg <- args ]
+      = [ CTemp (getItsUnique arg) (idPrimRep arg) | arg <- args ]
 \end{code}
 
 The situation is simpler for primitive
@@ -398,9 +415,7 @@ results, because there is only one!
 
 \begin{code}
 getPrimAppResultAmodes uniq (StgPrimAlts ty _ _)
-  = [CTemp uniq kind]
-  where
-    kind = primRepFromType ty
+  = [CTemp uniq (typePrimRep ty)]
 \end{code}
 
 
@@ -425,7 +440,6 @@ cgEvalAlts :: Maybe VirtualSpBOffset	-- Offset of cost-centre to be restored, if
 cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
   = 	-- Generate the instruction to restore cost centre, if any
     restoreCurrentCostCentre cc_slot 	`thenFC` \ cc_restore ->
-    getIntSwitchChkrC			`thenFC` \ isw_chkr ->
 
 	-- Generate sequel info for use downstream
 	-- At the moment, we only do it if the type is vector-returnable.
@@ -437,7 +451,7 @@ cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
 	-- which is worse than having the alt code in the switch statement
 
     let
-	(spec_tycon, _, _) = getUniDataSpecTyCon ty
+	(spec_tycon, _, _) = getDataSpecTyCon ty
 
 	use_labelled_alts
 	  = case ctrlReturnConvAlg spec_tycon of
@@ -448,7 +462,7 @@ cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
     	  = if not use_labelled_alts then
 		Nothing -- no semi-tagging info
 	    else
-		cgSemiTaggedAlts isw_chkr uniq alts deflt -- Just <something>
+		cgSemiTaggedAlts uniq alts deflt -- Just <something>
     in
     cgAlgAlts GCMayHappen uniq cc_restore use_labelled_alts ty alts deflt
 					`thenFC` \ (tagged_alt_absCs, deflt_absC) ->
@@ -560,10 +574,9 @@ It's all pretty turgid anyway.
 \begin{code}
 cgAlgAlts gc_flag uniq restore_cc semi_tagging
 	ty alts deflt@(StgBindDefault binder True{-used-} _)
-  = getIntSwitchChkrC	`thenFC` \ isw_chkr ->
-    let
+  = let
 	extra_branches :: [FCode (ConTag, AbstractC)]
-	extra_branches = catMaybes (map (mk_extra_branch isw_chkr) default_cons)
+	extra_branches = catMaybes (map mk_extra_branch default_cons)
 
 	must_label_default = semi_tagging || not (null extra_branches)
     in
@@ -575,14 +588,7 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
     default_join_lbl = mkDefaultLabel uniq
     jump_instruction = CJump (CLbl default_join_lbl CodePtrRep)
 
-    (spec_tycon, _, spec_cons)
-      = -- trace ("cgCase:tycon:"++(ppShow 80 (ppAboves [
-	--	ppr PprDebug uniq,
-	--	ppr PprDebug ty,
-	--	ppr PprShowAll binder
-	--	]))) (
-	getUniDataSpecTyCon ty
-	-- )
+    (spec_tycon, _, spec_cons) = getDataSpecTyCon ty
 
     alt_cons = [ con | (con,_,_,_) <- alts ]
 
@@ -596,18 +602,18 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
     -- nothing to do. Otherwise, we have a special case for a nullary constructor,
     -- but in the general case we do an allocation and heap-check.
 
-    mk_extra_branch :: IntSwitchChecker -> DataCon -> (Maybe (FCode (ConTag, AbstractC)))
+    mk_extra_branch :: DataCon -> (Maybe (FCode (ConTag, AbstractC)))
 
-    mk_extra_branch isw_chkr con
+    mk_extra_branch con
       = ASSERT(isDataCon con)
-	case dataReturnConvAlg isw_chkr con of
+	case dataReturnConvAlg con of
 	  ReturnInHeap	  -> Nothing
 	  ReturnInRegs rs -> Just (getAbsC (alloc_code rs) `thenFC` \ abs_c ->
 				   returnFC (tag, abs_c)
 				  )
       where
 	lf_info		= mkConLFInfo con
-	tag		= getDataConTag con
+	tag		= dataConTag con
     	closure_lbl 	= mkClosureLabel con
 
 	-- alloc_code generates code to allocate constructor con, whose args are
@@ -625,7 +631,7 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
 		absC jump_instruction
 	    )
 	  where
-	    zero_size reg = getPrimRepSize (kindFromMagicId reg) == 0
+	    zero_size reg = getPrimRepSize (magicIdPrimRep reg) == 0
 \end{code}
 
 Now comes the general case
@@ -698,16 +704,15 @@ cgAlgAlt gc_flag uniq restore_cc must_label_branch (con, args, use_mask, rhs)
     in
     returnFC (tag, final_abs_c)
   where
-    tag	= getDataConTag con
+    tag	= dataConTag con
     lbl = mkAltLabel uniq tag
 
 cgAlgAltRhs :: GCFlag -> Id -> [Id] -> [Bool] -> StgExpr -> Code
 
 cgAlgAltRhs gc_flag con args use_mask rhs
-  = getIntSwitchChkrC	`thenFC` \ isw_chkr ->
-    let
+  = let
       (live_regs, node_reqd)
-	= case (dataReturnConvAlg isw_chkr con) of
+	= case (dataReturnConvAlg con) of
 	    ReturnInHeap      -> ([],						  True)
 	    ReturnInRegs regs -> ([reg | (reg,True) <- regs `zipEqual` use_mask], False)
 				-- Pick the live registers using the use_mask
@@ -735,14 +740,13 @@ Turgid-but-non-monadic code to conjure up the required info from
 algebraic case alternatives for semi-tagging.
 
 \begin{code}
-cgSemiTaggedAlts :: IntSwitchChecker
-		 -> Unique
+cgSemiTaggedAlts :: Unique
 		 -> [(Id, [Id], [Bool], StgExpr)]
 		 -> GenStgCaseDefault Id Id
 		 -> SemiTaggingStuff
 
-cgSemiTaggedAlts isw_chkr uniq alts deflt
-  = Just (map (st_alt isw_chkr) alts, st_deflt deflt)
+cgSemiTaggedAlts uniq alts deflt
+  = Just (map st_alt alts, st_deflt deflt)
   where
     st_deflt StgNoDefault = Nothing
 
@@ -752,8 +756,8 @@ cgSemiTaggedAlts isw_chkr uniq alts deflt
 	       mkDefaultLabel uniq)
 	     )
 
-    st_alt isw_chkr (con, args, use_mask, _)
-      = case (dataReturnConvAlg isw_chkr con) of
+    st_alt (con, args, use_mask, _)
+      = case (dataReturnConvAlg con) of
 
 	  ReturnInHeap ->
 	    -- Ha!  Nothing to do; Node already points to the thing
@@ -767,7 +771,7 @@ cgSemiTaggedAlts isw_chkr uniq alts deflt
 	    -- We have to load the live registers from the constructor
 	    -- pointed to by Node.
 	    let
-		(_, regs_w_offsets) = layOutDynCon con kindFromMagicId regs
+		(_, regs_w_offsets) = layOutDynCon con magicIdPrimRep regs
 
 		used_regs = selectByMask use_mask regs
 
@@ -784,12 +788,12 @@ cgSemiTaggedAlts isw_chkr uniq alts deflt
 		CSimultaneous (mkAbstractCs (map move_to_reg used_regs_w_offsets))],
 	      join_label))
       where
-	con_tag	    = getDataConTag con
+	con_tag	    = dataConTag con
 	join_label  = mkAltLabel uniq con_tag
 
     move_to_reg :: (MagicId, VirtualHeapOffset {-from Node-}) -> AbstractC
     move_to_reg (reg, offset)
-      = CAssign (CReg reg) (CVal (NodeRel offset) (kindFromMagicId reg))
+      = CAssign (CReg reg) (CVal (NodeRel offset) (magicIdPrimRep reg))
 \end{code}
 
 %************************************************************************
@@ -821,7 +825,7 @@ cgPrimAlts gc_flag uniq ty alts deflt
 		     NoGC	 -> CTemp uniq kind
 		     GCMayHappen -> CReg (dataReturnConvPrim kind)
 
-    kind = primRepFromType ty
+    kind = typePrimRep ty
 
 
 cgPrimAltsGivenScrutinee gc_flag scrutinee alts deflt
@@ -892,7 +896,7 @@ saveVolatileVars :: StgLiveVars	-- Vars which should be made safe
 		 -> FCode AbstractC	-- Assignments to to the saves
 
 saveVolatileVars vars
-  = save_em (uniqSetToList vars)
+  = save_em (idSetToList vars)
   where
     save_em [] = returnFC AbsCNop
 
@@ -978,7 +982,9 @@ saveCurrentCostCentre ::
 					--   AbsCNop if not lexical CCs
 
 saveCurrentCostCentre
-  = isSwitchSetC SccProfilingOn		`thenFC` \ doing_profiling ->
+  = let
+	doing_profiling = opt_SccProfilingOn
+    in
     if not doing_profiling then
 	returnFC (Nothing, AbsCNop)
     else
@@ -1047,9 +1053,9 @@ mkReturnVector uniq ty tagged_alt_absCs deflt_absC
     -- )
   where
 
-    (spec_tycon,_,_) = case (getUniDataSpecTyCon_maybe ty) of -- *must* be a real "data" type constructor
+    (spec_tycon,_,_) = case (getDataSpecTyCon_maybe ty) of -- *must* be a real "data" type constructor
 	      Just xx -> xx
-	      Nothing -> error ("ERROR: can't generate code for polymorphic case;\nprobably a mis-use of `seq' or `par';\nthe User's Guide has more details.\nOffending type: "++(ppShow 80 (ppr PprDebug ty)))
+	      Nothing -> pprError "ERROR: can't generate code for polymorphic case;\nprobably a mis-use of `seq' or `par';\nthe User's Guide has more details.\nOffending type: " (ppr PprDebug ty)
 
     vtbl_label = mkVecTblLabel uniq
     ret_label = mkReturnPtLabel uniq

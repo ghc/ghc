@@ -12,31 +12,29 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 
 module CgClosure ( cgTopRhsClosure, cgRhsClosure ) where
 
-import StgSyn
+import Ubiq{-uitous-}
+import CgLoop2		( cgExpr, cgSccExpr )
+
 import CgMonad
 import AbsCSyn
+import StgSyn
 
-import PrelInfo		( PrimOp(..), Name
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Type		( isPrimType, isPrimTyCon,
-			  getTauType, showTypeCategory, getTyConDataCons
-			)
-import CgBindery	( getCAddrMode, getAtomAmodes,
-			  getCAddrModeAndInfo,
-			  bindNewToNode, bindNewToAStack, bindNewToBStack,
-			  bindNewToReg, bindArgsToRegs
+import AbsCUtils	( mkAbstractCs, getAmodeRep )
+import CgBindery	( getCAddrMode, getArgAmodes,
+			  getCAddrModeAndInfo, bindNewToNode,
+			  bindNewToAStack, bindNewToBStack,
+			  bindNewToReg, bindArgsToRegs,
+			  stableAmodeIdInfo, heapIdInfo
 			)
 import CgCompInfo	( spARelToInt, spBRelToInt )
-import CgExpr		( cgExpr, cgSccExpr )
 import CgUpdate		( pushUpdateFrame )
 import CgHeapery	( allocDynClosure, heapCheck
 #ifdef GRAN
-			  , heapCheckOnly, fetchAndReschedule  -- HWL
-#endif  {- GRAN -}
+			  , fetchAndReschedule  -- HWL
+#endif
 			)
-import CgRetConv	( ctrlReturnConvAlg, dataReturnConvAlg, mkLiveRegsBitMask,
+import CgRetConv	( mkLiveRegsMask,
+			  ctrlReturnConvAlg, dataReturnConvAlg, 
 			  CtrlReturnConvention(..), DataReturnConvention(..)
 			)
 import CgStackery	( getFinalStackHW, mkVirtStkOffsets,
@@ -46,20 +44,37 @@ import CgUsages		( getVirtSps, setRealAndVirtualSps,
 			  getSpARelOffset, getSpBRelOffset,
 			  getHpRelOffset
 			)
-import CLabel
-import ClosureInfo	-- lots and lots of stuff
-import CostCentre
-import Id		( idType, getIdPrimRep, isSysLocalId, myWrapperMaybe,
-			  showId, getIdInfo, getIdStrictness,
-    	    	    	  getDataConTag
+import CLabel		( mkClosureLabel, mkConUpdCodePtrVecLabel,
+			  mkStdUpdCodePtrVecLabel, mkStdUpdVecTblLabel,
+			  mkErrorStdEntryLabel, mkRednCountsLabel
 			)
-import IdInfo
+import ClosureInfo	-- lots and lots of stuff
+import CmdLineOpts	( opt_EmitArityChecks, opt_ForConcurrent,
+			  opt_AsmTarget
+			)
+import CostCentre	( useCurrentCostCentre, currentOrSubsumedCosts,
+			  noCostCentreAttached, costsAreSubsumed,
+			  isCafCC, overheadCostCentre
+			)
+import HeapOffs		( VirtualHeapOffset(..) )
+import Id		( idType, idPrimRep, 
+			  showId, getIdStrictness, dataConTag,
+			  emptyIdSet,
+			  GenId{-instance Outputable-}
+			)
 import ListSetOps	( minusList )
-import Maybes		( Maybe(..), maybeToBool )
-import PrimRep		( isFollowableRep )
-import UniqSet
-import Unpretty
-import Util
+import Maybes		( maybeToBool )
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instance Outputable-}, TyCon{-ditto-} )
+import Pretty		( prettyToUn, ppBesides, ppChar, ppPStr )
+import PrimRep		( isFollowableRep, PrimRep(..) )
+import TyCon		( isPrimTyCon, tyConDataCons )
+import Unpretty		( uppShow )
+import Util		( isIn, panic, pprPanic, assertPanic )
+
+myWrapperMaybe = panic "CgClosure.myWrapperMaybe (ToDo)"
+showTypeCategory = panic "CgClosure.showTypeCategory (ToDo)"
+getWrapperArgTypeCategories = panic "CgClosure.getWrapperArgTypeCategories (ToDo)"
 \end{code}
 
 %********************************************************
@@ -171,7 +186,7 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
   -- ToDo: check non-primitiveness (ASSERT)
   = (
 	-- LAY OUT THE OBJECT
-    getAtomAmodes std_thunk_payload		`thenFC` \ amodes ->
+    getArgAmodes std_thunk_payload		`thenFC` \ amodes ->
     let
 	(closure_info, amodes_w_offsets)
 	  = layOutDynClosure binder getAmodeRep amodes lf_info
@@ -226,7 +241,7 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
 
 	amodes_w_offsets = [(amode,offset) | ((_, (amode,_)), offset) <- bind_details]
 
-	get_kind (id, amode_and_info) = getIdPrimRep id
+	get_kind (id, amode_and_info) = idPrimRep id
     in
 	-- BUILD ITS INFO TABLE AND CODE
     forkClosureBody (
@@ -302,7 +317,7 @@ cgVapInfoTable perhaps_bind_the_fun upd_flag fun args fun_in_payload fun_lf_info
 	-- If f is not top-level, then f is one of the free variables too,
 	-- hence "payload_ids" isn't the same as "arg_ids".
 	--
-	vap_entry_rhs = StgApp (StgVarArg fun) (map StgVarArg args) emptyUniqSet
+	vap_entry_rhs = StgApp (StgVarArg fun) (map StgVarArg args) emptyIdSet
 									-- Empty live vars
 
 	arg_ids_w_info = [(name,mkLFArgument) | name <- args]
@@ -320,7 +335,7 @@ cgVapInfoTable perhaps_bind_the_fun upd_flag fun args fun_in_payload fun_lf_info
 		--		let x = f p q	-- x isn't top level!
 		--		in ...
 
-	get_kind (id, info) = getIdPrimRep id
+	get_kind (id, info) = idPrimRep id
 
 	payload_bind_details :: [((Id, LambdaFormInfo), VirtualHeapOffset)]
 	(closure_info, payload_bind_details) = layOutDynClosure
@@ -390,11 +405,10 @@ closureCodeBody binder_info closure_info cc [] body
 #endif
     getAbsC body_code 	`thenFC` \ body_absC ->
     moduleName		`thenFC` \ mod_name ->
-    getIntSwitchChkrC	`thenFC` \ isw_chkr ->
 
     absC (CClosureInfoAndCode closure_info body_absC Nothing
 			      stdUpd (cl_descr mod_name)
-			      (dataConLiveness isw_chkr closure_info))
+			      (dataConLiveness closure_info))
   where
     cl_descr mod_name = closureDescription mod_name (closureId closure_info) [] body
 
@@ -418,22 +432,19 @@ Node points to closure is available. -- HWL
 \begin{code}
 closureCodeBody binder_info closure_info cc all_args body
   = getEntryConvention id lf_info
-		       (map getIdPrimRep all_args)		`thenFC` \ entry_conv ->
-
-    isSwitchSetC EmitArityChecks			`thenFC` \ do_arity_chks ->
-
-    isSwitchSetC ForConcurrent	    	    	    	`thenFC` \ is_concurrent ->
-
-    isStringSwitchSetC AsmTarget    	    	    	`thenFC` \ native_code ->
-
+		       (map idPrimRep all_args)		`thenFC` \ entry_conv ->
     let
+	do_arity_chks = opt_EmitArityChecks
+	is_concurrent = opt_ForConcurrent
+	native_code   = opt_AsmTarget
+
 	stg_arity = length all_args
 
 	-- Arg mapping for standard (slow) entry point; all args on stack
     	(spA_all_args, spB_all_args, all_bxd_w_offsets, all_ubxd_w_offsets)
 	   = mkVirtStkOffsets
 		0 0 		-- Initial virtual SpA, SpB
-		getIdPrimRep
+		idPrimRep
 		all_args
 
 	-- Arg mapping for the fast entry point; as many args as poss in
@@ -450,7 +461,7 @@ closureCodeBody binder_info closure_info cc all_args body
     	(spA_stk_args, spB_stk_args, stk_bxd_w_offsets, stk_ubxd_w_offsets)
 	  = mkVirtStkOffsets
 		0 0 		-- Initial virtual SpA, SpB
-		getIdPrimRep
+		idPrimRep
 		stk_args
 
 	-- HWL; Note: empty list of live regs in slow entry code
@@ -531,7 +542,6 @@ closureCodeBody binder_info closure_info cc all_args body
 				`thenFC` \ slow_abs_c ->
     forkAbsC fast_entry_code	`thenFC` \ fast_abs_c ->
     moduleName			`thenFC` \ mod_name ->
-    getIntSwitchChkrC		`thenFC` \ isw_chkr ->
 
 	-- Now either construct the info table, or put the fast code in alone
 	-- (We never have slow code without an info table)
@@ -539,7 +549,7 @@ closureCodeBody binder_info closure_info cc all_args body
       if info_table_needed then
 	CClosureInfoAndCode closure_info slow_abs_c (Just fast_abs_c)
 			stdUpd (cl_descr mod_name)
-			(dataConLiveness isw_chkr closure_info)
+			(dataConLiveness closure_info)
       else
 	CCodeBlock fast_label fast_abs_c
     )
@@ -665,18 +675,22 @@ argSatisfactionCheck closure_info args
 
     if (isFollowableRep (getAmodeRep last_amode)) then
 	getSpARelOffset 0 	`thenFC` \ (SpARel spA off) ->
+	let
+	    lit = mkIntCLit (spARelToInt spA off)
+	in
 	if node_points then
-	    absC (CMacroStmt ARGS_CHK_A [mkIntCLit (spARelToInt spA off)])
+	    absC (CMacroStmt ARGS_CHK_A [lit])
 	else
-	    absC (CMacroStmt ARGS_CHK_A_LOAD_NODE
-				[mkIntCLit (spARelToInt spA off), set_Node_to_this])
+	    absC (CMacroStmt ARGS_CHK_A_LOAD_NODE [lit, set_Node_to_this])
     else
-	getSpBRelOffset 0 	`thenFC` \ b_rel_offset ->
+	getSpBRelOffset 0 	`thenFC` \ (SpBRel spB off) ->
+	let
+	    lit = mkIntCLit (spBRelToInt spB off)
+	in
 	if node_points then
-	    absC (CMacroStmt ARGS_CHK_B [mkIntCLit (spBRelToInt b_rel_offset)])
+	    absC (CMacroStmt ARGS_CHK_B [lit])
 	else
-	    absC (CMacroStmt ARGS_CHK_B_LOAD_NODE
-				[mkIntCLit (spBRelToInt b_rel_offset), set_Node_to_this])
+	    absC (CMacroStmt ARGS_CHK_B_LOAD_NODE [lit, set_Node_to_this])
   where
     -- We must tell the arg-satis macro whether Node is pointing to
     -- the closure or not.  If it isn't so pointing, then we give to
@@ -780,7 +794,7 @@ stackCheck closure_info regs node_reqd code
     )
   where
     all_regs = if node_reqd then node:regs else regs
-    liveness_mask = mkLiveRegsBitMask all_regs
+    liveness_mask = mkLiveRegsMask all_regs
 
     returns_prim_type = closureReturnsUnboxedType closure_info
 \end{code}
@@ -817,8 +831,7 @@ setupUpdate :: ClosureInfo -> Code -> Code	-- Only called for thunks
 setupUpdate closure_info code
  = if (closureUpdReqd closure_info) then
 	link_caf_if_needed	`thenFC` \ update_closure ->
-	getIntSwitchChkrC	`thenFC` \ isw_chkr ->
-    	pushUpdateFrame update_closure (vector isw_chkr) code
+    	pushUpdateFrame update_closure vector code
    else
 	profCtrC SLIT("UPDF_OMITTED") [] `thenC`
 	code
@@ -849,7 +862,7 @@ setupUpdate closure_info code
 
    closure_label = mkClosureLabel (closureId closure_info)
 
-   vector isw_chkr
+   vector
      = case (closureType closure_info) of
     	Nothing -> CReg StdUpdRetVecReg
     	Just (spec_tycon, _, spec_datacons) ->
@@ -857,9 +870,9 @@ setupUpdate closure_info code
     	      UnvectoredReturn 1 ->
        	    	let
 		    spec_data_con = head spec_datacons
-		    only_tag = getDataConTag spec_data_con
+		    only_tag = dataConTag spec_data_con
 
-    	    	    direct = case (dataReturnConvAlg isw_chkr spec_data_con) of
+    	    	    direct = case (dataReturnConvAlg spec_data_con) of
     	    	        ReturnInRegs _ -> mkConUpdCodePtrVecLabel spec_tycon only_tag
     	    	    	ReturnInHeap   -> mkStdUpdCodePtrVecLabel spec_tycon only_tag
 
@@ -893,8 +906,8 @@ closureDescription :: FAST_STRING	-- Module
 	-- Not called for StgRhsCon which have global info tables built in
 	-- CgConTbls.lhs with a description generated from the data constructor
 
-closureDescription mod_name name args body =
-    uppShow 0 (prettyToUn (
+closureDescription mod_name name args body
+  = uppShow 0 (prettyToUn (
 	ppBesides [ppChar '<',
 		   ppPStr mod_name,
 		   ppChar '.',

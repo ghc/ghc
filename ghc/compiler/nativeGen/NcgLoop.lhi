@@ -1,0 +1,16 @@
+Breaks loops between Stix{Macro,Prim,Integer}.lhs.
+
+Also some CLabel dependencies on MachMisc.
+
+\begin{code}
+interface NcgLoop where
+
+import AbsCSyn		( CAddrMode )
+import Stix		( StixTree )
+import MachMisc		( underscorePrefix, fmtAsmLbl )
+import StixPrim		( amodeToStix )
+
+amodeToStix :: CAddrMode -> StixTree
+underscorePrefix :: Bool
+fmtAsmLbl :: [Char] -> [Char]
+\end{code}

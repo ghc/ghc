@@ -13,7 +13,6 @@ module UgenAll (
 	U_constr.. ,
 	U_coresyn.. ,
 	U_entidt.. ,
-	U_finfot.. ,
 	U_hpragma.. ,
 	U_list.. ,
 	U_literal.. ,
@@ -35,7 +34,6 @@ import U_binding
 import U_constr
 import U_coresyn
 import U_entidt
-import U_finfot
 import U_hpragma
 import U_list
 import U_literal

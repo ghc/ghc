@@ -28,7 +28,8 @@ module CoreUnfold (
     ) where
 
 import Ubiq
-import IdLoop	 -- for paranoia checking
+import IdLoop	 -- for paranoia checking;
+		 -- and also to get mkMagicUnfoldingFun
 import PrelLoop  -- for paranoia checking
 
 import Bag		( emptyBag, unitBag, unionBags, Bag )
@@ -38,24 +39,21 @@ import CgCompInfo	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_NOREP_LIT_COST
 			)
 import CoreSyn
-import CoreUtils	( coreExprType )
+import CoreUtils	( coreExprType, manifestlyWHNF )
 import CostCentre	( ccMentionsId )
 import Id		( IdSet(..), GenId{-instances-} )
 import IdInfo		( bottomIsGuaranteed )
 import Literal		( isNoRepLit, isLitLitLit )
-import MagicUFs		( mkMagicUnfoldingFun, MagicUnfoldingFun )
 import Pretty
-import PrimOp		( PrimOp(..) )
+import PrimOp		( primOpCanTriggerGC, PrimOp(..) )
+import TyCon		( tyConFamilySize )
 import Type		( getAppDataTyCon )
-import UniqSet		( emptyUniqSet, singletonUniqSet, mkUniqSet,
-			  unionUniqSets
+import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
+			  addOneToUniqSet, unionUniqSets
 			)
 import Usage		( UVar(..) )
 import Util		( isIn, panic )
 
-manifestlyWHNF = panic "manifestlyWHNF (CoreUnfold)"
-primOpCanTriggerGC = panic "primOpCanTriggerGC (CoreUnfold)"
-getTyConFamilySize = panic "getTyConFamilySize (CoreUnfold)"
 whatsMentionedInId = panic "whatsMentionedInId (CoreUnfold)"
 getMentionedTyConsAndClassesFromType = panic "getMentionedTyConsAndClassesFromType (CoreUnfold)"
 \end{code}
@@ -333,8 +331,7 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
     ------------
     size_up_alts scrut_ty (AlgAlts alts deflt)
       = foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts
-		`addSizeN`
-    	(case (getTyConFamilySize tycon) of { Just n -> n })
+		`addSizeN` (tyConFamilySize tycon)
 	-- NB: we charge N for an alg. "case", where N is
 	-- the number of constructors in the thing being eval'd.
 	-- (You'll eventually get a "discount" of N if you
@@ -426,7 +423,7 @@ add1	     :: IdSet -> Id   -> IdSet
 add_some     :: IdSet -> [Id] -> IdSet
 
 no_in_scopes		= emptyUniqSet
-in_scopes `add1`     x  = in_scopes `unionUniqSets` singletonUniqSet x
+in_scopes `add1`     x  = addOneToUniqSet in_scopes x
 in_scopes `add_some` xs = in_scopes `unionUniqSets` mkUniqSet xs
 \end{code}
 
@@ -747,7 +744,7 @@ ppr_uf_Expr in_scopes (SCC cc body)
 \begin{code}
 ppr_uf_Binder :: Id -> Pretty
 ppr_uf_Binder v
-  = ppBesides [ppLparen, pprIdInUnfolding (singletonUniqSet v) v, ppPStr SLIT(" :: "),
+  = ppBesides [ppLparen, pprIdInUnfolding (unitUniqSet v) v, ppPStr SLIT(" :: "),
 	       ppr ppr_Unfolding (idType v), ppRparen]
 
 ppr_uf_Atom in_scopes (LitArg l) = ppr ppr_Unfolding l

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[SaLib]{Basic datatypes, functions for the strictness analyser}
 
@@ -16,13 +16,19 @@ module SaLib (
 	nullAbsValEnv, addOneToAbsValEnv, growAbsValEnvList,
 	lookupAbsValEnv,
 	absValFromStrictness
-
-	-- and to make the interface self-sufficient...
     ) where
 
-import IdInfo
-import Outputable
-import Pretty
+import Ubiq{-uitous-}
+
+import CoreSyn		( CoreExpr(..) )
+import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList,
+			  lookupIdEnv, IdEnv(..),
+			  GenId{-instance Outputable-}
+			)
+import IdInfo		( StrictnessInfo(..), Demand{-instance Outputable-} )
+import Outputable	( Outputable(..){-instance * []-} )
+import PprType		( GenType{-instance Outputable-} )
+import Pretty		( ppStr, ppCat )
 \end{code}
 
 %************************************************************************

@@ -58,6 +58,7 @@ import CoreUnfold	( UnfoldingDetails(..), mkGenForm, modifyUnfoldingDetails,
 			)
 import FiniteMap	-- lots of things
 import Id		( idType, getIdUnfolding, getIdStrictness,
+			  applyTypeEnvToId,
 			  nullIdEnv, growIdEnvList, rngIdEnv, lookupIdEnv,
 			  addOneToIdEnv, modifyIdEnv,
 			  IdEnv(..), IdSet(..), GenId )
@@ -68,19 +69,18 @@ import PprCore		-- various instances
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar )
 import Pretty
-import Type		( getAppDataTyCon )
+import Type		( getAppDataTyCon, applyTypeEnvToTy )
 import TyVar		( nullTyVarEnv, addOneToIdEnv, addOneToTyVarEnv,
 			  growTyVarEnvList,
-			  TyVarEnv(..), GenTyVar )
-import Unique		( Unique )
+			  TyVarEnv(..), GenTyVar{-instance Eq-}
+			)
+import Unique		( Unique{-instance Outputable-} )
 import UniqSet		-- lots of things
 import Usage		( UVar(..), GenUsage{-instances-} )
 import Util		( zipEqual, panic, assertPanic )
 
 type TypeEnv = TyVarEnv Type
 addToUFM_Directly = panic "addToUFM_Directly (SimplEnv)"
-applyTypeEnvToId = panic "applyTypeEnvToId (SimplEnv)"
-applyTypeEnvToTy = panic "applyTypeEnvToTy (SimplEnv)"
 bottomIsGuaranteed = panic "bottomIsGuaranteed (SimplEnv)"
 cmpType = panic "cmpType (SimplEnv)"
 exprSmallEnoughToDup = panic "exprSmallEnoughToDup (SimplEnv)"
@@ -303,7 +303,7 @@ grow_unfold_env (UFE u_env interesting_ids con_apps) id
     -- Only interested in Ids which have a "dangerous" unfolding; that is
     -- one that claims to have a single occurrence.
   = UFE (addOneToIdEnv u_env id (UnfoldItem id uf_details encl_cc))
-	(interesting_ids `unionUniqSets` singletonUniqSet id)
+	(addOneToUniqSet interesting_ids id)
 	con_apps
 
 grow_unfold_env (UFE u_env interesting_ids con_apps) id uf_details encl_cc
@@ -496,7 +496,6 @@ extendTyEnvList (SimplEnv chkr encl_cc ty_env id_env unfold_env) pairs
     new_ty_env = growTyVarEnvList ty_env pairs
 
 simplTy     (SimplEnv _ _ ty_env _ _) ty = applyTypeEnvToTy ty_env ty
-
 simplTyInId (SimplEnv _ _ ty_env _ _) id = applyTypeEnvToId ty_env id
 \end{code}
 
@@ -768,7 +767,7 @@ extendUnfoldEnvGivenRhs env@(SimplEnv chkr encl_cc ty_env id_env unfold_env)
 	-- (This is brought to you by *ANDY* Magic Constants, Inc.)
     is_really_small
       = case collectArgs new_rhs of
-	  (Var _, xs) -> length xs < 10
+	  (Var _, _, _, xs) -> length xs < 10
 	  _ -> False
 -}
 \end{code}

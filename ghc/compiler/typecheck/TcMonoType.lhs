@@ -24,9 +24,8 @@ import TcKind		( TcKind, mkTcTypeKind, mkBoxedTypeKind,
 			  mkTcArrowKind, unifyKind, newKindVar,
 			  kindToTcKind
 			)
-import ErrUtils		( arityErr )
 import Type		( GenType, Type(..), ThetaType(..), 
-			  mkTyVarTy, mkTyConTy, mkFunTy, mkAppTy,
+			  mkTyVarTy, mkTyConTy, mkFunTy, mkAppTy, mkSynTy,
 			  mkSigmaTy
 			)
 import TyVar		( GenTyVar, TyVar(..), mkTyVar )
@@ -79,26 +78,18 @@ tcMonoTypeKind (MonoFunTy ty1 ty2)
     tcMonoType ty2	`thenTc` \ tau_ty2 ->
     returnTc (mkTcTypeKind, mkFunTy tau_ty1 tau_ty2)
 
+tcMonoTypeKind (MonoTyApp name@(Short _ _) tys)
+  =	-- Must be a type variable
+    tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
+    tcMonoTyApp kind (mkTyVarTy tyvar) tys
+
 tcMonoTypeKind (MonoTyApp name tys)
-  = mapAndUnzipTc tcMonoTypeKind tys	`thenTc`    \ (arg_kinds, arg_tys) ->
-
-    tc_mono_name name			`thenNF_Tc` \ (fun_kind, maybe_arity, fun_ty) ->
-
-    newKindVar				`thenNF_Tc` \ result_kind ->
-    unifyKind fun_kind (foldr mkTcArrowKind result_kind arg_kinds)	`thenTc_`
-
-	-- Check for saturated application in the special case of
-	-- type synoyms.
-    (case maybe_arity of
-	Just arity | arity /= n_args -> failTc (err arity)
-	other			     -> returnTc ()
-    )									`thenTc_`
-
-    returnTc (result_kind, foldl mkAppTy fun_ty arg_tys)
-  where
-    err arity = arityErr "Type synonym constructor" name arity n_args
-    n_args    = length tys
-
+  | isTyConName name 	-- Must be a type constructor
+  = tcLookupTyCon name			`thenNF_Tc` \ (kind,maybe_arity,tycon) ->
+    case maybe_arity of
+	Just arity -> tcSynApp name kind arity tycon tys	-- synonum
+	Nothing	   -> tcMonoTyApp kind (mkTyConTy tycon) tys	-- newtype or data
+	
 -- for unfoldings only:
 tcMonoTypeKind (MonoForAllTy tyvars_w_kinds ty)
   = tcTyVarScopeGivenKinds names tc_kinds (\ tyvars ->
@@ -116,19 +107,28 @@ tcMonoTypeKind (MonoDictTy class_name ty)
     tcLookupClass class_name		`thenNF_Tc` \ (class_kind, clas) ->
     unifyKind class_kind arg_kind	`thenTc_`
     returnTc (mkTcTypeKind, mkDictTy clas arg_ty)
+\end{code}
 
+Help functions for type applications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+tcMonoTyApp fun_kind fun_ty tys
+  = mapAndUnzipTc tcMonoTypeKind tys	`thenTc`    \ (arg_kinds, arg_tys) ->
+    newKindVar				`thenNF_Tc` \ result_kind ->
+    unifyKind fun_kind (foldr mkTcArrowKind result_kind arg_kinds)	`thenTc_`
+    returnTc (result_kind, foldl mkAppTy fun_ty arg_tys)
 
-tc_mono_name :: Name -> NF_TcM s (TcKind s, Maybe Arity, Type)
-tc_mono_name name@(Short _ _) 		-- Must be a type variable
-  = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
-    returnNF_Tc (kind, Nothing, mkTyVarTy tyvar)
+tcSynApp name syn_kind arity tycon tys
+  = mapAndUnzipTc tcMonoTypeKind tys	`thenTc`    \ (arg_kinds, arg_tys) ->
+    newKindVar				`thenNF_Tc` \ result_kind ->
+    unifyKind syn_kind (foldr mkTcArrowKind result_kind arg_kinds)	`thenTc_`
 
-tc_mono_name name | isTyConName name 	-- Must be a type constructor
-  = tcLookupTyCon name			`thenNF_Tc` \ (kind,maybe_arity,tycon) ->
-    returnNF_Tc (kind, maybe_arity, mkTyConTy tycon)
-	
-tc_mono_name name 			-- Renamer should have got it right
-  = panic ("tc_mono_name:" ++ ppShow 1000 (ppr PprDebug name))
+	-- Check that it's applied to the right number of arguments
+    checkTc (arity == n_args) (err arity)				`thenTc_`
+    returnTc (result_kind, mkSynTy tycon arg_tys)
+  where
+    err arity = arityErr "Type synonym constructor" name arity n_args
+    n_args    = length tys
 \end{code}
 
 

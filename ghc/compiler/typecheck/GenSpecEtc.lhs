@@ -9,8 +9,7 @@
 module GenSpecEtc (
 	TcSigInfo(..), 
 	genBinds, 
-	checkSigTyVars, checkSigTyVarsGivenGlobals,
-	specTy
+	checkSigTyVars, checkSigTyVarsGivenGlobals
     ) where
 
 import Ubiq
@@ -26,7 +25,7 @@ import TcType		( TcType(..), TcThetaType(..), TcTauType(..),
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), HsExpr, OutPat(..), 
 			  Sig, HsLit, ArithSeqInfo, InPat, GRHSsAndBinds, Match, Fake
 			)
-import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcHsBinds(..), TcBind(..), TcExpr(..) )
+import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcHsBinds(..), TcBind(..), TcExpr(..),				       tcIdType )
 
 import Bag		( Bag, foldBag, bagToList, listToBag, isEmptyBag )
 import Class		( GenClass )
@@ -155,7 +154,7 @@ genBinds binder_names mono_ids bind lie sig_infos prag_info_fn
 	 -- BUILD THE NEW LOCALS
     let
 	tyvars	    = tyVarSetToList reduced_tyvars_to_gen	-- Commit to a particular order
-	dict_tys    = [idType d | TcId d <- dicts_bound]	-- Slightly ugh-ish
+	dict_tys    = map tcIdType dicts_bound
 	poly_tys    = map (mkForAllTys tyvars . mkFunTys dict_tys) mono_id_types
 	poly_ids    = zipWithEqual mk_poly binder_names poly_tys
 	mk_poly name ty = mkUserId name ty (prag_info_fn name)
@@ -282,12 +281,12 @@ The error message here is somewhat unsatisfactory, but it'll do for
 now (ToDo).
 
 \begin{code}
-checkSigMatch :: TcSigInfo s -> TcM s [TcTyVar s]
+checkSigMatch :: TcSigInfo s -> TcM s ()
 
 checkSigMatch (TySigInfo id sig_tyvars _ tau_ty src_loc)
   = tcAddSrcLoc src_loc	$
     tcAddErrCtxt (sigCtxt id) $
-    checkSigTyVars sig_tyvars tau_ty (idType id)
+    checkSigTyVars sig_tyvars tau_ty
 \end{code}
 
 
@@ -337,6 +336,8 @@ are
 		eg matching signature [(a,b)] against inferred type [(p,p)]
 		[then a and b will be unified together]
 
+BUT ACTUALLY THESE FIRST TWO ARE FORCED BY USING DontBind TYVARS
+
 	(c) not mentioned in the environment
 		eg the signature for f in this:
 
@@ -351,70 +352,29 @@ Before doing this, the substitution is applied to the signature type variable.
 \begin{code}
 checkSigTyVars :: [TcTyVar s]		-- The original signature type variables
 	       -> TcType s		-- signature type (for err msg)
-	       -> TcType s		-- inferred type (for err msg)
-	       -> TcM s [TcTyVar s]	-- Post-substitution signature type variables
+	       -> TcM s ()
 
-checkSigTyVars sig_tyvars sig_tau inferred_tau
+checkSigTyVars sig_tyvars sig_tau
   = tcGetGlobalTyVars			`thenNF_Tc` \ env_tyvars ->
-    checkSigTyVarsGivenGlobals env_tyvars sig_tyvars sig_tau inferred_tau
+    checkSigTyVarsGivenGlobals env_tyvars sig_tyvars sig_tau
 
 checkSigTyVarsGivenGlobals
 	 :: TcTyVarSet s	-- Consider these fully-zonked tyvars as global
 	 -> [TcTyVar s]		-- The original signature type variables
 	 -> TcType s		-- signature type (for err msg)
-	 -> TcType s		-- inferred type (for err msg)
-	 -> TcM s [TcTyVar s]	-- Post-substitution signature type variables
+	 -> TcM s ()
 
-checkSigTyVarsGivenGlobals globals sig_tyvars sig_tau inferred_tau
-  = 	 -- Check point (a) above
-    mapNF_Tc (zonkTcType.mkTyVarTy) sig_tyvars				`thenNF_Tc` \ sig_tys ->
-    checkMaybeTcM (allMaybes (map getTyVar_maybe sig_tys)) match_err	`thenTc` \ sig_tyvars' ->
-
-	 -- Check point (b)
-    checkTcM (hasNoDups sig_tyvars') match_err		`thenTc_`
-
-	-- Check point (c)
+checkSigTyVarsGivenGlobals globals sig_tyvars sig_tau
+  = 	-- Check point (c)
 	-- We want to report errors in terms of the original signature tyvars,
 	-- ie sig_tyvars, NOT sig_tyvars'.  sig_tys and sig_tyvars' correspond
 	-- 1-1 with sig_tyvars, so we can just map back.
-    let
-	mono_tyvars = [ sig_tyvar
-		      | (sig_tyvar,sig_tyvar') <- zipEqual sig_tyvars sig_tyvars',
-			sig_tyvar' `elementOfTyVarSet` globals
-		      ]
-    in
     checkTc (null mono_tyvars)
-	    (notAsPolyAsSigErr sig_tau mono_tyvars)	`thenTc_`
-
-    returnTc sig_tyvars'
+	    (notAsPolyAsSigErr sig_tau mono_tyvars)
   where
-    match_err = zonkTcType inferred_tau	`thenNF_Tc` \ inferred_tau' ->
-		failTc (badMatchErr sig_tau inferred_tau')
+    mono_tyvars = filter (`elementOfTyVarSet` globals) sig_tyvars
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection[GenEtc-SpecTy]{Instantiate a type and create new dicts for it}
-%*									*
-%************************************************************************
-
-\begin{code}
-specTy :: InstOrigin s
-       -> Type
-       -> NF_TcM s ([TcTyVar s], LIE s, TcType s, [TcIdOcc s])
-
-specTy origin sigma_ty
-  = tcInstType [] sigma_ty		`thenNF_Tc` \ tc_sigma_ty ->
-    let
-	(tyvars, theta, tau) = splitSigmaTy tc_sigma_ty
-    in
-	 -- Instantiate the dictionary types
-    newDicts origin theta		`thenNF_Tc` \ (dicts, dict_ids) ->
-
-	 -- Return the list of tyvars, the list of dicts and the tau type
-    returnNF_Tc (tyvars, dicts, tau, dict_ids)
-\end{code}
 
 
 

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %************************************************************************
 %*									*
@@ -15,19 +15,34 @@ core expression with (hopefully) improved usage information.
 
 module OccurAnal (
 	occurAnalyseBinds, occurAnalyseExpr, occurAnalyseGlobalExpr
-
-	-- and to make the interface self-sufficient...
     ) where
 
-import Type
+import Ubiq{-uitous-}
+
 import BinderInfo
-import CmdLineOpts	( GlobalSwitch(..), SimplifierSwitch(..) )
+import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
+import CoreSyn
 import Digraph		( stronglyConnComp )
-import Id		( eqId, idWantsToBeINLINEd, isConstMethodId,
-			  isSpecPragmaId_maybe, SpecInfo )
-import Maybes
-import UniqSet
-import Util
+import Id		( idWantsToBeINLINEd, isConstMethodId,
+			  emptyIdSet, unionIdSets, mkIdSet,
+			  unitIdSet, elementOfIdSet,
+			  addOneToIdSet, IdSet(..),
+			  nullIdEnv, unitIdEnv, combineIdEnvs,
+			  delOneFromIdEnv, delManyFromIdEnv,
+			  mapIdEnv, lookupIdEnv, IdEnv(..),
+			  GenId{-instance Eq-}
+			)
+import Maybes		( maybeToBool )
+import Outputable	( isExported, Outputable(..){-instance * (,) -} )
+import PprCore
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
+import Pretty		( ppAboves )
+import TyVar		( GenTyVar{-instance Eq-} )
+import Unique		( Unique{-instance Eq-} )
+import Util		( assoc, pprTrace, panic )
+
+isSpecPragmaId_maybe = panic "OccurAnal.isSpecPragmaId_maybe (ToDo)"
 \end{code}
 
 
@@ -56,18 +71,18 @@ data OccEnv =
    Bool		-- IgnoreINLINEPragma flag
 		-- False <=> OK to use INLINEPragma information
 		-- True  <=> ignore INLINEPragma information
-   (UniqSet Id)	-- Candidates
+   IdSet	-- Candidates
 
 addNewCands :: OccEnv -> [Id] -> OccEnv
 addNewCands (OccEnv kd ks kc ip cands) ids
-  = OccEnv kd ks kc ip (cands `unionUniqSets` mkUniqSet ids)
+  = OccEnv kd ks kc ip (cands `unionIdSets` mkIdSet ids)
 
 addNewCand :: OccEnv -> Id -> OccEnv
 addNewCand (OccEnv ks kd kc ip cands) id
-  = OccEnv kd ks kc ip (cands `unionUniqSets` singletonUniqSet id)
+  = OccEnv kd ks kc ip (addOneToIdSet cands id)
 
 isCandidate :: OccEnv -> Id -> Bool
-isCandidate (OccEnv _ _ _ _ cands) id = id `elementOfUniqSet` cands
+isCandidate (OccEnv _ _ _ _ cands) id = id `elementOfIdSet` cands
 
 ignoreINLINEPragma :: OccEnv -> Bool
 ignoreINLINEPragma (OccEnv _ _ _ ip _) = ip
@@ -86,37 +101,34 @@ combineUsageDetails, combineAltsUsageDetails
 	:: UsageDetails -> UsageDetails -> UsageDetails
 
 combineUsageDetails usage1 usage2
-  = --BSCC("combineUsages")
-    combineIdEnvs combineBinderInfo usage1 usage2
-    --ESCC
+  = combineIdEnvs combineBinderInfo usage1 usage2
 
 combineAltsUsageDetails usage1 usage2
-  = --BSCC("combineUsages")
-    combineIdEnvs combineAltsBinderInfo usage1 usage2
-    --ESCC
+  = combineIdEnvs combineAltsBinderInfo usage1 usage2
 
 addOneOcc :: UsageDetails -> Id -> BinderInfo -> UsageDetails
-addOneOcc usage id info = combineIdEnvs combineBinderInfo usage (unitIdEnv id info)
+addOneOcc usage id info
+  = combineIdEnvs combineBinderInfo usage (unitIdEnv id info)
 	-- ToDo: make this more efficient
 
 emptyDetails = (nullIdEnv :: UsageDetails)
 
 unitDetails id info = (unitIdEnv id info :: UsageDetails)
 
-tagBinders :: UsageDetails 		-- Of scope
-	   -> [Id]			-- Binders
-	   -> (UsageDetails, 		-- Details with binders removed
-	      [(Id,BinderInfo)])	-- Tagged binders
+tagBinders :: UsageDetails	    -- Of scope
+	   -> [Id]		    -- Binders
+	   -> (UsageDetails, 	    -- Details with binders removed
+	      [(Id,BinderInfo)])    -- Tagged binders
 
 tagBinders usage binders
   = (usage `delManyFromIdEnv` binders,
-     [(binder, usage_of usage binder) | binder <- binders]
+     [ (binder, usage_of usage binder) | binder <- binders ]
     )
 
-tagBinder :: UsageDetails 		-- Of scope
-	  -> Id				-- Binders
-	  -> (UsageDetails, 		-- Details with binders removed
-	      (Id,BinderInfo))		-- Tagged binders
+tagBinder :: UsageDetails	    -- Of scope
+	  -> Id			    -- Binders
+	  -> (UsageDetails, 	    -- Details with binders removed
+	      (Id,BinderInfo))	    -- Tagged binders
 
 tagBinder usage binder
   = (usage `delOneFromIdEnv` binder,
@@ -126,12 +138,12 @@ tagBinder usage binder
 usage_of usage binder
   | isExported binder = ManyOcc	0 -- Exported things count as many
   | otherwise
-  = case lookupIdEnv usage binder of
+  = case (lookupIdEnv usage binder) of
       Nothing   -> DeadCode
       Just info -> info
 
 isNeeded env usage binder
-  = case usage_of usage binder of
+  = case (usage_of usage binder) of
       DeadCode  -> keepUnusedBinding env binder	-- Maybe keep it anyway
       other     -> True
 \end{code}
@@ -148,13 +160,14 @@ Here's the externally-callable interface:
 \begin{code}
 occurAnalyseBinds
 	:: [CoreBinding]		-- input
-	-> (GlobalSwitch -> Bool)
 	-> (SimplifierSwitch -> Bool)
 	-> [SimplifiableCoreBinding]	-- output
 
-occurAnalyseBinds binds global_sw_chkr simplifier_sw_chkr
-  | global_sw_chkr D_dump_occur_anal = pprTrace "OccurAnal:" (ppr PprDebug binds') binds'
-  | otherwise	  		     = binds'
+occurAnalyseBinds binds simplifier_sw_chkr
+  | opt_D_dump_occur_anal = pprTrace "OccurAnal:"
+				     (ppAboves (map (ppr PprDebug) binds'))
+				     binds'
+  | otherwise		  = binds'
   where
     (_, binds') = do initial_env binds
 
@@ -162,7 +175,7 @@ occurAnalyseBinds binds global_sw_chkr simplifier_sw_chkr
 			 (simplifier_sw_chkr KeepSpecPragmaIds)
 			 (not (simplifier_sw_chkr SimplMayDeleteConjurableIds))
 			 (simplifier_sw_chkr IgnoreINLINEPragma)
-			 emptyUniqSet
+			 emptyIdSet
 
     do env [] = (emptyDetails, [])
     do env (bind:binds)
@@ -170,15 +183,13 @@ occurAnalyseBinds binds global_sw_chkr simplifier_sw_chkr
       where
 	new_env			 = env `addNewCands` (bindersOf bind)
 	(binds_usage, the_rest)  = do new_env binds
-	(final_usage, new_binds) = --BSCC("occAnalBind1")
-				   occAnalBind env bind binds_usage
-				   --ESCC
+	(final_usage, new_binds) = occAnalBind env bind binds_usage
 \end{code}
 
 \begin{code}
-occurAnalyseExpr :: UniqSet Id 			-- Set of interesting free vars
+occurAnalyseExpr :: IdSet 		-- Set of interesting free vars
 		 -> CoreExpr
-		 -> (IdEnv BinderInfo,		-- Occ info for interesting free vars
+		 -> (IdEnv BinderInfo,	-- Occ info for interesting free vars
 		     SimplifiableCoreExpr)
 
 occurAnalyseExpr candidates expr
@@ -194,7 +205,7 @@ occurAnalyseGlobalExpr :: CoreExpr -> SimplifiableCoreExpr
 occurAnalyseGlobalExpr expr
   = 	-- Top level expr, so no interesting free vars, and
 	-- discard occurence info returned
-    expr' where (_, expr') = occurAnalyseExpr emptyUniqSet expr
+    expr' where (_, expr') = occurAnalyseExpr emptyIdSet expr
 \end{code}
 
 %************************************************************************
@@ -291,7 +302,7 @@ occAnalBind env (Rec pairs) body_usage
     sccs :: [[Id]]
     sccs = case binders of
 		[_]   -> [binders]	-- Singleton; no need to analyse
-		other -> stronglyConnComp eqId edges binders
+		other -> stronglyConnComp (==) edges binders
 
     ---- stuff to "re-constitute" bindings from dependency-analysis info ------
 
@@ -336,7 +347,7 @@ ToDo: try using the occurrence info for the inline'd binder.
 
 \begin{code}
 occAnalRhs :: OccEnv
-	   -> Id		-- Binder
+	   -> Id	-- Binder
 	   -> CoreExpr	-- Rhs
 	   -> (UsageDetails, SimplifiableCoreExpr)
 
@@ -356,7 +367,7 @@ Expressions
 \begin{code}
 occAnal :: OccEnv
 	-> CoreExpr
-	-> (UsageDetails, 		-- Gives info only about the "interesting" Ids
+	-> (UsageDetails,	-- Gives info only about the "interesting" Ids
 	    SimplifiableCoreExpr)
 
 occAnal env (Var v)
@@ -367,8 +378,8 @@ occAnal env (Var v)
   = (emptyDetails, Var v)
 
 occAnal env (Lit lit)	   = (emptyDetails, Lit lit)
-occAnal env (Con con tys args) = (occAnalAtoms env args, Con con tys args)
-occAnal env (Prim op tys args) = (occAnalAtoms env args, Prim op tys args)
+occAnal env (Con con args) = (occAnalArgs env args, Con con args)
+occAnal env (Prim op args) = (occAnalArgs env args, Prim op args)
 
 occAnal env (SCC cc body)
   = (mapIdEnv markInsideSCC usage, SCC cc body')
@@ -378,25 +389,24 @@ occAnal env (SCC cc body)
 occAnal env (App fun arg)
   = (fun_usage `combineUsageDetails` arg_usage, App fun' arg)
   where
-    (fun_usage, fun') = occAnal env fun
-    arg_usage	      = occAnalAtom env arg
+    (fun_usage, fun') = occAnal    env fun
+    arg_usage	      = occAnalArg env arg
 
-occAnal env (CoTyApp fun ty)
-  = (fun_usage, CoTyApp fun' ty)
+occAnal env (Lam (ValBinder binder) body)
+  = (mapIdEnv markDangerousToDup final_usage,
+     Lam (ValBinder tagged_binder) body')
   where
-    (fun_usage, fun') = occAnal env fun
-
-occAnal env (Lam binder body)
-  = (mapIdEnv markDangerousToDup final_usage, Lam tagged_binder body')
-  where
-    (body_usage, body') 	  = occAnal (env `addNewCand` binder) body
+    (body_usage, body') 	 = occAnal (env `addNewCand` binder) body
     (final_usage, tagged_binder) = tagBinder body_usage binder
 
 -- ANDY: WE MUST THINK ABOUT THIS! (ToDo)
-occAnal env (CoTyLam tyvar body)
-  = (mapIdEnv markDangerousToDup body_usage, CoTyLam tyvar body')
+occAnal env (Lam (TyBinder tyvar) body)
+  = (mapIdEnv markDangerousToDup body_usage,
+     Lam (TyBinder tyvar) body')
   where
     (body_usage, body') = occAnal env body
+
+occAnal env (Lam (UsageBinder _) _) = panic "OccurAnal.occAnal Lam UsageBinder"
 
 occAnal env (Case scrut alts)
   = (scrut_usage `combineUsageDetails` alts_usage,
@@ -410,9 +420,7 @@ occAnal env (Let bind body)
   where
     new_env		     = env `addNewCands` (bindersOf bind)
     (body_usage, body')      = occAnal new_env body
-    (final_usage, new_binds) = --BSCC("occAnalBind2")
-			       occAnalBind env bind body_usage
-			       --ESCC
+    (final_usage, new_binds) = occAnalBind env bind body_usage
 \end{code}
 
 Case alternatives
@@ -460,21 +468,21 @@ occAnalDeflt env (BindDefault binder rhs)
 Atoms
 ~~~~~
 \begin{code}
-occAnalAtoms :: OccEnv -> [CoreArg] -> UsageDetails
+occAnalArgs :: OccEnv -> [CoreArg] -> UsageDetails
 
-occAnalAtoms env atoms
+occAnalArgs env atoms
   = foldr do_one_atom emptyDetails atoms
   where
-    do_one_atom (LitArg lit) usage = usage
     do_one_atom (VarArg v) usage
 	| isCandidate env v = addOneOcc usage v (argOccurrence 0)
 	| otherwise	    = usage
+    do_one_atom other_arg  usage = usage
 
 
-occAnalAtom  :: OccEnv -> CoreArg -> UsageDetails
+occAnalArg  :: OccEnv -> CoreArg -> UsageDetails
 
-occAnalAtom env (LitArg lit) = emptyDetails
-occAnalAtom env (VarArg v)
+occAnalArg env (VarArg v)
   | isCandidate env v = unitDetails v (argOccurrence 0)
   | otherwise         = emptyDetails
+occAnalArg _   _      = emptyDetails
 \end{code}

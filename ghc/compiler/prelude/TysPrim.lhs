@@ -17,8 +17,7 @@ import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind )
 import NameTypes	( mkPreludeCoreName, FullName )
 import PrelMods		( pRELUDE_BUILTIN )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
-import TyCon		( mkPrimTyCon, mkDataTyCon,
-			  ConsVisible(..), NewOrData(..) )
+import TyCon		( mkPrimTyCon, mkDataTyCon, NewOrData(..) )
 import TyVar		( GenTyVar(..), alphaTyVars )
 import Type		( applyTyCon, mkTyVarTys )
 import Usage		( usageOmega )
@@ -119,7 +118,6 @@ realWorldTyCon
 	[{-no context-}]
 	[{-no data cons!-}] -- we tell you *nothing* about this guy
 	[{-no derivings-}]
-	ConsInvisible
 	DataType
   where
     full_name = mkPreludeCoreName pRELUDE_BUILTIN SLIT("_RealWorld")

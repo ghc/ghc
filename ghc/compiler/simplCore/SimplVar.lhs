@@ -11,26 +11,31 @@ module SimplVar (
 	leastItCouldCost
     ) where
 
-import SimplMonad
-import SimplEnv
-import Literal		( isNoRepLit )
+import Ubiq{-uitous-}
+import SmplLoop		( simplExpr )
 
-import Type		( getAppDataTyCon, maybeAppDataTyCon,
-			  getTyConFamilySize, isPrimType
-			)
-import BinderInfo	( oneTextualOcc, oneSafeOcc )
 import CgCompInfo	( uNFOLDING_USE_THRESHOLD,
 			  uNFOLDING_CON_DISCOUNT_WEIGHT
 			)
-import CmdLineOpts	( switchIsOn, intSwitchSet, SimplifierSwitch(..) )
-import Id		( idType, getIdInfo )
-import IdInfo
-import Maybes		( maybeToBool, Maybe(..) )
-import Simplify		( simplExpr )
-import SimplUtils	( simplIdWantsToBeINLINEd )
-import MagicUFs
-import Pretty
-import Util
+import CmdLineOpts	( intSwitchSet, switchIsOn, SimplifierSwitch(..) )
+import CoreSyn
+import CoreUnfold	( UnfoldingDetails(..), UnfoldingGuidance(..),
+			  FormSummary(..)
+			)
+import Id		( idType, getIdInfo,
+			  GenId{-instance Outputable-}
+			)
+import IdInfo		( DeforestInfo(..) )
+import Literal		( isNoRepLit )
+import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instance Outputable-} )
+import Pretty		( ppBesides, ppStr )
+import SimplEnv
+import SimplMonad
+import TyCon		( tyConFamilySize )
+import Type		( isPrimType, getAppDataTyCon, maybeAppDataTyCon )
+import Util		( pprTrace, assertPanic, panic )
 \end{code}
 
 %************************************************************************
@@ -56,11 +61,11 @@ completeVar env var args
 	-> ASSERT( null args )
 	   returnSmpl (Lit lit)
 
-      ConForm con ty_args val_args
+      ConForm con args
 		-- Always inline constructors.
 		-- See comments before completeLetBinding
 	-> ASSERT( null args )
-	   returnSmpl (Con con ty_args val_args)
+	   returnSmpl (Con con args)
 
       GenForm txt_occ form_summary template guidance
 	-> considerUnfolding env var args
@@ -82,7 +87,8 @@ completeVar env var args
 		tick MagicUnfold		`thenSmpl_`
 		returnSmpl magic_result
 
-      IWantToBeINLINEd _ -> returnSmpl boring_result
+-- LATER:
+--    IWantToBeINLINEd _ -> returnSmpl boring_result
 
       other -> returnSmpl boring_result
 \end{code}
@@ -135,7 +141,7 @@ considerUnfolding env var args txt_occ form_summary template guidance
   = go_for_it
 
   | (case form_summary of {BottomForm -> True; other -> False} &&
-    not (any isPrimType [ ty | (TypeArg ty) <- args ]))
+    not (any isPrimType [ ty | (TyArg ty) <- args ]))
 		-- Always inline bottoming applications, unless
 		-- there's a primitive type lurking around...
   = go_for_it
@@ -193,16 +199,19 @@ considerUnfolding env var args txt_occ form_summary template guidance
     con_discount  -- ToDo: ************ get from a switch *********
       = uNFOLDING_CON_DISCOUNT_WEIGHT
 
-    (tyargs, valargs, args_left) = decomposeArgs args
+    (_, _, tyargs, valargs) = collectArgs args_in_dummy_expr
     no_tyargs  = length tyargs
     no_valargs = length valargs
+    args_in_dummy_expr = mkGenApp (Var (panic "SimplVar.dummy")) args
+    -- we concoct this dummy expr, just so we can use collectArgs
+    -- (rather than make up a special-purpose bit of code)
 
     rhs_looks_like_a_Con
       = let
 	    (_,_,val_binders,body) = collectBinders template
     	in
     	case (val_binders, body) of
-    	  ([], Con _ _ _) -> True
+    	  ([], Con _ _) -> True
 	  other -> False
 
     dont_go_for_it = returnSmpl (mkGenApp (Var var) args)
@@ -229,7 +238,7 @@ discountedCost
 	-> Int		    -- the size/cost of the expr
 	-> Int		    -- the number of val args (== length args)
 	-> ArgInfoVector    -- what we know about the *use* of the arguments
-	-> [OutAtom]	    -- *an actual set of value arguments*!
+	-> [OutArg]	    -- *an actual set of value arguments*!
 	-> Int
 
     -- If we apply an expression (usually a function) of given "costs"
@@ -249,8 +258,7 @@ discountedCost env con_discount_weight size no_args is_con_vec args
 	    full_price	         = disc size
 	    take_something_off v = let
 				     (tycon, _, _) = getAppDataTyCon (idType v)
-				     no_cons = case (getTyConFamilySize tycon) of
-						 Just n -> n
+				     no_cons = tyConFamilySize tycon
 				     reduced_size
 				       = size - (no_cons * con_discount_weight)
 				   in
@@ -262,8 +270,8 @@ discountedCost env con_discount_weight size no_args is_con_vec args
 	    case arg of
 	      LitArg _ -> full_price
 	      VarArg v -> case lookupUnfolding env v of
-			       ConForm _ _ _ -> take_something_off v
-			       other_form   	     -> full_price
+			       ConForm _ _ -> take_something_off v
+			       other_form  -> full_price
 
 	) want_cons rest_args
 \end{code}
@@ -294,7 +302,7 @@ leastItCouldCost con_discount_weight size no_val_args is_con_vec arg_tys
       = let
 	    take_something_off tycon
 	      = let
-		    no_cons = case (getTyConFamilySize tycon) of { Just n -> n }
+		    no_cons = tyConFamilySize tycon
 
 		    reduced_size
 		      = size - (no_cons * con_discount_weight)

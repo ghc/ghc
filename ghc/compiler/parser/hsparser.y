@@ -1662,6 +1662,7 @@ aexp	:  qvar					{ $$ = mkident($1); }
 	|  gcon					{ $$ = mkident($1); }
 	|  lit_constant				{ $$ = mklit($1); }
 	|  OPAREN exp CPAREN			{ $$ = mkpar($2); }	  /* mkpar: stop infix parsing at ()'s */
+	|  qcon OCURLY CCURLY			{ $$ = mkrecord($1,Lnil); }
 	|  qcon OCURLY rbinds CCURLY		{ $$ = mkrecord($1,$3); } /* 1 S/R conflict on OCURLY -> shift */
 	|  OBRACK list_exps CBRACK		{ $$ = mkllist($2); }
 	|  OPAREN exp COMMA texps CPAREN	{ if (ttree($4) == tuple)

@@ -31,7 +31,7 @@ import MainMonad	( thenMn, MainIO(..) )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import ProtoName	( isConopPN, ProtoName(..) )
-import Util		( nOfThem, panic )
+import Util		( nOfThem, pprError, panic )
 \end{code}
 
 %************************************************************************
@@ -327,7 +327,7 @@ wlkExpr expr
       U_record con rbinds -> -- record construction
 	wlkQid  con		`thenUgn` \ rcon     ->
 	wlkList rdRbind rbinds	`thenUgn` \ recbinds ->
-	returnUgn (RecordCon rcon recbinds)
+	returnUgn (RecordCon (HsVar rcon) recbinds)
 
       U_rupdate updexp updbinds -> -- record update
 	wlkExpr updexp		 `thenUgn` \ aexp ->
@@ -352,7 +352,11 @@ rdRbind pt
   = rdU_tree pt		`thenUgn` \ (U_rbind var exp) ->
     wlkQid   var	`thenUgn` \ rvar ->
     wlkMaybe rdExpr exp	`thenUgn` \ expr_maybe ->
-    returnUgn (rvar, expr_maybe)
+    returnUgn (
+      case expr_maybe of
+	Nothing -> (rvar, HsVar rvar, True{-pun-})
+	Just re -> (rvar, re,	      False)
+    )
 \end{code}
 
 Patterns: just bear in mind that lists of patterns are represented as
@@ -406,9 +410,8 @@ wlkPat pat
 		  ConPatIn x []     -> (x,  lpats)
 		  ConOpPatIn x op y -> (op, x:y:lpats)
 		  _ -> -- sorry about the weedy msg; the parser missed this one
-		       error (ppShow 100 (ppCat [
-			   ppStr "ERROR: an illegal `application' of a pattern to another one:",
-			   ppInterleave ppSP (map (ppr PprForUser) (lpat:lpats))]))
+		       pprError "ERROR: an illegal `application' of a pattern to another one:"
+			  (ppInterleave ppSP (map (ppr PprForUser) (lpat:lpats)))
 	in
 	returnUgn (ConPatIn n arg_pats)
 	where
@@ -444,7 +447,11 @@ wlkPat pat
 	    = rdU_tree pt	 `thenUgn` \ (U_rbind var pat) ->
     	      wlkQid   var	 `thenUgn` \ rvar ->
     	      wlkMaybe rdPat pat `thenUgn` \ pat_maybe ->
-    	      returnUgn (rvar, pat_maybe)
+	      returnUgn (
+		case pat_maybe of
+		  Nothing -> (rvar, VarPatIn rvar, True{-pun-})
+		  Just rp -> (rvar, rp,		   False)
+	      )
 \end{code}
 
 \begin{code}
@@ -748,7 +755,7 @@ mk_class_assertion :: ProtoNameMonoType -> (ProtoName, ProtoName)
 
 mk_class_assertion (MonoTyApp name [(MonoTyVar tyname)]) = (name, tyname)
 mk_class_assertion other
-  = error ("ERROR: malformed type context: "++ppShow 80 (ppr PprForUser other)++"\n")
+  = pprError "ERROR: malformed type context: " (ppr PprForUser other)
     -- regrettably, the parser does let some junk past
     -- e.g., f :: Num {-nothing-} => a -> ...
 \end{code}
@@ -784,14 +791,14 @@ wlkConDecl (U_constrrec ccon cfields srcline)
   = mkSrcLocUgn srcline		`thenUgn` \ src_loc      ->
     wlkQid	ccon		`thenUgn` \ con		 ->
     wlkList rd_field cfields	`thenUgn` \ fields_lists ->
-    returnUgn (RecConDecl con (concat fields_lists) src_loc)
+    returnUgn (RecConDecl con fields_lists src_loc)
   where
-    rd_field :: ParseTree -> UgnM [(ProtoName, BangType ProtoName)]
+    rd_field :: ParseTree -> UgnM ([ProtoName], BangType ProtoName)
     rd_field pt
       = rdU_constr pt		`thenUgn` \ (U_field fvars fty) ->
 	wlkList rdQid	fvars	`thenUgn` \ vars ->
 	wlkBangType fty		`thenUgn` \ ty ->
-	returnUgn [ (var, ty) | var <- vars ]
+	returnUgn (vars, ty)
 
 -----------------
 rdBangType pt = rdU_ttype pt `thenUgn` \ ty -> wlkBangType ty

@@ -21,6 +21,7 @@ import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId,
 			  getInstantiatedDataConSig, GenId{-instances-}
 			)
+import Maybes		( catMaybes )
 import Outputable	( Outputable(..) )
 import PprCore
 import PprStyle		( PprStyle(..) )
@@ -32,11 +33,13 @@ import SrcLoc		( SrcLoc )
 import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,getForAllTy_maybe,
 			  isPrimType,getTypeKind,instantiateTy,
 			  mkForAllUsageTy,getForAllUsageTy,instantiateUsage,
-			  maybeAppDataTyCon, eqTy )
-import TyCon		( isPrimTyCon,isVisibleDataTyCon )
+			  maybeAppDataTyCon, eqTy
+			)
+import TyCon		( isPrimTyCon, tyConFamilySize )
 import TyVar		( getTyVarKind, GenTyVar{-instances-} )
 import UniqSet		( emptyUniqSet, mkUniqSet, intersectUniqSets,
-			  unionUniqSets, elementOfUniqSet, UniqSet(..) )
+			  unionUniqSets, elementOfUniqSet, UniqSet(..)
+			)
 import Unique		( Unique )
 import Usage		( GenUsage )
 import Util		( zipEqual, pprTrace, pprPanic, assertPanic, panic )
@@ -89,9 +92,7 @@ lintCoreBindings sty whoDunnit spec_done binds
 	  ppStr ("*** Core Lint Errors: in " ++ whoDunnit ++ " ***"),
 	  msg sty,
 	  ppStr "*** Offending Program ***",
-	  ppAboves
-	   (map (pprCoreBinding sty (pprBigCoreBinder sty) (pprTypedCoreBinder sty) (ppr sty))
-	    binds),
+	  ppAboves (map (pprCoreBinding sty) binds),
 	  ppStr "*** End of Offense ***"
 	])
   where
@@ -297,23 +298,28 @@ lintCoreAlts :: CoreCaseAlts
 	     -> TyCon			-- TyCon pinned on the case
 	     -> LintM (Maybe Type)	-- Type of alternatives
 
-lintCoreAlts (AlgAlts alts deflt) ty tycon
-  = panic "CoreLint.lintCoreAlts"
-{- LATER:
-  WDP: can't tell what type DNT wants here
+lintCoreAlts whole_alts@(AlgAlts alts deflt) ty tycon
   = -- Check tycon is not a primitive tycon
     addErrIfL (isPrimTyCon tycon) (mkCasePrimMsg tycon)
     `seqL`
-    -- Check we have a non-abstract data tycon
-    addErrIfL (not (isVisibleDataTyCon tycon)) (mkCaseAbstractMsg tycon)
+    -- Check we are scrutinising a proper datatype
+    -- (ToDo: robustify)
+    addErrIfL (not (tyConFamilySize tycon >= 1)) (mkCaseAbstractMsg tycon)
     `seqL`
     lintDeflt deflt ty
     `thenL` \maybe_deflt_ty ->
     mapL (lintAlgAlt ty tycon) alts
     `thenL` \maybe_alt_tys ->
-    returnL (maybe_deflt_ty : maybe_alt_tys)
+    -- Check the result types
+    case catMaybes (maybe_deflt_ty : maybe_alt_tys) of
+      []	     -> returnL Nothing
 
-lintCoreAlts (PrimAlts alts deflt) ty tycon
+      (first_ty:tys) -> mapL check tys	`seqL`
+			returnL (Just first_ty)
+	where
+	  check ty = checkTys first_ty ty (mkCaseAltMsg whole_alts)
+
+lintCoreAlts whole_alts@(PrimAlts alts deflt) ty tycon
   = -- Check tycon is a primitive tycon
     addErrIfL (not (isPrimTyCon tycon)) (mkCaseNotPrimMsg tycon)
     `seqL`
@@ -321,21 +327,16 @@ lintCoreAlts (PrimAlts alts deflt) ty tycon
     `thenL` \maybe_alt_tys ->
     lintDeflt deflt ty
     `thenL` \maybe_deflt_ty ->
-    returnL (maybe_deflt_ty : maybe_alt_tys)
     -- Check the result types
--}
-{-
-    `thenL` \ maybe_result_tys ->
-    case catMaybes (maybe_result_tys) of
+    case catMaybes (maybe_deflt_ty : maybe_alt_tys) of
       []	     -> returnL Nothing
 
       (first_ty:tys) -> mapL check tys	`seqL`
 			returnL (Just first_ty)
 	where
-	  check ty = checkTys first_ty ty (mkCaseAltMsg alts)
--}
+	  check ty = checkTys first_ty ty (mkCaseAltMsg whole_alts)
 
-lintAlgAlt scrut_ty (con,args,rhs)
+lintAlgAlt scrut_ty tycon{-ToDo: use it!-} (con,args,rhs)
   = (case maybeAppDataTyCon scrut_ty of
       Nothing ->
 	 addErrL (mkAlgAltMsg1 scrut_ty)
@@ -551,7 +552,7 @@ mkCasePrimMsg tycon sty
 
 mkCaseAbstractMsg :: TyCon -> ErrMsg
 mkCaseAbstractMsg tycon sty
-  = ppAbove (ppStr "An algebraic case on an abstract type:")
+  = ppAbove (ppStr "An algebraic case on some weird type:")
 	    (ppr sty tycon)
 
 mkDefltMsg :: CoreCaseDefault -> ErrMsg

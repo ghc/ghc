@@ -11,7 +11,7 @@ module TcKind (
 	unifyKind, 	-- TcKind s -> TcKind s -> TcM s ()
 
 	kindToTcKind,	-- Kind     -> TcKind s
-	tcKindToKind	-- TcKind s -> NF_TcM s Kind
+	tcDefaultKind	-- TcKind s -> NF_TcM s Kind
   ) where
 
 import Kind
@@ -77,7 +77,7 @@ I'm not convinced it would save time, and it's a little tricky to get right.
 unify_var uniq1 box1 kind2
   = tcReadMutVar box1	`thenNF_Tc` \ maybe_kind1 ->
     case maybe_kind1 of
-      Just kind1 -> unify_kind kind1 kind1
+      Just kind1 -> unify_kind kind1 kind2
       Nothing    -> unify_unbound_var uniq1 box1 kind2
 
 unify_unbound_var uniq1 box1 kind2@(TcVarKind uniq2 box2)
@@ -127,22 +127,27 @@ kindToTcKind UnboxedTypeKind   = TcTypeKind
 kindToTcKind (ArrowKind k1 k2) = TcArrowKind (kindToTcKind k1) (kindToTcKind k2)
 
 
-tcKindToKind :: TcKind s -> NF_TcM s Kind
+-- Default all unbound kinds to TcTypeKind, and return the
+-- corresponding Kind as well.
+tcDefaultKind :: TcKind s -> NF_TcM s Kind
 
-tcKindToKind TcTypeKind
-  = returnNF_Tc TypeKind
+tcDefaultKind TcTypeKind
+  = returnNF_Tc BoxedTypeKind
 
-tcKindToKind (TcArrowKind kind1 kind2)
-  = tcKindToKind kind1	`thenNF_Tc` \ k1 ->
-    tcKindToKind kind2	`thenNF_Tc` \ k2 ->
+tcDefaultKind (TcArrowKind kind1 kind2)
+  = tcDefaultKind kind1	`thenNF_Tc` \ k1 ->
+    tcDefaultKind kind2	`thenNF_Tc` \ k2 ->
     returnNF_Tc (ArrowKind k1 k2)
 
 	-- Here's where we "default" unbound kinds to BoxedTypeKind
-tcKindToKind (TcVarKind uniq box)
+tcDefaultKind (TcVarKind uniq box)
   = tcReadMutVar box	`thenNF_Tc` \ maybe_kind ->
     case maybe_kind of
-	Nothing   -> returnNF_Tc BoxedTypeKind	-- Default is kind Type for unbound
-	Just kind -> tcKindToKind kind
+	Just kind -> tcDefaultKind kind
+
+	Nothing   -> 	-- Default unbound variables to kind Type
+		     tcWriteMutVar box (Just TcTypeKind)	`thenNF_Tc_`
+		     returnNF_Tc BoxedTypeKind
 
 zonkTcKind :: TcKind s -> NF_TcM s (TcKind s)
 -- Removes variables that have now been bound.
@@ -200,6 +205,6 @@ kindMisMatchErr kind1 kind2 sty
  = ppHang (ppStr "Couldn't match the kind") 4
 	(ppSep [ppBesides [ppStr "`", ppr sty kind1, ppStr "'"],
 		ppStr "against",
-		ppBesides [ppStr "`", ppr sty kind1, ppStr "'"]
+		ppBesides [ppStr "`", ppr sty kind2, ppStr "'"]
 	])
 \end{code}

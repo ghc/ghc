@@ -33,19 +33,19 @@ useless as map' will be transformed back to what map was.
 
 module StgSAT (	doStaticArgs ) where
 
-import Maybes		( Maybe(..) )
+import Ubiq{-uitous-}
+
 import StgSyn
-import SATMonad		( SATEnv(..), SATInfo(..), Arg(..), updSAEnv, insSAEnv,
-			  SatM(..), initSAT, thenSAT, thenSAT_,
-			  emptyEnvSAT, returnSAT, mapSAT )
-import StgSATMonad
-import UniqSupply
-import Util
+import UniqSupply	( UniqSM(..) )
+import Util		( panic )
 \end{code}
 
 \begin{code}
 doStaticArgs :: [StgBinding] -> UniqSupply -> [StgBinding]
 
+doStaticArgs = panic "StgSAT.doStaticArgs"
+
+{- LATER: to end of file:
 doStaticArgs binds
   = initSAT (mapSAT sat_bind binds)
   where
@@ -174,5 +174,5 @@ satRhs rhs@(StgRhsCon cc v args) = returnSAT rhs
 satRhs (StgRhsClosure cc bi fvs upd args body)
   = satExpr body		`thenSAT` \ body' ->
     returnSAT (StgRhsClosure cc bi fvs upd args body')
+-}
 \end{code}
-

@@ -7,15 +7,17 @@
 #include "HsVersions.h"
 
 module PprType(
-	GenTyVar, pprTyVar,
-	TyCon, pprTyCon,
-	GenType, pprType, pprParendType,
-	pprType_Internal,
+	GenTyVar, pprGenTyVar,
+	TyCon, pprTyCon, showTyCon,
+	GenType,
+	pprGenType, pprParendGenType,
+	pprType, pprParendType,
+	pprMaybeTy,
 	getTypeString,
 	typeMaybeString,
 	specMaybeTysSuffix,
 	GenClass, 
-	GenClassOp, pprClassOp
+	GenClassOp, pprGenClassOp
  ) where
 
 import Ubiq
@@ -28,7 +30,7 @@ import NameLoop	-- for paranoia checking
 import Type		( GenType(..), maybeAppTyCon,
 			  splitForAllTy, splitSigmaTy, splitRhoTy, splitAppTy )
 import TyVar		( GenTyVar(..) )
-import TyCon		( TyCon(..), ConsVisible, NewOrData )
+import TyCon		( TyCon(..), NewOrData )
 import Class		( Class(..), GenClass(..),
 			  ClassOp(..), GenClassOp(..) )
 import Kind		( Kind(..) )
@@ -39,7 +41,7 @@ import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( maybeToBool )
 import NameTypes	( ShortName, FullName )
 import Outputable	( ifPprShowAll, isAvarop, interpp'SP )
-import PprStyle		( PprStyle(..), codeStyle )
+import PprStyle		( PprStyle(..), codeStyle, showUserishTypes )
 import Pretty
 import TysWiredIn	( listTyCon )
 import Unique		( pprUnique10, pprUnique )
@@ -50,7 +52,7 @@ import Util
 \begin{code}
 instance (Eq tyvar, Outputable tyvar,
 	  Eq uvar,  Outputable uvar  ) => Outputable (GenType tyvar uvar) where
-    ppr sty ty = pprType sty ty
+    ppr sty ty = pprGenType sty ty
 
 instance Outputable TyCon where
     ppr sty tycon = pprTyCon sty tycon
@@ -60,10 +62,17 @@ instance Outputable (GenClass tyvar uvar) where
     ppr sty (Class u n _ _ _ _ _ _ _ _) = ppr sty n
 
 instance Outputable ty => Outputable (GenClassOp ty) where
-    ppr sty clsop = pprClassOp sty clsop
+    ppr sty clsop = pprGenClassOp sty clsop
 
 instance Outputable (GenTyVar flexi) where
-    ppr sty tv = pprTyVar sty tv
+    ppr sty tv = pprGenTyVar sty tv
+
+-- and two SPECIALIZEd ones:
+instance Outputable {-Type, i.e.:-}(GenType TyVar UVar) where
+    ppr sty ty = pprGenType sty ty
+
+instance Outputable {-TyVar, i.e.:-}(GenTyVar Usage) where
+    ppr sty ty = pprGenTyVar sty ty
 \end{code}
 
 %************************************************************************
@@ -72,29 +81,25 @@ instance Outputable (GenTyVar flexi) where
 %*									*
 %************************************************************************
 
-@pprType@ is the std @Type@ printer; the overloaded @ppr@ function is
-defined to use this.  @pprParendType@ is the same, except it puts
-parens around the type, except for the atomic cases.  @pprParendType@
+@pprGenType@ is the std @Type@ printer; the overloaded @ppr@ function is
+defined to use this.  @pprParendGenType@ is the same, except it puts
+parens around the type, except for the atomic cases.  @pprParendGenType@
 works just by setting the initial context precedence very high.
 
 \begin{code}
-pprType, pprParendType :: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
+pprGenType, pprParendGenType :: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
 		       => PprStyle -> GenType tyvar uvar -> Pretty
 
-pprType       sty ty = ppr_ty sty (initial_ve sty) tOP_PREC   ty
-pprParendType sty ty = ppr_ty sty (initial_ve sty) tYCON_PREC ty
+pprGenType       sty ty = ppr_ty sty (initial_ve sty) tOP_PREC   ty
+pprParendGenType sty ty = ppr_ty sty (initial_ve sty) tYCON_PREC ty
+
+pprType       	 sty ty = ppr_ty sty (initial_ve sty) tOP_PREC   (ty :: Type)
+pprParendType 	 sty ty = ppr_ty sty (initial_ve sty) tYCON_PREC (ty :: Type)
 
 pprMaybeTy :: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
            => PprStyle -> Maybe (GenType tyvar uvar) -> Pretty
 pprMaybeTy sty Nothing   = ppChar '*'
-pprMaybeTy sty (Just ty) = pprParendType sty ty
-\end{code}
-
-This somewhat sleazy interface is used when printing out Core syntax
-(see PprCore):
-\begin{code}
-pprType_Internal sty tvs ppr_tv uvs ppr_uv ty
-  = ppr_ty sty (VE tvs ppr_tv uvs ppr_uv) tOP_PREC ty
+pprMaybeTy sty (Just ty) = pprParendGenType sty ty
 \end{code}
 
 \begin{code}
@@ -270,16 +275,7 @@ tYCON_PREC  = (2 :: Int)
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
   | otherwise		   = ppParens pretty
-
-
--- True means types like   (Eq a, Text b) => a -> b
--- False means types like  _forall_ a b => Eq a -> Text b -> a -> b
-showUserishTypes PprForUser   = True	
-showUserishTypes PprInterface = True
-showUserishTypes other	      = False
 \end{code}
-
-
 
 %************************************************************************
 %*									*
@@ -288,7 +284,7 @@ showUserishTypes other	      = False
 %************************************************************************
 
 \begin{code}
-pprTyVar sty (TyVar uniq kind name usage)
+pprGenTyVar sty (TyVar uniq kind name usage)
   = ppBesides [pp_name, pprUnique10 uniq]
   where
     pp_name = case name of
@@ -318,7 +314,7 @@ pprTyCon sty FunTyCon 		        = ppStr "(->)"
 pprTyCon sty (TupleTyCon arity)	        = ppBeside (ppPStr SLIT("Tuple")) (ppInt arity)
 pprTyCon sty (PrimTyCon uniq name kind) = ppr sty name
 
-pprTyCon sty tycon@(DataTyCon uniq kind name tyvars ctxt cons derivings cv nd)
+pprTyCon sty tycon@(DataTyCon uniq kind name tyvars ctxt cons derivings nd)
   = case sty of
       PprDebug   -> pp_tycon_and_uniq
       PprShowAll -> pp_tycon_and_uniq
@@ -341,7 +337,7 @@ pprTyCon sty (SynTyCon uniq name kind arity tyvars expansion)
 		(ppCat [ ppStr " {-", 
 			 ppInt arity, 
 			 interpp'SP sty tyvars,
-			 pprParendType sty expansion,
+			 pprParendGenType sty expansion,
 			 ppStr "-}"]))
 \end{code}
 
@@ -353,9 +349,9 @@ pprTyCon sty (SynTyCon uniq name kind arity tyvars expansion)
 %************************************************************************
 
 \begin{code}
-pprClassOp :: Outputable ty => PprStyle -> GenClassOp ty -> Pretty
+pprGenClassOp :: Outputable ty => PprStyle -> GenClassOp ty -> Pretty
 
-pprClassOp sty op = ppr_class_op sty [] op
+pprGenClassOp sty op = ppr_class_op sty [] op
 
 ppr_class_op sty tyvars (ClassOp op_name i ty)
   = case sty of
@@ -388,7 +384,7 @@ getTypeString ty
   | otherwise     = [mod, string]
   where
     string = _PK_ (tidy (ppShow 1000 ppr_t))
-    ppr_t  = pprType PprForC ty
+    ppr_t  = pprGenType PprForC ty
 			-- PprForC expands type synonyms as it goes
 
     (is_prelude_ty, mod)
@@ -446,7 +442,7 @@ pprTyCon sty@PprInterface (SynonymTyCon k n a vs exp unabstract) specs
     ppCat [ppPStr SLIT("type"), ppr sty n, ppIntersperse ppSP pp_tyvars,
 	   ppEquals, ppr_ty sty lookup_fn tOP_PREC exp]
 
-pprTyCon sty@PprInterface this_tycon@(DataTyCon k n a vs ctxt cons derivings unabstract data_or_new) specs
+pprTyCon sty@PprInterface this_tycon@(DataTyCon k n a vs ctxt cons derivings data_or_new) specs
   = ppHang (ppCat [pp_data_or_new,
 		   pprContext sty ctxt,
 		   ppr sty n,
@@ -507,7 +503,7 @@ pprTyCon sty@PprInterface this_tycon@(DataTyCon k n a vs ctxt cons derivings una
       where
 	ppr_con con
 	  = let
-		(_, _, con_arg_tys, _) = getDataConSig con
+		(_, _, con_arg_tys, _) = dataConSig con
 	    in
 	    ppCat [pprNonOp PprForUser con, -- the data con's name...
 		   ppIntersperse ppSP (map (ppr_ty sty lookup_fn tYCON_PREC) con_arg_tys)]
@@ -523,7 +519,7 @@ pprTyCon sty@PprInterface this_tycon@(DataTyCon k n a vs ctxt cons derivings una
     pp_the_list (p:ps) = ppAbove (ppBeside p ppComma) (pp_the_list ps)
 
     pp_maybe Nothing   = pp_NONE
-    pp_maybe (Just ty) = pprParendType sty ty
+    pp_maybe (Just ty) = pprParendGenType sty ty
 
     pp_NONE = ppPStr SLIT("_N_")
 

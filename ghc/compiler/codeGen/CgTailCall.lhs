@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %********************************************************
 %*							*
@@ -17,37 +17,36 @@ module CgTailCall (
 	mkPrimReturnCode,
 
 	tailCallBusiness
-
-	-- and to make the interface self-sufficient...
     ) where
 
-IMPORT_Trace
-import Pretty		-- Pretty/Outputable: rm (debugging only) ToDo
-import Outputable
+import Ubiq{-uitous-}
 
-import StgSyn
 import CgMonad
 import AbsCSyn
 
-import Type		( isPrimType, Type )
-import CgBindery	( getAtomAmodes, getCAddrMode, getCAddrModeAndInfo )
-import CgCompInfo	( oTHER_TAG, iND_TAG )
-import CgRetConv	( dataReturnConvPrim, ctrlReturnConvAlg, dataReturnConvAlg,
-			  mkLiveRegsBitMask,
-			  CtrlReturnConvention(..), DataReturnConvention(..)
+import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
+import CgBindery	( getArgAmodes, getCAddrMode, getCAddrModeAndInfo )
+import CgRetConv	( dataReturnConvPrim, dataReturnConvAlg,
+			  ctrlReturnConvAlg, CtrlReturnConvention(..),
+			  DataReturnConvention(..)
 			)
 import CgStackery	( adjustRealSps, mkStkAmodes )
-import CgUsages		( getSpARelOffset, getSpBRelOffset )
-import CLabel	( CLabel, mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel )
-import ClosureInfo	( nodeMustPointToIt, getEntryConvention, EntryConvention(..) )
-import CmdLineOpts	( GlobalSwitch(..) )
-import Id		( getDataConTyCon, getDataConTag,
-			  idType, getIdPrimRep, fIRST_TAG, Id,
-			  ConTag(..)
+import CgUsages		( getSpARelOffset )
+import CLabel		( mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel )
+import ClosureInfo	( nodeMustPointToIt,
+			  getEntryConvention, EntryConvention(..)
 			)
-import Maybes		( assocMaybe, maybeToBool, Maybe(..) )
-import PrimRep		( retPrimRepSize )
-import Util
+import CmdLineOpts	( opt_EmitArityChecks, opt_DoSemiTagging )
+import HeapOffs		( zeroOff, VirtualSpAOffset(..) )
+import Id		( idType, dataConTyCon, dataConTag,
+			  fIRST_TAG
+			)
+import Literal		( mkMachInt )
+import Maybes		( assocMaybe )
+import PrimRep		( PrimRep(..) )
+import StgSyn		( StgArg(..), GenStgArg(..), StgLiveVars(..) )
+import Type		( isPrimType )
+import Util		( zipWithEqual, panic, assertPanic )
 \end{code}
 
 %************************************************************************
@@ -191,8 +190,7 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
 
 				-- Set the info pointer, and jump
 			set_info_ptr		`thenC`
-			getIntSwitchChkrC	`thenFC` \ isw_chkr ->
-    			absC (CJump (CLbl (update_label isw_chkr) CodePtrRep))
+    			absC (CJump (CLbl update_label CodePtrRep))
 
 	CaseAlts _ (Just (alts, _)) ->	-- Ho! We know the constructor so
 					-- we can go right to the alternative
@@ -216,14 +214,14 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
     )
 
   where
-    tag		      = getDataConTag con
-    tycon	      = getDataConTyCon con
+    tag		      = dataConTag   con
+    tycon	      = dataConTyCon con
     return_convention = ctrlReturnConvAlg tycon
     zero_indexed_tag  = tag - fIRST_TAG	      -- Adjust tag to be zero-indexed
 					      -- cf AbsCUtils.mkAlgAltsCSwitch
 
-    update_label isw_chkr
-      = case (dataReturnConvAlg isw_chkr con) of
+    update_label
+      = case (dataReturnConvAlg con) of
 	  ReturnInHeap   -> mkStdUpdCodePtrVecLabel tycon tag
 	  ReturnInRegs _ -> mkConUpdCodePtrVecLabel tycon tag
 
@@ -296,7 +294,7 @@ performTailCall fun args live_vars
   =	-- Get all the info we have about the function and args and go on to
 	-- the business end
     getCAddrModeAndInfo fun	`thenFC` \ (fun_amode, lf_info) ->
-    getAtomAmodes args		`thenFC` \ arg_amodes ->
+    getArgAmodes args		`thenFC` \ arg_amodes ->
 
     tailCallBusiness
 		fun fun_amode lf_info arg_amodes
@@ -316,8 +314,9 @@ tailCallBusiness :: Id -> CAddrMode	-- Function and its amode
 		 -> Code
 
 tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
-  = isSwitchSetC EmitArityChecks		`thenFC` \ do_arity_chks ->
-
+  = let
+	do_arity_chks = opt_EmitArityChecks
+    in
     nodeMustPointToIt lf_info			`thenFC` \ node_points ->
     getEntryConvention fun lf_info
 	(map getAmodeRep arg_amodes)		`thenFC` \ entry_conv ->
@@ -407,7 +406,9 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 	    adjustRealSps final_spa final_spb	`thenC`
 
 		-- Now decide about semi-tagging
-	    isSwitchSetC DoSemiTagging		`thenFC` \ semi_tagging_on ->
+	    let
+		semi_tagging_on = opt_DoSemiTagging
+	    in
 	    case (semi_tagging_on, arg_amodes, node_points, sequel) of
 
 	--

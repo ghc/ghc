@@ -41,27 +41,20 @@ module StgSyn (
 
 import Ubiq{-uitous-}
 
-{-
-import PrelInfo		( getPrimOpResultInfo, PrimOpResultInfo(..),
-			  PrimOp, PrimRep
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
+import CostCentre	( showCostCentre )
+import Id		( idPrimRep, GenId{-instance NamedThing-} )
+import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
+import Outputable	( isExported, isOpLexeme, ifPprDebug,
+			  interppSP, interpp'SP,
+			  Outputable(..){-instance * Bool-}
 			)
-import HsSyn		( HsBinds, HsExpr, GRHS, GRHSsAndBinds, InPat )
-import Type
-import Literal		( literalPrimRep, isLitLitLit,
-			  Literal(..) -- (..) for pragmas
-			)
-import Id		( idType, getIdPrimRep, toplevelishId,
-			  isTopLevId, Id, IdInfo
-			)
-import Maybes		( Maybe(..), catMaybes )
-import Outputable
-import Pretty
-import CostCentre	( showCostCentre, CostCentre )
-import UniqSet
-import Util
--}
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instance Outputable-} )
+import Pretty		-- all of it
+import PrimOp		( PrimOp{-instance Outputable-} )
+import Unique		( pprUnique )
+import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet(..) )
+import Util		( panic )
 \end{code}
 
 %************************************************************************
@@ -94,8 +87,8 @@ data GenStgArg occ
 \end{code}
 
 \begin{code}
-getArgPrimRep (StgVarArg  local) = getIdPrimRep local
-getArgPrimRep (StgLitArg  lit)	= literalPrimRep lit
+getArgPrimRep (StgVarArg  local) = idPrimRep local
+getArgPrimRep (StgLitArg  lit)	 = literalPrimRep lit
 
 isLitLitArg (StgLitArg x) = isLitLitLit x
 isLitLitArg _		  = False

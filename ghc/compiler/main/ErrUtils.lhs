@@ -10,10 +10,7 @@ module ErrUtils (
 
 	Error(..),
 	addErrLoc, addShortErrLocLine,
-	dontAddErrLoc, pprBagOfErrors,
-
-	TcError(..), TcWarning(..), Message(..),
-	mkTcErr, arityErr
+	dontAddErrLoc, pprBagOfErrors
 
     ) where
 
@@ -51,33 +48,3 @@ pprBagOfErrors sty bag_of_errors
     ppAboves (map (\ p -> ppAbove ppSP p) pretties)
 \end{code}
 
-TypeChecking Errors
-~~~~~~~~~~~~~~~~~~~
-
-\begin{code}
-type Message   = PprStyle -> Pretty
-type TcError   = Message
-type TcWarning = Message
-
-
-mkTcErr :: SrcLoc 		-- Where
-	-> [Message] 		-- Context
-	-> Message 		-- What went wrong
-	-> TcError		-- The complete error report
-
-mkTcErr locn ctxt msg sty
-  = ppHang (ppBesides [ppr PprForUser locn, ppStr ": ", msg sty])
-    	 4 (ppAboves [msg sty | msg <- ctxt])
-
-
-arityErr kind name n m sty =
-    ppBesides [ ppStr "`", ppr sty name, ppStr "' should have ",
-		n_arguments, ppStr ", but has been given ", ppInt m, ppChar '.']
-    where
-	errmsg = kind ++ " has too " ++ quantity ++ " arguments"
-	quantity | m < n     = "few"
-		 | otherwise = "many"
-	n_arguments | n == 0 = ppStr "no arguments"
-		    | n == 1 = ppStr "1 argument"
-		    | True   = ppCat [ppInt n, ppStr "arguments"]
-\end{code}

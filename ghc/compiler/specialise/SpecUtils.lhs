@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 
@@ -21,19 +21,39 @@ module SpecUtils (
 	pprSpecErrs
     ) where
 
-import Type
-import Bag		( Bag, isEmptyBag, bagToList )
-import FiniteMap	( FiniteMap, emptyFM, addListToFM_C,
-			  plusFM_C, keysFM, lookupWithDefaultFM
+import Ubiq{-uitous-}
+
+import Bag		( isEmptyBag, bagToList )
+import Class		( getClassOpString, GenClass{-instance NamedThing-} )
+import FiniteMap	( emptyFM, addListToFM_C, plusFM_C, keysFM,
+			  lookupWithDefaultFM
 			)
-import Id		( mkSameSpecCon, idType,
-			  isDictFunId, isConstMethodId_maybe,
+import Id		( idType, isDictFunId, isConstMethodId_maybe,
 			  isDefaultMethodId_maybe,
-			  getInstIdModule, Id )
-import Maybes
-import Outputable
-import Pretty
-import Util
+			  GenId {-instance NamedThing -}
+			)
+import Maybes		( maybeToBool, catMaybes, firstJust )
+import Outputable	( isAvarop, pprNonOp )
+import PprStyle		( PprStyle(..) )
+import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
+			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar
+			)
+import Pretty		-- plenty of it
+import TyCon		( tyConTyVars, TyCon{-instance NamedThing-} )
+import Type		( splitSigmaTy, mkTyVarTy, mkForAllTys,
+			  getTyVar_maybe, isUnboxedType
+			)
+import TyVar		( GenTyVar{-instance Eq-} )
+import Unique		( Unique{-instance Eq-} )
+import Util		( equivClasses, zipWithEqual, cmpPString,
+			  assertPanic, panic{-ToDo:rm-}
+			)
+
+cmpType = panic "SpecUtils.cmpType (ToDo: get rid of)"
+mkSameSpecCon = panic "SpecUtils.mkSameSpecCon (ToDo)"
+getInstIdModule = panic "SpecUtils.getInstIdModule (ToDo)"
+specialiseTy :: Type -> [Maybe Type] -> Int -> Type
+specialiseTy = panic "SpecUtils.specialiseTy (ToDo)"
 \end{code}
 
 @specialiseCallTys@ works out which type args don't need to be specialised on,
@@ -52,7 +72,7 @@ specialiseCallTys True _ _ cvec tys
 specialiseCallTys False spec_unboxed spec_overloading cvec tys
   = zipWithEqual spec_ty_other cvec tys
   where
-    spec_ty_other c ty | (spec_unboxed && isUnboxedDataType ty)
+    spec_ty_other c ty | (spec_unboxed && isUnboxedType ty)
 			 || (spec_overloading && c)
 			 = Just ty
 		       | otherwise
@@ -85,16 +105,16 @@ gained by specialising wrt them.
 
 \begin{code}
 getIdOverloading :: Id
-		 -> ([TyVarTemplate], [(Class,TyVarTemplate)])
+		 -> ([TyVar], [(Class,TyVar)])
 getIdOverloading id
   = (tyvars, tyvar_part_of theta)
   where
     (tyvars, theta, _) = splitSigmaTy (idType id)
 
-    tyvar_part_of [] 		      = []
-    tyvar_part_of ((clas,ty) : theta) = case getTyVarTemplateMaybe ty of
-					    Nothing    -> []
-					    Just tyvar -> (clas, tyvar) : tyvar_part_of theta
+    tyvar_part_of [] 		 = []
+    tyvar_part_of ((c,ty):theta) = case (getTyVar_maybe ty) of
+				     Nothing -> []
+				     Just tv -> (c, tv) : tyvar_part_of theta
 \end{code}
 
 \begin{code}
@@ -115,7 +135,7 @@ isUnboxedSpecialisation :: [Maybe Type] -> Bool
 isUnboxedSpecialisation tys
   = any is_unboxed tys
   where
-    is_unboxed (Just ty) = isUnboxedDataType ty
+    is_unboxed (Just ty) = isUnboxedType ty
     is_unboxed Nothing   = False
 \end{code}
 
@@ -129,7 +149,7 @@ specialiseConstrTys :: [Type]
 specialiseConstrTys tys
   = map maybe_unboxed_ty tys
   where
-    maybe_unboxed_ty ty = case isUnboxedDataType ty of
+    maybe_unboxed_ty ty = case isUnboxedType ty of
 			    True  -> Just ty
 			    False -> Nothing
 \end{code}
@@ -156,13 +176,13 @@ argTysMatchSpecTys_error spec_tys arg_tys
     then Nothing
     else Just (ppSep [ppStr "Spec and Arg Types Inconsistent:",
 		      ppStr "spectys=", ppSep [pprMaybeTy PprDebug ty | ty <- spec_tys],
-		      ppStr "argtys=", ppSep [pprParendType PprDebug ty | ty <- arg_tys]])
+		      ppStr "argtys=", ppSep [pprParendGenType PprDebug ty | ty <- arg_tys]])
   where
     match (Nothing:spec_tys) (arg:arg_tys)
-      = not (isUnboxedDataType arg) &&
+      = not (isUnboxedType arg) &&
 	match spec_tys arg_tys
     match (Just spec:spec_tys) (arg:arg_tys)
-      = case (cmpUniType True{-properly-} spec arg) of
+      = case (cmpType True{-properly-} spec arg) of
 	  EQ_   -> match spec_tys arg_tys
 	  other -> False
     match [] [] = True
@@ -261,7 +281,7 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 	mod_tyspecs = lookupWithDefaultFM tyspecs_fm [] mod
 	mod_idspecs = lookupWithDefaultFM idspecs_fm [] mod
 	have_specs  = not (null mod_tyspecs && null mod_idspecs)
-	ty_sty = PprInterface (error "SpecUtils:PprInterface:sw_chkr")
+	ty_sty = PprInterface
 
 pp_module mod
   = ppBesides [ppPStr mod, ppStr ":"]
@@ -271,15 +291,15 @@ pp_tyspec :: PprStyle -> Pretty -> (FAST_STRING, TyCon, [Maybe Type]) -> Pretty
 pp_tyspec sty pp_mod (_, tycon, tys)
   = ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE", ppStr "data",
-	   pprNonOp PprForUser tycon, ppCat (map (pprParendType sty) spec_tys),
+	   pprNonOp PprForUser tycon, ppCat (map (pprParendGenType sty) spec_tys),
 	   ppStr "#-}", ppStr "{- Essential -}"
 	   ]
   where
-    tvs = getTyConTyVarTemplates tycon
+    tvs = tyConTyVars tycon
     (spec_args, tv_maybes) = unzip (map choose_ty (tvs `zip` tys))
-    spec_tys = map (mkForallTy (catMaybes tv_maybes)) spec_args
+    spec_tys = map (mkForAllTys (catMaybes tv_maybes)) spec_args
 
-    choose_ty (tv, Nothing) = (mkTyVarTemplateTy tv, Just tv)
+    choose_ty (tv, Nothing) = (mkTyVarTy tv, Just tv)
     choose_ty (tv, Just ty) = (ty, Nothing)
 
 pp_idspec :: PprStyle -> Pretty -> (FAST_STRING, Id, [Maybe Type], Bool) -> Pretty
@@ -289,7 +309,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   = ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE",
 	   ppStr "instance",
-	   pprType sty spec_ty,
+	   pprGenType sty spec_ty,
 	   ppStr "#-}", pp_essential ]
 
   | is_const_method_id
@@ -301,9 +321,9 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
     ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE",
 	   pp_clsop clsop_str, ppStr "::",
-	   pprType sty spec_ty,
+	   pprGenType sty spec_ty,
 	   ppStr "#-} {- IN instance",
-	   ppPStr cls_str, pprParendType sty clsty,
+	   ppPStr cls_str, pprParendGenType sty clsty,
 	   ppStr "-}", pp_essential ]
 
   | is_default_method_id
@@ -317,14 +337,14 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
 	   ppPStr cls_str,
 	   ppStr "EXPLICIT METHOD REQUIRED",
 	   pp_clsop clsop_str, ppStr "::",
-	   pprType sty spec_ty,
+	   pprGenType sty spec_ty,
 	   ppStr "-}", pp_essential ]
 
   | otherwise
   = ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE",
 	   pprNonOp PprForUser id, ppStr "::",
-	   pprType sty spec_ty,
+	   pprGenType sty spec_ty,
 	   ppStr "#-}", pp_essential ]
   where
     spec_ty = specialiseTy (idType id) tys 100   -- HACK to drop all dicts!!!

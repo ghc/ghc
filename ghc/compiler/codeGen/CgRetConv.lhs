@@ -15,8 +15,6 @@ module CgRetConv (
 	ctrlReturnConvAlg,
 	dataReturnConvAlg,
 
-	mkLiveRegsBitMask, noLiveRegsMask,
-
 	dataReturnConvPrim,
 
 	assignPrimOpResultRegs,
@@ -26,27 +24,35 @@ module CgRetConv (
 	-- and to make the interface self-sufficient...
     ) where
 
-import AbsCSyn
+import Ubiq{-uitous-}
+import AbsCLoop		-- paranoia checking
 
-import PrelInfo		( PrimOp(..), PrimOpResultInfo(..), primOpCanTriggerGC,
-			  getPrimOpResultInfo, integerDataCon
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
+import AbsCSyn		-- quite a few things
+import AbsCUtils	( mkAbstractCs, getAmodeRep,
+			  amodeCanSurviveGC
 			)
-import Type		( getTyConFamilySize, primRepFromType, getTyConDataCons,
-			  TyVarTemplate, TyCon, Class,
-			  TauType(..), ThetaType(..), Type
+import CgCompInfo	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
+			  mAX_Vanilla_REG, mAX_Float_REG,
+			  mAX_Double_REG
 			)
-import CgCompInfo	-- various things
-import CgMonad		( IntSwitchChecker(..) )
-import CmdLineOpts	( GlobalSwitch(..) )
-import Id		( Id, getDataConSig, fIRST_TAG, isDataCon,
-			  DataCon(..), ConTag(..)
+import CmdLineOpts	( opt_ReturnInRegsThreshold )
+import Id		( isDataCon, dataConSig,
+			  DataCon(..), GenId{-instance Eq-}
 			)
-import Maybes		( catMaybes, Maybe(..) )
-import PrimRep
-import Util
-import Pretty
+import Maybes		( catMaybes )
+import PprStyle		( PprStyle(..) )
+import PprType		( TyCon{-instance Outputable-} )
+import PrelInfo		( integerDataCon )
+import PrimOp		( primOpCanTriggerGC,
+			  getPrimOpResultInfo, PrimOpResultInfo(..),
+			  PrimOp{-instance Outputable-}
+			)
+import PrimRep		( isFloatingRep, PrimRep(..) )
+import TyCon		( tyConDataCons, tyConFamilySize )
+import Type		( typePrimRep )
+import Util		( zipWithEqual, mapAccumL, isn'tIn,
+			  pprError, pprTrace, panic, assertPanic
+			)
 \end{code}
 
 %************************************************************************
@@ -88,11 +94,11 @@ The register assignment given by a @ReturnInRegs@ obeys three rules:
 ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
 
 ctrlReturnConvAlg tycon
-  = case (getTyConFamilySize tycon) of
-      Nothing -> -- pprPanic "ctrlReturnConvAlg:" (ppr PprDebug tycon)
-		 UnvectoredReturn 0 -- e.g., w/ "data Bin"
+  = case (tyConFamilySize tycon) of
+      0 -> pprTrace "ctrlReturnConvAlg:" (ppr PprDebug tycon) $
+	   UnvectoredReturn 0 -- e.g., w/ "data Bin"
 
-      Just size -> -- we're supposed to know...
+      size -> -- we're supposed to know...
 	if (size > (1::Int) && size <= mAX_FAMILY_SIZE_FOR_VEC_RETURNS) then
 	    VectoredReturn size
 	else
@@ -110,67 +116,22 @@ types.	If @assign_reg@ runs out of a particular kind of register,
 then it gives up, returning @ReturnInHeap@.
 
 \begin{code}
-dataReturnConvAlg :: IntSwitchChecker -> DataCon -> DataReturnConvention
+dataReturnConvAlg :: DataCon -> DataReturnConvention
 
-dataReturnConvAlg isw_chkr data_con
+dataReturnConvAlg data_con
   = ASSERT(isDataCon data_con)
     case leftover_kinds of
 	[]    ->	ReturnInRegs reg_assignment
 	other ->	ReturnInHeap	-- Didn't fit in registers
   where
-    (_, _, arg_tys, _) = getDataConSig data_con
+    (_, _, arg_tys, _) = dataConSig data_con
 
     (reg_assignment, leftover_kinds)
-      = assignRegs isw_chkr_to_use
-		   [node, infoptr] -- taken...
-		   (map primRepFromType arg_tys)
-
-    isw_chkr_to_use = isw_chkr
+      = assignRegs [node, infoptr] -- taken...
+		   (map typePrimRep arg_tys)
 
     is_prim_result_ty = data_con == integerDataCon -- ***HACK***! (WDP 95/11)
 \end{code}
-
-\begin{code}
-noLiveRegsMask :: Int	-- Mask indicating nothing live
-noLiveRegsMask = 0
-
-mkLiveRegsBitMask
-	:: [MagicId]	-- Candidate live regs; depends what they have in them
-	-> Int
-
-mkLiveRegsBitMask regs
-  = foldl do_reg noLiveRegsMask regs
-  where
-    do_reg acc (VanillaReg kind reg_no)
-      | isFollowableRep kind
-      = acc + (reg_tbl !! IBOX(reg_no _SUB_ ILIT(1)))
-
-    do_reg acc anything_else = acc
-
-    reg_tbl -- ToDo: mk Array!
-      = [lIVENESS_R1, lIVENESS_R2, lIVENESS_R3, lIVENESS_R4,
-	 lIVENESS_R5, lIVENESS_R6, lIVENESS_R7, lIVENESS_R8]
-
-{-
--- Completely opaque code.  ADR
--- What's wrong with: (untested)
-
-mkLiveRegsBitMask regs
-  = foldl (+) noLiveRegsMask (map liveness_bit regs)
-  where
-    liveness_bit (VanillaReg kind reg_no)
-      | isFollowableRep kind
-      = reg_tbl !! (reg_no - 1)
-
-    liveness_bit anything_else
-      = noLiveRegsBitMask
-
-    reg_tbl
-      = [lIVENESS_R1, lIVENESS_R2, lIVENESS_R3, lIVENESS_R4,
-	 lIVENESS_R5, lIVENESS_R6, lIVENESS_R7, lIVENESS_R8]
--}
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -224,7 +185,7 @@ assignPrimOpResultRegs op
 
 	ReturnsAlg tycon
 	  -> let
-		cons	    = getTyConDataCons tycon
+		cons	    = tyConDataCons tycon
 		result_regs = concat (map get_return_regs cons)
 	     in
 	     -- As R1 is dead, it can hold the tag if necessary
@@ -233,12 +194,9 @@ assignPrimOpResultRegs op
 		other -> (VanillaReg IntRep ILIT(1)) : result_regs
   where
     get_return_regs con
-      = case (dataReturnConvAlg fake_isw_chkr con) of
+      = case (dataReturnConvAlg con) of
 	  ReturnInRegs regs -> regs
 	  ReturnInHeap	    -> panic "getPrimOpAlgResultRegs"
-
-    fake_isw_chkr :: IntSwitchChecker
-    fake_isw_chkr x = Nothing
 \end{code}
 
 @assignPrimOpArgsRobust@ is used only for primitive ops which may
@@ -269,12 +227,12 @@ makePrimOpArgsRobust op arg_amodes
     	arg_kinds = map getAmodeRep non_robust_amodes
 
 	(arg_regs, extra_args)
-	  = assignRegs fake_isw_chkr [{-nothing live-}] arg_kinds
+	  = assignRegs [{-nothing live-}] arg_kinds
 
 		-- Check that all the args fit before returning arg_regs
 	final_arg_regs = case extra_args of
 			   []    -> arg_regs
-			   other -> error ("Cannot allocate enough registers for primop (try rearranging code or reducing number of arguments?) " ++ ppShow 80 (ppr PprDebug op))
+			   other -> pprError "Cannot allocate enough registers for primop (try rearranging code or reducing number of arguments?)" (ppr PprDebug op)
 
 	arg_assts
 	  = mkAbstractCs (zipWithEqual assign_to_reg final_arg_regs non_robust_amodes)
@@ -286,12 +244,9 @@ makePrimOpArgsRobust op arg_amodes
     		| otherwise    		= (tail regs, CReg (head regs))
     	safe_amodes = snd (mapAccumL safe_arg final_arg_regs arg_amodes)
 
-	liveness_mask = mkLiveRegsBitMask final_arg_regs
+	liveness_mask = mkLiveRegsMask final_arg_regs
     in
     (safe_amodes, liveness_mask, arg_assts)
-  where
-    fake_isw_chkr :: IntSwitchChecker
-    fake_isw_chkr x = Nothing
 \end{code}
 
 %************************************************************************
@@ -308,15 +263,14 @@ any further registers (even though we might have run out of only one kind of
 register); we just return immediately with the left-overs specified.
 
 \begin{code}
-assignRegs  :: IntSwitchChecker
-	    -> [MagicId]	-- Unavailable registers
+assignRegs  :: [MagicId]	-- Unavailable registers
 	    -> [PrimRep]	-- Arg or result kinds to assign
 	    -> ([MagicId],	-- Register assignment in same order
 				-- for *initial segment of* input list
 		[PrimRep])-- leftover kinds
 
-assignRegs isw_chkr regs_in_use kinds
- = assign_reg kinds [] (mkRegTbl isw_chkr regs_in_use)
+assignRegs regs_in_use kinds
+ = assign_reg kinds [] (mkRegTbl regs_in_use)
  where
 
     assign_reg	:: [PrimRep]  -- arg kinds being scrutinized
@@ -360,9 +314,9 @@ floatRegNos, doubleRegNos :: [Int]
 floatRegNos	= [1 .. mAX_Float_REG]
 doubleRegNos	= [1 .. mAX_Double_REG]
 
-mkRegTbl :: IntSwitchChecker -> [MagicId] -> ([Int], [Int], [Int])
+mkRegTbl :: [MagicId] -> ([Int], [Int], [Int])
 
-mkRegTbl isw_chkr regs_in_use
+mkRegTbl regs_in_use
   = (ok_vanilla, ok_float, ok_double)
   where
     ok_vanilla = catMaybes (map (select (VanillaReg VoidRep)) (taker vanillaRegNos))
@@ -371,7 +325,7 @@ mkRegTbl isw_chkr regs_in_use
 
     taker :: [Int] -> [Int]
     taker rs
-      = case (isw_chkr ReturnInRegsThreshold) of
+      = case (opt_ReturnInRegsThreshold) of
 	  Nothing -> rs -- no flag set; use all of them
 	  Just  n -> take n rs
 

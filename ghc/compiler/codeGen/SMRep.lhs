@@ -12,7 +12,9 @@ Other modules should access this info through ClosureInfo.
 module SMRep (
 	SMRep(..), SMSpecRepKind(..), SMUpdateKind(..),
 	getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr,
-	ltSMRepHdr
+	ltSMRepHdr,
+	isConstantRep, isSpecRep, isStaticRep, isPhantomRep,
+	isIntLikeRep
     ) where
 
 import Ubiq{-uitous-}
@@ -129,7 +131,27 @@ MuTupleRep == MUTUPLE
 
 --jim
 -}
+\end{code}
 
+\begin{code}
+isConstantRep, isSpecRep, isStaticRep, isPhantomRep, isIntLikeRep :: SMRep -> Bool
+isConstantRep (SpecialisedRep ConstantRep _ _ _)   = True
+isConstantRep other				   = False
+
+isSpecRep (SpecialisedRep kind _ _ _)	= True	  -- All the kinds of Spec closures
+isSpecRep other				= False   -- True indicates that the _VHS is 0 !
+
+isStaticRep (StaticRep _ _) = True
+isStaticRep _		    = False
+
+isPhantomRep PhantomRep	= True
+isPhantomRep _		= False
+
+isIntLikeRep (SpecialisedRep IntLikeRep _ _ _)   = True
+isIntLikeRep other				 = False
+\end{code}
+
+\begin{code}
 instance Eq SMRep where
     (SpecialisedRep k1 a1 b1 _) == (SpecialisedRep k2 a2 b2 _) = (tagOf_SMSpecRepKind k1) _EQ_ (tagOf_SMSpecRepKind k2)
 							       && a1 == a2 && b1 == b2

@@ -9,7 +9,7 @@
 
 module MatchEnv (
 	MatchEnv, nullMEnv, mkMEnv,
-	lookupMEnv, insertMEnv,
+	isEmptyMEnv, lookupMEnv, insertMEnv,
 	mEnvToList
 ) where
 
@@ -36,11 +36,15 @@ match will be the most specific.
 nullMEnv :: MatchEnv a b
 nullMEnv = EmptyME
 
+isEmptyMEnv EmptyME = True
+isEmptyMEnv _	    = False
+
 mkMEnv :: [(key, value)] -> MatchEnv key value
+mkMEnv []    = EmptyME
 mkMEnv stuff = ME stuff
 
 mEnvToList :: MatchEnv key value -> [(key, value)]
-mEnvToList EmptyME = []
+mEnvToList EmptyME    = []
 mEnvToList (ME stuff) = stuff
 \end{code}
 

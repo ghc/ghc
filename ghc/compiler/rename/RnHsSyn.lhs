@@ -32,6 +32,7 @@ type RenamedGenPragmas		= GenPragmas		Name
 type RenamedHsBinds		= HsBinds		Fake Fake Name RenamedPat
 type RenamedHsExpr		= HsExpr		Fake Fake Name RenamedPat
 type RenamedHsModule		= HsModule		Fake Fake Name RenamedPat
+type RenamedRecordBinds		= HsRecordBinds		Fake Fake Name RenamedPat
 type RenamedImportedInterface	= ImportedInterface	Fake Fake Name RenamedPat
 type RenamedInstDecl		= InstDecl		Fake Fake Name RenamedPat
 type RenamedInstancePragmas	= InstancePragmas	Name

@@ -1,59 +1,52 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CgConTbls]{Info tables and update bits for constructors}
 
 \begin{code}
 #include "HsVersions.h"
 
-module CgConTbls (
-	genStaticConBits,
+module CgConTbls ( genStaticConBits ) where
 
-	-- and to complete the interface...
-	TCE(..), UniqFM, CompilationInfo, AbstractC
-    ) where
-
-import Pretty		-- ToDo: rm (debugging)
-import Outputable
+import Ubiq{-uitous-}
 
 import AbsCSyn
 import CgMonad
 
-import Type		( getTyConDataCons, primRepFromType,
-    	    	    	  maybeIntLikeTyCon, mkSpecTyCon,
-			  TyVarTemplate, TyCon, Class,
-			  TauType(..), Type, ThetaType(..)
-			)
+import AbsCUtils	( mkAbsCStmts, mkAbstractCs, magicIdPrimRep )
+import CgCompInfo	( uF_UPDATEE )
 import CgHeapery	( heapCheck, allocDynClosure )
-import CgRetConv	( dataReturnConvAlg, ctrlReturnConvAlg,
-			  mkLiveRegsBitMask,
+import CgRetConv	( mkLiveRegsMask,
+			  dataReturnConvAlg, ctrlReturnConvAlg,
 			  CtrlReturnConvention(..),
 			  DataReturnConvention(..)
 			)
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
 import CgUsages		( getHpRelOffset )
-import CLabel	( mkConEntryLabel, mkStaticConEntryLabel,
-			  mkClosureLabel,
-			  mkConUpdCodePtrVecLabel, mkStdUpdCodePtrVecLabel,
-    	    	    	  mkStdUpdVecTblLabel, CLabel
+import CLabel		( mkConEntryLabel, mkClosureLabel,
+			  mkConUpdCodePtrVecLabel,
+			  mkStdUpdCodePtrVecLabel, mkStdUpdVecTblLabel
 			)
 import ClosureInfo	( layOutStaticClosure, layOutDynCon,
-			  closureSizeWithoutFixedHdr, closurePtrsSize,
-			  fitsMinUpdSize, mkConLFInfo, layOutPhantomClosure,
+			  layOutPhantomClosure, closurePtrsSize,
+			  fitsMinUpdSize, mkConLFInfo,
 			  infoTableLabelFromCI, dataConLiveness
 			)
-import FiniteMap
-import Id		( getDataConTag, getDataConSig, getDataConTyCon,
-			  mkSameSpecCon,
-			  getDataConArity, fIRST_TAG, ConTag(..),
-			  DataCon(..)
+import CostCentre	( dontCareCostCentre )
+import FiniteMap	( fmToList )
+import HeapOffs		( zeroOff, VirtualHeapOffset(..) )
+import Id		( dataConTag, dataConSig,
+			  dataConArity, fIRST_TAG,
+			  emptyIdSet,
+			  GenId{-instance NamedThing-}
 			)
-import CgCompInfo	( uF_UPDATEE )
-import Maybes		( maybeToBool, Maybe(..) )
-import PrimRep		( getPrimRepSize, retPrimRepSize )
-import CostCentre
-import UniqSet		-- ( emptyUniqSet, UniqSet(..) )
-import Util
+import PrimRep		( getPrimRepSize, PrimRep(..) )
+import TyCon		( tyConDataCons, mkSpecTyCon )
+import Type		( typePrimRep )
+import Util		( panic )
+
+maybeIntLikeTyCon = panic "CgConTbls.maybeIntLikeTyCon (ToDo)"
+mkSameSpecCon = panic "CgConTbls.mkSameSpecCon (ToDo)"
 \end{code}
 
 For every constructor we generate the following info tables:
@@ -139,7 +132,7 @@ genStaticConBits comp_info gen_tycons tycon_specs
 	  `mkAbsCStmts`
 	maybe_tycon_vtbl
       where
-    	data_cons   	= getTyConDataCons tycon
+    	data_cons   	= tyConDataCons tycon
     	tycon_upd_label = mkStdUpdVecTblLabel tycon
 
     	maybe_tycon_vtbl =
@@ -157,7 +150,7 @@ genStaticConBits comp_info gen_tycons tycon_specs
 	  `mkAbsCStmts`
 	maybe_spec_tycon_vtbl
       where
-	data_cons      = getTyConDataCons tycon
+	data_cons      = tyConDataCons tycon
 
 	spec_tycon     = mkSpecTyCon tycon ty_maybes
     	spec_data_cons = map (mkSameSpecCon ty_maybes) data_cons
@@ -174,15 +167,12 @@ genStaticConBits comp_info gen_tycons tycon_specs
     ------------------
     mk_upd_label tycon con
       = CLbl
-	(case (dataReturnConvAlg isw_chkr con) of
+	(case (dataReturnConvAlg con) of
 	  ReturnInRegs _ -> mkConUpdCodePtrVecLabel tycon tag
 	  ReturnInHeap   -> mkStdUpdCodePtrVecLabel tycon tag)
 	CodePtrRep
       where
-	tag = getDataConTag con
-
-    ------------------
-    (MkCompInfo sw_chkr isw_chkr _) = comp_info
+	tag = dataConTag con
 \end{code}
 
 %************************************************************************
@@ -197,7 +187,7 @@ static closure, for a constructor.
 \begin{code}
 genConInfo :: CompilationInfo -> TyCon -> Id -> AbstractC
 
-genConInfo comp_info@(MkCompInfo _ isw_chkr _) tycon data_con
+genConInfo comp_info tycon data_con
   = mkAbstractCs [
 		  CSplitMarker,
 		  inregs_upd_maybe,
@@ -206,12 +196,12 @@ genConInfo comp_info@(MkCompInfo _ isw_chkr _) tycon data_con
 		  closure_maybe]
 	-- Order of things is to reduce forward references
   where
-    (closure_info, body_code) = mkConCodeAndInfo isw_chkr data_con
+    (closure_info, body_code) = mkConCodeAndInfo data_con
 
     -- To allow the debuggers, interpreters, etc to cope with static
     -- data structures (ie those built at compile time), we take care that
     -- info-table contains the information we need.
-    (static_ci,_) = layOutStaticClosure data_con primRepFromType arg_tys (mkConLFInfo data_con)
+    (static_ci,_) = layOutStaticClosure data_con typePrimRep arg_tys (mkConLFInfo data_con)
 
     body       = (initC comp_info (
 	    	      profCtrC SLIT("ENT_CON") [CReg node] `thenC`
@@ -222,16 +212,16 @@ genConInfo comp_info@(MkCompInfo _ isw_chkr _) tycon data_con
 
     closure_code        = CClosureInfoAndCode closure_info body Nothing
 					      stdUpd con_descr
-					      (dataConLiveness isw_chkr closure_info)
+					      (dataConLiveness closure_info)
     static_code         = CClosureInfoAndCode static_ci body Nothing
 					      stdUpd con_descr
-					      (dataConLiveness isw_chkr static_ci)
+					      (dataConLiveness static_ci)
 
     inregs_upd_maybe    = genPhantomUpdInfo comp_info tycon data_con
 
     stdUpd  	    	= CLbl (mkStdUpdCodePtrVecLabel tycon tag) CodePtrRep
 
-    tag	    	    	= getDataConTag data_con
+    tag	    	    	= dataConTag data_con
 
     cost_centre = mkCCostCentre dontCareCostCentre -- not worried about static data costs
 
@@ -247,42 +237,41 @@ genConInfo comp_info@(MkCompInfo _ isw_chkr _) tycon data_con
 					cost_centre
 					[{-No args!  A slight lie for constrs with VoidRep args-}]
 
-    zero_size arg_ty = getPrimRepSize (primRepFromType arg_ty) == 0
+    zero_size arg_ty = getPrimRepSize (typePrimRep arg_ty) == 0
 
-    (_,_,arg_tys,_) = getDataConSig   data_con
-    con_arity	    = getDataConArity data_con
+    (_,_,arg_tys,_) = dataConSig   data_con
+    con_arity	    = dataConArity data_con
     entry_label     = mkConEntryLabel data_con
     closure_label   = mkClosureLabel  data_con
 \end{code}
 
 \begin{code}
-mkConCodeAndInfo :: IntSwitchChecker
-		 -> Id 			-- Data constructor
+mkConCodeAndInfo :: Id 			-- Data constructor
 		 -> (ClosureInfo, Code)	-- The info table
 
-mkConCodeAndInfo isw_chkr con
-  = case (dataReturnConvAlg isw_chkr con) of
+mkConCodeAndInfo con
+  = case (dataReturnConvAlg con) of
 
     ReturnInRegs regs ->
 	let
 	    (closure_info, regs_w_offsets)
-	      = layOutDynCon con kindFromMagicId regs
+	      = layOutDynCon con magicIdPrimRep regs
 
 	    body_code
 	      = profCtrC SLIT("RET_OLD_IN_REGS") [mkIntCLit (length regs_w_offsets)] `thenC`
 
 		performReturn (mkAbstractCs (map move_to_reg regs_w_offsets))
 			      (mkStaticAlgReturnCode con Nothing {- Info-ptr already loaded-})
-			      emptyUniqSet{-no live vars-}
+			      emptyIdSet{-no live vars-}
 	in
 	(closure_info, body_code)
 
     ReturnInHeap ->
 	let
-	    (_, _, arg_tys, _) = getDataConSig con
+	    (_, _, arg_tys, _) = dataConSig con
 
 	    (closure_info, arg_things)
-		= layOutDynCon con primRepFromType arg_tys
+		= layOutDynCon con typePrimRep arg_tys
 
 	    body_code
 		= -- NB: We don't set CC when entering data (WDP 94/06)
@@ -290,14 +279,14 @@ mkConCodeAndInfo isw_chkr con
 
 		  performReturn AbsCNop	-- Ptr to thing already in Node
 				(mkStaticAlgReturnCode con Nothing {- Info-ptr already loaded-})
-				emptyUniqSet{-no live vars-}
+				emptyIdSet{-no live vars-}
 	in
 	(closure_info, body_code)
 
   where
     move_to_reg :: (MagicId, VirtualHeapOffset {-from Node-}) -> AbstractC
     move_to_reg (reg, offset)
-      = CAssign (CReg reg) (CVal (NodeRel offset) (kindFromMagicId reg))
+      = CAssign (CReg reg) (CVal (NodeRel offset) (magicIdPrimRep reg))
 \end{code}
 
 %************************************************************************
@@ -312,8 +301,8 @@ Generate the "phantom" info table and update code, iff the constructor returns i
 
 genPhantomUpdInfo :: CompilationInfo -> TyCon -> Id{-data con-} -> AbstractC
 
-genPhantomUpdInfo comp_info@(MkCompInfo _ isw_chkr _) tycon data_con
-  = case (dataReturnConvAlg isw_chkr data_con) of
+genPhantomUpdInfo comp_info tycon data_con
+  = case (dataReturnConvAlg data_con) of
 
       ReturnInHeap -> AbsCNop	-- No need for a phantom update
 
@@ -321,19 +310,19 @@ genPhantomUpdInfo comp_info@(MkCompInfo _ isw_chkr _) tycon data_con
 	let
 	    phantom_itbl = CClosureInfoAndCode phantom_ci AbsCNop Nothing
 				upd_code con_descr
-				(dataConLiveness isw_chkr phantom_ci)
+				(dataConLiveness phantom_ci)
 
 	    phantom_ci = layOutPhantomClosure data_con (mkConLFInfo data_con)
 
 	    con_descr = _UNPK_ (getOccurrenceName data_con)
 
-	    con_arity = getDataConArity data_con
+	    con_arity = dataConArity data_con
 
 	    upd_code = CLabelledCode upd_label (mkAbsCStmts build_closure perform_return)
     	    upd_label = mkConUpdCodePtrVecLabel tycon tag
-	    tag = getDataConTag data_con
+	    tag = dataConTag data_con
 
-	    updatee = CVal (SpBRel 0 (-uF_UPDATEE)) PtrRep
+	    updatee = CVal (SpBRel 0 (- uF_UPDATEE)) PtrRep
 
 	    perform_return = mkAbstractCs
 	      [
@@ -352,7 +341,7 @@ genPhantomUpdInfo comp_info@(MkCompInfo _ isw_chkr _) tycon data_con
 	    blame_cc = use_cc -- who to blame for allocation
 
 	    do_move (reg, virt_offset) =
-    	    	CAssign (CVal (NodeRel virt_offset) (kindFromMagicId reg)) (CReg reg)
+    	    	CAssign (CVal (NodeRel virt_offset) (magicIdPrimRep reg)) (CReg reg)
 
 
     	    -- Code for building a new constructor in place over the updatee
@@ -402,9 +391,9 @@ genPhantomUpdInfo comp_info@(MkCompInfo _ isw_chkr _) tycon data_con
 			CAssign (CReg infoptr) (CLbl info_label DataPtrRep)
 		      ])
 
-	    (closure_info, regs_w_offsets) = layOutDynCon data_con kindFromMagicId regs
+	    (closure_info, regs_w_offsets) = layOutDynCon data_con magicIdPrimRep regs
 	    info_label = infoTableLabelFromCI closure_info
-	    liveness_mask = mkIntCLit (mkLiveRegsBitMask (node:regs))
+	    liveness_mask = mkIntCLit (mkLiveRegsMask (node:regs))
 
 	    build_closure =
 	      if fitsMinUpdSize closure_info then

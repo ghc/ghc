@@ -11,16 +11,31 @@ Semantique analyser) was written by Andy Gill.
 
 module StrictAnal ( saWwTopBinds, saTopBinds ) where
 
-import Id		( addIdDemandInfo, isWrapperId, addIdStrictness,
-			  idType, getIdDemandInfo
+import Ubiq{-uitous-}
+
+import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict,
+			  opt_D_dump_stranal, opt_D_simplifier_stats
 			)
-import IdInfo
+import CoreSyn
+import Id		( idType, addIdStrictness,
+			  getIdDemandInfo, addIdDemandInfo,
+			  GenId{-instance Outputable-}
+			)
+import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo,
+			  mkDemandInfo, willBeDemanded, DemandInfo
+			)
+import PprCore		( pprCoreBinding, pprBigCoreBinder )
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
+import Pretty		( ppBesides, ppStr, ppInt, ppChar, ppAboves )
 import SaAbsInt
 import SaLib
-import UniqSupply
-import Util
+import TyVar		( GenTyVar{-instance Eq-} )
 import WorkWrap		-- "back-end" of strictness analyser
-import WwLib		( WwM(..) )
+import Unique		( Unique{-instance Eq -} )
+import Util		( zipWith4Equal, pprTrace, panic{-ToDo:rm-} )
+
+isWrapperId = panic "StrictAnal.isWrapperId (ToDo)"
 \end{code}
 
 
@@ -72,13 +87,12 @@ Alas and alack.
 
 \begin{code}
 saWwTopBinds :: UniqSupply
-	     -> (GlobalSwitch -> Bool)
 	     -> [CoreBinding]
 	     -> [CoreBinding]
 
-saWwTopBinds us switch_chker binds
+saWwTopBinds us binds
   = let
-	strflags = (switch_chker AllStrict, switch_chker NumbersStrict)
+	strflags = (opt_AllStrict, opt_NumbersStrict)
 
 	-- mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS
@@ -90,13 +104,13 @@ saWwTopBinds us switch_chker binds
 #endif
     in
     -- possibly show what we decided about strictness...
-    (if switch_chker D_dump_stranal
+    (if opt_D_dump_stranal
      then pprTrace "Strictness:\n" (ppAboves (
-	   map (pprCoreBinding PprDebug pprBigCoreBinder pprBigCoreBinder ppr) binds_w_strictness))
+	   map (pprCoreBinding PprDebug)  binds_w_strictness))
      else id
     )
     -- possibly show how many things we marked as demanded...
-    ((if switch_chker D_simplifier_stats
+    ((if opt_D_simplifier_stats
 #ifndef OMIT_STRANAL_STATS
      then pp_stats sa_stats
 #else
@@ -107,7 +121,7 @@ saWwTopBinds us switch_chker binds
 	-- create worker/wrappers, and mark binders with their
 	-- "strictness info" [which encodes their
 	-- worker/wrapper-ness]
-    (workersAndWrappers binds_w_strictness us switch_chker))
+    (workersAndWrappers binds_w_strictness us))
 #ifndef OMIT_STRANAL_STATS
   where
     pp_stats (SaStats tlam dlam tc dc tlet dlet)
@@ -232,30 +246,26 @@ environment.
 \begin{code}
 saExpr :: StrictEnv -> AbsenceEnv -> CoreExpr -> SaM CoreExpr
 
-saExpr _ _ e@(Var _)      = returnSa e
-saExpr _ _ e@(Lit _)      = returnSa e
-saExpr _ _ e@(Con _ _ _)  = returnSa e
-saExpr _ _ e@(Prim _ _ _) = returnSa e
+saExpr _ _ e@(Var _)	= returnSa e
+saExpr _ _ e@(Lit _)	= returnSa e
+saExpr _ _ e@(Con  _ _)	= returnSa e
+saExpr _ _ e@(Prim _ _)	= returnSa e
 
-saExpr str_env abs_env (Lam arg body)
+saExpr str_env abs_env (Lam (ValBinder arg) body)
   = saExpr str_env abs_env body	`thenSa` \ new_body ->
     let
 	new_arg = addDemandInfoToId str_env abs_env body arg
     in
     tickLambda new_arg	`thenSa_` -- stats
-    returnSa (Lam new_arg new_body)
+    returnSa (Lam (ValBinder new_arg) new_body)
 
-saExpr str_env abs_env (CoTyLam ty expr)
+saExpr str_env abs_env (Lam other_binder expr)
   = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
-    returnSa (CoTyLam ty new_expr)
+    returnSa (Lam other_binder new_expr)
 
 saExpr str_env abs_env (App fun arg)
   = saExpr str_env abs_env fun	`thenSa` \ new_fun ->
     returnSa (App new_fun arg)
-
-saExpr str_env abs_env (CoTyApp expr ty)
-  = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
-    returnSa (CoTyApp new_expr ty)
 
 saExpr str_env abs_env (SCC cc expr)
   = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
@@ -447,7 +457,7 @@ returnSa      :: a -> SaM a
 {-# INLINE thenSa_ #-}
 {-# INLINE returnSa #-}
 
-tickLambda :: [Id] -> SaM ()
+tickLambda :: Id   -> SaM ()
 tickCases  :: [Id] -> SaM ()
 tickLet    :: Id   -> SaM ()
 
@@ -465,7 +475,7 @@ thenSa_ expr cont stats
 returnSa x stats = (x, stats)
 
 tickLambda var (SaStats tlam dlam tc dc tlet dlet)
-  = case (tick_demanded (0,0) var) of { (IBOX(tot), IBOX(demanded)) ->
+  = case (tick_demanded var (0,0)) of { (IBOX(tot), IBOX(demanded)) ->
     ((), SaStats (tlam _ADD_ tot) (dlam _ADD_ demanded) tc dc tlet dlet) }
 
 tickCases vars (SaStats tlam dlam tc dc tlet dlet)

@@ -115,7 +115,8 @@ lookupSpecId unspec_id ty_maybes
 
     case (firstJust (map try spec_infos)) of
       Just id -> id
-      Nothing -> error ("ERROR: There is some confusion about a value specialised to a type;\ndetails follow (and more info in the User's Guide):\n\t"++(ppShow 80 (ppr PprDebug unspec_id)))
+      Nothing -> pprError "ERROR: There is some confusion about a value specialised to a type;\ndetails follow (and more info in the User's Guide):\n\t"
+			  (ppr PprDebug unspec_id)
     }
   where
     try (SpecInfo template_maybes _ id)
@@ -188,7 +189,7 @@ lookupSpecEnv se@(SpecEnv spec_infos) spec_tys
     match [{-out of templates-}] [] = Just []
 
     match (Nothing:ty_maybes) (spec_ty:spec_tys)
-      = case (isUnboxedDataType spec_ty) of
+      = case (isUnboxedType spec_ty) of
 	  True  -> Nothing	-- Can only match boxed type against
 				-- type argument which has not been
 				-- specialised on
@@ -248,6 +249,6 @@ pp_specs sty print_spec_ids better_id_fn inline_env (SpecEnv specs)
     pp_the_list (p:ps) = ppBesides [p, pp'SP{-'-}, pp_the_list ps]
 
     pp_maybe Nothing  = ifPprInterface sty pp_NONE
-    pp_maybe (Just t) = pprParendType sty t
+    pp_maybe (Just t) = pprParendGenType sty t
 \end{pseudocode}
 

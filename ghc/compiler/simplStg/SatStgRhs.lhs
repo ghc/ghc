@@ -1,8 +1,10 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[SatStgRhs]{Saturates RHSs when they are partial applications}
 
+96/03: This is actually an essential module, as it sets arity info
+for the code generator.
 
 \begin{display}
 Subject: arg satis check
@@ -58,20 +60,22 @@ This is done for local definitions as well.
 
 module SatStgRhs ( satStgRhs ) where
 
+import Ubiq{-uitous-}
+
 import StgSyn
 
-import Type		( splitTypeWithDictsAsArgs, Class,
-			  TyVarTemplate, TauType(..)
+import CostCentre	( isCafCC, subsumedCosts, useCurrentCostCentre )
+import Id		( idType, getIdArity, addIdArity, mkSysLocal,
+			  nullIdEnv, addOneToIdEnv, growIdEnvList,
+			  lookupIdEnv, IdEnv(..)
 			)
-import CostCentre
-import Id		( mkSysLocal, idType, getIdArity, addIdArity )
-import IdInfo		-- SIGH: ( arityMaybe, ArityInfo, OptIdInfo(..) )
-import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
-import UniqSupply
-import Util
-import Maybes
+import IdInfo		( arityMaybe )
+import SrcLoc		( mkUnknownSrcLoc )
+import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM(..) )
+import Util		( panic, assertPanic )
 
-type Arity = Int
+splitTypeWithDictsAsArgs = panic "SatStgRhs.splitTypeWithDictsAsArgs (ToDo)"
+
 type Count = Int
 
 type ExprArityInfo = Maybe Int	    -- Just n  => This expression has a guaranteed

@@ -13,6 +13,7 @@ module Unpretty (
 	uppSP, uppLbrack, uppRbrack, uppLparen, uppRparen,
 	uppSemi, uppComma, uppEquals,
 
+	uppBracket, uppParens,
 	uppCat, uppBeside, uppBesides, uppAbove, uppAboves,
 	uppNest, uppSep, uppInterleave, uppIntersperse,
 	uppShow,
@@ -50,6 +51,9 @@ uppChar		:: Char -> Unpretty
 uppInt		:: Int -> Unpretty
 uppInteger	:: Integer -> Unpretty
 
+uppBracket	:: Unpretty -> Unpretty -- put brackets around it
+uppParens	:: Unpretty -> Unpretty -- put parens   around it
+
 uppBeside	:: Unpretty -> Unpretty -> Unpretty
 uppBesides	:: [Unpretty] -> Unpretty
 ppBesideSP	:: Unpretty -> Unpretty -> Unpretty
@@ -65,7 +69,7 @@ uppNest		:: Int -> Unpretty -> Unpretty
 
 uppShow		:: Int -> Unpretty -> [Char]
 
-uppAppendFile	:: _FILE -> Int -> Unpretty -> PrimIO ()
+uppAppendFile	:: _FILE -> Int -> Unpretty -> IO ()
 \end{code}
 
 %************************************************
@@ -95,6 +99,9 @@ uppRparen	= cCh ')'
 uppSemi		= cCh ';'
 uppComma	= cCh ','
 uppEquals	= cCh '='
+
+uppBracket p = uppBeside uppLbrack (uppBeside p uppRbrack)
+uppParens  p = uppBeside uppLparen (uppBeside p uppRparen)
 
 uppInterleave sep ps = uppSep (pi ps)
   where

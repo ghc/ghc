@@ -15,8 +15,6 @@ module RnBinds4 (
 	rnTopBinds, rnMethodBinds,
 	rnBinds,
 	FreeVars(..), DefinedVars(..)
-
-	-- and to make the interface self-sufficient...
    ) where
 
 import Ubiq{-uitous-}
@@ -37,9 +35,9 @@ import Name		( isUnboundName, Name{-instances-} )
 import Pretty
 import ProtoName	( elemByLocalNames, eqByLocalName, ProtoName{-instances-} )
 import RnExpr4		-- OK to look here; but not the other way 'round
-import UniqSet		( emptyUniqSet, singletonUniqSet, mkUniqSet,
+import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  unionUniqSets, unionManyUniqSets,
-			  elementOfUniqSet,
+			  elementOfUniqSet, addOneToUniqSet,
 			  uniqSetToList,
 			  UniqSet(..)
 			)
@@ -368,7 +366,7 @@ flattenMonoBinds uniq sigs (FunMonoBind name matches locn)
     returnRn4 (
       uniq + 1,
       [(uniq,
-	singletonUniqSet name',
+	unitUniqSet name',
 	fvs `unionUniqSets` sigs_fvs,
 	FunMonoBind name' new_matches locn,
 	sigs_for_me
@@ -391,7 +389,7 @@ sig_for_here want_me acc other_wise			 = acc
 -- acct in the dependency analysis (or we get an
 -- unexpected out-of-scope error)! WDP 95/07
 
-sig_fv (SpecSig _ _ (Just blah) _) acc = acc `unionUniqSets` singletonUniqSet blah
+sig_fv (SpecSig _ _ (Just blah) _) acc = addOneToUniqSet acc blah
 sig_fv _			   acc = acc
 \end{code}
 

@@ -1,47 +1,52 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1995
+% (c) The AQUA Project, Glasgow University, 1993-1996
 %
-\section[SimplPgm]{Interface to the ``new'' simplifier}
+\section[SimplPgm]{Interface to the simplifier}
 
 \begin{code}
 #include "HsVersions.h"
 
 module SimplPgm ( simplifyPgm ) where
 
-import Type		( getTyVarMaybe )
-import CmdLineOpts	( switchIsOn, intSwitchSet,
-			  GlobalSwitch(..), SimplifierSwitch(..)
+import Ubiq{-uitous-}
+
+import CmdLineOpts	( opt_D_verbose_core2core,
+			  switchIsOn, intSwitchSet, SimplifierSwitch(..)
 			)
-import Id		( externallyVisibleId )
-import IdInfo
-import Maybes		( catMaybes, Maybe(..) )
-import Outputable
+import CoreSyn
+import CoreUtils	( substCoreExpr )
+import Id		( externallyVisibleId,
+			  mkIdEnv, lookupIdEnv, IdEnv(..),
+			  GenId{-instance Ord3-}
+			)
+import Maybes		( catMaybes )
+import OccurAnal	( occurAnalyseBinds )
+import Outputable	( isExported )
+import Pretty		( ppAboves, ppBesides, ppInt, ppChar, ppStr )
 import SimplEnv
 import SimplMonad
 import Simplify		( simplTopBinds )
-import OccurAnal	-- occurAnalyseBinds
-import UniqSupply
-import Util
+import TyVar		( nullTyVarEnv, TyVarEnv(..) )
+import UniqSupply	( thenUs, returnUs, mapUs, splitUniqSupply, UniqSM(..) )
+import Util		( isIn, isn'tIn, removeDups, pprTrace )
 \end{code}
 
 \begin{code}
-simplifyPgm :: [CoreBinding]		-- input
-	    -> (GlobalSwitch->SwitchResult)	-- switch lookup fns (global
-	    -> (SimplifierSwitch->SwitchResult) -- and this-simplification-specific)
-	    -> SimplCount                       -- info about how many times
-						-- each transformation has occurred
+simplifyPgm :: [CoreBinding]	-- input
+	    -> (SimplifierSwitch->SwitchResult)
+	    -> SimplCount	-- info about how many times
+				-- each transformation has occurred
 	    -> UniqSupply
 	    -> ([CoreBinding],	-- output
-		 Int,			-- info about how much happened
-		 SimplCount)		-- accumulated simpl stats
+		 Int,		-- info about how much happened
+		 SimplCount)	-- accumulated simpl stats
 
-simplifyPgm binds g_sw_chkr s_sw_chkr simpl_stats us
+simplifyPgm binds s_sw_chkr simpl_stats us
   = case (splitUniqSupply us)		     of { (s1, s2) ->
     case (initSmpl s1 (simpl_pgm 0 1 binds)) of { ((pgm2, it_count, simpl_stats2), _) ->
     case (tidy_top pgm2 s2) 	    	     of { pgm3 ->
     (pgm3, it_count, combineSimplCounts simpl_stats simpl_stats2) }}}
   where
-    global_switch_is_on = switchIsOn g_sw_chkr
     simpl_switch_is_on  = switchIsOn s_sw_chkr
 
     occur_anal = occurAnalyseBinds
@@ -56,11 +61,8 @@ simplifyPgm binds g_sw_chkr s_sw_chkr simpl_stats us
     simpl_pgm n iterations pgm
       =	-- find out what top-level binders are used,
 	-- and prepare to unfold all the "simple" bindings
-	-- pprTrace ("\niteration "++show iterations++":\n") (ppr PprDebug pgm) (
 	let
-	    tagged_pgm = BSCC("OccurBinds")
-			 occur_anal pgm global_switch_is_on simpl_switch_is_on
-			 ESCC
+	    tagged_pgm = occur_anal pgm simpl_switch_is_on
 	in
 	      -- do the business
 	simplTopBinds (nullSimplEnv s_sw_chkr) tagged_pgm `thenSmpl` \ new_pgm ->
@@ -74,11 +76,11 @@ simplifyPgm binds g_sw_chkr s_sw_chkr simpl_stats us
 	    show_status = pprTrace "NewSimpl: " (ppAboves [
 		ppBesides [ppInt iterations, ppChar '/', ppInt max_simpl_iterations],
 		ppStr (showSimplCount dr)
---DEBUG:	, ppAboves (map (pprPlainCoreBinding PprDebug) new_pgm)
+--DEBUG:	, ppAboves (map (pprCoreBinding PprDebug) new_pgm)
 		])
 	in
 
-	(if global_switch_is_on D_verbose_core2core
+	(if opt_D_verbose_core2core
 	 || simpl_switch_is_on  ShowSimplifierProgress
 	 then show_status
 	 else id)
@@ -98,7 +100,6 @@ simplifyPgm binds g_sw_chkr s_sw_chkr simpl_stats us
 	else
 	    simpl_pgm r (iterations + 1) new_pgm
 	)
-	-- )
 \end{code}
 
 In @tidy_top@, we look for things at the top-level of the form...
@@ -131,10 +132,8 @@ tidy_top binds_in
   = if null blast_alist then
 	returnUs binds_in    -- no joy there
     else
-	-- pprTrace "undup output length:" (ppInt (length blast_alist)) (
 	mapUs blast binds_in	`thenUs` \ binds_maybe ->
 	returnUs (catMaybes binds_maybe)
-	-- )
   where
     blast_alist  = undup (foldl find_cand [] binds_in)
     blast_id_env = mkIdEnv blast_alist
@@ -158,13 +157,11 @@ tidy_top binds_in
     undup :: [(Id, Id)] -> [(Id, Id)]
 
     undup blast_list
-      = -- pprTrace "undup input length:" (ppInt (length blast_list)) (
-	let
+      = let
 	    (singles, dups) = removeDups compare blast_list
 	    list_of_dups    = concat dups
 	in
 	[ s | s <- singles, s `not_elem` list_of_dups ]
-	-- )
       where
 	compare (x,_) (y,_) = x `cmp` y
 
@@ -186,25 +183,23 @@ tidy_top binds_in
 	returnUs (Just (Rec blasted_pairs))
       where
 	blast_pr (binder, rhs)
-	  = subst_CoreExprUS blast_val_env nullTyVarEnv rhs `thenUs` \ blasted_rhs ->
+	  = substCoreExpr blast_val_env nullTyVarEnv rhs `thenUs` \ new_rhs ->
 	    returnUs (
-	    case lookupIdEnv blast_id_env binder of
-	      Just exportee -> (exportee, blasted_rhs)
-	      Nothing	    -> (binder,   blasted_rhs)
+	    case (lookupIdEnv blast_id_env binder) of
+	      Just exportee -> (exportee, new_rhs)
+	      Nothing	    -> (binder,   new_rhs)
 	    )
 
     blast (NonRec binder rhs)
       = if binder `is_elem` blast_all_exps then
 	   returnUs Nothing -- this binding dies!
     	else
-	   subst_CoreExprUS blast_val_env nullTyVarEnv rhs `thenUs` \ blasted_rhs ->
+	   substCoreExpr blast_val_env nullTyVarEnv rhs `thenUs` \ new_rhs ->
 	   returnUs (Just (
-	   case lookupIdEnv blast_id_env binder of
-	     Just exportee -> NonRec exportee blasted_rhs
-	     Nothing	   -> NonRec binder   blasted_rhs
+	   case (lookupIdEnv blast_id_env binder) of
+	     Just exportee -> NonRec exportee new_rhs
+	     Nothing	   -> NonRec binder   new_rhs
 	   ))
       where
 	is_elem = isIn "blast"
-
-subst_CoreExprUS e1 e2 rhs us = snd (substCoreExprUS e1 e2 rhs (mkUniqueSupplyGrimily us))
 \end{code}

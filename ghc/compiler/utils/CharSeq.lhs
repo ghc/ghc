@@ -65,7 +65,7 @@ cCh 	:: Char -> CSeq
 cInt	:: Int -> CSeq
 
 #if defined(COMPILING_GHC)
-cAppendFile :: _FILE -> CSeq -> PrimIO ()
+cAppendFile :: _FILE -> CSeq -> IO ()
 #endif
 \end{code}
 
@@ -128,7 +128,7 @@ cLength seq = length (cShow seq) -- *not* the best way to do this!
 
 #if defined(COMPILING_GHC)
 cAppendFile file_star seq
-  = flattenIO file_star seq
+  = flattenIO file_star seq `seqPrimIO` return ()
 #endif
 \end{code}
 

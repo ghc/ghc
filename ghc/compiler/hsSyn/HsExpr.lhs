@@ -20,13 +20,11 @@ import HsTypes		( PolyType )
 -- others:
 import Id		( DictVar(..), GenId, Id(..) )
 import Outputable
-import PprType		( pprType, pprParendType, GenType{-instance-}, GenTyVar{-instance-} )
+import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )
 import Pretty
 import PprStyle		( PprStyle(..) )
 import SrcLoc		( SrcLoc )
-import TyVar		( GenTyVar{-instances-} )
 import Usage		( GenUsage{-instance-} )
-import Unique		( Unique{-instances-} )
 import Util		( panic{-ToDo:rm eventually-} )
 \end{code}
 
@@ -99,11 +97,14 @@ data HsExpr tyvar uvar id pat
 				-- for tuples, we can get the types
 				-- direct from the components
 
-  | RecordCon	id		-- record construction
-		[(id, Maybe (HsExpr tyvar uvar id pat))]
+	-- Record construction
+  | RecordCon	(HsExpr tyvar uvar id pat)	-- Always (HsVar id) until type checker,
+						-- but the latter adds its type args too
+		(HsRecordBinds tyvar uvar id pat)
 
-  | RecordUpd	(HsExpr tyvar uvar id pat) -- record update
-		[(id, Maybe (HsExpr tyvar uvar id pat))]
+	-- Record update
+  | RecordUpd	(HsExpr tyvar uvar id pat)
+		(HsRecordBinds tyvar uvar id pat)
 
   | ExprWithTySig		-- signature binding
 		(HsExpr tyvar uvar id pat)
@@ -160,6 +161,11 @@ Everything from here on appears only in typechecker output.
 
   |  SingleDict			-- a simple special case of Dictionary
 		id		-- local dictionary name
+
+type HsRecordBinds tyvar uvar id pat
+  = [(id, HsExpr tyvar uvar id pat, Bool)]
+	-- True <=> source code used "punning",
+	-- i.e. {op1, op2} rather than {op1=e1, op2=e2}
 \end{code}
 
 A @Dictionary@, unless of length 0 or 1, becomes a tuple.  A
@@ -272,7 +278,7 @@ pprExpr sty (ExplicitList exprs)
   = ppBracket (ppInterleave ppComma (map (pprExpr sty) exprs))
 pprExpr sty (ExplicitListOut ty exprs)
   = ppBesides [ ppBracket (ppInterleave ppComma (map (pprExpr sty) exprs)),
-		ifnotPprForUser sty (ppBeside ppSP (ppParens (pprType sty ty))) ]
+		ifnotPprForUser sty (ppBeside ppSP (ppParens (pprGenType sty ty))) ]
 
 pprExpr sty (ExplicitTuple exprs)
   = ppParens (ppInterleave ppComma (map (pprExpr sty) exprs))
@@ -300,7 +306,7 @@ pprExpr sty (TyLam tyvars expr)
 	 4 (pprExpr sty expr)
 
 pprExpr sty (TyApp expr [ty])
-  = ppHang (pprExpr sty expr) 4 (pprParendType sty ty)
+  = ppHang (pprExpr sty expr) 4 (pprParendGenType sty ty)
 
 pprExpr sty (TyApp expr tys)
   = ppHang (pprExpr sty expr)
@@ -360,16 +366,17 @@ pprParendExpr sty expr
 %************************************************************************
 
 \begin{code}
+pp_rbinds :: (NamedThing id, Outputable id, Outputable pat,
+		  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
+	      => PprStyle -> Pretty 
+	      -> HsRecordBinds tyvar uvar id pat -> Pretty
+
 pp_rbinds sty thing rbinds
   = ppHang thing 4
 	(ppBesides [ppChar '{', ppInterleave ppComma (map (pp_rbind sty) rbinds), ppChar '}'])
-
-pp_rbind :: (NamedThing id, Outputable id, Outputable pat,
-		  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	      => PprStyle -> (id, Maybe (HsExpr tyvar uvar id pat)) -> Pretty
-
-pp_rbind sty (v, Nothing) = ppr sty v
-pp_rbind sty (v, Just e)  = ppCat [ppr sty v, ppStr "<-", ppr sty e]
+  where
+    pp_rbind sty (v, _, True{-pun-}) = ppr sty v
+    pp_rbind sty (v, e, _) = ppCat [ppr sty v, ppStr "<-", ppr sty e]
 \end{code}
 
 %************************************************************************

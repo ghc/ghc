@@ -24,18 +24,23 @@ module SimplUtils (
 import Ubiq{-uitous-}
 
 import BinderInfo
+import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
 import CoreUtils	( manifestlyWHNF )
-import Id		( idType, isBottomingId, getIdArity )
+import Id		( idType, isBottomingId, idWantsToBeINLINEd,
+			  getIdArity, GenId{-instance Eq-}
+			)
 import IdInfo		( arityMaybe )
 import Maybes		( maybeToBool )
 import PrelInfo		( augmentId, buildId, realWorldStateTy )
+import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
-import Type		( isPrimType, maybeAppDataTyCon, getTyVar_maybe )
+import Type		( eqTy, isPrimType, maybeAppDataTyCon, getTyVar_maybe )
+import TyVar		( GenTyVar{-instance Eq-} )
 import Util		( isIn, panic )
 
-primOpIsCheap = panic "SimplUtils. (ToDo)"
+getInstantiatedDataConSig =  panic "SimplUtils.getInstantiatedDataConSig (ToDo)"
 \end{code}
 
 
@@ -50,13 +55,13 @@ floatExposesHNF
 	:: Bool 		-- Float let(rec)s out of rhs
 	-> Bool 		-- Float cheap primops out of rhs
 	-> Bool 		-- OK to duplicate code
-	-> GenCoreExpr bdr Id
+	-> GenCoreExpr bdr Id tyvar uvar
 	-> Bool
 
 floatExposesHNF float_lets float_primops ok_to_dup rhs
   = try rhs
   where
-    try (Case (Prim _ _ _) (PrimAlts alts deflt) )
+    try (Case (Prim _ _) (PrimAlts alts deflt) )
       | float_primops && (null alts || ok_to_dup)
       = or (try_deflt deflt : map try_alt alts)
 
@@ -132,7 +137,7 @@ mkValLamTryingEta orig_ids body
 
     reduce_it (id:ids) (App fun (VarArg arg))
       | id == arg
-      && idType id /= realWorldStateTy
+      && not (idType id `eqTy` realWorldStateTy)
 	 -- *never* eta-reduce away a PrimIO state token! (WDP 94/11)
       = reduce_it ids fun
 
@@ -171,7 +176,7 @@ arguments as you care to give it.  For this special case we return
 100, to represent "infinity", which is a bit of a hack.
 
 \begin{code}
-etaExpandCount :: GenCoreExpr bdr Id
+etaExpandCount :: GenCoreExpr bdr Id tyvar uvar
 	       -> Int	-- Number of extra args you can safely abstract
 
 etaExpandCount (Lam (ValBinder _) body)
@@ -200,8 +205,8 @@ etaExpandCount other = 0    -- Give up
 	-- Case with non-whnf scrutinee
 
 -----------------------------
-eta_fun :: GenCoreExpr bdr Id 	-- The function
-	-> Int			-- How many args it can safely be applied to
+eta_fun :: GenCoreExpr bdr Id tv uv -- The function
+	-> Int			    -- How many args it can safely be applied to
 
 eta_fun (App fun arg) | notValArg arg = eta_fun fun
 
@@ -240,17 +245,14 @@ which aren't WHNF but are ``cheap'' are:
 	where op is a cheap primitive operator
 
 \begin{code}
-manifestlyCheap :: GenCoreExpr bndr Id -> Bool
+manifestlyCheap :: GenCoreExpr bndr Id tv uv -> Bool
 
-manifestlyCheap (Var _)       = True
-manifestlyCheap (Lit _)       = True
-manifestlyCheap (Con _ _ _)   = True
-manifestlyCheap (SCC _ e)     = manifestlyCheap e
-
-manifestlyCheap (Lam (ValBinder _) _) = True
-manifestlyCheap (Lam other_binder e)  = manifestlyCheap e
-
-manifestlyCheap (Prim op _ _) = primOpIsCheap op
+manifestlyCheap (Var _)     = True
+manifestlyCheap (Lit _)     = True
+manifestlyCheap (Con _ _)   = True
+manifestlyCheap (SCC _ e)   = manifestlyCheap e
+manifestlyCheap (Lam x e)   = if isValBinder x then True else manifestlyCheap e
+manifestlyCheap (Prim op _) = primOpIsCheap op
 
 manifestlyCheap (Let bind body)
   = manifestlyCheap body && all manifestlyCheap (rhssOfBind bind)
@@ -259,7 +261,7 @@ manifestlyCheap (Case scrut alts)
   = manifestlyCheap scrut && all manifestlyCheap (rhssOfAlts alts)
 
 manifestlyCheap other_expr   -- look for manifest partial application
-  = case (collectArgs other_expr) of { (fun, args) ->
+  = case (collectArgs other_expr) of { (fun, _, _, vargs) ->
     case fun of
 
       Var f | isBottomingId f -> True	-- Application of a function which
@@ -268,7 +270,7 @@ manifestlyCheap other_expr   -- look for manifest partial application
 					-- need to be shared!
 
       Var f -> let
-		    num_val_args = numValArgs args
+		    num_val_args = length vargs
 	       in
 	       num_val_args == 0 ||	-- Just a type application of
 					-- a variable (f t1 t2 t3)
@@ -381,7 +383,7 @@ mkIdentityAlts rhs_ty
 	    in
 	    returnSmpl (
 	      AlgAlts
-		[(data_con, new_binders, Con data_con ty_args (map VarArg new_bindees))]
+		[(data_con, new_binders, mkCon data_con [] ty_args (map VarArg new_bindees))]
 		NoDefault
 	    )
 

@@ -141,6 +141,9 @@ mAX_INTLIKE = MAX_INTLIKE
 
 \begin{code}
 -- THESE ARE DIRECTION SENSITIVE!
+spARelToInt :: Int{-VirtualSpAOffset-} -> Int{-VirtualSpAOffset-} -> Int
+spBRelToInt :: Int{-VirtualSpBOffset-} -> Int{-VirtualSpBOffset-} -> Int
+
 spARelToInt spA off = spA - off -- equiv to: AREL(spA - off)
 spBRelToInt spB off = off - spB -- equiv to: BREL(spB - off)
 \end{code}

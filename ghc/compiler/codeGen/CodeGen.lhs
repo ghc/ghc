@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CodeGen]{@CodeGen@: main module of the code generator}
 
@@ -19,28 +19,32 @@ functions drive the mangling of top-level bindings.
 
 module CodeGen ( codeGen ) where
 
+import Ubiq{-uitous-}
+
 import StgSyn
 import CgMonad
 import AbsCSyn
 
-import CLabel	( modnameToC )
+import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
+import Bag		( foldBag )
 import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
-import CgConTbls	( genStaticConBits, TCE(..), UniqFM )
-import ClosureInfo	( LambdaFormInfo, mkClosureLFInfo )
-import CmdLineOpts
-import FiniteMap	( FiniteMap )
-import Maybes		( Maybe(..) )
-import Pretty		-- debugging only
-import PrimRep		( getPrimRepSize )
-import Util
+import CgConTbls	( genStaticConBits )
+import ClosureInfo	( mkClosureLFInfo )
+import CmdLineOpts	( opt_SccProfilingOn, opt_CompilingPrelude,
+			  opt_EnsureSplittableC, opt_SccGroup
+			)
+import CStrings		( modnameToC )
+import Maybes		( maybeToBool )
+import PrimRep		( getPrimRepSize, PrimRep(..) )
+import Util		( panic, assertPanic )
 \end{code}
 
 \begin{code}
 codeGen :: FAST_STRING		-- module name
 	-> ([CostCentre],	-- local cost-centres needing declaring/registering
 	    [CostCentre])	-- "extern" cost-centres needing declaring
-	-> [FAST_STRING]	-- import names
+	-> Bag FAST_STRING	-- import names
 	-> [TyCon]		-- tycons with data constructors to convert
 	-> FiniteMap TyCon [(Bool, [Maybe Type])]
 				-- tycon specialisation info
@@ -51,11 +55,11 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
   = let
 	doing_profiling   = opt_SccProfilingOn
 	compiling_prelude = opt_CompilingPrelude
-	maybe_split       = if (switch_is_on (EnsureSplittableC (panic "codeGen:esc")))
+	maybe_split       = if maybeToBool (opt_EnsureSplittableC)
 			    then CSplitMarker
 			    else AbsCNop
 
-	cinfo = MkCompInfo switch_is_on int_switch_set mod_name
+	cinfo = MkCompInfo mod_name
     in
     if not doing_profiling then
 	mkAbstractCs [
@@ -85,15 +89,16 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
 		initC cinfo (cgTopBindings maybe_split stg_pgm) ]
   where
     -----------------
-    grp_name  = case (stringSwitchSet sw_lookup_fn SccGroup) of
-		  Just xx -> _PK_ xx
+    grp_name  = case opt_SccGroup of
+		  Just xx -> xx
 		  Nothing -> mod_name	-- default: module name
 
     -----------------
     mkCcRegister ccs import_names
       = let
 	    register_ccs     = mkAbstractCs (map mk_register ccs)
-	    register_imports = mkAbstractCs (map mk_import_register import_names)
+	    register_imports
+	      = foldBag mkAbsCStmts mk_import_register AbsCNop import_names
 	in
 	mkAbstractCs [
 	    CCallProfCCMacro SLIT("START_REGISTER_CCS") [CLitLit (modnameToC (SLIT("_reg") _APPEND_ mod_name)) AddrRep],

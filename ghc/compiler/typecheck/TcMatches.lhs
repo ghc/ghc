@@ -210,7 +210,7 @@ matchCtxt MCase match sty
 
 matchCtxt (MFun fun) match sty
   = ppHang (ppBesides [ppStr "In an equation for function ", ppr sty fun, ppChar ':'])
-	 4 (ppBesides [ppr sty fun, pprMatch sty False{-not case-} match])
+	 4 (ppBesides [ppr sty fun, ppSP, pprMatch sty False{-not case-} match])
 \end{code}
 
 

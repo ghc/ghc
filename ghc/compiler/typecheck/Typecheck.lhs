@@ -19,7 +19,6 @@ import HsSyn
 import RnHsSyn
 import TcHsSyn
 
-import ErrUtils		( TcWarning(..), TcError(..) )
 import Pretty
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
 import Maybes		( MaybeErr(..) )
@@ -41,7 +40,8 @@ typecheckModule
     -> -- OUTPUTS ...
     MaybeErr
        -- SUCCESS ...
-      (((TypecheckedHsBinds,	   -- binds from class decls; does NOT
+      (((TypecheckedHsBinds,	   -- record selector definitions
+	 TypecheckedHsBinds,	   -- binds from class decls; does NOT
 				   --    include default-methods bindings
 	 TypecheckedHsBinds,	   -- binds from instance decls; INCLUDES
 				   --    class default-methods binds

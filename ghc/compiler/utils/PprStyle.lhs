@@ -8,7 +8,8 @@
 
 module PprStyle (
 	PprStyle(..),
-	codeStyle
+	codeStyle,
+	showUserishTypes
     ) where
 
 CHK_Ubiq() -- debugging consistency check
@@ -47,3 +48,10 @@ codeStyle (PprForAsm _ _) = True
 codeStyle _		  = False
 \end{code}
 
+\begin{code}
+-- True means types like   (Eq a, Text b) => a -> b
+-- False means types like  _forall_ a b => Eq a -> Text b -> a -> b
+showUserishTypes PprForUser   = True	
+showUserishTypes PprInterface = True
+showUserishTypes other	      = False
+\end{code}

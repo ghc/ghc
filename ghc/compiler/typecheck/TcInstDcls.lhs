@@ -25,13 +25,13 @@ import RnHsSyn		( RenamedHsBinds(..), RenamedMonoBinds(..),
 			  RenamedInstDecl(..), RenamedFixityDecl(..),
 			  RenamedSig(..), RenamedSpecInstSig(..) )
 import TcHsSyn		( TcIdOcc(..), TcHsBinds(..),
-			  TcMonoBinds(..), TcExpr(..),
+			  TcMonoBinds(..), TcExpr(..), tcIdType,
 			  mkHsTyLam, mkHsTyApp,
 			  mkHsDictLam, mkHsDictApp )
 
 
 import TcMonad
-import GenSpecEtc	( checkSigTyVars, specTy )
+import GenSpecEtc	( checkSigTyVars )
 import Inst		( Inst, InstOrigin(..), InstanceMapper(..),
 			  newDicts, newMethod, LIE(..), emptyLIE, plusLIE )
 import TcBinds		( tcPragmaSigs )
@@ -44,7 +44,8 @@ import TcMatches	( tcMatchesFun )
 import TcMonoType	( tcContext, tcMonoTypeKind )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyThetas )
 import TcType		( TcType(..), TcTyVar(..),
-			  tcInstTyVar, tcInstType, tcInstTheta )
+			  tcInstSigTyVars, tcInstType, tcInstTheta
+			)
 import Unify		( unifyTauTy )
 
 
@@ -64,7 +65,7 @@ import Name		( Name, getTagFromClassOpName )
 import Outputable
 import PrelInfo		( pAT_ERROR_ID )
 import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
-			  pprParendType )
+			  pprParendGenType )
 import PprStyle
 import Pretty
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
@@ -346,10 +347,8 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     tcAddSrcLoc locn					$
 
 	-- Get the class signature
-    mapNF_Tc tcInstTyVar inst_tyvars	`thenNF_Tc` \ inst_tyvars' ->
+    tcInstSigTyVars inst_tyvars		`thenNF_Tc` \ (inst_tyvars', _, tenv) ->
     let 
-	tenv = inst_tyvars `zip` (mkTyVarTys inst_tyvars')
-
         (class_tyvar,
 	 super_classes, sc_sel_ids,
 	 class_ops, op_sel_ids, defm_ids) = getClassBigSig clas
@@ -378,9 +377,9 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 
 	mk_method_expr
 	  = if opt_OmitDefaultInstanceMethods then
-		makeInstanceDeclNoDefaultExpr origin clas meth_ids defm_ids inst_mod inst_ty'
+		makeInstanceDeclNoDefaultExpr     origin meth_ids defm_ids inst_ty' clas inst_mod
 	    else
-		makeInstanceDeclDefaultMethodExpr origin this_dict_id class_ops defm_ids inst_ty'
+		makeInstanceDeclDefaultMethodExpr origin meth_ids defm_ids inst_ty' this_dict_id 
     in
     processInstBinds mk_method_expr inst_tyvars' avail_insts meth_ids monobinds
 					 	`thenTc` \ (insts_needed, method_mbinds) ->
@@ -495,20 +494,18 @@ See the notes under default decls in TcClassDcl.lhs.
 \begin{code}
 makeInstanceDeclDefaultMethodExpr
 	:: InstOrigin s
-	-> TcIdOcc s
-	-> [ClassOp]
+	-> [TcIdOcc s]
 	-> [Id]
 	-> TcType s
+	-> TcIdOcc s
 	-> Int
 	-> NF_TcM s (TcExpr s)
 
-makeInstanceDeclDefaultMethodExpr origin this_dict class_ops defm_ids inst_ty tag
-  = specTy origin (getClassOpLocalType class_op)
-				`thenNF_Tc` \ (op_tyvars, op_lie, op_tau, op_dicts) ->
+makeInstanceDeclDefaultMethodExpr origin meth_ids defm_ids inst_ty this_dict tag
+  = newDicts origin op_theta		`thenNF_Tc` \ (op_lie,op_dicts) ->
 
 	-- def_op_id = /\ op_tyvars -> \ op_dicts ->
 	--		  defm_id inst_ty op_tyvars this_dict op_dicts
-
     returnNF_Tc (
       mkHsTyLam op_tyvars (
       mkHsDictLam op_dicts (
@@ -517,25 +514,23 @@ makeInstanceDeclDefaultMethodExpr origin this_dict class_ops defm_ids inst_ty ta
 		  (this_dict : op_dicts)
       )))
  where
-    idx	     = tag - 1
-    class_op = class_ops !! idx
-    defm_id  = defm_ids  !! idx
+    idx	    = tag - 1
+    meth_id = meth_ids !! idx
+    defm_id = defm_ids  !! idx
+    (op_tyvars, op_theta, op_tau) = splitSigmaTy (tcIdType meth_id)
 
 makeInstanceDeclNoDefaultExpr
 	:: InstOrigin s
-	-> Class
 	-> [TcIdOcc s]
 	-> [Id]
-	-> FAST_STRING
 	-> TcType s
+	-> Class
+	-> FAST_STRING
 	-> Int
 	-> NF_TcM s (TcExpr s)
 
-makeInstanceDeclNoDefaultExpr origin clas method_occs defm_ids inst_mod inst_ty tag
-  = let
-	(op_tyvars,op_theta,op_tau) = splitSigmaTy (idType method_id)
-    in
-    newDicts origin op_theta		`thenNF_Tc` \ (op_lie,op_dicts) ->
+makeInstanceDeclNoDefaultExpr origin meth_ids defm_ids inst_ty clas inst_mod tag
+  = newDicts origin op_theta		`thenNF_Tc` \ (op_lie, op_dicts) ->
 
 	-- Produce a warning if the default instance method
 	-- has been omitted when one exists in the class
@@ -547,12 +542,12 @@ makeInstanceDeclNoDefaultExpr origin clas method_occs defm_ids inst_mod inst_ty 
 		 HsApp (mkHsTyApp (HsVar (RealId pAT_ERROR_ID)) [op_tau])
 		     (HsLitOut (HsString (_PK_ error_msg)) stringTy))))
   where
-    idx	           = tag - 1
-    method_occ     = method_occs  !! idx
-    clas_op        = (getClassOps clas) !! idx
-    defm_id        = defm_ids  !! idx
+    idx	    = tag - 1
+    meth_id = meth_ids  !! idx
+    clas_op = (getClassOps clas) !! idx
+    defm_id = defm_ids  !! idx
+    (op_tyvars,op_theta,op_tau) = splitSigmaTy (tcIdType meth_id)
 
-    TcId method_id = method_occ
     Just (_, _, err_defm_ok) = isDefaultMethodId_maybe defm_id
 
     error_msg = "%E" 	-- => No explicit method for \"
@@ -673,12 +668,6 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
 
 		-- Type check the method itself
 	tcMethodBind method_id method_tau mbind	`thenTc` \ (mbind', lieIop) ->
-
-		-- Make sure that the instance tyvars havn't been
-		-- unified with each other or with the method tyvars.
-	tcSetErrCtxt (methodSigCtxt op method_tau) (
-	  checkSigTyVars inst_tyvars method_tau method_tau
-	)					`thenTc_`
 	returnTc ([tag], lieIop, mbind')
 
       other ->	-- It's a locally-polymorphic and/or overloaded method; UGH!
@@ -695,12 +684,6 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
 	in
 		-- Typecheck the method
 	tcMethodBind local_id method_tau mbind `thenTc` \ (mbind', lieIop) ->
-
-		-- Make sure that the instance tyvars haven't been
-		-- unified with each other or with the method tyvars.
-	tcAddErrCtxt (methodSigCtxt op method_tau) (
-	  checkSigTyVars inst_method_tyvars method_tau method_tau
-	)				        `thenTc_`
 
 		-- Check the overloading part of the signature.
 		-- Simplify everything fully, even though some
@@ -839,12 +822,12 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (SpecInstSig class_name ty src_loc
 	(ppAboves [ppCat [if null simpl_theta then ppNil else ppr PprDebug simpl_theta,
 			  if null simpl_theta then ppNil else ppStr "=>",
 			  ppr PprDebug clas,
-			  pprParendType PprDebug inst_ty],
+			  pprParendGenType PprDebug inst_ty],
 		   ppCat [ppStr "        derived from:",
 			  if null unspec_theta then ppNil else ppr PprDebug unspec_theta,
 			  if null unspec_theta then ppNil else ppStr "=>",
 			  ppr PprDebug clas,
-			  pprParendType PprDebug unspec_inst_ty]])
+			  pprParendGenType PprDebug unspec_inst_ty]])
     else id) (
 
     returnTc (unitBag (InstInfo clas inst_tmpls inst_ty simpl_theta
@@ -962,7 +945,7 @@ nonBoxedPrimCCallErr clas inst_ty sty
 omitDefaultMethodWarn clas_op clas_name inst_ty sty
   = ppCat [ppStr "Warning: Omitted default method for",
 	   ppr sty clas_op, ppStr "in instance",
-	   ppPStr clas_name, pprParendType sty inst_ty]
+	   ppPStr clas_name, pprParendGenType sty inst_ty]
 
 
 patMonoBindsCtxt pbind sty

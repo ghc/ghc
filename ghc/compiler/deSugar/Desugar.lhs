@@ -34,21 +34,23 @@ start.
 deSugar :: UniqSupply		-- name supply
 	-> FAST_STRING			-- module name
 
-	-> (TypecheckedHsBinds,   -- input: class, instance, and value
-	    TypecheckedHsBinds,	--   bindings; see "tcModule" (which produces
+	-> (TypecheckedHsBinds, -- input: recsel, class, instance, and value
+	    TypecheckedHsBinds, --   bindings; see "tcModule" (which produces
 	    TypecheckedHsBinds,	--   them)
+	    TypecheckedHsBinds,
 	    [(Id, TypecheckedHsExpr)])
 -- ToDo: handling of const_inst thingies is certainly WRONG ***************************
 
 	-> ([CoreBinding],	-- output
 	    Bag DsMatchContext)	-- Shadowing complaints
 
-deSugar us mod_name (clas_binds, inst_binds, val_binds, const_inst_pairs)
+deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst_pairs)
   = let
 	(us0, us0a) = splitUniqSupply us
 	(us1, us1a) = splitUniqSupply us0a
 	(us2, us2a) = splitUniqSupply us1a
-	(us3, us4)  = splitUniqSupply us2a
+	(us3, us3a) = splitUniqSupply us2a
+	(us4, us5)  = splitUniqSupply us3a
 
 	((core_const_prs, consts_pairs), shadows1)
 	    = initDs us0 nullIdEnv mod_name (dsInstBinds [] const_inst_pairs)
@@ -67,21 +69,28 @@ deSugar us mod_name (clas_binds, inst_binds, val_binds, const_inst_pairs)
 			= initDs us3 consts_env mod_name (dsBinds val_binds)
 	core_val_pairs	= pairsFromCoreBinds core_val_binds
 
+	(core_recsel_binds, shadows5)
+			= initDs us4 consts_env mod_name (dsBinds recsel_binds)
+	core_recsel_prs	= pairsFromCoreBinds core_recsel_binds
+
     	final_binds
-	  = if (null core_clas_prs && null core_inst_prs && null core_const_prs) then
+	  = if (null core_clas_prs && null core_inst_prs
+	     && null core_recsel_prs {-???dont know???-} && null core_const_prs) then
 		-- we don't have to make the whole thing recursive
 		core_clas_binds ++ core_val_binds
 
 	    else -- gotta make it recursive (sigh)
-	       [Rec (core_clas_prs ++ core_inst_prs ++ core_const_prs ++ core_val_pairs)]
+	       [Rec (core_clas_prs ++ core_inst_prs
+		  ++ core_const_prs ++ core_val_pairs ++ core_recsel_prs)]
 
-	lift_final_binds = liftCoreBindings us4 final_binds
+	lift_final_binds = liftCoreBindings us5 final_binds
 
 	really_final_binds = if opt_DoCoreLinting
 			     then lintCoreBindings PprDebug "Desugarer" False lift_final_binds
 			     else lift_final_binds
 
-	shadows = shadows1 `unionBags` shadows2 `unionBags` shadows3 `unionBags` shadows4
+	shadows = shadows1 `unionBags` shadows2 `unionBags`
+		  shadows3 `unionBags` shadows4 `unionBags` shadows5
     in
     (really_final_binds, shadows)
 \end{code}

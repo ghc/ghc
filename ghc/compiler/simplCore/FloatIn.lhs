@@ -172,12 +172,11 @@ fiExpr to_drop (_,AnnLam b@(TyBinder tyvar) body)
   where
     whnf :: CoreExprWithFVs -> Bool
 
-    whnf (_,AnnLit _)		    = True
-    whnf (_,AnnCon _ _)		    = True
-    whnf (_,AnnLam (ValBinder _) _) = True
-    whnf (_,AnnLam _             e) = whnf e
-    whnf (_,AnnSCC _ e)		    = whnf e
-    whnf _			    = False
+    whnf (_,AnnLit _)	= True
+    whnf (_,AnnCon _ _)	= True
+    whnf (_,AnnLam x e) = if isValBinder x then True else whnf e
+    whnf (_,AnnSCC _ e)	= whnf e
+    whnf _		= False
 \end{code}
 
 Applications: we could float inside applications, but it's probably

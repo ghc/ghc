@@ -23,8 +23,8 @@ module UniqFM (
 	UniqFM,   -- abstract type
 
 	emptyUFM,
-	singletonUFM,
-	singletonDirectlyUFM,
+	unitUFM,
+	unitDirectlyUFM,
 	listToUFM,
 	listToUFM_Directly,
 	addToUFM,
@@ -82,8 +82,8 @@ We use @FiniteMaps@, with a (@getItsUnique@-able) @Unique@ as ``key''.
 \begin{code}
 emptyUFM	:: UniqFM elt
 isNullUFM	:: UniqFM elt -> Bool
-singletonUFM	:: NamedThing key => key -> elt -> UniqFM elt
-singletonDirectlyUFM -- got the Unique already
+unitUFM	:: NamedThing key => key -> elt -> UniqFM elt
+unitDirectlyUFM -- got the Unique already
 		:: Unique -> elt -> UniqFM elt
 listToUFM	:: NamedThing key => [(key,elt)] -> UniqFM elt
 listToUFM_Directly
@@ -149,7 +149,7 @@ type RegFinMap   elt = UniqFM elt
 -- I don't think HBC was too happy about this (WDP 94/10)
 
 {-# SPECIALIZE
-    singletonUFM :: Id	  -> elt -> IdFinMap elt,
+    unitUFM :: Id	  -> elt -> IdFinMap elt,
 		    TyVar -> elt -> TyVarFinMap elt,
 		    Name  -> elt -> NameFinMap elt
     IF_NCG(COMMA    Reg   -> elt -> RegFinMap elt)
@@ -285,8 +285,8 @@ First the ways of building a UniqFM.
 
 \begin{code}
 emptyUFM		     = EmptyUFM
-singletonUFM	     key elt = mkLeafUFM (u2i (getItsUnique key)) elt
-singletonDirectlyUFM key elt = mkLeafUFM (u2i key) elt
+unitUFM	     key elt = mkLeafUFM (u2i (getItsUnique key)) elt
+unitDirectlyUFM key elt = mkLeafUFM (u2i key) elt
 
 listToUFM key_elt_pairs
   = addListToUFM_C use_snd EmptyUFM key_elt_pairs

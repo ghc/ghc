@@ -19,6 +19,8 @@ module Kind (
 import Ubiq{-uitous-}
 
 import Util		( panic )
+import Outputable	( Outputable(..) )
+import Pretty
 \end{code}
 
 \begin{code}
@@ -47,4 +49,19 @@ resultKind other_kind 		  = panic "resultKind"
 argKind :: Kind -> Kind		-- Get argument from arrow kind
 argKind (ArrowKind arg_kind _) = arg_kind
 argKind other_kind 	       = panic "argKind"
+\end{code}
+
+Printing
+~~~~~~~~
+\begin{code}
+instance Outputable Kind where
+  ppr sty kind = pprKind kind
+
+pprKind TypeKind        = ppStr "*"
+pprKind BoxedTypeKind   = ppStr "*b"
+pprKind UnboxedTypeKind = ppStr "*u"
+pprKind (ArrowKind k1 k2) = ppSep [pprKind_parend k1, ppStr "->", pprKind k2]
+
+pprKind_parend k@(ArrowKind _ _) = ppBesides [ppLparen, pprKind k, ppRparen]
+pprKind_parend k		 = pprKind k
 \end{code}

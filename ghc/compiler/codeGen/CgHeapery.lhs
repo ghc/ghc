@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -8,30 +8,31 @@
 
 module CgHeapery (
 	heapCheck,
-	allocHeap, allocDynClosure,
+	allocHeap, allocDynClosure
 
 #ifdef GRAN
 	-- new for GrAnSim    HWL
-	heapCheckOnly, fetchAndReschedule,
+	, heapCheckOnly, fetchAndReschedule
 #endif  {- GRAN -}
-
-	-- and to make the interface self-sufficient...
-	AbstractC, CAddrMode, HeapOffset,
-	CgState, ClosureInfo, Id
     ) where
+
+import Ubiq{-uitous-}
 
 import AbsCSyn
 import CgMonad
 
-import CgRetConv	( mkLiveRegsBitMask )
+import AbsCUtils	( mkAbstractCs, getAmodeRep )
+import CgRetConv	( mkLiveRegsMask )
 import CgUsages		( getVirtAndRealHp, setVirtHp, setRealHp,
 			  initHeapUsage
 			)
-import ClosureInfo	( closureSize, closureHdrSize, closureGoodStuffSize, slopSize,
-			  layOutDynClosure,
-			  allocProfilingMsg, closureKind
+import ClosureInfo	( closureSize, closureHdrSize, closureGoodStuffSize,
+			  slopSize, allocProfilingMsg, closureKind
 			)
-import Util
+import HeapOffs		( isZeroOff, addOff, intOff,
+			  VirtualHeapOffset(..)
+			)
+import PrimRep		( PrimRep(..) )
 \end{code}
 
 %************************************************************************
@@ -70,7 +71,7 @@ heapCheck regs node_reqd code
 	    -- at once or not.
       where
 	all_regs = if node_reqd then node:regs else regs
-	liveness_mask = mkLiveRegsBitMask all_regs
+	liveness_mask = mkLiveRegsMask all_regs
 
 	checking_code = CMacroStmt HEAP_CHK [
 			mkIntCLit liveness_mask,
@@ -149,7 +150,7 @@ heapCheck' do_context_switch regs node_reqd code
 	    -- at once or not.
       where
 	all_regs = if node_reqd then node:regs else regs
-	liveness_mask = mkLiveRegsBitMask all_regs
+	liveness_mask = mkLiveRegsMask all_regs
 
 	maybe_context_switch = if do_context_switch
 				then context_switch_code
@@ -177,7 +178,7 @@ fetchAndReschedule regs node_reqd =
 	else absC AbsCNop
       where
 	all_regs = if node_reqd then node:regs else regs
-	liveness_mask = mkLiveRegsBitMask all_regs
+	liveness_mask = mkLiveRegsMask all_regs
 
 	reschedule_code = absC  (CMacroStmt GRAN_RESCHEDULE [
 				 mkIntCLit liveness_mask,

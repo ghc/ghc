@@ -42,12 +42,12 @@ import PrelInfo		( stringTy )
 import Id		( idType, getInstantiatedDataConSig, mkTupleCon,
 			  DataCon(..), DictVar(..), Id(..), GenId )
 import TyCon		( mkTupleTyCon )
-import Type		( mkTyVarTys, mkRhoTy, mkFunTys,
-			  applyTyCon, getAppDataTyCon )
+import Type		( mkTyVarTys, mkRhoTy, mkFunTys, isUnboxedType,
+			  applyTyCon, getAppDataTyCon
+			)
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
 import Util		( panic, assertPanic )
 
-isUnboxedDataType = panic "DsUtils.isUnboxedDataType"
 quantifyTy = panic "DsUtils.quantifyTy"
 splitDictType = panic "DsUtils.splitDictType"
 mkCoTyApps = panic "DsUtils.mkCoTyApps"
@@ -228,7 +228,7 @@ dsExprToAtom arg_expr continue_with
     newSysLocalDs ty			`thenDs` \ arg_id ->
     continue_with (VarArg arg_id)	`thenDs` \ body   ->
     returnDs (
-	if isUnboxedDataType ty
+	if isUnboxedType ty
 	then Case arg_expr (PrimAlts [] (BindDefault arg_id body))
 	else Let (NonRec arg_id arg_expr) body
     )
@@ -537,7 +537,7 @@ mkFailurePair :: Type		-- Result type of the whole case expression
 		      CoreExpr)	-- Either the fail variable, or fail variable
 				-- applied to unit tuple
 mkFailurePair ty
-  | isUnboxedDataType ty
+  | isUnboxedType ty
   = newFailLocalDs (mkFunTys [unit_ty] ty)	`thenDs` \ fail_fun_var ->
     newSysLocalDs unit_ty			`thenDs` \ fail_fun_arg ->
     returnDs (\ body ->

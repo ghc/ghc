@@ -19,7 +19,7 @@ import CoreUtils	( coreExprType )
 import Id		( getInstantiatedDataConSig, mkTupleCon )
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
-import PprType		( GenType{-instances-}, GenTyVar{-instance-} )
+import PprType		( GenType{-instances-} )
 import PrelInfo		( byteArrayPrimTy, getStatePairingConInfo,
 		          packStringForCId, realWorldStatePrimTy,
 			  realWorldStateTy, realWorldTy, stateDataCon,
@@ -27,9 +27,7 @@ import PrelInfo		( byteArrayPrimTy, getStatePairingConInfo,
 import Pretty
 import PrimOp		( PrimOp(..) )
 import Type		( isPrimType, maybeAppDataTyCon, eqTy )
-import TyVar		( GenTyVar{-instance-} )
-import Unique		( Unique{-instances-} )
-import Util		( pprPanic, panic )
+import Util		( pprPanic, pprError, panic )
 
 maybeBoxedPrimType = panic "DsCCall.maybeBoxedPrimType"
 \end{code}
@@ -198,7 +196,8 @@ we decide what's happening with enumerations. ADR
     (data_con_arg_ty1 : data_con_arg_ty2 : _) = data_con_arg_tys
 
 can't_see_datacons_error thing ty
-  = error (ppShow 100 (ppBesides [ppStr "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ ", ppStr thing, ppStr "; type: ", ppr PprForUser ty]))
+  = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
+	     (ppBesides [ppStr thing, ppStr "; type: ", ppr PprForUser ty])
 \end{code}
 
 

@@ -10,40 +10,41 @@
 \begin{code}
 #include "HsVersions.h"
 
-module CgExpr (
-	cgExpr, cgSccExpr, getPrimOpArgAmodes
+module CgExpr ( cgExpr, cgSccExpr, getPrimOpArgAmodes ) where
 
-	-- and to make the interface self-sufficient...
-    ) where
+import Ubiq{-uitous-}
+import CgLoop2	-- here for paranoia-checking
 
 import StgSyn
 import CgMonad
 import AbsCSyn
 
-import PrelInfo		( PrimOp(..), PrimOpResultInfo(..), HeapRequirement(..),
-    	    	    	  primOpHeapReq, getPrimOpResultInfo, PrimRep,
-    	    	    	  primOpCanTriggerGC
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Type		( isPrimType, getTyConDataCons )
-import CLabel	( CLabel, mkPhantomInfoTableLabel, mkInfoTableVecTblLabel )
-import ClosureInfo	( LambdaFormInfo, mkClosureLFInfo )
-import CgBindery	( getAtomAmodes )
+import AbsCUtils	( mkAbsCStmts, mkAbstractCs )
+import CgBindery	( getArgAmodes )
 import CgCase		( cgCase, saveVolatileVarsAndRegs )
 import CgClosure	( cgRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )
 import CgHeapery	( allocHeap )
 import CgLetNoEscape	( cgLetNoEscapeClosure )
-import CgRetConv	-- various things...
-import CgTailCall	( cgTailCall, performReturn, mkDynamicAlgReturnCode,
-			  mkPrimReturnCode
+import CgRetConv	( dataReturnConvAlg, ctrlReturnConvAlg,
+			  DataReturnConvention(..), CtrlReturnConvention(..),
+			  assignPrimOpResultRegs, makePrimOpArgsRobust
 			)
-import CostCentre	( setToAbleCostCentre, isDupdCC, CostCentre )
-import Maybes		( Maybe(..) )
-import PrimRep		( getPrimRepSize )
-import UniqSet
-import Util
+import CgTailCall	( cgTailCall, performReturn,
+			  mkDynamicAlgReturnCode, mkPrimReturnCode
+			)
+import CLabel		( mkPhantomInfoTableLabel, mkInfoTableVecTblLabel )
+import ClosureInfo	( mkClosureLFInfo )
+import CostCentre	( setToAbleCostCentre, isDupdCC )
+import HeapOffs		( VirtualSpBOffset(..) )
+import Id		( mkIdSet, unionIdSets, GenId{-instance Outputable-} )
+import PprStyle		( PprStyle(..) )
+import PrimOp		( primOpCanTriggerGC, primOpHeapReq, HeapRequirement(..),
+			  getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..)
+			)
+import PrimRep		( getPrimRepSize, PrimRep(..) )
+import TyCon		( tyConDataCons )
+import Util		( panic, pprPanic )
 \end{code}
 
 This module provides the support code for @StgToAbstractC@ to deal
@@ -77,7 +78,7 @@ cgExpr (StgApp fun args live_vars) = cgTailCall fun args live_vars
 
 \begin{code}
 cgExpr (StgCon con args live_vars)
-  = getAtomAmodes args `thenFC` \ amodes ->
+  = getArgAmodes args `thenFC` \ amodes ->
     cgReturnDataCon con amodes (all zero_size args) live_vars
   where
     zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
@@ -93,10 +94,9 @@ Here is where we insert real live machine instructions.
 
 \begin{code}
 cgExpr x@(StgPrim op args live_vars)
-  = getIntSwitchChkrC		`thenFC` \ isw_chkr ->
-    getPrimOpArgAmodes op args	`thenFC` \ arg_amodes ->
+  = getPrimOpArgAmodes op args	`thenFC` \ arg_amodes ->
     let
-	result_regs   = assignPrimOpResultRegs {-NO:isw_chkr-} op
+	result_regs   = assignPrimOpResultRegs op
 	result_amodes = map CReg result_regs
 	may_gc  = primOpCanTriggerGC op
 	dyn_tag = head result_amodes
@@ -108,7 +108,7 @@ cgExpr x@(StgPrim op args live_vars)
 	-- (Can-trigger-gc primops guarantee to have their args in regs)
 	let
 	    (arg_robust_amodes, liveness_mask, arg_assts)
-	      = makePrimOpArgsRobust {-NO:isw_chkr-} op arg_amodes
+	      = makePrimOpArgsRobust op arg_amodes
 
 	    liveness_arg = mkIntCLit liveness_mask
 	in
@@ -172,10 +172,10 @@ cgExpr x@(StgPrim op args live_vars)
 		vec_lbl  = CTableEntry (CLbl (mkInfoTableVecTblLabel tycon) DataPtrRep)
     	    	    	        dyn_tag DataPtrRep
 
-		data_con = head (getTyConDataCons tycon)
+		data_con = head (tyConDataCons tycon)
 
 		(dir_lbl, num_of_fields)
-		  = case (dataReturnConvAlg fake_isw_chkr data_con) of
+		  = case (dataReturnConvAlg data_con) of
 		      ReturnInRegs rs
 			-> (CLbl (mkPhantomInfoTableLabel data_con) DataPtrRep,
 			    mkIntCLit (length rs)) -- for ticky-ticky only
@@ -184,8 +184,6 @@ cgExpr x@(StgPrim op args live_vars)
 			-> pprPanic "CgExpr: can't return prim in heap:" (ppr PprDebug data_con)
 			  -- Never used, and no point in generating
 			  -- the code for it!
-
-		fake_isw_chkr x = Nothing
   where
     -- for all PrimOps except ccalls, we pin the liveness info
     -- on as the first "argument"
@@ -314,7 +312,7 @@ cgRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along so a binding can be set up
 
 cgRhs name (StgRhsCon maybe_cc con args)
-  = getAtomAmodes args		`thenFC` \ amodes ->
+  = getArgAmodes args		`thenFC` \ amodes ->
     buildDynCon name maybe_cc con amodes (all zero_size args)
 				`thenFC` \ idinfo ->
     returnFC (name, idinfo)
@@ -344,7 +342,7 @@ cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgRec pairs)
   where
     -- We add the binders to the live-in-rhss set so that we don't
     -- delete the bindings for the binder from the environment!
-    full_live_in_rhss = live_in_rhss `unionUniqSets` (mkUniqSet [b | (b,r) <- pairs])
+    full_live_in_rhss = live_in_rhss `unionIdSets` (mkIdSet [b | (b,r) <- pairs])
 
 cgLetNoEscapeRhs
     :: StgLiveVars	-- Live in rhss
@@ -386,10 +384,9 @@ Main current use: allocating SynchVars.
 
 \begin{code}
 getPrimOpArgAmodes op args
-  = getAtomAmodes args		`thenFC` \ arg_amodes ->
+  = getArgAmodes args		`thenFC` \ arg_amodes ->
 
     case primOpHeapReq op of
-
 	FixedHeapRequired size -> allocHeap size `thenFC` \ amode ->
      	    	    	    	  returnFC (amode : arg_amodes)
 

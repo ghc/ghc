@@ -10,28 +10,14 @@
 \begin{code}
 #include "HsVersions.h"
 
-module StgSATMonad (
-	getArgLists, saTransform
-    ) where
+module StgSATMonad ( getArgLists, saTransform ) where
 
-import Type		( mkSigmaTy, TyVarTemplate,
-			  splitSigmaTy, splitTyArgs,
-			  glueTyArgs, instantiateTy, TauType(..),
-			  Class, ThetaType(..), SigmaType(..),
-			  InstTyEnv(..)
-			)
-import Id		( mkSysLocal, idType, eqId )
-import Maybes		( Maybe(..) )
-import StgSyn
-import SATMonad         ( SATEnv(..), SATInfo(..), Arg(..), updSAEnv, insSAEnv,
-			  SatM(..), initSAT, thenSAT, thenSAT_,
-			  emptyEnvSAT, returnSAT, mapSAT, isStatic, dropStatics,
-			  getSATInfo, newSATName )
-import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
-import UniqSupply
-import UniqSet		( UniqSet(..), emptyUniqSet )
-import Util
+import Ubiq{-uitous-}
 
+import Util		( panic )
+
+getArgLists = panic "StgSATMonad.getArgLists"
+saTransform = panic "StgSATMonad.saTransform"
 \end{code}
 
 %************************************************************************
@@ -41,6 +27,8 @@ import Util
 %************************************************************************
 
 \begin{code}
+{- LATER: to end of file:
+
 newSATNames :: [Id] -> SatM [Id]
 newSATNames [] = returnSAT []
 newSATNames (id:ids) = newSATName id (idType id)	`thenSAT` \ id' ->
@@ -175,4 +163,5 @@ doStgSubst binder orig_args subst_env body
       = remove_static_args origs as
     remove_static_args (NotStatic:origs) (a:as)
       = substAtom a:remove_static_args origs as
+-}
 \end{code}

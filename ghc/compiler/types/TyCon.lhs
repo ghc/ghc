@@ -9,9 +9,10 @@
 module TyCon(
 	TyCon(..), 	-- NB: some pals need to see representation
 
-	Arity(..), ConsVisible(..), NewOrData(..),
+	Arity(..), NewOrData(..),
 
-	isFunTyCon, isPrimTyCon, isVisibleDataTyCon,
+	isFunTyCon, isPrimTyCon, isBoxedTyCon,
+	isDataTyCon, isSynTyCon,
 
 	mkDataTyCon,
 	mkFunTyCon,
@@ -21,12 +22,14 @@ module TyCon(
 
 	mkSynTyCon,
 
-	getTyConKind,
-	getTyConUnique,
-	getTyConTyVars,
-	getTyConDataCons,
-	getTyConDerivings,
-	getSynTyConArity,
+	tyConKind,
+	tyConUnique,
+	tyConTyVars,
+	tyConDataCons,
+	tyConFamilySize,
+	tyConDerivings,
+	tyConArity, synTyConArity,
+	getSynTyConDefn,
 
         maybeTyConSingleCon,
 	isEnumerationTyCon,
@@ -39,7 +42,7 @@ import NameLoop	-- for paranoia checking
 import TyLoop		( Type(..), GenType,
 			  Class(..), GenClass,
 			  Id(..), GenId,
-			  mkTupleCon, getDataConSig,
+			  mkTupleCon, dataConSig,
 			  specMaybeTysSuffix
 			)
 
@@ -71,7 +74,6 @@ data TyCon
 		[(Class,Type)]	-- Its context
 		[Id]		-- Its data constructors, with fully polymorphic types
 		[Class]		-- Classes which have derived instances
-		ConsVisible
 		NewOrData
 
   | TupleTyCon	Arity	-- just a special case of DataTyCon
@@ -106,10 +108,6 @@ data TyCon
 			-- Acts as a template for the expansion when
 			-- the tycon is applied to some types.
 
-data ConsVisible
-  = ConsVisible	    -- whether or not data constructors are visible
-  | ConsInvisible   -- outside their TyCon's defining module.
-
 data NewOrData
   = NewType	    -- "newtype Blah ..."
   | DataType	    -- "data Blah ..."
@@ -129,8 +127,17 @@ isFunTyCon _ = False
 isPrimTyCon (PrimTyCon _ _ _) = True
 isPrimTyCon _ = False
 
-isVisibleDataTyCon (DataTyCon _ _ _ _ _ _ _ ConsVisible _) = True
-isVisibleDataTyCon _ = False
+-- At present there are no unboxed non-primitive types, so
+-- isBoxedTyCon is just the negation of isPrimTyCon.
+isBoxedTyCon = not . isPrimTyCon
+
+-- isDataTyCon returns False for @newtype@.
+-- Not sure about this decision yet.
+isDataTyCon (DataTyCon _ _ _ _ _ _ _ DataType) = True
+isDataTyCon other 			       = False
+
+isSynTyCon (SynTyCon _ _ _ _ _ _) = True
+isSynTyCon _			  = False
 \end{code}
 
 \begin{code}
@@ -138,20 +145,20 @@ isVisibleDataTyCon _ = False
 kind1 = mkBoxedTypeKind `mkArrowKind` mkBoxedTypeKind
 kind2 = mkBoxedTypeKind `mkArrowKind` kind1
 
-getTyConKind :: TyCon -> Kind
-getTyConKind FunTyCon 			      = kind2
-getTyConKind (DataTyCon _ kind _ _ _ _ _ _ _) = kind
-getTyConKind (PrimTyCon _ _ kind) 	      = kind
+tyConKind :: TyCon -> Kind
+tyConKind FunTyCon 			 = kind2
+tyConKind (DataTyCon _ kind _ _ _ _ _ _) = kind
+tyConKind (PrimTyCon _ _ kind)		 = kind
 
-getTyConKind (SpecTyCon tc tys)
-  = spec (getTyConKind tc) tys
+tyConKind (SpecTyCon tc tys)
+  = spec (tyConKind tc) tys
    where
     spec kind []	      = kind
     spec kind (Just _  : tys) = spec (resultKind kind) tys
     spec kind (Nothing : tys) =
       argKind kind `mkArrowKind` spec (resultKind kind) tys
 
-getTyConKind (TupleTyCon n)
+tyConKind (TupleTyCon n)
   = mkArrow n
    where
     mkArrow 0 = mkBoxedTypeKind
@@ -161,57 +168,78 @@ getTyConKind (TupleTyCon n)
 \end{code}
 
 \begin{code}
-getTyConUnique :: TyCon -> Unique
-getTyConUnique FunTyCon			        = funTyConKey
-getTyConUnique (DataTyCon uniq _ _ _ _ _ _ _ _) = uniq
-getTyConUnique (TupleTyCon a) 			= mkTupleTyConUnique a
-getTyConUnique (PrimTyCon uniq _ _) 	        = uniq
-getTyConUnique (SynTyCon uniq _ _ _ _ _)        = uniq
-getTyConUnique (SpecTyCon _ _ ) 	        = panic "getTyConUnique:SpecTyCon"
+tyConUnique :: TyCon -> Unique
+tyConUnique FunTyCon			   = funTyConKey
+tyConUnique (DataTyCon uniq _ _ _ _ _ _ _) = uniq
+tyConUnique (TupleTyCon a) 		   = mkTupleTyConUnique a
+tyConUnique (PrimTyCon uniq _ _) 	   = uniq
+tyConUnique (SynTyCon uniq _ _ _ _ _)      = uniq
+tyConUnique (SpecTyCon _ _ )		   = panic "tyConUnique:SpecTyCon"
+
+tyConArity :: TyCon -> Arity
+tyConArity FunTyCon			 = 2
+tyConArity (DataTyCon _ _ _ tvs _ _ _ _) = length tvs
+tyConArity (TupleTyCon arity)		 = arity
+tyConArity (PrimTyCon _ _ _)		 = 0	-- ??
+tyConArity (SpecTyCon _ _)		 = 0
+tyConArity (SynTyCon _ _ _ arity _ _)    = arity
+
+synTyConArity :: TyCon -> Maybe Arity -- Nothing <=> not a syn tycon
+synTyConArity (SynTyCon _ _ _ arity _ _) = Just arity
+synTyConArity _				 = Nothing
 \end{code}
 
 \begin{code}
-getTyConTyVars :: TyCon -> [TyVar]
-getTyConTyVars FunTyCon			       = [alphaTyVar,betaTyVar]
-getTyConTyVars (DataTyCon _ _ _ tvs _ _ _ _ _) = tvs
-getTyConTyVars (TupleTyCon arity) 	       = take arity alphaTyVars
-getTyConTyVars (SynTyCon _ _ _ _ tvs _)        = tvs
-getTyConTyVars (PrimTyCon _ _ _) 	       = panic "getTyConTyVars:PrimTyCon"
-getTyConTyVars (SpecTyCon _ _ ) 	       = panic "getTyConTyVars:SpecTyCon"
+tyConTyVars :: TyCon -> [TyVar]
+tyConTyVars FunTyCon			  = [alphaTyVar,betaTyVar]
+tyConTyVars (DataTyCon _ _ _ tvs _ _ _ _) = tvs
+tyConTyVars (TupleTyCon arity)		  = take arity alphaTyVars
+tyConTyVars (SynTyCon _ _ _ _ tvs _)      = tvs
+tyConTyVars (PrimTyCon _ _ _) 	     	  = panic "tyConTyVars:PrimTyCon"
+tyConTyVars (SpecTyCon _ _ ) 	     	  = panic "tyConTyVars:SpecTyCon"
 \end{code}
 
 \begin{code}
-getTyConDataCons :: TyCon -> [Id]
-getTyConDataCons (DataTyCon _ _ _ _ _ data_cons _ _ _) = data_cons
-getTyConDataCons (TupleTyCon a)			       = [mkTupleCon a]
+tyConDataCons :: TyCon -> [Id]
+tyConFamilySize  :: TyCon -> Int
+
+tyConDataCons (DataTyCon _ _ _ _ _ data_cons _ _) = data_cons
+tyConDataCons (TupleTyCon a)			  = [mkTupleCon a]
+tyConDataCons other				  = []
+	-- You may think this last equation should fail,
+	-- but it's quite convenient to return no constructors for
+	-- a synonym; see for example the call in TcTyClsDecls.
+
+tyConFamilySize (DataTyCon _ _ _ _ _ data_cons _ _) = length data_cons
+tyConFamilySize (TupleTyCon a)			    = 1
 \end{code}
 
 \begin{code}
-getTyConDerivings :: TyCon -> [Class]
-getTyConDerivings (DataTyCon _ _ _ _ _ _ derivs _ _) = derivs
+tyConDerivings :: TyCon -> [Class]
+tyConDerivings (DataTyCon _ _ _ _ _ _ derivs _) = derivs
+tyConDerivings other				   = []
 \end{code}
 
 \begin{code}
-getSynTyConArity :: TyCon -> Maybe Arity
-getSynTyConArity (SynTyCon _ _ _ arity _ _) = Just arity
-getSynTyConArity other			    = Nothing
+getSynTyConDefn :: TyCon -> ([TyVar], Type)
+getSynTyConDefn (SynTyCon _ _ _ _ tyvars ty) = (tyvars,ty)
 \end{code}
 
 \begin{code}
 maybeTyConSingleCon :: TyCon -> Maybe Id
-maybeTyConSingleCon (TupleTyCon arity)	             = Just (mkTupleCon arity)
-maybeTyConSingleCon (DataTyCon _ _ _ _ _ [c] _ _ _)  = Just c
-maybeTyConSingleCon (DataTyCon _ _ _ _ _ _   _ _ _)  = Nothing
-maybeTyConSingleCon (PrimTyCon _ _ _)	             = Nothing
-maybeTyConSingleCon (SpecTyCon tc tys)               = panic "maybeTyConSingleCon:SpecTyCon"
-						     -- requires DataCons of TyCon
+maybeTyConSingleCon (TupleTyCon arity)	          = Just (mkTupleCon arity)
+maybeTyConSingleCon (DataTyCon _ _ _ _ _ [c] _ _) = Just c
+maybeTyConSingleCon (DataTyCon _ _ _ _ _ _   _ _) = Nothing
+maybeTyConSingleCon (PrimTyCon _ _ _)	          = Nothing
+maybeTyConSingleCon (SpecTyCon tc tys)            = panic "maybeTyConSingleCon:SpecTyCon"
+						  -- requires DataCons of TyCon
 
 isEnumerationTyCon (TupleTyCon arity)
   = arity == 0
-isEnumerationTyCon (DataTyCon _ _ _ _ _ data_cons _ _ _)
+isEnumerationTyCon (DataTyCon _ _ _ _ _ data_cons _ _)
   = not (null data_cons) && all is_nullary data_cons
   where
-    is_nullary con = case (getDataConSig con) of { (_,_, arg_tys, _) ->
+    is_nullary con = case (dataConSig con) of { (_,_, arg_tys, _) ->
 		     null arg_tys }
 \end{code}
 
@@ -224,8 +252,8 @@ ToDo: what about derivings for specialised tycons !!!
 
 \begin{code}
 derivedFor :: Class -> TyCon -> Bool
-derivedFor clas (DataTyCon _ _ _ _ _ _ derivs _ _) = isIn "derivedFor" clas derivs
-derivedFor clas something_weird		           = False
+derivedFor clas (DataTyCon _ _ _ _ _ _ derivs _) = isIn "derivedFor" clas derivs
+derivedFor clas something_weird		         = False
 \end{code}
 
 %************************************************************************
@@ -241,12 +269,12 @@ the property @(a<=b) || (b<=a)@.
 
 \begin{code}
 instance Ord3 TyCon where
-  cmp FunTyCon		            FunTyCon		          = EQ_
-  cmp (DataTyCon a _ _ _ _ _ _ _ _) (DataTyCon b _ _ _ _ _ _ _ _) = a `cmp` b
-  cmp (SynTyCon a _ _ _ _ _)        (SynTyCon b _ _ _ _ _)        = a `cmp` b
-  cmp (TupleTyCon a)	            (TupleTyCon b)	          = a `cmp` b
-  cmp (PrimTyCon a _ _)		    (PrimTyCon b _ _)	          = a `cmp` b
-  cmp (SpecTyCon tc1 mtys1)	    (SpecTyCon tc2 mtys2)
+  cmp FunTyCon		          FunTyCon		      = EQ_
+  cmp (DataTyCon a _ _ _ _ _ _ _) (DataTyCon b _ _ _ _ _ _ _) = a `cmp` b
+  cmp (SynTyCon a _ _ _ _ _)      (SynTyCon b _ _ _ _ _)      = a `cmp` b
+  cmp (TupleTyCon a)	          (TupleTyCon b)	      = a `cmp` b
+  cmp (PrimTyCon a _ _)		  (PrimTyCon b _ _)	      = a `cmp` b
+  cmp (SpecTyCon tc1 mtys1)	  (SpecTyCon tc2 mtys2)
     = panic# "cmp on SpecTyCons" -- case (tc1 `cmp` tc2) of { EQ_ -> mtys1 `cmp` mtys2; xxx -> xxx }
 
     -- now we *know* the tags are different, so...
@@ -256,11 +284,11 @@ instance Ord3 TyCon where
     where
       tag1 = tag_TyCon other_1
       tag2 = tag_TyCon other_2
-      tag_TyCon FunTyCon    		      = ILIT(1)
-      tag_TyCon (DataTyCon _ _ _ _ _ _ _ _ _) = ILIT(2)
-      tag_TyCon (TupleTyCon _)		      = ILIT(3)
-      tag_TyCon (PrimTyCon  _ _ _)	      = ILIT(4)
-      tag_TyCon (SpecTyCon  _ _) 	      = ILIT(5)
+      tag_TyCon FunTyCon    		    = ILIT(1)
+      tag_TyCon (DataTyCon _ _ _ _ _ _ _ _) = ILIT(2)
+      tag_TyCon (TupleTyCon _)		    = ILIT(3)
+      tag_TyCon (PrimTyCon  _ _ _)	    = ILIT(4)
+      tag_TyCon (SpecTyCon  _ _) 	    = ILIT(5)
 
 instance Eq TyCon where
     a == b = case (a `cmp` b) of { EQ_ -> True;   _ -> False }
@@ -305,7 +333,7 @@ instance NamedThing TyCon where
 		     Nothing   -> mkBuiltinSrcLoc
 		     Just name -> getSrcLoc name
 
-    getItsUnique tycon = getTyConUnique tycon
+    getItsUnique tycon = tyConUnique tycon
 
     fromPreludeCore tc = case get_name tc of
 			   Nothing   -> True
@@ -315,10 +343,9 @@ instance NamedThing TyCon where
 Emphatically un-exported:
 
 \begin{code}
-get_name (DataTyCon _ _ n _ _ _ _ _ _) = Just n
-get_name (PrimTyCon _ n _)	       = Just n
-get_name (SpecTyCon tc _)	       = get_name tc
-get_name (SynTyCon _ n _ _ _ _)	       = Just n
-get_name other			       = Nothing
+get_name (DataTyCon _ _ n _ _ _ _ _) = Just n
+get_name (PrimTyCon _ n _)	     = Just n
+get_name (SpecTyCon tc _)	     = get_name tc
+get_name (SynTyCon _ n _ _ _ _)	     = Just n
+get_name other			     = Nothing
 \end{code}
-

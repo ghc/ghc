@@ -13,7 +13,8 @@ Basically, the things need to be in class @NamedThing@.
 module UniqSet (
 	UniqSet(..),    -- abstract type: NOT
 
-	mkUniqSet, uniqSetToList, emptyUniqSet, singletonUniqSet,
+	mkUniqSet, uniqSetToList, emptyUniqSet, unitUniqSet,
+	addOneToUniqSet,
 	unionUniqSets, unionManyUniqSets, minusUniqSet,
 	elementOfUniqSet, mapUniqSet, intersectUniqSets,
 	isEmptyUniqSet
@@ -55,14 +56,17 @@ type UniqSet a = UniqFM a
 emptyUniqSet :: UniqSet a
 emptyUniqSet = MkUniqSet emptyUFM
 
-singletonUniqSet :: NamedThing a => a -> UniqSet a
-singletonUniqSet x = MkUniqSet (singletonUFM x x)
+unitUniqSet :: NamedThing a => a -> UniqSet a
+unitUniqSet x = MkUniqSet (unitUFM x x)
 
 uniqSetToList :: UniqSet a -> [a]
 uniqSetToList (MkUniqSet set) = eltsUFM set
 
 mkUniqSet :: NamedThing a => [a]  -> UniqSet a
 mkUniqSet xs = MkUniqSet (listToUFM [ (x, x) | x <- xs])
+
+addOneToUniqSet :: NamedThing a => UniqSet a -> a -> UniqSet a
+addOneToUniqSet set x = set `unionUniqSets` unitUniqSet x
 
 unionUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 unionUniqSets (MkUniqSet set1) (MkUniqSet set2) = MkUniqSet (plusUFM set1 set2)
@@ -114,7 +118,7 @@ mapUniqSet f (MkUniqSet set)
 #if 0
 #if __GLASGOW_HASKELL__
 {-# SPECIALIZE
-    singletonUniqSet :: GenId ty       -> GenIdSet ty,
+    unitUniqSet :: GenId ty       -> GenIdSet ty,
 			GenTyVar flexi -> GenTyVarSet flexi,
 			Name  -> NameSet
     IF_NCG(COMMA	Reg   -> RegSet)

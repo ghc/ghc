@@ -10,7 +10,7 @@ module Inst (
 	Inst(..), 	-- Visible only to TcSimplify
 
 	InstOrigin(..), OverloadedLit(..),
-	LIE(..), emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE,
+	LIE(..), emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE, plusLIEs,
 
         InstanceMapper(..),
 
@@ -41,7 +41,7 @@ import TcEnv	( tcLookupGlobalValueByKey )
 import TcType	( TcType(..), TcRhoType(..), TcMaybe, TcTyVarSet(..),
 		  tcInstType, tcInstTcType, zonkTcType )
 
-import Bag	( Bag, emptyBag, unitBag, unionBags, listToBag, consBag )
+import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
 import Class	( Class(..), GenClass, ClassInstEnv(..), getClassInstEnv )
 import Id	( GenId, idType, mkInstId )
 import MatchEnv	( lookupMEnv, insertMEnv )
@@ -78,6 +78,7 @@ emptyLIE          = emptyBag
 unitLIE inst 	  = unitBag inst
 plusLIE lie1 lie2 = lie1 `unionBags` lie2
 consLIE inst lie  = inst `consBag` lie
+plusLIEs lies	  = unionManyBags lies
 
 zonkLIE :: LIE s -> NF_TcM s (LIE s)
 zonkLIE lie = mapBagNF_Tc zonkInst lie

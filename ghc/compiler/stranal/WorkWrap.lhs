@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 
@@ -8,20 +8,24 @@
 
 module WorkWrap ( workersAndWrappers ) where
 
-IMPORT_Trace
-import Outputable
-import Pretty
+import Ubiq{-uitous-}
 
-import Id		( idType, addIdStrictness, getIdStrictness,
-			  getIdUnfolding, mkWorkerId,
-			  replaceIdInfo, getIdInfo, idWantsToBeINLINEd
+import CoreSyn
+import CoreUnfold	( UnfoldingGuidance(..) )
+import CoreUtils	( coreExprType )
+import Id		( idWantsToBeINLINEd, getIdStrictness, mkWorkerId,
+			  getIdInfo
 			)
-import IdInfo		-- bits and pieces
-import Maybes		( maybeToBool, Maybe(..) )
+import IdInfo		( noIdInfo, addInfo_UF, indicatesWorker,
+			  mkStrictnessInfo, StrictnessInfo(..)
+			)
 import SaLib
-import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
-import Util
+import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM(..) )
 import WwLib
+import Util		( panic{-ToDo:rm-} )
+
+replaceIdInfo = panic "WorkWrap.replaceIdInfo (ToDo)"
+iWantToBeINLINEd = panic "WorkWrap.iWantToBeINLINEd (ToDo)"
 \end{code}
 
 We take Core bindings whose binders have their strictness attached (by
@@ -37,14 +41,14 @@ info for exported values).
 \end{enumerate}
 
 \begin{code}
-workersAndWrappers :: [CoreBinding] -> WwM [CoreBinding]
+workersAndWrappers :: [CoreBinding] -> UniqSM [CoreBinding]
 
 workersAndWrappers top_binds
-  = mapWw (wwBind True{-top-level-}) top_binds `thenWw` \ top_binds2 ->
+  = mapUs (wwBind True{-top-level-}) top_binds `thenUs` \ top_binds2 ->
     let
 	top_binds3 = map make_top_binding top_binds2
     in
-    returnWw (concat top_binds3)
+    returnUs (concat top_binds3)
   where
     make_top_binding :: WwBinding -> [CoreBinding]
 
@@ -63,24 +67,24 @@ turn.  Non-recursive case first, then recursive...
 \begin{code}
 wwBind	:: Bool			-- True <=> top-level binding
 	-> CoreBinding
-	-> WwM WwBinding	-- returns a WwBinding intermediate form;
+	-> UniqSM WwBinding	-- returns a WwBinding intermediate form;
 				-- the caller will convert to Expr/Binding,
 				-- as appropriate.
 
 wwBind top_level (NonRec binder rhs)
-  = wwExpr rhs			`thenWw` \ new_rhs ->
-    tryWW binder new_rhs 	`thenWw` \ new_pairs ->
-    returnWw (WwLet [NonRec b e | (b,e) <- new_pairs])
+  = wwExpr rhs			`thenUs` \ new_rhs ->
+    tryWW binder new_rhs 	`thenUs` \ new_pairs ->
+    returnUs (WwLet [NonRec b e | (b,e) <- new_pairs])
       -- Generated bindings must be non-recursive
       -- because the original binding was.
 
 ------------------------------
 
 wwBind top_level (Rec pairs)
-  = mapWw do_one pairs		`thenWw` \ new_pairs ->
-    returnWw (WwLet [Rec (concat new_pairs)])
+  = mapUs do_one pairs		`thenUs` \ new_pairs ->
+    returnUs (WwLet [Rec (concat new_pairs)])
   where
-    do_one (binder, rhs) = wwExpr rhs 	`thenWw` \ new_rhs ->
+    do_one (binder, rhs) = wwExpr rhs 	`thenUs` \ new_rhs ->
 			   tryWW binder new_rhs
 \end{code}
 
@@ -91,70 +95,62 @@ matching by looking for strict arguments of the correct type.
 ???????????????? ToDo
 
 \begin{code}
-wwExpr :: CoreExpr -> WwM CoreExpr
+wwExpr :: CoreExpr -> UniqSM CoreExpr
 
-wwExpr e@(Var _)	= returnWw e
-wwExpr e@(Lit _)	= returnWw e
-wwExpr e@(Con  _ _ _) = returnWw e
-wwExpr e@(Prim _ _ _) = returnWw e
+wwExpr e@(Var _)    = returnUs e
+wwExpr e@(Lit _)    = returnUs e
+wwExpr e@(Con  _ _) = returnUs e
+wwExpr e@(Prim _ _) = returnUs e
 
-wwExpr (Lam binders expr)
-  = wwExpr expr			`thenWw` \ new_expr ->
-    returnWw (Lam binders new_expr)
+wwExpr (Lam binder expr)
+  = wwExpr expr			`thenUs` \ new_expr ->
+    returnUs (Lam binder new_expr)
 
-wwExpr (CoTyLam ty expr)
-  = wwExpr expr			`thenWw` \ new_expr ->
-    returnWw (CoTyLam ty new_expr)
-
-wwExpr (App e1 e2)
-  = wwExpr e1			`thenWw` \ new_e1 ->
-    returnWw (App new_e1 e2)
-
-wwExpr (CoTyApp expr ty)
-  = wwExpr expr			`thenWw` \ new_expr ->
-    returnWw (CoTyApp new_expr ty)
+wwExpr (App f a)
+  = wwExpr f			`thenUs` \ new_f ->
+    returnUs (App new_f a)
 
 wwExpr (SCC cc expr)
-  = wwExpr expr			`thenWw` \ new_expr ->
-    returnWw (SCC cc new_expr)
+  = wwExpr expr			`thenUs` \ new_expr ->
+    returnUs (SCC cc new_expr)
 
 wwExpr (Let bind expr)
-  = wwBind False{-not top-level-} bind	`thenWw` \ intermediate_bind ->
-    wwExpr expr				`thenWw` \ new_expr ->
-    returnWw (mash_ww_bind intermediate_bind new_expr)
+  = wwBind False{-not top-level-} bind	`thenUs` \ intermediate_bind ->
+    wwExpr expr				`thenUs` \ new_expr ->
+    returnUs (mash_ww_bind intermediate_bind new_expr)
   where
     mash_ww_bind (WwLet  binds)   body = mkCoLetsNoUnboxed binds body
     mash_ww_bind (WwCase case_fn) body = case_fn body
 
 wwExpr (Case expr alts)
-  = wwExpr expr				`thenWw` \ new_expr ->
-    ww_alts alts			`thenWw` \ new_alts ->
-    returnWw (Case new_expr new_alts)
+  = wwExpr expr				`thenUs` \ new_expr ->
+    ww_alts alts			`thenUs` \ new_alts ->
+    returnUs (Case new_expr new_alts)
   where
     ww_alts (AlgAlts alts deflt)
-      = mapWw ww_alg_alt alts		`thenWw` \ new_alts ->
-	ww_deflt deflt			`thenWw` \ new_deflt ->
-	returnWw (AlgAlts new_alts new_deflt)
+      = mapUs ww_alg_alt alts		`thenUs` \ new_alts ->
+	ww_deflt deflt			`thenUs` \ new_deflt ->
+	returnUs (AlgAlts new_alts new_deflt)
 
     ww_alts (PrimAlts alts deflt)
-      = mapWw ww_prim_alt alts		`thenWw` \ new_alts ->
-	ww_deflt deflt			`thenWw` \ new_deflt ->
-	returnWw (PrimAlts new_alts new_deflt)
+      = mapUs ww_prim_alt alts		`thenUs` \ new_alts ->
+	ww_deflt deflt			`thenUs` \ new_deflt ->
+	returnUs (PrimAlts new_alts new_deflt)
 
     ww_alg_alt (con, binders, rhs)
-      =	wwExpr rhs			`thenWw` \ new_rhs ->
-	returnWw (con, binders, new_rhs)
+      =	wwExpr rhs			`thenUs` \ new_rhs ->
+	returnUs (con, binders, new_rhs)
 
     ww_prim_alt (lit, rhs)
-      = wwExpr rhs			`thenWw` \ new_rhs ->
-	returnWw (lit, new_rhs)
+      = wwExpr rhs			`thenUs` \ new_rhs ->
+	returnUs (lit, new_rhs)
 
     ww_deflt NoDefault
-      = returnWw NoDefault
+      = returnUs NoDefault
 
     ww_deflt (BindDefault binder rhs)
-      = wwExpr rhs			`thenWw` \ new_rhs ->
-	returnWw (BindDefault binder new_rhs)
+      = wwExpr rhs			`thenUs` \ new_rhs ->
+	returnUs (BindDefault binder new_rhs)
 \end{code}
 
 %************************************************************************
@@ -179,7 +175,7 @@ The only reason this is monadised is for the unique supply.
 tryWW	:: Id				-- the fn binder
 	-> CoreExpr		-- the bound rhs; its innards
 					--   are already ww'd
-	-> WwM [(Id, CoreExpr)]	-- either *one* or *two* pairs;
+	-> UniqSM [(Id, CoreExpr)]	-- either *one* or *two* pairs;
 					-- if one, then no worker (only
 					-- the orig "wrapper" lives on);
 					-- if two, then a worker and a
@@ -209,7 +205,7 @@ tryWW fn_id rhs
 	     (uvars, tyvars, args, body) = collectBinders rhs
 	     body_ty			 = coreExprType body
 	in
-	uniqSMtoWwM (mkWwBodies body_ty tyvars args args_info) `thenWw` \ result ->
+	mkWwBodies body_ty tyvars args args_info `thenUs` \ result ->
 	case result of
 
 	  Nothing -> 	-- Very peculiar. This can only happen if we hit an
@@ -223,7 +219,7 @@ tryWW fn_id rhs
 	  Just (wrapper_w_hole, worker_w_hole, worker_strictness, worker_ty_w_hole) ->
 
 		-- Terrific!  It worked!
-	    getUniqueWw		`thenWw` \ worker_uniq ->
+	    getUnique		`thenUs` \ worker_uniq ->
 	    let
 		worker_ty   = worker_ty_w_hole body_ty
 
@@ -246,8 +242,8 @@ tryWW fn_id rhs
 		-- NB! the "iWantToBeINLINEd" part adds an INLINE pragma to
 		-- the wrapper, which is of course what we want.
 	    in
-	    returnWw [ (worker_id,  worker_rhs),   -- worker comes first
+	    returnUs [ (worker_id,  worker_rhs),   -- worker comes first
 		       (wrapper_id, wrapper_rhs) ] -- because wrapper mentions it
   where
-    do_nothing = returnWw [ (fn_id, rhs) ]
+    do_nothing = returnUs [ (fn_id, rhs) ]
 \end{code}

@@ -13,39 +13,35 @@ Convert a @CoreSyntax@ program to a @StgSyntax@ program.
 \begin{code}
 #include "HsVersions.h"
 
-module CoreToStg (
-	topCoreBindsToStg
+module CoreToStg ( topCoreBindsToStg ) where
 
-	-- and to make the interface self-sufficient...
-    ) where
+import Ubiq{-uitous-}
 
-import AnnCoreSyn	-- intermediate form on which all work is done
+import CoreSyn		-- input
 import StgSyn		-- output
-import UniqSupply
 
+import Bag		( emptyBag, unitBag, unionBags, unionManyBags, bagToList )
+import CoreUtils	( coreExprType )
+import CostCentre	( noCostCentre )
+import Id		( mkSysLocal, idType, isBottomingId,
+			  nullIdEnv, addOneToIdEnv, lookupIdEnv,
+			  IdEnv(..), GenId{-instance NamedThing-}
+			)
+import Literal		( mkMachInt, Literal(..) )
+import Outputable	( isExported )
 import PrelInfo		( unpackCStringId, unpackCString2Id, stringTy,
 			  integerTy, rationalTy, ratioDataCon,
-			  PrimOp(..),		-- For Int2IntegerOp etc
 			  integerZeroId, integerPlusOneId,
 			  integerPlusTwoId, integerMinusOneId
-			  IF_ATTACK_PRAGMAS(COMMA mkListTy COMMA charTy)
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-
-import Type		( isPrimType, isLeakFreeType, getAppDataTyCon )
-import Bag		-- Bag operations
-import Literal		( mkMachInt, Literal(..) )	-- ToDo: its use is ugly...
-import CostCentre	( noCostCentre, CostCentre )
-import Id		( mkSysLocal, idType, isBottomingId
-			  IF_ATTACK_PRAGMAS(COMMA bottomIsGuaranteed)
-			)
-import Maybes		( Maybe(..), catMaybes )
-import Outputable	( isExported )
-import Pretty		-- debugging only!
+import PrimOp		( PrimOp(..) )
 import SpecUtils	( mkSpecialisedCon )
-import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
-import Util
+import SrcLoc		( mkUnknownSrcLoc )
+import Type		( getAppDataTyCon )
+import UniqSupply	-- all of it, really
+import Util		( panic )
+
+isLeakFreeType = panic "CoreToStg.isLeakFreeType (ToDo)"
 \end{code}
 
 
@@ -360,10 +356,20 @@ litToStgArg other_lit = returnUs (StgLitArg other_lit, emptyBag)
 %************************************************************************
 
 \begin{code}
-coreAtomToStg :: StgEnv -> CoreArg -> UniqSM (StgArg, Bag StgBinding)
+coreArgsToStg :: StgEnv -> [CoreArg] -> UniqSM ([Type], [StgArg], Bag StgBinding)
 
-coreAtomToStg env (VarArg var) = returnUs (stgLookup env var, emptyBag)
-coreAtomToStg env (LitArg lit) = litToStgArg lit
+coreArgsToStg env [] = returnUs ([], [], emptyBag)
+coreArgsToStg env (a:as)
+  = coreArgsToStg env as    `thenUs` \ (tys, args, binds) ->
+    do_arg a tys args binds
+  where
+    do_arg a trest vrest binds
+      = case a of
+	  TyArg    t -> returnUs (t:trest, vrest, binds)
+	  UsageArg u -> returnUs (trest, vrest, binds)
+	  VarArg   v -> returnUs (trest, stgLookup env v : vrest, binds)
+	  LitArg   i -> litToStgArg i `thenUs` \ (v, bs) ->
+			returnUs (trest, v:vrest, bs `unionBags` binds)
 \end{code}
 
 There's not anything interesting we can ASSERT about \tr{var} if it
@@ -397,28 +403,16 @@ coreExprToStg env (Lit lit)
 coreExprToStg env (Var var)
   = returnUs (StgApp (stgLookup env var) [] bOGUS_LVs, emptyBag)
 
-coreExprToStg env (Con con types args)
-  = mapAndUnzipUs (coreAtomToStg env) args `thenUs` \ (stg_atoms, stg_binds) ->
-    returnUs (StgCon spec_con stg_atoms bOGUS_LVs, unionManyBags stg_binds)
-  where
-    spec_con = mkSpecialisedCon con types
+coreExprToStg env (Con con args)
+  = coreArgsToStg env args  `thenUs` \ (types, stg_atoms, stg_binds) ->
+    let
+	spec_con = mkSpecialisedCon con types
+    in
+    returnUs (StgCon spec_con stg_atoms bOGUS_LVs, stg_binds)
 
-coreExprToStg env (Prim op tys args)
-  = mapAndUnzipUs (coreAtomToStg env) args `thenUs` \ (stg_atoms, stg_binds) ->
-    returnUs (StgPrim op stg_atoms bOGUS_LVs, unionManyBags stg_binds)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection[coreToStg-type-stuff]{Type application and abstraction}
-%*									*
-%************************************************************************
-
-This type information dies in this Core-to-STG translation.
-
-\begin{code}
-coreExprToStg env (CoTyLam tyvar expr) = coreExprToStg env expr
-coreExprToStg env (CoTyApp expr  ty)   = coreExprToStg env expr
+coreExprToStg env (Prim op args)
+  = coreArgsToStg env args  `thenUs` \ (_, stg_atoms, stg_binds) ->
+    returnUs (StgPrim op stg_atoms bOGUS_LVs, stg_binds)
 \end{code}
 
 %************************************************************************
@@ -429,7 +423,10 @@ coreExprToStg env (CoTyApp expr  ty)   = coreExprToStg env expr
 
 \begin{code}
 coreExprToStg env expr@(Lam _ _)
-  = coreExprToStg env body		`thenUs` \ (stg_body, binds) ->
+  = let
+	(_,_, binders, body) = collectBinders expr
+    in
+    coreExprToStg env body		`thenUs` \ (stg_body, binds) ->
     newStgVar (coreExprType expr)	`thenUs` \ var ->
     returnUs
       (StgLet (StgNonRec var (StgRhsClosure noCostCentre
@@ -440,14 +437,6 @@ coreExprToStg env expr@(Lam _ _)
 			      stg_body))
        (StgApp (StgVarArg var) [] bOGUS_LVs),
        binds)
-  where
-    (binders,body) = collect expr
-
-    -- Collect lambda-bindings, discarding type abstractions and applications
-    collect (Lam x e)   = (x:binders, body) where (binders,body) = collect e
-    collect (CoTyLam _ e) = collect e
-    collect (CoTyApp e _) = collect e
-    collect body	  = ([], body)
 \end{code}
 
 %************************************************************************
@@ -458,13 +447,15 @@ coreExprToStg env expr@(Lam _ _)
 
 \begin{code}
 coreExprToStg env expr@(App _ _)
-  = 	-- Deal with the arguments
-    mapAndUnzipUs (coreAtomToStg env) args `thenUs` \ (stg_args, arg_binds) ->
+  = let
+	(fun, _, _, args) = collectArgs expr
+    in
+	-- Deal with the arguments
+    coreArgsToStg env args `thenUs` \ (_, stg_args, arg_binds) ->
 
 	-- Now deal with the function
     case fun of
-      Var fun_id -> returnUs (StgApp (stgLookup env fun_id) stg_args bOGUS_LVs,
-				unionManyBags arg_binds)
+      Var fun_id -> returnUs (StgApp (stgLookup env fun_id) stg_args bOGUS_LVs, arg_binds)
 
       other ->	-- A non-variable applied to things; better let-bind it.
 		newStgVar (coreExprType fun)	`thenUs` \ fun_id ->
@@ -479,16 +470,7 @@ coreExprToStg env expr@(App _ _)
 		in
 		returnUs (StgLet (StgNonRec fun_id fun_rhs)
 			   	  (StgApp (StgVarArg fun_id) stg_args bOGUS_LVs),
-			   unionManyBags arg_binds `unionBags`
-			   fun_binds)
-  where
-    (fun,args) = collect_args expr []
-
-    -- Collect arguments, discarding type abstractions and applications
-    collect_args (App fun arg) args = collect_args fun (arg:args)
-    collect_args (CoTyLam _ e)   args = collect_args e args
-    collect_args (CoTyApp e _)   args = collect_args e args
-    collect_args fun             args = (fun, args)
+			   arg_binds `unionBags` fun_binds)
 \end{code}
 
 %************************************************************************
@@ -517,9 +499,9 @@ to
 
 \begin{code}
 
-coreExprToStg env (Case discrim@(Prim op tys args) alts)
-  | funnyParallelOp op =
-    getUnique			`thenUs` \ uniq ->
+coreExprToStg env (Case discrim@(Prim op _) alts)
+  | funnyParallelOp op
+  = getUnique			`thenUs` \ uniq ->
     coreExprToStg env discrim	`thenUs` \ (stg_discrim, discrim_binds) ->
     alts_to_stg alts		`thenUs` \ (stg_alts, alts_binds) ->
     returnUs (

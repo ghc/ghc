@@ -165,8 +165,7 @@ Comment the next section out to disable back-loops.
 >		if not (null back_loops){- && not (f `elem` ls')-} then
 >		   --if length back_loops > 1 then panic "barf!" else
 >		   	d2c (head back_loops)	`thenUs` \core_e ->
->		   	trace ("Back Loop:\n" ++
->				ppShow 80 (ppr PprDebug core_e)) $
+>		   	pprTrace "Back Loop:\n" (ppr PprDebug core_e) $
 
 If we find a back-loop that also occurs where we would normally make a
 new function...

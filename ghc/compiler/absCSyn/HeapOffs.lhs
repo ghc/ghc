@@ -22,10 +22,8 @@ module HeapOffs (
 
 	intOffsetIntoGoods,
 
-#if 0
 #if ! OMIT_NATIVE_CODEGEN
 	hpRelToInt,
-#endif
 #endif
 
 	VirtualHeapOffset(..), HpRelOffset(..),
@@ -34,15 +32,14 @@ module HeapOffs (
     ) where
 
 import Ubiq{-uitous-}
+#if ! OMIT_NATIVE_CODEGEN
+import AbsCLoop		( fixedHdrSizeInWords, varHdrSizeInWords )
+#endif
 
-import ClosureInfo	( isSpecRep )
 import Maybes		( catMaybes )
 import SMRep
 import Unpretty		-- ********** NOTE **********
 import Util		( panic )
-#if ! OMIT_NATIVE_CODEGEN
---import MachDesc		( Target )
-#endif
 \end{code}
 
 %************************************************************************
@@ -272,15 +269,15 @@ pprHeapOffset :: PprStyle -> HeapOffset -> Unpretty
 pprHeapOffset sty ZeroHeapOffset = uppChar '0'
 
 pprHeapOffset sty (MaxHeapOffset off1 off2)
-  = uppBesides [uppPStr SLIT("STG_MAX"), uppLparen,
-		pprHeapOffset sty off1, uppComma, pprHeapOffset sty off2,
-	       uppRparen]
+  = uppBeside (uppPStr SLIT("STG_MAX"))
+      (uppParens (uppBesides [pprHeapOffset sty off1, uppComma, pprHeapOffset sty off2]))
+
 pprHeapOffset sty (AddHeapOffset off1 off2)
-  = uppBesides [uppLparen, pprHeapOffset sty off1, uppChar '+',
-			pprHeapOffset sty off2, uppRparen]
+  = uppParens (uppBesides [pprHeapOffset sty off1, uppChar '+',
+			pprHeapOffset sty off2])
 pprHeapOffset sty (SubHeapOffset off1 off2)
-  = uppBesides [uppLparen, pprHeapOffset sty off1, uppChar '-',
-			pprHeapOffset sty off2, uppRparen]
+  = uppParens (uppBesides [pprHeapOffset sty off1, uppChar '-',
+			pprHeapOffset sty off2])
 
 pprHeapOffset sty (MkHeapOffset int_offs fxdhdr_offs varhdr_offs tothdr_offs)
   = pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
@@ -317,14 +314,12 @@ pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
     case (catMaybes [pp_tothdr_offs, pp_varhdr_offs, pp_fxdhdr_offs, pp_int_offs]) of
 	[]   -> uppChar '0'
 	[pp] -> pp	-- Each blob is parenthesised if necessary
-	pps  -> uppBesides [ uppLparen, uppIntersperse (uppChar '+') pps, uppRparen ]
+	pps  -> uppParens (uppIntersperse (uppChar '+') pps)
   where
     pp_hdrs hdr_pp [] = Nothing
     pp_hdrs hdr_pp [SMRI(rep, n)] | n _EQ_ ILIT(1) = Just (uppBeside (uppStr (show rep)) hdr_pp)
-    pp_hdrs hdr_pp hdrs = Just (uppBesides [ uppLparen,
-					    uppInterleave (uppChar '+')
-						(map (pp_hdr hdr_pp) hdrs),
-					    uppRparen ])
+    pp_hdrs hdr_pp hdrs = Just (uppParens (uppInterleave (uppChar '+')
+						(map (pp_hdr hdr_pp) hdrs)))
 
     pp_hdr :: Unpretty -> SMRep__Int -> Unpretty
     pp_hdr pp_str (SMRI(rep, n))
@@ -360,23 +355,22 @@ intOffsetIntoGoods anything_else = Nothing
 \end{code}
 
 \begin{code}
-#if 0
 #if ! OMIT_NATIVE_CODEGEN
 
-hpRelToInt :: Target -> HeapOffset -> Int
+hpRelToInt :: HeapOffset -> Int
 
-hpRelToInt target (MaxHeapOffset left right)
-  = (hpRelToInt target left) `max` (hpRelToInt target right)
+hpRelToInt ZeroHeapOffset = 0
 
-hpRelToInt target (SubHeapOffset left right)
-  = (hpRelToInt target left) - (hpRelToInt target right)
+hpRelToInt (MaxHeapOffset left right)
+  = hpRelToInt left `max` hpRelToInt right
 
-hpRelToInt target (AddHeapOffset left right)
-  = (hpRelToInt target left) + (hpRelToInt target right)
+hpRelToInt (SubHeapOffset left right)
+  = hpRelToInt left - hpRelToInt right
 
-hpRelToInt target ZeroHeapOffset = 0
+hpRelToInt (AddHeapOffset left right)
+  = hpRelToInt left + hpRelToInt right
 
-hpRelToInt target (MkHeapOffset base fhs vhs ths)
+hpRelToInt (MkHeapOffset base fhs vhs ths)
   = let
 	vhs_pieces, ths_pieces :: [Int]
 	fhs_off, vhs_off, ths_off :: Int
@@ -390,9 +384,8 @@ hpRelToInt target (MkHeapOffset base fhs vhs ths)
     in
     IBOX(base) + fhs_off + vhs_off + ths_off
   where
-    fhs_size   = (fixedHeaderSize target) :: Int
-    vhs_size r = (varHeaderSize target r) :: Int
+    fhs_size   = fixedHdrSizeInWords
+    vhs_size r = varHdrSizeInWords r
 
 #endif
-#endif {-0-}
 \end{code}

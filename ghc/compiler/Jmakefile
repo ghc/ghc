@@ -95,17 +95,19 @@ hsSyn/HsTypes.lhs \
 hsSyn/HsSyn.lhs
 
 #define NOT_SO_BASICSRCS_LHS 	\
-basicTypes/Unique.lhs		\
-basicTypes/UniqSupply.lhs 	\
-basicTypes/ProtoName.lhs 	\
-basicTypes/Name.lhs 		\
-basicTypes/NameTypes.lhs 	\
-basicTypes/SrcLoc.lhs		\
+basicTypes/FieldLabel.lhs	\
 basicTypes/Id.lhs		\
 basicTypes/IdInfo.lhs		\
 basicTypes/IdUtils.lhs		\
-basicTypes/PragmaInfo.lhs	\
 basicTypes/Literal.lhs		\
+basicTypes/Name.lhs 		\
+basicTypes/NameTypes.lhs 	\
+basicTypes/PprEnv.lhs		\
+basicTypes/PragmaInfo.lhs	\
+basicTypes/ProtoName.lhs 	\
+basicTypes/SrcLoc.lhs		\
+basicTypes/UniqSupply.lhs 	\
+basicTypes/Unique.lhs		\
 \
 types/Class.lhs			\
 types/Kind.lhs			\
@@ -181,6 +183,22 @@ deSugar/DsUtils.lhs \
 coreSyn/CoreLift.lhs \
 coreSyn/CoreLint.lhs
 
+#if GhcWithDeforester != YES
+#define __omit_deforester_flag -DOMIT_DEFORESTER=1
+#define DEFORESTER_SRCS_LHS /*none*/
+#else
+#define __omit_deforester_flag /*nope*/
+#define DEFORESTER_SRCS_LHS \
+deforest/DefSyn.lhs \
+deforest/Core2Def.lhs \
+deforest/Def2Core.lhs \
+deforest/Deforest.lhs \
+deforest/DefUtils.lhs \
+deforest/DefExpr.lhs \
+deforest/Cyclic.lhs \
+deforest/TreelessForm.lhs
+#endif /* GhcWithDeforester */
+
 #define SIMPL_SRCS_LHS \
 coreSyn/AnnCoreSyn.lhs \
 coreSyn/FreeVars.lhs \
@@ -215,30 +233,14 @@ stranal/SaAbsInt.lhs \
 stranal/WwLib.lhs \
 stranal/WorkWrap.lhs \
 \
-profiling/SCCauto.lhs \
-profiling/SCCfinal.lhs
+profiling/SCCauto.lhs DEFORESTER_SRCS_LHS
 
-#if GhcWithDeforester != YES
-#define __omit_deforester_flag -DOMIT_DEFORESTER=1
-#define DEFORESTER_SRCS_LHS /*none*/
-#else
-#define __omit_deforester_flag /*nope*/
-#define DEFORESTER_SRCS_LHS \
-deforest/DefSyn.lhs \
-deforest/Core2Def.lhs \
-deforest/Def2Core.lhs \
-deforest/Deforest.lhs \
-deforest/DefUtils.lhs \
-deforest/DefExpr.lhs \
-deforest/Cyclic.lhs \
-deforest/TreelessForm.lhs
-#endif /* GhcWithDeforester */
-
-#define BACKSRCS_LHS \
+#define STG_SRCS_LHS \
 stgSyn/CoreToStg.lhs \
 stgSyn/StgSyn.lhs \
 stgSyn/StgUtils.lhs \
 stgSyn/StgLint.lhs \
+profiling/SCCfinal.lhs \
 \
 simplStg/SatStgRhs.lhs \
 simplStg/LambdaLift.lhs \
@@ -247,8 +249,9 @@ simplStg/UpdAnal.lhs \
 simplStg/StgStats.lhs \
 simplStg/StgSATMonad.lhs \
 simplStg/StgSAT.lhs \
-simplStg/SimplStg.lhs \
-\
+simplStg/SimplStg.lhs
+
+#define BACKSRCS_LHS \
 absCSyn/AbsCUtils.lhs \
 absCSyn/AbsCSyn.lhs \
 absCSyn/CLabel.lhs \
@@ -283,36 +286,21 @@ codeGen/CgUpdate.lhs
 # define NATIVEGEN_SRCS_LHS /*none*/
 #else
 # define __omit_ncg_maybe /*none*/
-# if i386_TARGET_ARCH
-# define __machdep_nativegen_lhs \
-nativeGen/I386Desc.lhs \
-nativeGen/I386Code.lhs \
-nativeGen/I386Gen.lhs
-# endif
-# if sparc_TARGET_ARCH
-# define __machdep_nativegen_lhs \
-nativeGen/SparcDesc.lhs \
-nativeGen/SparcCode.lhs \
-nativeGen/SparcGen.lhs
-# endif
-# if alpha_TARGET_ARCH
-# define __machdep_nativegen_lhs \
-nativeGen/AlphaDesc.lhs \
-nativeGen/AlphaCode.lhs \
-nativeGen/AlphaGen.lhs
-# endif
 
 # define NATIVEGEN_SRCS_LHS \
 nativeGen/AbsCStixGen.lhs \
 nativeGen/AsmCodeGen.lhs \
 nativeGen/AsmRegAlloc.lhs \
-nativeGen/MachDesc.lhs \
+nativeGen/MachCode.lhs \
+nativeGen/MachMisc.lhs \
+nativeGen/MachRegs.lhs \
+nativeGen/PprMach.lhs \
+nativeGen/RegAllocInfo.lhs \
 nativeGen/Stix.lhs \
 nativeGen/StixInfo.lhs \
 nativeGen/StixInteger.lhs \
 nativeGen/StixPrim.lhs \
-nativeGen/StixMacro.lhs \
-__machdep_nativegen_lhs /*arch-specific ones */
+nativeGen/StixMacro.lhs
 #endif
 
 #define UTILSRCS_LHS \
@@ -366,22 +354,20 @@ simplCore/MagicUFs.lhs
 
 ALLSRCS_HS = READERSRCS_HS
 ALLSRCS_LHS = /* all pieces of the compiler */ \
-VBASICSRCS_LHS \
-NOT_SO_BASICSRCS_LHS \
-UTILSRCS_LHS \
-MAIN_SRCS_LHS \
-READERSRCS_LHS \
-RENAMERSRCS_LHS \
-TCSRCS_LHS \
-DSSRCS_LHS
+VBASICSRCS_LHS		\
+NOT_SO_BASICSRCS_LHS	\
+UTILSRCS_LHS 		\
+MAIN_SRCS_LHS 		\
+READERSRCS_LHS 		\
+RENAMERSRCS_LHS 	\
+TCSRCS_LHS 		\
+DSSRCS_LHS 		\
+SIMPL_SRCS_LHS 		\
+STG_SRCS_LHS 		\
+BACKSRCS_LHS NATIVEGEN_SRCS_LHS
 
 /*
-SIMPL_SRCS_LHS
-BACKSRCS_LHS
 */
-
-/* 
-NATIVEGEN_SRCS_LHS DEFORESTER_SRCS_LHS */
 /* NB: all the ones that may be empty (e.g., NATIVEGEN_SRCS_LHS)
 	need to be on the last line.
 */
@@ -405,13 +391,6 @@ ALLINTS=$(ALLSRCS_LHS:.lhs=.hi) $(ALLSRCS_HS:.hs=.hi)
 #define __version_sensitive_flags -fomit-reexported-instances
 #endif
 
-#if GhcWithRegisterised == NO
-    /* doing a raw boot from .hc files, presumably */
-#define __unreg_opts_maybe -O -unregisterised
-#else
-#define __unreg_opts_maybe /*none*/
-#endif
-
 /* avoid use of AllProjectsHcOpts; then put in HcMaxHeapFlag "by hand" */
 #undef  AllProjectsHcOpts
 #define AllProjectsHcOpts /**/
@@ -419,10 +398,9 @@ ALLINTS=$(ALLSRCS_LHS:.lhs=.hi) $(ALLSRCS_HS:.hs=.hi)
 HC_OPTS = -cpp HcMaxHeapFlag -fhaskell-1.3 -fglasgow-exts -DCOMPILING_GHC \
 	-fomit-derived-read \
 	-I. -i$(SUBDIR_LIST) \
-	use_DDEBUG __version_sensitive_flags __unreg_opts_maybe __omit_ncg_maybe
+	use_DDEBUG __version_sensitive_flags __omit_ncg_maybe __omit_deforester_flag
 
 #undef __version_sensitive_flags
-#undef __unreg_opts_maybe
 #undef __omit_ncg_maybe
 #undef __omit_deforester_flag
 
@@ -505,14 +483,22 @@ HaskellCompileWithExtraFlags_Recursive(module,isuf,o,-c,extra_flags)
 utils/Ubiq.hi : utils/Ubiq.lhi
 	$(GHC_UNLIT) utils/Ubiq.lhi utils/Ubiq.hi
 
+absCSyn/AbsCLoop.hi : absCSyn/AbsCLoop.lhi
+	$(GHC_UNLIT) absCSyn/AbsCLoop.lhi absCSyn/AbsCLoop.hi
 basicTypes/IdLoop.hi : basicTypes/IdLoop.lhi
 	$(GHC_UNLIT) basicTypes/IdLoop.lhi basicTypes/IdLoop.hi
 basicTypes/NameLoop.hi : basicTypes/NameLoop.lhi
 	$(GHC_UNLIT) basicTypes/NameLoop.lhi basicTypes/NameLoop.hi
+codeGen/CgLoop1.hi : codeGen/CgLoop1.lhi
+	$(GHC_UNLIT) codeGen/CgLoop1.lhi codeGen/CgLoop1.hi
+codeGen/CgLoop2.hi : codeGen/CgLoop2.lhi
+	$(GHC_UNLIT) codeGen/CgLoop2.lhi codeGen/CgLoop2.hi
 deSugar/DsLoop.hi : deSugar/DsLoop.lhi
 	$(GHC_UNLIT) deSugar/DsLoop.lhi deSugar/DsLoop.hi
 hsSyn/HsLoop.hi : hsSyn/HsLoop.lhi
 	$(GHC_UNLIT) hsSyn/HsLoop.lhi hsSyn/HsLoop.hi
+nativeGen/NcgLoop.hi : nativeGen/NcgLoop.lhi
+	$(GHC_UNLIT) nativeGen/NcgLoop.lhi nativeGen/NcgLoop.hi
 prelude/PrelLoop.hi : prelude/PrelLoop.lhi
 	$(GHC_UNLIT) prelude/PrelLoop.lhi prelude/PrelLoop.hi
 reader/RdrLoop.hi : reader/RdrLoop.lhi
@@ -548,12 +534,14 @@ compile(hsSyn/HsPragmas,lhs,)
 compile(hsSyn/HsTypes,lhs,)
 compile(hsSyn/HsSyn,lhs,if_ghc(-fno-omit-reexported-instances))
 
+compile(basicTypes/FieldLabel,lhs,)
 compile(basicTypes/Id,lhs,)
 compile(basicTypes/IdInfo,lhs,-K2m)
 compile(basicTypes/IdUtils,lhs,)
 compile(basicTypes/Literal,lhs,)
 compile(basicTypes/Name,lhs,)
 compile(basicTypes/NameTypes,lhs,)
+compile(basicTypes/PprEnv,lhs,)
 compile(basicTypes/PragmaInfo,lhs,)
 compile(basicTypes/ProtoName,lhs,)
 compile(basicTypes/SrcLoc,lhs,)
@@ -611,27 +599,16 @@ compile(main/MkIface,lhs,)
 compile(nativeGen/AbsCStixGen,lhs,)
 compile(nativeGen/AsmCodeGen,lhs,-I$(COMPINFO_DIR))
 compile(nativeGen/AsmRegAlloc,lhs,-I$(COMPINFO_DIR))
-compile(nativeGen/MachDesc,lhs,)
+compile(nativeGen/MachCode,lhs,)
+compile(nativeGen/MachMisc,lhs,)
+compile(nativeGen/MachRegs,lhs,)
+compile(nativeGen/PprMach,lhs,)
+compile(nativeGen/RegAllocInfo,lhs,)
 compile(nativeGen/Stix,lhs,)
 compile(nativeGen/StixInfo,lhs,-I$(NATIVEGEN_DIR))
 compile(nativeGen/StixInteger,lhs,)
 compile(nativeGen/StixMacro,lhs,-I$(NATIVEGEN_DIR))
 compile(nativeGen/StixPrim,lhs,)
-# if i386_TARGET_ARCH
-compile(nativeGen/I386Desc,lhs,)
-compile(nativeGen/I386Code,lhs,-I$(NATIVEGEN_DIR) if_ghc(-monly-4-regs))
-compile(nativeGen/I386Gen,lhs,)
-# endif
-# if sparc_TARGET_ARCH
-compile(nativeGen/SparcDesc,lhs,)
-compile(nativeGen/SparcCode,lhs,-I$(NATIVEGEN_DIR))
-compile(nativeGen/SparcGen,lhs,)
-# endif
-# if alpha_TARGET_ARCH
-compile(nativeGen/AlphaDesc,lhs,)
-compile(nativeGen/AlphaCode,lhs,-I$(NATIVEGEN_DIR))
-compile(nativeGen/AlphaGen,lhs,)
-# endif
 #endif
 
 compile(prelude/PrelInfo,lhs,)
@@ -923,7 +900,7 @@ compile(parser/U_ttype,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 
 /* *** misc *************************************************** */
 
-DEPSRCS = $(ALLSRCS_LHS) $(ALLSRCS_HS) SIMPL_SRCS_LHS
+DEPSRCS = $(ALLSRCS_LHS) $(ALLSRCS_HS)
 
 #if GhcWithHscBuiltViaC == NO
 MKDEPENDHS_OPTS= -I$(MAIN_INCLUDE_DIR) -I$(COMPINFO_DIR) -x HsVersions.h

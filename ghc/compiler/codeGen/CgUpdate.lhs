@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CgUpdate]{Manipulating update frames}
 
@@ -8,18 +8,15 @@
 
 module CgUpdate ( pushUpdateFrame ) where
 
-import StgSyn
+import Ubiq{-uitous-}
+
 import CgMonad
 import AbsCSyn
 
-import CgCompInfo	( sTD_UF_SIZE, cON_UF_SIZE,
-			  sCC_STD_UF_SIZE, sCC_CON_UF_SIZE,
-			  spARelToInt, spBRelToInt
-			)
+import CgCompInfo	( sTD_UF_SIZE, sCC_STD_UF_SIZE )
 import CgStackery	( allocUpdateFrame )
-import CgUsages
-import CmdLineOpts	( GlobalSwitch(..) )
-import Util
+import CmdLineOpts	( opt_SccProfilingOn )
+import Util		( assertPanic )
 \end{code}
 
 
@@ -41,8 +38,9 @@ to reflect the frame pushed.
 pushUpdateFrame :: CAddrMode -> CAddrMode -> Code -> Code
 
 pushUpdateFrame updatee vector code
-  = isSwitchSetC SccProfilingOn		`thenFC` \ profiling_on ->
-    let
+  = let
+	profiling_on = opt_SccProfilingOn
+
 	-- frame_size *includes* the return address
 	frame_size = if profiling_on
 		     then sCC_STD_UF_SIZE

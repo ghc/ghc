@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %************************************************************************
 %*									*
@@ -12,39 +12,46 @@
 
 module PprAbsC (
 	writeRealC,
-	dumpRealC,
+	dumpRealC
 #if defined(DEBUG)
-	pprAmode, -- otherwise, not exported
+	, pprAmode -- otherwise, not exported
 #endif
-
-	-- and for interface self-sufficiency...
-	AbstractC, CAddrMode, MagicId,
-	PprStyle, CSeq
     ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging only)
+import Ubiq{-uitous-}
+import AbsCLoop		-- break its dependence on ClosureInfo
 
 import AbsCSyn
 
-import PrelInfo		( pprPrimOp, primOpNeedsWrapper, PrimOp(..)
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
+import AbsCUtils	( getAmodeRep, nonemptyAbsC,
+			  mixedPtrLocn, mixedTypeLocn
 			)
-import Literal		( literalPrimRep, showLiteral )
-import CLabel	-- lots of things
 import CgCompInfo	( spARelToInt, spBRelToInt, mIN_UPD_SIZE )
-import CgRetConv 	( noLiveRegsMask )
-import ClosureInfo	-- quite a few things
-import Costs		-- for GrAnSim; cost counting function -- HWL
-import CostCentre
-import FiniteMap
-import Maybes		( catMaybes, maybeToBool, Maybe(..) )
-import Outputable
-import Pretty	    	( codeStyle, prettyToUn )
-import PrimRep		( showPrimRep, isFloatingRep, PrimRep(..) )
-import StgSyn
-import UniqFM
+import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
+			  isReadOnly, needsCDecl, pprCLabel,
+			  CLabel{-instance Ord-}
+			)
+import CmdLineOpts	( opt_SccProfilingOn )
+import CostCentre	( uppCostCentre, uppCostCentreDecl )
+import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
+import CStrings		( stringToC )
+import FiniteMap	( addToFM, emptyFM, lookupFM )
+import HeapOffs		( isZeroOff, subOff, pprHeapOffset )
+import Literal		( showLiteral, Literal(..) )
+import Maybes		( maybeToBool, catMaybes )
+import PprStyle		( PprStyle(..) )
+import Pretty		( prettyToUn )
+import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..) )
+import PrimRep		( isFloatingRep, showPrimRep, PrimRep(..) )
+import SMRep		( getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr,
+			  isConstantRep, isSpecRep, isPhantomRep
+			)
+import Unique		( pprUnique, Unique{-instance NamedThing-} )
+import UniqSet		( emptyUniqSet, elementOfUniqSet,
+			  addOneToUniqSet, UniqSet(..)
+			)
 import Unpretty		-- ********** NOTE **********
-import Util
+import Util		( nOfThem, panic, assertPanic )
 
 infixr 9 `thenTE`
 \end{code}
@@ -55,18 +62,18 @@ call to a cost evaluation function @GRAN_EXEC@. For that,
 @pprAbsC@ has a new ``costs'' argument.  %% HWL
 
 \begin{code}
-writeRealC :: _FILE -> AbstractC -> PrimIO ()
+writeRealC :: _FILE -> AbstractC -> IO ()
 
-writeRealC sw_chker file absC
+writeRealC file absC
   = uppAppendFile file 80 (
-      uppAbove (pprAbsC (PprForC sw_chker) absC (costs absC)) (uppChar '\n')
+      uppAbove (pprAbsC PprForC absC (costs absC)) (uppChar '\n')
     )
 
 dumpRealC :: AbstractC -> String
 
-dumpRealC sw_chker absC
+dumpRealC absC
   = uppShow 80 (
-      uppAbove (pprAbsC (PprForC sw_chker) absC (costs absC)) (uppChar '\n')
+      uppAbove (pprAbsC PprForC absC (costs absC)) (uppChar '\n')
     )
 \end{code}
 
@@ -246,7 +253,7 @@ pprAbsC sty (CCodeBlock label abs_C) _
 			  else "IFN_("),
 		   pprCLabel sty label, uppStr ") {"],
 	case sty of
-	  PprForC _ -> uppAbove pp_exts pp_temps
+	  PprForC -> uppAbove pp_exts pp_temps
 	  _ -> uppNil,
 	uppNest 8 (uppPStr SLIT("FB_")),
 	uppNest 8 (pprAbsC sty abs_C (costs abs_C)),
@@ -275,7 +282,7 @@ pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
   = BIND (pprTempAndExternDecls stmt) _TO_ (_, pp_exts) ->
     uppAboves [
 	case sty of
-	  PprForC _ -> pp_exts
+	  PprForC -> pp_exts
 	  _ -> uppNil,
 	uppBesides [
 		uppStr "SET_STATIC_HDR(",
@@ -416,7 +423,7 @@ pprAbsC sty stmt@(CFlatRetVector label amodes) _
   =	BIND (pprTempAndExternDecls stmt) _TO_ (_, pp_exts) ->
 	uppAboves [
 	    case sty of
-	      PprForC _ -> pp_exts
+	      PprForC -> pp_exts
 	      _ -> uppNil,
 	    uppBesides [ppLocalness label, uppPStr SLIT(" W_ "),
     	    	       pprCLabel sty label, uppStr "[] = {"],
@@ -504,9 +511,9 @@ pp_basic_restores
 \begin{code}
 if_profiling sty pretty
   = case sty of
-      PprForC sw_chker -> if  sw_chker SccProfilingOn
-			  then pretty
-			  else uppChar '0' -- leave it out!
+      PprForC -> if  opt_SccProfilingOn
+		 then pretty
+		 else uppChar '0' -- leave it out!
 
       _ -> {-print it anyway-} pretty
 
@@ -611,7 +618,6 @@ pprCCall sty op@(CCallOp op_str is_asm may_gc _ _) args results liveness_mask vo
   = if (may_gc && liveness_mask /= noLiveRegsMask)
     then panic ("Live register in _casm_GC_ \"" ++ casm_str ++ "\" " ++ (uppShow 80 (uppCat pp_non_void_args)) ++ "\n")
     else
---    trace ("casm \"" ++ casm_str ++ "\" " ++ (uppShow 80 (uppCat localVars)) ++ (uppShow 80 (uppCat pp_non_void_args)))
     uppAboves [
       uppChar '{',
       declare_local_vars,   -- local var for *result*
@@ -795,8 +801,8 @@ process_casm results args string = process results args string
 	  case readDec other of
 	    [(num,css)] ->
 		  if 0 <= num && num < length args
-		  then uppBesides [uppLparen, args !! num, uppRparen,
-				    process ress args css]
+		  then uppBeside (uppParens (args !! num))
+				 (process ress args css)
 		    else error ("process_casm: no such arg #:"++(show num)++" while processing \"" ++ string ++ "\".\n")
 	    _ -> error ("process_casm: not %<num> while processing _casm_ \"" ++ string ++ "\".\n")
 
@@ -918,8 +924,8 @@ no-cast case:
 \begin{code}
 pprAmode sty amode
   | mixedTypeLocn amode
-  = uppBesides [ uppLparen, pprPrimKind sty (getAmodeRep amode), uppStr ")(",
-		ppr_amode sty amode, uppRparen]
+  = uppParens (uppBesides [ pprPrimKind sty (getAmodeRep amode), uppStr ")(",
+		ppr_amode sty amode ])
   | otherwise	-- No cast needed
   = ppr_amode sty amode
 \end{code}
@@ -930,7 +936,7 @@ Now the rest of the cases for ``workhorse'' @ppr_amode@:
 ppr_amode sty (CVal reg_rel _)
   = case (pprRegRelative sty False{-no sign wanted-} reg_rel) of
 	(pp_reg, Nothing)     -> uppBeside  (uppChar '*') pp_reg
-	(pp_reg, Just offset) -> uppBesides [ pp_reg, uppLbrack, offset, uppRbrack ]
+	(pp_reg, Just offset) -> uppBesides [ pp_reg, uppBracket offset ]
 
 ppr_amode sty (CAddr reg_rel)
   = case (pprRegRelative sty True{-sign wanted-} reg_rel) of
@@ -1149,19 +1155,13 @@ x `elementOfCLabelSet` labs
   = case (lookupFM labs x) of { Just _ -> True; Nothing -> False }
 addToCLabelSet set x = addToFM set x ()
 
-type UniqueSet = UniqFM ()
-emptyUniqueSet = emptyUFM
-x `elementOfUniqueSet` us
-  = case (lookupDirectlyUFM us x) of { Just _ -> True; Nothing -> False }
-addToUniqueSet set x = set `plusUFM` singletonDirectlyUFM x ()
-
-type TEenv = (UniqueSet, CLabelSet)
+type TEenv = (UniqSet Unique, CLabelSet)
 
 type TeM result =  TEenv -> (TEenv, result)
 
 initTE :: TeM a -> a
 initTE sa
-  = case sa (emptyUniqueSet, emptyCLabelSet) of { (_, result) ->
+  = case sa (emptyUniqSet, emptyCLabelSet) of { (_, result) ->
     result }
 
 {-# INLINE thenTE #-}
@@ -1188,9 +1188,9 @@ returnTE result env = (env, result)
 
 tempSeenTE :: Unique -> TeM Bool
 tempSeenTE uniq env@(seen_uniqs, seen_labels)
-  = if (uniq `elementOfUniqueSet` seen_uniqs)
+  = if (uniq `elementOfUniqSet` seen_uniqs)
     then (env, True)
-    else ((addToUniqueSet seen_uniqs uniq,
+    else ((addOneToUniqSet seen_uniqs uniq,
 	  seen_labels),
 	  False)
 
@@ -1208,8 +1208,6 @@ pprTempDecl :: Unique -> PrimRep -> Unpretty
 pprTempDecl uniq kind
   = uppBesides [ pprPrimKind PprDebug kind, uppSP, prettyToUn (pprUnique uniq), uppSemi ]
 
-ppr_for_C = PprForC ( \ x -> False ) -- pretend no special cmd-line flags
-
 pprExternDecl :: CLabel -> PrimRep -> Unpretty
 
 pprExternDecl clabel kind
@@ -1222,7 +1220,7 @@ pprExternDecl clabel kind
 	      _		  -> ppLocalnessMacro False{-data-}    clabel
 	) _TO_ pp_macro_str ->
 
-	uppBesides [ pp_macro_str, uppLparen, pprCLabel ppr_for_C clabel, pp_paren_semi ]
+	uppBesides [ pp_macro_str, uppLparen, pprCLabel PprForC clabel, pp_paren_semi ]
 	BEND
 \end{code}
 

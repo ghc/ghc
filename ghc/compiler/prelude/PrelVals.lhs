@@ -10,6 +10,7 @@ module PrelVals where
 
 import Ubiq
 import IdLoop		( UnfoldingGuidance(..) )
+import Id		( Id(..), GenId, mkPreludeId, mkTemplateLocals )
 import PrelLoop
 
 -- friends:
@@ -29,13 +30,13 @@ import SpecEnv		( SpecEnv(..), nullSpecEnv )
 import TyVar		( alphaTyVar, betaTyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
+\end{code}
 
+
+
+
+\begin{code}
 -- only used herein:
-mkPreludeId = panic "PrelVals:Id.mkPreludeId"
-mkSpecId = panic "PrelVals:Id.mkSpecId"
-mkTemplateLocals = panic "PrelVals:Id.mkTemplateLocals"
-specialiseTy = panic "PrelVals:specialiseTy"
-
 pcMiscPrelId :: Unique{-IdKey-} -> FAST_STRING -> FAST_STRING -> Type -> IdInfo -> Id
 
 pcMiscPrelId key mod name ty info

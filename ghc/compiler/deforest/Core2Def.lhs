@@ -95,8 +95,8 @@ ToDo:
 >       Let (NonRec (v,ManyOcc _) e) e'
 >		| isTrivial e -> c2d (addOneToIdEnv p v (c2d p e)) e'
 >		| otherwise ->
->		trace ("Not inlining ManyOcc " ++ ppShow 80 (ppr PprDebug v)) (
->		Let (NonRec v (c2d p e)) (c2d p e'))
+>		pprTrace "Not inlining ManyOcc " (ppr PprDebug v) $
+>		Let (NonRec v (c2d p e)) (c2d p e')
 >
 >	Let (NonRec (v,DeadCode) e) e' ->
 >		panic "Core2Def(c2d): oops, unexpected DeadCode"
@@ -104,8 +104,8 @@ ToDo:
 >	Let (NonRec (v,OneOcc fun_or_arg dup_danger _ _ _) e) e'
 >	   | isTrivial e -> inline_it
 >	   | isDupDanger dup_danger ->
->		trace ("Not inlining DupDanger " ++ ppShow 80 (ppr PprDebug v))(
->		Let (NonRec v (c2d p e)) (c2d p e'))
+>		pprTrace "Not inlining DupDanger " (ppr PprDebug v) $
+>		Let (NonRec v (c2d p e)) (c2d p e')
 >	   | isFun fun_or_arg ->
 >		panic "Core2Def(c2d): oops, unexpected Macro"
 >	   | otherwise -> inline_it

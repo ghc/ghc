@@ -36,7 +36,7 @@ near the end (only \tr{#ifdef COMPILING_GHC}).
 module FiniteMap (
 	FiniteMap,		-- abstract type
 
-	emptyFM, singletonFM, listToFM,
+	emptyFM, unitFM, listToFM,
 
 	addToFM,   addListToFM,
 	IF_NOT_GHC(addToFM_C COMMA)
@@ -98,7 +98,7 @@ import Pretty
 \begin{code}
 --	BUILDING
 emptyFM		:: FiniteMap key elt
-singletonFM	:: key -> elt -> FiniteMap key elt
+unitFM	:: key -> elt -> FiniteMap key elt
 listToFM	:: (Ord key OUTPUTABLE_key) => [(key,elt)] -> FiniteMap key elt
 			-- In the case of duplicates, the last is taken
 
@@ -201,7 +201,7 @@ emptyFM
 
 -- #define EmptyFM (Branch _ _ IF_GHC(0#,0) _ _)
 
-singletonFM key elt = Branch key elt IF_GHC(1#,1) emptyFM emptyFM
+unitFM key elt = Branch key elt IF_GHC(1#,1) emptyFM emptyFM
 
 listToFM key_elt_pairs = addListToFM emptyFM key_elt_pairs
 \end{code}
@@ -215,7 +215,7 @@ listToFM key_elt_pairs = addListToFM emptyFM key_elt_pairs
 \begin{code}
 addToFM fm key elt = addToFM_C (\ old new -> new) fm key elt
 
-addToFM_C combiner EmptyFM key elt = singletonFM key elt
+addToFM_C combiner EmptyFM key elt = unitFM key elt
 addToFM_C combiner (Branch key elt size fm_l fm_r) new_key new_elt
 #ifdef __GLASGOW_HASKELL__
   = case _tagCmp new_key key of
@@ -404,7 +404,7 @@ eltsFM fm   = foldFM (\ key elt rest -> elt : rest)       [] fm
 @mkBranch@ simply gets the size component right.  This is the ONLY
 (non-trivial) place the Branch object is built, so the ASSERTion
 recursively checks consistency.  (The trivial use of Branch is in
-@singletonFM@.)
+@unitFM@.)
 
 \begin{code}
 sIZE_RATIO :: Int

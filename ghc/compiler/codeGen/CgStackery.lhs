@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CgStackery]{Stack management functions}
 
@@ -13,18 +13,19 @@ module CgStackery (
 	allocAStack, allocBStack, allocUpdateFrame,
 	adjustRealSps, getFinalStackHW,
 	mkVirtStkOffsets, mkStkAmodes
-
-	-- and to make the interface self-sufficient...
     ) where
 
-import StgSyn
+import Ubiq{-uitous-}
+
 import CgMonad
 import AbsCSyn
 
-import CgUsages		( getSpBRelOffset )
-import Maybes		( Maybe(..) )
-import PrimRep		( getPrimRepSize, retPrimRepSize, separateByPtrFollowness )
-import Util
+import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
+import HeapOffs		( VirtualSpAOffset(..), VirtualSpBOffset(..) )
+import PrimRep		( getPrimRepSize, separateByPtrFollowness,
+			  PrimRep(..)
+			)
+import Util		( mapAccumR, panic )
 \end{code}
 
 %************************************************************************

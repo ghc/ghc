@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1995
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[LambdaLift]{A STG-code lambda lifter}
 
@@ -8,18 +8,20 @@
 
 module LambdaLift ( liftProgram ) where
 
+import Ubiq{-uitous-}
+
 import StgSyn
 
-import Type		( mkForallTy, splitForalls, glueTyArgs,
-			  Type, RhoType(..), TauType(..)
+import Bag		( emptyBag, unionBags, unitBag, snocBag, bagToList )
+import Id		( idType, mkSysLocal, addIdArity,
+			  mkIdSet, unitIdSet, minusIdSet,
+			  unionManyIdSets, idSetToList, IdSet(..),
+			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv(..)
 			)
-import Bag
-import Id		( mkSysLocal, idType, addIdArity, Id )
-import Maybes
-import UniqSupply
-import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
-import UniqSet
-import Util
+import SrcLoc		( mkUnknownSrcLoc )
+import Type		( splitForAllTy, mkForAllTys, mkFunTys )
+import UniqSupply	( getUnique, splitUniqSupply )
+import Util		( zipEqual, panic, assertPanic )
 \end{code}
 
 This is the lambda lifter.  It turns lambda abstractions into
@@ -251,9 +253,9 @@ liftExpr (StgLet (StgRec pairs) body)
       let
 	-- Find the free vars of all the rhss,
 	-- excluding the binders themselves.
-	rhs_free_vars = unionManyUniqSets (map rhsFreeVars rhss)
-			`minusUniqSet`
-			mkUniqSet binders
+	rhs_free_vars = unionManyIdSets (map rhsFreeVars rhss)
+			`minusIdSet`
+			mkIdSet binders
 
 	rhs_info      = unionLiftInfos rhs_infos
       in
@@ -335,7 +337,7 @@ isLiftableRec (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) fvs _
 isLiftableRec other_rhs = False
 
 rhsFreeVars :: StgRhs -> IdSet
-rhsFreeVars (StgRhsClosure _ _ fvs _ _ _) = mkUniqSet fvs
+rhsFreeVars (StgRhsClosure _ _ fvs _ _ _) = mkIdSet fvs
 rhsFreeVars other 			  = panic "rhsFreeVars"
 \end{code}
 
@@ -364,22 +366,18 @@ mkScPieces :: IdSet 		-- Extra args for the supercombinator
 mkScPieces extra_arg_set (id, StgRhsClosure cc bi _ upd args body)
   = ASSERT( n_args > 0 )
 	-- Construct the rhs of the supercombinator, and its Id
-    -- this trace blackholes sometimes, don't use it
-    -- trace ("LL " ++ show (length (uniqSetToList extra_arg_set))) (
     newSupercombinator sc_ty arity  `thenLM` \ sc_id ->
-
     returnLM ((sc_id, extra_args), (sc_id, sc_rhs))
-    --)
   where
     n_args     = length args
-    extra_args = uniqSetToList extra_arg_set
+    extra_args = idSetToList extra_arg_set
     arity      = n_args + length extra_args
 
 	-- Construct the supercombinator type
     type_of_original_id = idType id
     extra_arg_tys       = map idType extra_args
-    (tyvars, rest)      = splitForalls type_of_original_id
-    sc_ty 	        = mkForallTy tyvars (glueTyArgs extra_arg_tys rest)
+    (tyvars, rest)      = splitForAllTy type_of_original_id
+    sc_ty 	        = mkForAllTys tyvars (mkFunTys extra_arg_tys rest)
 
     sc_rhs = StgRhsClosure cc bi [] upd (extra_args ++ args) body
 \end{code}
@@ -451,9 +449,9 @@ newSupercombinator ty arity ci us idenv
 
 lookup :: Id -> LiftM (Id,[Id])
 lookup v ci us idenv
-  = case lookupIdEnv idenv v of
-	Just result -> result
-	Nothing     -> (v, [])
+  = case (lookupIdEnv idenv v) of
+      Just result -> result
+      Nothing     -> (v, [])
 
 addScInlines :: [Id] -> [(Id,[Id])] -> LiftM a -> LiftM a
 addScInlines ids values m ci us idenv
@@ -488,14 +486,13 @@ addScInlines ids values m ci us idenv
 getFinalFreeVars :: IdSet -> LiftM IdSet
 
 getFinalFreeVars free_vars ci us idenv
-  = unionManyUniqSets (map munge_it (uniqSetToList free_vars))
+  = unionManyIdSets (map munge_it (idSetToList free_vars))
   where
     munge_it :: Id -> IdSet	-- Takes a free var and maps it to the "real"
 				-- free var
-    munge_it id = case lookupIdEnv idenv id of
-			Just (_, args) -> mkUniqSet args
-			Nothing	       -> singletonUniqSet id
-
+    munge_it id = case (lookupIdEnv idenv id) of
+		    Just (_, args) -> mkIdSet args
+		    Nothing	   -> unitIdSet id
 \end{code}
 
 

@@ -163,7 +163,6 @@ mkInterface modname export_list_fns inline_env tycon_specs
 	-- mkInterface to do I/O (WDP 94/10)
 	error "Can't produce interface file because of errors!\n"
     else
---  trace ("mkIface:Ids:"++(ppShow 80 (ppr PprDebug global_ids))) (
     ppAboves
        [ppPStr SLIT("{-# GHC_PRAGMA INTERFACE VERSION 7 #-}"),
 	ppCat [ppPStr SLIT("interface"), ppPStr modname, ppPStr SLIT("where")],
@@ -181,7 +180,6 @@ mkInterface modname export_list_fns inline_env tycon_specs
 
 	ppChar '\n'
        ]
---  )
   where
     any_purely_local tycons classes vals
       =  any bad_tc tycons || any bad_cl classes || any bad_id vals
@@ -322,7 +320,7 @@ get_tycon_pair tycon
 			ExportAbs   -> orig_nm
 			NotExported -> orig_nm
 
-	cons	    = getTyConDataCons tycon
+	cons	    = tyConDataCons tycon
     in
     (orig_mod, nm_to_print) }
 
@@ -411,7 +409,7 @@ do_value better_id_fn inline_env val
 			ppPStr SLIT("#-}")]
     in
     ppAbove (ppCat [ppr_non_op name_str,
-		    ppPStr SLIT("::"), pprType sty val_ty])
+		    ppPStr SLIT("::"), pprGenType sty val_ty])
 	    pp_id_info
 
 -- sadly duplicates Outputable.pprNonOp (ToDo)

@@ -652,7 +652,7 @@ doIfaceTyDecls1 sifun full_tc_nf ty_decls
     do_condecl cf_nf tc_nf (RecConDecl con fields src_loc)
       = RecConDecl (cf_nf con) (map do_field fields) src_loc
       where
-	do_field (var, ty) = (cf_nf var, do_bang tc_nf ty)
+	do_field (vars, ty) = (map cf_nf vars, do_bang tc_nf ty)
 
     --------------------------------------------
     do_bang tc_nf (Banged   ty) = Banged   (doIfaceMonoType1 tc_nf ty)

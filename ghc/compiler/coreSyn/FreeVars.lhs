@@ -26,14 +26,14 @@ import AnnCoreSyn	-- output
 
 import CoreSyn
 import Id		( idType, getIdArity, isBottomingId,
-			  emptyIdSet, singletonIdSet, mkIdSet,
+			  emptyIdSet, unitIdSet, mkIdSet,
 			  elementOfIdSet, minusIdSet, unionManyIdSets,
 			  IdSet(..)
 			)
 import IdInfo		( arityMaybe )
 import PrimOp		( PrimOp(..) )
 import Type		( tyVarsOfType )
-import TyVar		( emptyTyVarSet, singletonTyVarSet, minusTyVarSet,
+import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
 			  intersectTyVarSets,
 			  TyVarSet(..)
 			)
@@ -74,8 +74,8 @@ data FVInfo
 noFreeIds      = emptyIdSet
 noFreeTyVars   = emptyTyVarSet
 noFreeAnything = (noFreeIds, noFreeTyVars)
-aFreeId i      = singletonIdSet i
-aFreeTyVar t   = singletonTyVarSet t
+aFreeId i      = unitIdSet i
+aFreeTyVar t   = unitTyVarSet t
 is_among       = elementOfIdSet
 munge_id_ty  i = tyVarsOfType (idType i)
 combine	       = unionUniqSets -- used both for {Id,TyVar}Sets
@@ -171,13 +171,13 @@ fvExpr id_cands tyvar_cands (Lam (UsageBinder uvar) body)
   = panic "fvExpr:Lam UsageBinder"
 
 fvExpr id_cands tyvar_cands (Lam b@(ValBinder binder) body)
-  = (FVInfo (freeVarsOf body2   `minusIdSet` singletonIdSet binder)
+  = (FVInfo (freeVarsOf body2   `minusIdSet` unitIdSet binder)
 	    (freeTyVarsOf body2 `combine`    munge_id_ty binder)
 	    leakiness,
      AnnLam b body2)
   where
 	-- We need to collect free tyvars from the binders
-    body2 = fvExpr (singletonIdSet binder `combine` id_cands) tyvar_cands body
+    body2 = fvExpr (unitIdSet binder `combine` id_cands) tyvar_cands body
 
     leakiness = case leakinessOf body2 of
 		  MightLeak  -> LeakFree 1
@@ -412,7 +412,7 @@ addExprFVs fv_cand in_scope (Lam binder body)
 	  TyBinder    t -> (TyBinder t, emptyIdSet)
 	  UsageBinder u -> (UsageBinder u, emptyIdSet)
           ValBinder   b -> (ValBinder (b, lam_fvs),
-			    singletonIdSet b)
+			    unitIdSet b)
 
     new_in_scope	 = in_scope `combine` binder_set
     (new_body, body_fvs) = addExprFVs fv_cand new_in_scope body

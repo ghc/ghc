@@ -14,7 +14,7 @@ raw assembler/machine code.
 \begin{code}
 #include "HsVersions.h"
 
-module AbsCSyn (
+module AbsCSyn {- (
 	-- export everything
 	AbstractC(..),
 	CStmtMacro(..),
@@ -26,68 +26,37 @@ module AbsCSyn (
 	mkAbsCStmtList,
 	mkCCostCentre,
 
-	-- HeapOffsets, plus some convenient synonyms...
-	HeapOffset,
-	zeroOff, intOff, fixedHdrSize, totHdrSize, varHdrSize,
-	maxOff, addOff, subOff, intOffsetIntoGoods,
-	isZeroOff, possiblyEqualHeapOffset,
-	pprHeapOffset,
-	VirtualHeapOffset(..), HpRelOffset(..),
-	VirtualSpAOffset(..), VirtualSpBOffset(..),
-	SpARelOffset(..), SpBRelOffset(..),
-
 	-- RegRelatives
 	RegRelative(..),
 
 	-- registers
 	MagicId(..), node, infoptr,
-	isVolatileReg,
-
-	-- closure info
-	ClosureInfo, LambdaFormInfo, UpdateFlag, SMRep,
-
-	-- stuff from AbsCUtils and PprAbsC...
-	nonemptyAbsC, flattenAbsC, getAmodeRep,
-	mixedTypeLocn, mixedPtrLocn,
-	writeRealC,
-	dumpRealC,
-	kindFromMagicId,
-	amodeCanSurviveGC
+	isVolatileReg, noLiveRegsMask, mkLiveRegsMask
 
 #ifdef GRAN
 	, CostRes(Cost)
 #endif
+    )-} where
 
-	-- and stuff to make the interface self-sufficient
-    ) where
+import Ubiq{-uitous-}
 
-import AbsCUtils	-- used, and re-exported
-import ClosureInfo	-- ditto
-import Costs
-import PprAbsC		-- ditto
-import HeapOffs		hiding ( hpRelToInt )
-
-import PrelInfo		( PrimOp
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
+import CgCompInfo   	( mAX_Vanilla_REG, mAX_Float_REG,
+			  mAX_Double_REG, lIVENESS_R1, lIVENESS_R2,
+			  lIVENESS_R3, lIVENESS_R4, lIVENESS_R5,
+			  lIVENESS_R6, lIVENESS_R7, lIVENESS_R8
 			)
-import Literal		( mkMachInt, mkMachWord, Literal(..) )
-import CLabel
-import CgCompInfo   	( mAX_Vanilla_REG, mAX_Float_REG, mAX_Double_REG )
-import CostCentre	-- for CostCentre type
-import Id		( Id, ConTag(..), DataCon(..) )
-import Maybes		( Maybe )
-import Outputable
-import PrimRep		( PrimRep(..) )
-import StgSyn		( GenStgExpr, GenStgArg, StgBinderInfo )
-import UniqSet		( UniqSet(..), UniqFM )
-import Unpretty		-- ********** NOTE **********
-import Util
+import HeapOffs		( VirtualSpAOffset(..), VirtualSpBOffset(..),
+			  VirtualHeapOffset(..)
+			)
+import Literal		( mkMachInt )
+import PrimRep		( isFollowableRep, PrimRep(..) )
 \end{code}
 
 @AbstractC@ is a list of Abstract~C statements, but the data structure
 is tree-ish, for easier and more efficient putting-together.
 \begin{code}
+absCNop = AbsCNop
+
 data AbstractC
   = AbsCNop
   | AbsCStmts		AbstractC AbstractC
@@ -436,7 +405,6 @@ data ReturnInfo
   = DirectReturn    	    	    	-- Jump directly, if possible
   | StaticVectoredReturn Int		-- Fixed tag, starting at zero
   | DynamicVectoredReturn CAddrMode	-- Dynamic tag given by amode, starting at zero
-
 \end{code}
 
 %************************************************************************
@@ -512,6 +480,27 @@ data MagicId
 
 node 	= VanillaReg PtrRep     ILIT(1) -- A convenient alias for Node
 infoptr = VanillaReg DataPtrRep ILIT(2) -- An alias for InfoPtr
+
+--------------------
+noLiveRegsMask :: Int	-- Mask indicating nothing live
+noLiveRegsMask = 0
+
+mkLiveRegsMask
+	:: [MagicId]	-- Candidate live regs; depends what they have in them
+	-> Int
+
+mkLiveRegsMask regs
+  = foldl do_reg noLiveRegsMask regs
+  where
+    do_reg acc (VanillaReg kind reg_no)
+      | isFollowableRep kind
+      = acc + (reg_tbl !! IBOX(reg_no _SUB_ ILIT(1)))
+
+    do_reg acc anything_else = acc
+
+    reg_tbl -- ToDo: mk Array!
+      = [lIVENESS_R1, lIVENESS_R2, lIVENESS_R3, lIVENESS_R4,
+	 lIVENESS_R5, lIVENESS_R6, lIVENESS_R7, lIVENESS_R8]
 \end{code}
 
 We need magical @Eq@ because @VanillaReg@s come in multiple flavors.

@@ -73,8 +73,8 @@ import RnHsSyn		( RenamedFixityDecl(..) )
 import RnMonad4		-- initRn4, etc.
 import RnUtils
 
-import Id		( GenId, getDataConArity, getDataConTag,
-			  getDataConSig, fIRST_TAG,
+import Id		( GenId, dataConArity, dataConTag,
+			  dataConSig, fIRST_TAG,
 			  isDataCon, DataCon(..), ConTag(..) )
 import IdUtils		( primOpId )
 import Maybes		( maybeToBool )
@@ -86,7 +86,7 @@ import PrelInfo
 import Pretty
 import ProtoName	( ProtoName(..) )
 import SrcLoc		( mkGeneratedSrcLoc )
-import TyCon		( TyCon, getTyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
+import TyCon		( TyCon, tyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
 import Type		( eqTy, isPrimType )
 import Unique
 import Util
@@ -175,8 +175,8 @@ instance ... Eq (Foo ...) where
 gen_Eq_binds :: TyCon -> ProtoNameMonoBinds
 
 gen_Eq_binds tycon
-  = case (partition (\ con -> getDataConArity con == 0)
-		    (getTyConDataCons tycon))
+  = case (partition (\ con -> dataConArity con == 0)
+		    (tyConDataCons tycon))
     of { (nullary_cons, nonnullary_cons) ->
     let
 	rest
@@ -201,9 +201,9 @@ gen_Eq_binds tycon
 	    con2_pat = ConPatIn data_con_PN (map VarPatIn bs_needed)
 
 	    data_con_PN = Prel (WiredInVal data_con)
-	    as_needed   = take (getDataConArity data_con) as_PNs
-	    bs_needed   = take (getDataConArity data_con) bs_PNs
-	    tys_needed  = case (getDataConSig data_con) of
+	    as_needed   = take (dataConArity data_con) as_PNs
+	    bs_needed   = take (dataConArity data_con) bs_PNs
+	    tys_needed  = case (dataConSig data_con) of
 			    (_,_, arg_tys, _) -> arg_tys
 	in
 	([con1_pat, con2_pat], nested_eq_expr tys_needed as_needed bs_needed)
@@ -342,7 +342,7 @@ gen_Ord_binds tycon
 		    (cmp_tags_Expr ltH_PN ah_PN bh_PN ltTag_Expr gtTag_Expr)))
 
     (nullary_cons, nonnullary_cons)
-      = partition (\ con -> getDataConArity con == 0) (getTyConDataCons tycon)
+      = partition (\ con -> dataConArity con == 0) (tyConDataCons tycon)
 
     cmp_eq
       = mk_FunMonoBind cmp_eq_PN (map pats_etc nonnullary_cons ++ deflt_pats_etc)
@@ -355,9 +355,9 @@ gen_Ord_binds tycon
 	    con2_pat = ConPatIn data_con_PN (map VarPatIn bs_needed)
 
 	    data_con_PN = Prel (WiredInVal data_con)
-	    as_needed   = take (getDataConArity data_con) as_PNs
-	    bs_needed   = take (getDataConArity data_con) bs_PNs
-	    tys_needed  = case (getDataConSig data_con) of
+	    as_needed   = take (dataConArity data_con) as_PNs
+	    bs_needed   = take (dataConArity data_con) bs_PNs
+	    tys_needed  = case (dataConSig data_con) of
 			    (_,_, arg_tys, _) -> arg_tys
 
 	    nested_compare_expr [ty] [a] [b]
@@ -570,21 +570,21 @@ gen_Ix_binds tycon
       =	case maybeTyConSingleCon tycon of -- just checking...
 	  Nothing -> panic "get_Ix_binds"
 	  Just dc -> let
-			 (_, _, arg_tys, _) = getDataConSig dc
+			 (_, _, arg_tys, _) = dataConSig dc
 		     in
 		     if any isPrimType arg_tys then
 			 error ("ERROR: Can't derive Ix for a single-constructor type with primitive argument types: "++tycon_str)
 		     else
 			 dc
 
-    con_arity   = getDataConArity data_con
+    con_arity   = dataConArity data_con
     data_con_PN = Prel (WiredInVal data_con)
     con_pat  xs = ConPatIn data_con_PN (map VarPatIn xs)
     con_expr xs = foldl HsApp (HsVar data_con_PN) (map HsVar xs)
 
-    as_needed = take (getDataConArity data_con) as_PNs
-    bs_needed = take (getDataConArity data_con) bs_PNs
-    cs_needed = take (getDataConArity data_con) cs_PNs
+    as_needed = take (dataConArity data_con) as_PNs
+    bs_needed = take (dataConArity data_con) bs_PNs
+    cs_needed = take (dataConArity data_con) cs_PNs
 
     --------------------------------------------------------------
     single_con_range
@@ -645,7 +645,7 @@ gen_Read_binds fixities tycon
     reads_prec
       = let
 	    read_con_comprehensions
-	      = map read_con (getTyConDataCons tycon)
+	      = map read_con (tyConDataCons tycon)
 	in
 	mk_easy_FunMonoBind readsPrec_PN [a_Pat, b_Pat] [] (
 	      foldl1 append_Expr read_con_comprehensions
@@ -655,10 +655,10 @@ gen_Read_binds fixities tycon
 	  = let
 		data_con_PN = Prel (WiredInVal data_con)
 		data_con_str= snd  (getOrigName data_con)
-		as_needed   = take (getDataConArity data_con) as_PNs
-		bs_needed   = take (getDataConArity data_con) bs_PNs
+		as_needed   = take (dataConArity data_con) as_PNs
+		bs_needed   = take (dataConArity data_con) bs_PNs
 		con_expr    = foldl HsApp (HsVar data_con_PN) (map HsVar as_needed)
-		nullary_con = getDataConArity data_con == 0
+		nullary_con = dataConArity data_con == 0
 
 		con_qual
 		  = GeneratorQual
@@ -696,14 +696,14 @@ gen_Show_binds fixities tycon
 		  (HsApp (HsVar _showList_PN) (HsApp (HsVar showsPrec_PN) (HsLit (HsInt 0))))
     -----------------------------------------------------------------------
     shows_prec
-      = mk_FunMonoBind showsPrec_PN (map pats_etc (getTyConDataCons tycon))
+      = mk_FunMonoBind showsPrec_PN (map pats_etc (tyConDataCons tycon))
       where
 	pats_etc data_con
 	  = let
 		data_con_PN = Prel (WiredInVal data_con)
-		bs_needed   = take (getDataConArity data_con) bs_PNs
+		bs_needed   = take (dataConArity data_con) bs_PNs
 		con_pat     = ConPatIn data_con_PN (map VarPatIn bs_needed)
-		nullary_con = getDataConArity data_con == 0
+		nullary_con = dataConArity data_con == 0
 
 		show_con
 		  = let (mod, nm)   = getOrigName data_con
@@ -773,19 +773,19 @@ gen_tag_n_con_monobind
     -> ProtoNameMonoBinds
 
 gen_tag_n_con_monobind (pn, _, tycon, GenCon2Tag)
-  = mk_FunMonoBind pn (map mk_stuff (getTyConDataCons tycon))
+  = mk_FunMonoBind pn (map mk_stuff (tyConDataCons tycon))
   where
     mk_stuff :: DataCon -> ([ProtoNamePat], ProtoNameHsExpr)
 
     mk_stuff var
       = ASSERT(isDataCon var)
-	([pat], HsLit (HsIntPrim (toInteger ((getDataConTag var) - fIRST_TAG))))
+	([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
       where
-	pat    = ConPatIn var_PN (nOfThem (getDataConArity var) WildPatIn)
+	pat    = ConPatIn var_PN (nOfThem (dataConArity var) WildPatIn)
 	var_PN = Prel (WiredInVal var)
 
 gen_tag_n_con_monobind (pn, _, tycon, GenTag2Con)
-  = mk_FunMonoBind pn (map mk_stuff (getTyConDataCons tycon))
+  = mk_FunMonoBind pn (map mk_stuff (tyConDataCons tycon))
   where
     mk_stuff :: DataCon -> ([ProtoNamePat], ProtoNameHsExpr)
 
@@ -793,13 +793,13 @@ gen_tag_n_con_monobind (pn, _, tycon, GenTag2Con)
       = ASSERT(isDataCon var)
 	([lit_pat], HsVar var_PN)
       where
-	lit_pat = ConPatIn mkInt_PN [LitPatIn (HsIntPrim (toInteger ((getDataConTag var) - fIRST_TAG)))]
+	lit_pat = ConPatIn mkInt_PN [LitPatIn (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG)))]
 	var_PN  = Prel (WiredInVal var)
 
 gen_tag_n_con_monobind (pn, _, tycon, GenMaxTag)
   = mk_easy_FunMonoBind pn [] [] (HsApp (HsVar mkInt_PN) (HsLit (HsIntPrim max_tag)))
   where
-    max_tag =  case (getTyConDataCons tycon) of
+    max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 \end{code}
 

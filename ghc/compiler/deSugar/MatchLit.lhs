@@ -75,7 +75,7 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo (LitPat literal lit_ty : ps
 	mk_core_lit ty (HsFloatPrim   f) = MachFloat  f
 	mk_core_lit ty (HsDoublePrim  d) = MachDouble d
 	mk_core_lit ty (HsLitLit      s) = ASSERT(isPrimType ty)
-					   MachLitLit s (panic "MatchLit.matchLiterals:mk_core_lit:HsLitLit; primRepFromType???")
+					   MachLitLit s (panic "MatchLit.matchLiterals:mk_core_lit:HsLitLit; typePrimRep???")
     	mk_core_lit ty other	         = panic "matchLiterals:mk_core_lit:unhandled"
 \end{code}
 

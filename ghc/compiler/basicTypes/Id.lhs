@@ -32,12 +32,15 @@ module Id {- (
 	idType,
 	getIdInfo, replaceIdInfo,
 	getPragmaInfo,
-	getIdPrimRep, getInstIdModule,
+	idPrimRep, getInstIdModule,
 	getMentionedTyConsAndClassesFromId,
-	getDataConTag,
-	getDataConSig, getInstantiatedDataConSig,
 
-	getDataConTyCon,
+	dataConTag,
+	dataConSig, getInstantiatedDataConSig,
+	dataConTyCon, dataConArity,
+	dataConFieldLabels,
+
+	recordSelectorFieldLabel,
 
 	-- PREDICATES
 	isDataCon, isTupleCon,
@@ -62,7 +65,7 @@ module Id {- (
 -- not exported:	apply_to_Id, -- please don't use this, generally
 
 	-- UNFOLDING, ARITY, UPDATE, AND STRICTNESS STUFF (etc)
-	getIdArity, getDataConArity, addIdArity,
+	getIdArity, addIdArity,
 	getIdDemandInfo, addIdDemandInfo,
 	getIdSpecialisation, addIdSpecialisation,
 	getIdStrictness, addIdStrictness,
@@ -96,30 +99,38 @@ import NameLoop -- for paranoia checking
 
 import Bag
 import Class		( getClassOpString, Class(..), GenClass, ClassOp(..), GenClassOp )
+import CStrings		( identToC, cSEP )
 import IdInfo
 import Maybes		( maybeToBool )
 import NameTypes	( mkShortName, fromPrelude, FullName, ShortName )
+import FieldLabel	( fieldLabelName, FieldLabel{-instances-} )
 import Name		( Name(..) )
 import Outputable	( isAvarop, isAconop, getLocalName,
 			  isExported, ExportFlag(..) )
 import PragmaInfo	( PragmaInfo(..) )
 import PrelMods		( pRELUDE_BUILTIN )
-import PprType		( GenType, GenTyVar,
-			  getTypeString, typeMaybeString, specMaybeTysSuffix )
+import PprType		( getTypeString, typeMaybeString, specMaybeTysSuffix,
+			  GenType, GenTyVar
+			)
 import PprStyle
 import Pretty
 import SrcLoc		( mkBuiltinSrcLoc )
-import TyCon		( TyCon, mkTupleTyCon, getTyConDataCons )
+import TyCon		( TyCon, mkTupleTyCon, tyConDataCons )
 import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
 			  applyTyCon, isPrimType, instantiateTy,
-			  tyVarsOfType,
+			  tyVarsOfType, applyTypeEnvToTy, typePrimRep,
 			  GenType, ThetaType(..), TauType(..), Type(..)
 			)
-import TyVar		( GenTyVar, alphaTyVars, isEmptyTyVarSet )
+import TyVar		( alphaTyVars, isEmptyTyVarSet, TyVarEnv(..) )
 import UniqFM
 import UniqSet		-- practically all of it
-import Unique		( Unique, mkTupleDataConUnique, pprUnique, showUnique )
-import Util		( mapAccumL, nOfThem, panic, pprPanic, assertPanic )
+import UniqSupply	( getBuiltinUniques )
+import Unique		( mkTupleDataConUnique, pprUnique, showUnique,
+			  Unique{-instance Ord3-}
+			)
+import Util		( mapAccumL, nOfThem,
+			  panic, panic#, pprPanic, assertPanic
+			)
 \end{code}
 
 Here are the @Id@ and @IdDetails@ datatypes; also see the notes that
@@ -176,6 +187,7 @@ data IdDetails
   | DataConId	FullName
 		ConTag
 		[StrictnessMark] -- Strict args; length = arity
+		[FieldLabel]	-- Field labels for this constructor
 
 		[TyVar] [(Class,Type)] [Type] TyCon
 				-- the type is:
@@ -183,6 +195,8 @@ data IdDetails
 				--    unitype_1 -> ... -> unitype_n -> tycon tyvars
 
   | TupleConId	Int		-- Its arity
+
+  | RecordSelectorId FieldLabel
 
   ---------------- Things to do with overloading
 
@@ -229,6 +243,7 @@ data IdDetails
 
   | InstId	ShortName	-- An instance of a dictionary, class operation,
 				-- or overloaded value
+		Bool		-- as for LocalId
 
   | SpecId			-- A specialisation of another Id
 		Id		-- Id of which this is a specialisation
@@ -437,10 +452,10 @@ unsafeGenId2Id (Id u ty d p i) = Id u (panic "unsafeGenId2Id:ty") d p i
 
 isDataCon id = is_data (unsafeGenId2Id id)
  where
-  is_data (Id _ _ (DataConId _ _ _ _ _ _ _) _ _) = True
-  is_data (Id _ _ (TupleConId _) _ _)		 = True
-  is_data (Id _ _ (SpecId unspec _ _) _ _)	 = is_data unspec
-  is_data other					 = False
+  is_data (Id _ _ (DataConId _ _ _ _ _ _ _ _) _ _) = True
+  is_data (Id _ _ (TupleConId _) _ _)		   = True
+  is_data (Id _ _ (SpecId unspec _ _) _ _)	   = is_data unspec
+  is_data other					   = False
 
 
 isTupleCon id = is_tuple (unsafeGenId2Id id)
@@ -476,29 +491,31 @@ idHasNoFreeTyVars   :: Id -> Bool
 toplevelishId (Id _ _ details _ _)
   = chk details
   where
-    chk (DataConId _ _ _ _ _ _ _) = True
-    chk (TupleConId _)	    	  = True
-    chk (ImportedId _)	    	  = True
-    chk (PreludeId  _)	    	  = True
-    chk (TopLevId   _)	    	  = True	-- NB: see notes
-    chk (SuperDictSelId _ _)	  = True
-    chk (MethodSelId _ _)	  = True
-    chk (DefaultMethodId _ _ _)   = True
-    chk (DictFunId     _ _ _ _)	  = True
-    chk (ConstMethodId _ _ _ _ _) = True
-    chk (SpecId unspec _ _)	  = toplevelishId unspec
-				  -- depends what the unspecialised thing is
-    chk (WorkerId unwrkr)	  = toplevelishId unwrkr
-    chk (InstId _)		  = False	-- these are local
-    chk (LocalId      _ _)	  = False
-    chk (SysLocalId   _ _)	  = False
-    chk (SpecPragmaId _ _ _)	  = False
+    chk (DataConId _ _ _ _ _ _ _ _) = True
+    chk (TupleConId _)	    	    = True
+    chk (RecordSelectorId _)   	    = True
+    chk (ImportedId _)	    	    = True
+    chk (PreludeId  _)	    	    = True
+    chk (TopLevId   _)	    	    = True	-- NB: see notes
+    chk (SuperDictSelId _ _)	    = True
+    chk (MethodSelId _ _)	    = True
+    chk (DefaultMethodId _ _ _)     = True
+    chk (DictFunId     _ _ _ _)	    = True
+    chk (ConstMethodId _ _ _ _ _)   = True
+    chk (SpecId unspec _ _)	    = toplevelishId unspec
+				    -- depends what the unspecialised thing is
+    chk (WorkerId unwrkr)	    = toplevelishId unwrkr
+    chk (InstId _ _)		    = False	-- these are local
+    chk (LocalId      _ _)	    = False
+    chk (SysLocalId   _ _)	    = False
+    chk (SpecPragmaId _ _ _)	    = False
 
 idHasNoFreeTyVars (Id _ _ details _ info)
   = chk details
   where
-    chk (DataConId _ _ _ _ _ _ _) = True
+    chk (DataConId _ _ _ _ _ _ _ _) = True
     chk (TupleConId _)	    	  = True
+    chk (RecordSelectorId _)   	  = True
     chk (ImportedId _)	    	  = True
     chk (PreludeId  _)	    	  = True
     chk (TopLevId   _)	    	  = True
@@ -508,7 +525,7 @@ idHasNoFreeTyVars (Id _ _ details _ info)
     chk (DictFunId     _ _ _ _)	  = True
     chk (ConstMethodId _ _ _ _ _) = True
     chk (WorkerId unwrkr)	  = idHasNoFreeTyVars unwrkr
-    chk (InstId _)		  = False	-- these are local
+    chk (InstId       _   no_free_tvs) = no_free_tvs
     chk (SpecId _     _   no_free_tvs) = no_free_tvs
     chk (LocalId      _   no_free_tvs) = no_free_tvs
     chk (SysLocalId   _   no_free_tvs) = no_free_tvs
@@ -522,8 +539,7 @@ isTopLevId other		     = False
 isImportedId (Id _ _ (ImportedId _) _ _) = True
 isImportedId other		  	 = False
 
-isBottomingId (Id _ _ _ _ info) = panic "isBottomingId not implemented"
-			-- LATER: bottomIsGuaranteed (getInfo info)
+isBottomingId (Id _ _ _ _ info) = bottomIsGuaranteed (getInfo info)
 
 isSysLocalId (Id _ _ (SysLocalId _ _) _ _) = True
 isSysLocalId other			   = False
@@ -578,7 +594,7 @@ pprIdInUnfolding in_scopes v
     else if v == nilDataCon then
 	ppPStr SLIT("_NIL_")
     else if isTupleCon v then
-	ppBeside (ppPStr SLIT("_TUP_")) (ppInt (getDataConArity v))
+	ppBeside (ppPStr SLIT("_TUP_")) (ppInt (dataConArity v))
 
     -- ones to think about:
     else
@@ -592,7 +608,9 @@ pprIdInUnfolding in_scopes v
 
 	    -- these ones' exportedness checked later...
 	  TopLevId  _ -> pp_full_name
-	  DataConId _ _ _ _ _ _ _ -> pp_full_name
+	  DataConId _ _ _ _ _ _ _ _ -> pp_full_name
+
+	  RecordSelectorId lbl -> ppr sty lbl
 
 	    -- class-ish things: class already recorded as "mentioned"
 	  SuperDictSelId c sc
@@ -754,14 +772,10 @@ unfoldingUnfriendlyId (Id _ _ (SpecId d@(Id _ _ _ dfun@(DictFunId _ t _ _)) _ _)
     -- TyVar(Templates) in the i/face; only a problem
     -- if -fshow-pragma-name-errs; but we can do without the pain.
     -- A HACK in any case (WDP 94/05/02)
-  = --pprTrace "unfriendly1:" (ppCat [ppr PprDebug d, ppr PprDebug t]) (
-    naughty_DictFunId dfun
-    --)
+  = naughty_DictFunId dfun
 
 unfoldingUnfriendlyId d@(Id _ _ dfun@(DictFunId _ t _ _) _ _)
-  = --pprTrace "unfriendly2:" (ppCat [ppr PprDebug d, ppr PprDebug t]) (
-    naughty_DictFunId dfun -- similar deal...
-    --)
+  = naughty_DictFunId dfun -- similar deal...
 
 unfoldingUnfriendlyId other_id   = False -- is friendly in all other cases
 
@@ -785,9 +799,6 @@ compiling the prelude, the compiler may not recognise that as true.
 \begin{code}
 externallyVisibleId :: Id -> Bool
 
-externallyVisibleId id = panic "Id.externallyVisibleId"
-{-LATER:
-
 externallyVisibleId id@(Id _ _ details _ _)
   = if isLocallyDefined id then
 	toplevelishId id && isExported id && not (weird_datacon details)
@@ -805,26 +816,22 @@ externallyVisibleId id@(Id _ _ details _ _)
     -- of WeirdLocalType; but we need to know this when asked if
     -- "Mumble" is externally visible...
 
-    weird_datacon (DataConId _ _ _ _ _ _ tycon)
+{- LATER: if at all:
+    weird_datacon (DataConId _ _ _ _ _ _ _ tycon)
       = maybeToBool (maybePurelyLocalTyCon tycon)
+-}
     weird_datacon not_a_datacon_therefore_not_weird = False
 
     weird_tuplecon (TupleConId arity)
       = arity > 32 -- sigh || isBigTupleTyCon tycon -- generated *purely* for local use
     weird_tuplecon _ = False
--}
 \end{code}
 
 \begin{code}
 idWantsToBeINLINEd :: Id -> Bool
 
-idWantsToBeINLINEd id
-  = panic "Id.idWantsToBeINLINEd"
-{- LATER:
-  = case (getIdUnfolding id) of
-      IWantToBeINLINEd _ -> True
-      _ -> False
--}
+idWantsToBeINLINEd (Id _ _ _ IWantToBeINLINEd _) = True
+idWantsToBeINLINEd _				 = False
 \end{code}
 
 For @unlocaliseId@: See the brief commentary in
@@ -861,7 +868,7 @@ unlocaliseId mod (Id u ty info (WorkerId unwrkr))
       Nothing -> Nothing
       Just xx -> Just (Id u ty info (WorkerId xx))
 
-unlocaliseId mod (Id u ty info (InstId name))
+unlocaliseId mod (Id u ty info (InstId name no_ftvs))
   = Just (Id u ty info (TopLevId full_name))
 	-- type might be wrong, but it hardly matters
 	-- at this stage (just before printing C)  ToDo
@@ -902,41 +909,37 @@ The special casing is in @applyTypeEnvToId@, not @apply_to_Id@, as the
 former ``should be'' the usual crunch point.
 
 \begin{code}
-{-LATER:
+type TypeEnv = TyVarEnv Type
+
 applyTypeEnvToId :: TypeEnv -> Id -> Id
 
-applyTypeEnvToId type_env id@(Id u ty info details)
+applyTypeEnvToId type_env id@(Id _ ty _ _ _)
   | idHasNoFreeTyVars id
   = id
   | otherwise
   = apply_to_Id ( \ ty ->
 	applyTypeEnvToTy type_env ty
     ) id
--}
 \end{code}
 
 \begin{code}
-{-LATER:
 apply_to_Id :: (Type -> Type)
 	    -> Id
 	    -> Id
 
-apply_to_Id ty_fn (Id u ty info details)
-  = Id u (ty_fn ty) (apply_to_IdInfo ty_fn info) (apply_to_details details)
+apply_to_Id ty_fn (Id u ty details prag info)
+  = let
+	new_ty = ty_fn ty
+    in
+    Id u new_ty (apply_to_details details) prag (apply_to_IdInfo ty_fn info)
   where
-    apply_to_details (InstId inst)
-      = let
-	    new_inst = apply_to_Inst ty_fn inst
-	in
-	InstId new_inst
-
     apply_to_details (SpecId unspec ty_maybes no_ftvs)
       = let
 	    new_unspec = apply_to_Id ty_fn unspec
 	    new_maybes = map apply_to_maybe ty_maybes
 	in
-	SpecId new_unspec new_maybes no_ftvs
-	-- ToDo: recalc no_ftvs????
+	SpecId new_unspec new_maybes (no_free_tvs ty)
+	-- ToDo: gratuitous recalc no_ftvs???? (also InstId)
       where
 	apply_to_maybe Nothing   = Nothing
 	apply_to_maybe (Just ty) = Just (ty_fn ty)
@@ -948,7 +951,6 @@ apply_to_Id ty_fn (Id u ty info details)
 	WorkerId new_unwrkr
 
     apply_to_details other = other
--}
 \end{code}
 
 Sadly, I don't think the one using the magic typechecker substitution
@@ -970,9 +972,9 @@ applySubstToId subst id@(Id u ty info details)
     case (apply_to_details   s3 new_ty details) of { (s4, new_details) ->
     (s4, Id u new_ty new_info new_details) }}}
   where
-    apply_to_details subst _ (InstId inst)
+    apply_to_details subst _ (InstId inst no_ftvs)
       = case (applySubstToInst subst inst) of { (s2, new_inst) ->
-	(s2, InstId new_inst) }
+	(s2, InstId new_inst no_ftvs{-ToDo:right???-}) }
 
     apply_to_details subst new_ty (SpecId unspec ty_maybes _)
       = case (applySubstToId subst unspec)  	     of { (s2, new_unspec) ->
@@ -995,17 +997,20 @@ applySubstToId subst id@(Id u ty info details)
 
 \begin{code}
 getIdNamePieces :: Bool {-show Uniques-} -> GenId ty -> [FAST_STRING]
+
 getIdNamePieces show_uniqs id
   = get (unsafeGenId2Id id)
   where
   get (Id u _ details _ _)
     = case details of
-      DataConId n _ _ _ _ _ _ ->
+      DataConId n _ _ _ _ _ _ _ ->
 	case (getOrigName n) of { (mod, name) ->
 	if fromPrelude mod then [name] else [mod, name] }
 
       TupleConId 0 -> [SLIT("()")]
       TupleConId a -> [_PK_ ( "(" ++ nOfThem (a-1) ',' ++ ")" )]
+
+      RecordSelectorId lbl -> panic "getIdNamePieces:RecordSelectorId"
 
       ImportedId n -> get_fullname_pieces n
       PreludeId  n -> get_fullname_pieces n
@@ -1075,7 +1080,7 @@ getIdNamePieces show_uniqs id
 
       LocalId      n _   -> let local = getLocalName n in
 			    if show_uniqs then [local, showUnique u] else [local]
-      InstId       n     -> [getLocalName n, showUnique u]
+      InstId       n _   -> [getLocalName n, showUnique u]
       SysLocalId   n _   -> [getLocalName n, showUnique u]
       SpecPragmaId n _ _ -> [getLocalName n, showUnique u]
 
@@ -1110,7 +1115,7 @@ getMentionedTyConsAndClassesFromId id
 \end{code}
 
 \begin{code}
---getIdPrimRep i = primRepFromType (idType i)
+idPrimRep i = typePrimRep (idType i)
 \end{code}
 
 \begin{code}
@@ -1140,7 +1145,7 @@ mkConstMethodId	u c op ity full_ty from_here modname info
 
 mkWorkerId u unwrkr ty info = Id u ty (WorkerId unwrkr) NoPragmaInfo info
 
-mkInstId uniq ty name = Id uniq ty (InstId name) NoPragmaInfo noIdInfo
+mkInstId uniq ty name = Id uniq ty (InstId name (no_free_tvs ty)) NoPragmaInfo noIdInfo
 
 {-LATER:
 getConstMethodId clas op ty
@@ -1151,14 +1156,13 @@ getConstMethodId clas op ty
     in
     case (lookupConstMethodId (getIdSpecialisation sel_id) ty) of
       Just xx -> xx
-      Nothing -> error (ppShow 80 (ppAboves [
-	ppCat [ppStr "ERROR: getConstMethodId:", ppr PprDebug op,
-	       ppr PprDebug ty, ppr PprDebug ops, ppr PprDebug op_ids,
+      Nothing -> pprError "ERROR: getConstMethodId:" (ppAboves [
+	ppCat [ppr PprDebug ty, ppr PprDebug ops, ppr PprDebug op_ids,
 	       ppr PprDebug sel_id],
 	ppStr "(This can arise if an interface pragma refers to an instance",
 	ppStr "but there is no imported interface which *defines* that instance.",
 	ppStr "The info above, however ugly, should indicate what else you need to import."
-	]))
+	])
 -}
 \end{code}
 
@@ -1228,36 +1232,29 @@ mkSameSpecCon ty_maybes unspec@(Id u ty info details)
   where
     new_ty = specialiseTy ty ty_maybes 0
 
-    -- pprTrace "SameSpecCon:Unique:"
-    --	        (ppSep (ppr PprDebug unspec: [pprMaybeTy PprDebug ty | ty <- ty_maybes]))
-
 localiseId :: Id -> Id
 localiseId id@(Id u ty info details)
   = Id u ty info (LocalId (mkShortName name loc) (no_free_tvs ty))
   where
     name = getOccurrenceName id
     loc  = getSrcLoc id
+-}
 
--- this has to be one of the "local" flavours (LocalId, SysLocalId, InstId)
--- ToDo: it does??? WDP
 mkIdWithNewUniq :: Id -> Unique -> Id
 
-mkIdWithNewUniq (Id _ ty info details) uniq
-  = Id uniq ty info new_details
--}
+mkIdWithNewUniq (Id _ ty details prag info) uniq
+  = Id uniq ty details prag info
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
 @Uniques@, but that's OK because the templates are supposed to be
 instantiated before use.
 \begin{code}
-{-LATER:
 mkTemplateLocals :: [Type] -> [Id]
 mkTemplateLocals tys
-  = zipWith (\ u -> \ ty -> mkSysLocal SLIT("tpl") u ty mkUnknownSrcLoc)
+  = zipWith (\ u -> \ ty -> mkSysLocal SLIT("tpl") u ty mkBuiltinSrcLoc)
 	    (getBuiltinUniques (length tys))
 	    tys
--}
 \end{code}
 
 \begin{code}
@@ -1293,11 +1290,11 @@ besides the code-generator need arity info!)
 getIdArity :: Id -> ArityInfo
 getIdArity (Id _ _ _ _ id_info)  = getInfo id_info
 
-getDataConArity :: DataCon -> Int
-getDataConArity id@(Id _ _ _ _ id_info)
+dataConArity :: DataCon -> Int
+dataConArity id@(Id _ _ _ _ id_info)
   = ASSERT(isDataCon id)
     case (arityMaybe (getInfo id_info)) of
-      Nothing -> pprPanic "getDataConArity:Nothing:" (ppr PprDebug id)
+      Nothing -> pprPanic "dataConArity:Nothing:" (pprId PprDebug id)
       Just  i -> i
 
 addIdArity :: Id -> Int -> Id
@@ -1314,13 +1311,13 @@ addIdArity (Id u ty details pinfo info) arity
 \begin{code}
 mkDataCon :: Unique{-DataConKey-}
 	  -> FullName
-	  -> [StrictnessMark]
+	  -> [StrictnessMark] -> [FieldLabel]
 	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon
 --ToDo:   -> SpecEnv
 	  -> Id
   -- can get the tag and all the pieces of the type from the Type
 
-mkDataCon k n stricts tvs ctxt args_tys tycon
+mkDataCon k n stricts fields tvs ctxt args_tys tycon
   = ASSERT(length stricts == length args_tys)
     data_con
   where
@@ -1329,13 +1326,13 @@ mkDataCon k n stricts tvs ctxt args_tys tycon
     data_con
       = Id k
 	   type_of_constructor
-	   (DataConId n data_con_tag stricts tvs ctxt args_tys tycon)
+	   (DataConId n data_con_tag stricts fields tvs ctxt args_tys tycon)
 	   NoPragmaInfo
 	   datacon_info
 
     data_con_tag    = position_within fIRST_TAG data_con_family
 
-    data_con_family = getTyConDataCons tycon
+    data_con_family = tyConDataCons tycon
 
     position_within :: Int -> [Id] -> Int
 
@@ -1450,36 +1447,53 @@ fIRST_TAG =  1	-- Tags allocated from here for real constructors
 \end{code}
 
 \begin{code}
-getDataConTag :: DataCon -> ConTag	-- will panic if not a DataCon
-getDataConTag	(Id _ _ (DataConId _ tag _ _ _ _ _) _ _) = tag
-getDataConTag	(Id _ _ (TupleConId _) _ _)	         = fIRST_TAG
-getDataConTag	(Id _ _ (SpecId unspec _ _) _ _)	 = getDataConTag unspec
+dataConTag :: DataCon -> ConTag	-- will panic if not a DataCon
+dataConTag	(Id _ _ (DataConId _ tag _ _ _ _ _ _) _ _) = tag
+dataConTag	(Id _ _ (TupleConId _) _ _)	         = fIRST_TAG
+dataConTag	(Id _ _ (SpecId unspec _ _) _ _)	 = dataConTag unspec
 
-getDataConTyCon :: DataCon -> TyCon	-- will panic if not a DataCon
-getDataConTyCon (Id _ _ (DataConId _ _ _ _ _ _ tycon) _ _) = tycon
-getDataConTyCon (Id _ _ (TupleConId a) _ _)	           = mkTupleTyCon a
+dataConTyCon :: DataCon -> TyCon	-- will panic if not a DataCon
+dataConTyCon (Id _ _ (DataConId _ _ _ _ _ _ _ tycon) _ _) = tycon
+dataConTyCon (Id _ _ (TupleConId a) _ _)	           = mkTupleTyCon a
 
-getDataConSig :: DataCon -> ([TyVar], ThetaType, [TauType], TyCon)
+dataConSig :: DataCon -> ([TyVar], ThetaType, [TauType], TyCon)
 					-- will panic if not a DataCon
 
-getDataConSig (Id _ _ (DataConId _ _ _ tyvars theta_ty arg_tys tycon) _ _)
+dataConSig (Id _ _ (DataConId _ _ _ _ tyvars theta_ty arg_tys tycon) _ _)
   = (tyvars, theta_ty, arg_tys, tycon)
 
-getDataConSig (Id _ _ (TupleConId arity) _ _)
+dataConSig (Id _ _ (TupleConId arity) _ _)
   = (tyvars, [], tyvar_tys, mkTupleTyCon arity)
   where
     tyvars	= take arity alphaTyVars
     tyvar_tys	= mkTyVarTys tyvars
+
+dataConFieldLabels :: DataCon -> [FieldLabel]
+dataConFieldLabels (Id _ _ (DataConId _ _ _ fields _ _ _ _) _ _) = fields
+\end{code}
+
+\begin{code}
+mkRecordSelectorId field_label selector_ty
+  = Id (getItsUnique name)
+       selector_ty
+       (RecordSelectorId field_label)
+       NoPragmaInfo
+       noIdInfo
+  where
+    name = fieldLabelName field_label
+
+recordSelectorFieldLabel :: Id -> FieldLabel
+recordSelectorFieldLabel (Id _ _ (RecordSelectorId lbl) _ _) = lbl
 \end{code}
 
 {- LATER
-getDataConTyCon	(Id _ _ _ (SpecId unspec tys _))
-  = mkSpecTyCon (getDataConTyCon unspec) tys
+dataConTyCon	(Id _ _ _ (SpecId unspec tys _))
+  = mkSpecTyCon (dataConTyCon unspec) tys
 
-getDataConSig (Id _ _ _ (SpecId unspec ty_maybes _))
+dataConSig (Id _ _ _ (SpecId unspec ty_maybes _))
   = (spec_tyvars, spec_theta_ty, spec_arg_tys, spec_tycon)
   where
-    (tyvars, theta_ty, arg_tys, tycon) = getDataConSig unspec
+    (tyvars, theta_ty, arg_tys, tycon) = dataConSig unspec
 
     ty_env = tyvars `zip` ty_maybes
 
@@ -1493,7 +1507,7 @@ getDataConSig (Id _ _ _ (SpecId unspec ty_maybes _))
     spec_arg_tys = map (instantiateTauTy spec_env) arg_tys
 
     spec_theta_ty = if null theta_ty then []
-		    else panic "getDataConSig:ThetaTy:SpecDataCon"
+		    else panic "dataConSig:ThetaTy:SpecDataCon"
     spec_tycon    = mkSpecTyCon tycon ty_maybes
 -}
 \end{code}
@@ -1516,7 +1530,7 @@ getInstantiatedDataConSig ::
 getInstantiatedDataConSig data_con inst_tys
   = ASSERT(isDataCon data_con)
     let
-	(tvs, theta, arg_tys, tycon) = getDataConSig data_con
+	(tvs, theta, arg_tys, tycon) = dataConSig data_con
 
 	inst_env = ASSERT(length tvs == length inst_tys)
 		   tvs `zip` inst_tys
@@ -1698,7 +1712,6 @@ because a specialised data constructor has the same Unique as its
 unspecialised counterpart.
 
 \begin{code}
-{-LATER:
 cmpId_withSpecDataCon :: Id -> Id -> TAG_
 
 cmpId_withSpecDataCon id1 id2
@@ -1711,18 +1724,12 @@ cmpId_withSpecDataCon id1 id2
     cmp_ids = cmpId id1 id2
     eq_ids  = case cmp_ids of { EQ_ -> True; other -> False }
 
-cmpEqDataCon (Id _ _ _ (SpecId _ mtys1 _)) (Id _ _ _ (SpecId _ mtys2 _))
-  = cmpUniTypeMaybeList mtys1 mtys2
+cmpEqDataCon (Id _ _ (SpecId _ mtys1 _) _ _) (Id _ _ (SpecId _ mtys2 _) _ _)
+  = panic# "Id.cmpEqDataCon:cmpUniTypeMaybeList mtys1 mtys2"
 
-cmpEqDataCon unspec1 (Id _ _ _ (SpecId _ _ _))
-  = LT_
-
-cmpEqDataCon (Id _ _ _ (SpecId _ _ _)) unspec2
-  = GT_
-
-cmpEqDataCon unspec1 unspec2
-  = EQ_
--}
+cmpEqDataCon _ (Id _ _ (SpecId _ _ _) _ _) = LT_
+cmpEqDataCon (Id _ _ (SpecId _ _ _) _ _) _ = GT_
+cmpEqDataCon _				 _ = EQ_
 \end{code}
 
 %************************************************************************
@@ -1733,6 +1740,10 @@ cmpEqDataCon unspec1 unspec2
 
 \begin{code}
 instance Outputable ty => Outputable (GenId ty) where
+    ppr sty id = pprId sty id
+
+-- and a SPECIALIZEd one:
+instance Outputable {-Id, i.e.:-}(GenId Type) where
     ppr sty id = pprId sty id
 
 showId :: PprStyle -> Id -> String
@@ -1778,13 +1789,12 @@ pprId other_sty id
   = let
 	pieces = getIdNamePieces (case other_sty of {PprForUser -> False; _ -> True}) id
 
-	for_code = panic "pprId: for code"
-	{-  = let
+	for_code
+	  = let
 		pieces_to_print -- maybe use Unique only
 		  = if isSysLocalId id then tail pieces else pieces
 	    in
 	    ppIntersperse (ppPStr cSEP) (map identToC pieces_to_print)
-	-}
     in
     case other_sty of
       PprForC	      -> for_code
@@ -1810,12 +1820,12 @@ pprId other_sty id
       = ppBeside (pp_ubxd (ppIntersperse (ppChar '.') (map ppPStr pieces))) (pp_uniq id)
 
     pp_uniq (Id _ _ (PreludeId _) _ _) 	    	   = ppNil -- no uniq to add
-    pp_uniq (Id _ _ (DataConId _ _ _ _ _ _ _) _ _) = ppNil
+    pp_uniq (Id _ _ (DataConId _ _ _ _ _ _ _ _) _ _) = ppNil
     pp_uniq (Id _ _ (TupleConId _) _ _) 	   = ppNil
     pp_uniq (Id _ _ (LocalId _ _) _ _)   	   = ppNil -- uniq printed elsewhere
     pp_uniq (Id _ _ (SysLocalId _ _) _ _)   	   = ppNil
     pp_uniq (Id _ _ (SpecPragmaId _ _ _) _ _) 	   = ppNil
-    pp_uniq (Id _ _ (InstId _) _ _)   	   	   = ppNil
+    pp_uniq (Id _ _ (InstId _ _) _ _)  	   	   = ppNil
     pp_uniq other_id = ppBesides [ppPStr SLIT("{-"), pprUnique (getItsUnique other_id), ppPStr SLIT("-}")]
 
     -- print PprDebug Ids with # afterwards if they are of primitive type.
@@ -1834,8 +1844,9 @@ instance NamedThing (GenId ty) where
     getExportFlag (Id _ _ details _ _)
       = get details
       where
-	get (DataConId _ _ _ _ _ _ tc)= getExportFlag tc -- NB: don't use the FullName
+	get (DataConId _ _ _ _ _ _ _ tc)= getExportFlag tc -- NB: don't use the FullName
 	get (TupleConId _)	    = NotExported
+	get (RecordSelectorId l)    = getExportFlag l
 	get (ImportedId  n)         = getExportFlag n
 	get (PreludeId   n)         = getExportFlag n
 	get (TopLevId    n)         = getExportFlag n
@@ -1846,7 +1857,7 @@ instance NamedThing (GenId ty) where
 	get (ConstMethodId c ty _ from_here _) = instance_export_flag c ty from_here
 	get (SpecId unspec _ _)     = getExportFlag unspec
 	get (WorkerId unwrkr)	    = getExportFlag unwrkr
-	get (InstId _)		    = NotExported
+	get (InstId _ _)	    = NotExported
 	get (LocalId      _ _)	    = NotExported
 	get (SysLocalId   _ _)	    = NotExported
 	get (SpecPragmaId _ _ _)    = NotExported
@@ -1854,10 +1865,11 @@ instance NamedThing (GenId ty) where
     isLocallyDefined this_id@(Id _ _ details _ _)
       = get details
       where
-	get (DataConId _ _ _ _ _ _ tc)= isLocallyDefined tc -- NB: don't use the FullName
+	get (DataConId _ _ _ _ _ _ _ tc)= isLocallyDefined tc -- NB: don't use the FullName
 	get (TupleConId _)	    = False
 	get (ImportedId	_)    	    = False
 	get (PreludeId  _)    	    = False
+	get (RecordSelectorId l)    = isLocallyDefined l
 	get (TopLevId	n)	    = isLocallyDefined n
 	get (SuperDictSelId c _)    = isLocallyDefined c
 	get (MethodSelId c _) 	    = isLocallyDefined c
@@ -1870,7 +1882,7 @@ instance NamedThing (GenId ty) where
 	get (ConstMethodId c tyc _ from_here _) = from_here
 	get (SpecId unspec _ _)	    = isLocallyDefined unspec
 	get (WorkerId unwrkr) 	    = isLocallyDefined unwrkr
-	get (InstId  _)		    = True
+	get (InstId  _ _)	    = True
 	get (LocalId      _ _)	    = True
 	get (SysLocalId   _ _)	    = True
 	get (SpecPragmaId _ _ _)    = True
@@ -1878,9 +1890,10 @@ instance NamedThing (GenId ty) where
     getOrigName this_id@(Id u _ details _ _)
       = get details
       where
-	get (DataConId n _ _ _ _ _ _) =	 getOrigName n
+	get (DataConId n _ _ _ _ _ _ _) =	 getOrigName n
 	get (TupleConId 0)	= (pRELUDE_BUILTIN, SLIT("()"))
 	get (TupleConId a)	= (pRELUDE_BUILTIN, _PK_ ( "(" ++ nOfThem (a-1) ',' ++ ")" ))
+	get (RecordSelectorId l)= getOrigName l
 	get (ImportedId   n)	= getOrigName n
 	get (PreludeId    n)	= getOrigName n
 	get (TopLevId     n)	= getOrigName n
@@ -1911,7 +1924,7 @@ instance NamedThing (GenId ty) where
 	    BEND
 -}
 
-	get (InstId       n)    = (panic "NamedThing.Id.getOrigName (LocalId)",
+	get (InstId       n _)  = (panic "NamedThing.Id.getOrigName (LocalId)",
 				   getLocalName n)
 	get (LocalId      n _)  = (panic "NamedThing.Id.getOrigName (LocalId)",
 				   getLocalName n)
@@ -1933,9 +1946,10 @@ instance NamedThing (GenId ty) where
     getOccurrenceName this_id@(Id _ _ details _ _)
       = get details
       where
-	get (DataConId  n _ _ _ _ _ _) = getOccurrenceName n
+	get (DataConId  n _ _ _ _ _ _ _) = getOccurrenceName n
 	get (TupleConId 0)	= SLIT("()")
 	get (TupleConId a)	= _PK_ ( "(" ++ nOfThem (a-1) ',' ++ ")" )
+	get (RecordSelectorId l)= getOccurrenceName l
 	get (ImportedId	 n)	= getOccurrenceName n
 	get (PreludeId   n)	= getOccurrenceName n
 	get (TopLevId	 n)	= getOccurrenceName n
@@ -1947,8 +1961,9 @@ instance NamedThing (GenId ty) where
     getSrcLoc (Id _ _ details _ id_info)
       = get details
       where
-	get (DataConId  n _ _ _ _ _ _) = getSrcLoc n
+	get (DataConId  n _ _ _ _ _ _ _) = getSrcLoc n
 	get (TupleConId _)	= mkBuiltinSrcLoc
+	get (RecordSelectorId l)= getSrcLoc l
 	get (ImportedId	 n)	= getSrcLoc n
 	get (PreludeId   n)	= getSrcLoc n
 	get (TopLevId	 n)	= getSrcLoc n
@@ -1956,7 +1971,7 @@ instance NamedThing (GenId ty) where
 	get (MethodSelId c _)	= getSrcLoc c
 	get (SpecId unspec _ _)	= getSrcLoc unspec
 	get (WorkerId unwrkr)	= getSrcLoc unwrkr
-	get (InstId	  n)	= getSrcLoc n
+	get (InstId	  n _)	= getSrcLoc n
 	get (LocalId      n _)	= getSrcLoc n
 	get (SysLocalId   n _)	= getSrcLoc n
 	get (SpecPragmaId n _ _)= getSrcLoc n
@@ -1968,8 +1983,9 @@ instance NamedThing (GenId ty) where
     fromPreludeCore (Id _ _ details _ _)
       = get details
       where
-	get (DataConId _ _ _ _ _ _ tc)= fromPreludeCore tc -- NB: not from the FullName
+	get (DataConId _ _ _ _ _ _ _ tc)= fromPreludeCore tc -- NB: not from the FullName
 	get (TupleConId _)	    = True
+	get (RecordSelectorId l)    = fromPreludeCore l
 	get (ImportedId  n)	    = fromPreludeCore n
 	get (PreludeId   n)	    = fromPreludeCore n
 	get (TopLevId    n)	    = fromPreludeCore n
@@ -1980,7 +1996,7 @@ instance NamedThing (GenId ty) where
 	get (ConstMethodId c t _ _ _) = fromPreludeCore c && is_prelude_core_ty t
 	get (SpecId unspec _ _)	    = fromPreludeCore unspec
 	get (WorkerId unwrkr)	    = fromPreludeCore unwrkr
-	get (InstId       _)	    = False
+	get (InstId       _ _)	    = False
 	get (LocalId      _ _)	    = False
 	get (SysLocalId   _ _)	    = False
 	get (SpecPragmaId _ _ _)    = False
@@ -2030,7 +2046,7 @@ mapIdEnv	 = mapUFM
 mkIdEnv		 = listToUFM
 nullIdEnv	 = emptyUFM
 rngIdEnv	 = eltsUFM
-unitIdEnv	 = singletonUFM
+unitIdEnv	 = unitUFM
 
 growIdEnvList	  env pairs = plusUFM env (listToUFM pairs)
 isNullIdEnv	  env	    = sizeUFM env == 0
@@ -2054,14 +2070,16 @@ intersectIdSets	:: GenIdSet ty -> GenIdSet ty -> GenIdSet ty
 unionIdSets	:: GenIdSet ty -> GenIdSet ty -> GenIdSet ty
 unionManyIdSets	:: [GenIdSet ty] -> GenIdSet ty
 idSetToList	:: GenIdSet ty -> [GenId ty]
-singletonIdSet	:: GenId ty -> GenIdSet ty
+unitIdSet	:: GenId ty -> GenIdSet ty
+addOneToIdSet	:: GenIdSet ty -> GenId ty -> GenIdSet ty
 elementOfIdSet	:: GenId ty -> GenIdSet ty -> Bool
 minusIdSet	:: GenIdSet ty -> GenIdSet ty -> GenIdSet ty
 isEmptyIdSet	:: GenIdSet ty -> Bool
 mkIdSet		:: [GenId ty] -> GenIdSet ty
 
 emptyIdSet	= emptyUniqSet
-singletonIdSet	= singletonUniqSet
+unitIdSet	= unitUniqSet
+addOneToIdSet	= addOneToUniqSet
 intersectIdSets	= intersectUniqSets
 unionIdSets	= unionUniqSets
 unionManyIdSets	= unionManyUniqSets

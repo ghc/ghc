@@ -24,13 +24,12 @@ import TcHsSyn		( TcIdOcc(..), TcHsBinds(..), TcMonoBinds(..), TcExpr(..),
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, unZonkId )
 
 import TcMonad
-import GenSpecEtc	( specTy )
 import Inst		( Inst, InstOrigin(..), LIE(..), emptyLIE, plusLIE, newDicts )
 import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds)
 import TcInstDcls	( processInstBinds )
 import TcKind		( unifyKind )
 import TcMonoType	( tcMonoType, tcContext )
-import TcType		( TcTyVar(..), tcInstType, tcInstTyVar )
+import TcType		( TcType(..), TcTyVar(..), tcInstType, tcInstSigTyVars )
 import TcKind		( TcKind )
 
 import Bag		( foldBag )
@@ -246,6 +245,11 @@ tcClassDecl2 :: RenamedClassDecl	-- The class declaration
 
 tcClassDecl2 (ClassDecl context class_name
 			tyvar_name class_sigs default_binds pragmas src_loc)
+
+  | not (isLocallyDefined class_name)
+  = returnNF_Tc (emptyLIE, EmptyBinds)
+
+  | otherwise	-- It is locally defined
   = recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyBinds)) $
     tcAddSrcLoc src_loc		     		      $
 
@@ -255,14 +259,14 @@ tcClassDecl2 (ClassDecl context class_name
 	(tyvar, scs, sc_sel_ids, ops, op_sel_ids, defm_ids)
 	  = getClassBigSig clas
     in
-    tcInstTyVar tyvar			`thenNF_Tc` \ clas_tyvar ->
+    tcInstSigTyVars [tyvar]		`thenNF_Tc` \ ([clas_tyvar], _, _) ->
 
 	-- Generate bindings for the selector functions
-    buildSelectors clas clas_tyvar scs sc_sel_ids ops op_sel_ids
-						`thenNF_Tc` \ sel_binds ->
+    buildSelectors clas tyvar clas_tyvar scs sc_sel_ids ops op_sel_ids
+					`thenNF_Tc` \ sel_binds ->
 	-- Ditto for the methods
     buildDefaultMethodBinds clas clas_tyvar defm_ids default_binds
-						`thenTc` \ (const_insts, meth_binds) ->
+					`thenTc` \ (const_insts, meth_binds) ->
 
     returnTc (const_insts, sel_binds `ThenBinds` meth_binds)
 \end{code}
@@ -275,29 +279,33 @@ tcClassDecl2 (ClassDecl context class_name
 
 \begin{code}
 buildSelectors :: Class			-- The class object
-	       -> TcTyVar s		-- Class type variable
+	       -> TyVar			-- Class type variable
+	       -> TcTyVar s		-- Instantiated class type variable (TyVarTy)
 	       -> [Class] -> [Id]	-- Superclasses and selectors
 	       -> [ClassOp] -> [Id]	-- Class ops and selectors
 	       -> NF_TcM s (TcHsBinds s)
 
-buildSelectors clas clas_tyvar scs sc_sel_ids ops op_sel_ids
+buildSelectors clas clas_tyvar clas_tc_tyvar scs sc_sel_ids ops op_sel_ids
   =
 	-- Make new Ids for the components of the dictionary
-    mapNF_Tc (tcInstType [] . getClassOpLocalType) ops  `thenNF_Tc` \ op_tys ->
-
+    let
+	clas_tyvar_ty = mkTyVarTy clas_tc_tyvar
+	mk_op_ty = tcInstType [(clas_tyvar, clas_tyvar_ty)] . getClassOpLocalType 
+    in
+    mapNF_Tc mk_op_ty ops  				`thenNF_Tc` \ op_tys ->
     newLocalIds (map getClassOpString ops) op_tys	`thenNF_Tc` \ method_ids ->
 
     newDicts ClassDeclOrigin 
-	     [ (super_clas, mkTyVarTy clas_tyvar)
+	     [ (super_clas, clas_tyvar_ty)
 	     | super_clas <- scs ]			`thenNF_Tc` \ (_,dict_ids) ->
 
     newDicts ClassDeclOrigin 
-	     [ (clas, mkTyVarTy clas_tyvar) ]		`thenNF_Tc` \ (_,[clas_dict]) ->
+	     [ (clas, clas_tyvar_ty) ]			`thenNF_Tc` \ (_,[clas_dict]) ->
 
 	 -- Make suitable bindings for the selectors
     let
 	mk_sel sel_id method_or_dict
-	  = mkSelBind sel_id clas_tyvar clas_dict dict_ids method_ids method_or_dict
+	  = mkSelBind sel_id clas_tc_tyvar clas_dict dict_ids method_ids method_or_dict
     in
     listNF_Tc (zipWithEqual mk_sel op_sel_ids method_ids) `thenNF_Tc` \ op_sel_binds ->
     listNF_Tc (zipWithEqual mk_sel sc_sel_ids dict_ids)   `thenNF_Tc` \ sc_sel_binds ->
@@ -444,7 +452,7 @@ dfun.Foo.List
   = /\ a -> \ dfoo_a ->
     let rec
 	op1 = defm.Foo.op1 [a] dfoo_list
-	op2 = /\b -> defm.Foo.op2 [a] b dfoo_list
+	op2 = /\b -> \dord -> defm.Foo.op2 [a] b dfoo_list dord
 	dfoo_list = (op1, op2)
     in
 	dfoo_list
@@ -483,7 +491,11 @@ makeClassDeclDefaultMethodRhs
 	-> NF_TcM s (TcExpr s)
 
 makeClassDeclDefaultMethodRhs clas method_ids tag
-  = specTy ClassDeclOrigin (idType method_id) `thenNF_Tc` \ (tyvars, dicts, tau, dict_ids) ->
+  = tcInstType [] (idType method_id) 	`thenNF_Tc` \ method_ty ->
+    let 
+	(tyvars, theta, tau) = splitSigmaTy method_ty 
+    in	
+    newDicts ClassDeclOrigin theta	`thenNF_Tc` \ (lie, dict_ids) ->
 
     returnNF_Tc (mkHsTyLam tyvars (
 		 mkHsDictLam dict_ids (

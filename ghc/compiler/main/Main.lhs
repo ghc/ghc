@@ -19,15 +19,27 @@ import ReadPrefix	( rdModule )
 import Rename		( renameModule )
 import Typecheck	( typecheckModule, InstInfo )
 import Desugar		( deSugar, DsMatchContext, pprDsWarnings )
+import SimplCore	( core2core )
+import CoreToStg	( topCoreBindsToStg )
+import SimplStg		( stg2stg )
+import CodeGen		( codeGen )
+#if ! OMIT_NATIVE_CODEGEN
+import AsmCodeGen	( dumpRealAsm, writeRealAsm )
+#endif
 
+import AbsCSyn		( absCNop, AbstractC )
+import AbsCUtils	( flattenAbsC )
 import Bag		( emptyBag, isEmptyBag )
 import CmdLineOpts
 import ErrUtils		( pprBagOfErrors )
-import Maybes		( MaybeErr(..) )
+import Maybes		( maybeToBool, MaybeErr(..) )
 import PrelInfo		( builtinNameInfo )
 import RdrHsSyn		( getRawExportees )
+import Specialise	( SpecialiseData(..) )
+import StgSyn		( pprPlainStgBinding, GenStgBinding )
 
-import PprCore		( pprPlainCoreBinding )
+import PprAbsC		( dumpRealC, writeRealC )
+import PprCore		( pprCoreBinding )
 import PprStyle		( PprStyle(..) )
 import Pretty
 
@@ -39,20 +51,8 @@ import TyVar		( GenTyVar )		-- instances
 import Unique		( Unique)		-- instances
 
 {-
---import AbsCSyn
---import CodeGen		( codeGen )
---import CoreToStg	( topCoreBindsToStg )
---import MkIface		( mkInterface )
+--import MkIface	( mkInterface )
 
---import SimplCore	( core2core )
---import SimplStg		( stg2stg )
---import StgSyn		( pprPlainStgBinding, GenStgBinding, GenStgRhs, CostCentre,
-			  StgBinderInfo, StgBinding(..)
-			)
-
-#if ! OMIT_NATIVE_CODEGEN
---import AsmCodeGen	( dumpRealAsm, writeRealAsm )
-#endif
 -}
 
 \end{code}
@@ -153,12 +153,13 @@ doIt (core_cmds, stg_cmds) input_pgm
     else ( -- No typechecking errors ...
 
     case tc_results
-    of {  (typechecked_quad@(class_binds, inst_binds, val_binds, const_binds),
+    of {  (typechecked_quint@(recsel_binds, class_binds, inst_binds, val_binds, const_binds),
 	   interface_stuff@(_,_,_,_,_),  -- @-pat just for strictness...
 	   (local_tycons,local_classes), pragma_tycon_specs, ddump_deriv) ->
 
     doDump opt_D_dump_tc "Typechecked:"
 	(pp_show (ppAboves [
+	    ppr pprStyle recsel_binds,
 	    ppr pprStyle class_binds,
 	    ppr pprStyle inst_binds,
 	    ppAboves (map (\ (i,e) -> ppr pprStyle (VarMonoBind i e)) const_binds),
@@ -167,12 +168,11 @@ doIt (core_cmds, stg_cmds) input_pgm
     doDump opt_D_dump_deriv "Derived instances:"
 	(pp_show (ddump_deriv pprStyle))	`thenMn_`
 
-
     -- ******* DESUGARER
     show_pass "DeSugar" 			`thenMn_`
     let
 	(desugared,ds_warnings)
-	  = deSugar ds_uniqs ds_mod_name typechecked_quad
+	  = deSugar ds_uniqs ds_mod_name typechecked_quint
     in
     (if isEmptyBag ds_warnings then
 	returnMn ()
@@ -182,13 +182,11 @@ doIt (core_cmds, stg_cmds) input_pgm
     ) 						`thenMn_`
 
     doDump opt_D_dump_ds "Desugared:" (pp_show (ppAboves
-	(map (pprPlainCoreBinding pprStyle) desugared)))
+	(map (pprCoreBinding pprStyle) desugared)))
 						`thenMn_`
 
-{- LATER ...
-
     -- ******* CORE-TO-CORE SIMPLIFICATION (NB: I/O op)
-    core2core core_cmds switch_lookup_fn co_mod_name pprStyle
+    core2core core_cmds co_mod_name pprStyle
 	      sm_uniqs local_tycons pragma_tycon_specs desugared
 						`thenMn`
 
@@ -196,7 +194,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	    SpecData _ _ _ gen_tycons all_tycon_specs _ _ _) ->
 
     doDump opt_D_dump_simpl "Simplified:" (pp_show (ppAboves
-	(map (pprPlainCoreBinding pprStyle) simplified)))
+	(map (pprCoreBinding pprStyle) simplified)))
 						`thenMn_`
 
     -- ******* STG-TO-STG SIMPLIFICATION
@@ -206,7 +204,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     in
 
     show_pass "Stg2Stg" 			`thenMn_`
-    stg2stg stg_cmds switch_lookup_fn st_mod_name pprStyle st_uniqs stg_binds
+    stg2stg stg_cmds st_mod_name pprStyle st_uniqs stg_binds
 						`thenMn`
 
 	\ (stg_binds2, cost_centre_info) ->
@@ -215,6 +213,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	(pp_show (ppAboves (map (pprPlainStgBinding pprStyle) stg_binds2)))
 						`thenMn_`
 
+{- LATER ...
     -- ******* INTERFACE GENERATION (needs STG output)
 {-  let
 	mod_name = "_TestName_"
@@ -227,17 +226,19 @@ doIt (core_cmds, stg_cmds) input_pgm
 	if_inst_info = emptyBag
     in
 -}
+
     show_pass "Interface" 			`thenMn_`
     let
 	mod_interface
-    	  = mkInterface switch_is_on if_mod_name export_list_fns
+    	  = mkInterface if_mod_name export_list_fns
 			inlinings_env all_tycon_specs
 			interface_stuff
 			stg_binds2
     in
-    doOutput ProduceHi ( \ file ->
+    doOutput opt_ProduceHi ( \ file ->
 			 ppAppendFile file 1000{-pprCols-} mod_interface )
        						`thenMn_`
+-}
 
     -- ******* "ABSTRACT", THEN "FLAT", THEN *REAL* C!
     show_pass "CodeGen" 			`thenMn_`
@@ -245,7 +246,6 @@ doIt (core_cmds, stg_cmds) input_pgm
 	abstractC      = codeGen cc_mod_name     -- module name for CC labelling
 				 cost_centre_info
 				 cc_import_names -- import names for CC registering
-				 switch_lookup_fn
 				 gen_tycons	 -- type constructors generated locally
 				 all_tycon_specs -- tycon specialisations
 				 stg_binds2
@@ -253,42 +253,40 @@ doIt (core_cmds, stg_cmds) input_pgm
     	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
     doDump opt_D_dump_absC  "Abstract C:"
-	(dumpRealC switch_is_on abstractC)  	`thenMn_`
+	(dumpRealC abstractC)		  	`thenMn_`
 
     doDump opt_D_dump_flatC "Flat Abstract C:"
-	(dumpRealC switch_is_on flat_abstractC)	`thenMn_`
+	(dumpRealC flat_abstractC)		`thenMn_`
 
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
     -- flat_abstractC.  WDP 94/10]
     let
 	(flat_absC_c, flat_absC_ncg) =
-	   case (string_switch_is_on ProduceC || switch_is_on D_dump_realC,
-		 string_switch_is_on ProduceS || switch_is_on D_dump_asm) of
-	     (True,  False) -> (flat_abstractC, AbsCNop)
-	     (False, True)  -> (AbsCNop, flat_abstractC)
-	     (False, False) -> (AbsCNop, AbsCNop)
+	   case (maybeToBool opt_ProduceC || opt_D_dump_realC,
+		 maybeToBool opt_ProduceS || opt_D_dump_asm) of
+	     (True,  False) -> (flat_abstractC, absCNop)
+	     (False, True)  -> (absCNop, flat_abstractC)
+	     (False, False) -> (absCNop, absCNop)
 	     (True,  True)  -> error "ERROR: Can't do both .hc and .s at the same time"
 
-	c_output_d = dumpRealC switch_is_on flat_absC_c
-	c_output_w = (\ f -> writeRealC switch_is_on f flat_absC_c)
+	c_output_d = dumpRealC flat_absC_c
+	c_output_w = (\ f -> writeRealC f flat_absC_c)
 
 #if OMIT_NATIVE_CODEGEN
 	ncg_output_d = error "*** GHC not built with a native-code generator ***"
 	ncg_output_w = ncg_output_d
 #else
-	ncg_output_d = dumpRealAsm switch_lookup_fn flat_absC_ncg ncg_uniqs
-	ncg_output_w = (\ f -> writeRealAsm switch_lookup_fn f flat_absC_ncg ncg_uniqs)
+	ncg_output_d = dumpRealAsm flat_absC_ncg ncg_uniqs
+	ncg_output_w = (\ f -> writeRealAsm f flat_absC_ncg ncg_uniqs)
 #endif
     in
 
     doDump opt_D_dump_asm "" ncg_output_d 	`thenMn_`
-    doOutput ProduceS ncg_output_w 		`thenMn_`
+    doOutput opt_ProduceS ncg_output_w 		`thenMn_`
 
     doDump opt_D_dump_realC "" c_output_d 	`thenMn_`
-    doOutput ProduceC c_output_w 		`thenMn_`
-
-LATER -}
+    doOutput opt_ProduceC c_output_w 		`thenMn_`
     exitMn 0
     } ) } } }
   where
@@ -319,8 +317,8 @@ LATER -}
 
     doOutput switch io_action
       = case switch of
-	  Nothing	 -> returnMn ()
-	  Just fname ->
+	  Nothing -> returnMn ()
+	  Just fn -> let fname = _UNPK_ fn in
 	    fopen fname "a+"	`thenPrimIO` \ file ->
 	    if (file == ``NULL'') then
 		error ("doOutput: failed to open:"++fname)
@@ -333,8 +331,8 @@ LATER -}
 
     doDump switch hdr string
       = if switch
-	then writeMn stderr hdr		`thenMn_`
-	     writeMn stderr ('\n': string)	`thenMn_`
+	then writeMn stderr hdr		    `thenMn_`
+	     writeMn stderr ('\n': string)  `thenMn_`
 	     writeMn stderr "\n"
 	else returnMn ()
 

@@ -13,7 +13,7 @@ module TcEnv(
 
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
-	tcLookupGlobalValue, tcLookupGlobalValueByKey,
+	tcLookupGlobalValue, tcLookupGlobalValueByKey, tcGlobalOcc,
 
 	newMonoIds, newLocalIds, newLocalId,
 	tcGetGlobalTyVars
@@ -25,11 +25,13 @@ import TcMLoop  -- for paranoia checking
 
 import Id	( Id(..), GenId, idType, mkUserLocal )
 import TcHsSyn	( TcIdBndr(..), TcIdOcc(..) )
-import TcKind	( TcKind, newKindVars, tcKindToKind, kindToTcKind )
-import TcType	( TcType(..), TcMaybe, TcTyVar(..), TcTyVarSet(..), newTyVarTys, zonkTcTyVars )
+import TcKind	( TcKind, newKindVars, tcDefaultKind, kindToTcKind )
+import TcType	( TcType(..), TcMaybe, TcTyVar(..), TcTyVarSet(..),
+		  newTyVarTys, tcInstTyVars, tcInstType, zonkTcTyVars
+		)
 import TyVar	( mkTyVar, getTyVarKind, unionTyVarSets, emptyTyVarSet )
 import Type	( tyVarsOfTypes )
-import TyCon	( TyCon, Arity(..), getTyConKind, getSynTyConArity )
+import TyCon	( TyCon, Arity(..), tyConKind, synTyConArity )
 import Class	( Class(..), GenClass, getClassSig )
 
 import TcMonad
@@ -37,9 +39,10 @@ import TcMonad
 import Name	( Name(..), getNameShortName )
 import PprStyle
 import Pretty
+import Type	( splitForAllTy )
 import Unique	( Unique )
 import UniqFM
-import Util	( zipWithEqual, zipWith3Equal, zipLazy, panic )
+import Util	( zipWithEqual, zipWith3Equal, zipLazy, panic, pprPanic )
 \end{code}
 
 Data type declarations
@@ -89,7 +92,7 @@ tcTyVarScopeGivenKinds names kinds thing_inside
 		 (thing_inside rec_tyvars)	`thenTc` \ result ->
  
 		-- Get the tyvar's Kinds from their TcKinds
-	mapNF_Tc tcKindToKind kinds		`thenNF_Tc` \ kinds' ->
+	mapNF_Tc tcDefaultKind kinds		`thenNF_Tc` \ kinds' ->
 
 		-- Construct the real TyVars
 	let
@@ -123,7 +126,10 @@ tcExtendTyConEnv names_w_arities tycons scope
 								  (kinds `zipLazy` tycons)
 				]
     in
-    tcSetEnv (TcEnv tve tce' ce gve lve gtvs) scope
+    tcSetEnv (TcEnv tve tce' ce gve lve gtvs) scope	`thenTc` \ result ->
+    mapNF_Tc tcDefaultKind kinds			`thenNF_Tc_`
+    returnTc result 
+
 
 tcExtendClassEnv :: [Name] -> [Class] -> TcM s r -> TcM s r
 tcExtendClassEnv names classes scope
@@ -132,7 +138,9 @@ tcExtendClassEnv names classes scope
     let
 	ce' = addListToUFM ce (names `zip` (kinds `zipLazy` classes))
     in
-    tcSetEnv (TcEnv tve tce ce' gve lve gtvs) scope
+    tcSetEnv (TcEnv tve tce ce' gve lve gtvs) scope	`thenTc` \ result ->
+    mapNF_Tc tcDefaultKind kinds			`thenNF_Tc_`
+    returnTc result 
 \end{code}
 
 
@@ -145,7 +153,7 @@ tcLookupTyVar name
 
 
 tcLookupTyCon (WiredInTyCon tc)		-- wired in tycons
-  = returnNF_Tc (kindToTcKind (getTyConKind tc), getSynTyConArity tc, tc)
+  = returnNF_Tc (kindToTcKind (tyConKind tc), synTyConArity tc, tc)
 
 tcLookupTyCon name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
@@ -154,7 +162,9 @@ tcLookupTyCon name
 tcLookupTyConByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let 
-       (kind, arity, tycon) =  lookupWithDefaultUFM_Directly tce (panic "tcLookupTyCon") uniq
+       (kind, arity, tycon) =  lookupWithDefaultUFM_Directly tce 
+					(pprPanic "tcLookupTyCon:" (ppr PprDebug uniq)) 
+					uniq
     in
     returnNF_Tc tycon
 
@@ -165,7 +175,9 @@ tcLookupClass name
 tcLookupClassByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let
-	(kind, clas) = lookupWithDefaultUFM_Directly ce (panic "tcLookupClas") uniq
+	(kind, clas) = lookupWithDefaultUFM_Directly ce 
+				(pprPanic "tcLookupClas:" (ppr PprDebug uniq))
+				uniq
     in
     returnNF_Tc clas
 \end{code}
@@ -236,10 +248,26 @@ tcLookupGlobalValue name
     returnNF_Tc (lookupWithDefaultUFM gve def name)
   where
 #ifdef DEBUG
-    def = panic ("tcLookupGlobalValue:" ++ ppShow 1000 (ppr PprDebug name))
+    def = pprPanic "tcLookupGlobalValue:" (ppr PprDebug name)
 #else
     def = panic "tcLookupGlobalValue"
 #endif
+
+-- A useful function that takes an occurrence of a global thing
+-- and instantiates its type with fresh type variables
+tcGlobalOcc :: Name 
+	    -> NF_TcM s (Id, 		-- The Id
+			  [TcType s], 	-- Instance types
+			  TcType s)	-- Rest of its type
+
+tcGlobalOcc name
+  = tcLookupGlobalValue name	`thenNF_Tc` \ id ->
+    let
+      (tyvars, rho) = splitForAllTy (idType id)
+    in
+    tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
+    tcInstType tenv rho		`thenNF_Tc` \ rho' ->
+    returnNF_Tc (id, arg_tys, rho')
 
 
 tcLookupGlobalValueByKey :: Unique -> NF_TcM s Id
@@ -248,7 +276,7 @@ tcLookupGlobalValueByKey uniq
     returnNF_Tc (lookupWithDefaultUFM_Directly gve def uniq)
   where
 #ifdef DEBUG
-    def = panic ("tcLookupGlobalValueByKey:" ++ ppShow 1000 (ppr PprDebug uniq))
+    def = pprPanic "tcLookupGlobalValueByKey:" (ppr PprDebug uniq)
 #else
     def = panic "tcLookupGlobalValueByKey"
 #endif

@@ -161,7 +161,7 @@ data ConDecl name
 		SrcLoc
 
   | RecConDecl	name
-		[(name, BangType name)]	-- list of "fields"
+		[([name], BangType name)]	-- list of "fields"
 		SrcLoc
 
   | NewConDecl  name		-- newtype con decl

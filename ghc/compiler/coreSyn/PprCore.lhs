@@ -14,8 +14,7 @@ module PprCore (
 	pprCoreExpr,
 	pprCoreBinding,
 	pprBigCoreBinder,
-	pprTypedCoreBinder,
-	pprPlainCoreBinding
+	pprTypedCoreBinder
 	
 	-- these are here to make the instances go in 0.26:
 #if __GLASGOW_HASKELL__ <= 26
@@ -34,9 +33,8 @@ import Id		( idType, getIdInfo, getIdStrictness,
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
 import Literal		( Literal{-instances-} )
 import Outputable	-- quite a few things
-import PprType		( pprType_Internal,
-			  GenType{-instances-}, GenTyVar{-instance-}
-			)
+import PprEnv
+import PprType		( GenType{-instances-}, GenTyVar{-instance-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import PrimOp		( PrimOp{-instances-} )
@@ -58,7 +56,7 @@ function for ``major'' val_bdrs (those next to equal signs :-),
 usually be called through some intermediary.
 
 The binder/occ printers take the default ``homogenized'' (see
-@PrintEnv@...) @Pretty@ and the binder/occ.  They can either use the
+@PprEnv@...) @Pretty@ and the binder/occ.  They can either use the
 homogenized one, or they can ignore it completely.  In other words,
 the things passed in act as ``hooks'', getting the last word on how to
 print something.
@@ -66,9 +64,9 @@ print something.
 @pprParendCoreExpr@ puts parens around non-atomic Core expressions.
 
 \begin{code}
-pprPlainCoreBinding :: PprStyle -> CoreBinding -> Pretty
+pprCoreBinding :: PprStyle -> CoreBinding -> Pretty
 
-pprCoreBinding
+pprGenCoreBinding
 	:: (Eq tyvar, Outputable tyvar,
 	    Eq uvar,  Outputable uvar,
 	    Outputable bndr,
@@ -80,14 +78,27 @@ pprCoreBinding
 	-> GenCoreBinding bndr occ tyvar uvar
 	-> Pretty
 
-pprCoreBinding sty pbdr1 pbdr2 pocc bind
-  = ppr_bind (initial_pe sty (Left (pbdr1, pbdr2, pocc))) bind
+pprGenCoreBinding sty pbdr1 pbdr2 pocc bind
+  = ppr_bind (init_ppr_env sty pbdr1 pbdr2 pocc) bind
 
-pprPlainCoreBinding sty (NonRec binder expr)
+init_ppr_env sty pbdr1 pbdr2 pocc
+  = initPprEnv sty
+	(Just (ppr sty)) -- literals
+	(Just (ppr sty)) -- data cons
+	(Just (ppr sty)) -- primops
+	(Just (\ cc -> ppStr (showCostCentre sty True cc)))
+	(Just (ppr sty)) -- tyvars
+	(Just (ppr sty)) -- usage vars
+	(Just pbdr1) (Just pbdr2) (Just pocc) -- value vars
+	(Just (ppr sty)) -- types
+	(Just (ppr sty)) -- usages
+
+--------------
+pprCoreBinding sty (NonRec binder expr)
   = ppHang (ppCat [pprBigCoreBinder sty binder, ppEquals])
     	 4 (pprCoreExpr sty (pprBigCoreBinder sty) (pprBabyCoreBinder sty) (ppr sty) expr)
 
-pprPlainCoreBinding sty (Rec binds)
+pprCoreBinding sty (Rec binds)
   = ppAboves [ifPprDebug sty (ppStr "{- plain Rec -}"),
 	      ppAboves (map ppr_bind binds),
 	      ifPprDebug sty (ppStr "{- end plain Rec -}")]
@@ -98,7 +109,16 @@ pprPlainCoreBinding sty (Rec binds)
 \end{code}
 
 \begin{code}
-pprCoreExpr, pprParendCoreExpr
+pprCoreExpr
+	:: PprStyle
+	-> (Id -> Pretty) -- to print "major" val_bdrs
+	-> (Id -> Pretty) -- to print "minor" val_bdrs
+	-> (Id  -> Pretty) -- to print bindees
+	-> CoreExpr
+	-> Pretty
+pprCoreExpr = pprGenCoreExpr
+
+pprGenCoreExpr, pprParendCoreExpr
 	:: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar,
 	    Outputable bndr,
 	    Outputable occ)
@@ -109,8 +129,8 @@ pprCoreExpr, pprParendCoreExpr
 	-> GenCoreExpr bndr occ tyvar uvar
 	-> Pretty
 
-pprCoreExpr sty pbdr1 pbdr2 pocc expr
-  = ppr_expr (initial_pe sty (Left (pbdr1, pbdr2, pocc))) expr
+pprGenCoreExpr sty pbdr1 pbdr2 pocc expr
+  = ppr_expr (init_ppr_env sty pbdr1 pbdr2 pocc) expr
 
 pprParendCoreExpr sty pbdr1 pbdr2 pocc expr
   = let
@@ -120,16 +140,16 @@ pprParendCoreExpr sty pbdr1 pbdr2 pocc expr
 	      Lit _ -> id
 	      _	    -> ppParens	-- wraps in parens
     in
-    parenify (pprCoreExpr sty pbdr1 pbdr2 pocc expr)
+    parenify (pprGenCoreExpr sty pbdr1 pbdr2 pocc expr)
 
 ppr_core_arg sty pocc arg
-  = ppr_arg (initial_pe sty (Left (pocc, pocc, pocc))) arg
+  = ppr_arg (init_ppr_env sty pocc pocc pocc) arg
 
 ppr_core_alts sty pbdr1 pbdr2 pocc alts
-  = ppr_alts (initial_pe sty (Left (pbdr1, pbdr2, pocc))) alts
+  = ppr_alts (init_ppr_env sty pbdr1 pbdr2 pocc) alts
 
 ppr_core_default sty pbdr1 pbdr2 pocc deflt
-  = ppr_default (initial_pe sty (Left (pbdr1, pbdr2, pocc))) deflt
+  = ppr_default (init_ppr_env sty pbdr1 pbdr2 pocc) deflt
 \end{code}
 
 %************************************************************************
@@ -144,14 +164,14 @@ instance
    Eq uvar, Outputable uvar)
  =>
   Outputable (GenCoreBinding bndr occ tyvar uvar) where
-    ppr sty bind = pprCoreBinding sty (ppr sty) (ppr sty) (ppr sty) bind
+    ppr sty bind = pprGenCoreBinding sty (ppr sty) (ppr sty) (ppr sty) bind
 
 instance
   (Outputable bndr, Outputable occ, Eq tyvar, Outputable tyvar,
    Eq uvar, Outputable uvar)
  =>
   Outputable (GenCoreExpr bndr occ tyvar uvar) where
-    ppr sty expr = pprCoreExpr sty (ppr sty) (ppr sty) (ppr sty) expr
+    ppr sty expr = pprGenCoreExpr sty (ppr sty) (ppr sty) (ppr sty) expr
 
 instance
   (Outputable occ, Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
@@ -176,126 +196,13 @@ instance
 
 %************************************************************************
 %*									*
-\subsection{Core printing environment (purely local)}
-%*									*
-%************************************************************************
-
-Similar to @VE@ in @PprType@.  The ``values'' we print here
-are locally-defined nested-scope names; callers to @pprCoreBinding@,
-etc., can override these.
-
-For tyvars and uvars, we {\em do} normally use these homogenized
-names; for values, we {\em don't}.  In printing interfaces, though,
-we use homogenized value names, so that interfaces don't wobble
-uncontrollably from changing Unique-based names.
-
-\begin{code}
-data PrintEnv tyvar uvar bndr occ
-  = PE	(Literal -> Pretty)	-- Doing these this way saves
-	(DataCon -> Pretty)	-- carrying around a PprStyle
-	(PrimOp  -> Pretty)
-	(CostCentre -> Pretty)
-
-	[Pretty]		-- Tyvar pretty names
-	(tyvar -> Pretty)	-- Tyvar lookup function
-        [Pretty]		-- Uvar  pretty names
-	(uvar -> Pretty)	-- Uvar  lookup function
-
-	(GenType tyvar uvar -> Pretty)
-	(GenUsage uvar -> Pretty)
-
-	(ValPrinters bndr occ)
-
-data ValPrinters bndr occ
-  = BOPE -- print binders/occs differently
-	 (bndr -> Pretty)	-- to print "major" val_bdrs
-	 (bndr -> Pretty)	-- to print "minor" val_bdrs
-	 (occ  -> Pretty)	-- to print bindees
-
-  | VPE  -- print all values the same way
-	 [Pretty]		-- Value pretty names
-	 (bndr -> Pretty)	-- Binder lookup function
-	 (occ  -> Pretty)	-- Occurrence lookup function
-\end{code}
-
-\begin{code}
-initial_pe :: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar,
-	       Outputable bndr, Outputable occ)
-	   => PprStyle
-	   -> Either
-		(bndr -> Pretty, bndr -> Pretty, occ -> Pretty)
-		()
-	   -> PrintEnv tyvar uvar bndr occ
-
-initial_pe sty val_printing
-  = PE	(ppr sty)   -- for a Literal
-	(ppr sty)   -- for a DataCon
-	(ppr sty)   -- for a PrimOp
-	(\ cc -> ppStr (showCostCentre sty True cc)) -- CostCentre
-
-	tv_pretties ppr_tv -- for a TyVar
-        uv_pretties ppr_uv -- for a UsageVar
-
-	(\ ty -> pprType_Internal sty tv_pretties ppr_tv uv_pretties ppr_uv ty)
-	(ppr sty) -- for a Usage
-
-	val_printing_stuff
-  where
-    ppr_tv = ppr sty -- to print a tyvar
-    ppr_uv = ppr sty -- to print a uvar
-
-    tv_pretties = map (\ c -> ppChar c ) ['a' .. 'h']
-		  ++
-		  map (\ n -> ppBeside (ppChar 'a') (ppInt n))
-		      ([0 .. ] :: [Int])	-- a0 ... aN
-    
-    uv_pretties = map (\ c -> ppChar c ) ['u' .. 'y']
-		  ++
-		  map (\ n -> ppBeside (ppChar 'u') (ppInt n))
-		      ([0 .. ] :: [Int])	-- u0 ... uN
-    
-    val_pretties = map (\ c -> ppChar c ) ['i' .. 'k']
-		++ map (\ n -> ppBeside (ppChar 'v') (ppInt n))
-		       ([0 .. ] :: [Int])	-- v0 ... vN
-
-    ------------------------
-    val_printing_stuff
-      = case val_printing of
-	  Left  (pbdr1, pbdr2, pocc) -> BOPE pbdr1 pbdr2 pocc
-	  Right () -> VPE val_pretties (ppr sty) (ppr sty)
-
-\end{code}
-
-\begin{code}
-plit	 (PE pp  _  _  _ _  _ _  _  _  _ _) = pp
-pcon	 (PE  _ pp  _  _ _  _ _  _  _  _ _) = pp
-pprim	 (PE  _  _ pp  _ _  _ _  _  _  _ _) = pp
-pscc	 (PE  _  _  _ pp _  _ _  _  _  _ _) = pp
-ptyvar	 (PE  _  _  _  _ _ pp _  _  _  _ _) = pp
-puvar	 (PE  _  _  _  _ _  _ _ pp  _  _ _) = pp
-  
-pty	 (PE  _  _  _  _ _  _ _  _ pp  _ _) = pp
-puse	 (PE  _  _  _  _ _  _ _  _  _ pp _) = pp
-
-pmaj_bdr (PE  _  _  _  _ _  _ _  _  _  _ (BOPE pp _ _)) = pp
-pmaj_bdr (PE  _  _  _  _ _  _ _  _  _  _ (VPE  _ pp _)) = pp
-				   
-pmin_bdr (PE  _  _  _  _ _  _ _  _  _  _ (BOPE _ pp _)) = pp
-pmin_bdr (PE  _  _  _  _ _  _ _  _  _  _ (VPE  _ pp _)) = pp
-				   
-pocc	 (PE  _  _  _  _ _  _ _  _  _  _ (BOPE _ _ pp)) = pp
-pocc	 (PE  _  _  _  _ _  _ _  _  _  _ (VPE  _ _ pp)) = pp
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection{Workhorse routines (...????...)}
 %*									*
 %************************************************************************
 
 \begin{code}
 ppr_bind pe (NonRec val_bdr expr)
-  = ppHang (ppCat [pmaj_bdr pe val_bdr, ppEquals])
+  = ppHang (ppCat [pMajBndr pe val_bdr, ppEquals])
 	 4 (ppr_expr pe expr)
 
 ppr_bind pe (Rec binds)
@@ -304,7 +211,7 @@ ppr_bind pe (Rec binds)
 	       ppStr "{- end Rec -}" ]
   where
     ppr_pair (val_bdr, expr)
-      = ppHang (ppCat [pmaj_bdr pe val_bdr, ppEquals])
+      = ppHang (ppCat [pMajBndr pe val_bdr, ppEquals])
 	     4 (ppr_expr pe expr)
 \end{code}
 
@@ -321,25 +228,25 @@ ppr_parend_expr pe expr
 \end{code}
 
 \begin{code}
-ppr_expr pe (Var name)   = pocc pe name
-ppr_expr pe (Lit lit)    = plit pe lit
-ppr_expr pe (Con con []) = pcon pe con
+ppr_expr pe (Var name)   = pOcc pe name
+ppr_expr pe (Lit lit)    = pLit pe lit
+ppr_expr pe (Con con []) = pCon pe con
 
 ppr_expr pe (Con con args)
-  = ppHang (ppBesides [pcon pe con, ppChar '!'])
+  = ppHang (ppBesides [pCon pe con, ppChar '!'])
 	 4 (ppSep (map (ppr_arg pe) args))
 
 ppr_expr pe (Prim prim args)
-  = ppHang (ppBesides [pprim pe prim, ppChar '!'])
+  = ppHang (ppBesides [pPrim pe prim, ppChar '!'])
 	 4 (ppSep (map (ppr_arg pe) args))
 
 ppr_expr pe expr@(Lam _ _)
   = let
 	(uvars, tyvars, vars, body) = collectBinders expr
     in
-    ppHang (ppCat [pp_vars SLIT("_/u\\_") (puvar    pe) uvars,
-		   pp_vars SLIT("_/\\_")  (ptyvar   pe) tyvars,
-		   pp_vars SLIT("\\")     (pmin_bdr pe) vars])
+    ppHang (ppCat [pp_vars SLIT("_/u\\_") (pUVar    pe) uvars,
+		   pp_vars SLIT("_/\\_")  (pTyVar   pe) tyvars,
+		   pp_vars SLIT("\\")     (pMinBndr pe) vars])
 	 4 (ppr_expr pe body)
   where
     pp_vars lam pp [] = ppNil
@@ -348,10 +255,13 @@ ppr_expr pe expr@(Lam _ _)
 
 ppr_expr pe expr@(App _ _)
   = let
-	(fun, args) = collectArgs expr
+	(fun, uargs, targs, vargs) = collectArgs expr
     in
     ppHang (ppr_parend_expr pe fun)
-	 4 (ppSep (map (ppr_arg pe) args))
+	 4 (ppSep [ ppInterleave ppNil (map (pUse    pe) uargs)
+		  , ppInterleave ppNil (map (pTy     pe) targs)
+		  , ppInterleave ppNil (map (ppr_arg pe) vargs)
+	          ])
 
 ppr_expr pe (Case expr alts)
   = ppSep
@@ -364,7 +274,7 @@ ppr_expr pe (Case expr alts)
 
 ppr_expr pe (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
   = ppAboves [
-      ppCat [ppStr "let {", pmaj_bdr pe val_bdr, ppEquals],
+      ppCat [ppStr "let {", pMajBndr pe val_bdr, ppEquals],
       ppNest 2 (ppr_expr pe rhs),
       ppStr "} in",
       ppr_expr pe body ]
@@ -372,7 +282,7 @@ ppr_expr pe (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
 ppr_expr pe (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
   = ppAbove
       (ppHang (ppStr "let {")
-	    2 (ppCat [ppHang (ppCat [pmaj_bdr pe val_bdr, ppEquals])
+	    2 (ppCat [ppHang (ppCat [pMajBndr pe val_bdr, ppEquals])
 			   4 (ppr_expr pe rhs),
        ppStr "} in"]))
       (ppr_expr pe expr)
@@ -383,7 +293,7 @@ ppr_expr pe (Let bind expr)
 	   ppHang (ppStr "} in ") 2 (ppr_expr pe expr)]
 
 ppr_expr pe (SCC cc expr)
-  = ppSep [ppCat [ppPStr SLIT("_scc_"), pscc pe cc],
+  = ppSep [ppCat [ppPStr SLIT("_scc_"), pSCC pe cc],
 	   ppr_parend_expr pe expr ]
 \end{code}
 
@@ -392,8 +302,8 @@ ppr_alts pe (AlgAlts alts deflt)
   = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]
   where
     ppr_alt (con, params, expr)
-      = ppHang (ppCat [ppr_con con (pcon pe con),
-		       ppInterleave ppSP (map (pmin_bdr pe) params),
+      = ppHang (ppCat [ppr_con con (pCon pe con),
+		       ppInterleave ppSP (map (pMinBndr pe) params),
 		       ppStr "->"])
 	     4 (ppr_expr pe expr)
       where
@@ -404,7 +314,7 @@ ppr_alts pe (PrimAlts alts deflt)
   = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]
   where
     ppr_alt (lit, expr)
-      = ppHang (ppCat [plit pe lit, ppStr "->"])
+      = ppHang (ppCat [pLit pe lit, ppStr "->"])
 	     4 (ppr_expr pe expr)
 \end{code}
 
@@ -412,15 +322,15 @@ ppr_alts pe (PrimAlts alts deflt)
 ppr_default pe NoDefault = ppNil
 
 ppr_default pe (BindDefault val_bdr expr)
-  = ppHang (ppCat [pmin_bdr pe val_bdr, ppStr "->"])
+  = ppHang (ppCat [pMinBndr pe val_bdr, ppStr "->"])
 	 4 (ppr_expr pe expr)
 \end{code}
 
 \begin{code}
-ppr_arg pe (LitArg   lit) = plit pe lit
-ppr_arg pe (VarArg   v)	  = pocc pe v
-ppr_arg pe (TyArg    ty)  = pty  pe ty
-ppr_arg pe (UsageArg use) = puse pe use
+ppr_arg pe (LitArg   lit) = pLit pe lit
+ppr_arg pe (VarArg   v)	  = pOcc pe v
+ppr_arg pe (TyArg    ty)  = pTy  pe ty
+ppr_arg pe (UsageArg use) = pUse pe use
 \end{code}
 
 Other printing bits-and-bobs used with the general @pprCoreBinding@

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1995
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[SimplCase]{Simplification of `case' expression}
 
@@ -10,32 +10,34 @@ Support code for @Simplify@.
 
 module SimplCase ( simplCase, bindLargeRhs ) where
 
-import SimplMonad
-import SimplEnv
+import Ubiq{-uitous-}
+import SmplLoop		( simplBind, simplExpr, MagicUnfoldingFun )
 
-import PrelInfo		( getPrimOpResultInfo, PrimOpResultInfo(..), PrimOp,
-			  voidPrimTy, voidPrimId, mkFunTy, primOpOkForSpeculation
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Type		( splitSigmaTy, splitTyArgs, glueTyArgs,
-			  getTyConFamilySize, isPrimType,
-			  maybeAppDataTyCon
-			)
-import Literal		( isNoRepLit, Literal )
+import BinderInfo	-- too boring to try to select things...
 import CmdLineOpts	( SimplifierSwitch(..) )
-import Id
-import IdInfo
-import Maybes		( catMaybes, maybeToBool, Maybe(..) )
-import Simplify
-import SimplUtils
-import SimplVar		( completeVar )
-import Util
+import CoreSyn
+import CoreUnfold	( UnfoldingDetails(..), UnfoldingGuidance(..),
+			  FormSummary(..)
+			)
+import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
+			  unTagBindersAlts
+			)
+import Id		( idType, isDataCon, getIdDemandInfo,
+			  DataCon(..), GenId{-instance Eq-}
+			)
+import IdInfo		( willBeDemanded, DemandInfo )
+import Literal		( isNoRepLit, Literal{-instance Eq-} )
+import Maybes		( maybeToBool )
+import PrelInfo		( voidPrimTy, voidPrimId )
+import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
+import SimplEnv
+import SimplMonad
+import SimplUtils	( mkValLamTryingEta )
+import Type		( isPrimType, maybeAppDataTyCon, mkFunTys, eqTy )
+import Unique		( Unique{-instance Eq-} )
+import Usage		( GenUsage{-instance Eq-} )
+import Util		( isIn, isSingleton, panic, assertPanic )
 \end{code}
-
-
-
-
 
 Float let out of case.
 
@@ -44,7 +46,7 @@ simplCase :: SimplEnv
 	  -> InExpr	-- Scrutinee
 	  -> InAlts	-- Alternatives
 	  -> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
-	  -> OutUniType				-- Type of result expression
+	  -> OutType				-- Type of result expression
 	  -> SmplM OutExpr
 
 simplCase env (Let bind body) alts rhs_c result_ty
@@ -185,10 +187,10 @@ completeCase env (Lit lit) alts rhs_c
     tick KnownBranch		`thenSmpl_`
     completePrimCaseWithKnownLit env lit alts rhs_c
 
-completeCase env expr@(Con con tys con_args) alts rhs_c
+completeCase env expr@(Con con con_args) alts rhs_c
   = 	-- Ha! Staring us in the face -- select the appropriate alternative
     tick KnownBranch		`thenSmpl_`
-    completeAlgCaseWithKnownCon env con tys con_args alts rhs_c
+    completeAlgCaseWithKnownCon env con con_args alts rhs_c
 \end{code}
 
 Case elimination
@@ -310,7 +312,7 @@ completeCase env scrut alts rhs_c
 					       not (alt_con `is_elem` not_these)]
 
 #ifdef DEBUG
---				ConForm c t v -> pprPanic "completeCase!" (ppAbove (ppCat [ppr PprDebug c, ppr PprDebug t, ppr PprDebug v]) (ppr PprDebug alts))
+--				ConForm c v -> pprPanic "completeCase!" (ppAbove (ppCat [ppr PprDebug c, ppStr "<args>"]) (ppr PprDebug alts))
 				  -- ConForm can't happen, since we'd have
 				  -- inlined it, and be in completeCaseWithKnownCon by now
 #endif
@@ -328,19 +330,19 @@ completeCase env scrut alts rhs_c
 	-- If the scrut is already eval'd then there's no worry about
 	-- eliminating the case
     scrut_is_evald = case scrut_form of
-			OtherLitForm _     -> True
-			ConForm _ _ _  -> True
-			OtherConForm _ -> True
-			other		       -> False
+			OtherLitForm _   -> True
+			ConForm      _ _ -> True
+			OtherConForm _   -> True
+			other		 -> False
 
 
     scrut_is_eliminable_primitive
       = case scrut of
-	   Prim op _ _ -> primOpOkForSpeculation op
-	   Var _       -> case alts of
-				PrimAlts _ _ -> True	-- Primitive, hence non-bottom
-				AlgAlts _ _  -> False	-- Not primitive
-	   other	 -> False
+	   Prim op _ -> primOpOkForSpeculation op
+	   Var _     -> case alts of
+			  PrimAlts _ _ -> True	-- Primitive, hence non-bottom
+			  AlgAlts _ _  -> False	-- Not primitive
+	   other     -> False
 
 	-- case v of w -> e{strict in w}  ===>   e[v/w]
     scrut_is_var_and_single_strict_default
@@ -390,7 +392,7 @@ completeCase env scrut alts rhs_c
 bindLargeAlts :: SimplEnv
 	      -> InAlts
 	      -> (SimplEnv -> InExpr -> SmplM OutExpr)		-- Old rhs handler
-	      -> OutUniType					-- Result type
+	      -> OutType					-- Result type
 	      -> SmplM ([OutBinding],	-- Extra bindings
 			InAlts)		-- Modified alts
 
@@ -427,7 +429,7 @@ bindLargeDefault env (BindDefault binder rhs) rhs_ty rhs_c
 \begin{code}
 bindLargeRhs :: SimplEnv
 	     -> [InBinder]	-- The args wrt which the rhs should be abstracted
-	     -> OutUniType
+	     -> OutType
 	     -> (SimplEnv -> SmplM OutExpr)		-- Rhs handler
 	     -> SmplM (OutBinding,	-- New bindings (singleton or empty)
 		       InExpr)		-- Modified rhs
@@ -473,15 +475,15 @@ bindLargeRhs env args rhs_ty rhs_c
 	-- it's processed the OutId won't be found in the environment, so it
 	-- will be left unmodified.
   where
-    rhs_fun_ty :: OutUniType
-    rhs_fun_ty = glueTyArgs [simplTy env (idType id) | (id,_) <- used_args] rhs_ty
+    rhs_fun_ty :: OutType
+    rhs_fun_ty = mkFunTys [simplTy env (idType id) | (id,_) <- used_args] rhs_ty
 
     used_args      = [arg | arg@(_,usage) <- args, not (dead usage)]
     used_arg_atoms = [VarArg arg_id | (arg_id,_) <- used_args]
     dead DeadCode  = True
     dead other     = False
 
-    prim_rhs_fun_ty = mkFunTy voidPrimTy rhs_ty
+    prim_rhs_fun_ty = mkFunTys [voidPrimTy] rhs_ty
 \end{code}
 
 Case alternatives when we don't know the scrutinee
@@ -517,8 +519,8 @@ simplAlts env scrut (AlgAlts alts deflt) rhs_c
 	let
 	    env1    = extendIdEnvWithClones env con_args con_args'
 	    new_env = case scrut of
-		       Var var -> _scc_ "euegC1" (extendUnfoldEnvGivenConstructor env1 var con con_args')
-		       other     -> env1
+		       Var v -> extendUnfoldEnvGivenConstructor env1 v con con_args'
+		       other -> env1
 	in
 	rhs_c new_env rhs 				`thenSmpl` \ rhs' ->
 	returnSmpl (con, con_args', rhs')
@@ -532,8 +534,8 @@ simplAlts env scrut (PrimAlts alts deflt) rhs_c
     do_alt (lit, rhs)
       = let
 	    new_env = case scrut of
-			Var var -> _scc_ "euegFD1" (extendUnfoldEnvGivenFormDetails env var (LitForm lit))
-			other	  -> env
+			Var v -> extendUnfoldEnvGivenFormDetails env v (LitForm lit)
+			other -> env
 	in
 	rhs_c new_env rhs 				`thenSmpl` \ rhs' ->
 	returnSmpl (lit, rhs')
@@ -588,12 +590,12 @@ simplDefault env (Var scrut_var) (BindDefault binder rhs) form_from_this_case rh
       final_form
 	= case (form_from_this_case, scrut_form) of
 	    (OtherConForm cs, OtherConForm ds) -> OtherConForm (cs++ds)
-	    (OtherLitForm cs,     OtherLitForm ds)     -> OtherLitForm (cs++ds)
+	    (OtherLitForm cs, OtherLitForm ds) -> OtherLitForm (cs++ds)
 			-- ConForm, LitForm impossible
 			-- (ASSERT?  ASSERT?  Hello? WDP 95/05)
-	    other 				               -> form_from_this_case
+	    other 			       -> form_from_this_case
 
-      env2 = _scc_ "euegFD2" (extendUnfoldEnvGivenFormDetails env1 binder' final_form)
+      env2 = extendUnfoldEnvGivenFormDetails env1 binder' final_form
 
 	-- Change unfold details for scrut var.  We now want to unfold it
 	-- to binder'
@@ -609,7 +611,7 @@ simplDefault env scrut (BindDefault binder rhs) form rhs_c
   = cloneId env binder 	`thenSmpl` \ binder' ->
     let
 	env1    = extendIdEnvWithAtom env binder (VarArg binder')
-	new_env = _scc_ "euegFD2" (extendUnfoldEnvGivenFormDetails env1 binder' form)
+	new_env = extendUnfoldEnvGivenFormDetails env1 binder' form
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
     returnSmpl (BindDefault binder' rhs')
@@ -663,13 +665,13 @@ var [substitute \tr{y} out of existence].
 \begin{code}
 completeAlgCaseWithKnownCon
 	:: SimplEnv
-	-> DataCon -> [Type] -> [InAtom]
+	-> DataCon -> [InArg]
 		-- Scrutinee is (con, type, value arguments)
 	-> InAlts
 	-> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
 	-> SmplM OutExpr
 
-completeAlgCaseWithKnownCon env con tys con_args (AlgAlts alts deflt) rhs_c
+completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
   = ASSERT(isDataCon con)
     search_alts alts
   where
@@ -698,11 +700,11 @@ completeAlgCaseWithKnownCon env con tys con_args (AlgAlts alts deflt) rhs_c
 		cloneId env binder		`thenSmpl` \ id' ->
 		let
 		    env1    = extendIdEnvWithClone env binder id'
-		    new_env = _scc_ "euegFD3" (extendUnfoldEnvGivenFormDetails env1 id'
-					(ConForm con tys con_args))
+		    new_env = extendUnfoldEnvGivenFormDetails env1 id'
+					(ConForm con con_args)
 		in
 		rhs_c new_env rhs		`thenSmpl` \ rhs' ->
-		returnSmpl (Let (NonRec id' (Con con tys con_args)) rhs')
+		returnSmpl (Let (NonRec id' (Con con con_args)) rhs')
 \end{code}
 
 Case absorption and identity-case elimination
@@ -787,7 +789,7 @@ mkCoCase scrut (AlgAlts outer_alts
     munge_alt (con, args, rhs) = (con, args, Let (NonRec deflt_var v) rhs)
        where
 	 v | scrut_is_var = Var scrut_var
-	   | otherwise    = Con con arg_tys (map VarArg args)
+	   | otherwise    = Con con (map TyArg arg_tys ++ map VarArg args)
 
     arg_tys = case maybeAppDataTyCon (idType deflt_var) of
 		Just (_, arg_tys, _) -> arg_tys
@@ -856,7 +858,7 @@ mkCoCase scrut alts
     identity_alts (AlgAlts alts deflt)  = all identity_alg_alt  alts && identity_deflt deflt
     identity_alts (PrimAlts alts deflt) = all identity_prim_alt alts && identity_deflt deflt
 
-    identity_alg_alt (con, args, Con con' _ args')
+    identity_alg_alt (con, args, Con con' args')
 	 = con == con'
 	   && and (zipWith eq_arg args args')
 	   && length args == length args'
@@ -913,26 +915,30 @@ munge_alg_deflt deflt_var (BindDefault d' rhs)
 \end{code}
 
 \begin{code}
-	-- A cheap equality test which bales out fast!
 cheap_eq :: InExpr -> InExpr -> Bool
+	-- A cheap equality test which bales out fast!
+
 cheap_eq (Var v1) (Var v2) = v1==v2
 cheap_eq (Lit l1) (Lit l2) = l1==l2
-cheap_eq (Con con1 tys1 args1) (Con con2 tys2 args2) = (con1==con2) &&
-							   (args1 `eq_args` args2)
-							   -- Types bound to be equal
-cheap_eq (Prim op1 tys1 args1) (Prim op2 tys2 args2) = (op1==op2) &&
-							   (args1 `eq_args` args2)
-							   -- Types bound to be equal
-cheap_eq (App   f1 a1) (App   f2 a2) = (f1 `cheap_eq` f2) && (a1 `eq_atom` a2)
-cheap_eq (CoTyApp f1 t1) (CoTyApp f2 t2) = (f1 `cheap_eq` f2) && (t1 == t2)
+cheap_eq (Con con1 args1) (Con con2 args2)
+  = con1 == con2 && args1 `eq_args` args2
+
+cheap_eq (Prim op1 args1) (Prim op2 args2)
+  = op1 ==op2 && args1 `eq_args` args2
+
+cheap_eq (App f1 a1) (App f2 a2)
+  = f1 `cheap_eq` f2 && a1 `eq_arg` a2
+
 cheap_eq _ _ = False
 
 -- ToDo: make CoreArg an instance of Eq
-eq_args (arg1: args1) (arg2 : args2) = (arg1 `eq_atom` arg2) && (args1 `eq_args` args2)
-eq_args []		       []		      = True
-eq_args other1		       other2		      = False
+eq_args (a1:as1) (a2:as2) = a1 `eq_arg` a2 && as1 `eq_args` as2
+eq_args []	 []	  = True
+eq_args _	 _        = False
 
-eq_atom (LitArg l1) (LitArg l2) =  l1==l2
-eq_atom (VarArg v1) (VarArg v2) =  v1==v2
-eq_atom other1	       other2	      =  False
+eq_arg (LitArg 	 l1) (LitArg   l2) = l1	== l2
+eq_arg (VarArg 	 v1) (VarArg   v2) = v1	== v2
+eq_arg (TyArg  	 t1) (TyArg    t2) = t1 `eqTy` t2
+eq_arg (UsageArg u1) (UsageArg u2) = u1 == u2
+eq_arg _	     _		   =  False
 \end{code}

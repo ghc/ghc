@@ -31,24 +31,21 @@ import CmdLineOpts	( opt_SccGroup )
 import CoreSyn		( CoreExpr(..) )
 import CoreUtils	( substCoreExpr )
 import HsSyn		( OutPat )
-import Id		( mkSysLocal, lookupIdEnv, growIdEnvList, GenId, IdEnv(..) )
+import Id		( mkSysLocal, mkIdWithNewUniq,
+			  lookupIdEnv, growIdEnvList, GenId, IdEnv(..)
+			)
 import PprType		( GenType, GenTyVar )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import SrcLoc		( unpackSrcLoc, mkUnknownSrcLoc, SrcLoc )
 import TcHsSyn		( TypecheckedPat(..) )
-import TyVar		( nullTyVarEnv, GenTyVar )
+import TyVar		( nullTyVarEnv, cloneTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instances-} )
 import UniqSupply	( splitUniqSupply, getUnique, getUniques,
 			  mapUs, thenUs, returnUs, UniqSM(..) )
-import Unique		( Unique )
 import Util		( assoc, mapAccumL, zipWithEqual, panic )
 
 infixr 9 `thenDs`
-
-cloneTyVar = panic "DsMonad.cloneTyVar"
-cloneTyVarFromTemplate = panic "DsMonad.cloneTyVarFromTemplate"
-mkIdWithNewUniq = panic "DsMonad.mkIdWithNewUniq"
 \end{code}
 
 Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
@@ -165,7 +162,7 @@ newTyVarsDs :: [TyVar] -> DsM [TyVar]
 
 newTyVarsDs tyvar_tmpls us loc mod_and_grp env warns
   = case (getUniques (length tyvar_tmpls) us) of { uniqs ->
-    (zipWithEqual cloneTyVarFromTemplate tyvar_tmpls uniqs, warns) }
+    (zipWithEqual cloneTyVar tyvar_tmpls uniqs, warns) }
 \end{code}
 
 We can also reach out and either set/grab location information from

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1995
+% (c) The AQUA Project, Glasgow University, 1993-1996
 %
 
 \begin{code}
@@ -11,158 +11,142 @@ module Stix (
 
 	stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg,
 	stgSpA, stgSuA, stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg,
---	stgActivityReg,
 	stgStdUpdRetVecReg, stgStkStubReg,
 	getUniqLabelNCG
-
-	-- And for self-sufficiency, by golly...
     ) where
 
-import AbsCSyn	    ( MagicId(..), kindFromMagicId, node, infoptr )
-import PrelInfo	    ( showPrimOp, PrimOp
-		      IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-		    )
-import CLabel   ( CLabel, mkAsmTempLabel )
-import Outputable
-import UniqSupply
-import Unpretty
-import Util
+import Ubiq{-uitous-}
+
+import AbsCSyn		( node, infoptr, MagicId(..) )
+import AbsCUtils	( magicIdPrimRep )
+import CLabel		( mkAsmTempLabel )
+import UniqSupply	( returnUs, thenUs, getUnique, UniqSM(..) )
+import Unpretty		( uppPStr, Unpretty(..) )
 \end{code}
 
 Here is the tag at the nodes of our @StixTree@.	 Notice its
 relationship with @PrimOp@ in prelude/PrimOp.
 
 \begin{code}
+data StixTree
+  = -- Segment (text or data)
 
-data StixTree =
+    StSegment CodeSegment
 
-	-- Segment (text or data)
+    -- We can tag the leaves with constants/immediates.
 
-	StSegment CodeSegment
+  | StInt	Integer	    -- ** add Kind at some point
+  | StDouble	Rational
+  | StString	FAST_STRING
+  | StLitLbl	Unpretty    -- literal labels
+			    -- (will be _-prefixed on some machines)
+  | StLitLit	FAST_STRING -- innards from CLitLit
+  | StCLbl	CLabel	    -- labels that we might index into
 
-	-- We can tag the leaves with constants/immediates.
+    -- Abstract registers of various kinds
 
-      | StInt	  Integer      -- ** add Kind at some point
-      | StDouble  Rational
-      | StString  FAST_STRING
-      | StLitLbl  Unpretty	-- literal labels (will be _-prefixed on some machines)
-      | StLitLit  FAST_STRING	-- innards from CLitLit
-      | StCLbl	  CLabel	-- labels that we might index into
+  | StReg StixReg
 
-	-- Abstract registers of various kinds
+    -- A typed offset from a base location
 
-      | StReg StixReg
+  | StIndex PrimRep StixTree StixTree -- kind, base, offset
 
-	-- A typed offset from a base location
+    -- An indirection from an address to its contents.
 
-      | StIndex PrimRep StixTree StixTree -- kind, base, offset
+  | StInd PrimRep StixTree
 
-	-- An indirection from an address to its contents.
+    -- Assignment is typed to determine size and register placement
 
-      | StInd PrimRep StixTree
+  | StAssign PrimRep StixTree StixTree -- dst, src
 
-	-- Assignment is typed to determine size and register placement
+    -- A simple assembly label that we might jump to.
 
-      | StAssign PrimRep StixTree StixTree -- dst, src
+  | StLabel CLabel
 
-	-- A simple assembly label that we might jump to.
+    -- A function header and footer
 
-      | StLabel CLabel
+  | StFunBegin CLabel
+  | StFunEnd CLabel
 
-	-- A function header and footer
+    -- An unconditional jump. This instruction is terminal.
+    -- Dynamic targets are allowed
 
-      | StFunBegin CLabel
-      | StFunEnd CLabel
+  | StJump StixTree
 
-	-- An unconditional jump. This instruction is terminal.
-	-- Dynamic targets are allowed
+    -- A fall-through, from slow to fast
 
-      | StJump StixTree
+  | StFallThrough CLabel
 
-    	-- A fall-through, from slow to fast
+    -- A conditional jump. This instruction can be non-terminal :-)
+    -- Only static, local, forward labels are allowed
 
-      | StFallThrough CLabel
+  | StCondJump CLabel StixTree
 
-	-- A conditional jump.	This instruction can be non-terminal :-)
-	-- Only static, local, forward labels are allowed
+    -- Raw data (as in an info table).
 
-      | StCondJump CLabel StixTree
+  | StData PrimRep [StixTree]
 
-	-- Raw data (as in an info table).
+    -- Primitive Operations
 
-      | StData PrimRep	[StixTree]
+  | StPrim PrimOp [StixTree]
 
-    	-- Primitive Operations
+    -- Calls to C functions
 
-      | StPrim PrimOp [StixTree]
+  | StCall FAST_STRING PrimRep [StixTree]
 
-    	-- Calls to C functions
+    -- Assembly-language comments
 
-      | StCall FAST_STRING PrimRep [StixTree]
-
-	-- Comments, of course
-
-      | StComment FAST_STRING	-- For assembly comments
-
-      deriving ()
+  | StComment FAST_STRING
 
 sStLitLbl :: FAST_STRING -> StixTree
 sStLitLbl s = StLitLbl (uppPStr s)
 \end{code}
 
 Stix registers can have two forms.  They {\em may} or {\em may not}
-map to real, machine level registers.
+map to real, machine-level registers.
 
 \begin{code}
+data StixReg
+  = StixMagicId MagicId	-- Regs which are part of the abstract machine model
 
-data StixReg = StixMagicId MagicId	-- Regs which are part of the abstract machine model
-
-	     | StixTemp Unique PrimRep -- "Regs" which model local variables (CTemps) in
+  | StixTemp Unique PrimRep -- "Regs" which model local variables (CTemps) in
 					-- the abstract C.
-	     deriving ()
-
 \end{code}
 
 We hope that every machine supports the idea of data segment and text
-segment (or that it has no segments at all, and we can lump these together).
+segment (or that it has no segments at all, and we can lump these
+together).
 
 \begin{code}
-
-data CodeSegment = DataSegment | TextSegment deriving (Eq)
+data CodeSegment = DataSegment | TextSegment deriving Eq
 
 type StixTreeList = [StixTree] -> [StixTree]
-
 \end{code}
 
--- Stix Trees for STG registers
-
+Stix Trees for STG registers:
 \begin{code}
+stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg, stgSpA,
+    stgSuA, stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg,
+    stgStdUpdRetVecReg, stgStkStubReg :: StixTree
 
-stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg, stgSpA, stgSuA,
-    stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg{-, stgActivityReg-}, stgStdUpdRetVecReg,
-    stgStkStubReg :: StixTree
-
-stgBaseReg = StReg (StixMagicId BaseReg)
-stgStkOReg = StReg (StixMagicId StkOReg)
-stgNode = StReg (StixMagicId node)
-stgInfoPtr = StReg (StixMagicId infoptr)
-stgTagReg = StReg (StixMagicId TagReg)
-stgRetReg = StReg (StixMagicId RetReg)
-stgSpA = StReg (StixMagicId SpA)
-stgSuA = StReg (StixMagicId SuA)
-stgSpB = StReg (StixMagicId SpB)
-stgSuB = StReg (StixMagicId SuB)
-stgHp = StReg (StixMagicId Hp)
-stgHpLim = StReg (StixMagicId HpLim)
-stgLivenessReg = StReg (StixMagicId LivenessReg)
---stgActivityReg = StReg (StixMagicId ActivityReg)
-stgStdUpdRetVecReg = StReg (StixMagicId StdUpdRetVecReg)
-stgStkStubReg = StReg (StixMagicId StkStubReg)
+stgBaseReg 	    = StReg (StixMagicId BaseReg)
+stgStkOReg 	    = StReg (StixMagicId StkOReg)
+stgNode    	    = StReg (StixMagicId node)
+stgInfoPtr 	    = StReg (StixMagicId infoptr)
+stgTagReg  	    = StReg (StixMagicId TagReg)
+stgRetReg  	    = StReg (StixMagicId RetReg)
+stgSpA 		    = StReg (StixMagicId SpA)
+stgSuA 		    = StReg (StixMagicId SuA)
+stgSpB 		    = StReg (StixMagicId SpB)
+stgSuB 		    = StReg (StixMagicId SuB)
+stgHp		    = StReg (StixMagicId Hp)
+stgHpLim	    = StReg (StixMagicId HpLim)
+stgLivenessReg	    = StReg (StixMagicId LivenessReg)
+stgStdUpdRetVecReg  = StReg (StixMagicId StdUpdRetVecReg)
+stgStkStubReg	    = StReg (StixMagicId StkStubReg)
 
 getUniqLabelNCG :: UniqSM CLabel
-getUniqLabelNCG =
-      getUnique	      `thenUs` \ u ->
-      returnUs (mkAsmTempLabel u)
-
+getUniqLabelNCG
+  = getUnique	      `thenUs` \ u ->
+    returnUs (mkAsmTempLabel u)
 \end{code}

@@ -28,7 +28,7 @@ import Outputable	( ExportFlag(..) )
 import Pretty
 import PprStyle		( PprStyle(..) )
 import SrcLoc		( mkBuiltinSrcLoc, mkUnknownSrcLoc )
-import TyCon		( TyCon, getSynTyConArity )
+import TyCon		( TyCon, synTyConArity )
 import TyVar		( GenTyVar )
 import Unique		( pprUnique, Unique )
 import Util		( panic, panic#, pprPanic )
@@ -129,7 +129,7 @@ getTagFromClassOpName (ClassOpName _ _ _ tag)  = tag
 
 getSynNameArity :: Name -> Maybe Arity
 getSynNameArity (TyConName _ _ arity False{-syn-} _) = Just arity
-getSynNameArity (WiredInTyCon tycon)	             = getSynTyConArity tycon
+getSynNameArity (WiredInTyCon tycon)	             = synTyConArity tycon
 getSynNameArity other_name			     = Nothing
 
 getNameShortName :: Name -> ShortName

@@ -8,7 +8,7 @@ import PreludeStdIO ( Maybe )
 import Unique ( Unique )
 
 import Id      ( Id, GenId, StrictnessMark, mkTupleCon, mkDataCon,
-		 getDataConSig, getInstantiatedDataConSig )
+		 dataConSig, getInstantiatedDataConSig )
 import PprType ( specMaybeTysSuffix )
 import NameTypes ( FullName )
 import TyCon   ( TyCon )
@@ -30,7 +30,7 @@ type Id	   = GenId (GenType (GenTyVar (GenUsage Unique)) Unique)
 
 -- Needed in TyCon
 mkTupleCon :: Int -> Id
-getDataConSig :: Id -> ([TyVar], [(Class, Type)], [Type], TyCon)
+dataConSig :: Id -> ([TyVar], [(Class, Type)], [Type], TyCon)
 specMaybeTysSuffix :: [Maybe Type] -> _PackedString
 instance Eq (GenClass a b)
 

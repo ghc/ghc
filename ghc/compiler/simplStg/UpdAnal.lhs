@@ -1,7 +1,7 @@
 \section{Update Avoidance Analyser}			-*-haskell-literate-*-
 
 (c) Simon Marlow, Andre Santos 1992-1993
-(c) The AQUA Project, Glasgow University, 1995
+(c) The AQUA Project, Glasgow University, 1995-1996
 
 %-----------------------------------------------------------------------------
 \subsection{Module Interface}
@@ -12,18 +12,27 @@
 
 > module UpdAnal ( updateAnalyse ) where
 >
-> import Type		( splitTyArgs, splitSigmaTy, Class, TyVarTemplate,
-> 			  TauType(..)
->			)
-> import Id
-> import IdInfo
-> import Outputable	( isExported )
-> import Pretty
-> import SrcLoc 	( mkUnknownSrcLoc )
+> import Ubiq{-uitous-}
+>
 > import StgSyn
-> import UniqSet
-> import UniqSupply 	( getBuiltinUniques )
-> import Util
+> import Util		( panic )
+>
+> updateAnalyse :: [StgBinding] -> [StgBinding] {- Exported -}
+> updateAnalyse = panic "UpdAnal.updateAnalyse"
+>
+> {- LATER: to end of file:
+> --import Type		( splitTyArgs, splitSigmaTy, Class, TyVarTemplate,
+> --			  TauType(..)
+> --			)
+> --import Id
+> --import IdInfo
+> --import Outputable	( isExported )
+> --import Pretty
+> --import SrcLoc 	( mkUnknownSrcLoc )
+> --import StgSyn
+> --import UniqSet
+> --import UniqSupply 	( getBuiltinUniques )
+> --import Util
 
 %-----------------------------------------------------------------------------
 \subsection{Reverse application}
@@ -503,5 +512,6 @@ suffice for now.
 >		 		addIdUpdateInfo v
 >					(mkUpdateInfo (mkUpdateSpec v c))
 >		| otherwise    = v
+> -}
 
 %-----------------------------------------------------------------------------

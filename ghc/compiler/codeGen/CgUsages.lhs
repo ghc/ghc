@@ -15,15 +15,20 @@ module CgUsages (
 
 	getHpRelOffset,	getSpARelOffset, getSpBRelOffset,
 
-	freeBStkSlot,
-
-	-- and to make the interface self-sufficient...
-	AbstractC, HeapOffset, RegRelative, CgState
+	freeBStkSlot
     ) where
 
-import AbsCSyn
+import Ubiq{-uitous-}
+import CgLoop1	-- here for paranoia-checking
+
+import AbsCSyn		( RegRelative(..), AbstractC, CAddrMode )
 import CgMonad
-import Util
+import HeapOffs		( zeroOff,
+			  VirtualHeapOffset(..),
+			  VirtualSpAOffset(..),
+			  VirtualSpBOffset(..)
+			)
+import Id		( IdEnv(..) )
 \end{code}
 
 %************************************************************************

@@ -15,6 +15,7 @@ module UniqSupply (
 	UniqSM(..),		-- type: unique supply monad
 	initUs, thenUs, returnUs,
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
+	thenMaybeUs, mapAccumLUs,
 
 	mkSplitUniqSupply,
 	splitUniqSupply,
@@ -169,6 +170,24 @@ mapAndUnzip3Us f (x:xs)
   = f x		    	`thenUs` \ (r1,  r2,  r3)  ->
     mapAndUnzip3Us f xs	`thenUs` \ (rs1, rs2, rs3) ->
     returnUs (r1:rs1, r2:rs2, r3:rs3)
+
+thenMaybeUs :: UniqSM (Maybe a) -> (a -> UniqSM (Maybe b)) -> UniqSM (Maybe b)
+thenMaybeUs m k
+  = m	`thenUs` \ result ->
+    case result of
+      Nothing -> returnUs Nothing
+      Just x  -> k x
+
+mapAccumLUs :: (acc -> x -> UniqSM (acc, y))
+	    -> acc
+	    -> [x]
+	    -> UniqSM (acc, [y])
+
+mapAccumLUs f b []     = returnUs (b, [])
+mapAccumLUs f b (x:xs)
+  = f b x   	        	    `thenUs` \ (b__2, x__2) ->
+    mapAccumLUs f b__2 xs   	    `thenUs` \ (b__3, xs__2) ->
+    returnUs (b__3, x__2:xs__2)
 \end{code}
 
 %************************************************************************

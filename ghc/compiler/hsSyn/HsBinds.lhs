@@ -25,10 +25,9 @@ import HsTypes		( PolyType )
 --others:
 import Id		( DictVar(..), Id(..), GenId )
 import Outputable
-import PprType		( pprType )
 import Pretty
 import SrcLoc		( SrcLoc{-instances-} )
-import TyVar		( GenTyVar{-instances-} )
+--import TyVar		( GenTyVar{-instances-} )
 \end{code}
 
 %************************************************************************

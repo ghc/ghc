@@ -1,158 +1,128 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1995
+% (c) The AQUA Project, Glasgow University, 1993-1996
 %
 
 \begin{code}
 #include "HsVersions.h"
-#include "../../includes/platform.h"
-#include "../../includes/GhcConstants.h"
 
-module AsmCodeGen (
-	writeRealAsm,
-	dumpRealAsm,
+module AsmCodeGen ( writeRealAsm, dumpRealAsm ) where
 
-	-- And, I guess we need these...
-	AbstractC, GlobalSwitch, SwitchResult,
-	UniqSupply, UniqSM(..)
-    ) where
+import Ubiq{-uitous-}
 
-import AbsCSyn	    ( AbstractC )
-import AbsCStixGen  ( genCodeAbstractC )
-import PrelInfo	    ( PrimRep, PrimOp(..)
-		      IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-		    )
-import CmdLineOpts  ( GlobalSwitch(..), stringSwitchSet, switchIsOn, SwitchResult(..) )
-import MachDesc
-import Maybes	    ( Maybe(..) )
-import Outputable
-#if alpha_TARGET_ARCH
-import AlphaDesc    ( mkAlpha )
-#endif
-#if i386_TARGET_ARCH
-import I386Desc	    ( mkI386 )
-#endif
-#if sparc_TARGET_ARCH
-import SparcDesc    ( mkSparc )
-#endif
-import Stix
-import UniqSupply
-import Unpretty
-import Util
+import MachMisc
+import MachRegs
+import MachCode
+import PprMach
+
+import AbsCStixGen	( genCodeAbstractC )
+import AbsCSyn		( AbstractC, MagicId )
+import AsmRegAlloc	( runRegAllocate )
+import OrdList		( OrdList )
+import PrimOp		( commutableOp, PrimOp(..) )
+import PrimRep		( PrimRep{-instance Eq-} )
+import RegAllocInfo	( mkMRegsState, MRegsState )
+import Stix		( StixTree(..), StixReg(..), CodeSegment )
+import UniqSupply	( returnUs, thenUs, mapUs, UniqSM(..) )
+import Unpretty		( uppAppendFile, uppShow, uppAboves, Unpretty(..) )
 \end{code}
 
-This is a generic assembly language generator for the Glasgow Haskell
-Compiler.  It has been a long time in germinating, basically due to
-time constraints and the large spectrum of design possibilities.
-Presently it generates code for:
-\begin{itemize}
-\item Sparc
-\end{itemize}
-In the pipeline (sic) are plans and/or code for 680x0, 386/486.
+The 96/03 native-code generator has machine-independent and
+machine-dependent modules (those \tr{#include}'ing \tr{NCG.h}).
 
-The code generator presumes the presence of a working C port.  This is
-because any code that cannot be compiled (e.g. @casm@s) is re-directed
-via this route. It also help incremental development.  Because this
-code generator is specially written for the Abstract C produced by the
-Glasgow Haskell Compiler, several optimisation opportunities are open
-to us that are not open to @gcc@.  In particular, we know that the A
-and B stacks and the Heap are all mutually exclusive wrt. aliasing,
-and that expressions have no side effects (all state transformations
-are top level objects).
+This module (@AsmCodeGen@) is the top-level machine-independent
+module.  It uses @AbsCStixGen.genCodeAbstractC@ to produce @StixTree@s
+(defined in module @Stix@), using support code from @StixInfo@ (info
+tables), @StixPrim@ (primitive operations), @StixMacro@ (Abstract C
+macros), and @StixInteger@ (GMP arbitrary-precision operations).
 
-There are two main components to the code generator.
-\begin{itemize}
-\item Abstract C is considered in statements,
-	with a Twig-like system handling each statement in turn.
-\item A scheduler turns the tree of assembly language orderings
-      into a sequence suitable for input to an assembler.
-\end{itemize}
-The @codeGenerate@ function returns the final assembly language output
-(as a String).	We can return a string, because there is only one way
-of printing the output suitable for assembler consumption. It also
-allows limited abstraction of different machines from the Main module.
+Before entering machine-dependent land, we do some machine-independent
+@genericOpt@imisations (defined below) on the @StixTree@s.
 
-The first part is the actual assembly language generation.  First we
-split up the Abstract C into individual functions, then consider
-chunks in isolation, giving back an @OrdList@ of assembly language
-instructions.  The generic algorithm is heavily inspired by Twig
-(ref), but also draws concepts from (ref).  The basic idea is to
-(dynamically) walk the Abstract C syntax tree, annotating it with
-possible code matches.	For example, on the Sparc, a possible match
-(with its translation) could be
-@
-   :=
-   / \
-  i   r2	=> ST r2,[r1]
-  |
-  r1
-@
-where @r1,r2@ are registers, and @i@ is an indirection.	 The Twig
-bit twiddling algorithm for tree matching has been abandoned. It is
-replaced with a more direct scheme.  This is because, after careful
-consideration it is felt that the overhead of handling many bit
-patterns would be heavier that simply looking at the syntax of the
-tree at the node being considered, and dynamically choosing and
-pruning rules.
+We convert to the machine-specific @Instr@ datatype with
+@stmt2Instrs@, assuming an ``infinite'' supply of registers.  We then
+use a machine-independent register allocator (@runRegAllocate@) to
+rejoin reality.  Obviously, @runRegAllocate@ has machine-specific
+helper functions (see about @RegAllocInfo@ below).
 
-The ultimate result of the first part is a Set of ordering lists of
-ordering lists of assembly language instructions (yes, really!), where
-each element in the set is basic chunk.	 Now several (generic)
-simplifications and transformations can be performed.  This includes
-ones that turn the the ordering of orderings into just a single
-ordering list. (The equivalent of applying @concat@ to a list of
-lists.) A lot of the re-ordering and optimisation is actually done
-(generically) here!  The final part, the scheduler, can now be used on
-this structure.	 The code sequence is optimised (obviously) to avoid
-stalling the pipeline.	This part {\em has} to be heavily machine
-dependent.
+The machine-dependent bits break down as follows:
+\begin{description}
+\item[@MachRegs@:]  Everything about the target platform's machine
+    registers (and immediate operands, and addresses, which tend to
+    intermingle/interact with registers).
 
-[The above seems to describe mostly dreamware.  -- JSM]
+\item[@MachMisc@:]  Includes the @Instr@ datatype (possibly should
+    have a module of its own), plus a miscellany of other things
+    (e.g., @targetDoubleSize@, @smStablePtrTable@, ...)
 
-The flag that needs to be added is -fasm-<platform> where platform is one of
-the choices below.
+\item[@MachCode@:]  @stmt2Instrs@ is where @Stix@ stuff turns into
+    machine instructions.
+
+\item[@PprMach@:] @pprInstr@ turns an @Instr@ into text (well, really
+    an @Unpretty@).
+
+\item[@RegAllocInfo@:] In the register allocator, we manipulate
+    @MRegsState@s, which are @BitSet@s, one bit per machine register.
+    When we want to say something about a specific machine register
+    (e.g., ``it gets clobbered by this instruction''), we set/unset
+    its bit.  Obviously, we do this @BitSet@ thing for efficiency
+    reasons.
+
+    The @RegAllocInfo@ module collects together the machine-specific
+    info needed to do register allocation.
+\end{description}
+
+So, here we go:
+\begin{code}
+writeRealAsm :: _FILE -> AbstractC -> UniqSupply -> IO ()
+
+writeRealAsm file absC us
+  = uppAppendFile file 80 (runNCG absC us)
+
+dumpRealAsm :: AbstractC -> UniqSupply -> String
+
+dumpRealAsm absC us = uppShow 80 (runNCG absC us)
+
+runNCG absC
+  = genCodeAbstractC absC	`thenUs` \ treelists ->
+    let
+	stix = map (map genericOpt) treelists
+    in
+    codeGen stix
+\end{code}
+
+@codeGen@ is the top-level code-generation function:
+\begin{code}
+codeGen :: [[StixTree]] -> UniqSM Unpretty
+
+codeGen trees
+  = mapUs genMachCode trees	`thenUs` \ dynamic_codes ->
+    let
+	static_instrs = scheduleMachCode dynamic_codes
+    in
+    returnUs (uppAboves (map pprInstr static_instrs))
+\end{code}
+
+Top level code generator for a chunk of stix code:
+\begin{code}
+genMachCode :: [StixTree] -> UniqSM InstrList
+
+genMachCode stmts
+  = mapUs stmt2Instrs stmts    	    	`thenUs` \ blocks ->
+    returnUs (foldr (.) id blocks asmVoid)
+\end{code}
+
+The next bit does the code scheduling.  The scheduler must also deal
+with register allocation of temporaries.  Much parallelism can be
+exposed via the OrdList, but more might occur, so further analysis
+might be needed.
 
 \begin{code}
-writeRealAsm :: (GlobalSwitch -> SwitchResult) -> _FILE -> AbstractC -> UniqSupply -> PrimIO ()
+scheduleMachCode :: [InstrList] -> [Instr]
 
-writeRealAsm flags file absC uniq_supply
-  = uppAppendFile file 80 (runNCG (code flags absC) uniq_supply)
-
-dumpRealAsm :: (GlobalSwitch -> SwitchResult) -> AbstractC -> UniqSupply -> String
-
-dumpRealAsm flags absC uniq_supply = uppShow 80 (runNCG (code flags absC) uniq_supply)
-
-runNCG m uniq_supply = m uniq_supply
-
-code flags absC =
-    genCodeAbstractC target absC		    `thenUs` \ treelists ->
-    let
-	stix = map (map (genericOpt target)) treelists
-    in
-    codeGen {-target-} sty stix
+scheduleMachCode
+  = concat . map (runRegAllocate freeRegsState reservedRegs)
   where
-    sty = PprForAsm (switchIsOn flags) (underscore {-target-}) (fmtAsmLbl {-target-})
-
-    (target, codeGen, underscore, fmtAsmLbl)
-      = case stringSwitchSet flags AsmTarget of
-#if ! OMIT_NATIVE_CODEGEN
-# if alpha_TARGET_ARCH
-    	Just _ {-???"alpha-dec-osf1"-} -> mkAlpha flags
-# endif
-# if i386_TARGET_ARCH
-    	Just _ {-???"i386_unknown_linuxaout"-} -> mkI386 True flags
-# endif
-# if sparc_sun_sunos4_TARGET
-    	Just _ {-???"sparc-sun-sunos4"-} -> mkSparc True flags
-# endif
-# if sparc_sun_solaris2_TARGET
-    	Just _ {-???"sparc-sun-solaris2"-} -> mkSparc False flags
-# endif
-#endif
-	_ -> error
-	     ("ERROR:Trying to generate assembly language for an unsupported architecture\n"++
-	      "(or one for which this build is not configured).")
-
+    freeRegsState = mkMRegsState (extractMappedRegNos freeRegs)
 \end{code}
 
 %************************************************************************
@@ -161,128 +131,108 @@ code flags absC =
 %*									*
 %************************************************************************
 
-This is called between translating Abstract C to its Tree
-and actually using the Native Code Generator to generate
-the annotations.  It's a chance to do some strength reductions.
+This is called between translating Abstract C to its Tree and actually
+using the Native Code Generator to generate the annotations.  It's a
+chance to do some strength reductions.
 
 ** Remember these all have to be machine independent ***
 
-Note that constant-folding should have already happened, but we might have
-introduced some new opportunities for constant-folding wrt address manipulations.
+Note that constant-folding should have already happened, but we might
+have introduced some new opportunities for constant-folding wrt
+address manipulations.
 
 \begin{code}
-
-genericOpt
-    :: Target
-    -> StixTree
-    -> StixTree
-
+genericOpt :: StixTree -> StixTree
 \end{code}
 
 For most nodes, just optimize the children.
 
 \begin{code}
--- hacking with Uncle Will:
-#define target_STRICT target@(Target _ _ _ _ _ _ _ _)
+genericOpt (StInd pk addr) = StInd pk (genericOpt addr)
 
-genericOpt target_STRICT (StInd pk addr) =
-    StInd pk (genericOpt target addr)
+genericOpt (StAssign pk dst src)
+  = StAssign pk (genericOpt dst) (genericOpt src)
 
-genericOpt target (StAssign pk dst src) =
-    StAssign pk (genericOpt target dst) (genericOpt target src)
+genericOpt (StJump addr) = StJump (genericOpt addr)
 
-genericOpt target (StJump addr) =
-    StJump (genericOpt target addr)
+genericOpt (StCondJump addr test)
+  = StCondJump addr (genericOpt test)
 
-genericOpt target (StCondJump addr test) =
-    StCondJump addr (genericOpt target test)
-
-genericOpt target (StCall fn pk args) =
-    StCall fn pk (map (genericOpt target) args)
-
+genericOpt (StCall fn pk args)
+  = StCall fn pk (map genericOpt args)
 \end{code}
 
-Fold indices together when the types match.
-
+Fold indices together when the types match:
 \begin{code}
+genericOpt (StIndex pk (StIndex pk' base off) off')
+  | pk == pk'
+  = StIndex pk (genericOpt base)
+    	       (genericOpt (StPrim IntAddOp [off, off']))
 
-genericOpt target (StIndex pk (StIndex pk' base off) off')
-  | pk == pk' =
-    StIndex pk (genericOpt target base)
-    	       (genericOpt target (StPrim IntAddOp [off, off']))
-
-genericOpt target (StIndex pk base off) =
-    StIndex pk (genericOpt target base)
-    	       (genericOpt target off)
-
+genericOpt (StIndex pk base off)
+  = StIndex pk (genericOpt base) (genericOpt off)
 \end{code}
 
-For primOps, we first optimize the children, and then we try our hand
+For PrimOps, we first optimize the children, and then we try our hand
 at some constant-folding.
 
 \begin{code}
-
-genericOpt target (StPrim op args) =
-    primOpt op (map (genericOpt target) args)
-
+genericOpt (StPrim op args) = primOpt op (map genericOpt args)
 \end{code}
 
-Replace register leaves with appropriate StixTrees for the given target.
-(Oh, so this is why we've been hauling the target around!)
+Replace register leaves with appropriate StixTrees for the given
+target.
 
 \begin{code}
+genericOpt leaf@(StReg (StixMagicId id))
+  = case (stgReg id) of
+    	Always tree -> genericOpt tree
+    	Save _      -> leaf
 
-genericOpt target leaf@(StReg (StixMagicId id)) =
-    case stgReg target id of
-    	Always tree -> genericOpt target tree
-    	Save _     -> leaf
-
-genericOpt target other = other
-
+genericOpt other = other
 \end{code}
 
-Now, try to constant-fold the primOps.  The arguments have
-already been optimized and folded.
+Now, try to constant-fold the PrimOps.  The arguments have already
+been optimized and folded.
 
 \begin{code}
-
 primOpt
     :: PrimOp	    	-- The operation from an StPrim
     -> [StixTree]   	-- The optimized arguments
     -> StixTree
 
-primOpt op arg@[StInt x] =
-    case op of
+primOpt op arg@[StInt x]
+  = case op of
     	IntNegOp -> StInt (-x)
     	IntAbsOp -> StInt (abs x)
     	_ -> StPrim op arg
 
-primOpt op args@[StInt x, StInt y] =
-    case op of
-    	CharGtOp -> StInt (if x > y then 1 else 0)
+primOpt op args@[StInt x, StInt y]
+  = case op of
+    	CharGtOp -> StInt (if x > y  then 1 else 0)
     	CharGeOp -> StInt (if x >= y then 1 else 0)
     	CharEqOp -> StInt (if x == y then 1 else 0)
     	CharNeOp -> StInt (if x /= y then 1 else 0)
-    	CharLtOp -> StInt (if x < y then 1 else 0)
+    	CharLtOp -> StInt (if x < y  then 1 else 0)
     	CharLeOp -> StInt (if x <= y then 1 else 0)
     	IntAddOp -> StInt (x + y)
     	IntSubOp -> StInt (x - y)
     	IntMulOp -> StInt (x * y)
     	IntQuotOp -> StInt (x `quot` y)
     	IntRemOp -> StInt (x `rem` y)
-    	IntGtOp -> StInt (if x > y then 1 else 0)
+    	IntGtOp -> StInt (if x > y  then 1 else 0)
     	IntGeOp -> StInt (if x >= y then 1 else 0)
     	IntEqOp -> StInt (if x == y then 1 else 0)
     	IntNeOp -> StInt (if x /= y then 1 else 0)
-    	IntLtOp -> StInt (if x < y then 1 else 0)
+    	IntLtOp -> StInt (if x < y  then 1 else 0)
     	IntLeOp -> StInt (if x <= y then 1 else 0)
     	_ -> StPrim op args
-
 \end{code}
 
 When possible, shift the constants to the right-hand side, so that we
 can match for strength reductions.  Note that the code generator will
-also assume that constants have been shifted to the right when possible.
+also assume that constants have been shifted to the right when
+possible.
 
 \begin{code}
 primOpt op [x@(StInt _), y] | commutableOp op = primOpt op [y, x]
@@ -291,40 +241,40 @@ primOpt op [x@(StInt _), y] | commutableOp op = primOpt op [y, x]
 We can often do something with constants of 0 and 1 ...
 
 \begin{code}
-primOpt op args@[x, y@(StInt 0)] =
-    case op of
+primOpt op args@[x, y@(StInt 0)]
+  = case op of
     	IntAddOp -> x
     	IntSubOp -> x
     	IntMulOp -> y
-    	AndOp  -> y
-    	OrOp   -> x
-    	SllOp  -> x
-    	SraOp  -> x
-    	SrlOp  -> x
-    	ISllOp -> x
-    	ISraOp -> x
-    	ISrlOp -> x
-    	_ -> StPrim op args
+    	AndOp  	 -> y
+    	OrOp   	 -> x
+    	SllOp  	 -> x
+    	SraOp  	 -> x
+    	SrlOp  	 -> x
+    	ISllOp 	 -> x
+    	ISraOp 	 -> x
+    	ISrlOp 	 -> x
+    	_	 -> StPrim op args
 
-primOpt op args@[x, y@(StInt 1)] =
-    case op of
-    	IntMulOp -> x
+primOpt op args@[x, y@(StInt 1)]
+  = case op of
+    	IntMulOp  -> x
     	IntQuotOp -> x
-    	IntRemOp -> StInt 0
-    	_ -> StPrim op args
+    	IntRemOp  -> StInt 0
+    	_	  -> StPrim op args
 \end{code}
 
 Now look for multiplication/division by powers of 2 (integers).
 
 \begin{code}
-primOpt op args@[x, y@(StInt n)] =
-    case op of
-    	IntMulOp -> case exact_log2 n of
+primOpt op args@[x, y@(StInt n)]
+  = case op of
+    	IntMulOp -> case exactLog2 n of
 	    Nothing -> StPrim op args
-    	    Just p -> StPrim SllOp [x, StInt p]
-    	IntQuotOp -> case exact_log2 n of
+    	    Just p  -> StPrim SllOp [x, StInt p]
+    	IntQuotOp -> case exactLog2 n of
 	    Nothing -> StPrim op args
-    	    Just p -> StPrim SraOp [x, StInt p]
+    	    Just p  -> StPrim SraOp [x, StInt p]
     	_ -> StPrim op args
 \end{code}
 
@@ -332,53 +282,4 @@ Anything else is just too hard.
 
 \begin{code}
 primOpt op args = StPrim op args
-\end{code}
-
-The commutable ops are those for which we will try to move constants
-to the right hand side for strength reduction.
-
-\begin{code}
-commutableOp :: PrimOp -> Bool
-
-commutableOp CharEqOp = True
-commutableOp CharNeOp = True
-commutableOp IntAddOp = True
-commutableOp IntMulOp = True
-commutableOp AndOp = True
-commutableOp OrOp = True
-commutableOp IntEqOp = True
-commutableOp IntNeOp = True
-commutableOp IntegerAddOp = True
-commutableOp IntegerMulOp = True
-commutableOp FloatAddOp = True
-commutableOp FloatMulOp = True
-commutableOp FloatEqOp = True
-commutableOp FloatNeOp = True
-commutableOp DoubleAddOp = True
-commutableOp DoubleMulOp = True
-commutableOp DoubleEqOp = True
-commutableOp DoubleNeOp = True
-commutableOp _ = False
-\end{code}
-
-This algorithm for determining the $\log_2$ of exact powers of 2 comes
-from gcc.  It requires bit manipulation primitives, so we have a ghc
-version and an hbc version.  Other Haskell compilers are on their own.
-
-\begin{code}
-w2i x = word2Int# x
-i2w x = int2Word# x
-i2w_s x = (x::Int#)
-
-exact_log2 :: Integer -> Maybe Integer
-exact_log2 x
-    | x <= 0 || x >= 2147483648 = Nothing
-    | otherwise = case fromInteger x of
-	I# x# -> if (w2i ((i2w x#) `and#` (i2w (0# -# x#))) /=# x#) then Nothing
-    	         else Just (toInteger (I# (pow2 x#)))
-
-    	    where pow2 x# | x# ==# 1# = 0#
-    	    	    	  | otherwise = 1# +# pow2 (w2i (i2w x# `shiftr` i2w_s 1#))
-
-		  shiftr x y = shiftRA# x y
 \end{code}

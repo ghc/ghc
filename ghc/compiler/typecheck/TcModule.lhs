@@ -61,7 +61,8 @@ tycon_specs = emptyFM
 \begin{code}
 tcModule :: GlobalNameMappers		-- final renamer info for derivings
 	 -> RenamedHsModule		-- input
-	 -> TcM s ((TypecheckedHsBinds,	-- binds from class decls; does NOT
+	 -> TcM s ((TypecheckedHsBinds,	-- record selector binds
+		    TypecheckedHsBinds,	-- binds from class decls; does NOT
 					-- include default-methods bindings
 		    TypecheckedHsBinds,	-- binds from instance decls; INCLUDES
 					-- class default-methods binds
@@ -94,17 +95,17 @@ tcModule renamer_name_funs
 	-- pragmas, which is done lazily [ie failure just drops the pragma
 	-- without having any global-failure effect].
 
-    fixTc (\ ~(_, _, _, _, _, sig_ids) ->
+    fixTc (\ ~(_, _, _, _, _, _, sig_ids) ->
 	tcExtendGlobalValEnv sig_ids (
 
 	-- The knot for instance information.  This isn't used at all
 	-- till we type-check value declarations
-	fixTc ( \ ~(rec_inst_mapper, _, _, _, _) ->
+	fixTc ( \ ~(rec_inst_mapper, _, _, _, _, _) ->
 
 	     -- Type-check the type and class decls
 	    trace "tcTyAndClassDecls:"	$
 	    tcTyAndClassDecls1 rec_inst_mapper ty_decls_bag cls_decls_bag
-					`thenTc` \ env ->
+					`thenTc` \ (env, record_binds) ->
 
 		-- Typecheck the instance decls, includes deriving
 	    tcSetEnv env (
@@ -115,9 +116,9 @@ tcModule renamer_name_funs
 
 	    buildInstanceEnvs inst_info	`thenTc` \ inst_mapper ->
 
-	    returnTc (inst_mapper, env, inst_info, deriv_binds, ddump_deriv)
+	    returnTc (inst_mapper, env, record_binds, inst_info, deriv_binds, ddump_deriv)
 
-	) `thenTc` \ (_, env, inst_info, deriv_binds, ddump_deriv) ->
+	) `thenTc` \ (_, env, record_binds, inst_info, deriv_binds, ddump_deriv) ->
 	tcSetEnv env (
 
 	    -- Default declarations
@@ -132,9 +133,9 @@ tcModule renamer_name_funs
 	    --   we silently discard the pragma
 	tcInterfaceSigs sigs		`thenTc` \ sig_ids ->
 
-	returnTc (env, inst_info, deriv_binds, ddump_deriv, defaulting_tys, sig_ids)
+	returnTc (env, inst_info, record_binds, deriv_binds, ddump_deriv, defaulting_tys, sig_ids)
 
-    )))) `thenTc` \ (env, inst_info, deriv_binds, ddump_deriv, defaulting_tys, _) ->
+    )))) `thenTc` \ (env, inst_info, record_binds, deriv_binds, ddump_deriv, defaulting_tys, _) ->
 
     tcSetEnv env (				-- to the end...
     tcSetDefaultTys defaulting_tys (		-- ditto
@@ -181,6 +182,7 @@ tcModule renamer_name_funs
 	-- simplification step may have instantiated some
 	-- ambiguous types.  So, sadly, we need to back-substitute
 	-- over the whole bunch of bindings.
+    zonkBinds record_binds	 	`thenNF_Tc` \ record_binds' ->
     zonkBinds val_binds		 	`thenNF_Tc` \ val_binds' ->
     zonkBinds inst_binds	 	`thenNF_Tc` \ inst_binds' ->
     zonkBinds cls_binds	 		`thenNF_Tc` \ cls_binds' ->
@@ -189,7 +191,7 @@ tcModule renamer_name_funs
 
 	-- FINISHED AT LAST
     returnTc (
-	(cls_binds', inst_binds', val_binds', const_insts'),
+	(record_binds', cls_binds', inst_binds', val_binds', const_insts'),
 
 	     -- the next collection is just for mkInterface
 	(fixities, exported_ids', tycons, classes, inst_info),

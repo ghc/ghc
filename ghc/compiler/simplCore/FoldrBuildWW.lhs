@@ -8,38 +8,43 @@
 
 module FoldrBuildWW ( mkFoldrBuildWW ) where
 
-IMPORT_Trace
-import Outputable
-import Pretty
-import Type		( cloneTyVarFromTemplate, mkTyVarTy,
-			  splitTypeWithDictsAsArgs, eqTyCon,  mkForallTy )
-import TysPrim		( alphaTy )
-import TyVar		( alphaTyVar )
+import Ubiq{-uitous-}
 
-import Type		( Type(..) ) -- **** CAN SEE THE CONSTRUCTORS ****
-import UniqSupply	( runBuiltinUs )
-import WwLib            -- share the same monad (is this eticit ?)
-import PrelInfo		( listTyCon, mkListTy, nilDataCon, consDataCon,
-			  foldrId, buildId
-			)
-import Id               ( getIdFBTypeInfo, mkWorkerId, getIdInfo,
-			  replaceIdInfo, mkSysLocal, idType
-			)
-import IdInfo
-import Maybes
-import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
-import Util
+import CoreSyn		( CoreBinding(..) )
+import Util		( panic{-ToDo:rm?-} )
+
+--import Type		( cloneTyVarFromTemplate, mkTyVarTy,
+--			  splitTypeWithDictsAsArgs, eqTyCon,  mkForallTy )
+--import TysPrim		( alphaTy )
+--import TyVar		( alphaTyVar )
+--
+--import Type		( Type(..) ) -- **** CAN SEE THE CONSTRUCTORS ****
+--import UniqSupply	( runBuiltinUs )
+--import WwLib            -- share the same monad (is this eticit ?)
+--import PrelInfo		( listTyCon, mkListTy, nilDataCon, consDataCon,
+--			  foldrId, buildId
+--			)
+--import Id               ( getIdFBTypeInfo, mkWorkerId, getIdInfo,
+--			  replaceIdInfo, mkSysLocal, idType
+--			)
+--import IdInfo
+--import Maybes
+--import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
+--import Util
 \end{code}
 
 \begin{code}
 mkFoldrBuildWW
-	:: (GlobalSwitch -> Bool)
-	-> UniqSupply
+	:: UniqSupply
 	-> [CoreBinding]
 	-> [CoreBinding]
-mkFoldrBuildWW switch us top_binds =
+
+mkFoldrBuildWW = panic "mkFoldrBuildWW (ToDo)"
+
+{- LATER:
+mkFoldrBuildWW us top_binds =
    (mapWw wwBind top_binds `thenWw` \ top_binds2 ->
-   returnWw (concat top_binds2)) us switch
+   returnWw (concat top_binds2)) us
 \end{code}
 
 \begin{code}
@@ -176,5 +181,5 @@ try_split_bind id expr =
 	else
 	returnWw  [(worker_id,worker_rhs),(wrapper_id,wrapper_rhs)]
     _ -> returnWw [(id,expr')]
+-}
 \end{code}
-

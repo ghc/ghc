@@ -26,6 +26,9 @@ module TcMonad(
 
 	rn4MtoTcM,
 
+	TcError(..), TcWarning(..), Message(..),
+	mkTcErr, arityErr,
+
 	-- For closure
 	MutableVar(..), _MutableArray
   ) where
@@ -36,8 +39,6 @@ import TcMLoop		( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an in
 import Type		( Type(..), GenType )
 import TyVar		( TyVar(..), GenTyVar )
 import Usage		( Usage(..), GenUsage )
-import ErrUtils		( Error(..), Message(..), ErrCtxt(..),
-			  TcWarning(..), TcError(..), mkTcErr )
 
 import SST
 import RnMonad4
@@ -46,9 +47,8 @@ import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
 import FiniteMap	( FiniteMap, emptyFM )
-import Pretty		( Pretty(..), PrettyRep )
-import PprStyle		( PprStyle )
 import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
+import ErrUtils		( Error(..) )
 import Maybes		( MaybeErr(..) )
 import Name		( Name )
 import ProtoName	( ProtoName )
@@ -57,6 +57,8 @@ import UniqFM		( UniqFM, emptyUFM )
 import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply )
 import Unique		( Unique )
 import Util
+import Pretty
+import PprStyle		( PprStyle(..) )
 
 infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenNF_Tc_` 
 \end{code}
@@ -226,8 +228,8 @@ Error handling
 \begin{code}
 failTc :: Message -> TcM s a
 failTc err_msg down env
-  = readMutVarSST errs_var				`thenSST` \ (warns,errs) ->
-    foldr thenNF_Tc_ (returnNF_Tc []) ctxt down env	`thenSST` \ ctxt_msgs ->
+  = readMutVarSST errs_var	`thenSST` \ (warns,errs) ->
+    listNF_Tc ctxt down env	`thenSST` \ ctxt_msgs ->
     let
 	err = mkTcErr loc ctxt_msgs err_msg
     in
@@ -442,3 +444,37 @@ rn4MtoTcM name_funs rn_action down env
   where
     u_var = getUniqSupplyVar down
 \end{code}
+
+
+TypeChecking Errors
+~~~~~~~~~~~~~~~~~~~
+
+\begin{code}
+type Message   = PprStyle -> Pretty
+type TcError   = Message
+type TcWarning = Message
+
+
+mkTcErr :: SrcLoc 		-- Where
+	-> [Message] 		-- Context
+	-> Message 		-- What went wrong
+	-> TcError		-- The complete error report
+
+mkTcErr locn ctxt msg sty
+  = ppHang (ppBesides [ppr PprForUser locn, ppStr ": ", msg sty])
+    	 4 (ppAboves [msg sty | msg <- ctxt])
+
+
+arityErr kind name n m sty
+  = ppBesides [ ppStr "`", ppr sty name, ppStr "' should have ",
+		n_arguments, ppStr ", but has been given ", ppInt m, ppChar '.']
+    where
+	errmsg = kind ++ " has too " ++ quantity ++ " arguments"
+	quantity | m < n     = "few"
+		 | otherwise = "many"
+	n_arguments | n == 0 = ppStr "no arguments"
+		    | n == 1 = ppStr "1 argument"
+		    | True   = ppCat [ppInt n, ppStr "arguments"]
+\end{code}
+
+
