@@ -118,6 +118,9 @@ and its representation as distinct right through the compiler.  That's
 what you get if you use recursive newtypes.  (They are rare, so who
 cares if they are a tiny bit less efficient.)
 
+So: non-recursive newtypes are represented using a SourceTy (see below)
+    recursive newtypes are represented using a TyConApp
+
 The TyCon still says "I'm a newtype", but we do not represent the
 newtype application as a SourceType; instead as a TyConApp.
 
