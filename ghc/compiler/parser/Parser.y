@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.4 1999/06/02 16:05:56 simonmar Exp $
+$Id: Parser.y,v 1.5 1999/06/03 14:44:23 simonmar Exp $
 
 Haskell grammar.
 
@@ -633,7 +633,7 @@ exp10 :: { RdrNameHsExpr }
 
         | '_scc_' STRING exp    		{ if opt_SccProfilingOn
 							then HsSCC $2 $3
-							else $3 }
+							else HsPar $3 }
 
 	| fexp					{ $1 }
 
