@@ -19,16 +19,24 @@ module Foreign.C.Types
 	  CChar(..),  CSChar(..),  CUChar(..)
 	, CShort(..), CUShort(..), CInt(..),   CUInt(..)
 	, CLong(..),  CULong(..)
+	, CPtrdiff(..), CSize(..), CWchar(..), CSigAtomic(..)
 #ifndef __HUGS__
         , CLLong(..), CULLong(..)
 #endif
+	  -- Numeric types, instances of: Eq, Ord, Num, Read, Show, Enum,
+	  -- Typeable, Storable
+	, CClock(..),   CTime(..)
 
 	  -- Floating types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac,
 	  -- RealFloat 
 	, CFloat(..),  CDouble(..), CLDouble(..)
+
+          -- Instances of: Eq and Storable
+	, CFile,        CFpos,     CJmpBuf
 	) where
 
+import Foreign.C.TypesISO
 import Data.Bits	( Bits(..) )
 import Data.Int		( Int8,  Int16,  Int32,  Int64  )
 import Data.Word	( Word8, Word16, Word32, Word64 )
