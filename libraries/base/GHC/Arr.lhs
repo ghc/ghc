@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Arr.lhs,v 1.2 2001/12/21 15:07:22 simonmar Exp $
+% $Id: Arr.lhs,v 1.3 2002/04/01 09:19:18 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -278,7 +278,9 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
 type IPr = (Int, Int)
 
 data Ix i => Array     i e = Array   !i !i (Array# e)
-data Ix i => STArray s i e = STArray !i !i (MutableArray# s e)
+data         STArray s i e = STArray !i !i (MutableArray# s e)
+	-- No Ix context for STArray.  They are stupid,
+	-- and force an Ix context on the equality instance.
 
 -- Just pointer equality on mutable arrays:
 instance Eq (STArray s i e) where
