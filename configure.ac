@@ -13,8 +13,10 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
+AC_INIT([fptools build system], [1.0], [cvs-fptools@haskell.org], [fptools])
+
 # First off, a distrib sanity check..
-AC_INIT(mk/config.mk.in)
+AC_CONFIG_SRCDIR([mk/config.mk.in])
 
 dnl * We require autoconf version 2.52
 dnl We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
@@ -45,7 +47,7 @@ dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
 
 dnl Guess host/target/build platform(s) if necessary.
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 
 # "$host" defaults to "$target"
 if test "x$host" = xNONE ; then
@@ -995,9 +997,6 @@ AC_STRUCT_TIMEZONE
 dnl ** do we have altzone?
 FP_DECL_ALTZONE
 
-dnl ** does struct stat contain st_blksize?
-AC_STRUCT_ST_BLKSIZE
-
 dnl ** do we have long longs?
 AC_CHECK_TYPES([long long])
 
@@ -1380,7 +1379,7 @@ dnl ** can we get alloca?
 AC_FUNC_ALLOCA
 
 dnl ** Working vfork?
-AC_FUNC_VFORK
+AC_FUNC_FORK
 
 dnl ** determine whether or not const works
 AC_C_CONST
@@ -1410,4 +1409,6 @@ FPTOOLS_LD_X
 
 FP_EMPTY_STRUCTS
 
-AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
+AC_CONFIG_FILES([mk/config.mk])
+AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
+AC_OUTPUT

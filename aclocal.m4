@@ -655,7 +655,7 @@ dnl
 AC_DEFUN(FPTOOLS_GHC_VERSION,
 [FPTOOLS_NOCACHE_CHECK([version of ghc], [fptools_version_of_ghc],
 ["${WithGhc-ghc}" --version > conftestghc 2>&1
-  cat conftestghc >&AC_FD_CC
+  cat conftestghc >&AS_MESSAGE_LOG_FD
 #Useless Use Of cat award...
   fptools_version_of_ghc=`cat conftestghc | sed -n -e 's/, patchlevel *\([[0-9]]\)/.\1/;s/.* version \([[0-9]][[0-9.]]*\).*/\1/p'`
   rm -fr conftest*
@@ -1098,7 +1098,7 @@ AC_DEFUN([FP_CHECK_GL_HELPER],
 # -----------
 AC_DEFUN([FP_CHECK_GL],
 [AC_REQUIRE([FP_PATH_X])
-AC_REQUIRE([AC_CANONICAL_SYSTEM])
+AC_REQUIRE([AC_CANONICAL_TARGET])
 
 AC_ARG_ENABLE([hopengl],
   [AC_HELP_STRING([--enable-hopengl],
