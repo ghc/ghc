@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include "ffi002_stub.h"
 
-// XXX shouldn't be required
-#include "Rts.h"
-
 #include "RtsAPI.h"
 
 extern void __stginit_Foo ( void );
