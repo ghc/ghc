@@ -30,7 +30,6 @@ import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
 import RnHiFiles	( readIface, removeContext, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs,
 			)
-import MkIface		( pprUsage )
 import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
 			  plusAvailEnv, groupAvails, warnUnusedImports, 

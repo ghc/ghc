@@ -62,24 +62,25 @@ core2core :: DynFlags		-- includes spec of what core-to-core passes to do
 	  -> PersistentCompilerState
 	  -> HomeSymbolTable
 	  -> IsExported
-	  -> [CoreBind]		-- Binds in
-	  -> [IdCoreRule]	-- Rules defined in this module
-	  -> IO ([CoreBind], [IdCoreRule])  -- binds, local orphan rules out
+	  -> ModDetails
+	  -> IO ModDetails
 
-core2core dflags pcs hst is_exported binds rules
+core2core dflags pcs hst is_exported 
+	  mod_details@(ModDetails { md_binds = binds_in, md_rules = rules_in })
   = do
         let core_todos    = dopt_CoreToDo dflags
 	let pkg_rule_base = pcs_rules pcs		-- Rule-base accumulated from imported packages
+	
 
 	us <-  mkSplitUniqSupply 's'
 	let (cp_us, ru_us) = splitUniqSupply us
 
 		-- COMPUTE THE RULE BASE TO USE
 	(rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
-		<- prepareRules dflags pkg_rule_base hst ru_us binds rules
+		<- prepareRules dflags pkg_rule_base hst ru_us binds_in rules_in
 
 		-- PREPARE THE BINDINGS
-	let binds1 = updateBinders local_rule_ids rule_rhs_fvs is_exported binds
+	let binds1 = updateBinders local_rule_ids rule_rhs_fvs is_exported binds_in
 
 		-- DO THE BUSINESS
 	(stats, processed_binds)
@@ -92,7 +93,7 @@ core2core dflags pcs hst is_exported binds rules
 	-- Return results
         -- We only return local orphan rules, i.e., local rules not attached to an Id
 	-- The bindings cotain more rules, embedded in the Ids
-	return (processed_binds, orphan_rules)
+	return (mod_details { md_binds = processed_binds, md_rules = orphan_rules})
 
 
 simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do

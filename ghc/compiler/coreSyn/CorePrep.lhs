@@ -4,13 +4,13 @@
 \section{Core pass to saturate constructors and PrimOps}
 
 \begin{code}
-module CoreSat (
-      coreSatPgm, coreSatExpr
+module CorePrep (
+      corePrepPgm, corePrepExpr
   ) where
 
 #include "HsVersions.h"
 
-import CoreUtils( exprIsTrivial, exprIsAtom, exprType, exprIsValue, etaExpand, exprArity )
+import CoreUtils( exprIsTrivial, exprIsAtom, exprType, exprIsValue, etaExpand )
 import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
@@ -18,13 +18,16 @@ import Type	( Type, applyTy, splitFunTy_maybe, isTyVarTy,
 		  isUnLiftedType, isUnboxedTupleType, repType,	
 		  uaUTy, usOnce, usMany, seqType )
 import Demand	( Demand, isStrict, wwLazy, StrictnessInfo(..) )
-import PrimOp	( PrimOp(..) )
-import Var 	( Id, TyVar, setTyVarUnique )
+import PrimOp	( PrimOp(..), setCCallUnique )
+import Var 	( Var, Id, setVarUnique, globalIdDetails, setGlobalIdDetails )
 import VarSet
+import VarEnv
 import Id	( mkSysLocal, idType, idStrictness, idDemandInfo, idArity,
-		  isDeadBinder, setIdType, isPrimOpId_maybe, hasNoBinding
+		  setIdType, isPrimOpId_maybe, isLocalId, modifyIdInfo,
+		  hasNoBinding
 		)
-
+import IdInfo	( GlobalIdDetails(..) )
+import HscTypes ( ModDetails(..) )
 import UniqSupply
 import Maybes
 import OrdList
@@ -37,21 +40,7 @@ import Outputable
 -- Overview
 -- ---------------------------------------------------------------------------
 
-MAJOR CONSTRAINT: 
-	By the time this pass happens, we have spat out tidied Core into
-	the interface file, including all IdInfo.  
-
-	So we must not change the arity of any top-level function,
-	because we've already fixed it and put it out into the interface file.
-	Nor must we change a value (e.g. constructor) into a thunk.
-
-	It's ok to introduce extra bindings, which don't appear in the
-	interface file.  We don't put arity info on these extra bindings,
-	because they are never fully applied, so there's no chance of
-	compiling just-a-fast-entry point for them.
-
-Most of the contents of this pass used to be in CoreToStg.  The
-primary goals here are:
+The goal of this pass is to prepare for code generation.
 
 1.  Saturate constructor and primop applications.
 
@@ -74,9 +63,17 @@ primary goals here are:
 
 5.  Do the seq/par munging.  See notes with mkCase below.
 
+6.  Clone all local Ids.  This means that Tidy Core has the property
+    that all Ids are unique, rather than the weaker guarantee of
+    no clashes which the simplifier provides.
+
+7.  Give each dynamic CCall occurrence a fresh unique; this is
+    rather like the cloning step above.
+
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
 any trivial or useless bindings.
+
   
 
 
@@ -85,19 +82,20 @@ any trivial or useless bindings.
 -- -----------------------------------------------------------------------------
 
 \begin{code}
-coreSatPgm :: DynFlags -> [CoreBind] -> IO [CoreBind]
-coreSatPgm dflags binds 
-  = do	showPass dflags "CoreSat"
+corePrepPgm :: DynFlags -> ModDetails -> IO ModDetails
+corePrepPgm dflags mod_details
+  = do	showPass dflags "CorePrep"
 	us <- mkSplitUniqSupply 's'
-	let new_binds = initUs_ us (coreSatTopBinds binds)
-        endPass dflags "CoreSat" Opt_D_dump_sat new_binds
+	let new_binds = initUs_ us (corePrepTopBinds emptyVarEnv (md_binds mod_details))
+        endPass dflags "CorePrep" Opt_D_dump_sat new_binds
+	return (mod_details { md_binds = new_binds })
 
-coreSatExpr :: DynFlags -> CoreExpr -> IO CoreExpr
-coreSatExpr dflags expr
-  = do showPass dflags "CoreSat"
+corePrepExpr :: DynFlags -> CoreExpr -> IO CoreExpr
+corePrepExpr dflags expr
+  = do showPass dflags "CorePrep"
        us <- mkSplitUniqSupply 's'
-       let new_expr = initUs_ us (coreSatAnExpr expr)
-       dumpIfSet_dyn dflags Opt_D_dump_sat "Saturated/Normal form syntax:" 
+       let new_expr = initUs_ us (corePrepAnExpr emptyVarEnv expr)
+       dumpIfSet_dyn dflags Opt_D_dump_sat "CorePrep" 
 		     (ppr new_expr)
        return new_expr
 
@@ -108,86 +106,53 @@ coreSatExpr dflags expr
 data FloatingBind = FloatLet CoreBind
 		  | FloatCase Id CoreExpr
 
+type CloneEnv = IdEnv Id	-- Clone local Ids
+
 allLazy :: OrdList FloatingBind -> Bool
 allLazy floats = foldOL check True floats
 	       where
 		 check (FloatLet _)    y = y
 		 check (FloatCase _ _) y = False
 
-coreSatTopBinds :: [CoreBind] -> UniqSM [CoreBind]
--- Very careful to preserve the arity of top-level functions
-coreSatTopBinds [] = returnUs []
+corePrepTopBinds :: CloneEnv -> [CoreBind] -> UniqSM [CoreBind]
+corePrepTopBinds env [] = returnUs []
 
-coreSatTopBinds (NonRec b r : binds)
-  = coreSatTopRhs b r		`thenUs` \ (floats, r') ->
-    coreSatTopBinds binds	`thenUs` \ binds' ->
-    returnUs (floats ++ NonRec b r' : binds')
-
-coreSatTopBinds (Rec prs : binds)
-  = mapAndUnzipUs do_pair prs	`thenUs` \ (floats_s, prs') ->
-    coreSatTopBinds binds	`thenUs` \ binds' ->
-    returnUs (Rec (flattenBinds (concat floats_s) ++ prs') : binds')
+corePrepTopBinds env (bind : binds)
+  = corePrepBind env bind	`thenUs` \ (env', floats) ->
+    ASSERT( allLazy floats )
+    corePrepTopBinds env' binds	`thenUs` \ binds' ->
+    returnUs (foldOL add binds' floats)
   where
-    do_pair (b,r) = coreSatTopRhs b r	`thenUs` \ (floats, r') ->
-		    returnUs (floats, (b, r'))
-
-coreSatTopRhs :: Id -> CoreExpr -> UniqSM ([CoreBind], CoreExpr)
--- The trick here is that if we see
---	x = $wC p $wJust q
--- we want to transform to
---	sat = \a -> $wJust a
---	x = $wC p sat q
--- and NOT to
---	x = let sat = \a -> $wJust a in $wC p sat q
---
--- The latter is bad because the thing was a value before, but
--- is a thunk now, and that's wrong because now x may need to
--- be in other bindings' SRTs.
--- This has to be right for recursive as well as non-recursive bindings
---
--- Notice that it's right to give sat vanilla IdInfo; in particular NoCafRefs
---
--- You might worry that arity might increase, thus
---	x = $wC a  ==>  x = \ b c -> $wC a b c
--- but the simpifier does eta expansion vigorously, so I don't think this 
--- can occur.  If it did, it would be a problem, because x's arity changes,
--- so we have an ASSERT to check.  (I use WARN so we can see the output.)
-
-coreSatTopRhs b rhs
-  = coreSatExprFloat rhs	`thenUs` \ (floats, rhs1) ->
-    if exprIsValue rhs then
-	ASSERT( allLazy floats )
-        WARN( idArity b /= exprArity rhs1, ptext SLIT("Disaster!") <+> ppr b )
-	returnUs ([bind | FloatLet bind <- fromOL floats], rhs1)
-    else
-	mkBinds floats rhs1	`thenUs` \ rhs2 ->
-        WARN( idArity b /= exprArity rhs2, ptext SLIT("Disaster!") <+> ppr b )
-	returnUs ([], rhs2)
+    add (FloatLet bind) binds = bind : binds
 
 
-coreSatBind :: CoreBind -> UniqSM (OrdList FloatingBind)
+-- ---------------------------------------------------------------------------
+-- 			Bindings
+-- ---------------------------------------------------------------------------
+
+corePrepBind :: CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)
 -- Used for non-top-level bindings
--- We return a *list* of bindings because we may start with
+-- We return a *list* of bindings, because we may start with
 --	x* = f (g y)
 -- where x is demanded, in which case we want to finish with
 --	a = g y
 --	x* = f a
 -- And then x will actually end up case-bound
 
-coreSatBind (NonRec binder rhs)
-  = coreSatExprFloat rhs	`thenUs` \ (floats, new_rhs) ->
-    mkNonRec binder (bdrDem binder) floats new_rhs
-	-- NB: if there are any lambdas at the top of the RHS,
-	-- the floats will be empty, so the arity won't be affected
+corePrepBind env (NonRec bndr rhs)
+  = corePrepExprFloat env rhs			`thenUs` \ (floats, rhs') ->
+    cloneBndr env bndr				`thenUs` \ (env', bndr') ->
+    mkNonRec bndr' (bdrDem bndr') floats rhs'	`thenUs` \ floats' ->
+    returnUs (env', floats')
 
-coreSatBind (Rec pairs)
+corePrepBind env (Rec pairs)
 	-- Don't bother to try to float bindings out of RHSs
 	-- (compare mkNonRec, which does try)
-  = mapUs do_rhs pairs 			`thenUs` \ new_pairs ->
-    returnUs (unitOL (FloatLet (Rec new_pairs)))
+  = cloneBndrs env bndrs			`thenUs` \ (env', bndrs') ->
+    mapUs (corePrepAnExpr env') rhss		`thenUs` \ rhss' ->
+    returnUs (env', unitOL (FloatLet (Rec (bndrs' `zip` rhss'))))
   where
-    do_rhs (bndr,rhs) =	coreSatAnExpr rhs	`thenUs` \ new_rhs' ->
-			returnUs (bndr,new_rhs')
+    (bndrs, rhss) = unzip pairs
 
 
 -- ---------------------------------------------------------------------------
@@ -195,9 +160,10 @@ coreSatBind (Rec pairs)
 -- ---------------------------------------------------------------------------
 
 -- This is where we arrange that a non-trivial argument is let-bound
-coreSatArg :: CoreArg -> RhsDemand -> UniqSM (OrdList FloatingBind, CoreArg)
-coreSatArg arg dem
-  = coreSatExprFloat arg		`thenUs` \ (floats, arg') ->
+corePrepArg :: CloneEnv -> CoreArg -> RhsDemand
+	   -> UniqSM (OrdList FloatingBind, CoreArg)
+corePrepArg env arg dem
+  = corePrepExprFloat env arg		`thenUs` \ (floats, arg') ->
     if needs_binding arg'
 	then returnUs (floats, arg')
 	else newVar (exprType arg')	`thenUs` \ v ->
@@ -211,13 +177,13 @@ needs_binding | opt_KeepStgTypes = exprIsAtom
 -- Dealing with expressions
 -- ---------------------------------------------------------------------------
 
-coreSatAnExpr :: CoreExpr -> UniqSM CoreExpr
-coreSatAnExpr expr
-  = coreSatExprFloat expr		`thenUs` \ (floats, expr) ->
+corePrepAnExpr :: CloneEnv -> CoreExpr -> UniqSM CoreExpr
+corePrepAnExpr env expr
+  = corePrepExprFloat env expr		`thenUs` \ (floats, expr) ->
     mkBinds floats expr
 
 
-coreSatExprFloat :: CoreExpr -> UniqSM (OrdList FloatingBind, CoreExpr)
+corePrepExprFloat :: CloneEnv -> CoreExpr -> UniqSM (OrdList FloatingBind, CoreExpr)
 -- If
 --	e  ===>  (bs, e')
 -- then	
@@ -226,48 +192,52 @@ coreSatExprFloat :: CoreExpr -> UniqSM (OrdList FloatingBind, CoreExpr)
 -- For example
 --	f (g x)	  ===>   ([v = g x], f v)
 
-coreSatExprFloat (Var v)
-  = maybeSaturate v (Var v) 0 (idType v) `thenUs` \ app ->
+corePrepExprFloat env (Var v)
+  = fiddleCCall v				`thenUs` \ v1 ->
+    let v2 = lookupVarEnv env v1 `orElse` v1 in
+    maybeSaturate v2 (Var v2) 0 (idType v2) 	`thenUs` \ app ->
     returnUs (nilOL, app)
 
-coreSatExprFloat (Lit lit)
-  = returnUs (nilOL, Lit lit)
-
-coreSatExprFloat (Let bind body)
-  = coreSatBind bind			`thenUs` \ new_binds ->
-    coreSatExprFloat body		`thenUs` \ (floats, new_body) ->
-    returnUs (new_binds `appOL` floats, new_body)
-
-coreSatExprFloat (Note n@(SCC _) expr)
-  = coreSatAnExpr expr			`thenUs` \ expr ->
-    deLam expr				`thenUs` \ expr ->
-    returnUs (nilOL, Note n expr)
-
-coreSatExprFloat (Note other_note expr)
-  = coreSatExprFloat expr		`thenUs` \ (floats, expr) ->
-    returnUs (floats, Note other_note expr)
-
-coreSatExprFloat expr@(Type _)
+corePrepExprFloat env expr@(Type _)
   = returnUs (nilOL, expr)
 
-coreSatExprFloat expr@(Lam _ _)
-  = coreSatAnExpr body			`thenUs` \ body' ->
+corePrepExprFloat env expr@(Lit lit)
+  = returnUs (nilOL, expr)
+
+corePrepExprFloat env (Let bind body)
+  = corePrepBind env bind		`thenUs` \ (env', new_binds) ->
+    corePrepExprFloat env' body		`thenUs` \ (floats, new_body) ->
+    returnUs (new_binds `appOL` floats, new_body)
+
+corePrepExprFloat env (Note n@(SCC _) expr)
+  = corePrepAnExpr env expr		`thenUs` \ expr1 ->
+    deLam expr1				`thenUs` \ expr2 ->
+    returnUs (nilOL, Note n expr2)
+
+corePrepExprFloat env (Note other_note expr)
+  = corePrepExprFloat env expr		`thenUs` \ (floats, expr') ->
+    returnUs (floats, Note other_note expr')
+
+corePrepExprFloat env expr@(Lam _ _)
+  = corePrepAnExpr env body		`thenUs` \ body' ->
     returnUs (nilOL, mkLams bndrs body')
   where
     (bndrs,body) = collectBinders expr
 
-coreSatExprFloat (Case scrut bndr alts)
-  = coreSatExprFloat scrut		`thenUs` \ (floats, scrut) ->
-    mapUs sat_alt alts			`thenUs` \ alts ->
-    returnUs (floats, mkCase scrut bndr alts)
+corePrepExprFloat env (Case scrut bndr alts)
+  = corePrepExprFloat env scrut		`thenUs` \ (floats, scrut') ->
+    cloneBndr env bndr			`thenUs` \ (env', bndr') ->
+    mapUs (sat_alt env') alts		`thenUs` \ alts' ->
+    returnUs (floats, mkCase scrut' bndr' alts')
   where
-    sat_alt (con, bs, rhs)
-	  = coreSatAnExpr rhs	  	`thenUs` \ rhs ->
-	    deLam rhs			`thenUs` \ rhs ->
-	    returnUs (con, bs, rhs)
+    sat_alt env (con, bs, rhs)
+	  = cloneBndrs env bs		`thenUs` \ (env', bs') ->
+	    corePrepAnExpr env' rhs  	`thenUs` \ rhs1 ->
+	    deLam rhs1			`thenUs` \ rhs2 ->
+	    returnUs (con, bs', rhs2)
 
-coreSatExprFloat expr@(App _ _)
-  = collect_args expr 0  `thenUs` \ (app,(head,depth),ty,floats,ss) ->
+corePrepExprFloat env expr@(App _ _)
+  = collect_args expr 0  `thenUs` \ (app, (head,depth), ty, floats, ss) ->
     ASSERT(null ss)	-- make sure we used all the strictness info
 
 	-- Now deal with the function
@@ -305,14 +275,16 @@ coreSatExprFloat expr@(App _ _)
 	      (ss1, ss_rest)   = case ss of
 				   (ss1:ss_rest) -> (ss1, ss_rest)
 				   []	       -> (wwLazy, [])
-              (arg_ty, res_ty) = expectJust "coreSatExprFloat:collect_args" $
+              (arg_ty, res_ty) = expectJust "corePrepExprFloat:collect_args" $
                                  splitFunTy_maybe fun_ty
 	  in
-	  coreSatArg arg (mkDemTy ss1 arg_ty) `thenUs` \ (fs, arg') ->
+	  corePrepArg env arg (mkDemTy ss1 arg_ty)	`thenUs` \ (fs, arg') ->
 	  returnUs (App fun' arg', hd, res_ty, fs `appOL` floats, ss_rest)
 
     collect_args (Var v) depth
-	= returnUs (Var v, (Var v, depth), idType v, nilOL, stricts)
+	= fiddleCCall v `thenUs` \ v1 ->
+	  let v2 = lookupVarEnv env v1 `orElse` v1 in
+	  returnUs (Var v2, (Var v2, depth), idType v2, nilOL, stricts)
 	where
 	  stricts = case idStrictness v of
 			StrictnessInfo demands _ 
@@ -322,8 +294,9 @@ coreSatExprFloat expr@(App _ _)
 		-- If depth < length demands, then we have too few args to 
 		-- satisfy strictness  info so we have to  ignore all the 
 		-- strictness info, e.g. + (error "urk")
-		-- Here, we can't evaluate the arg  strictly, because this 
-		-- partial  application might be seq'd
+		-- Here, we can't evaluate the arg strictly, because this 
+		-- partial application might be seq'd
+
 
     collect_args (Note (Coerce ty1 ty2) fun) depth
         = collect_args fun depth  `thenUs` \ (fun', hd, fun_ty, floats, ss) ->
@@ -336,7 +309,7 @@ coreSatExprFloat expr@(App _ _)
 
 	-- non-variable fun, better let-bind it
     collect_args fun depth
-	= coreSatExprFloat fun	  		`thenUs` \ (fun_floats, fun) ->
+	= corePrepExprFloat env fun		`thenUs` \ (fun_floats, fun) ->
 	  newVar ty		 		`thenUs` \ fn_id ->
           mkNonRec fn_id onceDem fun_floats fun	`thenUs` \ floats ->
 	  returnUs (Var fn_id, (Var fn_id, depth), ty, floats, [])
@@ -349,21 +322,6 @@ coreSatExprFloat expr@(App _ _)
 	-- we don't ignore SCCs, since they require some code generation
 
 ------------------------------------------------------------------------------
--- Generating new binders
--- ---------------------------------------------------------------------------
-
-newVar :: Type -> UniqSM Id
-newVar ty
- = getUniqueUs	 		`thenUs` \ uniq ->
-   seqType ty			`seq`
-   returnUs (mkSysLocal SLIT("sat") uniq ty)
-
-cloneTyVar :: TyVar -> UniqSM TyVar
-cloneTyVar tv
- = getUniqueUs	 		`thenUs` \ uniq ->
-   returnUs (setTyVarUnique tv uniq)
-
-------------------------------------------------------------------------------
 -- Building the saturated syntax
 -- ---------------------------------------------------------------------------
 
@@ -372,7 +330,7 @@ cloneTyVar tv
 maybeSaturate :: Id -> CoreExpr -> Int -> Type -> UniqSM CoreExpr
 maybeSaturate fn expr n_args ty
   | hasNoBinding fn = saturate_it
-  | otherwise	    = returnUs expr
+  | otherwise     = returnUs expr
   where
     fn_arity	 = idArity fn
     excess_arity = fn_arity - n_args
@@ -383,7 +341,7 @@ maybeSaturate fn expr n_args ty
 -- Precipitating the floating bindings
 -- ---------------------------------------------------------------------------
 
--- mkNonRec is used for local bindings only, not top level
+-- mkNonRec is used for both top level and local bindings
 mkNonRec :: Id  -> RhsDemand 			-- Lhs: id with demand
 	 -> OrdList FloatingBind -> CoreExpr	-- Rhs: let binds in body
 	 -> UniqSM (OrdList FloatingBind)
@@ -399,19 +357,27 @@ mkNonRec bndr dem floats rhs
 	-- then the strictness analyser may say that f has strictness "S"
 	-- Later the eta expander will transform to
 	--	f x y = case x of { (a,b) -> a }
-	-- So now f has arity 2.  Now CoreSat may see
+	-- So now f has arity 2.  Now CorePrep may see
 	--	v = f E
 	-- so the E argument will turn into a FloatCase.  
 	-- Indeed we should end up with
 	--	v = case E of { r -> f r }
 	-- That is, we should not float, even though (f r) is a value
+	--
+	-- Similarly, given 
+	--	v = f (x `divInt#` y)
+	-- we don't want to float the case, even if f has arity 2,
+	-- because floating the case would make it evaluated too early
     returnUs (floats `snocOL` FloatLet (NonRec bndr rhs))
     
   |  isUnLiftedType bndr_rep_ty	|| isStrictDem dem 
+	-- It's a strict let, or the binder is unlifted,
+	-- so we definitely float all the bindings
   = ASSERT( not (isUnboxedTupleType bndr_rep_ty) )
     returnUs (floats `snocOL` FloatCase bndr rhs)
 
   | otherwise
+	-- Don't float
   = mkBinds floats rhs	`thenUs` \ rhs' ->
     returnUs (unitOL (FloatLet (NonRec bndr rhs')))
 
@@ -473,7 +439,7 @@ tryEta bndrs expr@(App _ _)
 
 	  -- we can't eta reduce something which must be saturated.
     ok_to_eta_reduce (Var f) = not (hasNoBinding f)
-    ok_to_eta_reduce _ 	     = False --safe. ToDo: generalise
+    ok_to_eta_reduce _       = False --safe. ToDo: generalise
 
 tryEta bndrs (Let bind@(NonRec b r) body)
   | not (any (`elemVarSet` fvs) bndrs)
@@ -519,8 +485,7 @@ rhs is strict --- but that would defeat the purpose of seq and par.
 mkCase scrut@(Var fn `App` Type ty `App` arg) bndr alts
   = case isPrimOpId_maybe fn of
 	Just ParOp -> Case scrut bndr     [deflt_alt]
-	Just SeqOp -> 
-		      Case arg   new_bndr [deflt_alt]
+	Just SeqOp -> Case arg   new_bndr [deflt_alt]
 	other	   -> Case scrut bndr alts
   where
     (deflt_alt@(_,_,rhs) : _) = [alt | alt@(DEFAULT,_,_) <- alts]
@@ -576,3 +541,56 @@ onceDem = RhsDemand False True   -- used at most once
 \end{code}
 
 
+
+
+%************************************************************************
+%*									*
+\subsection{Cloning}
+%*									*
+%************************************************************************
+
+\begin{code}
+------------------------------------------------------------------------------
+-- Cloning binders
+-- ---------------------------------------------------------------------------
+
+cloneBndrs :: CloneEnv -> [Var] -> UniqSM (CloneEnv, [Var])
+cloneBndrs env bs = mapAccumLUs cloneBndr env bs
+
+cloneBndr  :: CloneEnv -> Var -> UniqSM (CloneEnv, Var)
+cloneBndr env bndr
+  | isId bndr && isLocalId bndr		-- Top level things, which we don't want
+					-- to clone, have become ConstantIds by now
+  = getUniqueUs   `thenUs` \ uniq ->
+    let
+	bndr' = setVarUnique bndr uniq
+    in
+    returnUs (extendVarEnv env bndr bndr', bndr')
+
+  | otherwise = returnUs (env, bndr)
+
+------------------------------------------------------------------------------
+-- Cloning ccall Ids; each must have a unique name,
+-- to give the code generator a handle to hang it on
+-- ---------------------------------------------------------------------------
+
+fiddleCCall :: Id -> UniqSM Id
+fiddleCCall id 
+  = case globalIdDetails id of
+         PrimOpId (CCallOp ccall) ->
+	    -- Make a guaranteed unique name for a dynamic ccall.
+	    getUniqueUs   	`thenUs` \ uniq ->
+	    returnUs (setGlobalIdDetails id 
+			    (PrimOpId (CCallOp (setCCallUnique ccall uniq))))
+	 other -> returnUs id
+
+------------------------------------------------------------------------------
+-- Generating new binders
+-- ---------------------------------------------------------------------------
+
+newVar :: Type -> UniqSM Id
+newVar ty
+ = getUniqueUs	 		`thenUs` \ uniq ->
+   seqType ty			`seq`
+   returnUs (mkSysLocal SLIT("sat") uniq ty)
+\end{code}

@@ -79,11 +79,18 @@ tcInterfaceSigs unf_env mod decls
 
 \begin{code}
 tcIdInfo unf_env in_scope_vars name ty info_ins
-  = foldlTc tcPrag vanillaIdInfo info_ins
+  = foldlTc tcPrag init_info info_ins 
   where
-    tcPrag info (HsArity arity) = returnTc (info `setArityInfo`  arity)
+    -- set the CgInfo to something sensible but uninformative before
+    -- we start, because the default CgInfo is a panic.
+    init_info = vanillaIdInfo `setCgInfo` vanillaCgInfo
+
     tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)
     tcPrag info HsCprInfo       = returnTc (info `setCprInfo`	 ReturnsCPR)
+
+    tcPrag info (HsArity arity) = 
+	returnTc (info `setArityInfo` (ArityExactly arity)
+	 	       `setCgArity`   arity)
 
     tcPrag info (HsUnfold inline_prag expr)
 	= tcPragExpr unf_env name in_scope_vars expr 	`thenNF_Tc` \ maybe_expr' ->
@@ -101,35 +108,34 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
     tcPrag info (HsStrictness strict_info)
 	= returnTc (info `setStrictnessInfo` strict_info)
 
-    tcPrag info (HsWorker nm)
-	= tcWorkerInfo unf_env ty info nm
+    tcPrag info (HsWorker nm arity)
+	= tcWorkerInfo unf_env ty info nm arity
 \end{code}
 
 \begin{code}
-tcWorkerInfo unf_env ty info worker_name
-  | not (hasArity arity_info)
-  = pprPanic "Worker with no arity info" (ppr worker_name)
- 
-  | otherwise
+tcWorkerInfo unf_env ty info worker_name arity
   = uniqSMToTcM (mkWrapper ty arity demands res_bot cpr_info) `thenNF_Tc` \ wrap_fn ->
     let
 	-- Watch out! We can't pull on unf_env too eagerly!
 	info' = case tcLookupRecId_maybe unf_env worker_name of
-		  Just worker_id -> info `setUnfoldingInfo`  mkTopUnfolding (wrap_fn worker_id)
-                                         `setWorkerInfo`     HasWorker worker_id arity
+		  Just worker_id -> 
+		    info `setUnfoldingInfo`  mkTopUnfolding (wrap_fn worker_id)
+		         `setWorkerInfo`     HasWorker worker_id arity
 
-    		  Nothing        -> pprTrace "tcWorkerInfo failed:" (ppr worker_name) info
+    		  Nothing -> pprTrace "tcWorkerInfo failed:" 
+				(ppr worker_name) info
     in
     returnTc info'
   where
-	-- We are relying here on arity, cpr and strictness info always appearing 
+	-- We are relying here on cpr and strictness info always appearing 
 	-- before worker info,  fingers crossed ....
-      arity_info = arityInfo info
-      arity      = arityLowerBound arity_info
       cpr_info   = cprInfo info
-      (demands, res_bot)    = case strictnessInfo info of
-			 	StrictnessInfo d r -> (d,r)
-				_                  -> (take arity (repeat wwLazy),False)	-- Noncommittal
+
+      (demands, res_bot)
+	= case strictnessInfo info of
+	 	StrictnessInfo d r -> (d,r)
+		_                  -> (take arity (repeat wwLazy),False)
+					-- Noncommittal
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check

@@ -9,6 +9,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_SccProfilingOn )
+import HscTypes		( ModDetails(..) )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
 import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
@@ -50,20 +51,27 @@ deSugar :: DynFlags
 	-> PersistentCompilerState -> HomeSymbolTable
 	-> Module -> PrintUnqualified
         -> TcResults
-	-> IO ([CoreBind], [(Id,CoreRule)], (SDoc, SDoc, [CoreBndr]))
+	-> IO (ModDetails, (SDoc, SDoc, [CoreBndr]))
 
 deSugar dflags pcs hst mod_name unqual
-        (TcResults {tc_env   = local_type_env,
+        (TcResults {tc_env   = type_env,
 		    tc_binds = all_binds,
+		    tc_insts = insts,
 		    tc_rules = rules,
 		    tc_fords = fo_decls})
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
 
 	-- Do desugaring
-	; let (result, ds_warns) = initDs dflags us lookup mod_name
-					  (dsProgram mod_name all_binds rules fo_decls)    
-	      (ds_binds, ds_rules, _) = result
+	; let (ds_result, ds_warns) = initDs dflags us lookup mod_name
+					     (dsProgram mod_name all_binds rules fo_decls)    
+
+	      (ds_binds, ds_rules, foreign_stuff) = ds_result
+	
+	      mod_details = ModDetails { md_types = type_env,
+					 md_insts = insts,
+					 md_rules = ds_rules,
+					 md_binds = ds_binds }
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
@@ -76,7 +84,7 @@ deSugar dflags pcs hst mod_name unqual
 	; doIfSet (dopt Opt_D_dump_ds dflags) 
 		(printDump (ppr_ds_rules ds_rules))
 
-        ; return result
+        ; return (mod_details, foreign_stuff)
 	}
 
   where
@@ -88,7 +96,7 @@ deSugar dflags pcs hst mod_name unqual
     lookup n = case lookupType hst pte n of {
 		 Just (AnId v) -> v ;
 		 other -> 
-	       case lookupNameEnv local_type_env n of
+	       case lookupNameEnv type_env n of
 		 Just (AnId v) -> v ;
 		 other	       -> pprPanic "Desugar: lookup:" (ppr n)
                }

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.45 2001/02/20 09:38:59 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.46 2001/03/13 12:50:30 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -79,7 +79,7 @@ import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling,
 			  opt_SMP )
-import Id		( Id, idType, idArityInfo )
+import Id		( Id, idType, idCgArity )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 			  isNullaryDataCon, dataConName
 			)
@@ -261,16 +261,11 @@ mkLFLetNoEscape = LFLetNoEscape
 
 mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
-  = case idArityInfo id of
-      ArityExactly 0	-> LFThunk (idType id)
-				TopLevel True{-no fvs-}
-				True{-updatable-} NonStandardThunk
-				(error "mkLFImported: no srt label") 
-				(error "mkLFImported: no srt")
-      ArityExactly n	-> LFReEntrant (idType id) TopLevel n True  -- n > 0
-				(error "mkLFImported: no srt label") 
-				(error "mkLFImported: no srt")
-      other	   	-> LFImported	-- Not sure of exact arity
+  = case idCgArity id of
+      n | n > 0 -> LFReEntrant (idType id) TopLevel n True  -- n > 0
+		       (error "mkLFImported: no srt label") 
+		       (error "mkLFImported: no srt")
+      other -> LFImported	-- Not sure of exact arity
 \end{code}
 
 %************************************************************************

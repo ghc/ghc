@@ -71,11 +71,12 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal,
 			  mkTemplateLocals, mkTemplateLocalsNum,
 			  mkTemplateLocal, idCprInfo
 			)
-import IdInfo		( IdInfo, vanillaIdInfo, noTyGenIdInfo, noCafOrTyGenIdInfo,
-			  exactArity, setUnfoldingInfo, setCafInfo, setCprInfo,
-			  setArityInfo, setSpecInfo, 
+import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
+			  exactArity, setUnfoldingInfo, setCprInfo,
+			  setArityInfo, setSpecInfo,  setCgInfo,
 			  mkStrictnessInfo, setStrictnessInfo,
-			  GlobalIdDetails(..), CafInfo(..), CprInfo(..)
+			  GlobalIdDetails(..), CafInfo(..), CprInfo(..), 
+			  CgInfo(..), setCgArity
 			)
 import FieldLabel	( mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
@@ -137,7 +138,8 @@ mkDataConId :: Name -> DataCon -> Id
 mkDataConId work_name data_con
   = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
   where
-    info = noCafOrTyGenIdInfo
+    info = noCafNoTyGenIdInfo
+	   `setCgArity`		arity
 	   `setArityInfo`	exactArity arity
 	   `setStrictnessInfo`	strict_info
 	   `setCprInfo`		cpr_info
@@ -199,11 +201,12 @@ mkDataConWrapId data_con
     wrap_id = mkGlobalId (DataConWrapId data_con) (dataConName data_con) wrap_ty info
     work_id = dataConId data_con
 
-    info = noCafOrTyGenIdInfo
+    info = noCafNoTyGenIdInfo
 	   `setUnfoldingInfo`	mkTopUnfolding (mkInlineMe wrap_rhs)
 	   `setCprInfo`		cpr_info
 		-- The Cpr info can be important inside INLINE rhss, where the
 		-- wrapper constructor isn't inlined
+	   `setCgArity` 	arity
 	   `setArityInfo`	exactArity arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
@@ -393,8 +396,8 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 		   mkFunTy data_ty field_tau
       
     arity = 1 + n_dict_tys + n_field_dict_tys
-    info = noTyGenIdInfo
-	   `setCafInfo`		caf_info
+    info = noCafNoTyGenIdInfo
+	   `setCgInfo`		(CgInfo arity caf_info)
 	   `setArityInfo`	exactArity arity
 	   `setUnfoldingInfo`	unfolding	
 	-- ToDo: consider adding further IdInfo
@@ -519,7 +522,8 @@ mkDictSelId name clas
     field_lbl = mkFieldLabel name tycon ty tag
     tag       = assoc "MkId.mkDictSelId" (classSelIds clas `zip` allFieldLabelTags) sel_id
 
-    info      = noCafOrTyGenIdInfo
+    info      = noCafNoTyGenIdInfo
+		`setCgArity` 	    1
 		`setArityInfo`	    exactArity 1
 		`setUnfoldingInfo`  unfolding
 		
@@ -563,8 +567,9 @@ mkPrimOpId prim_op
     name = mkPrimOpIdName prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 		
-    info = noCafOrTyGenIdInfo
+    info = noCafNoTyGenIdInfo
 	   `setSpecInfo`	rules
+	   `setCgArity` 	arity
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
 
@@ -594,7 +599,8 @@ mkCCallOpId uniq ccall ty
     name    = mkCCallName uniq occ_str
     prim_op = CCallOp ccall
 
-    info = noCafOrTyGenIdInfo
+    info = noCafNoTyGenIdInfo
+	   `setCgArity` 	arity
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
 
@@ -613,7 +619,7 @@ mkCCallOpId uniq ccall ty
 
 \begin{code}
 mkDefaultMethodId dm_name ty
-  = mkVanillaGlobal dm_name ty noTyGenIdInfo
+  = mkVanillaGlobal dm_name ty noCafNoTyGenIdInfo
 
 mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Class 
@@ -623,10 +629,10 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Id
 
 mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
-  = mkVanillaGlobal dfun_name dfun_ty noTyGenIdInfo
+  = mkVanillaGlobal dfun_name dfun_ty noCafNoTyGenIdInfo
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
-    info     = noTyGenIdInfo
+    info     = noCafNoTyGenIdInfo
              -- Type is wired-in (see comment at TcClassDcl.tcClassSig),
              -- so do not generalise it
 
@@ -680,7 +686,7 @@ another gun with which to shoot yourself in the foot.
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty info
   where
-    info = noCafOrTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+    info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
 
     ty  = mkForAllTys [openAlphaTyVar,openBetaTyVar]
@@ -698,7 +704,7 @@ evaluate its argument and call the dataToTag# primitive.
 getTagId
   = pcMiscPrelId getTagIdKey pREL_GHC SLIT("getTag#") ty info
   where
-    info = noCafOrTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+    info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	-- We don't provide a defn for this; you must inline it
 
     ty = mkForAllTys [alphaTyVar] (mkFunTy alphaTy intPrimTy)
@@ -716,7 +722,7 @@ nasty as-is, change it back to a literal (@Literal@).
 realWorldPrimId	-- :: State# RealWorld
   = pcMiscPrelId realWorldPrimIdKey pREL_GHC SLIT("realWorld#")
 		 realWorldStatePrimTy
-		 (noCafOrTyGenIdInfo `setUnfoldingInfo` mkOtherCon [])
+		 (noCafNoTyGenIdInfo `setUnfoldingInfo` mkOtherCon [])
 	-- The mkOtherCon makes it look that realWorld# is evaluated
 	-- which in turn makes Simplify.interestingArg return True,
 	-- which in turn makes INLINE things applied to realWorld# likely
@@ -769,7 +775,7 @@ aBSENT_ERROR_ID
 
 pAR_ERROR_ID
   = pcMiscPrelId parErrorIdKey pREL_ERR SLIT("parError")
-    (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noCafOrTyGenIdInfo
+    (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noCafNoTyGenIdInfo
 \end{code}
 
 
@@ -796,9 +802,9 @@ pcMiscPrelId key mod str ty info
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
-    bottoming_info = noCafOrTyGenIdInfo 
+    bottoming_info = noCafNoTyGenIdInfo 
 		     `setStrictnessInfo` mkStrictnessInfo ([wwStrict], True)
-		     
+
 	-- these "bottom" out, no matter what their arguments
 
 generic_ERROR_ID u n = pc_bottoming_Id u pREL_ERR n errorTy

@@ -48,6 +48,7 @@ import PrimOp		( CCall, pprCCallOp )
 import DataCon		( dataConTyCon, dataConSourceArity )
 import TyCon		( isTupleTyCon, tupleTyConBoxity )
 import Type		( Kind )
+import BasicTypes	( Arity )
 import FiniteMap	( lookupFM )
 import CostCentre
 import Outputable
@@ -379,21 +380,22 @@ pprHsIdInfo []   = empty
 pprHsIdInfo info = ptext SLIT("{-##") <+> hsep (map ppr_hs_info info) <+> ptext SLIT("##-}")
 
 data HsIdInfo name
-  = HsArity		ArityInfo
+  = HsArity		Arity
   | HsStrictness	StrictnessInfo
   | HsUnfold		InlinePragInfo (UfExpr name)
   | HsNoCafRefs
   | HsCprInfo
-  | HsWorker		name		-- Worker, if any
+  | HsWorker		name Arity	-- Worker, if any see IdInfo.WorkerInfo
+					-- for why we want arity here.
   deriving( Eq )
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
 
 ppr_hs_info (HsUnfold prag unf) = ptext SLIT("__U") <> pprInlinePragInfo prag <+> parens (pprUfExpr noParens unf)
-ppr_hs_info (HsArity arity)     = ppArityInfo arity
+ppr_hs_info (HsArity arity)     = ptext SLIT("__A") <+> int arity
 ppr_hs_info (HsStrictness str)  = ptext SLIT("__S") <+> ppStrictnessInfo str
 ppr_hs_info HsNoCafRefs		= ptext SLIT("__C")
 ppr_hs_info HsCprInfo		= ptext SLIT("__M")
-ppr_hs_info (HsWorker w)	= ptext SLIT("__P") <+> ppr w
+ppr_hs_info (HsWorker w a)	= ptext SLIT("__P") <+> ppr w <+> int a
 \end{code}
 

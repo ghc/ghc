@@ -7,17 +7,14 @@ each let-binding.  At the same time, we figure out which top-level
 bindings have no CAF references, and record the fact in their IdInfo.
 
 \begin{code}
-module SRT where
+module SRT( computeSRTs ) where
 
 #include "HsVersions.h"
 
-import Id        ( Id, idCafInfo )
-import IdInfo 	 ( mayHaveCafRefs )
 import StgSyn
-
-import UniqFM
-import UniqSet
-import Panic
+import Id        ( Id )
+import VarSet	( varSetElems )
+import Util	( mapAccumL )
 
 #ifdef DEBUG
 import Outputable
@@ -26,6 +23,9 @@ import Outputable
 
 \begin{code}
 computeSRTs :: [StgBinding] -> [(StgBinding,[Id])]
+  -- The incoming bindingd are filled with SRTEntries in their SRT slots
+  -- the outgoing ones have NoSRT/SRT values instead
+
 computeSRTs binds = map srtTopBind binds
 \end{code}
 
@@ -34,18 +34,11 @@ Algorithm for figuring out SRT layout.
 
 Our functions have type
 
-	:: SrtOffset		-- next free offset within the SRT
-	-> (UniqSet Id,		-- global refs in the continuation
-	    UniqFM (UniqSet Id))-- global refs in let-no-escaped variables
-{- * -}	-> StgExpr		-- expression to analyse
-
+srtExpr	:: SrtOffset		-- Next free offset within the SRT
+	-> StgExpr		-- Expression to analyse
 	-> (StgExpr,		-- (e) newly annotated expression
-	    UniqSet Id,		-- (g) global refs from this expression
-	    [Id],		-- (s) SRT required for this expression
+	    SrtIds,		-- (s) SRT required for this expression (reversed)
 	    SrtOffset)		-- (o) new offset
-
-(g) is a set containing all local top-level and imported ids referred
-to by the expression (e), which have MayHaveCafRefs in their CafInfo.
 
 We build a single SRT for a recursive binding group, which is why the
 SRT building is done at the binding level rather than the
@@ -82,218 +75,91 @@ it done this way?
 Hmm, that probably makes no sense.
 
 \begin{code}
-srtTopBind 
-	:: StgBinding
-	-> (StgBinding,			-- the new binding
-	    [Id])			-- the SRT for this binding
+type SrtOffset = Int
+type SrtIds    = [Id]  -- An *reverse-ordered* list of the Ids needed in the SRT
 
-srtTopBind (StgNonRec binder rhs) =
+srtTopBind :: StgBinding -> (StgBinding, SrtIds)
 
-   -- no need to use circularity for non-recursive bindings
-   srtRhs (emptyUniqSet,emptyUFM) 0{-initial offset-} rhs
-					=: \(rhs, g, srt, off) ->
-   let
-	filtered_g = uniqSetToList g
-        extra_refs = filter (`notElem` srt) filtered_g
-	bind_srt   = reverse (extra_refs ++ srt)
-   in
-   ASSERT2(null bind_srt || idMayHaveCafRefs binder, ppr binder)
+srtTopBind bind
+  = srtBind 0 bind	=: \ (bind', srt, off) ->
+    (bind', reverse srt)	-- The 'reverse' is because the SRT is 
+				-- built up reversed, for efficiency's sake
 
-   case rhs of
-        StgRhsClosure _ _ _ _ _ _ _ ->
-	    (StgNonRec binder (attach_srt_rhs rhs 0 (length bind_srt)), 
-	     bind_srt)
+srtBind :: SrtOffset -> StgBinding -> (StgBinding, SrtIds, SrtOffset)
 
-	-- don't output an SRT for the constructor
-	StgRhsCon _ _ _    -> (StgNonRec binder rhs, [])
-
-
-srtTopBind (StgRec bs) =
-    ASSERT(null bind_srt || all idMayHaveCafRefs binders)
-    (attach_srt_bind (StgRec new_bs) 0 (length bind_srt), bind_srt)
+srtBind off (StgNonRec (SRTEntries rhs_cafs) binder rhs) 
+  = (StgNonRec srt_info binder new_rhs, this_srt, body_off)
   where
-    (binders,rhss) = unzip bs
+    (new_rhs,  rhs_srt,  rhs_off)  = srtRhs off rhs
+    (srt_info, this_srt, body_off) = constructSRT rhs_cafs rhs_srt off rhs_off
     
-    non_caf_binders = [ b | (b, rhs) <- bs, not (caf_rhs rhs) ]
 
-    (new_bs, g, srt, _) = doBinds bs [] emptyUniqSet [] 0
-
-    -- filter out ourselves from the global references: it makes no
-    -- sense to refer recursively to our SRT unless the recursive
-    -- reference is required by a nested SRT.
-    filtered_g = filter (\id -> id `notElem` non_caf_binders) (uniqSetToList g)
-    extra_refs = filter (`notElem` srt) filtered_g
-    bind_srt = reverse (extra_refs ++ srt)
-
-    doBinds [] new_binds g srt off = (reverse new_binds, g, srt, off)
-    doBinds ((binder,rhs):binds) new_binds g srt off =
-	srtRhs (emptyUniqSet,emptyUFM) off rhs 
-				=: \(rhs, rhs_g, rhs_srt, off) ->
-	let 
-	    g'   = unionUniqSets rhs_g g
-	    srt' = rhs_srt ++ srt
- 	in
-        doBinds binds ((binder,rhs):new_binds) g' srt' off
-
-caf_rhs (StgRhsClosure _ _ _ free_vars _ [] body) = True
-caf_rhs _ = False
-\end{code}
-
------------------------------------------------------------------------------
-Non-top-level bindings
-
-\begin{code}
-srtBind :: (UniqSet Id, UniqFM (UniqSet Id))
-	-> Int -> StgBinding -> (StgBinding, UniqSet Id, [Id], Int)
-
-srtBind cont_refs off (StgNonRec binder rhs) =
-  srtRhs cont_refs off rhs   =: \(rhs, g, srt, off) ->
-  (StgNonRec binder rhs, g, srt, off)
-
-srtBind cont_refs off (StgRec binds) =
-  (StgRec new_binds, g, srt, new_off)
+srtBind off (StgRec (SRTEntries rhss_cafs) pairs)
+  = (StgRec srt_info new_pairs, this_srt, body_off)
   where
-    -- process each binding
-    (new_binds, g, srt, new_off) = doBinds binds emptyUniqSet [] off []
+    ((rhss_off, rhss_srt), new_pairs) = mapAccumL do_bind (off, []) pairs
 
-    doBinds [] g srt off new_binds = (reverse new_binds, g, srt, off)
-    doBinds ((binder,rhs):binds) g srt off new_binds =
-        srtRhs cont_refs off rhs   =: \(rhs, g', srt', off) ->
-	doBinds binds (unionUniqSets g g') (srt'++srt) off
-		((binder,rhs):new_binds)
+    do_bind (off,srt) (bndr,rhs)
+	= srtRhs off rhs		=: \(rhs', srt', off') ->
+	  ((off', srt'++srt), (bndr, rhs'))
+
+    (srt_info, this_srt, body_off)
+	 = constructSRT rhss_cafs rhss_srt off rhss_off
 \end{code}
 
 -----------------------------------------------------------------------------
 Right Hand Sides
 
 \begin{code}
-srtRhs 	:: (UniqSet Id, UniqFM (UniqSet Id))
-	-> Int -> StgRhs -> (StgRhs, UniqSet Id, [Id], Int)
+srtRhs 	:: SrtOffset -> StgRhs -> (StgRhs, SrtIds, SrtOffset)
 
-srtRhs cont off (StgRhsClosure cc bi old_srt free_vars u args body) =
-    srtExpr cont off body	=: \(body, g, srt, off) ->
-    (StgRhsClosure cc bi old_srt free_vars u args body, g, srt, off)
+srtRhs off (StgRhsClosure cc bi free_vars u args body)
+  = srtExpr off body			=: \(body, srt, off) ->
+    (StgRhsClosure cc bi free_vars u args body, srt, off)
 
-srtRhs cont off e@(StgRhsCon cc con args) =
-    (e, getGlobalRefs args, [], off)
+srtRhs off e@(StgRhsCon cc con args) = (e, [], off)
 \end{code}
 
 -----------------------------------------------------------------------------
 Expressions
 
 \begin{code}
-srtExpr :: (UniqSet Id, UniqFM (UniqSet Id))
-	-> Int -> StgExpr -> (StgExpr, UniqSet Id, [Id], Int)
+srtExpr :: SrtOffset -> StgExpr -> (StgExpr, SrtIds, SrtOffset)
 
-srtExpr (cont,lne) off e@(StgApp f args) = (e, global_refs, [], off)
-  where global_refs = 
-		cont `unionUniqSets`
-		getGlobalRefs (StgVarArg f:args) `unionUniqSets`
-		lookupPossibleLNE lne f
+srtExpr off e@(StgApp f args) 	      = (e, [], off)
+srtExpr off e@(StgLit l)      	      = (e, [], off)
+srtExpr off e@(StgConApp con args)    = (e, [], off)
+srtExpr off e@(StgPrimApp op args ty) = (e, [], off)
 
-srtExpr (cont,lne) off e@(StgLit l) = (e, cont, [], off)
+srtExpr off (StgSCC cc expr) =
+   srtExpr off expr	=: \(expr, srt, off) ->
+   (StgSCC cc expr, srt, off)
 
-srtExpr (cont,lne) off e@(StgConApp con args) =
-   (e, cont `unionUniqSets` getGlobalRefs args, [], off)
-
-srtExpr (cont,lne) off e@(StgPrimApp op args ty) =
-   (e, cont `unionUniqSets` getGlobalRefs args, [], off)
-
-srtExpr c@(cont,lne) off (StgCase scrut live1 live2 uniq _{-srt-} alts) =
-   srtCaseAlts c off alts =: \(alts, alts_g, alts_srt, alts_off) ->
-
-	-- construct the SRT for this case
-   let (this_srt, scrut_off) = construct_srt alts_g alts_srt alts_off in
-
-	-- global refs in the continuation is alts_g.
-   srtExpr (alts_g,lne) scrut_off scrut
-				=: \(scrut, scrut_g, scrut_srt, case_off) ->
+srtExpr off (StgCase scrut live1 live2 uniq (SRTEntries cafs_in_alts) alts)
+ = srtCaseAlts off alts 	=: \(alts, alts_srt, alts_off) ->
    let
-	g = unionUniqSets alts_g scrut_g
-	srt = scrut_srt ++ this_srt
-	srt_info = case length this_srt of
-			0   -> NoSRT
-			len -> SRT off len
+	(srt_info, this_srt, scrut_off) 
+		= constructSRT cafs_in_alts alts_srt off alts_off
    in
-   (StgCase scrut live1 live2 uniq srt_info alts, g, srt, case_off)
+   srtExpr scrut_off scrut	=: \(scrut, scrut_srt, case_off) ->
 
-srtExpr cont off (StgLet bind body) =
-   srtLet cont off bind body StgLet (\_ cont -> cont)
+   (StgCase scrut live1 live2 uniq srt_info alts, 
+    scrut_srt ++ this_srt, 
+    case_off)
 
-srtExpr cont off (StgLetNoEscape live1 live2 b@(StgNonRec bndr rhs) body)
-  = srtLet cont off b body (StgLetNoEscape live1 live2) calc_cont
-  where calc_cont g (cont,lne) = (cont,addToUFM lne bndr g)
-
--- for recursive let-no-escapes, we do *two* passes, the first time
--- just to extract the list of global refs, and the second time we actually
--- construct the SRT now that we know what global refs should be in
--- the various let-no-escape continuations.
-srtExpr conts@(cont,lne) off 
-	(StgLetNoEscape live1 live2 bind@(StgRec pairs) body)
-  = srtBind conts off bind =: \(_, g, _, _) ->
-    let 
-	lne' = addListToUFM lne [ (bndr,g) | (bndr,_) <- pairs ]
-	calc_cont _ conts = conts
-    in
-    srtLet (cont,lne') off bind body (StgLetNoEscape live1 live2) calc_cont
-
-
-srtExpr cont off (StgSCC cc expr) =
-   srtExpr cont off expr	=: \(expr, g, srt, off) ->
-   (StgSCC cc expr, g, srt, off)
+srtExpr off (StgLet bind body)
+  = srtBind off bind		=: \ (bind', bind_srt, body_off) ->
+    srtExpr body_off body	=: \ (body', expr_srt, let_off) ->
+    (StgLet bind' body', expr_srt ++ bind_srt, let_off)
+     
+srtExpr off (StgLetNoEscape live1 live2 bind body)
+  = srtBind off bind		=: \ (bind', bind_srt, body_off) ->
+    srtExpr body_off body	=: \ (body', expr_srt, let_off) ->
+    (StgLetNoEscape live1 live2 bind' body', expr_srt ++ bind_srt, let_off)
 
 #ifdef DEBUG
-srtExpr cont off expr = pprPanic "srtExpr" (ppr expr)
-#else
-srtExpr cont off expr = panic "srtExpr"
+srtExpr off expr = pprPanic "srtExpr" (ppr expr)
 #endif
-\end{code}
-
------------------------------------------------------------------------------
-Let-expressions
-
-This is quite complicated stuff...
-
-\begin{code}
-srtLet cont off bind body let_constr calc_cont
-
- -- If the bindings are all constructors, then we don't need to
- -- buid an SRT at all...
- | all_con_binds bind =
-   srtBind cont off bind	=: \(bind, bind_g, bind_srt, off) ->
-   srtExpr cont off body	=: \(body, body_g, body_srt, off) ->
-   let
-	g   = unionUniqSets bind_g body_g
-	srt = body_srt ++ bind_srt
-   in
-   (let_constr bind body, g, srt, off)
-
- -- we have some closure bindings...
- | otherwise =
-
-    -- first, find the sub-SRTs in the binding
-   srtBind cont off bind	=: \(bind, bind_g, bind_srt, bind_off) ->
-
-    -- construct the SRT for this binding
-   let (this_srt, body_off) = construct_srt bind_g bind_srt bind_off in
-
-    -- get the new continuation information (if a let-no-escape)
-   let new_cont = calc_cont bind_g cont in
-
-    -- now find the SRTs in the body
-   srtExpr new_cont body_off body  =: \(body, body_g, body_srt, let_off) ->
-
-   let
-	-- union all the global references together
-       let_g   = unionUniqSets bind_g body_g
-
-	-- concatenate the sub-SRTs
-       let_srt = body_srt ++ this_srt
-
-	-- attach the SRT info to the binding
-       bind' = attach_srt_bind bind off (length this_srt)
-   in
-   (let_constr bind' body, let_g, let_srt, let_off)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -304,163 +170,57 @@ references which aren't already contained in one of the sub-SRTs (and
 which are "live").
 
 \begin{code}
-construct_srt global_refs sub_srt current_offset
+constructSRT caf_refs sub_srt initial_offset current_offset
    = let
-       extra_refs = filter (`notElem` sub_srt) (uniqSetToList global_refs)
-       this_srt = extra_refs ++ sub_srt
+       extra_refs = filter (`notElem` sub_srt) (varSetElems caf_refs)
+       this_srt   = extra_refs ++ sub_srt
 
 	-- Add the length of the new entries to the	
         -- current offset to get the next free offset in the global SRT.
        new_offset = current_offset + length extra_refs
-   in (this_srt, new_offset)
+       srt_length = new_offset - initial_offset
+
+       srt_info | srt_length == 0 = NoSRT
+		| otherwise       = SRT initial_offset srt_length
+
+   in ASSERT( srt_length == length this_srt )
+      (srt_info, this_srt, new_offset)
 \end{code}
 
 -----------------------------------------------------------------------------
 Case Alternatives
 
 \begin{code}
-srtCaseAlts :: (UniqSet Id, UniqFM (UniqSet Id))
-	-> Int -> StgCaseAlts -> (StgCaseAlts, UniqSet Id, [Id], Int)
+srtCaseAlts :: SrtOffset -> StgCaseAlts -> (StgCaseAlts, SrtIds, SrtOffset)
 
-srtCaseAlts cont off (StgAlgAlts t alts dflt) =
-   srtAlgAlts cont off alts [] emptyUniqSet []  
-				  =: \(alts, alts_g, alts_srt, off) ->
-   srtDefault cont off dflt	  =: \(dflt, dflt_g, dflt_srt, off) ->
-   let
-	g   = unionUniqSets alts_g dflt_g
-	srt = dflt_srt ++ alts_srt
-   in
-   (StgAlgAlts t alts dflt, g, srt, off)
+srtCaseAlts off (StgAlgAlts t alts dflt)
+  = srtDefault off dflt	 				=: \ ((dflt_off, dflt_srt), dflt') ->
+    mapAccumL srtAlgAlt (dflt_off, dflt_srt) alts	=: \ ((alts_off, alts_srt), alts') ->
+    (StgAlgAlts t alts' dflt', alts_srt, alts_off)
 
-srtCaseAlts cont off (StgPrimAlts t alts dflt) =
-   srtPrimAlts cont off alts [] emptyUniqSet []  
-				   =: \(alts, alts_g, alts_srt, off) ->
-   srtDefault cont off dflt	   =: \(dflt, dflt_g, dflt_srt, off) ->
-   let
-	g   = unionUniqSets alts_g dflt_g
-	srt = dflt_srt ++ alts_srt
-   in
-   (StgPrimAlts t alts dflt, g, srt, off)
+srtCaseAlts off (StgPrimAlts t alts dflt)
+  = srtDefault off dflt	 				=: \ ((dflt_off, dflt_srt), dflt') ->
+    mapAccumL srtPrimAlt (dflt_off, dflt_srt) alts	=: \ ((alts_off, alts_srt), alts') ->
+    (StgPrimAlts t alts' dflt', alts_srt, alts_off)
 
-srtAlgAlts cont off [] new_alts g srt = (reverse new_alts, g, srt, off)
-srtAlgAlts cont off ((con,args,used,rhs):alts) new_alts g srt =
-   srtExpr cont off rhs	=: \(rhs, rhs_g, rhs_srt, off) ->
-   let
-	g'   = unionUniqSets rhs_g g
-	srt' = rhs_srt ++ srt
-   in
-   srtAlgAlts cont off alts ((con,args,used,rhs) : new_alts) g' srt'
+srtAlgAlt (off,srt) (con,args,used,rhs)
+  = srtExpr off rhs	=: \(rhs', rhs_srt, rhs_off) ->
+    ((rhs_off, rhs_srt ++ srt), (con,args,used,rhs'))
 
-srtPrimAlts cont off [] new_alts g srt = (reverse new_alts, g, srt, off)
-srtPrimAlts cont off ((lit,rhs):alts) new_alts g srt =
-   srtExpr cont off rhs	=: \(rhs, rhs_g, rhs_srt, off) ->
-   let
-	g'   = unionUniqSets rhs_g g
-	srt' = rhs_srt ++ srt
-   in
-   srtPrimAlts cont off alts ((lit,rhs) : new_alts) g' srt'
+srtPrimAlt (off,srt) (lit,rhs)
+  = srtExpr off rhs	=: \(rhs', rhs_srt, rhs_off) ->
+    ((rhs_off, rhs_srt ++ srt), (lit, rhs'))
 
-srtDefault cont off StgNoDefault = (StgNoDefault,emptyUniqSet,[],off)
-srtDefault cont off (StgBindDefault rhs) =
-   srtExpr cont off rhs	=: \(rhs, g, srt, off) ->
-   (StgBindDefault rhs, g, srt, off)
-\end{code}
-
------------------------------------------------------------------------------
-
-Here we decide which Id's to place in the static reference table.  An
-internal top-level id will be in the environment with the appropriate
-CafInfo, so we use that if available.  An imported top-level Id will
-have the CafInfo attached.  Otherwise, we just ignore the Id.
-
-\begin{code}
-getGlobalRefs :: [StgArg] -> UniqSet Id
-getGlobalRefs args = mkUniqSet (concat (map globalRefArg args))
-
-globalRefArg :: StgArg -> [Id]
-globalRefArg (StgVarArg id)
-  | idMayHaveCafRefs id = [id]
-  | otherwise           = []
-globalRefArg _ = []
-
-idMayHaveCafRefs id = mayHaveCafRefs (idCafInfo id)
+srtDefault off StgNoDefault
+  = ((off,[]), StgNoDefault)
+srtDefault off (StgBindDefault rhs)
+  = srtExpr off rhs	=: \(rhs', srt, off) ->
+    ((off,srt), StgBindDefault rhs')
 \end{code}
 
 -----------------------------------------------------------------------------
 Misc stuff
 
 \begin{code}
-attach_srt_bind :: StgBinding -> Int -> Int -> StgBinding
-attach_srt_bind (StgNonRec binder rhs) off len = 
-	StgNonRec binder (attach_srt_rhs rhs off len)
-attach_srt_bind (StgRec binds) off len =
-	StgRec [ (v,attach_srt_rhs rhs off len) | (v,rhs) <- binds ]
-
-attach_srt_rhs :: StgRhs -> Int -> Int -> StgRhs
-attach_srt_rhs (StgRhsCon cc con args) off length
-  = StgRhsCon cc con args
-attach_srt_rhs (StgRhsClosure cc bi _ free upd args rhs) off length
-  = StgRhsClosure cc bi srt free upd args rhs
-  where
- 	srt | length == 0 = NoSRT
-	    | otherwise   = SRT off length
-
-
-all_con_binds (StgNonRec x rhs) = con_rhs rhs
-all_con_binds (StgRec bs) = all con_rhs (map snd bs)
-
-con_rhs (StgRhsCon _ _ _) = True
-con_rhs _ = False
-
-
 a =: k  = k a
-\end{code}
-
------------------------------------------------------------------------------
-Fix up the SRT's in a let-no-escape.
-
-(for a description of let-no-escapes, see CgLetNoEscape.lhs)
-
-Here's the problem: a let-no-escape isn't represented by an activation
-record on the stack.  It seems either very difficult or impossible to
-get the liveness bitmap right in the info table, so we don't do it
-this way (the liveness mask isn't constant).
-
-So, the question is how does the garbage collector get access to the
-SRT for the rhs of the let-no-escape?  It can't see an info table, so
-it must get the SRT from somewhere else.  Here's an example:
-
-   let-no-escape x = .... f ....
-   in  case blah of
-	   p -> .... x ... g ....
-
-(f and g are global).  Suppose we garbage collect while evaluating
-'blah'.  The stack will contain an activation record for the case,
-which will point to an SRT containing [g] (according to our SRT
-algorithm above).  But, since the case continuation can call x, and
-hence f, the SRT should really be [f,g].
-
-another example:
-
-   let-no-escape {-rec-} z =  \x -> case blah of
-				      p1 ->  .... f ...
-				      p2 ->  case blah2 of
-						p -> .... (z x') ...
-   in ....
-
-if we GC while evaluating blah2, then the case continuation on the
-stack needs to refer to [f] in its SRT, because we can reach f by
-calling z recursively.
-
-FIX:
-
-We keep track of the global references made by each let-no-escape in
-scope, so we can expand them every time the let-no-escape is
-referenced.
-
-\begin{code}
-lookupPossibleLNE lne_env f = 
-  case lookupUFM lne_env f of
-	Nothing   -> emptyUniqSet
-	Just refs -> refs
 \end{code}

@@ -89,11 +89,11 @@ lintStgVar v  = checkInScope v	`thenL_`
 
 \begin{code}
 lintStgBinds :: StgBinding -> LintM [Id]		-- Returns the binders
-lintStgBinds (StgNonRec binder rhs)
+lintStgBinds (StgNonRec _srt binder rhs)
   = lint_binds_help (binder,rhs) 	`thenL_`
     returnL [binder]
 
-lintStgBinds (StgRec pairs)
+lintStgBinds (StgRec _srt pairs)
   = addInScopeVars binders (
 	mapL lint_binds_help pairs `thenL_`
 	returnL binders
@@ -127,10 +127,10 @@ lint_binds_help (binder, rhs)
 \begin{code}
 lintStgRhs :: StgRhs -> LintM (Maybe Type)
 
-lintStgRhs (StgRhsClosure _ _ _ _ _ [] expr)
+lintStgRhs (StgRhsClosure _ _ _ _ [] expr)
   = lintStgExpr expr
 
-lintStgRhs (StgRhsClosure _ _ _ _ _ binders expr)
+lintStgRhs (StgRhsClosure _ _ _ _ binders expr)
   = addLoc (LambdaBodyOf binders) (
     addInScopeVars binders (
 	lintStgExpr expr   `thenMaybeL` \ body_ty ->

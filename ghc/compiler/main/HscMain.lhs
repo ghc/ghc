@@ -19,29 +19,32 @@ import ByteCodeGen	( byteCodeGen )
 import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
 import HscTypes		( InteractiveContext(..), TyThing(..) )
+import PrelNames	( iINTERACTIVE )
+import CoreTidy		( tidyCoreExpr )
+import StringBuffer	( stringToStringBuffer )
 #endif
 
 import HsSyn
 
-import StringBuffer	( hGetStringBuffer, 
-                          stringToStringBuffer, freeStringBuffer )
+import Id		( idName )
+import IdInfo		( CafInfo(..), CgInfoEnv, CgInfo(..) )
+import StringBuffer	( hGetStringBuffer, freeStringBuffer )
 import Parser
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
 import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
-import PrelNames	( vanillaSyntaxMap, knownKeyNames, iNTERACTIVE )
+import PrelNames	( vanillaSyntaxMap, knownKeyNames )
 import MkIface		( completeIface, writeIface, pprIface )
-import Type		( Type )
 import TcModule
 import InstEnv		( emptyInstEnv )
 import Desugar
 import SimplCore
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
-import CoreSat
-import CoreTidy		( tidyCoreExpr )
+import CorePrep		( corePrepPgm )
+import StgSyn
 import CoreToStg	( coreToStg )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -50,7 +53,7 @@ import CodeOutput	( codeOutput )
 import Module		( ModuleName, moduleName, mkHomeModule, 
 			  moduleUserString )
 import CmdLineOpts
-import ErrUtils		( dumpIfSet_dyn, showPass )
+import ErrUtils		( dumpIfSet_dyn, showPass, printError )
 import Util		( unJust )
 import UniqSupply	( mkSplitUniqSupply )
 
@@ -59,17 +62,15 @@ import Outputable
 import Interpreter
 import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
-import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
-			  PersistentRenamerState(..), ModuleLocation(..),
-			  HomeSymbolTable, 
-			  NameSupply(..), PackageRuleBase, HomeIfaceTable, 
-			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable
-			)
+import HscTypes
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName, isGlobalName )
-import NameEnv		( emptyNameEnv )
+import NameEnv		( emptyNameEnv, mkNameEnv )
 import Module		( Module, lookupModuleEnvByName )
+import Maybes		( orElse )
+
+import IOExts		( newIORef, readIORef, writeIORef, unsafePerformIO )
 
 import Monad		( when )
 import Maybe		( isJust )
@@ -223,71 +224,146 @@ hscRecomp ghci_mode dflags mod location maybe_checked_iface hst hit pcs_ch
       	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
       	     Just (pcs_tc, tc_result) -> do {
     
-	; let env_tc   = tc_env tc_result
-	      insts_tc = tc_insts tc_result
-
  	    -------------------
  	    -- DESUGAR
  	    -------------------
-	; (ds_binds, ds_rules, foreign_stuff) 
+	; (ds_details, foreign_stuff) 
              <- _scc_ "DeSugar" 
 		deSugar dflags pcs_tc hst this_mod print_unqualified tc_result
 
  	    -------------------
  	    -- SIMPLIFY
  	    -------------------
-	; (simplified, orphan_rules) 
+	; simpl_details
 	     <- _scc_     "Core2Core"
-		core2core dflags pcs_tc hst dont_discard ds_binds ds_rules
+		core2core dflags pcs_tc hst dont_discard ds_details
 
  	    -------------------
  	    -- TIDY
  	    -------------------
-	; (pcs_simpl, tidy_binds, new_details) 
-	     <- tidyCorePgm dflags this_mod pcs_tc env_tc insts_tc 
-			    simplified orphan_rules
+	; cg_info_ref <- newIORef Nothing ;
+	; let cg_info :: CgInfoEnv
+	      cg_info = unsafePerformIO $ do {
+			   maybe_cg_env <- readIORef cg_info_ref ;
+			   case maybe_cg_env of
+			     Just env -> return env
+			     Nothing  -> do { printError "Urk! Looked at CgInfo too early!";
+					      return emptyNameEnv } }
+		-- cg_info_ref will be filled in just after restOfCodeGeneration
+		-- Meanwhile, tidyCorePgm is careful not to look at cg_info!
+
+	; (pcs_simpl, tidy_details) 
+	     <- tidyCorePgm dflags this_mod pcs_tc cg_info simpl_details
       
  	    -------------------
- 	    -- BUILD THE NEW ModDetails AND ModIface
+ 	    -- PREPARE FOR CODE GENERATION
  	    -------------------
-	; final_iface <- _scc_ "MkFinalIface" 
-			  mkFinalIface ghci_mode dflags location 
-                                       maybe_checked_iface new_iface new_details
+	      -- Do saturation and convert to A-normal form
+	; prepd_details <- corePrepPgm dflags tidy_details
 
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION
  	    -------------------
-	      -- Do saturation and convert to A-normal form
-	; saturated <- coreSatPgm dflags tidy_binds
+	; let
+	    ModDetails{md_binds=binds, md_types=env_tc} = prepd_details
 
-	; (maybe_stub_h_filename, maybe_stub_c_filename, maybe_bcos)
-      	     <- restOfCodeGeneration dflags toInterp this_mod
- 		   (map ideclName (hsModuleImports rdr_module))
-      		   foreign_stuff env_tc saturated
-      		   hit (pcs_PIT pcs_simpl)       
+	    local_tycons     = typeEnvTyCons  env_tc
+	    local_classes    = typeEnvClasses env_tc
+
+ 	    imported_module_names = map ideclName (hsModuleImports rdr_module)
+	    imported_modules = map mod_name_to_Module imported_module_names
+
+	    (h_code,c_code,fe_binders) = foreign_stuff
+	
+	    pit = pcs_PIT pcs_simpl
+
+	    mod_name_to_Module :: ModuleName -> Module
+	    mod_name_to_Module nm
+	       = let str_mi = lookupModuleEnvByName hit nm `orElse`
+			      lookupModuleEnvByName pit nm `orElse`
+			      pprPanic "mod_name_to_Module: no hst or pst mapping for" 
+			       	(ppr nm)
+		 in  mi_module str_mi
+
+	; (maybe_stub_h_filename, maybe_stub_c_filename,
+	   maybe_bcos, final_iface )
+	   <- if toInterp
+	        then do 
+		    -----------------  Generate byte code ------------------
+		    (bcos,itbl_env) <- byteCodeGen dflags binds 
+					local_tycons local_classes
+
+		    -- Fill in the code-gen info
+		    writeIORef cg_info_ref (Just emptyNameEnv)
+
+		    ------------------ BUILD THE NEW ModIface ------------
+		    final_iface <- _scc_ "MkFinalIface" 
+			  mkFinalIface ghci_mode dflags location 
+                                   maybe_checked_iface new_iface tidy_details
+
+      		    return ( Nothing, Nothing, 
+			     Just (bcos,itbl_env), final_iface )
+
+	        else do
+		    -----------------  Convert to STG ------------------
+		    (stg_binds, cost_centre_info, stg_back_end_info) 
+		    	      <- _scc_ "CoreToStg"
+		    		  myCoreToStg dflags this_mod binds
+		    
+		    -- Fill in the code-gen info for the earlier tidyCorePgm
+		    writeIORef cg_info_ref (Just stg_back_end_info)
+
+		    ------------------ BUILD THE NEW ModIface ------------
+		    final_iface <- _scc_ "MkFinalIface" 
+			  mkFinalIface ghci_mode dflags location 
+                                   maybe_checked_iface new_iface tidy_details
+
+		    ------------------  Code generation ------------------
+		    abstractC <- _scc_ "CodeGen"
+		    		  codeGen dflags this_mod imported_modules
+		    			 cost_centre_info fe_binders
+		    			 local_tycons stg_binds
+		    
+		    ------------------  Code output -----------------------
+		    (maybe_stub_h_name, maybe_stub_c_name)
+		       <- codeOutput dflags this_mod local_tycons
+		    	     binds stg_binds
+		    	     c_code h_code abstractC
+	      		
+	      	    return ( maybe_stub_h_name, maybe_stub_c_name, 
+			     Nothing, final_iface )
+
+	; let final_details = tidy_details {md_binds = []} 
+
 
       	  -- and the answer is ...
-	; return (HscRecomp pcs_simpl new_details final_iface
+	; return (HscRecomp pcs_simpl
+			    final_details
+			    final_iface
                             maybe_stub_h_filename maybe_stub_c_filename
       			    maybe_bcos)
       	  }}}}}}}
 
 
 
-mkFinalIface ghci_mode dflags location maybe_old_iface new_iface new_details
+mkFinalIface ghci_mode dflags location 
+	maybe_old_iface new_iface new_details
  = case completeIface maybe_old_iface new_iface new_details of
+
       (new_iface, Nothing) -- no change in the interfacfe
          -> do when (dopt Opt_D_dump_hi_diffs dflags)
                     (printDump (text "INTERFACE UNCHANGED"))
                dumpIfSet_dyn dflags Opt_D_dump_hi
                              "UNCHANGED FINAL INTERFACE" (pprIface new_iface)
 	       return new_iface
+
       (new_iface, Just sdoc_diffs)
          -> do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "INTERFACE HAS CHANGED" 
                                     sdoc_diffs
                dumpIfSet_dyn dflags Opt_D_dump_hi "NEW FINAL INTERFACE" 
                                     (pprIface new_iface)
-               -- Write the interface file
+
+               -- Write the interface file, if not in interactive mode
                when (ghci_mode /= Interactive) 
                     (writeIface (unJust "hscRecomp:hi" (ml_hi_file location))
                                 new_iface)
@@ -324,71 +400,30 @@ myParseModule dflags src_filename
       }}
 
 
-restOfCodeGeneration dflags toInterp this_mod imported_module_names
-                     foreign_stuff env_tc tidy_binds
-                     hit pit -- these last two for mapping ModNames to Modules
- | toInterp
- = do (bcos,itbl_env) 
-         <- byteCodeGen dflags tidy_binds local_tycons local_classes
-      return (Nothing, Nothing, Just (bcos,itbl_env))
-
- | otherwise
- = do
-      --------------------------  Convert to STG -------------------------------
-      (stg_binds, cost_centre_info) 
-		<- _scc_ "CoreToStg"
-		    myCoreToStg dflags this_mod tidy_binds env_tc
-
-      --------------------------  Code generation ------------------------------
-      abstractC <- _scc_ "CodeGen"
-		    codeGen dflags this_mod imported_modules
-                           cost_centre_info fe_binders
-                           local_tycons stg_binds
-
-      --------------------------  Code output -------------------------------
-      (maybe_stub_h_name, maybe_stub_c_name)
-         <- codeOutput dflags this_mod local_tycons
-                       tidy_binds stg_binds
-                       c_code h_code abstractC
-
-      return (maybe_stub_h_name, maybe_stub_c_name, Nothing)
- where
-    local_tycons     = typeEnvTyCons env_tc
-    local_classes    = typeEnvClasses env_tc
-    imported_modules = map mod_name_to_Module imported_module_names
-    (h_code,c_code,fe_binders) = foreign_stuff
-
-    mod_name_to_Module :: ModuleName -> Module
-    mod_name_to_Module nm
-       = let str_mi = case lookupModuleEnvByName hit nm of
-                          Just mi -> mi
-                          Nothing -> case lookupModuleEnvByName pit nm of
-                                        Just mi -> mi
-                                        Nothing -> barf nm
-         in  mi_module str_mi
-    barf nm = pprPanic "mod_name_to_Module: no hst or pst mapping for" 
-                       (ppr nm)
-
-
-myCoreToStg dflags this_mod tidy_binds env_tc
+myCoreToStg dflags this_mod tidy_binds
  = do 
       () <- coreBindsSize tidy_binds `seq` return ()
       -- TEMP: the above call zaps some space usage allocated by the
       -- simplifier, which for reasons I don't understand, persists
       -- thoroughout code generation
 
-      --let bcos = byteCodeGen dflags tidy_binds local_tycons local_classes
-
-      
-      stg_binds <- _scc_ "Core2Stg" coreToStg dflags this_mod tidy_binds
+      stg_binds <- _scc_ "Core2Stg" coreToStg dflags tidy_binds
 
       (stg_binds2, cost_centre_info)
 	   <- _scc_ "Core2Stg" stg2stg dflags this_mod stg_binds
 
-      return (stg_binds2, cost_centre_info)
+      let env_rhs :: CgInfoEnv
+	  env_rhs = mkNameEnv [ (idName bndr, CgInfo (stgRhsArity rhs) caf_info)
+			      | (bind,_) <- stg_binds2, 
+			        let caf_info 
+				     | stgBindHasCafRefs bind = MayHaveCafRefs
+				     | otherwise = NoCafRefs,
+			        (bndr,rhs) <- stgBindPairs bind ]
+
+      return (stg_binds2, cost_centre_info, env_rhs)
    where
-      local_tycons  = typeEnvTyCons env_tc
-      local_classes = typeEnvClasses env_tc
+      stgBindPairs (StgNonRec _ b r) = [(b,r)]
+      stgBindPairs (StgRec    _ prs) = prs
 \end{code}
 
 

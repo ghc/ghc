@@ -28,10 +28,12 @@ import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			)
 
 import CmdLineOpts
-import Id		( idType, idInfo, isImplicitId, isLocalId, idName )
+import Id		( idType, idInfo, isImplicitId, idCgInfo,
+			  isLocalId, idName,
+			)
 import DataCon		( StrictnessMark(..), dataConId, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
-import CoreSyn		( CoreBind, CoreRule(..) )
+import CoreSyn		( CoreRule(..) )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
 import PprCore		( pprIdCoreRule )
 import Name		( getName, nameModule, toRdrName, isGlobalName, Name, NamedThing(..) )
@@ -69,7 +71,7 @@ completeIface :: Maybe ModIface		-- The old interface, if we have it
 	-- NB: 'Nothing' means that even the usages havn't changed, so there's no
 	--     need to write a new interface file.  But even if the usages have
 	--     changed, the module version may not have.
-completeIface maybe_old_iface new_iface mod_details 
+completeIface maybe_old_iface new_iface mod_details
   = addVersionInfo maybe_old_iface (new_iface { mi_decls = new_decls })
   where
      new_decls   = mkIfaceDecls ty_cls_dcls rule_dcls inst_dcls
@@ -171,18 +173,20 @@ ifaceTyCls (AnId id) so_far
 
     id_type = idType id
     id_info = idInfo id
+    cg_info = idCgInfo id
+    arity_info = cgArity cg_info
+    caf_info   = cgCafInfo cg_info
 
     hs_idinfo | opt_OmitInterfacePragmas = []
  	      | otherwise		 = arity_hsinfo  ++ caf_hsinfo  ++ cpr_hsinfo ++ 
 					   strict_hsinfo ++ wrkr_hsinfo ++ unfold_hsinfo
 
     ------------  Arity  --------------
-    arity_hsinfo = case arityInfo id_info of
-			a@(ArityExactly n) -> [HsArity a]
-			other		   -> []
+    arity_hsinfo | arity_info == 0 = []
+		 | otherwise       = [HsArity arity_info]
 
     ------------ Caf Info --------------
-    caf_hsinfo = case cafInfo id_info of
+    caf_hsinfo = case caf_info of
 		   NoCafRefs -> [HsNoCafRefs]
 		   otherwise -> []
 
@@ -200,8 +204,9 @@ ifaceTyCls (AnId id) so_far
     work_info   = workerInfo id_info
     has_worker  = case work_info of { HasWorker _ _ -> True; other -> False }
     wrkr_hsinfo = case work_info of
-		    HasWorker work_id wrap_arity -> [HsWorker (getName work_id)]
-		    NoWorker			 -> []
+		    HasWorker work_id wrap_arity -> 
+			[HsWorker (getName work_id) wrap_arity]
+		    NoWorker -> []
 
     ------------  Unfolding  --------------
 	-- The unfolding is redundant if there is a worker

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.41 2001/02/20 09:38:59 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.42 2001/03/13 12:50:30 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -208,14 +208,14 @@ cgExpr (StgCase expr live_vars save_vars bndr srt alts)
 \subsection[let-and-letrec-codegen]{Converting @StgLet@ and @StgLetrec@}
 
 \begin{code}
-cgExpr (StgLet (StgNonRec name rhs) expr)
-  = cgRhs name rhs	`thenFC` \ (name, info) ->
+cgExpr (StgLet (StgNonRec srt name rhs) expr)
+  = cgRhs srt name rhs	`thenFC` \ (name, info) ->
     addBindC name info 	`thenC`
     cgExpr expr
 
-cgExpr (StgLet (StgRec pairs) expr)
+cgExpr (StgLet (StgRec srt pairs) expr)
   = fixC (\ new_bindings -> addBindsC new_bindings `thenC`
-			    listFCs [ cgRhs b e | (b,e) <- pairs ]
+			    listFCs [ cgRhs srt b e | (b,e) <- pairs ]
     ) `thenFC` \ new_bindings ->
 
     addBindsC new_bindings `thenC`
@@ -274,17 +274,15 @@ We rely on the support code in @CgCon@ (to do constructors) and
 in @CgClosure@ (to do closures).
 
 \begin{code}
-cgRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
+cgRhs :: SRT -> Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along so a binding can be set up
 
-cgRhs name (StgRhsCon maybe_cc con args)
+cgRhs srt name (StgRhsCon maybe_cc con args)
   = getArgAmodes args				`thenFC` \ amodes ->
     buildDynCon name maybe_cc con amodes	`thenFC` \ idinfo ->
     returnFC (name, idinfo)
 
-cgRhs name (StgRhsClosure cc bi srt@(NoSRT) fvs upd_flag args body)
-  = mkRhsClosure name cc bi srt fvs upd_flag args body
-cgRhs name (StgRhsClosure cc bi srt@(SRT _ _) fvs upd_flag args body)
+cgRhs srt name (StgRhsClosure cc bi fvs upd_flag args body)
   = mkRhsClosure name cc bi srt fvs upd_flag args body
 \end{code}
 
@@ -391,17 +389,19 @@ mkRhsClosure bndr cc bi srt fvs upd_flag args body
 %*							*
 %********************************************************
 \begin{code}
-cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgNonRec binder rhs)
+cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot 
+	(StgNonRec srt binder rhs)
   = cgLetNoEscapeRhs live_in_rhss rhs_eob_info maybe_cc_slot 	
-			NonRecursive binder rhs 
+			NonRecursive srt binder rhs 
     	    	    	    	`thenFC` \ (binder, info) ->
     addBindC binder info
 
-cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgRec pairs)
+cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot 
+	(StgRec srt pairs)
   = fixC (\ new_bindings ->
 		addBindsC new_bindings 	`thenC`
 		listFCs [ cgLetNoEscapeRhs full_live_in_rhss 
-				rhs_eob_info maybe_cc_slot Recursive b e 
+				rhs_eob_info maybe_cc_slot Recursive srt b e 
 			| (b,e) <- pairs ]
     ) `thenFC` \ new_bindings ->
 
@@ -416,25 +416,27 @@ cgLetNoEscapeRhs
     -> EndOfBlockInfo
     -> Maybe VirtualSpOffset
     -> RecFlag
+    -> SRT
     -> Id
     -> StgRhs
     -> FCode (Id, CgIdInfo)
 
-cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
-		 (StgRhsClosure cc bi srt _ upd_flag args body)
+cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec srt binder
+		 (StgRhsClosure cc bi _ upd_flag args body)
   = -- We could check the update flag, but currently we don't switch it off
     -- for let-no-escaped things, so we omit the check too!
     -- case upd_flag of
     --     Updatable -> panic "cgLetNoEscapeRhs"	-- Nothing to update!
     --     other     -> cgLetNoEscapeClosure binder cc bi live_in_whole_let live_in_rhss args body
-    cgLetNoEscapeClosure binder cc bi srt full_live_in_rhss rhs_eob_info maybe_cc_slot rec args body
+    cgLetNoEscapeClosure binder cc bi srt full_live_in_rhss rhs_eob_info
+	maybe_cc_slot rec args body
 
 -- For a constructor RHS we want to generate a single chunk of code which
 -- can be jumped to from many places, which will return the constructor.
 -- It's easy; just behave as if it was an StgRhsClosure with a ConApp inside!
-cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
+cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec srt binder
     	    	 (StgRhsCon cc con args)
-  = cgLetNoEscapeClosure binder cc noBinderInfo{-safe-} NoSRT 
+  = cgLetNoEscapeClosure binder cc noBinderInfo{-safe-} srt
 			 full_live_in_rhss rhs_eob_info maybe_cc_slot rec
 	[] 	--No args; the binder is data structure, not a function
 	(StgConApp con args)

@@ -44,7 +44,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import CallConv         ( cCallConv )
 import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
-import IdInfo           ( exactArity, InlinePragInfo(..) )
+import IdInfo           ( InlinePragInfo(..) )
 import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
 
@@ -742,12 +742,12 @@ id_info		:: { [HsIdInfo RdrName] }
 		| id_info_item id_info		{ $1 : $2 }
 
 id_info_item	:: { HsIdInfo RdrName }
-		: '__A' INTEGER			{ HsArity (exactArity (fromInteger $2)) }
+		: '__A' INTEGER			{ HsArity (fromInteger $2) }
 		| '__U' inline_prag core_expr	{ HsUnfold $2 $3 }
 		| '__M'				{ HsCprInfo }
 		| '__S'				{ HsStrictness (mkStrictnessInfo $1) }
 		| '__C'                         { HsNoCafRefs }
-		| '__P' qvar_name 		{ HsWorker $2 }
+		| '__P' qvar_name INTEGER	{ HsWorker $2 (fromInteger $3) }
 
 inline_prag     :: { InlinePragInfo }
                 :  {- empty -}                  { NoInlinePragInfo }

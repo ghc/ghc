@@ -12,6 +12,7 @@ module ErrUtils (
 
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 
+	printError,
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
 	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, 
@@ -27,7 +28,7 @@ import Outputable
 import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt )
 
 import System		( ExitCode(..), exitWith )
-import IO		( hPutStr, stderr )
+import IO		( hPutStr, hPutStrLn, stderr )
 \end{code}
 
 \begin{code}
@@ -69,6 +70,10 @@ dontAddErrLoc msg = (noSrcLoc, msg)
 
 \end{code}
 
+\begin{code}
+printError :: String -> IO ()
+printError str = hPutStrLn stderr str
+\end{code}
 
 \begin{code}
 type Messages = (Bag WarnMsg, Bag ErrMsg)

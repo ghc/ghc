@@ -12,13 +12,12 @@ module CoreToStg ( coreToStg, coreExprToStg ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreFVs
 import CoreUtils
-import SimplUtils
 import StgSyn
 
 import Type
 import TyCon		( isAlgTyCon )
+import Literal
 import Id
 import Var		( Var, globalIdDetails )
 import IdInfo
@@ -28,15 +27,16 @@ import VarSet
 import VarEnv
 import DataCon		( dataConWrapId )
 import IdInfo		( OccInfo(..) )
-import PrimOp		( PrimOp(..), ccallMayGC )
 import TysPrim		( foreignObjPrimTyCon )
-import Maybes		( maybeToBool, orElse )
-import Name		( getOccName, isExternallyVisibleName )
-import Module		( Module )
+import Maybes		( maybeToBool )
+import Name		( getOccName, isExternallyVisibleName, isDllName )
 import OccName		( occNameUserString )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel )
 import CmdLineOpts	( DynFlags, opt_KeepStgTypes )
+import FastTypes	hiding ( fastOr )
 import Outputable
+
+import List 		( partition )
 
 infixr 9 `thenLne`
 \end{code}
@@ -92,64 +92,125 @@ if @v@ is.
 
 %************************************************************************
 %*									*
+\subsection[caf-info]{Collecting live CAF info}
+%*									*
+%************************************************************************
+
+In this pass we also collect information on which CAFs are live for 
+constructing SRTs (see SRT.lhs).  
+
+A top-level Id has CafInfo, which is
+
+	- MayHaveCafRefs, if it may refer indirectly to
+	  one or more CAFs, or
+	- NoCafRefs if it definitely doesn't
+
+we collect the CafInfo first by analysing the original Core expression, and
+also place this information in the environment.
+
+During CoreToStg, we then pin onto each binding and case expression, a
+list of Ids which represents the "live" CAFs at that point.  The meaning
+of "live" here is the same as for live variables, see above (which is
+why it's convenient to collect CAF information here rather than elsewhere).
+
+The later SRT pass takes these lists of Ids and uses them to construct
+the actual nested SRTs, and replaces the lists of Ids with (offset,length)
+pairs.
+
+%************************************************************************
+%*									*
 \subsection[binds-StgVarInfo]{Setting variable info: top-level, binds, RHSs}
 %*									*
 %************************************************************************
 
 \begin{code}
-coreToStg :: DynFlags -> Module -> [CoreBind] -> IO [StgBinding]
-coreToStg dflags this_mod pgm
-  = return (fst (initLne (coreTopBindsToStg pgm)))
+coreToStg :: DynFlags -> [CoreBind] -> IO [StgBinding]
+coreToStg dflags pgm
+  = return pgm'
+  where (env', fvs, pgm') = coreTopBindsToStg emptyVarEnv pgm
 
 coreExprToStg :: CoreExpr -> StgExpr
 coreExprToStg expr 
-  = new_expr where (new_expr,_,_) = initLne (coreToStgExpr expr)
+  = new_expr where (new_expr,_,_) = initLne emptyVarEnv (coreToStgExpr expr)
 
--- For top-level guys, we basically aren't worried about this
--- live-variable stuff; we do need to keep adding to the environment
--- as we step through the bindings (using @extendVarEnv@).
 
-coreTopBindsToStg :: [CoreBind] -> LneM ([StgBinding], FreeVarsInfo)
+coreTopBindsToStg
+    :: IdEnv HowBound		-- environment for the bindings
+    -> [CoreBind]
+    -> (IdEnv HowBound, FreeVarsInfo, [StgBinding])
 
-coreTopBindsToStg [] = returnLne ([], emptyFVInfo)
-coreTopBindsToStg (bind:binds)
-  =  let 
-         binders = bindersOf bind
-	 env_extension = binders `zip` repeat how_bound
-    	 how_bound = LetrecBound True {- top level -}
-				 emptyVarSet
-     in
-
-     extendVarEnvLne env_extension (
-       coreTopBindsToStg binds		       `thenLne` \ (binds', fv_binds) ->
-       coreTopBindToStg binders fv_binds bind  `thenLne` \ (bind',  fv_bind) ->
-       returnLne (
-		  (bind' : binds'),
-		  binders `minusFVBinders` (fv_binds `unionFVInfo` fv_bind)
-		 )
-      )
+coreTopBindsToStg env [] = (env, emptyFVInfo, [])
+coreTopBindsToStg env (b:bs)
+  = (env2, fvs1, b':bs')
+  where
+	-- env accumulates down the list of binds, fvs accumulates upwards
+	(env1, fvs2, b' ) = coreTopBindToStg env fvs1 b
+  	(env2, fvs1, bs') = coreTopBindsToStg env1 bs
 
 
 coreTopBindToStg
-	:: [Id]			-- New binders (with correct arity)
+	:: IdEnv HowBound
 	-> FreeVarsInfo		-- Info about the body
 	-> CoreBind
-	-> LneM (StgBinding, FreeVarsInfo)
+	-> (IdEnv HowBound, FreeVarsInfo, StgBinding)
 
-coreTopBindToStg [binder] body_fvs (NonRec _ rhs)
-  = coreToStgRhs body_fvs TopLevel (binder,rhs)	`thenLne` \ (rhs2, fvs, _) ->
-    returnLne (StgNonRec binder rhs2, fvs)
+coreTopBindToStg env body_fvs (NonRec id rhs)
+  = let 
+	caf_info = hasCafRefs env rhs
 
-coreTopBindToStg binders body_fvs (Rec pairs)
-  = fixLne (\ ~(_, rec_rhs_fvs) ->
-	let scope_fvs = unionFVInfo body_fvs rec_rhs_fvs
-	in
-	mapAndUnzip3Lne (coreToStgRhs scope_fvs TopLevel) pairs 
-						`thenLne` \ (rhss2, fvss, _) ->
-	let fvs = unionFVInfos fvss
-	in
-	returnLne (StgRec (binders `zip` rhss2), fvs)
-    )
+	env' = extendVarEnv env id (LetBound how_bound emptyVarSet)
+
+	how_bound | mayHaveCafRefs caf_info = TopLevelHasCafs
+		  | otherwise               = TopLevelNoCafs
+
+        (stg_rhs, fvs', cafs) = 
+	    initLne env (
+              coreToStgRhs body_fvs TopLevel (id,rhs) 
+			`thenLne` \ (stg_rhs, fvs', _) ->
+	      freeVarsToLiveVars fvs' `thenLne` \ (_, cafs) ->
+	      returnLne (stg_rhs, fvs', cafs)
+           )
+	
+	bind = StgNonRec (SRTEntries cafs) id stg_rhs
+    in
+    ASSERT2(consistent caf_info bind, ppr id)
+--    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
+    (env', fvs' `unionFVInfo` body_fvs, bind)
+
+coreTopBindToStg env body_fvs (Rec pairs)
+  = let 
+	(binders, rhss) = unzip pairs
+
+	-- to calculate caf_info, we initially map all the binders to
+	-- TopLevelNoCafs.
+	env1 = extendVarEnvList env 
+		[ (b, LetBound TopLevelNoCafs emptyVarSet) | b <- binders ]
+
+	caf_info = hasCafRefss env1{-NB: not env'-} rhss
+
+	env' = extendVarEnvList env 
+		[ (b, LetBound how_bound emptyVarSet) | b <- binders ]
+
+	how_bound | mayHaveCafRefs caf_info = TopLevelHasCafs
+		  | otherwise               = TopLevelNoCafs
+
+        (stg_rhss, fvs', cafs)
+	  = initLne env' (
+	       mapAndUnzip3Lne (coreToStgRhs body_fvs TopLevel) pairs
+			`thenLne` \ (stg_rhss, fvss', _) ->
+	       let fvs' = unionFVInfos fvss' in
+	       freeVarsToLiveVars fvs'	`thenLne` \ (_, cafs) ->
+	       returnLne (stg_rhss, fvs', cafs)
+           )
+
+	bind = StgRec (SRTEntries cafs) (zip binders stg_rhss)
+    in
+    ASSERT2(consistent caf_info bind, ppr binders)
+--    WARN(not (consistent caf_info bind), ppr binders <+> ppr cafs <+> ppCafInfo caf_info)
+    (env', fvs' `unionFVInfo` body_fvs, bind)
+
+-- assertion helper
+consistent caf_info bind = mayHaveCafRefs caf_info == stgBindHasCafRefs bind
 \end{code}
 
 \begin{code}
@@ -166,11 +227,14 @@ coreToStgRhs scope_fv_info top (binder, rhs)
   where
     binder_info = lookupFVInfo scope_fv_info binder
 
+bogus_rhs = StgRhsClosure noCCS noBinderInfo [] ReEntrant [] bogus_expr
+bogus_expr = (StgLit (MachInt 1))
+
 mkStgRhs :: TopLevelFlag -> FreeVarsInfo -> StgBinderInfo
 	 -> StgExpr -> StgRhs
 
 mkStgRhs top rhs_fvs binder_info (StgLam _ bndrs body)
-  = StgRhsClosure noCCS binder_info noSRT
+  = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 		  ReEntrant
 		  bndrs body
@@ -180,7 +244,7 @@ mkStgRhs top rhs_fvs binder_info (StgConApp con args)
   = StgRhsCon noCCS con args
 
 mkStgRhs top rhs_fvs binder_info rhs
-  = StgRhsClosure noCCS binder_info noSRT
+  = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 	          (updatable [] rhs)
 	          [] rhs
@@ -273,10 +337,10 @@ coreToStgExpr expr@(Lam _ _)
 	set_of_args	= mkVarSet args'
 	fvs		= args' `minusFVBinders` body_fvs
 	escs		= body_escs `minusVarSet`    set_of_args
+	result_expr | null args' = body
+		    | otherwise  = StgLam (exprType expr) args' body
     in
-    if null args'
-	then returnLne (body, fvs, escs)
-	else returnLne (StgLam (exprType expr) args' body, fvs, escs)
+    returnLne (result_expr, fvs, escs)
 
 coreToStgExpr (Note (SCC cc) expr)
   = coreToStgExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
@@ -289,10 +353,9 @@ coreToStgExpr (Note other_note expr)
 -- Cases require a little more real work.
 
 coreToStgExpr (Case scrut bndr alts)
-  = getVarsLiveInCont				`thenLne` \ live_in_cont ->
-    extendVarEnvLne [(bndr, CaseBound)]	$
-    vars_alts (findDefault alts)		`thenLne` \ (alts2, alts_fvs, alts_escs) ->
-    lookupLiveVarsForSet alts_fvs		`thenLne` \ alts_lvs ->
+  = extendVarEnvLne [(bndr, CaseBound)]	$
+    vars_alts (findDefault alts)   `thenLne` \ (alts2, alts_fvs, alts_escs) ->
+    freeVarsToLiveVars  alts_fvs   `thenLne` \ (alts_lvs, alts_caf_refs) ->
     let
 	-- determine whether the default binder is dead or not
 	-- This helps the code generator to avoid generating an assignment
@@ -301,41 +364,29 @@ coreToStgExpr (Case scrut bndr alts)
 		  then bndr
 		  else bndr `setIdOccInfo` IAmDead
 
-	 -- for a _ccall_GC_, some of the *arguments* need to live across the
-	 -- call (see findLiveArgs comments.), so we annotate them as being live
-	 -- in the alts to achieve the desired effect.
-	mb_live_across_case =
-	  case scrut of
-	    -- ToDo: Notes?
-	    e@(App _ _) | (v, args) <- myCollectArgs e,
-			  PrimOpId (CCallOp ccall) <- globalIdDetails v,
-			  ccallMayGC ccall
-			  -> Just (filterVarSet isForeignObjArg (exprFreeVars e))
-	    _   -> Nothing
-
 	-- Don't consider the default binder as being 'live in alts',
 	-- since this is from the point of view of the case expr, where
 	-- the default binder is not free.
-	live_in_alts = orElse (FMAP unionVarSet mb_live_across_case) id $
-		       live_in_cont `unionVarSet` 
-		       (alts_lvs `minusVarSet` unitVarSet bndr)
+	live_in_alts = (alts_lvs `minusVarSet` unitVarSet bndr)
     in
 	-- we tell the scrutinee that everything live in the alts
 	-- is live in it, too.
-    setVarsLiveInCont live_in_alts (
-	coreToStgExpr scrut
-    )			   `thenLne` \ (scrut2, scrut_fvs, scrut_escs) ->
+    setVarsLiveInCont (live_in_alts,alts_caf_refs) (
+	coreToStgExpr scrut	  `thenLne` \ (scrut2, scrut_fvs, scrut_escs) ->
+        freeVarsToLiveVars scrut_fvs `thenLne` \ (scrut_lvs, _) ->
+	returnLne (scrut2, scrut_fvs, scrut_escs, scrut_lvs)
+      )    
+		`thenLne` \ (scrut2, scrut_fvs, scrut_escs, scrut_lvs) ->
 
-    lookupLiveVarsForSet scrut_fvs `thenLne` \ scrut_lvs ->
-    let
-	live_in_whole_case = live_in_alts `unionVarSet` scrut_lvs
+    let srt = SRTEntries alts_caf_refs
     in
     returnLne (
-      StgCase scrut2 live_in_whole_case live_in_alts bndr' noSRT alts2,
+      StgCase scrut2 scrut_lvs live_in_alts bndr' srt alts2,
       bndr `minusFVBinder` (scrut_fvs `unionFVInfo` alts_fvs),
       (alts_escs `minusVarSet` unitVarSet bndr) `unionVarSet` getFVSet scrut_fvs
-		-- You might think we should have scrut_escs, not (getFVSet scrut_fvs),
-		-- but actually we can't call, and then return from, a let-no-escape thing.
+		-- You might think we should have scrut_escs, not 
+		-- (getFVSet scrut_fvs), but actually we can't call, and 
+		-- then return from, a let-no-escape thing.
       )
   where
     scrut_ty   = idType bndr
@@ -464,13 +515,12 @@ coreToStgApp
 	-> LneM (StgExpr, FreeVarsInfo, EscVarsSet)
 
 coreToStgApp maybe_thunk_body f args
-  = getVarsLiveInCont		`thenLne` \ live_in_cont ->
-    coreToStgArgs args		`thenLne` \ (args', args_fvs) ->
+  = coreToStgArgs args		`thenLne` \ (args', args_fvs) ->
     lookupVarLne f		`thenLne` \ how_bound ->
 
     let
 	n_args		 = length args
-	not_letrec_bound = not (isLetrecBound how_bound)
+	not_letrec_bound = not (isLetBound how_bound)
 	fun_fvs	 	 = singletonFVInfo f how_bound fun_occ
 
 	-- Mostly, the arity info of a function is in the fn's IdInfo
@@ -568,38 +618,28 @@ coreToStgLet
 				-- is among the escaping vars
 
 coreToStgLet let_no_escape bind body
-  = fixLne (\ ~(_, _, _, rec_bind_lvs, _, rec_body_fvs, _, _) ->
+  = fixLne (\ ~(_, _, _, _, _, rec_body_fvs, _, _) ->
 
 	-- Do the bindings, setting live_in_cont to empty if
 	-- we ain't in a let-no-escape world
 	getVarsLiveInCont		`thenLne` \ live_in_cont ->
-	setVarsLiveInCont
-		(if let_no_escape then live_in_cont else emptyVarSet)
-		(vars_bind rec_bind_lvs rec_body_fvs bind)
-			    `thenLne` \ (bind2, bind_fvs, bind_escs, env_ext) ->
-
-	-- The live variables of this binding are the ones which are live
-	-- by virtue of being accessible via the free vars of the binding (lvs_from_fvs)
-	-- together with the live_in_cont ones
-	lookupLiveVarsForSet (binders `minusFVBinders` bind_fvs)
-				`thenLne` \ lvs_from_fvs ->
-	let
-		bind_lvs = lvs_from_fvs `unionVarSet` live_in_cont
-	in
-
-	-- bind_fvs and bind_escs still include the binders of the let(rec)
-	-- but bind_lvs does not
+	setVarsLiveInCont (if let_no_escape 
+				then live_in_cont 
+				else (emptyVarSet,emptyVarSet))
+			  (vars_bind rec_body_fvs bind)
+		  `thenLne` \ (bind2, bind_fvs, bind_escs, bind_lvs, env_ext) ->
 
   	-- Do the body
 	extendVarEnvLne env_ext (
-		coreToStgExpr body			`thenLne` \ (body2, body_fvs, body_escs) ->
-		lookupLiveVarsForSet body_fvs	`thenLne` \ body_lvs ->
+	  coreToStgExpr body          `thenLne` \(body2, body_fvs, body_escs) ->
+	  freeVarsToLiveVars body_fvs `thenLne` \(body_lvs, _) ->
 
-		returnLne (bind2, bind_fvs, bind_escs, bind_lvs,
-			   body2, body_fvs, body_escs, body_lvs)
+  	  returnLne (bind2, bind_fvs, bind_escs, bind_lvs,
+		     body2, body_fvs, body_escs, body_lvs)
+	)
 
-    )) `thenLne` (\ (bind2, bind_fvs, bind_escs, bind_lvs,
-		     body2, body_fvs, body_escs, body_lvs) ->
+    ) `thenLne` (\ (bind2, bind_fvs, bind_escs, bind_lvs,
+		    body2, body_fvs, body_escs, body_lvs) ->
 
 
 	-- Compute the new let-expression
@@ -653,7 +693,7 @@ coreToStgLet let_no_escape bind body
 			Rec pairs         -> map fst pairs
 
     mk_binding bind_lvs binder
-	= (binder,  LetrecBound  False		-- Not top level
+	= (binder,  LetBound  NotTopLevelBound	-- Not top level
 			live_vars
 	   )
 	where
@@ -662,40 +702,47 @@ coreToStgLet let_no_escape bind body
 		       else
 			    unitVarSet binder
 
-    vars_bind :: StgLiveVars
-	      -> FreeVarsInfo			-- Free var info for body of binding
+    vars_bind :: FreeVarsInfo		-- Free var info for body of binding
 	      -> CoreBind
 	      -> LneM (StgBinding,
-		       FreeVarsInfo, EscVarsSet,	-- free vars; escapee vars
-		       [(Id, HowBound)])
-					 -- extension to environment
+		       FreeVarsInfo, 
+		       EscVarsSet,  	  -- free vars; escapee vars
+		       StgLiveVars,	  -- vars live in binding
+		       [(Id, HowBound)])  -- extension to environment
+					 
 
-    vars_bind rec_bind_lvs rec_body_fvs (NonRec binder rhs)
-      = coreToStgRhs rec_body_fvs NotTopLevel (binder,rhs)
-					`thenLne` \ (rhs2, fvs, escs) ->
+    vars_bind body_fvs (NonRec binder rhs)
+      = coreToStgRhs body_fvs NotTopLevel (binder,rhs)
+				`thenLne` \ (rhs2, bind_fvs, escs) ->
+
+	freeVarsToLiveVars bind_fvs `thenLne` \ (bind_lvs, bind_cafs) ->
 	let
-	    env_ext_item@(binder', _) = mk_binding rec_bind_lvs binder
+	    env_ext_item@(binder', _) = mk_binding bind_lvs binder
 	in
-	returnLne (StgNonRec binder' rhs2, fvs, escs, [env_ext_item])
+	returnLne (StgNonRec (SRTEntries bind_cafs) binder' rhs2, 
+			bind_fvs, escs, bind_lvs, [env_ext_item])
 
-    vars_bind rec_bind_lvs rec_body_fvs (Rec pairs)
-      = let
-	    binders = map fst pairs
-	    env_ext = map (mk_binding rec_bind_lvs) binders
-	in
-	extendVarEnvLne env_ext		  (
-	fixLne (\ ~(_, rec_rhs_fvs, _, _) ->
-		let
-			rec_scope_fvs = unionFVInfo rec_body_fvs rec_rhs_fvs
-		in
-		mapAndUnzip3Lne (coreToStgRhs rec_scope_fvs NotTopLevel) pairs 
+
+    vars_bind body_fvs (Rec pairs)
+      = fixLne (\ ~(_, rec_rhs_fvs, _, bind_lvs, _) ->
+	   let
+		rec_scope_fvs = unionFVInfo body_fvs rec_rhs_fvs
+	        binders = map fst pairs
+	        env_ext = map (mk_binding bind_lvs) binders
+	   in
+	   extendVarEnvLne env_ext (
+	      mapAndUnzip3Lne (coreToStgRhs rec_scope_fvs NotTopLevel) pairs 
 					`thenLne` \ (rhss2, fvss, escss) ->
-		let
-			fvs  = unionFVInfos      fvss
-			escs = unionVarSets escss
-		in
-		returnLne (StgRec (binders `zip` rhss2), fvs, escs, env_ext)
-	))
+	      let
+			bind_fvs = unionFVInfos fvss
+			escs     = unionVarSets escss
+	      in
+	      freeVarsToLiveVars (binders `minusFVBinders` bind_fvs)
+					`thenLne` \ (bind_lvs, bind_cafs) ->
+	      returnLne (StgRec (SRTEntries bind_cafs) (binders `zip` rhss2), 
+				bind_fvs, escs, bind_lvs, env_ext)
+	   )
+	)
 
 is_join_var :: Id -> Bool
 -- A hack (used only for compiler debuggging) to tell if
@@ -710,23 +757,24 @@ is_join_var j = occNameUserString (getOccName j) == "$j"
 %************************************************************************
 
 There's a lot of stuff to pass around, so we use this @LneM@ monad to
-help.  All the stuff here is only passed {\em down}.
+help.  All the stuff here is only passed *down*.
 
 \begin{code}
 type LneM a =  IdEnv HowBound
-	    -> StgLiveVars		-- vars live in continuation
+	    -> (StgLiveVars, 	-- vars live in continuation
+		IdSet)		-- cafs live in continuation
 	    -> a
 
 data HowBound
   = ImportBound
   | CaseBound
   | LambdaBound
-  | LetrecBound
-	Bool		-- True <=> bound at top level
+  | LetBound
+	TopLevelCafInfo
 	StgLiveVars	-- Live vars... see notes below
 
-isLetrecBound (LetrecBound _ _) = True
-isLetrecBound other		= False
+isLetBound (LetBound _ _) = True
+isLetBound other 	  = False
 \end{code}
 
 For a let(rec)-bound variable, x, we record StgLiveVars, the set of
@@ -734,7 +782,7 @@ variables that are live if x is live.  For "normal" variables that is
 just x alone.  If x is a let-no-escaped variable then x is represented
 by a code pointer and a stack pointer (well, one for each stack).  So
 all of the variables needed in the execution of x are live if x is,
-and are therefore recorded in the LetrecBound constructor; x itself
+and are therefore recorded in the LetBound constructor; x itself
 *is* included.
 
 The set of live variables is guaranteed ot have no further let-no-escaped
@@ -742,8 +790,8 @@ variables in it.
 
 The std monad functions:
 \begin{code}
-initLne :: LneM a -> a
-initLne m = m emptyVarEnv emptyVarSet
+initLne :: IdEnv HowBound -> LneM a -> a
+initLne env m = m env (emptyVarSet,emptyVarSet)
 
 {-# INLINE thenLne #-}
 {-# INLINE returnLne #-}
@@ -752,7 +800,7 @@ returnLne :: a -> LneM a
 returnLne e env lvs_cont = e
 
 thenLne :: LneM a -> (a -> LneM b) -> LneM b
-thenLne m k env lvs_cont
+thenLne m k env lvs_cont 
   = k (m env lvs_cont) env lvs_cont
 
 mapLne  :: (a -> LneM b)   -> [a] -> LneM [b]
@@ -788,10 +836,10 @@ fixLne expr env lvs_cont
 Functions specific to this monad:
 
 \begin{code}
-getVarsLiveInCont :: LneM StgLiveVars
+getVarsLiveInCont :: LneM (StgLiveVars, IdSet)
 getVarsLiveInCont env lvs_cont = lvs_cont
 
-setVarsLiveInCont :: StgLiveVars -> LneM a -> LneM a
+setVarsLiveInCont :: (StgLiveVars,IdSet) -> LneM a -> LneM a
 setVarsLiveInCont new_lvs_cont expr env lvs_cont
   = expr env new_lvs_cont
 
@@ -811,22 +859,34 @@ lookupVarLne v env lvs_cont
 -- only ever tacked onto a decorated expression. It is never used as
 -- the basis of a control decision, which might give a black hole.
 
-lookupLiveVarsForSet :: FreeVarsInfo -> LneM StgLiveVars
-
-lookupLiveVarsForSet fvs env lvs_cont
-  = returnLne (unionVarSets (map do_one (getFVs fvs)))
-	      env lvs_cont
+freeVarsToLiveVars :: FreeVarsInfo -> LneM (StgLiveVars, IdSet)
+freeVarsToLiveVars fvs env live_in_cont
+  = returnLne (lvs `unionVarSet` lvs_cont,
+	       mkVarSet cafs `unionVarSet` cafs_cont)
+	 env live_in_cont
   where
+    (lvs_cont, cafs_cont) = live_in_cont -- not a strict pattern match!
+    (local, global) = partition isLocalId (allFVs fvs)
+
+    cafs = filter is_caf_one global
+    lvs  = unionVarSets (map do_one local)
+
     do_one v
       = if isLocalId v then
 	    case (lookupVarEnv env v) of
-	      Just (LetrecBound _ lvs) -> extendVarSet lvs v
-	      Just _		       -> unitVarSet v
-	      Nothing -> pprPanic "lookupVarEnv/do_one:" (ppr v)
+	      Just (LetBound _ lvs) -> extendVarSet lvs v
+	      Just _		    -> unitVarSet v
+	      Nothing -> pprPanic "lookupLiveVarsForSet/do_one:" (ppr v)
 	else
 	    emptyVarSet
-\end{code}
 
+    is_caf_one v
+	 = case lookupVarEnv env v of
+		Just (LetBound TopLevelHasCafs lvs) ->
+		    ASSERT( isEmptyVarSet lvs ) True
+	        Just (LetBound _ _) -> False
+		_otherwise 	    -> mayHaveCafRefs (idCafInfo v)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -835,7 +895,7 @@ lookupLiveVarsForSet fvs env lvs_cont
 %************************************************************************
 
 \begin{code}
-type FreeVarsInfo = VarEnv (Var, Bool, StgBinderInfo)
+type FreeVarsInfo = VarEnv (Var, TopLevelCafInfo, StgBinderInfo)
 	-- If f is mapped to noBinderInfo, that means
 	-- that f *is* mentioned (else it wouldn't be in the
 	-- IdEnv at all), but perhaps in an unsaturated applications.
@@ -844,10 +904,14 @@ type FreeVarsInfo = VarEnv (Var, Bool, StgBinderInfo)
 	-- noBinderInfo, since we aren't interested in their
 	-- occurence info.
 	--
-	-- The Bool is True <=> the Id is top level letrec bound
-	--
 	-- For ILX we track free var info for type variables too;
 	-- hence VarEnv not IdEnv
+
+data TopLevelCafInfo
+  = NotTopLevelBound
+  | TopLevelNoCafs
+  | TopLevelHasCafs
+  deriving Eq
 
 type EscVarsSet = IdSet
 \end{code}
@@ -857,14 +921,18 @@ emptyFVInfo :: FreeVarsInfo
 emptyFVInfo = emptyVarEnv
 
 singletonFVInfo :: Id -> HowBound -> StgBinderInfo -> FreeVarsInfo
-singletonFVInfo id ImportBound		     info = emptyVarEnv
-singletonFVInfo id (LetrecBound top_level _) info = unitVarEnv id (id, top_level, info)
-singletonFVInfo id other		     info = unitVarEnv id (id, False,     info)
+singletonFVInfo id ImportBound info
+   | mayHaveCafRefs (idCafInfo id) = unitVarEnv id (id, TopLevelHasCafs, info)
+   | otherwise         		   = emptyVarEnv
+singletonFVInfo id (LetBound top_level _) info 
+   = unitVarEnv id (id, top_level, info)
+singletonFVInfo id other info
+   = unitVarEnv id (id, NotTopLevelBound, info)
 
 tyvarFVInfo :: TyVarSet -> FreeVarsInfo
 tyvarFVInfo tvs = foldVarSet add emptyFVInfo tvs
-	        where
-		  add tv fvs = extendVarEnv fvs tv (tv, False, noBinderInfo)
+        where
+	  add tv fvs = extendVarEnv fvs tv (tv, NotTopLevelBound, noBinderInfo)
 
 unionFVInfo :: FreeVarsInfo -> FreeVarsInfo -> FreeVarsInfo
 unionFVInfo fv1 fv2 = plusVarEnv_C plusFVInfo fv1 fv2
@@ -895,8 +963,11 @@ lookupFVInfo fvs id
 			Nothing         -> noBinderInfo
 			Just (_,_,info) -> info
 
+allFVs :: FreeVarsInfo -> [Id]	-- Non-top-level things only
+allFVs fvs = [id | (id,_,_) <- rngVarEnv fvs]
+
 getFVs :: FreeVarsInfo -> [Id]	-- Non-top-level things only
-getFVs fvs = [id | (id,False,_) <- rngVarEnv fvs]
+getFVs fvs = [id | (id,NotTopLevelBound,_) <- rngVarEnv fvs]
 
 getFVSet :: FreeVarsInfo -> IdSet
 getFVSet fvs = mkVarSet (getFVs fvs)
@@ -936,4 +1007,127 @@ myCollectArgs expr
     go (Note (SCC _) e) as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
     go (Note n e)       as = go e as
     go _		as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Figuring out CafInfo for an expression}
+%*									*
+%************************************************************************
+
+hasCafRefs decides whether a top-level closure can point into the dynamic heap.
+We mark such things as `MayHaveCafRefs' because this information is
+used to decide whether a particular closure needs to be referenced
+in an SRT or not.
+
+There are two reasons for setting MayHaveCafRefs:
+	a) The RHS is a CAF: a top-level updatable thunk.
+	b) The RHS refers to something that MayHaveCafRefs
+
+Possible improvement: In an effort to keep the number of CAFs (and 
+hence the size of the SRTs) down, we could also look at the expression and 
+decide whether it requires a small bounded amount of heap, so we can ignore 
+it as a CAF.  In these cases however, we would need to use an additional
+CAF list to keep track of non-collectable CAFs.  
+
+\begin{code}
+hasCafRefs  :: IdEnv HowBound -> CoreExpr -> CafInfo
+-- Only called for the RHS of top-level lets
+hasCafRefss :: IdEnv HowBound -> [CoreExpr] -> CafInfo
+	-- predicate returns True for a given Id if we look at this Id when
+	-- calculating the result.  Used to *avoid* looking at the CafInfo
+ 	-- field for an Id that is part of the current recursive group.
+
+hasCafRefs p expr 
+  | isCAF expr || isFastTrue (cafRefs p expr) =  MayHaveCafRefs
+  | otherwise = NoCafRefs
+
+	-- used for recursive groups.  The whole group is set to
+	-- "MayHaveCafRefs" if at least one of the group is a CAF or
+	-- refers to any CAFs.
+hasCafRefss p exprs
+  | any isCAF exprs || isFastTrue (cafRefss p exprs) = MayHaveCafRefs
+  | otherwise = NoCafRefs
+
+-- cafRefs compiles to beautiful code :)
+
+cafRefs p (Var id)
+  | isLocalId id = fastBool False
+  | otherwise = 
+      case lookupVarEnv p id of
+	Just (LetBound TopLevelHasCafs _) -> fastBool True
+        Just (LetBound _ _) -> fastBool False
+	Nothing -> fastBool (cgMayHaveCafRefs (idCgInfo id)) --  imported Ids
+
+cafRefs p (Lit l) 	     = fastBool False
+cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
+cafRefs p (Lam x e) 	     = cafRefs p e
+cafRefs p (Let b e) 	     = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
+cafRefs p (Case e bndr alts) = fastOr (cafRefs p e) 	
+				(cafRefss p) (rhssOfAlts alts)
+cafRefs p (Note n e) 	     = cafRefs p e
+cafRefs p (Type t) 	     = fastBool False
+
+cafRefss p [] 	  = fastBool False
+cafRefss p (e:es) = fastOr (cafRefs p e) (cafRefss p) es
+
+-- hack for lazy-or over FastBool.
+fastOr a f x = fastBool (isFastTrue a || isFastTrue (f x))
+
+isCAF :: CoreExpr -> Bool
+-- Only called for the RHS of top-level lets
+isCAF e = not (rhsIsNonUpd e)
+  {- ToDo: check type for onceness, i.e. non-updatable thunks? -}
+
+
+rhsIsNonUpd :: CoreExpr -> Bool
+  -- True => Value-lambda, constructor, PAP
+  -- This is a bit like CoreUtils.exprIsValue, with the following differences:
+  -- 	a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
+  --
+  --    b) (C x xs), where C is a contructors is updatable if the application is
+  --	   dynamic: see isDynConApp
+  -- 
+  --    c) don't look through unfolding of f in (f x).  I'm suspicious of this one
+
+rhsIsNonUpd (Lam b e)          = isId b || rhsIsNonUpd e
+rhsIsNonUpd (Note (SCC _) e)   = False
+rhsIsNonUpd (Note _ e)         = rhsIsNonUpd e
+rhsIsNonUpd other_expr
+  = go other_expr 0 []
+  where
+    go (Var f) n_args args = idAppIsNonUpd f n_args args
+	
+    go (App f a) n_args args
+	| isTypeArg a = go f n_args args
+	| otherwise   = go f (n_args + 1) (a:args)
+
+    go (Note (SCC _) f) n_args args = False
+    go (Note _ f) n_args args       = go f n_args args
+
+    go other n_args args = False
+
+idAppIsNonUpd :: Id -> Int -> [CoreExpr] -> Bool
+idAppIsNonUpd id n_val_args args
+  | Just con <- isDataConId_maybe id = not (isDynConApp con args)
+  | otherwise 			     = n_val_args < idArity id
+
+isDynConApp :: DataCon -> [CoreExpr] -> Bool
+isDynConApp con args = isDllName (dataConName con) || any isDynArg args
+-- Top-level constructor applications can usually be allocated 
+-- statically, but they can't if 
+-- 	a) the constructor, or any of the arguments, come from another DLL
+--	b) any of the arguments are LitLits
+-- (because we can't refer to static labels in other DLLs).
+-- If this happens we simply make the RHS into an updatable thunk, 
+-- and 'exectute' it rather than allocating it statically.
+-- All this should match the decision in (see CoreToStg.coreToStgRhs)
+
+
+isDynArg :: CoreExpr -> Bool
+isDynArg (Var v)    = isDllName (idName v)
+isDynArg (Note _ e) = isDynArg e
+isDynArg (Lit lit)  = isLitLitLit lit
+isDynArg (App e _)  = isDynArg e	-- must be a type app
+isDynArg (Lam _ e)  = isDynArg e	-- must be a type lam
 \end{code}

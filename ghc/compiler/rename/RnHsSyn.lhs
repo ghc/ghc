@@ -184,7 +184,7 @@ bangTyFVs bty = extractHsTyNames (getBangType bty)
 
 ----------------
 hsIdInfoFVs (HsUnfold _ unf) = ufExprFVs unf
-hsIdInfoFVs (HsWorker n)     = unitFV n
+hsIdInfoFVs (HsWorker n a)   = unitFV n
 hsIdInfoFVs other	     = emptyFVs
 
 ----------------

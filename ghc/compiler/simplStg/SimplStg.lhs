@@ -84,16 +84,11 @@ stg2stg dflags module_name binds
 	     end_pass us2 "ProfMassage" collected_CCs binds3
 
     end_pass us2 what ccs binds2
-      = -- report verbosely, if required
-	(if dopt Opt_D_verbose_stg2stg dflags then
-	    hPutStr stdout (showSDoc
-	      (text ("*** "++what++":") $$ vcat (map ppr binds2)
-	    ))
-	 else return ()) >>
-	let
-	    linted_binds = stg_linter what binds2
-	in
-	return (linted_binds, us2, ccs)
+      = do -- report verbosely, if required
+	   dumpIfSet_dyn dflags Opt_D_verbose_stg2stg what
+	      (vcat (map ppr binds2))
+	   let linted_binds = stg_linter what binds2
+	   return (linted_binds, us2, ccs)
 	    -- return: processed binds
 	    -- 	       UniqueSupply for the next guy to use
 	    --	       cost-centres to be declared/registered (specialised)

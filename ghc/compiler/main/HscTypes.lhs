@@ -59,6 +59,7 @@ import Module		( Module, ModuleName, ModuleEnv,
 			)
 import InstEnv		( InstEnv, ClsInstEnv, DFunId )
 import Rules		( RuleBase )
+import CoreSyn		( CoreBind )
 import Id		( Id )
 import Class		( Class, classSelIds )
 import TyCon		( TyCon, tyConGenIds, tyConSelIds, tyConDataConsIfAvailable )
@@ -167,27 +168,42 @@ data ModDetails
 	-- The next three fields are created by the typechecker
         md_types    :: TypeEnv,
         md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
-        md_rules    :: [IdCoreRule]	-- Domain may include Ids from other modules
+        md_rules    :: [IdCoreRule],	-- Domain may include Ids from other modules
+	md_binds    :: [CoreBind]
      }
 
---	NOT YET IMPLEMENTED
 -- The ModDetails takes on several slightly different forms:
 --
 -- After typecheck + desugar
---	md_types	contains TyCons, Classes, and hasNoBinding Ids
---	md_insts	all instances from this module (incl derived ones)
---	md_rules	all rules from this module
---	md_binds	desugared bindings
+--	md_types	Contains TyCons, Classes, and hasNoBinding Ids
+--	md_insts	All instances from this module (incl derived ones)
+--	md_rules	All rules from this module
+--	md_binds	Desugared bindings
 --
 -- After simplification
---	md_types	same as after typecheck
---	md_insts	ditto
---	md_rules	orphan rules only (local ones attached to binds)
---	md_binds	with rules attached
+--	md_types	Same as after typecheck
+--	md_insts	Ditto
+--	md_rules	Orphan rules only (local ones now attached to binds)
+--	md_binds	With rules attached
 --
--- After tidy 
---	md_types	now contains Ids as well, replete with correct IdInfo
---			apart from
+-- After CoreTidy
+--	md_types	Now contains Ids as well, replete with final IdInfo
+--			   The Ids are only the ones that are visible from
+--			   importing modules.  Without -O that means only
+--			   exported Ids, but with -O importing modules may
+--			   see ids mentioned in unfoldings of exported Ids
+--
+--	md_insts	Same DFunIds as before, but with final IdInfo,
+--			   and the unique might have changed; remember that
+--			   CoreTidy links up the uniques of old and new versions
+--
+--	md_rules	All rules for exported things, substituted with final Ids
+--
+--	md_binds	Tidied
+--
+-- Passed back to compilation manager
+--	Just as after CoreTidy, but with md_binds nuked
+
 \end{code}
 
 \begin{code}

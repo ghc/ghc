@@ -14,44 +14,39 @@ module CoreTidy (
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
-import CoreUtils	( exprArity )
-import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars, ruleSomeLhsFreeVars )
+import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars, 
+			  ruleSomeLhsFreeVars )
 import CoreLint		( showPass, endPass )
 import VarEnv
 import VarSet
-import Var		( Id, Var, varName, globalIdDetails, setGlobalIdDetails )
-import Id		( idType, idInfo, idName, isExportedId, idSpecialisation,
-			  idCafInfo, mkVanillaGlobal, isLocalId, isImplicitId,
-			  modifyIdInfo, idArity, hasNoBinding, mkLocalIdWithInfo
+import Var		( Id, Var, varName )
+import Id		( idType, idInfo, idName, isExportedId, 
+			  idSpecialisation, idUnique, 
+			  mkVanillaGlobal, isLocalId, isImplicitId,
+			  hasNoBinding, mkUserLocal
 			) 
 import IdInfo		{- loads of stuff -}
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
-		  	  localiseName, mkLocalName, isGlobalName, isDllName, isLocalName
+		  	  localiseName, isGlobalName, isLocalName
 			)
 import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType, tidyType, tidyTyVar )
 import Module		( Module, moduleName )
-import PrimOp		( PrimOp(..), setCCallUnique )
 import HscTypes		( PersistentCompilerState( pcs_PRS ), 
 			  PersistentRenamerState( prsOrig ),
 			  NameSupply( nsNames ), OrigNameCache,
 			  TypeEnv, extendTypeEnvList, 
-			  DFunId, ModDetails(..), TyThing(..)
+			  ModDetails(..), TyThing(..)
 			)
-import UniqSupply
-import DataCon		( DataCon, dataConName )
-import Literal		( isLitLitLit )
 import FiniteMap	( lookupFM, addToFM )
 import Maybes		( maybeToBool, orElse )
 import ErrUtils		( showPass )
-import PprCore		( pprIdCoreRule )
 import SrcLoc		( noSrcLoc )
 import UniqFM		( mapUFM )
-import Outputable
-import FastTypes
 import List		( partition )
 import Util		( mapAccumL )
+import Outputable
 \end{code}
 
 
@@ -96,13 +91,6 @@ binder
   - Give external Ids the same Unique as they had before
     if the name is in the renamer's name cache
   
-  - Clone all local Ids.  This means that Tidy Core has the property
-    that all Ids are unique, rather than the weaker guarantee of
-    no clashes which the simplifier provides.
-
-  - Give each dynamic CCall occurrence a fresh unique; this is
-    rather like the cloning step above.
-
   - Give the Id its UTTERLY FINAL IdInfo; in ptic, 
 	* Its IdDetails becomes VanillaGlobal, reflecting the fact that
 	  from now on we regard it as a global, not local, Id
@@ -121,23 +109,24 @@ RHSs, so that they print nicely in interfaces.
 \begin{code}
 tidyCorePgm :: DynFlags -> Module
 	    -> PersistentCompilerState
-	    -> TypeEnv -> [DFunId]
-	    -> [CoreBind] -> [IdCoreRule]
-	    -> IO (PersistentCompilerState, [CoreBind], ModDetails)
+	    -> CgInfoEnv		-- Information from the back end,
+					-- to be splatted into the IdInfo
+	    -> ModDetails
+	    -> IO (PersistentCompilerState, ModDetails)
 
-tidyCorePgm dflags mod pcs env_tc insts_tc binds_in orphans_in
+tidyCorePgm dflags mod pcs cg_info_env
+	    (ModDetails { md_types = env_tc, md_insts = insts_tc, 
+			  md_binds = binds_in, md_rules = orphans_in })
   = do	{ showPass dflags "Tidy Core"
 
-	; let ext_ids = findExternalSet binds_in orphans_in
+	; let ext_ids   = findExternalSet   binds_in orphans_in
+	; let ext_rules = findExternalRules binds_in orphans_in ext_ids
 
-	; us <- mkSplitUniqSupply 't' -- for "tidy"
+	; let ((orig_env', occ_env, subst_env), tidy_binds) 
+	       		= mapAccumL (tidyTopBind mod ext_ids cg_info_env) 
+				    init_tidy_env binds_in
 
-	; let ((us1, orig_env', occ_env, subst_env), tidy_binds) 
-	       		= mapAccumL (tidyTopBind mod ext_ids) 
-				    (init_tidy_env us) binds_in
-
-	; let (orphans_out, _) 
-		   = initUs us1 (tidyIdRules (occ_env,subst_env) orphans_in)
+	; let tidy_rules = tidyIdRules (occ_env,subst_env) ext_rules
 
 	; let prs' = prs { prsOrig = orig { nsNames = orig_env' } }
 	      pcs' = pcs { pcs_PRS = prs' }
@@ -152,17 +141,17 @@ tidyCorePgm dflags mod pcs env_tc insts_tc binds_in orphans_in
 				  pprPanic "lookup_dfun_id" (ppr id)
 
 
-	; let final_rules    = mkFinalRules orphans_out final_ids
-	      final_type_env = mkFinalTypeEnv env_tc final_ids
-	      final_dfun_ids = map lookup_dfun_id insts_tc
+	; let tidy_type_env = mkFinalTypeEnv env_tc final_ids
+	      tidy_dfun_ids = map lookup_dfun_id insts_tc
 
-	; let new_details = ModDetails { md_types = final_type_env,
-					 md_rules = final_rules,
-					 md_insts = final_dfun_ids }
+	; let tidy_details = ModDetails { md_types = tidy_type_env,
+					  md_rules = tidy_rules,
+					  md_insts = tidy_dfun_ids,
+					  md_binds = tidy_binds }
 
    	; endPass dflags "Tidy Core" Opt_D_dump_simpl tidy_binds
 
-	; return (pcs', tidy_binds, new_details)
+	; return (pcs', tidy_details)
 	}
   where
 	-- We also make sure to avoid any exported binders.  Consider
@@ -177,17 +166,12 @@ tidyCorePgm dflags mod pcs env_tc insts_tc binds_in orphans_in
     orig	     = prsOrig prs
     orig_env 	     = nsNames orig
 
-    init_tidy_env us = (us, orig_env, initTidyOccEnv avoids, emptyVarEnv)
+    init_tidy_env    = (orig_env, initTidyOccEnv avoids, emptyVarEnv)
     avoids	     = [getOccName bndr | bndr <- bindersOfBinds binds_in,
 				          isGlobalName (idName bndr)]
 
-
 tidyCoreExpr :: CoreExpr -> IO CoreExpr
-tidyCoreExpr expr
-  = do { us <- mkSplitUniqSupply 't' -- for "tidy"
-       ; let (expr',_) = initUs us (tidyExpr emptyTidyEnv expr) 
-       ; return expr'
-       }
+tidyCoreExpr expr = return (tidyExpr emptyTidyEnv expr)
 \end{code}
 
 
@@ -228,35 +212,40 @@ mkFinalTypeEnv type_env final_ids
 \end{code}
 
 \begin{code}
-mkFinalRules :: [IdCoreRule] 	-- Orphan rules
-	     -> [Id]		-- Ids that are exported, so we need their rules
-	     -> [IdCoreRule]
+findExternalRules :: [CoreBind]
+		  -> [IdCoreRule] -- Orphan rules
+	          -> IdEnv a	  -- Ids that are exported, so we need their rules
+	          -> [IdCoreRule]
   -- The complete rules are gotten by combining
   --	a) the orphan rules
   --	b) rules embedded in the top-level Ids
-mkFinalRules orphan_rules emitted
+findExternalRules binds orphan_rules ext_ids
   | opt_OmitInterfacePragmas = []
   | otherwise
   = orphan_rules ++ local_rules
   where
-    local_rules  = [ (fn, rule)
- 		   | fn <- emitted,
-		     rule <- rulesRules (idSpecialisation fn),
+    local_rules  = [ (id, rule)
+ 		   | id <- bindersOfBinds binds,
+		     id `elemVarEnv` ext_ids,
+		     rule <- rulesRules (idSpecialisation id),
 		     not (isBuiltinRule rule),
 			-- We can't print builtin rules in interface files
 			-- Since they are built in, an importing module
 			-- will have access to them anyway
 
-			-- Sept 00: I've disabled this test.  It doesn't stop many, if any, rules
-			-- from coming out, and to make it work properly we need to add ????
+			-- Sept 00: I've disabled this test.  It doesn't stop 
+			-- many, if any, rules from coming out, and to make it
+			-- work properly we need to add ????
 			--	(put it back in for now)
 		     isEmptyVarSet (ruleSomeLhsFreeVars (isLocalName . varName) rule)
-				-- Spit out a rule only if none of its LHS free vars are
-				-- LocalName things i.e. things that aren't visible to importing modules
-				-- This is a good reason not to do it when we emit the Id itself
-		   ]
-\end{code}
 
+				-- Spit out a rule only if none of its LHS free
+				-- vars are LocalName things i.e. things that
+				-- aren't visible to importing modules This is a
+				-- good reason not to do it when we emit the Id
+				-- itself
+		 ]
+\end{code}
 
 %************************************************************************
 %*				 					*
@@ -266,7 +255,8 @@ mkFinalRules orphan_rules emitted
 
 \begin{code}
 findExternalSet :: [CoreBind] -> [IdCoreRule]
-		-> IdEnv Bool	-- True <=> show unfolding
+		-> IdEnv Bool	-- In domain => external
+				-- Range = True <=> show unfolding
 	-- Step 1 from the notes above
 findExternalSet binds orphan_rules
   = foldr find init_needed binds
@@ -356,7 +346,7 @@ addExternal (id,rhs) needed
 
 
 \begin{code}
-type TopTidyEnv = (UniqSupply, OrigNameCache, TidyOccEnv, VarEnv Var)
+type TopTidyEnv = (OrigNameCache, TidyOccEnv, VarEnv Var)
 
 -- TopTidyEnv: when tidying we need to know
 --   * orig_env: Any pre-ordained Names.  These may have arisen because the
@@ -370,9 +360,6 @@ type TopTidyEnv = (UniqSupply, OrigNameCache, TidyOccEnv, VarEnv Var)
 --     are 'used'
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
---
---   * uniqsuppy: so we can clone any Ids with non-preordained names.
---
 \end{code}
 
 
@@ -380,47 +367,50 @@ type TopTidyEnv = (UniqSupply, OrigNameCache, TidyOccEnv, VarEnv Var)
 tidyTopBind :: Module
 	    -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
+	    -> CgInfoEnv
 	    -> TopTidyEnv -> CoreBind
 	    -> (TopTidyEnv, CoreBind)
 
-tidyTopBind mod ext_ids env (NonRec bndr rhs)
-  = ((us2,orig,occ,subst) , NonRec bndr' rhs')
+tidyTopBind mod ext_ids cg_info_env top_tidy_env (NonRec bndr rhs)
+  = ((orig,occ,subst) , NonRec bndr' rhs')
   where
-    ((us1,orig,occ,subst), bndr')
-	 = tidyTopBinder mod ext_ids tidy_env rhs' caf_info env bndr
-    tidy_env    = (occ,subst)
-    caf_info    = hasCafRefs (const True) rhs'
-    (rhs',us2)  = initUs us1 (tidyExpr tidy_env rhs)
+    ((orig,occ,subst), bndr')
+	 = tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs' top_tidy_env bndr
+    rec_tidy_env = (occ,subst)
+    rhs' = tidyExpr rec_tidy_env rhs
 
-tidyTopBind mod ext_ids env (Rec prs)
+tidyTopBind mod ext_ids cg_info_env top_tidy_env (Rec prs)
   = (final_env, Rec prs')
   where
-    (final_env@(_,_,occ,subst), prs') = mapAccumL do_one env prs
-    final_tidy_env = (occ,subst)
+    (final_env@(_,occ,subst), prs') = mapAccumL do_one top_tidy_env prs
+    rec_tidy_env = (occ,subst)
 
-    do_one env (bndr,rhs) 
-	= ((us',orig,occ,subst), (bndr',rhs'))
+    do_one top_tidy_env (bndr,rhs) 
+	= ((orig,occ,subst), (bndr',rhs'))
 	where
-	((us,orig,occ,subst), bndr')
-	   = tidyTopBinder mod ext_ids final_tidy_env rhs' caf_info env bndr
-        (rhs', us')   = initUs us (tidyExpr final_tidy_env rhs)
+	((orig,occ,subst), bndr')
+	   = tidyTopBinder mod ext_ids cg_info_env 
+		rec_tidy_env rhs' top_tidy_env bndr
+
+        rhs' = tidyExpr rec_tidy_env rhs
 
 	-- the CafInfo for a recursive group says whether *any* rhs in
 	-- the group may refer indirectly to a CAF (because then, they all do).
     (bndrs, rhss) = unzip prs'
-    caf_info = hasCafRefss pred rhss
     pred v = v `notElem` bndrs
 
 
 tidyTopBinder :: Module -> IdEnv Bool
-	      -> TidyEnv -> CoreExpr -> CafInfo
+	      -> CgInfoEnv
+	      -> TidyEnv -> CoreExpr
 			-- The TidyEnv is used to tidy the IdInfo
 			-- The expr is the already-tided RHS
 			-- Both are knot-tied: don't look at them!
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
+  -- NB: tidyTopBinder doesn't affect the unique supply
 
-tidyTopBinder mod ext_ids tidy_env rhs caf_info
-	      env@(us, orig_env2, occ_env2, subst_env2) id
+tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
+	      env@(orig_env2, occ_env2, subst_env2) id
 
   | isImplicitId id	-- Don't mess with constructors, 
   = (env, id)		-- record selectors, and the like
@@ -434,16 +424,14 @@ tidyTopBinder mod ext_ids tidy_env rhs caf_info
 
 	-- The rhs is already tidied
 	
-  = ((us_r, orig_env', occ_env', subst_env'), id')
+  = ((orig_env', occ_env', subst_env'), id')
   where
-    (us_l, us_r)    = splitUniqSupply us
-
     (orig_env', occ_env', name') = tidyTopName mod orig_env2 occ_env2
 					       is_external
 					       (idName id)
-    ty'	       	    = tidyTopType (idType id)
-    idinfo'         = tidyIdInfo us_l tidy_env
-			 is_external unfold_info arity_info caf_info id
+    ty'	    = tidyTopType (idType id)
+    cg_info = lookupCgInfo cg_info_env name'
+    idinfo' = tidyIdInfo tidy_env is_external unfold_info cg_info id
 
     id'	       = mkVanillaGlobal name' ty' idinfo'
     subst_env' = extendVarEnv subst_env2 id id'
@@ -456,35 +444,28 @@ tidyTopBinder mod ext_ids tidy_env rhs caf_info
     unfold_info | show_unfold = mkTopUnfolding rhs
 		| otherwise   = noUnfolding
 
-    arity_info = exprArity rhs
 
-
-tidyIdInfo us tidy_env is_external unfold_info arity_info caf_info id
+tidyIdInfo tidy_env is_external unfold_info cg_info id
   | opt_OmitInterfacePragmas || not is_external
 	-- No IdInfo if the Id isn't external, or if we don't have -O
   = vanillaIdInfo 
-	`setCafInfo` caf_info
+	`setCgInfo` 	    cg_info
 	`setStrictnessInfo` strictnessInfo core_idinfo
-	`setArityInfo`	    ArityExactly arity_info
-	-- Keep strictness, arity and CAF info; it's used by the code generator
+	-- Keep strictness; it's used by CorePrep
 
   | otherwise
-  =  let (rules', _) = initUs us (tidyRules tidy_env (specInfo core_idinfo))
-     in
-     vanillaIdInfo 
-	`setCafInfo` 	    caf_info
+  =  vanillaIdInfo 
+	`setCgInfo` 	    cg_info
 	`setCprInfo`	    cprInfo core_idinfo
 	`setStrictnessInfo` strictnessInfo core_idinfo
 	`setInlinePragInfo` inlinePragInfo core_idinfo
 	`setUnfoldingInfo`  unfold_info
-	`setWorkerInfo`	    tidyWorker tidy_env arity_info (workerInfo core_idinfo)
-	`setSpecInfo`	    rules'
-	`setArityInfo`	    ArityExactly arity_info
-		-- this is the final IdInfo, it must agree with the
-		-- code finally generated (i.e. NO more transformations
-		-- after this!).
+	`setWorkerInfo`	    tidyWorker tidy_env (workerInfo core_idinfo)
+	-- NB: we throw away the Rules
+	-- They have already been extracted by findExternalRules
   where
     core_idinfo = idInfo id
+
 
 -- This is where we set names to local/global based on whether they really are 
 -- externally visible (see comment at the top of this module).  If the name
@@ -517,55 +498,25 @@ tidyTopName mod orig_env occ_env external name
     internal	     = not external
 
 ------------  Worker  --------------
--- We only treat a function as having a worker if
--- the exported arity (which is now the number of visible lambdas)
--- is the same as the arity at the moment of the w/w split
--- If so, we can safely omit the unfolding inside the wrapper, and
--- instead re-generate it from the type/arity/strictness info
--- But if the arity has changed, we just take the simple path and
--- put the unfolding into the interface file, forgetting the fact
--- that it's a wrapper.  
---
--- How can this happen?  Sometimes we get
---	f = coerce t (\x y -> $wf x y)
--- at the moment of w/w split; but the eta reducer turns it into
---	f = coerce t $wf
--- which is perfectly fine except that the exposed arity so far as
--- the code generator is concerned (zero) differs from the arity
--- when we did the split (2).  
---
--- All this arises because we use 'arity' to mean "exactly how many
--- top level lambdas are there" in interface files; but during the
--- compilation of this module it means "how many things can I apply
--- this to".
-tidyWorker tidy_env real_arity (HasWorker work_id wrap_arity) 
-  | real_arity == wrap_arity
+tidyWorker tidy_env (HasWorker work_id wrap_arity) 
   = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
-tidyWorker tidy_env real_arity other
+tidyWorker tidy_env other
   = NoWorker
 
 ------------  Rules  --------------
-tidyIdRules :: TidyEnv -> [IdCoreRule] -> UniqSM [IdCoreRule]
-tidyIdRules env [] = returnUs []
+tidyIdRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
+tidyIdRules env [] = []
 tidyIdRules env ((fn,rule) : rules)
-  = tidyRule env rule  		`thenUs` \ rule ->
-    tidyIdRules env rules 	`thenUs` \ rules ->
-    returnUs ((tidyVarOcc env fn, rule) : rules)
+  = tidyRule env rule  		=: \ rule ->
+    tidyIdRules env rules 	=: \ rules ->
+     ((tidyVarOcc env fn, rule) : rules)
 
-tidyRules :: TidyEnv -> CoreRules -> UniqSM CoreRules
-tidyRules env (Rules rules fvs) 
-  = mapUs (tidyRule env) rules 		`thenUs` \ rules ->
-    returnUs (Rules rules (foldVarSet tidy_set_elem emptyVarSet fvs))
-  where
-    tidy_set_elem var new_set = extendVarSet new_set (tidyVarOcc env var)
-
-tidyRule :: TidyEnv -> CoreRule -> UniqSM CoreRule
-tidyRule env rule@(BuiltinRule _) = returnUs rule
+tidyRule :: TidyEnv -> CoreRule -> CoreRule
+tidyRule env rule@(BuiltinRule _) = rule
 tidyRule env (Rule name vars tpl_args rhs)
-  = tidyBndrs env vars			`thenUs` \ (env', vars) ->
-    mapUs (tidyExpr env') tpl_args  	`thenUs` \ tpl_args ->
-    tidyExpr env' rhs		 	`thenUs` \ rhs ->
-    returnUs (Rule name vars tpl_args rhs)
+  = tidyBndrs env vars			=: \ (env', vars) ->
+    map (tidyExpr env') tpl_args  	=: \ tpl_args ->
+     (Rule name vars tpl_args (tidyExpr env' rhs))
 \end{code}
 
 %************************************************************************
@@ -577,54 +528,40 @@ tidyRule env (Rule name vars tpl_args rhs)
 \begin{code}
 tidyBind :: TidyEnv
 	 -> CoreBind
-	 -> UniqSM (TidyEnv, CoreBind)
+	 ->  (TidyEnv, CoreBind)
+
 tidyBind env (NonRec bndr rhs)
-  = tidyBndrWithRhs env (bndr,rhs) `thenUs` \ (env', bndr') ->
-    tidyExpr env' rhs  		   `thenUs` \ rhs' ->
-    returnUs (env', NonRec bndr' rhs')
+  = tidyBndrWithRhs env (bndr,rhs) =: \ (env', bndr') ->
+    (env', NonRec bndr' (tidyExpr env' rhs))
 
 tidyBind env (Rec prs)
-  = mapAccumLUs tidyBndrWithRhs env prs 	`thenUs` \ (env', bndrs') ->
-    mapUs (tidyExpr env') (map snd prs)		`thenUs` \ rhss' ->
-    returnUs (env', Rec (zip bndrs' rhss'))
+  = mapAccumL tidyBndrWithRhs env prs 	=: \ (env', bndrs') ->
+    map (tidyExpr env') (map snd prs)	=: \ rhss' ->
+    (env', Rec (zip bndrs' rhss'))
 
-tidyExpr env (Var v)   
-  = fiddleCCall v  `thenUs` \ v ->
-    returnUs (Var (tidyVarOcc env v))
 
-tidyExpr env (Type ty) = returnUs (Type (tidyType env ty))
-tidyExpr env (Lit lit) = returnUs (Lit lit)
-
-tidyExpr env (App f a)
-  = tidyExpr env f 		`thenUs` \ f ->
-    tidyExpr env a 		`thenUs` \ a ->
-    returnUs (App f a)
-
-tidyExpr env (Note n e)
-  = tidyExpr env e 		`thenUs` \ e ->
-    returnUs (Note (tidyNote env n) e)
+tidyExpr env (Var v)   	=  Var (tidyVarOcc env v)
+tidyExpr env (Type ty) 	=  Type (tidyType env ty)
+tidyExpr env (Lit lit) 	=  Lit lit
+tidyExpr env (App f a) 	=  App (tidyExpr env f) (tidyExpr env a)
+tidyExpr env (Note n e) =  Note (tidyNote env n) (tidyExpr env e)
 
 tidyExpr env (Let b e) 
-  = tidyBind env b 		`thenUs` \ (env', b') ->
-    tidyExpr env' e 		`thenUs` \ e ->
-    returnUs (Let b' e)
+  = tidyBind env b 	=: \ (env', b') ->
+    Let b' (tidyExpr env' e)
 
 tidyExpr env (Case e b alts)
-  = tidyExpr env e 		`thenUs` \ e ->
-    tidyBndr env b 		`thenUs` \ (env', b) ->
-    mapUs (tidyAlt env') alts 	`thenUs` \ alts ->
-    returnUs (Case e b alts)
+  = tidyBndr env b 	=: \ (env', b) ->
+    Case (tidyExpr env e) b (map (tidyAlt env') alts)
 
 tidyExpr env (Lam b e)
-  = tidyBndr env b 		`thenUs` \ (env', b) ->
-    tidyExpr env' e		`thenUs` \ e ->
-    returnUs (Lam b e)
+  = tidyBndr env b 	=: \ (env', b) ->
+    Lam b (tidyExpr env' e)
 
 
 tidyAlt env (con, vs, rhs)
-  = tidyBndrs env vs		`thenUs` \ (env', vs) ->
-    tidyExpr env' rhs		`thenUs` \ rhs ->
-    returnUs (con, vs, rhs)
+  = tidyBndrs env vs 	=: \ (env', vs) ->
+    (con, vs, tidyExpr env' rhs)
 
 tidyNote env (Coerce t1 t2)  = Coerce (tidyType env t1) (tidyType env t2)
 tidyNote env note            = note
@@ -643,165 +580,36 @@ tidyVarOcc (_, var_env) v = case lookupVarEnv var_env v of
 				  Nothing -> v
 
 -- tidyBndr is used for lambda and case binders
-tidyBndr :: TidyEnv -> Var -> UniqSM (TidyEnv, Var)
+tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var
-  | isTyVar var = returnUs (tidyTyVar env var)
-  | otherwise   = tidyId env var noCafIdInfo
+  | isTyVar var = tidyTyVar env var
+  | otherwise   = tidyId env var
 
-tidyBndrs :: TidyEnv -> [Var] -> UniqSM (TidyEnv, [Var])
-tidyBndrs env vars = mapAccumLUs tidyBndr env vars
+tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
+tidyBndrs env vars = mapAccumL tidyBndr env vars
 
 -- tidyBndrWithRhs is used for let binders
-tidyBndrWithRhs :: TidyEnv -> (Var, CoreExpr) -> UniqSM (TidyEnv, Var)
-tidyBndrWithRhs env (id,rhs)
-   = tidyId env id idinfo
-   where
-	idinfo = noCafIdInfo `setArityInfo` ArityExactly (exprArity rhs)
-			-- NB: This throws away the IdInfo of the Id, which we
-			-- no longer need.  That means we don't need to
-			-- run over it with env, nor renumber it.
+tidyBndrWithRhs :: TidyEnv -> (Id, CoreExpr) -> (TidyEnv, Var)
+tidyBndrWithRhs env (id,rhs) = tidyId env id
 
-tidyId :: TidyEnv -> Id -> IdInfo -> UniqSM (TidyEnv, Id)
-tidyId env@(tidy_env, var_env) id idinfo
+tidyId :: TidyEnv -> Id -> (TidyEnv, Id)
+tidyId env@(tidy_env, var_env) id
   = 	-- Non-top-level variables
-    getUniqueUs   `thenUs` \ uniq ->
     let 
 	-- Give the Id a fresh print-name, *and* rename its type
 	-- The SrcLoc isn't important now, 
 	-- though we could extract it from the Id
-	name'        	  = mkLocalName uniq occ' noSrcLoc
+	-- 
+	-- All local Ids now have the same IdInfo, which should save some
+	-- space.
 	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
         ty'          	  = tidyType (tidy_env,var_env) (idType id)
-	id'          	  = mkLocalIdWithInfo name' ty' idinfo
+	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcLoc
 	var_env'	  = extendVarEnv var_env id id'
     in
-    returnUs ((tidy_env', var_env'), id')
-
-
-fiddleCCall id 
-  = case globalIdDetails id of
-         PrimOpId (CCallOp ccall) ->
-	    -- Make a guaranteed unique name for a dynamic ccall.
-	    getUniqueUs   	`thenUs` \ uniq ->
-	    returnUs (setGlobalIdDetails id 
-			    (PrimOpId (CCallOp (setCCallUnique ccall uniq))))
-	 other -> returnUs id
+     ((tidy_env', var_env'), id')
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Figuring out CafInfo for an expression}
-%*									*
-%************************************************************************
-
-hasCafRefs decides whether a top-level closure can point into the dynamic heap.
-We mark such things as `MayHaveCafRefs' because this information is
-used to decide whether a particular closure needs to be referenced
-in an SRT or not.
-
-There are two reasons for setting MayHaveCafRefs:
-	a) The RHS is a CAF: a top-level updatable thunk.
-	b) The RHS refers to something that MayHaveCafRefs
-
-Possible improvement: In an effort to keep the number of CAFs (and 
-hence the size of the SRTs) down, we could also look at the expression and 
-decide whether it requires a small bounded amount of heap, so we can ignore 
-it as a CAF.  In these cases however, we would need to use an additional
-CAF list to keep track of non-collectable CAFs.  
-
 \begin{code}
-hasCafRefs  :: (Id -> Bool) -> CoreExpr -> CafInfo
--- Only called for the RHS of top-level lets
-hasCafRefss :: (Id -> Bool) -> [CoreExpr] -> CafInfo
-	-- predicate returns True for a given Id if we look at this Id when
-	-- calculating the result.  Used to *avoid* looking at the CafInfo
- 	-- field for an Id that is part of the current recursive group.
-
-hasCafRefs p expr = if isCAF expr || isFastTrue (cafRefs p expr)
-			then MayHaveCafRefs
-			else NoCafRefs
-
-	-- used for recursive groups.  The whole group is set to
-	-- "MayHaveCafRefs" if at least one of the group is a CAF or
-	-- refers to any CAFs.
-hasCafRefss p exprs = if any isCAF exprs || isFastTrue (cafRefss p exprs)
-			then MayHaveCafRefs
-			else NoCafRefs
-
-cafRefs p (Var id)
- | p id
- = case idCafInfo id of 
-	NoCafRefs      -> fastBool False
-	MayHaveCafRefs -> fastBool True
- | otherwise
- = fastBool False
-
-cafRefs p (Lit l) 	     = fastBool False
-cafRefs p (App f a) 	     = cafRefs p f `fastOr` cafRefs p a
-cafRefs p (Lam x e) 	     = cafRefs p e
-cafRefs p (Let b e) 	     = cafRefss p (rhssOfBind b) `fastOr` cafRefs p e
-cafRefs p (Case e bndr alts) = cafRefs p e `fastOr` cafRefss p (rhssOfAlts alts)
-cafRefs p (Note n e) 	     = cafRefs p e
-cafRefs p (Type t) 	     = fastBool False
-
-cafRefss p [] 	  = fastBool False
-cafRefss p (e:es) = cafRefs p e `fastOr` cafRefss p es
-
-
-isCAF :: CoreExpr -> Bool
--- Only called for the RHS of top-level lets
-isCAF e = not (rhsIsNonUpd e)
-  {- ToDo: check type for onceness, i.e. non-updatable thunks? -}
-
-rhsIsNonUpd :: CoreExpr -> Bool
-  -- True => Value-lambda, constructor, PAP
-  -- This is a bit like CoreUtils.exprIsValue, with the following differences:
-  -- 	a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
-  --
-  --    b) (C x xs), where C is a contructors is updatable if the application is
-  --	   dynamic: see isDynConApp
-  -- 
-  --    c) don't look through unfolding of f in (f x).  I'm suspicious of this one
-
-rhsIsNonUpd (Lam b e)          = isId b || rhsIsNonUpd e
-rhsIsNonUpd (Note (SCC _) e)   = False
-rhsIsNonUpd (Note _ e)         = rhsIsNonUpd e
-rhsIsNonUpd other_expr
-  = go other_expr 0 []
-  where
-    go (Var f) n_args args = idAppIsNonUpd f n_args args
-	
-    go (App f a) n_args args
-	| isTypeArg a = go f n_args args
-	| otherwise   = go f (n_args + 1) (a:args)
-
-    go (Note (SCC _) f) n_args args = False
-    go (Note _ f) n_args args       = go f n_args args
-
-    go other n_args args = False
-
-idAppIsNonUpd :: Id -> Int -> [CoreExpr] -> Bool
-idAppIsNonUpd id n_val_args args
-  = case globalIdDetails id of
-	DataConId con | not (isDynConApp con args) -> True
-	other -> n_val_args < idArity id
-
-isDynConApp :: DataCon -> [CoreExpr] -> Bool
-isDynConApp con args = isDllName (dataConName con) || any isDynArg args
--- Top-level constructor applications can usually be allocated 
--- statically, but they can't if 
--- 	a) the constructor, or any of the arguments, come from another DLL
---	b) any of the arguments are LitLits
--- (because we can't refer to static labels in other DLLs).
--- If this happens we simply make the RHS into an updatable thunk, 
--- and 'exectute' it rather than allocating it statically.
--- All this should match the decision in (see CoreToStg.coreToStgRhs)
-
-
-isDynArg :: CoreExpr -> Bool
-isDynArg (Var v)    = isDllName (idName v)
-isDynArg (Note _ e) = isDynArg e
-isDynArg (Lit lit)  = isLitLitLit lit
-isDynArg (App e _)  = isDynArg e	-- must be a type app
-isDynArg (Lam _ e)  = isDynArg e	-- must be a type lam
+m =: k = m `seq` k m
 \end{code}

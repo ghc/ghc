@@ -11,7 +11,7 @@ module IdInfo (
 	GlobalIdDetails(..), notGlobalId, 	-- Not abstract
 
 	IdInfo,		-- Abstract
-	vanillaIdInfo, noTyGenIdInfo, noCafOrTyGenIdInfo, noCafIdInfo,
+	vanillaIdInfo, noCafNoTyGenIdInfo,
 	seqIdInfo, megaSeqIdInfo,
 
 	-- Zapping
@@ -57,8 +57,14 @@ module IdInfo (
 	-- Specialisation
 	specInfo, setSpecInfo,
 
+	-- CG info
+	CgInfo(..), cgInfo, setCgInfo,  cgMayHaveCafRefs, pprCgInfo,
+ 	cgArity, cgCafInfo, vanillaCgInfo,
+	CgInfoEnv, lookupCgInfo,
+	setCgArity,
+
 	-- CAF info
-	CafInfo(..), cafInfo, setCafInfo, mayHaveCafRefs, ppCafInfo,
+	CafInfo(..), ppCafInfo, setCafInfo, mayHaveCafRefs,
 
         -- Constructed Product Result Info
         CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
@@ -73,6 +79,8 @@ module IdInfo (
 import CoreSyn
 import Type		( Type, usOnce )
 import PrimOp	 	( PrimOp )
+import NameEnv		( NameEnv, lookupNameEnv )
+import Name		( Name )
 import Var              ( Id )
 import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBreaker,
 			  InsideLam, insideLam, notInsideLam, 
@@ -96,8 +104,10 @@ infixl 	1 `setDemandInfo`,
 	  `setCprInfo`,
 	  `setWorkerInfo`,
 	  `setLBVarInfo`,
+	  `setOccInfo`,
+	  `setCgInfo`,
 	  `setCafInfo`,
-	  `setOccInfo`
+	  `setCgArity`
 	-- infixl so you can say (id `set` a `set` b)
 \end{code}
 
@@ -168,7 +178,7 @@ data IdInfo
 	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
         workerInfo      :: WorkerInfo,          -- Pointer to Worker Function
 	unfoldingInfo	:: Unfolding,		-- Its unfolding
-	cafInfo		:: CafInfo,		-- whether it refers (indirectly) to any CAFs
+	cgInfo		:: CgInfo,		-- Code generator info (arity, CAF info)
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
         lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
 	inlinePragInfo	:: InlinePragInfo,	-- Inline pragma
@@ -191,7 +201,9 @@ megaSeqIdInfo info
 -- Omitting this improves runtimes a little, presumably because
 -- some unfoldings are not calculated at all
 
-    seqCaf (cafInfo info)		`seq`
+-- CgInfo is involved in a loop, so we have to be careful not to seq it
+-- too early.
+--    seqCg (cgInfo info)			`seq`
     seqCpr (cprInfo info)		`seq`
     seqLBVar (lbvarInfo info)		`seq`
     seqOccInfo (occInfo info) 
@@ -228,7 +240,7 @@ setUnfoldingInfo  info uf
 
 setDemandInfo	  info dd = info { demandInfo = dd }
 setArityInfo	  info ar = info { arityInfo = ar  }
-setCafInfo        info cf = info { cafInfo = cf }
+setCgInfo         info cg = info { cgInfo = cg }
 setCprInfo        info cp = info { cprInfo = cp }
 setLBVarInfo      info lb = info { lbvarInfo = lb }
 \end{code}
@@ -238,7 +250,7 @@ setLBVarInfo      info lb = info { lbvarInfo = lb }
 vanillaIdInfo :: IdInfo
 vanillaIdInfo 
   = IdInfo {
-	    cafInfo		= MayHaveCafRefs,	-- Safe!
+	    cgInfo		= noCgInfo,
 	    arityInfo		= UnknownArity,
 	    demandInfo		= wwLazy,
 	    specInfo		= emptyCoreRules,
@@ -252,15 +264,11 @@ vanillaIdInfo
 	    occInfo		= NoOccInfo
 	   }
 
-noTyGenIdInfo = vanillaIdInfo `setTyGenInfo` TyGenNever
+noCafNoTyGenIdInfo = vanillaIdInfo `setTyGenInfo` TyGenNever
+			      	   `setCgInfo`    (CgInfo 0 NoCafRefs)
+	-- Used for built-in type Ids in MkId.
 	-- Many built-in things have fixed types, so we shouldn't
 	-- run around generalising them
-
-noCafIdInfo = vanillaIdInfo  `setCafInfo` NoCafRefs
-	-- Local things don't refer to Cafs
-
-noCafOrTyGenIdInfo = noTyGenIdInfo `setCafInfo` NoCafRefs
-	-- Most also guarantee not to refer to CAFs
 \end{code}
 
 
@@ -309,8 +317,8 @@ hasArity UnknownArity = False
 hasArity other	      = True
 
 ppArityInfo UnknownArity	 = empty
-ppArityInfo (ArityExactly arity) = hsep [ptext SLIT("__A"), int arity]
-ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("__AL"), int arity]
+ppArityInfo (ArityExactly arity) = hsep [ptext SLIT("ArityExactly"), int arity]
+ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("ArityAtLeast"), int arity]
 \end{code}
 
 %************************************************************************
@@ -445,6 +453,23 @@ There might not be a worker, even for a strict function, because:
     for w/w split
 (b) the strictness info might be "SSS" or something, so no w/w split.
 
+Sometimes the arity of a wrapper changes from the original arity from
+which it was generated, so we always emit the "original" arity into
+the interface file, as part of the worker info.
+
+How can this happen?  Sometimes we get
+	f = coerce t (\x y -> $wf x y)
+at the moment of w/w split; but the eta reducer turns it into
+	f = coerce t $wf
+which is perfectly fine except that the exposed arity so far as
+the code generator is concerned (zero) differs from the arity
+when we did the split (2).  
+
+All this arises because we use 'arity' to mean "exactly how many
+top level lambdas are there" in interface files; but during the
+compilation of this module it means "how many things can I apply
+this to".
+
 \begin{code}
 
 data WorkerInfo = NoWorker
@@ -473,14 +498,42 @@ wrapperArity (HasWorker _ a) = a
 
 %************************************************************************
 %*									*
-\subsection[CAF-IdInfo]{CAF-related information}
+\subsection[CG-IdInfo]{Code generator-related information}
 %*									*
 %************************************************************************
 
-This information is used to build Static Reference Tables (see
-simplStg/ComputeSRT.lhs).
+CgInfo encapsulates calling-convention information produced by the code 
+generator.  It is pasted into the IdInfo of each emitted Id by CoreTidy,
+but only as a thunk --- the information is only actually produced further
+downstream, by the code generator.
 
 \begin{code}
+data CgInfo = CgInfo 
+		!Arity 		-- Exact arity for calling purposes
+		!CafInfo
+
+cgArity   (CgInfo arity _)    = arity
+cgCafInfo (CgInfo _ caf_info) = caf_info
+
+setCafInfo info caf_info = 
+  case cgInfo info of { CgInfo arity _  -> 
+	info `setCgInfo` CgInfo arity caf_info }
+
+setCgArity info arity = 
+  case cgInfo info of { CgInfo _ caf_info  -> 
+	info `setCgInfo` CgInfo arity caf_info }
+
+	-- Used for local Ids, which shouldn't need any CgInfo
+noCgInfo = panic "noCgInfo!"
+
+cgMayHaveCafRefs (CgInfo _ caf_info) = mayHaveCafRefs caf_info
+
+seqCg c = c `seq` ()  -- fields are strict anyhow
+
+vanillaCgInfo = CgInfo 0 MayHaveCafRefs		-- Definitely safe
+
+-- CafInfo is used to build Static Reference Tables (see simplStg/SRT.lhs).
+
 data CafInfo 
 	= MayHaveCafRefs		-- either:
 					-- (1) A function or static constructor
@@ -490,17 +543,27 @@ data CafInfo
 	| NoCafRefs			-- A function or static constructor
 				        -- that refers to no CAFs.
 
--- LATER: not sure how easy this is...
---      | OneCafRef Id
-
-
-mayHaveCafRefs MayHaveCafRefs = True
-mayHaveCafRefs _	      = False
+mayHaveCafRefs  MayHaveCafRefs = True
+mayHaveCafRefs _	       = False
 
 seqCaf c = c `seq` ()
 
+pprCgInfo (CgInfo arity caf_info) = ppArity arity <+> ppCafInfo caf_info
+
+ppArity 0 = empty
+ppArity n = hsep [ptext SLIT("__A"), int n]
+
 ppCafInfo NoCafRefs = ptext SLIT("__C")
 ppCafInfo MayHaveCafRefs = empty
+\end{code}
+
+\begin{code}
+type CgInfoEnv = NameEnv CgInfo
+
+lookupCgInfo :: NameEnv CgInfo -> Name -> CgInfo
+lookupCgInfo env n = case lookupNameEnv env n of
+			Just info -> info
+			Nothing   -> pprTrace "Urk! Not in CgInfo env" (ppr n) vanillaCgInfo
 \end{code}
 
 

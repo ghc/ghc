@@ -688,9 +688,9 @@ rnHsTyvar doc tyvar = lookupOccRn tyvar
 %*********************************************************
 
 \begin{code}
-rnIdInfo (HsWorker worker)
+rnIdInfo (HsWorker worker arity)
   = lookupOccRn worker			`thenRn` \ worker' ->
-    returnRn (HsWorker worker')
+    returnRn (HsWorker worker' arity)
 
 rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenRn` \ expr' ->
 				  returnRn (HsUnfold inline expr')

@@ -48,7 +48,7 @@ module Id (
         setIdTyGenInfo,
 	setIdWorkerInfo,
 	setIdSpecialisation,
-	setIdCafInfo,
+	setIdCgInfo,
 	setIdCprInfo,
 	setIdOccInfo,
 
@@ -59,7 +59,9 @@ module Id (
 	idWorkerInfo,
 	idUnfolding,
 	idSpecialisation,
+	idCgInfo,
 	idCafInfo,
+	idCgArity,
 	idCprInfo,
 	idLBVarInfo,
 	idOccInfo,
@@ -97,7 +99,6 @@ import FieldLabel	( FieldLabel )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques, 
 			  getNumBuiltinUniques )
-import Outputable
 
 infixl 	1 `setIdUnfolding`,
 	  `setIdArityInfo`,
@@ -132,7 +133,7 @@ mkLocalIdWithInfo name ty info = Var.mkLocalId name (addFreeTyVars ty) info
 mkSpecPragmaId :: OccName -> Unique -> Type -> SrcLoc -> Id
 mkSpecPragmaId occ uniq ty loc = Var.mkSpecPragmaId (mkLocalName uniq occ loc)
 						    (addFreeTyVars ty)
-						    noCafIdInfo
+						    vanillaIdInfo
 
 mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId details name ty info = Var.mkGlobalId details name (addFreeTyVars ty) info
@@ -140,7 +141,7 @@ mkGlobalId details name ty info = Var.mkGlobalId details name (addFreeTyVars ty)
 
 \begin{code}
 mkLocalId :: Name -> Type -> Id
-mkLocalId name ty = mkLocalIdWithInfo name ty noCafIdInfo
+mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
@@ -355,12 +356,23 @@ setIdSpecialisation :: Id -> CoreRules -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
 
 	---------------------------------
+	-- CG INFO
+idCgInfo :: Id -> CgInfo
+idCgInfo id = cgInfo (idInfo id)
+
+setIdCgInfo :: Id -> CgInfo -> Id
+setIdCgInfo id cg_info = modifyIdInfo (`setCgInfo` cg_info) id
+
+	---------------------------------
 	-- CAF INFO
 idCafInfo :: Id -> CafInfo
-idCafInfo id = cafInfo (idInfo id)
+idCafInfo id = cgCafInfo (idCgInfo id)
 
-setIdCafInfo :: Id -> CafInfo -> Id
-setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
+	---------------------------------
+	-- CG ARITY
+
+idCgArity :: Id -> Arity
+idCgArity id = cgArity (idCgInfo id)
 
 	---------------------------------
 	-- CPR INFO

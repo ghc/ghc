@@ -188,7 +188,7 @@ variable.
 
 \begin{code}
 cgTopBinding :: (StgBinding,[Id]) -> Code
-cgTopBinding (StgNonRec id rhs, srt)
+cgTopBinding (StgNonRec srt_info id rhs, srt)
   = absC maybeSplitCode	  	`thenC`
     maybeGlobaliseId id		`thenFC` \ id' ->
     let
@@ -196,11 +196,11 @@ cgTopBinding (StgNonRec id rhs, srt)
     in
     mkSRT srt_label srt [] 	`thenC`
     setSRTLabel srt_label (
-    cgTopRhs id' rhs	  	`thenFC` \ (id, info) ->
+    cgTopRhs id' rhs srt_info  	`thenFC` \ (id, info) ->
     addBindC id info
     )
 
-cgTopBinding (StgRec pairs, srt)
+cgTopBinding (StgRec srt_info pairs, srt)
   = absC maybeSplitCode		  	`thenC`
     let
         (bndrs, rhss) = unzip pairs
@@ -214,7 +214,7 @@ cgTopBinding (StgRec pairs, srt)
     setSRTLabel srt_label (
        fixC (\ new_binds -> 
 		addBindsC new_binds		`thenC`
-		mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs'
+		mapFCs ( \ (b,e) -> cgTopRhs b e srt_info ) pairs'
        )  `thenFC` \ new_binds -> nopC
     )
 
@@ -256,18 +256,18 @@ maybeSplitCode
 -- to enclose the listFCs in cgTopBinding, but that tickled the
 -- statics "error" call in initC.  I DON'T UNDERSTAND WHY!
 
-cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
+cgTopRhs :: Id -> StgRhs -> SRT -> FCode (Id, CgIdInfo)
 	-- the Id is passed along for setting up a binding...
 
-cgTopRhs bndr (StgRhsCon cc con args)
+cgTopRhs bndr (StgRhsCon cc con args) srt
   = maybeGlobaliseId bndr `thenFC` \ bndr' ->
     forkStatics (cgTopRhsCon bndr con args)
 
-cgTopRhs bndr (StgRhsClosure cc bi srt fvs upd_flag args body)
+cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag args body) srt
   =     -- There should be no free variables
     ASSERT(null fvs)
 	-- If the closure is a thunk, then the binder must be recorded as such.
-    ASSERT2(not (isUpdatable upd_flag) || mayHaveCafRefs (idCafInfo bndr), ppr bndr)
+--    ASSERT2(not (isUpdatable upd_flag) || mayHaveCafRefs (idCafInfo bndr), ppr bndr)
 
     getSRTLabel `thenFC` \srt_label ->
     let lf_info = 

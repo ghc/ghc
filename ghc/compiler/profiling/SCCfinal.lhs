@@ -81,18 +81,18 @@ stgMassageForProfiling mod_name us stg_binds
 
     do_top_bindings [] = returnMM []
 
-    do_top_bindings (StgNonRec b rhs : bs) 
+    do_top_bindings (StgNonRec srt b rhs : bs) 
       = do_top_rhs b rhs 		`thenMM` \ rhs' ->
 	addTopLevelIshId b (
 	   do_top_bindings bs `thenMM` \bs' ->
-	   returnMM (StgNonRec b rhs' : bs')
+	   returnMM (StgNonRec srt b rhs' : bs')
 	)
 
-    do_top_bindings (StgRec pairs : bs)
+    do_top_bindings (StgRec srt pairs : bs)
       = addTopLevelIshIds binders (
 	   mapMM do_pair pairs		`thenMM` \ pairs2 ->
 	   do_top_bindings bs `thenMM` \ bs' ->
-	   returnMM (StgRec pairs2 : bs')
+	   returnMM (StgRec srt pairs2 : bs')
 	)
       where
 	binders = map fst pairs
@@ -103,7 +103,7 @@ stgMassageForProfiling mod_name us stg_binds
     ----------
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
-    do_top_rhs binder (StgRhsClosure _ bi srt fv u [] (StgSCC cc (StgConApp con args)))
+    do_top_rhs binder (StgRhsClosure _ bi fv u [] (StgSCC cc (StgConApp con args)))
       | not (isSccCountCostCentre cc) && not (isDllConApp con args)
 	-- Trivial _scc_ around nothing but static data
 	-- Eliminate _scc_ ... and turn into StgRhsCon
@@ -112,17 +112,17 @@ stgMassageForProfiling mod_name us stg_binds
       = returnMM (StgRhsCon dontCareCCS con args)
 
 {- Can't do this one with cost-centre stacks:  --SDM
-    do_top_rhs binder (StgRhsClosure no_cc bi srt fv u [] (StgSCC ty cc expr))
+    do_top_rhs binder (StgRhsClosure no_cc bi fv u [] (StgSCC ty cc expr))
       | (noCCSAttached no_cc || currentOrSubsumedCCS no_cc)
         && not (isSccCountCostCentre cc)
 	-- Top level CAF without a cost centre attached
 	-- Attach and collect cc of trivial _scc_ in body
       = collectCC cc					`thenMM_`
 	set_prevailing_cc cc (do_expr expr)		`thenMM`  \ expr' ->
-        returnMM (StgRhsClosure cc bi srt fv u [] expr')
+        returnMM (StgRhsClosure cc bi fv u [] expr')
 -}
 
-    do_top_rhs binder (StgRhsClosure no_cc bi srt fv u [] body)
+    do_top_rhs binder (StgRhsClosure no_cc bi fv u [] body)
       | noCCSAttached no_cc || currentOrSubsumedCCS no_cc
 	-- Top level CAF without a cost centre attached
 	-- Attach CAF cc (collect if individual CAF ccs)
@@ -136,28 +136,18 @@ stgMassageForProfiling mod_name us stg_binds
 		else 
 		     returnMM all_cafs_ccs)		`thenMM`  \ caf_ccs ->
 	   set_prevailing_cc caf_ccs (do_expr body)	`thenMM`  \ body' ->
-           returnMM (StgRhsClosure caf_ccs bi srt fv u [] body')
+           returnMM (StgRhsClosure caf_ccs bi fv u [] body')
 
-    do_top_rhs binder (StgRhsClosure cc bi srt fv u [] body)
+    do_top_rhs binder (StgRhsClosure cc bi fv u [] body)
 	-- Top level CAF with cost centre attached
 	-- Should this be a CAF cc ??? Does this ever occur ???
       = pprPanic "SCCfinal: CAF with cc:" (ppr cc)
 
-{- can't do this with cost-centre stacks:  --SDM
-    do_top_rhs binder (StgRhsClosure _ bi srt fv u args (StgSCC cc expr))
-      | not (isSccCountCostCentre cc)
-	-- Top level function with trivial _scc_ in body
-	-- Attach and collect cc of trivial _scc_
-      = collectCC cc					`thenMM_`
-	set_prevailing_cc cc (do_expr expr)		`thenMM` \ expr' ->
-	returnMM (StgRhsClosure cc bi srt fv u args expr')
--}
-
-    do_top_rhs binder (StgRhsClosure no_ccs bi srt fv u args body)
+    do_top_rhs binder (StgRhsClosure no_ccs bi fv u args body)
 	-- Top level function, probably subsumed
       | noCCSAttached no_ccs
       = set_lambda_cc (do_expr body)	`thenMM` \ body' ->
-	returnMM (StgRhsClosure subsumedCCS bi srt fv u args body')
+	returnMM (StgRhsClosure subsumedCCS bi fv u args body')
 
       | otherwise
       = pprPanic "SCCfinal: CAF with cc:" (ppr no_ccs)
@@ -225,18 +215,18 @@ stgMassageForProfiling mod_name us stg_binds
 
     ----------------------------------
 
-    do_let (StgNonRec b rhs) e
+    do_let (StgNonRec srt b rhs) e
       = do_rhs rhs		 	`thenMM` \ rhs' ->
 	addTopLevelIshId b (
 	  do_expr e		  	`thenMM` \ e' ->
-	  returnMM (StgNonRec b rhs',e')
+	  returnMM (StgNonRec srt b rhs',e')
         )
 
-    do_let (StgRec pairs) e
+    do_let (StgRec srt pairs) e
       = addTopLevelIshIds binders (
 	   mapMM do_pair pairs	 	`thenMM` \ pairs' ->
 	   do_expr e		  	`thenMM` \ e' ->
-	   returnMM (StgRec pairs', e')
+	   returnMM (StgRec srt pairs', e')
 	)
       where
 	binders = map fst pairs
@@ -250,28 +240,28 @@ stgMassageForProfiling mod_name us stg_binds
 	-- but we don't have to worry about cafs etc.
 
 {-
-    do_rhs (StgRhsClosure closure_cc bi srt fv u [] (StgSCC ty cc (StgCon (DataCon con) args _)))
+    do_rhs (StgRhsClosure closure_cc bi fv u [] (StgSCC ty cc (StgCon (DataCon con) args _)))
       | not (isSccCountCostCentre cc)
       = collectCC cc `thenMM_`
 	returnMM (StgRhsCon cc con args)
 -}
 
 {-
-    do_rhs (StgRhsClosure _ bi srt fv u args (StgSCC ty cc expr))
+    do_rhs (StgRhsClosure _ bi fv u args (StgSCC ty cc expr))
       | not (isSccCountCostCentre cc)
       = collectCC cc 				`thenMM_`
 	set_prevailing_cc cc (do_expr expr)	`thenMM` \ expr' ->
-	returnMM (StgRhsClosure cc bi srt fv u args expr')
+	returnMM (StgRhsClosure cc bi fv u args expr')
 -}
 
-    do_rhs (StgRhsClosure cc bi srt fv u [] body)
+    do_rhs (StgRhsClosure cc bi fv u [] body)
       = do_expr body				`thenMM` \ body' ->
-	returnMM (StgRhsClosure currentCCS bi srt fv u [] body')
+	returnMM (StgRhsClosure currentCCS bi fv u [] body')
 
-    do_rhs (StgRhsClosure cc bi srt fv u args body)
+    do_rhs (StgRhsClosure cc bi fv u args body)
       = set_lambda_cc (do_expr body)		`thenMM` \ body' ->
 	get_prevailing_cc 			`thenMM` \ prev_ccs ->
-	returnMM (StgRhsClosure currentCCS bi srt fv u args body')
+	returnMM (StgRhsClosure currentCCS bi fv u args body')
 
     do_rhs (StgRhsCon cc con args)
       = returnMM (StgRhsCon currentCCS con args)
@@ -324,9 +314,9 @@ boxHigherOrderArgs almost_expr args
     mk_stg_let cc (new_var, old_var) body
       = let
 	    rhs_body    = StgApp old_var [{-args-}]
-	    rhs_closure = StgRhsClosure cc stgArgOcc NoSRT [{-fvs-}] ReEntrant [{-args-}] rhs_body
+	    rhs_closure = StgRhsClosure cc stgArgOcc [{-fvs-}] ReEntrant [{-args-}] rhs_body
         in
-	StgLet (StgNonRec new_var rhs_closure) body
+	StgLet (StgNonRec NoSRT{-eeek!!!-} new_var rhs_closure) body
       where
 	bOGUS_LVs = emptyUniqSet -- easier to print than: panic "mk_stg_let: LVs"
 
