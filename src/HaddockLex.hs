@@ -25,25 +25,22 @@ data Token
 
 -- simple finite-state machine for tokenising the doc string
 
+-- ----------------------------------------------------------------------------
+-- At the beginning of a paragraph, we throw away initial whitespace
+
 tokenise :: String -> [Token]
 tokenise "" = []
 tokenise str = case str of
   '<':cs  -> tokenise_url cs
-  '\n':cs -> tokenise_newline cs
+  '\n':cs -> tokenise_newline tokenise cs
   c:cs | c `elem` special -> TokSpecial c : tokenise cs
   _other  -> tokenise_string "" str
 
-tokenise_url cs =
-  let (url,rest) = break (=='>') cs in
-  TokURL url : case rest of
-		 '>':rest -> tokenise rest
-		 _ -> tokenise rest
-
-tokenise_newline cs =
+tokenise_newline next cs =
  case dropWhile nonNewlineSpace cs of
    '\n':cs -> TokPara : tokenise_para cs -- paragraph break
-   '>':cs  -> TokBirdTrack : tokenise cs -- bird track
-   _other  -> tokenise_string "\n" cs
+   '>':cs  -> TokBirdTrack : next cs -- bird track
+   _other  -> tokenise_string "" cs
 
 tokenise_para cs =
   case dropWhile nonNewlineSpace cs of   
@@ -63,20 +60,45 @@ tokenise_para cs =
 
 nonNewlineSpace c = isSpace c && c /= '\n'
 
+-- ----------------------------------------------------------------------------
+-- Within a paragraph, we don't throw away any whitespace (except before a
+-- birdtrack, and before a paragraph break).
+
+tokenise1 :: String -> [Token]
+tokenise1 "" = []
+tokenise1 str = case str of
+  '<':cs  -> tokenise_url cs
+  '\n':cs -> tokenise_newline1 cs
+  c:cs | c `elem` special -> TokSpecial c : tokenise1 cs
+  _other  -> tokenise_string "" str
+
+tokenise_newline1 cs =
+ case dropWhile nonNewlineSpace cs of
+   '\n':cs -> TokPara : tokenise_para cs -- paragraph break
+   '>':cs  -> TokString "\n" : TokBirdTrack : tokenise1 cs -- bird track
+   _other  -> tokenise_string "\n" cs
+
+tokenise_url cs =
+  let (url,rest) = break (=='>') cs in
+  TokURL url : case rest of
+		 '>':rest -> tokenise1 rest
+		 _ -> tokenise1 rest
+
+-- ----------------------------------------------------------------------------
+-- Within a string, we don't throw away any whitespace
+
 tokenise_string str cs = 
   case cs of
     [] -> [TokString (reverse str)]
     '\\':c:cs -> tokenise_string (c:str) cs
     '\n':cs   -> tokenise_string_newline str cs
-    c:cs | c == '<' || c `elem` special
-		-> TokString (reverse str) : tokenise (c:cs)
-         | otherwise
-	        -> tokenise_string (c:str) cs
+    '<':cs    -> TokString (reverse str) : tokenise_url cs
+    c:cs | c `elem` special -> TokString (reverse str) : tokenise1 (c:cs)
+         | otherwise 	    -> tokenise_string (c:str) cs
 
 tokenise_string_newline str cs =
   case dropWhile nonNewlineSpace cs  of
    '\n':cs -> TokString (reverse str) : TokPara : tokenise_para cs
-   '>':cs  -> TokString (reverse ('\n':str)) : TokBirdTrack : tokenise cs
+   '>':cs  -> TokString (reverse ('\n':str)) : TokBirdTrack : tokenise1 cs
 		 -- bird track
    _other  -> tokenise_string ('\n':str) cs  -- don't throw away whitespace
-
