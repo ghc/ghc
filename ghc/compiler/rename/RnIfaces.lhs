@@ -512,6 +512,7 @@ getGates source_fvs decl
 
 get_gates is_used (ForeignType {tcdName = tycon}) = unitNameSet tycon
 get_gates is_used (IfaceSig    {tcdType = ty})    = extractHsTyNames ty
+get_gates is_used (CoreDecl    {tcdType = ty})    = extractHsTyNames ty
 
 get_gates is_used (ClassDecl { tcdCtxt = ctxt, tcdName = cls, tcdTyVars = tvs, tcdSigs = sigs})
   = (super_cls_and_sigs `addOneToNameSet` cls) `unionNameSets` 

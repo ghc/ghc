@@ -92,6 +92,9 @@ import Maybe		( isJust, fromJust )
 import IO
 
 import MkExternalCore	( emitExternalCore )
+import ParserCore
+import ParserCoreUtils
+
 \end{code}
 
 
@@ -424,7 +427,13 @@ myParseModule dflags src_filename
  = do --------------------------  Parser  ----------------
       showPass dflags "Parser"
       _scc_  "Parser" do
-
+      if dopt_HscLang dflags == HscCore 
+       then do
+         inp <- readFile src_filename
+	 case parseCore inp 1 of
+	   OkP m   -> return (Just m)
+	   FailP s -> hPutStrLn stderr s >> return Nothing
+       else do
       buf <- hGetStringBuffer src_filename
 
       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.101 2002/03/26 22:08:44 sof Exp $
+-- $Id: Main.hs,v 1.102 2002/03/29 21:39:37 sof Exp $
 --
 -- GHC Driver program
 --
@@ -280,15 +280,19 @@ main =
 	  let not_hs_file  = not (haskellish_src_file src)
 	  pp <- if not_hs_file || mode == StopBefore Hsc || mode == StopBefore HsPp
 			then return src_and_suff else do
+--		hPutStrLn stderr "before" >> hFlush stderr
 		phases <- genPipeline (StopBefore Hsc) stop_flag
 				      False{-not persistent-} defaultHscLang
 				      src_and_suff
+--		hPutStrLn stderr "after" >> hFlush stderr
 	  	pipeLoop phases src_and_suff False{-no linking-} False{-no -o flag-}
 			basename suffix
 
 	  -- rest of compilation
 	  hsc_lang <- dynFlag hscLang
+--	  hPutStrLn stderr ("before-1 " ++ show (pp,mode)) >> hFlush stderr
 	  phases   <- genPipeline mode stop_flag True hsc_lang pp
+--	  hPutStrLn stderr "after" >> hFlush stderr
 	  (r,_)    <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL)
 	  			      True{-use -o flag-} basename suffix
 	  return r

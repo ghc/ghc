@@ -14,8 +14,8 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 module HsCore (
 	UfExpr(..), UfAlt, UfBinder(..), UfNote(..),
 	UfBinding(..), UfConAlt(..),
-	HsIdInfo(..), pprHsIdInfo, 
-
+	HsIdInfo(..), pprHsIdInfo,
+	
 	eq_ufExpr, eq_ufBinders, pprUfExpr, pprHsIdInfo,
 
 	toUfExpr, toUfBndr, ufBinderName

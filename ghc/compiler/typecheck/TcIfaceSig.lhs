@@ -4,7 +4,12 @@
 \section[TcIfaceSig]{Type checking of type signatures in interface files}
 
 \begin{code}
-module TcIfaceSig ( tcInterfaceSigs, tcDelay, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
+module TcIfaceSig ( tcInterfaceSigs,
+                    tcDelay,
+		    tcVar,
+		    tcCoreExpr,
+		    tcCoreLamBndrs,
+		    tcCoreBinds ) where
 
 #include "HsVersions.h"
 
@@ -31,7 +36,7 @@ import MkId		( mkFCallId )
 import IdInfo
 import TyCon		( tyConDataCons )
 import DataCon		( DataCon, dataConId, dataConSig, dataConArgTys )
-import Type		( mkTyVarTys, splitTyConApp )
+import Type		( Type, mkTyVarTys, splitTyConApp )
 import TysWiredIn	( tupleCon )
 import Var		( mkTyVar, tyVarKind )
 import Name		( Name, nameIsLocalOrFrom )
@@ -365,6 +370,28 @@ tcConAlt (UfDataAlt con_name)
 		    Just con -> con
 		    Nothing  -> pprPanic "tcCoreAlt" (ppr con_id))
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Core decls}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+tcCoreBinds :: [RenamedTyClDecl]
+            -> TcM [(Id, Type, CoreExpr)]
+tcCoreBinds ls = mapTc tcOne ls
+ where
+  tcOne (CoreDecl { tcdName = nm, tcdType = ty, tcdRhs = rhs }) =
+   tcVar nm         `thenTc` \ i ->
+   tcIfaceType ty   `thenTc` \ ty' ->
+   tcCoreExpr  rhs  `thenTc` \ rhs' ->
+   returnTc (i,ty',rhs')
+
+\end{code}
+
+
 
 \begin{code}
 ifaceSigCtxt sig_name

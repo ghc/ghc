@@ -15,7 +15,7 @@ module TcModule (
 import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  Stmt(..), InPat(..), HsMatchContext(..), HsDoContext(..), RuleDecl(..),
-			  isSourceInstDecl, mkSimpleMatch, placeHolderType
+			  isSourceInstDecl, mkSimpleMatch, placeHolderType, isCoreDecl
 			)
 import PrelNames	( ioTyConName, printName,
 			  returnIOName, bindIOName, failIOName, runMainName, 
@@ -26,8 +26,9 @@ import RnHsSyn		( RenamedHsDecl, RenamedStmt, RenamedHsExpr,
 			  RenamedRuleDecl, RenamedTyClDecl, RenamedInstDecl )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
+			  TypecheckedCoreBind,
 			  zonkTopBinds, zonkForeignExports, zonkRules, mkHsLet,
-			  zonkExpr, zonkIdBndr
+			  zonkExpr, zonkIdBndr, zonkCoreBinds
 			)
 
 import Rename		( RnResult(..) )
@@ -53,7 +54,7 @@ import TcEnv		( TcEnv, RecTcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv,
 			)
 import TcRules		( tcIfaceRules, tcSourceRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
-import TcIfaceSig	( tcInterfaceSigs )
+import TcIfaceSig	( tcInterfaceSigs, tcCoreBinds )
 import TcInstDcls	( tcInstDecls1, tcIfaceInstDecls1, addInstDFuns, initInstEnv, tcInstDecls2 )
 import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
@@ -352,6 +353,7 @@ data TcResults
 	tc_insts   :: [DFunId],			-- Instances 
 	tc_rules   :: [TypecheckedRuleDecl],	-- Transformation rules
 	tc_binds   :: TypecheckedMonoBinds,	-- Bindings
+	tc_cbinds  :: [TypecheckedCoreBind],    -- (external)Core value decls/bindings.
 	tc_fords   :: [TypecheckedForeignDecl]	-- Foreign import & exports.
     }
 
@@ -403,6 +405,7 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
         traceTc (text "Tc5")				`thenNF_Tc_`
 	tcTopBinds (val_binds `ThenBinds` deriv_binds)	`thenTc` \ ((val_binds, env2), lie_valdecls) ->
 	
+        tcCoreBinds core_binds                          `thenTc` \ core_binds' -> 
      	-- Second pass over class and instance declarations, 
 	-- plus rules and foreign exports, to generate bindings
 	tcSetEnv env2				$
@@ -458,6 +461,7 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
 	in
  	traceTc (text "Tc7")		`thenNF_Tc_`
 	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', final_env)  ->
+	zonkCoreBinds core_binds'       `thenNF_Tc` \ core_binds' ->
 	tcSetEnv final_env		$
 		-- zonkTopBinds puts all the top-level Ids into the tcGEnv
  	traceTc (text "Tc8")		`thenNF_Tc_`
@@ -476,6 +480,7 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
 			      tc_insts   = map iDFunId inst_info,
 			      tc_binds   = all_binds', 
 			      tc_fords   = foi_decls ++ foe_decls',
+			      tc_cbinds  = core_binds',
 			      tc_rules   = src_rules'
 			    }
 	)
@@ -486,6 +491,8 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
     rule_decls = [d | RuleD d <- decls]
     inst_decls = [d | InstD d <- decls]
     val_decls  = [d | ValD d  <- decls]
+    
+    core_binds = [d | d <- tycl_decls, isCoreDecl d]
 
     (src_inst_decls, iface_inst_decls) = partition isSourceInstDecl  	       inst_decls
     (src_rule_decls, iface_rule_decls) = partition (isSourceRuleDecl this_mod) rule_decls

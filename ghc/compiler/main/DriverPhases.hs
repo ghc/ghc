@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.16 2002/03/04 17:01:30 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.17 2002/03/29 21:39:37 sof Exp $
 --
 -- GHC Driver
 --
@@ -64,6 +64,7 @@ startPhase "lhs"   = Unlit
 startPhase "hs"    = Cpp
 startPhase "hscpp" = HsPp
 startPhase "hspp"  = Hsc
+startPhase "hcr"   = Hsc
 startPhase "hs-boot" = HsBoot
 startPhase "hc"    = HCc
 startPhase "c"     = Cc
@@ -97,8 +98,8 @@ phaseInputExt Ilx2Il      = "ilx"
 phaseInputExt Ilasm       = "il"
 #endif
 
-haskellish_suffix     = (`elem` [ "hs", "hspp", "hscpp", "lhs", "hc", "raw_s" ])
-haskellish_src_suffix = (`elem` [ "hs", "hspp", "hscpp", "lhs" ])
+haskellish_suffix     = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "raw_s" ])
+haskellish_src_suffix = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr"])
 cish_suffix           = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
 hsbootish_suffix      = (`elem` [ "hs-boot" ])
 

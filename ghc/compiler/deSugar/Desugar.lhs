@@ -54,11 +54,12 @@ deSugar :: DynFlags
 	-> IO (ModDetails, (SDoc, SDoc, [FAST_STRING], [CoreBndr]))
 
 deSugar dflags pcs hst mod_name unqual
-        (TcResults {tc_env   = type_env,
-		    tc_binds = all_binds,
-		    tc_insts = insts,
-		    tc_rules = rules,
-		    tc_fords = fo_decls})
+        (TcResults {tc_env    = type_env,
+		    tc_binds  = all_binds,
+		    tc_insts  = insts,
+		    tc_rules  = rules,
+		    tc_cbinds = core_binds,
+		    tc_fords  = fo_decls})
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
 
@@ -67,11 +68,16 @@ deSugar dflags pcs hst mod_name unqual
 					     (dsProgram mod_name all_binds rules fo_decls)    
 
 	      (ds_binds, ds_rules, foreign_stuff) = ds_result
+	      
+	      addCoreBinds ls =
+	        case core_binds of
+		  [] -> ls
+		  cs -> (Rec cs) : ls
 	
 	      mod_details = ModDetails { md_types = type_env,
 					 md_insts = insts,
 					 md_rules = ds_rules,
-					 md_binds = ds_binds }
+					 md_binds = addCoreBinds ds_binds }
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))

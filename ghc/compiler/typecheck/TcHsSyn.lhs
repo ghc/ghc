@@ -11,7 +11,7 @@ module TcHsSyn (
 	TcMonoBinds, TcHsBinds, TcPat,
 	TcExpr, TcGRHSs, TcGRHS, TcMatch,
 	TcStmt, TcArithSeqInfo, TcRecordBinds,
-	TcHsModule, TcCoreExpr, TcDictBinds,
+	TcHsModule, TcDictBinds,
 	TcForeignExportDecl,
 	
 	TypecheckedHsBinds, TypecheckedRuleDecl,
@@ -21,7 +21,7 @@ module TcHsSyn (
 	TypecheckedMatch, TypecheckedHsModule,
 	TypecheckedGRHSs, TypecheckedGRHS,
 	TypecheckedRecordBinds, TypecheckedDictBinds,
-	TypecheckedMatchContext,
+	TypecheckedMatchContext, TypecheckedCoreBind,
 
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsLet,
@@ -33,7 +33,7 @@ module TcHsSyn (
 	TcId, 
 
 	zonkTopBinds, zonkId, zonkIdBndr, zonkIdOcc, zonkExpr,
-	zonkForeignExports, zonkRules
+	zonkForeignExports, zonkRules, zonkCoreExpr, zonkCoreBinds
   ) where
 
 #include "HsVersions.h"
@@ -55,7 +55,7 @@ import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 		  )
 import TysWiredIn ( charTy, stringTy, intTy, integerTy,
 		    mkListTy, mkPArrTy, mkTupleTy, unitTy )
-import CoreSyn    ( Expr )
+import CoreSyn    ( Expr(..), CoreExpr, CoreBind, Bind(..), CoreAlt, Note(..) )
 import Var	  ( isId )
 import BasicTypes ( RecFlag(..), Boxity(..), IPName(..), ipNameName )
 import Bag
@@ -88,7 +88,6 @@ type TcArithSeqInfo	= ArithSeqInfo TcId TcPat
 type TcRecordBinds	= HsRecordBinds TcId TcPat
 type TcHsModule	= HsModule TcId TcPat
 
-type TcCoreExpr	= Expr TcId
 type TcForeignExportDecl = ForeignDecl TcId
 type TcRuleDecl 	 = RuleDecl    TcId TcPat
 
@@ -107,6 +106,7 @@ type TypecheckedRecordBinds	= HsRecordBinds Id TypecheckedPat
 type TypecheckedHsModule	= HsModule	Id TypecheckedPat
 type TypecheckedForeignDecl     = ForeignDecl Id
 type TypecheckedRuleDecl	= RuleDecl      Id TypecheckedPat
+type TypecheckedCoreBind        = (Id, CoreExpr)
 \end{code}
 
 \begin{code}
@@ -715,7 +715,7 @@ zonkPat (RecPat n ty tvs dicts rpats)
 	returnNF_Tc ((f, new_pat, pun), ids)
 
 zonkPat (LitPat lit ty)
-  = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty  ->
+  = zonkTcTypeToType ty	        `thenNF_Tc` \ new_ty  ->
     returnNF_Tc (LitPat lit new_ty, emptyBag)
 
 zonkPat (SigPat pat ty expr)
@@ -730,15 +730,15 @@ zonkPat (NPat lit ty expr)
     returnNF_Tc (NPat lit new_ty new_expr, emptyBag)
 
 zonkPat (NPlusKPat n k ty e1 e2)
-  = zonkIdBndr n		`thenNF_Tc` \ new_n ->
-    zonkTcTypeToType ty	`thenNF_Tc` \ new_ty ->
-    zonkExpr e1		`thenNF_Tc` \ new_e1 ->
-    zonkExpr e2		`thenNF_Tc` \ new_e2 ->
+  = zonkIdBndr n	        `thenNF_Tc` \ new_n ->
+    zonkTcTypeToType ty	        `thenNF_Tc` \ new_ty ->
+    zonkExpr e1		        `thenNF_Tc` \ new_e1 ->
+    zonkExpr e2		        `thenNF_Tc` \ new_e2 ->
     returnNF_Tc (NPlusKPat new_n k new_ty new_e1 new_e2, unitBag new_n)
 
 zonkPat (DictPat ds ms)
-  = mapNF_Tc zonkIdBndr ds    `thenNF_Tc` \ new_ds ->
-    mapNF_Tc zonkIdBndr ms    `thenNF_Tc` \ new_ms ->
+  = mapNF_Tc zonkIdBndr ds      `thenNF_Tc` \ new_ds ->
+    mapNF_Tc zonkIdBndr ms      `thenNF_Tc` \ new_ms ->
     returnNF_Tc (DictPat new_ds new_ms,
 		 listToBag new_ds `unionBags` listToBag new_ms)
 
@@ -790,4 +790,78 @@ zonkRule (HsRule name act vars lhs rhs loc)
 zonkRule (IfaceRuleOut fun rule)
   = zonkIdOcc fun	`thenNF_Tc` \ fun' ->
     returnNF_Tc (IfaceRuleOut fun' rule)
+\end{code}
+
+\begin{code}
+zonkCoreBinds :: [(Id, Type, CoreExpr)] -> NF_TcM [(Id, CoreExpr)]
+zonkCoreBinds ls = mapNF_Tc zonkOne ls
+ where
+  zonkOne (i, t, e) = 
+    zonkIdOcc          i `thenNF_Tc` \ i' ->
+    zonkCoreExpr       e `thenNF_Tc` \ e' ->
+    returnNF_Tc (i',e')
+
+-- needed?
+zonkCoreExpr :: CoreExpr -> NF_TcM CoreExpr
+zonkCoreExpr e = 
+  case e of
+    Var i ->
+      zonkIdOcc i `thenNF_Tc` \ i' ->
+      returnNF_Tc (Var i')
+    Lit l -> returnNF_Tc (Lit l)
+    App f arg ->
+      zonkCoreExpr f   `thenNF_Tc` \ f' ->
+      zonkCoreExpr arg `thenNF_Tc` \ arg' ->
+      returnNF_Tc (App f' arg')
+    Lam b e ->
+      zonkIdOcc b      `thenNF_Tc` \ b' ->
+      zonkCoreExpr e   `thenNF_Tc` \ e' ->
+      returnNF_Tc (Lam b' e')
+    Case scrut n alts ->
+      zonkCoreExpr scrut        `thenNF_Tc` \ scrut' ->
+      zonkIdOcc n               `thenNF_Tc` \ n' ->
+      mapNF_Tc zonkCoreAlt alts `thenNF_Tc` \ alts' -> 
+      returnNF_Tc (Case scrut' n' alts')
+    Let b rhs ->
+      zonkCoreBind b            `thenNF_Tc` \ b' ->
+      zonkCoreExpr rhs          `thenNF_Tc` \ rhs' ->
+      returnNF_Tc (Let b' rhs')
+    Note note e ->
+      zonkNote note             `thenNF_Tc` \ note' ->
+      zonkCoreExpr e            `thenNF_Tc` \ e' ->
+      returnNF_Tc (Note note' e')
+    Type t -> 
+      zonkTcTypeToType t         `thenNF_Tc` \ t' ->
+      returnNF_Tc (Type t')
+
+zonkCoreBind :: CoreBind -> NF_TcM CoreBind
+zonkCoreBind (NonRec b e) = 
+   zonkIdOcc    b `thenNF_Tc`  \ b' ->
+   zonkCoreExpr e `thenNF_Tc`  \ e' ->
+   returnNF_Tc (NonRec b' e')
+zonkCoreBind (Rec bs) = 
+   mapNF_Tc zonkIt bs `thenNF_Tc` \ bs' ->
+   returnNF_Tc (Rec bs')
+ where
+  zonkIt (b,e) = 
+   zonkIdOcc    b `thenNF_Tc`  \ b' ->
+   zonkCoreExpr e `thenNF_Tc`  \ e' ->
+   returnNF_Tc (b',e')
+
+
+zonkCoreAlt :: CoreAlt -> NF_TcM CoreAlt
+zonkCoreAlt (ac, bs, rhs) = 
+  mapNF_Tc zonkIdOcc bs `thenNF_Tc` \ bs'  ->
+  zonkCoreExpr rhs      `thenNF_Tc` \ rhs' ->
+  returnNF_Tc (ac, bs', rhs')
+
+zonkNote :: Note -> NF_TcM Note
+zonkNote n = 
+ case n of
+   Coerce t f ->
+     zonkTcTypeToType t `thenNF_Tc` \ t' ->
+     zonkTcTypeToType f `thenNF_Tc` \ f' ->
+     returnNF_Tc (Coerce t' f')
+   _ -> returnNF_Tc n
+
 \end{code}

@@ -156,6 +156,9 @@ tyClDeclFVs (ClassDecl {tcdCtxt = context, tcdTyVars = tyvars, tcdFDs = fds,
 		Just _ -> emptyFVs	-- Source code, so the default methods
 					-- are *bound* not *free*
 
+tyClDeclFVs (CoreDecl {tcdType = ty, tcdRhs = rhs})
+  = extractHsTyNames ty `plusFV` ufExprFVs rhs
+
 ----------------
 hsSigsFVs sigs = plusFVs (map hsSigFVs sigs)
 

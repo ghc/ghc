@@ -17,7 +17,8 @@ module HsDecls (
 	DeprecDecl(..), DeprecTxt,
 	hsDeclName, instDeclName, 
 	tyClDeclName, tyClDeclNames, tyClDeclSysNames, tyClDeclTyVars,
-	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
+	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, isCoreDecl,
+	countTyClDecls,
 	mkClassDeclSysNames, isSourceInstDecl, ifaceRuleDeclName,
 	getClassDeclSysNames, conDetailsTys,
 	collectRuleBndrSigTys
@@ -302,12 +303,19 @@ data TyClDecl name pat
 		tcdSysNames :: ClassSysNames name,
 		tcdLoc      :: SrcLoc
     }
+    -- a Core value binding (coming from 'external Core' input.)
+  | CoreDecl { tcdName      :: name,  
+               tcdType      :: HsType name,
+	       tcdRhs       :: UfExpr name,
+	       tcdLoc       :: SrcLoc
+    }
+
 \end{code}
 
 Simple classifiers
 
 \begin{code}
-isIfaceSigDecl, isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
+isIfaceSigDecl, isCoreDecl, isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
 
 isIfaceSigDecl (IfaceSig {}) = True
 isIfaceSigDecl other	     = False
@@ -320,6 +328,10 @@ isDataDecl other       = False
 
 isClassDecl (ClassDecl {}) = True
 isClassDecl other	   = False
+
+isCoreDecl (CoreDecl {}) = True
+isCoreDecl other	 = False
+
 \end{code}
 
 Dealing with names
@@ -338,6 +350,7 @@ tyClDeclNames :: Eq name => TyClDecl name pat -> [(name, SrcLoc)]
 
 tyClDeclNames (TySynonym   {tcdName = name, tcdLoc = loc})  = [(name,loc)]
 tyClDeclNames (IfaceSig    {tcdName = name, tcdLoc = loc})  = [(name,loc)]
+tyClDeclNames (CoreDecl    {tcdName = name, tcdLoc = loc})  = [(name,loc)]
 tyClDeclNames (ForeignType {tcdName = name, tcdLoc = loc})  = [(name,loc)]
 
 tyClDeclNames (ClassDecl {tcdName = cls_name, tcdSigs = sigs, tcdLoc = loc})
@@ -352,6 +365,7 @@ tyClDeclTyVars (TyData    {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (ClassDecl {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (ForeignType {})		     = []
 tyClDeclTyVars (IfaceSig {})		     = []
+tyClDeclTyVars (CoreDecl {})		     = []
 
 
 --------------------------------
@@ -395,6 +409,11 @@ instance (NamedThing name, Ord name) => Eq (TyClDecl name pat) where
       = tcdName d1 == tcdName d2 && 
 	tcdType d1 == tcdType d2 && 
 	tcdIdInfo d1 == tcdIdInfo d2
+
+  (==) d1@(CoreDecl {}) d2@(CoreDecl {})
+      = tcdName d1 == tcdName d2 && 
+	tcdType d1 == tcdType d2 && 
+	tcdRhs d1  == tcdRhs  d2
 
   (==) d1@(ForeignType {}) d2@(ForeignType {})
       = tcdName d1 == tcdName d2 && 
@@ -453,7 +472,7 @@ countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int, Int)
 countTyClDecls decls 
  = (count isClassDecl     decls,
     count isSynDecl       decls,
-    count isIfaceSigDecl  decls,
+    count (\ x -> isIfaceSigDecl x || isCoreDecl x) decls,
     count isDataTy        decls,
     count isNewTy         decls) 
  where
@@ -506,6 +525,10 @@ instance (NamedThing name, Outputable name, Outputable pat)
 			then empty
 			else ppr (fromJust methods)
         
+    ppr (CoreDecl {tcdName = var, tcdType = ty, tcdRhs = rhs})
+	= getPprStyle $ \ sty ->
+	   hsep [ ppr_var var, dcolon, ppr ty, ppr rhs ]
+
 pp_decl_head :: Outputable name => HsContext name -> name -> [HsTyVarBndr name] -> SDoc
 pp_decl_head context thing tyvars = hsep [pprHsContext context, ppr thing, interppSP tyvars]
 

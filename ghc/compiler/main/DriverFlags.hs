@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.89 2002/03/15 13:57:31 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.90 2002/03/29 21:39:37 sof Exp $
 --
 -- Driver flags
 --
@@ -432,6 +432,7 @@ dynamic_flags = [
   ,  ( "fvia-c",	NoArg (setLang HscC) )
   ,  ( "fvia-C",	NoArg (setLang HscC) )
   ,  ( "filx",		NoArg (setLang HscILX) )
+  ,  ( "fcore",		NoArg (setLang HscCore) )
 
 	-- "active negatives"
   ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )

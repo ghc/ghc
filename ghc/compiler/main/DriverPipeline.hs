@@ -152,6 +152,11 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 	        | split	       	  -> not_valid
 	        | otherwise       -> [ Hsc, HCc, As ]
 
+	HscCore | split && mangle -> [ Hsc, HCc, Mangle, SplitMangle, SplitAs ]
+	        | mangle          -> [ Hsc, HCc, Mangle, As ]
+	        | split	       	  -> not_valid
+	        | otherwise       -> [ Hsc, HCc, As ]
+
 	HscAsm  | split           -> [ Hsc, SplitMangle, SplitAs ]
 	        | otherwise       -> [ Hsc, As ]
 
@@ -187,9 +192,12 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 	-- something has gone wrong.  This test carefully avoids the
 	-- case where we aren't supposed to do any compilation, because the file
 	-- is already in linkable form (for example).
+--   hPutStrLn stderr (show ((start_phase `elem` pipeline,stop_phase /= Ln,stop_phase `notElem` pipeline), start_phase, stop_phase, pipeline,todo))
+--   hFlush stderr
    when (start_phase `elem` pipeline && 
    	 (stop_phase /= Ln && stop_phase `notElem` pipeline))
-        (throwDyn (UsageError 
+        (do
+	  throwDyn (UsageError 
 		    ("flag `" ++ stop_flag
 		     ++ "' is incompatible with source file `"
 		     ++ filename ++ "'" ++ show pipeline ++ show stop_phase)))

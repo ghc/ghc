@@ -18,7 +18,8 @@ import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..),
 			  collectMonoBinders, andMonoBinds,
 			  collectSigTysFromMonoBinds
 			)
-import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
+import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds,
+                          RenamedTyClDecl )
 import TcHsSyn		( TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcMonad

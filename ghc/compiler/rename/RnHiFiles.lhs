@@ -471,6 +471,10 @@ getTyClDeclBinders mod (IfaceSig {tcdName = var, tcdLoc = src_loc})
   = newTopBinder mod var src_loc			`thenRn` \ var_name ->
     returnRn (Avail var_name, [])
 
+getTyClDeclBinders mod (CoreDecl {tcdName = var, tcdLoc = src_loc})
+  = newTopBinder mod var src_loc			`thenRn` \ var_name ->
+    returnRn (Avail var_name, [])
+
 getTyClDeclBinders mod tycl_decl
   = new_top_bndrs mod (tyClDeclNames tycl_decl)		`thenRn` \ names@(main_name:_) ->
     new_top_bndrs mod (tyClDeclSysNames tycl_decl)	`thenRn` \ sys_names ->

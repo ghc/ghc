@@ -286,6 +286,15 @@ rnTyClDecl (IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc
   where
     doc_str = text "In the interface signature for" <+> quotes (ppr name)
 
+rnTyClDecl (CoreDecl {tcdName = name, tcdType = ty, tcdRhs = rhs, tcdLoc = loc})
+  = pushSrcLocRn loc $
+    lookupTopBndrRn name		`thenRn` \ name' ->
+    rnHsType doc_str ty			`thenRn` \ ty' ->
+    rnCoreExpr rhs                      `thenRn` \ rhs' ->
+    returnRn (CoreDecl {tcdName = name', tcdType = ty', tcdRhs = rhs', tcdLoc = loc})
+  where
+    doc_str = text "In the Core declaration for" <+> quotes (ppr name)
+
 rnTyClDecl (ForeignType {tcdName = name, tcdFoType = fo_type, tcdExtName = ext_name, tcdLoc = loc})
   = pushSrcLocRn loc 			$
     lookupTopBndrRn name		`thenRn` \ name' ->
