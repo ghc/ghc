@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.11 1999/01/18 15:21:37 simonm Exp $
+ * $Id: GC.c,v 1.12 1999/01/18 16:05:15 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -384,15 +384,17 @@ void GarbageCollect(void (*get_roots)(void))
    * twice the amount of live data plus whatever space the other
    * generations need.
    */
-  oldest_gen->max_blocks = 
-    stg_max(oldest_gen->steps[0].to_blocks * 2,
-	    RtsFlags.GcFlags.minAllocAreaSize * 4);
-  if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
-    oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
-    if (((int)oldest_gen->max_blocks - (int)oldest_gen->steps[0].to_blocks) < 
-	(RtsFlags.GcFlags.pcFreeHeap *
-	 RtsFlags.GcFlags.maxHeapSize / 200)) {
-      heapOverflow();
+  if (major_gc) {
+    oldest_gen->max_blocks = 
+      stg_max(oldest_gen->steps[0].to_blocks * 2,
+	      RtsFlags.GcFlags.minAllocAreaSize * 4);
+    if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
+      oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
+      if (((int)oldest_gen->max_blocks - (int)oldest_gen->steps[0].to_blocks) < 
+	  (RtsFlags.GcFlags.pcFreeHeap *
+	   RtsFlags.GcFlags.maxHeapSize / 200)) {
+	heapOverflow();
+      }
     }
   }
   
