@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.26 2003/07/24 13:40:05 simonmar Exp $
+# $Id: bootstrap.mk,v 1.27 2003/09/02 10:23:30 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -70,6 +70,10 @@ HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) $(PLATFORM_CC_OPTS) $(CC_OPTS)
 
 SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/libraries/unix/include
 
+ifeq "$(GhcWithInterpreter)" "YES"
+SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/libraries/readline/include
+endif
+
 # -----------------------------------------------------------------------------
 # Linking: we have to give all the libraries explicitly.
 
@@ -88,7 +92,17 @@ HC_BOOT_LD_OPTS =				\
    $(DASH_L_GHC_RTS_GMP_DIR)                    \
    -L$(FPTOOLS_TOP_ABS)/libraries/base		\
    -L$(FPTOOLS_TOP_ABS)/libraries/base/cbits	\
-   -L$(FPTOOLS_TOP_ABS)/libraries/haskell98	\
+   -L$(FPTOOLS_TOP_ABS)/libraries/haskell98
+
+ifeq "$(GhcWithInterpreter)" "YES"
+HC_BOOT_LD_OPTS += \
+   -L$(FPTOOLS_TOP_ABS)/libraries/haskell-src	\
+   -L$(FPTOOLS_TOP_ABS)/libraries/readline	\
+   -L$(FPTOOLS_TOP_ABS)/libraries/unix          \
+   -L$(FPTOOLS_TOP_ABS)/libraries/unix/cbits
+endif
+
+HC_BOOT_LD_OPTS += \
    -u "$(UNDERSCORE)GHCziBase_Izh_static_info" \
    -u "$(UNDERSCORE)GHCziBase_Czh_static_info" \
    -u "$(UNDERSCORE)GHCziFloat_Fzh_static_info" \
@@ -121,7 +135,14 @@ HC_BOOT_LD_OPTS =				\
    -u "$(UNDERSCORE)GHCziWeak_runFinalizzerBatch_closure" \
    -u "$(UNDERSCORE)__stginit_Prelude"
 
-HC_BOOT_LIBS = -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
+
+HC_BOOT_LIBS =
+
+ifeq "$(GhcWithInterpreter)" "YES"
+HC_BOOT_LIBS += -lHSreadline -lHShaskell-src -lHSunix -lHSunix_cbits
+endif
+
+HC_BOOT_LIBS += -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 
 ifeq "$(GhcLibsWithReadline)" "YES"
 HC_BOOT_LIBS += $(patsubst %, -l%, $(LibsReadline))
