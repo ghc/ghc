@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.10 2000/02/29 19:59:38 sof Exp $
+ * $Id: Stable.c,v 1.11 2000/04/24 22:05:08 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -163,11 +163,11 @@ removeIndirections(StgClosure* p)
 {
   StgClosure* q = p;
 
-  while (q->header.info->type == IND ||
-         q->header.info->type == IND_STATIC ||
-         q->header.info->type == IND_OLDGEN ||
-         q->header.info->type == IND_PERM ||
-         q->header.info->type == IND_OLDGEN_PERM ) {
+  while (get_itbl(q)->type == IND ||
+         get_itbl(q)->type == IND_STATIC ||
+         get_itbl(q)->type == IND_OLDGEN ||
+         get_itbl(q)->type == IND_PERM ||
+         get_itbl(q)->type == IND_OLDGEN_PERM ) {
       q = ((StgInd *)q)->indirectee;
   }
   return q;
