@@ -19,141 +19,122 @@ performance because of the implementation costs of Haskell's
 Executive summary of our extensions:
 </Para>
 
-<Para>
-<VariableList>
+  <variablelist>
 
-<VarListEntry>
-<Term>Unboxed types and primitive operations:</Term>
-<ListItem>
-<Para>
-You can get right down to the raw machine types and operations;
-included in this are &ldquo;primitive arrays&rdquo; (direct access to Big Wads
-of Bytes).  Please see <XRef LinkEnd="glasgow-unboxed"> and following.
-</Para>
-</ListItem>
-</VarListEntry>
+    <varlistentry>
+      <term>Unboxed types and primitive operations:</Term>
+      <listitem>
+	<para>You can get right down to the raw machine types and
+        operations; included in this are &ldquo;primitive
+        arrays&rdquo; (direct access to Big Wads of Bytes).  Please
+        see <XRef LinkEnd="glasgow-unboxed"> and following.</para>
+      </listitem>
+    </varlistentry>
 
-<VarListEntry>
-<Term>Type system extensions:</Term>
-<ListItem>
-<Para> GHC supports a large number of extensions to Haskell's type
-system.  Specifically:
-</Para>
+    <varlistentry>
+      <term>Type system extensions:</term>
+      <listitem>
+	<Para> GHC supports a large number of extensions to Haskell's
+        type system.  Specifically:</para>
 
-<VariableList>
-<VarListEntry>
-<Term>Multi-parameter type classes:</Term>
-<ListItem>
-<Para>
-<XRef LinkEnd="multi-param-type-classes">
-</Para>
-</ListItem>
-</VarListEntry>
+	<variablelist>
+	  <varlistentry>
+	    <term>Multi-parameter type classes:</term>
+	    <listitem>
+	      <para><XRef LinkEnd="multi-param-type-classes"></para>
+	    </listitem>
+	  </varlistentry>
 
-<VarListEntry>
-<Term>Functional dependencies:</Term>
-<ListItem>
-<Para>
-<XRef LinkEnd="functional-dependencies">
-</Para>
-</ListItem>
-</VarListEntry>
+	  <varlistentry>
+	    <term>Functional dependencies:</term>
+	    <listitem>
+	      <para><XRef LinkEnd="functional-dependencies"></para>
+	    </listitem>
+	  </varlistentry>
 
-<VarListEntry>
-<Term>Implicit parameters:</Term>
-<ListItem>
-<Para>
-<XRef LinkEnd="implicit parameters">
-</Para>
-</ListItem>
-</VarListEntry>
+	  <varlistentry>
+	    <term>Implicit parameters:</term>
+	    <listitem>
+	      <para><XRef LinkEnd="implicit-parameters"></para>
+	    </listitem>
+	  </varlistentry>
 
-<VarListEntry>
-<Term>Local universal quantification:</Term>
-<ListItem>
-<Para>
-<XRef LinkEnd="universal-quantification">
-</Para>
-</ListItem>
-</VarListEntry>
+	  <varlistentry>
+	    <term>Local universal quantification:</term>
+	    <listitem>
+	      <para><XRef LinkEnd="universal-quantification"></para>
+	    </listitem>
+	  </varlistentry>
 
-<VarListEntry>
-<Term>Extistentially quantification in data types:</Term>
-<ListItem>
-<Para>
-<XRef LinkEnd="existential-quantification">
-</Para>
-</ListItem>
-</VarListEntry>
+	  <varlistentry>
+	    <term>Extistentially quantification in data types:</term>
+	    <listitem>
+	      <para><XRef LinkEnd="existential-quantification"></para>
+	    </listitem>
+	  </varlistentry>
 
-<VarListEntry>
-<Term>Scoped type variables:</Term>
-<ListItem>
-<Para>
-Scoped type variables enable the programmer to supply type signatures
-for some nested declarations, where this would not be legal in Haskell
-98.  Details in <XRef LinkEnd="scoped-type-variables">.
-</Para>
-</ListItem>
-</VarListEntry>
-</VarListEntry>
+	  <varlistentry>
+	    <term>Scoped type variables:</term>
+	    <listitem>
+	      <para>Scoped type variables enable the programmer to
+              supply type signatures for some nested declarations,
+              where this would not be legal in Haskell 98.  Details in
+              <XRef LinkEnd="scoped-type-variables">.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </listitem>
+    </varlistentry>
 
+    <varlistentry>
+      <term>Pattern guards</term>
+      <listitem>
+	<para>Instead of being a boolean expression, a guard is a list
+	of qualifiers, exactly as in a list comprehension. See <XRef
+	LinkEnd="pattern-guards">.</para>
+      </listitem>
+    </varlistentry>
 
-<VarListEntry>
-<Term>Pattern guards</Term>
-<ListItem>
-<Para>
-Instead of being a boolean expression, a guard is a list of qualifiers, exactly as in a list comprehension. See <XRef LinkEnd="pattern-guards">.
-</Para>
-</ListItem>
-</VarListEntry>
+    <varlistentry>
+      <term>Foreign calling:</term>
+      <listitem>
+	<para>Just what it sounds like.  We provide
+        <Emphasis>lots</Emphasis> of rope that you can dangle around
+        your neck.  Please see <XRef LinkEnd="ffi">.</para>
+      </listitem>
+    </varlistentry>
 
-<VarListEntry>
-<Term>Foreign calling:</Term>
-<ListItem>
-<Para>
-Just what it sounds like.  We provide <Emphasis>lots</Emphasis> of rope that you
-can dangle around your neck.  Please see <XRef LinkEnd="ffi">.
-</Para>
-</ListItem>
-</VarListEntry>
+    <varlistentry>
+      <term>Pragmas</term>
+      <listitem>
+	<para>Pragmas are special instructions to the compiler placed
+        in the source file.  The pragmas GHC supports are described in
+        <XRef LinkEnd="pragmas">.</para>
+      </listitem>
+    </varlistentry>
 
-<VarListEntry>
-<Term>Pragmas</Term>
-<ListItem>
-<Para>
-Pragmas are special instructions to the compiler placed in the source
-file.  The pragmas GHC supports are described in <XRef LinkEnd="pragmas">.
-</Para>
-</ListItem>
-</VarListEntry>
+    <varlistentry>
+      <term>Rewrite rules:</term>
+      <listitem>
+	<para>The programmer can specify rewrite rules as part of the
+        source program (in a pragma).  GHC applies these rewrite rules
+        wherever it can.  Details in <XRef
+        LinkEnd="rewrite-rules">.</para>
+      </listitem>
+    </varlistentry>
 
-<VarListEntry>
-<Term>Rewrite rules:</Term>
-<ListItem>
-<Para>
-The programmer can specify rewrite rules as part of the source program
-(in a pragma).  GHC applies these rewrite rules wherever it can.
-Details in <XRef LinkEnd="rewrite-rules">.
-</Para>
-</ListItem>
-</VarListEntry>
-
-<VarListEntry>
-<Term>Generic classes:</Term>
-<ListItem>
-<Para>
-Generic class declarations allow you to define a class
-whose methods say how to work over an arbitrary data type.
-Then it's really easy to make any new type into an instance of
-the class.  This generalises the rather ad-hoc "deriving" feature
-of Haskell 98.
-Details in <XRef LinkEnd="generic-classes">.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
+    <varlistentry>
+      <term>Generic classes:</term>
+      <listitem>
+	<para>Generic class declarations allow you to define a class
+        whose methods say how to work over an arbitrary data type.
+        Then it's really easy to make any new type into an instance of
+        the class.  This generalises the rather ad-hoc "deriving"
+        feature of Haskell 98.  Details in <XRef
+        LinkEnd="generic-classes">.</para>
+      </listitem>
+    </varlistentry>
+  </variablelist>
 
 <Para>
 Before you get too carried away working at the lowest level (e.g.,
@@ -210,15 +191,6 @@ program), you may wish to check if there are libraries that provide a
 	<listitem>
 	  <para> See <XRef LinkEnd="instance-decls">.  Only relevant
           if you also use <option>-fglasgow-exts</option>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-fignore-asserts</option>:</term>
-	<indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
-	<listitem>
-	  <para>See <XRef LinkEnd="sec-assertions">.  Only relevant if
-          you also use <option>-fglasgow-exts</option>.</Para>
 	</listitem>
       </varlistentry>
 
@@ -2333,7 +2305,7 @@ declaration.  For example, both these declarations are illegal:
 Reason: exactly which implicit parameter you pick up depends on exactly where
 you invoke a function. But the ``invocation'' of instance declarations is done
 behind the scenes by the compiler, so it's hard to figure out exactly where it is done.
-Easiest thing is to outlaw the offending types.
+Easiest thing is to outlaw the offending types.</para>
 </ListItem>
 
 </ItemizedList>
