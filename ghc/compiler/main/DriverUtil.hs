@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.9 2000/11/19 19:40:08 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.10 2000/11/20 15:40:54 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -11,7 +11,6 @@ module DriverUtil where
 
 #include "HsVersions.h"
 
-import Config
 import Util
 
 import IOExts
@@ -142,9 +141,11 @@ splitFilename f = (reverse (stripDot rev_basename), reverse rev_ext)
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
 splitFilename3 :: String -> (String,String,String)
 splitFilename3 str
-   = let dir = getdir str
-         (name, ext) = splitFilename (drop (length dir) str)
-     in  (dir, name, ext)
+   = let (dir, rest) = split_longest_prefix str '/'
+	 (name, ext) = splitFilename rest
+	 real_dir | null dir  = "."
+		  | otherwise = dir
+     in  (real_dir, name, ext)
 
 remove_suffix :: Char -> String -> String
 remove_suffix c s
@@ -159,6 +160,16 @@ drop_longest_prefix s c = reverse suf
 take_longest_prefix :: String -> Char -> String
 take_longest_prefix s c = reverse pre
   where (_suf,pre) = break (==c) (reverse s)
+
+-- split a string at the last occurence of 'c', returning the two
+-- parts of the string with the 'c' removed.  If the string contains
+-- no 'c's, the entire string is returned in the second component.
+split_longest_prefix :: String -> Char -> (String,String)
+split_longest_prefix s c
+  = case pre of
+	[]      -> ([], reverse suf)
+	(_:pre) -> (reverse pre, reverse suf)
+  where (suf,pre) = break (==c) (reverse s)
 
 newsuf :: String -> String -> String
 newsuf suf s = remove_suffix '.' s ++ suf
