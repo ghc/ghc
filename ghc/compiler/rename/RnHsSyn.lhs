@@ -13,8 +13,8 @@ IMP_Ubiq()
 import HsSyn
 
 import Id		( isDataCon, GenId, SYN_IE(Id) )
-import Name		( isLocalName, nameUnique, Name, RdrName(..){-ToDo: rm ..-},
-			  mkLocalName{-ToDo:rm-}
+import Name		( isLocalName, nameUnique, Name, RdrName(..),
+			  mkLocalName
 			)
 import Outputable	( Outputable(..){-instance * []-} )
 import PprStyle		( PprStyle(..) )
@@ -23,7 +23,7 @@ import Pretty
 import TyCon		( TyCon )
 import TyVar		( GenTyVar )
 import Unique		( mkAlphaTyVarUnique, Unique )
-import Util		( panic, pprPanic, pprTrace{-ToDo:rm-} )
+import Util		( panic, pprPanic{-, pprTrace ToDo:rm-} )
 \end{code}
 
 \begin{code}
@@ -82,7 +82,7 @@ isRnField  (RnField _ _)  = True
 isRnField  _		  = False
 
 isRnClassOp cls (RnClassOp _ op_cls) = eqUniqsNamed cls op_cls
-isRnClassOp cls n		     = pprTrace "isRnClassOp:" (ppr PprShowAll n) $ True -- let it past anyway
+isRnClassOp cls n		     = True -- pprTrace "isRnClassOp:" (ppr PprShowAll n) $ True -- let it past anyway
 
 isRnImplicit (RnImplicit _)      = True
 isRnImplicit (RnImplicitTyCon _) = True

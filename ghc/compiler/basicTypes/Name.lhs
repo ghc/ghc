@@ -70,7 +70,7 @@ import SrcLoc		( mkBuiltinSrcLoc, mkUnknownSrcLoc, SrcLoc )
 import Unique		( funTyConKey, mkTupleDataConUnique, mkTupleTyConUnique,
 			  pprUnique, Unique
 			)
-import Util		( thenCmp, _CMP_STRING_, nOfThem, panic, assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( thenCmp, _CMP_STRING_, nOfThem, panic, assertPanic{-, pprTrace ToDo:rm-} )
 
 #ifdef REALLY_HASKELL_1_3
 ord = fromEnum :: Char -> Int
@@ -376,7 +376,7 @@ changeUnique (Global   _ m n p e os) u = Global u m n p e os
 
 nameOrigName msg (Global _ m (Left  n) _ _ _) = OrigName m n
 nameOrigName msg (Global _ m (Right n) _ _ _) = let str = _CONCAT_ (glue n) in
-						pprTrace ("nameOrigName:"++msg) (ppPStr str) $
+						--pprTrace ("nameOrigName:"++msg) (ppPStr str) $
 						OrigName m str
 #ifdef DEBUG
 nameOrigName msg (Local  _ n _ _)     = panic ("nameOrigName:Local:"++msg++":"++ _UNPK_ n)
@@ -385,7 +385,7 @@ nameOrigName msg (Local  _ n _ _)     = panic ("nameOrigName:Local:"++msg++":"++
 nameOccName (Local  _ n _ _)	     = Unqual n
 nameOccName (Global _ m (Left  n) _ _ []  )  = Qual m n
 nameOccName (Global _ m (Right n) _ _ []  )  =  let str = _CONCAT_ (glue n) in
-						pprTrace "nameOccName:" (ppPStr str) $
+						--pprTrace "nameOccName:" (ppPStr str) $
 						Qual m str
 nameOccName (Global _ m (Left  _) _ _ (o:_)) = o
 nameOccName (Global _ m (Right _) _ _ (o:_)) = panic "nameOccName:compound name"

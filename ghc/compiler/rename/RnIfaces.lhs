@@ -43,19 +43,19 @@ import Bag		( emptyBag, unitBag, consBag, snocBag,
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
 import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, eltsFM,
 			  fmToList, delListFromFM, sizeFM, foldFM, unitFM,
-			  plusFM_C, addListToFM, keysFM{-ToDo:rm-}, FiniteMap
+			  plusFM_C, addListToFM{-, keysFM ToDo:rm-}, FiniteMap
 			)
 import Maybes		( maybeToBool, MaybeErr(..) )
 import Name		( origName, moduleOf, nameOf, qualToOrigName, OrigName(..),
 			  isLexCon, RdrName(..), Name{-instance NamedThing-} )
-import PprStyle		-- ToDo:rm
-import Outputable	-- ToDo:rm
+--import PprStyle		-- ToDo:rm
+--import Outputable	-- ToDo:rm
 import PrelInfo		( builtinNameMaps, builtinKeysMap, builtinTcNamesMap, SYN_IE(BuiltinNames) )
 import Pretty
 import UniqFM		( emptyUFM )
 import UniqSupply	( splitUniqSupply )
 import Util		( sortLt, removeDups, cmpPString, startsWith,
-			  panic, pprPanic, assertPanic, pprTrace{-ToDo:rm-} )
+			  panic, pprPanic, assertPanic{-, pprTrace ToDo:rm-} )
 \end{code}
 
 \begin{code}
@@ -154,8 +154,8 @@ cachedIface (IfaceCache _ _ iface_var) want_orig_iface item modname
 ----------
 mergeIfaces (ParsedIface mod1 (_, files1) _ _ _ _ _ _ fixes1 tdefs1 vdefs1 idefs1 prags1)
 	    (ParsedIface mod2 (_, files2) _ _ _ _ _ _ fixes2 tdefs2 vdefs2 idefs2 prags2)
-  = pprTrace "mergeIfaces:" (ppCat [ppStr "import", ppCat (map ppPStr (bagToList files2)),
-				    ppStr "merged with", ppPStr mod1]) $
+  = --pprTrace "mergeIfaces:" (ppCat [ppStr "import", ppCat (map ppPStr (bagToList files2)),
+    --				    ppStr "merged with", ppPStr mod1]) $
     ASSERT(mod1 == mod2)
     ParsedIface mod1
 	(True, unionBags files2 files1)
@@ -165,16 +165,16 @@ mergeIfaces (ParsedIface mod1 (_, files1) _ _ _ _ _ _ fixes1 tdefs1 vdefs1 idefs
 	(panic "mergeIface: decl version numbers")
 	(panic "mergeIface: exports")
 	(panic "mergeIface: instance modules")
- 	(plusFM_C (dup_merge "fixity"      (ppr PprDebug . fixDeclName)) fixes1 fixes2)
-	(plusFM_C (dup_merge "tycon/class" (ppr PprDebug . idecl_nm))    tdefs1 tdefs2)
-	(plusFM_C (dup_merge "value"       (ppr PprDebug . idecl_nm))    vdefs1 vdefs2)
+ 	(plusFM_C (dup_merge {-"fixity"      (ppr PprDebug . fixDeclName)-}) fixes1 fixes2)
+	(plusFM_C (dup_merge {-"tycon/class" (ppr PprDebug . idecl_nm)-})    tdefs1 tdefs2)
+	(plusFM_C (dup_merge {-"value"       (ppr PprDebug . idecl_nm)-})    vdefs1 vdefs2)
 	(unionBags idefs1 idefs2)
-	(plusFM_C (dup_merge "pragma"      ppStr)			 prags1 prags2)
+	(plusFM_C (dup_merge {-"pragma"      ppStr-})			 prags1 prags2)
   where
-    dup_merge str ppr_dup dup1 dup2
-      = pprTrace "mergeIfaces:"
-	   	 (ppCat [ppPStr mod1, ppPStr mod2, ppStr ": dup", ppStr str, ppStr "decl",
-			 ppr_dup dup1, ppr_dup dup2]) $
+    dup_merge {-str ppr_dup-} dup1 dup2
+      = --pprTrace "mergeIfaces:"
+	--   	 (ppCat [ppPStr mod1, ppPStr mod2, ppStr ": dup", ppStr str, ppStr "decl",
+	--		 ppr_dup dup1, ppr_dup dup2]) $
         dup2
 
     idecl_nm (TypeSig    n _ _)     = n
@@ -244,7 +244,7 @@ cachedDeclByType iface_cache rn
 	case rn of
 	  WiredInId _       -> return_failed (ifaceLookupWiredErr "value" rn)
 	  WiredInTyCon _    -> return_failed (ifaceLookupWiredErr "type constructor" rn)
-	  RnUnbound _       -> pprPanic "cachedDeclByType:" (ppr PprDebug rn)
+	  RnUnbound _       -> panic "cachedDeclByType:" -- (ppr PprDebug rn)
 	  
 	  RnSyn _	    -> return_maybe_decl
 	  RnData _ _ _	    -> return_maybe_decl
@@ -440,7 +440,7 @@ rnIfaces iface_cache imp_mods us
 	     cachedDeclByType iface_cache n >>= \ maybe_ans ->
 	     case maybe_ans of
 	       CachingAvoided _ ->
-		 pprTrace "do_decls:caching avoided:" (ppr PprDebug n) $
+		 --pprTrace "do_decls:caching avoided:" (ppr PprDebug n) $
 		 do_decls ns down to_return
 
 	       CachingFail err -> -- add the error, but keep going:
@@ -501,7 +501,7 @@ new_uniqsupply us (def_env, occ_env, _) = (def_env, occ_env, us)
 
 add_occs (val_defds, tc_defds) (val_imps, tc_imps) (def_env, occ_env, us)
   = case (extendGlobalRnEnv def_env val_defds tc_defds) of { (new_def_env, def_dups) ->
-    (if isEmptyBag def_dups then \x->x else pprTrace "add_occs:" (ppCat [ppr PprDebug n | (n,_,_) <- bagToList def_dups])) $
+    --(if isEmptyBag def_dups then \x->x else pprTrace "add_occs:" (ppCat [ppr PprDebug n | (n,_,_) <- bagToList def_dups])) $
 --  ASSERT(isEmptyBag def_dups)
     let
 	de_orig imps = [ (Qual m n, v) | (OrigName m n, v) <- fmToList imps ]

@@ -64,20 +64,20 @@ import Maybes	( maybeToBool, assocMaybe )
 import PrimRep	( PrimRep(..) )
 import Unique	-- quite a few *Keys
 import Util	( thenCmp, zipEqual, assoc,
-		  panic, panic#, assertPanic, pprTrace{-ToDo:rm-}, pprPanic{-ToDo:rm-},
+		  panic, panic#, assertPanic,
 		  Ord3(..){-instances-}
 		)
 -- ToDo:rm all these
-import	{-mumble-}
-	Pretty
-import  {-mumble-}
-	PprStyle
+--import	{-mumble-}
+--	Pretty
+--import  {-mumble-}
+--	PprStyle
 --import	{-mumble-}
 --	PprType --(pprType )
-import  {-mumble-}
-	UniqFM (ufmToList )
-import {-mumble-}
-	Outputable
+--import  {-mumble-}
+--	UniqFM (ufmToList )
+--import {-mumble-}
+--	Outputable
 \end{code}
 
 Data types
@@ -747,10 +747,8 @@ matchTy  ty1  ty2  = match  ty1 ty2 (\s -> Just s) []
 matchTys tys1 tys2 = go [] tys1 tys2
 		   where
 		     go s [] 	    tys2        = Just (s,tys2)
-		     go s (ty1:tys1) []	        = panic "matchTys"
+		     go s (ty1:tys1) []	        = trace "matchTys" Nothing
 		     go s (ty1:tys1) (ty2:tys2) = match ty1 ty2 (\s' -> go s' tys1 tys2) s
-						    
-
 \end{code}
 
 @match@ is the main function.

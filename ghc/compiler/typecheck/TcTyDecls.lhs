@@ -47,7 +47,7 @@ import Id		( mkDataCon, dataConSig, mkRecordSelId, idType,
 			)
 import FieldLabel
 import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
-import SpecEnv		( SYN_IE(SpecEnv), nullSpecEnv )
+import SpecEnv		( SpecEnv, nullSpecEnv )
 import Name		( nameSrcLoc, isLocallyDefinedName, getSrcLoc,
 			  Name{-instance Ord3-}
 			)

@@ -51,8 +51,7 @@ import Outputable	( ifPprShowAll, interpp'SP )
 import PprEnv
 import PprStyle		( PprStyle(..), codeStyle, showUserishTypes )
 import Pretty
-import TysWiredIn	( listTyCon )
-import UniqFM		( addToUFM_Directly, lookupUFM_Directly, ufmToList{-ToDo:rm-} )
+import UniqFM		( addToUFM_Directly, lookupUFM_Directly{-, ufmToList ToDo:rm-} )
 import Unique		( pprUnique10, pprUnique, incrUnique, listTyConKey )
 import Util
 \end{code}
@@ -198,7 +197,7 @@ ppr_corner sty env ctxt_prec (TyConTy (TupleTyCon _ _ a) usage) arg_tys
     arg_tys_w_commas = ppIntersperse pp'SP (map (ppr_ty sty env tOP_PREC) arg_tys)
 
 ppr_corner sty env ctxt_prec (TyConTy tycon usage) arg_tys
-  | not (codeStyle sty) && tycon == listTyCon
+  | not (codeStyle sty) && uniqueOf tycon == listTyConKey
   = ASSERT(length arg_tys == 1)
     ppBesides [ppLbrack, ppr_ty sty env tOP_PREC ty1, ppRbrack]		    
   where
@@ -540,7 +539,7 @@ nmbrTyVar tv@(TyVar u _ _ _) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
   = case (lookupUFM_Directly tvenv u) of
       Just xx -> (nenv, xx)
       Nothing ->
-	pprTrace "nmbrTyVar: lookup failed:" (ppCat (ppr PprDebug u : [ppCat [ppr PprDebug x, ppStr "=>", ppr PprDebug tv] | (x,tv) <- ufmToList tvenv])) $
+	--pprTrace "nmbrTyVar: lookup failed:" (ppCat (ppr PprDebug u : [ppCat [ppr PprDebug x, ppStr "=>", ppr PprDebug tv] | (x,tv) <- ufmToList tvenv])) $
 	(nenv, tv)
 \end{code}
 

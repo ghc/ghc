@@ -38,7 +38,7 @@ import TysWiredIn
 import CStrings		( identToC )
 import CgCompInfo   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
-import PprStyle		( codeStyle, PprStyle(..){-ToDo:rm-} )
+import PprStyle		( codeStyle{-, PprStyle(..) ToDo:rm-} )
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )

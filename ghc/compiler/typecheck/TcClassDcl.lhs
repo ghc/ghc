@@ -25,7 +25,6 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(Tc
 
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
 import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcExtendGlobalTyVars )
-import SpecEnv		( SpecEnv )
 import TcInstDcls	( processInstBinds )
 import TcKind		( unifyKind, TcKind )
 import TcMonad		hiding ( rnMtoTcM )
@@ -46,7 +45,7 @@ import PrelVals		( nO_DEFAULT_METHOD_ERROR_ID )
 import PprStyle
 import Pretty
 import PprType		( GenType, GenTyVar, GenClassOp )
-import SpecEnv		( SYN_IE(SpecEnv) )
+import SpecEnv		( SpecEnv )
 import SrcLoc		( mkGeneratedSrcLoc )
 import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
 			  mkForAllTy, mkSigmaTy, splitSigmaTy)

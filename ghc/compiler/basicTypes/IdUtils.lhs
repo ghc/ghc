@@ -10,12 +10,12 @@ module IdUtils ( primOpNameInfo, primOpId ) where
 
 IMP_Ubiq()
 IMPORT_DELOOPER(PrelLoop)		-- here for paranoia checking
+IMPORT_DELOOPER(IdLoop) (SpecEnv)
 
 import CoreSyn
 import CoreUnfold	( UnfoldingGuidance(..), Unfolding )
 import Id		( mkImported, mkTemplateLocals )
 import IdInfo		-- quite a few things
-import SpecEnv		( SpecEnv )
 import Name		( mkPrimitiveName, OrigName(..) )
 import PrelMods		( gHC_BUILTINS )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,

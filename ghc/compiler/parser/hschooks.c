@@ -32,7 +32,7 @@ StackOverflowHook (I_ stack_size)    /* in bytes */
 void
 PatErrorHdrHook (FILE *where)
 {
-    fprintf(where, "\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@dcs.glasgow.ac.uk.\n\nFail: ");
+    fprintf(where, "\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\nFail: ");
 }
 
 void

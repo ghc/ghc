@@ -16,10 +16,10 @@ import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
 import Name		( ExportFlag(..), mkTupNameStr, preludeQual,
 			  RdrName(..){-instance Outputable:ToDo:rm-}
 			)
-import Outputable	-- ToDo:rm
-import PprStyle		( PprStyle(..) ) -- ToDo: rm debugging
+--import Outputable	-- ToDo:rm
+--import PprStyle		( PprStyle(..) ) -- ToDo: rm debugging
 import SrcLoc		( mkIfaceSrcLoc )
-import Util		( panic, pprPanic{-ToDo:rm-} )
+import Util		( panic{-, pprPanic ToDo:rm-} )
 
 -----------------------------------------------------------------
 
@@ -254,7 +254,7 @@ btype		:  gtyconapp		{ case $1 of (tc, tys) -> MonoTyApp tc tys }
 					    MonoListTy ty   -> MonoTyApp (preludeQual SLIT("[]")) (ty:tys);
 					    MonoTupleTy ts  -> MonoTyApp (preludeQual (mkTupNameStr (length ts)))
 									 (ts++tys);
-					    _		    -> pprPanic "test:" (ppr PprDebug $1)
+--					    _		    -> pprPanic "test:" (ppr PprDebug $1)
 					  }}
 					}
 

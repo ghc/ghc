@@ -35,7 +35,7 @@ import TysWiredIn	( mkListTy, mkTupleTy )
 import Unique		( Unique )
 import PprStyle
 import Pretty
-import Util		( zipWithEqual, panic, pprPanic{-ToDo:rm-} )
+import Util		( zipWithEqual, panic{-, pprPanic ToDo:rm-} )
 \end{code}
 
 

@@ -61,12 +61,12 @@ IMP_Ubiq()
 import Unique		( Unique )
 import UniqFM		( UniqFM )
 import Maybes		( assocMaybe )
-import Util		( zipEqual, nOfThem, panic, pprPanic, pprTrace{-ToDo:rm-} )
+import Util		( zipEqual, nOfThem, panic{-, pprPanic, pprTrace ToDo:rm-} )
 
-import Outputable	( Outputable(..) )	-- Debugging messages
-import PprType		( GenTyVar, GenType )
-import Pretty					-- ditto
-import PprStyle		( PprStyle(..) )	-- ditto
+--import Outputable	( Outputable(..) )	-- Debugging messages
+--import PprType		( GenTyVar, GenType )
+--import Pretty					-- ditto
+--import PprStyle		( PprStyle(..) )	-- ditto
 \end{code}
 
 
@@ -188,8 +188,8 @@ tcInstType tenv ty_to_inst
     bind_fn = inst_tyvar UnBound
     occ_fn env tyvar = case lookupTyVarEnv env tyvar of
 			 Just ty -> returnNF_Tc ty
-			 Nothing -> pprPanic "tcInstType:" (ppAboves [ppr PprDebug ty_to_inst, 
-								      ppr PprDebug tyvar])
+			 Nothing -> panic "tcInstType:1" --(ppAboves [ppr PprDebug ty_to_inst, 
+							--	      ppr PprDebug tyvar])
 
 tcInstSigType :: GenType (GenTyVar flexi) UVar -> NF_TcM s (TcType s)
 tcInstSigType ty_to_inst
@@ -198,8 +198,8 @@ tcInstSigType ty_to_inst
     bind_fn = inst_tyvar DontBind
     occ_fn env tyvar = case lookupTyVarEnv env tyvar of
 			 Just ty -> returnNF_Tc ty
-			 Nothing -> pprPanic "tcInstType:" (ppAboves [ppr PprDebug ty_to_inst, 
-								      ppr PprDebug tyvar])
+			 Nothing -> panic "tcInstType:2"-- (ppAboves [ppr PprDebug ty_to_inst, 
+							--	      ppr PprDebug tyvar])
 
 zonkTcTyVarToTyVar :: TcTyVar s -> NF_TcM s TyVar
 zonkTcTyVarToTyVar tv
@@ -208,7 +208,7 @@ zonkTcTyVarToTyVar tv
 
       TyVarTy tv' ->    returnNF_Tc (tcTyVarToTyVar tv')
 
-      _ -> pprTrace "zonkTcTyVarToTyVar:" (ppCat [ppr PprDebug tv, ppr PprDebug tv_ty]) $
+      _ -> --pprTrace "zonkTcTyVarToTyVar:" (ppCat [ppr PprDebug tv, ppr PprDebug tv_ty]) $
 	   returnNF_Tc (tcTyVarToTyVar tv)
 
 
@@ -376,7 +376,7 @@ zonkTcType (ForAllTy tv ty)
     case tv_ty of	-- Should be a tyvar!
       TyVarTy tv' -> 
 		     returnNF_Tc (ForAllTy tv' ty')
-      _ -> pprTrace "zonkTcType:ForAllTy:" (ppCat [ppr PprDebug tv, ppr PprDebug tv_ty]) $
+      _ -> --pprTrace "zonkTcType:ForAllTy:" (ppCat [ppr PprDebug tv, ppr PprDebug tv_ty]) $
 	   
 	   returnNF_Tc (ForAllTy tv{-(tcTyVarToTyVar tv)-} ty')
 

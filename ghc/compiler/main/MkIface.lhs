@@ -48,12 +48,12 @@ import PrelInfo		( builtinValNamesMap, builtinTcNamesMap )
 import Pretty		( prettyToUn )
 import Unpretty		-- ditto
 import RnHsSyn		( isRnConstr, SYN_IE(RenamedHsModule), RnName(..) )
-import RnUtils		( SYN_IE(RnEnv), pprRnEnv{-ToDo:rm-} )
+import RnUtils		( SYN_IE(RnEnv) {-, pprRnEnv ToDo:rm-} )
 import TcModule		( SYN_IE(TcIfaceInfo) )
 import TcInstUtil	( InstInfo(..) )
 import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
 import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitForAllTy )
-import Util		( sortLt, removeDups, zipWithEqual, zipWith3Equal, assertPanic, panic{-ToDo:rm-}, pprTrace{-ToDo:rm-} )
+import Util		( sortLt, removeDups, zipWithEqual, zipWith3Equal, assertPanic, panic{-ToDo:rm-}{-, pprTrace ToDo:rm-} )
 
 uppSemid   x = uppBeside (prettyToUn (ppr PprInterface x)) uppSemi -- micro util
 ppr_ty	  ty = prettyToUn (pprType PprInterface ty)
@@ -115,7 +115,7 @@ startIface mod
       Nothing -> return Nothing -- not producing any .hi file
       Just fn ->
 	openFile fn WriteMode	>>= \ if_hdl ->
-	hPutStr if_hdl ("interface "++ _UNPK_ mod) >>
+	hPutStr if_hdl ("{-# GHC_PRAGMA INTERFACE VERSION 20 #-}\ninterface "++ _UNPK_ mod) >>
 	return (Just if_hdl)
 
 endIface Nothing	= return ()

@@ -24,13 +24,13 @@ import FiniteMap	( unitFM, listToFM, lookupFM, plusFM, FiniteMap )
 import Maybes		( maybeToBool, MaybeErr(..) )
 import Name		( isLexConId, isLexVarId, isLexConSym,
 			  mkTupNameStr, preludeQual, isRdrLexCon,
-			  RdrName(..){-instance Outputable:ToDo:rm-}
+			  RdrName(..) {-instance Outputable:ToDo:rm-}
 			)
 import PprStyle		( PprStyle(..) ) -- ToDo: rm debugging
 import PrelMods		( pRELUDE )
 import Pretty		( ppCat, ppPStr, ppInt, ppShow, ppStr )
 import SrcLoc		( mkIfaceSrcLoc )
-import Util		( startsWith, isIn, panic, assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( startsWith, isIn, panic, assertPanic{-, pprTrace ToDo:rm-} )
 \end{code}
 
 \begin{code}

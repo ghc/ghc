@@ -77,7 +77,7 @@ around; if we get hits, we use the value accordingly.
 \begin{code}
 dsExpr :: TypecheckedHsExpr -> DsM CoreExpr
 
-dsExpr (HsVar var) = dsApp (HsVar var) []
+dsExpr e@(HsVar var) = dsApp e []
 \end{code}
 
 %************************************************************************
@@ -584,20 +584,9 @@ dsApp (TyApp expr tys) args
 
 -- we might should look out for SectionLs, etc., here, but we don't
 
-dsApp (HsVar v) args = mkAppDs (Var v) args
-
-{-	No need to do unfolding in desugarer now
-   = lookupEnvDs v	`thenDs` \ maybe_expr ->
-    case maybe_expr of
-      Just expr -> mkAppDs expr args
-
-      Nothing -> -- we're only saturating constructors and PrimOps
-	case getIdUnfolding v of
-	  SimpleUnfolding _ the_unfolding EssentialUnfolding
-	    -> do_unfold nullTyVarEnv nullIdEnv (unTagBinders the_unfolding) args
-
-	  _ -> mkAppDs (Var v) args
--}
+dsApp (HsVar v) args
+  = lookupEnvDs v	`thenDs` \ maybe_expr ->
+    mkAppDs (case maybe_expr of { Nothing -> Var v; Just expr -> expr }) args
 
 dsApp anything_else args
   = dsExpr anything_else	`thenDs` \ core_expr ->

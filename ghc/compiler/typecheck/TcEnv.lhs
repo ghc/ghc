@@ -41,10 +41,10 @@ import Name		( getOccName, getSrcLoc, Name{-instance NamedThing-} )
 import PprStyle
 import Pretty
 import RnHsSyn		( RnName(..) )
-import Unique		( pprUnique10, pprUnique{-ToDo:rm-} )
+import Unique		( pprUnique10{-, pprUnique ToDo:rm-} )
 import UniqFM	     
 import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy,
-			  panic, pprPanic, pprTrace{-ToDo:rm-}
+			  panic, pprPanic{-, pprTrace ToDo:rm-}
 			)
 \end{code}
 

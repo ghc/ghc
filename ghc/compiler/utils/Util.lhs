@@ -773,7 +773,7 @@ unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
 panic x = error ("panic! (the `impossible' happened):\n\t"
 	      ++ x ++ "\n\n"
 	      ++ "Please report it as a compiler bug "
-	      ++ "to glasgow-haskell-bugs@dcs.glasgow.ac.uk.\n\n" )
+	      ++ "to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\n" )
 
 pprPanic heading pretty_msg = panic (heading++(ppShow 80 pretty_msg))
 pprError heading pretty_msg = error (heading++(ppShow 80 pretty_msg))

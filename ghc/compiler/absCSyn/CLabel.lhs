@@ -66,11 +66,11 @@ import Id		( externallyVisibleId, cmpId_withSpecDataCon,
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( showTyCon, GenType{-instance Outputable-} )
-import Pretty		( prettyToUn, ppPStr{-ToDo:rm-} )
+import Pretty		( prettyToUn{-, ppPStr ToDo:rm-} )
 import TyCon		( TyCon{-instance Eq-} )
 import Unique		( showUnique, pprUnique, Unique{-instance Eq-} )
 import Unpretty		-- NOTE!! ********************
-import Util		( assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( assertPanic{-, pprTraceToDo:rm-} )
 \end{code}
 
 things we want to find out:

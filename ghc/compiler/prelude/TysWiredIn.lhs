@@ -86,14 +86,14 @@ module TysWiredIn (
 --import Kind
 
 IMP_Ubiq()
-IMPORT_DELOOPER(TyLoop)		( mkDataCon, StrictnessMark(..) )
+IMPORT_DELOOPER(TyLoop)	( mkDataCon, StrictnessMark(..) )
+IMPORT_DELOOPER(IdLoop)	( SpecEnv )
 
 -- friends:
 import PrelMods
 import TysPrim
 
 -- others:
-import SpecEnv		( SYN_IE(SpecEnv) )
 import Kind		( mkBoxedTypeKind, mkArrowKind )
 import Name		( mkWiredInName, ExportFlag(..) )
 import SrcLoc		( mkBuiltinSrcLoc )

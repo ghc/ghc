@@ -194,7 +194,7 @@ simplTopBinds env (NonRec binder@(in_id,occ_info) rhs : binds)
   = 	-- No cloning necessary at top level
  	-- Process the binding
     simplRhsExpr env binder rhs 	`thenSmpl` \ rhs' ->
-    completeNonRec env binder rhs'	`thenSmpl` \ (new_env, binds1') ->
+    completeNonRec True env binder rhs'	`thenSmpl` \ (new_env, binds1') ->
 
 	-- Process the other bindings
     simplTopBinds new_env binds	`thenSmpl` \ binds2' ->
@@ -733,10 +733,17 @@ simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
     simpl_bind env rhs | will_be_demanded &&
 		         try_let_to_case &&
 		         type_ok_for_let_to_case rhs_ty &&
-			 rhs_is_whnf	-- note: WHNF, but not bottom,  (comment below)
+			 not rhs_is_whnf	-- note: WHNF, but not bottom,  (comment below)
       = tick Let2Case				`thenSmpl_`
         mkIdentityAlts rhs_ty			`thenSmpl` \ id_alts ->
-        simplCase env rhs id_alts (\env rhs -> simpl_bind env rhs) body_ty
+        simplCase env rhs id_alts (\env rhs -> complete_bind env rhs) body_ty
+		-- NB: it's tidier to call complete_bind not simpl_bind, else
+		-- we nearly end up in a loop.  Consider:
+		-- 	let x = rhs in b
+		-- ==>  case rhs of (p,q) -> let x=(p,q) in b
+		-- This effectively what the above simplCase call does.
+		-- Now, the inner let is a let-to-case target again!  Actually, since
+		-- the RHS is in WHNF it won't happen, but it's a close thing!
 
     -- Try let-from-let
     simpl_bind env (Let bind rhs) | let_floating_ok
@@ -763,10 +770,12 @@ simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
 	    returnSmpl (Let extra_binding case_expr)
 
     -- None of the above; simplify rhs and tidy up
-    simpl_bind env rhs
-      = simplRhsExpr env binder rhs 	`thenSmpl` \ rhs' ->
-	completeNonRec env binder rhs'	`thenSmpl` \ (new_env, binds) ->
-        body_c new_env			`thenSmpl` \ body' ->
+    simpl_bind env rhs = complete_bind env rhs
+ 
+    complete_bind env rhs
+      = simplRhsExpr env binder rhs 		`thenSmpl` \ rhs' ->
+	completeNonRec False env binder rhs'	`thenSmpl` \ (new_env, binds) ->
+        body_c new_env				`thenSmpl` \ body' ->
         returnSmpl (mkCoLetsAny binds body')
 
 
@@ -951,7 +960,7 @@ simplBind env (Rec pairs) body_c body_ty
     let
        env_w_clones = extendIdEnvWithClones env binders ids'
     in
-    simplRecursiveGroup env ids' floated_pairs	`thenSmpl` \ (binding, new_env) ->
+    simplRecursiveGroup env_w_clones ids' floated_pairs	`thenSmpl` \ (binding, new_env) ->
 
     body_c new_env				`thenSmpl` \ body' ->
 
@@ -989,7 +998,8 @@ simplBind env (Rec pairs) body_c body_ty
 simplRecursiveGroup env new_ids pairs 
   = 	-- Add unfoldings to the new_ids corresponding to their RHS
     let
-       occs            = [occ | ((_,occ), _) <- pairs]
+       binders	       = map fst pairs
+       occs            = map snd binders
        new_ids_w_pairs = zipEqual "simplRecGp" new_ids pairs
        rhs_env         = foldl extendEnvForRecBinding 
 		               env new_ids_w_pairs
@@ -998,11 +1008,12 @@ simplRecursiveGroup env new_ids pairs
     mapSmpl (\(binder,rhs) -> simplRhsExpr rhs_env binder rhs) pairs	`thenSmpl` \ new_rhss ->
 
     let
-       new_pairs	   = zipEqual "simplRecGp" new_ids new_rhss
+       new_pairs	= zipEqual "simplRecGp" new_ids new_rhss
        occs_w_new_pairs = zipEqual "simplRecGp" occs new_pairs
-       new_env      	   = foldl (\env (occ_info,(new_id,new_rhs)) -> 
-			  	    extendEnvGivenBinding env occ_info new_id new_rhs)
-			 	   env occs_w_new_pairs
+       new_env      	= foldl add_binding env occs_w_new_pairs
+
+       add_binding env (occ_info,(new_id,new_rhs)) 
+	  = extendEnvGivenBinding env occ_info new_id new_rhs
     in
     returnSmpl (Rec new_pairs, new_env)
 \end{code}
@@ -1052,12 +1063,12 @@ x.  That's just what completeLetBinding does.
 	-- Sigh: rather disgusting case for coercions. We want to 
 	-- ensure that all let-bound Coerces have atomic bodies, so
 	-- they can freely be inlined.
-completeNonRec env binder@(_,occ_info) (Coerce coercion ty rhs)
+completeNonRec top_level env binder@(_,occ_info) (Coerce coercion ty rhs)
   = (case rhs of
 	Var v -> returnSmpl (env, [], rhs)
 	Lit l -> returnSmpl (env, [], rhs)
 	other -> newId (coreExprType rhs)			`thenSmpl` \ inner_id ->
-		 completeNonRec env 
+		 completeNonRec top_level env 
 			(inner_id, dangerousArgOcc) rhs		`thenSmpl` \ (env1, extra_bind) ->
 		-- Dangerous occ because, like constructor args,
 		-- it can be duplicated easily
@@ -1079,22 +1090,30 @@ completeNonRec env binder@(_,occ_info) (Coerce coercion ty rhs)
      in
      returnSmpl (new_env, extra_bind ++ [NonRec new_id new_rhs])
 	
-completeNonRec env binder new_rhs
+completeNonRec top_level env binder@(id,_) new_rhs
   -- See if RHS is an atom, or a reusable constructor
   | maybeToBool maybe_atomic_rhs
   = let
 	new_env = extendIdEnvWithAtom env binder rhs_atom
+	result_binds | top_level = [NonRec id new_rhs]	-- Don't discard top-level bindings
+							-- (they'll be dropped later if not
+							-- exported and dead)
+		     | otherwise = []
     in
     tick atom_tick_type			`thenSmpl_`
-    returnSmpl (new_env, [])
+    returnSmpl (new_env, result_binds)
   where
     maybe_atomic_rhs		    = exprToAtom env new_rhs
     Just (rhs_atom, atom_tick_type) = maybe_atomic_rhs
 
-completeNonRec env binder@(_,occ_info) new_rhs
-  = cloneId env binder			`thenSmpl` \ new_id ->
+completeNonRec top_level env binder@(old_id,occ_info) new_rhs
+  = (if top_level then
+	returnSmpl old_id		-- Only clone local binders
+     else
+	cloneId env binder
+    )				`thenSmpl` \ new_id ->
     let
-	env1    = extendIdEnvWithClone env binder new_id
+        env1    = extendIdEnvWithClone env binder new_id
 	new_env = extendEnvGivenBinding env1 occ_info new_id new_rhs
     in
     returnSmpl (new_env, [NonRec new_id new_rhs])

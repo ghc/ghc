@@ -57,7 +57,7 @@ import RnUtils		( SYN_IE(RnEnv) )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
-import FiniteMap	( FiniteMap, emptyFM, isEmptyFM, keysFM{-ToDo:rm-} )
+import FiniteMap	( FiniteMap, emptyFM, isEmptyFM{-, keysFM ToDo:rm-} )
 --import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
 import Maybes		( MaybeErr(..) )
 --import Name		( Name )
@@ -494,9 +494,9 @@ rnMtoTcM rn_env rn_action down env
 		getImplicitUpRn	`thenRn` \ implicit_env@(v_env,tc_env) ->
 		if (isEmptyFM v_env && isEmptyFM tc_env)
 		then returnRn result
-		else pprPanic "rnMtoTcM: non-empty ImplicitEnv!"
-			(ppAboves ([ ppCat [ppPStr m, ppPStr n] | (OrigName m n) <- keysFM v_env]
-				++ [ ppCat [ppPStr m, ppPStr n] | (OrigName m n) <- keysFM tc_env]))
+		else panic "rnMtoTcM: non-empty ImplicitEnv!"
+--			(ppAboves ([ ppCat [ppPStr m, ppPStr n] | (OrigName m n) <- keysFM v_env]
+--				++ [ ppCat [ppPStr m, ppPStr n] | (OrigName m n) <- keysFM tc_env]))
 	    )
     in
     returnSST (rn_result, rn_errs)

@@ -31,7 +31,7 @@ import Bag		( emptyBag, unitBag, consBag, snocBag, unionBags,
 			  unionManyBags, mapBag, foldBag, filterBag, listToBag, bagToList )
 import CmdLineOpts	( opt_NoImplicitPrelude, opt_CompilingGhcInternals )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning), addErrLoc, addShortErrLocLine, addShortWarnLocLine )
-import FiniteMap	( emptyFM, addToFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM, keysFM{-ToDo:rm-}, FiniteMap )
+import FiniteMap	( emptyFM, addToFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM, FiniteMap )
 import Id		( GenId )
 import Maybes		( maybeToBool, catMaybes, MaybeErr(..) )
 import Name		( RdrName(..), Name, isQual, mkTopLevName, mkWiredInName, origName,
@@ -49,9 +49,9 @@ import TyCon		( tyConDataCons )
 import UniqFM		( emptyUFM, addListToUFM_C, lookupUFM )
 import UniqSupply	( splitUniqSupply )
 import Util		( isIn, assoc, cmpPString, sortLt, removeDups,
-			  equivClasses, panic, assertPanic, pprPanic{-ToDo:rm-}, pprTrace{-ToDo:rm-}
+			  equivClasses, panic, assertPanic
 			)
-import PprStyle --ToDo:rm 
+--import PprStyle --ToDo:rm 
 \end{code}
 
 \begin{code}
@@ -332,7 +332,7 @@ newGlobalName locn maybe_exp is_val_name rdr@(Qual mod name)
 	  = case (lookupFM b_keys orig) of
 	      Just (key,_) -> (key, True)
 	      Nothing	   -> case (lookupFM (if is_val_name then b_val_names else b_tc_names) orig) of
-			        Nothing -> (pprPanic "newGlobalName:Qual:uniq:" (ppr PprDebug rdr), True)
+			        Nothing -> (panic "newGlobalName:Qual:uniq", True)
 				Just xx -> (uniqueOf xx, False{-builtin!-})
 
 	exp = case maybe_exp of
@@ -347,7 +347,7 @@ newGlobalName locn maybe_exp is_val_name rdr@(Qual mod name)
 
   | otherwise
   = addErrRn (qualNameErr "name in definition" (rdr, locn)) `thenRn_`
-    returnRn (pprPanic "newGlobalName:Qual:" (ppr PprDebug rdr))
+    returnRn (panic "newGlobalName:Qual")
 \end{code}
 
 *********************************************************
@@ -624,7 +624,7 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) modname maybe_spec
 	    (str, orig)
 	      = case (ie_name ie) of
 		  Unqual s -> (s, OrigName modname s)
-		  Qual m s -> pprTrace "do_builtin:surprising qual!" (ppCat [ppPStr m, ppPStr s]) $
+		  Qual m s -> --pprTrace "do_builtin:surprising qual!" (ppCat [ppPStr m, ppPStr s]) $
 			      (s, OrigName modname s)
 	in
 	case (lookupFM b_tc_names orig) of 	-- NB: we favour the tycon/class FM...

@@ -165,7 +165,6 @@ import PprType		( getTypeString, typeMaybeString, specMaybeTysSuffix,
 			)
 import PprStyle
 import Pretty
-import SpecEnv		( SpecEnv(..) )
 import MatchEnv		( MatchEnv )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TyCon		( TyCon, mkTupleTyCon, tyConDataCons )
@@ -1057,7 +1056,7 @@ mkWorkerId u unwrkr ty info
   = Id u n ty (WorkerId unwrkr) NoPragmaInfo info
   where
     unwrkr_name = getName unwrkr
-    unwrkr_orig = trace "mkWorkerId:origName:" $ origName "mkWorkerId" unwrkr_name
+    unwrkr_orig = origName "mkWorkerId" unwrkr_name
     umod = moduleOf unwrkr_orig
 
     n = mkCompoundName u umod SLIT("wrk") [Left unwrkr_orig] unwrkr_name

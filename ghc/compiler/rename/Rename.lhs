@@ -39,19 +39,19 @@ import RnUtils		( SYN_IE(RnEnv), extendGlobalRnEnv, emptyRnEnv )
 import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
 import CmdLineOpts	( opt_HiMap, opt_NoImplicitPrelude )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
-import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, lookupFM{-ToDo:rm-}, FiniteMap )
+import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, FiniteMap )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, mkWiredInName, getLocalName, isLocalName,
 			  origName,
 			  Name, RdrName(..), ExportFlag(..)
 			)
-import PprStyle		-- ToDo:rm
+--import PprStyle		-- ToDo:rm
 import PrelInfo		( builtinNameMaps, builtinKeysMap, SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
-import Pretty		-- ToDo:rm
+import Pretty
 import Unique		( ixClassKey )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
-import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
 \end{code}
 
 \begin{code}
@@ -90,7 +90,7 @@ renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
     				     , ppCat (map pp_pair (keysFM builtinKeysMap))
     				     ]}) $
     -}
---    _scc_ "rnGlobalNames"
+    -- _scc_ "rnGlobalNames"
     makeHiMap opt_HiMap	    >>=	         \ hi_files ->
 --  pprTrace "HiMap:\n" (ppAboves [ ppCat [ppPStr m, ppStr p] | (m,p) <- fmToList hi_files])
     initIfaceCache modname hi_files  >>= \ iface_cache ->
@@ -112,7 +112,7 @@ renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
     else
 
     -- No top-level name errors so rename source ...
---    _scc_ "rnSource"
+    -- _scc_ "rnSource"
     case initRn True modname occ_env us2
 		(rnSource imp_mods unqual_imps imp_fixes input) of {
 	((rn_module, export_fn, module_dotdots, src_occs), src_errs, src_warns) ->
@@ -150,7 +150,7 @@ renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
     else
 
     -- No errors renaming source so rename the interfaces ...
---    _scc_ "preRnIfaces"
+    -- _scc_ "preRnIfaces"
     let
 	-- split up all names that occurred in the source; between
 	-- those that are defined therein and those merely mentioned.
@@ -190,22 +190,15 @@ renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
 	     else case (origName "pairify_rn" name) of { OrigName m n ->
 		  Qual m n }
 	     , rn)
-
-	must_haves
-	  | opt_NoImplicitPrelude
-	  = [{-no Prelude.hi, no point looking-}]
-	  | otherwise
-	  = [ name_fn (mkWiredInName u orig ExportAll)
-	    | (orig@(OrigName mod str), (u, name_fn)) <- fmToList builtinKeysMap ]
     in
 --  ASSERT (isEmptyBag orig_occ_dups)
-    (if (isEmptyBag orig_occ_dups) then \x->x
-     else pprTrace "orig_occ_dups:" (ppAboves [ ppCat [ppr PprDebug m, ppr PprDebug n, ppr PprDebug o] | (m,n,o) <- bagToList orig_occ_dups])) $
+--    (if (isEmptyBag orig_occ_dups) then \x->x
+--     else pprTrace "orig_occ_dups:" (ppAboves [ ppCat [ppr PprDebug m, ppr PprDebug n, ppr PprDebug o] | (m,n,o) <- bagToList orig_occ_dups])) $
     ASSERT (isEmptyBag orig_def_dups)
 
---    _scc_ "rnIfaces"
+    -- _scc_ "rnIfaces"
     rnIfaces iface_cache imp_mods us3 orig_def_env orig_occ_env
-	     rn_module (must_haves {-initMustHaves-} ++ imports_used) >>=
+	     rn_module (initMustHaves ++ imports_used) >>=
 	\ (rn_module_with_imports, final_env,
 	   (implicit_val_fm, implicit_tc_fm),
 	   usage_stuff,

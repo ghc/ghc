@@ -51,7 +51,7 @@ import CmdLineOpts	( opt_WarnNameShadowing )
 import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine,
 			  SYN_IE(Error), SYN_IE(Warning)
 			)
-import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM, fmToList{-ToDo:rm-} )
+import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM{-, fmToList ToDo:rm-} )
 import Maybes		( assocMaybe )
 import Name		( SYN_IE(Module), RdrName(..), isQual,
 			  OrigName(..), Name, mkLocalName, mkImplicitName,
@@ -59,9 +59,9 @@ import Name		( SYN_IE(Module), RdrName(..), isQual,
 			)
 import PrelInfo		( builtinNameMaps, builtinKeysMap, SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
 import PrelMods		( pRELUDE )
-import PprStyle{-ToDo:rm-}
-import Outputable{-ToDo:rm-}
-import Pretty--ToDo:rm		( SYN_IE(Pretty), PrettyRep )
+--import PprStyle{-ToDo:rm-}
+--import Outputable{-ToDo:rm-}
+import Pretty
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
 import UniqSet		( SYN_IE(UniqSet), mkUniqSet, minusUniqSet )

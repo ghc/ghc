@@ -57,7 +57,7 @@ import Outputable
 import PprType	( GenClass, TyCon, GenType, GenTyVar, pprParendGenType )	
 import PprStyle	( PprStyle(..) )
 import Pretty
-import SpecEnv	( SYN_IE(SpecEnv) )
+import SpecEnv	( SpecEnv )
 import SrcLoc	( SrcLoc, mkUnknownSrcLoc )
 import Type	( GenType, eqSimpleTy, instantiateTy,
 		  isTyVarTy, mkDictTy, splitForAllTy, splitSigmaTy,

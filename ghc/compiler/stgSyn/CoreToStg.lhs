@@ -41,12 +41,12 @@ import Type		( maybeAppDataTyCon, getAppDataTyConExpandingDicts )
 import TysWiredIn	( stringTy )
 import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
 import UniqSupply	-- all of it, really
-import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
-import Pretty--ToDo:rm
-import PprStyle--ToDo:rm
-import PprType  --ToDo:rm
-import Outputable--ToDo:rm
-import PprEnv--ToDo:rm
+import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
+--import Pretty--ToDo:rm
+--import PprStyle--ToDo:rm
+--import PprType  --ToDo:rm
+--import Outputable--ToDo:rm
+--import PprEnv--ToDo:rm
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
@@ -343,7 +343,7 @@ litToStgArg (NoRepInteger i integer_ty)
 
 litToStgArg (NoRepRational r rational_ty)
   = --ASSERT(is_rational_ty)
-    (if is_rational_ty then \x->x else pprTrace "litToStgArg:not rational?" (pprType PprDebug rational_ty)) $
+    --(if is_rational_ty then \x->x else pprTrace "litToStgArg:not rational?" (pprType PprDebug rational_ty)) $
     litToStgArg (NoRepInteger (numerator   r) integer_ty) `thenUs` \ (num_atom,   binds1) ->
     litToStgArg (NoRepInteger (denominator r) integer_ty) `thenUs` \ (denom_atom, binds2) ->
     newStgVar rational_ty			`thenUs` \ var ->

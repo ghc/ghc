@@ -18,8 +18,19 @@ import MatchEnv
 import Type		( matchTys, isTyVarTy )
 import Usage		( SYN_IE(UVar) )
 import OccurAnal	( occurAnalyseGlobalExpr )
-import CoreSyn		( CoreExpr(..), SimplifiableCoreExpr(..) )
+import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(SimplifiableCoreExpr) )
 import Maybes		( MaybeErr(..) )
+--import PprStyle--ToDo:rm
+--import Util(pprTrace)--ToDo:rm
+--import Outputable--ToDo:rm
+--import PprType--ToDo:rm
+--import Pretty--ToDo:rm
+--import PprCore--ToDo:rm
+--import Id--ToDo:rm
+--import TyVar--ToDo:rm
+--import Unique--ToDo:rm
+--import IdInfo--ToDo:rm
+--import PprEnv--ToDo:rm
 \end{code}
 
 
@@ -67,12 +78,14 @@ isNullSpecEnv (SpecEnv env) = null (mEnvToList env)
 
 addOneToSpecEnv :: SpecEnv -> [Type] -> CoreExpr -> MaybeErr SpecEnv ([Type], SimplifiableCoreExpr)
 addOneToSpecEnv (SpecEnv env) tys rhs 
-  = case (insertMEnv matchTys env tys (occurAnalyseGlobalExpr rhs)) of
+  = --pprTrace "addOneToSpecEnv" (ppAbove (ppr PprDebug tys) (ppr PprDebug rhs)) $
+    case (insertMEnv matchTys env tys (occurAnalyseGlobalExpr rhs)) of
 	Succeeded menv -> Succeeded (SpecEnv menv)
 	Failed err     -> Failed err
 
 lookupSpecEnv :: SpecEnv -> [Type] -> Maybe (SimplifiableCoreExpr, ([(TyVar,Type)], [Type]))
 lookupSpecEnv (SpecEnv env) tys 
   | all isTyVarTy tys = Nothing	-- Short cut: no specialisation for simple tyvars
-  | otherwise	      = lookupMEnv matchTys env tys
+  | otherwise	      = --pprTrace "lookupSpecEnv" (ppr PprDebug tys) $
+			lookupMEnv matchTys env tys
 \end{code}

@@ -60,7 +60,7 @@ import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
 import Pretty		( SYN_IE(Pretty), PrettyRep )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
-import Util		( nOfThem, isIn, Ord3(..), panic, panic#, assertPanic, pprPanic{-ToDo:rm-} )
+import Util		( nOfThem, isIn, Ord3(..), panic, panic#, assertPanic )
 --import {-hide me-}
 --	PprType (pprTyCon)
 --import {-hide me-}

@@ -4,6 +4,7 @@ __exports__
 CoreSyn CoreExpr
 CoreUnfold FormSummary (..)
 CoreUnfold Unfolding (..)
+CoreUnfold SimpleUnfolding (..)
 CoreUnfold UnfoldingGuidance (..)
 CoreUtils unTagBinders (..)
 Id IdEnv
@@ -19,6 +20,7 @@ MagicUFs MagicUnfoldingFun
 MagicUFs mkMagicUnfoldingFun (..)
 OccurAnal occurAnalyseGlobalExpr (..)
 PprType pprParendGenType (..)
+SpecEnv  SpecEnv
 SpecEnv  isNullSpecEnv (..)
 SpecEnv  nullSpecEnv (..)
 WwLib mAX_WORKER_ARGS (..)

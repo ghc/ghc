@@ -16,7 +16,8 @@ IMPORT_DELOOPER(SmplLoop)		( simplBind, simplExpr, MagicUnfoldingFun )
 import BinderInfo	-- too boring to try to select things...
 import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), SimpleUnfolding 
+import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..),
+			  SimpleUnfolding, FormSummary
 			)
 import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
 			  unTagBindersAlts
@@ -371,7 +372,7 @@ constructor or literal, because that would have been inlined
 \begin{code}
 completeCase env scrut alts rhs_c
   = simplAlts env scrut alts rhs_c	`thenSmpl` \ alts' ->
-    mkCoCase scrut alts'
+    mkCoCase env scrut alts'
 \end{code}
 
 
@@ -682,7 +683,8 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
 			-- let-bind the binder to the constructor
 		cloneId env binder		`thenSmpl` \ id' ->
 		let
-		    new_env = extendEnvGivenBinding env occ_info id' (Con con con_args)
+		    env1    = extendIdEnvWithClone env binder id'
+		    new_env = extendEnvGivenBinding env1 occ_info id' (Con con con_args)
 		in
 		rhs_c new_env rhs		`thenSmpl` \ rhs' ->
 		returnSmpl (Let (NonRec id' (Con con con_args)) rhs')
@@ -692,7 +694,7 @@ Case absorption and identity-case elimination
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-mkCoCase :: OutExpr -> OutAlts -> SmplM OutExpr
+mkCoCase :: SimplEnv -> OutExpr -> OutAlts -> SmplM OutExpr
 \end{code}
 
 @mkCoCase@ tries the following transformation (if possible):
@@ -742,12 +744,13 @@ The following code handles *both* these transformations (one
 equation for AlgAlts, one for PrimAlts):
 
 \begin{code}
-mkCoCase scrut (AlgAlts outer_alts
+mkCoCase env scrut (AlgAlts outer_alts
 			  (BindDefault deflt_var
 					 (Case (Var scrut_var')
 						 (AlgAlts inner_alts inner_deflt))))
-  |  (scrut_is_var && scrut_var == scrut_var')	-- First transformation
-  || deflt_var == scrut_var'			-- Second transformation
+  |  switchIsSet env SimplCaseMerge &&
+     ((scrut_is_var && scrut_var == scrut_var')	||	-- First transformation
+      deflt_var == scrut_var')				-- Second transformation
   = 	-- Aha! The default-absorption rule applies
     tick CaseMerge	`thenSmpl_`
     returnSmpl (Case scrut (AlgAlts (outer_alts ++ munged_reduced_inner_alts)
@@ -775,13 +778,14 @@ mkCoCase scrut (AlgAlts outer_alts
     arg_tys = case (getAppDataTyConExpandingDicts (idType deflt_var)) of
 		(_, arg_tys, _) -> arg_tys
 
-mkCoCase scrut (PrimAlts
+mkCoCase env scrut (PrimAlts
 		  outer_alts
 		  (BindDefault deflt_var (Case
 					      (Var scrut_var')
 					      (PrimAlts inner_alts inner_deflt))))
-  | (scrut_is_var && scrut_var == scrut_var') ||
-    deflt_var == scrut_var'
+  |  switchIsSet env SimplCaseMerge &&
+     ((scrut_is_var && scrut_var == scrut_var') ||
+      deflt_var == scrut_var')
   = 	-- Aha! The default-absorption rule applies
     tick CaseMerge	`thenSmpl_`
     returnSmpl (Case scrut (PrimAlts (outer_alts ++ munged_reduced_inner_alts)
@@ -831,7 +835,7 @@ Now the identity-case transformation:
 and similar friends.
 
 \begin{code}
-mkCoCase scrut alts
+mkCoCase env scrut alts
   | identity_alts alts
   = tick CaseIdentity		`thenSmpl_`
     returnSmpl scrut
@@ -868,7 +872,7 @@ mkCoCase scrut alts
 The catch-all case
 
 \begin{code}
-mkCoCase other_scrut other_alts = returnSmpl (Case other_scrut other_alts)
+mkCoCase env other_scrut other_alts = returnSmpl (Case other_scrut other_alts)
 \end{code}
 
 Boring local functions used above.  They simply introduce a trivial binding

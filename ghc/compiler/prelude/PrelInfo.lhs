@@ -20,6 +20,7 @@ module PrelInfo (
 
 IMP_Ubiq()
 IMPORT_DELOOPER(PrelLoop) ( primOpNameInfo )
+IMPORT_DELOOPER(IdLoop)	  ( SpecEnv )
 
 -- friends:
 import PrelMods		-- Prelude module names

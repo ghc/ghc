@@ -43,7 +43,7 @@ import PprStyle		( PprStyle(..) )
 import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
 import Pretty		( ppShow )
 import Id		( idType, dataConArgTys, mkTupleCon,
-			  pprId{-ToDo:rm-},
+--			  pprId{-ToDo:rm-},
 			  SYN_IE(DataCon), SYN_IE(DictVar), SYN_IE(Id), GenId )
 import Literal		( Literal(..) )
 import TyCon		( mkTupleTyCon, isNewTyCon, tyConDataCons )
@@ -52,13 +52,13 @@ import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTy,
 			)
 import TysPrim		( voidTy )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, SYN_IE(UniqSet) )
-import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
-import PprCore{-ToDo:rm-}
+import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
+import Usage		( SYN_IE(UVar) )
+--import PprCore{-ToDo:rm-}
 --import PprType--ToDo:rm
-import Pretty--ToDo:rm
-import TyVar--ToDo:rm
-import Unique--ToDo:rm
-import Usage--ToDo:rm
+--import Pretty--ToDo:rm
+--import TyVar--ToDo:rm
+--import Unique--ToDo:rm
 \end{code}
 
 %************************************************************************

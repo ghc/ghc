@@ -30,8 +30,8 @@ import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..), 
 			  nameImportFlag, RdrName, pprNonSym, Name )
-import Outputable	-- ToDo:rm
-import PprStyle 	-- ToDo:rm 
+import Outputable	( Outputable(..){-instances-} )
+--import PprStyle 	-- ToDo:rm 
 import Pretty
 import SrcLoc		( SrcLoc )
 import TyCon		( tyConDataCons, TyCon{-instance NamedThing-} )
@@ -39,7 +39,7 @@ import Unique		( Unique )
 import UniqFM		( emptyUFM, addListToUFM_C, listToUFM, plusUFM, lookupUFM, eltsUFM )
 import UniqSet		( SYN_IE(UniqSet) )
 import Util		( isIn, isn'tIn, thenCmp, sortLt, removeDups, mapAndUnzip3, cmpPString,
-			  panic, assertPanic, pprTrace{-ToDo:rm-} )
+			  panic, assertPanic{- , pprTrace ToDo:rm-} )
 \end{code}
 
 rnSource `renames' the source module and export list.
@@ -301,7 +301,7 @@ rnIE mods (IEThingWith name names)
 	  failButContinueRn (emptyBag, emptyBag) (synAllExportErr True{-error-} rn src_loc)
     checkIEWith (WiredInTyCon _) rns = panic "RnSource.rnIE:checkIEWith:WiredInTyCon:ToDo (boring)"
     checkIEWith rn rns
-	= pprTrace "rnIE:IEWith:panic? ToDo?:" (ppr PprDebug rn) $
+	= --pprTrace "rnIE:IEWith:panic? ToDo?:" (ppr PprDebug rn) $
 	  returnRn (emptyBag, emptyBag)
 
     exp_all n = (n, ExportAll)

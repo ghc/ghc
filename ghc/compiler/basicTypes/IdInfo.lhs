@@ -30,7 +30,6 @@ module IdInfo (
 	mkDemandInfo,
 	willBeDemanded,
 
-	MatchEnv,		-- the SpecEnv (why is this exported???)
 	StrictnessInfo(..), 	-- non-abstract
 	Demand(..),	    	-- non-abstract
 
@@ -275,7 +274,7 @@ ppIdInfo sty for_this_id specs_please better_id_fn inline_env
 		    else pp_unfolding sty for_this_id inline_env unfold,
 
 		    if specs_please
-		    then panic "ppSpecs (ToDo)" -- sty (not (isDataCon for_this_id))
+		    then pp_NONE -- ToDo -- sty (not (isDataCon for_this_id))
 					 -- better_id_fn inline_env (mEnvToList specenv)
 		    else pp_NONE,
 

@@ -28,7 +28,7 @@ import RnMonad
 import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name		( isLocallyDefinedName, pprSym, Name, RdrName )
 import Pretty
-import UniqFM		( lookupUFM, ufmToList{-ToDo:rm-} )
+import UniqFM		( lookupUFM{-, ufmToList ToDo:rm-} )
 import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
 			  SYN_IE(UniqSet)

@@ -41,11 +41,11 @@ import Type		( mkTyVarTys, mkForAllTys, splitSigmaTy,
 			  tyVarsOfType, tyVarsOfTypes, isDictTy
 			)
 import TyVar		( tyVarSetToList, GenTyVar{-instance Eq-} )
-import Util		( isIn, panic, pprTrace{-ToDo:rm-} )
-import PprCore--ToDo:rm
-import PprType		( GenTyVar ) --ToDo:rm
-import Usage--ToDo:rm
-import Unique--ToDo:rm
+import Util		( isIn, panic{-, pprTrace ToDo:rm-} )
+--import PprCore--ToDo:rm
+--import PprType		( GenTyVar ) --ToDo:rm
+--import Usage--ToDo:rm
+--import Unique--ToDo:rm
 \end{code}
 
 %************************************************************************

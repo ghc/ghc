@@ -91,7 +91,7 @@ import Maybes		( assocMaybe, maybeToBool )
 import Name		( isLocallyDefined, nameOf, origName )
 import PprStyle		( PprStyle(..) )
 import PprType		( getTyDescription, GenType{-instance Outputable-} )
-import Pretty--ToDo:rm
+--import Pretty--ToDo:rm
 import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness )
 import SMRep		-- all of it
@@ -1161,8 +1161,8 @@ fun_result_ty arity id
 	(_, de_foralld_ty) = splitForAllTy (idType id)
 	(arg_tys, res_ty)  = splitFunTyExpandingDictsAndPeeking de_foralld_ty
     in
-    -- ASSERT(arity >= 0 && length arg_tys >= arity)
-    (if (arity >= 0 && length arg_tys >= arity) then (\x->x) else pprPanic "fun_result_ty:" (ppCat [ppInt arity, ppr PprShowAll id, ppr PprDebug (idType id)])) $
+    ASSERT(arity >= 0 && length arg_tys >= arity)
+--    (if (arity >= 0 && length arg_tys >= arity) then (\x->x) else pprPanic "fun_result_ty:" (ppCat [ppInt arity, ppr PprShowAll id, ppr PprDebug (idType id)])) $
     mkFunTys (drop arity arg_tys) res_ty
 \end{code}
 
@@ -1261,7 +1261,7 @@ fastLabelFromCI (MkClosureInfo id _ _) = mkFastEntryLabel id fun_arity
     arity_maybe = arityMaybe (getIdArity id)
     fun_arity	= case arity_maybe of
 		    Just x -> x
-		    _	   -> pprPanic "fastLabelFromCI:no arity:" (ppr PprShowAll id)
+		    _	   -> panic "fastLabelFromCI:no arity:" --(ppr PprShowAll id)
 \end{code}
 
 \begin{code}

@@ -35,7 +35,7 @@ import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, Name{--O only-} )
 import PprType		( GenClass, GenType, GenTyVar )
 import Pretty
-import SpecEnv		( SYN_IE(SpecEnv), nullSpecEnv, addOneToSpecEnv )
+import SpecEnv		( SpecEnv, nullSpecEnv, addOneToSpecEnv )
 import SrcLoc		( SrcLoc )
 import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTys,
 			  splitForAllTy, instantiateTy, matchTy, SYN_IE(ThetaType) )
@@ -121,11 +121,11 @@ mkInstanceRelatedIds from_here src_loc inst_mod inst_pragmas
 
 	-- MAKE THE CONSTANT-METHOD IDS
 	-- if there are no type variables involved
-    (if not (null inst_decl_theta)
+    (if (null inst_decl_theta)
      then
-	returnTc []
-     else
 	mapTc mk_const_meth_id class_ops
+     else
+	returnTc []
     )					`thenTc` \ const_meth_ids ->
 
     returnTc (dfun_id, dfun_theta, const_meth_ids)
@@ -244,14 +244,17 @@ addClassInstance
 	-- If there are any constant methods, then add them to 
 	-- the SpecEnv of each class op (ie selector)
 	--
-	-- Example.  class    Foo a     where { op :: Baz b => a -> b }
-	--	     instance Foo (p,q) where { op (x,y) = ... }
+	-- Example.  class    Foo a     where { op :: Baz b => a -> b; ... }
+	--	     instance Foo (p,q) where { op (x,y) = ...       ; ... }
+	--
+	-- The class decl means that 
+	--	op :: forall a. Foo a => forall b. Baz b => a -> b
 	--
 	-- The constant method from the instance decl will be:
 	--	op_Pair :: forall p q b. Baz b => (p,q) -> b
 	--
 	-- What we put in op's SpecEnv is
-	--	(p,q) b	 |-->  (\d::Foo (p,q) -> op_Pair p q b)
+	--	(p,q) |-->  (\d::Foo (p,q) -> op_Pair p q)
 	--
 	-- Here, [p,q] are the inst_tyvars, and d is a dict whose only
 	-- purpose is to cancel with the dict to which op is applied.
@@ -270,15 +273,11 @@ addClassInstance
 		    | otherwise		  = zipWithEqual "add_const_meth" add_const_meth op_spec_envs const_meth_ids
 
       add_const_meth (op,spec_env) meth_id
-        = (op, case addOneToSpecEnv spec_env (inst_ty : local_tyvar_tys) rhs of
+        = (op, case addOneToSpecEnv spec_env [inst_ty] rhs of
 		 Failed (tys', rhs') -> panic "TcInstDecls:add_const_meth"
 	         Succeeded spec_env' -> spec_env' )
         where
-	  (local_tyvars, _) = splitForAllTy (classOpLocalType op)
-	  local_tyvar_tys   = mkTyVarTys local_tyvars
-	  rhs = mkValLam [dict] (mkTyApp (mkTyApp (Var meth_id) 
-						  (mkTyVarTys inst_tyvars)) 
-				         local_tyvar_tys)
+	  rhs = mkValLam [dict] (mkTyApp (Var meth_id) (mkTyVarTys inst_tyvars))
     in
     returnTc (class_inst_env', op_spec_envs')
     }

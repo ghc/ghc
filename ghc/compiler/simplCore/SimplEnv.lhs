@@ -526,7 +526,7 @@ data UnfoldConApp
 nullConApps = emptyFM
 
 extendConApps con_apps id (Con con args)
-  = addToFM_C (\old new -> new++old) con_apps (UCA con val_args) [(ty_args,con)]
+  = addToFM_C (\old new -> new++old) con_apps (UCA con val_args) [(ty_args,id)]
   where
     val_args = filter isValArg args		-- Literals and Ids
     ty_args  = [ty | TyArg ty <- args]		-- Just types

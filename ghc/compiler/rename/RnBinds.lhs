@@ -34,12 +34,12 @@ import Digraph		( stronglyConnComp )
 import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name		( getLocalName, RdrName )
 import Maybes		( catMaybes )
-import PprStyle--ToDo:rm
+--import PprStyle--ToDo:rm
 import Pretty
 import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  unionUniqSets, unionManyUniqSets,
 			  elementOfUniqSet, uniqSetToList, SYN_IE(UniqSet) )
-import Util		( thenCmp, isIn, removeDups, panic, panic#, assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( thenCmp, isIn, removeDups, panic, panic#, assertPanic )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper

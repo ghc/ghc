@@ -32,7 +32,7 @@ import RnMonad
 import RnUtils		( SYN_IE(RnEnv), extendGlobalRnEnv )
 import RnBinds		( rnMethodBinds, rnTopBinds )
 
-import Bag		( emptyBag{-ToDo:rm-}, Bag, isEmptyBag, unionBags, listToBag )
+import Bag		( Bag, isEmptyBag, unionBags, listToBag )
 import Class		( classKey, needsDataDeclCtxtClassKeys, GenClass )
 import ErrUtils		( pprBagOfErrors, addErrLoc, SYN_IE(Error) )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
@@ -45,8 +45,8 @@ import Outputable	( Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppAbove, ppAboves, ppCat, ppBesides, ppStr, ppHang, SYN_IE(Pretty) )
-import Pretty--ToDo:rm
-import FiniteMap--ToDo:rm
+--import Pretty--ToDo:rm
+--import FiniteMap--ToDo:rm
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon,
@@ -61,8 +61,8 @@ import TyVar		( GenTyVar )
 import UniqFM		( emptyUFM )
 import Unique		-- Keys stuff
 import Util		( zipWithEqual, zipEqual, sortLt, removeDups,  assoc,
-			  thenCmp, cmpList, panic, pprPanic, pprPanic#,
-			  assertPanic, pprTrace{-ToDo:rm-}
+			  thenCmp, cmpList, panic, panic#, pprPanic, pprPanic#,
+			  assertPanic-- , pprTrace{-ToDo:rm-}
 			)
 \end{code}
 
@@ -439,7 +439,7 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 	  = (tv1 `cmp` tv2) `thenCmp` (c1 `cmp` c2)
 #ifdef DEBUG
 	cmp_rhs other_1 other_2
-	  = pprPanic# "tcDeriv:cmp_rhs:" (ppCat [ppr PprDebug other_1, ppr PprDebug other_2])
+	  = panic# "tcDeriv:cmp_rhs:" --(ppCat [ppr PprDebug other_1, ppr PprDebug other_2])
 #endif
 
 \end{code}
@@ -490,7 +490,7 @@ add_solns inst_infos_in eqns solns
 		-- We can't leave it as a panic because to get the theta part we
 		-- have to run down the type!
 
-	my_panic str = pprPanic ("add_soln:"++str) (ppCat [ppChar ':', ppr PprDebug clas, ppr PprDebug tycon])
+	my_panic str = panic "add_soln" -- pprPanic ("add_soln:"++str) (ppCat [ppChar ':', ppr PprDebug clas, ppr PprDebug tycon])
 \end{code}
 
 %************************************************************************
@@ -611,8 +611,9 @@ gen_inst_info modname fixities deriver_rn_env
     )			`thenNF_Tc` \ (mbinds, errs) ->
 
     if not (isEmptyBag errs) then
-	pprPanic "gen_inst_info:renamer errs!\n"
-		 (ppAbove (pprBagOfErrors PprDebug errs) (ppr PprDebug proto_mbinds))
+	panic "gen_inst_info:renamer errs!\n"
+--	pprPanic "gen_inst_info:renamer errs!\n"
+--		 (ppAbove (pprBagOfErrors PprDebug errs) (ppr PprDebug proto_mbinds))
     else
 	-- All done
     let
@@ -681,8 +682,9 @@ gen_tag_n_con_binds rn_env nm_alist_etc
     )			`thenNF_Tc` \ (binds, errs) ->
 
     if not (isEmptyBag errs) then
-	pprPanic "gen_tag_n_con_binds:renamer errs!\n"
-		 (ppAbove (pprBagOfErrors PprDebug errs) (ppr PprDebug binds))
+	panic "gen_tag_n_con_binds:renamer errs!\n"
+--	pprPanic "gen_tag_n_con_binds:renamer errs!\n"
+--		 (ppAbove (pprBagOfErrors PprDebug errs) (ppr PprDebug binds))
     else
 	returnTc (binds, deriver_rn_env)
 \end{code}

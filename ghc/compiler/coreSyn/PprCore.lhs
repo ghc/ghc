@@ -31,7 +31,6 @@ import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
 			  nullIdEnv, SYN_IE(DataCon), GenId{-instances-}
 			)
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
-import IdLoop		( Unfolding )	-- Needed by IdInfo.hi?
 import Literal		( Literal{-instances-} )
 import Name		( isSymLexeme )
 import Outputable	-- quite a few things

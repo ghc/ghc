@@ -26,7 +26,7 @@ import Pretty
 import PprStyle		( PprStyle(..) )
 import SrcLoc		( SrcLoc )
 import Usage		( GenUsage{-instance-} )
-import Util		( panic{-ToDo:rm eventually-} )
+--import Util		( panic{-ToDo:rm eventually-} )
 \end{code}
 
 %************************************************************************

@@ -402,9 +402,17 @@ ALLINTS=$(ALLSRCS_LHS:.lhs=.hi) $(ALLSRCS_HS:.hs=.hi)
 #endif
 
 #if GhcWithHscOptimised == YES
-#define __version_sensitive_flags -O /*-DUSE_ATTACK_PRAGMAS -fshow-pragma-name-errs*/ -fomit-reexported-instances -fshow-import-specs
+# if GhcBuilderVersion >= 200
+#  define __version_sensitive_flags -O -fshow-import-specs
+# else
+#  define __version_sensitive_flags -O -fshow-import-specs -fomit-derived-read -fomit-reexported-instances
+# endif
 #else
-#define __version_sensitive_flags -fomit-reexported-instances
+# if GhcBuilderVersion >= 200
+#  define __version_sensitive_flags /*none*/
+# else
+#  define __version_sensitive_flags -fomit-derived-read -fomit-reexported-instances
+# endif
 #endif
 
 /* avoid use of AllProjectsHcOpts; then put in HcMaxHeapFlag "by hand" */
@@ -412,8 +420,7 @@ ALLINTS=$(ALLSRCS_LHS:.lhs=.hi) $(ALLSRCS_HS:.hs=.hi)
 #define AllProjectsHcOpts /**/
 
 HC_OPTS = -cpp HcMaxHeapFlag -fhaskell-1.3 -fglasgow-exts -DCOMPILING_GHC \
-	-fomit-derived-read \
-	-I. -i$(SUBDIR_LIST) \
+	-Rghc-timing -I. -i$(SUBDIR_LIST) \
 	use_DDEBUG __version_sensitive_flags __omit_ncg_maybe __omit_deforester_flag
 
 #undef __version_sensitive_flags
@@ -502,7 +509,7 @@ HaskellCompileWithExtraFlags_Recursive(module,isuf,o,-c,extra_flags)
 
 rename/ParseIface.hs : rename/ParseIface.y
 	$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
-	happy -g -i rename/ParseIface.hinfo rename/ParseIface.y
+	happy -g rename/ParseIface.y
 	@chmod 444 rename/ParseIface.hs
 
 compile(absCSyn/AbsCUtils,lhs,)
@@ -706,7 +713,7 @@ compile(typecheck/TcType,lhs,)
 compile(typecheck/TcEnv,lhs,)
 compile(typecheck/TcMonoType,lhs,)
 compile(typecheck/TcPat,lhs,)
-compile(typecheck/TcPragmas,lhs,)
+/*compile(typecheck/TcPragmas,lhs,)*/
 compile(typecheck/TcSimplify,lhs,)
 compile(typecheck/TcTyClsDecls,lhs,)
 compile(typecheck/TcTyDecls,lhs,)
@@ -745,11 +752,9 @@ objs:: $(ALLOBJS)
 /* *** parser ************************************************* */
 
 YACC_OPTS = -d
-CC_OPTS = -Iparser -I. -I$(COMPINFO_DIR) -DUGEN_DEBUG=1 /*-DHSP_DEBUG=1*/ -g
+CC_OPTS = -Iparser -I. -I$(COMPINFO_DIR) /*-DUGEN_DEBUG=1*/ /*-DHSP_DEBUG=1*/
 
 /* add to these on the command line with, e.g., EXTRA_YACC_OPTS=-v */
-
-XCOMM D_DEBUG = -DDEBUG
 
 CPP_DEFINES = $(D_DEBUG)
 

@@ -43,11 +43,10 @@ import CoreUtils	( coreExprType )
 import CostCentre	( ccMentionsId )
 import Id		( idType, getIdArity,  isBottomingId, 
 			  SYN_IE(IdSet), GenId{-instances-} )
-import PrimOp		( fragilePrimOp, PrimOp(..) )
+import PrimOp		( primOpCanTriggerGC, fragilePrimOp, PrimOp(..) )
 import IdInfo		( arityMaybe, bottomIsGuaranteed )
 import Literal		( isNoRepLit, isLitLitLit )
 import Pretty
-import PrimOp		( primOpCanTriggerGC, PrimOp(..) )
 import TyCon		( tyConFamilySize )
 import Type		( getAppDataTyConExpandingDicts )
 import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
@@ -148,6 +147,7 @@ mkFormSummary expr
   where
     go n (Lit _)	= ASSERT(n==0) ValueForm
     go n (Con _ _)      = ASSERT(n==0) ValueForm
+    go n (Prim _ _)	= OtherForm
     go n (SCC _ e)      = go n e
     go n (Coerce _ _ e) = go n e
     go n (Let _ e)      = OtherForm

@@ -42,11 +42,10 @@ import Class		( GenClass, SYN_IE(Class), SYN_IE(ClassInstEnv),
 import Id		( GenId )
 import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool )
 import Outputable	( Outputable(..){-instance * []-} )
-import PprStyle--ToDo:rm
-import PprType		( GenType, GenTyVar, GenClass{-instance Outputable;ToDo:rm-} )
+--import PprStyle--ToDo:rm
+import PprType		( GenType, GenTyVar )
 import Pretty
 import SrcLoc		( mkUnknownSrcLoc )
-import Util
 import Type		( GenType, SYN_IE(Type), SYN_IE(TauType), mkTyVarTy, getTyVar, eqSimpleTy,
 			  getTyVar_maybe )
 import TysWiredIn	( intTy )
@@ -54,6 +53,7 @@ import TyVar		( GenTyVar, SYN_IE(GenTyVarSet),
 			  elementOfTyVarSet, emptyTyVarSet, unionTyVarSets,
 			  isEmptyTyVarSet, tyVarSetToList )
 import Unique		( Unique )
+import Util
 \end{code}
 
 

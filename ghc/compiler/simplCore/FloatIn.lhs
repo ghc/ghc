@@ -198,7 +198,7 @@ fiExpr to_drop (_, AnnSCC cc expr)
 
 \begin{code}
 fiExpr to_drop (_, AnnCoerce c ty expr)
-  = trace "fiExpr:Coerce:wimping out" $
+  = --trace "fiExpr:Coerce:wimping out" $
     mkCoLets' to_drop (Coerce c ty (fiExpr [] expr))
 \end{code}
 

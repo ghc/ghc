@@ -40,8 +40,8 @@ import MatchEnv		( MatchEnv )
 import Maybes		( assocMaybe )
 import Name		( changeUnique, Name )
 import Unique		-- Keys for built-in classes
-import Pretty		( SYN_IE(Pretty), ppCat{-ToDo:rm-}, ppPStr{-ditto-} )
-import PprStyle		( PprStyle )
+import Pretty		( SYN_IE(Pretty), ppCat, ppPStr )
+--import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
 import Util
 \end{code}

@@ -9,7 +9,7 @@
 module PrelVals where
 
 IMP_Ubiq()
-IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..) )
+IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..), nullSpecEnv, SpecEnv )
 import Id		( SYN_IE(Id), GenId, mkImported, mkUserId, mkTemplateLocals )
 IMPORT_DELOOPER(PrelLoop)
 
@@ -26,7 +26,6 @@ import Literal		( mkMachInt )
 import Name		( ExportFlag(..) )
 import PragmaInfo
 import PrimOp		( PrimOp(..) )
-import SpecEnv		( SYN_IE(SpecEnv), nullSpecEnv )
 import Type		( mkTyVarTy )
 import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar )
 import Unique		-- lots of *Keys
@@ -81,7 +80,7 @@ eRROR_ID
   = pc_bottoming_Id errorIdKey pRELUDE SLIT("error") errorTy
 
 generic_ERROR_ID u n
-  = pc_bottoming_Id u gHC__ n errorTy
+  = pc_bottoming_Id u SLIT("GHCerr") n errorTy
 
 pAT_ERROR_ID
   = generic_ERROR_ID patErrorIdKey SLIT("patError")
@@ -99,15 +98,17 @@ nO_EXPLICIT_METHOD_ERROR_ID
   = generic_ERROR_ID nonExplicitMethodErrorIdKey SLIT("noExplicitMethodError")
 
 aBSENT_ERROR_ID
-  = pc_bottoming_Id absentErrorIdKey gHC__ SLIT("absentErr")
-	(mkSigmaTy [alphaTyVar] [] alphaTy)
+  = pc_bottoming_Id absentErrorIdKey SLIT("GHCerr") SLIT("absentErr")
+	(mkSigmaTy [openAlphaTyVar] [] openAlphaTy)
 
 pAR_ERROR_ID
-  = pcMiscPrelId parErrorIdKey gHC__ SLIT("parError")
-    (mkSigmaTy [alphaTyVar] [] alphaTy) noIdInfo
+  = pcMiscPrelId parErrorIdKey SLIT("GHCerr") SLIT("parError")
+    (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noIdInfo
+
+openAlphaTy = mkTyVarTy openAlphaTyVar
 
 errorTy  :: Type
-errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] (mkTyVarTy openAlphaTyVar))
+errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
 \end{code}
 
 We want \tr{GHCbase.trace} to be wired in
@@ -577,7 +578,7 @@ voidId = pcMiscPrelId voidIdKey gHC_BUILTINS SLIT("void") voidTy noIdInfo
 
 \begin{code}
 buildId
-  = pcMiscPrelId buildIdKey gHC__ SLIT("build") buildTy
+  = pcMiscPrelId buildIdKey SLIT("GHCerr") SLIT("build") buildTy
 	((((noIdInfo
 		{-LATER:`addInfo_UF` mkMagicUnfolding buildIdKey-})
 		`addInfo` mkStrictnessInfo [WwStrict] Nothing)
@@ -622,7 +623,7 @@ mkBuild ty tv c n g expr
 
 \begin{code}
 augmentId
-  = pcMiscPrelId augmentIdKey gHC__ SLIT("augment") augmentTy
+  = pcMiscPrelId augmentIdKey SLIT("GHCerr") SLIT("augment") augmentTy
 	(((noIdInfo
 		{-LATER:`addInfo_UF` mkMagicUnfolding augmentIdKey-})
 		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)

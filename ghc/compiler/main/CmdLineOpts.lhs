@@ -215,6 +215,8 @@ data SimplifierSwitch
 			-- Oops!
 			-- So only use this flag inside List.hs
 			-- (Sigh, what a HACK, Andy.  WDP 96/01)
+
+  | SimplCaseMerge
 \end{code}
 
 %************************************************************************
@@ -406,6 +408,7 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fdo-inline-foldr-build"	    -> SIMPL_SW(SimplDoInlineFoldrBuild)
 	  "-freuse-con"			    -> SIMPL_SW(SimplReuseCon)
 	  "-fcase-of-case"		    -> SIMPL_SW(SimplCaseOfCase)
+	  "-fcase-merge"		    -> SIMPL_SW(SimplCaseMerge)
 	  "-flet-to-case"		    -> SIMPL_SW(SimplLetToCase)
 	  "-fpedantic-bottoms"		    -> SIMPL_SW(SimplPedanticBottoms)
 	  "-fkeep-spec-pragma-ids"	    -> SIMPL_SW(KeepSpecPragmaIds)
@@ -484,11 +487,12 @@ tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(27)
 tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(28)
 tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(29)
 tagOf_SimplSwitch SimplDontFoldBackAppend       = ILIT(30)
+tagOf_SimplSwitch SimplCaseMerge		= ILIT(31)
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
 tagOf_SimplSwitch _ = panic# "tagOf_SimplSwitch"
 
-lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplDontFoldBackAppend)
+lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCaseMerge)
 \end{code}
 
 %************************************************************************

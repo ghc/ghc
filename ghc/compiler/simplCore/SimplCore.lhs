@@ -34,14 +34,14 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), switchIsOn,
 import CoreLint		( lintCoreBindings )
 import CoreSyn
 import CoreUnfold
-import CoreUtils	( substCoreBindings, whnfOrBottom )
+import CoreUtils	( substCoreBindings )
 import ErrUtils		( ghcExit )
 import FiniteMap	( FiniteMap )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
 import Id		( idType, toplevelishId, idWantsToBeINLINEd,
-			  unfoldingUnfriendlyId,
+			  unfoldingUnfriendlyId, isWrapperId,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
 			  lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Outputable-}
@@ -72,7 +72,6 @@ import DefUtils		( deforestable )
 #endif
 
 isWrapperFor = panic "SimplCore.isWrapperFor (ToDo)"
-isWrapperId = panic "SimplCore.isWrapperId (ToDo)"
 \end{code}
 
 \begin{code}

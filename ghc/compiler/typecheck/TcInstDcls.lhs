@@ -80,7 +80,7 @@ import Type		( GenType(..), SYN_IE(ThetaType), mkTyVarTys,
 			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy, mkSigmaTy,
 			  getTyCon_maybe, maybeBoxedPrimType, splitRhoTy, eqTy
 			)
-import TyVar		( GenTyVar, GenTyVarSet(..), mkTyVarSet, unionTyVarSets )
+import TyVar		( GenTyVar, SYN_IE(GenTyVarSet), mkTyVarSet, unionTyVarSets )
 import TysWiredIn	( stringTy )
 import Unique		( Unique )
 import Util		( zipEqual, panic )
