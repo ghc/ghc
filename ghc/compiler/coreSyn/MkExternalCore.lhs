@@ -26,7 +26,6 @@ import IdInfo
 import Id	( idUnfolding )
 import CoreTidy	( tidyExpr )
 import VarEnv	( emptyTidyEnv )
-import TysPrim	( intPrimTy )
 import Literal
 import Name
 import CostCentre
@@ -165,8 +164,8 @@ make_lit :: Literal -> C.Lit
 make_lit l = 
   case l of
     MachChar i | i <= 0xff -> C.Lchar (chr i) t
-    MachChar i | otherwise -> C.Lint (toEnum i) (make_ty intPrimTy)
-	-- For 'big' characters, use an integer
+    MachChar i | otherwise -> C.Lint (toEnum i) t
+	-- For big characters, use an integer literal with a character type sig
     MachStr s -> C.Lstring (unpackFS s) t
     MachNullAddr -> C.Lint 0 t
     MachInt i -> C.Lint i t

@@ -263,6 +263,7 @@ convIntLit :: Integer -> RdrNameHsType -> Literal
 convIntLit i (HsTyVar n)
   | n == intPrimRdrName  = MachInt  i  
   | n == wordPrimRdrName = MachWord i
+  | n == charPrimRdrName = MachChar (fromInteger i)
 convIntLit i aty
   = pprPanic "Unknown integer literal type" (ppr aty $$ ppr intPrimRdrName) 
 
@@ -277,6 +278,7 @@ convRatLit i aty
 wordPrimRdrName, intPrimRdrName, floatPrimRdrName, doublePrimRdrName :: RdrName
 wordPrimRdrName   = nameRdrName wordPrimTyConName
 intPrimRdrName    = nameRdrName intPrimTyConName
+charPrimRdrName   = nameRdrName charPrimTyConName
 floatPrimRdrName  = nameRdrName floatPrimTyConName
 doublePrimRdrName = nameRdrName doublePrimTyConName
 
