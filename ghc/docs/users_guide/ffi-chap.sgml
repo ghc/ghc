@@ -152,6 +152,13 @@ int main(int argc, char *argv[])
 	<para>The functions <literal>startupHaskell()</literal> and
 	<literal>shutdownHaskell()</literal> may be called only once
 	each, and only in that order.</para>
+
+	<para>NOTE: when linking the final program, it is normally
+	easiest to do the link using GHC, although this isn't
+	essential.  If you do use GHC, then don't forget the flag
+	<option>-no-hs-main</option><indexterm><primary><option>-no-hs-main</option></primary>
+	  </indexterm>, otherwise GHC will try to link
+	to the <literal>Main</literal> Haskell module.</para>
       </sect3>
 
       <sect3 id="foreign-export-dynamic-ghc">
