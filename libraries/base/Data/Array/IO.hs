@@ -141,7 +141,9 @@ hGetArray
 		-- if the end of file was reached.
 
 hGetArray handle (IOUArray (STUArray l u ptr)) count
-  | count <= 0 || count > rangeSize (l,u)
+  | count == 0
+  = return 0
+  | count < 0 || count > rangeSize (l,u)
   = illegalBufferSize handle "hGetArray" count
   | otherwise = do
       wantReadableHandle "hGetArray" handle $ 
@@ -191,7 +193,9 @@ hPutArray
 	-> IO ()
 
 hPutArray handle (IOUArray (STUArray l u raw)) count
-  | count <= 0 || count > rangeSize (l,u)
+  | count == 0
+  = return ()
+  | count < 0 || count > rangeSize (l,u)
   = illegalBufferSize handle "hPutArray" count
   | otherwise
    = do wantWritableHandle "hPutArray" handle $ 
