@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.120 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: GC.c,v 1.121 2001/08/17 15:46:54 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -848,8 +848,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
      */
     blocks = g0s0->n_to_blocks;
 
-    if ( blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
-	 RtsFlags.GcFlags.maxHeapSize ) {
+    if ( RtsFlags.GcFlags.maxHeapSize != 0 &&
+	 blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
+	   RtsFlags.GcFlags.maxHeapSize ) {
       long adjusted_blocks;  // signed on purpose 
       int pc_free; 
       
