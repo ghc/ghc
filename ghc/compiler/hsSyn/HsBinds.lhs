@@ -15,20 +15,15 @@ import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSs, GRHSs )
 
 -- friends:
 import HsTypes		( HsType )
-import HsImpExp		( IE(..), ieName )
 import CoreSyn		( CoreExpr )
-import PprCore		()	   -- Instances for Outputable
 
 --others:
-import Id		( Id )
 import Name		( Name, isUnboundName )
 import NameSet		( NameSet, elemNameSet, nameSetToList )
 import BasicTypes	( RecFlag(..), Fixity )
 import Outputable	
-import Bag
 import SrcLoc		( SrcLoc )
 import Var		( TyVar )
-import Util		( thenCmp )
 \end{code}
 
 %************************************************************************

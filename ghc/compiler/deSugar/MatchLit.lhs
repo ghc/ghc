@@ -12,7 +12,6 @@ import {-# SOURCE #-} Match  ( match )
 import {-# SOURCE #-} DsExpr ( dsExpr )
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..) )
-import TcHsSyn		( TypecheckedHsExpr, TypecheckedPat )
 import CoreSyn		( Expr(..), Bind(..) )
 import Id		( Id )
 
@@ -20,7 +19,6 @@ import DsMonad
 import DsUtils
 
 import Literal		( mkMachInt, Literal(..) )
-import PrimRep          ( PrimRep(IntRep) )
 import Maybes		( catMaybes )
 import Type		( Type, isUnLiftedType )
 import Panic		( panic, assertPanic )

@@ -18,7 +18,6 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
 			  TypecheckedStmt
 			)
 import CoreSyn
-import PprCore		( {- instance Outputable Expr -} )
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
 import DsMonad
@@ -32,26 +31,23 @@ import DsUtils		( mkErrorAppDs, mkDsLets, mkStringLit, mkStringLitFS,
 import Match		( matchWrapper, matchSimply )
 
 import CostCentre	( mkUserCC )
-import FieldLabel	( FieldLabel )
 import Id		( Id, idType, recordSelectorFieldLabel )
-import PrelInfo		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID )
+import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConTyCon, dataConArgTys, dataConFieldLabels )
-import TyCon		( isNewTyCon )
 import DataCon		( isExistentialDataCon )
 import Literal		( Literal(..), inIntRange )
-import Type		( splitFunTys, mkTyConApp,
+import Type		( splitFunTys,
 			  splitAlgTyConApp, splitAlgTyConApp_maybe, splitTyConApp_maybe, 
 			  isNotUsgTy, unUsgTy,
 			  splitAppTy, isUnLiftedType, Type
 			)
-import TysWiredIn	( tupleCon, 
-			  listTyCon, mkListTy,
+import TysWiredIn	( tupleCon, listTyCon,
 			  charDataCon, charTy, stringTy,
 			  smallIntegerDataCon, isIntegerTy
 			)
 import BasicTypes	( RecFlag(..), Boxity(..) )
 import Maybes		( maybeToBool )
-import Unique		( Uniquable(..), hasKey, ratioTyConKey, addr2IntegerIdKey )
+import Unique		( hasKey, ratioTyConKey, addr2IntegerIdKey )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
 

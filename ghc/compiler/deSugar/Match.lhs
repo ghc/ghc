@@ -8,8 +8,6 @@ module Match ( match, matchExport, matchWrapper, matchSimply, matchSinglePat ) w
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr  ( dsExpr, dsLet  )
-
 import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappingPatterns,
 			  opt_WarnSimplePatterns
      			)
@@ -27,18 +25,8 @@ import DataCon		( dataConFieldLabels, dataConArgTys )
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 import PrelInfo		( pAT_ERROR_ID )
-import Type		( isUnLiftedType, splitAlgTyConApp,
-			  mkTyVarTys, Type
-			)
-import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
-			  addrPrimTy, wordPrimTy
-			)
-import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
-			  charTy, charDataCon, intTy, intDataCon,
-			  floatTy, floatDataCon, doubleTy, tupleCon,
-			  doubleDataCon, addrTy,
-			  addrDataCon, wordTy, wordDataCon
-			)
+import Type		( splitAlgTyConApp, mkTyVarTys, Type )
+import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy, tupleCon )
 import BasicTypes	( Boxity(..) )
 import UniqSet
 import ErrUtils		( addErrLocHdrLine, dontAddErrLoc )

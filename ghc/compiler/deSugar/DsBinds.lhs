@@ -24,14 +24,12 @@ import DsGRHSs		( dsGuarded )
 import DsUtils
 import Match		( matchWrapper )
 
-import BasicTypes       ( RecFlag(..) )
 import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs, 
 			  opt_AutoSccsOnExportedToplevs, opt_AutoSccsOnDicts
 		        )
 import CostCentre	( CostCentre, mkAutoCC, IsCafCC(..) )
 import Id		( idType, idName, isUserExportedId, isSpecPragmaId, Id )
 import NameSet
-import VarEnv
 import VarSet
 import Type		( mkTyVarTy, isDictTy )
 import Subst		( mkTyVarSubst, substTy )

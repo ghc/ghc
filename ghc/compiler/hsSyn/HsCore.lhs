@@ -38,19 +38,18 @@ import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo,
 			  pprInlinePragInfo, ppArityInfo, ppStrictnessInfo
 			)
 import RdrName		( RdrName )
-import Name		( Name, toRdrName )
+import Name		( toRdrName )
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import PrimOp		( PrimOp(CCallOp) )
-import Demand		( Demand, StrictnessInfo )
+import Demand		( StrictnessInfo )
 import Literal		( Literal, maybeLitLit )
 import PrimOp		( CCall, pprCCallOp )
 import DataCon		( dataConTyCon )
 import TyCon		( isTupleTyCon, tupleTyConBoxity )
-import Type		( Type, Kind )
+import Type		( Kind )
 import CostCentre
 import SrcLoc		( SrcLoc )
-import BasicTypes	( Arity )
 import Outputable
 \end{code}
 

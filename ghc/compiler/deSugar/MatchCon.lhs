@@ -1,4 +1,4 @@
-%
+
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[MatchCon]{Pattern-matching constructors}
@@ -19,8 +19,7 @@ import Id		( Id )
 import CoreSyn
 import Type		( mkTyVarTys )
 import Util		( equivClassesByUniq )
-import Unique		( Uniquable(..), Unique )
-import Outputable
+import Unique		( Uniquable(..) )
 \end{code}
 
 We are confronted with the first column of patterns in a set of

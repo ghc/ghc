@@ -10,7 +10,7 @@ module Desugar ( deSugar ) where
 
 import CmdLineOpts	( opt_D_dump_ds )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), HsExpr(..), HsBinds(..), MonoBinds(..) )
-import TcHsSyn		( TypecheckedMonoBinds, TypecheckedForeignDecl, TypecheckedRuleDecl )
+import TcHsSyn		( TypecheckedRuleDecl )
 import TcModule		( TcResults(..) )
 import CoreSyn
 import Rules		( ProtoCoreRule(..), pprProtoCoreRule )
@@ -19,20 +19,17 @@ import DsMonad
 import DsExpr		( dsExpr )
 import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsForeign	( dsForeigns )
-import DsUtils
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-import Module		( Module, moduleString )
-import Id		( Id )
-import Name		( isLocallyDefined )
+import Module		( Module )
 import VarEnv
 import VarSet
-import Bag		( isEmptyBag, unionBags )
+import Bag		( isEmptyBag )
 import CmdLineOpts	( opt_SccProfilingOn )
 import CoreLint		( beginPass, endPass )
 import ErrUtils		( doIfSet, pprBagOfWarnings )
 import Outputable
-import UniqSupply	( splitUniqSupply, UniqSupply )
+import UniqSupply	( UniqSupply )
 \end{code}
 
 %************************************************************************

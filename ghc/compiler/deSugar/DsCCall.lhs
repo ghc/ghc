@@ -17,34 +17,31 @@ module DsCCall
 import CoreSyn
 
 import DsMonad
-import DsUtils
 
 import CoreUtils	( exprType, mkCoerce )
-import Id		( Id, mkWildId )
+import Id		( mkWildId )
 import MkId		( mkCCallOpId, realWorldPrimId )
 import Maybes		( maybeToBool )
-import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
-import DataCon		( DataCon, splitProductType_maybe, dataConSourceArity, dataConWrapId )
+import PrimOp		( CCall(..), CCallTarget(..) )
+import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
 import CallConv
 import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, 
 			  isNewType, repType, isUnLiftedType, mkFunTy, mkTyConApp,
 			  Type
 			)
-import PprType		( {- instance Outputable Type -} )
-import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
+import TysPrim		( realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon, intPrimTy
 			)
-import TysWiredIn	( unitDataConId, stringTy,
+import TysWiredIn	( unitDataConId,
 			  unboxedSingletonDataCon, unboxedPairDataCon,
 			  unboxedSingletonTyCon, unboxedPairTyCon,
-			  mkTupleTy, tupleCon,
-			  boolTy, trueDataCon, falseDataCon, trueDataConId, falseDataConId,
-			  unitTy
+			  boolTy, trueDataCon, falseDataCon, 
+			  trueDataConId, falseDataConId, unitTy
 			)
 import Literal		( mkMachInt )
 import CStrings		( CLabelString )
-import Unique		( Unique, Uniquable(..), hasKey, ioTyConKey )
+import Unique		( Unique, hasKey, ioTyConKey )
 import VarSet		( varSetElems )
 import Outputable
 \end{code}

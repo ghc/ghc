@@ -30,17 +30,14 @@ import HsCore		( UfExpr(UfVar), UfBinder, IfaceSig(..), eq_ufBinders, eq_ufExpr,
 import CoreSyn		( CoreRule(..) )
 import BasicTypes	( Fixity, NewOrData(..) )
 import CallConv		( CallConv, pprCallConv )
-import Var		( TyVar, Id )
 import Name		( toRdrName )
 
 -- others:
-import PprType
 import FunDeps		( pprFundeps )
 import Class		( FunDep )
 import CStrings		( CLabelString, pprCLabelString )
 import Outputable	
 import SrcLoc		( SrcLoc, noSrcLoc )
-import Util
 \end{code}
 
 

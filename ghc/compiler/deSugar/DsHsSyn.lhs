@@ -16,7 +16,6 @@ import Id		( idType, Id )
 import Type             ( Type )
 import TysWiredIn	( mkListTy, mkTupleTy, unitTy )
 import BasicTypes	( Boxity(..) )
-import Panic		( panic )
 \end{code}
 
 Note: If @outPatType@ doesn't bear a strong resemblance to @exprType@,

@@ -25,14 +25,11 @@ module DsMonad (
 
 #include "HsVersions.h"
 
-import Bag		( emptyBag, snocBag, bagToList, Bag )
-import ErrUtils 	( WarnMsg, pprBagOfErrors )
-import HsSyn		( OutPat )
+import Bag		( emptyBag, snocBag, Bag )
+import ErrUtils 	( WarnMsg )
 import Id		( mkSysLocal, setIdUnique, Id )
 import Module		( Module )
-import Name		( Name, maybeWiredInIdName )
 import Var		( TyVar, setTyVarUnique )
-import VarEnv
 import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
 import TcHsSyn		( TypecheckedPat )

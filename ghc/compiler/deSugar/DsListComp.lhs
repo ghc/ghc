@@ -10,8 +10,8 @@ module DsListComp ( dsListComp ) where
 
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
-import HsSyn		( Stmt(..), HsExpr )
-import TcHsSyn		( TypecheckedStmt, TypecheckedHsExpr )
+import HsSyn		( Stmt(..) )
+import TcHsSyn		( TypecheckedStmt )
 import DsHsSyn		( outPatType )
 import CoreSyn
 
@@ -21,13 +21,12 @@ import DsUtils
 import CmdLineOpts	( opt_FoldrBuildOn )
 import CoreUtils	( exprType, mkIfThenElse )
 import Id		( idType )
-import Var              ( Id, TyVar )
-import Type		( mkTyVarTy, mkForAllTy, mkFunTys, mkFunTy, Type )
-import TysPrim		( alphaTyVar, alphaTy )
-import TysWiredIn	( nilDataCon, consDataCon, listTyCon )
+import Var              ( Id )
+import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type )
+import TysPrim		( alphaTyVar )
+import TysWiredIn	( nilDataCon, consDataCon )
 import Match		( matchSimply )
 import Unique		( foldrIdKey, buildIdKey )
-import Outputable
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''
