@@ -1,8 +1,9 @@
 import Foreign
 import Monad
+import Addr
 
 newtype XPtr a = XPtr Addr
-unXPtr (XPtr x) = x
+unXPtr (XPtr (A# x)) = x
 
 type CInt  = Int32
 type CSize = Word32
