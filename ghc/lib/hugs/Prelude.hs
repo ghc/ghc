@@ -419,11 +419,10 @@ f =<< x           = x >>= f
 -- Evaluation and strictness ------------------------------------------------
 
 seq           :: a -> b -> b
-seq x y       =  --case primForce x of () -> y
-                 primSeq x y
+seq x y       =  primSeq x y
 
 ($!)          :: (a -> b) -> a -> b
-f $! x        =  x `seq` f x
+f $! x        =  x `primSeq` f x
 
 -- Trivial type -------------------------------------------------------------
 
@@ -1095,16 +1094,26 @@ null (_:_)        = False
 (x:xs) ++ ys      = x : (xs ++ ys)
 
 map              :: (a -> b) -> [a] -> [b]
-map f xs          = [ f x | x <- xs ]
+--map f xs          = [ f x | x <- xs ]
+map f []     = []
+map f (x:xs) = f x : map f xs
+
 
 filter           :: (a -> Bool) -> [a] -> [a]
-filter p xs       = [ x | x <- xs, p x ]
+--filter p xs       = [ x | x <- xs, p x ]
+filter p [] = []
+filter p (x:xs) = if p x then x : filter p xs else filter p xs
+
 
 concat           :: [[a]] -> [a]
-concat            = foldr (++) []
+--concat            = foldr (++) []
+concat []       = []
+concat (xs:xss) = xs ++ concat xss
 
 length           :: [a] -> Int
-length            = foldl' (\n _ -> n + 1) 0
+--length            = foldl' (\n _ -> n + 1) 0
+length []     = 0
+length (x:xs) = let n = length xs in primSeq n (1+n)
 
 (!!)             :: [b] -> Int -> b
 (x:_)  !! 0       = x
@@ -1220,19 +1229,34 @@ unwords [] = []
 unwords ws = foldr1 (\w s -> w ++ ' ':s) ws
 
 reverse   :: [a] -> [a]
-reverse    = foldl (flip (:)) []
+--reverse    = foldl (flip (:)) []
+reverse xs = ri [] xs
+             where ri acc []     = acc
+                   ri acc (x:xs) = ri (x:acc) xs
 
 and, or   :: [Bool] -> Bool
-and        = foldr (&&) True
-or         = foldr (||) False
+--and        = foldr (&&) True
+--or         = foldr (||) False
+and []     = True
+and (x:xs) = if x then and xs else x
+or  []     = False
+or  (x:xs) = if x then x else or xs
 
 any, all  :: (a -> Bool) -> [a] -> Bool
-any p      = or  . map p
-all p      = and . map p
+--any p      = or  . map p
+--all p      = and . map p
+any p []     = False
+any p (x:xs) = if p x then True else any p xs
+all p []     = True
+all p (x:xs) = if p x then all p xs else False
 
 elem, notElem    :: Eq a => a -> [a] -> Bool
-elem              = any . (==)
-notElem           = all . (/=)
+--elem              = any . (==)
+--notElem           = all . (/=)
+elem x []        = False
+elem x (y:ys)    = if x==y then True else elem x ys
+notElem x []     = True
+notElem x (y:ys) = if x==y then False else notElem x ys
 
 lookup           :: Eq a => a -> [(a,b)] -> Maybe b
 lookup k []       = Nothing
