@@ -10,7 +10,7 @@ module SimplUtils (
 
 	floatExposesHNF,
 
-	etaCoreExpr,
+	etaCoreExpr, mkRhsTyLam,
 
 	etaExpandCount,
 
@@ -18,7 +18,7 @@ module SimplUtils (
 
 	simplIdWantsToBeINLINEd,
 
-	type_ok_for_let_to_case
+	singleConstructorType, typeOkForCase
     ) where
 
 IMP_Ubiq(){-uitous-}
@@ -27,17 +27,20 @@ IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
 import BinderInfo
 import CmdLineOpts	( opt_DoEtaReduction, SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( SimpleUnfolding, mkFormSummary, FormSummary(..) )
-import Id		( idType, isBottomingId, idWantsToBeINLINEd, dataConArgTys,
+import CoreUnfold	( SimpleUnfolding, mkFormSummary, exprIsTrivial, FormSummary(..) )
+import Id		( idType, isBottomingId, addInlinePragma, addIdDemandInfo,
+			  idWantsToBeINLINEd, dataConArgTys, SYN_IE(Id),
 			  getIdArity, GenId{-instance Eq-}
 			)
-import IdInfo		( ArityInfo(..) )
+import IdInfo		( ArityInfo(..), DemandInfo )
 import Maybes		( maybeToBool )
 import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
-import Type		( tyVarsOfType, isPrimType, maybeAppDataTyConExpandingDicts )
+import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, isPrimType, 
+			  maybeAppDataTyConExpandingDicts, SYN_IE(Type)
+			)
 import TysWiredIn	( realWorldStateTy )
 import TyVar		( elementOfTyVarSet,
 			  GenTyVar{-instance Eq-} )
@@ -101,6 +104,100 @@ floatExposesHNF float_lets float_primops ok_to_dup rhs
 
     try_deflt NoDefault           = False
     try_deflt (BindDefault _ rhs) = try rhs
+\end{code}
+
+
+Local tyvar-lifting
+~~~~~~~~~~~~~~~~~~~
+mkRhsTyLam tries this transformation, when the big lambda appears as
+the RHS of a let(rec) binding:
+
+	/\abc -> let(rec) x = e in b
+   ==>
+	let(rec) x' = /\abc -> let x = x' a b c in e
+	in 
+	/\abc -> let x = x' a b c in b
+
+This is good because it can turn things like:
+
+	let f = /\a -> letrec g = ... g ... in g
+into
+	letrec g' = /\a -> ... g' a ...
+	in
+	let f = /\ a -> f a
+
+which is better.  In effect, it means that big lambdas don't impede
+let-floating.
+
+This optimisation is CRUCIAL in eliminating the junk introduced by
+desugaring mutually recursive definitions.  Don't eliminate it lightly!
+
+So far as the implemtation is concerned:
+
+	Invariant: go F e = /\tvs -> F e
+	
+	Equalities:
+		go F (Let x=e in b)
+		= Let x' = /\tvs -> F e 
+		  in 
+		  go G b
+		where
+		    G = F . Let x = x' tvs
+	
+		go F (Letrec xi=ei in b)
+		= Letrec {xi' = /\tvs -> G ei} 
+		  in
+		  go G b
+		where
+		  G = F . Let {xi = xi' tvs}
+
+\begin{code}
+mkRhsTyLam [] body = returnSmpl body
+
+mkRhsTyLam tyvars body
+  = go (\x -> x) body
+  where
+    tyvar_tys = mkTyVarTys tyvars
+
+    go fn (Let bind@(NonRec var rhs) body) | exprIsTrivial rhs
+      = go (fn . Let bind) body
+
+    go fn (Let bind@(NonRec var rhs) body)
+      = mk_poly var				`thenSmpl` \ (var', rhs') ->
+	go (fn . Let (mk_silly_bind var rhs')) body	`thenSmpl` \ body' ->
+	returnSmpl (Let (NonRec var' (mkTyLam tyvars (fn rhs))) body')
+
+    go fn (Let (Rec prs) body)
+       = mapAndUnzipSmpl mk_poly vars		`thenSmpl` \ (vars', rhss') ->
+	 let
+	    gn body = fn $ foldr Let body (zipWith mk_silly_bind vars rhss')
+	 in
+	 go gn body				`thenSmpl` \ body' ->
+	 returnSmpl (Let (Rec (vars' `zip` [mkTyLam tyvars (gn rhs) | rhs <- rhss])) body')
+       where
+	 (vars,rhss) = unzip prs
+
+    go fn body = returnSmpl (mkTyLam tyvars (fn body))
+
+    mk_poly var
+      = newId (mkForAllTys tyvars (idType var))	`thenSmpl` \ poly_id ->
+	returnSmpl (poly_id, mkTyApp (Var poly_id) tyvar_tys)
+
+    mk_silly_bind var rhs = NonRec (addInlinePragma var) rhs
+		-- The addInlinePragma is really important!  If we don't say 
+		-- INLINE on these silly little bindings then look what happens!
+		-- Suppose we start with:
+		--
+		--	x = let g = /\a -> \x -> f x x
+		--	    in 
+		--	    /\ b -> let g* = g b in E
+		--
+		-- Then: 	* the binding for g gets floated out
+		-- 		* but then it gets inlined into the rhs of g*
+		--		* then the binding for g* is floated out of the /\b
+		--		* so we're back to square one
+		-- The silly binding for g* must be INLINE, so that no inlining
+		-- will happen in its RHS.
 \end{code}
 
 Eta reduction
@@ -336,15 +433,11 @@ if there's many, or if it's a primitive type.
 
 \begin{code}
 mkIdentityAlts
-	:: Type		-- type of RHS
+	:: Type			-- type of RHS
+	-> DemandInfo		-- Appropriate demand info
 	-> SmplM InAlts		-- result
 
-mkIdentityAlts rhs_ty
-  | isPrimType rhs_ty
-  = newId rhs_ty	`thenSmpl` \ binder ->
-    returnSmpl (PrimAlts [] (BindDefault (binder, bad_occ_info) (Var binder)))
-
-  | otherwise
+mkIdentityAlts rhs_ty demand_info
   = case (maybeAppDataTyConExpandingDicts rhs_ty) of
 	Just (tycon, ty_args, [data_con]) ->  -- algebraic type suitable for unpacking
 	    let
@@ -360,32 +453,78 @@ mkIdentityAlts rhs_ty
 		NoDefault
 	    )
 
-	_ -> -- Multi-constructor or abstract algebraic type
-	     newId rhs_ty	`thenSmpl` \ binder ->
-    	     returnSmpl (AlgAlts [] (BindDefault (binder,bad_occ_info) (Var binder)))
+	_ -> panic "mkIdentityAlts"	-- Should never happen; only called for single-constructor types
   where
     bad_occ_info = ManyOcc 0	-- Non-committal!
+
+
+{-		SHOULD NEVER HAPPEN 
+  | isPrimType rhs_ty
+  = newId rhs_ty	`thenSmpl` \ binder ->
+    let
+	binder_w_info = binder `addIdDemandInfo` demand_info
+	-- It's occasionally really worth adding the right demand info.  Consider
+	-- 	let x = E in B
+	-- where x is sure to be demanded in B
+	-- We will transform to:
+	--	case E of x -> B
+	-- Now suppose that E simplifies to just y; we get
+	--	case y of x -> B
+	-- Because x is sure to be demanded, we can eliminate the case
+	-- even if pedantic-bottoms is on; but we need to have the right
+	-- demand-info on the default branch of the case.  That's what
+	-- we are doing here.
+    in
+    returnSmpl (PrimAlts [] (BindDefault (binder, bad_occ_info) (Var binder)))
+-}
 \end{code}
 
 \begin{code}
 simplIdWantsToBeINLINEd :: Id -> SimplEnv -> Bool
 
 simplIdWantsToBeINLINEd id env
-  = if switchIsSet env IgnoreINLINEPragma
+  = {-	We used to arrange that in the final simplification pass we'd switch
+	off all INLINE pragmas, so that we'd inline workers back into the
+	body of their wrapper if the wrapper hadn't itself been inlined by then.
+	This occurred especially for methods in dictionaries.
+
+	We no longer do this:
+		a) there's a good chance that the exported wrapper will get
+		inlined in some importing scope, in which case we don't 
+		want to lose the w/w idea.
+
+		b) The occurrence analyser must agree about what has an
+		INLINE pragma.  Not hard, but delicate.
+	
+		c) if the worker gets inlined we have to tell the wrapepr
+		that it's no longer a wrapper, else the interface file stuff
+		asks for a worker that no longer exists.
+		  
+    if switchIsSet env IgnoreINLINEPragma
     then False
-    else idWantsToBeINLINEd id
+    else 
+    -}
+
+    idWantsToBeINLINEd id
 
 idMinArity id = case getIdArity id of
 			UnknownArity   -> 0
 			ArityAtLeast n -> n
 			ArityExactly n -> n
 
-type_ok_for_let_to_case :: Type -> Bool
+singleConstructorType :: Type -> Bool
+singleConstructorType ty
+  = case (maybeAppDataTyConExpandingDicts ty) of
+      Just (tycon, ty_args, [con]) -> True
+      other			   -> False
 
-type_ok_for_let_to_case ty
+typeOkForCase :: Type -> Bool
+typeOkForCase ty
   = case (maybeAppDataTyConExpandingDicts ty) of
       Nothing                                   -> False
       Just (tycon, ty_args, [])                 -> False
       Just (tycon, ty_args, non_null_data_cons) -> True
-      -- Null data cons => type is abstract
+      -- Null data cons => type is abstract, which code gen can't 
+      -- currently handle.  (ToDo: when return-in-heap is universal we
+      -- don't need to worry about this.)
 \end{code}
