@@ -14,5 +14,19 @@
 
 TEST_TOP := $(TOP)
 TOP := $(TOP)/..
+
 include $(TOP)/mk/boilerplate.mk
 TOP:=$(TEST_TOP)
+
+# By default, we're testing the GHC in the build tree.
+HC=$(GHC_INPLACE)
+
+# -----------------------------------------------------------------
+# Everything after this point
+# augments or overrides previously set variables.
+# -----------------------------------------------------------------
+
+-include $(TOP)/mk/paths.mk
+-include $(TOP)/mk/opts.mk
+-include $(TOP)/mk/version.mk
+-include $(TOP)/mk/suffix.mk
