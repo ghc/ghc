@@ -6,20 +6,43 @@
 tcname = mkTyCon str; \
 instance Typeable tycon where { typeOf _ = mkAppTy tcname [] }
 
+#ifdef __GLASGOW_HASKELL__
+
 #define INSTANCE_TYPEABLE1(tycon,tcname,str) \
 tcname = mkTyCon str; \
-instance Typeable a => Typeable (tycon a) where { \
-  typeOf x = mkAppTy tcname [typeOf ((undefined :: tycon a -> a) x) ] }
+instance Typeable1 tycon where { typeOf1 _ = mkAppTy tcname [] }
 
 #define INSTANCE_TYPEABLE2(tycon,tcname,str) \
 tcname = mkTyCon str; \
-instance (Typeable a, Typeable b) => Typeable (tycon a b) where { \
-  typeOf x = mkAppTy tcname [typeOf ((undefined :: tycon a b -> a) x), \
-			     typeOf ((undefined :: tycon a b -> b) x)] }
+instance Typeable2 tycon where { typeOf2 _ = mkAppTy tcname [] }
 
 #define INSTANCE_TYPEABLE3(tycon,tcname,str) \
 tcname = mkTyCon str; \
-instance (Typeable a, Typeable b, Typeable c) => Typeable (tycon a b c) where {\
-  typeOf a = mkAppTy tcname [typeOf ((undefined :: tycon a b c -> a) a), \
-			     typeOf ((undefined :: tycon a b c -> b) a), \
-			     typeOf ((undefined :: tycon a b c -> c) a)] }
+instance Typeable3 tycon where { typeOf3 _ = mkAppTy tcname [] }
+
+#else /* !__GLASGOW_HASKELL__ */
+
+#define INSTANCE_TYPEABLE1(tycon,tcname,str) \
+tcname = mkTyCon str; \
+instance Typeable1 tycon where { typeOf1 _ = mkAppTy tcname [] }; \
+instance Typeable a => Typeable (tycon a) where { typeOf = typeOfDefault }
+
+#define INSTANCE_TYPEABLE2(tycon,tcname,str) \
+tcname = mkTyCon str; \
+instance Typeable2 tycon where { typeOf2 _ = mkAppTy tcname [] }; \
+instance Typeable a => Typeable1 (tycon a) where { \
+  typeOf1 = typeOf1Default }; \
+instance (Typeable a, Typeable b) => Typeable (tycon a b) where { \
+  typeOf = typeOfDefault }
+
+#define INSTANCE_TYPEABLE3(tycon,tcname,str) \
+tcname = mkTyCon str; \
+instance Typeable3 tycon where { typeOf3 _ = mkAppTy tcname [] }; \
+instance Typeable a => Typeable2 (tycon a) where { \
+  typeOf2 = typeOf2Default }; \
+instance (Typeable a, Typeable b) => Typeable1 (tycon a b) where { \
+  typeOf1 = typeOf1Default }; \
+instance (Typeable a, Typeable b, Typeable c) => Typeable (tycon a b c) where { \
+  typeOf = typeOfDefault }
+
+#endif /* !__GLASGOW_HASKELL__ */

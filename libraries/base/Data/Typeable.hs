@@ -55,7 +55,16 @@ module Data.Typeable
 	Typeable6( typeOf6 ),	-- :: t a b c d e f -> TypeRep
 	Typeable7( typeOf7 ),	-- :: t a b c d e f g -> TypeRep
 	gcast1,			-- :: ... => c (t a) -> Maybe (c (t' a))
-	gcast2			-- :: ... => c (t a b) -> Maybe (c (t' a b))
+	gcast2,			-- :: ... => c (t a b) -> Maybe (c (t' a b))
+
+	-- * Default instances
+	typeOfDefault,	-- :: (Typeable1 t, Typeable a) => t a -> TypeRep
+	typeOf1Default,	-- :: (Typeable2 t, Typeable a) => t a b -> TypeRep
+	typeOf2Default,	-- :: (Typeable2 t, Typeable a) => t a b c -> TypeRep
+	typeOf3Default,	-- :: (Typeable2 t, Typeable a) => t a b c d -> TypeRep
+	typeOf4Default,	-- :: (Typeable2 t, Typeable a) => t a b c d e -> TypeRep
+	typeOf5Default,	-- :: (Typeable2 t, Typeable a) => t a b c d e f -> TypeRep
+	typeOf6Default	-- :: (Typeable2 t, Typeable a) => t a b c d e f g -> TypeRep
 
   ) where
 
@@ -145,11 +154,6 @@ mkAppTy tc@(TyCon tc_k _) args
   = TypeRep (appKeys tc_k arg_ks) tc args
   where
     arg_ks = [k | TypeRep k _ _ <- args]
-
-
--- The function type constructor
-funTc :: TyCon
-funTc = mkTyCon "->"
 
 
 -- | A special case of 'mkAppTy', which applies the function 
@@ -277,38 +281,22 @@ class Typeable a where
   -- any instance of 'Typeable', so that it is safe to pass 'undefined' as
   -- the argument.
 
--- HACK HACK HACK
-#ifdef __HUGS__
-#define INSTANCE_TYPEABLE1x(tycon,tcname,str) \
-instance Typeable a => Typeable (tycon a) where { \
-  typeOf x = mkAppTy tcname [typeOf ((undefined :: tycon a -> a) x) ] }
-#define INSTANCE_TYPEABLE2x(tycon,tcname,str) \
-instance (Typeable a, Typeable b) => Typeable (tycon a b) where { \
-  typeOf x = mkAppTy tcname [typeOf ((undefined :: tycon a b -> a) x), \
-			     typeOf ((undefined :: tycon a b -> b) x)] }
-
-INSTANCE_TYPEABLE1x(Ratio,ratioTc,"Ratio")
-INSTANCE_TYPEABLE2x(Either,eitherTc,"Either")
-INSTANCE_TYPEABLE1(IO,ioTc,"IO")
-INSTANCE_TYPEABLE1x(Maybe,maybeTc,"Maybe")
-INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
-INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
-INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
-#endif
-
 -- | Variant for unary type constructors
 class Typeable1 t where
   typeOf1 :: t a -> TypeRep
 
+-- | For defining a 'Typeable' instance from any 'Typeable1' instance.
+typeOfDefault :: (Typeable1 t, Typeable a) => t a -> TypeRep
+typeOfDefault x = typeOf1 x `popStarTy` typeOf (argType x)
+ where
+   argType :: t a -> a
+   argType =  undefined
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 -- | One Typeable instance for all Typeable1 instances
 instance (Typeable1 s, Typeable a)
        => Typeable (s a) where
-  typeOf x = typeOf1 x `popStarTy` typeOf (argType x)
-   where
-     argType :: t x -> x
-     argType =  undefined
+  typeOf = typeOfDefault
 #endif
 
 
@@ -316,15 +304,19 @@ instance (Typeable1 s, Typeable a)
 class Typeable2 t where
   typeOf2 :: t a b -> TypeRep
 
+-- | For defining a 'Typeable1' instance from any 'Typeable2' instance.
+typeOf1Default :: (Typeable2 t, Typeable a) => t a b -> TypeRep
+typeOf1Default x = typeOf2 x `popStarTy` typeOf (argType x)
+ where
+   argType :: t a b -> a
+   argType =  undefined
 
-#ifndef __HUGS__
+
+#ifdef __GLASGOW_HASKELL__
 -- | One Typeable1 instance for all Typeable2 instances
 instance (Typeable2 s, Typeable a)
        => Typeable1 (s a) where
-  typeOf1 x = typeOf2 x `popStarTy` typeOf (argType x)
-   where
-     argType :: t x y -> x
-     argType =  undefined
+  typeOf1 = typeOf1Default
 #endif
 
 
@@ -332,15 +324,19 @@ instance (Typeable2 s, Typeable a)
 class Typeable3 t where
   typeOf3 :: t a b c -> TypeRep
 
+-- | For defining a 'Typeable2' instance from any 'Typeable3' instance.
+typeOf2Default :: (Typeable3 t, Typeable a) => t a b c -> TypeRep
+typeOf2Default x = typeOf3 x `popStarTy` typeOf (argType x)
+ where
+   argType :: t a b c -> a
+   argType =  undefined
 
-#ifndef __HUGS__
+
+#ifdef __GLASGOW_HASKELL__
 -- | One Typeable2 instance for all Typeable3 instances
 instance (Typeable3 s, Typeable a)
        => Typeable2 (s a) where
-  typeOf2 x = typeOf3 x `popStarTy` typeOf (argType x)
-   where
-     argType :: t x y z -> x
-     argType =  undefined
+  typeOf2 = typeOf2Default
 #endif
 
 
@@ -348,15 +344,19 @@ instance (Typeable3 s, Typeable a)
 class Typeable4 t where
   typeOf4 :: t a b c d -> TypeRep
 
+-- | For defining a 'Typeable3' instance from any 'Typeable4' instance.
+typeOf3Default :: (Typeable4 t, Typeable a) => t a b c d -> TypeRep
+typeOf3Default x = typeOf4 x `popStarTy` typeOf (argType x)
+ where
+   argType :: t a b c d -> a
+   argType =  undefined
 
-#ifndef __HUGS__
+
+#ifdef __GLASGOW_HASKELL__
 -- | One Typeable3 instance for all Typeable4 instances
 instance (Typeable4 s, Typeable a)
        => Typeable3 (s a) where
-  typeOf3 x = typeOf4 x `popStarTy` typeOf (argType x)
-   where
-     argType :: t x y z z' -> x
-     argType =  undefined
+  typeOf3 = typeOf3Default
 #endif
 
 
@@ -364,15 +364,19 @@ instance (Typeable4 s, Typeable a)
 class Typeable5 t where
   typeOf5 :: t a b c d e -> TypeRep
 
+-- | For defining a 'Typeable4' instance from any 'Typeable5' instance.
+typeOf4Default :: (Typeable5 t, Typeable a) => t a b c d e -> TypeRep
+typeOf4Default x = typeOf5 x `popStarTy` typeOf (argType x)
+ where
+   argType :: t a b c d e -> a
+   argType =  undefined
 
-#ifndef __HUGS__
+
+#ifdef __GLASGOW_HASKELL__
 -- | One Typeable4 instance for all Typeable5 instances
 instance (Typeable5 s, Typeable a)
        => Typeable4 (s a) where
-  typeOf4 x = typeOf5 x `popStarTy` typeOf (argType x)
-   where
-     argType :: t x y z z' z'' -> x
-     argType =  undefined
+  typeOf4 = typeOf4Default
 #endif
 
 
@@ -380,15 +384,19 @@ instance (Typeable5 s, Typeable a)
 class Typeable6 t where
   typeOf6 :: t a b c d e f -> TypeRep
 
+-- | For defining a 'Typeable5' instance from any 'Typeable6' instance.
+typeOf5Default :: (Typeable6 t, Typeable a) => t a b c d e f -> TypeRep
+typeOf5Default x = typeOf6 x `popStarTy` typeOf (argType x)
+ where
+   argType :: t a b c d e f -> a
+   argType =  undefined
 
-#ifndef __HUGS__
+
+#ifdef __GLASGOW_HASKELL__
 -- | One Typeable5 instance for all Typeable6 instances
 instance (Typeable6 s, Typeable a)
        => Typeable5 (s a) where
-  typeOf5 x = typeOf6 x `popStarTy` typeOf (argType x)
-   where
-     argType :: t x y z z' z'' z''' -> x
-     argType =  undefined
+  typeOf5 = typeOf5Default
 #endif
 
 
@@ -396,15 +404,19 @@ instance (Typeable6 s, Typeable a)
 class Typeable7 t where
   typeOf7 :: t a b c d e f g -> TypeRep
 
+-- | For defining a 'Typeable6' instance from any 'Typeable7' instance.
+typeOf6Default :: (Typeable7 t, Typeable a) => t a b c d e f g -> TypeRep
+typeOf6Default x = typeOf7 x `popStarTy` typeOf (argType x)
+ where
+   argType :: t a b c d e f g -> a
+   argType =  undefined
 
-#ifndef __HUGS__
+
+#ifdef __GLASGOW_HASKELL__
 -- | One Typeable6 instance for all Typeable7 instances
 instance (Typeable7 s, Typeable a)
        => Typeable6 (s a) where
-  typeOf6 x = typeOf7 x `popStarTy` typeOf (argType x)
-   where
-     argType :: t x y z z' z'' z''' z'''' -> x
-     argType =  undefined
+  typeOf6 = typeOf6Default
 #endif
 
 
@@ -465,19 +477,15 @@ gcast2 x = r
 --
 -------------------------------------------------------------
 
-unitTc :: TyCon
-unitTc = mkTyCon "()"
-
-instance Typeable () where
-  typeOf _ = mkAppTy unitTc []
-
-
-tup3Tc :: TyCon
-tup3Tc = mkTyCon ",,"
-
-instance Typeable3 (,,) where
-  typeOf3 tu = mkAppTy tup3Tc []
-
+#ifndef __NHC__
+INSTANCE_TYPEABLE1([],listTc,"[]")
+INSTANCE_TYPEABLE1(Maybe,maybeTc,"Maybe")
+INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
+INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
+INSTANCE_TYPEABLE2((->),funTc,"->")
+INSTANCE_TYPEABLE0((),unitTc,"()")
+INSTANCE_TYPEABLE2((,),pairTc,"(,)")
+INSTANCE_TYPEABLE3((,,),tup3Tc,",,")
 
 tup4Tc :: TyCon
 tup4Tc = mkTyCon ",,,"
@@ -506,84 +514,11 @@ tup7Tc = mkTyCon ",,,,,"
 instance Typeable7 (,,,,,,) where
   typeOf7 tu = mkAppTy tup7Tc []
 
-
-listTc :: TyCon
-listTc = mkTyCon "[]"
-
--- | Instance for lists
-instance Typeable1 [] where
-  typeOf1 _ = mkAppTy listTc []
-
-
-maybeTc :: TyCon
-maybeTc = mkTyCon "Maybe"
-
--- | Instance for maybes
-instance Typeable1 Maybe where
-  typeOf1 _ = mkAppTy maybeTc []
-
-
-ratioTc :: TyCon
-ratioTc = mkTyCon "Ratio"
-
--- | Instance for ratios
-instance Typeable1 Ratio where
-  typeOf1 _ = mkAppTy ratioTc []
-
-
-pairTc :: TyCon
-pairTc = mkTyCon "(,)"
-
--- | Instance for products
-instance Typeable2 (,) where
-  typeOf2 _ = mkAppTy pairTc []
-
-
-eitherTc :: TyCon
-eitherTc = mkTyCon "Either"
-
--- | Instance for sums
-instance Typeable2 Either where
-  typeOf2 _ = mkAppTy eitherTc []
-
-
--- | Instance for functions
-instance Typeable2 (->) where
-  typeOf2 _ = mkAppTy funTc []
-
-
-#ifdef __GLASGOW_HASKELL__
-
-ioTc :: TyCon
-ioTc = mkTyCon "GHC.IOBase.IO"
-
-instance Typeable1 IO where
-  typeOf1 _ = mkAppTy ioTc []
-
-
-ptrTc :: TyCon
-ptrTc = mkTyCon "GHC.Ptr.Ptr"
-
-instance Typeable1 Ptr where
-  typeOf1 _ = mkAppTy ptrTc []
-
-
-stableptrTc :: TyCon
-stableptrTc = mkTyCon "GHC.Stable.StablePtr"
-
-instance Typeable1 StablePtr where
-  typeOf1 _ = mkAppTy stableptrTc []
-
-
-iorefTc :: TyCon
-iorefTc = mkTyCon "GHC.IOBase.IORef"
-
-instance Typeable1 IORef where
-  typeOf1 _ = mkAppTy iorefTc []
-
-#endif
-
-
+INSTANCE_TYPEABLE1(IO,ioTc,"System.IO.IO")
+INSTANCE_TYPEABLE1(Ptr,ptrTc,"Foreign.Ptr.Ptr")
+INSTANCE_TYPEABLE1(StablePtr,stableptrTc,"Foreign.StablePtr.StablePtr")
+INSTANCE_TYPEABLE1(IORef,iorefTc,"Data.IORef.IORef")
+#endif /* ! __NHC__ */
 
 -------------------------------------------------------
 --
@@ -613,13 +548,11 @@ INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
 
 INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
-#endif
+#endif /* !__NHC__ */
 
 #ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
 #endif
-
-
 
 ---------------------------------------------
 --
