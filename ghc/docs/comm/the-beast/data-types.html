@@ -106,7 +106,7 @@ After desugaring into Core (-ddump-ds), the definition of <tt>f</tt> looks like 
 <pre>
   f x = case x of
           Nil{d}       -> Nil{v}
-          MkT{d} a b r -> let { p = (a,b); q = I#r } in 
+          MkT{d} a b r -> let { p = (a,b); q = I# r } in 
 	                  $WMkT p (q+1)
 </pre>
 Notice the way that pattern matching has been desugared to take account of the fact
