@@ -36,6 +36,7 @@ import OccName		( OccName,
 import TysWiredIn	( listTyCon )
 import Type		( funTyCon )
 import Module		( ModuleName, mkThisModule, moduleName, mkVanillaModule, pprModuleName )
+import PrelInfo		( pRELUDE_Name )
 import FiniteMap
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
@@ -708,7 +709,8 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 warnUnusedModules :: [Module] -> RnM d ()
 warnUnusedModules mods
   | not opt_WarnUnusedImports = returnRn ()
-  | otherwise 		      = mapRn_ (addWarnRn . unused_mod . moduleName) mods
+  | otherwise 		      = mapRn_ (addWarnRn . unused_mod) $
+				filter (/= pRELUDE_Name) (map moduleName mods)
   where
     unused_mod m = vcat [ptext SLIT("Module") <+> quotes (pprModuleName m) <+> 
 			   text "is imported, but nothing from it is used",
