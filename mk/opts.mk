@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.10 1999/05/04 08:38:53 sof Exp $
+# 	$Id: opts.mk,v 1.11 1999/06/03 07:12:10 sof Exp $
 #
 #################################################################################
 
@@ -69,7 +69,7 @@ SRC_TEXI2HTML_OPTS +=-menu -verbose -glossary
 #
 # Default fptools options for dllwrap.
 #
-SRC_BLD_DLL_OPTS += -mno-cygwin --target=i386-mingw32 --export-all
+SRC_BLD_DLL_OPTS += -mno-cygwin --target=i386-mingw32
 
 #################################################################################
 #

@@ -356,8 +356,12 @@ endif
 
 all :: $(DLL_NAME)
 
+ifeq "$(DLL_IMPLIB_NAME)" ""
+DLL_IMPLIB_NAME = $(patsubst %.a, %_imp.a, $(LIBRARY))
+endif
+
 $(DLL_NAME) :: $(LIBRARY)
-	$(BLD_DLL) --output-lib $(patsubst %.a, %_imp.a, $(LIBRARY)) --output-def $(patsubst %.dll,%.def,$(DLL_NAME)) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS) 
+	$(BLD_DLL) --output-lib $(DLL_IMPLIB_NAME) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS) 
 	touch dLL_ifs.hi
 endif
 
@@ -516,8 +520,14 @@ ifneq "$(INSTALL_PROGS)" ""
 install:: $(INSTALL_PROGS)
 	@$(INSTALL_DIR) $(bindir)
 	@for i in $(INSTALL_PROGS); do \
-		echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir); \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir);      \
+		case $$i in \
+		  *.dll) \
+		    echo $(INSTALL_DATA) $(INSTALL_BIN_OPTS) $$i $(bindir); \
+		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir) ;; \
+		  *) \
+		    echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir); \
+		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir) ;;  \
+		esac; \
 	done
 endif
 
@@ -544,7 +554,7 @@ ifneq "$(BIN_DIST)" "1"
 	done
 else
 	for i in $(INSTALL_SCRIPTS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(bindir); \
+		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(bindir)/$$i; \
 	done
 endif
 else
@@ -567,13 +577,13 @@ ifneq "$(BIN_DIST)" "1"
 	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
 	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
-	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir) ;    \
+	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir)/$$i ;    \
 	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(libdir)/$$i ; \
 	   $(RM) $$i.tmp; \
 	done
 else
 	for i in $(INSTALL_LIB_SCRIPTS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir); \
+		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir)/$$i ; \
 	done
 endif
 else
@@ -620,6 +630,8 @@ install:: $(INSTALL_LIBS)
 		  *.a) \
 		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
 		    $(RANLIB) $(libdir)/`basename $$i` ;; \
+		  *.dll) \
+		    $(INSTALL_DATA) -s $(INSTALL_OPTS) $$i $(libdir) ;; \
 		  *) \
 		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
 		esac; \
