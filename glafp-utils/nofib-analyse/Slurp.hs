@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Slurp.hs,v 1.1 1999/11/12 11:54:17 simonmar Exp $
+-- $Id: Slurp.hs,v 1.2 2000/02/18 10:25:53 simonmar Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -348,7 +348,7 @@ parse_size prog mod (l:ls) =
 					      Just (read text + read datas),
 				    compile_status = Success})]
 		 | otherwise ->
-			let ms  = addToFM emptyFM mod (read text)
+			let ms  = addToFM emptyFM mod (read text + read datas)
 			in
 			[(prog,emptyResults{module_size = ms})]
 
