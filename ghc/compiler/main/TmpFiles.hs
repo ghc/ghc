@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.13 2000/12/11 14:42:21 sewardj Exp $
+-- $Id: TmpFiles.hs,v 1.14 2000/12/11 15:26:00 sewardj Exp $
 --
 -- Temporary file management
 --
@@ -19,6 +19,7 @@ module TmpFiles (
 -- main
 import Config
 import Util
+import DriverUtil
 
 -- hslibs
 import Exception
@@ -75,8 +76,3 @@ newTempName extn = do
 
 addFilesToClean :: [FilePath] -> IO ()
 addFilesToClean files = mapM_ (add v_FilesToClean) files
-
-add :: IORef [a] -> a -> IO ()
-add var x = do
-  xs <- readIORef var
-  writeIORef var (x:xs)

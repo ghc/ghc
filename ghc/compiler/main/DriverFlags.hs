@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.32 2000/12/11 12:30:58 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.33 2000/12/11 15:26:00 sewardj Exp $
 --
 -- Driver flags
 --
@@ -429,7 +429,7 @@ dynamic_flags = [
 
 	-- the rest of the -f* and -fno-* flags
   ,  ( "fno-", 		PrefixPred (\f -> isFFlag f) (\f -> unSetDynFlag (getFFlag f)) )
-  ,  ( "f".		PrefixPred (\f -> isFFlag f) (\f -> setDynFlag (getFFlag f)) )
+  ,  ( "f",		PrefixPred (\f -> isFFlag f) (\f -> setDynFlag (getFFlag f)) )
  ]
 
 -- these -f<blah> flags can all be reversed with -fno-<blah>
