@@ -47,7 +47,7 @@ import TcIface		( tcExtCoreBindings )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules, loadHiBootInterface )
-import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail, 
+import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail,
 			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
@@ -65,12 +65,12 @@ import TyCon		( tyConHasGenerics, isSynTyCon, getSynTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import Outputable
 import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState(..),
-			  GhciMode(..), noDependencies, isOneShot,
-			  Deprecs( NoDeprecs ), ModIface(..), plusDeprecs,
+			  GhciMode(..), noDependencies, 
+			  Deprecs( NoDeprecs ), plusDeprecs,
 			  ForeignStubs(NoStubs), TyThing(..), 
 			  TypeEnv, lookupTypeEnv,
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons, 
-			  emptyFixityEnv, availName
+			  emptyFixityEnv
 			)
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
@@ -147,7 +147,7 @@ tcRnModule :: HscEnv
 	   -> Located (HsModule RdrName)
 	   -> IO (Messages, Maybe TcGblEnv)
 
-tcRnModule hsc_env (L loc (HsModule maybe_mod exports 
+tcRnModule hsc_env (L loc (HsModule maybe_mod export_ies 
 				import_decls local_decls mod_deprec))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
@@ -199,7 +199,7 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
 	reportDeprecations tcg_env ;
 
 		-- Process the export list
-	exports <- exportsFromAvail (isJust maybe_mod) exports ;
+	exports <- exportsFromAvail (isJust maybe_mod) export_ies ;
 
 		-- Check whether the entire module is deprecated
 		-- This happens only once per module
@@ -972,7 +972,7 @@ getModuleExports mod
 			-- so their instances are visible
 	; avails <- exportsToAvails (mi_exports iface)
 	; let { gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
-			| avail <- avails, name <- availNames avail ] }
+			| avail <- nameSetToList avails ] }
 	; returnM (mkGlobalRdrEnv gres) }
 
 vanillaProv :: Module -> Provenance
@@ -1008,13 +1008,14 @@ getModuleContents hsc_env ictxt mod exports_only
   
       | otherwise		-- Want the exports only
       = do { iface <- load_iface mod
- 	   ; avails <- exportsToAvails (mi_exports iface)
- 	   ; mappM get_decl avails
+ 	   ; mappM get_decl [ (mod,avail) | (mod, avails) <- mi_exports iface
+					  , avail <- avails ]
     	}
 
-   get_decl avail 
-	= do { thing <- tcLookupGlobal (availName avail)
-	     ; return (filter_decl (availOccs avail) (toIfaceDecl thing)) }
+   get_decl (mod, avail)
+	= do { main_name <- lookupOrig mod (availName avail) 
+	     ; thing     <- tcLookupGlobal main_name
+	     ; return (filter_decl (availNames avail) (toIfaceDecl thing)) }
 
 ---------------------
 filter_decl occs decl@(IfaceClass {ifSigs = sigs})
@@ -1029,8 +1030,6 @@ filter_decl occs decl
 
 keep_sig occs (IfaceClassOp occ _ _) = occ `elem` occs
 keep_con occs con		     = ifConOcc con `elem` occs
-
-availOccs avail = map nameOccName (availNames avail)
 
 wantToSee (AnId id)    = not (isImplicitId id)
 wantToSee (ADataCon _) = False	-- They'll come via their TyCon

@@ -129,7 +129,7 @@ initTc hsc_env mod do_this
 	return (msgs, final_res)
     }
   where
-    init_imports = emptyImportAvails { imp_qual = unitModuleEnv mod emptyAvailEnv }
+    init_imports = emptyImportAvails { imp_env = unitModuleEnv mod emptyNameSet }
 	-- Initialise tcg_imports with an empty set of bindings for
 	-- this module, so that if we see 'module M' in the export
 	-- list, and there are no bindings in M, we don't bleat 

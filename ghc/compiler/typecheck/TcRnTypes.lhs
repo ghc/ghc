@@ -12,7 +12,7 @@ module TcRnTypes(
 	IfGblEnv(..), IfLclEnv(..),
 
 	-- Ranamer types
-	EntityUsage, emptyUsages, ErrCtxt,
+	ErrCtxt,
 	ImportAvails(..), emptyImportAvails, plusImportAvails, 
 	plusAvail, pruneAvails,  
 	AvailEnv, emptyAvailEnv, unitAvailEnv, plusAvailEnv, 
@@ -56,7 +56,7 @@ import IOEnv
 import RdrName		( GlobalRdrEnv, LocalRdrEnv )
 import Name		( Name )
 import NameEnv
-import NameSet		( NameSet, emptyNameSet, DefUses )
+import NameSet		( NameSet, unionNameSets, DefUses )
 import OccName		( OccEnv )
 import Var		( Id, TyVar )
 import VarEnv		( TidyEnv )
@@ -408,32 +408,6 @@ type ErrCtxt = [TidyEnv -> TcM (TidyEnv, Message)]
 
 %************************************************************************
 %*									*
-			EntityUsage
-%*									*
-%************************************************************************
-
-EntityUsage tells what things are actually need in order to compile this
-module.  It is used for generating the usage-version field of the ModIface.
-
-Note that we do not record version info for entities from 
-other (non-home) packages.  If the package changes, GHC doesn't help.
-
-\begin{code}
-type EntityUsage = NameSet
-	-- The Names are all the (a) home-package
-	--			 (b) "big" (i.e. no data cons, class ops)
-	--	   		 (c) non-locally-defined
-	--			 (d) non-wired-in
-	-- names that have been slurped in so far.
-	-- This is used to generate the "usage" information for this module.
-
-emptyUsages :: EntityUsage
-emptyUsages = emptyNameSet
-\end{code}
-
-
-%************************************************************************
-%*									*
 	Operations over ImportAvails
 %*									*
 %************************************************************************
@@ -449,27 +423,20 @@ It is used 	* when processing the export list
 \begin{code}
 data ImportAvails 
    = ImportAvails {
-	imp_env :: AvailEnv,
-		-- All the things that are available from the import
-		-- Its domain is all the "main" things;
-		-- i.e. *excluding* class ops and constructors
-		--	(which appear inside their parent AvailTC)
-
-	imp_qual :: ModuleEnv AvailEnv,
-		-- Used to figure out "module M" export specifiers
+	imp_env :: ModuleEnv NameSet,
+		-- All the things imported, classified by 
+		-- the *module qualifier* for its import
+		--   e.g.	 import List as Foo
+		-- would add a binding Foo |-> ...stuff from List...
+		-- to imp_env.
+		-- 
+		-- We need to classify them like this so that we can figure out 
+		-- "module M" export specifiers in an export list 
 		-- (see 1.4 Report Section 5.1.1).  Ultimately, we want to find 
 		-- everything that is unambiguously in scope as 'M.x'
 		-- and where plain 'x' is (perhaps ambiguously) in scope.
 		-- So the starting point is all things that are in scope as 'M.x',
 		-- which is what this field tells us.
-		--
-		-- Domain is the *module qualifier* for imports.
-		--   e.g.	 import List as Foo
-		-- would add a binding Foo |-> ...stuff from List...
-		-- to imp_qual.
-		-- We keep the stuff as an AvailEnv so that it's easy to 
-		-- combine stuff coming from different (unqualified) 
-		-- imports of the same module
 
 	imp_mods :: ModuleEnv (Module, Maybe Bool, SrcSpan),
 		-- Domain is all directly-imported modules
@@ -515,8 +482,7 @@ mkModDeps deps = foldl add emptyModuleEnv deps
 		 add env elt@(m,_) = extendModuleEnv env m elt
 
 emptyImportAvails :: ImportAvails
-emptyImportAvails = ImportAvails { imp_env    	= emptyAvailEnv, 
-				   imp_qual 	= emptyModuleEnv, 
+emptyImportAvails = ImportAvails { imp_env 	= emptyModuleEnv, 
 				   imp_mods   	= emptyModuleEnv,
 				   imp_dep_mods = emptyModuleEnv,
 				   imp_dep_pkgs = [],
@@ -524,12 +490,11 @@ emptyImportAvails = ImportAvails { imp_env    	= emptyAvailEnv,
 
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
-  (ImportAvails { imp_env = env1, imp_qual = unqual1, imp_mods = mods1,
+  (ImportAvails { imp_env = env1, imp_mods = mods1,
 		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, imp_orphs = orphs1 })
-  (ImportAvails { imp_env = env2, imp_qual = unqual2, imp_mods = mods2,
+  (ImportAvails { imp_env = env2, imp_mods = mods2,
 		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2, imp_orphs = orphs2 })
-  = ImportAvails { imp_env      = env1 `plusAvailEnv` env2, 
-		   imp_qual     = plusModuleEnv_C plusAvailEnv unqual1 unqual2, 
+  = ImportAvails { imp_env      = plusModuleEnv_C unionNameSets env1 env2, 
 		   imp_mods     = mods1  `plusModuleEnv` mods2,	
 		   imp_dep_mods = plusModuleEnv_C plus_mod_dep dmods1 dmods2,	
 		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
