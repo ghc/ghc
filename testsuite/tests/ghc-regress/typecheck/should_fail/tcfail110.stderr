@@ -1,8 +1,5 @@
 
 tcfail110.hs:8:
-    Couldn't match `*' against `* -> *'
-	Expected kind: *
-	Inferred kind: * -> *
-    When checking that `Foo a' is a type
+    Kind error: `Foo a' is not applied to enough type arguments
     In the type: String -> (forall a. Foo a) -> IO ()
     While checking the type signature for `bar'

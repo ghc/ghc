@@ -1,7 +1,4 @@
 
 tcfail079.hs:9:
-    Couldn't match `*' against `#'
-	Expected kind: *
-	Inferred kind: #
-    When checking that `Int#' is a type
+    Kind error: Expecting a lifted type, but `Int#' is unlifted
     In the newtype declaration for `Unboxed'

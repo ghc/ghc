@@ -1,7 +1,5 @@
 
 tcfail070.hs:15:
-    Couldn't match `*' against `* -> k'
-	Expected kind: *
-	Inferred kind: * -> k
+    Kind error: `[Int]' is applied to too many type arguments
     When checking kinds in `[Int] Bool'
     In the type synonym declaration for `State'

@@ -1,8 +1,8 @@
 
 tcfail017.hs:10:
     Could not deduce (C [a]) from the context (B a)
+      arising from the instance declaration at tcfail017.hs:10
     Probable fix:
 	Add (C [a]) to the instance declaration superclass context
 	Or add an instance declaration for (C [a])
-    arising from the instance declaration at tcfail017.hs:10
     In the instance declaration for `B [a]'
