@@ -286,11 +286,6 @@ lookupInstEnv env key_cls key_tys
 	      Nothing        -> find rest
 	      Just _         -> NoMatch (any_match rest)
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
-#ifdef DEBUG
-				     pprTrace "lookupInst" (vcat [text "look:" <+> ppr key_cls <+> ppr key_tys, 
-								  text "found:" <+> ppr dfun_id,
-								  text "env:" <+> ppr (classInstEnv env key_cls)]) $
-#endif
 				     FoundInst subst dfun_id
 
     any_match rest = or [ maybeToBool (matchTys tvs tpl key_tys)
