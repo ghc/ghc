@@ -146,7 +146,7 @@ reify v = Q (qReify v)
 currentModule :: Q String
 currentModule = Q qCurrentModule
 
--- |The 'runIO' function lest you run an I/O computation in the 'Q' monad.
+-- |The 'runIO' function lest you run an I\/O computation in the 'Q' monad.
 -- Take care: you are guaranteed the ordering of calls to 'runIO' within 
 -- a single 'Q' computation, but not about the order in which splices are run.  
 --
@@ -167,7 +167,7 @@ instance Quasi Q where
 
 ----------------------------------------------------
 -- The following operations are used solely in DsMeta when desugaring brackets
--- They aren't necessary for the user, who can use ordinary return and (>>=) etc
+-- They are not necessary for the user, who can use ordinary return and (>>=) etc
 
 returnQ :: a -> Q a
 returnQ = return
