@@ -15,11 +15,12 @@ module TcModule (
 
 IMP_Ubiq(){-uitous-}
 
+import CmdLineOpts	( opt_D_dump_tc, opt_D_dump_deriv )
 import HsSyn		( HsDecl(..), HsModule(..), HsBinds(..), HsExpr, MonoBinds(..),
 			  TyDecl, SpecDataSig, ClassDecl, InstDecl, IfaceSig,
 			  SpecInstSig, DefaultDecl, Sig, Fake, InPat,
 			  SYN_IE(RecFlag), nonRecursive,  GRHSsAndBinds, Match,
- 			  FixityDecl, IE, ImportDecl
+ 			  FixityDecl, IE, ImportDecl, OutPat
 			)
 import RnHsSyn		( SYN_IE(RenamedHsModule), RenamedFixityDecl(..) )
 import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr),
@@ -49,9 +50,11 @@ import TcKind		( TcKind )
 
 import RnMonad		( RnNameSupply(..) )
 import Bag		( listToBag )
-import ErrUtils		( SYN_IE(Warning), SYN_IE(Error) )
+import ErrUtils		( SYN_IE(Warning), SYN_IE(Error), 
+			  pprBagOfErrors, dumpIfSet, ghcExit
+			)
 import Id		( idType, GenId, SYN_IE(IdEnv), nullIdEnv )
-import Maybes		( catMaybes, MaybeErr )
+import Maybes		( catMaybes, MaybeErr(..) )
 import Name		( Name, isLocallyDefined, pprModule )
 import Pretty
 import TyCon		( TyCon, isSynTyCon )
@@ -72,7 +75,7 @@ import Bag		( Bag, isEmptyBag )
 
 import FiniteMap	( emptyFM, FiniteMap )
 
-import Outputable	( Outputable(..), PprStyle )
+import Outputable	( Outputable(..), PprStyle, printErrs, pprDumpStyle, pprErrorsStyle )
 
 tycon_specs = emptyFM
 \end{code}
@@ -107,14 +110,29 @@ typecheckModule
 	:: UniqSupply
 	-> RnNameSupply
 	-> RenamedHsModule
-	-> MaybeErr
-	    (TcResults, 		-- if all goes well...
-	     Bag Warning)	      	-- (we can still get warnings)
-	    (Bag Error,		      	-- if we had errors...
-	     Bag Warning)
+	-> IO (Maybe TcResults)
 
 typecheckModule us rn_name_supply mod
-  = initTc us (tcModule rn_name_supply mod)
+  = case initTc us (tcModule rn_name_supply mod) of
+	Failed (errs, warns) ->
+	  print_errs warns	>>
+	  print_errs errs	>>
+	  return Nothing
+
+	Succeeded (results@(binds, _, _, _, _, dump_deriv), warns) -> 
+	  print_errs warns			>>
+
+	  dumpIfSet opt_D_dump_tc "Typechecked"
+		(ppr pprDumpStyle binds)	  	>>
+
+	  dumpIfSet opt_D_dump_deriv "Derived instances"
+		(dump_deriv pprDumpStyle)		>>
+
+	  return (Just results)
+
+print_errs errs
+  | isEmptyBag errs = return ()
+  | otherwise       = printErrs (pprBagOfErrors pprErrorsStyle errs)
 \end{code}
 
 The internal monster:
