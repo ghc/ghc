@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.6 2000/11/20 16:51:35 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.7 2000/11/21 10:48:20 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -129,8 +129,9 @@ doCommand expr = do
 	Nothing -> throwDyn (OtherError "no module context in which to run the expression")
 	Just mod -> do
              dflags <- io (readIORef v_DynFlags)
-             (st, maybe_hvalue) <- 
+             (new_cmstate, maybe_hvalue) <- 
         	io (cmGetExpr (cmstate st) dflags mod expr)
+	     setGHCiState st{cmstate = new_cmstate}
              case maybe_hvalue of
         	Nothing -> return ()
         	Just hv -> io (cmRunExpr hv)

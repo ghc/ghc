@@ -27,7 +27,7 @@ import TcType		( newTyVarTy )
 import Inst		( plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
-import TcDefaults	( tcDefaults )
+import TcDefaults	( tcDefaults, defaultDefaultTys )
 import TcExpr		( tcMonoExpr )
 import TcEnv		( TcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, 
 			  isLocalThing, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
@@ -112,6 +112,8 @@ typecheckExpr :: DynFlags
 typecheckExpr dflags pcs hst unqual this_mod (expr, decls)
   = typecheck dflags pcs hst unqual $
 
+ 	 -- use the default default settings, i.e. [Integer, Double]
+    tcSetDefaultTys defaultDefaultTys $
     tcImports pcs hst get_fixity this_mod decls	`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
     ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
 

@@ -4,7 +4,7 @@
 \section[TcDefaults]{Typechecking \tr{default} declarations}
 
 \begin{code}
-module TcDefaults ( tcDefaults ) where
+module TcDefaults ( tcDefaults, defaultDefaultTys ) where
 
 #include "HsVersions.h"
 
@@ -24,7 +24,7 @@ import HscTypes		( TyThing(..) )
 \end{code}
 
 \begin{code}
-default_default = [integerTy, doubleTy]
+defaultDefaultTys = [integerTy, doubleTy]
 
 tcDefaults :: [RenamedHsDecl]
 	   -> TcM [Type] 	    -- defaulting types to heave
@@ -32,7 +32,7 @@ tcDefaults :: [RenamedHsDecl]
 				    -- in Disambig.
 tcDefaults decls = tc_defaults [default_decl | DefD default_decl <- decls]
 
-tc_defaults [] = returnTc default_default
+tc_defaults [] = returnTc defaultDefaultTys
 
 tc_defaults [DefaultDecl [] locn]
   = returnTc []		-- no defaults

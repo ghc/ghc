@@ -305,6 +305,9 @@ pprIExpr (expr:: IExpr con var)
         NonRecP bind body -> doNonRec 'P' bind body
 	NonRecI bind body -> doNonRec 'I' bind body
 
+	RecP binds body -> doRec 'P' binds body
+	RecI binds body -> doRec 'I' binds body
+
         ConApp    i          -> doConApp "" i ([] :: [IExpr con var])
         ConAppI   i a1       -> doConApp "" i [a1]
         ConAppP   i a1       -> doConApp "" i [a1]
@@ -323,6 +326,10 @@ pprIExpr (expr:: IExpr con var)
 
         doNonRec repchr bind body
            = vcat [text "let" <> char repchr <+> pprIBind bind, text "in", pprIExpr body]
+
+	doRec repchr binds body
+	   = vcat [text "letrec" <> char repchr <+> vcat (map pprIBind binds),
+		text "in", pprIExpr body]
 
         doCasePrim repchr b sc alts def
            = sep [text "CasePrim" <> char repchr 
