@@ -27,19 +27,14 @@ module Class (
 CHK_Ubiq() -- debugging consistency check
 
 IMPORT_DELOOPER(TyLoop)
---IMPORT_DELOOPER(IdLoop)
 
-
---import TyVar
---import Id
---import Type
 #if __GLASGOW_HASKELL__ >= 202
 import Name
 #endif
 
-import TyCon		--( TyCon )
-import TyVar		--( SYN_IE(TyVar), GenTyVar )
-import Usage		--( GenUsage, SYN_IE(Usage), SYN_IE(UVar) )
+import TyCon		( TyCon )
+import TyVar		( SYN_IE(TyVar), GenTyVar )
+import Usage		( GenUsage, SYN_IE(Usage), SYN_IE(UVar) )
 
 import MatchEnv		( MatchEnv )
 import Maybes		( assocMaybe )
@@ -48,7 +43,6 @@ import Outputable
 import Unique		-- Keys for built-in classes
 import UniqFM           ( SYN_IE(Uniquable))
 import Pretty		( Doc, hsep, ptext )
-import PprStyle		( PprStyle(..) )
 import SrcLoc		( SrcLoc )
 import Util
 \end{code}
