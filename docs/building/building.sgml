@@ -1278,13 +1278,20 @@ file.  Typing <Command>gmake</Command> alone is generally the same as typing <Co
 <Term><Literal>install</Literal>:</Term>
 <ListItem>
 <para>
-installs the things built by <Literal>all</Literal>.  Where does it
+installs the things built by <Literal>all</Literal> (except for the documentation).  Where does it
 install them?  That is specified by
 <filename>mk/config.mk.in</filename>; you can override it in
 <filename>mk/build.mk</filename>, or by running
 <command>configure</command> with command-line arguments like
 <literal>--bindir=/home/simonpj/bin</literal>;  see <literal>./configure
 --help</literal> for the full details.
+</para>
+</ListItem></VarListEntry>
+<VarListEntry>
+<Term><Literal>install-docs</Literal>:</Term>
+<ListItem>
+<para>
+installs the documentation. Otherwise behaves just like <literal>install</literal>.
 </para>
 </ListItem></VarListEntry>
 <VarListEntry>
