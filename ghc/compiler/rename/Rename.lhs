@@ -126,7 +126,19 @@ renameStmt dflags hit hst pcs scope_module this_module local_env stmt
         doDump dflags [] stmt [] `thenRn_` returnRn (print_unqual, Nothing)
     else
 
-    slurpImplicitDecls fvs local_env 	`thenRn` \ decls ->
+	-- Add implicit free vars, and close decls
+    getImplicitStmtFVs 				`thenRn` \ implicit_fvs ->
+    slurpImpDecls (fvs `plusFV` implicit_fvs)	`thenRn` \ decls ->
+	-- NB: an earlier version deleted (rdrEnvElts local_env) from
+	--     the fvs.  But (a) that isn't necessary, because previously
+	--     bound things in the local_env will be in the TypeEnv, and 
+	--     the renamer doesn't re-slurp such things, and 
+	-- (b) it's WRONG to delete them. Consider in GHCi:
+	--	  Mod> let x = e :: T
+	--	  Mod> let y = x + 3
+	--     We need to pass 'x' among the fvs to slurpImpDecls, so that
+	--     the latter can see that T is a gate, and hence import the Num T 
+	--     instance decl.  (See the InTypEnv case in RnIfaces.slurpSourceRefs
 
     doDump dflags binders stmt decls   	`thenRn_`
     returnRn (print_unqual, Just (binders, (stmt, decls)))
@@ -171,7 +183,8 @@ renameRdrName dflags hit hst pcs scope_module this_module local_env rdr_names =
 		returnRn (print_unqual, Nothing)
 	else 
 
-  slurpImplicitDecls (mkNameSet ok_names) local_env `thenRn` \ decls ->
+  slurpImpDecls (mkNameSet ok_names)	`thenRn` \ decls ->
+
   doDump dflags ok_names decls 		`thenRn_`
   returnRn (print_unqual, Just (ok_names, decls))
  where
@@ -197,15 +210,6 @@ loadContextModule scope_module thing_inside
 	returnRn (print_unqual, Nothing)
     else
 	thing_inside (rdr_env, print_unqual)
-
--- Add implicit free vars, and close decls
-slurpImplicitDecls fvs local_env 
- =  getImplicitStmtFVs 				`thenRn` \ implicit_fvs ->
-    let
-	filtered_fvs = fvs `delListFromNameSet` rdrEnvElts local_env 
-	source_fvs   = implicit_fvs `plusFV` filtered_fvs
-    in
-    slurpImpDecls source_fvs
 \end{code}
 
 %*********************************************************
