@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.16 2000/04/04 10:04:47 simonmar Exp $
+ * $Id: Signals.c,v 1.17 2000/04/14 16:47:43 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,6 +19,7 @@
 
 #ifndef PAR
 
+/* SUP: The type of handlers is a little bit, well, doubtful... */
 static StgInt *handlers = NULL; /* Dynamically grown array of signal handlers */
 static StgInt nHandlers = 0;    /* Size of handlers array */
 
@@ -97,7 +98,7 @@ generic_handler(int sig)
        circumstances, depending on the signal.  
     */
 
-    *next_pending_handler++ = deRefStablePtr(handlers[sig]);
+    *next_pending_handler++ = deRefStablePtr(stgCast(StgStablePtr,handlers[sig]));
 
     /* stack full? */
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
@@ -196,7 +197,7 @@ sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
        * by freeing the previous handler if there was one.
        */	 
       if (previous_spi >= 0) {
-	  freeStablePtr(handlers[sig]);
+	  freeStablePtr(stgCast(StgStablePtr,handlers[sig]));
       }
       return STG_SIG_ERR;
     }

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.67 2000/04/14 15:18:07 sewardj Exp $
+ * $Id: Schedule.c,v 1.68 2000/04/14 16:47:43 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1572,8 +1572,8 @@ initScheduler(void)
   context_switch = 0;
   interrupted    = 0;
 
-  ecafList = END_ECAF_LIST;
 #ifdef INTERPRETER
+  ecafList = END_ECAF_LIST;
   clearECafTable();
 #endif
 

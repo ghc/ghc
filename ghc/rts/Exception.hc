@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.11 2000/03/17 14:37:21 simonmar Exp $
+ * $Id: Exception.hc,v 1.12 2000/04/14 16:47:43 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,6 +16,9 @@
 #include "RtsFlags.h"
 #if defined(PAR)
 # include "FetchMe.h"
+#endif
+#if defined(PROFILING)
+# include "Profiling.h"
 #endif
 
 /* -----------------------------------------------------------------------------

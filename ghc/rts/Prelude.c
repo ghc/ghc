@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.c,v 1.5 2000/04/03 17:27:10 sewardj Exp $
+ * $Id: Prelude.c,v 1.6 2000/04/14 16:47:43 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -95,6 +95,7 @@ INFO_TABLE_CONSTR(hugs_standalone_StablePtr_static_info,Hugs_CONSTR_entry,
 */
 void fixupRTStoPreludeRefs ( void*(*ask_hugs_dynamic_linker)(char*) )
 {
+  (void)ask_hugs_dynamic_linker;   /* keep gcc -Wall happy */
 #if defined(INTERPRETER)
   if (ask_hugs_dynamic_linker == NULL) {
 

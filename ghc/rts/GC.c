@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.79 2000/04/14 15:18:06 sewardj Exp $
+ * $Id: GC.c,v 1.80 2000/04/14 16:47:43 panne Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -142,7 +142,9 @@ lnat g0s0_pcnt_kept = 30;	/* percentage of g0s0 live at last minor GC */
 static StgClosure * evacuate                ( StgClosure *q );
 static void         zero_static_object_list ( StgClosure* first_static );
 static void         zero_mutable_list       ( StgMutClosure *first );
+#if 0
 static void         revert_dead_CAFs        ( void );
+#endif
 
 static rtsBool      traverse_weak_ptr_list  ( void );
 static void         cleanup_weak_ptr_list   ( StgWeak **list );
