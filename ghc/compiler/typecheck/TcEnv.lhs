@@ -24,7 +24,11 @@ module TcEnv(
 
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
+#else
+import {-# SOURCE #-} TcType
+#endif
 
 import HsTypes	( HsTyVar(..) )
 import Id	( SYN_IE(Id), GenId, idType, mkUserLocal, mkUserId, replaceIdInfo, getIdInfo )
