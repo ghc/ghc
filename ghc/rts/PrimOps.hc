@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.24 1999/03/22 09:24:45 simonm Exp $
+ * $Id: PrimOps.hc,v 1.25 1999/03/22 13:01:38 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -682,7 +682,7 @@ FN_(decodeFloatzh_fast)
   /* arguments: F1 = Float# */
   arg = F1;
 
-  HP_CHK_GEN(sizeof(StgArrWords)+1, NO_PTRS, decodeFloatzh_fast,);
+  HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, decodeFloatzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
   CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -702,8 +702,8 @@ FN_(decodeFloatzh_fast)
 }
 #endif /* !FLOATS_AS_DOUBLES */
 
-#define DOUBLE_MANTISSA_SIZE (sizeof(StgDouble)/sizeof(W_))
-#define ARR_SIZE (sizeof(StgArrWords) + DOUBLE_MANTISSA_SIZE)
+#define DOUBLE_MANTISSA_SIZE (sizeofW(StgDouble))
+#define ARR_SIZE (sizeofW(StgArrWords) + DOUBLE_MANTISSA_SIZE)
 
 FN_(decodeDoublezh_fast)
 { MP_INT mantissa;
@@ -716,7 +716,7 @@ FN_(decodeDoublezh_fast)
   arg = D1;
 
   HP_CHK_GEN(ARR_SIZE, NO_PTRS, decodeDoublezh_fast,);
-  TICK_ALLOC_PRIM(sizeof(StgArrWords),DOUBLE_MANTISSA_SIZE,0);
+  TICK_ALLOC_PRIM(sizeofW(StgArrWords),DOUBLE_MANTISSA_SIZE,0);
   CCS_ALLOC(CCCS,ARR_SIZE); /* ccs prof */
 
   /* Be prepared to tell Lennart-coded __decodeDouble	*/
