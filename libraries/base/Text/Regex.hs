@@ -47,8 +47,8 @@ mkRegexWithOpts
 mkRegexWithOpts s single_line case_sensitive
    = unsafePerformIO (RE.regcomp s (RE.regExtended + newline + igcase))
    where
-	newline | single_line = 0
-		| otherwise   = RE.regNewline
+	newline | single_line = RE.regNewline
+		| otherwise   = 0
 
 	igcase  | case_sensitive = 0 
 		| otherwise 	 = RE.regIgnoreCase
