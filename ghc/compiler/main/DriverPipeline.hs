@@ -439,17 +439,19 @@ run_phase MkDependHS basename suff input_fn output_fn
       hdl <- readIORef v_Dep_tmp_hdl
 
 	-- std dependency of the object(s) on the source file
-      hPutStrLn hdl (unwords objs ++ " : " ++ basename ++ '.':suff)
+      hPutStrLn hdl (unwords (map escapeSpaces objs) ++ " : " ++
+		     escapeSpaces (basename ++ '.':suff))
 
       let genDep (dep, False {- not an hi file -}) = 
-	     hPutStrLn hdl (unwords objs ++ " : " ++ dep)
+	     hPutStrLn hdl (unwords (map escapeSpaces objs) ++ " : " ++
+			    escapeSpaces dep)
           genDep (dep, True  {- is an hi file -}) = do
 	     hisuf <- readIORef v_Hi_suf
 	     let dep_base = remove_suffix '.' dep
 	         deps = (dep_base ++ hisuf)
 		        : map (\suf -> dep_base ++ suf ++ '_':hisuf) extra_suffixes
 		  -- length objs should be == length deps
-	     sequence_ (zipWith (\o d -> hPutStrLn hdl (o ++ " : " ++ d)) objs deps)
+	     sequence_ (zipWith (\o d -> hPutStrLn hdl (escapeSpaces o ++ " : " ++ escapeSpaces d)) objs deps)
 
       sequence_ (map genDep [ d | Just d <- deps ])
       return (Just output_fn)
@@ -472,6 +474,7 @@ run_phase MkDependHS basename suff input_fn output_fn
    	   -- (where .o is $osuf, and the other suffixes come from
    	   -- the cmdline -s options).
    
+
 -----------------------------------------------------------------------------
 -- Hsc phase
 
