@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.18 2004/09/03 15:28:19 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.19 2004/09/06 11:00:21 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -262,12 +262,13 @@ static void
 freeMegaGroup(bdescr *p)
 {
   nat n;
+  void *q = p;
 
-  n = p->blocks * BLOCK_SIZE / MBLOCK_SIZE + 1;
-  for (; n > 0; (W_)p += MBLOCK_SIZE, n--) {
-    initMBlock(MBLOCK_ROUND_DOWN(p));
-    initGroup(BLOCKS_PER_MBLOCK, p);
-    freeGroup(p);
+  n = ((bdescr *)q)->blocks * BLOCK_SIZE / MBLOCK_SIZE + 1;
+  for (; n > 0; q += MBLOCK_SIZE, n--) {
+    initMBlock(MBLOCK_ROUND_DOWN(q));
+    initGroup(BLOCKS_PER_MBLOCK, (bdescr *)q);
+    freeGroup((bdescr *)q);
   }
 }
 
@@ -296,7 +297,7 @@ initMBlock(void *mblock)
 
   /* Initialise the start field of each block descriptor
    */
-  for (; block <= LAST_BLOCK(mblock); bd += 1, (lnat)block += BLOCK_SIZE) {
+  for (; block <= LAST_BLOCK(mblock); bd += 1, block += BLOCK_SIZE) {
     bd->start = block;
   }
 }
