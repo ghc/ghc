@@ -34,7 +34,7 @@ import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
 			  warnUnusedLocalBinds, warnUnusedModules, 
-			  lookupSrcName, getImplicitStmtFVs, getImplicitModuleFVs, rnSyntaxNames,
+			  lookupSrcName, getImplicitStmtFVs, getImplicitModuleFVs, 
 			  newGlobalName, unQualInScope,, ubiquitousNames
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
@@ -45,7 +45,7 @@ import Name		( Name, nameModule )
 import NameEnv
 import NameSet
 import RdrName		( foldRdrEnv, isQual )
-import PrelNames	( SyntaxMap, vanillaSyntaxMap, pRELUDE_Name )
+import PrelNames	( pRELUDE_Name )
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass, 
 			  printErrorsAndWarnings, errorsFound )
 import Bag		( bagToList )
@@ -83,7 +83,7 @@ renameModule :: DynFlags
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
 	     -> IO (PersistentCompilerState, PrintUnqualified,
-		    Maybe (IsExported, ModIface, (SyntaxMap, [RenamedHsDecl])))
+		    Maybe (IsExported, ModIface, [RenamedHsDecl]))
 	-- Nothing => some error occurred in the renamer
 
 renameModule dflags hit hst pcs this_module rdr_module
@@ -102,7 +102,7 @@ renameStmt :: DynFlags
 	   -> RdrNameStmt		-- parsed stmt
 	   -> IO ( PersistentCompilerState, 
 		   PrintUnqualified,
-		   Maybe ([Name], (SyntaxMap, RenamedStmt, [RenamedHsDecl]))
+		   Maybe ([Name], (RenamedStmt, [RenamedHsDecl]))
                  )
 
 renameStmt dflags hit hst pcs scope_module this_module local_env stmt
@@ -141,7 +141,7 @@ renameStmt dflags hit hst pcs scope_module this_module local_env stmt
     slurpImpDecls source_fvs			`thenRn` \ decls ->
 
     doDump binders stmt decls  `thenRn_`
-    returnRn (print_unqual, Just (binders, (vanillaSyntaxMap, stmt, decls)))
+    returnRn (print_unqual, Just (binders, (stmt, decls)))
 
   where
      doc = text "context for compiling expression"
@@ -191,7 +191,7 @@ renameSource dflags hit hst old_pcs this_module thing_inside
 
 \begin{code}
 rename :: Module -> RdrNameHsModule 
-       -> RnMG (PrintUnqualified, Maybe (IsExported, ModIface, (SyntaxMap, [RenamedHsDecl])))
+       -> RnMG (PrintUnqualified, Maybe (IsExported, ModIface, [RenamedHsDecl]))
 rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec loc)
   = pushSrcLocRn loc		$
 
@@ -239,10 +239,9 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
    	-- Find out what re-bindable names to use for desugaring
     getImplicitModuleFVs mod_name rn_local_decls	`thenRn` \ implicit_fvs ->
-    rnSyntaxNames gbl_env source_fvs			`thenRn` \ (source_fvs1, sugar_map) ->
     let
 	export_fvs  = availsToNameSet export_avails
-	source_fvs2 = source_fvs1 `plusFV` export_fvs
+	source_fvs2 = source_fvs `plusFV` export_fvs
 		-- The export_fvs make the exported names look just as if they
 		-- occurred in the source program.  For the reasoning, see the
 		-- comments with RnIfaces.mkImportInfo
@@ -298,7 +297,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 		-- NB: source_fvs2: include exports (else we get bogus 
 		--     warnings of unused things) but not implicit FVs.
 
-    returnRn (print_unqualified, Just (is_exported, mod_iface, (sugar_map, final_decls)))
+    returnRn (print_unqualified, Just (is_exported, mod_iface, final_decls))
   where
     mod_name = moduleName this_module
 \end{code}

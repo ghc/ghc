@@ -39,7 +39,7 @@ import TcHsSyn	( TcExpr, TcId,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
-import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupSyntaxId )
+import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType,
@@ -433,18 +433,11 @@ newOverloadedLit :: InstOrigin
 		 -> HsOverLit
 		 -> TcType
 		 -> NF_TcM (TcExpr, LIE)
-newOverloadedLit orig (HsIntegral i) ty
-  | isIntTy ty && inIntRange i		-- Short cut for Int
-  = returnNF_Tc (int_lit, emptyLIE)
+newOverloadedLit orig lit ty
+  | Just expr <- shortCutLit lit ty
+  = returnNF_Tc (expr, emptyLIE)
 
-  | isIntegerTy ty 			-- Short cut for Integer
-  = returnNF_Tc (integer_lit, emptyLIE)
-
-  where
-    int_lit     = HsLit (HsInt i)
-    integer_lit = HsLit (HsInteger i)
-
-newOverloadedLit orig lit ty		-- The general case
+  | otherwise
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
     tcGetUnique			`thenNF_Tc` \ new_uniq ->
     let
@@ -452,6 +445,22 @@ newOverloadedLit orig lit ty		-- The general case
 	lit_id   = mkSysLocal SLIT("lit") new_uniq ty
     in
     returnNF_Tc (HsVar (instToId lit_inst), unitLIE lit_inst)
+
+shortCutLit :: HsOverLit -> TcType -> Maybe TcExpr
+shortCutLit (HsIntegral i fi) ty
+  | isIntTy ty && inIntRange i && fi == fromIntegerName		-- Short cut for Int
+  = Just (HsLit (HsInt i))
+  | isIntegerTy ty && fi == fromIntegerName			-- Short cut for Integer
+  = Just (HsLit (HsInteger i))
+
+shortCutLit (HsFractional f fr) ty
+  | isFloatTy ty  && fr == fromRationalName 
+  = Just (mkHsConApp floatDataCon [] [HsLit (HsFloatPrim f)])
+  | isDoubleTy ty && fr == fromRationalName 
+  = Just (mkHsConApp doubleDataCon [] [HsLit (HsDoublePrim f)])
+
+shortCutLit lit ty
+  = Nothing
 \end{code}
 
 
@@ -590,45 +599,32 @@ lookupInst inst@(Method _ id tys theta _ loc)
 
 -- Literals
 
-lookupInst inst@(LitInst u (HsIntegral i) ty loc)
-  | isIntTy ty && in_int_range			-- Short cut for Int
-  = returnNF_Tc (GenInst [] int_lit)
-	-- GenInst, not SimpleInst, because int_lit is actually a constructor application
-
-  | isIntegerTy ty				-- Short cut for Integer
-  = returnNF_Tc (GenInst [] integer_lit)
-
-  | otherwise   				-- Alas, it is overloaded and a big literal!
-  = tcLookupSyntaxId fromIntegerName		`thenNF_Tc` \ from_integer ->
-    newMethodAtLoc loc from_integer [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
-    returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) integer_lit))
-  where
-    in_int_range   = inIntRange i
-    integer_lit    = HsLit (HsInteger i)
-    int_lit        = HsLit (HsInt i)
-
--- similar idea for overloaded floating point literals: if the literal is
--- *definitely* a float or a double, generate the real thing here.
+-- Look for short cuts first: if the literal is *definitely* a 
+-- int, integer, float or a double, generate the real thing here.
 -- This is essential  (see nofib/spectral/nucleic).
+-- [Same shortcut as in newOverloadedLit, but we
+--  may have done some unification by now] 		
 
-lookupInst inst@(LitInst u (HsFractional f) ty loc)
-  | isFloatTy ty    = returnNF_Tc (GenInst [] float_lit)
-  | isDoubleTy ty   = returnNF_Tc (GenInst [] double_lit)
+lookupInst inst@(LitInst u lit ty loc)
+  | Just expr <- shortCutLit lit ty
+  = returnNF_Tc (GenInst [] expr)	-- GenInst, not SimpleInst, because 
+					-- expr may be a constructor application
 
-  | otherwise 
-  = tcLookupSyntaxId fromRationalName		`thenNF_Tc` \ from_rational ->
+lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
+  = tcLookupId from_integer_name		`thenNF_Tc` \ from_integer ->
+    newMethodAtLoc loc from_integer [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
+    returnNF_Tc (GenInst [method_inst] 
+			 (HsApp (HsVar method_id) (HsLit (HsInteger i))))
+
+
+lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
+  = tcLookupId from_rat_name			`thenNF_Tc` \ from_rational ->
     newMethodAtLoc loc from_rational [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     let
 	rational_ty  = tcFunArgTy (idType method_id)
 	rational_lit = HsLit (HsRat f rational_ty)
     in
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) rational_lit))
-
-  where
-    floatprim_lit  = HsLit (HsFloatPrim f)
-    float_lit      = mkHsConApp floatDataCon [] [floatprim_lit]
-    doubleprim_lit = HsLit (HsDoublePrim f)
-    double_lit     = mkHsConApp doubleDataCon [] [doubleprim_lit]
 \end{code}
 
 There is a second, simpler interface, when you want an instance of a

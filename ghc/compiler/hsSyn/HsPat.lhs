@@ -26,6 +26,7 @@ import HsTypes		( HsType )
 import BasicTypes	( Fixity, Boxity, tupleParens )
 
 -- others:
+import Name		( Name )
 import Var		( Id, TyVar )
 import DataCon		( DataCon, dataConTyCon )
 import Name		( isDataSymOcc, getOccName, NamedThing )
@@ -57,6 +58,7 @@ data InPat name
 
   | NPlusKPatIn	    name		-- n+k pattern
 		    HsOverLit		-- It'll always be an HsIntegral
+		    Name		-- Name of '-' (see RnEnv.lookupSyntaxName)
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
 
@@ -112,11 +114,11 @@ data OutPat id
 		    HsLit
 		    Type 		-- Type of pattern
 
-  | NPat	    -- Used for *overloaded* literal patterns
+  | NPat	    -- Used for literal patterns where there's an equality function to call
 		    HsLit			-- The literal is retained so that
 						-- the desugarer can readily identify
 						-- equations with identical literal-patterns
-						-- Always HsInt, HsRat or HsString.
+						-- Always HsInteger, HsRat or HsString.
 		    Type	 		-- Type of pattern, t
    	    	    (HsExpr id (OutPat id))	-- Of type t -> Bool; detects match
 
@@ -151,7 +153,7 @@ pprInPat (AsPatIn name pat)   = parens (hcat [ppr name, char '@', ppr pat])
 pprInPat (ParPatIn pat)	      = parens (pprInPat pat)
 pprInPat (ListPatIn pats)     = brackets (interpp'SP pats)
 pprInPat (TuplePatIn pats bx) = tupleParens bx (interpp'SP pats)
-pprInPat (NPlusKPatIn n k)    = parens (hcat [ppr n, char '+', ppr k])
+pprInPat (NPlusKPatIn n k _)  = parens (hcat [ppr n, char '+', ppr k])
 pprInPat (NPatIn l)	      = ppr l
 
 pprInPat (ConPatIn c pats)
@@ -317,7 +319,7 @@ collect (LitPatIn _)	      	 bndrs = bndrs
 collect (SigPatIn pat _)	 bndrs = collect pat bndrs
 collect (LazyPatIn pat)     	 bndrs = collect pat bndrs
 collect (AsPatIn a pat)     	 bndrs = a : collect pat bndrs
-collect (NPlusKPatIn n _)        bndrs = n : bndrs
+collect (NPlusKPatIn n _ _)      bndrs = n : bndrs
 collect (NPatIn _)		 bndrs = bndrs
 collect (ConPatIn c pats)   	 bndrs = foldr collect bndrs pats
 collect (ConOpPatIn p1 c f p2)   bndrs = collect p1 (collect p2 bndrs)
@@ -344,7 +346,7 @@ collect_pat (LitPatIn _)	   acc = acc
 collect_pat (LazyPatIn pat)        acc = collect_pat pat acc
 collect_pat (AsPatIn a pat)        acc = collect_pat pat acc
 collect_pat (NPatIn _)		   acc = acc
-collect_pat (NPlusKPatIn n _)      acc = acc
+collect_pat (NPlusKPatIn n _ _)    acc = acc
 collect_pat (ConPatIn c pats)      acc = foldr collect_pat acc pats
 collect_pat (ConOpPatIn p1 c f p2) acc = collect_pat p1 (collect_pat p2 acc)
 collect_pat (ParPatIn  pat)        acc = collect_pat pat acc

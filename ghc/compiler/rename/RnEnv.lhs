@@ -25,7 +25,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  extendLocalRdrEnv
 			)
 import RnMonad
-import Name		( Name,
+import Name		( Name, 
 			  getSrcLoc, nameIsLocalOrFrom,
 			  mkLocalName, mkGlobalName,
 			  mkIPName, nameOccName, nameModule_maybe,
@@ -36,7 +36,7 @@ import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
 import Module		( ModuleName, moduleName, mkVanillaModule, 
 			  mkSysModuleNameFS, moduleNameFS, WhereFrom(..) )
-import PrelNames	( mkUnboundName, syntaxList, SyntaxMap,	vanillaSyntaxMap,
+import PrelNames	( mkUnboundName, 
 			  derivingOccurrences,
 			  mAIN_Name, pREL_MAIN_Name, 
 			  ioTyConName, intTyConName, 
@@ -410,38 +410,47 @@ ubiquitousNames
 	--	  free var at every function application!)
 \end{code}
 
-\begin{code}
-rnSyntaxNames :: GlobalRdrEnv -> FreeVars -> RnMG (FreeVars, SyntaxMap)
--- Look up the re-bindable syntactic sugar names
--- Any errors arising from these lookups may surprise the
--- programmer, since they aren't explicitly mentioned, and
--- the src line will be unhelpful (ToDo)
+%************************************************************************
+%*									*
+\subsection{Re-bindable desugaring names}
+%*									*
+%************************************************************************
 
-rnSyntaxNames gbl_env source_fvs
+Haskell 98 says that when you say "3" you get the "fromInteger" from the
+Standard Prelude, regardless of what is in scope.   However, to experiment
+with having a language that is less coupled to the standard prelude, we're
+trying a non-standard extension that instead gives you whatever "Prelude.fromInteger"
+happens to be in scope.  Then you can
+	import Prelude ()
+	import MyPrelude as Prelude
+to get the desired effect.
+
+At the moment this just happens for
+  * fromInteger, fromRational on literals (in expressions and patterns)
+  * negate (in expressions)
+  * minus  (arising from n+k patterns)
+
+We store the relevant Name in the HsSyn tree, in 
+  * HsIntegral/HsFractional	
+  * NegApp
+  * NPlusKPatIn
+respectively.  Initially, we just store the "standard" name (PrelNames.fromIntegralName,
+fromRationalName etc), but the renamer changes this to the appropriate user
+name if Opt_NoImplicitPrelude is on.  That is what lookupSyntaxName does.
+
+\begin{code}
+lookupSyntaxName :: Name 	-- The standard name
+	         -> RnMS Name	-- Possibly a non-standard name
+lookupSyntaxName std_name
   = doptRn Opt_NoImplicitPrelude	`thenRn` \ no_prelude -> 
     if not no_prelude then
-	returnRn (source_fvs, vanillaSyntaxMap)
+	returnRn std_name	-- Normal case
     else
-
-	-- There's a -fno-implicit-prelude flag,
-	-- so build the re-mapping function
     let
-	reqd_syntax_list = filter is_reqd syntaxList
-	is_reqd (n,_)    = n `elemNameSet` source_fvs
-	lookup (n,rn)    = lookupSrcName gbl_env rn	`thenRn` \ rn' ->
-			   returnRn (n,rn')
+	rdr_name = mkRdrUnqual (nameOccName std_name)
+	-- Get the similarly named thing from the local environment
     in
-    mapRn lookup reqd_syntax_list	`thenRn` \ rn_syntax_list ->
-    let
-	-- Delete the proxies and add the actuals
-	proxies = map fst rn_syntax_list
-	actuals = map snd rn_syntax_list
-	new_source_fvs = (proxies `delFVs` source_fvs) `plusFV` mkFVs actuals
-
-	syntax_env   = mkNameEnv rn_syntax_list
-	syntax_map n = lookupNameEnv syntax_env n `orElse` n
-    in   
-    returnRn (new_source_fvs, syntax_map)
+    lookupOccRn rdr_name
 \end{code}
 
 

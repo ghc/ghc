@@ -16,7 +16,7 @@ import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  Stmt(..), InPat(..), HsMatchContext(..), HsDoContext(..), RuleDecl(..),
 			  isIfaceRuleDecl, nullBinds, andMonoBindList, mkSimpleMatch, placeHolderType
 			)
-import PrelNames	( SyntaxMap, mAIN_Name, mainName, ioTyConName, printName,
+import PrelNames	( mAIN_Name, mainName, ioTyConName, printName,
 			  returnIOName, bindIOName, failIOName, 
 			  itName
 			)
@@ -91,8 +91,7 @@ typecheckStmt
    -> PrintUnqualified	   -- For error printing
    -> Module		   -- Is this really needed
    -> [Name]		   -- Names bound by the Stmt (empty for expressions)
-   -> (SyntaxMap,
-       RenamedStmt, 	   -- The stmt itself
+   -> (RenamedStmt, 	   -- The stmt itself
        [RenamedHsDecl])	   -- Plus extra decls it sucked in from interface files
    -> IO (Maybe (PersistentCompilerState, 
 		 TypecheckedHsExpr, 
@@ -101,8 +100,8 @@ typecheckStmt
 		-- The returned [Id] is the same as the input except for
 		-- ExprStmt, in which case the returned [Name] is [itName]
 
-typecheckStmt dflags pcs hst ic_type_env unqual this_mod names (syn_map, stmt, iface_decls)
-  = typecheck dflags syn_map pcs hst unqual $
+typecheckStmt dflags pcs hst ic_type_env unqual this_mod names (stmt, iface_decls)
+  = typecheck dflags pcs hst unqual $
 
  	 -- use the default default settings, i.e. [Integer, Double]
     tcSetDefaultTys defaultDefaultTys $
@@ -235,16 +234,15 @@ typecheckExpr :: DynFlags
 	      -> TypeEnv	   -- The interactive context's type envt 
 	      -> PrintUnqualified	-- For error printing
 	      -> Module
-	      -> (SyntaxMap,
-		  RenamedHsExpr, 	-- The expression itself
+	      -> (RenamedHsExpr, 	-- The expression itself
 	          [RenamedHsDecl])	-- Plus extra decls it sucked in from interface files
 	      -> IO (Maybe (PersistentCompilerState, 
 			    TypecheckedHsExpr, 
 			    [Id],	-- always empty (matches typecheckStmt)
 			    Type))
 
-typecheckExpr dflags pcs hst ic_type_env unqual this_mod (syn_map, expr, decls)
-  = typecheck dflags syn_map pcs hst unqual $
+typecheckExpr dflags pcs hst ic_type_env unqual this_mod (expr, decls)
+  = typecheck dflags pcs hst unqual $
 
  	 -- use the default default settings, i.e. [Integer, Double]
     tcSetDefaultTys defaultDefaultTys $
@@ -302,7 +300,7 @@ typecheckModule
 	-> HomeSymbolTable
 	-> ModIface		-- Iface for this module
 	-> PrintUnqualified	-- For error printing
-	-> (SyntaxMap, [RenamedHsDecl])
+	-> [RenamedHsDecl]
 	-> IO (Maybe (PersistentCompilerState, TcResults))
 			-- The new PCS is Augmented with imported information,
 						-- (but not stuff from this module)
@@ -318,8 +316,8 @@ data TcResults
     }
 
 
-typecheckModule dflags pcs hst mod_iface unqual (syn_map, decls)
-  = do	{ maybe_tc_result <- typecheck dflags syn_map pcs hst unqual $
+typecheckModule dflags pcs hst mod_iface unqual decls
+  = do	{ maybe_tc_result <- typecheck dflags pcs hst unqual $
 			     tcModule pcs hst get_fixity this_mod decls
 	; printTcDump dflags unqual maybe_tc_result
 	; return maybe_tc_result }
@@ -469,13 +467,13 @@ typecheckIface
 	-> PersistentCompilerState
 	-> HomeSymbolTable
 	-> ModIface		-- Iface for this module (just module & fixities)
-	-> (SyntaxMap, [RenamedHsDecl])
+	-> [RenamedHsDecl]
 	-> IO (Maybe (PersistentCompilerState, ModDetails))
 			-- The new PCS is Augmented with imported information,
 			-- (but not stuff from this module).
 
-typecheckIface dflags pcs hst mod_iface (syn_map, decls)
-  = do	{ maybe_tc_stuff <- typecheck dflags syn_map pcs hst alwaysQualify $
+typecheckIface dflags pcs hst mod_iface decls
+  = do	{ maybe_tc_stuff <- typecheck dflags pcs hst alwaysQualify $
 			    tcIfaceImports pcs hst get_fixity this_mod decls
 	; printIfaceDump dflags maybe_tc_stuff
 	; return maybe_tc_stuff }
@@ -645,16 +643,15 @@ noMainErr = hsep [ptext SLIT("Module") <+> quotes (ppr mAIN_Name),
 
 \begin{code}
 typecheck :: DynFlags
-	  -> SyntaxMap
 	  -> PersistentCompilerState
 	  -> HomeSymbolTable
 	  -> PrintUnqualified	-- For error printing
 	  -> TcM r
 	  -> IO (Maybe r)
 
-typecheck dflags syn_map pcs hst unqual thing_inside 
+typecheck dflags pcs hst unqual thing_inside 
  = do	{ showPass dflags "Typechecker";
-	; env <- initTcEnv syn_map hst (pcs_PTE pcs)
+	; env <- initTcEnv hst (pcs_PTE pcs)
 
 	; (maybe_tc_result, errs) <- initTc dflags env thing_inside
 

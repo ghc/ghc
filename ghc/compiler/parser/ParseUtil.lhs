@@ -33,7 +33,8 @@ import SrcLoc
 import RdrHsSyn		( RdrBinding(..),
 			  RdrNameHsType, RdrNameBangType, RdrNameContext,
 			  RdrNameHsTyVar, RdrNamePat, RdrNameHsExpr, RdrNameGRHSs,
-			  RdrNameHsRecordBinds, RdrNameMonoBinds, RdrNameConDetails
+			  RdrNameHsRecordBinds, RdrNameMonoBinds, RdrNameConDetails,
+			  mkNPlusKPat
 			)
 import RdrName
 import PrelNames	( unitTyCon_RDR )
@@ -194,9 +195,9 @@ checkPat e [] = case e of
 			      in
 			      returnP (SigPatIn e t')
 
-	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral k)) 
+	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral _ _)) 
 		  	   | plus == plus_RDR
-			   -> returnP (NPlusKPatIn n lit)
+			   -> returnP (mkNPlusKPat n lit)
 			   where
 			      plus_RDR = mkUnqual varName SLIT("+")	-- Hack
 

@@ -17,6 +17,7 @@ import HsTypes		( HsType )
 import HsImpExp		( isOperator )
 
 -- others:
+import Name		( Name )
 import ForeignCall	( Safety )
 import Outputable	
 import PprType		( pprParendType )
@@ -60,6 +61,7 @@ data HsExpr id pat
   -- They are eventually removed by the type checker.
 
   | NegApp	(HsExpr id pat)	-- negated expr
+		Name		-- Name of 'negate' (see RnEnv.lookupSyntaxName)
 
   | HsPar	(HsExpr id pat)	-- parenthesised expr
 
@@ -248,7 +250,7 @@ ppr_expr (OpApp e1 op fixity e2)
 		| otherwise    = char '`' <> ppr v <> char '`'
 	        -- Put it in backquotes if it's not an operator already
 
-ppr_expr (NegApp e) = char '-' <+> pprParendExpr e
+ppr_expr (NegApp e _) = char '-' <+> pprParendExpr e
 
 ppr_expr (HsPar e) = parens (ppr_expr e)
 

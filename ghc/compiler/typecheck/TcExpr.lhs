@@ -26,7 +26,7 @@ import Inst		( InstOrigin(..),
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
 			  tcLookupTyCon, tcLookupDataCon, tcLookupId,
-			  tcExtendGlobalTyVars, tcLookupSyntaxName
+			  tcExtendGlobalTyVars
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
@@ -195,9 +195,8 @@ tcMonoExpr (HsLit lit)     res_ty = tcLit lit res_ty
 tcMonoExpr (HsOverLit lit) res_ty = newOverloadedLit (LiteralOrigin lit) lit res_ty
 tcMonoExpr (HsPar expr)    res_ty = tcMonoExpr expr res_ty
 
-tcMonoExpr (NegApp expr) res_ty
-  = tcLookupSyntaxName negateName	`thenNF_Tc` \ neg ->
-    tcMonoExpr (HsApp (HsVar neg) expr) res_ty
+tcMonoExpr (NegApp expr neg_name) res_ty
+  = tcMonoExpr (HsApp (HsVar neg_name) expr) res_ty
 
 tcMonoExpr (HsLam match) res_ty
   = tcMatchLambda match res_ty 		`thenTc` \ (match',lie) ->

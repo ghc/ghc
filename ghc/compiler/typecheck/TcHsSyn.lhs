@@ -411,8 +411,8 @@ zonkExpr (OpApp e1 op fixity e2)
     zonkExpr e2	`thenNF_Tc` \ new_e2 ->
     returnNF_Tc (OpApp new_e1 new_op fixity new_e2)
 
-zonkExpr (NegApp _) = panic "zonkExpr: NegApp"
-zonkExpr (HsPar _)  = panic "zonkExpr: HsPar"
+zonkExpr (NegApp _ _) = panic "zonkExpr: NegApp"
+zonkExpr (HsPar _)    = panic "zonkExpr: HsPar"
 
 zonkExpr (SectionL expr op)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->

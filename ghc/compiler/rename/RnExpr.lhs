@@ -94,11 +94,12 @@ rnPat (NPatIn lit)
     lookupOrigName eqClass_RDR		`thenRn` \ eq   ->	-- Needed to find equality on pattern
     returnRn (NPatIn lit', fvs1 `addOneFV` eq)
 
-rnPat (NPlusKPatIn name lit)
+rnPat (NPlusKPatIn name lit minus)
   = rnOverLit lit			`thenRn` \ (lit', fvs) ->
     lookupOrigName ordClass_RDR		`thenRn` \ ord ->
     lookupBndrRn name			`thenRn` \ name' ->
-    returnRn (NPlusKPatIn name' lit', fvs `addOneFV` ord `addOneFV` minusName)
+    lookupSyntaxName minus		`thenRn` \ minus' ->
+    returnRn (NPlusKPatIn name' lit' minus', fvs `addOneFV` ord `addOneFV` minus')
 
 rnPat (LazyPatIn pat)
   = rnPat pat		`thenRn` \ (pat', fvs) ->
@@ -333,10 +334,11 @@ rnExpr (OpApp e1 op _ e2)
     returnRn (final_e,
 	      fv_e1 `plusFV` fv_op `plusFV` fv_e2)
 
-rnExpr (NegApp e)
+rnExpr (NegApp e neg_name)
   = rnExpr e			`thenRn` \ (e', fv_e) ->
-    mkNegAppRn e'		`thenRn` \ final_e ->
-    returnRn (final_e, fv_e `addOneFV` negateName)
+    lookupSyntaxName neg_name	`thenRn` \ neg_name' ->
+    mkNegAppRn e' neg_name'	`thenRn` \ final_e ->
+    returnRn (final_e, fv_e `addOneFV` neg_name')
 
 rnExpr (HsPar e)
   = rnExpr e 		`thenRn` \ (e', fvs_e) ->
@@ -652,21 +654,21 @@ mkOpAppRn e1@(OpApp e11 op1 fix1 e12) op2 fix2 e2
 
 ---------------------------
 --	(- neg_arg) `op` e2
-mkOpAppRn e1@(NegApp neg_arg) op2 fix2 e2
+mkOpAppRn e1@(NegApp neg_arg neg_name) op2 fix2 e2
   | nofix_error
   = addErrRn (precParseErr (pp_prefix_minus,negateFixity) (ppr_op op2,fix2))	`thenRn_`
     returnRn (OpApp e1 op2 fix2 e2)
 
   | associate_right
   = mkOpAppRn neg_arg op2 fix2 e2	`thenRn` \ new_e ->
-    returnRn (NegApp new_e)
+    returnRn (NegApp new_e neg_name)
   where
     (nofix_error, associate_right) = compareFixity negateFixity fix2
 
 ---------------------------
 --	e1 `op` - neg_arg
-mkOpAppRn e1 op1 fix1 e2@(NegApp neg_arg)	-- NegApp can occur on the right
-  | not associate_right					-- We *want* right association
+mkOpAppRn e1 op1 fix1 e2@(NegApp neg_arg _)	-- NegApp can occur on the right
+  | not associate_right				-- We *want* right association
   = addErrRn (precParseErr (ppr_op op1, fix1) (pp_prefix_minus, negateFixity))	`thenRn_`
     returnRn (OpApp e1 op1 fix1 e2)
   where
@@ -691,13 +693,13 @@ right_op_ok fix1 other
   = True
 
 -- Parser initially makes negation bind more tightly than any other operator
-mkNegAppRn neg_arg
+mkNegAppRn neg_arg neg_name
   = 
 #ifdef DEBUG
     getModeRn			`thenRn` \ mode ->
     ASSERT( not_op_app mode neg_arg )
 #endif
-    returnRn (NegApp neg_arg)
+    returnRn (NegApp neg_arg neg_name)
 
 not_op_app SourceMode (OpApp _ _ _ _) = False
 not_op_app mode other	 	      = True
@@ -769,7 +771,7 @@ checkPrec op pat right
 checkSectionPrec left_or_right section op arg
   = case arg of
 	OpApp _ op fix _ -> go_for_it (ppr_op op)     fix
-	NegApp _	 -> go_for_it pp_prefix_minus negateFixity
+	NegApp _ _	 -> go_for_it pp_prefix_minus negateFixity
 	other		 -> returnRn ()
   where
     HsVar op_name = op
@@ -831,20 +833,22 @@ litFVs (HsLitLit l bogus_ty)  = lookupOrigName cCallableClass_RDR	`thenRn` \ cc 
 litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat only appear 
 									-- in post-typechecker translations
 
-rnOverLit (HsIntegral i)
-  | inIntRange i
-  = returnRn (HsIntegral i, unitFV fromIntegerName)
-  | otherwise
-  = lookupOrigNames [fromInteger_RDR, plusInteger_RDR, timesInteger_RDR]	`thenRn` \ ns ->
-	-- Big integers are built, using + and *, out of small integers
-	-- [No particular reason why we use fromIntegerName in one case can 
-	--  fromInteger_RDR in the other; but plusInteger_RDR means we 
-	--  can get away without plusIntegerName altogether.]
-    returnRn (HsIntegral i, ns)
+rnOverLit (HsIntegral i from_integer_name)
+  = lookupSyntaxName from_integer_name	`thenRn` \ from_integer_name' ->
+    if inIntRange i then
+	returnRn (HsIntegral i from_integer_name', unitFV from_integer_name')
+    else
+	lookupOrigNames [plusInteger_RDR, timesInteger_RDR]	`thenRn` \ ns ->
+	-- Big integer literals are built, using + and *, 
+	-- out of small integers (DsUtils.mkIntegerLit)
+	-- [NB: plusInteger, timesInteger aren't rebindable... 
+	--	they are used to construct the argument to fromInteger, 
+	--	which is the rebindable one.]
+    returnRn (HsIntegral i from_integer_name', ns `addOneFV` from_integer_name')
 
-rnOverLit (HsFractional i)
-  = lookupOrigNames [fromRational_RDR, ratioDataCon_RDR, 
-		     plusInteger_RDR, timesInteger_RDR]  `thenRn` \ ns ->
+rnOverLit (HsFractional i from_rat_name)
+  = lookupSyntaxName from_rat_name						`thenRn` \ from_rat_name' ->
+    lookupOrigNames [ratioDataCon_RDR, plusInteger_RDR, timesInteger_RDR]	`thenRn` \ ns ->
 	-- We have to make sure that the Ratio type is imported with
 	-- its constructor, because literals of type Ratio t are
 	-- built with that constructor.
@@ -852,7 +856,7 @@ rnOverLit (HsFractional i)
 	-- when fractionalClass does.
 	-- The plus/times integer operations may be needed to construct the numerator
 	-- and denominator (see DsUtils.mkIntegerLit)
-    returnRn (HsFractional i, ns)
+    returnRn (HsFractional i from_rat_name', ns `addOneFV` from_rat_name')
 \end{code}
 
 %************************************************************************

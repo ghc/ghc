@@ -9,6 +9,7 @@ module HsLit where
 #include "HsVersions.h"
 
 import Type	( Type )
+import Name	( Name )
 import HsTypes	( PostTcType )
 import Outputable
 import Ratio	( Rational )
@@ -55,19 +56,21 @@ instance Eq HsLit where
   (HsLitLit x1 _)   == (HsLitLit x2 _)   = x1==x2
   lit1		    == lit2		 = False
 
-data HsOverLit 		-- An overloaded literal
-  = HsIntegral	    Integer 		-- Integer-looking literals;
-  | HsFractional    Rational 		-- Frac-looking literals
+data HsOverLit 			-- An overloaded literal
+  = HsIntegral	    Integer  Name	-- Integer-looking literals;
+					-- The name is fromInteger
+  | HsFractional    Rational Name	-- Frac-looking literals
+					-- The name is fromRational
 
 instance Eq HsOverLit where
-  (HsIntegral i1)   == (HsIntegral i2)   = i1 == i2
-  (HsFractional f1) == (HsFractional f2) = f1 == f2
+  (HsIntegral i1 _)   == (HsIntegral i2 _)   = i1 == i2
+  (HsFractional f1 _) == (HsFractional f2 _) = f1 == f2
 
 instance Ord HsOverLit where
-  compare (HsIntegral i1)   (HsIntegral i2)   = i1 `compare` i2
-  compare (HsIntegral _)    (HsFractional _)  = LT
-  compare (HsFractional f1) (HsFractional f2) = f1 `compare` f2
-  compare (HsFractional f1) (HsIntegral _)    = GT
+  compare (HsIntegral i1 _)   (HsIntegral i2 _)   = i1 `compare` i2
+  compare (HsIntegral _ _)    (HsFractional _ _)  = LT
+  compare (HsFractional f1 _) (HsFractional f2 _) = f1 `compare` f2
+  compare (HsFractional f1 _) (HsIntegral _ _)    = GT
 \end{code}
 
 \begin{code}
@@ -86,8 +89,8 @@ instance Outputable HsLit where
     ppr (HsLitLit s _)	 = hcat [text "``", ptext s, text "''"]
 
 instance Outputable HsOverLit where
-  ppr (HsIntegral i)   = integer i
-  ppr (HsFractional f) = rational f
+  ppr (HsIntegral i _)   = integer i
+  ppr (HsFractional f _) = rational f
 \end{code}
 
 

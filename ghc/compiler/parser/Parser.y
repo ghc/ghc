@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.70 2001/07/12 16:21:23 simonpj Exp $
+$Id: Parser.y,v 1.71 2001/07/13 13:29:57 simonpj Exp $
 
 Haskell grammar.
 
@@ -773,8 +773,8 @@ aexp1	:: { RdrNameHsExpr }
 	: ipvar				{ HsIPVar $1 }
 	| var_or_con			{ $1 }
 	| literal			{ HsLit $1 }
-	| INTEGER			{ HsOverLit (HsIntegral   $1) }
-	| RATIONAL			{ HsOverLit (HsFractional $1) }
+	| INTEGER			{ HsOverLit (mkHsIntegral   $1) }
+	| RATIONAL			{ HsOverLit (mkHsFractional $1) }
 	| '(' exp ')'			{ HsPar $2 }
 	| '(' exp ',' texps ')'		{ ExplicitTuple ($2 : reverse $4) Boxed}
 	| '(#' texps '#)'		{ ExplicitTuple (reverse $2)      Unboxed }

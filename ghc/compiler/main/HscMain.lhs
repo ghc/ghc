@@ -39,7 +39,7 @@ import Finder		( findModule )
 import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
-import PrelNames	( vanillaSyntaxMap, knownKeyNames )
+import PrelNames	( knownKeyNames )
 import MkIface		( mkFinalIface )
 import TcModule
 import InstEnv		( emptyInstEnv )
@@ -170,7 +170,7 @@ hscNoRecomp ghci_mode dflags have_object
 
       -- TYPECHECK
       maybe_tc_result 
-	<- typecheckIface dflags pcs_cl hst old_iface (vanillaSyntaxMap, cl_hs_decls);
+	<- typecheckIface dflags pcs_cl hst old_iface cl_hs_decls;
 
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);

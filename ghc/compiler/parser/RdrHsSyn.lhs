@@ -49,7 +49,7 @@ module RdrHsSyn (
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
 	mkHsOpApp, mkClassDecl, mkClassOpSigDM, mkConDecl,
-	mkHsNegApp, 
+	mkHsNegApp, mkNPlusKPat, mkHsIntegral, mkHsFractional,
 
 	cvBinds,
 	cvMonoBindsAndSigs,
@@ -65,6 +65,7 @@ import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
                           mkSuperDictSelOcc, mkDefaultMethodOcc, mkGenOcc1,
 			  mkGenOcc2, 
                       	)
+import PrelNames	( minusName, negateName, fromIntegerName, fromRationalName )
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
 			)
 import List		( nub )
@@ -260,9 +261,9 @@ mkHsNegApp (HsLit (HsIntPrim i))    = HsLit (HsIntPrim (-i))
 mkHsNegApp (HsLit (HsFloatPrim i))  = HsLit (HsFloatPrim (-i))  
 mkHsNegApp (HsLit (HsDoublePrim i)) = HsLit (HsDoublePrim (-i)) 
 
-mkHsNegApp (HsOverLit (HsIntegral   i)) = HsOverLit (HsIntegral   (-i))
-mkHsNegApp (HsOverLit (HsFractional f)) = HsOverLit (HsFractional (-f))
-mkHsNegApp expr 			= NegApp expr
+mkHsNegApp (HsOverLit (HsIntegral   i n)) = HsOverLit (HsIntegral   (-i) n)
+mkHsNegApp (HsOverLit (HsFractional f n)) = HsOverLit (HsFractional (-f) n)
+mkHsNegApp expr 		  	  = NegApp expr negateName
 \end{code}
 
 A useful function for building @OpApps@.  The operator is always a
@@ -270,6 +271,15 @@ variable, and we don't know the fixity yet.
 
 \begin{code}
 mkHsOpApp e1 op e2 = OpApp e1 (HsVar op) (error "mkOpApp:fixity") e2
+\end{code}
+
+These are the bits of syntax that contain rebindable names
+See RnEnv.lookupSyntaxName
+
+\begin{code}
+mkHsIntegral   i = HsIntegral   i fromIntegerName
+mkHsFractional f = HsFractional f fromRationalName
+mkNPlusKPat n k  = NPlusKPatIn n k minusName
 \end{code}
 
 
