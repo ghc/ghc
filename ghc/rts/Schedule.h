@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.26 2002/02/04 20:40:37 sof Exp $
+ * $Id: Schedule.h,v 1.27 2002/02/12 15:39:49 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -159,7 +159,9 @@ extern  StgTSO *all_threads;
 #if defined(RTS_SUPPORTS_THREADS)
 extern Mutex       sched_mutex;
 extern Condition   thread_ready_cond;
+# if defined(SMP)
 extern Condition   gc_pending_cond;
+# endif
 #endif
 
 /* Called by shutdown_handler(). */
@@ -246,9 +248,9 @@ void print_bqe (StgBlockingQueueElement *bqe);
 /* Signal that a runnable thread has become available, in
  * case there are any waiting tasks to execute it.
  */
-#ifdef SMP
+#if defined(RTS_SUPPORTS_THREADS)
 #define THREAD_RUNNABLE()			\
-  if (free_capabilities != NULL) {		\
+  if ( !noCapabilities() ) {		        \
      signalCondition(&thread_ready_cond);	\
   }						\
   context_switch = 1;
@@ -260,6 +262,7 @@ void print_bqe (StgBlockingQueueElement *bqe);
 /* Check whether the run queue is empty i.e. the PE is idle
  */
 #define EMPTY_RUN_QUEUE()     (run_queue_hd == END_TSO_QUEUE)
+#define EMPTY_QUEUE(q)        (q == END_TSO_QUEUE)
 
 #endif /* __SCHEDULE_H__ */
 
