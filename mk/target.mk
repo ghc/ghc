@@ -69,17 +69,19 @@ ifneq "$(MKDEPENDC_SRCS)" ""
 	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS)
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
-ifeq ($(notdir $(MKDEPENDHS)),ghc)
-#	New way of doing dependencies: the ghc driver knows how to invoke script
-	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS)
-else
-#	Old way: call mkdependHS-1.2
-	$(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) \
-		$(foreach way,$(WAYS),-s $(way)) \
-		-- $(HC_OPTS) -- $(MKDEPENDHS_SRCS)
+	@if echo $(notdir $(MKDEPENDHS)) | grep -s ghc ; then \
+	   echo $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
+	   $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
+	else \
+	   echo $(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(HC_OPTS) -- $(MKDEPENDHS_SRCS) ; \
+	   $(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(HC_OPTS) -- $(MKDEPENDHS_SRCS) ; \
+	fi
 endif
-endif
-
+#
+# The above decides whether to invoke the computation of dependencies
+# the ghc-0.xx or the ghc-2.x way by looking for "ghc" in the name of
+# of the `make depend' script. Not bulletproof this.
+#
 
 ##################################################################
 # 			boot
