@@ -20,7 +20,6 @@ module DsUtils (
 	mkFailurePair,
 	mkGuardedMatchResult,
 	mkSelectorBinds,
-	mkTupleBind,
 	mkTupleExpr,
 	mkTupleSelector,
 	selectMatchVars,
@@ -51,7 +50,7 @@ import Type		( mkRhoTy, mkFunTy,
 			)
 import BasicTypes	( Unused )
 import TysPrim		( voidTy )
-import TysWiredIn	( unitDataCon, tupleCon )
+import TysWiredIn	( unitDataCon, tupleCon, stringTy )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet )
 import Unique		( Unique )
 import Outputable
@@ -373,50 +372,63 @@ mkSelectorBinds (VarPat v) val_expr
   = returnDs [(v, val_expr)]
 
 mkSelectorBinds pat val_expr
-  | is_simple_tuple_pat pat 
-  = mkTupleBind binders val_expr
+  | length binders == 1 || is_simple_pat pat
+  = newSysLocalDs (coreExprType val_expr)	`thenDs` \ val_var ->
+
+	-- For the error message we don't use mkErrorAppDs to avoid
+	-- duplicating the string literal each time
+    newSysLocalDs stringTy			`thenDs` \ msg_var ->
+    getSrcLocDs					`thenDs` \ src_loc ->
+    let
+	full_msg = showSDoc (hcat [ppr src_loc, text "|", ppr pat])
+	msg_lit  = NoRepStr (_PK_ full_msg)
+    in
+    mapDs (mk_bind val_var msg_var) binders	`thenDs` \ binds ->
+    returnDs ( (val_var, val_expr) : 
+	       (msg_var, Lit msg_lit) :
+	       binds )
+
 
   | otherwise
-  = mkErrorAppDs iRREFUT_PAT_ERROR_ID res_ty pat_string		`thenDs` \ error_expr ->
-    matchSimply val_expr LetMatch pat res_ty local_tuple error_expr	`thenDs` \ tuple_expr ->
-    mkTupleBind binders tuple_expr
-
+  = mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (showSDoc (ppr pat))	`thenDs` \ error_expr ->
+    matchSimply val_expr LetMatch pat tuple_ty local_tuple error_expr	`thenDs` \ tuple_expr ->
+    newSysLocalDs tuple_ty						`thenDs` \ tuple_var ->
+    let
+	mk_tup_bind binder = (binder, mkTupleSelector binders binder (Var tuple_var))
+    in
+    returnDs ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where
     binders	= collectTypedPatBinders pat
     local_tuple = mkTupleExpr binders
-    res_ty      = coreExprType local_tuple
+    tuple_ty    = coreExprType local_tuple
 
-    is_simple_tuple_pat (TuplePat ps) = all is_var_pat ps
-    is_simple_tuple_pat other         = False
+    mk_bind scrut_var msg_var bndr_var
+    -- (mk_bind sv bv) generates
+    --		bv = case sv of { pat -> bv; other -> error-msg }
+    -- Remember, pat binds bv
+      = matchSimply (Var scrut_var) LetMatch pat binder_ty 
+		    (Var bndr_var) error_expr			`thenDs` \ rhs_expr ->
+        returnDs (bndr_var, rhs_expr)
+      where
+        binder_ty = idType bndr_var
+        error_expr = mkApp (Var iRREFUT_PAT_ERROR_ID) [binder_ty] [VarArg msg_var]
 
-    is_var_pat (VarPat v) = True
-    is_var_pat other      = False -- Even wild-card patterns aren't acceptable
+    is_simple_pat (TuplePat ps)        = all is_triv_pat ps
+    is_simple_pat (ConPat _ _ ps)      = all is_triv_pat ps
+    is_simple_pat (VarPat _)	       = True
+    is_simple_pat (ConOpPat p1 _ p2 _) = is_triv_pat p1 && is_triv_pat p2
+    is_simple_pat (RecPat _ _ ps)      = and [is_triv_pat p | (_,p,_) <- ps]
+    is_simple_pat other		       = False
 
-    pat_string = showSDoc (ppr pat)
-\end{code}
-
-
-\begin{code}
-mkTupleBind :: [Id]			-- Names of tuple components
-	    -> CoreExpr			-- Expr whose value is a tuple of correct type
-	    -> DsM [(Id, CoreExpr)]	-- Bindings for the globals
-
-
-mkTupleBind [local] tuple_expr
-  = returnDs [(local, tuple_expr)]
-
-mkTupleBind locals tuple_expr
-  = newSysLocalDs (coreExprType tuple_expr)	`thenDs` \ tuple_var ->
-    let
-	mk_bind local = (local, mkTupleSelector locals local (Var tuple_var))
-    in
-    returnDs ( (tuple_var, tuple_expr) :
-	       map mk_bind locals )
+    is_triv_pat (VarPat v)  = True
+    is_triv_pat (WildPat _) = True
+    is_triv_pat other       = False
 \end{code}
 
 
 @mkTupleExpr@ builds a tuple; the inverse to @mkTupleSelector@.  If it
 has only one element, it is the identity function.
+
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
 
@@ -443,17 +455,13 @@ mkTupleSelector :: [Id]			-- The tuple args
 		-> CoreExpr		-- Scrutinee
 		-> CoreExpr
 
-mkTupleSelector [] the_var scrut = panic "mkTupleSelector"
-
 mkTupleSelector [var] should_be_the_same_var scrut
   = ASSERT(var == should_be_the_same_var)
     scrut
 
 mkTupleSelector vars the_var scrut
- = Case scrut (AlgAlts [(tupleCon arity, vars, Var the_var)]
-			  NoDefault)
- where
-   arity = length vars
+  = ASSERT( not (null vars) )
+    Case scrut (AlgAlts [(tupleCon (length vars), vars, Var the_var)] NoDefault)
 \end{code}
 
 
