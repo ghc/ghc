@@ -106,6 +106,9 @@ import PreludeGlaST	-- bad bad bad boy, Will (_Array internals)
 #else
 import GlaExts
 import ArrBase
+#if __GLASGOW_HASKELL__ >= 209
+import Addr
+#endif
 -- 2.04 and later exports Lift from GlaExts
 #if __GLASGOW_HASKELL__ < 204
 import PrelBase (Lift(..))

@@ -42,6 +42,10 @@ import PreludeGlaST
 # define WHASH	    W#
 #endif
 
+#if __GLASGOW_HASKELL__ >= 209
+import Unsafe ( unsafeInterleaveIO )
+#endif
+
 w2i x = word2Int# x
 i2w x = int2Word# x
 i2w_s x = (x :: Int#)
@@ -101,13 +105,16 @@ mkSplitUniqSupply (C# c#)
 	    -- in the compiler....
 	    -- Too bad it's not 1.3-portable...
 	    unsafe_interleave m =
+#if __GLASGOW_HASKELL__ >= 209
+               unsafeInterleaveIO m
+#else
 	       MkST ( \ s ->
 	        let
 		    (MkST m') = m
-		    (r, new_s) = m' s
+		    ST_RET(r, new_s) = m' s
 	        in
-	        (r, s))
---
+	        ST_RET(r, s))
+#endif
 
 	mk_unique = _ccall_ genSymZh		`thenPrimIO` \ (WHASH u#) ->
 		    returnPrimIO (I# (w2i (mask# `or#` u#)))
