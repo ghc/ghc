@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.77 2000/05/10 13:07:43 simonmar Exp $
+# $Id: Makefile,v 1.78 2000/05/12 13:37:05 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -141,6 +141,8 @@ nativeGen/MachCode_HC_OPTS 	= -H10m
 usageSP/UsageSPInf_HC_OPTS	= -Onot
 
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
+prelude/PrelRules_HC_OPTS	= -fvia-C
+
 parser/Lex_HC_OPTS		= -fvia-C -K2m -H16m 
 parser/Ctype_HC_OPTS		= -K2m -fvia-C
 
