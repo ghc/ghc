@@ -401,14 +401,13 @@ endif
 
 # FPTOOLS_TOP: the top of the fptools hierarchy, absolute path.
 
+ifeq "$(findstring $(TARGETPLATFORM), i386-unknown-cygwin32 i386-unknown-mingw32)" ""
 FPTOOLS_TOP_ABS		= @hardtop@
+else
+FPTOOLS_TOP_ABS		= $(subst \,/,$(shell cygpath -w @hardtop@))
+endif
+# Keep the Unix-style path to use with Unix tools (e.g. in ghc-inplace script)
 FPTOOLS_TOP_ABS_UNIX    = @hardtop@
-ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
-FPTOOLS_TOP_ABS		= $(subst \,/,$(shell cygpath -w @hardtop@))
-endif
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-FPTOOLS_TOP_ABS		= $(subst \,/,$(shell cygpath -w @hardtop@))
-endif
 
 #
 # Installation directories, we don't use half of these,
