@@ -19,7 +19,7 @@ endif
 
 GhcBinDistPrlScripts = 
 GhcBinDistLibPrlScripts = ghc-asm ghc-split
-GhcBinDistBins = hp2ps ghcprof
+GhcBinDistBins = hp2ps ghcprof runghc
 GhcBinDistOptBins = runhaskell
 GhcBinDistLinks = ghc ghci ghc-pkg
 GhcBinDistLibSplicedFiles = package.conf
