@@ -14,9 +14,9 @@ At the moment, there four different collections of system libraries:
 \item The GHC system library - collection of interfaces that mainly
 have grown out of abstractions used to implement GHC itself.
 \item Parts of the HBC libraries.
-\item The Posix interface - a quality interface to OS functionality as
-specified by {\tt POSIX 1003.1}. Sadly, this library hasn't made it
-into a standard Haskell library.
+\item The Posix interface - a mostly complete interface to OS functionality as
+specified by {\tt POSIX 1003.1}. Sadly, this library isn't a standard
+Haskell library...yet.
 \item The contrib libraries - oodles of numeric codes..
 \end{itemize}
 
@@ -266,8 +266,8 @@ accumulating any errors that occur.
 %*                                                                      *
 %************************************************************************
 
-You need to \tr{import PackedString} and heave in your \tr{-syslib
-ghc} to use \tr{PackedString}s.
+You need to \tr{import PackedString} and heave in your
+\tr{-syslib ghc} to use \tr{PackedString}s.
 
 The basic type and functions available are:
 \begin{verbatim}
@@ -774,7 +774,7 @@ type Hostname = String
 \end{verbatim}
 
 Various examples of networking Haskell code are provided in
-\tr{ghc/misc/examples/}, notably the \tr{net???/Main.hs} programs.
+%\tr{ghc/misc/examples/}, notably the \tr{net???/Main.hs} programs.
 
 %************************************************************************
 %*                                                                      *
@@ -787,10 +787,10 @@ Various examples of networking Haskell code are provided in
 The @Posix@ interface gives you access to the set of OS services
 standardised by POSIX 1003.1b (or the {\em IEEE Portable Operating System
 Interface for Computing Environments} - IEEE Std. 1003.1). The
-interface is accessed by \tr{import Posix} and adding \tr{-syslib
-posix} on your command-line.
+interface is accessed by \tr{import Posix} and adding 
+\tr{-syslib posix} on your command-line.
 
-\subsubsection[Posix-data-types]{Posix data types}
+\subsubsection[Posix data types]{Posix data types}
 \index{Posix, data types}
 
 
@@ -818,7 +818,7 @@ A \tr{DeviceID} is a primitive of type \tr{dev_t}.  It must
 be an arithmetic type.
 
 \begin{verbatim}
-> data EpochTime -- instances of : Eq Ord Num Real Integral Ix Enum Show
+data EpochTime -- instances of : Eq Ord Num Real Integral Ix Enum Show
 \end{verbatim}
 
 A \tr{EpochTime} is a primitive of type \tr{time_t}, which is
@@ -1019,14 +1019,14 @@ data ProcessStatus = Exited ExitCode
                    deriving (Eq, Show)
 \end{verbatim}
 
-\subsubsection{posix-process-env}{Posix Process Primitives}
+\subsubsection[Process Primitives]{Posix Process Primitives}
 
 \begin{verbatim}
 forkProcess :: IO (Maybe ProcessID)
 \end{verbatim}
 
 \tr{forkProcess} calls \tr{fork}, returning
-\tr{Just pid} to the parent, where <var>pid</var> is the
+\tr{Just pid} to the parent, where \tr{pid} is the
 ProcessID of the child, and returning \tr{Nothing} to the
 child.
 
@@ -1266,8 +1266,8 @@ installHandler :: Signal
 \tr{installHandler int handler iset} calls \tr{sigaction} to install
 an interrupt handler for signal \tr{int}.  If \tr{handler} is
 \tr{Default}, \tr{SIG_DFL} is installed; if \tr{handler} is
-\tr{Ignore}, \tr{SIG_IGN} is installed; if \tr{handler} is \tr{Catch
-action}, a handler is installed which will invoke \tr{action} as a
+\tr{Ignore}, \tr{SIG_IGN} is installed; if \tr{handler} is
+\tr{Catch action}, a handler is installed which will invoke \tr{action} as a
 replacement for \tr{main}.  If \tr{iset} is \tr{Just s}, then the
 \tr{sa_mask} of the \tr{sigaction} structure is set to \tr{s};
 otherwise it is cleared.  The previously installed signal handler for
@@ -1336,7 +1336,7 @@ sleep :: Int -> IO ()
 program until at least \tr{i} seconds have elapsed or a signal is
 received.
 
-\subsubsection[posix-proc-env]{Posix Process Environment}
+\subsubsection[Process Environment]{Posix Process Environment}
 \index{Posix, process environment}
 
 \begin{verbatim}
@@ -1547,7 +1547,7 @@ The operation may fail with:
 The requested system limit or option is undefined.
 \end{itemize}
 
-\subsubsection[posix-files-dir]{Files and Directories}
+\subsubsection[Files and Directories]{Posix operations on files and directories}
 \index{Posix, files and directories}
 
 \begin{verbatim}
@@ -1838,7 +1838,7 @@ The requested file limit or option is undefined.
 Various other causes.
 \end{itemize}
 
-\subsubsection[posix-input-output]{Posix Input and Output Primitives}
+\subsubsection[Inut Output]{Posix Input and Output Primitives}
 \index{Posix, input/output}
 
 \begin{verbatim}
@@ -1951,7 +1951,7 @@ seekChannel :: Channel -> SeekMode -> FileOffset -> IO FileOffset
 indicated by \tr{whence}.  It returns the resulting offset from the
 start of the file in bytes.
 
-\subsubsection[posix-device-class]{Posix, Device- and Class-Specific Functions}
+\subsubsection[Device Specific Functions]{Posix, Device- and Class-Specific Functions}
 \index{Posix, device and class-specific functions}
 
 \begin{verbatim}
@@ -2049,7 +2049,7 @@ set the \tr{ProcessGroupID} of the foreground process group
 associated with the terminal attached to \tr{Channel} 
 \tr{fd} to \tr{pgid}.
 
-\subsubsection[posix-system-db]{Posix System Databases}
+\subsubsection[System Database]{Posix System Databases}
 \index{Posix, system databases}
 
 \begin{verbatim}
@@ -2121,7 +2121,7 @@ The operation may fail with:
 There is no user entry for the name.
 \end{itemize}
 
-\subsubsection[posix-errors]{POSIX Errors}
+\subsubsection[Error reporting and handling]{POSIX Errors}
 \index{Posix, errors}
 
 \begin{verbatim}

@@ -209,7 +209,7 @@ chr# :: Int# -> Char#
 negateInt# :: Int# -> Int#
 \end{verbatim}
 
-\bf{Note:} No error/overflow checking!
+{\bf Note:} No error/overflow checking!
 
 \subsubsubsection{Unboxed-@Double@ and @Float@ operations}
 \begin{verbatim}
@@ -259,7 +259,7 @@ decodeDouble#	:: Double# -> PrelNum.ReturnIntAndGMP
 We implement @Integers@ (arbitrary-precision integers) using the GNU
 multiple-precision (GMP) package (version 1.3.2).
 
-\bf{Note:} some of this might change when we upgrade to using GMP~2.x.
+{\bf Note:} some of this might change when we upgrade to using GMP~2.x.
 
 The data type for @Integer@ must mirror that for @MP_INT@ in @gmp.h@
 (see @gmp.info@ in \tr{ghc/includes/runtime/gmp}).  It comes out as:
@@ -604,7 +604,7 @@ deRefStablePointer# :: StablePtr# a -> State# RealWorld -> StateAndPtr RealWorld
 
 There is also a C procedure @FreeStablePtr@ which frees a stable pointer.
 
-%{\em Andy's comment.} \bf{Errors:} The following is not strictly true: the current
+%{\em Andy's comment.} {\bf Errors:} The following is not strictly true: the current
 %implementation is not as polymorphic as claimed.  The reason for this
 %is that the C programmer will have to use a different entry-routine
 %for each type of stable pointer.  At present, we only supply a very
@@ -613,7 +613,6 @@ There is also a C procedure @FreeStablePtr@ which frees a stable pointer.
 %entry points to apply stable pointers to (stable pointers to)
 %arguments and to enter (stable pointers to) boxed primitive values.
 %{\em End of Andy's comment.}
-
 
 %
 % Rewritten and updated for MallocPtr++ -- 4/96 SOF
@@ -674,7 +673,7 @@ makeForeignObj# :: Addr# -- foreign reference
 		-> StateAndForeignObj# RealWorld ForeignObj#
 \end{verbatim}
 
-\bf{Note:} the foreign object value and its finaliser are contained
+{\bf Note:} the foreign object value and its finaliser are contained
 in the primitive value @ForeignObj#@, so there's no danger of an
 aggressive optimiser somehow separating the two. (with the result
 that the foreign reference would not be freed).
@@ -722,6 +721,22 @@ putMVar#    :: SynchVar# s elt -> State# s -> State# s
 %a GC too?  Is there any need for a function that provides finer
 %control over GC: argument = amount of space required; result = amount
 %of space recovered.
+=======
+The C function {\tt PerformGC\/}, allows the C world to force Haskell
+to do a garbage collection. It can only be called while Haskell is
+performing a C Call.
+
+Note that this function can be used to define a Haskell IO operation
+with the same effect:
+\begin{verbatim}
+>	performGCIO :: PrimIO ()
+>	performGCIO = _ccall_gc_ PerformGC
+\end{verbatim}
+
+{\bf ToDo:} Is there any need for abnormal/normal termination to force
+a GC too?  Is there any need for a function that provides finer
+control over GC: argument = amount of space required; result = amount
+of space recovered.
 
 \subsection{@spark#@ primitive operation (for parallel execution)}
 
@@ -740,7 +755,7 @@ errorIO# :: (State RealWorld -> ((), State RealWorld)) -> a
 
 \subsection{C Calls}
 
-\bf{ToDo:} current implementation has state variable as second
+{\bf ToDo:} current implementation has state variable as second
 argument not last argument.
 
 The @ccall#@ primitive can't be given an ordinary type, because it has
@@ -895,7 +910,7 @@ mapAndUnzipST f ls = mapAndUnzipM f ls
 \end{verbatim}
 
 
-\bf{Note:} all the derived operators over @ST@ are implemented using
+{\bf Note:} all the derived operators over @ST@ are implemented using
 the {\em strict} @ST@ instance of @Monad@.
 
 \subsubsection{The @PrimIO@ monad}
@@ -1098,7 +1113,7 @@ makeForeignObj :: Addr   -- object to be boxed up as a ForeignObj
 
 Everything in this section goes for @_casm_@ too.
 
-\bf{ToDo:} {\em mention @_ccall_gc_@ and @_casm_gc_@...}
+{\bf ToDo:} {\em mention @_ccall_gc_@ and @_casm_gc_@...}
 
 The @_ccall_@ construct has the following form:
 $$@_ccall_@~croutine~a_1~\ldots~a_n$$
@@ -1158,10 +1173,10 @@ All of the above are {\em C-returnable} except:
   Array, ByteArray, MutableArray, MutableByteArray, ForeignObj
 \end{verbatim}
 
-\bf{ToDo:} I'm pretty wary of @Array@ and @MutableArray@ being in
+{\bf ToDo:} I'm pretty wary of @Array@ and @MutableArray@ being in
 this list, and not too happy about @State@ [WDP].
 
-\bf{ToDo:} Can code generator pass all the primitive types?  Should this be
+{\bf ToDo:} Can code generator pass all the primitive types?  Should this be
 extended to include {\tt Bool\/} (or any enumeration type?)
 
 The type checker must be able to figure out just which of the C-callable/returnable

@@ -177,8 +177,9 @@ Finally, there are operations to delay a concurrent thread, and to
 make one wait:\index{delay a concurrent thread}
 \index{wait for a file descriptor}
 \begin{verbatim}
-threadDelay :: Int -> IO () -- delay rescheduling for N microseconds
-threadWait  :: Int -> IO () -- wait for input on specified file descriptor
+threadDelay     :: Int -> IO () -- delay rescheduling for N microseconds
+threadWaitRead  :: Int -> IO () -- wait for input on specified file descriptor
+threadWaitWrite :: Int -> IO () -- (read and write, respectively).
 \end{verbatim}
 
 %************************************************************************

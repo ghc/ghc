@@ -697,9 +697,9 @@ A small word of warning: \tr{-cpp} is not friendly to
 %************************************************************************
 %*                                                                      *
 \subsection[options-C-compiler]{Options affecting the C compiler (if applicable)}
+\index{include-file-option}
 \index{C compiler options}
 \index{GCC options}
-\index{include file option}
 %*                                                                      *
 %************************************************************************
 
@@ -1202,11 +1202,11 @@ trademark of Peyton Jones Enterprises, plc.)
 Sometimes it is useful to make the connection between a source file
 and the command-line options it requires, quite tight. For instance,
 if a (Glasgow) Haskell source file uses \tr{casm}s, the C back-end
-often needs to be told about header files to use,
-\ref{include file option}. Rather than maintaining the list of
-files the source depends on in a \tr{Makefile}, it is possible to
-do this directly in the source file using the \tr{OPTIONS} pragma
-\index{OPTIONS pragma}:
+often needs to be told about header files to use. Rather than
+maintaining the list of files the source depends on in a
+\tr{Makefile} (using \tr{-#include} option), it is possible to do this
+directly in the source file using the \tr{OPTIONS} pragma
+\index{OPTIONS pragma}: 
 
 \begin{verbatim}
 {-# OPTIONS -#include "foo.h" #-}
@@ -1274,10 +1274,9 @@ _declarations_
 To make sure you get the syntax right, tailoring an existing interface
 file is a Good Idea.
 
-\bf{Note:} This is all a temporary solution, a version of the compiler
+{\bf Note:} This is all a temporary solution, a version of the compiler
 that handles mutually recursive properly without the manual
 construction of interface file, is in the works.
-
 
 %----------------------------------------------------------------------
 %\subsubsection[arity-checking]{Options to insert arity-checking code}
