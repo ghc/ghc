@@ -381,12 +381,6 @@ tidyTopBind mod ext_ids cg_info_env top_tidy_env (Rec prs)
 
         rhs' = tidyExpr rec_tidy_env rhs
 
-	-- the CafInfo for a recursive group says whether *any* rhs in
-	-- the group may refer indirectly to a CAF (because then, they all do).
-    (bndrs, rhss) = unzip prs'
-    pred v = v `notElem` bndrs
-
-
 tidyTopBinder :: Module -> IdEnv Bool
 	      -> CgInfoEnv
 	      -> TidyEnv -> CoreExpr

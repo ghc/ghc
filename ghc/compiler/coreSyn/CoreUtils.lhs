@@ -707,7 +707,7 @@ exprEtaExpandArity e
     ok_note InlineCall   = True
     ok_note other        = False
 	    -- Notice that we do not look through __inline_me__
-	    -- This one is a bit more surprising, but consider
+	    -- This may seem surprising, but consider
 	    --	f = _inline_me (\x -> e)
 	    -- We DO NOT want to eta expand this to
 	    --	f = \x -> (_inline_me (\x -> e)) x
@@ -746,8 +746,6 @@ etaExpand :: Int	  	-- Add this number of value args
 --
 -- would return
 --	(/\b. coerce T (\y::A -> (coerce (A->B) (E b) y)
-
--- (case x of { I# x -> /\ a -> coerce T E)
 
 etaExpand n us expr ty
   | n == 0	-- Saturated, so nothing to do

@@ -690,6 +690,11 @@ There is no point in looking for a combination of the two, because
 that would leave use with some lets sandwiched between lambdas; that's
 what the final test in the first equation is for.
 
+In Case 1, we may have to sandwich some coerces between the lambdas
+to make the types work.   exprEtaExpandArity looks through coerces
+when computing arity; and etaExpand adds the coerces as necessary when
+actually computing the expansion.
+
 \begin{code}
 tryEtaExpansion :: OutExpr -> OutType -> SimplM ([OutBind], OutExpr)
 tryEtaExpansion rhs rhs_ty
