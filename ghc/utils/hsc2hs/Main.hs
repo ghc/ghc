@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.48 2003/08/27 14:11:17 panne Exp $
+-- $Id: Main.hs,v 1.49 2003/10/01 16:45:10 sof Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -775,7 +775,7 @@ conditional _         = False
 
 outCLine :: SourcePos -> String
 outCLine (SourcePos name line) =
-    "# "++show line++" \""++showCString (snd (splitName name))++"\"\n"
+    "#line "++show line++" \""++showCString (snd (splitName name))++"\"\n"
 
 outHsLine :: SourcePos -> String
 outHsLine (SourcePos name line) =
