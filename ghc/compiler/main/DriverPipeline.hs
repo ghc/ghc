@@ -736,7 +736,7 @@ run_phase Hsc basename suff input_fn output_fn
 	writeIORef v_Include_paths (current_dir : paths)
 	
   -- gather the imports and module name
-        (srcimps,imps,mod_name) <- 
+        (_,_,mod_name) <- 
             if extcoreish_suffix suff
 	     then do
                -- no explicit imports in ExtCore input.
@@ -812,7 +812,7 @@ run_phase Hsc basename suff input_fn output_fn
             HscNoRecomp pcs details iface -> do { SysTools.touch "Touching object file" o_file
 						; return Nothing } ;
 
-	    HscRecomp pcs details iface stub_h_exists stub_c_exists
+	    HscRecomp _pcs _details _iface stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
 
 			    -- deal with stubs
