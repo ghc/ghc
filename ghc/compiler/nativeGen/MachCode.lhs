@@ -2284,48 +2284,27 @@ genCCall fn cconv kind args
 
 genCCall fn cconv kind [StInt i]
   | fn == SLIT ("PerformGC_wrapper")
-  = let
-     call = [MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
-	     CALL (ImmLit (ptext (if underscorePrefix then (SLIT ("_PerformGC_wrapper")) else (SLIT ("PerformGC_wrapper")))))]
+  = let call = [MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
+	        CALL (ImmLit (ptext (if   underscorePrefix 
+                                     then (SLIT ("_PerformGC_wrapper"))
+                                     else (SLIT ("PerformGC_wrapper")))))]
     in
     returnInstrs call
 
-{- OLD:
-  = getUniqLabelNCG    	    	    `thenUs` \ lbl ->
-    let
-	call = [MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
-		MOV L (OpImm (ImmCLbl lbl))
-		      -- this is hardwired
-		      (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt 104))),
-		JMP (OpImm (ImmLit (ptext (if underscorePrefix then (SLIT ("_PerformGC_wrapper")) else (SLIT ("PerformGC_wrapper")))))),
-		LABEL lbl]
-    in
-    returnInstrs call
--}
 
 genCCall fn cconv kind args
-  = mapUs get_call_arg args `thenUs` \ argCode ->
+  = mapUs get_call_arg args `thenUs` \ sizes_and_argCodes ->
     let
-	nargs = length args
+        (sizes, argCode) = unzip sizes_and_argCodes
+        tot_arg_size = sum (map (\sz -> case sz of DF -> 8; _ -> 4) sizes)
 
-{- OLD: Since there's no attempt at stealing %esp at the moment, 
-   restoring %esp from MainRegTable.rCstkptr is not done.  -- SOF 97/09
-   (ditto for saving away old-esp in MainRegTable.Hp (!!) )
-	code1 = asmParThen [asmSeq [ -- MOV L (OpReg esp) (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt 80))),
-			MOV L (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt 100))) (OpReg esp)
-				   ]
-			   ]
--}
 	code2 = asmParThen (map ($ asmVoid) (reverse argCode))
 	call = [CALL fn__2 ,
-		-- pop args; all args word sized?
-		ADD L (OpImm (ImmInt (nargs * 4))) (OpReg esp) --,
-		
-		-- Don't restore %esp (see above)
-		-- MOV L (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt 80))) (OpReg esp)
-		]
+		ADD L (OpImm (ImmInt tot_arg_size)) (OpReg esp)
+               ]
     in
     returnSeq (code2) call
+
   where
     -- function names that begin with '.' are assumed to be special
     -- internally generated names like '.mul,' which don't get an
@@ -2336,11 +2315,22 @@ genCCall fn cconv kind args
 	      _   -> ImmLab (ptext fn)
 
     ------------
-    get_call_arg :: StixTree{-current argument-} -> UniqSM InstrBlock	-- code
+    get_call_arg :: StixTree{-current argument-} 
+                    -> UniqSM (Size, InstrBlock)  -- arg size, code
 
     get_call_arg arg
       = get_op arg		`thenUs` \ (code, op, sz) ->
-	returnUs (code . mkSeqInstr (PUSH sz op))
+        case sz of
+           DF -> returnUs (sz,
+                           code .
+                           mkSeqInstr (FLD L op) .
+                           mkSeqInstr (SUB L (OpImm (ImmInt 8)) (OpReg esp)) .
+                           mkSeqInstr (FSTP DF (OpAddr (AddrBaseIndex 
+                                                          (Just esp) 
+                                                          Nothing (ImmInt 0))))
+                          )
+	   _  -> returnUs (sz,
+                           code . mkSeqInstr (PUSH sz op))
 
     ------------
     get_op
