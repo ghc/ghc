@@ -57,8 +57,8 @@ gread :: Data a => ReadS a
 
 This is a read operation which insists on prefix notation.  (The
 Haskell 98 read deals with infix operators subject to associativity
-and precedence as well.) We use gunfoldR to "parse" the input. To be
-precise, gunfoldR is used for all types except String. The
+and precedence as well.) We use fromConstrM to "parse" the input. To be
+precise, fromConstrM is used for all types except String. The
 type-specific case for String uses basic String read.
 
 -}
@@ -92,9 +92,9 @@ gread = readP_to_S gread'
          skipSpaces			-- Discard following space
 
 		-- Do the real work
-	 str   <- parseConstr		-- Get a lexeme for the constructor
-         con   <- str2con str		-- Convert it to a Constr (may fail)
-         x     <- gunfoldR con gread'	-- Read the children
+	 str  <- parseConstr		-- Get a lexeme for the constructor
+         con  <- str2con str		-- Convert it to a Constr (may fail)
+         x    <- fromConstrM gread' con -- Read the children
 
 		-- Drop "  )  "
          skipSpaces			-- Discard leading space

@@ -42,10 +42,6 @@ module Data.Generics.Aliases (
 	choiceMp,
 	choiceQ,
 
-        -- * Operators for (over-appreciated) unfolding
-        gunfoldB,
-        gunfoldR,
-
 	-- * Type extension for unary type constructors
 	ext1T, 
 	ext1M,
@@ -300,30 +296,6 @@ recoverMp f = f `choiceMp` return
 -- | Recover from the failure of monadic query by a constant
 recoverQ :: MonadPlus m => r -> GenericQ (m r) -> GenericQ (m r)
 recoverQ r f = f `choiceQ` const (return r)
-
-
-
-------------------------------------------------------------------------------
---
---	Generic unfolding
---
-------------------------------------------------------------------------------
-
--- | Construct an initial term with undefined immediate subterms
---   and then map over the skeleton to fill in proper terms.
-gunfoldB :: Data a
-         => Constr
-         -> (forall a. Data a => a)
-         -> a
-gunfoldB c f = gmapT (const f) (fromConstr c)
-
-
--- | Monadic variation on \"gunfoldB\"
-gunfoldR :: (Monad m, Data a)
-         => Constr
-         -> (forall a. Data a => m a)
-         -> m a
-gunfoldR c f = gmapM (const f) $ fromConstr c
 
 
 

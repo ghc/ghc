@@ -22,8 +22,8 @@ module Data.Generics.Basics (
 	-- * The Data class for processing constructor applications
 	Data( 
 		gfoldl,		-- :: ... -> a -> c a
+		gunfold,	-- :: ... -> Constr -> c a
 		toConstr, 	-- :: a -> Constr
-		fromConstr,	-- :: Constr -> a
 		dataTypeOf,	-- :: a -> DataType
 		dataCast1,	-- mediate types and unary type constructors
 		dataCast2	-- mediate types and binary type constructors
@@ -87,6 +87,11 @@ module Data.Generics.Basics (
         gmapMp,
         gmapMo,
 
+	-- * Generic operation(s) defined in terms of gunfold
+        fromConstr,	-- :: Constr -> a
+        fromConstrB,	-- :: ... -> Constr -> a
+	fromConstrM	-- :: Monad m => ... -> Constr -> m a
+
   ) where
 
 
@@ -130,14 +135,14 @@ class Typeable a => Data a where
 
 Folding constructor applications ("gfoldl")
 
-The combinator takes two arguments "f" and "z" to fold over a term
+The combinator takes two arguments "k" and "z" to fold over a term
 "x".  The result type is defined in terms of "x" but variability is
 achieved by means of type constructor "c" for the construction of the
 actual result type. The purpose of the argument "z" is to define how
 the empty constructor application is folded. So "z" is like the
 neutral / start element for list folding. The purpose of the argument
-"f" is to define how the nonempty constructor application is
-folded. That is, "f" takes the folded "tail" of the constructor
+"k" is to define how the nonempty constructor application is
+folded. That is, "k" takes the folded "tail" of the constructor
 application and its head, i.e., an immediate subterm, and combines
 them in some way. See the Data instances in this file for an
 illustration of "gfoldl". Conclusion: the type of gfoldl is a
@@ -156,16 +161,18 @@ fold.
   --
   gfoldl _ z = z
 
+  -- | Unfolding constructor applications
+  gunfold :: (forall b r. Data b => c (b -> r) -> c r)
+          -> (forall r. r -> c r)
+          -> Constr
+          -> c a
+
   -- | Obtaining the constructor from a given datum.
   -- For proper terms, this is meant to be the top-level constructor.
   -- Primitive datatypes are here viewed as potentially infinite sets of
   -- values (i.e., constructors).
   --
   toConstr   :: a -> Constr
-
-
-  -- | Building a term from a constructor
-  fromConstr   :: Constr -> a
 
 
   -- | Provide access to list of all constructors
@@ -355,6 +362,41 @@ newtype Qr r a = Qr { unQr  :: r -> r }
 
 -- | The type constructor used in definition of gmapMp
 newtype Mp m x = Mp { unMp :: m (x, Bool) }
+
+
+
+------------------------------------------------------------------------------
+--
+--	Generic unfolding
+--
+------------------------------------------------------------------------------
+
+
+-- | Build a term skeleton
+fromConstr :: Data a => Constr -> a
+fromConstr = fromConstrB undefined
+
+
+-- | Build a term and use a generic function for subterms
+fromConstrB :: Data a
+            => (forall a. Data a => a)
+            -> Constr
+            -> a
+fromConstrB f = unID . gunfold k z
+ where
+  k c = ID (unID c f)
+  z = ID
+
+
+-- | Monadic variation on \"fromConstrB\"
+fromConstrM :: (Monad m, Data a)
+            => (forall a. Data a => m a)
+            -> Constr
+            -> m a
+fromConstrM f = gunfold k z 
+ where
+  k c = do { c' <- c; b <- f; return (c' b) }
+  z = return
 
 
 
