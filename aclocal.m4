@@ -113,6 +113,12 @@ if expr "$ac_cv_happy_version" "<" 1.4 > /dev/null 2>&1; then
 fi;
 ])
 HappyVersion=$ac_cv_happy_version;
+if test x"$HappyCmd" != x && expr "$HappyVersion" \<= "1.3" >/dev/null; then
+	echo "   Happy Version 1.3 or later is required to compile GHC."
+	echo "   Using the Happy sources in the tree.";
+	HappyCmd=""
+	AC_SUBST(HappyCmd)
+fi;
 AC_SUBST(HappyVersion)
 ])
 
@@ -273,7 +279,7 @@ AC_DEFUN(AC_PROG_GNUCPP,
 [if test "$HaveGcc" = "YES"; then
 	echo > conftest.c
 	gcc -v -E conftest.c >/dev/null 2>conftest.out
-	echo '/(\S+(\/|\\)cpp)/ && ([$]foo = [$]1) =~ tr/\\/\// && print "[$]foo";' > conftest.pl
+	echo 'tr /\\/\// ; /(\S+\/cpp)/ && print "[$]1";' > conftest.pl
 	ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
 	rm -fr conftest*
  else
