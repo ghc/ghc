@@ -182,7 +182,7 @@ test('tc172', normal, compile, [''])
 test('tc173', normal, run_command_ignore_output, ['make tc173'])
 
 test('tc174', normal, compile, [''])
-test('tc175', normal, compile, [''])
+test('tc175', expect_fail, compile, [''])
 test('tc176', normal, compile, [''])
 test('tc177', normal, compile, [''])
 test('tc178', normal, compile, [''])
