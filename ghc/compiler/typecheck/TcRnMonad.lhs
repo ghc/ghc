@@ -403,6 +403,18 @@ addMessages (m_warns, m_errs)
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns `unionBags` m_warns,
 			       errs  `unionBags` m_errs) }
+
+discardWarnings :: TcRn a -> TcRn a
+-- Ignore warnings inside the thing inside;
+-- used to ignore-unused-variable warnings inside derived code
+-- With -dppr-debug, the effects is switched off, so you can still see
+-- what warnings derived code would give
+discardWarnings thing_inside
+  = do	{ errs_var <- newMutVar emptyMessages
+	; result <- setErrsVar errs_var thing_inside
+	; (_warns, errs) <- readMutVar errs_var
+	; addMessages (emptyBag, errs)
+	; return result }
 \end{code}
 
 

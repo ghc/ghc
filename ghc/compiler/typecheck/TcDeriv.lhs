@@ -248,8 +248,9 @@ deriveOrdinaryStuff eqns
 	; tcg_env <- getGblEnv
 	; let gen_binds = mkGenericBinds (typeEnvTyCons (tcg_type_env tcg_env))
 
-	-- Rename these extra bindings
-	; (rn_binds, _fvs1) <- rnTopMonoBinds (extra_binds `AndMonoBinds` gen_binds) []
+	-- Rename these extra bindings, discarding warnings about unused bindings etc
+	; (rn_binds, _fvs1) <- discardWarnings $
+			       rnTopMonoBinds (extra_binds `AndMonoBinds` gen_binds) []
 
 	; let all_binds = rn_binds `ThenBinds` 
 			  foldr ThenBinds EmptyBinds aux_binds_s
