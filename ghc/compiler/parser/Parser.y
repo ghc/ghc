@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.2 1999/06/02 14:42:43 simonmar Exp $
+$Id: Parser.y,v 1.3 1999/06/02 15:50:25 simonmar Exp $
 
 Haskell grammar.
 
@@ -23,6 +23,7 @@ import OccName		( varName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CallConv
+import CmdLineOpts	( opt_SccProfilingOn )
 import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
 import Panic
 
@@ -80,6 +81,7 @@ Conflicts: 13 shift/reduce
  'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
+ '_scc_'	{ ITscc }
 
  'forall'	{ ITforall }			-- GHC extension keywords
  'foreign'	{ ITforeign }
@@ -117,7 +119,7 @@ Conflicts: 13 shift/reduce
  '__litlit'	{ ITlit_lit }
  '__string'	{ ITstring_lit }
  '__ccall'	{ ITccall $$ }
- '__scc' 	{ ITscc }
+ '__scc' 	{ IT__scc }
  '__sccC'       { ITsccAllCafs }
 
  '__A'		{ ITarity }
@@ -624,6 +626,10 @@ exp10 :: { RdrNameHsExpr }
 	| '_ccall_GC_' ccallid aexps0		{ CCall $2 $3 True  False cbot }
 	| '_casm_'     CLITLIT aexps0		{ CCall $2 $3 False True  cbot }
 	| '_casm_GC_'  CLITLIT aexps0		{ CCall $2 $3 True  True  cbot }
+
+        | '_scc_' STRING exp    		{ if opt_SccProfilingOn
+							then HsSCC $2 $3
+							else $3 }
 
 	| fexp					{ $1 }
 

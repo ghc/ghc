@@ -120,6 +120,7 @@ data Token
   | ITthen
   | ITtype
   | ITwhere
+  | ITscc
 
   | ITforall			-- GHC extension keywords
   | ITforeign
@@ -155,7 +156,7 @@ data Token
   | ITstrict ([Demand], Bool)
   | ITrules
   | ITcprinfo (CprInfo)
-  | ITscc
+  | IT__scc
   | ITsccAllCafs
 
   | ITspecialise_prag		-- Pragmas
@@ -266,7 +267,8 @@ haskellKeywordsFM = listToUFM $
 	( "qualified",	ITqualified ),
 	( "then",	ITthen ),     
 	( "type",	ITtype ),     
-	( "where",	ITwhere )
+	( "where",	ITwhere ),
+	( "_scc_",	ITscc )
      ]
 
 
@@ -588,6 +590,7 @@ lexToken cont glaexts buf =
       | is_symbol c -> lex_sym cont buf
       | is_upper  c -> lex_con cont glaexts buf
       | is_ident  c -> lex_id  cont glaexts buf
+      | otherwise   -> lexError "illegal character" buf
 
 -- Int# is unlifted, and therefore faster than Bool for flags.
 {-# INLINE flag #-}
