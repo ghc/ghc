@@ -194,7 +194,7 @@ start:
     for (i=0; i < completed_hw; i++) {
       unsigned int rID = completedTable[i].reqID;
       prev = NULL;
-      for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; tso = tso->link) {
+      for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; prev = tso, tso = tso->link) {
 	switch(tso->why_blocked) {
 	case BlockedOnRead:
 	case BlockedOnWrite:
@@ -207,14 +207,18 @@ start:
 	    tso->block_info.async_result->errCode = completedTable[i].errCode;
 
 	    /* Drop the matched TSO from blocked_queue */
-	    if (prev) {
-	      prev->link = tso->link;
+	    if ( prev == NULL ) {
+		blocked_queue_hd = tso->link;
+		if (blocked_queue_tl == tso) {
+		    blocked_queue_tl = END_TSO_QUEUE;
+		}
 	    } else {
-	      blocked_queue_hd = tso->link;
+	      prev->link = tso->link;
+	      if (blocked_queue_tl == tso) {
+		  blocked_queue_tl = END_TSO_QUEUE;
+	      }
 	    }
-	    if (blocked_queue_tl == tso) {
-	      blocked_queue_tl = prev;
-	    }
+
 	    /* Terminates the run queue + this inner for-loop. */
 	    tso->link = END_TSO_QUEUE;
 	    tso->why_blocked = NotBlocked;
@@ -228,7 +232,6 @@ start:
 	  }
 	  break;
 	}
-	prev = tso;
       }
     }
     completed_hw = 0;
