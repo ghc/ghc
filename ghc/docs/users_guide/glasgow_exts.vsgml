@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.17 1999/10/28 07:53:13 simonpj Exp $
+% $Id: glasgow_exts.vsgml,v 1.18 1999/11/01 16:06:34 simonpj Exp $
 %
 % GHC Language Extensions.
 %
@@ -2085,9 +2085,14 @@ This rule will cause the compiler to go into an infinite loop.
 
 <item> GHC currently uses a very simple, syntactic, matching algorithm
 for matching a rule LHS with an expression.  It seeks a substitution
-which makes the LHS and expression syntactically equal modulo: alpha
-conversion, and (I think) eta conversion.  But not beta conversion (that's
-called higher-order matching).
+which makes the LHS and expression syntactically equal modulo alpha
+conversion.  The pattern (rule), but not the expression, is eta-expanded if 
+necessary.  (Eta-expanding the epression can lead to laziness bugs.)
+But not beta conversion (that's called higher-order matching).
+<p>
+Matching is carried out on GHC's intermediate language, which includes
+type abstractions and applications.  So a rule only matches if the
+types match too.  See Section <ref name="Specialisation" id="rule-spec"> below.
 
 <item> GHC keeps trying to apply the rules as it optimises the program.
 For example, consider:
@@ -2184,6 +2189,7 @@ If you want to write your own good consumers or producers, look at the
 Prelude definitions of the above functions to see how to do so.
 
 <sect2>Specialisation
+<label id="rule-spec">
 <p>
 
 Rewrite rules can be used to get the same effect as a feature

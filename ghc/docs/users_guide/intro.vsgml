@@ -3,8 +3,12 @@
 <p>
 
 This is a guide to using the Glasgow Haskell compilation (GHC) system.
-It is a batch compiler for the Haskell~1.4 language, with support for
+It is a batch compiler for the Haskell~98 language, with support for
 various Glasgow-only extensions.
+In this document, we assume that GHC has been installed at your site
+as @ghc@.  A separate document, ``Building and Installing the 
+Glasgow Functional Programming Tools Suite'',
+describes how to install @ghc@.
 
 Many people will use GHC very simply: compile some
 modules---@ghc -c -O Foo.hs Bar.hs@; and link them---
@@ -17,8 +21,7 @@ ghc -c -O -fno-foldr-build -dcore-lint -fvia-C -ddump-simpl Foo.lhs
 </verb></tscreen>
 Stay tuned---all will be revealed!
 
-In this document, we assume that GHC has been installed at your site
-as @ghc@.  The rest of this section provide some tutorial information
+The rest of this section provide some tutorial information
 on batch-style compilation; if you're familiar with these concepts
 already, then feel free to skip to the next section.
 
