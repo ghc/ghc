@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * $Id: LLComms.c,v 1.2 1998/12/02 13:29:06 simonm Exp $
+ * $Id: LLComms.c,v 1.3 1999/08/26 08:23:44 panne Exp $
  *
  * GUM Low-Level Inter-Task Communication
  *
@@ -65,8 +65,8 @@ GetOpName(nat op)
  */
 
 static void
-trace_SendOp(OPCODE op, GLOBAL_TASK_ID dest UNUSED,
-	     unsigned int data1 UNUSED, unsigned int data2 UNUSED)
+trace_SendOp(OPCODE op, GLOBAL_TASK_ID dest STG_UNUSED,
+	     unsigned int data1 STG_UNUSED, unsigned int data2 STG_UNUSED)
 {
     char *OpName;
 
