@@ -131,7 +131,7 @@ dsReify r@(ReifyOut ReifyDecl name)
 -- 			Declarations
 -------------------------------------------------------
 
-repTopDs :: HsGroup Name -> DsM (Core [M.Decl])
+repTopDs :: HsGroup Name -> DsM (Core (M.Q [M.Dec]))
 repTopDs group
  = do { let { bndrs = groupBinders group } ;
 	ss    <- mkGenSyms bndrs ;
@@ -151,8 +151,11 @@ repTopDs group
 			-- more needed
 			return (val_ds ++ catMaybes tycl_ds ++ inst_ds) }) ;
 
-	core_list <- coreList declTyConName decls ;
-	wrapNongenSyms ss core_list
+	decl_ty <- lookupType declTyConName ;
+	let { core_list = coreList' decl_ty decls } ;
+	q_decs  <- repSequenceQ decl_ty core_list ;
+
+	wrapNongenSyms ss q_decs
 	-- Do *not* gensym top-level binders
       }
 
@@ -404,7 +407,7 @@ repE (RecordConOut _ _ _) = panic "DsMeta.repE: No record construction yet"
 repE (RecordUpdOut _ _ _ _) = panic "DsMeta.repE: No record update yet"
 
 repE (ExprWithTySig e ty) = do { e1 <- repE e; t1 <- repTy ty; repSigExp e1 t1 }
-repE (ArithSeqOut _ aseq) =
+repE (ArithSeqIn aseq) =
   case aseq of
     From e              -> do { ds1 <- repE e; repFrom ds1 }
     FromThen e1 e2      -> do 
@@ -650,6 +653,8 @@ repP (ConPatIn dc details)
          RecCon pairs   -> error "No records in template haskell yet"
          InfixCon p1 p2 -> do { qs <- repPs [p1,p2]; repPcon con_str qs }
    }
+repP (NPatIn l (Just _)) = panic "Can't cope with negative overloaded patterns yet (repP (NPatIn _ (Just _)))"
+repP (NPatIn l Nothing) = do { a <- repOverloadedLiteral l; repPlit a }
 repP other = panic "Exotic pattern inside meta brackets"
 
 repListPat :: [Pat Name] -> DsM (Core M.Patt)     
@@ -733,17 +738,14 @@ wrapGenSyns tc_name binds body@(MkC b)
 -- Just like wrapGenSym, but don't actually do the gensym
 -- Instead use the existing name
 -- Only used for [Decl]
-wrapNongenSyms :: [GenSymBind] 
-	       -> Core [M.Decl] -> DsM (Core [M.Decl])
-wrapNongenSyms binds body@(MkC b)
-  = go binds
+wrapNongenSyms :: [GenSymBind] -> Core a -> DsM (Core a)
+wrapNongenSyms binds (MkC body)
+  = do { binds' <- mapM do_one binds ;
+	 return (MkC (mkLets binds' body)) }
   where
-    go [] = return body
-    go ((name,id) : binds)
-      = do { MkC body'   <- go binds
-	   ; MkC lit_str <- localVar name	-- No gensym
-	   ; return (MkC (Let (NonRec id lit_str) body'))
-	   }
+    do_one (name,id) 
+	= do { MkC lit_str <- localVar name	-- No gensym
+	     ; return (NonRec id lit_str) }
 
 void = placeHolderType
 
@@ -980,6 +982,10 @@ repBindQ :: Type -> Type	-- a and b
 repBindQ ty_a ty_b (MkC x) (MkC y) 
   = rep2 bindQName [Type ty_a, Type ty_b, x, y] 
 
+repSequenceQ :: Type -> Core [M.Q a] -> DsM (Core (M.Q [a]))
+repSequenceQ ty_a (MkC list)
+  = rep2 sequenceQName [Type ty_a, list]
+
 ------------ Lists and Tuples -------------------
 -- turn a list of patterns into a single pattern matching a list
 
@@ -1036,7 +1042,7 @@ templateHaskellNames
 		bindStName, letStName, noBindStName, parStName,
 		fromName, fromThenName, fromToName, fromThenToName,
 		funName, valName, liftName,
-	  	gensymName, returnQName, bindQName, 
+	  	gensymName, returnQName, bindQName, sequenceQName,
 		matchName, clauseName, funName, valName, dataDName, classDName,
 		instName, protoName, tvarName, tconName, tappName, 
 		arrowTyConName, tupleTyConName, listTyConName, namedTyConName,
@@ -1100,6 +1106,7 @@ liftName       = varQual FSLIT("lift")          liftIdKey
 gensymName     = varQual FSLIT("gensym")        gensymIdKey
 returnQName    = varQual FSLIT("returnQ")       returnQIdKey
 bindQName      = varQual FSLIT("bindQ")         bindQIdKey
+sequenceQName  = varQual FSLIT("sequenceQ")     sequenceQIdKey
 
 -- type Mat = ...
 matchName      = varQual FSLIT("match")         matchIdKey
@@ -1187,6 +1194,7 @@ classDIdKey     = mkPreludeMiscIdUnique 215
 instIdKey       = mkPreludeMiscIdUnique 216
 dataDIdKey      = mkPreludeMiscIdUnique 217
 
+sequenceQIdKey  = mkPreludeMiscIdUnique 218
 
 plitIdKey       = mkPreludeMiscIdUnique 220
 pvarIdKey       = mkPreludeMiscIdUnique 221

@@ -24,7 +24,7 @@ import RnHsSyn		( RenamedHsExpr )
 import TcExpr		( tcMonoExpr )
 import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
 import TcSimplify	( tcSimplifyTop )
-import TcType		( TcType, openTypeKind )
+import TcType		( TcType, openTypeKind, mkAppTy )
 import TcEnv		( spliceOK, tcMetaTy )
 import TcRnTypes	( TopEnv(..) )
 import TcMType		( newTyVarTy )
@@ -32,7 +32,7 @@ import Name		( Name )
 import TcRnMonad
 
 import TysWiredIn	( mkListTy )
-import DsMeta		( exprTyConName, declTyConName )
+import DsMeta		( exprTyConName, declTyConName, decTyConName, qTyConName )
 import Outputable
 import GHC.Base		( unsafeCoerce# )	-- Should have a better home in the module hierarchy
 \end{code}
@@ -70,12 +70,16 @@ tcBracket (ExpBr expr)
   = newTyVarTy openTypeKind		`thenM` \ any_ty ->
     tcMonoExpr expr any_ty		`thenM_`
     tcMetaTy exprTyConName
+	-- Result type is Expr (= Q Exp)
 
 tcBracket (DecBr decls)
   = tcTopSrcDecls decls			`thenM_`
-    tcMetaTy declTyConName		`thenM` \ decl_ty ->
-    returnM (mkListTy decl_ty)
+    tcMetaTy decTyConName		`thenM` \ decl_ty ->
+    tcMetaTy qTyConName			`thenM` \ q_ty ->
+    returnM (mkAppTy q_ty (mkListTy decl_ty))
+	-- Result type is Q [Dec]
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -163,9 +167,10 @@ tcTopSplice expr res_ty
 \begin{code}
 -- Always at top level
 tcSpliceDecls expr
-  = tcMetaTy declTyConName		`thenM` \ meta_dec_ty ->
+  = tcMetaTy decTyConName		`thenM` \ meta_dec_ty ->
+    tcMetaTy qTyConName    		`thenM` \ meta_q_ty ->
     setStage topSpliceStage (
-	getLIE (tcMonoExpr expr (mkListTy meta_dec_ty))
+	getLIE (tcMonoExpr expr (mkAppTy meta_q_ty (mkListTy meta_dec_ty)))
     )					`thenM` \ (expr', lie) ->
 	-- Solve the constraints
     tcSimplifyTop lie			`thenM` \ const_binds ->
@@ -198,24 +203,20 @@ tcSpliceDecls expr
 \begin{code}
 runMetaE :: TypecheckedHsExpr 	-- Of type (Q Exp)
 	 -> TcM Meta.Exp	-- Of type Exp
-runMetaE e = runMeta tcRunQ e
+runMetaE e = runMeta e
 
-runMetaD :: TypecheckedHsExpr 	-- Of type [Q Dec]
+runMetaD :: TypecheckedHsExpr 	-- Of type Q [Dec]
 	 -> TcM [Meta.Dec]	-- Of type [Dec]
-runMetaD e = runMeta run_decl e
-	   where
-	     run_decl :: [Meta.Decl] -> TcM [Meta.Dec]
-	     run_decl ds = mappM tcRunQ ds
+runMetaD e = runMeta e
 
 -- Warning: if Q is anything other than IO, we need to change this
 tcRunQ :: Meta.Q a -> TcM a
 tcRunQ thing = ioToTcRn thing
 
 
-runMeta :: (x -> TcM t)		-- :: X -> IO t
-	-> TypecheckedHsExpr 	-- Of type X
+runMeta :: TypecheckedHsExpr 	-- Of type X
 	-> TcM t		-- Of type t
-runMeta run_it expr :: TcM t
+runMeta expr
   = getTopEnv		`thenM` \ top_env ->
     getEps		`thenM` \ eps ->
     getNameCache	`thenM` \ name_cache -> 
@@ -241,7 +242,7 @@ runMeta run_it expr :: TcM t
     ioToTcRn (HscMain.compileExpr hsc_env pcs this_mod 
 				  print_unqual expr) `thenM` \ hval ->
 
-    tryM (run_it (unsafeCoerce# hval))	`thenM` \ either_tval ->
+    tryM (tcRunQ (unsafeCoerce# hval))	`thenM` \ either_tval ->
 
     case either_tval of
 	  Left exn -> failWithTc (vcat [text "Exception when running compile-time code:", 

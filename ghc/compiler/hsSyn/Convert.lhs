@@ -33,7 +33,9 @@ import TyCon	( DataConDetails(..) )
 import Type	( Type )
 import BasicTypes( Boxity(..), RecFlag(Recursive), 
 		   NewOrData(..), StrictnessMark(..) )
-import FastString( mkFastString )
+import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..) )
+import HsDecls ( CImportSpec(..), ForeignImport(..), ForeignDecl(..) )
+import FastString( mkFastString, nilFS )
 import Char 	( ord, isAlphaNum )
 import List	( partition )
 import Outputable
@@ -78,6 +80,14 @@ cvt_top (Instance tys ty decs)
 			 (HsPredTy (cvt_pred ty))
 
 cvt_top (Proto nm typ) = SigD (Sig (vName nm) (cvtType typ) loc0)
+
+cvt_top (Foreign (Import callconv safety from nm typ))
+ = ForD (ForeignImport (vName nm) (cvtType typ) fi False loc0)
+    where fi = CImport CCallConv (PlaySafe True) c_header nilFS cis
+          (c_header', c_func') = break (== ' ') from
+          c_header = mkFastString c_header'
+          c_func = tail c_func'
+          cis = CFunction (StaticTarget (mkFastString c_func))
 
 noContext      = []
 noExistentials = []
