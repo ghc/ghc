@@ -199,14 +199,15 @@ case $HostPlatform in
 alpha-dec-osf*) fptools_cv_leading_underscore=no;;
 *cygwin32) fptools_cv_leading_underscore=yes;;
 *mingw32) fptools_cv_leading_underscore=yes;;
-*darwin)  fptools_cv_leading_underscore=yes;;
 *) AC_TRY_RUN([#ifdef HAVE_NLIST_H
 #include <nlist.h>
 struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};
 struct nlist xYzzY2[] = {{"_xYzzY2", 0},{0}};
 #endif
 
-int main()
+int main(argc, argv)
+int argc;
+char **argv;
 {
 #ifdef HAVE_NLIST_H
     if(nlist(argv[0], xYzzY1) == 0 && xYzzY1[0].n_value != 0)
