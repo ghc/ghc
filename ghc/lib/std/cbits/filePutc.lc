@@ -14,7 +14,7 @@
 StgInt
 filePutc(ptr, c)
 StgForeignObj ptr;
-StgInt c;
+StgChar c;
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;

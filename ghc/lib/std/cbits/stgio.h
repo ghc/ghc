@@ -53,7 +53,7 @@ StgInt	fileGetc PROTO((StgForeignObj));
 
 /* fileLookAhead.lc */
 StgInt	fileLookAhead PROTO((StgForeignObj));
-StgInt	ungetChar PROTO((StgForeignObj,StgInt));
+StgInt	ungetChar PROTO((StgForeignObj,StgChar));
 
 /* fileObject.lc */
 void    setBufFlags PROTO((StgForeignObj, StgInt));
@@ -81,7 +81,7 @@ StgInt	getFilePosn PROTO((StgForeignObj));
 StgInt	setFilePosn PROTO((StgForeignObj, StgInt));
 
 /* filePutc.lc */
-StgInt	filePutc    PROTO((StgForeignObj, StgInt));
+StgInt	filePutc    PROTO((StgForeignObj, StgChar));
 
 /* fileSize.lc */
 StgInt	fileSize    PROTO((StgForeignObj, StgByteArray));

@@ -35,7 +35,7 @@ StgForeignObj ptr;
          return c;
     }
 
-    rc = ungetChar(ptr,c);
+    rc = ungetChar(ptr,(char)c);
     if ( rc < 0 ) {
        return rc;
     } else {
@@ -46,7 +46,7 @@ StgForeignObj ptr;
 StgInt
 ungetChar(ptr,c)
 StgForeignObj ptr;
-StgInt c;
+StgChar c;
 {
   IOFileObject* fo = (IOFileObject*)ptr;
   int rc = 0, sz = 0;

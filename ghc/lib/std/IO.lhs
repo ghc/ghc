@@ -329,7 +329,7 @@ hPutChar :: Handle -> Char -> IO ()
 hPutChar handle c = do
     handle_  <- wantWriteableHandle "hPutChar" handle
     let fo = haFO__ handle_
-    rc       <- mayBlock fo (_ccall_ filePutc fo (ord c))   -- ConcHask: UNSAFE, may block.
+    rc       <- mayBlock fo (_ccall_ filePutc fo c)   -- ConcHask: UNSAFE, may block.
     writeHandle handle handle_
     if rc == 0
      then return ()
@@ -472,7 +472,7 @@ writeChars :: Addr -> String -> IO ()
 #endif
 writeChars fo "" = return ()
 writeChars fo (c:cs) = do
-  rc <- mayBlock fo (_ccall_ filePutc fo (ord c))   -- ConcHask: UNSAFE, may block.
+  rc <- mayBlock fo (_ccall_ filePutc fo c)   -- ConcHask: UNSAFE, may block.
   if rc == 0 
    then writeChars fo cs
    else constructErrorAndFail "writeChars"

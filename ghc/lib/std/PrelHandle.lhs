@@ -791,7 +791,7 @@ pushback. (For unbuffered channels, the (default) push-back limit is
 hUngetChar :: Handle -> Char -> IO ()
 hUngetChar handle c = do
     handle_ <- wantReadableHandle "hLookAhead" handle
-    rc      <- _ccall_ ungetChar (haFO__ handle_) (ord c)  -- ConcHask: SAFE, won't block
+    rc      <- _ccall_ ungetChar (haFO__ handle_) c  -- ConcHask: SAFE, won't block
     writeHandle handle handle_
     if rc == (-1)
      then constructErrorAndFail "hUngetChar"
