@@ -779,8 +779,7 @@ mkCoCase env scrut (AlgAlts outer_alts
 	 v | scrut_is_var = Var scrut_var
 	   | otherwise    = Con con (map TyArg arg_tys ++ map VarArg args)
 
-    arg_tys = --trace "SimplCase:getAppData...:2" $
-	      case (getAppDataTyConExpandingDicts (idType deflt_var)) of
+    arg_tys = case (getAppDataTyConExpandingDicts (idType deflt_var)) of
 		(_, arg_tys, _) -> arg_tys
 
 mkCoCase env scrut (PrimAlts
