@@ -13,6 +13,10 @@ StgInt closeFile PROTO((StgForeignObj));
 /* createDirectory.lc */
 StgInt createDirectory PROTO((StgByteArray));
 
+/* directoryAux.lc */
+StgAddr openDir__ PROTO((StgByteArray));
+StgAddr readDir__ PROTO((StgAddr));
+
 /* env.lc */
 char *	strDup		PROTO((const char *));
 int	setenviron	PROTO((char **));
@@ -70,9 +74,6 @@ StgInt clockTicks();
 
 /* getCurrentDirectory.lc */
 StgAddr getCurrentDirectory(STG_NO_ARGS);
-
-/* getDirectoryContents.lc */
-StgAddr getDirectoryContents PROTO((StgByteArray));
 
 /* getLock.lc */
 int     lockFile    PROTO((int, int));
