@@ -483,7 +483,7 @@ instance Ord ImportSpec where
 \begin{code}
 plusProv :: Provenance -> Provenance -> Provenance
 -- Choose LocalDef over Imported
--- There is an obscure bug lurking here, in the presence
+-- There is an obscure bug lurking here; in the presence
 -- of recursive modules, something can be imported *and* locally
 -- defined, and one might refer to it with a qualified name from
 -- the import -- but I'm going to ignore that because it makes

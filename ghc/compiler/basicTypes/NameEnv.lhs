@@ -44,7 +44,6 @@ elemNameEnv    	 :: Name -> NameEnv a -> Bool
 unitNameEnv    	 :: Name -> a -> NameEnv a
 lookupNameEnv  	 :: NameEnv a -> Name -> Maybe a
 lookupNameEnv_NF :: NameEnv a -> Name -> a
-mapNameEnv	 :: (a->b) -> NameEnv a -> NameEnv b
 foldNameEnv	 :: (a -> b -> b) -> b -> NameEnv a -> b
 filterNameEnv	 :: (elt -> Bool) -> NameEnv elt -> NameEnv elt
 
@@ -60,7 +59,6 @@ extendNameEnvList= addListToUFM
 delFromNameEnv 	 = delFromUFM
 delListFromNameEnv = delListFromUFM
 elemNameEnv    	 = elemUFM
-mapNameEnv	 = mapUFM
 unitNameEnv    	 = unitUFM
 filterNameEnv	 = filterUFM
 

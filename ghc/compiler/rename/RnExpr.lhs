@@ -28,7 +28,7 @@ import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
 import RnEnv
-import RdrName		( plusGlobalRdrEnv )
+import OccName		( plusOccEnv )
 import RnNames		( importsFromLocalDecls )
 import RnTypes		( rnHsTypeFVs, rnPat, litFVs, rnOverLit, rnPatsAndThen,
 			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr, checkTupSize )
@@ -637,7 +637,12 @@ rnBracket (DecBr group)
   = importsFromLocalDecls group `thenM` \ (rdr_env, avails) ->
 	-- Discard avails (not useful here)
 
-    updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env gbl }) $
+    updGblEnv (\gbl -> gbl { tcg_rdr_env = tcg_rdr_env gbl `plusOccEnv` rdr_env}) $
+	-- Notice plusOccEnv, not plusGlobalRdrEnv.  In this situation we want
+	-- to *shadow* top-level bindings.  E.g.
+	--	foo = 1
+	--	bar = [d| foo = 1|]
+	-- So we drop down to plusOccEnv.  (Perhaps there should be a fn in RdrName.)
 
     rnSrcDecls group	`thenM` \ (tcg_env, group') ->
 	-- Discard the tcg_env; it contains only extra info about fixity

@@ -18,7 +18,7 @@ module OccName (
 	-- The OccEnv type
 	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv,
 	lookupOccEnv, mkOccEnv, extendOccEnvList, elemOccEnv,
-	occEnvElts, foldOccEnv, plusOccEnv_C, extendOccEnv_C,
+	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
 
 
 	-- The OccSet type
@@ -281,6 +281,7 @@ elemOccEnv   :: OccName -> OccEnv a -> Bool
 foldOccEnv   :: (a -> b -> b) -> b -> OccEnv a -> b
 occEnvElts   :: OccEnv a -> [a]
 extendOccEnv_C :: (a->a->a) -> OccEnv a -> OccName -> a -> OccEnv a
+plusOccEnv     :: OccEnv a -> OccEnv a -> OccEnv a
 plusOccEnv_C   :: (a->a->a) -> OccEnv a -> OccEnv a -> OccEnv a
 
 emptyOccEnv  	 = emptyUFM
@@ -292,6 +293,7 @@ mkOccEnv         = listToUFM
 elemOccEnv	 = elemUFM
 foldOccEnv	 = foldUFM
 occEnvElts 	 = eltsUFM
+plusOccEnv	 = plusUFM
 plusOccEnv_C	 = plusUFM_C
 extendOccEnv_C   = addToUFM_C
 
