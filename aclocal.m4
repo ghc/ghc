@@ -134,7 +134,7 @@ m4_popdef([fp_Cache])[]dnl
 ])# FP_CHECK_ALIGNMENT
 
 
-# FP_CHECK_CONST(EXPRESSION, [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = (-1)])
+# FP_CHECK_CONST(EXPRESSION, [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = -1])
 # ---------------------------------------------------------------------------------
 # Defines CONST_EXPRESSION to the value of the compile-time EXPRESSION, using
 # INCLUDES. If the value cannot be determined, use VALUE-IF-FAIL.
@@ -142,7 +142,7 @@ AC_DEFUN([FP_CHECK_CONST],
 [AS_VAR_PUSHDEF([fp_Cache], [fp_cv_const_$1])[]dnl
 AC_CACHE_CHECK([value of $1], fp_Cache,
 [FP_COMPUTE_INT([$1], fp_check_const_result, [AC_INCLUDES_DEFAULT([$2])],
-                [fp_check_const_result=m4_default([$3], ['(-1)'])])
+                [fp_check_const_result=m4_default([$3], ['-1'])])
 AS_VAR_SET(fp_Cache, [$fp_check_const_result])])[]dnl
 AC_DEFINE_UNQUOTED(AS_TR_CPP([CONST_$1]), AS_VAR_GET(fp_Cache), [The value of $1.])[]dnl
 AS_VAR_POPDEF([fp_Cache])[]dnl
@@ -159,7 +159,7 @@ m4_define([FP_CHECK_CONSTS_TEMPLATE],
 ])# FP_CHECK_CONSTS_TEMPLATE
 
 
-# FP_CHECK_CONSTS(EXPRESSION..., [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = (-1)])
+# FP_CHECK_CONSTS(EXPRESSION..., [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = -1])
 # -------------------------------------------------------------------------------------
 # List version of FP_CHECK_CONST
 AC_DEFUN(FP_CHECK_CONSTS,
