@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.17 2001/07/26 03:08:39 ken Exp $
+ * $Id: StgTypes.h,v 1.18 2001/10/03 13:57:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -25,7 +25,7 @@
 	StgCode, StgArray, StgByteArray, StgStablePtr, StgFunPtr,
 	StgUnion.
 
- * WARNING: Keep this file and HsFFI.h in synch!
+ * WARNING: Keep this file, MachDeps.h, and HsFFI.h in synch!
  *
  * NOTE: assumes #include "config.h"
  * 

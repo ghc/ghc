@@ -1,52 +1,22 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.17 2001/08/01 08:20:33 simonmar Exp $
+ * $Id: Constants.h,v 1.18 2001/10/03 13:57:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
  * Constants
  *
- * NOTE: this information is used by both the compiler and the RTS,
- * and *must* be kept up-to-date with respect to the rest of the
- * world.
+ * NOTE: this information is used by both the compiler and the RTS.
+ * Some of it is tweakable, and some of it must be kept up to date
+ * with various other parts of the system.
+ *
+ * Constants which are derived automatically from other definitions in
+ * the system (eg. structure sizes) are generated into the file
+ * DerivedConstants.h by a C program (mkDerivedConstantsHdr).
  *
  * -------------------------------------------------------------------------- */
 
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
-
-/* -----------------------------------------------------------------------------
-   Header Sizes
-
-   NOTE: keep these in line with the real definitions in Closures.h
-   HWL: checked GRAN_HDR_SIZE; ok
-   -------------------------------------------------------------------------- */
-
-#define STD_HDR_SIZE   1
-#define PROF_HDR_SIZE  1
-#define GRAN_HDR_SIZE  1
-#define PAR_HDR_SIZE   0
-#define TICKY_HDR_SIZE 0
-
-#define ARR_WORDS_HDR_SIZE  1
-#define ARR_PTRS_HDR_SIZE   2
-
-/* -----------------------------------------------------------------------------
-   Info Table sizes
-
-   The native code generator needs to know these things, and can't use
-   the C sizeof() function.
-  
-   NOTE: keep these in line with the real definitions in InfoTables.h
-
-   NOTE: the PROF, and GRAN values are *wrong*  (ToDo)
-   HWL: checked GRAN_ITBL_SIZE; ok
-   -------------------------------------------------------------------------- */
-
-#define STD_ITBL_SIZE   3
-#define PROF_ITBL_SIZE  1
-#define GRAN_ITBL_SIZE  1
-#define PAR_ITBL_SIZE   0
-#define TICKY_ITBL_SIZE 0
 
 /* -----------------------------------------------------------------------------
    Minimum closure sizes
@@ -102,32 +72,6 @@
 #define MAX_SPEC_CONSTR_SIZE   2
 
 /* -----------------------------------------------------------------------------
-   Update Frame Layout
-   GranSim uses an additional word as bitmask in the update frame; actually,
-   not really necessary, but uses standard closure layout that way
-   NB: UF_RET etc are *wrong* in a GranSim setup; should be increased by 1 
-       if compiling for GranSim (currently not used in compiler) -- HWL
-   -------------------------------------------------------------------------- */
-#define NOSCC_UF_SIZE 	3
-#define GRAN_UF_SIZE 	4
-#define SCC_UF_SIZE	4
-
-#define UF_RET		0
-#define UF_SU		1
-#define UF_UPDATEE	2
-
-/* -----------------------------------------------------------------------------
-   SEQ frame size
-
-   I don't think seq frames really need sccs --SDM
-   They don't need a GranSim bitmask either, but who cares anyway -- HWL
-   -------------------------------------------------------------------------- */
-
-#define NOSCC_SEQ_FRAME_SIZE 2
-#define GRAN_SEQ_FRAME_SIZE  3
-#define SCC_SEQ_FRAME_SIZE   3
-
-/* -----------------------------------------------------------------------------
    STG Registers.
 
    Note that in MachRegs.h we define how many of these registers are
@@ -139,27 +83,6 @@
 #define MAX_DOUBLE_REG  2
 /* register is only used for returning (unboxed) 64-bit vals */
 #define MAX_LONG_REG    1
-
-/*---- The size of an StgDouble, in StgWords. */
-
-#if SIZEOF_VOID_P == SIZEOF_DOUBLE
-#define DOUBLE_SIZE 	1
-#else
-#define DOUBLE_SIZE 	2
-#endif
-
-/*---- The size of Stg{Int,Word}64e, in StgWords. */
-#if SIZEOF_VOID_P == 8
-#define WORD64_SIZE 	1
-#define INT64_SIZE 	1
-#else
-#define WORD64_SIZE 	2
-#define INT64_SIZE 	2
-#endif
-
-
-/*---- The size of StgWord, in bytes. */
-#define WORD_SIZE       SIZEOF_VOID_P
 
 /*---- Maximum number of constructors in a data type for direct-returns.  */
 
@@ -220,12 +143,10 @@
    Storage manager constants
    -------------------------------------------------------------------------- */
 
-/* The size of a block */
-#define BLOCK_SIZE   0x1000
+/* The size of a block (2^BLOCK_SHIFT bytes) */
 #define BLOCK_SHIFT  12
 
-/* The size of a megablock */
-#define MBLOCK_SIZE    0x100000
+/* The size of a megablock (2^MBLOCK_SHIFT bytes) */
 #define MBLOCK_SHIFT   20
 
 /* the largest size an object can be before we give it a block of its

@@ -34,14 +34,14 @@ module Constants (
 	mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 
 	uF_SIZE,
-	sCC_UF_SIZE,
+	pROF_UF_SIZE,
 	gRAN_UF_SIZE,  -- HWL
 	uF_RET,
 	uF_SU,
 	uF_UPDATEE,
 
 	sEQ_FRAME_SIZE,
-	sCC_SEQ_FRAME_SIZE,
+	pROF_SEQ_FRAME_SIZE,
 	gRAN_SEQ_FRAME_SIZE, -- HWL
 
 	mAX_Vanilla_REG,
@@ -81,6 +81,8 @@ module Constants (
 #include "../includes/config.h"
 #include "../includes/MachRegs.h"
 #include "../includes/Constants.h"
+#include "../includes/MachDeps.h"
+#include "../includes/DerivedConstants.h"
 
 -- import Util
 \end{code}
@@ -146,10 +148,10 @@ mAX_FAMILY_SIZE_FOR_VEC_RETURNS = (MAX_VECTORED_RTN::Int)  -- pretty arbitrary
 -- If you change this, you may need to change runtimes/standard/Update.lhc
 
 -- The update frame sizes
-uF_SIZE	= (NOSCC_UF_SIZE::Int)
+uF_SIZE	= (STD_UF_SIZE::Int)
 
 -- Same again, with profiling
-sCC_UF_SIZE = (SCC_UF_SIZE::Int)
+pROF_UF_SIZE = (PROF_UF_SIZE::Int)
 
 -- Same again, with gransim
 gRAN_UF_SIZE = (GRAN_UF_SIZE::Int)
@@ -163,8 +165,8 @@ uF_UPDATEE     = (UF_UPDATEE::Int)
 Seq frame sizes.
 
 \begin{code}
-sEQ_FRAME_SIZE = (NOSCC_SEQ_FRAME_SIZE::Int)
-sCC_SEQ_FRAME_SIZE = (SCC_SEQ_FRAME_SIZE::Int)
+sEQ_FRAME_SIZE = (STD_SEQ_FRAME_SIZE::Int)
+pROF_SEQ_FRAME_SIZE = (PROF_SEQ_FRAME_SIZE::Int)
 gRAN_SEQ_FRAME_SIZE = (GRAN_SEQ_FRAME_SIZE::Int)
 \end{code}
 
@@ -207,9 +209,9 @@ tICKY_ITBL_SIZE = (TICKY_ITBL_SIZE :: Int)
 Size of a double in StgWords.
 
 \begin{code}
-dOUBLE_SIZE    = (DOUBLE_SIZE   :: Int)
-wORD64_SIZE    = (WORD64_SIZE   :: Int)
-iNT64_SIZE     = (INT64_SIZE   :: Int)
+dOUBLE_SIZE     = (SIZEOF_DOUBLE `quot` SIZEOF_HSWORD :: Int)
+wORD64_SIZE     = (8 `quot` SIZEOF_HSWORD :: Int)
+iNT64_SIZE      = wORD64_SIZE
 \end{code}
 
 This tells the native code generator the size of the spill
@@ -229,7 +231,7 @@ rESERVED_STACK_WORDS = (RESERVED_STACK_WORDS :: Int)
 Size of a word, in bytes
 
 \begin{code}
-wORD_SIZE = (WORD_SIZE :: Int)
+wORD_SIZE = (SIZEOF_HSWORD :: Int)
 \end{code}
 
 Size of a storage manager block (in bytes).

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.10 2000/05/12 13:01:04 simonmar Exp $
+ * $Id: StgProf.h,v 1.11 2001/10/03 13:57:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -8,6 +8,49 @@
 
 #ifndef STGPROF_H
 #define STGPROF_H
+
+/* -----------------------------------------------------------------------------
+ * Data Structures 
+ * ---------------------------------------------------------------------------*/  
+typedef struct _CostCentre {
+  int ccID;
+
+  char *label;
+  char *module;
+ 
+  /* used for accumulating costs at the end of the run... */
+  unsigned long time_ticks;
+  unsigned long long mem_alloc;
+
+  char is_caf;
+
+  struct _CostCentre *link;
+} CostCentre;
+
+
+typedef struct _CostCentreStack {
+  int ccsID;
+
+  CostCentre *cc;
+  struct _CostCentreStack *prevStack;
+  struct _IndexTable *indexTable;
+  
+  unsigned long long scc_count;
+    
+  unsigned long time_ticks;
+  unsigned long long mem_alloc;
+  unsigned long mem_resid;
+
+  unsigned long inherited_ticks;
+  unsigned long long inherited_alloc;
+
+  CostCentre *root;
+} CostCentreStack;
+
+
+/* -----------------------------------------------------------------------------
+ * The rest is PROFILING only...
+ * ---------------------------------------------------------------------------*/
 
 #if !defined(PROFILING)
   
@@ -32,52 +75,6 @@
 /* -----------------------------------------------------------------------------
  * Data Structures 
  * ---------------------------------------------------------------------------*/  
-/* 
- * CostCentre 
- */
-
-typedef struct _CostCentre {
-  int ccID;
-
-  char *label;
-  char *module;
- 
-  /* used for accumulating costs at the end of the run... */
-  unsigned long time_ticks;
-  unsigned long mem_alloc;
-
-  char is_caf;
-
-  struct _CostCentre *link;
-} CostCentre;
-
-
-	
-/* 
- * CostCentreStack 
- */
-
-typedef struct _CostCentreStack {
-  int ccsID;
-
-  CostCentre *cc;
-  struct _CostCentreStack *prevStack;
-  struct _IndexTable *indexTable;
-  
-  unsigned long scc_count;
-    
-  unsigned long time_ticks;
-  unsigned long mem_alloc;
-  unsigned long mem_resid;
-
-  unsigned long inherited_ticks;
-  unsigned long inherited_alloc;
-
-  CostCentre *root;
-} CostCentreStack;
-
-
-
 /* 
  * IndexTable 
  */

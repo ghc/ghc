@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.22 2001/08/29 17:24:25 qrczak Exp $
+ * $Id: InfoTables.h,v 1.23 2001/10/03 13:57:42 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -14,20 +14,10 @@
    Profiling info
    -------------------------------------------------------------------------- */
 
-#ifdef PROFILING
-
 typedef struct {
     char *closure_type;
     char *closure_desc;
 } StgProfInfo;
-
-#else /* !PROFILING */
-
-typedef struct {
-  /* empty */
-} StgProfInfo;
-
-#endif /* PROFILING */
 
 /* -----------------------------------------------------------------------------
    Parallelism info
@@ -42,13 +32,12 @@ typedef struct {
   StgInfoTable *rbh_infoptr;     /* infoptr to the RBH  */
 } StgParInfo;
 
-#else /* !PAR */
+#endif /* 0 */
 
 typedef struct {
 	/* empty */
 } StgParInfo;
 
-#endif /* PAR */
 
 /*
    Copied from ghc-0.29; ToDo: check this code -- HWL
@@ -96,6 +85,14 @@ typedef struct {
 //#endif
 
 #endif
+
+/* -----------------------------------------------------------------------------
+   Ticky info
+   -------------------------------------------------------------------------- */
+
+typedef struct {
+    /* empty */
+} StgTickyInfo;
 
 /* -----------------------------------------------------------------------------
    Debugging info
@@ -216,6 +213,9 @@ typedef struct _StgInfoTable {
 #endif
 #ifdef PROFILING
     StgProfInfo     prof;
+#endif
+#ifdef TICKY
+    StgTickyInfo    ticky;
 #endif
 #ifdef DEBUG_CLOSURE
     StgDebugInfo    debug;

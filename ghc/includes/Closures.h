@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.27 2001/08/29 17:24:25 qrczak Exp $
+ * $Id: Closures.h,v 1.28 2001/10/03 13:57:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,55 +19,25 @@
    The profiling header
    -------------------------------------------------------------------------- */
 
-#ifdef PROFILING
-
 typedef struct {
    CostCentreStack *ccs;
 } StgProfHeader;
-
-#else /* !PROFILING */
-
-typedef struct {
-	/* empty */
-} StgProfHeader;
-
-#endif /* PROFILING */
 
 /* -----------------------------------------------------------------------------
    The parallel header
    -------------------------------------------------------------------------- */
 
-#ifdef PAR
-
 typedef struct {
   /* StgWord ga; */  /* nope! global addresses are managed via a hash table */
 } StgParHeader;
-
-#else /* !PAR */
-
-typedef struct {
-  /* empty */
-} StgParHeader;
-
-#endif /* PAR */
 
 /* -----------------------------------------------------------------------------
    The GranSim header
    -------------------------------------------------------------------------- */
 
-#if defined(GRAN)
-
 typedef struct {
   StgWord procs; /* bitmask indicating on which PEs this closure resides */
 } StgGranHeader;
-
-#else /* !GRAN */
-
-typedef struct {
-  /* empty */
-} StgGranHeader;
-
-#endif /* GRAN */
 
 /* -----------------------------------------------------------------------------
    The ticky-ticky header
@@ -88,19 +58,9 @@ typedef struct {
    info tables to be @_Evacuate_1@ and @_Scavenge_1_0@.
    -------------------------------------------------------------------------- */
 
-#ifdef TICKY_TICKY
-
 typedef struct {
   /* old: W_ updated; */
 } StgTickyHeader;
-
-#else /* !TICKY_TICKY */
-
-typedef struct {
-	/* empty */
-} StgTickyHeader;
-
-#endif /* TICKY_TICKY */
 
 /* -----------------------------------------------------------------------------
    The full fixed-size closure header

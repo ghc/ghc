@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.9 2001/08/17 17:18:54 apt Exp $
+% $Id: PrelStorable.lhs,v 1.10 2001/10/03 13:57:42 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -106,25 +106,25 @@ instance Storable (T) where {			\
 STORABLE(Char,SIZEOF_INT32,ALIGNMENT_INT32,
 	 readWideCharOffPtr,writeWideCharOffPtr)
 
-STORABLE(Int,SIZEOF_LONG,ALIGNMENT_LONG,
+STORABLE(Int,SIZEOF_HSINT,ALIGNMENT_HSINT,
 	 readIntOffPtr,writeIntOffPtr)
 
-STORABLE(Word,SIZEOF_LONG,ALIGNMENT_LONG,
+STORABLE(Word,SIZEOF_HSWORD,ALIGNMENT_HSWORD,
 	 readWordOffPtr,writeWordOffPtr)
 
-STORABLE((Ptr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
+STORABLE((Ptr a),SIZEOF_HSPTR,ALIGNMENT_HSPTR,
 	 readPtrOffPtr,writePtrOffPtr)
 
-STORABLE((FunPtr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
+STORABLE((FunPtr a),SIZEOF_HSFUNPTR,ALIGNMENT_HSFUNPTR,
 	 readFunPtrOffPtr,writeFunPtrOffPtr)
 
-STORABLE((StablePtr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
+STORABLE((StablePtr a),SIZEOF_HSSTABLEPTR,ALIGNMENT_HSSTABLEPTR,
 	 readStablePtrOffPtr,writeStablePtrOffPtr)
 
-STORABLE(Float,SIZEOF_FLOAT,ALIGNMENT_FLOAT,
+STORABLE(Float,SIZEOF_HSFLOAT,ALIGNMENT_HSFLOAT,
 	 readFloatOffPtr,writeFloatOffPtr)
 
-STORABLE(Double,SIZEOF_DOUBLE,ALIGNMENT_DOUBLE,
+STORABLE(Double,SIZEOF_HSDOUBLE,ALIGNMENT_HSDOUBLE,
 	 readDoubleOffPtr,writeDoubleOffPtr)
 
 STORABLE(Word8,SIZEOF_WORD8,ALIGNMENT_WORD8,

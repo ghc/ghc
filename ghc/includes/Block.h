@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.9 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: Block.h,v 1.10 2001/10/03 13:57:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,6 +16,7 @@
 
 /* Block related constants (4k blocks) */
 
+#define BLOCK_SIZE   (1<<BLOCK_SHIFT)
 #define BLOCK_SIZE_W (BLOCK_SIZE/sizeof(W_))
 #define BLOCK_MASK   (BLOCK_SIZE-1)
 
@@ -24,6 +25,7 @@
 
 /* Megablock related constants (1M megablocks) */
 
+#define MBLOCK_SIZE    (1<<MBLOCK_SHIFT)
 #define MBLOCK_SIZE_W  (MBLOCK_SIZE/sizeof(W_))
 #define MBLOCK_MASK    (MBLOCK_SIZE-1)
 

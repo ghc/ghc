@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.40 2001/07/24 06:31:35 ken Exp $
+% $Id: PrelNum.lhs,v 1.41 2001/10/03 13:57:42 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -19,12 +19,12 @@ and the type
 {-# OPTIONS -fno-implicit-prelude #-}
 
 #include "MachDeps.h"
-#if WORD_SIZE_IN_BYTES == 4
+#if SIZEOF_HSWORD == 4
 #define LEFTMOST_BIT 2147483648
-#elif WORD_SIZE_IN_BYTES == 8
+#elif SIZEOF_HSWORD == 8
 #define LEFTMOST_BIT 9223372036854775808
 #else
-#error Please define LEFTMOST_BIT to be 2^(WORD_SIZE_IN_BYTES*8-1)
+#error Please define LEFTMOST_BIT to be 2^(SIZEOF_HSWORD*8-1)
 #endif
 
 module PrelNum where

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.19 2001/09/12 15:52:40 sewardj Exp $
+% $Id: CgStackery.lhs,v 1.20 2001/10/03 13:57:42 simonmar Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -27,8 +27,9 @@ import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import Panic		( panic )
-import Constants	( uF_SIZE, sCC_UF_SIZE, gRAN_UF_SIZE, 
-			  sEQ_FRAME_SIZE, sCC_SEQ_FRAME_SIZE, gRAN_SEQ_FRAME_SIZE )
+import Constants	( uF_SIZE, pROF_UF_SIZE, gRAN_UF_SIZE, 
+			  sEQ_FRAME_SIZE, pROF_SEQ_FRAME_SIZE, 
+			  gRAN_SEQ_FRAME_SIZE )
 
 import Util		( sortLt )
 import IOExts		( trace )
@@ -222,11 +223,11 @@ getFinalStackHW fcode = do
 \end{code}
 
 \begin{code}
-updateFrameSize | opt_SccProfilingOn = sCC_UF_SIZE
+updateFrameSize | opt_SccProfilingOn = pROF_UF_SIZE
 		| opt_GranMacros     = trace ("updateFrameSize = " ++ (show gRAN_UF_SIZE))gRAN_UF_SIZE
 		| otherwise          = uF_SIZE
 
-seqFrameSize    | opt_SccProfilingOn  = sCC_SEQ_FRAME_SIZE
+seqFrameSize    | opt_SccProfilingOn  = pROF_SEQ_FRAME_SIZE
 	        | opt_GranMacros      = gRAN_SEQ_FRAME_SIZE
 		| otherwise           = sEQ_FRAME_SIZE
 \end{code}			

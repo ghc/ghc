@@ -1,57 +1,89 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachDeps.h,v 1.6 2001/08/17 17:18:53 apt Exp $
+ * $Id: MachDeps.h,v 1.7 2001/10/03 13:57:42 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  * (c) The GHC Team, 1998-1999
+ * (c) The University of Glasgow 2001
  * 
  * Definitions that characterise machine specific properties of basic
- * Stg types provided as unboxed types (mirrors the typedefs in
- * StgTypes.)
+ * types (C & Haskell).
  *
+ * NB: Keep in sync with HsFFI.h and StgTypes.h.
  * NB: THIS FILE IS INCLUDED IN HASKELL SOURCE!
  * ---------------------------------------------------------------------------*/
 
 #ifndef MACHDEPS_H
 #define MACHDEPS_H
 
+/* Sizes of C types come from here... */
 #include "config.h"
 
+/* Sizes of Haskell types follow.  These sizes correspond to:
+ *   - the number of bytes in the primitive type (eg. Int#)
+ *   - the number of bytes in the external representation (eg. HsInt)
+ *   - the scale offset used by writeFooOffAddr#
+ *
+ * In the heap, the type may take up more space: eg. SIZEOF_INT8 == 1,
+ * but it takes up SIZEOF_HSWORD (4 or 8) bytes in the heap.
+ */
 
-
-#define CHAR_SIZE_IN_BYTES	1
-#define ADDR_SIZE_IN_BYTES	SIZEOF_VOID_P
-#define INT_SIZE_IN_BYTES	SIZEOF_LONG
-#define WORD_SIZE_IN_BYTES	SIZEOF_LONG
-
-#ifndef WORD_SIZE_IN_BITS
-#if WORD_SIZE_IN_BYTES == 4
-#define WORD_SIZE_IN_BITS       32
-#else 
-#define WORD_SIZE_IN_BITS       64
+/* First, check some assumptions.. */
+#if SIZEOF_CHAR != 1
+#error GHC untested on this architecture: sizeof(char) != 1
 #endif
+
+#if SIZEOF_SHORT != 2
+#error GHC untested on this architecture: sizeof(short) != 2
 #endif
 
-#define FLOAT_SIZE_IN_BYTES 	SIZEOF_FLOAT
-#define DOUBLE_SIZE_IN_BYTES	SIZEOF_DOUBLE
+#if SIZEOF_UNSIGNED_INT != 4
+#error GHC untested on this architecture: sizeof(unsigned int) != 4
+#endif
+
+#define SIZEOF_HSCHAR           SIZEOF_WORD32
+#define ALIGNMENT_HSCHAR        ALIGNMENT_WORD32
+
+#define SIZEOF_HSINT            SIZEOF_VOID_P
+#define ALIGNMENT_HSINT         ALIGNMENT_VOID_P
+
+#define SIZEOF_HSWORD		SIZEOF_VOID_P
+#define ALIGNMENT_HSWORD	ALIGNMENT_VOID_P
+
+#define SIZEOF_HSDOUBLE		SIZEOF_DOUBLE
+#define ALIGNMENT_HSDOUBLE	ALIGNMENT_DOUBLE
+
+#define SIZEOF_HSFLOAT		SIZEOF_FLOAT
+#define ALIGNMENT_HSFLOAT	ALIGNMENT_FLOAT
+
+#define SIZEOF_HSPTR            SIZEOF_VOID_P
+#define ALIGNMENT_HSPTR         ALIGNMENT_VOID_P
+
+#define SIZEOF_HSFUNPTR         SIZEOF_VOID_P
+#define ALIGNMENT_HSFUNPTR      ALIGNMENT_VOID_P
+
+#define SIZEOF_HSFOREIGNPTR     SIZEOF_VOID_P
+#define ALIGNMENT_HSFOREIGNPTR  ALIGNMENT_VOID_P
+
+#define SIZEOF_HSSTABLEPTR      SIZEOF_VOID_P
+#define ALIGNMENT_HSSTABLEPTR   ALIGNMENT_VOID_P
 
 #define SIZEOF_INT8             SIZEOF_CHAR
 #define ALIGNMENT_INT8          ALIGNMENT_CHAR
+
 #define SIZEOF_WORD8            SIZEOF_UNSIGNED_CHAR
 #define ALIGNMENT_WORD8         ALIGNMENT_UNSIGNED_CHAR
 
 #define SIZEOF_INT16            SIZEOF_SHORT
 #define ALIGNMENT_INT16         ALIGNMENT_SHORT
+
 #define SIZEOF_WORD16           SIZEOF_UNSIGNED_SHORT
 #define ALIGNMENT_WORD16        ALIGNMENT_UNSIGNED_SHORT
 
-#if SIZEOF_UNSIGNED_INT == 4
 #define SIZEOF_INT32            SIZEOF_INT
 #define ALIGNMENT_INT32         ALIGNMENT_INT
+
 #define SIZEOF_WORD32           SIZEOF_UNSIGNED_INT
 #define ALIGNMENT_WORD32        ALIGNMENT_UNSIGNED_INT
-#else
-#error GHC untested on this architecture: sizeof(unsigned int) != 4
-#endif
 
 #if HAVE_LONG_LONG && SIZEOF_VOID_P < 8
 /* assume long long is 64 bits */
@@ -68,4 +100,12 @@
 #error GHC untested on this architecture: sizeof(void *) < 8 and no long longs.
 #endif
 
+#ifndef WORD_SIZE_IN_BITS
+#if SIZEOF_HSWORD == 4
+#define WORD_SIZE_IN_BITS       32
+#else 
+#define WORD_SIZE_IN_BITS       64
 #endif
+#endif
+
+#endif /* MACHDEPS_H */

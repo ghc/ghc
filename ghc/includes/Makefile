@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.15 2001/07/16 21:01:58 qrczak Exp $
+# $Id: Makefile,v 1.16 2001/10/03 13:57:42 simonmar Exp $
 #
 
 TOP = ..
@@ -64,8 +64,25 @@ endif
 # ---------------------------------------------------------------------------
 # Make NativeDefs.h for the NCG
 
-C_PROG = mkNativeHdr
-C_SRCS = mkNativeHdr.c
+all :: DerivedConstants.h
+
+mkDerivedConstantsHdr : mkDerivedConstants.o
+	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkDerivedConstants.o
+
+DerivedConstants.h : mkDerivedConstantsHdr
+	./mkDerivedConstantsHdr >DerivedConstants.h
+
+CLEAN_FILES += DerivedConstants.h
+
+# ---------------------------------------------------------------------------
+# Make NativeDefs.h for the NCG
+
+all :: NativeDefs.h
+
+mkNativeHdr.o : DerivedConstants.h
+
+mkNativeHdr : mkNativeHdr.o
+	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkNativeHdr.o
 
 NativeDefs.h : mkNativeHdr
 	./mkNativeHdr >NativeDefs.h
