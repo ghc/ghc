@@ -2,10 +2,10 @@
 function toggle(button,id) {
    var n = document.getElementById(id).style;
    if (n.display == "none") {
-	button.childNodes[0].data = "-";
+	button.src = "minus.jpg";
 	n.display = "inline";
    } else {
-	button.childNodes[0].data = "+";
+	button.src = "plus.jpg";
 	n.display = "none";
    }
 }

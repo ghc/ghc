@@ -43,6 +43,8 @@ cssFile, jsFile, iconFile :: String
 cssFile  = "haddock.css"
 jsFile   = "haddock.js"
 iconFile = "haskell_icon.gif"
+plusFile = "plus.jpg"
+minusFile = "minus.jpg"
 
 -- -----------------------------------------------------------------------------
 -- Generating HTML documentation
@@ -95,7 +97,7 @@ copyHtmlBits odir libdir maybe_css = do
   
   css_contents <- readFile css_file
   writeFile css_destination css_contents
-  mapM_ copyFile [ iconFile, jsFile ]
+  mapM_ copyFile [ iconFile, plusFile, minusFile, jsFile ]
 
 
 contentsHtmlFile, indexHtmlFile :: String
@@ -1119,8 +1121,7 @@ escapeStr = flip escapeString unreserved
 --
 collapsebutton :: String -> Html
 collapsebutton id = 
-  button ! [ theclass "coll", onclick ("toggle(this,'" ++ id ++ "')") ] << 
-    toHtml "+"
+  image ! [ src plusFile, theclass "coll", onclick ("toggle(this,'" ++ id ++ "')") ]
 
 collapsed :: String -> Html -> Html
 collapsed id html =

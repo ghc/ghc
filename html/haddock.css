@@ -35,7 +35,8 @@ TD.s15 {  height: 15px; }
 
 SPAN.keyword { text-decoration: underline; }
 
-BUTTON.coll { width : 2em; }
+/* Resize the buttom image to match the text size */
+IMG.coll { width : 1em; height: 1em; }
 
 /* --------- Documentation elements ---------- */
 
