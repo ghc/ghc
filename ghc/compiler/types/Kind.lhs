@@ -60,7 +60,7 @@ data Kind
   deriving( Eq )
 
 data KindVar = KVar Unique (IORef (Maybe SimpleKind))
-  -- INVARIANT: a KindVar can only be instantaited by a SimpleKind
+  -- INVARIANT: a KindVar can only be instantiated by a SimpleKind
 
 type SimpleKind = Kind	
   -- A SimpleKind has no ? or # kinds in it:
