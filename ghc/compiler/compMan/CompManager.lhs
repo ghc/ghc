@@ -204,6 +204,7 @@ cmLoadModule cmstate1 rootname
 	-- See getValidLinkables below for details.
 	valid_linkables <- getValidLinkables ui1 mg2unsorted_names 
 				mg2_with_srcimps
+	pprTrace "valid_linkables" (ppr valid_linkables) $ do
 
         -- Figure out a stable set of modules which can be retained
         -- the top level envs, to avoid upsweeping them.  Goes to a
@@ -802,7 +803,7 @@ downsweep rootNm old_summaries
 		let all_home = map (moduleName.ms_mod) home_summaries
 
 		-- imports for modules we don't already have
-                let needed_imps = filter (`notElem` all_home) imps
+                let needed_imps = nub (filter (`notElem` all_home) imps)
 
 		-- summarise them
                 needed_summaries <- mapM getSummary needed_imps
