@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.40 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.41 2001/12/11 02:59:17 chak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -77,6 +77,7 @@ extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_V_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_gc_unbx_r1_ret_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_gc_f1_ret_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_gc_d1_ret_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_gc_l1_ret_info;
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
@@ -266,6 +267,9 @@ EF_(stg_gc_f1);
 
 EI_(stg_gc_d1_ret_info);
 EF_(stg_gc_d1);
+
+EI_(stg_gc_l1_ret_info);
+EF_(stg_gc_l1);
 
 EI_(stg_gc_ut_1_0_ret_info);
 EF_(stg_gc_ut_1_0);
