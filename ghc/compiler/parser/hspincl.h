@@ -56,5 +56,6 @@
 #include "pbinding.h"
 
 extern char *input_filename;
+extern tree hspmain();
 
 #endif /* HSPINCL_H */
