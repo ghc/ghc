@@ -424,7 +424,8 @@ __export PrelGHC
   BCOzh
   mkApUpd0zh
 
-  unsafeCoercezh	-- Defined in MkId
+  unsafeCoercezh	-- unsafeCoerce# :: forall a b. a -> b
+			-- It's defined in ghc/compiler/basicTypes/MkId.lhs
   addrToHValuezh
 ;
 
