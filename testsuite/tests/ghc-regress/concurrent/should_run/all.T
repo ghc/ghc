@@ -16,7 +16,7 @@ test "conc001" { myvtr("", "", "") }
 test "conc002" { myvtr("", "", "") }
 test "conc003" { myvtr("", "", "") }
 test "conc004" { myvtr("", "", "") }
-test "conc005" { myvtr("", "", "") }
+test "conc005" { myvtr("-package concurrent", "", "") }
 test "conc006" { myvtr("", "", "") }
 test "conc007" { myvtr("", "+RTS -H128M -RTS", "") }
 test "conc008" { myvtr("", "", "") }

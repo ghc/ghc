@@ -1,6 +1,8 @@
 module Main where
 
-import Control.Concurrent
+import Concurrent
+import MVar
+import CVar
 
 -- same as conc004, but using the ChannelVar abstraction
 
@@ -20,4 +22,3 @@ main = do
   forkIO reader
   writer "Hello World"
   takeMVar done
-  
