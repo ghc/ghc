@@ -37,6 +37,7 @@ import Pretty		( Mode(..), printDoc )
 import Module		( Module )
 import ListSetOps	( removeDupsEq )
 
+import System.Directory ( doesFileExist )
 import Monad		( when )
 import IO
 \end{code}
@@ -220,7 +221,12 @@ outputIlx dflags filename mod tycons stg_binds
 outputForeignStubs :: DynFlags -> ForeignStubs
 		   -> IO (Bool, 	-- Header file created
 			  Bool)		-- C file created
-outputForeignStubs dflags NoStubs = return (False, False)
+outputForeignStubs dflags NoStubs = do
+-- When compiling External Core files, may need to use stub files from a 
+-- previous compilation
+   hFileExists <- doesFileExist (hscStubHOutName dflags)
+   cFileExists <- doesFileExist (hscStubCOutName dflags)
+   return (hFileExists, cFileExists)
 outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
   = do
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
