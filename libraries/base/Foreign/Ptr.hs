@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Ptr.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Ptr.hs,v 1.3 2002/02/11 16:11:38 simonmar Exp $
 --
 -- Pointer types.
 --
@@ -46,6 +46,28 @@ import Data.Dynamic
 import GHC.Ptr
 import GHC.IOBase
 import GHC.Err
+import GHC.Prim
+import GHC.Base
+import GHC.Num
+import GHC.List
+import GHC.Show
+import Numeric
+#endif
+
+#include "MachDeps.h"
+
+#ifdef __GLASGOW_HASKELL__
+#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
+instance Show (Ptr a) where
+   showsPrec p (Ptr a) rs = pad_out (showHex (word2Integer(int2Word#(addr2Int# a))) "") rs
+     where
+        -- want 0s prefixed to pad it out to a fixed length.
+       pad_out ('0':'x':ls) rs = 
+	  '0':'x':(replicate (2*SIZEOF_HSPTR - length ls) '0') ++ ls ++ rs
+       -- word2Integer :: Word# -> Integer (stolen from Word.lhs)
+       word2Integer w = case word2Integer# w of
+			(# s, d #) -> J# s d
+#endif
 #endif
 
 foreign import "freeHaskellFunctionPtr" unsafe
