@@ -319,9 +319,14 @@ stdHandleFinalizer m = do
 
 handleFinalizer :: MVar Handle__ -> IO ()
 handleFinalizer m = do
-  h_ <- takeMVar m
-  hClose_help h_
-  return ()
+  handle_ <- takeMVar m
+  case haType handle_ of 
+      ClosedHandle -> return ()
+      _ -> do flushWriteBufferOnly handle_ `catchException` \_ -> return ()
+		-- ignore errors and async exceptions, and close the
+		-- descriptor anyway...
+	      hClose_handle_ handle_
+	      return ()
 
 -- ---------------------------------------------------------------------------
 -- Grimy buffer operations
@@ -856,37 +861,38 @@ hClose_help :: Handle__ -> IO Handle__
 hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return handle_
-      _ -> do
-	  let fd = haFD handle_
-	      c_fd = fromIntegral fd
+      _ -> do flushWriteBufferOnly handle_ -- interruptible
+	      hClose_handle_ handle_
 
-	  flushWriteBufferOnly handle_
+hClose_handle_ handle_ = do
+    let fd = haFD handle_
+        c_fd = fromIntegral fd
 
-	  -- close the file descriptor, but not when this is the read
-	  -- side of a duplex handle, and not when this is one of the
-	  -- std file handles.
-	  case haOtherSide handle_ of
-	    Nothing -> 
-		when (fd /= fd_stdin && fd /= fd_stdout && fd /= fd_stderr) $
-			throwErrnoIfMinus1Retry_ "hClose" 
+    -- close the file descriptor, but not when this is the read
+    -- side of a duplex handle, and not when this is one of the
+    -- std file handles.
+    case haOtherSide handle_ of
+      Nothing -> 
+  	  when (fd /= fd_stdin && fd /= fd_stdout && fd /= fd_stderr) $
+  		  throwErrnoIfMinus1Retry_ "hClose" 
 #ifdef mingw32_TARGET_OS
 	    			(closeFd (haIsStream handle_) c_fd)
 #else
 	    			(c_close c_fd)
 #endif
-	    Just _  -> return ()
+      Just _  -> return ()
 
-	  -- free the spare buffers
-	  writeIORef (haBuffers handle_) BufferListNil
-
-	  -- unlock it
-	  unlockFile c_fd
-
-	  -- we must set the fd to -1, because the finalizer is going
-	  -- to run eventually and try to close/unlock it.
-	  return (handle_{ haFD        = -1, 
-		    	   haType      = ClosedHandle
-			 })
+    -- free the spare buffers
+    writeIORef (haBuffers handle_) BufferListNil
+  
+    -- unlock it
+    unlockFile c_fd
+  
+    -- we must set the fd to -1, because the finalizer is going
+    -- to run eventually and try to close/unlock it.
+    return (handle_{ haFD        = -1, 
+  		     haType      = ClosedHandle
+  		   })
 
 -----------------------------------------------------------------------------
 -- Detecting the size of a file
