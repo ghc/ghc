@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.33 2001/09/12 11:16:05 rrt Exp $
+-- $Id: Main.hs,v 1.34 2001/09/12 11:52:58 rrt Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -70,14 +70,14 @@ main = do
     prog <- getProgName
     let header = "Usage: "++prog++" [OPTIONS] INPUT.hsc [...]"
     args <- getArgs
+    let opts@(flags, files, errs) = getOpt Permute options args
 #ifdef mingw32_TARGET_OS
     h <- getModuleHandle Nothing
     n <- getModuleFileName h
     let tempName = reverse (drop (length "\\bin\\hsc2hs.exe") (reverse n)) ++ "\\template-hsc.h"
-#endif
-    let (flags, files, errs) = getOpt Permute options args
     let fflags = if [t | Template t <- flags] /= [] then flags else (Template tempName) : flags
     let opts = (fflags, files, errs)
+#endif
     case opts of
         (flags, _, _)
             | any isHelp    flags -> putStrLn (usageInfo header options)
