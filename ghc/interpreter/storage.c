@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.69 $
- * $Date: 2000/04/11 16:36:53 $
+ * $Revision: 1.70 $
+ * $Date: 2000/04/12 09:37:19 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -3001,6 +3001,27 @@ List args; {
 /* --------------------------------------------------------------------------
  * debugging support
  * ------------------------------------------------------------------------*/
+
+/* Given the address of an info table, find the constructor/tuple
+   that it belongs to, and return the name.  Only needed for debugging.
+*/
+char* lookupHugsItblName ( void* v )
+{
+   int i;
+   for (i = TYCON_BASE_ADDR; 
+        i < TYCON_BASE_ADDR+tabTyconSz; ++i) {
+      if (tabTycon[i-TYCON_BASE_ADDR].inUse
+          && tycon(i).itbl == v)
+         return textToStr(tycon(i).text);
+   }
+   for (i = NAME_BASE_ADDR; 
+        i < NAME_BASE_ADDR+tabNameSz; ++i) {
+      if (tabName[i-NAME_BASE_ADDR].inUse
+          && name(i).itbl == v)
+         return textToStr(name(i).text);
+   }
+   return NULL;
+}
 
 static String maybeModuleStr ( Module m )
 {

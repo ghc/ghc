@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.21 $
- * $Date: 2000/04/05 10:25:08 $
+ * $Revision: 1.22 $
+ * $Date: 2000/04/12 09:37:19 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -441,11 +441,6 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
     }
 }
 
-#define M_ITBLNAMES 35000
-
-void* itblNames[M_ITBLNAMES];
-int   nItblNames = 0;
-
 /* allocate space for top level variable
  * any change requires a corresponding change in 'build'.
  */
@@ -465,20 +460,7 @@ static Void alloc( AsmBCO bco, StgVar v )
                 pushAtom(bco,hd(args));
                 setPos(v,asmBox(bco,boxingConRep(con)));
             } else {
-
-                void* vv = stgConInfo(con);
-                if (!(nItblNames < (M_ITBLNAMES-2))) 
-                   internal("alloc -- M_ITBLNAMES too small");
-                if (isName(con)) {
-                   itblNames[nItblNames++] = vv;
-                   itblNames[nItblNames++] = textToStr(name(con).text);
-                } else
-                if (isTuple(con)) {
-                   itblNames[nItblNames++] = vv;
-                   itblNames[nItblNames++] = textToStr(ghcTupleText(con));
-                } else
-                assert ( /* cant identify constructor name */ 0 );
-                setPos(v,asmAllocCONSTR(bco, vv));
+                setPos(v,asmAllocCONSTR(bco,stgConInfo(con)));
             }
             break;
         }
@@ -494,7 +476,6 @@ static Void alloc( AsmBCO bco, StgVar v )
                }
             }
             setPos(v,asmAllocAP(bco,totSizeW));
-            //ORIGINALLY:setPos(v,asmAllocAP(bco,length(stgAppArgs(rhs))));
             break;
          }
     case LAMBDA: /* optimisation */

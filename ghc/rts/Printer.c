@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.23 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: Printer.c,v 1.24 2000/04/12 09:37:19 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -43,17 +43,8 @@ static void    printZcoded   ( const char *raw );
  * Printer
  * ------------------------------------------------------------------------*/
 
-
 #ifdef INTERPRETER
-extern void* itblNames[];
-extern int   nItblNames;
-char* lookupHugsItblName ( void* v )
-{
-   int i;
-   for (i = 0; i < nItblNames; i += 2)
-      if (itblNames[i] == v) return itblNames[i+1];
-   return NULL;
-}
+char* lookupHugsItblName ( void* itbl );
 #endif
 
 void printPtr( StgPtr p )
