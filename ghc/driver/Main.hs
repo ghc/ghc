@@ -1767,7 +1767,6 @@ opts =
 
   ,  ( "split-objs"	, NoArg (if can_split
 				    then do writeIORef split_object_files True
-				            writeIORef hsc_lang HscC
 					    add opt_C "-fglobalise-toplev-names"
 					    add opt_c "-DUSE_SPLIT_MARKERS"
 				    else hPutStrLn stderr
