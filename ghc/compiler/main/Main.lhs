@@ -28,7 +28,7 @@ import Desugar		( deSugar, pprDsWarnings
 			)
 import SimplCore	( core2core )
 import CoreToStg	( topCoreBindsToStg )
-import StgSyn		( collectFinalStgBinders )
+import StgSyn		( collectFinalStgBinders, pprStgBindings )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 #if ! OMIT_NATIVE_CODEGEN
@@ -40,17 +40,16 @@ import AbsCUtils	( flattenAbsC )
 import CoreUnfold	( Unfolding )
 import Bag		( emptyBag, isEmptyBag )
 import CmdLineOpts
-import ErrUtils		( pprBagOfErrors, ghcExit )
+import ErrUtils		( pprBagOfErrors, ghcExit, doIfSet, dumpIfSet )
 import Maybes		( maybeToBool, MaybeErr(..) )
 import Specialise	( SpecialiseData(..) )
-import StgSyn		( pprPlainStgBinding, GenStgBinding )
+import StgSyn		( GenStgBinding )
 import TcInstUtil	( InstInfo )
 import TyCon		( isDataTyCon )
 import UniqSupply	( mkSplitUniqSupply )
 
 import PprAbsC		( dumpRealC, writeRealC )
 import PprCore		( pprCoreBinding )
-import Outputable	( PprStyle(..), Outputable(..) )
 import Pretty
 
 import Id		( GenId )		-- instances
@@ -58,6 +57,9 @@ import Name		( Name )		-- instances
 import PprType		( GenType, GenTyVar )	-- instances
 import TyVar		( GenTyVar )		-- instances
 import Unique		( Unique )		-- instances
+
+import Outputable	( PprStyle(..), Outputable(..), pprDumpStyle, pprErrorsStyle )
+
 \end{code}
 
 \begin{code}
@@ -74,17 +76,21 @@ main =
 doIt :: ([CoreToDo], [StgToDo]) -> String -> IO ()
 
 doIt (core_cmds, stg_cmds) input_pgm
-  = doDump opt_Verbose ("Glasgow Haskell Compiler, version " ++ show PROJECTVERSION ++ ", for Haskell 1.4") "" >>
+  = doIfSet opt_Verbose 
+	(hPutStr stderr ("Glasgow Haskell Compiler, version " ++ 
+			 show PROJECTVERSION ++ 
+			 ", for Haskell 1.4"))		>>
+
     -- ******* READER
     show_pass "Reader"	>>
     _scc_     "Reader"
     rdModule		>>= \ (mod_name, rdr_module) ->
 
-    doDump opt_D_dump_rdr "Reader:"
-	(pp_show (ppr pprStyle rdr_module))	>>
+    dumpIfSet opt_D_dump_rdr "Reader"
+	(ppr pprDumpStyle rdr_module)		>>
 
-    doDump opt_D_source_stats "\nSource Statistics:"
-	(pp_show (ppSourceStats rdr_module)) 	>>
+    dumpIfSet opt_D_source_stats "Source Statistics"
+	(ppSourceStats rdr_module)	 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
 --    _scc_     "spl-rn"
@@ -108,22 +114,16 @@ doIt (core_cmds, stg_cmds) input_pgm
     show_pass "Renamer" 			>>
     _scc_     "Renamer"
 
-    renameModule rn_uniqs rdr_module >>=
-	\ (maybe_rn_stuff, rn_errs_bag, rn_warns_bag) ->
-
-    checkErrors rn_errs_bag rn_warns_bag	>>
+    renameModule rn_uniqs rdr_module		>>=
+	\ maybe_rn_stuff ->
     case maybe_rn_stuff of {
 	Nothing -> 	-- Hurrah!  Renamer reckons that there's no need to
 			-- go any further
-			ghcExit 0 ;
-
-		-- Oh well, we've got to recompile for real
+			return ();
+	
 	Just (rn_mod, iface_file_stuff, rn_name_supply, imported_modules) ->
+			-- Oh well, we've got to recompile for real
 
-
-
-    doDump opt_D_dump_rn "Renamer:"
-	(pp_show (ppr pprStyle rn_mod))		>>
 
     -- Safely past renaming: we can start the interface file:
     -- (the iface file is produced incrementally, as we have
@@ -134,63 +134,35 @@ doIt (core_cmds, stg_cmds) input_pgm
 
 
     -- ******* TYPECHECKER
-    show_pass "TypeCheck" 			>>
+    show_pass "TypeCheck" 				>>
     _scc_     "TypeCheck"
-    case (case (typecheckModule tc_uniqs {-idinfo_fm-} rn_name_supply rn_mod) of
-	    Succeeded (stuff, warns)
-		-> (emptyBag, warns, stuff)
-	    Failed (errs, warns)
-		-> (errs, warns, error "tc_results"))
+    typecheckModule tc_uniqs rn_name_supply rn_mod	>>= \ maybe_tc_stuff ->
+    case maybe_tc_stuff of {
+	Nothing -> ghcExit 1;	-- Type checker failed
 
-    of { (tc_errs_bag, tc_warns_bag, tc_results) ->
+	Just (all_binds,
+	      local_tycons, local_classes, inst_info, pragma_tycon_specs,
+	      ddump_deriv) ->
 
-    checkErrors tc_errs_bag tc_warns_bag	>>
-
-    case tc_results
-    of {  (all_binds,
-	   local_tycons, local_classes, inst_info, pragma_tycon_specs,
-	   ddump_deriv) ->
-
-    doDump opt_D_dump_tc "Typechecked:"
-	(pp_show (ppr pprStyle all_binds))  	>>
-
-    doDump opt_D_dump_deriv "Derived instances:"
-	(pp_show (ddump_deriv pprStyle))	>>
 
     -- ******* DESUGARER
     show_pass "DeSugar" 			>>
     _scc_     "DeSugar"
-    let
-	(desugared,ds_warnings)
-	  = deSugar ds_uniqs mod_name all_binds
-    in
-    (if isEmptyBag ds_warnings then
-	return ()
-     else
-	hPutStr stderr (pp_show (pprDsWarnings pprErrorsStyle ds_warnings))
-	>> hPutStr stderr "\n"
-    ) 						>>
+    deSugar ds_uniqs mod_name all_binds		>>= \ desugared ->
 
-    doDump opt_D_dump_ds "Desugared:" (pp_show (vcat
-	(map (pprCoreBinding pprStyle) desugared)))
-						>>
 
-    -- ******* CORE-TO-CORE SIMPLIFICATION (NB: I/O op)
+    -- ******* CORE-TO-CORE SIMPLIFICATION
     show_pass "Core2Core" 			>>
     _scc_     "Core2Core"
     let
 	local_data_tycons = filter isDataTyCon local_tycons
     in
-    core2core core_cmds mod_name pprStyle
+    core2core core_cmds mod_name
 	      sm_uniqs local_data_tycons pragma_tycon_specs desugared
 						>>=
-
 	 \ (simplified,
 	    SpecData _ _ _ gen_data_tycons all_tycon_specs _ _ _) ->
 
-    doDump opt_D_dump_simpl "Simplified:" (pp_show (vcat
-	(map (pprCoreBinding pprStyle) simplified)))
-						>>
 
     -- ******* STG-TO-STG SIMPLIFICATION
     show_pass "Core2Stg" 			>>
@@ -201,13 +173,12 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     show_pass "Stg2Stg" 			>>
     _scc_     "Stg2Stg"
-    stg2stg stg_cmds mod_name pprStyle st_uniqs stg_binds
+    stg2stg stg_cmds mod_name st_uniqs stg_binds
 						>>=
-
 	\ (stg_binds2, cost_centre_info) ->
 
-    doDump opt_D_dump_stg "STG syntax:"
-	(pp_show (vcat (map (pprPlainStgBinding pprStyle) stg_binds2)))
+    dumpIfSet opt_D_dump_stg "STG syntax:"
+	(pprStgBindings pprDumpStyle stg_binds2)
 						>>
 
 	-- Dump instance decls and type signatures into the interface file
@@ -234,10 +205,10 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
-    doDump opt_D_dump_absC  "Abstract C:"
+    dumpIfSet opt_D_dump_absC "Abstract C"
 	(dumpRealC abstractC)		  	>>
 
-    doDump opt_D_dump_flatC "Flat Abstract C:"
+    dumpIfSet opt_D_dump_flatC "Flat Abstract C"
 	(dumpRealC flat_abstractC)		>>
 
     show_pass "CodeOutput" 			>>
@@ -266,19 +237,15 @@ doIt (core_cmds, stg_cmds) input_pgm
 #endif
     in
 
-    doDump opt_D_dump_asm "" ncg_output_d 	>>
-    doOutput opt_ProduceS ncg_output_w 		>>
+    dumpIfSet opt_D_dump_asm "Asm code" ncg_output_d 	>>
+    doOutput opt_ProduceS ncg_output_w 			>>
 
-    doDump opt_D_dump_realC "" c_output_d 	>>
-    doOutput opt_ProduceC c_output_w 		>>
+    dumpIfSet opt_D_dump_realC "Real C" c_output_d 	>>
+    doOutput opt_ProduceC c_output_w 			>>
 
     ghcExit 0
-    } } }
+    } }
   where
-    -------------------------------------------------------------
-    -- ****** printing styles and column width:
-
-
     -------------------------------------------------------------
     -- ****** help functions:
 
@@ -294,39 +261,6 @@ doIt (core_cmds, stg_cmds) input_pgm
 	    openFile fname WriteMode	>>= \ handle ->
 	    io_action handle		>>
 	    hClose handle
-
-    doDump switch hdr string
-      = if switch
-	then hPutStr stderr ("\n\n" ++ (take 80 $ repeat '=')) >>
-	     hPutStr stderr ('\n': hdr)	    >>
-	     hPutStr stderr ('\n': string)  >>
-	     hPutStr stderr "\n"
-	else return ()
-
-
-pprCols = (80 :: Int) -- could make configurable
-
-(pprStyle, pprErrorsStyle)
-  | opt_PprStyle_All   = (PprShowAll, PprShowAll)
-  | opt_PprStyle_Debug = (PprDebug,   PprDebug)
-  | opt_PprStyle_User  = (PprQuote,   PprQuote)
-  | otherwise	       = (PprDebug,   PprQuote)
-
-pp_show p = show p	-- ToDo: use pprCols
-
-checkErrors errs_bag warns_bag
-  | not (isEmptyBag errs_bag)
-  = 	hPutStr stderr (pp_show (pprBagOfErrors pprErrorsStyle errs_bag))
-	>> hPutStr stderr "\n" >>
-	hPutStr stderr (pp_show (pprBagOfErrors pprErrorsStyle warns_bag))
-	>> hPutStr stderr "\n" >>
-	ghcExit 1
-
-  | not (isEmptyBag warns_bag)
-  = hPutStr stderr (pp_show (pprBagOfErrors pprErrorsStyle warns_bag))	>> 
-    hPutStr stderr "\n"
- 
-  | otherwise = return ()
 
 
 ppSourceStats (HsModule name version exports imports fixities decls src_loc)
