@@ -1,0 +1,45 @@
+<sect2>The <idx/ByteArray/ interface
+<label id="sec:byte-array">
+<p>
+<nidx>ByteArray interface (GHC extensions)</nidx>
+
+<tt/ByteArray/s are chunks of immutable Haskell heap:
+
+<tscreen><code>
+data ByteArray ix -- abstract
+		  -- instance of: Eq, CCallable.
+
+newByteArray       :: Ix ix => (ix,ix) -> ST s (ByteArray ix)
+
+indexCharArray     :: Ix ix => ByteArray ix -> ix -> Char 
+indexIntArray      :: Ix ix => ByteArray ix -> ix -> Int
+indexAddrArray     :: Ix ix => ByteArray ix -> ix -> Addr
+indexFloatArray    :: Ix ix => ByteArray ix -> ix -> Float
+indexDoubleArray   :: Ix ix => ByteArray ix -> ix -> Double
+
+sizeofByteArray    :: Ix ix => ByteArray ix -> Int
+</code></tscreen>
+<nidx/newByteArray/
+<nidx/indexCharArray/
+<nidx/indexIntArray/
+<nidx/indexAddrArray/
+<nidx/indexFloatArray/
+<nidx/indexDoubleArray/
+<nidx/indexDoubleArray/
+<nidx/sizeofByteArray/
+
+<bf/Remarks:/
+
+<itemize>
+<item>
+The operation <tt/newByteArray/ creates a byte array of length
+equal to the range of its indices <em/in bytes/.
+<item>
+<tt/sizeofByteArray/ returns the size of the byte array, <em/in bytes/.
+
+<item>
+Equality on byte arrays is value equality, not pointer equality (as is
+the case for its mutable variant.) Two byte arrays are equal if
+they're of the same length and they're pairwise equal.
+
+</itemize>

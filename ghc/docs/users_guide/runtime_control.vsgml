@@ -71,12 +71,12 @@ maximum performance.
 collector.  The default of 2 seems to be good, but the garbage
 collector can support any number of generations.  Anything larger than
 about 4 is probably not a good idea unless your program runs for a
-<emph/long/ time, because the oldest generation will never get
+<em/long/ time, because the oldest generation will never get
 collected.
 
 Specifying 1 generation with @+RTS -G1@ gives you a simple 2-space
 collector, as you would expect.  In a 2-space collector, the @-A@
-option (see below) specifies the <emph/minimum/ allocation area size,
+option (see below) specifies the <em/minimum/ allocation area size,
 since the allocation area will grow with the amount of live data in
 the heap.  In a multi-generational collector the allocation area is a
 fixed size.

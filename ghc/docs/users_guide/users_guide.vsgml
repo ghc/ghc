@@ -15,18 +15,14 @@
 	<!ENTITY libmisc   	SYSTEM "libmisc.sgml" >
 	<!ENTITY wrong	 	SYSTEM "gone_wrong.sgml" >
 	<!ENTITY utils 		SYSTEM "utils.sgml" >
+	<!ENTITY mutablearray   SYSTEM "MutableArray.sgml">
+	<!ENTITY bytearray      SYSTEM "ByteArray.sgml">
 ]>
 <article>
 
 <title>The Glasgow Haskell Compiler User's Guide, Version~4.02
-<author>The GHC Team,
-Department of Computing Science,
-University of Glasgow,
-Glasgow, Scotland,
-G12 8QQ
-
+<author>The GHC Team, 
 Email: @glasgow-haskell-{bugs,users}-request@@dcs.gla.ac.uk@
-
 <toc>
 
 &intro

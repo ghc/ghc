@@ -38,7 +38,7 @@ occur in the source code.
 
 <item> <tt/isEmptyMVar/ operation added to the <tt/Concurrent/ library.
 
-<item> Two functions exported from <tt/IOExts/: <tt/unsafeIOToST/ and
-<tt/stToIO/.
+<item> Two new functions exported from <tt/ST/ (and <tt/LazyST/):
+<tt/unsafeIOToST/ and <tt/stToIO/.
 
 </itemize>

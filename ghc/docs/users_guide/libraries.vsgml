@@ -1,5 +1,5 @@
 % 
-% $Id: libraries.vsgml,v 1.3 1998/12/02 13:20:40 simonm Exp $
+% $Id: libraries.vsgml,v 1.4 1999/02/02 14:14:12 sof Exp $
 %
 % GHC Prelude and Libraries.
 %
@@ -55,6 +55,73 @@ your own programs.  The @Prel@ modules are always available: in fact,
 you can get access to several extensions this way (for some you might
 need to give the @-fglasgow-exts@<nidx>-fglasgow-exts option</nidx>
 flag).
+
+
+<sect1>GHC/Hugs Extension Libraries
+<p>
+
+The extension libraries provided by both GHC and Hugs are described in
+the 
+<htmlurl name="GHC/Hugs Extension Library Document" url="http://www.dcs.gla.ac.uk/fp/software/ghc/hg-libs/hg-libs.html">
+
+<sect1>GHC-only Extension Libraries
+<p>
+<nidx>libraries, ghc-only</nidx>
+<nidx>extension libraries, ghc-only</nidx>
+
+If you rely on the implicit @import Prelude@ that GHC normally does
+for you, and if you don't use any weird flags (notably
+@-fglasgow-exts@), and if you don't import the Glasgow extensions
+interface, @GlaExts@, then GHC should work <em>exactly</em> as the
+Haskell report says (modulo a few minor issues, see Section <ref
+id="vs-Haskell-defn" name="Language Non-compliance">).
+
+If you turn on @-fglasgow-exts@, a new world opesn up to you and the compiler
+will recognise and parse unboxed values properly, and provide access to the
+various interfaces libraries described here (and piles of other goodies.)
+
+&mutablearray;
+&bytearray;
+
+<sect2>The @CCall@ module
+<p>
+
+The @CCall@ module defines the classes @CCallable@ and @CReturnable@,
+along with instances for the primitive types (@Int@, @Int#@, @Float@,
+@Float#@ etc.)  GHC knows to import this module if you use @_ccall_@,
+but if you need to define your own instances of these classes, you
+will need to import @CCall@ explicitly.
+
+More information on how to use @_ccall_@ can be found in Section
+<ref name="Calling~C directly from Haskell" id="glasgow-ccalls">.
+							
+<sect2>The @GlaExts@ interface
+<p>
+<nidx>GlaExts interface (GHC extensions)</nidx>
+
+The @GlaExts@ interface provides access to extensions that only GHC
+implements.  These currently are: unboxed types, including the
+representations of the primitive types (Int, Float, etc.), and the
+GHC primitive operations (@+#@, @==#@, etc.).
+
+This module used to provide access to all the Glasgow extensions, but
+these have since been moved into separate libraries for compatibility
+with Hugs (version 2.09: in fact, you can still get at this stuff via
+@GlaExts@ for compatibility, but this facility will likely be removed
+in the future).
+
+<tscreen><verb>
+-- the representation of some basic types:
+data Char    = C# Char#
+data Int     = I# Int#
+data Addr    = A# Addr#
+data Word    = W# Word#
+data Float   = F# Float#
+data Double  = D# Double#
+data Integer = J# Int# Int# ByteArray#
+
+module GHC  -- all primops and primitive types.
+</verb></tscreen>
 
 <sect1>The module @PrelGHC@: really primitive stuff
 <label id="ghc-libs-ghc">
@@ -823,257 +890,3 @@ putMVar#    :: SynchVar# s elt -> State# s -> State# s
 <ncdx>newSynchVar#</ncdx>
 <ncdx>takeMVar</ncdx>
 <ncdx>putMVar</ncdx>
-
-<sect1>GHC/Hugs Extension Libraries
-<p>
-
-The extension libraries provided by both GHC and Hugs are described in
-the <htmlurl name="GHC/Hugs Extension Libraries" url="libs.html">
-document.
-
-<sect1>GHC-only Extension Libraries
-<p>
-<nidx>libraries, ghc-only</nidx>
-<nidx>extension libraries, ghc-only</nidx>
-
-If you rely on the implicit @import Prelude@ that GHC normally does
-for you, and if you don't use any weird flags (notably
-@-fglasgow-exts@), and if you don't import the Glasgow extensions
-interface, @GlaExts@, then GHC should work <em>exactly</em> as the
-Haskell report says (modulo a few minor issues, see Section <ref
-id="vs-Haskell-defn" name="Language Non-compliance">).
-
-If you turn on @-fglasgow-exts@, the compiler will recognise and parse
-unboxed values properly, and provide access to the various interfaces
-libraries described here.
-
-<sect2>The @GlaExts@ interface
-<p>
-<nidx>GlaExts interface (GHC extensions)</nidx>
-
-The @GlaExts@ interface provides access to extensions that only GHC
-implements.  These currently are: unboxed types, including the
-representations of the primitive types (Int, Float, etc.), and the
-GHC primitive operations (@+#@, @==#@, etc.).
-
-This module used to provide access to all the Glasgow extensions, but
-these have since been moved into separate libraries for compatibility
-with Hugs (version 2.09: in fact, you can still get at this stuff via
-@GlaExts@ for compatibility, but this facility will likely be removed
-in the future).
-
-<tscreen><verb>
--- the representation of some basic types:
-data Char    = C# Char#
-data Int     = I# Int#
-data Addr    = A# Addr#
-data Word    = W# Word#
-data Float   = F# Float#
-data Double  = D# Double#
-data Integer = J# Int# Int# ByteArray#
-
-module GHC  -- all primops and primitive types.
-</verb></tscreen>
-
-<sect2>The @MutableArray@ interface
-<label id="sec:mutable-array">
-<p>
-<nidx>MutableArray interface (GHC extensions)</nidx>
-
-The @MutableArray@ interface defines a general set of operations over
-mutable arrays (@MutableArray@) and mutable chunks of memory
-(@MutableByteArray@):
-
-<tscreen><verb>
-data MutableArray s ix elt -- abstract
-data MutableByteArray s ix -- abstract
-                           -- instance of : CCallable
--- Creators:
-newArray           :: Ix ix => (ix,ix) -> elt -> ST s (MutableArray s ix elt)
-newCharArray       :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newAddrArray       :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newIntArray        :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newFloatArray      :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newDoubleArray     :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-                 
-boundsOfArray      :: Ix ix => MutableArray s ix elt -> (ix, ix)  
-boundsOfByteArray  :: Ix ix => MutableByteArray s ix -> (ix, ix)
-                 
-                 
-readArray          :: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
-                 
-readCharArray      :: Ix ix => MutableByteArray s ix -> ix -> ST s Char 
-readIntArray       :: Ix ix => MutableByteArray s ix -> ix -> ST s Int
-readAddrArray      :: Ix ix => MutableByteArray s ix -> ix -> ST s Addr
-readFloatArray     :: Ix ix => MutableByteArray s ix -> ix -> ST s Float
-readDoubleArray    :: Ix ix => MutableByteArray s ix -> ix -> ST s Double
-                 
-writeArray         :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
-writeCharArray     :: Ix ix => MutableByteArray s ix -> ix -> Char -> ST s () 
-writeIntArray      :: Ix ix => MutableByteArray s ix -> ix -> Int  -> ST s () 
-writeAddrArray     :: Ix ix => MutableByteArray s ix -> ix -> Addr -> ST s () 
-writeFloatArray    :: Ix ix => MutableByteArray s ix -> ix -> Float -> ST s () 
-writeDoubleArray   :: Ix ix => MutableByteArray s ix -> ix -> Double -> ST s () 
-                 
-freezeArray        :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
-freezeCharArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeIntArray     :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeAddrArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeFloatArray   :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeDoubleArray  :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-
-unsafeFreezeArray     :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
-unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-thawArray             :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
-</verb></tscreen>
-
-<nidx>newArray</nidx>
-<nidx>newCharArray</nidx>
-<nidx>newAddrArray</nidx>
-<nidx>newIntArray</nidx>
-<nidx>newFloatArray</nidx>
-<nidx>newDoubleArray</nidx>
-<nidx>boundsOfArray</nidx>
-<nidx>boundsOfByteArray</nidx>
-<nidx>readArray</nidx>
-<nidx>readCharArray</nidx>
-<nidx>readIntArray</nidx>
-<nidx>readAddrArray</nidx>
-<nidx>readFloatArray</nidx>
-<nidx>readDoubleArray</nidx>
-<nidx>writeArray</nidx>
-<nidx>writeCharArray</nidx>
-<nidx>writeIntArray</nidx>
-<nidx>writeAddrArray</nidx>
-<nidx>writeFloatArray</nidx>
-<nidx>writeDoubleArray</nidx>
-<nidx>freezeArray</nidx>
-<nidx>freezeCharArray</nidx>
-<nidx>freezeIntArray</nidx>
-<nidx>freezeAddrArray</nidx>
-<nidx>freezeFloatArray</nidx>
-<nidx>freezeDoubleArray</nidx>
-<nidx>unsafeFreezeArray</nidx>
-<nidx>unsafeFreezeByteArray</nidx>
-<nidx>thawArray</nidx>
-
-<sect2>The @ByteArray@ interface
-<label id="sec:byte-array">
-<p>
-<nidx>ByteArray interface (GHC extensions)</nidx>
-
-@ByteArray@s are chunks of immutable Haskell heap:
-
-<tscreen><verb>
-data ByteArray ix -- abstract
-		  -- instance of: CCallable
-
-indexCharArray     :: Ix ix => ByteArray ix -> ix -> Char 
-indexIntArray      :: Ix ix => ByteArray ix -> ix -> Int
-indexAddrArray     :: Ix ix => ByteArray ix -> ix -> Addr
-indexFloatArray    :: Ix ix => ByteArray ix -> ix -> Float
-indexDoubleArray   :: Ix ix => ByteArray ix -> ix -> Double
-
-indexCharOffAddr   :: Addr -> Int -> Char
-indexIntOffAddr    :: Addr -> Int -> Int
-indexAddrOffAddr   :: Addr -> Int -> Addr
-indexFloatOffAddr  :: Addr -> Int -> Float
-indexDoubleOffAddr :: Addr -> Int -> Double
-</verb></tscreen>
-
-<sect2>Stable pointers
-<p>
-
-Nothing exciting here, just simple boxing up.
-<tscreen><verb>
-data StablePtr a = StablePtr (StablePtr# a)
-
-makeStablePointer :: a -> StablePtr a
-freeStablePointer :: StablePtr a -> IO ()
-</verb></tscreen>
-
-<sect2>Foreign objects
-<label id="sec:foreign-obj">
-<p>
-<nidx>Foreign objects</nidx>
-
-This module provides the @ForeignObj@ type and wrappers around the
-primitive operations on foreign objects.
-
-<tscreen><verb>
-data ForeignObj = ForeignObj ForeignObj#
-
-makeForeignObj 
-	:: Addr   -- object to be boxed up as a ForeignObj
-        -> Addr   -- finaliser 
-	-> IO ForeignObj
-
-writeForeignObj 
-	:: ForeignObj   -- previously created foreign object
-	-> Addr         -- new value
-	-> IO ()
-
-</verb></tscreen>
-<ncdx>ForeignObj</ncdx>
-<ncdx>makeForeignObj</ncdx>
-<ncdx>writeForeignObj</ncdx>
-
-A typical use of @ForeignObj@ is in constructing Haskell bindings
-to external libraries. A good example is that of writing a binding to
-an image-processing library (which was actually the main motivation
-for implementing @ForeignObj@'s precursor, @MallocPtr#@). The
-images manipulated are not stored in the Haskell heap, either because
-the library insist on allocating them internally or we (sensibly)
-decide to spare the GC from having to heave heavy images around.
-
-<tscreen><verb>
-data Image = Image ForeignObj
-</verb></tscreen>
-
-The @ForeignObj@ type is then used to refer to the externally
-allocated image, and to acheive some type safety, the Haskell binding
-defines the @Image@ data type. So, a value of type @ForeignObj@ is
-used to ``box'' up an external reference into a Haskell heap object
-that we can then indirectly reference:
-
-<tscreen><verb>
-createImage :: (Int,Int) -> IO Image
-</verb></tscreen>
-
-So far, this looks just like an @Addr@ type, but @ForeignObj@ offers a
-bit more, namely that we can specify a <em>finalisation routine</em> to
-invoke when the @ForeignObj@ is discarded by the GC. The garbage
-collector invokes the finalisation routine associated with the
-@ForeignObj@, saying `` Thanks, I'm through with this now..'' For the
-image-processing library, the finalisation routine could for the
-images free up memory allocated for them. The finalisation routine has
-currently to be written in C (the finalisation routine can in turn
-call on @FreeStablePtr@ to deallocate a stable pointer).
-
-Associating a finalisation routine with an external object is done by
-calling @makeForeignObj@.  {\bf Note:} the foreign object value and
-its finaliser are contained in the @ForeignObj@, so there's no danger
-of an aggressive optimiser somehow separating the two (with the result
-that the foreign reference would not be freed).
-
-(Implementation: a linked list of all @ForeignObj#@s is maintained to
- allow the garbage collector to detect when a @ForeignObj#@ becomes
- garbage.)
-
-Like @Array@, @ForeignObj#@s are represented by heap objects.
-
-Upon controlled termination of the Haskell program, all @ForeignObjs@
-are freed, invoking their respective finalisers before terminating.
-
-<sect2>The @CCall@ module
-<p>
-
-The @CCall@ module defines the classes @CCallable@ and @CReturnable@,
-along with instances for the primitive types (@Int@, @Int#@, @Float@,
-@Float#@ etc.)  GHC knows to import this module if you use @_ccall_@,
-but if you need to define your own instances of these classes, you
-will need to import @CCall@ explicitly.
-
-More information on how to use @_ccall_@ can be found in Section
-<ref name="Calling~C directly from Haskell" id="glasgow-ccalls">.
-							
