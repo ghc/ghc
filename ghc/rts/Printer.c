@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.38 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Printer.c,v 1.39 2001/04/02 14:51:57 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -69,6 +69,9 @@ static void printStdObject( StgClosure *obj, char* tag )
     const StgInfoTable* info = get_itbl(obj);
     fprintf(stderr,"%s(",tag);
     printPtr((StgPtr)obj->header.info);
+#ifdef PROFILING
+    fprintf(stderr,", %s", obj->header.prof.ccs->cc->label);
+#endif
     for (i = 0; i < info->layout.payload.ptrs; ++i) {
         fprintf(stderr,", ");
         printPtr((StgPtr)obj->payload[i]);
@@ -81,7 +84,11 @@ static void printStdObject( StgClosure *obj, char* tag )
 
 void printClosure( StgClosure *obj )
 {
-    switch ( get_itbl(obj)->type ) {
+    StgInfoTable *info;
+    
+    info = get_itbl(obj);
+
+    switch ( info->type ) {
     case INVALID_OBJECT:
             barf("Invalid object");
     case BCO:
@@ -212,12 +219,16 @@ void printClosure( StgClosure *obj )
              * tag as well.
 	     */
             StgWord i, j;
-            const StgInfoTable* info = get_itbl(obj);
-            fprintf(stderr,"PACK(");
+#ifdef PROFILING
+	    fprintf(stderr,"%s(", info->prof.closure_desc);
+	    fprintf(stderr,"%s", obj->header.prof.ccs->cc->label);
+#else
+            fprintf(stderr,"CONSTR(");
             printPtr((StgPtr)obj->header.info);
             fprintf(stderr,"(tag=%d)",info->srt_len);
+#endif
             for (i = 0; i < info->layout.payload.ptrs; ++i) {
-                fprintf(stderr,", ");
+		fprintf(stderr,", ");
                 printPtr((StgPtr)obj->payload[i]);
             }
             for (j = 0; j < info->layout.payload.nptrs; ++j) {
@@ -256,7 +267,11 @@ void printClosure( StgClosure *obj )
     case THUNK_1_1: case THUNK_0_2: case THUNK_2_0:
     case THUNK_STATIC:
             /* ToDo: will this work for THUNK_STATIC too? */
+#ifdef PROFILING
+	    printStdObject(obj,info->prof.closure_desc);
+#else
             printStdObject(obj,"THUNK");
+#endif
             break;
 
     case THUNK_SELECTOR:
@@ -904,32 +919,52 @@ extern void DEBUG_LoadSymbols( char *name )
 
 extern void DEBUG_LoadSymbols( char *name STG_UNUSED )
 {
-  /* nothing, yet */
+(  /* nothing, yet */
 }
 
 #endif /* HAVE_BFD_H */
 
 #include "StoragePriv.h"
 
-void findPtr(P_ p);		/* keep gcc -Wall happy */
+void findPtr(P_ p, int);		/* keep gcc -Wall happy */
 
 void
-findPtr(P_ p)
+findPtr(P_ p, int follow)
 {
   nat s, g;
-  P_ q;
+  P_ q, r;
   bdescr *bd;
+  const int arr_size = 1024;
+  StgPtr arr[arr_size];
+  int i = 0;
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
-      for (bd = generations[g].steps[s].blocks; bd; bd = bd->link) {
-	for (q = bd->start; q < bd->free; q++) {
-	  if (*q == (W_)p) {
-	    printf("%p\n", q);
+      for (s = 0; s < generations[g].n_steps; s++) {
+	  if (RtsFlags.GcFlags.generations == 1) {
+	      bd = generations[g].steps[s].to_space;
+	  } else {
+	      bd = generations[g].steps[s].blocks;
 	  }
-	}
+	  for (; bd; bd = bd->link) {
+	      for (q = bd->start; q < bd->free; q++) {
+		  if (*q == (W_)p) {
+		      if (i < arr_size) {
+			  r = q;
+			  while (!LOOKS_LIKE_GHC_INFO(*r)) { r--; };
+			  fprintf(stderr, "%p = ", r);
+			  printClosure((StgClosure *)r);
+			  arr[i++] = r;
+		      } else {
+			  return;
+		      }
+		  }
+	      }
+	  }
       }
-    }
+  }
+  if (follow && i == 1) {
+      fprintf(stderr, "-->\n");
+      findPtr(arr[0], 1);
   }
 }
 
