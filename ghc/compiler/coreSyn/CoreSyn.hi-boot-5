@@ -1,5 +1,5 @@
 __interface CoreSyn 1 0 where
 __export CoreSyn CoreExpr ;
 -- Needed by IdInfo
-1 type CoreExpr = Expr Var.IdOrTyVar BasicTypes.Unused;
-1 data Expr b f ;
+1 type CoreExpr = Expr Var.IdOrTyVar;
+1 data Expr b ;
