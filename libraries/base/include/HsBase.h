@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.4 2002/03/19 11:24:52 simonmar Exp $
+ * $Id: HsBase.h,v 1.5 2002/03/26 10:53:03 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -178,6 +178,10 @@ StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ 
 #ifndef INLINE
 #define INLINE extern inline
 #endif
+
+INLINE int
+__hscore_sigaddset( sigset_t * set, int s )
+{ return sigaddset(set,s); }
 
 INLINE int __hscore_s_isreg(m)  { return S_ISREG(m);  }
 INLINE int __hscore_s_isdir(m)  { return S_ISDIR(m);  }
