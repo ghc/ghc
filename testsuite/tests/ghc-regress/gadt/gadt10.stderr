@@ -1,0 +1,4 @@
+
+gadt10.hs:6:23:
+    Kind error: `RInt' is not applied to enough type arguments
+    In the data type declaration for `RInt'
