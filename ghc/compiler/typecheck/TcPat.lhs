@@ -114,7 +114,8 @@ tcCheckPats ctxt pats tys thing_inside 	-- A trivial wrapper
 %************************************************************************
 
 \begin{code}
-data PatCtxt = LamPat Bool | LetPat TcSigFun
+data PatCtxt = LamPat Bool 	-- Used for lambda, case, do-notation etc
+	     | LetPat TcSigFun	-- Used for let(rec) bindings
 	-- True <=> we are checking the case expression, 
 	--		so can do full-blown refinement
 	-- False <=> inferring, do no refinement
