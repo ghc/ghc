@@ -9,7 +9,12 @@
 module MatchLit ( matchLiterals ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(DsLoop)		-- break match-ish and dsExpr-ish loops
+#else
+import {-# SOURCE #-} Match
+import {-# SOURCE #-} DsExpr ( dsExpr )
+#endif
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..), Fixity,
 			  Match, HsBinds, Stmt(..), DoOrListComp, HsType, ArithSeqInfo )

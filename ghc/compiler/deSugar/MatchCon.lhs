@@ -9,7 +9,11 @@
 module MatchCon ( matchConFamily ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(DsLoop)		( match )	-- break match-ish loop
+#else
+import {-# SOURCE #-} Match
+#endif
 
 import HsSyn		( OutPat(..), HsLit, HsExpr )
 import DsHsSyn		( outPatType )
