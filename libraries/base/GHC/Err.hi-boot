@@ -1,0 +1,12 @@
+---------------------------------------------------------------------------
+--                              PrelErr.hi-boot
+-- 
+--      This hand-written interface file is the initial bootstrap version
+--	for PrelErr.hi.
+--	It doesn't need to give "error" a type signature, 
+--	because it's wired into the compiler
+---------------------------------------------------------------------------
+
+__interface "std" GHCziErr 1 where
+__export GHCziErr error parError;
+

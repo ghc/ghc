@@ -1,0 +1,1156 @@
+<!DOCTYPE ARTICLE PUBLIC "-//OASIS//DTD DocBook V3.1//EN">
+  
+<article id="libraries">
+  <artheader>
+    <title>Haskell Libraries</title>
+    <orgname>The Haskell Libraries Mailing List</orgname>
+    <address><email>libraries@haskell.org</email></address>
+  </artheader>
+
+  <sect1 id="introduction">
+    <title>Introduction</title>
+
+    <para>This document consistutes part of a proposal for an
+    extension to the <ulink
+    url="http://www.haskell.org/onlinereport/">Haskell 98</ulink>
+    language.  The full proposal has several parts: </para>
+
+    <itemizedlist>
+      <listitem>
+	<para>A modest language extension to Haskell 98 that adds the
+        character <quote>.</quote> to the lexical syntax for a module
+        name, allowing a hierarchical module namespace where a module
+        name is a sequence of components separated by periods.</para>
+      </listitem>
+      <listitem>
+	<para>An allocation of the new module namespace to existing
+	and non-existent libraries, people, organisations, and local
+	use.</para>
+      </listitem>
+      <listitem>
+	<para>A policy and procedure for allocating new parts of the
+	namespace.</para>
+      </listitem>
+      <listitem>
+	<para>A set of libraries which are under the control of the
+	community, have reference implementations kept in a standard
+	place, and conform to a set of guidelines and policies set out
+	in this document.  We shall call this set of libraries the
+	<firstterm>core libraries</firstterm>.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para>In addition, this document also describes:</para>
+
+    <itemizedlist>
+      <listitem>
+	<para>Guidelines and conventions for organising the
+	hierarchy.</para>
+      </listitem>
+      <listitem>
+	<para>Our policy with respect to the design and evolution of
+	library APIs, versioning of library APIs, and maintenance of
+	the reference implementation.</para>
+      </listitem>
+      <listitem>
+	<para>A set of conventions for coding style and portability
+	within the core libraries.</para>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+
+  <sect1 id="contributing">
+    <title>How to contribute</title>
+
+    <para>This project is driven by the Haskell community, so
+    contributions of all kinds are welcome.  The first step is to join
+    the <ulink
+    url="http://www.haskell.org/mailman/listinfo/libraries">Haskell
+    libraries mailing list</ulink>, and maybe <ulink
+    url="http://www.haskell.org/pipermail/libraries/">browse the list
+    archives</ulink>.  Some of the ways you can contribute are:</para>
+
+    <itemizedlist>
+      <listitem>
+	<para>By donating code: for libraries in the core set which
+	don't yet have a reference implementation, or for new
+	contributions to the core set, code is always welcome.  Code
+	that conforms to the style guidelines (which aren't very
+	strict, see <xref linkend="conventions">) and comes with
+	documentation (<xref linkend="documentation">) and a test
+	suite (<xref linkend="testing">) is better, but these aren't
+	essential.  As a library progresses through the stability
+	scale (<xref linkend="stability">) these things become more
+	important, but for an experimental library we're not going to
+	worry too much about this stuff.</para>
+      </listitem>
+      <listitem>
+	<para>By porting code for an existing library to a new
+	compiler or architecture.  A library is classed as portable if
+	it should be available regardless of which compiler/platform
+	combination you're using; however, many libraries are
+	non-portable for one reason or another (see <xref
+	linkend="portability">, and broadening the scope of these
+	libraries is always welcome.</para>
+      </listitem>
+      <listitem>
+	<para>Become a library maintainer: if you have a particular
+	interest in and/or knowledge about a certain library, and have
+	the time to spare, and the library in question doesn't already
+	have a maintainer, then you may be a suitable maintainer for
+	the library.  The responsibilities of library maintainers are
+	given in <xref linkend="maintainership">. </para>
+      </listitem>
+      <listitem>
+	<para>Participating in the design process for new libraries,
+	and suggesting improvements to existing libraries.  Everyone
+	on the <ulink
+	url="http://www.haskell.org/mailman/listinfo/libraries">Haskell
+	libraries mailing list</ulink> is invited to
+	participate in the design process, so get involved!</para>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+
+  <sect1 id="layout">
+    <title>The hierarchy layout</title>
+
+    <para>We first classify each node in the hierarchy according to
+    one of the following terms:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term>Allocated</term>
+	<listitem>
+	  <para>Nodes in the hierarchy can be allocated to a library
+	  (whether the library actually exists or not).  The currently
+	  allocated nodes are specified in <xref
+	  linkend="hierarchy">.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>User</term>
+	<listitem>
+	  <para>The <literal>User</literal> hierarchy is reserved for
+	  users: a user may always use the portion of the hierarchy
+	  which is formed from his/her email address as follows:
+	  replace the <literal>@</literal> by a <literal>.</literal>,
+	  reverse the order of the components, capitalise the first
+	  letter of each component, and prepend
+	  <literal>User.</literal>.  For example,
+	  <literal>simonmar@microsoft.com</literal> becomes
+	  <literal>User.Com.Microsoft.Simonmar</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Organisation</term>
+	<listitem>
+	  <para>The <literal>Org</literal> hierarchy is reserved for
+          organisations.  Any organisation with a DNS domain name owns
+          a unique space in the hierarchy formed by reversing the
+          components of the domain, capitalising the first character
+          of each component, and prepending
+          <literal>Org.</literal>.  <emphasis>ToDo: I don't like this
+          very much, any better ideas?</emphasis></para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Local</term>
+	<listitem>
+	  <para>The <literal>Local</literal> hierarchy is reserved for
+	  libraries which are local to the current site.  Libraries
+	  which are to be distributed outside the current site should
+	  not be placed in the <literal>Local</literal>
+	  hierarchy.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Top-level</term>
+	<listitem>
+	  <para>All top-level names (i.e. module names that don't
+	  contain a <quote><literal>.</literal></quote>) that are
+	  otherwise unallocated, are available for use by the program.
+	  Note that for compabibility with Haskell 98, some modules in
+	  this namespace are reserved
+	  (eg. <literal>Directory</literal>, <literal>IO</literal>,
+	  <literal>Time</literal> etc.).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Unallocated</term>
+	<listitem>
+	  <para>Any node which doesn't belong to any of the above
+	  categories is currently unallocated, and is not available
+	  for use.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>A node in the hierarchy may be both a specific library and a
+    parent node for a number of child nodes.  For example,
+    <literal>Foreign</literal> is a library, and so is
+    <literal>Foreign.Ptr</literal>.</para>
+
+    <sect2 id="hierarchy-design-guidelines">
+      <title>Hierarchy design guidelines</title>
+      <para></para>
+    </sect2>
+    
+    <sect2 id="module-naming-convention">
+      <title>Module Naming Conventions</title>
+      <para></para>
+    </sect2>
+
+    <sect2 id="hierarchy">
+      <title>The hierarchy</title>
+
+      <para>The currently allocated top-level names are:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><literal>Prelude</literal></term>
+	  <listitem>
+	    <para>Haskell98 Prelude (mostly just re-exports other
+	    parts of the tree).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Control</literal></term>
+	  <listitem>
+	    <para> Libraries which provide functions, types or classes
+            whose purpose is primarily to express control
+            structure.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Data</literal></term>
+	  <listitem>
+	    <para>Libraries which provide data types, operations over
+            data types, or type classes, except for libraries for
+            which one of the other more specific categories is
+            appropriate.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Database</literal></term>
+	  <listitem>
+	    <para>Libraries for providing access to or operations for
+            building databases.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Debug</literal></term>
+	  <listitem>
+	    <para>Support for debugging Haskell programs.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Edison</literal></term>
+	  <listitem>
+	    <para>The Edison data structure library.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>FileFormat</literal></term>
+	  <listitem>
+	    <para>Support for reading and/or writing various file
+            formats (except: programming language source code which
+            lives in <literal>Language</literal>, database formats
+            which live in <literal>Database</literal>, and textual
+            file formats which are catered for in
+            <literal>Text</literal>).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Foreign</literal></term>
+	  <listitem>
+	    <para>Interaction with code written in a foreign
+	    programming language.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Graphics</literal></term>
+	  <listitem>
+	    <para>Libraries for producing graphics or providing
+            graphical user interfaces.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Language</literal></term>
+	  <listitem>
+	    <para>Libraries for operating on or generating source code
+            in various programming languages, including parsers,
+            pretty printers, abstract syntax definitions etc.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Local</literal></term>
+	  <listitem>
+	    <para>Available for site-local use.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Numeric</literal></term>
+	  <listitem>
+	    <para>Functions and classes which provide operations over
+	    numeric data.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Network</literal></term>
+	  <listitem>
+	    <para>Libraries for communicating over a network,
+            including implementations of network protocols.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Org</literal></term>
+	  <listitem>
+	    <para>Allocated to organisations on a domain-name
+	    basis (see <xref linkend="layout">).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>System</literal></term>
+	  <listitem>
+	    <para>Libraries for communication with the system on which
+            the Haskell program is running (including the runtime
+            system).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Text</literal></term>
+	  <listitem>
+	    <para>Libraries for parsing and generating data in a
+            textual format (including structured textual formats such
+            as XML, HTML, but not including programming language
+            source, which lives in Language).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>GHC</literal></term>
+	  <listitem>
+	    <para>Libraries specific to the GHC/GHCi system.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>NHC</literal></term>
+	  <listitem>
+	    <para>Libraries specific to the NHC compiler.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Hugs</literal></term>
+	  <listitem>
+	    <para>Libraries specific to the Hugs system.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>User</literal></term>
+	  <listitem>
+	    <para>Allocated to individual users, using email
+	    addresses (see <xref linkend="layout">).</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
+  </sect1>
+    
+  <sect1 id="licensing">
+    <title>Licensing</title>
+
+    <para>Following some discussion on the mailing list related to how
+    we should license the libraries, the viewpoint that was least
+    offensive to all involved seems to be the following:</para>
+
+    <para>We wish to accomodate source code from different
+    contributors, and with different licenses.  However, a library of
+    modules where each module is released under a different license,
+    and where the dependencies between modules aren't clear, isn't
+    workable (it's too hard for a user of the library to tell whether
+    they're violating the terms of the each license or not).</para>
+
+    <para>So the solution is as follows: code under different licenses
+    will be clearly separate in the repository (i.e. in separate
+    subdirectories), and compilers are expected to present packages of
+    modules where all modules in a package fall under the same
+    license, and where the dependencies between packages are
+    clear.</para>
+
+    <para>It was decided that certain essential functionality should
+    be available under a BSD style license.  Hence, the BSD part of
+    the repository will contain implementations of at least the
+    following modules: <literal>Prelude</literal>,
+    <literal>Foreign</literal>, <emphasis>ToDo: what
+    else?</emphasis>.</para>
+
+    <para><emphasis>ToDo: include a prototype BSD license
+    here</emphasis>.</para>
+  </sect1>
+    
+  <sect1 id="versioning">
+    <title>Versioning</title>
+    <para></para>
+  </sect1>
+    
+  <sect1 id="stability">
+    <title>Library Stability</title>
+
+    <para>The stability of a library relates primarily to its API.
+    Stability provides an indication of how often the API is likely to
+    change (or whether it may even go away entirely).</para>
+
+    <para>The stability scale is also a measure of how strictly the
+    conventions in this document are applied to the library: an
+    experimental library isn't subject to any restrictions regarding
+    coding style and documentation, but a stable library is expected
+    to adhere to the guidelines, and come with full documentation and
+    tests.</para>
+
+    <para>To help with the stability issue, library maintainers are
+    allowed to mark functions, types or classes as
+    <firstterm>deprecated</firstterm><footnote><para>Compilers may have
+    extra support for warning about the use of a deprecated feature, for
+    example GHC's <literal>DEPRECATED</literal> pragma.</para>
+      </footnote>, which means simply that the
+    feature will be removed at a later date.  Just how long it will
+    stick around for depends on the stability category of the library
+    (see below).  A feature is marked as deprecated in the
+    documentation for the library, and optionally in an
+    implementation-dependent way which enables the system to warn
+    about the use of deprecated features.</para>
+
+    <para>The current stability categories are:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><firstterm>experimental</firstterm></term>
+	<listitem>
+	  <para>An experimental library is unrestricted in terms of
+	  API changes: the API may change between minor revisions and
+	  there is no requirement to retain old interfaces for
+	  compatibility.  Documentation and tests aren't required for
+	  an experimental library.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><firstterm>provisional</firstterm></term>
+	<listitem>
+	  <para>A provisional library is moving towards stability, and
+	  the rate of change of the API is slower.  API changes
+	  between minor revisions must be accompanied by deprecated
+	  versions of the old features where possible.  API changes
+	  between major versions are unrestricted.  The library should
+	  come with at least rudimentary documentation.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><firstterm>stable</firstterm></term>
+	<listitem>
+	  <para>A stable library has an essentially fixed API.
+	  Additions to the API may be made for a minor release,
+	  deprecated features must be retained for at least one major
+	  revision, and small changes only may be made to the existing
+	  API semantics for a major revision.  A stable library is
+	  expected to include full documentation and tests.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+  </sect1>
+    
+  <sect1 id="portability">
+    <title>Portability Considerations</title>
+
+    <para>The portability status of a library affects under which
+    platforms and compilers the library will be available on.  Haskell
+    implementations are expected to provide all of the portable core
+    libraries, and those non-portable core libraries which are
+    appropriate for that particular platform/compiler
+    implementation.</para>
+
+    <para>The precise meaning of the terms portable and non-portable
+    for our purposes are given below:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><firstterm>Portable</firstterm></term>
+	<listitem>
+	  <para>A portable library may use only Haskell 98 features
+	  plus approved extensions (see <xref linkend="portability">),
+	  and may not use any platform-specific features.  It may make
+	  use of other portable libraries only.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><firstterm>Non-portable</firstterm></term>
+	<listitem>
+	  <para>A non-portable library may be non-portable for one or
+	  more of the following reasons:</para>
+	  <variablelist>
+	    <varlistentry>
+	      <term><firstterm>Requires extensions</firstterm></term>
+	      <listitem>
+		<para>A library which uses non-approved language
+		extensions.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><firstterm>Requires nonportable libraries</firstterm></term>
+	      <listitem>
+		<para>A library which depends (directly or indirectly)
+		on other non-portable libraries.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><firstterm>OS-specific</firstterm></term>
+	      <term><firstterm>Platform-specific</firstterm></term>
+	      <listitem>
+		<para>A library which depends on features or APIs
+		particular to a certain OS or platform is non-portable
+		for that reason.</para>
+	      </listitem>
+	    </varlistentry>
+	  </variablelist>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+  </sect1>
+    
+  <sect1 id="maintainership">
+    <title>Library Maintainers</title>
+
+    <para>This is a collaborative project, so we like to devolve
+    control of the design and implementation of libraries to those
+    with an interest or appropriate expertise (or maybe just the
+    time!).  A maintainer isn't necessarily a single person - for
+    example, the listed maintainer for most of the core libraries is
+    <email>libraries@haskell.org</email>, indicating that the library
+    is under the control of the community as a whole.  The maintainer
+    for the <literal>Foreign</literal> hierarchy is
+    <email>ffi@haskell.org</email>, the mailing list for discussion of
+    the Haskell FFI standard.</para>
+
+    <para>The responsibilities of a library maintainer include:</para>
+
+    <itemizedlist>
+      <listitem>
+	<para>Most importantly: act as a single point of contact for
+	issues relating to the library API and its
+	implementation.</para>
+      </listitem>
+      <listitem>
+	<para>Manage any discussion related to the library (which can
+	take place on <email>libraries.haskell.org</email> if
+	necessary), and summarise the results.  Make final decisions,
+	and implement them.</para>
+      </listitem>
+      <listitem>
+	<para>Maintain the implementation, including: fixing bugs,
+	updating to keep up with changes in other libraries, porting
+	to new compilers/platforms, and integrating code from other
+	contributors.  The maintainer is expected to be the only
+	person/group to make functional changes to the source code
+	(non-functional or trivial changes don't count).</para>
+      </listitem>
+      <listitem>
+	<para>Maintain/write the documentation and tests.</para>
+      </listitem>
+      <listitem>
+	<para>If you can't maintain the library any more for whatever
+	reason, tell <email>libraries@haskell.org</email> and we'll
+	revert the maintainer status of the library to the
+	default.</para>
+      </listitem>
+    </itemizedlist>
+
+    <sect2 id="core-team">
+      <title>The Core Team</title>
+      
+      <para>The core team is responsible for making final decisions
+      about the project as a whole and resolving disputes where
+      necessary.  We expect that needing to invoke the core team will
+      be a rare occurrence.</para>
+
+      <para>The core team is also responsible for approving
+      maintainership requests.</para>
+
+      <para>Currently, the core team consists of one person from each
+      of the compiler camps, and these are also the people that will
+      primarily be maintaining the library framework for their
+      respective compiler projects:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>Simon Marlow
+	  <email>simonmar@microsoft.com</email> (GHC representative)</para>
+	</listitem>
+	<listitem>
+	  <para>Malcolm Wallace
+	  <email>Malcolm.Wallace@cs.york.ac.uk</email> (NHC representative)</para>
+	</listitem>
+	<listitem>
+	  <para>Andy Gill
+	  <email>andy@galconn.com</email> (Hugs representative)</para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+
+  </sect1>
+    
+  <sect1 id="documentation">
+    <title>Documentation</title>
+    <para></para>
+  </sect1>
+    
+  <sect1 id="testing">
+    <title>Testing</title>
+    <para></para>
+  </sect1>
+    
+  <sect1 id="Migration-path">
+    <title>Migration path</title>
+
+    <para>How compatible will a compiler using the new libraries be
+    with code written for Haskell 98 or older library systems (such as
+    the <literal>hslibs</literal> suite and GHC's package system), and
+    for how long will compatibility be maintained?</para>
+
+    <para>Our current plan for GHC is as follows: by default, with the
+    <option>-fglasgow-exts</option> flag, you'll get access to the
+    core libraries.  Compatibility with Haskell 98 code will be
+    maintained using a separate package of wrappers presenting
+    interfaces for the Haskell 98 libraries (<literal>IO</literal>,
+    <literal>Ratio</literal>, <literal>Directory</literal>, etc.).
+    The Haskell 98 compatibility package will be enabled by default,
+    but we plan to add an option to disable it if necessary.  For code
+    that uses <literal>-package lang</literal>, we could also provide
+    a compatibility wrapper package (so <literal>-package
+    lang</literal> will continue to work as before and present the
+    same library interfaces), but this may prove too much work to
+    maintain - we haven't decided whether to do this or not.  It is
+    unlikely that compatibility wrappers for any of the other
+    <literal>hslibs</literal> packages will be provided.</para>
+  </sect1>
+
+  <sect1 id="conventions">
+    <title>Programming Conventions</title>
+
+    <sect2 id="module-header">
+      <title>Standard Module Header</title> <para>The following module
+      header will be used for all core libraries, and we recommend
+      using it for library source code in general:</para>
+
+<programlisting>
+-----------------------------------------------------------------------------
+-- 
+-- Module      :  <replaceable>module</replaceable>
+-- Copyright   :  (c) <replaceable>author</replaceable> <replaceable>year</replaceable>
+-- License     :  <replaceable>license</replaceable>
+-- 
+-- Maintainer  :  libraries@haskell.org | <replaceable>email-address</replaceable>
+-- Stability   :  experimental | provisional | stable
+-- Portability :  portable | non-portable (<replaceable>reason(s)</replaceable>)
+--
+-- $Id: libraries.sgml,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+--
+-- <replaceable>Description</replaceable>
+-----------------------------------------------------------------------------
+</programlisting>
+
+      <para>where:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><literal>$Id: libraries.sgml,v 1.1 2001/06/28 14:15:04 simonmar Exp $</literal></term>
+	  <listitem>
+	    <para>is optional, but usually included if the module is
+	    under CVS or RCS control.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><replaceable>module</replaceable></term>
+	  <listitem>
+	    <para>is the fully qualified module name of the
+	    module</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><replaceable>author</replaceable>/<replaceable>year</replaceable></term>
+	  <listitem>
+	    <para>Is the primary author and copyright holder of the
+	    module, and the year in which copyright is claimed.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><replaceable>license</replaceable></term>
+	  <listitem>
+	    <para>Specifies the license on the file (see <xref
+	    linkend="licensing">).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><replaceable>email-address</replaceable></term>
+	  <listitem>
+	    <para>The email address of the maintainer, or maintainers,
+	    of the library (see <xref linkend="maintainership">).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><replaceable>reason(s)</replaceable></term>
+	  <listitem>
+	    <para>The reasons for non-portability must be listed (see
+	    <xref linkend="portability">).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><replaceable>description</replaceable></term>
+	  <listitem>
+	    <para>A short description of the module.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+    </sect2>
+    
+    <sect2 id="naming-conventions">
+      <title>Naming Conventions</title>
+
+      <para>These naming conventions are pulled straight from the
+      <literal>hslibs</literal> documentation.  They were formed after
+      lengthy discussions and are heavily based on an initial
+      suggestion from Marcin Kowalczyk
+      <email>qrczak@knm.org.pl</email>.</para>
+
+      <para>Note that the conventions are not mutually exclusive,
+      e.g. should the function creating a set from a list of elements
+      have the name <Literal>set</Literal> or
+      <Literal>listToSet</Literal>?  (Alas, it currently has neither
+      name.)</para>
+
+      <para> The following nomenclature is used: Pure,
+      i.e. non-monadic functions are simply called, well,
+      <emphasis>functions</emphasis>.  Monadic functions,
+      i.e. functions having a type <Literal>... -&#62; m a</Literal>
+      for some Monad <Literal>m</Literal> are called
+      <emphasis>actions</emphasis>.</para>
+
+      <sect3 id="sec-library-module-names">
+	<title>Module names</title>
+	<itemizedlist>
+	  <listitem>
+	    <para>A module defining a data type or type class
+            <replaceable>X</replaceable> has the itself the name
+            <replaceable>X</replaceable>, e.g.
+            <literal>StablePtr</literal>.</para>
+	  </listitem>
+
+	  <listitem>
+	    <para>A module which re-exports the modules in a subtree
+	    of the hierarchy has the same name as the root of that
+	    subtree, eg. <literal>Foreign</literal> re-exports
+	    <literal>Foreign.Ptr</literal>,
+	    <literal>Foreign.MarshalUtils</literal> etc.</para>
+	  </listitem>
+
+	  <listitem>
+	    <para>If a subtree of the hierarchy contains several
+	    modules which provide similar functionality (eg. there are
+	    several pretty-printing libraries under
+	    <literal>Text.PrettyPrinter</literal>), then the module at
+	    the root of the subtree generally re-exports just
+	    <emphasis>one</emphasis> of the modules in the subtree
+	    (possibly the most popular or commonly-used
+	    alternative).</para>
+	  </listitem>
+
+	  <listitem>
+	    <para>In Haskell you sometimes publish
+            <emphasis>two</emphasis> interfaces to your libraries; one
+            for users, and one for library writers or advanced users
+            who might want to extend things.  Typically the advanced
+            users need to be able to see past certain
+            abstractions.</para>
+
+	    <para>The current proposal is for a module named
+	    <literal>M</literal>, the <quote>advanced</quote> version
+	    would be named <literal>M.Internals</literal>. eg.</para>
+
+<programlisting>
+import Text.Html           -- The library
+import Text.Html.Internals -- The non-abstract library (for building other libs)
+</programlisting>
+	  </listitem>
+
+	</itemizedlist>
+      </sect3>
+
+      <sect3 id="sec-library-constructor-names">
+	<title>Constructor names</title>
+	<indexterm><primary>Constructor names</primary></indexterm>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>Empty values of type <replaceable>X</replaceable>
+            have the name <Literal>empty<replaceable>X</replaceable></Literal>,
+            e.g. <literal>emptySet</literal>.</para>
+	  </listitem>
+
+	  <listitem>
+	    <para>Actions creating a new empty value of type
+            <replaceable>X</replaceable> have the name
+            <literal>newEmpty<replaceable>X</replaceable></literal>,
+            e.g. <literal>newEmptyMVar</literal>.</para>
+	  </listitem>
+
+	  <listitem>
+	    <para>Functions creating an arbitrary value of type
+            <replaceable>X</replaceable> have the name
+            <replaceable>X</replaceable> itself (with the first letter
+            downcased),
+            e.g. <literal>array</literal>. (<emphasis>TODO</emphasis>:
+            This often collides with <literal>xToY</literal>
+            convention, how should this be resolved?)
+            </para>
+	  </listitem>
+
+	  <listitem>
+	    <para>Actions creating new values arbitrary values of type
+            <replaceable>X</replaceable> have the name
+            <literal>new<replaceable>X</replaceable></literal>,
+            e.g. <literal>newIORef</literal>.
+            </para>
+	  </listitem>
+	</itemizedlist>
+      </sect3>
+
+    <sect3 id="sec-library-accessor-names">
+	<title>Accessor names</title>
+	<indexterm><primary>Accessor names</primary></indexterm>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>Functions getting an attribute of a value or a part
+            of it have the name of the attribute itself,
+            e.g. <literal>length</literal>, <literal>bounds</literal>.
+            </para>
+	  </listitem>
+
+	  <listitem>
+	    <para> Actions accessing some kind of reference or state
+            have the name
+            <literal>get<replaceable>X</replaceable></literal>, where
+            <replaceable>X</replaceable> is the type of the contents
+            or the name of the part being accessed,
+            e.g. <literal>getChar</literal>,
+            <literal>getEnv</literal>. An alternative naming scheme is
+            <literal>read<replaceable>Y</replaceable></literal>,
+            where <replaceable>Y</replaceable> is the type of the
+            reference or container, e.g. <literal>readIORef</literal>.
+            </para>
+	  </listitem>
+
+	  <listitem>
+	    <para>Functions or actions getting a value via a
+            pointer-like type <replaceable>X</replaceable> should be
+            named
+            <literal>deRef<replaceable>X</replaceable></literal>,
+            e.g. <literal>deRefStablePtr</literal>,
+            <literal>deRefWeak</literal>.</para>
+	  </listitem>
+	</itemizedlist>
+      </sect3>
+
+      <sect3 id="sec-library-modifier-names">
+	<title>Modifier names</title>
+	<indexterm><primary>Modifier names</primary></indexterm>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>Functions returning a value with attribute
+            <replaceable>X</replaceable> set to a new value should be
+            named
+            <literal>set<replaceable>X</replaceable></literal>. (<emphasis>TODO</emphasis>:
+            Add Examples.)</para>
+	  </listitem>
+
+	  <listitem>
+	    <para> Actions setting some kind of reference or state
+            have the name
+            <literal>put<replaceable>X</replaceable></literal>, where
+            <replaceable>X</replaceable> is the type of the contents
+            or the name of the part being accessed,
+            e.g. <literal>putChar</literal>. An alternative naming
+            scheme is
+            <literal>write<replaceable>Y</replaceable></literal>,
+            where <replaceable>X</replaceable> is the type of the
+            reference or container,
+            e.g. <literal>writeIORef</literal>.  </para></listitem>
+
+	  <listitem>
+	    <para> Actions in the <literal>IO</literal> monad setting
+            some global state <replaceable>X</replaceable> are
+            traditionally named <literal>setX</literal>, too, although
+            <literal>put<replaceable>X</replaceable></literal> would
+            be more appropriate,
+            e.g. <literal>setReadlineName</literal>.</para>
+	  </listitem>
+
+	  <listitem>
+	    <para> Actions modifying a container
+            <replaceable>X</replaceable> by a function of type
+            <literal>a -> a</literal> have the name
+            <literal>modify<replaceable>X</replaceable></literal>,
+            e.g. <literal>modifySTRef</literal>.</para>
+	  </listitem>
+	</itemizedlist>
+      </sect3>
+
+      <sect3 id="sec-library-predicate-names">
+	<title>Predicate names</title>
+	<indexterm><primary>Predicate names</primary></indexterm>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>Predicates, both non-monadic and monadic, testing a
+            property <replaceable>X</replaceable> have the name
+            <literal>is<replaceable>X</replaceable></literal>.
+            </para>
+	  </listitem>
+	</itemizedlist>
+      </sect3>
+
+      <sect3 id="sec-library-naming-conversions">
+	<title>Names for conversions</title>
+	<indexterm><primary>Names for conversions</primary></indexterm>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>Functions converting a value of type
+            <replaceable>X</replaceable> to a value of type
+            <replaceable>Y</replaceable> have the name
+            <literal><replaceable>X</replaceable>To<replaceable>Y</replaceable></literal>
+            with all leading uppercase characters of
+            <replaceable>X</replaceable> converted to lower case,
+            e.g. <literal>stToIO</literal>.</para>
+	  </listitem>
+
+	  <listitem>
+	    <para>Overloaded conversion functions of type 
+            <literal>C a => a -> <replaceable>X</replaceable></literal>
+            have the name
+            <literal>to<replaceable>X</replaceable></literal>,
+            e.g. <literal>toInteger</literal>.</para>
+	  </listitem>
+
+	  <listitem>
+	    <para> Overloaded conversion functions of type 
+<literal>C a => <replaceable>X</replaceable> -> a</literal> 
+            have the name <literal>from<replaceable>X</replaceable></literal>,
+e.g. <literal>fromInteger</literal>.</para>
+	  </listitem>
+	</itemizedlist>
+      </sect3>
+
+      <sect3 id="sec-library-misc-names">
+	<title>Miscellaneous naming conventions</title>
+	<indexterm><primary>Miscellaneous naming
+	convetions</primary></indexterm>
+
+	<itemizedlist>
+	  <listitem>
+	    <para> An action that is identical to another one called
+            <replaceable>X</replaceable>, but discards the return
+            value has the name
+            <literal><replaceable>X</replaceable>_</literal>,
+            e.g. <literal>mapM</literal> and <literal>mapM_</literal>.
+            </para>
+	  </listitem>
+
+	  <listitem>
+	    <para>Functions and actions which are potentially
+            dangerous to use and leave some kind of proof obligation
+            to the programmer have the name
+            <literal>unsafe<replaceable>X</replaceable></literal>,
+            e.g. <literal>unsafePerformIO</literal>.
+            </para>
+	  </listitem>
+
+	  <listitem>
+	    <para>There are two conventions for binary and N-ary
+            variants of an associative operation: One convention uses
+            an operator or a short name for the binary operation and a
+            long name for the N-ary variant,
+            e.g. <literal>(+)</literal> and <literal>sum</literal>,
+            <literal>max</literal> and <literal>maximum</literal>. The
+            other convention suffixes the N-ary variant with
+            <literal>Many</literal>.  (<emphasis>TODO</emphasis>: Add
+            Examples.)</para>
+	  </listitem>
+
+	  <listitem>
+	    <para>If possible, names are chosen such that either plain
+            application or <literal>arg1 `operation` arg2</literal> is
+            correct English, e.g. <literal>isPrefixOf</literal> is
+            good for use in backquotes.</para>
+	  </listitem>
+	</itemizedlist>
+      </sect3>
+    </sect2>
+
+    <sect2 id="sec-library-misc-conventions">
+      <title>Library design conventions</title>
+
+      <itemizedlist>
+	<listitem>
+	  <para>Actions setting and modifying a kind of reference or
+          state return <literal>()</literal>, getting the value is
+          separate, e.g. <literal>writeIORef</literal> and
+          <literal>modifyIORef</literal> both return
+          <literal>()</literal>, only <literal>readIORef</literal>
+          returns the value in an <literal>IORef</literal>
+          </para>
+	</listitem>
+
+	<listitem>
+	  <para>A function or action taking a some kind of state and
+          returning a pair consisting of a result and a new state, the
+          result is the first element of the pair and the new state is
+          the second, see e.g. <literal>Random</literal>.</para>
+	</listitem>
+
+	<listitem>
+	  <para>When the type <literal>Either</literal> is used to
+          encode an error condition and a normal result,
+          <literal>Left</literal> is used for the former and
+          <literal>Right</literal> for the latter, see
+          e.g. <literal>MonadEither</literal>.</para>
+	</listitem>
+
+	<listitem>
+	  <para> A module corresponding to a class
+          (e.g. <literal>Bits</literal>) contains the class
+          definition, perhaps some auxiliary functions, and all
+          sensible instances for Prelude types, but nothing
+          more. Other modules containing types for which an instance
+          for the class in question makes sense contain the code for
+          the instance itself.</para>
+	</listitem>
+
+	<listitem>
+	  <para> Record-like C bit fields or structs have a
+          record-like interface, i.e. pure getting and setting of
+          fields. (<emphasis>TODO</emphasis>: Clarify a little
+          bit. Add examples.)</para>
+	</listitem>
+
+	<listitem>
+	  <para> Although the possibility of partial application
+          suggests the type 
+
+<literal><replaceable>attr</replaceable> -> <replaceable>object</replaceable> -> <replaceable>object</replaceable></literal> 
+
+          for functions setting an attribute or value, infix notation
+          with backquotes implies 
+
+<literal><replaceable>object</replaceable> -> <replaceable>attr</replaceable> -> <replaceable>object</replaceable></literal>.
+
+          (<emphasis>TODO</emphasis>: Add Examples.)</para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+    
+    <sect2 id="coding-style">
+      <title>Coding style conventions</title>
+      <para></para>
+    </sect2>
+
+  </sect1>
+
+  <sect1>
+    <title>Changes to standard Haskell 98 libraries</title>
+
+    <para>Some changes have been made to the standard Haskell 98
+    libraries in the new library scheme, both in the names of the
+    modules themselves and in their exported interfaces.  Below is a
+    summary of those changes - at this time, the new libraries are
+    marked as provisional and are maintained by
+    <email>libraries@haskell.org</email>, so changes in the interfaces
+    are all up for discussion.</para>
+
+<screen>
+    modules with interface changes
+    ------------------------------
+
+    Array -> Data.Array
+       added instance Typeable (Array ix a)
+
+    Char  -> Data.Char
+       no interface changes (should have instance Typeable?)
+
+    Complex -> Data.Complex
+       added instance Typeable (Complex a)
+
+    IO -> System.IO
+       added 
+        hPutBuf :: Handle -> Ptr a -> Int -> IO ()
+        hGetBuf :: Handle -> Ptr a -> Int -> IO Int
+        fixIO   :: (a -> IO a) -> IO a
+
+    List -> Data.List
+       exports [](..)
+
+    Numeric -> ????
+       not placed in hierarchy yet
+
+    System    -> System.Exit, System.Environment, System.Cmd
+       split into three modules
+
+    just renamed, no interface changes:
+    -----------------------------------
+
+    CPUTTime  -> System.CPUTime
+    Directory -> System.IO.Directory
+    Ix        -> Data.Ix
+    Locale    -> System.Locale
+    Monad     -> Data.Monad
+    Random    -> System.Radom
+    Ratio     -> Data.Ratio
+    Time      -> System.Time
+</screen>
+  </sect1>
+
+</article>
+
+
