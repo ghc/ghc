@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.15 2001/06/22 12:36:34 rrt Exp $
+-- $Id: Time.hsc,v 1.16 2001/07/13 11:48:52 rrt Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -92,7 +92,7 @@ module Time
 
      ) where
 
-#include "cbits/HsStd.h"
+#include "HsStd.h"
 
 import Ix
 import Locale

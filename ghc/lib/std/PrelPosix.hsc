@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.8 2001/06/29 13:41:43 simonmar Exp $
+-- $Id: PrelPosix.hsc,v 1.9 2001/07/13 11:48:52 rrt Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -10,7 +10,7 @@
 
 module PrelPosix where
 
-#include "cbits/HsStd.h"
+#include "HsStd.h"
 
 import PrelBase
 import PrelNum

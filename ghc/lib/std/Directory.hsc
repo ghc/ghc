@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.12 2001/06/13 17:01:37 rrt Exp $
+-- $Id: Directory.hsc,v 1.13 2001/07/13 11:48:52 rrt Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -65,7 +65,7 @@ import PrelPtr
 import PrelIOBase
 import PrelBase
 
-#include "../includes/config.h"
+#include "config.h"
 #include <sys/stat.h>
 #include <dirent.h>
 #include <limits.h>
