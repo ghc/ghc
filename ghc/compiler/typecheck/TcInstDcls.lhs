@@ -660,7 +660,7 @@ checkInstValidity dflags theta clas inst_tys
   | null errs = returnTc ()
   | otherwise = addErrsTc errs `thenNF_Tc_` failTc
   where
-    errs = checkInstHead dflags clas inst_tys ++
+    errs = checkInstHead dflags theta clas inst_tys ++
 	   [err | pred <- theta, err <- checkInstConstraint dflags pred]
 
 checkInstConstraint dflags pred
@@ -674,7 +674,7 @@ checkInstConstraint dflags pred
   |  otherwise
   =  [instConstraintErr pred]
 
-checkInstHead dflags clas inst_taus
+checkInstHead dflags theta clas inst_taus
   |	-- CCALL CHECK
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
@@ -688,7 +688,7 @@ checkInstHead dflags clas inst_taus
 	-- If GlasgowExts then check at least one isn't a type variable
   | dopt Opt_GlasgowExts dflags
   = 	-- GlasgowExts case
-    check_tyvars dflags clas inst_taus ++ check_fundeps dflags clas inst_taus
+    check_tyvars dflags clas inst_taus ++ check_fundeps dflags theta clas inst_taus
 
 	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
   | not (length inst_taus == 1 &&
@@ -725,9 +725,9 @@ check_tyvars dflags clas inst_taus
     the_err = instTypeErr clas inst_taus msg
     msg     = ptext SLIT("There must be at least one non-type-variable in the instance head")
 
-check_fundeps dflags clas inst_taus
-  | checkInstFDs clas inst_taus = []
-  | otherwise			= [the_err]
+check_fundeps dflags theta clas inst_taus
+  | checkInstFDs theta clas inst_taus = []
+  | otherwise			      = [the_err]
   where
     the_err = instTypeErr clas inst_taus msg
     msg  = ptext SLIT("the instance types do not agree with the functional dependencies of the class")

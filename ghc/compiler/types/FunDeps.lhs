@@ -14,7 +14,7 @@ module FunDeps (
 
 import Var		( TyVar )
 import Class		( Class, FunDep, classTvsFds )
-import Type		( Type, PredType(..), predTyUnique, tyVarsOfTypes, tyVarsOfPred )
+import Type		( Type, ThetaType, PredType(..), predTyUnique, tyVarsOfTypes, tyVarsOfPred )
 import Subst		( mkSubst, emptyInScopeSet, substTy )
 import Unify		( unifyTyListsX )
 import Outputable	( Outputable, SDoc, interppSP, ptext, empty, hsep, punctuate, comma )
@@ -241,7 +241,8 @@ checkGroup inst_env clss@(Class cls tys : _)
 
 
 ----------
-checkClsFD :: TyVarSet 
+checkClsFD :: TyVarSet 			-- The quantified type variables, which
+					-- can be instantiated to make the types match
 	   -> FunDep TyVar -> [TyVar] 	-- One functional dependency from the class
 	   -> [Type] -> [Type]
 	   -> [Equation]
@@ -271,18 +272,18 @@ instFD (ls,rs) tvs tys
 \end{code}
 
 \begin{code}
-checkInstFDs :: Class -> [Type] -> Bool
+checkInstFDs :: ThetaType -> Class -> [Type] -> Bool
 -- Check that functional dependencies are obeyed in an instance decl
 -- For example, if we have 
---	class C a b | a -> b
+--	class theta => C a b | a -> b
 -- 	instance C t1 t2 
--- Then we require fv(t2) `subset` fv(t1)
+-- Then we require fv(t2) `subset` oclose(fv(t1), theta)
 
-checkInstFDs clas inst_taus
+checkInstFDs theta clas inst_taus
   = all fundep_ok fds
   where
     (tyvars, fds) = classTvsFds clas
-    fundep_ok fd  = tyVarsOfTypes rs `subVarSet` tyVarsOfTypes ls
+    fundep_ok fd  = tyVarsOfTypes rs `subVarSet` oclose theta (tyVarsOfTypes ls)
 		 where
 		   (ls,rs) = instFD fd tyvars inst_taus
 \end{code}
