@@ -4186,7 +4186,7 @@ key_function :: Int -> String -> (Bool, Double)
         you're very cautious about code size.</para>
 
 	<para><literal>NOTINLINE</literal> is a synonym for
-        <literal>NOINLINE</literal> (<literal>NOTINLINE</literal> is
+        <literal>NOINLINE</literal> (<literal>NOINLINE</literal> is
         specified by Haskell 98 as the standard way to disable
         inlining, so it should be used if you want your code to be
         portable).</para>
