@@ -1,0 +1,147 @@
+%
+%
+%
+
+Stubs to check for extremities of (IEEE) floats, 
+the tests have been (artfully) lifted from the hbc-0.9999.3 (lib/fltcode.c)
+source.
+
+\begin{code}
+
+#if (defined (sun) && !defined(i386)) || defined(hp300) || defined(_IBMR2) || defined(sgi) || defined(hppa)
+#define BIGENDIAN
+#endif
+
+#include "rtsdefs.h"
+#include "ieee-flpt.h"
+#include "floatExtreme.h"
+
+#ifdef BIGENDIAN
+#define L 1
+#define H 0
+#else
+#define L 0
+#define H 1
+#endif
+
+#ifdef IEEE_FLOATING_POINT
+
+StgInt
+isDoubleNaN(d)
+StgDouble d;
+{
+    union { double d; int i[2]; } u;
+    int hx,lx;
+    int r;
+
+    u.d = d;
+    hx = u.i[H];
+    lx = u.i[L];
+    hx &= 0x7fffffff;
+    hx |= (unsigned int)(lx|(-lx))>>31;        
+    hx = 0x7ff00000 - hx;
+    r = (int)((unsigned int)(hx))>>31;
+    return (r);
+}
+
+StgInt
+isDoubleInfinite(d)
+StgDouble d;
+{
+    union { double d; int i[2]; } u;
+    int hx,lx;
+
+    u.d = d;
+    hx = u.i[H];
+    lx = u.i[L];
+    hx &= 0x7fffffff;
+    hx ^= 0x7ff00000;
+    hx |= lx;
+    return (hx == 0);
+}
+
+StgInt
+isDoubleDenormalized(d) 
+StgDouble d;
+{
+    union { double d; int i[2]; } u;
+    int high, iexp;
+
+    u.d = d;
+    high = u.i[H];
+    iexp = high & (0x7ff << 20);
+    return (iexp == 0);
+}
+
+StgInt
+isDoubleNegativeZero(d) 
+StgDouble d;
+{
+    union { double d; int i[2]; } u;
+    int high, iexp;
+
+    u.d = d;
+    return (u.i[H] == 0x80000000 && u.i[L] == 0);
+}
+
+StgInt
+isFloatNaN(f) 
+StgFloat f;
+{
+    int ix;
+    int r;
+
+    ix = (int)f;
+    ix &= 0x7fffffff;
+    ix = 0x7f800000 - ix;
+    r = (int)(((unsigned int)(ix))>>31);
+    return (r);
+}
+
+StgInt
+isFloatInfinite(f) 
+StgFloat f;
+{
+    int ix;
+
+    ix = (int)f;
+    ix &= 0x7fffffff;
+    ix ^= 0x7f800000;
+    return (ix == 0);
+}
+
+StgInt
+isFloatDenormalized(f) 
+StgFloat f;
+{
+    int high, iexp;
+
+    high = (int)f;
+    iexp = high & (0xff << 23);
+    return (iexp == 0);
+}
+
+StgInt
+isFloatNegativeZero(f) 
+StgFloat f;
+{
+    int high = (int)f;
+    return (high == 0x80000000);
+}
+
+
+#else
+
+StgInt isDoubleNaN(d) StgDouble d; { return 0; }
+StgInt isDoubleInfinite(d) StgDouble d; { return 0; }
+StgInt isDoubleDenormalized(d) StgDouble d; { return 0; }
+StgInt isDoubleNegativeZero(d) StgDouble d; { return 0; }
+StgInt isFloatNaN(f) StgFloat f; { return 0; }
+StgInt isFloatInfinite(f) StgFloat f; { return 0; }
+StgInt isFloatDenormalized(f) StgFloat f; { return 0; }
+StgInt isFloatNegativeZero(f) StgFloat f; { return 0; }
+
+#endif
+
+
+\end{code}
