@@ -68,7 +68,8 @@ copyenv(void)
     char **new;
     int i;
 
-    for (i = 0; environ[i] != NULL; i++);
+    for (i = 0; environ[i] != NULL; i++)
+          ;
 
     if ((new = (char **) malloc((i + 1) * sizeof(char *))) == NULL)
 	 return -1;
@@ -120,7 +121,8 @@ _setenv(char *mapping)
 	free(environ[i]);
 	environ[i] = p;
     } else {
-	if ((new = (char **) realloc(environ, (i + 1) * sizeof(char *))) == NULL) {
+	/* We want to grow the table by *two*, one for the new entry, one for the terminator */
+	if ((new = (char **) realloc((void*)environ, (i + 2) * sizeof(char *))) == NULL) {
 	    free(p);
 	    return -1;
 	}
