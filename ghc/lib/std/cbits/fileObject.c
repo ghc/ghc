@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.6 1999/09/16 13:14:42 simonmar Exp $
+ * $Id: fileObject.c,v 1.7 1999/11/23 14:38:40 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -21,42 +21,33 @@
 #endif
 
 void
-setBufFlags(fo, flg)
-StgForeignPtr fo;
-StgInt flg;
+setBufFlags(StgForeignPtr fo, StgInt flg)
 {
   ((IOFileObject*)fo)->flags = flg;
   return;
 }
 
 void
-setBufWPtr(fo, len)
-StgForeignPtr fo;
-StgInt len;
+setBufWPtr(StgForeignPtr fo, StgInt len)
 {
   ((IOFileObject*)fo)->bufWPtr = len;
   return;
 }
 
 StgInt
-getBufWPtr(fo)
-StgForeignPtr fo;
+getBufWPtr(StgForeignPtr fo)
 {
   return (((IOFileObject*)fo)->bufWPtr);
 }
 
 StgInt
-getBufSize(fo)
-StgForeignPtr fo;
+getBufSize(StgForeignPtr fo)
 {
   return (((IOFileObject*)fo)->bufSize);
 }
 
 void
-setBuf(fo, buf,sz)
-StgForeignPtr fo;
-StgAddr buf;
-StgInt sz;
+setBuf(StgForeignPtr fo, StgAddr buf,StgInt sz)
 {
   ((IOFileObject*)fo)->buf     = buf;
   ((IOFileObject*)fo)->bufSize = sz;
@@ -64,13 +55,11 @@ StgInt sz;
 }
 
 StgAddr
-getBuf(fo)
-StgForeignPtr fo;
+getBuf(StgForeignPtr fo)
 { return (((IOFileObject*)fo)->buf); }
 
 StgAddr
-getWriteableBuf(ptr)
-StgForeignPtr ptr;
+getWriteableBuf(StgForeignPtr ptr)
 { 
    /* getWriteableBuf() is called prior to starting to pack
       a Haskell string into the IOFileObject buffer. It takes
@@ -88,35 +77,26 @@ StgForeignPtr ptr;
 }
 
 StgAddr
-getBufStart(fo,count)
-StgForeignPtr fo;
-StgInt count;
+getBufStart(StgForeignPtr fo, StgInt count)
 { return ((char*)((IOFileObject*)fo)->buf + (((IOFileObject*)fo)->bufRPtr) - count); }
 
 StgInt
-getFileFd(fo)
-StgForeignPtr fo;
+getFileFd(StgForeignPtr fo)
 { return (((IOFileObject*)fo)->fd); }
 
 StgInt
-getConnFileFd(fo)
-StgForeignPtr fo;
+getConnFileFd(StgForeignPtr fo)
 { return (((IOFileObject*)fo)->connectedTo->fd); }
 
 
 void
-setFd(fo,fp)
-StgForeignPtr fo;
-StgInt fp;
+setFd(StgForeignPtr fo,StgInt fp)
 { ((IOFileObject*)fo)->fd = fp;
   return;
 }
 
 void
-setConnectedTo(fo, fw, flg)
-StgForeignPtr fo;
-StgForeignPtr fw;
-StgInt flg;
+setConnectedTo(StgForeignPtr fo, StgForeignPtr fw, StgInt flg)
 {
   if( flg && (! isatty(((IOFileObject*)fo)->fd) || !isatty(((IOFileObject*)fw)->fd)) ) {
       return;
@@ -128,18 +108,16 @@ StgInt flg;
 static int __pushback_buf_size__ = 2;
 
 void
-setPushbackBufSize(i)
-StgInt i;
+setPushbackBufSize(StgInt i)
 { __pushback_buf_size__ = (i > 0 ? i : 0); }
 
 StgInt
-getPushbackBufSize()
+getPushbackBufSize(void)
 { return (__pushback_buf_size__); }
 
 /* Only ever called on line-buffered file objects */
 StgInt
-fill_up_line_buffer(fo)
-IOFileObject* fo;
+fill_up_line_buffer(IOFileObject* fo)
 {
   int count,len, ipos;
   unsigned char* p;
