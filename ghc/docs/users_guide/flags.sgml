@@ -731,7 +731,7 @@
 
 	    <row>
 	      <entry><option>-fliberate-case-threshold</option></entry>
-	      <entry>Tweak the liberate-case optimisation</entry>
+	      <entry>Tweak the liberate-case optimisation (default: 10)</entry>
 	      <entry>static</entry>
 	      <entry><option>-fno-liberate-case-threshold</option></entry>
 	    </row>
@@ -741,6 +741,14 @@
 	      <entry>Don't generate interface pragmas</entry>
 	      <entry>static</entry>
 	      <entry><option>-fno-omit-interface-pragmas</option></entry>
+	    </row>
+
+	    <row>
+	      <entry><option>-fmax-worker-args</option></entry>
+	      <entry>If a worker has that many arguments, none will be
+	        unpacked anymore (default: 10)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
 	    </row>
 
 	    <row>
