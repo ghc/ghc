@@ -1,0 +1,12 @@
+
+tcfail082.hs:1:
+    Duplicate or overlapping instance declarations
+	for `Read FooData'
+	    imported from module `Inst82_1' and imported from module `Inst82_2'
+
+tcfail082.hs:8:
+    No instance for `Show FooData'
+	arising from use of `print' at tcfail082.hs:8
+
+Compilation had errors
+
