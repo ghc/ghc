@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.54 2003/07/28 16:05:36 simonmar Exp $
+ * $Id: StgMacros.h,v 1.55 2003/07/31 10:07:02 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -445,6 +445,9 @@ EXTFUN_RTS(stg_gen_block);
 #   else
 // An object is replaced by a blackhole, so we fill the slop with zeros.
 // 
+// This looks like it can't work - we're overwriting the contents of
+// the THUNK with slop!  Perhaps this never worked??? --SDM
+//
 // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
 // 
 #    define UPD_BH_UPDATABLE(info)		\
