@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide POSIX regexps)
 --
--- $Id: Posix.hsc,v 1.2 2001/08/17 12:50:35 simonmar Exp $
+-- $Id: Posix.hsc,v 1.3 2001/09/13 11:39:58 simonmar Exp $
 --
 -- Interface to the POSIX regular expression library.
 -- ToDo: detect regex library with configure.
@@ -49,11 +49,12 @@ regcomp :: String -> Int -> IO Regex
 regcomp pattern flags = do
   regex_ptr <- mallocBytes (#const sizeof(regex_t))
   regex_fptr <- newForeignPtr regex_ptr (regfree regex_ptr)
-  withCString pattern $ \cstr -> do
-    r <- c_regcomp regex_fptr cstr (fromIntegral flags)
-    if (r == 0)
-       then return (Regex regex_fptr)
-       else error "Text.Regex.Posix.regcomp: error in pattern" -- ToDo
+  r <- withCString pattern $ \cstr ->
+    	 withForeignPtr regex_fptr $ \p ->
+           c_regcomp p cstr (fromIntegral flags)
+  if (r == 0)
+     then return (Regex regex_fptr)
+     else error "Text.Regex.Posix.regcomp: error in pattern" -- ToDo
 
 regfree :: Ptr CRegex -> IO ()
 regfree p_regex = do
@@ -72,21 +73,22 @@ regexec :: Regex			-- pattern
 
 regexec (Regex regex_fptr) str = do
   withCString str $ \cstr -> do
-    nsub <- withForeignPtr regex_fptr $ \p -> (#peek regex_t, re_nsub) p
-    let nsub_int = fromIntegral (nsub :: CSize)
-    allocaBytes ((1 + nsub_int) * (#const sizeof(regmatch_t))) $ \p_match -> do
+    withForeignPtr regex_fptr $ \regex_ptr -> do
+      nsub <- (#peek regex_t, re_nsub) regex_ptr
+      let nsub_int = fromIntegral (nsub :: CSize)
+      allocaBytes ((1 + nsub_int) * (#const sizeof(regmatch_t))) $ \p_match -> do
 		-- add one because index zero covers the whole match
-      r <- c_regexec regex_fptr cstr (1 + nsub) p_match 0{-no flags for now-}
+        r <- c_regexec regex_ptr cstr (1 + nsub) p_match 0{-no flags for now-}
 
-      if (r /= 0) then return Nothing else do 
+        if (r /= 0) then return Nothing else do 
 
-      (before,match,after) <- matched_parts str p_match
+        (before,match,after) <- matched_parts str p_match
 
-      sub_strs <- 
+        sub_strs <- 
 	  mapM (unpack str) $ take nsub_int $ tail $
 	     iterate (`plusPtr` (#const sizeof(regmatch_t))) p_match
 
-      return (Just (before, match, after, sub_strs))
+        return (Just (before, match, after, sub_strs))
 
 matched_parts :: String -> Ptr CRegMatch -> IO (String, String, String)
 matched_parts string p_match = do
@@ -145,11 +147,11 @@ type CRegex    = ()
 type CRegMatch = ()
 
 foreign import "regcomp" unsafe
-  c_regcomp :: ForeignPtr CRegex -> CString -> CInt -> IO CInt
+  c_regcomp :: Ptr CRegex -> CString -> CInt -> IO CInt
 
 foreign import "regfree" unsafe
   c_regfree :: Ptr CRegex -> IO ()
 
 foreign import "regexec" unsafe
-  c_regexec :: ForeignPtr CRegex -> CString -> CSize
+  c_regexec :: Ptr CRegex -> CString -> CSize
 	    -> Ptr CRegMatch -> CInt -> IO CInt
