@@ -6,7 +6,8 @@
 
 \begin{code}
 module HscMain ( 
-	HscResult(..), hscMain, newHscEnv, hscCmmFile, hscBufferFrontEnd
+	HscResult(..), HscCheckResult(..) , 
+	hscMain, newHscEnv, hscCmmFile, hscBufferFrontEnd
 #ifdef GHCI
 	, hscStmt, hscTcExpr, hscKcType
 	, hscGetInfo, GetInfoResult
@@ -46,6 +47,7 @@ import Parser
 import Lexer		( P(..), ParseResult(..), mkPState )
 import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( tcRnModule, tcRnExtCore )
+import TcRnTypes	( TcGblEnv )
 import TcIface		( typecheckIface )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
@@ -129,7 +131,7 @@ data HscResult
    = HscFail
 
    -- In IDE mode: we just do the static/dynamic checks
-   | HscChecked (Located (HsModule RdrName))
+   | HscChecked HscCheckResult
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -143,6 +145,13 @@ data HscResult
 	         Bool  		 	-- stub_c exists
 	         (Maybe CompiledByteCode)
 
+
+-- The result when we're just checking (in an IDE editor, for example)
+data HscCheckResult
+    = HscParsed  (Located (HsModule RdrName))
+		-- renaming/typechecking failed, here's the parse tree
+    | HscTypechecked TcGblEnv
+		-- renaming/typechecking succeeded
 
 -- What to do when we have compiler error or warning messages
 type MessageAction = Messages -> IO ()
@@ -369,14 +378,19 @@ hscBufferFrontEnd hsc_env buffer msg_act = do
         showPass (hsc_dflags hsc_env) "Parser"
 	case unP parseModule (mkPState buffer loc (hsc_dflags hsc_env)) of
 		PFailed span err -> do
-			msg_act (emptyBag, unitBag (mkPlainErrMsg span err))
-			return HscFail
-		POk _ rdr_module -> do 
-			r <- hscFrontEnd hsc_env msg_act rdr_module
-			case r of
-			   Left r -> return r
-			   Right _ -> return (HscChecked rdr_module)
+		   msg_act (emptyBag, unitBag (mkPlainErrMsg span err))
+		   return HscFail
+		POk _ rdr_module -> do
+		   hscBufferTypecheck hsc_env rdr_module msg_act
 
+hscBufferTypecheck hsc_env rdr_module msg_act = do
+	(tc_msgs, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
+					tcRnModule hsc_env rdr_module
+	msg_act tc_msgs
+	case maybe_tc_result of
+	    Nothing  -> return (HscChecked (HscParsed rdr_module))
+				-- space leak on rdr_module!
+	    Just r -> return (HscChecked (HscTypechecked r))
 
 
 hscFrontEnd hsc_env msg_act rdr_module  = do {
