@@ -10,7 +10,7 @@ TH_reifyDecl1.hs:33:9:
 
 TH_reifyDecl1.hs:33:9:
     data TH_reifyDecl1.Tree a_0 = TH_reifyDecl1.Leaf
-                            | TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0) (TH_reifyDecl1.Tree a_0)
+                            | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
 
 TH_reifyDecl1.hs:33:9: type TH_reifyDecl1.IntList = GHC.Base.[] GHC.Base.Int
 
