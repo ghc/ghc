@@ -509,7 +509,17 @@ evaluated to WHNF.  This is used to decide wether it's ok to change
 
 and to decide whether it's safe to discard a `seq`
 
-So, it does *not* treat variables as evaluated, unless they say they are
+So, it does *not* treat variables as evaluated, unless they say they are.
+
+But it *does* treat partial applications and constructor applications
+as values, even if their arguments are non-trivial; 
+	e.g.  (:) (f x) (map f xs)	is a value
+	      map (...redex...)		is a value
+Because `seq` on such things completes immediately
+
+A worry: constructors with unboxed args:
+		C (f x :: Int#)
+Suppose (f x) diverges; then C (f x) is not a value.
 
 \begin{code}
 exprIsValue :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
@@ -548,18 +558,17 @@ exprIsConApp_maybe expr
   = analyse (collectArgs expr)
   where
     analyse (Var fun, args)
-	| maybeToBool maybe_con_app = maybe_con_app
-	where
-	  maybe_con_app = case isDataConId_maybe fun of
-				Just con | length args >= dataConRepArity con 
-					-- Might be > because the arity excludes type args
-				         -> Just (con, args)
-				other    -> Nothing
+	| Just con <- isDataConId_maybe fun,
+	  length args >= dataConRepArity con
+		-- Might be > because the arity excludes type args
+	= Just (con,args)
 
+	-- Look through unfoldings, but only cheap ones, because
+	-- we are effectively duplicating the unfolding
     analyse (Var fun, [])
-	= case maybeUnfoldingTemplate (idUnfolding fun) of
-	    	Nothing  -> Nothing
-		Just unf -> exprIsConApp_maybe unf
+	| let unf = idUnfolding fun,
+	  isCheapUnfolding unf
+	= exprIsConApp_maybe (unfoldingTemplate unf)
 
     analyse other = Nothing
 \end{code}
