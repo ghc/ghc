@@ -195,29 +195,16 @@ lookupIfaceByModule hpt pit mod
 
 
 \begin{code}
-hptInstances :: HscEnv -> [(Module, IsBootInterface)] -> [DFunId]
+hptInstances :: HscEnv -> (Module -> Bool) -> [DFunId]
 -- Find all the instance declarations that are in modules imported 
 -- by this one, directly or indirectly, and are in the Home Package Table
 -- This ensures that we don't see instances from modules --make compiled 
 -- before this one, but which are not below this one
-hptInstances hsc_env deps
-  | isOneShot (hsc_mode hsc_env) = []	-- In one-shot mode, the HPT is empty
-  | otherwise
-  = let 
-	hpt = hsc_HPT hsc_env
-    in
-    [ dfun 
-    |	-- Find each non-hi-boot module below me
-      (mod, False) <- deps
-
-	-- Look it up in the HPT
-    , let mod_info = ASSERT2( mod `elemModuleEnv` hpt, ppr mod $$ vcat (map ppr_hm (moduleEnvElts hpt)))
-		     fromJust (lookupModuleEnv hpt mod)
-
-	-- And get its dfuns
+hptInstances hsc_env want_this_module
+  = [ dfun 
+    | mod_info <- moduleEnvElts (hsc_HPT hsc_env)
+    , want_this_module (mi_module (hm_iface mod_info))
     , dfun <- md_insts (hm_details mod_info) ]
-  where
-   ppr_hm hm = ppr (mi_module (hm_iface hm))
 
 hptRules :: HscEnv -> [(Module, IsBootInterface)] -> [IdCoreRule]
 -- Get rules from modules "below" this one (in the dependency sense)

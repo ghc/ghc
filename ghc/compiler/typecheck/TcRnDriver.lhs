@@ -59,7 +59,7 @@ import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import VarEnv		( varEnvElts )
-import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts )
+import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts, lookupModuleEnv )
 import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, getOccName, isWiredInName )
 import NameSet
@@ -120,7 +120,6 @@ import Var		( globaliseId )
 import Name		( nameOccName, nameModule )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, returnIOName )
-import Module		( lookupModuleEnv )
 import HscTypes		( InteractiveContext(..), HomeModInfo(..), typeEnvElts, typeEnvClasses,
 			  availNames, availName, ModIface(..), icPrintUnqual,
 			  ModDetails(..), Dependencies(..) )
@@ -169,16 +168,22 @@ tcRnModule hsc_env hsc_src (L loc (HsModule maybe_mod export_ies
 		-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
 
+	let { dep_mods :: ModuleEnv (Module, IsBootInterface)
+	    ; dep_mods = imp_dep_mods imports
+
+	    ; is_dep_mod :: Module -> Bool
+	    ; is_dep_mod mod = case lookupModuleEnv dep_mods mod of
+				Nothing		  -> False
+				Just (_, is_boot) -> not is_boot 
+	    ; home_insts = hptInstances hsc_env is_dep_mod
+	    } ;
+
 		-- Record boot-file info in the EPS, so that it's 
 		-- visible to loadHiBootInterface in tcRnSrcDecls,
 		-- and any other incrementally-performed imports
-	let { dep_mods :: ModuleEnv (Module, IsBootInterface)
-	    ; dep_mods = imp_dep_mods imports } ;
-
 	updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
 
 		-- Update the gbl env
-	let { home_insts = hptInstances hsc_env (moduleEnvElts dep_mods) } ;
 	updGblEnv ( \ gbl -> 
 		gbl { tcg_rdr_env  = rdr_env,
 		      tcg_inst_env = extendInstEnvList (tcg_inst_env gbl) home_insts,
@@ -767,9 +772,10 @@ check_main ghci_mode tcg_env main_mod main_fn
 setInteractiveContext :: HscEnv -> InteractiveContext -> TcRn a -> TcRn a
 setInteractiveContext hsc_env icxt thing_inside 
   = let 
-	root_modules :: [(Module, IsBootInterface)]
-	root_modules = [(mkModule m, False) | m <- ic_toplev_scope icxt]
-	dfuns 	     = hptInstances hsc_env root_modules
+	-- Initialise the tcg_inst_env with instances 
+	-- from all home modules.  This mimics the more selective
+	-- call to hptInstances in tcRnModule
+	dfuns = hptInstances hsc_env (\mod -> True)
     in
     updGblEnv (\env -> env { 
 	tcg_rdr_env  = ic_rn_gbl_env icxt,
