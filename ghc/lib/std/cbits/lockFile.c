@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: lockFile.c,v 1.1 2001/05/18 16:54:06 simonmar Exp $
+ * $Id: lockFile.c,v 1.2 2001/05/21 11:02:15 simonmar Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
@@ -27,8 +27,21 @@ static int writeLocks = 0;
 int
 lockFile(int fd, int for_writing, int exclusive)
 {
-    int i;
     struct stat sb;
+    int i;
+
+    while (fstat(fd, &sb) < 0) {
+	if (errno != EINTR) {
+#ifndef _WIN32
+	    return -1;
+#else
+	    /* fstat()ing socket fd's seems to fail with CRT's fstat(),
+	       so let's just silently return and hope for the best..
+	    */
+	    return 0;
+#endif
+	}
+    }
 
     if (for_writing) {
       /* opening a file for writing, check to see whether
