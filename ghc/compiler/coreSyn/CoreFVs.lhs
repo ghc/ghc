@@ -151,7 +151,7 @@ expr_fvs (Let (Rec pairs) body)
 exprFreeNames finds the free *names* of an expression, notably
 including the names of type constructors (which of course do not show
 up in exprFreeVars).  Similarly ruleLhsFreeNames.  The latter is used
-when deciding whethera rule is an orphan.  In particular, suppose that
+when deciding whether a rule is an orphan.  In particular, suppose that
 T is defined in this module; we want to avoid declaring that a rule like
 	fromIntegral T = fromIntegral_T
 is an orphan.  Of course it isn't, an declaring it an orphan would
