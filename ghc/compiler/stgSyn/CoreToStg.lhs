@@ -37,16 +37,11 @@ import PrimOp		( PrimOp(..) )
 import SpecUtils	( mkSpecialisedCon )
 import SrcLoc		( noSrcLoc )
 import TyCon		( TyCon{-instance Uniquable-} )
-import Type		( maybeAppDataTyCon, getAppDataTyConExpandingDicts, SYN_IE(Type) )
+import Type		( getAppDataTyConExpandingDicts, SYN_IE(Type) )
 import TysWiredIn	( stringTy )
 import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
 import UniqSupply	-- all of it, really
 import Util		( zipLazy, panic, assertPanic{-, pprTrace ToDo:rm-} )
---import Pretty--ToDo:rm
---import PprStyle--ToDo:rm
---import PprType  --ToDo:rm
---import Outputable--ToDo:rm
---import PprEnv--ToDo:rm
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
