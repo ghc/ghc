@@ -445,10 +445,44 @@ zonkTcTyVarToTyVar tv
 	-- so that all other occurrences of the tyvar will get zapped too
     zonkTyVar zap tv		`thenNF_Tc` \ ty2 ->
 
+	-- This warning shows up if the allegedly-unbound tyvar is
+	-- already bound to something.  It can actually happen, and 
+	-- in a harmless way (see [Silly Type Synonyms] below) so
+	-- it's only a warning
     WARN( not (immut_tv_ty `tcEqType` ty2), ppr tv $$ ppr immut_tv $$ ppr ty2 )
 
     returnNF_Tc immut_tv
 \end{code}
+
+[Silly Type Synonyms]
+
+Consider this:
+	type C u a = u	-- Note 'a' unused
+
+	foo :: (forall a. C u a -> C u a) -> u
+	foo x = ...
+
+	bar :: Num u => u
+	bar = foo (\t -> t + t)
+
+* From the (\t -> t+t) we get type  {Num d} =>  d -> d
+  where d is fresh.
+
+* Now unify with type of foo's arg, and we get:
+	{Num (C d a)} =>  C d a -> C d a
+  where a is fresh.
+
+* Now abstract over the 'a', but float out the Num (C d a) constraint
+  because it does not 'really' mention a.  (see Type.tyVarsOfType)
+  The arg to foo becomes
+	/\a -> \t -> t+t
+
+* So we get a dict binding for Num (C d a), which is zonked to give
+	a = ()
+
+* Then the /\a abstraction has a zonked 'a' in it.
+
+All very silly.   I think its harmless to ignore the problem.
 
 
 %************************************************************************

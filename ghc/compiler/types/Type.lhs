@@ -602,11 +602,26 @@ tyVarsOfType :: Type -> TyVarSet
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
-tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty1
+tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty2	-- See note [Syn] below
 tyVarsOfType (SourceTy sty)		= tyVarsOfSourceType sty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
+
+-- 			Note [Syn]
+-- Consider
+--	type T a = Int
+-- What are the free tyvars of (T x)?  Empty, of course!  
+-- Here's the example that Ralf Laemmel showed me:
+--	foo :: (forall a. C u a -> C u a) -> u
+--	mappend :: Monoid u => u -> u -> u
+--
+--	bar :: Monoid u => u
+--	bar = foo (\t -> t `mappend` t)
+-- We have to generalise at the arg to f, and we don't
+-- want to capture the constraint (Monad (C u a)) because
+-- it appears to mention a.  Pretty silly, but it was useful to him.
+
 
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
