@@ -31,7 +31,7 @@ much pain.
 # define NON_POSIX_SOURCE
 #endif
 
-#if defined(freebsd_TARGET_OS)
+#if defined(freebsd_TARGET_OS) || defined(aix_TARGET_OS)
 # define NON_POSIX_SOURCE
 #endif
 
@@ -121,16 +121,21 @@ Fun, eh?
 
 \begin{code}
 # if defined(sunos4_TARGET_OS) || defined(freebsd_TARGET_OS) \
-  || defined(linux_TARGET_OS)  || defined(linuxaout_TARGET_OS)
+  || defined(linux_TARGET_OS)  || defined(linuxaout_TARGET_OS) \
+  || defined(aix_TARGET_OS)
 
 static void
 segv_handler(int sig,
     /* NB: all except first argument are "implementation defined" */
 #  if defined(sunos4_TARGET_OS) || defined(freebsd_TARGET_OS)
 	int code, struct sigcontext *scp, caddr_t addr)
-#  else /* linux */
+#  else /* linux || aix */
+#    if defined(aix_TARGET_OS)
+	int code, struct sigcontext *scp)
+#    else /* linux */
 	struct sigcontext_struct scp)
-#  endif /* linux */
+#    endif 
+#  endif
 {
     extern void StackOverflow(STG_NO_ARGS) STG_NORETURN;
 
@@ -138,7 +143,10 @@ segv_handler(int sig,
     caddr_t addr = scp.cr2;
     /* Magic info from Tommy Thorn! */
 #  endif
-
+#  if defined(aix_TARGET_OS)
+    caddr_t addr = scp->sc_jmpbuf.jmp_context.o_vaddr;
+    /* Magic guess by andre */
+#  endif
     if (addr >= (caddr_t) stks_space
       && addr < (caddr_t) (stks_space + RTSflags.GcFlags.stksSize))
 	StackOverflow();
