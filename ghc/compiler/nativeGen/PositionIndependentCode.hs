@@ -55,6 +55,10 @@ import CLabel           ( CLabel, pprCLabel,
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
                           labelDynamic, externallyVisibleCLabel )
 
+#if powerpc_TARGET_ARCH && linux_TARGET_OS
+import CLabel           ( mkForeignLabel )
+#endif
+
 import MachRegs
 import MachInstrs
 import NCGMonad         ( NatM, getNewRegNat, getNewLabelNat )
@@ -391,7 +395,7 @@ pprGotDeclaration = vcat [
     
 pprImportedSymbol importedLbl
     | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
-    vcat [
+    = vcat [
         ptext SLIT(".section \".got2\", \"aw\""),
         ptext SLIT(".LC_") <> pprCLabel_asm lbl <> char ':',
         ptext SLIT("\t.long") <+> pprCLabel_asm lbl
