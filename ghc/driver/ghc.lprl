@@ -231,6 +231,7 @@ sub setupOptFlags {
    $Oopt_FB_Support		  = ''; # was '-fdo-arity-expand';
 #  $Oopt_FoldrBuildWW		  = 0; # Off by default
    $Oopt_FoldrBuildInline	  = ''; # was '-fdo-inline-foldr-build';
+   $Oopt_UsageSPInf               = ''; # Off by default
    $Oopt_ShowSimplifierProgress   = '';
 } # end of setupOptFlags
 
@@ -438,6 +439,7 @@ $OptLevel      = 0; # no -O == 0; -O == 1; -O2 == 2; -Ofile == 3
 $MinusO2ForC   = 0; # set to 1 if -O2 should be given to C compiler
 $StolenX86Regs = 4; # **HACK*** of the very worst sort
 $CoreLint      = '';
+$USPLint       = '';
 $StgLint       = '';
 
 @Import_dir	= ('.'); #-i things
@@ -733,7 +735,7 @@ sub setupOptimiseFlags {
 	  ']',
 	$Oopt_AddAutoSccs,
 #	'-ffull-laziness',	# removed 95/04 WDP following Andr\'e's lead
-	
+
 	$Oopt_FinalStgProfilingMassage
       );
 
@@ -784,6 +786,9 @@ sub setupOptimiseFlags {
 	($Oopt_DoSpecialise) ? (
 	  $Oopt_DoSpecialise,
 	) : (),
+
+        $Oopt_UsageSPInf, # infer usage information here in case we need it later.
+                          # (add more of these where you need them --KSW 1999-04)
 
 	'-fsimplify', 		# need dependency anal after specialiser ...
 	  '[', 			# need tossing before calc-inlinings ...
@@ -1900,13 +1905,13 @@ sub runHsc {
 
       local($to_do_opts) = "$Tmp_prefix.opts";
       open(OPTS, "> $Tmp_prefix.opts") || &tidy_up_and_die(1,"Can't open $Tmp_prefix.opts\n");
-      print OPTS "$dump @HsC_flags $CoreLint $StgLint $Verbose";
+      print OPTS "$dump @HsC_flags $CoreLint $USPLint $StgLint $Verbose";
       close(OPTS);
       $to_do = "$HsC @HsP_flags ,$hscpp_hsc \@$Tmp_prefix.opts $output +RTS @HsC_rts_flags";
 
     } else {
 
-      $to_do = "$HsC @HsP_flags ,$hscpp_hsc $dump @HsC_flags $CoreLint $StgLint $Verbose $output +RTS @HsC_rts_flags";
+      $to_do = "$HsC @HsP_flags ,$hscpp_hsc $dump @HsC_flags $CoreLint $USPLint $StgLint $Verbose $output +RTS @HsC_rts_flags";
     }
     &run_something($to_do, 'Haskell compiler');
 
@@ -3216,6 +3221,10 @@ arg: while($_ = $Args[0]) {
     /^-fno-speciali[sz]e$/
 		&& do { $Oopt_DoSpecialise = ''; next arg; };
 
+    /^-fusagesp$/
+                && do {  $Oopt_UsageSPInf = '-fusagesp';
+                         push (@HsC_flags, '-fusagesp-on'); next arg; };
+
     /^-fcompiling-prelude$/ && do { $CompilingPrelude=1; push(@HsC_flags, $_); next arg; };
 
 # Now the foldr/build options, which are *on* by default (for -O).
@@ -3323,6 +3332,9 @@ arg: while($_ = $Args[0]) {
     # -d(no-)core-lint is done this way so it is turn-off-able.
     /^-dcore-lint/       && do { $CoreLint = '-dcore-lint'; next arg; };
     /^-dno-core-lint/    && do { $CoreLint = '';    	    next arg; };
+    # Ditto for USP lint
+    /^-dusagesp-lint/    && do { $USPLint = '-dusagesp-lint'; next arg; };
+    /^-dno-usagesp-lint/ && do { $USPLint = '';               next arg; };
     # Ditto for STG lint
     /^-dstg-lint/       && do { $StgLint = '-dstg-lint'; next arg; };
     /^-dno-stg-lint/    && do { $StgLint = '';           next arg; };

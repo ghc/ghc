@@ -109,6 +109,7 @@ need a short form...).  Some of the most useful ones are:
 @-ddump-ds@ | desugarer output @@
 @-ddump-simpl@ | simplifer output (Core-to-Core passes) @@
 @-ddump-stranal@ | strictness analyser output @@
+@-ddump-usagesp@ | UsageSP inference pre-inf and output @@
 @-ddump-occur-anal@ | `occurrence analysis' output @@
 @-ddump-spec@ | dump specialisation info @@
 @-ddump-stg@ | output of STG-to-STG passes @@
@@ -124,6 +125,7 @@ need a short form...).  Some of the most useful ones are:
 <nidx>-ddump-deriv option</nidx>%
 <nidx>-ddump-ds option</nidx>%
 <nidx>-ddump-simpl option</nidx>%
+<nidx>-ddump-usagesp option</nidx>%
 <nidx>-ddump-stranal option</nidx>%
 <nidx>-ddump-occur-anal option</nidx>%
 <nidx>-ddump-spec option</nidx>%
@@ -189,6 +191,32 @@ Have the renamer report what imports does not contribute.
 
 %ToDo: -ddump-asm-insn-counts
 %-ddump-asm-globals-info
+
+%----------------------------------------------------------------------
+<sect2>Checking for consistency
+<label id="checking-consistency">
+<p>
+<nidx>consistency checks</nidx>
+<nidx>lint</nidx>
+
+<descrip>
+<tag>@-dcore-lint@:</tag>
+<nidx>-dcore-lint option</nidx>
+Turn on heavyweight intra-pass sanity-checking within GHC, at Core
+level.  (It checks GHC's sanity, not yours.)
+
+<tag>@-dstg-lint@:</tag>
+<nidx>-dstg-lint option</nidx>
+Ditto for STG level.
+
+<tag>@-dusagesp-lint@:</tag>
+<nidx>-dstg-lint option</nidx>
+Turn on checks around UsageSP inference (@-fusagesp@).  This verifies
+various simple properties of the results of the inference, and also
+warns if any identifier with a used-once annotation before the
+inference has a used-many annotation afterwards; this could indicate a
+non-worksafe transformation is being applied.
+</descrip>
 
 %----------------------------------------------------------------------
 <sect2>How to read Core syntax (from some @-ddump-*@ flags)
