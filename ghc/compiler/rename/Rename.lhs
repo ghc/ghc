@@ -135,8 +135,8 @@ renameExpr dflags hit hst pcs this_module expr
 		returnRn Nothing
 	  else
 
-	  lookupOrigNames implicit_occs		`thenRn` \ implicit_names ->
-	  slurpImpDecls (fvs `plusFV` implicit_names) `thenRn` \ decls ->
+	  lookupOrigNames implicit_occs			`thenRn` \ implicit_names ->
+	  slurpImpDecls (fvs `plusFV` implicit_names)	`thenRn` \ decls ->
 
 	  doDump e decls  `thenRn_`
 	  returnRn (Just (print_unqual, (e, decls)))
@@ -603,8 +603,16 @@ closeIfaceDecls dflags hit hst pcs
 	local_names    = foldl add emptyNameSet tycl_decls
 	add names decl = addListToNameSet names (map fst (tyClDeclSysNames decl ++ tyClDeclNames decl))
     in
+	-- Record that we have now got declarations for local_names
     recordLocalSlurps local_names	`thenRn_`
-    closeDecls decls needed
+
+	-- Do the transitive closure
+    lookupOrigNames implicit_occs	`thenRn` \ implicit_names ->
+    closeDecls decls (needed `plusFV` implicit_names)
+  where
+    implicit_occs = string_occs	-- Data type decls with record selectors,
+				-- which may appear in the decls, need unpackCString
+				-- and friends. It's easier to just grab them right now.
 \end{code}
 
 %*********************************************************
