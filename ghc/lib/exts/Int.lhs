@@ -95,6 +95,9 @@ module Int
 	, writeInt64OffForeignObj
 #endif
 	
+	-- The non-standard fromInt and toInt methods
+	, Num( fromInt ), Integral( toInt )
+
 	-- non-standard, GHC specific
 	, intToWord
 
