@@ -405,11 +405,15 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag
 		find_branch :: ConTagZ -> Maybe BlockId
 		find_branch i = assocDefault mb_deflt tagged_blk_ids i
 
-		arms = [ find_branch (i+lo_tag) | i <- [0..n_tags-1]]
+		-- NB. we have eliminated impossible branches at
+		-- either end of the range (see below), so the first
+		-- tag of a real branch is real_lo_tag (not lo_tag).
+		arms = [ find_branch i | i <- [real_lo_tag..real_hi_tag]]
 
-	        switch_stmt = CmmSwitch (cmmOffset tag_expr (- lo_tag)) arms
+	        switch_stmt = CmmSwitch (cmmOffset tag_expr (- real_lo_tag)) arms
 
-	; return (oneCgStmt switch_stmt)
+	; ASSERT(not (all isNothing arms)) 
+	  return (oneCgStmt switch_stmt)
 	}
 
   -- if we can knock off a bunch of default cases with one if, then do so
