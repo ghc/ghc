@@ -32,9 +32,11 @@ import System.Posix.Signals
 # else
 import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
 # endif /* GHC > 504 */
-
-import CONCURRENT	( myThreadId )
 #endif /* mingw32_HOST_OS */
+
+#if defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ >= 603
+import GHC.ConsoleHandler
+#endif
 
 # if __GLASGOW_HASKELL__ < 500
 import EXCEPTION        ( raiseInThread )
@@ -46,6 +48,7 @@ import EXCEPTION	( throwTo )
 import EXCEPTION	( catchJust, tryJust, ioErrors )
 #endif
 
+import CONCURRENT	( myThreadId )
 import DYNAMIC
 import qualified EXCEPTION as Exception
 import TRACE		( trace )
@@ -196,12 +199,24 @@ thread.
 \begin{code}
 installSignalHandlers :: IO ()
 installSignalHandlers = do
-#ifndef mingw32_HOST_OS
   main_thread <- myThreadId
-  let sig_handler = Catch (throwTo main_thread 
-				(Exception.DynException (toDyn Interrupted)))
-  installHandler sigQUIT sig_handler Nothing 
-  installHandler sigINT  sig_handler Nothing
-#endif
+  let
+      interrupt_exn = Exception.DynException (toDyn Interrupted)
+      interrupt = throwTo main_thread interrupt_exn
+  --
+#if !defined(mingw32_HOST_OS)
+  installHandler sigQUIT interrupt Nothing 
+  installHandler sigINT  interrupt Nothing
   return ()
+#elif __GLASGOW_HASKELL__ >= 603
+  -- GHC 6.3+ has support for console events on Windows
+  let sig_handler ControlC = interrupt
+      sig_handler Break    = interrupt
+      sig_handler _        = return ()
+
+  installHandler (Catch sig_handler)
+  return ()
+#else
+  -- nothing
+#endif
 \end{code}
