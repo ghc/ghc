@@ -1243,44 +1243,44 @@ bit 3 = 8
 0 `setBit` 1 = 2
 0 `setBit` 2 = 4
 0 `setBit` 3 = 8
-0 `setBit` 32 = 0
+0 `setBit` 32 = 4294967296
  
 1 `setBit` 0 = 1
 1 `setBit` 1 = 3
 1 `setBit` 2 = 5
 1 `setBit` 3 = 9
-1 `setBit` 32 = 1
+1 `setBit` 32 = 4294967297
  
 2 `setBit` 0 = 3
 2 `setBit` 1 = 2
 2 `setBit` 2 = 6
 2 `setBit` 3 = 10
-2 `setBit` 32 = 2
+2 `setBit` 32 = 4294967298
  
 3 `setBit` 0 = 3
 3 `setBit` 1 = 3
 3 `setBit` 2 = 7
 3 `setBit` 3 = 11
-3 `setBit` 32 = 3
+3 `setBit` 32 = 4294967299
  
 #
 -3 `clearBit` 0 = -4
 -3 `clearBit` 1 = -3
 -3 `clearBit` 2 = -7
 -3 `clearBit` 3 = -11
--3 `clearBit` 32 = -3
+-3 `clearBit` 32 = -4294967299
  
 -2 `clearBit` 0 = -2
 -2 `clearBit` 1 = -4
 -2 `clearBit` 2 = -6
 -2 `clearBit` 3 = -10
--2 `clearBit` 32 = -2
+-2 `clearBit` 32 = -4294967298
  
 -1 `clearBit` 0 = -2
 -1 `clearBit` 1 = -3
 -1 `clearBit` 2 = -5
 -1 `clearBit` 3 = -9
--1 `clearBit` 32 = -1
+-1 `clearBit` 32 = -4294967297
  
 0 `clearBit` 0 = 0
 0 `clearBit` 1 = 0
@@ -1311,62 +1311,62 @@ bit 3 = 8
 -3 `complementBit` 1 = -1
 -3 `complementBit` 2 = -7
 -3 `complementBit` 3 = -11
--3 `complementBit` 32 = -3
+-3 `complementBit` 32 = -4294967299
  
 -2 `complementBit` 0 = -1
 -2 `complementBit` 1 = -4
 -2 `complementBit` 2 = -6
 -2 `complementBit` 3 = -10
--2 `complementBit` 32 = -2
+-2 `complementBit` 32 = -4294967298
  
 -1 `complementBit` 0 = -2
 -1 `complementBit` 1 = -3
 -1 `complementBit` 2 = -5
 -1 `complementBit` 3 = -9
--1 `complementBit` 32 = -1
+-1 `complementBit` 32 = -4294967297
  
 0 `complementBit` 0 = 1
 0 `complementBit` 1 = 2
 0 `complementBit` 2 = 4
 0 `complementBit` 3 = 8
-0 `complementBit` 32 = 0
+0 `complementBit` 32 = 4294967296
  
 1 `complementBit` 0 = 0
 1 `complementBit` 1 = 3
 1 `complementBit` 2 = 5
 1 `complementBit` 3 = 9
-1 `complementBit` 32 = 1
+1 `complementBit` 32 = 4294967297
  
 2 `complementBit` 0 = 3
 2 `complementBit` 1 = 0
 2 `complementBit` 2 = 6
 2 `complementBit` 3 = 10
-2 `complementBit` 32 = 2
+2 `complementBit` 32 = 4294967298
  
 3 `complementBit` 0 = 2
 3 `complementBit` 1 = 1
 3 `complementBit` 2 = 7
 3 `complementBit` 3 = 11
-3 `complementBit` 32 = 3
+3 `complementBit` 32 = 4294967299
  
 #
 -3 `testBit` 0 = True
 -3 `testBit` 1 = False
 -3 `testBit` 2 = True
 -3 `testBit` 3 = True
--3 `testBit` 32 = False
+-3 `testBit` 32 = True
  
 -2 `testBit` 0 = False
 -2 `testBit` 1 = True
 -2 `testBit` 2 = True
 -2 `testBit` 3 = True
--2 `testBit` 32 = False
+-2 `testBit` 32 = True
  
 -1 `testBit` 0 = True
 -1 `testBit` 1 = True
 -1 `testBit` 2 = True
 -1 `testBit` 3 = True
--1 `testBit` 32 = False
+-1 `testBit` 32 = True
  
 0 `testBit` 0 = False
 0 `testBit` 1 = False
