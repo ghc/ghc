@@ -13,6 +13,33 @@ stuff to do with the C stack.
 Any other required tidying up.
 \end{itemize}
 
+HPPA specific notes:
+\begin{itemize}
+\item
+The HP linker is very picky about symbols being in the appropriate
+space (code vs. data).  When we mangle the threaded code to put the
+info tables just prior to the code, they wind up in code space
+rather than data space.  This means that references to *_info from
+un-mangled parts of the RTS (e.g. unthreaded GC code) get
+unresolved symbols.  Solution:  mini-mangler for .c files on HP.  I
+think this should really be triggered in the driver by a new -rts
+option, so that user code doesn't get mangled inappropriately.
+\item
+With reversed tables, jumps are to the _info label rather than to
+the _entry label.  The _info label is just an address in code
+space, rather than an entry point with the descriptive blob we
+talked about yesterday.  As a result, you can't use the call-style
+JMP_ macro.  However, some JMP_ macros take _info labels as targets
+and some take code entry points within the RTS.  The latter won't
+work with the goto-style JMP_ macro.  Sigh.  Solution: Use the goto
+style JMP_ macro, and mangle some more assembly, changing all
+"RP'literal" and "LP'literal" references to "R'literal" and
+"L'literal," so that you get the real address of the code, rather
+than the descriptive blob.  Also change all ".word P%literal"
+entries in info tables and vector tables to just ".word literal,"
+for the same reason.  Advantage: No more ridiculous call sequences.
+\end{itemize}
+
 %************************************************************************
 %*									*
 \subsection{Constants for various architectures}
@@ -22,7 +49,62 @@ Any other required tidying up.
 \begin{code}
 sub init_TARGET_STUFF {
 
-    if ( $TargetPlatform =~ /^i386-.*-linuxaout/ ) {
+    #--------------------------------------------------------#
+    if ( $TargetPlatform =~ /^alpha-.*-.*/ ) {
+
+    $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = ''; # _ if symbols have an underscore on the front
+    $T_DO_GC	    = 'PerformGC_wrapper';
+    $T_PRE_APP	    = 'DONT THINK THIS APPLIES'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^\$C(\d+):$'; # regexp for what such a lbl looks like
+    $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^(\s*(\.align\s+\d+|\.(globl|ent)\s+\S+|\#.*|\.(file|loc)\s+\S+\s+\S+|\.text|\.r?data)\n)';
+    $T_COPY_DIRVS   = '^\s*(\#|\.(file|globl|ent|loc))';
+
+    $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
+    $T_DOT_WORD	    = '\.quad';
+    $T_DOT_GLOBAL   = '^\t\.globl';
+    $T_HDR_literal  = "\.rdata\n\t\.align 3\n";
+    $T_HDR_misc	    = "\.text\n\t\.align 3\n";
+    $T_HDR_data	    = "\.data\n\t\.align 3\n";
+    $T_HDR_consist  = "\.text\n";
+    $T_HDR_closure  = "\.data\n\t\.align 3\n";
+    $T_HDR_info	    = "\.text\n\t\.align 3\n";
+    $T_HDR_entry    = "\.text\n\t\.align 3\n";
+    $T_HDR_fast	    = "\.text\n\t\.align 3\n";
+    $T_HDR_vector   = "\.text\n\t\.align 3\n";
+    $T_HDR_direct   = "\.text\n\t\.align 3\n";
+
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^hppa/ ) {
+
+    $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = ''; # _ if symbols have an underscore on the front
+    $T_DO_GC	    = 'PerformGC_wrapper';
+    $T_PRE_APP	    = 'DONT THINK THIS APPLIES'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^L\$C(\d+)$'; # regexp for what such a lbl looks like
+    $T_POST_LBL	    = '';
+
+    $T_MOVE_DIRVS   = '^((\s+\.(IMPORT|EXPORT|PARAM).*|\s+\.align\s+\d+|\s+\.(SPACE|SUBSPA)\s+\S+|\s*)\n)';
+    $T_COPY_DIRVS   = '^\s+\.(IMPORT|EXPORT)';
+
+    $T_hsc_cc_PAT   = '\.STRING.*\)(hsc|cc) (.*)\\\\x09(.*)\\\\x00';
+    $T_DOT_WORD	    = '\.word';
+    $T_DOT_GLOBAL   = '^\s+\.EXPORT';
+    $T_HDR_literal  = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$LIT\$\n";
+    $T_HDR_misc	    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
+    $T_HDR_data	    = "\t.SPACE \$PRIVATE\$\n\t.SUBSPA \$DATA\$\n\t\.align 4\n";
+    $T_HDR_consist  = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$LIT\$\n";
+    $T_HDR_closure  = "\t.SPACE \$PRIVATE\$\n\t.SUBSPA \$DATA\$\n\t\.align 4\n";
+    $T_HDR_info	    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
+    $T_HDR_entry    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
+    $T_HDR_fast	    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
+    $T_HDR_vector   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
+    $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
+
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd)/ ) {
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
@@ -30,43 +112,47 @@ sub init_TARGET_STUFF {
     $T_PRE_APP	    = '^#'; # regexp that says what comes before APP/NO_APP
     $T_CONST_LBL    = '^LC(\d+):$';
     $T_POST_LBL	    = ':';
-    $T_PRE_LLBL_PAT = 'L';
-    $T_PRE_LLBL	    = 'L';
+    $T_X86_PRE_LLBL_PAT = 'L';
+    $T_X86_PRE_LLBL	    = 'L';
     $T_X86_BADJMP   = '^\tjmp [^L\*]';
 
-    $T_MOVE_DIRVS   = '^\s*(\.align\s+\d+(,0x90)?\n|\.globl\s+\S+\n|\.text\n|\.data\n|\.stab[^n].*\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.stab[^n].*|\.type\s+.*|\.size\s+.*)\n)';
     $T_COPY_DIRVS   = '\.(globl|stab)';
     $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
     $T_DOT_WORD	    = '\.long';
-    $T_HDR_string   = "\.text\n\t\.align 4\n"; # .align 4 is 486-cache friendly
-    $T_HDR_misc	    = "\.text\n\t\.align 4\n";
-    $T_HDR_data	    = "\.data\n\t\.align 2\n"; # ToDo: change align??
+    $T_DOT_GLOBAL   = '\.globl';
+    $T_HDR_literal  = "\.text\n\t\.align 2\n";
+    $T_HDR_misc	    = "\.text\n\t\.align 2,0x90\n";
+    $T_HDR_data	    = "\.data\n\t\.align 2\n";
     $T_HDR_consist  = "\.text\n";
-    $T_HDR_closure  = "\.data\n\t\.align 2\n"; # ToDo: change align?
-    $T_HDR_info	    = "\.text\n\t\.align 4\n"; # NB: requires padding
+    $T_HDR_closure  = "\.data\n\t\.align 2\n";
+    $T_HDR_info	    = "\.text\n\t\.align 2\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
-    $T_HDR_fast	    = "\.text\n\t\.align 4\n";
-    $T_HDR_vector   = "\.text\n\t\.align 4\n"; # NB: requires padding
-    $T_HDR_direct   = "\.text\n\t\.align 4\n";
+    $T_HDR_fast	    = "\.text\n\t\.align 2,0x90\n";
+    $T_HDR_vector   = "\.text\n\t\.align 2\n"; # NB: requires padding
+    $T_HDR_direct   = "\.text\n\t\.align 2,0x90\n";
 
-    } elsif ( $TargetPlatform =~ /^i386-.*-solaris2/ ) {
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux)$/ ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_DO_GC	    = 'PerformGC_wrapper';
-    $T_PRE_APP	    = '/'; # regexp that says what comes before APP/NO_APP
+    $T_PRE_APP	    = # regexp that says what comes before APP/NO_APP
+		      ($TargetPlatform =~ /-linux$/) ? '#' : '/' ;
     $T_CONST_LBL    = '^\.LC(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
-    $T_PRE_LLBL_PAT = '\.L';
-    $T_PRE_LLBL	    = '.L';
+    $T_X86_PRE_LLBL_PAT = '\.L';
+    $T_X86_PRE_LLBL	    = '.L';
     $T_X86_BADJMP   = '^\tjmp [^\.\*]';
 
-    $T_MOVE_DIRVS   = '^\s*(\.align\s+\d+(,0x90)?\n|\.globl\s+\S+\n|\.text\n|\.data\n|\.section\s+.*\n|\.type\s+.*\n|\.Lfe.*\n\t\.size\s+.*\n|\.size\s+.*\n|\.ident.*\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.Lfe.*\n\t\.size\s+.*|\.size\s+.*|\.ident.*)\n)';
     $T_COPY_DIRVS   = '\.(globl)';
 
     $T_hsc_cc_PAT   = '\.string.*\)(hsc|cc) (.*)\\\\t(.*)"';
     $T_DOT_WORD	    = '\.long';
-    $T_HDR_string   = "\.section\t\.rodata\n"; # or just use .text??? (WDP 95/11)
+    $T_DOT_GLOBAL   = '\.globl';
+    $T_HDR_literal  = "\.section\t\.rodata\n"; # or just use .text??? (WDP 95/11)
     $T_HDR_misc	    = "\.text\n\t\.align 16\n";
     $T_HDR_data	    = "\.data\n\t\.align 4\n"; # ToDo: change align??
     $T_HDR_consist  = "\.text\n";
@@ -77,33 +163,145 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 16\n"; # NB: requires padding
     $T_HDR_direct   = "\.text\n\t\.align 16\n";
 
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^m68k-.*-sunos4/ ) {
+
+    $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = '_'; # _ if symbols have an underscore on the front
+    $T_DO_GC	    = '_PerformGC_wrapper';
+    $T_PRE_APP	    = '^# MAY NOT APPLY'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^LC(\d+):$';
+    $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^(\s*(\.align\s+\d+|\.proc\s+\d+|\.const|\.cstring|\.globl\s+\S+|\.text|\.data|\.even|\.stab[^n].*)\n)';
+    $T_COPY_DIRVS   = '\.(globl|proc|stab)';
+    $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
+
+    $T_DOT_WORD	    = '\.long';
+    $T_DOT_GLOBAL   = '\.globl';
+    $T_HDR_literal  = "\.text\n\t\.even\n";
+    $T_HDR_misc	    = "\.text\n\t\.even\n";
+    $T_HDR_data	    = "\.data\n\t\.even\n";
+    $T_HDR_consist  = "\.text\n";
+    $T_HDR_closure  = "\.data\n\t\.even\n";
+    $T_HDR_info	    = "\.text\n\t\.even\n";
+    $T_HDR_entry    = "\.text\n\t\.even\n";
+    $T_HDR_fast	    = "\.text\n\t\.even\n";
+    $T_HDR_vector   = "\.text\n\t\.even\n";
+    $T_HDR_direct   = "\.text\n\t\.even\n";
+
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^mips-.*/ ) {
+
+    $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = ''; # _ if symbols have an underscore on the front
+    $T_DO_GC	    = 'PerformGC_wrapper';
+    $T_PRE_APP	    = '^\s*#'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^\$LC(\d+):$'; # regexp for what such a lbl looks like
+    $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^(\s*(\.align\s+\d+|\.(globl|ent)\s+\S+|\.text|\.r?data)\n)';
+    $T_COPY_DIRVS   = '\.(globl|ent)';
+
+    $T_hsc_cc_PAT   = 'I WAS TOO LAZY TO DO THIS BIT (WDP 95/05)';
+    $T_DOT_WORD	    = '\.word';
+    $T_DOT_GLOBAL   = '^\t\.globl';
+    $T_HDR_literal  = "\t\.rdata\n\t\.align 2\n";
+    $T_HDR_misc	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
+    $T_HDR_consist  = 'TOO LAZY TO DO THIS TOO';
+    $T_HDR_closure  = "\t\.data\n\t\.align 2\n";
+    $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_fast	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
+    $T_HDR_direct   = "\t\.text\n\t\.align 2\n";
+
+    #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^powerpc-.*/ ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
-    $T_US	    = '\.'; # _ if symbols have an underscore on the front
+    $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_DO_GC	    = 'PerformGC_wrapper';
     $T_PRE_APP	    = 'NOT APPLICABLE'; # regexp that says what comes before APP/NO_APP
     $T_CONST_LBL    = '^LC\.\.(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
-    $T_PRE_LLBL_PAT = '\.L';
-    $T_PRE_LLBL	    = '.L';
-    $T_X86_BADJMP   = 'NOT APPLICABLE';
 
-    $T_MOVE_DIRVS   = '^\s*(\.align\s+\d+(,0x90)?\n|\.globl\s+\S+\n|\.text\n|\.data\n|\.section\s+.*\n|\.type\s+.*\n|\.Lfe.*\n\t\.size\s+.*\n|\.size\s+.*\n|\.ident.*\n)';
-    $T_COPY_DIRVS   = '\.(globl)';
+    $T_MOVE_DIRVS   = '^(\s*(\.toc|.csect \S+|\.l?globl \S+|\.align \d+)\n)';
+    $T_COPY_DIRVS   = '\.(l?globl)';
 
     $T_hsc_cc_PAT   = '\.string.*\)(hsc|cc) (.*)\\\\t(.*)"';
     $T_DOT_WORD	    = '\.long';
-    $T_HDR_string   = "\.section\t\.rodata\n"; # or just use .text??? (WDP 95/11)
-    $T_HDR_misc	    = "\.text\n\t\.align 16\n";
-    $T_HDR_data	    = "\.data\n\t\.align 4\n"; # ToDo: change align??
+    $T_DOT_GLOBAL   = '\.globl';
+    $T_HDR_literal  = "\.section\t\.rodata\n";
+    $T_HDR_misc	    = "\.text\n\t\.align 2\n";
+    $T_HDR_data	    = "\.data\n\t\.align 2\n";
     $T_HDR_consist  = "\.text\n";
-    $T_HDR_closure  = "\.data\n\t\.align 4\n"; # ToDo: change align?
-    $T_HDR_info	    = "\.text\n\t\.align 16\n"; # NB: requires padding
-    $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
-    $T_HDR_fast	    = "\.text\n\t\.align 16\n";
-    $T_HDR_vector   = "\.text\n\t\.align 16\n"; # NB: requires padding
-    $T_HDR_direct   = "\.text\n\t\.align 16\n";
+    $T_HDR_closure  = "\.data\n\t\.align 2\n";
+    $T_HDR_info	    = "\.text\n\t\.align 2\n";
+    $T_HDR_entry    = "\.text\n";
+    $T_HDR_fast	    = "\.text\n\t\.align 2\n";
+    $T_HDR_vector   = "\.text\n\t\.align 2\n";
+    $T_HDR_direct   = "\.text\n\t\.align 2\n";
+
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^sparc-.*-solaris2/ ) {
+
+    $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = ''; # _ if symbols have an underscore on the front
+    $T_DO_GC	    = 'PerformGC_wrapper';
+    $T_PRE_APP	    = 'DOES NOT SEEM TO APPLY'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^\.LLC(\d+):$'; # regexp for what such a lbl looks like
+    $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^((\s+\.align\s+\d+|\s+\.proc\s+\d+|\s+\.global\s+\S+|\.text|\.data|\.stab.*|\.section.*|\s+\.type.*|\s+\.size.*)\n)';
+    $T_COPY_DIRVS   = '\.(global|proc|stab)';
+
+    $T_hsc_cc_PAT   = '\.asciz.*\)(hsc|cc) (.*)\\\\t(.*)"';
+    $T_DOT_WORD	    = '\.word';
+    $T_DOT_GLOBAL   = '^\t\.global';
+    $T_HDR_literal  = "\.text\n\t\.align 8\n";
+    $T_HDR_misc	    = "\.text\n\t\.align 4\n";
+    $T_HDR_data	    = "\.data\n\t\.align 8\n";
+    $T_HDR_consist  = "\.text\n";
+    $T_HDR_closure  = "\.data\n\t\.align 4\n";
+    $T_HDR_info	    = "\.text\n\t\.align 4\n";
+    $T_HDR_entry    = "\.text\n\t\.align 4\n";
+    $T_HDR_fast	    = "\.text\n\t\.align 4\n";
+    $T_HDR_vector   = "\.text\n\t\.align 4\n";
+    $T_HDR_direct   = "\.text\n\t\.align 4\n";
+
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^sparc-.*-sunos4/ ) {
+
+    $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = '_'; # _ if symbols have an underscore on the front
+    $T_DO_GC	    = '_PerformGC_wrapper';
+    $T_PRE_APP	    = '^# DOES NOT SEEM TO APPLY'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^LC(\d+):$';
+    $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^((\s+\.align\s+\d+|\s+\.proc\s+\d+|\s+\.global\s+\S+|\.text|\.data|\.stab.*)\n)';
+    $T_COPY_DIRVS   = '\.(global|proc|stab)';
+    $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
+
+    $T_DOT_WORD	    = '\.word';
+    $T_DOT_GLOBAL   = '^\t\.global';
+    $T_HDR_literal  = "\.text\n\t\.align 8\n";
+    $T_HDR_misc	    = "\.text\n\t\.align 4\n";
+    $T_HDR_data	    = "\.data\n\t\.align 8\n";
+    $T_HDR_consist  = "\.text\n";
+    $T_HDR_closure  = "\.data\n\t\.align 4\n";
+    $T_HDR_info	    = "\.text\n\t\.align 4\n";
+    $T_HDR_entry    = "\.text\n\t\.align 4\n";
+    $T_HDR_fast	    = "\.text\n\t\.align 4\n";
+    $T_HDR_vector   = "\.text\n\t\.align 4\n";
+    $T_HDR_direct   = "\.text\n\t\.align 4\n";
+
+    #--------------------------------------------------------#
+    } else {
+	print STDERR "$Pgm: don't know how to mangle assembly language for: $TargetPlatform\n";
+	exit 1;
     }
 
 if ( 0 ) {
@@ -113,15 +311,16 @@ print STDERR "T_DO_GC: $T_DO_GC\n";
 print STDERR "T_PRE_APP: $T_PRE_APP\n";
 print STDERR "T_CONST_LBL: $T_CONST_LBL\n";
 print STDERR "T_POST_LBL: $T_POST_LBL\n";
-print STDERR "T_PRE_LLBL_PAT: $T_PRE_LLBL_PAT\n";
-print STDERR "T_PRE_LLBL: $T_PRE_LLBL\n";
-print STDERR "T_X86_BADJMP: $T_X86_BADJMP\n";
-
+if ( $TargetPlatform =~ /^i386-/ ) {
+    print STDERR "T_X86_PRE_LLBL_PAT: $T_X86_PRE_LLBL_PAT\n";
+    print STDERR "T_X86_PRE_LLBL: $T_X86_PRE_LLBL\n";
+    print STDERR "T_X86_BADJMP: $T_X86_BADJMP\n";
+}
 print STDERR "T_MOVE_DIRVS: $T_MOVE_DIRVS\n";
 print STDERR "T_COPY_DIRVS: $T_COPY_DIRVS\n";
 print STDERR "T_hsc_cc_PAT: $T_hsc_cc_PAT\n";
 print STDERR "T_DOT_WORD: $T_DOT_WORD\n";
-print STDERR "T_HDR_string: $T_HDR_string\n";
+print STDERR "T_HDR_literal: $T_HDR_literal\n";
 print STDERR "T_HDR_misc: $T_HDR_misc\n";
 print STDERR "T_HDR_data: $T_HDR_data\n";
 print STDERR "T_HDR_consist: $T_HDR_consist\n";
@@ -170,34 +369,54 @@ sub mangle_asm {
     %infochk = (); 	# given a symbol base, say what chunk its info tbl is in
     %vectorchk = ();    # ditto, return vector table
     %directchk = ();    # ditto, direct return code
+    $EXTERN_DECLS = '';	# .globl <foo> .text (MIPS only)
 
-    $i = 0;
-    $chkcat[0] = 'misc';
+    $i = 0; $chkcat[0] = 'misc'; $chk[0] = '';
 
     while (<INASM>) {
 	next if $T_STABBY && /^\.stab.*${T_US}__stg_split_marker/o;
 	next if $T_STABBY && /^\.stab.*ghc.*c_ID/;
 	next if /${T_PRE_APP}(NO_)?APP/o;
 
-	if ( /^\s+/ ) { # most common case first -- a simple line!
+    	next if /^;/ && $TargetPlatform =~ /^hppa/;
+
+	next if /(^$|^\t\.file\t|^ # )/ && $TargetPlatform =~ /^(mips|powerpc)-/;
+
+	last if /^_section_\.text:$/ && $TargetPlatform =~ /^powerpc-/;
+
+	if ( $TargetPlatform =~ /^mips-/ 
+	  && /^\t\.(globl \S+ \.text|comm\t)/ ) {
+	    $EXTERN_DECLS .= $_ unless /(__DISCARD__|\b(PK_|ASSIGN_)(FLT|DBL)\b)/;
+  
+	} elsif ( /^\s+/ ) { # most common case first -- a simple line!
 	    # duplicated from the bottom
 
 	    $chk[$i] .= $_;
 
+	} elsif ( /\.\.ng:$/ && $TargetPlatform =~ /^alpha-/ ) {
+	    # Alphas: Local labels not to be confused with new chunks
+	    $chk[$i] .= $_;
+  
+	# NB: all the rest start with a non-space
+
+	} elsif ( $TargetPlatform =~ /^mips-/
+	       && /^\d+:/ ) { # a funny-looking very-local label
+	    $chk[$i] .= $_;
+
 	} elsif ( /$T_CONST_LBL/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'string';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'literal';
 	    $chksymb[$i] = $1;
 
 	} elsif ( /^${T_US}__stg_split_marker(\d+)${T_POST_LBL}$/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'splitmarker';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'splitmarker';
 	    $chksymb[$i] = $1;
 
 	} elsif ( /^${T_US}([A-Za-z0-9_]+)_info${T_POST_LBL}$/o ) {
 	    $symb = $1;
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'infotbl';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'infotbl';
 	    $chksymb[$i] = $symb;
 
 	    die "Info table already? $symb; $i\n" if defined($infochk{$symb});
@@ -205,31 +424,31 @@ sub mangle_asm {
 	    $infochk{$symb} = $i;
 
 	} elsif ( /^${T_US}([A-Za-z0-9_]+)_entry${T_POST_LBL}$/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'slow';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'slow';
 	    $chksymb[$i] = $1;
 
 	    $slowchk{$1} = $i;
 
 	} elsif ( /^${T_US}([A-Za-z0-9_]+)_fast\d+${T_POST_LBL}$/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'fast';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'fast';
 	    $chksymb[$i] = $1;
 
 	    $fastchk{$1} = $i;
 
 	} elsif ( /^${T_US}([A-Za-z0-9_]+)_closure${T_POST_LBL}$/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'closure';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'closure';
 	    $chksymb[$i] = $1;
 
 	    $closurechk{$1} = $i;
 
 	} elsif ( /^${T_US}ghc.*c_ID${T_POST_LBL}/o ) {
-	    $chk[++$i] .= $_;
+	    $chk[++$i]  = $_;
 	    $chkcat[$i] = 'consist';
 
-	} elsif ( /^(___gnu_compiled_c|gcc2_compiled\.)${T_POST_LBL}/o ) {
+	} elsif ( /^(${T_US}__gnu_compiled_c|gcc2_compiled\.)${T_POST_LBL}/o ) {
 	    ; # toss it
 
 	} elsif ( /^${T_US}ErrorIO_call_count${T_POST_LBL}$/o	# HACK!!!!
@@ -239,32 +458,37 @@ sub mangle_asm {
 	       || /^${T_US}.*_done${T_POST_LBL}$/o		# PROF: _module_done
 	       || /^${T_US}_module_registered${T_POST_LBL}$/o	# PROF: _module_registered
 	       ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'data';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
+	} elsif ( /^([A-Za-z0-9_]+)\s+\.comm/ && $TargetPlatform =~ /^hppa/ ) {
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'bss';
+  	    $chksymb[$i] = $1;
+
 	} elsif ( /^${T_US}(ret_|djn_)/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'misc';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = '';
 
 	} elsif ( /^${T_US}vtbl_([A-Za-z0-9_]+)${T_POST_LBL}$/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'vector';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'vector';
 	    $chksymb[$i] = $1;
 
 	    $vectorchk{$1} = $i;
 
 	} elsif ( /^${T_US}([A-Za-z0-9_]+)DirectReturn${T_POST_LBL}$/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'direct';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'direct';
 	    $chksymb[$i] = $1;
 
 	    $directchk{$1} = $i;
 
 	} elsif ( /^${T_US}[A-Za-z0-9_]+_upd${T_POST_LBL}$/o ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'misc';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = '';
 
 	} elsif ( $TargetPlatform =~ /^i386-.*-solaris2/
@@ -278,20 +502,24 @@ sub mangle_asm {
 	    # Haskell, make a call to your own C wrapper, then
 	    # put that C wrapper (which calls one of these) in a
 	    # plain .c file.  WDP 95/12
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'toss';
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'toss';
 	    $chksymb[$i] = $1;
 
-	} elsif ( /^${T_US}[A-Za-z0-9_]/o ) {
+	} elsif ( /^${T_US}[A-Za-z0-9_]/o
+		&& ( $TargetPlatform !~ /^hppa/ # need to avoid local labels in this case
+		   || ! /^L\$\d+$/ )
+		&& ( $TargetPlatform !~ /^powerpc/ # ditto
+		   || ! /^(L\.\.\d+|LT\.\..*):$/ ) ) {
 	    local($thing);
 	    chop($thing = $_);
 	    print STDERR "Funny global thing?: $_"
 		unless $KNOWN_FUNNY_THING{$thing}
 		    || /^${T_US}_(PRIn|PRStart).*${T_POST_LBL}$/o # pointer reversal GC routines
-		    || /^${T_US}CC_.*${T_POST_LBL}$/		# PROF: _CC_ccident
-		    || /^${T_US}_reg.*${T_POST_LBL}$/;		# PROF: __reg<module>
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'misc';
+		    || /^${T_US}CC_.*${T_POST_LBL}$/o		# PROF: _CC_ccident
+		    || /^${T_US}_reg.*${T_POST_LBL}$/o;		# PROF: __reg<module>
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = '';
 
 	} else { # simple line (duplicated at the top)
@@ -309,52 +537,140 @@ sub mangle_asm {
     # about the whole module before we start spitting
     # output.
 
-    for ($i = 0; $i < $numchks; $i++) {
+    local($FIRST_MANGLABLE) = ($TargetPlatform =~ /^(alpha-|hppa|mips-)/) ? 1 : 0;
+
+#   print STDERR "first chunk to mangle: $FIRST_MANGLABLE\n";
+
+    # Alphas: NB: we start meddling at chunk 1, not chunk 0
+    # The first ".rdata" is quite magical; as of GCC 2.7.x, it
+    # spits a ".quad 0" in after the v first ".rdata"; we
+    # detect this special case (tossing the ".quad 0")!
+    local($magic_rdata_seen) = 0;
+  
+    # HPPAs, MIPSen: also start medding at chunk 1
+
+    for ($i = $FIRST_MANGLABLE; $i < $numchks; $i++) {
 	$c = $chk[$i]; # convenience copy
 
 #	print STDERR "\nCHK $i (BEFORE) (",$chkcat[$i],"):\n", $c;
 
-	# toss all prologue stuff;
+	# toss all prologue stuff; HPPA is pretty weird
+	# (see elsewhere)
+	$c = &mash_hppa_prologue($c) if $TargetPlatform =~ /^hppa/;
+
 	# be slightly paranoid to make sure there's
 	# nothing surprising in there
 	if ( $c =~ /--- BEGIN ---/ ) {
 	    if (($p, $r) = split(/--- BEGIN ---/, $c)) {
-		$p =~ s/^\tpushl \%edi\n//;
-		$p =~ s/^\tpushl \%esi\n//;
-		$p =~ s/^\tsubl \$\d+,\%esp\n//;
-		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
+
+		if ($TargetPlatform =~ /^i386-/) {
+		    $p =~ s/^\tpushl \%edi\n//;
+		    $p =~ s/^\tpushl \%esi\n//;
+		    $p =~ s/^\tsubl \$\d+,\%esp\n//;
+		} elsif ($TargetPlatform =~ /^m68k-/) {
+		    $p =~ s/^\tlink a6,#-?\d.*\n//;
+		    $p =~ s/^\tmovel d2,sp\@-\n//;
+		    $p =~ s/^\tmovel d5,sp\@-\n//; # SMmark.* only?
+		    $p =~ s/^\tmoveml \#0x[0-9a-f]+,sp\@-\n//; # SMmark.* only?
+		} elsif ($TargetPlatform =~ /^mips-/) {
+		    # the .frame/.mask/.fmask that we use is the same
+		    # as that produced by GCC for miniInterpret; this
+		    # gives GDB some chance of figuring out what happened
+		    $FRAME = "\t.frame\t\$sp,2168,\$31\n\t.mask\t0x90000000,-4\n\t.fmask\t0x00000000,0\n";
+		    $p =~ s/^\t\.(frame).*\n/__FRAME__/g;
+		    $p =~ s/^\t\.(mask|fmask).*\n//g;
+		    $p =~ s/^\t\.cprestore.*\n/\t\.cprestore 416\n/; # 16 + 100 4-byte args
+		    $p =~ s/^\tsubu\t\$sp,\$sp,\d+\n//;
+		    $p =~ s/^\tsw\t\$31,\d+\(\$sp\)\n//;
+		    $p =~ s/^\tsw\t\$fp,\d+\(\$sp\)\n//;
+		    $p =~ s/^\tsw\t\$28,\d+\(\$sp\)\n//;
+		    $p =~ s/__FRAME__/$FRAME/;
+		} else {
+		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
+		}
+
+		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/
+		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
 		# glue together what's left
 		$c = $p . $r;
+		$c =~ s/\n\t\n/\n/; # junk blank line
 	    }
+	}
+
+	if ( $TargetPlatform =~ /^mips-/ ) {
+	    # MIPS: first, this basic sequence may occur "--- END ---" or not
+	    $c =~ s/^\tlw\t\$31,\d+\(\$sp\)\n\taddu\t\$sp,\$sp,\d+\n\tj\t\$31\n\t\.end/\t\.end/;
 	}
 
 	# toss all epilogue stuff; again, paranoidly
 	if ( $c =~ /--- END ---/ ) {
 	    if (($r, $e) = split(/--- END ---/, $c)) {
-		$e =~ s/^\tret\n//;
-		$e =~ s/^\tpopl \%edi\n//;
-		$e =~ s/^\tpopl \%esi\n//;
-		$e =~ s/^\taddl \$\d+,\%esp\n//;
-		die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/;
+		if ($TargetPlatform =~ /^i386-/) {
+		    $e =~ s/^\tret\n//;
+		    $e =~ s/^\tpopl \%edi\n//;
+		    $e =~ s/^\tpopl \%esi\n//;
+		    $e =~ s/^\taddl \$\d+,\%esp\n//;
+		} elsif ($TargetPlatform =~ /^m68k-/) {
+		    $e =~ s/^\tunlk a6\n//;
+		    $e =~ s/^\trts\n//;
+		} elsif ($TargetPlatform =~ /^mips-/) {
+		    $e =~ s/^\tlw\t\$31,\d+\(\$sp\)\n//;
+		    $e =~ s/^\tlw\t\$fp,\d+\(\$sp\)\n//;
+		    $e =~ s/^\taddu\t\$sp,\$sp,\d+\n//;
+		    $e =~ s/^\tj\t\$31\n//;
+		} else {
+		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
+		}
+		die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
+		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
 		# glue together what's left
 		$c = $r . $e;
+		$c =~ s/\n\t\n/\n/; # junk blank line
 	    }
 	}
 
+	# On SPARCs, we don't do --- BEGIN/END ---, we just
+	# toss the register-windowing save/restore/ret* instructions
+	# directly:
+	if ( $TargetPlatform =~ /^sparc-/ ) {
+	    $c =~ s/^\t(save .*|restore|ret|retl)\n//g;
+	    # throw away PROLOGUE comments
+	    $c =~ s/^\t!#PROLOGUE# 0\n\t!#PROLOGUE# 1\n//;
+	}
+
+	# On Alphas, the prologue mangling is done a little later (below)
+
     	# toss all calls to __DISCARD__
-	$c =~ s/^\tcall ${T_US}__DISCARD__\n//go;
+	$c =~ s/^\t(call|jbsr|jal)\s+${T_US}__DISCARD__\n//go;
+
+	# MIPS: that may leave some gratuitous asm macros around
+	# (no harm done; but we get rid of them to be tidier)
+	$c =~ s/^\t\.set\tnoreorder\n\t\.set\tnomacro\n\taddu\t(\S+)\n\t\.set\tmacro\n\t\.set\treorder\n/\taddu\t$1\n/
+	    if $TargetPlatform =~ /^mips-/;
+
+    	# toss stack adjustment after DoSparks
+    	$c =~ s/^(\tjbsr _DoSparks\n)\taddqw #8,sp/$1/g
+		if $TargetPlatform =~ /^m68k-/; # this looks old...
+
+	if ( $TargetPlatform =~ /^alpha-/ &&
+	   ! $magic_rdata_seen &&
+	   $c =~ /^\s*\.rdata\n\t\.quad 0\n\t\.align \d\n/ ) {
+	    $c =~ s/^\s*\.rdata\n\t\.quad 0\n\t\.align (\d)\n/\.rdata\n\t\.align $1\n/;
+	    $magic_rdata_seen = 1;
+	}
+
+	# pick some end-things and move them to the next chunk
 
 	# pin a funny end-thing on (for easier matching):
 	$c .= 'FUNNY#END#THING';
 
-	# pick some end-things and move them to the next chunk
-
 	while ( $c =~ /${T_MOVE_DIRVS}FUNNY#END#THING/o ) {
 	    $to_move = $1;
-
-	    if ( $to_move =~ /${T_COPY_DIRVS}/ && $i < ($numchks - 1) ) {
+	    if ( $i < ($numchks - 1)
+	      && ( $to_move =~ /${T_COPY_DIRVS}/
+	        || ($TargetPlatform =~ /^hppa/ && $to_move =~ /align/ && $chkcat[$i+1] eq 'literal') )) {
 		$chk[$i + 1] = $to_move . $chk[$i + 1];
 		# otherwise they're tossed
 	    }
@@ -362,6 +678,19 @@ sub mangle_asm {
 	    $c =~ s/${T_MOVE_DIRVS}FUNNY#END#THING/FUNNY#END#THING/o;
 	}
 
+    	if ( $TargetPlatform =~ /^alpha-/ && $c =~ /^\t\.ent\s+(\S+)/ ) {
+    	    $ent = $1;
+	    # toss all prologue stuff, except for loading gp, and the ..ng address
+	    if (($p, $r) = split(/^\t\.prologue/, $c)) {
+    	        if (($keep, $junk) = split(/\.\.ng:/, $p)) {
+    	    	    $c = $keep . "..ng:\n";
+    	        } else {
+    	    	    print STDERR "malformed code block ($ent)?\n"
+    	    	}
+    	    }
+    	    $c .= "\t.frame \$30,0,\$26,0\n\t.prologue" . $r;
+    	}
+  
 	$c =~ s/FUNNY#END#THING//;
 
 #	print STDERR "\nCHK $i (AFTER) (",$chkcat[$i],"):\n", $c;
@@ -369,30 +698,78 @@ sub mangle_asm {
 	$chk[$i] = $c; # update w/ convenience copy
     }
 
-    # print out all the literal strings first
+    if ( $TargetPlatform =~ /^alpha-/ ) {
+	# print out the header stuff first
+	$chk[0] =~ s/^(\t\.file.*)"(ghc\d+\.c)"/$1"$ifile_root.hc"/;
+	print OUTASM $chk[0];
+
+    } elsif ( $TargetPlatform =~ /^hppa/ ) {
+	print OUTASM $chk[0];
+
+    } elsif ( $TargetPlatform =~ /^mips-/ ) {
+	$chk[0] = "\t\.file\t1 \"$ifile_root.hc\"\n" . $chk[0];
+
+	# get rid of horrible "<dollar>Revision: .*$" strings
+	local(@lines0) = split(/\n/, $chk[0]);
+	local($z) = 0;
+	while ( $z <= $#lines0 ) {
+	    if ( $lines0[$z] =~ /^\t\.byte\t0x24,0x52,0x65,0x76,0x69,0x73,0x69,0x6f$/ ) {
+		undef($lines0[$z]);
+		$z++;
+		while ( $z <= $#lines0 ) {
+		    undef($lines0[$z]);
+		    last if $lines0[$z] =~ /[,\t]0x0$/;
+		    $z++;
+		}
+	    }
+	    $z++;
+	}
+	$chk[0] = join("\n", @lines0);
+	$chk[0] =~ s/\n\n+/\n/;
+	print OUTASM $chk[0];
+    }
+
+    # print out all the literal strings next
     for ($i = 0; $i < $numchks; $i++) {
-	if ( $chkcat[$i] eq 'string' ) {
-	    print OUTASM $T_HDR_string, $chk[$i];
-	    
+	if ( $chkcat[$i] eq 'literal' ) {
+	    print OUTASM $T_HDR_literal, $chk[$i];
+	    print OUTASM "; end literal\n" if $TargetPlatform =~ /^hppa/; # for the splitter
+
 	    $chkcat[$i] = 'DONE ALREADY';
 	}
     }
 
-    for ($i = 0; $i < $numchks; $i++) {
+    # on the HPPA, print out all the bss next
+    if ( $TargetPlatform =~ /^hppa/ ) {
+	for ($i = 1; $i < $numchks; $i++) {
+	    if ( $chkcat[$i] eq 'bss' ) {
+		print OUTASM "\t.SPACE \$PRIVATE\$\n\t.SUBSPA \$BSS\$\n\t.align 4\n";
+		print OUTASM $chk[$i];
+
+		$chkcat[$i] = 'DONE ALREADY';
+	    }
+	}
+    }
+
+    for ($i = $FIRST_MANGLABLE; $i < $numchks; $i++) {
 #	print STDERR "$i: cat $chkcat[$i], symb $chksymb[$i]\n";
 
 	next if $chkcat[$i] eq 'DONE ALREADY';
 
 	if ( $chkcat[$i] eq 'misc' ) {
-	    print OUTASM $T_HDR_misc;
-	    &print_doctored($chk[$i], 0);
+	    if ($chk[$i] ne '') {
+		print OUTASM $T_HDR_misc;
+		&print_doctored($chk[$i], 0);
+	    }
 
 	} elsif ( $chkcat[$i] eq 'toss' ) {
 	    print STDERR "*** NB: TOSSING code for $chksymb[$i] !!! ***\n";
 
 	} elsif ( $chkcat[$i] eq 'data' ) {
-	    print OUTASM $T_HDR_data;
-	    print OUTASM $chk[$i];
+	    if ($chk[$i] ne '') {
+		print OUTASM $T_HDR_data;
+		print OUTASM $chk[$i];
+	    }
 
 	} elsif ( $chkcat[$i] eq 'consist' ) {
 	    if ( $chk[$i] =~ /$T_hsc_cc_PAT/o ) {
@@ -402,13 +779,20 @@ sub mangle_asm {
 		$consist =~ s/-/_/g;
 		$consist =~ s/[^A-Za-z0-9_.]/ZZ/g; # ToDo: properly?
 		print OUTASM $T_HDR_consist, "${consist}${T_POST_LBL}\n";
-	    } else {
+
+	    } elsif ( $TargetPlatform !~ /^(mips|powerpc)-/ ) { # we just don't try in those case (ToDo)
+		# on mips: consistency string is just a v
+		# horrible bunch of .bytes,
+		# which I am too lazy to sort out (WDP 95/05)
+
 		print STDERR "Couldn't grok consistency: ", $chk[$i];
 	    }
 
 	} elsif ( $chkcat[$i] eq 'splitmarker' ) {
 	    # we can just re-constitute this one...
-	    print OUTASM "${T_US}__stg_split_marker",$chksymb[$i],"${T_POST_LBL}\n";
+	    # NB: we emit _three_ underscores no matter what,
+	    # so ghc-split doesn't have to care.
+	    print OUTASM "___stg_split_marker",$chksymb[$i],"${T_POST_LBL}\n";
 
 	} elsif ( $chkcat[$i] eq 'closure'
 	       || $chkcat[$i] eq 'infotbl'
@@ -446,12 +830,33 @@ sub mangle_asm {
 		$c = $chk[$slowchk{$symb}];
 
 		if ( defined($fastchk{$symb}) ) {
-		    $c =~ s/^\tmovl \$${T_US}${symb}_fast\d+,\%edx\n\tjmp \*\%edx\n//;
-		    $c =~ s/^\tmovl \$${T_US}${symb}_fast\d+,\%eax\n\tjmp \*\%eax\n//;
+		    if ( $TargetPlatform =~ /^alpha-/ ) {
+			$c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
+		    } elsif ( $TargetPlatform =~ /^hppa/ ) {
+			$c =~ s/^\s+ldil.*\n\s+ldo.*\n\s+bv.*\n(.*\n)?\s+\.EXIT/$1\t.EXIT/;
+		    } elsif ( $TargetPlatform =~ /^i386-/ ) {
+			$c =~ s/^\tmovl \$${T_US}${symb}_fast\d+,\%edx\n\tjmp \*\%edx\n//;
+			$c =~ s/^\tmovl \$${T_US}${symb}_fast\d+,\%eax\n\tjmp \*\%eax\n//;
+		    } elsif ( $TargetPlatform =~ /^mips-/ ) {
+			$c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
+		    } elsif ( $TargetPlatform =~ /^m68k-/ ) {
+			$c =~ s/^\tjmp ${T_US}${symb}_fast\d+.*\n\tnop\n//;
+			$c =~ s/^\tjmp ${T_US}${symb}_fast\d+.*\n//;
+		    } elsif ( $TargetPlatform =~ /^sparc-/ ) {
+			$c =~ s/^\tcall ${T_US}${symb}_fast\d+,.*\n\tnop\n//;
+			$c =~ s/^\tcall ${T_US}${symb}_fast\d+,.*\n(\t[a-z].*\n)/$1/;
+		    } else {
+			print STDERR "$Pgm: mystery slow-fast dropthrough: $TargetPlatform\n";
+		    }
 		}
 
-		print STDERR "still has jump to fast entry point:\n$c"
-		    if $c =~ /${T_US}${symb}_fast/; # NB: paranoia
+		if ( $TargetPlatform !~ /^(alpha-|hppa|mips-)/ ) {
+		    # On alphas, hppa: no very good way to look for "dangling"
+		    # references to fast-entry point.
+		    # (questionable re hppa and mips...)
+		    print STDERR "still has jump to fast entry point:\n$c"
+			if $c =~ /${T_US}${symb}_fast/; # NB: paranoia
+		}
 
 		print OUTASM $T_HDR_entry;
 
@@ -462,7 +867,13 @@ sub mangle_asm {
 	    
 	    # FAST ENTRY POINT
 	    if ( defined($fastchk{$symb}) ) {
-		print OUTASM $T_HDR_fast;
+    	    	if ( ! defined($slowchk{$symb})
+		   # ToDo: the || clause can go once we're no longer
+		   # concerned about producing exactly the same output as before
+#OLD:		   || $TargetPlatform =~ /^(m68k|sparc|i386)-/
+		   ) {
+		    print OUTASM $T_HDR_fast;
+		}
 		&print_doctored($chk[$fastchk{$symb}], 0);
 		$chkcat[$fastchk{$symb}] = 'DONE ALREADY';
 	    }
@@ -484,15 +895,55 @@ sub mangle_asm {
 		print OUTASM $T_HDR_direct;
 		&print_doctored($chk[$directchk{$symb}], 0);
 		$chkcat[$directchk{$symb}] = 'DONE ALREADY';
+
+	    } elsif ( $TargetPlatform =~ /^alpha-/ ) {
+		# Alphas: the commented nop is for the splitter, to ensure
+		# that no module ends with a label as the very last
+		# thing.  (The linker will adjust the label to point
+		# to the first code word of the next module linked in,
+		# even if alignment constraints cause the label to move!)
+
+		print OUTASM "\t# nop\n";
 	    }
 	    
 	} else {
 	    &tidy_up_and_die(1,"$Pgm: unknown chkcat (ghc-asm: $TargetPlatform)\n$chkcat[$i]\n$chk[$i]\n");
 	}
     }
+
+    print OUTASM $EXTERN_DECLS if $TargetPlatform =~ /^mips-/;
+
+    print OUTASM ".csect .text[PR]\n_section_.text:\n.csect .data[RW]\n\t.long _section_.text\n"
+	if $TargetPlatform =~ /^powerpc-/;
+
     # finished
     close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
     close(INASM)  || &tidy_up_and_die(1,"Failed reading from $in_asmf\n");
+}
+\end{code}
+
+\begin{code}
+sub mash_hppa_prologue { # OK, epilogue, too
+    local($_) = @_;
+
+    # toss all prologue stuff
+    s/^\s+\.ENTRY[^\0]*--- BEGIN ---/\t.ENTRY/;
+
+    # Lie about our .CALLINFO
+    s/^\s+\.CALLINFO.*$/\t.CALLINFO NO_CALLS,NO_UNWIND/;
+
+    # Get rid of P'
+
+    s/LP'/L'/g;
+    s/RP'/R'/g;
+
+    # toss all epilogue stuff
+    s/^\s+--- END ---[^\0]*\.EXIT/\t.EXIT/;
+
+    # Sorry; we moved the _info stuff to the code segment.
+    s/_info,DATA/_info,CODE/g;
+
+    return($_);
 }
 \end{code}
 
@@ -631,13 +1082,13 @@ sub print_doctored {
 
     # fix _all_ non-local jumps:
 
-    s/^\tjmp \*${T_PRE_LLBL_PAT}/\tJMP___SL/go;
-    s/^\tjmp ${T_PRE_LLBL_PAT}/\tJMP___L/go;
+    s/^\tjmp \*${T_X86_PRE_LLBL_PAT}/\tJMP___SL/go;
+    s/^\tjmp ${T_X86_PRE_LLBL_PAT}/\tJMP___L/go;
 
     s/^(\tjmp .*\n)/$exit_patch$1/g; # here's the fix...
 
-    s/^\tJMP___SL/\tjmp \*${T_PRE_LLBL}/go;
-    s/^\tJMP___L/\tjmp ${T_PRE_LLBL}/go;
+    s/^\tJMP___SL/\tjmp \*${T_X86_PRE_LLBL}/go;
+    s/^\tJMP___L/\tjmp ${T_X86_PRE_LLBL}/go;
 
     # fix post-PerformGC wrapper (re-)entries ???
 
@@ -656,14 +1107,34 @@ sub print_doctored {
 #=	    if /^\t(jmp|call) .*\%ecx/;
     }
 
-    # final peephole fix
+    # final peephole fixes
 
     s/^\tmovl \%eax,36\(\%ebx\)\n\tjmp \*36\(\%ebx\)\n/\tmovl \%eax,36\(\%ebx\)\n\tjmp \*\%eax\n/;
+# the short form may tickle perl bug:
+#    s/^\tmovl \$${T_US}(.*),(\%e[abcd]x)\n\tjmp \*$2/\tjmp $T_US$1/g;
+    s/^\tmovl \$${T_US}(.*),\%eax\n\tjmp \*\%eax/\tjmp $T_US$1/g;
+    s/^\tmovl \$${T_US}(.*),\%ebx\n\tjmp \*\%ebx/\tjmp $T_US$1/g;
+    s/^\tmovl \$${T_US}(.*),\%ecx\n\tjmp \*\%ecx/\tjmp $T_US$1/g;
+    s/^\tmovl \$${T_US}(.*),\%edx\n\tjmp \*\%edx/\tjmp $T_US$1/g;
+
+    # Hacks to eliminate some reloads of Hp.  Worth about 5% code size.
+    # We could do much better than this, but at least it catches about
+    # half of the unnecessary reloads.
+    # Note that these will stop working if either:
+    #  (i) the offset of Hp from BaseReg changes from 80, or
+    #  (ii) the register assignment of BaseReg changes from %ebx
+
+    s/^\tmovl 80\(\%ebx\),\%e.x\n\tmovl \$(.*),(-?[0-9]*)\(\%e.x\)\n\tmovl 80\(\%ebx\),\%e(.)x/\tmovl 80\(\%ebx\),\%e$3x\n\tmovl \$$1,$2\(\%e$3x\)/g;
+
+    s/^\tmovl 80\(\%ebx\),\%e(.)x\n\tmovl (.*),\%e(.)x\n\tmovl \%e$3x,(-?[0-9]*\(\%e$1x\))\n\tmovl 80\(\%ebx\),\%e$1x/\tmovl 80\(\%ebx\),\%e$1x\n\tmovl $2,\%e$3x\n\tmovl \%e$3x,$4/g;
+
+    s/^\tmovl 80\(\%ebx\),\%edx((\n\t(movl|addl) .*,((-?[0-9]*\(.*)|(\%e[abc]x)))+)\n\tmovl 80\(\%ebx\),\%edx/\tmovl 80\(\%ebx\),\%edx$1/g;
+    s/^\tmovl 80\(\%ebx\),\%eax((\n\t(movl|addl) .*,((-?[0-9]*\(.*)|(\%e[bcd]x)))+)\n\tmovl 80\(\%ebx\),\%eax/\tmovl 80\(\%ebx\),\%eax$1/g;
 
     # --------------------------------------------------------
     # that's it -- print it
     #
-    die "Funny jumps?\n$_" if /${T_X86_BADJMP}/o; # paranoia
+    #die "Funny jumps?\n$_" if /${T_X86_BADJMP}/o; # paranoia
 
     print OUTASM $_;
 
@@ -713,6 +1184,8 @@ sub init_FUNNY_THINGS {
 	"${T_US}_PRMarking_MarkNextGA${T_POST_LBL}", 1,
 	"${T_US}_PRMarking_MarkNextRoot${T_POST_LBL}", 1,
 	"${T_US}_PRMarking_MarkNextSpark${T_POST_LBL}", 1,
+	"${T_US}_PRMarking_MarkNextEvent${T_POST_LBL}", 1,
+	"${T_US}_PRMarking_MarkNextClosureInFetchBuffer${T_POST_LBL}", 1,
 	"${T_US}_Scavenge_Forward_Ref${T_POST_LBL}", 1,
 	"${T_US}__std_entry_error__${T_POST_LBL}", 1,
 	"${T_US}_startMarkWorld${T_POST_LBL}", 1,
@@ -739,37 +1212,64 @@ sub rev_tbl {
 
     local($before) = '';
     local($label) = '';
+    local(@imports) = (); # hppa only
     local(@words) = ();
     local($after) = '';
     local(@lines) = split(/\n/, $tbl);
     local($i, $extra, $words_to_pad, $j);
 
-    for ($i = 0; $i <= $#lines && $lines[$i] !~ /^\t\.long\s+/; $i++) {
+    for ($i = 0; $i <= $#lines && $lines[$i] !~ /^\t${T_DOT_WORD}\s+/o; $i++) {
 	$label .= $lines[$i] . "\n",
-	    next if $lines[$i] =~ /^[A-Za-z0-9_]+_info:$/
-		 || $lines[$i] =~ /^\.globl/
-		 || $lines[$i] =~ /^${T_US}vtbl_\S+:$/;
+	    next if $lines[$i] =~ /^[A-Za-z0-9_]+_info${T_POST_LBL}$/o
+		 || $lines[$i] =~ /${T_DOT_GLOBAL}/o
+		 || $lines[$i] =~ /^${T_US}vtbl_\S+${T_POST_LBL}$/o;
 
 	$before .= $lines[$i] . "\n"; # otherwise...
     }
 
-    for ( ; $i <= $#lines && $lines[$i] =~ /^\t\.long\s+/; $i++) {
-	push(@words, $lines[$i]);
+    if ( $TargetPlatform !~ /^hppa/ ) {
+	for ( ; $i <= $#lines && $lines[$i] =~ /^\t${T_DOT_WORD}\s+/o; $i++) {
+	    push(@words, $lines[$i]);
+	}
+    } else { # hppa weirdness
+	for ( ; $i <= $#lines && $lines[$i] =~ /^\s+\.(word|IMPORT)/; $i++) {
+	    if ($lines[$i] =~ /^\s+\.IMPORT/) {
+		push(@imports, $lines[$i]);
+	    } else {
+		# We don't use HP's ``function pointers''
+		# We just use labels in code space, like normal people
+		$lines[$i] =~ s/P%//;
+		push(@words, $lines[$i]);
+	    }
+	}
     }
+
     # now throw away the first word (entry code):
     shift(@words) if $discard1;
 
+# Padding removed to reduce code size and improve performance on Pentiums.
+# Simon M. 13/4/96
     # for 486-cache-friendliness, we want our tables aligned
     # on 16-byte boundaries (.align 4).  Let's pad:
-    $extra = ($#words + 1) % 4;
-    $words_to_pad = ($extra == 0) ? 0 : 4 - $extra;
-    for ($j = 0; $j < $words_to_pad; $j++) { push(@words, "\t\.long 0"); }
+#    $extra = ($#words + 1) % 4;
+#    $words_to_pad = ($extra == 0) ? 0 : 4 - $extra;
+#    for ($j = 0; $j < $words_to_pad; $j++) { push(@words, "\t${T_DOT_WORD} 0"); }
 
     for (; $i <= $#lines; $i++) {
 	$after .= $lines[$i] . "\n";
     }
 
-    $tbl = $before . join("\n", (reverse @words)) . "\n" . $label . $after;
+    # Alphas:If we have anonymous text (not part of a procedure), the
+    # linker may complain about missing exception information.  Bleh.
+    if ( $TargetPlatform =~ /^alpha-/ && $label =~ /^([A-Za-z0-9_]+):$/) {
+    	$before = "\t.ent $1\n" . $before;
+    	$after .= "\t.end $1\n";
+    }
+
+    $tbl = $before
+	 . (($TargetPlatform !~ /^hppa/) ? '' : join("\n", @imports) . "\n")
+	 . join("\n", (reverse @words)) . "\n"
+	 . $label . $after;
 
 #   print STDERR "before=$before\n";
 #   print STDERR "label=$label\n";
@@ -781,7 +1281,7 @@ sub rev_tbl {
 \end{code}
 
 \begin{code}
-sub mini_mangle_asm {
+sub mini_mangle_asm_i386 {
     local($in_asmf, $out_asmf) = @_;
 
     &init_TARGET_STUFF();
@@ -798,6 +1298,33 @@ sub mini_mangle_asm {
 	    /^${T_US}(PerformGC|StackOverflow|Yield|PerformReschedule)_wrapper${T_POST_LBL}\n/o;
 	print OUTASM "\tmovl \%esp, ${T_US}__temp_esp\n";
 	print OUTASM "\tmovl \%eax, ${T_US}__temp_eax\n";
+    }
+
+    # finished:
+    close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
+    close(INASM)  || &tidy_up_and_die(1,"Failed reading from $in_asmf\n");
+}
+\end{code}
+
+The HP is a major nuisance.  The threaded code mangler moved info
+tables from data space to code space, but unthreaded code in the RTS
+still has references to info tables in data space.  Since the HP
+linker is very precise about where symbols live, we need to patch the
+references in the unthreaded RTS as well.
+
+\begin{code}
+sub mini_mangle_asm_hppa {
+    local($in_asmf, $out_asmf) = @_;
+
+    open(INASM, "< $in_asmf")
+	|| &tidy_up_and_die(1,"$Pgm: failed to open `$in_asmf' (to read)\n");
+    open(OUTASM,"> $out_asmf")
+	|| &tidy_up_and_die(1,"$Pgm: failed to open `$out_asmf' (to write)\n");
+
+    while (<INASM>) {
+	s/_info,DATA/_info,CODE/;   # Move _info references to code space
+	s/P%_PR/_PR/;
+	print OUTASM;
     }
 
     # finished:
