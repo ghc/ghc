@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.67 2001/07/23 17:23:20 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.68 2001/08/10 09:41:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -730,7 +730,7 @@ NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
 SET_STATIC_HDR(stg_END_MUT_LIST_closure,stg_END_MUT_LIST_info,0/*CC*/,,EI_)
 , /*payload*/{} };
 
-INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 2, 0, MUT_CONS, , EF_, 0, 0);
+INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 1, 1, MUT_CONS, , EF_, 0, 0);
 NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
 
 /* -----------------------------------------------------------------------------
