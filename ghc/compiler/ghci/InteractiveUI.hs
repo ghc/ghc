@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.148 2003/02/24 12:39:26 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.149 2003/03/03 12:30:11 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -47,6 +47,9 @@ import Config
 
 #ifndef mingw32_HOST_OS
 import System.Posix
+#if __GLASGOW_HASKELL__ > 504
+	hiding (getEnv)
+#endif
 #endif
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
