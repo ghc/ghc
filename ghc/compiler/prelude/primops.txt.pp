@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.6 2001/09/11 09:02:43 simonpj Exp $
+-- $Id: primops.txt.pp,v 1.7 2001/10/16 13:31:56 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -32,19 +32,17 @@
 --	- the User's Guide 
 --
 
--- This file is divided into named sections, each containing or more primop entries.
--- Section headers have the format:
+-- This file is divided into named sections, each containing or more
+-- primop entries. Section headers have the format:
 --
 --	section "section-name" {description}
 --
--- This information is used solely when producing documentation; it is otherwise ignored.
--- The description is optional.
+-- This information is used solely when producing documentation; it is
+-- otherwise ignored.  The description is optional.
 --
 -- The format of each primop entry is as follows:
 --
 --	primop internal-name "name-in-program-text" type category {description} attributes
-
--- The description is optional.
 
 -- The default attribute values which apply if you don't specify
 -- other ones.  Attribute values can be True, False, or arbitrary
@@ -62,57 +60,72 @@ defaults
    strictness       = { \ arity -> StrictnessInfo (replicate arity wwPrim) False }
    usage            = { nomangle other }
 
--- Currently, documentation is produced using latex, so contents of description fields
--- should be legal latex. Descriptions can contain matched pairs of embedded curly brackets.
+-- Currently, documentation is produced using latex, so contents of
+-- description fields should be legal latex. Descriptions can contain
+-- matched pairs of embedded curly brackets.
 
 #include "MachDeps.h"
 
 section "The word size story."
-	{Haskell98 specifies that signed integers (type {\tt Int}) must contain at least 30 
-	 bits. GHC always implements {\tt Int} using the primitive type {\tt Int\#}, whose
-	 size equals the {\tt MachDeps.h} constant {\tt WORD\_SIZE\_IN\_BITS}.  This
- 	 is normally set based on the {\tt config.h} parameter {\tt SIZEOF\_LONG},
-	 i.e., 32 bits on 32-bit machines, 64 bits on 64-bit machines.  However, it can
-	 also be explicitly set to a smaller number, e.g., 31 bits, to allow the possibility
-	 of using  tag bits. Currently GHC itself has only 32-bit and 64-bit variants,
-	 but 30 or 31-bit code can be exported as an external core file for use in 
-	 other back ends.
+	{Haskell98 specifies that signed integers (type {\tt Int})
+	 must contain at least 30 bits. GHC always implements {\tt
+	 Int} using the primitive type {\tt Int\#}, whose size equals
+	 the {\tt MachDeps.h} constant {\tt WORD\_SIZE\_IN\_BITS}.
+	 This is normally set based on the {\tt config.h} parameter
+	 {\tt SIZEOF\_HSWORD}, i.e., 32 bits on 32-bit machines, 64
+	 bits on 64-bit machines.  However, it can also be explicitly
+	 set to a smaller number, e.g., 31 bits, to allow the
+	 possibility of using tag bits. Currently GHC itself has only
+	 32-bit and 64-bit variants, but 30 or 31-bit code can be
+	 exported as an external core file for use in other back ends.
 
-	 GHC also implements a primitive unsigned integer type {\tt Word\#} which always
-	 has the same number of bits as {\tt Int\#}.
+	 GHC also implements a primitive unsigned integer type {\tt
+	 Word\#} which always has the same number of bits as {\tt
+	 Int\#}.
 	
-	 In addition, GHC supports families of explicit-sized integers and words at
-	 8, 16, 32, and 64 bits, with the usual arithmetic operations, comparisons,
-	 and a range of conversions.  The 8-bit and 16-bit sizes are always represented as
-	 {\tt Int\#} and {\tt Word\#}, and the operations implemented in terms of the
-	 the primops on these types, with suitable range restrictions on the results
-	 (using the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families of primops.
-	 The 32-bit sizes are represented using {\tt Int\#} and {\tt Word\#} when 
-	 {\tt WORD\_SIZE\_IN\_BITS} $\geq$ 32;
-	 otherwise, these are represented using distinct primitive types {\tt Int32\#}
-	 and {\tt Word32\#}. These (when needed) have a complete set of corresponding
-	 operations; however, nearly all of these are implemented as external C functions
-	 rather than as primops.  Exactly the same story applies to the 64-bit sizes.	 
-	 All of these details are hidden under the {\tt PrelInt} and {\tt PrelWord} modules,
-	 which use {\tt \#if}-defs to invoke the appropriate types and operators.
+	 In addition, GHC supports families of explicit-sized integers
+	 and words at 8, 16, 32, and 64 bits, with the usual
+	 arithmetic operations, comparisons, and a range of
+	 conversions.  The 8-bit and 16-bit sizes are always
+	 represented as {\tt Int\#} and {\tt Word\#}, and the
+	 operations implemented in terms of the the primops on these
+	 types, with suitable range restrictions on the results (using
+	 the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families
+	 of primops.  The 32-bit sizes are represented using {\tt
+	 Int\#} and {\tt Word\#} when {\tt WORD\_SIZE\_IN\_BITS}
+	 $\geq$ 32; otherwise, these are represented using distinct
+	 primitive types {\tt Int32\#} and {\tt Word32\#}. These (when
+	 needed) have a complete set of corresponding operations;
+	 however, nearly all of these are implemented as external C
+	 functions rather than as primops.  Exactly the same story
+	 applies to the 64-bit sizes.  All of these details are hidden
+	 under the {\tt PrelInt} and {\tt PrelWord} modules, which use
+	 {\tt \#if}-defs to invoke the appropriate types and
+	 operators.
 
-	 Word size also matters for the families of primops 
-	 for indexing/reading/writing fixed-size quantities at offsets from
-	 an array base, address, or foreign pointer.  Here, a slightly different approach is taken.
-	 The names of these primops are fixed, but their 
-	 {\it types} vary according to the value of {\tt WORD\_SIZE\_IN\_BITS}. For example, if
-	 word size is at least 32 bits then an operator like \texttt{indexInt32Array\#}  
-	 has type {\tt ByteArr\# -> Int\# -> Int\#}; otherwise it has type 
-	 {\tt ByteArr\# -> Int\# -> Int32\#}.  This approach confines the necessary {\tt \#if}-defs to this file;
-	 no conditional compilation is needed in the files that expose these primops, namely \texttt{lib/std/PrelStorable.lhs},
-	 \texttt{hslibs/lang/ArrayBase.hs}, and (in deprecated fashion) in \texttt{hslibs/lang/ForeignObj.lhs}
-	 and \texttt{hslibs/lang/Addr.lhs}.
+	 Word size also matters for the families of primops for
+	 indexing/reading/writing fixed-size quantities at offsets
+	 from an array base, address, or foreign pointer.  Here, a
+	 slightly different approach is taken.  The names of these
+	 primops are fixed, but their {\it types} vary according to
+	 the value of {\tt WORD\_SIZE\_IN\_BITS}. For example, if word
+	 size is at least 32 bits then an operator like
+	 \texttt{indexInt32Array\#} has type {\tt ByteArr\# -> Int\#
+	 -> Int\#}; otherwise it has type {\tt ByteArr\# -> Int\# ->
+	 Int32\#}.  This approach confines the necessary {\tt
+	 \#if}-defs to this file; no conditional compilation is needed
+	 in the files that expose these primops, namely
+	 \texttt{lib/std/PrelStorable.lhs},
+	 \texttt{hslibs/lang/ArrayBase.hs}, and (in deprecated
+	 fashion) in \texttt{hslibs/lang/ForeignObj.lhs} and
+	 \texttt{hslibs/lang/Addr.lhs}.
 
-	 Finally, there are strongly deprecated primops for coercing between {\tt Addr\#}, the primitive
-         type of machine addresses, and {\tt Int\#}.  These are pretty bogus anyway, but will work on
-	 existing 32-bit and 64-bit GHC targets;  they are completely bogus when tag bits are used in
-	 {\tt Int\#}, so are not available in this case.
-}
+	 Finally, there are strongly deprecated primops for coercing
+         between {\tt Addr\#}, the primitive type of machine
+         addresses, and {\tt Int\#}.  These are pretty bogus anyway,
+         but will work on existing 32-bit and 64-bit GHC targets; they
+         are completely bogus when tag bits are used in {\tt Int\#},
+         so are not available in this case.  }
 	
 -- Define synonyms for indexing ops. 
 
