@@ -21,7 +21,8 @@ import HsTypes		( getTyVarName, replaceTyVarName )
 import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
-			  mkLocalName, mkImportedLocalName, mkGlobalName, isSystemName,
+			  mkLocalName, mkImportedLocalName, mkGlobalName,
+			  mkIPName, isSystemName,
 			  nameOccName, setNameModule, nameModule,
 			  pprOccName, isLocallyDefined, nameUnique, nameOccName,
                           occNameUserString,
@@ -57,13 +58,13 @@ import Maybes		( mapMaybe )
 
 \begin{code}
 newImportedGlobalName mod_name occ mod
-  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
+  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
     let
 	key = (mod_name, occ)
     in
     case lookupFM cache key of
 	Just name -> returnRn name
-	Nothing   -> setNameSupplyRn (us', inst_ns, new_cache)	`thenRn_`
+	Nothing   -> setNameSupplyRn (us', inst_ns, new_cache, ipcache)	`thenRn_`
 		     returnRn name
 		  where
 		     (us', us1) = splitUniqSupply us
@@ -73,8 +74,8 @@ newImportedGlobalName mod_name occ mod
 
 updateProvenances :: [Name] -> RnM d ()
 updateProvenances names
-  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
-    setNameSupplyRn (us, inst_ns, update cache names)
+  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
+    setNameSupplyRn (us, inst_ns, update cache names, ipcache)
   where
     update cache [] 	      = cache
     update cache (name:names) = WARN( not (key `elemFM` cache), ppr name )
@@ -110,7 +111,7 @@ newLocalTopBinder :: Module -> OccName
 	       -> RnM d Name
 newLocalTopBinder mod occ rec_exp_fn loc
   = 	-- First check the cache
-    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
+    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
     let 
 	key          = (moduleName mod,occ)
 	mk_prov name = LocalDef loc (rec_exp_fn name)
@@ -134,7 +135,7 @@ newLocalTopBinder mod occ rec_exp_fn loc
 			new_name = setNameProvenance name (mk_prov new_name)
 			new_cache = addToFM cache key new_name
 		     in
-		     setNameSupplyRn (us, inst_ns, new_cache)		`thenRn_`
+		     setNameSupplyRn (us, inst_ns, new_cache, ipcache)	`thenRn_`
 		     returnRn new_name
 		     
 	-- Miss in the cache!
@@ -145,8 +146,21 @@ newLocalTopBinder mod occ rec_exp_fn loc
 			new_name   = mkGlobalName uniq mod occ (mk_prov new_name)
 			new_cache  = addToFM cache key new_name
 		   in
-		   setNameSupplyRn (us', inst_ns, new_cache)		`thenRn_`
+		   setNameSupplyRn (us', inst_ns, new_cache, ipcache)	`thenRn_`
 		   returnRn new_name
+
+getIPName rdr_name
+  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
+    case lookupFM ipcache key of
+	Just name -> returnRn name
+	Nothing   -> setNameSupplyRn (us', inst_ns, cache, new_ipcache)	`thenRn_`
+		     returnRn name
+		  where
+		     (us', us1)  = splitUniqSupply us
+		     uniq   	 = uniqFromSupply us1
+		     name        = mkIPName uniq key
+		     new_ipcache = addToFM ipcache key name
+    where key = (rdrNameOcc rdr_name)
 \end{code}
 
 %*********************************************************
@@ -214,7 +228,7 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 	returnRn ()
     )					`thenRn_`
 	
-    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
+    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
     getModeRn 			`thenRn` \ mode ->
     let
 	n	   = length rdr_names_w_loc
@@ -229,7 +243,7 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 		     -- Keep track of whether the name originally came from 
 		     -- an interface file.
     in
-    setNameSupplyRn (us', inst_ns, cache)	`thenRn_`
+    setNameSupplyRn (us', inst_ns, cache, ipcache)	`thenRn_`
 
     let
 	new_name_env = addListToRdrEnv name_env (map fst rdr_names_w_loc `zip` names)
@@ -254,13 +268,13 @@ bindCoreLocalFVRn :: RdrName -> (Name -> RnMS (a, FreeVars))
 bindCoreLocalFVRn rdr_name enclosed_scope
   = getSrcLocRn 		`thenRn` \ loc ->
     getLocalNameEnv		`thenRn` \ name_env ->
-    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
+    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
     let
 	(us', us1) = splitUniqSupply us
 	uniq	   = uniqFromSupply us1
 	name	   = mkImportedLocalName uniq (rdrNameOcc rdr_name) loc
     in
-    setNameSupplyRn (us', inst_ns, cache)	`thenRn_`
+    setNameSupplyRn (us', inst_ns, cache, ipcache)	`thenRn_`
     let
 	new_name_env = extendRdrEnv name_env rdr_name name
     in

@@ -23,7 +23,8 @@ import TcClassDcl	( tcMethodBind, checkFromThisClass )
 import TcMonad
 import RnMonad		( RnNameSupply, Fixities )
 import Inst		( Inst, InstOrigin(..),
-			  newDicts, LIE, emptyLIE, plusLIE, plusLIEs )
+			  newDicts, newClassDicts,
+			  LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
 import TcEnv		( ValueEnv, tcExtendGlobalValEnv, tcExtendTyVarEnvForMeths,
 			  tcAddImportedIdInfo, tcInstId
@@ -51,11 +52,12 @@ import SrcLoc		( SrcLoc )
 import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
 import Type		( Type, isUnLiftedType, mkTyVarTys,
 			  splitSigmaTy, isTyVarTy,
-			  splitTyConApp_maybe, splitDictTy_maybe, unUsgTy,
-			  splitAlgTyConApp_maybe,
-			  tyVarsOfTypes
+			  splitTyConApp_maybe, splitDictTy_maybe,
+			  getClassTys_maybe, splitAlgTyConApp_maybe,
+			  classesToPreds, classesOfPreds,
+			  unUsgTy, tyVarsOfTypes
 			)
-import Subst		( mkTopTyVarSubst, substTheta )
+import Subst		( mkTopTyVarSubst, substClasses )
 import VarSet		( mkVarSet, varSetElems )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy )
@@ -175,9 +177,10 @@ tcInstDecl1 unf_env (InstDecl poly_ty binds uprags dfun_name src_loc)
     tcHsTopType poly_ty			`thenTc` \ poly_ty' ->
     let
 	(tyvars, theta, dict_ty) = splitSigmaTy poly_ty'
-	(clas, inst_tys)         = case splitDictTy_maybe dict_ty of
-				     Nothing   -> pprPanic "tcInstDecl1" (ppr poly_ty)
-				     Just pair -> pair
+	constr			 = classesOfPreds theta
+	(clas, inst_tys)	 = case splitDictTy_maybe dict_ty of
+				     Just ct -> ct
+				     Nothing -> pprPanic "tcInstDecl1" (ppr poly_ty)
     in
 
 	-- Check for respectable instance type, and context
@@ -187,19 +190,19 @@ tcInstDecl1 unf_env (InstDecl poly_ty binds uprags dfun_name src_loc)
 	--	instance CCallable [Char] 
     (if isLocallyDefined dfun_name then
 	scrutiniseInstanceHead clas inst_tys	`thenNF_Tc_`
-	mapNF_Tc scrutiniseInstanceConstraint theta
+	mapNF_Tc scrutiniseInstanceConstraint constr
      else
 	returnNF_Tc []
      )						`thenNF_Tc_`
 
 	-- Make the dfun id
     let
-	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
+	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys constr
 
 	-- Add info from interface file
 	final_dfun_id = tcAddImportedIdInfo unf_env dfun_id
     in
-    returnTc (unitBag (InstInfo clas tyvars inst_tys theta	
+    returnTc (unitBag (InstInfo clas tyvars inst_tys constr
 				final_dfun_id
 			     	binds src_loc uprags))
 \end{code}
@@ -329,17 +332,17 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 	dm_ids = [dm_id | (_, dm_id, _) <- op_items]
 
 	-- Instantiate the theta found in the original instance decl
-	inst_decl_theta' = substTheta (mkTopTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars'))
-				      inst_decl_theta
+	inst_decl_theta' = substClasses (mkTopTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars'))
+				        inst_decl_theta
 
          -- Instantiate the super-class context with inst_tys
-	sc_theta' = substTheta (mkTopTyVarSubst class_tyvars inst_tys') sc_theta
+	sc_theta' = substClasses (mkTopTyVarSubst class_tyvars inst_tys') sc_theta
     in
 	 -- Create dictionary Ids from the specified instance contexts.
-    newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
+    newClassDicts origin sc_theta'	`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
     newDicts origin dfun_theta'		`thenNF_Tc` \ (dfun_arg_dicts,  dfun_arg_dicts_ids)  ->
-    newDicts origin inst_decl_theta'	`thenNF_Tc` \ (inst_decl_dicts, _) ->
-    newDicts origin [(clas,inst_tys')]	`thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
+    newClassDicts origin inst_decl_theta' `thenNF_Tc` \ (inst_decl_dicts, _) ->
+    newClassDicts origin [(clas,inst_tys')] `thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
 
 	 -- Check that all the method bindings come from this class
     checkFromThisClass clas op_items monobinds		`thenNF_Tc_`
@@ -348,8 +351,9 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
  	tcExtendGlobalValEnv dm_ids (
 		-- Default-method Ids may be mentioned in synthesised RHSs 
 
-	mapAndUnzip3Tc (tcMethodBind clas origin inst_tyvars' inst_tys' inst_decl_theta'
-				     monobinds uprags True) 
+	mapAndUnzip3Tc (tcMethodBind clas origin inst_tyvars' inst_tys'
+				     (classesToPreds inst_decl_theta')
+				     monobinds uprags True)
 		       op_items
     ))		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 

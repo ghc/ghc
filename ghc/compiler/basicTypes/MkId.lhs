@@ -41,8 +41,8 @@ import TysWiredIn	( boolTy, charTy, mkListTy )
 import PrelMods		( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
-import Type		( Type, ThetaType,
-			  mkDictTy, mkTyConApp, mkTyVarTys, mkFunTys, mkFunTy, mkSigmaTy,
+import Type		( Type, ClassContext, mkDictTy, mkTyConApp, mkTyVarTys,
+			  mkFunTys, mkFunTy, mkSigmaTy, classesToPreds,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfTypes,
 			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp,
 			  splitFunTys, splitForAllTys, unUsgTy,
@@ -50,7 +50,7 @@ import Type		( Type, ThetaType,
 			)
 import Module		( Module )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
-import Subst		( mkTopTyVarSubst, substTheta )
+import Subst		( mkTopTyVarSubst, substClasses )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isDataTyCon )
 import Class		( Class, classBigSig, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
@@ -156,7 +156,7 @@ mkDataConId data_con
   where
     (tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon) = dataConSig data_con
     id_ty = mkSigmaTy (tyvars ++ ex_tyvars) 
-	              (theta ++ ex_theta)
+	              (classesToPreds (theta ++ ex_theta))
 	              (mkFunTys arg_tys (mkTyConApp tycon (mkTyVarTys tyvars)))
 \end{code}
 
@@ -460,16 +460,16 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Class 
 	    -> [TyVar]
 	    -> [Type]
-	    -> ThetaType
+	    -> ClassContext
 	    -> Id
 
 mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
   = mkVanillaId dfun_name dfun_ty
   where
     (class_tyvars, sc_theta, _, _) = classBigSig clas
-    sc_theta' = substTheta (mkTopTyVarSubst class_tyvars inst_tys) sc_theta
+    sc_theta' = substClasses (mkTopTyVarSubst class_tyvars inst_tys) sc_theta
 
-    dfun_theta = inst_decl_theta
+    dfun_theta = classesToPreds inst_decl_theta
 
 {-  1 dec 99: disable the Mark Jones optimisation for the sake
     of compatibility with Hugs.

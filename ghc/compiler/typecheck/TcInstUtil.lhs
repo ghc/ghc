@@ -27,7 +27,7 @@ import InstEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, nameModule, isLocallyDefined )
 import SrcLoc		( SrcLoc )
-import Type		( ThetaType, Type )
+import Type		( ThetaType, Type, ClassContext )
 import PprType		( pprConstraint )
 import Class		( classTyCon )
 import DataCon		( DataCon )
@@ -45,7 +45,7 @@ data InstInfo
       Class	        -- Class, k
       [TyVar]		-- Type variables, tvs
       [Type]		-- The types at which the class is being instantiated
-      ThetaType		-- inst_decl_theta: the original context, c, from the
+      ClassContext	-- inst_decl_theta: the original context, c, from the
 			--   instance declaration.  It constrains (some of)
 			--   the TyVars above
       Id		-- The dfun id

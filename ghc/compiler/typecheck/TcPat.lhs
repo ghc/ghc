@@ -17,7 +17,7 @@ import TcHsSyn		( TcPat, TcId )
 import TcMonad
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			  emptyLIE, plusLIE, LIE,
-			  newMethod, newOverloadedLit, newDicts
+			  newMethod, newOverloadedLit, newDicts, newClassDicts
 			)
 import Name		( Name, getOccName, getSrcLoc )
 import FieldLabel	( fieldLabelName )
@@ -36,8 +36,8 @@ import DataCon		( DataCon, dataConSig, dataConFieldLabels,
 			  dataConSourceArity
 			)
 import Id		( Id, idType, isDataConId_maybe )
-import Type		( Type, isTauTy, mkTyConApp, boxedTypeKind )
-import Subst		( substTy, substTheta )
+import Type		( Type, isTauTy, mkTyConApp, mkClassPred, boxedTypeKind )
+import Subst		( substTy, substClasses )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
@@ -290,7 +290,7 @@ tcPat tc_bndr (LitPatIn lit@(HsLitLit s))     pat_ty
 	-- cf tcExpr on LitLits
   = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
     newDicts (LitLitOrigin (_UNPK_ s))
-	     [(cCallableClass, [pat_ty])]		`thenNF_Tc` \ (dicts, _) ->
+	     [mkClassPred cCallableClass [pat_ty]]	`thenNF_Tc` \ (dicts, _) ->
     returnTc (LitPat lit pat_ty, dicts, emptyBag, emptyBag, emptyLIE)
 \end{code}
 
@@ -407,14 +407,14 @@ tcConstructor pat con_name pat_ty
     in
     tcInstTyVars (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
     let
-	ex_theta' = substTheta tenv ex_theta
+	ex_theta' = substClasses tenv ex_theta
 	arg_tys'  = map (substTy tenv) arg_tys
 
 	n_ex_tvs  = length ex_tvs
 	ex_tvs'   = take n_ex_tvs all_tvs'
 	result_ty = mkTyConApp tycon (drop n_ex_tvs ty_args')
     in
-    newDicts (PatOrigin pat) ex_theta'	`thenNF_Tc` \ (lie_avail, dicts) ->
+    newClassDicts (PatOrigin pat) ex_theta'	`thenNF_Tc` \ (lie_avail, dicts) ->
 
 	-- Check overall type matches
     unifyTauTy pat_ty result_ty		`thenTc_`

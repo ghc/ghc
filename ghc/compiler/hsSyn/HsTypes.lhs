@@ -6,13 +6,13 @@
 \begin{code}
 module HsTypes (
 	HsType(..), MonoUsageAnn(..), HsTyVar(..),
-	Context, ClassAssertion
+	HsContext, HsClassAssertion, HsPred(..)
 
 	, mkHsForAllTy, mkHsUsForAllTy
 	, getTyVarName, replaceTyVarName
 	, pprParendHsType
-	, pprForAll, pprContext, pprClassAssertion
-	, cmpHsType, cmpHsTypes, cmpContext
+	, pprForAll, pprHsContext, pprHsClassAssertion, pprHsPred
+	, cmpHsType, cmpHsTypes, cmpHsContext, cmpHsPred
     ) where
 
 #include "HsVersions.h"
@@ -26,15 +26,17 @@ import Util		( thenCmp, cmpList )
 This is the syntax for types as seen in type signatures.
 
 \begin{code}
-type Context name = [ClassAssertion name]
-
-type ClassAssertion name = (name, [HsType name])
-	-- The type is usually a type variable, but it
-	-- doesn't have to be when reading interface files
+type HsContext name = [HsPred name]
+type HsClassAssertion name = (name, [HsType name])
+-- The type is usually a type variable, but it
+-- doesn't have to be when reading interface files
+data HsPred name =
+    HsPClass name [HsType name]
+  | HsPIParam name (HsType name)
 
 data HsType name
   = HsForAllTy		(Maybe [HsTyVar name])	-- Nothing for implicitly quantified signatures
-			(Context name)
+			(HsContext name)
 			(HsType name)
 
   | MonoTyVar		name		-- Type variable
@@ -121,13 +123,19 @@ instance (Outputable name) => Outputable (HsTyVar name) where
 -- pprForAll []  = empty
 pprForAll tvs = ptext SLIT("forall") <+> interppSP tvs <> ptext SLIT(".")
 
-pprContext :: (Outputable name) => Context name -> SDoc
-pprContext []	   = empty
-pprContext context = parens (hsep (punctuate comma (map pprClassAssertion context))) <+> ptext SLIT("=>")
+pprHsContext :: (Outputable name) => HsContext name -> SDoc
+pprHsContext []	   = empty
+pprHsContext context = parens (hsep (punctuate comma (map pprHsPred context))) <+> ptext SLIT("=>")
 
-pprClassAssertion :: (Outputable name) => ClassAssertion name -> SDoc
-pprClassAssertion (clas, tys) 
+pprHsClassAssertion :: (Outputable name) => HsClassAssertion name -> SDoc
+pprHsClassAssertion (clas, tys)
   = ppr clas <+> hsep (map pprParendHsType tys)
+
+pprHsPred :: (Outputable name) => HsPred name -> SDoc
+pprHsPred (HsPClass clas tys)
+  = ppr clas <+> hsep (map pprParendHsType tys)
+pprHsPred (HsPIParam n ty)
+  = hsep [char '?' <> ppr n, text "::", ppr ty]
 \end{code}
 
 \begin{code}
@@ -148,7 +156,7 @@ pprParendHsType ty = ppr_mono_ty pREC_CON ty
 
 ppr_mono_ty ctxt_prec (HsForAllTy maybe_tvs ctxt ty)
   = maybeParen (ctxt_prec >= pREC_FUN) $
-    sep [pp_tvs, pprContext ctxt, pprHsType ty]
+    sep [pp_tvs, pprHsContext ctxt, pprHsType ty]
   where
     pp_tvs = case maybe_tvs of
 		Just tvs -> pprForAll tvs
@@ -213,16 +221,16 @@ in checking interfaces.  Most any other use is likely to be {\em
 wrong}, so be careful!
 
 \begin{code}
-cmpHsTyVar  :: (a -> a -> Ordering) -> HsTyVar a  -> HsTyVar a  -> Ordering
-cmpHsType   :: (a -> a -> Ordering) -> HsType a   -> HsType a   -> Ordering
-cmpHsTypes  :: (a -> a -> Ordering) -> [HsType a] -> [HsType a] -> Ordering
-cmpContext  :: (a -> a -> Ordering) -> Context  a -> Context  a -> Ordering
+cmpHsTyVar   :: (a -> a -> Ordering) -> HsTyVar a   -> HsTyVar a   -> Ordering
+cmpHsType    :: (a -> a -> Ordering) -> HsType a    -> HsType a    -> Ordering
+cmpHsTypes   :: (a -> a -> Ordering) -> [HsType a]  -> [HsType a]  -> Ordering
+cmpHsContext :: (a -> a -> Ordering) -> HsContext a -> HsContext a -> Ordering
+cmpHsPred    :: (a -> a -> Ordering) -> HsPred a    -> HsPred a    -> Ordering
 
 cmpHsTyVar cmp (UserTyVar v1)    (UserTyVar v2)    = v1 `cmp` v2
 cmpHsTyVar cmp (IfaceTyVar v1 _) (IfaceTyVar v2 _) = v1 `cmp` v2
 cmpHsTyVar cmp (UserTyVar _)	 other		   = LT
 cmpHsTyVar cmp other1	 	 other2		   = GT
-
 
 cmpHsTypes cmp [] []   = EQ
 cmpHsTypes cmp [] tys2 = LT
@@ -231,7 +239,7 @@ cmpHsTypes cmp (ty1:tys1) (ty2:tys2) = cmpHsType cmp ty1 ty2 `thenCmp` cmpHsType
 
 cmpHsType cmp (HsForAllTy tvs1 c1 t1) (HsForAllTy tvs2 c2 t2)
   = cmpMaybe (cmpList (cmpHsTyVar cmp)) tvs1 tvs2	`thenCmp`
-    cmpContext cmp c1 c2    				`thenCmp`
+    cmpHsContext cmp c1 c2    				`thenCmp`
     cmpHsType cmp t1 t2
 
 cmpHsType cmp (MonoTyVar n1) (MonoTyVar n2)
@@ -272,11 +280,15 @@ cmpHsType cmp ty1 ty2 -- tags must be different
     tag (HsForAllTy _ _ _)		= ILIT(9)
 
 -------------------
-cmpContext cmp a b
-  = cmpList cmp_ctxt a b
-  where
-    cmp_ctxt (c1, tys1) (c2, tys2)
-      = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
+cmpHsContext cmp a b
+  = cmpList (cmpHsPred cmp) a b
+
+cmpHsPred cmp (HsPClass c1 tys1) (HsPClass c2 tys2)
+  = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
+cmpHsPred cmp (HsPIParam n1 ty1) (HsPIParam n2 ty2)
+  = cmp n1 n2 `thenCmp` cmpHsType cmp ty1 ty2
+cmpHsPred cmp (HsPClass _ _) (HsPIParam _ _) = LT
+cmpHsPred cmp _              _               = GT
 
 cmpUsg cmp  MonoUsOnce     MonoUsOnce    = EQ
 cmpUsg cmp  MonoUsMany     MonoUsMany    = EQ

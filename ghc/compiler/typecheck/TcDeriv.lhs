@@ -49,7 +49,7 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			)
 import Type		( TauType, mkTyVarTys, mkTyConApp,
 			  mkSigmaTy, mkDictTy, isUnboxedType,
-			  splitAlgTyConApp
+			  splitAlgTyConApp, classesToPreds
 			)
 import TysWiredIn	( voidTy )
 import Var		( TyVar )
@@ -254,9 +254,10 @@ tcDeriving modname fixs rn_name_supply inst_decl_infos_in
       = vcat (map pp_info inst_infos) $$ ppr extra_binds
       where
 	pp_info (InstInfo clas tvs [ty] inst_decl_theta _ mbinds _ _)
-	  = ppr (mkSigmaTy tvs inst_decl_theta (mkDictTy clas [ty]))
+	  = ppr (mkSigmaTy tvs inst_decl_theta' (mkDictTy clas [ty]))
 	    $$
 	    ppr mbinds
+	    where inst_decl_theta' = classesToPreds inst_decl_theta
 \end{code}
 
 
@@ -471,7 +472,8 @@ add_solns inst_infos_in eqns solns
 	  = mkVanillaId (getName tycon) dummy_dfun_ty
 		-- The name is getSrcLoc'd in an error message 
 
-	dummy_dfun_ty = mkSigmaTy tyvars theta voidTy
+	theta' = classesToPreds theta
+	dummy_dfun_ty = mkSigmaTy tyvars theta' voidTy
 		-- All we need from the dfun is its "theta" part, used during
 		-- equation simplification (tcSimplifyThetas).  The final
 		-- dfun_id will have the superclass dictionaries as arguments too,

@@ -26,10 +26,10 @@ import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
 
 import CmdLineOpts	( opt_DictsStrict )
 import TysPrim
-import Type		( Type, ThetaType, TauType,
+import Type		( Type, ThetaType, TauType, ClassContext,
 			  mkSigmaTy, mkFunTys, mkTyConApp, 
 			  mkTyVarTys, mkDictTy,
-			  splitAlgTyConApp_maybe
+			  splitAlgTyConApp_maybe, classesToPreds
 			)
 import PprType
 import TyCon		( TyCon, tyConDataCons, isDataTyCon, isProductTyCon,
@@ -84,10 +84,10 @@ data DataCon
 	--	dcTyCon    = T
 
 	dcTyVars :: [TyVar], 		-- Type vars and context for the data type decl
-	dcTheta  ::  ThetaType,
+	dcTheta  ::  ClassContext,
 
 	dcExTyVars :: [TyVar], 		-- Ditto for the context of the constructor, 
-	dcExTheta  :: ThetaType,	-- the existentially quantified stuff
+	dcExTheta  :: ClassContext,	-- the existentially quantified stuff
 					
 	dcOrigArgTys :: [Type],		-- Original argument types
 					-- (before unboxing and flattening of
@@ -204,8 +204,8 @@ instance Show DataCon where
 \begin{code}
 mkDataCon :: Name
 	  -> [StrictnessMark] -> [FieldLabel]
-	  -> [TyVar] -> ThetaType
-	  -> [TyVar] -> ThetaType
+	  -> [TyVar] -> ClassContext
+	  -> [TyVar] -> ClassContext
 	  -> [TauType] -> TyCon
 	  -> Id
 	  -> DataCon
@@ -238,7 +238,7 @@ mkDataCon name arg_stricts fields tyvars theta ex_tyvars ex_theta orig_arg_tys t
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
     ty  = mkSigmaTy (tyvars ++ ex_tyvars) 
-	            ex_theta
+	            (classesToPreds ex_theta)
 	            (mkFunTys rep_arg_tys 
 			(mkTyConApp tycon (mkTyVarTys tyvars)))
 
@@ -246,7 +246,7 @@ mk_dict_strict_mark (clas,tys)
   | opt_DictsStrict &&
 	-- Don't mark newtype things as strict!
     isDataTyCon (classTyCon clas) = MarkedStrict
-  | otherwise		          = NotMarkedStrict
+  | otherwise			  = NotMarkedStrict
 \end{code}
 
 \begin{code}
@@ -287,8 +287,8 @@ dataConRepStrictness dc
     go (NotMarkedStrict     : ss) = wwLazy   : go ss
     go (MarkedUnboxed con _ : ss) = go (dcRealStricts con ++ ss)
 
-dataConSig :: DataCon -> ([TyVar], ThetaType, 
-			  [TyVar], ThetaType, 
+dataConSig :: DataCon -> ([TyVar], ClassContext,
+			  [TyVar], ClassContext,
 			  [TauType], TyCon)
 
 dataConSig (MkData {dcTyVars = tyvars, dcTheta = theta,

@@ -131,28 +131,28 @@ import TcHsSyn		( TcExpr, TcId,
 
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
-			  tyVarsOfInst, 
+			  tyVarsOfInst, tyVarsOfInsts,
 			  isDict, isStdClassTyVarDict, isMethodFor, notFunDep,
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld,
-			  getDictClassTys,
+			  getDictClassTys, getIPs,
 			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
-			  Inst, LIE, pprInsts, pprInstsInFull, mkLIE, emptyLIE, 
-			  plusLIE
+			  Inst, LIE, pprInsts, pprInstsInFull,
+			  mkLIE, emptyLIE, plusLIE, lieToList
 			)
 import TcEnv		( tcGetGlobalTyVars )
 import TcType		( TcType, TcTyVarSet, typeToTcType )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
-import Bag		( bagToList )
 import Class		( Class, classBigSig, classInstEnv )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
-import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
+import Type		( Type, ThetaType, TauType, ClassContext,
+			  mkTyVarTy, getTyVar,
 			  isTyVarTy, splitSigmaTy, tyVarsOfTypes
 			)
 import InstEnv		( InstEnv )
-import Subst		( mkTopTyVarSubst, substTheta )
+import Subst		( mkTopTyVarSubst, substClasses )
 import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
 import VarSet
@@ -181,7 +181,6 @@ float them out if poss, after inlinings are sorted out.
 \begin{code}
 tcSimplify
 	:: SDoc 
-	-> TopLevelFlag
 	-> TcTyVarSet			-- ``Local''  type variables
 					-- ASSERT: this tyvar set is already zonked
 	-> LIE				-- Wanted
@@ -189,11 +188,13 @@ tcSimplify
 		  TcDictBinds,		-- Bindings
 		  LIE)			-- Remaining wanteds; no dups
 
-tcSimplify str top_lvl local_tvs wanted_lie
+tcSimplify str local_tvs wanted_lie
+{-
   | isEmptyVarSet local_tvs
   = returnTc (wanted_lie, EmptyMonoBinds, emptyLIE)
 
   | otherwise
+-}
   = reduceContext str try_me [] wanteds		`thenTc` \ (binds, frees, irreds) ->
 
 	-- Check for non-generalisable insts
@@ -219,6 +220,8 @@ tcSimplify str top_lvl local_tvs wanted_lie
 	(irreds', bad_guys) = partition (isEmptyVarSet . ambig_tv_fn) irreds
 	ambig_tv_fn dict    = tyVarsOfInst dict `minusVarSet` avail_tvs
     in
+    -- pprTrace "tcS" (ppr (frees, irreds')) $
+    -- pprTrace "tcS bad" (ppr bad_guys) $
     addAmbigErrs ambig_tv_fn bad_guys	`thenNF_Tc_`
 
 
@@ -235,11 +238,12 @@ tcSimplify str top_lvl local_tvs wanted_lie
     -- dependencies as hidden constraints (i.e. they'd only
     -- show up in interface files) -- or maybe they'd be useful
     -- as first class predicates...
-    wanteds = filter notFunDep (bagToList wanted_lie)
+    wanteds = filter notFunDep (lieToList wanted_lie)
 
     try_me inst 
       -- Does not constrain a local tyvar
       | isEmptyVarSet (tyVarsOfInst inst `intersectVarSet` local_tvs)
+        && null (getIPs inst)
       = -- if is_top_level then
 	--   FreeIfTautological		  -- Special case for inference on 
 	--				  -- top-level defns
@@ -281,9 +285,9 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
 	-- Done
     returnTc (mkLIE frees, binds)
   where
-    givens  = bagToList given_lie
+    givens  = lieToList given_lie
     -- see comment on wanteds in tcSimplify
-    wanteds = filter notFunDep (bagToList wanted_lie)
+    wanteds = filter notFunDep (lieToList wanted_lie)
     given_dicts = filter isDict givens
 
     try_me inst 
@@ -329,7 +333,7 @@ tcSimplifyToDicts wanted_lie
     returnTc (mkLIE irreds, binds)
   where
     -- see comment on wanteds in tcSimplify
-    wanteds = filter notFunDep (bagToList wanted_lie)
+    wanteds = filter notFunDep (lieToList wanted_lie)
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
     try_me inst	| isDict inst = DontReduce
@@ -428,10 +432,10 @@ data RHS
 			-- Invariant: these Insts are already in the finite mapping
 
 
-pprAvails avails = vcat (map pp (eltsFM avails))
-  where
-    pp (Avail main_id rhs ids)
-      = ppr main_id <> colon <+> brackets (ppr ids) <+> pprRhs rhs
+pprAvails avails = vcat (map pprAvail (eltsFM avails))
+    
+pprAvail (Avail main_id rhs ids)
+  = ppr main_id <> colon <+> brackets (ppr ids) <+> pprRhs rhs
 
 pprRhs NoRhs = text "<no rhs>"
 pprRhs (Rhs rhs b) = ppr rhs
@@ -703,7 +707,10 @@ addGiven avails given
 	 -- This assertion isn't necessarily true.  It's permitted
 	 -- to given a redundant context in a type signature (eg (Ord a, Eq a) => ...)
 	 -- and when typechecking instance decls we generate redundant "givens" too.
-    addAvail avails given avail
+    -- addAvail avails given avail
+    addAvail avails given avail `thenNF_Tc` \av ->
+    zonkInst given `thenNF_Tc` \given' ->
+    returnNF_Tc av	
   where
     avail = Avail (instToId given) NoRhs []
 
@@ -724,7 +731,7 @@ addSuperClasses avails dict
     (clas, tys) = getDictClassTys dict
     
     (tyvars, sc_theta, sc_sels, _) = classBigSig clas
-    sc_theta' = substTheta (mkTopTyVarSubst tyvars tys) sc_theta
+    sc_theta' = substClasses (mkTopTyVarSubst tyvars tys) sc_theta
 
     add_sc avails ((super_clas, super_tys), sc_sel)
       = newDictFromOld dict super_clas super_tys	`thenNF_Tc` \ super_dict ->
@@ -775,8 +782,8 @@ instance declarations.
 
 \begin{code}
 tcSimplifyThetas :: (Class -> InstEnv)		-- How to find the InstEnv
-	       	 -> ThetaType			-- Wanted
-	       	 -> TcM s ThetaType		-- Needed
+	       	 -> ClassContext		-- Wanted
+	       	 -> TcM s ClassContext		-- Needed
 
 tcSimplifyThetas inst_mapper wanteds
   = reduceSimple inst_mapper [] wanteds		`thenNF_Tc` \ irreds ->
@@ -803,8 +810,8 @@ used with \tr{default} declarations.  We are only interested in
 whether it worked or not.
 
 \begin{code}
-tcSimplifyCheckThetas :: ThetaType	-- Given
-		      -> ThetaType	-- Wanted
+tcSimplifyCheckThetas :: ClassContext	-- Given
+		      -> ClassContext	-- Wanted
 		      -> TcM s ()
 
 tcSimplifyCheckThetas givens wanteds
@@ -818,14 +825,14 @@ tcSimplifyCheckThetas givens wanteds
 
 
 \begin{code}
-type AvailsSimple = FiniteMap (Class, [TauType]) Bool
+type AvailsSimple = FiniteMap (Class,[Type]) Bool
 		    -- True  => irreducible 
 		    -- False => given, or can be derived from a given or from an irreducible
 
 reduceSimple :: (Class -> InstEnv) 
-	     -> ThetaType		-- Given
-	     -> ThetaType		-- Wanted
-	     -> NF_TcM s ThetaType	-- Irreducible
+	     -> ClassContext			-- Given
+	     -> ClassContext			-- Wanted
+	     -> NF_TcM s ClassContext		-- Irreducible
 
 reduceSimple inst_mapper givens wanteds
   = reduce_simple (0,[]) inst_mapper givens_fm wanteds	`thenNF_Tc` \ givens_fm' ->
@@ -833,10 +840,10 @@ reduceSimple inst_mapper givens wanteds
   where
     givens_fm     = foldl addNonIrred emptyFM givens
 
-reduce_simple :: (Int,ThetaType)		-- Stack
+reduce_simple :: (Int,ClassContext)		-- Stack
 	      -> (Class -> InstEnv) 
 	      -> AvailsSimple
-	      -> ThetaType
+	      -> ClassContext
 	      -> NF_TcM s AvailsSimple
 
 reduce_simple (n,stack) inst_mapper avails wanteds
@@ -857,29 +864,30 @@ reduce_simple_help stack inst_mapper givens wanted@(clas,tys)
       Nothing ->    returnNF_Tc (addIrred givens wanted)
       Just theta -> reduce_simple stack inst_mapper (addNonIrred givens wanted) theta
 
-addIrred :: AvailsSimple -> (Class, [TauType]) -> AvailsSimple
-addIrred givens ct
+addIrred :: AvailsSimple -> (Class,[Type]) -> AvailsSimple
+addIrred givens ct@(clas,tys)
   = addSCs (addToFM givens ct True) ct
 
-addNonIrred :: AvailsSimple -> (Class, [TauType]) -> AvailsSimple
-addNonIrred givens ct
+addNonIrred :: AvailsSimple -> (Class,[Type]) -> AvailsSimple
+addNonIrred givens ct@(clas,tys)
   = addSCs (addToFM givens ct False) ct
 
 addSCs givens ct@(clas,tys)
  = foldl add givens sc_theta
  where
    (tyvars, sc_theta_tmpl, _, _) = classBigSig clas
-   sc_theta = substTheta (mkTopTyVarSubst tyvars tys) sc_theta_tmpl
+   sc_theta = substClasses (mkTopTyVarSubst tyvars tys) sc_theta_tmpl
 
-   add givens ct = case lookupFM givens ct of
-			   Nothing    -> -- Add it and its superclasses
-					 addSCs (addToFM givens ct False) ct
+   add givens ct@(clas, tys)
+     = case lookupFM givens ct of
+       Nothing    -> -- Add it and its superclasses
+		     addSCs (addToFM givens ct False) ct
 
-			   Just True  -> -- Set its flag to False; superclasses already done
-				         addToFM givens ct False
+       Just True  -> -- Set its flag to False; superclasses already done
+		     addToFM givens ct False
 
-			   Just False -> -- Already done
-				         givens
+       Just False -> -- Already done
+		     givens
 			   
 \end{code}
 
@@ -933,7 +941,7 @@ bindInstsOfLocalFuns init_lie local_ids
 	-- No sense in repeatedly zonking lots of 
 	-- constant constraints so filter them out here
     (lie_for_here, lie_not_for_here) = partition (isMethodFor overloaded_set)
-					 	 (bagToList init_lie)
+					 	 (lieToList init_lie)
     try_me inst | isMethodFor overloaded_set inst = ReduceMe AddToIrreds
 		| otherwise		          = Free
 \end{code}
@@ -1014,12 +1022,13 @@ tcSimplifyTop wanted_lie
     returnTc (binds1 `andMonoBinds` andMonoBindList binds_ambig)
   where
     -- see comment on wanteds in tcSimplify
-    wanteds	= filter notFunDep (bagToList wanted_lie)
+    wanteds	= filter notFunDep (lieToList wanted_lie)
     try_me inst	= ReduceMe AddToIrreds
 
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
-    complain d | isEmptyVarSet (tyVarsOfInst d) = addTopInstanceErr d
+    complain d | not (null (getIPs d))		= addTopIPErr d
+	       | isEmptyVarSet (tyVarsOfInst d) = addTopInstanceErr d
 	       | otherwise			= addAmbigErr tyVarsOfInst d
 
 get_tv d   = case getDictClassTys d of
@@ -1184,6 +1193,13 @@ addRuleLhsErr dict
   where
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
+addTopIPErr dict
+  = addInstErrTcM (instLoc dict) 
+	(tidy_env, 
+	 ptext SLIT("Unbound implicit parameter") <+> quotes (pprInst tidy_dict))
+  where
+    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
+
 -- Used for top-level irreducibles
 addTopInstanceErr dict
   = addInstErrTcM (instLoc dict) 
@@ -1201,7 +1217,7 @@ addNoInstanceErr str givens dict
 	 ptext SLIT("Probable cause:") <+> 
 	      vcat [sep [ptext SLIT("missing") <+> quotes (pprInst tidy_dict),
 		    ptext SLIT("in") <+> str],
-		    if all_tyvars then empty else
+		    if isDict dict && all_tyvars then empty else
 		    ptext SLIT("or missing instance declaration for") <+> quotes (pprInst tidy_dict)]
     )
   where

@@ -35,6 +35,7 @@ import SrcLoc		( SrcLoc )
 \begin{code}
 data HsExpr id pat
   = HsVar	id				-- variable
+  | HsIPVar	id				-- implicit parameter
   | HsLit	HsLit				-- literal
   | HsLitOut	HsLit				-- TRANSLATION
 		Type		-- (with its type)
@@ -78,6 +79,9 @@ data HsExpr id pat
 
   | HsLet	(HsBinds id pat)	-- let(rec)
 		(HsExpr  id pat)
+
+  | HsWith	(HsExpr id pat)	-- implicit parameter binding
+  		[(id, HsExpr id pat)]
 
   | HsDo	StmtCtxt
 		[Stmt id pat]	-- "do":one or more stmts
@@ -209,6 +213,7 @@ pprExpr e = pprDeeper (ppr_expr e)
 pprBinds b = pprDeeper (ppr b)
 
 ppr_expr (HsVar v) = ppr v
+ppr_expr (HsIPVar v) = char '?' <> ppr v
 
 ppr_expr (HsLit    lit)   = ppr lit
 ppr_expr (HsLitOut lit _) = ppr lit
@@ -291,6 +296,9 @@ ppr_expr (HsLet binds expr@(HsLet _ _))
 ppr_expr (HsLet binds expr)
   = sep [hang (ptext SLIT("let")) 2 (pprBinds binds),
 	 hang (ptext SLIT("in"))  2 (ppr expr)]
+
+ppr_expr (HsWith expr binds)
+  = hsep [ppr expr, ptext SLIT("with"), ppr binds]
 
 ppr_expr (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp stmts
 ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts
@@ -381,6 +389,7 @@ pprParendExpr expr
       HsLitOut l _	    -> ppr l
 
       HsVar _		    -> pp_as_was
+      HsIPVar _		    -> pp_as_was
       ExplicitList _	    -> pp_as_was
       ExplicitListOut _ _   -> pp_as_was
       ExplicitTuple _ _	    -> pp_as_was

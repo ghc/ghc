@@ -346,6 +346,10 @@ zonkExpr (HsVar id)
   = zonkIdOcc id	`thenNF_Tc` \ id' ->
     returnNF_Tc (HsVar id')
 
+zonkExpr (HsIPVar id)
+  = zonkIdOcc id	`thenNF_Tc` \ id' ->
+    returnNF_Tc (HsIPVar id')
+
 zonkExpr (HsLit _) = panic "zonkExpr:HsLit"
 
 zonkExpr (HsLitOut lit ty)
@@ -396,6 +400,16 @@ zonkExpr (HsLet binds expr)
     tcSetEnv new_env		$
     zonkExpr expr	`thenNF_Tc` \ new_expr ->
     returnNF_Tc (HsLet new_binds new_expr)
+
+zonkExpr (HsWith expr binds)
+  = zonkExpr expr		`thenNF_Tc` \ new_expr ->
+    zonkIPBinds binds		`thenNF_Tc` \ new_binds ->
+    returnNF_Tc (HsWith new_expr new_binds)
+    where
+	zonkIPBinds = mapNF_Tc zonkIPBind
+	zonkIPBind (n, e) =
+	    zonkExpr e		`thenNF_Tc` \ e' ->
+	    returnNF_Tc (n, e')
 
 zonkExpr (HsDo _ _ _) = panic "zonkExpr:HsDo"
 

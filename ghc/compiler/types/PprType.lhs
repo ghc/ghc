@@ -7,7 +7,7 @@
 module PprType(
 	pprKind, pprParendKind,
 	pprType, pprParendType,
-	pprConstraint, pprTheta,
+	pprConstraint, pprPred, pprTheta,
 	pprTyVarBndr, pprTyVarBndrs,
 
 	-- Junk
@@ -21,8 +21,8 @@ module PprType(
 import TypeRep		( Type(..), TyNote(..), Kind, UsageAnn(..),
 			  boxedTypeKind,
 			)  -- friend
-import Type		( ThetaType,
-			  splitDictTy_maybe,
+import Type		( PredType(..), ThetaType,
+			  splitPredTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
 			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
                           splitUsForAllTys
@@ -35,7 +35,7 @@ import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, isUnboxedTupleTyCon,
 			  maybeTyConSingleCon, isEnumerationTyCon, 
 			  tyConArity, tyConUnique
 			)
-import Class		( Class )
+import Class		( Class, className )
 
 -- others:
 import Maybes		( maybeToBool )
@@ -67,13 +67,15 @@ pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
 
+pprPred :: PredType -> SDoc
+pprPred (Class clas tys) = pprConstraint clas tys
+pprPred (IParam n ty)    = ppr n <+> ppr ty
+
 pprConstraint :: Class -> [Type] -> SDoc
 pprConstraint clas tys = ppr clas <+> hsep (map (pprParendType) tys)
 
 pprTheta :: ThetaType -> SDoc
-pprTheta theta = parens (hsep (punctuate comma (map ppr_dict theta)))
-	       where
-		 ppr_dict (c,tys) = pprConstraint c tys
+pprTheta theta = parens (hsep (punctuate comma (map pprPred theta)))
 
 instance Outputable Type where
     ppr ty = pprType ty
@@ -140,8 +142,8 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
 	-- DICTIONARY CASE, prints {C a}
 	-- This means that instance decls come out looking right in interfaces
 	-- and that in turn means they get "gated" correctly when being slurped in
-  | maybeToBool maybe_dict
-  = braces (ppr_dict env tYCON_PREC ctys)
+  | maybeToBool maybe_pred
+  = braces (ppr_pred env pred)
 
 	-- NO-ARGUMENT CASE (=> no parens)
   | null tys
@@ -155,8 +157,8 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
     tycon_uniq = tyConUnique tycon
     n_tys      = length tys
     (ty1:_)    = tys
-    Just ctys  = maybe_dict
-    maybe_dict = splitDictTy_maybe ty	-- Checks class and arity
+    Just pred  = maybe_pred
+    maybe_pred = splitPredTy_maybe ty	-- Checks class and arity
     tys_w_commas = sep (punctuate comma (map (ppr_ty env tOP_PREC) tys))
     tys_w_spaces = sep (map (ppr_ty env tYCON_PREC) tys)
   
@@ -183,11 +185,12 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
     pp_tyvars = hsep (map (pBndr env LambdaBind) tyvars)
     
     ppr_theta []	= empty
-    ppr_theta theta     = parens (hsep (punctuate comma (map ppr_dict theta))) 
+    ppr_theta theta     = parens (hsep (punctuate comma (map ppr_pred theta))) 
 			  <+> ptext SLIT("=>")
 
-    ppr_dict (clas,tys) = ppr clas <+> hsep (map (ppr_ty env tYCON_PREC) tys)
-
+    ppr_pred (Class clas tys) = ppr clas <+> hsep (map (ppr_ty env tYCON_PREC) tys)
+    ppr_pred (IParam n ty)    = hsep [char '?' <> ppr n, text "::",
+				      ppr_ty env tYCON_PREC ty]
 
 ppr_ty env ctxt_prec (FunTy ty1 ty2)
   = maybeParen ctxt_prec fUN_PREC (sep (ppr_ty env fUN_PREC ty1 : pp_rest ty2))
@@ -221,11 +224,21 @@ ppr_ty env ctxt_prec (NoteTy (UsgNote u) ty)
   = maybeParen ctxt_prec tYCON_PREC $
     ptext SLIT("__u") <+> ppr u <+> ppr_ty env tYCON_PREC ty
 
-ppr_theta env []    = empty
-ppr_theta env theta = braces (hsep (punctuate comma (map (ppr_dict env tOP_PREC) theta)))
+ppr_ty env ctxt_prec (NoteTy (IPNote nm) ty)
+  = braces (ppr_pred env (IParam nm ty))
 
+ppr_theta env []    = empty
+ppr_theta env theta = braces (hsep (punctuate comma (map (ppr_pred env) theta)))
+
+ppr_pred env (Class clas tys) = ppr clas <+>
+				hsep (map (ppr_ty env tYCON_PREC) tys)
+ppr_pred env (IParam n ty)    = hsep [char '?' <> ppr n, text "::",
+				      ppr_ty env tYCON_PREC ty]
+
+{-
 ppr_dict env ctxt (clas, tys) = ppr clas <+> 
 				hsep (map (ppr_ty env tYCON_PREC) tys)
+-}
 \end{code}
 
 \begin{code}

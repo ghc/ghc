@@ -24,7 +24,7 @@ import Outputable
 type RenamedArithSeqInfo	= ArithSeqInfo		Name RenamedPat
 type RenamedClassOpSig		= Sig			Name
 type RenamedConDecl		= ConDecl		Name
-type RenamedContext		= Context 		Name
+type RenamedContext		= HsContext 		Name
 type RenamedHsDecl		= HsDecl		Name RenamedPat
 type RenamedRuleDecl		= RuleDecl		Name RenamedPat
 type RenamedTyClDecl		= TyClDecl		Name RenamedPat
@@ -94,8 +94,13 @@ extractHsTyNames_s  :: [RenamedHsType] -> NameSet
 extractHsTyNames_s tys = foldr (unionNameSets . extractHsTyNames) emptyNameSet tys
 
 extractHsCtxtTyNames :: RenamedContext -> NameSet
-extractHsCtxtTyNames ctxt = foldr (unionNameSets . get) emptyNameSet ctxt
-  where
-    get (cls, tys) = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
+extractHsCtxtTyNames ctxt = foldr (unionNameSets . extractHsPredTyNames) emptyNameSet ctxt
+
+-- You don't import or export implicit parameters, so don't mention
+-- the IP names
+extractHsPredTyNames (HsPClass cls tys)
+  = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
+extractHsPredTyNames (HsPIParam n ty)
+  = extractHsTyNames ty
 \end{code}
 

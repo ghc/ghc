@@ -93,7 +93,7 @@ import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys,
 			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
 			  mkFunTy, mkFunTys, isUnLiftedType,
 			  splitTyConApp_maybe, splitAlgTyConApp_maybe,
-			  ThetaType, TauType )
+			  TauType, ClassContext )
 import PrimRep		( PrimRep(..) )
 import Unique
 import CmdLineOpts      ( opt_GlasgowExts )
@@ -136,7 +136,7 @@ pcSynTyCon key mod str kind arity tyvars expansion argvrcs  -- this fun never us
     name  = mkWiredInTyConName key mod str tycon
 
 pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
-	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> DataCon
+	  -> [TyVar] -> ClassContext -> [TauType] -> TyCon -> DataCon
 pcDataCon key mod str tyvars context arg_tys tycon
   = data_con
   where

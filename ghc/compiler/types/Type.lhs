@@ -34,7 +34,7 @@ module Type (
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
-	mkDictTy, splitDictTy_maybe, isDictTy,
+	mkDictTy, mkPredTy, splitPredTy_maybe, splitDictTy_maybe, isDictTy,
 
 	mkSynTy, isSynTy, deNoteType, repType, splitNewType_maybe,
 
@@ -44,9 +44,10 @@ module Type (
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	isForAllTy, applyTy, applyTys, mkPiType,
 
-	TauType, RhoType, SigmaType, ThetaType,
-	isTauTy,
-	mkRhoTy, splitRhoTy,
+	TauType, RhoType, SigmaType, PredType(..), ThetaType,
+	ClassPred, ClassContext, mkClassPred,
+	getClassTys_maybe, ipName_maybe, classesToPreds, classesOfPreds,
+	isTauTy, mkRhoTy, splitRhoTy,
 	mkSigmaTy, splitSigmaTy,
 
 	-- Lifting and boxity
@@ -54,8 +55,8 @@ module Type (
 	typePrimRep,
 
 	-- Free variables
-	tyVarsOfType, tyVarsOfTypes, namesOfType, typeKind,
-	addFreeTyVars,
+	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
+	namesOfType, typeKind, addFreeTyVars,
 
 	-- Tidying up for printing
 	tidyType,     tidyTypes,
@@ -78,7 +79,7 @@ import TypeRep
 -- Other imports:
 
 import {-# SOURCE #-}	DataCon( DataCon, dataConType )
-import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
+import {-# SOURCE #-}	PprType( pprType, pprPred )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
 
 -- friends:
@@ -88,7 +89,7 @@ import Var	( TyVar, IdOrTyVar, UVar,
 import VarEnv
 import VarSet
 
-import Name	( NamedThing(..), mkLocalName, tidyOccName,
+import Name	( Name, NamedThing(..), mkLocalName, tidyOccName,
 		)
 import NameSet
 import Class	( classTyCon, Class )
@@ -329,6 +330,11 @@ tell from the type constructor whether it's a dictionary or not.
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = TyConApp (classTyCon clas) tys
 
+mkPredTy :: PredType -> Type
+mkPredTy (Class clas tys) = TyConApp (classTyCon clas) tys
+mkPredTy (IParam n ty)    = NoteTy (IPNote n) ty
+
+{-
 splitDictTy_maybe :: Type -> Maybe (Class, [Type])
 splitDictTy_maybe (TyConApp tc tys) 
   |  maybeToBool maybe_class
@@ -339,6 +345,26 @@ splitDictTy_maybe (TyConApp tc tys)
 
 splitDictTy_maybe (NoteTy _ ty)	= splitDictTy_maybe ty
 splitDictTy_maybe other		= Nothing
+-}
+
+splitPredTy_maybe :: Type -> Maybe PredType
+splitPredTy_maybe (TyConApp tc tys) 
+  |  maybeToBool maybe_class
+  && tyConArity tc == length tys = Just (Class clas tys)
+  where
+     maybe_class = tyConClass_maybe tc
+     Just clas   = maybe_class
+
+splitPredTy_maybe (NoteTy (IPNote n) ty)
+				= Just (IParam n ty)
+splitPredTy_maybe (NoteTy _ ty)	= splitPredTy_maybe ty
+splitPredTy_maybe other		= Nothing
+
+splitDictTy_maybe :: Type -> Maybe (Class, [Type])
+splitDictTy_maybe ty
+  = case splitPredTy_maybe ty of
+    Just p -> getClassTys_maybe p
+    Nothing -> Nothing
 
 isDictTy :: Type -> Bool
 	-- This version is slightly more efficient than (maybeToBool . splitDictTy)
@@ -628,14 +654,44 @@ argument, however, must still be unannotated.
 %************************************************************************
 %*									*
 \subsection{Stuff to do with the source-language types}
+
+PredType and ThetaType are used in types for expressions and bindings.
+ClassPred and ClassContext are used in class and instance declarations.
 %*									*
 %************************************************************************
 
 \begin{code}
 type RhoType   = Type
 type TauType   = Type
-type ThetaType = [(Class, [Type])]
+data PredType  = Class  Class [Type]
+	       | IParam Name  Type
+type ThetaType = [PredType]
+type ClassPred = (Class, [Type])
+type ClassContext = [ClassPred]
 type SigmaType = Type
+\end{code}
+
+\begin{code}
+instance Outputable PredType where
+    ppr = pprPred
+\end{code}
+
+\begin{code}
+mkClassPred clas tys = Class clas tys
+
+getClassTys_maybe :: PredType -> Maybe ClassPred
+getClassTys_maybe (Class clas tys) = Just (clas, tys)
+getClassTys_maybe _		    = Nothing
+
+ipName_maybe :: PredType -> Maybe Name
+ipName_maybe (IParam n _) = Just n
+ipName_maybe _		  = Nothing
+
+classesToPreds cts = map (uncurry Class) cts
+
+classesOfPreds theta = concatMap cvt theta
+    where cvt (Class clas tys) = [(clas, tys)]
+	  cvt (IParam _   _  ) = []
 \end{code}
 
 @isTauTy@ tests for nested for-alls.
@@ -651,14 +707,14 @@ isTauTy other	       	 = False
 \end{code}
 
 \begin{code}
-mkRhoTy :: [(Class, [Type])] -> Type -> Type
-mkRhoTy theta ty = foldr (\(c,t) r -> FunTy (mkDictTy c t) r) ty theta
+mkRhoTy :: [PredType] -> Type -> Type
+mkRhoTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
 
-splitRhoTy :: Type -> ([(Class, [Type])], Type)
+splitRhoTy :: Type -> ([PredType], Type)
 splitRhoTy ty = split ty ty []
  where
-  split orig_ty (FunTy arg res) ts = case splitDictTy_maybe arg of
-					Just pair -> split res res (pair:ts)
+  split orig_ty (FunTy arg res) ts = case splitPredTy_maybe arg of
+					Just p -> split res res (p:ts)
 					Nothing   -> (reverse ts, orig_ty)
   split orig_ty (NoteTy _ ty) ts   = split orig_ty ty ts
   split orig_ty ty ts		   = (reverse ts, orig_ty)
@@ -669,7 +725,7 @@ splitRhoTy ty = split ty ty []
 \begin{code}
 mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkRhoTy theta tau)
 
-splitSigmaTy :: Type -> ([TyVar], [(Class, [Type])], Type)
+splitSigmaTy :: Type -> ([TyVar], [PredType], Type)
 splitSigmaTy ty =
   (tyvars, theta, tau)
  where
@@ -715,12 +771,20 @@ tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
 tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty1
 tyVarsOfType (NoteTy (UsgNote _) ty)	= tyVarsOfType ty
 tyVarsOfType (NoteTy (UsgForAll _) ty)	= tyVarsOfType ty
+tyVarsOfType (NoteTy (IPNote _) ty)	= tyVarsOfType ty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
 
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
+
+tyVarsOfPred :: PredType -> TyVarSet
+tyVarsOfPred (Class clas tys) = tyVarsOfTypes tys
+tyVarsOfPred (IParam n ty)    = tyVarsOfType ty
+
+tyVarsOfTheta :: ThetaType -> TyVarSet
+tyVarsOfTheta = foldr (unionVarSet . tyVarsOfPred) emptyVarSet
 
 -- Add a Note with the free tyvars to the top of the type
 -- (but under a usage if there is one)
@@ -800,6 +864,7 @@ tidyType env@(tidy_env, subst) ty
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
     go_note note@(UsgNote _)    = note  -- Usage annotation is already tidy
     go_note note@(UsgForAll _)  = note  -- Uvar binder is already tidy
+    go_note note@(IPNote _)	= note  -- IP is already tidy
 
 tidyTypes  env tys    = map (tidyType env) tys
 \end{code}
@@ -901,5 +966,6 @@ seqNote :: TyNote -> ()
 seqNote (SynNote ty)  = seqType ty
 seqNote (FTVNote set) = sizeUniqSet set `seq` ()
 seqNote (UsgNote usg) = usg `seq` ()
+seqNote (IPNote nm)    = nm `seq` ()
 \end{code}
 

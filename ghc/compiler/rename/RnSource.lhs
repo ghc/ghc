@@ -11,7 +11,7 @@ module RnSource ( rnDecl, rnSourceDecls, rnHsType, rnHsSigType, rnHsPolyType ) w
 import RnExpr
 import HsSyn
 import HsPragmas
-import HsTypes		( getTyVarName, pprClassAssertion, cmpHsTypes )
+import HsTypes		( getTyVarName, pprHsPred, cmpHsTypes )
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, isRdrTyVar )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
 			  extractRuleBndrsTyVars, extractHsTyRdrTyVars, extractHsTysRdrTyVars
@@ -20,7 +20,7 @@ import RnHsSyn
 import HsCore
 
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, unknownSigErr )
-import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, 
+import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, getIPName,
 			  lookupImplicitOccRn, 
 			  bindLocalsRn, bindLocalRn, bindLocalsFVRn, bindUVarRn,
 			  bindTyVarsFVRn, bindTyVarsFV2Rn, extendTyVarEnvFVRn,
@@ -560,9 +560,11 @@ rnHsPolyType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	-- context in which case it's an error
   = let
 	mentioned_in_tau  = extractHsTyRdrTyVars tau
-	mentioned_in_ctxt = nub [tv | (_,tys) <- ctxt,
-				      ty <- tys,
+	mentioned_in_ctxt = nub [tv | p <- ctxt,
+				      ty <- tys_of_pred p,
 				      tv <- extractHsTyRdrTyVars ty]
+	tys_of_pred (HsPClass clas tys) = tys
+	tys_of_pred (HsPIParam n ty) = [ty]
 
 	dubious_guys	      = filter (`notElem` mentioned_in_tau) forall_tyvar_names
 		-- dubious = explicitly quantified but not mentioned in tau type
@@ -586,20 +588,20 @@ rnHsPolyType doc other_ty = rnHsType doc other_ty
 -- of the tau-type part, this guarantees that every constraint mentions
 -- at least one of the free tyvars in ty
 checkConstraints doc forall_tyvars tau_vars ctxt ty
-   = mapRn check ctxt			`thenRn` \ maybe_ctxt' ->
+   = mapRn (checkPred doc forall_tyvars ty) ctxt `thenRn` \ maybe_ctxt' ->
      returnRn (catMaybes maybe_ctxt')
 	    -- Remove problem ones, to avoid duplicate error message.
-   where
-     check ct@(_,tys)
-	| not_univ  = failWithRn Nothing (univErr  doc ct ty)
-	| otherwise = returnRn (Just ct)
-        where
-	  ct_vars    = extractHsTysRdrTyVars tys
-
-	  not_univ   = 	-- At least one of the tyvars in each constraint must
-			-- be universally quantified. This restriction isn't in Hugs
-			not (any (`elem` forall_tyvars) ct_vars)
 	
+checkPred doc forall_tyvars ty p@(HsPClass clas tys)
+  | not_univ  = failWithRn Nothing (univErr  doc p ty)
+  | otherwise = returnRn (Just p)
+  where
+      ct_vars  = extractHsTysRdrTyVars tys
+      not_univ =  -- At least one of the tyvars in each constraint must
+		  -- be universally quantified. This restriction isn't in Hugs
+		  not (any (`elem` forall_tyvars) ct_vars)
+checkPred doc forall_tyvars ty p@(HsPIParam _ _)
+  = returnRn (Just p)
 
 rnForAll doc forall_tyvars ctxt ty
   = bindTyVarsFVRn doc forall_tyvars	$ \ new_tyvars ->
@@ -676,23 +678,24 @@ rnHsTypes doc tys = mapFvRn (rnHsType doc) tys
 rnContext :: SDoc -> RdrNameContext -> RnMS (RenamedContext, FreeVars)
 
 rnContext doc ctxt
-  = mapAndUnzipRn rn_ctxt ctxt		`thenRn` \ (theta, fvs_s) ->
+  = mapAndUnzipRn (rnPred doc) ctxt	`thenRn` \ (theta, fvs_s) ->
     let
-	(_, dup_asserts) = removeDups cmp_assert theta
+	(_, dup_asserts) = removeDups (cmpHsPred compare) theta
     in
 	-- Check for duplicate assertions
 	-- If this isn't an error, then it ought to be:
     mapRn_ (addWarnRn . dupClassAssertWarn theta) dup_asserts	`thenRn_`
 
     returnRn (theta, plusFVs fvs_s)
-  where
-    rn_ctxt (clas, tys)
-      =	lookupOccRn clas		`thenRn` \ clas_name ->
-	rnHsTypes doc tys		`thenRn` \ (tys', fvs) ->
-	returnRn ((clas_name, tys'), fvs `addOneFV` clas_name)
 
-    cmp_assert (c1,tys1) (c2,tys2)
-      = (c1 `compare` c2) `thenCmp` (cmpHsTypes compare tys1 tys2)
+rnPred doc (HsPClass clas tys)
+  = lookupOccRn clas		`thenRn` \ clas_name ->
+    rnHsTypes doc tys		`thenRn` \ (tys', fvs) ->
+    returnRn (HsPClass clas_name tys', fvs `addOneFV` clas_name)
+rnPred doc (HsPIParam n ty)
+  = getIPName n			`thenRn` \ name ->
+    rnHsType doc ty		`thenRn` \ (ty', fvs) ->
+    returnRn (HsPIParam name ty', fvs)
 \end{code}
 
 \begin{code}
@@ -902,9 +905,9 @@ classTyVarNotInOpTyErr clas_tyvar sig
 
 dupClassAssertWarn ctxt (assertion : dups)
   = sep [hsep [ptext SLIT("Duplicate class assertion"), 
-	       quotes (pprClassAssertion assertion),
+	       quotes (pprHsPred assertion),
 	       ptext SLIT("in the context:")],
-	 nest 4 (pprContext ctxt <+> ptext SLIT("..."))]
+	 nest 4 (pprHsContext ctxt <+> ptext SLIT("..."))]
 
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
@@ -937,7 +940,7 @@ forAllErr doc ty tyvar
 
 univErr doc constraint ty
   = sep [ptext SLIT("All of the type variable(s) in the constraint")
-          <+> quotes (pprClassAssertion constraint) 
+          <+> quotes (pprHsPred constraint) 
 	  <+> ptext SLIT("are already in scope"),
 	 nest 4 (ptext SLIT("At least one must be universally quantified here"))
     ]
@@ -945,7 +948,7 @@ univErr doc constraint ty
     (ptext SLIT("In") <+> doc)
 
 ambigErr doc constraint ty
-  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprClassAssertion constraint),
+  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprHsPred constraint),
 	 nest 4 (ptext SLIT("in the type:") <+> ppr ty),
 	 nest 4 (ptext SLIT("Each forall-d type variable mentioned by the constraint must appear after the =>."))]
     $$

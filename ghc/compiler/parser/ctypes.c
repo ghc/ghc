@@ -103,34 +103,34 @@ const unsigned char char_types[] =
     C_Any | C_Symbol,		/* \ */
     C_Any,			/* ] */
     C_Any | C_Symbol,		/* ^ */
-    C_Any | C_Ident,		/* _ */
+    C_Any | C_Ident | C_Lower,	/* _ */
     C_Any,			/* ` */
-    C_Any | C_Ident,		/* a */
-    C_Any | C_Ident,		/* b */
-    C_Any | C_Ident,		/* c */
-    C_Any | C_Ident,		/* d */
-    C_Any | C_Ident,		/* e */
-    C_Any | C_Ident,		/* f */
-    C_Any | C_Ident,		/* g */
-    C_Any | C_Ident,		/* h */
-    C_Any | C_Ident,		/* i */
-    C_Any | C_Ident,		/* j */
-    C_Any | C_Ident,		/* k */
-    C_Any | C_Ident,		/* l */
-    C_Any | C_Ident,		/* m */
-    C_Any | C_Ident,		/* n */
-    C_Any | C_Ident,		/* o */
-    C_Any | C_Ident,		/* p */
-    C_Any | C_Ident,		/* q */
-    C_Any | C_Ident,		/* r */
-    C_Any | C_Ident,		/* s */
-    C_Any | C_Ident,		/* t */
-    C_Any | C_Ident,		/* u */
-    C_Any | C_Ident,		/* v */
-    C_Any | C_Ident,		/* w */
-    C_Any | C_Ident,		/* x */
-    C_Any | C_Ident,		/* y */
-    C_Any | C_Ident,		/* z */
+    C_Any | C_Ident | C_Lower,	/* a */
+    C_Any | C_Ident | C_Lower,	/* b */
+    C_Any | C_Ident | C_Lower,	/* c */
+    C_Any | C_Ident | C_Lower,	/* d */
+    C_Any | C_Ident | C_Lower,	/* e */
+    C_Any | C_Ident | C_Lower,	/* f */
+    C_Any | C_Ident | C_Lower,	/* g */
+    C_Any | C_Ident | C_Lower,	/* h */
+    C_Any | C_Ident | C_Lower,	/* i */
+    C_Any | C_Ident | C_Lower,	/* j */
+    C_Any | C_Ident | C_Lower,	/* k */
+    C_Any | C_Ident | C_Lower,	/* l */
+    C_Any | C_Ident | C_Lower,	/* m */
+    C_Any | C_Ident | C_Lower,	/* n */
+    C_Any | C_Ident | C_Lower,	/* o */
+    C_Any | C_Ident | C_Lower,	/* p */
+    C_Any | C_Ident | C_Lower,	/* q */
+    C_Any | C_Ident | C_Lower,	/* r */
+    C_Any | C_Ident | C_Lower,	/* s */
+    C_Any | C_Ident | C_Lower,	/* t */
+    C_Any | C_Ident | C_Lower,	/* u */
+    C_Any | C_Ident | C_Lower,	/* v */
+    C_Any | C_Ident | C_Lower,	/* w */
+    C_Any | C_Ident | C_Lower,	/* x */
+    C_Any | C_Ident | C_Lower,	/* y */
+    C_Any | C_Ident | C_Lower,	/* z */
     C_Any,			/* { */
     C_Any | C_Symbol,		/* | */
     C_Any,			/* } */
@@ -223,7 +223,7 @@ const unsigned char char_types[] =
     C_Any | C_Ident | C_Upper,	/* Ô */
     C_Any | C_Ident | C_Upper,	/* Õ */
     C_Any | C_Ident | C_Upper,	/* Ö */
-    C_Any | C_Symbol,		/* × */
+    C_Any | C_Symbol | C_Lower,	/* × */
     C_Any | C_Ident | C_Upper,	/* Ø */
     C_Any | C_Ident | C_Upper,	/* Ù */
     C_Any | C_Ident | C_Upper,	/* Ú */
@@ -232,36 +232,36 @@ const unsigned char char_types[] =
     C_Any | C_Ident | C_Upper,	/* Ý */
     C_Any | C_Ident | C_Upper,	/* Þ */
     C_Any | C_Ident,		/* ß */
-    C_Any | C_Ident,		/* à */
-    C_Any | C_Ident,		/* á */
-    C_Any | C_Ident,		/* â */
-    C_Any | C_Ident,		/* ã */
-    C_Any | C_Ident,		/* ä */
-    C_Any | C_Ident,		/* å */
-    C_Any | C_Ident,		/* æ */
-    C_Any | C_Ident,		/* ç */
-    C_Any | C_Ident,		/* è */
-    C_Any | C_Ident,		/* é */
-    C_Any | C_Ident,		/* ê */
-    C_Any | C_Ident,		/* ë */
-    C_Any | C_Ident,		/* ì */
-    C_Any | C_Ident,		/* í */
-    C_Any | C_Ident,		/* î */
-    C_Any | C_Ident,		/* ï */
-    C_Any | C_Ident,		/* ð */
-    C_Any | C_Ident,		/* ñ */
-    C_Any | C_Ident,		/* ò */
-    C_Any | C_Ident,		/* ó */
-    C_Any | C_Ident,		/* ô */
-    C_Any | C_Ident,		/* õ */
-    C_Any | C_Ident,		/* ö */
+    C_Any | C_Ident | C_Lower,	/* à */
+    C_Any | C_Ident | C_Lower,	/* á */
+    C_Any | C_Ident | C_Lower,	/* â */
+    C_Any | C_Ident | C_Lower,	/* ã */
+    C_Any | C_Ident | C_Lower,	/* ä */
+    C_Any | C_Ident | C_Lower,	/* å */
+    C_Any | C_Ident | C_Lower,	/* æ */
+    C_Any | C_Ident | C_Lower,	/* ç */
+    C_Any | C_Ident | C_Lower,	/* è */
+    C_Any | C_Ident | C_Lower,	/* é */
+    C_Any | C_Ident | C_Lower,	/* ê */
+    C_Any | C_Ident | C_Lower,	/* ë */
+    C_Any | C_Ident | C_Lower,	/* ì */
+    C_Any | C_Ident | C_Lower,	/* í */
+    C_Any | C_Ident | C_Lower,	/* î */
+    C_Any | C_Ident | C_Lower,	/* ï */
+    C_Any | C_Ident | C_Lower,	/* ð */
+    C_Any | C_Ident | C_Lower,	/* ñ */
+    C_Any | C_Ident | C_Lower,	/* ò */
+    C_Any | C_Ident | C_Lower,	/* ó */
+    C_Any | C_Ident | C_Lower,	/* ô */
+    C_Any | C_Ident | C_Lower,	/* õ */
+    C_Any | C_Ident | C_Lower,	/* ö */
     C_Any | C_Symbol,		/* ÷ */
     C_Any | C_Ident,		/* ø */
-    C_Any | C_Ident,		/* ù */
-    C_Any | C_Ident,		/* ú */
-    C_Any | C_Ident,		/* û */
-    C_Any | C_Ident,		/* ü */
-    C_Any | C_Ident,		/* ý */
-    C_Any | C_Ident,		/* þ */
-    C_Any | C_Ident,		/* ÿ */
+    C_Any | C_Ident | C_Lower,	/* ù */
+    C_Any | C_Ident | C_Lower,	/* ú */
+    C_Any | C_Ident | C_Lower,	/* û */
+    C_Any | C_Ident | C_Lower,	/* ü */
+    C_Any | C_Ident | C_Lower,	/* ý */
+    C_Any | C_Ident | C_Lower,	/* þ */
+    C_Any | C_Ident | C_Lower,	/* ÿ */
   };

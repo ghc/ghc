@@ -128,6 +128,7 @@ data Token
   | ITlabel
   | ITdynamic
   | ITunsafe
+  | ITwith
   | ITstdcallconv
   | ITccallconv
 
@@ -208,6 +209,8 @@ data Token
   | ITqvarsym (FAST_STRING,FAST_STRING)
   | ITqconsym (FAST_STRING,FAST_STRING)
 
+  | ITipvarid FAST_STRING	-- GHC extension: implicit param: ?x
+
   | ITpragma StringBuffer
 
   | ITchar       Char 
@@ -282,6 +285,7 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "label",	ITlabel ),
 	( "dynamic",	ITdynamic ),
 	( "unsafe",	ITunsafe ),
+	( "with",	ITwith ),
 	( "stdcall",    ITstdcallconv),
 	( "ccall",      ITccallconv),
         ("_ccall_",	ITccall (False, False, False)),
@@ -590,6 +594,8 @@ lexToken cont glaexts buf =
 	       trace "lexIface: misplaced NUL?" $ 
 	       cont (ITunknown "\NUL") (stepOn buf)
 
+    '?'# | flag glaexts && is_lower (lookAhead# buf 1#) ->
+	    lex_ip cont (setCurrentPos# buf 1#)
     c | is_digit  c -> lex_num cont glaexts 0 buf
       | is_symbol c -> lex_sym cont buf
       | is_upper  c -> lex_con cont glaexts buf
@@ -892,11 +898,17 @@ is_ident  = is_ctype 1
 is_symbol = is_ctype 2
 is_any    = is_ctype 4
 is_space  = is_ctype 8
-is_upper  = is_ctype 16
-is_digit  = is_ctype 32
+is_lower  = is_ctype 16
+is_upper  = is_ctype 32
+is_digit  = is_ctype 64
 
 -----------------------------------------------------------------------------
 -- identifiers, symbols etc.
+
+lex_ip cont buf =
+ case expandWhile# is_ident buf of
+   buf' -> cont (ITipvarid lexeme) buf'
+	   where lexeme = lexemeToFastString buf'
 
 lex_id cont glaexts buf =
  case expandWhile# is_ident buf of { buf1 -> 

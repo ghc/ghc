@@ -13,7 +13,7 @@ module TcTyClsDecls (
 import HsSyn		( HsDecl(..), TyClDecl(..),
 			  HsType(..), HsTyVar,
 			  ConDecl(..), ConDetails(..), BangType(..),
-			  Sig(..),
+			  Sig(..), HsPred(..),
 			  tyClDeclName, isClassDecl, isSynDecl
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name, tupleTyCon_name )
@@ -272,7 +272,7 @@ Edges in Type/Class decls
 mk_cls_edges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Unique, [Unique])
 
 mk_cls_edges decl@(ClassDecl ctxt name _ _ _ _ _ _ _ _ _)
-  = Just (decl, getUnique name, map (getUnique . fst) ctxt)
+  = Just (decl, getUnique name, map (getUnique . get_clas) ctxt)
 mk_cls_edges other_decl
   = Nothing
 
@@ -293,7 +293,8 @@ mk_edges decl@(ClassDecl ctxt name _ _ sigs _ _ _ _ _ _)
 
 
 ----------------------------------------------------
-get_ctxt ctxt = unionManyUniqSets (map (set_name.fst) ctxt)
+get_ctxt ctxt = unionManyUniqSets (map (set_name . get_clas) ctxt)
+get_clas (HsPClass clas _) = clas
 
 ----------------------------------------------------
 get_deriv Nothing     = emptyUniqSet

@@ -25,7 +25,7 @@ import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
 import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
 import Name		( OccName, Provenance )
 import OccName          ( mkSysOccFS,
-			  tcName, varName, dataName, clsName, tvName, uvName,
+			  tcName, varName, ipName, dataName, clsName, tvName, uvName,
 			  EncodedFS 
 			)
 import Module           ( ModuleName, mkSysModuleFS )			
@@ -145,6 +145,7 @@ import Ratio ( (%) )
  QCONID  	{ ITqconid   $$ }
  QVARSYM 	{ ITqvarsym  $$ }
  QCONSYM 	{ ITqconsym  $$ }
+ IPVARID   	{ ITipvarid  $$ }
 
  PRAGMA		{ ITpragma   $$ }
 
@@ -421,8 +422,9 @@ context_list1	:: { RdrNameContext }
 context_list1	: class					{ [$1] }
 		| class ',' context_list1 		{ $1 : $3 }
 
-class		:: { (RdrName, [RdrNameHsType]) }
-class		:  qcls_name atypes			{ ($1, $2) }
+class		:: { HsPred RdrName }
+class		:  qcls_name atypes			{ (HsPClass $1 $2) }
+		|  IPVARID '::' type			{ (HsPIParam (mkSysUnqual ipName $1) $3) }
 
 types0		:: { [RdrNameHsType] 			{- Zero or more -}  }	
 types0		:  {- empty -}				{ [ ] }

@@ -48,7 +48,8 @@ import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			)
 import Class		( Class, classExtraBigSig )
 import FieldLabel	( fieldLabelName, fieldLabelType )
-import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType, deNoteType,
+import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType,
+			  deNoteType, classesToPreds,
 			  Type, ThetaType
 		        )
 
@@ -260,7 +261,8 @@ ifaceInstances if_hdl inst_infos
 		--	instance Foo Tibble where ...
 		-- and this instance decl wouldn't get imported into a module
 		-- that mentioned T but not Tibble.
-	    forall_ty     = mkSigmaTy tvs theta (deNoteType (mkDictTy clas tys))
+	    forall_ty     = mkSigmaTy tvs (classesToPreds theta)
+				      (deNoteType (mkDictTy clas tys))
 	    renumbered_ty = tidyTopType forall_ty
 	in			 
 	hcat [ptext SLIT("instance "), pprType renumbered_ty, 
@@ -494,7 +496,7 @@ ifaceTyCon tycon
 ifaceTyCon tycon
   | isAlgTyCon tycon
   = hsep [ ptext keyword,
-	   ppr_decl_context (tyConTheta tycon),
+	   ppr_decl_class_context (tyConTheta tycon),
 	   ppr (getName tycon),
 	   pprTyVarBndrs (tyConTyVars tycon),
 	   ptext SLIT("="),
@@ -528,7 +530,7 @@ ifaceTyCon tycon
 
     ppr_ex [] ex_theta = ASSERT( null ex_theta ) empty
     ppr_ex ex_tvs ex_theta = ptext SLIT("__forall") <+> brackets (pprTyVarBndrs ex_tvs)
-			     <+> pprIfaceTheta ex_theta <+> ptext SLIT("=>")
+			     <+> pprIfaceClasses ex_theta <+> ptext SLIT("=>")
 
     ppr_arg_ty (strict_mark, ty) = ppr_strict_mark strict_mark <> pprParendType ty
 
@@ -547,7 +549,7 @@ ifaceTyCon tycon
 
 ifaceClass clas
   = hsep [ptext SLIT("class"),
-	   ppr_decl_context sc_theta,
+	   ppr_decl_class_context sc_theta,
 	   ppr clas,			-- Print the name
 	   pprTyVarBndrs clas_tyvars,
 	   pprFundeps clas_fds,
@@ -576,9 +578,17 @@ ppr_decl_context :: ThetaType -> SDoc
 ppr_decl_context []    = empty
 ppr_decl_context theta = pprIfaceTheta theta <+> ptext SLIT(" =>")
 
+ppr_decl_class_context :: [(Class,[Type])] -> SDoc
+ppr_decl_class_context []    = empty
+ppr_decl_class_context ctxt  = pprIfaceClasses ctxt <+> ptext SLIT(" =>")
+
 pprIfaceTheta :: ThetaType -> SDoc	-- Use braces rather than parens in interface files
 pprIfaceTheta []    = empty
-pprIfaceTheta theta = braces (hsep (punctuate comma [pprConstraint c tys | (c,tys) <- theta]))
+pprIfaceTheta theta = braces (hsep (punctuate comma [pprPred p | p <- theta]))
+
+pprIfaceClasses :: [(Class,[Type])] -> SDoc
+pprIfaceClasses []    = empty
+pprIfaceClasses theta = braces (hsep (punctuate comma [pprConstraint c tys | (c,tys) <- theta]))
 \end{code}
 
 %************************************************************************

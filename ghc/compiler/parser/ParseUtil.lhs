@@ -137,15 +137,15 @@ checkInstType t
 checkContext :: RdrNameHsType -> P RdrNameContext
 checkContext (MonoTupleTy ts True) 
   = mapP (\t -> checkAssertion t []) ts `thenP` \cs ->
-    returnP cs
+    returnP (map (uncurry HsPClass) cs)
 checkContext (MonoTyVar t) -- empty contexts are allowed
   | t == unitTyCon_RDR = returnP []
 checkContext t 
-  = checkAssertion t [] `thenP` \c ->
-    returnP [c]
+  = checkAssertion t [] `thenP` \(c,ts) ->
+    returnP [HsPClass c ts]
 
 checkAssertion :: RdrNameHsType -> [RdrNameHsType] 
-	-> P (ClassAssertion RdrName)
+	-> P (HsClassAssertion RdrName)
 checkAssertion (MonoTyVar t) args@(_:_) | not (isRdrTyVar t) 
   	= returnP (t,args)
 checkAssertion (MonoTyApp l r) args = checkAssertion l (r:args)
@@ -239,6 +239,7 @@ patterns).
 checkExpr :: RdrNameHsExpr -> P RdrNameHsExpr
 checkExpr e = case e of
 	HsVar _			  -> returnP e
+	HsIPVar _		  -> returnP e
 	HsLit _			  -> returnP e
 	HsLam match		  -> checkMatch match `thenP` (returnP.HsLam)
 	HsApp e1 e2		  -> check2Exprs e1 e2 HsApp

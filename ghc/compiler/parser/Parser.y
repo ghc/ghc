@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.18 1999/12/01 17:01:36 simonmar Exp $
+$Id: Parser.y,v 1.19 2000/01/28 20:52:39 lewie Exp $
 
 Haskell grammar.
 
@@ -19,7 +19,7 @@ import Lex
 import ParseUtil
 import RdrName
 import PrelMods		( mAIN_Name )
-import OccName		( varName, dataName, tcClsName, tvName )
+import OccName		( varName, ipName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CallConv
@@ -85,6 +85,7 @@ Conflicts: 14 shift/reduce
  'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
+ 'with' 	{ ITwith }
  '_scc_'	{ ITscc }
 
  'forall'	{ ITforall }			-- GHC extension keywords
@@ -173,6 +174,7 @@ Conflicts: 14 shift/reduce
  QCONID  	{ ITqconid   $$ }
  QVARSYM 	{ ITqvarsym  $$ }
  QCONSYM 	{ ITqconsym  $$ }
+ IPVARID   	{ ITipvarid  $$ }
 
  PRAGMA		{ ITpragma   $$ }
 
@@ -633,6 +635,7 @@ gdrh :: { RdrNameGRHS }
 
 exp   :: { RdrNameHsExpr }
 	: infixexp '::' sigtype		{ ExprWithTySig $1 $3 }
+	| infixexp 'with' dbinding	{ HsWith $1 $3 }
 	| infixexp			{ $1 }
 
 infixexp :: { RdrNameHsExpr }
@@ -683,6 +686,7 @@ aexp	:: { RdrNameHsExpr }
 
 aexp1	:: { RdrNameHsExpr }
 	: qvar				{ HsVar $1 }
+	| IPVARID			{ HsIPVar (mkSrcUnqual ipName $1) }
 	| gcon				{ HsVar $1 }
   	| literal			{ HsLit $1 }
 	| '(' exp ')'			{ HsPar $2 }
@@ -814,6 +818,22 @@ fbinds 	:: { RdrNameHsRecordBinds }
 
 fbind	:: { (RdrName, RdrNameHsExpr, Bool) }
 	: qvar '=' exp			{ ($1,$3,False) }
+
+-----------------------------------------------------------------------------
+-- Implicit Parameter Bindings
+
+dbinding :: { [(RdrName, RdrNameHsExpr)] }
+	: '{' dbinds '}'		{ $2 }
+	| layout_on dbinds close	{ $2 }
+
+dbinds 	:: { [(RdrName, RdrNameHsExpr)] }
+	: dbinds ';' dbind		{ $3 : $1 }
+	| dbinds ';'			{ $1 }
+	| dbind				{ [$1] }
+	| {- empty -}			{ [] }
+
+dbind	:: { (RdrName, RdrNameHsExpr) }
+dbind	: IPVARID '=' exp		{ (mkSrcUnqual ipName $1, $3) }
 
 -----------------------------------------------------------------------------
 -- Variables, Constructors and Operators.

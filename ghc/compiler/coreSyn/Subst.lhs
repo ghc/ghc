@@ -23,7 +23,7 @@ module Subst (
 
 	-- Type stuff
 	mkTyVarSubst, mkTopTyVarSubst, 
-	substTy, substTheta,
+	substTy, substClasses, substTheta,
 
 	-- Expression stuff
 	substExpr, substIdInfo
@@ -38,7 +38,7 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBndr,
 import CoreFVs		( exprFreeVars )
 import TypeRep		( Type(..), TyNote(..), 
 			)  -- friend
-import Type		( ThetaType,
+import Type		( ThetaType, PredType(..), ClassContext,
 			  tyVarsOfType, tyVarsOfTypes, mkAppTy
 			)
 import VarSet
@@ -262,10 +262,19 @@ substTy :: Subst -> Type  -> Type
 substTy subst ty | isEmptySubst subst = ty
 	         | otherwise	      = subst_ty subst ty
 
+substClasses :: TyVarSubst -> ClassContext -> ClassContext
+substClasses subst theta
+  | isEmptySubst subst = theta
+  | otherwise	       = [(clas, map (subst_ty subst) tys) | (clas, tys) <- theta]
+
 substTheta :: TyVarSubst -> ThetaType -> ThetaType
 substTheta subst theta
   | isEmptySubst subst = theta
-  | otherwise	       = [(clas, map (subst_ty subst) tys) | (clas, tys) <- theta]
+  | otherwise	       = map (substPred subst) theta
+
+substPred :: TyVarSubst -> PredType -> PredType
+substPred subst (Class clas tys) = Class clas (map (subst_ty subst) tys)
+substPred subst (IParam n ty)    = IParam n (subst_ty subst ty)
 
 subst_ty subst ty
    = go ty
@@ -277,6 +286,7 @@ subst_ty subst ty
     go (FunTy arg res)   	  = (FunTy $! (go arg)) $! (go res)
     go (NoteTy (UsgNote usg)  ty2) = (NoteTy $! UsgNote usg) $! go ty2  	-- Keep usage annot
     go (NoteTy (UsgForAll uv) ty2) = (NoteTy $! UsgForAll uv) $! go ty2  	-- Keep uvar bdr
+    go (NoteTy (IPNote nm) ty2)	   = (NoteTy $! IPNote nm) $! go ty2		-- Keep ip note
     go (AppTy fun arg)   	  = mkAppTy (go fun) $! (go arg)
     go ty@(TyVarTy tv)   	  = case (lookupSubst subst tv) of
 	       				Nothing 	   -> ty

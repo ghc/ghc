@@ -18,7 +18,7 @@ import VarSet
 import VarEnv
 
 import Type		( Type, mkTyVarTy, splitSigmaTy, splitFunTysN,
-			  tyVarsOfType, tyVarsOfTypes, applyTys,
+			  tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, applyTys,
 			  mkForAllTys, boxedTypeKind
 			)
 import Subst		( Subst, mkSubst, substTy, emptySubst, substBndrs, extendSubstList,
@@ -972,7 +972,7 @@ mkCallUDs f args
     }
   where
     (tyvars, theta, tau) = splitSigmaTy (idType f)
-    constrained_tyvars   = foldr (unionVarSet . tyVarsOfTypes . snd) emptyVarSet theta 
+    constrained_tyvars   = tyVarsOfTheta theta 
     n_tyvars		 = length tyvars
     n_dicts		 = length theta
 

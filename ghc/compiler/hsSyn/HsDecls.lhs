@@ -113,14 +113,14 @@ instance (Outputable name, Outputable pat)
 \begin{code}
 data TyClDecl name pat
   = TyData	NewOrData
-		(Context name)	-- context
-		name		-- type constructor
-		[HsTyVar name]	-- type variables
-		[ConDecl name]	-- data constructors (empty if abstract)
-		(Maybe [name])	-- derivings; Nothing => not specified
-				-- (i.e., derive default); Just [] => derive
-				-- *nothing*; Just <list> => as you would
-				-- expect...
+		(HsContext name) -- context
+		name		 -- type constructor
+		[HsTyVar name]	 -- type variables
+		[ConDecl name]	 -- data constructors (empty if abstract)
+		(Maybe [name])	 -- derivings; Nothing => not specified
+				 -- (i.e., derive default); Just [] => derive
+				 -- *nothing*; Just <list> => as you would
+				 -- expect...
 		(DataPragmas name)
 		SrcLoc
 
@@ -129,7 +129,7 @@ data TyClDecl name pat
 		(HsType name)	-- synonym expansion
 		SrcLoc
 
-  | ClassDecl	(Context name)	    	-- context...
+  | ClassDecl	(HsContext name)    	-- context...
 		name		    	-- name of the class
 		[HsTyVar name]	    	-- the class type variables
 		[([name], [name])]	-- functional dependencies
@@ -172,7 +172,7 @@ instance (Outputable name, Outputable pat)
 
     ppr (TyData new_or_data context tycon tyvars condecls derivings pragmas src_loc)
       = pp_tydecl
-		  (pp_decl_head keyword (pprContext context) tycon tyvars)
+		  (pp_decl_head keyword (pprHsContext context) tycon tyvars)
 		  (pp_condecls condecls)
 		  derivings
       where
@@ -190,7 +190,7 @@ instance (Outputable name, Outputable pat)
 				   ppr methods,
 				   char '}'])]
       where
-        top_matter = hsep [ptext SLIT("class"), pprContext context,
+        top_matter = hsep [ptext SLIT("class"), pprHsContext context,
                             ppr clas, hsep (map (ppr) tyvars), pprFundeps fds]
 	ppr_sig sig = ppr sig <> semi
 
@@ -239,7 +239,7 @@ data ConDecl name
   = ConDecl 	name			-- Constructor name
 
 		[HsTyVar name]		-- Existentially quantified type variables
-		(Context name)		-- ...and context
+		(HsContext name)	-- ...and context
 					-- If both are empty then there are no existentials
 
 		(ConDetails name)
@@ -269,7 +269,7 @@ data BangType name
 \begin{code}
 instance (Outputable name) => Outputable (ConDecl name) where
     ppr (ConDecl con tvs cxt con_details  loc)
-      = sep [pprForAll tvs, pprContext cxt, ppr_con_details con con_details]
+      = sep [pprForAll tvs, pprHsContext cxt, ppr_con_details con con_details]
 
 ppr_con_details con (InfixCon ty1 ty2)
   = hsep [ppr_bang ty1, ppr con, ppr_bang ty2]

@@ -20,8 +20,8 @@ import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcMonad
 import Inst		( Inst, LIE, emptyLIE, mkLIE, plusLIE, plusLIEs, InstOrigin(..),
-			  newDicts, tyVarsOfInst, instToId, getFunDepsOfLIE,
-			  zonkFunDeps
+			  newDicts, tyVarsOfInst, instToId,
+			  getAllFunDepsOfLIE, getIPsOfLIE, zonkFunDeps
 			)
 import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId, newLocalId,
@@ -46,12 +46,12 @@ import PrelInfo		( main_NAME, ioTyCon_NAME )
 
 import Id		( Id, mkVanillaId, setInlinePragma )
 import Var		( idType, idName )
-import IdInfo		( IdInfo, vanillaIdInfo, setInlinePragInfo, InlinePragInfo(..) )
+import IdInfo		( setInlinePragInfo, InlinePragInfo(..) )
 import Name		( Name, getName, getOccName, getSrcLoc )
 import NameSet
 import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
 			  splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, 
-			  mkDictTy, splitRhoTy, mkForAllTy, isUnLiftedType, 
+			  mkPredTy, splitRhoTy, mkForAllTy, isUnLiftedType, 
 			  isUnboxedType, unboxedTypeKind, boxedTypeKind
 			)
 import FunDeps		( tyVarFunDep, oclose )
@@ -290,8 +290,9 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 
 	-- SIMPLIFY THE LIE
     tcExtendGlobalTyVars tyvars_not_to_gen (
-	if null real_tyvars_to_gen_list then
-		-- No polymorphism, so no need to simplify context
+	let ips = getIPsOfLIE lie_req in
+	if null real_tyvars_to_gen_list && null ips then
+		-- No polymorphism, and no IPs, so no need to simplify context
 	    returnTc (lie_req, EmptyMonoBinds, [])
 	else
 	case maybe_sig_theta of
@@ -300,7 +301,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 		-- NB: no signatures => no polymorphic recursion, so no
 		-- need to use lie_avail (which will be empty anyway)
 	    tcSimplify (text "tcBinds1" <+> ppr binder_names)
-		       top_lvl real_tyvars_to_gen lie_req	`thenTc` \ (lie_free, dict_binds, lie_bound) ->
+		       real_tyvars_to_gen lie_req	`thenTc` \ (lie_free, dict_binds, lie_bound) ->
 	    returnTc (lie_free, dict_binds, map instToId (bagToList lie_bound))
 
 	  Just (sig_theta, lie_avail) ->
@@ -408,6 +409,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 
 	 -- BUILD RESULTS
     returnTc (
+	 -- pprTrace "binding.." (ppr ((dicts_bound, dict_binds), exports, [idType poly_id | (_, poly_id, _) <- exports])) $
 	 AbsBinds real_tyvars_to_gen_list
 		  dicts_bound
 		  exports
@@ -539,7 +541,7 @@ getTyVarsToGen is_unrestricted mono_id_tys lie
     in
     if is_unrestricted
     then
-	let fds = concatMap snd (getFunDepsOfLIE lie) in
+	let fds = getAllFunDepsOfLIE lie in
 	zonkFunDeps fds		`thenNF_Tc` \ fds' ->
 	let tvFundep = tyVarFunDep fds'
 	    extended_tyvars = oclose tvFundep body_tyvars in
@@ -551,7 +553,7 @@ getTyVarsToGen is_unrestricted mono_id_tys lie
 	recoverNF_Tc (returnNF_Tc (emptyVarSet, body_tyvars))		$
 	discardErrsTc							$
 
-	tcSimplify (text "getTVG") NotTopLevel body_tyvars lie    `thenTc` \ (_, _, constrained_dicts) ->
+	tcSimplify (text "getTVG") body_tyvars lie    `thenTc` \ (_, _, constrained_dicts) ->
 	let
 	  -- ASSERT: dicts_sig is already zonked!
 	    constrained_tyvars    = foldrBag (unionVarSet . tyVarsOfInst) emptyVarSet constrained_dicts
@@ -792,7 +794,7 @@ checkSigMatch top_lvl binder_names mono_ids sigs
 	= tcAddSrcLoc src_loc	$
 	  checkTc (null theta) (mainContextsErr id)
 
-    mk_dict_tys theta = [mkDictTy c ts | (c,ts) <- theta]
+    mk_dict_tys theta = map mkPredTy theta
 
     sig_msg id tidy_ty = sep [ptext SLIT("When checking the type signature"),
 			      nest 4 (ppr id <+> dcolon <+> ppr tidy_ty)]

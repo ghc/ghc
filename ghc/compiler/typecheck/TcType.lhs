@@ -40,7 +40,7 @@ module TcType (
 
   --------------------------------
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarBndr,
-  zonkTcType, zonkTcTypes, zonkTcThetaType,
+  zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
 
   zonkTcTypeToType, zonkTcTyVarToTyVar,
   zonkTcKindToKind
@@ -55,9 +55,9 @@ import PprType		( pprType )
 import TypeRep		( Type(..), Kind, TyNote(..), 
 			  typeCon, openTypeKind, boxedTypeKind, boxedKind, superKind, superBoxity
 			)  -- friend
-import Type		( ThetaType,
+import Type		( ThetaType, PredType(..),
 			  mkAppTy, mkTyConApp,
-			  splitDictTy_maybe, splitForAllTys, isNotUsgTy,
+			  splitPredTy_maybe, splitForAllTys, isNotUsgTy,
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
@@ -108,7 +108,7 @@ tcSplitRhoTy t
  where
 	-- A type variable is never instantiated to a dictionary type,
 	-- so we don't need to do a tcReadVar on the "arg".
-    go syn_t (FunTy arg res) ts = case splitDictTy_maybe arg of
+    go syn_t (FunTy arg res) ts = case splitPredTy_maybe arg of
 					Just pair -> go res res (pair:ts)
 					Nothing   -> returnNF_Tc (reverse ts, syn_t)
     go syn_t (NoteTy _ t)    ts = go syn_t t ts
@@ -331,11 +331,21 @@ zonkTcType ty = zonkType (\ tv -> returnNF_Tc (TyVarTy tv)) ty
 zonkTcTypes :: [TcType] -> NF_TcM s [TcType]
 zonkTcTypes tys = mapNF_Tc zonkTcType tys
 
+zonkTcClassConstraints cts = mapNF_Tc zonk cts
+    where zonk (clas, tys)
+	    = zonkTcTypes tys	`thenNF_Tc` \ new_tys ->
+	      returnNF_Tc (clas, new_tys)
+
 zonkTcThetaType :: TcThetaType -> NF_TcM s TcThetaType
-zonkTcThetaType theta = mapNF_Tc zonk theta
-		    where
-		        zonk (c,ts) = zonkTcTypes ts	`thenNF_Tc` \ new_ts ->
-				      returnNF_Tc (c, new_ts)
+zonkTcThetaType theta = mapNF_Tc zonkTcPredType theta
+
+zonkTcPredType :: TcPredType -> NF_TcM s TcPredType
+zonkTcPredType (Class c ts) =
+    zonkTcTypes ts	`thenNF_Tc` \ new_ts ->
+    returnNF_Tc (Class c new_ts)
+zonkTcPredType (IParam n t) =
+    zonkTcType t	`thenNF_Tc` \ new_t ->
+    returnNF_Tc (IParam n new_t)
 
 zonkTcKind :: TcKind -> NF_TcM s TcKind
 zonkTcKind = zonkTcType
@@ -443,6 +453,9 @@ zonkType unbound_var_fn ty
 
     go (NoteTy (UsgForAll uv) ty2)= go ty2		`thenNF_Tc` \ ty2' ->
 				    returnNF_Tc (NoteTy (UsgForAll uv) ty2')
+
+    go (NoteTy (IPNote nm) ty2)   = go ty2		`thenNF_Tc` \ ty2' ->
+				    returnNF_Tc (NoteTy (IPNote nm) ty2')
 
     go (FunTy arg res)      	  = go arg		`thenNF_Tc` \ arg' ->
 				    go res		`thenNF_Tc` \ res' ->

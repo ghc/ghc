@@ -8,7 +8,7 @@ module Class (
 	Class, ClassOpItem,
 
 	mkClass, classTyVars,
-	classKey, classSelIds, classTyCon,
+	classKey, className, classSelIds, classTyCon,
 	classBigSig, classExtraBigSig, classInstEnv, classTvsFds
     ) where
 

@@ -29,7 +29,7 @@ import Var	( TyVar, UVar )
 import VarEnv
 import VarSet
 
-import Name	( Provenance(..), ExportFlag(..),
+import Name	( Name, Provenance(..), ExportFlag(..),
 		  mkWiredInTyConName, mkGlobalName, mkKindOccFS, tcName,
 		)
 import TyCon	( TyCon, KindCon,
@@ -133,6 +133,7 @@ data TyNote
   | FTVNote TyVarSet	-- The free type variables of the noted expression
   | UsgNote UsageAnn    -- The usage annotation at this node
   | UsgForAll UVar      -- Annotation variable binder
+  | IPNote Name		-- It's an implicit parameter
 
 data UsageAnn
   = UsOnce		-- Used at most once

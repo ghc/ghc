@@ -88,7 +88,7 @@ type RdrNameBangType		= BangType		RdrName
 type RdrNameClassOpSig		= Sig			RdrName
 type RdrNameConDecl		= ConDecl		RdrName
 type RdrNameConDetails		= ConDetails		RdrName
-type RdrNameContext		= Context 		RdrName
+type RdrNameContext		= HsContext 		RdrName
 type RdrNameHsDecl		= HsDecl		RdrName RdrNamePat
 type RdrNameSpecDataSig		= SpecDataSig		RdrName
 type RdrNameDefaultDecl		= DefaultDecl		RdrName
@@ -147,12 +147,13 @@ extractRuleBndrsTyVars bndrs = filter isRdrTyVar (nub (foldr go [] bndrs))
                              go (RuleBndr _)       acc = acc
                              go (RuleBndrSig _ ty) acc = extract_ty ty acc
 
-extractHsCtxtRdrNames :: Context RdrName -> [RdrName]
+extractHsCtxtRdrNames :: HsContext RdrName -> [RdrName]
 extractHsCtxtRdrNames ty = nub (extract_ctxt ty [])
 
-extract_ctxt ctxt acc = foldr extract_ass acc ctxt
-                    where
-                      extract_ass (cls, tys) acc = foldr extract_ty (cls : acc) tys
+extract_ctxt ctxt acc = foldr extract_pred acc ctxt
+
+extract_pred (HsPClass cls tys) acc	= foldr extract_ty (cls : acc) tys
+extract_pred (HsPIParam n ty) acc	= extract_ty ty acc
 
 extract_tys tys acc = foldr extract_ty acc tys
 

@@ -10,7 +10,7 @@ module TcExpr ( tcApp, tcExpr, tcPolyExpr, tcId ) where
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
 			  HsBinds(..), Stmt(..), StmtCtxt(..),
-			  mkMonoBind
+			  mkMonoBind, nullMonoBinds
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds,
@@ -21,8 +21,12 @@ import TcMonad
 import BasicTypes	( RecFlag(..) )
 
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
-			  LIE, emptyLIE, unitLIE, plusLIE, plusLIEs, newOverloadedLit,
-			  newMethod, instOverloadedFun, newDicts )
+			  LIE, emptyLIE, unitLIE, consLIE, plusLIE, plusLIEs,
+			  lieToList, listToLIE, tyVarsOfLIE, zonkLIE,
+			  newOverloadedLit, newMethod, newIPDict,
+			  instOverloadedFun, newDicts, newClassDicts,
+			  partitionLIEbyMeth, getIPsOfLIE
+			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcInstId,
 			  tcLookupValue, tcLookupClassByKey,
@@ -33,7 +37,7 @@ import TcEnv		( tcInstId,
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsType, checkSigTyVars, sigCtxt )
 import TcPat		( badFieldCon )
-import TcSimplify	( tcSimplifyAndCheck )
+import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
 import TcType		( TcType, TcTauType,
 			  tcInstTyVars,
 			  tcInstTcType, tcSplitRhoTy,
@@ -44,13 +48,14 @@ import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType
 			)
 import Id		( idType, recordSelectorFieldLabel,
 			  isRecordSelector,
-			  Id
+			  Id, mkVanillaId
 			)
 import DataCon		( dataConFieldLabels, dataConSig, dataConId,
 			  dataConStrictMarks, StrictnessMark(..)
 			)
-import Name		( Name )
+import Name		( Name, getName )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
+			  ipName_maybe,
 			  splitFunTy_maybe, splitFunTys, isNotUsgTy,
 			  mkTyConApp,
 			  splitForAllTys, splitRhoTy,
@@ -59,9 +64,9 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  boxedTypeKind, mkArrowKind,
 			  tidyOpenType
 			)
-import Subst		( mkTopTyVarSubst, substTheta )
+import Subst		( mkTopTyVarSubst, substClasses )
 import UsageSPUtils     ( unannotTy )
-import VarSet		( elemVarSet, mkVarSet )
+import VarSet		( emptyVarSet, unionVarSet, elemVarSet, mkVarSet )
 import TyCon		( tyConDataCons )
 import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
 			  floatPrimTy, addrPrimTy
@@ -177,7 +182,7 @@ tcPolyExpr arg expected_arg_ty
 
 \begin{code}
 tcMonoExpr :: RenamedHsExpr		-- Expession to type check
-	   -> TcTauType 			-- Expected type (could be a type variable)
+	   -> TcTauType 		-- Expected type (could be a type variable)
 	   -> TcM s (TcExpr, LIE)
 
 tcMonoExpr (HsVar name) res_ty
@@ -191,6 +196,14 @@ tcMonoExpr (HsVar name) res_ty
 	    (lurkingRank2Err name id_ty) `thenTc_`
 
     returnTc (expr', lie)
+\end{code}
+
+\begin{code}
+tcMonoExpr (HsIPVar name) res_ty
+  = let id = mkVanillaId name res_ty in
+    tcGetInstLoc (OccurrenceOf id)	`thenNF_Tc` \ loc ->
+    newIPDict name res_ty loc		`thenNF_Tc` \ ip ->
+    returnNF_Tc (HsIPVar id, unitLIE ip)
 \end{code}
 
 %************************************************************************
@@ -217,8 +230,8 @@ tcMonoExpr (HsLit (HsFrac f)) res_ty
 
 tcMonoExpr (HsLit lit@(HsLitLit s)) res_ty
   = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
-    newDicts (LitLitOrigin (_UNPK_ s))
-	     [(cCallableClass, [res_ty])]		`thenNF_Tc` \ (dicts, _) ->
+    newClassDicts (LitLitOrigin (_UNPK_ s))
+	          [(cCallableClass,[res_ty])]		`thenNF_Tc` \ (dicts, _) ->
     returnTc (HsLitOut lit res_ty, dicts)
 \end{code}
 
@@ -347,8 +360,8 @@ tcMonoExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
     tcLookupTyCon ioTyCon_NAME			`thenNF_Tc` \ ioTyCon ->
     let
 	new_arg_dict (arg, arg_ty)
-	  = newDicts (CCallOrigin (_UNPK_ lbl) (Just arg))
-		     [(cCallableClass, [arg_ty])]	`thenNF_Tc` \ (arg_dicts, _) ->
+	  = newClassDicts (CCallOrigin (_UNPK_ lbl) (Just arg))
+			  [(cCallableClass, [arg_ty])]	`thenNF_Tc` \ (arg_dicts, _) ->
 	    returnNF_Tc arg_dicts	-- Actually a singleton bag
 
 	result_origin = CCallOrigin (_UNPK_ lbl) Nothing {- Not an arg -}
@@ -375,7 +388,7 @@ tcMonoExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 	-- Construct the extra insts, which encode the
 	-- constraints on the argument and result types.
     mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenNF_Tc` \ ccarg_dicts_s ->
-    newDicts result_origin [(cReturnableClass, [result_ty])]		`thenNF_Tc` \ (ccres_dict, _) ->
+    newClassDicts result_origin [(cReturnableClass, [result_ty])]	`thenNF_Tc` \ (ccres_dict, _) ->
     returnTc (HsApp (HsVar (dataConId ioDataCon) `TyApp` [result_ty])
 		    (CCall lbl args' may_gc is_asm result_ty),
 		      -- do the wrapping in the newtype constructor here
@@ -617,9 +630,9 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let
 	(tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
 	inst_env = mkTopTyVarSubst tyvars result_inst_tys
-	theta'   = substTheta inst_env theta
+	theta'   = substClasses inst_env theta
     in
-    newDicts RecordUpdOrigin theta'		`thenNF_Tc` \ (con_lie, dicts) ->
+    newClassDicts RecordUpdOrigin theta'	`thenNF_Tc` \ (con_lie, dicts) ->
 
 	-- Phew!
     returnTc (RecordUpdOut record_expr' result_record_ty dicts rbinds', 
@@ -709,6 +722,50 @@ tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
 	    -- resolution it may have done, which is recorded in the
 	    -- substitution.
 	returnTc (expr, lie)
+\end{code}
+
+Implicit Parameter bindings.
+
+\begin{code}
+tcMonoExpr (HsWith expr binds) res_ty
+  = tcMonoExpr expr res_ty		`thenTc` \ (expr', lie) ->
+    tcIPBinds binds			`thenTc` \ (binds', types, lie2) ->
+    partitionLIEbyMeth isBound lie	`thenTc` \ (ips, lie') ->
+    zonkLIE ips				`thenTc` \ ips' ->
+    tcSimplify (text "With!") (tyVarsOfLIE ips') ips' `thenTc` \ res@(_, dict_binds, _) ->
+    let expr'' = if nullMonoBinds dict_binds
+		 then expr'
+		 else HsLet (MonoBind dict_binds [] NonRecursive) expr' in
+    tcCheckIPBinds binds' types ips'	`thenTc_`
+    returnTc (HsWith expr'' binds', lie')
+  where isBound p
+	  = case ipName_maybe p of
+	    Just n -> n `elem` names
+	    Nothing -> False
+	names = map fst binds
+
+tcIPBinds ((name, expr) : binds)
+  = newTyVarTy_OpenKind		`thenTc` \ ty ->
+    let id = mkVanillaId name ty in
+    tcMonoExpr expr ty		`thenTc` \ (expr', lie) ->
+    zonkTcType ty		`thenTc` \ ty' ->
+    tcIPBinds binds		`thenTc` \ (binds', types, lie2) ->
+    returnTc ((id, expr') : binds', ty : types, lie `plusLIE` lie2)
+tcIPBinds [] = returnTc ([], [], emptyLIE)
+
+tcCheckIPBinds binds types ips
+  = foldrTc tcCheckIPBind (getIPsOfLIE ips) (zip binds types)
+
+-- ZZ how do we use the loc?
+tcCheckIPBind bt@((v, _), t1) ((n, t2) : ips) | getName v == n
+  = unifyTauTy t1 t2		`thenTc_`
+    tcCheckIPBind bt ips	`thenTc` \ ips' ->
+    returnTc ips'
+tcCheckIPBind bt (ip : ips)
+  = tcCheckIPBind bt ips	`thenTc` \ ips' ->
+    returnTc (ip : ips')
+tcCheckIPBind bt []
+  = returnTc []
 \end{code}
 
 Typecheck expression which in most cases will be an Id.

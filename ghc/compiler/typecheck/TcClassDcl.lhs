@@ -12,8 +12,9 @@ module TcClassDcl ( kcClassDecl, tcClassDecl1, tcClassDecls2,
 
 import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  InPat(..), HsBinds(..), GRHSs(..),
-			  HsExpr(..), HsLit(..), HsType(..), pprClassAssertion,
-			  unguardedRHS, andMonoBinds, andMonoBindList, getTyVarName,
+			  HsExpr(..), HsLit(..), HsType(..), HsPred(..),
+			  pprHsClassAssertion, unguardedRHS,
+			  andMonoBinds, andMonoBindList, getTyVarName,
 			  isClassDecl, isClassOpSig, isPragSig, collectMonoBinders
 			)
 import HsPragmas	( ClassPragmas(..) )
@@ -50,8 +51,9 @@ import IdInfo
 import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
 import NameSet		( emptyNameSet )
 import Outputable
-import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
-			  mkSigmaTy, mkForAllTys, Type, ThetaType,
+import Type		( Type, ThetaType, ClassContext,
+			  mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
+			  mkSigmaTy, mkForAllTys, mkClassPred, classesOfPreds,
 			  boxedTypeKind, mkArrowKind
 			)
 import Var		( tyVarKind, TyVar )
@@ -219,7 +221,7 @@ tc_fd_tyvar v =
 tcClassContext :: Name -> Class -> [TyVar]
 	       -> RenamedContext 	-- class context
 	       -> [Name]		-- Names for superclass selectors
-	       -> TcM s (ThetaType,	-- the superclass context
+	       -> TcM s (ClassContext,	-- the superclass context
 			 [Type],	-- types of the superclass dictionaries
 		         [Id])  	-- superclass selector Ids
 
@@ -238,11 +240,12 @@ tcClassContext class_name rec_class rec_tyvars context sc_sel_names
     tcContext context			`thenTc` \ sc_theta ->
 
     let
-       sc_tys = [mkDictTy sc tys | (sc,tys) <- sc_theta]
+       sc_theta' = classesOfPreds sc_theta
+       sc_tys = [mkDictTy sc tys | (sc,tys) <- sc_theta']
        sc_sel_ids = zipWithEqual "tcClassContext" mk_super_id sc_sel_names sc_tys
     in
 	-- Done
-    returnTc (sc_theta, sc_tys, sc_sel_ids)
+    returnTc (sc_theta', sc_tys, sc_sel_ids)
 
   where
     rec_tyvar_tys = mkTyVarTys rec_tyvars
@@ -253,8 +256,8 @@ tcClassContext class_name rec_class rec_tyvars context sc_sel_names
 	  ty = mkForAllTys rec_tyvars $
 	       mkFunTy (mkDictTy rec_class rec_tyvar_tys) dict_ty
 
-    check_constraint (c, tys) = checkTc (all is_tyvar tys)
-					(superClassErr class_name (c, tys))
+    check_constraint (HsPClass c tys) = checkTc (all is_tyvar tys)
+					 (superClassErr class_name (c, tys))
 
     is_tyvar (MonoTyVar _) = True
     is_tyvar other	   = False
@@ -282,7 +285,7 @@ tcClassSig rec_env rec_clas rec_clas_tyvars
     tcHsTopType op_ty				`thenTc` \ local_ty ->
     let
 	global_ty   = mkSigmaTy rec_clas_tyvars 
-			        [(rec_clas, mkTyVarTys rec_clas_tyvars)]
+			        [mkClassPred rec_clas (mkTyVarTys rec_clas_tyvars)]
 			        local_ty
 
 	-- Build the selector id and default method id
@@ -463,7 +466,7 @@ tcDefaultMethodBinds clas default_binds sigs
     tc_dm op_item@(_, dm_id, _)
       = tcInstTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, _) ->
 	let
-	    theta = [(clas,inst_tys)]
+	    theta = [(mkClassPred clas inst_tys)]
 	in
 	newDicts origin theta 			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
 	let
@@ -642,7 +645,7 @@ classArityErr class_name
   = ptext SLIT("Too many parameters for class") <+> quotes (ppr class_name)
 
 superClassErr class_name sc
-  = ptext SLIT("Illegal superclass constraint") <+> quotes (pprClassAssertion sc)
+  = ptext SLIT("Illegal superclass constraint") <+> quotes (pprHsClassAssertion sc)
     <+> ptext SLIT("in declaration for class") <+> quotes (ppr class_name)
 
 defltMethCtxt class_name

@@ -282,6 +282,10 @@ rnExpr (HsVar v)
         -- The normal case
        returnRn (HsVar name, unitFV name)
 
+rnExpr (HsIPVar v)
+  = getIPName v			`thenRn` \ name ->
+    returnRn (HsIPVar name, emptyFVs)
+
 rnExpr (HsLit lit) 
   = litOccurrence lit		`thenRn` \ fvs ->
     returnRn (HsLit lit, fvs)
@@ -366,6 +370,11 @@ rnExpr (HsLet binds expr)
   = rnBinds binds		$ \ binds' ->
     rnExpr expr			 `thenRn` \ (expr',fvExpr) ->
     returnRn (HsLet binds' expr', fvExpr)
+
+rnExpr (HsWith expr binds)
+  = rnExpr expr			`thenRn` \ (expr',fvExpr) ->
+    rnIPBinds binds		`thenRn` \ (binds',fvBinds) ->
+    returnRn (HsWith expr' binds', fvExpr `plusFV` fvBinds)
 
 rnExpr e@(HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
@@ -487,6 +496,22 @@ rnRpats rpats
       = lookupGlobalOccRn field	`thenRn` \ fieldname ->
 	rnPat pat		`thenRn` \ (pat', fvs) ->
 	returnRn ((fieldname, pat', pun), fvs `addOneFV` fieldname)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{@rnIPBinds@s: in implicit parameter bindings}		*
+%*									*
+%************************************************************************
+
+\begin{code}
+rnIPBinds [] = returnRn ([], emptyFVs)
+rnIPBinds ((n, expr) : binds)
+  = getIPName n			`thenRn` \ name ->
+    rnExpr expr			`thenRn` \ (expr',fvExpr) ->
+    rnIPBinds binds		`thenRn` \ (binds',fvBinds) ->
+    returnRn ((name, expr') : binds', fvExpr `plusFV` fvBinds)
+
 \end{code}
 
 %************************************************************************

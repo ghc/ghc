@@ -24,7 +24,7 @@ import TcMonoType	( tcExtendTopTyVarScope, tcExtendTyVarScope,
 			  tcHsTypeKind, tcHsType, tcHsTopType, tcHsTopBoxedType,
 			  tcContext, tcHsTopTypeKind
 			)
-import TcType		( zonkTcTyVarToTyVar, zonkTcThetaType )
+import TcType		( zonkTcTyVarToTyVar, zonkTcClassConstraints )
 import TcEnv		( tcLookupTy, TcTyThing(..) )
 import TcMonad
 import TcUnify		( unifyKind )
@@ -48,7 +48,7 @@ import Type		( getTyVar, tyVarsOfTypes,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
 			  mkTyVarTy,
 			  mkArrowKind, mkArrowKinds, boxedTypeKind,
-			  isUnboxedType, Type, ThetaType
+			  isUnboxedType, Type, ThetaType, classesOfPreds
 			)
 import Var		( tyVarKind )
 import VarSet		( intersectVarSet, isEmptyVarSet )
@@ -128,7 +128,8 @@ tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_
 
 	-- Typecheck the pieces
     tcContext context					`thenTc` \ ctxt ->
-    mapTc (tcConDecl rec_tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
+    let ctxt' = classesOfPreds ctxt in
+    mapTc (tcConDecl rec_tycon tyvars ctxt') con_decls	`thenTc` \ data_cons ->
     tc_derivs derivings					`thenTc` \ derived_classes ->
 
     let
@@ -141,7 +142,7 @@ tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_
         argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcTyDecl: argvrcs:" $ ppr tycon_name)
                                       tycon_name
 
-	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
+	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt' argvrcs
 			   data_cons
 			   derived_classes
 			   Nothing		-- Not a dictionary
@@ -164,13 +165,14 @@ tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_
 %************************************************************************
 
 \begin{code}
-tcConDecl :: TyCon -> [TyVar] -> ThetaType -> RenamedConDecl -> TcM s DataCon
+tcConDecl :: TyCon -> [TyVar] -> [(Class,[Type])] -> RenamedConDecl -> TcM s DataCon
 
 tcConDecl tycon tyvars ctxt (ConDecl name ex_tvs ex_ctxt details src_loc)
   = tcAddSrcLoc src_loc			$
     tcExtendTyVarScope ex_tvs		$ \ ex_tyvars -> 
     tcContext ex_ctxt			`thenTc` \ ex_theta ->
-    tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
+    let ex_ctxt' = classesOfPreds ex_theta in
+    tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_ctxt' details
 
 tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
   = case details of
@@ -223,7 +225,7 @@ tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
 		-- immutable type variables.  (The top-level tyvars are
 		-- already fixed, by the preceding kind-inference pass.)
 	mapNF_Tc zonkTcTyVarToTyVar ex_tyvars	`thenNF_Tc` \ ex_tyvars' ->
-	zonkTcThetaType	ex_theta		`thenNF_Tc` \ ex_theta' ->
+	zonkTcClassConstraints	ex_theta	`thenNF_Tc` \ ex_theta' ->
 	let
 	   data_con = mkDataCon name arg_stricts fields
 		      	   tyvars (thinContext arg_tys ctxt)

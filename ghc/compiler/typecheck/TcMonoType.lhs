@@ -14,7 +14,7 @@ module TcMonoType ( tcHsType, tcHsTypeKind, tcHsTopType, tcHsTopBoxedType, tcHsT
 #include "HsVersions.h"
 
 import HsSyn		( HsType(..), HsTyVar(..), MonoUsageAnn(..),
-                          Sig(..), pprClassAssertion, pprParendHsType )
+                          Sig(..), HsPred(..), pprHsPred, pprParendHsType )
 import RnHsSyn		( RenamedHsType, RenamedContext, RenamedSig )
 import TcHsSyn		( TcId )
 
@@ -30,7 +30,7 @@ import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr )
 import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
-import Type		( Type, ThetaType, UsageAnn(..),
+import Type		( Type, PredType(..), ThetaType, UsageAnn(..),
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
                           mkUsForAllTy, zipFunTys,
 			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys, splitForAllTys, splitRhoTy,
@@ -162,7 +162,7 @@ tc_type_kind (MonoTyApp ty1 ty2)
   = tc_app ty1 [ty2]
 
 tc_type_kind (MonoDictTy class_name tys)
-  = tcClassAssertion (class_name, tys)	`thenTc` \ (clas, arg_tys) ->
+  = tcClassAssertion (HsPClass class_name tys)	`thenTc` \ (Class clas arg_tys) ->
     returnTc (boxedTypeKind, mkDictTy clas arg_tys)
 
 tc_type_kind (MonoUsgTy usg ty)
@@ -197,8 +197,8 @@ tc_type_kind (HsForAllTy (Just tv_names) context ty)
 		-- give overloaded functions like
 		--	f :: forall a. Num a => (# a->a, a->a #)
 		-- And we want these to get through the type checker
-        check ct@(c,tys) | ambiguous = failWithTc (ambigErr ct tau)
-			 | otherwise = returnTc ()
+        check ct@(Class c tys) | ambiguous = failWithTc (ambigErr (c,tys) tau)
+			       | otherwise = returnTc ()
 	  where ct_vars = tyVarsOfTypes tys
 		forall_tyvars = map varName in_scope_vars
 		tau_vars = tyVarsOfType tau
@@ -287,12 +287,13 @@ tcContext context
     mapTc tcClassAssertion context
 
  where
-   check_naughty (class_name, _) 
+   check_naughty (HsPClass class_name _) 
      = checkTc (not (getUnique class_name `elem` cCallishClassKeys))
 	       (naughtyCCallContextErr class_name)
+   check_naughty (HsPIParam _ _) = returnTc ()
 
-tcClassAssertion assn@(class_name, tys)
-  = tcAddErrCtxt (appKindCtxt (pprClassAssertion assn))	$
+tcClassAssertion assn@(HsPClass class_name tys)
+  = tcAddErrCtxt (appKindCtxt (pprHsPred assn))	$
     mapAndUnzipTc tc_type_kind tys	`thenTc` \ (arg_kinds, arg_tys) ->
     tcLookupTy class_name		`thenTc` \ (kind, ~(Just arity), thing) ->
     case thing of
@@ -302,10 +303,14 @@ tcClassAssertion assn@(class_name, tys)
 		    	-- Check with kind mis-match
 		checkTc (arity == n_tys) err				`thenTc_`
 		unifyKind kind (mkArrowKinds arg_kinds boxedTypeKind)	`thenTc_`
-		returnTc (clas, arg_tys)
+		returnTc (Class clas arg_tys)
 	    where
 		n_tys = length tys
 		err   = arityErr "Class" class_name arity n_tys
+tcClassAssertion assn@(HsPIParam name ty)
+  = tcAddErrCtxt (appKindCtxt (pprHsPred assn))	$
+    tc_type_kind ty	`thenTc` \ (arg_kind, arg_ty) ->
+    returnTc (IParam name arg_ty)
 \end{code}
 
 

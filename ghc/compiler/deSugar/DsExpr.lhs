@@ -118,6 +118,7 @@ dsLet (MonoBind binds sigs is_rec) body
 dsExpr :: TypecheckedHsExpr -> DsM CoreExpr
 
 dsExpr e@(HsVar var) = returnDs (Var var)
+dsExpr e@(HsIPVar var) = returnDs (Var var)
 \end{code}
 
 %************************************************************************
@@ -319,7 +320,15 @@ dsExpr (HsCase discrim matches src_loc)
 dsExpr (HsLet binds body)
   = dsExpr body		`thenDs` \ body' ->
     dsLet binds body'
-    
+
+dsExpr (HsWith expr binds)
+  = dsExpr expr		`thenDs` \ expr' ->
+    foldlDs dsIPBind expr' binds
+    where
+      dsIPBind body (n, e)
+        = dsExpr e	`thenDs` \ e' ->
+	  returnDs (Let (NonRec n e') body)
+
 dsExpr (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty src_loc)
   | maybeToBool maybe_list_comp
   =	-- Special case for list comprehensions

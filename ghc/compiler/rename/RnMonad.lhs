@@ -214,6 +214,8 @@ type RnNameSupply
 
    , FiniteMap (ModuleName, OccName) Name
 	-- Ensures that one (module,occname) pair gets one unique
+   , FiniteMap OccName Name
+	-- Ensures that one implicit parameter name gets one unique
    )
 
 
@@ -370,7 +372,7 @@ initRn :: ModuleName -> UniqSupply -> SearchPath -> SrcLoc
 
 initRn mod us dirs loc do_rn = do
   himaps    <- mkModuleHiMaps dirs
-  names_var <- newIORef (us, emptyFM, builtins)
+  names_var <- newIORef (us, emptyFM, builtins, emptyFM)
   errs_var  <- newIORef (emptyBag,emptyBag)
   iface_var <- newIORef emptyIfaces 
   let
@@ -635,23 +637,23 @@ setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
 -- See comments with RnNameSupply above.
 newInstUniq :: String -> RnM d Int
 newInstUniq key (RnDown {rn_ns = names_var}) l_down
-  = readIORef names_var				>>= \ (us, mapInst, cache) ->
+  = readIORef names_var				>>= \ (us, mapInst, cache, ipcache) ->
     let
 	uniq = case lookupFM mapInst key of
 		   Just x  -> x+1
 		   Nothing -> 0
 	mapInst' = addToFM mapInst key uniq
     in
-    writeIORef names_var (us, mapInst', cache)	>>
+    writeIORef names_var (us, mapInst', cache, ipcache) >>
     return uniq
 
 getUniqRn :: RnM d Unique
 getUniqRn (RnDown {rn_ns = names_var}) l_down
- = readIORef names_var >>= \ (us, mapInst, cache) ->
+ = readIORef names_var >>= \ (us, mapInst, cache, ipcache) ->
    let
      (us1,us') = splitUniqSupply us
    in
-   writeIORef names_var (us', mapInst, cache)  >>
+   writeIORef names_var (us', mapInst, cache, ipcache)  >>
    return (uniqFromSupply us1)
 \end{code}
 

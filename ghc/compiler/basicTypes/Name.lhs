@@ -11,7 +11,7 @@ module Name (
 	-- The Name type
 	Name,					-- Abstract
 	mkLocalName, mkImportedLocalName, mkSysLocalName, 
-	mkTopName,
+	mkTopName, mkIPName,
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal,
 	mkWiredInIdName,   mkWiredInTyConName,
 	maybeWiredInIdName, maybeWiredInTyConName,
@@ -132,6 +132,13 @@ mkTopName uniq mod fs
 	   n_sort = mk_top_sort mod,
 	   n_occ  = mkSrcVarOcc (_PK_ ((_UNPK_ fs) ++ show uniq)),
 	   n_prov = LocalDef noSrcLoc NotExported }
+
+mkIPName :: Unique -> OccName -> Name
+mkIPName uniq occ
+  = Name { n_uniq = uniq,
+	   n_sort = Local,
+	   n_occ  = mkIPOcc occ,
+	   n_prov = SystemProv }
 
 ------------------------- Wired in names -------------------------
 

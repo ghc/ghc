@@ -1,7 +1,7 @@
 \begin{code}
 module TcMonad(
 	TcType, 
-	TcTauType, TcThetaType, TcRhoType,
+	TcTauType, TcPredType, TcThetaType, TcRhoType,
 	TcTyVar, TcTyVarSet,
 	TcKind,
 
@@ -47,7 +47,7 @@ import {-# SOURCE #-} TcEnv  ( TcEnv )
 
 import HsSyn		( HsLit )
 import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
-import Type		( Type, Kind, ThetaType, RhoType, TauType,
+import Type		( Type, Kind, PredType, ThetaType, RhoType, TauType,
 			)
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, pprBagOfErrors, ErrMsg, Message, WarnMsg )
 import CmdLineOpts      ( opt_PprStyle_Debug )
@@ -91,6 +91,7 @@ type TcType = Type 		-- A TcType can have mutable type variables
 	-- a cannot occur inside a MutTyVar in T; that is,
 	-- T is "flattened" before quantifying over a
 
+type TcPredType  = PredType
 type TcThetaType = ThetaType
 type TcRhoType   = RhoType
 type TcTauType   = TauType

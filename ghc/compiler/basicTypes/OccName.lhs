@@ -7,8 +7,8 @@
 \begin{code}
 module OccName (
 	-- The NameSpace type; abstact
-	NameSpace, tcName, clsName, tcClsName, dataName, varName, tvName,
-	uvName, nameSpaceString, 
+	NameSpace, tcName, clsName, tcClsName, dataName, varName, ipName,
+	tvName, uvName, nameSpaceString, 
 
 	-- The OccName type
 	OccName, 	-- Abstract, instance of Outputable
@@ -16,10 +16,10 @@ module OccName (
 
 	mkSrcOccFS, mkSysOcc, mkSysOccFS, mkSrcVarOcc, mkKindOccFS,
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
-	mkDictOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
+	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
 	
-	isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc,
+	isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
 	setOccNameSpace,
@@ -82,11 +82,12 @@ pprEncodedFS fs
 
 \begin{code}
 data NameSpace = VarName	-- Variables
+	       | IPName		-- Implicit Parameters
 	       | DataName	-- Data constructors
 	       | TvName		-- Type variables
 	       | UvName		-- Usage variables
 	       | TcClsName	-- Type constructors and classes; Haskell has them
-				-- in the same name space for now.  
+				-- in the same name space for now.
 	       deriving( Eq, Ord )
 
 -- Though type constructors and classes are in the same name space now,
@@ -99,11 +100,13 @@ dataName = DataName
 tvName   = TvName
 uvName   = UvName
 varName  = VarName
+ipName   = IPName
 
 
 nameSpaceString :: NameSpace -> String
 nameSpaceString DataName  = "Data constructor"
 nameSpaceString VarName   = "Variable"
+nameSpaceString IPName    = "Implicit Param"
 nameSpaceString TvName    = "Type variable"
 nameSpaceString UvName    = "Usage variable"
 nameSpaceString TcClsName = "Type constructor or class"
@@ -234,6 +237,9 @@ isDataOcc oter		       = False
 -- Pretty inefficient!
 isSymOcc (OccName DataName s) = isLexConSym (decodeFS s)
 isSymOcc (OccName VarName s)  = isLexSym (decodeFS s)
+
+isIPOcc (OccName IPName _) = True
+isIPOcc _		   = False
 \end{code}
 
 
@@ -277,7 +283,7 @@ mk_deriv occ_sp sys_prefix str = mkSysOcc occ_sp (encode sys_prefix ++ str)
 \end{code}
 
 \begin{code}
-mkDictOcc, mkWorkerOcc, mkDefaultMethodOcc,
+mkDictOcc, mkIPOcc, mkWorkerOcc, mkDefaultMethodOcc,
  	   mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc
    :: OccName -> OccName
 
@@ -288,6 +294,7 @@ mkDerivedTyConOcc  = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it 
 mkClassTyConOcc    = mk_simple_deriv tcName   ":T"	-- as a tycon/datacon
 mkClassDataConOcc  = mk_simple_deriv dataName ":D"	--
 mkDictOcc	   = mk_simple_deriv varName  "$d"
+mkIPOcc		   = mk_simple_deriv varName  "$i"
 mkSpecOcc	   = mk_simple_deriv varName  "$s"
 mkForeignExportOcc = mk_simple_deriv varName  "$f"
 
