@@ -58,7 +58,7 @@ should all be ok).
 test -f configure || autoreconf
 ./configure --prefix=%{prefix}
 make
-( cd haddock/doc ; make dvi ps html ; gzip -f -9 *.dvi *.ps )
+make html
 
 %install
 make prefix=${RPM_BUILD_ROOT}%{prefix} install
@@ -70,8 +70,6 @@ rm -rf ${RPM_BUILD_ROOT}
 %defattr(-,root,root)
 %doc haddock/README
 %doc haddock/doc/haddock
-%doc haddock/doc/haddock.dvi.gz
-%doc haddock/doc/haddock.ps.gz
 %{prefix}/bin/haddock
 %{prefix}/bin/haddock-%{version}
 %{prefix}/lib/haddock-%{version}
