@@ -41,7 +41,7 @@ import GLAEXTS		-- For `xori`
 
 import CoreSyn
 import PprCore		( pprCoreExpr )
-import Var		( Var, isId, isTyVar )
+import Var		( Var )
 import VarEnv
 import Name		( hashName )
 import Packages		( isDllName )
@@ -62,8 +62,7 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  splitFunTy,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitRecNewType_maybe, 
-			  splitTyConApp_maybe, eqType, funResultTy, applyTy,
-			  funResultTy, applyTy
+			  splitTyConApp_maybe, eqType, funResultTy, applyTy
 			)
 import TyCon		( tyConArity )
 -- gaw 2004

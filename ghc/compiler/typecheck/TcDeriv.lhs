@@ -36,7 +36,7 @@ import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConOrigArgTys )
 import Maybes		( catMaybes )
 import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
-import NameSet		( NameSet, emptyNameSet, duDefs )
+import NameSet		( duDefs )
 import Kind		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConStupidTheta, isProductTyCon, isDataTyCon, newTyConRhs,

@@ -122,11 +122,10 @@ import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
 
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-			  tyVarsOfTheta, Kind, Type, PredType(..),
+			  tyVarsOfTheta, Kind, PredType(..),
 			  ThetaType, unliftedTypeKind, 
 			  liftedTypeKind, openTypeKind, mkArrowKind,
 		  	  isLiftedTypeKind, isUnliftedTypeKind, 
-			  isOpenTypeKind, 
 			  mkArrowKinds, mkForAllTy, mkForAllTys,
 			  defaultKind, isArgTypeKind, isOpenTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
@@ -169,7 +168,6 @@ import OccName		( OccName, mkDictOcc )
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
 import BasicTypes	( IPName(..), ipNameName )
-import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc, SrcSpan )
 import Util		( cmpList, thenCmp, snocView )
 import Maybes		( maybeToBool, expectJust )

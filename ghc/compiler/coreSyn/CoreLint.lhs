@@ -19,7 +19,7 @@ import Unify      	( coreRefineTys )
 import Bag
 import Literal		( literalType )
 import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon, dataConResTy )
-import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId, mustHaveLocalBinding )
+import Var		( Var, Id, TyVar, idType, tyVarKind, mustHaveLocalBinding )
 import VarSet
 import Name		( getSrcLoc )
 import PprCore
@@ -34,7 +34,7 @@ import Type		( Type, tyVarsOfType, eqType,
 			  substTyWith, emptyTvSubst, extendTvInScope, 
 			  TvSubst, TvSubstEnv, setTvSubstEnv, substTy,
 			  extendTvSubst, isInScope )
-import TyCon		( isPrimTyCon, TyCon )
+import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), isNonRec )
 import CmdLineOpts
 import Outputable
