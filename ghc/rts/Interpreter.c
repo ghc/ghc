@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.15 $
- * $Date: 2001/02/06 12:02:05 $
+ * $Revision: 1.16 $
+ * $Date: 2001/02/06 12:09:42 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -383,7 +383,16 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
              cap->rCurrentTSO->what_next = ThreadEnterInterp;
              RETURN(StackOverflow);
           }
+
+          /* Context-switch check */
+          if (context_switch) {
+             iSp--;
+             StackWord(0) = (W_)obj;
+             cap->rCurrentTSO->what_next = ThreadEnterInterp;
+             RETURN(ThreadYielding);
+	  }
  
+
 #         ifdef INTERP_STATS
           it_lastopc = 0; /* no opcode */
 #         endif
