@@ -14,7 +14,7 @@ import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
 			  Match, HsBinds, HsType, Fixity,
 			  ArithSeqInfo, Stmt, DoOrListComp, Fake )
 import RnHsSyn		( SYN_IE(RenamedPat) )
-import TcHsSyn		( SYN_IE(TcPat), TcIdOcc(..) )
+import TcHsSyn		( SYN_IE(TcPat) )
 
 import TcMonad
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
@@ -25,7 +25,7 @@ import Name		( Name {- instance Outputable -} )
 import TcEnv		( tcLookupGlobalValue, tcLookupGlobalValueByKey, 
 			  tcLookupLocalValueOK )
 import SpecEnv		( SpecEnv )
-import TcType 		( SYN_IE(TcType), TcMaybe, newTyVarTy, newTyVarTys, tcInstId )
+import TcType 		( TcIdOcc(..), SYN_IE(TcType), TcMaybe, newTyVarTy, newTyVarTys, tcInstId )
 import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
 import Bag		( Bag )
@@ -277,13 +277,13 @@ tcPat (LitPatIn lit@(HsDoublePrim _))
 tcPat (LitPatIn lit@(HsInt i))
   = newTyVarTy mkBoxedTypeKind				`thenNF_Tc` \ tyvar_ty ->
     newOverloadedLit origin  
-		     (OverloadedIntegral i) tyvar_ty	`thenNF_Tc` \ (lie1, over_lit_id) ->
+		     (OverloadedIntegral i) tyvar_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
 
     tcLookupGlobalValueByKey eqClassOpKey		`thenNF_Tc` \ eq_sel_id ->
     newMethod origin (RealId eq_sel_id) [tyvar_ty]	`thenNF_Tc` \ (lie2, eq_id) ->
 
     returnTc (NPat lit tyvar_ty (HsApp (HsVar eq_id)
-				       (HsVar over_lit_id)),
+				       over_lit_expr),
 	      lie1 `plusLIE` lie2,
 	      tyvar_ty)
   where
@@ -292,13 +292,13 @@ tcPat (LitPatIn lit@(HsInt i))
 tcPat (LitPatIn lit@(HsFrac f))
   = newTyVarTy mkBoxedTypeKind				`thenNF_Tc` \ tyvar_ty ->
     newOverloadedLit origin
-		     (OverloadedFractional f) tyvar_ty	`thenNF_Tc` \ (lie1, over_lit_id) ->
+		     (OverloadedFractional f) tyvar_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
 
     tcLookupGlobalValueByKey eqClassOpKey		`thenNF_Tc` \ eq_sel_id ->
     newMethod origin (RealId eq_sel_id) [tyvar_ty]	`thenNF_Tc` \ (lie2, eq_id) ->
 
     returnTc (NPat lit tyvar_ty (HsApp (HsVar eq_id)
-				       (HsVar over_lit_id)),
+				       over_lit_expr),
 	      lie1 `plusLIE` lie2,
 	      tyvar_ty)
   where
@@ -316,14 +316,14 @@ tcPat (NPlusKPatIn name lit@(HsInt i))
     tcLookupGlobalValueByKey minusClassOpKey		`thenNF_Tc` \ minus_sel_id ->
 
     newOverloadedLit origin
-		     (OverloadedIntegral i) local_ty	`thenNF_Tc` \ (lie1, over_lit_id) ->
+		     (OverloadedIntegral i) local_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
 
     newMethod origin (RealId ge_sel_id)    [local_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
     newMethod origin (RealId minus_sel_id) [local_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
 
     returnTc (NPlusKPat (TcId local) lit local_ty
-			(SectionR (HsVar ge_id) (HsVar over_lit_id))
-			(SectionR (HsVar minus_id) (HsVar over_lit_id)),
+			(SectionR (HsVar ge_id) over_lit_expr)
+			(SectionR (HsVar minus_id) over_lit_expr),
 	      lie1 `plusLIE` lie2 `plusLIE` lie3,
 	      local_ty)
   where
