@@ -32,6 +32,7 @@ mkdependHS-specific options (not between --'s):
 
     -v		Be verbose.
     -v -v	Be very verbose.
+    -W          No warnings
     -f blah	Use "blah" as the makefile, rather than "makefile"
 		or "Makefile".
     -o <osuf>	Use <osuf> as the "object file" suffix ( default: o)
@@ -54,8 +55,9 @@ mkdependHS-specific options (not between --'s):
 
 EOUSAGE
 
-$Status  = 0; # just used for exit() status
-$Verbose = 0; # 1 => verbose, 2 => very verbose
+$Status     = 0; # just used for exit() status
+$Verbose    = 0; # 1 => verbose, 2 => very verbose
+$Warnings   = 1; # 1 => warn about duplicate interface files
 $Dashdashes_seen = 0;
 
 # Try to guess how to run gcc's CPP directly -------------
@@ -239,7 +241,7 @@ sub mangle_command_line_args {
 
 	} elsif ( /^-D(.*)/ ) { # recognized wherever they occur
 	    push(@Defines, $_);
-	} elsif ( /^-i(.*)/ ) {
+	} elsif ( /^-i(.*)/ ) { # ditto
 	    $Import_dirs .= ":$1";
 	} elsif ( /^-I/ ) {
 	    $Include_dirs .= " $_";
@@ -248,6 +250,8 @@ sub mangle_command_line_args {
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
 		$Verbose++;
+	    } elsif ( /^-W$/ ) {
+		$Warnings     = 0;
 	    } elsif ( /^-f(.*)/ ) {
 		$Makefile	= &grab_arg_arg('-f',$1);
 	    } elsif ( /^-o(.*)/ ) {
@@ -318,7 +322,7 @@ sub preprocess_import_dirs {
 	    next unless /(.*)\.hi$/;
 	    $thing = $1;
 	    if ($ModuleIn{$thing} && $ModuleIn{$thing} ne $d) {
-		print STDERR "$Pgm: warning: $thing.hi appears in both $ModuleIn{$thing} and $d!\n";
+		print STDERR "$Pgm: warning: $thing.hi appears in both $ModuleIn{$thing} and $d!\n" if ($Warnings);
 	    } else {
 		$ModuleIn{$thing} = $d;
 	    }
