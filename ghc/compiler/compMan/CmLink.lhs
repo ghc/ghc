@@ -37,7 +37,10 @@ import ErrUtils		( showPass )
 import CmdLineOpts	( DynFlags(..) )
 import Util
 
+#ifdef GHCI
 import Exception	( block )
+#endif
+
 import IOExts
 import List
 import Monad
