@@ -492,8 +492,8 @@ refineAlt ctxt con ex_tvs ctxt_tys pat_tys thing_inside
 		      | otherwise         = tcMatchTys
 	; case refiner ex_tvs old_subst pat_tys ctxt_tys of
 		Failed msg -> failWithTc (inaccessibleAlt msg)
-		Succeeded new_subst -> do
-	{ traceTc (text "refineTypes:match" <+> ppr con <+> ppr new_subst)
+		Succeeded new_subst -> do {
+	  traceTc (text "refineTypes:match" <+> ppr con <+> ppr new_subst)
 	; setTypeRefinement new_subst thing_inside } }
 
   where
