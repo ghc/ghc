@@ -24,10 +24,8 @@ module Foreign.Marshal.Alloc (
   realloc,      -- :: Storable b => Ptr a        -> IO (Ptr b)
   reallocBytes, -- ::		    Ptr a -> Int -> IO (Ptr a)
 
-  free          -- :: Ptr a -> IO ()
-#ifdef __HUGS__
-  , finalizerFree -- :: FunPtr (Ptr a -> IO ())
-#endif
+  free,         -- :: Ptr a -> IO ()
+  finalizerFree -- :: FunPtr (Ptr a -> IO ())
 ) where
 
 import Data.Maybe
@@ -149,9 +147,8 @@ failWhenNULL name f = do
 foreign import ccall unsafe "stdlib.h malloc"  _malloc  ::          CSize -> IO (Ptr a)
 foreign import ccall unsafe "stdlib.h realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)
 foreign import ccall unsafe "stdlib.h free"    _free    :: Ptr a -> IO ()
-#ifdef __HUGS__
--- |A pointer to a foreign function equivalent to @free@, which may be used
--- as a finalizer for storage allocated with @malloc@ or @mallocBytes@.
+
+-- | A pointer to a foreign function equivalent to 'free', which may be used
+-- as a finalizer for storage allocated with 'malloc' or 'mallocBytes'.
 foreign import ccall unsafe "stdlib.h &free"
 			finalizerFree :: FunPtr (Ptr a -> IO ())
-#endif
