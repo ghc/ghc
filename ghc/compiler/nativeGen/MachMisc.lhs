@@ -53,7 +53,7 @@ import PrimRep		( PrimRep(..) )
 import Stix		( StixStmt(..), StixExpr(..), StixReg(..), 
                           CodeSegment, DestInfo(..) )
 import Panic		( panic )
-import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
+import GlaExts
 import Outputable	( pprPanic, ppr, showSDoc )
 import IOExts		( trace )
 import Config           ( cLeadingUnderscore )
@@ -176,7 +176,11 @@ exactLog2 x
 	  Just (toInteger (iBox (pow2 x#)))
        }
   where
+#if __GLASGOW_HASKELL__ >= 503
+    shiftr x y = uncheckedShiftRL# x y
+#else
     shiftr x y = shiftRL# x y
+#endif
 
     pow2 x# | x# ==# 1# = 0#
             | otherwise = 1# +# pow2 (w2i (i2w x# `shiftr` 1#))

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.28 2001/11/23 11:58:00 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.29 2001/12/12 12:19:11 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -377,10 +377,16 @@ altHeapCheck is_fun regs [] AbsCNop Nothing code
 
 -- build up a bitmap of the live pointer registers
 
+#if __GLASGOW_HASKELL__ >= 503
+shiftL = uncheckedShiftL#
+#else
+shiftL = shiftL#
+#endif
+
 mkRegLiveness :: [MagicId] -> Word#
 mkRegLiveness []  =  int2Word# 0#
 mkRegLiveness (VanillaReg rep i : regs) | isFollowableRep rep 
-  =  ((int2Word# 1#) `shiftL#` (i -# 1#)) `or#` mkRegLiveness regs
+  =  ((int2Word# 1#) `shiftL` (i -# 1#)) `or#` mkRegLiveness regs
 mkRegLiveness (_ : regs)  =  mkRegLiveness regs
 
 -- The two functions below are only used in a GranSim setup
