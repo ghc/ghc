@@ -70,6 +70,21 @@
       <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/HsVersions.h"><code>HsVersions.h</code></a>. 
 
+    <h2>What Happens When</h2>
+    <p>
+      Inside the Haskell compiler proper (<code>hsc</code>), a whole series of
+      stages (``passes'') are executed in order to transform your Haskell program
+      into C or native code.  This process is orchestrated by
+      <code>main/HscMain.hscMain</code> and its relative
+      <code>hscReComp</code>.  The latter directly invokes, in order,
+      the parser, the renamer, the typechecker, the desugarer, the
+      simplifier (Core2Core), the CoreTidy pass, the CorePrep pass,
+      conversion to STG (CoreToStg), the interface generator
+      (MkFinalIface), the code generator, and code output.  The
+      simplifier is the most complex of these, and is made up of many
+      sub-passes.  These are controlled by <code>buildCoreToDo</code>,
+      as described below.
+
     <h2>Scheduling Optimisations Phases</h2>
     <p>
       GHC has a large variety of optimisations at its disposal, many of which
@@ -157,7 +172,7 @@
     
     <p><small>
 <!-- hhmts start -->
-Last modified: Tue Nov  6 16:08:59 EST 2001
+Last modified: Tue Feb 19 11:09:00 UTC 2002
 <!-- hhmts end -->
     </small>
   </body>
