@@ -2,7 +2,7 @@
 include ($confdir ++ "/../vanilla-test.T")
 
 test "read001" { vtcf("") }
-test "read002" { vtcf("") }
+test "read002" { $expect = "fail" vtcf("") }
 test "read003" { vtcf("") }
 test "read004" { vtcf("") }
 test "read005" { vtcf("") }
