@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.34 2001/02/07 10:45:43 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.35 2001/02/08 14:58:28 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -211,7 +211,8 @@ runCommand :: String -> GHCi Bool
 runCommand c = 
   ghciHandle ( 
      \other_exception 
-        -> io (putStrLn (show other_exception)) >> return False
+        -> io (do putStrLn ("*** Exception: " ++ show other_exception)
+		  return False)
   ) $
   ghciHandleDyn
     (\dyn -> case dyn of
@@ -574,10 +575,13 @@ setLastExpr last_expr
 
 io m = GHCi $ \s -> m >>= \a -> return (s,a)
 
+-- recursive exception handlers
+ghciHandle :: (Exception -> GHCi a) -> GHCi a -> GHCi a
 ghciHandle h (GHCi m) = GHCi $ \s -> 
-   Exception.catch (m s) (\e -> unGHCi (h e) s)
+   Exception.catch (m s) (\e -> unGHCi (ghciHandle h (h e)) s)
+
 ghciHandleDyn h (GHCi m) = GHCi $ \s -> 
-   Exception.catchDyn (m s) (\e -> unGHCi (h e) s)
+   Exception.catchDyn (m s) (\e -> unGHCi (ghciHandleDyn h (h e)) s)
 
 -----------------------------------------------------------------------------
 -- package loader
