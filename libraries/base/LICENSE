@@ -15,9 +15,6 @@ sources:
   * Code from the Parsec library which is (c) Daan Leijen, and
     distributable under a BSD-style license (see below).
 
-  * Code from the Haskell Html library which is (c) Andy Gill, and the
-    Oregon Graduate Institute of Science and Technology
-
 The full text of these licenses is reproduced below.  All of the
 licenses are BSD-style or compatible.
 
@@ -114,34 +111,3 @@ negligence or otherwise) arising in any way out of the use of this software,
 even if advised of the possibility of such damage.
 
 -----------------------------------------------------------------------------
-
-Code derived from Andy Gill's Haskell Html combinator library is in
-Text/Html.hs and Text/Html/BlockTable.hs.
-
-The Haskell Html Library is Copyright (c) Andy Gill, and the Oregon
-Graduate Institute of Science and Technology, 1999, All rights
-reserved, and is distributed as free software under the following
-license.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-- Redistributions of source code must retain the above copyright notice,
-this list of conditions and the following disclaimer.
-
-- Neither name of the copyright holders nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND THE CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDERS OR THE CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
-TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
