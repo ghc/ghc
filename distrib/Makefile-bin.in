@@ -173,7 +173,7 @@ config-pkgs ::
 
 # Convert pwd's UNC reported path into DOS style
 # (cygwin32 only.)
-CURRENT_DIR = $(shell pwd | sed 's|^//\(.\)|\1:|' )
+CURRENT_DIR = `pwd | sed 's|^//\(.\)|\1:|'`
 
 in-place ::
 	$(MAKE) $(MFLAGS) config-pkgs bindir=$(CURRENT_DIR)/bin/$(platform) libdir=$(CURRENT_DIR)/lib/$(platform) datadir=$(CURRENT_DIR)/share
