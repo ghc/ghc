@@ -32,11 +32,13 @@ module PrelErr
        , assertError		   -- :: String -> Bool -> a -> a
        ) where
 
---import Prelude
 import PrelBase
-import PrelIOBase
+import PrelIOBase   ( IO(..), catch )
+import PrelHandle
 import PrelAddr
 import PrelList     ( span )
+import PrelPack     ( packString )
+import PrelArr      ( ByteArray(..) )
 
 #ifndef __PARALLEL_HASKELL__
 import PrelForeign  ( StablePtr, deRefStablePtr )
@@ -70,40 +72,53 @@ errorIO (IO io)
     bottom = bottom -- Never evaluated
 
 ioError :: String -> a
-ioError s = error__ ( \ x -> _ccall_ IOErrorHdrHook x ) s
+ioError s = error__ ``&IOErrorHdrHook'' s 
 
 -- error stops execution and displays an error message
 error :: String -> a
-error s = error__ ( \ x -> _ccall_ ErrorHdrHook x ) s
+error s = error__ ``&ErrorHdrHook'' s
 
-error__ :: (Addr{-FILE *-} -> IO ()) -> String -> a
+-- This local variant of "error" calls PatErrorHdrHook instead of ErrorHdrHook,
+-- but the former does exactly the same as the latter, so I nuked it.
+--		SLPJ Jan 97
+--
+-- Hmm..distinguishing between these two kinds of error is quite useful in the
+-- compiler sources, printing out a more verbose msg in the case of patter
+-- matching failure.
+-- So I've reinstated patError to invoke its own message function hook again.
+--    SOF 8/98
+patError__ x = error__ ``&PatErrorHdrHook'' x
+
+error__ :: Addr{-C function pointer to hook-} -> String -> a
 
 error__ msg_hdr s
 #ifdef __PARALLEL_HASKELL__
-  = errorIO (msg_hdr sTDERR{-msg hdr-}	>>
-	     _ccall_ fflush sTDERR	>>
-	     fputs sTDERR s		>>
-	     _ccall_ fflush sTDERR	>>
-	     _ccall_ stg_exit (1::Int)
-	    )
+  = errorIO (do
+     (hFlush stdout) `catch` (\ _ -> return ())
+     let bs@(ByteArray (_,len) _) = packString s
+     _ccall_ __writeErrString__ msg_hdr bs len
+     _ccall_ stg_exit (1::Int)
+    )
 #else
-  = errorIO (msg_hdr sTDERR{-msg hdr-}	>>
-	     _ccall_ fflush sTDERR	>>
-	     fputs sTDERR s		>>
-	     _ccall_ fflush sTDERR	>>
-	     _ccall_ getErrorHandler	>>= \ errorHandler ->
-	     if errorHandler == (-1::Int) then
-		_ccall_ stg_exit (1::Int)
-	     else
-		_casm_ ``%r = (StgStablePtr)(%0);'' errorHandler
-						>>= \ osptr ->
-		_ccall_ decrementErrorCount     >>= \ () ->
-		deRefStablePtr osptr            >>= \ oact ->
-		oact
-	    )
+  = errorIO ( do
+      (hFlush stdout) `catch` (\ _ -> return ())
+	    -- Note: there's potential for trouble here in a
+	    -- a concurrent setting if an error is flagged after the
+	    -- lock on the stdout handle. (I don't see a possibility
+	    -- of this occurring with the current impl, but still.)
+      let bs@(ByteArray (_,len) _) = packString s
+      _ccall_ writeErrString__ msg_hdr bs len
+      errorHandler <- _ccall_ getErrorHandler
+      if errorHandler == (-1::Int) then
+	 _ccall_ stg_exit (1::Int)
+       else do
+	osptr <- _casm_ ``%r = (StgStablePtr)(%0);'' errorHandler
+	_ccall_ decrementErrorCount
+	oact  <- deRefStablePtr osptr
+	oact
+   )
+
 #endif {- !parallel -}
-  where
-    sTDERR = (``stderr'' :: Addr)
 \end{code}
 
 %*********************************************************
@@ -139,11 +154,10 @@ irrefutPatError
 noMethodBindingError     s = error (untangle s "No instance nor default method for class operation")
 irrefutPatError		 s = error (untangle s "Irrefutable pattern failed for pattern")
 nonExhaustiveGuardsError s = error (untangle s "Non-exhaustive guards in")
-patError 		 s = error (untangle s "Non-exhaustive patterns in")
 recSelError 		 s = error (untangle s "Missing field in record selection:")
 recConError 		 s = error (untangle s "Missing field in record construction:")
 recUpdError 		 s = error (untangle s "Record to doesn't contain field(s) to be updated")
-
+patError 		 s = patError__ (untangle s "Non-exhaustive patterns in")
 
 assertError :: String -> Bool -> a -> a
 assertError str pred v 
@@ -177,9 +191,3 @@ untangle coded message
 	}
     not_bar c = c /= '|'
 \end{code}
-
--- This local variant of "error" calls PatErrorHdrHook instead of ErrorHdrHook,
--- but the former does exactly the same as the latter, so I nuked it.
---		SLPJ Jan 97
--- patError__ = error__ (\ x -> _ccall_ PatErrorHdrHook x)
-

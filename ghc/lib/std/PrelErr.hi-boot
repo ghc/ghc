@@ -9,4 +9,4 @@
  
 _interface_ PrelErr 1
 _exports_
-PrelErr error;
+PrelErr error parError;
