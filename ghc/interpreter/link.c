@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/11/23 18:08:17 $
+ * $Revision: 1.19 $
+ * $Date: 1999/12/03 17:56:04 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -99,8 +99,6 @@ Name namePmSub;
 #endif
 Name namePMFail;
 Name nameEqChar;
-Name nameEqInt;
-Name nameEqDouble;
 Name namePmInt;
 Name namePmInteger;
 Name namePmDouble;
@@ -108,23 +106,13 @@ Name namePmLe;
 Name namePmSubtract;
 Name namePmFromInteger;
 Name nameMkIO;
-Name nameRunST;
 Name nameUnpackString;
 Name nameError;
 Name nameInd;
 Name nameCreateAdjThunk;
 
 Name nameAnd;
-Name nameConCmp;
 Name nameCompAux;
-Name nameEnFrTh;
-Name nameEnFrTo;
-Name nameEnFrom;
-Name nameEnFrEn;
-Name nameEnToEn;
-Name nameEnInRng;
-Name nameEnIndex;
-Name nameEnRange;
 Name nameRangeSize;
 Name nameComp;
 Name nameShowField;
@@ -354,23 +342,6 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
          * than we might like, but they are the closest we can get without a
          * special datatype class.
          */
-        name(nameConCmp).type
-            = mkPolyType(starToStar,fn(aVar,fn(aVar,typeOrdering)));
-        name(nameEnRange).type
-            = mkPolyType(starToStar,fn(boundPair,listof));
-        name(nameEnIndex).type
-            = mkPolyType(starToStar,fn(boundPair,fn(aVar,typeInt)));
-        name(nameEnInRng).type
-            = mkPolyType(starToStar,fn(boundPair,fn(aVar,typeBool)));
-        name(nameEnToEn).type
-            = mkPolyType(starToStar,fn(aVar,fn(typeInt,aVar)));
-        name(nameEnFrEn).type
-            = mkPolyType(starToStar,fn(aVar,typeInt));
-        name(nameEnFrom).type
-            = mkPolyType(starToStar,fn(aVar,listof));
-        name(nameEnFrTo).type
-            = name(nameEnFrTh).type
-            = mkPolyType(starToStar,fn(aVar,fn(aVar,listof)));
 
         name(namePrimSeq).type
             = primType(MONAD_Id, "ab", "b");
@@ -472,8 +443,6 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
             implementPrim(n);
         }
 
-        nameRunST          = linkName("primRunST");
-
         /* static(tidyInfix)                        */
         nameNegate         = linkName("negate");
         /* user interface                           */
@@ -488,9 +457,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
 #endif                          
         /* translator                               */
         nameEqChar         = linkName("primEqChar");
-        nameEqInt          = linkName("primEqInt");
         nameCreateAdjThunk = linkName("primCreateAdjThunk");
-        nameEqDouble       = linkName("primEqDouble");
         namePmInt          = linkName("primPmInt");
         namePmInteger      = linkName("primPmInteger");
         namePmDouble       = linkName("primPmDouble");
@@ -547,15 +514,6 @@ Int what; {
                        pFun(nameShowField,      "showField");
                        pFun(nameShowParen,      "showParen");
                        pFun(nameLex,            "lex");
-                       pFun(nameEnToEn,         "toEnumPR"); //not sure
-                       pFun(nameEnFrEn,         "fromEnum"); //not sure
-                       pFun(nameEnFrom,         "enumFrom"); //not sure
-                       pFun(nameEnFrTh,         "enumFromThen"); //not sure
-                       pFun(nameEnFrTo,         "enumFromTo"); //not sure
-                       pFun(nameEnRange,        "range"); //not sure
-                       pFun(nameEnIndex,        "index"); //not sure
-                       pFun(nameEnInRng,        "inRange"); //not sure
-                       pFun(nameConCmp,         "_concmp"); //very not sure
                        pFun(nameComp,           ".");
                        pFun(nameAnd,            "&&");
                        pFun(nameCompAux,        "primCompAux");

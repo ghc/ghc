@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.19 $
- * $Date: 1999/11/29 18:59:25 $
+ * $Revision: 1.20 $
+ * $Date: 1999/12/03 17:56:04 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -58,11 +58,6 @@ extern Name  nameRange;
 extern Name  nameLe,      nameGt;
 extern Name  nameShowsPrec, nameReadsPrec;
 extern Name  nameMult,    namePlus;
-extern Name  nameConCmp,  nameEnRange;
-extern Name  nameEnIndex, nameEnInRng;
-extern Name  nameEnToEn,  nameEnFrEn;
-extern Name  nameEnFrom,  nameEnFrTh;
-extern Name  nameEnFrTo;
 extern Name  nameComp,    nameApp;      /* composition and append          */
 extern Name  nameShowField;             /* display single field            */
 extern Name  nameShowParen;             /* wrap with parens                */
