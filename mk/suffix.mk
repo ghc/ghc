@@ -104,6 +104,13 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 	$(LX) $(LX_OPTS) $<
 
 #-----------------------------------------------------------------------------
+# Green-card Suffix Rules
+#
+
+%.hs : %.gc
+	$(GREENCARD) $(GREENCARD_OPTS) $<
+
+#-----------------------------------------------------------------------------
 # C-related suffix rules
 
 %.$(way_)o : %.$(way_)s

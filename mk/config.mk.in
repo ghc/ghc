@@ -464,6 +464,7 @@ INFO_PREFIX    	        = $(FPTOOLS_TOP)/literate/info-utils/
 TEXI2HTML_PREFIX        = $(LITERATE_PREFIX)texi2html/
 
 HAPPY_PREFIX    	= $(FPTOOLS_TOP)/happy/src/
+GREENCARD_PREFIX	= $(FPTOOLS_TOP)/green-card/src/
 
 UNLIT_PREFIX    	= $(FPTOOLS_TOP)/ghc/utils/unlit/
 UGEN_PREFIX             = $(FPTOOLS_TOP)/ghc/utils/ugen/
@@ -603,6 +604,7 @@ VERBATIM		= $(VERBATIM_PREFIX)verbatim
 RUNTEST			= $(RUNTEST_PREFIX)runstdtest
 HAPPY			= @HappyCmd@
 LX			= @LxCmd@
+GREENCARD		= @GreencardCmd@
 
 ifeq "$(HAPPY)" ""
 HAPPY			= $(HAPPY_PREFIX)happy
