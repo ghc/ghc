@@ -135,8 +135,8 @@ tags:
     <sect2>
       <title>Command line syntax</title>
 
-      <para>glue-hsc takes input files as arguments, and flags that
-      modify its behavior:</para>
+      <para><command>hsc2hs</command> takes input files as arguments,
+      and flags that modify its behavior:</para>
 
       <variablelist>
 	<varlistentry>
@@ -171,9 +171,24 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
+	  <term><literal>-I DIR</literal></term>
+	  <listitem>
+	    <para>Passed to the C compiler.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><literal>--lflag=FLAG</literal></term>
 	  <listitem>
 	    <para>An extra flag to pass to the linker.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>--include=FILE</literal></term>
+	  <listitem>
+	    <para>As if the appropriate <literal>#include</literal>
+            directive was placed in the source.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -196,11 +211,11 @@ tags:
 	      <entry>Haskell file</entry>
 	    </row>
 	    <row>
-	      <entry><literal>_hsc.h</literal></entry>
+	      <entry><literal>.hs.h</literal></entry>
 	      <entry>C header</entry>
 	    </row>
 	    <row>
-	      <entry><literal>_hsc.c</literal></entry>
+	      <entry><literal>.hs.c</literal></entry>
 	      <entry>C file</entry>
 	    </row>
 	  </tbody>
@@ -280,7 +295,7 @@ tags:
             is placed in the <literal>{-# OPTIONS #-}</literal> pragma
             at the top of the Haskell file (see <xref
             linkend="source-file-options">). This is needed because
-            glue-hsc emits its own <literal>OPTIONS</literal> pragma,
+            <command>hsc2hs</command> emits its own <literal>OPTIONS</literal> pragma,
             and only one such pragma is interpreted by GHC.</para>
 	  </listitem>
 	</varlistentry>
@@ -393,6 +408,13 @@ tags:
       prefixed by <literal>hsc_</literal> that handles the construct
       by emitting the expansion to stdout. See
       <filename>template-hsc.h</filename> for examples.</para>
+      
+      <para>Such macros can also be defined directly in the
+      source. They are useful for making a <literal>#let</literal>-like
+      macro whose expansion uses other <literal>#let</literal> macros.
+      Plain <literal>#let</literal> prepends <literal>hsc_</literal>
+      to the macro name and wraps the defininition in a
+      <literal>printf</literal> call.
 
     </sect2>
 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.3 2000/12/28 10:34:56 qrczak Exp $
+-- $Id: Main.hs,v 1.4 2000/12/30 20:06:00 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -23,18 +23,27 @@ data Flag
     = Help
     | Template String
     | Compiler String
-    | Linker String
+    | Linker   String
     | CompFlag String
     | LinkFlag String
+    | Include  String
+
+include :: String -> Flag
+include s@('\"':_) = Include s
+include s@('<' :_) = Include s
+include s          = Include ("\""++s++"\"")
 
 options :: [OptDescr Flag]
 options = [
-    Option "t" ["template"] (ReqArg Template "FILE") "template file",
-    Option ""  ["cc"]       (ReqArg Compiler "PROG") "C compiler to use",
-    Option ""  ["ld"]       (ReqArg Linker   "PROG") "linker to use",
-    Option ""  ["cflag"]    (ReqArg CompFlag "FLAG") "flag to pass to the C compiler",
-    Option ""  ["lflag"]    (ReqArg LinkFlag "FLAG") "flag to pass to the linker",
-    Option ""  ["help"]     (NoArg  Help)            "display this help and exit"]
+    Option "t" ["template"] (ReqArg Template   "FILE") "template file",
+    Option ""  ["cc"]       (ReqArg Compiler   "PROG") "C compiler to use",
+    Option ""  ["ld"]       (ReqArg Linker     "PROG") "linker to use",
+    Option ""  ["cflag"]    (ReqArg CompFlag   "FLAG") "flag to pass to the C compiler",
+    Option "I" []           (ReqArg (CompFlag . ("-I"++))
+                                               "DIR")  "passed to the C compiler",
+    Option ""  ["lflag"]    (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
+    Option ""  ["include"]  (ReqArg include    "FILE") "as if placed in the source",
+    Option ""  ["help"]     (NoArg  Help)              "display this help and exit"]
 
 main :: IO ()
 main = do
@@ -145,11 +154,12 @@ output flags name toks = let
         _   -> onlyOne "linker"
         
     writeFile cProgName $
-        concat ["#include \""++t++"\"\n" | Template t <- flags] ++
-        outHeaderCProg specials ++
-        "\nint main (void)\n{\n" ++
-        outHeaderHs (if needsH then Just outHName else Nothing) specials ++
-        concatMap outTokenHs toks ++
+        concat ["#include \""++t++"\"\n" | Template t <- flags]++
+        concat ["#include "++f++"\n"     | Include  f <- flags]++
+        outHeaderCProg specials++
+        "\nint main (void)\n{\n"++
+        outHeaderHs flags (if needsH then Just outHName else Nothing) specials++
+        concatMap outTokenHs toks++
         "    return 0;\n}\n"
     
     compilerStatus <- system $
@@ -183,6 +193,7 @@ output flags name toks = let
         \#include <Rts.h>\n\
         \#endif\n\
         \#include <HsFFI.h>\n"++
+        concat ["#include "++name++"\n" | Include name <- flags]++
         concatMap outTokenH specials++
         "#endif\n"
     
@@ -215,11 +226,11 @@ outHeaderCProg = concatMap $ \(key, arg) -> case key of
     where
     joinLines = concat . intersperse " \\\n" . lines
 
-outHeaderHs :: Maybe String -> [(String, String)] -> String
-outHeaderHs inH toks =
+outHeaderHs :: [Flag] -> Maybe String -> [(String, String)] -> String
+outHeaderHs flags inH toks =
     "    hsc_begin_options();\n"++
-    concatMap outSpecial toks ++
-    includeH ++
+    includeH++
+    concatMap outSpecial toks++
     "    hsc_end_options();\n\n"
     where
     outSpecial (key, arg) = case key of
@@ -240,9 +251,11 @@ outHeaderHs inH toks =
     toOptD arg = case break isSpace arg of
         (name, "")      -> name
         (name, _:value) -> name++'=':dropWhile isSpace value
-    includeH = case inH of
-        Nothing   -> ""
-        Just name -> outOption ("-#include \""++name++"\"")
+    includeH = concat [
+        outOption ("-#include "++name++"")
+        | name <- case inH of
+            Nothing   -> [name | Include name <- flags]
+            Just name -> ["\""++name++"\""]]
     outOption s = "    hsc_option (\""++showCString s++"\");\n"
 
 outTokenHs :: Token -> String
