@@ -246,6 +246,7 @@ genApply args =
       text "F_ " <> fun_ret_label <> text "( void )\n{",
       nest 4 (vcat [
        text "StgInfoTable *info;",
+       text "F_ target;",
        text "nat arity;",
 
 --    if fast == 1:
@@ -311,7 +312,8 @@ genApply args =
 	text "case BCO:",
 	nest 4 (vcat [
 	  text "arity = BCO_ARITY((StgBCO *)R1.p);",
-	  text "goto apply_fun;"
+	  text "target = (F_)&stg_BCO_entry;",
+	  text "goto apply_pap;"
 	 ]),
 
 --    if fast == 1:
@@ -326,7 +328,6 @@ genApply args =
         text "case FUN_STATIC:",
 	nest 4 (vcat [
 	  text "arity = itbl_to_fun_itbl(info)->arity;",
-	  text "apply_fun:",
 	  text "ASSERT(arity > 0);",
           genMkPAP "BUILD_PAP" "GET_ENTRY(R1.cl)" False{-not PAP-}
 		args all_args_size fun_info_label
@@ -339,8 +340,10 @@ genApply args =
 	text "case PAP:",
 	nest 4 (vcat [
  	  text "arity = ((StgPAP *)R1.p)->arity;",
+	  text "target = (F_)&stg_PAP_entry;",
+	  text "apply_pap:",
 	  text "ASSERT(arity > 0);",
-	  genMkPAP "NEW_PAP" "stg_PAP_entry" True{-is PAP-}
+	  genMkPAP "NEW_PAP" "target" True{-is PAP-}
 		args all_args_size fun_info_label
 	 ]),
 
