@@ -1,1 +1,2 @@
-should produce a warning!
+
+ds053.hs:5: Warning: Defined but not used: f
