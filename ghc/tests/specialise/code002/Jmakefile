@@ -1,0 +1,8 @@
+SRCS_HS=Spec.hs Use.hs
+OBJS_O= Spec.o  Use.o
+
+all : $(OBJS_O)
+
+NoFibHaskellCompile(code002,Spec,hs)
+NoFibHaskellCompile(code002,Use,hs)
+

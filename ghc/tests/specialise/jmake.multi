@@ -1,0 +1,12 @@
+HC_OPTS=-O -unregisterised -g -darity-checks -debug -keep-hc-files-too -odump spec001.dump
+
+SRCS_HS=Main.hs PreludeSpec001.hs
+OBJS_O= Main.o  PreludeSpec001.o
+
+NoFibMultiModuleCompileAndRun(spec001,-i spec001.stdin -o1 spec001.stdout)
+
+NoFibHaskellCompile(spec001,Main,hs)
+NoFibHaskellCompile(spec001,PreludeSpec001,hs)
+
+HaskellDependTarget( $(SRCS_HS) )
+

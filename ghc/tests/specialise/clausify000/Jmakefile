@@ -1,0 +1,11 @@
+HC_OPTS=-v -O -fglasgow-exts \
+	-keep-hc-files-too -dcore-lint -ftrace-specialisations -ddump-simpl -ddump-stg -odump clausify000.dump
+
+SRCS_HS=Main.hs
+OBJS_O= Main.o 
+
+NoFibMultiModuleCompileAndRun(clausify000,-i clausify000.stdin -o1 clausify000.stdout)
+
+NoFibHaskellCompile(clausify000,Main,hs)
+
+HaskellDependTarget( $(SRCS_HS) )
