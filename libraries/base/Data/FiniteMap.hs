@@ -210,8 +210,21 @@ lookupWithDefaultFM
 		-- to return for an unmapped key
 
 --	LISTIFYING
+
+-- | Convert a 'FiniteMap' to a @[(key, elt)]@ sorted by 'Ord' key
+--
 fmToList	:: FiniteMap key elt -> [(key,elt)]
+
+-- | Extract the keys from a 'FiniteMap', in the order of the keys, so
+--
+-- > keysFM == map fst . fmToList
+--
 keysFM		:: FiniteMap key elt -> [key]
+
+-- | Extract the elements from a 'FiniteMap', in the order of the keys, so
+--
+-- > eltsFM == map snd . fmToList
+--
 eltsFM		:: FiniteMap key elt -> [elt]
 
 -- ---------------------------------------------------------------------------
