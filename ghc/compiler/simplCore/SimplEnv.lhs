@@ -6,7 +6,7 @@
 \begin{code}
 module SimplEnv (
 	nullSimplEnv, 
-	getEnvs, setTyEnv, setIdEnv, notInScope, setSubstEnvs,
+	getEnvs, setTyEnv, setIdEnv, notInScope, setSubstEnvs, zapSubstEnvs,
 
 	bindTyVar, bindTyVars, simplTy,
 
@@ -15,9 +15,9 @@ module SimplEnv (
 	bindIdToAtom, bindIdToExpr,
 
 	markDangerousOccs,
-	lookupRhsInfo, isEvaluated,
+	lookupUnfolding, isEvaluated,
 	extendEnvGivenBinding, extendEnvGivenNewRhs,
-	extendEnvGivenRhsInfo,
+	extendEnvGivenUnfolding,
 
 	lookForConstructor,
 
@@ -30,7 +30,7 @@ module SimplEnv (
 	SwitchChecker,
 	SimplEnv, 
 	UnfoldConApp,
-	RhsInfo(..),
+	SubstInfo(..),
 
 	InId,  InBinder,  InBinding,  InType,
 	OutId, OutBinder, OutBinding, OutType,
@@ -50,16 +50,16 @@ import CmdLineOpts	( switchIsOn, intSwitchSet, opt_UnfoldingCreationThreshold,
 			)
 import CoreSyn
 import CoreUnfold	( mkFormSummary, couldBeSmallEnoughToInline, whnfOrBottom,
-			  Unfolding(..), SimpleUnfolding(..), FormSummary(..),
+			  Unfolding(..), FormSummary(..),
 			  calcUnfoldingGuidance	)
 import CoreUtils	( coreExprCc )
-import CostCentre	( CostCentre, subsumedCosts, costsAreSubsumed, noCostCentreAttached )
+import CostCentre	( CostCentre, isCurrentCostCentre, useCurrentCostCentre, costsAreSubsumed, noCostCentreAttached )
 import FiniteMap	-- lots of things
 import Id		( getInlinePragma,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, delOneFromIdEnv,
 			  addOneToIdEnv, modifyIdEnv, modifyIdEnv_Directly,
 			  IdEnv, IdSet, Id )
-import Literal		( Literal{-instances-} )
+import Literal		( Literal )
 import Maybes		( expectJust )
 import OccurAnal	( occurAnalyseExpr )
 import PprCore		-- various instances
@@ -152,7 +152,8 @@ type SimplValEnv = (IdEnv StuffAboutId,	-- Domain includes *all* in-scope
 	-- they *must* be substituted for the given OutArg
 
 data SubstInfo 
-  = SubstArg OutArg	-- The Id maps to an already-substituted atom
+  = SubstVar OutId		-- The Id maps to an already-substituted atom
+  | SubstLit Literal		-- ...ditto literal
   | SubstExpr 			-- Id maps to an as-yet-unsimplified expression
 	(TyVarEnv Type) 	-- ...hence we need to capture the substitution
 	(IdEnv SubstInfo)	--    environments too
@@ -168,17 +169,7 @@ type StuffAboutId = (OutId, 		-- Always has the same unique as the
 					-- We keep this info so we can modify it when 
 					-- something changes. 
 
-		     RhsInfo)		-- Info about what it is bound to
-\end{code}
-
-The @RhsInfo@ part tells about the value to which the @OutId@ is bound.
-
-\begin{code}
-data RhsInfo = NoRhsInfo
-	     | OtherLit [Literal]		-- It ain't one of these
-	     | OtherCon [Id]			-- It ain't one of these
-	     | OutUnfolding CostCentre
-			    SimpleUnfolding	-- Already-simplified unfolding
+		     Unfolding)		-- Info about what it is bound to
 \end{code}
 
 
@@ -186,7 +177,10 @@ data RhsInfo = NoRhsInfo
 nullSimplEnv :: SwitchChecker -> SimplEnv
 
 nullSimplEnv sw_chkr
-  = SimplEnv sw_chkr subsumedCosts (emptyTyVarSet, emptyTyVarEnv) (nullIdEnv, nullIdEnv) nullConApps
+  = SimplEnv sw_chkr useCurrentCostCentre 
+	     (emptyTyVarSet, emptyTyVarEnv)
+	     (nullIdEnv, nullIdEnv)
+	     nullConApps
 
 getEnvs :: SimplEnv -> (SimplTypeEnv, SimplValEnv)
 getEnvs (SimplEnv _ _ ty_env id_env _) = (ty_env, id_env)
@@ -203,6 +197,10 @@ setSubstEnvs :: SimplEnv -> TyVarEnv Type -> IdEnv SubstInfo -> SimplEnv
 setSubstEnvs (SimplEnv chkr encl_cc (in_scope_tyvars, _) (in_scope_ids, _) con_apps)
 	     ty_subst id_subst
   = SimplEnv chkr encl_cc (in_scope_tyvars, ty_subst) (in_scope_ids, id_subst) con_apps
+
+zapSubstEnvs :: SimplEnv -> SimplEnv
+zapSubstEnvs (SimplEnv chkr encl_cc (in_scope_tyvars, _) (in_scope_ids, _) con_apps)
+  = SimplEnv chkr encl_cc (in_scope_tyvars, emptyTyVarEnv) (in_scope_ids, nullIdEnv) con_apps
 \end{code}
 
 
@@ -270,7 +268,7 @@ switchOffInlining :: SimplEnv -> SimplEnv
 switchOffInlining (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
   = SimplEnv chkr encl_cc ty_env (mapUFM forget in_scope_ids, id_subst) nullConApps
   where
-    forget (id, binder_info, rhs_info) = (id, noBinderInfo, NoRhsInfo)
+    forget (id, binder_info, rhs_info) = (id, noBinderInfo, NoUnfolding)
 \end{code}
 
 
@@ -348,12 +346,12 @@ bindIdToAtom :: SimplEnv
 
 bindIdToAtom (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
 	     (in_id,occ_info) atom
-  = SimplEnv chkr encl_cc ty_env (in_scope_ids', id_subst') con_apps
+  = SimplEnv chkr encl_cc ty_env id_env' con_apps
   where
-    id_subst'     = addOneToIdEnv id_subst in_id (SubstArg atom)
-    in_scope_ids' =  case atom of
-			LitArg _      -> in_scope_ids
-			VarArg out_id -> modifyOccInfo in_scope_ids (uniqueOf out_id) occ_info
+    id_env' = case atom of
+		LitArg lit -> (in_scope_ids, addOneToIdEnv id_subst in_id (SubstLit lit))
+		VarArg id  -> (modifyOccInfo in_scope_ids (uniqueOf id) occ_info,
+			       addOneToIdEnv id_subst in_id (SubstVar id))
 
 bindIdToExpr :: SimplEnv
 	     -> InBinder
@@ -381,32 +379,32 @@ bindIdToExpr (SimplEnv chkr encl_cc ty_env@(_, ty_subst) (in_scope_ids, id_subst
 lookupIdSubst :: SimplEnv -> InId -> Maybe SubstInfo
 lookupIdSubst (SimplEnv _ _ _ (_, id_subst) _) id = lookupIdEnv id_subst id
 
-lookupOutIdEnv :: SimplEnv -> OutId -> Maybe (OutId,BinderInfo,RhsInfo)
+lookupOutIdEnv :: SimplEnv -> OutId -> Maybe (OutId, BinderInfo, Unfolding)
 lookupOutIdEnv (SimplEnv _ _ _ (in_scope_ids, _) _) id = lookupIdEnv in_scope_ids id
 
-lookupRhsInfo :: SimplEnv -> OutId -> RhsInfo
-lookupRhsInfo env id
+lookupUnfolding :: SimplEnv -> OutId -> Unfolding
+lookupUnfolding env id
   = case lookupOutIdEnv env id of
 	Just (_,_,info) -> info
-	Nothing		-> NoRhsInfo
+	Nothing		-> NoUnfolding
 
-modifyOutEnvItem :: (OutId, BinderInfo, RhsInfo)
-	         -> (OutId, BinderInfo, RhsInfo) 
-	         -> (OutId, BinderInfo, RhsInfo)
+modifyOutEnvItem :: (OutId, BinderInfo, Unfolding)
+	         -> (OutId, BinderInfo, Unfolding) 
+	         -> (OutId, BinderInfo, Unfolding)
 modifyOutEnvItem (id, occ, info1) (_, _, info2)
   = case (info1, info2) of
 		(OtherLit ls1, OtherLit ls2) -> (id,occ, OtherLit (ls1++ls2))
 		(OtherCon cs1, OtherCon cs2) -> (id,occ, OtherCon (cs1++cs2))
-		(_,            NoRhsInfo)    -> (id,occ, info1)
+		(_,            NoUnfolding)  -> (id,occ, info1)
 		other	       		     -> (id,occ, info2)
 \end{code}
 
 
 \begin{code}
-isEvaluated :: RhsInfo -> Bool
+isEvaluated :: Unfolding -> Bool
 isEvaluated (OtherLit _) = True
 isEvaluated (OtherCon _) = True
-isEvaluated (OutUnfolding _ (SimpleUnfolding ValueForm _ expr)) = True
+isEvaluated (CoreUnfolding ValueForm _ expr) = True
 isEvaluated other = False
 \end{code}
 
@@ -416,8 +414,8 @@ isEvaluated other = False
 mkSimplUnfoldingGuidance chkr out_id rhs
   = calcUnfoldingGuidance (getInlinePragma out_id) opt_UnfoldingCreationThreshold rhs
 
-extendEnvGivenRhsInfo :: SimplEnv -> OutId -> BinderInfo -> RhsInfo -> SimplEnv
-extendEnvGivenRhsInfo env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
+extendEnvGivenUnfolding :: SimplEnv -> OutId -> BinderInfo -> Unfolding -> SimplEnv
+extendEnvGivenUnfolding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
 	              out_id occ_info rhs_info
   = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) con_apps
   where
@@ -630,7 +628,7 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst)
 	-- The "interesting" free variables we want occurrence info for are those
 	-- in the OutIdEnv that have only a single occurrence right now.
     (fv_occ_info, template) = _scc_ "eegnr.occ-anal" 
-			      occurAnalyseExpr is_interesting rhs
+			      occurAnalyseExpr is_interesting rhs_w_cc
 
     is_interesting v        = _scc_ "eegnr.mkidset" 
 			      case lookupIdEnv in_scope_ids v of
@@ -638,15 +636,16 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst)
 				other	         -> False
 
 	-- Compute unfolding details
-    rhs_info = OutUnfolding unf_cc (SimpleUnfolding form guidance template)
+    rhs_info = CoreUnfolding form guidance template
     form     = _scc_ "eegnr.form_sum" 
 	       mkFormSummary rhs
     guidance = _scc_ "eegnr.guidance" 
 	       mkSimplUnfoldingGuidance chkr out_id rhs
 
-	-- Compute cost centre for thing
-    unf_cc  | noCostCentreAttached expr_cc = encl_cc
-	    | otherwise		           = expr_cc
-	    where
-	      expr_cc =  coreExprCc rhs
+	-- Attach a cost centre to the RHS if necessary
+    rhs_w_cc  | isCurrentCostCentre encl_cc
+	      || not (noCostCentreAttached (coreExprCc rhs))
+	      = rhs
+	      | otherwise
+	      = SCC encl_cc rhs
 \end{code}

@@ -11,7 +11,7 @@ module Simplify ( simplTopBinds, simplExpr, simplBind ) where
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import ConFold		( completePrim )
-import CoreUnfold	( Unfolding, SimpleUnfolding, mkFormSummary, 
+import CoreUnfold	( Unfolding, mkFormSummary, 
 			  exprIsTrivial, whnfOrBottom, inlineUnconditionally,
 			  FormSummary(..)
 			)
@@ -247,16 +247,16 @@ the more sophisticated stuff.
 
 \begin{code}
 simplExpr env (Var var) args result_ty
-  = case (runEager $ lookupIdSubst env var) of
+  = case lookupIdSubst env var of
   
       Just (SubstExpr ty_subst id_subst expr)
 	-> simplExpr (setSubstEnvs env ty_subst id_subst) expr args result_ty
 
-      Just (SubstArg (LitArg lit))		-- A boring old literal
+      Just (SubstLit lit)		-- A boring old literal
 	-> ASSERT( null args )
 	   returnSmpl (Lit lit)
 
-      Just (SubstArg (VarArg var')) 	-- More interesting!  An id!
+      Just (SubstVar var') 		-- More interesting!  An id!
 	-> completeVar env var' args result_ty
 
       Nothing  -- Not in the substitution; hand off to completeVar
@@ -1330,9 +1330,10 @@ simplArg env (TyArg  ty)  = simplTy env ty 	`appEager` \ ty' ->
 			    returnEager (TyArg ty')
 simplArg env arg@(VarArg id)
   = case lookupIdSubst env id of
-	Just (SubstArg arg') -> returnEager arg'
-	Just (SubstExpr _)   -> panic "simplArg"
-	Nothing		     -> case lookupOutIdEnv env id of
+	Just (SubstVar id')   -> returnEager (VarArg id')
+	Just (SubstLit lit)   -> returnEager (LitArg lit)
+	Just (SubstExpr _ __) -> panic "simplArg"
+	Nothing		      -> case lookupOutIdEnv env id of
 				  Just (id', _, _) -> returnEager (VarArg id')
 				  Nothing          -> returnEager arg
 \end{code}

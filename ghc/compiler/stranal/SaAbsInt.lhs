@@ -17,7 +17,7 @@ module SaAbsInt (
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), SimpleUnfolding(..), FormSummary )
+import CoreUnfold	( Unfolding(..), FormSummary )
 import CoreUtils	( unTagBinders )
 import Id		( idType, getIdStrictness, getIdUnfolding,
 			  dataConTyCon, dataConArgTys, Id
@@ -404,7 +404,7 @@ absId anal var env
 	(Just abs_val, _, _) ->
 			abs_val	-- Bound in the environment
 
-	(Nothing, NoStrictnessInfo, CoreUnfolding (SimpleUnfolding _ _ unfolding)) ->
+	(Nothing, NoStrictnessInfo, CoreUnfolding _ _ unfolding) ->
 			-- We have an unfolding for the expr
 			-- Assume the unfolding has no free variables since it
 			-- came from inside the Id

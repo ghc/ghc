@@ -15,7 +15,7 @@ import {-# SOURCE #-} Simplify ( simplBind, simplExpr )
 import BinderInfo	-- too boring to try to select things...
 import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( Unfolding, SimpleUnfolding )
+import CoreUnfold	( Unfolding(..) )
 import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
 			  unTagBindersAlts, unTagBinders, coreExprType
 			)
@@ -330,8 +330,8 @@ completeCase env scrut alts rhs_c
 
 	-- If the scrutinee is a variable, look it up to see what we know about it
     scrut_form = case scrut of
-		  Var v -> lookupRhsInfo env v
-		  other -> NoRhsInfo
+		  Var v -> lookupUnfolding env v
+		  other -> NoUnfolding
 
 	-- If the scrut is already eval'd then there's no worry about
 	-- eliminating the case
@@ -368,9 +368,10 @@ completeCase env scrut alts rhs_c
 	-- the scrutinee.  Remember that the rhs is as yet unsimplified.
     rhs1_is_scrutinee = case (scrut, rhs1) of
 			  (Var scrut_var, Var rhs_var)
-				-> case (runEager $ lookupId env rhs_var) of
-				    VarArg rhs_var' -> rhs_var' == scrut_var
-				    other	    -> False
+				-> case (lookupIdSubst env rhs_var) of
+				    Nothing 		     -> rhs_var  == scrut_var
+				    Just (SubstVar rhs_var') -> rhs_var' == scrut_var
+				    other	             -> False
 			  other -> False
 
     is_elem x ys = isIn "completeCase" x ys
@@ -592,7 +593,7 @@ simplDefault
 	:: SimplEnv
 	-> OutExpr			-- Simplified scrutinee
 	-> InDefault 			-- Default alternative to be completed
-	-> RhsInfo			-- Gives form of scrutinee
+	-> Unfolding			-- Gives form of scrutinee
 	-> (SimplEnv -> InExpr -> SmplM OutExpr)		-- Old rhs handler
 	-> SmplM OutDefault
 
@@ -604,11 +605,11 @@ simplDefault env (Var scrut_var) (BindDefault binder@(_,occ_info) rhs)
 	     info_from_this_case rhs_c
   = simplBinder env binder 	`thenSmpl` \ (env1, binder') ->
     let
-      env2    = extendEnvGivenRhsInfo env1 binder' occ_info info_from_this_case
+      env2    = extendEnvGivenUnfolding env1 binder' occ_info info_from_this_case
 
 	-- Add form details for the default binder
-      scrut_info = lookupRhsInfo env scrut_var
-      env3       = extendEnvGivenRhsInfo env2 binder' occ_info scrut_info
+      scrut_info = lookupUnfolding env scrut_var
+      env3       = extendEnvGivenUnfolding env2 binder' occ_info scrut_info
       new_env    = extendEnvGivenNewRhs env3 scrut_var (Var binder')
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
@@ -618,7 +619,7 @@ simplDefault env scrut (BindDefault binder@(_,occ_info) rhs)
 	     info_from_this_case rhs_c
   = simplBinder env binder 	`thenSmpl` \ (env1, binder') ->
     let
-	new_env = extendEnvGivenRhsInfo env1 binder' occ_info info_from_this_case
+	new_env = extendEnvGivenUnfolding env1 binder' occ_info info_from_this_case
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
     returnSmpl (BindDefault binder' rhs')

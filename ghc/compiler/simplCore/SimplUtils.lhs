@@ -24,7 +24,7 @@ module SimplUtils (
 import BinderInfo
 import CmdLineOpts	( opt_DoEtaReduction, SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( SimpleUnfolding, mkFormSummary, exprIsTrivial, FormSummary(..) )
+import CoreUnfold	( mkFormSummary, exprIsTrivial, FormSummary(..) )
 import Id		( idType, isBottomingId, mkSysLocal,
 			  addInlinePragma, addIdDemandInfo,
 			  idWantsToBeINLINEd, dataConArgTys, Id,

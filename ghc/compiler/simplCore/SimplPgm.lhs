@@ -12,7 +12,6 @@ import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_simpl_iterations,
 			  switchIsOn, SimplifierSwitch(..), SwitchResult
 			)
 import CoreSyn
-import CoreUnfold	( SimpleUnfolding )
 import Id		( mkIdEnv, lookupIdEnv, IdEnv
 			)
 import Maybes		( catMaybes )

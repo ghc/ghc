@@ -13,7 +13,7 @@ module ConFold	( completePrim ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUnfold	( Unfolding, SimpleUnfolding )
+import CoreUnfold	( Unfolding )
 import Id		( idType )
 import Literal		( mkMachInt, mkMachWord, Literal(..) )
 import PrimOp		( PrimOp(..) )
@@ -90,7 +90,7 @@ completePrim env SeqOp [TyArg ty, LitArg lit]
   = returnSmpl (Lit (mkMachInt 1))
 
 completePrim env op@SeqOp args@[TyArg ty, VarArg var]
-  | isEvaluated (lookupRhsInfo env var) = returnSmpl (Lit (mkMachInt 1))  -- var is eval'd
+  | isEvaluated (lookupUnfolding env var) = returnSmpl (Lit (mkMachInt 1))  -- var is eval'd
   | otherwise				= returnSmpl (Prim op args)	  -- var not eval'd
 \end{code}
 

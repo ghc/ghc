@@ -21,7 +21,6 @@ module SimplMonad (
 #include "HsVersions.h"
 
 import Id		( GenId, mkSysLocal, mkIdWithNewUniq, Id )
-import CoreUnfold	( SimpleUnfolding )
 import SimplEnv
 import SrcLoc		( noSrcLoc )
 import TyVar		( TyVar )

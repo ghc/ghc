@@ -9,12 +9,12 @@ syntax (namely @CoreExpr@s).
 The type @Unfolding@ sits ``above'' simply-Core-expressions
 unfoldings, capturing ``higher-level'' things we know about a binding,
 usually things that the simplifier found out (e.g., ``it's a
-literal'').  In the corner of a @SimpleUnfolding@ unfolding, you will
+literal'').  In the corner of a @CoreUnfolding@ unfolding, you will
 find, unsurprisingly, a Core expression.
 
 \begin{code}
 module CoreUnfold (
-	SimpleUnfolding(..), Unfolding(..), UnfoldingGuidance(..), -- types
+	Unfolding(..), UnfoldingGuidance(..), -- types
 
 	FormSummary(..), mkFormSummary, whnfOrBottom, exprSmallEnoughToDup, 
 	exprIsTrivial,
@@ -46,6 +46,7 @@ import BinderInfo	( BinderInfo, isOneFunOcc, isOneSafeFunOcc
 			)
 import PragmaInfo	( PragmaInfo(..) )
 import CoreSyn
+import Literal		( Literal )
 import CoreUtils	( unTagBinders )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( coreExprType )
@@ -72,20 +73,20 @@ import Outputable
 data Unfolding
   = NoUnfolding
 
-  | CoreUnfolding SimpleUnfolding
+  | OtherLit [Literal]		-- It ain't one of these
+  | OtherCon [Id]		-- It ain't one of these
 
-  | MagicUnfolding
-	Unique				-- Unique of the Id whose magic unfolding this is
-	MagicUnfoldingFun
-
-
-data SimpleUnfolding
-  = SimpleUnfolding			-- An unfolding with redundant cached information
+  | CoreUnfolding			-- An unfolding with redundant cached information
 		FormSummary		-- Tells whether the template is a WHNF or bottom
 		UnfoldingGuidance	-- Tells about the *size* of the template.
 		SimplifiableCoreExpr	-- Template
 
+  | MagicUnfolding
+	Unique				-- Unique of the Id whose magic unfolding this is
+	MagicUnfoldingFun
+\end{code}
 
+\begin{code}
 noUnfolding = NoUnfolding
 
 mkUnfolding inline_prag expr
@@ -93,7 +94,7 @@ mkUnfolding inline_prag expr
      -- strictness mangling (depends on there being no CSE)
      ufg = calcUnfoldingGuidance inline_prag opt_UnfoldingCreationThreshold expr
      occ = occurAnalyseGlobalExpr expr
-     cuf = CoreUnfolding (SimpleUnfolding (mkFormSummary expr) ufg occ)
+     cuf = CoreUnfolding (mkFormSummary expr) ufg occ
 					  
      cont = case occ of { Var _ -> cuf; _ -> cuf }
     in
@@ -103,7 +104,7 @@ mkMagicUnfolding :: Unique -> Unfolding
 mkMagicUnfolding tag  = MagicUnfolding tag (mkMagicUnfoldingFun tag)
 
 getUnfoldingTemplate :: Unfolding -> CoreExpr
-getUnfoldingTemplate (CoreUnfolding (SimpleUnfolding _ _ expr))
+getUnfoldingTemplate (CoreUnfolding _ _ expr)
   = unTagBinders expr
 getUnfoldingTemplate other = panic "getUnfoldingTemplate"
 

@@ -6,8 +6,7 @@
 \begin{code}
 module Specialise (
 	specProgram, 
-	idSpecVars,
-	substSpecEnvRhs
+	idSpecVars
     ) where
 
 #include "HsVersions.h"
@@ -1210,33 +1209,6 @@ idSpecVars id
     get_spec (App f _) = get_spec f
     get_spec (Lam _ b) = get_spec b
     get_spec (Var v)   = v
-
--- substSpecEnvRhs applies a substitution to the RHS's of a SpecEnv
--- It's placed here because Specialise.lhs built that RHS, so
--- it knows its structure.  (Fully general subst
-
-substSpecEnvRhs te ve rhs
-  = go te ve rhs
-  where
-    go te ve (App f (TyArg ty)) = App (go te ve f) (TyArg (instantiateTy te ty))
-    go te ve (App f (VarArg v)) = App (go te ve f) (case lookupIdEnv ve v of
-							Just arg' -> arg'
-							Nothing   -> VarArg v)
-    go te ve (Var v)		  = case lookupIdEnv ve v of
-						Just (VarArg v') -> Var v'
-						Just (LitArg l)  -> Lit l
-						Nothing 	 -> Var v
-
-	-- These equations are a bit half baked, because
-	-- they don't deal properly wih capture.
-	-- But I'm sure it'll never matter... sigh.
-    go te ve (Lam b@(TyBinder tyvar) e) = Lam b (go te' ve e)
-				        where
-					  te' = delFromTyVarEnv te tyvar
-
-    go te ve (Lam b@(ValBinder v) e) = Lam b (go te ve' e)
-				     where
-				       ve' = delOneFromIdEnv ve v
 
 ----------------------------------------
 type SpecM a = UniqSM a

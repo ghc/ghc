@@ -16,18 +16,17 @@ import {-# SOURCE #-} Simplify ( simplExpr )
 import CmdLineOpts	( switchIsOn, SimplifierSwitch(..) )
 import CoreSyn
 import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), 
-			  SimpleUnfolding(..),
 			  FormSummary, whnfOrBottom,
 			  smallEnoughToInline )
-import Specialise	( substSpecEnvRhs )
+import CoreUtils	( coreExprCc )
 import BinderInfo	( BinderInfo, noBinderInfo, okToInline )
 
-import CostCentre	( CostCentre, isCurrentCostCentre )
+import CostCentre	( CostCentre, noCostCentreAttached, isCurrentCostCentre )
 import Id		( idType, getIdInfo, getIdUnfolding, 
 			  getIdSpecialisation, setIdSpecialisation,
 			  idMustBeINLINEd, idHasNoFreeTyVars,
 			  mkIdWithNewUniq, mkIdWithNewType, 
-			  elemIdEnv, isNullIdEnv, addOneToIdEnv
+			  IdEnv, lookupIdEnv, delOneFromIdEnv, elemIdEnv, isNullIdEnv, addOneToIdEnv
 			)
 import SpecEnv		( lookupSpecEnv, substSpecEnv, isEmptySpecEnv )
 import OccurAnal	( occurAnalyseGlobalExpr )
@@ -38,7 +37,7 @@ import SimplMonad
 import Type		( instantiateTy, mkTyVarTy )
 import TyCon		( tyConFamilySize )
 import TyVar		( TyVar, cloneTyVar,
-			  isEmptyTyVarEnv, addToTyVarEnv,
+			  isEmptyTyVarEnv, addToTyVarEnv, delFromTyVarEnv,
 			  addOneToTyVarSet, elementOfTyVarSet
 			)
 import Maybes		( maybeToBool )
@@ -72,49 +71,59 @@ completeVar env var args result_ty
 
 	-- Look for an unfolding. There's a binding for the
 	-- thing, but perhaps we want to inline it anyway
-  | (  maybeToBool maybe_unfolding_info
+  |    has_unfolding
     && (not essential_unfoldings_only || idMustBeINLINEd var)
 	-- If "essential_unfoldings_only" is true we do no inlinings at all,
 	-- EXCEPT for things that absolutely have to be done
 	-- (see comments with idMustBeINLINEd)
     && ok_to_inline
-    && costCentreOk (getEnclosingCC env) (getEnclosingCC unf_env)
+    && costCentreOk (getEnclosingCC env) (coreExprCc unf_template)
+  =
+{-
+    pprTrace "Unfolding" (ppr var) $
+    simplCount		`thenSmpl` \ n ->
+    (if n > 1000 then
+	pprTrace "Ticks > 1000 and unfolding" (sep [space, int n, ppr var])
+    else
+	id
     )
-  = -- pprTrace "Unfolding" (ppr var) $
-    unfold var unf_env unf_template args result_ty
-
+    (if n>4000 then
+       returnSmpl (mkGenApp (Var var) args)
+    else
+-}
+    tickUnfold var		`thenSmpl_`
+    simplExpr unf_env unf_template args result_ty
 
   | otherwise
   = returnSmpl (mkGenApp (Var var') args)
 
   where
-   info_from_env = lookupOutIdEnv env var
-   var'		 = case info_from_env of
-			Just (var', _, _) -> var'
-			Nothing           -> var
-
-    unfolding_from_id = getIdUnfolding var
+    (var', occ_info, unfolding) = case lookupOutIdEnv env var of
+					Just stuff -> stuff
+					Nothing    -> (var, noBinderInfo, getIdUnfolding var)
 
 	---------- Magic unfolding stuff
-    maybe_magic_result	= case unfolding_from_id of
+    maybe_magic_result	= case unfolding of
 				MagicUnfolding _ magic_fn -> applyMagicUnfoldingFun magic_fn 
 										    env args
 			        other 			  -> Nothing
     Just magic_result = maybe_magic_result
 
-    maybe_unfolding_info 
-	= case (info_from_env, unfolding_from_id) of
+	---------- Unfolding stuff
+    has_unfolding = case unfolding of
+			CoreUnfolding _ _ _ -> True
+			other		    -> False
 
-	     (Just (_, occ_info, OutUnfolding enc_cc unf), _)
-		-> Just (occ_info, setEnclosingCC env enc_cc, unf)	
-
-	     (_, CoreUnfolding unf)
-		-> Just (noBinderInfo, env, unf)
-
-	     other -> Nothing
-
-    Just (occ_info, unf_env, simple_unfolding) = maybe_unfolding_info
-    SimpleUnfolding form guidance unf_template = simple_unfolding
+    CoreUnfolding form guidance unf_template = unfolding
+    unf_env = zapSubstEnvs env
+		-- The template is already simplified, so don't re-substitute.
+		-- This is VITAL.  Consider
+		--	let x = e in
+		--	let y = \z -> ...x... in
+		--	\ x -> ...y...
+		-- We'll clone the inner \x, adding x->x' in the id_subst
+		-- Then when we inline y, we must *not* replace x by x' in
+		-- the inlined copy!!
 
     	---------- Specialisation stuff
     (ty_args, remaining_args) = initialTyArgs args
@@ -130,26 +139,10 @@ completeVar env var args result_ty
     small_enough	      = smallEnoughToInline var arg_evals is_case_scrutinee guidance
     arg_evals		      = [is_evald arg | arg <- args, isValArg arg]
 
-    is_evald (VarArg v) = isEvaluated (lookupRhsInfo env v)
+    is_evald (VarArg v) = isEvaluated (lookupUnfolding env v)
     is_evald (LitArg l) = True
 
 
--- Perform the unfolding
-unfold var unf_env unf_template args result_ty
- =
-{-
-    simplCount		`thenSmpl` \ n ->
-    (if n > 1000 then
-	pprTrace "Ticks > 1000 and unfolding" (sep [space, int n, ppr var])
-    else
-	id
-    )
-    (if n>4000 then
-       returnSmpl (mkGenApp (Var var) args)
-    else
--}
-    tickUnfold var		`thenSmpl_`
-    simplExpr unf_env unf_template args result_ty
 
 
 -- costCentreOk checks that it's ok to inline this thing
@@ -162,7 +155,7 @@ unfold var unf_env unf_template args result_ty
 -- regardless of whether E is a WHNF or not.
 
 costCentreOk cc_encl cc_rhs
-  = isCurrentCostCentre cc_encl || not (isCurrentCostCentre cc_rhs)
+  = isCurrentCostCentre cc_encl || not (noCostCentreAttached cc_rhs)
 \end{code}		   
 
 
@@ -184,7 +177,7 @@ simplBinder env (id, _)
   && empty_ty_subst 		-- No type substitution to do inside the Id
   && isNullIdEnv id_subst	-- No id substitution to do inside the Id
   = let 
-	env' = setIdEnv env (addOneToIdEnv in_scope_ids id id, id_subst)
+	env'          = setIdEnv env (new_in_scope_ids id, id_subst)
     in
     returnSmpl (env', id)
 
@@ -207,7 +200,7 @@ simplBinder env (id, _)
     if not_in_scope then
 	-- No need to clone
 	let
-	    env' = setIdEnv env (addOneToIdEnv in_scope_ids id id2, id_subst)
+	    env' = setIdEnv env (new_in_scope_ids id2, id_subst)
 	in
 	returnSmpl (env', id2)
     else
@@ -215,21 +208,24 @@ simplBinder env (id, _)
 	getUniqueSmpl         `thenSmpl` \ uniq ->
 	let
 	    id3 = mkIdWithNewUniq id2 uniq
-	    env' = setIdEnv env (addOneToIdEnv in_scope_ids id3 id3,
-				 addOneToIdEnv id_subst id (VarArg id3))
+	    env' = setIdEnv env (new_in_scope_ids id3,
+				 addOneToIdEnv id_subst id (SubstVar id3))
 	in
 	returnSmpl (env', id3)
     )
   where
     ((in_scope_tyvars, ty_subst), (in_scope_ids, id_subst)) = getEnvs env
-    empty_ty_subst   = isEmptyTyVarEnv ty_subst
-    not_in_scope     = not (id `elemIdEnv` in_scope_ids)
 
-    ty               = idType id
-    ty'              = instantiateTy ty_subst ty
+    empty_ty_subst   	 = isEmptyTyVarEnv ty_subst
+    not_in_scope     	 = not (id `elemIdEnv` in_scope_ids)
 
-    spec_env         = getIdSpecialisation id
-    spec_env'        = substSpecEnv ty_subst (substSpecEnvRhs ty_subst id_subst) spec_env
+    new_in_scope_ids id' = addOneToIdEnv in_scope_ids id' (id', noBinderInfo, NoUnfolding)
+    
+    ty               	 = idType id
+    ty'              	 = instantiateTy ty_subst ty
+    
+    spec_env         	 = getIdSpecialisation id
+    spec_env'        	 = substSpecEnv ty_subst (substSpecEnvRhs ty_subst id_subst) spec_env
 
 simplBinders :: SimplEnv -> [InBinder] -> SmplM (SimplEnv, [OutId])
 simplBinders env binders = mapAccumLSmpl simplBinder env binders
@@ -257,4 +253,35 @@ simplTyBinder env tyvar
 
 simplTyBinders :: SimplEnv -> [TyVar] -> SmplM (SimplEnv, [TyVar])
 simplTyBinders env binders = mapAccumLSmpl simplTyBinder env binders
+\end{code}
+
+
+substSpecEnvRhs applies a substitution to the RHS's of a SpecEnv
+It exploits the known structure of a SpecEnv's RHS to have fewer
+equations.
+
+\begin{code}
+substSpecEnvRhs te ve rhs
+  = go te ve rhs
+  where
+    go te ve (App f (TyArg ty)) = App (go te ve f) (TyArg (instantiateTy te ty))
+    go te ve (App f (VarArg v)) = App (go te ve f) (case lookupIdEnv ve v of
+							Just (SubstVar v') -> VarArg v'
+							Just (SubstLit l)  -> LitArg l
+							Nothing            -> VarArg v)
+    go te ve (Var v)		  = case lookupIdEnv ve v of
+						Just (SubstVar v') -> Var v'
+						Just (SubstLit l)  -> Lit l
+						Nothing 	   -> Var v
+
+	-- These equations are a bit half baked, because
+	-- they don't deal properly wih capture.
+	-- But I'm sure it'll never matter... sigh.
+    go te ve (Lam b@(TyBinder tyvar) e) = Lam b (go te' ve e)
+				        where
+					  te' = delFromTyVarEnv te tyvar
+
+    go te ve (Lam b@(ValBinder v) e) = Lam b (go te ve' e)
+				     where
+				       ve' = delOneFromIdEnv ve v
 \end{code}
