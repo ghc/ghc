@@ -10,11 +10,12 @@ module Main where
 f :: (?x :: Int) => ((?x :: Int) => Int) -> Int -> Int
 f g y = if y == 0 
 	then g 
-	else (f g (y - 1) with ?x = ?x + 1)
+	else let ?x = ?x + 1 
+	     in f g (y - 1)
 
 h :: (?x :: Int) => Int
 h = ?x
 
-main = print (f h 10 with ?x = 0)
+main = print (let ?x = 0 in f h 10)
 -- The result should be 10!
 
