@@ -55,7 +55,7 @@ signalling that the current hostname applies.
 \begin{code}
 data PortID = 
 	  Service String		-- Service Name eg "ftp"
-	| PortNumber Int		-- User defined Port Number
+	| PortNumber PortNumber		-- User defined Port Number
 #ifndef cygwin32_TARGET_OS
 	| UnixSocket String		-- Unix family socket in file system
 #endif
@@ -73,25 +73,25 @@ connectTo :: Hostname		-- Hostname
 	  -> PortID 		-- Port Identifier
 	  -> IO Handle		-- Connected Socket
 
-connectTo hostname (Service serv) =
-    getProtocolNumber "tcp"			    >>= \ proto ->
-    socket AF_INET Stream proto			    >>= \ sock ->
-    getServicePortNumber serv			    >>= \ port ->
-    getHostByName hostname			    >>= \ (HostEntry _ _ _ haddrs) ->
-    connect sock (SockAddrInet port (head haddrs))  >>
-    socketToHandle sock	ReadWriteMode		    >>= \ h ->
-    return h
-connectTo hostname (PortNumber port) =
-    getProtocolNumber "tcp"			    >>= \ proto ->
-    socket AF_INET Stream proto			    >>= \ sock ->
-    getHostByName hostname			    >>= \ (HostEntry _ _ _ haddrs) ->
-    connect sock (SockAddrInet port (head haddrs))  >>
+connectTo hostname (Service serv) = do
+    proto	<- getProtocolNumber "tcp"
+    sock	<- socket AF_INET Stream proto
+    port	<- getServicePortNumber serv
+    he		<- getHostByName hostname
+    connect sock (SockAddrInet port (hostAddress he))
+    socketToHandle sock	ReadWriteMode
+
+connectTo hostname (PortNumber port) = do
+    proto	<- getProtocolNumber "tcp"
+    sock        <- socket AF_INET Stream proto
+    he		<- getHostByName hostname
+    connect sock (SockAddrInet port (hostAddress he))
     socketToHandle sock ReadWriteMode
 
 #ifndef cygwin32_TARGET_OS
-connectTo _ (UnixSocket path) =
-    socket AF_UNIX Datagram 0			    >>= \ sock ->
-    connect sock (SockAddrUnix path)		    >>
+connectTo _ (UnixSocket path) = do
+    sock    <- socket AF_UNIX Datagram 0
+    connect sock (SockAddrUnix path)
     socketToHandle sock ReadWriteMode
 #endif
 
@@ -104,23 +104,25 @@ socket which has been bound to the specified port.
 listenOn :: PortID 	-- Port Identifier
 	 -> IO Socket	-- Connected Socket
 
-listenOn (Service serv) =
-    getProtocolNumber "tcp"			    >>= \ proto ->
-    socket AF_INET Stream proto			    >>= \ sock ->
-    getServicePortNumber serv			    >>= \ port ->
-    bindSocket sock (SockAddrInet port iNADDR_ANY)  >>
-    listen sock maxListenQueue			    >>
+listenOn (Service serv) = do
+    proto   <- getProtocolNumber "tcp"
+    sock    <- socket AF_INET Stream proto
+    port    <- getServicePortNumber serv
+    bindSocket sock (SockAddrInet port iNADDR_ANY)
+    listen sock maxListenQueue
     return sock
-listenOn (PortNumber port) =
-    getProtocolNumber "tcp"			    >>= \ proto ->
-    socket AF_INET Stream proto			    >>= \ sock ->
-    bindSocket sock (SockAddrInet port iNADDR_ANY)  >>
-    listen sock maxListenQueue			    >>
+
+listenOn (PortNumber port) = do
+    proto <- getProtocolNumber "tcp"
+    sock  <- socket AF_INET Stream proto
+    bindSocket sock (SockAddrInet port iNADDR_ANY)
+    listen sock maxListenQueue
     return sock
+
 #ifndef cygwin32_TARGET_OS
-listenOn (UnixSocket path) =
-    socket AF_UNIX Datagram 0			    >>= \ sock ->
-    bindSocket sock (SockAddrUnix path)		    >>
+listenOn (UnixSocket path) = do
+    sock <- socket AF_UNIX Datagram 0
+    bindSocket sock (SockAddrUnix path)
     return sock
 #endif
 \end{code}
@@ -129,12 +131,12 @@ listenOn (UnixSocket path) =
 accept :: Socket 		-- Listening Socket
        -> IO (Handle, 		-- StdIO Handle for read/write
 	      HostName)		-- HostName of Peer socket
-
-accept sock =
- SocketPrim.accept sock	             >>= \ (sock', (SockAddrInet _ haddr)) ->
- getHostByAddr AF_INET haddr         >>= \ (HostEntry peer _ _ _) ->
- socketToHandle sock ReadWriteMode   >>= \ handle ->
+accept sock = do
+ ~(sock', (SockAddrInet _ haddr)) <- SocketPrim.accept sock
+ (HostEntry peer _ _ _)           <- getHostByAddr AF_INET haddr
+ handle				  <- socketToHandle sock ReadWriteMode
  return (handle, peer)
+
 \end{code}
 
 Send and recived data from/to the given host and port number.  These
@@ -148,45 +150,48 @@ sendTo :: Hostname 	-- Hostname
        -> PortID	-- Port Number
        -> String	-- Message to send
        -> IO ()
-sendTo h p msg = 
- connectTo h p	>>= \ s ->
- hPutStr s msg	>>
- hClose s
+sendTo h p msg = do
+  s <- connectTo h p
+  hPutStr s msg
+  hClose s
 
 recvFrom :: Hostname 	-- Hostname
 	 -> PortID	-- Port Number
 	 -> IO String	-- Received Data
-recvFrom host port =
- listenOn port		>>= \ s ->
+recvFrom host port = do
+ s <- listenOn port
  let 
-  waiting =
-   SocketPrim.accept s		>>= \ (s', (SockAddrInet _ haddr)) ->
-   getHostByAddr AF_INET haddr  	>>= \ (HostEntry peer _ _ _) ->
-   if peer /= host then
-      sClose s'			>>
-      waiting
-   else
-      readSocketAll s'		>>= \ msg ->
-      sClose s'			>>
-      return msg
- in
- waiting			>>= \ message ->
- sClose s			>>
+  waiting = do
+     ~(s', SockAddrInet _ haddr) <-  SocketPrim.accept s
+     (HostEntry peer _ _ _)      <- getHostByAddr AF_INET haddr
+     if peer /= host 
+      then do
+         sClose s'
+         waiting
+      else do
+        msg <- readSocketAll s'
+        sClose s'
+        return msg
+
+ message <- waiting
+ sClose s
  return message
+
 \end{code}
 
 Access function returning the port type/id of socket.
 
 \begin{code}
 socketPort :: Socket -> IO PortID
-socketPort s =
-    getSocketName s			>>= \ sockaddr ->
-    return (case sockaddr of
-		SockAddrInet port _	->
-		    (PortNumber port)
+socketPort s = do
+    sockaddr <- getSocketName s
+    return (portID sockaddr)
+  where
+   portID sa =
+    case sa of
+     SockAddrInet port _    -> PortNumber port
 #ifndef cygwin32_TARGET_OS
-		SockAddrUnix path	->
-		    (UnixSocket path)
+     SockAddrUnix path	    -> UnixSocket path
 #endif
-	    )
+
 \end{code}
