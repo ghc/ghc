@@ -920,8 +920,9 @@ def runCmd( cmd ):
     if (config.timeout_prog == ''):
         return os.system( cmd )
     else:
-        return os.spawnv(os.P_WAIT, config.timeout_prog,
+        r = os.spawnv(os.P_WAIT, config.timeout_prog,
                          [config.timeout_prog,`config.timeout`,cmd] )
+        return r << 8
 
 def rm_no_fail( file ):
    try:
