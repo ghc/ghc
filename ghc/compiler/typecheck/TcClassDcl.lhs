@@ -30,11 +30,9 @@ import TcEnv		( TcId, ValueEnv, TyThing(..), TyThingDetails(..), tcAddImportedId
 			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
-import TcTyDecls	( mkNewTyConRep )
 import TcMonoType	( tcHsSigType, tcClassContext, checkSigTyVars, sigCtxt, mkTcSig )
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
 import TcType		( TcType, TcTyVar, tcInstTyVars, tcGetTyVar, zonkTcSigTyVars )
-import TcInstUtil	( classDataCon )
 import TcMonad
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import Bag		( unionManyBags, bagToList )
@@ -53,10 +51,7 @@ import Type		( Type, ThetaType, ClassContext,
 			)
 import Var		( tyVarKind, TyVar )
 import VarSet		( mkVarSet, emptyVarSet )
-import TyCon		( AlgTyConFlavour(..), mkClassTyCon )
 import Maybes		( seqMaybe )
-import SrcLoc		( SrcLoc )
-import FiniteMap        ( lookupWithDefaultFM )
 \end{code}
 
 
