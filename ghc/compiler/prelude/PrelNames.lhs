@@ -557,14 +557,14 @@ realFloatClassName = clsQual  pREL_FLOAT FSLIT("RealFloat") realFloatClassKey
 ixClassName = clsQual pREL_ARR FSLIT("Ix") ixClassKey
 
 -- Class Typeable
-typeableClassName = clsQual tYPEABLE FSLIT("Typeable") typeableClassKey
-typeable1ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable1ClassKey
-typeable2ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable2ClassKey
-typeable3ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable3ClassKey
-typeable4ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable4ClassKey
-typeable5ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable5ClassKey
-typeable6ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable6ClassKey
-typeable7ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable7ClassKey
+typeableClassName  = clsQual tYPEABLE FSLIT("Typeable") typeableClassKey
+typeable1ClassName = clsQual tYPEABLE FSLIT("Typeable1") typeable1ClassKey
+typeable2ClassName = clsQual tYPEABLE FSLIT("Typeable2") typeable2ClassKey
+typeable3ClassName = clsQual tYPEABLE FSLIT("Typeable3") typeable3ClassKey
+typeable4ClassName = clsQual tYPEABLE FSLIT("Typeable4") typeable4ClassKey
+typeable5ClassName = clsQual tYPEABLE FSLIT("Typeable5") typeable5ClassKey
+typeable6ClassName = clsQual tYPEABLE FSLIT("Typeable6") typeable6ClassKey
+typeable7ClassName = clsQual tYPEABLE FSLIT("Typeable7") typeable7ClassKey
 
 typeableClassNames = 	[ typeableClassName, typeable1ClassName, typeable2ClassName
 		 	, typeable3ClassName, typeable4ClassName, typeable5ClassName
