@@ -84,11 +84,9 @@ type FixityEnv = LocalFixityEnv
 
 \begin{code}
 type RenameResult = ( PersistentCompilerState
-		    , Module		-- This module
-		    , RenamedHsModule	-- Renamed module
-		    , Maybe ParsedIface	-- The existing interface file, if any
-		    , ParsedIface	-- The new interface
-		    , [Module])		-- Imported modules
+		    , ModIface		-- The mi_decls in here include
+					-- ones imported from packages too
+		    )	
 		   
 renameModule :: DynFlags -> Finder 
 	     -> PersistentCompilerState -> HomeSymbolTable
@@ -193,7 +191,7 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
 	    | FixitySig name fixity loc <- nameEnvElts local_fixity_env,
 	      isUserExportedName name
 	    ]
-
+ ------ HERE
 	new_iface = ParsedIface { pi_mod     = this_module
 				, pi_vers    = initialVersion
 				, pi_orphan  = any isOrphanDecl rn_local_decls

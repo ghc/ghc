@@ -5,8 +5,9 @@
 
 \begin{code}
 module HscTypes ( 
-	ModDetails(..),	GlobalSymbolTable, 
+	ModDetails(..),	ModIface(..), GlobalSymbolTable, 
 	HomeSymbolTable, PackageSymbolTable,
+	HomeIfaceTable, PackageIfaceTable,
 
 	TyThing(..), groupTyThings,
 
@@ -39,7 +40,7 @@ import Name		( Name, NameEnv, NamedThing,
 			  unitNameEnv, extendNameEnv, plusNameEnv, 
 			  lookupNameEnv, emptyNameEnv, getName, nameModule,
 			  nameSrcLoc )
-import Module		( Module, ModuleName,
+import Module		( Module, ModuleName, ModuleEnv,
 			  extendModuleEnv, lookupModuleEnv )
 import Class		( Class )
 import OccName		( OccName )
@@ -62,11 +63,13 @@ import HsDecls		( DeprecTxt )
 import CoreSyn		( CoreRule )
 import NameSet		( NameSet )
 import Type		( Type )
+import Name		( emptyNameEnv )
 import VarSet		( TyVarSet )
 import Panic		( panic )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import Util		( thenCmp )
+import RnHsSyn		( RenamedHsDecl )
 \end{code}
 
 %************************************************************************
@@ -81,55 +84,48 @@ and can be written out to an interface file.  The @ModDetails@ is after
 linking; it is the "linked" form of the mi_decls field.
 
 \begin{code}
+data ModIface 
+   = ModIface {
+        mi_module   :: Module,			-- Complete with package info
+        mi_version  :: VersionInfo,		-- Module version number
+        mi_orphan   :: WhetherHasOrphans,       -- Whether this module has orphans
+        mi_usages   :: [ImportVersion Name],	-- Usages
+
+        mi_exports  :: Avails,			-- What it exports
+        mi_globals  :: GlobalRdrEnv,		-- Its top level environment
+
+        mi_fixities :: NameEnv Fixity,		-- Fixities
+	mi_deprecs  :: NameEnv DeprecTxt,	-- Deprecations
+
+	mi_decls    :: [RenamedHsDecl]		-- types, classes 
+						-- inst decls, rules, iface sigs
+     }
+
+-- typechecker should only look at this, not ModIface
+-- Should be able to construct ModDetails from mi_decls in ModIface
 data ModDetails
    = ModDetails {
-        md_module   :: Module,			-- Complete with package info
-        md_version  :: VersionInfo,		-- Module version number
-        md_orphan   :: WhetherHasOrphans,       -- Whether this module has orphans
-        md_usages   :: [ImportVersion Name],	-- Usages
-
-        md_exports  :: Avails,			-- What it exports
-        md_globals  :: GlobalRdrEnv,		-- Its top level environment
-
-        md_fixities :: NameEnv Fixity,		-- Fixities
-	md_deprecs  :: NameEnv DeprecTxt,	-- Deprecations
-
 	-- The next three fields are created by the typechecker
         md_types    :: TypeEnv,
         md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
         md_rules    :: RuleEnv		-- Domain may include Ids from other modules
      }
-
--- ModIFace is nearly the same as RnMonad.ParsedIface.
--- Right now it's identical :)
-data ModIFace 
-   = ModIFace {
-        mi_mod       :: Module,                   -- Complete with package info
-        mi_vers      :: Version,                  -- Module version number
-        mi_orphan    :: WhetherHasOrphans,        -- Whether this module has orphans
-        mi_usages    :: [ImportVersion OccName],  -- Usages
-        mi_exports   :: [ExportItem],             -- Exports
-        mi_insts     :: [RdrNameInstDecl],        -- Local instance declarations
-        mi_decls     :: [(Version, RdrNameHsDecl)],    -- Local definitions
-        mi_fixity    :: (Version, [RdrNameFixitySig]), -- Local fixity declarations, 
-                                                       -- with their version
-        mi_rules     :: (Version, [RdrNameRuleDecl]),  -- Rules, with their version
-        mi_deprecs   :: [RdrNameDeprecation]           -- Deprecations
-     }
-
 \end{code}
 
 \begin{code}
-emptyModDetails :: Module -> ModDetails
-emptyModDetails mod
-  = ModDetails { md_module   = mod,
-		 md_exports  = [],
-		 md_globals  = emptyRdrEnv,
-		 md_fixities = emptyNameEnv,
-		 md_deprecs  = emptyNameEnv,
-		 md_types    = emptyNameEnv,
-		 md_insts    = [],
-    		 md_rules    = emptyRuleEnv
+emptyModDetails :: ModDetails
+emptyModDetails
+  = ModDetails { md_types = emptyTypeEnv,
+                 md_insts = [],
+                 md_rules = emptyRuleEnv
+    }
+
+emptyModIface :: Module -> ModIface
+emptyModIface mod
+  = ModIface { mi_module   = mod,
+	       mi_exports  = [],
+	       mi_globals  = emptyRdrEnv,
+	       mi_deprecs  = emptyNameEnv,
     }		
 \end{code}
 
@@ -137,6 +133,11 @@ Symbol tables map modules to ModDetails:
 
 \begin{code}
 type SymbolTable	= ModuleEnv ModDetails
+type IfaceTable		= ModuleEnv ModIface
+
+type HomeIfaceTable     = IfaceTable
+type PackageIfaceTable  = IfaceTable
+
 type HomeSymbolTable    = SymbolTable	-- Domain = modules in the home package
 type PackageSymbolTable = SymbolTable	-- Domain = modules in the some other package
 type GlobalSymbolTable  = SymbolTable	-- Domain = all modules
@@ -145,12 +146,12 @@ type GlobalSymbolTable  = SymbolTable	-- Domain = all modules
 Simple lookups in the symbol table.
 
 \begin{code}
-lookupFixityEnv :: SymbolTable -> Name -> Maybe Fixity
+lookupFixityEnv :: IfaceTable -> Name -> Maybe Fixity
 	-- Returns defaultFixity if there isn't an explicit fixity
 lookupFixityEnv tbl name
   = case lookupModuleEnv tbl (nameModule name) of
 	Nothing	     -> Nothing
-	Just details -> lookupNameEnv (md_fixities details) name
+	Just details -> lookupNameEnv (mi_fixities details) name
 \end{code}
 
 
@@ -162,6 +163,7 @@ lookupFixityEnv tbl name
 
 \begin{code}
 type TypeEnv = NameEnv TyThing
+emptyTypeEnv = emptyNameEnv
 
 data TyThing = AnId   Id
 	     | ATyCon TyCon
@@ -205,7 +207,7 @@ extendTypeEnv tbl things
 	where
 	  new_details 
              = case lookupModuleEnv tbl mod of
-                  Nothing      -> (emptyModDetails mod) {md_types = type_env}
+                  Nothing      -> emptyModDetails {md_types = type_env}
                   Just details -> details {md_types = md_types details 
                                                      `plusNameEnv` type_env}
 \end{code}
@@ -400,7 +402,7 @@ type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
 \begin{code}
 data CompResult
    = CompOK   ModDetails  -- new details (HST additions)
-              (Maybe (ModIFace, Linkable))
+              (Maybe (ModIface, Linkable))
                        -- summary and code; Nothing => compilation not reqd
                        -- (old summary and code are still valid)
               PersistentCompilerState	-- updated PCS
@@ -419,7 +421,7 @@ data CompResult
 
 data HscResult
    = HscOK   ModDetails  	     -- new details (HomeSymbolTable additions)
-	     (Maybe ModIFace)	     -- new iface (if any compilation was done)
+	     (Maybe ModIface)	     -- new iface (if any compilation was done)
 	     (Maybe String)  	     -- generated stub_h filename (in /tmp)
 	     (Maybe String)  	     -- generated stub_c filename (in /tmp)
 	     (Maybe [UnlinkedIBind]) -- interpreted code, if any
@@ -429,13 +431,6 @@ data HscResult
    | HscErrs PersistentCompilerState -- updated PCS
              (Bag ErrMsg)		-- errors
              (Bag WarnMsg)             -- warnings
-
--- These two are only here to avoid recursion between CmCompile and
--- CompManager.  They really ought to be in the latter.
-type ModuleEnv a = UniqFM a   -- Domain is Module
-
-type HomeModMap         = FiniteMap ModuleName Module -- domain: home mods only
-type HomeInterfaceTable = ModuleEnv ModIFace
 \end{code}
 
 

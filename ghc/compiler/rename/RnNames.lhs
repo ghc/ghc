@@ -126,7 +126,7 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 		-- to compile A, and of course that doesn't include B.f.  That's
 		-- why we wait till after the plusEnv stuff to do the early-exit.
 		
-	-- Check For eacly exit
+	-- Check For early exit
 	checkErrsRn				`thenRn` \ no_errs_so_far ->
         if not no_errs_so_far then
 		-- Found errors already, so exit now

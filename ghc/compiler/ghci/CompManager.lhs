@@ -58,7 +58,7 @@ type ModHandle = String   -- ToDo: do better?
 data PersistentCMState
    = PersistentCMState {
         hst :: HomeSymbolTable,    -- home symbol table
-        hit :: HomeInterfaceTable, -- home interface table
+        hit :: HomeIfaceTable, -- home interface table
         ui  :: UnlinkedImages,     -- the unlinked images
         mg  :: ModuleGraph         -- the module graph
      }
@@ -69,7 +69,7 @@ emptyPCMS = PersistentCMState
                  hst = emptyHST, hit = emptyHIT,
                  ui  = emptyUI,  mg  = emptyMG }
 
-emptyHIT :: HomeInterfaceTable
+emptyHIT :: HomeIfaceTable
 emptyHIT = emptyFM
 emptyHST :: HomeSymbolTable
 emptyHST = emptyFM

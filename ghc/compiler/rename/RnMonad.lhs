@@ -66,7 +66,8 @@ import HscTypes		( GlobalSymbolTable, AvailEnv,
 			  PersistentRenamerState(..), IsBootInterface, Avails,
 			  DeclsMap, IfaceInsts, IfaceRules, DeprecationEnv,
 			  HomeSymbolTable, PackageSymbolTable,
-			  PersistentCompilerState(..), GlobalRdrEnv )
+			  PersistentCompilerState(..), GlobalRdrEnv,
+			  HomeIfaceTable, PackageIfaceTable )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -118,7 +119,8 @@ data RnDown
 
 	rn_finder  :: Finder,
 	rn_dflags  :: DynFlags,
-	rn_hst     :: HomeSymbolTable,
+	rn_hit     :: HomeIfaceTable,
+	rn_done    :: Name -> Bool,   -- available before compiling this module?
 
 	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
 
@@ -194,7 +196,8 @@ data ParsedIface
       pi_exports   :: [ExportItem],			-- Exports
       pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
       pi_decls	   :: [(Version, RdrNameHsDecl)],	-- Local definitions
-      pi_fixity	   :: (Version, [RdrNameFixitySig]),	-- Local fixity declarations, with their version
+      pi_fixity	   :: (Version, [RdrNameFixitySig]),	-- Local fixity declarations,
+							--   with their version
       pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
       pi_deprecs   :: [RdrNameDeprecation]		-- Deprecations
     }
@@ -209,18 +212,18 @@ data ParsedIface
 \begin{code}
 data Ifaces = Ifaces {
     -- PERSISTENT FIELDS
-	iPST :: PackageSymbolTable,	
-		-- The ModuleDetails for modules in other packages
+	iPIT :: PackageIfaceTable,
+		-- The ModuleIFaces for modules in other packages
 		-- whose interfaces we have opened
-		-- The contents of those interface files may be mostly
-		-- in the iDecls, iInsts, iRules (below), but what *will*
-		-- be in the PackageSymbolTable is:
+		-- The declarations in these interface files are held in
+		-- iDecls, iInsts, iRules (below), not in the mi_decls fields
+		-- of the iPIT.  What _is_ in the iPIT is:
 		--	* The Module 
 		--	* Version info
 		--	* Its exports
 		--	* Fixities
 		--	* Deprecations
-		-- This field is initialised from the compiler's persistent
+		-- The iPIT field is initialised from the compiler's persistent
 		-- package symbol table, and the renamer incrementally adds
 		-- to it.
 
@@ -268,13 +271,16 @@ type IsLoaded = Bool
 %************************************************************************
 
 \begin{code}
-initRn :: DynFlags -> Finder -> HomeSymbolTable
+initRn :: DynFlags 
+       -> Finder 
+       -> HomeIfaceTable
        -> PersistentCompilerState
-       -> Module -> SrcLoc
+       -> Module 
+       -> SrcLoc
        -> RnMG t
        -> IO (t, PersistentCompilerState, (Bag WarnMsg, Bag ErrMsg))
 
-initRn dflags finder hst pcs mod loc do_rn
+initRn dflags finder hit pcs mod loc do_rn
   = do 
 	let prs = pcs_PRS pcs
 	uniqs     <- mkSplitUniqSupply 'r'
@@ -287,7 +293,7 @@ initRn dflags finder hst pcs mod loc do_rn
 	
 			       rn_finder = finder,
 			       rn_dflags = dflags,
-			       rn_hst    = hst,
+			       rn_hit    = hit,
 					     
 			       rn_ns     = names_var, 
 			       rn_errs   = errs_var, 
@@ -530,7 +536,7 @@ getDOptsRn (RnDown { rn_dflags = dflags}) l_down
 
 
 %================
-\subsubsection{  Source location}
+\subsubsection{Source location}
 %=====================
 
 \begin{code}
@@ -551,8 +557,8 @@ getSrcLocRn down l_down
 getFinderRn :: RnM d Finder
 getFinderRn down l_down = return (rn_finder down)
 
-getHomeSymbolTableRn :: RnM d HomeSymbolTable
-getHomeSymbolTableRn down l_down = return (rn_hst down)
+getHomeIfaceTableRn :: RnM d HomeIfaceTable
+getHomeIfaceTableRn down l_down = return (rn_hit down)
 \end{code}
 
 %================

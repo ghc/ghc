@@ -217,12 +217,12 @@ tryLoadInterface doc_str mod_name from
 	mod_map2 = addToFM mod_map1 mod_name (pi_orphan iface, hi_boot_file, True)
 
 	-- Now add info about this module to the PST
-	new_pst     = extendModuleEnv pst mod mod_detils
- 	mod_details = ModDetails { mdModule = mod, mvVersion = version,
+	new_pit   = extendModuleEnv pit mod mod_iface
+ 	mod_iface = ModIface { mdModule = mod, mvVersion = version,
 				   mdExports = avails,
 				   mdFixEnv = fix_env, mdDeprecEnv = deprec_env }
 
-	new_ifaces = ifaces { iPST	  = new_pst,
+	new_ifaces = ifaces { iPIT	  = new_pit,
 			      iDecls      = new_decls,
 			      iInsts      = new_insts,
 			      iRules	  = new_rules,
