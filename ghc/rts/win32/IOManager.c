@@ -363,9 +363,12 @@ AddProcRequest ( void* proc,
     return depositWorkItem(reqID, wItem);
 }
 
-void ShutdownIOManager()
+void ShutdownIOManager ( void )
 {
   SetEvent(ioMan->hExitEvent);
-  free(ioMan);
-  ioMan = NULL;
+  // ToDo: we can't free this now, because the worker thread(s)
+  // haven't necessarily finished with it yet.  Perhaps it should
+  // have a reference count or something.
+  // free(ioMan);
+  // ioMan = NULL;
 }
