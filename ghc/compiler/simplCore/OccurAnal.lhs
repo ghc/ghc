@@ -26,7 +26,7 @@ import Id		( isDataConId, isOneShotLambda, setOneShotLambda,
 			  idSpecialisation, isLocalId,
 			  idType, idUnique, Id
 			)
-import IdInfo		( shortableIdInfo, copyIdInfo )
+import IdInfo		( copyIdInfo )
 import BasicTypes	( OccInfo(..), isOneOcc )
 
 import VarSet

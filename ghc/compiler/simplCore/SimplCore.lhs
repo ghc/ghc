@@ -264,7 +264,11 @@ updateBinders :: IdSet	 		-- Locally defined ids with their Rules attached
 -- Update the binders of top-level bindings as follows
 -- 	a) Attach the rules for each locally-defined Id to that Id.
 --	b) Set the no-discard flag if either the Id is exported,
---	   or it's mentoined in the RHS of a rule
+--	   or it's mentioned in the RHS of a rule
+--
+-- You might wonder why exported Ids aren't already marked as such;
+-- it's just because the type checker is rather busy already and
+-- I didn't want to pass in yet another mapping.
 -- 
 -- Reason for (a)
 -- 	- It makes the rules easier to look up
