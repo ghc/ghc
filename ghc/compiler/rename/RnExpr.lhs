@@ -26,11 +26,11 @@ import RnHsSyn
 import RnMonad
 import RnEnv
 import CmdLineOpts	( opt_GlasgowExts )
-import BasicTypes	( Fixity(..), FixityDirection(..) )
+import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
-			  ratioDataCon_RDR, negate_RDR, 
+			  ratioDataCon_RDR, negate_RDR, assert_RDR,
 			  ioDataCon_RDR, ioOkDataCon_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
@@ -248,10 +248,24 @@ free-var set iff if it's a LocallyDefined Name.
 rnExpr :: RdrNameHsExpr -> RnMS s (RenamedHsExpr, FreeVars)
 
 rnExpr (HsVar v)
-  = lookupOccRn v	`thenRn` \ vname ->
-    returnRn (HsVar vname, if isLocallyDefined vname
-			   then unitNameSet vname
-			   else emptyUniqSet)
+  = tryLookupOccRn v	`thenRn` \ res ->
+    case res of
+      Left (nm,err) 
+        | opt_GlasgowExts && v == assertRdrName -> 
+            -- if `assert' is not in scope,
+	    -- we expand it to (GHCerr.assert__ location)
+           mkAssertExpr  `thenRn` \ (expr, assert_name) ->
+	   returnRn (expr, unitNameSet assert_name)
+
+        | otherwise -> -- a failure after all.
+	   failWithRn nm err `thenRn_`
+           returnRn (HsVar nm, if isLocallyDefined nm
+			       then unitNameSet nm
+			       else emptyUniqSet)
+      Right vname -> 
+       returnRn (HsVar vname, if isLocallyDefined vname
+			      then unitNameSet vname
+			      else emptyUniqSet)
 
 rnExpr (HsLit lit) 
   = litOccurrence lit		`thenRn_`
@@ -711,6 +725,31 @@ litOccurrence (HsLitLit _)
   = lookupImplicitOccRn ccallableClass_RDR
 \end{code}
 
+%************************************************************************
+%*									*
+\subsubsection{Assertion utils}
+%*									*
+%************************************************************************
+
+\begin{code}
+mkAssertExpr :: RnMS s (RenamedHsExpr, Name)
+mkAssertExpr =
+  newImportedGlobalName mod occ HiFile `thenRn` \ name ->
+  addOccurrenceName name	       `thenRn_`
+  getSrcLocRn                          `thenRn` \ sloc ->
+  let
+   expr = HsApp (HsVar name)
+	        (HsLit (HsString (_PK_ (showSDoc (ppr sloc)))))
+  in
+  returnRn (expr, name)
+
+  where
+   mod = rdrNameModule assert_RDR
+   occ = rdrNameOcc assert_RDR
+
+assertRdrName :: RdrName
+assertRdrName = Unqual (VarOcc SLIT("assert"))
+\end{code}
 
 %************************************************************************
 %*									*

@@ -17,6 +17,7 @@ import RdrHsSyn		( RdrName(..), RdrNameIE,
 import HsTypes		( getTyVarName, replaceTyVarName )
 import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
 import RnMonad
+import ErrUtils         ( ErrMsg )
 import Name		( Name, OccName(..), Provenance(..), ExportFlag(..), NamedThing(..),
 			  occNameFlavour, getSrcLoc,
 			  NameSet, emptyNameSet, addListToNameSet, nameSetToList,
@@ -254,19 +255,33 @@ Looking up a name in the RnEnv.
 lookupRn :: RdrName
 	 -> Maybe Name		-- Result of environment lookup
 	 -> RnMS s Name
-
-lookupRn rdr_name (Just name) 
+lookupRn rdr_name (Just name)
   = 	-- Found the name in the envt
     returnRn name	-- In interface mode the only things in 
 			-- the environment are things in local (nested) scopes
+lookupRn rdr_name nm@Nothing
+  = tryLookupRn rdr_name nm `thenRn` \ name_or_error ->
+    case name_or_error of
+      Left (nm,err) -> failWithRn nm err
+      Right nm      -> returnRn nm
 
-lookupRn rdr_name Nothing
+tryLookupRn :: RdrName
+	    -> Maybe Name		-- Result of environment lookup
+	    -> RnMS s (Either (Name, ErrMsg) Name)
+tryLookupRn rdr_name (Just name) 
+  = 	-- Found the name in the envt
+    returnRn (Right name) -- In interface mode the only things in 
+			  -- the environment are things in local (nested) scopes
+
+-- lookup in environment, but don't flag an error if
+-- name is not found.
+tryLookupRn rdr_name Nothing
   =	-- We didn't find the name in the environment
     getModeRn 		`thenRn` \ mode ->
     case mode of {
-	SourceMode -> failWithRn (mkUnboundName rdr_name)
-				 (unknownNameErr rdr_name) ;
-		-- Souurce mode; lookup failure is an error
+	SourceMode -> returnRn (Left ( mkUnboundName rdr_name
+				     , unknownNameErr rdr_name));
+		-- Source mode; lookup failure is an error
 
         InterfaceMode _ _ ->
 
@@ -279,9 +294,13 @@ lookupRn rdr_name Nothing
 	-- So, qualify the unqualified name with the 
 	-- module of the interface file, and try again
     case rdr_name of 
-	Unqual occ       -> getModuleRn		`thenRn` \ mod ->
-		            newImportedGlobalName mod occ HiFile
-	Qual mod occ hif -> newImportedGlobalName mod occ hif
+	Unqual occ       -> 
+	    getModuleRn		`thenRn` \ mod ->
+            newImportedGlobalName mod occ HiFile `thenRn` \ nm ->
+	    returnRn (Right nm)
+	Qual mod occ hif -> 
+	    newImportedGlobalName mod occ hif `thenRn` \ nm ->
+	    returnRn (Right nm)
 
     }
 
@@ -321,12 +340,28 @@ lookupBndrRn rdr_name
 -- deciding which instance declarations to import.
 lookupOccRn :: RdrName -> RnMS s Name
 lookupOccRn rdr_name
+  = tryLookupOccRn rdr_name `thenRn` \ name_or_error ->
+    case name_or_error of
+      Left (nm, err) -> failWithRn nm err
+      Right nm       -> returnRn nm
+
+-- tryLookupOccRn is the fail-safe version of lookupOccRn, returning
+-- back the error rather than immediately flagging it. It is only
+-- directly used by RnExpr.rnExpr to catch and rewrite unbound
+-- uses of `assert'.
+tryLookupOccRn :: RdrName -> RnMS s (Either (Name,ErrMsg) Name)
+tryLookupOccRn rdr_name
   = lookupNameRn rdr_name		`thenRn` \ maybe_name ->
-    lookupRn rdr_name maybe_name	`thenRn` \ name ->
-    let
+    tryLookupRn rdr_name maybe_name	`thenRn` \ name_or_error ->
+    case name_or_error of
+     Left _     -> returnRn name_or_error
+     Right name -> 
+       let
 	name' = mungePrintUnqual rdr_name name
-    in
-    addOccurrenceName name'
+       in
+       addOccurrenceName name' `thenRn_`
+       returnRn name_or_error
+
 
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
 -- environment only.  It's used for record field names only.

@@ -46,7 +46,7 @@ module RdrHsSyn (
 	qual, varQual, tcQual, varUnqual, lexVarQual, lexTcQual,
 	dummyRdrVarName, dummyRdrTcName,
 	isUnqual, isQual,
-	showRdr, rdrNameOcc, ieOcc,
+	showRdr, rdrNameOcc, rdrNameModule, ieOcc,
 	cmpRdr, prefixRdrName,
 	mkOpApp, mkClassDecl
 
@@ -195,6 +195,7 @@ lexVarQual (m,n,hif) = Qual m (VarOcc n) hif
 dummyRdrVarName = Unqual (VarOcc SLIT("V-DUMMY"))
 dummyRdrTcName = Unqual (VarOcc SLIT("TC-DUMMY"))
 
+
 varUnqual n = Unqual (VarOcc n)
 
 isUnqual (Unqual _)   = True
@@ -217,6 +218,9 @@ cmpRdr (Qual m1 n1 _) (Qual m2 n2 _) = (n1 `compare` n2) `thenCmp` (m1 `compare`
 rdrNameOcc :: RdrName -> OccName
 rdrNameOcc (Unqual occ)   = occ
 rdrNameOcc (Qual _ occ _) = occ
+
+rdrNameModule :: RdrName -> Module
+rdrNameModule (Qual m _ _) = m
 
 ieOcc :: RdrNameIE -> OccName
 ieOcc ie = rdrNameOcc (ieName ie)
