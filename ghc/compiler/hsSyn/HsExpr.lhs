@@ -193,7 +193,7 @@ instance (NamedThing id, Outputable id, Outputable pat,
 \end{code}
 
 \begin{code}
-pprExpr sty (HsVar v) = pprNonSym sty v
+pprExpr sty (HsVar v) = ppr sty v
 
 pprExpr sty (HsLit    lit)   = ppr sty lit
 pprExpr sty (HsLitOut lit _) = ppr sty lit
@@ -220,7 +220,7 @@ pprExpr sty (OpApp e1 op e2)
       = ppHang (pprExpr sty op) 4 (ppSep [pp_e1, pp_e2])
 
     pp_infixly v
-      = ppSep [pp_e1, ppCat [pprSym sty v, pp_e2]]
+      = ppSep [pp_e1, ppCat [ppr sty v, pp_e2]]
 
 pprExpr sty (NegApp e _)
   = ppBeside (ppChar '-') (pprParendExpr sty e)
@@ -239,7 +239,7 @@ pprExpr sty (SectionL expr op)
 		       4 (ppCat [pp_expr, ppStr "x_ )"])
     pp_infixly v
       = ppSep [ ppBeside ppLparen pp_expr,
-	    	ppBeside (pprSym sty v) ppRparen ]
+	    	ppBeside (ppr sty v) ppRparen ]
 
 pprExpr sty (SectionR op expr)
   = case op of
@@ -251,7 +251,7 @@ pprExpr sty (SectionR op expr)
     pp_prefixly = ppHang (ppCat [ppStr "( \\ x_ ->", ppr sty op, ppPStr SLIT("x_")])
 		       4 (ppBeside pp_expr ppRparen)
     pp_infixly v
-      = ppSep [ ppBeside ppLparen (pprSym sty v),
+      = ppSep [ ppBeside ppLparen (ppr sty v),
 		ppBeside pp_expr  ppRparen ]
 
 pprExpr sty (HsCase expr matches _)

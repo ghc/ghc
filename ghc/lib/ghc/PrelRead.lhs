@@ -11,7 +11,7 @@ The @Read@ class and many of its instances.
 
 module PrelRead where
 
-import {#- SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-}	IOBase	( error )
 import PrelNum
 import PrelList
 import PrelTup

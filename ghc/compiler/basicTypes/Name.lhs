@@ -257,8 +257,9 @@ mkInstDeclName uniq mod occ loc from_here
          | otherwise = Implicit
 
 
-setNameProvenance :: Name -> Provenance -> Name		-- Globals only
-setNameProvenance (Global uniq mod occ def _) prov = Global uniq mod occ def prov
+setNameProvenance :: Name -> Provenance -> Name		-- Implicit Globals only
+setNameProvenance (Global uniq mod occ def Implicit) prov = Global uniq mod occ def prov
+setNameProvenance other_name 			     prov = other_name
 
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached
@@ -404,14 +405,19 @@ instance Outputable Name where
     ppr PprForUser (Local _ n _) = ppPStr (occNameString n)
     ppr other_sty  (Local u n _) = ppBesides [ppPStr (occNameString n), ppPStr SLIT("_"), pprUnique u]
 
-    ppr sty (Global u m n _ _) = ppBesides [pp_name, pp_uniq sty u]
+    ppr sty name@(Global u m n _ _) = ppBesides [pp_name, pp_debug sty name]
 			       where
 				 pp_name | codeStyle sty = identToC qual_name
 				         | otherwise     = ppPStr qual_name
 				 qual_name = m _APPEND_ SLIT(".") _APPEND_ occNameString n
 
-pp_uniq PprDebug uniq = ppBesides [ppStr "{-", pprUnique uniq, ppStr "-}"]
-pp_uniq other    uniq = ppNil
+pp_debug PprDebug (Global uniq m n _ prov) = ppBesides [ppStr "{-", pprUnique uniq, ppStr ",", 
+						        pp_prov prov, ppStr "-}"]
+					where
+						pp_prov (LocalDef _ _) = ppChar 'l'
+						pp_prov (Imported _ _) = ppChar 'i'
+						pp_prov Implicit       = ppChar 'p'
+pp_debug other    name 		        = ppNil
 
 -- pprNameProvenance is used in error messages to say where a name came from
 pprNameProvenance :: PprStyle -> Name -> Pretty

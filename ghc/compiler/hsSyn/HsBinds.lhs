@@ -154,7 +154,7 @@ data Sig name
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (Sig name) where
     ppr sty (Sig var ty _)
-      = ppHang (ppCat [pprNonSym sty var, ppPStr SLIT("::")])
+      = ppHang (ppCat [ppr sty var, ppPStr SLIT("::")])
 	     4 (ppr sty ty)
 
     ppr sty (ClassOpSig var ty pragmas _)
@@ -270,14 +270,14 @@ instance (NamedThing id, Outputable id, Outputable pat,
       = ppHang (ppr sty pat) 4 (pprGRHSsAndBinds sty False grhss_n_binds)
 
     ppr sty (FunMonoBind fun inf matches locn)
-      = pprMatches sty (False, pprNonSym sty fun) matches
+      = pprMatches sty (False, ppr sty fun) matches
       -- ToDo: print infix if appropriate
 
     ppr sty (VarMonoBind name expr)
-      = ppHang (ppCat [pprNonSym sty name, ppEquals]) 4 (ppr sty expr)
+      = ppHang (ppCat [ppr sty name, ppEquals]) 4 (ppr sty expr)
 
     ppr sty (CoreMonoBind name expr)
-      = ppHang (ppCat [pprNonSym sty name, ppEquals]) 4 (ppr sty expr)
+      = ppHang (ppCat [ppr sty name, ppEquals]) 4 (ppr sty expr)
 \end{code}
 
 %************************************************************************

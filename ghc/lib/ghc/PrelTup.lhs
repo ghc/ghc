@@ -11,7 +11,7 @@ This modules defines the typle data types.
 
 module PrelTup where
 
-import {#- SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-}	IOBase	( error )
 import PrelBase
 \end{code}
 

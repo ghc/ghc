@@ -291,7 +291,7 @@ class		:: { (RdrName, RdrNameHsType) }
 class		:  qtc_name atype			{ ($1, $2) }
 
 type		:: { RdrNameHsType }
-type		: FORALL forall context DARROW tautype	{ mkHsForAllTy $2 $3 $5 }
+type		: FORALL forall context DARROW type	{ mkHsForAllTy $2 $3 $5 }
 		| tautype				{ $1 }
 
 tautype		:: { RdrNameHsType }

@@ -11,7 +11,7 @@ module Ix (
 	Ix(range, index, inRange)
   ) where
 
-import {#- SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-}	IOBase	( error )
 import PrelNum
 import PrelTup
 import PrelBase

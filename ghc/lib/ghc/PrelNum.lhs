@@ -18,7 +18,7 @@ It's rather big!
 
 module PrelNum where
 
-import {#- SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-}	IOBase	( error )
 import PrelList
 import PrelBase
 import GHC

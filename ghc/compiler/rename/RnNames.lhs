@@ -268,6 +268,8 @@ qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities)
     foldlRn (add_fixity name_env) emptyFixityEnv fixities	`thenRn` \ fixity_env ->
     returnRn (RnEnv name_env fixity_env, mod_avail_env)
   where
+    show_it (rdr, (fix,prov)) = ppSep [ppLbrack, ppr PprDebug rdr, ppr PprDebug fix, pprProvenance PprDebug prov, ppRbrack]
+
     qual_mod = case as_mod of
 		  Nothing  	    -> this_mod
 		  Just another_name -> another_name
@@ -441,9 +443,7 @@ mk_export_fn avails
     exported_names = availsToNameSet avails
 
 export_fixity :: NameEnv -> NameSet -> RdrName -> Bool
-export_fixity name_env exports (Unqual _)
-  = False	-- The qualified fixity is always there as well
-export_fixity name_env exports rdr_name@(Qual _ occ)
+export_fixity name_env exports rdr_name
   = case lookupFM name_env rdr_name of
 	Just fixity_name -> fixity_name `elemNameSet` exports
 				-- Check whether the exported thing is

@@ -115,7 +115,7 @@ instance (Outputable name, NamedThing name) => Outputable (InPat name) where
 pprInPat :: (Outputable name, NamedThing name) => PprStyle -> InPat name -> Pretty
 
 pprInPat sty (WildPatIn)	= ppStr "_"
-pprInPat sty (VarPatIn var)	= pprNonSym sty var
+pprInPat sty (VarPatIn var)	= ppr sty var
 pprInPat sty (LitPatIn s)	= ppr sty s
 pprInPat sty (LazyPatIn pat)	= ppBeside (ppChar '~') (ppr sty pat)
 pprInPat sty (AsPatIn name pat)

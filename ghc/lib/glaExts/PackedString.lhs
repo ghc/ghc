@@ -69,7 +69,7 @@ module PackedString (
 	packCBytesST, unpackCString
     ) where
 
-import {#- SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-}	IOBase	( error )
 import Ix
 import PrelList
 import STBase
