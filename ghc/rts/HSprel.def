@@ -1,5 +1,7 @@
 ; list of entry points that the RTS imports from
 ; the Prelude.
+; N.B. __init_Main shouldn't really be here, as it should be treated like
+; Main.main_closure (but how's that?)
 EXPORTS
 PrelBase_False_static_closure
 PrelBase_True_static_closure
@@ -18,6 +20,9 @@ PrelFloat_Dzh_static_info DATA
 PrelAddr_Wzh_con_info DATA
 PrelAddr_Wzh_static_info DATA
 PrelStable_StablePtr_con_info DATA
-PrelStable_StablePtr_static_info DATA 
+PrelStable_StablePtr_static_info DATA
 PrelPack_unpackCString_closure
 PrelException_stackOverflow_closure
+PrelException_PutFullMVar_static_closure
+__init_Prelude
+__init_Main
