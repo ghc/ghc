@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.62 2001/01/31 10:12:08 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.63 2001/02/08 14:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -398,7 +398,7 @@ STGFUN(stg_BLACKHOLE_entry)
       bdescr *bd = Bdescr(R1.p);
       if (bd->back != (bdescr *)BaseReg) {
 	if (bd->gen->no >= 1 || bd->step->no >= 1) {
-	  CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
+	  CMPXCHG(R1.cl->header.info, &stg_BLACKHOLE_info, &stg_WHITEHOLE_info);
 	} else {
 	  EXTFUN_RTS(stg_gc_enter_1_hponly);
 	  JMP_(stg_gc_enter_1_hponly);
@@ -447,7 +447,7 @@ STGFUN(stg_BLACKHOLE_BQ_entry)
       bdescr *bd = Bdescr(R1.p);
       if (bd->back != (bdescr *)BaseReg) {
 	if (bd->gen->no >= 1 || bd->step->no >= 1) {
-	  CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
+	  CMPXCHG(R1.cl->header.info, &stg_BLACKHOLE_info, &stg_WHITEHOLE_info);
 	} else {
 	  EXTFUN_RTS(stg_gc_enter_1_hponly);
 	  JMP_(stg_gc_enter_1_hponly);
@@ -538,7 +538,7 @@ STGFUN(stg_CAF_BLACKHOLE_entry)
       bdescr *bd = Bdescr(R1.p);
       if (bd->back != (bdescr *)BaseReg) {
 	if (bd->gen->no >= 1 || bd->step->no >= 1) {
-	  CMPXCHG(R1.cl->header.info, &CAF_BLACKHOLE_info, &WHITEHOLE_info);
+	  CMPXCHG(R1.cl->header.info, &stg_CAF_BLACKHOLE_info, &stg_WHITEHOLE_info);
 	} else {
 	  EXTFUN_RTS(stg_gc_enter_1_hponly);
 	  JMP_(stg_gc_enter_1_hponly);

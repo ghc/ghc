@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: SMP.h,v 1.1 1999/11/02 15:05:52 simonmar Exp $
+ * $Id: SMP.h,v 1.2 2001/02/08 14:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1999
  *
@@ -66,15 +66,15 @@
 #define LOCK_CLOSURE(c)					\
   ({							\
     const StgInfoTable *__info;				\
-    __info = &WHITEHOLE_info;				\
+    __info = &stg_WHITEHOLE_info;			\
     do {						\
       XCHG(__info,((StgClosure *)(c))->header.info);	\
-    } while (__info == &WHITEHOLE_info);		\
+    } while (__info == &stg_WHITEHOLE_info);		\
     __info;						\
   })
 
 #define LOCK_THUNK(__info)				\
-  CMPXCHG(R1.cl->header.info, __info, &WHITEHOLE_info);
+  CMPXCHG(R1.cl->header.info, __info, &stg_WHITEHOLE_info);
 
 #define ACQUIRE_LOCK(mutex) pthread_mutex_lock(mutex);
 #define RELEASE_LOCK(mutex) pthread_mutex_unlock(mutex);

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.24 2001/01/11 17:25:56 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.25 2001/02/08 14:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -356,7 +356,7 @@ rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
   return waitThread(tso, ret);
 }
 
-#if defined(PAR) || defined(SMP)
+#if defined(PAR)
 /*
   Needed in the parallel world for non-Main PEs, which do not get a piece
   of work to start with --- they have to humbly ask for it

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.25 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: Storage.h,v 1.26 2001/02/08 14:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -102,6 +102,13 @@ extern void markCafs( void );
    updateWithPermIndirection(p1,p2)  As above but uses a permanent indir.
 
    -------------------------------------------------------------------------- */
+
+/*
+ * Storage manager mutex
+ */
+#ifdef SMP
+extern pthread_mutex_t sm_mutex;
+#endif
 
 /* ToDo: shouldn't recordMutable and recordOldToNewPtrs acquire some
  * kind of lock in the SMP case?
