@@ -1,10 +1,7 @@
 THISPKG	= base
 SEARCH	= -I$(TOPDIR)/targets/$(MACHINE)
 
-DIRS	= Data Control Control/Monad Debug System System/IO System/Console \
-	  Foreign Foreign/C Foreign/Marshal Text Text/ParserCombinators \
-	  Text/ParserCombinators/Parsec Text/PrettyPrint Text/Html \
-	  Text/Show
+DIRS	= $(shell ${LOCAL}pkgdirlist ${THISPKG})
 
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
@@ -119,3 +116,24 @@ Foreign/Marshal/Utils.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
 Foreign/Marshal/Error.$C:  Foreign/Ptr.$C
 Foreign/C/String.$C:       Data/Word.$C Foreign/Ptr.$C Foreign/C/Types.$C \
 	Foreign/Marshal/Array.$C
+Text/ParserCombinators/Parsec/Char.$C: \
+	Text/ParserCombinators/Parsec/Pos.$C \
+	Text/ParserCombinators/Parsec/Prim.$C
+Text/ParserCombinators/Parsec/Combinator.$C: \
+	Text/ParserCombinators/Parsec/Prim.$C
+Text/ParserCombinators/Parsec/Error.$C: \
+	Text/ParserCombinators/Parsec/Pos.$C
+Text/ParserCombinators/Parsec/Expr.$C: \
+	Text/ParserCombinators/Parsec/Prim.$C \
+	Text/ParserCombinators/Parsec/Combinator.$C
+Text/ParserCombinators/Parsec/Language.$C: \
+	Text/ParserCombinators/Parsec.$C \
+	Text/ParserCombinators/Parsec/Token.$C
+Text/ParserCombinators/Parsec/Perm.$C: \
+	Text/ParserCombinators/Parsec.$C
+Text/ParserCombinators/Parsec/Prim.$C: \
+	Text/ParserCombinators/Parsec/Pos.$C \
+	Text/ParserCombinators/Parsec/Error.$C
+Text/ParserCombinators/Parsec/Token.$C: \
+	Text/ParserCombinators/Parsec.$C
+
