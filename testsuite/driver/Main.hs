@@ -26,7 +26,7 @@ findTFiles root_in
                 let this_dir = root ++ "/" ++ dir
 
                 dir_contents_raw <- getDirectoryContents this_dir
-                let dir_contents = filter (`notElem` [".", ".."]) 
+                let dir_contents = filter ((/= ".").(take 1))
                                           dir_contents_raw
 
                 let tag_subdir f = do b <- doesDirectoryExist 
@@ -76,7 +76,7 @@ main
 imain arg_str
    = main_really (words arg_str)
 test
-   = imain "--tool=ghc --config=../config/msrc/cam-02-unx.T ../tests/"
+   = imain "--tool=ghc --config=../config/msrc/cam-02-unx.T ../tests/codeGen"
 
 main_really arg_ws0
    = do { let (arg_ws1, maybe_tool) = fish arg_ws0 "--tool="

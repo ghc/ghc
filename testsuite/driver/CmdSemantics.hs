@@ -9,7 +9,7 @@ import TopSort		( topSort )
 import Monad		( when )
 import Directory	( doesFileExist )
 import System		( ExitCode(..) )
-import List		( nub )
+import List		( nub, (\\) )
 
 #ifdef __NHC__
 import NonStdTrace(trace)
@@ -265,12 +265,28 @@ evalTopBinds globals binds
 ---------------------------------------------------------------------
 -- Parsing a complete .T file and the transitive closure of its includes.
 
-parseOneTFile :: [(Var,String)]		-- global var env
-              -> FilePath		-- the T file to parse
-              -> IO (Either String{-complaint of some sort-}
-                            (FilePath, [TopDef]))
+parseOneTFile,
+ parseOneTFile_wrk :: [(Var,String)]	-- global var env
+                   -> FilePath		-- the T file to parse
+                   -> IO (Either String{-complaint of some sort-}
+                                 (FilePath, [TopDef]))
 
 parseOneTFile global_env tfile
+   = do ei_parsed <- parseOneTFile_wrk global_env tfile
+        case ei_parsed of
+           Left barfage
+              -> return (Left barfage)
+           Right name_and_defs
+              -> do let testnames 
+                          = [testnm | TTest testnm stmts <- snd name_and_defs]
+                    let dups = testnames \\ (nub testnames)
+                    if null dups 
+                     then return (Right name_and_defs)
+                     else return (Left (tfile ++ ": duplicate tests: " 
+                                        ++ unwords dups))
+
+
+parseOneTFile_wrk global_env tfile
    = do { have_f <- doesFileExist tfile
         ; if not have_f
            then return (Left ("can't open script file `" ++ tfile ++ "'"))
@@ -294,7 +310,7 @@ parseOneTFile global_env tfile
                     Left moanage -> return (Left moanage)
             else 
      do { let names_to_include = map unRight incl_paths
-        ; incl_topdefss <- mapM (parseOneTFile global_env) names_to_include
+        ; incl_topdefss <- mapM (parseOneTFile_wrk global_env) names_to_include
         ; let failed_includes = filter isLeft incl_topdefss
         ; if not (null failed_includes)
             then return (head failed_includes)

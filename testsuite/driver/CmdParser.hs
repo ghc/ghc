@@ -59,7 +59,7 @@ pTopDef
      ]
      where
         pFormals
-           = pInParens (pZeroOrMoreWithSep (pKW L_Comma) pFormalVar)
+           = pInParens (pZeroOrMoreWithSep (pKW L_Comma) pVar)
         pStmtBlock
            = pInBraces (pStar pStmt)
 pStmt 
@@ -145,11 +145,6 @@ pInParens p
 pInBraces p
    = p3 (\l x r -> x) (pKW L_LBrace) p (pKW L_RBrace)
 
-pFormalVar
-   = pSatMap f where f (LVar var) 
-                        | take 1 var == "_" = Just var
-                        | otherwise = Nothing
-                     f _ = Nothing
 
 ---------------------------------------------------------------------
 -- parser generics
