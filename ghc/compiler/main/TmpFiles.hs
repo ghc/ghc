@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.3 2000/10/23 09:03:27 simonpj Exp $
+-- $Id: TmpFiles.hs,v 1.4 2000/10/24 13:23:33 sewardj Exp $
 --
 -- Temporary file management
 --
@@ -21,7 +21,9 @@ import Config
 import Util
 
 -- hslibs
--- import Posix		commented out SLPJ
+#ifndef mingw32_TARGET_OS
+import Posix ( getProcessID )
+#endif
 import Exception
 import IOExts
 
@@ -57,6 +59,13 @@ cleanTempFiles verbose = do
 type Suffix = String
 
 -- find a temporary name that doesn't already exist.
+#ifdef mingw32_TARGET_OS
+getProcessID :: IO Int
+getProcessID
+   = do putStr "warning: faking getProcessID in main/TmpFiles.lhs"
+        return 12345
+#endif
+
 newTempName :: Suffix -> IO FilePath
 newTempName extn = do
   x <- getProcessID

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.43 2000/10/24 08:40:10 simonpj Exp $
+$Id: Parser.y,v 1.44 2000/10/24 13:23:33 sewardj Exp $
 
 Haskell grammar.
 
@@ -278,7 +278,7 @@ importdecls :: { [RdrNameImportDecl] }
 
 importdecl :: { RdrNameImportDecl }
 	: 'import' srcloc maybe_src optqualified CONID maybeas maybeimpspec 
-		{ ImportDecl (mkSrcModuleFS $5) $3 $4 $6 $7 $2 }
+		{ ImportDecl (mkModuleNameFS $5) $3 $4 $6 $7 $2 }
 
 maybe_src :: { WhereFrom }
 	: '{-# SOURCE' '#-}'			{ ImportByUserSource }
@@ -875,7 +875,7 @@ dbind	: ipvar '=' exp			{ ($1, $3) }
 
 depreclist :: { [RdrName] }
 depreclist : deprec_var			{ [$1] }
-	   | deprec_var ',' depreclist	{ $1 : $2 }
+	   | deprec_var ',' depreclist	{ $1 : $3 }
 
 deprec_var :: { RdrName }
 deprec_var : var			{ $1 }
@@ -1061,7 +1061,7 @@ layout_on_for_do  :: { () }	: {% layoutOn False }
 -- Miscellaneous (mostly renamings)
 
 modid 	:: { ModuleName }
-	: CONID			{ mkSrcModuleFS $1 }
+	: CONID			{ mkModuleNameFS $1 }
 
 tycon 	:: { RdrName }
 	: CONID			{ mkUnqual tcClsName $1 }

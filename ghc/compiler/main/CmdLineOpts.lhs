@@ -28,6 +28,7 @@ module CmdLineOpts (
 	dopt_CoreToDo,
 	dopt_StgToDo,
 	dopt_HscLang,
+	dopt_OutName,
 
 	-- profiling opts
 	opt_AutoSccsOnAllToplevs,
@@ -276,10 +277,11 @@ data DynFlag
    deriving (Eq)
 
 data DynFlags = DynFlags {
-  coreToDo :: CoreToDo,
-  stgToDo  :: StgToDo,
-  hscLang  :: HscLang,
-  flags    :: [DynFlag]
+  coreToDo   :: CoreToDo,
+  stgToDo    :: StgToDo,
+  hscLang    :: HscLang,
+  hscOutName :: String,  -- name of the file in which to place output
+  flags      :: [DynFlag]
  }
 
 dopt :: DynFlag -> DynFlags -> Bool
@@ -291,10 +293,13 @@ dopt_CoreToDo = coreToDo
 dopt_StgToDo :: DynFlags -> StgToDo
 dopt_StgToDo = stgToDo
 
+dopt_OutName :: DynFlags -> String
+dopt_OutName = hscOutName
+
 data HscLang
-  = HscC     String   -- String is the filename to put output into
-  | HscAsm   String   -- ditto
-  | HscJava  String   -- ditto
+  = HscC
+  | HscAsm
+  | HscJava
   | HscInterpreter
 
 dopt_HscLang :: DynFlags -> HscLang

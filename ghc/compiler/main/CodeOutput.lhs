@@ -31,8 +31,8 @@ import Module		( Module )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn )
 import Outputable
-import CmdLineOpts	( DynFlags(..), HscLang(..) )
-import TmpFiles		( newTmpName )
+import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
+import TmpFiles		( newTempName )
 
 import IO		( IOMode(..), hClose, openFile, Handle )
 \end{code}
@@ -63,17 +63,18 @@ codeOutput dflags mod_name tycons classes core_binds stg_binds
 
     -- Dunno if the above comment is still meaningful now.  JRS 001024.
 
-    do stub_names <- outputForeignStubs c_code h_code
+    do let filenm = dopt_OutName dflags 
+       stub_names <- outputForeignStubs dflags c_code h_code
        case dopt_HscLang dflags of
           HscInterpreter -> return stub_names
-          HscAsm  filenm -> outputAsm dflags filenm flat_abstractC ncg_uniqs
+          HscAsm         -> outputAsm dflags filenm flat_abstractC ncg_uniqs
                             >> return stub_names
-          HscC    filenm -> outputC dflags filenm flat_abstractC	
+          HscC           -> outputC dflags filenm flat_abstractC	
                             >> return stub_names
-          HscJava filenm -> outputJava dflags filenm mod_name tycons core_binds
+          HscJava        -> outputJava dflags filenm mod_name tycons core_binds
                             >> return stub_names
 
-doOutput :: (Handle -> IO ()) -> IO ()
+doOutput :: String -> (Handle -> IO ()) -> IO ()
 doOutput filenm io_action
   = (do	handle <- openFile filenm WriteMode
 	io_action handle
@@ -91,7 +92,7 @@ doOutput filenm io_action
 
 \begin{code}
 outputC dflags filenm flat_absC
-  = do dumpIfSet_dyn Opt_D_dump_realC dflags "Real C" (dumpRealC flat_absC)
+  = do dumpIfSet_dyn dflags Opt_D_dump_realC "Real C" (dumpRealC flat_absC)
        doOutput filenm (\ h -> writeRealC h flat_absC)
 \end{code}
 
@@ -107,8 +108,8 @@ outputAsm dflags filenm flat_absC ncg_uniqs
 
 #ifndef OMIT_NATIVE_CODEGEN
 
-  = do dumpIfSet_dyn Opt_D_dump_stix dflags "Final stix code" stix_final
-       dumpIfSet_dyn Opt_D_dump_asm dflags "Asm code" ncg_output_d
+  = do dumpIfSet_dyn dflags Opt_D_dump_stix "Final stix code" stix_final
+       dumpIfSet_dyn dflags Opt_D_dump_asm "Asm code" ncg_output_d
        doOutput filenm ( \f -> printForAsm f ncg_output_d)
   where
     (stix_final, ncg_output_d) = nativeCodeGen flat_absC ncg_uniqs
@@ -147,13 +148,13 @@ outputJava dflags filenm mod tycons core_binds
 \begin{code}
 outputForeignStubs dflags c_code h_code
   = do
-	dumpIfSet_dyn Opt_D_dump_foreign dflags 
+	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
 
 	maybe_stub_h_file
            <- outputForeignStubs_help True{-.h output-} stub_h_output_w
 
-	dumpIfSet_dyn Opt_D_dump_foreign dflags 
+	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
 
         maybe_stub_c_file
@@ -173,13 +174,11 @@ outputForeignStubs dflags c_code h_code
 -- Don't use doOutput for dumping the f. export stubs
 -- since it is more than likely that the stubs file will
 -- turn out to be empty, in which case no file should be created.
-outputForeignStubs_help is_header switch ""      = return Nothing
-outputForeignStubs_help is_header switch doc_str =
-  case switch of
-    Nothing    -> return Nothing
-    Just fname -> newTempName suffix >>= \ fname ->
-                  writeFile fname (include_prefix ++ doc_str) >>
-                  return (Just suffix)
+outputForeignStubs_help is_header ""      = return Nothing
+outputForeignStubs_help is_header doc_str 
+   = newTempName suffix >>= \ fname ->
+     writeFile fname (include_prefix ++ doc_str) >>
+     return (Just suffix)
   where
     suffix
        | is_header   = "h_stub"
