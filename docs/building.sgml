@@ -1,6 +1,6 @@
 <!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN">
 
-<Article>
+<Article id="building-guide">
 
 <ArtHeader>
 
@@ -182,32 +182,26 @@ Here's a list of things to check before you get started.
 <ListItem>
 
 <Para>
-<IndexTerm><Primary>Disk space needed</Primary></IndexTerm>Disk space needed: About 30MB (five hamburgers' worth) of disk space
-for the most basic binary distribution of GHC; more for some
-platforms, e.g., Alphas.  An extra ``bundle'' (e.g., concurrent
-Haskell libraries) might take you to 8&ndash;10 hamburgers.
-
-You'll need over 100MB (say, 20 hamburgers' worth) if you need to
-build the basic stuff from scratch.
-
-
-All of the above are <Emphasis>estimates</Emphasis> of disk-space needs. (I don't yet
-know the disk requirements for the non-GHC tools).
-
+<IndexTerm><Primary>Disk space needed</Primary></IndexTerm>
+Disk space needed: About 40MB (one tenth of one hamburger's worth) of disk
+space for the most basic binary distribution of GHC; more for some
+platforms, e.g., Alphas.  An extra ``bundle'' (e.g., concurrent Haskell
+libraries) might take you to up to one fifth of a hamburger. You'll need
+over 100MB (say, one fifth a hamburger's worth) if you need to build the
+basic stuff from scratch. All of the above are
+<Emphasis>estimates</Emphasis> of disk-space needs. (Note: our benchmark hamburger is a standard Double Whopper with Cheese, with an RRP of UKP2.99.)
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
 Use an appropriate machine, compilers, and things.
-
 SPARC boxes, and PCs running Linux, FreeBSD, NetBSD, or Solaris are
 all fully supported.  Win32 and HP boxes are in pretty good shape.
 DEC Alphas running OSF/1, Linux or some BSD variant, MIPS and AIX
 boxes will need some minimal porting effort before they work (as of
 4.06).  <Xref LinkEnd="sec-port-info"> gives the full run-down on
 ports or lack thereof.
-
 </Para>
 </ListItem>
 <ListItem>
@@ -647,19 +641,7 @@ documentation that comes with the <Literal>fptools</Literal> projects:
 <IndexTerm><Primary>DocBook, pre-supposed</Primary></IndexTerm>
 <ListItem>
 <Para>
-All our documentation is written in SGML, using the DocBook DTD.
-Instructions on how to install the SGML processor Jade and the DocBook DTD
-and DSSSL stylesheets follows; if you're using a system that can handle
-RedHat RPM packages, you might be able to use the <ULink
-URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
-tools</ULink>, which is the most shrink-wrapped SGML suite that we
-could find. You need all the RPMs except for psgml (i.e. docbook, jade,
-jadetex, sgmlcommon and stylesheets). N.B. The
-<Emphasis>Cygnus</Emphasis> version of the tools is assumed. Others, such as
-the SuSE version, may not work. Note that most of these RPMs are
-architecture neutral, so are likely to be found in a
-<Filename>noarch</Filename>
-directory.
+All our documentation is written in SGML, using the DocBook DTD. Instructions on installing and configuring the DocBook tools are in the installation guide (<XRef LinkEnd="building-docs">).
 </Para>
 
 </ListItem></VarListEntry>

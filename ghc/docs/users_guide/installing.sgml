@@ -28,7 +28,7 @@ so binary distributions allow you to install them without having a Haskell compi
 
 <Para>
 Binary distributions come in &ldquo;bundles,&rdquo; one bundle per file called
-<Literal>&lt;bundle&gt;-&lt;platform&gt;.tar.gz</Literal>.  (See the building guide for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
+<Literal>&lt;bundle&gt;-&lt;platform&gt;.tar.gz</Literal>.  (See the building guide (<XRef LinkEnd="pre-supposed-doc-tools">) for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
 </Para>
 
 <Para>
@@ -353,8 +353,8 @@ stuff in your bin directory.
 <XRef LinkEnd="sec-GHC-test">.  Be sure to use a <Literal>-v</Literal>
 option, so you can see exactly what pathnames it's using.
 
-If things don't work as expected, check the list of know pitfalls in
-the building guide.
+If things don't work as expected, check the list of known pitfalls in
+the building guide (<XRef LinkEnd="pre-supposed-doc-tools">.
 </Para>
 </ListItem>
 
@@ -505,11 +505,10 @@ with a binary distribution, or in source form in
 <Sect1><Title>Installing on Windows</Title>
 
 <Para>
-Getting the Glasgow Haskell Compiler (GHC) to run on Windows95/98 or
-Windows NT4 platforms can be a bit of a trying experience. This document
-tries to simplify the task by enumerating the steps you need to
-follow in order to set up and configure your machine to run GHC (at
-least that's the intention ;-)
+Getting the Glasgow Haskell Compiler (GHC) to run on Windows platforms can
+be a bit of a trying experience. This document tries to simplify the task by
+enumerating the steps you need to follow in order to set up and configure
+your machine to run GHC (at least that's the intention ;-)
 </Para>
 
 <Sect2><Title>System requirements</Title>
@@ -522,52 +521,6 @@ supporting software.
 
 <Para>
 To run GHC comfortably, your machine should have at least 32M of memory.
-</Para>
-
-</Sect2>
-
-
-<Sect2><Title>Your environment variables</Title>
-
-<Para>
-Much of the Unixy stuff below involves setting environment variables.  
-This section summarises  how to set these variables on a Windows machine, in
-case you don't know alread.y
-On WinNT/Win2k, to edit your <Constant>PATH</Constant> variable (for example),
-do the following:
-</Para>
-
-<ItemizedList>
-<ListItem><Para>Press Start/Settings/Control Panels</Para></ListItem>
-<ListItem><Para>Double-click System</Para></ListItem>
-<ListItem><Para>Press Advanced</Para></ListItem>
-<ListItem><Para>Press Environment Variables</Para></ListItem>
-<ListItem><Para>Under System Variables, select PATH</Para></ListItem>
-<ListItem><Para>Press Edit</Para></ListItem>
-<ListItem><Para>Add "<Filename>;C:/whatever/</Filename>" to the end of the string (for example)</Para></ListItem>
-<ListItem><Para>Press OK</Para></ListItem>
-</ItemizedList>
-
-<Para>
-Some environment variables are &ldquo;user variables&rdquo; and
-some are &ldquo;system variables&rdquo;.  I'm not sure of the difference
-but both are changed though the same dialogue.
-</Para>
-
-<Para>
-In addition, when running a Cygwin (see <XRef LinkEnd="sec-required">) shell
-you can set environment variables in your <Filename>.bashrc</Filename> file.
-But it is better to set your environment variables from the
-control panel (they get inherited by bash) because then they are visible
-to applications that aren't started by bash.  For example,
-when you're invoking CVS (and ssh) via Emacs keybindings;
-it invokes <Filename>cvs.exe</Filename> without going via bash.
-</Para>
-
-<Para>
-On a Win9x machine you need to edit <Filename>autoexec.bat</Filename> using
-<Filename>Windows/system/Sysedit</Filename>.  You need to reboot to make
-the new settings take effect.
 </Para>
 
 </Sect2>
@@ -586,7 +539,7 @@ GHC depends at the moment on the cygwin tools to operate, which
 dresses up the Win32 environment into something more UNIX-like.
 (notably, it provides <Command>gcc</Command>, <Command>as</Command> and <Command>ld</Command>),
 so you'll need to install these tools first. You also need
-Cygwin to use CVS.
+Cygwin to use CVS. (We don't yet support later versions of Cygwin.)
 </Para>
 
 <Para>
@@ -669,6 +622,50 @@ instructions on how to set this up.
 
 </ItemizedList>
 
+</Sect3>
+
+
+<Sect3><Title>Environment variables</Title>
+
+<Para>
+In case you don't already know how to set environment variables on a Windows
+machine, here's how. On WinNT/Win2k, to edit your <Constant>PATH</Constant>
+variable (for example), do the following:
+</Para>
+
+<ItemizedList>
+<ListItem><Para>Press Start/Settings/Control Panels</Para></ListItem>
+<ListItem><Para>Double-click System</Para></ListItem>
+<ListItem><Para>Press Advanced</Para></ListItem>
+<ListItem><Para>Press Environment Variables</Para></ListItem>
+<ListItem><Para>Under System Variables, select <Constant>PATH</Constant></Para></ListItem>
+<ListItem><Para>Press Edit</Para></ListItem>
+<ListItem><Para>Add "<Filename>;C:/whatever/</Filename>" to the end of the string (for example)</Para></ListItem>
+<ListItem><Para>Press OK</Para></ListItem>
+</ItemizedList>
+
+<Para>
+Some environment variables are &ldquo;user variables&rdquo; and
+some are &ldquo;system variables&rdquo;.  I'm not sure of the difference
+but both are changed though the same dialogue.
+</Para>
+
+<Para>
+In addition, when running <Command>bash</Command>
+you can set environment variables in your <Filename>.bashrc</Filename> file.
+But it is better to set your environment variables from the
+control panel (they get inherited by bash) because then they are visible
+to applications that aren't started by bash.  For example,
+when you're invoking CVS (and ssh) via Emacs keybindings;
+it invokes <Filename>cvs.exe</Filename> without going via bash.
+</Para>
+
+<Para>
+On a Win9x machine you need to edit <Filename>autoexec.bat</Filename> using
+<Filename>Windows/system/Sysedit</Filename>.  You must reboot to make
+the new settings take effect.
+</Para>
+
 <Para>
 The following environment variables must be set:
 </Para>
@@ -742,6 +739,15 @@ We think this is due to a bug in Cygwin.
 
 </TGroup>
 </InformalTable>
+</Para>
+
+<Para>
+In addition, we've had problems in the past with certain environment
+variables being set that seem to have bad effects on GHC. If you have
+installed other systems ported from Unix, you might too. If you get weird
+inexplicable failures to build GHC, then it might be worth weeding out unused
+environment variables. Known culprits from the past include
+<Constant>GCC_EXEC_PREFIX</Constant> and <Constant>INCLUDE</Constant>.
 </Para>
 
 </Sect3>
@@ -865,10 +871,8 @@ Further information on using GHC under Windows can be found in <ULink URL="http:
 
 </Sect2>
 
-</Sect1>
 
-
-<Sect1 id="winfaq"><title>Installing ghc-win32 FAQ</title>
+<Sect2 id="winfaq"><title>Installing ghc-win32 FAQ</title>
 
 <QandASet>
 
@@ -896,6 +900,59 @@ All being well, ghc should then start to function.
 
 </QandAEntry>
 
+<QandAEntry>
+
+<Question>
+<Para>
+I'm having trouble with symlinks.
+</Para>
+</Question>
+
+<Answer>
+<Para>
+Symlinks only work under Cygwin (<Xref LinkEnd="sec-install">), so binaries
+not linked to the Cygwin DLL, in particular those built for Mingwin, will not
+work with symlinks.
+</Para>
+</Answer>
+
+<QandAEntry>
+
+<Question>
+<Para>
+I'm getting ``permission denied'' messages from <Command>rm</Command> or
+<Command>mv</Command>.
+</Para>
+</Question>
+
+<Answer>
+<Para>
+This can have various causes: trying to rename a directory when an Explorer
+window is open on it tends to fail. Closing the window generally cures the
+problem, but sometimes its cause is more mysterious, and logging off and back
+on or rebooting may be the quickest cure.
+</Para>
+</Answer>
+
+</QandAEntry>
+
+<QandAEntry>
+
+<Question>
+<Para>
+I get errors when trying to build GHC 4.07 with GHC 4.05.
+</Para>
+</Question>
+
+<Answer>
+<Para>
+This seems to work better if you don't use <Option>-O</Option> in <Constant>GhcHcOpts</Constant>. It's a bug in 4.05, unfortunately. Anyway, better to install 4.07 binaries and use those.
+</Para>
+</Answer>
+
+</QandAEntry>
+
+<!--
 <QandAEntry>
 
 <Question>
@@ -943,7 +1000,7 @@ files within the directory tree that the installer created:
 </Para>
 
 <Screen>
-bin/ghc-4.xx   -- where xx is the minor release number
+bin/ghc-4.xx    where xx is the minor release number
 bin/stat2resid
 bin/hstags
 lib/mkdependHS</Screen>
@@ -961,46 +1018,150 @@ of perl instead, a <ULink URL="http://cygutils.netpedia.net/">cygwin port</ULink
 </Answer>
 
 </QandAEntry>
-
-<QAndAEntry>
-
-<Question>
-<Para>
-<Function>System.getArgs</Function> always return the empty list, i.e. the following program always prints &ldquo;<Literal>[]</Literal>&rdquo;:
-</Para>
-
-<ProgramListing>
-module Main(main) where
-import qualified System
-main = System.getArgs >>= print
-</ProgramListing>
-
-</Question>
-
-<Answer>
-<Para>
-This is a bug with the RTS DLL that comes with ghc-4.03. To fix, upgrade to
-ghc-4.05.
-</Para>
-</Answer>
-
-</QAndAEntry>
+-->
 
 </QandASet>
+
+</Sect2>
 
 </Sect1>
 
 
-<Sect1>
+<Sect1 id="building-docs">
 <Title>Building the documentation</Title>
 
 <Para>
-This is a slightly sore point at the moment, because the GHC team has been unable to strike a good balance between having a documentation system that is easy to maintain and one that is widely available. We use the DocBook DTD, which is widely used; however, shrink-wrapped distributions of DocBook are few and far between, and getting it to work out of the box is a nightmare. We settled on the Cygnus DocBook tools; however, these are only available as Red Hat RPMs, and hence at the moment the documentation can only be built on systems which can use RPMs (i.e. most versions of Linux). Sorry about that. We will probably add pre-built documentation to future source distributions (it's already in binary distributions, of course) until the situation is sorted out (either we bite the bullet and have our own version of the DocBook tools, or a more portable distribution is made available).
+We use the DocBook DTD, which is widely used; however, shrink-wrapped
+distributions of DocBook are few and far between, and getting it to work out
+of the box can be tricky. There are currently two supported ways of using
+DocBook: installing from sources yourself, and the Cygnus DocBook tools.
+Neither is ideal: installing by yourself is tricky, while the Cygnus tools
+are idiosyncratic, slightly broken, and only available as RedHat RPMs
 </Para>
 
 <Para>
-See the Building Guide for details of what to install to get the DocBook tools and how to build the documentation (it's done by the build system, but just isn't part of a normal build).
+Instructions on installing and configuring the DocBook tools follow.
 </Para>
+
+<Sect2>
+<Title>Installing the DocBook tools from RPMs</Title>
+
+<Para>
+If you're using a system that can handle RedHat RPM packages, you can
+probably use the <ULink
+URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
+tools</ULink>, which is the most shrink-wrapped SGML suite that we could
+find. You need all the RPMs except for psgml (i.e.
+<Filename>docbook</Filename>, <Filename>jade</Filename>,
+<Filename>jadetex</Filename>, <Filename>sgmlcommon</Filename> and
+<Filename>stylesheets</Filename>). Note that most of these RPMs are
+architecture neutral, so are likely to be found in a
+<Filename>noarch</Filename> directory. N.B. The <Emphasis>Cygnus</Emphasis>
+version of the tools is assumed. Others, such as the SuSE version, may not
+work.
+</Para>
+
+</Sect2>
+
+<Sect2>
+<Title>Installing the DocBook tools from source</Title>
+
+<Para>
+Especially if you're working in Windows, you may find Norman Walsh's <ULink
+URL="http://nwalsh.com/docbook/dsssl/doc/install.html">installation
+notes</ULink> a better way to install DocBook tools. You should get version
+3.1 of DocBook, and note that his file <Filename>test.sgm</Filename> won't
+work, as it needs version 3.0.
+</Para>
+
+
+<Sect3>
+<Title>Jade</Title>
+
+<Para>
+Install <ULink URL="http://openjade.sourceforge.net/">OpenJade</ULink> (Windows binaries are available as well as sources). If you want DVI, PS, or PDF then install JadeTeX from the <Filename>dsssl</Filename>
+subdirectory. (If you get the error:
+
+<Screen>
+! LaTeX Error: Unknown option implicit=false' for package hyperref'.
+</Screen>
+
+your version of <Command>hyperref</Command> is out of date; download it from
+CTAN (<Filename>macros/latex/contrib/supported/hyperref</Filename>), and
+make it, ensuring that you have first removed or renamed your old copy. If
+you start getting file not found errors when making the test for
+<Command>hyperref</Command>, you can abort at that point and proceed
+straight to <Command>make install</Command>, or enter them as
+<Filename>../<Emphasis>filename</Emphasis></Filename>.)
+</Para>
+
+<Para>
+Make links from <Filename>virtex</Filename> to <Filename>jadetex</Filename>
+and <Filename>pdfvirtex</Filename> to <Filename>pdfjadetex</Filename>
+(otherwise DVI, PostScript and PDF output will not work). Copy
+<Filename>dsssl/*.{dtd,dsl}</Filename> and <Filename>catalog</Filename> to <Filename>/usr/[local/]lib/sgml</Filename>.
+</Para>
+
+</Sect3>
+
+<Sect3>
+<Title>DocBook and the DocBook stylesheets</Title>
+
+<Para>
+Get a Zip of <ULink
+URL="http://www.oasis-open.org/docbook/sgml/3.1/index.html">DocBook</ULink> 
+and install the contents in <Filename>/usr/[local/]/lib/sgml</Filename>.
+</Para>
+
+<Para>
+Get the <ULink URL="http://nwalsh.com/docbook/dsssl/">DocBook
+stylesheets</ULink> and install in
+<Filename>/usr/[local/]lib/sgml/stylesheets</Filename> (thereby creating a
+subdirectory docbook). For indexing, copy or link <Filename>collateindex.pl</Filename> from the DocBook stylesheets archive in <Filename>bin</Filename> into a directory on your <Constant>PATH</Constant>.
+</Para>
+
+<Para>
+Download the <ULink
+URL="http://www.oasis-open.org/cover/ISOEnts.zip">ISO
+entities</ULink> into <Filename>/usr/[local/]lib/sgml</Filename>.
+</Para>
+
+</Sect3>
+
+</Sect2>
+
+<Sect2>
+<Title>Configuring the DocBook tools</Title>
+
+<Para>
+The supported way to do this is to edit one of the
+<Filename>CATALOG</Filename> files in
+<Filename>fptools/glafp-utils/docbook</Filename> to suit your system.
+<Filename>CATALOG.generic</Filename> should work on most Unix systems when the files have been installed as per these instructions; <Filename>CATALOG.cygnus</Filename> is for systems with the Cygnus DocBook tools. You need to edit all the paths so they match your system. The edited file should be called <Filename>CATALOG</Filename>, and placed in the same directory.
+</Para>
+
+<Para>
+Alternatively, if you have a properly working DocBook toolset (the FreeBSD package is likely to be one such), set <Constant>SGML_CATALOG_FILES</Constant> to point to the catalog in a pre-installed working system (even if it doesn't normally). The build system will complain if there's no <Filename>CATALOG</Filename> in <Filename>glafp-utils/docbook</Filename> and <Filename>SGML_CATALOG_FILES</Filename> is unset.
+</Para>
+
+<Para>
+One day there will be properly-working DocBook distributions everywhere and the world will be a better and a quieter place, whose people will have more time for interesting things.
+</Para>
+
+</Sect2>
+
+<Sect2>
+<Title>Remaining problems</Title>
+
+<Para>
+If you install from source, you'll get a pile of warnings of the form
+
+<Screen>DTDDECL catalog entries are not supported</Screen>
+
+every time you build anything. These can safely be ignored, but if you find them tedious you can get rid of them by removing all the <Constant>DTDDECL</Constant> entries from <Filename>docbook.cat</Filename>.
+</Para>
+
+</Sect2>
 
 </Sect1>
 
