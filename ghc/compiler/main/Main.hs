@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.15 2000/10/31 11:13:29 simonmar Exp $
+-- $Id: Main.hs,v 1.16 2000/10/31 11:16:30 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -201,7 +201,7 @@ main =
    writeIORef v_InitDynFlags init_dyn_flags
 
     	-- complain about any unknown flags
-   mapM unknownFlagErr [ f | ('-':f) <- srcs ]
+   mapM unknownFlagErr [ f | f@('-':_) <- srcs ]
 
 	-- get the -v flag
    verb <- readIORef v_Verbose
