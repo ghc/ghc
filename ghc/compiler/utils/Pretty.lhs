@@ -195,8 +195,6 @@ import PrelBase		( unpackCString# )
 import GHC.Base		( unpackCString# )
 #endif
 
-import PrimPacked 	( strLength )
-
 #if __GLASGOW_HASKELL__ < 411
 import PrelAddr		( Addr(..) )
 #else

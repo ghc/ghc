@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.216 2002/04/22 14:54:09 simonmar Exp $
+# $Id: Makefile,v 1.217 2002/05/11 10:02:21 panne Exp $
 
 TOP = ..
 
@@ -268,6 +268,10 @@ main/SysTools_HC_OPTS		= -fno-cse
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 main/SysTools_HC_OPTS		+= '-\#include <windows.h>' '-\#include <process.h>'
 endif
+
+# ghc_strlen percolates through so many modules that it is easier to get its
+# prototype via a global option instead of a myriad of per-file OPTIONS
+SRC_HC_OPTS += '-\#include "hschooks.h"'
 
 # ----------------------------------------------------------------------------
 #		Generate supporting stuff for prelude/PrimOp.lhs 

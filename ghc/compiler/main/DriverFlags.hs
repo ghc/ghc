@@ -1,7 +1,5 @@
-{-# OPTIONS -#include "hschooks.h" #-}
-
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.92 2002/04/22 16:06:36 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.93 2002/05/11 10:02:22 panne Exp $
 --
 -- Driver flags
 --
