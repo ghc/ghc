@@ -643,7 +643,7 @@ unpackFamily family = (range (AF_UNSPEC, AF_NIT))!!family
 
 #endif
 
-#if osf1_TARGET_OS
+#if osf1_TARGET_OS || osf3_TARGET_OS
        
 data Family =
 	  AF_UNSPEC	-- unspecified 
@@ -813,8 +813,8 @@ unpackFamily family = (range (AF_UNSPEC, AF_MAX))!!family
 
 -- Alpha running OSF or a SPARC with SunOS, rather than Solaris.
 
-#if osf1_TARGET_OS || sunos4_TARGET_OS || hpux_TARGET_OS || aix_TARGET_OS \
-	|| freebsd_TARGET_OS
+#if osf1_TARGET_OS || osf3_TARGET_OS || sunos4_TARGET_OS || hpux_TARGET_OS || \
+	aix_TARGET_OS || freebsd_TARGET_OS
 data SocketType = 
 	  Stream 
 	| Datagram
