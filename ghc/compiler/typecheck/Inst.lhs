@@ -451,12 +451,15 @@ newOverloadedLit orig lit ty		-- The general case
 
 \begin{code}
 newFunDepFromDict dict
+  | isClassDict dict
   = tcGetUnique		`thenNF_Tc` \ uniq ->
     let (clas, tys) = getDictClassTys dict
 	fds = instantiateFdClassTys clas tys
 	inst = FunDep uniq clas fds (instLoc dict)
     in
 	if null fds then returnNF_Tc Nothing else returnNF_Tc (Just inst)
+  | otherwise
+  = returnNF_Tc Nothing
 \end{code}
 
 \begin{code}
