@@ -502,6 +502,13 @@
 	  </row>
 
 	  <row>
+	    <entry><option>-fwarn-misc</option></entry>
+	    <entry>enable miscellaneous warnings</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-misc</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-missing-fields</option></entry>
 	    <entry>warn when fields of a record are uninitialised</entry>
 	    <entry>dynamic</entry>
