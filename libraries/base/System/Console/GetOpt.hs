@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Console.GetOpt
--- Copyright   :  (c) Sven Panne Oct. 1996 (small changes Feb. 2003)
+-- Copyright   :  (c) Sven Panne 2002-2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
@@ -38,20 +38,19 @@ over 1100 lines, we need only 195 here, including a 46 line example!
 -}
 
 module System.Console.GetOpt (
-	-- * GetOpt
-	getOpt,
-	usageInfo,
-	ArgOrder(..),
-	OptDescr(..),
-	ArgDescr(..),
+   -- * GetOpt
+   getOpt,
+   usageInfo,
+   ArgOrder(..),
+   OptDescr(..),
+   ArgDescr(..),
 
-	-- * Example
-		
-	-- $example
-  ) where
+   -- * Example
 
-import Prelude
-import Data.List 	( isPrefixOf )
+   -- $example
+) where
+
+import Data.List ( isPrefixOf )
 
 -- |What to do with options following non-options
 data ArgOrder a
@@ -98,19 +97,22 @@ usageInfo :: String                    -- header
           -> [OptDescr a]              -- option descriptors
           -> String                    -- nicely formatted decription of options
 usageInfo header optDescr = unlines (header:table)
-   where (ss,ls,ds)     = (unzip3 . map fmtOpt) optDescr
+   where (ss,ls,ds)     = (unzip3 . concatMap fmtOpt) optDescr
          table          = zipWith3 paste (sameLen ss) (sameLen ls) ds
          paste x y z    = "  " ++ x ++ "  " ++ y ++ "  " ++ z
          sameLen xs     = flushLeft ((maximum . map length) xs) xs
          flushLeft n xs = [ take n (x ++ repeat ' ') | x <- xs ]
 
-fmtOpt :: OptDescr a -> (String,String,String)
-fmtOpt (Option sos los ad descr) = (sepBy ',' (map (fmtShort ad) sos),
-                                    sepBy ',' (map (fmtLong  ad) los),
-                                    descr)
+fmtOpt :: OptDescr a -> [(String,String,String)]
+fmtOpt (Option sos los ad descr) =
+   case lines descr of
+     []     -> [(sosFmt,losFmt,"")]
+     (d:ds) ->  (sosFmt,losFmt,d) : [ ("","",d') | d' <- ds ]
    where sepBy _  []     = ""
          sepBy _  [x]    = x
          sepBy ch (x:xs) = x ++ ch:' ':sepBy ch xs
+         sosFmt = sepBy ',' (map (fmtShort ad) sos)
+         losFmt = sepBy ',' (map (fmtLong  ad) los)
 
 fmtShort :: ArgDescr a -> Char -> String
 fmtShort (NoArg  _   ) so = "-" ++ [so]
@@ -274,7 +276,7 @@ compiler:
 >    data Flag 
 >     = Verbose  | Version 
 >     | Input String | Output String | LibDir String
->    	deriving Show
+>       deriving Show
 >    
 >    options :: [OptDescr Flag]
 >    options =
@@ -291,9 +293,9 @@ compiler:
 >    
 >    compilerOpts :: [String] -> IO ([Flag], [String])
 >    compilerOpts argv = 
->    	case (getOpt Permute options argv) of
->    	   (o,n,[]  ) -> return (o,n)
->    	   (_,_,errs) -> ioError (userError (concat errs ++ usageInfo header options))
+>       case (getOpt Permute options argv) of
+>          (o,n,[]  ) -> return (o,n)
+>          (_,_,errs) -> ioError (userError (concat errs ++ usageInfo header options))
 >      where header = "Usage: ic [OPTION...] files..."
 
 -}
