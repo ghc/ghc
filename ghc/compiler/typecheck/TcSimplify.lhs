@@ -146,7 +146,7 @@ import Id		( mkIdSet )
 
 import Bag		( Bag, bagToList, snocBag )
 import Class		( Class, ClassInstEnv, classBigSig, classInstEnv )
-import PrelInfo		( isNumericClass, isCcallishClass )
+import PrelInfo		( isNumericClass, isCreturnableClass )
 
 import Maybes		( maybeToBool )
 import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
@@ -925,9 +925,9 @@ disambigGroup dicts
     ASSERT( null frees && null ambigs )
     returnTc binds
 
-  | all isCcallishClass classes
+  | all isCreturnableClass classes
   = 	-- Default CCall stuff to (); we don't even both to check that () is an 
-	-- instance of CCallable/CReturnable, because we know it is.
+	-- instance of CReturnable, because we know it is.
     unifyTauTy (mkTyVarTy tyvar) unitTy    `thenTc_`
     returnTc EmptyMonoBinds
     

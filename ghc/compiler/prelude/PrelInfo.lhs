@@ -33,7 +33,7 @@ module PrelInfo (
 	main_NAME, allClass_NAME, ioTyCon_NAME,
 
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, isNoDictClass,
-	isNumericClass, isStandardClass, isCcallishClass
+	isNumericClass, isStandardClass, isCcallishClass, isCreturnableClass
     ) where
 
 #include "HsVersions.h"
@@ -499,12 +499,14 @@ even though every numeric class has these two as a superclass,
 because the list of ambiguous dictionaries hasn't been simplified.
 
 \begin{code}
-isCcallishClass, isNoDictClass, isNumericClass, isStandardClass :: Class -> Bool
+isCcallishClass, isCreturnableClass, isNoDictClass, 
+isNumericClass, isStandardClass :: Class -> Bool
 
-isNumericClass   clas = classKey clas `is_elem` numericClassKeys
-isStandardClass  clas = classKey clas `is_elem` standardClassKeys
-isCcallishClass	 clas = classKey clas `is_elem` cCallishClassKeys
-isNoDictClass    clas = classKey clas `is_elem` noDictClassKeys
+isNumericClass     clas = classKey clas `is_elem` numericClassKeys
+isStandardClass    clas = classKey clas `is_elem` standardClassKeys
+isCcallishClass	   clas = classKey clas `is_elem` cCallishClassKeys
+isCreturnableClass clas = classKey clas == cReturnableClassKey
+isNoDictClass      clas = classKey clas `is_elem` noDictClassKeys
 is_elem = isIn "is_X_Class"
 
 numericClassKeys
