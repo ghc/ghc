@@ -44,7 +44,8 @@ import System.IO
 #ifdef __HUGS__
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 
-{-# CBITS PrelIOUtils.c dirUtils.c #-}
+{-# CBITS PrelIOUtils.c dirUtils.c consUtils.c #-}
+ioException = ioError
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -129,7 +130,7 @@ fileTruncate file = do
     c_close fd
   return ()
 
-#ifdef mingw32_TARGET_OS
+#if defined(mingw32_TARGET_OS) || defined(__MINGW32__)
 closeFd :: Bool -> CInt -> IO CInt
 closeFd isStream fd 
   | isStream  = c_closesocket fd
@@ -141,7 +142,7 @@ foreign import stdcall unsafe "HsBase.h closesocket"
 
 fdGetMode :: Int -> IO IOMode
 fdGetMode fd = do
-#ifdef mingw32_TARGET_OS
+#if defined(mingw32_TARGET_OS) || defined(__MINGW32__)
     flags1 <- throwErrnoIfMinus1Retry "fdGetMode" 
                 (c__setmode (fromIntegral fd) (fromIntegral o_WRONLY))
     flags  <- throwErrnoIfMinus1Retry "fdGetMode" 
@@ -169,7 +170,7 @@ fdGetMode fd = do
 fdIsTTY :: Int -> IO Bool
 fdIsTTY fd = c_isatty (fromIntegral fd) >>= return.toBool
 
-#ifndef mingw32_TARGET_OS
+#if defined(HTYPE_TCFLAG_T)
 
 setEcho :: Int -> Bool -> IO ()
 setEcho fd on = do
@@ -295,7 +296,7 @@ foreign import ccall unsafe "consUtils.h get_console_echo__"
 -- ---------------------------------------------------------------------------
 -- Turning on non-blocking for a file descriptor
 
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
 
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
@@ -389,7 +390,7 @@ foreign import ccall unsafe "HsBase.h write"
 foreign import ccall unsafe "HsBase.h unlink"
    c_unlink :: CString -> IO CInt
 
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
 foreign import ccall unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
@@ -495,7 +496,7 @@ foreign import ccall unsafe "HsBase.h __hscore_sig_setmask"  const_sig_setmask :
 foreign import ccall unsafe "HsBase.h __hscore_f_getfl"      const_f_getfl :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_f_setfl"      const_f_setfl :: CInt
 
-#ifndef mingw32_TARGET_OS
+#if defined(HTYPE_TCFLAG_T)
 foreign import ccall unsafe "HsBase.h __hscore_sizeof_termios"  sizeof_termios :: Int
 foreign import ccall unsafe "HsBase.h __hscore_sizeof_sigset_t" sizeof_sigset_t :: Int
 
@@ -504,7 +505,7 @@ foreign import ccall unsafe "HsBase.h __hscore_poke_lflag" poke_c_lflag :: Ptr C
 foreign import ccall unsafe "HsBase.h __hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
 #endif
 
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
 foreign import ccall unsafe "HsBase.h __hscore_s_issock" s_issock :: CMode -> Bool
 #else
 s_issock :: CMode -> Bool
