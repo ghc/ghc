@@ -16,7 +16,6 @@
 #include "Updates.h"
 #include "Stats.h"
 #include "Schedule.h"
-#include "SchedAPI.h"		// for ReverCAFs prototype
 #include "Sanity.h"
 #include "BlockAlloc.h"
 #include "MBlock.h"
@@ -4190,8 +4189,8 @@ threadSqueezeStack(StgTSO *tso)
 			 * same size as a BLACKHOLE in any case.
 			 */
 			if (bh_info->type != THUNK_SELECTOR) {
-			    for (i = np; i < np + nw; i++) {
-				((StgClosure *)bh)->payload[i] = 0;
+			    for (i = 0; i < np + nw; i++) {
+				((StgClosure *)bh)->payload[i] = INVALID_OBJECT;
 			    }
 			}
 		    }
