@@ -8,20 +8,21 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( RuleDecl(..), RuleBndr(..), collectRuleBndrSigTys )
+import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), collectRuleBndrSigTys )
 import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedRuleDecl )
-import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
+import TcHsSyn		( TypecheckedRuleDecl, TcExpr, mkHsLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
-import TcType		( tyVarsOfTypes, openTypeKind )
+import TcType		( TcTyVarSet, tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcMonoExpr )
 import TcEnv		( tcExtendLocalValEnv )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
+import VarSet
 import Outputable
 \end{code}
 
@@ -86,17 +87,18 @@ tcRule (HsRule name act vars lhs rhs src_loc)
 	--	RULE:  forall v. fst (ss v) = fst v
 	-- The type of the rhs of the rule is just a, but v::(a,(b,c))
 	--
-	-- It's still conceivable that there may be type variables mentioned
-	-- in the LHS, but not in the type of the lhs, nor in the binders.
-	-- They'll get zapped to (), but that's over-constraining really.
-	-- Let's see if we get a problem.
+	-- We also need to get the free tyvars of the LHS; see notes 
+	-- below with ruleLhsTvs.
+	--
 	forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
+			`unionVarSet`
+		     ruleLhsTvs lhs'
     in
-
 	-- RHS can be a bit more lenient.  In particular,
 	-- we let constant dictionaries etc float outwards
 	--
-	-- 
+	-- NB: tcSimplifyInferCheck zonks the forall_tvs, and 
+	--     knocks out any that are constrained by the environment
     tcSimplifyInferCheck (text "tcRule")
 			 forall_tvs
 			 lhs_dicts rhs_lie	`thenM` \ (forall_tvs1, rhs_binds) ->
@@ -111,6 +113,34 @@ tcRule (HsRule name act vars lhs rhs src_loc)
 		          	     returnM (mkLocalId var ty)
     new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt var) rn_ty	`thenM` \ ty ->
 				     returnM (mkLocalId var ty)
+
+ruleLhsTvs :: TcExpr -> TcTyVarSet
+-- We need to gather the type variables mentioned on the LHS so we can 
+-- quantify over them.  Example:
+--   data T a = C
+-- 
+--   foo :: T a -> Int
+--   foo C = 1
+--
+--   {-# RULES "myrule"  foo C = 1 #-}
+-- 
+-- After type checking the LHS becomes (foo a (C a))
+-- and we do not want to zap the unbound tyvar 'a' to (), because
+-- that limits the applicability of the rule.  Instead, we
+-- want to quantify over it!  
+--
+-- Fortunately the form of the LHS is pretty limited (see RnSource.validRuleLhs)
+-- so we don't need to deal with the whole of HsSyn.
+--
+ruleLhsTvs (OpApp e1 op _ e2)
+  = ruleLhsTvs e1 `unionVarSet` ruleLhsTvs op `unionVarSet` ruleLhsTvs e2
+ruleLhsTvs (HsApp e1 e2)
+  = ruleLhsTvs e1 `unionVarSet` ruleLhsTvs e2
+ruleLhsTvs (HsVar v) = emptyVarSet	-- I don't think we need the tyvars of the Id
+ruleLhsTvs (TyApp e1 tys)
+  = ruleLhsTvs e1 `unionVarSet` tyVarsOfTypes tys
+ruleLhsTvs e = pprPanic "ruleLhsTvs" (ppr e)
+
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)

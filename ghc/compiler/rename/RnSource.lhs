@@ -417,6 +417,8 @@ Check the shape of a transformation rule LHS.  Currently
 we only allow LHSs of the form @(f e1 .. en)@, where @f@ is
 not one of the @forall@'d variables.
 
+NB: if you add new cases here, make sure you add new ones to TcRule.ruleLhsTvs
+
 \begin{code}
 validRuleLhs foralls lhs
   = check lhs
