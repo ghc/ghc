@@ -15,9 +15,9 @@ module DsMonad (
 	getSrcLocDs, putSrcLocDs,
 	getModuleDs,
 	getUniqueDs,
+	getDOptsDs,
 	dsLookupGlobalValue,
 
-	ValueEnv,
 	dsWarn, 
 	DsWarnings,
 	DsMatchContext(..), DsMatchKind(..)
@@ -33,13 +33,16 @@ import Var		( TyVar, setTyVarUnique )
 import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
 import TcHsSyn		( TypecheckedPat )
-import TcEnv		( ValueEnv )
 import Type             ( Type )
 import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
 import Unique		( Unique )
 import UniqFM		( lookupWithDefaultUFM_Directly )
 import Util		( zipWithEqual )
+import Name		( Name, lookupNameEnv )
+import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), 
+			  TyThing(..), TypeEnv, lookupTypeEnv )
+import CmdLineOpts	( DynFlags )
 
 infixr 9 `thenDs`
 \end{code}
@@ -49,7 +52,8 @@ a @UniqueSupply@ and some annotations, which
 presumably include source-file location information:
 \begin{code}
 type DsM result =
-	UniqSupply
+	DynFlags
+	-> UniqSupply
         -> (Name -> Id)		-- Lookup well-known Ids
 	-> SrcLoc		-- to put in pattern-matching error msgs
 	-> Module       	-- module: for SCC profiling
@@ -65,20 +69,21 @@ type DsWarnings = Bag WarnMsg           -- The desugarer reports matches which a
 
 -- initDs returns the UniqSupply out the end (not just the result)
 
-initDs  :: UniqSupply
+initDs  :: DynFlags
+	-> UniqSupply
 	-> (HomeSymbolTable, PersistentCompilerState, TypeEnv)
 	-> Module   -- module name: for profiling
 	-> DsM a
 	-> (a, DsWarnings)
 
-initDs init_us (hst,pcs,local_type_env) mod action
-  = action init_us lookup noSrcLoc mod emptyBag
+initDs dflags init_us (hst,pcs,local_type_env) mod action
+  = action dflags init_us lookup noSrcLoc mod emptyBag
   where
 	-- This lookup is used for well-known Ids, 
 	-- such as fold, build, cons etc, so the chances are
 	-- it'll be found in the package symbol table.  That's
 	-- why we don't merge all these tables
-    pst = pcsPST pcs
+    pst = pcs_PST pcs
     lookup n = case lookupTypeEnv pst n of {
 		 Just (AnId v) -> v ;
 		 other -> 
@@ -88,23 +93,24 @@ initDs init_us (hst,pcs,local_type_env) mod action
 	       case lookupNameEnv local_type_env n of
 		 Just (AnId v) -> v ;
 		 other	       -> pprPanic "initDS: lookup:" (ppr n)
+               }}
 
 thenDs :: DsM a -> (a -> DsM b) -> DsM b
 andDs  :: (a -> a -> a) -> DsM a -> DsM a -> DsM a
 
-thenDs m1 m2 us genv loc mod warns
+thenDs m1 m2 dflags us genv loc mod warns
   = case splitUniqSupply us		    of { (s1, s2) ->
-    case (m1 s1 genv loc mod warns)  of { (result, warns1) ->
-    m2 result s2 genv loc mod warns1}}
+    case (m1 dflags s1 genv loc mod warns)  of { (result, warns1) ->
+    m2 result dflags s2 genv loc mod warns1}}
 
-andDs combiner m1 m2 us genv loc mod warns
+andDs combiner m1 m2 dflags us genv loc mod warns
   = case splitUniqSupply us		    of { (s1, s2) ->
-    case (m1 s1 genv loc mod warns)  of { (result1, warns1) ->
-    case (m2 s2 genv loc mod warns1) of { (result2, warns2) ->
+    case (m1 dflags s1 genv loc mod warns)  of { (result1, warns1) ->
+    case (m2 dflags s2 genv loc mod warns1) of { (result2, warns2) ->
     (combiner result1 result2, warns2) }}}
 
 returnDs :: a -> DsM a
-returnDs result us genv loc mod warns = (result, warns)
+returnDs result dflags us genv loc mod warns = (result, warns)
 
 listDs :: [DsM a] -> DsM [a]
 listDs []     = returnDs []
@@ -151,29 +157,33 @@ it easier to read debugging output.
 
 \begin{code}
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
-newSysLocalDs ty us genv loc mod warns
+newSysLocalDs ty dflags us genv loc mod warns
   = case uniqFromSupply us of { assigned_uniq ->
     (mkSysLocal SLIT("ds") assigned_uniq ty, warns) }
 
 newSysLocalsDs tys = mapDs newSysLocalDs tys
 
-newFailLocalDs ty us genv loc mod warns
+newFailLocalDs ty dflags us genv loc mod warns
   = case uniqFromSupply us of { assigned_uniq ->
     (mkSysLocal SLIT("fail") assigned_uniq ty, warns) }
 	-- The UserLocal bit just helps make the code a little clearer
 
 getUniqueDs :: DsM Unique
-getUniqueDs us genv loc mod warns
+getUniqueDs dflags us genv loc mod warns
   = case (uniqFromSupply us) of { assigned_uniq ->
     (assigned_uniq, warns) }
 
+getDOptsDs :: DsM DynFlags
+getDOptsDs dflags us genv loc mod warns
+  = (dflags, warns)
+
 duplicateLocalDs :: Id -> DsM Id
-duplicateLocalDs old_local us genv loc mod warns
+duplicateLocalDs old_local dflags us genv loc mod warns
   = case uniqFromSupply us of { assigned_uniq ->
     (setIdUnique old_local assigned_uniq, warns) }
 
 cloneTyVarsDs :: [TyVar] -> DsM [TyVar]
-cloneTyVarsDs tyvars us genv loc mod warns
+cloneTyVarsDs tyvars dflags us genv loc mod warns
   = case uniqsFromSupply (length tyvars) us of { uniqs ->
     (zipWithEqual "cloneTyVarsDs" setTyVarUnique tyvars uniqs, warns) }
 \end{code}
@@ -181,7 +191,7 @@ cloneTyVarsDs tyvars us genv loc mod warns
 \begin{code}
 newTyVarsDs :: [TyVar] -> DsM [TyVar]
 
-newTyVarsDs tyvar_tmpls us genv loc mod warns
+newTyVarsDs tyvar_tmpls dflags us genv loc mod warns
   = case uniqsFromSupply (length tyvar_tmpls) us of { uniqs ->
     (zipWithEqual "newTyVarsDs" setTyVarUnique tyvar_tmpls uniqs, warns) }
 \end{code}
@@ -191,35 +201,31 @@ the @SrcLoc@ being carried around.
 \begin{code}
 uniqSMtoDsM :: UniqSM a -> DsM a
 
-uniqSMtoDsM u_action us genv loc mod warns
+uniqSMtoDsM u_action dflags us genv loc mod warns
   = (initUs_ us u_action, warns)
 
 getSrcLocDs :: DsM SrcLoc
-getSrcLocDs us genv loc mod warns
+getSrcLocDs dflags us genv loc mod warns
   = (loc, warns)
 
 putSrcLocDs :: SrcLoc -> DsM a -> DsM a
-putSrcLocDs new_loc expr us genv old_loc mod warns
-  = expr us genv new_loc mod warns
+putSrcLocDs new_loc expr dflags us genv old_loc mod warns
+  = expr dflags us genv new_loc mod warns
 
 dsWarn :: WarnMsg -> DsM ()
-dsWarn warn us genv loc mod warns = ((), warns `snocBag` warn)
+dsWarn warn dflags us genv loc mod warns = ((), warns `snocBag` warn)
 
 \end{code}
 
 \begin{code}
 getModuleDs :: DsM Module
-getModuleDs us genv loc mod warns = (mod, warns)
+getModuleDs dflags us genv loc mod warns = (mod, warns)
 \end{code}
 
 \begin{code}
 dsLookupGlobalValue :: Name -> DsM Id
-dsLookupGlobalValue key us genv loc mod warns
-  = (result, warns)
-  where
-    result = case lookupNameEnv genv name of
-		Just (AnId v) -> v
-		Nothing       -> pprPanic "dsLookupGlobalValue:" (ppr name)
+dsLookupGlobalValue name dflags us genv loc mod warns
+  = (genv name, warns)
 \end{code}
 
 

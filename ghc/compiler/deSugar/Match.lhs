@@ -8,9 +8,7 @@ module Match ( match, matchExport, matchWrapper, matchSimply, matchSinglePat ) w
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappingPatterns,
-			  opt_WarnSimplePatterns
-     			)
+import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import HsSyn		
 import TcHsSyn		( TypecheckedPat, TypecheckedMatch )
 import DsHsSyn		( outPatType )
@@ -45,7 +43,12 @@ matchExport :: [Id]	        -- Vars rep'ing the exprs we're matching with
             -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
             -> DsM MatchResult  -- Desugared result!
 
-matchExport vars qs@((EqnInfo _ ctx _ (MatchResult _ _)) : _)
+
+matchExport vars qs
+   = getDOptsDs 				`thenDs` \ dflags ->
+     matchExport_really dflags vars qs
+
+matchExport_really dflags vars qs@((EqnInfo _ ctx _ (MatchResult _ _)) : _)
   | incomplete && shadow = 
       dsShadowWarn ctx eqns_shadow		`thenDs`   \ () ->
       dsIncompleteWarn ctx pats			`thenDs`   \ () ->
@@ -59,8 +62,10 @@ matchExport vars qs@((EqnInfo _ ctx _ (MatchResult _ _)) : _)
   | otherwise             =
       match vars qs
   where (pats,indexs) = check qs
-        incomplete    = opt_WarnIncompletePatterns && (length pats /= 0)
-        shadow        = opt_WarnOverlappingPatterns && sizeUniqSet indexs < no_eqns
+        incomplete    = dopt Opt_WarnIncompletePatterns dflags
+			&& (length pats /= 0)
+        shadow        = dopt Opt_WarnOverlappingPatterns dflags
+			&& sizeUniqSet indexs < no_eqns
         no_eqns       = length qs
 	unused_eqns   = uniqSetToList (mkUniqSet [1..no_eqns] `minusUniqSet` indexs)
 	eqns_shadow   = map (\n -> qs!!(n - 1)) unused_eqns
@@ -701,20 +706,22 @@ JJQC 30-Nov-1997
 
 \begin{code}
 matchWrapper kind matches error_string
-  = flattenMatches kind matches			`thenDs` \ (result_ty, eqns_info) ->
+  = getDOptsDs					`thenDs` \ dflags ->
+    flattenMatches kind matches			`thenDs` \ (result_ty, eqns_info) ->
     let
 	EqnInfo _ _ arg_pats _ : _ = eqns_info
     in
-    mapDs selectMatchVar arg_pats			`thenDs` \ new_vars ->
-    match_fun new_vars eqns_info 		 	`thenDs` \ match_result ->
+    mapDs selectMatchVar arg_pats		`thenDs` \ new_vars ->
+    match_fun dflags new_vars eqns_info 	`thenDs` \ match_result ->
 
     mkErrorAppDs pAT_ERROR_ID result_ty error_string	`thenDs` \ fail_expr ->
     extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
     returnDs (new_vars, result_expr)
-  where match_fun = case kind of 
-                      LambdaMatch | opt_WarnSimplePatterns -> matchExport 
-                                  | otherwise              -> match
-                      _                                    -> matchExport
+  where match_fun dflags
+           = case kind of 
+                LambdaMatch | dopt Opt_WarnSimplePatterns dflags -> matchExport 
+                            | otherwise                          -> match
+                _                                                -> matchExport
 \end{code}
 
 %************************************************************************
@@ -749,10 +756,12 @@ matchSinglePat :: CoreExpr -> DsMatchContext -> TypecheckedPat
 	       -> MatchResult -> DsM MatchResult
 
 matchSinglePat (Var var) ctx pat match_result
-  = match_fn [var] [EqnInfo 1 ctx [pat] match_result]
+  = getDOptsDs					`thenDs` \ dflags ->
+    match_fn dflags [var] [EqnInfo 1 ctx [pat] match_result]
   where
-    match_fn | opt_WarnSimplePatterns = matchExport
-	     | otherwise	      = match
+    match_fn dflags
+       | dopt Opt_WarnSimplePatterns dflags = matchExport
+       | otherwise	                    = match
 
 matchSinglePat scrut ctx pat match_result
   = selectMatchVar pat		 	 		`thenDs` \ var ->

@@ -41,8 +41,9 @@ import TysWiredIn	( unitTy, addrTy, stablePtrTyCon,
 			)
 import TysPrim		( addrPrimTy )
 import PrelNames	( Uniquable(..), hasKey,
-			  ioTyConKey, deRefStablePtrIdKey, returnIOIdKey, 
-			  bindIOIdKey, makeStablePtrIdKey
+			  ioTyConKey, deRefStablePtrName, returnIOIdKey, 
+			  bindIOName,
+			  returnIOName, makeStablePtrName
 			)
 import Outputable
 
@@ -213,7 +214,7 @@ dsFExport fn_id ty mod_name ext_name cconv isDyn
 		 returnDs (\body -> body, orig_res_ty, res_ty)
 
 	other -> 	-- The function returns t, so wrap the call in returnIO
-		 dsLookupGlobalValue returnIOIdKey	`thenDs` \ retIOId ->
+		 dsLookupGlobalValue returnIOName	`thenDs` \ retIOId ->
 	         returnDs (\body -> mkApps (Var retIOId) [Type orig_res_ty, body],
 		           funResultTy (applyTy (idType retIOId) orig_res_ty), 
 				-- We don't have ioTyCon conveniently to hand
@@ -228,8 +229,8 @@ dsFExport fn_id ty mod_name ext_name cconv isDyn
      (if isDyn then 
         newSysLocalDs stbl_ptr_ty			`thenDs` \ stbl_ptr ->
 	newSysLocalDs stbl_ptr_to_ty			`thenDs` \ stbl_value ->
-	dsLookupGlobalValue deRefStablePtrIdKey		`thenDs` \ deRefStablePtrId ->
-        dsLookupGlobalValue bindIOIdKey			`thenDs` \ bindIOId ->
+	dsLookupGlobalValue deRefStablePtrName		`thenDs` \ deRefStablePtrId ->
+        dsLookupGlobalValue bindIOName			`thenDs` \ bindIOId ->
 	let
 	 the_deref_app = mkApps (Var deRefStablePtrId)
 				[ Type stbl_ptr_to_ty, Var stbl_ptr ]
@@ -336,11 +337,11 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      dsFExport  i export_ty mod_name fe_ext_name cconv True
      	`thenDs` \ (feb, fe, h_code, c_code) ->
      newSysLocalDs arg_ty			`thenDs` \ cback ->
-     dsLookupGlobalValue makeStablePtrIdKey	`thenDs` \ makeStablePtrId ->
+     dsLookupGlobalValue makeStablePtrName	`thenDs` \ makeStablePtrId ->
      let
 	mk_stbl_ptr_app    = mkApps (Var makeStablePtrId) [ Type arg_ty, Var cback ]
      in
-     dsLookupGlobalValue bindIOIdKey		        `thenDs` \ bindIOId ->
+     dsLookupGlobalValue bindIOName		        `thenDs` \ bindIOId ->
      newSysLocalDs (mkTyConApp stablePtrTyCon [arg_ty]) `thenDs` \ stbl_value ->
      let
       stbl_app cont ret_ty 

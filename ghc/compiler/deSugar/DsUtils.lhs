@@ -63,8 +63,8 @@ import TysWiredIn	( nilDataCon, consDataCon,
 			)
 import BasicTypes	( Boxity(..) )
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
-import PrelNames	( unpackCStringIdKey, unpackCStringUtf8IdKey, 
-			  plusIntegerIdKey, timesIntegerIdKey )
+import PrelNames	( unpackCStringName, unpackCStringUtf8Name, 
+			  plusIntegerName, timesIntegerName )
 import Outputable
 import UnicodeUtil      ( stringToUtf8 )
 \end{code}
@@ -384,8 +384,8 @@ mkIntegerLit i
 -- integral literals. This improves constant folding.
 
   | otherwise 		-- Big, so start from a string
-  = dsLookupGlobalValue plusIntegerIdKey	`thenDs` \ plus_id ->
-    dsLookupGlobalValue timesIntegerIdKey	`thenDs` \ times_id ->
+  = dsLookupGlobalValue plusIntegerName		`thenDs` \ plus_id ->
+    dsLookupGlobalValue timesIntegerName	`thenDs` \ times_id ->
     let 
         plus a b  = Var plus_id  `App` a `App` b
         times a b = Var times_id `App` a `App` b
@@ -420,11 +420,11 @@ mkStringLitFS str
     returnDs (mkConsExpr charTy the_char (mkNilExpr charTy))
 
   | all safeChar chars
-  = dsLookupGlobalValue unpackCStringIdKey	`thenDs` \ unpack_id ->
+  = dsLookupGlobalValue unpackCStringName	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr str)))
 
   | otherwise
-  = dsLookupGlobalValue unpackCStringUtf8IdKey	`thenDs` \ unpack_id ->
+  = dsLookupGlobalValue unpackCStringUtf8Name	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr (_PK_ (stringToUtf8 chars)))))
 
   where

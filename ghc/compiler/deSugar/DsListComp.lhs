@@ -26,7 +26,7 @@ import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type )
 import TysPrim		( alphaTyVar )
 import TysWiredIn	( nilDataCon, consDataCon )
 import Match		( matchSimply )
-import PrelNames	( foldrIdKey, buildIdKey )
+import PrelNames	( foldrName, buildName )
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''
@@ -54,7 +54,7 @@ dsListComp quals elt_ty
 
     dfListComp c n quals		`thenDs` \ result ->
 
-    dsLookupGlobalValue buildIdKey	`thenDs` \ build_id ->
+    dsLookupGlobalValue buildName	`thenDs` \ build_id ->
     returnDs (Var build_id `App` Type elt_ty 
 			   `App` mkLams [n_tyvar, c, n] result)
 \end{code}
@@ -207,7 +207,7 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
     matchSimply (Var x) ListCompMatch pat core_rest (Var b)	`thenDs` \ core_expr ->
 
     -- now build the outermost foldr, and return
-    dsLookupGlobalValue foldrIdKey		`thenDs` \ foldr_id ->
+    dsLookupGlobalValue foldrName		`thenDs` \ foldr_id ->
     returnDs (
       Var foldr_id `App` Type x_ty 
 		   `App` Type b_ty

@@ -8,8 +8,9 @@ module Desugar ( deSugar ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_ds )
-import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), HsExpr(..), HsBinds(..), MonoBinds(..) )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_SccProfilingOn )
+import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
+			  HsExpr(..), HsBinds(..), MonoBinds(..) )
 import TcHsSyn		( TypecheckedRuleDecl )
 import TcModule		( TcResults(..) )
 import CoreSyn
@@ -25,11 +26,11 @@ import Module		( Module )
 import VarEnv
 import VarSet
 import Bag		( isEmptyBag )
-import CmdLineOpts	( opt_SccProfilingOn )
 import CoreLint		( beginPass, endPass )
 import ErrUtils		( doIfSet, pprBagOfWarnings )
 import Outputable
 import UniqSupply	( UniqSupply )
+import HscTypes		( HomeSymbolTable )
 \end{code}
 
 %************************************************************************
@@ -42,20 +43,24 @@ The only trick here is to get the @DsMonad@ stuff off to a good
 start.
 
 \begin{code}
-deSugar :: Module 
+deSugar :: DynFlags
+	-> Module 
 	-> UniqSupply
+	-> HomeSymbolTable
         -> TcResults
 	-> IO ([CoreBind], [ProtoCoreRule], SDoc, SDoc, [CoreBndr])
 
-deSugar mod_name us (TcResults {tc_env = global_val_env,
-			        tc_binds = all_binds,
-				tc_rules = rules,
-			        tc_fords = fo_decls})
+deSugar dflags mod_name us hst
+        (TcResults {tc_env   = global_val_env,
+		    tc_pcs   = pcs,
+		    tc_binds = all_binds,
+		    tc_rules = rules,
+		    tc_fords = fo_decls})
   = do
-	beginPass "Desugar"
+	beginPass dflags "Desugar"
 	-- Do desugaring
 	let (result, ds_warns) = 
-		initDs us global_val_env mod_name
+		initDs dflags us (hst,pcs,global_val_env) mod_name
 			(dsProgram mod_name all_binds rules fo_decls)    
 	    (ds_binds, ds_rules, _, _, _) = result
 
@@ -64,9 +69,10 @@ deSugar mod_name us (TcResults {tc_env = global_val_env,
 		(printErrs (pprBagOfWarnings ds_warns))
 
 	 -- Lint result if necessary
-        endPass "Desugar" opt_D_dump_ds ds_binds
+        let do_dump_ds = dopt Opt_D_dump_ds dflags
+        endPass dflags "Desugar" do_dump_ds ds_binds
 
-	doIfSet opt_D_dump_ds (printDump (ppr_ds_rules ds_rules))
+	doIfSet do_dump_ds (printDump (ppr_ds_rules ds_rules))
 
         return result
 
