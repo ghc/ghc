@@ -438,8 +438,9 @@ data RuleBndr name
 instance (Outputable name, Outputable pat)
 	      => Outputable (RuleDecl name pat) where
   ppr (RuleDecl name tvs ns lhs rhs loc)
-	= text "RULE" <+> doubleQuotes (ptext name) <> colon <+> 
-	  sep [pp_forall, ppr lhs, equals <+> ppr rhs]
+	= sep [text "{-# RULES" <+> doubleQuotes (ptext name),
+	       pp_forall, ppr lhs, equals <+> ppr rhs,
+               text "#-}" ]
 	where
 	  pp_forall | null tvs && null ns = empty
 		    | otherwise		  = text "forall" <+> 
