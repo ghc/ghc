@@ -419,10 +419,11 @@ addAvailEnv warn_dups ie env avail
    occ_avail = nameOccName (availName avail)
    occ_ie    = ieOcc ie
    key
-    | occ_ie == occ_avail = occ_avail
-    | otherwise           = occ_ie 
+    | not warn_dups || occ_ie == occ_avail = occ_avail
+    | otherwise                            = occ_ie 
         -- export item is a class method, use export occ name instead.
-
+        -- (this is only needed to get more precise warnings about
+	--  duplicates.)
    elt  = (ie,avail,reports_on)
 
    reports_on
