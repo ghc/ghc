@@ -382,6 +382,9 @@ AC_PROG_LEX
 dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL
 
+dnl If you can run configure, you certainly have /bin/sh
+AC_DEFINE(HAVE_BIN_SH)
+
 dnl ** how to invoke `ar' and `ranlib'
 FPTOOLS_PROG_AR_AND_RANLIB
 
@@ -433,10 +436,25 @@ dnl ** check for full ANSI header (.h) files
 AC_HEADER_STDC
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS(dirent.h fcntl.h grp.h malloc.h memory.h nlist.h pwd.h siginfo.h signal.h stdlib.h string.h sys/fault.h sys/file.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termios.h time.h types.h unistd.h utime.h vfork.h readline/readline.h bfd.h)
+AC_CHECK_HEADERS(Files.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdlib.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h vfork.h readline/readline.h bfd.h)
+
+dnl ** check for DOS include files
+AC_CHECK_HEADERS(dos.h conio.h io.h std.h) 
+
+dnl ** check for Windows include files
+AC_CHECK_HEADERS(windows.h)
 
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME
+
+dnl dynamic loading include files
+AC_CHECK_HEADERS(dlfcn.h dl.h) 
+
+dnl ** check for farcalloc (in bcc)
+AC_CHECK_HEADER(alloc.h,AC_CHECK_FUNCS(farcalloc))
+
+dnl ** check for valloc (in sunos, solaris, mips, amiga, next, minix, ultrix)
+AC_CHECK_HEADER(malloc.h,AC_CHECK_FUNCS(valloc))
 
 dnl ** how do we get a timezone name, and UTC offset ?
 AC_STRUCT_TIMEZONE
@@ -470,6 +488,78 @@ FPTOOLS_C_LONG_LONG
 dnl ** can we open files in binary mode?
 FPTOOLS_O_BINARY
 
+dnl ** check for GetModuleFileName and WinExec (windows only)
+dnl Old: AC_CHECK_FUNCS(WinExec GetModuleFileName)       dnl Windows
+dnl Doesn't work because the linker can't see the functions if
+dnl you omit the #include <windows.h>.  (I've no idea why not...)
+
+FPTOOLS_TRY_LINK_NOWARN(,[
+#if HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+main() { 
+  WinExec("",0);
+  exit(0);
+}
+],
+[have_winexec=1],
+[have_winexec=0])
+if test "$have_winexec" = "1"; then
+AC_DEFINE(HAVE_WINEXEC)
+fi
+
+FPTOOLS_TRY_LINK_NOWARN(,[
+#if HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+main() { 
+  char* dir;
+  GetModuleFileName((HMODULE)0,dir,0);
+  exit(0);
+}
+],
+[have_getmodulefilename=1],
+[have_getmodulefilename=0])
+if test "$have_getmodulefilename" = "1"; then
+AC_DEFINE(HAVE_GETMODULEFILENAME)
+fi
+
+dnl ** check return type of signal handlers
+dnl Foo: assumes we can use prototypes.
+dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
+dnl AC_CACHE_CHECK([type of signal handlers], ac_cv_type_signal_handler,
+dnl [AC_TRY_COMPILE([#include <sys/types.h>
+dnl #include <signal.h>
+dnl #ifdef signal
+dnl #undef signal
+dnl #endif
+dnl void (*signal (int, void (*)(int)))(int);
+dnl ],
+dnl [int i;], 
+dnl ac_cv_type_signal_handler=void_int,
+dnl ac_cv_type_signal_handler=int_void)])
+dnl if test "$ac_cv_type_signal_handler" = void_int; then
+dnl AC_DEFINE(VOID_INT_SIGNALS)
+dnl fi
+
+dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
+AC_TYPE_SIGNAL
+if test "$ac_cv_type_signal" = void; then
+AC_DEFINE(VOID_INT_SIGNALS)
+fi
+
+dnl ** check for more functions
+AC_CHECK_FUNCS(strcasecmp _stricmp stricmp strcmpi)
+AC_CHECK_FUNCS(strcmp)
+AC_CHECK_FUNCS(realpath _fullpath)  
+AC_CHECK_FUNCS(PBHSetVolSync macsystem)  
+AC_CHECK_FUNCS(fgetpos fsetpos fseek ftell)
+AC_CHECK_FUNCS(vsnprintf _vsnprintf)
+AC_CHECK_FUNCS(snprintf  _snprintf )  
+AC_CHECK_FUNCS(popen     _popen )  
+AC_CHECK_FUNCS(pclose    _pclose )  
+
+
 dnl ** check for specific library functions that we are interested in
 AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect setitimer stat sysconf timelocal times vadvise vfork)
 
@@ -485,6 +575,13 @@ dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_init)
 
+dnl ################################################################
+dnl Check for libraries
+dnl ################################################################
+
+FPTOOLS_CHECK_LIB_NOWARN(dl, dlopen)
+FPTOOLS_CHECK_LIB_NOWARN(dld, shl_load)
+FPTOOLS_CHECK_LIB_NOWARN(m, atan)
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests
@@ -495,6 +592,9 @@ AC_FUNC_ALLOCA
 
 dnl ** determine whether or not const works
 AC_C_CONST
+
+dnl ** determine whether ANSI-function prototypes work?
+AC_C_PROTOTYPES          
 
 dnl ** are we big endian?
 AC_C_BIGENDIAN

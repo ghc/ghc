@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.30 1998/10/07 12:41:42 simonm Exp $
+dnl $Id: aclocal.m4,v 1.31 1998/11/17 01:24:58 reid Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -498,3 +498,99 @@ else
 fi
 fi
 ])])
+
+
+
+dnl Based on AC_TRY_LINK - run iftrue if links cleanly with no warning
+
+dnl FPTOOLS_TRY_LINK_NOWARN(flags,main?,iftrue,iffalse)
+
+AC_DEFUN(FPTOOLS_TRY_LINK_NOWARN,
+[
+ac_save_LIBS="$LIBS"
+LIBS=[$1];
+cat > conftest.$ac_ext <<EOF
+dnl This sometimes fails to find confdefs.h, for some reason.
+dnl [#]line __oline__ "[$]0"
+[#]line __oline__ "configure"
+#include "confdefs.h"
+[$2]
+int t() { return 0; }
+EOF
+if AC_TRY_EVAL(ac_link); then
+  ifelse([$3], , :, [
+    LIBS="$ac_save_LIBS"
+    rm -rf conftest*
+    $3])
+  ifelse([$4], , , [else
+    LIBS="$ac_save_LIBS"
+    rm -rf conftest*
+    $4
+])dnl
+fi
+rm -f conftest*
+]
+)
+
+dnl Loosely based on AC_CHECK_LIB in acgeneral.m4 in autoconf distribution
+
+dnl FPTOOLS_CHECK_FLAG_NOWARN(NAME, FLAG, CODE, iftrue, iffalse)
+
+AC_DEFUN(FPTOOLS_CHECK_FLAG_NOWARN,
+[AC_MSG_CHECKING([for $1])
+ AC_CACHE_VAL(ac_cv_flag_$1,
+   [FPTOOLS_TRY_LINK_NOWARN("$2", [main() { $3; exit(0); } ],
+     eval "ac_cv_flag_$1=yes",
+     eval "ac_cv_flag_$1=no"
+   )]
+ )
+if eval "test \"`echo '$ac_cv_flag_'$1`\" = yes"; then
+  AC_MSG_RESULT(yes)
+  LIBS="$2 $LIBS"
+  $4
+else
+  AC_MSG_RESULT(no)
+  $5
+fi
+])
+
+dnl FPTOOLS_CHECK_LIB_NOWARN(LIBRARY, FUNCTION)
+
+AC_DEFUN(FPTOOLS_CHECK_LIB_NOWARN,
+[FPTOOLS_CHECK_FLAG_NOWARN([function_$2],[],[extern char $2(); $2();],
+[changequote(, )dnl
+  ac_tr_lib=HAVE_LIB`echo $1 | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'`
+ changequote([, ])dnl
+ AC_DEFINE_UNQUOTED($ac_tr_lib)
+],
+[FPTOOLS_CHECK_FLAG_NOWARN([library_$1],[-l$1],[extern char $2(); $2();],
+[changequote(, )dnl
+  ac_tr_lib=HAVE_LIB`echo $1 | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'`
+ changequote([, ])dnl
+ AC_DEFINE_UNQUOTED($ac_tr_lib)
+],
+[]
+)])]
+)
+
+dnl check for prototypes
+dnl
+AC_DEFUN(AC_C_PROTOTYPES,
+[AC_CACHE_CHECK([prototypes], ac_cv_prototypes,
+[AC_TRY_COMPILE([
+void foo(int);
+void foo(i)
+int i; { 
+return;
+}
+],
+[int i;], 
+ac_cv_prototypes=yes,
+ac_cv_prototypes=no)])
+if test "$ac_cv_prototypes" = yes; then
+AC_DEFINE(HAVE_PROTOTYPES)
+fi
+])
+
+
+# LocalWords:  fi
