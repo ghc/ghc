@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.106 2001/11/08 16:17:35 simonmar Exp $
+ * $Id: Schedule.c,v 1.107 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -95,6 +95,12 @@
 #include "Stats.h"
 #include "Itimer.h"
 #include "Prelude.h"
+#ifdef PROFILING
+#include "Proftimer.h"
+#include "ProfHeap.h"
+#include "RetainerProfile.h"
+#include "LdvProfile.h"
+#endif
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
 # include "GranSim.h"
@@ -181,7 +187,6 @@ StgTSO *all_threads;
  */
 static StgTSO *suspended_ccalling_threads;
 
-static void GetRoots(evac_fn);
 static StgTSO *threadStackOverflow(StgTSO *tso);
 
 /* KH: The following two flags are shared memory locations.  There is no need
@@ -923,10 +928,14 @@ schedule( void )
      * the user specified "context switch as often as possible", with
      * +RTS -C0
      */
-    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0
-	&& (run_queue_hd != END_TSO_QUEUE
-	    || blocked_queue_hd != END_TSO_QUEUE
-	    || sleeping_queue != END_TSO_QUEUE))
+    if (
+#ifdef PROFILING
+	RtsFlags.ProfFlags.profileInterval == 0 ||
+#endif
+	(RtsFlags.ConcFlags.ctxtSwitchTicks == 0
+	 && (run_queue_hd != END_TSO_QUEUE
+	     || blocked_queue_hd != END_TSO_QUEUE
+	     || sleeping_queue != END_TSO_QUEUE)))
 	context_switch = 1;
     else
 	context_switch = 0;
@@ -935,6 +944,10 @@ schedule( void )
 
     IF_DEBUG(scheduler, sched_belch("-->> Running TSO %ld (%p) %s ...", 
 			      t->id, t, whatNext_strs[t->what_next]));
+
+#ifdef PROFILING
+    startHeapProfTimer();
+#endif
 
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     /* Run the current thread 
@@ -961,6 +974,7 @@ schedule( void )
     
     /* Costs for the scheduler are assigned to CCS_SYSTEM */
 #ifdef PROFILING
+    stopHeapProfTimer();
     CCCS = CCS_SYSTEM;
 #endif
     
@@ -1260,6 +1274,39 @@ schedule( void )
     cap->link = free_capabilities;
     free_capabilities = cap;
     n_free_capabilities++;
+#endif
+
+#ifdef PROFILING
+    if (RtsFlags.ProfFlags.profileInterval==0 || performHeapProfile) {
+        if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) { 
+	    //
+	    // Note: currently retainer profiling is performed after
+	    // a major garbage collection.
+	    //
+	    GarbageCollect(GetRoots, rtsTrue);
+	    retainerProfile();
+	} else if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
+	    //
+	    // We have LdvCensus() preceded by a major garbage
+	    // collection because we don't want *genuinely* dead
+	    // closures to be involved in LDV profiling. Another good
+	    // reason is to produce consistent profiling results
+	    // regardless of the interval at which GCs are performed.
+	    // In other words, we want LDV profiling results to be
+	    // completely independent of the GC interval.
+	    //
+	    GarbageCollect(GetRoots, rtsTrue);
+	    LdvCensus();
+	} else {
+	    //
+	    // Normal creator-based heap profile
+	    //
+	    GarbageCollect(GetRoots, rtsTrue);
+	    heapCensus();
+	}
+	performHeapProfile = rtsFalse;
+	ready_to_gc = rtsFalse;	// we already GC'd
+    }
 #endif
 
 #ifdef SMP
@@ -2170,7 +2217,7 @@ take_off_run_queue(StgTSO *tso) {
 	KH @ 25/10/99
 */
 
-static void
+void
 GetRoots(evac_fn evac)
 {
   StgMainThread *m;

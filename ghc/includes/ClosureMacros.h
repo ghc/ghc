@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.32 2001/02/06 11:41:04 rrt Exp $
+ * $Id: ClosureMacros.h,v 1.33 2001/11/22 14:25:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -79,8 +79,39 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
    -------------------------------------------------------------------------- */
 
 #ifdef PROFILING
-#define SET_PROF_HDR(c,ccs_) 		(c)->header.prof.ccs = ccs_
-#define SET_STATIC_PROF_HDR(ccs_)	prof : { ccs : ccs_ },
+#ifdef DEBUG_RETAINER
+/* 
+  For the sake of debugging, we take the safest way for the moment. Actually, this 
+  is useful to check the sanity of heap before beginning retainer profiling.
+  flip is defined in RetainerProfile.c, and declared as extern in RetainerProfile.h.
+  Note: change those functions building Haskell objects from C datatypes, i.e.,
+  all rts_mk???() functions in RtsAPI.c, as well.
+ */
+extern StgWord flip;
+#define SET_PROF_HDR(c,ccs_)            \
+        ((c)->header.prof.ccs = ccs_, (c)->header.prof.hp.rs = (retainerSet *)((StgWord)NULL | flip))
+#else
+/*
+  For retainer profiling only: we do not have to set (c)->header.prof.hp.rs to
+  NULL | flip (flip is defined in RetainerProfile.c) because even when flip
+  is 1, rs is invalid and will be initialized to NULL | flip later when 
+  the closure *c is visited.
+ */
+/*
+#define SET_PROF_HDR(c,ccs_)            \
+        ((c)->header.prof.ccs = ccs_, (c)->header.prof.hp.rs = NULL)
+ */
+/*
+  The following macro works for both retainer profiling and LDV profiling:
+  for retainer profiling, ldvTime remains 0, so rs fields are initialized to 0.
+  See the invariants on ldvTime.
+ */
+#define SET_PROF_HDR(c,ccs_)            \
+        ((c)->header.prof.ccs = ccs_,   \
+        LDV_recordCreate((c)))
+#endif  // DEBUG_RETAINER
+#define SET_STATIC_PROF_HDR(ccs_)       \
+        prof : { ccs : ccs_, hp : { rs : NULL } },
 #else
 #define SET_PROF_HDR(c,ccs)
 #define SET_STATIC_PROF_HDR(ccs)
@@ -109,6 +140,7 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
 #define SET_TICKY_HDR(c,stuff)
 #define SET_STATIC_TICKY_HDR(stuff)
 #endif
+
 #define SET_HDR(c,info,ccs)				\
    {							\
 	SET_INFO(c,info);				\

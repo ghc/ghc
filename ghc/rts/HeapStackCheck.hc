@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.18 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.19 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -46,7 +46,6 @@
 /* Remember that the return address is *removed* when returning to a
  * ThreadRunGHC thread.
  */
-
 
 #define GC_GENERIC					\
   if (Hp > HpLim) {					\

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.36 2001/08/08 10:50:37 simonmar Exp $
+ * $Id: Storage.h,v 1.37 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,6 +13,9 @@
 #include "Block.h"
 #include "BlockAlloc.h"
 #include "StoragePriv.h"
+#ifdef PROFILING
+#include "LdvProfile.h"
+#endif
 
 /* -----------------------------------------------------------------------------
    Initialisation / De-initialisation
@@ -152,7 +155,10 @@ recordOldToNewPtrs(StgMutClosure *p)
   }
 }
 
-#ifndef DEBUG
+// @LDV profiling
+// We zero out the slop when PROFILING is on.
+// #ifndef DEBUG
+#if !defined(DEBUG) && !defined(PROFILING)
 #define updateWithIndirection(info, p1, p2)				\
   {									\
     bdescr *bd;								\
@@ -174,6 +180,41 @@ recordOldToNewPtrs(StgMutClosure *p)
       TICK_UPD_OLD_IND();						\
     }									\
   }
+#elif defined(PROFILING)
+// @LDV profiling
+// We call LDV_recordDead_FILL_SLOP_DYNAMIC(p1) regardless of the generation in 
+// which p1 resides.
+//
+// Note: 
+//   After all, we do *NOT* need to call LDV_recordCreate() for both IND and 
+//   IND_OLDGEN closures because they are inherently used. But, it corrupts
+//   the invariants that every closure keeps its creation time in the profiling
+//   field. So, we call LDV_recordCreate().
+
+#define updateWithIndirection(info, p1, p2)				\
+  {									\
+    bdescr *bd;								\
+									\
+    LDV_recordDead_FILL_SLOP_DYNAMIC((p1));                             \
+    bd = Bdescr((P_)p1);						\
+    if (bd->gen_no == 0) {						\
+      ((StgInd *)p1)->indirectee = p2;					\
+      SET_INFO(p1,&stg_IND_info);					\
+      LDV_recordCreate((p1));                                           \
+      TICK_UPD_NEW_IND();						\
+    } else {								\
+      ((StgIndOldGen *)p1)->indirectee = p2;				\
+      if (info != &stg_BLACKHOLE_BQ_info) {				\
+        ACQUIRE_LOCK(&sm_mutex);					\
+        ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;	\
+        generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;    \
+        RELEASE_LOCK(&sm_mutex);					\
+      }									\
+      SET_INFO(p1,&stg_IND_OLDGEN_info);				\
+      LDV_recordCreate((p1));                                           \
+    }									\
+  }
+
 #else
 
 /* In the DEBUG case, we also zero out the slop of the old closure,
@@ -242,10 +283,17 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
   bdescr *bd;
 
   ASSERT( p1 != p2 && !closure_IND(p1) );
+
+  // @LDV profiling
+  // Destroy the old closure.
+  LDV_recordDead_FILL_SLOP_DYNAMIC(p1);
   bd = Bdescr((P_)p1);
   if (bd->gen_no == 0) {
     ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1,&stg_IND_PERM_info);
+    // @LDV profiling
+    // We have just created a new closure.
+    LDV_recordCreate(p1);
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
     ((StgIndOldGen *)p1)->indirectee = p2;
@@ -256,6 +304,9 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
       RELEASE_LOCK(&sm_mutex);
     }
     SET_INFO(p1,&stg_IND_OLDGEN_PERM_info);
+    // @LDV profiling
+    // We have just created a new closure.
+    LDV_recordCreate(p1);
     TICK_UPD_OLD_PERM_IND();
   }
 }

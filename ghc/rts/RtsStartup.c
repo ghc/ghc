@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.55 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.56 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -33,6 +33,7 @@
 #if defined(PROFILING) || defined(DEBUG)
 # include "Profiling.h"
 # include "ProfHeap.h"
+# include "RetainerProfile.h"
 #endif
 
 #if defined(GRAN)
@@ -84,7 +85,7 @@ getProgArgv(int *argc, char **argv[])
 void
 startupHaskell(int argc, char *argv[], void (*init_root)(void))
 {
-    /* To avoid repeated initialisations of the RTS */
+   /* To avoid repeated initialisations of the RTS */
    if (rts_has_started_up)
      return;
    else
@@ -218,13 +219,14 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 
 /* The init functions use an explicit stack... 
  */
-#define INIT_STACK_SIZE  (BLOCK_SIZE * 4)
+#define INIT_STACK_BLOCKS  4
 F_ *init_stack = NULL;
 nat init_sp = 0;
 
 static void
 initModules ( void (*init_root)(void) )
 {
+    bdescr *bd;
 #ifdef SMP
     Capability cap;
 #else
@@ -232,7 +234,8 @@ initModules ( void (*init_root)(void) )
 #endif
 
     init_sp = 0;
-    init_stack = (F_ *)allocate(INIT_STACK_SIZE / sizeof(W_));
+    bd = allocGroup(4);
+    init_stack = (F_ *)bd->start;
     init_stack[init_sp++] = (F_)stg_init_ret;
     init_stack[init_sp++] = (F_)__stginit_Prelude;
     if (init_root != NULL) {
@@ -241,6 +244,8 @@ initModules ( void (*init_root)(void) )
     
     cap.r.rSp = (P_)(init_stack + init_sp);
     StgRun((StgFunPtr)stg_init, &cap.r);
+
+    freeGroup(bd);
 }
 
 /* -----------------------------------------------------------------------------
@@ -271,6 +276,26 @@ shutdownHaskell(void)
 
   /* start timing the shutdown */
   stat_startExit();
+
+#ifdef PROFILING
+  // @LDV profiling
+  // 
+  // Note: 
+  //   We do not need to perform a major garbage collection because all the
+  //   closures created since the last census will not affect the profiling
+  //   statistics anyhow.
+  // 
+  // Note: 
+  //   We ignore any object created afterwards. 
+  //   finalizeWeakPointersNow() may corrupt the heap (because it executes 
+  //   rts_evalIO(), which adds an initial evaluation stack again).
+  //   Thus, we call LdvCensusKillAll() here, and prohibit LDV profiling
+  //   afterwards. 
+  //   Acutally, it is pointless to call LdvCensusKillAll() any later because
+  //   no object created later will be taken into account for profiling.
+  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) 
+    LdvCensusKillAll();
+#endif
 
 #if !defined(GRAN)
   /* Finalize any remaining weak pointers */
@@ -316,12 +341,19 @@ shutdownHaskell(void)
     }
 #endif
 
+#if defined(PROFILING) 
+  report_ccs_profiling();
+#endif
+
 #if defined(PROFILING) || defined(DEBUG)
   endProfiling();
 #endif
 
-#if defined(PROFILING) 
-  report_ccs_profiling();
+#ifdef PROFILING
+  // Originally, this was in report_ccs_profiling().  Now, retainer
+  // profiling might tack some extra stuff on to the end of this file
+  // during endProfiling().
+  fclose(prof_file);
 #endif
 
 #if defined(TICKY_TICKY)

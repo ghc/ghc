@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.24 2001/10/18 14:41:01 simonmar Exp $
+ * $Id: Profiling.c,v 1.25 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -19,6 +19,8 @@
 #include "Itimer.h"
 #include "ProfHeap.h"
 #include "Arena.h"
+#include "RetainerProfile.h"
+#include "LdvProfile.h"
 
 /*
  * Profiling allocation arena.
@@ -144,9 +146,6 @@ static  IndexTable *      AddToIndexTable ( IndexTable *, CostCentreStack *,
 
 
 
-#ifdef DEBUG
-static    void printCCS            ( CostCentreStack *ccs );
-#endif
 static    void initTimeProfiling   ( void );
 static    void initProfilingLogFile( void );
 
@@ -195,6 +194,15 @@ initProfiling1 (void)
   /* cost centres are registered by the per-module 
    * initialisation code now... 
    */
+
+  switch (RtsFlags.ProfFlags.doHeapProfile) {
+  case HEAP_BY_RETAINER:
+      initRetainerProfiling();
+      break;
+  case HEAP_BY_LDV:
+      initLdvProfiling();
+      break;
+  }
 }
 
 void
@@ -242,6 +250,13 @@ initProfilingLogFile(void)
     if ((prof_file = fopen(prof_filename, "w")) == NULL) {
 	fprintf(stderr, "Can't open profiling report file %s\n", prof_filename);
 	RtsFlags.CcFlags.doCostCentres = 0;
+        // @retainer profiling
+        // @LDV profiling
+        // The following line was added by Sung; retainer/LDV profiling may need
+        // two output files, i.e., <program>.prof/hp.
+        if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER ||
+            RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV)
+            RtsFlags.ProfFlags.doHeapProfile = 0;
 	return;
     }
 
@@ -328,7 +343,7 @@ PushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
 {
   IF_DEBUG(prof, 
 	   fprintf(stderr,"Pushing %s on ", cc->label);
-	   printCCS(ccs);
+	   fprintCCS(stderr,ccs);
 	   fprintf(stderr,"\n"));
   return PushCostCentre(ccs,cc);
 }
@@ -390,9 +405,9 @@ AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
   IF_DEBUG(prof, 
 	   if (ccs1 != ccs2) {
 	     fprintf(stderr,"Appending ");
-	     printCCS(ccs1);
+	     fprintCCS(stderr,ccs1);
 	     fprintf(stderr," to ");
-	     printCCS(ccs2);
+	     fprintCCS(stderr,ccs2);
 	     fprintf(stderr,"\n");});
   return AppendCCS(ccs1,ccs2);
 }
@@ -688,7 +703,11 @@ report_ccs_profiling( void )
     fprint_header();
     reportCCS(pruneCCSTree(CCS_MAIN), 0);
 
-    fclose(prof_file);
+    // @retainer profiling
+    // @LDV profiling
+    // Now, prof_file is closed in shutdownHaskell() because this file
+    // is also used for retainer/LDV profiling. See shutdownHaskell().
+    // fclose(prof_file);
 }
 
 static void 
@@ -862,39 +881,16 @@ reportCCS_XML(CostCentreStack *ccs)
 }
 
 void
-print_ccs (FILE *fp, CostCentreStack *ccs)
+fprintCCS( FILE *f, CostCentreStack *ccs )
 {
-  if (ccs == CCCS) {
-    fprintf(fp, "Cost-Centre Stack: ");
+  fprintf(f,"<");
+  for (; ccs && ccs != CCS_MAIN; ccs = ccs->prevStack ) {
+      fprintf(f,"%s.%s", ccs->cc->module, ccs->cc->label);
+      if (ccs->prevStack && ccs->prevStack != CCS_MAIN) {
+	  fprintf(f,",");
+      }
   }
-  
-  if (ccs != CCS_MAIN)
-    {
-      print_ccs(fp, ccs->prevStack);
-      fprintf(fp, "->[%s,%s]", ccs->cc->label, ccs->cc->module);
-    } else {
-      fprintf(fp, "[%s,%s]", ccs->cc->label, ccs->cc->module);
-    }
-
-  if (ccs == CCCS) {
-    fprintf(fp, "\n");
-  }
+  fprintf(f,">");
 }
-
-
-#ifdef DEBUG
-static void
-printCCS ( CostCentreStack *ccs )
-{
-  fprintf(stderr,"<");
-  for (; ccs; ccs = ccs->prevStack ) {
-    fprintf(stderr,ccs->cc->label);
-    if (ccs->prevStack) {
-      fprintf(stderr,",");
-    }
-  }
-  fprintf(stderr,">");
-}
-#endif
 
 #endif /* PROFILING */

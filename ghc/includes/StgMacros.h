@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.41 2001/11/08 16:37:54 simonmar Exp $
+ * $Id: StgMacros.h,v 1.42 2001/11/22 14:25:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -144,7 +144,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	    tag_assts						\
 	    (r) = (P_)ret;                                     	\
 	    JMP_(stg_chk_##layout);			   	\
-	}
+	}                                                       
 
 #define HP_STK_CHK(stk_headroom,hp_headroom,ret,r,layout,tag_assts) \
         DO_GRAN_ALLOCATE(hp_headroom)                              \
@@ -153,7 +153,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	    tag_assts						\
 	    (r) = (P_)ret;	                               	\
 	    JMP_(stg_chk_##layout);			   	\
-	}
+	}                                                       
 
 /* -----------------------------------------------------------------------------
    A Heap Check in a case alternative are much simpler: everything is
@@ -186,7 +186,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
             HpAlloc = (headroom);				\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);				\
-	}
+	}                                                       
 
 #define HP_CHK_SEQ_NP(headroom,ptrs,tag_assts)			\
         DO_GRAN_ALLOCATE(headroom)                              \
@@ -194,7 +194,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
             HpAlloc = (headroom);				\
             tag_assts						\
 	    JMP_(stg_gc_seq_##ptrs);				\
-	}
+	}                                                       
 
 #define HP_STK_CHK_NP(stk_headroom, hp_headroom, ptrs, tag_assts) \
         DO_GRAN_ALLOCATE(hp_headroom)                              \
@@ -202,7 +202,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
             HpAlloc = (hp_headroom);				\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);			   	\
-	}
+	}                                                       
 
 
 /* Heap checks for branches of a primitive case / unboxed tuple return */
@@ -214,7 +214,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
             HpAlloc = (headroom);				\
             tag_assts						\
 	    JMP_(lbl);						\
-	}
+	}                                                       
 
 #define HP_CHK_NOREGS(headroom,tag_assts) \
     GEN_HP_CHK_ALT(headroom,stg_gc_noregs,tag_assts);
@@ -298,7 +298,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	R9.w = (W_)LIVENESS_MASK(liveness);		\
         R10.w = (W_)reentry;				\
         JMP_(stg_gen_chk);				\
-   }
+    }                                                       
 
 #define HP_CHK_GEN_TICKY(headroom,liveness,reentry,tag_assts)	\
    HP_CHK_GEN(headroom,liveness,reentry,tag_assts);		\
@@ -435,12 +435,29 @@ EXTINFO_RTS(stg_gen_chk_info);
 	}							\
         SET_INFO(R1.cl,&stg_BLACKHOLE_info)
 #  else
+#   ifndef PROFILING
 #    define UPD_BH_UPDATABLE(info)		\
         TICK_UPD_BH_UPDATABLE();		\
         SET_INFO(R1.cl,&stg_BLACKHOLE_info)
 #    define UPD_BH_SINGLE_ENTRY(info)		\
         TICK_UPD_BH_SINGLE_ENTRY();		\
         SET_INFO(R1.cl,&stg_SE_BLACKHOLE_info)
+#   else
+// An object is replaced by a blackhole, so we fill the slop with zeros.
+// 
+// Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+// 
+#    define UPD_BH_UPDATABLE(info)		\
+        TICK_UPD_BH_UPDATABLE();		\
+        LDV_recordDead_FILL_SLOP_DYNAMIC(R1.cl);               \
+        SET_INFO(R1.cl,&stg_BLACKHOLE_info);    \
+        LDV_recordCreate(R1.cl)
+#    define UPD_BH_SINGLE_ENTRY(info)		\
+        TICK_UPD_BH_SINGLE_ENTRY();		\
+        LDV_recordDead_FILL_SLOP_DYNAMIC(R1.cl);               \
+        SET_INFO(R1.cl,&stg_SE_BLACKHOLE_info)  \
+        LDV_recordCreate(R1.cl)
+#   endif /* PROFILING */
 #  endif
 #else /* !EAGER_BLACKHOLING */
 #  define UPD_BH_UPDATABLE(thunk)    /* nothing */

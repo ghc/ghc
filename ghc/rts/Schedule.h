@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.24 2001/11/13 13:38:02 simonmar Exp $
+ * $Id: Schedule.h,v 1.25 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -92,6 +92,15 @@ void awaitEvent(rtsBool wait);  /* In Select.c */
  * Locks assumed   :  sched_mutex
  */
 rtsBool wakeUpSleepingThreads(nat);  /* In Select.c */
+
+/* GetRoots(evac_fn f)
+ *
+ * Call f() for each root known to the scheduler.
+ *
+ * Called from STG :  NO
+ * Locks assumed   :  ????
+ */
+void GetRoots(evac_fn);
 
 // ToDo: check whether all fcts below are used in the SMP version, too
 //@cindex awaken_blocked_queue

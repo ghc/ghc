@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.53 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: Storage.c,v 1.54 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,6 +22,8 @@
 #include "Storage.h"
 #include "Schedule.h"
 #include "StoragePriv.h"
+
+#include "RetainerProfile.h"	// for counting memory blocks (memInventory)
 
 StgClosure    *caf_list         = NULL;
 
@@ -62,23 +64,6 @@ initStorage( void )
   nat g, s;
   step *stp;
   generation *gen;
-
-  /* If we're doing heap profiling, we want a two-space heap with a
-   * fixed-size allocation area so that we get roughly even-spaced
-   * samples.
-   */
-
-  /* As an experiment, try a 2 generation collector
-   */
-
-#if defined(PROFILING) || defined(DEBUG)
-  if (RtsFlags.ProfFlags.doHeapProfile) {
-    RtsFlags.GcFlags.generations = 1;
-    RtsFlags.GcFlags.steps = 1;
-    RtsFlags.GcFlags.oldGenFactor = 0;
-    RtsFlags.GcFlags.heapSizeSuggestion = 0;
-  }
-#endif
 
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
       RtsFlags.GcFlags.heapSizeSuggestion > 
@@ -350,6 +335,20 @@ resetNurseries( void )
   }
 #else
   for (bd = g0s0->blocks; bd; bd = bd->link) {
+#ifdef PROFILING
+    // @LDV profiling
+    // Reset every word in the nursery to zero when doing LDV profiling.
+    // This relieves the mutator of the burden of zeroing every new closure,
+    // which is stored in the nursery.
+    // 
+    // Todo: make it more efficient, e.g. memcpy()
+    //
+    StgPtr p;
+    if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
+      for (p = bd->start; p < bd->start + BLOCK_SIZE_W; p++)
+        *p = 0;
+    }
+#endif
     bd->free = bd->start;
     ASSERT(bd->gen_no == 0);
     ASSERT(bd->step == g0s0);
@@ -370,6 +369,12 @@ allocNursery (bdescr *tail, nat blocks)
   // cons them on to the front of the list, not forgetting to update
   // the back pointer on the tail of the list to point to the new block.
   for (i=0; i < blocks; i++) {
+    // @LDV profiling
+    /*
+      processNursery() in LdvProfile.c assumes that every block group in
+      the nursery contains only a single block. So, if a block group is
+      given multiple blocks, change processNursery() accordingly.
+     */
     bd = allocBlock();
     bd->link = tail;
     // double-link the nursery: we might need to insert blocks
@@ -786,7 +791,14 @@ memInventory(void)
   for (bd = large_alloc_list; bd; bd = bd->link) {
     total_blocks += bd->blocks;
   }
-  
+
+#ifdef PROFILING
+  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
+    for (bd = firstStack; bd != NULL; bd = bd->link) 
+      total_blocks += bd->blocks;
+  }
+#endif
+
   // count the blocks allocated by the arena allocator
   total_blocks += arenaBlocks();
 

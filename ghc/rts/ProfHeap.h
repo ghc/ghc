@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.h,v 1.1 1999/09/15 13:46:29 simonmar Exp $
+ * $Id: ProfHeap.h,v 1.2 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -8,6 +8,7 @@
  * ---------------------------------------------------------------------------*/
 
 
-void heapCensus(void);
-extern nat initHeapProfiling(void);
-void endHeapProfiling(void);
+extern void    heapCensus( void );
+extern nat     initHeapProfiling( void );
+extern void    endHeapProfiling( void );
+extern rtsBool closureSatisfiesConstraints( StgClosure* p );

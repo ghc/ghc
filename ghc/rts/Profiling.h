@@ -1,5 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.h,v 1.2 2000/04/19 12:42:48 simonmar Exp $
+
+ * $Id: Profiling.h,v 1.3 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -29,5 +30,10 @@ void print_ccs (FILE *, CostCentreStack *);
 # define DEFAULT_INTERVAL TICK_FREQUENCY
 
 extern rtsBool time_profiling;
+
+extern lnat total_prof_ticks;
+
+extern void fprintCCS( FILE *f, CostCentreStack *ccs );
+
 
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.69 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.70 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -288,19 +288,18 @@ STGFUN(stg_BCO_entry) {
    Entry code for an indirection.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_IND_info,stg_IND_entry,1,0,IND,,EF_,0,0);
+INFO_TABLE(stg_IND_info,stg_IND_entry,1,0,IND,,EF_,"IND","IND");
 STGFUN(stg_IND_entry)
 {
     FB_
     TICK_ENT_IND(Node);	/* tick */
-
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
     JMP_(ENTRY_CODE(*R1.p));
     FE_
 }
 
-INFO_TABLE(stg_IND_STATIC_info,stg_IND_STATIC_entry,1,0,IND_STATIC,,EF_,0,0);
+INFO_TABLE(stg_IND_STATIC_info,stg_IND_STATIC_entry,1,0,IND_STATIC,,EF_,"IND_STATIC","IND_STATIC");
 STGFUN(stg_IND_STATIC_entry)
 {
     FB_
@@ -322,6 +321,8 @@ STGFUN(stg_IND_PERM_entry)
     /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than being extra  */
     TICK_ENT_PERM_IND(R1.p); /* tick */
 #endif
+
+    LDV_ENTER((StgInd *)R1.p);
 
     /* Enter PAP cost centre -- lexical scoping only */
     ENTER_CCS_PAP_CL(R1.cl);
@@ -353,19 +354,18 @@ STGFUN(stg_IND_PERM_entry)
     FE_
 }  
 
-INFO_TABLE(stg_IND_OLDGEN_info,stg_IND_OLDGEN_entry,1,1,IND_OLDGEN,,EF_,0,0);
+INFO_TABLE(stg_IND_OLDGEN_info,stg_IND_OLDGEN_entry,1,1,IND_OLDGEN,,EF_,"IND_OLDGEN","IND_OLDGEN");
 STGFUN(stg_IND_OLDGEN_entry)
 {
     FB_
     TICK_ENT_IND(Node);	/* tick */
-  
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
     JMP_(ENTRY_CODE(*R1.p));
     FE_
 }
 
-INFO_TABLE(stg_IND_OLDGEN_PERM_info,stg_IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PERM,,EF_,0,0);
+INFO_TABLE(stg_IND_OLDGEN_PERM_info,stg_IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PERM,,EF_,"IND_OLDGEN_PERM","IND_OLDGEN_PERM");
 STGFUN(stg_IND_OLDGEN_PERM_entry)
 {
     FB_
@@ -375,7 +375,9 @@ STGFUN(stg_IND_OLDGEN_PERM_entry)
     /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than being extra  */
     TICK_ENT_PERM_IND(R1.p); /* tick */
 #endif
-  
+
+    LDV_ENTER((StgInd *)R1.p);
+
     /* Enter PAP cost centre -- lexical scoping only */
     ENTER_CCS_PAP_CL(R1.cl);
 
@@ -433,7 +435,10 @@ STGFUN(stg_BLACKHOLE_entry)
 #endif
     TICK_ENT_BH();
 
-    // Put ourselves on the blocking queue for this black hole
+    // Actually this is not necessary because R1.p is about to be destroyed.
+    LDV_ENTER((StgClosure *)R1.p);
+
+    /* Put ourselves on the blocking queue for this black hole */
 #if defined(GRAN) || defined(PAR)
     // in fact, only difference is the type of the end-of-queue marker!
     CurrentTSO->link = END_BQ_QUEUE;
@@ -446,8 +451,19 @@ STGFUN(stg_BLACKHOLE_entry)
     CurrentTSO->why_blocked = BlockedOnBlackHole;
     CurrentTSO->block_info.closure = R1.cl;
 
-    // Change the CAF_BLACKHOLE into a BLACKHOLE_BQ_STATIC
+    /* Change the BLACKHOLE into a BLACKHOLE_BQ */
+#ifdef PROFILING
+
+    // The size remains the same, so we call LDV_recordDead() - no need to fill slop.
+    LDV_recordDead((StgClosure *)R1.p, BLACKHOLE_sizeW());
+#endif
+    // 
+    // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+    // 
     ((StgBlockingQueue *)R1.p)->header.info = &stg_BLACKHOLE_BQ_info;
+#ifdef PROFILING
+    LDV_recordCreate((StgClosure *)R1.p);
+#endif
 
     // closure is mutable since something has just been added to its BQ
     recordMutable((StgMutClosure *)R1.cl);
@@ -483,6 +499,7 @@ STGFUN(stg_BLACKHOLE_BQ_entry)
 #endif
 
     TICK_ENT_BH();
+    LDV_ENTER((StgClosure *)R1.p);
 
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
@@ -515,7 +532,7 @@ STGFUN(stg_BLACKHOLE_BQ_entry)
 
 #if defined(PAR) || defined(GRAN)
 
-INFO_TABLE(stg_RBH_info, stg_RBH_entry,1,1,RBH,,EF_,0,0);
+INFO_TABLE(stg_RBH_info, stg_RBH_entry,1,1,RBH,,EF_,"RBH","RBH");
 STGFUN(stg_RBH_entry)
 {
   FB_
@@ -539,13 +556,13 @@ STGFUN(stg_RBH_entry)
   FE_
 }
 
-INFO_TABLE(stg_RBH_Save_0_info, stg_RBH_Save_0_entry,0,2,CONSTR,,EF_,0,0);
+INFO_TABLE(stg_RBH_Save_0_info, stg_RBH_Save_0_entry,0,2,CONSTR,,EF_,"RBH_Save_0","RBH_Save_0");
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_0);
 
-INFO_TABLE(stg_RBH_Save_1_info, stg_RBH_Save_1_entry,1,1,CONSTR,,EF_,0,0);
+INFO_TABLE(stg_RBH_Save_1_info, stg_RBH_Save_1_entry,1,1,CONSTR,,EF_,"RBH_Save_1","RBH_Save_1");
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_1);
 
-INFO_TABLE(stg_RBH_Save_2_info, stg_RBH_Save_2_entry,2,0,CONSTR,,EF_,0,0);
+INFO_TABLE(stg_RBH_Save_2_info, stg_RBH_Save_2_entry,2,0,CONSTR,,EF_,"RBH_Save_2","RBH_Save_2");
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_2);
 #endif /* defined(PAR) || defined(GRAN) */
 
@@ -574,6 +591,7 @@ STGFUN(stg_CAF_BLACKHOLE_entry)
 #endif
 
     TICK_ENT_BH();
+    LDV_ENTER((StgClosure *)R1.p);
 
     // Put ourselves on the blocking queue for this black hole
 #if defined(GRAN) || defined(PAR)
@@ -602,7 +620,7 @@ STGFUN(stg_CAF_BLACKHOLE_entry)
 }
 
 #ifdef TICKY_TICKY
-INFO_TABLE(stg_SE_BLACKHOLE_info, stg_SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,,EF_,0,0);
+INFO_TABLE(stg_SE_BLACKHOLE_info, stg_SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,,EF_,"SE_BLACKHOLE","SE_BLACKHOLE");
 STGFUN(stg_SE_BLACKHOLE_entry)
 {
   FB_
@@ -611,7 +629,7 @@ STGFUN(stg_SE_BLACKHOLE_entry)
   FE_
 }
 
-INFO_TABLE(SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,EF_,0,0);
+INFO_TABLE(SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,EF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
 STGFUN(stg_SE_CAF_BLACKHOLE_entry)
 {
   FB_
@@ -622,7 +640,7 @@ STGFUN(stg_SE_CAF_BLACKHOLE_entry)
 #endif
 
 #ifdef SMP
-INFO_TABLE(stg_WHITEHOLE_info, stg_WHITEHOLE_entry,0,2,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE(stg_WHITEHOLE_info, stg_WHITEHOLE_entry,0,2,CONSTR_NOCAF_STATIC,,EF_,"WHITEHOLE","WHITEHOLE");
 STGFUN(stg_WHITEHOLE_entry)
 {
   FB_
@@ -645,7 +663,7 @@ NON_ENTERABLE_ENTRY_CODE(TSO);
    one is a real bug.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_EVACUATED_info,stg_EVACUATED_entry,1,0,EVACUATED,,EF_,0,0);
+INFO_TABLE(stg_EVACUATED_info,stg_EVACUATED_entry,1,0,EVACUATED,,EF_,"EVACUATED","EVACUATED");
 NON_ENTERABLE_ENTRY_CODE(EVACUATED);
 
 /* -----------------------------------------------------------------------------
@@ -659,7 +677,19 @@ NON_ENTERABLE_ENTRY_CODE(EVACUATED);
 INFO_TABLE(stg_WEAK_info,stg_WEAK_entry,0,4,WEAK,,EF_,"WEAK","WEAK");
 NON_ENTERABLE_ENTRY_CODE(WEAK);
 
-INFO_TABLE_CONSTR(stg_DEAD_WEAK_info,stg_DEAD_WEAK_entry,0,1,0,CONSTR,,EF_,"DEAD_WEAK","DEAD_WEAK");
+// XXX! The garbage collector replaces a WEAK with a DEAD_WEAK
+// in-place, which causes problems if the heap is scanned linearly
+// after GC (certain kinds of profiling do this).  So when profiling,
+// we set the size of a DEAD_WEAK to 4 non-pointers, rather than its
+// usual 1.
+
+#ifdef PROFILING
+#define DEAD_WEAK_PAYLOAD_WORDS 4
+#else
+#define DEAD_WEAK_PAYLOAD_WORDS 1
+#endif
+
+INFO_TABLE_CONSTR(stg_DEAD_WEAK_info,stg_DEAD_WEAK_entry,0,DEAD_WEAK_PAYLOAD_WORDS,0,CONSTR,,EF_,"DEAD_WEAK","DEAD_WEAK");
 NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 
 /* -----------------------------------------------------------------------------
@@ -669,7 +699,7 @@ NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
    finalizer in a weak pointer object.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_NO_FINALIZER_info,stg_NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(stg_NO_FINALIZER_info,stg_NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,"NO_FINALIZER","NO_FINALIZER");
 NON_ENTERABLE_ENTRY_CODE(NO_FINALIZER);
 
 SET_STATIC_HDR(stg_NO_FINALIZER_closure,stg_NO_FINALIZER_info,0/*CC*/,,EI_)
@@ -709,7 +739,7 @@ NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
    end of a linked TSO queue.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_END_TSO_QUEUE_info,stg_END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(stg_END_TSO_QUEUE_info,stg_END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,"END_TSO_QUEUE","END_TSO_QUEUE");
 NON_ENTERABLE_ENTRY_CODE(END_TSO_QUEUE);
 
 SET_STATIC_HDR(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE_info,0/*CC*/,,EI_)
@@ -723,26 +753,26 @@ SET_STATIC_HDR(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE_info,0/*CC*/,,EI_)
    an END_MUT_LIST closure.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_END_MUT_LIST_info,stg_END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(stg_END_MUT_LIST_info,stg_END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,"END_MUT_LIST","END_MUT_LIST");
 NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
 
 SET_STATIC_HDR(stg_END_MUT_LIST_closure,stg_END_MUT_LIST_info,0/*CC*/,,EI_)
 , /*payload*/{} };
 
-INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 1, 1, MUT_CONS, , EF_, 0, 0);
+INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 1, 1, MUT_CONS, , EF_, "MUT_CONS", "MUT_CONS");
 NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
 
 /* -----------------------------------------------------------------------------
    Exception lists
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_END_EXCEPTION_LIST_info,stg_END_EXCEPTION_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(stg_END_EXCEPTION_LIST_info,stg_END_EXCEPTION_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,"END_EXCEPTION_LIST","END_EXCEPTION_LIST");
 NON_ENTERABLE_ENTRY_CODE(END_EXCEPTION_LIST);
 
 SET_STATIC_HDR(stg_END_EXCEPTION_LIST_closure,stg_END_EXCEPTION_LIST_info,0/*CC*/,,EI_)
 , /*payload*/{} };
 
-INFO_TABLE(stg_EXCEPTION_CONS_info, stg_EXCEPTION_CONS_entry, 1, 1, CONSTR, , EF_, 0, 0);
+INFO_TABLE(stg_EXCEPTION_CONS_info, stg_EXCEPTION_CONS_entry, 1, 1, CONSTR, , EF_, "EXCEPTION_CONS", "EXCEPTION_CONS");
 NON_ENTERABLE_ENTRY_CODE(EXCEPTION_CONS);
 
 /* -----------------------------------------------------------------------------
@@ -804,7 +834,7 @@ STGFUN(stg_error_entry)							\
    just enter the top stack word to start the thread.  (see deleteThread)
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_dummy_ret_info, stg_dummy_ret_entry, 0, 0, CONSTR_NOCAF_STATIC, , EF_, 0, 0);
+INFO_TABLE(stg_dummy_ret_info, stg_dummy_ret_entry, 0, 0, CONSTR_NOCAF_STATIC, , EF_, "DUMMY_RET", "DUMMY_RET");
 STGFUN(stg_dummy_ret_entry)
 {
   W_ ret_addr;
@@ -855,7 +885,7 @@ STGFUN(stg_forceIO_ret_entry)
 }
 #endif
 
-INFO_TABLE(stg_forceIO_info,stg_forceIO_entry,1,0,FUN_STATIC,,EF_,0,0);
+INFO_TABLE(stg_forceIO_info,stg_forceIO_entry,1,0,FUN_STATIC,,EF_,"FORCE_IO","FORCE_IO");
 FN_(stg_forceIO_entry)
 {
   FB_

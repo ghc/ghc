@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.25 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: Updates.h,v 1.26 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -178,7 +178,9 @@ extern void awakenBlockedQueue(StgTSO *q);
    ------------------------------------------------------------------------- */
 
 #if defined(PROFILING)
-#define PUSH_STD_CCCS(frame) frame->header.prof.ccs = CCCS
+// frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0) is unnecessary 
+// because it is not used anyhow.
+#define PUSH_STD_CCCS(frame) (frame->header.prof.ccs = CCCS)
 #else
 #define PUSH_STD_CCCS(frame)
 #endif

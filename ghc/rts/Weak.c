@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.18 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Weak.c,v 1.19 2001/11/22 14:25:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -36,6 +36,15 @@ finalizeWeakPointersNow(void)
   while ((w = weak_ptr_list)) {
     weak_ptr_list = w->link;
     if (w->header.info != &stg_DEAD_WEAK_info) {
+        // @LDV profiling
+        // Even thought the info type of w changes, we DO NOT perform any
+        // LDV profiling because at this moment, LDV profiling must already
+        // have been terminated. See the comments in shutdownHaskell().
+        // At any rate, there is no need to call LDV_recordDead() because
+        // weak pointers are inherently used.
+#ifdef PROFILING
+        ASSERT(ldvTime == 0);   // LDV profiling is turned off.
+#endif
 	w->header.info = &stg_DEAD_WEAK_info;
 	IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
 	if (w->finalizer != &stg_NO_FINALIZER_closure) {
@@ -85,7 +94,17 @@ scheduleFinalizers(StgWeak *list)
 	    arr->payload[n] = w->finalizer;
 	    n++;
 	}
-	w->header.info = &stg_DEAD_WEAK_info;
+
+#ifdef PROFILING
+        // A weak pointer is inherently used, so we do not need to call
+        // LDV_recordDead().
+	//
+        // Furthermore, when PROFILING is turned on, dead weak
+        // pointers are exactly as large as weak pointers, so there is
+        // no need to fill the slop, either.  See stg_DEAD_WEAK_info
+        // in StgMiscClosures.hc.
+#endif
+	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
 
     t = createIOThread(RtsFlags.GcFlags.initialStkSize, 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.13 2001/10/18 13:46:47 simonmar Exp $
+ * $Id: StgProf.h,v 1.14 2001/11/22 14:25:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -348,9 +348,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 
 #define ENTER_CCS_PAP_CL(closure)  \
         ENTER_CCS_PAP((closure)->header.prof.ccs)
-
- /* temp EW */
-#define STATIC_CCS_REF(ccs) (ccs)
 
 /* -----------------------------------------------------------------------------
    When not profiling, these macros do nothing...

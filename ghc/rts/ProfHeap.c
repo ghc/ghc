@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.25 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: ProfHeap.c,v 1.26 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -25,6 +25,8 @@
 #include "Stats.h"
 #include "Hash.h"
 #include "StrHash.h"
+#include "RetainerProfile.h"
+#include "LdvProfile.h"
 
 #ifdef DEBUG_HEAP_PROF
 #include "Printer.h"
@@ -95,7 +97,7 @@ strToCtr(const char *str)
 	for (; ctr != NULL; prev = ctr, ctr = ctr->next_bucket ) {
 	    if (!strcmp(ctr->str, str)) {
 		insertHashTable( str_to_ctr, (W_)str, ctr );
-#ifdef DEBUG
+#ifdef DEBUG_CTR
 		fprintf(stderr,"strToCtr: existing ctr for `%s'\n",str);
 #endif
 		return ctr;
@@ -109,7 +111,7 @@ strToCtr(const char *str)
 	ctr->next = all_ctrs;
 	all_ctrs = ctr;
 
-#ifdef DEBUG
+#ifdef DEBUG_CTR
 	fprintf(stderr,"strToCtr: new ctr for `%s'\n",str);
 #endif
 
@@ -175,23 +177,17 @@ initHeapProfiling(void)
 
     fprintf(hp_file, "JOB \"%s", prog_argv[0]);
 
-#   ifdef PROFILING
-    switch (RtsFlags.ProfFlags.doHeapProfile) {
-       case HEAP_BY_CCS:   fprintf(hp_file, " -h%c", CCchar); break;
-       case HEAP_BY_MOD:   fprintf(hp_file, " -h%c", MODchar); break;
-       case HEAP_BY_DESCR: fprintf(hp_file, " -h%c", DESCRchar); break;
-       case HEAP_BY_TYPE:  fprintf(hp_file, " -h%c", TYPEchar); break;
-       default: /* nothing */
+#ifdef PROFILING
+    {
+	int count;
+	for(count = 1; count < prog_argc; count++)
+	    fprintf(hp_file, " %s", prog_argv[count]);
+	fprintf(hp_file, " +RTS ");
+	for(count = 0; count < rts_argc; count++)
+	    fprintf(hp_file, "%s ", rts_argv[count]);
+	fprintf(hp_file, "\n");
     }
-    if (RtsFlags.ProfFlags.ccSelector)
-       fprintf(hp_file, " -hc{%s}", RtsFlags.ProfFlags.ccSelector);
-    if (RtsFlags.ProfFlags.modSelector)
-       fprintf(hp_file, " -hm{%s}", RtsFlags.ProfFlags.modSelector);
-    if (RtsFlags.ProfFlags.descrSelector)
-       fprintf(hp_file, " -hd{%s}", RtsFlags.ProfFlags.descrSelector);
-    if (RtsFlags.ProfFlags.typeSelector)
-       fprintf(hp_file, " -hy{%s}", RtsFlags.ProfFlags.typeSelector);
-#   endif /* PROFILING */
+#endif /* PROFILING */
 
     fprintf(hp_file, "\"\n" );
 
@@ -223,6 +219,17 @@ endHeapProfiling(void)
     if (! RtsFlags.ProfFlags.doHeapProfile) {
         return;
     }
+
+#ifdef PROFILING
+    switch (RtsFlags.ProfFlags.doHeapProfile) {
+    case HEAP_BY_RETAINER:
+	endRetainerProfiling();
+	break;
+    case HEAP_BY_LDV:
+	endLdvProfiling();
+	break;
+    }
+#endif
 
     seconds = mut_user_time();
     fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", seconds);
@@ -417,24 +424,48 @@ clearCCSResid(CostCentreStack *ccs)
 }
 
 static void
-fprint_ccs(FILE *fp, CostCentreStack *ccs, nat components)
+fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 {
-  CostCentre *cc;
-  CostCentreStack *prev;
+    char buf[max_length+1];
+    nat next_offset = 0;
+    nat written;
+    char *template;
 
-  cc = ccs->cc;
-  prev = ccs->prevStack;
+    // MAIN on its own gets printed as "MAIN", otherwise we ignore MAIN.
+    if (ccs == CCS_MAIN) {
+	fprintf(fp, "MAIN");
+	return;
+    }
 
-  if (prev == NULL
-      || prev->cc->is_caf != CC_IS_BORING
-      || components == 1) { 
-    fprintf(fp,"%s",cc->label);
-    return; 
+    // keep printing components of the stack until we run out of space
+    // in the buffer.  If we run out of space, end with "...".
+    for (; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack) {
 
-  } else {
-    fprint_ccs(fp, ccs->prevStack,components-1);
-    fprintf(fp,"/%s",cc->label);
-  }
+	// CAF cost centres print as M.CAF, but we leave the module
+	// name out of all the others to save space.
+	if (!strcmp(ccs->cc->label,"CAF")) {
+	    written = snprintf(buf+next_offset, 
+			       (int)max_length-3-(int)next_offset,
+			       "%s.CAF", ccs->cc->module);
+	} else {
+	    if (ccs->prevStack != NULL && ccs->prevStack != CCS_MAIN) {
+		template = "%s/";
+	    } else {
+		template = "%s";
+	    }
+	    written = snprintf(buf+next_offset, 
+			       (int)max_length-3-(int)next_offset,
+			       template, ccs->cc->label);
+	}
+
+	if (next_offset+written >= max_length-4) {
+	    sprintf(buf+max_length-4, "...");
+	    break;
+	} else {
+	    next_offset += written;
+	}
+    }
+    fprintf(fp, "%s", buf);
 }
 
 static void
@@ -444,7 +475,8 @@ reportCCSResid(FILE *fp, CostCentreStack *ccs)
 
   if (ccs->mem_resid != 0) {
     fprintf(fp,"   ");
-    fprint_ccs(fp,ccs,2/*print 2 components only*/);
+    // print as much of the CCS as possible in 20 chars, ending with "..."
+    fprint_ccs(fp,ccs,30);
     fprintf(fp," %ld\n", ccs->mem_resid * sizeof(W_));
   }
 
@@ -455,75 +487,190 @@ reportCCSResid(FILE *fp, CostCentreStack *ccs)
   }
 }
 
-static
-rtsBool str_matches_selector ( char* str, char* sel )
+static rtsBool
+str_matches_selector( char* str, char* sel )
 {
    char* p;
-   /* fprintf(stderr, "str_matches_selector %s %s\n", str, sel); */
+   // fprintf(stderr, "str_matches_selector %s %s\n", str, sel);
    while (1) {
-      /* Compare str against wherever we've got to in sel. */
-      p = str;
-      while (*p != '\0' && *sel != ',' && *sel != '\0' && *p == *sel) {
-         p++; sel++;
-      }
-      /* Match if all of str used and have reached the end of a sel
-         fragment. */
-      if (*p == '\0' && (*sel == ',' || *sel == '\0'))
-         return rtsTrue;
-
-      /* No match.  Advance sel to the start of the next elem. */
-      while (*sel != ',' && *sel != '\0') sel++;
-      if (*sel == ',') sel++;
-
-      /* Run out of sel ?? */
-      if (*sel == '\0') return rtsFalse;
+       // Compare str against wherever we've got to in sel.
+       p = str;
+       while (*p != '\0' && *sel != ',' && *sel != '\0' && *p == *sel) {
+	   p++; sel++;
+       }
+       // Match if all of str used and have reached the end of a sel fragment.
+       if (*p == '\0' && (*sel == ',' || *sel == '\0'))
+	   return rtsTrue;
+       
+       // No match.  Advance sel to the start of the next elem.
+       while (*sel != ',' && *sel != '\0') sel++;
+       if (*sel == ',') sel++;
+       
+       /* Run out of sel ?? */
+       if (*sel == '\0') return rtsFalse;
    }
 }
 
-/* Figure out whether a closure should be counted in this census, by
-   testing against all the specified constraints. */
-static
-rtsBool satisfies_constraints ( StgClosure* p )
+// Figure out whether a closure should be counted in this census, by
+// testing against all the specified constraints.
+rtsBool
+closureSatisfiesConstraints( StgClosure* p )
 {
    rtsBool b;
    if (RtsFlags.ProfFlags.modSelector) {
-      b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->module,
-                                RtsFlags.ProfFlags.modSelector );
-      if (!b) return rtsFalse;
+       b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->module,
+				 RtsFlags.ProfFlags.modSelector );
+       if (!b) return rtsFalse;
    }
    if (RtsFlags.ProfFlags.descrSelector) {
-      b = str_matches_selector( (get_itbl((StgClosure *)p))->prof.closure_desc,
-                                RtsFlags.ProfFlags.descrSelector );
-      if (!b) return rtsFalse;
+       b = str_matches_selector( (get_itbl((StgClosure *)p))->prof.closure_desc,
+				 RtsFlags.ProfFlags.descrSelector );
+       if (!b) return rtsFalse;
    }
    if (RtsFlags.ProfFlags.typeSelector) {
-      b = str_matches_selector( (get_itbl((StgClosure *)p))->prof.closure_type,
+       b = str_matches_selector( (get_itbl((StgClosure *)p))->prof.closure_type,
                                 RtsFlags.ProfFlags.typeSelector );
-      if (!b) return rtsFalse;
+       if (!b) return rtsFalse;
    }
    if (RtsFlags.ProfFlags.ccSelector) {
-      b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->label,
-                                RtsFlags.ProfFlags.ccSelector );
-      if (!b) return rtsFalse;
+       b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->label,
+				 RtsFlags.ProfFlags.ccSelector );
+       if (!b) return rtsFalse;
    }
    return rtsTrue;
 }
 #endif /* PROFILING */
 
+/* -----------------------------------------------------------------------------
+ * Code to perform a heap census.
+ * -------------------------------------------------------------------------- */
+static void
+heapCensusChain( bdescr *bd )
+{
+    StgPtr p;
+    StgInfoTable *info;
+    nat size;
+#ifdef PROFILING
+    nat real_size;
+#endif
 
-static double time_of_last_heapCensus = 0.0;
+    for (; bd != NULL; bd = bd->link) {
+	p = bd->start;
+	while (p < bd->free) {
+	    info = get_itbl((StgClosure *)p);
+	    
+	    switch (info->type) {
+
+	    case CONSTR:
+	    case BCO:
+	    case FUN:
+	    case THUNK:
+	    case IND_PERM:
+	    case IND_OLDGEN_PERM:
+	    case CAF_BLACKHOLE:
+	    case SE_CAF_BLACKHOLE:
+	    case SE_BLACKHOLE:
+	    case BLACKHOLE:
+	    case BLACKHOLE_BQ:
+	    case WEAK:
+	    case FOREIGN:
+	    case STABLE_NAME:
+	    case MVAR:
+	    case MUT_VAR:
+	    case MUT_CONS:
+	    case CONSTR_INTLIKE:
+	    case CONSTR_CHARLIKE:
+	    case FUN_1_0:
+	    case FUN_0_1:
+	    case FUN_1_1:
+	    case FUN_0_2:
+	    case FUN_2_0:
+	    case THUNK_1_1:
+	    case THUNK_0_2:
+	    case THUNK_2_0:
+	    case CONSTR_1_0:
+	    case CONSTR_0_1:
+	    case CONSTR_1_1:
+	    case CONSTR_0_2:
+	    case CONSTR_2_0:
+		size = sizeW_fromITBL(info);
+		break;
+		
+	    case THUNK_1_0:		/* ToDo - shouldn't be here */
+	    case THUNK_0_1:		/* "  ditto  " */
+	    case THUNK_SELECTOR:
+		size = sizeofW(StgHeader) + MIN_UPD_SIZE;
+		break;
+
+	    case PAP:
+	    case AP_UPD:
+		size = pap_sizeW((StgPAP *)p);
+		break;
+		
+	    case ARR_WORDS:
+		size = arr_words_sizeW(stgCast(StgArrWords*,p));
+		break;
+		
+	    case MUT_ARR_PTRS:
+	    case MUT_ARR_PTRS_FROZEN:
+		size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
+		break;
+		
+	    case TSO:
+		size = tso_sizeW((StgTSO *)p);
+		break;
+		
+	    default:
+		barf("heapCensus");
+	    }
+	    
+#ifdef DEBUG_HEAP_PROF
+	    switch (RtsFlags.ProfFlags.doHeapProfile) {
+	    case HEAP_BY_INFOPTR:
+		add_data((void *)(*p), size * sizeof(W_));
+		break;
+	    case HEAP_BY_CLOSURE_TYPE:
+		closure_types[info->type] += size * sizeof(W_);
+		break;
+	    }
+#endif
+	    
+#ifdef PROFILING
+	    // subtract the profiling overhead
+	    real_size = size - sizeofW(StgProfHeader);
+
+	    if (closureSatisfiesConstraints((StgClosure*)p)) {
+		switch (RtsFlags.ProfFlags.doHeapProfile) {
+		case HEAP_BY_CCS:
+		    ((StgClosure *)p)->header.prof.ccs->mem_resid += real_size;
+		    break;
+		case HEAP_BY_MOD:
+		    strToCtr(((StgClosure *)p)->header.prof.ccs->cc->module)
+			->mem_resid += real_size;
+		    break;
+		case HEAP_BY_DESCR:
+		    strToCtr(get_itbl(((StgClosure *)p))->prof.closure_desc)->mem_resid 
+			+= real_size;
+		    break;
+		case HEAP_BY_TYPE:
+		    strToCtr(get_itbl(((StgClosure *)p))->prof.closure_type)->mem_resid
+			+= real_size;
+		    break;
+		default:
+		    barf("heapCensus; doHeapProfile");
+		}
+	    }
+#endif
+	    p += size;
+	}
+    }
+}
 
 void
-heapCensus(void)
+heapCensus( void )
 {
-  bdescr *bd;
-  const StgInfoTable *info;
   StgDouble time;
-  nat size;
-  StgPtr p;
-#ifdef PROFILING
-  nat elapsed;
-#endif
+  nat g, s;
     
 #ifdef DEBUG_HEAP_PROF
   switch (RtsFlags.ProfFlags.doHeapProfile) {
@@ -540,21 +687,6 @@ heapCensus(void)
     return;
   }
 #endif
-
-#ifdef PROFILING
-  /*
-   * We only continue iff we've waited long enough,
-   * otherwise, we just dont do the census.
-   */
-
-  time = mut_user_time_during_GC();  
-  elapsed = (time - time_of_last_heapCensus) * 1000;
-  if (elapsed < RtsFlags.ProfFlags.profileFrequency) {
-      return;
-    }
-  time_of_last_heapCensus = time;
-#endif
-
 
 #ifdef PROFILING
   switch (RtsFlags.ProfFlags.doHeapProfile) {
@@ -574,136 +706,27 @@ heapCensus(void)
   }
 #endif
 
-  /* Only do heap profiling in a two-space heap */
-  ASSERT(RtsFlags.GcFlags.generations == 1);
-  bd = g0s0->to_blocks;
-
+  time = mut_user_time_during_GC();  
   fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", time);
-  
-  while (bd != NULL) {
-    p = bd->start;
-    while (p < bd->free) {
-      info = get_itbl((StgClosure *)p);
 
-      switch (info->type) {
-	
-      case CONSTR:
-	if (((StgClosure *)p)->header.info == &stg_DEAD_WEAK_info
-	    && !(LOOKS_LIKE_GHC_INFO(*(p + sizeW_fromITBL(info))))) {
-	    size = sizeofW(StgWeak);
-	    break;
-	}
-	/* else, fall through... */
-
-      case BCO:
-      case FUN:
-      case THUNK:
-      case IND_PERM:
-      case IND_OLDGEN_PERM:
-      case CAF_BLACKHOLE:
-      case SE_CAF_BLACKHOLE:
-      case SE_BLACKHOLE:
-      case BLACKHOLE:
-      case BLACKHOLE_BQ:
-      case WEAK:
-      case FOREIGN:
-      case STABLE_NAME:
-      case MVAR:
-      case MUT_VAR:
-      case CONSTR_INTLIKE:
-      case CONSTR_CHARLIKE:
-      case FUN_1_0:
-      case FUN_0_1:
-      case FUN_1_1:
-      case FUN_0_2:
-      case FUN_2_0:
-      case THUNK_1_1:
-      case THUNK_0_2:
-      case THUNK_2_0:
-      case CONSTR_1_0:
-      case CONSTR_0_1:
-      case CONSTR_1_1:
-      case CONSTR_0_2:
-      case CONSTR_2_0:
-	size = sizeW_fromITBL(info);
-	break;
-	
-      case THUNK_1_0:		/* ToDo - shouldn't be here */
-      case THUNK_0_1:		/* "  ditto  " */
-      case THUNK_SELECTOR:
-	size = sizeofW(StgHeader) + MIN_UPD_SIZE;
-	break;
-	
-      case AP_UPD: /* we can treat this as being the same as a PAP */
-      case PAP:
-	size = pap_sizeW((StgPAP *)p);
-	break;
-	
-      case ARR_WORDS:
-	size = arr_words_sizeW(stgCast(StgArrWords*,p));
-	break;
-	
-      case MUT_ARR_PTRS:
-      case MUT_ARR_PTRS_FROZEN:
-	size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
-	break;
-	
-      case TSO:
-	size = tso_sizeW((StgTSO *)p);
-	break;
-	
-      default:
-	barf("heapCensus");
+  if (RtsFlags.GcFlags.generations == 1) {
+      heapCensusChain( g0s0->to_blocks );
+  } else {
+      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	  for (s = 0; s < generations[g].n_steps; s++) {
+	      heapCensusChain( generations[g].steps[s].blocks );
+	  }
       }
-
-#ifdef DEBUG_HEAP_PROF
-      switch (RtsFlags.ProfFlags.doHeapProfile) {
-      case HEAP_BY_INFOPTR:
-	add_data((void *)(*p), size * sizeof(W_));
-	break;
-      case HEAP_BY_CLOSURE_TYPE:
-	closure_types[info->type] += size * sizeof(W_);
-	break;
-      }
-#endif
-
-#     ifdef PROFILING
-      if (satisfies_constraints((StgClosure*)p)) {
-         switch (RtsFlags.ProfFlags.doHeapProfile) {
-            case HEAP_BY_CCS:
-	       ((StgClosure *)p)->header.prof.ccs->mem_resid += size;
-               break;
-            case HEAP_BY_MOD:
-               strToCtr(((StgClosure *)p)->header.prof.ccs->cc->module)
-                  ->mem_resid += size;
-               break;
-            case HEAP_BY_DESCR:
-               strToCtr(get_itbl(((StgClosure *)p))->prof.closure_desc)->mem_resid 
-                  += size;
-               break;
-            case HEAP_BY_TYPE:
-               strToCtr(get_itbl(((StgClosure *)p))->prof.closure_type)->mem_resid
-                  += size;
-               break;
-            default:
-               barf("heapCensus; doHeapProfile");
-         }
-      }
-#     endif
-
-      p += size;
-    }
-    bd = bd->link;
   }
 
 #ifdef DEBUG_HEAP_PROF
   switch (RtsFlags.ProfFlags.doHeapProfile) {
   case HEAP_BY_INFOPTR:
-    fprint_data(hp_file);
-    break;
+      fprint_data(hp_file);
+      break;
   case HEAP_BY_CLOSURE_TYPE:
-    fprint_closure_types(hp_file);
-    break;
+      fprint_closure_types(hp_file);
+      break;
   }
 #endif
     

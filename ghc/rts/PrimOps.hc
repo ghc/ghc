@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.84 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.85 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -420,7 +420,25 @@ FN_(finalizzeWeakzh_fast)
   }
 
   /* kill it */
+#ifdef PROFILING
+  // @LDV profiling
+  // A weak pointer is inherently used, so we do not need to call
+  // LDV_recordDead_FILL_SLOP_DYNAMIC():
+  //    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)w);
+  // or, LDV_recordDead():
+  //    LDV_recordDead((StgClosure *)w, sizeofW(StgWeak) - sizeofW(StgProfHeader));
+  // Furthermore, when PROFILING is turned on, dead weak pointers are exactly as 
+  // large as weak pointers, so there is no need to fill the slop, either.
+  // See stg_DEAD_WEAK_info in StgMiscClosures.hc.
+#endif
+  //
+  // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+  //
   w->header.info = &stg_DEAD_WEAK_info;
+#ifdef PROFILING
+  // @LDV profiling
+  LDV_recordCreate((StgClosure *)w);
+#endif
   f = ((StgWeak *)w)->finalizer;
   w->link = ((StgWeak *)w)->link;
 

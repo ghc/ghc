@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.126 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: GC.c,v 1.127 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -41,6 +41,9 @@
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
 #endif
+
+#include "RetainerProfile.h"
+#include "LdvProfile.h"
 
 /* STATIC OBJECT LIST.
  *
@@ -602,6 +605,13 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       }
   }
 
+#ifdef PROFILING
+  // We call processHeapClosureForDead() on every closure destroyed during
+  // the current garbage collection, so we invoke LdvCensusForDead().
+  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV)
+    LdvCensusForDead(N);
+#endif
+
   // NO MORE EVACUATION AFTER THIS POINT!
   // Finally: compaction of the oldest generation.
   if (major_gc && oldest_gen->steps[0].is_compacted) {
@@ -933,6 +943,12 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   if (major_gc) { gcCAFs(); }
 #endif
   
+#ifdef PROFILING
+  // resetStaticObjectForRetainerProfiling() must be called before
+  // zeroing below.
+  resetStaticObjectForRetainerProfiling();
+#endif
+
   // zero the scavenged static object list 
   if (major_gc) {
     zero_static_object_list(scavenged_static_objects);
@@ -963,7 +979,6 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
   // restore enclosing cost centre 
 #ifdef PROFILING
-  heapCensus();
   CCCS = prev_CCS;
 #endif
 
@@ -1271,6 +1286,10 @@ static __inline__ StgClosure *
 copy(StgClosure *src, nat size, step *stp)
 {
   P_ to, from, dest;
+#ifdef PROFILING
+  // @LDV profiling
+  nat size_org = size;
+#endif
 
   TICK_GC_WORDS_COPIED(size);
   /* Find out where we're going, using the handy "to" pointer in 
@@ -1300,6 +1319,12 @@ copy(StgClosure *src, nat size, step *stp)
   dest = stp->hp;
   stp->hp = to;
   upd_evacuee(src,(StgClosure *)dest);
+#ifdef PROFILING
+  // @LDV profiling
+  // We store the size of the just evacuated object in the LDV word so that
+  // the profiler can guess the position of the next object later.
+  SET_EVACUAEE_FOR_LDV(src, size_org);
+#endif
   return (StgClosure *)dest;
 }
 
@@ -1309,10 +1334,14 @@ copy(StgClosure *src, nat size, step *stp)
  */
 
 
-static __inline__ StgClosure *
+static StgClosure *
 copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 {
   P_ dest, to, from;
+#ifdef PROFILING
+  // @LDV profiling
+  nat size_to_copy_org = size_to_copy;
+#endif
 
   TICK_GC_WORDS_COPIED(size_to_copy);
   if (stp->gen_no < evac_gen) {
@@ -1334,6 +1363,17 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
   dest = stp->hp;
   stp->hp += size_to_reserve;
   upd_evacuee(src,(StgClosure *)dest);
+#ifdef PROFILING
+  // @LDV profiling
+  // We store the size of the just evacuated object in the LDV word so that
+  // the profiler can guess the position of the next object later.
+  // size_to_copy_org is wrong because the closure already occupies size_to_reserve
+  // words.
+  SET_EVACUAEE_FOR_LDV(src, size_to_reserve);
+  // fill the slop
+  if (size_to_reserve - size_to_copy_org > 0)
+    FILL_SLOP(stp->hp - 1, (int)(size_to_reserve - size_to_copy_org)); 
+#endif
   return (StgClosure *)dest;
 }
 
@@ -2162,9 +2202,23 @@ scavenge(step *stp)
     }
 
     case IND_PERM:
-	if (stp->gen_no != 0) {
-	    SET_INFO(((StgClosure *)p), &stg_IND_OLDGEN_PERM_info);
-	}
+      if (stp->gen->no != 0) {
+#ifdef PROFILING
+        // @LDV profiling
+        // No need to call LDV_recordDead_FILL_SLOP_DYNAMIC() because an 
+        // IND_OLDGEN_PERM closure is larger than an IND_PERM closure.
+        LDV_recordDead((StgClosure *)p, sizeofW(StgInd));
+#endif        
+        // 
+        // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+        //
+	SET_INFO(((StgClosure *)p), &stg_IND_OLDGEN_PERM_info);
+#ifdef PROFILING
+        // @LDV profiling
+        // We pretend that p has just been created.
+        LDV_recordCreate((StgClosure *)p);
+#endif
+      }
 	// fall through 
     case IND_OLDGEN_PERM:
 	((StgIndOldGen *)p)->indirectee = 
@@ -3590,7 +3644,17 @@ threadLazyBlackHole(StgTSO *tso)
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
         belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
+#ifdef PROFILING
+        // @LDV profiling
+        // We pretend that bh is now dead.
+        LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
+#endif
 	SET_INFO(bh,&stg_BLACKHOLE_info);
+#ifdef PROFILING
+        // @LDV profiling
+        // We pretend that bh has just been created.
+        LDV_recordCreate(bh);
+#endif
       }
 
       update_frame = update_frame->link;
@@ -3832,7 +3896,20 @@ threadSqueezeStack(StgTSO *tso)
 	      }
 	  }
 #endif
+#ifdef PROFILING
+          // @LDV profiling
+          // We pretend that bh is now dead.
+          LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
+#endif
+          // 
+          // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+          // 
 	  SET_INFO(bh,&stg_BLACKHOLE_info);
+#ifdef PROFILING
+          // @LDV profiling
+          // We pretend that bh has just been created.
+          LDV_recordCreate(bh);
+#endif
 	}
       }
 

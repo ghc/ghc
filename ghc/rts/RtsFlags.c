@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.51 2001/10/01 11:36:28 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.52 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -250,12 +250,13 @@ void initRtsFlagsDefaults(void)
 
 #ifdef PROFILING
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
-    RtsFlags.ProfFlags.profileFrequency   = 20;
+    RtsFlags.ProfFlags.profileInterval    = 20;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
     RtsFlags.ProfFlags.modSelector        = NULL;
     RtsFlags.ProfFlags.descrSelector      = NULL;
     RtsFlags.ProfFlags.typeSelector       = NULL;
     RtsFlags.ProfFlags.ccSelector         = NULL;
+
 #elif defined(DEBUG)
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
 #endif
@@ -417,6 +418,8 @@ usage_text[] = {
 "  -h<break-down> Heap residency profile (text) (output file <program>.prof)",
 "     break-down: C = cost centre stack (default), M = module",
 "                 D = closure description, Y = type description",
+"  -hR            Retainer profile (output files <program>.hp)",
+"  -hL            Lag/Drag/Void/Use profile (output files <program>.hp)",
 "  A subset of closures may be selected thusly:",
 "    -hc{cc, cc ...} specific cost centre(s) (NOT STACKS!)",
 "    -hm{mod,mod...} all cost centres from the specified modules(s)",
@@ -838,18 +841,53 @@ error = rtsTrue;
 		PROFILING_BUILD_ONLY(
 		switch (rts_argv[arg][2]) {
 		  case '\0':
-		  case CCchar:
-		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
-		    break;
-		  case MODchar:
-		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
-		    break;
-		  case DESCRchar:
-		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
-		    break;
-		  case TYPEchar:
-		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
-		    break;
+		  case 'C':
+		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
+			  break;
+		      } else {
+			  goto many_hps;
+		      }
+		  case 'M':
+		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
+			  break;
+		      } else {
+			  goto many_hps;
+		      }
+		  case 'D':
+		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
+			  break;
+		      } else {
+			  goto many_hps;
+		      }
+		  case 'Y':
+		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
+			  break;
+		      } else {
+			  goto many_hps;
+		      }
+		  case 'R':
+		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_RETAINER;
+			  break;
+		      } else {
+			  goto many_hps;
+		      }
+		  case 'L':
+		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_LDV;
+			  break;
+		      } else {
+			  goto many_hps;
+		      }
+		many_hps:
+		      prog_belch("multiple heap profile options");
+		      error = rtsTrue;
+		      break;
+		      
                   case 'c': /* cost centre label select */
                   case 'm': /* cost centre module select */
                   case 'd': /* closure descr select */
@@ -904,11 +942,9 @@ error = rtsTrue;
 		    if (cst != 0 && cst < CS_MIN_MILLISECS)
 			cst = CS_MIN_MILLISECS;
 
-		    RtsFlags.ProfFlags.profileFrequency = cst;
+		    RtsFlags.ProfFlags.profileInterval = cst;
 		}
-		
 		break;
-
 #endif
 
 	      /* =========== CONCURRENT ========================= */

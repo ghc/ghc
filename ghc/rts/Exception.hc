@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.21 2001/08/17 14:44:54 simonmar Exp $
+ * $Id: Exception.hc,v 1.22 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -260,8 +260,8 @@ CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_5_entry,RET_VEC(Sp[SP_OFF],5));
 CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_6_entry,RET_VEC(Sp[SP_OFF],6));
 CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_entry,RET_VEC(Sp[SP_OFF],7));
 
-#ifdef PROFILING
-#define CATCH_FRAME_BITMAP 7
+#if defined(PROFILING)
+#define CATCH_FRAME_BITMAP 15
 #else
 #define CATCH_FRAME_BITMAP 3
 #endif
@@ -355,7 +355,7 @@ FN_(raisezh_fast)
      * the info was only displayed for an *uncaught* exception.
      */
     if (RtsFlags.ProfFlags.showCCSOnException) {
-      STGCALL2(print_ccs,stderr,CCCS);
+      STGCALL2(fprintCCS,stderr,CCCS);
     }
 #endif
 
@@ -365,8 +365,18 @@ FN_(raisezh_fast)
      * is the exception raise.  It is used to overwrite all the
      * thunks which are currently under evaluataion.
      */
+    /*    
+    // @LDV profiling
+    // stg_raise_info has THUNK as its closure type. Since a THUNK takes at least
+    // MIN_UPD_SIZE words in its payload, MIN_UPD_SIZE is more approprate than 1.
+    // It seems that 1 does not cause any problem unless profiling is performed.
+    // However, when LDV profiling goes on, we need to linearly scan small object pool,
+    // where raise_closure is stored, so we should use MIN_UPD_SIZE.
     raise_closure = (StgClosure *)RET_STGCALL1(P_,allocate,
 					       sizeofW(StgClosure)+1);
+     */
+    raise_closure = (StgClosure *)RET_STGCALL1(P_,allocate,
+					       sizeofW(StgClosure)+MIN_UPD_SIZE);
     SET_HDR(raise_closure, &stg_raise_info, CCCS);
     raise_closure->payload[0] = R1.cl;
 

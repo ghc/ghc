@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.h,v 1.8 2001/11/21 20:55:10 sof Exp $
+ * $Id: Itimer.h,v 1.9 2001/11/22 14:25:12 simonmar Exp $
  *
- * (c) The GHC Team 1998-1999
+ * (c) The GHC Team 1998-2001
  *
  * Interval timer for profiling and pre-emptive scheduling.
  *
@@ -15,11 +15,6 @@
  */
 #define CS_MIN_MILLISECS TICK_MILLISECS       /* milliseconds per slice */
  
-extern rtsBool do_prof_ticks;	/* profiling ticks on/off */
-
-/* Total number of ticks since startup */
-extern lnat total_ticks;
-
 int  initialize_virtual_timer  ( nat ms );
 int  install_vtalrm_handler    ( void );
 void block_vtalrm_signal       ( void );

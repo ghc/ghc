@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.25 2001/11/21 20:55:10 sof Exp $
+ * $Id: Itimer.c,v 1.26 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -142,6 +142,8 @@ initialize_virtual_timer(nat ms)
     }
   }
 
+  initProfTimer();
+
   return 0;
 }
  
@@ -157,6 +159,10 @@ initialize_virtual_timer(nat ms)
     struct itimerval it;
 
     timestamp = getourtimeofday();
+
+#ifdef PROFILING
+    initProfTimer();
+#endif
 
     it.it_value.tv_sec = ms / 1000;
     it.it_value.tv_usec = 1000 * (ms - (1000 * it.it_value.tv_sec));
@@ -177,6 +183,8 @@ initialize_virtual_timer(nat ms)
     timer_t tid;
 
     timestamp = getourtimeofday();
+
+    initProfTimer();
 
     se.sigev_notify = SIGEV_SIGNAL;
     se.sigev_signo = SIGVTALRM;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.35 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: Updates.hc,v 1.36 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -117,8 +117,8 @@ UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_7_entry,RET_VEC(Sp[0],7));
   return size!
   */
 
-#ifdef PROFILING
-#define UPD_FRAME_BITMAP 3
+#if defined(PROFILING)
+#define UPD_FRAME_BITMAP 7
 #else
 #define UPD_FRAME_BITMAP 1
 #endif
@@ -207,6 +207,7 @@ STGFUN(stg_PAP_entry)
   Sp -= Words;
 
   TICK_ENT_PAP(pap);
+  LDV_ENTER(pap);
 
   /* Enter PAP cost centre -- lexical scoping only */
   ENTER_CCS_PAP_CL(pap);
@@ -286,6 +287,14 @@ EXTFUN(__stg_update_PAP)
 	 * such as removing the update frame.
 	 */
 	if ((Hp += PapSize) > HpLim) {
+#ifdef PROFILING
+          // @LDV profiling
+          // Not filling the slop for the object (because there is none), but
+          // filling in the trailing words in the current block.
+          // This is unnecessary because we fills the entire nursery with
+          // zeroes after each garbage collection.
+          // FILL_SLOP(HpLim, PapSize - (Hp - HpLim));
+#endif
 	  Sp -= 1;
 	  Sp[0] = (W_)Fun;	    
 	  JMP_(stg_gc_entertop);
@@ -351,7 +360,7 @@ EXTFUN(__stg_update_PAP)
       
       Updatee = Su->updatee; 
 
-#if defined(PROFILING)
+#if defined(PROFILING) 
       if (Words != 0) {
         UPD_IND(Updatee,PapClosure);
 	TICK_UPD_PAP_IN_NEW(Words+1);
@@ -436,6 +445,7 @@ STGFUN(stg_AP_UPD_entry)
   Sp -= sizeofW(StgUpdateFrame) + Words;
 
   TICK_ENT_AP_UPD(ap);
+  LDV_ENTER(ap);
 
   /* Enter PAP cost centre -- lexical scoping only */
   ENTER_CCS_PAP_CL(ap);   /* ToDo: ENTER_CC_AP_UPD_CL */

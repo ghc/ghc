@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.16 2001/09/04 18:29:21 ken Exp $
+ * $Id: StgStartup.hc,v 1.17 2001/11/22 14:25:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -45,8 +45,8 @@
 
 EXTFUN(stg_stop_thread_entry);
 
-#ifdef PROFILING
-#define STOP_THREAD_BITMAP 1
+#if defined(PROFILING)
+#define STOP_THREAD_BITMAP 3
 #else
 #define STOP_THREAD_BITMAP 0
 #endif
