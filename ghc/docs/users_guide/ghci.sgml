@@ -1109,8 +1109,31 @@ Prelude> :set -fno-glasgow-exts
 	  properly with GHC's concurrency model.</para>
 	</listitem>
       </varlistentry>
-    </variablelist>
 
+      <varlistentry>
+	<term>After using <literal>getContents</literal>, I can't use
+	<literal>stdin</literal> again until I do
+	<literal>:load</literal> or <literal>:reload</literal>.</term>
+
+	<listitem>
+	  <para>This is the defined behaviour of
+	  <literal>getContents</literal>: it puts the stdin Handle in
+	  a state known as <firstterm>semi-closed</firstterm>, wherein
+	  any further I/O operations on it are forbidden.  Because I/O
+	  state is retained between computations, the semi-closed
+	  state persists until the next <literal>:load</literal> or
+	  <literal>:reload</literal> command.</para>
+
+	  <para>You can make <literal>stdin</literal> reset itself
+	  after every evaluation by giving GHCi the command
+	  <literal>:set +r</literal>.  This works because
+	  <literal>stdin</literal> is just a top-level expression that
+	  can be reverted to its unevaluated state in the same way as
+	  any other top-level expression (CAF).</para>
+	</listitem>
+      </varlistentry>
+
+    </variablelist>
   </sect1>
 
 </chapter>
