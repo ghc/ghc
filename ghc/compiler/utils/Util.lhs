@@ -792,7 +792,8 @@ Module names:
 
 \begin{code}
 looksLikeModuleName [] = False
-looksLikeModuleName (c:cs) = isUpper c && all isAlphaNumEx cs
-
-isAlphaNumEx c = isAlphaNum c || c == '_' || c == '.'
+looksLikeModuleName (c:cs) = isUpper c && go cs
+  where go [] = True
+	go ('.':cs) = looksLikeModuleName cs
+	go (c:cs)   = (isAlphaNum c || c == '_') && go cs
 \end{code}

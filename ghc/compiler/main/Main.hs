@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.117 2002/12/19 09:37:32 simonmar Exp $
+-- $Id: Main.hs,v 1.118 2003/01/09 10:49:21 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -334,7 +334,23 @@ beginMake fileish_args  = do
 		    when (failed ok_flag) (exitWith (ExitFailure 1))
 		    return ()
   where
-    looks_like_an_input m = haskellish_src_file m || '.' `notElem` m
+    {-
+      The following things should be considered compilation manager inputs:
+
+       - haskell source files (strings ending in .hs, .lhs or other 
+         haskellish extension),
+
+       - module names (not forgetting hierarchical module names),
+
+       - and finally we consider everything not containing a '.' to be
+         a comp manager input, as shorthand for a .hs or .lhs filename.
+
+      Everything else is considered to be a linker object, and passed
+      straight through to the linker.
+    -}
+    looks_like_an_input m =  haskellish_src_file m 
+			  || looksLikeModuleName m
+			  || '.' `notElem` m
 
 
 beginInteractive :: [String] -> IO ()
