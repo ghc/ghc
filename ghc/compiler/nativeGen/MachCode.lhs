@@ -23,11 +23,13 @@ import qualified MachRegs (Addr(..))
 #define MachRegsAddr MachRegs.Addr
 #define MachRegsAddrRegImm MachRegs.AddrRegImm
 #define MachRegsAddrRegReg MachRegs.AddrRegReg
+#define MachRegsImmAddr    MachRegs.ImmAddr
 #else
 import MachRegs
 #define MachRegsAddr Addr
 #define MachRegsAddrRegImm AddrRegImm
 #define MachRegsAddrRegReg AddrRegReg
+#define MachRegsImmAddr    ImmAddr
 #endif
 
 import AbsCSyn		( MagicId )
@@ -1133,7 +1135,7 @@ getAmode (StPrim IntAddOp [x, StInt i])
   = let
 	code = mkSeqInstrs []
     in
-    returnUs (Amode (ImmAddr imm__2 (fromInteger i)) code)
+    returnUs (Amode (MachRegsImmAddr imm__2 (fromInteger i)) code)
   where
     imm    = maybeImm x
     imm__2 = case imm of Just x -> x
@@ -1167,7 +1169,7 @@ getAmode leaf
   = let
 	code = mkSeqInstrs []
     in
-    returnUs (Amode (ImmAddr imm__2 0) code)
+    returnUs (Amode (MachRegsImmAddr imm__2 0) code)
   where
     imm    = maybeImm leaf
     imm__2 = case imm of Just x -> x
