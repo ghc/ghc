@@ -613,6 +613,27 @@ setCurrentDirectory path = do
        throwErrnoIfMinus1Retry_ "setCurrentDirectory" (c_chdir s)
 	-- ToDo: add path to error
 
+{- | Returns the current user's home directory.
+
+The directory returned is expected to be writable by the current user,
+but note that it isn't generally considered good practice to store
+application-specific data here; use 'getAppUserDataDirectory'
+instead.
+
+On Unix, 'getHomeDirectory' returns the value of the @HOME@
+environment variable.  On Windows, the system is queried for a
+suitable path; a typical path might be 
+@C:/Documents And Settings/user@.
+
+The operation may fail with:
+
+* 'UnsupportedOperation'
+The operating system has no notion of home directory.
+
+* 'isDoesNotExistError'
+The home directory for the current user does not exist, or
+cannot be found.
+-}
 getHomeDirectory :: IO FilePath
 getHomeDirectory =
 #ifdef mingw32_TARGET_OS
@@ -626,6 +647,33 @@ getHomeDirectory =
   getEnv "HOME"
 #endif
 
+{- | Returns the pathname of a directory in which application-specific
+data for the current user can be stored.  The result of
+'getAppUserDataDirectory' for a given application is specific to
+the current user.
+
+The argument should be the name of the application, which will be used
+to construct the pathname (so avoid using unusual characters that
+might result in an invalid pathname).
+
+Note: the directory may not actually exist, and may need to be created
+first.  It is expected that the parent directory exists and is
+writable.
+
+On Unix, this function returns @$HOME\/.appName@.  On Windows, a
+typical path might be 
+
+> C:/Documents And Settings/user/Application Data/appName
+
+The operation may fail with:
+
+* 'UnsupportedOperation'
+The operating system has no notion of application-specific data directory.
+
+* 'isDoesNotExistError'
+The home directory for the current user does not exist, or
+cannot be found.
+-}
 getAppUserDataDirectory :: String -> IO FilePath
 getAppUserDataDirectory appName = do
 #ifdef mingw32_TARGET_OS
