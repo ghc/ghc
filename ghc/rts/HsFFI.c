@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2002
+ * (c) The GHC Team, 2005
  *
  * RTS entry points as mandated by the FFI addendum to the Haskell 98 report
  *
@@ -14,8 +14,7 @@
 void
 hs_set_argv(int argc, char *argv[])
 {
-    prog_argc = argc;
-    prog_argv = argv;
+    setProgArgv(argc,argv);
 }
 
 void

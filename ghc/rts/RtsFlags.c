@@ -499,21 +499,8 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     rtsBool error = rtsFalse;
     I_ mode;
     I_ arg, total_arg;
-    char *last_slash;
 
-    /* Remove directory from argv[0] -- default files in current directory */
-    if ((last_slash = (char *) strrchr(argv[0], 
-#if !defined(mingw32_HOST_OS)
-				       '/')
-#else
-				       '\\')
-#endif
-				       ) != NULL) {
-	prog_name = last_slash+1;
-    } else {
-	prog_name = argv[0];
-    }
-
+    setProgName (argv);
     total_arg = *argc;
     arg = 1;
 
@@ -2190,4 +2177,49 @@ bad_option(const char *s)
 {
   errorBelch("bad RTS option: %s", s);
   stg_exit(EXIT_FAILURE);
+}
+
+/* -----------------------------------------------------------------------------
+   Getting/Setting the program's arguments.
+
+   These are used by System.Environment, and parts of the RTS.
+   -------------------------------------------------------------------------- */
+
+void
+setProgName(char *argv[])
+{
+    char *last_slash;
+
+    /* Remove directory from argv[0] -- default files in current directory */
+    if ((last_slash = (char *) strrchr(argv[0], 
+#if !defined(mingw32_HOST_OS)
+				       '/'
+#else
+				       '\\'
+#endif
+				       )) != NULL) {
+	prog_name = last_slash+1;
+   } else {
+	prog_name = argv[0];
+   }
+}
+
+void
+getProgArgv(int *argc, char **argv[])
+{
+    if (argc) { *argc = prog_argc; }
+    if (argv) { *argv = prog_argv; }
+}
+
+void
+setProgArgv(int argc, char *argv[])
+{
+   /* Usually this is done by startupHaskell, so we don't need to call this. 
+      However, sometimes Hugs wants to change the arguments which Haskell
+      getArgs >>= ... will be fed.  So you can do that by calling here
+      _after_ calling startupHaskell.
+   */
+   prog_argc = argc;
+   prog_argv = argv;
+   setProgName(prog_argv);
 }

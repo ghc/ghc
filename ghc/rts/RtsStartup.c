@@ -159,8 +159,7 @@ hs_init(int *argc, char **argv[])
     /* Parse the flags, separating the RTS flags from the programs args */
     if (argc != NULL && argv != NULL) {
 	setupRtsFlags(argc, *argv, &rts_argc, rts_argv);
-	prog_argc = *argc;
-	prog_argv = *argv;
+	setProgArgv(*argc,*argv);
     }
 
 #if defined(PAR)
@@ -248,31 +247,6 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
     hs_add_root(init_root);
 }
 
-
-/* -----------------------------------------------------------------------------
-   Getting/Setting the program's arguments.
-
-   These are used by System.Environment.
-   -------------------------------------------------------------------------- */
-
-void
-getProgArgv(int *argc, char **argv[])
-{
-    if (argc) { *argc = prog_argc; }
-    if (argv) { *argv = prog_argv; }
-}
-
-void
-setProgArgv(int argc, char *argv[])
-{
-   /* Usually this is done by startupHaskell, so we don't need to call this. 
-      However, sometimes Hugs wants to change the arguments which Haskell
-      getArgs >>= ... will be fed.  So you can do that by calling here
-      _after_ calling startupHaskell.
-   */
-   prog_argc = argc;
-   prog_argv = argv;
-}
 
 /* -----------------------------------------------------------------------------
    Per-module initialisation
