@@ -18,6 +18,7 @@ import HsTypes		( getTyVarName )
 import RdrHsSyn
 import RnHsSyn
 import HsCore
+import CmdLineOpts	( opt_IgnoreIfacePragmas )
 
 import RnBinds		( rnTopBinds, rnMethodBinds )
 import RnEnv		( bindTyVarsRn, lookupRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
@@ -25,7 +26,7 @@ import RnEnv		( bindTyVarsRn, lookupRn, lookupOccRn, lookupImplicitOccRn, bindLo
 			  listType_RDR, tupleType_RDR )
 import RnMonad
 
-import Name		( Name, isLocallyDefined, isTvOcc, pprNonSym,
+import Name		( Name, isLocallyDefined, occNameString,
 			  Provenance,
 			  SYN_IE(NameSet), unionNameSets, emptyNameSet, mkNameSet, unitNameSet,
 			  elemNameSet
@@ -35,6 +36,7 @@ import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
 import Id		( GenId{-instance NamedThing-} )
 import IdInfo		( IdInfo, StrictnessInfo(..), FBTypeInfo, DemandInfo, ArgUsageInfo )
 import SpecEnv		( SpecEnv )
+import Lex		( isLexCon )
 import CoreUnfold	( Unfolding(..), SimpleUnfolding )
 import MagicUFs		( MagicUnfoldingFun )
 import PrelInfo		( derivingOccurrences, evalClass_RDR, numClass_RDR )
@@ -84,7 +86,14 @@ rnDecl (SigD (IfaceSig name ty id_infos loc))
   = pushSrcLocRn loc $
     lookupRn name		`thenRn` \ name' ->
     rnHsType ty			`thenRn` \ ty' ->
-    mapRn rnIdInfo id_infos	`thenRn` \ id_infos' -> 
+
+	-- Get the pragma info, unless we should ignore it
+    (if opt_IgnoreIfacePragmas then
+	returnRn []
+     else
+	mapRn rnIdInfo id_infos
+    )				`thenRn` \ id_infos' -> 
+
     returnRn (SigD (IfaceSig name' ty' id_infos' loc))
 \end{code}
 
@@ -284,6 +293,7 @@ rnConDecl :: RdrNameConDecl -> RnMS s RenamedConDecl
 
 rnConDecl (ConDecl name tys src_loc)
   = pushSrcLocRn src_loc $
+    checkConName name		`thenRn_` 
     lookupRn name		`thenRn` \ new_name ->
     mapRn rnBangTy tys		`thenRn` \ new_tys  ->
     returnRn (ConDecl new_name new_tys src_loc)
@@ -297,6 +307,7 @@ rnConDecl (ConOpDecl ty1 op ty2 src_loc)
 
 rnConDecl (NewConDecl name ty src_loc)
   = pushSrcLocRn src_loc $
+    checkConName name		`thenRn_` 
     lookupRn name		`thenRn` \ new_name ->
     rnHsType ty			`thenRn` \ new_ty  ->
     returnRn (NewConDecl new_name new_ty src_loc)
@@ -319,6 +330,20 @@ rnBangTy (Banged ty)
 rnBangTy (Unbanged ty)
   = rnHsType ty `thenRn` \ new_ty ->
     returnRn (Unbanged new_ty)
+
+-- This data decl will parse OK
+--	data T = a Int
+-- treating "a" as the constructor.
+-- It is really hard to make the parser spot this malformation.
+-- So the renamer has to check that the constructor is legal
+--
+-- We can get an operator as the constructor, even in the prefix form:
+--	data T = :% Int Int
+-- from interface files, which always print in prefix form
+
+checkConName name
+  = checkRn (isLexCon (occNameString (rdrNameOcc name)))
+	    (badDataCon name)
 \end{code}
 
 
@@ -362,10 +387,10 @@ rnHsType (MonoTupleTy _ tys)
     mapRn rnHsType tys					`thenRn` \ tys' ->
     returnRn (MonoTupleTy tycon_name tys')
 
-rnHsType (MonoTyApp name tys)
-  = lookupOccRn name		`thenRn` \ name' ->
-    mapRn rnHsType tys		`thenRn` \ tys' ->
-    returnRn (MonoTyApp name' tys')
+rnHsType (MonoTyApp ty1 ty2)
+  = rnHsType ty1		`thenRn` \ ty1' ->
+    rnHsType ty2		`thenRn` \ ty2' ->
+    returnRn (MonoTyApp ty1' ty2')
 
 rnHsType (MonoDictTy clas ty)
   = lookupOccRn clas		`thenRn` \ clas' ->
@@ -583,6 +608,9 @@ classTyVarInOpCtxtErr clas_tyvar sig sty
 dupClassAssertWarn ctxt dups sty
   = ppHang (ppBesides [ppStr "Duplicate class assertion `", ppr sty dups, ppStr "' in context:"])
 	 4 (ppr sty ctxt)
+
+badDataCon name sty
+   = ppCat [ppStr "Illegal data constructor name:", ppr sty name]
 \end{code}
 
 

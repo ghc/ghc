@@ -34,6 +34,7 @@ data Demand
 			-- calling-convention magic)
 
   | WwUnpack		-- Argument is strict & a single-constructor
+	Bool		-- True <=> wrapper unpacks it; False <=> doesn't
 	[Demand]	-- type; its constituent parts (whose StrictInfos
 			-- are in the list) should be passed
 			-- as arguments to the worker.
@@ -53,7 +54,7 @@ type MaybeAbsent = Bool -- True <=> not even used
 -- versions that don't worry about Absence:
 wwLazy	    = WwLazy 	  False
 wwStrict    = WwStrict
-wwUnpack xs = WwUnpack xs
+wwUnpack xs = WwUnpack False xs
 wwPrim	    = WwPrim
 wwEnum	    = WwEnum
 \end{code}
@@ -69,7 +70,7 @@ wwEnum	    = WwEnum
 isStrict :: Demand -> Bool
 
 isStrict WwStrict	= True
-isStrict (WwUnpack _)	= True
+isStrict (WwUnpack _ _)	= True
 isStrict WwPrim		= True
 isStrict WwEnum		= True
 isStrict _		= False
@@ -97,24 +98,30 @@ instance Text Demand where
 	read_em acc ('E' : xs)	= read_em (WwEnum : acc) xs
 
 	read_em acc (')' : xs)	= [(reverse acc, xs)]
-	read_em acc ( 'U'  : '(' : xs)
-	  = case (read_em [] xs) of
-	      [(stuff, rest)] -> read_em (WwUnpack stuff : acc) rest
-	      _ -> panic ("Text.Demand:"++str++"::"++xs)
+	read_em acc ( 'U'  : '(' : xs) = do_unpack True  acc xs
+	read_em acc ( 'u'  : '(' : xs) = do_unpack False acc xs
 
 	read_em acc rest	= [(reverse acc, rest)]
+
+	do_unpack wrapper_unpacks acc xs
+	  = case (read_em [] xs) of
+	      [(stuff, rest)] -> read_em (WwUnpack wrapper_unpacks stuff : acc) rest
+	      _ -> panic ("Text.Demand:"++str++"::"++xs)
+
 
 #ifdef REALLY_HASKELL_1_3
 instance Show Demand where
 #endif
     showList wrap_args rest = foldr show1 rest wrap_args
       where
-	show1 (WwLazy False)  rest = 'L' : rest
-	show1 (WwLazy True)   rest = 'A' : rest
-	show1 WwStrict	      rest = 'S' : rest
-	show1 WwPrim	      rest = 'P' : rest
-	show1 WwEnum	      rest = 'E' : rest
-	show1 (WwUnpack args) rest = "U(" ++ showList args (')' : rest)
+	show1 (WwLazy False)  	 rest = 'L' : rest
+	show1 (WwLazy True)   	 rest = 'A' : rest
+	show1 WwStrict	      	 rest = 'S' : rest
+	show1 WwPrim	      	 rest = 'P' : rest
+	show1 WwEnum	      	 rest = 'E' : rest
+	show1 (WwUnpack wu args) rest = ch ++ "(" ++ showList args (')' : rest)
+				      where
+					ch = if wu then "U" else "u"
 
 instance Outputable Demand where
     ppr sty si = ppStr (showList [si] "")

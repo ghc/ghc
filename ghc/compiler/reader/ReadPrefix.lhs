@@ -154,7 +154,7 @@ rdModule
 	add_sig (BindWith b ss) s = BindWith b (s:ss)
 	add_sig _		_ = panic "rdModule:add_sig"
 
-	io_ty t = MonoTyApp (Unqual (TCOcc t)) [MonoTupleTy dummyRdrTcName []]
+	io_ty t = MonoTyApp (MonoTyVar (Unqual (TCOcc t))) (MonoTupleTy dummyRdrTcName [])
 \end{code}
 
 %************************************************************************
@@ -661,7 +661,7 @@ wlk_sig_thing (U_dspec_uprag itycon dspec_tys srcline)
   = mkSrcLocUgn srcline		 	 $ \ src_loc ->
     wlkTCId	itycon		 `thenUgn` \ tycon   ->
     wlkList rdMonoType dspec_tys `thenUgn` \ tys     ->
-    returnUgn (RdrSpecDataSig (SpecDataSig tycon (MonoTyApp tycon tys) src_loc))
+    returnUgn (RdrSpecDataSig (SpecDataSig tycon (foldl MonoTyApp (MonoTyVar tycon) tys) src_loc))
 
 	-- value inlining user-pragma
 wlk_sig_thing (U_inline_uprag ivar srcline)
@@ -717,27 +717,12 @@ wlkMonoType ttype
 
       U_tname tcon -> -- type constructor
 	wlkTCId tcon	`thenUgn` \ tycon ->
-	returnUgn (MonoTyApp tycon [])
+	returnUgn (MonoTyVar tycon)
 
       U_tapp t1 t2 ->
+	wlkMonoType t1		`thenUgn` \ ty1 ->
 	wlkMonoType t2		`thenUgn` \ ty2 ->
-	collect t1 [ty2]	`thenUgn` \ (tycon, tys) ->
-	returnUgn (MonoTyApp tycon tys)
-       where
-	collect t acc
-	  = case t of
-	      U_tapp t1 t2   -> wlkMonoType t2	`thenUgn` \ ty2 ->
-			        collect t1 (ty2:acc)
-	      U_tname tcon   -> wlkTCId tcon	`thenUgn` \ tycon ->
-			        returnUgn (tycon, acc)
-	      U_namedtvar tv -> wlkTvId tv	`thenUgn` \ tyvar ->
-			        returnUgn (tyvar, acc)
-	      U_tllist _ -> panic "tlist"
-	      U_ttuple _ -> panic "ttuple"
-	      U_tfun _ _ -> panic "tfun"
-	      U_tbang _  -> panic "tbang"
-	      U_context _ _ -> panic "context"
-	      _ -> panic "something else"
+	returnUgn (MonoTyApp ty1 ty2)
 	      
       U_tllist tlist -> -- list type
 	wlkMonoType tlist	`thenUgn` \ ty ->
@@ -760,11 +745,12 @@ wlkContext   	  :: U_list  -> UgnM RdrNameContext
 wlkClassAssertTy  :: U_ttype -> UgnM (RdrName, HsTyVar RdrName)
 
 wlkTyConAndTyVars ttype
-  = wlkMonoType ttype	`thenUgn` \ (MonoTyApp tycon ty_args) ->
+  = wlkMonoType ttype	`thenUgn` \ ty ->
     let
-	args = [ UserTyVar a | (MonoTyVar a) <- ty_args ]
+	split (MonoTyApp fun (MonoTyVar arg)) args = split fun (UserTyVar arg : args)
+	split (MonoTyVar tycon)		      args = (tycon,args)
     in
-    returnUgn (tycon, args)
+    returnUgn (split ty [])
 
 wlkContext list
   = wlkList rdMonoType list `thenUgn` \ tys ->
@@ -778,7 +764,7 @@ wlkClassAssertTy xs
 
 mk_class_assertion :: RdrNameHsType -> (RdrName, RdrNameHsType)
 
-mk_class_assertion (MonoTyApp name [ty@(MonoTyVar tyname)]) = (name, ty)
+mk_class_assertion (MonoTyApp (MonoTyVar name) ty@(MonoTyVar tyname)) = (name, ty)
 mk_class_assertion other
   = pprError "ERROR: malformed type context: " (ppr PprForUser other)
     -- regrettably, the parser does let some junk past

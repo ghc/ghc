@@ -543,18 +543,19 @@ splittyconapp(app, tyc, tys)
   qid *tyc;
   list *tys;
 {
-  if(tttype(app) == tapp) 
-    {
+  switch (tttype(app)) {
+    case tapp:
       splittyconapp(gtapp((struct Stapp *)app), tyc, tys);
       *tys = lapp(*tys, gtarg((struct Stapp *)app));
-    }
-  else if(tttype(app) == tname)
-    {
+      break;
+
+    case tname:
+    case namedtvar:
       *tyc = gtypeid((struct Stname *)app);
       *tys = Lnil;
-    }
-  else
-    {
+      break;
+
+    default:
       hsperror("panic: splittyconap: bad tycon application (no tycon)");
     }
 }

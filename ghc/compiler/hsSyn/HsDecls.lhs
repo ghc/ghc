@@ -249,7 +249,8 @@ instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
 	       ppCurlies (ppInterleave pp'SP (map pp_field fields))
 	      ]
       where
-	pp_field (n, ty) = ppCat [ppr sty n, ppPStr SLIT("::"), ppr_bang sty ty]
+	pp_field (ns, ty) = ppCat [ppCat (map (ppr sty . getOccName) ns), 
+				   ppPStr SLIT("::"), ppr_bang sty ty]
 
 ppr_bang sty (Banged   ty) = ppBeside (ppChar '!') (pprParendHsType sty ty)
 ppr_bang sty (Unbanged ty) = pprParendHsType sty ty

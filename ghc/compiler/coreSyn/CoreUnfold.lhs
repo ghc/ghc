@@ -52,7 +52,7 @@ import RdrHsSyn		( RdrName )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( coreExprType )
 import CostCentre	( ccMentionsId )
-import Id		( idType, getIdArity,  isBottomingId, 
+import Id		( idType, getIdArity,  isBottomingId, isDataCon, isPrimitiveId_maybe,
 			  SYN_IE(IdSet), GenId{-instances-} )
 import PrimOp		( primOpCanTriggerGC, fragilePrimOp, PrimOp(..) )
 import IdInfo		( ArityInfo(..), bottomIsGuaranteed )
@@ -64,6 +64,7 @@ import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  addOneToUniqSet, unionUniqSets
 			)
 import Usage		( SYN_IE(UVar) )
+import Maybes		( maybeToBool )
 import Util		( isIn, panic, assertPanic )
 
 \end{code}
@@ -179,6 +180,7 @@ mkFormSummary expr
     go n (App fun other_arg)          = go n fun
 
     go n (Var f) | isBottomingId f = BottomForm
+		 | isDataCon f	   = ValueForm		-- Can happen inside imported unfoldings
     go 0 (Var f)		   = VarForm
     go n (Var f)		   = case getIdArity f of
 					  ArityExactly a | n < a -> ValueForm
@@ -235,39 +237,31 @@ calcUnfoldingGuidance
 
 calcUnfoldingGuidance True bOMB_OUT_SIZE expr = UnfoldAlways	-- Always inline if the INLINE pragma says so
 
-calcUnfoldingGuidance False any_size (Con _ _ ) = UnfoldAlways	-- We are very gung ho about inlining
-calcUnfoldingGuidance False any_size (Lit _)    = UnfoldAlways	-- constructors and literals
-
 calcUnfoldingGuidance False bOMB_OUT_SIZE expr
   = let
     	(use_binders, ty_binders, val_binders, body) = collectBinders expr
     in
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
-      Nothing		     -> UnfoldNever
+      Nothing -> UnfoldNever
 
       Just (size, cased_args)
-	-> let
-	       uf = UnfoldIfGoodArgs
+	-> UnfoldIfGoodArgs
 			(length ty_binders)
 			(length val_binders)
 			(map discount_for val_binders)
 			size
-
-	       discount_for b
+	where        
+	    discount_for b
 	         | is_data && b `is_elem` cased_args = tyConFamilySize tycon
 		 | otherwise = 0
 		 where
 		   (is_data, tycon)
-		     = --trace "CoreUnfold.getAppDataTyConExpandingDicts:1" $ 
-			case (maybeAppDataTyConExpandingDicts (idType b)) of
+		     = case (maybeAppDataTyConExpandingDicts (idType b)) of
 			  Nothing       -> (False, panic "discount")
 			  Just (tc,_,_) -> (True,  tc)
-	   in
-	   -- pprTrace "calcUnfold:" (ppAbove (ppr PprDebug uf) (ppr PprDebug expr))
-	   uf
-  where
-    is_elem = isIn "calcUnfoldingGuidance"
+
+	    is_elem = isIn "calcUnfoldingGuidance"
 \end{code}
 
 \begin{code}
@@ -280,13 +274,31 @@ sizeExpr :: Int 	    -- Bomb out if it gets bigger than this
 	    )
 
 sizeExpr bOMB_OUT_SIZE args expr
+
+  | data_or_prim fun
+-- We are very keen to inline literals, constructors, or primitives
+-- including their slightly-disguised forms as applications (the latter
+-- can show up in the bodies of things imported from interfaces).
+  = Just (0, [])
+
+  | otherwise
   = size_up expr
   where
-    size_up (Var v)        = sizeOne
-    size_up (App fun arg)  = size_up fun `addSize` size_up_arg arg
+    (fun, _) = splitCoreApps expr
+    data_or_prim (Var v)    = maybeToBool (isPrimitiveId_maybe v) ||
+			      isDataCon v
+    data_or_prim (Con _ _)  = True
+    data_or_prim (Prim _ _) = True
+    data_or_prim (Lit _)    = True
+    data_or_prim other	    = False
+			
+    size_up (Var v)        = sizeZero
+    size_up (App fun arg)  = size_up fun `addSize` size_up_arg arg `addSizeN` 1
+				-- 1 for application node
+
     size_up (Lit lit)      = if isNoRepLit lit
 			     then sizeN uNFOLDING_NOREP_LIT_COST
-			     else sizeOne
+			     else sizeZero
 
 -- I don't understand this hack so I'm removing it!  SLPJ Nov 96
 --    size_up (SCC _ (Con _ _)) = Nothing -- **** HACK *****
@@ -294,8 +306,10 @@ sizeExpr bOMB_OUT_SIZE args expr
     size_up (SCC lbl body)    = size_up body		-- SCCs cost nothing
     size_up (Coerce _ _ body) = size_up body		-- Coercions cost nothing
 
-    size_up (Con con args) = -- 1 + # of val args
-			     sizeN (1 + numValArgs args)
+    size_up (Con con args) = sizeN (numValArgs args)
+			     -- We don't count 1 for the constructor because we're
+			     -- quite keen to get constructors into the open
+			     
     size_up (Prim op args) = sizeN op_cost -- NB: no charge for PrimOp args
       where
 	op_cost = if primOpCanTriggerGC op
@@ -331,16 +345,23 @@ sizeExpr bOMB_OUT_SIZE args expr
 	    -- We charge for the "case" itself in "size_up_alts"
 
     ------------
-    size_up_arg arg = if isValArg arg then sizeOne else sizeZero{-it's free-}
+    size_up_arg (LitArg lit) | isNoRepLit lit = sizeN uNFOLDING_NOREP_LIT_COST
+    size_up_arg other			      = sizeZero
 
     ------------
     size_up_alts scrut_ty (AlgAlts alts deflt)
-      = foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts
-		`addSizeN` (if is_data then tyConFamilySize tycon else 1{-??-})
+      = foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts `addSizeN` 1
+		-- "1" for the case itself
+
+	--	`addSizeN` (if is_data then tyConFamilySize tycon else 1)
+	--
+	--	OLD COMMENT: looks unfair to me!  So I've nuked this extra charge
+	--		     SLPJ Jan 97
 	-- NB: we charge N for an alg. "case", where N is
 	-- the number of constructors in the thing being eval'd.
 	-- (You'll eventually get a "discount" of N if you
 	-- think the "case" is likely to go away.)
+
       where
 	size_alg_alt (con,args,rhs) = size_up rhs
 	    -- Don't charge for args, so that wrappers look cheap
@@ -367,8 +388,8 @@ sizeExpr bOMB_OUT_SIZE args expr
 	-- Second, we want to charge nothing for the srutinee if it's just
 	-- a variable.  That way wrapper-like things look cheap.
     size_up_scrut (Var v) | v `is_elem` args = Just (0, [v])
-			    | otherwise	       = Just (0, [])
-    size_up_scrut other			       = size_up other
+			  | otherwise	     = Just (0, [])
+    size_up_scrut other			     = size_up other
 
     is_elem :: Id -> [Id] -> Bool
     is_elem = isIn "size_up_scrut"
@@ -393,6 +414,12 @@ sizeExpr bOMB_OUT_SIZE args expr
       where
 	tot = n+m
 	xys = xs ++ ys
+
+splitCoreApps e
+  = go e []
+  where
+    go (App fun arg) args = go fun (arg:args)
+    go fun           args = (fun,args)
 \end{code}
 
 %************************************************************************

@@ -56,11 +56,8 @@ data HsType name
 
   | MonoTyVar		name		-- Type variable
 
-  | MonoTyApp		name		-- Type constructor or variable
-			[HsType name]
-
-    -- We *could* have a "MonoTyCon name" equiv to "MonoTyApp name []"
-    -- (for efficiency, what?)  WDP 96/02/18
+  | MonoTyApp		(HsType name)
+			(HsType name)
 
   | MonoFunTy		(HsType name) -- function type
 			(HsType name)
@@ -167,13 +164,9 @@ ppr_mono_ty sty ctxt_prec (MonoTupleTy _ tys)
 ppr_mono_ty sty ctxt_prec (MonoListTy _ ty)
  = ppBesides [ppLbrack, ppr_mono_ty sty pREC_TOP ty, ppRbrack]
 
-ppr_mono_ty sty ctxt_prec (MonoTyApp tycon tys)
-  = let pp_tycon = ppr_hs_tyname sty tycon in
-    if null tys then
-	pp_tycon
-    else 
-	maybeParen (ctxt_prec >= pREC_CON)
-		   (ppCat [pp_tycon, ppInterleave ppNil (map (ppr_mono_ty sty pREC_CON) tys)])
+ppr_mono_ty sty ctxt_prec (MonoTyApp fun_ty arg_ty)
+  = maybeParen (ctxt_prec >= pREC_CON)
+	       (ppCat [ppr_mono_ty sty pREC_FUN fun_ty, ppr_mono_ty sty pREC_CON arg_ty])
 
 ppr_mono_ty sty ctxt_prec (MonoDictTy clas ty)
   = ppCurlies (ppCat [ppr sty clas, ppr_mono_ty sty pREC_CON ty])
@@ -221,9 +214,8 @@ cmpHsType cmp (MonoTupleTy _ tys1) (MonoTupleTy _ tys2)
 cmpHsType cmp (MonoListTy _ ty1) (MonoListTy _ ty2)
   = cmpHsType cmp ty1 ty2
 
-cmpHsType cmp (MonoTyApp tc1 tys1) (MonoTyApp tc2 tys2)
-  = cmp tc1 tc2 `thenCmp`
-    cmpList (cmpHsType cmp) tys1 tys2
+cmpHsType cmp (MonoTyApp fun_ty1 arg_ty1) (MonoTyApp fun_ty2 arg_ty2)
+  = cmpHsType cmp fun_ty1 fun_ty2 `thenCmp` cmpHsType cmp arg_ty1 arg_ty2
 
 cmpHsType cmp (MonoFunTy a1 b1) (MonoFunTy a2 b2)
   = cmpHsType cmp a1 a2 `thenCmp` cmpHsType cmp b1 b2

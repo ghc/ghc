@@ -228,7 +228,7 @@ BOOLEAN inpat;
 		constrs constr1 fields 
 		types atypes batypes
 		types_and_maybe_ids
-  		pats context context_list tyvar_list
+  		pats context context_list /* tyvar_list */
 		export_list enames
   		import_list inames
  		impdecls maybeimpdecls impdecl
@@ -269,9 +269,11 @@ BOOLEAN inpat;
 %type <upbinding> valrhs1 altrest
 
 %type <uttype>    simple ctype type atype btype
-		  gtyconapp ntyconapp ntycon gtyconvars
-		  bbtype batype btyconapp
-		  class restrict_inst general_inst tyvar
+		  gtyconvars 
+		  bbtype batype 
+		  class tyvar
+/* 		  gtyconapp0 gtyconapp1 ntyconapp0 ntyconapp1 btyconapp */
+/*		  restrict_inst general_inst */
 
 %type <uconstr>	  constr field
 
@@ -513,9 +515,9 @@ cbody	:  /* empty */				{ $$ = mknullbind(); }
 	|  WHERE vocurly decls vccurly		{ checkorder($3); $$ = $3; }
 	;
 
-instd	:  instkey context DARROW gtycon restrict_inst rinst
+instd	:  instkey context DARROW gtycon atype rinst
 		{ $$ = mkibind($2,$4,$5,$6,startlineno); }
-	|  instkey gtycon general_inst rinst
+	|  instkey gtycon atype rinst
 	 	{ $$ = mkibind(Lnil,$2,$3,$4,startlineno); }
 	;
 
@@ -523,6 +525,13 @@ rinst	:  /* empty */			  			{ $$ = mknullbind(); }
 	|  WHERE ocurly  instdefs ccurly  			{ $$ = $3; }
 	|  WHERE vocurly instdefs vccurly 			{ $$ = $3; }
 	;
+
+/*	I now allow a general type in instance declarations, relying
+	on the type checker to reject instance decls which are ill-formed.
+	Some (non-standard) extensions of Haskell may allow more general
+	types than the Report syntax permits, and in any case not all things
+	can be checked in the syntax (eg repeated type variables).
+		SLPJ Jan 97
 
 restrict_inst : gtycon				{ $$ = mktname($1); }
 	|  OPAREN gtyconvars CPAREN		{ $$ = $2; }
@@ -532,11 +541,12 @@ restrict_inst : gtycon				{ $$ = mktname($1); }
 	;
 
 general_inst : gtycon				{ $$ = mktname($1); }
-	|  OPAREN gtyconapp CPAREN		{ $$ = $2; }
+	|  OPAREN gtyconapp1 CPAREN		{ $$ = $2; }
 	|  OPAREN type COMMA types CPAREN	{ $$ = mkttuple(mklcons($2,$4)); }
 	|  OBRACK type CBRACK			{ $$ = mktllist($2); }
 	|  OPAREN btype RARROW type CPAREN	{ $$ = mktfun($2,$4); }
 	;
+*/
 
 defaultd:  defaultkey OPAREN types CPAREN       { $$ = mkdbind($3,startlineno); }
 	|  defaultkey OPAREN CPAREN		{ $$ = mkdbind(Lnil,startlineno); }
@@ -579,7 +589,7 @@ decl	: qvarsk DCOLON ctype
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
 		}
 
-	|  SPECIALISE_UPRAGMA INSTANCE gtycon general_inst END_UPRAGMA
+	|  SPECIALISE_UPRAGMA INSTANCE gtycon atype END_UPRAGMA
 		{
 		  $$ = mkispec_uprag($3, $4, startlineno);
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
@@ -663,25 +673,12 @@ type	:  btype				{ $$ = $1; }
 	|  btype RARROW type			{ $$ = mktfun($1,$3); }
 	;
 
-/* btype is split so we can parse gtyconapp without S/R conflicts */
-btype	:  gtyconapp				{ $$ = $1; }
-	|  ntyconapp				{ $$ = $1; }
+btype	:  atype				{ $$ = $1; }
+	|  btype atype				{ $$ = mktapp($1,$2); }
 	;
-
-ntyconapp: ntycon				{ $$ = $1; }
-	|  ntyconapp atype			{ $$ = mktapp($1,$2); }
-	;
-
-gtyconapp: gtycon				{ $$ = mktname($1); }
-	|  gtyconapp atype			{ $$ = mktapp($1,$2); }
-	;
-
 
 atype  	:  gtycon				{ $$ = mktname($1); }
-	|  ntycon				{ $$ = $1; }
-	;
-
-ntycon	:  tyvar				{ $$ = $1; }
+	|  tyvar				{ $$ = $1; }
 	|  OPAREN type COMMA types CPAREN	{ $$ = mkttuple(mklcons($2,$4)); }
 	|  OBRACK type CBRACK			{ $$ = mktllist($2); }
 	|  OPAREN type CPAREN			{ $$ = $2; }
@@ -737,23 +734,47 @@ constrs	:  constr				{ $$ = lsing($1); }
 	|  constrs VBAR constr			{ $$ = lapp($1,$3); }
 	;
 
-constr	:  btyconapp				{ qid tyc; list tys;
+constr	:  
+/* 	 	This stuff looks really baroque. I've replaced it with simpler stuff.
+			SLPJ Jan 97
+	
+	   btyconapp				{ qid tyc; list tys;
 						  splittyconapp($1, &tyc, &tys);
 					          $$ = mkconstrpre(tyc,tys,hsplineno); }
-	|  OPAREN qconsym CPAREN		{ $$ = mkconstrpre($2,Lnil,hsplineno); }
-	|  OPAREN qconsym CPAREN batypes	{ $$ = mkconstrpre($2,$4,hsplineno); }
-	|  btyconapp qconop bbtype		{ checknobangs($1);
+ 	|  btyconapp qconop bbtype		{ checknobangs($1);
 						  $$ = mkconstrinf($1,$2,$3,hsplineno); }
-	|  ntyconapp qconop bbtype		{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
-	|  BANG atype qconop bbtype		{ $$ = mkconstrinf(mktbang($2),$3,$4,hsplineno); }
+	|  ntyconapp0 qconop bbtype		{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
 
-	/* 1 S/R conflict on OCURLY -> shift */
+	|  BANG atype qconop bbtype		{ $$ = mkconstrinf(mktbang($2),$3,$4,hsplineno); }
+	|  OPAREN qconsym CPAREN		{ $$ = mkconstrpre($2,Lnil,hsplineno); }
+*/
+
+	   btype				{ qid tyc; list tys;
+						  splittyconapp($1, &tyc, &tys);
+					          $$ = mkconstrpre(tyc,tys,hsplineno); }
+	/* We have to parse the constructor application as a *type*, else we get
+	   into terrible ambiguity problems.  Consider the difference between
+
+		data T = S Int Int Int `R` Int
+	   and
+		data T = S Int Int Int
+	
+	   It isn't till we get to the operator that we discover that the "S" is
+	   part of a type in the first, but part of a constructor application in the
+	   second.
+	*/
+
+	|  OPAREN qconsym CPAREN batypes	{ $$ = mkconstrpre($2,$4,hsplineno); }
+	|  bbtype qconop bbtype			{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
 	|  gtycon OCURLY fields CCURLY		{ $$ = mkconstrrec($1,$3,hsplineno); }
+		/* 1 S/R conflict on OCURLY -> shift */
 	;
 
+/* 
 btyconapp: gtycon				{ $$ = mktname($1); }
 	|  btyconapp batype			{ $$ = mktapp($1,$2); }
 	;
+*/
 
 bbtype	:  btype				{ $$ = $1; }
 	|  BANG atype				{ $$ = mktbang($2); }
@@ -763,7 +784,7 @@ batype	:  atype				{ $$ = $1; }
 	|  BANG atype				{ $$ = mktbang($2); }
 	;
 
-batypes	:  batype				{ $$ = lsing($1); }
+batypes	:  					{ $$ = Lnil; }
 	|  batypes batype			{ $$ = lapp($1,$2); }
 	;
 
@@ -1452,9 +1473,11 @@ tycon	:  CONID
 modid	:  CONID
 	;
 
+/*
 tyvar_list: tyvar			{ $$ = lsing($1); }
 	|  tyvar_list COMMA tyvar 	{ $$ = lapp($1,$3); }
 	;
+*/
 
 /**********************************************************************
 *                                                                     *

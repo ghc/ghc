@@ -488,7 +488,22 @@ asciiTab = -- Using an array drags in the array module.  listArray ('\NUL', ' ')
 %*********************************************************
 
 \begin{code}
-data Int	= I# Int#			deriving (Eq,Ord)
+data Int = I# Int#
+
+instance Eq Int where
+    (I# x) == (I# y) = x ==# y
+
+instance Ord Int where
+    (I# x) `compare` (I# y) | x <# y    = LT
+			    | x ==# y   = EQ
+			    | otherwise = GT
+
+    (I# x) <  (I# y) = x <#  y
+    (I# x) <= (I# y) = x <=# y
+    (I# x) >= (I# y) = x >=# y
+    (I# x) >  (I# y) = x >#  y
+
+
 
 instance  Enum Int  where
     toEnum   x = x
@@ -546,8 +561,8 @@ rather not link the @Integer@ module at all; and the default-decl stuff
 in the renamer tends to slurp in @Double@ regardless.
 
 \begin{code}
-data Float	= F# Float#			deriving (Eq, Ord)
-data Double	= D# Double#			deriving (Eq, Ord)
+data Float	= F# Float#
+data Double	= D# Double#
 data Integer	= J# Int# Int# ByteArray#
 \end{code}
 

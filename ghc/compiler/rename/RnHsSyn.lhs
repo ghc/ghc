@@ -75,7 +75,7 @@ extractHsTyNames   :: RenamedHsType  -> NameSet
 extractHsTyNames ty
   = get ty
   where
-    get (MonoTyApp con tys)      = foldr (unionNameSets . get) (unitNameSet con) tys
+    get (MonoTyApp ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (MonoListTy tc ty)       = unitNameSet tc `unionNameSets` get ty
     get (MonoTupleTy tc tys)     = foldr (unionNameSets . get) (unitNameSet tc) tys
     get (MonoFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2

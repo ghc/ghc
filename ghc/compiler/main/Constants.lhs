@@ -83,7 +83,7 @@ import Util
 
 All pretty arbitrary:
 \begin{code}
-uNFOLDING_USE_THRESHOLD	      = ( 3 :: Int)
+uNFOLDING_USE_THRESHOLD	      = ( 8 :: Int)
 uNFOLDING_CREATION_THRESHOLD  = (30 :: Int)
 iNTERFACE_UNFOLD_THRESHOLD    = (30 :: Int)
 lIBERATE_CASE_THRESHOLD	      = (10 :: Int)
@@ -91,7 +91,7 @@ lIBERATE_CASE_THRESHOLD	      = (10 :: Int)
 
 uNFOLDING_CHEAP_OP_COST       = ( 1 :: Int)
 uNFOLDING_DEAR_OP_COST        = ( 4 :: Int)
-uNFOLDING_NOREP_LIT_COST      = ( 4 :: Int)
+uNFOLDING_NOREP_LIT_COST      = ( 20 :: Int)	-- Strings can be pretty big
 uNFOLDING_CON_DISCOUNT_WEIGHT = ( 1 :: Int)
 \end{code}
 

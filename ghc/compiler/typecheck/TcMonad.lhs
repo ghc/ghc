@@ -10,6 +10,8 @@ module TcMonad(
 	foldrTc, foldlTc, mapAndUnzipTc, mapAndUnzip3Tc,
 	mapBagTc, fixTc, tryTc, getErrsTc, 
 
+	uniqSMToTcM,
+
 	returnNF_Tc, thenNF_Tc, thenNF_Tc_, mapNF_Tc, fixNF_Tc, forkNF_Tc,
 
 	listNF_Tc, mapAndUnzipNF_Tc, mapBagNF_Tc,
@@ -55,7 +57,8 @@ import FiniteMap	( FiniteMap, emptyFM, isEmptyFM{-, keysFM ToDo:rm-} )
 import Maybes		( MaybeErr(..) )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
-import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply )
+import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply,
+			  SYN_IE(UniqSM), initUs )
 import Unique		( Unique )
 import Util
 import Pretty
@@ -410,6 +413,17 @@ tcGetUniques n down env
     in
     writeMutVarSST u_var new_uniq_supply		`thenSST_`
     returnSST uniqs
+  where
+    u_var = getUniqSupplyVar down
+
+uniqSMToTcM :: UniqSM a -> NF_TcM s a
+uniqSMToTcM m down env
+  = readMutVarSST u_var				`thenSST` \ uniq_supply ->
+    let
+      (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
+    in
+    writeMutVarSST u_var new_uniq_supply		`thenSST_`
+    returnSST (initUs uniq_s m)
   where
     u_var = getUniqSupplyVar down
 \end{code}

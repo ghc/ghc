@@ -71,7 +71,7 @@ simplifyPgm binds s_sw_chkr simpl_stats us
 	    show_status = pprTrace "NewSimpl: " (ppAboves [
 		ppBesides [ppInt iterations, ppChar '/', ppInt max_simpl_iterations],
 		ppStr (showSimplCount dr)
---DEBUG:	, ppAboves (map (pprCoreBinding PprDebug) new_pgm)
+-- DEBUG		, ppAboves (map (pprCoreBinding PprDebug) new_pgm)
 		])
 	in
 

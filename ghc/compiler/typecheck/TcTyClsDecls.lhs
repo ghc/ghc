@@ -228,11 +228,10 @@ get_con (RecConDecl _ nbtys _)
 get_bty (Banged ty)   = get_ty ty
 get_bty (Unbanged ty) = get_ty ty
 
-get_ty (MonoTyVar tv)
-  = emptyUniqSet
-get_ty (MonoTyApp name tys)
-  = (if isTvOcc (nameOccName name) then emptyUniqSet else set_name name)
-    `unionUniqSets` get_tys tys
+get_ty (MonoTyVar name)
+  = if isTvOcc (nameOccName name) then emptyUniqSet else set_name name
+get_ty (MonoTyApp ty1 ty2)
+  = unionUniqSets (get_ty ty1) (get_ty ty2)
 get_ty (MonoFunTy ty1 ty2)	
   = unionUniqSets (get_ty ty1) (get_ty ty2)
 get_ty (MonoListTy tc ty)

@@ -54,11 +54,16 @@ tcHsTypeKind does the real work.  It returns a kind and a type.
 \begin{code}
 tcHsTypeKind :: RenamedHsType -> TcM s (TcKind s, Type)
 
+	-- This equation isn't needed (the next one would handle it fine)
+	-- but it's rather a common case, so we handle it directly
 tcHsTypeKind (MonoTyVar name)
-  = tcLookupTyVar name	`thenNF_Tc` \ (kind,tyvar) ->
+  | isTvOcc (getOccName name)
+  = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
     returnTc (kind, mkTyVarTy tyvar)
-    
 
+tcHsTypeKind ty@(MonoTyVar name)
+  = tcFunType ty []
+    
 tcHsTypeKind (MonoListTy _ ty)
   = tcHsType ty	`thenTc` \ tau_ty ->
     returnTc (mkTcTypeKind, mkListTy tau_ty)
@@ -72,16 +77,8 @@ tcHsTypeKind (MonoFunTy ty1 ty2)
     tcHsType ty2	`thenTc` \ tau_ty2 ->
     returnTc (mkTcTypeKind, mkFunTy tau_ty1 tau_ty2)
 
-tcHsTypeKind (MonoTyApp name tys)
-  | isTvOcc (getOccName name)	-- Must be a type variable
-  = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
-    tcMonoTyApp kind (mkTyVarTy tyvar) tys
-
-  | otherwise		 	-- Must be a type constructor
-  = tcLookupTyCon name			`thenTc` \ (kind,maybe_arity,tycon) ->
-    case maybe_arity of
-	Just arity -> tcSynApp name kind arity tycon tys	-- synonum
-	Nothing	   -> tcMonoTyApp kind (mkTyConTy tycon) tys	-- newtype or data
+tcHsTypeKind (MonoTyApp ty1 ty2)
+  = tcTyApp ty1 [ty2]
 
 tcHsTypeKind (HsForAllTy tv_names context ty)
   = tcTyVarScope tv_names		 	$ \ tyvars ->
@@ -101,23 +98,41 @@ tcHsTypeKind (MonoDictTy class_name ty)
 Help functions for type applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcMonoTyApp fun_kind fun_ty tys
-  = mapAndUnzipTc tcHsTypeKind tys	`thenTc`    \ (arg_kinds, arg_tys) ->
-    newKindVar				`thenNF_Tc` \ result_kind ->
-    unifyKind fun_kind (foldr mkTcArrowKind result_kind arg_kinds)	`thenTc_`
-    returnTc (result_kind, foldl mkAppTy fun_ty arg_tys)
+tcTyApp (MonoTyApp ty1 ty2) tys
+  = tcTyApp ty1 (ty2:tys)
 
-tcSynApp name syn_kind arity tycon tys
-  = mapAndUnzipTc tcHsTypeKind tys	`thenTc`    \ (arg_kinds, arg_tys) ->
-    newKindVar				`thenNF_Tc` \ result_kind ->
-    unifyKind syn_kind (foldr mkTcArrowKind result_kind arg_kinds)	`thenTc_`
+tcTyApp ty tys
+  | null tys
+  = tcFunType ty []
 
-	-- Check that it's applied to the right number of arguments
-    checkTc (arity == n_args) (err arity)				`thenTc_`
-    returnTc (result_kind, mkSynTy tycon arg_tys)
+  | otherwise
+  = mapAndUnzipTc tcHsTypeKind tys	`thenTc`    \ (arg_kinds, arg_tys) ->
+    tcFunType ty arg_tys		`thenTc` \ (fun_kind, result_ty) ->
+
+	-- Check argument compatibility; special ca
+    newKindVar				`thenNF_Tc` \ result_kind ->
+    unifyKind fun_kind (foldr mkTcArrowKind result_kind arg_kinds)
+					`thenTc_`
+    returnTc (result_kind, result_ty)
+
+tcFunType (MonoTyVar name) arg_tys
+  | isTvOcc (getOccName name)	-- Must be a type variable
+  = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
+    returnTc (kind, foldl mkAppTy (mkTyVarTy tyvar) arg_tys)
+
+  | otherwise		 	-- Must be a type constructor
+  = tcLookupTyCon name			`thenTc` \ (kind,maybe_arity,tycon) ->
+    case maybe_arity of
+	Nothing    -> returnTc (kind, foldl mkAppTy (mkTyConTy tycon) arg_tys)
+	Just arity -> checkTc (arity == n_args) (err arity)	`thenTc_`
+		      returnTc (kind, mkSynTy tycon arg_tys)
   where
     err arity = arityErr "Type synonym constructor" name arity n_args
-    n_args    = length tys
+    n_args    = length arg_tys
+
+tcFunType ty arg_tys
+  = tcHsTypeKind ty		`thenTc` \ (fun_kind, fun_ty) ->
+    returnTc (fun_kind, foldl mkAppTy fun_ty arg_tys)
 \end{code}
 
 

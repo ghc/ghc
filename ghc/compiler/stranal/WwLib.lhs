@@ -9,7 +9,8 @@
 module WwLib (
 	WwBinding(..),
 
-	mkWwBodies, mAX_WORKER_ARGS
+	worthSplitting, setUnpackStrategy,
+	mkWwBodies, mkWrapper
     ) where
 
 IMP_Ubiq(){-uitous-}
@@ -17,15 +18,17 @@ IMP_Ubiq(){-uitous-}
 import CoreSyn
 import Id		( idType, mkSysLocal, dataConArgTys )
 import IdInfo		( mkStrictnessInfo, nonAbsentArgs, Demand(..) )
-import PrelVals		( aBSENT_ERROR_ID )
+import PrelVals		( aBSENT_ERROR_ID, voidId )
+import TysPrim		( voidTy )
 import SrcLoc		( noSrcLoc )
 import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
+			  splitForAllTy, splitFunTyExpandingDicts,
 			  maybeAppDataTyConExpandingDicts
 			)
 import UniqSupply	( returnUs, thenUs, thenMaybeUs,
-			  getUniques, SYN_IE(UniqSM)
+			  getUniques, getUnique, SYN_IE(UniqSM)
 			)
-import Util		( zipWithEqual, assertPanic, panic )
+import Util		( zipWithEqual, zipEqual, assertPanic, panic )
 \end{code}
 
 %************************************************************************
@@ -155,256 +158,214 @@ probably slightly paranoid, but OK in practice.)  If it isn't the
 same, we ``revise'' the strictness info, so that we won't propagate
 the unusable strictness-info into the interfaces.
 
-==========================
 
-Here's the real fun... The wrapper's ``deconstructing'' of arguments
-and the worker's putting them back together again are ``duals'' in
-some sense.
-
-What we do is walk along the @Demand@ list, producing two
-expressions (one for wrapper, one for worker...), each with a ``hole''
-in it, where we will later plug in more information.  For our previous
-example, the expressions-with-HOLES are:
-\begin{verbatim}
-\ x ys ->		-- wrapper
-	case x of
-	  I# x# -> <<HOLE>> x# ys
-
-\ x# ys ->		-- worker
-	let
-	    x = I# x#
-	in
-	    <<HOLE>>
-\end{verbatim}
-(Actually, we add the lambda-bound arguments at the end...) (The big
-Lambdas are added on the front later.)
-
-\begin{code}
-mkWwBodies
-	:: Type		-- Type of the *body* of the orig
-				-- function; i.e. /\ tyvars -> \ vars -> body
-	-> [TyVar] 		-- Type lambda vars of original function
-	-> [Id]			-- Args of original function
-	-> [Demand]		-- Strictness info for those args
-
-	-> UniqSM (Maybe 	-- Nothing iff (a) no interesting split possible
-				-- 	       (b) any unpack on abstract type
-		     (Id -> CoreExpr,		-- Wrapper expr w/
-							--   hole for worker id
-		      CoreExpr -> CoreExpr,	-- Worker expr w/ hole
-	   						--   for original fn body
-		      StrictnessInfo Id,		-- Worker strictness info
-		      Type -> Type)		-- Worker type w/ hole
-	   )						--   for type of original fn body
-
-
-mkWwBodies body_ty tyvars args arg_infos
-  = ASSERT(length args == length arg_infos)
-    -- or you can get disastrous user/definer-module mismatches
-    if (all_absent_args_and_unboxed_value body_ty arg_infos)
-    then returnUs Nothing
-
-    else -- the rest...
-    mk_ww_arg_processing args arg_infos 
-			 False 		-- Initialise the "useful-split" flag
-			 (mAX_WORKER_ARGS - nonAbsentArgs arg_infos)
-		`thenMaybeUs` \ (wrap_frag, work_args_info, work_frag) ->
-    let
-	(work_args, wrkr_demands) = unzip work_args_info
-
-	wrkr_strictness = mkStrictnessInfo wrkr_demands Nothing -- no worker-of-worker...
-
-	wrapper_w_hole = \ worker_id ->
-				mkLam tyvars args (
-				wrap_frag (
-				mkTyApp (Var worker_id) (mkTyVarTys tyvars)
-			 ))
-
-	worker_w_hole = \ orig_body ->
-				mkLam tyvars work_args (
-				work_frag orig_body
-			)
-
-	worker_ty_w_hole = \ body_ty ->
-				mkForAllTys tyvars $
-				mkFunTys (map idType work_args) body_ty
-    in
-    returnUs (Just (wrapper_w_hole, worker_w_hole, wrkr_strictness, worker_ty_w_hole))
-  where
-    -- "all_absent_args_and_unboxed_value":
-    -- check for the obscure case of "\ x y z ... -> body" where
-    -- (a) *all* of the args x, y, z,... are absent, and
-    -- (b) the type of body is unboxed
-    -- If these conditions are true, we must *not* play worker/wrapper games!
-
-    all_absent_args_and_unboxed_value body_ty arg_infos
-      = not (null arg_infos)
-	&& all is_absent_arg arg_infos
-	&& isPrimType body_ty
-
-    is_absent_arg (WwLazy True) = True
-    is_absent_arg _		= False
-\end{code}
-
-Important: mk_ww_arg_processing doesn't check
-for an "interesting" split.  It just races ahead and makes the
-split, even if there's no unpacking at all.  This is important for
-when it calls itself recursively.
-
-It returns Nothing only if it encounters an abstract type in mid-flight.
+%************************************************************************
+%*									*
+\subsection{Functions over Demands}
+%*									*
+%************************************************************************
 
 \begin{code}
 mAX_WORKER_ARGS :: Int		-- ToDo: set via flag
-mAX_WORKER_ARGS = 6		-- Hmm... but this is an everything-must-
-				-- be-compiled-with-the-same-val thing...
+mAX_WORKER_ARGS = 6
 
-mk_ww_arg_processing
-	:: [Id]			-- Args of original function
-	-> [Demand]		-- Strictness info for those args
-				--   must be at least as long as args
-
-	-> Bool			-- False <=> we've done nothing useful in an enclosing call
-				-- If this is False when we hit the end of the arg list, we
-				-- don't want to do a w/w split... the wrapper would be the identity fn!
-				-- So we return Nothing
-
-	-> Int			-- Number of extra args we are prepared to add.
-				-- This prevents over-eager unpacking, leading
-				-- to huge-arity functions.
-
-	-> UniqSM (Maybe 	-- Nothing iff any unpack on abstract type
-				-- or if the wrapper would be the identity fn (can happen if we unpack
-				-- a huge structure, and decide not to do it)
-
-		     (CoreExpr -> CoreExpr,	-- Wrapper expr w/
-							--   hole for worker id
-							--   applied to types
-		      [(Id,Demand)],			-- Worker's args
-							-- and their strictness info
-		      CoreExpr -> CoreExpr)	-- Worker body expr w/ hole
-	   )						--   for original fn body
-
-mk_ww_arg_processing [] _ useful_split _ = if useful_split then
-						returnUs (Just (id, [], id))
-					   else
-						returnUs Nothing
-
-mk_ww_arg_processing (arg : args) (WwLazy True : infos) useful_split max_extra_args
-  =  	-- Absent argument
-	-- So, finish args to the right...
-    --pprTrace "Absent; num_wrkr_args=" (ppInt num_wrkr_args) (
-    let
-	arg_ty = idType arg
-    in
-    mk_ww_arg_processing args infos True {- useful split -} max_extra_args
-				    -- We've already discounted for absent args,
-				    -- so we don't change max_extra_args
-		   `thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
-
-       		-- wrapper doesn't pass this arg to worker:
-    returnUs (Just (
-		 -- wrapper:
-		 \ hole -> wrap_rest hole,
-
-		 -- worker:
-		 work_args_info, -- NB: no argument added
-		 \ hole -> mk_absent_let arg arg_ty (work_rest hole)
-    ))
-    --)
+setUnpackStrategy :: [Demand] -> [Demand]
+setUnpackStrategy ds
+  = snd (go (mAX_WORKER_ARGS - nonAbsentArgs ds) ds)
   where
-    mk_absent_let arg arg_ty body
-      = if not (isPrimType arg_ty) then
-	    Let (NonRec arg (mkTyApp (Var aBSENT_ERROR_ID) [arg_ty])) body
-	else -- quite horrible
-	    panic "WwLib: haven't done mk_absent_let for primitives yet"
+    go :: Int 			-- Max number of args available for sub-components of [Demand]
+       -> [Demand]
+       -> (Int, [Demand])	-- Args remaining after subcomponents of [Demand] are unpacked
 
+    go n (WwUnpack _ cs : ds) | n' >= 0
+			      = WwUnpack True cs' `cons` go n'' ds
+			      | otherwise
+			      = WwUnpack False cs `cons` go n ds
+			      where
+				n' = n + 1 - nonAbsentArgs cs
+					-- Add one because we don't pass the top-level arg any more
+					-- Delete # of non-absent args to which we'll now be committed
+				(n'',cs') = go n' cs
+				
+    go n (d:ds) = d `cons` go n ds
+    go n []     = (n,[])
 
-mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) useful_split max_extra_args
-  | new_max_extra_args > 0	-- Check that we are prepared to add arguments
-  = 	-- this is the complicated one.
-    --pprTrace "Unpack; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr "; new_max=", ppInt new_num_wrkr_args, ppStr "; arg=", ppr PprDebug arg, ppr PprDebug (WwUnpack cmpnt_infos)]) $
-
-    case (maybeAppDataTyConExpandingDicts arg_ty) of
-
-	  Nothing 	  -> 	     -- Not a data type
-				     panic "mk_ww_arg_processing: not datatype"
-
-	  Just (arg_tycon, tycon_arg_tys, [data_con]) ->
-				     -- The main event: a single-constructor data type
-				     do_single_constr arg_tycon tycon_arg_tys data_con
-
-	  Just (_, _, data_cons) ->  -- Zero, or two or more constructors; that's odd
-				     panic "mk_ww_arg_processing: not one constr"
-
-  where
-    arg_ty = idType arg
-
-    new_max_extra_args
-      = max_extra_args
-	+ 1			    -- We won't pass the original arg now
-	- nonAbsentArgs cmpnt_infos -- But we will pass an arg for each cmpt
-
-    do_single_constr arg_tycon tycon_arg_tys data_con
-      = let
-	    inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
-	in
-	getUniques (length inst_con_arg_tys)    `thenUs` \ uniqs ->
-	
-	let
-	    unpk_args = zipWithEqual "mk_ww_arg_processing"
-	    	     (\ u t -> mkSysLocal SLIT("upk") u t noSrcLoc)
-	    	     uniqs inst_con_arg_tys
-	in
-	    -- In processing the rest, push the sub-component args
-	    -- and infos on the front of the current bunch
-	mk_ww_arg_processing (unpk_args ++ args) (cmpnt_infos ++ infos) True {- useful split -} new_max_extra_args
-	    	`thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
-	
-	returnUs (Just (
-	  -- wrapper: unpack the value
-	  \ hole -> mk_unpk_case arg unpk_args
-	    	    data_con arg_tycon
-	    	    (wrap_rest hole),
-	
-	  -- worker: expect the unpacked value;
-	  -- reconstruct the orig value with a "let"
-	  work_args_info,
-	  \ hole -> work_rest (mk_pk_let arg data_con tycon_arg_tys unpk_args hole)
-	))
-
-    mk_unpk_case arg unpk_args boxing_con boxing_tycon body
-      = Case (Var arg) (
-	  AlgAlts [(boxing_con, unpk_args, body)]
-	  NoDefault
-	)
-
-    mk_pk_let arg boxing_con con_tys unpk_args body
-      = Let (NonRec arg (Con boxing_con
-			    (map TyArg con_tys ++ map VarArg unpk_args)))
-	      body
-
-mk_ww_arg_processing (arg : args) (arg_demand : infos) useful_split max_extra_args
-  | otherwise
-  = 	-- For all others at the moment, we just
-	-- pass them to the worker unchanged.
-    --pprTrace "Other; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr ";arg=", ppr PprDebug arg, ppr PprDebug arg_demand]) (
-
-	-- Finish args to the right...
-    mk_ww_arg_processing args infos useful_split max_extra_args
-			`thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
-
-    returnUs (Just (
-	      -- wrapper:
-	      \ hole -> wrap_rest (App hole (VarArg arg)),
-
-	      -- worker:
-	      (arg, arg_demand) : work_args_info,
-	      \ hole -> work_rest hole
-    ))
-    --)
+    cons d (n,ds) = (n, d:ds)
 
 nonAbsentArgs :: [Demand] -> Int
 nonAbsentArgs []		 = 0
 nonAbsentArgs (WwLazy True : ds) = nonAbsentArgs ds
 nonAbsentArgs (d	   : ds) = 1 + nonAbsentArgs ds
+
+worthSplitting :: [Demand] -> Bool	-- True <=> the wrapper would not be an identity function
+worthSplitting [] 			= False
+worthSplitting (WwLazy True : ds)	= True		-- Absent arg
+worthSplitting (WwUnpack True _ : ds)	= True		-- Arg to unpack
+worthSplitting (d : ds)			= worthSplitting ds
+
+allAbsent :: [Demand] -> Bool
+allAbsent (WwLazy True      : ds) = allAbsent ds
+allAbsent (WwUnpack True cs : ds) = allAbsent cs && allAbsent ds
+allAbsent (d		    : ds) = False
+allAbsent []			  = True
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The worker wrapper core}
+%*									*
+%************************************************************************
+
+@mkWrapper@ is called when importing a function.  We have the type of 
+the function and the name of its worker, and we want to make its body (the wrapper).
+
+\begin{code}
+mkWrapper :: Type		-- Wrapper type
+	  -> [Demand]		-- Wrapper strictness info
+	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
+
+mkWrapper fun_ty demands
+  = let
+	n_wrap_args = length demands
+    in
+    getUniques n_wrap_args	`thenUs` \ wrap_uniqs ->
+    let
+	(tyvars, tau_ty)   = splitForAllTy fun_ty
+	(arg_tys, body_ty) = splitFunTyExpandingDicts tau_ty
+	wrap_args	   = zipWith mk_ww_local wrap_uniqs arg_tys
+	leftover_arg_tys   = drop n_wrap_args arg_tys
+	final_body_ty	   = mkFunTys leftover_arg_tys body_ty
+    in
+    mkWwBodies tyvars wrap_args final_body_ty demands	`thenUs` \ (wrap_fn, _, _) ->
+    returnUs wrap_fn
+\end{code}
+
+@mkWwBodies@ is called when doing the worker/wrapper split inside a module.
+
+\begin{code}
+mkWwBodies :: [TyVar] -> [Id] -> Type		-- Original fn args and body type
+	   -> [Demand]				-- Strictness info for original fn; corresp 1-1 with args
+	   -> UniqSM (Id -> CoreExpr,		-- Wrapper body, lacking only the worker Id
+		      CoreExpr -> CoreExpr,	-- Worker body, lacking the original function body
+		      [Demand])			-- Strictness info for worker
+
+mkWwBodies tyvars args body_ty demands
+  | allAbsent demands &&
+    isPrimType body_ty
+  = 	-- Horrid special case.  If the worker would have no arguments, and the
+	-- function returns a primitive type value, that would make the worker into
+	-- an unboxed value.  We box it by passing a dummy void argument, thus:
+	--
+	--	f = /\abc. \xyz. fw abc void
+	-- 	fw = /\abc. \v. body
+	--
+    getUnique 		`thenUs` \ void_arg_uniq ->
+    let
+	void_arg = mk_ww_local void_arg_uniq voidTy
+    in
+    returnUs (\ work_id -> mkLam tyvars args (App (mkTyApp (Var work_id) (mkTyVarTys tyvars)) (VarArg voidId)),
+	      \ body    -> mkLam tyvars [void_arg] body,
+	      [WwLazy True])
+
+mkWwBodies tyvars args body_ty demands
+  | otherwise
+  = let
+	args_w_demands = zipEqual "mkWwBodies" args demands
+    in
+    mkWW args_w_demands		`thenUs` \ (wrap_fn, work_args_w_demands, work_fn) ->
+    let
+	(work_args, work_demands) = unzip work_args_w_demands
+    in
+    returnUs (\ work_id -> mkLam tyvars args (wrap_fn (mkTyApp (Var work_id) (mkTyVarTys tyvars))),
+	      \ body    -> mkLam tyvars work_args (work_fn body),
+	      work_demands)
+\end{code}    
+
+
+\begin{code}
+mkWW :: [(Id,Demand)]
+     -> UniqSM (CoreExpr -> CoreExpr,	-- Wrapper body, lacking the inner call to the worker
+					-- and without its lambdas
+		[(Id,Demand)],		-- Worker args and their demand infos
+		CoreExpr -> CoreExpr)	-- Worker body, lacking the original body of the function
+
+
+	-- Empty case
+mkWW []
+  = returnUs (\ wrapper_body -> wrapper_body,
+	      [],
+	      \ worker_body  -> worker_body)
+
+
+	-- Absent case
+mkWW ((arg,WwLazy True) : ds)
+  = mkWW ds 		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
+    returnUs (\ wrapper_body -> wrap_fn wrapper_body,
+	      worker_args,
+	      \ worker_body  -> mk_absent_let arg (work_fn worker_body))
+
+
+	-- Unpack case
+mkWW ((arg,WwUnpack True cs) : ds)
+  = getUniques (length inst_con_arg_tys)		`thenUs` \ uniqs ->
+    let
+	unpk_args	 = zipWith mk_ww_local uniqs inst_con_arg_tys
+	unpk_args_w_ds   = zipEqual "mkWW" unpk_args cs
+    in
+    mkWW (unpk_args_w_ds ++ ds)		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
+    returnUs (\ wrapper_body -> mk_unpk_case arg unpk_args data_con arg_tycon (wrap_fn wrapper_body),
+	      worker_args,
+	      \ worker_body  -> work_fn (mk_pk_let arg data_con tycon_arg_tys unpk_args worker_body))
+  where
+    inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
+    (arg_tycon, tycon_arg_tys, data_con)
+	= case (maybeAppDataTyConExpandingDicts (idType arg)) of
+
+	      Just (arg_tycon, tycon_arg_tys, [data_con]) ->
+				     -- The main event: a single-constructor data type
+				     (arg_tycon, tycon_arg_tys, data_con)
+
+	      Just (_, _, data_cons) ->  panic "mk_ww_arg_processing: not one constr"
+	      Nothing		     ->  panic "mk_ww_arg_processing: not datatype"
+
+
+	-- Other cases
+mkWW ((arg,other_demand) : ds)
+  = mkWW ds		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
+    returnUs (\ wrapper_body -> wrap_fn (App wrapper_body (VarArg arg)),
+	      (arg,other_demand) : worker_args, 
+	      work_fn)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Utilities}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+mk_absent_let arg body
+  | not (isPrimType arg_ty)
+  = Let (NonRec arg (mkTyApp (Var aBSENT_ERROR_ID) [arg_ty])) body
+  | otherwise
+  = panic "WwLib: haven't done mk_absent_let for primitives yet"
+  where
+    arg_ty = idType arg
+
+mk_unpk_case arg unpk_args boxing_con boxing_tycon body
+  = Case (Var arg)
+	 (AlgAlts [(boxing_con, unpk_args, body)]
+		  NoDefault
+	 )
+
+mk_pk_let arg boxing_con con_tys unpk_args body
+  = Let (NonRec arg (Con boxing_con con_args)) body
+  where
+    con_args = map TyArg con_tys ++ map VarArg unpk_args
+
+mk_ww_local uniq ty
+  = mkSysLocal SLIT("ww") uniq ty noSrcLoc
 \end{code}

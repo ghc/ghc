@@ -279,7 +279,7 @@ creategid(i)
 {
   switch(i) {
     case -2:
-      return(mkgid(i,install_literal("(->)")));
+      return(mkgid(i,install_literal("->")));
     case -1:
       return(mkgid(i,install_literal("[]")));
     case  0:

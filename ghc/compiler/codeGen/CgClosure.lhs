@@ -980,7 +980,7 @@ mkWrapperArgTypeCategories wrapper_ty wrap_info
     do_one (WwPrim, _) = 'P'
     do_one (WwEnum, _) = 'E'
     do_one (WwStrict, arg_ty_char) = arg_ty_char
-    do_one (WwUnpack _, arg_ty_char)
+    do_one (WwUnpack _ _, arg_ty_char)
       = if arg_ty_char `elem` "CIJFDTS"
 	then toLower arg_ty_char
 	else if arg_ty_char == '+' then 't'

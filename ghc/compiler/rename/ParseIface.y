@@ -271,8 +271,8 @@ fields1		: field					{ [$1] }
 		| field COMMA fields1			{ $1 : $3 }
 
 field		:: { ([RdrName], RdrNameBangType) }
-field		:  var_name DCOLON type	   	{ ([$1], Unbanged $3) }
-		|  var_name DCOLON BANG type    	{ ([$1], Banged   $4)
+field		:  var_names1 DCOLON type		{ ($1, Unbanged $3) }
+		|  var_names1 DCOLON BANG type    	{ ($1, Banged   $4)
 --------------------------------------------------------------------------
 						    	}
 
@@ -304,11 +304,10 @@ types2		:  type COMMA type			{ [$1,$3] }
 
 btype		:: { RdrNameHsType }
 btype		:  atype				{ $1 }
-		|  qtc_name atype atypes		{ MonoTyApp $1 ($2:$3) }
-		|  tv_name  atype atypes		{ MonoTyApp $1 ($2:$3) }
+		|  btype atype				{ MonoTyApp $1 $2 }
 
 atype		:: { RdrNameHsType }
-atype		:  qtc_name 			  	{ MonoTyApp $1 [] }
+atype		:  qtc_name 			  	{ MonoTyVar $1 }
 		|  tv_name			  	{ MonoTyVar $1 }
 		|  OPAREN types2 CPAREN	  		{ MonoTupleTy dummyRdrTcName $2 }
 		|  OBRACK type CBRACK		  	{ MonoListTy  dummyRdrTcName $2 }
@@ -329,10 +328,15 @@ var_occ		: VARID			{ VarOcc $1 }
 		| VARSYM		{ VarOcc $1 }
 		| BANG  		{ VarOcc SLIT("!") {-sigh, double-sigh-} }
 
+tc_occ		:: { OccName }
+tc_occ		:  CONID		{ TCOcc $1 }
+		|  CONSYM		{ TCOcc $1 }
+		|  OPAREN RARROW CPAREN	{ TCOcc SLIT("->") }
+
 entity_occ	:: { OccName }
 entity_occ	:  var_occ		{ $1 }
-		|  CONID		{ TCOcc $1 }
-		|  CONSYM		{ TCOcc $1 }
+		|  tc_occ 		{ $1 }
+		|  RARROW		{ TCOcc SLIT("->") {- Allow un-paren'd arrow -} }
 
 val_occ		:: { OccName }
 val_occ		:  var_occ 		{ $1 }
@@ -350,6 +354,10 @@ qvar_name	:: { RdrName }
 
 var_name	:: { RdrName }
 var_name	:  var_occ		{ Unqual $1 }
+
+var_names1	:: { [RdrName] }
+var_names1	: var_name		{ [$1] }
+		| var_name var_names1	{ $1 : $2 }
 
 any_var_name	:: {RdrName}
 any_var_name	:  var_name		{ $1 }
@@ -372,8 +380,7 @@ qtc_names1	:: { [RdrName] }
 		| qtc_name COMMA qtc_names1	{ $1 : $3 }
 
 tc_name		:: { RdrName }
-tc_name		: CONID			{ Unqual (TCOcc $1) }		
-
+tc_name		: tc_occ			{ Unqual $1 }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }

@@ -175,8 +175,8 @@ reason), then we don't w-w it.
 The only reason this is monadised is for the unique supply.
 
 \begin{code}
-tryWW	:: Id				-- the fn binder
-	-> CoreExpr		-- the bound rhs; its innards
+tryWW	:: Id				-- The fn binder
+	-> CoreExpr			-- The bound rhs; its innards
 					--   are already ww'd
 	-> UniqSM [(Id, CoreExpr)]	-- either *one* or *two* pairs;
 					-- if one, then no worker (only
@@ -184,60 +184,49 @@ tryWW	:: Id				-- the fn binder
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW fn_id rhs
-  | certainlySmallEnoughToInline $
-    calcUnfoldingGuidance (idWantsToBeINLINEd fn_id) 
+  | (certainlySmallEnoughToInline $
+     calcUnfoldingGuidance (idWantsToBeINLINEd fn_id) 
 			  opt_UnfoldingCreationThreshold
-			  rhs
-    -- No point in worker/wrappering something that is going to be
-    -- INLINEd wholesale anyway.  If the strictness analyser is run
-    -- twice, this test also prevents wrappers (which are INLINEd)
-    -- from being re-done.
-  = do_nothing
+			  rhs)
+	    -- No point in worker/wrappering something that is going to be
+	    -- INLINEd wholesale anyway.  If the strictness analyser is run
+	    -- twice, this test also prevents wrappers (which are INLINEd)
+	    -- from being re-done.
 
-  | otherwise
-  = case (getIdStrictness fn_id) of
+  || not has_strictness_info
+  || not (worthSplitting revised_wrap_args_info)
+  = returnUs [ (fn_id, rhs) ]
 
-      NoStrictnessInfo    -> do_nothing
-      BottomGuaranteed    -> do_nothing
+  | otherwise		-- Do w/w split
+  = let
+	(uvars, tyvars, wrap_args, body) = collectBinders rhs
+    in
+    mkWwBodies tyvars wrap_args 
+	       (coreExprType body)
+	       revised_wrap_args_info		`thenUs` \ (wrap_fn, work_fn, work_demands) ->
+    getUnique					`thenUs` \ work_uniq ->
+    let
+	work_rhs  = work_fn body
+	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) work_info
+	work_info = noIdInfo `addStrictnessInfo` mkStrictnessInfo work_demands Nothing
 
-      StrictnessInfo args_info _ ->
-	let
-	     (uvars, tyvars, args, body) = collectBinders rhs
-	     body_ty			 = coreExprType body
-	in
-	mkWwBodies body_ty tyvars args args_info `thenUs` \ result ->
-	case result of
-
-	  Nothing -> 	-- We've hit the all-args-absent-and-the-body-is-unboxed case,
-			-- or there are too many args for a w/w split,
-			-- or there's no benefit from w/w (e.g. SSS)
-			do_nothing
-
-	  Just (wrapper_w_hole, worker_w_hole, worker_strictness, worker_ty_w_hole) ->
-
-		-- Terrific!  It worked!
-	    getUnique		`thenUs` \ worker_uniq ->
-	    let
-		worker_ty   = worker_ty_w_hole body_ty
-
-		worker_id   = mkWorkerId worker_uniq fn_id worker_ty
-				(noIdInfo `addStrictnessInfo` worker_strictness)
-
-		wrapper_rhs = wrapper_w_hole worker_id
-		worker_rhs  = worker_w_hole body
-
-		revised_strictness_info
-		  = -- We know the basic strictness info already, but
-		    -- we need to slam in the exact identity of the
-		    -- worker Id:
-		    mkStrictnessInfo args_info (Just worker_id)
-
-		wrapper_id  = addInlinePragma (fn_id `addIdStrictness`
-					       revised_strictness_info)
-		-- NB the "addInlinePragma" part; we want to inline wrappers everywhere
-	    in
-	    returnUs [ (worker_id,  worker_rhs),   -- worker comes first
-		       (wrapper_id, wrapper_rhs) ] -- because wrapper mentions it
+	wrap_rhs = wrap_fn work_id
+	wrap_id  = addInlinePragma (fn_id `addIdStrictness`
+				    mkStrictnessInfo revised_wrap_args_info (Just work_id))
+		-- Add info to the wrapper:
+		--	(a) we want to inline it everywhere
+		-- 	(b) we want to pin on its revised stricteness info
+		--	(c) we pin on its worker id
+    in
+    returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
+	-- Worker first, because wrapper mentions it
   where
-    do_nothing = returnUs [ (fn_id, rhs) ]
+    strictness_info     = getIdStrictness fn_id
+    has_strictness_info = case strictness_info of
+				StrictnessInfo _ _ -> True
+				other		   -> False
+
+    wrap_args_info = case strictness_info of
+			StrictnessInfo args_info _ -> args_info
+    revised_wrap_args_info = setUnpackStrategy wrap_args_info
 \end{code}

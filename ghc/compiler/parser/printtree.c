@@ -19,7 +19,7 @@
 /* fwd decls, necessary and otherwise */
 static void pbool   PROTO( (BOOLEAN) );
 static void pconstr PROTO( (constr) );
-static void pcoresyn PROTO((coresyn));
+/* static void pcoresyn PROTO((coresyn)); */
 static void pentid  PROTO( (entidt) );
 static void pgrhses PROTO( (list) );
 static void pid	    PROTO( (id) );
@@ -27,12 +27,13 @@ static void plist   PROTO( (void (*)(/*NOT WORTH IT: void * */), list) );
 static void pmaybe  PROTO( (void (*)(), maybe) );
 static void pmaybe_list  PROTO( (void (*)(), maybe) );
 static void ppbinding PROTO((pbinding));
-static void ppragma PROTO( (hpragma) );
+/* static void ppragma PROTO( (hpragma) ); */
 static void pqid    PROTO( (qid) );
 static void prbind  PROTO( (binding) );
 static void pstr    PROTO( (char *) );
 static void ptree   PROTO( (tree) );
 static void pttype  PROTO( (ttype) );
+static void plineno PROTO( (long) );
 
 extern char *input_filename;
 extern BOOLEAN hashIds;
@@ -90,6 +91,15 @@ print_string(hstring str)
     }
     putchar('\t');
 }
+
+static void
+plineno (l)
+long l;
+{
+ printf("#%lu\t",l);
+ return;
+}
+
 
 static int
 get_character(hstring str)
@@ -153,21 +163,7 @@ pliteral(literal t)
       case clitlit:
 		      PUTTAG('Y');
 		      pstr(gclitlit(t));
-		      pstr(gclitlit_kind(t));
-		      break;
-
-      case norepi:
-		      PUTTAG('I');
-		      pstr(gnorepi(t));
-		      break;
-      case norepr:
-		      PUTTAG('R');
-		      pstr(gnorepr_n(t));
-		      pstr(gnorepr_d(t));
-		      break;
-      case noreps:
-		      PUTTAG('s');
-		      print_string(gnoreps(t));
+		      /* pstr(gclitlit_kind(t)); */
 		      break;
       default:
 		      error("Bad pliteral");
@@ -180,16 +176,21 @@ ptree(t)
 {
 again:
     switch(ttree(t)) {
-      case par:		t = gpare(t); goto again;
       case hmodule:
 		      PUTTAG('M');
-		      printf("#%lu\t",ghmodline(t));
+		      plineno(ghmodline(t));
 		      pid(ghname(t));
+		      printf("#%lu\t",ghversion(t));
 		      pstr(input_filename);
 		      prbind(ghmodlist(t));
 	              /* pfixes(); */
 		      plist(prbind, ghimplist(t));
 		      pmaybe_list(pentid, ghexplist(t));
+		      break;
+      case fixop:     
+		      PUTTAG('I');
+	              pqid(gfixop(t));
+		      printf("%lu\t%lu",gfixinfx(t),gfixprec(t));
 		      break;
       case ident: 
 		      PUTTAG('i');
@@ -211,9 +212,13 @@ again:
 		      ptree(ginfarg1(t));
 		      ptree(ginfarg2(t));
 		      break;
+      case negate:
+		      PUTTAG('-');
+		      ptree(gnexp(t));
+		      break;
       case lambda: 
 		      PUTTAG('l');
-		      printf("#%lu\t",glamline(t));
+		      plineno(glamline(t));
 		      plist(ptree,glampats(t));
 		      ptree(glamexpr(t));
 		      break;
@@ -225,6 +230,7 @@ again:
 		      break;
       case casee:
 		      PUTTAG('c');
+		      plineno(gcaseline(t));
 		      ptree(gcaseexpr(t));
 		      plist(ppbinding, gcasebody(t));
 		      break;
@@ -234,13 +240,45 @@ again:
 		      ptree(gifthen(t));
 		      ptree(gifelse(t));
 		      break;
-      /* case doe: */
-      /* case dobind: */
-      /* case doexp: */
-      /* case seqlet: */
-      /* case record: */
-      /* case rupdate: */
-      /* case rbind: */
+      case doe:
+                      PUTTAG('O');
+		      plineno(gdoline(t));
+		      plist(ptree, gdo(t));
+		      break;
+      case dobind:
+		      PUTTAG('Q');
+		      plineno(gdobindline(t));
+		      ptree(gdobindpat(t));
+		      ptree(gdobindexp(t));
+		      break;
+      case doexp:
+		      PUTTAG('R');
+		      plineno(gdoexpline(t));
+		      ptree(gdoexp(t));
+		      break;
+      case seqlet:
+		      PUTTAG('U');
+		      prbind(gseqlet(t));
+		      break;
+      case record:
+		      PUTTAG('d');
+		      pqid(grcon(t));
+		      plist(prbind,grbinds(t));
+		      break;
+		
+      case rupdate:
+		      PUTTAG('h');
+		      ptree(gupdexp(t));
+		      plist(prbind,gupdbinds(t));
+		      break;
+		
+      case rbind:
+		      PUTTAG('o');
+		      pqid(grbindvar(t));
+		      pmaybe(ptree,grbindexp(t));
+		      break;
+		
+      case par:	      t = gpare(t); goto again;
 
       case as:
 		      PUTTAG('s');
@@ -308,10 +346,6 @@ again:
 		      PUTTAG('k');
 		      print_string(gsccid(t));
 		      ptree(gsccexp(t));
-		      break;
-      case negate:
-		      PUTTAG('-');
-		      ptree(gnexp(t));
 		      break;
       default:
 		      error("Bad ptree");
@@ -392,28 +426,34 @@ prbind(b)
 	switch(tbinding(b)) {
 	case tbind: 
 			  PUTTAG('t');
-			  printf("#%lu\t",gtline(b));
+			  plineno(gtline(b));
 			  plist(pttype, gtbindc(b));
 			  pmaybe_list(pid, gtbindd(b));
 			  pttype(gtbindid(b));
 			  plist(pconstr, gtbindl(b));
-			  ppragma(gtpragma(b));
 			  break;
-	/* case ntbind: */
+	case ntbind:
+			  PUTTAG('q');
+			  plineno(gntline(b));
+			  plist(pttype,gntbindcty(b));
+			  pmaybe_list(pid, gntbindd(b));
+			  pttype(gntbindid(b));
+			  plist(pconstr, gntbindcty(b));
+			  break;
 	case nbind	: 
 			  PUTTAG('n');
-			  printf("#%lu\t",gnline(b));
+			  plineno(gnline(b));
 			  pttype(gnbindid(b));
 			  pttype(gnbindas(b));
 			  break;
 	case pbind	: 
 			  PUTTAG('p');
-			  printf("#%lu\t",gpline(b));
+			  plineno(gpline(b));
 			  plist(ppbinding, gpbindl(b));
 			  break;
 	case fbind	: 
 			  PUTTAG('f');
-			  printf("#%lu\t",gfline(b));
+			  plineno(gfline(b));
 			  plist(ppbinding, gfbindl(b));
 			  break;
 	case abind	: 
@@ -421,92 +461,105 @@ prbind(b)
 			  prbind(gabindfst(b));
 			  prbind(gabindsnd(b));
 			  break;
-	case cbind	:
-			  PUTTAG('$');
-			  printf("#%lu\t",gcline(b));
-			  plist(pttype,gcbindc(b));
-			  pttype(gcbindid(b));
-			  prbind(gcbindw(b));
-			  ppragma(gcpragma(b));
-			  break;
 	case ibind	:
 			  PUTTAG('%');
-			  printf("#%lu\t",giline(b));
+			  plineno(giline(b));
 			  plist(pttype,gibindc(b));
 			  pqid(gibindid(b));
 			  pttype(gibindi(b));
 			  prbind(gibindw(b));
-			  ppragma(gipragma(b));
+			  /* ppragma(gipragma(b)); */
 			  break;
 	case dbind	:
 			  PUTTAG('D');
-			  printf("#%lu\t",gdline(b));
+			  plineno(gdline(b));
 			  plist(pttype,gdbindts(b));
+			  break;
+
+	case cbind	:
+			  PUTTAG('$');
+			  plineno(gcline(b));
+			  plist(pttype,gcbindc(b));
+			  pttype(gcbindid(b));
+			  prbind(gcbindw(b));
 			  break;
 
 	/* signature(-like) things, including user pragmas */
 	case sbind	:
-			  PUTTAGSTR("St");
-			  printf("#%lu\t",gsline(b));
+			  PUTTAG('r');
+			  plineno(gsline(b));
 			  plist(pqid,gsbindids(b));
 			  pttype(gsbindid(b));
-			  ppragma(gspragma(b));
 			  break;
+
+	case nullbind	:
+			  PUTTAG('B');
+			  break;
+
+	case import:	  
+			  PUTTAG('e');
+			  plineno(gibindline(b));
+			  /* pid(gibindfile(b)); */
+			  pid(gibindimod(b));
+			  printf("#%lu\t",gibindqual(b)); /* 1 -- qualified */
+			  pmaybe(pid, gibindas(b));
+			  pmaybe(pconstr, gibindspec(b));
+			  /* plist(pentid,giebindexp(b)); ??? */
+			  /* prbind(giebinddef(b)); ???? */
+			  break;
+
+         /* User pragmas till the end */
 
 	case vspec_uprag:
 			  PUTTAGSTR("Ss");
-			  printf("#%lu\t",gvspec_line(b));
+			  plineno(gvspec_line(b));
 			  pqid(gvspec_id(b));
 			  plist(pttype,gvspec_tys(b));
 			  break;
+	case vspec_ty_and_id:
+			  PUTTAGSTR("St");
+			  pttype(gvspec_ty(b));
+			  pmaybe(pttype,gvspec_tyid(b));
+			  break;
+
 	case ispec_uprag:
 			  PUTTAGSTR("SS");
-			  printf("#%lu\t",gispec_line(b));
+			  plineno(gispec_line(b));
 			  pqid(gispec_clas(b));
 			  pttype(gispec_ty(b));
 			  break;
 	case inline_uprag:
 			  PUTTAGSTR("Si");
-			  printf("#%lu\t",ginline_line(b));
+			  plineno(ginline_line(b));
 			  pqid(ginline_id(b));
 			  break;
 	case deforest_uprag:
 			  PUTTAGSTR("Sd");
-			  printf("#%lu\t",gdeforest_line(b));
+			  plineno(gdeforest_line(b));
 			  pqid(gdeforest_id(b));
 			  break;
 	case magicuf_uprag:
 			  PUTTAGSTR("Su");
-			  printf("#%lu\t",gmagicuf_line(b));
+			  plineno(gmagicuf_line(b));
 			  pqid(gmagicuf_id(b));
 			  pid(gmagicuf_str(b));
 			  break;
 	case dspec_uprag:
 			  PUTTAGSTR("Sd");
-			  printf("#%lu\t",gdspec_line(b));
+			  plineno(gdspec_line(b));
 			  pqid(gdspec_id(b));
 			  plist(pttype,gdspec_tys(b));
 			  break;
 
 	/* end of signature(-like) things */
-
+/* not used:
 	case mbind:	  
 			  PUTTAG('7');
-			  printf("#%lu\t",gmline(b));
+			  plineno(gmline(b));
 			  pid(gmbindmodn(b));
 			  plist(pentid,gmbindimp(b));
 			  break;
-	case import:	  
-			  PUTTAG('e');
-			  printf("#%lu\t",gibindline(b));
-			  pid(gibindfile(b));
-			  pid(gibindimod(b));
-			  /* plist(pentid,giebindexp(b)); ??? */
-			  /* prbind(giebinddef(b)); ???? */
-			  break;
-	case nullbind	:
-			  PUTTAG('B');
-			  break;
+*/
 	default		: error("Bad prbind");
 			  break;
 	}
@@ -521,7 +574,7 @@ pttype(t)
 			  pqid(gtypeid(t));
 			  break;
 	case namedtvar	: PUTTAG('y');
-			  pid(gnamedtvar(t));
+			  pqid(gnamedtvar(t));
 			  break;
 	case tllist	: PUTTAG(':');
 			  pttype(gtlist(t));
@@ -544,19 +597,6 @@ pttype(t)
 			  plist(pttype,gtcontextl(t));
 			  pttype(gtcontextt(t));
 			  break;
-
-	case unidict	: PUTTAGSTR("2A");
-			  pqid(gunidict_clas(t));
-			  pttype(gunidict_ty(t));
-			  break;
-	case unityvartemplate : PUTTAGSTR("2B");
-			  pid(gunityvartemplate(t));
-			  break;
-	case uniforall	: PUTTAGSTR("2C");
-			  plist(pid,guniforall_tv(t));
-			  pttype(guniforall_ty(t));
-			  break;
-
 	default		: error("bad pttype");
 	}
 }
@@ -568,18 +608,35 @@ pconstr(a)
 	switch (tconstr(a)) {
 	case constrpre	:
 			  PUTTAG('1');
-			  printf("#%lu\t",gconcline(a));
+			  plineno(gconcline(a));
 			  pqid(gconcid(a));
 			  plist(pttype, gconctypel(a));
 			  break;
 	case constrinf	:
 			  PUTTAG('2');
-			  printf("#%lu\t",gconiline(a));
+			  plineno(gconiline(a));
 			  pqid(gconiop(a));
 			  pttype(gconity1(a));
 			  pttype(gconity2(a));
 			  break;
 
+        case constrrec  :
+			  PUTTAG('u');
+			  plineno(gconrline(a));
+			  pqid(gconrid(a));
+			  plist(pqid,gconrfieldl(a));
+			  break;
+	case constrnew  :
+			  PUTTAG('v');
+			  plineno(gconnline(a));
+			  pqid(gconnid(a));
+			  pttype(gconnty(a));
+			  break;
+	case field      :
+			  PUTTAG('5');
+			  plist(pqid,gfieldn(a));
+			  pttype(gfieldt(a));
+			  break;
 	default		: fprintf(stderr, "Bad tag in abstree %d\n", tconstr(a));
 			  exit(1);
 	}
@@ -619,12 +676,25 @@ ppbinding(p)
 {
 	switch(tpbinding(p)) {
 	case pgrhs	: PUTTAG('W');
-  			  printf("#%lu\t",ggline(p));
+  			  plineno(ggline(p));
 	  		  pqid(ggfuncname(p));
 			  ptree(ggpat(p));
-			  plist(pgrhses,ggdexprs(p));
+			  ppbinding(ggdexprs(p));
 	  		  prbind(ggbind(p));
 	  		  break;
+        case pnoguards  :
+			  PUTTAG('6');
+			  ptree(gpnoguard(p));
+			  break;
+	case pguards    :
+			  PUTTAG('9');
+			  plist(ptree, gpguards(p));
+			  break;
+	case pgdexp	: 
+			  PUTTAG('&');
+			  ptree(gpguard(p));
+			  ptree(gpexp(p));
+			  break;
 	default	        :
 			  error("Bad pbinding");
 	}
@@ -638,7 +708,7 @@ pgrhses(l)
   ptree(lhd(l));		/* Guard */
   ptree(lhd(ltl(l)));		/* Expression */
 }
-
+/*
 static void
 ppragma(p)
   hpragma p;
@@ -661,12 +731,12 @@ ppragma(p)
 				break;
 
       case iinst_simpl_pragma:	PUTTAGSTR("Pis");
-/*				pid(gprag_imod_simpl(p));
-*/				ppragma(gprag_dfun_simpl(p));
+/ *				pid(gprag_imod_simpl(p));
+* /				ppragma(gprag_dfun_simpl(p));
 				break;
       case iinst_const_pragma:	PUTTAGSTR("Pic");
-/*				pid(gprag_imod_const(p));
-*/				ppragma(gprag_dfun_const(p));
+/ *				pid(gprag_imod_const(p));
+* /				ppragma(gprag_dfun_const(p));
 				plist(ppragma, gprag_constms(p));
 				break;
 
@@ -725,6 +795,7 @@ ppragma(p)
       default:           	error("Bad Pragma");
       }
 }
+*/
 
 static void
 pbool(b)
@@ -737,198 +808,3 @@ pbool(b)
     }
 }
 
-static void
-pcoresyn(p)
-  coresyn p;
-{
-    switch(tcoresyn(p)) {
-      case cobinder:		PUTTAGSTR("Fa");
-			    	pid(gcobinder_v(p));
-				pttype(gcobinder_ty(p));
-				break;
-
-      case colit:		PUTTAGSTR("Fb");
-				pliteral(gcolit(p));
-				break;
-      case colocal:		PUTTAGSTR("Fc");
-				pcoresyn(gcolocal_v(p));
-				break;
-
-      case cononrec:		PUTTAGSTR("Fd");
-				pcoresyn(gcononrec_b(p));
-				pcoresyn(gcononrec_rhs(p));
-				break;
-      case corec:		PUTTAGSTR("Fe");
-				plist(pcoresyn,gcorec(p));
-				break;
-      case corec_pair:		PUTTAGSTR("Ff");
-				pcoresyn(gcorec_b(p));
-				pcoresyn(gcorec_rhs(p));
-				break;		
-
-      case covar:		PUTTAGSTR("Fg");
-				pcoresyn(gcovar(p));
-				break;
-      case coliteral:		PUTTAGSTR("Fh");
-				pliteral(gcoliteral(p));
-				break;
-      case cocon:		PUTTAGSTR("Fi");
-				pcoresyn(gcocon_con(p));
-				plist(pttype, gcocon_tys(p));
-				plist(pcoresyn, gcocon_args(p));
-				break;
-      case coprim:		PUTTAGSTR("Fj");
-				pcoresyn(gcoprim_op(p));
-				plist(pttype, gcoprim_tys(p));
-				plist(pcoresyn, gcoprim_args(p));
-				break;
-      case colam:		PUTTAGSTR("Fk");
-				plist(pcoresyn, gcolam_vars(p));
-				pcoresyn(gcolam_body(p));
-				break;
-      case cotylam:		PUTTAGSTR("Fl");
-				plist(pid, gcotylam_tvs(p));
-				pcoresyn(gcotylam_body(p));
-				break;
-      case coapp:		PUTTAGSTR("Fm");
-				pcoresyn(gcoapp_fun(p));
-				plist(pcoresyn, gcoapp_args(p));
-				break;
-      case cotyapp:		PUTTAGSTR("Fn");
-				pcoresyn(gcotyapp_e(p));
-				pttype(gcotyapp_t(p));
-				break;
-      case cocase:		PUTTAGSTR("Fo");
-				pcoresyn(gcocase_s(p));
-				pcoresyn(gcocase_alts(p));
-				break;
-      case colet:		PUTTAGSTR("Fp");
-				pcoresyn(gcolet_bind(p));
-				pcoresyn(gcolet_body(p));
-				break;
-      case coscc:		PUTTAGSTR("Fz");	/* out of order! */
-				pcoresyn(gcoscc_scc(p));
-				pcoresyn(gcoscc_body(p));
-				break;
-
-      case coalg_alts:		PUTTAGSTR("Fq");
-				plist(pcoresyn, gcoalg_alts(p));
-				pcoresyn(gcoalg_deflt(p));
-				break;
-      case coalg_alt:		PUTTAGSTR("Fr");
-				pcoresyn(gcoalg_con(p));
-				plist(pcoresyn, gcoalg_bs(p));
-				pcoresyn(gcoalg_rhs(p));
-				break;
-      case coprim_alts:		PUTTAGSTR("Fs");
-				plist(pcoresyn, gcoprim_alts(p));
-				pcoresyn(gcoprim_deflt(p));
-				break;
-      case coprim_alt:		PUTTAGSTR("Ft");
-				pliteral(gcoprim_lit(p));
-				pcoresyn(gcoprim_rhs(p));
-				break;
-      case conodeflt:		PUTTAGSTR("Fu");
-				break;
-      case cobinddeflt:		PUTTAGSTR("Fv");
-				pcoresyn(gcobinddeflt_v(p));
-				pcoresyn(gcobinddeflt_rhs(p));
-				break;
-
-      case co_primop:		PUTTAGSTR("Fw");
-				pid(gco_primop(p));
-				break;
-      case co_ccall:		PUTTAGSTR("Fx");
-	                        pbool(gco_ccall_may_gc(p));
-				pid(gco_ccall(p));
-				plist(pttype, gco_ccall_arg_tys(p));
-				pttype(gco_ccall_res_ty(p));
-				break;
-      case co_casm:		PUTTAGSTR("Fy");
-	                        pbool(gco_casm_may_gc(p));
-				pliteral(gco_casm(p));
-				plist(pttype, gco_casm_arg_tys(p));
-				pttype(gco_casm_res_ty(p));
-				break;
-
-	/* Cost-centre stuff */
-      case co_preludedictscc:	PUTTAGSTR("F?a");
-				pcoresyn(gco_preludedictscc_dupd(p));
-				break;
-      case co_alldictscc:	PUTTAGSTR("F?b");
-				print_string(gco_alldictscc_m(p));
-				print_string(gco_alldictscc_g(p));
-				pcoresyn(gco_alldictscc_dupd(p));
-				break;
-      case co_usercc:		PUTTAGSTR("F?c");
-				print_string(gco_usercc_n(p));
-				print_string(gco_usercc_m(p));
-				print_string(gco_usercc_g(p));
-				pcoresyn(gco_usercc_dupd(p));
-				pcoresyn(gco_usercc_cafd(p));
-				break;
-      case co_autocc:		PUTTAGSTR("F?d");
-				pcoresyn(gco_autocc_i(p));
-				print_string(gco_autocc_m(p));
-				print_string(gco_autocc_g(p));
-				pcoresyn(gco_autocc_dupd(p));
-				pcoresyn(gco_autocc_cafd(p));
-				break;
-      case co_dictcc:		PUTTAGSTR("F?e");
-				pcoresyn(gco_dictcc_i(p));
-				print_string(gco_dictcc_m(p));
-				print_string(gco_dictcc_g(p));
-				pcoresyn(gco_dictcc_dupd(p));
-				pcoresyn(gco_dictcc_cafd(p));
-				break;
-
-      case co_scc_noncaf:	PUTTAGSTR("F?f");
-				break;
-      case co_scc_caf:		PUTTAGSTR("F?g");
-				break;
-      case co_scc_nondupd:	PUTTAGSTR("F?h");
-				break;
-      case co_scc_dupd:		PUTTAGSTR("F?i");
-				break;
-
-	/* Id stuff */
-      case co_id:		PUTTAGSTR("F1");
-				pid(gco_id(p));
-				break;
-      case co_orig_id:		PUTTAGSTR("F9");
-				pid(gco_orig_id_m(p));
-				pid(gco_orig_id_n(p));
-				break;
-      case co_sdselid:		PUTTAGSTR("F2");
-				pid(gco_sdselid_c(p));
-				pid(gco_sdselid_sc(p));
-				break;
-      case co_classopid:	PUTTAGSTR("F3");
-				pid(gco_classopid_c(p));
-				pid(gco_classopid_o(p));
-				break;
-      case co_defmid:		PUTTAGSTR("F4");
-				pid(gco_defmid_c(p));
-				pid(gco_defmid_op(p));
-				break;
-      case co_dfunid:		PUTTAGSTR("F5");
-				pid(gco_dfunid_c(p));
-				pttype(gco_dfunid_ty(p));
-				break;
-      case co_constmid:		PUTTAGSTR("F6");
-				pid(gco_constmid_c(p));
-				pid(gco_constmid_op(p));
-				pttype(gco_constmid_ty(p));
-				break;
-      case co_specid:		PUTTAGSTR("F7");
-				pcoresyn(gco_specid_un(p));
-				plist(pttype,gco_specid_tys(p));
-				break;
-      case co_wrkrid:		PUTTAGSTR("F8");
-				pcoresyn(gco_wrkrid_un(p));
-				break;
-      /* more to come?? */
-
-      default :		    	error("Bad Core syntax");
-    }
-}

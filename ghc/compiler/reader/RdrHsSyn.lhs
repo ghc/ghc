@@ -114,7 +114,7 @@ extractHsTyVars :: HsType RdrName -> [RdrName]
 extractHsTyVars ty
   = get ty []
   where
-    get (MonoTyApp con tys)	 acc = foldr get (insert con acc) tys
+    get (MonoTyApp ty1 ty2)	 acc = get ty1 (get ty2 acc)
     get (MonoListTy tc ty)	 acc = get ty acc
     get (MonoTupleTy tc tys)	 acc = foldr get acc tys
     get (MonoFunTy ty1 ty2)	 acc = get ty1 (get ty2 acc)

@@ -287,8 +287,13 @@ getWiredInDecl :: Name -> RnMG AvailInfo
 getWiredInDecl name
   = 	-- Force in the home module in case it has instance decls for
 	-- the thing we are interested in
-    (if mod == gHC__ then
-	returnRn ()			-- Mini hack; GHC is guaranteed not to have
+    (if not is_tycon || mod == gHC__ then
+	returnRn ()			-- Mini hack 1: no point for non-tycons; and if we
+					-- do this we find PrelNum trying to import PackedString,
+					-- because PrelBase's .hi file mentions PackedString.unpackString
+					-- But PackedString.hi isn't built by that point!
+					--
+					-- Mini hack 2; GHC is guaranteed not to have
 					-- instance decls, so it's a waste of time
 					-- to read it
     else
@@ -296,7 +301,7 @@ getWiredInDecl name
 	returnRn ()
     )					 	`thenRn_`
 
-    if (maybeToBool maybe_wired_in_tycon) then
+    if is_tycon then
 	get_wired_tycon the_tycon
     else				-- Must be a wired-in-Id
     if (isDataCon the_id) then		-- ... a wired-in data constructor
@@ -307,6 +312,7 @@ getWiredInDecl name
     doc_str = ppSep [ppStr "Need home module for wired in thing", ppr PprDebug name]
     (mod,_) = modAndOcc name
     maybe_wired_in_tycon = maybeWiredInTyConName name
+    is_tycon		 = maybeToBool maybe_wired_in_tycon
     maybe_wired_in_id    = maybeWiredInIdName    name
     Just the_tycon	 = maybe_wired_in_tycon
     Just the_id 	 = maybe_wired_in_id

@@ -343,7 +343,7 @@ evalStrictness (WwLazy _) _   = False
 evalStrictness WwStrict   val = isBot val
 evalStrictness WwEnum	  val = isBot val
 
-evalStrictness (WwUnpack demand_info) val
+evalStrictness (WwUnpack _ demand_info) val
   = case val of
       AbsTop	   -> False
       AbsBot	   -> True
@@ -368,7 +368,7 @@ possibly} hit poison.
 evalAbsence (WwLazy True) _ = False	-- Can't possibly hit poison
 					-- with Absent demand
 
-evalAbsence (WwUnpack demand_info) val
+evalAbsence (WwUnpack _ demand_info) val
   = case val of
 	AbsTop	     -> False		-- No poison in here
 	AbsBot 	     -> True		-- Pure poison

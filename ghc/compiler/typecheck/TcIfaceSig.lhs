@@ -26,6 +26,7 @@ import Literal		( Literal(..) )
 import CoreSyn
 import CoreUnfold
 import MagicUFs		( MagicUnfoldingFun )
+import WwLib		( mkWrapper )
 import SpecEnv		( SpecEnv )
 import PrimOp		( PrimOp(..) )
 
@@ -58,8 +59,8 @@ tcInterfaceSigs :: [RenamedHsDecl] -> TcM s [Id]
 
 tcInterfaceSigs (SigD (IfaceSig name ty id_infos src_loc) : rest)
   = tcAddSrcLoc src_loc $
-    tcHsType ty				`thenTc` \ sigma_ty ->
-    tcIdInfo name noIdInfo id_infos	`thenTc` \ id_info' ->
+    tcHsType ty					`thenTc` \ sigma_ty ->
+    tcIdInfo name sigma_ty noIdInfo id_infos	`thenTc` \ id_info' ->
     let
 	sig_id = mkImported name sigma_ty id_info'
     in
@@ -72,54 +73,62 @@ tcInterfaceSigs [] = returnTc []
 \end{code}
 
 \begin{code}
-tcIdInfo name info [] = returnTc info
+tcIdInfo name ty info [] = returnTc info
 
-tcIdInfo name info (HsArity arity : rest)
-  = tcIdInfo name (info `addArityInfo` arity) rest
+tcIdInfo name ty info (HsArity arity : rest)
+  = tcIdInfo name ty (info `addArityInfo` arity) rest
 
-tcIdInfo name info (HsUpdate upd : rest)
-  = tcIdInfo name (info `addUpdateInfo` upd) rest
+tcIdInfo name ty info (HsUpdate upd : rest)
+  = tcIdInfo name ty (info `addUpdateInfo` upd) rest
 
-tcIdInfo name info (HsFBType fb : rest)
-  = tcIdInfo name (info `addFBTypeInfo` fb) rest
+tcIdInfo name ty info (HsFBType fb : rest)
+  = tcIdInfo name ty (info `addFBTypeInfo` fb) rest
 
-tcIdInfo name info (HsArgUsage au : rest)
-  = tcIdInfo name (info `addArgUsageInfo` au) rest
+tcIdInfo name ty info (HsArgUsage au : rest)
+  = tcIdInfo name ty (info `addArgUsageInfo` au) rest
 
-tcIdInfo name info (HsDeforest df : rest)
-  = tcIdInfo name (info `addDeforestInfo` df) rest
+tcIdInfo name ty info (HsDeforest df : rest)
+  = tcIdInfo name ty (info `addDeforestInfo` df) rest
 
-tcIdInfo name info (HsUnfold expr : rest)
+tcIdInfo name ty info (HsUnfold expr : rest)
   = tcUnfolding name expr 	`thenNF_Tc` \ unfold_info ->
-    tcIdInfo name (info `addUnfoldInfo` unfold_info) rest
+    tcIdInfo name ty (info `addUnfoldInfo` unfold_info) rest
 
-tcIdInfo name info (HsStrictness strict : rest)
-  = tcStrictness strict 	`thenTc` \ strict_info ->
-    tcIdInfo name (info `addStrictnessInfo` strict_info) rest
+tcIdInfo name ty info (HsStrictness strict : rest)
+  = tcStrictness ty info strict 	`thenTc` \ info' ->
+    tcIdInfo name ty info' rest
 \end{code}
 
 \begin{code}
-tcStrictness (StrictnessInfo demands (Just worker))
-  = tcWorker worker		`thenNF_Tc` \ maybe_worker_id ->
-    returnTc (StrictnessInfo demands  maybe_worker_id)
+tcStrictness ty info (StrictnessInfo demands maybe_worker)
+  = tcWorker maybe_worker			`thenNF_Tc` \ maybe_worker_id ->
+    uniqSMToTcM (mkWrapper ty demands)		`thenNF_Tc` \ wrap_fn ->
+    let
+	-- Watch out! We can't pull on maybe_worker_id too eagerly!
+	info' = case maybe_worker_id of
+			Just worker_id -> info `addUnfoldInfo` mkUnfolding False (wrap_fn worker_id)
+			Nothing        -> info
+    in
+    returnTc (info' `addStrictnessInfo` StrictnessInfo demands maybe_worker_id)
 
--- Boring to write these out, but the result type differe from the arg type...
-tcStrictness (StrictnessInfo demands Nothing) = returnTc (StrictnessInfo demands Nothing)
-tcStrictness NoStrictnessInfo		      = returnTc NoStrictnessInfo
-tcStrictness BottomGuaranteed		      = returnTc BottomGuaranteed
+-- Boring to write these out, but the result type differs from the arg type...
+tcStrictness ty info BottomGuaranteed
+  = returnTc (info `addStrictnessInfo` BottomGuaranteed)
+tcStrictness ty info NoStrictnessInfo
+  = returnTc info
 \end{code}
 
 \begin{code}
-tcWorker worker
-  = tcLookupGlobalValueMaybe worker	`thenNF_Tc` \ maybe_worker_id ->
+tcWorker Nothing = returnNF_Tc Nothing
+
+tcWorker (Just worker_name)
+  = tcLookupGlobalValueMaybe worker_name	`thenNF_Tc` \ maybe_worker_id ->
     returnNF_Tc (trace_maybe maybe_worker_id)
   where
 	-- The trace is so we can see what's getting dropped
-    trace_maybe Nothing  = pprTrace "tcWorker failed:" (ppr PprDebug worker) Nothing
+    trace_maybe Nothing  = pprTrace "tcWorker failed:" (ppr PprDebug worker_name) Nothing
     trace_maybe (Just x) = Just x
 \end{code}
-
-tcLookupGlobalValue worker
 
 For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
@@ -316,4 +325,5 @@ tcCorePrim (UfCCallOp str casm gc arg_tys res_ty)
     tcHsType res_ty		`thenTc` \ res_ty' ->
     returnTc (CCallOp str casm gc arg_tys' res_ty')
 \end{code}
+
 

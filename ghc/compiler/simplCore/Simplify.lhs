@@ -700,7 +700,7 @@ ToDo: check this is OK with andy
 
 simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
   | idWantsToBeINLINEd id
-  = complete_bind env rhs	-- Don't messa bout with floating or let-to-case on
+  = complete_bind env rhs	-- Don't mess about with floating or let-to-case on
 				-- INLINE things
   | otherwise
   = simpl_bind env rhs
@@ -728,8 +728,7 @@ simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
 		      (\env -> simpl_bind env rhs) body_ty
 
     -- Try case-from-let; this deals with a strict let of error too
-    simpl_bind env (Case scrut alts) | will_be_demanded || 
-				       (float_primops && is_cheap_prim_app scrut)
+    simpl_bind env (Case scrut alts) | case_floating_ok scrut
       = tick CaseFloatFromLet				`thenSmpl_`
 
 	-- First, bind large let-body if necessary
@@ -773,10 +772,30 @@ simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
 			ValueForm -> True
 			other -> False
 
+    float_exposes_hnf = floatExposesHNF float_lets float_primops ok_to_dup rhs
+
     let_floating_ok  = (will_be_demanded && not no_float) ||
 		       always_float_let_from_let ||
-		       floatExposesHNF float_lets float_primops ok_to_dup rhs
+		       float_exposes_hnf
+
+    case_floating_ok scrut = (will_be_demanded && not no_float) || 
+			     (float_exposes_hnf && is_cheap_prim_app scrut && float_primops)
+	-- See note below 
 \end{code}
+
+Float switches
+~~~~~~~~~~~~~~
+The booleans controlling floating have to be set with a little care.
+Here's one performance bug I found:
+
+	let x = let y = let z = case a# +# 1 of {b# -> E1}
+			in E2
+		in E3
+	in E4
+
+Now, if E2, E3 aren't HNFs we won't float the y-binding or the z-binding.
+Before case_floating_ok included float_exposes_hnf, the case expression was floated
+*one level per simplifier iteration* outwards.  So it made th s
 
 Let to case
 ~~~~~~~~~~~
@@ -801,7 +820,7 @@ Now watch what happens if we do let-to-case first:
 	let k = \a# -> let a*=I# a# in b
 	in case v of
 		p1 -> case e1 of I# a# -> k a#
-		p1 -> case e1 of I# a# -> k a#
+		p1 -> case e2 of I# a# -> k a#
 
 The latter is clearly better.  (Remember the reboxing let-decl for a
 is likely to go away, because after all b is strict in a.)

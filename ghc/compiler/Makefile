@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.6 1997/01/06 21:08:42 simonpj Exp $
+# $Id: Makefile,v 1.7 1997/01/17 00:32:23 simonpj Exp $
 
 TOP = ../..
 FlexSuffixRules = YES
@@ -23,7 +23,7 @@ include $(TOP)/mk/rules.mk
 #-----------------------------------------------------------------------------
 # make libhsp.a
 
-YFLAGS = -d
+YFLAGS = -d -v
 CFLAGS = -Iparser -I. -IcodeGen
 ARCHIVE = libhsp.a
 DESTDIR =  $(INSTLIBDIR_GHC)

@@ -110,8 +110,7 @@ topCoreBindsToStg :: UniqSupply	-- name supply
 		  -> [StgBinding]	-- output
 
 topCoreBindsToStg us core_binds
-  = case (initUs us (coreBindsToStg nullIdEnv core_binds)) of
-      (_, stuff) -> stuff
+  = initUs us (coreBindsToStg nullIdEnv core_binds)
   where
     coreBindsToStg :: StgEnv -> [CoreBinding] -> UniqSM [StgBinding]
 

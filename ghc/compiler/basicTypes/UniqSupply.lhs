@@ -134,11 +134,9 @@ type UniqSM result = UniqSupply -> result
 
 -- the initUs function also returns the final UniqSupply
 
-initUs :: UniqSupply -> UniqSM a -> (UniqSupply, a)
+initUs :: UniqSupply -> UniqSM a -> a
 
-initUs init_us m
-  = case (splitUniqSupply init_us) of { (s1, s2) ->
-    (s2, m s1) }
+initUs init_us m = m init_us
 
 {-# INLINE thenUs #-}
 {-# INLINE returnUs #-}

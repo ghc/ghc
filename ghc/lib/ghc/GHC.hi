@@ -8,6 +8,8 @@
 _interface_ GHC 2
 _exports_
 GHC
+  ->
+
   Void
   void
 
