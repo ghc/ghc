@@ -138,7 +138,6 @@ module Unique (
 	ordClassKey,
 	orderingTyConKey,
 	otherwiseIdKey,
-	packCStringIdKey,
 	parErrorIdKey,
 	parIdKey,
 	patErrorIdKey,
@@ -618,7 +617,6 @@ irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 15
 lexIdKey		      = mkPreludeMiscIdUnique 16
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 17
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 18
-packCStringIdKey	      = mkPreludeMiscIdUnique 19
 parErrorIdKey		      = mkPreludeMiscIdUnique 20
 parIdKey		      = mkPreludeMiscIdUnique 21
 patErrorIdKey		      = mkPreludeMiscIdUnique 22

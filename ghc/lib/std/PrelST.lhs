@@ -8,7 +8,6 @@
 
 module PrelST where
 
-import Monad
 import PrelShow
 import PrelBase
 import PrelGHC

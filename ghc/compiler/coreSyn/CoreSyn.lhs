@@ -52,7 +52,7 @@ import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
 import Literal	        ( Literal(MachStr), mkMachInt )
 import PrimOp		( PrimOp )
 import DataCon		( DataCon, dataConId )
-import ThinAir		( unpackCStringId, unpackCString2Id, addr2IntegerId )
+import ThinAir		( unpackCStringId, unpackCString2Id )
 import VarSet
 import Outputable
 \end{code}

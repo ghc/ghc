@@ -4,8 +4,6 @@
 \section[Monad]{Module @Monad@}
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
-
 module Monad 
     ( MonadPlus (   -- class context: Monad
 	  mzero     -- :: (MonadPlus m) => m a
@@ -39,14 +37,7 @@ module Monad
     , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
     ) where
 
-#ifndef __HUGS__
-import PrelList
-import PrelTup
-import PrelBase
-import PrelMaybe ( Maybe(..) )
-
-infixr 1 =<<
-#endif
+import Prelude
 \end{code}
 
 %*********************************************************
@@ -80,32 +71,6 @@ instance MonadPlus Maybe where
 %*********************************************************
 
 \begin{code}
-#ifdef __HUGS__
--- These functions are defined in the Prelude.
--- sequence       :: Monad m => [m a] -> m [a] 
--- sequence_        :: Monad m => [m a] -> m () 
--- mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
--- mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
-#else
-sequence       :: Monad m => [m a] -> m [a] 
-{-# INLINE sequence #-}
-sequence ms = foldr k (return []) ms
-	    where
-	      k m m' = do { x <- m; xs <- m'; return (x:xs) }
-
-sequence_        :: Monad m => [m a] -> m () 
-{-# INLINE sequence_ #-}
-sequence_ ms     =  foldr (>>) (return ()) ms
-
-mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
-{-# INLINE mapM #-}
-mapM f as       =  sequence (map f as)
-
-mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
-{-# INLINE mapM_ #-}
-mapM_ f as      =  sequence_ (map f as)
-#endif
-
 guard           :: MonadPlus m => Bool -> m ()
 guard pred
  | pred      = return ()
@@ -125,15 +90,6 @@ filterM  predM (x:xs) = do
 msum        :: MonadPlus m => [m a] -> m a
 {-# INLINE msum #-}
 msum        =  foldr mplus mzero
- 
-#ifdef __HUGS__
--- This function is defined in the Prelude.
---(=<<)           :: Monad m => (a -> m b) -> m a -> m b
-#else
-{-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
-(=<<)           :: Monad m => (a -> m b) -> m a -> m b
-f =<< x		= x >>= f
-#endif
 \end{code}
 
 

@@ -13,7 +13,6 @@ module PrelByteArr where
 import {-# SOURCE #-} PrelErr ( error )
 import PrelArr
 import PrelFloat
-import Ix
 import PrelList (foldl)
 import PrelST
 import PrelBase

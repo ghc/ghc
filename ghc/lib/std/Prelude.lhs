@@ -53,7 +53,7 @@ module Prelude (
     RealFrac(..),
     RealFloat(..),
 
-	-- From Monad
+	-- Monad stuff, from PrelBase, and defined here
     Monad(..),
     Functor(..), 
     mapM, mapM_, sequence, sequence_, (=<<),
@@ -74,6 +74,8 @@ import PrelList
 #ifndef USE_REPORT_PRELUDE
      hiding ( takeUInt_append )
 #endif
+import PrelIOBase
+import PrelException
 import PrelRead
 import PrelEnum
 import PrelNum
@@ -83,13 +85,20 @@ import PrelTup
 import PrelMaybe
 import PrelShow
 import PrelConc
-import Monad
-import Maybe
 import PrelErr   ( error )
-import IO
 
+infixr 1 =<<
 infixr 0 $!
+\end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{Miscellaneous functions}
+%*							*
+%*********************************************************
+
+\begin{code}
 ($!)    :: (a -> b) -> a -> b
 f $! x  = x `seq` f x
 
@@ -136,6 +145,37 @@ product	l	= prod l 1
 
 %*********************************************************
 %*							*
+\subsection{Prelude monad functions}
+%*							*
+%*********************************************************
+
+\begin{code}
+{-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
+(=<<)           :: Monad m => (a -> m b) -> m a -> m b
+f =<< x		= x >>= f
+
+sequence       :: Monad m => [m a] -> m [a] 
+{-# INLINE sequence #-}
+sequence ms = foldr k (return []) ms
+	    where
+	      k m m' = do { x <- m; xs <- m'; return (x:xs) }
+
+sequence_        :: Monad m => [m a] -> m () 
+{-# INLINE sequence_ #-}
+sequence_ ms     =  foldr (>>) (return ()) ms
+
+mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
+{-# INLINE mapM #-}
+mapM f as       =  sequence (map f as)
+
+mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
+{-# INLINE mapM_ #-}
+mapM_ f as      =  sequence_ (map f as)
+\end{code}
+
+
+%*********************************************************
+%*							*
 \subsection{Coercions}
 %*							*
 %*********************************************************
@@ -167,4 +207,65 @@ fromIntegral	=  fromInteger . toInteger
     Float	-> Double #-}
 realToFrac	:: (Real a, Fractional b) => a -> b
 realToFrac	=  fromRational . toRational
+\end{code}
+
+
+%*********************************************************
+%*							 *
+\subsection{Standard IO}
+%*							 *
+%*********************************************************
+
+The Prelude has from Day 1 provided a collection of common
+IO functions. We define these here, but let the Prelude
+export them.
+
+\begin{code}
+putChar         :: Char -> IO ()
+putChar c       =  hPutChar stdout c
+
+putStr          :: String -> IO ()
+putStr s        =  hPutStr stdout s
+
+putStrLn        :: String -> IO ()
+putStrLn s      =  do putStr s
+                      putChar '\n'
+
+print           :: Show a => a -> IO ()
+print x         =  putStrLn (show x)
+
+getChar         :: IO Char
+getChar         =  hGetChar stdin
+
+getLine         :: IO String
+getLine         =  hGetLine stdin
+            
+getContents     :: IO String
+getContents     =  hGetContents stdin
+
+interact        ::  (String -> String) -> IO ()
+interact f      =   do s <- getContents
+                       putStr (f s)
+
+readFile        :: FilePath -> IO String
+readFile name	=  openFile name ReadMode >>= hGetContents
+
+writeFile       :: FilePath -> String -> IO ()
+writeFile name str = do
+    hdl <- openFile name WriteMode
+    hPutStr hdl str
+    hClose hdl
+
+appendFile      :: FilePath -> String -> IO ()
+appendFile name str = do
+    hdl <- openFile name AppendMode
+    hPutStr hdl str
+    hClose hdl
+
+readLn          :: Read a => IO a
+readLn          =  do l <- getLine
+                      r <- readIO l
+                      return r
+
+
 \end{code}

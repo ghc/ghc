@@ -418,10 +418,10 @@ floatingClass_RDR	= clsQual pREL_FLOAT_Name  SLIT("Floating")
 realFloatClass_RDR	= clsQual pREL_FLOAT_Name  SLIT("RealFloat")
 
 -- Class Ix
-ixClass_RDR	   = clsQual iX_Name	  SLIT("Ix")
-range_RDR	   = varQual iX_Name   SLIT("range")
-index_RDR	   = varQual iX_Name   SLIT("index")
-inRange_RDR	   = varQual iX_Name   SLIT("inRange")
+ixClass_RDR	   = clsQual pREL_ARR_Name SLIT("Ix")
+range_RDR	   = varQual pREL_ARR_Name SLIT("range")
+index_RDR	   = varQual pREL_ARR_Name SLIT("index")
+inRange_RDR	   = varQual pREL_ARR_Name SLIT("inRange")
 
 -- Class CCallable and CReturnable
 ccallableClass_RDR	= clsQual pREL_GHC_Name  SLIT("CCallable")

@@ -43,7 +43,6 @@ import Name		( mkLocalName, tidyOccName, tidyTopName,
 			  NamedThing(..), OccName
 			)
 import TyCon		( TyCon, isDataTyCon )
-import PrelInfo		( unpackCStringId, unpackCString2Id, addr2IntegerId )
 import PrelRules	( builtinRules )
 import Type		( Type, 
 			  isUnLiftedType,

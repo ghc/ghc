@@ -23,7 +23,6 @@ import CoreUtils	( exprType, mkCoerce )
 import Id		( Id, mkWildId )
 import MkId		( mkCCallOpId, realWorldPrimId )
 import Maybes		( maybeToBool )
-import PrelInfo		( packStringForCId )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import DataCon		( DataCon, splitProductType_maybe, dataConSourceArity, dataConWrapId )
 import CallConv

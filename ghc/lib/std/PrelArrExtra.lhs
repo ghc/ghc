@@ -13,7 +13,6 @@ module.
 
 module PrelArrExtra where
 
-import Ix
 import PrelArr
 import PrelByteArr
 import PrelST

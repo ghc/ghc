@@ -21,7 +21,6 @@ import PrelTup
 import PrelMaybe
 import PrelShow		-- isAlpha etc
 import PrelBase
-import Monad
 
 -- needed for readIO and instance Read Buffermode
 import PrelIOBase ( IO, userError, BufferMode(..) )
@@ -57,6 +56,22 @@ class  Read a  where
 
     readList  :: ReadS [a]
     readList   = readList__ reads
+\end{code}
+
+In this module we treat [(a,String)] as a monad in MonadPlus
+But MonadPlus isn't defined yet, so we simply give local
+declarations for mzero and guard suitable for this particular
+type.  It would also be reasonably to move MonadPlus to PrelBase
+along with Monad and Functor, but that seems overkill for one 
+example
+
+\begin{code}
+mzero :: [a]
+mzero = []
+
+guard :: Bool -> [()]
+guard True  = [()]
+guard False = []
 \end{code}
 
 %*********************************************************

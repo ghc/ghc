@@ -12,7 +12,7 @@ module ThinAir (
 			-- mentioned.  Subset of builtinNames.
 	-- Here are the thin-air Ids themselves
 	addr2IntegerId,
-	packStringForCId, unpackCStringId, unpackCString2Id,
+	unpackCStringId, unpackCString2Id,
 	unpackCStringAppendId, unpackCStringFoldrId,
 	foldrId, buildId,
 
@@ -57,9 +57,6 @@ thinAirIdNames
 	-- Needed for converting literals to Integers (used in tidyCoreExpr)
       (varQual pREL_NUM_Name SLIT("addr2Integer"), addr2IntegerIdKey)
 
-	-- String literals
-    , (varQual pREL_PACK_Name SLIT("packCString#"),   packCStringIdKey)
-
 	-- Folds and builds; introduced by desugaring list comprehensions
     , (varQual pREL_BASE_Name SLIT("unpackNBytes#"),  unpackCString2IdKey)
     , (varQual pREL_BASE_Name SLIT("unpackCString#"), unpackCStringIdKey)
@@ -81,7 +78,6 @@ noRepStrIds = [unpackCString2Id, unpackCStringId]
 
 addr2IntegerId = lookupThinAirId addr2IntegerIdKey
 
-packStringForCId = lookupThinAirId packCStringIdKey
 unpackCStringId  = lookupThinAirId unpackCStringIdKey
 unpackCString2Id = lookupThinAirId unpackCString2IdKey 
 unpackCStringAppendId = lookupThinAirId unpackCStringAppendIdKey 

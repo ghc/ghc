@@ -14,6 +14,7 @@ which are supported for them.
 #ifndef __HUGS__ /* Hugs just includes this in PreludeBuiltin so no header needed */
 module PrelHandle where
 
+import PrelArr
 import PrelBase
 import PrelAddr		( Addr, nullAddr )
 import PrelByteArr	( ByteArray(..), MutableByteArray(..) )
@@ -31,7 +32,6 @@ import PrelPack         ( packString )
 #ifndef __PARALLEL_HASKELL__
 import PrelWeak		( addForeignFinalizer )
 #endif
-import Ix
 
 import PrelConc
 

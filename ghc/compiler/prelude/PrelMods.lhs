@@ -17,8 +17,8 @@ module PrelMods
 	pREL_GHC, pREL_BASE, pREL_ADDR, pREL_STABLE,
 	pREL_IO_BASE, pREL_PACK, pREL_ERR, pREL_NUM, pREL_FLOAT, pREL_REAL,
 
-	pREL_GHC_Name, pRELUDE_Name, mONAD_Name, rATIO_Name, 
-	iX_Name, mAIN_Name, pREL_MAIN_Name, pREL_ERR_Name,
+	pREL_GHC_Name, pRELUDE_Name, 
+	mAIN_Name, pREL_MAIN_Name, pREL_ERR_Name,
 	pREL_BASE_Name, pREL_NUM_Name, pREL_LIST_Name, 
 	pREL_TUP_Name, pREL_ADDR_Name, pREL_READ_Name,
 	pREL_PACK_Name, pREL_CONC_Name, pREL_IO_BASE_Name, 
@@ -57,9 +57,6 @@ pREL_ERR_Name     = mkSrcModule "PrelErr"
 pREL_REAL_Name    = mkSrcModule "PrelReal"
 pREL_FLOAT_Name   = mkSrcModule "PrelFloat"
 
-mONAD_Name	 = mkSrcModule "Monad"
-rATIO_Name	 = mkSrcModule "Ratio"
-iX_Name	    	 = mkSrcModule "Ix"
 pREL_MAIN_Name   = mkSrcModule "PrelMain"
 mAIN_Name	 = mkSrcModule "Main"
 iNT_Name	 = mkSrcModule "Int"
