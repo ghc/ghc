@@ -46,7 +46,7 @@ import GLAEXTS
 
 {-
 -----------------------------------------------------------------------------
-Conflicts: 29 shift/reduce, [SDM 19/9/2002]
+Conflicts: 33 shift/reduce, [SDM 19/9/2002]
 
 10 for abiguity in 'if x then y else z + 1'		[State 136]
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
