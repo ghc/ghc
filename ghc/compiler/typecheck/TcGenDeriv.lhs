@@ -184,7 +184,7 @@ gen_Eq_binds tycon
 	    else -- calc. and compare the tags
 		 [([a_Pat, b_Pat],
 		    untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
-		      (cmp_tags_Expr eqH_Int_RDR ah_RDR bh_RDR true_Expr false_Expr))]
+		               (genOpApp (HsVar ah_RDR) eqH_Int_RDR (HsVar bh_RDR)))]
     in
     mk_FunMonoBind tycon_loc eq_RDR ((map pats_etc nonnullary_cons) ++ rest)
 	    `AndMonoBinds`
@@ -1191,10 +1191,10 @@ compare_gen_Case fun lt eq gt a b
       generatedSrcLoc
 
 careful_compare_Case ty lt eq gt a b
-  = if not (isUnLiftedType ty) then
+  | not (isUnLiftedType ty) =
        compare_gen_Case compare_RDR lt eq gt a b
-
-    else -- we have to do something special for primitive things...
+  | otherwise               =
+         -- we have to do something special for primitive things...
        HsIf (genOpApp a relevant_eq_op b)
 	    eq
 	    (HsIf (genOpApp a relevant_lt_op b) lt gt generatedSrcLoc)
@@ -1237,13 +1237,14 @@ append_Expr a b = genOpApp a append_RDR b
 -----------------------------------------------------------------------
 
 eq_Expr :: Type -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
-eq_Expr ty a b
-  = if not (isUnLiftedType ty) then
-       genOpApp a eq_RDR  b
-    else -- we have to do something special for primitive things...
-       genOpApp a relevant_eq_op b
-  where
-    relevant_eq_op = assoc_ty_id eq_op_tbl ty
+eq_Expr ty a b = genOpApp a eq_op b
+ where
+   eq_op
+    | not (isUnLiftedType ty) = eq_RDR
+    | otherwise               =
+         -- we have to do something special for primitive things...
+	assoc_ty_id eq_op_tbl ty
+
 \end{code}
 
 \begin{code}
