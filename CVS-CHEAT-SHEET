@@ -175,6 +175,48 @@ Committing Your Changes
   For a multiple-file change, you should still get only *one* message.
 
 
+Updating Your Source Tree
+-------------------------
+
+It can be tempting to cvs update just part of a source tree to bring
+in some changes that someone else has made, or before committing your
+own changes.  This is NOT RECOMMENDED!  Quite often changes in one
+part of the tree are dependent on changes in another part of the tree
+(the mk/*.mk files are a good example where problems crop up quite
+often).  Having an inconsistent tree is a major cause of headaches.
+
+So, to avoid a lot of hassle, follow this recipe for updating your
+tree:
+
+$ cd fptools
+$ cvs update -Pd 2>&1 | tee log
+
+Look at the log file, and fix any conflicts (denoted by a 'C' in the
+first column).  Next for every build tree you have pointing at this
+source tree, you need to update the links in case any new files have
+appeared:
+
+$ cd <build-tree>
+$ lndir <source-tree>
+
+Some files might have been removed, so you need to remove the links
+pointing to these non-existent files:
+
+$ find . -xtype l -exec rm '{}' \;
+
+And finally, re-configure to take into accound any changes in
+mk/config.mk.in.
+
+$ ./configure
+
+To be *really* safe, you should do
+
+$ gmake boot && gmake all
+
+from the top-level, to update the dependencies and build any changed
+files.
+
+
 General Hints
 -------------
 
