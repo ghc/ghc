@@ -259,13 +259,10 @@ newDoubleArray ixs = ST $ \ s# ->
     (# s2#, MutableByteArray ixs barr# #) }}
 
 boundsOfArray     :: Ix ix => MutableArray s ix elt -> (ix, ix)  
-boundsOfByteArray :: Ix ix => MutableByteArray s ix -> (ix, ix)
 
 {-# SPECIALIZE boundsOfArray     :: MutableArray s Int elt -> IPr #-}
-{-# SPECIALIZE boundsOfByteArray :: MutableByteArray s Int -> IPr #-}
 
 boundsOfArray     (MutableArray     ixs _) = ixs
-boundsOfByteArray (MutableByteArray ixs _) = ixs
 
 readArray   	:: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
 
