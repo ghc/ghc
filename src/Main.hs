@@ -200,7 +200,7 @@ mkInterface mod_map filename
 	 Nothing  -> return (Nothing, Nothing, [])
 	 Just doc -> do
 	    let (doc1, maybe_info) = parseModuleHeader doc
-	    (doc2,ns) <- formatDocString (lookupForDoc import_env) doc1
+	    (doc2,ns) <- formatDocString mod (lookupForDoc import_env) doc1
 	    return (Just doc2, maybe_info, ns)
 
   let
@@ -212,7 +212,7 @@ mkInterface mod_map filename
      local_docstrings = collectDoc final_decls
 
      formatLocalDoc (n,doc) = do
-	doc' <- formatDocString (lookupForDoc orig_env) doc
+	doc' <- formatDocString mod (lookupForDoc orig_env) doc
 	return (n,doc')
 
   local_docs_formatted <- mapM formatLocalDoc local_docstrings
@@ -323,7 +323,7 @@ mkExportItems mod_map mod env decl_map decls options maybe_exps
   where
 
     everything_local_exported =
-	fullContentsOfThisModule decls env -- everything exported
+	fullContentsOfThisModule mod decls env -- everything exported
 
     lookupExport (HsEVar x) 
 	| Just decl <- findDecl x
@@ -345,11 +345,11 @@ mkExportItems mod_map mod env decl_map decls options maybe_exps
 	= return [ ExportDecl (restrictTo (map nameOfQName cs) decl) ]
     lookupExport (HsEModuleContents m) = fullContentsOf m
     lookupExport (HsEGroup lev str)
-	= do (doc, _names) <- formatDocHeading (lookupForDoc env) str
+	= do (doc, _names) <- formatDocHeading mod (lookupForDoc env) str
 	     return [ ExportGroup lev "" doc ]
 	  -- ToDo: report the unresolved names
     lookupExport (HsEDoc str)
-	= do (doc, _names) <- formatDocString (lookupForDoc env) str
+	= do (doc, _names) <- formatDocString mod (lookupForDoc env) str
 	     return [ ExportDoc doc ]
 	-- ToDo: report the unresolved names
     lookupExport (HsEDocNamed str)
@@ -357,13 +357,13 @@ mkExportItems mod_map mod env decl_map decls options maybe_exps
 	     case r of
 		Nothing -> return []
 		Just found -> do
-		  (doc, _nms) <- formatDocString (lookupForDoc env) found
+		  (doc, _nms) <- formatDocString mod (lookupForDoc env) found
 	  	  return [ ExportDoc doc ]
 	
     lookupExport _ = return [] -- didn't find it?
 
     fullContentsOf m
-	| m == mod  = fullContentsOfThisModule decls env
+	| m == mod  = fullContentsOfThisModule mod decls env
 	| otherwise = 
 	   case lookupFM mod_map m of
 	     Just iface
@@ -383,10 +383,10 @@ mkExportItems mod_map mod env decl_map decls options maybe_exps
 		Just iface -> lookupFM (iface_decls iface) n
 		Nothing -> Nothing
 
-fullContentsOfThisModule decls env = 
+fullContentsOfThisModule mod decls env = 
   mapM mkExportItem (filter keepDecl decls)
   where mkExportItem (HsDocGroup lev str) = do
-	   (doc, _names) <- formatDocHeading (lookupForDoc env) str
+	   (doc, _names) <- formatDocHeading mod (lookupForDoc env) str
 	   return (ExportGroup lev "" doc)
 	   -- ToDo: report the unresolved names
 	mkExportItem decl = return (ExportDecl decl)
@@ -459,7 +459,7 @@ buildEnv :: ModuleMap -> Module -> [HsQName] -> HsImportDecl
    -> ( FiniteMap HsQName HsQName, 	-- source name ==> orig name
         FiniteMap HsQName HsQName	-- orig name ==> import name
       )
-buildEnv mod_map this_mod exported_names (HsImportDecl _ mod qual _ _)
+buildEnv mod_map this_mod exported_names (HsImportDecl _ mod qual maybe_as _)
    = case lookupFM mod_map mod of
        Nothing    -> trace ("Warning: module not found: " ++ show mod) 
 			(emptyFM, emptyFM)
@@ -472,8 +472,12 @@ buildEnv mod_map this_mod exported_names (HsImportDecl _ mod qual _ _)
 	-- bring both qualified and unqualified names into scope, unless
 	-- the import was 'qualified'.
      orig_map (nm,qnm)
-	| qual      = [ (Qual mod nm, qnm) ]
-	| otherwise = [ (UnQual nm, qnm), (Qual mod nm, qnm) ]
+	| qual      = [ (Qual qual_module nm, qnm) ]
+	| otherwise = [ (UnQual nm, qnm), (Qual qual_module nm, qnm) ]
+
+     qual_module
+	| Just m <- maybe_as = m
+	| otherwise          = mod
 
      import_map (nm,qnm) = (qnm, maps_to)
 	where maps_to | qnm `elem` exported_names = Qual this_mod nm
@@ -553,23 +557,25 @@ docsFromField (HsFieldDecl nms ty Nothing) rest
 -- description to this function to get the marked-up text.
 
 -- this one formats a heading
-formatDocHeading :: (String -> Maybe HsQName) -> DocString
+formatDocHeading :: Module -> (String -> Maybe HsQName) -> DocString
   -> ErrMsgM (Doc,[String])
-formatDocHeading lookup string = format parseString lookup string
+formatDocHeading mod lookup string = format mod parseString lookup string
 
 -- this one formats a sequence of paragraphs
-formatDocString :: (String -> Maybe HsQName) -> DocString
+formatDocString :: Module -> (String -> Maybe HsQName) -> DocString
   -> ErrMsgM (Doc,[String])
-formatDocString lookup string = format parseParas lookup string
+formatDocString mod lookup string = format mod parseParas lookup string
 
-format 	:: ([Token] -> Either String ParsedDoc)
+format 	:: Module			--  for error messages only
+	-> ([Token] -> Either String ParsedDoc)
 	-> (String -> Maybe HsQName)
 	-> DocString
        	-> ErrMsgM (Doc, [String])
-format parse lookup string
+format mod parse lookup string
   = case parse (tokenise string) of
 	Left error -> do 	
-	  tell ["Warning: parse error in doc string beginning:\n\ 
+	  tell ["Warning: in " ++ show mod ++
+		", parse error in doc string beginning:\n\ 
 		\    " ++ take 40 string]
 	  return (DocEmpty, [])
 	Right doc -> 
