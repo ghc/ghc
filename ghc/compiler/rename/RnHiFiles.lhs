@@ -635,7 +635,7 @@ hiModuleNameMismatchWarn requested_mod read_mod =
 
 packageNameMismatchWarn :: Module -> Module  -> Message
 packageNameMismatchWarn requested_mod read_mod = 
-    sep [ ptext SLIT("Module"), quotes (ppr requested_mod), 
+    fsep [ ptext SLIT("Module"), quotes (ppr requested_mod), 
 	  ptext SLIT("is located in package"), 
 	  quotes (ptext (modulePackage requested_mod)),
 	  ptext SLIT("but its interface file claims it is part of package"),
