@@ -1,6 +1,6 @@
 /*
  *
- * $Id: ghci.c,v 1.5 2002/01/07 16:32:54 sof Exp $
+ * $Id: ghci.c,v 1.6 2003/06/02 16:24:07 sof Exp $
  *
  * ghci wrapper - invokes ghc.exe with the added command-line
  *                option "--interactive".
@@ -95,12 +95,17 @@ main(int argc, char** argv)
   }
 
   for ( i=1; i < argc; i++ ) {
-    new_argv[i+1] = (char*)malloc(sizeof(char) * (strlen(argv[i]) + 1));
+    int len = strlen(argv[i]);
+    /* to avoid quoting issues, surround each option in double quotes */
+    new_argv[i+1] = (char*)malloc(sizeof(char) * (len + 3));
     if (new_argv[i+1] == NULL) {
       errmsg("failed to start up ghc.exe");
       return 1;
     } else {
-      strcpy(new_argv[i+1], argv[i]);
+      new_argv[i+1][0] = '"';
+      strcpy(1 + new_argv[i+1], argv[i]);
+      new_argv[i+1][len+1] = '"';
+      new_argv[i+1][len+2] = '\0';
     }
   }
   new_argv[i+1] = NULL;
