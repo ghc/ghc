@@ -32,7 +32,6 @@ import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
-import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
 import Id		( Id, idType, idInfo, isDataConWorkId, idOccInfo,
 			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
 			  idUnfolding, idNewStrictness, idInlinePragma,
