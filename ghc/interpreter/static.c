@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.26 $
- * $Date: 2000/03/09 06:14:38 $
+ * $Revision: 1.27 $
+ * $Date: 2000/03/09 10:19:33 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -467,27 +467,6 @@ Bool priv; {
                 }
             }
         }
-#if 0
-    } else if (STAR == impList) {
-      List xs;
-      for(xs=module(m).names; nonNull(xs); xs=tl(xs)) {
-	Cell e = hd(xs);
-	imports = cons(e,imports);
-      }
-      for(xs=module(m).classes; nonNull(xs); xs=tl(xs)) {
-	Cell cl = hd(xs);
-	imports = cons(cl,imports);
-	imports = dupOnto(cclass(cl).members,imports);
-      }
-      for(xs=module(m).tycons; nonNull(xs); xs=tl(xs)) {
-	Cell t = hd(xs);
-	imports = cons(t,imports);
-	if (isTycon(t)
-	    && (tycon(t).what == DATATYPE 
-		|| tycon(t).what == NEWTYPE))
-	  imports = dupOnto(tycon(t).defn,imports);
-      }
-#endif
     } else {
         map2Accum(checkImportEntity,imports,m,priv,impList);
     }
@@ -514,10 +493,10 @@ Pair importSpec; {
         hidden  = resolveImportList(m, snd(impList),FALSE);
         imports = resolveImportList(m, DOTDOT,FALSE);
     } else if (isPair(impList) && STAR == fst(impList)) {
-        /* Somewhat inefficient - but obviously correct:
-         * imports = importsOf("module Foo") `setDifference` hidden;
-         */
-      imports = resolveImportList(m, snd(impList),TRUE);
+      List privileged;
+      imports = resolveImportList(m, DOTDOT, FALSE);
+      privileged = resolveImportList(m, snd(impList),TRUE);
+      imports = dupOnto(privileged,imports);
     } else {
         imports = resolveImportList(m, impList,FALSE);
     }
