@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.176 2004/09/30 10:36:47 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.177 2004/10/11 14:44:38 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -47,7 +47,7 @@ import System.Posix
 #endif
 #endif
 
-#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
+#ifdef USE_READLINE
 import Control.Concurrent	( yield )	-- Used in readline loop
 import System.Console.Readline as Readline
 #endif
@@ -185,7 +185,7 @@ interactiveUI srcs maybe_expr = do
 	-- initial context is just the Prelude
    cmstate <- cmSetContext cmstate [] ["Prelude"]
 
-#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
+#ifdef USE_READLINE
    Readline.initialize
 #endif
 
@@ -196,7 +196,7 @@ interactiveUI srcs maybe_expr = do
 		   cmstate = cmstate,
 		   options = [] }
 
-#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
+#ifdef USE_READLINE
    Readline.resetTerminal Nothing
 #endif
 
@@ -265,8 +265,8 @@ interactiveLoop is_tty show_prompt = do
 			_other      -> return ()) $ do
 
   -- read commands from stdin
-#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
-  if (is_tty) 
+#ifdef USE_READLINE
+  if (True || is_tty) 
 	then readlineLoop
 	else fileLoop stdin show_prompt
 #else
@@ -331,7 +331,7 @@ stringLoop (s:ss) = do
 mkPrompt toplevs exports
    = concat (intersperse " " (map ('*':) toplevs ++ exports)) ++ "> "
 
-#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
+#ifdef USE_READLINE
 readlineLoop :: GHCi ()
 readlineLoop = do
    cmstate <- getCmState

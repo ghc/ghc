@@ -273,21 +273,49 @@ compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 500); then echo YES
 endif
 endif
 
-# Only include GHCi if we're bootstrapping with at least version 411
+# -----------------------------------------------------------------------------
+# Building a compiler with interpreter support
+#
+# The interpreter, GHCi interface, and Template Haskell are only
+# enabled when we are bootstrapping with the same version of GHC, and
+# the interpreter is supported on this platform.
+
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
-# Yes, include the interpreter, readline, and Template Haskell extensions
+
+# Yes, include the interepreter, readline, and Template Haskell extensions
 SRC_HC_OPTS += -DGHCI -package template-haskell
+
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SRC_HC_OPTS += -package unix
-ifeq "$(GhcLibsWithReadline)" "YES"
-SRC_HC_OPTS += -package readline 
 endif
-endif
+
 ALL_DIRS += ghci
+
+# Enable readline if either:
+#   - we're building stage 1 and $(GhcHasReadline)="YES"
+#   - we're building stage 2/3, and we have built the readline package
+#
+# But we don't enable readline on Windows, because readline is fairly
+# broken there.
+#
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(stage)" "1"
+ifeq "$(GhcHasReadline)" "YES"
+SRC_HC_OPTS += -package readline -DUSE_READLINE
+endif
 else
+ifeq "$(GhcLibsWithReadline)" "YES"
+SRC_HC_OPTS += -package readline -DUSE_READLINE
+endif
+endif # stage=1
+endif # not windows
+
+else
+
 # No interpreter, so exclude Template Haskell modules
 EXCLUDED_SRCS += deSugar/DsMeta.hs typecheck/TcSplice.lhs hsSyn/Convert.lhs
-endif 
+
+endif # bootstrapped with interpreter
 
 # -----------------------------------------------
 # mkdependC stuff
