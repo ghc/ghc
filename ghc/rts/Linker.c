@@ -425,7 +425,14 @@ typedef struct _RtsSymbolVal {
       SymX(genericRaise)			\
       SymX(getProgArgv)				\
       SymX(getStablePtr)			\
-      SymX(initLinker)  			\
+      SymX(hs_init)				\
+      SymX(hs_exit)				\
+      SymX(hs_set_argv)				\
+      SymX(hs_add_root)				\
+      SymX(hs_perform_gc)			\
+      SymX(hs_free_stable_ptr)			\
+      SymX(hs_free_fun_ptr)			\
+      SymX(initLinker)				\
       SymX(int2Integerzh_fast)			\
       SymX(integer2Intzh_fast)			\
       SymX(integer2Wordzh_fast)			\
