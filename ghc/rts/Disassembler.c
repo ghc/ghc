@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/26 17:27:31 $
+ * $Revision: 1.10 $
+ * $Date: 1999/11/01 18:19:40 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -205,6 +205,8 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disNone(bco,pc,"PANIC");
     case i_STK_CHECK:
             return disInt(bco,pc,"STK_CHECK");
+    case i_STK_CHECK_big:
+            return disInt16(bco,pc,"STK_CHECK_big");
     case i_ARG_CHECK:
             return disInt(bco,pc,"ARG_CHECK");
     case i_ALLOC_AP:

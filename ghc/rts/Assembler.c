@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/10/29 13:41:27 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/01 18:19:40 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -281,10 +281,25 @@ static void resetHp( AsmBCO bco, nat hp )
     bco->hp     = hp;
 }
 
-static void resetSp( AsmBCO bco, AsmSp sp )
+static void setSp( AsmBCO bco, AsmSp sp )
 {
     bco->max_sp = stg_max(bco->sp,bco->max_sp);
     bco->sp     = sp;
+    bco->max_sp = stg_max(bco->sp,bco->max_sp);
+}
+
+static void incSp ( AsmBCO bco, int sp_delta )
+{
+    bco->max_sp  = stg_max(bco->sp,bco->max_sp);
+    bco->sp     += sp_delta;
+    bco->max_sp  = stg_max(bco->sp,bco->max_sp);
+}
+
+static void decSp ( AsmBCO bco, int sp_delta )
+{
+    bco->max_sp  = stg_max(bco->sp,bco->max_sp);
+    bco->sp     -= sp_delta;
+    bco->max_sp  = stg_max(bco->sp,bco->max_sp);
 }
 
 /* --------------------------------------------------------------------------
@@ -370,7 +385,7 @@ void asmEndBCO( AsmBCO bco )
 {
     nat p  = bco->object.ptrs.len;
     nat np = bco->nps.len;
-    nat is = bco->is.len + 2;  /* 2 for stack check */
+    nat is = bco->is.len + (bco->max_sp <= 255 ? 2 : 3);  /* 2 or 3 for stack check */
 
     StgClosure* c = asmAlloc(BCO_sizeW(p,np,is));
     StgBCO*     o = stgCast(StgBCO*,c);
@@ -385,8 +400,17 @@ void asmEndBCO( AsmBCO bco )
         nat j = 0;
         bco->max_sp = stg_max(bco->sp,bco->max_sp);
         bco->max_hp = stg_max(bco->hp,bco->max_hp);
-        bcoInstr(o,j++) = i_STK_CHECK;
-        bcoInstr(o,j++) = bco->max_sp;
+
+        ASSERT(bco->max_sp <= 65535);
+        if (bco->max_sp <= 255) {
+           bcoInstr(o,j++) = i_STK_CHECK;
+           bcoInstr(o,j++) = bco->max_sp;
+        } else {
+           bcoInstr(o,j++) = i_STK_CHECK_big;
+           bcoInstr(o,j++) = bco->max_sp / 256;
+           bcoInstr(o,j++) = bco->max_sp % 256;
+        }
+
         mapQueue(Instrs,  StgWord8,   bco->is,   bcoInstr(o,j++) = x);
         ASSERT(j == is);
     }
@@ -767,7 +791,7 @@ void   asmEndArgCheck   ( AsmBCO bco, AsmSp last_arg )
 
 AsmVar asmBind          ( AsmBCO bco, AsmRep rep )
 {
-    bco->sp += repSizeW(rep);
+    incSp(bco,repSizeW(rep));
     return bco->sp;
 }
 
@@ -777,7 +801,7 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
 
     if (rep == VOID_REP) {
         emiti_(bco,i_VOID);
-        bco->sp += repSizeW(rep);
+        incSp(bco,repSizeW(rep));
         return;
     }
 
@@ -833,7 +857,7 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     default:
             barf("asmVar %d",rep);
     }
-    bco->sp += repSizeW(rep);
+    incSp(bco,repSizeW(rep));
 }
 
 /* --------------------------------------------------------------------------
@@ -852,9 +876,10 @@ void asmEndEnter( AsmBCO bco, AsmSp sp1, AsmSp sp2 )
     ASSERT(x >= 0 && y >= 0);
     if (y != 0) {
         emit_i_SLIDE(bco,x,y);
-        bco->sp -= sp1 - sp2;
+        decSp(bco,sp1 - sp2);
     }
     emiti_(bco,i_ENTER);
+    decSp(bco,sizeofW(StgPtr));
 }
 
 /* --------------------------------------------------------------------------
@@ -897,8 +922,8 @@ AsmVar asmBox( AsmBCO bco, AsmRep rep )
             barf("asmBox %d",rep);
     }
     /* NB: these operations DO pop their arg       */
-    bco->sp -= repSizeW(rep);   /* pop unboxed arg */
-    bco->sp += sizeofW(StgPtr); /* push box        */
+    decSp(bco, repSizeW(rep));   /* pop unboxed arg */
+    incSp(bco, sizeofW(StgPtr)); /* push box        */
     return bco->sp;
 }
 
@@ -934,7 +959,7 @@ AsmVar asmUnbox( AsmBCO bco, AsmRep rep )
             barf("asmUnbox %d",rep);
     }
     /* NB: these operations DO NOT pop their arg  */
-    bco->sp += repSizeW(rep); /* push unboxed arg */
+    incSp(bco, repSizeW(rep)); /* push unboxed arg */
     return bco->sp;
 }
 
@@ -947,49 +972,49 @@ void asmConstInt( AsmBCO bco, AsmInt x )
 {
     emit_i_CONST_INT(bco,bco->nps.len);
     asmWords(bco,AsmInt,x);
-    bco->sp += repSizeW(INT_REP);
+    incSp(bco, repSizeW(INT_REP));
 }
 
 void asmConstInteger( AsmBCO bco, AsmString x )
 {
     emit_i_CONST_INTEGER(bco,bco->nps.len);
     asmWords(bco,AsmString,x);
-    bco->sp += repSizeW(INTEGER_REP);
+    incSp(bco, repSizeW(INTEGER_REP));
 }
 
 void asmConstAddr( AsmBCO bco, AsmAddr x )
 {
     emit_i_CONST_ADDR(bco,bco->nps.len);
     asmWords(bco,AsmAddr,x);
-    bco->sp += repSizeW(ADDR_REP);
+    incSp(bco, repSizeW(ADDR_REP));
 }
 
 void asmConstWord( AsmBCO bco, AsmWord x )
 {
     emit_i_CONST_INT(bco,bco->nps.len);
     asmWords(bco,AsmWord,(AsmInt)x);
-    bco->sp += repSizeW(WORD_REP);
+    incSp(bco, repSizeW(WORD_REP));
 }
 
 void asmConstChar( AsmBCO bco, AsmChar x )
 {
     emit_i_CONST_CHAR(bco,bco->nps.len);
     asmWords(bco,AsmChar,x);
-    bco->sp += repSizeW(CHAR_REP);
+    incSp(bco, repSizeW(CHAR_REP));
 }
 
 void asmConstFloat( AsmBCO bco, AsmFloat x )
 {
     emit_i_CONST_FLOAT(bco,bco->nps.len);
     asmWords(bco,AsmFloat,x);
-    bco->sp += repSizeW(FLOAT_REP);
+    incSp(bco, repSizeW(FLOAT_REP));
 }
 
 void asmConstDouble( AsmBCO bco, AsmDouble x )
 {
     emit_i_CONST_DOUBLE(bco,bco->nps.len);
     asmWords(bco,AsmDouble,x);
-    bco->sp += repSizeW(DOUBLE_REP);
+    incSp(bco, repSizeW(DOUBLE_REP));
 }
 
 /* --------------------------------------------------------------------------
@@ -1010,14 +1035,14 @@ AsmSp asmContinuation( AsmBCO bco, AsmBCO ret_addr )
 {
     emit_i_RETADDR(bco,bco->object.ptrs.len);
     asmPtr(bco,&(ret_addr->object));
-    bco->sp += 2 * sizeofW(StgPtr);
+    incSp(bco, 2 * sizeofW(StgPtr));
     return bco->sp;
 }
 
 AsmBCO asmBeginContinuation ( AsmSp sp, int /*List*/ alts )
 {
     AsmBCO bco = asmBeginBCO(alts);
-    bco->sp = sp;
+    setSp(bco, sp);
     return bco;
 }
 
@@ -1038,7 +1063,7 @@ AsmSp asmBeginAlt( AsmBCO bco )
 
 void asmEndAlt( AsmBCO bco, AsmSp  sp )
 {
-    resetSp(bco,sp);
+    setSp(bco,sp);
 }
 
 AsmPc asmTest( AsmBCO bco, AsmWord tag )
@@ -1052,7 +1077,7 @@ AsmPc asmTestInt( AsmBCO bco, AsmVar v, AsmInt x )
     asmVar(bco,v,INT_REP);
     asmConstInt(bco,x);
     emiti_16(bco,i_TEST_INT,0);
-    bco->sp -= 2*repSizeW(INT_REP);
+    decSp(bco, 2*repSizeW(INT_REP));
     return bco->is.len;
 }
 
@@ -1082,7 +1107,7 @@ AsmSp asmBeginPrim( AsmBCO bco )
 void   asmEndPrim( AsmBCO bco, const AsmPrim* prim, AsmSp base )
 {
     emiti_8(bco,prim->prefix,prim->opcode);
-    bco->sp = base;
+    setSp(bco, base);
 }
 
 /* Hugs used to let you add arbitrary primops with arbitrary types
@@ -1437,8 +1462,9 @@ AsmBCO asm_BCO_catch ( void )
    AsmBCO bco = asmBeginBCO(0 /*NIL*/);
    emiti_8(bco,i_ARG_CHECK,2);
    emiti_8(bco,i_PRIMOP1,i_pushcatchframe);
-   bco->sp += (1-2)*sizeofW(StgPtr) + sizeofW(StgCatchFrame);
+   incSp(bco, (1-2)*sizeofW(StgPtr) + sizeofW(StgCatchFrame));
    emiti_(bco,i_ENTER);
+   decSp(bco, sizeofW(StgPtr));
    asmEndBCO(bco);
    return bco;
 }
@@ -1448,6 +1474,7 @@ AsmBCO asm_BCO_raise ( void )
    AsmBCO bco = asmBeginBCO(0 /*NIL*/);
    emiti_8(bco,i_ARG_CHECK,1);
    emiti_8(bco,i_PRIMOP2,i_raise);
+   decSp(bco,sizeofW(StgPtr));
    asmEndBCO(bco);
    return bco;
 }
@@ -1461,7 +1488,7 @@ AsmBCO asm_BCO_seq ( void )
    emit_i_VAR(cont,1);
    emit_i_SLIDE(cont,1,2);
    emiti_(cont,i_ENTER);
-   cont->sp += 3*sizeofW(StgPtr);
+   incSp(cont, 3*sizeofW(StgPtr));
    asmEndBCO(cont);
 
    eval = asmBeginBCO(0 /*NIL*/);
@@ -1472,7 +1499,7 @@ AsmBCO asm_BCO_seq ( void )
    emit_i_SLIDE(eval,3,1);
    emiti_8(eval,i_PRIMOP1,i_pushseqframe);
    emiti_(eval,i_ENTER);
-   eval->sp += sizeofW(StgSeqFrame) + 4*sizeofW(StgPtr);
+   incSp(eval, sizeofW(StgSeqFrame) + 4*sizeofW(StgPtr));
    asmEndBCO(eval);
 
    return eval;
@@ -1487,7 +1514,7 @@ AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info )
     ASSERT( sizeW_fromITBL(info) >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
     emiti_8(bco,i_ALLOC_CONSTR,bco->nps.len);
     asmWords(bco,AsmInfo,info);
-    bco->sp += sizeofW(StgClosurePtr);
+    incSp(bco, sizeofW(StgClosurePtr));
     grabHpNonUpd(bco,sizeW_fromITBL(info));
     return bco->sp;
 }
@@ -1505,7 +1532,7 @@ void asmEndPack( AsmBCO bco, AsmVar v, AsmSp start, AsmInfo info )
     /* only reason to include info is for this assertion */
     assert(info->layout.payload.ptrs == size);
     emit_i_PACK(bco, bco->sp - v);
-    bco->sp = start;
+    setSp(bco, start);
 }
 
 void asmBeginUnpack( AsmBCO bco )
@@ -1521,7 +1548,7 @@ void asmEndUnpack( AsmBCO bco )
 AsmVar asmAllocAP( AsmBCO bco, AsmNat words )
 {
     emiti_8(bco,i_ALLOC_AP,words);
-    bco->sp += sizeofW(StgPtr);
+    incSp(bco, sizeofW(StgPtr));
     grabHpUpd(bco,AP_sizeW(words));
     return bco->sp;
 }
@@ -1535,13 +1562,13 @@ void asmEndMkAP( AsmBCO bco, AsmVar v, AsmSp start )
 {
     emit_i_MKAP(bco,bco->sp-v,bco->sp-start-1);
             /* -1 because fun isn't counted */
-    bco->sp = start;
+    setSp(bco, start);
 }
 
 AsmVar asmAllocPAP( AsmBCO bco, AsmNat size )
 {
     emiti_8(bco,i_ALLOC_PAP,size);
-    bco->sp += sizeofW(StgPtr);
+    incSp(bco, sizeofW(StgPtr));
     return bco->sp;
 }
 
@@ -1554,14 +1581,14 @@ void asmEndMkPAP( AsmBCO bco, AsmVar v, AsmSp start )
 {
     emiti_8_8(bco,i_MKPAP,bco->sp-v,bco->sp-start-1);
             /* -1 because fun isn't counted */
-    bco->sp = start;
+    setSp(bco, start);
 }
 
 AsmVar asmClosure( AsmBCO bco, AsmObject p )
 {
     emit_i_CONST(bco,bco->object.ptrs.len);
     asmPtr(bco,p);
-    bco->sp += sizeofW(StgPtr);
+    incSp(bco, sizeofW(StgPtr));
     return bco->sp;
 }
 
@@ -1570,7 +1597,7 @@ AsmVar asmGHCClosure( AsmBCO bco, AsmObject p )
     // A complete hack.  Pushes the address as a tagged int
     // and then uses SLIDE to get rid of the tag.  Appalling.
     asmConstInt(bco, (AsmInt)p);
-    emit_i_SLIDE(bco,0,1); bco->sp -= 1;
+    emit_i_SLIDE(bco,0,1); decSp(bco,1);
     return bco->sp;
 }
 

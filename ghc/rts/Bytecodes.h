@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.9 1999/10/29 13:41:29 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.10 1999/11/01 18:19:39 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,6 +27,7 @@
     Ins(i_INTERNAL_ERROR),    \
     Ins(i_PANIC),             \
     Ins(i_STK_CHECK),         \
+    Ins(i_STK_CHECK_big),     \
     Ins(i_ARG_CHECK),         \
     Ins(i_ALLOC_AP),          \
     Ins(i_ALLOC_PAP),         \

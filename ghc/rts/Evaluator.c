@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.23 $
- * $Date: 1999/10/29 13:41:29 $
+ * $Revision: 1.24 $
+ * $Date: 1999/11/01 18:19:41 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -585,6 +585,15 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             Case(i_STK_CHECK):
                 {
                     int n = BCO_INSTR_8;
+                    if (xSp - n < xSpLim) {
+                        xPushCPtr((StgClosure*)bco); /* code to restart with */
+                        RETURN(StackOverflow);
+                    }
+                    Continue;
+                }
+            Case(i_STK_CHECK_big):
+                {
+                    int n = BCO_INSTR_16;
                     if (xSp - n < xSpLim) {
                         xPushCPtr((StgClosure*)bco); /* code to restart with */
                         RETURN(StackOverflow);
