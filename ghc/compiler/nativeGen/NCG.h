@@ -1,5 +1,14 @@
 #ifndef NCG_H
 #define NCG_H
+#if 0
+ COMPILING_NCG is used to control the visibility of 
+ relevant information from the GHC header files when
+ compiling the native code generator modules.
+#endif
+
+#ifndef COMPILING_NCG
+#define COMPILING_NCG
+#endif
 
 #if 0
 
@@ -37,6 +46,7 @@ you will screw up the layout where they are used in case expressions!
 # define STOLEN_X86_REGS 4
 -- HACK: go for the max
 #endif
+
 #include "../../includes/MachRegs.h"
 
 #if alpha_TARGET_ARCH
