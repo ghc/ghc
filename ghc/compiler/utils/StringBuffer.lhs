@@ -47,6 +47,11 @@ import GHC.IO		( slurpFile )
 #endif
 
 import IO			( openFile, hFileSize, IOMode(ReadMode) )
+#if __GLASGOW_HASKELL__ >= 601
+import System.IO		( openBinaryFile )
+#else
+import IOExts                   ( openFileEx, IOModeEx(..) )
+#endif
 
 #if __GLASGOW_HASKELL__ < 503
 import IArray			( listArray )
@@ -62,6 +67,9 @@ import Data.Array.IO		( IOArray, hGetArray )
 
 import Char			( ord )
 
+#if __GLASGOW_HASKELL__ < 601
+openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
+#endif
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type
 
@@ -82,7 +90,7 @@ instance Show StringBuffer where
 
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname = do
-   h <- openFile fname ReadMode
+   h <- openBinaryFile fname ReadMode
    size <- hFileSize h
    let size_i@(I# sz#) = fromIntegral size
 #if __GLASGOW_HASKELL__ < 503
