@@ -79,7 +79,7 @@ HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 # the suffix .hs, since they're special and don't fall under the umbrella of $(HS_SRCS)
 # always (only when $(Ghc2_0) is equal to YES)
 ifeq "$(Ghc2_0)" "YES"
-LOOPS_HS  = $(wildcard */*Loop*.hs)
+#OLD:LOOPS_HS  = $(wildcard */*Loop*.hs)
 MKDEPENDHS_SRCS = $(HS_SRCS)
 #HS_SRCS  += $(LOOPS_HS)
 else
@@ -134,7 +134,7 @@ SRC_HC_OPTS += \
 # -syslib ghc just needed for use of PackedString.hPutPS
 
 
-SRC_CC_OPTS += -Iparser -I.
+SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes
 
 ifeq "$(Ghc2_0)" "NO"
 SRC_HC_OPTS += -fomit-derived-read -fomit-reexported-instances
@@ -178,6 +178,7 @@ parser/U_either_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_qid_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_tree_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
+parser/hslexer_CC_OPTS          = -I$(TOP)/includes
 prelude/PrimOp_HC_OPTS 		= -K3m
 reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 ifeq "$(Ghc2_0)" "NO"
@@ -187,6 +188,12 @@ reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 rename/ParseIface_HC_OPTS 	= -Onot -H16m
 rename/ParseType_HC_OPTS 	= -Onot -H16m
 rename/ParseUnfolding_HC_OPTS 	= -Onot -H16m
+ifeq "$(Ghc2_0)" "YES"
+rename/ParseIface_HC_OPTS       += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
+rename/ParseType_HC_OPTS        += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
+rename/ParseUnfolding_HC_OPTS   += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
+endif
+
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		= -fvia-C -O2 -O2-for-C
 else
@@ -289,7 +296,7 @@ hi-boot ::
 # Have the collector *Loop.hs interface files be generated just after having
 # created the .hi's from the .hi-boot's. 
 
-hi-boot :: $(patsubst %.hs,%.hi,$(LOOPS_HS))
+#hi-boot :: $(patsubst %.hs,%.hi,$(LOOPS_HS))
 
 else
 %.hi : %.lhi
