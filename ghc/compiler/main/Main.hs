@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.100 2002/03/13 13:51:35 simonmar Exp $
+-- $Id: Main.hs,v 1.101 2002/03/26 22:08:44 sof Exp $
 --
 -- GHC Driver program
 --
@@ -66,14 +66,14 @@ import Monad
 import List
 import Maybe
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 import Concurrent	( myThreadId )
-#if __GLASGOW_HASKELL__ < 500
+# if __GLASGOW_HASKELL__ < 500
 import Exception        ( raiseInThread )
 #define throwTo  raiseInThread
-#else
+# else
 import Exception	( throwTo )
-#endif
+# endif
 
 import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
 import Dynamic		( toDyn )
@@ -137,7 +137,7 @@ main =
 	-- signals.
 
 	-- install signal handlers
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
    main_thread <- myThreadId
    let sig_handler = Catch (throwTo main_thread 
 				(DynException (toDyn Interrupted)))

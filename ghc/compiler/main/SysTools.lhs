@@ -85,7 +85,7 @@ import Addr
     
 #include "../includes/config.h"
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 import qualified Posix
 #else
 import List		( isPrefixOf )
@@ -98,7 +98,7 @@ import Foreign
 import GHC.IOBase
 # else
 # endif
-# ifdef mingw32_TARGET_OS
+# ifdef mingw32_HOST_OS
 import SystemExts       ( rawSystem )
 # endif
 #else
@@ -273,7 +273,7 @@ initSysTools minusB_args
 		| am_installed = installed_bin cGHC_MANGLER_PGM
 		| otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 	-- check whether TMPDIR is set in the environment
 	; IO.try (do dir <- getEnv "TMPDIR" -- fails if not set
 	      	     setTmpDir dir
@@ -315,7 +315,7 @@ initSysTools minusB_args
 	     throwDyn (InstallationError 
 		         ("Can't find package.conf as " ++ pkgconfig_path))
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 	--		WINDOWS-SPECIFIC STUFF
 	-- On Windows, gcc and friends are distributed with GHC,
 	-- 	so when "installed" we look in TopDir/bin
@@ -414,7 +414,7 @@ initSysTools minusB_args
 	; return ()
 	}
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 foreign import stdcall "GetTempPathA" unsafe getTempPath :: Int -> CString -> IO Int32
 #endif
 \end{code}
@@ -512,13 +512,6 @@ showOptions ls = unwords (map (quote.showOpt) ls)
  where
    showOpt (FileOption pre f) = pre ++ dosifyPath f
    showOpt (Option s)     = s
-
-#if defined(mingw32_TARGET_OS)
-   quote "" = ""
-   quote s  = "\"" ++ s ++ "\""
-#else
-   quote = id
-#endif
 
 \end{code}
 
@@ -704,7 +697,7 @@ runSomething :: String		-- For -v message
 runSomething phase_name pgm args
  = traceCmd phase_name cmd_line $
    do   {
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 	  exit_code <- system cmd_line
 #else
           exit_code <- rawSystem cmd_line
@@ -714,14 +707,9 @@ runSomething phase_name pgm args
   	  else return ()
 	}
   where
-    cmd_line = pgm ++ ' ':showOptions args -- unwords (pgm : dosifyPaths (map quote args))
 	-- The pgm is already in native format (appropriate dir separators)
-#if defined(mingw32_TARGET_OS)
-    quote "" = ""
-    quote s  = "\"" ++ s ++ "\""
-#else
-    quote = id
-#endif
+    cmd_line = pgm ++ ' ':showOptions args 
+                -- unwords (pgm : dosifyPaths (map quote args))
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
@@ -780,7 +768,7 @@ pgmPath :: String		-- Directory string in Unix format
 
 
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 
 --------------------- Windows version ------------------
 dosifyPaths xs = map dosifyPath xs
@@ -840,7 +828,7 @@ slash s1 s2 = s1 ++ ('/' : s2)
 -----------------------------------------------------------------------------
 -- Define	getExecDir     :: IO (Maybe String)
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 getExecDir :: IO (Maybe String)
 getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 		buf <- mallocArray len
@@ -856,14 +844,14 @@ foreign import stdcall "GetModuleFileNameA" unsafe getModuleFileName :: Addr -> 
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 foreign import "_getpid" unsafe getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
 #endif
 
-#if defined(mingw32_TARGET_OS) && (__GLASGOW_HASKELL__ <= 408)
+#if defined(mingw32_HOST_OS) && (__GLASGOW_HASKELL__ <= 408)
 rawSystem :: String -> IO ExitCode
 rawSystem cmd = system cmd
  -- mingw only: if you try to build a stage2 compiler with a stage1
@@ -873,5 +861,12 @@ rawSystem cmd = system cmd
  -- to compile up the GHC sources.
 #endif
 
+quote :: String -> String
+#if defined(mingw32_HOST_OS)
+quote "" = ""
+quote s  = "\"" ++ s ++ "\""
+#else
+quote s = s
+#endif
 
 \end{code}
