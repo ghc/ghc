@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: ghcconfig.mk.in,v 1.2 1996/11/21 16:48:02 simonm Exp $
+# $Id: ghcconfig.mk.in,v 1.3 1996/11/22 14:12:39 simonm Exp $
 
 # This stuff should be split into separate files: that which can be 
 # messed with, and that which can't.
@@ -37,15 +37,15 @@ __hsc_opt 		=
 endif
 
 ifeq ($(HaskellCompilerType), HC_CHALMERS_HBC)
-SETUP_HC_OPTS 		= $(__hsc_opt) -fpbu
+PROJECT_HC_OPTS		= $(__hsc_opt) -fpbu
 else
 ifeq ($(HaskellCompilerType), HC_GLASGOW_GHC)
-SETUP_HC_OPTS 		= $(__hsc_opt) -hi-diffs -link-chk
+PROJECT_HC_OPTS		= $(__hsc_opt) -hi-diffs -link-chk
 else
 ifeq ($(HaskellCompilerType),HC_ROJEMO_NHC)
-SETUP_HC_OPTS 		=
+PROJECT_HC_OPTS		=
 else
-SETUP_HC_OPTS 		=
+PROJECT_HC_OPTS		=
 endif
 endif
 endif
@@ -99,7 +99,6 @@ GLUED_HSTAGS_OPTS = \
 	$(ALL_PROJECTS_HSTAGS_OPTS) \
 	$(PLATFORM_HSTAGS_OPTS) \
 	$(PROJECT_HSTAGS_OPTS) \
-	$(SETUP_HSTAGS_OPTS) \
 	$(HSTAGS_OPTS) \
 	$(EXTRA_HSTAGS_OPTS)
 
@@ -149,7 +148,6 @@ GLUED_GHC_OPTS = \
 	$(ALL_PROJECTS_GHC_OPTS) \
 	$(PLATFORM_GHC_OPTS) \
 	$(PROJECT_GHC_OPTS) \
-	$(SETUP_GHC_OPTS) \
 	$(GHC_OPTS) \
 	$(EXTRA_GHC_OPTS)
 
