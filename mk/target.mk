@@ -414,10 +414,15 @@ ifeq "$(GHCI_LIBOBJS)" ""
 GHCI_LIBOBJS = $(LIBOBJS)
 endif
 
+ifneq "$(HS_SRCS)" ""
 ifeq "$(SplitObjs)" "YES"
 $(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
 	( echo $(STUBOBJS) ; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print ) | xargs ld -r -x -o $@
-else
+else # not SplitObjs
+$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
+	ld -r -x -o $@ $(GHCI_LIBOBJS)
+endif
+else # no HS_SRCS
 $(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
 	ld -r -x -o $@ $(GHCI_LIBOBJS)
 endif
