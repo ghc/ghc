@@ -8,7 +8,7 @@ _declarations_
 1 data Expr b ;
 
 1 data CoreRule ;
-1 type CoreRules = [CoreRule] ;
+1 data CoreRules = Rules [CoreRule] VarSet.IdOrTyVarSet ;;
 1 emptyCoreRules _:_ CoreRules ;;
 1 seqRules _:_ CoreRules -> PrelBase.() ;;
 1 isEmptyCoreRules _:_ CoreRules -> PrelBase.Bool ;;

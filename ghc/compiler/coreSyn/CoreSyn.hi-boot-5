@@ -6,7 +6,7 @@ __export CoreSyn CoreExpr CoreRules CoreRule emptyCoreRules isEmptyCoreRules seq
 1 data Expr b ;
 
 1 data CoreRule ;
-1 type CoreRules = [CoreRule] ;
+1 data CoreRules = Rules [CoreRule] VarSet.IdOrTyVarSet ;
 1 emptyCoreRules :: CoreRules ;
 1 seqRules :: CoreRules -> PrelBase.Z0T ;
 1 isEmptyCoreRules :: CoreRules -> PrelBase.Bool ;
