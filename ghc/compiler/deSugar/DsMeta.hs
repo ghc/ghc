@@ -51,7 +51,7 @@ import CoreUtils  ( exprType )
 import SrcLoc	  ( noSrcLoc, unLoc, Located(..), SrcSpan, srcLocSpan )
 import Maybe	  ( catMaybes )
 import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique, getKey, Uniquable(..) )
-import BasicTypes ( NewOrData(..), isBoxed ) 
+import BasicTypes ( isBoxed ) 
 import Packages	  ( thPackage )
 import Outputable
 import Bag	  ( bagToList )

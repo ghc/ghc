@@ -20,9 +20,9 @@ import CmdLineOpts	( DynFlags( verbosity ), DynFlag( Opt_IgnoreInterfacePragmas 
 			  opt_InPackage )
 import Parser		( parseIface )
 
-import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..), IfaceInst(..), 
-			  IfaceRule(..), IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..),
-			  IfaceType(..), IfacePredType(..), IfaceExtName, mkIfaceExtName )
+import IfaceSyn		( IfaceDecl(..), IfaceConDecls(..), IfaceConDecl(..), IfaceClassOp(..), 
+			  IfaceInst(..), IfaceRule(..), IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..), 
+			  IfaceType(..), IfacePredType(..), IfaceExtName, visibleIfConDecls, mkIfaceExtName )
 import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc )
 import HscTypes		( HscEnv(..), ModIface(..), emptyModIface,
 			  ExternalPackageState(..), emptyTypeEnv, emptyPool, 
@@ -55,7 +55,7 @@ import OccName		( OccName, mkClassTyConOcc, mkClassDataConOcc,
 			  mkSuperDictSelOcc, 
 			  mkDataConWrapperOcc, mkDataConWorkerOcc )
 import Class		( Class, className )
-import TyCon		( DataConDetails(..), tyConName )
+import TyCon		( tyConName )
 import SrcLoc		( mkSrcLoc, importedSrcLoc )
 import Maybes		( isJust, mapCatMaybes )
 import StringBuffer     ( hGetStringBuffer )
@@ -300,11 +300,9 @@ ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, ifSigs = sigs
     tc_occ  = mkClassTyConOcc cls_occ
     dc_occ  = mkClassDataConOcc cls_occ	
 
-ifaceDeclSubBndrs (IfaceData {ifCons = Unknown}) = []
-ifaceDeclSubBndrs (IfaceData {ifCons = DataCons cons})
-  = foldr ((++) . conDeclBndrs) [] cons
-
-ifaceDeclSubBndrs other = []
+ifaceDeclSubBndrs (IfaceData {ifCons = cons}) = foldr ((++) . conDeclBndrs) [] 
+						      (visibleIfConDecls cons)
+ifaceDeclSubBndrs other 		      = []
 
 conDeclBndrs (IfaceConDecl con_occ _ _ _ _ fields)
   = fields ++ 

@@ -32,7 +32,7 @@ import Module
 import CmdLineOpts	( opt_SccProfilingOn )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
-			  NewOrData(..), Activation(..) )
+			  Activation(..) )
 import OrdList
 import Bag		( emptyBag )
 import Panic

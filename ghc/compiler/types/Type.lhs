@@ -84,9 +84,9 @@ import Name	( NamedThing(..), mkInternalName, tidyOccName )
 import Class	( Class, classTyCon )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
-		  isFunTyCon, isNewTyCon, newTyConRep,
+		  isFunTyCon, isNewTyCon, newTyConRep, newTyConRhs,
 		  isAlgTyCon, isSynTyCon, tyConArity, 
-	          tyConKind, getSynTyConDefn,
+	          tyConKind, getSynTyConDefn, 
 		  tyConPrimRep, 
 		)
 
@@ -398,6 +398,12 @@ typePrimRep ty = case repType ty of
 		   AppTy _ _	 -> PtrRep	-- ??
 		   TyVarTy _	 -> PtrRep
 		   other	 -> pprPanic "typePrimRep" (ppr ty)
+
+-- new_type_rep doesn't ask any questions: 
+-- it just expands newtype, whether recursive or not
+new_type_rep new_tycon tys = ASSERT( tys `lengthIs` tyConArity new_tycon )
+			     case newTyConRep new_tycon of
+				 (tvs, rep_ty) -> substTyWith tvs tys rep_ty
 \end{code}
 
 
@@ -512,6 +518,8 @@ mkPredTys preds = map PredTy preds
 predTypeRep :: PredType -> Type
 -- Convert a PredType to its "representation type";
 -- the post-type-checking type used by all the Core passes of GHC.
+-- Unwraps only the outermost level; for example, the result might
+-- be a NewTcApp; c.f. newTypeRep
 predTypeRep (IParam _ ty)     = ty
 predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 	-- Result might be a NewTcApp, but the consumer will
@@ -529,24 +537,33 @@ predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 splitRecNewType_maybe :: Type -> Maybe Type
 -- Newtypes are always represented by a NewTcApp
 -- Sometimes we want to look through a recursive newtype, and that's what happens here
+-- It only strips *one layer* off, so the caller will usually call itself recursively
 -- Only applied to types of kind *, hence the newtype is always saturated
 splitRecNewType_maybe (NoteTy _ ty) = splitRecNewType_maybe ty  
 splitRecNewType_maybe (PredTy p)    = splitRecNewType_maybe (predTypeRep p)
 splitRecNewType_maybe (NewTcApp tc tys)
   | isRecursiveTyCon tc
   = ASSERT( tys `lengthIs` tyConArity tc && isNewTyCon tc )
-	-- The assert should hold because repType should
-	-- only be applied to *types* (of kind *)
-    Just (new_type_rep tc tys)
+	-- The assert should hold because splitRecNewType_maybe
+	-- should only be applied to *types* (of kind *)
+    Just (new_type_rhs tc tys)
 splitRecNewType_maybe other = Nothing
 			
 -----------------------------
 newTypeRep :: TyCon -> [Type] -> Type
 -- A local helper function (not exported)
--- Expands a newtype application to 
+-- Expands *the outermoset level of* a newtype application to 
 --	*either* a vanilla TyConApp (recursive newtype, or non-saturated)
---	*or*     the newtype representation (otherwise)
--- Either way, the result is not a NewTcApp
+--	*or*     the newtype representation (otherwise), meaning the
+--			type written in the RHS of the newtype decl,
+--			which may itself be a newtype
+--
+-- Example: newtype R = MkR S
+--	    newtype S = MkS T
+--	    newtype T = MkT (T -> T)
+--   newTypeRep on R gives NewTcApp S
+--		on S gives NewTcApp T
+--		on T gives TyConApp T
 --
 -- NB: the returned TyConApp is always deconstructed immediately by the 
 --     caller... a TyConApp with a newtype type constructor never lives
@@ -554,17 +571,16 @@ newTypeRep :: TyCon -> [Type] -> Type
 newTypeRep tc tys
   | not (isRecursiveTyCon tc),		-- Not recursive and saturated
     tys `lengthIs` tyConArity tc 	-- treat as equivalent to expansion
-  = new_type_rep tc tys
+  = new_type_rhs tc tys
   | otherwise
   = TyConApp tc tys
 	-- ToDo: Consider caching this substitution in a NType
 
-----------------------------
--- new_type_rep doesn't ask any questions: 
--- it just expands newtype, whether recursive or not
-new_type_rep new_tycon tys = ASSERT( tys `lengthIs` tyConArity new_tycon )
-			     case newTyConRep new_tycon of
-				 (tvs, rep_ty) -> substTyWith tvs tys rep_ty
+-- new_type_rhs doesn't ask any questions: 
+-- it just expands newtype one level, whether recursive or not
+new_type_rhs tc tys 
+  = case newTyConRhs tc of
+	(tvs, rep_ty) -> substTyWith tvs tys rep_ty
 \end{code}
 
 

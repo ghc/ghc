@@ -87,7 +87,8 @@ import Inst		( tcStdSyntaxName )
 import RnExpr		( rnStmts, rnLExpr )
 import RnNames		( exportsToAvails )
 import LoadIface	( loadSrcInterface )
-import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceExtName(..),
+import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
+			  IfaceExtName(..), IfaceConDecls(..),
 			  tyThingToIfaceDecl )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( Id, isImplicitId )
@@ -864,8 +865,11 @@ getModuleContents hsc_env ictxt mod exports_only
 ---------------------
 filter_decl occs decl@(IfaceClass {ifSigs = sigs})
   = decl { ifSigs = filter (keep_sig occs) sigs }
-filter_decl occs decl@(IfaceData {ifCons = DataCons cons})
-  = decl { ifCons = DataCons (filter (keep_con occs) cons) }
+filter_decl occs decl@(IfaceData {ifCons = IfDataTyCon cons})
+  = decl { ifCons = IfDataTyCon (filter (keep_con occs) cons) }
+filter_decl occs decl@(IfaceData {ifCons = IfNewTyCon con})
+  | keep_con occs con = decl
+  | otherwise	      = decl {ifCons = IfAbstractTyCon}	-- Hmm?
 filter_decl occs decl
   = decl
 

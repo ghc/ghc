@@ -14,8 +14,7 @@ files for imported data types.
 module TcTyDecls(
         calcTyConArgVrcs,
 	calcRecFlags, 
-	calcClassCycles, calcSynCycles,
-	newTyConRhs
+	calcClassCycles, calcSynCycles
     ) where
 
 #include "HsVersions.h"
@@ -24,11 +23,10 @@ import TypeRep          ( Type(..), TyNote(..), PredType(..) )  -- friend
 import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl, isClassDecl )
 import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep )
-import BuildTyCl	( newTyConRhs )
 import HscTypes		( TyThing(..) )
 import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons, tyConTyVars,
                           getSynTyConDefn, isSynTyCon, isAlgTyCon, isHiBootTyCon,
-			  tyConName, isNewTyCon, isProductTyCon, tyConArgVrcs )
+			  tyConName, isNewTyCon, isProductTyCon, tyConArgVrcs, newTyConRhs )
 import Class		( classTyCon )
 import DataCon          ( dataConRepArgTys, dataConOrigArgTys )
 import Var              ( TyVar )
@@ -219,7 +217,7 @@ calcRecFlags tyclss
     nt_edges = [(t, mk_nt_edges t) | t <- new_tycons]
 
     mk_nt_edges nt 	-- Invariant: nt is a newtype
-	= concatMap (mk_nt_edges1 nt) (tcTyConsOfType (newTyConRhs nt))
+	= concatMap (mk_nt_edges1 nt) (tcTyConsOfType (new_tc_rhs nt))
 			-- tyConsOfType looks through synonyms
 
     mk_nt_edges1 nt tc 
@@ -247,13 +245,15 @@ calcRecFlags tyclss
  	| tc `elem` prod_tycons   = [tc]		-- Local product
  	| tc `elem` new_tycons    = if is_rec_nt tc 	-- Local newtype
 				    then []
-				    else mk_prod_edges1 ptc (newTyConRhs tc)
+				    else mk_prod_edges1 ptc (new_tc_rhs tc)
 	| isHiBootTyCon tc	  = [ptc]	-- Make it self-recursive if 
 						-- it mentions an hi-boot TyCon
 		-- At this point we know that either it's a local non-product data type,
 		-- or it's imported.  Either way, it can't form part of a cycle
 	| otherwise = []
 			
+new_tc_rhs tc = snd (newTyConRhs tc)	-- Ignore the type variables
+
 getTyCon (ATyCon tc) = tc
 getTyCon (AClass cl) = classTyCon cl
 

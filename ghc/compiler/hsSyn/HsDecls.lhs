@@ -9,7 +9,7 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 \begin{code}
 module HsDecls (
 	HsDecl(..), LHsDecl, TyClDecl(..), LTyClDecl, 
-	InstDecl(..), LInstDecl,
+	InstDecl(..), LInstDecl, NewOrData(..),
 	RuleDecl(..), LRuleDecl, RuleBndr(..),
 	DefaultDecl(..), LDefaultDecl, HsGroup(..), SpliceDecl(..),
 	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
@@ -38,7 +38,7 @@ import HsImpExp		( pprHsVar )
 import HsTypes
 import HscTypes		( DeprecTxt )
 import CoreSyn		( RuleName )
-import BasicTypes	( NewOrData(..), Activation(..) )
+import BasicTypes	( Activation(..) )
 import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
 			  CExportSpec(..)) 
 
@@ -323,6 +323,11 @@ data TyClDecl name
 		tcdSigs    :: [LSig name],		-- Methods' signatures
 		tcdMeths   :: LHsBinds name		-- Default methods
     }
+
+data NewOrData
+  = NewType  	-- "newtype Blah ..."
+  | DataType 	-- "data Blah ..."
+  deriving( Eq )	-- Needed because Demand derives Eq
 \end{code}
 
 Simple classifiers
@@ -431,6 +436,10 @@ pp_tydecl pp_head pp_decl_rhs derivings
 	  Just ds	   -> hsep [ptext SLIT("deriving"), 
 					ppr_hs_context (unLoc ds)]
     ])
+
+instance Outputable NewOrData where
+  ppr NewType  = ptext SLIT("newtype")
+  ppr DataType = ptext SLIT("data")
 \end{code}
 
 

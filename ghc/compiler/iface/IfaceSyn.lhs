@@ -14,10 +14,13 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 module IfaceSyn (
 	module IfaceType,		-- Re-export all this
 
-	IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
+	IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceConDecls(..),
 	IfaceExpr(..), IfaceAlt, IfaceNote(..),
 	IfaceBinding(..), IfaceConAlt(..), IfaceIdInfo(..),
 	IfaceInfoItem(..), IfaceRule(..), IfaceInst(..), 
+
+	-- Misc
+	visibleIfConDecls,
 
 	-- Converting things to IfaceSyn
 	tyThingToIfaceDecl, dfunToIfaceInst, coreRuleToIfaceRule,
@@ -46,11 +49,11 @@ import NewDemand	( isTopSig )
 import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
 			  arityInfo, cafInfo, newStrictnessInfo, 
 			  workerInfo, unfoldingInfo, inlinePragInfo )
-import TyCon		( TyCon, ArgVrcs, DataConDetails(..), isRecursiveTyCon, isForeignTyCon,
+import TyCon		( TyCon, ArgVrcs, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCon,
 			  isSynTyCon, isNewTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
 			  isTupleTyCon, tupleTyConBoxity,
 			  tyConHasGenerics, tyConArgVrcs, tyConTheta, getSynTyConDefn,
-			  tyConArity, tyConTyVars, tyConDataConDetails, tyConExtName  )
+			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName  )
 import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon )
 import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
@@ -64,7 +67,7 @@ import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
 import ForeignCall	( ForeignCall )
 import TysPrim		( alphaTyVars )
-import BasicTypes	( Arity, Activation(..), StrictnessMark, NewOrData(..),
+import BasicTypes	( Arity, Activation(..), StrictnessMark, 
 			  RecFlag(..), boolToRecFlag, Boxity(..), 
 			  tupleParens )
 import Outputable
@@ -89,11 +92,10 @@ data IfaceDecl
 	      ifType   :: IfaceType, 
 	      ifIdInfo :: IfaceIdInfo }
 
-  | IfaceData { ifND	   :: NewOrData,
-		ifCtxt     :: IfaceContext,	-- Context
+  | IfaceData { ifCtxt     :: IfaceContext,	-- Context
 		ifName     :: OccName,		-- Type constructor
 		ifTyVars   :: [IfaceTvBndr],	-- Type variables
-		ifCons	   :: DataConDetails IfaceConDecl,
+		ifCons	   :: IfaceConDecls,	-- Includes new/data info
 	        ifRec	   :: RecFlag,		-- Recursive or not?
 		ifVrcs     :: ArgVrcs,
 		ifGeneric  :: Bool		-- True <=> generic converter functions available
@@ -123,6 +125,16 @@ data IfaceClassOp = IfaceClassOp OccName DefMeth IfaceType
 	-- Nothing    => no default method
 	-- Just False => ordinary polymorphic default method
 	-- Just True  => generic default method
+
+data IfaceConDecls
+  = IfAbstractTyCon		-- No info
+  | IfDataTyCon [IfaceConDecl]	-- data type decls
+  | IfNewTyCon  IfaceConDecl	-- newtype decls
+
+visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
+visibleIfConDecls IfAbstractTyCon  = []
+visibleIfConDecls (IfDataTyCon cs) = cs
+visibleIfConDecls (IfNewTyCon c)   = [c]
 
 data IfaceConDecl 
   = IfaceConDecl OccName		-- Constructor name
@@ -246,10 +258,15 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty, i
        4 (vcat [equals <+> ppr mono_ty,
 		pprVrcs vrcs])
 
-pprIfaceDecl (IfaceData {ifND = new_or_data, ifCtxt = context, ifName = tycon, ifGeneric = gen,
+pprIfaceDecl (IfaceData {ifCtxt = context, ifName = tycon, ifGeneric = gen,
 			 ifTyVars = tyvars, ifCons = condecls, ifRec = isrec, ifVrcs = vrcs})
-  = hang (ppr new_or_data <+> pp_decl_head context tycon tyvars)
+  = hang (pp_nd <+> pp_decl_head context tycon tyvars)
        4 (vcat [pprVrcs vrcs, pprRec isrec, pprGen gen, pp_condecls condecls])
+  where
+    pp_nd = case condecls of
+		IfAbstractTyCon -> ptext SLIT("data")
+		IfDataTyCon _   -> ptext SLIT("data")
+		IfNewTyCon _    -> ptext SLIT("newtype")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 			  ifFDs = fds, ifSigs = sigs, ifVrcs = vrcs, ifRec = isrec})
@@ -270,8 +287,9 @@ pp_decl_head :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
 pp_decl_head context thing tyvars 
   = hsep [pprIfaceContext context, ppr thing, pprIfaceTvBndrs tyvars]
 
-pp_condecls Unknown	  = ptext SLIT("{- abstract -}")
-pp_condecls (DataCons cs) = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
+pp_condecls IfAbstractTyCon  = ptext SLIT("{- abstract -}")
+pp_condecls (IfDataTyCon cs) = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
+pp_condecls (IfNewTyCon c)   = equals <+> ppr c
 
 instance Outputable IfaceConDecl where
   ppr (IfaceConDecl name ex_tvs ex_ctxt arg_tys strs fields)
@@ -445,11 +463,10 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
 		ifSynRhs = toIfaceType ext syn_ty }
 
   | isAlgTyCon tycon
-  = IfaceData {	ifND	  = new_or_data,
-		ifCtxt    = toIfaceContext ext (tyConTheta tycon),
+  = IfaceData {	ifCtxt    = toIfaceContext ext (tyConTheta tycon),
 		ifName    = getOccName tycon,
 		ifTyVars  = toIfaceTvBndrs tyvars,
-		ifCons    = ifaceConDecls (tyConDataConDetails tycon),
+		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifVrcs    = tyConArgVrcs tycon,
 		ifGeneric = tyConHasGenerics tycon }
@@ -460,11 +477,10 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
 
   | isPrimTyCon tycon || isFunTyCon tycon
 	-- Needed in GHCi for ':info Int#', for example
-  = IfaceData { ifND     = DataType,
-		ifCtxt   = [],
+  = IfaceData { ifCtxt   = [],
 		ifName   = getOccName tycon,
 	  	ifTyVars = toIfaceTvBndrs (take (tyConArity tycon) alphaTyVars),
-		ifCons   = Unknown,
+		ifCons   = IfAbstractTyCon,
 		ifGeneric  = False,
 		ifRec      = NonRecursive,
 		ifVrcs     = tyConArgVrcs tycon }
@@ -473,14 +489,13 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
   where
     tyvars      = tyConTyVars tycon
     (_, syn_ty) = getSynTyConDefn tycon
-    new_or_data | isNewTyCon tycon = NewType
-	        | otherwise	   = DataType
+    abstract    = getName tycon `elemNameSet` abstract_tcs
 
-    abstract = getName tycon `elemNameSet` abstract_tcs
-
-    ifaceConDecls _ | abstract  = Unknown
-    ifaceConDecls Unknown       = Unknown
-    ifaceConDecls (DataCons cs) = DataCons (map ifaceConDecl cs)
+    ifaceConDecls _ | abstract       = IfAbstractTyCon
+    ifaceConDecls (NewTyCon con _ _) = IfNewTyCon (ifaceConDecl con)
+    ifaceConDecls (DataTyCon cons _) = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls AbstractTyCon	     = pprPanic "ifaceConDecls" (ppr tycon)
+	-- We're exporting this thing, so it's locally defined and should not be abstract
 
     ifaceConDecl data_con 
 	= IfaceConDecl (getOccName (dataConName data_con))
@@ -723,7 +738,6 @@ eqIfDecl d1@(IfaceForeign {}) d2@(IfaceForeign {})
 
 eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
   = bool (ifName d1    == ifName d2 && 
-  	  ifND d1      == ifND   d2 && 
 	  ifRec d1     == ifRec   d2 && 
 	  ifVrcs d1    == ifVrcs   d2 && 
 	  ifGeneric d1 == ifGeneric d2) &&&
@@ -769,9 +783,10 @@ eqIfRule (IfaceRule n1 a1 bs1 f1 es1 rhs1)
          eq_ifaceExpr env rhs1 rhs2)
 eqIfRule _ _ = NotEqual
 
-eq_hsCD env (DataCons c1) (DataCons c2) = eqListBy (eq_ConDecl env) c1 c2
-eq_hsCD env Unknown	  Unknown	= Equal
-eq_hsCD env d1		  d2		= NotEqual
+eq_hsCD env (IfDataTyCon c1) (IfDataTyCon c2) = eqListBy (eq_ConDecl env) c1 c2
+eq_hsCD env (IfNewTyCon c1)  (IfNewTyCon c2)  = eq_ConDecl env c1 c2
+eq_hsCD env IfAbstractTyCon  IfAbstractTyCon  = Equal
+eq_hsCD env d1		     d2		      = NotEqual
 
 eq_ConDecl env (IfaceConDecl n1 tvs1 cxt1 args1 ss1 lbls1)
 	       (IfaceConDecl n2 tvs2 cxt2 args2 ss2 lbls2)	

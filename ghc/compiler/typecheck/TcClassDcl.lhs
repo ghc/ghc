@@ -13,7 +13,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 #include "HsVersions.h"
 
 import HsSyn
-import BasicTypes	( RecFlag(..), NewOrData(..) )
+import BasicTypes	( RecFlag(..) )
 import RnHsSyn		( maybeGenericMatch, extractHsTyVars )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupTopBndrRn, lookupImportedName )

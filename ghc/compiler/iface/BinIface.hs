@@ -14,7 +14,6 @@ import BasicTypes
 import NewDemand
 import IfaceSyn
 import VarEnv
-import TyCon		( DataConDetails(..) )
 import Class		( DefMeth(..) )
 import CostCentre
 import Module		( moduleName, mkModule )
@@ -51,7 +50,6 @@ readBinIface hi_path = getBinFileWithDict hi_path
 {-! for IPName derive: Binary !-}
 {-! for Fixity derive: Binary !-}
 {-! for FixityDirection derive: Binary !-}
-{-! for NewOrData derive: Binary !-}
 {-! for Boxity derive: Binary !-}
 {-! for StrictnessMark derive: Binary !-}
 {-! for Activation derive: Binary !-}
@@ -61,9 +59,6 @@ readBinIface hi_path = getBinFileWithDict hi_path
 {-! for Demands derive: Binary !-}
 {-! for DmdResult derive: Binary !-}
 {-! for StrictSig derive: Binary !-}
-
--- TyCon
-{-! for DataConDetails derive: Binary !-}
 
 -- Class
 {-! for DefMeth derive: Binary !-}
@@ -317,17 +312,6 @@ instance Binary TupCon where
 	  ab <- get bh
 	  ac <- get bh
 	  return (TupCon ab ac)
-
-instance Binary NewOrData where
-    put_ bh NewType = do
-	    putByte bh 0
-    put_ bh DataType = do
-	    putByte bh 1
-    get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do return NewType
-	      _ -> do return DataType
 
 instance Binary RecFlag where
     put_ bh Recursive = do
@@ -891,7 +875,7 @@ instance Binary IfaceDecl where
 	    put_ bh idinfo
     put_ bh (IfaceForeign ae af) = 
 	error "Binary.put_(IfaceDecl): IfaceForeign"
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8) = do
+    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7) = do
 	    putByte bh 2
 	    put_ bh a1
 	    put_ bh a2
@@ -900,7 +884,6 @@ instance Binary IfaceDecl where
 	    put_ bh a5
 	    put_ bh a6
 	    put_ bh a7
-	    put_ bh a8
 
     put_ bh (IfaceSyn aq ar as at) = do
 	    putByte bh 3
@@ -933,8 +916,7 @@ instance Binary IfaceDecl where
 		    a5 <- get bh
 		    a6 <- get bh
 		    a7 <- get bh
-		    a8 <- get bh
-		    return (IfaceData a1 a2 a3 a4 a5 a6 a7 a8)
+		    return (IfaceData a1 a2 a3 a4 a5 a6 a7)
 	      3 -> do
 		    aq <- get bh
 		    ar <- get bh
@@ -958,6 +940,21 @@ instance Binary IfaceInst where
     get bh = do ty   <- get bh
 		dfun <- get bh
 		return (IfaceInst ty dfun)
+
+instance Binary IfaceConDecls where
+    put_ bh IfAbstractTyCon = putByte bh 0
+    put_ bh (IfDataTyCon cs) = do { putByte bh 1
+				  ; put_ bh cs }
+    put_ bh (IfNewTyCon c)  = do { putByte bh 2
+				  ; put_ bh c }
+    get bh = do
+	    h <- getByte bh
+	    case h of
+	      0 -> return IfAbstractTyCon
+	      1 -> do aa <- get bh
+		      return (IfDataTyCon aa)
+	      _ -> do aa <- get bh
+		      return (IfNewTyCon aa)
 
 instance Binary IfaceConDecl where
     put_ bh (IfaceConDecl a1 a2 a3 a4 a5 a6) = do
@@ -1005,16 +1002,4 @@ instance Binary IfaceRule where
 	    a6 <- get bh
 	    return (IfaceRule a1 a2 a3 a4 a5 a6)
 
-instance (Binary datacon) => Binary (DataConDetails datacon) where
-    put_ bh (DataCons aa) = do
-	    putByte bh 0
-	    put_ bh aa
-    put_ bh Unknown = do
-	    putByte bh 1
-    get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do aa <- get bh
-		      return (DataCons aa)
-	      _ -> do return Unknown
 

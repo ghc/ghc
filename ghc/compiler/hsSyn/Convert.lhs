@@ -23,7 +23,7 @@ import SrcLoc	( SrcLoc, generatedSrcLoc, noLoc, unLoc, Located(..),
 		  noSrcSpan, SrcSpan, srcLocSpan, noSrcLoc )
 import Type	( Type )
 import TysWiredIn ( unitTyCon, tupleTyCon, trueDataCon, falseDataCon )
-import BasicTypes( Boxity(..), RecFlag(Recursive), NewOrData(..) )
+import BasicTypes( Boxity(..), RecFlag(Recursive) )
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
                      CExportSpec(..)) 
 import HsDecls ( CImportSpec(..), ForeignImport(..), ForeignExport(..),

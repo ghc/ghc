@@ -29,7 +29,6 @@ import RnEnv		( bindLocalNames )
 import TcRnMonad	( thenM, returnM, mapAndUnzipM )
 import HscTypes		( DFunId, FixityEnv )
 
-import BasicTypes	( NewOrData(..) )
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
 import Subst		( mkTyVarSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )

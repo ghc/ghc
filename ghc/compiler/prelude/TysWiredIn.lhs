@@ -65,7 +65,7 @@ import Name		( Name, nameUnique, nameOccName,
 import OccName		( mkOccFS, tcName, dataName, mkTupleOcc, mkDataConWorkerOcc )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
-import TyCon		( TyCon, AlgTyConFlavour(..), DataConDetails(..), tyConDataCons,
+import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName
 			)
 
@@ -176,9 +176,8 @@ pcTyCon is_enum is_rec name tyvars argvrcs cons
                 tyvars
                 []              -- No context
                 argvrcs
-                (DataCons cons)
+                (DataTyCon cons is_enum)
 		[]		-- No record selectors
-                (DataTyCon is_enum)
                 is_rec
 		True		-- All the wired-in tycons have generics
 

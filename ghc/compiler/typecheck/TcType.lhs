@@ -866,7 +866,9 @@ toDNType ty
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	-- Look through newtypes
 	-- Non-recursive ones are transparent to splitTyConApp,
-	-- but recursive ones aren't
+	-- but recursive ones aren't.  Manuel had:
+	--	newtype T = MkT (Ptr T)
+	-- and wanted it to work...
 checkRepTyCon check_tc ty 
   | Just (tc,_) <- splitTyConApp_maybe (repType ty) = check_tc tc
   | otherwise				  	    = False

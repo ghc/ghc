@@ -18,7 +18,8 @@ import IfaceEnv		( lookupIfaceTop, newGlobalBinder, lookupOrig,
 			  tcIfaceTyVar, tcIfaceTyCon, tcIfaceClass, tcIfaceExtId,
 			  tcIfaceDataCon, tcIfaceLclId,
 			  newIfaceName, newIfaceNames )
-import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass )
+import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
+			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
 import Type		( liftedTypeKind, splitTyConApp, 
 			  mkTyVarTys, mkGenTyConApp, mkTyVarTys, ThetaType, pprClassPred )
@@ -45,7 +46,7 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 			  setArityInfo, setInlinePragInfo, setCafInfo, 
 			  vanillaIdInfo, newStrictnessInfo )
 import Class		( Class )
-import TyCon		( DataConDetails(..), tyConDataCons, tyConTyVars, isTupleTyCon, mkForeignTyCon )
+import TyCon		( AlgTyConRhs(..), tyConDataCons, tyConTyVars, isTupleTyCon, mkForeignTyCon )
 import DataCon		( dataConWorkId, dataConExistentialTyVars, dataConArgTys )
 import TysWiredIn	( tupleCon )
 import Var		( TyVar, mkTyVar, tyVarKind )
@@ -335,7 +336,7 @@ tcIfaceDecl (IfaceId {ifName = occ_name, ifType = iface_type, ifIdInfo = info})
 	; info <- tcIdInfo name ty info
 	; return (AnId (mkVanillaGlobal name ty info)) }
 
-tcIfaceDecl (IfaceData {ifND = new_or_data, ifName = occ_name, 
+tcIfaceDecl (IfaceData {ifName = occ_name, 
 			ifTyVars = tv_bndrs, ifCtxt = rdr_ctxt,
 			ifCons = rdr_cons, 
 			ifVrcs = arg_vrcs, ifRec = is_rec, 
@@ -358,7 +359,7 @@ tcIfaceDecl (IfaceData {ifND = new_or_data, ifName = occ_name,
 
 	; tycon <- fixM ( \ tycon -> do
 	    { cons <- tcIfaceDataCons tycon tyvars ctxt rdr_cons
-	    ; tycon <- buildAlgTyCon new_or_data tc_name tyvars ctxt cons 
+	    ; tycon <- buildAlgTyCon tc_name tyvars ctxt cons 
 			    arg_vrcs is_rec want_generic
 	    ; return tycon
 	    })
@@ -404,12 +405,13 @@ tcIfaceDecl (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
 	; return (ATyCon (mkForeignTyCon name ext_name 
 					 liftedTypeKind 0 [])) }
 
-tcIfaceDataCons tycon tyvars ctxt Unknown
-  = returnM Unknown
-
-tcIfaceDataCons tycon tyvars ctxt (DataCons cs)
-  = mappM tc_con_decl cs	`thenM` \ data_cons ->
-    returnM (DataCons data_cons)
+tcIfaceDataCons tycon tyvars ctxt if_cons
+  = case if_cons of
+	IfAbstractTyCon  -> return mkAbstractTyConRhs
+	IfDataTyCon cons -> do 	{ data_cons <- mappM tc_con_decl cons
+				; return (mkDataTyConRhs data_cons) }
+	IfNewTyCon con   -> do 	{ data_con <- tc_con_decl con
+				; return (mkNewTyConRhs data_con) }
   where
     tc_con_decl (IfaceConDecl occ ex_tvs ex_ctxt args stricts field_lbls)
       = bindIfaceTyVars ex_tvs	$ \ ex_tyvars -> do
@@ -492,6 +494,7 @@ loadImportedInsts cls tys
 	-- we call loadImportedInsts when looking up even predicates like (C a)
 	-- But without undecidable instances it's rare to see C (a b) and 
 	-- somethat interesting
+{- (comment out; happens a lot in some code)
 #ifdef DEBUG
 	; dflags  <- getDOpts
 	; WARN( not (dopt Opt_AllowUndecidableInstances dflags) && null tc_gates, 
@@ -499,7 +502,7 @@ loadImportedInsts cls tys
 			<+> pprClassPred cls tys )
  	  return ()
 #endif
-
+-}
 	-- Suck in the instances
 	; let { (inst_pool', iface_insts) 
 		    = selectInsts (eps_insts eps) cls_gate tc_gates }

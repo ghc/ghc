@@ -51,7 +51,7 @@ module RdrHsSyn (
 import HsSyn		-- Lots of it
 import IfaceType
 import HscTypes		( ModIface(..), emptyModIface, mkIfaceVerCache )
-import IfaceSyn		( IfaceDecl(..), IfaceIdInfo(..), IfaceConDecl(..) )
+import IfaceSyn		( IfaceDecl(..), IfaceIdInfo(..), IfaceConDecl(..), IfaceConDecls(..) )
 import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
 			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace, rdrNameModule )
@@ -65,7 +65,6 @@ import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 import OccName  	( OccName, srcDataName, varName, isDataOcc, isTcOcc, 
 			  occNameUserString, isValOcc )
 import BasicTypes	( initialVersion, StrictnessMark(..) )
-import TyCon		( DataConDetails(..) )
 import Module		( ModuleName )
 import SrcLoc
 import CStrings		( CLabelString )
@@ -242,11 +241,10 @@ hsIfaceDecl (TyClD decl@(TySynonym {}))
 	       ifVrcs = [] } 
 
 hsIfaceDecl (TyClD decl@(TyData {}))
-  = IfaceData { ifND = tcdND decl, 
-	        ifName = rdrNameOcc (tcdName decl), 
+  = IfaceData { ifName = rdrNameOcc (tcdName decl), 
 	        ifTyVars = hsIfaceTvs (tcdTyVars decl), 
 		ifCtxt = hsIfaceCtxt (unLoc (tcdCtxt decl)),
-		ifCons = hsIfaceCons (tcdCons decl), 
+		ifCons = hsIfaceCons (tcdND decl) (tcdCons decl), 
 		ifRec = NonRecursive,
 		ifVrcs = [], ifGeneric = False }
 	-- I'm not sure that [] is right for ifVrcs, but
@@ -262,12 +260,16 @@ hsIfaceDecl (TyClD decl@(ClassDecl {}))
 
 hsIfaceDecl decl = pprPanic "hsIfaceDecl" (ppr decl)
 
-hsIfaceCons :: [LConDecl RdrName] -> DataConDetails IfaceConDecl
-hsIfaceCons cons
-  | null cons 	-- data T a, meaning "constructors unspecified", not "no constructors"
-  = Unknown	
-  | otherwise	-- data T a = C1 | C2 
-  = DataCons (map (hsIfaceCon . unLoc) cons)
+hsIfaceCons :: NewOrData -> [LConDecl RdrName] -> IfaceConDecls
+hsIfaceCons DataType []	-- data T a, meaning "constructors unspecified", 
+  = IfAbstractTyCon	-- not "no constructors"
+
+hsIfaceCons DataType cons	-- data type
+  = IfDataTyCon (map (hsIfaceCon . unLoc) cons)
+
+hsIfaceCons NewType [con]	-- newtype
+  = IfNewTyCon (hsIfaceCon (unLoc con))
+
 
 hsIfaceCon :: ConDecl RdrName -> IfaceConDecl
 hsIfaceCon (ConDecl lname ex_tvs ex_ctxt details)

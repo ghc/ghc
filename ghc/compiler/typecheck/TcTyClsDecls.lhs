@@ -11,13 +11,14 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
-			  ConDecl(..),   Sig(..), BangType(..), HsBang(..),
+			  ConDecl(..),   Sig(..), BangType(..), HsBang(..), NewOrData(..), 
 			  tyClDeclTyVars, getBangType, getBangStrictness, isSynDecl,
 			  LTyClDecl, tcdName, LHsTyVarBndr
 			)
-import BasicTypes	( RecFlag(..), NewOrData(..), StrictnessMark(..) )
+import BasicTypes	( RecFlag(..), StrictnessMark(..) )
 import HscTypes		( implicitTyThings )
-import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon )
+import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
+			  mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
 import TcEnv		( TcTyThing(..), TyThing(..), 
 			  tcLookupLocated, tcLookupLocatedGlobal, 
@@ -37,7 +38,7 @@ import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
 import FieldLabel	( fieldLabelName, fieldLabelType )
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
-import TyCon		( TyCon, ArgVrcs, DataConDetails(..), 
+import TyCon		( TyCon, ArgVrcs, 
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
 			  tyConTheta, getSynTyConDefn, tyConDataCons, isSynTyCon, tyConName )
 import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, dataConFieldLabels )
@@ -359,10 +360,14 @@ tcTyClDecl1 calc_vrcs calc_isrec
   { ctxt' 	 <- tcHsKindedContext ctxt
   ; want_generic <- doptM Opt_Generics
   ; tycon <- fixM (\ tycon -> do 
-	{ cons' <- mappM (addLocM (tcConDecl new_or_data tycon tvs' ctxt')) cons
-	; buildAlgTyCon new_or_data tc_name tvs' ctxt' 
-  			(DataCons cons') arg_vrcs is_rec
-			(want_generic && canDoGenerics cons')
+	{ data_cons <- mappM (addLocM (tcConDecl new_or_data tycon tvs' ctxt')) cons
+	; let tc_rhs = case new_or_data of
+			DataType -> mkDataTyConRhs data_cons
+			NewType  -> ASSERT( isSingleton data_cons )
+				    mkNewTyConRhs (head data_cons)
+	; buildAlgTyCon tc_name tvs' ctxt' 
+  			tc_rhs arg_vrcs is_rec
+			(want_generic && canDoGenerics data_cons)
 	})
   ; return (ATyCon tycon)
   }

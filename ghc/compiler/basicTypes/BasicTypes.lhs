@@ -27,8 +27,6 @@ module BasicTypes(
 
 	IPName(..), ipNameName, mapIPName,
 
-	NewOrData(..), 
-
 	RecFlag(..), isRec, isNonRec, boolToRecFlag,
 
 	TopLevelFlag(..), isTopLevel, isNotTopLevel,
@@ -188,24 +186,6 @@ compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
     right	 = (False, True)
     left         = (False, False)
     error_please = (True,  False)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[NewType/DataType]{NewType/DataType flag}
-%*									*
-%************************************************************************
-
-\begin{code}
-data NewOrData
-  = NewType  	-- "newtype Blah ..."
-  | DataType 	-- "data Blah ..."
-  deriving( Eq )	-- Needed because Demand derives Eq
-
-instance Outputable NewOrData where
-  ppr NewType  = ptext SLIT("newtype")
-  ppr DataType = ptext SLIT("data")
 \end{code}
 
 

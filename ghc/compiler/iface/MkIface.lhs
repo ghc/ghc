@@ -177,7 +177,7 @@ import HsSyn
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 			  IfaceRule(..), IfaceInst(..), IfaceExtName(..), IfaceTyCon(..),
 			  eqIfDecl, eqIfRule, eqIfInst, IfaceEq(..), (&&&), bool, 
-			  eqMaybeBy, eqListBy,
+			  eqMaybeBy, eqListBy, visibleIfConDecls,
 			  tyThingToIfaceDecl, dfunToIfaceInst, coreRuleToIfaceRule )
 import LoadIface	( readIface, loadInterface, ifaceInstGates )
 import BasicTypes	( Version, initialVersion, bumpVersion )
@@ -535,7 +535,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 	  eq_ind_occs [op | IfaceClassOp op _ _ <- sigs] 
     eq_indirects (IfaceData {ifName = tc_occ, ifCons = cons})
 	= same_insts tc_occ &&& same_fixity tc_occ &&&	-- The TyCon can have a fixity too
-	  eq_ind_occs [occ | IfaceConDecl occ _ _ _ _ _ <- visibleDataCons cons]
+	  eq_ind_occs [occ | IfaceConDecl occ _ _ _ _ _ <- visibleIfConDecls cons]
     eq_indirects other = Equal	-- Synonyms and foreign declarations
 
     eq_ind_occ :: OccName -> IfaceEq	-- For class ops and Ids; check fixity and rules

@@ -17,7 +17,7 @@ module HsSyn (
 	module HsPat,
 	module HsTypes,
  	module HsUtils,
-	Fixity, NewOrData, 
+	Fixity,
 
 	HsModule(..), HsExtCore(..)
      ) where
@@ -33,7 +33,7 @@ import HsLit
 import HsPat
 import HsTypes
 import HscTypes		( DeprecTxt )
-import BasicTypes	( Fixity, NewOrData )
+import BasicTypes	( Fixity )
 import HsUtils
 
 -- others:
