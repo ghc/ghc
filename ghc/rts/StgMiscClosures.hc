@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.3 1999/01/13 17:25:46 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.4 1999/01/15 12:47:20 sewardj Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -242,7 +242,7 @@ NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
 INFO_TABLE_CONSTR(END_TSO_QUEUE_info,END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(END_TSO_QUEUE);
 
-SET_STATIC_HDR(END_TSO_QUEUE_closure,END_TSO_QUEUE_info,0/*CC*/,const,EI_)
+SET_STATIC_HDR(END_TSO_QUEUE_closure,END_TSO_QUEUE_info,0/*CC*/,,EI_)
 };
 
 /* -----------------------------------------------------------------------------
@@ -256,7 +256,7 @@ SET_STATIC_HDR(END_TSO_QUEUE_closure,END_TSO_QUEUE_info,0/*CC*/,const,EI_)
 INFO_TABLE_CONSTR(END_MUT_LIST_info,END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
 
-SET_STATIC_HDR(END_MUT_LIST_closure,END_MUT_LIST_info,0/*CC*/,const,EI_)
+SET_STATIC_HDR(END_MUT_LIST_closure,END_MUT_LIST_info,0/*CC*/,,EI_)
 };
 
 INFO_TABLE(MUT_CONS_info, MUT_CONS_entry, 1, 1, MUT_VAR, const, EF_, 0, 0);
@@ -329,7 +329,7 @@ FN_(dummy_ret_entry)
   Sp++;
   JMP_(ENTRY_CODE(ret_addr));
 }
-SET_STATIC_HDR(dummy_ret_closure,dummy_ret_info,CCS_DONTZuCARE,const,EI_)
+SET_STATIC_HDR(dummy_ret_closure,dummy_ret_info,CCS_DONTZuCARE,,EI_)
 };
 
 /* -----------------------------------------------------------------------------

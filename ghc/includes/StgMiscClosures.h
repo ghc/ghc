@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.3 1999/01/13 17:25:54 simonm Exp $
+ * $Id: StgMiscClosures.h,v 1.4 1999/01/15 12:47:19 sewardj Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -79,9 +79,9 @@ extern const StgInfoTable ret_bco_info;
 
 /* closures */
 
-extern const StgClosure END_TSO_QUEUE_closure;
-extern const StgClosure END_MUT_LIST_closure;
-extern const StgClosure dummy_ret_closure;
+extern StgClosure END_TSO_QUEUE_closure;
+extern StgClosure END_MUT_LIST_closure;
+extern StgClosure dummy_ret_closure;
 
 extern StgIntCharlikeClosure CHARLIKE_closure[];
 extern StgIntCharlikeClosure INTLIKE_closure[];
