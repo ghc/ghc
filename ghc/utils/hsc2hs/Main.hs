@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.49 2003/10/01 16:45:10 sof Exp $
+-- $Id: Main.hs,v 1.50 2004/02/07 16:37:06 panne Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -17,7 +17,6 @@ import System.Console.GetOpt
 import GetOpt
 #endif
 
-import Config
 import System        (getProgName, getArgs, ExitCode(..), exitWith, system)
 import Directory     (removeFile,doesFileExist)
 import Monad         (MonadPlus(..), liftM, liftM2, when, unless)
@@ -25,11 +24,8 @@ import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit
 import List          (intersperse, isSuffixOf)
 import IO            (hPutStr, hPutStrLn, stderr)
 
-#include "../../includes/config.h"
-
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import Foreign
-
 #if __GLASGOW_HASKELL__ >= 504
 import Foreign.C.String
 #else
@@ -38,9 +34,8 @@ import CString
 #endif
 
 
-
 version :: String
-version = "hsc2hs version 0.65\n"
+version = "hsc2hs version 0.66\n"
 
 data Flag
     = Help
@@ -56,6 +51,7 @@ data Flag
     | Output    String
     | Verbose
 
+template_flag :: Flag -> Bool
 template_flag (Template _) = True
 template_flag _		   = False
 
@@ -131,8 +127,8 @@ main = do
             where
             isHelp    Help    = True; isHelp    _ = False
             isVersion Version = True; isVersion _ = False
-        (files@(_:_), []) -> mapM_ (processFile flags_w_tpl) files
-        (_,   errs) -> die (concat errs ++ usageInfo header options)
+        ((_:_), []) -> mapM_ (processFile flags_w_tpl) files
+        (_,     _ ) -> die (concat errs ++ usageInfo header options)
 
 getProgramName :: IO String
 getProgramName = liftM (`withoutSuffix` "-bin") getProgName
@@ -498,7 +494,7 @@ output flags name toks = do
     
     let cProgName    = outDir++outBase++"_hsc_make.c"
         oProgName    = outDir++outBase++"_hsc_make.o"
-        progName     = outDir++outBase++"_hsc_make" ++ progNameSuffix
+        progName     = outDir++outBase++"_hsc_make" ++ EXEEXT
 	outHFile     = outBase++"_hsc.h"
         outHName     = outDir++outHFile
         outCName     = outDir++outBase++"_hsc.c"
@@ -506,7 +502,7 @@ output flags name toks = do
 	beVerbose    = any (\ x -> case x of { Verbose{} -> True; _ -> False}) flags
 
     let execProgName
-            | null outDir = '.':pathSep:progName
+            | null outDir = dosifyPath ("./" ++ progName)
             | otherwise   = progName
     
     let specials = [(pos, key, arg) | Special pos key arg <- toks]
@@ -673,9 +669,9 @@ outHeaderHs flags inH toks =
                   showCString s++"\");\n"
 
 outTokenHs :: Token -> String
-outTokenHs (Text pos text) =
-    case break (== '\n') text of
-        (all, [])       -> outText all
+outTokenHs (Text pos txt) =
+    case break (== '\n') txt of
+        (allTxt, [])       -> outText allTxt
         (first, _:rest) ->
             outText (first++"\n")++
             outHsLine pos++
@@ -808,11 +804,15 @@ showCString = concatMap showCChar
 --	Cut and pasted from ghc/compiler/SysTools
 -- Convert paths foo/baz to foo\baz on Windows
 
-
+dosifyPath :: String -> String
 #if defined(mingw32_HOST_OS)
-subst a b ls = map (\ x -> if x == a then b else x) ls
-unDosifyPath xs = subst '\\' '/' xs
 dosifyPath xs = subst '/' '\\' xs
+
+unDosifyPath :: String -> String
+unDosifyPath xs = subst '\\' '/' xs
+
+subst :: Eq a => a -> a -> [a] -> [a]
+subst a b ls = map (\ x -> if x == a then b else x) ls
 
 getExecDir :: String -> IO (Maybe String)
 -- (getExecDir cmd) returns the directory in which the current
@@ -836,5 +836,5 @@ foreign import stdcall "GetModuleFileNameA" unsafe
 dosifyPath xs = xs
 
 getExecDir :: String -> IO (Maybe String) 
-getExecDir s = do return Nothing
+getExecDir _ = return Nothing
 #endif

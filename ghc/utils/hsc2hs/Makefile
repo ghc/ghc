@@ -1,5 +1,4 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.38 2003/06/04 15:18:30 panne Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -23,7 +22,10 @@ ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package util
 endif
 
-SRC_HC_OPTS      += -cpp
+SRC_HC_OPTS      += -Wall -cpp '-DEXEEXT="$(exeext)"'
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+SRC_HC_OPTS      += -Dmingw32_HOST_OS=1
+endif
 
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALLED_SCRIPT_PROG  = hsc2hs
@@ -76,29 +78,6 @@ endif
 
 override datadir=$(libdir)
 INSTALL_DATAS += template-hsc.h
-
-# -----------------------------------------------------------------------------
-# Create driver configuration
-
-CONFIG_HS   = Config.hs
-CLEAN_FILES += $(CONFIG_HS)
-EXTRA_SRCS  += $(CONFIG_HS)
-
-boot :: $(CONFIG_HS)
-
-$(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
-	@$(RM) -f $(CONFIG_HS)
-	@echo -n "Creating $(CONFIG_HS) ... "
-	@echo "module Config where" >>$(CONFIG_HS)
-	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
-	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
-	@echo "progNameSuffix        = \"$(exeext)\"" >> $(CONFIG_HS)
-ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-	@echo "pathSep               = '/'" >> $(CONFIG_HS)
-else
-	@echo "pathSep               = (toEnum 92 :: Char)" >> $(CONFIG_HS)
-endif
-	@echo done.
 
 # -----------------------------------------------------------------------------
 # don't recurse on 'make install'
