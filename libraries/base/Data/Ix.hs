@@ -8,27 +8,14 @@
 -- Stability   :  stable
 -- Portability :  portable
 --
--- Class of index types.
---
--- The 'Ix' class is used to map a continuous subrange of values in a type onto
--- integers. It is used primarily for array indexing (see Section 6
--- <http://www.haskell.org/onlinelibrary/array.html#arrays>). The 'Ix'
--- class contains the methods range, index, and inRange. The 'index' operation
--- maps a bounding pair, which defines the lower and upper bounds of the range,
--- and a subscript, to an integer. The 'range' operation enumerates all
--- subscripts; the 'inRange' operation tells whether a particular subscript
--- lies in the range defined by a bounding pair.
--- 
--- An implementation is entitled to assume the following laws about these
--- operations: 
--- 
--- >        range (l,u) !! index (l,u) i == i   -- when i is in range
--- 
--- >        inRange (l,u) i == i `elem` range (l,u)
+-- The 'Ix' class is used to map a contiguous subrange of values in
+-- type onto integers.  It is used primarily for array indexing
+-- (see "Data.Array", "Data.Array.IArray" and "Data.Array.MArray").
 -- 
 -----------------------------------------------------------------------------
 module Data.Ix
     (
+    -- * The 'Ix' class
 	Ix
 	  ( range	-- :: (Ix a) => (a,a) -> [a]
 	  , index       -- :: (Ix a) => (a,a) -> a   -> Int
@@ -48,7 +35,7 @@ module Data.Ix
 
     -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 
-    -- * Deriving Instances of Ix
+    -- * Deriving Instances of 'Ix'
     -- | Derived instance declarations for the class 'Ix' are only possible
     -- for enumerations (i.e. datatypes having only nullary constructors)
     -- and single-constructor datatypes, including arbitrarily large tuples,

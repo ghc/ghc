@@ -37,11 +37,46 @@ default ()
 %*********************************************************
 
 \begin{code}
+-- | The 'Ix' class is used to map a contiguous subrange of values in
+-- a type onto integers.  It is used primarily for array indexing
+-- (see "Data.Array", "Data.Array.IArray" and "Data.Array.MArray").
+--
+-- The first argument @(l,u)@ of each of these operations is a pair
+-- specifying the lower and upper bounds of a contiguous subrange of values.
+--
+-- An implementation is entitled to assume the following laws about these
+-- operations:
+--
+-- * @'inRange' (l,u) i == 'elem' i ('range' (l,u))@
+--
+-- * @'range' (l,u) '!!' 'index' (l,u) i == i@, when @'inRange' (l,u) i@
+--
+-- * @'map' ('index' (l,u)) ('range' (l,u))) == [0..'rangeSize' (l,u)-1]@
+--
+-- * @'rangeSize' (l,u) == 'length' ('range' (l,u))@
+--
+-- Minimal complete instance: 'range', 'index' and 'inRange'.
+--
 class (Ord a) => Ix a where
+    -- | The list of values in the subrange defined by a bounding pair.
     range		:: (a,a) -> [a]
-    index, unsafeIndex	:: (a,a) -> a -> Int
+    -- | The position of a subscript in the subrange.
+    index		:: (a,a) -> a -> Int
+    -- | Like 'index', but without checking that the value is in range.
+    unsafeIndex		:: (a,a) -> a -> Int
+    -- | Returns 'True' the given subscript lies in the range defined
+    -- the bounding pair.
     inRange		:: (a,a) -> a -> Bool
+    -- | The size of the subrange defined by a bounding pair.
     rangeSize		:: (a,a) -> Int
+    -- | like 'rangeSize', but without checking that the upper bound is
+    -- in range.
+    --
+    -- As long as you don't override the default 'rangeSize', you can
+    -- specify 'unsafeRangeSize' as follows, to speed up some operations:
+    --
+    -- >  unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
+    --
     unsafeRangeSize     :: (a,a) -> Int
 
 	-- Must specify one of index, unsafeIndex
@@ -49,12 +84,6 @@ class (Ord a) => Ix a where
 	      | otherwise   = error "Error in array index"
     unsafeIndex b i = index b i
 
-	-- As long as you don't override the default rangeSize, 
-	-- you can specify unsafeRangeSize as follows, to speed up
-	-- some operations:
-	--
-	--    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-	--
     rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
 		       | otherwise   = 0
     unsafeRangeSize b = rangeSize b
