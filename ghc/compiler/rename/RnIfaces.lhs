@@ -102,33 +102,35 @@ loadInterface doc_str mod_name from
    let
 	mod_map  = iImpModInfo ifaces
 	mod_info = lookupFM mod_map mod_name
-	in_map   = maybeToBool mod_info
+	below_me = case mod_info of
+                      Nothing -> False
+                      Just (_, _, is_boot, _) -> not is_boot
    in
 
 	-- Issue a warning for a redundant {- SOURCE -} import
 	-- It's redundant if the moduld is in the iImpModInfo at all,
 	-- because we arrange to read all the ordinary imports before 
 	-- any of the {- SOURCE -} imports
-   warnCheckRn	(not (in_map && case from of {ImportByUserSource -> True; other -> False}))
+   warnCheckRn	(not (below_me && case from of {ImportByUserSource -> True; other -> False}))
 		(warnRedundantSourceImport mod_name)	`thenRn_`
 
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case mod_info of {
-	Just (_, _, Just (load_mod, _, _))
+	Just (_, _, _, Just (load_mod, _))
 		-> 	-- We're read it already so don't re-read it
 		    returnRn (load_mod, ifaces) ;
 
 	mod_map_result ->
 
 	-- READ THE MODULE IN
-   findAndReadIface doc_str mod_name from in_map
+   findAndReadIface doc_str mod_name from below_me
    `thenRn` \ (hi_boot_read, read_result) ->
    case read_result of {
 	Nothing -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
 	   let
 		mod         = mkVanillaModule mod_name
-		new_mod_map = addToFM mod_map mod_name (0, False, Just (mod, False, []))
+		new_mod_map = addToFM mod_map mod_name (0, False, False, Just (mod, []))
 		new_ifaces  = ifaces { iImpModInfo = new_mod_map }
 	   in
 	   setIfacesRn new_ifaces		`thenRn_`
@@ -168,7 +170,7 @@ loadInterface doc_str mod_name from
 
 	-- Now add info about this module
 	mod_map2    = addToFM mod_map1 mod_name mod_details
-	mod_details = (pi_mod iface, pi_orphan iface, Just (mod, hi_boot_read, concat avails_s))
+	mod_details = (pi_mod iface, pi_orphan iface, hi_boot_read, Just (mod, concat avails_s))
 
 	new_ifaces = ifaces { iImpModInfo = mod_map2,
 			      iDecls      = new_decls,
@@ -187,16 +189,19 @@ addModDeps mod mod_deps new_deps
   = foldr add mod_deps new_deps
   where
     is_lib = isLibModule mod	-- Don't record dependencies when importing a library module
-    add (imp_mod, version, has_orphans, _) deps
+    add (imp_mod, version, has_orphans, is_boot, _) deps
 	| is_lib && not has_orphans = deps
-	| otherwise  =  addToFM_C combine deps imp_mod (version, has_orphans, Nothing)
+	| otherwise  =  addToFM_C combine deps imp_mod (version, has_orphans, is_boot, Nothing)
 	-- Record dependencies for modules that are
 	--	either are dependent via a non-library module
 	--	or contain orphan rules or instance decls
 
-	-- Don't ditch a module that's already loaded!!
-    combine old@(_, _, Just _)  new = old
-    combine old@(_, _, Nothing) new = new
+	-- Don't ditch a module that's already loaded
+ 	-- If it isn't loaded, and together the is_boot-ness
+    combine old@(_, _, _, Just _)  new = old
+    combine old@(_, _, old_is_boot, Nothing) 
+            new@(version, has_orphans, new_is_boot, _) 
+               = (version, has_orphans, old_is_boot && new_is_boot, Nothing)
 
 loadExport :: ModuleName -> ExportItem -> RnM d [AvailInfo]
 loadExport this_mod (mod, entities)
@@ -391,7 +396,7 @@ checkUpToDate mod_name
 
 checkModUsage [] = returnRn True		-- Yes!  Everything is up to date!
 
-checkModUsage ((mod_name, old_mod_vers, _, Specifically []) : rest)
+checkModUsage ((mod_name, old_mod_vers, _, _, Specifically []) : rest)
 	-- If CurrentModule.hi contains 
 	--	import Foo :: ;
 	-- then that simply records that Foo lies below CurrentModule in the
@@ -400,11 +405,11 @@ checkModUsage ((mod_name, old_mod_vers, _, Specifically []) : rest)
   = traceRn (ptext SLIT("Nothing used from:") <+> ppr mod_name)	`thenRn_`
     checkModUsage rest	-- This one's ok, so check the rest
 
-checkModUsage ((mod_name, old_mod_vers, _, whats_imported) : rest)
+checkModUsage ((mod_name, old_mod_vers, _, _, whats_imported) : rest)
   = loadInterface doc_str mod_name ImportBySystem	`thenRn` \ (mod, ifaces) ->
     let
 	maybe_mod_vers = case lookupFM (iImpModInfo ifaces) mod_name of
-			   Just (version, _, Just (_, _, _)) -> Just version
+			   Just (version, _, _, Just (_, _)) -> Just version
 			   other			     -> Nothing
     in
     case maybe_mod_vers of {
@@ -557,7 +562,7 @@ getInterfaceExports mod_name from
 		   --  anyway, but this does no harm.)
 		   returnRn (mod, [])
 
-	Just (_, _, Just (mod, _, avails)) -> returnRn (mod, avails)
+	Just (_, _, _, Just (mod, avails)) -> returnRn (mod, avails)
   where
     doc_str = sep [pprModuleName mod_name, ptext SLIT("is directly imported")]
 \end{code}
@@ -577,7 +582,7 @@ getImportedInstDecls gates
     getIfacesRn 					`thenRn` \ ifaces ->
     let
 	orphan_mods =
-	  [mod | (mod, (_, True, Nothing)) <- fmToList (iImpModInfo ifaces)]
+	  [mod | (mod, (_, True, _, Nothing)) <- fmToList (iImpModInfo ifaces)]
     in
     loadOrphanModules orphan_mods			`thenRn_` 
 
@@ -754,9 +759,10 @@ getImportVersions this_mod (ExportEnv export_avails _ export_all_mods)
 	-- whether something is a boot file along with the usage info for it, but 
 	-- I can't be bothered just now.
 
-	mk_version_info mod_name (version, has_orphans, contents) so_far
+	mk_version_info mod_name (version, has_orphans, is_boot, contents) so_far
 	   = let
-		go_for_it exports = (mod_name, version, has_orphans, exports) : so_far
+		go_for_it exports = (mod_name, version, has_orphans, is_boot, exports) 
+                                    : so_far
 	     in 
 	     case contents of
 		Nothing -> 	-- We didn't even open the interface
@@ -767,9 +773,8 @@ getImportVersions this_mod (ExportEnv export_avails _ export_all_mods)
 			-- file but we must still propagate the dependeny info.
 		   go_for_it (Specifically [])
 
-		Just (mod, boot_import, _)		-- We did open the interface
-		   |  boot_import			-- Don't record any usage info for this module
-		   || (is_lib_module && not has_orphans)
+		Just (mod, _)				-- We did open the interface
+		   |  is_lib_module && not has_orphans
 		   -> so_far		
 	   
 		   |  is_lib_module 			-- Record the module but not detailed

@@ -155,14 +155,16 @@ ifaceImports :: Handle -> VersionInfo Name -> IO ()
 ifaceImports if_hdl import_usages
   = hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
   where
-    upp_uses (m, mv, has_orphans, whats_imported)
+    upp_uses (m, mv, has_orphans, is_boot, whats_imported)
       = hsep [ptext SLIT("import"), pprModuleName m, 
-	      int mv, pp_orphan,
+	      int mv, pp_orphan, pp_boot,
 	      upp_import_versions whats_imported
 	] <> semi
       where
 	pp_orphan | has_orphans = ptext SLIT("!")
 		  | otherwise   = empty
+        pp_boot   | is_boot     = ptext SLIT("@")
+                  | otherwise   = empty
 
 	-- Importing the whole module is indicated by an empty list
     upp_import_versions Everything = empty
@@ -678,7 +680,7 @@ lt_lexical :: NamedThing a => a -> a -> Bool
 lt_lexical a1 a2 = getName a1 `lt_name` getName a2
 
 lt_imp_vers :: ImportVersion a -> ImportVersion a -> Bool
-lt_imp_vers (m1,_,_,_) (m2,_,_,_) = m1 < m2
+lt_imp_vers (m1,_,_,_,_) (m2,_,_,_,_) = m1 < m2
 
 sort_versions vs = sortLt lt_vers vs
 

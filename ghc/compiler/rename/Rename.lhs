@@ -589,7 +589,7 @@ getRnStats :: [RenamedHsDecl] -> RnMG SDoc
 getRnStats imported_decls
   = getIfacesRn 		`thenRn` \ ifaces ->
     let
-	n_mods = length [() | (_, _, Just _) <- eltsFM (iImpModInfo ifaces)]
+	n_mods = length [() | (_, _, _, Just _) <- eltsFM (iImpModInfo ifaces)]
 
 	decls_read     = [decl | (_, avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
 				-- Data, newtype, and class decls are in the decls_fm

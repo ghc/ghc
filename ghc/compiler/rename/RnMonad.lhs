@@ -259,7 +259,8 @@ type RdrAvailInfo = GenAvailInfo OccName
 type ExportItem		 = (ModuleName, [RdrAvailInfo])
 type VersionInfo name    = [ImportVersion name]
 
-type ImportVersion name  = (ModuleName, Version, WhetherHasOrphans, WhatsImported name)
+type ImportVersion name  = (ModuleName, Version, 
+                            WhetherHasOrphans, IsBootInterface, WhatsImported name)
 
 type WhetherHasOrphans   = Bool
 	-- An "orphan" is 
@@ -267,6 +268,8 @@ type WhetherHasOrphans   = Bool
 	--		one of the tycons or classes in the instance head
 	--	* a transformation rule in a module other than the one defining
 	--		the function in the head of the rule.
+
+type IsBootInterface     = Bool
 
 data WhatsImported name  = Everything 
 			 | Specifically [LocalVersion name] -- List guaranteed non-empty
@@ -342,7 +345,7 @@ data Ifaces = Ifaces {
 type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
 
 type ImportedModuleInfo 
-     = FiniteMap ModuleName (Version, Bool, Maybe (Module, Bool, Avails))
+     = FiniteMap ModuleName (Version, WhetherHasOrphans, IsBootInterface, Maybe (Module, Avails))
 		-- Suppose the domain element is module 'A'
 		--
 		-- The first Bool is True if A contains 

@@ -18,7 +18,8 @@ import IdInfo           ( ArityInfo, exactArity, CprInfo(..), InlinePragInfo(..)
 import Lex		
 
 import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..),
-			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..), WhetherHasOrphans
+			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..), 
+                          WhetherHasOrphans, IsBootInterface
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
@@ -201,15 +202,20 @@ import_part :				    		  { [] }
 	    |  import_part import_decl			  { $2 : $1 }
 	    
 import_decl :: { ImportVersion OccName }
-import_decl : 'import' mod_fs INTEGER orphans whats_imported ';'
-			{ (mkSysModuleFS $2, fromInteger $3, $4, $5) }
+import_decl : 'import' mod_fs INTEGER orphans is_boot whats_imported ';'
+			{ (mkSysModuleFS $2, fromInteger $3, $4, $5, $6) }
 	-- import Foo 3 :: a 1 b 3 c 7 ;	means import a,b,c from Foo
 	-- import Foo 3	;			means import all of Foo
-	-- import Foo 3 ! :: ...stuff... ;	the ! means that Foo contains orphans
+	-- import Foo 3 ! @ :: ...stuff... ;	the ! means that Foo contains orphans
+        --                                      and @ that Foo is a boot interface
 
 orphans		    :: { WhetherHasOrphans }
 orphans		    : 						{ False }
 		    | '!'					{ True }
+
+is_boot		    :: { IsBootInterface }
+is_boot		    : 						{ False }
+		    | '@'					{ True }
 
 whats_imported      :: { WhatsImported OccName }
 whats_imported      :                                           { Everything }
