@@ -172,14 +172,15 @@ loadInterface :: SDoc -> Module -> RnMG (Module, Ifaces)
 loadInterface doc_str load_mod
  = getIfacesRn 		`thenRn` \ ifaces ->
    let
-	new_hif		     = moduleIfaceFlavour load_mod
+	hi_boot_wanted	     = bootFlavour (moduleIfaceFlavour load_mod)
 	mod_map  	     = iModMap ifaces
 	(insts, tycls_names) = iDefInsts ifaces
+	
    in
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case lookupFM mod_map load_mod of {
 	Just (existing_hif, _, _) 
-		| bootFlavour new_hif || not (bootFlavour existing_hif)
+		| hi_boot_wanted || not (bootFlavour existing_hif)
 		-> 	-- Already in the cache, and new version is no better than old,
 			-- so don't re-read it
 		    returnRn (setModuleFlavour existing_hif load_mod, ifaces) ;
@@ -188,8 +189,20 @@ loadInterface doc_str load_mod
 	-- READ THE MODULE IN
    findAndReadIface doc_str load_mod		`thenRn` \ read_result ->
    case read_result of {
-	-- Check for not found
-	Nothing -> 	-- Not found, so add an empty export env to the Ifaces map
+	Nothing | not hi_boot_wanted && load_mod `elem` thinAirModules
+		-> -- Hack alert!  When compiling PrelBase we have to load the
+		   -- decls for packCString# and friends; they are 'thin-air' Ids
+		   -- (see PrelInfo.lhs).  So if we don't find the HiFile we quietly
+		   -- look for a .hi-boot file instead, and use that
+		   --
+		   -- NB this causes multiple "failed" attempts to read PrelPack,
+		   --    which makes curious reading with -dshow-rn-trace, but
+		   --    there's no harm done
+		   loadInterface doc_str (mkBootModule load_mod)
+
+	       
+		| otherwise
+		-> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
 		   let
 			new_mod_map = addToFM mod_map load_mod (hiFile, 0, [])
@@ -1050,15 +1063,8 @@ findAndReadIface doc_str mod_name
     case (lookupFM himap (moduleUserString mod_name)) of
          -- Found the file
        Just fpath -> readIface mod_name fpath
-    	 -- Hack alert!  When compiling PrelBase we have to load the
-	 -- decls for packCString# and friends; they are 'thin-air' Ids
-	 -- (see PrelInfo.lhs).  So if we don't find the HiFile we quietly
-	 -- look for a .hi-boot file instead, and use that
-       Nothing |  not from_hi_boot && mod_name `elem` thinAirModules
-	       -> findAndReadIface doc_str (mkBootModule mod_name)
-               | otherwise		 
-	       -> traceRn (ptext SLIT("...failed"))	`thenRn_`
-	          returnRn Nothing
+       Nothing    -> traceRn (ptext SLIT("...failed"))	`thenRn_`
+	             returnRn Nothing
   where
     hif		 = moduleIfaceFlavour mod_name
     from_hi_boot = bootFlavour hif
