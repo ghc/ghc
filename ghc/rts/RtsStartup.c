@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.8 1999/03/03 19:10:37 sof Exp $
+ * $Id: RtsStartup.c,v 1.9 1999/03/09 14:27:06 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -30,6 +30,7 @@
 #include "LLC.h"
 #endif
 
+#ifdef COMPILER
 #ifndef aix_TARGET_OS /* AIX gives link errors with this as a const (RO assembler section) */
 const 
 #endif 
@@ -42,6 +43,7 @@ const
     &dummy_ret_closure
 #endif
 };
+#endif
 
 /*
  * Flag Structure
