@@ -132,7 +132,7 @@ import TcHsSyn		( TcExpr, TcId,
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  tyVarsOfInst, 
-			  isDict, isStdClassTyVarDict, isMethodFor,
+			  isDict, isStdClassTyVarDict, isMethodFor, notFunDep,
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld,
 			  getDictClassTys,
@@ -225,7 +225,17 @@ tcSimplify str top_lvl local_tvs wanted_lie
 	-- Finished
     returnTc (mkLIE frees, binds, mkLIE irreds')
   where
-    wanteds = bagToList wanted_lie
+    -- the idea behind filtering out the dependencies here is that
+    -- they've already served their purpose, and can be reconstructed
+    -- at a later point from the retained class predicates.
+    -- however, there *is* the possibility that a dependency
+    -- out-lives the predicate from which it arose.
+    -- I don't have any examples of this, but if they show up,
+    -- we'd want to consider the possibility of saving the
+    -- dependencies as hidden constraints (i.e. they'd only
+    -- show up in interface files) -- or maybe they'd be useful
+    -- as first class predicates...
+    wanteds = filter notFunDep (bagToList wanted_lie)
 
     try_me inst 
       -- Does not constrain a local tyvar
@@ -272,7 +282,8 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
     returnTc (mkLIE frees, binds)
   where
     givens  = bagToList given_lie
-    wanteds = bagToList wanted_lie
+    -- see comment on wanteds in tcSimplify
+    wanteds = filter notFunDep (bagToList wanted_lie)
     given_dicts = filter isDict givens
 
     try_me inst 
@@ -1001,7 +1012,8 @@ tcSimplifyTop wanted_lie
 
     returnTc (binds1 `andMonoBinds` andMonoBindList binds_ambig)
   where
-    wanteds	= bagToList wanted_lie
+    -- see comment on wanteds in tcSimplify
+    wanteds	= filter notFunDep (bagToList wanted_lie)
     try_me inst	= ReduceMe AddToIrreds
 
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2

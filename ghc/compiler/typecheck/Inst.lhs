@@ -16,14 +16,14 @@ module Inst (
 	newDictFromOld, newDicts, newDictsAtLoc, 
 	newMethod, newMethodWithGivenTy, newOverloadedLit, instOverloadedFun,
 
-	tyVarsOfInst, instLoc, getDictClassTys,
+	tyVarsOfInst, instLoc, getDictClassTys, getFunDeps,
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
-	isDict, isTyVarDict, isStdClassTyVarDict, isMethodFor,
+	isDict, isTyVarDict, isStdClassTyVarDict, isMethodFor, notFunDep,
 	instBindingRequired, instCanBeGeneralised,
 
-	zonkInst, instToId, instToIdBndr,
+	zonkInst, zonkFunDeps, instToId, instToIdBndr,
 
 	InstOrigin(..), InstLoc, pprInstLoc
     ) where
@@ -44,8 +44,8 @@ import TcType	( TcThetaType,
 		)
 import Bag
 import Class	( classInstEnv, Class )
+import FunDeps	( instantiateFdClassTys )
 import Id	( Id, idFreeTyVars, idType, mkUserLocal, mkSysLocal )
-import VarSet	( elemVarSet )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( OccName, Name, mkDictOcc, mkMethodOcc, getOccName )
 import PprType	( pprConstraint )	
@@ -61,10 +61,11 @@ import Subst	( emptyInScopeSet, mkSubst,
 		  substTy, substTheta, mkTyVarSubst, mkTopTyVarSubst
 		)
 import TyCon	( TyCon )
+import Var	( TyVar )
 import VarEnv	( lookupVarEnv, TidyEnv,
 		  lookupSubstEnv, SubstResult(..)
 		)
-import VarSet	( unionVarSet )
+import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
 import TysPrim	  ( intPrimTy, floatPrimTy, doublePrimTy )
 import TysWiredIn ( intDataCon, isIntTy, inIntRange,
 		    floatDataCon, isFloatTy,
@@ -161,6 +162,11 @@ data Inst
 	TcType		-- The type at which the literal is used
 	InstLoc
 
+  | FunDep
+	Class		-- the class from which this arises
+	[([TcType], [TcType])]
+	InstLoc
+
 data OverloadedLit
   = OverloadedIntegral	 Integer	-- The number
   | OverloadedFractional Rational	-- The number
@@ -196,7 +202,14 @@ cmpInst (Method _ _ _ _ _ _) other
 
 cmpInst (LitInst _ lit1 ty1 _) (LitInst _ lit2 ty2 _)
   = (lit1 `cmpOverLit` lit2) `thenCmp` (ty1 `compare` ty2)
+cmpInst (LitInst _ _ _ _) (FunDep _ _ _)
+  = LT
 cmpInst (LitInst _ _ _ _) other
+  = GT
+
+cmpInst (FunDep clas1 fds1 _) (FunDep clas2 fds2 _)
+  = (clas1 `compare` clas2) `thenCmp` (fds1 `compare` fds2)
+cmpInst (FunDep _ _ _) other
   = GT
 
 cmpOverLit (OverloadedIntegral   i1) (OverloadedIntegral   i2) = i1 `compare` i2
@@ -212,8 +225,12 @@ Selection
 instLoc (Dict   u clas tys  loc) = loc
 instLoc (Method u _ _ _ _   loc) = loc
 instLoc (LitInst u lit ty   loc) = loc
+instLoc (FunDep _ _	    loc) = loc
 
 getDictClassTys (Dict u clas tys _) = (clas, tys)
+
+getFunDeps (FunDep clas fds _) = Just (clas, fds)
+getFunDeps _ = Nothing
 
 tyVarsOfInst :: Inst -> TcTyVarSet
 tyVarsOfInst (Dict _ _ tys _)        = tyVarsOfTypes  tys
@@ -221,6 +238,10 @@ tyVarsOfInst (Method _ id tys _ _ _) = tyVarsOfTypes tys `unionVarSet` idFreeTyV
 					 -- The id might have free type variables; in the case of
 					 -- locally-overloaded class methods, for example
 tyVarsOfInst (LitInst _ _ ty _)      = tyVarsOfType  ty
+tyVarsOfInst (FunDep _ fds _)
+  = foldr unionVarSet emptyVarSet (map tyVarsOfFd fds)
+  where tyVarsOfFd (ts1, ts2) =
+	    tyVarsOfTypes ts1 `unionVarSet` tyVarsOfTypes ts1
 \end{code}
 
 Predicates
@@ -242,6 +263,10 @@ isTyVarDict other 	     = False
 
 isStdClassTyVarDict (Dict _ clas [ty] _) = isStandardClass clas && isTyVarTy ty
 isStdClassTyVarDict other		 = False
+
+notFunDep :: Inst -> Bool
+notFunDep (FunDep _ _ _) = False
+notFunDep other	         = True
 \end{code}
 
 Two predicates which deal with the case where class constraints don't
@@ -307,7 +332,14 @@ newMethod orig id tys
 
 instOverloadedFun orig (HsVar v) arg_tys theta tau
   = newMethodWithGivenTy orig v arg_tys theta tau	`thenNF_Tc` \ inst ->
-    returnNF_Tc (HsVar (instToId inst), unitLIE inst)
+    instFunDeps orig theta				`thenNF_Tc` \ fds ->
+    returnNF_Tc (HsVar (instToId inst), mkLIE (inst : fds))
+    --returnNF_Tc (HsVar (instToId inst), unitLIE inst)
+
+instFunDeps orig theta
+  = tcGetInstLoc orig	`thenNF_Tc` \ loc ->
+    let ifd (clas, tys) = FunDep clas (instantiateFdClassTys clas tys) loc in
+    returnNF_Tc (map ifd theta)
 
 newMethodWithGivenTy orig id tys theta tau
   = tcGetInstLoc orig	`thenNF_Tc` \ loc ->
@@ -379,6 +411,9 @@ instToIdBndr (Method u id tys theta tau (_,loc,_))
     
 instToIdBndr (LitInst u list ty loc)
   = mkSysLocal SLIT("lit") u ty
+
+instToIdBndr (FunDep clas fds _)
+  = panic "FunDep escaped!!!"
 \end{code}
 
 
@@ -408,6 +443,17 @@ zonkInst (Method u id tys theta tau loc)
 zonkInst (LitInst u lit ty loc)
   = zonkTcType ty			`thenNF_Tc` \ new_ty ->
     returnNF_Tc (LitInst u lit new_ty loc)
+
+zonkInst (FunDep clas fds loc)
+  = zonkFunDeps fds			`thenNF_Tc` \ fds' ->
+    returnNF_Tc (FunDep clas fds' loc)
+
+zonkFunDeps fds = mapNF_Tc zonkFd fds
+  where
+  zonkFd (ts1, ts2)
+    = zonkTcTypes ts1			`thenNF_Tc` \ ts1' ->
+      zonkTcTypes ts2			`thenNF_Tc` \ ts2' ->
+      returnNF_Tc (ts1', ts2')
 \end{code}
 
 
@@ -435,6 +481,9 @@ pprInst (Method u id tys _ _ loc)
 	  brackets (interppSP tys),
 	  show_uniq u]
 
+pprInst (FunDep clas fds loc)
+  = ptext SLIT("fundep!")
+
 tidyInst :: TidyEnv -> Inst -> (TidyEnv, Inst)
 tidyInst env (LitInst u lit ty loc)
   = (env', LitInst u lit ty' loc)
@@ -451,7 +500,11 @@ tidyInst env (Method u id tys theta tau loc)
 		-- Leave theta, tau alone cos we don't print them
   where
     (env', tys') = tidyOpenTypes env tys
-    
+
+-- this case shouldn't arise... (we never print fundeps)
+tidyInst env fd@(FunDep clas fds loc)
+  = (env, fd)
+
 tidyInsts env insts = mapAccumL tidyInst env insts
 
 show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
@@ -576,6 +629,10 @@ lookupInst inst@(LitInst u (OverloadedFractional f) ty loc)
     float_lit      = HsCon floatDataCon [] [floatprim_lit]
     doubleprim_lit = HsLitOut (HsDoublePrim f) doublePrimTy
     double_lit     = HsCon doubleDataCon [] [doubleprim_lit]
+
+-- there are no `instances' of functional dependencies
+
+lookupInst (FunDep _ _ _)  = returnNF_Tc NoInstance
 
 \end{code}
 

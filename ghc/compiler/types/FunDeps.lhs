@@ -1,19 +1,14 @@
 It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
-module FunDeps(oclose, instantiateFundeps, instantiateFdTys, instantiateFdClassTys, pprFundeps) where
+module FunDeps(oclose, instantiateFdClassTys, pprFundeps) where
 
 #include "HsVersions.h"
 
-import Inst		(getDictClassTys)
 import Class		(classTvsFds)
-import Type		(getTyVar_maybe, tyVarsOfType)
 import Outputable	(interppSP, ptext, empty, hsep, punctuate, comma)
-import UniqSet		(elementOfUniqSet, addOneToUniqSet,
-			 uniqSetToList, unionManyUniqSets)
+import UniqSet		(elementOfUniqSet, addOneToUniqSet )
 import List		(elemIndex)
-import Maybe		(catMaybes)
-import FastString
 
 oclose fds vs =
     case oclose1 fds vs of
@@ -39,17 +34,6 @@ ounion (x:xs) ys =
     where
 	(ys', b) = ounion xs ys
 
--- instantiate fundeps to type variables
-instantiateFundeps dict =
-    map (\(xs, ys) -> (unionMap getTyVars xs, unionMap getTyVars ys)) fdtys
-    where
-	fdtys = instantiateFdTys dict
-	getTyVars ty = tyVarsOfType ty
-	unionMap f xs = uniqSetToList (unionManyUniqSets (map f xs))
-
--- instantiate fundeps to types
-instantiateFdTys dict = instantiateFdClassTys clas ts
-    where (clas, ts) = getDictClassTys dict
 instantiateFdClassTys clas ts =
     map (lookupInstFundep tyvars ts) fundeps
     where

@@ -28,6 +28,7 @@ import TcEnv		( tcExtendLocalValEnv,
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts )
+import TcImprove	( tcImprove )
 import TcMonoType	( tcHsType, checkSigTyVars,
 			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
 			)
@@ -249,6 +250,14 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	-- CHECK THAT THE SIGNATURES MATCH
 	-- (must do this before getTyVarsToGen)
     checkSigMatch top_lvl binder_names mono_ids tc_ty_sigs	`thenTc` \ maybe_sig_theta ->	
+
+	-- IMPROVE the LIE
+	-- Force any unifications dictated by functional dependencies.
+	-- Because unification may happen, it's important that this step
+	-- come before:
+	--   - computing vars over which to quantify
+	--   - zonking the generalized type vars
+    tcImprove lie_req `thenTc_`
 
 	-- COMPUTE VARIABLES OVER WHICH TO QUANTIFY, namely tyvars_to_gen
 	-- The tyvars_not_to_gen are free in the environment, and hence
