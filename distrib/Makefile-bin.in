@@ -205,8 +205,15 @@ install-bin:
 	for i in $(VERSION_SYMLINKS_FOR) ""; do \
 	   if [ "x$$i" != "x" ]; then 		\
 	   	( cd $(bindir); 		\
-		  $(RM) $$i;			\
-		  $(LN_S) $$i-$(version) $$i	\
+		  if ( $(PERL) -e '$$fn="'$$i'"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   	     echo "Creating a symbol link from $$i-$(version) to $$i"; \
+	   	     $(RM) $$i; \
+	             $(LN_S) $$i-$(version) $$i; \
+	          else \
+	             echo "Creating a symbol link from $$i-$(version) to $$i failed: \`$$i' already exists"; \
+	             echo "Perhaps remove \`$$i' manually?"; \
+	             exit 1; \
+	          fi;\
 		); 				\
 	   fi; 					\
 	done
