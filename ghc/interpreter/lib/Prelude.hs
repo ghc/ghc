@@ -1806,7 +1806,6 @@ newtype ST s a = ST (s -> (a,s))
 data RealWorld
 type IO a = ST RealWorld a
 
-
 --primRunST :: (forall s. ST s a) -> a
 primRunST :: ST RealWorld a -> a
 primRunST m = fst (unST m theWorld)
