@@ -85,7 +85,7 @@ data DllFlavour = NotDll	-- Ordinary module
 dll    = Dll
 notDll = NotDll
 
-instance Text DllFlavour where	-- Just used in debug prints of lex tokens
+instance Show DllFlavour where	-- Just used in debug prints of lex tokens
   showsPrec n NotDll s = s
   showsPrec n Dll    s = "dll " ++ s
 \end{code}
