@@ -1,13 +1,14 @@
 Running the test suite against a GHC build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To use the test suite to test a GHC build, just say 'make' in
-fptools/testsuite.  The build system will build the test driver and
-run all the tests against the GHC build in the same source tree.
-You'll get a summary indicating how many tests succeeded and failed
-(including how many of the failures were 'expected'), and a list of
-which tests failed.  To investigate the failures in more detail, see
-"Running individual tests" below.
+To use the test suite to test a GHC build, first say 'make' in
+fptools/testsuite.  The build system will build the test driver. To
+run the tests, cd into tests/ghc-regress and say 'make' to run all the
+tests against the GHC build in the same source tree.  You'll get a
+summary indicating how many tests succeeded and failed (including how
+many of the failures were 'expected'), and a list of which tests
+failed.  To investigate the failures in more detail, see "Running
+individual tests" below.
 
 
 Running the testsuite with a compiler other than GHC
