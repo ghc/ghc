@@ -447,7 +447,7 @@ mkFinalId codegen_ids is_rec id rhs
     bottoming_fn   = isBottomingStrictness (strictnessInfo core_idinfo)
 
     unfolding    = mkTopUnfolding rhs
-    rhs_is_small = neverUnfold unfolding
+    rhs_is_small = not (neverUnfold unfolding)
 
     unfold_info | show_unfold = unfolding
 		| otherwise   = noUnfolding
