@@ -46,6 +46,10 @@ import PprCore          ( pprCoreBindings )
 
 ======================================================================
 
+-- **!  wasn't I going to do something about not requiring annotations
+-- to be correct on unpointed types and/or those without haskell pointers
+-- inside?
+
 The whole inference
 ~~~~~~~~~~~~~~~~~~~
 
@@ -212,11 +216,11 @@ usgInfCE ve e0@(Var v) | isTyVar v
   = panic "usgInfCE: unexpected TyVar"
                        | otherwise
   = do v' <- instVar (lookupVar ve v)
-       ASSERT( isUsgTy (varType v' {-'cpp-}) )
-        return (Var v',
-                varType v',
-                emptyUConSet,
-                unitMS v')
+       return $ ASSERT( isUsgTy (varType v' {-'cpp-}) )
+                (Var v',
+                 varType v',
+                 emptyUConSet,
+                 unitMS v')
 
 usgInfCE ve e0@(Con (Literal lit) args)
   = ASSERT( null args )
@@ -242,11 +246,11 @@ usgInfCE ve e0@(Con con args)
        eyhf3s <- mapM (usgInfCE ve) e1s
        let (e3s,y3us,h3s,f3s) = unzip4 eyhf3s
            h4s = zipWith usgSubTy y3us y2us
-       ASSERT( isUsgTy y2u )
-        return (Con con (map Type y1s ++ e3s),
-                y2u,
-                unionUCSs (h3s ++ h4s),
-                foldl plusMS emptyMS f3s)
+       return $ ASSERT( isUsgTy y2u )
+                (Con con (map Type y1s ++ e3s),
+                 y2u,
+                 unionUCSs (h3s ++ h4s),
+                 foldl plusMS emptyMS f3s)
 
   where dataConTys c u y1s
         -- compute argtys of a datacon
@@ -272,11 +276,11 @@ usgInfCE ve (App ea eb)
            (y2u,y3u) = expectJust "usgInfCE:App" $ splitFunTy_maybe ya1
        (eb1,yb1u,hb1,fb1) <- usgInfCE ve eb
        let h4 = usgSubTy yb1u y2u
-       ASSERT( isUsgTy y3u )
-        return (App ea1 eb1,
-                y3u,
-                unionUCSs [ha1,hb1,h4],
-                fa1 `plusMS` fb1)
+       return $ ASSERT( isUsgTy y3u )
+                (App ea1 eb1,
+                 y3u,
+                 unionUCSs [ha1,hb1,h4],
+                 fa1 `plusMS` fb1)
 
 usgInfCE ve e0@(Lam v0 e) | isTyVar v0
   = do (e1,y1u,h1,f1) <- usgInfCE ve e
@@ -308,11 +312,11 @@ usgInfCE ve (Let b0s e0)
   = do (v1s,ve1,b1s,h1,fb1,fa1) <- usgInfBind ve b0s
        (e2,y2u,h2,f2)           <- usgInfCE ve1 e0
        let h3 = occChksUConSet v1s (fb1 `plusMS` f2)
-       ASSERT( isUsgTy y2u )
-        return (Let b1s e2,
-                y2u,
-                unionUCSs [h1,h2,h3],
-                fa1 `plusMS` (f2 `delsFromMS` v1s))
+       return $ ASSERT( isUsgTy y2u )
+                (Let b1s e2,
+                 y2u,
+                 unionUCSs [h1,h2,h3],
+                 fa1 `plusMS` (f2 `delsFromMS` v1s))
 
 usgInfCE ve (Case e0 v0 [(DEFAULT,[],e1)])
 -- pure strict let, no selection (could be at polymorphic or function type)
@@ -321,11 +325,11 @@ usgInfCE ve (Case e0 v0 [(DEFAULT,[],e1)])
        (e3,y3u,h3,f3) <- usgInfCE (extendVarEnv ve v0 v1) e1
        let h4 = usgEqTy y2u y1u -- **! why not subty?
            h5 = occChkUConSet v1 f3
-       ASSERT( isUsgTy y3u )
-        return (Case e2 v1 [(DEFAULT,[],e3)],
-                y3u,
-                unionUCSs [h2,h3,h4,h5],
-                f2 `plusMS` (f3 `delFromMS` v1))
+       return $ ASSERT( isUsgTy y3u )
+                (Case e2 v1 [(DEFAULT,[],e3)],
+                 y3u,
+                 unionUCSs [h2,h3,h4,h5],
+                 f2 `plusMS` (f3 `delFromMS` v1))
  
 usgInfCE ve e0@(Case e1 v1 alts)
 -- general case (tycon of scrutinee must be known)
@@ -347,11 +351,11 @@ usgInfCE ve e0@(Case e1 v1 alts)
            h6s      = zipWith occChksUConSet v2ss f4s
            f4       = foldl1 maxMS (zipWith delsFromMS f4s v2ss)
            h7       = occChkUConSet v2 (f4 `plusMS` (unitMS v2))
-       ASSERT( isUsgTy y5u )
-        return (Case e2 v2 (zip3 cs v2ss e4s),
-                y5u,
-                unionUCSs (h2:h3:h7:(h4s ++ h5s ++ h6s)),
-                f2 `plusMS` (f4 `delFromMS` v2))
+       return $ ASSERT( isUsgTy y5u )
+                (Case e2 v2 (zip3 cs v2ss e4s),
+                 y5u,
+                 unionUCSs (h2:h3:h7:(h4s ++ h5s ++ h6s)),
+                 f2 `plusMS` (f4 `delFromMS` v2))
 
 usgInfCE ve e0@(Note note ea)
   = do (e1,y1u,h1,f1) <- usgInfCE ve ea
