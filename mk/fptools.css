@@ -4,7 +4,7 @@ div {
   background: white
 }
 
-h1, h2, h3 { color: #005A9C }
+h1, h2, h3, h4, h5, h6, p.title { color: #005A9C }
 
 h1 { font:            170% sans-serif }
 h2 { font:            140% sans-serif }
@@ -20,8 +20,15 @@ pre {
   padding: 0.3em
 }
 
-pre.screen         { color: green  }
+pre.screen         { color: #006400 }
 pre.programlisting { color: maroon }
+
+div.example {
+  background-color: #fffcf5;
+  margin: 1ex 0em;
+  border: solid #412e25 1px;
+  padding: 0ex 0.4em
+}
 
 a:link    { color:      #0000C8 }
 a:hover   { background: #FFFFA8 }
