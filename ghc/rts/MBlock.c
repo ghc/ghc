@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.8 1999/01/26 10:41:20 sof Exp $
+ * $Id: MBlock.c,v 1.9 1999/02/05 16:02:44 simonm Exp $
+ *
+ * (c) The GHC Team 1998-1999
  *
  * MegaBlock Allocator Interface.  This file contains all the dirty
  * architecture-dependent hackery required to get a chunk of aligned

@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStorage.h,v 1.2 1998/12/02 13:21:41 simonm Exp $
+ * $Id: StgStorage.h,v 1.3 1999/02/05 16:02:29 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * STG Storage Manger Interface
  *

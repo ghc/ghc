@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StablePriv.h,v 1.1 1999/01/26 14:18:38 simonm Exp $
+ * $Id: StablePriv.h,v 1.2 1999/02/05 16:02:56 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Internal RTS API for stable names and stable ptrs.
  *

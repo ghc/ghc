@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.11 1999/02/05 14:48:01 simonm Exp $
+ * $Id: Storage.c,v 1.12 1999/02/05 16:03:01 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Storage manager front end
  *

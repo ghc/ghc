@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.4 1999/01/27 14:51:14 simonpj Exp $
+ * $Id: Prelude.h,v 1.5 1999/02/05 16:02:24 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Prelude identifiers that we sometimes need to refer to in the RTS.
  *

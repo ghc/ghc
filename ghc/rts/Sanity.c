@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.8 1999/02/02 12:37:14 simonm Exp $
+ * $Id: Sanity.c,v 1.9 1999/02/05 16:02:52 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Sanity checking code for the heap and stack.
  *
@@ -310,7 +312,6 @@ checkClosure( StgClosure* p )
 	}
 
     case ARR_WORDS:
-    case MUT_ARR_WORDS:
 	    return arr_words_sizeW(stgCast(StgArrWords*,p));
 
     case MUT_ARR_PTRS:

@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.8 1999/01/27 16:41:16 simonm Exp $
+ * $Id: RtsFlags.h,v 1.9 1999/02/05 16:02:50 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Datatypes that holds the command-line flag settings.
  *

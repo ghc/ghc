@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgLongLong.c,v 1.2 1998/12/02 13:28:51 simonm Exp $
+ * $Id: StgLongLong.c,v 1.3 1999/02/05 16:02:58 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Primitive operations over (64-bit) long longs
  * (only used on 32-bit platforms.)

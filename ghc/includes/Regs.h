@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.2 1998/12/02 13:21:20 simonm Exp $
+ * $Id: Regs.h,v 1.3 1999/02/05 16:02:26 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Registers used in STG code.  Might or might not correspond to
  * actual machine registers.

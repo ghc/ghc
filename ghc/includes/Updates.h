@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.6 1999/01/21 10:31:45 simonm Exp $
+ * $Id: Updates.h,v 1.7 1999/02/05 16:02:31 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Definitions related to updates.
  *

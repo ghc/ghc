@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.8 1999/01/27 14:51:23 simonpj Exp $
+ * $Id: Updates.hc,v 1.9 1999/02/05 16:03:03 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Code to perform updates.
  *

@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.12 1999/02/05 15:25:09 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.13 1999/02/05 16:02:58 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Entry code for various built-in closure types.
  *

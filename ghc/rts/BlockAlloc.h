@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.h,v 1.4 1999/02/03 16:32:47 simonm Exp $
+ * $Id: BlockAlloc.h,v 1.5 1999/02/05 16:02:36 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Block Allocator Interface
  *

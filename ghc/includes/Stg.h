@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.5 1999/01/26 11:12:57 simonm Exp $
+ * $Id: Stg.h,v 1.6 1999/02/05 16:02:28 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Top-level include file for everything STG-ish.  
  *

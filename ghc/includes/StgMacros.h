@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.4 1999/01/23 17:51:27 sof Exp $
+ * $Id: StgMacros.h,v 1.5 1999/02/05 16:02:28 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Macros used for writing STG-ish C code.
  *

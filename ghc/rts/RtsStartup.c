@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.5 1999/01/26 11:12:47 simonm Exp $
+ * $Id: RtsStartup.c,v 1.6 1999/02/05 16:02:50 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Main function for a standalone Haskell program.
  *

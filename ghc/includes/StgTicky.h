@@ -1,5 +1,8 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.2 1999/02/02 14:21:28 simonm Exp $
+ * $Id: StgTicky.h,v 1.3 1999/02/05 16:02:30 simonm Exp $
+ *
+ * (c) The AQUA project, Glasgow University, 1994-1997
+ * (c) The GHC Team, 1998-1999
  *
  * Ticky-ticky profiling macros.
  *

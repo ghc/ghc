@@ -1,12 +1,10 @@
 /* -*- mode: hugs-c; -*- */
 /* --------------------------------------------------------------------------
+ * $Id: Assembler.c,v 1.4 1999/02/05 16:02:34 simonm Exp $
+ *
+ * Copyright (c) The GHC Team 1994-1998.
+ *
  * Bytecode assembler
- *
- * Copyright (c) 1994-1998.
- *
- * $RCSfile: Assembler.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/01/27 14:51:16 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.

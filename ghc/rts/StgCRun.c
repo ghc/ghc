@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.2 1998/12/02 13:28:50 simonm Exp $
+ * $Id: StgCRun.c,v 1.3 1999/02/05 16:02:57 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * STG-to-C glue.  Some architectures have this code written in
  * straight assembler (see StgRun.S), some in C.

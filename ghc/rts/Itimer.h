@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.h,v 1.2 1998/12/02 13:28:28 simonm Exp $
+ * $Id: Itimer.h,v 1.3 1999/02/05 16:02:44 simonm Exp $
  *
- * (c) The GHC Team 1998
+ * (c) The GHC Team 1998-1999
  *
  * Interval timer for profiling and pre-emptive scheduling.
  *

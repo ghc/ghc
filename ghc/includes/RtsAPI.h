@@ -1,5 +1,7 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.2 1998/12/02 13:21:21 simonm Exp $
+ * $Id: RtsAPI.h,v 1.3 1999/02/05 16:02:27 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * API for invoking Haskell functions via the RTS
  *

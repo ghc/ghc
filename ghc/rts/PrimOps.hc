@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.12 1999/02/05 15:25:09 simonm Exp $
+ * $Id: PrimOps.hc,v 1.13 1999/02/05 16:02:45 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Primitive functions / data
  *

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.2 1998/12/02 13:28:35 simonm Exp $
+ * $Id: Profiling.c,v 1.3 1999/02/05 16:02:48 simonm Exp $
  *
- * (c) The GHC Team, 1998
+ * (c) The GHC Team, 1998-1999
  *
  * Support for profiling
  *

@@ -1,7 +1,8 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.2 1999/02/02 14:21:34 simonm Exp $
+ * $Id: Ticky.c,v 1.3 1999/02/05 16:03:02 simonm Exp $
  *
- * (c) The GHC Team, Glasgow University, 1992-1998
+ * (c) The AQUA project, Glasgow University, 1992-1997
+ * (c) The GHC Team, 1998-1999
  *
  * Ticky-ticky profiling
  *-------------------------------------------------------------------------- */

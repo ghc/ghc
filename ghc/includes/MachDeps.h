@@ -1,7 +1,8 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachDeps.h,v 1.2 1998/12/02 13:21:12 simonm Exp $
+ * $Id: MachDeps.h,v 1.3 1999/02/05 16:02:23 simonm Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
+ * (c) The GHC Team, 1998-1999
  * 
  * Definitions that characterise machine specific properties of basic
  * Stg types provided as unboxed types (mirrors the typedefs in

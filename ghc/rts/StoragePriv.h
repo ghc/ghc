@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.7 1999/02/02 14:21:34 simonm Exp $
+ * $Id: StoragePriv.h,v 1.8 1999/02/05 16:03:02 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Internal Storage Manger Interface
  *

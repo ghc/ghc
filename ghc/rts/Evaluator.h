@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.h,v 1.3 1999/01/27 14:51:20 simonpj Exp $
+ * $Id: Evaluator.h,v 1.4 1999/02/05 16:02:40 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Prototypes for functions in Evaluator.c
  *

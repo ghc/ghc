@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.3 1999/01/13 17:25:51 simonm Exp $
+ * $Id: Block.h,v 1.4 1999/02/05 16:02:19 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Block structure for the storage manager
  *

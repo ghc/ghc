@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Disassembler.h,v 1.2 1998/12/02 13:28:16 simonm Exp $
+ * $Id: Disassembler.h,v 1.3 1999/02/05 16:02:37 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Prototypes for functions in Disassembler.c
  *

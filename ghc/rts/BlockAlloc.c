@@ -1,6 +1,8 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.3 1999/01/13 17:25:37 simonm Exp $
+ * $Id: BlockAlloc.c,v 1.4 1999/02/05 16:02:35 simonm Exp $
  *
+ * (c) The GHC Team 1998-1999
+ * 
  * The block allocator and free list manager.
  *
  * This is the architecture independent part of the block allocator.

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.1 1999/01/27 10:11:27 simonm Exp $
+ * $Id: Stable.c,v 1.2 1999/02/05 16:02:55 simonm Exp $
  *
- * (c) The GHC Team 1998-1999
+ * (c) The GHC Team, 1998-1999
  *
  * Stable names and stable pointers.
  *

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: DebugProf.c,v 1.5 1999/02/05 15:25:04 simonm Exp $
+ * $Id: DebugProf.c,v 1.6 1999/02/05 16:02:36 simonm Exp $
  *
- * (c) The GHC Team 1998
+ * (c) The GHC Team 1998-1999
  *
  * Simple Heap Profiling
  *

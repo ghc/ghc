@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.6 1999/02/02 14:21:34 simonm Exp $
+ * $Id: Storage.h,v 1.7 1999/02/05 16:03:01 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * External Storage Manger Interface
  *

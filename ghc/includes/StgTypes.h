@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.3 1999/01/26 11:12:58 simonm Exp $
+ * $Id: StgTypes.h,v 1.4 1999/02/05 16:02:30 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Various C datatypes used in the run-time system.
 

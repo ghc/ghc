@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.3 1999/01/13 17:25:41 simonm Exp $
+ * $Id: MBlock.h,v 1.4 1999/02/05 16:02:45 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * MegaBlock Allocator interface.
  *

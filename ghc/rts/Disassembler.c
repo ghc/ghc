@@ -1,12 +1,11 @@
 /* -*- mode: hugs-c; -*- */
 /* -----------------------------------------------------------------------------
+ * $Id: Disassembler.c,v 1.3 1999/02/05 16:02:37 simonm Exp $
+ *
+ * Copyright (c) The GHC Team 1994-1999.
+ *
  * Bytecode disassembler
  *
- * Copyright (c) 1994-1998.
- *
- * $RCSfile: Disassembler.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:28:15 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"

@@ -1,5 +1,8 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.8 1999/01/27 16:41:16 simonm Exp $
+ * $Id: RtsFlags.c,v 1.9 1999/02/05 16:02:49 simonm Exp $
+ *
+ * (c) The AQUA Project, Glasgow University, 1994-1997
+ * (c) The GHC Team, 1998-1999
  *
  * Functions for parsing the argument list.
  *

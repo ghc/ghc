@@ -1,12 +1,10 @@
 /* -*- mode: hugs-c; -*- */
 /* -----------------------------------------------------------------------------
+ * $Id: Assembler.h,v 1.4 1999/02/05 16:02:18 simonm Exp $
+ *
+ * (c) The GHC Team 1994-1998.
+ *
  * Bytecode assembler
- *
- * Copyright (c) 1994-1998.
- *
- * $RCSfile: Assembler.h,v $
- * $Revision: 1.3 $
- * $Date: 1999/01/18 15:23:30 $
  *
  * NB This is one of the few files shared between Hugs and the runtime system,
  * so it is very important that it not conflict with either and that it not

@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.5 1999/02/03 16:42:18 simonm Exp $
+ * $Id: Stats.c,v 1.6 1999/02/05 16:02:56 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Statistics and timing-related functions.
  *

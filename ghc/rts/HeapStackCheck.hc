@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.2 1998/12/02 13:28:26 simonm Exp $
+ * $Id: HeapStackCheck.hc,v 1.3 1999/02/05 16:02:43 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Canned Heap-Check and Stack-Check sequences.
  *

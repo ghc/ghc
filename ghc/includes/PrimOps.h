@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.15 1999/02/05 15:25:03 simonm Exp $
+ * $Id: PrimOps.h,v 1.16 1999/02/05 16:02:25 simonm Exp $
+ *
+ * (c) The GHC Team, 1998-1999
  *
  * Macros for primitive operations in STG-ish C code.
  *

@@ -1,5 +1,9 @@
 /* -*- mode: hugs-c; -*- */
-/* --------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
+ * $Id: QueueTemplate.h,v 1.3 1999/02/05 16:02:48 simonm Exp $
+ *
+ * (c) The GHC Team, 1998
+ *
  * Template for generating queues of various types
  *
  * #define Queue##ChunkSize, Queue and Type before #including this file
@@ -13,8 +17,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: QueueTemplate.h,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:28:37 $
+ * $Revision: 1.3 $
+ * $Date: 1999/02/05 16:02:48 $
  *
  * ------------------------------------------------------------------------*/
 
