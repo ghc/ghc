@@ -29,7 +29,7 @@ module TcType (
 
   --------------------------------
   -- Builders
-  mkPhiTy, mkSigmaTy, 
+  mkPhiTy, mkSigmaTy, hoistForAllTys,
 
   --------------------------------
   -- Splitters  
@@ -139,7 +139,7 @@ import Type		(	-- Re-exports
 			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar,
 			  tidyOpenTyVars, 
-			  isSubKind, 
+			  isSubKind, deShadowTy,
 
 			  tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
 			  tcEqPred, tcCmpPred, tcEqTypeX, 
@@ -617,6 +617,79 @@ is_tc :: Unique -> Type -> Bool
 is_tc uniq ty = case tcSplitTyConApp_maybe ty of
 			Just (tc, _) -> uniq == getUnique tc
 			Nothing	     -> False
+\end{code}
+
+
+
+
+%************************************************************************
+%*									*
+		Hoisting for-alls
+%*									*
+%************************************************************************
+
+hoistForAllTys is used for user-written type signatures only
+We want to 'look through' type synonyms when doing this
+so it's better done on the Type than the HsType
+
+It moves all the foralls and constraints to the top
+e.g.	T -> forall a. a        ==>   forall a. T -> a
+	T -> (?x::Int) -> Int   ==>   (?x::Int) -> T -> Int
+
+Also: it eliminates duplicate constraints.  These can show up
+when hoisting constraints, notably implicit parameters.
+
+It tries hard to retain type synonyms if hoisting does not break one
+up.  Not only does this improve error messages, but there's a tricky
+interaction with Haskell 98.  H98 requires no unsaturated type
+synonyms, which is checked by checkValidType.  This runs after
+hoisting, so we don't want hoisting to remove the SynNotes!  (We can't
+run validity checking before hoisting because in mutually-recursive
+type definitions we postpone validity checking until after the knot is
+tied.)
+
+\begin{code}
+hoistForAllTys :: Type -> Type
+hoistForAllTys ty
+  = go (deShadowTy ty)
+	-- Running over ty with an empty substitution gives it the
+	-- no-shadowing property.  This is important.  For example:
+	--	type Foo r = forall a. a -> r
+	--	foo :: Foo (Foo ())
+	-- Here the hoisting should give
+	--	foo :: forall a a1. a -> a1 -> ()
+	--
+	-- What about type vars that are lexically in scope in the envt?
+	-- We simply rely on them having a different unique to any
+	-- binder in 'ty'.  Otherwise we'd have to slurp the in-scope-tyvars
+	-- out of the envt, which is boring and (I think) not necessary.
+
+  where
+    go (TyVarTy tv)   		   = TyVarTy tv
+    go (TyConApp tc tys)	   = TyConApp tc (map go tys)
+    go (PredTy pred)  		   = PredTy pred    -- No nested foralls 
+    go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote (go ty1)) (go ty2)
+    go (NoteTy (FTVNote _) ty2)    = go ty2	    -- Discard the free tyvar note
+    go (FunTy arg res)   	   = mk_fun_ty (go arg) (go res)
+    go (AppTy fun arg)   	   = AppTy (go fun) (go arg)
+    go (ForAllTy tv ty)		   = ForAllTy tv (go ty)
+
+ 	-- mk_fun_ty does all the work.  
+	-- It's building t1 -> t2: 
+	--	if t2 is a for-all type, push t1 inside it
+	--	if t2 is (pred -> t3), check for duplicates
+    mk_fun_ty ty1 ty2
+	| not (isOverloadedTy ty2) 	-- No forall's, or context => 
+	= FunTy ty1 ty2 	
+	| PredTy p1 <- ty1		-- ty1 is a predicate
+	= if p1 `elem` theta then 	-- so check for duplicates
+		ty2
+	  else
+		mkSigmaTy tvs (p1:theta) tau
+	| otherwise 	
+	= mkSigmaTy tvs theta (FunTy ty1 tau)
+	where
+	  (tvs, theta, tau) = tcSplitSigmaTy ty2
 \end{code}
 
 

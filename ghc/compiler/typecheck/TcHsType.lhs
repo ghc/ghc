@@ -37,7 +37,7 @@ import TcMType		( newKindVar, newMetaTyVar, zonkTcKindToKind,
 			)
 import TcUnify		( unifyFunKind, checkExpectedKind )
 import TcType		( Type, PredType(..), ThetaType, 
-			  MetaDetails(Flexi),
+			  MetaDetails(Flexi), hoistForAllTys,
 			  TcType, TcTyVar, TcKind, TcThetaType, TcTauType,
 		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy, mkFunTy, 
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
@@ -821,66 +821,5 @@ lookupSig [] name = Nothing
 lookupSig (sig : sigs) name
   | name == idName (sig_id sig) = Just sig
   | otherwise	     	 	= lookupSig sigs name
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Errors and contexts}
-%*									*
-%************************************************************************
-
-
-\begin{code}
-hoistForAllTys :: Type -> Type
--- Used for user-written type signatures only
--- Move all the foralls and constraints to the top
--- e.g.  T -> forall a. a        ==>   forall a. T -> a
---	 T -> (?x::Int) -> Int   ==>   (?x::Int) -> T -> Int
---
--- Also: eliminate duplicate constraints.  These can show up
--- when hoisting constraints, notably implicit parameters.
---
--- We want to 'look through' type synonyms when doing this
--- so it's better done on the Type than the HsType
-
-hoistForAllTys ty
-  = let
-	no_shadow_ty = deShadowTy ty
-	-- Running over ty with an empty substitution gives it the
-	-- no-shadowing property.  This is important.  For example:
-	--	type Foo r = forall a. a -> r
-	--	foo :: Foo (Foo ())
-	-- Here the hoisting should give
-	--	foo :: forall a a1. a -> a1 -> ()
-	--
-	-- What about type vars that are lexically in scope in the envt?
-	-- We simply rely on them having a different unique to any
-	-- binder in 'ty'.  Otherwise we'd have to slurp the in-scope-tyvars
-	-- out of the envt, which is boring and (I think) not necessary.
-    in
-    case hoist no_shadow_ty of 
-	(tvs, theta, body) -> mkForAllTys tvs (mkFunTys (nubBy tcEqType theta) body)
-		-- The 'nubBy' eliminates duplicate constraints,
-		-- notably implicit parameters
-  where
-    hoist ty
-	| (tvs1, body_ty) <- tcSplitForAllTys ty,
-	  not (null tvs1)
-	= case hoist body_ty of
-		(tvs2,theta,tau) -> (tvs1 ++ tvs2, theta, tau)
-
-	| Just (arg, res) <- tcSplitFunTy_maybe ty
-	= let
-	      arg' = hoistForAllTys arg	-- Don't forget to apply hoist recursively
-	  in				-- to the argument type
-	  if (isPredTy arg') then
-	    case hoist res of
-		(tvs,theta,tau) -> (tvs, arg':theta, tau)
-	  else
-	     case hoist res of
-		(tvs,theta,tau) -> (tvs, theta, mkFunTy arg' tau)
-
-	| otherwise = ([], [], ty)
 \end{code}
 

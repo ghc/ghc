@@ -1207,5 +1207,3 @@ substTyVarBndr subst@(TvSubst in_scope env) old_var
     new_var = uniqAway in_scope old_var
 	-- The uniqAway part makes sure the new variable is not already in scope
 \end{code}
-
-
