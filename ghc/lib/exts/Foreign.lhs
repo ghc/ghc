@@ -7,9 +7,12 @@
 \begin{code}
 module Foreign 
        ( 
-	 ForeignObj      -- abstract, instance of: Eq
-       , makeForeignObj  -- :: Addr{-obj-} -> Addr{-finaliser-} -> IO ForeignObj
-       , writeForeignObj -- :: ForeignObj  -> Addr{-new obj-}   -> IO ()
+	 ForeignObj       -- abstract, instance of: Eq
+       , makeForeignObj   -- :: Addr{-obj-} -> Addr{-finaliser-} -> IO ForeignObj
+       , writeForeignObj  -- :: ForeignObj  -> Addr{-new obj-}   -> IO ()
+       , foreignObjToAddr -- :: ForeignObj  -> IO Addr
+           -- the coercion from a foreign obj. to an addr. is unsafe,
+	   -- and should not be used unless absolutely necessary.
        
        , StablePtr {-a-} -- abstract.
        , makeStablePtr   -- :: a -> IO (StablePtr a)
@@ -101,6 +104,12 @@ import Int
    )
 import PrelIOBase ( IO(..), IOResult(..) )
 \end{code}
+
+\begin{code}
+foreignObjToAddr :: ForeignObj -> IO Addr
+foreignObjToAddr fo = _casm_ `` %r=(StgAddr)%0; '' fo
+\end{code}
+
 
 \begin{code}
 indexCharOffForeignObj   :: ForeignObj -> Int -> Char
