@@ -225,8 +225,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- BUILD THE NEW ModDetails AND ModIface
  	    -------------------
-	; let new_details = mkModDetails env_tc tidy_binds 
- 				(bindersOfBinds tidy_binds) orphan_rules
+	; let new_details = mkModDetails env_tc tidy_binds  orphan_rules
 	; final_iface <- mkFinalIface ghci_mode dflags location 
                                       maybe_checked_iface new_iface new_details
 

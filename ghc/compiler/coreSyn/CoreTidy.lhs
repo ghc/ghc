@@ -368,7 +368,7 @@ tidyIdInfo us tidy_env is_external unfold_info arity_info caf_info id
 	`setStrictnessInfo` strictnessInfo core_idinfo
 	`setInlinePragInfo` inlinePragInfo core_idinfo
 	`setUnfoldingInfo`  unfold_info
-	`setWorkerInfo`	    tidyWorker tidy_env (workerInfo core_idinfo)
+	`setWorkerInfo`	    tidyWorker tidy_env arity_info (workerInfo core_idinfo)
 	`setSpecInfo`	    rules'
 	`setArityInfo`	    ArityExactly arity_info
 	`setCafInfo`        caf_info
@@ -387,6 +387,7 @@ tidyIdInfo us tidy_env is_external unfold_info arity_info caf_info id
 		    DictFunId  -> DictFunId
 		    flavour    -> pprTrace "tidyIdInfo" (ppr id <+> ppFlavourInfo flavour)
 				  flavour
+
 
 -- This is where we set names to local/global based on whether they really are 
 -- externally visible (see comment at the top of this module).  If the name
@@ -418,17 +419,41 @@ tidyTopName mod orig_env occ_env external name
     local	     = not global
     internal	     = not external
 
+------------  Worker  --------------
+-- We only treat a function as having a worker if
+-- the exported arity (which is now the number of visible lambdas)
+-- is the same as the arity at the moment of the w/w split
+-- If so, we can safely omit the unfolding inside the wrapper, and
+-- instead re-generate it from the type/arity/strictness info
+-- But if the arity has changed, we just take the simple path and
+-- put the unfolding into the interface file, forgetting the fact
+-- that it's a wrapper.  
+--
+-- How can this happen?  Sometimes we get
+--	f = coerce t (\x y -> $wf x y)
+-- at the moment of w/w split; but the eta reducer turns it into
+--	f = coerce t $wf
+-- which is perfectly fine except that the exposed arity so far as
+-- the code generator is concerned (zero) differs from the arity
+-- when we did the split (2).  
+--
+-- All this arises because we use 'arity' to mean "exactly how many
+-- top level lambdas are there" in interface files; but during the
+-- compilation of this module it means "how many things can I apply
+-- this to".
+tidyWorker tidy_env real_arity (HasWorker work_id wrap_arity) 
+  | real_arity == wrap_arity
+  = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
+tidyWorker tidy_env real_arity other
+  = NoWorker
+
+------------  Rules  --------------
 tidyIdRules :: TidyEnv -> [IdCoreRule] -> UniqSM [IdCoreRule]
 tidyIdRules env [] = returnUs []
 tidyIdRules env ((fn,rule) : rules)
   = tidyRule env rule  		`thenUs` \ rule ->
     tidyIdRules env rules 	`thenUs` \ rules ->
     returnUs ((tidyVarOcc env fn, rule) : rules)
-
-tidyWorker tidy_env (HasWorker work_id wrap_arity) 
-  = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
-tidyWorker tidy_env NoWorker
-  = NoWorker
 
 tidyRules :: TidyEnv -> CoreRules -> UniqSM CoreRules
 tidyRules env (Rules rules fvs) 

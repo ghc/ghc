@@ -68,11 +68,10 @@ import IO		( IOMode(..), openFile, hClose )
 \begin{code}
 mkModDetails :: TypeEnv		-- From typechecker
 	     -> [CoreBind]	-- Final bindings
-	     -> [Id]		-- Top-level Ids from the code generator; 
 				-- they have authoritative arity info
 	     -> [IdCoreRule]	-- Tidy orphan rules
 	     -> ModDetails
-mkModDetails type_env tidy_binds stg_ids orphan_rules
+mkModDetails type_env tidy_binds orphan_rules
   = ModDetails { md_types = new_type_env,
 		 md_rules = rule_dcls,
 		 md_insts = filter isDictFunId final_ids }
@@ -99,10 +98,9 @@ mkModDetails type_env tidy_binds stg_ids orphan_rules
     keep_it (AnId id) = hasNoBinding id
     keep_it other     = True
 
-    stg_id_set = mkVarSet stg_ids
-    final_ids  = [addStgInfo stg_id_set id | bind <- tidy_binds
-					   , id <- bindersOf bind
-					   , isGlobalName (idName id)]
+    final_ids  = [id | bind <- tidy_binds
+		     , id <- bindersOf bind
+		     , isGlobalName (idName id)]
 
 	-- The complete rules are gotten by combining
 	--	a) the orphan rules
@@ -124,58 +122,6 @@ mkModDetailsFromIface type_env rules
     rule_dcls = [(id,rule) | IfaceRuleOut id rule <- rules]
 	-- All the rules from an interface are of the IfaceRuleOut form
 \end{code}
-
-
-We have to add on the arity and CAF info computed by the code generator
-This is also the moment at which we may forget that this function has
-a worker: see the comments below
-
-\begin{code}
-addStgInfo :: IdSet 	-- Ids used at code-gen time; they have better pragma info!
-	   -> Id -> Id
-addStgInfo stg_ids id
-  = id `setIdInfo` final_idinfo
-  where
-    idinfo  = idInfo id
-    idinfo' = idinfo `setArityInfo` stg_arity
-		     `setCafInfo`   cafInfo stg_idinfo
-    final_idinfo | worker_ok = idinfo'
-		 | otherwise = idinfo' `setWorkerInfo` NoWorker
-		
-    stg_idinfo = case lookupVarSet stg_ids id of
-			Just id' -> idInfo id'
-			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
-				    idInfo id
-
-    stg_arity = arityInfo stg_idinfo
-
-    ------------  Worker  --------------
-	-- We only treat a function as having a worker if
-	-- the exported arity (which is now the number of visible lambdas)
-	-- is the same as the arity at the moment of the w/w split
-	-- If so, we can safely omit the unfolding inside the wrapper, and
-	-- instead re-generate it from the type/arity/strictness info
-	-- But if the arity has changed, we just take the simple path and
-	-- put the unfolding into the interface file, forgetting the fact
-	-- that it's a wrapper.  
-	--
-	-- How can this happen?  Sometimes we get
-	--	f = coerce t (\x y -> $wf x y)
-	-- at the moment of w/w split; but the eta reducer turns it into
-	--	f = coerce t $wf
-	-- which is perfectly fine except that the exposed arity so far as
-	-- the code generator is concerned (zero) differs from the arity
-	-- when we did the split (2).  
-	--
-	-- All this arises because we use 'arity' to mean "exactly how many
-	-- top level lambdas are there" in interface files; but during the
-	-- compilation of this module it means "how many things can I apply
-	-- this to".
-    worker_ok = case workerInfo idinfo of
-		     NoWorker		          -> True
-		     HasWorker work_id wrap_arity -> wrap_arity == arityLowerBound stg_arity
-\end{code}
-
 
 \begin{code}
 getRules :: [IdCoreRule] 	-- Orphan rules
