@@ -1,11 +1,16 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.47 2002/07/17 09:21:49 simonmar Exp $
+ * $Id: Stg.h,v 1.48 2002/07/22 10:02:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
  * Top-level include file for everything STG-ish.  
  *
  * This file is included *automatically* by all .hc files.
+ *
+ * NOTE: always include Stg.h *before* any other headers, because we
+ * define some register variables which must be done before any inline
+ * functions are defined (some system headers have been known to
+ * define the odd inline function).
  *
  * ---------------------------------------------------------------------------*/
 
