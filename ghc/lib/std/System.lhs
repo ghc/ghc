@@ -13,7 +13,6 @@ module System (
 import Prelude
 import PrelAddr
 import PrelIOBase	( IOError(..), IOErrorType(..), constructErrorAndFailWithInfo )
-import PrelArr		( indexAddrOffAddr )
 import PrelPack    	( unpackCString )
 
 \end{code}
