@@ -1,0 +1,82 @@
+PrelAll_SRC=Array.lhs          Maybe.lhs          PrelDynamic.lhs    PrelIOBase.lhs     PrelShow.lhs \
+CPUTime.lhs        Monad.lhs          PrelEnum.lhs       PrelList.lhs       PrelStable.lhs \
+Char.lhs           Numeric.lhs        PrelErr.lhs               PrelTup.lhs \
+Complex.lhs        PrelAddr.lhs       PrelException.lhs  PrelMaybe.lhs      PrelWeak.lhs \
+Directory.lhs      PrelArr.lhs        PrelFloat.lhs      PrelNum.lhs        Prelude.lhs \
+IO.lhs             PrelArrExtra.lhs   PrelForeign.lhs    PrelPack.lhs       Random.lhs \
+Ix.lhs             PrelBase.lhs       PrelHandle.lhs     PrelRead.lhs       Ratio.lhs \
+List.lhs           PrelByteArr.lhs    PrelHugs.lhs       PrelReal.lhs       System.lhs \
+Locale.lhs         PrelConc.lhs       PrelIO.lhs         PrelST.lhs         Time.lhs
+
+PrelAll_ILX=$(patsubst %.lhs,%.ilx,$(PrelAll_SRC))
+CLEAN_FILES += $(PrelAll_ILX)
+PrelAll_ILX_FWD=$(patsubst %.lhs,%.ilx.fwd.ok,$(PrelAll_SRC))
+PrelAll_IL=$(patsubst %.lhs,%.il,$(PrelAll_SRC))  PrelGHC.il
+PrelAll_MOD=$(patsubst %.il,%.mod,$(PrelAll_IL))
+
+
+%.ilx %.ilx.fwd: %.lhs
+	$(HC_PRE_OPTS)
+	$(HC) $(HC_OPTS) -Onot -D__ILX__ --ilx $*.lhs -o $*.ilx 
+	$(HC_POST_OPTS)
+
+
+CORRUN=
+LOCALRUN=./
+ifeq ($(HOSTNAME),msrc-hilda)
+CORRUN=cmd /c "devvs && "
+LOCALRUN=.\\
+endif    
+
+ILXASM=/devel/fcom/src/bin/ilxasmx.exe -l /devel/fcom/src/ilxasm --no-ilasm --box-everything
+ILASM=$(CORRUN)ilasm
+AL=$(CORRUN)al
+
+%.ilx.fwd.ok: %.ilx.fwd
+	if diff -q $< $@; then true; else cp $< $@; fi
+
+%.mod : %.il
+	$(ILASM) /QUIET /DLL /OUT=$@ $<
+
+PrelGHC.il: ../../compiler/ilxGen/PrelGHC.il
+	cp $< $@
+
+PrelAll.dll : ilxasm-stdlib.mod $(PrelAll_MOD)
+	$(AL) ilxasm-stdlib.mod $(PrelAll_MOD) -out:$@
+
+%.ilx_with_fwd: %.ilx $(PrelAll_ILX_FWD)
+	cat  $(PrelAll_ILX_FWD) $*.ilx > $@
+
+%.il : %.ilx_with_fwd  /devel/fcom/src/bin/ilxasmx.exe
+	$(ILXASM) --no-stdlib -o $@ $*.ilx_with_fwd 
+
+ilxasm-stdlib.il : /devel/fcom/src/bin/ilxasmx.exe /devel/fcom/src/ilxasm/stdlib-func-by-mcalli.ilx
+	rm -f tmp.ilx
+	touch tmp.ilx
+	$(ILXASM) -o $@ tmp.ilx
+	rm -f tmp.ilx
+
+
+#--------------------
+# For validation only:
+
+PrelAll.il: $(PrelAll_IL) ilxasm-stdlib.il
+	cat ilxasm-stdlib.il $(PrelAll_IL) > $@
+
+%.mvl: %.il
+	make -C ../../compiler/ilxGen/tests ilvalidx
+	ILVALID_HOME=/devel/fcom/src /devel/fcom/src/bin/ilvalidx.exe $*.il
+
+
+ilxasm:
+	make -C ../../compiler/ilxGen/tests ilxasmx
+
+ilvalid:
+	$(MAKE) -C /devel/fcom/src bin/ilvalidx.exe
+
+
+ghc:
+	make -C ../../compiler/ilxGen/tests ghc
+
+
+.PRECIOUS: %.ilx.fwd %.ilx.fwd.ok %.il %.ilx_with_fwd
