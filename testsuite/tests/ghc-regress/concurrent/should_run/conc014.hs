@@ -8,9 +8,11 @@ main = do
   main_thread <- myThreadId
   m <- newEmptyMVar
   forkIO (do { takeMVar m;  throwTo main_thread (ErrorCall "foo") })
-  (error "wibble")
-	`Control.Exception.catch` (\e -> do putMVar m ()
-			                    sum [1..10000] `seq` putStrLn "done.")
-  (threadDelay 500000)
-	`Control.Exception.catch` (\e -> putStrLn ("caught: " ++ show e))
+  (do 
+     error "wibble"
+	`Control.Exception.catch`
+	    (\e -> do putMVar m (); sum [1..10000] `seq` putStrLn "done.")
+     threadDelay 500000
+   )
+    `Control.Exception.catch` (\e -> putStrLn ("caught: " ++ show e))
 
