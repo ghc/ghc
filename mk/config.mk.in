@@ -258,6 +258,10 @@ StripLibraries=NO
 #
 GhcReportCompiles=NO
 
+# Win32 only: Enable the RTS and libraries to be built as DLLs
+#
+EnableWin32DLLs=@EnableWin32DLLs@
+
 #################################################################################
 #
 #		happy project
@@ -622,6 +626,8 @@ HAPPY_VERSION		= @HappyVersion@
 LX			= @LxCmd@
 GREENCARD	        = $(FPTOOLS_TOP)/green-card/src/green-card
 
+BLD_DLL			= dllwrap
+
 #
 # Stuff from fptools/literate
 #
@@ -712,6 +718,10 @@ WAY_mp_HC_OPTS=-parallel
 # Way `mg': 
 WAY_mg_NAME=GranSim
 WAY_mg_HC_OPTS=-gransim
+
+# Way `dll': 
+WAY_dll_NAME=Win32 DLLs
+WAY_dll_HC_OPTS=
 
 #
 # Add user-way configurations here:
