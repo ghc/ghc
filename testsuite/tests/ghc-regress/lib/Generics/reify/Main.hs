@@ -17,7 +17,7 @@ import CompanyDatatypes
 
 
 -- Build a shallow term 
-shallowTerm :: GenericR Maybe -> GenericB
+shallowTerm :: (forall a. Data a => Maybe a) -> (forall b. Data b => b)
 shallowTerm cust
   =
     maybe gdefault id cust

@@ -44,6 +44,8 @@ clean:
 	rm -f gzip/gzip
 	rm -f local-quantors
 	rm -f newtype
+	rm -f typecase1
+	rm -f typecase2
 	rm -f paradise/paradise
 	rm -f reify/reify
 	rm -f shortcut
