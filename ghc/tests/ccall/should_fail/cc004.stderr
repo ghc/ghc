@@ -5,7 +5,7 @@ cc004.hs:2:
 
 cc004.hs:2:
     Cannot generalise these overloadings (in a _ccall_):
-	`CReturnable b' arising from the result of the _ccall_ to `f' at cc004.hs:15
+	`CReturnable t_aGM' arising from the result of the _ccall_ to `f' at cc004.hs:15
 
 Compilation had errors
 
