@@ -16,7 +16,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.TopHandler (
-   runMain, reportStackOverflow, reportError 
+   runIO, runNonIO, reportStackOverflow, reportError 
   ) where
 
 import Prelude
@@ -27,26 +27,39 @@ import Foreign.C.String
 import Foreign.Ptr
 import GHC.IOBase
 import GHC.Exception
+import GHC.Prim (unsafeCoerce#)
 
--- runMain is applied to Main.main by TcModule
-runMain :: IO a -> IO ()
-runMain main = catchException (main >> return ()) topHandler
-  
-topHandler :: Exception -> IO ()
+-- | 'runIO' is wrapped around 'Main.main' by @TcModule@.  It is also wrapped
+-- around every @foreign export@ and @foreign import \"wrapper\"@ to mop up
+-- any uncaught exceptions.  Thus, the result of running
+-- 'System.Exit.exitWith' in a foreign-exported function is the same as
+-- in the main thread: it terminates the program.
+--
+runIO :: IO a -> IO a
+runIO main = catchException main topHandler
+
+-- | The same as 'runIO', but for non-IO computations.  Used for
+-- wrapping @foreign export@ and @foreign import \"wrapper\"@ when these
+-- are used to export Haskell functions with non-IO types.
+--
+runNonIO :: a -> IO a
+runNonIO a = catchException (a `seq` return a) topHandler
+
+topHandler :: Exception -> IO a
 topHandler err = catchException (real_handler err) topHandler
 
 -- Make sure we handle errors while reporting the error!
 -- (e.g. evaluating the string passed to 'error' might generate
 --  another error, etc.)
 --
-real_handler :: Exception -> IO ()
+real_handler :: Exception -> IO a
 real_handler ex =
   case ex of
 	AsyncException StackOverflow -> reportStackOverflow True
 
 	-- only the main thread gets ExitException exceptions
-	ExitException ExitSuccess     -> shutdownHaskellAndExit 0
-	ExitException (ExitFailure n) -> shutdownHaskellAndExit n
+	ExitException ExitSuccess     -> safe_exit 0
+	ExitException (ExitFailure n) -> safe_exit n
 
 	Deadlock    -> reportError True 
 			"no threads to run:  infinite loop or deadlock?"
@@ -54,28 +67,22 @@ real_handler ex =
 	ErrorCall s -> reportError True s
 	other       -> reportError True (showsPrec 0 other "\n")
 
--- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
--- re-enter Haskell land through finalizers.
-foreign import ccall "shutdownHaskellAndExit" 
-  shutdownHaskellAndExit :: Int -> IO ()
-
-reportStackOverflow :: Bool -> IO ()
+reportStackOverflow :: Bool -> IO a
 reportStackOverflow bombOut = do
    (hFlush stdout) `catchException` (\ _ -> return ())
    callStackOverflowHook
-   if bombOut then
-     stg_exit 2
-    else
-     return ()
+   if bombOut 
+	then exit 2
+	else return undefined
 
-reportError :: Bool -> String -> IO ()
+reportError :: Bool -> String -> IO a
 reportError bombOut str = do
    (hFlush stdout) `catchException` (\ _ -> return ())
    withCStringLen str $ \(cstr,len) -> do
      writeErrString errorHdrHook cstr len
      if bombOut 
-	then stg_exit 1
-        else return ()
+	then exit 1
+        else return undefined
 
 #ifndef ILX
 foreign import ccall "&ErrorHdrHook" errorHdrHook :: Ptr ()
@@ -93,4 +100,17 @@ foreign import ccall unsafe "stackOverflow"
 
 foreign import ccall unsafe "stg_exit"
 	stg_exit :: Int -> IO ()
+
+exit :: Int -> IO a
+exit r = unsafeCoerce# (stg_exit r)
+
+-- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
+-- re-enter Haskell land through finalizers.
+foreign import ccall "shutdownHaskellAndExit" 
+  shutdownHaskellAndExit :: Int -> IO ()
+
+-- we have to use unsafeCoerce# to get the 'IO a' result type, since the
+-- compiler doesn't let us declare that as the result type of a foreign export.
+safe_exit :: Int -> IO a
+safe_exit r = unsafeCoerce# (shutdownHaskellAndExit r)
 \end{code}
