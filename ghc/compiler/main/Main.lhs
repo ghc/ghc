@@ -87,8 +87,7 @@ doIt (core_cmds, stg_cmds)
   = doIfSet opt_Verbose 
 	(hPutStr stderr "Glasgow Haskell Compiler, version " 	>>
  	 hPutStr stderr compiler_version                    	>>
-	 hPutStr stderr ", for Haskell 98\n"			>>
-	 hPutStr stderr "\tcompiled by GHC version "		>>
+	 hPutStr stderr ", for Haskell 98, compiled by GHC version " >>
 	 hPutStr stderr booter_version				>>
 	 hPutStr stderr "\n")					>>
 
