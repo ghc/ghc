@@ -321,6 +321,7 @@ rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLo
 
 	-- For H98 we do *not* universally quantify on the RHS of a synonym
 	-- Silently discard context... but the tyvars in the rest won't be in scope
+	-- In interface files all types are quantified, so this is a no-op
     unquantify glaExts (HsForAllTy Nothing ctxt ty) | glaExts = ty
     unquantify glaExys ty			     	      = ty
 

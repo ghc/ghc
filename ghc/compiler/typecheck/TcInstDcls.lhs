@@ -249,8 +249,10 @@ tcInstDecl1 unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
 		-- Imported ones should have been checked already, and may indeed
 		-- contain something illegal in normal Haskell, notably
 		--	instance CCallable [Char] 
-	    scrutiniseInstanceHead clas inst_tys		`thenNF_Tc_`
-	    mapNF_Tc scrutiniseInstanceConstraint theta		`thenNF_Tc_`
+	    
+	    getDOptsTc							`thenTc` \ dflags -> 
+	    scrutiniseInstanceHead dflags clas inst_tys			`thenNF_Tc_`
+	    mapNF_Tc (scrutiniseInstanceConstraint dflags) theta	`thenNF_Tc_`
 
 		-- Make the dfun id and return it
 	    newDFunName clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
@@ -660,23 +662,19 @@ compiled elsewhere). In these cases, we let them go through anyway.
 We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
-scrutiniseInstanceConstraint pred
-  = getDOptsTc `thenTc` \ dflags -> case () of
-    () 
-     |  dopt Opt_AllowUndecidableInstances dflags
-     -> returnNF_Tc ()
+scrutiniseInstanceConstraint dflags pred
+  |  dopt Opt_AllowUndecidableInstances dflags
+  =  returnNF_Tc ()
 
-     |  Just (clas,tys) <- getClassTys_maybe pred,
-        all isTyVarTy tys
-     -> returnNF_Tc ()
+  |  Just (clas,tys) <- getClassTys_maybe pred,
+     all isTyVarTy tys
+  = returnNF_Tc ()
 
-     |  otherwise
-     -> addErrTc (instConstraintErr pred)
+  |  otherwise
+  =  addErrTc (instConstraintErr pred)
 
-scrutiniseInstanceHead clas inst_taus
-  = getDOptsTc `thenTc` \ dflags -> case () of
-    () 
-     |	-- CCALL CHECK
+scrutiniseInstanceHead dflags clas inst_taus
+  |	-- CCALL CHECK
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
         (clas `hasKey` cCallableClassKey   
@@ -684,34 +682,34 @@ scrutiniseInstanceHead clas inst_taus
         ||
         (clas `hasKey` cReturnableClassKey 
             && not (creturnable_type first_inst_tau))
-     -> addErrTc (nonBoxedPrimCCallErr clas first_inst_tau)
+  = addErrTc (nonBoxedPrimCCallErr clas first_inst_tau)
 
 	-- Allow anything for AllowUndecidableInstances
-     |  dopt Opt_AllowUndecidableInstances dflags
-     -> returnNF_Tc ()
+  |  dopt Opt_AllowUndecidableInstances dflags
+  =  returnNF_Tc ()
 
 	-- If GlasgowExts then check at least one isn't a type variable
-     |  dopt Opt_GlasgowExts dflags
-     -> if   all isTyVarTy inst_taus
-        then addErrTc (instTypeErr clas inst_taus 
+  |  dopt Opt_GlasgowExts dflags
+  = if   all isTyVarTy inst_taus
+    then addErrTc (instTypeErr clas inst_taus 
              (text "There must be at least one non-type-variable in the instance head"))
-        else returnNF_Tc ()
+    else returnNF_Tc ()
 
 	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
-     |  not (length inst_taus == 1 &&
-             maybeToBool maybe_tycon_app &&	-- Yes, there's a type constuctor
-             not (isSynTyCon tycon) &&		-- ...but not a synonym
-             all isTyVarTy arg_tys && 		-- Applied to type variables
-	     length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
-             -- This last condition checks that all the type variables are distinct
-            )
-     ->  addErrTc (instTypeErr clas inst_taus
-		     (text "the instance type must be of form (T a b c)" $$
-		      text "where T is not a synonym, and a,b,c are distinct type variables")
+  |  not (length inst_taus == 1 &&
+          maybeToBool maybe_tycon_app &&	-- Yes, there's a type constuctor
+          not (isSynTyCon tycon) &&		-- ...but not a synonym
+          all isTyVarTy arg_tys && 		-- Applied to type variables
+	  length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
+          -- This last condition checks that all the type variables are distinct
+         )
+  =  addErrTc (instTypeErr clas inst_taus
+			   (text "the instance type must be of form (T a b c)" $$
+			    text "where T is not a synonym, and a,b,c are distinct type variables")
          )
 
-     |  otherwise
-     -> returnNF_Tc ()
+  | otherwise
+  = returnNF_Tc ()
 
   where
     (first_inst_tau : _)       = inst_taus

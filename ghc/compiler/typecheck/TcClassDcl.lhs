@@ -108,8 +108,14 @@ tcClassDecl1 is_rec rec_env
 			 tcdSigs = class_sigs, tcdMeths = def_methods,
 			 tcdSysNames = sys_names, tcdLoc = src_loc})
   = 	-- CHECK ARITY 1 FOR HASKELL 1.4
-    doptsTc Opt_GlasgowExts				`thenTc` \ glaExts ->
-    checkTc (glaExts || length tyvar_names == 1)
+    doptsTc Opt_GlasgowExts				`thenTc` \ gla_ext_opt ->
+    let
+	gla_exts = gla_ext_opt || not (maybeToBool def_methods)
+		-- Accept extensions if gla_exts is on,
+		-- or if we're looking at an interface file decl
+    in		-- (in which case def_methods = Nothing
+
+    checkTc (gla_exts || length tyvar_names == 1)
 	    (classArityErr class_name)			`thenTc_`
 
 	-- LOOK THINGS UP IN THE ENVIRONMENT
@@ -131,7 +137,7 @@ tcClassDecl1 is_rec rec_env
     )							   `thenTc` \ mb_dm_env ->
 	
 	-- CHECK THE CONTEXT
-    tcSuperClasses is_rec clas context sc_sel_names	`thenTc` \ (sc_theta, sc_sel_ids) ->
+    tcSuperClasses is_rec gla_exts clas context sc_sel_names	`thenTc` \ (sc_theta, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
     mapTc (tcClassSig is_rec rec_env clas tyvars mb_dm_env) op_sigs	`thenTc` \ sig_stuff ->
@@ -207,20 +213,19 @@ checkGenericClassIsUnary clas dm_env
 
 
 \begin{code}
-tcSuperClasses :: RecFlag -> Class
+tcSuperClasses :: RecFlag -> Bool -> Class
 	       -> RenamedContext 	-- class context
 	       -> [Name]		-- Names for superclass selectors
 	       -> TcM (ClassContext,	-- the superclass context
 		         [Id])  	-- superclass selector Ids
 
-tcSuperClasses is_rec clas context sc_sel_names
+tcSuperClasses is_rec gla_exts clas context sc_sel_names
   = 	-- Check the context.
 	-- The renamer has already checked that the context mentions
 	-- only the type variable of the class decl.
 
 	-- For std Haskell check that the context constrains only tyvars
-    doptsTc Opt_GlasgowExts			`thenTc` \ glaExts ->
-    (if glaExts then
+    (if gla_exts then
 	returnTc ()
      else
 	mapTc_ check_constraint context
