@@ -755,6 +755,9 @@ foreign import ccall unsafe "rawSystem"
 -- itself.
 rawSystem cmd args = do
   let cmdline = {-translate-} cmd ++ concat (map ((' ':) . translate) args)
+	-- Urk, don't quote/escape the command name on Windows, because the
+	-- compiler is exceedingly naughty and sometimes uses 'perl "..."' 
+	-- as the command name.
   withCString cmdline $ \pcmdline -> do
     status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmdline)
     case status of
