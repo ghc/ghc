@@ -3,7 +3,7 @@ _exports_
 CgBindery CgBindings CgIdInfo(MkCgIdInfo) VolatileLoc StableLoc nukeVolatileBinds maybeAStkLoc maybeBStkLoc;
 _declarations_
 1 type CgBindings = Id.IdEnv CgIdInfo;
-1 data CgIdInfo = MkCgIdInfo Id.Id CgBindery.VolatileLoc CgBindery.StableLoc ClosureInfo.LambdaFormInfo;
+1 data CgIdInfo = MkCgIdInfo Id.Id CgBindery.VolatileLoc CgBindery.StableLoc ClosureInfo!LambdaFormInfo;
 1 data VolatileLoc;
 1 data StableLoc;
 1 nukeVolatileBinds _:_ CgBindery.CgBindings -> CgBindery.CgBindings ;;
