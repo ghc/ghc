@@ -276,6 +276,19 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 <para>GHC has the following known bugs or infelicities:
 <itemizedlist>
 
+<listitem><para>
+GHC only provides tuples up to size 62, and derived tuple instances (for
+Eq, Ord, etc) up to size 15.
+</para></listitem>
+
+<listitem><para>
+GHC can warn about non-exhaustive or overlapping patterns, and usually does so correctly.
+But not always.  It gets confused by string patterns, and by guards, and can then 
+emit bogus warnings.  The entire overlap-check code needs an overhaul really.
+</para></listitem>
+
+
+
 <listitem><para>Dangers with multiple Main modules.</para>
 
 	<para>

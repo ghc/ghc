@@ -3296,6 +3296,13 @@ Tim Sheard is going to expand it.)
     <listitem><para>
 	    The flag <literal>-ddump-splices</literal> shows the expansion of all top-level splices as they happen.
    </para></listitem>
+    <listitem><para>
+	    If you are building GHC from source, you need at least a stage-2 bootstrap compiler to
+	      run Template Haskell.  A stage-1 compiler will reject the TH constructs.  Reason: TH
+	      compiles and runs a program, and then looks at the result.  So it's important that
+	      the program it compiles produces results whose representations are identical to
+	      those of the compiler itself.
+   </para></listitem>
 </itemizedlist>
 </para>
 <para> Template Haskell works in any mode (<literal>--make</literal>, <literal>--interactive</literal>,
@@ -3358,7 +3365,7 @@ pr s      = gen (parse s)
 <para>Now run the compiler (here we are using a "stage three" build of GHC, at a Cygwin prompt on Windows):
 </para>
 <programlisting>
-stage3/ghc/compiler/ghc-inplace --make -fglasgow-exts -package haskell-src main.hs -o main.exe
+ghc/compiler/stage3/ghc-inplace --make -fglasgow-exts -package haskell-src main.hs -o main.exe
 </programlisting>
 
 <para>Run "main.exe" and here is your output:
