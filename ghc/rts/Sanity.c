@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.19 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: Sanity.c,v 1.20 2000/04/12 09:34:46 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -164,7 +164,9 @@ checkStackClosure( StgClosure* c )
 void 
 checkClosureShallow( StgClosure* p )
 {
-    ASSERT(LOOKS_LIKE_GHC_INFO(p->header.info));
+    ASSERT(p);
+    ASSERT(LOOKS_LIKE_GHC_INFO(p->header.info)
+           || IS_HUGS_CONSTR_INFO(GET_INFO(p)));
 
     /* Is it a static closure (i.e. in the data segment)? */
     if (LOOKS_LIKE_STATIC(p)) {
