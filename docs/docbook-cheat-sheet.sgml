@@ -43,6 +43,7 @@ for other links. </Para>
 <ListItem>
 <Para>Remember to use <SGMLTag class="StartTag">Para</SGMLTag> inside
 <SGMLTag class="StartTag">ListItem</SGMLTag>s.
+</Para>
 </ListItem>
 </ItemizedList>
 
