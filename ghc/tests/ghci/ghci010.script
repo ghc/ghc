@@ -1,0 +1,3 @@
+-- !!! check we can detect deadlock
+:set -package concurrent
+Concurrent.newEmptyMVar >>= Concurrent.takeMVar
