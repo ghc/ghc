@@ -126,6 +126,8 @@ HSstd.o :: $(GHCI_LIBOBJS)
 	$(LD) -r -x -o HSstd1.o $(filter     Prel%, $(GHCI_LIBOBJS))
 	$(LD) -r -x -o HSstd2.o $(filter-out Prel%, $(GHCI_LIBOBJS))
 	@touch HSstd.o
+
+INSTALL_LIBS += HSstd1.o HSstd2.o
 endif # TARGETPLATFORM = i386-unknown-mingw32
 
 
