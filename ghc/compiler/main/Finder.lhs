@@ -136,15 +136,9 @@ maybeHomeModule mod_name = do
 
 mkHomeModuleLocn mod_name basename source_fn = do
 
-   -- figure out the .hi file name: it lives in the same dir as the
-   -- source, unless there's a -ohi flag on the command line.
-   ohi    <- readIORef v_Output_hi
    hisuf  <- readIORef v_Hi_suf
-   let hifile = case ohi of
-		   Nothing -> getdir basename 
-				++ '/':moduleNameUserString mod_name 
+   let hifile = getdir basename ++ '/':moduleNameUserString mod_name 
 				++ '.':hisuf
-		   Just fn -> fn
 
    -- figure out the .o file name.  It also lives in the same dir
    -- as the source, but can be overriden by a -odir flag.
