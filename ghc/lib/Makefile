@@ -4,7 +4,7 @@
 #
 #		Makefile for building the GHC Prelude libraries umpteen ways
 #
-# 	$Id: Makefile,v 1.10 1997/05/26 05:15:12 sof Exp $
+# 	$Id: Makefile,v 1.11 1997/06/03 23:42:21 sof Exp $
 #
 #	
 #################################################################################
@@ -52,10 +52,14 @@ endif
 
 # per-module flags
 
-ghc/PackedString_HC_OPTS    += -monly-3-regs
-required/Directory_HC_OPTS  += -monly-3-regs 
-concurrent/Parallel_HC_OPTS += -fglasgow-exts
-required/Time_HC_OPTS       += -monly-3-regs
+glaExts/PackedString_HC_OPTS += -monly-3-regs
+required/Directory_HC_OPTS   += -monly-3-regs 
+concurrent/Parallel_HC_OPTS  += -fglasgow-exts
+required/Time_HC_OPTS        += -monly-3-regs
+
+# Far too much heap is needed to compile PrelNum with -O at the
+# moment, but there you go..
+ghc/PrelNum_HC_OPTS          += -H30m
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
