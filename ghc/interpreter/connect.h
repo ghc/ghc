@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.13 $
- * $Date: 1999/10/26 17:27:41 $
+ * $Revision: 1.14 $
+ * $Date: 1999/10/29 11:41:04 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -238,6 +238,7 @@ extern  Void   addTupInst       Args((Class,Int));
 extern  Inst   addRecShowInst   Args((Class,Ext));
 extern  Inst   addRecEqInst     Args((Class,Ext));
 #endif
+extern  List   typeVarsIn	Args((Cell,List,List,List));
 extern  List   oclose		Args((List,List));
 extern  List   zonkTyvarsIn	Args((Type,List));
 extern  Type   zonkTyvar	Args((Int));

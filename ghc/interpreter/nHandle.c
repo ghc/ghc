@@ -93,15 +93,4 @@ int nh_getenv ( int p )
    return (int)getenv ( (const char *)p );
 }
 
-extern int prog_argc;
-extern char** prog_argv;
 
-int nh_argc ( void )
-{
-   return prog_argc;
-}
-
-int nh_argvb ( int argno, int offset )
-{
-   return (int)(prog_argv[argno][offset]);
-}

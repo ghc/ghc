@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/07/06 15:24:38 $
+ * $Revision: 1.6 $
+ * $Date: 1999/10/29 11:41:04 $
  * ------------------------------------------------------------------------*/
 
 /* ToDo:
@@ -31,7 +31,7 @@
 #include "connect.h"
 #include "errors.h"
 #include "link.h"
-#include "Assembler.h" /* for wrapping GHC objects */
+#include "Assembler.h"  /* for wrapping GHC objects */
 #include "dynamic.h"
 
 #define DEBUG_IFACE
@@ -1059,7 +1059,8 @@ List ktyvars; { /* [(VarId|Text,Kind)] */
          fprintf(stderr,"\n");
          assert(0);
    }
-   assert(0); /* NOTREACHED */
+   assert(0);
+   return NIL; /* NOTREACHED */
 }
 
 
@@ -1086,7 +1087,7 @@ Type type; {
          Text m     = qmodOf(type);
          Text v     = qtextOf(type);
          Module mod = findModule(m);
-printf ( "lookup qualident " ); print(type,100); printf("\n");
+	 //printf ( "lookup qualident " ); print(type,100); printf("\n");
          if (isNull(mod)) {
             ERRMSG(line)
                "Undefined module in qualified name \"%s\"",
@@ -1136,7 +1137,8 @@ printf ( "lookup qualident " ); print(type,100); printf("\n");
          fprintf(stderr,"\n");
          assert(0);
    }
-   assert(0); /* NOTREACHED */
+   assert(0);
+   return NIL; /* NOTREACHED */
 }
 
 
@@ -1201,7 +1203,7 @@ Type type; {
 
 static List local ifTyvarsIn(type)
 Type type; {
-    List vs = typeVarsIn(type,NIL,NIL);
+    List vs = typeVarsIn(type,NIL,NIL,NIL);
     List vs2 = vs;
     for (; nonNull(vs2); vs2=tl(vs2)) {
        Cell v = hd(vs2);
@@ -1218,6 +1220,8 @@ Type type; {
 /* --------------------------------------------------------------------------
  * ELF specifics
  * ------------------------------------------------------------------------*/
+
+#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
 
 #include <elf.h>
 
@@ -1548,6 +1552,8 @@ static void readSyms_elf ( Module m )
    }
 }
 
+#endif /* defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) */
+
 
 /* --------------------------------------------------------------------------
  * Arch-independent interface to the runtime linker
@@ -1555,20 +1561,32 @@ static void readSyms_elf ( Module m )
 
 static Bool local validateOImage ( void* img, Int size, Bool verb )
 {
+#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
    return
       validateOImage_elf ( img, size, verb );
+#else
+   internal("validateOImage: not implemented on this platform");
+#endif
 }
 
 
 static Void local resolveReferencesInObjectModule ( Module m, Bool verb )
 {
+#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
    resolveReferencesInObjectModule_elf ( m, verb );
+#else
+   internal("resolveReferencesInObjectModule: not implemented on this platform");
+#endif
 }
 
 
 static Void local readSyms ( Module m )
 {
+#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
    readSyms_elf ( m );
+#else
+   internal("readSyms: not implemented on this platform");
+#endif
 }
 
 

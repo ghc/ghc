@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1999.
  *
  * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.7 $
- * $Date: 1999/10/27 15:29:37 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/29 11:41:12 $
  * ------------------------------------------------------------------------*/
 	
 #include "config.h"
@@ -64,7 +64,13 @@
          }
       }
 #endif
-	
+
+#if LEADING_UNDERSCORE
+#define ADD_UNDERSCORE(sss) _##sss
+#else
+#define ADD_UNDERSCORE(sss) sss
+#endif
+
 #if i386_TARGET_ARCH
 
 /*
@@ -72,8 +78,8 @@
  * *and* assumes that I myself was called using ccall.
  */
 
-.globl universal_call_c_x86_ccall
-universal_call_c_x86_ccall:
+.globl ADD_UNDERSCORE(universal_call_c_x86_ccall)
+ADD_UNDERSCORE(universal_call_c_x86_ccall):
 	pushl %ebp
 	movl %esp,%ebp
 	pushl %edi
@@ -148,8 +154,8 @@ universal_call_c_x86_ccall:
 # stdcall convention, *but* assumes that I myself was called 
 # using ccall.
 	
-.globl universal_call_c_x86_stdcall
-universal_call_c_x86_stdcall:
+.globl ADD_UNDERSCORE(universal_call_c_x86_stdcall)
+ADD_UNDERSCORE(universal_call_c_x86_stdcall):
 	pushl %ebp
 	movl %esp,%ebp
 	pushl %edi

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/10/26 17:27:45 $
+ * $Revision: 1.14 $
+ * $Date: 1999/10/29 11:41:05 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -65,7 +65,6 @@ static List   local classBindings       Args((String,Class,List));
 static Name   local memberName          Args((Class,Text));
 static List   local numInsert           Args((Int,Cell,List));
 
-       List   local typeVarsIn		Args((Cell,List,List,List));
 static List   local maybeAppendVar      Args((Cell,List));
 
 static Type   local checkSigType        Args((Int,String,Cell,Type));

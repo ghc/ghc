@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.11 1999/10/15 11:02:09 sewardj Exp $                         #
+# $Id: Makefile,v 1.12 1999/10/29 11:41:04 sewardj Exp $                        #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -12,6 +12,12 @@ RTS_DIR = $(TOP)/ghc/rts
 # --------------------------------------------------------------------- #
 # interpreter and relevant .a/.so files                                 #
 # --------------------------------------------------------------------- #
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+DYN_EXT=.dll
+else
+DYN_EXT=.so
+endif
 
 YACC = bison -y
 %.c: %.y
@@ -31,16 +37,22 @@ SRC_CC_OPTS = -g -O -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/
 
 GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a
 
-all :: parser.c $(GHC_LIBS_NEEDED) nHandle.so hugs
+all :: parser.c $(GHC_LIBS_NEEDED) nHandle.$(DYN_EXT) hugs
 
 ### EXTREMELY hacky
 hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
-      ../rts/StgCRun.o nHandle.so
-	$(CC) -o $@ -rdynamic $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty -ldl -lm
+      ../rts/StgCRun.o
+	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty -lm
 
-nHandle.so: nHandle.c
-	gcc -O -fPIC -shared -o nHandle.so nHandle.c
+
+nHandle.$(DYN_EXT): nHandle.c
+ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+	gcc -O -Wall -o nHandle.o -c nHandle.c
+	dllwrap -o nHandle.dll nHandle.o
+else
+	gcc -O -Wall -shared -fPIC -o nHandle.so nHandle.c
+endif
 
 $(TOP)/ghc/rts/libHSrts.a:
 	(cd $(TOP)/ghc/rts ; make clean ; make EXTRA_CC_OPTS=-I$(GHC_DIR)/interpreter)
@@ -78,7 +90,7 @@ checkrun: all
 # Cleanery & misc                                                       #
 # --------------------------------------------------------------------- #
 
-CLEAN_FILES += hugs nHandle.so
+CLEAN_FILES += hugs nHandle.dll
 CLEAN_FILES += $(TOP)/ghc/rts/libHSrts.a $(TOP)/ghc/rts/*.o
 CLEAN_FILES += parser.c
 
