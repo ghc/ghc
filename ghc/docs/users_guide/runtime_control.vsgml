@@ -63,18 +63,26 @@ operation, but there are several things that can be tweaked for
 maximum performance.
 
 <descrip>
+<tag>@-G<generations>@:</tag>
+<nidx>-G&lt;generations&gt; RTS option</nidx>
+<nidx>generations, number of</nidx>
+
+[Default: 2] Set the number of generations used by the garbage
+collector.  The default of 2 seems to be good, but the garbage
+collector can support any number of generations.  NOTE: -G1 (i.e. a
+two-space copying collector) is currently not supported.
+
 <tag>@-A<size>@:</tag>
 <nidx>-A&lt;size&gt; RTS option</nidx>
 <nidx>allocation area, size</nidx>
 
-[Default: 256k] Set the minimum (and initial) allocation area size
-used by the garbage collector.  The allocation area is resized after
-each garbage collection to be a multiple of the size of the current
-live data (currently a factor of 2).
+[Default: 256k] Set the allocation area size used by the garbage
+collector.  The allocation area (actually generation 0 step 0) is
+fixed and is never resized.
 
-Increasing the minimum allocation area size will typically give better
-performance for programs which quickly generate a large amount of live
-data.
+Increasing the allocation area size may or may not give better
+performance (a bigger allocation area means worse cache behaviour but
+fewer garbage collections and less promotion).
 
 <tag>@-k<size>@:</tag>
 <nidx>-k&lt;size&gt; RTS option</nidx>
@@ -132,26 +140,26 @@ heap size based on the current amount of live data.
 %PostScript), using the @stat2resid@<nidx>stat2resid</nidx> utility in
 %the GHC distribution (@ghc/utils/stat2resid@).
 
-<tag>@-F2s@:</tag> 
-<nidx>-F2s RTS option</nidx>
-
-Forces a program compiled for generational GC to use two-space copying
-collection. The two-space collector may outperform the generational
-collector for programs which have a very low heap residency. It can
-also be used to generate a statistics file from which a basic heap
-residency profile can be produced (see Section <ref name="stat2resid -
-residency info from GC stats" id="stat2resid">).
-
-There will still be a small execution overhead imposed by the
-generational compilation as the test for old generation updates will
-still be executed (of course none will actually happen).  This
-overhead is typically less than 1\%.
-
-<tag>@-j<size>@:</tag>
-<nidx>-j&lt;size&gt; RTS option</nidx>
-Force a major garbage collection every @<size>@ bytes.  (Normally
-used because you're keen on getting major-GC stats, notably heap residency
-info.)
+% <tag>@-F2s@:</tag> 
+% <nidx>-F2s RTS option</nidx>
+% 
+% Forces a program compiled for generational GC to use two-space copying
+% collection. The two-space collector may outperform the generational
+% collector for programs which have a very low heap residency. It can
+% also be used to generate a statistics file from which a basic heap
+% residency profile can be produced (see Section <ref name="stat2resid -
+% residency info from GC stats" id="stat2resid">).
+% 
+% There will still be a small execution overhead imposed by the
+% generational compilation as the test for old generation updates will
+% still be executed (of course none will actually happen).  This
+% overhead is typically less than 1\%.
+% 
+% <tag>@-j<size>@:</tag>
+% <nidx>-j&lt;size&gt; RTS option</nidx>
+% Force a major garbage collection every @<size>@ bytes.  (Normally
+% used because you're keen on getting major-GC stats, notably heap residency
+% info.)
 
 </descrip>
 

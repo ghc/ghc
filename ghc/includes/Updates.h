@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.2 1998/12/02 13:21:47 simonm Exp $
+ * $Id: Updates.h,v 1.3 1999/01/13 17:25:55 simonm Exp $
  *
  * Definitions related to updates.
  *
@@ -7,18 +7,6 @@
 
 #ifndef UPDATES_H
 #define UPDATES_H
-
-/*
-  ticky-ticky wants to use permanent indirections when it's doing
-  update entry counts.
- */
-
-#ifndef TICKY_TICKY
-# define Ind_info_TO_USE &IND_info
-#else
-# define Ind_info_TO_USE ((AllFlags.doUpdEntryCounts) ? &IND_PERM_info : &IND_info
-)
-#endif
 
 /* -----------------------------------------------------------------------------
    Update a closure with an indirection.  This may also involve waking
@@ -31,11 +19,16 @@
  *       (I think the fancy version of the GC is supposed to do this too.)
  */
 
+/* This expands to a fair chunk of code, what with waking up threads 
+ * and checking whether we're updating something in a old generation.
+ * preferably don't use this macro inline in compiled code.
+ */
+
 #define UPD_IND(updclosure, heapptr)                            \
         TICK_UPDATED_SET_UPDATED(updclosure);		        \
         AWAKEN_BQ(updclosure);                                  \
-        SET_INFO((StgInd*)updclosure,Ind_info_TO_USE);          \
-        ((StgInd *)updclosure)->indirectee   = (StgClosure *)(heapptr)
+	updateWithIndirection((StgClosure *)updclosure,         \
+			      (StgClosure *)heapptr);
 
 /* -----------------------------------------------------------------------------
    Update a closure inplace with an infotable that expects 1 (closure)
@@ -105,11 +98,11 @@ extern const StgPolyInfoTable Upd_frame_info;
 
        - for the parallel system, which can implement updates more
          easily if the updatee is always in the heap. (allegedly).
+
+   When debugging, we maintain a separate CAF list so we can tell when
+   a CAF has been garbage collected.
    -------------------------------------------------------------------------- */
    
-EI_(Caf_info);
-EF_(Caf_entry);
-
 /* ToDo: only call newCAF when debugging. */
 
 extern void newCAF(StgClosure*);

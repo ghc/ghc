@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.2 1998/12/02 13:20:58 simonm Exp $
+ * $Id: ClosureMacros.h,v 1.3 1999/01/13 17:25:52 simonm Exp $
  *
  * Macros for building and manipulating closures
  *
@@ -186,8 +186,8 @@ static __inline__ StgOffset pap_sizeW( StgPAP* x )
  */
 static __inline__ StgOffset arr_words_sizeW( StgArrWords* x )
 { return sizeofW(StgArrWords) + x->words; }
-static __inline__ StgOffset arr_ptrs_sizeW( StgArrPtrs* x )
-{ return sizeofW(StgArrPtrs) + x->ptrs; }
+static __inline__ StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
+{ return sizeofW(StgMutArrPtrs) + x->ptrs; }
 
 static __inline__ StgWord bco_sizeW( StgBCO* bco )
 { return BCO_sizeW(bco->n_ptrs,bco->n_words,bco->n_instrs); }
@@ -240,8 +240,6 @@ static __inline__ StgWord tso_sizeW ( StgTSO *tso )
 	SET_PROF_HDR((StgClosure *)(c),ccs);		\
 	SET_TICKY_HDR((StgClosure *)(c),0);		\
    }
-
-/* works for all ARR_WORDS, ARR_PTRS variants (at the moment...) */
 
 #define SET_ARR_HDR(c,info,costCentreStack,n_words) \
    SET_HDR(c,info,costCentreStack); \

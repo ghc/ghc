@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.2 1998/12/02 13:21:43 simonm Exp $
+ * $Id: TSO.h,v 1.3 1999/01/13 17:25:55 simonm Exp $
  *
  * The definitions for Thread State Objects.
  *
@@ -52,7 +52,7 @@ typedef enum {
  * even doing 10^6 forks per second would take 35 million years to
  * overflow a 64 bit thread ID :-)
  */
-typedef StgNat64 StgThreadID;
+typedef StgNat32 StgThreadID;
 
 /*
  * This type is returned to the scheduler by a thread that has
@@ -76,6 +76,7 @@ typedef enum {
 typedef struct StgTSO_ {
   StgHeader          header;
   struct StgTSO_*    link;
+  StgMutClosure *    mut_link;	/* TSO's are mutable of course! */
   StgTSOWhatNext     whatNext;
   StgTSOState        state;	/* necessary? */
   StgThreadID        id;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.2 1998/12/02 13:21:18 simonm Exp $
+ * $Id: PrimOps.h,v 1.3 1999/01/13 17:25:53 simonm Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -108,6 +108,8 @@ typedef union {
   r = z.i[R];					\
   c = z.i[C];					\
 }
+
+
 
 #define subWithCarryZh(r,c,a,b)			\
 { long_long_u z;				\
@@ -407,25 +409,22 @@ LI_ stg_word64ToInt64 (StgNat64);
  * about increasing the alignment requirements.
  */
 #define REAL_BYTE_ARR_CTS(a)   ((void *) (((StgArrWords *)(a))->payload))
-#define REAL_PTRS_ARR_CTS(a)   ((P_)   (((StgArrPtrs  *)(a))->payload))
+#define REAL_PTRS_ARR_CTS(a)   ((P_)   (((StgMutArrPtrs  *)(a))->payload))
 
 #ifdef DEBUG
 #define BYTE_ARR_CTS(a)				\
  ({ ASSERT(GET_INFO(a) == &ARR_WORDS_info);	\
     REAL_BYTE_ARR_CTS(a); })
 #define PTRS_ARR_CTS(a)				\
- ({ ASSERT((GET_INFO(a) == &ARR_PTRS_info)	\
-	|| (GET_INFO(a) == &MUT_ARR_PTRS_info));\
+ ({ ASSERT((GET_INFO(a) == &MUT_ARR_PTRS_info));\
     REAL_PTRS_ARR_CTS(a); })
 #else
 #define BYTE_ARR_CTS(a)		REAL_BYTE_ARR_CTS(a)
 #define PTRS_ARR_CTS(a)		REAL_PTRS_ARR_CTS(a)
 #endif
 
-/* Todo: define... */
 extern I_ genSymZh(void);
 extern I_ resetGenSymZh(void);
-extern I_ incSeqWorldZh(void);
 
 /*--- everything except new*Array is done inline: */
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.2 1998/12/02 13:28:12 simonm Exp $
+ * $Id: BlockAlloc.c,v 1.3 1999/01/13 17:25:37 simonm Exp $
  *
  * The block allocator and free list manager.
  *
@@ -210,6 +210,14 @@ freeGroup(bdescr *p)
     return;
   }
 
+#ifdef DEBUG
+  p->free = (void *)-1;  /* indicates that this block is free */
+  p->step = NULL;
+  p->gen  = NULL;
+  /* fill the block group with garbage if sanity checking is on */
+  IF_DEBUG(sanity,memset(p->start, 0xaa, p->blocks * BLOCK_SIZE));
+#endif
+
   /* find correct place in free list to place new group */
   last = NULL;
   for (bd = free_list; bd != NULL && bd->start < p->start; 
@@ -252,9 +260,6 @@ freeChain(bdescr *bd)
   bdescr *next_bd;
   while (bd != NULL) {
     next_bd = bd->link;
-#ifdef DEBUG
-    bd->free = (void *)-1;  /* indicates that this block is free */
-#endif
     freeGroup(bd);
     bd = next_bd;
   }
@@ -300,5 +305,17 @@ checkFreeListSanity(void)
       ASSERT(bd->start < bd->link->start);
     }
   }
+}
+
+nat /* BLOCKS */
+countFreeList(void)
+{
+  bdescr *bd;
+  lnat total_blocks = 0;
+
+  for (bd = free_list; bd != NULL; bd = bd->link) {
+    total_blocks += bd->blocks;
+  }
+  return total_blocks;
 }
 #endif

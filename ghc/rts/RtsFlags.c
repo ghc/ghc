@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.2 1998/12/02 13:28:39 simonm Exp $
+ * $Id: RtsFlags.c,v 1.3 1999/01/13 17:25:42 simonm Exp $
  *
  * Functions for parsing the argument list.
  *
@@ -64,8 +64,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.minAllocAreaSize   = (256 * 1024)        / BLOCK_SIZE;
     RtsFlags.GcFlags.maxHeapSize	= (64  * 1024 * 1024) / BLOCK_SIZE;
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
+    RtsFlags.GcFlags.generations        = 2;
 
-    RtsFlags.GcFlags.force2s		= rtsFalse;
     RtsFlags.GcFlags.forceGC		= rtsFalse;
     RtsFlags.GcFlags.forcingInterval	= 5000000; /* 5MB (or words?) */
     RtsFlags.GcFlags.ringBell		= rtsFalse;
@@ -213,6 +213,7 @@ usage_text[] = {
 "  -A<size> Sets the minimum allocation area size (default 256k) Egs: -A1m -A10k",
 "  -M<size> Sets the maximum heap size (default 64M)  Egs: -H256k -H1G",
 "  -m<n>%   Minimum % of heap which must be available (default 3%)",
+"  -G<n>    Number of generations (default: 2)",
 "  -s<file> Summary GC statistics   (default file: <program>.stat)",
 "  -S<file> Detailed GC statistics  (with -Sstderr going to stderr)",
 "",
@@ -435,14 +436,6 @@ error = rtsTrue;
 		break;
 #endif
 
-	      case 'F':
-		if (strequal(rts_argv[arg]+2, "2s")) {
-		    RtsFlags.GcFlags.force2s = rtsTrue;
-		} else {
-		    bad_option( rts_argv[arg] );
-		}
-		break;
-
 	      case 'K':
 		RtsFlags.GcFlags.maxStkSize = 
 		  decode(rts_argv[arg]+2) / sizeof(W_);
@@ -475,6 +468,13 @@ error = rtsTrue;
 		if (RtsFlags.GcFlags.pcFreeHeap < 0 || 
 		    RtsFlags.GcFlags.pcFreeHeap > 100)
 		  bad_option( rts_argv[arg] );
+		break;
+
+	      case 'G':
+		RtsFlags.GcFlags.generations = decode(rts_argv[arg]+2);
+		if (RtsFlags.GcFlags.generations <= 1) {
+		  bad_option(rts_argv[arg]);
+		}
 		break;
 
 	      case 'H':

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.2 1998/12/02 13:28:32 simonm Exp $
+ * $Id: PrimOps.hc,v 1.3 1999/01/13 17:25:41 simonm Exp $
  *
  * Primitive functions / data
  *
@@ -213,21 +213,21 @@ newByteArray(StablePtr, sizeof(StgStablePtr));
 FN_(newArrayZh_fast)
 {
   W_ size, n, init;
-  StgArrPtrs* arr;
+  StgMutArrPtrs* arr;
   StgPtr p;
   FB_
     n = R1.w;
 
     MAYBE_GC(R2_PTR,newArrayZh_fast);
 
-    size = sizeofW(StgArrPtrs) + n;
-    arr = (StgArrPtrs *)allocate(size);
+    size = sizeofW(StgMutArrPtrs) + n;
+    arr = (StgMutArrPtrs *)allocate(size);
 
     SET_HDR(arr,&MUT_ARR_PTRS_info,CCCS);
     arr->ptrs = n;
 
     init = R2.w;
-    for (p = (P_)arr + sizeofW(StgArrPtrs); 
+    for (p = (P_)arr + sizeofW(StgMutArrPtrs); 
 	 p < (P_)arr + size; p++) {
 	*p = (W_)init;
     }

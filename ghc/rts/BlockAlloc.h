@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.h,v 1.2 1998/12/02 13:28:13 simonm Exp $
+ * $Id: BlockAlloc.h,v 1.3 1999/01/13 17:25:38 simonm Exp $
  *
  * Block Allocator Interface
  *
@@ -36,6 +36,7 @@ static inline bdescr *Bdescr(StgPtr p)
 
 #ifdef DEBUG
 extern void checkFreeListSanity(void);
+nat         countFreeList(void);
 #endif
 
 #endif BLOCK_ALLOC_H

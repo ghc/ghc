@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.3 1999/01/06 11:44:44 simonm Exp $
+ * $Id: Schedule.c,v 1.4 1999/01/13 17:25:44 simonm Exp $
  *
  * Scheduler
  *
@@ -119,7 +119,7 @@ initThread(StgTSO *tso, nat stack_size)
   SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_MAIN);
   tso->su = (StgUpdateFrame*)tso->sp;
 
-  IF_DEBUG(scheduler,belch("Initialised thread %lld, stack size = %lx words\n", 
+  IF_DEBUG(scheduler,belch("Initialised thread %ld, stack size = %lx words\n", 
 			   tso->id, tso->stack_size));
 
   /* Put the new thread on the head of the runnable queue.
@@ -160,7 +160,7 @@ void deleteThread(StgTSO *tso)
       return;
     }
 
-    IF_DEBUG(scheduler, belch("Killing thread %lld.", tso->id));
+    IF_DEBUG(scheduler, belch("Killing thread %ld.", tso->id));
 
     tso->whatNext = ThreadKilled; /* changed to ThreadComplete in schedule() */
     tso->link = END_TSO_QUEUE; /* Just to be on the safe side... */
@@ -363,7 +363,7 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
     ccalling_threads = CurrentTSO;
     in_ccall_gc = rtsTrue;
     IF_DEBUG(scheduler,
-	     fprintf(stderr, "Re-entry, thread %lld did a _ccall_gc\n", 
+	     fprintf(stderr, "Re-entry, thread %d did a _ccall_gc\n", 
 		     CurrentTSO->id););
   } else {
     in_ccall_gc = rtsFalse;
@@ -391,7 +391,12 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
     } else {
       context_switch = 0;
     }
-    IF_DEBUG(scheduler, belch("Running thread %lld...\n", t->id));
+    IF_DEBUG(scheduler, belch("Running thread %ld...\n", t->id));
+
+    /* Be friendly to the storage manager: we're about to *run* this
+     * thread, so we better make sure the TSO is mutable.
+     */
+    recordMutable((StgMutClosure *)t);
 
     /* Run the current thread */
     switch (t->whatNext) {
@@ -441,14 +446,14 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
     switch (ret) {
 
     case HeapOverflow:
-      IF_DEBUG(scheduler,belch("Thread %lld stopped: HeapOverflow\n", t->id));
+      IF_DEBUG(scheduler,belch("Thread %ld stopped: HeapOverflow\n", t->id));
       threadPaused(t);
       PUSH_ON_RUN_QUEUE(t);
       GarbageCollect(GetRoots);
       break;
 
     case StackOverflow:
-      IF_DEBUG(scheduler,belch("Thread %lld stopped, StackOverflow\n", t->id));
+      IF_DEBUG(scheduler,belch("Thread %ld stopped, StackOverflow\n", t->id));
       { 
 	nat i;
 	/* enlarge the stack */
@@ -474,9 +479,9 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
 		   /* ToDo: or maybe a timer expired when we were in Hugs?
 		    * or maybe someone hit ctrl-C
                     */
-                   belch("Thread %lld stopped to switch to Hugs\n", t->id);
+                   belch("Thread %ld stopped to switch to Hugs\n", t->id);
                } else {
-                   belch("Thread %lld stopped, timer expired\n", t->id);
+                   belch("Thread %ld stopped, timer expired\n", t->id);
                }
                );
       threadPaused(t);
@@ -510,7 +515,7 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
       break;
 
     case ThreadBlocked:
-      IF_DEBUG(scheduler,belch("Thread %lld stopped, blocking\n", t->id));
+      IF_DEBUG(scheduler,belch("Thread %ld stopped, blocking\n", t->id));
       threadPaused(t);
       /* assume the thread has put itself on some blocked queue
        * somewhere.
@@ -518,7 +523,7 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
       break;
 
     case ThreadFinished:
-      IF_DEBUG(scheduler,belch("Thread %lld finished\n", t->id));
+      IF_DEBUG(scheduler,belch("Thread %ld finished\n", t->id));
       deleteThread(t);
       t->whatNext = ThreadComplete;
       break;
@@ -690,7 +695,14 @@ threadStackOverflow(StgTSO *tso)
   /* and relocate the update frame list */
   relocate_TSO(tso, dest);
 
-  IF_DEBUG(sanity,checkTSO(tso,0)); /* Step 0 because we're not GC'ing. */
+  /* Mark the old one as dead so we don't try to scavenge it during
+   * garbage collection (the TSO will likely be on a mutables list in
+   * some generation, but it'll get collected soon enough).
+   */
+  tso->whatNext = ThreadKilled;
+  dest->mut_link = NULL;
+
+  IF_DEBUG(sanity,checkTSO(tso));
 #if 0
   IF_DEBUG(scheduler,printTSO(dest));
 #endif
@@ -714,7 +726,7 @@ void awaken_blocked_queue(StgTSO *q)
     tso = q;
     q = tso->link;
     PUSH_ON_RUN_QUEUE(tso);
-    IF_DEBUG(scheduler,belch("Waking up thread %lld", tso->id));
+    IF_DEBUG(scheduler,belch("Waking up thread %ld", tso->id));
   }
 }
 

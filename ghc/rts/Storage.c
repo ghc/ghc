@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.2 1998/12/02 13:28:57 simonm Exp $
+ * $Id: Storage.c,v 1.3 1999/01/13 17:25:47 simonm Exp $
  *
  * Storage manager front end
  *
@@ -11,13 +11,13 @@
 #include "Stats.h"
 #include "Hooks.h"
 #include "BlockAlloc.h"
+#include "MBlock.h"
 #include "gmp.h"
 #include "Weak.h"
 
 #include "Storage.h"
 #include "StoragePriv.h"
 
-bdescr *nursery;		/* chained-blocks in the nursery */
 bdescr *current_nursery;	/* next available nursery block, or NULL */
 nat nursery_blocks;		/* number of blocks in the nursery */
 
@@ -31,9 +31,15 @@ nat alloc_blocks_lim;		/* approximate limit on alloc_blocks */
 StgPtr alloc_Hp    = NULL;	/* next free byte in small_alloc_list */
 StgPtr alloc_HpLim = NULL;	/* end of block at small_alloc_list   */
 
+generation *generations;	/* all the generations */
+generation *g0;			/* generation 0, for convenience */
+generation *oldest_gen;		/* oldest generation, for convenience */
+step *g0s0;			/* generation 0, step 0, for convenience */
+
 /*
  * Forward references
  */
+static bdescr *allocNursery   (nat blocks);
 static void *stgAllocForGMP   (size_t size_in_bytes);
 static void *stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
 static void  stgDeallocForGMP (void *ptr, size_t size);
@@ -41,9 +47,83 @@ static void  stgDeallocForGMP (void *ptr, size_t size);
 void
 initStorage (void)
 {
+  nat g, s;
+  step *step;
+
   initBlockAllocator();
   
-  nursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
+  /* allocate generation info array */
+  generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations 
+					     * sizeof(struct _generation),
+					     "initStorage: gens");
+
+  /* set up all generations */
+  for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    generations[g].no = g;
+    generations[g].mut_list = END_MUT_LIST;
+    generations[g].collections = 0;
+    generations[g].failed_promotions = 0;
+  }
+
+  /* Oldest generation: one step */
+  g = RtsFlags.GcFlags.generations-1;
+  generations[g].n_steps = 1;
+  generations[g].steps = 
+    stgMallocBytes(1 * sizeof(struct _step), "initStorage: last step");
+  generations[g].max_blocks = RtsFlags.GcFlags.minAllocAreaSize * 4;
+  step = &generations[g].steps[0];
+  step->no = 0;
+  step->gen = &generations[g];
+  step->blocks = NULL;
+  step->n_blocks = 0;
+  step->to = step;		/* destination is this step */
+  step->hp = NULL;
+  step->hpLim = NULL;
+  step->hp_bd = NULL;
+  
+  /* set up all except the oldest generation with 2 steps */
+  for(g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
+    generations[g].n_steps = 2;
+    generations[g].steps  = stgMallocBytes (2 * sizeof(struct _step),
+					    "initStorage: steps");
+    generations[g].max_blocks = RtsFlags.GcFlags.minAllocAreaSize * 4;
+  }
+
+  for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
+    for (s = 0; s < generations[g].n_steps; s++) {
+      step = &generations[g].steps[s];
+      step->no = s;
+      step->blocks = NULL;
+      step->n_blocks = 0;
+      step->gen = &generations[g];
+      if ( s == 1 ) {
+	step->to = &generations[g+1].steps[0];
+      } else {
+	step->to = &generations[g].steps[s+1];
+      }
+      step->hp = NULL;
+      step->hpLim = NULL;
+      step->hp_bd = NULL;
+      step->large_objects = NULL;
+      step->new_large_objects = NULL;
+      step->scavenged_large_objects = NULL;
+    }
+  }
+  
+  oldest_gen = &generations[RtsFlags.GcFlags.generations-1];
+
+  /* generation 0 is special: that's the nursery */
+  g0 = &generations[0];
+  generations[0].max_blocks = 0;
+
+  /* G0S0: the allocation area */
+  step = &generations[0].steps[0];
+  g0s0 = step;
+  step->blocks   = allocNursery(RtsFlags.GcFlags.minAllocAreaSize);
+  step->n_blocks = RtsFlags.GcFlags.minAllocAreaSize;
+  nursery_blocks = RtsFlags.GcFlags.minAllocAreaSize;
+  current_nursery = step->blocks;
+  /* hp, hpLim, hp_bd, to_space etc. aren't used in G0S0 */
 
   weak_ptr_list = NULL;
   caf_list = NULL;
@@ -58,24 +138,27 @@ initStorage (void)
   /* Tell GNU multi-precision pkg about our custom alloc functions */
   mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
 #endif
+
+  IF_DEBUG(gc, stat_describe_gens());
 }
 
-bdescr *
-allocNursery (bdescr *last_bd, nat blocks)
+static bdescr *
+allocNursery (nat blocks)
 {
-  bdescr *bd;
+  bdescr *last_bd, *bd;
   nat i;
 
+  last_bd = NULL;
   /* Allocate a nursery */
   for (i=0; i < blocks; i++) {
     bd = allocBlock();
     bd->link = last_bd;
-    bd->step = 0;
+    bd->step = g0s0;
+    bd->gen = g0;
+    bd->evacuated = 0;
     bd->free = bd->start;
     last_bd = bd;
   }
-  nursery_blocks = blocks;
-  current_nursery = last_bd;
   return last_bd;
 }
 
@@ -95,13 +178,46 @@ exitStorage (void)
 }
 
 void
+recordMutable(StgMutClosure *p)
+{
+  bdescr *bd;
+
+  ASSERT(closure_MUTABLE(p));
+
+  bd = Bdescr((P_)p);
+
+  /* no need to bother in generation 0 */
+  if (bd->gen == g0) { 
+    return; 
+  } 
+
+  if (p->mut_link == NULL) {
+    p->mut_link = bd->gen->mut_list;
+    bd->gen->mut_list = p;
+  }
+}
+
+void
 newCAF(StgClosure* caf)
 {
-  const StgInfoTable *info = get_itbl(caf);
+  const StgInfoTable *info;
 
+  /* Put this CAF on the mutable list for the old generation.
+   * This is a HACK - the IND_STATIC closure doesn't really have
+   * a mut_link field, but we pretend it has - in fact we re-use
+   * the STATIC_LINK field for the time being, because when we
+   * come to do a major GC we won't need the mut_link field
+   * any more and can use it as a STATIC_LINK.
+   */
+  ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_list;
+  oldest_gen->mut_list = (StgMutClosure *)caf;
+
+#ifdef DEBUG
+  info = get_itbl(caf);
   ASSERT(info->type == IND_STATIC);
   STATIC_LINK2(info,caf) = caf_list;
   caf_list = caf;
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -122,16 +238,15 @@ allocate(nat n)
   CCS_ALLOC(CCCS,n);
 
   /* big allocation (>LARGE_OBJECT_THRESHOLD) */
+  /* ToDo: allocate directly into generation 1 */
   if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
     nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
     bd = allocGroup(req_blocks);
-    bd->link = large_alloc_list; 
-    bd->back = NULL;
-    if (large_alloc_list) {
-      large_alloc_list->back = bd; /* double-link the list */
-    }
-    large_alloc_list = bd;
-    bd->step = 0;
+    dbl_link_onto(bd, &g0s0->large_objects);
+    bd->gen  = g0;
+    bd->step = g0s0;
+    bd->evacuated = 0;
+    bd->free = bd->start;
     /* don't add these blocks to alloc_blocks, since we're assuming
      * that large objects are likely to remain live for quite a while
      * (eg. running threads), so garbage collecting early won't make
@@ -147,7 +262,9 @@ allocate(nat n)
     bd = allocBlock();
     bd->link = small_alloc_list;
     small_alloc_list = bd;
-    bd->step = 0;
+    bd->gen = g0;
+    bd->step = g0s0;
+    bd->evacuated = 0;
     alloc_Hp = bd->start;
     alloc_HpLim = bd->start + BLOCK_SIZE_W;
     alloc_blocks++;
@@ -215,3 +332,65 @@ stgDeallocForGMP (void *ptr STG_UNUSED,
 {
     /* easy for us: the garbage collector does the dealloc'n */
 }
+
+/* -----------------------------------------------------------------------------
+   Debugging
+
+   memInventory() checks for memory leaks by counting up all the
+   blocks we know about and comparing that to the number of blocks
+   allegedly floating around in the system.
+   -------------------------------------------------------------------------- */
+
+#ifdef DEBUG
+
+extern void
+memInventory(void)
+{
+  nat g, s;
+  step *step;
+  bdescr *bd;
+  lnat total_blocks = 0, free_blocks = 0;
+
+  /* count the blocks we current have */
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    for (s = 0; s < generations[g].n_steps; s++) {
+      step = &generations[g].steps[s];
+      total_blocks += step->n_blocks;
+      for (bd = step->large_objects; bd; bd = bd->link) {
+	total_blocks += bd->blocks;
+	/* hack for megablock groups: they have an extra block or two in
+	   the second and subsequent megablocks where the block
+	   descriptors would normally go.
+	*/
+	if (bd->blocks > BLOCKS_PER_MBLOCK) {
+	  total_blocks -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
+	                  * bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE);
+	}
+      }
+    }
+  }
+
+  /* any blocks held by allocate() */
+  for (bd = small_alloc_list; bd; bd = bd->link) {
+    total_blocks += bd->blocks;
+  }
+  for (bd = large_alloc_list; bd; bd = bd->link) {
+    total_blocks += bd->blocks;
+  }
+  
+  /* count the blocks on the free list */
+  free_blocks = countFreeList();
+
+  ASSERT(total_blocks + free_blocks == mblocks_allocated * BLOCKS_PER_MBLOCK);
+
+#if 0
+  if (total_blocks + free_blocks != mblocks_allocated *
+      BLOCKS_PER_MBLOCK) {
+    fprintf(stderr, "Blocks: %ld live + %ld free  = %ld total (%ld around)\n",
+	    total_blocks, free_blocks, total_blocks + free_blocks,
+	    mblocks_allocated * BLOCKS_PER_MBLOCK);
+  }
+#endif
+}
+
+#endif

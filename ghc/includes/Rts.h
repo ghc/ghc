@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.2 1998/12/02 13:21:21 simonm Exp $
+ * $Id: Rts.h,v 1.3 1999/01/13 17:25:54 simonm Exp $
  *
  * Top-level include file for the RTS itself
  *

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1998/12/02 13:28:32 simonm Exp $
+# $Id: Makefile,v 1.3 1999/01/13 17:25:41 simonm Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).

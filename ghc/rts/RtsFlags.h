@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.2 1998/12/02 13:28:40 simonm Exp $
+ * $Id: RtsFlags.h,v 1.3 1999/01/13 17:25:43 simonm Exp $
  *
  * Datatypes that holds the command-line flag settings.
  *
@@ -23,9 +23,8 @@ struct GC_FLAGS {
     nat     minAllocAreaSize;   /* in *blocks* */
     double  pcFreeHeap;
 
-    rtsBool force2s; /* force the use of 2-space copying collection;
-			forced to rtsTrue if we do *heap* profiling.
-		     */
+    nat     generations;
+
     rtsBool forceGC; /* force a major GC every <interval> bytes */
     int	    forcingInterval; /* actually, stored as a number of *words* */
     rtsBool ringBell;

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.2 1998/12/02 13:21:10 simonm Exp $
+ * $Id: InfoTables.h,v 1.3 1999/01/13 17:25:53 simonm Exp $
  * 
  * Info Tables
  *
@@ -130,7 +130,6 @@ typedef enum {
     , MVAR
 
     , ARR_WORDS
-    , ARR_PTRS
 
     , MUT_ARR_WORDS
     , MUT_ARR_PTRS
@@ -162,9 +161,12 @@ typedef enum {
 #define _UPT (1<<6)  /* unpointed?         */
 #define _SRT (1<<7)  /* has an SRT?        */
 
-#define isSTATIC(flags) ((flags)&_STA)
+#define isSTATIC(flags)  ((flags)&_STA)
+#define isMUTABLE(flags) ((flags) &_MUT)
+
 #define closure_STATIC(closure)       (  get_itbl(closure)->flags & _STA)
 #define closure_SHOULD_SPARK(closure) (!(get_itbl(closure)->flags & _NS))
+#define closure_MUTABLE(closure)      (  get_itbl(closure)->flags & _MUT)
 #define closure_UNPOINTED(closure)    (  get_itbl(closure)->flags & _UPT)
 
 /*				    HNF  BTM   NS  STA  THU MUT UPT SRT */
@@ -191,58 +193,65 @@ typedef enum {
 #define FLAGS_EVACUATED		   0
 #define FLAGS_ARR_WORDS		   (_HNF|     _NS|              _UPT     )	
 #define FLAGS_MUT_ARR_WORDS	   (_HNF|     _NS|         _MUT|_UPT     )	
-#define FLAGS_ARR_PTRS		   (_HNF|     _NS|              _UPT     )	
 #define FLAGS_MUT_ARR_PTRS	   (_HNF|     _NS|         _MUT|_UPT     )	
 #define FLAGS_MUT_ARR_PTRS_FROZEN  (_HNF|     _NS|         _MUT|_UPT     )	
 #define FLAGS_MUT_VAR		   (_HNF|     _NS|         _MUT|_UPT     )	
 #define FLAGS_FOREIGN		   (_HNF|     _NS|              _UPT     )	
 #define FLAGS_WEAK		   (_HNF|     _NS|              _UPT     )	
-#define FLAGS_BLACKHOLE		   ( 	 _BTM|_NS|              _UPT     )	
-#define FLAGS_MVAR		   (_HNF|     _NS|              _UPT     )	
+#define FLAGS_BLACKHOLE		   ( 	      _NS|              _UPT     )	
+#define FLAGS_MVAR		   (_HNF|     _NS|         _MUT|_UPT     )	
 #define FLAGS_FETCH_ME		   (_HNF|     _NS                        )	
-#define FLAGS_TSO                  0				    
+#define FLAGS_TSO                  (_HNF|     _NS|         _MUT|_UPT     )
 #define FLAGS_RET_BCO		   (     _BTM                            )
 #define FLAGS_RET_SMALL		   (     _BTM|                       _SRT)
 #define FLAGS_RET_VEC_SMALL	   (     _BTM|                       _SRT)
 #define FLAGS_RET_BIG		   (                                 _SRT)
 #define FLAGS_RET_VEC_BIG	   (                                 _SRT)
 #define FLAGS_RET_DYN		   (                                 _SRT)
-#define FLAGS_CATCH_FRAME	   0
-#define FLAGS_STOP_FRAME	   0
-#define FLAGS_SEQ_FRAME 	   0
-#define FLAGS_UPDATE_FRAME         0
+#define FLAGS_CATCH_FRAME	   (     _BTM                            )
+#define FLAGS_STOP_FRAME	   (     _BTM                            )
+#define FLAGS_SEQ_FRAME 	   (     _BTM                            )
+#define FLAGS_UPDATE_FRAME         (     _BTM                            )
 
 /* -----------------------------------------------------------------------------
    Info Tables
    -------------------------------------------------------------------------- */
 
 /* A large bitmap.  Small 32-bit ones live in the info table, but sometimes
- * 32 bits isn't enough and we have to generate a larger one.
+ * 32 bits isn't enough and we have to generate a larger one.  (sizes
+ * differ for 64-bit machines.
  */
 
 typedef struct {
-  StgNat32 size;
-  StgNat32 bitmap[0];
+  StgWord size;
+  StgWord bitmap[0];
 } StgLargeBitmap;
 
 /*
  * Stuff describing the closure layout.  Well, actually, it might
- * contain the selector index for a THUNK_SELECTOR.
+ * contain the selector index for a THUNK_SELECTOR.  If we're on a
+ * 64-bit architecture then we can enlarge some of these fields, since
+ * the union contains a pointer field.
  */
 
 typedef union {
 
-  StgNat32 bitmap;		/* bit pattern, 1 = pointer, 0 = non-pointer */
-
+  StgWord bitmap;		/* bit pattern, 1 = pointer, 0 = non-pointer */
+  StgWord selector_offset;	/* used in THUNK_SELECTORs */
   StgLargeBitmap* large_bitmap;	/* pointer to large bitmap structure */
 
+#if SIZEOF_VOID_P == 8
+  struct {
+    StgNat32 ptrs;		/* number of pointers     */
+    StgNat32 nptrs;		/* number of non-pointers */
+  } payload;
+#else
   struct {
     StgNat16 ptrs;		/* number of pointers     */
     StgNat16 nptrs;		/* number of non-pointers */
   } payload;
+#endif
   
-  StgNat32 selector_offset;	/* used in THUNK_SELECTORs */
-
 } StgClosureInfo;
 
 /*
@@ -259,10 +268,16 @@ typedef struct _StgInfoTable {
     StgParInfo	    par;
     StgProfInfo     prof;
     StgDebugInfo    debug;
-    StgClosureInfo  layout;	/* closure layout info */
+    StgClosureInfo  layout;	/* closure layout info (pointer-sized) */
+#if SIZEOF_VOID_P == 8
+    StgNat16        flags;	/* }                                   */
+    StgClosureType  type : 16;	/* } These 4 elements fit into 64 bits */
+    StgNat32        srt_len;    /* }                                   */
+#else
     StgNat8         flags;	/* }                                   */
     StgClosureType  type : 8;	/* } These 4 elements fit into 32 bits */
     StgNat16        srt_len;    /* }                                   */
+#endif
 #if USE_MINIINTERPRETER
     StgFunPtr       (*vector)[];
     StgFunPtr       entry;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: DebugProf.c,v 1.2 1998/12/02 13:28:14 simonm Exp $
+ * $Id: DebugProf.c,v 1.3 1999/01/13 17:25:38 simonm Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -160,7 +160,6 @@ static char *type_names[] = {
     , "MVAR"
 
     , "ARR_WORDS"
-    , "ARR_PTRS"
 
     , "MUT_ARR_WORDS"
     , "MUT_ARR_PTRS"
@@ -316,10 +315,9 @@ heapCensus(bdescr *bd)
 		size = arr_words_sizeW(stgCast(StgArrWords*,p));
 		break;
 
-	    case ARR_PTRS:
 	    case MUT_ARR_PTRS:
 	    case MUT_ARR_PTRS_FROZEN:
-		size = arr_ptrs_sizeW((StgArrPtrs *)p);
+		size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
 		break;
 
 	    case TSO:

@@ -1,9 +1,11 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.2 1998/12/02 13:28:30 simonm Exp $
+ * $Id: MBlock.h,v 1.3 1999/01/13 17:25:41 simonm Exp $
  *
  * MegaBlock Allocator interface.
  *
  * ---------------------------------------------------------------------------*/
+
+extern lnat mblocks_allocated;
 
 extern void * getMBlock(void);
 extern void * getMBlocks(nat n);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.2 1998/12/02 13:20:53 simonm Exp $
+ * $Id: Block.h,v 1.3 1999/01/13 17:25:51 simonm Exp $
  *
  * Block structure for the storage manager
  *
@@ -43,13 +43,14 @@ typedef struct _bdescr {
   StgPtr free;			/* first free byte of memory */
   struct _bdescr *link;		/* used for chaining blocks together */
   struct _bdescr *back;		/* used (occasionally) for doubly-linked lists*/
-  StgNat32 gen;			/* generation */
-  StgNat32 step;		/* step */
+  struct _generation *gen;	/* generation */
+  struct _step *step;		/* step */
   StgNat32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
+  StgNat32 evacuated;           /* block is in to-space */
 #if SIZEOF_VOID_P == 8
-  StgNat32 _padding[5];
+  StgNat32 _padding[2];
 #else
-  StgNat32 _padding[1];
+  StgNat32 _padding[0];
 #endif
 } bdescr;
 

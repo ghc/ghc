@@ -2301,7 +2301,7 @@ sub process_ghc_timings {
 	    $MaxResidency = $1; $ResidencySamples = $2;
 	}
 
-        $GCs = $1 if /^\s*([0-9,]+) garbage collections? performed/;
+        $GCs = $1 if /^\s*([0-9,]+) (collections? in generation 0|garbage collections? performed)/;
 
 	# The presence of -? in the following pattern is only there to
 	# accommodate 0.29 && <= 2.05 RTS'

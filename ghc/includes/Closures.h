@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.2 1998/12/02 13:20:59 simonm Exp $
+ * $Id: Closures.h,v 1.3 1999/01/13 17:25:53 simonm Exp $
  *
  * Closures
  *
@@ -113,6 +113,19 @@ typedef struct StgClosure_ {
     struct StgClosure_ *payload[0];
 } StgClosure;
 
+/* What a stroke of luck - all our mutable closures follow the same
+ * basic layout, with the mutable link field as the second field after
+ * the header.  This means the following structure is the supertype of
+ * mutable closures.
+ */
+
+typedef struct StgMutClosure_ {
+    StgHeader   header;
+    StgPtr     *padding;
+    struct StgMutClosure_ *mut_link;
+    struct StgClosure_ *payload[0];
+} StgMutClosure;
+
 typedef struct {
     StgHeader   header;
     StgClosure *selectee;
@@ -147,8 +160,8 @@ typedef struct {
 
 typedef struct {
     StgHeader   header;
-    StgClosure *mut_link;
     StgClosure *indirectee;
+    StgMutClosure *mut_link;
 } StgIndOldGen;
 
 typedef struct {
@@ -178,12 +191,14 @@ typedef struct {
 typedef struct {
     StgHeader   header;
     StgWord     ptrs;
+    StgMutClosure *mut_link;	/* mutable list */
     StgClosure *payload[0];
-} StgArrPtrs;
+} StgMutArrPtrs;
 
 typedef struct {
     StgHeader   header;
     StgClosure *var;
+    StgMutClosure *mut_link;
 } StgMutVar;
 
 typedef struct _StgUpdateFrame {
@@ -251,8 +266,9 @@ typedef struct {
 
 typedef struct {
   StgHeader       header;
-  struct StgTSO_* head;
-  struct StgTSO_* tail;
+  struct StgTSO_ *head;
+  StgMutClosure  *mut_link;
+  struct StgTSO_ *tail;
   StgClosure*     value;
 } StgMVar;
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.2 1998/12/02 13:28:28 simonm Exp $
+ * $Id: MBlock.c,v 1.3 1999/01/13 17:25:40 simonm Exp $
  *
  * MegaBlock Allocator Interface.  This file contains all the dirty
  * architecture-dependent hackery required to get a chunk of aligned
@@ -61,6 +61,8 @@
 #error Dont know where to get memory from on this architecture
 /* ToDo: memory locations on other architectures */
 #endif
+
+lnat mblocks_allocated = 0;
 
 void *
 getMBlock(void)
@@ -134,5 +136,7 @@ getMBlocks(nat n)
 
   next_request += size;
 
+  mblocks_allocated += n;
+  
   return ret;
 }

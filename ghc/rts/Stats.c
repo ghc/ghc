@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.2 1998/12/02 13:28:49 simonm Exp $
+ * $Id: Stats.c,v 1.3 1999/01/13 17:25:46 simonm Exp $
  *
  * Statistics and timing-related functions.
  *
@@ -10,6 +10,8 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "StoragePriv.h"
+#include "MBlock.h"
 
 /**
  *  Ian: For the moment we just want to ignore
@@ -84,14 +86,6 @@ static ullong GC_tot_alloc = 0;
 
 static StgDouble GC_start_time,  GC_tot_time = 0;  /* User GC Time */
 static StgDouble GCe_start_time, GCe_tot_time = 0; /* Elapsed GC time */
-
-static StgDouble GC_min_time = 0;
-static StgDouble GCe_min_time = 0;
-static lnat GC_maj_no = 0;
-static lnat GC_min_no = 0;
-static lnat GC_min_since_maj = 0;
-static lnat GC_live_maj = 0;         /* Heap live at last major collection */
-static lnat GC_alloc_since_maj = 0;  /* Heap alloc since collection major */
 
 lnat MaxResidency = 0;     /* in words; for stats only */
 lnat ResidencySamples = 0; /* for stats only */
@@ -185,8 +179,8 @@ initStats(void)
   FILE *sf = RtsFlags.GcFlags.statsFile;
   
   if (RtsFlags.GcFlags.giveStats) {
-    fprintf(sf, "  Alloc  Collect   Live   Resid   GC    GC     TOT     TOT  Page Flts\n");
-    fprintf(sf, "  bytes   bytes    bytes   ency  user  elap    user    elap\n");
+    fprintf(sf, "    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
+    fprintf(sf, "    bytes     bytes     bytes  user  elap    user    elap\n");
   }
 }    
 
@@ -265,7 +259,7 @@ stat_startGC(void)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC(lnat alloc, lnat collect, lnat live, char *comment)
+stat_endGC(lnat alloc, lnat collect, lnat live, lnat gen)
 {
     FILE *sf = RtsFlags.GcFlags.statsFile;
 
@@ -276,25 +270,31 @@ stat_endGC(lnat alloc, lnat collect, lnat live, char *comment)
 	if (RtsFlags.GcFlags.giveStats) {
 	    nat faults = pagefaults();
 
-	    fprintf(sf, "%8ld %7ld %7ld %5.1f%%",
-		    alloc*sizeof(W_), collect*sizeof(W_), live*sizeof(W_), collect == 0 ? 0.0 : (live / (StgDouble) collect * 100));
-	    fprintf(sf, " %5.2f %5.2f %7.2f %7.2f %4ld %4ld  %s\n", 
+	    fprintf(sf, "%9ld %9ld %9ld",
+		    alloc*sizeof(W_), collect*sizeof(W_), live*sizeof(W_));
+	    fprintf(sf, " %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
 		    (time-GC_start_time), 
 		    (etime-GCe_start_time), 
 		    time,
 		    etime,
 		    faults - GC_start_faults,
 		    GC_start_faults - GC_end_faults,
-		    comment);
+		    gen);
 
 	    GC_end_faults = faults;
 	    fflush(sf);
 	}
 
-	GC_maj_no++;
 	GC_tot_alloc += (ullong) alloc;
 	GC_tot_time  += time-GC_start_time;
 	GCe_tot_time += etime-GCe_start_time;
+
+	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
+	  if (live > MaxResidency) {
+	    MaxResidency = live;
+	  }
+	  ResidencySamples++;
+	}
     }
 
     if (rub_bell) {
@@ -327,31 +327,32 @@ stat_exit(int alloc)
 	if (etime == 0.0) etime = 0.0001;
 	
 
-	if (RtsFlags.GcFlags.giveStats) {
-	    fprintf(sf, "%8d\n\n", alloc*sizeof(W_));
-	}
+	fprintf(sf, "%9ld %9.9s %9.9s",
+		(lnat)alloc*sizeof(W_), "", "");
+	fprintf(sf, " %5.2f %5.2f\n\n", 0.0, 0.0);
 
-	else {
-	    fprintf(sf, "%8ld %7.7s %6.6s %7.7s %6.6s",
-		    (GC_alloc_since_maj + alloc)*sizeof(W_), "", "", "", "");
-	    fprintf(sf, "  %3ld  %5.2f %5.2f\n\n",
-		    GC_min_since_maj, GC_min_time, GCe_min_time);
-	}
-	GC_min_no    += GC_min_since_maj;
-	GC_tot_time  += GC_min_time;
-	GCe_tot_time += GCe_min_time;
-	GC_tot_alloc += GC_alloc_since_maj + alloc;
+	GC_tot_alloc += alloc;
+
 	ullong_format_string(GC_tot_alloc*sizeof(W_), temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s bytes allocated in the heap\n", temp);
+
 	if ( ResidencySamples > 0 ) {
 	    ullong_format_string(MaxResidency*sizeof(W_), temp, rtsTrue/*commas*/);
-	    fprintf(sf, "%11s bytes maximum residency (%.1f%%, %ld sample(s))\n",
+	    fprintf(sf, "%11s bytes maximum residency (%ld sample(s))\n",
 			      temp,
-			      MaxResidency / (StgDouble) RtsFlags.GcFlags.maxHeapSize * 100,
 			      ResidencySamples);
 	}
-	fprintf(sf, "%11ld garbage collections performed (%ld major, %ld minor)\n\n",
-		GC_maj_no + GC_min_no, GC_maj_no, GC_min_no);
+	fprintf(sf,"\n");
+
+	{ /* Count garbage collections */
+	  nat g;
+	  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	    fprintf(sf, "%11d collections in generation %d\n", 
+		    generations[g].collections, g);
+	  }
+	}
+	fprintf(sf,"\n%11ld Mb total memory in use\n\n", 
+		mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 
 	MutTime = time - GC_tot_time - InitUserTime;
 	if (MutTime < 0) { MutTime = 0; }
@@ -385,4 +386,44 @@ stat_exit(int alloc)
 	fflush(sf);
 	fclose(sf);
     }
+}
+
+/* -----------------------------------------------------------------------------
+   stat_describe_gens
+
+   Produce some detailed info on the state of the generational GC.
+   -------------------------------------------------------------------------- */
+void
+stat_describe_gens(void)
+{
+  nat g, s, mut, lge, live;
+  StgMutClosure *m;
+  bdescr *bd;
+  step *step;
+
+  fprintf(stderr, "     Gen    Steps      Max   Mutable   Step  Blocks     Live    Large\n"       "                    Blocks  Closures                          Objects\n");
+
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    for (m = generations[g].mut_list, mut = 0; m != END_MUT_LIST; 
+	 m = m->mut_link) 
+      mut++;
+    fprintf(stderr, "%8d %8d %8d %9d", g, generations[g].n_steps,
+	    generations[g].max_blocks, mut);
+
+    for (s = 0; s < generations[g].n_steps; s++) {
+      step = &generations[g].steps[s];
+      for (bd = step->large_objects, lge = 0; bd; bd = bd->link)
+	lge++;
+      live = 0;
+      for (bd = step->blocks; bd; bd = bd->link) {
+	live += (bd->free - bd->start) * sizeof(W_);
+      }
+      if (s != 0) {
+	fprintf(stderr,"%36s","");
+      }
+      fprintf(stderr,"%6d %8d %8d %8d\n", s, step->n_blocks,
+	      live, lge);
+    }
+  }
+  fprintf(stderr,"\n");
 }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.2 1998/12/02 13:28:58 simonm Exp $
+ * $Id: Storage.h,v 1.3 1999/01/13 17:25:48 simonm Exp $
  *
  * External Storage Manger Interface
  *
@@ -87,8 +87,30 @@ extern StgClosure *MarkRoot(StgClosure *p);
 
    -------------------------------------------------------------------------- */
 
-extern void RecordMutable(StgPtr p);
-extern void UpdateWithIndirection(StgPtr p1, StgPtr p2);
+extern void recordMutable(StgMutClosure *p);
+
+#ifdef TICKY_TICKY
+#error updateWithIndirection: maybe permanent indirection?
+# define Ind_info_TO_USE ((AllFlags.doUpdEntryCounts) ? &IND_PERM_info : &IND_info
+)
+#endif
+
+static inline void
+updateWithIndirection(StgClosure *p1, StgClosure *p2) 
+{
+  bdescr *bd;
+
+  bd = Bdescr((P_)p1);
+  if (bd->gen->no == 0) {
+    SET_INFO(p1,&IND_info);
+    ((StgInd *)p1)->indirectee = p2;
+  } else {
+    SET_INFO(p1,&IND_OLDGEN_info);
+    ((StgIndOldGen *)p1)->indirectee = p2;
+    ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_list;
+    bd->gen->mut_list = (StgMutClosure *)p1;
+  }
+}
 
 /* -----------------------------------------------------------------------------
    The CAF list - used to let us revert CAFs

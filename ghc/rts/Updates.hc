@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.2 1998/12/02 13:29:00 simonm Exp $
+ * $Id: Updates.hc,v 1.3 1999/01/13 17:25:49 simonm Exp $
  *
  * Code to perform updates.
  *
@@ -8,6 +8,7 @@
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "HeapStackCheck.h"
+#include "Storage.h"
 
 /*
   The update frame return address must be *polymorphic*, that means
@@ -51,7 +52,7 @@
 	  TICK_UPD_EXISTING();						\
 									\
           updatee = ((StgUpdateFrame *)Sp)->updatee;			\
-									\
+						\
 	  /* update the updatee with an indirection to the return value */\
 	  UPD_IND(updatee,R1.p);					\
 									\
@@ -74,7 +75,6 @@ UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_4_entry,RET_VEC(Sp[0],4));
 UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_5_entry,RET_VEC(Sp[0],5));
 UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_6_entry,RET_VEC(Sp[0],6));
 UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_7_entry,RET_VEC(Sp[0],7));
-
 
 /*
   Make sure this table is big enough to handle the maximum vectored

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.2 1998/12/02 13:29:01 simonm Exp $
+ * $Id: Weak.c,v 1.3 1999/01/13 17:25:49 simonm Exp $
  *
  * Weak pointers / finalisers
  *
@@ -50,6 +50,12 @@ scheduleFinalisers(StgWeak *list)
     createIOThread(RtsFlags.GcFlags.initialStkSize, w->finaliser);
 #endif
     w->header.info = &DEAD_WEAK_info;
+
+    /* need to fill the slop with zeros if we're sanity checking */
+    IF_DEBUG(sanity, {
+      nat dw_size = sizeW_fromITBL(get_itbl(w));
+      memset((P_)w + dw_size, 0, (sizeofW(StgWeak) - dw_size) * sizeof(W_));
+    });
   }
 }
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.2 1998/12/02 13:28:43 simonm Exp $
+ * $Id: Sanity.c,v 1.3 1999/01/13 17:25:43 simonm Exp $
  *
  * Sanity checking code for the heap and stack.
  *
@@ -21,10 +21,8 @@
 #include "BlockAlloc.h"
 #include "Sanity.h"
 
-static nat heap_step;
-
 #define LOOKS_LIKE_PTR(r) \
-  (IS_DATA_PTR(r) || ((IS_USER_PTR(r) && Bdescr((P_)r)->step == heap_step)))
+  (IS_DATA_PTR(r) || ((IS_USER_PTR(r) && Bdescr((P_)r)->free != (void *)-1)))
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
@@ -199,6 +197,7 @@ checkClosure( StgClosure* p )
     case THUNK:
     case CONSTR:
     case IND_PERM:
+    case IND_OLDGEN:
     case IND_OLDGEN_PERM:
     case CAF_UNENTERED:
     case CAF_ENTERED:
@@ -241,14 +240,16 @@ checkClosure( StgClosure* p )
 	    return sizeofW(StgHeader) + MIN_UPD_SIZE;
 
     case IND:
-    case IND_OLDGEN:
 	{ 
   	    /* we don't expect to see any of these after GC
 	     * but they might appear during execution
 	     */
+	    P_ q;
 	    StgInd *ind = stgCast(StgInd*,p);
 	    ASSERT(LOOKS_LIKE_PTR(ind->indirectee));
-	    return sizeofW(StgInd);
+	    q = (P_)p + sizeofW(StgInd);
+	    while (!*q) { q++; }; /* skip padding words (see GC.c: evacuate())*/
+	    return q - (P_)p;
 	}
 
     case RET_BCO:
@@ -278,20 +279,19 @@ checkClosure( StgClosure* p )
     case MUT_ARR_WORDS:
 	    return arr_words_sizeW(stgCast(StgArrWords*,p));
 
-    case ARR_PTRS:
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
 	{
-	    StgArrPtrs* a = stgCast(StgArrPtrs*,p);
+	    StgMutArrPtrs* a = stgCast(StgMutArrPtrs*,p);
 	    nat i;
 	    for (i = 0; i < a->ptrs; i++) {
-		ASSERT(LOOKS_LIKE_PTR(payloadPtr(a,i)));
+		ASSERT(LOOKS_LIKE_PTR(a->payload[i]));
 	    }
-	    return arr_ptrs_sizeW(a);
+	    return mut_arr_ptrs_sizeW(a);
 	}
 
     case TSO:
-        checkTSO((StgTSO *)p, heap_step);
+        checkTSO((StgTSO *)p);
         return tso_sizeW((StgTSO *)p);
 
     case BLOCKED_FETCH:
@@ -309,27 +309,44 @@ checkClosure( StgClosure* p )
 
    After garbage collection, the live heap is in a state where we can
    run through and check that all the pointers point to the right
-   place.
+   place.  This function starts at a given position and sanity-checks
+   all the objects in the remainder of the chain.
    -------------------------------------------------------------------------- */
 
 extern void 
-checkHeap(bdescr *bd, nat step)
+checkHeap(bdescr *bd, StgPtr start)
 {
     StgPtr p;
 
-    heap_step = step;
+    if (start == NULL) {
+      p = bd->start;
+    } else {
+      p = start;
+    }
 
     while (bd != NULL) {
-      p = bd->start;
       while (p < bd->free) {
         nat size = checkClosure(stgCast(StgClosure*,p));
         /* This is the smallest size of closure that can live in the heap. */
         ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
 	p += size;
+	while (*p == 0) { p++; } /* skip over slop */
       }
       bd = bd->link;
+      if (bd != NULL) {
+	p = bd->start;
+      }
     }
-}    
+}
+
+extern void
+checkChain(bdescr *bd)
+{
+  while (bd != NULL) {
+    checkClosure((StgClosure *)bd->start);
+    bd = bd->link;
+  }
+}
 
 /* check stack - making sure that update frames are linked correctly */
 void 
@@ -361,7 +378,7 @@ checkStack(StgPtr sp, StgPtr stack_end, StgUpdateFrame* su )
 }
 
 extern void
-checkTSO(StgTSO *tso, nat step)
+checkTSO(StgTSO *tso)
 {
     StgPtr sp = tso->sp;
     StgPtr stack = tso->stack;
@@ -369,7 +386,12 @@ checkTSO(StgTSO *tso, nat step)
     StgOffset stack_size = tso->stack_size;
     StgPtr stack_end = stack + stack_size;
 
-    heap_step = step;
+    if (tso->whatNext == ThreadComplete ||  tso->whatNext == ThreadKilled) {
+      /* The garbage collector doesn't bother following any pointers
+       * from dead threads, so don't check sanity here.  
+       */
+      return;
+    }
 
     ASSERT(stack <= sp && sp < stack_end);
     ASSERT(sp <= stgCast(StgPtr,su));

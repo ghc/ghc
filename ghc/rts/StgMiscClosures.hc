@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.2 1998/12/02 13:28:52 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.3 1999/01/13 17:25:46 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -64,7 +64,7 @@ ling */
     FE_
 }  
 
-INFO_TABLE(IND_OLDGEN_info,IND_OLDGEN_entry,1,0,IND_OLDGEN,const,EF_,0,0);
+INFO_TABLE(IND_OLDGEN_info,IND_OLDGEN_entry,1,1,IND_OLDGEN,const,EF_,0,0);
 STGFUN(IND_OLDGEN_entry)
 {
     FB_
@@ -76,7 +76,7 @@ STGFUN(IND_OLDGEN_entry)
     FE_
 }
 
-INFO_TABLE(IND_OLDGEN_PERM_info,IND_OLDGEN_PERM_entry,1,0,IND_OLDGEN_PERM,const,EF_,0,0);
+INFO_TABLE(IND_OLDGEN_PERM_info,IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PERM,const,EF_,0,0);
 STGFUN(IND_OLDGEN_PERM_entry)
 {
     FB_
@@ -127,12 +127,12 @@ STGFUN(CAF_ENTERED_entry)
    -------------------------------------------------------------------------- */
 
 /* Note: a black hole must be big enough to be overwritten with an
- * indirection/evacuee/catch.  Thus we claim it has 2 non-pointer words of
- * payload, which should be big enough for an old-generation
- * indirection.  
+ * indirection/evacuee/catch.  Thus we claim it has 1 non-pointer word of
+ * payload (in addition to the pointer word for the blocking queue), which 
+ * should be big enough for an old-generation indirection.  
  */
 
-INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,const,EF_,0,0);
+INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,1,1,BLACKHOLE,const,EF_,0,0);
 STGFUN(BLACKHOLE_entry)
 {
   FB_
@@ -146,7 +146,7 @@ STGFUN(BLACKHOLE_entry)
 }
 
 /* identical to BLACKHOLEs except for the infotag */
-INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,const,EF_,0,0);
+INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,1,1,CAF_BLACKHOLE,const,EF_,0,0);
 STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
@@ -226,10 +226,10 @@ NON_ENTERABLE_ENTRY_CODE(FOREIGN);
    and entry code for each type.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(FULL_MVAR_info,FULL_MVAR_entry,3,0,MVAR,const,EF_,0,0);
+INFO_TABLE(FULL_MVAR_info,FULL_MVAR_entry,4,0,MVAR,const,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(FULL_MVAR);
 
-INFO_TABLE(EMPTY_MVAR_info,EMPTY_MVAR_entry,3,0,MVAR,const,EF_,0,0);
+INFO_TABLE(EMPTY_MVAR_info,EMPTY_MVAR_entry,4,0,MVAR,const,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
 
 /* -----------------------------------------------------------------------------
@@ -244,6 +244,23 @@ NON_ENTERABLE_ENTRY_CODE(END_TSO_QUEUE);
 
 SET_STATIC_HDR(END_TSO_QUEUE_closure,END_TSO_QUEUE_info,0/*CC*/,const,EI_)
 };
+
+/* -----------------------------------------------------------------------------
+   Mutable lists
+
+   Mutable lists (used by the garbage collector) consist of a chain of
+   StgMutClosures connected through their mut_link fields, ending in
+   an END_MUT_LIST closure.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(END_MUT_LIST_info,END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
+
+SET_STATIC_HDR(END_MUT_LIST_closure,END_MUT_LIST_info,0/*CC*/,const,EI_)
+};
+
+INFO_TABLE(MUT_CONS_info, MUT_CONS_entry, 1, 1, MUT_VAR, const, EF_, 0, 0);
+NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
 
 /* -----------------------------------------------------------------------------
    Arrays
@@ -266,7 +283,6 @@ NON_ENTERABLE_ENTRY_CODE(type);
 
 ArrayInfo(ARR_WORDS);
 ArrayInfo(MUT_ARR_WORDS);
-ArrayInfo(ARR_PTRS);
 ArrayInfo(MUT_ARR_PTRS);
 ArrayInfo(MUT_ARR_PTRS_FROZEN);
 
@@ -276,7 +292,7 @@ ArrayInfo(MUT_ARR_PTRS_FROZEN);
    Mutable Variables
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(MUT_VAR_info, MUT_VAR_entry, 1, 0, MUT_VAR, const, EF_, 0, 0);
+INFO_TABLE(MUT_VAR_info, MUT_VAR_entry, 1, 1, MUT_VAR, const, EF_, 0, 0);
 NON_ENTERABLE_ENTRY_CODE(MUT_VAR);
 
 /* -----------------------------------------------------------------------------

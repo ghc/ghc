@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.2 1998/12/02 13:21:39 simonm Exp $
+ * $Id: StgMiscClosures.h,v 1.3 1999/01/13 17:25:54 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -31,11 +31,12 @@ STGFUN(FULL_MVAR_entry);
 STGFUN(EMPTY_MVAR_entry);
 STGFUN(ARR_WORDS_entry);
 STGFUN(MUT_ARR_WORDS_entry);
-STGFUN(ARR_PTRS_entry);
 STGFUN(MUT_ARR_PTRS_entry);
 STGFUN(MUT_ARR_PTRS_FROZEN_entry);
 STGFUN(MUT_VAR_entry);
 STGFUN(END_TSO_QUEUE_entry);
+STGFUN(MUT_CONS_entry);
+STGFUN(END_MUT_LIST_entry);
 STGFUN(dummy_ret_entry);
 
 /* info tables */
@@ -59,11 +60,12 @@ extern const StgInfoTable EMPTY_MVAR_info;
 extern const StgInfoTable TSO_info;
 extern const StgInfoTable ARR_WORDS_info;
 extern const StgInfoTable MUT_ARR_WORDS_info;
-extern const StgInfoTable ARR_PTRS_info;
 extern const StgInfoTable MUT_ARR_PTRS_info;
 extern const StgInfoTable MUT_ARR_PTRS_FROZEN_info;
 extern const StgInfoTable MUT_VAR_info;
 extern const StgInfoTable END_TSO_QUEUE_info;
+extern const StgInfoTable MUT_CONS_info;
+extern const StgInfoTable END_MUT_LIST_info;
 extern const StgInfoTable catch_info;
 extern const StgInfoTable seq_info;
 extern const StgInfoTable dummy_ret_info;
@@ -78,6 +80,7 @@ extern const StgInfoTable ret_bco_info;
 /* closures */
 
 extern const StgClosure END_TSO_QUEUE_closure;
+extern const StgClosure END_MUT_LIST_closure;
 extern const StgClosure dummy_ret_closure;
 
 extern StgIntCharlikeClosure CHARLIKE_closure[];
