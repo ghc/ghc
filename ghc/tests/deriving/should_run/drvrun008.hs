@@ -1,5 +1,4 @@
-{-# OPTIONS -funbox-strict-fields #-}
--- !!! Check that -funbox-strict-fields doesn't mess up deriving
+-- !!! Check that -funbox-strict-fields doesn't mess up deriving (can't be in an options pragma, it's in the Makefile)
 -- !!!  (it did in 4.04)
 
 module Main( main ) where
