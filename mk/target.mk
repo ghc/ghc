@@ -548,18 +548,18 @@ ifneq "$(BIN_DIST)" "1"
 	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
 	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
-	   echo $(INSTALL_PROGRAM) $(filter-out -s,$(INSTALL_BIN_OPTS)) $$i.tmp $(bindir)/$$i ;    \
-	   $(INSTALL_PROGRAM) $(filter-out -s,$(INSTALL_BIN_OPTS)) $$i.tmp $(bindir)/$$i ; \
+	   echo $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i.tmp $(bindir)/$$i ;    \
+	   $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i.tmp $(bindir)/$$i ; \
 	   $(RM) $$i.tmp; \
 	done
 else
 	for i in $(INSTALL_SCRIPTS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(bindir)/$$i; \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(bindir)/$$i; \
 	done
 endif
 else
 	for i in $(INSTALL_SCRIPTS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(bindir); \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(bindir); \
 	done
 endif
 endif
@@ -577,18 +577,18 @@ ifneq "$(BIN_DIST)" "1"
 	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
 	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
-	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir)/$$i ;    \
-	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(libdir)/$$i ; \
+	   echo $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libdir)/$$i ;    \
+	   $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i.tmp $(libdir)/$$i ; \
 	   $(RM) $$i.tmp; \
 	done
 else
 	for i in $(INSTALL_LIB_SCRIPTS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir)/$$i ; \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libdir)/$$i ; \
 	done
 endif
 else
 	for i in $(INSTALL_LIB_SCRIPTS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir); \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libdir); \
 	done
 endif
 endif
@@ -606,18 +606,18 @@ ifneq "$(BIN_DIST)" "1"
 	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
 	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
-	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libexecdir) ;    \
-	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(libexecdir)/$$i ; \
+	   echo $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libexecdir) ;    \
+	   $(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i.tmp $(libexecdir)/$$i ; \
 	   $(RM) $$i.tmp; \
 	done
 else
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libexecdir); \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libexecdir); \
 	done
 endif
 else
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libexecdir); \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libexecdir); \
 	done
 endif
 endif

@@ -51,8 +51,8 @@ SRC_INSTALL_OPTS += $(INSTALL_OWNER) $(INSTALL_GROUP)
 # of targets:
 #
 
-INSTALL_PROGRAM = $(INSTALL)
-INSTALL_SCRIPT  = $(INSTALL)
+INSTALL_PROGRAM = $(INSTALL) -m 755
+INSTALL_SCRIPT  = $(INSTALL) -m 755
 INSTALL_DATA    = $(INSTALL) -m 644
 INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 
@@ -167,7 +167,7 @@ MAINTAINER_CLEAN_FILES += .depend $(BOOT_SRCS)
 # `Standard' set of files to clean out.
 #
 MOSTLY_CLEAN_FILES += \
- *.CKP *.ln *.BAK *.bak *.o *core a.out errs ,* *.a .emacs_*	     \
+ *.CKP *.ln *.BAK *.bak .*.bak *.o *core a.out errs ,* *.a .emacs_*  \
  tags TAGS *.ind *.ilg *.idx *.idx-prev *.aux *.aux-prev *.dvi *.log \
  *.toc *.lot *.lof *.blg *.info *.itxi *.itex *.ihtml *.cb
 
