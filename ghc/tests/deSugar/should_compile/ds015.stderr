@@ -1,87 +1,88 @@
 ds015.hs:9: 
     Warning: Possibly incomplete patterns
-	in a lambda abstraction:
-	    `(x PrelBase.: xs) -> ...'
+	in a lambda abstraction: `(x PrelBase.: xs) -> ...'
 
 
 ================================================================================
 Desugared:
-h{-r3z,x-}  :: 
-    _forall_ [t{-an8-} t{-anf-}] => [t{-an8-}] -> t{-anf-} -> t{-an8-}
+Rec {
+h{-r3w,x-}  ::  _forall_ [takN takG] => [takG] -> takN -> takG
 {-# L #-}
-h{-r3z,x-} =
-    _/\_ t{-an8-} t{-anf-} -> \ x_r3t  :: 
-				    [t{-an8-}]
-				{-# L #-}
-				x_r3t y_r3v  :: 
-					  t{-anf-}
-				      {-# L #-}
-				      y_r3v ->
-	(\ ds_drl  :: 
-	       [t{-an8-}]
-	   {-# L #-}
-	   ds_drl ->
-	     let {
-	       fail_drm  :: 
-		   t{-an8-}
-	       {-# L #-}
-	       fail_drm =
-		   GHCerr.patError{-8r,p-}
-		       _@_ t{-an8-} _string_ "ds015.hs:9|lambda"
-	     } in 
-	       case ds_drl of {
-		 PrelBase.[]{-5i,p-}{i} ->
-		     fail_drm;
-		 PrelBase.:{-55,p-}{i} x_r3x xs_r3y ->
-		     x_r3x;
-	       })
-	    x_r3t
-g{-r3A,x-}  :: 
-    _forall_
-    [t{-any-} t{-anA-} t{-anC-}]
-    =>
-    ((t{-any-} -> t{-any-}) -> t{-anA-}) -> t{-anC-} -> t{-anA-}
-{-# L #-}
-g{-r3A,x-} =
-    _/\_ t{-any-} t{-anA-} t{-anC-} -> \ x_r3j  :: 
-					     (t{-any-} -> t{-any-}) -> t{-anA-}
-					 {-# L #-}
-					 x_r3j y_r3l  :: 
-						   t{-anC-}
-					       {-# L #-}
-					       y_r3l ->
-	let {
-	  ds_drT  :: 
-	      t{-any-} -> t{-any-}
+h{-r3w,x-} =
+    _/\_ takN takG ->
+	_letrec_ {
+	  h_ako  ::  [takG] -> takN -> takG
 	  {-# L #-}
-	  ds_drT =
-	      \ x_r3r  :: 
-		    t{-any-}
+	  h_ako =
+	      \ x_r3r  ::  [takG]
 		{-# L #-}
-		x_r3r ->
-		  x_r3r
-	} in 
-	  (\ x_r3n  :: 
-		 t{-any-} -> t{-any-}
-	     {-# L #-}
-	     x_r3n y_r3p  :: 
-		       (t{-any-} -> t{-any-}) -> t{-anA-}
-		   {-# L #-}
-		   y_r3p ->
-	       y_r3p
-		   x_r3n)
-	      ds_drT x_r3j
-f{-r3B,x-}  :: 
-    _forall_ [t{-anM-}] => t{-anM-} -> t{-anM-}
+		x_r3r y_r3s  ::  takN
+		      {-# L #-}
+		      y_r3s ->
+		  (\ ds_dpA  ::  [takG]
+		     {-# L #-}
+		     ds_dpA ->
+		       let {
+			 fail_dpJ  ::  takG
+			 {-# L #-}
+			 fail_dpJ =
+			     GHCerr.patError{-8r,w-} _@_ takG _string_ "ds015.hs:9|lambda"
+		       } in 
+			 case ds_dpA of {
+			   PrelBase.[]{-5i,w-}{i} -> fail_dpJ;
+			   PrelBase.:{-55,w-}{i} x_r3u xs_r3v -> x_r3u;
+			 })
+		      x_r3r;
+	} in  h_ako
+g{-r3x,x-}  ::  _forall_
+		[talp talr talt]
+		=>
+		((talt -> talt) -> talr) -> talp -> talr
 {-# L #-}
-f{-r3B,x-} =
-    _/\_ t{-anM-} -> \ x_r3f  :: 
-			   t{-anM-}
-		       {-# L #-}
-		       x_r3f ->
-	(\ x_r3h  :: 
-	       t{-anM-}
-	   {-# L #-}
-	   x_r3h ->
-	     x_r3h)
-	    x_r3f
+g{-r3x,x-} =
+    _/\_ talp talr talt ->
+	_letrec_ {
+	  g_akP  ::  ((talt -> talt) -> talr) -> talp -> talr
+	  {-# L #-}
+	  g_akP =
+	      \ x_r3j  ::  (talt -> talt) -> talr
+		{-# L #-}
+		x_r3j y_r3k  ::  talp
+		      {-# L #-}
+		      y_r3k ->
+		  (let {
+		     ds_dql  ::  talt -> talt
+		     {-# L #-}
+		     ds_dql =
+			 \ x_r3p  ::  talt
+			   {-# L #-}
+			   x_r3p ->
+			     x_r3p
+		   } in 
+		     (\ x_r3m  ::  talt -> talt
+			{-# L #-}
+			x_r3m y_r3n  ::  (talt -> talt) -> talr
+			      {-# L #-}
+			      y_r3n ->
+			  y_r3n x_r3m)
+			 ds_dql)
+		      x_r3j;
+	} in  g_akP
+f{-r3y,x-}  ::  _forall_ [talL] => talL -> talL
+{-# L #-}
+f{-r3y,x-} =
+    _/\_ talL ->
+	_letrec_ {
+	  f_alv  ::  talL -> talL
+	  {-# L #-}
+	  f_alv =
+	      \ x_r3f  ::  talL
+		{-# L #-}
+		x_r3f ->
+		  (\ x_r3h  ::  talL
+		     {-# L #-}
+		     x_r3h ->
+		       x_r3h)
+		      x_r3f;
+	} in  f_alv
+end Rec }

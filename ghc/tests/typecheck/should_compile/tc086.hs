@@ -22,7 +22,7 @@ SPJ note: the type signature on "multiply" should be
 
 -}
 
-module Rings( Group, Ring ) where
+module ShouldSucceed( Group, Ring ) where
 
 import qualified Prelude( Ord(..), Eq(..), Num(..) )
 import Prelude hiding( Ord(..), Eq(..), Num(..), MonadZero( zero ) )

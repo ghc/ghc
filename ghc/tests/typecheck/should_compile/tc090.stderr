@@ -1,0 +1,26 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds
+[taBh]
+[d.Ord_aBq]
+[([taBh], a{-r3h,x-}, a_aBf), ([taBh], b{-r3i,x-}, b_aBg)]
+    d.Ord_aBs = d.Ord_aBq
+    b_aBv = b{-r3i,x-} taBh d.Ord_aBs
+    d.Ord_aBu = d.Ord_aBq
+    a_aBw = a{-r3h,x-} taBh d.Ord_aBu
+    a_aBf = b_aBv
+    b_aBg = a_aBw
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d15 1 $d16 1 $d33 1 $d35 1 $d50 1 $d52 1 $d7 1 $d8 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 Eq 1 Ord 1 Ordering 1;
+PrelNum 1 :: $d17 1 $d18 1;
+_exports_
+ShouldSucceed a b;
+_declarations_
+1 a _:_ _forall_ [ta] {PrelBase.Ord ta} => ta ;;
+1 b _:_ _forall_ [ta] {PrelBase.Ord ta} => ta ;;

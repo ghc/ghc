@@ -1,0 +1,17 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds
+[tayE, tayH, tayM]
+[]
+[([tayE, tayH, tayM], u{-r3h,x-}, u_ays)]
+    u_ays x_r3d = \ (y_r3f, z_r3g) -> x_r3d
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed u;
+_declarations_
+1 u _:_ _forall_ [ta tb tc] => tc -> (ta, tb) -> tc ;;

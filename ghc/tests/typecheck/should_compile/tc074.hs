@@ -1,4 +1,4 @@
-module ShouldSucc where
+module ShouldSucceed where
 
 data T a = D (B a) | C
 data B b = X | Y b

@@ -1,0 +1,16 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [tar6] [] [([tar6], f{-r1,x-}, f_aqX)]
+    f_aqX _ | PrelBase.otherwise{-818,p-} = PrelBase.(){-60,w-}{i}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: otherwise 1;
+_exports_
+ShouldSucceed f;
+_declarations_
+1 f _:_ _forall_ [ta] => ta -> PrelBase.() ;;

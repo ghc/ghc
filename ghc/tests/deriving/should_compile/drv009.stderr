@@ -1,0 +1,248 @@
+
+
+================================================================================
+Typechecked:
+Pair{-r4e,x-}{i} =
+    _/\_ a_tr4b b_tr4c -> \ tpl_B1 tpl_B2 ->
+	Pair{-r4e,x-}{i} {_@_ a_tr4b _@_ b_tr4c tpl_B1 tpl_B2}
+AbsBinds
+[taXK, taXN]
+[]
+[([taXK, taXN], con2tag_Pair#_rUo, con2tag_Pair#_aXD)]
+    con2tag_Pair#_aXD (Pair{-r4e,x-}{i} _ _) = 0#
+AbsBinds [] [] [([], maxtag_Pair#_rUn, maxtag_Pair#_aXR)]
+    maxtag_Pair#_aXR = PrelBase.I#{-5b,w-}{i} 0#
+AbsBinds
+[taY0, taY2]
+[]
+[([taY0, taY2], tag2con_Pair#_rUm, tag2con_Pair#_aXU)]
+    tag2con_Pair#_aXU (PrelBase.I#{-5b,w-}{i} 0#)
+		      = Pair{-r4e,x-}{i} [taY0, taY2]
+    tag2con_Pair#_aXU _
+		      = IOBase.error{-87,w-}
+			    (taY0 -> taY2 -> Pair{-r4d,x-} taY0 taY2) "Urk! in TcGenDeriv"
+AbsBinds
+[taYr, taYs]
+[d.Eq_aYS, d.Eq_aYT]
+[([taYr, taYs], $d1{-r17l,x-}, d.Eq_aYe)]
+    d.Eq_aYX = d.Eq_aYS
+    ==_a17y = PrelBase.=={-8Y,p-} taYr d.Eq_aYX
+    d.Eq_aYZ = d.Eq_aYT
+    ==_a17z = PrelBase.=={-8Y,p-} taYs d.Eq_aYZ
+    ==_a17A = ==_a17B
+    AbsBinds [] [] [([], ==_a17B, ==_aYi)]
+	==_aYi (Pair{-r4e,x-}{i} a1_rUx a2_rUy)
+	       (Pair{-r4e,x-}{i} b1_rUz b2_rUA)
+	       = (a1_rUx ==_a17y b1_rUz)
+		 PrelBase.&&{-rgJ,p-} (a2_rUy ==_a17z b2_rUA)
+    AbsBinds [] [] [([], /=_a17C, /=_aYL)]
+	/=_aYL a_rUE b_rUF = PrelBase.not{-rhH,p-} ==_a17A a_rUE b_rUF
+    d.Eq_aYe = ({-dict-} [] [==_a17B, /=_a17C])
+AbsBinds
+[ta17g, ta17h]
+[]
+[([ta17g, ta17h], $d2{-r17m,x-}, d.Eval_aZ8)]
+    d.Eval_aZ8 = ({-dict-} [] [])
+AbsBinds
+[taZm, taZn]
+[d.Ord_a11v, d.Ord_a11w, d.Eq_a11x]
+[([taZm, taZn], $d3{-r17n,x-}, d.Ord_aZf)]
+    d.Eq_a11u = d.Eq_a11x
+    d.Ord_a10d = d.Ord_a11v
+    d.Ord_a10e = d.Ord_a11w
+    compare_a17D = compare_a17J
+    compare_a17E = compare_a17J
+    compare_a17F = compare_a17J
+    compare_a17G = compare_a17J
+    compare_a17H = compare_a17J
+    compare_a17I = compare_a17J
+    AbsBinds [] [] [([], compare_a17J, compare_aZj)]
+	compare_aZj a_rVx b_rVy
+		    = case cmp_eq_a17Q a_rVx b_rVy of
+			PrelBase.LT{-raH,p-}{i} -> PrelBase.LT{-raH,p-}{i}
+			PrelBase.EQ{-raG,p-}{i} -> PrelBase.EQ{-raG,p-}{i}
+			PrelBase.GT{-raI,p-}{i} -> PrelBase.GT{-raI,p-}{i}
+		    where
+			{- nonrec -}
+			AbsBinds
+			[taZR, taZV]
+			[d.Ord_a103, d.Ord_a105]
+			[([taZR, taZV], cmp_eq_rVA, cmp_eq_aZr)]
+			    compare_a17R = PrelBase.compare{-rgY,p-} taZR d.Ord_a103
+			    compare_a17S = PrelBase.compare{-rgY,p-} taZV d.Ord_a105
+			    cmp_eq_aZr (Pair{-r4e,x-}{i} a1_rVC a2_rVD)
+				       (Pair{-r4e,x-}{i} b1_rVE b2_rVF)
+				       = case compare_a17R a1_rVC b1_rVE of
+					   PrelBase.LT{-raH,p-}{i} -> PrelBase.LT{-raH,p-}{i}
+					   PrelBase.EQ{-raG,p-}{i}
+					   -> case compare_a17S a2_rVD b2_rVF of
+						PrelBase.LT{-raH,p-}{i} -> PrelBase.LT{-raH,p-}{i}
+						PrelBase.EQ{-raG,p-}{i} -> PrelBase.EQ{-raG,p-}{i}
+						PrelBase.GT{-raI,p-}{i} -> PrelBase.GT{-raI,p-}{i}
+					   PrelBase.GT{-raI,p-}{i} -> PrelBase.GT{-raI,p-}{i}
+			    cmp_eq_aZr _ _
+				       = IOBase.error{-87,w-}
+					     PrelBase.Ordering{-3o,p-} "Urk! in TcGenDeriv"
+			{- nonrec -}
+			cmp_eq_a17Q = cmp_eq_rVA [taZm, taZn] [d.Ord_a10d, d.Ord_a10e]
+			{- nonrec -}
+    AbsBinds [] [] [([], <_a17K, <_a10j)]
+	<_a10j a_rUL b_rUM
+	       = case compare_a17D a_rUL b_rUM of
+		   PrelBase.LT{-raH,p-}{i} -> PrelBase.True{-5E,w-}{i}
+		   PrelBase.EQ{-raG,p-}{i} -> PrelBase.False{-58,w-}{i}
+		   PrelBase.GT{-raI,p-}{i} -> PrelBase.False{-58,w-}{i}
+    AbsBinds [] [] [([], <=_a17L, <=_a10w)]
+	<=_a10w a_rUT b_rUU
+		= case compare_a17E a_rUT b_rUU of
+		    PrelBase.LT{-raH,p-}{i} -> PrelBase.True{-5E,w-}{i}
+		    PrelBase.EQ{-raG,p-}{i} -> PrelBase.True{-5E,w-}{i}
+		    PrelBase.GT{-raI,p-}{i} -> PrelBase.False{-58,w-}{i}
+    AbsBinds [] [] [([], >=_a17M, >=_a10J)]
+	>=_a10J a_rV1 b_rV2
+		= case compare_a17F a_rV1 b_rV2 of
+		    PrelBase.LT{-raH,p-}{i} -> PrelBase.False{-58,w-}{i}
+		    PrelBase.EQ{-raG,p-}{i} -> PrelBase.True{-5E,w-}{i}
+		    PrelBase.GT{-raI,p-}{i} -> PrelBase.True{-5E,w-}{i}
+    AbsBinds [] [] [([], >_a17N, >_a10W)]
+	>_a10W a_rV9 b_rVa
+	       = case compare_a17G a_rV9 b_rVa of
+		   PrelBase.LT{-raH,p-}{i} -> PrelBase.False{-58,w-}{i}
+		   PrelBase.EQ{-raG,p-}{i} -> PrelBase.False{-58,w-}{i}
+		   PrelBase.GT{-raI,p-}{i} -> PrelBase.True{-5E,w-}{i}
+    AbsBinds [] [] [([], max_a17O, max_a119)]
+	max_a119 a_rVh b_rVi
+		 = case compare_a17H a_rVh b_rVi of
+		     PrelBase.LT{-raH,p-}{i} -> b_rVi
+		     PrelBase.EQ{-raG,p-}{i} -> a_rVh
+		     PrelBase.GT{-raI,p-}{i} -> a_rVh
+    AbsBinds [] [] [([], min_a17P, min_a11m)]
+	min_a11m a_rVp b_rVq
+		 = case compare_a17I a_rVp b_rVq of
+		     PrelBase.LT{-raH,p-}{i} -> a_rVp
+		     PrelBase.EQ{-raG,p-}{i} -> b_rVq
+		     PrelBase.GT{-raI,p-}{i} -> b_rVq
+    d.Ord_aZf =
+	({-dict-}
+	 [d.Eq_a11u]
+	 [compare_a17J, <_a17K, <=_a17L, >=_a17M, >_a17N, max_a17O, min_a17P])
+AbsBinds
+[ta121, ta122]
+[d.Show_a12w, d.Show_a12x]
+[([ta121, ta122], $d4{-r17o,x-}, d.Show_a11N)]
+    d.Show_a12D = d.Show_a12w
+    showsPrec_a17T = PrelBase.showsPrec{-rh4,p-} ta121 d.Show_a12D
+    d.Show_a12F = d.Show_a12x
+    showsPrec_a17U = PrelBase.showsPrec{-rh4,p-} ta122 d.Show_a12F
+    showsPrec_a17V = showsPrec_a17W
+    AbsBinds [] [] [([], showsPrec_a17W, showsPrec_a11R)]
+	showsPrec_a11R a_rVU (Pair{-r4e,x-}{i} b1_rVV b2_rVW)
+		       = PrelBase.showParen{-rhT,p-} a_rVU >=_a17q lit_a17r
+						     PrelBase..{-rgK,p-}
+							 [PrelBase.String{-rh7,p-}, PrelBase.String{-rh7,p-}, PrelBase.String{-rh7,p-}] PrelBase.showString{-rhW,p-} "Pair "
+																	PrelBase..{-rgK,p-}
+																	    [PrelBase.String{-rh7,p-}, PrelBase.String{-rh7,p-}, PrelBase.String{-rh7,p-}] showsPrec_a17T PrelBase.I#{-5b,w-}{i} 10#
+																													  b1_rVV
+																											   PrelBase..{-rgK,p-}
+																											       [PrelBase.String{-rh7,p-}, PrelBase.String{-rh7,p-}, PrelBase.String{-rh7,p-}] PrelBase.showSpace{-rhV,p-}
+																																					      showsPrec_a17U PrelBase.I#{-5b,w-}{i} 10#
+																																							     b2_rVW
+    AbsBinds [] [] [([], showList_a17X, showList_a12r)]
+	showList_a12r = PrelBase.showList__{-rhR,p-}
+			    (Pair{-r4d,x-} ta121 ta122) showsPrec_a17V PrelBase.I#{-5b,w-}{i} 0#
+    d.Show_a11N = ({-dict-} [] [showsPrec_a17W, showList_a17X])
+AbsBinds
+[ta13d, ta13e]
+[d.Ix_a16l, d.Ix_a16m, d.Show_a16n, d.Ord_a16o]
+[([ta13d, ta13e], $d5{-r17p,x-}, d.Ix_a12O)]
+    d.Show_a16k = d.Show_a16n
+    d.Ord_a16p = d.Ord_a16o
+    d.Ix_a16s = d.Ix_a16l
+    range_a17Y = Ix.range{-rbr,p-} ta13d d.Ix_a16s
+    d.Ix_a16u = d.Ix_a16m
+    range_a17Z = Ix.range{-rbr,p-} ta13e d.Ix_a16u
+    d.Ix_a16C = d.Ix_a16m
+    index_a180 = Ix.index{-rbs,p-} ta13e d.Ix_a16C
+    d.Ix_a15t = d.Ix_a16m
+    d.Ix_a16G = d.Ix_a16l
+    index_a181 = Ix.index{-rbs,p-} ta13d d.Ix_a16G
+    d.Ix_a15u = d.Ix_a16l
+    d.Ix_a16I = d.Ix_a16l
+    inRange_a182 = Ix.inRange{-rbt,p-} ta13d d.Ix_a16I
+    d.Ix_a16K = d.Ix_a16m
+    inRange_a183 = Ix.inRange{-rbt,p-} ta13e d.Ix_a16K
+    AbsBinds [] [] [([], range_a184, range_a12S)]
+	range_a12S ((Pair{-r4e,x-}{i} a1_rW4 a2_rW5), (Pair{-r4e,x-}{i} b1_rW6 b2_rW7))
+		   = [Pair{-r4e,x-}{i} [ta13d, ta13e] c1_rW9 c2_rWb |
+			  c1_rW9 <- range_a17Y (a1_rW4,
+						b1_rW6), c2_rWb <- range_a17Z (a2_rW5, b2_rW7)]
+    AbsBinds [] [] [([], index_a185, index_a13T)]
+	+_a187 = +_a17u
+	*_a188 = *_a17v
+	+_a189 = +_a17u
+	index_a13T ((Pair{-r4e,x-}{i} a1_rWf a2_rWg), (Pair{-r4e,x-}{i} b1_rWh b2_rWi))
+		   (Pair{-r4e,x-}{i} c1_rWj c2_rWk)
+		   = (index_a180 (a2_rWg, b2_rWi) c2_rWk)
+		     +_a17u ((rangeSize_a18a (a2_rWg, b2_rWi))
+			     *_a17v ((index_a181 (a1_rWf, b1_rWh) c1_rWj)
+				     +_a187 ((rangeSize_a18b (a1_rWf, b1_rWh)) *_a188 lit_a17w)))
+		   where
+		       {- nonrec -}
+		       AbsBinds
+		       [ta14I]
+		       [d.Ix_a14P]
+		       [([ta14I], rangeSize_rWm, rangeSize_a14n)]
+			   index_a18c = Ix.index{-rbs,p-} ta14I d.Ix_a14P
+			   rangeSize_a14n (a_rWo, b_rWp)
+					  = (index_a18c (a_rWo, b_rWp) b_rWp) +_a189 lit_a17x
+		       {- nonrec -}
+		       rangeSize_a18a = rangeSize_rWm ta13e d.Ix_a15t
+		       rangeSize_a18b = rangeSize_rWm ta13d d.Ix_a15u
+		       {- nonrec -}
+    AbsBinds [] [] [([], inRange_a186, inRange_a15D)]
+	inRange_a15D ((Pair{-r4e,x-}{i} a1_rWt a2_rWu), (Pair{-r4e,x-}{i} b1_rWv b2_rWw))
+		     (Pair{-r4e,x-}{i} c1_rWx c2_rWy)
+		     = (inRange_a182 (a1_rWt, b1_rWv) c1_rWx)
+		       PrelBase.&&{-rgJ,p-} (inRange_a183 (a2_rWu, b2_rWw) c2_rWy)
+    d.Ix_a12O =
+	({-dict-}
+	 [d.Show_a16k, d.Ord_a16p]
+	 [range_a184, index_a185, inRange_a186])
+d.Ord_a174 = PrelBase.$d7{-rcq,p-}
+>=_a17q = PrelBase.>={-8Z,p-} PrelBase.Int{-3g,W-} d.Ord_a174
+lit_a17r = PrelBase.I#{-5b,w-}{i} 10#
+d.Monad_a177 = PrelBase.$d25{-rbO,p-}
+>>=_a17s = PrelBase.>>={-811,p-} PrelBase.[]{-3j,W-} d.Monad_a177
+d.Monad_a17a = d.Monad_a177
+return_a17t =
+    PrelBase.return{-816,p-} PrelBase.[]{-3j,W-} d.Monad_a17a
+d.Num_a17c = PrelBase.$d4{-rc4,p-}
++_a17u = PrelBase.+{-rgT,p-} PrelBase.Int{-3g,W-} d.Num_a17c
+d.Num_a17f = d.Num_a17c
+*_a17v = PrelBase.*{-rgU,p-} PrelBase.Int{-3g,W-} d.Num_a17f
+lit_a17w = PrelBase.I#{-5b,w-}{i} 0#
+lit_a17x = PrelBase.I#{-5b,w-}{i} 1#
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+Ix 1 :: $d4 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 Ix 1;
+PrelBase 1 :: $d1 1 $d11 1 $d12 1 $d14 1 $d15 1 $d16 1 $d2 1 $d22 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d3 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d6 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 && 1 . 1 not 1 showList__ 1 showParen 1 showSpace 1 showString 1 Enum 1 Eq 1 Eval 1 Functor 1 Monad 1 MonadZero 1 Num 1 Ord 1 Ordering 1 Ordering 1 Show 1 ShowS 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d17 1 $d18 1 $d28 1 $d29 1 $d30 1 $d33 1 $d34 1 $d35 1 $d8 1;
+PrelTup 1 :: $d13 1 $d4 1 $d49 1 $d9 1;
+_exports_
+ShouldSucceed Pair(Pair);
+_instances_
+instance _forall_ [a b] {PrelBase.Eq a, PrelBase.Eq b} => {PrelBase.Eq (Pair a b)} = $d1;
+instance _forall_ [a b] => {PrelBase.Eval (Pair a b)} = $d2;
+instance _forall_ [a b] {PrelBase.Ord a, PrelBase.Ord b} => {PrelBase.Ord (Pair a b)} = $d3;
+instance _forall_ [a b] {PrelBase.Show a, PrelBase.Show b} => {PrelBase.Show (Pair a b)} = $d4;
+instance _forall_ [a b] {Ix.Ix a, Ix.Ix b} => {Ix.Ix (Pair a b)} = $d5;
+_declarations_
+1 $d1 _:_ _forall_ [a b] {PrelBase.Eq a, PrelBase.Eq b} => {PrelBase.Eq (Pair a b)} ;;
+1 $d2 _:_ _forall_ [a b] => {PrelBase.Eval (Pair a b)} ;;
+1 $d3 _:_ _forall_ [a b] {PrelBase.Ord a, PrelBase.Ord b, PrelBase.Eq (Pair a b)} => {PrelBase.Ord (Pair a b)} ;;
+1 $d4 _:_ _forall_ [a b] {PrelBase.Show a, PrelBase.Show b} => {PrelBase.Show (Pair a b)} ;;
+1 $d5 _:_ _forall_ [a b] {Ix.Ix a, Ix.Ix b, PrelBase.Show (Pair a b), PrelBase.Ord (Pair a b)} => {Ix.Ix (Pair a b)} ;;
+1 data Pair a b = Pair a b ;

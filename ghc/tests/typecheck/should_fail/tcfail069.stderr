@@ -1,7 +1,7 @@
  
 tcfail069.hs:21: Couldn't match the type
-		     `PrelBase.[]' against `PrelTup.(,) [PrelBase.Int]'
-    Expected: `[taCf]'
+		     `PrelTup.(,) taCl' against `PrelBase.[]'
+    Expected: `[taCp]'
     Inferred: `([PrelBase.Int], [PrelBase.Int])'
     In a "case" branch: `PrelBase.[]' -> `IOBase.error "foo"'
     In the case expression

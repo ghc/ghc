@@ -1,12 +1,12 @@
  
-tcfail067.hs:1: Context `{PrelBase.Ord ta17k}'
+tcfail067.hs:1: Context `{PrelBase.Ord ta179}'
 		    required by inferred type, but missing on a type signature
-		    `PrelBase.Ord' `ta17k' arising from use of `SubRange' at tcfail067.hs:76
+		    `PrelBase.Ord ta179' arising from use of `SubRange' at tcfail067.hs:76
     When checking signature(s) for: `numSubRangeBinOp'
  
-tcfail067.hs:65: Context `{PrelBase.Ord ta18S}'
+tcfail067.hs:65: Context `{PrelBase.Ord ta18O}'
 		     required by inferred type, but missing on a type signature
-		     `PrelBase.Ord' `ta18S' arising from use of `numSubRangeNegate' at tcfail067.hs:61
+		     `PrelBase.Ord ta18O' arising from use of `numSubRangeNegate' at tcfail067.hs:61
     When checking methods of an instance declaration
  
 tcfail067.hs:65: No explicit method nor default method for `PrelBase.abs'

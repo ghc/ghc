@@ -11,7 +11,7 @@
 -}
 
 
-module Foo where
+module ShouldSucceed where
 
 a :: (Ord f) => f 
 a = b

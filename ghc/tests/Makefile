@@ -1,7 +1,9 @@
-TOP = ..
+TOP = .
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = reader rename simplCore typecheck deSugar printing ccall deriving programs
+SUBDIRS = ccall deriving deSugar printing reader rename simplCore typecheck 
+
+#programs
 
 include $(TOP)/mk/target.mk
 

@@ -1,8 +1,8 @@
  
 tcfail012.hs:3: Couldn't match the type
-		    `PrelBase.Bool' against `[tajU]'
-    Expected: `PrelBase.Bool'
-    Inferred: `[tajU]'
+		    `[tak1]' against `PrelBase.Bool'
+    Expected: `[tak1]'
+    Inferred: `PrelBase.Bool'
     In a pattern binding: `PrelBase.True = PrelBase.[]'
 
 

@@ -7,7 +7,7 @@
    Simon PJ
 -}
 
-module Foo where
+module ShouldSucceed where
 
 
 g :: Num a => Bool -> a -> b -> a

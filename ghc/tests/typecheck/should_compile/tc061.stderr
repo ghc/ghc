@@ -1,0 +1,31 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [] [] [([], $d1{-rlB,x-}, d.Eq1_akU)]
+    AbsBinds [] [] [([], deq_alC, deq_akY)]
+	deq_akY x_r3h y_r3i = PrelBase.True{-5E,w-}{i}
+    d.Eq1_akU = ({-dict-} [] [deq_alC])
+AbsBinds [tali] [d.Eq1_alr] [([tali], $d2{-rlD,x-}, d.Eq1_al7)]
+    d.Eq1_alv = d.Eq1_alr
+    deq_alE = deq{-r3x,x-} tali d.Eq1_alv
+    AbsBinds [] [] [([], deq_alF, deq_alb)]
+	deq_alb (a_r3q PrelBase.:{-55,w-}{i} as_r3r)
+		(b_r3s PrelBase.:{-55,w-}{i} bs_r3t)
+		= deq_alE a_r3q b_r3s
+    d.Eq1_al7 = ({-dict-} [] [deq_alF])
+deq{-r3x,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [talA] [d.Eq1_alz] []
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed Eq1(deq);
+_instances_
+instance {Eq1 PrelBase.Int} = $d1;
+instance _forall_ [a] {Eq1 a} => {Eq1 [a]} = $d2;
+_declarations_
+1 $d1 _:_ {Eq1 PrelBase.Int} ;;
+1 $d2 _:_ _forall_ [a] {Eq1 a} => {Eq1 [a]} ;;
+1 class Eq1 a where {deq :: a -> a -> PrelBase.Bool} ;

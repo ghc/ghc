@@ -28,6 +28,6 @@ main =
     getPeerName s			>>= \ (SockAddrInet p haddr) ->   
     putStr ("Connected to : " ++ (inet_ntoa haddr) ++ "\n") >>
     writeSocket s message			>>
-    shutdown s 2				>>
+    shutdown s ShutdownBoth			>>
     sClose s
 

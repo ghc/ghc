@@ -2,7 +2,7 @@
 --!!! "easy" to check default methods and such...
 --!!! (this is the example given in TcClassDcl)
 --
-module Test where
+module ShouldSucceed where
 
 class Foo a where
     op1 :: a -> Bool

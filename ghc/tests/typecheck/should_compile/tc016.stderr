@@ -1,0 +1,14 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [takL, takN] [] [([takL, takN], f{-r3f,x-}, f_akt)]
+    f_akt (x_r3d@_) (y_r3e@_) = x_r3d
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f;
+_declarations_
+1 f _:_ _forall_ [ta tb] => tb -> ta -> tb ;;

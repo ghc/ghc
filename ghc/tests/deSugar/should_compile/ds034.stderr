@@ -3,108 +3,76 @@
 ================================================================================
 Desugared:
 Rec {
-op1{-r3r,x-}  :: 
-    _forall_
-    [a{-r3p-}]
-    =>
-    {Foo{-r3s,x-} a{-r3p-}} -> a{-r3p-} -> a{-r3p-}
+op2_amz  ::  PrelBase.Int{-3g,W-} -> PrelBase.Int{-3g,W-}
 {-# L #-}
-op1{-r3r,x-} =
-    _/\_ a{-r3p-} -> \ tpl_B1  :: 
-			   {Foo{-r3s,x-} a{-r3p-}}
-		       {-# L #-}
-		       tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-op2{-r3q,x-}  :: 
-    _forall_
-    [a{-r3p-}]
-    =>
-    {Foo{-r3s,x-} a{-r3p-}} -> a{-r3p-} -> a{-r3p-}
+op2_amz =
+    op2_amB
+op1_amD  ::  PrelBase.Int{-3g,W-} -> PrelBase.Int{-3g,W-}
 {-# L #-}
-op2{-r3q,x-} =
-    _/\_ a{-r3p-} -> \ tpl_B1  :: 
-			   {Foo{-r3s,x-} a{-r3p-}}
-		       {-# L #-}
-		       tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-$mop1{-rn8,x-}  :: 
-    _forall_
-    [a{-r3p-}]
-    =>
-    {Foo{-r3s,x-} a{-r3p-}} -> a{-r3p-} -> a{-r3p-}
+op1_amD =
+    op1_amE
+op1_akv  ::  PrelBase.Int{-3g,W-} -> PrelBase.Int{-3g,W-}
 {-# L #-}
-$mop1{-rn8,x-} =
-    _/\_ a{-anB-} -> \ d.Foo_anu  :: 
-			   {Foo{-r3s,x-} a{-anB-}}
-		       {-# L #-}
-		       d.Foo_anu ->
-	GHCerr.noDefaultMethodError{-8k,p-}
-	    _@_ (a{-anB-} -> a{-anB-}) _string_ "Class Foo Method op1"
-$mop2{-rn7,x-}  :: 
-    _forall_
-    [a{-r3p-}]
-    =>
-    {Foo{-r3s,x-} a{-r3p-}} -> a{-r3p-} -> a{-r3p-}
-{-# L #-}
-$mop2{-rn7,x-} =
-    _/\_ a{-anB-} -> \ d.Foo_anE  :: 
-			   {Foo{-r3s,x-} a{-anB-}}
-		       {-# L #-}
-		       d.Foo_anE ->
-	GHCerr.noDefaultMethodError{-8k,p-}
-	    _@_ (a{-anB-} -> a{-anB-}) _string_ "Class Foo Method op2"
-op2_aq8  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
-{-# L #-}
-op2_aq8 =
-    op2_aqv
-op1_aqd  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
-{-# L #-}
-op1_aqd =
-    op1_aqm
-op1_an6  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
-{-# L #-}
-op1_an6 =
-    \ x_r3i  :: 
-	  PrelBase.Int{-3g,p-}
+op1_akv =
+    \ x_r3i  ::  PrelBase.Int{-3g,W-}
       {-# L #-}
       x_r3i ->
-	op2_aq8
-	    x_r3i
-op1_aqm  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+	op2_amz x_r3i
+op1_amE  ::  PrelBase.Int{-3g,W-} -> PrelBase.Int{-3g,W-}
 {-# L #-}
-op1_aqm =
-    op1_an6
-op2_anj  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+op1_amE =
+    op1_akv
+op2_akF  ::  PrelBase.Int{-3g,W-} -> PrelBase.Int{-3g,W-}
 {-# L #-}
-op2_anj =
-    \ y_r3m  :: 
-	  PrelBase.Int{-3g,p-}
+op2_akF =
+    \ y_r3m  ::  PrelBase.Int{-3g,W-}
       {-# L #-}
       y_r3m ->
-	op1_aqd
-	    y_r3m
-op2_aqv  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+	op1_amD y_r3m
+op2_amB  ::  PrelBase.Int{-3g,W-} -> PrelBase.Int{-3g,W-}
 {-# L #-}
-op2_aqv =
-    op2_anj
-d.Foo_an3  :: 
-    {Foo{-r3s,x-} PrelBase.Int{-3g,p-}}
+op2_amB =
+    op2_akF
+d.Foo_akr  ::  {Foo{-r3q,x-} PrelBase.Int{-3g,W-}}
 {-# L #-}
-d.Foo_an3 =
-    PrelTup.(,){-62,p-}{i}
-	{_@_ (PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-})
-	 _@_ (PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-})
-	 op1_aqm
-	 op2_aqv}
-$d1{-rqE,x-}  :: 
-    {Foo{-r3s,x-} PrelBase.Int{-3g,p-}}
+d.Foo_akr =
+    PrelTup.(,){-62,w-}{i}
+	{_@_ (PrelBase.Int{-3g,W-} -> PrelBase.Int{-3g,W-})
+	 _@_ (PrelBase.Int{-3g,W-} -> PrelBase.Int{-3g,W-})
+	 op1_amE
+	 op2_amB}
+$d1{-rmC,x-}  ::  {Foo{-r3q,x-} PrelBase.Int{-3g,W-}}
 {-# L #-}
-$d1{-rqE,x-} =
-    d.Foo_an3
+$d1{-rmC,x-} =
+    d.Foo_akr
+op1{-r3r,x-}  ::  _forall_
+		  [a_tr3p]
+		  =>
+		  {Foo{-r3q,x-} a_tr3p} -> a_tr3p -> a_tr3p
+{-# L #-}
+op1{-r3r,x-} =
+    _/\_ t12 -> \ tpl_B1  ::  {Foo{-r3q,x-} t12}
+		  {-# L #-}
+		  tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3s,x-}  ::  _forall_
+		  [a_tr3p]
+		  =>
+		  {Foo{-r3q,x-} a_tr3p} -> a_tr3p -> a_tr3p
+{-# L #-}
+op2{-r3s,x-} =
+    _/\_ t12 -> \ tpl_B1  ::  {Foo{-r3q,x-} t12}
+		  {-# L #-}
+		  tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+ds_dnj  ::  _forall_
+	    [takP]
+	    =>
+	    {Foo{-r3q,x-} takP} -> PrelBase.(){-40,W-}
+{-# L #-}
+ds_dnj =
+    _/\_ takP -> \ d.Foo_akO  ::  {Foo{-r3q,x-} takP}
+		   {-# L #-}
+		   d.Foo_akO ->
+	PrelBase.(){-60,w-}{i} {}
 end Rec }

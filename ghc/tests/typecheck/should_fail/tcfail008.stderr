@@ -1,8 +1,8 @@
  
-tcfail008.hs:3: No instance for: `PrelBase.Num [taBA]'
+tcfail008.hs:3: No instance for: `PrelBase.Num [taBM]'
     arising from the literal 2 at tcfail008.hs:3
  
-tcfail008.hs:3: No instance for: `PrelBase.Num [taBA]'
+tcfail008.hs:3: No instance for: `PrelBase.Num [taBM]'
     arising from the literal 2 at tcfail008.hs:3
  
 tcfail008.hs:3: No instance for: `PrelBase.Num [PrelBase.Int]'

@@ -3,200 +3,146 @@
 ================================================================================
 Desugared:
 Rec {
-d.MonadPlus_aXs  :: 
-    {PrelBase.MonadPlus{-2a,p-} PrelBase.[]{-3j,p-}}
+f{-r3r,x-}  ::  _forall_
+		[taRl taRH taRP]
+		=>
+		[taRP] -> taRH -> [taRl] -> [taRl]
 {-# L #-}
-d.MonadPlus_aXs =
-    PrelBase.$d22{-rp7,p-}
-++_aYK  :: 
-    _forall_
-    [rjy{-aWo-}]
-    =>
-    [rjy{-aWo-}] -> [rjy{-aWo-}] -> [rjy{-aWo-}]
-{-# L #-}
-++_aYK =
-    PrelBase.++{-roG,p-}
-	_@_ PrelBase.[]{-3j,p-} d.MonadPlus_aXs
-f{-r3t,x-}  :: 
-    _forall_
-    [rjy{-aWN-} t{-aWT-} t{-aXo-}]
-    =>
-    [rjy{-aWN-}] -> t{-aXo-} -> [t{-aWT-}] -> [t{-aWT-}]
-{-# L #-}
-f{-r3t,x-} =
-    _/\_ rjy{-aWN-} t{-aWT-} t{-aXo-} ->
-	let {
-	  ++_aYM  :: 
-	      _forall_
-	      [rjy{-aWw-}]
-	      =>
-	      [rjy{-aWw-}] -> [rjy{-aWw-}] -> [rjy{-aWw-}]
+f{-r3r,x-} =
+    _/\_ taRl taRH taRP ->
+	_letrec_ {
+	  ++_aTa  ::  _forall_ [taQZ] => [taQZ] -> [taQZ] -> [taQZ]
 	  {-# L #-}
-	  ++_aYM =
-	      ++_aYK } in
-	let {
-	  ++_aYL  :: 
-	      _forall_
-	      [rjy{-aWD-}]
-	      =>
-	      [rjy{-aWD-}] -> [rjy{-aWD-}] -> [rjy{-aWD-}]
+	  ++_aTa =
+	      ++_aTb;
+	  ++_aT9  ::  _forall_ [taR6] => [taR6] -> [taR6] -> [taR6]
 	  {-# L #-}
-	  ++_aYL =
-	      ++_aYK } in
-	let {
-	  ++_aYJ  :: 
-	      _forall_
-	      [rjy{-aWK-}]
-	      =>
-	      [rjy{-aWK-}] -> [rjy{-aWK-}] -> [rjy{-aWK-}]
+	  ++_aT9 =
+	      ++_aTb;
+	  ++_aTc  ::  _forall_ [taRd] => [taRd] -> [taRd] -> [taRd]
 	  {-# L #-}
-	  ++_aYJ =
-	      ++_aYK
-	} in 
-	  \ x_r3d  :: 
-		[rjy{-aWN-}]
-	    {-# L #-}
-	    x_r3d y_r3f  :: 
-		      t{-aXo-}
-		  {-# L #-}
-		  y_r3f z_r3h  :: 
-			    [t{-aWT-}]
-			{-# L #-}
-			z_r3h ->
-	      let { ds_d13I  :: 
-			[rjy{-aWN-}]
-		    {-# L #-}
-		    ds_d13I =
-		let { ds_d131  :: 
-			  [rjy{-aWN-}]
+	  ++_aTc =
+	      ++_aTb;
+	  f_aQw  ::  [taRP] -> taRH -> [taRl] -> [taRl]
+	  {-# L #-}
+	  f_aQw =
+	      \ x_r3d  ::  [taRP]
+		{-# L #-}
+		x_r3d y_r3e  ::  taRH
 		      {-# L #-}
-		      ds_d131 =
-		  let { ds_d13e  :: 
-			    [rjy{-aWN-}]
-			{-# L #-}
-			ds_d13e =
-		    let {
-		      ds_d13r  :: 
-			  [rjy{-aWN-}]
-		      {-# L #-}
-		      ds_d13r =
-			  ++_aYJ
-			      _@_ rjy{-aWN-} x_r3d x_r3d
-		    } in 
-		      ++_aYL
-			  _@_ rjy{-aWN-} x_r3d ds_d13r
-		  } in
-		  ++_aYM
-		      _@_ rjy{-aWN-} x_r3d ds_d13e
-		} in
-		++_aYK
-		    _@_ rjy{-aWN-} x_r3d ds_d131
-	      } in
-	      case ds_d13I of {
-		PrelBase.[]{-5i,p-}{i} ->
-		    PrelBase.[]{-5i,p-}{i}
-			_@_ t{-aWT-};
-		PrelBase.:{-55,p-}{i} a_r3k ds_d140 ->
-		    let { fail_d14E  :: 
-			      [t{-aWT-}]
-			  {-# L #-}
-			  fail_d14E =
-		      let {
-			bs_r3s  :: 
-			    [rjy{-aWN-}]
-			{-# L #-}
-			bs_r3s =
-			    ds_d140 } in
-		      let {
-			a_r3r  :: 
-			    rjy{-aWN-}
-			{-# L #-}
-			a_r3r =
-			    a_r3k } in
-		      let { ds_d14d  :: 
-				[PrelBase.Char{-38,p-}]
+		      y_r3e z_r3f  ::  [taRl]
 			    {-# L #-}
-			    ds_d14d =
-			let {
-			  ds_d14q  :: 
-			      PrelBase.Char{-38,p-}
+			    z_r3f ->
+		  let { ds_dYt  ::  [taRP]
+			{-# L #-}
+			ds_dYt =
+		    let { ds_dXM  ::  [taRP]
 			  {-# L #-}
-			  ds_d14q =
-			      PrelBase.C#{-54,p-}{i}
-				  {'4'} } in
+			  ds_dXM =
+		      let { ds_dXZ  ::  [taRP]
+			    {-# L #-}
+			    ds_dXZ =
 			let {
-			  ds_d14u  :: 
-			      [PrelBase.Char{-38,p-}]
+			  ds_dYc  ::  [taRP]
 			  {-# L #-}
-			  ds_d14u =
-			      PrelBase.[]{-5i,p-}{i}
-				  {_@_ PrelBase.Char{-38,p-}}
-			} in 
-			  PrelBase.:{-55,p-}{i}
-			      {_@_ PrelBase.Char{-38,p-} ds_d14q ds_d14u}
+			  ds_dYc =
+			      ++_aTc _@_ taRP x_r3d x_r3d
+			} in  ++_aT9 _@_ taRP x_r3d ds_dYc
 		      } in
-		      IOBase.error{-87,p-}
-			  _@_ [t{-aWT-}] ds_d14d
+		      ++_aTa _@_ taRP x_r3d ds_dXZ
 		    } in
-		    case ds_d140 of {
-		      PrelBase.[]{-5i,p-}{i} ->
-			  let { ds_d14S  :: 
-				    [PrelBase.Char{-38,p-}]
+		    ++_aTb _@_ taRP x_r3d ds_dXM
+		  } in
+		  case ds_dYt of {
+		    PrelBase.[]{-5i,w-}{i} -> PrelBase.[]{-5i,w-}{i} _@_ taRl;
+		    PrelBase.:{-55,w-}{i} a_r3i ds_dYL ->
+			let { fail_dZp  ::  [taRl]
+			      {-# L #-}
+			      fail_dZp =
+			  let {
+			    bs_r3q  ::  [taRP]
+			    {-# L #-}
+			    bs_r3q =
+				ds_dYL } in
+			  let {
+			    a_r3p  ::  taRP
+			    {-# L #-}
+			    a_r3p =
+				a_r3i } in
+			  let { ds_dYY  ::  [PrelBase.Char{-38,W-}]
 				{-# L #-}
-				ds_d14S =
+				ds_dYY =
 			    let {
-			      ds_d153  :: 
-				  PrelBase.Char{-38,p-}
+			      ds_dZb  ::  PrelBase.Char{-38,W-}
 			      {-# L #-}
-			      ds_d153 =
-				  PrelBase.C#{-54,p-}{i}
-				      {'2'} } in
+			      ds_dZb =
+				  PrelBase.C#{-54,w-}{i} {'4'} } in
 			    let {
-			      ds_d157  :: 
-				  [PrelBase.Char{-38,p-}]
+			      ds_dZf  ::  [PrelBase.Char{-38,W-}]
 			      {-# L #-}
-			      ds_d157 =
-				  PrelBase.[]{-5i,p-}{i}
-				      {_@_ PrelBase.Char{-38,p-}}
+			      ds_dZf =
+				  PrelBase.[]{-5i,w-}{i} {_@_ PrelBase.Char{-38,W-}}
 			    } in 
-			      PrelBase.:{-55,p-}{i}
-				  {_@_ PrelBase.Char{-38,p-} ds_d153 ds_d157}
+			      PrelBase.:{-55,w-}{i} {_@_ PrelBase.Char{-38,W-} ds_dZb ds_dZf}
 			  } in
-			  IOBase.error{-87,p-}
-			      _@_ [t{-aWT-}] ds_d14S;
-		      PrelBase.:{-55,p-}{i} b_r3n ds_d15m ->
-			  case ds_d15m of {
-			    PrelBase.[]{-5i,p-}{i} ->
-				fail_d14E;
-			    PrelBase.:{-55,p-}{i} c_r3o ds_d15z ->
-				case ds_d15z of {
-				  PrelBase.:{-55,p-}{i} ds_d15H ds_d15G ->
-				      fail_d14E;
-				  PrelBase.[]{-5i,p-}{i} ->
-				      let {
-					a_r3m  :: 
-					    rjy{-aWN-}
-					{-# L #-}
-					a_r3m =
-					    a_r3k } in
-				      let {
-					ds_d15Q  :: 
-					    (t{-aXo-}, [t{-aWT-}], t{-aXo-}, [t{-aWT-}])
-					{-# L #-}
-					ds_d15Q =
-					    PrelTup.(,,,){-64,p-}{i}
-						{_@_ t{-aXo-}
-						 _@_ [t{-aWT-}]
-						 _@_ t{-aXo-}
-						 _@_ [t{-aWT-}]
-						 y_r3f
-						 z_r3h
-						 y_r3f
-						 z_r3h}
-				      } in 
-					z_r3h;
-				};
-			  };
-		    };
-	      }
+			  IOBase.error{-87,w-} _@_ [taRl] ds_dYY
+			} in
+			case ds_dYL of {
+			  PrelBase.[]{-5i,w-}{i} ->
+			      let { ds_dZD  ::  [PrelBase.Char{-38,W-}]
+				    {-# L #-}
+				    ds_dZD =
+				let {
+				  ds_dZO  ::  PrelBase.Char{-38,W-}
+				  {-# L #-}
+				  ds_dZO =
+				      PrelBase.C#{-54,w-}{i} {'2'} } in
+				let {
+				  ds_dZS  ::  [PrelBase.Char{-38,W-}]
+				  {-# L #-}
+				  ds_dZS =
+				      PrelBase.[]{-5i,w-}{i} {_@_ PrelBase.Char{-38,W-}}
+				} in 
+				  PrelBase.:{-55,w-}{i} {_@_ PrelBase.Char{-38,W-} ds_dZO ds_dZS}
+			      } in
+			      IOBase.error{-87,w-} _@_ [taRl] ds_dZD;
+			  PrelBase.:{-55,w-}{i} b_r3l ds_d107 ->
+			      case ds_d107 of {
+				PrelBase.[]{-5i,w-}{i} -> fail_dZp;
+				PrelBase.:{-55,w-}{i} c_r3m ds_d10k ->
+				    case ds_d10k of {
+				      PrelBase.:{-55,w-}{i} ds_d10r ds_d10s -> fail_dZp;
+				      PrelBase.[]{-5i,w-}{i} ->
+					  let {
+					    a_r3k  ::  taRP
+					    {-# L #-}
+					    a_r3k =
+						a_r3i } in
+					  let {
+					    ds_d10B  ::  (taRH, [taRl], taRH, [taRl])
+					    {-# L #-}
+					    ds_d10B =
+						PrelTup.(,,,){-64,w-}{i}
+						    {_@_ taRH
+						     _@_ [taRl]
+						     _@_ taRH
+						     _@_ [taRl]
+						     y_r3e
+						     z_r3f
+						     y_r3e
+						     z_r3f}
+					  } in  z_r3f;
+				    };
+			      };
+			};
+		  };
+	} in  f_aQw
+d.MonadPlus_aRX  ::  {PrelBase.MonadPlus{-2a,p-} PrelBase.[]{-3j,W-}}
+{-# L #-}
+d.MonadPlus_aRX =
+    PrelBase.$d23{-roi,p-}
+++_aTb  ::  _forall_ [taQR] => [taQR] -> [taQR] -> [taQR]
+{-# L #-}
+++_aTb =
+    PrelBase.++{-rnQ,p-} _@_ PrelBase.[]{-3j,W-} d.MonadPlus_aRX
 end Rec }

@@ -1,0 +1,25 @@
+
+
+================================================================================
+Typechecked:
+Node{-r4,x-}{i} =
+    _/\_ b_tr3h -> \ tpl_B1 tpl_B2 ->
+	Node{-r4,x-}{i} {_@_ b_tr3h tpl_B1 tpl_B2}
+Other{-r3,x-}{i} =
+    _/\_ b_tr3h -> \ tpl_B1 -> Other{-r3,x-}{i} {_@_ b_tr3h tpl_B1}
+AbsBinds [taQa] [] [([taQa], $d1{-rQd,x-}, d.Eval_aQ9)]
+    d.Eval_aQ9 = ({-dict-} [] [])
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d2 1 $d38 1 $d39 1 $d40 1 $d42 1 $d45 1 $d47 1 Eval 1;
+PrelTup 1 :: $d13 1;
+_exports_
+ShouldSucceed AList(Node Other);
+_instances_
+instance _forall_ [b] => {PrelBase.Eval (AList b)} = $d1;
+_declarations_
+1 $d1 _:_ _forall_ [b] => {PrelBase.Eval (AList b)} ;;
+1 data AList b = Node b [b] |  Other (b, PrelBase.Char) ;

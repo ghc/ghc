@@ -1,0 +1,74 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds
+[taD0, taD1]
+[d.Num_aEx, d.Eq_aEy, d.Show_aEz, d.Eval_aEA]
+[([taD0, taD1], $d1{-rFx,x-}, d.Num_aCT)]
+    d.Eq_aEw = d.Eq_aEy
+    d.Show_aEB = d.Show_aEz
+    d.Eval_aEC = d.Eval_aEA
+    d.Num_aEG = d.Num_aEx
+    +_aFz = PrelBase.+{-rgc,p-} taD1 d.Num_aEG
+    d.Num_aEI = d.Num_aEx
+    -_aFA = PrelBase.-{-817,p-} taD1 d.Num_aEI
+    d.Num_aEK = d.Num_aEx
+    *_aFB = PrelBase.*{-rgd,p-} taD1 d.Num_aEK
+    d.Num_aEM = d.Num_aEx
+    negate_aFC = PrelBase.negate{-rge,p-} taD1 d.Num_aEM
+    d.Num_aEO = d.Num_aEx
+    abs_aFD = PrelBase.abs{-rgf,p-} taD1 d.Num_aEO
+    d.Num_aEQ = d.Num_aEx
+    signum_aFE = PrelBase.signum{-rgg,p-} taD1 d.Num_aEQ
+    d.Num_aES = d.Num_aEx
+    fromInteger_aFF = PrelBase.fromInteger{-8S,p-} taD1 d.Num_aES
+    d.Num_aEU = d.Num_aEx
+    fromInt_aFG = PrelBase.fromInt{-8R,p-} taD1 d.Num_aEU
+    AbsBinds [] [] [([], +_aFH, +_aCX)]
+	+_aCX f_r3h g_r3i = \ a_r3k -> (f_r3h a_r3k) +_aFz (g_r3i a_r3k)
+    AbsBinds [] [] [([], -_aFI, -_aDd)]
+	-_aDd f_r3o g_r3p = \ a_r3r -> (f_r3o a_r3r) -_aFA (g_r3p a_r3r)
+    AbsBinds [] [] [([], *_aFJ, *_aDr)]
+	*_aDr f_r3v g_r3w = \ a_r3y -> (f_r3v a_r3y) *_aFB (g_r3w a_r3y)
+    AbsBinds [] [] [([], negate_aFK, negate_aDF)]
+	negate_aDF f_r3C = \ a_r3E -> negate_aFC f_r3C a_r3E
+    AbsBinds [] [] [([], abs_aFL, abs_aDR)]
+	abs_aDR f_r3I = \ a_r3K -> abs_aFD f_r3I a_r3K
+    AbsBinds [] [] [([], signum_aFM, signum_aE3)]
+	signum_aE3 f_r3O = \ a_r3Q -> signum_aFE f_r3O a_r3Q
+    AbsBinds [] [] [([], fromInteger_aFN, fromInteger_aEf)]
+	fromInteger_aEf n_r3U = \ a_r3W -> fromInteger_aFF n_r3U
+    AbsBinds [] [] [([], fromInt_aFO, fromInt_aEq)]
+	fromInt_aEq n_r40 = \ a_r42 -> fromInt_aFG n_r40
+    d.Num_aCT =
+	({-dict-}
+	 [d.Eq_aEw, d.Show_aEB, d.Eval_aEC]
+	 [+_aFH, -_aFI, *_aFJ, negate_aFK, abs_aFL, signum_aFM, fromInteger_aFN, fromInt_aFO])
+AbsBinds
+[taFe, taFf]
+[d.Eq_aFr]
+[([taFe, taFf], $d2{-rFy,x-}, d.Eq_aF7)]
+    d.Eq_aFv = d.Eq_aF7
+    $m/=_aFP = PrelBase.$m/={-rfO,p-} (taFe -> taFf) d.Eq_aFv
+    AbsBinds [] [] [([], ==_aFQ, ==_aFb)]
+	==_aFb f_r4a g_r4b
+	       = IOBase.error{-87,w-}
+		     PrelBase.Bool{-34,W-} "attempt to compare functions"
+    AbsBinds [] [] [([], /=_aFR, /=_aFo)]
+	/=_aFo = $m/=_aFP
+    d.Eq_aF7 = ({-dict-} [] [==_aFQ, /=_aFR])
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum ShouldSucceed
+_usages_
+PrelBase 1 :: $d1 1 $d12 1 $d16 1 $d2 1 $d22 1 $d28 1 $d3 1 $d33 1 $d34 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d47 1 $d55 1 $d8 1 $d9 1 $m- 1 $m/= 1 $mfromInt 1 $mshowList 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+_instances_
+instance _forall_ [a b] {PrelBase.Num b} => {PrelBase.Num (a -> b)} = $d1;
+instance _forall_ [a b] {PrelBase.Eq b} => {PrelBase.Eq (a -> b)} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a b] {PrelBase.Num b, PrelBase.Eq (a -> b), PrelBase.Show (a -> b), PrelBase.Eval (a -> b)} => {PrelBase.Num (a -> b)} ;;
+1 $d2 _:_ _forall_ [a b] {PrelBase.Eq b} => {PrelBase.Eq (a -> b)} ;;

@@ -1,0 +1,64 @@
+
+
+================================================================================
+Typechecked:
+MkAFE{-r3X,x-}{i} =
+    _/\_ n_tr3K a_tr3L b_tr3M -> \ tpl_B1 ->
+	MkAFE{-r3X,x-}{i} {_@_ n_tr3K _@_ a_tr3L _@_ b_tr3M tpl_B1}
+MkFG{-r3W,x-}{i} =
+    _/\_ a_tr3O b_tr3P -> \ tpl_B1 ->
+	MkFG{-r3W,x-}{i} {_@_ a_tr3O _@_ b_tr3P tpl_B1}
+MkOL{-r3V,x-}{i} =
+    _/\_ a_tr3R -> \ tpl_B1 -> MkOL{-r3V,x-}{i} {_@_ a_tr3R tpl_B1}
+AbsBinds [taR8, taRb] [] [([taR8, taRb], sNd{-r3v,x-}, sNd_aR1)]
+    sNd_aR1 (f_r3F, s_r3G) = s_r3G
+AbsBinds [taRA, taRE] [] [([taRA, taRE], mAp{-r3u,x-}, mAp_aRg)]
+    mAp_aRg f_r3z PrelBase.[]{-5i,w-}{i} = PrelBase.[]{-5i,w-}{i} taRE
+    mAp_aRg f_r3B (x_r3C PrelBase.:{-55,w-}{i} xs_r3D)
+	    = PrelBase.:{-55,w-}{i} taRE (f_r3B x_r3C) (mAp_aRg f_r3B xs_r3D)
+AbsBinds
+[taRU, taRV]
+[]
+[([taRU, taRV], ranOAL{-r3s,x-}, ranOAL_aRP)]
+    ranOAL_aRP (MkOL{-r3V,x-}{i} xs_r3x)
+	       = mAp{-r3u,x-} [(taRU, taRV), taRV] sNd{-r3v,x-} [taRU, taRV]
+						   xs_r3x
+AbsBinds
+[taSn, taSo, taSp]
+[]
+[([taSn, taSo, taSp], ranAFE{-r3t,x-}, ranAFE_aSe)]
+    ranAFE_aSe (MkAFE{-r3X,x-}{i} nfs_r3I)
+	       = ranOAL{-r3s,x-} [taSn, FG{-r3T,x-} taSo taSp] nfs_r3I
+AbsBinds
+[taSQ, taSR, taSS]
+[]
+[([taSQ, taSR, taSS], $d1{-rSY,x-}, d.Eval_aSC)]
+    d.Eval_aSC = ({-dict-} [] [])
+AbsBinds [taST, taSU] [] [([taST, taSU], $d2{-rT0,x-}, d.Eval_aSJ)]
+    d.Eval_aSJ = ({-dict-} [] [])
+AbsBinds [taSV] [] [([taSV], $d3{-rT2,x-}, d.Eval_aSP)]
+    d.Eval_aSP = ({-dict-} [] [])
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d2 1 $d38 1 $d40 1 $d42 1 $d45 1 $d47 1 Eval 1;
+PrelTup 1 :: $d13 1;
+_exports_
+ShouldSucceed mAp ranAFE ranOAL sNd AFE(MkAFE) FG(MkFG) OL(MkOL);
+_instances_
+instance _forall_ [n a b] => {PrelBase.Eval (AFE n a b)} = $d1;
+instance _forall_ [a b] => {PrelBase.Eval (FG a b)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (OL a)} = $d3;
+_declarations_
+1 $d1 _:_ _forall_ [n a b] => {PrelBase.Eval (AFE n a b)} ;;
+1 $d2 _:_ _forall_ [a b] => {PrelBase.Eval (FG a b)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (OL a)} ;;
+1 data AFE n a b = MkAFE (OL (n, FG a b)) ;
+1 data FG a b = MkFG (OL (a, b)) ;
+1 data OL a = MkOL [a] ;
+1 mAp _:_ _forall_ [ta tb] => (ta -> tb) -> [ta] -> [tb] ;;
+1 ranAFE _:_ _forall_ [ta tb tc] => AFE ta tb tc -> [FG tb tc] ;;
+1 ranOAL _:_ _forall_ [ta tb] => OL (ta, tb) -> [tb] ;;
+1 sNd _:_ _forall_ [ta tb] => (ta, tb) -> tb ;;

@@ -1,6 +1,6 @@
  
-tcfail028.hs:4: Couldn't match the kind `ka2534 -> *' against `*'
-    When unifying two kinds `ka2534 -> *' and `*'
+tcfail028.hs:4: Couldn't match the kind `ka2551 -> *' against `*'
+    When unifying two kinds `ka2551 -> *' and `*'
     In the data declaration for `A'
 
 

@@ -1,4 +1,4 @@
-TOP = ..
+TOP = .
 include $(TOP)/mk/boilerplate.mk
 
 NOT_THESE = Makefile ipoole_spec_class areid_pass

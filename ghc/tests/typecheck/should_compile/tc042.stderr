@@ -1,0 +1,137 @@
+
+
+================================================================================
+Typechecked:
+Leaf{-rx,x-}{i} =
+    _/\_ t_tr5p -> \ tpl_B1 -> Leaf{-rx,x-}{i} {_@_ t_tr5p tpl_B1}
+Node{-rw,x-}{i} =
+    _/\_ t_tr5p -> \ tpl_B1 tpl_B2 ->
+	Node{-rw,x-}{i} {_@_ t_tr5p tpl_B1 tpl_B2}
+Zero{-rv,x-}{i} = Zero{-rv,x-}{i} {}
+Succ{-ru,x-}{i} = \ tpl_B1 -> Succ{-ru,x-}{i} {tpl_B1}
+Nil{-rt,x-}{i} = _/\_ alpha_tr5s -> Nil{-rt,x-}{i} {_@_ alpha_tr5s}
+Cons{-rs,x-}{i} =
+    _/\_ alpha_tr5s -> \ tpl_B1 tpl_B2 ->
+	Cons{-rs,x-}{i} {_@_ alpha_tr5s tpl_B1 tpl_B2}
+Mkpair{-r5B,x-}{i} =
+    _/\_ a_tr5u b_tr5v -> \ tpl_B1 tpl_B2 ->
+	Mkpair{-r5B,x-}{i} {_@_ a_tr5u _@_ b_tr5v tpl_B1 tpl_B2}
+FF{-rr,x-}{i} = FF{-rr,x-}{i} {}
+TT{-rq,x-}{i} = TT{-rq,x-}{i} {}
+AbsBinds [] [] [([], before{-r4a,x-}, before_aDu)]
+    before_aDu xs_r4W
+	       = case xs_r4W of
+		   Nil{-rt,x-}{i} -> Nil{-rt,x-}{i} Nat{-r5x,x-}
+		   (Cons{-rs,x-}{i} y_r4Z ys_r50)
+		   -> case y_r4Z of
+			Zero{-rv,x-}{i} -> Nil{-rt,x-}{i} Nat{-r5x,x-}
+			(Succ{-ru,x-}{i} n_r53)
+			-> Cons{-rs,x-}{i} Nat{-r5x,x-} y_r4Z before{-r4a,x-} ys_r50
+AbsBinds [taDR] [] [([taDR], lEngth{-r49,x-}, lEngth_aDO)]
+    lEngth_aDO xs_r4Q
+	       = case xs_r4Q of
+		   Nil{-rt,x-}{i} -> Zero{-rv,x-}{i}
+		   (Cons{-rs,x-}{i} y_r4T ys_r4U)
+		   -> Succ{-ru,x-}{i} lEngth{-r49,x-} taDR ys_r4U
+AbsBinds [taEe] [] [([taEe], app{-r48,x-}, app_aEb)]
+    app_aEb xs_r4J zs_r4K
+	    = case xs_r4J of
+		Nil{-rt,x-}{i} -> zs_r4K
+		(Cons{-rs,x-}{i} y_r4N ys_r4O)
+		-> Cons{-rs,x-}{i} taEe y_r4N app{-r48,x-} taEe ys_r4O zs_r4K
+AbsBinds [taEE] [] [([taEE], rEverse{-r4b,x-}, rEverse_aEB)]
+    rEverse_aEB rs_r55
+		= case rs_r55 of
+		    Nil{-rt,x-}{i} -> Nil{-rt,x-}{i} taEE
+		    (Cons{-rs,x-}{i} y_r58 ys_r59)
+		    -> app{-r48,x-} taEE rEverse{-r4b,x-} taEE ys_r59
+					 Cons{-rs,x-}{i} taEE y_r58 Nil{-rt,x-}{i} taEE
+AbsBinds [taF8] [] [([taF8], flatten{-r4c,x-}, flatten_aF5)]
+    flatten_aF5 t_r5b
+		= case t_r5b of
+		    (Leaf{-rx,x-}{i} x_r5d)
+		    -> Cons{-rs,x-}{i} taF8 x_r5d Nil{-rt,x-}{i} taF8
+		    (Node{-rw,x-}{i} l_r5f r_r5g)
+		    -> app{-r48,x-} taF8 flatten{-r4c,x-} taF8 l_r5f
+					 flatten{-r4c,x-} taF8 r_r5g
+AbsBinds [] [] [([], add{-r47,x-}, add_aFx)]
+    add_aFx a_r4D b_r4E
+	    = case a_r4D of
+		Zero{-rv,x-}{i} -> b_r4E
+		(Succ{-ru,x-}{i} c_r4H) -> Succ{-ru,x-}{i} add{-r47,x-} c_r4H b_r4E
+AbsBinds [] [] [([], sUm{-r4d,x-}, sUm_aFF)]
+    sUm_aFF t_r5i
+	    = case t_r5i of
+		(Leaf{-rx,x-}{i} t_r5k) -> t_r5k
+		(Node{-rw,x-}{i} l_r5m r_r5n)
+		-> add{-r47,x-} sUm{-r4d,x-} l_r5m sUm{-r4d,x-} r_r5n
+AbsBinds [taG1] [] [([taG1], idl{-r46,x-}, idl_aFY)]
+    idl_aFY xs_r4x
+	    = case xs_r4x of
+		Nil{-rt,x-}{i} -> Nil{-rt,x-}{i} taG1
+		(Cons{-rs,x-}{i} y_r4A ys_r4B)
+		-> Cons{-rs,x-}{i} taG1 y_r4A idl{-r46,x-} taG1 ys_r4B
+AbsBinds [taGq] [] [([taGq], nUll{-r45,x-}, nUll_aGn)]
+    nUll_aGn l_r4r
+	     = case l_r4r of
+		 Nil{-rt,x-}{i} -> TT{-rq,x-}{i}
+		 (Cons{-rs,x-}{i} y_r4u ys_r4v) -> FF{-rr,x-}{i}
+AbsBinds [] [] [([], neg{-r44,x-}, neg_aGD)]
+    neg_aGD b_r4n
+	    = case b_r4n of
+		FF{-rr,x-}{i} -> TT{-rq,x-}{i}
+		TT{-rq,x-}{i} -> FF{-rr,x-}{i}
+AbsBinds [taGR, taGS] [] [([taGS, taGR], swap{-r43,x-}, swap_aGO)]
+    swap_aGO t_r4i
+	     = case t_r4i of
+		 (Mkpair{-r5B,x-}{i} x_r4k y_r4l)
+		 -> Mkpair{-r5B,x-}{i} [taGS, taGR] y_r4l x_r4k
+AbsBinds [] [] [([], idb{-r42,x-}, idb_aH9)]
+    idb_aH9 x_r4g = x_r4g
+AbsBinds [taHF] [] [([taHF], $d1{-rHL,x-}, d.Eval_aHh)]
+    d.Eval_aHh = ({-dict-} [] [])
+AbsBinds [] [] [([], $d2{-rHN,x-}, d.Eval_aHm)]
+    d.Eval_aHm = ({-dict-} [] [])
+AbsBinds [taHG] [] [([taHG], $d3{-rHP,x-}, d.Eval_aHs)]
+    d.Eval_aHs = ({-dict-} [] [])
+AbsBinds [taHH, taHI] [] [([taHH, taHI], $d4{-rHR,x-}, d.Eval_aHz)]
+    d.Eval_aHz = ({-dict-} [] [])
+AbsBinds [] [] [([], $d5{-rHT,x-}, d.Eval_aHE)]
+    d.Eval_aHE = ({-dict-} [] [])
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d2 1 $d38 1 $d40 1 $d42 1 $d47 1 Eval 1;
+_exports_
+ShouldSucceed add app before flatten idb idl lEngth nUll neg rEverse sUm swap Boolean(FF TT) List(Nil Cons) Nat(Zero Succ) Pair(Mkpair) Tree(Leaf Node);
+_instances_
+instance _forall_ [t] => {PrelBase.Eval (Tree t)} = $d1;
+instance {PrelBase.Eval Nat} = $d2;
+instance _forall_ [alpha] => {PrelBase.Eval (List alpha)} = $d3;
+instance _forall_ [a b] => {PrelBase.Eval (Pair a b)} = $d4;
+instance {PrelBase.Eval Boolean} = $d5;
+_declarations_
+1 $d1 _:_ _forall_ [t] => {PrelBase.Eval (Tree t)} ;;
+1 $d2 _:_ {PrelBase.Eval Nat} ;;
+1 $d3 _:_ _forall_ [alpha] => {PrelBase.Eval (List alpha)} ;;
+1 $d4 _:_ _forall_ [a b] => {PrelBase.Eval (Pair a b)} ;;
+1 $d5 _:_ {PrelBase.Eval Boolean} ;;
+1 data Boolean = FF |  TT ;
+1 data List alpha = Nil |  Cons alpha (List alpha) ;
+1 data Nat = Zero |  Succ Nat ;
+1 data Pair a b = Mkpair a b ;
+1 data Tree t = Leaf t |  Node (Tree t) (Tree t) ;
+1 add _:_ Nat -> Nat -> Nat ;;
+1 app _:_ _forall_ [ta] => List ta -> List ta -> List ta ;;
+1 before _:_ List Nat -> List Nat ;;
+1 flatten _:_ _forall_ [ta] => Tree ta -> List ta ;;
+1 idb _:_ Boolean -> Boolean ;;
+1 idl _:_ _forall_ [ta] => List ta -> List ta ;;
+1 lEngth _:_ _forall_ [ta] => List ta -> Nat ;;
+1 nUll _:_ _forall_ [ta] => List ta -> Boolean ;;
+1 neg _:_ Boolean -> Boolean ;;
+1 rEverse _:_ _forall_ [ta] => List ta -> List ta ;;
+1 sUm _:_ Tree Nat -> Nat ;;
+1 swap _:_ _forall_ [ta tb] => Pair tb ta -> Pair ta tb ;;

@@ -1,4 +1,4 @@
-module H where
+module ShouldSucceed where
 
 class C a where
  op1 :: a -> a

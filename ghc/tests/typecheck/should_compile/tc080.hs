@@ -1,15 +1,20 @@
 --module Parse(Parse(..),whiteSpace,seperatedBy) where
 --import StdLib
+module ShouldSucceed where
+
+import Char
+
 class Parse a where
        parseFile :: String -> [a]
+       parseLine :: String -> a
+       parseType :: String -> (a,String)
+       parse :: String -> (a,String)
+       forced :: a -> Bool
+
        parseFile string | all forced x = x
 		       where x = map parseLine (lines' string)
-       parseLine :: String -> a
        parseLine = pl.parse where pl (a,_) = a
-       parse :: String -> (a,String)
        parse = parseType.whiteSpace
-       parseType :: String -> (a,String)
-       forced :: a -> Bool
        forced x = True
 
 instance Parse Int where

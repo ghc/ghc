@@ -1,0 +1,334 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [] [] [([], charToInt{-r3R,x-}, charToInt_aZA)]
+    charToInt_aZA x_r4E
+		  = (PrelBase.ord{-riq,p-} x_r4E) -_a1a5 (PrelBase.ord{-riq,p-} '0')
+AbsBinds [] [] [([], strToInt{-r3Q,x-}, strToInt_aZI)]
+    d.Integral_a10K = PrelNum.$d36{-rI6,p-}
+    strToInt_aZI x_r4v
+		 = strToInt'_a1ai (PrelList.length{-rz0,p-}
+				       PrelBase.Char{-38,W-} x_r4v)
+				  -_a19Z lit_a1a0
+				  x_r4v
+		 where
+		     {- rec -}
+		     AbsBinds
+		     [ta10j]
+		     [d.Integral_a10t]
+		     [([ta10j], strToInt'_r4x, strToInt'_aZL)]
+			 d.Real_a19S =
+			     PrelNum.scsel_IntegralPrelNumReal{-a1an,p-} ta10j d.Integral_a10t
+			 d.Num_a10w =
+			     PrelNum.scsel_RealPrelBaseNum{-a1ao,p-} ta10j d.Real_a19S
+			 d.Num_a10s = PrelBase.$d4{-rcO,p-}
+			 ^_a1aj =
+			     PrelNum.^{-rAz,p-} [ta10j, PrelBase.Int{-3g,W-}]
+				 [d.Num_a10s, d.Integral_a10t]
+			 -_a1ak = PrelBase.-{-817,p-} ta10j d.Num_a10w
+			 d.Num_a10z = d.Num_a10w
+			 fromInt_a1al = PrelBase.fromInt{-8R,p-} ta10j d.Num_a10z
+			 lit_a1am = fromInt_a1al PrelBase.I#{-5b,w-}{i} 1#
+			 strToInt'_aZL _ PrelBase.[]{-5i,w-}{i} = lit_a1a1
+			 strToInt'_aZL x_r4A (a_r4B PrelBase.:{-55,w-}{i} l_r4C)
+				       = ((charToInt{-r3R,x-} a_r4B) *_a1a3 (lit_a1a4 ^_a1aj x_r4A))
+					 +_a1a2 (strToInt'_aZL x_r4A -_a1ak lit_a1am l_r4C)
+		     {- nonrec -}
+		     strToInt'_a1ai = strToInt'_r4x PrelBase.Int{-3g,W-} d.Integral_a10K
+		     {- nonrec -}
+AbsBinds [ta10Z] [] [([ta10Z], span'{-r3O,x-}, span'_a10W)]
+    span'_a10W p_r49 PrelBase.[]{-5i,w-}{i}
+	       = (PrelBase.[]{-5i,w-}{i} ta10Z, PrelBase.[]{-5i,w-}{i} ta10Z)
+    span'_a10W p_r4b (x_r4c PrelBase.:{-55,w-}{i} xs'_r4d)
+	       | p_r4b x_r4c
+	       = fixLeak_r4f [[ta10Z], ta10Z] x_r4c
+					      span'{-r3O,x-} ta10Z p_r4b xs'_r4d
+	       where
+		   {- nonrec -}
+		   AbsBinds
+		   [ta11F, ta11H]
+		   []
+		   [([ta11F, ta11H], fixLeak_r4f, fixLeak_a11j)]
+		       fixLeak_a11j x_r4h (xs_r4i, ys_r4j)
+				    = (PrelBase.:{-55,w-}{i} ta11H x_r4h xs_r4i, ys_r4j)
+		   {- nonrec -}
+		   {- nonrec -}
+    span'_a10W _ xs_r4l = (PrelBase.[]{-5i,w-}{i} ta10Z, xs_r4l)
+AbsBinds [] [] [([], lines'{-r3P,x-}, lines'_a121)]
+    lines'_a121 "" = PrelBase.[]{-5i,w-}{i} [PrelBase.Char{-38,W-}]
+    lines'_a121 s_r4o
+		= plumb_r4q span'{-r3O,x-} PrelBase.Char{-38,W-} /=_a19Y '\n' s_r4o
+		where
+		    {- nonrec -}
+		    AbsBinds [] [] [([], plumb_r4q, plumb_a126)]
+			plumb_a126 (l_r4s, s'_r4t)
+				   = PrelBase.:{-55,w-}{i} [PrelBase.Char{-38,W-}]
+					 l_r4s
+					 (if PrelList.null{-rz6,p-}
+						 PrelBase.Char{-38,W-} s'_r4t then
+					      PrelBase.[]{-5i,w-}{i} [PrelBase.Char{-38,W-}]
+					  else
+					      lines'{-r3P,x-} PrelList.tail{-rzj,p-}
+								  PrelBase.Char{-38,W-} s'_r4t)
+		    {- nonrec -}
+		    {- nonrec -}
+AbsBinds [] [] [([], whiteSpace{-r3N,x-}, whiteSpace_a12C)]
+    whiteSpace_a12C
+	= PrelBase.dropWhile{-rhV,p-}
+	      PrelBase.Char{-38,W-} PrelBase.isSpace{-rig,p-}
+AbsBinds [] [] [([], seperatedBy{-r3M,x-}, seperatedBy_a12G)]
+    seperatedBy_a12G ch_r3W PrelBase.[]{-5i,w-}{i}
+		     = PrelBase.[]{-5i,w-}{i} PrelBase.String{-r5n,p-}
+    seperatedBy_a12G ch_r3Y xs_r3Z
+		     = twaddle_r41 ch_r3Y
+				   span'{-r3O,x-} PrelBase.Char{-38,W-} \ x_r47
+									  -> x_r47 /=_a19W ch_r3Y
+									xs_r3Z
+		     where
+			 {- nonrec -}
+			 AbsBinds [] [] [([], twaddle_r41, twaddle_a12N)]
+			     twaddle_a12N ch_r43 (l_r44, (_ PrelBase.:{-55,w-}{i} r_r45))
+					  = PrelBase.:{-55,w-}{i} PrelBase.String{-r5n,p-}
+						l_r44 (seperatedBy{-r3M,x-} ch_r43 r_r45)
+			 {- nonrec -}
+			 {- nonrec -}
+AbsBinds
+[ta13E]
+[d.Parse_a154]
+[([ta13E], $d1{-r19T,x-}, d.Parse_a13s)]
+    d.Parse_a158 = d.Parse_a13s
+    $mparseFile_a1ap = $mparseFile{-r13v,x-} [ta13E] d.Parse_a158
+    d.Parse_a15a = d.Parse_a13s
+    $mparseLine_a1aq = $mparseLine{-r13z,x-} [ta13E] d.Parse_a15a
+    d.Parse_a15e = d.Parse_a154
+    parseLine_a1ar = parseLine{-r4R,x-} ta13E d.Parse_a15e
+    d.Parse_a15k = d.Parse_a13s
+    $mparse_a1as = $mparse{-r13A,x-} [ta13E] d.Parse_a15k
+    d.Parse_a15m = d.Parse_a154
+    forced_a1at = forced{-r5S,x-} ta13E d.Parse_a15m
+    AbsBinds [] [] [([], parseFile_a1au, parseFile_a13y)]
+	parseFile_a13y = $mparseFile_a1ap
+    AbsBinds [] [] [([], parseLine_a1av, parseLine_a13L)]
+	parseLine_a13L = $mparseLine_a1aq
+    AbsBinds [] [] [([], parseType_a1aw, parseType_a13T)]
+	parseType_a13T more_r4L
+		       = (map_a1a6 [PrelBase.String{-r5n,p-}, ta13E] parseLine_a1ar
+								     seperatedBy{-r3M,x-} ','
+											  ++_a1a7
+											      PrelBase.Char{-38,W-}
+											      l_r4N
+											      ",",
+			  out_r4O)
+		       where
+			   {- nonrec -}
+			   AbsBinds [] [] [([], l_r4N, l_a13W), ([], out_r4O, out_a13X)]
+			       (l_a13W, (']' PrelBase.:{-55,w-}{i} out_a13X))
+				   = span'{-r3O,x-} PrelBase.Char{-38,W-} \ x_r4Q
+									    -> x_r4Q /=_a1a8 ']'
+									  PrelList.tail{-rzj,p-}
+									      PrelBase.Char{-38,W-} more_r4L
+			   {- nonrec -}
+			   {- nonrec -}
+    AbsBinds [] [] [([], parse_a1ax, parse_a14R)]
+	parse_a14R = $mparse_a1as
+    AbsBinds [] [] [([], forced_a1ay, forced_a14Z)]
+	forced_a14Z = PrelList.all{-rwP,p-} ta13E forced_a1at
+    d.Parse_a13s =
+	({-dict-}
+	 []
+	 [parseFile_a1au, parseLine_a1av, parseType_a1aw, parse_a1ax, forced_a1ay])
+AbsBinds [] [] [([], $d2{-r19U,x-}, d.Parse_a15s)]
+    AbsBinds [] [] [([], parseFile_a1az, parseFile_a15x)]
+	parseFile_a15x = $mparseFile_a1a9
+    AbsBinds [] [] [([], parseLine_a1aA, parseLine_a15H)]
+	parseLine_a15H = $mparseLine_a1aa
+    AbsBinds [] [] [([], parseType_a1aB, parseType_a15Q)]
+	parseType_a15Q (ch_r4Z PrelBase.:{-55,w-}{i} str_r50)
+		       = (ch_r4Z, str_r50)
+    AbsBinds [] [] [([], parse_a1aC, parse_a164)]
+	parse_a164 = $mparse_a1ab
+    AbsBinds [] [] [([], forced_a1aD, forced_a16d)]
+	forced_a16d n_r54 = PrelBase.True{-5E,w-}{i}
+    d.Parse_a15s =
+	({-dict-}
+	 []
+	 [parseFile_a1az, parseLine_a1aA, parseType_a1aB, parse_a1aC, forced_a1aD])
+AbsBinds [] [] [([], $d3{-r19V,x-}, d.Parse_a16q)]
+    AbsBinds [] [] [([], parseFile_a1aE, parseFile_a16v)]
+	parseFile_a16v = $mparseFile_a1ac
+    AbsBinds [] [] [([], parseLine_a1aF, parseLine_a16F)]
+	parseLine_a16F = $mparseLine_a1ad
+    AbsBinds [] [] [([], parseType_a1aG, parseType_a16O)]
+	parseType_a16O str_r5a
+		       = pl_r5c PrelBase.String{-r5n,p-} span'{-r3O,x-}
+							     PrelBase.Char{-38,W-} PrelBase.isDigit{-ria,p-}
+										   str_r5a
+		       where
+			   {- nonrec -}
+			   AbsBinds [ta178] [] [([ta178], pl_r5c, pl_a16R)]
+			       pl_a16R (l_r5e, r_r5f) = (strToInt{-r3Q,x-} l_r5e, r_r5f)
+			   {- nonrec -}
+			   {- nonrec -}
+    AbsBinds [] [] [([], parse_a1aH, parse_a17h)]
+	parse_a17h = $mparse_a1ae
+    AbsBinds [] [] [([], forced_a1aI, forced_a17q)]
+	forced_a17q n_r5j
+		    | n_r5j >=_a1af lit_a1ag = PrelBase.True{-5E,w-}{i}
+    d.Parse_a16q =
+	({-dict-}
+	 []
+	 [parseFile_a1aE, parseLine_a1aF, parseType_a1aG, parse_a1aH, forced_a1aI])
+parseFile{-r5P,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
+	tpl_B1;}
+parseLine{-r4R,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
+	tpl_B2;}
+parseType{-r5Q,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
+	tpl_B3;}
+parse{-r5R,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
+	tpl_B4;}
+forced{-r5S,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
+	tpl_B5;}
+AbsBinds
+[ta182]
+[d.Parse_a197]
+[([ta182], $mparseFile{-r13v,x-}, parseFile_a1aJ), ([ta182],
+						    $mparseLine{-r13z,x-},
+						    parseLine_a1aO), ([ta182],
+								      $mparse{-r13A,x-},
+								      parse_a1aP), ([ta182],
+										    $mforced{-r13B,x-},
+										    forced_a1aQ)]
+    d.Parse_a199 = d.Parse_a197
+    forced_a1aK = forced{-r5S,x-} ta182 d.Parse_a199
+    d.Parse_a19d = d.Parse_a197
+    parseLine_a1aL = parseLine{-r4R,x-} ta182 d.Parse_a19d
+    d.Parse_a19f = d.Parse_a197
+    parse_a1aM = parse{-r5R,x-} ta182 d.Parse_a19f
+    d.Parse_a19h = d.Parse_a197
+    parseType_a1aN = parseType{-r5Q,x-} ta182 d.Parse_a19h
+    AbsBinds [] [] [([], parseFile_a1aJ, parseFile_a17K)]
+	parseFile_a17K string_r5A
+		       | PrelList.all{-rwP,p-} ta182 forced_a1aK x_r5C = x_r5C
+		       where
+			   {- nonrec -}
+			   AbsBinds [] [] [([], x_r5C, x_a17N)]
+			       x_a17N
+				   = map_a1ah [PrelBase.String{-r5n,p-}, ta182] parseLine_a1aL
+										lines'{-r3P,x-} string_r5A
+			   {- nonrec -}
+			   {- nonrec -}
+    AbsBinds [] [] [([], parseLine_a1aO, parseLine_a18o)]
+	parseLine_a18o
+	    = PrelBase..{-rc2,p-}
+		  [(ta182, PrelBase.String{-r5n,p-}), PrelBase.String{-r5n,p-}, ta182]
+		  (pl_r5G [ta182, PrelBase.String{-r5n,p-}]) parse_a1aM
+	    where
+		{- nonrec -}
+		AbsBinds [ta18v, ta18y] [] [([ta18v, ta18y], pl_r5G, pl_a18n)]
+		    pl_a18n (a_r5I, _) = a_r5I
+		{- nonrec -}
+		{- nonrec -}
+    AbsBinds [] [] [([], parse_a1aP, parse_a18R)]
+	parse_a18R
+	    = PrelBase..{-rc2,p-}
+		  [PrelBase.String{-r5n,p-}, PrelBase.String{-r5n,p-}, (ta182, PrelBase.String{-r5n,p-})]
+		  parseType_a1aN whiteSpace{-r3N,x-}
+    AbsBinds [] [] [([], forced_a1aQ, forced_a192)]
+	forced_a192 x_r5O = PrelBase.True{-5E,w-}{i}
+d.Eq_a19j = PrelBase.$d34{-rcI,p-}
+/=_a19W = PrelBase./={-rhx,p-} PrelBase.Char{-38,W-} d.Eq_a19j
+d.Eq_a19o = d.Eq_a19j
+d.Eq_a19m = PrelBase.$d28{-rcB,p-} PrelBase.Char{-38,W-} d.Eq_a19o
+==_a19X = PrelBase.=={-8Y,p-} [PrelBase.Char{-38,W-}] d.Eq_a19m
+/=_a19Y = /=_a19W
+d.Num_a19q = PrelBase.$d4{-rcO,p-}
+-_a19Z = PrelBase.-{-817,p-} PrelBase.Int{-3g,W-} d.Num_a19q
+lit_a1a0 = PrelBase.I#{-5b,w-}{i} 1#
+lit_a1a1 = PrelBase.I#{-5b,w-}{i} 0#
+d.Num_a19t = d.Num_a19q
++_a1a2 = PrelBase.+{-rhC,p-} PrelBase.Int{-3g,W-} d.Num_a19t
+d.Num_a19v = d.Num_a19q
+*_a1a3 = PrelBase.*{-rhD,p-} PrelBase.Int{-3g,W-} d.Num_a19v
+lit_a1a4 = PrelBase.I#{-5b,w-}{i} 10#
+-_a1a5 = -_a19Z
+d.Functor_a19x = PrelBase.$d26{-rcz,p-}
+map_a1a6 = PrelBase.map{-rhy,p-} PrelBase.[]{-3j,W-} d.Functor_a19x
+d.MonadPlus_a19A = PrelBase.$d23{-rcw,p-}
+++_a1a7 = PrelBase.++{-rhB,p-} PrelBase.[]{-3j,W-} d.MonadPlus_a19A
+/=_a1a8 = /=_a19W
+d.Parse_a19D = $d2{-r19U,x-}
+$mparseFile_a1a9 =
+    $mparseFile{-r13v,x-} PrelBase.Char{-38,W-} d.Parse_a19D
+d.Parse_a19G = d.Parse_a19D
+$mparseLine_a1aa =
+    $mparseLine{-r13z,x-} PrelBase.Char{-38,W-} d.Parse_a19G
+d.Parse_a19I = d.Parse_a19D
+$mparse_a1ab = $mparse{-r13A,x-} PrelBase.Char{-38,W-} d.Parse_a19I
+d.Parse_a19K = $d3{-r19V,x-}
+$mparseFile_a1ac =
+    $mparseFile{-r13v,x-} PrelBase.Int{-3g,W-} d.Parse_a19K
+d.Parse_a19N = d.Parse_a19K
+$mparseLine_a1ad =
+    $mparseLine{-r13z,x-} PrelBase.Int{-3g,W-} d.Parse_a19N
+d.Parse_a19P = d.Parse_a19K
+$mparse_a1ae = $mparse{-r13A,x-} PrelBase.Int{-3g,W-} d.Parse_a19P
+d.Ord_a19R = PrelBase.$d7{-rda,p-}
+>=_a1af = PrelBase.>={-8Z,p-} PrelBase.Int{-3g,W-} d.Ord_a19R
+lit_a1ag = lit_a1a1
+map_a1ah = map_a1a6
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d12 1 $d14 1 $d15 1 $d16 1 $d2 1 $d22 1 $d23 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d3 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d6 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 . 1 dropWhile 1 isDigit 1 isSpace 1 ord 1 Enum 1 Eq 1 Eval 1 Functor 1 Monad 1 MonadPlus 1 MonadZero 1 Num 1 Ord 1 Ordering 1 Show 1 String 1;
+PrelList 1 :: all 1 length 1 null 1 tail 1;
+PrelNum 1 :: $d1 1 $d10 1 $d15 1 $d16 1 $d17 1 $d18 1 $d2 1 $d29 1 $d30 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d36 1 $d37 1 $d38 1 $d39 1 $d5 1 $d6 1 $d7 1 $d8 1 $mdiv 1 $mdivMod 1 $mmod 1 $mquot 1 $mrem 1 ^ 1 Integral 1 Ratio 1 Rational 1 Real 1;
+PrelTup 1 :: $d13 1 $d4 1 $d49 1 $d9 1;
+_exports_
+ShouldSucceed charToInt lines' seperatedBy span' strToInt whiteSpace Parse(parseFile parseLine parseType parse forced);
+_instances_
+instance _forall_ [a] {Parse a} => {Parse [a]} = $d1;
+instance {Parse PrelBase.Char} = $d2;
+instance {Parse PrelBase.Int} = $d3;
+_declarations_
+1 $d1 _:_ _forall_ [a] {Parse a} => {Parse [a]} ;;
+1 $d2 _:_ {Parse PrelBase.Char} ;;
+1 $d3 _:_ {Parse PrelBase.Int} ;;
+1 $mforced _:_ _forall_ [a] {Parse a} => a -> PrelBase.Bool ;;
+1 $mparse _:_ _forall_ [a] {Parse a} => PrelBase.String -> (a, PrelBase.String) ;;
+1 $mparseFile _:_ _forall_ [a] {Parse a} => PrelBase.String -> [a] ;;
+1 $mparseLine _:_ _forall_ [a] {Parse a} => PrelBase.String -> a ;;
+1 class Parse a where {parseFile = :: PrelBase.String -> [a]; parseLine = :: PrelBase.String -> a; parseType :: PrelBase.String -> (a, PrelBase.String); parse = :: PrelBase.String -> (a, PrelBase.String); forced = :: a -> PrelBase.Bool} ;
+1 charToInt _:_ PrelBase.Char -> PrelBase.Int ;;
+1 lines' _:_ [PrelBase.Char] -> [[PrelBase.Char]] ;;
+1 seperatedBy _:_ PrelBase.Char -> PrelBase.String -> [PrelBase.String] ;;
+1 span' _:_ _forall_ [ta] => (ta -> PrelBase.Bool) -> [ta] -> ([ta], [ta]) ;;
+1 strToInt _:_ PrelBase.String -> PrelBase.Int ;;
+1 whiteSpace _:_ PrelBase.String -> PrelBase.String ;;

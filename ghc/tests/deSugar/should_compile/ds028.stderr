@@ -2,82 +2,62 @@
 
 ================================================================================
 Desugared:
-||||_amR  :: 
-    PrelBase.Bool{-34,p-}
-    -> PrelBase.Bool{-34,p-}
-    -> PrelBase.Bool{-34,p-}
-{-# L #-}
-||||_amR =
-    \ ds_dq6  :: 
-	  PrelBase.Bool{-34,p-}
-      {-# L #-}
-      ds_dq6 ds_dq7  :: 
-		 PrelBase.Bool{-34,p-}
-	     {-# L #-}
-	     ds_dq7 ->
-	case ds_dq6 of {
-	  PrelBase.True{-5E,p-}{i} ->
-	      PrelBase.True{-5E,p-}{i};
-	  PrelBase.False{-58,p-}{i} ->
-	      ds_dq7;
-	}
-||||{-r3q,x-}  :: 
-    PrelBase.Bool{-34,p-}
-    -> PrelBase.Bool{-34,p-}
-    -> PrelBase.Bool{-34,p-}
-{-# L #-}
-||||{-r3q,x-} =
-    ||||_amR
 Rec {
-mAp{-r3r,x-}  :: 
-    _forall_
-    [t{-an5-} t{-an7-}]
-    =>
-    (t{-an5-} -> t{-an7-}) -> [t{-an5-}] -> [t{-an7-}]
+||||_akd  ::  PrelBase.Bool{-34,W-}
+	      -> PrelBase.Bool{-34,W-}
+	      -> PrelBase.Bool{-34,W-}
 {-# L #-}
-mAp{-r3r,x-} =
-    _/\_ t{-an5-} t{-an7-} ->
+||||_akd =
+    \ ds_dnL  ::  PrelBase.Bool{-34,W-}
+      {-# L #-}
+      ds_dnL ds_dnU  ::  PrelBase.Bool{-34,W-}
+	     {-# L #-}
+	     ds_dnU ->
+	case ds_dnL of {
+	  PrelBase.True{-5E,w-}{i} -> PrelBase.True{-5E,w-}{i};
+	  PrelBase.False{-58,w-}{i} -> ds_dnU;
+	}
+||||{-r3m,x-}  ::  PrelBase.Bool{-34,W-}
+		   -> PrelBase.Bool{-34,W-}
+		   -> PrelBase.Bool{-34,W-}
+{-# L #-}
+||||{-r3m,x-} =
+    ||||_akd
+mAp{-r3n,x-}  ::  _forall_
+		  [takK takO]
+		  =>
+		  (takK -> takO) -> [takK] -> [takO]
+{-# L #-}
+mAp{-r3n,x-} =
+    _/\_ takK takO ->
 	_letrec_ {
-	  mAp_amZ  :: 
-	      (t{-an5-} -> t{-an7-}) -> [t{-an5-}] -> [t{-an7-}]
+	  mAp_akq  ::  (takK -> takO) -> [takK] -> [takO]
 	  {-# L #-}
-	  mAp_amZ =
-	      \ f_r3e  :: 
-		    t{-an5-} -> t{-an7-}
+	  mAp_akq =
+	      \ f_r3e  ::  takK -> takO
 		{-# L #-}
-		f_r3e ds_dqV  :: 
-			  [t{-an5-}]
+		f_r3e ds_doq  ::  [takK]
 		      {-# L #-}
-		      ds_dqV ->
-		  case ds_dqV of {
-		    PrelBase.[]{-5i,p-}{i} ->
-			PrelBase.[]{-5i,p-}{i}
-			    _@_ t{-an7-};
-		    PrelBase.:{-55,p-}{i} x_r3j xs_r3k ->
+		      ds_doq ->
+		  case ds_doq of {
+		    PrelBase.[]{-5i,w-}{i} -> PrelBase.[]{-5i,w-}{i} _@_ takO;
+		    PrelBase.:{-55,w-}{i} x_r3h xs_r3i ->
 			let {
-			  f_r3h  :: 
-			      t{-an5-} -> t{-an7-}
+			  f_r3g  ::  takK -> takO
 			  {-# L #-}
-			  f_r3h =
+			  f_r3g =
 			      f_r3e } in
 			let {
-			  ds_drl  :: 
-			      t{-an7-}
+			  ds_doQ  ::  takO
 			  {-# L #-}
-			  ds_drl =
-			      f_r3h
-				  x_r3j } in
+			  ds_doQ =
+			      f_r3g x_r3h } in
 			let {
-			  ds_drp  :: 
-			      [t{-an7-}]
+			  ds_doU  ::  [takO]
 			  {-# L #-}
-			  ds_drp =
-			      mAp_amZ
-				  f_r3h xs_r3k
-			} in 
-			  PrelBase.:{-55,p-}{i}
-			      _@_ t{-an7-} ds_drl ds_drp;
+			  ds_doU =
+			      mAp_akq f_r3g xs_r3i
+			} in  PrelBase.:{-55,w-}{i} _@_ takO ds_doQ ds_doU;
 		  };
-	} in 
-	  mAp_amZ
+	} in  mAp_akq
 end Rec }

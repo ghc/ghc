@@ -1,0 +1,22 @@
+
+
+================================================================================
+Typechecked:
+scsel_BShouldSucceedC{-akS,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3n,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+AbsBinds [takQ] [d.B_akM] []
+op1{-r3m,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [takR] [d.C_akP] []
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed B(op2) C(op1);
+_declarations_
+1 class {C a} => B a where {op2 :: a -> a -> a} ;
+1 class C a where {op1 :: a -> a} ;

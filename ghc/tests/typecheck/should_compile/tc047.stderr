@@ -1,0 +1,34 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [tayV, tayY] [] [([tayV, tayY], sd{-r3w,x-}, sd_ayO)]
+    sd_ayO (f_r3s, s_r3t) = s_r3t
+AbsBinds [tazn, tazr] [] [([tazn, tazr], mp{-r3x,x-}, mp_az3)]
+    mp_az3 f_r3m PrelBase.[]{-5i,w-}{i} = PrelBase.[]{-5i,w-}{i} tazr
+    mp_az3 f_r3o (x_r3p PrelBase.:{-55,w-}{i} xs_r3q)
+	   = PrelBase.:{-55,w-}{i} tazr (f_r3o x_r3p) (mp_az3 f_r3o xs_r3q)
+AbsBinds
+[taA2, tazZ, taA0]
+[]
+[([taA2, tazZ, taA0], f{-r3y,x-}, f_azx)]
+    f_azx x_r3g
+	  = ranOAL_r3i [taA0, tazZ]
+	  where
+	      {- nonrec -}
+	      AbsBinds [tazP, tazS] [] [([tazP, tazS], ranOAL_r3i, ranOAL_azF)]
+		  ranOAL_azF xs_r3k
+			     = mp{-r3x,x-} [(tazS, tazP), tazP] sd{-r3w,x-} [tazS, tazP] xs_r3k
+	      {- nonrec -}
+	      {- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f mp sd OL;
+_declarations_
+1 type OL a = [a] ;
+1 f _:_ _forall_ [ta tb tc] => ta -> [(tb, tc)] -> [tc] ;;
+1 mp _:_ _forall_ [ta tb] => (ta -> tb) -> [ta] -> [tb] ;;
+1 sd _:_ _forall_ [ta tb] => (ta, tb) -> tb ;;

@@ -1,0 +1,32 @@
+
+
+================================================================================
+Typechecked:
+FooData{-r5,l-}{i} = FooData{-r5,l-}{i} {}
+AbsBinds [] [] [([], $d1{-rBr,x-}, d.Eval_aBo)]
+    d.Eval_aBo = ({-dict-} [] [])
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+GlaExts 1 ::;
+PrelBase 1 :: $d2 1 $d38 1 $d40 1 $d42 1 $d47 1 Eval 1;
+_exports_
+ArrBase boundsOfArray boundsOfByteArray freezeAddrArray freezeArray freezeCharArray freezeDoubleArray freezeFloatArray freezeIntArray indexAddrArray indexAddrOffAddr indexCharArray indexCharOffAddr indexDoubleArray indexDoubleOffAddr indexFloatArray indexFloatOffAddr indexIntArray indexIntOffAddr newAddrArray newArray newCharArray newDoubleArray newFloatArray newIntArray readAddrArray readArray readCharArray readDoubleArray readFloatArray readIntArray thawArray unsafeFreezeArray unsafeFreezeByteArray writeAddrArray writeArray writeCharArray writeDoubleArray writeFloatArray writeIntArray ByteArray(ByteArray) MutableArray(MutableArray) MutableByteArray(MutableByteArray);
+Foreign Addr(A#) Word(W#);
+GHC *# *## **## +# +## -# -## /## /=# /=## <# <## <=# <=## ==# ==## ># >## >=# >=## acosDouble# acosFloat# addr2Int# and# asinDouble# asinFloat# atanDouble# atanFloat# chr# cmpInteger# cosDouble# cosFloat# coshDouble# coshFloat# deRefStablePtr# decodeDouble# decodeFloat# delay# divideFloat# double2Float# double2Int# encodeDouble# encodeFloat# eqAddr# eqChar# eqFloat# eqWord# errorIO# expDouble# expFloat# float2Double# float2Int# fork# geAddr# geChar# geFloat# geWord# gtAddr# gtChar# gtFloat# gtWord# iShiftL# iShiftRA# iShiftRL# indexAddrArray# indexAddrOffAddr# indexAddrOffForeignObj# indexArray# indexCharArray# indexCharOffAddr# indexCharOffForeignObj# indexDoubleArray# indexDoubleOffAddr# indexDoubleOffForeignObj# indexFloatArray# indexFloatOffAddr# indexFloatOffForeignObj# indexIntArray# indexIntOffAddr# indexIntOffForeignObj# int2Addr# int2Double# int2Float# int2Integer# int2Word# integer2Int# leAddr# leChar# leFloat# leWord# logDouble# logFloat# ltAddr# ltChar# ltFloat# ltWord# makeForeignObj# makeStablePtr# minusFloat# minusInteger# neAddr# neChar# neFloat# neWord# negateDouble# negateFloat# negateInt# negateInteger# newAddrArray# newArray# newCharArray# newDoubleArray# newFloatArray# newIntArray# newSynchVar# not# or# ord# par# parAt# parAtForNow# parGlobal# parLocal# plusFloat# plusInteger# powerFloat# putMVar# quotInt# quotRemInteger# readAddrArray# readArray# readCharArray# readDoubleArray# readFloatArray# readIntArray# realWorld# remInt# sameMutableArray# sameMutableByteArray# seq# shiftL# shiftRA# shiftRL# sinDouble# sinFloat# sinhDouble# sinhFloat# sqrtDouble# sqrtFloat# takeMVar# tanDouble# tanFloat# tanhDouble# tanhFloat# timesFloat# timesInteger# unsafeFreezeArray# unsafeFreezeByteArray# waitRead# waitWrite# word2Int# writeAddrArray# writeArray# writeCharArray# writeDoubleArray# writeFloatArray# writeForeignObj# writeIntArray# -> Addr# All Array# ByteArray# Char# Double# Float# ForeignObj# Int# MutableArray# MutableByteArray# RealWorld StablePtr# State# SynchVar# Void Word#;
+IOBase ioToPrimIO ioToST primIOToIO seqIO_Prim stToIO thenIO_Prim trace;
+Ix Ix;
+PrelBase Char(C#) Double(D#) Float(F#) Int(I#) Integer(J#) Lift(Lift);
+STBase fixPrimIO listPrimIO mapAndUnzipPrimIO mapPrimIO returnPrimIO seqPrimIO thenPrimIO PrimIO ST;
+UnsafeST unsafeInterleavePrimIO unsafePerformPrimIO;
+_fixities_
+infixr 1 seqIO_Prim;
+infixr 1 thenIO_Prim;
+_instances_
+instance {PrelBase.Eval FooData} = $d1;
+_declarations_
+1 $d1 _:_ {PrelBase.Eval FooData} ;;
+1 data FooData = FooData ;
+1 type FooType = PrelBase.Int ;

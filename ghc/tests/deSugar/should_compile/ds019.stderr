@@ -8,26 +8,26 @@ ds019.hs:8:
 
 ================================================================================
 Desugared:
-f{-r3G,x-}  :: 
-    _forall_
-    [t{-aBG-} t{-aBJ-} t{-aBM-} t{-aBY-} t{-aC1-} t{-aC9-} t{-aC7-}]
-    =>
-    (t{-aBG-}, t{-aBJ-}, t{-aBM-})
-    -> (t{-aBY-}, t{-aC1-})
-    -> t{-aC9-}
-    -> [t{-aC7-}]
+Rec {
+f{-r3y,x-}  ::  _forall_
+		[tazA taz7 taza tazd tazq tazt tazy]
+		=>
+		(taz7, taza, tazd) -> (tazq, tazt) -> tazA -> [tazy]
 {-# L #-}
-f{-r3G,x-} =
-    _/\_ t{-aBG-} t{-aBJ-} t{-aBM-} t{-aBY-} t{-aC1-} t{-aC9-} t{-aC7-} -> \ ds_dGA  :: 
-										 (t{-aBG-}, t{-aBJ-}, t{-aBM-})
-									     {-# L #-}
-									     ds_dGA i_r3h  :: 
-											(t{-aBY-}, t{-aC1-})
-										    {-# L #-}
-										    i_r3h o_r3j  :: 
-											      t{-aC9-}
-											  {-# L #-}
-											  o_r3j ->
-	case ds_dGA of { PrelTup.(,,){-63,p-}{i} a_r3d b_r3e c_r3f  ->
-	PrelBase.[]{-5i,p-}{i}
-	    _@_ t{-aC7-};}
+f{-r3y,x-} =
+    _/\_ tazA taz7 taza tazd tazq tazt tazy ->
+	_letrec_ {
+	  f_ayl  ::  (taz7, taza, tazd) -> (tazq, tazt) -> tazA -> [tazy]
+	  {-# L #-}
+	  f_ayl =
+	      \ ds_dEd  ::  (taz7, taza, tazd)
+		{-# L #-}
+		ds_dEd i_r3g  ::  (tazq, tazt)
+		       {-# L #-}
+		       i_r3g o_r3h  ::  tazA
+			     {-# L #-}
+			     o_r3h ->
+		  case ds_dEd of { PrelTup.(,,){-63,w-}{i} a_r3d b_r3e c_r3f  ->
+		  PrelBase.[]{-5i,w-}{i} _@_ tazy;};
+	} in  f_ayl
+end Rec }

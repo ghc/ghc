@@ -1,6 +1,6 @@
 --!!! Stress test for type checker
 
-module Prims where
+module ShouldSucceed where
 
 import Prelude hiding (head)
 

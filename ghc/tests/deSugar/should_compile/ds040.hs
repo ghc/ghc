@@ -1,7 +1,7 @@
 --!!! Another bug in overloaded n+k patts
 --
 
-main _ = [AppendChan stdout (shows ((4::Int) ^^^^ (6::Int)) "\n")]
+main  = print ((4::Int) ^^^^ (6::Int))
 
 (^^^^)		:: (Num a, Integral b) => a -> b -> a
 x ^^^^ 0		=  1

@@ -1,0 +1,14 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [taks] [] [([taks], x{-r1,x-}, x_akq)]
+    (x_akq@_) = x_akq
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed x;
+_declarations_
+1 x _:_ _forall_ [ta] => ta ;;

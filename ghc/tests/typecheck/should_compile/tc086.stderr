@@ -1,0 +1,124 @@
+
+
+================================================================================
+Typechecked:
+scsel_RingShouldSucceedGroup{-aFJ,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+*{-r6D,l-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+AbsBinds [taE5] [d.Ring_aFn] [([taE5], $m*{-rFK,x-}, *_aFL)]
+    d.Group_aFk = scsel_RingShouldSucceedGroup{-aFJ,x-} taE5 d.Ring_aFn
+    AbsBinds [] [] [([], *_aFL, *_aE2)]
+	*_aE2 a_r6L b_r6M
+	      = multiply_aFO a_r6L b_r6M
+	      where
+		  {- rec -}
+		  AbsBinds
+		  [taEe]
+		  [d.Group_aF3]
+		  [([taEe], multiply_r6O, multiply_aEb)]
+		      d.Group_aF5 = d.Group_aF3
+		      compare_aFP = compare{-r6w,l-} taEe d.Group_aF5
+		      d.Group_aF7 = d.Group_aF3
+		      zero_aFQ = zero{-r6A,l-} taEe d.Group_aF7
+		      zero_aFR = zero_aFQ
+		      d.Group_aF9 = d.Group_aF3
+		      -_aFS = -{-r6z,l-} taEe d.Group_aF9
+		      zero_aFT = zero_aFQ
+		      d.Group_aFb = d.Group_aF3
+		      multiply_aFU = multiply_r6O taEe d.Group_aFb
+		      -_aFV = -_aFS
+		      zero_aFW = zero_aFQ
+		      compare_aFX = compare_aFP
+		      d.Group_aFd = d.Group_aF3
+		      one_aFY = one{-r6B,l-} taEe d.Group_aFd
+		      d.Group_aFf = d.Group_aF3
+		      +_aFZ = +{-r6y,l-} taEe d.Group_aFf
+		      multiply_aG0 = multiply_aFU
+		      -_aG1 = -_aFS
+		      one_aG2 = one_aFY
+		      multiply_aEb a_r6S b_r6T
+				   = case compare_aFP a_r6S zero_aFQ of
+				       PrelBase.EQ{-r2a,p-}{i} -> zero_aFR
+				       PrelBase.LT{-r28,p-}{i}
+				       -> zero_aFT -_aFS (multiply_aFU zero_aFW -_aFV a_r6S b_r6T)
+				       PrelBase.GT{-r2c,p-}{i}
+				       -> case compare_aFX a_r6S one_aFY of
+					    PrelBase.EQ{-r2a,p-}{i} -> b_r6T
+					    _
+					    -> b_r6T +_aFZ (multiply_aG0 a_r6S -_aG1 one_aG2 b_r6T)
+		  {- nonrec -}
+		  multiply_aFO = multiply_r6O taE5 d.Group_aFk
+		  {- nonrec -}
+compare{-r6w,l-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
+	tpl_B1;}
+fromInteger{-r6x,l-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
+	tpl_B2;}
++{-r6y,l-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
+	tpl_B3;}
+-{-r6z,l-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
+	tpl_B4;}
+zero{-r6A,l-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
+	tpl_B5;}
+one{-r6B,l-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case
+	    tpl_B1
+	of {
+	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
+	tpl_B6;}
+AbsBinds
+[taFt]
+[d.Group_aFG]
+[([taFt], $mzero{-rFM,x-}, zero_aG3), ([taFt],
+				       $mone{-rFN,x-},
+				       one_aG6)]
+    d.Group_aFI = d.Group_aFG
+    fromInteger_aG4 = fromInteger{-r6x,l-} taFt d.Group_aFI
+    fromInteger_aG5 = fromInteger_aG4
+    AbsBinds [] [] [([], zero_aG3, zero_aFs)]
+	zero_aFs = fromInteger_aG4 0
+    AbsBinds [] [] [([], one_aG6, one_aFA)]
+	one_aFA = fromInteger_aG5 1
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d12 1 $d16 1 $d2 1 $d22 1 $d28 1 $d3 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d55 1 $d56 1 $d8 1 $d9 1 $m- 1 $m/= 1 $mfromInt 1 $mshowList 1 Eq 1 Eval 1 Num 1 Ordering 1 Ordering 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed Group Ring;
+_declarations_
+1 $m* _:_ _forall_ [a] {Ring a} => a -> a -> a ;;
+1 $mone _:_ _forall_ [a] {Group a} => a ;;
+1 $mzero _:_ _forall_ [a] {Group a} => a ;;
+1 class Group a where {compare :: a -> a -> PrelBase.Ordering; fromInteger :: PrelBase.Integer -> a; + :: a -> a -> a; - :: a -> a -> a; zero = :: a; one = :: a} ;
+1 class {Group a} => Ring a where {* = :: a -> a -> a} ;

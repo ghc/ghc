@@ -3,129 +3,100 @@
 ================================================================================
 Desugared:
 Rec {
-ds_dK5  :: 
-    _forall_
-    [rlg{-aHq-} riC{-aHC-}]
-    =>
-    {PrelBase.Num{-2c,p-} riC{-aHC-}}
-    -> {PrelBase.Eq{-23,p-} rlg{-aHq-}}
-    -> (rlg{-aHq-} -> riC{-aHC-}, PrelBase.Bool{-34,p-}
-				  -> rlg{-aHq-}
-				  -> riC{-aHC-})
+ds_dEJ  ::  _forall_
+	    [taC5 taCc]
+	    =>
+	    {PrelBase.Num{-2c,p-} taCc}
+	    -> {PrelBase.Eq{-23,p-} taC5}
+	    -> (taC5 -> taCc, PrelBase.Bool{-34,W-} -> taC5 -> taCc)
 {-# L #-}
-ds_dK5 =
-    _/\_ rlg{-aHq-} riC{-aHC-} -> \ d.Num_aHI  :: 
-					{PrelBase.Num{-2c,p-} riC{-aHC-}}
-				    {-# L #-}
-				    d.Num_aHI d.Eq_aHG  :: 
-						  {PrelBase.Eq{-23,p-} rlg{-aHq-}}
-					      {-# L #-}
-					      d.Eq_aHG ->
+ds_dEJ =
+    _/\_ taC5 taCc -> \ d.Num_aCh  ::  {PrelBase.Num{-2c,p-} taCc}
+			{-# L #-}
+			d.Num_aCh d.Eq_aCf  ::  {PrelBase.Eq{-23,p-} taC5}
+				  {-# L #-}
+				  d.Eq_aCf ->
 	_letrec_ {
-	  ==_aKk  :: 
-	      rlg{-aHq-} -> rlg{-aHq-} -> PrelBase.Bool{-34,p-}
+	  ==_aEY  ::  taC5 -> taC5 -> PrelBase.Bool{-34,W-}
 	  {-# L #-}
-	  ==_aKk =
-	      PrelBase.=={-8Y,p-}
-		  _@_ rlg{-aHq-} d.Eq_aHG;
-	  abs_aKr  :: 
-	      riC{-aHC-} -> riC{-aHC-}
+	  ==_aEY =
+	      PrelBase.=={-8Y,p-} _@_ taC5 d.Eq_aCf;
+	  abs_aF5  ::  taCc -> taCc
 	  {-# L #-}
-	  abs_aKr =
-	      PrelBase.abs{-r3j,p-}
-		  _@_ riC{-aHC-} d.Num_aHI;
-	  f_aHi  :: 
-	      rlg{-aHq-} -> riC{-aHC-}
+	  abs_aF5 =
+	      PrelBase.abs{-r3i,p-} _@_ taCc d.Num_aCh;
+	  f_aBP  ::  taC5 -> taCc
 	  {-# L #-}
-	  f_aHi =
-	      \ x_r3e  :: 
-		    rlg{-aHq-}
+	  f_aBP =
+	      \ x_r3e  ::  taC5
 		{-# L #-}
 		x_r3e ->
-		  let {
-		    ds_dL3  :: 
-			PrelBase.Bool{-34,p-}
-		    {-# L #-}
-		    ds_dL3 =
-			==_aKk
-			    x_r3e x_r3e
-		  } in 
-		    g_aHj
-			ds_dL3 x_r3e;
-	  g_aHj  :: 
-	      PrelBase.Bool{-34,p-} -> rlg{-aHq-} -> riC{-aHC-}
+		  (let {
+		     ds_dFM  ::  PrelBase.Bool{-34,W-}
+		     {-# L #-}
+		     ds_dFM =
+			 ==_aEY x_r3e x_r3e
+		   } in  g_aBQ ds_dFM)
+		      x_r3e;
+	  g_aBQ  ::  PrelBase.Bool{-34,W-} -> taC5 -> taCc
 	  {-# L #-}
-	  g_aHj =
-	      \ b_r3g  :: 
-		    PrelBase.Bool{-34,p-}
+	  g_aBQ =
+	      \ b_r3g  ::  PrelBase.Bool{-34,W-}
 		{-# L #-}
-		b_r3g x_r3i  :: 
-			  rlg{-aHq-}
+		b_r3g x_r3h  ::  taC5
 		      {-# L #-}
-		      x_r3i ->
+		      x_r3h ->
 		  let {
-		    ds_dLq  :: 
-			riC{-aHC-}
+		    ds_dG6  ::  taCc
 		    {-# L #-}
-		    ds_dLq =
-			f_aHi
-			    x_r3i
-		  } in 
-		    abs_aKr
-			ds_dLq;
+		    ds_dG6 =
+			f_aBP x_r3h
+		  } in  abs_aF5 ds_dG6;
 	} in 
-	  PrelTup.(,){-62,p-}{i}
-	      {_@_ (rlg{-aHq-} -> riC{-aHC-})
-	       _@_ (PrelBase.Bool{-34,p-} -> rlg{-aHq-} -> riC{-aHC-})
-	       f_aHi
-	       g_aHj}
-f{-r3l,x-}  :: 
-    _forall_
-    [rlg{-aHq-} riC{-aHC-}]
-    =>
-    {PrelBase.Num{-2c,p-} riC{-aHC-}}
-    -> {PrelBase.Eq{-23,p-} rlg{-aHq-}}
-    -> rlg{-aHq-}
-    -> riC{-aHC-}
+	  PrelTup.(,){-62,w-}{i}
+	      {_@_ (taC5 -> taCc)
+	       _@_ (PrelBase.Bool{-34,W-} -> taC5 -> taCc)
+	       f_aBP
+	       g_aBQ}
+f{-r3k,x-}  ::  _forall_
+		[taC5 taCc]
+		=>
+		{PrelBase.Num{-2c,p-} taCc}
+		-> {PrelBase.Eq{-23,p-} taC5}
+		-> taC5
+		-> taCc
 {-# L #-}
-f{-r3l,x-} =
-    _/\_ rlg{-aHq-} riC{-aHC-} -> \ d.Num_aHI  :: 
-					{PrelBase.Num{-2c,p-} riC{-aHC-}}
-				    {-# L #-}
-				    d.Num_aHI d.Eq_aHG  :: 
-						  {PrelBase.Eq{-23,p-} rlg{-aHq-}}
-					      {-# L #-}
-					      d.Eq_aHG ->
+f{-r3k,x-} =
+    _/\_ taC5 taCc -> \ d.Num_aCh  ::  {PrelBase.Num{-2c,p-} taCc}
+			{-# L #-}
+			d.Num_aCh d.Eq_aCf  ::  {PrelBase.Eq{-23,p-} taC5}
+				  {-# L #-}
+				  d.Eq_aCf ->
 	case
-	    ds_dK5
-		_@_ rlg{-aHq-} _@_ riC{-aHC-} d.Num_aHI d.Eq_aHG
+	    ds_dEJ _@_ taC5 _@_ taCc d.Num_aCh d.Eq_aCf
 	of {
-	PrelTup.(,){-62,p-}{i} ds_dM9 ds_dMa  ->
-	ds_dM9;}
-g{-r3k,x-}  :: 
-    _forall_
-    [rlg{-aHq-} riC{-aHC-}]
-    =>
-    {PrelBase.Num{-2c,p-} riC{-aHC-}}
-    -> {PrelBase.Eq{-23,p-} rlg{-aHq-}}
-    -> PrelBase.Bool{-34,p-}
-    -> rlg{-aHq-}
-    -> riC{-aHC-}
+	PrelTup.(,){-62,w-}{i} ds_dGP ds_dGQ  ->
+	ds_dGP;}
+g{-r3j,x-}  ::  _forall_
+		[taC5 taCc]
+		=>
+		{PrelBase.Num{-2c,p-} taCc}
+		-> {PrelBase.Eq{-23,p-} taC5}
+		-> PrelBase.Bool{-34,W-}
+		-> taC5
+		-> taCc
 {-# L #-}
-g{-r3k,x-} =
-    _/\_ rlg{-aHq-} riC{-aHC-} -> \ d.Num_aHI  :: 
-					{PrelBase.Num{-2c,p-} riC{-aHC-}}
-				    {-# L #-}
-				    d.Num_aHI d.Eq_aHG  :: 
-						  {PrelBase.Eq{-23,p-} rlg{-aHq-}}
-					      {-# L #-}
-					      d.Eq_aHG ->
+g{-r3j,x-} =
+    _/\_ taC5 taCc -> \ d.Num_aCh  ::  {PrelBase.Num{-2c,p-} taCc}
+			{-# L #-}
+			d.Num_aCh d.Eq_aCf  ::  {PrelBase.Eq{-23,p-} taC5}
+				  {-# L #-}
+				  d.Eq_aCf ->
 	case
-	    ds_dK5
-		_@_ rlg{-aHq-} _@_ riC{-aHC-} d.Num_aHI d.Eq_aHG
+	    ds_dEJ _@_ taC5 _@_ taCc d.Num_aCh d.Eq_aCf
 	of {
-	PrelTup.(,){-62,p-}{i} ds_dMB ds_dMA  ->
-	ds_dMA;}
+	PrelTup.(,){-62,w-}{i} ds_dHh ds_dHg  ->
+	ds_dHg;}
 end Rec }
 
 NOTE: Simplifier still going after 4 iterations; bailing out.

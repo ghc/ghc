@@ -1,6 +1,6 @@
  
-tcfail070.hs:13: Couldn't match the kind `*' against `* -> ka1921'
-    When unifying two kinds `*' and `* -> ka1921'
+tcfail070.hs:13: Couldn't match the kind `*' against `* -> ka1932'
+    When unifying two kinds `*' and `* -> ka1932'
     In the type declaration for `State'
 
 

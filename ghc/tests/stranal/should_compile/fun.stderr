@@ -1,0 +1,29 @@
+
+
+================================================================================
+Simplified:
+`$d1'  ::  `{PrelBase.Eval (LList a)}'
+`$d1' =
+    _/\_ `$x0' -> `PrelBase.void'
+`MkFun'  ::  `(Fun -> Fun) -> Fun'
+`MkFun' =
+    \ `$x0'  ::  `Fun -> Fun'
+      `$x0' ->
+	`MkFun' {`$x0'}
+`Nill'  ::  `LList a'
+`Nill' =
+    _/\_ `$x0' -> `Nill' {_@_ `$x0'}
+`Conss'  ::  `a -> LList a -> LList a'
+`Conss' =
+    _/\_ `$x0' -> \ `$x1'  ::  `$x0'
+		    `$x1' `$x2'  ::  `LList $x0'
+			  `$x2' ->
+	`Conss' {_@_ `$x0' `$x1' `$x2'}
+`$d2'  ::  `{PrelBase.Eval Fun}'
+`$d2' =
+    `PrelBase.void'
+`g'  ::  `Fun -> Fun'
+`g' =
+    \ `$x0'  ::  `Fun'
+      `$x0' ->
+	`$x0'

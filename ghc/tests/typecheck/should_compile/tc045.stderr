@@ -1,0 +1,39 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [tald] [] [([tald], $d1{-rlI,x-}, d.C_al6)]
+    AbsBinds [] [] [([], op1_alJ, op1_ala)]
+	op1_ala xs_r3k = xs_r3k
+    d.C_al6 = ({-dict-} [] [op1_alJ])
+AbsBinds
+[talr]
+[d.B_alv, d.C_alw]
+[([talr], $d2{-rlK,x-}, d.B_alk)]
+    d.C_alu = d.C_alw
+    AbsBinds [] [] [([], op2_alM, op2_alo)]
+	op2_alo xs_r3s ys_r3t = xs_r3s
+    d.B_alk = ({-dict-} [d.C_alu] [op2_alM])
+scsel_BShouldSucceedC{-alL,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3C,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+AbsBinds [talG] [d.B_alC] []
+op1{-r3B,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [talH] [d.C_alF] []
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed B(op2) C(op1);
+_instances_
+instance _forall_ [a] => {C [a]} = $d1;
+instance _forall_ [a] {B a} => {B [a]} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] => {C [a]} ;;
+1 $d2 _:_ _forall_ [a] {B a, C [a]} => {B [a]} ;;
+1 class {C a} => B a where {op2 :: a -> a -> a} ;
+1 class C a where {op1 :: a -> a} ;

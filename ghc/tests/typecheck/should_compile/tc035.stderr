@@ -1,0 +1,34 @@
+
+
+================================================================================
+Typechecked:
+Var{-r5,x-}{i} =
+    _/\_ a_tr3q -> \ tpl_B1 -> Var{-r5,x-}{i} {_@_ a_tr3q tpl_B1}
+App{-r4,x-}{i} =
+    _/\_ a_tr3q -> \ tpl_B1 tpl_B2 ->
+	App{-r4,x-}{i} {_@_ a_tr3q tpl_B1 tpl_B2}
+AbsBinds [taRI] [] [([taRI], g{-r3t,x-}, g_aRm)]
+    g_aRm (a_r3j, (Var{-r5,x-}{i} name_r3k))
+	  = [name_r3k] ([PrelBase.Char{-38,W-}])
+    g_aRm (a_r3m, (App{-r4,x-}{i} e1_r3n e2_r3o))
+	  = ++_aS9 [PrelBase.Char{-38,W-}] (g_aRm e1_r3n) (g_aRm e2_r3o)
+AbsBinds [taS5] [] [([taS5], $d1{-rS8,x-}, d.Eval_aS2)]
+    d.Eval_aS2 = ({-dict-} [] [])
+d.MonadPlus_aS4 = PrelBase.$d23{-rpi,p-}
+++_aS9 = PrelBase.++{-ruo,p-} PrelBase.[]{-3j,W-} d.MonadPlus_aS4
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d2 1 $d23 1 $d24 1 $d25 1 $d38 1 $d39 1 $d40 1 $d42 1 $d45 1 $d47 1 $m>> 1 Eval 1 Monad 1 MonadPlus 1 MonadZero 1;
+PrelTup 1 :: $d13 1;
+_exports_
+ShouldSucceed g AnnExpr Expr(Var App);
+_instances_
+instance _forall_ [a] => {PrelBase.Eval (Expr a)} = $d1;
+_declarations_
+1 $d1 _:_ _forall_ [a] => {PrelBase.Eval (Expr a)} ;;
+1 type AnnExpr a = (a, Expr a) ;
+1 data Expr a = Var [PrelBase.Char] |  App (AnnExpr a) (AnnExpr a) ;
+1 g _:_ _forall_ [ta] => (ta, Expr ta) -> [[PrelBase.Char]] ;;

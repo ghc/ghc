@@ -1,53 +1,33 @@
 
 
---================================================================================
+================================================================================
 Simplified:
-`$d2'  :: 
-    `{PrelBase.Eval (LList t{-r3s-})}'
+`$d2'  ::  `{PrelBase.Eval (LList t)}'
 `$d2' =
-    _/\_ `t{-sUf-}' ->
-	`PrelBase.void'
-`Nill'  :: 
-    `LList t{-r3s-}'
-`Nill' =
-    _/\_ `t{-sUc-}' ->
-	`Nill'
-	    {_@_ `t{-sUc-}'}
-`Conss'  :: 
-    `t{-r3s-} -> LList t{-r3s-} -> LList t{-r3s-}'
-`Conss' =
-    _/\_ `t{-sUd-}' -> \ `tpl'  :: 
-			     `t{-sUd-}'
-			 `tpl' `tpl'  :: 
-				   `LList t{-sUd-}'
-			       `tpl' ->
-	`Conss'
-	    {_@_ `t{-sUd-}' `tpl' `tpl'}
-`TTrue'  :: 
-    `BBool'
+    _/\_ `$x0' -> `PrelBase.void'
+`TTrue'  ::  `BBool'
 `TTrue' =
-    `TTrue'
-	{}
-`FFalse'  :: 
-    `BBool'
+    `TTrue' {}
+`FFalse'  ::  `BBool'
 `FFalse' =
-    `FFalse'
-	{}
-`f'  :: 
-    `LList t{-aGi-} -> BBool'
+    `FFalse' {}
+`f'  ::  `LList taBg -> BBool'
 `f' =
-    _/\_ `t{-sUe-}' -> \ `ds'  :: 
-			     `LList t{-sUe-}'
-			 `ds' ->
-	case `ds' of {
-	  `Nill' ->
-	      `TTrue'
-		  {};
-	  `Conss' `a' `as' ->
-	      `FFalse'
-		  {};
+    _/\_ `$x0' -> \ `$x1'  ::  `LList $x0'
+		    `$x1' ->
+	case `$x1' of {
+	  `Nill' -> `TTrue' {};
+	  `Conss' `$x2' `$x3' -> `FFalse' {};
 	}
-`$d1'  :: 
-    `{PrelBase.Eval BBool}'
+`Nill'  ::  `LList t'
+`Nill' =
+    _/\_ `$x0' -> `Nill' {_@_ `$x0'}
+`Conss'  ::  `t -> LList t -> LList t'
+`Conss' =
+    _/\_ `$x0' -> \ `$x1'  ::  `$x0'
+		    `$x1' `$x2'  ::  `LList $x0'
+			  `$x2' ->
+	`Conss' {_@_ `$x0' `$x1' `$x2'}
+`$d1'  ::  `{PrelBase.Eval BBool}'
 `$d1' =
     `PrelBase.void'

@@ -1,9 +1,10 @@
  
 tcfail071.hs:10: Couldn't match the signature/existential type variable
-		     `taCF' with the type `taCR -> taCS -> taCS'
-    Expected: `taCR -> taCS -> taCS'
-    Inferred: `taCF'
-    In the first argument of `PrelBase.foldr', namely `(f c)'
+		     `taCS' with the type `taD6 -> taD3 -> taD3'
+    Expected: `taCS'
+    Inferred: `taD6 -> taD3 -> taD3'
+    In a pattern binding:
+	`p = PrelBase.foldr (f c) PrelBase.[] PrelBase.[]'
     In an equation for function `g':
 	`g c
 	   = c

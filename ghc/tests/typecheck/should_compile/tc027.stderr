@@ -1,0 +1,28 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds
+[tal1]
+[]
+[([tal1], f{-r3n,x-}, f_akC), ([tal1], g{-r3m,x-}, g_akD)]
+    f_akC x_r3h y_r3i = if x_r3h then y_r3i else g_akD y_r3i x_r3h
+    g_akD y_r3k x_r3l = if x_r3l then y_r3k else f_akC x_r3l y_r3k
+AbsBinds [] [] [([], h{-r3o,x-}, h_al3)]
+    h_al3 x_r3f
+	  = f{-r3n,x-} PrelBase.Bool{-34,W-} f{-r3n,x-}
+						 PrelBase.Bool{-34,W-} PrelBase.True{-5E,w-}{i}
+								       x_r3f
+					     x_r3f
+
+NOTE: Simplifier still going after 4 iterations; bailing out.
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f g h;
+_declarations_
+1 f _:_ _forall_ [ta] => PrelBase.Bool -> ta -> ta ;;
+1 g _:_ _forall_ [ta] => ta -> PrelBase.Bool -> ta ;;
+1 h _:_ PrelBase.Bool -> PrelBase.Bool ;;

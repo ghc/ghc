@@ -1,0 +1,25 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [] [] [([], x{-r3i,x-}, x_akw)]
+    x_akw = 'a'
+AbsBinds [] [] [([], y{-r3h,x-}, y_akz), ([], ys{-r3g,x-}, ys_akA)]
+    (y_akz PrelBase.:{-55,w-}{i} ys_akA)
+	= ['a', 'b', 'c'] (PrelBase.Char{-38,W-})
+	where
+	    {- nonrec -}
+	    AbsBinds [] [] [([], p_r3f, p_akI)]
+		p_akI = x{-r3i,x-}
+	    {- nonrec -}
+	    {- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed x y ys;
+_declarations_
+1 x _:_ PrelBase.Char ;;
+1 y _:_ PrelBase.Char ;;
+1 ys _:_ [PrelBase.Char] ;;

@@ -1,9 +1,9 @@
  
 tcfail033.hs:4: Cannot construct the infinite type (occur check)
-		    `taGt' = `(taGt, taGw)'
-    Expected: `aaGy (taGt, taGw)'
-    Inferred: `aaGy taGt'
-    In a pattern binding: `buglet = [ x | (x, y) <- buglet ]'
+		    `taGA' = `(taGA, taGD)'
+    Expected: `aaGF taGA'
+    Inferred: `aaGF (taGA, taGD)'
+    In a pattern binding: `buglet = [x | (x, y) <- buglet]'
 
 
 Compilation had errors

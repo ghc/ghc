@@ -1,191 +1,121 @@
 
 
---================================================================================
+================================================================================
 Simplified:
-`$d5'  :: 
-    `{PrelBase.Eval (Pair a{-r4b-} b{-r4c-})}'
+`$d5'  ::  `{PrelBase.Eval (Pair a b)}'
 `$d5' =
-    _/\_ `a{-s1NX-}' `b{-s1NY-}' ->
-	`PrelBase.void'
-`$d4'  :: 
-    `{PrelBase.Eval (LList alpha{-r49-})}'
+    _/\_ `$x0' `$x1' -> `PrelBase.void'
+`$d4'  ::  `{PrelBase.Eval (LList alpha)}'
 `$d4' =
-    _/\_ `alpha{-s1NZ-}' ->
-	`PrelBase.void'
-`$d2'  :: 
-    `{PrelBase.Eval (Tree x{-r46-})}'
+    _/\_ `$x0' -> `PrelBase.void'
+`$d2'  ::  `{PrelBase.Eval (Tree x)}'
 `$d2' =
-    _/\_ `x{-s1O0-}' ->
-	`PrelBase.void'
-`$d1'  :: 
-    `{PrelBase.Eval (A a{-r44-})}'
+    _/\_ `$x0' -> `PrelBase.void'
+`$d1'  ::  `{PrelBase.Eval (A a)}'
 `$d1' =
-    _/\_ `a{-s1O1-}' ->
-	`PrelBase.void'
-`MkPair'  :: 
-    `a{-r4b-} -> b{-r4c-} -> Pair a{-r4b-} b{-r4c-}'
-`MkPair' =
-    _/\_ `a{-s1NI-}' `b{-s1NJ-}' -> \ `tpl'  :: 
-					  `a{-s1NI-}'
-				      `tpl' `tpl'  :: 
-						`b{-s1NJ-}'
-					    `tpl' ->
-	`MkPair'
-	    {_@_ `a{-s1NI-}' _@_ `b{-s1NJ-}' `tpl' `tpl'}
-`MkA'  :: 
-    `a{-r44-} -> A a{-r44-} -> A a{-r44-}'
+    _/\_ `$x0' -> `PrelBase.void'
+`MkA'  ::  `a -> A a -> A a'
 `MkA' =
-    _/\_ `a{-s1NK-}' -> \ `tpl'  :: 
-			      `a{-s1NK-}'
-			  `tpl' `tpl'  :: 
-				    `A a{-s1NK-}'
-				`tpl' ->
-	`MkA'
-	    {_@_ `a{-s1NK-}' `tpl' `tpl'}
-`FF'  :: 
-    `Boolean'
-`FF' =
-    `FF'
-	{}
-`TT'  :: 
-    `Boolean'
-`TT' =
-    `TT'
-	{}
-`Nill'  :: 
-    `LList alpha{-r49-}'
-`Nill' =
-    _/\_ `alpha{-s1NL-}' ->
-	`Nill'
-	    {_@_ `alpha{-s1NL-}'}
-`Conss'  :: 
-    `alpha{-r49-} -> LList alpha{-r49-} -> LList alpha{-r49-}'
-`Conss' =
-    _/\_ `alpha{-s1NM-}' -> \ `tpl'  :: 
-				  `alpha{-s1NM-}'
-			      `tpl' `tpl'  :: 
-					`LList alpha{-s1NM-}'
-				    `tpl' ->
-	`Conss'
-	    {_@_ `alpha{-s1NM-}' `tpl' `tpl'}
-Rec {
-`append'  :: 
-    `LList a{-aHq-} -> LList a{-aHq-} -> LList a{-aHq-}'
-`append' =
-    _/\_ `a{-s1NN-}' -> \ `xs'  :: 
-			      `LList a{-s1NN-}'
-			  `xs' `ys'  :: 
-				   `LList a{-s1NN-}'
-			       `ys' ->
-	case `xs' of {
-	  `Nill' ->
-	      `ys';
-	  `Conss' `z' `zs' ->
-	      let {
-		`ds'  :: 
-		    `LList a{-s1NN-}'
-		`ds' =
-		    `append'
-			_@_ `a{-s1NN-}' `zs' `ys'
-	      } in 
-		`Conss'
-		    {_@_ `a{-s1NN-}' `z' `ds'};
-	}
-end Rec }
-Rec {
-`flat'  :: 
-    `Tree (Pair a{-aHT-} b{-aHU-}) -> LList a{-aHT-}'
-`flat' =
-    _/\_ `b{-s1NQ-}' `a{-s1NP-}' -> \ `s'  :: 
-					  `Tree (Pair a{-s1NP-} b{-s1NQ-})'
-				      `s' ->
-	case `s' of {
-	  `Leaf' `ds' ->
-	      case `ds' of { `MkPair' `a' `b'  ->
-	      let {
-		`ds'  :: 
-		    `LList a{-s1NP-}'
-		`ds' =
-		    `Nill'
-			{_@_ `a{-s1NP-}'}
-	      } in 
-		`Conss'
-		    {_@_ `a{-s1NP-}' `a' `ds'};};
-	  `Node' `l' `r' ->
-	      case
-		  `flat'
-		      _@_ `b{-s1NQ-}' _@_ `a{-s1NP-}' `l'
-	      of {
-	      `ds' ->
-	      let {
-		`ds'  :: 
-		    `LList a{-s1NP-}'
-		`ds' =
-		    `flat'
-			_@_ `b{-s1NQ-}' _@_ `a{-s1NP-}' `r'
-	      } in 
-		`append'
-		    _@_ `a{-s1NP-}' `ds' `ds';};
-	}
-end Rec }
-`Zero'  :: 
-    `Nat'
-`Zero' =
-    `Zero'
-	{}
-`Succ'  :: 
-    `Nat -> Nat'
-`Succ' =
-    \ `tpl'  :: 
-	  `Nat'
-      `tpl' ->
-	`Succ'
-	    {`tpl'}
-`Leaf'  :: 
-    `x{-r46-} -> Tree x{-r46-}'
+    _/\_ `$x0' -> \ `$x1'  ::  `$x0'
+		    `$x1' `$x2'  ::  `A $x0'
+			  `$x2' ->
+	`MkA' {_@_ `$x0' `$x1' `$x2'}
+`MkPair'  ::  `a -> b -> Pair a b'
+`MkPair' =
+    _/\_ `$x0' `$x1' -> \ `$x2'  ::  `$x0'
+			  `$x2' `$x3'  ::  `$x1'
+				`$x3' ->
+	`MkPair' {_@_ `$x0' _@_ `$x1' `$x2' `$x3'}
+`Leaf'  ::  `x -> Tree x'
 `Leaf' =
-    _/\_ `x{-s1NU-}' -> \ `tpl'  :: 
-			      `x{-s1NU-}'
-			  `tpl' ->
-	`Leaf'
-	    {_@_ `x{-s1NU-}' `tpl'}
-`Node'  :: 
-    `Tree x{-r46-} -> Tree x{-r46-} -> Tree x{-r46-}'
+    _/\_ `$x0' -> \ `$x1'  ::  `$x0'
+		    `$x1' ->
+	`Leaf' {_@_ `$x0' `$x1'}
+`Node'  ::  `Tree x -> Tree x -> Tree x'
 `Node' =
-    _/\_ `x{-s1NV-}' -> \ `tpl'  :: 
-			      `Tree x{-s1NV-}'
-			  `tpl' `tpl'  :: 
-				    `Tree x{-s1NV-}'
-				`tpl' ->
-	`Node'
-	    {_@_ `x{-s1NV-}' `tpl' `tpl'}
-`$d6'  :: 
-    `{PrelBase.Eval Boolean}'
+    _/\_ `$x0' -> \ `$x1'  ::  `Tree $x0'
+		    `$x1' `$x2'  ::  `Tree $x0'
+			  `$x2' ->
+	`Node' {_@_ `$x0' `$x1' `$x2'}
+`Zero'  ::  `Nat'
+`Zero' =
+    `Zero' {}
+`Succ'  ::  `Nat -> Nat'
+`Succ' =
+    \ `$x0'  ::  `Nat'
+      `$x0' ->
+	`Succ' {`$x0'}
+`Nill'  ::  `LList alpha'
+`Nill' =
+    _/\_ `$x0' -> `Nill' {_@_ `$x0'}
+`Conss'  ::  `alpha -> LList alpha -> LList alpha'
+`Conss' =
+    _/\_ `$x0' -> \ `$x1'  ::  `$x0'
+		    `$x1' `$x2'  ::  `LList $x0'
+			  `$x2' ->
+	`Conss' {_@_ `$x0' `$x1' `$x2'}
+Rec {
+`append'  ::  `LList taCl -> LList taCl -> LList taCl'
+`append' =
+    _/\_ `$x0' -> \ `$x1'  ::  `LList $x0'
+		    `$x1' `$x2'  ::  `LList $x0'
+			  `$x2' ->
+	case `$x1' of {
+	  `Nill' -> `$x2';
+	  `Conss' `$x3' `$x4' ->
+	      let {
+		`$x5'  ::  `LList $x0'
+		`$x5' =
+		    `append' _@_ `$x0' `$x4' `$x2'
+	      } in  `Conss' {_@_ `$x0' `$x3' `$x5'};
+	}
+end Rec }
+Rec {
+`flat'  ::  `Tree (Pair taCO taCP) -> LList taCO'
+`flat' =
+    _/\_ `$x0' `$x1' -> \ `$x2'  ::  `Tree (Pair $x1 $x0)'
+			  `$x2' ->
+	case `$x2' of {
+	  `Leaf' `$x3' ->
+	      case `$x3' of { `MkPair' `$x4' `$x5'  ->
+	      let {
+		`$x6'  ::  `LList $x1'
+		`$x6' =
+		    `Nill' {_@_ `$x1'}
+	      } in  `Conss' {_@_ `$x1' `$x4' `$x6'};};
+	  `Node' `$x7' `$x8' ->
+	      let {
+		`$x9'  ::  `LList $x1'
+		`$x9' =
+		    `flat' _@_ `$x0' _@_ `$x1' `$x8'
+	      } in 
+		case `flat' _@_ `$x0' _@_ `$x1' `$x7' of { `$xa' ->
+		`append' _@_ `$x1' `$xa' `$x9';};
+	}
+end Rec }
+`FF'  ::  `Boolean'
+`FF' =
+    `FF' {}
+`TT'  ::  `Boolean'
+`TT' =
+    `TT' {}
+`$d6'  ::  `{PrelBase.Eval Boolean}'
 `$d6' =
     `PrelBase.void'
-`$d3'  :: 
-    `{PrelBase.Eval Nat}'
+`$d3'  ::  `{PrelBase.Eval Nat}'
 `$d3' =
     `PrelBase.void'
-`s1h2'  :: 
-    `Pair Boolean Nat'
-`s1h2' =
-    `MkPair'
-	{_@_ `Boolean' _@_ `Nat' `TT' `Zero'}
-`s1h7'  :: 
-    `Tree (Pair Boolean Nat)'
-`s1h7' =
-    `Leaf'
-	{_@_ (`Pair' `Boolean' `Nat') `s1h2'}
-`s1l4'  :: 
-    `LList Boolean'
-`s1l4' =
-    `flat'
-	_@_ `Nat' _@_ `Boolean' `s1h7'
-`fl'  :: 
-    `Boolean -> LList Boolean'
+`$g0'  ::  `Pair Boolean Nat'
+`$g0' =
+    `MkPair' {_@_ `Boolean' _@_ `Nat' `TT' `Zero'}
+`$g1'  ::  `Tree (Pair Boolean Nat)'
+`$g1' =
+    `Leaf' {_@_ (`Pair' `Boolean' `Nat') `$g0'}
+`$g2'  ::  `LList Boolean'
+`$g2' =
+    `flat' _@_ `Nat' _@_ `Boolean' `$g1'
+`fl'  ::  `Boolean -> LList Boolean'
 `fl' =
-    \ `x'  :: 
-	  `Boolean'
-      `x' ->
-	`s1l4'
+    \ `$x0'  ::  `Boolean'
+      `$x0' ->
+	`$g2'

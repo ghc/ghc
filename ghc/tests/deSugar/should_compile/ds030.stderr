@@ -3,52 +3,39 @@
 ================================================================================
 Desugared:
 Rec {
+f{-r3e,x-}  ::  _forall_ [taBY] => [taBY] -> PrelBase.Int{-3g,W-}
 {-# L #-}
-d.Num_aHE =
-    PrelBase.$d3
-{-# L #-}
-fromInt_aKm =
-    PrelBase.fromInt
-	_@_ PrelBase.Int d.Num_aHE
-{-# L #-}
-lit_aKx =
-    let {
-      {-# L #-}
-      ds_dKW =
-	  PrelBase.I#
-	      3
-    } in 
-      fromInt_aKm
-	  ds_dKW
-{-# L #-}
-fromInt_aKw =
-    fromInt_aKm
-{-# L #-}
-lit_aKt =
-    let {
-      {-# L #-}
-      ds_dLb =
-	  PrelBase.I#
-	      4
-    } in 
-      fromInt_aKw
-	  ds_dLb
-{-# L #-}
-f = _/\_ t{-aHm-} -> \ {-# L #-}
-		       x_r3d ->
-	let {
+f{-r3e,x-} =
+    _/\_ taBY ->
+	_letrec_ {
+	  f_aBO  ::  [taBY] -> PrelBase.Int{-3g,W-}
 	  {-# L #-}
-	  ds_dLw =
-	      x_r3d } in
-	let {
-	  {-# L #-}
-	  fail_dLy =
-	      lit_aKt
-	} in 
-	  case ds_dLw of {
-	    PrelBase.: ds_dLG ds_dLF ->
-		fail_dLy;
-	    PrelBase.[] ->
-		lit_aKx;
-	  }
+	  f_aBO =
+	      \ x_r3d  ::  [taBY]
+		{-# L #-}
+		x_r3d ->
+		  let {
+		    ds_dEM  ::  [taBY]
+		    {-# L #-}
+		    ds_dEM =
+			x_r3d } in
+		  let {
+		    fail_dEO  ::  PrelBase.Int{-3g,W-}
+		    {-# L #-}
+		    fail_dEO =
+			lit_aEC
+		  } in 
+		    case ds_dEM of {
+		      PrelBase.:{-55,w-}{i} ds_dEV ds_dEW -> fail_dEO;
+		      PrelBase.[]{-5i,w-}{i} -> lit_aEA;
+		    };
+	} in  f_aBO
+lit_aEA  ::  PrelBase.Int{-3g,W-}
+{-# L #-}
+lit_aEA =
+    PrelBase.I#{-5b,w-}{i} 3
+lit_aEC  ::  PrelBase.Int{-3g,W-}
+{-# L #-}
+lit_aEC =
+    PrelBase.I#{-5b,w-}{i} 4
 end Rec }

@@ -1,8 +1,8 @@
  
 tcfail002.hs:4: Cannot construct the infinite type (occur check)
-		    `tak5' = `[tak5]'
-    Expected: `[tak5] -> tak5'
-    Inferred: `[tak5] -> [tak5]'
+		    `take' = `[take]'
+    Expected: `[take]'
+    Inferred: `take'
     In an equation for function `c': `c z = z'
 
 

@@ -6,196 +6,159 @@ ds032.hs:12:
 ================================================================================
 Desugared:
 Rec {
-d.Fractional_a11b  :: 
-    {PrelNum.Fractional{-26,p-} PrelBase.Float{-3c,p-}}
+==_a11H  ::  PrelBase.Float{-3c,W-}
+	     -> PrelBase.Float{-3c,W-}
+	     -> PrelBase.Bool{-34,W-}
 {-# L #-}
-d.Fractional_a11b =
-    PrelNum.$d23{-rGg,p-}
-fromRational_a17D  :: 
-    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
+==_a11H =
+    ==_a11J
+flatten_aUn  ::  PrelBase.Int{-3g,W-}
+		 -> PrelBase.Bool{-34,W-}
+		 -> PrelBase.Float{-3c,W-}
+		 -> [(PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})]
+		 -> PrelBase.String{-rAJ,p-}
 {-# L #-}
-fromRational_a17D =
-    PrelNum.fromRational{-8T,p-}
-	_@_ PrelBase.Float{-3c,p-} d.Fractional_a11b
-lit_a17V  :: 
-    PrelBase.Float{-3c,p-}
-{-# L #-}
-lit_a17V =
-    fromRational_a17D
-	_rational_  0 1
-d.Eq_a11e  :: 
-    {PrelBase.Eq{-23,p-} PrelBase.Float{-3c,p-}}
-{-# L #-}
-d.Eq_a11e =
-    PrelNum.$d27{-rGk,p-}
-==_a17U  :: 
-    PrelBase.Float{-3c,p-}
-    -> PrelBase.Float{-3c,p-}
-    -> PrelBase.Bool{-34,p-}
-{-# L #-}
-==_a17U =
-    PrelBase.=={-8Y,p-}
-	_@_ PrelBase.Float{-3c,p-} d.Eq_a11e
-fromRational_a17T  :: 
-    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
-{-# L #-}
-fromRational_a17T =
-    fromRational_a17D
-lit_a17S  :: 
-    PrelBase.Float{-3c,p-}
-{-# L #-}
-lit_a17S =
-    fromRational_a17T
-	_rational_  1 1
-fromRational_a17R  :: 
-    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
-{-# L #-}
-fromRational_a17R =
-    fromRational_a17D
-lit_a17Q  :: 
-    PrelBase.Float{-3c,p-}
-{-# L #-}
-lit_a17Q =
-    fromRational_a17R
-	_rational_  11 10
-fromRational_a17P  :: 
-    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
-{-# L #-}
-fromRational_a17P =
-    fromRational_a17D
-lit_a17K  :: 
-    PrelBase.Float{-3c,p-}
-{-# L #-}
-lit_a17K =
-    fromRational_a17P
-	_rational_  6 5
-==_a18C  :: 
-    PrelBase.Float{-3c,p-}
-    -> PrelBase.Float{-3c,p-}
-    -> PrelBase.Bool{-34,p-}
-{-# L #-}
-==_a18C =
-    ==_a17U
-flatten_a10r  :: 
-    PrelBase.Int{-3g,p-}
-    -> PrelBase.Bool{-34,p-}
-    -> PrelBase.Float{-3c,p-}
-    -> [(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})]
-    -> PrelBase.String{-rzM,p-}
-{-# L #-}
-flatten_a10r =
-    \ n_r3i  :: 
-	  PrelBase.Int{-3g,p-}
+flatten_aUn =
+    \ n_r3i  ::  PrelBase.Int{-3g,W-}
       {-# L #-}
-      n_r3i nlp_r3k  :: 
-		PrelBase.Bool{-34,p-}
+      n_r3i nlp_r3j  ::  PrelBase.Bool{-34,W-}
 	    {-# L #-}
-	    nlp_r3k ds_d19G  :: 
-			PrelBase.Float{-3c,p-}
+	    nlp_r3j ds_d13a  ::  PrelBase.Float{-3c,W-}
 		    {-# L #-}
-		    ds_d19G seqs_r3n  :: 
-				[(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})]
+		    ds_d13a seqs_r3k  ::  [(PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})]
 			    {-# L #-}
-			    seqs_r3n ->
+			    seqs_r3k ->
 	let {
-	  fail_d19H  :: 
-	      PrelBase.String{-rzM,p-}
+	  fail_d13b  ::  PrelBase.String{-rAJ,p-}
 	  {-# L #-}
-	  fail_d19H =
-	      GHCerr.patError{-8r,p-}
-		  _@_ PrelBase.String{-rzM,p-}
+	  fail_d13b =
+	      GHCerr.patError{-8r,w-}
+		  _@_ PrelBase.String{-rAJ,p-}
 		  _string_ "ds032.hs:12|function `flatten'"
 	} in 
-	  case ds_d19G of { PrelBase.F#{-59,p-}{i} ds_d19Q  ->
-	  case# ds_d19Q of {
-	    _float_ 0.0000000000000000 ->
-		flattenS{-r3,x-}
-		    nlp_r3k seqs_r3n;
+	  case ds_d13a of { PrelBase.F#{-59,w-}{i} ds_d13k  ->
+	  case# ds_d13k of {
+	    _float_ 0.0000000000000000 -> flattenS{-r3,x-} nlp_r3j seqs_r3k;
 	    _float_ 1.0000000000000000 ->
 		let {
-		  seqs_r3u  :: 
-		      [(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})]
+		  seqs_r3o  ::  [(PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})]
 		  {-# L #-}
-		  seqs_r3u =
-		      seqs_r3n } in
+		  seqs_r3o =
+		      seqs_r3k } in
 		let {
-		  nlp_r3r  :: 
-		      PrelBase.Bool{-34,p-}
+		  nlp_r3n  ::  PrelBase.Bool{-34,W-}
 		  {-# L #-}
-		  nlp_r3r =
-		      nlp_r3k } in
+		  nlp_r3n =
+		      nlp_r3j } in
 		let {
-		  n_r3p  :: 
-		      PrelBase.Int{-3g,p-}
+		  n_r3m  ::  PrelBase.Int{-3g,W-}
 		  {-# L #-}
-		  n_r3p =
+		  n_r3m =
 		      n_r3i } in
-		let { ds_d1at  :: 
-			  [(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})]
+		let { ds_d13X  ::  [(PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})]
 		      {-# L #-}
-		      ds_d1at =
+		      ds_d13X =
 		  let {
-		    ds_d1aG  :: 
-			(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})
+		    ds_d14a  ::  (PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})
 		    {-# L #-}
-		    ds_d1aG =
-			PrelTup.(,){-62,p-}{i}
-			    {_@_ PrelBase.Int{-3g,p-}
-			     _@_ PrelBase.Float{-3c,p-}
-			     n_r3p
-			     lit_a17K}
+		    ds_d14a =
+			PrelTup.(,){-62,w-}{i}
+			    {_@_ PrelBase.Int{-3g,W-}
+			     _@_ PrelBase.Float{-3c,W-}
+			     n_r3m
+			     lit_a11V}
 		  } in 
-		    PrelBase.:{-55,p-}{i}
-			_@_ (PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-}) ds_d1aG seqs_r3u
+		    PrelBase.:{-55,w-}{i}
+			_@_ (PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-}) ds_d14a seqs_r3o
 		} in
-		flatten{-r1,x-}
-		    n_r3p nlp_r3r lit_a17Q ds_d1at;
-	    ds_d1b0 ->
-		fail_d19H;
+		flatten{-r1,x-} n_r3m nlp_r3n lit_a11S ds_d13X;
+	    ds_d14u -> fail_d13b;
 	  };}
-flattenS_a10s  :: 
-    PrelBase.Bool{-34,p-}
-    -> [(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})]
-    -> PrelBase.String{-rzM,p-}
+flattenS_aUo  ::  PrelBase.Bool{-34,W-}
+		  -> [(PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})]
+		  -> PrelBase.String{-rAJ,p-}
 {-# L #-}
-flattenS_a10s =
-    \ nlp_r3w  :: 
-	  PrelBase.Bool{-34,p-}
+flattenS_aUo =
+    \ nlp_r3q  ::  PrelBase.Bool{-34,W-}
       {-# L #-}
-      nlp_r3w ds_d1b6  :: 
-		  [(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})]
+      nlp_r3q ds_d14A  ::  [(PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})]
 	      {-# L #-}
-	      ds_d1b6 ->
-	case ds_d1b6 of {
-	  PrelBase.[]{-5i,p-}{i} ->
-	      PrelBase.[]{-5i,p-}{i}
-		  {_@_ PrelBase.Char{-38,p-}};
-	  PrelBase.:{-55,p-}{i} ds_d1bl seqs_r3D ->
-	      case ds_d1bl of { PrelTup.(,){-62,p-}{i} col_r3B seq_r3C  ->
+	      ds_d14A ->
+	case ds_d14A of {
+	  PrelBase.[]{-5i,w-}{i} ->
+	      PrelBase.[]{-5i,w-}{i} {_@_ PrelBase.Char{-38,W-}};
+	  PrelBase.:{-55,w-}{i} ds_d14P seqs_r3v ->
+	      case ds_d14P of { PrelTup.(,){-62,w-}{i} col_r3t seq_r3u  ->
 	      let {
-		nlp_r3z  :: 
-		    PrelBase.Bool{-34,p-}
+		nlp_r3s  ::  PrelBase.Bool{-34,W-}
 		{-# L #-}
-		nlp_r3z =
-		    nlp_r3w
-	      } in 
-		flatten{-r1,x-}
-		    col_r3B nlp_r3z seq_r3C seqs_r3D;};
+		nlp_r3s =
+		    nlp_r3q
+	      } in  flatten{-r1,x-} col_r3t nlp_r3s seq_r3u seqs_r3v;};
 	}
-flatten{-r1,x-}  :: 
-    PrelBase.Int{-3g,p-}
-    -> PrelBase.Bool{-34,p-}
-    -> PrelBase.Float{-3c,p-}
-    -> [(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})]
-    -> PrelBase.String{-rzM,p-}
+flatten{-r1,x-}  ::  PrelBase.Int{-3g,W-}
+		     -> PrelBase.Bool{-34,W-}
+		     -> PrelBase.Float{-3c,W-}
+		     -> [(PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})]
+		     -> PrelBase.String{-rAJ,p-}
 {-# L #-}
 flatten{-r1,x-} =
-    flatten_a10r
-flattenS{-r3,x-}  :: 
-    PrelBase.Bool{-34,p-}
-    -> [(PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-})]
-    -> PrelBase.String{-rzM,p-}
+    flatten_aUn
+flattenS{-r3,x-}  ::  PrelBase.Bool{-34,W-}
+		      -> [(PrelBase.Int{-3g,W-}, PrelBase.Float{-3c,W-})]
+		      -> PrelBase.String{-rAJ,p-}
 {-# L #-}
 flattenS{-r3,x-} =
-    flattenS_a10s
+    flattenS_aUo
+d.Fractional_aV4  ::  {PrelNum.Fractional{-26,p-} PrelBase.Float{-3c,W-}}
+{-# L #-}
+d.Fractional_aV4 =
+    PrelNum.$d23{-rCU,p-}
+fromRational_a11K  ::  PrelNum.Rational{-3r,p-}
+		       -> PrelBase.Float{-3c,W-}
+{-# L #-}
+fromRational_a11K =
+    PrelNum.fromRational{-8T,p-}
+	_@_ PrelBase.Float{-3c,W-} d.Fractional_aV4
+lit_a11L  ::  PrelBase.Float{-3c,W-}
+{-# L #-}
+lit_a11L =
+    fromRational_a11K _rational_  0 1
+d.Eq_aV7  ::  {PrelBase.Eq{-23,p-} PrelBase.Float{-3c,W-}}
+{-# L #-}
+d.Eq_aV7 =
+    PrelNum.$d27{-rCY,p-}
+==_a11J  ::  PrelBase.Float{-3c,W-}
+	     -> PrelBase.Float{-3c,W-}
+	     -> PrelBase.Bool{-34,W-}
+{-# L #-}
+==_a11J =
+    PrelBase.=={-8Y,p-} _@_ PrelBase.Float{-3c,W-} d.Eq_aV7
+fromRational_a11O  ::  PrelNum.Rational{-3r,p-}
+		       -> PrelBase.Float{-3c,W-}
+{-# L #-}
+fromRational_a11O =
+    fromRational_a11K
+lit_a11P  ::  PrelBase.Float{-3c,W-}
+{-# L #-}
+lit_a11P =
+    fromRational_a11O _rational_  1 1
+fromRational_a11R  ::  PrelNum.Rational{-3r,p-}
+		       -> PrelBase.Float{-3c,W-}
+{-# L #-}
+fromRational_a11R =
+    fromRational_a11K
+lit_a11S  ::  PrelBase.Float{-3c,W-}
+{-# L #-}
+lit_a11S =
+    fromRational_a11R _rational_  11 10
+fromRational_a11U  ::  PrelNum.Rational{-3r,p-}
+		       -> PrelBase.Float{-3c,W-}
+{-# L #-}
+fromRational_a11U =
+    fromRational_a11K
+lit_a11V  ::  PrelBase.Float{-3c,W-}
+{-# L #-}
+lit_a11V =
+    fromRational_a11U _rational_  6 5
 end Rec }

@@ -2,186 +2,131 @@
 
 ================================================================================
 Desugared:
-f{-r3h,x-}  :: 
-    _forall_
-    [t{-aY1-} t{-aYi-}]
-    =>
-    {PrelBase.Ord{-2d,p-} t{-aY1-}}
-    -> {PrelBase.Num{-2c,p-} t{-aY1-}}
-    -> t{-aYi-}
-    -> t{-aY1-}
+Rec {
+f{-r3h,x-}  ::  _forall_
+		[taSX taSv]
+		=>
+		{PrelBase.Ord{-2d,p-} taSv}
+		-> {PrelBase.Num{-2c,p-} taSv}
+		-> taSX
+		-> taSv
 {-# L #-}
 f{-r3h,x-} =
-    _/\_ t{-aY1-} t{-aYi-} -> \ d.Ord_aYk  :: 
-				    {PrelBase.Ord{-2d,p-} t{-aY1-}}
-				{-# L #-}
-				d.Ord_aYk d.Num_aYn  :: 
-					      {PrelBase.Num{-2c,p-} t{-aY1-}}
-					  {-# L #-}
-					  d.Num_aYn ->
-	let {
-	  <_a137  :: 
-	      t{-aY1-} -> t{-aY1-} -> PrelBase.Bool{-34,p-}
+    _/\_ taSX taSv -> \ d.Ord_aSZ  ::  {PrelBase.Ord{-2d,p-} taSv}
+			{-# L #-}
+			d.Ord_aSZ d.Num_aT2  ::  {PrelBase.Num{-2c,p-} taSv}
+				  {-# L #-}
+				  d.Num_aT2 ->
+	_letrec_ {
+	  <_aXx  ::  taSv -> taSv -> PrelBase.Bool{-34,W-}
 	  {-# L #-}
-	  <_a137 =
-	      PrelBase.<{-rcJ,p-}
-		  _@_ t{-aY1-} d.Ord_aYk } in
-	let {
-	  fromInt_a136  :: 
-	      PrelBase.Int{-3g,p-} -> t{-aY1-}
+	  <_aXx =
+	      PrelBase.<{-rfn,p-} _@_ taSv d.Ord_aSZ;
+	  fromInt_aXE  ::  PrelBase.Int{-3g,W-} -> taSv
 	  {-# L #-}
-	  fromInt_a136 =
-	      PrelBase.fromInt{-8R,p-}
-		  _@_ t{-aY1-} d.Num_aYn } in
-	let { lit_a135  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      lit_a135 =
-	  let {
-	    ds_d13v  :: 
-		PrelBase.Int{-3g,p-}
-	    {-# L #-}
-	    ds_d13v =
-		PrelBase.I#{-5b,p-}{i}
-		    0
-	  } in 
-	    fromInt_a136
-		ds_d13v
-	} in
-	let {
-	  fromInt_a134  :: 
-	      PrelBase.Int{-3g,p-} -> t{-aY1-}
+	  fromInt_aXE =
+	      PrelBase.fromInt{-8R,p-} _@_ taSv d.Num_aT2;
+	  lit_aXF  ::  taSv
 	  {-# L #-}
-	  fromInt_a134 =
-	      fromInt_a136 } in
-	let { lit_a133  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      lit_a133 =
-	  let {
-	    ds_d13K  :: 
-		PrelBase.Int{-3g,p-}
-	    {-# L #-}
-	    ds_d13K =
-		PrelBase.I#{-5b,p-}{i}
-		    1
-	  } in 
-	    fromInt_a134
-		ds_d13K
-	} in
-	let {
-	  d.Ord_aYq  :: 
-	      {PrelBase.Ord{-2d,p-} t{-aY1-}}
+	  lit_aXF =
+	      let {
+		ds_dYN  ::  PrelBase.Int{-3g,W-}
+		{-# L #-}
+		ds_dYN =
+		    PrelBase.I#{-5b,w-}{i} 0
+	      } in  fromInt_aXE ds_dYN;
+	  fromInt_aXG  ::  PrelBase.Int{-3g,W-} -> taSv
 	  {-# L #-}
-	  d.Ord_aYq =
-	      d.Ord_aYk } in
-	let {
-	  >_a132  :: 
-	      t{-aY1-} -> t{-aY1-} -> PrelBase.Bool{-34,p-}
+	  fromInt_aXG =
+	      fromInt_aXE;
+	  lit_aXH  ::  taSv
 	  {-# L #-}
-	  >_a132 =
-	      PrelBase.>{-rcL,p-}
-		  _@_ t{-aY1-} d.Ord_aYq } in
-	let {
-	  fromInt_a131  :: 
-	      PrelBase.Int{-3g,p-} -> t{-aY1-}
+	  lit_aXH =
+	      let {
+		ds_dZ2  ::  PrelBase.Int{-3g,W-}
+		{-# L #-}
+		ds_dZ2 =
+		    PrelBase.I#{-5b,w-}{i} 1
+	      } in  fromInt_aXG ds_dZ2;
+	  d.Ord_aT5  ::  {PrelBase.Ord{-2d,p-} taSv}
 	  {-# L #-}
-	  fromInt_a131 =
-	      fromInt_a136 } in
-	let { lit_a130  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      lit_a130 =
-	  let {
-	    ds_d148  :: 
-		PrelBase.Int{-3g,p-}
-	    {-# L #-}
-	    ds_d148 =
-		PrelBase.I#{-5b,p-}{i}
-		    2
-	  } in 
-	    fromInt_a131
-		ds_d148
-	} in
-	let {
-	  fromInt_a12Z  :: 
-	      PrelBase.Int{-3g,p-} -> t{-aY1-}
+	  d.Ord_aT5 =
+	      d.Ord_aSZ;
+	  >_aXI  ::  taSv -> taSv -> PrelBase.Bool{-34,W-}
 	  {-# L #-}
-	  fromInt_a12Z =
-	      fromInt_a136 } in
-	let { lit_a12W  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      lit_a12W =
-	  let {
-	    ds_d14n  :: 
-		PrelBase.Int{-3g,p-}
-	    {-# L #-}
-	    ds_d14n =
-		PrelBase.I#{-5b,p-}{i}
-		    3
-	  } in 
-	    fromInt_a12Z
-		ds_d14n
-	} in
-	\ x_r3d  :: 
-	      t{-aYi-}
+	  >_aXI =
+	      PrelBase.>{-rfp,p-} _@_ taSv d.Ord_aT5;
+	  fromInt_aXK  ::  PrelBase.Int{-3g,W-} -> taSv
 	  {-# L #-}
-	  x_r3d ->
-	    _letrec_ {
-	      lit_a14F  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      lit_a14F =
-		  lit_a133;
-	      lit_a14H  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      lit_a14H =
-		  lit_a130;
-	      ds_d14Q  :: 
-		  (t{-aY1-}, t{-aY1-})
-	      {-# L #-}
-	      ds_d14Q =
-		  case
-		      <_a137
-			  y_aXx z_aXy
-		  of {
-		    PrelBase.True{-5E,p-}{i} ->
-			PrelTup.(,){-62,p-}{i}
-			    {_@_ t{-aY1-} _@_ t{-aY1-} lit_a135 lit_a133};
-		    PrelBase.False{-58,p-}{i} ->
-			case
-			    >_a132
-				y_aXx z_aXy
-			of {
-			  PrelBase.True{-5E,p-}{i} ->
-			      PrelTup.(,){-62,p-}{i}
-				  {_@_ t{-aY1-} _@_ t{-aY1-} lit_a14F lit_a130};
-			  PrelBase.False{-58,p-}{i} ->
-			      PrelTup.(,){-62,p-}{i}
-				  {_@_ t{-aY1-} _@_ t{-aY1-} lit_a14H lit_a12W};
+	  fromInt_aXK =
+	      fromInt_aXE;
+	  lit_aXL  ::  taSv
+	  {-# L #-}
+	  lit_aXL =
+	      let {
+		ds_dZq  ::  PrelBase.Int{-3g,W-}
+		{-# L #-}
+		ds_dZq =
+		    PrelBase.I#{-5b,w-}{i} 2
+	      } in  fromInt_aXK ds_dZq;
+	  fromInt_aXN  ::  PrelBase.Int{-3g,W-} -> taSv
+	  {-# L #-}
+	  fromInt_aXN =
+	      fromInt_aXE;
+	  lit_aXO  ::  taSv
+	  {-# L #-}
+	  lit_aXO =
+	      let {
+		ds_dZF  ::  PrelBase.Int{-3g,W-}
+		{-# L #-}
+		ds_dZF =
+		    PrelBase.I#{-5b,w-}{i} 3
+	      } in  fromInt_aXN ds_dZF;
+	  f_aS1  ::  taSX -> taSv
+	  {-# L #-}
+	  f_aS1 =
+	      \ x_r3d  ::  taSX
+		{-# L #-}
+		x_r3d ->
+		  _letrec_ {
+		    lit_aZY  ::  taSv
+		    {-# L #-}
+		    lit_aZY =
+			lit_aXH;
+		    lit_a100  ::  taSv
+		    {-# L #-}
+		    lit_a100 =
+			lit_aXL;
+		    ds_d109  ::  (taSv, taSv)
+		    {-# L #-}
+		    ds_d109 =
+			case <_aXx y_aS9 z_aSa of {
+			  PrelBase.True{-5E,w-}{i} ->
+			      PrelTup.(,){-62,w-}{i} {_@_ taSv _@_ taSv lit_aXF lit_aXH};
+			  PrelBase.False{-58,w-}{i} ->
+			      case >_aXI y_aS9 z_aSa of {
+				PrelBase.True{-5E,w-}{i} ->
+				    PrelTup.(,){-62,w-}{i} {_@_ taSv _@_ taSv lit_aZY lit_aXL};
+				PrelBase.False{-58,w-}{i} ->
+				    PrelTup.(,){-62,w-}{i} {_@_ taSv _@_ taSv lit_a100 lit_aXO};
+			      };
 			};
-		  };
-	      y_aXx  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      y_aXx =
-		  case ds_d14Q of { PrelTup.(,){-62,p-}{i} y_aXx z_aXy  -> y_aXx;};
-	      z_aXy  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      z_aXy =
-		  case ds_d14Q of { PrelTup.(,){-62,p-}{i} y_aXx z_aXy  -> z_aXy;};
-	      y_r3f  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      y_r3f =
-		  y_aXx;
-	      z_r3g  :: 
-		  t{-aY1-}
-	      {-# L #-}
-	      z_r3g =
-		  z_aXy;
-	    } in 
-	      y_r3f
+		    y_aS9  ::  taSv
+		    {-# L #-}
+		    y_aS9 =
+			case ds_d109 of { PrelTup.(,){-62,w-}{i} y_aS9 z_aSa  -> y_aS9;};
+		    z_aSa  ::  taSv
+		    {-# L #-}
+		    z_aSa =
+			case ds_d109 of { PrelTup.(,){-62,w-}{i} y_aS9 z_aSa  -> z_aSa;};
+		    y_r3f  ::  taSv
+		    {-# L #-}
+		    y_r3f =
+			y_aS9;
+		    z_r3g  ::  taSv
+		    {-# L #-}
+		    z_r3g =
+			z_aSa;
+		  } in  y_r3f;
+	} in  f_aS1
+end Rec }

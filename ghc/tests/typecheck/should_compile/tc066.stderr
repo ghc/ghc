@@ -1,0 +1,31 @@
+
+
+================================================================================
+Typechecked:
+MkPair{-r3o,x-}{i} =
+    _/\_ a_tr3k b_tr3l -> \ tpl_B1 tpl_B2 ->
+	MkPair{-r3o,x-}{i} {_@_ a_tr3k _@_ b_tr3l tpl_B1 tpl_B2}
+AbsBinds
+[taBY, taC1, aaC2]
+[d.Monad_aCe]
+[([taBY, taC1, aaC2], f{-r3m,x-}, f_aBM)]
+    >>=_aCt = PrelBase.>>={-811,p-} aaC2 d.Monad_aCe
+    d.Monad_aCg = d.Monad_aCe
+    return_aCx = PrelBase.return{-816,p-} aaC2 d.Monad_aCg
+    f_aBM x_r3f = [a_r3i | (MkPair{-r3o,x-}{i} c_r3h a_r3i) <- x_r3f]
+AbsBinds [taCr, taCs] [] [([taCr, taCs], $d1{-rCw,x-}, d.Eval_aCn)]
+    d.Eval_aCn = ({-dict-} [] [])
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d2 1 $d38 1 $d40 1 $d42 1 $d47 1 $m>> 1 Eval 1 Monad 1 MonadZero 1;
+_exports_
+ShouldSucceed f Pair(MkPair);
+_instances_
+instance _forall_ [a b] => {PrelBase.Eval (Pair a b)} = $d1;
+_declarations_
+1 $d1 _:_ _forall_ [a b] => {PrelBase.Eval (Pair a b)} ;;
+1 data Pair a b = MkPair a b ;
+1 f _:_ _forall_ [ta tb ac :: (* -> *)] {PrelBase.Monad ac} => ac (Pair ta tb) -> ac tb ;;

@@ -1,0 +1,43 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [taCy, taCu] [d.A_aCA] [([taCy, taCu], f{-r3B,x-}, f_aCm)]
+    op1_aDr = op1{-r3D,x-} taCu d.A_aCA
+    f_aCm x_r3h = op1_aDr
+AbsBinds [taCN] [d.B_aD3] [([taCN], $d1{-rDs,x-}, d.B_aCG)]
+    op2_aDw = op2_aDx
+    AbsBinds [] [] [([], op2_aDx, op2_aCK)]
+	op2_aCK PrelBase.[]{-5i,w-}{i} = PrelBase.I#{-5b,w-}{i} 0#
+	op2_aCK (x_r3p PrelBase.:{-55,w-}{i} xs_r3q)
+		= lit_aDv +_aDu (op2_aDw xs_r3q)
+    d.B_aCG = ({-dict-} [] [op2_aDx])
+AbsBinds [] [] [([], $d2{-rDt,x-}, d.A_aDb)]
+    AbsBinds [] [] [([], op1_aDy, op1_aDf)]
+	op1_aDf = PrelBase.I#{-5b,w-}{i} 2#
+    d.A_aDb = ({-dict-} [] [op1_aDy])
+op2{-r3E,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taDp] [d.B_aDj] []
+op1{-r3D,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taDq] [d.A_aDm] []
+d.Num_aDo = PrelBase.$d4{-raQ,p-}
++_aDu = PrelBase.+{-rfF,p-} PrelBase.Int{-3g,W-} d.Num_aDo
+lit_aDv = PrelBase.I#{-5b,w-}{i} 1#
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d12 1 $d16 1 $d2 1 $d22 1 $d28 1 $d3 1 $d33 1 $d34 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d47 1 $d55 1 $d8 1 $d9 1 $m- 1 $m/= 1 $mfromInt 1 $mshowList 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed f A(op1) B(op2);
+_instances_
+instance _forall_ [a] {B a} => {B [a]} = $d1;
+instance {A PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {B a} => {B [a]} ;;
+1 $d2 _:_ {A PrelBase.Int} ;;
+1 class A a where {op1 :: a} ;
+1 class B b where {op2 :: b -> PrelBase.Int} ;
+1 f _:_ _forall_ [ta tb] {A tb} => ta -> tb ;;

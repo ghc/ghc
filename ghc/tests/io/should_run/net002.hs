@@ -37,6 +37,6 @@ main =
     connect s (SockAddrInet 5000 (inet_addr avon))	>>
     
     writeSocket s message				>>
-    shutdown s 2					>>
+    shutdown s ShutdownBoth				>>
     sClose s
 

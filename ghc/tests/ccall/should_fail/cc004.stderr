@@ -1,0 +1,9 @@
+ 
+cc004.hs:2: Cannot generalise these overloadings (in a _ccall_):
+		`Foreign.CReturnable taWQ'
+ 
+cc004.hs:2: Cannot generalise these overloadings (in a _ccall_):
+		`Foreign.CReturnable taXx'
+
+
+Compilation had errors

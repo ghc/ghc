@@ -8,9 +8,7 @@ infixr 2 \\\
 infix 3 :==>
 infix 4 MkFoo
 {- rec -}
-\\\ ::
-    _forall_ [] {Eq a} => [a] -> [a] -> [a]
-f   x y     =   x
-\\\ xs ys   =   xs
-data Foo =
-    MkFoo Int | Float :==> Double
+\\\ :: _forall_ [] (Eq a) => [a] -> [a] -> [a]
+f x y = x
+\\\ xs ys = xs
+data Foo = MkFoo Int | Float :==> Double

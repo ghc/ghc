@@ -5,77 +5,53 @@ ds021.hs:8:
 
 ================================================================================
 Desugared:
-f{-r3i,x-}  :: 
-    _forall_
-    [rlg{-aG9-} t{-aGm-}]
-    =>
-    {PrelBase.Eq{-23,p-} rlg{-aG9-}}
-    -> rlg{-aG9-}
-    -> rlg{-aG9-}
-    -> rlg{-aG9-}
-    -> [t{-aGm-}]
+Rec {
+f{-r3g,x-}  ::  _forall_
+		[taBa taBj]
+		=>
+		{PrelBase.Eq{-23,p-} taBa} -> taBa -> taBa -> taBa -> [taBj]
 {-# L #-}
-f{-r3i,x-} =
-    _/\_ rlg{-aG9-} t{-aGm-} -> \ d.Eq_aGr  :: 
-				      {PrelBase.Eq{-23,p-} rlg{-aG9-}}
-				  {-# L #-}
-				  d.Eq_aGr ->
-	let {
-	  ==_aIv  :: 
-	      rlg{-aG9-} -> rlg{-aG9-} -> PrelBase.Bool{-34,p-}
-	  {-# L #-}
-	  ==_aIv =
-	      PrelBase.=={-8Y,p-}
-		  _@_ rlg{-aG9-} d.Eq_aGr } in
-	let {
-	  d.Eq_aGt  :: 
-	      {PrelBase.Eq{-23,p-} rlg{-aG9-}}
-	  {-# L #-}
-	  d.Eq_aGt =
-	      d.Eq_aGr } in
-	let {
-	  /=_aIu  :: 
-	      rlg{-aG9-} -> rlg{-aG9-} -> PrelBase.Bool{-34,p-}
-	  {-# L #-}
-	  /=_aIu =
-	      PrelBase./={-ray,p-}
-		  _@_ rlg{-aG9-} d.Eq_aGt
-	} in 
-	  \ x_r3d  :: 
-		rlg{-aG9-}
-	    {-# L #-}
-	    x_r3d y_r3f  :: 
-		      rlg{-aG9-}
-		  {-# L #-}
-		  y_r3f z_r3h  :: 
-			    rlg{-aG9-}
+f{-r3g,x-} =
+    _/\_ taBa taBj -> \ d.Eq_aBl  ::  {PrelBase.Eq{-23,p-} taBa}
 			{-# L #-}
-			z_r3h ->
-	      let {
-		fail_dJa  :: 
-		    [t{-aGm-}]
+			d.Eq_aBl ->
+	_letrec_ {
+	  ==_aDt  ::  taBa -> taBa -> PrelBase.Bool{-34,W-}
+	  {-# L #-}
+	  ==_aDt =
+	      PrelBase.=={-8Y,p-} _@_ taBa d.Eq_aBl;
+	  d.Eq_aBn  ::  {PrelBase.Eq{-23,p-} taBa}
+	  {-# L #-}
+	  d.Eq_aBn =
+	      d.Eq_aBl;
+	  /=_aDA  ::  taBa -> taBa -> PrelBase.Bool{-34,W-}
+	  {-# L #-}
+	  /=_aDA =
+	      PrelBase./={-r9I,p-} _@_ taBa d.Eq_aBn;
+	  f_aAK  ::  taBa -> taBa -> taBa -> [taBj]
+	  {-# L #-}
+	  f_aAK =
+	      \ x_r3d  ::  taBa
 		{-# L #-}
-		fail_dJa =
-		    GHCerr.patError{-8r,p-}
-			_@_ [t{-aGm-}] _string_ "ds021.hs:5|function `f'"
-	      } in 
-		case
-		    ==_aIv
-			x_r3d y_r3f
-		of {
-		  PrelBase.True{-5E,p-}{i} ->
-		      PrelBase.[]{-5i,p-}{i}
-			  _@_ t{-aGm-};
-		  PrelBase.False{-58,p-}{i} ->
-		      case
-			  /=_aIu
-			      x_r3d z_r3h
-		      of {
-			PrelBase.True{-5E,p-}{i} ->
-			    PrelBase.[]{-5i,p-}{i}
-				_@_ t{-aGm-};
-			PrelBase.False{-58,p-}{i} ->
-			    PrelBase.[]{-5i,p-}{i}
-				_@_ t{-aGm-};
-		      };
-		}
+		x_r3d y_r3e  ::  taBa
+		      {-# L #-}
+		      y_r3e z_r3f  ::  taBa
+			    {-# L #-}
+			    z_r3f ->
+		  let {
+		    fail_dEl  ::  [taBj]
+		    {-# L #-}
+		    fail_dEl =
+			GHCerr.patError{-8r,w-}
+			    _@_ [taBj] _string_ "ds021.hs:5|function `f'"
+		  } in 
+		    case ==_aDt x_r3d y_r3e of {
+		      PrelBase.True{-5E,w-}{i} -> PrelBase.[]{-5i,w-}{i} _@_ taBj;
+		      PrelBase.False{-58,w-}{i} ->
+			  case /=_aDA x_r3d z_r3f of {
+			    PrelBase.True{-5E,w-}{i} -> PrelBase.[]{-5i,w-}{i} _@_ taBj;
+			    PrelBase.False{-58,w-}{i} -> PrelBase.[]{-5i,w-}{i} _@_ taBj;
+			  };
+		    };
+	} in  f_aAK
+end Rec }

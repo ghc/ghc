@@ -1,133 +1,84 @@
 
 
---================================================================================
+================================================================================
 Simplified:
-`$d5'  :: 
-    `{PrelBase.Eval (Pair a{-r3U-} b{-r3V-})}'
+`$d5'  ::  `{PrelBase.Eval (Pair a b)}'
 `$d5' =
-    _/\_ `a{-s1gp-}' `b{-s1gq-}' ->
-	`PrelBase.void'
-`$d4'  :: 
-    `{PrelBase.Eval (LList alpha{-r3S-})}'
+    _/\_ `$x0' `$x1' -> `PrelBase.void'
+`$d4'  ::  `{PrelBase.Eval (LList alpha)}'
 `$d4' =
-    _/\_ `alpha{-s1gr-}' ->
-	`PrelBase.void'
-`$d2'  :: 
-    `{PrelBase.Eval (Tree x{-r3P-})}'
+    _/\_ `$x0' -> `PrelBase.void'
+`$d2'  ::  `{PrelBase.Eval (Tree x)}'
 `$d2' =
-    _/\_ `x{-s1gs-}' ->
-	`PrelBase.void'
-`$d1'  :: 
-    `{PrelBase.Eval (A a{-r3N-})}'
+    _/\_ `$x0' -> `PrelBase.void'
+`$d1'  ::  `{PrelBase.Eval (A a)}'
 `$d1' =
-    _/\_ `a{-s1gt-}' ->
-	`PrelBase.void'
-`MkPair'  :: 
-    `a{-r3U-} -> b{-r3V-} -> Pair a{-r3U-} b{-r3V-}'
-`MkPair' =
-    _/\_ `a{-s1gc-}' `b{-s1gd-}' -> \ `tpl'  :: 
-					  `a{-s1gc-}'
-				      `tpl' `tpl'  :: 
-						`b{-s1gd-}'
-					    `tpl' ->
-	`MkPair'
-	    {_@_ `a{-s1gc-}' _@_ `b{-s1gd-}' `tpl' `tpl'}
-`MkA'  :: 
-    `a{-r3N-} -> A a{-r3N-} -> A a{-r3N-}'
+    _/\_ `$x0' -> `PrelBase.void'
+`MkA'  ::  `a -> A a -> A a'
 `MkA' =
-    _/\_ `a{-s1ge-}' -> \ `tpl'  :: 
-			      `a{-s1ge-}'
-			  `tpl' `tpl'  :: 
-				    `A a{-s1ge-}'
-				`tpl' ->
-	`MkA'
-	    {_@_ `a{-s1ge-}' `tpl' `tpl'}
-`FF'  :: 
-    `Boolean'
-`FF' =
-    `FF'
-	{}
-`TT'  :: 
-    `Boolean'
-`TT' =
-    `TT'
-	{}
-`Nill'  :: 
-    `LList alpha{-r3S-}'
+    _/\_ `$x0' -> \ `$x1'  ::  `$x0'
+		    `$x1' `$x2'  ::  `A $x0'
+			  `$x2' ->
+	`MkA' {_@_ `$x0' `$x1' `$x2'}
+`MkPair'  ::  `a -> b -> Pair a b'
+`MkPair' =
+    _/\_ `$x0' `$x1' -> \ `$x2'  ::  `$x0'
+			  `$x2' `$x3'  ::  `$x1'
+				`$x3' ->
+	`MkPair' {_@_ `$x0' _@_ `$x1' `$x2' `$x3'}
+`Leaf'  ::  `x -> Tree x'
+`Leaf' =
+    _/\_ `$x0' -> \ `$x1'  ::  `$x0'
+		    `$x1' ->
+	`Leaf' {_@_ `$x0' `$x1'}
+`Node'  ::  `Tree x -> Tree x -> Tree x'
+`Node' =
+    _/\_ `$x0' -> \ `$x1'  ::  `Tree $x0'
+		    `$x1' `$x2'  ::  `Tree $x0'
+			  `$x2' ->
+	`Node' {_@_ `$x0' `$x1' `$x2'}
+`Zero'  ::  `Nat'
+`Zero' =
+    `Zero' {}
+`Succ'  ::  `Nat -> Nat'
+`Succ' =
+    \ `$x0'  ::  `Nat'
+      `$x0' ->
+	`Succ' {`$x0'}
+`Nill'  ::  `LList alpha'
 `Nill' =
-    _/\_ `alpha{-s1gf-}' ->
-	`Nill'
-	    {_@_ `alpha{-s1gf-}'}
-`Conss'  :: 
-    `alpha{-r3S-} -> LList alpha{-r3S-} -> LList alpha{-r3S-}'
+    _/\_ `$x0' -> `Nill' {_@_ `$x0'}
+`Conss'  ::  `alpha -> LList alpha -> LList alpha'
 `Conss' =
-    _/\_ `alpha{-s1gg-}' -> \ `tpl'  :: 
-				  `alpha{-s1gg-}'
-			      `tpl' `tpl'  :: 
-					`LList alpha{-s1gg-}'
-				    `tpl' ->
-	`Conss'
-	    {_@_ `alpha{-s1gg-}' `tpl' `tpl'}
+    _/\_ `$x0' -> \ `$x1'  ::  `$x0'
+		    `$x1' `$x2'  ::  `LList $x0'
+			  `$x2' ->
+	`Conss' {_@_ `$x0' `$x1' `$x2'}
 Rec {
-`append'  :: 
-    `LList a{-aH9-} -> LList a{-aH9-} -> LList a{-aH9-}'
+`append'  ::  `LList taC4 -> LList taC4 -> LList taC4'
 `append' =
-    _/\_ `a{-s1gh-}' -> \ `xs'  :: 
-			      `LList a{-s1gh-}'
-			  `xs' `ys'  :: 
-				   `LList a{-s1gh-}'
-			       `ys' ->
-	case `xs' of {
-	  `Nill' ->
-	      `ys';
-	  `Conss' `z' `zs' ->
+    _/\_ `$x0' -> \ `$x1'  ::  `LList $x0'
+		    `$x1' `$x2'  ::  `LList $x0'
+			  `$x2' ->
+	case `$x1' of {
+	  `Nill' -> `$x2';
+	  `Conss' `$x3' `$x4' ->
 	      let {
-		`ds'  :: 
-		    `LList a{-s1gh-}'
-		`ds' =
-		    `append'
-			_@_ `a{-s1gh-}' `zs' `ys'
-	      } in 
-		`Conss'
-		    {_@_ `a{-s1gh-}' `z' `ds'};
+		`$x5'  ::  `LList $x0'
+		`$x5' =
+		    `append' _@_ `$x0' `$x4' `$x2'
+	      } in  `Conss' {_@_ `$x0' `$x3' `$x5'};
 	}
 end Rec }
-`Zero'  :: 
-    `Nat'
-`Zero' =
-    `Zero'
-	{}
-`Succ'  :: 
-    `Nat -> Nat'
-`Succ' =
-    \ `tpl'  :: 
-	  `Nat'
-      `tpl' ->
-	`Succ'
-	    {`tpl'}
-`Leaf'  :: 
-    `x{-r3P-} -> Tree x{-r3P-}'
-`Leaf' =
-    _/\_ `x{-s1gl-}' -> \ `tpl'  :: 
-			      `x{-s1gl-}'
-			  `tpl' ->
-	`Leaf'
-	    {_@_ `x{-s1gl-}' `tpl'}
-`Node'  :: 
-    `Tree x{-r3P-} -> Tree x{-r3P-} -> Tree x{-r3P-}'
-`Node' =
-    _/\_ `x{-s1go-}' -> \ `tpl'  :: 
-			      `Tree x{-s1go-}'
-			  `tpl' `tpl'  :: 
-				    `Tree x{-s1go-}'
-				`tpl' ->
-	`Node'
-	    {_@_ `x{-s1go-}' `tpl' `tpl'}
-`$d6'  :: 
-    `{PrelBase.Eval Boolean}'
+`FF'  ::  `Boolean'
+`FF' =
+    `FF' {}
+`TT'  ::  `Boolean'
+`TT' =
+    `TT' {}
+`$d6'  ::  `{PrelBase.Eval Boolean}'
 `$d6' =
     `PrelBase.void'
-`$d3'  :: 
-    `{PrelBase.Eval Nat}'
+`$d3'  ::  `{PrelBase.Eval Nat}'
 `$d3' =
     `PrelBase.void'

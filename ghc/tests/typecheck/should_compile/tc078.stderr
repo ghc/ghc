@@ -1,0 +1,80 @@
+ 
+tc078.hs:7: No explicit method nor default method for `PrelBase.=='
+	    in an instance declaration for `PrelBase.Eq'
+
+
+================================================================================
+Typechecked:
+MkBar{-r3m,x-}{i} =
+    _/\_ a_tr3k -> \ tpl_B1 tpl_B2 ->
+	MkBar{-r3m,x-}{i} {_@_ a_tr3k tpl_B1 tpl_B2}
+AbsBinds [taDD] [] [([taDD], $d3{-rDH,x-}, d.Eval_aBH)]
+    d.Eval_aBH = ({-dict-} [] [])
+AbsBinds
+[taBV]
+[d.Ord_aCP, d.Eq_aCQ]
+[([taBV], $d1{-rDI,x-}, d.Ord_aBN)]
+    d.Eq_aCO = d.Eq_aCQ
+    d.Ord_aCU = d.Ord_aBN
+    $mcompare_aDK =
+	PrelBase.$mcompare{-rf4,p-} (Bar{-r3l,x-} taBV) d.Ord_aCU
+    d.Ord_aCW = d.Ord_aBN
+    $m<_aDL = PrelBase.$m<{-reZ,p-} (Bar{-r3l,x-} taBV) d.Ord_aCW
+    d.Ord_aCY = d.Ord_aBN
+    $m<=_aDM = PrelBase.$m<={-rf0,p-} (Bar{-r3l,x-} taBV) d.Ord_aCY
+    d.Ord_aD0 = d.Ord_aBN
+    $m>=_aDN = PrelBase.$m>={-rf2,p-} (Bar{-r3l,x-} taBV) d.Ord_aD0
+    d.Ord_aD2 = d.Ord_aBN
+    $m>_aDO = PrelBase.$m>{-rf1,p-} (Bar{-r3l,x-} taBV) d.Ord_aD2
+    d.Ord_aD4 = d.Ord_aBN
+    $mmax_aDP = PrelBase.$mmax{-rf8,p-} (Bar{-r3l,x-} taBV) d.Ord_aD4
+    d.Ord_aD6 = d.Ord_aBN
+    $mmin_aDQ = PrelBase.$mmin{-rf9,p-} (Bar{-r3l,x-} taBV) d.Ord_aD6
+    AbsBinds [] [] [([], compare_aDR, compare_aBS)]
+	compare_aBS = $mcompare_aDK
+    AbsBinds [] [] [([], <_aDS, <_aC2)]
+	<_aC2 = $m<_aDL
+    AbsBinds [] [] [([], <=_aDT, <=_aCb)]
+	<=_aCb = $m<=_aDM
+    AbsBinds [] [] [([], >=_aDU, >=_aCk)]
+	>=_aCk = $m>=_aDN
+    AbsBinds [] [] [([], >_aDV, >_aCt)]
+	>_aCt = $m>_aDO
+    AbsBinds [] [] [([], max_aDW, max_aCC)]
+	max_aCC = $mmax_aDP
+    AbsBinds [] [] [([], min_aDX, min_aCL)]
+	min_aCL = $mmin_aDQ
+    d.Ord_aBN =
+	({-dict-}
+	 [d.Eq_aCO]
+	 [compare_aDR, <_aDS, <=_aDT, >=_aDU, >_aDV, max_aDW, min_aDX])
+AbsBinds [taDo] [d.Eq_aDx] [([taDo], $d2{-rDJ,x-}, d.Eq_aDg)]
+    d.Eq_aDB = d.Eq_aDg
+    $m/=_aDY = PrelBase.$m/={-reY,p-} (Bar{-r3l,x-} taDo) d.Eq_aDB
+    AbsBinds [] [] [([], ==_aDZ, ==_aDl)]
+	==_aDl
+	    = GHCerr.noDefaultMethodError{-8k,w-}
+		  (Bar{-r3l,x-} taDo
+		   -> Bar{-r3l,x-} taDo
+		   -> PrelBase.Bool{-34,W-}) "<NoSrcLoc>|PrelBase.=="
+    AbsBinds [] [] [([], /=_aE0, /=_aDu)]
+	/=_aDu = $m/=_aDY
+    d.Eq_aDg = ({-dict-} [] [==_aDZ, /=_aE0])
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldFail 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d15 1 $d16 1 $d2 1 $d33 1 $d35 1 $d38 1 $d40 1 $d42 1 $d46 1 $d47 1 $d50 1 $d52 1 $d7 1 $d8 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 Eq 1 Eval 1 Ord 1 Ordering 1;
+PrelNum 1 :: $d17 1 $d18 1;
+_exports_
+ShouldFail Bar(MkBar);
+_instances_
+instance _forall_ [a] {PrelBase.Ord a} => {PrelBase.Ord (Bar a)} = $d1;
+instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (Bar a)} = $d3;
+_declarations_
+1 $d1 _:_ _forall_ [a] {PrelBase.Ord a, PrelBase.Eq (Bar a)} => {PrelBase.Ord (Bar a)} ;;
+1 $d2 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (Bar a)} ;;
+1 data Bar a = MkBar PrelBase.Int a ;

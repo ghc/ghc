@@ -1,0 +1,87 @@
+
+
+================================================================================
+Typechecked:
+A{-r4,x-}{i} = A{-r4,x-}{i} {}
+B{-r3,x-}{i} = B{-r3,x-}{i} {}
+C{-r6,x-}{i} = C{-r6,x-}{i} {}
+D{-r8,x-}{i} = D{-r8,x-}{i} {}
+AbsBinds [] [] [([], con2tag_AD#_rBg, con2tag_AD#_aC1)]
+    con2tag_AD#_aC1 A{-r4,x-}{i} = 0#
+    con2tag_AD#_aC1 B{-r3,x-}{i} = 1#
+    con2tag_AD#_aC1 C{-r6,x-}{i} = 2#
+    con2tag_AD#_aC1 D{-r8,x-}{i} = 3#
+AbsBinds [] [] [([], maxtag_AD#_rBf, maxtag_AD#_aC6)]
+    maxtag_AD#_aC6 = PrelBase.I#{-5b,w-}{i} 3#
+AbsBinds [] [] [([], tag2con_AD#_rBe, tag2con_AD#_aC9)]
+    tag2con_AD#_aC9 (PrelBase.I#{-5b,w-}{i} 0#) = A{-r4,x-}{i}
+    tag2con_AD#_aC9 (PrelBase.I#{-5b,w-}{i} 1#) = B{-r3,x-}{i}
+    tag2con_AD#_aC9 (PrelBase.I#{-5b,w-}{i} 2#) = C{-r6,x-}{i}
+    tag2con_AD#_aC9 (PrelBase.I#{-5b,w-}{i} 3#) = D{-r8,x-}{i}
+    tag2con_AD#_aC9 _
+		    = IOBase.error{-87,w-} AD{-rU,x-} "Urk! in TcGenDeriv"
+AbsBinds [] [] [([], $d1{-rEh,x-}, d.Enum_aCl)]
+    map_aEp = map_aEk
+    AbsBinds [] [] [([], toEnum_aEq, toEnum_aCp)]
+	toEnum_aCp a_rBv = tag2con_AD#_rBe a_rBv
+    AbsBinds [] [] [([], fromEnum_aEr, fromEnum_aCv)]
+	fromEnum_aCv a_rBO
+		     = case con2tag_AD#_rBg a_rBO of
+			 a#_rBQ -> PrelBase.I#{-5b,w-}{i} a#_rBQ
+    AbsBinds [] [] [([], enumFrom_aEs, enumFrom_aCF)]
+	enumFrom_aCF a_rBz
+		     = case con2tag_AD#_rBg a_rBz of
+			 a#_rBB
+			 -> map_aEk [PrelBase.Int{-3g,W-}, AD{-rU,x-}] tag2con_AD#_rBe
+								       enumFromTo_aEl PrelBase.I#{-5b,w-}{i} a#_rBB
+										      maxtag_AD#_rBf
+    AbsBinds [] [] [([], enumFromThen_aEt, enumFromThen_aD4)]
+	enumFromThen_aD4 a_rBF b_rBG
+			 = case con2tag_AD#_rBg a_rBF of
+			     a#_rBI
+			     -> case con2tag_AD#_rBg b_rBG of
+				  b#_rBK
+				  -> map_aEp [PrelBase.Int{-3g,W-}, AD{-rU,x-}] tag2con_AD#_rBe
+										enumFromThenTo_aEm PrelBase.I#{-5b,w-}{i} a#_rBI
+												   PrelBase.I#{-5b,w-}{i} b#_rBK
+												   maxtag_AD#_rBf
+    AbsBinds [] [] [([], enumFromTo_aEu, enumFromTo_aDz)]
+	enumFromTo_aDz = $menumFromTo_aEn
+    AbsBinds [] [] [([], enumFromThenTo_aEv, enumFromThenTo_aDJ)]
+	enumFromThenTo_aDJ = $menumFromThenTo_aEo
+    d.Enum_aCl =
+	({-dict-}
+	 []
+	 [toEnum_aEq, fromEnum_aEr, enumFrom_aEs, enumFromThen_aEt, enumFromTo_aEu, enumFromThenTo_aEv])
+AbsBinds [] [] [([], $d2{-rEj,x-}, d.Eval_aE3)]
+    d.Eval_aE3 = ({-dict-} [] [])
+d.Functor_aE5 = PrelBase.$d26{-rai,p-}
+map_aEk = PrelBase.map{-rT,p-} PrelBase.[]{-3j,W-} d.Functor_aE5
+d.Enum_aE8 = PrelBase.$d6{-raS,p-}
+enumFromTo_aEl =
+    PrelBase.enumFromTo{-8W,p-} PrelBase.Int{-3g,W-} d.Enum_aE8
+d.Enum_aEb = d.Enum_aE8
+enumFromThenTo_aEm =
+    PrelBase.enumFromThenTo{-8X,p-} PrelBase.Int{-3g,W-} d.Enum_aEb
+d.Enum_aEd = $d1{-rEh,x-}
+$menumFromTo_aEn =
+    PrelBase.$menumFromTo{-rf6,p-} AD{-rU,x-} d.Enum_aEd
+d.Enum_aEg = d.Enum_aEd
+$menumFromThenTo_aEo =
+    PrelBase.$menumFromThenTo{-rf5,p-} AD{-rU,x-} d.Enum_aEg
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d14 1 $d2 1 $d26 1 $d31 1 $d38 1 $d40 1 $d42 1 $d45 1 $d47 1 $d6 1 $menumFromThenTo 1 $menumFromTo 1 Enum 1 Eval 1 Functor 1;
+PrelNum 1 :: $d8 1;
+_exports_
+ShouldSucceed AD(A B C D);
+_instances_
+instance {PrelBase.Enum AD} = $d1;
+instance {PrelBase.Eval AD} = $d2;
+_declarations_
+1 $d1 _:_ {PrelBase.Enum AD} ;;
+1 $d2 _:_ {PrelBase.Eval AD} ;;
+1 data AD = A |  B |  C |  D ;

@@ -1,0 +1,42 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [] [] [([], $d1{-rlY,x-}, d.Ord'_alb)]
+    d.Eq'_alg = $d3{-rm0,x-}
+    AbsBinds [] [] [([], lt_am2, lt_alf)]
+	lt_alf x_r3j y_r3k = PrelBase.True{-5E,w-}{i}
+    d.Ord'_alb = ({-dict-} [d.Eq'_alg] [lt_am2])
+AbsBinds [taly] [d.Eq'_alB] [([taly], $d2{-rlZ,x-}, d.Eq'_alr)]
+    AbsBinds [] [] [([], doubleeq_am3, doubleeq_alv)]
+	doubleeq_alv x_r3s y_r3t = PrelBase.True{-5E,w-}{i}
+    d.Eq'_alr = ({-dict-} [] [doubleeq_am3])
+AbsBinds [] [] [([], $d3{-rm0,x-}, d.Eq'_alI)]
+    AbsBinds [] [] [([], doubleeq_am4, doubleeq_alM)]
+	doubleeq_alM x_r3z y_r3A = PrelBase.True{-5E,w-}{i}
+    d.Eq'_alI = ({-dict-} [] [doubleeq_am4])
+scsel_Ord'ShouldSucceedEq'{-am1,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+lt{-r3J,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+AbsBinds [talW] [d.Ord'_alS] []
+doubleeq{-r3I,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [talX] [d.Eq'_alV] []
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed Eq'(doubleeq) Ord'(lt);
+_instances_
+instance {Ord' PrelBase.Int} = $d1;
+instance _forall_ [a] {Eq' a} => {Eq' [a]} = $d2;
+instance {Eq' PrelBase.Int} = $d3;
+_declarations_
+1 $d1 _:_ {Ord' PrelBase.Int} ;;
+1 $d2 _:_ _forall_ [a] {Eq' a} => {Eq' [a]} ;;
+1 $d3 _:_ {Eq' PrelBase.Int} ;;
+1 class Eq' a where {doubleeq :: a -> a -> PrelBase.Bool} ;
+1 class {Eq' a} => Ord' a where {lt :: a -> a -> PrelBase.Bool} ;

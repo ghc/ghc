@@ -1,4 +1,4 @@
-module Digraphs where
+module ShouldSucceed where
 
 import TheUtils
 import Set

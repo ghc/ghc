@@ -1,0 +1,23 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [tayv] [] [([tayv], x{-r3g,x-}, x_ayt)]
+    x_ayt = x_ayt
+AbsBinds [tayB, tayD] [] [([tayB, tayD], a{-r3h,x-}, a_ayx)]
+    a_ayx = (x{-r3g,x-} tayB, x{-r3g,x-} tayD)
+AbsBinds
+[tayW, tayS, tayU]
+[]
+[([tayW, tayS, tayU], f{-r3i,x-}, f_ayJ)]
+    f_ayJ x_r3f = a{-r3h,x-} [tayS, tayU]
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed a f x;
+_declarations_
+1 a _:_ _forall_ [ta tb] => (ta, tb) ;;
+1 f _:_ _forall_ [ta tb tc] => ta -> (tb, tc) ;;
+1 x _:_ _forall_ [ta] => ta ;;

@@ -2,480 +2,349 @@
 
 ================================================================================
 Desugared:
-j{-r3R,x-}  :: 
-    _forall_
-    [t{-aXD-} t{-aXG-} t{-aXJ-} t{-aXM-} a{-aXO-}]
-    =>
-    {PrelBase.Monad{-28,p-} a{-aXO-}}
-    -> a{-aXO-} (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
-    -> a{-aXO-} (t{-aXD-}, t{-aXG-})
+Rec {
+j{-r3O,x-}  ::  _forall_
+		[taS7 taSa aaSb taSf taSh]
+		=>
+		{PrelBase.Monad{-28,p-} aaSb}
+		-> aaSb (taSf, taSh, taS7, taSa)
+		-> aaSb (taSf, taSh)
 {-# L #-}
-j{-r3R,x-} =
-    _/\_ t{-aXD-} t{-aXG-} t{-aXJ-} t{-aXM-} a{-aXO-} -> \ d.Monad_aXY  :: 
-							       {PrelBase.Monad{-28,p-} a{-aXO-}}
-							   {-# L #-}
-							   d.Monad_aXY ->
-	let {
-	  >>=_a1c0  :: 
-	      _forall_
-	      [rjI{-a107-} rjJ{-a106-}]
-	      =>
-	      a{-aXO-} rjI{-a107-}
-	      -> (rjI{-a107-} -> a{-aXO-} rjJ{-a106-})
-	      -> a{-aXO-} rjJ{-a106-}
+j{-r3O,x-} =
+    _/\_ taS7 taSa aaSb taSf taSh -> \ d.Monad_aSr  ::  {PrelBase.Monad{-28,p-} aaSb}
+				       {-# L #-}
+				       d.Monad_aSr ->
+	_letrec_ {
+	  >>=_a17B  ::  _forall_
+			[taVi taVh]
+			=>
+			aaSb taVi -> (taVi -> aaSb taVh) -> aaSb taVh
 	  {-# L #-}
-	  >>=_a1c0 =
-	      PrelBase.>>={-811,p-}
-		  _@_ a{-aXO-} d.Monad_aXY } in
-	let {
-	  d.Monad_aY0  :: 
-	      {PrelBase.Monad{-28,p-} a{-aXO-}}
+	  >>=_a17B =
+	      PrelBase.>>={-811,p-} _@_ aaSb d.Monad_aSr;
+	  d.Monad_aSt  ::  {PrelBase.Monad{-28,p-} aaSb}
 	  {-# L #-}
-	  d.Monad_aY0 =
-	      d.Monad_aXY } in
-	let {
-	  return_a1bZ  :: 
-	      _forall_ [rjQ{-a108-}] => rjQ{-a108-} -> a{-aXO-} rjQ{-a108-}
+	  d.Monad_aSt =
+	      d.Monad_aSr;
+	  return_a17I  ::  _forall_ [taVj] => taVj -> aaSb taVj
 	  {-# L #-}
-	  return_a1bZ =
-	      PrelBase.return{-816,p-}
-		  _@_ a{-aXO-} d.Monad_aY0
-	} in 
-	  \ xs_r3L  :: 
-		a{-aXO-} (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
-	    {-# L #-}
-	    xs_r3L ->
-	      let {
-		ds_d1cw  :: 
-		    (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
-		    -> a{-aXO-} (t{-aXD-}, t{-aXG-})
+	  return_a17I =
+	      PrelBase.return{-816,p-} _@_ aaSb d.Monad_aSt;
+	  j_aRN  ::  aaSb (taSf, taSh, taS7, taSa) -> aaSb (taSf, taSh)
+	  {-# L #-}
+	  j_aRN =
+	      \ xs_r3I  ::  aaSb (taSf, taSh, taS7, taSa)
 		{-# L #-}
-		ds_d1cw =
-		    \ ds_d1cC  :: 
-			  (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
-		      {-# L #-}
-		      ds_d1cC ->
-			case
-			    ds_d1cC
-			of {
-			PrelTup.(,,,){-64,p-}{i} a_r3N b_r3O c_r3P d_r3Q  ->
-			let {
-			  ds_d1cQ  :: 
-			      (t{-aXD-}, t{-aXG-})
+		xs_r3I ->
+		  let {
+		    ds_d18A  ::  (taSf, taSh, taS7, taSa) -> aaSb (taSf, taSh)
+		    {-# L #-}
+		    ds_d18A =
+			\ ds_d18G  ::  (taSf, taSh, taS7, taSa)
 			  {-# L #-}
-			  ds_d1cQ =
-			      PrelTup.(,){-62,p-}{i}
-				  {_@_ t{-aXD-} _@_ t{-aXG-} a_r3N b_r3O}
-			} in 
-			  return_a1bZ
-			      _@_ (t{-aXD-}, t{-aXG-}) ds_d1cQ;}
-	      } in 
-		>>=_a1c0
-		    _@_ (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
-		    _@_ (t{-aXD-}, t{-aXG-})
-		    xs_r3L
-		    ds_d1cw
-i{-r3S,x-}  :: 
-    _forall_
-    [a{-aYh-} t{-aYm-} t{-aYo-}]
-    =>
-    {PrelBase.Eq{-23,p-} t{-aYm-}}
-    -> {PrelBase.Eq{-23,p-} t{-aYo-}}
-    -> {PrelBase.MonadZero{-29,p-} a{-aYh-}}
-    -> a{-aYh-} ([t{-aYm-}], [t{-aYo-}])
-    -> a{-aYh-} [t{-aYm-}]
+			  ds_d18G ->
+			    case
+				ds_d18G
+			    of {
+			    PrelTup.(,,,){-64,w-}{i} a_r3K b_r3L c_r3M d_r3N  ->
+			    let {
+			      ds_d18U  ::  (taSf, taSh)
+			      {-# L #-}
+			      ds_d18U =
+				  PrelTup.(,){-62,w-}{i} {_@_ taSf _@_ taSh a_r3K b_r3L}
+			    } in  return_a17I _@_ (taSf, taSh) ds_d18U;}
+		  } in 
+		    >>=_a17B
+			_@_ (taSf, taSh, taS7, taSa) _@_ (taSf, taSh) xs_r3I ds_d18A;
+	} in  j_aRN
+i{-r3P,x-}  ::  _forall_
+		[aaSN taSX taSZ]
+		=>
+		{PrelBase.Eq{-23,p-} taSX}
+		-> {PrelBase.Eq{-23,p-} taSZ}
+		-> {PrelBase.MonadZero{-29,p-} aaSN}
+		-> aaSN ([taSX], [taSZ])
+		-> aaSN [taSX]
 {-# L #-}
-i{-r3S,x-} =
-    _/\_ a{-aYh-} t{-aYm-} t{-aYo-} -> \ d.Eq_aYC  :: 
-					     {PrelBase.Eq{-23,p-} t{-aYm-}}
-					 {-# L #-}
-					 d.Eq_aYC d.Eq_aYF  :: 
-						      {PrelBase.Eq{-23,p-} t{-aYo-}}
-						  {-# L #-}
-						  d.Eq_aYF d.MonadZero_aYL  :: 
-							       {PrelBase.MonadZero{-29,p-} a{-aYh-}}
-							   {-# L #-}
-							   d.MonadZero_aYL ->
-	let {
-	  d.Monad_aYH  :: 
-	      {PrelBase.Monad{-28,p-} a{-aYh-}}
+i{-r3P,x-} =
+    _/\_ aaSN taSX taSZ -> \ d.Eq_aTf  ::  {PrelBase.Eq{-23,p-} taSX}
+			     {-# L #-}
+			     d.Eq_aTf d.Eq_aTi  ::  {PrelBase.Eq{-23,p-} taSZ}
+				      {-# L #-}
+				      d.Eq_aTi d.MonadZero_aTo  ::  {PrelBase.MonadZero{-29,p-} aaSN}
+					       {-# L #-}
+					       d.MonadZero_aTo ->
+	_letrec_ {
+	  d.Monad_aTk  ::  {PrelBase.Monad{-28,p-} aaSN}
 	  {-# L #-}
-	  d.Monad_aYH =
-	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a1dR,p-}
-		  _@_ a{-aYh-} d.MonadZero_aYL } in
-	let {
-	  d.Eq_aYA  :: 
-	      {PrelBase.Eq{-23,p-} [t{-aYm-}]}
+	  d.Monad_aTk =
+	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a19C,p-}
+		  _@_ aaSN d.MonadZero_aTo;
+	  d.Eq_aTd  ::  {PrelBase.Eq{-23,p-} [taSX]}
 	  {-# L #-}
-	  d.Eq_aYA =
-	      PrelBase.$d27{-rqA,p-}
-		  _@_ t{-aYm-} d.Eq_aYC } in
-	let {
-	  d.Eq_aYD  :: 
-	      {PrelBase.Eq{-23,p-} [t{-aYo-}]}
+	  d.Eq_aTd =
+	      PrelBase.$d28{-rpK,p-} _@_ taSX d.Eq_aTf;
+	  d.Eq_aTg  ::  {PrelBase.Eq{-23,p-} [taSZ]}
 	  {-# L #-}
-	  d.Eq_aYD =
-	      PrelBase.$d27{-rqA,p-}
-		  _@_ t{-aYo-} d.Eq_aYF } in
-	let {
-	  d.Eq_aYy  :: 
-	      {PrelBase.Eq{-23,p-} ([t{-aYm-}], [t{-aYo-}])}
+	  d.Eq_aTg =
+	      PrelBase.$d28{-rpK,p-} _@_ taSZ d.Eq_aTi;
+	  d.Eq_aTb  ::  {PrelBase.Eq{-23,p-} ([taSX], [taSZ])}
 	  {-# L #-}
-	  d.Eq_aYy =
-	      PrelTup.$d9{-rq7,p-}
-		  _@_ [t{-aYm-}] _@_ [t{-aYo-}] d.Eq_aYA d.Eq_aYD } in
-	let {
-	  ==_a1dH  :: 
-	      ([t{-aYm-}], [t{-aYo-}])
-	      -> ([t{-aYm-}], [t{-aYo-}])
-	      -> PrelBase.Bool{-34,p-}
+	  d.Eq_aTb =
+	      PrelTup.$d9{-rpg,p-} _@_ [taSX] _@_ [taSZ] d.Eq_aTd d.Eq_aTg;
+	  ==_a19w  ::  ([taSX], [taSZ])
+		       -> ([taSX], [taSZ])
+		       -> PrelBase.Bool{-34,W-}
 	  {-# L #-}
-	  ==_a1dH =
-	      PrelBase.=={-8Y,p-}
-		  _@_ ([t{-aYm-}], [t{-aYo-}]) d.Eq_aYy } in
-	let {
-	  >>=_a1dG  :: 
-	      _forall_
-	      [rjI{-a10a-} rjJ{-a109-}]
-	      =>
-	      a{-aYh-} rjI{-a10a-}
-	      -> (rjI{-a10a-} -> a{-aYh-} rjJ{-a109-})
-	      -> a{-aYh-} rjJ{-a109-}
+	  ==_a19w =
+	      PrelBase.=={-8Y,p-} _@_ ([taSX], [taSZ]) d.Eq_aTb;
+	  >>=_a19x  ::  _forall_
+			[taVl taVk]
+			=>
+			aaSN taVl -> (taVl -> aaSN taVk) -> aaSN taVk
 	  {-# L #-}
-	  >>=_a1dG =
-	      PrelBase.>>={-811,p-}
-		  _@_ a{-aYh-} d.Monad_aYH } in
-	let {
-	  d.Monad_aYJ  :: 
-	      {PrelBase.Monad{-28,p-} a{-aYh-}}
+	  >>=_a19x =
+	      PrelBase.>>={-811,p-} _@_ aaSN d.Monad_aTk;
+	  d.Monad_aTm  ::  {PrelBase.Monad{-28,p-} aaSN}
 	  {-# L #-}
-	  d.Monad_aYJ =
-	      d.Monad_aYH } in
-	let {
-	  return_a1dF  :: 
-	      _forall_ [rjQ{-a10b-}] => rjQ{-a10b-} -> a{-aYh-} rjQ{-a10b-}
+	  d.Monad_aTm =
+	      d.Monad_aTk;
+	  return_a19y  ::  _forall_ [taVm] => taVm -> aaSN taVm
 	  {-# L #-}
-	  return_a1dF =
-	      PrelBase.return{-816,p-}
-		  _@_ a{-aYh-} d.Monad_aYJ } in
-	let {
-	  zero_a1dE  :: 
-	      _forall_ [rjD{-a10c-}] => a{-aYh-} rjD{-a10c-}
+	  return_a19y =
+	      PrelBase.return{-816,p-} _@_ aaSN d.Monad_aTm;
+	  zero_a19z  ::  _forall_ [taVn] => aaSN taVn
 	  {-# L #-}
-	  zero_a1dE =
-	      PrelBase.zero{-810,p-}
-		  _@_ a{-aYh-} d.MonadZero_aYL
-	} in 
-	  \ xs_r3F  :: 
-		a{-aYh-} ([t{-aYm-}], [t{-aYo-}])
-	    {-# L #-}
-	    xs_r3F ->
-	      let {
-		ds_d1f5  :: 
-		    ([t{-aYm-}], [t{-aYo-}]) -> a{-aYh-} [t{-aYm-}]
+	  zero_a19z =
+	      PrelBase.zero{-810,p-} _@_ aaSN d.MonadZero_aTo;
+	  i_aSv  ::  aaSN ([taSX], [taSZ]) -> aaSN [taSX]
+	  {-# L #-}
+	  i_aSv =
+	      \ xs_r3C  ::  aaSN ([taSX], [taSZ])
 		{-# L #-}
-		ds_d1f5 =
-		    \ all_r3H  :: 
-			  ([t{-aYm-}], [t{-aYo-}])
-		      {-# L #-}
-		      all_r3H ->
-			case all_r3H of { PrelTup.(,){-62,p-}{i} x_r3I y_r3J  ->
-			case
-			    let { ds_d1fr  :: 
-				      ([t{-aYm-}], [t{-aYo-}])
-				  {-# L #-}
-				  ds_d1fr =
-			      let {
-				ds_d1fE  :: 
-				    [t{-aYm-}]
-				{-# L #-}
-				ds_d1fE =
-				    PrelBase.[]{-5i,p-}{i}
-					_@_ t{-aYm-} } in
-			      let {
-				ds_d1fI  :: 
-				    [t{-aYo-}]
-				{-# L #-}
-				ds_d1fI =
-				    PrelBase.[]{-5i,p-}{i}
-					_@_ t{-aYo-}
-			      } in 
-				PrelTup.(,){-62,p-}{i}
-				    {_@_ [t{-aYm-}] _@_ [t{-aYo-}] ds_d1fE ds_d1fI}
-			    } in
-			    ==_a1dH
-				all_r3H ds_d1fr
-			of {
-			  PrelBase.True{-5E,p-}{i} ->
-			      return_a1dF
-				  _@_ [t{-aYm-}] x_r3I;
-			  PrelBase.False{-58,p-}{i} ->
-			      zero_a1dE
-				  _@_ [t{-aYm-}];
-			};}
-	      } in 
-		>>=_a1dG
-		    _@_ ([t{-aYm-}], [t{-aYo-}]) _@_ [t{-aYm-}] xs_r3F ds_d1f5
-h{-r3T,x-}  :: 
-    _forall_
-    [a{-aYU-} t{-aYZ-}]
-    =>
-    {PrelBase.MonadZero{-29,p-} a{-aYU-}}
-    -> a{-aYU-} t{-aYZ-}
-    -> a{-aYU-} t{-aYZ-}
-    -> a{-aYU-} [t{-aYZ-}]
-{-# L #-}
-h{-r3T,x-} =
-    _/\_ a{-aYU-} t{-aYZ-} -> \ d.MonadZero_aZd  :: 
-				    {PrelBase.MonadZero{-29,p-} a{-aYU-}}
-				{-# L #-}
-				d.MonadZero_aZd ->
-	let {
-	  d.Monad_aZ9  :: 
-	      {PrelBase.Monad{-28,p-} a{-aYU-}}
-	  {-# L #-}
-	  d.Monad_aZ9 =
-	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a1dR,p-}
-		  _@_ a{-aYU-} d.MonadZero_aZd } in
-	let {
-	  >>=_a1gH  :: 
-	      _forall_
-	      [rjI{-a10e-} rjJ{-a10d-}]
-	      =>
-	      a{-aYU-} rjI{-a10e-}
-	      -> (rjI{-a10e-} -> a{-aYU-} rjJ{-a10d-})
-	      -> a{-aYU-} rjJ{-a10d-}
-	  {-# L #-}
-	  >>=_a1gH =
-	      PrelBase.>>={-811,p-}
-		  _@_ a{-aYU-} d.Monad_aZ9 } in
-	let {
-	  d.Monad_aZb  :: 
-	      {PrelBase.Monad{-28,p-} a{-aYU-}}
-	  {-# L #-}
-	  d.Monad_aZb =
-	      d.Monad_aZ9 } in
-	let {
-	  return_a1gG  :: 
-	      _forall_ [rjQ{-a10f-}] => rjQ{-a10f-} -> a{-aYU-} rjQ{-a10f-}
-	  {-# L #-}
-	  return_a1gG =
-	      PrelBase.return{-816,p-}
-		  _@_ a{-aYU-} d.Monad_aZb } in
-	let {
-	  zero_a1gF  :: 
-	      _forall_ [rjD{-a10g-}] => a{-aYU-} rjD{-a10g-}
-	  {-# L #-}
-	  zero_a1gF =
-	      PrelBase.zero{-810,p-}
-		  _@_ a{-aYU-} d.MonadZero_aZd
-	} in 
-	  \ xs_r3x  :: 
-		a{-aYU-} t{-aYZ-}
-	    {-# L #-}
-	    xs_r3x ys_r3z  :: 
-		       a{-aYU-} t{-aYZ-}
-		   {-# L #-}
-		   ys_r3z ->
-	      let {
-		ds_d1hu  :: 
-		    t{-aYZ-} -> a{-aYU-} [t{-aYZ-}]
-		{-# L #-}
-		ds_d1hu =
-		    \ x_r3B  :: 
-			  t{-aYZ-}
-		      {-# L #-}
-		      x_r3B ->
-			let {
-			  ds_d1hK  :: 
-			      t{-aYZ-} -> a{-aYU-} [t{-aYZ-}]
+		xs_r3C ->
+		  let {
+		    ds_d1br  ::  ([taSX], [taSZ]) -> aaSN [taSX]
+		    {-# L #-}
+		    ds_d1br =
+			\ all_r3E  ::  ([taSX], [taSZ])
 			  {-# L #-}
-			  ds_d1hK =
-			      \ y_r3D  :: 
-				    t{-aYZ-}
-				{-# L #-}
-				y_r3D ->
-				  zero_a1gF
-				      _@_ [t{-aYZ-}]
-			} in 
-			  >>=_a1gH
-			      _@_ t{-aYZ-} _@_ [t{-aYZ-}] ys_r3z ds_d1hK
-	      } in 
-		>>=_a1gH
-		    _@_ t{-aYZ-} _@_ [t{-aYZ-}] xs_r3x ds_d1hu
-g{-r3U,x-}  :: 
-    _forall_
-    [a{-aZn-} t{-aZp-} t{-aZs-} t{-aZv-}]
-    =>
-    {PrelBase.MonadZero{-29,p-} a{-aZn-}}
-    -> a{-aZn-} t{-aZp-}
-    -> a{-aZn-} t{-aZs-}
-    -> a{-aZn-} t{-aZv-}
-    -> a{-aZn-} (t{-aZp-}, t{-aZs-}, t{-aZv-})
-{-# L #-}
-g{-r3U,x-} =
-    _/\_ a{-aZn-} t{-aZp-} t{-aZs-} t{-aZv-} -> \ d.MonadZero_aZJ  :: 
-						      {PrelBase.MonadZero{-29,p-} a{-aZn-}}
-						  {-# L #-}
-						  d.MonadZero_aZJ ->
-	let {
-	  d.Monad_aZF  :: 
-	      {PrelBase.Monad{-28,p-} a{-aZn-}}
-	  {-# L #-}
-	  d.Monad_aZF =
-	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a1dR,p-}
-		  _@_ a{-aZn-} d.MonadZero_aZJ } in
-	let {
-	  >>=_a1im  :: 
-	      _forall_
-	      [rjI{-a10i-} rjJ{-a10h-}]
-	      =>
-	      a{-aZn-} rjI{-a10i-}
-	      -> (rjI{-a10i-} -> a{-aZn-} rjJ{-a10h-})
-	      -> a{-aZn-} rjJ{-a10h-}
-	  {-# L #-}
-	  >>=_a1im =
-	      PrelBase.>>={-811,p-}
-		  _@_ a{-aZn-} d.Monad_aZF } in
-	let {
-	  d.Monad_aZH  :: 
-	      {PrelBase.Monad{-28,p-} a{-aZn-}}
-	  {-# L #-}
-	  d.Monad_aZH =
-	      d.Monad_aZF } in
-	let {
-	  return_a1il  :: 
-	      _forall_ [rjQ{-a10j-}] => rjQ{-a10j-} -> a{-aZn-} rjQ{-a10j-}
-	  {-# L #-}
-	  return_a1il =
-	      PrelBase.return{-816,p-}
-		  _@_ a{-aZn-} d.Monad_aZH } in
-	let {
-	  zero_a1ik  :: 
-	      _forall_ [rjD{-a10k-}] => a{-aZn-} rjD{-a10k-}
-	  {-# L #-}
-	  zero_a1ik =
-	      PrelBase.zero{-810,p-}
-		  _@_ a{-aZn-} d.MonadZero_aZJ
-	} in 
-	  \ xs_r3l  :: 
-		a{-aZn-} t{-aZp-}
-	    {-# L #-}
-	    xs_r3l ys_r3n  :: 
-		       a{-aZn-} t{-aZs-}
-		   {-# L #-}
-		   ys_r3n zs_r3p  :: 
-			      a{-aZn-} t{-aZv-}
-			  {-# L #-}
-			  zs_r3p ->
-	      let {
-		ds_d1ja  :: 
-		    t{-aZp-} -> a{-aZn-} (t{-aZp-}, t{-aZs-}, t{-aZv-})
-		{-# L #-}
-		ds_d1ja =
-		    \ x_r3r  :: 
-			  t{-aZp-}
-		      {-# L #-}
-		      x_r3r ->
-			let {
-			  ds_d1jq  :: 
-			      t{-aZs-} -> a{-aZn-} (t{-aZp-}, t{-aZs-}, t{-aZv-})
-			  {-# L #-}
-			  ds_d1jq =
-			      \ y_r3t  :: 
-				    t{-aZs-}
-				{-# L #-}
-				y_r3t ->
+			  all_r3E ->
+			    case all_r3E of { PrelTup.(,){-62,w-}{i} x_r3F y_r3G  ->
+			    case
+				let { ds_d1bN  ::  ([taSX], [taSZ])
+				      {-# L #-}
+				      ds_d1bN =
 				  let {
-				    ds_d1jG  :: 
-					t{-aZv-} -> a{-aZn-} (t{-aZp-}, t{-aZs-}, t{-aZv-})
+				    ds_d1c0  ::  [taSX]
 				    {-# L #-}
-				    ds_d1jG =
-					\ z_r3v  :: 
-					      t{-aZv-}
-					  {-# L #-}
-					  z_r3v ->
-					    let {
-					      ds_d1jR  :: 
-						  (t{-aZp-}, t{-aZs-}, t{-aZv-})
-					      {-# L #-}
-					      ds_d1jR =
-						  PrelTup.(,,){-63,p-}{i}
-						      {_@_ t{-aZp-}
-						       _@_ t{-aZs-}
-						       _@_ t{-aZv-}
-						       x_r3r
-						       y_r3t
-						       z_r3v}
-					    } in 
-					      return_a1il
-						  _@_ (t{-aZp-}, t{-aZs-}, t{-aZv-}) ds_d1jR
+				    ds_d1c0 =
+					PrelBase.[]{-5i,w-}{i} _@_ taSX } in
+				  let {
+				    ds_d1c4  ::  [taSZ]
+				    {-# L #-}
+				    ds_d1c4 =
+					PrelBase.[]{-5i,w-}{i} _@_ taSZ
 				  } in 
-				    >>=_a1im
-					_@_ t{-aZv-}
-					_@_ (t{-aZp-}, t{-aZs-}, t{-aZv-})
-					zs_r3p
-					ds_d1jG
-			} in 
-			  >>=_a1im
-			      _@_ t{-aZs-} _@_ (t{-aZp-}, t{-aZs-}, t{-aZv-}) ys_r3n ds_d1jq
-	      } in 
-		>>=_a1im
-		    _@_ t{-aZp-} _@_ (t{-aZp-}, t{-aZs-}, t{-aZv-}) xs_r3l ds_d1ja
-f{-r3V,x-}  :: 
-    _forall_
-    [a{-aZR-} t{-aZT-}]
-    =>
-    {PrelBase.Monad{-28,p-} a{-aZR-}}
-    -> a{-aZR-} t{-aZT-}
-    -> a{-aZR-} t{-aZT-}
+				    PrelTup.(,){-62,w-}{i} {_@_ [taSX] _@_ [taSZ] ds_d1c0 ds_d1c4}
+				} in
+				==_a19w all_r3E ds_d1bN
+			    of {
+			      PrelBase.True{-5E,w-}{i} -> return_a19y _@_ [taSX] x_r3F;
+			      PrelBase.False{-58,w-}{i} -> zero_a19z _@_ [taSX];
+			    };}
+		  } in  >>=_a19x _@_ ([taSX], [taSZ]) _@_ [taSX] xs_r3C ds_d1br;
+	} in  i_aSv
+h{-r3Q,x-}  ::  _forall_
+		[aaTE taTN]
+		=>
+		{PrelBase.MonadZero{-29,p-} aaTE}
+		-> aaTE taTN
+		-> aaTE taTN
+		-> aaTE [taTN]
 {-# L #-}
-f{-r3V,x-} =
-    _/\_ a{-aZR-} t{-aZT-} -> \ d.Monad_a103  :: 
-				    {PrelBase.Monad{-28,p-} a{-aZR-}}
-				{-# L #-}
-				d.Monad_a103 ->
-	let {
-	  >>=_a1ky  :: 
-	      _forall_
-	      [rjI{-a10m-} rjJ{-a10l-}]
-	      =>
-	      a{-aZR-} rjI{-a10m-}
-	      -> (rjI{-a10m-} -> a{-aZR-} rjJ{-a10l-})
-	      -> a{-aZR-} rjJ{-a10l-}
+h{-r3Q,x-} =
+    _/\_ aaTE taTN -> \ d.MonadZero_aU1  ::  {PrelBase.MonadZero{-29,p-} aaTE}
+			{-# L #-}
+			d.MonadZero_aU1 ->
+	_letrec_ {
+	  d.Monad_aTX  ::  {PrelBase.Monad{-28,p-} aaTE}
 	  {-# L #-}
-	  >>=_a1ky =
-	      PrelBase.>>={-811,p-}
-		  _@_ a{-aZR-} d.Monad_a103 } in
-	let {
-	  d.Monad_a105  :: 
-	      {PrelBase.Monad{-28,p-} a{-aZR-}}
+	  d.Monad_aTX =
+	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a19C,p-}
+		  _@_ aaTE d.MonadZero_aU1;
+	  >>=_a1cX  ::  _forall_
+			[taVp taVo]
+			=>
+			aaTE taVp -> (taVp -> aaTE taVo) -> aaTE taVo
 	  {-# L #-}
-	  d.Monad_a105 =
-	      d.Monad_a103 } in
-	let {
-	  return_a1kx  :: 
-	      _forall_ [rjQ{-a10n-}] => rjQ{-a10n-} -> a{-aZR-} rjQ{-a10n-}
+	  >>=_a1cX =
+	      PrelBase.>>={-811,p-} _@_ aaTE d.Monad_aTX;
+	  d.Monad_aTZ  ::  {PrelBase.Monad{-28,p-} aaTE}
 	  {-# L #-}
-	  return_a1kx =
-	      PrelBase.return{-816,p-}
-		  _@_ a{-aZR-} d.Monad_a105
-	} in 
-	  \ xs_r3h  :: 
-		a{-aZR-} t{-aZT-}
-	    {-# L #-}
-	    xs_r3h ->
-	      let {
-		ds_d1l4  :: 
-		    t{-aZT-} -> a{-aZR-} t{-aZT-}
+	  d.Monad_aTZ =
+	      d.Monad_aTX;
+	  return_a1cY  ::  _forall_ [taVq] => taVq -> aaTE taVq
+	  {-# L #-}
+	  return_a1cY =
+	      PrelBase.return{-816,p-} _@_ aaTE d.Monad_aTZ;
+	  zero_a1cZ  ::  _forall_ [taVr] => aaTE taVr
+	  {-# L #-}
+	  zero_a1cZ =
+	      PrelBase.zero{-810,p-} _@_ aaTE d.MonadZero_aU1;
+	  h_aTr  ::  aaTE taTN -> aaTE taTN -> aaTE [taTN]
+	  {-# L #-}
+	  h_aTr =
+	      \ xs_r3v  ::  aaTE taTN
 		{-# L #-}
-		ds_d1l4 =
-		    \ x_r3j  :: 
-			  t{-aZT-}
-		      {-# L #-}
-		      x_r3j ->
-			return_a1kx
-			    _@_ t{-aZT-} x_r3j
-	      } in 
-		>>=_a1ky
-		    _@_ t{-aZT-} _@_ t{-aZT-} xs_r3h ds_d1l4
+		xs_r3v ys_r3w  ::  aaTE taTN
+		       {-# L #-}
+		       ys_r3w ->
+		  let {
+		    ds_d1e0  ::  taTN -> aaTE [taTN]
+		    {-# L #-}
+		    ds_d1e0 =
+			\ x_r3y  ::  taTN
+			  {-# L #-}
+			  x_r3y ->
+			    let {
+			      ds_d1eg  ::  taTN -> aaTE [taTN]
+			      {-# L #-}
+			      ds_d1eg =
+				  \ y_r3A  ::  taTN
+				    {-# L #-}
+				    y_r3A ->
+				      zero_a1cZ _@_ [taTN]
+			    } in  >>=_a1cX _@_ taTN _@_ [taTN] ys_r3w ds_d1eg
+		  } in  >>=_a1cX _@_ taTN _@_ [taTN] xs_r3v ds_d1e0;
+	} in  h_aTr
+g{-r3R,x-}  ::  _forall_
+		[aaUm taUx taUz taUB]
+		=>
+		{PrelBase.MonadZero{-29,p-} aaUm}
+		-> aaUm taUx
+		-> aaUm taUz
+		-> aaUm taUB
+		-> aaUm (taUx, taUz, taUB)
+{-# L #-}
+g{-r3R,x-} =
+    _/\_ aaUm taUx taUz taUB -> \ d.MonadZero_aUP  ::  {PrelBase.MonadZero{-29,p-} aaUm}
+				  {-# L #-}
+				  d.MonadZero_aUP ->
+	_letrec_ {
+	  d.Monad_aUL  ::  {PrelBase.Monad{-28,p-} aaUm}
+	  {-# L #-}
+	  d.Monad_aUL =
+	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a19C,p-}
+		  _@_ aaUm d.MonadZero_aUP;
+	  >>=_a1eM  ::  _forall_
+			[taVt taVs]
+			=>
+			aaUm taVt -> (taVt -> aaUm taVs) -> aaUm taVs
+	  {-# L #-}
+	  >>=_a1eM =
+	      PrelBase.>>={-811,p-} _@_ aaUm d.Monad_aUL;
+	  d.Monad_aUN  ::  {PrelBase.Monad{-28,p-} aaUm}
+	  {-# L #-}
+	  d.Monad_aUN =
+	      d.Monad_aUL;
+	  return_a1eN  ::  _forall_ [taVu] => taVu -> aaUm taVu
+	  {-# L #-}
+	  return_a1eN =
+	      PrelBase.return{-816,p-} _@_ aaUm d.Monad_aUN;
+	  zero_a1eO  ::  _forall_ [taVv] => aaUm taVv
+	  {-# L #-}
+	  zero_a1eO =
+	      PrelBase.zero{-810,p-} _@_ aaUm d.MonadZero_aUP;
+	  g_aU4  ::  aaUm taUx
+		     -> aaUm taUz
+		     -> aaUm taUB
+		     -> aaUm (taUx, taUz, taUB)
+	  {-# L #-}
+	  g_aU4 =
+	      \ xs_r3l  ::  aaUm taUx
+		{-# L #-}
+		xs_r3l ys_r3m  ::  aaUm taUz
+		       {-# L #-}
+		       ys_r3m zs_r3n  ::  aaUm taUB
+			      {-# L #-}
+			      zs_r3n ->
+		  let {
+		    ds_d1fQ  ::  taUx -> aaUm (taUx, taUz, taUB)
+		    {-# L #-}
+		    ds_d1fQ =
+			\ x_r3p  ::  taUx
+			  {-# L #-}
+			  x_r3p ->
+			    let {
+			      ds_d1g6  ::  taUz -> aaUm (taUx, taUz, taUB)
+			      {-# L #-}
+			      ds_d1g6 =
+				  \ y_r3r  ::  taUz
+				    {-# L #-}
+				    y_r3r ->
+				      let {
+					ds_d1gm  ::  taUB -> aaUm (taUx, taUz, taUB)
+					{-# L #-}
+					ds_d1gm =
+					    \ z_r3t  ::  taUB
+					      {-# L #-}
+					      z_r3t ->
+						let {
+						  ds_d1gx  ::  (taUx, taUz, taUB)
+						  {-# L #-}
+						  ds_d1gx =
+						      PrelTup.(,,){-63,w-}{i}
+							  {_@_ taUx
+							   _@_ taUz
+							   _@_ taUB
+							   x_r3p
+							   y_r3r
+							   z_r3t}
+						} in  return_a1eN _@_ (taUx, taUz, taUB) ds_d1gx
+				      } in  >>=_a1eM _@_ taUB _@_ (taUx, taUz, taUB) zs_r3n ds_d1gm
+			    } in  >>=_a1eM _@_ taUz _@_ (taUx, taUz, taUB) ys_r3m ds_d1g6
+		  } in  >>=_a1eM _@_ taUx _@_ (taUx, taUz, taUB) xs_r3l ds_d1fQ;
+	} in  g_aU4
+f{-r3S,x-}  ::  _forall_
+		[aaV0 taV2]
+		=>
+		{PrelBase.Monad{-28,p-} aaV0} -> aaV0 taV2 -> aaV0 taV2
+{-# L #-}
+f{-r3S,x-} =
+    _/\_ aaV0 taV2 -> \ d.Monad_aVe  ::  {PrelBase.Monad{-28,p-} aaV0}
+			{-# L #-}
+			d.Monad_aVe ->
+	_letrec_ {
+	  >>=_a1h7  ::  _forall_
+			[taVx taVw]
+			=>
+			aaV0 taVx -> (taVx -> aaV0 taVw) -> aaV0 taVw
+	  {-# L #-}
+	  >>=_a1h7 =
+	      PrelBase.>>={-811,p-} _@_ aaV0 d.Monad_aVe;
+	  d.Monad_aVg  ::  {PrelBase.Monad{-28,p-} aaV0}
+	  {-# L #-}
+	  d.Monad_aVg =
+	      d.Monad_aVe;
+	  return_a1he  ::  _forall_ [taVy] => taVy -> aaV0 taVy
+	  {-# L #-}
+	  return_a1he =
+	      PrelBase.return{-816,p-} _@_ aaV0 d.Monad_aVg;
+	  f_aUS  ::  aaV0 taV2 -> aaV0 taV2
+	  {-# L #-}
+	  f_aUS =
+	      \ xs_r3h  ::  aaV0 taV2
+		{-# L #-}
+		xs_r3h ->
+		  let {
+		    ds_d1hQ  ::  taV2 -> aaV0 taV2
+		    {-# L #-}
+		    ds_d1hQ =
+			\ x_r3j  ::  taV2
+			  {-# L #-}
+			  x_r3j ->
+			    return_a1he _@_ taV2 x_r3j
+		  } in  >>=_a1h7 _@_ taV2 _@_ taV2 xs_r3h ds_d1hQ;
+	} in  f_aUS
+end Rec }

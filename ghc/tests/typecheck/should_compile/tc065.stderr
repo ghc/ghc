@@ -1,0 +1,310 @@
+
+
+================================================================================
+Typechecked:
+Succeeded{-rd,x-}{i} =
+    _/\_ a_tr8i b_tr8j -> \ tpl_B1 ->
+	Succeeded{-rd,x-}{i} {_@_ a_tr8i _@_ b_tr8j tpl_B1}
+Failed{-rc,x-}{i} =
+    _/\_ a_tr8i b_tr8j -> \ tpl_B1 ->
+	Failed{-rc,x-}{i} {_@_ a_tr8i _@_ b_tr8j tpl_B1}
+MkDigraph{-r8z,x-}{i} =
+    _/\_ vertex_tr8t -> \ tpl_B1 ->
+	MkDigraph{-r8z,x-}{i} {_@_ vertex_tr8t tpl_B1}
+AbsBinds
+[ta14c]
+[d.Eq_a14r]
+[([ta14c], isRecursiveCycle{-r6D,x-}, isRecursiveCycle_a147)]
+    d.Eq_a14v = d.Eq_a14r
+    d.Eq_a14w = d.Eq_a14r
+    d.Eq_a14t =
+	PrelTup.$d9{-rDa,p-} [ta14c, ta14c] [d.Eq_a14v, d.Eq_a14w]
+    elem_a1gA = PrelList.elem{-rDi,p-} (ta14c, ta14c) d.Eq_a14t
+    isRecursiveCycle_a147 [vertex_r8c] edges_r8d
+			  = (vertex_r8c, vertex_r8c) elem_a1gA edges_r8d
+    isRecursiveCycle_a147 cycle_r8f edges_r8g
+			  = PrelBase.True{-5E,w-}{i}
+AbsBinds
+[ta14I, ta14J, ta14K]
+[d.Eq_a15B, d.Ord_a15C]
+[([ta14J, ta14I, ta14K], lookupVertex{-r6C,x-}, lookupVertex_a14F)]
+    d.Eq_a15E = d.Eq_a15B
+    ==_a1gB = PrelBase.=={-8Y,p-} ta14I d.Eq_a15E
+    lookupVertex_a14F flat_info_r84 vertex_r85
+		      = PrelList.head{-rEs,p-} ta14K code_list_r87
+		      where
+			  {- nonrec -}
+			  AbsBinds [] [] [([], code_list_r87, code_list_a14O)]
+			      code_list_a14O
+				  = [code_r8a |
+					 (vertex'_r89, _, _, code_r8a) <- flat_info_r84, vertex_r85
+											 ==_a1gB vertex'_r89]
+			  {- nonrec -}
+			  {- nonrec -}
+AbsBinds
+[ta15X, ta160, ta161]
+[d.Eq_a17I, d.Ord_a17J]
+[([ta160, ta161, ta15X], mkEdges{-r6B,x-}, mkEdges_a15U)]
+    d.Ord_a17F = d.Ord_a17J
+    d.MonadZero_a17G = PrelBase.$d24{-ri3,p-}
+    mkEdges_a15U vertices_r7M flat_info_r7N
+		 = [(source_vertex_r7X, target_vertex_r82) |
+			(source_vertex_r7X, _, used_names_r7Y, _) <- flat_info_r7N, target_name_r80 <- Set.setToList{-rge,p-}
+													   ta160 used_names_r7Y, target_vertex_r82 <- vertices_defining_a1gC target_name_r80
+																					     flat_info_r7N]
+		 where
+		     {- nonrec -}
+		     AbsBinds
+		     [ta16m, ta16r, ta16u, aa16w, ta16z]
+		     [d.Ord_a16M, d.MonadZero_a16S]
+		     [([ta16m, ta16r, ta16u, aa16w, ta16z],
+		       vertices_defining_r7P,
+		       vertices_defining_a163)]
+			 d.Monad_a16O =
+			     PrelBase.scsel_MonadZeroPrelBaseMonad{-a1gH,p-} aa16w
+				 d.MonadZero_a16S
+			 elementOf_a1gD = Set.elementOf{-rg7,p-} ta16z d.Ord_a16M
+			 >>=_a1gE = PrelBase.>>={-811,p-} aa16w d.Monad_a16O
+			 d.Monad_a16Q = d.Monad_a16O
+			 return_a1gF = PrelBase.return{-816,p-} aa16w d.Monad_a16Q
+			 zero_a1gG = PrelBase.zero{-810,p-} aa16w d.MonadZero_a16S
+			 vertices_defining_a163 name_r7R flat_info_r7S
+						= [vertex_r7U |
+						       (vertex_r7U, names_defined_r7V, _, _) <- flat_info_r7S, name_r7R
+													       elementOf_a1gD names_defined_r7V]
+		     {- nonrec -}
+		     vertices_defining_a1gC =
+			 vertices_defining_r7P
+			     [ta15X, Set.Set{-rg4,p-} ta160, ta161, PrelBase.[]{-3j,W-}, ta160]
+			     [d.Ord_a17F, d.MonadZero_a17G]
+		     {- nonrec -}
+AbsBinds
+[ta180, ta181, ta182]
+[]
+[([ta181, ta182, ta180], mkVertices{-r6A,x-}, mkVertices_a17X)]
+    mkVertices_a17X info_r7I
+		    = [vertex_r7K | (vertex_r7K, _, _, _) <- info_r7I]
+AbsBinds
+[ta18F]
+[d.Eq_a18W]
+[([ta18F], isCyclic{-r6y,x-}, isCyclic_a18C)]
+    d.Eq_a190 = d.Eq_a18W
+    d.Eq_a191 = d.Eq_a18W
+    d.Eq_a18Y =
+	PrelTup.$d9{-rDa,p-} [ta18F, ta18F] [d.Eq_a190, d.Eq_a191]
+    elem_a1gI = PrelList.elem{-rDi,p-} (ta18F, ta18F) d.Eq_a18Y
+    isCyclic_a18C edges_r7r [v_r7s]
+		  = (v_r7s, v_r7s) elem_a1gI edges_r7r
+    isCyclic_a18C edges_r7u vs_r7v = PrelBase.True{-5E,w-}{i}
+AbsBinds [ta1au] [d.Eq_a1aw] [([ta1au], dfs{-r6F,x-}, dfs_a193)]
+    elem_a1gJ = PrelList.elem{-rDi,p-} ta1au d.Eq_a1aw
+    dfs_a193 r_r7e (vs_r7f, ns_r7g) PrelBase.[]{-5i,w-}{i}
+	     = (vs_r7f, ns_r7g)
+    dfs_a193 r_r7i
+	     (vs_r7j, ns_r7k)
+	     (x_r7l PrelBase.:{-55,w-}{i} xs_r7m)
+	     | x_r7l elem_a1gJ vs_r7j = dfs_a193 r_r7i (vs_r7j, ns_r7k) xs_r7m
+	     | PrelBase.otherwise{-818,p-}
+	     = dfs_a193 r_r7i
+			(vs'_r7o,
+			 ++_a1gs ta1au (PrelBase.:{-55,w-}{i} ta1au x_r7l ns'_r7p) ns_r7k)
+			xs_r7m
+	     where
+		 {- nonrec -}
+		 AbsBinds [] [] [([], vs'_r7o, vs'_a19M), ([], ns'_r7p, ns'_a19N)]
+		     (vs'_a19M, ns'_a19N)
+			 = dfs_a193 r_r7i
+				    (PrelBase.:{-55,w-}{i} ta1au x_r7l vs_r7j,
+				     PrelBase.[]{-5i,w-}{i} ta1au)
+				    r_r7i x_r7l
+		 {- nonrec -}
+		 {- nonrec -}
+AbsBinds
+[ta1aG]
+[d.Eq_a1eb]
+[([ta1aG], stronglyConnComp{-r6x,x-}, stronglyConnComp_a1aD)]
+    d.Eq_a1e9 = d.Eq_a1eb
+    d.Eq_a1e6 = d.Eq_a1eb
+    d.Eq_a1ed = d.Eq_a1eb
+    dfs_a1gK = dfs{-r6F,x-} ta1aG d.Eq_a1ed
+    d.Eq_a1e7 = d.Eq_a1eb
+    stronglyConnComp_a1aD es_r6H vs_r6I
+			  = PrelTup.snd{-rDg,p-}
+				[[ta1aG], [[ta1aG]]] span_tree_a1gL new_range_a1gM reversed_edges_r6K
+								    (PrelBase.[]{-5i,w-}{i} ta1aG,
+								     PrelBase.[]{-5i,w-}{i} [ta1aG])
+								    PrelTup.snd{-rDg,p-}
+									[[ta1aG], [ta1aG]] dfs_a1gK new_range_a1gN es_r6H
+												    (PrelBase.[]{-5i,w-}{i}
+													 ta1aG,
+												     PrelBase.[]{-5i,w-}{i}
+													 ta1aG)
+												    vs_r6I
+			  where
+			      {- rec -}
+			      AbsBinds
+			      [ta1c5]
+			      [d.Eq_a1c7]
+			      [([ta1c5], span_tree_r6N, span_tree_a1aK)]
+				  elem_a1gO = PrelList.elem{-rDi,p-} ta1c5 d.Eq_a1c7
+				  d.Eq_a1c9 = d.Eq_a1c7
+				  dfs_a1gP = dfs{-r6F,x-} ta1c5 d.Eq_a1c9
+				  span_tree_a1aK r_r71 (vs_r72, ns_r73) PrelBase.[]{-5i,w-}{i}
+						 = (vs_r72, ns_r73)
+				  span_tree_a1aK r_r75
+						 (vs_r76, ns_r77)
+						 (x_r78 PrelBase.:{-55,w-}{i} xs_r79)
+						 | x_r78 elem_a1gO vs_r76
+						 = span_tree_a1aK r_r75 (vs_r76, ns_r77) xs_r79
+						 | PrelBase.otherwise{-818,p-}
+						 = span_tree_a1aK r_r75
+								  (vs'_r7b,
+								   PrelBase.:{-55,w-}{i} [ta1c5]
+								       (PrelBase.:{-55,w-}{i} ta1c5
+									    x_r78 ns'_r7c)
+								       ns_r77)
+								  xs_r79
+						 where
+						     {- nonrec -}
+						     AbsBinds
+						     []
+						     []
+						     [([], vs'_r7b, vs'_a1bt), ([],
+										ns'_r7c,
+										ns'_a1bu)]
+							 (vs'_a1bt, ns'_a1bu)
+							     = dfs_a1gP r_r75
+									(PrelBase.:{-55,w-}{i} ta1c5
+									     x_r78 vs_r76,
+									 PrelBase.[]{-5i,w-}{i}
+									     ta1c5)
+									r_r75 x_r78
+						     {- nonrec -}
+						     {- nonrec -}
+			      {- nonrec -}
+			      span_tree_a1gL = span_tree_r6N ta1aG d.Eq_a1e9
+			      {- nonrec -}
+			      {- rec -}
+			      AbsBinds
+			      [ta1cF, ta1cI]
+			      [d.Eq_a1cK]
+			      [([ta1cF, ta1cI], new_range_r6M, new_range_a1cb)]
+				  ==_a1gQ = PrelBase.=={-8Y,p-} ta1cF d.Eq_a1cK
+				  new_range_a1cb PrelBase.[]{-5i,w-}{i} w_r6U
+						 = PrelBase.[]{-5i,w-}{i} ta1cI
+				  new_range_a1cb ((x_r6W, y_r6X) PrelBase.:{-55,w-}{i} xys_r6Y)
+						 w_r6Z
+						 = if x_r6W ==_a1gQ w_r6Z then
+						       PrelBase.:{-55,w-}{i} ta1cI
+							   y_r6X (new_range_a1cb xys_r6Y w_r6Z)
+						   else
+						       new_range_a1cb xys_r6Y w_r6Z
+			      {- nonrec -}
+			      new_range_a1gM = new_range_r6M [ta1aG, ta1aG] d.Eq_a1e6
+			      new_range_a1gN = new_range_r6M [ta1aG, ta1aG] d.Eq_a1e7
+			      {- nonrec -}
+			      {- nonrec -}
+			      AbsBinds [ta1cZ] [] [([ta1cZ], swap_r6L, swap_a1cQ)]
+				  swap_a1cQ (x_r6R, y_r6S) = (y_r6S, x_r6R)
+			      {- nonrec -}
+			      {- nonrec -}
+			      {- nonrec -}
+			      AbsBinds [] [] [([], reversed_edges_r6K, reversed_edges_a1d6)]
+				  reversed_edges_a1d6
+				      = map_a1gr [Edge{-r8x,x-} ta1aG, Edge{-r8x,x-} ta1aG] swap_r6L
+												ta1aG
+											    es_r6H
+			      {- nonrec -}
+			      {- nonrec -}
+AbsBinds
+[ta1eo]
+[d.Eq_a1fh]
+[([ta1eo], topSort{-r6z,x-}, topSort_a1el)]
+    d.Eq_a1fp = d.Eq_a1fh
+    isCyclic_a1gR = isCyclic{-r6y,x-} ta1eo d.Eq_a1fp
+    d.Eq_a1fr = d.Eq_a1fh
+    stronglyConnComp_a1gS = stronglyConnComp{-r6x,x-} ta1eo d.Eq_a1fr
+    topSort_a1el edges_r7x vertices_r7y
+		 = case cycles_r7B of
+		     PrelBase.[]{-5i,w-}{i}
+		     -> Succeeded{-rd,x-}{i} [[ta1eo], [[ta1eo]]] [v_r7F |
+								       [v_r7F] <- singletons_r7C]
+		     _ -> Failed{-rc,x-}{i} [[ta1eo], [[ta1eo]]] cycles_r7B
+		 where
+		     {- nonrec -}
+		     AbsBinds [] [] [([], sccs_r7A, sccs_a1es)]
+			 sccs_a1es = stronglyConnComp_a1gS edges_r7x vertices_r7y
+		     {- nonrec -}
+		     {- nonrec -}
+		     {- nonrec -}
+		     AbsBinds
+		     []
+		     []
+		     [([], cycles_r7B, cycles_a1ez), ([],
+						      singletons_r7C,
+						      singletons_a1eA)]
+			 (cycles_a1ez, singletons_a1eA)
+			     = List.partition{-rhs,p-} [ta1eo] isCyclic_a1gR edges_r7x sccs_r7A
+		     {- nonrec -}
+		     {- nonrec -}
+AbsBinds [ta1fx] [] [([ta1fx], mkDigraph{-r6E,x-}, mkDigraph_a1ft)]
+    mkDigraph_a1ft = MkDigraph{-r8z,x-}{i} ta1fx
+AbsBinds
+[ta1g2, ta1g3]
+[]
+[([ta1g2, ta1g3], $d1{-r1gl,x-}, d.Eval_a1fE)]
+    d.Eval_a1fE = ({-dict-} [] [])
+AbsBinds [ta1g4] [] [([ta1g4], $d2{-r1gn,x-}, d.Eval_a1fK)]
+    d.Eval_a1fK = ({-dict-} [] [])
+d.Monad_a1fM = PrelBase.$d25{-ri4,p-}
+>>=_a1go = PrelBase.>>={-811,p-} PrelBase.[]{-3j,W-} d.Monad_a1fM
+d.Monad_a1fP = d.Monad_a1fM
+return_a1gp =
+    PrelBase.return{-816,p-} PrelBase.[]{-3j,W-} d.Monad_a1fP
+d.MonadZero_a1fR = PrelBase.$d24{-ri3,p-}
+zero_a1gq =
+    PrelBase.zero{-810,p-} PrelBase.[]{-3j,W-} d.MonadZero_a1fR
+d.Functor_a1fU = PrelBase.$d26{-ri5,p-}
+map_a1gr = PrelBase.map{-rn5,p-} PrelBase.[]{-3j,W-} d.Functor_a1fU
+d.MonadPlus_a1fX = PrelBase.$d23{-ri2,p-}
+++_a1gs = PrelBase.++{-rn8,p-} PrelBase.[]{-3j,W-} d.MonadPlus_a1fX
+>>=_a1gt = >>=_a1go
+return_a1gu = return_a1gp
+>>=_a1gv = >>=_a1go
+return_a1gw = return_a1gp
+>>=_a1gx = >>=_a1go
+return_a1gy = return_a1gp
+zero_a1gz = zero_a1gq
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+List 1 :: partition 1;
+PrelBase 1 :: $d15 1 $d16 1 $d2 1 $d23 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d33 1 $d35 1 $d38 1 $d40 1 $d42 1 $d45 1 $d46 1 $d47 1 $d50 1 $d52 1 $d7 1 $d8 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $mmax 1 $mmin 1 otherwise 1 Eq 1 Eval 1 Functor 1 Monad 1 MonadPlus 1 MonadZero 1 Ord 1 Ordering 1;
+PrelList 1 :: elem 1 head 1;
+PrelNum 1 :: $d17 1 $d18 1;
+PrelTup 1 :: $d11 1 $d13 1 $d15 1 $d49 1 $d51 1 $d9 1 snd 1;
+Set 1 :: $d1 1 $d2 1 elementOf 1 setToList 1 Set 1;
+_exports_
+ShouldSucceed dfs isCyclic isRecursiveCycle lookupVertex mkDigraph mkEdges mkVertices stronglyConnComp topSort Cycle Digraph(MkDigraph) Edge FlattenedDependencyInfo MaybeErr(Succeeded Failed);
+_instances_
+instance _forall_ [a b] => {PrelBase.Eval (MaybeErr a b)} = $d1;
+instance _forall_ [vertex] => {PrelBase.Eval (Digraph vertex)} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a b] => {PrelBase.Eval (MaybeErr a b)} ;;
+1 $d2 _:_ _forall_ [vertex] => {PrelBase.Eval (Digraph vertex)} ;;
+1 type Cycle vertex = [vertex] ;
+1 data Digraph vertex = MkDigraph [vertex] ;
+1 type Edge vertex = (vertex, vertex) ;
+1 type FlattenedDependencyInfo vertex name code = [(vertex, Set.Set name, Set.Set name, code)] ;
+1 data MaybeErr a b = Succeeded a |  Failed b ;
+1 dfs _:_ _forall_ [ta] {PrelBase.Eq ta} => (ta -> [ta]) -> ([ta], [ta]) -> [ta] -> ([ta], [ta]) ;;
+1 isCyclic _:_ _forall_ [ta] {PrelBase.Eq ta} => [Edge ta] -> [ta] -> PrelBase.Bool ;;
+1 isRecursiveCycle _:_ _forall_ [ta] {PrelBase.Eq ta} => Cycle ta -> [Edge ta] -> PrelBase.Bool ;;
+1 lookupVertex _:_ _forall_ [ta tb tc] {PrelBase.Eq tb, PrelBase.Ord ta} => FlattenedDependencyInfo tb ta tc -> tb -> tc ;;
+1 mkDigraph _:_ _forall_ [ta] => [ta] -> Digraph ta ;;
+1 mkEdges _:_ _forall_ [ta tb tc] {PrelBase.Eq tc, PrelBase.Ord ta} => [tc] -> FlattenedDependencyInfo tc ta tb -> [Edge tc] ;;
+1 mkVertices _:_ _forall_ [ta tb tc] => FlattenedDependencyInfo tc ta tb -> [tc] ;;
+1 stronglyConnComp _:_ _forall_ [ta] {PrelBase.Eq ta} => [Edge ta] -> [ta] -> [[ta]] ;;
+1 topSort _:_ _forall_ [ta] {PrelBase.Eq ta} => [Edge ta] -> [ta] -> MaybeErr [ta] [[ta]] ;;

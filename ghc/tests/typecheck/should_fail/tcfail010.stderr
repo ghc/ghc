@@ -1,8 +1,8 @@
  
-tcfail010.hs:3: No instance for: `PrelBase.Num [taBD]'
+tcfail010.hs:3: No instance for: `PrelBase.Num [taBS]'
     arising from use of `PrelBase.+' at tcfail010.hs:3
  
-tcfail010.hs:3: No instance for: `PrelBase.Num [taBD]'
+tcfail010.hs:3: No instance for: `PrelBase.Num [taBS]'
     arising from use of `PrelBase.+' at tcfail010.hs:3
 
 

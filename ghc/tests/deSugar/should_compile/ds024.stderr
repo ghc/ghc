@@ -2,77 +2,71 @@
 
 ================================================================================
 Desugared:
-g{-r3h,x-}  :: 
-    _forall_
-    [t{-aAR-} t{-aAL-} t{-aAN-} t{-aAP-}]
-    =>
-    t{-aAR-} -> ([t{-aAL-}], [t{-aAN-}], [t{-aAP-}])
+Rec {
+g{-r3h,x-}  ::  _forall_
+		[tayq tayk taym tayo]
+		=>
+		tayq -> ([tayk], [taym], [tayo])
 {-# L #-}
 g{-r3h,x-} =
-    _/\_ t{-aAR-} t{-aAL-} t{-aAN-} t{-aAP-} -> \ x_r3g  :: 
-						      t{-aAR-}
-						  {-# L #-}
-						  x_r3g ->
-	let {
-	  ds_dD1  :: 
-	      [t{-aAL-}]
+    _/\_ tayq tayk taym tayo ->
+	_letrec_ {
+	  g_ay5  ::  tayq -> ([tayk], [taym], [tayo])
 	  {-# L #-}
-	  ds_dD1 =
-	      PrelBase.[]{-5i,p-}{i}
-		  _@_ t{-aAL-} } in
-	let {
-	  ds_dD5  :: 
-	      [t{-aAN-}]
-	  {-# L #-}
-	  ds_dD5 =
-	      PrelBase.[]{-5i,p-}{i}
-		  _@_ t{-aAN-} } in
-	let {
-	  ds_dD9  :: 
-	      [t{-aAP-}]
-	  {-# L #-}
-	  ds_dD9 =
-	      PrelBase.[]{-5i,p-}{i}
-		  _@_ t{-aAP-}
-	} in 
-	  PrelTup.(,,){-63,p-}{i}
-	      {_@_ [t{-aAL-}] _@_ [t{-aAN-}] _@_ [t{-aAP-}] ds_dD1 ds_dD5 ds_dD9}
-f{-r3i,x-}  :: 
-    _forall_ [t{-aAZ-} t{-aB3-}] => t{-aB3-} -> [[t{-aAZ-}]]
+	  g_ay5 =
+	      \ x_r3g  ::  tayq
+		{-# L #-}
+		x_r3g ->
+		  let {
+		    ds_dAP  ::  [tayk]
+		    {-# L #-}
+		    ds_dAP =
+			PrelBase.[]{-5i,w-}{i} _@_ tayk } in
+		  let {
+		    ds_dAT  ::  [taym]
+		    {-# L #-}
+		    ds_dAT =
+			PrelBase.[]{-5i,w-}{i} _@_ taym } in
+		  let {
+		    ds_dAX  ::  [tayo]
+		    {-# L #-}
+		    ds_dAX =
+			PrelBase.[]{-5i,w-}{i} _@_ tayo
+		  } in 
+		    PrelTup.(,,){-63,w-}{i}
+			{_@_ [tayk] _@_ [taym] _@_ [tayo] ds_dAP ds_dAT ds_dAX};
+	} in  g_ay5
+f{-r3i,x-}  ::  _forall_ [tayH tayF] => tayH -> [[tayF]]
 {-# L #-}
 f{-r3i,x-} =
-    _/\_ t{-aAZ-} t{-aB3-} -> \ x_r3e  :: 
-				    t{-aB3-}
-				{-# L #-}
-				x_r3e ->
-	let {
-	  ds_dDN  :: 
-	      [t{-aAZ-}]
+    _/\_ tayH tayF ->
+	_letrec_ {
+	  f_ays  ::  tayH -> [[tayF]]
 	  {-# L #-}
-	  ds_dDN =
-	      PrelBase.[]{-5i,p-}{i}
-		  _@_ t{-aAZ-} } in
-	let { ds_dDR  :: 
-		  [[t{-aAZ-}]]
-	      {-# L #-}
-	      ds_dDR =
-	  let {
-	    ds_dE7  :: 
-		[t{-aAZ-}]
-	    {-# L #-}
-	    ds_dE7 =
-		PrelBase.[]{-5i,p-}{i}
-		    _@_ t{-aAZ-} } in
-	  let {
-	    ds_dEb  :: 
-		[[t{-aAZ-}]]
-	    {-# L #-}
-	    ds_dEb =
-		PrelBase.[]{-5i,p-}{i}
-		    {_@_ [t{-aAZ-}]}
-	  } in 
-	    PrelBase.:{-55,p-}{i}
-		{_@_ [t{-aAZ-}] ds_dE7 ds_dEb}
-	} in
-	PrelBase.:{-55,p-}{i}
-	    {_@_ [t{-aAZ-}] ds_dDN ds_dDR}
+	  f_ays =
+	      \ x_r3e  ::  tayH
+		{-# L #-}
+		x_r3e ->
+		  let {
+		    ds_dBF  ::  [tayF]
+		    {-# L #-}
+		    ds_dBF =
+			PrelBase.[]{-5i,w-}{i} _@_ tayF } in
+		  let { ds_dBJ  ::  [[tayF]]
+			{-# L #-}
+			ds_dBJ =
+		    let {
+		      ds_dBZ  ::  [tayF]
+		      {-# L #-}
+		      ds_dBZ =
+			  PrelBase.[]{-5i,w-}{i} _@_ tayF } in
+		    let {
+		      ds_dC3  ::  [[tayF]]
+		      {-# L #-}
+		      ds_dC3 =
+			  PrelBase.[]{-5i,w-}{i} {_@_ [tayF]}
+		    } in  PrelBase.:{-55,w-}{i} {_@_ [tayF] ds_dBZ ds_dC3}
+		  } in
+		  PrelBase.:{-55,w-}{i} {_@_ [tayF] ds_dBF ds_dBJ};
+	} in  f_ays
+end Rec }

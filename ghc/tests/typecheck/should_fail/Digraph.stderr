@@ -1,8 +1,7 @@
  
 Digraph.hs:19: A type signature is more polymorphic than the inferred type
-		   Some type variables in the inferred type can't be forall'd, namely:
-		   `taXO'
-		   Possible cause: the RHS mentions something subject to the monomorphism restriction
+		   Can't for-all the type variable(s) `taWg'
+		   in the inferred type `[Edge taWg]'
     When checking signature for `reversed_edges'
     In an equation for function `stronglyConnComp':
 	`stronglyConnComp es vs
@@ -14,8 +13,8 @@ Digraph.hs:19: A type signature is more polymorphic than the inferred type
 			  where
 			      span_tree r (vs, ns) PrelBase.[] = (vs, (ns))
 			      span_tree r (vs, ns) (x PrelBase.: xs)
-					| [x PrelList.elem vs] = span_tree r (vs, (ns)) xs
-					| [PrelBase.otherwise]
+					| x PrelList.elem vs = span_tree r (vs, (ns)) xs
+					| PrelBase.otherwise
 					= span_tree r (vs', ((x PrelBase.: ns') PrelBase.: ns)) xs
 					where
 					    (vs', ns')

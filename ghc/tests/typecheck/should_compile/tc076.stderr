@@ -1,0 +1,25 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [] [] [([], x{-r3,x-}, x_aBl)]
+    x_aBl
+	= [[PrelBase.True{-5E,w-}{i}] (PrelBase.Bool{-34,W-})] ([PrelBase.Bool{-34,W-}])
+AbsBinds [] [] [([], xs{-r2,x-}, xs_aBt)]
+    xs_aBt = [x_r3j | x_r3h <- x{-r3,x-}, x_r3j <- x_r3h]
+d.Monad_aBL = PrelBase.$d25{-rae,p-}
+>>=_aBS = PrelBase.>>={-811,p-} PrelBase.[]{-3j,W-} d.Monad_aBL
+d.Monad_aBO = d.Monad_aBL
+return_aBT =
+    PrelBase.return{-816,p-} PrelBase.[]{-3j,W-} d.Monad_aBO
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d24 1 $d25 1 $m>> 1 Monad 1 MonadZero 1;
+_exports_
+ShouldSucceed x xs;
+_declarations_
+1 x _:_ [[PrelBase.Bool]] ;;
+1 xs _:_ [PrelBase.Bool] ;;

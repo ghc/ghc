@@ -1,6 +1,6 @@
  
-tcfail040.hs:3: Ambiguous context `{ORD taBu}'
-		    `ORD' `taBu' arising from use of `<<' at tcfail040.hs:19
+tcfail040.hs:3: Ambiguous context `{ORD taBH}'
+		    `ORD taBH' arising from use of `<<' at tcfail040.hs:19
 
 
 Compilation had errors

@@ -3,114 +3,93 @@
 ================================================================================
 Desugared:
 Rec {
-d.Num_aY4  :: 
-    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
+f{-r3i,x-}  ::  _forall_ [taRU taRS] => taRU -> [taRS]
 {-# L #-}
-d.Num_aY4 =
-    PrelBase.$d3{-rbb,p-}
-fromInt_a117  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
-{-# L #-}
-fromInt_a117 =
-    PrelBase.fromInt{-8R,p-}
-	_@_ PrelBase.Int{-3g,p-} d.Num_aY4
-lit_a11e  :: 
-    PrelBase.Int{-3g,p-}
-{-# L #-}
-lit_a11e =
-    let {
-      ds_d11D  :: 
-	  PrelBase.Int{-3g,p-}
-      {-# L #-}
-      ds_d11D =
-	  PrelBase.I#{-5b,p-}{i}
-	      1
-    } in 
-      fromInt_a117
-	  ds_d11D
-f{-r3m,x-}  :: 
-    _forall_ [t{-aXj-} t{-aXh-}] => t{-aXj-} -> [t{-aXh-}]
-{-# L #-}
-f{-r3m,x-} =
-    _/\_ t{-aXj-} t{-aXh-} -> \ x_r3f  :: 
-				    t{-aXj-}
-				{-# L #-}
-				x_r3f ->
-	PrelBase.[]{-5i,p-}{i}
-	    _@_ t{-aXh-}
-g{-r3l,x-}  :: 
-    _forall_
-    [t{-aXD-} t{-aXv-} t{-aXx-} t{-aXz-} t{-aXB-}]
-    =>
-    t{-aXD-} -> ([t{-aXv-}], [t{-aXx-}], [t{-aXz-}], [t{-aXB-}])
-{-# L #-}
-g{-r3l,x-} =
-    _/\_ t{-aXD-} t{-aXv-} t{-aXx-} t{-aXz-} t{-aXB-} -> \ x_r3h  :: 
-							       t{-aXD-}
-							   {-# L #-}
-							   x_r3h ->
-	let { ds_d12o  :: 
-		  [t{-aXv-}]
-	      {-# L #-}
-	      ds_d12o =
-	  let {
-	    ds_d12M  :: 
-		[GHC.Void{-3T,p-}]
-	    {-# L #-}
-	    ds_d12M =
-		PrelBase.[]{-5i,p-}{i}
-		    _@_ GHC.Void{-3T,p-}
-	  } in 
-	    f{-r3m,x-}
-		_@_ [GHC.Void{-3T,p-}] _@_ t{-aXv-} ds_d12M
-	} in
-	let {
-	  ds_d12s  :: 
-	      [t{-aXx-}]
+f{-r3i,x-} =
+    _/\_ taRU taRS ->
+	_letrec_ {
+	  f_aRJ  ::  taRU -> [taRS]
 	  {-# L #-}
-	  ds_d12s =
-	      PrelBase.[]{-5i,p-}{i}
-		  _@_ t{-aXx-} } in
-	let {
-	  ds_d12w  :: 
-	      [t{-aXz-}]
-	  {-# L #-}
-	  ds_d12w =
-	      PrelBase.[]{-5i,p-}{i}
-		  _@_ t{-aXz-} } in
-	let {
-	  ds_d12A  :: 
-	      [t{-aXB-}]
-	  {-# L #-}
-	  ds_d12A =
-	      PrelBase.[]{-5i,p-}{i}
-		  _@_ t{-aXB-}
-	} in 
-	  PrelTup.(,,,){-64,p-}{i}
-	      {_@_ [t{-aXv-}]
-	       _@_ [t{-aXx-}]
-	       _@_ [t{-aXz-}]
-	       _@_ [t{-aXB-}]
-	       ds_d12o
-	       ds_d12s
-	       ds_d12w
-	       ds_d12A}
-h{-r3k,x-}  :: 
-    _forall_
-    [t{-aY0-} t{-aXS-} t{-aXT-} t{-aXU-} t{-aXV-}]
-    =>
-    t{-aY0-} -> ([t{-aXS-}], [t{-aXT-}], [t{-aXU-}], [t{-aXV-}])
+	  f_aRJ =
+	      \ x_r3f  ::  taRU
+		{-# L #-}
+		x_r3f ->
+		  PrelBase.[]{-5i,w-}{i} _@_ taRS;
+	} in  f_aRJ
+g{-r3m,x-}  ::  _forall_
+		[taSp taSe taSj taSl taSn]
+		=>
+		taSp -> ([taSe], [taSj], [taSl], [taSn])
 {-# L #-}
-h{-r3k,x-} =
-    _/\_ t{-aY0-} t{-aXS-} t{-aXT-} t{-aXU-} t{-aXV-} -> \ x_r3j  :: 
-							       t{-aY0-}
-							   {-# L #-}
-							   x_r3j ->
-	g{-r3l,x-}
-	    _@_ PrelBase.Int{-3g,p-}
-	    _@_ t{-aXS-}
-	    _@_ t{-aXT-}
-	    _@_ t{-aXU-}
-	    _@_ t{-aXV-}
-	    lit_a11e
+g{-r3m,x-} =
+    _/\_ taSp taSe taSj taSl taSn ->
+	_letrec_ {
+	  g_aRW  ::  taSp -> ([taSe], [taSj], [taSl], [taSn])
+	  {-# L #-}
+	  g_aRW =
+	      \ x_r3h  ::  taSp
+		{-# L #-}
+		x_r3h ->
+		  let { ds_dWB  ::  [taSe]
+			{-# L #-}
+			ds_dWB =
+		    let {
+		      ds_dWZ  ::  [GHC.Void{-3T,W-}]
+		      {-# L #-}
+		      ds_dWZ =
+			  PrelBase.[]{-5i,w-}{i} _@_ GHC.Void{-3T,W-}
+		    } in  f{-r3i,x-} _@_ [GHC.Void{-3T,W-}] _@_ taSe ds_dWZ
+		  } in
+		  let {
+		    ds_dWF  ::  [taSj]
+		    {-# L #-}
+		    ds_dWF =
+			PrelBase.[]{-5i,w-}{i} _@_ taSj } in
+		  let {
+		    ds_dWJ  ::  [taSl]
+		    {-# L #-}
+		    ds_dWJ =
+			PrelBase.[]{-5i,w-}{i} _@_ taSl } in
+		  let {
+		    ds_dWN  ::  [taSn]
+		    {-# L #-}
+		    ds_dWN =
+			PrelBase.[]{-5i,w-}{i} _@_ taSn
+		  } in 
+		    PrelTup.(,,,){-64,w-}{i}
+			{_@_ [taSe]
+			 _@_ [taSj]
+			 _@_ [taSl]
+			 _@_ [taSn]
+			 ds_dWB
+			 ds_dWF
+			 ds_dWJ
+			 ds_dWN};
+	} in  g_aRW
+h{-r3l,x-}  ::  _forall_
+		[taSM taSB taSD taSF taSH]
+		=>
+		taSM -> ([taSB], [taSD], [taSF], [taSH])
+{-# L #-}
+h{-r3l,x-} =
+    _/\_ taSM taSB taSD taSF taSH ->
+	_letrec_ {
+	  h_aSr  ::  taSM -> ([taSB], [taSD], [taSF], [taSH])
+	  {-# L #-}
+	  h_aSr =
+	      \ x_r3k  ::  taSM
+		{-# L #-}
+		x_r3k ->
+		  g{-r3m,x-}
+		      _@_ PrelBase.Int{-3g,W-}
+		      _@_ taSB
+		      _@_ taSD
+		      _@_ taSF
+		      _@_ taSH
+		      lit_aVP;
+	} in  h_aSr
+lit_aVP  ::  PrelBase.Int{-3g,W-}
+{-# L #-}
+lit_aVP =
+    PrelBase.I#{-5b,w-}{i} 1
 end Rec }

@@ -1,6 +1,6 @@
 -- Check that "->" is an instance of Eval
 
-module Foo where
+module ShouldSucceed where
 
 instance (Eq b) => Eq (a -> b) where
 	(==) f g = error "attempt to compare functions"

@@ -3,187 +3,130 @@
 ================================================================================
 Desugared:
 Rec {
-d.Num_aXF  :: 
-    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
+ds_dVA  ::  _forall_
+	    [taS9]
+	    =>
+	    (PrelBase.Int{-3g,W-}
+	     -> PrelBase.Int{-3g,W-}
+	     -> (taS9, PrelBase.Int{-3g,W-}), PrelBase.Int{-3g,W-}
+					      -> PrelBase.Int{-3g,W-}
+					      -> (taS9, PrelBase.Int{-3g,W-}))
 {-# L #-}
-d.Num_aXF =
-    PrelBase.$d3{-rbd,p-}
-+_aZO  :: 
-    PrelBase.Int{-3g,p-}
-    -> PrelBase.Int{-3g,p-}
-    -> PrelBase.Int{-3g,p-}
-{-# L #-}
-+_aZO =
-    PrelBase.+{-r3m,p-}
-	_@_ PrelBase.Int{-3g,p-} d.Num_aXF
-d.Num_aXJ  :: 
-    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
-{-# L #-}
-d.Num_aXJ =
-    d.Num_aXF
-fromInt_aZN  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
-{-# L #-}
-fromInt_aZN =
-    PrelBase.fromInt{-8R,p-}
-	_@_ PrelBase.Int{-3g,p-} d.Num_aXJ
-lit_aZM  :: 
-    PrelBase.Int{-3g,p-}
-{-# L #-}
-lit_aZM =
-    let {
-      ds_d123  :: 
-	  PrelBase.Int{-3g,p-}
-      {-# L #-}
-      ds_d123 =
-	  PrelBase.I#{-5b,p-}{i}
-	      1
-    } in 
-      fromInt_aZN
-	  ds_d123
-ds_d11F  :: 
-    _forall_
-    [b{-aXa-}]
-    =>
-    (PrelBase.Int{-3g,p-}
-     -> PrelBase.Int{-3g,p-}
-     -> (b{-aXa-}, PrelBase.Int{-3g,p-}), PrelBase.Int{-3g,p-}
-					  -> PrelBase.Int{-3g,p-}
-					  -> (b{-aXa-}, PrelBase.Int{-3g,p-}))
-{-# L #-}
-ds_d11F =
-    _/\_ b{-aXa-} ->
+ds_dVA =
+    _/\_ taS9 ->
 	_letrec_ {
-	  +_aZQ  :: 
-	      PrelBase.Int{-3g,p-}
-	      -> PrelBase.Int{-3g,p-}
-	      -> PrelBase.Int{-3g,p-}
+	  +_aTZ  ::  PrelBase.Int{-3g,W-}
+		     -> PrelBase.Int{-3g,W-}
+		     -> PrelBase.Int{-3g,W-}
 	  {-# L #-}
-	  +_aZQ =
-	      +_aZO;
-	  lit_aZP  :: 
-	      PrelBase.Int{-3g,p-}
+	  +_aTZ =
+	      +_aU0;
+	  lit_aU2  ::  PrelBase.Int{-3g,W-}
 	  {-# L #-}
-	  lit_aZP =
-	      lit_aZM;
-	  f_aWT  :: 
-	      PrelBase.Int{-3g,p-}
-	      -> PrelBase.Int{-3g,p-}
-	      -> (b{-aXa-}, PrelBase.Int{-3g,p-})
+	  lit_aU2 =
+	      lit_aU1;
+	  f_aRp  ::  PrelBase.Int{-3g,W-}
+		     -> PrelBase.Int{-3g,W-}
+		     -> (taS9, PrelBase.Int{-3g,W-})
 	  {-# L #-}
-	  f_aWT =
-	      \ x_r3e  :: 
-		    PrelBase.Int{-3g,p-}
+	  f_aRp =
+	      \ x_r3e  ::  PrelBase.Int{-3g,W-}
 		{-# L #-}
-		x_r3e y_r3g  :: 
-			  PrelBase.Int{-3g,p-}
+		x_r3e y_r3f  ::  PrelBase.Int{-3g,W-}
 		      {-# L #-}
-		      y_r3g ->
-		  let { ds_d12N  :: 
-			    b{-aXa-}
+		      y_r3f ->
+		  let { ds_dWx  ::  taS9
 			{-# L #-}
-			ds_d12N =
+			ds_dWx =
 		    let {
-		      ds_d133  :: 
-			  (b{-aXa-}, PrelBase.Int{-3g,p-})
+		      ds_dWN  ::  (taS9, PrelBase.Int{-3g,W-})
 		      {-# L #-}
-		      ds_d133 =
-			  g_aWU
-			      y_r3g x_r3e
-		    } in 
-		      PrelTup.fst{-riN,p-}
-			  _@_ PrelBase.Int{-3g,p-} _@_ b{-aXa-} ds_d133
+		      ds_dWN =
+			  g_aRq y_r3f x_r3e
+		    } in  PrelTup.fst{-rgQ,p-} _@_ PrelBase.Int{-3g,W-} _@_ taS9 ds_dWN
 		  } in
 		  let {
-		    ds_d12R  :: 
-			PrelBase.Int{-3g,p-}
+		    ds_dWB  ::  PrelBase.Int{-3g,W-}
 		    {-# L #-}
-		    ds_d12R =
-			+_aZO
-			    x_r3e lit_aZM
+		    ds_dWB =
+			+_aU0 x_r3e lit_aU1
 		  } in 
-		    PrelTup.(,){-62,p-}{i}
-			{_@_ b{-aXa-} _@_ PrelBase.Int{-3g,p-} ds_d12N ds_d12R};
-	  g_aWU  :: 
-	      PrelBase.Int{-3g,p-}
-	      -> PrelBase.Int{-3g,p-}
-	      -> (b{-aXa-}, PrelBase.Int{-3g,p-})
+		    PrelTup.(,){-62,w-}{i}
+			{_@_ taS9 _@_ PrelBase.Int{-3g,W-} ds_dWx ds_dWB};
+	  g_aRq  ::  PrelBase.Int{-3g,W-}
+		     -> PrelBase.Int{-3g,W-}
+		     -> (taS9, PrelBase.Int{-3g,W-})
 	  {-# L #-}
-	  g_aWU =
-	      \ x_r3j  :: 
-		    PrelBase.Int{-3g,p-}
+	  g_aRq =
+	      \ x_r3j  ::  PrelBase.Int{-3g,W-}
 		{-# L #-}
-		x_r3j y_r3l  :: 
-			  PrelBase.Int{-3g,p-}
+		x_r3j y_r3k  ::  PrelBase.Int{-3g,W-}
 		      {-# L #-}
-		      y_r3l ->
-		  let { ds_d13B  :: 
-			    b{-aXa-}
+		      y_r3k ->
+		  let { ds_dXl  ::  taS9
 			{-# L #-}
-			ds_d13B =
+			ds_dXl =
 		    let {
-		      ds_d13R  :: 
-			  (b{-aXa-}, PrelBase.Int{-3g,p-})
+		      ds_dXB  ::  (taS9, PrelBase.Int{-3g,W-})
 		      {-# L #-}
-		      ds_d13R =
-			  f_aWT
-			      x_r3j y_r3l
-		    } in 
-		      PrelTup.fst{-riN,p-}
-			  _@_ PrelBase.Int{-3g,p-} _@_ b{-aXa-} ds_d13R
+		      ds_dXB =
+			  f_aRp x_r3j y_r3k
+		    } in  PrelTup.fst{-rgQ,p-} _@_ PrelBase.Int{-3g,W-} _@_ taS9 ds_dXB
 		  } in
 		  let {
-		    ds_d13F  :: 
-			PrelBase.Int{-3g,p-}
+		    ds_dXp  ::  PrelBase.Int{-3g,W-}
 		    {-# L #-}
-		    ds_d13F =
-			+_aZQ
-			    y_r3l lit_aZP
+		    ds_dXp =
+			+_aTZ y_r3k lit_aU2
 		  } in 
-		    PrelTup.(,){-62,p-}{i}
-			{_@_ b{-aXa-} _@_ PrelBase.Int{-3g,p-} ds_d13B ds_d13F};
+		    PrelTup.(,){-62,w-}{i}
+			{_@_ taS9 _@_ PrelBase.Int{-3g,W-} ds_dXl ds_dXp};
 	} in 
-	  PrelTup.(,){-62,p-}{i}
-	      {_@_ (PrelBase.Int{-3g,p-}
-		    -> PrelBase.Int{-3g,p-}
-		    -> (b{-aXa-}, PrelBase.Int{-3g,p-}))
-	       _@_ (PrelBase.Int{-3g,p-}
-		    -> PrelBase.Int{-3g,p-}
-		    -> (b{-aXa-}, PrelBase.Int{-3g,p-}))
-	       f_aWT
-	       g_aWU}
-f{-r3o,x-}  :: 
-    _forall_
-    [b{-aXa-}]
-    =>
-    PrelBase.Int{-3g,p-}
-    -> PrelBase.Int{-3g,p-}
-    -> (b{-aXa-}, PrelBase.Int{-3g,p-})
+	  PrelTup.(,){-62,w-}{i}
+	      {_@_ (PrelBase.Int{-3g,W-}
+		    -> PrelBase.Int{-3g,W-}
+		    -> (taS9, PrelBase.Int{-3g,W-}))
+	       _@_ (PrelBase.Int{-3g,W-}
+		    -> PrelBase.Int{-3g,W-}
+		    -> (taS9, PrelBase.Int{-3g,W-}))
+	       f_aRp
+	       g_aRq}
+f{-r3l,x-}  ::  _forall_
+		[taS9]
+		=>
+		PrelBase.Int{-3g,W-}
+		-> PrelBase.Int{-3g,W-}
+		-> (taS9, PrelBase.Int{-3g,W-})
 {-# L #-}
-f{-r3o,x-} =
-    _/\_ b{-aXa-} ->
-	case
-	    ds_d11F
-		_@_ b{-aXa-}
-	of {
-	PrelTup.(,){-62,p-}{i} ds_d14B ds_d14C  ->
-	ds_d14B;}
-g{-r3n,x-}  :: 
-    _forall_
-    [b{-aXa-}]
-    =>
-    PrelBase.Int{-3g,p-}
-    -> PrelBase.Int{-3g,p-}
-    -> (b{-aXa-}, PrelBase.Int{-3g,p-})
+f{-r3l,x-} =
+    _/\_ taS9 ->
+	case ds_dVA _@_ taS9 of { PrelTup.(,){-62,w-}{i} ds_dYl ds_dYm  ->
+	ds_dYl;}
+g{-r3g,x-}  ::  _forall_
+		[taS9]
+		=>
+		PrelBase.Int{-3g,W-}
+		-> PrelBase.Int{-3g,W-}
+		-> (taS9, PrelBase.Int{-3g,W-})
 {-# L #-}
-g{-r3n,x-} =
-    _/\_ b{-aXa-} ->
-	case
-	    ds_d11F
-		_@_ b{-aXa-}
-	of {
-	PrelTup.(,){-62,p-}{i} ds_d14S ds_d14R  ->
-	ds_d14R;}
+g{-r3g,x-} =
+    _/\_ taS9 ->
+	case ds_dVA _@_ taS9 of { PrelTup.(,){-62,w-}{i} ds_dYC ds_dYB  ->
+	ds_dYB;}
+d.Num_aSj  ::  {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,W-}}
+{-# L #-}
+d.Num_aSj =
+    PrelBase.$d4{-ray,p-}
++_aU0  ::  PrelBase.Int{-3g,W-}
+	   -> PrelBase.Int{-3g,W-}
+	   -> PrelBase.Int{-3g,W-}
+{-# L #-}
++_aU0 =
+    PrelBase.+{-r3m,p-} _@_ PrelBase.Int{-3g,W-} d.Num_aSj
+lit_aU1  ::  PrelBase.Int{-3g,W-}
+{-# L #-}
+lit_aU1 =
+    PrelBase.I#{-5b,w-}{i} 1
 end Rec }
 
 NOTE: Simplifier still going after 4 iterations; bailing out.

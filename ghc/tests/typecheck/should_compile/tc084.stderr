@@ -1,0 +1,33 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds
+[taC7, taCa]
+[d.Num_aCi]
+[([taCa, taC7], g{-r3h,x-}, g_aC3)]
+    d.Num_aCk = d.Num_aCi
+    +_aCR = PrelBase.+{-rfr,p-} taC7 d.Num_aCk
+    d.Num_aCm = d.Num_aCi
+    -_aCS = PrelBase.-{-817,p-} taC7 d.Num_aCm
+    g_aC3 b_r3l x_r3m y_r3n
+	  = if b_r3l then x_r3m +_aCR x_r3m else x_r3m -_aCS x_r3m
+AbsBinds [taCu] [] [([taCu], f{-r3i,x-}, f_aCo)]
+    g_aCT = g{-r3h,x-} [taCu, PrelBase.Int{-3g,W-}] d.Num_aCz
+    f_aCo = g_aCT PrelBase.True{-5E,w-}{i}
+AbsBinds [taCQ] [] [([taCQ], h{-r3j,x-}, h_aCB)]
+    h_aCB y_r3p x_r3q = f{-r3i,x-} taCQ x_r3q y_r3p
+d.Num_aCz = PrelBase.$d4{-raC,p-}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d12 1 $d16 1 $d2 1 $d22 1 $d28 1 $d3 1 $d33 1 $d34 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d47 1 $d55 1 $d8 1 $d9 1 $m- 1 $m/= 1 $mfromInt 1 $mshowList 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed f g h;
+_declarations_
+1 f _:_ _forall_ [ta] => PrelBase.Int -> ta -> PrelBase.Int ;;
+1 g _:_ _forall_ [ta tb] {PrelBase.Num tb} => PrelBase.Bool -> tb -> ta -> tb ;;
+1 h _:_ _forall_ [ta] => ta -> PrelBase.Int -> PrelBase.Int ;;

@@ -1,0 +1,14 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [takB] [] [([takB], q{-r3e,x-}, q_aks)]
+    q_aks = \ y_r3d -> y_r3d
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed q;
+_declarations_
+1 q _:_ _forall_ [ta] => ta -> ta ;;

@@ -1,4 +1,4 @@
-TOP = ../../../..
+TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
 HS_SRCS = $(wildcard *.hs)

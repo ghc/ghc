@@ -1,0 +1,21 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [takL] [] [([takL], f{-r3i,x-}, f_akx)]
+    f_akx x_r3g y_r3h = if x_r3g then y_r3h else f_akx x_r3g y_r3h
+AbsBinds [] [] [([], g{-r3j,x-}, g_akN)]
+    g_akN x_r3e
+	  = f{-r3i,x-} PrelBase.Bool{-34,W-} f{-r3i,x-}
+						 PrelBase.Bool{-34,W-} PrelBase.True{-5E,w-}{i}
+								       x_r3e
+					     x_r3e
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f g;
+_declarations_
+1 f _:_ _forall_ [ta] => PrelBase.Bool -> ta -> ta ;;
+1 g _:_ PrelBase.Bool -> PrelBase.Bool ;;

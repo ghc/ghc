@@ -1,6 +1,6 @@
 --!!! tc082: an instance for functions
 --
-module N where
+module ShouldSucceed where
 
 class Normal a
 	where

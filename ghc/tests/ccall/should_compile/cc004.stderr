@@ -1,9 +1,0 @@
- 
-cc004.hs:2: Cannot generalise these overloadings (in a _ccall_):
-		`Foreign.CReturnable t{-a12p-}'
- 
-cc004.hs:2: Cannot generalise these overloadings (in a _ccall_):
-		`Foreign.CReturnable t{-a138-}'
-
-
-Compilation had errors

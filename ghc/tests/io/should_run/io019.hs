@@ -7,8 +7,8 @@ main =
     let (CalendarTime year month mday hour min sec psec 
                       wday yday timezone gmtoff isdst) = toUTCTime time
     in
-      putStr (wdays !! wday) >>
-      putStr (' ' : months !! month) >>
+      putStr (wdays !! fromEnum wday) >>
+      putStr (' ' : months !! fromEnum month) >>
       putStr (' ' : shows2 mday (' ' : shows2 hour (':' : shows2 min (':' : shows2 sec
              (' ' : timezone ++ ' ' : shows year "\n")))))
 

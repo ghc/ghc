@@ -3,17 +3,14 @@
 ================================================================================
 Desugared:
 Rec {
-x{-r1,x-}  :: 
-    _forall_ [t{-amE-}] => t{-amE-}
+x{-r1,x-}  ::  _forall_ [tak4] => tak4
 {-# L #-}
 x{-r1,x-} =
-    _/\_ t{-amE-} ->
+    _/\_ tak4 ->
 	_letrec_ {
-	  x_amC  :: 
-	      t{-amE-}
+	  x_ak2  ::  tak4
 	  {-# L #-}
-	  x_amC =
-	      x_amC;
-	} in 
-	  x_amC
+	  x_ak2 =
+	      x_ak2;
+	} in  x_ak2
 end Rec }

@@ -1,0 +1,26 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [takP, takR] [] [([takP, takR], k{-r3l,x-}, k_akB)]
+    k_akB x_r3j y_r3k = x_r3j
+AbsBinds
+[taln, talp, talr]
+[]
+[([taln, talp, talr], s{-r3m,x-}, s_akT)]
+    s_akT f_r3f g_r3g x_r3h = f_r3f x_r3h g_r3g x_r3h
+AbsBinds [talA] [] [([talA], main{-r3n,x-}, main_alt)]
+    main_alt
+	= s{-r3m,x-} [talA, GHC.Void{-3T,W-} -> talA, talA] k{-r3l,x-}
+								[GHC.Void{-3T,W-} -> talA, talA]
+							    k{-r3l,x-} [GHC.Void{-3T,W-}, talA]
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed k main s;
+_declarations_
+1 k _:_ _forall_ [ta tb] => tb -> ta -> tb ;;
+1 main _:_ _forall_ [ta] => ta -> ta ;;
+1 s _:_ _forall_ [ta tb tc] => (tc -> tb -> ta) -> (tc -> tb) -> tc -> ta ;;

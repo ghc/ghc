@@ -1,0 +1,26 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [] [] [([], f{-r1,x-}, f_akM)]
+    f_akM x_r3h y_r3i = op1_ald x_r3h x_r3h
+AbsBinds [] [] [([], $d1{-rlc,x-}, d.H_akY)]
+    AbsBinds [] [] [([], op1_ale, op1_al2)]
+	op1_al2 x_r3n y_r3o = y_r3o
+    d.H_akY = ({-dict-} [] [op1_ale])
+op1{-r3t,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [talb] [d.H_al8] []
+d.H_ala = $d1{-rlc,x-}
+op1_ald = op1{-r3t,x-} PrelBase.Bool{-34,W-} d.H_ala
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f H(op1);
+_instances_
+instance {H PrelBase.Bool} = $d1;
+_declarations_
+1 $d1 _:_ {H PrelBase.Bool} ;;
+1 class H a where {op1 :: a -> a -> a} ;
+1 f _:_ PrelBase.Bool -> PrelBase.Int -> PrelBase.Bool ;;

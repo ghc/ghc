@@ -1,0 +1,110 @@
+
+
+================================================================================
+Reader:
+module OneOfEverything (
+	fixn, FooData, FooDataB(..), FooDataC(..), EqTree(EqLeaf,
+							  EqBranch), EqClass(..), OrdClass(orda,
+											   ordb), module OneC, module OneOfEverything
+    ) where
+import qualified OneA
+import OneB (fB)
+import OneC hiding (fC)
+import OneC hiding (fC)
+infix 6 fixn
+infixl 7 +#
+infixr 8 fixr
+{- rec -}
+bindwith :: _forall_ [] (OrdClass a, OrdClass b) => a -> b -> b
+g :: _forall_ [] (Num a, Eq b) => Foo a -> [b] -> (a, a, a) -> b
+fixn x y = x
+fixl x y = x
+fixr x y = x
+singlebind x = x
+bindwith a b = b
+reca a = recb a
+recb a = reca a
+(~(a, b, c))
+    | nullity b = a
+    | nullity c = a
+    | otherwise = a
+    where
+	{- rec -}
+	nullity = null
+mat a b c d
+    | foof a b = d
+    | foof a c = d
+    | foof b c = d
+    where
+	{- rec -}
+	foof a b = a == b
+expr a b c d
+     = ((((((((a + (: a b)) + (a : b))
+	     + (((1 - 'c') - "abc") - 1.2929999999999999))
+	    + ((\ x y z -> x) 42))
+	   + ((9 *)))
+	  + ((* 8)))
+	 + (case x of
+	      []
+	      | null x -> 99
+	      | otherwise -> 98
+	      | True -> 97
+	      where
+		  {- rec -}
+		  null x = False))
+	+ ([z | z <- c, isSpace z]))
+       + (let
+	    {- rec -}
+	    y = foo
+	  in
+	    (((((((y + [1, 2, 3, 4]) + (4, 3, 2, 1))
+		 + (4 :: _forall_ [] (Num a) => a))
+		+ (if 42 == 42.000000000000000 then 1 else 4))
+	       + ([1 .. ]))
+	      + ([2, 4 .. ]))
+	     + ([3 .. 5]))
+	    + ([4, 8 .. 999]))
+f _
+  x
+  1
+  1.9299999999999999
+  'c'
+  "dog"
+  ~y
+  (z@(Foo a b))
+  (c Bar d)
+  [1, 2]
+  (3, 4)
+  ((n+42))
+  = y
+g x y z = head y
+default (Integer, Rational)
+instance _forall_ [] (Eq a) => EqClass (EqTree a) where
+    []
+    eqc x = 'a'
+class (Ord a) => OrdClass a where {
+    orda :: a -> Char; ordb :: a -> Char; ordc :: a -> Char;
+    }
+class (Eq a) => EqClass a where {
+    eqc :: a -> Char;
+    eqc x = '?'
+    }
+data (Eq a) => EqTree a = EqLeaf a | EqBranch (EqLeaf a) (EqLeaf a)
+data FooDataB = FooConB Double
+data FooData = FooCon Int
+type Pair a b = (a, b)
+ 
+read001.hs:17: Could not find valid interface file `OneA'
+ 
+read001.hs:18: Could not find valid interface file `OneB'
+ 
+read001.hs:18: Module OneB does not export `fB'
+ 
+read001.hs:19: Could not find valid interface file `OneC'
+ 
+read001.hs:19: Module OneC does not export `fC'
+ 
+read001.hs:20: Module OneC does not export `fC'
+
+
+Compilation had errors

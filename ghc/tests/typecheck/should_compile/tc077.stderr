@@ -1,0 +1,39 @@
+
+
+================================================================================
+Typechecked:
+ONE{-r7,x-}{i} = ONE{-r7,x-}{i} {}
+TWO{-r6,x-}{i} = TWO{-r6,x-}{i} {}
+AbsBinds [] [] [([], $d1{-rCq,x-}, d.Eval_aCf)]
+    d.Eval_aCf = ({-dict-} [] [])
+scsel_EQShouldSucceedORD{-aCr,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
+	tpl_B1;}
+scsel_EQPrelBaseShow{-aCs,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
+	tpl_B2;}
+==={-r3r,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
+	tpl_B3;}
+AbsBinds [taCm] [d.EQ_aCi] []
+scsel_ORDPrelBaseNum{-aCt,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taCn] [d.ORD_aCl] []
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d12 1 $d16 1 $d2 1 $d22 1 $d28 1 $d3 1 $d33 1 $d34 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d47 1 $d55 1 $d8 1 $d9 1 $m- 1 $m/= 1 $mfromInt 1 $mshowList 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed EQ(===) NUM(ONE TWO) ORD;
+_instances_
+instance {PrelBase.Eval NUM} = $d1;
+_declarations_
+1 $d1 _:_ {PrelBase.Eval NUM} ;;
+1 class {ORD a, PrelBase.Show a} => EQ a where {=== :: a -> a -> PrelBase.Bool} ;
+1 data NUM = ONE |  TWO ;
+1 class {PrelBase.Num a} => ORD a ;

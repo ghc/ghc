@@ -1,10 +1,9 @@
  
 tcfail009.hs:3: Couldn't match the type
-		    `PrelBase.Integer' against `PrelBase.Int'
-    Expected: `PrelBase.Int'
-    Inferred: `PrelBase.Integer'
-    In an arithmetic sequence:
-	`[(1 :: PrelBase.Int) .. (2 :: PrelBase.Integer)]'
+		    `PrelBase.Int' against `PrelBase.Integer'
+    Expected: `PrelBase.Integer'
+    Inferred: `PrelBase.Int'
+    In an expression with a type signature: `2 :: PrelBase.Integer'
 
 
 Compilation had errors

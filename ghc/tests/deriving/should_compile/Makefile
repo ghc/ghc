@@ -1,15 +1,7 @@
-TOP = ../../..
+TOP = ../..
 include $(TOP)/mk/boilerplate.mk
+include $(TOP)/mk/should_compile.mk
 
-HS_SRCS = $(wildcard *.hs)
-
-SRC_RUNTEST_OPTS += -o1 $*.stdout -o2 $*.stderr -x 0
-HC_OPTS += -noC -dcore-lint -hi -ddump-tc 
-
-%.o : %.hs
-	$(RUNTEST) $(HC) $(RUNTEST_OPTS) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@)) 
-
-all :: $(HS_OBJS)
+HC_OPTS += -noC -dcore-lint -hi -ddump-tc
 
 include $(TOP)/mk/target.mk
-

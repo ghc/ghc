@@ -1,24 +1,112 @@
- 
-ds035.hs:3:
-    Type constructor or class not in scope: `Int#'
- 
-ds035.hs:8:
-    Type constructor or class not in scope: `Int#'
- 
-ds035.hs:4:
-    Value not in scope: `==#'
- 
-ds035.hs:6:
-    Value not in scope: `minusInt#'
- 
-ds035.hs:10:
-    Value not in scope: `+#'
- 
-ds035.hs:18:
-    Value not in scope: `+#'
- 
-ds035.hs:3:
-    Type constructor or class not in scope: `Int#'
 
 
-Compilation had errors
+================================================================================
+Desugared:
+Rec {
+CNil{-r7,x-}{i}  ::  CList{-r4u,x-}
+_A_ 0 {-# L #-}
+CNil{-r7,x-}{i} =
+    CNil{-r7,x-}{i} {}
+CCons{-r6,x-}{i}  ::  GHC.Int#{-3f,W-}
+		      -> CList{-r4u,x-}
+		      -> CList{-r4u,x-}
+_A_ 2 {-# L #-}
+CCons{-r6,x-}{i} =
+    \ tpl_B1  ::  GHC.Int#{-3f,W-}
+      {-# L #-}
+      tpl_B1 tpl_B2  ::  CList{-r4u,x-}
+	     {-# L #-}
+	     tpl_B2 ->
+	CCons{-r6,x-}{i} {tpl_B1 tpl_B2}
+clen_aGK  ::  CList{-r4u,x-} -> GHC.Int#{-3f,W-}
+{-# L #-}
+clen_aGK =
+    \ ds_dNA  ::  CList{-r4u,x-}
+      {-# L #-}
+      ds_dNA ->
+	case ds_dNA of {
+	  CNil{-r7,x-}{i} -> 0;
+	  CCons{-r6,x-}{i} ds_dNR cl_r4p ->
+	      case# clen{-r9,x-} cl_r4p of { ds_dO1 ->
+	      GHC.+#{-7D,w-}{I} 1 ds_dO1;};
+	}
+clen{-r9,x-}  ::  CList{-r4u,x-} -> GHC.Int#{-3f,W-}
+{-# L #-}
+clen{-r9,x-} =
+    clen_aGK
+mk_aGP  ::  GHC.Int#{-3f,W-} -> CList{-r4u,x-}
+{-# L #-}
+mk_aGP =
+    \ n_r4k  ::  GHC.Int#{-3f,W-}
+      {-# L #-}
+      n_r4k ->
+	let {
+	  ds_dOE  ::  PrelBase.Bool{-34,W-}
+	  {-# L #-}
+	  ds_dOE =
+	      GHC.==#{-79,w-}{I} n_r4k 0 } in
+	let { fail_dOR  ::  CList{-r4u,x-}
+	      {-# L #-}
+	      fail_dOR =
+	  let {
+	    ds_dOs  ::  CList{-r4u,x-}
+	    {-# L #-}
+	    ds_dOs =
+		case# GHC.-#{-7E,w-}{I} n_r4k 1 of { ds_dOM -> mk{-r8,x-} ds_dOM;}
+	  } in  CCons{-r6,x-}{i} 1 ds_dOs
+	} in
+	case ds_dOE of {
+	  PrelBase.True{-5E,w-}{i} -> fail_dOR;
+	  PrelBase.False{-58,w-}{i} -> CNil{-r7,x-}{i};
+	}
+mk{-r8,x-}  ::  GHC.Int#{-3f,W-} -> CList{-r4u,x-}
+{-# L #-}
+mk{-r8,x-} =
+    mk_aGP
+main_aH0  ::  IOBase.IO{-3e,p-} PrelBase.(){-40,W-}
+{-# L #-}
+main_aH0 =
+    let {
+      list4_aGZ  ::  CList{-r4u,x-}
+      {-# L #-}
+      list4_aGZ =
+	  mk{-r8,x-} 4 } in
+    let {
+      list4_r4r  ::  CList{-r4u,x-}
+      {-# L #-}
+      list4_r4r =
+	  list4_aGZ
+    } in 
+      case# clen{-r9,x-} list4_r4r of { len4_aH4 ->
+      case# len4_aH4 of { len4_r4s ->
+      case# GHC.+#{-7D,w-}{I} len4_r4s len4_r4s of { len4_twice_aH7 ->
+      case# len4_twice_aH7 of { len4_twice_r4t ->
+      let {
+	ds_dPl  ::  [PrelBase.Char{-38,W-}]
+	{-# L #-}
+	ds_dPl =
+	    case# len4_twice_r4t of { ds_dPS ->
+	    let {
+	      fail_dPT  ::  PrelBase.String{-rgL,p-}
+	      {-# L #-}
+	      fail_dPT =
+		  _string_ "oops\n"
+	    } in 
+	      case# ds_dPS of {
+		8 -> _string_ "bingo\n";
+		ds_dQ1 -> fail_dPT;
+	      };}
+      } in  PrelIO.putStr{-rhQ,p-} ds_dPl;};};};}
+main{-814,x-}  ::  IOBase.IO{-3e,p-} PrelBase.(){-40,W-}
+{-# L #-}
+main{-814,x-} =
+    main_aH0
+d.Eval_aHh  ::  {PrelBase.Eval{-24,p-} CList{-r4u,x-}}
+{-# L #-}
+d.Eval_aHh =
+    PrelBase.void{-8G,w-}
+$d1{-rNv,x-}  ::  {PrelBase.Eval{-24,p-} CList{-r4u,x-}}
+{-# L #-}
+$d1{-rNv,x-} =
+    d.Eval_aHh
+end Rec }

@@ -1,0 +1,42 @@
+
+
+================================================================================
+Typechecked:
+Tag{-r3G,x-}{i} =
+    _/\_ a_tr3C -> \ tpl_B1 -> Tag{-r3G,x-}{i} {_@_ a_tr3C tpl_B1}
+AbsBinds [taBx] [d.Reps_aBA] [([taBx], g{-r3D,x-}, g_aBo)]
+    f_aCe = f{-r3H,x-} taBx d.Reps_aBA
+    g_aBo x_r3h = f_aCe x_r3h x_r3h
+AbsBinds [taCc] [] [([taCc], $d3{-rCh,x-}, d.Eval_aBG)]
+    d.Eval_aBG = ({-dict-} [] [])
+AbsBinds [] [] [([], $d1{-rCi,x-}, d.Reps_aBL)]
+    AbsBinds [] [] [([], f_aCk, f_aBP)]
+	f_aBP PrelBase.True{-5E,w-}{i} PrelBase.True{-5E,w-}{i}
+	      = PrelBase.True{-5E,w-}{i}
+	f_aBP x_r3n y_r3o = PrelBase.False{-58,w-}{i}
+    d.Reps_aBL = ({-dict-} [] [f_aCk])
+AbsBinds [taC5] [] [([taC5], $d2{-rCj,x-}, d.Reps_aBY)]
+    AbsBinds [] [] [([], f_aCl, f_aC2)]
+	f_aC2 x_r3v y_r3w = y_r3w
+    d.Reps_aBY = ({-dict-} [] [f_aCl])
+f{-r3H,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taCd] [d.Reps_aCb] []
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d2 1 $d38 1 $d40 1 $d42 1 $d47 1 Eval 1;
+_exports_
+ShouldSucceed g Reps(f) X(Tag);
+_instances_
+instance {Reps PrelBase.Bool} = $d1;
+instance _forall_ [q] => {Reps (X q)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (X a)} = $d3;
+_declarations_
+1 $d1 _:_ {Reps PrelBase.Bool} ;;
+1 $d2 _:_ _forall_ [q] => {Reps (X q)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (X a)} ;;
+1 class Reps r where {f :: r -> r -> r} ;
+1 data X a = Tag a ;
+1 g _:_ _forall_ [ta] {Reps ta} => ta -> ta ;;

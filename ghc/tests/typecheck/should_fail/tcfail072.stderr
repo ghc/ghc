@@ -1,0 +1,7 @@
+ 
+tcfail072.hs:17: Ambiguous context `{PrelBase.Ord taDf}'
+		     `PrelBase.Ord taDf' arising from use of `g' at tcfail072.hs:23
+    When checking signature(s) for: `g'
+
+
+Compilation had errors

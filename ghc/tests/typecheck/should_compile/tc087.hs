@@ -1,4 +1,4 @@
-module SOL where
+module ShouldSucceed where
 
 import GlaExts
 

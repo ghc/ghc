@@ -1,0 +1,195 @@
+
+NOTE: Simplifier still going after 4 iterations; bailing out.
+
+
+================================================================================
+Simplified:
+$d1{-rOe,x-}  ::  _forall_
+		  [a_tr41]
+		  =>
+		  {PrelBase.Eval{-24,p-} (IMonadReturn{-r45,x-} a_tr41)}
+_A>_ 0 {-# L #-}
+$d1{-rOe,x-} =
+    _/\_ $x0_ts1mQ -> PrelBase.void{-8G,w-}
+IMonadOk{-ra,x-}{i}  ::  _forall_
+			 [a_tr41]
+			 =>
+			 IMonadState{-r44,x-} -> a_tr41 -> IMonadReturn{-r45,x-} a_tr41
+_A>_ 2 {-# L #-}
+IMonadOk{-ra,x-}{i} =
+    _/\_ $x0_ts1mb -> \ $x1_s1ix  ::  IMonadState{-r44,x-}
+			{-# L #-}
+			$x1_s1ix $x2_s1iw  ::  $x0_ts1mb
+				 {-# L #-}
+				 $x2_s1iw ->
+	IMonadOk{-ra,x-}{i} {_@_ $x0_ts1mb $x1_s1ix $x2_s1iw}
+returnI{-rf,x-}{i}  ::  _forall_
+			[taEj]
+			=>
+			taEj -> IMonadState{-r44,x-} -> IMonadReturn{-r45,x-} taEj
+_A>_ 2 {-# L #-}
+returnI{-rf,x-}{i} =
+    _/\_ $x0_ts1mf -> \ $x1_s1iv  ::  $x0_ts1mf
+			{-# L #-}
+			$x1_s1iv $x2_s1iu  ::  IMonadState{-r44,x-}
+				 {-# L #-}
+				 $x2_s1iu ->
+	IMonadOk{-ra,x-}{i} {_@_ $x0_ts1mf $x2_s1iu $x1_s1iv}
+IMonadFail{-r9,x-}{i}  ::  _forall_
+			   [a_tr41]
+			   =>
+			   IMonadState{-r44,x-}
+			   -> PrelBase.String{-rgk,p-}
+			   -> IMonadReturn{-r45,x-} a_tr41
+_A>_ 2 {-# L #-}
+IMonadFail{-r9,x-}{i} =
+    _/\_ $x0_ts1mj -> \ $x1_s1it  ::  IMonadState{-r44,x-}
+			{-# L #-}
+			$x1_s1it $x2_s1is  ::  PrelBase.String{-rgk,p-}
+				 {-# L #-}
+				 $x2_s1is ->
+	IMonadFail{-r9,x-}{i} {_@_ $x0_ts1mj $x1_s1it $x2_s1is}
+thenI{-rd,x-}{i}  ::  _forall_
+		      [taDN taDA taDE]
+		      =>
+		      (taDN -> IMonadReturn{-r45,x-} taDE)
+		      -> (taDE -> IMonadState{-r44,x-} -> IMonadReturn{-r45,x-} taDA)
+		      -> taDN
+		      -> IMonadReturn{-r45,x-} taDA
+_A>_ 3 {-# L #-}
+thenI{-rd,x-}{i} =
+    _/\_ $x0_ts1mt $x1_ts1mv $x2_ts1mu -> \ $x3_s1hN  ::  $x0_ts1mt
+							  -> IMonadReturn{-r45,x-} $x2_ts1mu
+					    {-# L #-}
+					    $x3_s1hN $x4_s1i5  ::  $x2_ts1mu
+								   -> IMonadState{-r44,x-}
+								   -> IMonadReturn{-r45,x-} $x1_ts1mv
+						     {-# L #-}
+						     $x4_s1i5 $x5_s1ir  ::  $x0_ts1mt
+							      {-# L #-}
+							      $x5_s1ir ->
+	case $x3_s1hN $x5_s1ir of {
+	  IMonadFail{-r9,x-}{i} $x6_s1iz $x7_s1iy ->
+	      IMonadFail{-r9,x-}{i} {_@_ $x1_ts1mv $x6_s1iz $x7_s1iy};
+	  IMonadOk{-ra,x-}{i} $x8_s1iB $x9_s1iA ->
+	      $x4_s1i5 $x9_s1iA $x8_s1iB;
+	}
+Rec {
+$g0_s11s{n}  ::  _forall_
+		 [tsXl tsXm]
+		 =>
+		 (tsXl -> IMonadState{-r44,x-} -> IMonadReturn{-r45,x-} tsXm)
+		 -> [tsXl]
+		 -> IMonadState{-r44,x-}
+		 -> IMonadReturn{-r45,x-} [tsXm]
+_A>_ 2 {-# L #-}
+$g0_s11s{n} =
+    _/\_ $x0_ts1iP $x1_ts1iQ -> \ $x2_s1jb  ::  $x0_ts1iP
+						-> IMonadState{-r44,x-}
+						-> IMonadReturn{-r45,x-} $x1_ts1iQ
+				  {-# L #-}
+				  $x2_s1jb $x3_s1iq  ::  [$x0_ts1iP]
+					   {-# L #-}
+					   $x3_s1iq ->
+	case $x3_s1iq of {
+	  PrelBase.[]{-5i,w-}{i} ->
+	      let {
+		$x4_s1mx  ::  [$x1_ts1iQ]
+		_A>_ 0 {-# L #-}
+		$x4_s1mx =
+		    PrelBase.[]{-5i,w-}{i} {_@_ $x1_ts1iQ}
+	      } in 
+		\ $x5_s1mw  ::  IMonadState{-r44,x-}
+		  {-# L #-}
+		  $x5_s1mw ->
+		    IMonadOk{-ra,x-}{i} {_@_ [$x1_ts1iQ] $x5_s1mw $x4_s1mx};
+	  PrelBase.:{-55,w-}{i} $x6_s1jc $x7_s1jd ->
+	      let {
+		$x8_s1jn  ::  IMonadState{-r44,x-}
+			      -> IMonadReturn{-r45,x-} $x1_ts1iQ
+		_A>_ 0 {-# L #-}
+		$x8_s1jn =
+		    $x2_s1jb $x6_s1jc
+	      } in 
+		\ $x9_s1my  ::  IMonadState{-r44,x-}
+		  {-# L #-}
+		  $x9_s1my ->
+		    case $x8_s1jn $x9_s1my of {
+		      IMonadFail{-r9,x-}{i} $xa_s1mz $xb_s1mA ->
+			  IMonadFail{-r9,x-}{i} {_@_ [$x1_ts1iQ] $xa_s1mz $xb_s1mA};
+		      IMonadOk{-ra,x-}{i} $xc_s1mB $xd_s1kg ->
+			  let {
+			    $xe_s1jP  ::  IMonadState{-r44,x-}
+					  -> IMonadReturn{-r45,x-} [$x1_ts1iQ]
+			    _A>_ 0 {-# L #-}
+			    $xe_s1jP =
+				$g0_s11s{n} _@_ $x0_ts1iP _@_ $x1_ts1iQ $x2_s1jb $x7_s1jd
+			  } in 
+			    case
+				$g0_s11s{n} _@_ $x0_ts1iP _@_ $x1_ts1iQ $x2_s1jb $x7_s1jd $xc_s1mB
+			    of {
+			      IMonadFail{-r9,x-}{i} $xf_s1mC $xg_s1mD ->
+				  IMonadFail{-r9,x-}{i} {_@_ [$x1_ts1iQ] $xf_s1mC $xg_s1mD};
+			      IMonadOk{-ra,x-}{i} $xh_s1mE $xi_s1mF ->
+				  let {
+				    $xj_s1mG  ::  [$x1_ts1iQ]
+				    _A>_ 0 {-# L #-}
+				    $xj_s1mG =
+					PrelBase.:{-55,w-}{i} {_@_ $x1_ts1iQ $xd_s1kg $xi_s1mF}
+				  } in  IMonadOk{-ra,x-}{i} {_@_ [$x1_ts1iQ] $xh_s1mE $xj_s1mG};
+			    };
+		    };
+	}
+end Rec }
+mapI{-rb,x-}{i}  ::  _forall_
+		     [taEH taF6]
+		     =>
+		     (taEH -> IMonadState{-r44,x-} -> IMonadReturn{-r45,x-} taF6)
+		     -> [taEH]
+		     -> IMonadState{-r44,x-}
+		     -> IMonadReturn{-r45,x-} [taF6]
+_A>_ 2 {-# L #-}
+mapI{-rb,x-}{i} =
+    _/\_ $x0_ts1mH $x1_ts1mI -> $g0_s11s{n} _@_ $x0_ts1mH _@_ $x1_ts1mI
+failI{-re,x-}{i}  ::  _forall_
+		      [taE3]
+		      =>
+		      PrelBase.String{-rgk,p-}
+		      -> IMonadState{-r44,x-}
+		      -> IMonadReturn{-r45,x-} taE3
+_A>_ 2 {-# L #-}
+failI{-re,x-}{i} =
+    _/\_ $x0_ts1mM -> \ $x1_s1l0  ::  PrelBase.String{-rgk,p-}
+			{-# L #-}
+			$x1_s1l0 $x2_s1kZ  ::  IMonadState{-r44,x-}
+				 {-# L #-}
+				 $x2_s1kZ ->
+	IMonadFail{-r9,x-}{i} {_@_ $x0_ts1mM $x2_s1kZ $x1_s1l0}
+$g1_aOn  ::  IMonadState{-r44,x-}
+	     -> IMonadState{-r44,x-}
+	     -> IMonadState{-r44,x-}
+_A>_ 0 {-# L #-}
+$g1_aOn =
+    case
+	PrelBase.$d4{-rbh,p-}
+    of {
+    PrelTup.(,,,,,,,,,,){-6b,w-}{i} $x0_s1lt $x1_s1lu $x2_s1lv $x3_s1ls $x4_s1lw $x5_s1lx $x6_s1ly $x7_s1lz $x8_s1lA $x9_s1lB $xa_s1lC  ->
+    $x3_s1ls;}
+tickI{-rc,x-}  ::  IMonadState{-r44,x-}
+		   -> IMonadState{-r44,x-}
+		   -> IMonadReturn{-r45,x-} PrelBase.(){-40,W-}
+_A>_ 2 {-# L #-}
+tickI{-rc,x-} =
+    \ $x0_s1mN  ::  IMonadState{-r44,x-}
+      {-# L #-}
+      $x0_s1mN $x1_s1mO  ::  IMonadState{-r44,x-}
+	       {-# L #-}
+	       $x1_s1mO ->
+	let {
+	  $x2_s1mP  ::  IMonadState{-r44,x-}
+	  _A>_ 0 {-# L #-}
+	  $x2_s1mP =
+	      $g1_aOn $x1_s1mO $x0_s1mN
+	} in 
+	  IMonadOk{-ra,x-}{i}
+	      {_@_ PrelBase.(){-40,W-} $x2_s1mP PrelBase.(){-60,w-}{i}}

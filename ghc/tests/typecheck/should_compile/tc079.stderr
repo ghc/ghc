@@ -1,0 +1,70 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [taC2] [d.Foo_aCq] [([taC2], $d1{-rDQ,x-}, d.Foo_aBS)]
+    d.Foo_aCs = d.Foo_aBS
+    $mop1_aDU = $mop1{-rBV,x-} [taC2] d.Foo_aCs
+    d.Foo_aCu = d.Foo_aBS
+    $mop2_aDV = $mop2{-rBZ,x-} [taC2] d.Foo_aCu
+    AbsBinds [] [] [([], op1_aDW, op1_aBY)]
+	op1_aBY = $mop1_aDU
+    AbsBinds [taCk] [d.Ord_aCn] [([taCk], op2_aDX, op2_aCb)]
+	d.Ord_aCp = d.Ord_aCn
+	$mop2_aDY = $mop2_aDV taCk d.Ord_aCp
+	op2_aCb = $mop2_aDY
+    d.Foo_aBS = ({-dict-} [] [op1_aDW, op2_aDX])
+AbsBinds [] [] [([], $d2{-rDR,x-}, d.Foo_aCA)]
+    AbsBinds [] [] [([], op1_aDZ, op1_aCF)]
+	op1_aCF = $mop1_aDS
+    AbsBinds [taD0] [d.Ord_aD3] [([taD0], op2_aE0, op2_aCR)]
+	d.Ord_aD7 = d.Ord_aD3
+	$mop2_aE1 = $mop2_aDT taD0 d.Ord_aD7
+	op2_aCR = $mop2_aE1
+    d.Foo_aCA = ({-dict-} [] [op1_aDZ, op2_aE0])
+op1{-r3C,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3D,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+AbsBinds
+[taDi]
+[d.Foo_aDI]
+[([taDi], $mop1{-rBV,x-}, op1_aE2), ([taDi],
+				     $mop2{-rBZ,x-},
+				     op2_aE4)]
+    d.Foo_aDK = d.Foo_aDI
+    op1_aE3 = op1{-r3C,x-} taDi d.Foo_aDK
+    AbsBinds [] [] [([], op1_aE2, op1_aDf)]
+	op1_aDf x_r3u = PrelBase.True{-5E,w-}{i}
+    AbsBinds [taDu] [d.Ord_aDE] [([taDu], op2_aE4, op2_aDo)]
+	d.Ord_aDG = d.Ord_aDE
+	<_aE5 = PrelBase.<{-rfI,p-} taDu d.Ord_aDG
+	op2_aDo x_r3y y_r3z z_r3A
+		= if (op1_aE3 x_r3y) PrelBase.&&{-r3B,p-} (y_r3z <_aE5 z_r3A) then
+		      y_r3z
+		  else
+		      z_r3A
+d.Foo_aDM = $d2{-rDR,x-}
+$mop1_aDS = $mop1{-rBV,x-} PrelBase.Int{-3g,W-} d.Foo_aDM
+d.Foo_aDP = d.Foo_aDM
+$mop2_aDT = $mop2{-rBZ,x-} PrelBase.Int{-3g,W-} d.Foo_aDP
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d15 1 $d16 1 $d27 1 $d28 1 $d33 1 $d35 1 $d50 1 $d52 1 $d7 1 $d8 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mmax 1 $mmin 1 && 1 Eq 1 Ord 1 Ordering 1;
+PrelNum 1 :: $d17 1 $d18 1;
+_exports_
+ShouldSucceed Foo(op1 op2);
+_instances_
+instance _forall_ [a] {Foo a} => {Foo [a]} = $d1;
+instance {Foo PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {Foo a} => {Foo [a]} ;;
+1 $d2 _:_ {Foo PrelBase.Int} ;;
+1 $mop1 _:_ _forall_ [a] {Foo a} => a -> PrelBase.Bool ;;
+1 $mop2 _:_ _forall_ [a] {Foo a} => _forall_ [b] {PrelBase.Ord b} => a -> b -> b -> b ;;
+1 class Foo a where {op1 = :: a -> PrelBase.Bool; op2 = :: _forall_ [b] {PrelBase.Ord b} => a -> b -> b -> b} ;

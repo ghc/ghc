@@ -1,8 +1,8 @@
  
 tcfail031.hs:3: Couldn't match the type
-		    `PrelBase.Bool' against `PrelBase.Char'
-    Expected: `PrelBase.Bool'
-    Inferred: `PrelBase.Char'
+		    `PrelBase.Char' against `PrelBase.Bool'
+    Expected: `PrelBase.Char'
+    Inferred: `PrelBase.Bool'
     In the predicate expression `'a''
     In an equation for function `f': `f x = if 'a' then 1 else 2'
 

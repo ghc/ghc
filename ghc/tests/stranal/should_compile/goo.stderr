@@ -1,0 +1,36 @@
+
+
+================================================================================
+Simplified:
+`$d2'  ::  `{PrelBase.Eval (Goo a)}'
+`$d2' =
+    _/\_ `$x0' -> `PrelBase.void'
+`$d1'  ::  `{PrelBase.Eval (Moo a b)}'
+`$d1' =
+    _/\_ `$x0' `$x1' -> `PrelBase.void'
+`idMoo'  ::  `Moo taBA taBB -> Moo taBA taBB'
+`idMoo' =
+    _/\_ `$x0' `$x1' -> \ `$x2'  ::  `Moo $x0 $x1'
+			  `$x2' ->
+	`$x2'
+`idGoo'  ::  `Goo taBL -> Goo taBL'
+`idGoo' =
+    _/\_ `$x0' -> \ `$x1'  ::  `Goo $x0'
+		    `$x1' ->
+	`$x1'
+`Msimple'  ::  `Moo a b'
+`Msimple' =
+    _/\_ `$x0' `$x1' -> `Msimple' {_@_ `$x0' _@_ `$x1'}
+`Mcompl'  ::  `Moo b a -> Moo a b'
+`Mcompl' =
+    _/\_ `$x0' `$x1' -> \ `$x2'  ::  `Moo $x1 $x0'
+			  `$x2' ->
+	`Mcompl' {_@_ `$x0' _@_ `$x1' `$x2'}
+`Gsimpl'  ::  `Goo a'
+`Gsimpl' =
+    _/\_ `$x0' -> `Gsimpl' {_@_ `$x0'}
+`Gcompl'  ::  `[Goo a] -> Goo a'
+`Gcompl' =
+    _/\_ `$x0' -> \ `$x1'  ::  `[Goo $x0]'
+		    `$x1' ->
+	`Gcompl' {_@_ `$x0' `$x1'}

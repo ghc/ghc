@@ -1,8 +1,8 @@
  
 tcfail013.hs:4: Couldn't match the type
-		    `[taBB]' against `PrelBase.Bool'
-    Expected: `[taBB] -> taBD'
-    Inferred: `PrelBase.Bool -> taBG'
+		    `[taBQ]' against `PrelBase.Bool'
+    Expected: `PrelBase.Bool'
+    Inferred: `[taBQ]'
     In an equation for function `f': `f PrelBase.True = 2'
 
 

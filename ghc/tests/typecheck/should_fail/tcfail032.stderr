@@ -1,8 +1,7 @@
  
 tcfail032.hs:14: A type signature is more polymorphic than the inferred type
-		     Some type variables in the inferred type can't be forall'd, namely:
-		     `taAx'
-		     Possible cause: the RHS mentions something subject to the monomorphism restriction
+		     Can't for-all the type variable(s) `taAO'
+		     in the inferred type `taAO -> PrelBase.Int'
     In an expression with a type signature:
 	`x :: _forall_ [a] (PrelBase.Eq a) => a -> PrelBase.Int'
 

@@ -1,0 +1,22 @@
+
+
+================================================================================
+Typechecked:
+bitRsh{-r3h,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+bitLsh{-r3i,x-} =
+    _/\_ t12 -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+AbsBinds [takE] [d.Bits_akD] []
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ Word 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+Word Bits(bitRsh bitLsh);
+_fixities_
+infixl 8 bitLsh;
+infixl 8 bitRsh;
+_declarations_
+1 class Bits a where {bitRsh :: a -> PrelBase.Int -> a; bitLsh :: a -> PrelBase.Int -> a} ;

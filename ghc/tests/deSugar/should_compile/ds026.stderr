@@ -3,190 +3,142 @@
 ================================================================================
 Desugared:
 Rec {
-scsel_NooShouldSucceedBoo{-aKl,x-}  :: 
-    _forall_
-    [a{-r3n-}]
-    =>
-    {Noo{-r3B,x-} a{-r3n-}} -> {Boo{-r3o,x-} a{-r3n-}}
+f{-r3w,x-}  ::  _forall_
+		[taBw taBB]
+		=>
+		{Noo{-r3x,x-} taBw}
+		-> {PrelBase.Eq{-23,p-} taBB}
+		-> taBw
+		-> taBB
+		-> taBw
 {-# L #-}
-scsel_NooShouldSucceedBoo{-aKl,x-} =
-    _/\_ a{-r3n-} -> \ tpl_B1  :: 
-			   {Noo{-r3B,x-} a{-r3n-}}
-		       {-# L #-}
-		       tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-op2{-r3A,x-}  :: 
-    _forall_
-    [a{-r3n-}]
-    =>
-    {Noo{-r3B,x-} a{-r3n-}}
-    -> (_forall_
-	[b{-r3q-}]
-	=>
-	{PrelBase.Eq{-23,p-} b{-r3q-}} -> a{-r3n-} -> b{-r3q-} -> a{-r3n-})
+f{-r3w,x-} =
+    _/\_ taBw taBB -> \ d.Noo_aBH  ::  {Noo{-r3x,x-} taBw}
+			{-# L #-}
+			d.Noo_aBH d.Eq_aBJ  ::  {PrelBase.Eq{-23,p-} taBB}
+				  {-# L #-}
+				  d.Eq_aBJ ->
+	_letrec_ {
+	  d.Boo_aBL  ::  {Boo{-r3n,x-} taBw}
+	  {-# L #-}
+	  d.Boo_aBL =
+	      scsel_NooShouldSucceedBoo{-aEv,x-} _@_ taBw d.Noo_aBH;
+	  d.Foo_aBF  ::  {Foo{-r3s,x-} taBw}
+	  {-# L #-}
+	  d.Foo_aBF =
+	      scsel_BooShouldSucceedFoo{-aEw,x-} _@_ taBw d.Boo_aBL;
+	  op_aEx  ::  taBw -> taBw
+	  {-# L #-}
+	  op_aEx =
+	      op{-r3y,x-} _@_ taBw d.Foo_aBF;
+	  op2_aBC  ::  _forall_
+		       [taBy]
+		       =>
+		       {PrelBase.Eq{-23,p-} taBy} -> taBw -> taBy -> taBw
+	  {-# L #-}
+	  op2_aBC =
+	      op2{-r3A,x-} _@_ taBw d.Noo_aBH;
+	  op2_aEy  ::  taBw -> taBB -> taBw
+	  {-# L #-}
+	  op2_aEy =
+	      op2_aBC _@_ taBB d.Eq_aBJ;
+	  f_aBf  ::  taBw -> taBB -> taBw
+	  {-# L #-}
+	  f_aBf =
+	      \ x_r3j  ::  taBw
+		{-# L #-}
+		x_r3j y_r3k  ::  taBB
+		      {-# L #-}
+		      y_r3k ->
+		  let {
+		    ds_dG8  ::  taBw
+		    {-# L #-}
+		    ds_dG8 =
+			op2_aEy x_r3j y_r3k
+		  } in  op_aEx ds_dG8;
+	} in  f_aBf
+scsel_NooShouldSucceedBoo{-aEv,x-}  ::  _forall_
+					[a_tr3m]
+					=>
+					{Noo{-r3x,x-} a_tr3m} -> {Boo{-r3n,x-} a_tr3m}
+{-# L #-}
+scsel_NooShouldSucceedBoo{-aEv,x-} =
+    _/\_ t12 -> \ tpl_B1  ::  {Noo{-r3x,x-} t12}
+		  {-# L #-}
+		  tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3A,x-}  ::  _forall_
+		  [a_tr3m]
+		  =>
+		  {Noo{-r3x,x-} a_tr3m}
+		  -> (_forall_
+		      [b_tr3p]
+		      =>
+		      {PrelBase.Eq{-23,p-} b_tr3p} -> a_tr3m -> b_tr3p -> a_tr3m)
 {-# L #-}
 op2{-r3A,x-} =
-    _/\_ a{-r3n-} -> \ tpl_B1  :: 
-			   {Noo{-r3B,x-} a{-r3n-}}
-		       {-# L #-}
-		       tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-$mop2{-rGB,x-}  :: 
-    _forall_
-    [a{-r3n-}]
-    =>
-    {Noo{-r3B,x-} a{-r3n-}}
-    -> (_forall_
-	[b{-r3q-}]
-	=>
-	{PrelBase.Eq{-23,p-} b{-r3q-}} -> a{-r3n-} -> b{-r3q-} -> a{-r3n-})
-{-# L #-}
-$mop2{-rGB,x-} =
-    _/\_ a{-aHc-} -> \ d.Noo_aH5  :: 
-			   {Noo{-r3B,x-} a{-aHc-}}
-		       {-# L #-}
-		       d.Noo_aH5 ->
-	_/\_ b{-aHg-} -> \ d.Eq_aHi  :: 
-			       {PrelBase.Eq{-23,p-} b{-aHg-}}
-			   {-# L #-}
-			   d.Eq_aHi ->
-	    GHCerr.noDefaultMethodError{-8k,p-}
-		_@_ (a{-aHc-} -> b{-aHg-} -> a{-aHc-})
-		_string_ "Class Noo Method op2"
-scsel_BooShouldSucceedFoo{-aKD,x-}  :: 
-    _forall_
-    [a{-r3t-}]
-    =>
-    {Boo{-r3o,x-} a{-r3t-}} -> {Foo{-r3u,x-} a{-r3t-}}
-{-# L #-}
-scsel_BooShouldSucceedFoo{-aKD,x-} =
-    _/\_ a{-r3t-} -> \ tpl_B1  :: 
-			   {Boo{-r3o,x-} a{-r3t-}}
-		       {-# L #-}
-		       tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-op1{-r3C,x-}  :: 
-    _forall_
-    [a{-r3t-}]
-    =>
-    {Boo{-r3o,x-} a{-r3t-}} -> a{-r3t-} -> a{-r3t-}
-{-# L #-}
-op1{-r3C,x-} =
-    _/\_ a{-r3t-} -> \ tpl_B1  :: 
-			   {Boo{-r3o,x-} a{-r3t-}}
-		       {-# L #-}
-		       tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-$mop1{-rGD,x-}  :: 
-    _forall_
-    [a{-r3t-}]
-    =>
-    {Boo{-r3o,x-} a{-r3t-}} -> a{-r3t-} -> a{-r3t-}
-{-# L #-}
-$mop1{-rGD,x-} =
-    _/\_ a{-aHs-} -> \ d.Boo_aHl  :: 
-			   {Boo{-r3o,x-} a{-aHs-}}
-		       {-# L #-}
-		       d.Boo_aHl ->
-	GHCerr.noDefaultMethodError{-8k,p-}
-	    _@_ (a{-aHs-} -> a{-aHs-}) _string_ "Class Boo Method op1"
-op{-r3D,x-}  :: 
-    _forall_
-    [a{-r3y-}]
-    =>
-    {Foo{-r3u,x-} a{-r3y-}} -> a{-r3y-} -> a{-r3y-}
-{-# L #-}
-op{-r3D,x-} =
-    _/\_ a{-r3y-} -> \ tpl_B1  :: 
-			   {Foo{-r3u,x-} a{-r3y-}}
-		       {-# L #-}
-		       tpl_B1 ->
-	tpl_B1
-$mop{-rGC,x-}  :: 
-    _forall_
-    [a{-r3y-}]
-    =>
-    {Foo{-r3u,x-} a{-r3y-}} -> a{-r3y-} -> a{-r3y-}
-{-# L #-}
-$mop{-rGC,x-} =
-    _/\_ a{-aHD-} -> \ d.Foo_aHw  :: 
-			   {Foo{-r3u,x-} a{-aHD-}}
-		       {-# L #-}
-		       d.Foo_aHw ->
-	GHCerr.noDefaultMethodError{-8k,p-}
-	    _@_ (a{-aHD-} -> a{-aHD-}) _string_ "Class Foo Method op"
-f{-r3z,x-}  :: 
-    _forall_
-    [a{-aGK-} b{-aGQ-}]
-    =>
-    {Noo{-r3B,x-} a{-aGK-}}
-    -> {PrelBase.Eq{-23,p-} b{-aGQ-}}
-    -> a{-aGK-}
-    -> b{-aGQ-}
-    -> a{-aGK-}
-{-# L #-}
-f{-r3z,x-} =
-    _/\_ a{-aGK-} b{-aGQ-} -> \ d.Noo_aGY  :: 
-				    {Noo{-r3B,x-} a{-aGK-}}
-				{-# L #-}
-				d.Noo_aGY d.Eq_aH0  :: 
-					      {PrelBase.Eq{-23,p-} b{-aGQ-}}
-					  {-# L #-}
-					  d.Eq_aH0 ->
-	let {
-	  d.Boo_aH2  :: 
-	      {Boo{-r3o,x-} a{-aGK-}}
-	  {-# L #-}
-	  d.Boo_aH2 =
-	      scsel_NooShouldSucceedBoo{-aKl,x-}
-		  _@_ a{-aGK-} d.Noo_aGY } in
-	let {
-	  d.Foo_aGW  :: 
-	      {Foo{-r3u,x-} a{-aGK-}}
-	  {-# L #-}
-	  d.Foo_aGW =
-	      scsel_BooShouldSucceedFoo{-aKD,x-}
-		  _@_ a{-aGK-} d.Boo_aH2 } in
-	let {
-	  op_aMI  :: 
-	      a{-aGK-} -> a{-aGK-}
-	  {-# L #-}
-	  op_aMI =
-	      op{-r3D,x-}
-		  _@_ a{-aGK-} d.Foo_aGW } in
-	let {
-	  op2_aMH  :: 
-	      _forall_
-	      [b{-aGM-}]
-	      =>
-	      {PrelBase.Eq{-23,p-} b{-aGM-}} -> a{-aGK-} -> b{-aGM-} -> a{-aGK-}
-	  {-# L #-}
-	  op2_aMH =
-	      op2{-r3A,x-}
-		  _@_ a{-aGK-} d.Noo_aGY } in
-	let {
-	  op2_aMG  :: 
-	      a{-aGK-} -> b{-aGQ-} -> a{-aGK-}
-	  {-# L #-}
-	  op2_aMG =
-	      op2_aMH
-		  _@_ b{-aGQ-} d.Eq_aH0
-	} in 
-	  \ x_r3j  :: 
-		a{-aGK-}
-	    {-# L #-}
-	    x_r3j y_r3l  :: 
-		      b{-aGQ-}
+    _/\_ t12 -> \ tpl_B1  ::  {Noo{-r3x,x-} t12}
 		  {-# L #-}
-		  y_r3l ->
-	      let {
-		ds_dNv  :: 
-		    a{-aGK-}
-		{-# L #-}
-		ds_dNv =
-		    op2_aMG
-			x_r3j y_r3l
-	      } in 
-		op_aMI
-		    ds_dNv
+		  tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+ds_dEN  ::  _forall_
+	    [taBV]
+	    =>
+	    {Noo{-r3x,x-} taBV} -> PrelBase.(){-40,W-}
+{-# L #-}
+ds_dEN =
+    _/\_ taBV -> \ d.Noo_aBO  ::  {Noo{-r3x,x-} taBV}
+		   {-# L #-}
+		   d.Noo_aBO ->
+	PrelBase.(){-60,w-}{i} {}
+scsel_BooShouldSucceedFoo{-aEw,x-}  ::  _forall_
+					[a_tr3r]
+					=>
+					{Boo{-r3n,x-} a_tr3r} -> {Foo{-r3s,x-} a_tr3r}
+{-# L #-}
+scsel_BooShouldSucceedFoo{-aEw,x-} =
+    _/\_ t12 -> \ tpl_B1  ::  {Boo{-r3n,x-} t12}
+		  {-# L #-}
+		  tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op1{-r3z,x-}  ::  _forall_
+		  [a_tr3r]
+		  =>
+		  {Boo{-r3n,x-} a_tr3r} -> a_tr3r -> a_tr3r
+{-# L #-}
+op1{-r3z,x-} =
+    _/\_ t12 -> \ tpl_B1  ::  {Boo{-r3n,x-} t12}
+		  {-# L #-}
+		  tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+ds_dF0  ::  _forall_
+	    [taBW]
+	    =>
+	    {Boo{-r3n,x-} taBW} -> PrelBase.(){-40,W-}
+{-# L #-}
+ds_dF0 =
+    _/\_ taBW -> \ d.Boo_aBR  ::  {Boo{-r3n,x-} taBW}
+		   {-# L #-}
+		   d.Boo_aBR ->
+	PrelBase.(){-60,w-}{i} {}
+op{-r3y,x-}  ::  _forall_
+		 [a_tr3v]
+		 =>
+		 {Foo{-r3s,x-} a_tr3v} -> a_tr3v -> a_tr3v
+{-# L #-}
+op{-r3y,x-} =
+    _/\_ t12 -> \ tpl_B1  ::  {Foo{-r3s,x-} t12}
+		  {-# L #-}
+		  tpl_B1 ->
+	tpl_B1
+ds_dF9  ::  _forall_
+	    [taBX]
+	    =>
+	    {Foo{-r3s,x-} taBX} -> PrelBase.(){-40,W-}
+{-# L #-}
+ds_dF9 =
+    _/\_ taBX -> \ d.Foo_aBU  ::  {Foo{-r3s,x-} taBX}
+		   {-# L #-}
+		   d.Foo_aBU ->
+	PrelBase.(){-60,w-}{i} {}
 end Rec }

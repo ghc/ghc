@@ -3,160 +3,138 @@
 ================================================================================
 Desugared:
 Rec {
-ds_dsc  :: 
-    _forall_
-    [t{-anl-} t{-ann-}]
-    =>
-    (t{-anl-} -> t{-ann-}, t{-anl-} -> t{-ann-})
+ds_dq1  ::  _forall_ [takN takP] => (takP -> takN, takP -> takN)
 {-# L #-}
-ds_dsc =
-    _/\_ t{-anl-} t{-ann-} ->
+ds_dq1 =
+    _/\_ takN takP ->
 	_letrec_ {
-	  g4_an6  :: 
-	      t{-anl-} -> t{-ann-}
+	  g4_akw  ::  takP -> takN
 	  {-# L #-}
-	  g4_an6 =
-	      \ y_r3w  :: 
-		    t{-anl-}
+	  g4_akw =
+	      \ y_r3w  ::  takP
 		{-# L #-}
 		y_r3w ->
-		  f4_an7
-		      y_r3w;
-	  f4_an7  :: 
-	      t{-anl-} -> t{-ann-}
+		  f4_akx y_r3w;
+	  f4_akx  ::  takP -> takN
 	  {-# L #-}
-	  f4_an7 =
-	      \ x_r3y  :: 
-		    t{-anl-}
+	  f4_akx =
+	      \ x_r3y  ::  takP
 		{-# L #-}
 		x_r3y ->
-		  g4_an6
-		      x_r3y;
+		  g4_akw x_r3y;
 	} in 
-	  PrelTup.(,){-62,p-}{i}
-	      {_@_ (t{-anl-} -> t{-ann-})
-	       _@_ (t{-anl-} -> t{-ann-})
-	       g4_an6
-	       f4_an7}
-g4{-r3A,x-}  :: 
-    _forall_ [t{-anl-} t{-ann-}] => t{-anl-} -> t{-ann-}
+	  PrelTup.(,){-62,w-}{i}
+	      {_@_ (takP -> takN) _@_ (takP -> takN) g4_akw f4_akx}
+g4{-r3A,x-}  ::  _forall_ [takN takP] => takP -> takN
 {-# L #-}
 g4{-r3A,x-} =
-    _/\_ t{-anl-} t{-ann-} ->
+    _/\_ takN takP ->
 	case
-	    ds_dsc
-		_@_ t{-anl-} _@_ t{-ann-}
+	    ds_dq1 _@_ takN _@_ takP
 	of {
-	PrelTup.(,){-62,p-}{i} ds_dth ds_dti  ->
-	ds_dth;}
-f4{-r3z,x-}  :: 
-    _forall_ [t{-anl-} t{-ann-}] => t{-anl-} -> t{-ann-}
+	PrelTup.(,){-62,w-}{i} ds_drz ds_drA  ->
+	ds_drz;}
+f4{-r3z,x-}  ::  _forall_ [takN takP] => takP -> takN
 {-# L #-}
 f4{-r3z,x-} =
-    _/\_ t{-anl-} t{-ann-} ->
+    _/\_ takN takP ->
 	case
-	    ds_dsc
-		_@_ t{-anl-} _@_ t{-ann-}
+	    ds_dq1 _@_ takN _@_ takP
 	of {
-	PrelTup.(,){-62,p-}{i} ds_dtB ds_dtA  ->
-	ds_dtA;}
-end Rec }
-Rec {
-ds_dtM  :: 
-    _forall_
-    [t{-anE-} t{-anG-}]
-    =>
-    (t{-anE-} -> t{-anG-}, t{-anE-} -> t{-anG-})
+	PrelTup.(,){-62,w-}{i} ds_drT ds_drS  ->
+	ds_drS;}
+ds_dqx  ::  _forall_ [tal8 tala] => (tala -> tal8, tala -> tal8)
 {-# L #-}
-ds_dtM =
-    _/\_ t{-anE-} t{-anG-} ->
+ds_dqx =
+    _/\_ tal8 tala ->
 	_letrec_ {
-	  f3_anp  :: 
-	      t{-anE-} -> t{-anG-}
+	  f3_akR  ::  tala -> tal8
 	  {-# L #-}
-	  f3_anp =
-	      \ x_r3s  :: 
-		    t{-anE-}
+	  f3_akR =
+	      \ x_r3s  ::  tala
 		{-# L #-}
 		x_r3s ->
-		  g3_anq
-		      x_r3s;
-	  g3_anq  :: 
-	      t{-anE-} -> t{-anG-}
+		  g3_akS x_r3s;
+	  g3_akS  ::  tala -> tal8
 	  {-# L #-}
-	  g3_anq =
-	      \ y_r3u  :: 
-		    t{-anE-}
+	  g3_akS =
+	      \ y_r3u  ::  tala
 		{-# L #-}
 		y_r3u ->
-		  f3_anp
-		      y_r3u;
+		  f3_akR y_r3u;
 	} in 
-	  PrelTup.(,){-62,p-}{i}
-	      {_@_ (t{-anE-} -> t{-anG-})
-	       _@_ (t{-anE-} -> t{-anG-})
-	       f3_anp
-	       g3_anq}
-f3{-r3C,x-}  :: 
-    _forall_ [t{-anE-} t{-anG-}] => t{-anE-} -> t{-anG-}
+	  PrelTup.(,){-62,w-}{i}
+	      {_@_ (tala -> tal8) _@_ (tala -> tal8) f3_akR g3_akS}
+f3{-r3C,x-}  ::  _forall_ [tal8 tala] => tala -> tal8
 {-# L #-}
 f3{-r3C,x-} =
-    _/\_ t{-anE-} t{-anG-} ->
+    _/\_ tal8 tala ->
 	case
-	    ds_dtM
-		_@_ t{-anE-} _@_ t{-anG-}
+	    ds_dqx _@_ tal8 _@_ tala
 	of {
-	PrelTup.(,){-62,p-}{i} ds_duR ds_duS  ->
-	ds_duR;}
-g3{-r3B,x-}  :: 
-    _forall_ [t{-anE-} t{-anG-}] => t{-anE-} -> t{-anG-}
+	PrelTup.(,){-62,w-}{i} ds_dsQ ds_dsR  ->
+	ds_dsQ;}
+g3{-r3B,x-}  ::  _forall_ [tal8 tala] => tala -> tal8
 {-# L #-}
 g3{-r3B,x-} =
-    _/\_ t{-anE-} t{-anG-} ->
+    _/\_ tal8 tala ->
 	case
-	    ds_dtM
-		_@_ t{-anE-} _@_ t{-anG-}
+	    ds_dqx _@_ tal8 _@_ tala
 	of {
-	PrelTup.(,){-62,p-}{i} ds_dvb ds_dva  ->
-	ds_dva;}
-end Rec }
-g2{-r3E,x-}  :: 
-    _forall_ [t{-anO-}] => t{-anO-} -> t{-anO-}
+	PrelTup.(,){-62,w-}{i} ds_dta ds_dt9  ->
+	ds_dt9;}
+g2{-r3E,x-}  ::  _forall_ [tall] => tall -> tall
 {-# L #-}
 g2{-r3E,x-} =
-    _/\_ t{-anO-} -> \ y_r3o  :: 
-			   t{-anO-}
-		       {-# L #-}
-		       y_r3o ->
-	y_r3o
-f2{-r3D,x-}  :: 
-    _forall_ [t{-anU-}] => t{-anU-} -> t{-anU-}
+    _/\_ tall ->
+	_letrec_ {
+	  g2_alc  ::  tall -> tall
+	  {-# L #-}
+	  g2_alc =
+	      \ y_r3o  ::  tall
+		{-# L #-}
+		y_r3o ->
+		  y_r3o;
+	} in  g2_alc
+f2{-r3D,x-}  ::  _forall_ [talw] => talw -> talw
 {-# L #-}
 f2{-r3D,x-} =
-    _/\_ t{-anU-} -> \ x_r3q  :: 
-			   t{-anU-}
-		       {-# L #-}
-		       x_r3q ->
-	g2{-r3E,x-}
-	    _@_ t{-anU-} x_r3q
-g1{-r3F,x-}  :: 
-    _forall_ [t{-ao4-}] => t{-ao4-} -> t{-ao4-}
+    _/\_ talw ->
+	_letrec_ {
+	  f2_aln  ::  talw -> talw
+	  {-# L #-}
+	  f2_aln =
+	      \ x_r3q  ::  talw
+		{-# L #-}
+		x_r3q ->
+		  g2{-r3E,x-} _@_ talw x_r3q;
+	} in  f2_aln
+g1{-r3F,x-}  ::  _forall_ [talH] => talH -> talH
 {-# L #-}
 g1{-r3F,x-} =
-    _/\_ t{-ao4-} -> \ y_r3m  :: 
-			   t{-ao4-}
-		       {-# L #-}
-		       y_r3m ->
-	y_r3m
-f1{-r3G,x-}  :: 
-    _forall_ [t{-aoa-}] => t{-aoa-} -> t{-aoa-}
+    _/\_ talH ->
+	_letrec_ {
+	  g1_aly  ::  talH -> talH
+	  {-# L #-}
+	  g1_aly =
+	      \ y_r3m  ::  talH
+		{-# L #-}
+		y_r3m ->
+		  y_r3m;
+	} in  g1_aly
+f1{-r3G,x-}  ::  _forall_ [talS] => talS -> talS
 {-# L #-}
 f1{-r3G,x-} =
-    _/\_ t{-aoa-} -> \ x_r3k  :: 
-			   t{-aoa-}
-		       {-# L #-}
-		       x_r3k ->
-	g1{-r3F,x-}
-	    _@_ t{-aoa-} x_r3k
+    _/\_ talS ->
+	_letrec_ {
+	  f1_alJ  ::  talS -> talS
+	  {-# L #-}
+	  f1_alJ =
+	      \ x_r3k  ::  talS
+		{-# L #-}
+		x_r3k ->
+		  g1{-r3F,x-} _@_ talS x_r3k;
+	} in  f1_alJ
+end Rec }
 
 NOTE: Simplifier still going after 4 iterations; bailing out.

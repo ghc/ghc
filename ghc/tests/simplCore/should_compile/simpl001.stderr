@@ -2,110 +2,97 @@
 
 ================================================================================
 Simplified:
-++++{-r3h,x-}  :: 
-    _forall_
-    [a{-auX-} b{-auY-}]
-    =>
-    (a{-auX-} -> (b{-auY-} -> a{-auX-}) -> b{-auY-})
-    -> (a{-auX-} -> (b{-auY-} -> a{-auX-}) -> b{-auY-})
-    -> a{-auX-}
-    -> (b{-auY-} -> a{-auX-})
-    -> b{-auY-}
+++++{-r3h,x-}  ::  _forall_
+		   [tark tarl]
+		   =>
+		   (tark -> (tarl -> tark) -> tarl)
+		   -> (tark -> (tarl -> tark) -> tarl)
+		   -> tark
+		   -> (tarl -> tark)
+		   -> tarl
 _A>_ 2 {-# L #-}
 ++++{-r3h,x-} =
-    _/\_ a{-sE8-} b{-sE9-} -> \ x_sDl  :: 
-				    a{-sE8-} -> (b{-sE9-} -> a{-sE8-}) -> b{-sE9-}
+    _/\_ $x0_tsEh $x1_tsEi -> \ $x2_sDp  ::  $x0_tsEh
+					     -> ($x1_tsEi -> $x0_tsEh)
+					     -> $x1_tsEi
 				{-# L #-}
-				x_sDl y_sCR  :: 
-					  a{-sE8-} -> (b{-sE9-} -> a{-sE8-}) -> b{-sE9-}
-				      {-# L #-}
-				      y_sCR ->
-	y_sCR
-g{-r3j,x-}  :: 
-    _forall_
-    [a{-avh-} b{-avi-} rk0{-avq-}]
-    =>
-    {PrelBase.Functor{-2b,p-} rk0{-avq-}}
-    -> (a{-avh-} -> (b{-avi-} -> a{-avh-}) -> b{-avi-})
-    -> rk0{-avq-} (a{-avh-} -> (b{-avi-} -> a{-avh-}) -> b{-avi-})
-    -> rk0{-avq-} (a{-avh-} -> (b{-avi-} -> a{-avh-}) -> b{-avi-})
+				$x2_sDp $x3_sCV  ::  $x0_tsEh -> ($x1_tsEi -> $x0_tsEh) -> $x1_tsEi
+					{-# L #-}
+					$x3_sCV ->
+	$x3_sCV
+g{-r3i,x-}  ::  _forall_
+		[aarD tarO tarQ]
+		=>
+		{PrelBase.Functor{-2b,p-} aarD}
+		-> (tarO -> (tarQ -> tarO) -> tarQ)
+		-> aarD (tarO -> (tarQ -> tarO) -> tarQ)
+		-> aarD (tarO -> (tarQ -> tarO) -> tarQ)
 _A>_ 3 {-# L #-}
-g{-r3j,x-} =
-    _/\_ a{-sEd-} b{-sEe-} rk0{-sEf-} -> \ d.Functor_sDp  :: 
-					       {PrelBase.Functor{-2b,p-} rk0{-sEf-}}
-					   {-# L #-}
-					   d.Functor_sDp a_sDk  :: 
-							     a{-sEd-}
-							     -> (b{-sEe-} -> a{-sEd-})
-							     -> b{-sEe-}
+g{-r3i,x-} =
+    _/\_ $x0_asEl $x1_tsEj $x2_tsEk -> \ $x3_sDt  ::  {PrelBase.Functor{-2b,p-} $x0_asEl}
+					 {-# L #-}
+					 $x3_sDt $x4_sDo  ::  $x1_tsEj
+							      -> ($x2_tsEk -> $x1_tsEj)
+							      -> $x2_tsEk
+						 {-# L #-}
+						 $x4_sDo $x5_sE2  ::  $x0_asEl ($x1_tsEj
+										-> ($x2_tsEk
+										    -> $x1_tsEj)
+										-> $x2_tsEk)
 							 {-# L #-}
-							 a_sDk xs_sDV  :: 
-								   rk0{-sEf-} (a{-sEd-}
-									       -> (b{-sEe-}
-										   -> a{-sEd-})
-									       -> b{-sEe-})
-							       {-# L #-}
-							       xs_sDV ->
+							 $x5_sE2 ->
 	let {
-	  ds_sDr  :: 
-	      (a{-sEd-} -> (b{-sEe-} -> a{-sEd-}) -> b{-sEe-})
-	      -> a{-sEd-}
-	      -> (b{-sEe-} -> a{-sEd-})
-	      -> b{-sEe-}
+	  $x7_sDv  ::  ($x1_tsEj -> ($x2_tsEk -> $x1_tsEj) -> $x2_tsEk)
+		       -> $x1_tsEj
+		       -> ($x2_tsEk -> $x1_tsEj)
+		       -> $x2_tsEk
 	  _A>_ 1 {-# L #-}
-	  ds_sDr =
-	      \ ds_sDq  :: 
-		    a{-sEd-} -> (b{-sEe-} -> a{-sEd-}) -> b{-sEe-}
+	  $x7_sDv =
+	      \ $x6_sDu  ::  $x1_tsEj -> ($x2_tsEk -> $x1_tsEj) -> $x2_tsEk
 		{-# L #-}
-		ds_sDq ->
-		  a_sDk
+		$x6_sDu ->
+		  $x4_sDo
 	} in 
-	  d.Functor_sDp
-	      _@_ (a{-sEd-} -> (b{-sEe-} -> a{-sEd-}) -> b{-sEe-})
-	      _@_ (a{-sEd-} -> (b{-sEe-} -> a{-sEd-}) -> b{-sEe-})
-	      ds_sDr
-	      xs_sDV
-h{-r3i,x-}  :: 
-    _forall_
-    [a{-avI-} b{-avK-} rk0{-avT-}]
-    =>
-    {PrelBase.Functor{-2b,p-} rk0{-avT-}}
-    -> (a{-avI-} -> (b{-avK-} -> a{-avI-}) -> b{-avK-})
-    -> rk0{-avT-} (a{-avI-} -> (b{-avK-} -> a{-avI-}) -> b{-avK-})
-    -> rk0{-avT-} (a{-avI-} -> (b{-avK-} -> a{-avI-}) -> b{-avK-})
+	  $x3_sDt
+	      _@_ ($x1_tsEj -> ($x2_tsEk -> $x1_tsEj) -> $x2_tsEk)
+	      _@_ ($x1_tsEj -> ($x2_tsEk -> $x1_tsEj) -> $x2_tsEk)
+	      $x7_sDv
+	      $x5_sE2
+h{-r3j,x-}  ::  _forall_
+		[aas8 task tasm]
+		=>
+		{PrelBase.Functor{-2b,p-} aas8}
+		-> (task -> (tasm -> task) -> tasm)
+		-> aas8 (task -> (tasm -> task) -> tasm)
+		-> aas8 (task -> (tasm -> task) -> tasm)
 _A>_ 3 {-# L #-}
-h{-r3i,x-} =
-    _/\_ a{-sEl-} b{-sEm-} rk0{-sEn-} -> \ d.Functor_sDZ  :: 
-					       {PrelBase.Functor{-2b,p-} rk0{-sEn-}}
-					   {-# L #-}
-					   d.Functor_sDZ b_sEg  :: 
-							     a{-sEl-}
-							     -> (b{-sEm-} -> a{-sEl-})
-							     -> b{-sEm-}
+h{-r3j,x-} =
+    _/\_ $x0_asEu $x1_tsEs $x2_tsEt -> \ $x3_sE6  ::  {PrelBase.Functor{-2b,p-} $x0_asEu}
+					 {-# L #-}
+					 $x3_sE6 $x4_sEm  ::  $x1_tsEs
+							      -> ($x2_tsEt -> $x1_tsEs)
+							      -> $x2_tsEt
+						 {-# L #-}
+						 $x4_sEm $x5_sEn  ::  $x0_asEu ($x1_tsEs
+										-> ($x2_tsEt
+										    -> $x1_tsEs)
+										-> $x2_tsEt)
 							 {-# L #-}
-							 b_sEg xs_sEh  :: 
-								   rk0{-sEn-} (a{-sEl-}
-									       -> (b{-sEm-}
-										   -> a{-sEl-})
-									       -> b{-sEm-})
-							       {-# L #-}
-							       xs_sEh ->
+							 $x5_sEn ->
 	let {
-	  ds_sE0  :: 
-	      (a{-sEl-} -> (b{-sEm-} -> a{-sEl-}) -> b{-sEm-})
-	      -> a{-sEl-}
-	      -> (b{-sEm-} -> a{-sEl-})
-	      -> b{-sEm-}
+	  $x7_sE7  ::  ($x1_tsEs -> ($x2_tsEt -> $x1_tsEs) -> $x2_tsEt)
+		       -> $x1_tsEs
+		       -> ($x2_tsEt -> $x1_tsEs)
+		       -> $x2_tsEt
 	  _A>_ 1 {-# L #-}
-	  ds_sE0 =
-	      \ ds_sDU  :: 
-		    a{-sEl-} -> (b{-sEm-} -> a{-sEl-}) -> b{-sEm-}
+	  $x7_sE7 =
+	      \ $x6_sDY  ::  $x1_tsEs -> ($x2_tsEt -> $x1_tsEs) -> $x2_tsEt
 		{-# L #-}
-		ds_sDU ->
-		  ds_sDU
+		$x6_sDY ->
+		  $x6_sDY
 	} in 
-	  d.Functor_sDZ
-	      _@_ (a{-sEl-} -> (b{-sEm-} -> a{-sEl-}) -> b{-sEm-})
-	      _@_ (a{-sEl-} -> (b{-sEm-} -> a{-sEl-}) -> b{-sEm-})
-	      ds_sE0
-	      xs_sEh
+	  $x3_sE6
+	      _@_ ($x1_tsEs -> ($x2_tsEt -> $x1_tsEs) -> $x2_tsEt)
+	      _@_ ($x1_tsEs -> ($x2_tsEt -> $x1_tsEs) -> $x2_tsEt)
+	      $x7_sE7
+	      $x5_sEn

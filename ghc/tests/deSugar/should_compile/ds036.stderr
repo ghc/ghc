@@ -1,539 +1,382 @@
-ds036.hs:44: 
-    Warning: Possibly incomplete patterns
-	in the definition of function `kh'
 ds036.hs:22: 
     Warning: Possibly incomplete patterns
 	in the definition of function `brack''
+ds036.hs:44: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `kh'
 
 
 ================================================================================
 Desugared:
 Rec {
-d.Num_aZF  :: 
-    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
-{-# L #-}
-d.Num_aZF =
-    PrelBase.$d3{-rbz,p-}
-fromInt_a19P  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
-{-# L #-}
-fromInt_a19P =
-    PrelBase.fromInt{-8R,p-}
-	_@_ PrelBase.Int{-3g,p-} d.Num_aZF
-lit_a1a1  :: 
-    PrelBase.Int{-3g,p-}
-{-# L #-}
-lit_a1a1 =
-    let {
-      ds_d1aS  :: 
-	  PrelBase.Int{-3g,p-}
-      {-# L #-}
-      ds_d1aS =
-	  PrelBase.I#{-5b,p-}{i}
-	      0
-    } in 
-      fromInt_a19P
-	  ds_d1aS
-d.Eq_aZI  :: 
-    {PrelBase.Eq{-23,p-} PrelBase.Int{-3g,p-}}
-{-# L #-}
-d.Eq_aZI =
-    PrelBase.$d7{-rc5,p-}
-==_a1a0  :: 
-    PrelBase.Int{-3g,p-}
-    -> PrelBase.Int{-3g,p-}
-    -> PrelBase.Bool{-34,p-}
-{-# L #-}
-==_a1a0 =
-    PrelBase.=={-8Y,p-}
-	_@_ PrelBase.Int{-3g,p-} d.Eq_aZI
-fromInt_a19Z  :: 
-    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
-{-# L #-}
-fromInt_a19Z =
-    fromInt_a19P
-lit_a19Y  :: 
-    PrelBase.Int{-3g,p-}
-{-# L #-}
-lit_a19Y =
-    let {
-      ds_d1bg  :: 
-	  PrelBase.Int{-3g,p-}
-      {-# L #-}
-      ds_d1bg =
-	  PrelBase.I#{-5b,p-}{i}
-	      1
-    } in 
-      fromInt_a19Z
-	  ds_d1bg
-d.Ord_aZM  :: 
-    {PrelBase.Ord{-2d,p-} PrelBase.Int{-3g,p-}}
-{-# L #-}
-d.Ord_aZM =
-    PrelBase.$d6{-rc4,p-}
->=_a19X  :: 
-    PrelBase.Int{-3g,p-}
-    -> PrelBase.Int{-3g,p-}
-    -> PrelBase.Bool{-34,p-}
-{-# L #-}
->=_a19X =
-    PrelBase.>={-8Z,p-}
-	_@_ PrelBase.Int{-3g,p-} d.Ord_aZM
-d.Num_aZP  :: 
-    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
-{-# L #-}
-d.Num_aZP =
-    d.Num_aZF
--_a19W  :: 
-    PrelBase.Int{-3g,p-}
-    -> PrelBase.Int{-3g,p-}
-    -> PrelBase.Int{-3g,p-}
-{-# L #-}
--_a19W =
-    PrelBase.-{-817,p-}
-	_@_ PrelBase.Int{-3g,p-} d.Num_aZP
-kh{-r3g,x-}  :: 
-    _forall_
-    [t{-aYd-}]
-    =>
-    {PrelBase.Num{-2c,p-} t{-aYd-}}
-    -> {PrelBase.Ord{-2d,p-} t{-aYd-}}
-    -> t{-aYd-}
-    -> t{-aYd-}
-    -> t{-aYd-}
+kh{-r3g,x-}  ::  _forall_
+		 [taSF]
+		 =>
+		 {PrelBase.Num{-2c,p-} taSF}
+		 -> {PrelBase.Ord{-2d,p-} taSF}
+		 -> taSF
+		 -> taSF
+		 -> taSF
 {-# L #-}
 kh{-r3g,x-} =
-    _/\_ t{-aYd-} -> \ d.Num_aYs  :: 
-			   {PrelBase.Num{-2c,p-} t{-aYd-}}
-		       {-# L #-}
-		       d.Num_aYs d.Ord_aYu  :: 
-				     {PrelBase.Ord{-2d,p-} t{-aYd-}}
-				 {-# L #-}
-				 d.Ord_aYu ->
-	let {
-	  fromInt_a1cx  :: 
-	      PrelBase.Int{-3g,p-} -> t{-aYd-}
+    _/\_ taSF -> \ d.Num_aSU  ::  {PrelBase.Num{-2c,p-} taSF}
+		   {-# L #-}
+		   d.Num_aSU d.Ord_aSW  ::  {PrelBase.Ord{-2d,p-} taSF}
+			     {-# L #-}
+			     d.Ord_aSW ->
+	_letrec_ {
+	  fromInt_a14h  ::  PrelBase.Int{-3g,W-} -> taSF
 	  {-# L #-}
-	  fromInt_a1cx =
-	      PrelBase.fromInt{-8R,p-}
-		  _@_ t{-aYd-} d.Num_aYs } in
-	let { lit_a1cw  :: 
-		  t{-aYd-}
-	      {-# L #-}
-	      lit_a1cw =
-	  let {
-	    ds_d1cN  :: 
-		PrelBase.Int{-3g,p-}
-	    {-# L #-}
-	    ds_d1cN =
-		PrelBase.I#{-5b,p-}{i}
-		    2
-	  } in 
-	    fromInt_a1cx
-		ds_d1cN
-	} in
-	let {
-	  >=_a1cv  :: 
-	      t{-aYd-} -> t{-aYd-} -> PrelBase.Bool{-34,p-}
+	  fromInt_a14h =
+	      PrelBase.fromInt{-8R,p-} _@_ taSF d.Num_aSU;
+	  lit_a14t  ::  taSF
 	  {-# L #-}
-	  >=_a1cv =
-	      PrelBase.>={-8Z,p-}
-		  _@_ t{-aYd-} d.Ord_aYu } in
-	let {
-	  d.Num_aYw  :: 
-	      {PrelBase.Num{-2c,p-} t{-aYd-}}
-	  {-# L #-}
-	  d.Num_aYw =
-	      d.Num_aYs } in
-	let {
-	  -_a1cu  :: 
-	      t{-aYd-} -> t{-aYd-} -> t{-aYd-}
-	  {-# L #-}
-	  -_a1cu =
-	      PrelBase.-{-817,p-}
-		  _@_ t{-aYd-} d.Num_aYw } in
-	let {
-	  d.Ord_aYy  :: 
-	      {PrelBase.Ord{-2d,p-} t{-aYd-}}
-	  {-# L #-}
-	  d.Ord_aYy =
-	      d.Ord_aYu } in
-	let {
-	  >_a1ct  :: 
-	      t{-aYd-} -> t{-aYd-} -> PrelBase.Bool{-34,p-}
-	  {-# L #-}
-	  >_a1ct =
-	      PrelBase.>{-rdf,p-}
-		  _@_ t{-aYd-} d.Ord_aYy } in
-	let {
-	  d.Num_aYA  :: 
-	      {PrelBase.Num{-2c,p-} t{-aYd-}}
-	  {-# L #-}
-	  d.Num_aYA =
-	      d.Num_aYs } in
-	let {
-	  *_a1cs  :: 
-	      t{-aYd-} -> t{-aYd-} -> t{-aYd-}
-	  {-# L #-}
-	  *_a1cs =
-	      PrelBase.*{-rd8,p-}
-		  _@_ t{-aYd-} d.Num_aYA } in
-	let {
-	  lit_a1cr  :: 
-	      t{-aYd-}
-	  {-# L #-}
-	  lit_a1cr =
-	      lit_a1cw } in
-	let {
-	  fromInt_a1cq  :: 
-	      PrelBase.Int{-3g,p-} -> t{-aYd-}
-	  {-# L #-}
-	  fromInt_a1cq =
-	      fromInt_a1cx } in
-	let { lit_a1cp  :: 
-		  t{-aYd-}
-	      {-# L #-}
-	      lit_a1cp =
-	  let {
-	    ds_d1dC  :: 
-		PrelBase.Int{-3g,p-}
-	    {-# L #-}
-	    ds_d1dC =
-		PrelBase.I#{-5b,p-}{i}
-		    1
-	  } in 
-	    fromInt_a1cq
-		ds_d1dC
-	} in
-	let {
-	  >=_a1co  :: 
-	      t{-aYd-} -> t{-aYd-} -> PrelBase.Bool{-34,p-}
-	  {-# L #-}
-	  >=_a1co =
-	      >=_a1cv } in
-	let {
-	  -_a1cn  :: 
-	      t{-aYd-} -> t{-aYd-} -> t{-aYd-}
-	  {-# L #-}
-	  -_a1cn =
-	      -_a1cu } in
-	let {
-	  lit_a1cm  :: 
-	      t{-aYd-}
-	  {-# L #-}
-	  lit_a1cm =
-	      lit_a1cp } in
-	let {
-	  >=_a1cl  :: 
-	      t{-aYd-} -> t{-aYd-} -> PrelBase.Bool{-34,p-}
-	  {-# L #-}
-	  >=_a1cl =
-	      >=_a1cv } in
-	let {
-	  -_a1ck  :: 
-	      t{-aYd-} -> t{-aYd-} -> t{-aYd-}
-	  {-# L #-}
-	  -_a1ck =
-	      -_a1cu
-	} in 
-	  \ ds_d1e9  :: 
-		t{-aYd-}
-	    {-# L #-}
-	    ds_d1e9 x_r3H  :: 
-			t{-aYd-}
-		    {-# L #-}
-		    x_r3H ->
+	  lit_a14t =
 	      let {
-		fail_d1em  :: 
-		    t{-aYd-}
+		ds_d16u  ::  PrelBase.Int{-3g,W-}
 		{-# L #-}
-		fail_d1em =
-		    GHCerr.patError{-8r,p-}
-			_@_ t{-aYd-} _string_ "ds036.hs:44|function `kh'" } in
+		ds_d16u =
+		    PrelBase.I#{-5b,w-}{i} 2
+	      } in  fromInt_a14h ds_d16u;
+	  >=_a14u  ::  taSF -> taSF -> PrelBase.Bool{-34,W-}
+	  {-# L #-}
+	  >=_a14u =
+	      PrelBase.>={-8Z,p-} _@_ taSF d.Ord_aSW;
+	  d.Num_aSY  ::  {PrelBase.Num{-2c,p-} taSF}
+	  {-# L #-}
+	  d.Num_aSY =
+	      d.Num_aSU;
+	  -_a14v  ::  taSF -> taSF -> taSF
+	  {-# L #-}
+	  -_a14v =
+	      PrelBase.-{-817,p-} _@_ taSF d.Num_aSY;
+	  d.Ord_aT0  ::  {PrelBase.Ord{-2d,p-} taSF}
+	  {-# L #-}
+	  d.Ord_aT0 =
+	      d.Ord_aSW;
+	  >_a14w  ::  taSF -> taSF -> PrelBase.Bool{-34,W-}
+	  {-# L #-}
+	  >_a14w =
+	      PrelBase.>{-rfI,p-} _@_ taSF d.Ord_aT0;
+	  d.Num_aT2  ::  {PrelBase.Num{-2c,p-} taSF}
+	  {-# L #-}
+	  d.Num_aT2 =
+	      d.Num_aSU;
+	  *_a14x  ::  taSF -> taSF -> taSF
+	  {-# L #-}
+	  *_a14x =
+	      PrelBase.*{-rfB,p-} _@_ taSF d.Num_aT2;
+	  lit_a14y  ::  taSF
+	  {-# L #-}
+	  lit_a14y =
+	      lit_a14t;
+	  fromInt_a14z  ::  PrelBase.Int{-3g,W-} -> taSF
+	  {-# L #-}
+	  fromInt_a14z =
+	      fromInt_a14h;
+	  lit_a14A  ::  taSF
+	  {-# L #-}
+	  lit_a14A =
 	      let {
-		fail_d1fO  :: 
-		    t{-aYd-}
+		ds_d17j  ::  PrelBase.Int{-3g,W-}
 		{-# L #-}
-		fail_d1fO =
-		    case
-			(\ ds_d1eg  :: 
-			       t{-aYd-}
-			   {-# L #-}
-			   ds_d1eg ->
-			     >=_a1co
-				 ds_d1eg lit_a1cp)
-			    ds_d1e9
-		    of {
-		      PrelBase.True{-5E,p-}{i} ->
-			  let {
-			    x_r3J  :: 
-				t{-aYd-}
-			    {-# L #-}
-			    x_r3J =
-				(\ ds_d1eG  :: 
-				       t{-aYd-}
-				   {-# L #-}
-				   ds_d1eG ->
-				     -_a1cn
-					 ds_d1eG lit_a1cp)
-				    ds_d1e9
-			  } in 
-			    case
-				(\ ds_d1eW  :: 
-				       t{-aYd-}
-				   {-# L #-}
-				   ds_d1eW ->
-				     >=_a1cl
-					 ds_d1eW lit_a1cm)
-				    x_r3H
-			    of {
-			      PrelBase.True{-5E,p-}{i} ->
-				  (\ ds_d1fk  :: 
-					 t{-aYd-}
-				     {-# L #-}
-				     ds_d1fk ->
-				       -_a1ck
-					   ds_d1fk lit_a1cm)
-				      x_r3H;
-			      PrelBase.False{-58,p-}{i} ->
-				  fail_d1em;
-			    };
-		      PrelBase.False{-58,p-}{i} ->
-			  fail_d1em;
-		    }
-	      } in 
-		case
-		    (\ ds_d1fI  :: 
-			   t{-aYd-}
-		       {-# L #-}
-		       ds_d1fI ->
-			 >=_a1cv
-			     ds_d1fI lit_a1cw)
-			ds_d1e9
-		of {
-		  PrelBase.True{-5E,p-}{i} ->
-		      let {
-			n_r3F  :: 
-			    t{-aYd-}
+		ds_d17j =
+		    PrelBase.I#{-5b,w-}{i} 1
+	      } in  fromInt_a14z ds_d17j;
+	  >=_a14B  ::  taSF -> taSF -> PrelBase.Bool{-34,W-}
+	  {-# L #-}
+	  >=_a14B =
+	      >=_a14u;
+	  -_a14C  ::  taSF -> taSF -> taSF
+	  {-# L #-}
+	  -_a14C =
+	      -_a14v;
+	  lit_a14D  ::  taSF
+	  {-# L #-}
+	  lit_a14D =
+	      lit_a14A;
+	  >=_a14E  ::  taSF -> taSF -> PrelBase.Bool{-34,W-}
+	  {-# L #-}
+	  >=_a14E =
+	      >=_a14u;
+	  -_a14F  ::  taSF -> taSF -> taSF
+	  {-# L #-}
+	  -_a14F =
+	      -_a14v;
+	  kh_aSk  ::  taSF -> taSF -> taSF
+	  {-# L #-}
+	  kh_aSk =
+	      \ ds_d17R  ::  taSF
+		{-# L #-}
+		ds_d17R x_r3x  ::  taSF
 			{-# L #-}
-			n_r3F =
-			    (\ ds_d1g8  :: 
-				   t{-aYd-}
-			       {-# L #-}
-			       ds_d1g8 ->
-				 -_a1cu
-				     ds_d1g8 lit_a1cw)
-				ds_d1e9
-		      } in 
+			x_r3x ->
+		  let {
+		    fail_d184  ::  taSF
+		    {-# L #-}
+		    fail_d184 =
+			GHCerr.patError{-8r,w-}
+			    _@_ taSF _string_ "ds036.hs:44|function `kh'" } in
+		  let {
+		    fail_d19w  ::  taSF
+		    {-# L #-}
+		    fail_d19w =
 			case
-			    >_a1ct
-				x_r3H n_r3F
+			    (\ ds_d17Y  ::  taSF
+			       {-# L #-}
+			       ds_d17Y ->
+				 >=_a14B ds_d17Y lit_a14A)
+				ds_d17R
 			of {
-			  PrelBase.True{-5E,p-}{i} ->
-			      *_a1cs
-				  x_r3H lit_a1cr;
-			  PrelBase.False{-58,p-}{i} ->
-			      fail_d1fO;
-			};
-		  PrelBase.False{-58,p-}{i} ->
-		      fail_d1fO;
-		}
-brack'{-r3f,x-}  :: 
-    _forall_
-    [a{-aYI-}]
-    =>
-    {PrelBase.Eq{-23,p-} a{-aYI-}}
-    -> a{-aYI-}
-    -> a{-aYI-}
-    -> PrelBase.Int{-3g,p-}
-    -> [a{-aYI-}]
-    -> ([a{-aYI-}], [a{-aYI-}])
+			  PrelBase.True{-5E,w-}{i} ->
+			      let {
+				x_r3z  ::  taSF
+				{-# L #-}
+				x_r3z =
+				    (\ ds_d18o  ::  taSF
+				       {-# L #-}
+				       ds_d18o ->
+					 -_a14C ds_d18o lit_a14A)
+					ds_d17R
+			      } in 
+				case
+				    (\ ds_d18E  ::  taSF
+				       {-# L #-}
+				       ds_d18E ->
+					 >=_a14E ds_d18E lit_a14D)
+					x_r3x
+				of {
+				  PrelBase.True{-5E,w-}{i} ->
+				      (\ ds_d192  ::  taSF
+					 {-# L #-}
+					 ds_d192 ->
+					   -_a14F ds_d192 lit_a14D)
+					  x_r3x;
+				  PrelBase.False{-58,w-}{i} -> fail_d184;
+				};
+			  PrelBase.False{-58,w-}{i} -> fail_d184;
+			}
+		  } in 
+		    case
+			(\ ds_d19q  ::  taSF
+			   {-# L #-}
+			   ds_d19q ->
+			     >=_a14u ds_d19q lit_a14t)
+			    ds_d17R
+		    of {
+		      PrelBase.True{-5E,w-}{i} ->
+			  let {
+			    n_r3w  ::  taSF
+			    {-# L #-}
+			    n_r3w =
+				(\ ds_d19Q  ::  taSF
+				   {-# L #-}
+				   ds_d19Q ->
+				     -_a14v ds_d19Q lit_a14t)
+				    ds_d17R
+			  } in 
+			    case >_a14w x_r3x n_r3w of {
+			      PrelBase.True{-5E,w-}{i} -> *_a14x x_r3x lit_a14y;
+			      PrelBase.False{-58,w-}{i} -> fail_d19w;
+			    };
+		      PrelBase.False{-58,w-}{i} -> fail_d19w;
+		    };
+	} in  kh_aSk
+brack'{-r3f,x-}  ::  _forall_
+		     [taTa]
+		     =>
+		     {PrelBase.Eq{-23,p-} taTa}
+		     -> taTa
+		     -> taTa
+		     -> PrelBase.Int{-3g,W-}
+		     -> [taTa]
+		     -> ([taTa], [taTa])
 {-# L #-}
 brack'{-r3f,x-} =
-    _/\_ a{-aYI-} -> \ d.Eq_aZs  :: 
-			   {PrelBase.Eq{-23,p-} a{-aYI-}}
-		       {-# L #-}
-		       d.Eq_aZs ->
-	let {
-	  lit_a1h1  :: 
-	      PrelBase.Int{-3g,p-}
+    _/\_ taTa -> \ d.Eq_aU7  ::  {PrelBase.Eq{-23,p-} taTa}
+		   {-# L #-}
+		   d.Eq_aU7 ->
+	_letrec_ {
+	  lit_a1aE  ::  PrelBase.Int{-3g,W-}
 	  {-# L #-}
-	  lit_a1h1 =
-	      lit_a19Y } in
-	let {
-	  >=_a1h0  :: 
-	      PrelBase.Int{-3g,p-}
-	      -> PrelBase.Int{-3g,p-}
-	      -> PrelBase.Bool{-34,p-}
+	  lit_a1aE =
+	      lit_a14q;
+	  >=_a1aG  ::  PrelBase.Int{-3g,W-}
+		       -> PrelBase.Int{-3g,W-}
+		       -> PrelBase.Bool{-34,W-}
 	  {-# L #-}
-	  >=_a1h0 =
-	      >=_a19X } in
-	let {
-	  -_a1gZ  :: 
-	      PrelBase.Int{-3g,p-}
-	      -> PrelBase.Int{-3g,p-}
-	      -> PrelBase.Int{-3g,p-}
+	  >=_a1aG =
+	      >=_a14r;
+	  -_a1aH  ::  PrelBase.Int{-3g,W-}
+		      -> PrelBase.Int{-3g,W-}
+		      -> PrelBase.Int{-3g,W-}
 	  {-# L #-}
-	  -_a1gZ =
-	      -_a19W } in
-	let {
-	  d.Eq_aZC  :: 
-	      {PrelBase.Eq{-23,p-} a{-aYI-}}
+	  -_a1aH =
+	      -_a14s;
+	  d.Eq_aUf  ::  {PrelBase.Eq{-23,p-} taTa}
 	  {-# L #-}
-	  d.Eq_aZC =
-	      d.Eq_aZs } in
-	let {
-	  ==_a1gY  :: 
-	      a{-aYI-} -> a{-aYI-} -> PrelBase.Bool{-34,p-}
+	  d.Eq_aUf =
+	      d.Eq_aU7;
+	  ==_a1aI  ::  taTa -> taTa -> PrelBase.Bool{-34,W-}
 	  {-# L #-}
-	  ==_a1gY =
-	      PrelBase.=={-8Y,p-}
-		  _@_ a{-aYI-} d.Eq_aZC
-	} in 
-	  \ open_r3i  :: 
-		a{-aYI-}
-	    {-# L #-}
-	    open_r3i close_r3k  :: 
-			 a{-aYI-}
-		     {-# L #-}
-		     close_r3k ds_d1hB  :: 
-				   PrelBase.Int{-3g,p-}
-			       {-# L #-}
-			       ds_d1hB xs_r3n  :: 
-					   [a{-aYI-}]
-				       {-# L #-}
-				       xs_r3n ->
-	      let {
-		fail_d1hO  :: 
-		    ([a{-aYI-}], [a{-aYI-}])
+	  ==_a1aI =
+	      PrelBase.=={-8Y,p-} _@_ taTa d.Eq_aUf;
+	  brack'_aT7  ::  taTa
+			  -> taTa
+			  -> PrelBase.Int{-3g,W-}
+			  -> [taTa]
+			  -> ([taTa], [taTa])
+	  {-# L #-}
+	  brack'_aT7 =
+	      \ open_r3i  ::  taTa
 		{-# L #-}
-		fail_d1hO =
-		    GHCerr.patError{-8r,p-}
-			_@_ ([a{-aYI-}], [a{-aYI-}])
-			_string_ "ds036.hs:22|function `brack''" } in
-	      let {
-		fail_d1jT  :: 
-		    ([a{-aYI-}], [a{-aYI-}])
-		{-# L #-}
-		fail_d1jT =
-		    case
-			(\ ds_d1hI  :: 
-			       PrelBase.Int{-3g,p-}
-			   {-# L #-}
-			   ds_d1hI ->
-			     >=_a19X
-				 ds_d1hI lit_a19Y)
-			    ds_d1hB
-		    of {
-		      PrelBase.True{-5E,p-}{i} ->
-			  let {
-			    n_r3t  :: 
-				PrelBase.Int{-3g,p-}
-			    {-# L #-}
-			    n_r3t =
-				(\ ds_d1i8  :: 
-				       PrelBase.Int{-3g,p-}
+		open_r3i close_r3j  ::  taTa
+			 {-# L #-}
+			 close_r3j ds_d1bB  ::  PrelBase.Int{-3g,W-}
 				   {-# L #-}
-				   ds_d1i8 ->
-				     -_a19W
-					 ds_d1i8 lit_a19Y)
-				    ds_d1hB
+				   ds_d1bB xs_r3k  ::  [taTa]
+					   {-# L #-}
+					   xs_r3k ->
+		  let {
+		    fail_d1bO  ::  ([taTa], [taTa])
+		    {-# L #-}
+		    fail_d1bO =
+			GHCerr.patError{-8r,w-}
+			    _@_ ([taTa], [taTa]) _string_ "ds036.hs:22|function `brack''" } in
+		  let {
+		    fail_d1dT  ::  ([taTa], [taTa])
+		    {-# L #-}
+		    fail_d1dT =
+			case
+			    (\ ds_d1bI  ::  PrelBase.Int{-3g,W-}
+			       {-# L #-}
+			       ds_d1bI ->
+				 >=_a14r ds_d1bI lit_a14q)
+				ds_d1bB
+			of {
+			  PrelBase.True{-5E,w-}{i} ->
+			      let {
+				n_r3o  ::  PrelBase.Int{-3g,W-}
+				{-# L #-}
+				n_r3o =
+				    (\ ds_d1c8  ::  PrelBase.Int{-3g,W-}
+				       {-# L #-}
+				       ds_d1c8 ->
+					 -_a14s ds_d1c8 lit_a14q)
+					ds_d1bB
+			      } in 
+				case xs_r3k of {
+				  PrelBase.[]{-5i,w-}{i} ->
+				      let {
+					close_r3n  ::  taTa
+					{-# L #-}
+					close_r3n =
+					    close_r3j } in
+				      let {
+					open_r3m  ::  taTa
+					{-# L #-}
+					open_r3m =
+					    open_r3i } in
+				      let {
+					ds_d1cz  ::  [taTa]
+					{-# L #-}
+					ds_d1cz =
+					    PrelBase.[]{-5i,w-}{i} _@_ taTa } in
+				      let {
+					ds_d1cD  ::  [taTa]
+					{-# L #-}
+					ds_d1cD =
+					    PrelBase.[]{-5i,w-}{i} _@_ taTa
+				      } in 
+					PrelTup.(,){-62,w-}{i}
+					    {_@_ [taTa] _@_ [taTa] ds_d1cz ds_d1cD};
+				  PrelBase.:{-55,w-}{i} h_r3t t_r3u ->
+				      let {
+					n_r3s  ::  PrelBase.Int{-3g,W-}
+					{-# L #-}
+					n_r3s =
+					    n_r3o } in
+				      let {
+					close_r3r  ::  taTa
+					{-# L #-}
+					close_r3r =
+					    close_r3j } in
+				      let {
+					open_r3q  ::  taTa
+					{-# L #-}
+					open_r3q =
+					    open_r3i
+				      } in 
+					case ==_a1aI h_r3t open_r3q of {
+					  PrelBase.True{-5E,w-}{i} ->
+					      let {
+						ds_d1du  ::  [taTa]
+						{-# L #-}
+						ds_d1du =
+						    PrelBase.[]{-5i,w-}{i} _@_ taTa } in
+					      let {
+						ds_d1dy  ::  [taTa]
+						{-# L #-}
+						ds_d1dy =
+						    PrelBase.[]{-5i,w-}{i} _@_ taTa
+					      } in 
+						PrelTup.(,){-62,w-}{i}
+						    {_@_ [taTa] _@_ [taTa] ds_d1du ds_d1dy};
+					  PrelBase.False{-58,w-}{i} -> fail_d1bO;
+					};
+				};
+			  PrelBase.False{-58,w-}{i} -> fail_d1bO;
+			}
+		  } in 
+		    case ds_d1bB of { PrelBase.I#{-5b,w-}{i} ds_d1e2  ->
+		    case# ds_d1e2 of {
+		      0 ->
+			  let {
+			    ds_d1eh  ::  [taTa]
+			    {-# L #-}
+			    ds_d1eh =
+				PrelBase.[]{-5i,w-}{i} _@_ taTa
 			  } in 
-			    case xs_r3n of {
-			      PrelBase.[]{-5i,p-}{i} ->
-				  let {
-				    close_r3r  :: 
-					a{-aYI-}
-				    {-# L #-}
-				    close_r3r =
-					close_r3k } in
-				  let {
-				    open_r3p  :: 
-					a{-aYI-}
-				    {-# L #-}
-				    open_r3p =
-					open_r3i } in
-				  let {
-				    ds_d1iz  :: 
-					[a{-aYI-}]
-				    {-# L #-}
-				    ds_d1iz =
-					PrelBase.[]{-5i,p-}{i}
-					    _@_ a{-aYI-} } in
-				  let {
-				    ds_d1iD  :: 
-					[a{-aYI-}]
-				    {-# L #-}
-				    ds_d1iD =
-					PrelBase.[]{-5i,p-}{i}
-					    _@_ a{-aYI-}
-				  } in 
-				    PrelTup.(,){-62,p-}{i}
-					{_@_ [a{-aYI-}] _@_ [a{-aYI-}] ds_d1iz ds_d1iD};
-			      PrelBase.:{-55,p-}{i} h_r3C t_r3D ->
-				  let {
-				    n_r3A  :: 
-					PrelBase.Int{-3g,p-}
-				    {-# L #-}
-				    n_r3A =
-					n_r3t } in
-				  let {
-				    close_r3y  :: 
-					a{-aYI-}
-				    {-# L #-}
-				    close_r3y =
-					close_r3k } in
-				  let {
-				    open_r3w  :: 
-					a{-aYI-}
-				    {-# L #-}
-				    open_r3w =
-					open_r3i
-				  } in 
-				    case
-					==_a1gY
-					    h_r3C open_r3w
-				    of {
-				      PrelBase.True{-5E,p-}{i} ->
-					  let {
-					    ds_d1ju  :: 
-						[a{-aYI-}]
-					    {-# L #-}
-					    ds_d1ju =
-						PrelBase.[]{-5i,p-}{i}
-						    _@_ a{-aYI-} } in
-					  let {
-					    ds_d1jy  :: 
-						[a{-aYI-}]
-					    {-# L #-}
-					    ds_d1jy =
-						PrelBase.[]{-5i,p-}{i}
-						    _@_ a{-aYI-}
-					  } in 
-					    PrelTup.(,){-62,p-}{i}
-						{_@_ [a{-aYI-}] _@_ [a{-aYI-}] ds_d1ju ds_d1jy};
-				      PrelBase.False{-58,p-}{i} ->
-					  fail_d1hO;
-				    };
-			    };
-		      PrelBase.False{-58,p-}{i} ->
-			  fail_d1hO;
-		    }
-	      } in 
-		case ds_d1hB of { PrelBase.I#{-5b,p-}{i} ds_d1k2  ->
-		case# ds_d1k2 of {
-		  0 ->
-		      let {
-			ds_d1kh  :: 
-			    [a{-aYI-}]
-			{-# L #-}
-			ds_d1kh =
-			    PrelBase.[]{-5i,p-}{i}
-				_@_ a{-aYI-}
-		      } in 
-			PrelTup.(,){-62,p-}{i}
-			    {_@_ [a{-aYI-}] _@_ [a{-aYI-}] ds_d1kh xs_r3n};
-		  ds_d1kt ->
-		      fail_d1jT;
-		};}
+			    PrelTup.(,){-62,w-}{i} {_@_ [taTa] _@_ [taTa] ds_d1eh xs_r3k};
+		      ds_d1et -> fail_d1dT;
+		    };};
+	} in  brack'_aT7
+lit_a14o  ::  PrelBase.Int{-3g,W-}
+{-# L #-}
+lit_a14o =
+    PrelBase.I#{-5b,w-}{i} 0
+d.Eq_aUh  ::  {PrelBase.Eq{-23,p-} PrelBase.Int{-3g,W-}}
+{-# L #-}
+d.Eq_aUh =
+    PrelBase.$d8{-rb8,p-}
+==_a14p  ::  PrelBase.Int{-3g,W-}
+	     -> PrelBase.Int{-3g,W-}
+	     -> PrelBase.Bool{-34,W-}
+{-# L #-}
+==_a14p =
+    PrelBase.=={-8Y,p-} _@_ PrelBase.Int{-3g,W-} d.Eq_aUh
+lit_a14q  ::  PrelBase.Int{-3g,W-}
+{-# L #-}
+lit_a14q =
+    PrelBase.I#{-5b,w-}{i} 1
+d.Ord_aUk  ::  {PrelBase.Ord{-2d,p-} PrelBase.Int{-3g,W-}}
+{-# L #-}
+d.Ord_aUk =
+    PrelBase.$d7{-rb7,p-}
+>=_a14r  ::  PrelBase.Int{-3g,W-}
+	     -> PrelBase.Int{-3g,W-}
+	     -> PrelBase.Bool{-34,W-}
+{-# L #-}
+>=_a14r =
+    PrelBase.>={-8Z,p-} _@_ PrelBase.Int{-3g,W-} d.Ord_aUk
+d.Num_aUn  ::  {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,W-}}
+{-# L #-}
+d.Num_aUn =
+    PrelBase.$d4{-raL,p-}
+-_a14s  ::  PrelBase.Int{-3g,W-}
+	    -> PrelBase.Int{-3g,W-}
+	    -> PrelBase.Int{-3g,W-}
+{-# L #-}
+-_a14s =
+    PrelBase.-{-817,p-} _@_ PrelBase.Int{-3g,W-} d.Num_aUn
 end Rec }

@@ -1,0 +1,24 @@
+
+
+================================================================================
+Typechecked:
+FF{-r5,x-}{i} = FF{-r5,x-}{i} {}
+TT{-r4,x-}{i} = TT{-r4,x-}{i} {}
+AbsBinds [] [] [([], idb{-r6,x-}, idb_aAU)]
+    idb_aAU x_r3k = x_r3k
+AbsBinds [] [] [([], $d1{-rB4,x-}, d.Eval_aB1)]
+    d.Eval_aB1 = ({-dict-} [] [])
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d2 1 $d38 1 $d40 1 $d42 1 $d47 1 Eval 1;
+_exports_
+ShouldSucceed idb Boolean(FF TT);
+_instances_
+instance {PrelBase.Eval Boolean} = $d1;
+_declarations_
+1 $d1 _:_ {PrelBase.Eval Boolean} ;;
+1 data Boolean = FF |  TT ;
+1 idb _:_ Boolean -> Boolean ;;

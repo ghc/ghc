@@ -1,4 +1,4 @@
-TOP = ../../../..
+TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
 HS_SRCS = $(wildcard *.hs)
@@ -9,7 +9,7 @@ HC_OPTS += -noC -dcore-lint
 
 all :: $(BINS)
 
-%.o : %
+% : %.o
 	$(HC) $(HC_OPTS) $< -o $@
 
 

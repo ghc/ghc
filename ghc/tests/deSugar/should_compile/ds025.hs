@@ -14,5 +14,3 @@ assocMaybe :: (Eq a) => a -> [(a,b)] -> Maybe b
 assocMaybe key lst
  = if (null res) then Nothing else (Just (head res))
    where res =  [ val | (key',val) <- lst, key==key']
-
-data Maybe a = Just a | Nothing deriving ()

@@ -1,0 +1,56 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [taW8] [] [([taW8], init_last{-r3m,x-}, init_last_aW5)]
+    init_last_aW5 a_r3E b_r3F = (a_r3E, a_r3E)
+AbsBinds [taWl] [d.Ord_aWp] [([taWl], merge{-r3l,x-}, merge_aWi)]
+    merge_aWi xs_r3B ys_r3C = xs_r3B
+AbsBinds [taWw] [d.Ord_aXv] [([taWw], sort{-r3k,x-}, sort_aWt)]
+    d.Ord_aXt = d.Ord_aXv
+    sort_aWt xs_r3o
+	     = s_aXJ xs_r3o PrelList.length{-rhD,p-} taWw xs_r3o
+	     where
+		 {- nonrec -}
+		 AbsBinds [taWD] [d.Ord_aXe] [([taWD], s_r3q, s_aWA)]
+		     d.Ord_aXi = d.Ord_aXe
+		     merge_aXK = merge{-r3l,x-} taWD d.Ord_aXi
+		     d.Ord_aXk = d.Ord_aXe
+		     sort_aXL = sort{-r3k,x-} taWD d.Ord_aXk
+		     sort_aXM = sort_aXL
+		     s_aWA xs_r3u k_r3v
+			   = if k_r3v <=_aXF lit_aXG then
+				 xs_r3u
+			     else
+				 merge_aXK sort_aXL ys_r3x sort_aXM zs_r3y
+			   where
+			       {- nonrec -}
+			       AbsBinds [] [] [([], ys_r3x, ys_aWG), ([], zs_r3y, zs_aWH)]
+				   (ys_aWG, zs_aWH)
+				       = init_last{-r3m,x-} taWD xs_r3u k_r3v div_aXH lit_aXI
+			       {- nonrec -}
+			       {- nonrec -}
+		 {- nonrec -}
+		 s_aXJ = s_r3q taWw d.Ord_aXt
+		 {- nonrec -}
+d.Ord_aXB = PrelBase.$d7{-rrR,p-}
+<=_aXF = PrelBase.<={-rqO,p-} PrelBase.Int{-3g,W-} d.Ord_aXB
+lit_aXG = PrelBase.I#{-5b,w-}{i} 1#
+d.Integral_aXE = PrelNum.$d36{-rFA,p-}
+div_aXH = PrelNum.div{-ry2,p-} PrelBase.Int{-3g,W-} d.Integral_aXE
+lit_aXI = PrelBase.I#{-5b,w-}{i} 2#
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d12 1 $d14 1 $d15 1 $d16 1 $d2 1 $d22 1 $d27 1 $d28 1 $d3 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d6 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 Enum 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 String 1;
+PrelList 1 :: length 1;
+PrelNum 1 :: $d1 1 $d10 1 $d15 1 $d16 1 $d17 1 $d18 1 $d2 1 $d29 1 $d30 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d36 1 $d37 1 $d38 1 $d39 1 $d5 1 $d6 1 $d7 1 $d8 1 $mdiv 1 $mdivMod 1 $mmod 1 $mquot 1 $mrem 1 Integral 1 Ratio 1 Rational 1 Real 1;
+PrelTup 1 :: $d13 1 $d4 1 $d49 1 $d9 1;
+_exports_
+ShouldSucceed init_last merge sort;
+_declarations_
+1 init_last _:_ _forall_ [ta] => [ta] -> PrelBase.Int -> ([ta], [ta]) ;;
+1 merge _:_ _forall_ [ta] {PrelBase.Ord ta} => [ta] -> [ta] -> [ta] ;;
+1 sort _:_ _forall_ [ta] {PrelBase.Ord ta} => [ta] -> [ta] ;;

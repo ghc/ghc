@@ -1,6 +1,6 @@
 -- once produced a bug, here as regression test
 
-module P where
+module ShouldSucceed where
 
 f _ | otherwise = ()
 

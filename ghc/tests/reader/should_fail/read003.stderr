@@ -1,0 +1,28 @@
+
+
+================================================================================
+Reader:
+module Read003 where
+{- rec -}
+~(a, b, c)
+    | nullity b = a
+    | nullity c = a
+    | otherwise = a
+    where
+	{- rec -}
+	nullity = null
+ 
+read003.hs:8: Cannot construct the infinite type (occur check)
+		  `taGH' = `(taGH, taGK, taGN)'
+    Expected: `taGH'
+    Inferred: `(taGH, [taGW], taGN)'
+    In a pattern binding:
+	`~(a, b, c)
+	     | nullity b = a
+	     | nullity c = a
+	     | PrelBase.otherwise = a
+	     where
+		 nullity = PrelList.null'
+
+
+Compilation had errors

@@ -1,6 +1,6 @@
 --!!! make sure context of EQ is minimised in interface file.
 --
-module M where
+module ShouldSucceed where
 
 data NUM = ONE | TWO
 class (Num a) => ORD a

@@ -1,0 +1,30 @@
+
+
+================================================================================
+Typechecked:
+AbsBinds [taAV] [d.Eq_aBd] [([taAV], f{-r3e,x-}, f_aAS)]
+    d.Eq_aBf = d.Eq_aBd
+    ==_aBg = PrelBase.=={-8Y,p-} taAV d.Eq_aBf
+    f_aAS x_r3g
+	  = g_r3i x_r3g
+	  where
+	      {- nonrec -}
+	      AbsBinds [] [] [([], g_r3i, g_aAX)]
+		  g_aAX y_r3k
+			= if y_r3k ==_aBg x_r3g then
+			      PrelBase.[]{-5i,w-}{i} taAV
+			  else
+			      [y_r3k] (taAV)
+	      {- nonrec -}
+	      {- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d16 1 $d28 1 $d33 1 $d8 1 $m/= 1 Eq 1;
+PrelNum 1 :: $d18 1;
+_exports_
+ShouldSucceed f;
+_declarations_
+1 f _:_ _forall_ [ta] {PrelBase.Eq ta} => ta -> [ta] ;;
