@@ -306,10 +306,10 @@ dsExpr (HsSCC cc expr)
     getModuleAndGroupDs		`thenDs` \ (mod_name, group_name) ->
     returnDs (Note (SCC (mkUserCC cc mod_name group_name)) core_expr)
 
--- special case to handle unboxed tuple patterns
+-- special case to handle unboxed tuple patterns.
 
 dsExpr (HsCase discrim matches@[Match _ [TuplePat ps boxed] _ _] src_loc)
- | all var_pat ps 
+ | not boxed && all var_pat ps 
  =  putSrcLocDs src_loc $
     dsExpr discrim				`thenDs` \ core_discrim ->
     matchWrapper CaseMatch matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
