@@ -123,7 +123,8 @@ INSTALL_DATA_OPTS = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_DATA_OPTS)
 
 config-pkgs ::
 	@echo "Configuring $(package), version $(version), on $(platform) ..."
-	@for i in $(PACKAGE_PRL_SCRIPTS); do \
+	@if test "$(PACKAGE_PRL_SCRIPTS)"; then \
+	  for i in $(PACKAGE_PRL_SCRIPTS); do \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   if [ -f bin/$(platform)/$(package)-$(version)/$$i ]; then $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; fi; \
@@ -137,8 +138,10 @@ config-pkgs ::
 	   cat bin/$(platform)/$(package)-$(version)/$$i.prl   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
-	done
-	@for i in $(PACKAGE_LIB_PRL_SCRIPTS); do \
+	  done; \
+	fi
+	@if test "$(PACKAGE_LIB_PRL_SCRIPTS)"; then \
+	  for i in $(PACKAGE_LIB_PRL_SCRIPTS); do \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) lib/$(platform)/$(package)-$(version)/$$i.bak; \
 	   if [ -f lib/$(platform)/$(package)-$(version)/$$i ]; then $(MV) lib/$(platform)/$(package)-$(version)/$$i lib/$(platform)/$(package)-$(version)/$$i.bak; fi; \
@@ -152,8 +155,10 @@ config-pkgs ::
 	   cat lib/$(platform)/$(package)-$(version)/$$i.prl >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
-	done
-	@for i in $(PACKAGE_SH_SCRIPTS); do \
+	  done; \
+	fi
+	@if test "$(PACKAGE_SH_SCRIPTS)"; then \
+	  for i in $(PACKAGE_SH_SCRIPTS); do \
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   if [ -f bin/$(platform)/$(package)-$(version)/$$i ]; then $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; fi; \
@@ -167,7 +172,8 @@ config-pkgs ::
 	   cat bin/$(platform)/$(package)-$(version)/$$i.sh >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
-	done
+	  done; \
+	fi
 
 
 mk-version-symlinks ::
