@@ -11,39 +11,14 @@ module SMRep (
 	SMRep(..), ClosureType(..),
 	isStaticRep,
 	fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize,
-        stdItblSize, retItblSize
+        stdItblSize, retItblSize,
+	getSMRepClosureTypeInt
 
-#ifndef OMIT_NATIVE_CODEGEN
-	, getSMRepClosureTypeInt
-	, cONSTR
-	, cONSTR_1_0
-	, cONSTR_0_1
-	, cONSTR_2_0
-	, cONSTR_1_1
-	, cONSTR_0_2
-	, cONSTR_STATIC
-	, cONSTR_NOCAF_STATIC
-	, fUN
-	, fUN_1_0
-	, fUN_0_1
-	, fUN_2_0
-	, fUN_1_1
-	, fUN_0_2
-	, fUN_STATIC
-	, tHUNK
-	, tHUNK_1_0
-	, tHUNK_0_1
-	, tHUNK_2_0
-	, tHUNK_1_1
-	, tHUNK_0_2
-	, tHUNK_STATIC
-	, tHUNK_SELECTOR
 	, rET_SMALL
 	, rET_VEC_SMALL
 	, rET_BIG
 	, rET_VEC_BIG
-	, bLACKHOLE
-#endif
+
     ) where
 
 #include "HsVersions.h"
@@ -73,11 +48,11 @@ data SMRep
 
 data ClosureType	-- Corresponds 1-1 with the varieties of closures
 			-- implemented by the RTS.  Compare with ghc/includes/ClosureTypes.h
-    = CONSTR
-    | CONSTR_NOCAF
-    | FUN
-    | THUNK
-    | THUNK_SELECTOR
+    = Constr
+    | ConstrNoCaf
+    | Fun
+    | Thunk
+    | ThunkSelector
 \end{code}
 
 Size of a closure header.
@@ -111,7 +86,7 @@ retItblSize :: Int{-words-}
 retItblSize = stdItblSize + rET_ITBL_SIZE
 
 profItblSize  :: Int{-words-}
-profItblSize  | opt_SccProfilingOn   = pROF_ITBL_SIZE
+profItblSize  | opt_SccProfilingOn  = pROF_ITBL_SIZE
 	      | otherwise	    = 0
 
 granItblSize  :: Int{-words-}
@@ -120,7 +95,7 @@ granItblSize  | opt_GranMacros	    = gRAN_ITBL_SIZE
 
 tickyItblSize :: Int{-words-}
 tickyItblSize | opt_DoTickyProfiling = tICKY_ITBL_SIZE
-	      | otherwise	    = 0
+	      | otherwise	     = 0
 \end{code}
 
 \begin{code}
@@ -130,70 +105,46 @@ isStaticRep BlackHoleRep	         = False
 \end{code}
 
 \begin{code}
+#include "../includes/ClosureTypes.h"
+-- Defines CONSTR, CONSTR_1_0 etc
+
 getSMRepClosureTypeInt :: SMRep -> Int
-getSMRepClosureTypeInt (GenericRep False 1 0 CONSTR) = cONSTR_1_0
-getSMRepClosureTypeInt (GenericRep False 0 1 CONSTR) = cONSTR_0_1
-getSMRepClosureTypeInt (GenericRep False 2 0 CONSTR) = cONSTR_2_0
-getSMRepClosureTypeInt (GenericRep False 1 1 CONSTR) = cONSTR_1_1
-getSMRepClosureTypeInt (GenericRep False 0 2 CONSTR) = cONSTR_0_2
-getSMRepClosureTypeInt (GenericRep False _ _ CONSTR) = cONSTR
+getSMRepClosureTypeInt (GenericRep False 1 0 Constr) = CONSTR_1_0
+getSMRepClosureTypeInt (GenericRep False 0 1 Constr) = CONSTR_0_1
+getSMRepClosureTypeInt (GenericRep False 2 0 Constr) = CONSTR_2_0
+getSMRepClosureTypeInt (GenericRep False 1 1 Constr) = CONSTR_1_1
+getSMRepClosureTypeInt (GenericRep False 0 2 Constr) = CONSTR_0_2
+getSMRepClosureTypeInt (GenericRep False _ _ Constr) = CONSTR
 
-getSMRepClosureTypeInt (GenericRep False 1 0 FUN) = fUN_1_0
-getSMRepClosureTypeInt (GenericRep False 0 1 FUN) = fUN_0_1
-getSMRepClosureTypeInt (GenericRep False 2 0 FUN) = fUN_2_0
-getSMRepClosureTypeInt (GenericRep False 1 1 FUN) = fUN_1_1
-getSMRepClosureTypeInt (GenericRep False 0 2 FUN) = fUN_0_2
-getSMRepClosureTypeInt (GenericRep False _ _ FUN) = fUN
+getSMRepClosureTypeInt (GenericRep False 1 0 Fun) = FUN_1_0
+getSMRepClosureTypeInt (GenericRep False 0 1 Fun) = FUN_0_1
+getSMRepClosureTypeInt (GenericRep False 2 0 Fun) = FUN_2_0
+getSMRepClosureTypeInt (GenericRep False 1 1 Fun) = FUN_1_1
+getSMRepClosureTypeInt (GenericRep False 0 2 Fun) = FUN_0_2
+getSMRepClosureTypeInt (GenericRep False _ _ Fun) = FUN
 
-getSMRepClosureTypeInt (GenericRep False 1 0 THUNK) = tHUNK_1_0
-getSMRepClosureTypeInt (GenericRep False 0 1 THUNK) = tHUNK_0_1
-getSMRepClosureTypeInt (GenericRep False 2 0 THUNK) = tHUNK_2_0
-getSMRepClosureTypeInt (GenericRep False 1 1 THUNK) = tHUNK_1_1
-getSMRepClosureTypeInt (GenericRep False 0 2 THUNK) = tHUNK_0_2
-getSMRepClosureTypeInt (GenericRep False _ _ THUNK) = tHUNK
+getSMRepClosureTypeInt (GenericRep False 1 0 Thunk) = THUNK_1_0
+getSMRepClosureTypeInt (GenericRep False 0 1 Thunk) = THUNK_0_1
+getSMRepClosureTypeInt (GenericRep False 2 0 Thunk) = THUNK_2_0
+getSMRepClosureTypeInt (GenericRep False 1 1 Thunk) = THUNK_1_1
+getSMRepClosureTypeInt (GenericRep False 0 2 Thunk) = THUNK_0_2
+getSMRepClosureTypeInt (GenericRep False _ _ Thunk) = THUNK
 
-getSMRepClosureTypeInt (GenericRep False _ _ THUNK_SELECTOR) =  tHUNK_SELECTOR
+getSMRepClosureTypeInt (GenericRep False _ _ ThunkSelector) =  THUNK_SELECTOR
 
-getSMRepClosureTypeInt (GenericRep True _ _ CONSTR)       = cONSTR_STATIC
-getSMRepClosureTypeInt (GenericRep True _ _ CONSTR_NOCAF) = cONSTR_NOCAF_STATIC
-getSMRepClosureTypeInt (GenericRep True _ _ FUN)          = fUN_STATIC
-getSMRepClosureTypeInt (GenericRep True _ _ THUNK)        = tHUNK_STATIC
+getSMRepClosureTypeInt (GenericRep True _ _ Constr)      = CONSTR_STATIC
+getSMRepClosureTypeInt (GenericRep True _ _ ConstrNoCaf) = CONSTR_NOCAF_STATIC
+getSMRepClosureTypeInt (GenericRep True _ _ Fun)         = FUN_STATIC
+getSMRepClosureTypeInt (GenericRep True _ _ Thunk)       = THUNK_STATIC
 
-getSMRepClosureTypeInt BlackHoleRep = bLACKHOLE
+getSMRepClosureTypeInt BlackHoleRep = BLACKHOLE
 
 getSMRepClosureTypeInt rep = panic "getSMRepClosureTypeInt"
 
 
--- Just the ones we need:
-
-#include "../includes/ClosureTypes.h"
-
-cONSTR                  = (CONSTR               :: Int)
-cONSTR_1_0              = (CONSTR_1_0           :: Int)
-cONSTR_0_1              = (CONSTR_0_1           :: Int)
-cONSTR_2_0              = (CONSTR_2_0           :: Int)
-cONSTR_1_1              = (CONSTR_1_1           :: Int)
-cONSTR_0_2              = (CONSTR_0_2           :: Int)
-cONSTR_STATIC           = (CONSTR_STATIC        :: Int)
-cONSTR_NOCAF_STATIC     = (CONSTR_NOCAF_STATIC  :: Int)
-fUN                     = (FUN                  :: Int)
-fUN_1_0                 = (FUN_1_0              :: Int)
-fUN_0_1                 = (FUN_0_1              :: Int)
-fUN_2_0                 = (FUN_2_0              :: Int)
-fUN_1_1                 = (FUN_1_1              :: Int)
-fUN_0_2                 = (FUN_0_2              :: Int)
-fUN_STATIC              = (FUN_STATIC           :: Int)
-tHUNK                   = (THUNK                :: Int)
-tHUNK_1_0               = (THUNK_1_0            :: Int)
-tHUNK_0_1               = (THUNK_0_1            :: Int)
-tHUNK_2_0               = (THUNK_2_0            :: Int)
-tHUNK_1_1               = (THUNK_1_1            :: Int)
-tHUNK_0_2               = (THUNK_0_2            :: Int)
-tHUNK_STATIC            = (THUNK_STATIC         :: Int)
-tHUNK_SELECTOR          = (THUNK_SELECTOR       :: Int)
-rET_SMALL               = (RET_SMALL            :: Int)
-rET_VEC_SMALL           = (RET_VEC_SMALL        :: Int)
-rET_BIG                 = (RET_BIG              :: Int)
-rET_VEC_BIG             = (RET_VEC_BIG          :: Int)
-bLACKHOLE               = (BLACKHOLE            :: Int)
+-- We export these ones
+rET_SMALL     = (RET_SMALL     :: Int)
+rET_VEC_SMALL = (RET_VEC_SMALL :: Int)
+rET_BIG       = (RET_BIG       :: Int)
+rET_VEC_BIG   = (RET_VEC_BIG   :: Int)
 \end{code}

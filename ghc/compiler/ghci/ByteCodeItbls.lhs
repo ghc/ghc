@@ -66,8 +66,9 @@ mkITbl tc
         dcs = tyConDataCons tc
         n   = tyConFamilySize tc
 
-cONSTR :: Int
-cONSTR = 1  -- as defined in ghc/includes/ClosureTypes.h
+#include "../includes/ClosureTypes.h"
+cONSTR :: Int	-- Defined in ClosureTypes.h
+cONSTR = CONSTR 
 
 -- Assumes constructors are numbered from zero, not one
 make_constr_itbls :: [DataCon] -> IO ItblEnv

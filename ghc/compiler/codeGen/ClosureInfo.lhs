@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.54 2002/12/11 15:36:28 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.55 2002/12/11 16:55:04 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -518,11 +518,11 @@ chooseSMRep is_static lf_info tot_wds ptr_wds
 getClosureType :: Bool -> Int -> Int -> LambdaFormInfo -> ClosureType
 getClosureType is_static tot_wds ptr_wds lf_info
   = case lf_info of
-	LFCon con | is_static && ptr_wds == 0	-> CONSTR_NOCAF
-		  | otherwise			-> CONSTR
-  	LFReEntrant _ _ _ _ 			-> FUN
-	LFThunk _ _ _ (SelectorThunk _) _ 	-> THUNK_SELECTOR
-	LFThunk _ _ _ _ _ 			-> THUNK
+	LFCon con | is_static && ptr_wds == 0	-> ConstrNoCaf
+		  | otherwise			-> Constr
+  	LFReEntrant _ _ _ _ 			-> Fun
+	LFThunk _ _ _ (SelectorThunk _) _ 	-> ThunkSelector
+	LFThunk _ _ _ _ _ 			-> Thunk
 	_ -> panic "getClosureType"
 \end{code}
 
@@ -801,8 +801,8 @@ staticClosureNeedsLink (ConInfo { closureSMRep = sm_rep, closureCon = con })
   where
     not_nocaf_constr = 
 	case sm_rep of 
-	   GenericRep _ _ _ CONSTR_NOCAF -> False
-	   _other			 -> True
+	   GenericRep _ _ _ ConstrNoCaf -> False
+	   _other			-> True
 \end{code}
 
 Avoiding generating entries and info tables
