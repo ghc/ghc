@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.11 2000/04/19 10:53:11 simonmar Exp $
+ * $Id: StgStdThunks.hc,v 1.12 2000/05/19 09:49:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -41,7 +41,7 @@
 #endif
 
 #define SELECTOR_CODE_UPD(offset) \
-  EF_(__sel_ret_##offset##_upd_ret);					\
+  IF_(__sel_ret_##offset##_upd_ret);					\
   INFO_TABLE_SRT_BITMAP(__sel_ret_##offset##_upd_info,__sel_ret_##offset##_upd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, EF_, 0, 0);			\
   EF_(__sel_ret_##offset##_upd_ret) {					\
     FB_									\
@@ -86,8 +86,9 @@ SELECTOR_CODE_UPD(14);
 SELECTOR_CODE_UPD(15);
 
 #define SELECTOR_CODE_NOUPD(offset) \
+  IF_(__sel_ret_##offset##_noupd_ret); \
   INFO_TABLE_SRT_BITMAP(__sel_ret_##offset##_noupd_info, __sel_ret_##offset##_noupd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, EF_, 0, 0);	\
-  EF_(__sel_ret_##offset##_noupd_ret) {					\
+  IF_(__sel_ret_##offset##_noupd_ret) {					\
     FB_									\
       R1.p=(P_)R1.cl->payload[offset];					\
       GET_SAVED_CCCS;							\
