@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.62 2002/12/11 15:36:47 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.63 2002/12/19 14:23:35 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -569,7 +569,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	}
     }
 
-    // process arguments from the GHCRTS environment variable first
+    // process arguments from the GHCRTS environment variable next
     // (arguments from the command line override these).
     {
 	char *ghc_rts = getenv("GHCRTS");
