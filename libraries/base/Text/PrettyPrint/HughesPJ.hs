@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- John Hughes\'s and Simon Peyton Jones\'s Pretty Printer Combinators
+-- John Hughes's and Simon Peyton Jones's Pretty Printer Combinators
 -- 
 -- Based on /The Design of a Pretty-printing Library/
 -- in Advanced Functional Programming,
@@ -226,17 +226,17 @@ infixl 5 $$, $+$
 isEmpty :: Doc    -> Bool;  -- ^ Returns 'True' if the document is empty
 
 empty   :: Doc;			-- ^ An empty document
-semi	:: Doc;			-- ^ A \';\' character
-comma	:: Doc;			-- ^ A \',\' character
-colon	:: Doc;			-- ^ A \':\' character
+semi	:: Doc;			-- ^ A ';' character
+comma	:: Doc;			-- ^ A ',' character
+colon	:: Doc;			-- ^ A ':' character
 space	:: Doc;			-- ^ A space character
-equals	:: Doc;			-- ^ A \'=\' character
-lparen	:: Doc;			-- ^ A \'(\' character
-rparen	:: Doc;			-- ^ A \')\' character
-lbrack	:: Doc;			-- ^ A \'[\' character
-rbrack	:: Doc;			-- ^ A \']\' character
-lbrace	:: Doc;			-- ^ A \'{\' character
-rbrace	:: Doc;			-- ^ A \'}\' character
+equals	:: Doc;			-- ^ A '=' character
+lparen	:: Doc;			-- ^ A '(' character
+rparen	:: Doc;			-- ^ A ')' character
+lbrack	:: Doc;			-- ^ A '[' character
+rbrack	:: Doc;			-- ^ A ']' character
+lbrace	:: Doc;			-- ^ A '{' character
+rbrace	:: Doc;			-- ^ A '}' character
 
 text	 :: String   -> Doc
 ptext	 :: String   -> Doc
@@ -251,7 +251,7 @@ rational :: Rational -> Doc
 parens       :: Doc -> Doc; 	-- ^ Wrap document in @(...)@
 brackets     :: Doc -> Doc;  	-- ^ Wrap document in @[...]@
 braces	     :: Doc -> Doc;   	-- ^ Wrap document in @{...}@
-quotes	     :: Doc -> Doc;	-- ^ Wrap document in @\'...\'@
+quotes	     :: Doc -> Doc;	-- ^ Wrap document in @'...'@
 doubleQuotes :: Doc -> Doc;	-- ^ Wrap document in @\"...\"@
 
 -- Combining @Doc@ values

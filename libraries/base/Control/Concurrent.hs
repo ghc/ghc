@@ -56,9 +56,9 @@ module Control.Concurrent (
 	nmergeIO,		-- :: [[a]] -> IO [a]
 	-- $merge
 
-	-- * GHC\'s implementation of concurrency
+	-- * GHC's implementation of concurrency
 
-	-- |This section describes features specific to GHC\'s
+	-- |This section describes features specific to GHC's
 	-- implementation of Concurrent Haskell.
 	
 	-- ** Terminating the program
@@ -103,7 +103,7 @@ The concurrency extension for Haskell is described in the paper
 Concurrency is \"lightweight\", which means that both thread creation
 and context switching overheads are extremely low.  Scheduling of
 Haskell threads is done internally in the Haskell runtime system, and
-doesn\'t make use of any operating system-supplied thread packages.
+doesn't make use of any operating system-supplied thread packages.
 
 Haskell threads can communicate via 'MVar's, a kind of synchronised
 mutable variable (see "Control.Concurrent.MVar").  Several common
@@ -122,7 +122,7 @@ via exceptions.
     as:
 
 
->   main = forkIO (write \'a\') >> write \'b\'
+>   main = forkIO (write 'a') >> write 'b'
 >     where write c = putChar c >> write c
 
     will print either @aaaaaaaaaaaaaa...@ or @bbbbbbbbbbbb...@,
@@ -135,7 +135,7 @@ via exceptions.
 Calling a foreign C procedure (such as @getchar@) that blocks waiting
 for input will block /all/ threads, unless the @threadsafe@ attribute
 is used on the foreign call (and your compiler \/ operating system
-supports it).  GHC\'s I\/O system uses non-blocking I\/O internally to
+supports it).  GHC's I\/O system uses non-blocking I\/O internally to
 implement thread-friendly I\/O, so calling standard Haskell I\/O
 functions blocks only the thead making the call.
 -}
@@ -358,11 +358,11 @@ nmergeIO lss
       to the locking on a 'Handle'.  Only one thread
       may hold the lock on a 'Handle' at any one
       time, so if a reschedule happens while a thread is holding the
-      lock, the other thread won\'t be able to run.  The upshot is that
+      lock, the other thread won't be able to run.  The upshot is that
       the switch from @aaaa@ to
       @bbbbb@ happens infrequently.  It can be
       improved by lowering the reschedule tick period.  We also have a
       patch that causes a reschedule whenever a thread waiting on a
-      lock is woken up, but haven\'t found it to be useful for anything
+      lock is woken up, but haven't found it to be useful for anything
       other than this example :-)
 -}
