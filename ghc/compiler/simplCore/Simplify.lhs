@@ -1502,7 +1502,7 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
     simplBinders env tvs			`thenSmpl` \ (env1, tvs') ->
     let
 	pat_res_ty = dataConResTy con (mkTyVarTys tvs')
-	tv_subst   = getTvSubst env
+	tv_subst   = getTvSubst env1
     in
     case coreRefineTys tvs' tv_subst pat_res_ty (idType case_bndr') of {
 	Nothing 	-- Dead code; for now, I'm just going to put in an
