@@ -532,14 +532,29 @@ we can't traverse the list of all ForeignObjs.)
 The @FreeRoutine@ is a reference to the finalisation routine to call
 when the @ForeignObj@ becomes garbage -- SOF 4/96
 
+[8/97 -- from the p.o.v. of the NCG, it is very convenient if
+the offset to the data field is constant and not dependent on
+what scheme of GC being used by the RTS. So much so, that I'm
+uniformly adding a VHS of 1. For schemes using a copying
+collector, that's the forward field. For the one-space collector,
+it's an unused word. 
+
+If the change is reverted back to what it was (conditional on
+the setting of _INFO_COPYING), then MachMisc.foHS
+needs to be changed accordingly.		-- SOF]
+
 \begin{code}
 #if !defined(PAR)
 
+/* See comment above */
+#  define ForeignObj_VHS			1
+/*
 # if defined(_INFO_COPYING)
 #  define ForeignObj_VHS			1
 # else
 #  define ForeignObj_VHS			0
 # endif
+*/
 
 # define ForeignObj_HS			(FIXED_HS + ForeignObj_VHS)
 # define ForeignObj_SIZE		(ForeignObj_VHS + 3)
