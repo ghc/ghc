@@ -20,7 +20,7 @@ directly, <tt/CPP/ will now by default not be run over the input
 files. To have CPP wash your input files, use the command-line option
 <tt/-cpp/.
 
-<item> Working specialiser (ToDo: more here)
+<item> Added a working specialiser.
 
 <item> Added <tt/unsafeCoerce#/.
 
@@ -29,6 +29,10 @@ previously generated as applications of <tt/fromRational/, even when
 not overloaded.
 
 <item> The object splitter had a bug in it that increased binary sizes
-significantly on i386-unknown-linux and sparc-sun-solaris2.  Now fixed.
+significantly on i386-unknown-linux and sparc-sun-solaris2.  Now
+fixed.
+
+<item> Bump some of the constants that affect unfolding agression:
+performance is now better than 2.10, and binary sizes are smaller.
 
 </itemize>
