@@ -75,7 +75,7 @@ codeOutput mod_name c_code h_code flat_abstractC ncg_uniqs
     ncg_output_d = error "*** GHC not built with a native-code generator ***"
     ncg_output_w = ncg_output_d
 #else
-    (stix_raw, stix_opt, stix_final, ncg_output_d)
+    (stix_final, ncg_output_d)
        = nativeCodeGen flat_absC_ncg ncg_uniqs
     ncg_output_w = (\ f -> printForAsm f ncg_output_d)
 #endif

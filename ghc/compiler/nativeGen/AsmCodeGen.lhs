@@ -22,7 +22,8 @@ import PrimOp		( commutableOp, PrimOp(..) )
 import RegAllocInfo	( mkMRegsState, MRegsState )
 import Stix		( StixTree(..), StixReg(..), pprStixTrees )
 import PrimRep		( isFloatingRep )
-import UniqSupply	( returnUs, thenUs, mapUs, initUs_, UniqSM, UniqSupply )
+import UniqSupply	( returnUs, thenUs, mapUs, initUs, 
+                          initUs_, UniqSM, UniqSupply )
 import UniqFM		( UniqFM, emptyUFM, addToUFM, lookupUFM )
 import Outputable	
 
@@ -76,40 +77,36 @@ The machine-dependent bits break down as follows:
 \end{description}
 
 So, here we go:
-\begin{code}
-nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, SDoc, SDoc, SDoc)
-nativeCodeGen absC us = initUs_ us (runNCG absC)
 
-runNCG :: AbstractC -> UniqSM (SDoc, SDoc, SDoc, SDoc)
-runNCG absC
-  = genCodeAbstractC absC	`thenUs` \ stixRaw ->
-    let
-	stixOpt   = map (map genericOpt) stixRaw
+\begin{code}
+nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, SDoc)
+nativeCodeGen absC us
+   = let (stixRaw, us1) = initUs us (genCodeAbstractC absC)
+         stixOpt        = map (map genericOpt) stixRaw
+         stixFinal      = map x86floatFix stixOpt
+         insns          = initUs_ us1 (codeGen stixFinal)
+         debug_stix     = vcat (map pprStixTrees stixFinal)
+     in 
+         (debug_stix, insns)
+
 #if i386_TARGET_ARCH
-        stixFinal = map floatFix stixOpt
+x86floatFix = floatFix
 #else
-        stixFinal = stixOpt
+x86floatFix = id
 #endif
-    in
-        codeGen (stixRaw, stixOpt, stixFinal)
+
 \end{code}
 
 @codeGen@ is the top-level code-generation function:
 \begin{code}
-codeGen :: ([[StixTree]],[[StixTree]],[[StixTree]]) 
-           -> UniqSM (SDoc, SDoc, SDoc, SDoc)
+codeGen :: [[StixTree]] -> UniqSM SDoc
 
-codeGen (stixRaw, stixOpt, stixFinal)
+codeGen stixFinal
   = mapUs genMachCode stixFinal	`thenUs` \ dynamic_codes ->
     let
 	static_instrs = scheduleMachCode dynamic_codes
     in
-    returnUs (
-       text "ppr'd stixRaw",
-       text "ppr'd stixOpt",
-       vcat (map pprStixTrees stixFinal),
-       vcat (map pprInstr static_instrs)
-    )
+    returnUs (vcat (map pprInstr static_instrs))
 \end{code}
 
 Top level code generator for a chunk of stix code:
