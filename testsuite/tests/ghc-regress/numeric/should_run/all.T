@@ -20,14 +20,6 @@ test "arith012" { vtr("-package lang", "", "") }
 test "arith013" { vtr("", "", "") }
 test "arith014" { vtr("", "", "") }
 test "arith015" { vtr("", "", "") }
-test "num001" { vtr("", "", "") }
-test "num002" { vtr("", "", "") }
-test "num003" { vtr("", "", "") }
-test "num004" { vtr("", "", "") }
-test "num005" { vtr("", "", "") }
-test "num006" { vtr("-package lang", "", "") }
-test "num007" { vtr("", "", "") }
-test "num008" { vtr("", "", "") }
 test "num009" { vtr("", "", "") }
 test "num010" { vtr("", "", "") }
 test "num011" { vtr("", "", "") }
