@@ -233,17 +233,11 @@ mkSRT lbl ids these
 -- which refers to this name).
 maybeGlobaliseId :: Id -> FCode Id
 maybeGlobaliseId id
-  = moduleName `thenFC` \ mod ->
-    let
-    	name = idName id
-
-	-- globalise the name for -split-objs, if necessary
-	real_name | opt_EnsureSplittableC = globaliseName name mod
-	          | otherwise             = name
-
-	id' = setIdName id real_name
-    in 
-    returnFC id'
+  | opt_EnsureSplittableC 
+  = moduleName				 `thenFC` \ mod ->
+    returnFC (setIdName id (globaliseName (idName id) mod))
+  | otherwise		-- Globalise the name for -split-objs
+  = returnFC id
 
 maybeSplitCode
   | opt_EnsureSplittableC = CSplitMarker 
