@@ -66,6 +66,7 @@ import DataCon		( DataCon,
 			  splitProductType
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
+			  mkLocalIdWithInfo, setIdNoDiscard,
 			  mkTemplateLocals, mkTemplateLocalsNum,
 			  mkTemplateLocal, idNewStrictness, idName
 			)
@@ -665,7 +666,19 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Id
 
 mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
-  = mkVanillaGlobal dfun_name dfun_ty noCafNoTyGenIdInfo
+  = setIdNoDiscard (mkLocalIdWithInfo dfun_name dfun_ty noCafNoTyGenIdInfo)
+	-- NB: It's important that dict funs are *local* Ids
+	-- This ensures that they are taken to account by free-variable finding
+	-- and dependency analysis (e.g. CoreFVs.exprFreeVars).  
+	-- In particular, if they are globals, the
+	-- specialiser floats dict uses above their defns, which prevents
+	-- good simplifications happening.
+	--
+	-- It's OK for them to be locals, because we form the instance-env to
+	-- pass on to the next module (md_insts) in CoreTidy, afer tdying
+	-- and globalising the top-level Ids.
+	--
+	-- BUT Make sure it's an exported Id (setIdNoDiscard) so that it's not dropped!
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 
