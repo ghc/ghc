@@ -11,6 +11,8 @@ ps: sm.ps rp.ps ldv.ps
 %.dvi: %.tex $(addsuffix .tex, $(basename $(wildcard *.verb))) $(wildcard *.bib)
 	latex $<
 	@if grep -s "\citation" $*.aux; then bibtex $*; fi
+	latex $<
+	latex $<
 
 %.ps: %.dvi
 	dvips -f < $< > $@
