@@ -52,6 +52,9 @@ from the storage manager).
 
 typedef struct rt {
     StgDouble rDbl[2];	/* Put a double first to ensure expected alignment */
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+    StgWord64  rLng[2];
+#endif
     StgFloat rFlt[4];
     StgUnion rR[8];
     PP_ rSpA;
@@ -137,6 +140,10 @@ extern STGRegisterTable MainRegTable;
 #define MAIN_Flt4   	    (MainRegTable.rFlt[3])
 #define MAIN_Dbl1   	    (MainRegTable.rDbl[0])
 #define MAIN_Dbl2   	    (MainRegTable.rDbl[1])
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+#define MAIN_Lng1   	    (MainRegTable.rLng[0])
+#define MAIN_Lng2   	    (MainRegTable.rLng[1])
+#endif
 
 #define MAIN_Hp    	    (MainRegTable.rHp)
 #define MAIN_HpLim    	    (MainRegTable.rHpLim)
@@ -168,6 +175,10 @@ extern STGRegisterTable MainRegTable;
 #define SAVE_Flt4   	    MAIN_Flt4
 #define SAVE_Dbl1   	    MAIN_Dbl1
 #define SAVE_Dbl2   	    MAIN_Dbl2
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+#define SAVE_Lng1   	    MAIN_Lng1
+#define SAVE_Lng2   	    MAIN_Lng2
+#endif
 			    
 #define SAVE_SpA    	    MAIN_SpA
 #define SAVE_SuA    	    MAIN_SuA
@@ -203,6 +214,10 @@ extern STGRegisterTable *CurrentRegTable;
 #define SAVE_Flt4   	    (CurrentRegTable->rFlt[3])
 #define SAVE_Dbl1   	    (CurrentRegTable->rDbl[0])
 #define SAVE_Dbl2   	    (CurrentRegTable->rDbl[1])
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+#define SAVE_Lng1   	    (CurrentRegTable->rLng[0])
+#define SAVE_Lng2   	    (CurrentRegTable->rLng[1])
+#endif
 
 /* These are only valid when StkOReg is loaded! */
 
@@ -817,6 +832,10 @@ context is saved, so the space does not go to waste.
 /* these are if we get stuck using the reg-tbl "register" (no machine reg avail) */
 #define RTBL_Dbl1   	    (BaseReg->rDbl[0])
 #define RTBL_Dbl2   	    (BaseReg->rDbl[1])
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+#define RTBL_Lng1   	    (BaseReg->rLng[0])
+#define RTBL_Lng2   	    (BaseReg->rLng[1])
+#endif
 #define RTBL_Flt1   	    (BaseReg->rFlt[0])
 #define RTBL_Flt2   	    (BaseReg->rFlt[1])
 #define RTBL_Flt3   	    (BaseReg->rFlt[2])
@@ -946,6 +965,22 @@ GLOBAL_REG_DECL(StgDouble,DblReg1,REG_Dbl1)
 GLOBAL_REG_DECL(StgDouble,DblReg2,REG_Dbl2)
 #else
 #define DblReg2 RTBL_Dbl2
+#endif
+
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+#ifdef REG_Lng1
+GLOBAL_REG_DECL(StgWord64,LngReg1,REG_Lng1)
+#else
+#define LngReg1 RTBL_Lng1
+#endif
+#endif
+
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+#ifdef REG_Lng2
+GLOBAL_REG_DECL(StgWord64,LngReg2,REG_Lng2)
+#else
+#define LngReg2 RTBL_Lng2
+#endif
 #endif
 
 #ifdef REG_Tag
@@ -1135,6 +1170,26 @@ GLOBAL_REG_DECL(P_,StkStubReg,REG_StkStub)
 #else
 #define CALLER_SAVE_DblReg2    	/* nothing */
 #define CALLER_RESTORE_DblReg2 	/* nothing */
+#endif
+
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+#ifdef CALLER_SAVES_LngReg1
+#define CALLER_SAVE_LngReg1    	SAVE_Lng1 = LngReg1;
+#define CALLER_RESTORE_LngReg1 	LngReg1 = SAVE_Lng1;
+#else
+#define CALLER_SAVE_LngReg1    	/* nothing */
+#define CALLER_RESTORE_LngReg1 	/* nothing */
+#endif
+#endif
+
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+#ifdef CALLER_SAVES_LngReg2
+#define CALLER_SAVE_LngReg2    	SAVE_Lng2 = LngReg2;
+#define CALLER_RESTORE_LngReg2 	LngReg2 = SAVE_Lng2;
+#else
+#define CALLER_SAVE_LngReg2    	/* nothing */
+#define CALLER_RESTORE_LngReg2 	/* nothing */
+#endif
 #endif
 
 #ifdef CALLER_SAVES_Tag
