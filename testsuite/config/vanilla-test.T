@@ -262,8 +262,8 @@ def vanilla-test-actions ( $extra_compile_args,
 
 
 -- Compile only (should_compile) style test.  Deemed to have
--- succeeded if the compiler returned zero AND testname.comp.stderr
--- is empty.
+-- succeeded if the compiler returned zero AND (testname.comp.stderr
+-- matches testname.stderr, if it exists, or is empty).
 
 def vanilla-comp-test-actions ( $extra_compile_args )
 {
@@ -287,6 +287,7 @@ def vanilla-comp-test-actions ( $extra_compile_args )
         then print ( "-- UNMATCHED WARNING MSGS: EXPECTED\n" ++ $stderr_e ++
                      "-- ACTUAL\n" ++ $stderr_a ++ "-- END\n" )
              return False
+        else return True
         fi
    fi
 
