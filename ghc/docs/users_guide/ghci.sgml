@@ -871,7 +871,10 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 
 	  <para>All previously loaded modules, except package modules,
 	  are forgotten.  The new set of modules is known as the
-	  <firstterm>target set</firstterm>.</para>
+	  <firstterm>target set</firstterm>.  Note that
+	  <literal>:load</literal> can be used without any arguments
+	  to unload all the currently loaded modules and
+	  bindings.</para>
 
 	  <para>After a <literal>:load</literal> command, the current
 	  context is set to:</para>
