@@ -18,7 +18,7 @@
 #	install* uninstall installcheck installdirs
 #	clean* distclean* mostlyclean* maintainer-clean*
 #	tags*
-#	info dvi ps
+#	dvi ps (no info) FPTOOLS adds: pdf rtf html
 #	dist binary-dist
 #	check
 #
@@ -80,7 +80,7 @@
 
 ifneq "$(SUBDIRS)" ""
 
-all docs runtests boot TAGS clean distclean mostlyclean maintainer-clean install info html ps dvi txt::
+all docs runtests boot TAGS clean distclean mostlyclean maintainer-clean install html ps dvi txt::
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
@@ -201,9 +201,7 @@ boot :: depend
 # 
 # `all'
 #      Compile the entire program. This should be the default target.
-#      This target need not rebuild any documentation files; Info files
-#      should normally be included in the distribution, and DVI files
-#      should be made only when explicitly asked for.
+#      This target need not rebuild any documentation files
 # 
 # `install'
 #      Compile the program and copy the executables, libraries, and so on
@@ -221,27 +219,6 @@ boot :: depend
 #      Use `-' before any command for installing a man page, so that make
 #      will ignore any errors.  This is in case there are systems that
 #      don't have the Unix man page documentation system installed.
-# 
-#      The way to install Info files is to copy them into `$(infodir)'
-#      with $(INSTALL_DATA) (see Command Variables), and then run the
-#      install-info program if it is present.  install-info is a script
-#      that edits the Info `dir' file to add or update the menu entry for
-#      the given Info file; it will be part of the Texinfo package. Here
-#      is a sample rule to install an Info file:
-# 
-# 	     $(infodir)/foo.info: foo.info # There may be a newer info
-# 	     file in . than in srcdir.
-# 		     -if test -f foo.info; then d=.; \
-# 		      else d=$(srcdir); fi; \ $(INSTALL_DATA)
-# 		     $$d/foo.info $@; \ # Run install-info only if it
-# 	     exists.  # Use `if' instead of just prepending `-' to the
-# 	     # line so we notice real errors from install-info.  # We
-# 	     use `$(SHELL) -c' because some shells do not # fail
-# 	     gracefully when there is an unknown command.
-# 		     if $(SHELL) -c 'install-info --version' \
-# 			>/dev/null 2>&1; then \ install-info
-# 		       --infodir=$(infodir) $$d/foo.info; \ else true;
-# 		     fi
 # 
 # `uninstall'
 #      Delete all the installed files that the `install' target would
@@ -276,7 +253,7 @@ boot :: depend
 #      Delete everything from the current directory that can be
 #      reconstructed with this Makefile.  This typically includes
 #      everything deleted by distclean , plus more: C source files
-#      produced by Bison, tags tables, Info files, and so on.
+#      produced by Bison, tags tables, and so on.
 # 
 #      One exception, however: `make maintainer-clean' should not delete
 #      `configure' even if `configure' can be remade using a rule in the
@@ -287,40 +264,17 @@ boot :: depend
 # `TAGS'
 #      Update a tags table for this program.
 # 
-# `info'
-#      Generate any Info files needed. The best way to write the rules is
-#      as follows:
-# 
-# 	     info: foo.info
-# 
-# 	     foo.info: foo.texi chap1.texi chap2.texi
-# 		     $(MAKEINFO) $(srcdir)/foo.texi
-# 
-#      You must define the variable MAKEINFO in the Makefile. It should
-#      run the makeinfo program, which is part of the Texinfo
-#      distribution.
-# 
-# `dvi' `ps'
-#      Generate DVI files for all TeXinfo documentation. For example:
-# 
-# 	     dvi: foo.dvi
-# 
-# 	     foo.dvi: foo.texi chap1.texi chap2.texi
-# 		     $(TEXI2DVI) $(srcdir)/foo.texi
-# 
-#      You must define the variable TEXI2DVI in the Makefile. It should
-#      run the program texi2dvi , which is part of the Texinfo
-#      distribution. Alternatively, write just the dependencies, and
-#      allow GNU Make to provide the command.
+# `dvi' `ps' `pdf' `html' `pdf'
+#      Generate DVI/PS/PDF files for LaTeX/DocBook docs. Not everything is
+#      supported everywhere, but the intention is to standardise on DocBook
+#      producing all formats.
 #
-#      ps is a FPtools addition for Postscript files
-# 
 # `dist' `binary-dist'
 #      Create a distribution tar file for this program. The tar file
 #      should be set up so that the file names in the tar file start with
 #      a subdirectory name which is the name of the package it is a
 #      distribution for. This name can include the version number.
-# 
+#
 #      For example, the distribution tar file of GCC version 1.40 unpacks
 #      into a subdirectory named `gcc-1.40'.
 # 
@@ -944,7 +898,7 @@ dist-package-zip ::
 
 ###########################################
 #
-#	Targets: check tags show info
+#	Targets: check tags show
 #
 ###########################################
 
@@ -1017,7 +971,7 @@ SGML_HTML = $(SGML_DOC).html
 # HTML output goes in a subdirectory on its own.
 SGML_TEXT = $(SGML_DOC).txt
 
-$(SGML_DVI) $(SGML_PS) $(SGML_INFO) $(SGML_HTML) $(SGML_TEXT) :: $(SGML_SRCS)
+$(SGML_DVI) $(SGML_PS) $(SGML_HTML) $(SGML_TEXT) :: $(SGML_SRCS)
 
 dvi  :: $(SGML_DVI)
 ps   :: $(SGML_PS)

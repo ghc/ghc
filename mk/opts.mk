@@ -5,14 +5,14 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.14 2000/05/08 14:54:58 rrt Exp $
+# 	$Id: opts.mk,v 1.15 2000/05/09 15:37:08 rrt Exp $
 #
 #################################################################################
 
 # Exports:	Define P_OPTS for the most important utility programs, P, namely
 #
 #		AR AS CPP CTAGS C FLEX HC HSTAGS LD LINT 
-#		LIT2CHANGELOG LIT2HTML LIT2LATEX LIT2PGM LIT2TEXI
+#		LIT2CHANGELOG LIT2HTML LIT2LATEX LIT2PGM
 #		MKDEPENDC MKDEPENDHS MKDEPENDLIT MSUB
 #		RUNTEST UGEN UNLIT YACC          
 
@@ -57,15 +57,6 @@ SRC_INSTALL_BIN_OPTS	+= -s
 SRC_LINT_OPTS		+= -axz -DLINT $(SRC_CPP_OPTS)
 WAY$(_way)_LINT_OPTS	+= WAY$(_way)_CPP_OPTS
 
-
-# Default fptools options for texi2html:
-#
-#  - each node in separate file.
-#  - handle texi menus and glossaries.
-#
-# 
-SRC_TEXI2HTML_OPTS +=-menu -verbose -glossary
-
 #
 # Default fptools options for dllwrap.
 #
@@ -107,8 +98,6 @@ LIT2CHANGELOG_OPTS = $(SRC_LIT2CHANGELOG_OPTS) $(WAY$(_way)_LIT2CHANGELOG_OPTS) 
 LIT2HTML_OPTS      = $(SRC_LIT2HTML_OPTS) $(WAY$(_way)_LIT2HTML_OPTS) $(EXTRA_LIT2HTML_OPTS)
 LIT2LATEX_OPTS     = $(SRC_LIT2LATEX_OPTS) $(WAY$(_way)_LIT2LATEX_OPTS) $(EXTRA_LIT2LATEX_OPTS)
 LIT2PGM_OPTS       = $(SRC_LIT2PGM_OPTS) $(WAY$(_way)_LIT2PGM_OPTS) $(EXTRA_LIT2PGM_OPTS)
-LIT2TEXI_OPTS      = $(SRC_LIT2TEXI_OPTS) $(WAY$(_way)_LIT2TEXI_OPTS) $(EXTRA_LIT2TEXI_OPTS)
-TEXI2HTML_OPTS     = $(SRC_TEXI2HTML_OPTS) $(WAY$(_way)_TEXI2HTML_OPTS) $(EXTRA_TEXI2HTML_OPTS)
 MKDEPENDC_OPTS     = $(SRC_MKDEPENDC_OPTS) $(WAY$(_way)_MKDEPENDC_OPTS) $(EXTRA_MKDEPENDC_OPTS)
 MKDEPENDHS_OPTS    = $(SRC_MKDEPENDHS_OPTS) $(WAY$(_way)_MKDEPENDHS_OPTS) \
                      $(EXTRA_MKDEPENDHS_OPTS)
@@ -116,6 +105,7 @@ MKDEPENDLIT_OPTS   = $(SRC_MKDEPENDLIT_OPTS) $(WAY$(_way)_MKDEPENDLIT_OPTS) \
                      $(EXTRA_MKDEPENDLIT_OPTS)
 SGML2DVI_OPTS      = $(SRC_SGML2DVI_OPTS) $(WAY$(_way)_SGML2DVI_OPTS) $(EXTRA_SGML2DVI_OPTS)
 SGML2PS_OPTS       = $(SRC_SGML2PS_OPTS) $(WAY$(_way)_SGML2PS_OPTS) $(EXTRA_SGML2PS_OPTS)
+SGML2PDF_OPTS      = $(SRC_SGML2PDF_OPTS) $(WAY$(_way)_SGML2PDF_OPTS) $(EXTRA_SGML2PDF_OPTS)
 SGML2RTF_OPTS      = $(SRC_SGML2RTF_OPTS) $(WAY$(_way)_SGML2RTF_OPTS) $(EXTRA_SGML2RTF_OPTS)
 SGML2HTML_OPTS     = $(SRC_SGML2HTML_OPTS) $(WAY$(_way)_SGML2HTML_OPTS) $(EXTRA_SGML2HTML_OPTS)
 UGEN_OPTS          = $(SRC_UGEN_OPTS) $(WAY$(_way)_UGEN_OPTS) $(EXTRA_UGEN_OPTS)

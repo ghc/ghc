@@ -380,7 +380,6 @@ datadir                 = @datadir@
 #sharedstatedir          = @sharedstatedir@
 #localstatedir           = @localstatedir@
 libdir                  = @libdir@
-infodir		        = @infodir@
 includedir              = @includedir@
 oldincludedir           = @oldincludedir@
 mandir			= @mandir@
@@ -412,9 +411,6 @@ datadir		= $(prefix)/share
 endif
 ifeq "$(strip $(libdir))" ""
 libdir		= $(exec_prefix)/lib
-endif
-ifeq "$(strip $(infodir))" ""
-infodir		= $(prefix)/info
 endif
 ifeq "$(strip $(includedir))" ""
 includedir	= $(prefix)/include
@@ -486,8 +482,6 @@ MKDIRHIER_PREFIX	= $(GLAFP_UTILS)/mkdirhier/
 LITERATE	    	= $(FPTOOLS_TOP)/literate
 
 LITERATE_PREFIX    	= $(FPTOOLS_TOP)/literate/
-INFO_PREFIX    	        = $(FPTOOLS_TOP)/literate/info-utils/
-TEXI2HTML_PREFIX        = $(LITERATE_PREFIX)texi2html/
 
 HAPPY_PREFIX    	= $(FPTOOLS_TOP)/happy/src/
 GREENCARD_PREFIX	= $(FPTOOLS_TOP)/green-card/src/
@@ -676,17 +670,12 @@ BLD_DLL			= dllwrap
 #
 # Stuff from fptools/literate
 #
-INFO         		= $(UTIL_PREFIX)info
-MAKEINFO     		= $(INFO_PREFIX)makeinfo
-POSTMAKEINFO 		= $(INFO_PREFIX)postmakeinfo
 LIT2PGM 		= $(LITERATE_PREFIX)lit2pgm
-LIT2TEXI      		= $(LITERATE_PREFIX)lit2texi
 LIT2HTML      		= $(LITERATE_PREFIX)lit2html
 LIT2LATEX     		= $(LITERATE_PREFIX)lit2latex
 MKDEPENDLIT   		= $(LITERATE_PREFIX)mkdependlit
 LIT2CHANGELOG 		= $(LITERATE_PREFIX)lit2changelog
 LIT2TEXT 		= $(LITERATE_PREFIX)lit2text
-TEXI2HTML               = $(TEXI2HTML_PREFIX)texi2html
 
 #
 # Stuff from fptools/ghc/utils
