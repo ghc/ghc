@@ -273,6 +273,21 @@ qid_to_pmod(q)
   return mod;
 }
 
+/* Darkly mysterious function used to construct "special-syntax"
+   identifiers.  These mean their prelude versions regardless of
+   context, which is why they are distinguished.  
+
+   We build a gid node (rather than a qual or non-qual name node;
+   look at qid.ugn) with a key (number) and a string.  Here's the 
+   deal
+
+		key
+		-2	function arrow ->
+		-1	list type constructor [], or the empty list []
+		0	unit type constructor (), or the unity value ()
+		n	n-tuple type constructor (,,,)
+*/
+		
 qid
 creategid(i)
   long i;
