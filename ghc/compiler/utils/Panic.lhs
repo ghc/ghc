@@ -121,10 +121,16 @@ showGhcException (Panic s)
 	         ++ "to glasgow-haskell-bugs@haskell.org,\n"
 		 ++ "or http://sourceforge.net/projects/ghc/.\n\n")
 
+#if __GLASGOW_HASKELL__ < 630
+myMkTyConApp = mkAppTy
+#else 
+myMkTyConApp = mkTyConApp
+#endif
+
 ghcExceptionTc = mkTyCon "GhcException"
 {-# NOINLINE ghcExceptionTc #-}
 instance Typeable GhcException where
-  typeOf _ = mkAppTy ghcExceptionTc []
+  typeOf _ = myMkTyConApp ghcExceptionTc []
 \end{code}
 
 Panics and asserts.
