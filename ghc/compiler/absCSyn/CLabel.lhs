@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.23 1999/01/20 16:07:43 simonm Exp $
+% $Id: CLabel.lhs,v 1.24 1999/03/02 16:44:26 sof Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -46,7 +46,7 @@ module CLabel (
 	
 	needsCDecl, isReadOnly, isAsmTemp, externallyVisibleCLabel,
 
-	CLabelType(..), labelType,
+	CLabelType(..), labelType, labelDynamic,
 
 	pprCLabel
 #if ! OMIT_NATIVE_CODEGEN
@@ -61,9 +61,11 @@ module CLabel (
 import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 #endif
 
+import CmdLineOpts      ( opt_Static )
 import CStrings		( pp_cSEP )
 import DataCon		( ConTag, DataCon )
-import Name		( Name, isExternallyVisibleName )
+import Module		( isDynamicModule )
+import Name		( Name, getName, isExternallyVisibleName, nameModule, isLocallyDefinedName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
 import PrimOp		( PrimOp, pprPrimOp )
@@ -318,6 +320,24 @@ labelType (DataConLabel _ info) =
 
 labelType _        = DataType
 \end{code}
+
+When referring to data in code, we need to know whether
+that data resides in a DLL or not. [Win32 only.]
+@labelDynamic@ returns @True@ if the label is located
+in a DLL, be it a data reference or not.
+
+\begin{code}
+labelDynamic :: CLabel -> Bool
+labelDynamic lbl = 
+  case lbl of
+   RtsLabel _  -> not opt_Static  -- i.e., is the RTS in a DLL or not?
+   IdLabel n k      | not (isLocallyDefinedName n) -> isDynamicModule (nameModule n)
+   DataConLabel n k | not (isLocallyDefinedName n) -> isDynamicModule (nameModule n)
+   TyConLabel tc    | not (isLocallyDefinedName (getName tc)) -> isDynamicModule (nameModule (getName tc))
+   _ -> False
+
+\end{code}
+
 
 OLD?: These GRAN functions are needed for spitting out GRAN_FETCH() at the
 right places. It is used to detect when the abstractC statement of an

@@ -30,7 +30,7 @@ import CallConv		( CallConv, callConvAttribute, cCallConv )
 import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  isReadOnly, needsCDecl, pprCLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel,
-			  CLabel, CLabelType(..), labelType
+			  CLabel, CLabelType(..), labelType, labelDynamic
 			)
 
 import CmdLineOpts	( opt_SccProfilingOn, opt_EmitCExternDecls, opt_GranMacros )
@@ -251,7 +251,10 @@ pprAbsC stmt@(CSRT lbl closures) c
       $$ nest 2 (hcat (punctuate comma (map pp_closure_lbl closures)))
          <> ptext SLIT("};")
   }
-  where pp_closure_lbl lbl = char '&' <> pprCLabel lbl
+  where 
+    pp_closure_lbl lbl
+      | labelDynamic lbl = text "DLL_SRT_ENTRY" <> parens (pprCLabel lbl)
+      | otherwise	 = char '&' <> pprCLabel lbl
 
 pprAbsC stmt@(CBitmap lbl mask) c
   = vcat [
@@ -353,7 +356,7 @@ pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 		pprCLabel info_lbl,				comma,
 		if_profiling (pprAmode cost_centre), 		comma,
 		ppLocalness closure_lbl,			comma,
-		ppLocalnessMacro info_lbl,
+		ppLocalnessMacro True{-include dyn-} info_lbl,
 		char ')'
 		],
 	nest 2 (ppr_payload (amodes ++ padding_wds)),
@@ -400,8 +403,8 @@ pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast srt cl_descr) _
 	    pprCLabel slow_lbl,				comma,
 	    pp_rest, {- ptrs,nptrs,[srt,]type,-}	comma,
 
-	    ppLocalness info_lbl,			comma,
-	    ppLocalnessMacro slow_lbl,			comma,
+	    ppLocalness info_lbl,			   comma,
+	    ppLocalnessMacro True{-include dyn-} slow_lbl, comma,
 
 	    if_profiling pp_descr, comma,
 	    if_profiling pp_type,
@@ -465,7 +468,7 @@ pprAbsC stmt@(CRetDirect uniq code srt liveness) _
 	  pp_srt_info srt,			  -- SRT
 	  ptext type_str,		comma,	  -- closure type
 	  ppLocalness info_lbl, 	comma,	  -- info table storage class
-	  ppLocalnessMacro entry_lbl, 	comma,    -- entry pt storage class
+	  ppLocalnessMacro True{-include dyn-} entry_lbl, 	comma,    -- entry pt storage class
 	  int 0, comma,
 	  int 0, text ");"
       ],
@@ -535,18 +538,33 @@ ppLocalness label
 -- Horrible macros for declaring the types and locality of labels (see
 -- StgMacros.h).
 
-ppLocalnessMacro clabel =
+ppLocalnessMacro include_dyn_prefix clabel =
      hcat [
-       char (if externallyVisibleCLabel clabel then 'E' else 'I'),
-       case labelType clabel of
-	  InfoTblType -> ptext SLIT("I_")
+        visiblity_prefix,
+	dyn_prefix,
+        case label_type of
 	  ClosureType -> ptext SLIT("C_")
 	  CodeType    -> ptext SLIT("F_")
+	  InfoTblType -> ptext SLIT("I_")
 	  DataType    -> ptext SLIT("D_") <>
 				   if isReadOnly clabel 
 				      then ptext SLIT("RO_") 
 				      else empty 
      ]
+  where
+   is_visible = externallyVisibleCLabel clabel
+   label_type = labelType clabel
+   is_dynamic = labelDynamic clabel
+
+   visiblity_prefix
+     | is_visible = char 'E'
+     | otherwise  = char 'I'
+
+   dyn_prefix
+     | not include_dyn_prefix = empty
+     | is_dynamic	      = char 'D'
+     | otherwise	      = empty
+
 \end{code}
 
 \begin{code}
@@ -1115,7 +1133,7 @@ ppr_amode (CReg magic_id) = pprMagicId magic_id
 
 ppr_amode (CTemp uniq kind) = char '_' <> pprUnique uniq <> char '_'
 
-ppr_amode (CLbl label kind) = pprCLabelAddr label
+ppr_amode (CLbl label kind) = pprCLabelAddr label 
 
 ppr_amode (CCharLike ch)
   = hcat [ptext SLIT("CHARLIKE_CLOSURE"), char '(', pprAmode ch, rparen ]
@@ -1365,14 +1383,17 @@ pprTempDecl :: Unique -> PrimRep -> SDoc
 pprTempDecl uniq kind
   = hcat [ pprPrimKind kind, space, char '_', pprUnique uniq, ptext SLIT("_;") ]
 
-pprExternDecl :: CLabel -> PrimRep -> SDoc
+pprExternDecl :: Bool -> CLabel -> SDoc
+pprExternDecl in_srt clabel
+  | not (needsCDecl clabel) = empty -- do not print anything for "known external" things
+  | otherwise		    = 
+	hcat [ ppLocalnessMacro (not in_srt) clabel, 
+	       lparen, dyn_wrapper (pprCLabel clabel), pp_paren_semi ]
+ where
+  dyn_wrapper d
+    | in_srt && labelDynamic clabel = text "DLL_IMPORT_DATA_VAR" <> parens d
+    | otherwise			    = d
 
-pprExternDecl clabel kind
-  = if not (needsCDecl clabel) then
-	empty -- do not print anything for "known external" things
-    else 
-	hcat [ ppLocalnessMacro clabel, 
-	       lparen, pprCLabel clabel, pp_paren_semi ]
 \end{code}
 
 \begin{code}
@@ -1416,7 +1437,7 @@ ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre)
 	      if label_seen then
 		  Nothing
 	      else
-		  Just (pprExternDecl info_lbl PtrRep))
+		  Just (pprExternDecl False{-not in an SRT decl-} info_lbl))
   where
     info_lbl = infoTableLabelFromCI cl_info
 
@@ -1457,7 +1478,7 @@ ppr_decls_AbsC (CSRT lbl closure_lbls)
   = mapTE labelSeenTE closure_lbls		`thenTE` \ seen ->
     returnTE (Nothing, 
 	      if and seen then Nothing
-		else Just (vcat [ pprExternDecl l PtrRep
+		else Just (vcat [ pprExternDecl True{-in SRT decl-} l
 				| (l,False) <- zip closure_lbls seen ]))
 
 ppr_decls_AbsC (CRetDirect     _ code _ _)   = ppr_decls_AbsC code
@@ -1495,7 +1516,7 @@ ppr_decls_Amode (CLbl label VoidRep)
 ppr_decls_Amode (CLbl label kind)
   = labelSeenTE label `thenTE` \ label_seen ->
     returnTE (Nothing,
-	      if label_seen then Nothing else Just (pprExternDecl label kind))
+	      if label_seen then Nothing else Just (pprExternDecl False{-not in an SRT decl-} label))
 
 ppr_decls_Amode (CTableEntry base index _)
   = ppr_decls_Amode base    `thenTE` \ p1 ->
@@ -1542,6 +1563,7 @@ pprCLabelAddr clabel =
   where
     addr_of_label = ptext SLIT("(P_)&") <> pp_label
     pp_label = pprCLabel clabel
+
 \end{code}
 
 -----------------------------------------------------------------------------
