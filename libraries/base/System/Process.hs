@@ -172,8 +172,8 @@ runInteractiveCommand string = do
 
     For example, to start a process and feed a string to its stdin:
    
->   (in,out,err,pid) <- runInteractiveProcess "..."
->   forkIO (hPutStr in str)
+>   (inp,out,err,pid) <- runInteractiveProcess "..."
+>   forkIO (hPutStr inp str)
 -}
 runInteractiveProcess
   :: FilePath			-- ^ Filename of the executable
