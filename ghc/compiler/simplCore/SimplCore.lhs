@@ -132,6 +132,8 @@ doCorePass dfs rb us binds CoreDoUSPInf
    = _scc_ "CoreUsageSPInf" noStats dfs (doUsageSPInf dfs us binds)
 doCorePass dfs rb us binds CoreDoGlomBinds	        
    = noStats dfs (glomBinds dfs binds)
+doCorePass dfs rb us binds CoreDoNothing
+   = noStats dfs (return binds)
 
 printCore binds = do dumpIfSet True "Print Core"
 			       (pprCoreBindings binds)
