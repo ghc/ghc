@@ -1,6 +1,6 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
-WAYS=
+override WAYS=
 
 C_SRCS=unlit.c
 C_PROG=unlit
