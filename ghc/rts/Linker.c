@@ -3137,6 +3137,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             break;
 #        endif
 
+#if x86_64_HOST_OS
       case R_X86_64_64:
 	  *(Elf64_Xword *)P = value;
 	  break;
@@ -3152,6 +3153,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       case R_X86_64_32S:
 	  *(Elf64_Sword *)P = (Elf64_Sword)value;
 	  break;
+#endif
 
          default:
             errorBelch("%s: unhandled ELF relocation(RelA) type %d\n",
