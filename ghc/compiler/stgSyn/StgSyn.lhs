@@ -71,7 +71,7 @@ with respect to binder and occurrence information (just as in
 data GenStgBinding bndr occ
   = StgNonRec	bndr (GenStgRhs bndr occ)
   | StgRec	[(bndr, GenStgRhs bndr occ)]
-  | StgCoerceBinding bndr occ
+  | StgCoerceBinding bndr occ			-- UNUSED?
 \end{code}
 
 %************************************************************************
