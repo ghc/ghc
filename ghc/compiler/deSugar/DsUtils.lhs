@@ -597,17 +597,14 @@ mkTupleExpr ids
 
 chunkify :: [a] -> [[a]]
 -- The sub-lists of the result all have length <= mAX_TUPLE_SIZE
+-- But there may be more than mAX_TUPLE_SIZE sub-lists
 chunkify xs
-  | n_xs <= mAX_TUPLE_SIZE = [xs]
-  | otherwise		   = split xs
+  | n_xs <= mAX_TUPLE_SIZE = pprTrace "Small" (ppr n_xs) [xs] 
+  | otherwise		   = pprTrace "Big" (ppr n_xs) (split xs)
   where
-	-- n_chunks_m1 = numbe of chunks - 1
-    n_xs        = length xs
-    n_chunks_m1 = n_xs `div` mAX_TUPLE_SIZE
-    chunk_size  = n_xs `div` n_chunks_m1
-
+    n_xs     = length xs
     split [] = []
-    split xs = take chunk_size xs : split (drop chunk_size xs)
+    split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
 \end{code}
 
 
