@@ -701,6 +701,38 @@ file).
 
 </Sect2>
 
+  <sect2 id="unreg">
+    <title>Unregisterised compilation</title>
+    <indexterm><primary>unregisterised compilation</primary></indexterm>
+
+    <para>The term "unregisterised" really means "compile via vanilla
+    C", disabling some of the platform-specific tricks that GHC
+    normally uses to make programs go faster.  When compiling
+    unregisterised, GHC simply generates a C file which is compiled
+    via gcc.</para>
+
+    <para>Unregisterised compilation can be useful when porting GHC to
+    a new machine, since it reduces the prerequisite tools to
+    <program>gcc</program>, <program>as</program>, and
+    <program>ld</program> and nothing more, and furthermore the amount
+    of platform-specific code that needs to be written in order to get
+    unregisterised compilation going is usually fairly small.</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>-unreg</option>:</term>
+	<indexterm><primary><option>-unreg</option></primary></indexterm>
+	<listitem>
+	  <para>Compile via vanilla ANSI C only, turning off
+	  platform-specific optimisations.  NOTE: in order to use
+	  <option>-unreg</option>, you need to have a set of libraries
+	  (including the RTS) built for unregisterised compilation.
+	  This amounts to building GHC with way "u" enabled.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </sect2>
+
 </Sect1>
 
 <!-- Emacs stuff:
