@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.191 2005/02/25 13:07:10 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.192 2005/02/28 16:01:52 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -598,9 +598,11 @@ showDecl exts want_name (IfaceData {ifName = tycon,
 showDecl exts want_name (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 		      ifFDs = fds, ifSigs = sigs})
   = hang (ptext SLIT("class") <+> pprIfaceDeclHead context clas tyvars
-		<+> pprFundeps fds <+> ptext SLIT("where"))
+		<+> pprFundeps fds <+> opt_where)
        2 (vcat (ppr_trim show_op sigs))
   where
+    opt_where | null sigs = empty
+	      | otherwise = ptext SLIT("where")
     show_op (IfaceClassOp op dm ty) 
 	| want_name clas || want_name op 
 	= Just (ppr_bndr op <+> dcolon <+> showType exts ty)
