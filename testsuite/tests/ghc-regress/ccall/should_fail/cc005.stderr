@@ -1,10 +1,8 @@
 
-cc005.hs:7:
+./cc005.hs:7:
     Unacceptable argument type in foreign declaration: Int#
-    When checking declaration:
-	foreign export _ccall "foo" foo :: Int# -> IO ()
+    When checking declaration: foreign export foo foo :: Int# -> IO ()
 
-cc005.hs:10:
+./cc005.hs:10:
     Unacceptable result type in foreign declaration: Int#
-    When checking declaration:
-	foreign export _ccall "bar" bar :: Int -> Int#
+    When checking declaration: foreign export bar bar :: Int -> Int#

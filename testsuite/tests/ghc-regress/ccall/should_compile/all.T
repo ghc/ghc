@@ -9,13 +9,15 @@ def myvtc($extra_comp_args)
    vtc(" -fglasgow-exts -package lang " ++ $extra_comp_args)
 }
 
+$compile_to_hc = "True"
+
 test "cc001" { myvtc("") }
 test "cc002" { myvtc("") }
 test "cc003" { myvtc("") }
-test "cc004" { myvtc("-fvia-C") }
-test "cc005" { myvtc("-fvia-C") }
-test "cc006" { myvtc("-fvia-C -fno-prune-tydecls") }
+test "cc004" { myvtc("") }
+test "cc005" { myvtc("") }
+test "cc006" { myvtc("-fno-prune-tydecls") }
 test "cc007" { myvtc("") }
 test "cc008" { myvtc("") }
 test "cc009" { myvtc("") }
-test "cc010" { myvtc("-fvia-C") }
+test "cc010" { myvtc("") }

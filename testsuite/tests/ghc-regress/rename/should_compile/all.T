@@ -3,8 +3,6 @@ include ($confdir ++ "/../vanilla-test.T")
 
 -- Args to vtc are: extra compile flags
 
---Rn037Help.hs
-
 test "rn003" { vtc("") }
 test "rn005" { vtc("") }
 test "rn006" { vtc("") }
@@ -31,17 +29,7 @@ test "rn033" { vtc("") }
 test "rn034" { vtc("") }
 test "rn035" { vtc("") }
 test "rn036" { vtc("") }
-test "rn037" { vtc("") }
+
 test "timing001" { vtc("") }
 test "timing002" { vtc("") }
 test "timing003" { vtc("") }
-
--- There used to be a -noC flag, but I removed it because
--- Rn037Help needs to generate an interface file, and
--- if -noC is on I can't see how to.  (Driver grottiness.)
--- rn017_HC_OPTS = -hi -hi-with-exports
--- rn025_HC_OPTS = -hi -hi-with-exports
--- Rn037Help_HC_OPTS = -hi
---
--- CLEAN_FILES += Confused.hi Foo.hi Imp10.hi Imp100.hi Imp1000.hi \
---	Imp500.hi Main.hi Mod10.hi OK.hi ShouldSucceed.hi Silly.hi Test.hi

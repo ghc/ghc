@@ -5,7 +5,7 @@ include ($confdir ++ "/../vanilla-test.T")
 
 def myvtcf ( $args )
 {
-   vtcf ( " -package lang " ++ $args)
+   vtcf ( " -fglasgow-exts -package lang " ++ $args)
 }
 
 test "cc001" { myvtcf("") }

@@ -1,0 +1,42 @@
+*** Testing: toDyn ***
+[ <<Int>>
+, <<Char>>
+, <<Bool>>
+, <<Float>>
+, <<Double>>
+, <<Integer>>
+, <<IO ()>>
+, <<[Dynamic]>>
+, <<[Int]>>
+, <<Maybe Int>>
+, <<Maybe Int>>
+, <<Maybe Int>>
+, <<Either Int Bool>>
+, <<Either Char Int>>
+, <<()>>
+, <<Ordering>>
+, <<((),Int)>>
+, <<((),Int,Char)>>
+, <<((),Int,Char,Double)>>
+, <<((),Int,Char,Double,(Maybe Bool))>>
+, <<Int -> Int -> Int>>
+, <<Integer -> Integer -> Integer>>
+, <<[Char] -> [Char] -> [Char]>>
+]
+*** Testing: fromDyn ***
+1
+0
+'a'
+1.0
+0
+3.0
+0
+5
+False
+[1,3,5]
+Just True
+Left True
+LT
+False
+4
+[1,2]

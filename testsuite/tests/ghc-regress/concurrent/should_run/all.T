@@ -11,9 +11,6 @@ def myvtr ( $args_c, $args_r, $ret_res )
          $args_r, $ret_res )
 }
 
---conc009_RUNTEST_OPTS = -x 1
---conc021_RUNTEST_OPTS = -x 250 -o2 conc021.stderr-mingw
-
 test "conc001" { myvtr("", "", "") }
 test "conc002" { myvtr("", "", "") }
 test "conc003" { myvtr("", "", "") }
@@ -22,7 +19,7 @@ test "conc005" { myvtr("", "", "") }
 test "conc006" { myvtr("", "", "") }
 test "conc007" { myvtr("", "+RTS -H128M -RTS", "") }
 test "conc008" { myvtr("", "", "") }
-test "conc009" { myvtr("", "", "") }
+test "conc009" { myvtr("", "", "1") }
 test "conc010" { myvtr("", "", "") }
 test "conc012" { myvtr("", "", "") }
 test "conc013" { myvtr("", "", "") }
@@ -34,11 +31,11 @@ test "conc018" { myvtr("", "", "") }
 test "conc019" { myvtr("", "", "") }
 
 --# conc020 *should* work on mingw32
-test "conc020" { skip when $platform == "i386-unknown-mingw32"
+test "conc020" { skip when $os == "mingw32"
                  myvtr("", "", "") }
 
-test "conc021" { skip when $platform == "i386-unknown-mingw32"
-                 myvtr("", "", "") }
+test "conc021" { skip when $os == "mingw32"
+                 myvtr("", "", "250") }
 
 test "conc022" { myvtr("", "", "") }
 test "conc023" { myvtr("", "", "") }

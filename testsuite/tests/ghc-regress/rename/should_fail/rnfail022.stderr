@@ -1,3 +1,2 @@
 
-tests/ghc-regress/rename/should_fail/rnfail022.hs:8:
-    Variable not in scope: `intersperse'
+./rnfail022.hs:8: Variable not in scope: `intersperse'
