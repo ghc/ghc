@@ -5,7 +5,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 override WAYS=
 
-CC:=$(HC)
+CC:=$(GHC)
 
 C_SRCS=$(wildcard *.c)
 
