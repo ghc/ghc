@@ -29,12 +29,12 @@ import HscTypes		( ModuleLocation(..),
 			 )
 import HsSyn		( TyClDecl(..), InstDecl(..),
 			  HsType(..), HsPred(..), FixitySig(..), RuleDecl(..),
-			  tyClDeclNames, tyClDeclSysNames
+			  tyClDeclNames, tyClDeclSysNames, hsTyVarNames
 			)
-import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl,
-			  extractSomeHsTysRdrNames 
-			)
+import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl )
+import RnHsSyn		( extractHsTyNames_s )
 import BasicTypes	( Version, defaultFixity )
+import RnTypes		( rnHsType )
 import RnEnv
 import RnMonad
 import ParseIface	( parseIface )
@@ -43,8 +43,9 @@ import Name		( Name {-instance NamedThing-},
 			  nameModule, isLocalName, nameIsLocalOrFrom
 			 )
 import NameEnv
+import NameSet
 import Module
-import RdrName		( rdrNameOcc, isRdrTc )
+import RdrName		( rdrNameOcc )
 import SrcLoc		( mkSrcLoc )
 import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
@@ -53,6 +54,7 @@ import ErrUtils         ( Message )
 import Finder		( findModule, findPackageModule )
 import Lex
 import FiniteMap
+import ListSetOps	( minusList )
 import Outputable
 import Bag
 import Config
@@ -373,30 +375,39 @@ loadInstDecl mod insts decl@(InstDecl inst_ty _ _ _ _)
 	-- if C is visible and *any one* of the Names in the types
 	-- This is a slightly brutal approximation, but most instance decls
 	-- are regular H98 ones and it's perfect for them.
+	--
+	-- NOTICE that we rename the type before extracting its free
+	-- variables.  The free-variable finder for a renamed HsType 
+	-- does the Right Thing for built-in syntax like [] and (,).
+    initIfaceRnMS mod (
+	rnHsType (text "In an interface instance decl") inst_ty
+    )					`thenRn` \ inst_ty' ->
     let 
-	(cls_name,tys) = get_head inst_ty
-	free_ty_names  = extractSomeHsTysRdrNames isRdrTc tys
-    in
-    lookupIfaceName cls_name			`thenRn` \ cls_name' ->
-    mapRn lookupIfaceName free_ty_names		`thenRn` \ free_ty_names' ->
-    let
-	gate_fn vis_fn = vis_fn cls_name' && any vis_fn free_ty_names'
+	(tvs,(cls,tys)) = get_head inst_ty'
+	free_tcs  = nameSetToList (extractHsTyNames_s tys) `minusList` hsTyVarNames tvs
+
+	gate_fn vis_fn = vis_fn cls && (null free_tcs || any vis_fn free_tcs)
 	-- Here is the implementation of HOWEVER above
+	-- (Note that we do let the inst decl in if it mentions 
+	--  no tycons at all.  Hence the null free_ty_names.)
     in
     returnRn ((gate_fn, (mod, decl)) `consBag` insts)
 
 
 -- In interface files, the instance decls now look like
 --	forall a. Foo a -> Baz (T a)
--- so we have to strip off function argument types as well
--- as the bit before the '=>' (which is always empty in interface files)
+-- so we have to strip off function argument types,
+-- as well as the bit before the '=>' (which is always 
+-- empty in interface files)
 --
 -- The parser ensures the type will have the right shape.
 -- (e.g. see ParseUtil.checkInstType)
 
-get_head (HsForAllTy tvs cxt ty)        = get_head ty
-get_head (HsFunTy _ ty)			= get_head ty
-get_head (HsPredTy (HsClassP cls tys))	= (cls,tys)
+get_head  (HsForAllTy (Just tvs) _ tau) = (tvs, get_head1 tau)
+get_head  tau				= ([],  get_head1 tau)
+
+get_head1 (HsFunTy _ ty)		= get_head1 ty
+get_head1 (HsPredTy (HsClassP cls tys)) = (cls,tys)
 
 
 
@@ -580,15 +591,14 @@ readIface file_path
     bale_out err = returnRn (Left (badIfaceFile file_path err))
 \end{code}
 
-
 %*********************************************************
 %*							*
 \subsection{Looking up fixities}
 %*							*
 %*********************************************************
 
-@lookupFixityRn@ has to be in RnIfaces (or RnHiFiles) because 
-it calls @loadHomeInterface@.
+@lookupFixityRn@ has to be in RnIfaces (or RnHiFiles), instead of
+its obvious home in RnEnv,  because it calls @loadHomeInterface@.
 
 lookupFixity is a bit strange.  
 
@@ -673,4 +683,3 @@ notLoaded mod
 warnSelfImport mod
   = ptext SLIT("Importing my own interface: module") <+> ppr mod
 \end{code}
-

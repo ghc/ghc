@@ -18,15 +18,14 @@ module RnExpr (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnBinds  ( rnBinds ) 
-import {-# SOURCE #-} RnSource ( rnHsTypeFVs )
 
 import HsSyn
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnEnv
+import RnTypes		( rnHsTypeFVs )
 import RnHiFiles	( lookupFixityRn )
-import RdrName		( isRdrTyVar )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange, inCharRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
@@ -210,8 +209,7 @@ bindPatSigTyVars :: [RdrNameHsType]
 bindPatSigTyVars tys thing_inside
   = getLocalNameEnv			`thenRn` \ name_env ->
     let
-	tyvars_in_sigs = extractSomeHsTysRdrNames isRdrTyVar tys
-	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
+	forall_tyvars  = [ tv | ty <- tys, tv <- extractHsTyRdrTyVars ty, not (tv `elemFM` name_env)]
 	doc_sig        = text "In a pattern type-signature"
     in
     bindNakedTyVarsFVRn doc_sig forall_tyvars thing_inside

@@ -18,13 +18,13 @@ module RnBinds (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} RnSource ( rnHsSigType, rnHsType )
 
 import HsSyn
 import HsBinds		( eqHsSig, sigName, hsSigDoc )
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
+import RnTypes		( rnHsSigType, rnHsType )
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, 
 			  lookupGlobalOccRn, lookupSigOccRn,

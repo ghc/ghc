@@ -43,8 +43,7 @@ module RdrHsSyn (
 	RdrMatch(..),
 	SigConverter,
 
-	extractHsTyRdrNames,  extractSomeHsTyRdrNames, 
-	extractHsTysRdrNames, extractSomeHsTysRdrNames, 
+	extractHsTyRdrNames,  extractHsTyRdrTyVars, 
 	extractRuleBndrsTyVars,
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
@@ -66,8 +65,7 @@ import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
 			  mkGenOcc2, 
                       	)
 import PrelNames	( minusName, negateName, fromIntegerName, fromRationalName )
-import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
-			)
+import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc, isRdrTyVar )
 import List		( nub )
 import BasicTypes	( RecFlag(..) )
 import Class            ( DefMeth (..) )
@@ -129,14 +127,8 @@ It's used when making the for-alls explicit.
 extractHsTyRdrNames :: RdrNameHsType -> [RdrName]
 extractHsTyRdrNames ty = nub (extract_ty ty [])
 
-extractHsTysRdrNames :: [RdrNameHsType] -> [RdrName]
-extractHsTysRdrNames tys = nub (extract_tys tys)
-
-extractSomeHsTyRdrNames	 :: (RdrName -> Bool) -> RdrNameHsType -> [RdrName]
-extractSomeHsTyRdrNames ok ty = nub (filter ok (extract_ty ty []))
-
-extractSomeHsTysRdrNames :: (RdrName -> Bool) -> [RdrNameHsType] -> [RdrName]
-extractSomeHsTysRdrNames ok tys = nub (filter ok (extract_tys tys))
+extractHsTyRdrTyVars :: RdrNameHsType -> [RdrName]
+extractHsTyRdrTyVars ty = nub (filter isRdrTyVar (extract_ty ty []))
 
 extractRuleBndrsTyVars :: [RuleBndr RdrName] -> [RdrName]
 extractRuleBndrsTyVars bndrs = filter isRdrTyVar (nub (foldr go [] bndrs))
