@@ -252,7 +252,7 @@ ppPrologue title (Just doc) =
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
   tda [theclass "section1"] << toHtml "Modules" </>
-  pad_td 0 << vanillaTable << htmlTable
+  pad_td Nothing << vanillaTable << htmlTable
   where
     genTable htmlTable id []     = (htmlTable,id)
     genTable htmlTable id (x:xs) = genTable (htmlTable </> u) id' xs      
@@ -265,9 +265,9 @@ mkNode :: [String] -> ModuleTree -> Int -> (HtmlTable,Int)
 mkNode ss (Node s leaf pkg ts) id = htmlNode
   where
     htmlNode = case ts of
-      [] -> ( pad_td 15 << htmlModule                           <-> htmlPkg,id)
-      _  -> ((pad_td  0 << (collapsebutton id_s +++ toHtml " " +++ htmlModule) <-> htmlPkg) </> 
-                (pad_td 20 << sub_tree), id')
+      [] -> ( pad_td (Just 1.25) << htmlModule                           <-> htmlPkg,id)
+      _  -> ((pad_td Nothing<< (collapsebutton id_s +++ htmlModule) <-> htmlPkg) </> 
+                (pad_td (Just 2) << sub_tree), id')
 
     htmlModule 
       | leaf      = ppHsModule mdl
@@ -293,8 +293,9 @@ mkNode ss (Node s leaf pkg ts) id = htmlNode
       where
         (u,id') = mkNode (s:ss) x id
 
-pad_td 0 = tda [width "100%"]
-pad_td n = tda [thestyle ("padding-left:" ++ show n ++ "px"), width "100%"]
+pad_td :: Maybe Float -> Html -> HtmlTable
+pad_td Nothing  = tda [width "100%"]
+pad_td (Just n) = tda [thestyle ("padding-left:" ++ show n ++ "em"), width "100%"]
 
 -- ---------------------------------------------------------------------------
 -- Generate the index
