@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.59 2001/03/06 11:23:46 simonmar Exp $
+-- $Id: Main.hs,v 1.60 2001/03/23 12:11:26 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -18,7 +18,6 @@ module Main (main) where
 
 #ifdef GHCI
 import InteractiveUI
-import Char		( toLower )
 #endif
 
 #ifndef mingw32_TARGET_OS
