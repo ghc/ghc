@@ -34,15 +34,16 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcHsBinds),
 			  mkHsTyLam, mkHsTyApp,
 			  mkHsDictLam, mkHsDictApp )
 
-import TcBinds		( tcBindWithSigs, tcPragmaSigs, TcSigInfo(..) )
+import TcBinds		( tcBindWithSigs, tcPragmaSigs, TcSigInfo(..), checkSigTyVars )
 import TcMonad
 import RnMonad		( SYN_IE(RnNameSupply) )
 import Inst		( Inst, InstOrigin(..), SYN_IE(InstanceMapper),
 			  instToId, newDicts, newMethod, SYN_IE(LIE), emptyLIE, plusLIE )
-import TcBinds		( tcPragmaSigs, checkSigTyVars )
 import PragmaInfo	( PragmaInfo(..) )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcLookupClass, newLocalId, tcExtendGlobalTyVars, tcGetGlobalTyVars )
+import TcEnv		( tcLookupClass, newLocalId, tcExtendGlobalTyVars, tcGetGlobalTyVars,
+			  tcExtendGlobalValEnv, tcAddImportedIdInfo
+			)
 import SpecEnv		( SpecEnv )
 import TcGRHSs		( tcGRHSsAndBinds )
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
@@ -61,23 +62,23 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  concatBag, foldBag, bagToList, listToBag,
 			  Bag )
 import CmdLineOpts	( opt_GlasgowExts, opt_CompilingGhcInternals,
-			  opt_OmitDefaultInstanceMethods,
+			  opt_OmitDefaultInstanceMethods, opt_PprUserLength,
 			  opt_SpecialiseOverloaded
 			)
-import Class		( GenClass, GenClassOp, 
-			  classBigSig, classOps, classOpLocalType,
+import Class		( GenClass,
+			  classBigSig,
 			  classDefaultMethodId, SYN_IE(Class)
 			  )
-import Id		( GenId, idType, isDefaultMethodId_maybe, replacePragmaInfo,
+import Id		( GenId, idType, replacePragmaInfo,
 			  isNullaryDataCon, dataConArgTys, SYN_IE(Id) )
 import ListSetOps	( minusList )
-import Maybes 		( maybeToBool, expectJust, seqMaybe )
-import Name		( nameOccName, getOccString, occNameString, moduleString,
+import Maybes 		( maybeToBool, expectJust, seqMaybe, catMaybes )
+import Name		( nameOccName, getOccString, occNameString, moduleString, getSrcLoc,
 			  isLocallyDefined, OccName, Name{--O only-}, SYN_IE(Module),
 			  NamedThing(..)
 			)
-import PrelVals		( nO_EXPLICIT_METHOD_ERROR_ID )
-import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
+import PrelVals		( nO_EXPLICIT_METHOD_ERROR_ID, nO_DEFAULT_METHOD_ERROR_ID )
+import PprType		( GenType, GenTyVar, GenClass, TyCon,
 			  pprParendGenType
 			)
 import Outputable
@@ -94,7 +95,7 @@ import TyVar		( GenTyVar, SYN_IE(GenTyVarSet), tyVarSetToList,
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, Uniquable(..) )
-import Util		( zipEqual, panic, pprPanic, pprTrace, removeDups, Ord3(..),
+import Util		( zipEqual, panic, pprPanic, pprTrace, removeDups, Ord3(..)
 #if __GLASGOW_HASKELL__ < 202
 		          , trace 
 #endif
@@ -175,16 +176,17 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 \end{enumerate}
 
 \begin{code}
-tcInstDecls1 :: [RenamedHsDecl]
+tcInstDecls1 :: TcEnv s			-- Contains IdInfo for dfun ids
+	     -> [RenamedHsDecl]
 	     -> Module			-- module name for deriving
 	     -> RnNameSupply			-- for renaming derivings
 	     -> TcM s (Bag InstInfo,
 		       RenamedHsBinds,
 		       PprStyle -> Doc)
 
-tcInstDecls1 decls mod_name rn_name_supply
+tcInstDecls1 unf_env decls mod_name rn_name_supply
   = 	-- Do the ordinary instance declarations
-    mapNF_Tc (tcInstDecl1 mod_name) 
+    mapNF_Tc (tcInstDecl1 unf_env mod_name) 
 	     [inst_decl | InstD inst_decl <- decls]	`thenNF_Tc` \ inst_info_bags ->
     let
 	decl_inst_info = unionManyBags inst_info_bags
@@ -202,9 +204,9 @@ tcInstDecls1 decls mod_name rn_name_supply
     returnTc (full_inst_info, deriv_binds, ddump_deriv)
 
 
-tcInstDecl1 :: Module -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
+tcInstDecl1 :: TcEnv s -> Module -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
 
-tcInstDecl1 mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
+tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
   = 	-- Prime error recovery, set source location
     recoverNF_Tc (returnNF_Tc emptyBag)	$
     tcAddSrcLoc src_loc			$
@@ -225,12 +227,14 @@ tcInstDecl1 mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
 					`thenTc` \ (inst_tycon,arg_tys) ->
 
 	-- Make the dfun id and constant-method ids
-    mkInstanceRelatedIds dfun_name
-		         clas inst_tyvars inst_tau inst_theta
-					`thenNF_Tc` \ (dfun_id, dfun_theta) ->
-
+    let
+	(dfun_id, dfun_theta) = mkInstanceRelatedIds dfun_name
+				         clas inst_tyvars inst_tau inst_theta
+	-- Add info from interface file
+	final_dfun_id = tcAddImportedIdInfo unf_env dfun_id
+    in
     returnTc (unitBag (InstInfo clas inst_tyvars inst_tau inst_theta	
-				dfun_theta dfun_id
+			dfun_theta final_dfun_id
 			     	binds src_loc uprags))
   where
     (tyvar_names, context, dict_ty) = case poly_ty of
@@ -250,15 +254,15 @@ tcInstDecl1 mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
 
 \begin{code}
 tcInstDecls2 :: Bag InstInfo
-	     -> NF_TcM s (LIE s, TcHsBinds s)
+	     -> NF_TcM s (LIE s, TcMonoBinds s)
 
 tcInstDecls2 inst_decls
-  = foldBag combine tcInstDecl2 (returnNF_Tc (emptyLIE, EmptyBinds)) inst_decls
+  = foldBag combine tcInstDecl2 (returnNF_Tc (emptyLIE, EmptyMonoBinds)) inst_decls
   where
     combine tc1 tc2 = tc1 	`thenNF_Tc` \ (lie1, binds1) ->
 		      tc2	`thenNF_Tc` \ (lie2, binds2) ->
 		      returnNF_Tc (lie1 `plusLIE` lie2,
-				   binds1 `ThenBinds` binds2)
+				   binds1 `AndMonoBinds` binds2)
 \end{code}
 
 
@@ -329,14 +333,14 @@ is the @dfun_theta@ below.
 First comes the easy case of a non-local instance decl.
 
 \begin{code}
-tcInstDecl2 :: InstInfo -> NF_TcM s (LIE s, TcHsBinds s)
+tcInstDecl2 :: InstInfo -> NF_TcM s (LIE s, TcMonoBinds s)
 
 tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 		      inst_decl_theta dfun_theta
 		      dfun_id monobinds
 		      locn uprags)
   | not (isLocallyDefined dfun_id)
-  = returnNF_Tc (emptyLIE, EmptyBinds)
+  = returnNF_Tc (emptyLIE, EmptyMonoBinds)
 
 {-
   -- I deleted this "optimisation" because when importing these
@@ -351,8 +355,8 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 
   | otherwise
   =	 -- Prime error recovery
-    recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyBinds)) 	$
-    tcAddSrcLoc locn					$
+    recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))  $
+    tcAddSrcLoc locn					   $
 
 	-- Get the class signature
     tcInstSigTyVars inst_tyvars		`thenNF_Tc` \ (inst_tyvars', _, tenv) ->
@@ -360,7 +364,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	origin = InstanceDeclOrigin
         (class_tyvar,
 	 super_classes, sc_sel_ids,
-	 class_ops, op_sel_ids, defm_ids) = classBigSig clas
+	 op_sel_ids, defm_ids) = classBigSig clas
     in
     tcInstType tenv inst_ty		`thenNF_Tc` \ inst_ty' ->
     tcInstTheta tenv dfun_theta		`thenNF_Tc` \ dfun_theta' ->
@@ -390,8 +394,10 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     in
     mapTc check_from_this_class (bagToList (collectMonoBinders monobinds))	`thenTc_`
     tcExtendGlobalTyVars inst_tyvars_set' (
-	mapAndUnzip3Tc (tcMethodBind (getDefmRhs clas) inst_ty' prag_fn monobinds) 
-		       (op_sel_ids `zip` [0..])
+        tcExtendGlobalValEnv (catMaybes defm_ids) $
+		-- Default-method Ids may be mentioned in synthesised RHSs 
+	mapAndUnzip3Tc (tcMethodBind clas inst_ty' monobinds) 
+		       (op_sel_ids `zip` defm_ids)
     )				 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
 	-- Check the overloading constraints of the methods and superclasses
@@ -427,28 +433,16 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	method_binds = andMonoBinds method_binds_s
 
 	main_bind
-	  = MonoBind (
-		AbsBinds
+	  = AbsBinds
 		 inst_tyvars'
 		 dfun_arg_dicts_ids
 		 [(inst_tyvars', RealId dfun_id, this_dict_id)] 
 		 (super_binds	`AndMonoBinds` 
 		  method_binds	`AndMonoBinds`
-		  dict_bind))
-		[] recursive		-- Recursive to play safe
+		  dict_bind)
     in
     returnTc (const_lie `plusLIE` spec_lie,
-	      main_bind `ThenBinds` spec_binds)
-\end{code}
-
-The next function looks for a method binding; if there isn't one it
-manufactures one that just calls the global default method.
-
-See the notes under default decls in TcClassDcl.lhs.
-
-\begin{code}
-getDefmRhs :: Class -> Int -> RenamedHsExpr
-getDefmRhs clas idx = HsVar (getName (classDefaultMethodId clas idx))
+	      main_bind `AndMonoBinds` spec_binds)
 \end{code}
 
 
@@ -460,32 +454,32 @@ getDefmRhs clas idx = HsVar (getName (classDefaultMethodId clas idx))
 
 \begin{code}
 tcMethodBind 
-	:: (Int -> RenamedHsExpr)			-- Function mapping a tag to default RHS
+	:: Class
 	-> TcType s					-- Instance type
-	-> (Name -> PragmaInfo)
 	-> RenamedMonoBinds				-- Method binding
-	-> (Id, Int)					-- Selector ID (and its 0-indexed tag)
-							--  for which binding is wanted
+	-> (Id, Maybe Id)				-- Selector id and default-method id
 	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
 
-tcMethodBind deflt_fn inst_ty prag_fn meth_binds (sel_id, idx)
-  = newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId meth_id) ->
-    tcInstSigTcType (idType meth_id)		`thenNF_Tc` \ (tyvars', rho_ty') ->
+tcMethodBind clas inst_ty meth_binds (sel_id, maybe_dm_id)
+  = newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId local_meth_id) ->
+    tcInstSigTcType (idType local_meth_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
     let
-	meth_name    = getName meth_id
-	default_bind = PatMonoBind (VarPatIn meth_name)
-				   (GRHSsAndBindsIn [OtherwiseGRHS (deflt_fn idx) noSrcLoc] EmptyBinds)
-				   noSrcLoc
+	meth_name    = getName local_meth_id
 
-        (op_name, op_bind) = case go (getOccName sel_id) meth_binds of
-				Just stuff -> stuff
-				Nothing    -> (meth_name, default_bind)
+	maybe_meth_bind      = go (getOccName sel_id) meth_binds 
+        (bndr_name, op_bind) = case maybe_meth_bind of
+				  Just stuff -> stuff
+				  Nothing    -> (meth_name, mk_default_bind meth_name)
 
 	(theta', tau')  = splitRhoTy rho_ty'
-	meth_id_w_prags = replacePragmaInfo meth_id (prag_fn meth_name)
-	sig_info        = TySigInfo op_name meth_id_w_prags tyvars' theta' tau' noSrcLoc
+	sig_info        = TySigInfo bndr_name local_meth_id tyvars' theta' tau' noSrcLoc
     in
-    tcBindWithSigs [op_name] op_bind [sig_info]
+
+	-- Warn if no method binding
+    warnTc (not (maybeToBool maybe_meth_bind) && not (maybeToBool maybe_dm_id))	
+	   (omittedMethodWarn sel_id clas)		`thenNF_Tc_`
+
+    tcBindWithSigs [bndr_name] op_bind [sig_info]
 		   nonRecursive (\_ -> NoPragmaInfo)	`thenTc` \ (binds, insts, _) ->
 
     returnTc (binds, insts, meth)
@@ -500,6 +494,23 @@ tcMethodBind deflt_fn inst_ty prag_fn meth_binds (sel_id, idx)
     go occ b@(PatMonoBind (VarPatIn op_name) _ locn) | nameOccName op_name == occ = Just (op_name, b)
 						     | otherwise		  = Nothing
     go occ other = panic "Urk! Bad instance method binding"
+
+
+    mk_default_bind local_meth_name
+      = PatMonoBind (VarPatIn local_meth_name)
+		    (GRHSsAndBindsIn [OtherwiseGRHS default_expr noSrcLoc] EmptyBinds)
+		    noSrcLoc
+
+    default_expr = case maybe_dm_id of
+			Just dm_id -> HsVar (getName dm_id)	-- There's a default method
+			Nothing    -> error_expr		-- No default method
+
+    error_expr = HsApp (HsVar (getName nO_DEFAULT_METHOD_ERROR_ID)) 
+			      (HsLit (HsString (_PK_ error_msg)))
+
+    error_msg = show (hcat [ppr (PprForUser opt_PprUserLength) (getSrcLoc sel_id), text "|", 
+			    ppr (PprForUser opt_PprUserLength) sel_id
+		])
 \end{code}
 
 
@@ -730,7 +741,7 @@ instTypeErr ty sty
   = case ty of
       SynTy tc _ _ -> hsep [ptext SLIT("The type synonym"), ppr sty tc, rest_of_msg]
       TyVarTy tv   -> hsep [ptext SLIT("The type variable"), ppr sty tv, rest_of_msg]
-      other	   -> hsep [ptext SLIT("The type"), ppr sty ty, rest_of_msg]
+      other	   -> sep [ptext SLIT("The type"), nest 4 (ppr sty ty), rest_of_msg]
   where
     rest_of_msg = ptext SLIT("cannot be used as an instance type")
 
@@ -743,24 +754,14 @@ derivingWhenInstanceExistsErr clas tycon sty
 		       ptext SLIT("type"), ppr sty tycon])
          4 (ptext SLIT("when an explicit instance exists"))
 
-derivingWhenInstanceImportedErr inst_mod clas tycon sty
-  = hang (hsep [ptext SLIT("Deriving class"), 
-		       ppr sty clas, 
-		       ptext SLIT("type"), ppr sty tycon])
-         4 (hsep [ptext SLIT("when an instance declared in module"), 
-		       pp_mod, ptext SLIT("has been imported")])
-  where
-    pp_mod = hsep [ptext SLIT("module"), ptext inst_mod]
-
 nonBoxedPrimCCallErr clas inst_ty sty
   = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
 	 4 (hsep [ ptext SLIT("class"), ppr sty clas, ptext SLIT("type"),
     		        ppr sty inst_ty])
 
-omitDefaultMethodWarn clas_op clas_name inst_ty sty
-  = hsep [ptext SLIT("Warning: Omitted default method for"),
-	   ppr sty clas_op, ptext SLIT("in instance"),
-	   text clas_name, pprParendGenType sty inst_ty]
+omittedMethodWarn sel_id clas sty
+  = sep [ptext SLIT("No explicit method nor default method for") <+> ppr sty sel_id, 
+	 ptext SLIT("in an instance declaration for") <+> ppr sty clas]
 
 instMethodNotInClassErr occ clas sty
   = hang (ptext SLIT("Instance mentions a method not in the class"))
@@ -781,5 +782,4 @@ bindSigCtxt sty
 
 superClassSigCtxt sty
   = ptext SLIT("When checking superclass constraints of an instance declaration")
-
 \end{code}

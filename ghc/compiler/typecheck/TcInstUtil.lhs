@@ -20,17 +20,15 @@ import HsSyn		( MonoBinds, Fake, InPat, Sig )
 import RnHsSyn		( SYN_IE(RenamedMonoBinds), RenamedSig(..), 
 			  RenamedInstancePragmas(..) )
 
-import TcEnv		( tcAddImportedIdInfo )
 import TcMonad
 import Inst		( SYN_IE(InstanceMapper) )
 
 import Bag		( bagToList, Bag )
-import Class		( GenClass, GenClassOp, SYN_IE(ClassInstEnv),
-			  classBigSig, classOps, classOpLocalType,
-			  SYN_IE(ClassOp), SYN_IE(Class)
+import Class		( GenClass, SYN_IE(ClassInstEnv),
+			  classBigSig, SYN_IE(Class)
 			)
 import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
-import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal, SYN_IE(Id) )
+import Id		( GenId, mkDictFunId, mkSysLocal, SYN_IE(Id) )
 import MatchEnv		( nullMEnv, insertMEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, Name{--O only-} )
@@ -45,9 +43,7 @@ import TyVar		( GenTyVar, SYN_IE(TyVar) )
 import Unique		( Unique )
 import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-}, Ord3(..) )
 
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-#endif
 \end{code}
 
     instance c => k (t tvs) where b
@@ -82,13 +78,12 @@ mkInstanceRelatedIds :: Name		-- Name to use for the dict fun;
 		     -> [TyVar]
 		     -> Type
 		     -> ThetaType
-		     -> NF_TcM s (Id, ThetaType)
+		     -> (Id, ThetaType)
 
 mkInstanceRelatedIds dfun_name clas inst_tyvars inst_ty inst_decl_theta
-  = tcAddImportedIdInfo dfun_id			`thenNF_Tc` \ new_dfun_id ->
-    returnNF_Tc (new_dfun_id, dfun_theta)
+  = (dfun_id, dfun_theta)
   where
-    (_, super_classes, _, _, _, _) = classBigSig clas
+    (_, super_classes, _, _, _) = classBigSig clas
     super_class_theta = super_classes `zip` repeat inst_ty
 
     dfun_theta = case inst_decl_theta of
@@ -126,24 +121,20 @@ buildInstanceEnvs info
     in
     mapTc buildInstanceEnv info_by_class    `thenTc` \ inst_env_entries ->
     let
-	class_lookup_fn = mkLookupFunDef (==) inst_env_entries 
-					 (nullMEnv, \ o -> nullSpecEnv)
+	class_lookup_fn = mkLookupFunDef (==) inst_env_entries nullMEnv
     in
     returnTc class_lookup_fn
 \end{code}
 
 \begin{code}
 buildInstanceEnv :: [InstInfo]		-- Non-empty, and all for same class
-		 -> TcM s (Class, (ClassInstEnv, (ClassOp -> SpecEnv)))
+		 -> TcM s (Class, ClassInstEnv)
 
 buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _ _) : _)
   = foldlTc addClassInstance
-	    (nullMEnv, [(op, nullSpecEnv) | op <- classOps clas])
-	    inst_infos
-					`thenTc` \ (class_inst_env, op_inst_envs) ->
-    returnTc (clas, (class_inst_env,
-		     mkLookupFunDef (==) op_inst_envs
-				    (panic "buildInstanceEnv")))
+	    nullMEnv
+	    inst_infos				`thenTc` \ class_inst_env ->
+    returnTc (clas, class_inst_env)
 \end{code}
 
 @addClassInstance@ adds the appropriate stuff to the @ClassInstEnv@
@@ -152,34 +143,19 @@ about any overlap with an existing instance.
 
 \begin{code}
 addClassInstance
-    :: (ClassInstEnv, [(ClassOp,SpecEnv)])
+    :: ClassInstEnv
     -> InstInfo
-    -> TcM s (ClassInstEnv, [(ClassOp,SpecEnv)])
+    -> TcM s ClassInstEnv
 
-addClassInstance
-    input_stuff@(class_inst_env, op_spec_envs)
+addClassInstance class_inst_env
     (InstInfo clas inst_tyvars inst_ty _ _ 
 	      dfun_id _ src_loc _)
-  = 
-
--- We only add specialised/overlapped instances
--- if we are specialising the overloading
--- ToDo ... This causes getConstMethodId errors!
---
---    if not (is_plain_instance inst_ty) && not opt_SpecialiseOverloaded
---    then
---	-- Drop this specialised/overlapped instance
---	returnTc (class_inst_env, op_spec_envs)
---    else	
-
-	-- Add the instance to the class's instance environment
-    case insertMEnv matchTy class_inst_env inst_ty dfun_id of {
-	Failed (ty', dfun_id')    -> recoverTc (returnTc input_stuff) $
+  = 	-- Add the instance to the class's instance environment
+    case insertMEnv matchTy class_inst_env inst_ty dfun_id of
+	Failed (ty', dfun_id')    -> recoverTc (returnTc class_inst_env) $
 				     dupInstFailure clas (inst_ty, src_loc) 
 							 (ty', getSrcLoc dfun_id');
-	Succeeded class_inst_env' -> 
-
-	    returnTc (class_inst_env', op_spec_envs)
+	Succeeded class_inst_env' -> returnTc class_inst_env'
 
 {- 		OLD STUFF FOR CONSTANT METHODS 
 
@@ -224,7 +200,6 @@ addClassInstance
     returnTc (class_inst_env', op_spec_envs')
 		END OF OLD STUFF -}
 
-    }
 \end{code}
 
 \begin{code}
@@ -233,8 +208,8 @@ dupInstFailure clas info1@(ty1, locn1) info2@(ty2, locn2)
   = tcAddErrCtxt ctxt $
     failTc (\sty -> ptext SLIT("Duplicate or overlapping instance declarations"))
   where
-    ctxt sty = hang (sep [ptext SLIT("Class"), ppr sty clas,
-			  ptext SLIT("type"),  ppr sty ty1])
-		    4 (sep [hcat [ptext SLIT("at "), ppr sty locn1],
-		    	      hcat [ptext SLIT("and "), ppr sty locn2]])
+    ctxt sty = sep [hsep [ptext SLIT("for"), 
+			  pprQuote sty $ \ sty -> ppr sty clas <+> ppr sty ty1],
+		    nest 4 (sep [ptext SLIT("at")  <+> ppr sty locn1,
+		    	         ptext SLIT("and") <+> ppr sty locn2])]
 \end{code}

@@ -24,9 +24,7 @@ import TcMonad
 import Unique	( Unique, pprUnique10 )
 import Pretty
 import Util	( nOfThem )
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-#endif
 \end{code}
 
 
@@ -179,7 +177,7 @@ zonkTcKind kind@(TcVarKind uniq box)
 
 \begin{code}
 instance Outputable (TcKind s) where
-  ppr sty kind = ppr_kind sty kind
+  ppr sty kind = pprQuote sty $ \ sty -> ppr_kind sty kind
 
 ppr_kind sty TcTypeKind 
   = char '*'

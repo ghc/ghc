@@ -37,6 +37,7 @@ import HsSyn		( HsBinds(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
 import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
 			  SYN_IE(RdrNameMonoBinds), SYN_IE(RdrNameHsExpr), SYN_IE(RdrNamePat)
 			)
+import BasicTypes	( IfaceFlavour(..) )
 import Id		( GenId, isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
 			  isDataCon, SYN_IE(DataCon), SYN_IE(ConTag),
@@ -1051,7 +1052,7 @@ genOpApp e1 op e2 = mkOpApp e1 op e2
 \end{code}
 
 \begin{code}
-qual_orig_name n = case modAndOcc n of { (m,n) -> Qual m n }
+qual_orig_name n = case modAndOcc n of { (m,n) -> Qual m n HiFile }
 
 a_RDR		= varUnqual SLIT("a")
 b_RDR		= varUnqual SLIT("b")

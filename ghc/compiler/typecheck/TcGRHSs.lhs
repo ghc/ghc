@@ -76,6 +76,6 @@ tcGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
 	 )			`thenTc` \ (grhss_and_binds'@(GRHSsAndBindsOut _ _ result_ty), lie) ->
     returnTc (grhss_and_binds', lie, result_ty)
   where
-    combiner binds1 (GRHSsAndBindsOut grhss binds2 ty) 
- 	= GRHSsAndBindsOut grhss (binds1 `ThenBinds` binds2) ty
+    combiner is_rec binds1 (GRHSsAndBindsOut grhss binds2 ty) 
+ 	= GRHSsAndBindsOut grhss ((MonoBind binds1 [] is_rec) `ThenBinds` binds2) ty
 \end{code}

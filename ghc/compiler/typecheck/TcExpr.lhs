@@ -44,7 +44,7 @@ import TcType		( SYN_IE(TcType), TcMaybe(..),
 			  newTyVarTy, newTyVarTys, zonkTcTyVars, zonkTcType )
 import TcKind		( TcKind )
 
-import Class		( SYN_IE(Class), classSig )
+import Class		( SYN_IE(Class) )
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType )
 import Id		( idType, dataConFieldLabels, dataConSig, recordSelectorFieldLabel,
 			  isRecordSelector,
@@ -295,7 +295,7 @@ tcExpr (HsLet binds expr)
   where
     tc_expr expr = tcExpr expr `thenTc` \ (expr', lie, ty) ->
 	   	   returnTc ((expr',ty), lie)
-    combiner bind (expr, ty) = (HsLet bind expr, ty)
+    combiner is_rec bind (expr, ty) = (HsLet (MonoBind bind [] is_rec) expr, ty)
 
 tcExpr in_expr@(HsCase expr matches src_loc)
   = tcAddSrcLoc src_loc	$
@@ -885,7 +885,7 @@ tcStmt tc_expr do_or_lc m combine (LetStmt binds) do_next
   	binds
   	do_next
      where
-      	combine' binds' thing' = combine (LetStmt binds') Nothing thing'
+      	combine' is_rec binds' thing' = combine (LetStmt (MonoBind binds' [] is_rec)) Nothing thing'
 \end{code}
 
 %************************************************************************

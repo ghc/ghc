@@ -15,7 +15,7 @@ module TcEnv(
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
 	tcLookupGlobalValue, tcLookupGlobalValueByKey, tcLookupGlobalValueMaybe,
-	tcAddImportedIdInfo,
+	tcAddImportedIdInfo, tcExplicitLookupGlobal,
 	tcLookupGlobalValueByKeyMaybe, 
 
 	newMonoIds, newLocalIds, newLocalId,
@@ -26,8 +26,6 @@ module TcEnv(
 IMP_Ubiq()
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
-#else
-import {-# SOURCE #-} TcType
 #endif
 
 import HsTypes	( HsTyVar(..) )
@@ -42,13 +40,13 @@ import TyVar	( unionTyVarSets, emptyTyVarSet, tyVarSetToList, SYN_IE(TyVar) )
 import PprType	( GenTyVar )
 import Type	( tyVarsOfTypes, splitForAllTy )
 import TyCon	( TyCon, tyConKind, synTyConArity, SYN_IE(Arity) )
-import Class	( SYN_IE(Class), GenClass, classSig )
+import Class	( SYN_IE(Class), GenClass )
 
 import TcMonad
 
 import IdInfo		( noIdInfo )
 import Name		( Name, OccName(..), getSrcLoc, occNameString,
-			  maybeWiredInTyConName, maybeWiredInIdName,
+			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
 			  NamedThing(..)
 			)
 import Pretty
@@ -255,7 +253,6 @@ tcLookupLocalValueOK err name
 
 
 tcLookupGlobalValue :: Name -> NF_TcM s Id
-
 tcLookupGlobalValue name
   = case maybeWiredInIdName name of
 	Just id -> returnNF_Tc id
@@ -265,7 +262,6 @@ tcLookupGlobalValue name
     def = pprPanic "tcLookupGlobalValue:" (ppr PprDebug name)
 
 tcLookupGlobalValueMaybe :: Name -> NF_TcM s (Maybe Id)
-
 tcLookupGlobalValueMaybe name
   = case maybeWiredInIdName name of
 	Just id -> returnNF_Tc (Just id)
@@ -289,18 +285,29 @@ tcLookupGlobalValueByKeyMaybe uniq
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupUFM_Directly gve uniq)
 
+
+-- Non-monadic version, environment given explicitly
+tcExplicitLookupGlobal :: TcEnv s -> Name -> Maybe Id
+tcExplicitLookupGlobal (TcEnv tve tce ce gve lve gtvs) name
+  = case maybeWiredInIdName name of
+	Just id -> Just id
+	Nothing -> lookupUFM gve name
+
 	-- Extract the IdInfo from an IfaceSig imported from an interface file
-tcAddImportedIdInfo :: Id -> NF_TcM s Id
-tcAddImportedIdInfo id
-  = tcLookupGlobalValueMaybe (getName id)	`thenNF_Tc` \ maybe_id ->
-    let 
-	new_info = case maybe_id of
+tcAddImportedIdInfo :: TcEnv s -> Id -> Id
+tcAddImportedIdInfo unf_env id
+  | isLocallyDefined id		-- Don't look up locally defined Ids, because they
+				-- have explicit local definitions, so we get a black hole!
+  = id
+  | otherwise
+  = id `replaceIdInfo` new_info
+	-- The Id must be returned without a data dependency on maybe_id
+  where
+    new_info = -- pprTrace "tcAdd" (ppr PprDebug id) $
+	       case tcExplicitLookupGlobal unf_env (getName id) of
 		     Nothing	      -> noIdInfo
 		     Just imported_id -> getIdInfo imported_id
 		-- ToDo: could check that types are the same
-    in
-    returnNF_Tc (id `replaceIdInfo` new_info)
-	-- The Id must be returned without a data dependency on maybe_id
 \end{code}
 
 
