@@ -242,7 +242,8 @@ getClockTime = do
 #else /* use POSIX time() */
 getClockTime = do
     secs <- time nullPtr -- can't fail, according to POSIX
-    return (TOD (fromIntegral secs) 0)
+    let realToInteger = round . realToFrac :: Real a => a -> Integer
+    return (TOD (realToInteger secs) 0)
 
 #endif
 
