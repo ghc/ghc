@@ -4,7 +4,7 @@
 \section[CPUTime]{Haskell 1.4 CPU Time Library}
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 
 module CPUTime 
 	(
