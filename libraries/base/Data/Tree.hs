@@ -20,7 +20,9 @@ module Data.Tree(
 	flatten, levels,
 	-- * Building trees
 	unfoldTree, unfoldForest,
+#ifndef __NHC__
 	unfoldTreeM, unfoldForestM,
+#endif
 	unfoldTreeM_BF, unfoldForestM_BF,
     ) where
 
@@ -89,6 +91,7 @@ unfoldTree f b = let (a, bs) = f b in Node a (unfoldForest f bs)
 unfoldForest :: (b -> (a, [b])) -> [b] -> Forest a
 unfoldForest f = map (unfoldTree f)
 
+#ifndef __NHC__
 -- | Monadic tree builder, in depth-first order
 unfoldTreeM :: Monad m => (b -> m (a, [b])) -> b -> m (Tree a)
 unfoldTreeM f b = do
@@ -99,6 +102,7 @@ unfoldTreeM f b = do
 -- | Monadic forest builder, in depth-first order
 unfoldForestM :: Monad m => (b -> m (a, [b])) -> [b] -> m (Forest a)
 unfoldForestM f = mapM (unfoldTreeM f)
+#endif
 
 -- | Monadic tree builder, in breadth-first order,
 -- using an algorithm adapted from
