@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.9 1999/02/05 16:02:44 simonm Exp $
+ * $Id: MBlock.c,v 1.10 1999/03/03 19:04:56 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -25,8 +25,10 @@
 #include <sys/types.h>
 #endif
 
-#ifdef HAVE_SYS_MMAN_H
-#include <sys/mman.h>
+#ifndef mingw32_TARGET_OS
+# ifdef HAVE_SYS_MMAN_H
+# include <sys/mman.h>
+# endif
 #endif
 
 #ifdef HAVE_FCNTL_H
@@ -133,18 +135,27 @@ getMBlocks(nat n)
 
 */
 
+char* base_non_committed = (char*)0;
+
+/* Reserve VM 128M at the time to try to minimise the slop cost. */
+#define SIZE_RESERVED_POOL  ( 128 * 1024 * 1024 )
+
+/* This predicate should be inlined, really. */
+int
+is_heap_alloced(const void* x)
+{
+  return (((char*)(x) >= base_non_committed) && 
+          ((char*)(x) <= (base_non_committed + 128 * 1024 * 1024)));
+}
+
 void *
 getMBlocks(nat n)
 {
-  static char* base_non_committed = (char*)0;
   static char* base_mblocks       = (char*)0;
   static char* next_request       = (char*)0;
   void* ret                       = (void*)0;
 
   lnat size = MBLOCK_SIZE * n;
-
-  /* Reserve VM 128M at the time to try to minimise the slop cost. */
-#define SIZE_RESERVED_POOL  ( 128 * 1024 * 1024 )
 
   if ( (base_non_committed == 0) || 
        (next_request + size > base_non_committed + SIZE_RESERVED_POOL) ) {
@@ -154,7 +165,7 @@ getMBlocks(nat n)
 				      , PAGE_READWRITE
 				      );
     if ( base_non_committed == 0 ) {
-# ifdef DEBUG
+# if 1 /*def DEBUG*/
          fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %d\n", GetLastError());
 # endif
          ret=(void*)-1;
@@ -167,7 +178,7 @@ getMBlocks(nat n)
 # endif
 
        if ( ((char*)base_mblocks + size) > ((char*)base_non_committed + SIZE_RESERVED_POOL) ) {
-# ifdef DEBUG
+# if 1 /*def DEBUG*/
           fprintf(stderr, "oops, committed too small a region to start with.");
 # endif
 	  ret=(void*)-1;
@@ -180,7 +191,7 @@ getMBlocks(nat n)
   if ( ret != (void*)-1 ) {
      ret = VirtualAlloc(next_request, size, MEM_COMMIT, PAGE_READWRITE);
      if (ret == NULL) {
-# ifdef DEBUG
+# if 1 /*def DEBUG*/
         fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %d\n", GetLastError());
 # endif
         ret=(void*)-1;

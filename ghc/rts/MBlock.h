@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.4 1999/02/05 16:02:45 simonm Exp $
+ * $Id: MBlock.h,v 1.5 1999/03/03 19:04:57 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -8,6 +8,10 @@
  * ---------------------------------------------------------------------------*/
 
 extern lnat mblocks_allocated;
+
+#ifdef HAVE_WIN32_DLL_SUPPORT
+extern int is_heap_alloced(const void* p);
+#endif
 
 extern void * getMBlock(void);
 extern void * getMBlocks(nat n);
