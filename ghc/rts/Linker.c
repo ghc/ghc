@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.138 2003/10/29 16:12:00 wolfgang Exp $
+ * $Id: Linker.c,v 1.139 2003/11/02 06:55:24 dons Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -744,11 +744,8 @@ addDLL( char *dll_name )
 
    initLinker();
 
-#if !defined(openbsd_TARGET_OS)
    hdl= dlopen(dll_name, RTLD_NOW | RTLD_GLOBAL);
-#else
-   hdl= dlopen(dll_name, RTLD_LAZY);
-#endif
+
    if (hdl == NULL) {
       /* dlopen failed; return a ptr to the error msg. */
       errmsg = dlerror();
