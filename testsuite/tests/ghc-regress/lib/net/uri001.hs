@@ -1,8 +1,7 @@
 module Main where
 
-import URI
-import Maybe
-import IOExts
+import Network.URI
+import Data.Maybe
 
 main =  sequence_ (map do_test tests)
 
