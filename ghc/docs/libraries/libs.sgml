@@ -510,7 +510,8 @@ redistribute their implementation of this module.
 module Concurrent where
 
 data ThreadId    -- thread identifiers
-instance Eq ThreadId
+instance Eq  ThreadId
+instance Ord ThreadId
 
 forkIO           :: IO () -> IO ThreadId
 killThread       :: ThreadId -> IO ()
@@ -530,7 +531,7 @@ writeChan        :: Chan a -> a -> IO ()
 readChan         :: Chan a -> IO a
 dupChan          :: Chan a -> IO (Chan a)
 unReadChan       :: Chan a -> a -> IO ()
-readChanContents :: Chan a -> IO [a]
+getChanContents  :: Chan a -> IO [a]
 writeList2Chan   :: Chan a -> [a] -> IO ()
                       
 data CVar a       -- one element channels
@@ -584,10 +585,10 @@ Hugs does not provide the functions <tt/mergeIO/ or <tt/nmergeIO/ since these
 require preemptive multitasking.
 
 <item>
-<tt/killThread/ has not been implemented yet on either system.
-The plan is that <tt/killThread/ will raise an IO exception in the
-killed thread which it can catch --- perhaps allowing it to kill its
-children before exiting.
+Thread identities and <tt/killThread/ has not been implemented yet on
+either system. The plan is that <tt/killThread/ will raise an IO
+exception in the killed thread which it can catch --- perhaps allowing -->
+--it to kill its children before exiting.
 
 <item>
 The <tt/Ord/ instance for <tt/ThreadId/s provides an arbitrary total ordering
