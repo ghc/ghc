@@ -188,7 +188,7 @@ lexCharE =
          _    -> pfail
   
   lexNumeric =
-    do base <- lexBaseChar
+    do base <- lexBaseChar <++ return 10
        n    <- lexInteger base
        guard (n <= toInteger (ord maxBound))
        return (chr (fromInteger n))
@@ -319,12 +319,9 @@ lexHexOct
 	return (Int (val (fromIntegral base) 0 digits))
 
 lexBaseChar :: ReadP Int
--- Lex a single character indicating the base, 
--- or return 10 if there isn't one
-lexBaseChar = lex_base <++ return 10
-   where
-      lex_base = do { c <- get;
-		      case c of
+-- Lex a single character indicating the base; fail if not there
+lexBaseChar = do { c <- get;
+		   case c of
 		   	'o' -> return 8
 	           	'O' -> return 8
 	           	'x' -> return 16
