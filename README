@@ -19,5 +19,18 @@ effort.  The tools are:
 Components which are always part of a distribution (never stand-alone)
 are "glafp-utils" and "mk" (a configuration system).
 
+Quick start:  the following is *supposed* to work
+
+	$ ./configure
+	$ make boot
+	$ make
+	$ make install
+
+where 'make' is whatever GNU make is called on your system.  The
+configuration script is a standard GNU autoconf script which accepts
+all the normal arguments, eg. --prefix=<blah> to install the package
+somewhere other than /usr/local.  Try ./configure --help to get a full
+list of the options.
+
 There is usually an ANNOUNCE* file with any distribution.  Please
 consult that, or the <piece>/README file, to find out how to proceed.
