@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.15 2000/11/19 19:40:08 simonmar Exp $
+-- $Id: DriverState.hs,v 1.16 2000/11/21 14:35:05 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -115,10 +115,6 @@ v_Hs_source_cpp_opts = global
 	, "-D__CONCURRENT_HASKELL__"
 	]
 {-# NOINLINE v_Hs_source_cpp_opts #-}
-
--- Verbose
-GLOBAL_VAR(v_Verbose, False, Bool)
-is_verbose = do v <- readIORef v_Verbose; if v then return "-v" else return ""
 
 -- Keep output from intermediate phases
 GLOBAL_VAR(v_Keep_hi_diffs, 		False, 		Bool)
@@ -731,40 +727,3 @@ machdepCCOpts
 
    | otherwise
 	= return ( [], [] )
-
-
------------------------------------------------------------------------------
--- Running an external program
-
-run_something phase_name cmd
- = do
-   verb <- readIORef v_Verbose
-   when verb $ do
-	putStr phase_name
-	putStrLn ":"
-	putStrLn cmd
-	hFlush stdout
-
-   -- test for -n flag
-   n <- readIORef v_Dry_run
-   unless n $ do 
-
-   -- and run it!
-#ifndef mingw32_TARGET_OS
-   exit_code <- system cmd `catchAllIO` 
-		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
-#else
-   tmp <- newTempName "sh"
-   h <- openFile tmp WriteMode
-   hPutStrLn h cmd
-   hClose h
-   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
-		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
-   removeFile tmp
-#endif
-
-   if exit_code /= ExitSuccess
-	then throwDyn (PhaseFailed phase_name exit_code)
-	else do when verb (putStr "\n")
-	        return ()
-

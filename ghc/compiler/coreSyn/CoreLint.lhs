@@ -27,7 +27,7 @@ import VarSet
 import Subst		( mkTyVarSubst, substTy )
 import Name		( getSrcLoc )
 import PprCore
-import ErrUtils		( doIfSet_dyn, dumpIfSet, ghcExit, Message, showPass,
+import ErrUtils		( doIfSet, dumpIfSet, ghcExit, Message, showPass,
 			  ErrMsg, addErrLocHdrLine, pprBagOfErrors,
                           WarnMsg, pprBagOfWarnings)
 import SrcLoc		( SrcLoc, noSrcLoc )
@@ -72,7 +72,7 @@ endPassWithRules dflags pass_name dump_flag binds rules
 
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
-	if dopt Opt_D_show_passes dflags then
+	if verbosity dflags >= 2 then
 	   hPutStrLn stdout ("    Result size = " ++ show (coreBindsSize binds))
 	 else
 	   return ()
@@ -148,7 +148,7 @@ lintCoreBindings dflags whoDunnit binds
 				  returnL ()
     lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
 
-    done_lint = doIfSet_dyn dflags Opt_D_show_passes
+    done_lint = doIfSet (verbosity dflags >= 2)
 		        (hPutStr stdout ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
     warn warnings
       = vcat [

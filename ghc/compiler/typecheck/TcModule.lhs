@@ -23,7 +23,7 @@ import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 
 
 import TcMonad
-import TcType		( newTyVarTy )
+import TcType		( newTyVarTy, zonkTcType )
 import Inst		( plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
@@ -107,7 +107,7 @@ typecheckExpr :: DynFlags
 	      -> Module
 	      -> (RenamedHsExpr, 	-- The expression itself
 	          [RenamedHsDecl])	-- Plus extra decls it sucked in from interface files
-	      -> IO (Maybe (PersistentCompilerState, TypecheckedHsExpr))
+	      -> IO (Maybe (PersistentCompilerState, TypecheckedHsExpr, TcType))
 
 typecheckExpr dflags pcs hst unqual this_mod (expr, decls)
   = typecheck dflags pcs hst unqual $
@@ -121,7 +121,8 @@ typecheckExpr dflags pcs hst unqual this_mod (expr, decls)
     newTyVarTy openTypeKind	`thenTc` \ ty ->
     tcMonoExpr expr ty		`thenTc` \ (expr', lie) ->
     tcSimplifyTop lie		`thenTc` \ binds ->
-    returnTc (new_pcs, mkHsLet binds expr') 
+    zonkTcType ty		`thenNF_Tc` \ zonked_ty ->
+    returnTc (new_pcs, mkHsLet binds expr', zonked_ty) 
   where
     get_fixity :: Name -> Maybe Fixity
     get_fixity n = pprPanic "typecheckExpr" (ppr n)

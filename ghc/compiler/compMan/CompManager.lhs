@@ -34,14 +34,16 @@ import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
 			  UniqFM, listToUFM )
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp )
+import DriverFlags	( getDynFlags )
 import DriverPhases
 import DriverUtil	( BarfKind(..), splitFilename3 )
+import ErrUtils		( showPass )
 import Util
 import Outputable
 import Panic		( panic )
 
 #ifdef GHCI
-import CmdLineOpts	( DynFlags )
+import CmdLineOpts	( DynFlags(..) )
 import Interpreter	( HValue )
 import HscMain		( hscExpr )
 import RdrName
@@ -55,6 +57,7 @@ import Exception	( throwDyn )
 import Time             ( ClockTime )
 import Directory        ( getModificationTime, doesFileExist )
 import IO
+import Monad
 import List		( nub )
 import Maybe		( catMaybes, fromMaybe, isJust )
 \end{code}
@@ -175,7 +178,11 @@ cmLoadModule cmstate1 rootname
         -- Throw away the old home dir cache
         emptyHomeDirCache
 
-        hPutStrLn stderr ("ghc: chasing modules, starting from: " ++ rootname)
+	dflags <- getDynFlags
+        let verb = verbosity dflags
+
+	showPass dflags "Chasing dependencies"
+
         mg2unsorted <- downsweep [rootname]
 
         let modnames1   = map name_of_summary mg1
@@ -225,10 +232,12 @@ cmLoadModule cmstate1 rootname
 
          then 
            -- Easy; just relink it all.
-           do hPutStrLn stderr "UPSWEEP COMPLETELY SUCCESSFUL"
+           do when (verb >= 2) $ 
+		hPutStrLn stderr "Upsweep completely successful."
               linkresult 
-                 <- link ghci_mode (any exports_main (moduleEnvElts hst3)) 
-                         newLis pls1
+                 <- link ghci_mode dflags 
+			(any exports_main (moduleEnvElts hst3)) 
+                        newLis pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
@@ -244,7 +253,8 @@ cmLoadModule cmstate1 rootname
            -- Tricky.  We need to back out the effects of compiling any
            -- half-done cycles, both so as to clean up the top level envs
            -- and to avoid telling the interactive linker to link them.
-           do hPutStrLn stderr "UPSWEEP PARTIALLY SUCCESSFUL"
+           do when (verb >= 2) $
+		hPutStrLn stderr "Upsweep partially successful."
 
               let modsDone_names
                      = map name_of_summary modsDone
@@ -262,7 +272,7 @@ cmLoadModule cmstate1 rootname
                      = map (unJust "linkables_to_link" . findModuleLinkable_maybe ui4)
                            mods_to_keep_names
 
-              linkresult <- link ghci_mode False linkables_to_link pls1
+              linkresult <- link ghci_mode dflags False linkables_to_link pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (2)"
@@ -342,7 +352,7 @@ upsweep_mods ghci_mode oldUI reachable_from threaded
 
 upsweep_mods ghci_mode oldUI reachable_from threaded 
      ((CyclicSCC ms):_)
-   = do hPutStrLn stderr ("ghc: module imports form a cycle for modules:\n\t" ++
+   = do hPutStrLn stderr ("Module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleNameUserString.name_of_summary) ms))
         return (False, threaded, [], [])
 

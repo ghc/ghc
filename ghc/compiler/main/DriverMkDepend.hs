@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.5 2000/11/15 15:43:31 sewardj Exp $
+-- $Id: DriverMkDepend.hs,v 1.6 2000/11/21 14:34:47 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -155,11 +155,11 @@ endMkDependHS = do
 
 	-- create a backup of the original makefile
   when (isJust makefile_hdl) $
-     run_something ("Backing up " ++ makefile)
+     runSomething ("Backing up " ++ makefile)
 	(unwords [ "cp", makefile, makefile++".bak" ])
 
   	-- copy the new makefile in place
-  run_something "Installing new makefile"
+  runSomething "Installing new makefile"
 	(unwords [ "cp", tmp_file, makefile ])
 
 

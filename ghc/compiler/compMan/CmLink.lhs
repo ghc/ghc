@@ -25,13 +25,16 @@ import CmStaticInfo	( GhciMode(..) )
 import Outputable	( SDoc )
 import Digraph		( SCC(..), flattenSCC )
 import DriverUtil
-import Module		( ModuleName, PackageName )
+import Module		( ModuleName )
 import RdrName
 import FiniteMap
 import Outputable
+import ErrUtils		( showPass )
+import CmdLineOpts	( DynFlags(..) )
 import Panic		( panic )
 
 import Exception
+import Monad
 import IO
 
 #include "HsVersions.h"
@@ -83,6 +86,7 @@ emptyPLS = return (PersistentLinkerState {})
 
 \begin{code}
 link :: GhciMode		-- interactive or batch
+     -> DynFlags		-- dynamic flags
      -> Bool			-- attempt linking in batch mode?
      -> [Linkable] 		-- only contains LMs, not LPs
      -> PersistentLinkerState 
@@ -107,30 +111,38 @@ link :: GhciMode		-- interactive or batch
 --	   to be actually linked this time around (or unlinked and re-linked 
 --	   if the module was recompiled).
 
-link mode batch_attempt_linking linkables pls1
-   = do hPutStrLn stderr "CmLink.link: linkables are ..."
-        hPutStrLn stderr (showSDoc (vcat (map ppr linkables)))
-	res <- link' mode batch_attempt_linking linkables pls1
-	hPutStrLn stderr "CmLink.link: done"
+link mode dflags batch_attempt_linking linkables pls1
+   = do let verb = verbosity dflags
+        when (verb >= 3) $ do
+	     hPutStrLn stderr "CmLink.link: linkables are ..."
+             hPutStrLn stderr (showSDoc (vcat (map ppr linkables)))
+	res <- link' mode dflags batch_attempt_linking linkables pls1
+        when (verb >= 3) $ 
+	     hPutStrLn stderr "CmLink.link: done"
 	return res
 
-link' Batch batch_attempt_linking linkables pls1
+link' Batch dflags batch_attempt_linking linkables pls1
    | batch_attempt_linking
    = do let o_files = concatMap getOfiles linkables
+	-- don't showPass in Batch mode; doLink will do that for us.
         doLink o_files
 	-- doLink only returns if it succeeds
         return (LinkOK pls1)
    | otherwise
-   = do hPutStrLn stderr "CmLink.link(batch): upsweep (partially?) failed OR main not exported;"
-        hPutStrLn stderr "               -- not doing linking"
+   = do let verb = verbosity dflags
+        when (verb >= 3) $ do
+	    hPutStrLn stderr "CmLink.link(batch): upsweep (partially?) failed OR main not exported;"
+            hPutStrLn stderr "not linking."
         return (LinkOK pls1)
    where
       getOfiles (LP _)    = panic "CmLink.link(getOfiles): shouldn't get package linkables"
       getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 
-link' Interactive batch_attempt_linking linkables pls1
-    = linkObjs linkables pls1
-        
+link' Interactive dflags batch_attempt_linking linkables pls1
+    = do showPass dflags "Linking"
+	 pls2 <- unload pls1
+	 linkObjs linkables pls2
+
 
 ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC
@@ -202,7 +214,6 @@ linkFinish pls mods ul_trees = do
 				  closure_env = new_closure_env,
 				  itbl_env    = new_itbl_env
 			}
-   putStrLn (showSDoc (vcat (map ppr (keysFM new_closure_env))))
    return (LinkOK new_pls)
 
 -- purge the current "linked image"

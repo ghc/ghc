@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.33 2000/11/20 17:42:00 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.34 2000/11/21 14:34:50 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -35,6 +35,7 @@ import TmpFiles
 import HscTypes
 import Outputable
 import Module
+import ErrUtils
 import CmdLineOpts
 import Config
 import Util
@@ -288,7 +289,7 @@ pipeLoop ((phase, keep, o_suffix):phases)
 run_phase Unlit _basename _suff input_fn output_fn
   = do unlit <- readIORef v_Pgm_L
        unlit_flags <- getOpts opt_L
-       run_something "Literate pre-processor"
+       runSomething "Literate pre-processor"
 	  ("echo '# 1 \"" ++input_fn++"\"' > "++output_fn++" && "
 	   ++ unlit ++ ' ':input_fn ++ " - >> " ++ output_fn)
        return True
@@ -318,8 +319,9 @@ run_phase Cpp basename suff input_fn output_fn
 	    let include_paths = map (\p -> "-I"++p) (cmdline_include_paths
 							++ pkg_include_dirs)
 
-	    verb <- is_verbose
-	    run_something "C pre-processor" 
+	    verb <- getVerbFlag
+
+	    runSomething "C pre-processor" 
 		(unwords
        	    	   (["echo '{-# LINE 1 \"" ++ input_fn ++ "\" -}'", ">", output_fn, "&&",
 		     cpp, verb] 
@@ -329,7 +331,7 @@ run_phase Cpp basename suff input_fn output_fn
 		    ++ [ "-x", "c", input_fn, ">>", output_fn ]
 		   ))
 	  else do
-	    run_something "Ineffective C pre-processor"
+	    runSomething "Ineffective C pre-processor"
 	           ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" -}' > " 
 		    ++ output_fn ++ " && cat " ++ input_fn
 		    ++ " >> " ++ output_fn)
@@ -525,7 +527,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 	mangle <- readIORef v_Do_asm_mangling
 	(md_c_flags, md_regd_c_flags) <- machdepCCOpts
 
-        verb <- is_verbose
+        verb <- getVerbFlag
 
 	o2 <- readIORef v_minus_o2_for_C
 	let opt_flag | o2        = "-O2"
@@ -539,7 +541,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 
 	excessPrecision <- readIORef v_Excess_precision
 
-	run_something "C Compiler"
+	runSomething "C Compiler"
 	 (unwords ([ cc, "-x", "c", cc_help, "-o", output_fn ]
 		   ++ md_c_flags
 		   ++ (if cc_phase == HCc && mangle
@@ -572,7 +574,7 @@ run_phase Mangle _basename _suff input_fn output_fn
 	    then do n_regs <- readState stolen_x86_regs
 		    return [ show n_regs ]
 	    else return []
-       run_something "Assembly Mangler"
+       runSomething "Assembly Mangler"
 	(unwords (mangler : 
 		     mangler_opts
 		  ++ [ input_fn, output_fn ]
@@ -596,7 +598,7 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
 	-- allocate a tmp file to put the no. of split .s files in (sigh)
 	n_files <- newTempName "n_files"
 
-	run_something "Split Assembly File"
+	runSomething "Split Assembly File"
 	 (unwords [ splitter
 		  , input_fn
 		  , split_s_prefix
@@ -618,7 +620,7 @@ run_phase As _basename _suff input_fn output_fn
 
         cmdline_include_paths <- readIORef v_Include_paths
         let cmdline_include_flags = map (\p -> "-I"++p) cmdline_include_paths
-        run_something "Assembler"
+        runSomething "Assembler"
 	   (unwords (as : as_opts
 		       ++ cmdline_include_flags
 		       ++ [ "-c", input_fn, "-o",  output_fn ]
@@ -642,7 +644,7 @@ run_phase SplitAs basename _suff _input_fn _output_fn
 		    let output_o = newdir real_odir 
 					(basename ++ "__" ++ show n ++ ".o")
 		    real_o <- osuf_ify output_o
-		    run_something "Assembler" 
+		    runSomething "Assembler" 
 			    (unwords (as : as_opts
 				      ++ [ "-c", "-o", real_o, input_s ]
 			    ))
@@ -656,7 +658,7 @@ run_phase SplitAs basename _suff _input_fn _output_fn
 doLink :: [String] -> IO ()
 doLink o_files = do
     ln <- readIORef v_Pgm_l
-    verb <- is_verbose
+    verb <- getVerbFlag
     static <- readIORef v_Static
     let imp = if static then "" else "_imp"
     no_hs_main <- readIORef v_NoHsMain
@@ -695,7 +697,7 @@ doLink o_files = do
 		     else []
 #endif
     (md_c_flags, _) <- machdepCCOpts
-    run_something "Linker"
+    runSomething "Linker"
        (unwords
 	 ([ ln, verb, "-o", output_fn ]
 	 ++ md_c_flags
@@ -770,21 +772,20 @@ data CompResult
 
 
 compile ghci_mode summary source_unchanged old_iface hst hit pcs = do 
-   verb <- readIORef v_Verbose
-   when verb (hPutStrLn stderr 
-                 (showSDoc (text "compile: compiling" 
-                            <+> ppr (name_of_summary summary))))
-
    init_dyn_flags <- readIORef v_InitDynFlags
    writeIORef v_DynFlags init_dyn_flags
    init_driver_state <- readIORef v_InitDriverState
    writeIORef v_Driver_state init_driver_state
 
+   showPass init_dyn_flags (showSDoc (text "*** Compiling: " 
+		            <+> ppr (name_of_summary summary)))
+
+   let verb = verbosity init_dyn_flags
    let location   = ms_location summary   
    let input_fn   = unJust "compile:hs" (ml_hs_file location) 
    let input_fnpp = unJust "compile:hspp" (ml_hspp_file location)
 
-   when verb (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
+   when (verb >= 2) (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
 
    opts <- getOptionsFromSource input_fnpp
    processArgs dynamic_flags opts []
@@ -857,7 +858,7 @@ dealWithStubs basename maybe_stub_h maybe_stub_c
 	case maybe_stub_h of
 	   Nothing -> return ()
 	   Just tmp_stub_h -> do
-	      	run_something "Copy stub .h file"
+	      	runSomething "Copy stub .h file"
 				("cp " ++ tmp_stub_h ++ ' ':stub_h)
 	
 			-- #include <..._stub.h> in .hc file
@@ -867,7 +868,7 @@ dealWithStubs basename maybe_stub_h maybe_stub_c
 	case maybe_stub_c of
 	   Nothing -> return Nothing
 	   Just tmp_stub_c -> do  -- copy the _stub.c file into the current dir
-		run_something "Copy stub .c file" 
+		runSomething "Copy stub .c file" 
 		    (unwords [ 
 			"rm -f", stub_c, "&&",
 			"echo \'#include \""++stub_h++"\"\' >"++stub_c, " &&",

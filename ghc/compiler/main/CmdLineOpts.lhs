@@ -10,9 +10,11 @@ module CmdLineOpts (
 	SimplifierSwitch(..), isAmongSimpl,
 	StgToDo(..),
 	SwitchResult(..),
+
 	HscLang(..),
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
 	DynFlags(..),
+	defaultDynFlags,
 
 	v_Static_hsc_opts,
 
@@ -214,9 +216,7 @@ data SimplifierSwitch
 data DynFlag
 
    -- debugging flags
-   = Opt_D_dump_all
-   | Opt_D_dump_most
-   | Opt_D_dump_absC
+   = Opt_D_dump_absC
    | Opt_D_dump_asm
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
@@ -239,7 +239,6 @@ data DynFlag
    | Opt_D_dump_usagesp
    | Opt_D_dump_cse
    | Opt_D_dump_worker_wrapper
-   | Opt_D_show_passes
    | Opt_D_dump_rn_trace
    | Opt_D_dump_rn_stats
    | Opt_D_dump_stix
@@ -285,8 +284,26 @@ data DynFlags = DynFlags {
   stgToDo    :: [StgToDo],
   hscLang    :: HscLang,
   hscOutName :: String,  -- name of the file in which to place output
+  verbosity  :: Int,	 -- verbosity level
   flags      :: [DynFlag]
  }
+
+defaultDynFlags = DynFlags {
+  coreToDo = [], stgToDo = [], 
+  hscLang = HscC, hscOutName = "", 
+  verbosity = 0, flags = []
+  }
+
+{- 
+    Verbosity levels:
+	
+    0	|   print errors & warnings only
+    1   |   minimal verbosity: print "compiling M ... done." for each module.
+    2   |   equivalent to -dshow-passes
+    3   |   equivalent to existing "ghc -v"
+    4   |   "ghc -v -ddump-most"
+    5   |   "ghc -v -ddump-all"
+-}
 
 dopt :: DynFlag -> DynFlags -> Bool
 dopt f dflags  = f `elem` (flags dflags)

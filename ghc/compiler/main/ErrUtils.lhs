@@ -22,7 +22,7 @@ import Bag		( Bag, bagToList, isEmptyBag )
 import SrcLoc		( SrcLoc, noSrcLoc, isGoodSrcLoc )
 import Util		( sortLt )
 import Outputable
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt )
 
 import System		( ExitCode(..), exitWith )
 import IO		( hPutStr, stderr )
@@ -114,8 +114,8 @@ doIfSet_dyn dflags flag action | dopt flag dflags = action
 \begin{code}
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what
-  | dopt Opt_D_show_passes dflags = hPutStr stderr ("*** "++what++":\n")
-  | otherwise			  = return ()
+  | verbosity dflags >= 2 = hPutStr stderr ("*** "++what++":\n")
+  | otherwise		  = return ()
 
 dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
@@ -124,8 +124,8 @@ dumpIfSet flag hdr doc
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
-  | not (dopt flag dflags)  = return ()
-  | otherwise               = printDump (dump hdr doc)
+  | not (dopt flag dflags) && verbosity dflags < 4 = return ()
+  | otherwise                                      = printDump (dump hdr doc)
 
 dump hdr doc 
    = vcat [text "", 

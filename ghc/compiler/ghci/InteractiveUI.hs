@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.7 2000/11/21 10:48:20 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.8 2000/11/21 14:32:44 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -82,7 +82,7 @@ interactiveUI st = do
    Readline.initialize
 #endif
    _ <- (unGHCi uiLoop) GHCiState{ modules = [],
-				   current_module = Nothing, 
+				   current_module = defaultCurrentModule,
 	  	                   target = Nothing,
 			           cmstate = st }
    return ()
@@ -91,7 +91,7 @@ uiLoop :: GHCi ()
 uiLoop = do
   st <- getGHCiState
 #ifndef NO_READLINE
-  l <- io (readline (mkPrompt (current_module st) ++ "> "))
+  l <- io (readline (moduleNameUserString (current_module st) ++ "> "))
 #else
   l <- io (hGetLine stdin)
 #endif
@@ -104,9 +104,6 @@ uiLoop = do
 #endif
   	  runCommand l
 	  uiLoop  
-
-mkPrompt Nothing = ""
-mkPrompt (Just mod_name) = moduleNameUserString mod_name
 
 -- Top level exception handler, just prints out the exception 
 -- and carries on.
@@ -123,18 +120,15 @@ runCommand c =
    doCommand c
 
 doCommand (':' : command) = specialCommand command
-doCommand expr = do
-  st <- getGHCiState
-  case current_module st of
-	Nothing -> throwDyn (OtherError "no module context in which to run the expression")
-	Just mod -> do
-             dflags <- io (readIORef v_DynFlags)
-             (new_cmstate, maybe_hvalue) <- 
-        	io (cmGetExpr (cmstate st) dflags mod expr)
-	     setGHCiState st{cmstate = new_cmstate}
-             case maybe_hvalue of
-        	Nothing -> return ()
-        	Just hv -> io (cmRunExpr hv)
+doCommand expr
+ = do st <- getGHCiState
+      dflags <- io (readIORef v_DynFlags)
+      (new_cmstate, maybe_hvalue) <- 
+      	 io (cmGetExpr (cmstate st) dflags (current_module st) expr)
+      setGHCiState st{cmstate = new_cmstate}
+      case maybe_hvalue of
+      	 Nothing -> return ()
+      	 Just hv -> io (cmRunExpr hv)
 {-
   let (mod,'.':str) = break (=='.') expr
   case cmLookupSymbol (mkOrig varName (mkModuleName mod) (_PK_ str)) (cmstate st) of
@@ -175,8 +169,8 @@ loadModule path = do
   			cmstate = new_cmstate,
 			modules = mods,
 			current_module = case mods of 
-					   [] -> Nothing
-					   xs -> Just (last xs),
+					   [] -> defaultCurrentModule
+					   xs -> last xs,
 			target = Just path
 		   }
   setGHCiState new_state
@@ -236,10 +230,12 @@ shellEscape str = io (system str >> return ())
 data GHCiState = GHCiState
      { 
 	modules	       :: [ModuleName],
-	current_module :: Maybe ModuleName,
+	current_module :: ModuleName,
 	target         :: Maybe FilePath,
 	cmstate        :: CmState
      }
+
+defaultCurrentModule = mkModuleName "Prelude"
 
 newtype GHCi a = GHCi { unGHCi :: GHCiState -> IO (GHCiState, a) }
 

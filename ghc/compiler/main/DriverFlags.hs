@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.20 2000/11/19 19:40:08 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.21 2000/11/21 14:34:29 simonmar Exp $
 --
 -- Driver flags
 --
@@ -22,6 +22,7 @@ import Util
 import Exception
 import IOExts
 import IO
+import Monad
 import System
 import Char
 
@@ -152,7 +153,6 @@ static_flags =
 				     exitWith ExitSuccess))
 
       ------- verbosity ----------------------------------------------------
-  ,  ( "v"		, NoArg (writeIORef v_Verbose True) )
   ,  ( "n"              , NoArg (writeIORef v_Dry_run True) )
 
 	------- recompilation checker --------------------------------------
@@ -295,16 +295,30 @@ static_flags =
 -----------------------------------------------------------------------------
 -- parse the dynamic arguments
 
-GLOBAL_VAR(v_InitDynFlags, error "no InitDynFlags", DynFlags)
-GLOBAL_VAR(v_DynFlags, error "no DynFlags", DynFlags)
+-- v_InitDynFlags 
+--	is the "baseline" dynamic flags, initialised from
+-- 	the defaults and command line options.
+--
+-- v_DynFlags
+--	is the dynamic flags for the current compilation.  It is reset
+--	to the value of v_InitDynFlags before each compilation, then
+--	updated by reading any OPTIONS pragma in the current module.
 
-setDynFlag f = do
-   dfs <- readIORef v_DynFlags
-   writeIORef v_DynFlags dfs{ flags = f : flags dfs }
+GLOBAL_VAR(v_InitDynFlags, defaultDynFlags, DynFlags)
+GLOBAL_VAR(v_DynFlags,     defaultDynFlags, DynFlags)
 
-unSetDynFlag f = do
+updDynFlags f = do
    dfs <- readIORef v_DynFlags
-   writeIORef v_DynFlags dfs{ flags = filter (/= f) (flags dfs) }
+   writeIORef v_DynFlags (f dfs)
+
+getDynFlags :: IO DynFlags
+getDynFlags = readIORef v_DynFlags
+
+dynFlag :: (DynFlags -> a) -> IO a
+dynFlag f = do dflags <- readIORef v_DynFlags; return (f dflags)
+
+setDynFlag f   = updDynFlags (\dfs -> dfs{ flags = f : flags dfs })
+unSetDynFlag f = updDynFlags (\dfs -> dfs{ flags = filter (/= f) (flags dfs) })
 
 -- we can only change HscC to HscAsm and vice-versa with dynamic flags 
 -- (-fvia-C and -fasm).
@@ -315,10 +329,26 @@ setLang l = do
 	HscAsm -> writeIORef v_DynFlags dfs{ hscLang = l }
 	_      -> return ()
 
+setVerbosityAtLeast n =
+  updDynFlags (\dfs -> if verbosity dfs < n 
+			  then dfs{ verbosity = n }
+			  else dfs)
+
+setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 2 })
+setVerbosity n 
+  | all isDigit n = updDynFlags (\dfs -> dfs{ verbosity = read n })
+  | otherwise     = throwDyn (OtherError "can't parse verbosity flag (-v<n>)")
+
+getVerbFlag = do
+   verb <- dynFlag verbosity
+   if verb >= 3  then return  "-v" else return ""
+
 dynamic_flags = [
 
      ( "cpp",		NoArg  (updateState (\s -> s{ cpp_flag = True })) )
   ,  ( "#include",	HasArg (addCmdlineHCInclude) )
+
+  ,  ( "v",		OptPrefix (setVerbosity) )
 
   ,  ( "optL",		HasArg (addOpt_L) )
   ,  ( "optP",		HasArg (addOpt_P) )
@@ -333,8 +363,6 @@ dynamic_flags = [
 	------ Debugging ----------------------------------------------------
   ,  ( "dstg-stats",	NoArg (writeIORef v_StgStats True) )
 
-  ,  ( "ddump-all",         	 NoArg (setDynFlag Opt_D_dump_all) )
-  ,  ( "ddump-most",         	 NoArg (setDynFlag Opt_D_dump_most) )
   ,  ( "ddump-absC",         	 NoArg (setDynFlag Opt_D_dump_absC) )
   ,  ( "ddump-asm",          	 NoArg (setDynFlag Opt_D_dump_asm) )
   ,  ( "ddump-cpranal",      	 NoArg (setDynFlag Opt_D_dump_cpranal) )
@@ -358,7 +386,7 @@ dynamic_flags = [
   ,  ( "ddump-usagesp",      	 NoArg (setDynFlag Opt_D_dump_usagesp) )
   ,  ( "ddump-cse",          	 NoArg (setDynFlag Opt_D_dump_cse) )
   ,  ( "ddump-worker-wrapper",   NoArg (setDynFlag Opt_D_dump_worker_wrapper) )
-  ,  ( "dshow-passes",           NoArg (setDynFlag Opt_D_show_passes) )
+  ,  ( "dshow-passes",           NoArg (setVerbosity "2") )
   ,  ( "ddump-rn-trace",         NoArg (setDynFlag Opt_D_dump_rn_trace) )
   ,  ( "ddump-rn-stats",         NoArg (setDynFlag Opt_D_dump_rn_stats) )
   ,  ( "ddump-stix",             NoArg (setDynFlag Opt_D_dump_stix) )
@@ -470,3 +498,39 @@ buildStaticHscOpts = do
 					      else return "")
 
   return ( static : filtered_opts )
+
+-----------------------------------------------------------------------------
+-- Running an external program
+
+-- sigh, here because both DriverMkDepend & DriverPipeline need it.
+
+runSomething phase_name cmd
+ = do
+   verb <- dynFlag verbosity
+   when (verb >= 2) $ putStr ("*** " ++ phase_name)
+   when (verb >= 3) $ putStrLn cmd
+   hFlush stdout
+
+   -- test for -n flag
+   n <- readIORef v_Dry_run
+   unless n $ do 
+
+   -- and run it!
+#ifndef mingw32_TARGET_OS
+   exit_code <- system cmd `catchAllIO` 
+		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+#else
+   tmp <- newTempName "sh"
+   h <- openFile tmp WriteMode
+   hPutStrLn h cmd
+   hClose h
+   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
+		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+   removeFile tmp
+#endif
+
+   if exit_code /= ExitSuccess
+	then throwDyn (PhaseFailed phase_name exit_code)
+	else do when (verb >= 3) (putStr "\n")
+	        return ()
+

@@ -44,6 +44,8 @@ import Module		( ModuleName, moduleName, mkHomeModule )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Util		( unJust )
+import Unique		( Uniquable(..) )
+import PrelNames	( ioTyConKey )
 import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
@@ -56,6 +58,7 @@ import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  HomeSymbolTable, 
 			  OrigNameEnv(..), PackageRuleBase, HomeIfaceTable, 
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
+import Type		( splitTyConApp_maybe )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName  )
@@ -416,7 +419,17 @@ hscExpr dflags hst hit pcs0 this_module expr
 	   <- typecheckExpr dflags pcs1 hst print_unqual this_module rn_expr;
 	case maybe_tc_return of
 		Nothing -> return (pcs1, Nothing)
-		Just (pcs2, tc_expr) -> do {
+		Just (pcs2, tc_expr, ty) -> do {
+
+	let { is_IO_type = case splitTyConApp_maybe ty of {
+	   		    Just (tycon, _) -> getUnique tycon == ioTyConKey;
+			    Nothing -> False }
+            };
+
+        if (not is_IO_type)
+		then hscExpr dflags hst hit pcs2 this_module 
+			("print (" ++ expr ++ ")")
+		else do
 
 		-- Desugar it
 	ds_expr <- deSugarExpr dflags pcs2 hst this_module
@@ -448,23 +461,22 @@ hscParseExpr dflags str
       -- of the string...)
       let glaexts = 1#
       --let glaexts | dopt Opt_GlasgowExts dflags = 1#
-      --	          | otherwise 		        = 0#
+      --	    | otherwise  	          = 0#
 
       case parse buf PState{ bol = 0#, atbol = 1#,
 	 		     context = [], glasgow_exts = glaexts,
 			     loc = mkSrcLoc SLIT("<no file>") 0 } of {
 
-	PFailed err -> do { freeStringBuffer buf
-			  ; hPutStrLn stderr (showSDoc err)
-                          ; return Nothing };
+	PFailed err -> do { freeStringBuffer buf;
+			    hPutStrLn stderr (showSDoc err);
+                            return Nothing };
 
 	POk _ (PExpr rdr_expr) -> do {
 
-      -- ToDo:
-      -- freeStringBuffer buf;
-
+      --ToDo: can't free the string buffer until we've finished this
+      -- compilation sweep and all the identifiers have gone away.
+      --freeStringBuffer buf;
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_expr);
-      
       return (Just rdr_expr)
       }}
 #endif

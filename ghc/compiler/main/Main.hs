@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.28 2000/11/20 16:37:42 sewardj Exp $
+-- $Id: Main.hs,v 1.29 2000/11/21 14:35:52 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -98,8 +98,8 @@ main =
    -- make sure we clean up after ourselves
    later (do  forget_it <- readIORef v_Keep_tmp_files
 	      unless forget_it $ do
-	      verb <- readIORef v_Verbose
-	      cleanTempFiles verb
+	      verb <- dynFlag verbosity
+	      cleanTempFiles (verb >= 2)
      ) $ do
 	-- exceptions will be blocked while we clean the temporary files,
 	-- so there shouldn't be any difficulty if we receive further
@@ -201,6 +201,12 @@ main =
                   hscLang  = lang,
 		  -- leave out hscOutName for now
                   hscOutName = panic "Main.main:hscOutName not set",
+
+		  verbosity = case mode of
+				DoInteractive -> 1
+				DoMake	      -> 1
+				_other        -> 0,
+
 		  flags = [] }
 
 	-- the rest of the arguments are "dynamic"
@@ -219,15 +225,16 @@ main =
    saved_driver_state <- readIORef v_Driver_state
    writeIORef v_InitDriverState saved_driver_state
 
-	-- get the -v flag
-   verb <- readIORef v_Verbose
+   verb <- dynFlag verbosity
 
-   when verb (do hPutStr stderr "Glasgow Haskell Compiler, Version "
- 	         hPutStr stderr cProjectVersion
-	         hPutStr stderr ", for Haskell 98, compiled by GHC version "
-	         hPutStrLn stderr cBooterVersion)
+   when (verb >= 2) 
+	(do hPutStr stderr "Glasgow Haskell Compiler, Version "
+ 	    hPutStr stderr cProjectVersion
+	    hPutStr stderr ", for Haskell 98, compiled by GHC version "
+	    hPutStrLn stderr cBooterVersion)
 
-   when verb (hPutStrLn stderr ("Using package config file: " ++ conf_file))
+   when (verb >= 2) 
+	(hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
 	-- initialise the finder
    initFinder pkg_details
