@@ -139,7 +139,10 @@ tcPat tc_bndr pat_in@(AsPatIn name pat) pat_ty
 	      tvs, (name, bndr_id) `consBag` ids, lie_avail)
 
 tcPat tc_bndr WildPatIn pat_ty
-  = returnTc (WildPat pat_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
+  = zapToType pat_ty			`thenNF_Tc` \ pat_ty' ->
+	-- We might have an incoming 'hole' type variable; no annotation
+	-- so zap it to a type.  Rather like tcMonoPatBndr.
+    returnTc (WildPat pat_ty', emptyLIE, emptyBag, emptyBag, emptyLIE)
 
 tcPat tc_bndr (ParPatIn parend_pat) pat_ty
   = tcPat tc_bndr parend_pat pat_ty
