@@ -10,7 +10,7 @@ module HaddockVersion (
 
 projectName, projectUrl :: String
 projectName = "Haddock"
-projectUrl = "http://www.haskell.org/haddock"
+projectUrl = "http://www.haskell.org/haddock/"
 
 -- The version comes in via CPP from mk/version.mk
 projectVersion :: String
