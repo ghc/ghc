@@ -606,6 +606,7 @@ occAnal env (Con con args)
 	-- arguments are just variables, or trivial expressions.
 	final_arg_uds    = case con of
 				DataCon _ -> mapVarEnv markMany arg_uds
+				PrimOp _  -> mapVarEnv markLazy arg_uds
 				other	  -> arg_uds
     in
     (final_arg_uds, Con con args')
