@@ -116,8 +116,9 @@ instance (Outputable name, Outputable pat)
 instance Ord name => Eq (HsDecl name pat) where
 	-- Used only when comparing interfaces, 
 	-- at which time only signature and type/class decls
-   (SigD s1)  == (SigD s2) = s1 == s2
+   (SigD s1)  == (SigD s2)  = s1 == s2
    (TyClD d1) == (TyClD d2) = d1 == d2
+   _          == _          = False
 \end{code}
 
 
