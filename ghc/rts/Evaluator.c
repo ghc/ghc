@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.19 $
- * $Date: 1999/10/19 11:01:26 $
+ * $Revision: 1.20 $
+ * $Date: 1999/10/22 09:59:28 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1547,7 +1547,7 @@ static inline void            PushTaggedRealWorld( void            )
    { PushTag(REALWORLD_TAG);  }
        inline void            PushTaggedInt      ( StgInt        x ) 
    { Sp -= sizeofW(StgInt);        *Sp = x;          PushTag(INT_TAG);    }
-static inline void            PushTaggedWord     ( StgWord       x ) 
+       inline void            PushTaggedWord     ( StgWord       x ) 
    { Sp -= sizeofW(StgWord);       *Sp = x;          PushTag(WORD_TAG);   }
        inline void            PushTaggedAddr     ( StgAddr       x ) 
    { Sp -= sizeofW(StgAddr);       *Sp = (W_)x;      PushTag(ADDR_TAG);   }
@@ -1557,7 +1557,7 @@ static inline void            PushTaggedWord     ( StgWord       x )
    { Sp -= sizeofW(StgFloat);      ASSIGN_FLT(Sp,x); PushTag(FLOAT_TAG);  }
        inline void            PushTaggedDouble   ( StgDouble     x ) 
    { Sp -= sizeofW(StgDouble);     ASSIGN_DBL(Sp,x); PushTag(DOUBLE_TAG); }
-static inline void            PushTaggedStablePtr   ( StgStablePtr  x ) 
+       inline void            PushTaggedStablePtr   ( StgStablePtr  x ) 
    { Sp -= sizeofW(StgStablePtr);  *Sp = x;          PushTag(STABLE_TAG); }
 static inline void            PushTaggedBool     ( int           x ) 
    { PushTaggedInt(x); }
@@ -1569,7 +1569,7 @@ static inline void            PopTaggedRealWorld ( void )
        inline StgInt          PopTaggedInt       ( void ) 
    { StgInt    r; PopTag(INT_TAG);     r = *stgCast(StgInt*,  Sp);      
      Sp += sizeofW(StgInt);        return r;}
-static inline StgWord         PopTaggedWord      ( void ) 
+       inline StgWord         PopTaggedWord      ( void ) 
    { StgWord   r; PopTag(WORD_TAG);    r = *stgCast(StgWord*, Sp);      
      Sp += sizeofW(StgWord);       return r;}
        inline StgAddr         PopTaggedAddr      ( void ) 
@@ -1584,7 +1584,7 @@ static inline StgWord         PopTaggedWord      ( void )
        inline StgDouble       PopTaggedDouble    ( void ) 
    { StgDouble r; PopTag(DOUBLE_TAG);  r = PK_DBL(Sp);                  
      Sp += sizeofW(StgDouble);     return r;}
-static inline StgStablePtr    PopTaggedStablePtr    ( void ) 
+       inline StgStablePtr    PopTaggedStablePtr    ( void ) 
    { StgInt    r; PopTag(STABLE_TAG);  r = *stgCast(StgStablePtr*, Sp); 
      Sp += sizeofW(StgStablePtr);  return r;}
 

@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.7 1999/10/19 23:52:02 andy Exp $
+ * $Id: ForeignCall.c,v 1.8 1999/10/22 09:59:34 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -96,21 +96,28 @@
 */
 
 /* ToDo: move these to the Right Place */
-extern StgInt          PopTaggedInt       ( void ) ;
-extern StgDouble       PopTaggedDouble    ( void ) ;
-extern StgFloat        PopTaggedFloat     ( void ) ;
-extern StgChar         PopTaggedChar      ( void ) ;
-extern StgAddr         PopTaggedAddr      ( void ) ;
+extern StgInt          PopTaggedInt        ( void ) ;
+extern StgWord         PopTaggedWord       ( void ) ;
+extern StgAddr         PopTaggedAddr       ( void ) ;
+extern StgStablePtr    PopTaggedStablePtr  ( void ) ;
+extern StgChar         PopTaggedChar       ( void ) ;
+extern StgFloat        PopTaggedFloat      ( void ) ;
+extern StgDouble       PopTaggedDouble     ( void ) ;
 
-extern void   PushTaggedInt     ( StgInt    );
-extern void   PushTaggedDouble  ( StgDouble );
-extern void   PushTaggedFloat   ( StgFloat  );
-extern void   PushTaggedChar    ( StgChar   );
-extern void   PushTaggedAddr    ( StgAddr   );
+extern void   PushTaggedInt        ( StgInt       );
+extern void   PushTaggedWord       ( StgWord      );
+extern void   PushTaggedAddr       ( StgAddr      );
+extern void   PushTaggedStablePtr  ( StgStablePtr );
+extern void   PushTaggedChar       ( StgChar      );
+extern void   PushTaggedFloat      ( StgFloat     );
+extern void   PushTaggedDouble     ( StgDouble    );
 
 extern void   PushPtr        ( StgPtr );
 extern StgPtr PopPtr         ( void );
 
+
+extern void universal_call_c_x86_linux  ( int, void*, char*, void* );
+       void universal_call_c_generic    ( int, void*, char*, void* );
 
 /* --------------------------------------------------------------------------
  * This is a generic version of universal call that
@@ -120,13 +127,13 @@ extern StgPtr PopPtr         ( void );
  * even if univeral_call_c_<os/specific> is not ported.
  * ------------------------------------------------------------------------*/
 
-void universal_call_c_x86_generic
+void universal_call_c_generic
 ( int   n_args,
   void* args, 
   char* argstr, 
   void* fun )
 {
-   unsigned int *p = (unsigned int*) args;
+  unsigned int *p = (unsigned int*) args;
 
 #define ARG(n)  (p[n*2])
 #define CMP(str) ((n_args + 1 == strlen(str)) && \
@@ -167,6 +174,9 @@ void universal_call_c_x86_generic
  *         1 if too many args/results or non-handled type
  *         2 if config error on this platform
  * Tries to automatically handle 32-vs-64 bit differences.
+ * Assumes an LP64 programming model for 64 bit: 
+ *    sizeof(long)==sizeof(void*)==64  on a 64 bit platform
+ *    sizeof(int)==32                  on a 64 bit platform
  * ------------------------------------------------------------------------*/
 
 int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
@@ -175,9 +185,11 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
    char           argd_vec[31];
    unsigned int*  p;
    int            i;
+   unsigned long  ul;
 
    if (sizeof(int) != 4 || sizeof(double) != 8 || sizeof(float) != 4
-       || (sizeof(void*) != 4 && sizeof(void*) != 8))
+       || (sizeof(void*) != 4 && sizeof(void*) != 8)
+       || (sizeof(unsigned long) != sizeof(void*)))
       return 2;
 
    if (d->num_args > 30 || d->num_results > 1)
@@ -189,28 +201,33 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
    p = (unsigned int*) &arg_vec[1];
    for (i = 0; i < d->num_args; i++) {
       switch (d->arg_tys[i]) {
+
+         case INT_REP:
+            ul = (unsigned long)PopTaggedInt();
+            goto common_int32_or_64;
+         case WORD_REP:
+            ul = (unsigned long)PopTaggedWord();
+            goto common_int32_or_64;
+         case ADDR_REP:
+            ul = (unsigned long)(PopTaggedAddr());
+            goto common_int32_or_64;
+         case STABLE_REP:
+            ul = (unsigned long)PopTaggedStablePtr();
+            common_int32_or_64:
+            if (sizeof(void*) == 4) {
+               *(unsigned long *)p = ul; p++; *p++ = 0;
+               argd_vec[i+1] = 'i';
+            } else {
+               *(unsigned long *)p = ul;
+               p += 2;
+               argd_vec[i+1] = 'I';
+            }
+            break;
+
          case CHAR_REP: {
             int j = (int)PopTaggedChar();
             *p++ = j; *p++ = 0;
             argd_vec[i+1] = 'i';
-            break;
-         }
-         case INT_REP: {
-            int j = PopTaggedInt();
-            *p++ = j; *p++ = 0;
-            argd_vec[i+1] = 'i';
-            break;
-         }
-         case ADDR_REP: {
-            void* a = PopTaggedAddr();
-            if (sizeof(void*) == 4) {
-               *(void**)p = a; p++; *p++ = 0;
-               argd_vec[i+1] = 'i';
-            } else {
-               *(void**)p = a;
-               p += 2;
-               argd_vec[i+1] = 'I';
-            }
             break;
          }
          case FLOAT_REP: {
@@ -234,10 +251,10 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
       argd_vec[0] = 'i'; 
    } else {
       switch (d->result_tys[0]) {
-         case CHAR_REP: case INT_REP:
-            argd_vec[0] = 'i'; break;
-         case ADDR_REP:
+         case INT_REP: case WORD_REP: case ADDR_REP: case STABLE_REP:
             argd_vec[0] = (sizeof(void*)==4) ? 'i' : 'I'; break;
+         case CHAR_REP:
+            argd_vec[0] = 'i'; break;
          case FLOAT_REP:
             argd_vec[0] = 'f'; break;
          case DOUBLE_REP:
@@ -257,26 +274,34 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
    universal_call_c_x86_linux ( 
       d->num_args, (void*)arg_vec, argd_vec, fun );
 #else
-   universal_call_c_x86_generic ( 
+   universal_call_c_generic ( 
       d->num_args, (void*)arg_vec, argd_vec, fun );
 #endif
    LoadThreadState();
    *bco=(StgBCO*)PopPtr();
 
+   /* INT, WORD, ADDR, STABLE don't need to do a word-size check
+      since the result is in the bytes starting at p regardless. */
+
    if (d->num_results > 0) {
       p = (unsigned int*) &arg_vec[0];
       switch (d->result_tys[0]) {
-         case CHAR_REP:
-            PushTaggedChar ( (StgChar) p[0]);
-            break;
+
          case INT_REP:
             PushTaggedInt ( ((StgInt*)p) [0] );
             break;
+         case WORD_REP:
+            PushTaggedWord ( ((StgWord*)p) [0] );
+            break;
          case ADDR_REP:
-            if (sizeof(void*) == 4) 
-               PushTaggedAddr ( ((StgAddr*)p) [0] );
-            else
-               PushTaggedAddr ( ((StgAddr*)p) [0] );
+            PushTaggedAddr ( ((StgAddr*)p) [0] );
+            break;
+         case STABLE_REP:
+            PushTaggedStablePtr ( ((StgStablePtr*)p) [0] );
+            break;
+
+         case CHAR_REP:
+            PushTaggedChar ( (StgChar) p[0]);
             break;
          case FLOAT_REP:
             PushTaggedFloat ( ((StgFloat*)p) [0] );
@@ -284,6 +309,7 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
          case DOUBLE_REP:
             PushTaggedDouble ( ((StgDouble*)p) [0] );
             break;
+
          default:
             return 1;
       }
