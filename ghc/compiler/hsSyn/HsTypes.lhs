@@ -6,6 +6,7 @@
 If compiled without \tr{#define COMPILING_GHC}, you get
 (part of) a Haskell-abstract-syntax library.  With it,
 you get part of GHC.
+[OLD COMMENT -- SOF 7/97]
 
 \begin{code}
 #include "HsVersions.h"
