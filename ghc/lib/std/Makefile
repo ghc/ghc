@@ -152,8 +152,6 @@ INSTALL_DATAS += PrelGHC.$(way_)hi
 
 
 ilxstd:
-	(cd //c/devel/fcom/src; make ilxsdk)
-	(cd ../../compiler; make)
 	$(MAKE) way=ilx-Onot-mono std.ilx-Onot.mono.dll std.ilx-Onot.mono.vlb
 	$(MAKE) way=ilx-O-mono  std.ilx-O.mono.dll std.ilx-O.mono.vlb
 	$(MAKE) way=ilx-Onot-generic std.ilx-Onot.generic.dll
