@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.3 2001/05/22 15:06:47 simonmar Exp $
+-- $Id: PrelIO.hsc,v 1.4 2001/05/24 10:41:13 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -293,26 +293,27 @@ hGetLineUnBuffered h = do
 -- unread portion of the channel or file managed by the handle, which
 -- is made semi-closed.
 
+-- hGetContents on a DuplexHandle only affects the read side: you can
+-- carry on writing to it afterwards.
+
 hGetContents :: Handle -> IO String
-hGetContents handle = 
-	-- can't use wantReadableHandle here, because we want to side effect
-	-- the handle.
-    withHandle "hGetContents" handle $ \ handle_ -> do
+hGetContents handle@(DuplexHandle r w) 
+  = withHandle' "hGetContents" handle r (hGetContents' handle)
+hGetContents handle@(FileHandle m) 
+  = withHandle' "hGetContents" handle m (hGetContents' handle)
+
+hGetContents' handle handle_ = 
     case haType handle_ of 
       ClosedHandle 	   -> ioe_closedHandle
       SemiClosedHandle 	   -> ioe_closedHandle
-      AppendHandle 	   -> ioException not_readable_error
-      WriteHandle 	   -> ioException not_readable_error
+      AppendHandle 	   -> ioe_notReadable
+      WriteHandle 	   -> ioe_notReadable
       _ -> do xs <- lazyRead handle
 	      return (handle_{ haType=SemiClosedHandle}, xs )
-  where
-   not_readable_error = 
-	IOError (Just handle) IllegalOperation "hGetContents"
-		"handle is not open for reading" Nothing
 
 -- Note that someone may close the semi-closed handle (or change its
--- buffering), so each these lazy read functions are pulled on, they
--- have to check whether the handle has indeed been closed.
+-- buffering), so each time these lazy read functions are pulled on,
+-- they have to check whether the handle has indeed been closed.
 
 lazyRead :: Handle -> IO String
 lazyRead handle = 

@@ -4,21 +4,21 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.4 2001/05/21 11:02:50 simonmar Exp $
+-- $Id: PrelHandle.hsc,v 1.5 2001/05/24 10:41:13 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
 -- This module defines the basic operations on I/O "handles".
 
 module PrelHandle (
-  withHandle, withHandle_,
+  withHandle, withHandle', withHandle_,
   wantWritableHandle, wantReadableHandle, wantSeekableHandle,
   
   newEmptyBuffer, allocateBuffer, readCharFromBuffer, writeCharIntoBuffer,
   flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer, fillReadBuffer,
   read_off,
 
-  ioe_closedHandle, ioe_EOF,
+  ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
   IOMode(..), IOModeEx(..), openFile, openFileEx, openFd,
@@ -184,7 +184,7 @@ checkWritableHandle act handle_
   = case haType handle_ of 
       ClosedHandle 	   -> ioe_closedHandle
       SemiClosedHandle 	   -> ioe_closedHandle
-      ReadHandle 	   -> ioException not_writeable_error
+      ReadHandle 	   -> ioe_notWritable
       ReadWriteHandle  	   -> do
 		let ref = haBuffer handle_
 		buf <- readIORef ref
@@ -196,10 +196,6 @@ checkWritableHandle act handle_
 		writeIORef ref new_buf
 		act handle_
       _other 		   -> act handle_
-  where
-   not_writeable_error = 
-	IOError Nothing IllegalOperation ""
-		"handle is not open for writing" Nothing
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for read operations.
@@ -221,8 +217,8 @@ checkReadableHandle act handle_ =
     case haType handle_ of 
       ClosedHandle 	   -> ioe_closedHandle
       SemiClosedHandle 	   -> ioe_closedHandle
-      AppendHandle 	   -> ioException not_readable_error
-      WriteHandle 	   -> ioException not_readable_error
+      AppendHandle 	   -> ioe_notReadable
+      WriteHandle 	   -> ioe_notReadable
       ReadWriteHandle	   -> do 
 	let ref = haBuffer handle_
 	buf <- readIORef ref
@@ -231,10 +227,6 @@ checkReadableHandle act handle_ =
 	   writeIORef ref new_buf{ bufState=ReadBuffer }
 	act handle_
       _other 		   -> act handle_
-  where
-   not_readable_error = 
-	IOError Nothing IllegalOperation ""
-		"handle is not open for reading" Nothing
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for seek operations.
@@ -250,21 +242,29 @@ checkSeekableHandle act handle_ =
     case haType handle_ of 
       ClosedHandle 	   -> ioe_closedHandle
       SemiClosedHandle	   -> ioe_closedHandle
-      AppendHandle         -> not_seekable_error
+      AppendHandle         -> ioe_notSeekable
       _ 		   -> act handle_
-
-not_seekable_error
-  = ioException (IOError Nothing IllegalOperation ""
-		   "handle is not seekable" Nothing)
 
 -- -----------------------------------------------------------------------------
 -- Handy IOErrors
 
-ioe_closedHandle :: IO a
-ioe_closedHandle = ioException (IOError Nothing IllegalOperation "" "" Nothing)
+ioe_closedHandle, ioe_EOF, 
+  ioe_notReadable, ioe_notWritable, ioe_notSeekable :: IO a
 
-ioe_EOF :: IO a
-ioe_EOF = ioException (IOError Nothing EOF "" "" Nothing)
+ioe_closedHandle = ioException 
+   (IOError Nothing IllegalOperation "" 
+	"handle is closed" Nothing)
+ioe_EOF = ioException 
+   (IOError Nothing EOF "" "" Nothing)
+ioe_notReadable = ioException 
+   (IOError Nothing IllegalOperation "" 
+	"handle is not open for reading" Nothing)
+ioe_notWritable = ioException 
+   (IOError Nothing IllegalOperation "" 
+	"handle is not open for writing" Nothing)
+ioe_notSeekable = ioException 
+   (IOError Nothing IllegalOperation ""
+	"handle is not seekable" Nothing)
 
 -- -----------------------------------------------------------------------------
 -- Handle Finalizers
