@@ -101,7 +101,7 @@
 	<A HREF="haskell98/index.html"><TT>haskell98</TT></a>,
 	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>,
 	<A HREF="network/index.html"><TT>network</TT></a>,
-	<A HREF="parsec/index.html"><TT>parsec</TT></a> and.
+	<A HREF="parsec/index.html"><TT>parsec</TT></a> and
 	<A HREF="QuickCheck/index.html"><TT>QuickCheck</TT></a> packages.
 @unixHTMLStart@
 	Most of the modules in the <A HREF="unix/index.html"><TT>unix</TT></a>
