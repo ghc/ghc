@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.20 2002/03/12 11:51:07 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.21 2002/03/20 23:07:02 sebc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -85,8 +85,8 @@ extern nat  countBlocks(bdescr *);
 
 /* 
  * These three are used by the garbage collector when we have
- * dynamically-linked object modules.  (see ClosureMacros.h,
- * IS_CODE_PTR etc.). 
+ * dynamically-linked object modules.  (see Storage.h,
+ * IS_DATA_PTR etc.). 
  * Defined in Linker.c.
  */
 int is_dynamically_loaded_code_or_rodata_ptr ( void* p );
