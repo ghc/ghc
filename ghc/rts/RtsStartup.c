@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.59 2001/12/06 07:07:12 sof Exp $
+ * $Id: RtsStartup.c,v 1.60 2001/12/12 14:31:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -326,7 +326,7 @@ shutdownHaskell(void)
 #endif
 
 #if defined(PROFILING) 
-  report_ccs_profiling();
+  reportCCSProfiling();
 #endif
 
 #if defined(PROFILING) || defined(DEBUG)

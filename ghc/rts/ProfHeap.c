@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.32 2001/11/29 16:38:13 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.33 2001/12/12 14:31:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -37,7 +37,7 @@
  * RESTRICTION:
  *   era must be no longer than LDV_SHIFT (15 or 30) bits.
  * Invariants:
- *   era is initialized to 0 in initHeapProfiling().
+ *   era is initialized to 1 in initHeapProfiling().
  *
  * max_era is initialized to 2^LDV_SHIFT in initHeapProfiling().
  * When era reaches max_era, the profiling stops because a closure can
@@ -181,20 +181,27 @@ closureIdentity( StgClosure *p )
 
 #ifdef PROFILING
     case HEAP_BY_CCS:
-	return ((StgClosure *)p)->header.prof.ccs;
+	return p->header.prof.ccs;
     case HEAP_BY_MOD:
-	return ((StgClosure *)p)->header.prof.ccs->cc->module;
+	return p->header.prof.ccs->cc->module;
     case HEAP_BY_DESCR:
-	return (get_itbl((StgClosure *)p))->prof.closure_desc;
+	return get_itbl(p)->prof.closure_desc;
     case HEAP_BY_TYPE:
-	return (get_itbl((StgClosure *)p))->prof.closure_type;
+	return get_itbl(p)->prof.closure_type;
     case HEAP_BY_RETAINER:
-	return retainerSetOf((StgClosure *)p);
+	// AFAIK, the only closures in the heap which might not have a
+	// valid retainer set are DEAD_WEAK closures.
+	if (isRetainerSetFieldValid(p))
+	    return retainerSetOf(p);
+	else
+	    return NULL;
+
 #else // DEBUG
     case HEAP_BY_INFOPTR:
 	return (void *)((StgClosure *)p)->header.info; 
     case HEAP_BY_CLOSURE_TYPE:
 	return type_names[get_itbl(p)->type];
+
 #endif
     default:
 	barf("closureIdentity");
@@ -366,6 +373,13 @@ initHeapProfiling(void)
         return 0;
     }
 
+#ifdef PROFILING
+    if (doingLDVProfiling() && doingRetainerProfiling()) {
+	prog_belch("cannot mix -hb and -hr");
+	stg_exit(1);
+    }
+#endif
+
     // we only count eras if we're doing LDV profiling.  Otherwise era
     // is fixed at zero.
 #ifdef PROFILING
@@ -505,9 +519,10 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
     }
     fprintf(fp, "%s", buf);
 }
+#endif // PROFILING
 
-static rtsBool
-str_matches_selector( char* str, char* sel )
+rtsBool
+strMatchesSelector( char* str, char* sel )
 {
    char* p;
    // fprintf(stderr, "str_matches_selector %s %s\n", str, sel);
@@ -529,7 +544,6 @@ str_matches_selector( char* str, char* sel )
        if (*sel == '\0') return rtsFalse;
    }
 }
-#endif // PROFILING
 
 /* -----------------------------------------------------------------------------
  * Figure out whether a closure should be counted in this census, by
@@ -542,24 +556,22 @@ closureSatisfiesConstraints( StgClosure* p )
     return rtsTrue;
 #else
    rtsBool b;
-   if (RtsFlags.ProfFlags.modSelector) {
-       b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->module,
-				 RtsFlags.ProfFlags.modSelector );
-       if (!b) return rtsFalse;
+
+   // The CCS has a selected field to indicate whether this closure is
+   // deselected by not being mentioned in the module, CC, or CCS
+   // selectors.
+   if (!p->header.prof.ccs->selected) {
+       return rtsFalse;
    }
+
    if (RtsFlags.ProfFlags.descrSelector) {
-       b = str_matches_selector( (get_itbl((StgClosure *)p))->prof.closure_desc,
+       b = strMatchesSelector( (get_itbl((StgClosure *)p))->prof.closure_desc,
 				 RtsFlags.ProfFlags.descrSelector );
        if (!b) return rtsFalse;
    }
    if (RtsFlags.ProfFlags.typeSelector) {
-       b = str_matches_selector( (get_itbl((StgClosure *)p))->prof.closure_type,
+       b = strMatchesSelector( (get_itbl((StgClosure *)p))->prof.closure_type,
                                 RtsFlags.ProfFlags.typeSelector );
-       if (!b) return rtsFalse;
-   }
-   if (RtsFlags.ProfFlags.ccSelector) {
-       b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->label,
-				 RtsFlags.ProfFlags.ccSelector );
        if (!b) return rtsFalse;
    }
    if (RtsFlags.ProfFlags.retainerSelector) {
@@ -568,7 +580,7 @@ closureSatisfiesConstraints( StgClosure* p )
        rs = retainerSetOf((StgClosure *)p);
        if (rs != NULL) {
 	   for (i = 0; i < rs->num; i++) {
-	       b = str_matches_selector( rs->element[i]->cc->label,
+	       b = strMatchesSelector( rs->element[i]->cc->label,
 					 RtsFlags.ProfFlags.retainerSelector );
 	       if (b) return rtsTrue;
 	   }
@@ -704,13 +716,13 @@ dumpCensus( Census *census )
 #ifdef PROFILING
 	if (RtsFlags.ProfFlags.bioSelector != NULL) {
 	    count = 0;
-	    if (str_matches_selector("lag", RtsFlags.ProfFlags.bioSelector))
+	    if (strMatchesSelector("lag", RtsFlags.ProfFlags.bioSelector))
 		count += ctr->c.ldv.not_used - ctr->c.ldv.void_total;
-	    if (str_matches_selector("drag", RtsFlags.ProfFlags.bioSelector))
+	    if (strMatchesSelector("drag", RtsFlags.ProfFlags.bioSelector))
 		count += ctr->c.ldv.drag_total;
-	    if (str_matches_selector("void", RtsFlags.ProfFlags.bioSelector))
+	    if (strMatchesSelector("void", RtsFlags.ProfFlags.bioSelector))
 		count += ctr->c.ldv.void_total;
-	    if (str_matches_selector("use", RtsFlags.ProfFlags.bioSelector))
+	    if (strMatchesSelector("use", RtsFlags.ProfFlags.bioSelector))
 		count += ctr->c.ldv.used - ctr->c.ldv.drag_total;
 	} else
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Proftimer.c,v 1.8 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Proftimer.c,v 1.9 2001/12/12 14:31:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -29,17 +29,13 @@ rtsBool performHeapProfile;
 void
 stopProfTimer( void )
 {
-    if (time_profiling) {
-	do_prof_ticks = rtsFalse;
-    }
+    do_prof_ticks = rtsFalse;
 }
 
 void
 startProfTimer( void )
 {
-    if (time_profiling) {
-	do_prof_ticks = rtsTrue;
-    }
+    do_prof_ticks = rtsTrue;
 }
 
 void
@@ -68,13 +64,13 @@ initProfTimer( void )
 
     startHeapProfTimer();
 }
-    
+
 
 void
 handleProfTick(void)
 {
     if (do_prof_ticks) {
-	CCS_TICK(CCCS);
+	CCCS->time_ticks++;
     }
 
     if (do_heap_prof_ticks) {

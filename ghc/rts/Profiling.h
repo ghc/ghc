@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
 
- * $Id: Profiling.h,v 1.3 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Profiling.h,v 1.4 2001/12/12 14:31:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -20,16 +20,9 @@ extern FILE *hp_file;
 #ifdef PROFILING
 
 void gen_XML_logfile     ( void );
-void report_ccs_profiling ( void );
-void heap_profile_finish (void);
+void reportCCSProfiling ( void );
 
 void PrintNewStackDecls ( void );
-
-void print_ccs (FILE *, CostCentreStack *);
-
-# define DEFAULT_INTERVAL TICK_FREQUENCY
-
-extern rtsBool time_profiling;
 
 extern lnat total_prof_ticks;
 

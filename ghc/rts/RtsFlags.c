@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.55 2001/12/03 14:34:45 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.56 2001/12/12 14:31:43 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -257,6 +257,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.descrSelector      = NULL;
     RtsFlags.ProfFlags.typeSelector       = NULL;
     RtsFlags.ProfFlags.ccSelector         = NULL;
+    RtsFlags.ProfFlags.ccsSelector        = NULL;
     RtsFlags.ProfFlags.retainerSelector   = NULL;
     RtsFlags.ProfFlags.bioSelector        = NULL;
 
@@ -426,7 +427,8 @@ usage_text[] = {
 "                 r = retainer",
 "                 b = biography (LAG,DRAG,VOID,USE)",
 "  A subset of closures may be selected thusly:",
-"    -hc<cc>,...  specific cost centre(s) (NOT STACKS!)",
+"    -hc<cc>,...  specific cost centre(s) (top of stack only)",
+"    -hC<cc>,...  specific cost centre(s) (anywhere in stack)",
 "    -hm<mod>...  all cost centres from the specified modules(s)",
 "    -hd<des>,... closures with specified closure descriptions",
 "    -hy<typ>...  closures with specified type descriptions",
@@ -889,9 +891,11 @@ error = rtsTrue;
 			    *right = '\0';
 
 			    switch (rts_argv[arg][2]) {
-			    case 'C':
 			    case 'c': // cost centre label select
 				RtsFlags.ProfFlags.ccSelector = left;
+				break;
+			    case 'C':
+				RtsFlags.ProfFlags.ccsSelector = left;
 				break;
 			    case 'M':
 			    case 'm': // cost centre module select

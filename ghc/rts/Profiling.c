@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.28 2001/11/28 15:42:26 simonmar Exp $
+ * $Id: Profiling.c,v 1.29 2001/12/12 14:31:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -35,21 +35,6 @@ Arena *prof_arena;
 unsigned int CC_ID;
 unsigned int CCS_ID;
 unsigned int HP_ID;
-
-/* Table sizes from old profiling system.  Not sure if we'll need
- * these.
- */
-nat time_intervals = 0;
-nat earlier_ticks  = 0;
-nat max_cc_no      = 0;
-nat max_mod_no     = 0;
-nat max_grp_no     = 0;
-nat max_descr_no   = 0;
-nat max_type_no    = 0;
-
-/* Are we time-profiling?
- */
-rtsBool time_profiling = rtsFalse;
 
 /* figures for the profiling report.
  */
@@ -143,13 +128,12 @@ static  CostCentreStack * ActualPush      ( CostCentreStack *, CostCentre * );
 static  CostCentreStack * IsInIndexTable  ( IndexTable *, CostCentre * );
 static  IndexTable *      AddToIndexTable ( IndexTable *, CostCentreStack *, 
 					    CostCentre *, unsigned int );
+static  void              ccsSetSelected  ( CostCentreStack *ccs );
 
+static  void              initTimeProfiling   ( void );
+static  void              initProfilingLogFile( void );
 
-
-static    void initTimeProfiling   ( void );
-static    void initProfilingLogFile( void );
-
-static    void reportCCS_XML       ( CostCentreStack *ccs );
+static  void              reportCCS_XML       ( CostCentreStack *ccs );
 
 /* -----------------------------------------------------------------------------
    Initialise the profiling environment
@@ -212,7 +196,9 @@ initProfiling2 (void)
    */
   ASSERT(CCS_MAIN->prevStack == 0);
   CCS_MAIN->root = CC_MAIN;
+  ccsSetSelected(CCS_MAIN);
   DecCCS(CCS_MAIN);
+
   for (ccs = CCS_LIST; ccs != CCS_MAIN; ) {
     next = ccs->prevStack;
     ccs->prevStack = 0;
@@ -229,7 +215,45 @@ initProfiling2 (void)
     initHeapProfiling();
   }
 }
-  
+
+// Decide whether closures with this CCS should contribute to the heap
+// profile.
+static void 
+ccsSetSelected( CostCentreStack *ccs )
+{
+    if (RtsFlags.ProfFlags.modSelector) {
+	if (! strMatchesSelector( ccs->cc->module,
+				  RtsFlags.ProfFlags.modSelector ) ) {
+	    ccs->selected = 0;
+	    return;
+	}
+    }
+    if (RtsFlags.ProfFlags.ccSelector) {
+	if (! strMatchesSelector( ccs->cc->label,
+				  RtsFlags.ProfFlags.ccSelector ) ) {
+	    ccs->selected = 0;
+	    return;
+	}
+    }
+    if (RtsFlags.ProfFlags.ccsSelector) {
+	CostCentreStack *c;
+	for (c = ccs; c != NULL; c = c->prevStack) {
+	    if ( strMatchesSelector( c->cc->label,
+				     RtsFlags.ProfFlags.ccsSelector )) {
+		break; 
+	    }
+	}
+	if (c == NULL) {
+	    ccs->selected = 0;
+	    return;
+	}
+    }
+
+    ccs->selected = 1;
+    return;
+}
+
+
 static void
 initProfilingLogFile(void)
 {
@@ -281,8 +305,6 @@ initProfilingLogFile(void)
 void
 initTimeProfiling(void)
 {
-  time_profiling = rtsTrue;
-
   /* Start ticking */
   startProfTimer();
 };
@@ -456,6 +478,9 @@ ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
   new_ccs->inherited_alloc = 0;
   
   new_ccs->root = ccs->root;
+
+  // Set the selected field.
+  ccsSetSelected(new_ccs);
 
   /* update the memoization table for the parent stack */
   if (ccs != EMPTY_STACK)
@@ -669,7 +694,7 @@ fprint_header( void )
 }
 
 void
-report_ccs_profiling( void )
+reportCCSProfiling( void )
 {
     nat count;
     char temp[128]; /* sigh: magic constant */
@@ -722,12 +747,6 @@ report_ccs_profiling( void )
 
     fprint_header();
     reportCCS(pruneCCSTree(CCS_MAIN), 0);
-
-    // @retainer profiling
-    // @LDV profiling
-    // Now, prof_file is closed in shutdownHaskell() because this file
-    // is also used for retainer/LDV profiling. See shutdownHaskell().
-    // fclose(prof_file);
 }
 
 static void 
@@ -745,8 +764,8 @@ reportCCS(CostCentreStack *ccs, nat indent)
 	/* force printing of *all* cost centres if -P -P */ 
     {
 
-    fprintf(prof_file, "%-*s%-*s %-10s", 
-	    indent, "", 24-indent, cc->label, cc->module);
+    fprintf(prof_file, "%6d %-*s%-*s %-10s", 
+	    ccs->ccsID, indent, "", 24-indent, cc->label, cc->module);
 
     fprintf(prof_file, "%8lld  %5.1f %5.1f    %5.1f %5.1f",
 	    ccs->scc_count, 
