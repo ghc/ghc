@@ -31,11 +31,10 @@ import GlaExts (Addr(..))
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)		-- break its dependence on ClosureInfo
 #else
-import {-# SOURCE #-} ClosureInfo
 #endif
 
 import AbsCSyn
-
+import ClosureInfo
 import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			  mixedPtrLocn, mixedTypeLocn
 			)
