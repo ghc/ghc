@@ -39,11 +39,13 @@
       </DT><DD>
 	a library for interactively reading input from the console.
       </DD>
+@unixHTMLStart@
       <DT>
 	<A HREF="unix/index.html"><TT>unix</TT></a>
       </DT><DD>
-	supplies POSIX functionality (not all platforms).
+	supplies POSIX functionality.
       </DD>
+@unixHTMLEnd@
 @HOpenGLHTMLStart@
       <DT>
 	<A HREF="OpenGL/index.html"><TT>OpenGL</TT></a>
@@ -83,11 +85,15 @@
 
       <DT><A HREF="http://www.haskell.org/hugs/">Hugs 98</A></DT>
       <DD>
-	Hugs provides almost all of the modules in the <tt>base</tt> package,
-	all the modules in the
-	<tt>haskell98</tt>, <tt>network</tt> and <tt>haskell-src</tt> packages,
-	and some of those in the <tt>unix</tt> package.
-	These modules are always available, as a single hierarchy;
+	Hugs provides almost all of the modules in the
+	<A HREF="base/index.html"><TT>base</TT></a> package and all the
+	modules in the <A HREF="haskell98/index.html"><TT>haskell98</TT></a>,
+	<A HREF="network/index.html"><TT>network</TT></a> and
+	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a> packages.
+@unixHTMLStart@
+	Some of the modules in the <A HREF="unix/index.html"><TT>unix</TT></a> package are supported, too.
+@unixHTMLEnd@
+	All those modules are always available, as a single hierarchy;
 	Hugs does not use the package subdivision.
       </DD>
 

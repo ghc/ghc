@@ -20,6 +20,26 @@ dnl These are needed by the .spec file.
 AC_SUBST(version)
 AC_SUBST(patchlevel)
 
+dnl Uncomment links to unix docs if necessary dnl NOTE: This is a slight
+dnl hack: It needs to be synchronized with fptools/configure.in and
+dnl fptools/libraries/Makefile and should probably use target features
+dnl instead of host.
+AC_CANONICAL_HOST
+
+case $host in
+i[3456]86-*-mingw32*)
+	unixHTMLStart="<!--"
+	unixHTMLEnd="-->"
+	;;
+*)
+	unixHTMLStart=""
+	unixHTMLEnd=""
+	;;
+esac
+
+AC_SUBST(unixHTMLStart)
+AC_SUBST(unixHTMLEnd)
+
 dnl Uncomment links to ObjectIO docs if necessary
 AC_ARG_ENABLE(objectio,
 [  --enable-objectio
