@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.57 2004/06/27 20:41:07 panne Exp $
+-- $Id: Main.hs,v 1.58 2004/06/29 17:14:01 panne Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -19,7 +19,7 @@ import GetOpt
 
 import System        (getProgName, getArgs, ExitCode(..), exitWith, system)
 import Directory     (removeFile,doesFileExist)
-import Monad         (MonadPlus(..), liftM, liftM2, when, unless)
+import Monad         (MonadPlus(..), liftM, liftM2, when)
 import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
 import List          (intersperse, isSuffixOf)
 import IO            (hPutStr, hPutStrLn, stderr)
@@ -563,7 +563,10 @@ output flags name toks = do
         concatMap outTokenHs toks++
         "    return 0;\n}\n"
     
-    unless (null [() | NoCompile <- flags]) $ exitWith ExitSuccess
+    -- NOTE: hbc compiles "[() | NoCompile <- flags]" into wrong code,
+    -- so we use something slightly more complicated.   :-P
+    when (any (\x -> case x of NoCompile -> True; _ -> False) flags) $
+       exitWith ExitSuccess
 
 
     
