@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.145 2005/02/01 08:36:07 simonpj Exp $
+-- $Id: Main.hs,v 1.146 2005/02/02 13:27:07 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -14,7 +14,8 @@ module Main (main) where
 #include "HsVersions.h"
 
 #ifdef GHCI
-import InteractiveUI( ghciWelcomeMsg, interactiveUI )
+import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
+import DriverState	( isInteractiveMode )
 #endif
 
 
@@ -24,10 +25,10 @@ import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( initSysTools, cleanTempFiles, normalisePath )
 import Packages		( dumpPackages, initPackages, haskell98PackageId, PackageIdH(..) )
 import DriverPipeline	( staticLink, doMkDLL, compileFile )
-import DriverState	( isLinkMode, isMakeMode, isInteractiveMode,
+import DriverState	( isLinkMode, 
 			  isCompManagerMode, isInterpretiveMode, 
 			  buildStgToDo, findBuildTag, unregFlags, 
-			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
+			  v_GhcMode, GhcMode(..),
 			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
 			  v_Output_file, v_Output_hi, v_GhcLink,
 			  verifyOutputFiles, GhcLink(..)
@@ -51,7 +52,6 @@ import EXCEPTION	( throwDyn, Exception(..),
 
 -- Standard Haskell libraries
 import IO
-import Directory	( doesFileExist )
 import System		( getArgs, exitWith, ExitCode(..) )
 import Monad
 import List
