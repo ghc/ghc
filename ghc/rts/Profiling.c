@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.33 2002/11/01 11:16:33 simonmar Exp $
+ * $Id: Profiling.c,v 1.34 2002/11/01 11:17:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -21,6 +21,8 @@
 #include "Arena.h"
 #include "RetainerProfile.h"
 #include "LdvProfile.h"
+
+#include <string.h>
 
 /*
  * Profiling allocation arena.
