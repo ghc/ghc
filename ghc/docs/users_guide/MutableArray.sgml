@@ -1,211 +1,270 @@
-<sect2> <idx/MutableArray/
-<label id="MutableArray">
-<p>
+<Sect2 id="MutableArray">
+<Title>MutableArray
+<IndexTerm><Primary>MutableArray</Primary></IndexTerm>
+</Title>
 
-The <tt/MutableArray/ interface provide operations for reading and
+<Para>
+The <Literal>MutableArray</Literal> interface provide operations for reading and
 writing values to mutable arrays. There's two kinds of
-mutable arrays, the mutatable version of Haskell <tt/Array/s
-and <em/mutable byte arrays/, chunks of memory containing
-values of some basic type. 
+mutable arrays, the mutatable version of Haskell <Literal>Array</Literal>s
+and <Emphasis>mutable byte arrays</Emphasis>, chunks of memory containing
+values of some basic type.
+</Para>
 
-<sect3> <idx/Mutable arrays/
-<label id="MutableArray:mutable-arrays">
-<p>
+<Sect3 id="MutableArray-mutable-arrays">
+<Title>Mutable arrays
+<IndexTerm><Primary>Mutable arrays</Primary></IndexTerm>
+</Title>
 
+<Para>
 The mutable array section of the API provides the following
 operations:
+</Para>
 
-<tscreen><code>
+<Para>
+<ProgramListing>
 
 -- mutable arrays:
-newArray      :: Ix ix -> (ix,ix) -> elt -> ST s (MutableArray s ix elt)
-boundsOfArray :: Ix ix => MutableArray s ix elt -> (ix, ix)  
-readArray     :: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
-writeArray    :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
-freezeArray   :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
-thawArray     :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
+newArray      :: Ix ix -&#62; (ix,ix) -&#62; elt -&#62; ST s (MutableArray s ix elt)
+boundsOfArray :: Ix ix =&#62; MutableArray s ix elt -&#62; (ix, ix)
+readArray     :: Ix ix =&#62; MutableArray s ix elt -&#62; ix -&#62; ST s elt
+writeArray    :: Ix ix =&#62; MutableArray s ix elt -&#62; ix -&#62; elt -&#62; ST s ()
+freezeArray   :: Ix ix =&#62; MutableArray s ix elt -&#62; ST s (Array ix elt)
+thawArray     :: Ix ix =&#62; Array ix elt -&#62; ST s (MutableArray s ix elt)
 
-unsafeFreezeArray   :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
-unsafeThawArray     :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
-</code></tscreen>
-<nidx>newArray</nidx>
-<nidx>boundsOfArray</nidx>
-<nidx>readArray</nidx>
-<nidx>writeArray</nidx>
-<nidx>freezeArray</nidx>
-<nidx>thawArray</nidx>
-<nidx>unsafeFreezeArray</nidx>
-<nidx>unsafeThawArray</nidx>
+unsafeFreezeArray   :: Ix ix =&#62; MutableArray s ix elt -&#62; ST s (Array ix elt)
+unsafeThawArray     :: Ix ix =&#62; Array ix elt -&#62; ST s (MutableArray s ix elt)
+</ProgramListing>
 
-<bf/Remarks:/
+<IndexTerm><Primary>newArray</Primary></IndexTerm>
+<IndexTerm><Primary>boundsOfArray</Primary></IndexTerm>
+<IndexTerm><Primary>readArray</Primary></IndexTerm>
+<IndexTerm><Primary>writeArray</Primary></IndexTerm>
+<IndexTerm><Primary>freezeArray</Primary></IndexTerm>
+<IndexTerm><Primary>thawArray</Primary></IndexTerm>
+<IndexTerm><Primary>unsafeFreezeArray</Primary></IndexTerm>
+<IndexTerm><Primary>unsafeThawArray</Primary></IndexTerm>
+</Para>
 
-<itemize>
-<item>
-The <tt/freezeArray/ action converts a mutable array into an
-immutable one by copying, whereas <tt/unsafeFreezeArray/ returns
+<Para>
+<Emphasis>Remarks:</Emphasis>
+</Para>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+The <Literal>freezeArray</Literal> action converts a mutable array into an
+immutable one by copying, whereas <Literal>unsafeFreezeArray</Literal> returns
 an immutable array that is effectively just the type cast version
 of the mutable array. Should you write to the mutable array after
 it has been (unsafely) frozen, you'll side-effect the immutable
 array in the process. Please don't :-)
 
-<item>
-The operation <tt/thawArray/ goes the other way, converting
-an immutable <tt/Array/ into a mutable one. This is done by
-copying. The operation <tt/unsafeThawArray/ is also provided,
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The operation <Literal>thawArray</Literal> goes the other way, converting
+an immutable <Literal>Array</Literal> into a mutable one. This is done by
+copying. The operation <Literal>unsafeThawArray</Literal> is also provided,
 which places the same kind of proof obligation on the programmer
-as <tt/unsafeFreezeArray/ does.
-</itemize>
+as <Literal>unsafeFreezeArray</Literal> does.
+</Para>
+</ListItem>
 
-<sect3> <idx/Mutable byte arrays/
-<label id="MutableArray:mutable-byte-arrays">
-<p>
+</ItemizedList>
 
-<tscreen><code>
+</Para>
+
+</Sect3>
+
+<Sect3 id="MutableArray-mutable-byte-arrays">
+<Title>Mutable byte arrays
+<IndexTerm><Primary>Mutable byte arrays</Primary></IndexTerm>
+</Title>
+
+<Para>
+<ProgramListing>
 -- creators:
-newCharArray      :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newAddrArray      :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newIntArray       :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newWordArray      :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newFloatArray     :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newDoubleArray    :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newStablePtrArray :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
+newCharArray      :: Ix ix =&#62; (ix,ix) -&#62; ST s (MutableByteArray s ix)
+newAddrArray      :: Ix ix =&#62; (ix,ix) -&#62; ST s (MutableByteArray s ix)
+newIntArray       :: Ix ix =&#62; (ix,ix) -&#62; ST s (MutableByteArray s ix)
+newWordArray      :: Ix ix =&#62; (ix,ix) -&#62; ST s (MutableByteArray s ix)
+newFloatArray     :: Ix ix =&#62; (ix,ix) -&#62; ST s (MutableByteArray s ix)
+newDoubleArray    :: Ix ix =&#62; (ix,ix) -&#62; ST s (MutableByteArray s ix)
+newStablePtrArray :: Ix ix =&#62; (ix,ix) -&#62; ST s (MutableByteArray s ix)
 
-boundsOfMutableByteArray 
-                   :: Ix ix => MutableByteArray s ix -> (ix, ix)
+boundsOfMutableByteArray
+                   :: Ix ix =&#62; MutableByteArray s ix -&#62; (ix, ix)
 
-readCharArray      :: Ix ix => MutableByteArray s ix -> ix -> ST s Char 
-readIntArray       :: Ix ix => MutableByteArray s ix -> ix -> ST s Int
-readAddrArray      :: Ix ix => MutableByteArray s ix -> ix -> ST s Addr
-readFloatArray     :: Ix ix => MutableByteArray s ix -> ix -> ST s Float
-readDoubleArray    :: Ix ix => MutableByteArray s ix -> ix -> ST s Double
-readStablePtrArray :: Ix ix => MutableByteArray s ix -> ix -> ST s (StablePtr a)
-readWord8Array	   :: Ix ix => MutableByteArray s ix -> ix -> ST s Word8
-readWord16Array	   :: Ix ix => MutableByteArray s ix -> ix -> ST s Word16
-readWord32Array	   :: Ix ix => MutableByteArray s ix -> ix -> ST s Word32
-readWord64Array	   :: Ix ix => MutableByteArray s ix -> ix -> ST s Word64
-readInt8Array	   :: Ix ix => MutableByteArray s ix -> ix -> ST s Int8
-readInt16Array	   :: Ix ix => MutableByteArray s ix -> ix -> ST s Int16
-readInt32Array	   :: Ix ix => MutableByteArray s ix -> ix -> ST s Int32
-readInt64Array	   :: Ix ix => MutableByteArray s ix -> ix -> ST s Int64
+readCharArray      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Char
+readIntArray       :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Int
+readAddrArray      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Addr
+readFloatArray     :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Float
+readDoubleArray    :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Double
+readStablePtrArray :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s (StablePtr a)
+readWord8Array	   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Word8
+readWord16Array	   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Word16
+readWord32Array	   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Word32
+readWord64Array	   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Word64
+readInt8Array	   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Int8
+readInt16Array	   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Int16
+readInt32Array	   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Int32
+readInt64Array	   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; ST s Int64
 
-writeCharArray        :: Ix ix => MutableByteArray s ix -> ix -> Char -> ST s () 
-writeIntArray         :: Ix ix => MutableByteArray s ix -> ix -> Int  -> ST s () 
-writeAddrArray        :: Ix ix => MutableByteArray s ix -> ix -> Addr -> ST s () 
-writeFloatArray       :: Ix ix => MutableByteArray s ix -> ix -> Float -> ST s () 
-writeDoubleArray      :: Ix ix => MutableByteArray s ix -> ix -> Double -> ST s () 
-writeStablePtrArray   :: Ix ix => MutableByteArray s ix -> ix -> StablePtr a -> ST s () 
-writeWord8Array	      :: Ix ix => MutableByteArray s ix -> ix -> Word8  -> ST s ()
-writeWord16Array      :: Ix ix => MutableByteArray s ix -> ix -> Word16 -> ST s ()
-writeWord32Array      :: Ix ix => MutableByteArray s ix -> ix -> Word32 -> ST s ()
-writeWord64Array      :: Ix ix => MutableByteArray s ix -> ix -> Word64 -> ST s ()
-writeInt8Array	      :: Ix ix => MutableByteArray s ix -> ix -> Int8  -> ST s ()
-writeInt16Array       :: Ix ix => MutableByteArray s ix -> ix -> Int16 -> ST s ()
-writeInt32Array	      :: Ix ix => MutableByteArray s ix -> ix -> Int32 -> ST s ()
-writeInt64Array	      :: Ix ix => MutableByteArray s ix -> ix -> Int64 -> ST s ()
+writeCharArray        :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Char -&#62; ST s ()
+writeIntArray         :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Int  -&#62; ST s ()
+writeAddrArray        :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Addr -&#62; ST s ()
+writeFloatArray       :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Float -&#62; ST s ()
+writeDoubleArray      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Double -&#62; ST s ()
+writeStablePtrArray   :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; StablePtr a -&#62; ST s ()
+writeWord8Array	      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Word8  -&#62; ST s ()
+writeWord16Array      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Word16 -&#62; ST s ()
+writeWord32Array      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Word32 -&#62; ST s ()
+writeWord64Array      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Word64 -&#62; ST s ()
+writeInt8Array	      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Int8  -&#62; ST s ()
+writeInt16Array       :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Int16 -&#62; ST s ()
+writeInt32Array	      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Int32 -&#62; ST s ()
+writeInt64Array	      :: Ix ix =&#62; MutableByteArray s ix -&#62; ix -&#62; Int64 -&#62; ST s ()
 
-freezeCharArray       :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeIntArray        :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeAddrArray       :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeFloatArray      :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeDoubleArray     :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeStablePtrArray  :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+freezeCharArray       :: Ix ix =&#62; MutableByteArray s ix -&#62; ST s (ByteArray ix)
+freezeIntArray        :: Ix ix =&#62; MutableByteArray s ix -&#62; ST s (ByteArray ix)
+freezeAddrArray       :: Ix ix =&#62; MutableByteArray s ix -&#62; ST s (ByteArray ix)
+freezeFloatArray      :: Ix ix =&#62; MutableByteArray s ix -&#62; ST s (ByteArray ix)
+freezeDoubleArray     :: Ix ix =&#62; MutableByteArray s ix -&#62; ST s (ByteArray ix)
+freezeStablePtrArray  :: Ix ix =&#62; MutableByteArray s ix -&#62; ST s (ByteArray ix)
 
-unsafeFreezeByteArray  :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+unsafeFreezeByteArray  :: Ix ix =&#62; MutableByteArray s ix -&#62; ST s (ByteArray ix)
 
-sizeofMutableByteArray :: Ix ix => MutableByteArray s ix -> Int
+sizeofMutableByteArray :: Ix ix =&#62; MutableByteArray s ix -&#62; Int
 
-thawByteArray       :: Ix ix => ByteArray ixt -> ST s (MutableByteArray s ix)
-unsafeThawByteArray :: Ix ix => ByteArray ixt -> ST s (MutableByteArray s ix)
+thawByteArray       :: Ix ix =&#62; ByteArray ixt -&#62; ST s (MutableByteArray s ix)
+unsafeThawByteArray :: Ix ix =&#62; ByteArray ixt -&#62; ST s (MutableByteArray s ix)
+</ProgramListing>
 
-</code></tscreen>
-<nidx>newCharArray</nidx>
-<nidx>newAddrArray</nidx>
-<nidx>newIntArray</nidx>
-<nidx>newFloatArray</nidx>
-<nidx>newDoubleArray</nidx>
-<nidx>boundsOfMutableByteArray</nidx>
-<nidx>readCharArray</nidx>
-<nidx>readIntArray</nidx>
-<nidx>readAddrArray</nidx>
-<nidx>readFloatArray</nidx>
-<nidx>readDoubleArray</nidx>
-<nidx>readWord8Array</nidx>
-<nidx>readWord16Array</nidx>
-<nidx>readWord32Array</nidx>
-<nidx>readWord64Array</nidx>
-<nidx>readInt8Array</nidx>
-<nidx>readInt16Array</nidx>
-<nidx>readInt32Array</nidx>
-<nidx>readInt64Array</nidx>
-<nidx>writeCharArray</nidx>
-<nidx>writeIntArray</nidx>
-<nidx>writeAddrArray</nidx>
-<nidx>writeFloatArray</nidx>
-<nidx>writeDoubleArray</nidx>
-<nidx>writeWord8Array</nidx>
-<nidx>writeWord16Array</nidx>
-<nidx>writeWord32Array</nidx>
-<nidx>writeWord64Array</nidx>
-<nidx>writeInt8Array</nidx>
-<nidx>writeInt16Array</nidx>
-<nidx>writeInt32Array</nidx>
-<nidx>writeInt64Array</nidx>
-<nidx>freezeCharArray</nidx>
-<nidx>freezeIntArray</nidx>
-<nidx>freezeAddrArray</nidx>
-<nidx>freezeFloatArray</nidx>
-<nidx>freezeDoubleArray</nidx>
-<nidx>unsafeFreezeByteArray</nidx>
-<nidx>unsafeThawByteArray</nidx>
-<nidx>thawByteArray</nidx>
+<IndexTerm><Primary>newCharArray</Primary></IndexTerm>
+<IndexTerm><Primary>newAddrArray</Primary></IndexTerm>
+<IndexTerm><Primary>newIntArray</Primary></IndexTerm>
+<IndexTerm><Primary>newFloatArray</Primary></IndexTerm>
+<IndexTerm><Primary>newDoubleArray</Primary></IndexTerm>
+<IndexTerm><Primary>boundsOfMutableByteArray</Primary></IndexTerm>
+<IndexTerm><Primary>readCharArray</Primary></IndexTerm>
+<IndexTerm><Primary>readIntArray</Primary></IndexTerm>
+<IndexTerm><Primary>readAddrArray</Primary></IndexTerm>
+<IndexTerm><Primary>readFloatArray</Primary></IndexTerm>
+<IndexTerm><Primary>readDoubleArray</Primary></IndexTerm>
+<IndexTerm><Primary>readWord8Array</Primary></IndexTerm>
+<IndexTerm><Primary>readWord16Array</Primary></IndexTerm>
+<IndexTerm><Primary>readWord32Array</Primary></IndexTerm>
+<IndexTerm><Primary>readWord64Array</Primary></IndexTerm>
+<IndexTerm><Primary>readInt8Array</Primary></IndexTerm>
+<IndexTerm><Primary>readInt16Array</Primary></IndexTerm>
+<IndexTerm><Primary>readInt32Array</Primary></IndexTerm>
+<IndexTerm><Primary>readInt64Array</Primary></IndexTerm>
+<IndexTerm><Primary>writeCharArray</Primary></IndexTerm>
+<IndexTerm><Primary>writeIntArray</Primary></IndexTerm>
+<IndexTerm><Primary>writeAddrArray</Primary></IndexTerm>
+<IndexTerm><Primary>writeFloatArray</Primary></IndexTerm>
+<IndexTerm><Primary>writeDoubleArray</Primary></IndexTerm>
+<IndexTerm><Primary>writeWord8Array</Primary></IndexTerm>
+<IndexTerm><Primary>writeWord16Array</Primary></IndexTerm>
+<IndexTerm><Primary>writeWord32Array</Primary></IndexTerm>
+<IndexTerm><Primary>writeWord64Array</Primary></IndexTerm>
+<IndexTerm><Primary>writeInt8Array</Primary></IndexTerm>
+<IndexTerm><Primary>writeInt16Array</Primary></IndexTerm>
+<IndexTerm><Primary>writeInt32Array</Primary></IndexTerm>
+<IndexTerm><Primary>writeInt64Array</Primary></IndexTerm>
+<IndexTerm><Primary>freezeCharArray</Primary></IndexTerm>
+<IndexTerm><Primary>freezeIntArray</Primary></IndexTerm>
+<IndexTerm><Primary>freezeAddrArray</Primary></IndexTerm>
+<IndexTerm><Primary>freezeFloatArray</Primary></IndexTerm>
+<IndexTerm><Primary>freezeDoubleArray</Primary></IndexTerm>
+<IndexTerm><Primary>unsafeFreezeByteArray</Primary></IndexTerm>
+<IndexTerm><Primary>unsafeThawByteArray</Primary></IndexTerm>
+<IndexTerm><Primary>thawByteArray</Primary></IndexTerm>
+</Para>
 
-<bf/Remarks:/
-<itemize>
-<item>
+<Para>
+<Emphasis>Remarks:</Emphasis>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
 A Mutable byte array is created by specifying its size in units of
 some basic type. For example,
 
-<tscreen><code>
-  mkPair :: ST s (MutableByteArray s Int)
-  mkPair = newIntArray (0,1)
-</code></tscreen>
 
-creates a mutable array capable of storing two <tt/Int/s. Notice
-that the range size <em/is not in bytes/, but in units of the
+<ProgramListing>
+mkPair :: ST s (MutableByteArray s Int)
+mkPair = newIntArray (0,1)
+</ProgramListing>
+
+
+creates a mutable array capable of storing two <Literal>Int</Literal>s. Notice
+that the range size <Emphasis>is not in bytes</Emphasis>, but in units of the
 basic type.
 
-<item>
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
 A mutable byte array is not parameterised over the kind of values
 it contains. A consequence of this is that it is possible to
 have byte arrays containing a mix of basic types, or even read
 a value from the array at a different type from which it was
 written, e.g.,
 
-<tscreen><code>
- isLitteEndian :: IO Bool
- isLitteEndian = stToIO $ do
-    x <- newIntArray (0,1)
-    writeIntArray x 1
-    v <- readCharArray x 0
-    return (v == chr 1)
-</code></tscreen>
+<ProgramListing>
+isLitteEndian :: IO Bool
+isLitteEndian = stToIO $ do
+   x &#60;- newIntArray (0,1)
+   writeIntArray x 1
+   v &#60;- readCharArray x 0
+   return (v == chr 1)
+</ProgramListing>
+
 
 It's left as an exercise for the reader to determine whether having
 byte arrays not be parameterised over the type of values they
 contain is a bug or a feature..
 
-<item>
+</Para>
+</ListItem>
+<ListItem>
+<Para>
 As for mutable arrays, operations for turning mutable byte arrays
-into immutable byte arrays are also provided by the <tt/freeze*/ 
+into immutable byte arrays are also provided by the <Literal>freeze*</Literal>
 class of actions. There's also the non-copying
-<tt/unsafeFreezeByteArray/. 
-<p>
-<item>
-Operations for going the other way, where an immutable byte
-array is 'thawed' are also provided. <tt/thawByteArray/ does
-this by copying, whereas <tt/unsafeThawByteArray/ does not
+<Literal>unsafeFreezeByteArray</Literal>.
+</Para>
+</ListItem>
+<ListItem>
 
-<item>
-The operation <tt/sizeofMutableByteArray/ returns the size of
-the array, <em/in bytes./
-</itemize>
+<Para>
+Operations for going the other way, where an immutable byte
+array is 'thawed' are also provided. <Literal>thawByteArray</Literal> does
+this by copying, whereas <Literal>unsafeThawByteArray</Literal> does not
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The operation <Literal>sizeofMutableByteArray</Literal> returns the size of
+the array, <Emphasis>in bytes.</Emphasis>
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+</Sect3>
+
+</Sect2>
