@@ -10,6 +10,7 @@ module AsmRegAlloc ( runRegAllocate, runHairyRegAllocate ) where
 
 import MachCode		( InstrList )
 import MachMisc		( Instr )
+import PprMach		( pprUserReg ) -- debugging
 import MachRegs
 import RegAllocInfo
 
@@ -41,16 +42,11 @@ runRegAllocate regs find_reserve_regs instrs
 	Nothing     -> tryHairy reserves
   where
     tryHairy [] 
-       = error "nativeGen: register allocator: too difficult!  Try -fvia-C.\n"
+       = error "nativeGen: spilling failed.  Try -fvia-C.\n"
     tryHairy (resv:resvs)
        = case hairyAlloc resv of
             Just success -> success
-            Nothing      -> fooble resvs (tryHairy resvs)
-
-    fooble [] x = x
-    fooble (resvs:_) x = trace ("nativeGen: spilling with " 
-                                ++ show (length resvs - 2) ++ 
-                                " int temporaries") x
+            Nothing      -> tryHairy resvs
 
     reserves         = find_reserve_regs flatInstrs
     flatInstrs       = flattenOrdList instrs
@@ -168,17 +164,25 @@ hairyRegAlloc regs reserve_regs instrs =
                     noFuture instrs_patched of
                   ((RH _ mloc2 _),_,instrs'') 
                      -- successfully allocated the patched code
-        	     | mloc2 == mloc1 -> Just instrs''
+        	     | mloc2 == mloc1 -> trace (spillMsg True) (Just instrs'')
                      -- no; we have to give up
-                     | otherwise      -> Nothing 
+                     | otherwise      -> trace (spillMsg False) Nothing 
                        -- instrs''
-	               -- pprPanic "runRegAllocate" (ppr mloc2 <+> ppr mloc1)
   where
     regs'  = regs `useMRegs` reserve_regs
     regs'' = mkMRegsState reserve_regs
 
     noFuture :: RegFuture
     noFuture = RF emptyRegSet (FL emptyRegSet emptyFM) emptyFM
+
+    spillMsg success
+       = "nativeGen: spilling " 
+         ++ (if success then "succeeded" else "failed   ")
+         ++ " using " 
+         ++ showSDoc (hsep (map (pprUserReg.toMappedReg) 
+                                (reverse reserve_regs)))
+         where
+            toMappedReg (I# i) = MappedReg i
 \end{code}
 
 Here we patch instructions that reference ``registers'' which are really in

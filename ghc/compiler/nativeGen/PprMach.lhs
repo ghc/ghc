@@ -10,7 +10,7 @@ We start with the @pprXXX@s with some cross-platform commonality
 \begin{code}
 #include "nativeGen/NCG.h"
 
-module PprMach ( pprInstr, pprSize ) where
+module PprMach ( pprInstr, pprSize, pprUserReg ) where
 
 #include "HsVersions.h"
 
@@ -38,6 +38,10 @@ import Char		( ord )
 For x86, the way we print a register name depends
 on which bit of it we care about.  Yurgh.
 \begin{code}
+pprUserReg:: Reg -> SDoc
+pprUserReg = pprReg IF_ARCH_i386(L,)
+
+
 pprReg :: IF_ARCH_i386(Size ->,) Reg -> SDoc
 
 pprReg IF_ARCH_i386(s,) r
@@ -94,49 +98,16 @@ pprReg IF_ARCH_i386(s,) r
 	_ -> SLIT("very naughty I386 byte register")
       })
 
-{- UNUSED:
-    ppr_reg_no HB i = ptext
-      (case i of {
-	ILIT( 0) -> SLIT("%ah");  ILIT( 1) -> SLIT("%bh");
-	ILIT( 2) -> SLIT("%ch");  ILIT( 3) -> SLIT("%dh");
-	_ -> SLIT("very naughty I386 high byte register")
-      })
--}
-
-{- UNUSED:
-    ppr_reg_no S i = ptext
-      (case i of {
-	ILIT( 0) -> SLIT("%ax");  ILIT( 1) -> SLIT("%bx");
-	ILIT( 2) -> SLIT("%cx");  ILIT( 3) -> SLIT("%dx");
-	ILIT( 4) -> SLIT("%si");  ILIT( 5) -> SLIT("%di");
-	ILIT( 6) -> SLIT("%bp");  ILIT( 7) -> SLIT("%sp");
-	_ -> SLIT("very naughty I386 word register")
-      })
--}
-
-    ppr_reg_no L i = ptext
+    ppr_reg_no _ i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%eax");  ILIT( 1) -> SLIT("%ebx");
 	ILIT( 2) -> SLIT("%ecx");  ILIT( 3) -> SLIT("%edx");
 	ILIT( 4) -> SLIT("%esi");  ILIT( 5) -> SLIT("%edi");
 	ILIT( 6) -> SLIT("%ebp");  ILIT( 7) -> SLIT("%esp");
-	_ -> SLIT("very naughty I386 double word register")
-      })
-
-    ppr_reg_no F i = ptext
-      (case i of {
 	ILIT( 8) -> SLIT("%fake0");  ILIT( 9) -> SLIT("%fake1");
 	ILIT(10) -> SLIT("%fake2");  ILIT(11) -> SLIT("%fake3");
 	ILIT(12) -> SLIT("%fake4");  ILIT(13) -> SLIT("%fake5");
-	_ -> SLIT("very naughty I386 float register")
-      })
-
-    ppr_reg_no DF i = ptext
-      (case i of {
-	ILIT( 8) -> SLIT("%fake0");  ILIT( 9) -> SLIT("%fake1");
-	ILIT(10) -> SLIT("%fake2");  ILIT(11) -> SLIT("%fake3");
-	ILIT(12) -> SLIT("%fake4");  ILIT(13) -> SLIT("%fake5");
-	_ -> SLIT("very naughty I386 float register")
+	_ -> SLIT("very naughty I386 register")
       })
 #endif
 #if sparc_TARGET_ARCH

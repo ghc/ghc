@@ -252,6 +252,11 @@ checkCode macro args assts
 		in  (\xs -> assign_hp words : cjmp_hp : 
 			    assts (gc_enter ptrs : join : xs))
 
+	HP_CHK_SEQ_NP  -> 
+		let [words,ptrs] = args_stix
+		in  (\xs -> assign_hp words : cjmp_hp : 
+			    assts (gc_seq ptrs : join : xs))
+
 	STK_CHK_NP     -> 
 		let [words,ptrs] = args_stix
 		in  (\xs -> cjmp_sp_pass words :
@@ -309,7 +314,8 @@ checkCode macro args assts
 	HP_CHK_UT_ALT  -> 
                 let [words,ptrs,nonptrs,r,ret] = args_stix
                 in (\xs -> assign_hp words : cjmp_hp :
-                           assts (assign_ret r ret : gc_ut ptrs nonptrs : join : xs))
+                           assts (assign_ret r ret : gc_ut ptrs nonptrs 
+                                  : join : xs))
 
 	HP_CHK_GEN     -> 
                 let [words,liveness,reentry] = args_stix
@@ -321,8 +327,12 @@ checkCode macro args assts
 	
 -- Various canned heap-check routines
 
-gc_chk (StInt n)   = StJump (StLitLbl (ptext SLIT("stg_chk_") <> int (fromInteger n)))
-gc_enter (StInt n) = StJump (StLitLbl (ptext SLIT("stg_gc_enter_") <> int (fromInteger n)))
+gc_chk (StInt n)   = StJump (StLitLbl (ptext SLIT("stg_chk_") 
+                                       <> int (fromInteger n)))
+gc_enter (StInt n) = StJump (StLitLbl (ptext SLIT("stg_gc_enter_") 
+                                       <> int (fromInteger n)))
+gc_seq (StInt n)   = StJump (StLitLbl (ptext SLIT("stg_gc_seq_") 
+                                       <> int (fromInteger n)))
 gc_noregs          = StJump (StLitLbl (ptext SLIT("stg_gc_noregs")))
 gc_unpt_r1         = StJump (StLitLbl (ptext SLIT("stg_gc_unpt_r1")))
 gc_unbx_r1         = StJump (StLitLbl (ptext SLIT("stg_gc_unbx_r1")))
@@ -331,6 +341,7 @@ gc_d1              = StJump (StLitLbl (ptext SLIT("stg_gc_d1")))
 gc_gen             = StJump (StLitLbl (ptext SLIT("stg_gen_chk")))
 
 gc_ut (StInt p) (StInt np)
-                   = StJump (StLitLbl (ptext SLIT("stg_gc_ut_") <> int (fromInteger p) 
+                   = StJump (StLitLbl (ptext SLIT("stg_gc_ut_") 
+                                       <> int (fromInteger p) 
                                        <> char '_' <> int (fromInteger np)))
 \end{code}

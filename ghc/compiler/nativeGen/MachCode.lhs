@@ -483,8 +483,10 @@ getRegister (StDouble d)
     in
     returnUs (Any DoubleRep code)
 
+-- incorrectly assumes that %esp doesn't move (as does spilling); ToDo: fix
 getRegister (StScratchWord i)
-   = let code dst = mkSeqInstr (LEA L (OpAddr (spRel (-1000+i))) (OpReg dst))
+   | i >= 0 && i < 6
+   = let code dst = mkSeqInstr (LEA L (OpAddr (spRel (i+1))) (OpReg dst))
      in returnUs (Any PtrRep code)
 
 getRegister (StPrim primop [x]) -- unary PrimOps
@@ -2476,10 +2478,10 @@ condIntReg cond x y
 	code = condCode condition
 	cond = condName condition
 	-- ToDo: if dst is eax, ebx, ecx, or edx we would not need the move.
-	code__2 dst = code . mkSeqInstrs [COMMENT (_PK_ "aaaaa"),
+	code__2 dst = code . mkSeqInstrs [
 	    SETCC cond (OpReg tmp),
 	    AND L (OpImm (ImmInt 1)) (OpReg tmp),
-	    MOV L (OpReg tmp) (OpReg dst) ,COMMENT (_PK_ "bbbbb")]
+	    MOV L (OpReg tmp) (OpReg dst)]
     in
     returnUs (Any IntRep code__2)
 
@@ -2729,11 +2731,10 @@ trivialCode instr x y
     	code__2 dst = let code1 = registerCode register1 dst
     	                  src1  = registerName register1 dst
 		      in code1 .
-			 if isFixed register1 && src1 /= dst
+			 if   isFixed register1 && src1 /= dst
 			 then mkSeqInstrs [MOV L (OpReg src1) (OpReg dst),
 					   instr (OpImm imm__2) (OpReg dst)]
-			 else
-				mkSeqInstrs [instr (OpImm imm__2) (OpReg src1)]
+			 else mkSeqInstrs [instr (OpImm imm__2) (OpReg src1)]
     in
     returnUs (Any IntRep code__2)
   where
@@ -2745,17 +2746,15 @@ trivialCode instr x y
     getRegister y		`thenUs` \ register2 ->
     getNewRegNCG IntRep		`thenUs` \ tmp2 ->
     let
-    	code2 = registerCode register2 tmp2 asmVoid
+    	code2 = registerCode register2 tmp2 --asmVoid
     	src2  = registerName register2 tmp2
-    	code__2 dst = let
-    	                  code1 = registerCode register1 dst asmVoid
+    	code__2 dst = let code1 = registerCode register1 dst --asmVoid
     	                  src1  = registerName register1 dst
-		      in asmParThen [code1, code2] .
-			 if isFixed register1 && src1 /= dst
+		      in code2 . code1 .  --asmParThen [code1, code2] .
+			 if   isFixed register1 && src1 /= dst
 			 then mkSeqInstrs [MOV L (OpReg src1) (OpReg dst),
 					   instr (OpReg src2)  (OpReg dst)]
-			 else
-				mkSeqInstr (instr (OpReg src2) (OpReg src1))
+			 else mkSeqInstr (instr (OpReg src2) (OpReg src1))
     in
     returnUs (Any IntRep code__2)
 
@@ -2763,13 +2762,13 @@ trivialCode instr x y
 trivialUCode instr x
   = getRegister x		`thenUs` \ register ->
     let
-    	code__2 dst = let
-    	                  code = registerCode register dst
+    	code__2 dst = let code = registerCode register dst
 		      	  src  = registerName register dst
-		      in code . if isFixed register && dst /= src
-				then mkSeqInstrs [MOV L (OpReg src) (OpReg dst),
-						  instr (OpReg dst)]
-				else mkSeqInstr (instr (OpReg src))
+		      in code . 
+                         if isFixed register && dst /= src
+			 then mkSeqInstrs [MOV L (OpReg src) (OpReg dst),
+				           instr (OpReg dst)]
+			 else mkSeqInstr (instr (OpReg src))
     in
     returnUs (Any IntRep code__2)
 
