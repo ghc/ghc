@@ -9,6 +9,7 @@ module HscStats ( ppSourceStats ) where
 #include "HsVersions.h"
 
 import HsSyn
+import TyCon		( DataConDetails(..) )
 import Outputable
 import Char		( isSpace )
 import Util             ( count )
@@ -127,8 +128,8 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     spec_info (Just (False, _)) = (0,0,0,0,1,0)
     spec_info (Just (True, _))  = (0,0,0,0,0,1)
 
-    data_info (TyData {tcdNCons = nconstrs, tcdDerivs = derivs})
-	= (nconstrs, case derivs of {Nothing -> 0; Just ds -> length ds})
+    data_info (TyData {tcdCons = DataCons cs, tcdDerivs = derivs})
+	= (length cs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
     class_info decl@(ClassDecl {})

@@ -49,7 +49,7 @@ import Id		( isDataConWrapId_maybe )
 import Var		( TyVar, Id, idType )
 import VarSet
 import DataCon		( DataCon )
-import TyCon		( TyCon )
+import TyCon		( TyCon, DataConDetails )
 import Class		( Class, ClassOpItem )
 import Name		( Name, NamedThing(..), 
 			  getSrcLoc, mkLocalName, isLocalName, nameIsLocalOrFrom
@@ -172,7 +172,7 @@ This data type is used to help tie the knot
 
 \begin{code}
 data TyThingDetails = SynTyDetails Type
-		    | DataTyDetails ThetaType [DataCon] [Id]
+		    | DataTyDetails ThetaType (DataConDetails DataCon) [Id]
 		    | ClassDetails ThetaType [Id] [ClassOpItem] DataCon
 		    | ForeignTyDetails	-- Nothing yet
 \end{code}

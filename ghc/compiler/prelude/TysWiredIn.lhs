@@ -94,7 +94,7 @@ import OccName		( mkOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
 import RdrName		( rdrNameOcc )
 import DataCon		( DataCon, mkDataCon, dataConId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
-import TyCon		( TyCon, AlgTyConFlavour(..), tyConDataCons,
+import TyCon		( TyCon, AlgTyConFlavour(..), DataConDetails(..), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName
 			)
 
@@ -165,8 +165,7 @@ pcTyCon new_or_data is_rec name tyvars argvrcs cons
                 tyvars
                 []              -- No context
                 argvrcs
-                cons
-                (length cons) 
+                (DataCons cons)
 		[]		-- No record selectors
                 new_or_data
                 is_rec
@@ -575,11 +574,10 @@ parrTyCon  = tycon
 		parrTyConName 
 		kind
 		tyvars
-		[]               -- No context
+		[]              	 -- No context
 		[(True, False)]
-		[parrDataCon]	 -- The constructor defined in `PrelPArr'
-		1		 -- The real definition has one constructor
-		[]		 -- No record selectors
+		(DataCons [parrDataCon]) -- The constructor defined in `PrelPArr'
+		[]			 -- No record selectors
 		DataTyCon
 		NonRecursive
 		genInfo

@@ -32,6 +32,7 @@ import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupIfaceName,
 import RnMonad
 
 import Class		( FunDep, DefMeth (..) )
+import TyCon		( DataConDetails(..), visibleDataCons )
 import DataCon		( dataConId )
 import Name		( Name, NamedThing(..) )
 import NameSet
@@ -291,7 +292,7 @@ rnTyClDecl (ForeignType {tcdName = name, tcdFoType = fo_type, tcdExtName = ext_n
     returnRn (ForeignType {tcdName = name', tcdFoType = fo_type, tcdExtName = ext_name, tcdLoc = loc})
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
-		    tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = nconstrs,
+		    tcdTyVars = tyvars, tcdCons = condecls, 
 		    tcdDerivs = derivs, tcdLoc = src_loc, tcdSysNames = sys_names})
   = pushSrcLocRn src_loc $
     lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
@@ -300,24 +301,14 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
     rn_derivs derivs 				`thenRn` \ derivs' ->
     checkDupOrQualNames data_doc con_names	`thenRn_`
 
-	-- Check that there's at least one condecl,
-	-- or else we're reading an interface file, or -fglasgow-exts
-    (if null condecls then
-	doptRn Opt_GlasgowExts	`thenRn` \ glaExts ->
-	getModeRn		`thenRn` \ mode ->
-	checkRn (glaExts || isInterfaceMode mode)
-		(emptyConDeclsErr tycon)
-     else returnRn ()
-    )						`thenRn_` 
-
-    mapRn rnConDecl condecls			`thenRn` \ condecls' ->
+    rnConDecls tycon' condecls			`thenRn` \ condecls' ->
     mapRn lookupSysBinder sys_names	        `thenRn` \ sys_names' ->
     returnRn (TyData {tcdND = new_or_data, tcdCtxt = context', tcdName = tycon',
-		      tcdTyVars = tyvars', tcdCons = condecls', tcdNCons = nconstrs,
+		      tcdTyVars = tyvars', tcdCons = condecls', 
 		      tcdDerivs = derivs', tcdLoc = src_loc, tcdSysNames = sys_names'})
   where
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
-    con_names = map conDeclName condecls
+    con_names = map conDeclName (visibleDataCons condecls)
 
     rn_derivs Nothing   = returnRn Nothing
     rn_derivs (Just ds) = rnContext data_doc ds	`thenRn` \ ds' -> returnRn (Just ds')
@@ -457,6 +448,23 @@ finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
 \begin{code}
 conDeclName :: RdrNameConDecl -> (RdrName, SrcLoc)
 conDeclName (ConDecl n _ _ _ _ l) = (n,l)
+
+rnConDecls :: Name -> DataConDetails RdrNameConDecl -> RnMS (DataConDetails RenamedConDecl)
+rnConDecls tycon Unknown     = returnRn Unknown
+rnConDecls tycon (HasCons n) = returnRn (HasCons n)
+rnConDecls tycon (DataCons condecls)
+  = 	-- Check that there's at least one condecl,
+	-- or else we're reading an interface file, or -fglasgow-exts
+    (if null condecls then
+	doptRn Opt_GlasgowExts	`thenRn` \ glaExts ->
+	getModeRn		`thenRn` \ mode ->
+	checkRn (glaExts || isInterfaceMode mode)
+		(emptyConDeclsErr tycon)
+     else returnRn ()
+    )						`thenRn_` 
+
+    mapRn rnConDecl condecls			`thenRn` \ condecls' ->
+    returnRn (DataCons condecls')
 
 rnConDecl :: RdrNameConDecl -> RnMS RenamedConDecl
 rnConDecl (ConDecl name wkr tvs cxt details locn)

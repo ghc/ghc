@@ -11,6 +11,7 @@ module RnHsSyn where
 import HsSyn
 import HsCore
 import Class		( FunDep, DefMeth(..) )
+import TyCon		( DataConDetails, visibleDataCons )
 import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
@@ -131,9 +132,9 @@ tyClDeclFVs (IfaceSig {tcdType = ty, tcdIdInfo = id_infos})
     plusFVs (map hsIdInfoFVs id_infos)
 
 tyClDeclFVs (TyData {tcdCtxt = context, tcdTyVars = tyvars, tcdCons = condecls})
-  = delFVs (map hsTyVarName tyvars) $
-    extractHsCtxtTyNames context		`plusFV`
-    plusFVs (map conDeclFVs condecls)
+  = delFVs (map hsTyVarName tyvars)	$
+    extractHsCtxtTyNames context	`plusFV`
+    plusFVs (map conDeclFVs (visibleDataCons condecls))
 
 tyClDeclFVs (TySynonym {tcdTyVars = tyvars, tcdSynRhs = ty})
   = delFVs (map hsTyVarName tyvars) (extractHsTyNames ty)

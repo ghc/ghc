@@ -35,7 +35,7 @@ import TcType		( Type, Kind, TcKind, mkArrowKind, liftedTypeKind, zipFunTys )
 import Type		( splitTyConApp_maybe )
 import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
-import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), 
+import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), DataConDetails(..), visibleDataCons,
 			  tyConKind, tyConTyVars, tyConDataCons, isNewTyCon,
 			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon, 
 			)
@@ -267,7 +267,7 @@ kcTyClDecl (ForeignType {}) = returnTc ()
 kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = context, tcdCons = con_decls})
   = kcTyClDeclBody decl			$ \ result_kind ->
     kcHsContext context			`thenTc_` 
-    mapTc_ kc_con_decl con_decls
+    mapTc_ kc_con_decl (visibleDataCons con_decls)
   where
     kc_con_decl (ConDecl _ _ ex_tvs ex_ctxt details loc)
       = kcHsTyVars ex_tvs		`thenNF_Tc` \ kind_env ->
@@ -327,12 +327,12 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs rec_details
         argvrcs		    = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
-	          (TyData {tcdND = data_or_new, tcdName = tycon_name, tcdTyVars = tyvar_names,
-			   tcdNCons = nconstrs, tcdSysNames = sys_names})
+	          (TyData {tcdND = data_or_new, tcdName = tycon_name, 
+			   tcdTyVars = tyvar_names, tcdSysNames = sys_names})
   = ATyCon tycon
   where
 	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
-			   data_cons nconstrs sel_ids
+			   data_cons sel_ids
 			   flavour is_rec gen_info
 
 	gen_info | not (dopt Opt_Generics dflags) = Nothing
@@ -348,8 +348,11 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 	-- so flavour has to be able to answer this question without consulting rec_details
 	flavour = case data_or_new of
 		    NewType  -> NewTyCon (mkNewTyConRep tycon)
-		    DataType | all (null . dataConOrigArgTys) data_cons -> EnumTyCon
-	 		     | otherwise		     		-> DataTyCon
+		    DataType | all_nullary data_cons -> EnumTyCon
+	 		     | otherwise	     -> DataTyCon
+
+ 	all_nullary (DataCons cons) = all (null . dataConOrigArgTys) cons
+	all_nullary other	    = False	-- Safe choice for unknown data types
 			-- NB (null . dataConOrigArgTys).  It used to say isNullaryDataCon
 			-- but that looks at the *representation* arity, and that in turn
 			-- depends on deciding whether to unpack the args, and that 

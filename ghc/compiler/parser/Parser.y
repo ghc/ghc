@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.88 2002/02/13 14:05:51 simonpj Exp $
+$Id: Parser.y,v 1.89 2002/02/13 15:19:19 simonpj Exp $
 
 Haskell grammar.
 
@@ -25,6 +25,7 @@ import ForeignCall	( Safety(..), CExportSpec(..),
 			  CCallConv(..), CCallTarget(..), defaultCCallConv,
 			)
 import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
+import TyCon		( DataConDetails(..) )
 import SrcLoc		( SrcLoc )
 import Module
 import CmdLineOpts	( opt_SccProfilingOn )
@@ -357,11 +358,11 @@ topdecl :: { RdrBinding }
 
 	| srcloc 'data' tycl_hdr constrs deriving
 		{% returnP (RdrHsDecl (TyClD
-		      (mkTyData DataType $3 (reverse $4) (length $4) $5 $1))) }
+		      (mkTyData DataType $3 (DataCons (reverse $4)) $5 $1))) }
 
 	| srcloc 'newtype' tycl_hdr '=' newconstr deriving
 		{% returnP (RdrHsDecl (TyClD
-		      (mkTyData NewType $3 [$5] 1 $6 $1))) }
+		      (mkTyData NewType $3 (DataCons [$5]) $6 $1))) }
 
 	| srcloc 'class' tycl_hdr fds where
 		{% let 

@@ -15,7 +15,7 @@ import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
 import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy )
 import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, dataConId, isExistentialDataCon )
 
-import TyCon            ( TyCon, tyConTyVars, tyConDataConsIfAvailable, 
+import TyCon            ( TyCon, tyConTyVars, tyConDataCons_maybe, 
 			  tyConGenInfo, isNewTyCon, newTyConRep, isBoxedTupleTyCon
 			)
 import Name		( Name, mkSysLocalName )
@@ -35,6 +35,7 @@ import TysWiredIn       ( genericTyCons,
 import IdInfo           ( noCafNoTyGenIdInfo, setUnfoldingInfo, setArityInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
+import Maybe		( isNothing )
 import SrcLoc		( builtinSrcLoc )
 import Unique		( mkBuiltinUnique )
 import Util             ( takeList )
@@ -238,8 +239,8 @@ mkTyConGenInfo :: TyCon -> [Name] -> Maybe (EP Id)
 -- for the fromT and toT conversion functions.
 
 mkTyConGenInfo tycon [from_name, to_name]
-  | null datacons 	-- Abstractly imported types don't have
-  = Nothing		-- to/from operations, (and should not need them)
+  | isNothing maybe_datacons	-- Abstractly imported types don't have
+  = Nothing			-- to/from operations, (and should not need them)
 
 	-- If any of the constructor has an unboxed type as argument,
 	-- then we can't build the embedding-projection pair, because
@@ -254,10 +255,12 @@ mkTyConGenInfo tycon [from_name, to_name]
   = Just (EP { fromEP = mkVanillaGlobal from_name from_ty from_id_info,
 	       toEP   = mkVanillaGlobal to_name   to_ty   to_id_info })
   where
-    tyvars	 = tyConTyVars tycon			-- [a, b, c]
-    datacons 	 = tyConDataConsIfAvailable tycon	-- [C, D]
-    tycon_ty	 = mkTyConApp tycon tyvar_tys		-- T a b c
-    tyvar_tys    = mkTyVarTys tyvars
+    maybe_datacons = tyConDataCons_maybe tycon
+    Just datacons  = maybe_datacons		-- [C, D]
+
+    tyvars	   = tyConTyVars tycon		-- [a, b, c]
+    tycon_ty	   = mkTyConApp tycon tyvar_tys	-- T a b c
+    tyvar_tys      = mkTyVarTys tyvars
 
     from_id_info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
 				      `setArityInfo`     exprArity from_fn

@@ -199,8 +199,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
 			tcdCtxt   = toHsContext (tyConTheta tycon),
 			tcdName   = getName tycon,
 		 	tcdTyVars = toHsTyVars tyvars,
-			tcdCons   = map ifaceConDecl (tyConDataCons tycon),
-			tcdNCons  = tyConFamilySize tycon,
+			tcdCons   = ifaceConDecls (tyConDataConDetails tycon),
 			tcdDerivs = Nothing,
 		        tcdSysNames  = map getName (tyConGenIds tycon),
 			tcdLoc	     = noSrcLoc }
@@ -217,8 +216,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
 			tcdCtxt   = [],
 			tcdName   = getName tycon,
 		 	tcdTyVars = toHsTyVars (take (tyConArity tycon) alphaTyVars),
-			tcdCons   = [],
-			tcdNCons  = 0,
+			tcdCons   = Unknown,
 			tcdDerivs = Nothing,
 		        tcdSysNames  = [],
 			tcdLoc	     = noSrcLoc }
@@ -229,6 +227,10 @@ ifaceTyThing (ATyCon tycon) = ty_decl
     (_, syn_ty) = getSynTyConDefn tycon
     new_or_data | isNewTyCon tycon = NewType
 	        | otherwise	   = DataType
+
+    ifaceConDecls Unknown       = Unknown
+    ifaceConDecls (HasCons n)   = HasCons n
+    ifaceConDecls (DataCons cs) = DataCons (map ifaceConDecl cs)
 
     ifaceConDecl data_con 
 	= ConDecl (getName data_con) (getName (dataConId data_con))

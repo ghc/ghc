@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.113 2002/02/12 15:17:15 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.114 2002/02/13 15:19:18 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -30,7 +30,7 @@ import Util
 import Id		( isRecordSelector, recordSelectorFieldLabel, 
 			  isDataConWrapId, isDataConId, idName )
 import Class		( className )
-import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon )
+import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon, DataConDetails(..) )
 import FieldLabel	( fieldLabelTyCon )
 import SrcLoc		( isGoodSrcLoc )
 import Module		( moduleName )
@@ -680,8 +680,8 @@ browseModule m exports_only = do
       thingDecl thing@(ATyCon t) =
         let rn_decl = ifaceTyThing thing in
 	case rn_decl of
-	  TyData { tcdCons = cons } -> 
-		rn_decl{ tcdCons = filter conIsVisible cons }
+	  TyData { tcdCons = DataCons cons } -> 
+		rn_decl{ tcdCons = DataCons (filter conIsVisible cons) }
 	  other -> other
         where
 	  conIsVisible (ConDecl n _ _ _ _ _) = n `elem` thing_names

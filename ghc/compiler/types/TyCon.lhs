@@ -5,7 +5,10 @@
 
 \begin{code}
 module TyCon(
-	TyCon, KindCon, SuperKindCon, ArgVrcs, AlgTyConFlavour(..),
+	TyCon, KindCon, SuperKindCon, ArgVrcs, 
+
+	AlgTyConFlavour(..), 
+	DataConDetails(..), visibleDataCons,
 
 	isFunTyCon, isUnLiftedTyCon, isBoxedTyCon, isProductTyCon,
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
@@ -15,7 +18,7 @@ module TyCon(
 
 	mkForeignTyCon, isForeignTyCon,
 
-	mkAlgTyCon, --mkAlgTyCon, 
+	mkAlgTyCon,
 	mkClassTyCon,
 	mkFunTyCon,
 	mkPrimTyCon,
@@ -32,7 +35,7 @@ module TyCon(
 	tyConUnique,
 	tyConTyVars,
 	tyConArgVrcs_maybe,
-	tyConDataCons, tyConDataConsIfAvailable, tyConFamilySize,
+	tyConDataConDetails, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
 	tyConSelIds,
 	tyConTheta,
 	tyConPrimRep,
@@ -65,6 +68,7 @@ import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Util             ( lengthIs )
+import Maybes		( expectJust )
 import Outputable
 import FastString
 \end{code}
@@ -99,24 +103,9 @@ data TyCon
 	tyConArgVrcs  :: ArgVrcs,
 	algTyConTheta :: [PredType],
 
-	dataCons :: [DataCon],
-		-- Its data constructors, with fully polymorphic types
-		-- 	This list can be empty, when we import a data type
-		--	abstractly, either
-		--	     (a) the interface is hand-written and doesn't give
-		--		 the constructors, or
-		--	     (b) in a quest for fast compilation we don't import 
-		--		 the constructors
+	dataCons :: DataConDetails DataCon,
 
 	selIds :: [Id],	-- Its record selectors (if any)
-
-	noOfDataCons :: Int,
-		-- Number of data constructors.  Usually this is the
-		-- same as the length of the dataCons field, but the
-		-- latter may be empty if we imported the type
-		-- abstractly.  But even if we import abstractly we
-		-- still need to know the number of constructors so we
-		-- can get the return convention right.  Tiresome!
 
 	algTyConFlavour	:: AlgTyConFlavour,
 	algTyConRec     :: RecFlag,	-- Tells whether the data type is part of 
@@ -202,7 +191,22 @@ data AlgTyConFlavour
 			-- The rep type isn't entirely simple:
 			--  for a recursive newtype we pick () as the rep type
 			--	newtype T = MkT T
+
+data DataConDetails datacon
+  = DataCons [datacon]	-- Its data constructors, with fully polymorphic types
+			-- A type can have zero constructors
+
+  | Unknown		-- We're importing this data type from an hi-boot file
+			-- and we don't know what its constructors are
+
+  | HasCons Int		-- In a quest for compilation speed we have imported
+			-- only the number of constructors (to get return 
+			-- conventions right) but not the constructors themselves
+
+visibleDataCons (DataCons cs) = cs
+visibleDataCons other	      = []
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -255,7 +259,7 @@ tyConGenIds tycon = case tyConGenInfo tycon of
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars theta argvrcs cons ncons sels flavour rec 
+mkAlgTyCon name kind tyvars theta argvrcs cons sels flavour rec 
 	      gen_info
   = AlgTyCon {	
 	tyConName 		= name,
@@ -267,7 +271,6 @@ mkAlgTyCon name kind tyvars theta argvrcs cons ncons sels flavour rec
 	algTyConTheta		= theta,
 	dataCons		= cons, 
 	selIds			= sels,
-	noOfDataCons		= ncons,
 	algTyConClass		= Nothing,
 	algTyConFlavour 	= flavour,
 	algTyConRec		= rec,
@@ -283,9 +286,8 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour rec
 	tyConTyVars		= tyvars,
 	tyConArgVrcs		= argvrcs,
 	algTyConTheta		= [],
-	dataCons		= [con],
+	dataCons		= DataCons [con],
 	selIds			= [],
-	noOfDataCons		= 1,
 	algTyConClass		= Just clas,
 	algTyConFlavour		= flavour,
 	algTyConRec		= rec,
@@ -408,9 +410,9 @@ newTyConRep (AlgTyCon {tyConTyVars = tvs, algTyConFlavour = NewTyCon rep}) = (tv
 --	may be  DataType or NewType, 
 -- 	may be  unboxed or not, 
 --	may be  recursive or not
-isProductTyCon (AlgTyCon {dataCons = [data_con]}) = not (isExistentialDataCon data_con)
-isProductTyCon (TupleTyCon {}) 			  = True
-isProductTyCon other				  = False
+isProductTyCon (AlgTyCon {dataCons = DataCons [data_con]}) = not (isExistentialDataCon data_con)
+isProductTyCon (TupleTyCon {}) 			  	   = True   
+isProductTyCon other				  	   = False
 
 isSynTyCon (SynTyCon {}) = True
 isSynTyCon _		 = False
@@ -442,22 +444,23 @@ isForeignTyCon other				      = False
 \end{code}
 
 \begin{code}
-tyConDataCons :: TyCon -> [DataCon]
-tyConDataCons tycon = ASSERT2( cons `lengthIs` (tyConFamilySize tycon), ppr tycon )
-		      cons
-		    where
-		      cons = tyConDataConsIfAvailable tycon
+tyConDataConDetails :: TyCon -> DataConDetails DataCon
+tyConDataConDetails (AlgTyCon {dataCons = cons}) = cons
+tyConDataConDetails (TupleTyCon {dataCon = con}) = DataCons [con]
+tyConDataConDetails other			 = Unknown
 
-tyConDataConsIfAvailable (AlgTyCon {dataCons = cons}) = cons	-- Empty for abstract types
-tyConDataConsIfAvailable (TupleTyCon {dataCon = con}) = [con]
-tyConDataConsIfAvailable other			      = []
-	-- You may think this last equation should fail,
-	-- but it's quite convenient to return no constructors for
-	-- a synonym; see for example the call in TcTyClsDecls.
+tyConDataCons :: TyCon -> [DataCon]
+tyConDataCons tycon = expectJust "tyConDataCons" (tyConDataCons_maybe tycon)
+
+tyConDataCons_maybe :: TyCon -> Maybe [DataCon]
+tyConDataCons_maybe (AlgTyCon {dataCons = DataCons cons}) = Just cons
+tyConDataCons_maybe (TupleTyCon {dataCon = con})	  = Just [con]
+tyConDataCons_maybe other			          = Nothing
 
 tyConFamilySize  :: TyCon -> Int
-tyConFamilySize (AlgTyCon {noOfDataCons = n}) = n
-tyConFamilySize (TupleTyCon {}) 	      = 1
+tyConFamilySize (AlgTyCon {dataCons = DataCons cs}) = length cs
+tyConFamilySize (AlgTyCon {dataCons = HasCons n})   = n
+tyConFamilySize (TupleTyCon {}) 	  	    = 1
 #ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 #endif
@@ -505,13 +508,12 @@ getSynTyConDefn (SynTyCon {tyConTyVars = tyvars, synTyConDefn = ty}) = (tyvars,t
 
 \begin{code}
 maybeTyConSingleCon :: TyCon -> Maybe DataCon
-maybeTyConSingleCon (AlgTyCon {dataCons = [c]})  = Just c
-maybeTyConSingleCon (AlgTyCon {})	         = Nothing
-maybeTyConSingleCon (TupleTyCon {dataCon = con}) = Just con
-maybeTyConSingleCon (PrimTyCon {})               = Nothing
-maybeTyConSingleCon (FunTyCon {})                = Nothing  -- case at funty
-maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $
-                         ppr tc
+maybeTyConSingleCon (AlgTyCon {dataCons = DataCons [c]})  = Just c
+maybeTyConSingleCon (AlgTyCon {})	         	  = Nothing
+maybeTyConSingleCon (TupleTyCon {dataCon = con}) 	  = Just con
+maybeTyConSingleCon (PrimTyCon {})               	  = Nothing
+maybeTyConSingleCon (FunTyCon {})                	  = Nothing  -- case at funty
+maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $ ppr tc
 \end{code}
 
 \begin{code}

@@ -39,7 +39,7 @@ import IdInfo		( GlobalIdDetails(..) )
 import TcType		( namesOfType )
 import FieldLabel	( fieldLabelTyCon )
 import DataCon		( dataConTyCon )
-import TyCon		( isSynTyCon, getSynTyConDefn, tyConClass_maybe, tyConName )
+import TyCon		( visibleDataCons, isSynTyCon, getSynTyConDefn, tyConClass_maybe, tyConName )
 import Class		( className )
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocalName, NamedThing(..)
@@ -528,7 +528,8 @@ get_gates is_used (TySynonym {tcdTyVars = tvs, tcdSynRhs = ty})
 	-- A type synonym type constructor isn't a "gate" for instance decls
 
 get_gates is_used (TyData {tcdCtxt = ctxt, tcdName = tycon, tcdTyVars = tvs, tcdCons = cons})
-  = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
+  = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) 
+					     (visibleDataCons cons))
 		       (hsTyVarNames tvs)
     `addOneToNameSet` tycon
   where

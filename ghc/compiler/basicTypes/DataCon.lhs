@@ -30,7 +30,7 @@ import Type		( Type, ThetaType,
 			  mkTyVarTys, splitTyConApp_maybe, repType, 
 			  mkPredTys, isStrictType
 			)
-import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isProductTyCon,
+import TyCon		( TyCon, tyConDataCons, tyConDataCons, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique )
@@ -399,7 +399,7 @@ splitProductType_maybe ty
 					-- and for constructors visible
 	   -> Just (tycon, ty_args, data_con, dataConArgTys data_con ty_args)
 	   where
-	      data_con = head (tyConDataConsIfAvailable tycon)
+	      data_con = head (tyConDataCons tycon)
 	other -> Nothing
 
 splitProductType str ty

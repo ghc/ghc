@@ -52,6 +52,7 @@ import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..),
                           RdrAvailInfo )
 
 import RdrName          ( RdrName, mkRdrUnqual, mkIfaceOrig )
+import TyCon		( DataConDetails(..) )
 import Name		( OccName )
 import OccName          ( mkSysOccFS,
 			  tcName, varName, dataName, clsName, tvName,
@@ -337,9 +338,9 @@ decl    : src_loc qvar_name '::' type maybe_idinfo
 	| src_loc 'foreign' 'type' qtc_name  		       
 			{ ForeignType $4 Nothing DNType $1 }
 	| src_loc 'data' tycl_hdr constrs 	       
-	       		{ mkTyData DataType $3 $4 (length $4) Nothing $1 }
+	       		{ mkTyData DataType $3 $4 Nothing $1 }
 	| src_loc 'newtype' tycl_hdr newtype_constr
-			{ mkTyData NewType $3 $4 1 Nothing $1 }
+			{ mkTyData NewType $3 (DataCons [$4]) Nothing $1 }
 	| src_loc 'class' tycl_hdr fds csigs
 			{ mkClassDecl $3 $4 $5 Nothing $1 }
 
@@ -452,9 +453,10 @@ opt_version	: version			{ $1 }
 
 ----------------------------------------------------------------------------
 
-constrs		:: { [RdrNameConDecl] {- empty for handwritten abstract -} }
-		: 			{ [] }
-		| '=' constrs1		{ $2 }
+constrs		:: { DataConDetails RdrNameConDecl }
+		: 			{ Unknown }
+		| '=' 			{ DataCons [] }
+		| '=' constrs1		{ DataCons $2 }
 
 constrs1	:: { [RdrNameConDecl] }
 constrs1	:  constr		{ [$1] }
@@ -465,10 +467,10 @@ constr		:  src_loc ex_stuff qdata_name batypes		{ mk_con_decl $3 $2 (VanillaCon 
 		|  src_loc ex_stuff qdata_name '{' fields1 '}'	{ mk_con_decl $3 $2 (RecCon $5)     $1 }
                 -- We use "data_fs" so as to include ()
 
-newtype_constr	:: { [RdrNameConDecl] {- Not allowed to be empty -} }
-newtype_constr	: src_loc '=' ex_stuff qdata_name atype	{ [mk_con_decl $4 $3 (VanillaCon [unbangedType $5]) $1] }
+newtype_constr	:: { RdrNameConDecl }
+newtype_constr	: src_loc '=' ex_stuff qdata_name atype	{ mk_con_decl $4 $3 (VanillaCon [unbangedType $5]) $1 }
 		| src_loc '=' ex_stuff qdata_name '{' qvar_name '::' atype '}'
-							{ [mk_con_decl $4 $3 (RecCon [([$6], unbangedType $8)]) $1] }
+							{ mk_con_decl $4 $3 (RecCon [([$6], unbangedType $8)]) $1 }
 
 ex_stuff :: { ([HsTyVarBndr RdrName], RdrNameContext) }
 ex_stuff	:                                       { ([],[]) }

@@ -42,6 +42,7 @@ import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
 -- others:
 import Name		( NamedThing )
 import FunDeps		( pprFundeps )
+import TyCon		( DataConDetails(..), visibleDataCons )
 import Class		( FunDep, DefMeth(..) )
 import CStrings		( CLabelString )
 import Outputable	
@@ -277,8 +278,7 @@ data TyClDecl name pat
 		tcdCtxt   :: HsContext name,	 -- context
 		tcdName   :: name,		 -- type constructor
 		tcdTyVars :: [HsTyVarBndr name], -- type variables
-		tcdCons	  :: [ConDecl name],	 -- data constructors (empty if abstract)
-		tcdNCons  :: Int,		 -- Number of data constructors (valid even if type is abstract)
+		tcdCons	  :: DataConDetails (ConDecl name),	 -- data constructors (empty if abstract)
 		tcdDerivs :: Maybe (HsContext name),	-- derivings; Nothing => not specified
 							-- Just [] => derive exactly what is asked
 		tcdSysNames :: DataSysNames name,	-- Generic converter functions
@@ -376,7 +376,7 @@ tyClDeclSysNames :: TyClDecl name pat -> [(name, SrcLoc)]
 
 tyClDeclSysNames (ClassDecl {tcdSysNames = names, tcdLoc = loc})
   = [(n,loc) | n <- names]
-tyClDeclSysNames (TyData {tcdCons = cons, tcdSysNames = names, tcdLoc = loc})
+tyClDeclSysNames (TyData {tcdCons = DataCons cons, tcdSysNames = names, tcdLoc = loc})
   = [(n,loc) | n <- names] ++ 
     [(wkr_name,loc) | ConDecl _ wkr_name _ _ _ loc <- cons]
 tyClDeclSysNames decl = []
@@ -405,7 +405,7 @@ instance (NamedThing name, Ord name) => Eq (TyClDecl name pat) where
 	tcdND d1   == tcdND   d2 && 
 	eqWithHsTyVars (tcdTyVars d1) (tcdTyVars d2) (\ env -> 
    	  eq_hsContext env (tcdCtxt d1) (tcdCtxt d2)  &&
-	  eqListBy (eq_ConDecl env) (tcdCons d1) (tcdCons d2)
+	  eq_hsCD      env (tcdCons d1) (tcdCons d2)
 	)
 
   (==) d1@(TySynonym {}) d2@(TySynonym {})
@@ -423,6 +423,11 @@ instance (NamedThing name, Ord name) => Eq (TyClDecl name pat) where
        )
 
   (==) _ _ = False	-- default case
+
+eq_hsCD env (DataCons c1) (DataCons c2) = eqListBy (eq_ConDecl env) c1 c2
+eq_hsCD env Unknown	  Unknown	= True
+eq_hsCD env (HasCons n1)  (HasCons n2)  = n1 == n2
+eq_hsCD env d1		  d2		= False
 
 eq_hsFD env (ns1,ms1) (ns2,ms2)
   = eqListBy (eq_hsVar env) ns1 ns2 && eqListBy (eq_hsVar env) ms1 ms2
@@ -477,10 +482,10 @@ instance (NamedThing name, Outputable name, Outputable pat)
 	     4 (ppr mono_ty)
 
     ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
-		 tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = ncons,
+		 tcdTyVars = tyvars, tcdCons = condecls, 
 		 tcdDerivs = derivings})
       = pp_tydecl (ptext keyword <+> pp_decl_head context tycon tyvars)
-		  (pp_condecls condecls ncons)
+		  (pp_condecls condecls)
 		  derivings
       where
 	keyword = case new_or_data of
@@ -507,8 +512,9 @@ instance (NamedThing name, Outputable name, Outputable pat)
 pp_decl_head :: Outputable name => HsContext name -> name -> [HsTyVarBndr name] -> SDoc
 pp_decl_head context thing tyvars = hsep [pprHsContext context, ppr thing, interppSP tyvars]
 
-pp_condecls []     ncons = ptext SLIT("{- abstract with") <+> int ncons <+> ptext SLIT("constructors -}")
-pp_condecls (c:cs) ncons = equals <+> sep (ppr c : map (\ c -> ptext SLIT("|") <+> ppr c) cs)
+pp_condecls Unknown	  = ptext SLIT("{- abstract -}")
+pp_condecls (HasCons n)   = ptext SLIT("{- abstract with") <+> int n <+> ptext SLIT("constructors -}")
+pp_condecls (DataCons cs) = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
 
 pp_tydecl pp_head pp_decl_rhs derivings
   = hang pp_head 4 (sep [
@@ -554,12 +560,12 @@ data ConDetails name
 \end{code}
 
 \begin{code}
-conDeclsNames :: Eq name => [ConDecl name] -> [(name,SrcLoc)]
+conDeclsNames :: Eq name => DataConDetails (ConDecl name) -> [(name,SrcLoc)]
   -- See tyClDeclNames for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
 conDeclsNames cons
-  = snd (foldl do_one ([], []) cons)
+  = snd (foldl do_one ([], []) (visibleDataCons cons))
   where
     do_one (flds_seen, acc) (ConDecl name _ _ _ details loc)
 	= do_details ((name,loc):acc) details

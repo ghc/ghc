@@ -32,13 +32,14 @@ import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
 			)
 import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
-import TyCon		( tyConDataConsIfAvailable, isEnumerationTyCon, isNewTyCon )
+import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConId, fIRST_TAG )
 import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
 import Type		( tyConAppTyCon, eqType )
 import OccName		( occNameUserString)
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
 			  eqStringName, unpackCStringIdKey )
+import Maybes		( orElse )
 import Name		( Name )
 import Bits		( Bits(..) )
 #if __GLASGOW_HASKELL__ >= 500
@@ -418,7 +419,7 @@ seqRule other				 = Nothing
 \begin{code}
 tagToEnumRule [Type ty, Lit (MachInt i)]
   = ASSERT( isEnumerationTyCon tycon ) 
-    case filter correct_tag (tyConDataConsIfAvailable tycon) of
+    case filter correct_tag (tyConDataCons_maybe tycon `orElse` []) of
 
 
 	[]	  -> Nothing	-- Abstract type

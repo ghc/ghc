@@ -65,7 +65,7 @@ import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import Id		( Id )
 import Class		( Class, classSelIds )
-import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataConsIfAvailable )
+import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataCons_maybe )
 import DataCon		( dataConId, dataConWrapId )
 
 import BasicTypes	( Version, initialVersion, Fixity, defaultFixity, IPName )
@@ -371,7 +371,7 @@ implicitTyThingIds things
     go (AClass cl) = classSelIds cl
     go (ATyCon tc) = tyConGenIds tc ++
 		     tyConSelIds tc ++
-		     [ n | dc <- tyConDataConsIfAvailable tc, 
+		     [ n | dc <- tyConDataCons_maybe tc `orElse` [],
 			   n  <- implicitConIds tc dc]
 		-- Synonyms return empty list of constructors and selectors
 

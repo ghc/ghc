@@ -213,12 +213,12 @@ mkClassDecl (cxt, cname, tyvars) fds sigs mbinds loc
       --  superclasses both called C!)
     new_names = mkClassDeclSysNames (tname, dname, dwname, sc_sel_names)
 
-mkTyData new_or_data (context, tname, tyvars) list_con i maybe src
+mkTyData new_or_data (context, tname, tyvars) data_cons maybe src
   = let t_occ  = rdrNameOcc tname
         name1 = mkRdrUnqual (mkGenOcc1 t_occ) 
 	name2 = mkRdrUnqual (mkGenOcc2 t_occ) 
     in TyData { tcdND = new_or_data, tcdCtxt = context, tcdName = tname,
-		tcdTyVars = tyvars, tcdCons = list_con, tcdNCons = i,
+		tcdTyVars = tyvars, tcdCons = data_cons, 
 		tcdDerivs = maybe, tcdLoc = src, tcdSysNames = [name1, name2] }
 
 mkClassOpSigDM op ty loc

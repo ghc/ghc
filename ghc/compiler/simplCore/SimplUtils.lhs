@@ -41,7 +41,7 @@ import Type		( Type, seqType, splitRepFunTys, isStrictType,
 			)
 import TcType		( isDictTy )
 import OccName		( UserFS )
-import TyCon		( tyConDataConsIfAvailable, isAlgTyCon, isNewTyCon )
+import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConSig, dataConArgTys )
 import Var		( mkSysTyVar, tyVarKind )
 import Util		( lengthExceeds, mapAccumL )
@@ -405,10 +405,10 @@ canUpdateInPlace ty
   | otherwise
   = case splitTyConApp_maybe ty of 
 	Nothing		-> False 
-	Just (tycon, _) -> case tyConDataConsIfAvailable tycon of
-				[dc]  -> arity == 1 || arity == 2
-				      where
-					 arity = dataConRepArity dc
+	Just (tycon, _) -> case tyConDataCons_maybe tycon of
+				Just [dc]  -> arity == 1 || arity == 2
+				           where
+					      arity = dataConRepArity dc
 				other -> False
 \end{code}
 
@@ -891,8 +891,8 @@ mkAlts scrut handled_cons case_bndr alts
 				-- 	case x of { DEFAULT -> e }
 				-- and we don't want to fill in a default for them!
 
-    [missing_con] <- [con | con <- tyConDataConsIfAvailable tycon,
-			    not (con `elem` handled_data_cons)]
+    Just all_cons <- tyConDataCons_maybe tycon,
+    [missing_con] <- [con | con <- all_cons, not (con `elem` handled_data_cons)]
 			-- There is just one missing constructor!
 
   = tick (FillInCaseDefault case_bndr)	`thenSmpl_`

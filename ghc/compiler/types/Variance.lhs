@@ -12,7 +12,7 @@ module Variance(
 #include "HsVersions.h"
 
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
-import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataConsIfAvailable, tyConTyVars,
+import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons_maybe, tyConDataCons, tyConTyVars,
                           tyConArgVrcs_maybe, getSynTyConDefn, isSynTyCon, isAlgTyCon )
 import DataCon          ( dataConRepArgTys )
 
@@ -20,6 +20,7 @@ import FiniteMap
 import Var              ( TyVar )
 import VarSet
 import Maybes           ( expectJust )
+import Maybe		( isNothing )
 import Outputable
 \end{code}
 
@@ -47,7 +48,7 @@ calcTyConArgVrcs tycons
 
     initial_oi :: FiniteMap TyCon ArgVrcs
     initial_oi   = foldl (\fm tc -> addToFM fm tc (initial tc)) emptyFM tycons
-    initial tc   = if isAlgTyCon tc && null (tyConDataConsIfAvailable tc) then
+    initial tc   = if isAlgTyCon tc && isNothing (tyConDataCons_maybe tc) then
                          -- make pessimistic assumption (and warn)
                          abstractVrcs tc
                        else
@@ -79,7 +80,7 @@ calcTyConArgVrcs tycons
             map (\v -> anyVrc (\ty -> vrcInTy myfao v ty) argtys)
                 vs
       where
-       	data_cons = tyConDataConsIfAvailable tc
+       	data_cons = tyConDataCons tc
        	vs        = tyConTyVars tc
        	argtys    = concatMap dataConRepArgTys data_cons
        	myfao tc  = lookupWithDefaultFM oi (expectJust "tcaoIter(Alg)" $
