@@ -13,9 +13,7 @@ import CgMonad
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
-import ClosureInfo	( layOutStaticClosure, layOutDynCon,
-			  mkConLFInfo, ClosureInfo
-			)
+import ClosureInfo	( layOutStaticConstr, layOutDynConstr, ClosureInfo )
 import DataCon		( DataCon, dataConName, dataConRepArgTys, isNullaryDataCon )
 import Name		( getOccName )
 import OccName		( occNameUserString )
@@ -114,8 +112,7 @@ genConInfo comp_info tycon data_con
     -- To allow the debuggers, interpreters, etc to cope with static
     -- data structures (ie those built at compile time), we take care that
     -- info-table contains the information we need.
-    (static_ci,_) = layOutStaticClosure con_name typePrimRep arg_tys 
-				(mkConLFInfo data_con)
+    (static_ci,_) = layOutStaticConstr con_name data_con typePrimRep arg_tys
 
     body       = (initC comp_info (
 	    	      profCtrC SLIT("TICK_ENT_CON") [CReg node] `thenC`
@@ -149,7 +146,7 @@ mkConCodeAndInfo con
 	arg_tys = dataConRepArgTys con
 
 	(closure_info, arg_things)
-		= layOutDynCon con typePrimRep arg_tys
+		= layOutDynConstr (dataConName con) con typePrimRep arg_tys
 
 	body_code
 		= -- NB: We don't set CC when entering data (WDP 94/06)

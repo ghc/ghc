@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.52 2001/05/22 13:43:15 simonpj Exp $
+% $Id: CgCase.lhs,v 1.53 2001/09/26 15:11:50 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -402,8 +402,8 @@ cgEvalAlts cc_slot bndr srt alts
          	[alt] -> let lbl = mkReturnInfoLabel uniq in
 			 cgUnboxedTupleAlt uniq cc_slot True alt
 				`thenFC` \ abs_c ->
-		  	 getSRTLabel `thenFC` \srt_label -> 
-		  	 absC (CRetDirect uniq abs_c (srt_label, srt) 
+		  	 getSRTInfo srt		 `thenFC` \ srt_info -> 
+		  	 absC (CRetDirect uniq abs_c srt_info
 					liveness_mask) `thenC`
 		  	returnFC (CaseAlts (CLbl lbl RetRep) Nothing)
 	 	_ -> panic "cgEvalAlts: dodgy case of unboxed tuple type"
@@ -442,9 +442,9 @@ cgEvalAlts cc_slot bndr srt alts
     	getAbsC (cgPrimEvalAlts bndr tycon alts deflt) 	`thenFC` \ abs_c ->
 
     	-- Generate the labelled block, starting with restore-cost-centre
-    	getSRTLabel 					`thenFC` \srt_label ->
+    	getSRTInfo srt					`thenFC` \srt_info ->
     	absC (CRetDirect uniq (cc_restore `mkAbsCStmts` abs_c) 
-			(srt_label,srt) liveness_mask)	`thenC`
+			 srt_info liveness_mask)	`thenC`
 
 	-- Return an amode for the block
     	returnFC (CaseAlts (CLbl (mkReturnInfoLabel uniq) RetRep) Nothing)
@@ -807,7 +807,7 @@ mkReturnVector :: Unique
 	       -> FCode CAddrMode
 
 mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
-  = getSRTLabel `thenFC` \srt_label ->
+  = getSRTInfo srt		`thenFC` \ srt_info ->
     let
      (return_vec_amode, vtbl_body) = case ret_conv of {
 
@@ -815,7 +815,7 @@ mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
       UnvectoredReturn 0 ->
 	ASSERT(null tagged_alt_absCs)
     	(CLbl ret_label RetRep,
-	 absC (CRetDirect uniq deflt_absC (srt_label, srt) liveness));
+	 absC (CRetDirect uniq deflt_absC srt_info liveness));
 
       UnvectoredReturn n ->
         -- find the tag explicitly rather than using tag_reg for now.
@@ -827,7 +827,7 @@ mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
     	(CLbl ret_label RetRep,
 	 absC (CRetDirect uniq 
 			    (mkAlgAltsCSwitch tag tagged_alt_absCs deflt_absC)
-			    (srt_label, srt)
+			    srt_info
 			    liveness));
 
       VectoredReturn table_size ->
@@ -835,9 +835,7 @@ mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
 	  (vector_table, alts_absC) = 
 	    unzip (map mk_vector_entry [fIRST_TAG .. (table_size+fIRST_TAG-1)])
 
-	  ret_vector = CRetVector vtbl_label
-			  vector_table
-			  (srt_label, srt) liveness
+	  ret_vector = CRetVector vtbl_label vector_table srt_info liveness
 	in
     	(CLbl vtbl_label DataPtrRep, 
 	 -- alts come first, because we don't want to declare all the symbols

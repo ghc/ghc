@@ -20,8 +20,8 @@ import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
 			  snocOL, consOL, concatOL )
 import AbsCUtils	( magicIdPrimRep )
 import ForeignCall	( CCallConv(..) )
-import CLabel		( isAsmTemp, CLabel, labelDynamic )
-import Maybes		( maybeToBool, expectJust )
+import CLabel		( CLabel, labelDynamic )
+import Maybes		( maybeToBool )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
 import Stix		( getNatLabelNCG, StixTree(..),

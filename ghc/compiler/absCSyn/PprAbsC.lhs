@@ -53,7 +53,7 @@ import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, UniqSet
 			)
-import StgSyn		( SRT(..), StgOp(..) )
+import StgSyn		( StgOp(..) )
 import BitSet		( BitSet, intBS )
 import Outputable
 import GlaExts
@@ -476,8 +476,11 @@ pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast cl_descr) _
     is_constr = maybeToBool maybe_tag
     (Just tag) = maybe_tag
 
-    needs_srt = infoTblNeedsSRT cl_info
-    srt = getSRTInfo cl_info
+    srt       = closureSRT cl_info
+    needs_srt = case srt of
+		   NoC_SRT -> False
+		   other   -> True
+
 
     size = closureNonHdrSize cl_info
 
@@ -646,16 +649,12 @@ pp_basic_restores = ptext SLIT("CALLER_RESTORE_SYSTEM")
 \end{code}
 
 \begin{code}
-pp_srt_info srt = 
-    case srt of
-	(lbl, NoSRT) -> 
-		hcat [  int 0, comma, 
-			int 0, comma, 
-			int 0, comma ]
-	(lbl, SRT off len) -> 
-		hcat [ 	pprCLabel lbl, comma,
-		       	int off, comma,
-		       	int len, comma ]
+pp_srt_info NoC_SRT = hcat [ int 0, comma, 
+			     int 0, comma, 
+			     int 0, comma ]
+pp_srt_info (C_SRT lbl off len) = hcat [ pprCLabel lbl, comma,
+				         int off, comma,
+				       	 int len, comma ]
 \end{code}
 
 \begin{code}

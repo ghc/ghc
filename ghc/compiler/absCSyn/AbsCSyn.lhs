@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.37 2001/07/24 05:04:58 ken Exp $
+% $Id: AbsCSyn.lhs,v 1.38 2001/09/26 15:11:50 simonpj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -17,6 +17,7 @@ raw assembler/machine code.
 module AbsCSyn {- (
 	-- export everything
 	AbstractC(..),
+	C_SRT(..)
 	CStmtMacro(..),
 	CExprMacro(..),
 	CAddrMode(..),
@@ -47,7 +48,7 @@ import Literal		( mkMachInt, Literal(..) )
 import ForeignCall	( CCallSpec )
 import PrimRep		( PrimRep(..) )
 import Unique           ( Unique )
-import StgSyn		( StgOp, SRT(..) )
+import StgSyn		( StgOp )
 import TyCon		( TyCon )
 import BitSet				-- for liveness masks
 import FastTypes
@@ -146,7 +147,7 @@ stored in a mixed type location.)
   | CRetDirect			-- Direct return
         !Unique			-- for making labels
 	AbstractC   		-- return code
-	(CLabel,SRT)		-- SRT info
+	C_SRT			-- SRT info
 	Liveness		-- stack liveness at the return point
 
   -- see the notes about these next few; they follow below...
@@ -193,7 +194,7 @@ stored in a mixed type location.)
   | CRetVector			-- A labelled block of static data
 	CLabel
 	[CAddrMode]
-	(CLabel,SRT)		-- SRT info
+	C_SRT			-- SRT info
 	Liveness		-- stack liveness at the return point
 
   | CClosureTbl 		-- table of constructors for enumerated types
@@ -214,6 +215,16 @@ stored in a mixed type location.)
 				-- CostCentre.lhs)
 
   | CSplitMarker		-- Split into separate object modules here
+
+-- C_SRT is what StgSyn.SRT gets translated to... 
+-- we add a label for the table, and expect only the 'offset/length' form
+
+data C_SRT = NoC_SRT
+	   | C_SRT CLabel !Int{-offset-} !Int{-length-}
+
+needsSRT :: C_SRT -> Bool
+needsSRT NoC_SRT       = False
+needsSRT (C_SRT _ _ _) = True
 \end{code}
 
 About @CMacroStmt@, etc.: notionally, they all just call some

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.48 2001/09/10 10:07:21 rje Exp $
+% $Id: CgClosure.lhs,v 1.49 2001/09/26 15:11:50 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -73,17 +73,19 @@ They should have no free variables.
 cgTopRhsClosure :: Id
 		-> CostCentreStack	-- Optional cost centre annotation
 		-> StgBinderInfo
+		-> SRT
 		-> [Id]		-- Args
 		-> StgExpr
 		-> LambdaFormInfo
 		-> FCode (Id, CgIdInfo)
 
-cgTopRhsClosure id ccs binder_info args body lf_info
+cgTopRhsClosure id ccs binder_info srt args body lf_info
   = 
     -- LAY OUT THE OBJECT
+    getSRTInfo srt		`thenFC` \ srt_info ->
     let
     	name          = idName id
-	closure_info  = layOutStaticNoFVClosure name lf_info
+	closure_info  = layOutStaticNoFVClosure name lf_info srt_info
     	closure_label = mkClosureLabel name
     	cg_id_info    = stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info
     in
@@ -147,7 +149,8 @@ cgStdRhsClosure binder cc binder_info fvs args body lf_info payload
     getArgAmodes payload			`thenFC` \ amodes ->
     let
 	(closure_info, amodes_w_offsets)
-	  = layOutDynClosure (idName binder) getAmodeRep amodes lf_info
+	  = layOutDynClosure (idName binder) getAmodeRep amodes lf_info NoC_SRT
+		-- No SRT for a standard-form closure
 
 	(use_cc, blame_cc) = chooseDynCostCentres cc args fvs body
     in
@@ -166,13 +169,14 @@ Here's the general case.
 cgRhsClosure	:: Id
 		-> CostCentreStack	-- Optional cost centre annotation
 		-> StgBinderInfo
+		-> SRT
 		-> [Id]			-- Free vars
 		-> [Id]			-- Args
 		-> StgExpr
 		-> LambdaFormInfo
 		-> FCode (Id, CgIdInfo)
 
-cgRhsClosure binder cc binder_info fvs args body lf_info
+cgRhsClosure binder cc binder_info srt fvs args body lf_info
   = (
   	-- LAY OUT THE OBJECT
 	--
@@ -192,12 +196,14 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
 			 else fvs
     in
     mapFCs getCAddrModeAndInfo reduced_fvs	`thenFC` \ fvs_w_amodes_and_info ->
+    getSRTInfo srt				`thenFC` \ srt_info ->
     let
 	closure_info :: ClosureInfo
 	bind_details :: [((Id, CAddrMode, LambdaFormInfo), VirtualHeapOffset)]
 
 	(closure_info, bind_details)
-	  = layOutDynClosure (idName binder) get_kind fvs_w_amodes_and_info lf_info
+	  = layOutDynClosure (idName binder) get_kind
+			     fvs_w_amodes_and_info lf_info srt_info
 
 	bind_fv ((id, _, lf_info), offset) = bindNewToNode id offset lf_info
 

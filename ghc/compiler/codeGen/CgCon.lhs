@@ -38,9 +38,9 @@ import CgHeapery	( allocDynClosure, inPlaceAllocDynClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode, doTailCall,
 			  mkUnboxedTupleReturnCode )
 import CLabel		( mkClosureLabel )
-import ClosureInfo	( mkConLFInfo, mkLFArgument,
-			  layOutDynCon, layOutDynClosure,
-			  layOutStaticClosure, closureSize
+import ClosureInfo	( mkConLFInfo, mkLFArgument, closureLFInfo,
+			  layOutDynConstr, layOutDynClosure,
+			  layOutStaticConstr, closureSize
 			)
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
@@ -71,19 +71,15 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 cgTopRhsCon id con args
   = ASSERT(not (isDllConApp con args))	-- checks for litlit args too
     ASSERT(length args == dataConRepArity con)
-    let
-	name          = idName id
-    	closure_label = mkClosureLabel name
-	lf_info       = mkConLFInfo con
-    in
 
-    (
 	-- LAY IT OUT
     getArgAmodes args		`thenFC` \ amodes ->
 
     let
-	(closure_info, amodes_w_offsets)
-	  = layOutStaticClosure name getAmodeRep amodes lf_info
+	name          = idName id
+    	closure_label = mkClosureLabel name
+	lf_info	      = closureLFInfo closure_info
+	(closure_info, amodes_w_offsets) = layOutStaticConstr name con getAmodeRep amodes
     in
 
 	-- BUILD THE OBJECT
@@ -93,7 +89,7 @@ cgTopRhsCon id con args
 	    (mkCCostCentreStack dontCareCCS) -- because it's static data
 	    (map fst amodes_w_offsets)) -- Sorted into ptrs first, then nonptrs
 
-    ) `thenC`
+    							`thenC`
 
 	-- RETURN
     returnFC (id, stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info)
@@ -186,7 +182,7 @@ buildDynCon binder ccs con args
     returnFC (heapIdInfo binder hp_off lf_info)
   where
     (closure_info, amodes_w_offsets)
-      = layOutDynClosure (idName binder) getAmodeRep args lf_info
+      = layOutDynClosure (idName binder) getAmodeRep args lf_info NoC_SRT
     lf_info = mkConLFInfo con
 
     use_cc	-- cost-centre to stick in the object
@@ -220,7 +216,9 @@ bindConArgs con args
     mapCs bind_arg args_w_offsets
    where
      bind_arg (arg, offset) = bindNewToNode arg offset mkLFArgument
-     (_, args_w_offsets) = layOutDynCon con idPrimRep args
+     (_, args_w_offsets)    = layOutDynConstr bogus_name con idPrimRep args
+
+bogus_name = panic "bindConArgs"
 \end{code}
 
 Unboxed tuples are handled slightly differently - the object is
@@ -235,8 +233,8 @@ bindUnboxedTupleComponents
 
 bindUnboxedTupleComponents args
  =  -- Assign as many components as possible to registers
-    let (arg_regs, leftovers) = assignRegs [] (map idPrimRep args)
-	(reg_args, stk_args) = splitAt (length arg_regs) args
+    let (arg_regs, _leftovers) = assignRegs [] (map idPrimRep args)
+	(reg_args, stk_args)   = splitAt (length arg_regs) args
     in
 
     -- Allocate the rest on the stack (ToDo: separate out pointers)
@@ -338,11 +336,9 @@ cgReturnDataCon con amodes
 	   setEndOfBlockInfo (EndOfBlockInfo new_sp (OnStack new_sp)) $
 	   performReturn (AbsCNop) (mkStaticAlgReturnCode con)
 
-	where (closure_info, stuff) 
-		  = layOutDynClosure (dataConName con) 
-			getAmodeRep amodes lf_info
-
-	      lf_info = mkConLFInfo con
+	where
+	   (closure_info, stuff) 
+		  = layOutDynConstr (dataConName con) con getAmodeRep amodes
 
       other_sequel	-- The usual case
 

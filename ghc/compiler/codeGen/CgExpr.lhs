@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.43 2001/05/22 13:43:15 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.44 2001/09/26 15:11:50 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -35,7 +35,7 @@ import CgTailCall	( cgTailCall, performReturn, performPrimReturn,
 			  tailCallPrimOp, returnUnboxedTuple
 			)
 import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo,
-			  mkApLFInfo, layOutDynCon )
+			  mkApLFInfo, layOutDynConstr )
 import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
 import Id		( idPrimRep, idType, Id )
 import VarSet
@@ -325,15 +325,14 @@ mkRhsClosure	bndr cc	bi srt
     cgStdRhsClosure bndr cc bi [the_fv] [] body lf_info [StgVarArg the_fv]
   where
     lf_info 		  = mkSelectorLFInfo (idType bndr) offset_into_int 
-				(isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynCon con idPrimRep params
+						(isUpdatable upd_flag)
+    (_, params_w_offsets) = layOutDynConstr bogus_name con idPrimRep params	-- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset
     offset_into_int       = the_offset - fixedHdrSize
     is_single_constructor = maybeToBool (maybeTyConSingleCon tycon)
+    bogus_name		  = panic "mkRhsClosure"
 \end{code}
-
-
 Ap thunks
 ~~~~~~~~~
 
@@ -377,11 +376,9 @@ The default case
 ~~~~~~~~~~~~~~~~
 \begin{code}
 mkRhsClosure bndr cc bi srt fvs upd_flag args body
-  = getSRTLabel		`thenFC` \ srt_label ->
-    let lf_info = 
-	  mkClosureLFInfo bndr NotTopLevel fvs upd_flag args srt_label srt
-    in
-    cgRhsClosure bndr cc bi fvs args body lf_info
+  = cgRhsClosure bndr cc bi srt fvs args body lf_info
+  where
+    lf_info = mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
 \end{code}
 
 

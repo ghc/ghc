@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.14 2000/07/11 16:03:37 simonmar Exp $
+% $Id: CgLetNoEscape.lhs,v 1.15 2001/09/26 15:11:50 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -170,12 +170,12 @@ cgLetNoEscapeClosure
 	(allocStackTop retPrimRepSize	`thenFC` \_ ->
 	 nukeDeadBindings full_live_in_rhss)
 
-	(deAllocStackTop retPrimRepSize   `thenFC` \_ ->
-	 buildContLivenessMask uniq 	  `thenFC` \ liveness ->
+	(deAllocStackTop retPrimRepSize		`thenFC` \_ ->
+	 buildContLivenessMask uniq		`thenFC` \ liveness ->
      	 forkAbsC (cgLetNoEscapeBody binder cc args body uniq) 
 						`thenFC` \ code ->
-	 getSRTLabel 				`thenFC` \ srt_label -> 
-	 absC (CRetDirect uniq code (srt_label,srt) liveness)
+	 getSRTInfo srt				`thenFC` \ srt_info -> 
+	 absC (CRetDirect uniq code srt_info liveness)
 		`thenC` returnFC ())
 	    	    	    	     	`thenFC` \ (vSp, _) ->
 

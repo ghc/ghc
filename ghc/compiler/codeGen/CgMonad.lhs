@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.29 2001/08/31 12:39:06 rje Exp $
+% $Id: CgMonad.lhs,v 1.30 2001/09/26 15:11:50 simonpj Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -23,7 +23,7 @@ module CgMonad (
 	EndOfBlockInfo(..),
 	setEndOfBlockInfo, getEndOfBlockInfo,
 
-	setSRTLabel, getSRTLabel,
+	setSRTLabel, getSRTLabel, getSRTInfo,
 	setTickyCtrLabel, getTickyCtrLabel,
 
 	StackUsage, Slot(..), HeapUsage,
@@ -53,6 +53,7 @@ import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 import {-# SOURCE #-} CgUsages  ( getSpRelOffset )
 
 import AbsCSyn
+import StgSyn		( SRT(..) )
 import AbsCUtils	( mkAbsCStmts )
 import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
 import CLabel           ( CLabel, mkUpdInfoLabel, mkTopTickyCtrLabel )
@@ -615,15 +616,19 @@ getEndOfBlockInfo = do
 \end{code}
 
 \begin{code}
-getSRTLabel :: FCode CLabel
-getSRTLabel = do 
-	(MkCgInfoDown _ _ srt _ _) <- getInfoDown
-	return srt
+getSRTInfo :: SRT -> FCode C_SRT
+getSRTInfo NoSRT	 = return NoC_SRT
+getSRTInfo (SRT off len) = do srt_lbl <- getSRTLabel
+			      return (C_SRT srt_lbl off len)
+
+getSRTLabel :: FCode CLabel	-- Used only by cgPanic
+getSRTLabel = do MkCgInfoDown _ _ srt_lbl _ _ <- getInfoDown
+		 return srt_lbl
 
 setSRTLabel :: CLabel -> Code -> Code
-setSRTLabel srt code = do
-	(MkCgInfoDown c_info statics _ ticky eob_info) <- getInfoDown
-	withInfoDown code (MkCgInfoDown c_info statics srt ticky eob_info)
+setSRTLabel srt_lbl code
+  = do  MkCgInfoDown c_info statics _ ticky eob_info <- getInfoDown
+	withInfoDown code (MkCgInfoDown c_info statics srt_lbl ticky eob_info)
 \end{code}
 
 \begin{code}

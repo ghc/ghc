@@ -15,13 +15,13 @@ module StixInfo (
 #include "../includes/config.h"
 #include "NCG.h"
 
-import AbsCSyn		( AbstractC(..), Liveness(..) )
+import AbsCSyn		( AbstractC(..), Liveness(..), C_SRT(..), needsSRT )
 import CLabel		( CLabel )
 import StgSyn		( SRT(..) )
 import ClosureInfo	( closurePtrsSize,
 			  closureNonHdrSize, closureSMRep,
 			  infoTableLabelFromCI,
-			  infoTblNeedsSRT, getSRTInfo, closureSemiTag
+			  closureSRT, closureSemiTag
 			)
 import PrimRep		( PrimRep(..) )
 import SMRep		( getSMRepClosureTypeInt )
@@ -50,7 +50,6 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 
     where
 	info_lbl  = infoTableLabelFromCI cl_info
-        needs_srt = infoTblNeedsSRT cl_info
 
 	table | needs_srt = srt_label : rest_of_table
 	      | otherwise = rest_of_table
@@ -72,18 +71,16 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
         type_info = (fromInt closure_type) .|.
 		    (fromInt srt_len `shiftL` 16)
 #endif	     
-	srt = getSRTInfo cl_info	     
+	srt	  = closureSRT cl_info	     
+        needs_srt = needsSRT srt
 
 	(srt_label,srt_len)
            | is_constr
            = (StInt 0, tag)
-           | needs_srt
-	   = case srt of
-		(lbl, SRT off len) -> 
-			(StIndex DataPtrRep (StCLbl lbl) 
-				(StInt (toInteger off)), len)
            | otherwise
-           = (StInt 0, 0)
+	   = case srt of
+		NoC_SRT 	  -> (StInt 0, 0)
+		C_SRT lbl off len -> (StIndex DataPtrRep (StCLbl lbl) (StInt (toInteger off)), len)
 
         maybe_tag = closureSemiTag cl_info
         is_constr = maybeToBool maybe_tag
@@ -107,7 +104,7 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 
 genBitmapInfoTable
 	:: Liveness
-	-> (CLabel, SRT)
+	-> C_SRT
 	-> Int
 	-> Bool			-- must include SRT field (i.e. it's a vector)
 	-> UniqSM StixTreeList
@@ -146,8 +143,8 @@ genBitmapInfoTable liveness srt closure_type include_srt
 
 	(srt_label,srt_len) = 
 	     case srt of
-		(lbl, NoSRT) -> (StInt 0, 0)
-		(lbl, SRT off len) -> 
+		NoC_SRT -> (StInt 0, 0)
+		C_SRT lbl off len -> 
 			(StIndex DataPtrRep (StCLbl lbl) 
 				(StInt (toInteger off)), len)
 

@@ -50,8 +50,6 @@ import ErrUtils		( dumpIfSet_dyn, showPass )
 import Panic		( assertPanic )
 
 #ifdef DEBUG
-import Id		( idCafInfo )
-import IdInfo		( mayHaveCafRefs )
 import Outputable
 #endif
 \end{code}
@@ -266,11 +264,9 @@ cgTopRhs bndr (StgRhsCon cc con args) srt
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag args body) srt
   =     -- There should be no free variables
     ASSERT(null fvs)
-
-    getSRTLabel `thenFC` \srt_label ->
-    let lf_info = 
-	  mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args srt_label srt
+    let 
+	lf_info = mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args
     in
-    maybeGlobaliseId bndr `thenFC` \ bndr' ->
-    forkStatics (cgTopRhsClosure bndr' cc bi args body lf_info)
+    maybeGlobaliseId bndr			`thenFC` \ bndr' ->
+    forkStatics (cgTopRhsClosure bndr' cc bi srt args body lf_info)
 \end{code}
