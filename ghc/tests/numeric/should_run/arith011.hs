@@ -32,6 +32,7 @@ testIntlikeNoBits name zero = do
   testNum      zero
   testReal     zero
   testIntegral zero
+  testConversions zero
 
 testInteger  = do
   let zero = 0 :: Integer
@@ -67,6 +68,20 @@ testEnum zero = do
   print $ take 10 [zero, toEnum 2 .. ] -- enumFromThen
   print [zero .. toEnum 20]            -- enumFromTo
   print [zero, toEnum 2 .. toEnum 20]  -- enumFromThenTo
+
+testConversions zero = do
+  putStrLn "testConversions"
+  putStr "Integer : " >> print (map fromIntegral numbers :: [Integer])
+  putStr "Int     : " >> print (map fromIntegral numbers :: [Int])
+  putStr "Int8    : " >> print (map fromIntegral numbers :: [Int8])
+  putStr "Int16   : " >> print (map fromIntegral numbers :: [Int16])
+  putStr "Int32   : " >> print (map fromIntegral numbers :: [Int32])
+  putStr "Int64   : " >> print (map fromIntegral numbers :: [Int64])
+  putStr "Word8   : " >> print (map fromIntegral numbers :: [Word8])
+  putStr "Word16  : " >> print (map fromIntegral numbers :: [Word16])
+  putStr "Word32  : " >> print (map fromIntegral numbers :: [Word32])
+  putStr "Word64  : " >> print (map fromIntegral numbers :: [Word64])
+  where numbers = [minBound, 0, maxBound] `asTypeOf` [zero]
 
 samples :: (Num a, Enum a) => a -> ([a], [a])
 samples zero = ([-3 .. -1]++[0 .. 3], [-3 .. -1]++[1 .. 3])
