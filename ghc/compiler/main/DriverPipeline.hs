@@ -656,10 +656,10 @@ runPhase (Hsc src_flavour) stop dflags basename suff input_fn get_output_fn _may
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	let do_recomp = recompFlag dflags
 	source_unchanged <- 
-          if not do_recomp || isStopLn stop
+          if not do_recomp || not (isStopLn stop)
 		-- Set source_unchanged to False unconditionally if
 		--	(a) recompilation checker is off, or
-		-- 	(b) we aren't going all the way to .o file (e.g. ghc -S),
+		-- 	(b) we aren't going all the way to .o file (e.g. ghc -S)
 	     then return False	
 		-- Otherwise look at file modification dates
 	     else do o_file_exists <- doesFileExist o_file
