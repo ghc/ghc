@@ -157,6 +157,14 @@ eqForeignObj(p1, p2)
 {
   return (p1 == p2);
 }
+
+StgInt 
+eqStablePtr(p1, p2)
+  StgStablePtr p1;
+  StgStablePtr p2;
+{
+  return (p1 == p2);
+}
 \end{code}
 
 And some code that HAS NO RIGHT being here.
