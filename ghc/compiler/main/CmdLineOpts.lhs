@@ -300,7 +300,8 @@ data HscLang
   = HscC
   | HscAsm
   | HscJava
-  | HscInterpreter
+  | HscInterpreted
+    deriving Eq
 
 dopt_HscLang :: DynFlags -> HscLang
 dopt_HscLang = hscLang

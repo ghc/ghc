@@ -11,6 +11,8 @@ module StgInterp (
     linkIModules,	-- :: ItblEnv -> ClosureEnv -> [[UnlinkedIBind]] -> 
 		 	--	([LinkedIBind], ItblEnv, ClosureEnv)
 
+    stgToIBinds,	-- :: [StgBinding] -> [UnlinkedIBind]
+
     runStgI  -- tmp, for testing
  ) where
 
@@ -94,11 +96,13 @@ runStgI	      = panic "StgInterp.runStgI: not implemented"
 linkIModules  = panic "StgInterp.linkIModules: not implemented"
 #else
 
+
+
 -- the bindings need to have a binding for stgMain, and the
 -- body of it had better represent something of type Int# -> Int#
 runStgI tycons classes stgbinds
    = do 
-	let unlinked_binds = concatMap (stg2IBinds emptyUniqSet) stgbinds
+	let unlinked_binds = concatMap (translateBind emptyUniqSet) stgbinds
 	     
 {-
         let dbg_txt 
@@ -133,9 +137,13 @@ runStgI tycons classes stgbinds
 -- Convert STG to an unlinked interpretable
 -- ---------------------------------------------------------------------------
 
-stg2IBinds :: UniqSet Id -> StgBinding -> [UnlinkedIBind]
-stg2IBinds ie (StgNonRec v e)  = [IBind v (rhs2expr ie e)]
-stg2IBinds ie (StgRec vs_n_es) = [IBind v (rhs2expr ie' e) | (v,e) <- vs_n_es]
+-- visible from outside
+stgToIBinds :: [StgBinding] -> [UnlinkedIBind]
+stgToIBinds = concatMap (translateBind emptyUniqSet)
+
+translateBind :: UniqSet Id -> StgBinding -> [UnlinkedIBind]
+translateBind ie (StgNonRec v e)  = [IBind v (rhs2expr ie e)]
+translateBind ie (StgRec vs_n_es) = [IBind v (rhs2expr ie' e) | (v,e) <- vs_n_es]
   where ie' = addListToUniqSet ie (map fst vs_n_es)
 
 isRec (StgNonRec _ _) = False
@@ -336,12 +344,12 @@ stg2expr ie stgexpr
 
         StgLet binds@(StgNonRec v e) body
 	   -> mkNonRec (repOfStgExpr stgexpr) 
-		(head (stg2IBinds ie binds)) 
+		(head (translateBind ie binds)) 
 		(stg2expr (addOneToUniqSet ie v) body)
 
         StgLet binds@(StgRec bs) body
            -> mkRec (repOfStgExpr stgexpr) 
-		(stg2IBinds ie binds) 
+		(translateBind ie binds) 
 		(stg2expr (addListToUniqSet ie (map fst bs)) body)
 
         other 
@@ -416,7 +424,7 @@ linkIModules ie ce mods = do
   new_ie <- mkITbls (concat tyconss)
   let new_ce = addListToFM ce (zip top_level_binders new_rhss)
       new_rhss = map (\b -> evalP (bindee b) emptyUFM) new_binds
-    ---vvvvvvvvv--------------------------------------^^^^^^^^^-- circular
+    ---vvvvvvvvv---------------------------------------^^^^^^^^^-- circular
       (new_binds, final_ie, final_ce) = linkIBinds new_ie new_ce binds
 
   return (new_binds, final_ie, final_ce)

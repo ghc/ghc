@@ -61,11 +61,10 @@ data HscResult
 	     (Maybe String)  	     -- generated stub_c filename (in /tmp)
 	     (Maybe [UnlinkedIBind]) -- interpreted code, if any
              PersistentCompilerState -- updated PCS
-             (Bag WarnMsg) 		-- warnings
 
-   | HscErrs PersistentCompilerState -- updated PCS
-             (Bag ErrMsg)		-- errors
-             (Bag WarnMsg)             -- warnings
+   | HscFail PersistentCompilerState -- updated PCS
+	-- no errors or warnings; the individual passes
+	-- (parse/rename/typecheck) print messages themselves
 
 hscMain
   :: DynFlags	
@@ -95,35 +94,42 @@ hscMain dflags core_cmds stg_cmds summary maybe_old_iface
 hscNoRecomp = panic "hscNoRecomp"
 
 hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
- = do 
-      -- parsed :: RdrNameHsModule
-      parsed <- parseModule summary
-      -- check for parse errors
+ = do {
+      -- what target are we shooting for?
+      let toInterp = dopt_HscLang dflags == HscInterpreted;
 
+      -- PARSE
+      maybe_parsed <- myParseModule dflags summary;
+      case maybe_parsed of {
+         Nothing -> return (HscFail pcs);
+         Just rdr_module -> do {
+
+      -- RENAME
       (pcs_rn, maybe_rn_result) 
-         <- renameModule dflags finder hit hst pcs mod parsed
+         <- renameModule dflags finder hit hst pcs mod rdr_module;
+      case maybe_rn_result of {
+         Nothing -> return (HscFail pcs_rn);
+         Just (new_iface, rn_hs_decls) -> do {
 
-      -- check maybe_rn_result for failure
-
-      (new_iface, rn_hs_decls) = unJust maybe_rn_result
-
+      -- TYPECHECK
       maybe_tc_result
-         <- typecheckModule dflags mod pcs hst hit pit rn_hs_decls
+         <- typecheckModule dflags mod pcs_rn hst hit pit rn_hs_decls;
+      case maybe_tc_result of {
+         Nothing -> return (HscFail pcs_rn);
+         Just tc_result -> do {
 
-      -- check maybe_tc_result for failure
-      let tc_result = unJust maybe_tc_result
-      let tc_pcs = tc_pcs tc_result
-      let tc_env = tc_env tc_result
-      let tc_binds = tc_binds tc_result
-      let local_tycons = tc_tycons tc_result
+      let pcs_tc        = tc_pcs tc_result
+      let env_tc        = tc_env tc_result
+      let binds_tc      = tc_binds tc_result
+      let local_tycons  = tc_tycons tc_result
       let local_classes = tc_classes tc_result
 
-      -- desugar, simplify and tidy, to create the unfoldings
-      -- why is this IO-typed?
+      -- DESUGAR, SIMPLIFY, TIDY-CORE
+      -- We grab the the unfoldings at this point.
       (tidy_binds, orphan_rules, fe_binders, h_code, c_code)   -- return modDetails?
          <- dsThenSimplThenTidy dflags mod tc_result rule_base ds_uniqs
 
-      -- convert to Stg; needed for binders
+      -- CONVERT TO STG
       (stg_binds, cost_centre_info, top_level_ids) 
          <- myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
 
@@ -134,18 +140,54 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
       let maybe_final_iface = completeIface maybe_old_iface new_iface new_details 
 
       -- do the rest of code generation/emission
-      -- this is obviously nonsensical: FIX
-      (unlinkeds, stub_h_filename, stub_c_filename) 
-         <- restOfCodeGeneration this_mod imported_modules cost_centre_info 
+      (maybe_ibinds, maybe_stub_h_filename, maybe_stub_c_filename) 
+         <- restOfCodeGeneration toInterp
+                                 this_mod imported_modules cost_centre_info 
                                  fe_binders local_tycons local_classes stg_binds
 
       -- and the answer is ...
-      return (HscOK new_details maybe_final_iface stub_h_filename stub_c_filename
-                    unlinkeds tc_pcs (unionBags rn_warns tc_warns))
+      return (HscOK new_details maybe_final_iface 
+		    maybe_stub_h_filename maybe_stub_c_filename
+                    maybe_ibinds pcs_tc)
+      }}}}}}}
+
+myParseModule dflags summary
+ = do --------------------------  Reader  ----------------
+      show_pass "Parser"
+      -- _scc_     "Parser"
+
+      let src_filename -- name of the preprocessed source file
+         = case ms_ppsource summary of
+              Just (filename, fingerprint) -> filename
+              Nothing -> pprPanic "myParseModule:summary is not of a source module"
+                                  (ppr summary)
+
+      buf <- hGetStringBuffer True{-expand tabs-} src_filename
+
+      let glaexts | dopt Opt_GlasgowExts dflags = 1#
+	          | otherwise 		      = 0#
+
+      case parse buf PState{ bol = 0#, atbol = 1#,
+	 		     context = [], glasgow_exts = glaexts,
+			     loc = mkSrcLoc src_filename 1 } of {
+
+	PFailed err -> do hPutStrLn stderr (showSDoc err)
+                          return Nothing
+	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) ->
+
+      dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_module)
+      dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
+			   (ppSourceStats False rdr_module)
+
+      return (Just rdr_module)
 
 
-restOfCodeGeneration this_mod imported_modules cost_centre_info 
+restOfCodeGeneration toInterp this_mod imported_modules cost_centre_info 
                      fe_binders local_tycons local_classes stg_binds
+ | toInterp
+ = return (Nothing, Nothing, stgToIBinds stg_binds local_tycons local_classes)
+
+ | otherwise
  = do --------------------------  Code generation -------------------------------
       show_pass "CodeGen"
       -- _scc_     "CodeGen"
@@ -161,8 +203,7 @@ restOfCodeGeneration this_mod imported_modules cost_centre_info
                        occ_anal_tidy_binds stg_binds2
                        c_code h_code abstractC ncg_uniqs
 
-      -- this is obviously nonsensical: FIX
-      return (maybe_stub_h_name, maybe_stub_c_name, [])
+      return (maybe_stub_h_name, maybe_stub_c_name, [{-UnlinkedIBind-}])
 
 
 dsThenSimplThenTidy dflags mod tc_result rule_base ds_uniqs
