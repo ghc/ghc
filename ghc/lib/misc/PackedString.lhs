@@ -17,6 +17,7 @@ module PackedString (
         packCBytesST,        -- :: Int -> Addr -> ST s PackedString
 
 	byteArrayToPS,       -- :: ByteArray Int -> PackedString
+	cByteArrayToPS,	     -- :: ByteArray Int -> PackedString
 	unsafeByteArrayToPS, -- :: ByteArray a   -> Int -> PackedString
 
 	psToByteArray,       -- :: PackedString  -> ByteArray Int
@@ -24,7 +25,10 @@ module PackedString (
 	psToCString,	     -- :: PackedString  -> Addr
         isCString,	     -- :: PackedString  -> Bool
 
-	unpackPS,    -- :: PackedString -> [Char]
+	unpackPS,        -- :: PackedString -> [Char]
+	unpackNBytesPS,  -- :: PackedString -> Int -> [Char]
+	unpackPSIO,      -- :: PackedString -> IO [Char]
+
 {-LATER:
 	hPutPS,      -- :: Handle -> PackedString -> IO ()
         putPS,       -- :: FILE -> PackedString -> PrimIO () -- ToDo: more sensible type
@@ -70,8 +74,14 @@ module PackedString (
 
  	  -- Converting to C strings
 	packCString#, 
-	unpackCString#, unpackCString2#, unpackAppendCString#, unpackFoldrCString#,
-	unpackCString
+	unpackCString#,
+	unpackCString2#,
+	unpackAppendCString#,
+	unpackFoldrCString#,
+	unpackCString,
+	unpackCStringIO,
+	unpackCStringLenIO
+
     ) where
 
 import GlaExts
@@ -262,6 +272,28 @@ byteArrayToPS (ByteArray ixs@(_, ix_end) frozen#) =
  in
  PS frozen# n# (byteArrayHasNUL# frozen# n#)
 
+-- byteArray is zero-terminated, make everything upto it
+-- a packed string.
+cByteArrayToPS :: ByteArray Int -> PackedString
+cByteArrayToPS (ByteArray ixs@(_, ix_end) frozen#) =
+ let
+  n# = 
+   case (
+	 if null (range ixs)
+	  then 0
+	  else ((index ixs ix_end) + 1)
+        ) of { I# x -> x }
+  len# = findNull 0#
+
+  findNull i#
+     | i# ==# n#	   = n#
+     | ch# `eqChar#` '\0'# = i# -- everything upto the sentinel
+     | otherwise	   = findNull (i# +# 1#)
+    where
+     ch#  = indexCharArray# frozen# i#
+ in
+ PS frozen# len# False
+
 unsafeByteArrayToPS :: ByteArray a -> Int -> PackedString
 unsafeByteArrayToPS (ByteArray _ frozen#) (I# n#)
   = PS frozen# n# (byteArrayHasNUL# frozen# n#)
@@ -332,6 +364,32 @@ unpackPS (CPS addr len)
       | otherwise	   = C# ch : unpack (nh +# 1#)
       where
 	ch = indexCharOffAddr# addr nh
+
+unpackNBytesPS :: PackedString -> Int -> [Char]
+unpackNBytesPS ps len@(I# l#)
+ | len < 0	= error ("PackedString.unpackNBytesPS: negative length "++ show len)
+ | otherwise    =
+    case ps of
+      PS bytes len# has_null -> unpackPS (PS bytes (min# len# l#) has_null)
+      CPS a len# -> unpackPS (CPS a (min# len# l#))
+ where
+  min# x# y# 
+    | x# ># y#  = x#
+    | otherwise = y#
+
+unpackPSIO :: PackedString -> IO String
+unpackPSIO ps@(PS bytes len has_null) = return (unpackPS ps)
+unpackPSIO (CPS addr len)
+  = unpack 0#
+  where
+    unpack nh = do
+       ch <- readCharOffAddr (A# addr) (I# nh)
+       if ch == '\0'
+        then return []
+	else do
+	   ls <- unpack (nh +# 1#)
+	   return (ch : ls)
+
 \end{code}
 
 Output a packed string via a handle:
@@ -1038,6 +1096,30 @@ unpackCString# addr
       | otherwise	   = C# ch : unpack (nh +# 1#)
       where
 	ch = indexCharOffAddr# addr nh
+
+unpackCStringIO :: Addr -> IO String
+unpackCStringIO addr = unpack 0#
+  where
+    unpack nh = do
+       ch <- readCharOffAddr addr (I# nh)
+       if ch == '\0'
+        then return []
+	else do
+	   ls <- unpack (nh +# 1#)
+	   return (ch : ls)
+
+-- unpack 'len' chars
+unpackCStringLenIO :: Addr -> Int -> IO String
+unpackCStringLenIO addr l@(I# len#)
+ | len# <# 0#  = fail (userError ("PackedString.unpackCStringLenIO: negative length (" ++ show l ++ ")"))
+ | otherwise   = unpack len#
+  where
+    unpack 0# = return []
+    unpack nh = do
+       ch <- readCharOffAddr addr (I# nh)
+       ls <- unpack (nh -# 1#)
+       return (ch : ls)
+
 
 unpackCString2# addr len
   -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
