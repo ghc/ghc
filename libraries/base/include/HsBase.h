@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.25 2003/09/02 16:07:11 ross Exp $
+ * $Id: HsBase.h,v 1.26 2003/09/12 12:29:44 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -128,6 +128,9 @@ int inputReady(int fd, int msecs, int isSock);
 
 /* in writeError.c */
 void writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len);
+
+/* in Signals.c */
+extern HsInt nocldstop;
 
 /* -----------------------------------------------------------------------------
    64-bit operations, defined in longlong.c

@@ -75,6 +75,9 @@ module System.Posix.Signals (
   -- * Waiting for signals
   getPendingSignals, awaitSignal,
 
+  -- * The @NOCLDSTOP@ flag
+  setStoppedChildFlag, queryStoppedChildFlag,
+
   -- MISSING FUNCTIONALITY:
   -- sigaction(), (inc. the sigaction structure + flags etc.)
   -- the siginfo structure
@@ -311,6 +314,27 @@ scheduleAlarm secs = do
 
 foreign import ccall unsafe "alarm"
   c_alarm :: CUInt -> IO CUInt
+
+-- -----------------------------------------------------------------------------
+-- The NOCLDSTOP flag
+
+foreign import ccall "&nocldstop" nocldstop :: Ptr Int
+
+-- | Tells the system whether or not to set the @SA_NOCLDSTOP@ flag when
+-- installing new signal handlers.
+setStoppedChildFlag :: Bool -> IO Bool
+setStoppedChildFlag b = do
+    rc <- peek nocldstop
+    poke nocldstop x
+    return (rc == (0::Int))
+  where
+    x = case b of {True -> 0; False -> 1}
+
+-- | Queries the current state of the stopped child flag.
+queryStoppedChildFlag :: IO Bool
+queryStoppedChildFlag = do
+    rc <- peek nocldstop
+    return (rc == (0::Int))
 
 -- -----------------------------------------------------------------------------
 -- Manipulating signal sets
