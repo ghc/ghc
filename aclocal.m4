@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.48 2000/05/31 00:55:10 chak Exp $
+dnl $Id: aclocal.m4,v 1.49 2000/06/08 20:57:02 panne Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -372,6 +372,51 @@ AC_PROVIDE($AC_TYPE_NAME)
 undefine([AC_TYPE_NAME])dnl
 undefine([AC_CV_NAME])dnl
 undefine([AC_CV_SIZEOF_NAME])dnl
+])
+
+dnl ** Map an arithmetic C type to a Haskell type.
+dnl    Based on autconf's AC_CHECK_SIZEOF.
+
+dnl FPTOOLS_CHECK_HTYPE(TYPE)
+AC_DEFUN(FPTOOLS_CHECK_HTYPE,
+[changequote(<<, >>)dnl
+dnl The name to #define.
+define(<<AC_TYPE_NAME>>, translit(htype_$1, [a-z *], [A-Z_P]))dnl
+dnl The cache variable name.
+define(<<AC_CV_NAME>>, translit(fptools_cv_htype_$1, [ *], [_p]))dnl
+changequote([, ])dnl
+AC_MSG_CHECKING(Haskell type for $1)
+AC_CACHE_VAL(AC_CV_NAME,
+[AC_TRY_RUN([#include <stdio.h>
+#include <stddef.h>
+#ifdef HAVE_SIGNAL_H
+#include <signal.h>
+#endif
+#ifdef HAVE_TIME_H
+#include <time.h>
+#endif
+
+typedef $1 testing;
+
+main() {
+  FILE *f=fopen("conftestval", "w");
+  if (!f) exit(1);
+  if (((testing)((int)((testing)1.4))) == ((testing)1.4)) {
+    fprintf(f, "%s%d\n",
+           ((testing)(-1) < (testing)0) ? "Int" : "Word",
+           sizeof(testing)*8);
+  } else {
+    fprintf(f,"%s\n",
+           (sizeof(testing) >  sizeof(double)) ? "LDouble" :
+           (sizeof(testing) == sizeof(double)) ? "Double"  : "Float");
+  }
+  fclose(f);
+  exit(0);
+}], AC_CV_NAME=`cat conftestval`, AC_CV_NAME=NotReallyAType, AC_CV_NAME=NotReallyAType)])dnl
+AC_MSG_RESULT($AC_CV_NAME)
+AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME)
+undefine([AC_TYPE_NAME])dnl
+undefine([AC_CV_NAME])dnl
 ])
 
 dnl ** figure out whether C compiler supports 'long long's
