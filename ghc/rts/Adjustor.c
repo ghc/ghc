@@ -336,7 +336,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 		adj_code[6] |= ((unsigned long)wptr) >> 16;
 		
 		adj_code[7] = 0x3c600000;	//lis r3,hi(hptr)
-		adj_code[6] |= ((unsigned long)hptr) >> 16;
+		adj_code[7] |= ((unsigned long)hptr) >> 16;
 		
 		adj_code[8] = 0x60000000;	//ori r0,r0,lo(wptr)
 		adj_code[8] |= ((unsigned long)wptr) & 0xFFFF; 
