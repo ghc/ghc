@@ -39,9 +39,10 @@ import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
 			)
 -- import RnHsSyn		( RenamedFixityDecl(..) )
 
-import Id		( GenId, dataConNumFields, isNullaryDataCon, dataConTag,
+import Id		( GenId, isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
-			  isDataCon, SYN_IE(DataCon), SYN_IE(ConTag) )
+			  isDataCon, SYN_IE(DataCon), SYN_IE(ConTag),
+			  SYN_IE(Id) )
 import Maybes		( maybeToBool )
 import Name		( getOccString, getOccName, getSrcLoc, occNameString, modAndOcc, OccName, Name )
 
@@ -464,7 +465,7 @@ gen_Bounded_binds tycon
     data_con_N_RDR = qual_orig_name data_con_N
 
     ----- single-constructor-flavored: -------------
-    arity	   = dataConNumFields data_con_1
+    arity	   = argFieldCount data_con_1
 
     min_bound_1con = mk_easy_FunMonoBind tycon_loc minBound_RDR [] [] $
 		     mk_easy_App data_con_1_RDR (nOfThem arity minBound_RDR)
@@ -596,7 +597,7 @@ gen_Ix_binds tycon
 		     else
 			 dc
 
-    con_arity   = dataConNumFields data_con
+    con_arity   = argFieldCount data_con
     data_con_RDR = qual_orig_name data_con
     con_pat  xs = ConPatIn data_con_RDR (map VarPatIn xs)
     con_expr xs = mk_easy_App data_con_RDR xs
@@ -680,11 +681,11 @@ gen_Read_binds tycon
 	  = let
 		data_con_RDR = qual_orig_name data_con
 		data_con_str= occNameString (getOccName data_con)
-		con_arity   = dataConNumFields data_con
+		con_arity   = argFieldCount data_con
 		as_needed   = take con_arity as_RDRs
 		bs_needed   = take con_arity bs_RDRs
 		con_expr    = mk_easy_App data_con_RDR as_needed
-		nullary_con = isNullaryDataCon data_con
+		nullary_con = con_arity == 0
 
 		con_qual
 		  = BindStmt
@@ -746,10 +747,10 @@ gen_Show_binds tycon
 	pats_etc data_con
 	  = let
 		data_con_RDR = qual_orig_name data_con
-		con_arity   = dataConNumFields data_con
+		con_arity   = argFieldCount data_con
 		bs_needed   = take con_arity bs_RDRs
 		con_pat     = ConPatIn data_con_RDR (map VarPatIn bs_needed)
-		nullary_con = isNullaryDataCon data_con
+		nullary_con = con_arity == 0
 
 		show_con
 		  = let nm = occNameString (getOccName data_con)
@@ -812,7 +813,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
       = ASSERT(isDataCon var)
 	([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
       where
-	pat    = ConPatIn var_RDR (nOfThem (dataConNumFields var) WildPatIn)
+	pat    = ConPatIn var_RDR (nOfThem (argFieldCount var) WildPatIn)
 	var_RDR = qual_orig_name var
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
@@ -984,6 +985,11 @@ eq_Expr ty a b
        genOpApp a relevant_eq_op b
   where
     relevant_eq_op = assoc_ty_id eq_op_tbl ty
+\end{code}
+
+\begin{code}
+argFieldCount :: Id -> Int	-- Works on data and newtype constructors
+argFieldCount con = length (dataConRawArgTys con)
 \end{code}
 
 \begin{code}
