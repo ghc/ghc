@@ -102,7 +102,7 @@ import Outputable
 	CHAR		{ ITchar $$ }
 	STRING		{ ITstring $$ }	
 	INTEGER		{ ITinteger  $$ }
-	DOUBLE		{ ITdouble $$ }
+	RATIONAL 	{ ITrational $$ }
 
 	INTEGER_LIT	{ ITinteger_lit }
 	FLOAT_LIT	{ ITfloat_lit }
@@ -572,8 +572,8 @@ core_lit	: INTEGER			{ MachInt $1 True }
 		| CHAR				{ MachChar $1 }
 		| STRING			{ MachStr $1 }
 		| STRING_LIT STRING		{ NoRepStr $2 }
-		| DOUBLE			{ MachDouble (toRational $1) }
-		| FLOAT_LIT DOUBLE		{ MachFloat (toRational $2) }
+		| RATIONAL			{ MachDouble $1 }
+		| FLOAT_LIT RATIONAL		{ MachFloat $2 }
 
 		| INTEGER_LIT INTEGER		{ NoRepInteger  $2 (panic "NoRepInteger type") 
 							-- The type checker will add the types

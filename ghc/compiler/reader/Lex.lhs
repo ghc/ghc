@@ -53,6 +53,8 @@ import FastString
 import StringBuffer
 import GlaExts
 import ST		( runST )
+
+import PrelRead 		( readRational__ ) -- Glasgow non-std
 \end{code}
 
 %************************************************************************
@@ -219,7 +221,7 @@ data IfaceToken
   | ITccall (Bool,Bool)		-- (is_casm, may_gc)
   | ITscc CostCentre 
   | ITchar Char | ITstring FAST_STRING
-  | ITinteger Integer | ITdouble Double
+  | ITinteger Integer | ITrational Rational
   | ITinteger_lit | ITfloat_lit | ITrational_lit | ITaddr_lit | ITlit_lit | ITstring_lit
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof				-- end of file token
@@ -443,13 +445,19 @@ lex_num cont minus acc# buf =
              -- presence of floating point numbers in interface
              -- files is not that common. (ToDo)
 	    case expandWhile (isDigit) (incLexeme buf') of
-              buf'' -> -- points to first non digit char
-		case reads (lexemeToString buf'') of
-	          [(v,_)] -> cont (ITdouble v) (stepOverLexeme buf'')
+              buf2 -> -- points to first non digit char
+		let l = case currentChar# buf2 of
+		          'e'# -> let buf3 = incLexeme buf2 in
+			      case currentChar# buf3 of
+				'-'# -> expandWhile (isDigit) (incLexeme buf3)
+				_    -> expandWhile (isDigit) buf3
+		          _ -> buf2
+		in let v = readRational__ (lexemeToString l) in
+	           cont (ITrational v) (stepOverLexeme l)
+
          _ -> cont (ITinteger (fromInt (minus acc'))) (stepOverLexeme buf')
 
---	   case reads (lexemeToString buf') of
---	     [(i,_)] -> cont (ITinteger i) (stepOverLexeme buf')
+
 
 ------------
 lex_keyword cont buf =
