@@ -958,7 +958,7 @@ packSocketType stype = 1 + (index (Stream, SeqPacket) stype)
 
 -- This is for a box running cygwin32 toolchain.
 
-#if defined(_WIN32)
+#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
 data SocketType = 
 	  Stream 
 	| Datagram

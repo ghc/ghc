@@ -61,7 +61,7 @@ signalling that the current hostname applies.
 data PortID = 
 	  Service String		-- Service Name eg "ftp"
 	| PortNumber PortNumber		-- User defined Port Number
-#ifndef _WIN32
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
 	| UnixSocket String		-- Unix family socket in file system
 #endif
 
@@ -93,7 +93,7 @@ connectTo hostname (PortNumber port) = do
     connect sock (SockAddrInet port (hostAddress he))
     socketToHandle sock ReadWriteMode
 
-#ifndef _WIN32
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
 connectTo _ (UnixSocket path) = do
     sock    <- socket AF_UNIX Datagram 0
     connect sock (SockAddrUnix path)
@@ -124,7 +124,7 @@ listenOn (PortNumber port) = do
     listen sock maxListenQueue
     return sock
 
-#ifndef _WIN32
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
 listenOn (UnixSocket path) = do
     sock <- socket AF_UNIX Datagram 0
     bindSocket sock (SockAddrUnix path)
@@ -195,7 +195,7 @@ socketPort s = do
    portID sa =
     case sa of
      SockAddrInet port _    -> PortNumber port
-#ifndef _WIN32
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
      SockAddrUnix path	    -> UnixSocket path
 #endif
 
