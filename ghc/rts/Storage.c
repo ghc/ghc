@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.62 2002/04/23 11:21:39 simonmar Exp $
+ * $Id: Storage.c,v 1.63 2002/04/25 04:54:55 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -580,7 +580,7 @@ allocatePinned( nat n )
     // 8-byte aligned to begin with, so we just round up n to
     // the nearest multiple of 8 bytes.
     ASSERT(((StgWord)bd->free & 7) == 0);
-    n = (n+7) & ~8;
+    n = (n+7) & ~7;
 
     // If we don't have a block of pinned objects yet, or the current
     // one isn't large enough to hold the new object, allocate a new one.
