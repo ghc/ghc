@@ -1,3 +1,5 @@
+#define COMMA ,
+
 #ifndef NCG_H
 #define NCG_H
 #if 0

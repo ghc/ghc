@@ -2,10 +2,10 @@
 #include "hspincl.h"
 %}
 %{{
+module U_tree where
+
 #include "HsVersions.h"
 
-module U_tree where
-IMP_Ubiq() --  debugging consistency check
 import UgenUtil
 
 import U_constr		( U_constr )	-- interface only
@@ -26,7 +26,8 @@ type tree;
 		    ghmodline	: long; >;
 	fixop	: < gfixop	: qid;
 		    gfixinfx	: long;
-		    gfixprec	: long; >;
+		    gfixprec	: long; 
+		    gfixline    : long; >;
 
 	ident	: < gident 	: qid; >;
 	lit 	: < glit	: literal; >;

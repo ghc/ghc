@@ -4,23 +4,14 @@
 \section[PrelVals]{Prelude values the compiler ``knows about''}
 
 \begin{code}
-#include "HsVersions.h"
-
 module PrelVals where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..), mkUnfolding, nullSpecEnv, SpecEnv )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} CoreUnfold ( UnfoldingGuidance(..), mkUnfolding )
-import {-# SOURCE #-} SpecEnv    ( SpecEnv, nullSpecEnv )
-#endif
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(PrelLoop)
-#endif
-
-import Id		( SYN_IE(Id), GenId, mkImported, mkTemplateLocals )
+import Id		( Id, mkImported, mkTemplateLocals )
+import SpecEnv		( SpecEnv, emptySpecEnv )
 
 -- friends:
 import PrelMods
@@ -32,7 +23,7 @@ import CmdLineOpts	( maybe_CompilingGhcInternals )
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
 import Literal		( mkMachInt )
-import Name		( mkWiredInIdName, SYN_IE(Module) )
+import Name		( mkWiredInIdName, Module )
 import PragmaInfo
 import PrimOp		( PrimOp(..) )
 #if __GLASGOW_HASKELL__ >= 202
@@ -40,7 +31,7 @@ import Type
 #else
 import Type		( mkTyVarTy )
 #endif
-import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar, SYN_IE(TyVar) )
+import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar, TyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
 \end{code}
@@ -651,9 +642,9 @@ types passed to the pre-processor with the -genSPECS arg (see ghc.lprl).
 ToDo: Create single mkworld definition which is grabbed here and in ghc.lprl
 
 \begin{code}
-pcGenerateSpecs :: Unique -> Id -> IdInfo -> Type -> SpecEnv
+pcGenerateSpecs :: Unique -> Id -> IdInfo -> Type -> IdSpecEnv
 pcGenerateSpecs key id info ty
-  = nullSpecEnv
+  = emptySpecEnv
 
 {- LATER:
 

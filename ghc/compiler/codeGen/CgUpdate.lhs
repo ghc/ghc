@@ -4,11 +4,9 @@
 \section[CgUpdate]{Manipulating update frames}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgUpdate ( pushUpdateFrame ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CgMonad
 import AbsCSyn

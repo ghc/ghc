@@ -4,8 +4,6 @@
 \section[WwLib]{A library for the ``worker/wrapper'' back-end to the strictness analyser}
 
 \begin{code}
-#include "HsVersions.h"
-
 module WwLib (
 	WwBinding(..),
 
@@ -13,30 +11,29 @@ module WwLib (
 	mkWwBodies, mkWrapper
     ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(List(nub))
+#include "HsVersions.h"
 
 import CoreSyn
-import Id		( GenId, idType, mkSysLocal, dataConArgTys, isDataCon, isNewCon, SYN_IE(Id) )
+import Id		( GenId, idType, mkSysLocal, dataConArgTys, isDataCon, isNewCon, Id )
 import IdInfo		( mkStrictnessInfo, {-??nonAbsentArgs,-} Demand(..) )
 import PrelVals		( aBSENT_ERROR_ID, voidId )
 import TysPrim		( voidTy )
 import SrcLoc		( noSrcLoc )
-import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
-			  splitForAllTyExpandingDicts, splitForAllTy, splitFunTyExpandingDicts,
-			  maybeAppDataTyConExpandingDicts, 
-			  SYN_IE(Type)
+import Type		( isUnpointedType, mkTyVarTys, mkForAllTys, mkFunTys,
+			  splitForAllTys, splitFunTys,
+			  splitAlgTyConApp_maybe, 
+			  Type
 			)
 import TyCon		( isNewTyCon, isDataTyCon )
 import BasicTypes	( NewOrData(..) )
-import TyVar            ( SYN_IE(TyVar) )
+import TyVar            ( TyVar )
 import PprType		( GenType, GenTyVar )
 import UniqSupply	( returnUs, thenUs, thenMaybeUs,
-			  getUniques, getUnique, SYN_IE(UniqSM)
+			  getUniques, getUnique, UniqSM
 			)
-import Util		( zipWithEqual, zipEqual, assertPanic, panic, pprPanic )
-import Pretty
+import Util		( zipWithEqual, zipEqual )
 import Outputable
+import List		( nub )
 \end{code}
 
 %************************************************************************
@@ -239,8 +236,8 @@ mkWrapper fun_ty demands
     in
     getUniques n_wrap_args	`thenUs` \ wrap_uniqs ->
     let
-	(tyvars, tau_ty)   = splitForAllTyExpandingDicts fun_ty
-	(arg_tys, body_ty) = splitFunTyExpandingDicts tau_ty
+	(tyvars, tau_ty)   = splitForAllTys fun_ty
+	(arg_tys, body_ty) = splitFunTys tau_ty
 		-- The "expanding dicts" part here is important, even for the splitForAll
 		-- The imported thing might be a dictionary, such as Functor Foo
 		-- But Functor Foo = forall a b. (a->b) -> Foo a -> Foo b
@@ -266,7 +263,7 @@ mkWwBodies :: [TyVar] -> [Id] -> Type		-- Original fn args and body type
 
 mkWwBodies tyvars args body_ty demands
   | allAbsent demands &&
-    isPrimType body_ty
+    isUnpointedType body_ty
   = 	-- Horrid special case.  If the worker would have no arguments, and the
 	-- function returns a primitive type value, that would make the worker into
 	-- an unboxed value.  We box it by passing a dummy void argument, thus:
@@ -334,13 +331,13 @@ mkWW ((arg,WwUnpack new_or_data True cs) : ds)
   where
     inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
     (arg_tycon, tycon_arg_tys, data_con)
-	= case (maybeAppDataTyConExpandingDicts (idType arg)) of
+	= case (splitAlgTyConApp_maybe (idType arg)) of
 
 	      Just (arg_tycon, tycon_arg_tys, [data_con]) ->
 				     -- The main event: a single-constructor data type
 				     (arg_tycon, tycon_arg_tys, data_con)
 
-	      Just (_, _, data_cons) ->  pprPanic "mk_ww_arg_processing: not one constr (interface files not consistent/up to date ?)" ((ppr PprDebug arg) <+> (ppr PprDebug (idType arg)))
+	      Just (_, _, data_cons) ->  pprPanic "mk_ww_arg_processing: not one constr (interface files not consistent/up to date ?)" ((ppr arg) <+> (ppr (idType arg)))
 	      Nothing		     ->  panic "mk_ww_arg_processing: not datatype"
 
 
@@ -362,7 +359,7 @@ mkWW ((arg,other_demand) : ds)
 
 \begin{code}
 mk_absent_let arg body
-  | not (isPrimType arg_ty)
+  | not (isUnpointedType arg_ty)
   = Let (NonRec arg (mkTyApp (Var aBSENT_ERROR_ID) [arg_ty])) body
   | otherwise
   = panic "WwLib: haven't done mk_absent_let for primitives yet"

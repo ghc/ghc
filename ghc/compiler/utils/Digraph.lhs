@@ -1,15 +1,13 @@
 \begin{code}
-# include "HsVersions.h"
-
 module Digraph(
 
 	-- At present the only one with a "nice" external interface
 	stronglyConnComp, stronglyConnCompR, SCC(..),
 
-	SYN_IE(Graph), SYN_IE(Vertex), 
+	Graph, Vertex, 
 	graphFromEdges, buildG, transposeG, reverseE, outdegree, indegree,
 
-	Tree(..), SYN_IE(Forest),
+	Tree(..), Forest,
 	showTree, showForest,
 
 	dfs, dff,
@@ -22,6 +20,8 @@ module Digraph(
 
     ) where
 
+# include "HsVersions.h"
+
 ------------------------------------------------------------------------------
 -- A version of the graph algorithms described in:
 -- 
@@ -31,7 +31,6 @@ module Digraph(
 -- Also included is some additional code for printing tree structures ...
 ------------------------------------------------------------------------------
 
-#ifdef REALLY_HASKELL_1_3
 
 #define ARR_ELT		(COMMA)
 
@@ -40,26 +39,7 @@ import List
 import ST
 import ArrBase
 import Maybe
-
-# if __GLASGOW_HASKELL__ >= 209
-import GlaExts ( thenST, returnST )
-# endif
-
-#else
-
-#define ARR_ELT 	(:=)
-#define runST		_runST
-#define MutableArray	_MutableArray
-#define Show		Text
-
-import PreludeGlaST
-import Maybes		( mapMaybe )
-
-#endif
-
-import Util	( Ord3(..), 
-		  sortLt
-	 	)
+import Util	( sortLt )
 \end{code}
 
 
@@ -74,7 +54,7 @@ data SCC vertex = AcyclicSCC vertex
 	        | CyclicSCC  [vertex]
 
 stronglyConnComp
-	:: Ord3 key
+	:: Ord key
 	=> [(node, key, [key])]		-- The graph; its ok for the
 					-- out-list to contain keys which arent
 					-- a vertex key, they are ignored
@@ -89,7 +69,7 @@ stronglyConnComp edges
 -- The "R" interface is used when you expect to apply SCC to
 -- the (some of) the result of SCC, so you dont want to lose the dependency info
 stronglyConnCompR
-	:: Ord3 key
+	:: Ord key
 	=> [(node, key, [key])]		-- The graph; its ok for the
 					-- out-list to contain keys which arent
 					-- a vertex key, they are ignored
@@ -132,13 +112,13 @@ edges    :: Graph -> [Edge]
 edges g   = [ (v, w) | v <- vertices g, w <- g!v ]
 
 mapT    :: (Vertex -> a -> b) -> Table a -> Table b
-mapT f t = array (bounds t) [ ARR_ELT v (f v (t!v)) | v <- indices t ]
+mapT f t = array (bounds t) [ (,) v (f v (t!v)) | v <- indices t ]
 
 buildG :: Bounds -> [Edge] -> Graph
 #ifdef REALLY_HASKELL_1_3
 buildG bounds edges = accumArray (flip (:)) [] bounds edges
 #else
-buildG bounds edges = accumArray (flip (:)) [] bounds [ARR_ELT k v | (k,v) <- edges]
+buildG bounds edges = accumArray (flip (:)) [] bounds [(,) k v | (k,v) <- edges]
 #endif
 
 transposeG  :: Graph -> Graph
@@ -158,7 +138,7 @@ indegree  = outdegree . transposeG
 
 \begin{code}
 graphFromEdges
-	:: Ord3 key
+	:: Ord key
 	=> [(node, key, [key])]
 	-> (Graph, Vertex -> (node, key, [key]))
 graphFromEdges edges
@@ -167,13 +147,13 @@ graphFromEdges edges
     max_v      	    = length edges - 1
     bounds          = (0,max_v) :: (Vertex, Vertex)
     sorted_edges    = sortLt lt edges
-    edges1	    = zipWith ARR_ELT [0..] sorted_edges
+    edges1	    = zipWith (,) [0..] sorted_edges
 
-    graph	    = array bounds [ARR_ELT v (mapMaybe key_vertex ks) | ARR_ELT v (_,    _, ks) <- edges1]
-    key_map	    = array bounds [ARR_ELT v k			       | ARR_ELT v (_,    k, _ ) <- edges1]
+    graph	    = array bounds [(,) v (mapMaybe key_vertex ks) | (,) v (_,    _, ks) <- edges1]
+    key_map	    = array bounds [(,) v k			       | (,) v (_,    k, _ ) <- edges1]
     vertex_map	    = array bounds edges1
 
-    (_,k1,_) `lt` (_,k2,_) = case k1 `cmp` k2 of { LT_ -> True; other -> False }
+    (_,k1,_) `lt` (_,k2,_) = case k1 `compare` k2 of { LT -> True; other -> False }
 
     -- key_vertex :: key -> Maybe Vertex
     -- 	returns Nothing for non-interesting vertices
@@ -181,10 +161,10 @@ graphFromEdges edges
 		   where
 		     find a b | a > b 
 			      = Nothing
-		     find a b = case cmp k (key_map ! mid) of
-				   LT_ -> find a (mid-1)
-				   EQ_ -> Just mid
-				   GT_ -> find (mid+1) b
+		     find a b = case compare k (key_map ! mid) of
+				   LT -> find a (mid-1)
+				   EQ -> Just mid
+				   GT -> find (mid+1) b
 			      where
 			 	mid = (a + b) `div` 2
 \end{code}
@@ -264,20 +244,20 @@ generate     :: Graph -> Vertex -> Tree Vertex
 generate g v  = Node v (map (generate g) (g!v))
 
 prune        :: Bounds -> Forest Vertex -> Forest Vertex
-prune bnds ts = runST (mkEmpty bnds  `thenST` \m ->
+prune bnds ts = runST (mkEmpty bnds  >>= \m ->
                        chop m ts)
 
 chop         :: Set s -> Forest Vertex -> ST s (Forest Vertex)
-chop m []     = returnST []
+chop m []     = return []
 chop m (Node v ts : us)
-              = contains m v `thenStrictlyST` \visited ->
+              = contains m v >>= \visited ->
                 if visited then
                   chop m us
                 else
-                  include m v `thenStrictlyST` \_  ->
-                  chop m ts   `thenStrictlyST` \as ->
-                  chop m us   `thenStrictlyST` \bs ->
-                  returnST (Node v as : bs)
+                  include m v >>= \_  ->
+                  chop m ts   >>= \as ->
+                  chop m us   >>= \bs ->
+                  return (Node v as : bs)
 \end{code}
 
 
@@ -302,7 +282,7 @@ preOrd :: Graph -> [Vertex]
 preOrd  = preorderF . dff
 
 tabulate        :: Bounds -> [Vertex] -> Table Int
-tabulate bnds vs = array bnds (zipWith ARR_ELT vs [1..])
+tabulate bnds vs = array bnds (zipWith (,) vs [1..])
 
 preArr          :: Bounds -> Forest Vertex -> Table Int
 preArr bnds      = tabulate bnds . preorderF

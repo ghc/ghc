@@ -8,10 +8,8 @@ Based on @UniqFMs@ (as you would expect).
 Basically, the things need to be in class @Uniquable@.
 
 \begin{code}
-#include "HsVersions.h"
-
 module UniqSet (
-	SYN_IE(UniqSet),    -- abstract type: NOT
+	UniqSet,    -- abstract type: NOT
 
 	mkUniqSet, uniqSetToList, emptyUniqSet, unitUniqSet,
 	addOneToUniqSet, addListToUniqSet,
@@ -20,19 +18,15 @@ module UniqSet (
 	isEmptyUniqSet, filterUniqSet, sizeUniqSet
     ) where
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER( SpecLoop )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} Name
-#endif
 
 import Maybes		( maybeToBool )
 import UniqFM
 import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
-import Outputable	( PprStyle, Outputable(..) )
-import Pretty		( Doc )
-import Util		( Ord3(..) )
+import Outputable	( Outputable(..) )
 
 #if ! OMIT_NATIVE_CODEGEN
 #define IF_NCG(a) a

@@ -8,18 +8,11 @@ We start with the @pprXXX@s with some cross-platform commonality
 @pprInstr@.
 
 \begin{code}
-#include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
 module PprMach ( pprInstr ) where
 
-IMPORT_1_3(Char(isPrint,isDigit))
-#if __GLASGOW_HASKELL__ == 201
-import qualified GHCbase(Addr(..)) -- to see innards
-IMP_Ubiq(){-uitious-}
-#else
-IMP_Ubiq(){-uitious-}
-#endif
+#include "HsVersions.h"
 
 import MachRegs		-- may differ per-platform
 import MachMisc
@@ -30,15 +23,8 @@ import CStrings		( charToC )
 import Maybes		( maybeToBool )
 import OrdList		( OrdList )
 import Stix		( CodeSegment(..), StixTree )
-import Pretty		-- all of it
-
-#if __GLASGOW_HASKELL__ == 201
-a_HASH   x = GHCbase.A# x
-pACK_STR x = packCString x
-#else
-a_HASH   x = A# x
-pACK_STR x = mkFastCharString x --_packCString x
-#endif
+import Char		( isPrint, isDigit )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -50,7 +36,7 @@ pACK_STR x = mkFastCharString x --_packCString x
 For x86, the way we print a register name depends
 on which bit of it we care about.  Yurgh.
 \begin{code}
-pprReg :: IF_ARCH_i386(Size ->,) Reg -> Doc
+pprReg :: IF_ARCH_i386(Size ->,) Reg -> SDoc
 
 pprReg IF_ARCH_i386(s,) r
   = case r of
@@ -59,7 +45,7 @@ pprReg IF_ARCH_i386(s,) r
       other	  -> text (show other)   -- should only happen when debugging
   where
 #if alpha_TARGET_ARCH
-    ppr_reg_no :: FAST_REG_NO -> Doc
+    ppr_reg_no :: FAST_REG_NO -> SDoc
     ppr_reg_no i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("$0");   ILIT( 1) -> SLIT("$1");
@@ -98,7 +84,7 @@ pprReg IF_ARCH_i386(s,) r
       })
 #endif
 #if i386_TARGET_ARCH
-    ppr_reg_no :: Size -> FAST_REG_NO -> Doc
+    ppr_reg_no :: Size -> FAST_REG_NO -> SDoc
     ppr_reg_no B i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%al");  ILIT( 1) -> SLIT("%bl");
@@ -156,7 +142,7 @@ pprReg IF_ARCH_i386(s,) r
       })
 #endif
 #if sparc_TARGET_ARCH
-    ppr_reg_no :: FAST_REG_NO -> Doc
+    ppr_reg_no :: FAST_REG_NO -> SDoc
     ppr_reg_no i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%g0");  ILIT( 1) -> SLIT("%g1");
@@ -203,7 +189,7 @@ pprReg IF_ARCH_i386(s,) r
 %************************************************************************
 
 \begin{code}
-pprSize :: Size -> Doc
+pprSize :: Size -> SDoc
 
 pprSize x = ptext (case x of
 #if alpha_TARGET_ARCH
@@ -237,7 +223,7 @@ pprSize x = ptext (case x of
 --	D   -> SLIT("d") UNUSED
 	DF  -> SLIT("d")
     )
-pprStSize :: Size -> Doc
+pprStSize :: Size -> SDoc
 pprStSize x = ptext (case x of
 	B   -> SLIT("b")
 	BU  -> SLIT("b")
@@ -258,7 +244,7 @@ pprStSize x = ptext (case x of
 %************************************************************************
 
 \begin{code}
-pprCond :: Cond -> Doc
+pprCond :: Cond -> SDoc
 
 pprCond c = ptext (case c of {
 #if alpha_TARGET_ARCH
@@ -300,7 +286,7 @@ pprCond c = ptext (case c of {
 %************************************************************************
 
 \begin{code}
-pprImm :: Imm -> Doc
+pprImm :: Imm -> SDoc
 
 pprImm (ImmInt i)     = int i
 pprImm (ImmInteger i) = integer i
@@ -314,12 +300,12 @@ pprImm (ImmLab s) | underscorePrefix = (<>) (char '_') s
 pprImm (LO i)
   = hcat [ pp_lo, pprImm i, rparen ]
   where
-    pp_lo = ptext (pACK_STR (a_HASH "%lo("#))
+    pp_lo = ptext SLIT("%lo(")
 
 pprImm (HI i)
   = hcat [ pp_hi, pprImm i, rparen ]
   where
-    pp_hi = ptext (pACK_STR (a_HASH "%hi("#))
+    pp_hi = ptext SLIT("%hi(")
 #endif
 \end{code}
 
@@ -330,7 +316,7 @@ pprImm (HI i)
 %************************************************************************
 
 \begin{code}
-pprAddr :: Address -> Doc
+pprAddr :: MachRegsAddr -> SDoc
 
 #if alpha_TARGET_ARCH
 pprAddr (AddrReg r) = parens (pprReg r)
@@ -353,7 +339,7 @@ pprAddr (ImmAddr imm off)
     else
 	hcat [pp_imm, char '+', int off]
 
-pprAddr (Address base index displacement)
+pprAddr (AddrBaseIndex base index displacement)
   = let
 	pp_disp  = ppr_disp displacement
 	pp_off p = (<>) pp_disp (parens p)
@@ -403,7 +389,7 @@ pprAddr (AddrRegImm r1 imm)
 %************************************************************************
 
 \begin{code}
-pprInstr :: Instr -> Doc
+pprInstr :: Instr -> SDoc
 
 --pprInstr (COMMENT s) = (<>) (ptext SLIT("# "))   (ptext s)
 pprInstr (COMMENT s) = empty -- nuke 'em
@@ -449,7 +435,7 @@ pprInstr (ASCII False{-no backslash conversion-} str)
 pprInstr (ASCII True str)
   = (<>) (text "\t.ascii \"") (asciify str 60)
   where
-    asciify :: String -> Int -> Doc
+    asciify :: String -> Int -> SDoc
 
     asciify [] _ = text "\\0\""
     asciify s     n | n <= 0 = (<>) (text "\"\n\t.ascii \"") (asciify s 60)
@@ -834,8 +820,8 @@ pprInstr (FUNBEGIN clab)
     where
 	pp_lab = pprCLabel_asm clab
 
-	pp_ldgp  = ptext (pACK_STR (a_HASH ":\n\tldgp $29,0($27)\n"#))
-	pp_frame = ptext (pACK_STR (a_HASH "..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1"#))
+	pp_ldgp  = ptext SLIT(":\n\tldgp $29,0($27)\n")
+	pp_frame = ptext SLIT("..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1")
 
 pprInstr (FUNEND clab)
   = (<>) (ptext SLIT("\t.align 4\n\t.end ")) (pprCLabel_asm clab)
@@ -843,12 +829,12 @@ pprInstr (FUNEND clab)
 
 Continue with Alpha-only printing bits and bobs:
 \begin{code}
-pprRI :: RI -> Doc
+pprRI :: RI -> SDoc
 
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprRegRIReg :: FAST_STRING -> Reg -> RI -> Reg -> Doc
+pprRegRIReg :: FAST_STRING -> Reg -> RI -> Reg -> SDoc
 
 pprRegRIReg name reg1 ri reg2
   = hcat [
@@ -862,7 +848,7 @@ pprRegRIReg name reg1 ri reg2
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> SDoc
 
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
@@ -904,13 +890,13 @@ pprInstr (MOVSX size src dst) = pprSizeOpOpCoerce SLIT("movxs") L size src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
-pprInstr (LEA size (OpAddr (Address src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
   | reg1 == reg3
   = pprSizeOpOp SLIT("add") size (OpReg reg2) dst
-pprInstr (LEA size (OpAddr (Address src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
   | reg2 == reg3
   = pprSizeOpOp SLIT("add") size (OpReg reg1) dst
-pprInstr (LEA size (OpAddr (Address src1@(Just reg1) Nothing displ)) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(Just reg1) Nothing displ)) dst@(OpReg reg3))
   | reg1 == reg3
   = pprInstr (ADD size (OpImm displ) dst)
 pprInstr (LEA size src dst) = pprSizeOpOp SLIT("lea") size src dst
@@ -1019,16 +1005,16 @@ pprInstr FNOP = ptext SLIT("")
 
 Continue with I386-only printing bits and bobs:
 \begin{code}
-pprDollImm :: Imm -> Doc
+pprDollImm :: Imm -> SDoc
 
 pprDollImm i     = hcat [ ptext SLIT("$"), pprImm i]
 
-pprOperand :: Size -> Operand -> Doc
+pprOperand :: Size -> Operand -> SDoc
 pprOperand s (OpReg r) = pprReg s r
 pprOperand s (OpImm i) = pprDollImm i
 pprOperand s (OpAddr ea) = pprAddr ea
 
-pprSizeOp :: FAST_STRING -> Size -> Operand -> Doc
+pprSizeOp :: FAST_STRING -> Size -> Operand -> SDoc
 pprSizeOp name size op1
   = hcat [
     	char '\t',
@@ -1038,7 +1024,7 @@ pprSizeOp name size op1
 	pprOperand size op1
     ]
 
-pprSizeOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
+pprSizeOpOp :: FAST_STRING -> Size -> Operand -> Operand -> SDoc
 pprSizeOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1050,7 +1036,7 @@ pprSizeOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeByteOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
+pprSizeByteOpOp :: FAST_STRING -> Size -> Operand -> Operand -> SDoc
 pprSizeByteOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1062,7 +1048,7 @@ pprSizeByteOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeOpReg :: FAST_STRING -> Size -> Operand -> Reg -> Doc
+pprSizeOpReg :: FAST_STRING -> Size -> Operand -> Reg -> SDoc
 pprSizeOpReg name size op1 reg
   = hcat [
     	char '\t',
@@ -1074,7 +1060,7 @@ pprSizeOpReg name size op1 reg
 	pprReg size reg
     ]
 
-pprSizeAddr :: FAST_STRING -> Size -> Address -> Doc
+pprSizeAddr :: FAST_STRING -> Size -> MachRegsAddr -> SDoc
 pprSizeAddr name size op
   = hcat [
     	char '\t',
@@ -1084,7 +1070,7 @@ pprSizeAddr name size op
 	pprAddr op
     ]
 
-pprSizeAddrReg :: FAST_STRING -> Size -> Address -> Reg -> Doc
+pprSizeAddrReg :: FAST_STRING -> Size -> MachRegsAddr -> Reg -> SDoc
 pprSizeAddrReg name size op dst
   = hcat [
     	char '\t',
@@ -1096,7 +1082,7 @@ pprSizeAddrReg name size op dst
 	pprReg size dst
     ]
 
-pprOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
+pprOpOp :: FAST_STRING -> Size -> Operand -> Operand -> SDoc
 pprOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1106,7 +1092,7 @@ pprOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeOpOpCoerce :: FAST_STRING -> Size -> Size -> Operand -> Operand -> Doc
+pprSizeOpOpCoerce :: FAST_STRING -> Size -> Size -> Operand -> Operand -> SDoc
 pprSizeOpOpCoerce name size1 size2 op1 op2
   = hcat [ char '\t', ptext name, space,
 	pprOperand size1 op1,
@@ -1114,7 +1100,7 @@ pprSizeOpOpCoerce name size1 size2 op1 op2
 	pprOperand size2 op2
     ]
 
-pprCondInstr :: FAST_STRING -> Cond -> Doc -> Doc
+pprCondInstr :: FAST_STRING -> Cond -> SDoc -> SDoc
 pprCondInstr name cond arg
   = hcat [ char '\t', ptext name, pprCond cond, space, arg]
 
@@ -1326,11 +1312,11 @@ pprInstr (CALL imm n _)
 
 Continue with SPARC-only printing bits and bobs:
 \begin{code}
-pprRI :: RI -> Doc
+pprRI :: RI -> SDoc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Doc
+pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> SDoc
 pprSizeRegReg name size reg1 reg2
   = hcat [
     	char '\t',
@@ -1343,7 +1329,7 @@ pprSizeRegReg name size reg1 reg2
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> SDoc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
     	char '\t',
@@ -1358,7 +1344,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 	pprReg reg3
     ]
 
-pprRegRIReg :: FAST_STRING -> Bool -> Reg -> RI -> Reg -> Doc
+pprRegRIReg :: FAST_STRING -> Bool -> Reg -> RI -> Reg -> SDoc
 pprRegRIReg name b reg1 ri reg2
   = hcat [
 	char '\t',
@@ -1371,7 +1357,7 @@ pprRegRIReg name b reg1 ri reg2
 	pprReg reg2
     ]
 
-pprRIReg :: FAST_STRING -> Bool -> RI -> Reg -> Doc
+pprRIReg :: FAST_STRING -> Bool -> RI -> Reg -> SDoc
 pprRIReg name b ri reg1
   = hcat [
 	char '\t',
@@ -1382,10 +1368,10 @@ pprRIReg name b ri reg1
 	pprReg reg1
     ]
 
-pp_ld_lbracket    = ptext (pACK_STR (a_HASH "\tld\t["#))
-pp_rbracket_comma = ptext (pACK_STR (a_HASH "],"#))
-pp_comma_lbracket = ptext (pACK_STR (a_HASH ",["#))
-pp_comma_a	  = ptext (pACK_STR (a_HASH ",a"#))
+pp_ld_lbracket    = ptext SLIT("\tld\t[")
+pp_rbracket_comma = ptext SLIT("],")
+pp_comma_lbracket = ptext SLIT(",[")
+pp_comma_a	  = ptext SLIT(",a")
 
 #endif {-sparc_TARGET_ARCH-}
 \end{code}

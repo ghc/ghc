@@ -4,16 +4,9 @@
 \section[Simplify]{The main module of the simplifier}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Simplify ( simplTopBinds, simplExpr, simplBind ) where
 
-IMPORT_1_3(List(partition))
-
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
-#endif
+#include "HsVersions.h"
 
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
@@ -38,11 +31,6 @@ import IdInfo		( willBeDemanded, noDemandInfo, DemandInfo, ArityInfo(..),
 import Literal		( isNoRepLit )
 import Maybes		( maybeToBool )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{- instance Outputable -} )
-#if __GLASGOW_HASKELL__ <= 30
-import PprCore		( GenCoreArg, GenCoreExpr )
-#endif
-import TyVar		( GenTyVar {- instance Eq -} )
-import Pretty		--( ($$) )
 import PrimOp		( primOpOkForSpeculation, PrimOp(..) )
 import SimplCase	( simplCase, bindLargeRhs )
 import SimplEnv
@@ -50,13 +38,14 @@ import SimplMonad
 import SimplVar		( completeVar )
 import Unique		( Unique )
 import SimplUtils
-import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, mkFunTys, maybeAppDataTyCon,
-			  splitFunTy, splitFunTyExpandingDicts, getFunTy_maybe, eqTy
+import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, mkFunTys, splitAlgTyConApp_maybe,
+			  splitFunTys, splitFunTy_maybe, isUnpointedType
 			)
 import TysPrim		( realWorldStatePrimTy )
-import Outputable	( PprStyle(..), Outputable(..) )
-import Util		( SYN_IE(Eager), appEager, returnEager, runEager, mapEager,
-			  isSingleton, zipEqual, zipWithEqual, mapAndUnzip, panic, pprPanic, assertPanic, pprTrace )
+import Util		( Eager, appEager, returnEager, runEager, mapEager,
+			  isSingleton, zipEqual, zipWithEqual, mapAndUnzip
+			)
+import Outputable	
 \end{code}
 
 The controlling flags, and what they do
@@ -339,8 +328,7 @@ First the case when it's applied to an argument.
 
 \begin{code}
 simplExpr env (Lam (TyBinder tyvar) body) (TyArg ty : args) result_ty
-  = -- ASSERT(not (isPrimType ty))
-    tick TyBetaReduction	`thenSmpl_`
+  = tick TyBetaReduction	`thenSmpl_`
     simplExpr (extendTyEnv env tyvar ty) body args result_ty
 \end{code}
 
@@ -434,7 +422,7 @@ We must be careful to maintain the scc counts ...
 
 \begin{code}
 simplExpr env (SCC cc1 (SCC cc2 expr)) args result_ty
-  | not (isSccCountCostCentre cc2) && case cmpCostCentre cc1 cc2 of { EQ_ -> True; _ -> False }
+  | not (isSccCountCostCentre cc2) && case cmpCostCentre cc1 cc2 of { EQ -> True; _ -> False }
     	-- eliminate inner scc if no call counts and same cc as outer
   = simplExpr env (SCC cc1 expr) args result_ty
 
@@ -508,7 +496,7 @@ simplRhsExpr
 
 \begin{code}
 simplRhsExpr env binder@(id,occ_info) rhs new_id
-  | maybeToBool (maybeAppDataTyCon rhs_ty)
+  | maybeToBool (splitAlgTyConApp_maybe rhs_ty)
 	-- Deal with the data type case, in which case the elaborate
 	-- eta-expansion nonsense is really quite a waste of time.
   = simplExpr rhs_env rhs [] rhs_ty		`thenSmpl` \ rhs' ->
@@ -516,8 +504,6 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
 
   | otherwise	-- OK, use the big hammer
   = 	-- Deal with the big lambda part
-    ASSERT( null uvars )	-- For now
-
     mapSmpl cloneTyVarSmpl tyvars			`thenSmpl` \ tyvars' ->
     let
 	new_tys  = mkTyVarTys tyvars'
@@ -551,7 +537,7 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
     env1 | costsAreSubsumed current_cc = setEnclosingCC env useCurrentCostCentre
 	 | otherwise		       = env
 
-    (uvars, tyvars, body) = collectUsageAndTyBinders rhs
+    (tyvars, body) = collectTyBinders rhs
 \end{code}
 
 
@@ -658,11 +644,11 @@ simplValLam env expr min_no_of_args expr_ty
   | otherwise				-- Eta expansion possible
   = -- A SSERT( no_of_extra_binders <= length potential_extra_binder_tys )
     (if not ( no_of_extra_binders <= length potential_extra_binder_tys ) then
-	pprTrace "simplValLam" (vcat [ppr PprDebug expr, 
-					  ppr PprDebug expr_ty,
-					  ppr PprDebug binders,
+	pprTrace "simplValLam" (vcat [ppr expr, 
+					  ppr expr_ty,
+					  ppr binders,
 					  int no_of_extra_binders,
-					  ppr PprDebug potential_extra_binder_tys])
+					  ppr potential_extra_binder_tys])
     else \x -> x) $
 
     tick EtaExpansion			`thenSmpl_`
@@ -680,11 +666,11 @@ simplValLam env expr min_no_of_args expr_ty
   where
     (binders,body)	       = collectValBinders expr
     no_of_binders	       = length binders
-    (arg_tys, res_ty)	       = splitFunTyExpandingDicts expr_ty
+    (arg_tys, res_ty)	       = splitFunTys expr_ty
     potential_extra_binder_tys = (if not (no_of_binders <= length arg_tys) then
-					pprTrace "simplValLam" (vcat [ppr PprDebug expr, 
-									  ppr PprDebug expr_ty,
-									  ppr PprDebug binders])
+					pprTrace "simplValLam" (vcat [ppr expr, 
+									  ppr expr_ty,
+									  ppr binders])
 				  else \x->x) $
 				 drop no_of_binders arg_tys
     body_ty		       = mkFunTys potential_extra_binder_tys res_ty
@@ -720,8 +706,8 @@ simplValLam env expr min_no_of_args expr_ty
 				-- but usually doesn't
 			   `max`
 			   case potential_extra_binder_tys of
-				[ty] | ty `eqTy` realWorldStatePrimTy -> 1
-				other				      -> 0
+				[ty] | ty == realWorldStatePrimTy -> 1
+				other				  -> 0
 \end{code}
 
 
@@ -923,22 +909,29 @@ simplNonRec env binder@(id,occ_info) rhs body_c body_ty
   | idWantsToBeINLINEd id
   = complete_bind env rhs	-- Don't mess about with floating or let-to-case on
 				-- INLINE things
-  | otherwise
-  = simpl_bind env rhs
-  where
-    -- Try let-to-case; see notes below about let-to-case
-    simpl_bind env rhs | try_let_to_case &&
-			 will_be_demanded &&
-		         (rhs_is_bot ||
-			  not rhs_is_whnf &&	-- Don't do it if RHS is a constr applicn 
-		          singleConstructorType rhs_ty
-				-- Only do let-to-case for single constructor types. 
-				-- For other types we defer doing it until the tidy-up phase at
-				-- the end of simplification.
-			 )
-      = tick Let2Case				`thenSmpl_`
-        simplCase env rhs (AlgAlts [] (BindDefault binder (Var id)))
-			  (\env rhs -> complete_bind env rhs) body_ty
+
+	-- Do let-to-case right away for unpointed types
+	-- These shouldn't occur much, but do occur right after desugaring,
+	-- because we havn't done dependency analysis at that point, so
+	-- we can't trivially do let-to-case (because there may be some unboxed
+	-- things bound in letrecs that aren't really recursive).
+  | isUnpointedType rhs_ty && not rhs_is_whnf
+  = simplCase env rhs (PrimAlts [] (BindDefault binder (Var id)))
+		      (\env rhs -> complete_bind env rhs) body_ty
+
+	-- Try let-to-case; see notes below about let-to-case
+  | try_let_to_case &&
+    will_be_demanded &&
+    (  rhs_is_bot
+    || (not rhs_is_whnf && singleConstructorType rhs_ty)
+		-- Don't do let-to-case if the RHS is a constructor application.
+		-- Even then only do it for single constructor types. 
+		-- For other types we defer doing it until the tidy-up phase at
+		-- the end of simplification.
+    )
+  = tick Let2Case				`thenSmpl_`
+    simplCase env rhs (AlgAlts [] (BindDefault binder (Var id)))
+		      (\env rhs -> complete_bind env rhs) body_ty
 		-- OLD COMMENT:  [now the new RHS is only "x" so there's less worry]
 		-- NB: it's tidier to call complete_bind not simpl_bind, else
 		-- we nearly end up in a loop.  Consider:
@@ -948,6 +941,9 @@ simplNonRec env binder@(id,occ_info) rhs body_c body_ty
 		-- Now, the inner let is a let-to-case target again!  Actually, since
 		-- the RHS is in WHNF it won't happen, but it's a close thing!
 
+  | otherwise
+  = simpl_bind env rhs
+  where
     -- Try let-from-let
     simpl_bind env (Let bind rhs) | let_floating_ok
       = tick LetFloatFromLet                    `thenSmpl_`
@@ -1382,14 +1378,14 @@ computeResultType env expr_ty orig_args
     let
 	go ty [] = ty
 	go ty (TyArg ty_arg : args) = go (mkAppTy ty ty_arg) args
-	go ty (a:args) | isValArg a = case (getFunTy_maybe ty) of
+	go ty (a:args) | isValArg a = case (splitFunTy_maybe ty) of
 					Just (_, res_ty) -> go res_ty args
 					Nothing	         -> 
 					    pprPanic "computeResultType" (vcat [
-									ppr PprDebug (a:args),
-									ppr PprDebug orig_args,
-									ppr PprDebug expr_ty',
-									ppr PprDebug ty])
+									ppr (a:args),
+									ppr orig_args,
+									ppr expr_ty',
+									ppr ty])
     in
     go expr_ty' orig_args
 

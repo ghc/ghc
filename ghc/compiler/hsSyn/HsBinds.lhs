@@ -6,42 +6,28 @@
 Datatype for: @HsBinds@, @Bind@, @Sig@, @MonoBinds@.
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsBinds where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
--- friends:
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(HsLoop)	( pprMatches, pprGRHSsAndBinds,
-			  Match, GRHSsAndBinds,
-			  pprExpr, HsExpr )
-#endif
-
-import HsPragmas	( GenPragmas, ClassOpPragmas )
-import HsTypes		( HsType )
-import CoreSyn		( SYN_IE(CoreExpr) )
-
---others:
-import Id		( SYN_IE(DictVar), SYN_IE(Id), GenId )
-import Name		( OccName, NamedThing(..) )
-import Outputable	( interpp'SP, ifnotPprForUser, pprQuote,
-			  Outputable(..){-instance * (,)-}
-			)
-import PprCore		--( GenCoreExpr {- instance Outputable -} )
-import PprType		( GenTyVar {- instance Outputable -} )
-import Pretty
-import Bag
-import SrcLoc		( SrcLoc{-instances-} )
-import TyVar		( GenTyVar{-instances-} )
-import Unique		( Unique {- instance Eq -} )
-
-#if __GLASGOW_HASKELL__ >= 202
 import {-# SOURCE #-} HsExpr    ( pprExpr, HsExpr )
 import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSsAndBinds, GRHSsAndBinds )
-#endif
 
+-- friends:
+import HsPragmas	( GenPragmas, ClassOpPragmas )
+import HsTypes		( HsType )
+import CoreSyn		( CoreExpr )
+import PprCore		()	   -- Instances for Outputable
+
+--others:
+import Id		( DictVar, Id, GenId )
+import Name		( OccName, NamedThing(..) )
+import BasicTypes	( RecFlag(..) )
+import Outputable	
+import Bag
+import SrcLoc		( SrcLoc )
+import Type		( GenType )
+import TyVar		( GenTyVar )
 \end{code}
 
 %************************************************************************
@@ -59,23 +45,19 @@ grammar.
 Collections of bindings, created by dependency analysis and translation:
 
 \begin{code}
-data HsBinds tyvar uvar id pat		-- binders and bindees
+data HsBinds flexi id pat		-- binders and bindees
   = EmptyBinds
 
-  | ThenBinds	(HsBinds tyvar uvar id pat)
-		(HsBinds tyvar uvar id pat)
+  | ThenBinds	(HsBinds flexi id pat)
+		(HsBinds flexi id pat)
 
-  | MonoBind 	(MonoBinds tyvar uvar id pat)
+  | MonoBind 	(MonoBinds flexi id pat)
 		[Sig id]		-- Empty on typechecker output
 		RecFlag
-
-type RecFlag = Bool
-recursive    = True
-nonRecursive = False
 \end{code}
 
 \begin{code}
-nullBinds :: HsBinds tyvar uvar id pat -> Bool
+nullBinds :: HsBinds flexi id pat -> Bool
 
 nullBinds EmptyBinds		= True
 nullBinds (ThenBinds b1 b2)	= nullBinds b1 && nullBinds b2
@@ -83,26 +65,22 @@ nullBinds (MonoBind b _ _)	= nullMonoBinds b
 \end{code}
 
 \begin{code}
-instance (Outputable pat, NamedThing id, Outputable id,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (HsBinds tyvar uvar id pat) where
+instance (Outputable pat, NamedThing id, Outputable id) =>
+		Outputable (HsBinds flexi id pat) where
+    ppr binds = ppr_binds binds
 
-    ppr sty binds = pprQuote sty (\ sty -> ppr_binds sty binds)
-
-ppr_binds sty EmptyBinds = empty
-ppr_binds sty (ThenBinds binds1 binds2)
-     = ($$) (ppr_binds sty binds1) (ppr_binds sty binds2)
-ppr_binds sty (MonoBind bind sigs is_rec)
-     = vcat [
-	ifnotPprForUser sty (ptext rec_str),
-	if null sigs
-	  then empty
-	  else vcat (map (ppr sty) sigs),
-	ppr sty bind
+ppr_binds EmptyBinds = empty
+ppr_binds (ThenBinds binds1 binds2)
+     = ($$) (ppr_binds binds1) (ppr_binds binds2)
+ppr_binds (MonoBind bind sigs is_rec)
+     = vcat [ifNotPprForUser (ptext rec_str),
+     	     vcat (map ppr sigs),
+	     ppr bind
        ]
      where
-       rec_str | is_rec    = SLIT("{- rec -}")
-               | otherwise = SLIT("{- nonrec -}")
+       rec_str = case is_rec of
+		   Recursive    -> SLIT("{- rec -}")
+		   NonRecursive -> SLIT("{- nonrec -}")
 \end{code}
 
 %************************************************************************
@@ -114,32 +92,32 @@ ppr_binds sty (MonoBind bind sigs is_rec)
 Global bindings (where clauses)
 
 \begin{code}
-data MonoBinds tyvar uvar id pat
+data MonoBinds flexi id pat
   = EmptyMonoBinds
 
-  | AndMonoBinds    (MonoBinds tyvar uvar id pat)
-		    (MonoBinds tyvar uvar id pat)
+  | AndMonoBinds    (MonoBinds flexi id pat)
+		    (MonoBinds flexi id pat)
 
   | PatMonoBind     pat
-		    (GRHSsAndBinds tyvar uvar id pat)
+		    (GRHSsAndBinds flexi id pat)
 		    SrcLoc
 
   | FunMonoBind     id
 		    Bool			-- True => infix declaration
-		    [Match tyvar uvar id pat]	-- must have at least one Match
+		    [Match flexi id pat]	-- must have at least one Match
 		    SrcLoc
 
   | VarMonoBind	    id			-- TRANSLATION
-		    (HsExpr tyvar uvar id pat)
+		    (HsExpr flexi id pat)
 
   | CoreMonoBind    id			-- TRANSLATION
 		    CoreExpr		-- No zonking; this is a final CoreExpr with Ids and Types!
 
   | AbsBinds			-- Binds abstraction; TRANSLATION
-		[tyvar]			  -- Type variables
+		[GenTyVar flexi]	  -- Type variables
 		[id]			  -- Dicts
-		[([tyvar], id, id)]	  -- (type variables, polymorphic, momonmorphic) triples
-		(MonoBinds tyvar uvar id pat)	 -- The "business end"
+		[([GenTyVar flexi], id, id)]  -- (type variables, polymorphic, momonmorphic) triples
+		(MonoBinds flexi id pat)      -- The "business end"
 
 	-- Creates bindings for *new* (polymorphic, overloaded) locals
 	-- in terms of *old* (monomorphic, non-overloaded) ones.
@@ -174,46 +152,45 @@ So the desugarer tries to do a better job:
 				      in (fm,gm)
 
 \begin{code}
-nullMonoBinds :: MonoBinds tyvar uvar id pat -> Bool
+nullMonoBinds :: MonoBinds flexi id pat -> Bool
 
 nullMonoBinds EmptyMonoBinds	     = True
 nullMonoBinds (AndMonoBinds bs1 bs2) = nullMonoBinds bs1 && nullMonoBinds bs2
 nullMonoBinds other_monobind	     = False
 
-andMonoBinds :: [MonoBinds tyvar uvar id pat] -> MonoBinds tyvar uvar id pat
+andMonoBinds :: [MonoBinds flexi id pat] -> MonoBinds flexi id pat
 andMonoBinds binds = foldr AndMonoBinds EmptyMonoBinds binds
 \end{code}
 
 \begin{code}
-instance (NamedThing id, Outputable id, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (MonoBinds tyvar uvar id pat) where
-    ppr sty mbind = pprQuote sty (\ sty -> ppr_monobind sty mbind)
+instance (NamedThing id, Outputable id, Outputable pat) =>
+		Outputable (MonoBinds flexi id pat) where
+    ppr mbind = ppr_monobind mbind
 
 
-ppr_monobind sty EmptyMonoBinds = empty
-ppr_monobind sty (AndMonoBinds binds1 binds2)
-      = ($$) (ppr_monobind sty binds1) (ppr_monobind sty binds2)
+ppr_monobind EmptyMonoBinds = empty
+ppr_monobind (AndMonoBinds binds1 binds2)
+      = ($$) (ppr_monobind binds1) (ppr_monobind binds2)
 
-ppr_monobind sty (PatMonoBind pat grhss_n_binds locn)
-      = sep [ppr sty pat, nest 4 (pprGRHSsAndBinds sty False grhss_n_binds)]
+ppr_monobind (PatMonoBind pat grhss_n_binds locn)
+      = sep [ppr pat, nest 4 (pprGRHSsAndBinds False grhss_n_binds)]
 
-ppr_monobind sty (FunMonoBind fun inf matches locn)
-      = pprMatches sty (False, ppr sty fun) matches
+ppr_monobind (FunMonoBind fun inf matches locn)
+      = pprMatches (False, ppr fun) matches
       -- ToDo: print infix if appropriate
 
-ppr_monobind sty (VarMonoBind name expr)
-      = sep [ppr sty name <+> equals, nest 4 (pprExpr sty expr)]
+ppr_monobind (VarMonoBind name expr)
+      = sep [ppr name <+> equals, nest 4 (pprExpr expr)]
 
-ppr_monobind sty (CoreMonoBind name expr)
-      = sep [ppr sty name <+> equals, nest 4 (ppr sty expr)]
+ppr_monobind (CoreMonoBind name expr)
+      = sep [ppr name <+> equals, nest 4 (ppr expr)]
 
-ppr_monobind sty (AbsBinds tyvars dictvars exports val_binds)
+ppr_monobind (AbsBinds tyvars dictvars exports val_binds)
      = ($$) (sep [ptext SLIT("AbsBinds"),
-		  brackets (interpp'SP sty tyvars),
-		  brackets (interpp'SP sty dictvars),
-		  brackets (interpp'SP sty exports)])
-	       (nest 4 (ppr sty val_binds))
+		  brackets (interpp'SP tyvars),
+		  brackets (interpp'SP dictvars),
+		  brackets (interpp'SP exports)])
+	       (nest 4 (ppr val_binds))
 \end{code}
 
 %************************************************************************
@@ -254,29 +231,29 @@ data Sig name
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (Sig name) where
-    ppr sty sig = pprQuote sty (\ sty -> ppr_sig sty sig)
+    ppr sig = ppr_sig sig
 
 
-ppr_sig sty (Sig var ty _)
-      = sep [ppr sty var <+> ptext SLIT("::"),
-	     nest 4 (ppr sty ty)]
+ppr_sig (Sig var ty _)
+      = sep [ppr var <+> ptext SLIT("::"),
+	     nest 4 (ppr ty)]
 
-ppr_sig sty (ClassOpSig var _ ty _)
-      = sep [ppr sty (getOccName var) <+> ptext SLIT("::"),
-	     nest 4 (ppr sty ty)]
+ppr_sig (ClassOpSig var _ ty _)
+      = sep [ppr (getOccName var) <+> ptext SLIT("::"),
+	     nest 4 (ppr ty)]
 
-ppr_sig sty (SpecSig var ty using _)
-      = sep [ hsep [text "{-# SPECIALIZE", ppr sty var, ptext SLIT("::")],
-	      nest 4 (hsep [ppr sty ty, pp_using using, text "#-}"])
+ppr_sig (SpecSig var ty using _)
+      = sep [ hsep [text "{-# SPECIALIZE", ppr var, ptext SLIT("::")],
+	      nest 4 (hsep [ppr ty, pp_using using, text "#-}"])
 	]
       where
 	pp_using Nothing   = empty
-	pp_using (Just me) = hsep [char '=', ppr sty me]
+	pp_using (Just me) = hsep [char '=', ppr me]
 
-ppr_sig sty (InlineSig var _)
-        = hsep [text "{-# INLINE", ppr sty var, text "#-}"]
+ppr_sig (InlineSig var _)
+        = hsep [text "{-# INLINE", ppr var, text "#-}"]
 
-ppr_sig sty (MagicUnfoldingSig var str _)
-      = hsep [text "{-# MAGIC_UNFOLDING", ppr sty var, ptext str, text "#-}"]
+ppr_sig (MagicUnfoldingSig var str _)
+      = hsep [text "{-# MAGIC_UNFOLDING", ppr var, ptext str, text "#-}"]
 \end{code}
 

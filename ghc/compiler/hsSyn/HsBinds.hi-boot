@@ -1,7 +1,7 @@
-_interface_ HsBinds 1
+d_interface_ HsBinds 1
 _exports_
 HsBinds HsBinds nullBinds;
 _instances_
 _declarations_
-1 data HsBinds a b c d ;
-1 nullBinds _:_ _forall_ [a b c d] => HsBinds.HsBinds a b c d -> PrelBase.Bool ;;
+1 data HsBinds f i p ;
+1 nullBinds _:_ _forall_ [f i p] => HsBinds.HsBinds f i p -> PrelBase.Bool ;;

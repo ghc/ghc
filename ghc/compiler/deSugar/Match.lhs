@@ -5,50 +5,39 @@
 \section[Main_match]{The @match@ function}
 
 \begin{code}
+module Match ( match, matchExport, matchWrapper, matchSimply ) where
+
 #include "HsVersions.h"
 
-module Match ( matchExport, match, matchWrapper, matchSimply ) where
-
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)	-- here for paranoia-checking reasons
-			-- and to break dsExpr/dsBinds-ish loop
-#else
 import {-# SOURCE #-} DsExpr  ( dsExpr  )
 import {-# SOURCE #-} DsBinds ( dsBinds )
-#endif
 
 import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappingPatterns,
 			  opt_PprUserLength,opt_WarnSimplePatterns
      			)
 import HsSyn		
-import TcHsSyn		( SYN_IE(TypecheckedPat), SYN_IE(TypecheckedMatch),
-			  SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr)	)
+import TcHsSyn		( TypecheckedPat, TypecheckedMatch,
+			  TypecheckedHsBinds, TypecheckedHsExpr	)
 import DsHsSyn		( outPatType, collectTypedPatBinders )
-import Check            ( check, SYN_IE(ExhaustivePat), SYN_IE(WarningPat), BoxedString )
+import Check            ( check, ExhaustivePat, WarningPat, BoxedString )
 import CoreSyn
 import CoreUtils	( coreExprType )
 import DsMonad
 import DsGRHSs		( dsGRHSs )
 import DsUtils
-import ErrUtils 	( SYN_IE(Warning) )
-import FieldLabel	( FieldLabel {- Eq instance -} )
 import Id		( idType, dataConFieldLabels,
 			  dataConArgTys, recordSelectorFieldLabel,
-			  GenId{-instance-}, SYN_IE(Id)
+			  Id
 			)
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 import Name		( Name {--O only-} )
-import Outputable	( PprStyle(..), Outputable(..), pprQuote )
 import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )        
-import Pretty		
 import PrelVals		( pAT_ERROR_ID )
-import SrcLoc		( noSrcLoc, SrcLoc )
-import Type		( isPrimType, eqTy, getAppDataTyConExpandingDicts,
-			  instantiateTauTy, SYN_IE(Type)
+import Type		( isUnpointedType, splitAlgTyConApp,
+			  instantiateTauTy, Type
 			)
-import TyVar		( GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
+import TyVar		( TyVar )
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
 			  addrPrimTy, wordPrimTy
 			)
@@ -58,9 +47,8 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  doubleDataCon, stringTy, addrTy,
 			  addrDataCon, wordTy, wordDataCon
 			)
-import Unique		( Unique{-instance Eq-} )
 import UniqSet
-import Util		( panic, pprPanic, assertPanic )
+import Outputable
 \end{code}
 
 This function is a wrapper of @match@, it must be called from all the parts where 
@@ -111,64 +99,64 @@ The next two functions creates the warning message.
 dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
 dsShadowWarn ctx@(DsMatchContext kind _ _) qs = dsWarn warn 
 	where
-	  warn sty | length qs > maximum_output = 
-               hang (pp_context sty ctx (ptext SLIT("are overlapped")))
-                    12 ((vcat $ map (ppr_eqn kind sty) (take maximum_output qs))
+	  warn | length qs > maximum_output
+               = hang (pp_context ctx (ptext SLIT("are overlapped")))
+                    12 ((vcat $ map (ppr_eqn kind) (take maximum_output qs))
                         $$ ptext SLIT("..."))
-          warn sty =  
-               hang (pp_context sty ctx (ptext SLIT("are overlapped")))
-                    12 (vcat $ map (ppr_eqn kind sty) qs)
+	       | otherwise
+               = hang (pp_context ctx (ptext SLIT("are overlapped")))
+                    12 (vcat $ map (ppr_eqn kind) qs)
 
 dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
 dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn 
 	where
-	  warn sty | length pats > maximum_output = 
-               hang (pp_context sty ctx (ptext SLIT("are non-exhaustive")))
+	  warn | length pats > maximum_output
+               = hang (pp_context ctx (ptext SLIT("are non-exhaustive")))
                     12 (hang (ptext SLIT("Patterns not recognized:"))
-                       4 ((vcat $ map (ppr_incomplete_pats kind sty) (take maximum_output pats))
+                       4 ((vcat $ map (ppr_incomplete_pats kind) (take maximum_output pats))
                           $$ ptext SLIT("...")))
-          warn sty =
-               hang (pp_context sty ctx (ptext SLIT("are non-exhaustive")))
+	       | otherwise
+               = hang (pp_context ctx (ptext SLIT("are non-exhaustive")))
                     12 (hang (ptext SLIT("Patterns not recognized:"))
-                       4 (vcat $ map (ppr_incomplete_pats kind sty) pats))
+                       4 (vcat $ map (ppr_incomplete_pats kind) pats))
 
-pp_context sty NoMatchContext msg = ptext SLIT("Warning: Some match(es)") <+> msg
+pp_context NoMatchContext msg = ptext SLIT("Some match(es)") <+> msg
 
-pp_context sty (DsMatchContext kind pats loc) msg
-  = hang (hcat [ppr (PprForUser opt_PprUserLength) loc, ptext SLIT(": ")])
+pp_context (DsMatchContext kind pats loc) msg
+  = hang (hcat [ppr loc, ptext SLIT(": ")])
 	     4 (hang message
 		     4 (pp_match kind pats))
  where
-    message = ptext SLIT("Warning: Pattern match(es)") <+> msg     
+    message = ptext SLIT("Pattern match(es)") <+> msg     
 
     pp_match (FunMatch fun) pats
-      = hsep [ptext SLIT("in the definition of function"), ppr sty fun]
+      = hsep [ptext SLIT("in the definition of function"), quotes (ppr fun)]
 
     pp_match CaseMatch pats
       = hang (ptext SLIT("in a group of case alternatives beginning:"))
-	4 (ppr_pats sty pats)
+	4 (ppr_pats pats)
 
     pp_match PatBindMatch pats
       = hang (ptext SLIT("in a pattern binding:"))
-	4 (ppr_pats sty pats)
+	4 (ppr_pats pats)
 
     pp_match LambdaMatch pats
       = hang (ptext SLIT("in a lambda abstraction:"))
-	4 (ppr_pats sty pats)
+	4 (ppr_pats pats)
 
     pp_match DoBindMatch pats
       = hang (ptext SLIT("in a `do' pattern binding:"))
-	4 (ppr_pats sty pats)
+	4 (ppr_pats pats)
 
     pp_match ListCompMatch pats
       = hang (ptext SLIT("in a `list comprension' pattern binding:"))
-	4 (ppr_pats sty pats)
+	4 (ppr_pats pats)
 
     pp_match LetMatch pats
       = hang (ptext SLIT("in a `let' pattern binding:"))
-	4 (ppr_pats sty pats)
+	4 (ppr_pats pats)
 
-ppr_pats sty pats = pprQuote sty $ \ sty -> sep (map (ppr sty) pats)
+ppr_pats pats = sep (map ppr pats)
 
 separator (FunMatch _)    = SLIT("=")
 separator (CaseMatch)     = SLIT("->") 
@@ -178,19 +166,17 @@ separator (DoBindMatch)   = SLIT("<-")
 separator (ListCompMatch) = SLIT("<-")  
 separator (LetMatch)      = SLIT("=")
                  
-ppr_shadow_pats kind sty pats = pprQuote sty $ \ sty ->
-	                 sep [sep (map (ppr sty) pats), ptext (separator kind), ptext SLIT("...")]
+ppr_shadow_pats kind pats = sep [ppr_pats pats, ptext (separator kind), ptext SLIT("...")]
     
-ppr_incomplete_pats kind sty (pats,[]) = pprQuote sty $ \ sty ->
-	                 sep [sep (map (ppr sty) pats)]
-ppr_incomplete_pats kind sty (pats,constraints) = pprQuote sty $ \ sty ->
-	                 sep [sep (map (ppr sty) pats), ptext SLIT("with"), 
-                         sep (map (ppr_constraint sty) constraints)]
+ppr_incomplete_pats kind (pats,[]) = ppr_pats pats
+ppr_incomplete_pats kind (pats,constraints) = 
+	                 sep [ppr_pats pats, ptext SLIT("with"), 
+	                      sep (map ppr_constraint constraints)]
     
 
-ppr_constraint sty (var,pats) = sep [ppr sty var, ptext SLIT("`not_elem`"),ppr sty pats]
+ppr_constraint (var,pats) = sep [ppr var, ptext SLIT("`not_elem`"), ppr pats]
 
-ppr_eqn kind sty (EqnInfo _ _ pats _) = ppr_shadow_pats kind sty pats
+ppr_eqn kind (EqnInfo _ _ pats _) = ppr_shadow_pats kind pats
 
 \end{code}
 
@@ -461,7 +447,7 @@ tidy1 v (RecPat con_id pat_ty rpats) match_result
     pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
-    (_, inst_tys, _) = getAppDataTyConExpandingDicts pat_ty
+    (_, inst_tys, _) = splitAlgTyConApp pat_ty
     con_arg_tys'     = dataConArgTys con_id inst_tys 
     tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels con_id)
 
@@ -507,14 +493,14 @@ tidy1 v (DictPat dicts methods) match_result
 -- LitPats: the desugarer only sees these at well-known types
 
 tidy1 v pat@(LitPat lit lit_ty) match_result
-  | isPrimType lit_ty
+  | isUnpointedType lit_ty
   = returnDs (pat, match_result)
 
-  | lit_ty `eqTy` charTy
+  | lit_ty == charTy
   = returnDs (ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy],
 	      match_result)
 
-  | otherwise = pprPanic "tidy1:LitPat:" (ppr PprDebug pat)
+  | otherwise = pprPanic "tidy1:LitPat:" (ppr pat)
   where
     mk_char (HsChar c)    = HsCharPrim c
 
@@ -525,12 +511,12 @@ tidy1 v pat@(NPat lit lit_ty _) match_result
   = returnDs (better_pat, match_result)
   where
     better_pat
-      | lit_ty `eqTy` charTy   = ConPat charDataCon   lit_ty [LitPat (mk_char lit)   charPrimTy]
-      | lit_ty `eqTy` intTy    = ConPat intDataCon    lit_ty [LitPat (mk_int lit)    intPrimTy]
-      | lit_ty `eqTy` wordTy   = ConPat wordDataCon   lit_ty [LitPat (mk_word lit)   wordPrimTy]
-      | lit_ty `eqTy` addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
-      | lit_ty `eqTy` floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
-      | lit_ty `eqTy` doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
+      | lit_ty == charTy   = ConPat charDataCon   lit_ty [LitPat (mk_char lit)   charPrimTy]
+      | lit_ty == intTy    = ConPat intDataCon    lit_ty [LitPat (mk_int lit)    intPrimTy]
+      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [LitPat (mk_word lit)   wordPrimTy]
+      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
+      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
+      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
 
 		-- Convert the literal pattern "" to the constructor pattern [].
       | null_str_lit lit       = ConPat nilDataCon    lit_ty [] 
@@ -741,7 +727,7 @@ matchWrapper kind [(PatMatch (WildPat ty) match)] error_string
     returnDs (var:vars, core_expr)
 
 matchWrapper kind [(GRHSMatch
-		     (GRHSsAndBindsOut [OtherwiseGRHS expr _] binds _))] error_string
+		     (GRHSsAndBindsOut [GRHS [] expr _] binds _))] error_string
   = dsBinds False{-don't auto-scc-} binds            `thenDs` \ core_binds ->
     dsExpr  expr	                             `thenDs` \ core_expr ->
     returnDs ([], mkCoLetsAny core_binds core_expr)

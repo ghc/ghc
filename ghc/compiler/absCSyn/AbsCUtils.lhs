@@ -4,8 +4,6 @@
 \section[AbsCUtils]{Help functions for Abstract~C datatype}
 
 \begin{code}
-#include "HsVersions.h"
-
 module AbsCUtils (
 	nonemptyAbsC,
 	mkAbstractCs, mkAbsCStmts,
@@ -19,24 +17,21 @@ module AbsCUtils (
 	-- printing/forcing stuff comes from PprAbsC
     ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 200
-import AbsCLoop (mkReturnPtLabel, CLabel )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} CLabel	( mkReturnPtLabel, CLabel )
 	-- The loop here is (CLabel -> CgRetConv -> AbsCUtils -> CLabel)
-#endif
 
 import AbsCSyn
 
 import Digraph		( stronglyConnComp, SCC(..) )
 import HeapOffs		( possiblyEqualHeapOffset )
-import Id		( fIRST_TAG, SYN_IE(ConTag) )
+import Id		( fIRST_TAG, ConTag )
 import Literal		( literalPrimRep, Literal(..) )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
-import Util		( assocDefaultUsing, panic, Ord3(..) )
+import Util		( assocDefaultUsing, panic )
 
 infixr 9 `thenFlt`
 \end{code}

@@ -10,20 +10,15 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 
 \begin{code}
-#include "HsVersions.h"
-
 module RnExpr (
 	rnMatch, rnGRHSsAndBinds, rnPat,
 	checkPrecMatch
    ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(RnLoop)		-- break the RnPass/RnExpr/RnBinds loops
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} RnBinds 
 import {-# SOURCE #-} RnSource ( rnHsSigType )
-#endif
 
 import HsSyn
 import RdrHsSyn
@@ -41,19 +36,14 @@ import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR,
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
 			)
-import TyCon		( TyCon )
-import Id		( GenId )
-import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name
-import Pretty
 import UniqFM		( lookupUFM, {- ToDo:rm-} isNullUFM )
 import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
-			  SYN_IE(UniqSet)
+			  UniqSet
 			)
-import Util		( Ord3(..), removeDups, panic, pprPanic, assertPanic )
+import Util		( removeDups )
 import Outputable
-
 \end{code}
 
 
@@ -153,9 +143,16 @@ rnMatch, rnMatch1 :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
 --	f x x = 1
 
 rnMatch match
-  = bindLocalsRn "pattern" (get_binders	match) 	$ \ new_binders ->
+  = pushSrcLocRn (getMatchLoc match) $
+    bindLocalsRn "pattern" (get_binders	match) 	$ \ new_binders ->
     rnMatch1 match				`thenRn` \ (match', fvs) ->
-    returnRn (match', fvs `minusNameSet` mkNameSet new_binders)
+    let
+	binder_set     = mkNameSet new_binders
+	unused_binders = binder_set `minusNameSet` fvs
+	net_fvs	       = fvs `minusNameSet` binder_set
+    in
+    warnUnusedNames unused_binders	`thenRn_`
+    returnRn (match', net_fvs)
  where
     get_binders (GRHSMatch _)	     = []
     get_binders (PatMatch pat match) = collectPatBinders pat ++ get_binders match
@@ -207,14 +204,10 @@ rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
 	rnExpr expr	`thenRn` \ (expr',  fvse) ->
 	returnRn (GRHS guard' expr' locn, fvse))
 
-    rnGRHS (OtherwiseGRHS expr locn)
-      = pushSrcLocRn locn $
-	rnExpr expr	`thenRn` \ (expr', fvs) ->
-	returnRn (GRHS [] expr' locn, fvs)
-
 	-- Standard Haskell 1.4 guards are just a single boolean
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
+    is_standard_guard [] 	      = True
     is_standard_guard [GuardStmt _ _] = True
     is_standard_guard other	      = False
 \end{code}
@@ -287,8 +280,8 @@ rnExpr (OpApp e1 op@(HsVar op_name) _ e2)
     lookupFixity op_name		`thenRn` \ fixity ->
     getModeRn				`thenRn` \ mode -> 
     (case mode of
-	SourceMode      -> mkOpAppRn e1' op' fixity e2'
-	InterfaceMode _ -> returnRn (OpApp e1' op' fixity e2')
+	SourceMode        -> mkOpAppRn e1' op' fixity e2'
+	InterfaceMode _ _ -> returnRn (OpApp e1' op' fixity e2')
     )					`thenRn` \ final_e -> 
 
     returnRn (final_e,
@@ -315,6 +308,7 @@ rnExpr (SectionR op expr)
     returnRn (SectionR op' expr', fvs_op `unionNameSets` fvs_expr)
 
 rnExpr (CCall fun args may_gc is_casm fake_result_ty)
+	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
   = lookupImplicitOccRn ccallableClass_RDR	`thenRn_`
     lookupImplicitOccRn creturnableClass_RDR	`thenRn_`
     lookupImplicitOccRn ioDataCon_RDR		`thenRn_`
@@ -353,10 +347,10 @@ rnExpr (ExplicitTuple exps)
     rnExprs exps	 				`thenRn` \ (exps', fvExps) ->
     returnRn (ExplicitTuple exps', fvExps)
 
-rnExpr (RecordCon con rbinds)
-  = lookupOccRn con 			`thenRn` \ conname ->
+rnExpr (RecordCon con_id _ rbinds)
+  = lookupOccRn con_id 			`thenRn` \ conname ->
     rnRbinds "construction" rbinds	`thenRn` \ (rbinds', fvRbinds) ->
-    returnRn (RecordCon conname rbinds', fvRbinds)
+    returnRn (RecordCon conname (error "rnExpr:RecordCon") rbinds', fvRbinds)
 
 rnExpr (RecordUpd expr rbinds)
   = rnExpr expr			`thenRn` \ (expr', fvExpr) ->
@@ -364,8 +358,8 @@ rnExpr (RecordUpd expr rbinds)
     returnRn (RecordUpd expr' rbinds', fvExpr `unionNameSets` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)
-  = rnExpr expr			 			`thenRn` \ (expr', fvExpr) ->
-    rnHsSigType (\ sty -> text "an expression") pty	`thenRn` \ pty' ->
+  = rnExpr expr			 		`thenRn` \ (expr', fvExpr) ->
+    rnHsSigType (text "an expression") pty	`thenRn` \ pty' ->
     returnRn (ExprWithTySig expr' pty', fvExpr)
 
 rnExpr (HsIf p b1 b2 src_loc)
@@ -414,7 +408,7 @@ rnRbinds str rbinds
     mapAndUnzipRn rn_rbind rbinds	`thenRn` \ (rbinds', fvRbind_s) ->
     returnRn (rbinds', unionManyNameSets fvRbind_s)
   where
-    (_, dup_fields) = removeDups cmp [ f | (f,_,_) <- rbinds ]
+    (_, dup_fields) = removeDups compare [ f | (f,_,_) <- rbinds ]
 
     field_dup_err dups = addErrRn (dupFieldErr str dups)
 
@@ -427,7 +421,7 @@ rnRpats rpats
   = mapRn field_dup_err dup_fields 	`thenRn_`
     mapRn rn_rpat rpats
   where
-    (_, dup_fields) = removeDups cmp [ f | (f,_,_) <- rpats ]
+    (_, dup_fields) = removeDups compare [ f | (f,_,_) <- rpats ]
 
     field_dup_err dups = addErrRn (dupFieldErr "pattern" dups)
 
@@ -550,7 +544,9 @@ mkOpAppRn e1@(NegApp neg_arg neg_op)
     (nofix_error, rearrange_me) = compareFixity fix_neg fix2
 
 mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
-  = ASSERT( right_op_ok fix e2 )
+  = ASSERT( if right_op_ok fix e2 then True
+	    else pprPanic "mkOpAppRn" (vcat [ppr e1, text "---", ppr op, text "---", ppr fix, text "---", ppr e2])
+    )
     returnRn (OpApp e1 op fix e2)
 
 get (HsVar n) = n
@@ -656,10 +652,10 @@ compareFixity :: Fixity -> Fixity
 	      -> (Bool,		-- Error please
 		  Bool)		-- Associate to the right: a op1 (b op2 c)
 compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
-  = case prec1 `cmp` prec2 of
-	GT_ -> left
-	LT_ -> right
-	EQ_ -> case (dir1, dir2) of
+  = case prec1 `compare` prec2 of
+	GT -> left
+	LT -> right
+	EQ -> case (dir1, dir2) of
 			(InfixR, InfixR) -> right
 			(InfixL, InfixL) -> left
 			_		 -> error_please
@@ -700,7 +696,9 @@ litOccurrence (HsFrac _)
     lookupImplicitOccRn ratioDataCon_RDR
 	-- We have to make sure that the Ratio type is imported with
 	-- its constructor, because literals of type Ratio t are
-	-- built with that constructor. 
+	-- built with that constructor.
+	-- The Rational type is needed too, but that will come in
+	-- when fractionalClass does.
     
 litOccurrence (HsIntPrim _)
   = addImplicitOccRn (getName intPrimTyCon)
@@ -723,28 +721,29 @@ litOccurrence (HsLitLit _)
 %************************************************************************
 
 \begin{code}
-dupFieldErr str (dup:rest) sty
-  = hcat [ptext SLIT("duplicate field name `"), 
-               ppr sty dup, 
-	       ptext SLIT("' in record "), text str]
+dupFieldErr str (dup:rest)
+  = hsep [ptext SLIT("duplicate field name"), 
+          quotes (ppr dup),
+	  ptext SLIT("in record"), text str]
 
-negPatErr pat  sty
-  = sep [ptext SLIT("prefix `-' not applied to literal in pattern"), ppr sty pat]
+negPatErr pat 
+  = sep [ptext SLIT("prefix `-' not applied to literal in pattern"), quotes (ppr pat)]
 
-precParseNegPatErr op sty 
+precParseNegPatErr op 
   = hang (ptext SLIT("precedence parsing error"))
-      4 (hcat [ptext SLIT("prefix `-' has lower precedence than "), 
-		    pp_op sty op, 
-		    ptext SLIT(" in pattern")])
+      4 (hsep [ptext SLIT("prefix `-' has lower precedence than"), 
+	       quotes (pp_op op), 
+	       ptext SLIT("in pattern")])
 
-precParseErr op1 op2  sty
+precParseErr op1 op2 
   = hang (ptext SLIT("precedence parsing error"))
-      4 (hcat [ptext SLIT("cannot mix "), pp_op sty op1, ptext SLIT(" and "), pp_op sty op2,
-	 	    ptext SLIT(" in the same infix expression")])
+      4 (hsep [ptext SLIT("cannot mix"), quotes (pp_op op1), ptext SLIT("and"), 
+	       quotes (pp_op op2),
+	       ptext SLIT("in the same infix expression")])
 
-nonStdGuardErr guard sty
+nonStdGuardErr guard
   = hang (ptext SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)"))
-      4 (ppr sty guard)
+      4 (ppr guard)
 
-pp_op sty (op, fix) = hcat [ppr sty op, space, parens (ppr sty fix)]
+pp_op (op, fix) = hcat [ppr op, space, parens (ppr fix)]
 \end{code}

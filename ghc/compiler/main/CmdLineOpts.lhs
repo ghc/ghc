@@ -4,8 +4,6 @@
 \section[CmdLineOpts]{Things to do with command-line options}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CmdLineOpts (
 	CoreToDo(..),
 	SimplifierSwitch(..),
@@ -57,6 +55,7 @@ module CmdLineOpts (
 	opt_IgnoreIfacePragmas,
 	opt_IrrefutableTuples,
 	opt_LiberateCaseThreshold,
+	opt_MultiParamClasses,
 	opt_NoImplicitPrelude,
 	opt_NumbersStrict,
 	opt_OmitBlackHoling,
@@ -95,31 +94,17 @@ module CmdLineOpts (
 	opt_WarnMissingMethods,
 	opt_WarnDuplicateExports,
 	opt_PruneTyDecls, opt_PruneInstDecls,
-	opt_D_show_unused_imports,
-	opt_D_show_rn_stats,
-	
-	all_toplev_ids_visible
+	opt_D_show_rn_stats
     ) where
 
-IMPORT_1_3(Array(array, (//)))
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-import PreludeGlaST	-- bad bad bad boy, Will (_Array internals)
-#else
+#include "HsVersions.h"
+
+import Array	( array, (//) )
 import GlaExts
 import ArrBase
-#if __GLASGOW_HASKELL__ >= 209
-import Addr
-#endif
--- 2.04 and later exports Lift from GlaExts
-#if __GLASGOW_HASKELL__ < 204
-import PrelBase (Lift(..))
-#endif
-#endif
-
-CHK_Ubiq() -- debugging consistency check
-
 import Argv
 import Constants	-- Default values for some flags
+
 import Maybes		( assocMaybe, firstJust, maybeToBool )
 import Util		( startsWith, panic, panic#, assertPanic )
 \end{code}
@@ -310,10 +295,10 @@ opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
 opt_ForConcurrent		= lookUp  SLIT("-fconcurrent")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
---UNUSED:opt_Haskell_1_3	= lookUp  SLIT("-fhaskell-1.3")
 opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
+opt_MultiParamClasses		= opt_GlasgowExts
 opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
@@ -356,26 +341,10 @@ opt_WarnMissingMethods		= lookUp  SLIT("-fwarn-missing-methods")
 opt_WarnDuplicateExports	= lookUp  SLIT("-fwarn-duplicate-exports")
 opt_PruneTyDecls		= not (lookUp SLIT("-fno-prune-tydecls"))
 opt_PruneInstDecls		= not (lookUp SLIT("-fno-prune-instdecls"))
-opt_D_show_unused_imports	= lookUp SLIT("-dshow-unused-imports")
 opt_D_show_rn_stats		= lookUp SLIT("-dshow-rn-stats")
 
 -- opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
 \end{code}
-
-
-\begin{code}
-all_toplev_ids_visible :: Bool
-all_toplev_ids_visible = 
-  not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
-  opt_EnsureSplittableC        ||  -- Splitting requires visiblilty
-  opt_AutoSccsOnAllToplevs	   -- ditto for profiling 
-				   -- (ToDo: fix up the auto-annotation
-				   -- pass in the desugarer to avoid having
-				   -- to do this)
-
-\end{code}
-
-
 
 \begin{code}
 classifyOpts :: ([CoreToDo],	-- Core-to-Core processing spec

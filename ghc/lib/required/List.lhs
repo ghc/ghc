@@ -34,7 +34,9 @@ module List (
   ) where
 
 import Prelude
-import Maybe (listToMaybe)
+import Maybe	(listToMaybe)
+import PrelBase	( Int(..) )
+import GHC	( (+#) )
 
 infix 5 \\
 \end{code}
@@ -59,7 +61,16 @@ findIndex       :: (a -> Bool) -> [a] -> Maybe Int
 findIndex p     = listToMaybe . findIndices p
 
 findIndices      :: (a -> Bool) -> [a] -> [Int]
-findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
+
+-- One line definition
+-- findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
+
+-- Efficient definition
+findIndices p xs = loop 0# p xs
+		 where
+	 	   loop n p [] = []
+		   loop n p (x:xs) | p x       = I# n : loop (n +# 1#) p xs
+				   | otherwise = loop (n +# 1#) p xs
 
 isPrefixOf              :: (Eq a) => [a] -> [a] -> Bool
 isPrefixOf [] _         =  True

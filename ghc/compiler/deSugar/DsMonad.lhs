@@ -4,10 +4,8 @@
 \section[DsMonad]{@DsMonad@: monadery used in desugaring}
 
 \begin{code}
-#include "HsVersions.h"
-
 module DsMonad (
-	SYN_IE(DsM),
+	DsM,
 	initDs, returnDs, thenDs, andDs, mapDs, listDs,
 	mapAndUnzipDs, zipWithDs,
 	uniqSMtoDsM,
@@ -17,37 +15,33 @@ module DsMonad (
 	getSrcLocDs, putSrcLocDs,
 	getModuleAndGroupDs,
 	extendEnvDs, lookupEnvDs, 
-	SYN_IE(DsIdEnv),
+	DsIdEnv,
 
 	dsWarn, 
-	SYN_IE(DsWarnings),
+	DsWarnings,
 	DsMatchContext(..), DsMatchKind(..), pprDsWarnings
-
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 import Bag		( emptyBag, snocBag, bagToList, Bag )
-import BasicTypes       ( SYN_IE(Module) )
-import CmdLineOpts	( opt_PprUserLength )
-import CoreSyn		( SYN_IE(CoreExpr) )
+import BasicTypes       ( Module )
+import CoreSyn		( CoreExpr )
 import CoreUtils	( substCoreExpr )
-import ErrUtils 	( SYN_IE(Warning) )
+import ErrUtils 	( WarnMsg )
 import HsSyn		( OutPat )
 import Id		( mkSysLocal, mkIdWithNewUniq,
-			  lookupIdEnv, growIdEnvList, GenId, SYN_IE(IdEnv),
-			  SYN_IE(Id)
+			  lookupIdEnv, growIdEnvList, GenId, IdEnv,
+			  Id
 			)
 import PprType		( GenType, GenTyVar )
-import Outputable	( pprQuote, Outputable(..), PprStyle(..) )
-import Pretty
+import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
-import TcHsSyn		( SYN_IE(TypecheckedPat) )
-import Type             ( SYN_IE(Type) )
-import TyVar		( nullTyVarEnv, cloneTyVar, GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
-import Unique		( Unique{-instances-} )
+import TcHsSyn		( TypecheckedPat )
+import Type             ( Type )
+import TyVar		( cloneTyVar, TyVar )
 import UniqSupply	( splitUniqSupply, getUnique, getUniques,
-			  mapUs, thenUs, returnUs, SYN_IE(UniqSM),
+			  mapUs, thenUs, returnUs, UniqSM,
 			  UniqSupply )
 import Util		( assoc, mapAccumL, zipWithEqual, panic )
 
@@ -66,7 +60,7 @@ type DsM result =
 	-> DsWarnings
 	-> (result, DsWarnings)
 
-type DsWarnings = Bag Warning           -- The desugarer reports matches which are
+type DsWarnings = Bag WarnMsg           -- The desugarer reports matches which are
 					-- completely shadowed or incomplete patterns
 
 type Group = FAST_STRING
@@ -185,7 +179,7 @@ putSrcLocDs :: SrcLoc -> DsM a -> DsM a
 putSrcLocDs new_loc expr us old_loc mod_and_grp env warns
   = expr us new_loc mod_and_grp env warns
 
-dsWarn :: Warning -> DsM ()
+dsWarn :: WarnMsg -> DsM ()
 dsWarn warn us loc mod_and_grp env warns = ((), warns `snocBag` warn)
 
 \end{code}
@@ -234,7 +228,6 @@ data DsMatchKind
   | LetMatch
   deriving ()
 
-pprDsWarnings :: PprStyle -> DsWarnings -> Doc
-pprDsWarnings sty warns = vcat [ warn sty | warn <- (bagToList warns)]
-
+pprDsWarnings :: DsWarnings -> SDoc
+pprDsWarnings warns = vcat (bagToList warns)
 \end{code}

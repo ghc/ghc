@@ -23,23 +23,22 @@ This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
 * "Distributes" given cost-centres to all as-yet-unmarked RHSs.
 
 \begin{code}
-#include "HsVersions.h"
-
 module SCCfinal ( stgMassageForProfiling ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import StgSyn
 
 import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
-import Id		( idType, mkSysLocal, emptyIdSet, SYN_IE(Id) )
+import Id		( idType, mkSysLocal, emptyIdSet, Id )
 import SrcLoc		( noSrcLoc )
-import Type		( splitSigmaTy, getFunTy_maybe )
+import Type		( splitSigmaTy, splitFunTy_maybe )
 import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
 import Util		( removeDups, assertPanic )
 import Outputable	
+import GlaExts		( trace )
 
 infixr 9 `thenMM`, `thenMM_`
 \end{code}
@@ -125,7 +124,7 @@ stgMassageForProfiling mod_name grp_name us stg_binds
     do_top_rhs binder (StgRhsClosure cc bi fv u [] body)
 	-- Top level CAF with cost centre attached
 	-- Should this be a CAF cc ??? Does this ever occur ???
-      = trace ("SCCfinal: CAF with cc: " ++ showCostCentre PprDebug False cc) $
+      = trace ("SCCfinal: CAF with cc: " ++ showCostCentre False cc) $
 	collectCC cc					`thenMM_`
         set_prevailing_cc cc (do_expr body)		`thenMM` \ body' ->
 	returnMM (StgRhsClosure cc bi fv u [] body')

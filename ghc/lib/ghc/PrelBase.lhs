@@ -28,6 +28,107 @@ infixl 1  >>, >>=
 infixr 0  $
 \end{code}
 
+
+\begin{code}
+{-
+class Eval a
+data Bool = False | True
+data Int = I# Int#
+data Double	= D# Double#
+data  ()  =  ()  --easier to do explicitly: deriving (Eq, Ord, Enum, Show, Bounded)
+		 -- (avoids weird-named functions, e.g., con2tag_()#
+
+data  Maybe a  =  Nothing | Just a	
+data Ordering = LT | EQ | GT	 deriving( Eq )
+
+type  String = [Char]
+
+data Char = C# Char#	
+data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
+			  -- to avoid weird names like con2tag_[]#
+
+
+-------------- Stage 2 -----------------------
+not True = False
+not False = True
+True  && x		=  x
+False && x		=  False
+otherwise = True
+
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybe n f Nothing  = n
+maybe n f (Just x) = f x
+
+-------------- Stage 3 -----------------------
+class  Eq a  where
+    (==), (/=)		:: a -> a -> Bool
+
+    x /= y		=  not (x == y)
+
+-- f :: Eq a => a -> a -> Bool
+f x y = x == y
+
+g :: Eq a => a -> a -> Bool
+g x y =  f x y 
+
+-------------- Stage 4 -----------------------
+
+class  (Eq a) => Ord a  where
+    compare             :: a -> a -> Ordering
+    (<), (<=), (>=), (>):: a -> a -> Bool
+    max, min		:: a -> a -> a
+
+-- An instance of Ord should define either compare or <=
+-- Using compare can be more efficient for complex types.
+    compare x y
+	    | x == y    = EQ
+	    | x <= y    = LT
+	    | otherwise = GT
+
+    x <= y  = compare x y /= GT
+    x <	 y  = compare x y == LT
+    x >= y  = compare x y /= LT
+    x >	 y  = compare x y == GT
+    max x y = case (compare x y) of { LT -> y ; EQ -> x ; GT -> x }
+    min x y = case (compare x y) of { LT -> x ; EQ -> x ; GT -> y }
+
+eqInt	(I# x) (I# y) = x ==# y
+
+instance Eq Int where
+    (==) x y = x `eqInt` y
+
+instance Ord Int where
+    compare x y = error "help"
+  
+class  Bounded a  where
+    minBound, maxBound :: a
+
+
+type  ShowS     = String -> String
+
+class  Show a  where
+    showsPrec :: Bool -> a -> ShowS
+    showList  :: [a] -> ShowS
+
+    showList ls = showList__ (showsPrec True) ls 
+
+showList__ :: (a -> ShowS) ->  [a] -> ShowS
+showList__ showx []     = showString "[]"
+
+showString      :: String -> ShowS
+showString      =  (++)
+
+[] ++ [] = []
+
+shows           :: (Show a) => a -> ShowS
+shows           =  showsPrec True
+
+-- show            :: (Show a) => a -> String
+--show x          =  shows x ""
+-}
+\end{code}
+
+
 %*********************************************************
 %*							*
 \subsection{Standard classes @Eq@, @Ord@, @Bounded@, @Eval@}
@@ -323,6 +424,7 @@ it here seems more direct.
 \begin{code}
 data  ()  =  ()  --easier to do explicitly: deriving (Eq, Ord, Enum, Show, Bounded)
 		 -- (avoids weird-named functions, e.g., con2tag_()#
+
 instance Eq () where
     () == () = True
     () /= () = False

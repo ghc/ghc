@@ -7,20 +7,17 @@ This module tracks the ``state interface'' document, ``GHC prelude:
 types and operations.''
 
 \begin{code}
-#include "HsVersions.h"
-
 module TysPrim where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import Name		( mkWiredInTyConName )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
 import TyCon		( mkPrimTyCon, mkDataTyCon, TyCon )
-import BasicTypes	( NewOrData(..) )
-import Type		( applyTyCon, mkTyVarTys, mkTyConTy, SYN_IE(Type) )
+import BasicTypes	( NewOrData(..), RecFlag(..) )
+import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, Type )
 import TyVar		( GenTyVar(..), alphaTyVars )
-import Usage		( usageOmega )
 import PrelMods		( gHC__ )
 import Unique
 \end{code}
@@ -47,22 +44,22 @@ pcPrimTyCon key str arity primrep
     the_tycon = mkPrimTyCon name arity primrep
 
 
-charPrimTy	= applyTyCon charPrimTyCon []
+charPrimTy	= mkTyConTy charPrimTyCon
 charPrimTyCon	= pcPrimTyCon charPrimTyConKey SLIT("Char#") 0 CharRep
 
-intPrimTy	= applyTyCon intPrimTyCon []
+intPrimTy	= mkTyConTy intPrimTyCon
 intPrimTyCon	= pcPrimTyCon intPrimTyConKey SLIT("Int#") 0 IntRep
 
-wordPrimTy	= applyTyCon wordPrimTyCon []
+wordPrimTy	= mkTyConTy wordPrimTyCon
 wordPrimTyCon	= pcPrimTyCon wordPrimTyConKey SLIT("Word#") 0 WordRep
 
-addrPrimTy	= applyTyCon addrPrimTyCon []
+addrPrimTy	= mkTyConTy addrPrimTyCon
 addrPrimTyCon	= pcPrimTyCon addrPrimTyConKey SLIT("Addr#") 0 AddrRep
 
-floatPrimTy	= applyTyCon floatPrimTyCon []
+floatPrimTy	= mkTyConTy floatPrimTyCon
 floatPrimTyCon	= pcPrimTyCon floatPrimTyConKey SLIT("Float#") 0 FloatRep
 
-doublePrimTy	= applyTyCon doublePrimTyCon []
+doublePrimTy	= mkTyConTy doublePrimTyCon
 doublePrimTyCon	= pcPrimTyCon doublePrimTyConKey SLIT("Double#") 0 DoubleRep
 \end{code}
 
@@ -100,7 +97,7 @@ where s is a type variable. The only purpose of the type parameter is to
 keep different state threads separate.  It is represented by nothing at all.
 
 \begin{code}
-mkStatePrimTy ty = applyTyCon statePrimTyCon [ty]
+mkStatePrimTy ty = mkTyConApp statePrimTyCon [ty]
 statePrimTyCon	 = pcPrimTyCon statePrimTyConKey SLIT("State#") 1 VoidRep
 \end{code}
 
@@ -110,7 +107,7 @@ We never manipulate values of type RealWorld; it's only used in the type
 system, to parameterise State#.
 
 \begin{code}
-realWorldTy	     = applyTyCon realWorldTyCon []
+realWorldTy	     = mkTyConTy realWorldTyCon
 realWorldTyCon	     = mk_no_constr_tycon realWorldTyConKey SLIT("RealWorld") 
 realWorldStatePrimTy = mkStatePrimTy realWorldTy
 \end{code}
@@ -137,11 +134,13 @@ mk_no_constr_tycon key str
   where
     name      = mkWiredInTyConName key gHC__ str the_tycon
     the_tycon = mkDataTyCon name mkBoxedTypeKind 
-			[{-no tyvars-}]
-			[{-no context-}]
-			[{-no data cons!-}] -- we tell you *nothing* about this guy
-			[{-no derivings-}]
+			[]		-- No tyvars
+			[]		-- No context
+			[]		-- No constructors; we tell you *nothing* about this guy
+			[]		-- No derivings
+			Nothing		-- Not a dictionary
 			DataType
+			NonRecursive
 \end{code}
 
 %************************************************************************
@@ -159,10 +158,10 @@ mutableArrayPrimTyCon = pcPrimTyCon mutableArrayPrimTyConKey SLIT("MutableArray#
 
 mutableByteArrayPrimTyCon = pcPrimTyCon mutableByteArrayPrimTyConKey SLIT("MutableByteArray#") 1 ByteArrayRep
 
-mkArrayPrimTy elt    	    = applyTyCon arrayPrimTyCon [elt]
-byteArrayPrimTy	    	    = applyTyCon byteArrayPrimTyCon []
-mkMutableArrayPrimTy s elt  = applyTyCon mutableArrayPrimTyCon [s, elt]
-mkMutableByteArrayPrimTy s  = applyTyCon mutableByteArrayPrimTyCon [s]
+mkArrayPrimTy elt    	    = mkTyConApp arrayPrimTyCon [elt]
+byteArrayPrimTy	    	    = mkTyConTy byteArrayPrimTyCon
+mkMutableArrayPrimTy s elt  = mkTyConApp mutableArrayPrimTyCon [s, elt]
+mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
 \end{code}
 
 %************************************************************************
@@ -174,7 +173,7 @@ mkMutableByteArrayPrimTy s  = applyTyCon mutableByteArrayPrimTyCon [s]
 \begin{code}
 synchVarPrimTyCon = pcPrimTyCon synchVarPrimTyConKey SLIT("SynchVar#") 2 PtrRep
 
-mkSynchVarPrimTy s elt 	    = applyTyCon synchVarPrimTyCon [s, elt]
+mkSynchVarPrimTy s elt 	    = mkTyConApp synchVarPrimTyCon [s, elt]
 \end{code}
 
 %************************************************************************
@@ -186,7 +185,7 @@ mkSynchVarPrimTy s elt 	    = applyTyCon synchVarPrimTyCon [s, elt]
 \begin{code}
 stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConKey SLIT("StablePtr#") 1 StablePtrRep
 
-mkStablePtrPrimTy ty = applyTyCon stablePtrPrimTyCon [ty]
+mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 \end{code}
 
 %************************************************************************
@@ -210,6 +209,6 @@ There are no primitive operations on @ForeignObj#@s (although equality
 could possibly be added?)
 
 \begin{code}
-foreignObjPrimTy    = applyTyCon foreignObjPrimTyCon []
+foreignObjPrimTy    = mkTyConTy foreignObjPrimTyCon
 foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConKey SLIT("ForeignObj#") 0 ForeignObjRep
 \end{code}

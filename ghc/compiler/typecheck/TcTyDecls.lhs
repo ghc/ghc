@@ -4,83 +4,74 @@
 \section[TcTyDecls]{Typecheck type declarations}
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcTyDecls (
 	tcTyDecl,
 	tcConDecl,
 	mkDataBinds
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import HsSyn		( TyDecl(..), ConDecl(..), ConDetails(..), BangType(..), HsExpr(..), 
-			  Match(..), GRHSsAndBinds(..), GRHS(..), OutPat(..), 
-			  HsBinds(..), HsLit, Stmt, DoOrListComp, ArithSeqInfo,
-			  SYN_IE(RecFlag), nonRecursive, andMonoBinds, 
-			  HsType, Fake, InPat, HsTyVar, Fixity,
-			  MonoBinds(..), Sig 
+import HsSyn		( MonoBinds(..), 
+			  TyDecl(..), ConDecl(..), ConDetails(..), BangType(..),
+			  andMonoBinds
 			)
 import HsTypes		( getTyVarName )
 import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..)	)
 import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType,
-			  SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds)
+			  TcHsBinds, TcMonoBinds
 			)
+import BasicTypes	( RecFlag(..) )
+
 import Inst		( newDicts, InstOrigin(..), Inst )
 import TcMonoType	( tcHsTypeKind, tcHsType, tcContext )
-import TcSimplify	( tcSimplifyThetas )
-import TcType		( TcIdOcc(..), tcInstTyVars, tcInstType, tcInstId )
-import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
+import TcSimplify	( tcSimplifyCheckThetas )
+import TcType		( tcInstTyVars )
+import TcEnv		( TcIdOcc(..), tcInstId,
+			  tcLookupTyCon, tcLookupTyVar, tcLookupClass,
 			  newLocalId, newLocalIds, tcLookupClassByKey
 			)
 import TcMonad
-import TcKind		( TcKind, unifyKind, mkTcArrowKind, mkTcTypeKind )
+import TcKind		( TcKind, unifyKind, mkArrowKind, mkBoxedTypeKind )
 
-import PprType		( GenClass, GenType{-instance Outputable-},
-			  GenTyVar{-instance Outputable-}{-ToDo:possibly rm-}
-			)
-import CoreUnfold	( getUnfoldingTemplate )
-import Class		( GenClass{-instance Eq-}, classInstEnv, SYN_IE(Class) )
+import Class		( classInstEnv, Class )
 import Id		( mkDataCon, dataConSig, mkRecordSelId, idType,
 			  dataConFieldLabels, dataConStrictMarks,
 			  StrictnessMark(..), getIdUnfolding,
-			  GenId{-instance NamedThing-},
-			  SYN_IE(Id)
+			  Id
 			)
+import CoreUnfold	( getUnfoldingTemplate )
 import FieldLabel
 import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
-import SpecEnv		( SpecEnv, nullSpecEnv )
 import Name		( nameSrcLoc, isLocallyDefined, getSrcLoc,
-			  OccName(..), Name{-instance Ord3-},
+			  OccName(..), 
 			  NamedThing(..)
 			)
-import Outputable	( Outputable(..), interpp'SP )
-import Pretty
-import TyCon		( TyCon, NewOrData, mkSynTyCon, mkDataTyCon, isAlgTyCon, 
+import Outputable
+import TyCon		( TyCon, mkSynTyCon, mkDataTyCon, isAlgTyCon, 
 			  isSynTyCon, tyConDataCons
 			)
-import Type		( GenType, -- instances
-			  typeKind, getTyVar, tyVarsOfTypes, eqTy, splitSigmaTy,
-			  applyTyCon, mkTyVarTys, mkForAllTys, mkFunTy,
-			  splitFunTy, mkTyVarTy, getTyVar_maybe,
-			  SYN_IE(Type)
+import Type		( typeKind, getTyVar, tyVarsOfTypes, splitSigmaTy,
+			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
+			  splitFunTys, mkTyVarTy, getTyVar_maybe,
+			  Type, ThetaType
 			)
-import TyVar		( tyVarKind, elementOfTyVarSet, 
-			  GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
-import Unique		( Unique {- instance Eq -}, evalClassKey )
-import UniqSet		( emptyUniqSet, mkUniqSet, uniqSetToList, unionManyUniqSets, SYN_IE(UniqSet) )
-import Util		( equivClasses, zipEqual, nOfThem, panic, assertPanic, Ord3(..) )
+import TyVar		( tyVarKind, elementOfTyVarSet, intersectTyVarSets, isEmptyTyVarSet,
+			  TyVar )
+import Unique		( evalClassKey )
+import UniqSet		( emptyUniqSet, mkUniqSet, uniqSetToList, unionManyUniqSets, UniqSet )
+import Util		( equivClasses, zipEqual, nOfThem, panic, assertPanic )
 \end{code}
 
 \begin{code}
-tcTyDecl :: RenamedTyDecl -> TcM s TyCon
+tcTyDecl :: RecFlag -> RenamedTyDecl -> TcM s TyCon
 \end{code}
 
 Type synonym decls
 ~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tcTyDecl (TySynonym tycon_name tyvar_names rhs src_loc)
+tcTyDecl is_rec (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcAddSrcLoc src_loc $
     tcAddErrCtxt (tySynCtxt tycon_name) $
 
@@ -94,7 +85,7 @@ tcTyDecl (TySynonym tycon_name tyvar_names rhs src_loc)
 
 	-- Unify tycon kind with (k1->...->kn->rhs)
     unifyKind tycon_kind
-	(foldr mkTcArrowKind rhs_kind tyvar_kinds)
+	(foldr mkArrowKind rhs_kind tyvar_kinds)
 						`thenTc_`
     let
 	-- Getting the TyCon's kind is a bit of a nuisance.  We can't use the tycon_kind,
@@ -120,7 +111,7 @@ Algebraic data and newtype decls
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tcTyDecl (TyData data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc)
+tcTyDecl is_rec (TyData data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc)
   = tcAddSrcLoc src_loc $
     tcAddErrCtxt (tyDataCtxt tycon_name) $
 
@@ -135,7 +126,7 @@ tcTyDecl (TyData data_or_new context tycon_name tyvar_names con_decls derivings 
 
 	-- Unify tycon kind with (k1->...->kn->Type)
     unifyKind tycon_kind
-	(foldr mkTcArrowKind mkTcTypeKind tyvar_kinds)
+	(foldr mkArrowKind mkBoxedTypeKind tyvar_kinds)
 						`thenTc_`
 
 	-- Walk the condecls
@@ -152,7 +143,9 @@ tcTyDecl (TyData data_or_new context tycon_name tyvar_names con_decls derivings 
 			    ctxt
 			    con_ids
 			    derived_classes
+			    Nothing		-- Not a dictionary
 			    data_or_new
+			    is_rec
     in
     returnTc tycon
 
@@ -199,7 +192,7 @@ mkDataBinds_one tycon
 	-- groups is list of fields that share a common name
     groups = equivClasses cmp_name fields
     cmp_name (_, field1) (_, field2) 
-	= fieldLabelName field1 `cmp` fieldLabelName field2
+	= fieldLabelName field1 `compare` fieldLabelName field2
 \end{code}
 
 -- Check that all the types of all the strict arguments are in Eval
@@ -212,18 +205,16 @@ checkConstructorContext con_id
   | otherwise	-- It is locally defined
   = tcLookupClassByKey evalClassKey	`thenNF_Tc` \ eval_clas ->
     let
-	strict_marks         = dataConStrictMarks con_id
-	(tyvars,theta,tau)   = splitSigmaTy (idType con_id)
-	(arg_tys, result_ty) = splitFunTy tau
+	strict_marks					   = dataConStrictMarks con_id
+	(tyvars, theta, ext_tyvars, ext_theta, arg_tys, _) = dataConSig con_id
 
-	eval_theta = [ (eval_clas,arg_ty) 
+	eval_theta = [ (eval_clas, [arg_ty]) 
 		     | (arg_ty, MarkedStrict) <- zipEqual "strict_args" 
-							arg_tys strict_marks
+						   arg_tys strict_marks
 		     ]
     in
-    tcSimplifyThetas classInstEnv theta eval_theta	`thenTc` \ eval_theta' ->
-    checkTc (null eval_theta')
-	    (missingEvalErr con_id eval_theta')
+    tcAddErrCtxt (evalCtxt con_id eval_theta) $
+    tcSimplifyCheckThetas theta eval_theta
 \end{code}
 
 \begin{code}
@@ -233,7 +224,7 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 	-- Check that all the fields in the group have the same type
 	-- This check assumes that all the constructors of a given
 	-- data type use the same type variables
-  = checkTc (all (eqTy field_ty) other_tys)
+  = checkTc (all (== field_ty) other_tys)
 	    (fieldTypeMisMatch field_name)	`thenTc_`
     returnTc selector_id
   where
@@ -241,7 +232,7 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
     field_name = fieldLabelName first_field_label
     other_tys  = [fieldLabelType fl | (_, fl) <- other_fields]
     (tyvars, _, _, _, _, _) = dataConSig first_con
-    data_ty  = applyTyCon tycon (mkTyVarTys tyvars)
+    data_ty  = mkTyConApp tycon (mkTyVarTys tyvars)
     -- tyvars of first_con may be free in field_ty
     -- Now build the selector
 
@@ -257,7 +248,7 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 Constructors
 ~~~~~~~~~~~~
 \begin{code}
-tcConDecl :: TyCon -> [TyVar] -> [(Class,Type)] -> RenamedConDecl -> TcM s Id
+tcConDecl :: TyCon -> [TyVar] -> ThetaType -> RenamedConDecl -> TcM s Id
 
 tcConDecl tycon tyvars ctxt (ConDecl name ex_ctxt (VanillaCon btys) src_loc)
   = tcDataCon tycon tyvars ctxt name btys src_loc
@@ -274,7 +265,7 @@ tcConDecl tycon tyvars ctxt (ConDecl name ex_ctxt (NewCon ty) src_loc)
 			   [{- No labelled fields -}]
 		      	   tyvars
 		      	   ctxt
-			   [] []	-- Temporary
+			   [] []	-- Temporary; existential chaps
 		      	   [arg_ty]
 		      	   tycon
     in
@@ -296,7 +287,7 @@ tcConDecl tycon tyvars ctxt (ConDecl name ex_ctxt (RecCon fields) src_loc)
 			   field_labels
 		      	   tyvars
 		      	   (thinContext arg_tys ctxt)
-			   [] []	-- Temporary
+			   [] []	-- Temporary; existential chaps
 		      	   arg_tys
 		      	   tycon
     in
@@ -319,7 +310,7 @@ tcDataCon tycon tyvars ctxt name btys src_loc
 			   [{- No field labels -}]
 		      	   tyvars
 		      	   (thinContext arg_tys ctxt)
-			   [] []	-- Temporary
+			   [] []	-- Temporary existential chaps
 		      	   arg_tys
 		      	   tycon
     in
@@ -331,7 +322,8 @@ thinContext arg_tys ctxt
   = filter in_arg_tys ctxt
   where
       arg_tyvars = tyVarsOfTypes arg_tys
-      in_arg_tys (clas,ty) = getTyVar "tcDataCon" ty `elementOfTyVarSet` arg_tyvars
+      in_arg_tys (clas,tys) = not $ isEmptyTyVarSet $ 
+			      tyVarsOfTypes tys `intersectTyVarSets` arg_tyvars
   
 get_strictness (Banged   _) = MarkedStrict
 get_strictness (Unbanged _) = NotMarkedStrict
@@ -345,20 +337,20 @@ get_pty (Unbanged ty) = ty
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tySynCtxt tycon_name sty
-  = hsep [ptext SLIT("In the type declaration for"), ppr sty tycon_name]
+tySynCtxt tycon_name
+  = hsep [ptext SLIT("In the type declaration for"), quotes (ppr tycon_name)]
 
-tyDataCtxt tycon_name sty
-  = hsep [ptext SLIT("In the data declaration for"), ppr sty tycon_name]
+tyDataCtxt tycon_name
+  = hsep [ptext SLIT("In the data declaration for"), quotes (ppr tycon_name)]
 
-tyNewCtxt tycon_name sty
-  = hsep [ptext SLIT("In the newtype declaration for"), ppr sty tycon_name]
+tyNewCtxt tycon_name
+  = hsep [ptext SLIT("In the newtype declaration for"), quotes (ppr tycon_name)]
 
-fieldTypeMisMatch field_name sty
-  = sep [ptext SLIT("Declared types differ for field"), ppr sty field_name]
+fieldTypeMisMatch field_name
+  = sep [ptext SLIT("Declared types differ for field"), quotes (ppr field_name)]
 
-missingEvalErr con eval_theta sty
-  = hsep [ptext SLIT("Missing Eval context for constructor"), 
-	   ppr sty con,
-	   char ':', ppr sty eval_theta]
+evalCtxt con eval_theta
+  = hsep [ptext SLIT("When checking the Eval context for constructor:"), 
+	   ppr con,
+	   text "::", ppr eval_theta]
 \end{code}

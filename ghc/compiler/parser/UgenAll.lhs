@@ -1,36 +1,27 @@
 Stuff the Ugenny things show to the parser.
 
 \begin{code}
-#include "HsVersions.h"
-
 module UgenAll (
-	-- re-exported Prelude stuff
-	returnUgn, thenUgn,
-
 	-- stuff defined in utils module
-	EXP_MODULE(UgenUtil) ,
+	module UgenUtil,
 
 	-- re-exported ugen-generated stuff
-	EXP_MODULE(U_binding) ,
-	EXP_MODULE(U_constr) ,
-	EXP_MODULE(U_entidt) ,
-	EXP_MODULE(U_list) ,
-	EXP_MODULE(U_literal) ,
-	EXP_MODULE(U_maybe) ,
-	EXP_MODULE(U_either) ,
-	EXP_MODULE(U_pbinding) ,
-	EXP_MODULE(U_qid) ,
-	EXP_MODULE(U_tree) ,
-	EXP_MODULE(U_ttype)
+	module U_binding,
+	module U_constr,
+	module U_entidt,
+	module U_list,
+	module U_literal,
+	module U_maybe,
+	module U_either,
+	module U_pbinding,
+	module U_qid,
+	module U_tree,
+	module U_ttype
     ) where
 
-#if __GLASGOW_HASKELL__ <= 201
-import PreludeGlaST
-#else
-import GlaExts
-#endif
+#include "HsVersions.h"
 
-IMP_Ubiq(){-uitous-}
+import GlaExts
 
 -- friends:
 import U_binding

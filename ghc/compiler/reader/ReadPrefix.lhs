@@ -4,19 +4,9 @@
 \section{Read parse tree built by Yacc parser}
 
 \begin{code}
-#include "HsVersions.h"
-
 module ReadPrefix ( rdModule )  where
 
-IMP_Ubiq()
-IMPORT_1_3(IO(hPutStr, stderr))
-#if __GLASGOW_HASKELL__ == 201
-import GHCio(stThen)
-#elif __GLASGOW_HASKELL__ >= 202
-import GlaExts
-import IOBase
-import PrelRead
-#endif
+#include "HsVersions.h"
 
 import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
@@ -27,16 +17,16 @@ import RdrHsSyn
 import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..) )
 import PrefixToHs
 
-import CmdLineOpts      ( opt_PprUserLength, opt_NoImplicitPrelude )
-import ErrUtils		( addErrLoc, ghcExit )
+import CmdLineOpts      ( opt_NoImplicitPrelude )
 import FiniteMap	( elemFM, FiniteMap )
-import Name		( OccName(..), SYN_IE(Module) )
+import Name		( OccName(..), Module )
 import Lex		( isLexConId )
-import Outputable	( Outputable(..), PprStyle(..) )
+import Outputable
 import PrelMods		( pRELUDE )
-import Pretty
-import SrcLoc		( mkGeneratedSrcLoc, noSrcLoc, SrcLoc )
-import Util		( nOfThem, pprError, panic )
+import Util		( nOfThem )
+import FastString	( mkFastCharString )
+import IO 		( hPutStr, stderr )
+import PrelRead		( readRational__ )
 \end{code}
 
 %************************************************************************
@@ -113,21 +103,13 @@ cvFlag 1 = True
 %************************************************************************
 
 \begin{code}
-#if __GLASGOW_HASKELL__ == 201
-# define PACK_STR packCString
-#elif __GLASGOW_HASKELL__ >= 202
-# define PACK_STR mkFastCharString
-#else
-# define PACK_STR mkFastCharString
-#endif
-
 rdModule :: IO (Module,		    -- this module's name
 	        RdrNameHsModule)    -- the main goods
 
 rdModule
-  = _ccall_ hspmain `CCALL_THEN` \ pt -> -- call the Yacc parser!
+  = _ccall_ hspmain 	>>= \ pt -> -- call the Yacc parser!
     let
-	srcfile  = PACK_STR ``input_filename'' -- What A Great Hack! (TM)
+	srcfile  = mkFastCharString ``input_filename'' -- What A Great Hack! (TM)
     in
     initUgn 		  $
     rdU_tree pt `thenUgn` \ (U_hmodule modname himplist hexplist hfixlist
@@ -210,7 +192,7 @@ wlkExpr expr
 	returnUgn (
 	    HsLam (foldr PatMatch
 			 (GRHSMatch (GRHSsAndBindsIn
-				      [OtherwiseGRHS body src_loc]
+				      (unguardedRHS body src_loc)
 				      EmptyBinds))
 			 pats)
 	)
@@ -330,7 +312,7 @@ wlkExpr expr
       U_record con rbinds -> -- record construction
 	wlkDataId  con		`thenUgn` \ rcon     ->
 	wlkList rdRbind rbinds	`thenUgn` \ recbinds ->
-	returnUgn (RecordCon rcon recbinds)
+	returnUgn (RecordCon rcon (HsVar rcon) recbinds)
 
       U_rupdate updexp updbinds -> -- record update
 	wlkExpr updexp		 `thenUgn` \ aexp ->
@@ -348,7 +330,7 @@ wlkExpr expr
       U_dobind _ _ _ 	      -> error "U_dobind"
       U_doexp _ _	      -> error "U_doexp"
       U_rbind _ _	      -> error "U_rbind"
-      U_fixop _ _ _	      -> error "U_fixop"
+      U_fixop _ _ _ _	      -> error "U_fixop"
 #endif
 
 rdRbind pt
@@ -450,22 +432,8 @@ wlkPat pat
 	    ConPatIn x []       -> returnUgn (x,  lpats)
 	    ConOpPatIn x op _ y -> returnUgn (op, x:y:lpats)
 	    _ -> getSrcLocUgn 	`thenUgn` \ loc ->
-		 let
-		     err = addErrLoc loc "Illegal pattern `application'"
-			             (\sty -> hsep (map (ppr sty) (lpat:lpats)))
-		     msg = show (err (PprForUser opt_PprUserLength))
-		 in
-#if __GLASGOW_HASKELL__ == 201
-	         ioToUgnM  (GHCbase.ioToPrimIO (hPutStr stderr msg)) `thenUgn` \ _ ->
-		 ioToUgnM  (GHCbase.ioToPrimIO (ghcExit 1))	     `thenUgn` \ _ ->
-#elif __GLASGOW_HASKELL__ >= 202 && __GLASGOW_HASKELL__ < 209
-	         ioToUgnM  (IOBase.ioToPrimIO (hPutStr stderr msg)) `thenUgn` \ _ ->
-		 ioToUgnM  (IOBase.ioToPrimIO (ghcExit 1))	     `thenUgn` \ _ ->
-#else
-	         ioToUgnM  (hPutStr stderr msg) `thenUgn` \ _ ->
-		 ioToUgnM  (ghcExit 1)		`thenUgn` \ _ ->
-#endif
-		 returnUgn (error "ReadPrefix")
+		 pprPanic "Illegal pattern `application'"
+			  (ppr loc <> colon <+> hsep (map ppr (lpat:lpats)))
 
 	)			`thenUgn` \ (n, arg_pats) ->
 	returnUgn (ConPatIn n arg_pats)
@@ -533,16 +501,8 @@ wlkLiteral ulit
   where
     as_char s     = _HEAD_ s
     as_integer s  = readInteger (_UNPK_ s)
-#if __GLASGOW_HASKELL__ == 201
-    as_rational s = GHCbase.readRational__ (_UNPK_ s) -- non-std
-#elif __GLASGOW_HASKELL__ == 202
-    as_rational s = case readRational (_UNPK_ s) of { [(a,_)] -> a }
-#elif __GLASGOW_HASKELL__ >= 203
     as_rational s = readRational__ (_UNPK_ s) -- use non-std readRational__ 
 					      -- to handle rationals with leading '-'
-#else
-    as_rational s = _readRational (_UNPK_ s) -- non-std
-#endif
     as_string s   = s
 \end{code}
 
@@ -571,7 +531,7 @@ wlkBinding binding
       U_tbind tctxt ttype tcons tderivs srcline ->
 	mkSrcLocUgn	   srcline  	    $ \ src_loc	    ->
 	wlkContext	   tctxt    `thenUgn` \ ctxt	    ->
-	wlkTyConAndTyVars  ttype    `thenUgn` \ (tycon, tyvars) ->
+	wlkConAndTyVars    ttype    `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  tcons    `thenUgn` \ cons	    ->
 	wlkDerivings	   tderivs  `thenUgn` \ derivings   ->
 	returnUgn (RdrTyDecl (TyData DataType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
@@ -580,7 +540,7 @@ wlkBinding binding
       U_ntbind ntctxt nttype ntcon ntderivs srcline ->
 	mkSrcLocUgn	   srcline  	    $ \ src_loc	    ->
 	wlkContext	   ntctxt   `thenUgn` \ ctxt	    ->
-	wlkTyConAndTyVars  nttype   `thenUgn` \ (tycon, tyvars) ->
+	wlkConAndTyVars    nttype   `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  ntcon    `thenUgn` \ cons	    ->
 	wlkDerivings	   ntderivs `thenUgn` \ derivings   ->
 	returnUgn (RdrTyDecl (TyData NewType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
@@ -588,7 +548,7 @@ wlkBinding binding
 	-- "type" declaration
       U_nbind nbindid nbindas srcline -> 		
 	mkSrcLocUgn	  srcline 	  $ \ src_loc	    ->
-	wlkTyConAndTyVars nbindid `thenUgn` \ (tycon, tyvars) ->
+	wlkConAndTyVars   nbindid `thenUgn` \ (tycon, tyvars) ->
 	wlkMonoType	  nbindas `thenUgn` \ expansion	    ->
 	returnUgn (RdrTyDecl (TySynonym tycon tyvars expansion src_loc))
 
@@ -606,29 +566,29 @@ wlkBinding binding
 
  	-- "class" declaration
       U_cbind cbindc cbindid cbindw srcline ->
-	mkSrcLocUgn	 srcline 	$ \ src_loc	  ->
-	wlkContext	 cbindc	 `thenUgn` \ ctxt	  ->
-	wlkClassAssertTy cbindid `thenUgn` \ (clas, tyvar)->
-	wlkBinding	 cbindw	 `thenUgn` \ binding	  ->
-	getSrcFileUgn		 `thenUgn` \ sf		  ->
+	mkSrcLocUgn	 srcline 	$ \ src_loc	    ->
+	wlkContext	 cbindc	 `thenUgn` \ ctxt	    ->
+	wlkConAndTyVars  cbindid `thenUgn` \ (clas, tyvars) ->
+	wlkBinding	 cbindw	 `thenUgn` \ binding	    ->
+	getSrcFileUgn		 `thenUgn` \ sf		    ->
 	let
 	    (final_methods, final_sigs) = cvMonoBindsAndSigs sf cvClassOpSig binding
 	in
 	returnUgn (RdrClassDecl
-	  (ClassDecl ctxt clas tyvar final_sigs final_methods noClassPragmas src_loc))
+	  (mkClassDecl ctxt clas tyvars final_sigs final_methods noClassPragmas src_loc))
 
 	-- "instance" declaration
-      U_ibind ibindc iclas ibindi ibindw srcline ->
+      U_ibind ty ibindw srcline ->
+	-- The "ty" contains the instance context too
+	-- So for "instance Eq a => Eq [a]" the type will be
+	--	Eq a => Eq [a]
 	mkSrcLocUgn	srcline		$ \ src_loc ->
-	wlkContext	ibindc	`thenUgn` \ ctxt    ->
-	wlkTCId		iclas	`thenUgn` \ clas    ->
-	wlkMonoType	ibindi	`thenUgn` \ at_ty ->
-	wlkBinding	ibindw	`thenUgn` \ binding ->
-	getSrcModUgn		`thenUgn` \ modname ->
-	getSrcFileUgn		`thenUgn` \ sf	    ->
+	wlkInstType       ty		`thenUgn` \ inst_ty    ->
+	wlkBinding	ibindw		`thenUgn` \ binding ->
+	getSrcModUgn			`thenUgn` \ modname ->
+	getSrcFileUgn			`thenUgn` \ sf	    ->
 	let
 	    (binds,uprags) = cvMonoBindsAndSigs sf cvInstDeclSig binding
-	    inst_ty = HsPreForAllTy ctxt (MonoDictTy clas at_ty)
 	in
 	returnUgn (RdrInstDecl
           (InstDecl inst_ty binds uprags Nothing {- No dfun id -} src_loc))
@@ -765,38 +725,49 @@ wlkMonoType ttype
 	wlkMonoType targ	`thenUgn` \ ty2 ->
 	returnUgn (MonoFunTy ty1 ty2)
 
+wlkInstType ttype
+  = case ttype of
+      U_context tcontextl tcontextt -> -- context
+	wlkContext  tcontextl	`thenUgn` \ ctxt ->
+	wlkConAndTys tcontextt	`thenUgn` \ (clas, tys)	 ->
+	returnUgn (HsPreForAllTy ctxt (MonoDictTy clas tys))
+
+      other -> -- something else
+	wlkConAndTys other   `thenUgn` \ (clas, tys) ->
+	returnUgn (HsPreForAllTy [{-no context-}] (MonoDictTy clas tys))
 \end{code}
 
 \begin{code}
-wlkTyConAndTyVars :: U_ttype -> UgnM (RdrName, [HsTyVar RdrName])
-wlkContext   	  :: U_list  -> UgnM RdrNameContext
-wlkClassAssertTy  :: U_ttype -> UgnM (RdrName, HsTyVar RdrName)
-
-wlkTyConAndTyVars ttype
+wlkConAndTyVars :: U_ttype   -> UgnM (RdrName, [HsTyVar RdrName])
+wlkConAndTyVars ttype
   = wlkMonoType ttype	`thenUgn` \ ty ->
     let
 	split (MonoTyApp fun (MonoTyVar arg)) args = split fun (UserTyVar arg : args)
 	split (MonoTyVar tycon)		      args = (tycon,args)
+	split other			      args = pprPanic "ERROR: malformed type: "
+						     (ppr other)
     in
     returnUgn (split ty [])
 
-wlkContext list
-  = wlkList rdMonoType list `thenUgn` \ tys ->
-    returnUgn (map mk_class_assertion tys)
 
-wlkClassAssertTy xs
-  = wlkMonoType xs   `thenUgn` \ mono_ty ->
-    returnUgn (case mk_class_assertion mono_ty of
-		  (clas, MonoTyVar tyvar) -> (clas, UserTyVar tyvar)
-    )
+wlkContext   :: U_list  -> UgnM RdrNameContext
+rdConAndTys  :: ParseTree -> UgnM (RdrName, [HsType RdrName])
 
-mk_class_assertion :: RdrNameHsType -> (RdrName, RdrNameHsType)
+wlkContext list = wlkList rdConAndTys list
 
-mk_class_assertion (MonoTyApp (MonoTyVar name) ty@(MonoTyVar tyname)) = (name, ty)
-mk_class_assertion other
-  = pprError "ERROR: malformed type context: " (ppr (PprForUser opt_PprUserLength) other)
-    -- regrettably, the parser does let some junk past
-    -- e.g., f :: Num {-nothing-} => a -> ...
+rdConAndTys pt
+  = rdU_ttype pt `thenUgn` \ ttype -> 
+    wlkConAndTys ttype
+
+wlkConAndTys ttype
+  = wlkMonoType ttype	`thenUgn` \ ty ->
+    let
+	split (MonoTyApp fun ty) tys = split fun (ty : tys)
+	split (MonoTyVar tycon)  tys = (tycon, tys)
+	split other		 tys = pprPanic "ERROR: malformed type: "
+					     (ppr other)
+    in
+    returnUgn (split ty [])
 \end{code}
 
 \begin{code}
@@ -899,9 +870,9 @@ rdFixOp :: ParseTree -> UgnM RdrNameFixityDecl
 rdFixOp pt 
   = rdU_tree pt `thenUgn` \ fix ->
     case fix of
-      U_fixop op dir_n prec -> wlkVarId op `thenUgn` \ op ->
-				       returnUgn (FixityDecl op (Fixity prec dir) noSrcLoc)
-						-- ToDo: add SrcLoc!
+      U_fixop op dir_n prec srcline -> wlkVarId op 		`thenUgn` \ op ->
+				       mkSrcLocUgn srcline	$ \ src_loc ->
+				       returnUgn (FixityDecl op (Fixity prec dir) src_loc)
 			    where
 			      dir = case dir_n of
 					(-1) -> InfixL

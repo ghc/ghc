@@ -2,12 +2,14 @@
 #include "hspincl.h"
 %}
 %{{
-#include "HsVersions.h"
 
 module U_either where
-IMP_Ubiq() --  debugging consistency check
+
+#include "HsVersions.h"
+
 import UgenUtil
 %}}
+
 type either;
 	left	: < gleft  : VOID_STAR; > ;
 	right	: < gright : VOID_STAR; > ;

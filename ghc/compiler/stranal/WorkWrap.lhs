@@ -4,11 +4,9 @@
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 
 \begin{code}
-#include "HsVersions.h"
-
 module WorkWrap ( workersAndWrappers, getWorkerIdAndCons ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CoreSyn
 import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidance )
@@ -17,18 +15,16 @@ import CmdLineOpts	( opt_UnfoldingCreationThreshold )
 import CoreUtils	( coreExprType )
 import Id		( getInlinePragma, getIdStrictness, mkWorkerId,
 			  addIdStrictness, addInlinePragma,
-			  SYN_IE(IdSet), emptyIdSet, addOneToIdSet,
-			  GenId, SYN_IE(Id)
+			  IdSet, emptyIdSet, addOneToIdSet,
+			  GenId, Id
 			)
 import IdInfo		( noIdInfo, addUnfoldInfo,  
 			  mkStrictnessInfo, addStrictnessInfo, StrictnessInfo(..)
 			)
 import SaLib
-import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
+import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM )
 import WwLib
-import Pretty		( Doc )
-import Outputable	( ppr, PprStyle(..) )
-import Util		( pprPanic )
+import Outputable
 \end{code}
 
 We take Core bindings whose binders have their strictness attached (by
@@ -204,7 +200,7 @@ tryWW fn_id rhs
 
   | otherwise		-- Do w/w split
   = let
-	(uvars, tyvars, wrap_args, body) = collectBinders rhs
+	(tyvars, wrap_args, body) = collectBinders rhs
     in
     mkWwBodies tyvars wrap_args 
 	       (coreExprType body)
@@ -235,7 +231,7 @@ tryWW fn_id rhs
 			StrictnessInfo args_info _ -> args_info
     revised_wrap_args_info = setUnpackStrategy wrap_args_info
 
--- This rather crude function looks at a wrapper function, and
+-- This rather (nay! extremely!) crude function looks at a wrapper function, and
 -- snaffles out (a) the worker Id and (b) constructors needed to 
 -- make the wrapper.
 -- These are needed when we write an interface file.
@@ -252,5 +248,5 @@ getWorkerIdAndCons wrap_id wrapper_fn
 
     get_work_id (App fn _)    = get_work_id fn
     get_work_id (Var work_id) = work_id
-    get_work_id other	      = pprPanic "getWorkerIdAndCons" (ppr PprDebug wrap_id)
+    get_work_id other	      = pprPanic "getWorkerIdAndCons" (ppr wrap_id)
 \end{code}

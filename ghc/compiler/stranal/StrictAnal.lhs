@@ -7,33 +7,30 @@ The original version(s) of all strictness-analyser code (except the
 Semantique analyser) was written by Andy Gill.
 
 \begin{code}
-#include "HsVersions.h"
-
 module StrictAnal ( saWwTopBinds ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CmdLineOpts	( opt_D_dump_stranal, opt_D_simplifier_stats
 			)
 import CoreSyn
 import Id		( idType, addIdStrictness, isWrapperId,
 			  getIdDemandInfo, addIdDemandInfo,
-			  GenId{-instance Outputable-}, SYN_IE(Id)
+			  GenId{-instance Outputable-}, Id
 			)
 import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo,
 			  mkDemandInfo, willBeDemanded, DemandInfo
 			)
-import PprCore		( pprCoreBinding, pprBigCoreBinder )
-import Outputable	( PprStyle(..) )
+import PprCore		( pprCoreBinding )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
-import Pretty		( Doc, hcat, ptext, int, char, vcat )
 import SaAbsInt
 import SaLib
 import TyVar		( GenTyVar{-instance Eq-} )
 import WorkWrap		-- "back-end" of strictness analyser
 import Unique		( Unique{-instance Eq -} )
 import UniqSupply       ( UniqSupply )
-import Util		( zipWith4Equal, pprTrace, panic )
+import Util		( zipWith4Equal )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -102,7 +99,7 @@ saWwTopBinds us binds
     -- possibly show what we decided about strictness...
     (if opt_D_dump_stranal
      then pprTrace "Strictness:\n" (vcat (
-	   map (pprCoreBinding PprDebug)  binds_w_strictness))
+	   map (pprCoreBinding)  binds_w_strictness))
      else id
     )
     -- possibly show how many things we marked as demanded...
@@ -392,8 +389,8 @@ addStrictnessInfoToId str_val abs_val binder body
 
   | otherwise
   = case (collectBinders body) of
-	(_, _, [], rhs) 	   -> binder
-	(_, _, lambda_bounds, rhs) -> binder `addIdStrictness` 
+	(_, [], rhs) 	        -> binder
+	(_, lambda_bounds, rhs) -> binder `addIdStrictness` 
 				      mkStrictnessInfo strictness False
 		where
 		    tys        = map idType lambda_bounds

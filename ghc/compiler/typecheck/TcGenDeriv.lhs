@@ -9,8 +9,6 @@ This module is nominally ``subordinate'' to @TcDeriv@, which is the
 This is where we do all the grimy bindings' generation.
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcGenDeriv (
 	gen_Bounded_binds,
 	gen_Enum_binds,
@@ -27,22 +25,22 @@ module TcGenDeriv (
 	TagThingWanted(..)
     ) where
 
-IMP_Ubiq()
-IMPORT_1_3(List(partition,intersperse))
+#include "HsVersions.h"
 
-import HsSyn		( HsBinds(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
-			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Stmt(..), DoOrListComp(..),
-			  SYN_IE(RecFlag), recursive,
-			  ArithSeqInfo, Sig, HsType, FixityDecl, Fixity, Fake )
-import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
-			  SYN_IE(RdrNameMonoBinds), SYN_IE(RdrNameHsExpr), SYN_IE(RdrNamePat)
+import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..), GRHS(..), 
+			  Match(..), GRHSsAndBinds(..), Stmt(..), HsLit(..),
+			  HsBinds(..), DoOrListComp(..),
+			  unguardedRHS
 			)
-import BasicTypes	( IfaceFlavour(..) )
+import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
+			  RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat
+			)
+import BasicTypes	( IfaceFlavour(..), RecFlag(..) )
 import FieldLabel       ( fieldLabelName )
 import Id		( GenId, isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
-			  isDataCon, SYN_IE(DataCon), SYN_IE(ConTag),
-			  dataConFieldLabels, SYN_IE(Id) )
+			  isDataCon, DataCon, ConTag,
+			  dataConFieldLabels, Id )
 import Maybes		( maybeToBool )
 import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
 			  modAndOcc, OccName, Name )
@@ -51,21 +49,14 @@ import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
-import Type		( eqTy, isPrimType, SYN_IE(Type) )
+import Type		( isUnpointedType, isUnboxedType, Type )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
 import Util		( mapAccumL, zipEqual, zipWithEqual,
 			  zipWith3Equal, nOfThem, panic, assertPanic )
 
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 200
-intersperse :: a -> [a] -> [a]
-intersperse s []     = []
-intersperse s [x]    = [x]
-intersperse s (x:xs) = x : s : intersperse s xs
-#endif
-
+import List		( partition, intersperse )
 \end{code}
 
 %************************************************************************
@@ -272,6 +263,7 @@ cmp_eq (O3 a1 b1 c1) (O3 a2 b2 c2)
   Again, we must be careful about unboxed comparisons.  For example,
   if \tr{a1} and \tr{a2} were \tr{Int#}s in the 2nd example above, we'd need to
   generate:
+
 \begin{verbatim}
 cmp_eq lt eq gt (O2 a1) (O2 a2)
   = compareInt# a1 a2
@@ -580,7 +572,7 @@ gen_Ix_binds tycon
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
 	   untag_Expr tycon [(d_RDR, dh_RDR)] (
 	   let
-		grhs = [OtherwiseGRHS (mk_easy_App mkInt_RDR [c_RDR]) tycon_loc]
+		grhs = unguardedRHS (mk_easy_App mkInt_RDR [c_RDR]) tycon_loc
 	   in
 	   HsCase
 	     (genOpApp (HsVar dh_RDR) minusH_RDR (HsVar ah_RDR))
@@ -613,7 +605,7 @@ gen_Ix_binds tycon
     data_con
       =	case maybeTyConSingleCon tycon of -- just checking...
 	  Nothing -> panic "get_Ix_binds"
-	  Just dc -> if (any isPrimType (dataConRawArgTys dc)) then
+	  Just dc -> if (any isUnpointedType (dataConRawArgTys dc)) then
 			 error ("ERROR: Can't derive Ix for a single-constructor type with primitive argument types: "++tycon_str)
 		     else
 			 dc
@@ -965,7 +957,7 @@ mk_easy_Match loc pats binds expr
   = mk_match loc pats expr (mkbind binds)
   where
     mkbind [] = EmptyBinds
-    mkbind bs = MonoBind (foldr1 AndMonoBinds bs) [] recursive
+    mkbind bs = MonoBind (foldr1 AndMonoBinds bs) [] Recursive
 	-- The renamer expects everything in its input to be a
 	-- "recursive" MonoBinds, and it is its job to sort things out
 	-- from there.
@@ -982,7 +974,7 @@ mk_FunMonoBind loc fun pats_and_exprs
 
 mk_match loc pats expr binds
   = foldr PatMatch
-	  (GRHSMatch (GRHSsAndBindsIn [OtherwiseGRHS expr loc] binds))
+	  (GRHSMatch (GRHSsAndBindsIn (unguardedRHS expr loc) binds))
 	  (map paren pats)
   where
     paren p@(VarPatIn _) = p
@@ -1017,17 +1009,17 @@ cmp_eq_Expr = compare_gen_Case cmp_eq_RDR
 compare_gen_Case fun lt eq gt a b
   = HsCase (HsPar (HsApp (HsApp (HsVar fun) a) b)) {-of-}
       [PatMatch (ConPatIn ltTag_RDR [])
-	  (GRHSMatch (GRHSsAndBindsIn [OtherwiseGRHS lt mkGeneratedSrcLoc] EmptyBinds)),
+	  (GRHSMatch (GRHSsAndBindsIn (unguardedRHS lt mkGeneratedSrcLoc) EmptyBinds)),
 
        PatMatch (ConPatIn eqTag_RDR [])
-	  (GRHSMatch (GRHSsAndBindsIn [OtherwiseGRHS eq mkGeneratedSrcLoc] EmptyBinds)),
+	  (GRHSMatch (GRHSsAndBindsIn (unguardedRHS eq mkGeneratedSrcLoc) EmptyBinds)),
 
        PatMatch (ConPatIn gtTag_RDR [])
-	  (GRHSMatch (GRHSsAndBindsIn [OtherwiseGRHS gt mkGeneratedSrcLoc] EmptyBinds))]
+	  (GRHSMatch (GRHSsAndBindsIn (unguardedRHS gt mkGeneratedSrcLoc) EmptyBinds))]
        mkGeneratedSrcLoc
 
 careful_compare_Case ty lt eq gt a b
-  = if not (isPrimType ty) then
+  = if not (isUnboxedType ty) then
        compare_gen_Case compare_RDR lt eq gt a b
 
     else -- we have to do something special for primitive things...
@@ -1043,7 +1035,7 @@ assoc_ty_id tyids ty
   = if null res then panic "assoc_ty"
     else head res
   where
-    res = [id | (ty',id) <- tyids, eqTy ty ty']
+    res = [id | (ty',id) <- tyids, ty == ty']
 
 eq_op_tbl =
     [(charPrimTy,	eqH_Char_RDR)
@@ -1074,7 +1066,7 @@ append_Expr a b = genOpApp a append_RDR b
 
 eq_Expr :: Type -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
 eq_Expr ty a b
-  = if not (isPrimType ty) then
+  = if not (isUnboxedType ty) then
        genOpApp a eq_RDR  b
     else -- we have to do something special for primitive things...
        genOpApp a relevant_eq_op b
@@ -1096,7 +1088,7 @@ untag_Expr tycon ((untag_this, put_tag_here) : more) expr
 			(GRHSMatch (GRHSsAndBindsIn grhs EmptyBinds))]
       mkGeneratedSrcLoc
   where
-    grhs = [OtherwiseGRHS (untag_Expr tycon more expr) mkGeneratedSrcLoc]
+    grhs = unguardedRHS (untag_Expr tycon more expr) mkGeneratedSrcLoc
 
 cmp_tags_Expr :: RdrName 		-- Comparison op
 	     -> RdrName -> RdrName	-- Things to compare

@@ -4,21 +4,18 @@
 \section[Desugar]{@deSugar@: the main function}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Desugar ( deSugar, pprDsWarnings
 #if __GLASGOW_HASKELL__ < 200
 		, DsMatchContext
 #endif
 	       ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CmdLineOpts	( opt_D_dump_ds )
-import HsSyn		( HsBinds, HsExpr, MonoBinds,
-			  SYN_IE(RecFlag), nonRecursive, recursive
+import HsSyn		( HsBinds, HsExpr, MonoBinds
 			)
-import TcHsSyn		( SYN_IE(TypecheckedMonoBinds), SYN_IE(TypecheckedHsExpr)
+import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr
 			)
 import CoreSyn
 import PprCore		( pprCoreBindings )
@@ -28,16 +25,15 @@ import DsBinds		( dsMonoBinds )
 import DsUtils
 
 import Bag		( unionBags, isEmptyBag )
-import BasicTypes       ( SYN_IE(Module) )
+import BasicTypes       ( Module, RecFlag(..) )
 import CmdLineOpts	( opt_DoCoreLinting, opt_SccGroup, opt_SccProfilingOn )
 import CostCentre       ( IsCafCC(..), mkAutoCC )
 import CoreLift		( liftCoreBindings )
 import CoreLint		( lintCoreBindings )
 import Id		( nullIdEnv, mkIdEnv, idType, 
-			  SYN_IE(DictVar), GenId, SYN_IE(Id) )
+			  DictVar, GenId, Id )
 import ErrUtils		( dumpIfSet, doIfSet )
-import Outputable	( PprStyle(..), pprDumpStyle, pprErrorsStyle, printErrs )
-import Pretty		( Doc )
+import Outputable
 import UniqSupply	( splitUniqSupply, UniqSupply )
 \end{code}
 
@@ -60,21 +56,21 @@ deSugar us mod_name all_binds
 		    	Nothing -> mod_name	-- default: module name
 
 	(core_prs, ds_warns) = initDs us1 nullIdEnv module_and_group 
-			       (dsMonoBinds opt_SccProfilingOn recursive all_binds [])
+			       (dsMonoBinds opt_SccProfilingOn all_binds [])
 
 	ds_binds = liftCoreBindings us2 [Rec core_prs]
     in
 
 	-- Display any warnings
     doIfSet (not (isEmptyBag ds_warns))
-	(printErrs (pprDsWarnings pprErrorsStyle ds_warns)) >>
+	(printErrs (pprDsWarnings ds_warns)) >>
 
 	-- Lint result if necessary
     lintCoreBindings "Desugarer" False ds_binds >>
 
 	-- Dump output
     dumpIfSet opt_D_dump_ds "Desugared:"
-	(pprCoreBindings pprDumpStyle ds_binds)	>>
+	(pprCoreBindings ds_binds)	>>
 
     return ds_binds    
 \end{code}

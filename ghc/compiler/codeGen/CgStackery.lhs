@@ -7,8 +7,6 @@ Stack-twiddling operations, which are pretty low-down and grimy.
 (This is the module that knows all about stack layouts, etc.)
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgStackery (
 	allocAStack, allocBStack, allocAStackTop, allocBStackTop,
 	allocUpdateFrame,
@@ -16,13 +14,13 @@ module CgStackery (
 	mkVirtStkOffsets, mkStkAmodes
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CgMonad
 import AbsCSyn
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
-import HeapOffs		( SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset) )
+import HeapOffs		( VirtualSpAOffset, VirtualSpBOffset )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness,
 			  PrimRep(..)
 			)

@@ -4,35 +4,33 @@
 \section[SimplPgm]{Interface to the simplifier}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SimplPgm ( simplifyPgm ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_simpl_iterations,
-			  switchIsOn, SimplifierSwitch(..), SYN_IE(SwitchResult)
+			  switchIsOn, SimplifierSwitch(..), SwitchResult
 			)
 import CoreSyn
 import CoreUnfold	( SimpleUnfolding )
 import CoreUtils	( substCoreExpr )
-import Id		( mkIdEnv, lookupIdEnv, SYN_IE(IdEnv),
-			  GenId{-instance Ord3-}
+import Id		( mkIdEnv, lookupIdEnv, IdEnv
 			)
 import Maybes		( catMaybes )
 import OccurAnal	( occurAnalyseBinds )
-import Pretty		( Doc, vcat, hcat, int, char, text, ptext, empty )
-import Outputable       ( PprStyle(..) )   -- added SOF
 import PprCore          ( pprCoreBinding ) -- added SOF
 import SimplEnv
 import SimplMonad
 import Simplify		( simplTopBinds )
-import TyVar		( nullTyVarEnv, SYN_IE(TyVarEnv) )
+import TyVar		( TyVarEnv )
 import UniqSupply	( thenUs, returnUs, mapUs, 
-			  splitUniqSupply, SYN_IE(UniqSM),
+			  splitUniqSupply, UniqSM,
 			  UniqSupply
 			 )
-import Util		( isIn, isn'tIn, removeDups, pprTrace )
+import Util		( isIn, isn'tIn, removeDups )
+import Outputable 
+
+import GlaExts		( trace )
 \end{code}
 
 \begin{code}
@@ -78,7 +76,7 @@ simplifyPgm binds s_sw_chkr simpl_stats us
 			   int max_simpl_iterations],
 		text (showSimplCount dr),
 		if opt_D_dump_simpl_iterations then
-			vcat (map (pprCoreBinding PprDebug) new_pgm)
+			vcat (map (pprCoreBinding) new_pgm)
 		else
 			empty
 		])

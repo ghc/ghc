@@ -12,18 +12,16 @@ case, so that we don't allocate things, save them on the stack, and
 then discover that they aren't needed in the chosen branch.
 
 \begin{code}
-#include "HsVersions.h"
-
 module FloatIn ( floatInwards ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import AnnCoreSyn
 import CoreSyn
 
 import FreeVars
 import Id		( emptyIdSet, unionIdSets, unionManyIdSets,
-			  elementOfIdSet, SYN_IE(IdSet), GenId, SYN_IE(Id)
+			  elementOfIdSet, IdSet, GenId, Id
 			)
 import Util		( nOfThem, panic, zipEqual )
 \end{code}
@@ -141,9 +139,6 @@ fiExpr to_drop (_,AnnPrim c atoms)
 
 Here we are not floating inside lambda (type lambdas are OK):
 \begin{code}
-fiExpr to_drop (_,AnnLam (UsageBinder binder) body)
-  = panic "FloatIn.fiExpr:AnnLam UsageBinder"
-
 fiExpr to_drop (_,AnnLam b@(ValBinder binder) body)
   = mkCoLets' to_drop (Lam b (fiExpr [] body))
 

@@ -4,24 +4,15 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-#include "HsVersions.h"
-
 module RnSource ( rnDecl, rnHsType, rnHsSigType ) where
 
-IMPORT_1_3(List(partition))
-IMP_Ubiq()
+#include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(RnLoop)		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
-#else
 import RnExpr
---import {-# SOURCE #-} RnExpr
-#endif
-
 import HsSyn
 import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
 import HsPragmas
-import HsTypes		( getTyVarName )
+import HsTypes		( getTyVarName, pprClassAssertion, cmpHsTypes )
 import RdrHsSyn
 import RnHsSyn
 import HsCore
@@ -30,7 +21,7 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import RnBinds		( rnTopBinds, rnMethodBinds )
 import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
 			  newDfunName, checkDupOrQualNames, checkDupNames,
-			  newLocallyDefinedGlobalName, newGlobalName, ifaceFlavour,
+			  newLocallyDefinedGlobalName, newImportedGlobalName, ifaceFlavour,
 			  listType_RDR, tupleType_RDR )
 import RnMonad
 
@@ -38,14 +29,12 @@ import Name		( Name, isLocallyDefined,
 			  OccName(..), occNameString, prefixOccName,
 			  ExportFlag(..),
 			  Provenance(..), getNameProvenance,
-			  SYN_IE(NameSet), unionNameSets, emptyNameSet, mkNameSet, unitNameSet,
-			  elemNameSet
+			  NameSet, unionNameSets, emptyNameSet, mkNameSet, unitNameSet,
+			  elemNameSet, nameSetToList
 			)
-import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine )
 import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
 import Id		( GenId{-instance NamedThing-} )
 import IdInfo		( IdInfo, StrictnessInfo(..), FBTypeInfo, DemandInfo, ArgUsageInfo )
-import SpecEnv		( SpecEnv )
 import Lex		( isLexCon )
 import CoreUnfold	( Unfolding(..), SimpleUnfolding )
 import MagicUFs		( MagicUnfoldingFun )
@@ -53,14 +42,13 @@ import PrelInfo		( derivingOccurrences, evalClass_RDR, numClass_RDR, allClass_NA
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
 import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
-import Outputable	( PprStyle(..), Outputable(..){-instances-}, pprQuote )
-import Pretty
+import Outputable
 import SrcLoc		( SrcLoc )
 import Unique		( Unique )
-import UniqSet		( SYN_IE(UniqSet) )
+import UniqSet		( UniqSet )
 import UniqFM		( UniqFM, lookupUFM )
 import Util
-IMPORT_1_3(List(nub))
+import List		( partition, nub )
 \end{code}
 
 rnDecl `renames' declarations.
@@ -94,8 +82,10 @@ rnDecl (SigD (IfaceSig name ty id_infos loc))
   = pushSrcLocRn loc $
     lookupBndrRn name		`thenRn` \ name' ->
     rnHsType ty			`thenRn` \ ty' ->
+
 	-- Get the pragma info (if any).
-    setModeRn (InterfaceMode Optional) $
+    getModeRn			`thenRn` \ (InterfaceMode _ print_unqual) ->
+    setModeRn (InterfaceMode Optional print_unqual) $
 	-- In all the rest of the signature we read in optional mode,
 	-- so that (a) we don't die
     mapRn rnIdInfo id_infos	`thenRn` \ id_infos' -> 
@@ -132,7 +122,7 @@ rnDecl (TyD (TyData new_or_data context tycon tyvars condecls derivings pragmas 
     ASSERT(isNoDataPragmas pragmas)
     returnRn (TyD (TyData new_or_data context' tycon' tyvars' condecls' derivings' noDataPragmas src_loc))
   where
-    data_doc sty = text "the data type declaration for" <+> ppr sty tycon
+    data_doc = text "the data type declaration for" <+> ppr tycon
     con_names = map conDeclName condecls
 
 rnDecl (TyD (TySynonym name tyvars ty src_loc))
@@ -142,7 +132,7 @@ rnDecl (TyD (TySynonym name tyvars ty src_loc))
     rnHsType ty	    				`thenRn` \ ty' ->
     returnRn (TyD (TySynonym name' tyvars' ty' src_loc))
   where
-    syn_doc sty = text "the declaration for type synonym" <+> ppr sty name
+    syn_doc = text "the declaration for type synonym" <+> ppr name
 \end{code}
 
 %*********************************************************
@@ -156,18 +146,24 @@ class declaration in which local names have been replaced by their
 original names, reporting any unknown names.
 
 \begin{code}
-rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
+rnDecl (ClD (ClassDecl context cname tyvars sigs mbinds pragmas tname dname src_loc))
   = pushSrcLocRn src_loc $
 
-    bindTyVarsRn cls_doc [tyvar]			( \ [tyvar'] ->
+    lookupBndrRn cname					`thenRn` \ cname' ->
+    lookupBndrRn tname					`thenRn` \ tname' ->
+    lookupBndrRn dname					`thenRn` \ dname' ->
+
+    bindTyVarsRn cls_doc tyvars					( \ tyvars' ->
 	rnContext context	    				`thenRn` \ context' ->
-	lookupBndrRn cname					`thenRn` \ cname' ->
 
 	     -- Check the signatures
+	let
+	  clas_tyvar_names = map getTyVarName tyvars'
+	in
 	checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	`thenRn_` 
-	mapRn (rn_op cname' (getTyVarName tyvar')) sigs		`thenRn` \ sigs' ->
-	returnRn (tyvar', context', cname', sigs')
-    )							`thenRn` \ (tyvar', context', cname', sigs') ->
+	mapRn (rn_op cname' clas_tyvar_names) sigs		`thenRn` \ sigs' ->
+	returnRn (tyvars', context', sigs')
+    )							`thenRn` \ (tyvars', context', sigs') ->
 
 	-- Check the methods
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
@@ -179,20 +175,20 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
 	-- for instance decls.
 
     ASSERT(isNoClassPragmas pragmas)
-    returnRn (ClD (ClassDecl context' cname' tyvar' sigs' mbinds' NoClassPragmas src_loc))
+    returnRn (ClD (ClassDecl context' cname' tyvars' sigs' mbinds' NoClassPragmas tname' dname' src_loc))
   where
-    cls_doc sty  = text "the declaration for class" 	<+> ppr sty cname
-    sig_doc sty  = text "the signatures for class"  	<+> ppr sty cname
-    meth_doc sty = text "the default-methods for class" <+> ppr sty cname
+    cls_doc  = text "the declaration for class" 	<+> ppr cname
+    sig_doc  = text "the signatures for class"  	<+> ppr cname
+    meth_doc = text "the default-methods for class" <+> ppr cname
 
     sig_rdr_names_w_locs  = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
     meth_rdr_names_w_locs = bagToList (collectMonoBinders mbinds)
     meth_rdr_names	  = map fst meth_rdr_names_w_locs
 
-    rn_op clas clas_tyvar sig@(ClassOpSig op maybe_dm ty locn)
+    rn_op clas clas_tyvars sig@(ClassOpSig op maybe_dm ty locn)
       = pushSrcLocRn locn $
 	lookupBndrRn op				`thenRn` \ op_name ->
-	rnHsSigType (\sty -> ppr sty op) ty	`thenRn` \ new_ty  ->
+	rnHsSigType (quotes (ppr op)) ty	`thenRn` \ new_ty  ->
 
 		-- Make the default-method name
 	let
@@ -207,28 +203,27 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
 					       (\_ -> Exported) locn	`thenRn` \ dm_name ->
 		   returnRn (Just dm_name)
 
-	    (InterfaceMode _, Just _) 
+	    (InterfaceMode _ _, Just _) 
 		-> 	-- Imported class that has a default method decl
-		    newGlobalName mod_name dm_occ (ifaceFlavour clas)	`thenRn` \ dm_name ->
-		    addOccurrenceName dm_name				`thenRn_`
+		    newImportedGlobalName mod_name dm_occ (ifaceFlavour clas)	`thenRn` \ dm_name ->
+		    addOccurrenceName dm_name					`thenRn_`
 		    returnRn (Just dm_name)
 
 	    other -> returnRn Nothing
 	)					`thenRn` \ maybe_dm_name ->
 
-		-- Checks.....
+		-- Check that each class tyvar appears in op_ty
 	let
 	    (ctxt, op_ty) = case new_ty of
 				HsForAllTy tvs ctxt op_ty -> (ctxt, op_ty)
 				other			  -> ([], new_ty)
-	    ctxt_fvs  = extractCtxtTyNames ctxt
-	    op_ty_fvs = extractHsTyNames op_ty		-- Includes tycons/classes but we
-							-- don't care about that
+	    ctxt_fvs  = extractHsCtxtTyNames ctxt	-- Includes tycons/classes but we
+	    op_ty_fvs = extractHsTyNames op_ty		-- don't care about that
+
+	    check_in_op_ty clas_tyvar = checkRn (clas_tyvar `elemNameSet` op_ty_fvs)
+					        (classTyVarNotInOpTyErr clas_tyvar sig)
 	in
-		-- Check that class tyvar appears in op_ty
-        checkRn (clas_tyvar `elemNameSet` op_ty_fvs)
-	        (classTyVarNotInOpTyErr clas_tyvar sig)
-							 `thenRn_`
+        mapRn check_in_op_ty clas_tyvars		 `thenRn_`
 
 	returnRn (ClassOpSig op_name maybe_dm_name new_ty locn)
 \end{code}
@@ -243,7 +238,7 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
 \begin{code}
 rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
   = pushSrcLocRn src_loc $
-    rnHsSigType (\sty -> text "an instance decl") inst_ty	`thenRn` \ inst_ty' ->
+    rnHsSigType (text "an instance decl") inst_ty	`thenRn` \ inst_ty' ->
 
 
 	-- Rename the bindings
@@ -260,13 +255,13 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
 	-- The typechecker checks that all the bindings are for the right class.
     returnRn (InstD (InstDecl inst_ty' mbinds' new_uprags (Just dfun_name) src_loc))
   where
-    meth_doc sty = text "the bindings in an instance declaration"
+    meth_doc = text "the bindings in an instance declaration"
     meth_names   = bagToList (collectMonoBinders mbinds)
 
     rn_uprag (SpecSig op ty using locn)
       = pushSrcLocRn src_loc $
 	lookupBndrRn op				`thenRn` \ op_name ->
-	rnHsSigType (\sty -> ppr sty op) ty	`thenRn` \ new_ty ->
+	rnHsSigType (quotes (ppr op)) ty	`thenRn` \ new_ty ->
 	rn_using using				`thenRn` \ new_using ->
 	returnRn (SpecSig op_name new_ty new_using locn)
 
@@ -362,7 +357,7 @@ rnConDetails con locn (RecCon fields)
     mapRn rnField fields			`thenRn` \ new_fields ->
     returnRn (RecCon new_fields)
   where
-    fld_doc sty = text "the fields of constructor" <> ppr sty con
+    fld_doc = text "the fields of constructor" <> ppr con
     field_names = [(fld, locn) | (flds, _) <- fields, fld <- flds]
 
 rnField (names, ty)
@@ -401,7 +396,7 @@ checkConName name
 %*********************************************************
 
 \begin{code}
-rnHsSigType :: (PprStyle -> Doc) -> RdrNameHsType -> RnMS s RenamedHsType 
+rnHsSigType :: SDoc -> RdrNameHsType -> RnMS s RenamedHsType 
 	-- rnHsSigType is used for source-language type signatures,
 	-- which use *implicit* universal quantification.
 
@@ -412,13 +407,13 @@ rnHsSigType :: (PprStyle -> Doc) -> RdrNameHsType -> RnMS s RenamedHsType
 -- no type variables that don't appear free in the tau-type part.
 
 rnHsSigType doc_str full_ty@(HsPreForAllTy ctxt ty)	-- From source code (no kinds on tyvars)
-  = getNameEnv		`thenRn` \ name_env ->
+  = getLocalNameEnv		`thenRn` \ name_env ->
     let
 	mentioned_tyvars = extractHsTyVars ty
 	forall_tyvars    = filter (not . in_scope) mentioned_tyvars
 	in_scope tv      = maybeToBool (lookupFM name_env tv)
 
-	constrained_tyvars 	      = nub (concat (map (extractHsTyVars . snd) ctxt))
+	constrained_tyvars 	      = extractHsCtxtTyVars ctxt
 	constrained_and_in_scope      = filter in_scope constrained_tyvars
 	constrained_and_not_mentioned = filter (not . (`elem` mentioned_tyvars)) constrained_tyvars
 
@@ -437,7 +432,7 @@ rnHsSigType doc_str full_ty@(HsPreForAllTy ctxt ty)	-- From source code (no kind
      returnRn (HsForAllTy new_tyvars new_ctxt new_ty)
     )
   where
-    sig_doc sty = text "the type signature for" <+> doc_str sty
+    sig_doc = text "the type signature for" <+> doc_str
 			     
 
 rnHsSigType doc_str other_ty = rnHsType other_ty
@@ -448,9 +443,9 @@ rnHsType (HsForAllTy tvs ctxt ty)		-- From an interface file (tyvars may be kind
 
 rnHsType full_ty@(HsPreForAllTy ctxt ty)	-- A (context => ty) embedded in a type.
 						-- Universally quantify over tyvars in context
-  = getNameEnv		`thenRn` \ name_env ->
+  = getLocalNameEnv		`thenRn` \ name_env ->
     let
-	forall_tyvars = foldr unionLists [] (map (extractHsTyVars . snd) ctxt)
+	forall_tyvars = extractHsCtxtTyVars ctxt
     in
     rn_poly_help (map UserTyVar forall_tyvars) ctxt ty
 
@@ -476,10 +471,10 @@ rnHsType (MonoTyApp ty1 ty2)
     rnHsType ty2		`thenRn` \ ty2' ->
     returnRn (MonoTyApp ty1' ty2')
 
-rnHsType (MonoDictTy clas ty)
+rnHsType (MonoDictTy clas tys)
   = lookupOccRn clas		`thenRn` \ clas' ->
-    rnHsType ty			`thenRn` \ ty' ->
-    returnRn (MonoDictTy clas' ty')
+    mapRn rnHsType tys		`thenRn` \ tys' ->
+    returnRn (MonoDictTy clas' tys')
 
 rn_poly_help :: [HsTyVar RdrName]		-- Universally quantified tyvars
 	     -> RdrNameContext
@@ -491,7 +486,7 @@ rn_poly_help tyvars ctxt ty
     rnHsType ty						`thenRn` \ new_ty ->
     returnRn (HsForAllTy new_tyvars new_ctxt new_ty)
   where
-    sig_doc sty = text "a nested for-all type"
+    sig_doc = text "a nested for-all type"
 \end{code}
 
 
@@ -503,22 +498,21 @@ rnContext  ctxt
     let
 	(_, dup_asserts) = removeDups cmp_assert result
 	(alls, theta)    = partition (\(c,_) -> c == allClass_NAME) result
-	non_tyvar_alls   = [(c,t) | (c,t) <- alls, not (is_tyvar t)]
     in
 
 	-- Check for duplicate assertions
 	-- If this isn't an error, then it ought to be:
-    mapRn (addWarnRn . dupClassAssertWarn theta) dup_asserts `thenRn_`
+    mapRn (addWarnRn . dupClassAssertWarn theta) dup_asserts	`thenRn_`
 
 	-- Check for All constraining a non-type-variable
-    mapRn (addWarnRn . allOfNonTyVar) non_tyvar_alls	`thenRn_`
+    mapRn check_All alls					`thenRn_`
     
 	-- Done.  Return a theta omitting all the "All" constraints.
 	-- They have done done their work by ensuring that we universally
 	-- quantify over their tyvar.
     returnRn theta
   where
-    rn_ctxt (clas, ty)
+    rn_ctxt (clas, tys)
       =		-- Mini hack here.  If the class is our pseudo-class "All",
 		-- then we don't want to record it as an occurrence, otherwise
 		-- we try to slurp it in later and it doesn't really exist at all.
@@ -529,14 +523,15 @@ rnContext  ctxt
 	 else
 		returnRn clas_name
 	)			`thenRn_`
-	rnHsType ty		`thenRn` \ ty' ->
-	returnRn (clas_name, ty')
+	mapRn rnHsType tys	`thenRn` \ tys' ->
+	returnRn (clas_name, tys')
 
-    cmp_assert (c1,ty1) (c2,ty2)
-      = (c1 `cmp` c2) `thenCmp` (cmpHsType cmp ty1 ty2)
 
-    is_tyvar (MonoTyVar _) = True
-    is_tyvar other         = False
+    cmp_assert (c1,tys1) (c2,tys2)
+      = (c1 `compare` c2) `thenCmp` (cmpHsTypes compare tys1 tys2)
+
+    check_All (c, [MonoTyVar _]) = returnRn ()	-- OK!
+    check_All assertion		 = addErrRn (wierdAllErr assertion)
 \end{code}
 
 
@@ -640,10 +635,6 @@ rnCoreBndr (UfTyBinder name kind) thing_inside
   = bindLocalsRn "unfolding tyvar" [name] $ \ [name'] ->
     thing_inside (UfTyBinder name' kind)
     
-rnCoreBndr (UfUsageBinder name) thing_inside
-  = bindLocalsRn "unfolding usage" [name] $ \ [name'] ->
-    thing_inside (UfUsageBinder name')
-
 rnCoreBndrs bndrs thing_inside		-- Expect them all to be ValBinders
   = mapRn rnHsType tys			`thenRn` \ tys' ->
     bindLocalsRn "unfolding value" names $ \ names' ->
@@ -659,8 +650,7 @@ rnCoreBndrNamess names thing_inside
 
 \begin{code}
 rnCoreArg (UfVarArg v)	 = lookupOccRn v	`thenRn` \ v' -> returnRn (UfVarArg v')
-rnCoreArg (UfUsageArg u) = lookupOccRn u	`thenRn` \ u' -> returnRn (UfUsageArg u')
-rnCoreArg (UfTyArg ty)	 = rnHsType ty			`thenRn` \ ty' -> returnRn (UfTyArg ty')
+rnCoreArg (UfTyArg ty)	 = rnHsType ty		`thenRn` \ ty' -> returnRn (UfTyArg ty')
 rnCoreArg (UfLitArg lit) = returnRn (UfLitArg lit)
 
 rnCoreAlts (UfAlgAlts alts deflt)
@@ -706,37 +696,37 @@ rnCorePrim (UfCCallOp str casm gc arg_tys res_ty)
 %*********************************************************
 
 \begin{code}
-derivingNonStdClassErr clas sty
-  = hsep [ptext SLIT("non-standard class"), ppr sty clas, ptext SLIT("in deriving clause")]
+derivingNonStdClassErr clas
+  = hsep [ptext SLIT("non-standard class"), ppr clas, ptext SLIT("in deriving clause")]
 
-classTyVarNotInOpTyErr clas_tyvar sig sty
-  = hang (hsep [ptext SLIT("Class type variable"), 
-		       ppr sty clas_tyvar, 
+classTyVarNotInOpTyErr clas_tyvar sig
+  = hang (hsep [ptext SLIT("Class type variable"),
+		       quotes (ppr clas_tyvar),
 		       ptext SLIT("does not appear in method signature")])
-	 4 (ppr sty sig)
+	 4 (ppr sig)
 
-dupClassAssertWarn ctxt ((clas,ty) : dups) sty
+dupClassAssertWarn ctxt (assertion : dups)
   = sep [hsep [ptext SLIT("Duplicated class assertion"), 
-	       pprQuote sty $ \ sty -> ppr sty clas <+> ppr sty ty,
-	       ptext SLIT("in context:")],
-	 nest 4 (pprQuote sty $ \ sty -> pprContext sty ctxt)]
+	       quotes (pprClassAssertion assertion),
+	       ptext SLIT("in the context:")],
+	 nest 4 (pprContext ctxt)]
 
-badDataCon name sty
-   = hsep [ptext SLIT("Illegal data constructor name"), ppr sty name]
+badDataCon name
+   = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 
-allOfNonTyVar ty sty
-  = hsep [ptext SLIT("`All' applied to a non-type variable"), ppr sty ty]
+wierdAllErr assertion
+  = ptext SLIT("Mal-formed use of `All':") <+> pprClassAssertion assertion
 
-ctxtErr1 doc tyvars sty
+ctxtErr1 doc tyvars
   = hsep [ptext SLIT("Context constrains in-scope type variable(s)"), 
-	  hsep (punctuate comma (map (ppr sty) tyvars))]
+	  pprQuotedList tyvars]
     $$
-    nest 4 (ptext SLIT("in") <+> doc sty)
+    nest 4 (ptext SLIT("in") <+> doc)
 
-ctxtErr2 doc tyvars ty sty
+ctxtErr2 doc tyvars ty
   = (ptext SLIT("Context constrains type variable(s)")
-	<+> hsep (punctuate comma (map (ppr sty) tyvars)))
+	<+> pprQuotedList tyvars)
     $$
-    nest 4 (vcat [ptext SLIT("that do not appear in") <+> ppr sty ty,
-	    	  ptext SLIT("in") <+> doc sty])
+    nest 4 (vcat [ptext SLIT("that do not appear in") <+> quotes (ppr ty),
+	    	  ptext SLIT("in") <+> doc])
 \end{code}

@@ -12,8 +12,6 @@ From @AbstractC@, one may convert to real C (for portability) or to
 raw assembler/machine code.
 
 \begin{code}
-#include "HsVersions.h"
-
 module AbsCSyn {- (
 	-- export everything
 	AbstractC(..),
@@ -35,15 +33,13 @@ module AbsCSyn {- (
 	CostRes(Cost)
     )-} where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(AbsCLoop)
-#else
-# if  ! OMIT_NATIVE_CODEGEN
-import {-# SOURCE #-} MachMisc
-# endif
+#include "HsVersions.h"
+
 import {-# SOURCE #-} ClosureInfo ( ClosureInfo )
 import {-# SOURCE #-} CLabel	  ( CLabel )
+
+#if  ! OMIT_NATIVE_CODEGEN
+import {-# SOURCE #-} MachMisc
 #endif
 
 import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
@@ -51,8 +47,8 @@ import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  lIVENESS_R3, lIVENESS_R4, lIVENESS_R5,
 			  lIVENESS_R6, lIVENESS_R7, lIVENESS_R8
 			)
-import HeapOffs		( SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset),
-			  SYN_IE(VirtualHeapOffset), HeapOffset
+import HeapOffs		( VirtualSpAOffset, VirtualSpBOffset,
+			  VirtualHeapOffset, HeapOffset
 			)
 import CostCentre       ( CostCentre )
 import Literal		( mkMachInt, Literal )

@@ -32,6 +32,13 @@ HS_PROG=hsc
 
 
 # -----------------------------------------------------------------------------
+#		Compilation history for Patrick
+
+# Make the sources first, because that's what the compilation history needs
+$(HS_PROG) :: $(HS_SRCS)
+
+
+# -----------------------------------------------------------------------------
 # 		Set SRCS, LOOPS, HCS, OBJS
 #
 # First figure out DIRS, the source sub-directories
@@ -53,7 +60,7 @@ endif
 
 HS_SRCS = $(SRCS_UGNHS) \
           $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs)) \
-	  rename/ParseIface.hs rename/ParseType.hs rename/ParseUnfolding.hs
+	  rename/ParseIface.hs
 
 ifneq "$(Ghc2_0)" "YES"
 HS_SRCS += main/LoopHack.hc 
@@ -104,7 +111,7 @@ LIBOBJS = \
 #
 # stuff you get for free in a source distribution
 # 
-SRC_DIST_FILES += \
+SRC_DIST_FILES += rename/ParseIface.hs \
  parser/U_tree.c parser/tree.h parser/tree.c \
  parser/hsparser.tab.c parser/hsparser.tab.h \
  parser/hslexer.c
@@ -148,6 +155,10 @@ SRC_HC_OPTS += $(GhcHcOpts)
 
 absCSyn/AbsCSyn_HC_OPTS 	= -fno-omit-reexported-instances
 absCSyn/CStrings_HC_OPTS 	= -monly-3-regs
+
+# Was 6m with 2.10
+absCSyn/PprAbsC_HC_OPTS 	= -H10m
+
 basicTypes/IdInfo_HC_OPTS 	= -K2m
 coreSyn/AnnCoreSyn_HC_OPTS 	= -fno-omit-reexported-instances
 hsSyn/HsExpr_HC_OPTS 		= -K2m
@@ -172,14 +183,13 @@ parser/U_tree_HC_OPTS 		= -H12m -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
 reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
-reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
-rename/ParseIface_HC_OPTS 	+= -Onot -H16m
-rename/ParseType_HC_OPTS 	+= -Onot -H16m
-rename/ParseUnfolding_HC_OPTS 	+= -Onot -H30m
+
+# Heap was 6m with 2.10
+reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"' -H10m
+
+rename/ParseIface_HC_OPTS 	+= -Onot -H30m
 ifeq "$(Ghc2_0)" "YES"
 rename/ParseIface_HC_OPTS       += -fno-warn-incomplete-patterns
-rename/ParseType_HC_OPTS        += -fno-warn-incomplete-patterns
-rename/ParseUnfolding_HC_OPTS   += -fno-warn-incomplete-patterns
 endif
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
@@ -192,6 +202,7 @@ endif
 rename/RnEnv_HC_OPTS 		= -fvia-C
 rename/RnSource_HC_OPTS		= -H12m
 rename/RnIfaces_HC_OPTS		= -H8m -fvia-C
+rename/RnExpr_HC_OPTS		= -H10m
 rename/RnNames_HC_OPTS		= -H12m
 rename/RnMonad_HC_OPTS		= -fvia-C
 # Urk!  Really big heap for ParseUnfolding
@@ -199,8 +210,13 @@ rename/RnMonad_HC_OPTS		= -fvia-C
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
 stgSyn/StgSyn_HC_OPTS 		= -fno-omit-reexported-instances
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
-typecheck/TcHsSyn_HC_OPTS	= -H10m
-typecheck/TcExpr_HC_OPTS	= -H10m
+
+# Was 10m for 2.10
+typecheck/TcHsSyn_HC_OPTS	= -H15m	
+
+# Was 10m for 2.10
+typecheck/TcExpr_HC_OPTS	= -H15m
+
 typecheck/TcEnv_HC_OPTS		= -H10m
 ifeq "$(Ghc2_0)" "NO"
 typecheck/TcMonad_HC_OPTS	= -fvia-C	
@@ -257,16 +273,6 @@ rename/ParseIface.hs : rename/ParseIface.y
 	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
 	$(HAPPY) $(HAPPY_OPTS) -g rename/ParseIface.y
 	@chmod 444 rename/ParseIface.hs
-
-rename/ParseType.hs : rename/ParseType.y
-	@$(RM) rename/ParseType.hs rename/ParseType.hinfo
-	$(HAPPY) $(HAPPY_OPTS) -g rename/ParseType.y
-	@chmod 444 rename/ParseType.hs
-
-rename/ParseUnfolding.hs : rename/ParseUnfolding.y
-	@$(RM) rename/ParseUnfolding.hs rename/ParseUnfolding.hinfo
-	$(HAPPY) $(HAPPY_OPTS) -g rename/ParseUnfolding.y
-	@chmod 444 rename/ParseUnfolding.hs
 
 #----------------------------------------------------------------------
 #
@@ -332,7 +338,7 @@ endif
 #
 # Before doing `make depend', need to build all derived Haskell source files
 #
-depend :: $(LOOPS) $(SRCS_UGNHS) rename/ParseIface.hs rename/ParseUnfolding.hs rename/ParseType.hs
+depend :: $(LOOPS) $(SRCS_UGNHS) rename/ParseIface.hs
 
 
 ifeq "$(GhcWithHscBuiltViaC)" "YES"

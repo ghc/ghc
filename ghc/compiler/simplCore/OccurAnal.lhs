@@ -11,45 +11,37 @@ The occurrence analyser re-typechecks a core expression, returning a new
 core expression with (hopefully) improved usage information.
 
 \begin{code}
-#include "HsVersions.h"
-
 module OccurAnal (
 	occurAnalyseBinds, occurAnalyseExpr, occurAnalyseGlobalExpr
     ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(List(partition))
+#include "HsVersions.h"
 
 import BinderInfo
 import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
 import Digraph		( stronglyConnComp, stronglyConnCompR, SCC(..) )
 import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
-			  idType, idUnique, SYN_IE(Id),
+			  idType, idUnique, Id,
 			  emptyIdSet, unionIdSets, mkIdSet,
 			  unitIdSet, elementOfIdSet,
-			  addOneToIdSet, SYN_IE(IdSet),
+			  addOneToIdSet, IdSet,
 			  nullIdEnv, unitIdEnv, combineIdEnvs,
 			  delOneFromIdEnv, delManyFromIdEnv, isNullIdEnv, 
-			  mapIdEnv, lookupIdEnv, SYN_IE(IdEnv), 
+			  mapIdEnv, lookupIdEnv, IdEnv, 
 			  GenId{-instance Eq-}
 			)
 import Name		( isExported, isLocallyDefined )
-import Type		( getFunTy_maybe, splitForAllTy )
+import Type		( splitFunTy_maybe, splitForAllTys )
 import Maybes		( maybeToBool )
-import Outputable	( PprStyle(..), Outputable(..){-instance * (,) -} )
 import PprCore
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
-import Pretty		( Doc, vcat, ptext, nest, punctuate, comma, hcat, text )
 import TyVar		( GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-}, u2i )
-import UniqFM		( keysUFM ) 
-import Util		( assoc, zipEqual, zipWithEqual, Ord3(..)
-			, pprTrace, panic 
-#ifdef DEBUG
-			, assertPanic
-#endif
-			)
+import UniqFM		( keysUFM )  
+import Util		( assoc, zipEqual, zipWithEqual )
+import Outputable
+import List		( partition )
 
 isSpecPragmaId_maybe x = Nothing -- ToDo:!trace "OccurAnal.isSpecPragmaId_maybe"
 \end{code}
@@ -232,11 +224,11 @@ occurAnalyseBinds binds simplifier_sw_chkr
 	-- for interface files too.  Sigh
 
 ppr_bind bind@(NonRec binder expr)
-  = ppr PprDebug bind
+  = ppr bind
 
 ppr_bind bind@(Rec binds)
   = vcat [ptext SLIT("Rec {"),
-	      nest 2 (ppr PprDebug bind),
+	      nest 2 (ppr bind),
 	      ptext SLIT("end Rec }")]
 \end{code}
 
@@ -340,7 +332,7 @@ occAnalBind env (Rec pairs) body_usage
   where
     pp_scc (CyclicSCC cycle) = hcat [text "Cyclic ", hcat (punctuate comma (map pp_item cycle))]
     pp_scc (AcyclicSCC item) = hcat [text "Acyclic ", pp_item item]
-    pp_item (_, bndr, _)     = ppr PprDebug bndr
+    pp_item (_, bndr, _)     = ppr bndr
 
     binders = map fst pairs
     new_env = env `addNewCands` binders
@@ -510,9 +502,9 @@ reOrderRec env (CyclicSCC binds)
 	-- On the other hand we *could* simplify those case expressions if
 	-- we didn't stupidly choose d as the loop breaker.
 
-    not_fun_ty ty = not (maybeToBool (getFunTy_maybe rho_ty))
+    not_fun_ty ty = not (maybeToBool (splitFunTy_maybe rho_ty))
 		  where
-		    (_, rho_ty) = splitForAllTy ty
+		    (_, rho_ty) = splitForAllTys ty
 
 	-- A variable RHS
     var_rhs (Var v)   = True
@@ -628,8 +620,6 @@ occAnal env (Lam (TyBinder tyvar) body)
       Lam (TyBinder tyvar) body') }
 --  where
 --    (body_usage, body') = occAnal env body
-
-occAnal env (Lam (UsageBinder _) _) = panic "OccurAnal.occAnal Lam UsageBinder"
 
 occAnal env (Case scrut alts)
   = case occAnalAlts env alts of { (alts_usage, alts')   -> 

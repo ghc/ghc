@@ -4,8 +4,6 @@
 Taken quite directly from the Peyton Jones/Lester paper.
 
 \begin{code}
-#include "HsVersions.h"
-
 module FreeVars (
 	freeVars,
 
@@ -13,14 +11,14 @@ module FreeVars (
 	addTopBindsFVs, addExprFVs,
 
 	freeVarsOf, freeTyVarsOf,
-	SYN_IE(FVCoreExpr), SYN_IE(FVCoreBinding),
+	FVCoreExpr, FVCoreBinding,
 
-	SYN_IE(CoreExprWithFVs),		-- For the above functions
-	SYN_IE(AnnCoreExpr),		-- Dito
+	CoreExprWithFVs,		-- For the above functions
+	AnnCoreExpr,		-- Dito
 	FVInfo(..), LeakInfo(..)
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import AnnCoreSyn	-- output
 
@@ -28,17 +26,17 @@ import CoreSyn
 import Id		( idType, getIdArity, isBottomingId,
 			  emptyIdSet, unitIdSet, mkIdSet,
 			  elementOfIdSet, minusIdSet, unionManyIdSets,
-			  SYN_IE(IdSet), SYN_IE(Id)
+			  IdSet, Id
 			)
 import IdInfo		( ArityInfo(..) )
 import PrimOp		( PrimOp(..) )
-import Type		( tyVarsOfType, SYN_IE(Type) )
+import Type		( tyVarsOfType, Type )
 import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
 			  intersectTyVarSets,
-			  SYN_IE(TyVarSet), SYN_IE(TyVar)
+			  TyVarSet, TyVar
 			)
+import BasicTypes	( Unused )
 import UniqSet		( unionUniqSets )
-import Usage		( SYN_IE(UVar) )
 import Util		( panic, assertPanic )
 \end{code}
 
@@ -59,7 +57,7 @@ I've half-convinced myself we don't for case- and letrec bound ids
 but I might be wrong. (SLPJ, date unknown)
 
 \begin{code}
-type CoreExprWithFVs =  AnnCoreExpr Id Id TyVar UVar FVInfo
+type CoreExprWithFVs =  AnnCoreExpr Id Id Unused FVInfo
 
 type TyVarCands = TyVarSet  -- for when we carry around lists of
 type IdCands	= IdSet	    -- "candidate" TyVars/Ids.
@@ -167,9 +165,6 @@ fvExpr id_cands tyvar_cands (Prim op args)
 	  _			 -> args
 
 -- this Lam stuff could probably be improved by rewriting (WDP 96/03)
-
-fvExpr id_cands tyvar_cands (Lam (UsageBinder uvar) body)
-  = panic "fvExpr:Lam UsageBinder"
 
 fvExpr id_cands tyvar_cands (Lam b@(ValBinder binder) body)
   = (FVInfo (freeVarsOf body2   `minusIdSet` unitIdSet binder)
@@ -325,7 +320,6 @@ freeArgs icands tcands (arg:args)
 	(arg_fvs `combine` irest, tfvs `combine` trest) }
   where
     free_arg (LitArg   _) = noFreeAnything
-    free_arg (UsageArg _) = noFreeAnything
     free_arg (TyArg   ty) = (noFreeIds, freeTy tcands ty)
     free_arg (VarArg   v)
       | v `is_among` icands = (aFreeId v, noFreeTyVars)
@@ -383,8 +377,8 @@ As it happens this is only ever used by the Specialiser!
 
 \begin{code}
 type FVCoreBinder  = (Id, IdSet)
-type FVCoreExpr    = GenCoreExpr    FVCoreBinder Id TyVar UVar
-type FVCoreBinding = GenCoreBinding FVCoreBinder Id TyVar UVar
+type FVCoreExpr    = GenCoreExpr    FVCoreBinder Id Unused
+type FVCoreBinding = GenCoreBinding FVCoreBinder Id Unused
 
 type InterestingIdFun
   =  IdSet	-- Non-top-level in-scope variables
@@ -420,7 +414,6 @@ addExprFVs fv_cand in_scope (Lam binder body)
     (new_binder, binder_set)
       = case binder of
 	  TyBinder    t -> (TyBinder t, emptyIdSet)
-	  UsageBinder u -> (UsageBinder u, emptyIdSet)
           ValBinder   b -> (ValBinder (b, lam_fvs),
 			    unitIdSet b)
 

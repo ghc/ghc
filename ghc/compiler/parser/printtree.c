@@ -464,8 +464,6 @@ prbind(b)
 	case ibind	:
 			  PUTTAG('%');
 			  plineno(giline(b));
-			  plist(pttype,gibindc(b));
-			  pqid(gibindid(b));
 			  pttype(gibindi(b));
 			  prbind(gibindw(b));
 			  /* ppragma(gipragma(b)); */

@@ -23,9 +23,6 @@ import GHC
 %*********************************************************
 
 \begin{code}
-class CCallable   a
-class CReturnable a
-
 instance CCallable Char
 instance CCallable   Char#
 instance CReturnable Char

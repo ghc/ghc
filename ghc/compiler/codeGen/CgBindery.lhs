@@ -4,13 +4,11 @@
 \section[CgBindery]{Utility functions related to doing @CgBindings@}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgBindery (
-	SYN_IE(CgBindings), CgIdInfo(..){-dubiously concrete-},
-	VolatileLoc, StableLoc, -- (the latter is defined in CgMonad)
+	CgBindings, CgIdInfo(..){-dubiously concrete-},
+	StableLoc, VolatileLoc,
 
---	maybeAStkLoc, maybeBStkLoc,
+	maybeAStkLoc, maybeBStkLoc,
 
 	stableAmodeIdInfo, heapIdInfo, newTempAmodeAndIdInfo,
 	letNoEscapeIdInfo, idInfoToAmode,
@@ -26,7 +24,7 @@ module CgBindery (
 	rebindToAStack, rebindToBStack
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import AbsCSyn
 import CgMonad
@@ -34,26 +32,24 @@ import CgMonad
 import CgUsages		( getHpRelOffset, getSpARelOffset, getSpBRelOffset )
 import CLabel		( mkStaticClosureLabel, mkClosureLabel )
 import ClosureInfo	( mkLFImported, mkConLFInfo, mkLFArgument, LambdaFormInfo )
-import HeapOffs		( SYN_IE(VirtualHeapOffset),
-			  SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset)
+import HeapOffs		( VirtualHeapOffset,
+			  VirtualSpAOffset, VirtualSpBOffset
 			)
 import Id		( idPrimRep, toplevelishId, 
-			  mkIdEnv, rngIdEnv, SYN_IE(IdEnv),
+			  mkIdEnv, rngIdEnv, IdEnv,
 			  idSetToList,
-			  GenId{-instance NamedThing-}, SYN_IE(Id)
+			  Id
 			)
+import Literal		( Literal )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, isWiredInName,
 			  Name{-instance NamedThing-}, NamedThing(..) )
-#ifdef DEBUG
 import PprAbsC		( pprAmode )
-#endif
-import Outputable	( PprStyle(..) )
-import Pretty		( Doc )
 import PrimRep          ( PrimRep )
-import StgSyn		( SYN_IE(StgArg), SYN_IE(StgLiveVars), GenStgArg(..) )
+import StgSyn		( StgArg, StgLiveVars, GenStgArg(..) )
 import Unique           ( Unique, Uniquable(..) )
 import Util		( zipWithEqual, panic )
+import Outputable
 \end{code}
 
 
@@ -91,7 +87,26 @@ data VolatileLoc
 
   | VirNodeLoc	VirtualHeapOffset	-- Cts of offset indirect from Node
 					-- ie *(Node+offset)
+\end{code}
 
+@StableLoc@ encodes where an Id can be found, used by
+the @CgBindings@ environment in @CgBindery@.
+
+\begin{code}
+data StableLoc
+  = NoStableLoc
+  | VirAStkLoc		VirtualSpAOffset
+  | VirBStkLoc		VirtualSpBOffset
+  | LitLoc		Literal
+  | StableAmodeLoc	CAddrMode
+
+-- these are so StableLoc can be abstract:
+
+maybeAStkLoc (VirAStkLoc offset) = Just offset
+maybeAStkLoc _			 = Nothing
+
+maybeBStkLoc (VirBStkLoc offset) = Just offset
+maybeBStkLoc _			 = Nothing
 \end{code}
 
 %************************************************************************
@@ -398,7 +413,7 @@ bindNewPrimToAmode name (CVal (NodeRel offset) _)
 
 #ifdef DEBUG
 bindNewPrimToAmode name amode
-  = panic ("bindNew...:"++(show (pprAmode PprDebug  amode)))
+  = pprPanic "bindNew...:" (pprAmode amode)
 #endif
 \end{code}
 

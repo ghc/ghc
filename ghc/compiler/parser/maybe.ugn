@@ -2,10 +2,10 @@
 #include "hspincl.h"
 %}
 %{{
+module U_maybe where
+
 #include "HsVersions.h"
 
-module U_maybe where
-IMP_Ubiq() --  debugging consistency check
 import UgenUtil
 %}}
 type maybe;

@@ -4,8 +4,6 @@
 \section[Maybes]{The `Maybe' types and associated utility functions}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Maybes (
 --	Maybe(..), -- no, it's in 1.3
 	MaybeErr(..),
@@ -28,10 +26,9 @@ module Maybes (
 	catMaybes
     ) where
 
-#if __GLASGOW_HASKELL__ >= 204
-import Maybe ( catMaybes, mapMaybe )
-#endif
+#include "HsVersions.h"
 
+import Maybe( catMaybes, mapMaybe )
 \end{code}
 
 
@@ -60,19 +57,6 @@ allMaybes (Just x  : ms) = case (allMaybes ms) of
 			     Nothing -> Nothing
 			     Just xs -> Just (x:xs)
 
-#if __GLASGOW_HASKELL__ < 204
-	-- After 2.04 we get these from the library Maybe
-catMaybes :: [Maybe a] -> [a]
-catMaybes []		    = []
-catMaybes (Nothing : xs)   = catMaybes xs
-catMaybes (Just x : xs)	   = (x : catMaybes xs)
-
-mapMaybe :: (a -> Maybe b) -> [a] -> [b]
-mapMaybe f [] = []
-mapMaybe f (x:xs) = case f x of
-			Just y  -> y : mapMaybe f xs
-			Nothing -> mapMaybe f xs
-#endif
 \end{code}
 
 @firstJust@ takes a list of @Maybes@ and returns the

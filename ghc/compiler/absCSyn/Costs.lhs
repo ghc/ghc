@@ -44,8 +44,6 @@ These are first suggestions for scaling the costs. But, this scaling should be d
 \end{pseudocode}
 
 \begin{code}
-#include "HsVersions.h"
-
 #define ACCUM_COSTS(i,b,l,s,f)	(i+b+l+s+f)
 
 #define NUM_REGS		10 {- PprAbsCSyn.lhs -}	      {- runtime/c-as-asm/CallWrap_C.lc -}
@@ -57,10 +55,11 @@ module Costs( costs,
 	      addrModeCosts, CostRes(Cost), nullCosts, Side(..)
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import AbsCSyn
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
+import GlaExts		( trace )
 
 -- --------------------------------------------------------------------------
 data CostRes = Cost (Int, Int, Int, Int, Int)

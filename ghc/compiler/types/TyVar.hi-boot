@@ -1,7 +1,0 @@
-_interface_ TyVar 1
-_exports_
-TyVar TyVar GenTyVar;
-_declarations_
-1 type TyVar = TyVar.GenTyVar Usage.Usage ;
-1 data GenTyVar a;
-

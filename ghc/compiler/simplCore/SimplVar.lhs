@@ -4,18 +4,13 @@
 \section[SimplVar]{Simplifier stuff related to variables}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SimplVar (
 	completeVar
     ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(SmplLoop)		( simplExpr )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} Simplify ( simplExpr )
-#endif
 
 import Constants	( uNFOLDING_USE_THRESHOLD,
 			  uNFOLDING_CON_DISCOUNT_WEIGHT
@@ -32,17 +27,15 @@ import CostCentre	( CostCentre, isCurrentCostCentre )
 import Id		( idType, getIdInfo, getIdUnfolding, getIdSpecialisation,
 			  idMustBeINLINEd, GenId{-instance Outputable-}
 			)
-import SpecEnv		( SpecEnv, lookupSpecEnv )
+import SpecEnv		( matchSpecEnv )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
-import Outputable	( Outputable(..), PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import SimplEnv
 import SimplMonad
 import TyCon		( tyConFamilySize )
-import Util		( pprTrace, assertPanic, panic )
 import Maybes		( maybeToBool )
-import Pretty
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -84,9 +77,9 @@ completeVar env var args result_ty
 
   | maybeToBool maybe_specialisation
   = tick SpecialisationDone	`thenSmpl_`
-    simplExpr (extendTyEnvList env spec_bindings) 
+    simplExpr (extendTyEnvEnv env spec_bindings) 
 	      spec_template
-	      (map TyArg leftover_ty_args ++ remaining_args)
+	      remaining_args
 	      result_ty
 
   | otherwise
@@ -124,8 +117,8 @@ completeVar env var args result_ty
 
     	---------- Specialisation stuff
     (ty_args, remaining_args) = initialTyArgs args
-    maybe_specialisation = lookupSpecEnv (getIdSpecialisation var) ty_args
-    (Just (spec_template, (spec_bindings, leftover_ty_args))) = maybe_specialisation
+    maybe_specialisation = matchSpecEnv (getIdSpecialisation var) ty_args
+    Just (spec_bindings, spec_template) = maybe_specialisation
 
 
 	---------- Switches
@@ -146,7 +139,7 @@ unfold var unf_env unf_template args result_ty
 {-
     simplCount		`thenSmpl` \ n ->
     (if n > 1000 then
-	pprTrace "Ticks > 1000 and unfolding" (sep [space, int n, ppr PprDebug var])
+	pprTrace "Ticks > 1000 and unfolding" (sep [space, int n, ppr var])
     else
 	id
     )

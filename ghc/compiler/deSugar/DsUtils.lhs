@@ -6,15 +6,13 @@
 This module exports some utility functions of no great interest.
 
 \begin{code}
-#include "HsVersions.h"
-
 module DsUtils (
 	CanItFail(..), EquationInfo(..), MatchResult(..),
-        SYN_IE(EqnNo), SYN_IE(EqnSet),
+        EqnNo, EqnSet,
 
 	combineGRHSMatchResults,
 	combineMatchResults,
-	dsExprToAtomGivenTy, SYN_IE(DsCoreArg),
+	dsExprToAtomGivenTy, DsCoreArg,
 	mkCoAlgCaseMatchResult,
 	mkAppDs, mkConDs, mkPrimDs, mkErrorAppDs,
 	mkCoLetsMatchResult,
@@ -29,48 +27,35 @@ module DsUtils (
 	showForErr
     ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} Match (match, matchSimply )
-#endif
 
 import HsSyn		( HsExpr(..), OutPat(..), HsLit(..), Fixity,
 			  Match, HsBinds, Stmt, DoOrListComp, HsType, ArithSeqInfo )
-import TcHsSyn		( SYN_IE(TypecheckedPat) )
+import TcHsSyn		( TypecheckedPat )
 import DsHsSyn		( outPatType, collectTypedPatBinders )
-import CmdLineOpts      ( opt_PprUserLength )
 import CoreSyn
 
 import DsMonad
 
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
-import Pretty		( Doc, hcat, text )
 import Id		( idType, dataConArgTys, 
---			  pprId{-ToDo:rm-},
-			  SYN_IE(DataCon), SYN_IE(DictVar), SYN_IE(Id), GenId )
+			  DataCon, DictVar, Id, GenId )
 import Literal		( Literal(..) )
-import PprType		( GenType, GenTyVar )
 import PrimOp           ( PrimOp )
 import TyCon		( isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTy,
-			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon,
-			  GenType {- instances -}, SYN_IE(Type)
+			  isUnpointedType, mkTyConApp, splitAlgTyConApp,
+			  Type
 			)
-import TyVar		( GenTyVar {- instances -}, SYN_IE(TyVar) )
+import BasicTypes	( Unused )
 import TysPrim		( voidTy )
 import TysWiredIn	( tupleTyCon, unitDataCon, tupleCon )
-import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, SYN_IE(UniqSet) )
-import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
+import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet )
 import Unique		( Unique )
-import UniqSet
-import Usage		( SYN_IE(UVar) )
-import SrcLoc		( SrcLoc {- instance Outputable -} )
-
 import Outputable
-
 \end{code}
 
 
@@ -213,8 +198,7 @@ mkCoAlgCaseMatchResult var alts
   where
 	-- Common stuff
     scrut_ty = idType var
-    (tycon, tycon_arg_tys) = --pprTrace "CoAlgCase:" (pprType PprDebug scrut_ty) $ 
-			     getAppTyCon scrut_ty
+    (tycon, tycon_arg_tys, _) = splitAlgTyConApp scrut_ty
 
 	-- Stuff for newtype
     (con_id, arg_ids, match_result) = head alts
@@ -281,7 +265,6 @@ dsArgToAtom :: DsCoreArg		    -- The argument expression
 					    -- and delivering an expression E
 	     -> DsM CoreExpr		    -- Either E or let x=arg-expr in E
 
-dsArgToAtom (UsageArg u) continue_with = continue_with (UsageArg u)
 dsArgToAtom (TyArg    t) continue_with = continue_with (TyArg    t)
 dsArgToAtom (LitArg   l) continue_with = continue_with (LitArg   l)
 dsArgToAtom (VarArg arg) continue_with = dsExprToAtomGivenTy arg (coreExprType arg) continue_with
@@ -299,7 +282,7 @@ dsExprToAtomGivenTy arg_expr arg_ty continue_with
   = newSysLocalDs arg_ty		`thenDs` \ arg_id ->
     continue_with (VarArg arg_id)	`thenDs` \ body   ->
     returnDs (
-	if isUnboxedType arg_ty
+	if isUnpointedType arg_ty
 	then Case arg_expr (PrimAlts [] (BindDefault arg_id body))
 	else Let (NonRec arg_id arg_expr) body
     )
@@ -323,7 +306,7 @@ dsArgsToAtoms (arg:args) continue_with
 %************************************************************************
 
 \begin{code}
-type DsCoreArg = GenCoreArg CoreExpr{-NB!-} TyVar UVar
+type DsCoreArg = GenCoreArg CoreExpr{-NB!-} Unused
 
 mkAppDs  :: CoreExpr -> [DsCoreArg] -> DsM CoreExpr
 mkConDs  :: Id       -> [DsCoreArg] -> DsM CoreExpr
@@ -344,7 +327,7 @@ mkPrimDs op args
 
 \begin{code}
 showForErr :: Outputable a => a -> String		-- Boring but useful
-showForErr thing = show (ppr PprQuote thing)
+showForErr thing = showSDoc (ppr thing)
 
 mkErrorAppDs :: Id 		-- The error function
 	     -> Type		-- Type to which it should be applied
@@ -354,10 +337,10 @@ mkErrorAppDs :: Id 		-- The error function
 mkErrorAppDs err_id ty msg
   = getSrcLocDs			`thenDs` \ src_loc ->
     let
-	full_msg = show (hcat [ppr (PprForUser opt_PprUserLength) src_loc, text "|", text msg])
+	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
 	msg_lit  = NoRepStr (_PK_ full_msg)
     in
-    returnDs (mkApp (Var err_id) [] [ty] [LitArg msg_lit])
+    returnDs (mkApp (Var err_id) [ty] [LitArg msg_lit])
 \end{code}
 
 %************************************************************************
@@ -410,7 +393,7 @@ mkSelectorBinds pat val_expr
     is_var_pat (VarPat v) = True
     is_var_pat other      = False -- Even wild-card patterns aren't acceptable
 
-    pat_string = show (ppr (PprForUser opt_PprUserLength) pat)
+    pat_string = showSDoc (ppr pat)
 \end{code}
 
 
@@ -441,7 +424,6 @@ mkTupleExpr :: [Id] -> CoreExpr
 mkTupleExpr []	 = Con unitDataCon []
 mkTupleExpr [id] = Var id
 mkTupleExpr ids	 = mkCon (tupleCon (length ids))
-			 [{-usages-}]
 			 (map idType ids)
 			 [ VarArg i | i <- ids ]
 \end{code}
@@ -538,7 +520,7 @@ mkFailurePair :: Type		-- Result type of the whole case expression
 		      CoreExpr)	-- Either the fail variable, or fail variable
 				-- applied to unit tuple
 mkFailurePair ty
-  | isUnboxedType ty
+  | isUnpointedType ty
   = newFailLocalDs (voidTy `mkFunTy` ty)	`thenDs` \ fail_fun_var ->
     newSysLocalDs voidTy			`thenDs` \ fail_fun_arg ->
     returnDs (\ body ->

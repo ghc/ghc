@@ -2,10 +2,10 @@
 #include "hspincl.h"
 %}
 %{{
+module U_binding where
+
 #include "HsVersions.h"
 
-module U_binding where
-IMP_Ubiq() --  debugging consistency check
 import UgenUtil
 
 import U_constr
@@ -34,9 +34,7 @@ type binding;
 		    gfline	: long; >;
 	abind	: < gabindfst	: binding;
 		    gabindsnd	: binding; >;
-	ibind	: < gibindc	: list;
-		    gibindid	: qid;
-		    gibindi	: ttype;
+	ibind	: < gibindi	: ttype;
 		    gibindw	: binding;
 		    giline	: long;	>;
 	dbind	: < gdbindts	: list;

@@ -4,19 +4,14 @@
 \section[HsImpExp]{Abstract syntax: imports, exports, interfaces}
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsImpExp where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import BasicTypes	( IfaceFlavour(..) )
+import BasicTypes	( Module, IfaceFlavour(..) )
+import Name		( NamedThing )
 import Outputable
-import Pretty
 import SrcLoc		( SrcLoc )
-#if __GLASGOW_HASKELL__ >= 202
-import Name
-#endif
 \end{code}
 
 %************************************************************************
@@ -39,7 +34,7 @@ data ImportDecl name
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) where
-    ppr sty (ImportDecl mod qual as_source as spec _)
+    ppr (ImportDecl mod qual as_source as spec _)
       = hang (hsep [ptext SLIT("import"), pp_src as_source, 
                     pp_qual qual, ptext mod, pp_as as])
 	     4 (pp_spec spec)
@@ -51,13 +46,13 @@ instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) wher
 	pp_qual True	= ptext SLIT("qualified")
 
 	pp_as Nothing   = empty
-	pp_as (Just a)  = (<>) (ptext SLIT("as ")) (ptext a)
+	pp_as (Just a)  = ptext SLIT("as ") <+> ptext a
 
 	pp_spec Nothing = empty
 	pp_spec (Just (False, spec))
-			= parens (interpp'SP sty spec)
+			= parens (interpp'SP spec)
 	pp_spec (Just (True, spec))
-			= (<>) (ptext SLIT("hiding ")) (parens (interpp'SP sty spec))
+			= ptext SLIT("hiding") <+> parens (interpp'SP spec)
 \end{code}
 
 %************************************************************************
@@ -85,14 +80,12 @@ ieName (IEThingAll  n)   = n
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (IE name) where
-    ppr sty (IEVar	var)	= ppr sty var
-    ppr sty (IEThingAbs	thing)	= ppr sty thing
-    ppr sty (IEThingAll	thing)
-	= hcat [ppr sty thing, text "(..)"]
-    ppr sty (IEThingWith thing withs)
-	= (<>) (ppr sty thing)
-	    (parens (fsep (punctuate comma (map (ppr sty) withs))))
-    ppr sty (IEModuleContents mod)
-	= (<>) (ptext SLIT("module ")) (ptext mod)
+    ppr (IEVar	        var)	= ppr var
+    ppr (IEThingAbs	thing)	= ppr thing
+    ppr (IEThingAll	thing)	= hcat [ppr thing, text "(..)"]
+    ppr (IEThingWith thing withs)
+	= ppr thing <> parens (fsep (punctuate comma (map ppr withs)))
+    ppr (IEModuleContents mod)
+	= ptext SLIT("module") <+> ptext mod
 \end{code}
 

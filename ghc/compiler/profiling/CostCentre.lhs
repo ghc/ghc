@@ -4,8 +4,6 @@
 \section[CostCentre]{The @CostCentre@ data type}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CostCentre (
 	CostCentre, CcKind, IsDupdCC{-ToDo:rm-}, IsCafCC(..),
 	noCostCentre, subsumedCosts,
@@ -28,15 +26,13 @@ module CostCentre (
 	cmpCostCentre	-- used for removing dups in a list
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import Id		( externallyVisibleId, GenId, showId, SYN_IE(Id) )
+import Id		( externallyVisibleId, GenId, showId, Id )
 import CStrings		( identToC, stringToC )
 import Name		( OccName, getOccString, moduleString, nameString )
-import Outputable	( PprStyle(..), codeStyle, ifaceStyle )
-import Pretty
-import Util	        ( panic, panic#, assertPanic, cmpPString, thenCmp, Ord3(..) )
-import CmdLineOpts      ( all_toplev_ids_visible )
+import Outputable	
+import Util	        ( panic, panic#, assertPanic, thenCmp )
 
 pprIdInUnfolding = panic "Whoops"
 \end{code}
@@ -191,13 +187,13 @@ cafifyCC (NormalCC kind m g is_dupd is_caf)
   where
     not_a_calf_already IsCafCC = False
     not_a_calf_already _       = True
-cafifyCC cc = panic ("cafifyCC"++(showCostCentre PprDebug False cc))
+cafifyCC cc = panic ("cafifyCC"++(showCostCentre False cc))
 
 dupifyCC (AllDictsCC m g _) = AllDictsCC m g ADupdCC
 dupifyCC (PreludeDictsCC _) = PreludeDictsCC ADupdCC
 dupifyCC (NormalCC kind m g is_dupd is_caf)
   = NormalCC kind m g ADupdCC is_caf
-dupifyCC cc = panic ("dupifyCC"++(showCostCentre PprDebug False cc))
+dupifyCC cc = panic ("dupifyCC"++(showCostCentre False cc))
 
 isCafCC, isDictCC, isDupdCC :: CostCentre -> Bool
 
@@ -265,26 +261,26 @@ ccMentionsId other			    = Nothing
 \end{code}
 
 \begin{code}
-cmpCostCentre :: CostCentre -> CostCentre -> TAG_
+cmpCostCentre :: CostCentre -> CostCentre -> Ordering
 
-cmpCostCentre (AllCafsCC  m1 _)   (AllCafsCC  m2 _)   = _CMP_STRING_ m1 m2
-cmpCostCentre (AllDictsCC m1 _ _) (AllDictsCC m2 _ _) = _CMP_STRING_ m1 m2
-cmpCostCentre PreludeCafsCC    	  PreludeCafsCC	      = EQ_
-cmpCostCentre (PreludeDictsCC _)  (PreludeDictsCC _)  = EQ_
-cmpCostCentre OverheadCC       	  OverheadCC	      = EQ_
-cmpCostCentre DontCareCC       	  DontCareCC	      = EQ_
+cmpCostCentre (AllCafsCC  m1 _)   (AllCafsCC  m2 _)   = m1 `compare` m2
+cmpCostCentre (AllDictsCC m1 _ _) (AllDictsCC m2 _ _) = m1 `compare` m2
+cmpCostCentre PreludeCafsCC    	  PreludeCafsCC	      = EQ
+cmpCostCentre (PreludeDictsCC _)  (PreludeDictsCC _)  = EQ
+cmpCostCentre OverheadCC       	  OverheadCC	      = EQ
+cmpCostCentre DontCareCC       	  DontCareCC	      = EQ
 
 cmpCostCentre (NormalCC k1 m1 _ _ c1) (NormalCC k2 m2 _ _ c2)
     -- first key is module name, then we use "kinds" (which include
     -- names) and finally the caf flag
-  = _CMP_STRING_ m1 m2 `thenCmp` cmp_kind k1 k2 `thenCmp` cmp_caf c1 c2
+  = (m1 `compare` m2) `thenCmp` (k1 `cmp_kind` k2) `thenCmp` (c1 `cmp_caf` c2)
 
 cmpCostCentre other_1 other_2
   = let
 	tag1 = tag_CC other_1
 	tag2 = tag_CC other_2
     in
-    if tag1 _LT_ tag2 then LT_ else GT_
+    if tag1 _LT_ tag2 then LT else GT
   where
     tag_CC (NormalCC _ _ _ _ _) = (ILIT(1) :: FAST_INT)
     tag_CC (AllCafsCC  _ _)   	= ILIT(2)
@@ -300,30 +296,30 @@ cmpCostCentre other_1 other_2
     tag_CC CurrentCC	 = panic# "tag_CC:SubsumedCosts"
 
 
-cmp_kind (UserCC n1) (UserCC n2) = _CMP_STRING_ n1 n2
-cmp_kind (AutoCC i1) (AutoCC i2) = cmp i1 i2
-cmp_kind (DictCC i1) (DictCC i2) = cmp i1 i2
+cmp_kind (UserCC n1) (UserCC n2) = n1 `compare` n2
+cmp_kind (AutoCC i1) (AutoCC i2) = i1 `compare` i2
+cmp_kind (DictCC i1) (DictCC i2) = i1 `compare` i2
 cmp_kind other_1     other_2
   = let
 	tag1 = tag_CcKind other_1
 	tag2 = tag_CcKind other_2
     in
-    if tag1 _LT_ tag2 then LT_ else GT_
+    if tag1 _LT_ tag2 then LT else GT
   where
     tag_CcKind (UserCC _) = (ILIT(1) :: FAST_INT)
     tag_CcKind (AutoCC _) = ILIT(2)
     tag_CcKind (DictCC _) = ILIT(3)
 
-cmp_caf IsNotCafCC IsCafCC     = LT_
-cmp_caf IsNotCafCC IsNotCafCC  = EQ_
-cmp_caf IsCafCC    IsCafCC     = EQ_
-cmp_caf IsCafCC    IsNotCafCC  = GT_
+cmp_caf IsNotCafCC IsCafCC     = LT
+cmp_caf IsNotCafCC IsNotCafCC  = EQ
+cmp_caf IsCafCC    IsCafCC     = EQ
+cmp_caf IsCafCC    IsNotCafCC  = GT
 \end{code}
 
 \begin{code}
-showCostCentre    :: PprStyle -> Bool -> CostCentre -> String
-uppCostCentre	  :: PprStyle -> Bool -> CostCentre -> Doc
-uppCostCentreDecl :: PprStyle -> Bool -> CostCentre -> Doc
+showCostCentre    :: Bool -> CostCentre -> String
+uppCostCentre	  :: Bool -> CostCentre -> SDoc
+uppCostCentreDecl :: Bool -> CostCentre -> SDoc
 
 {- 	PprUnfolding is gone now
 showCostCentre PprUnfolding print_as_string cc
@@ -333,34 +329,32 @@ showCostCentre PprUnfolding print_as_string cc
     uppShow 80 (upp_cc_uf cc)
 -}
 
-showCostCentre sty print_as_string cc
-  = show (uppCostCentre sty print_as_string cc)
+showCostCentre print_as_string cc
+  = showSDoc (uppCostCentre print_as_string cc)
 
-uppCostCentre sty print_as_string NoCostCentre
-  | friendly_style sty	= empty
+uppCostCentre print_as_string NoCostCentre
   | print_as_string	= text "\"NO_CC\""
   | otherwise		= ptext SLIT("NO_CC")
 
-uppCostCentre sty print_as_string SubsumedCosts
+uppCostCentre print_as_string SubsumedCosts
   | print_as_string 	= text "\"SUBSUMED\""
   | otherwise		= ptext SLIT("CC_SUBSUMED")
 
-uppCostCentre sty print_as_string CurrentCC
+uppCostCentre print_as_string CurrentCC
   | print_as_string 	= text "\"CURRENT_CC\""
   | otherwise		= ptext SLIT("CCC")
 
-uppCostCentre sty print_as_string OverheadCC
+uppCostCentre print_as_string OverheadCC
   | print_as_string	= text "\"OVERHEAD\""
   | otherwise		= ptext SLIT("CC_OVERHEAD")
 
-uppCostCentre sty print_as_string cc
-  = let
-	prefix_CC = ptext SLIT("CC_")
-
-	basic_thing = do_cc cc
-
-	basic_thing_string
-	  = if friendly_sty then basic_thing else stringToC basic_thing
+uppCostCentre print_as_string cc
+  = getPprStyle $ \ sty ->
+    let
+        friendly_sty = userStyle sty || debugStyle sty    -- i.e. probably for human consumption
+	prefix_CC	   = ptext SLIT("CC_")
+	basic_thing        = do_cc friendly_sty cc
+	basic_thing_string = stringToC basic_thing
     in
     if print_as_string then
     	hcat [char '"', text basic_thing_string, char '"']
@@ -370,26 +364,23 @@ uppCostCentre sty print_as_string cc
     else
 	hcat [prefix_CC, identToC (_PK_ basic_thing)]
   where
-    friendly_sty = friendly_style sty
+    do_cc friendly_sty DontCareCC	  = "DONT_CARE"
+    do_cc friendly_sty (AllCafsCC  m _)   = if print_as_string
+					    then "CAFs_in_..."
+					    else "CAFs." ++ _UNPK_ m
+    do_cc friendly_sty (AllDictsCC m _ d) = do_dupd friendly_sty d (
+				            if print_as_string
+					    then "DICTs_in_..."
+			       		    else "DICTs." ++ _UNPK_ m)
+    do_cc friendly_sty PreludeCafsCC	  = if print_as_string
+					    then "CAFs_in_..."
+					    else "CAFs"
+    do_cc friendly_sty (PreludeDictsCC d) = do_dupd friendly_sty d (
+				            if print_as_string
+					    then "DICTs_in_..."
+					    else "DICTs")
 
-    ----------------
-    do_cc DontCareCC	     = "DONT_CARE"
-    do_cc (AllCafsCC  m _)   = if print_as_string
-			       then "CAFs_in_..."
-			       else "CAFs." ++ _UNPK_ m
-    do_cc (AllDictsCC m _ d) = do_dupd d (
-			       if print_as_string
-			       then "DICTs_in_..."
-			       else "DICTs." ++ _UNPK_ m)
-    do_cc PreludeCafsCC	     = if print_as_string
-			       then "CAFs_in_..."
-			       else "CAFs"
-    do_cc (PreludeDictsCC d) = do_dupd d (
-			       if print_as_string
-			       then "DICTs_in_..."
-			       else "DICTs")
-
-    do_cc (NormalCC kind mod_name grp_name is_dupd is_caf)
+    do_cc friendly_sty (NormalCC kind mod_name grp_name is_dupd is_caf)
       = let
             basic_kind  = do_kind kind
 	    module_kind = do_caf is_caf (moduleString mod_name ++ '/':
@@ -401,7 +392,7 @@ uppCostCentre sty print_as_string cc
 			  ('/' : basic_kind))
 	in
         if friendly_sty then
-	   do_dupd is_dupd full_kind
+	   do_dupd friendly_sty is_dupd full_kind
 	else
 	    module_kind
       where
@@ -420,19 +411,8 @@ uppCostCentre sty print_as_string cc
 	do_id id = getOccString id
 
     ---------------
-    do_dupd ADupdCC str = if friendly_sty then str ++ "/DUPD" else str
-    do_dupd _	    str = str
-
-friendly_style sty -- i.e., probably for human consumption
-  = case sty of
-      PprForUser _ -> True
-      PprDebug   -> True
-      PprShowAll -> True
-      _ 	 -> False
-{-
-friendly_style sty -- i.e., probably for human consumption
-  = not (codeStyle sty || ifaceStyle sty)
--}
+    do_dupd friendly_sty ADupdCC str = if friendly_sty then str ++ "/DUPD" else str
+    do_dupd _	         _       str = str
 \end{code}
 
 Printing unfoldings is sufficiently weird that we do it separately.
@@ -467,7 +447,7 @@ upp_cc_uf cc@(NormalCC cc_kind m g is_dupd is_caf)
     pp_caf IsNotCafCC = ptext SLIT("_N_")
 
 #ifdef DEBUG
-upp_cc_uf other = panic ("upp_cc_uf:"++(showCostCentre PprDebug True other))
+upp_cc_uf other = panic ("upp_cc_uf:"++(showCostCentre True other))
 #endif
 
 upp_dupd AnOriginalCC = ptext SLIT("_N_")
@@ -475,7 +455,7 @@ upp_dupd ADupdCC      = ptext SLIT("_D_")
 \end{code}
 
 \begin{code}
-uppCostCentreDecl sty is_local cc
+uppCostCentreDecl is_local cc
 #ifdef DEBUG
   | noCostCentreAttached cc || currentOrSubsumedCosts cc
   = panic "uppCostCentreDecl: no cost centre!"
@@ -485,16 +465,20 @@ uppCostCentreDecl sty is_local cc
 	hcat [
 	    ptext SLIT("CC_DECLARE"),char '(',
 	    upp_ident, comma,
-	    uppCostCentre sty True {-as String!-} cc, comma,
+	    uppCostCentre True {-as String!-} cc, comma,
 	    pp_str mod_name, comma,
 	    pp_str grp_name, comma,
 	    text is_subsumed, comma,
-	    if externally_visible || all_toplev_ids_visible then empty else ptext SLIT("static"),
+	    if externally_visible {- || all_toplev_ids_visible -}
+			-- all_toplev stuff removed SLPJ Sept 97;
+			-- not sure this is right.
+	       then empty 
+	       else ptext SLIT("static"),
 	    text ");"]
     else
 	hcat [ ptext SLIT("CC_EXTERN"),char '(', upp_ident, text ");" ]
   where
-    upp_ident = uppCostCentre sty False{-as identifier!-} cc
+    upp_ident = uppCostCentre False{-as identifier!-} cc
 
     pp_str s  = doubleQuotes (ptext s)
 

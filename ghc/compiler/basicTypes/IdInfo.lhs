@@ -7,8 +7,6 @@
 Haskell. [WDP 94/11])
 
 \begin{code}
-#include "HsVersions.h"
-
 module IdInfo (
 	IdInfo,		-- Abstract
 
@@ -32,48 +30,34 @@ module IdInfo (
 
 	unfoldInfo, addUnfoldInfo, 
 
-	specInfo, addSpecInfo,
+	IdSpecEnv, specInfo, addSpecInfo,
 
-	UpdateInfo, SYN_IE(UpdateSpec),
+	UpdateInfo, UpdateSpec,
 	mkUpdateInfo, updateInfo, updateInfoMaybe, ppUpdateInfo, addUpdateInfo,
 
-	ArgUsageInfo, ArgUsage(..), SYN_IE(ArgUsageType),
+	ArgUsageInfo, ArgUsage(..), ArgUsageType,
 	mkArgUsageInfo, argUsageInfo, addArgUsageInfo, getArgUsage,
 
 	FBTypeInfo, FBType(..), FBConsum(..), FBProd(..),
 	fbTypeInfo, ppFBTypeInfo, addFBTypeInfo, mkFBTypeInfo, getFBType
     ) where
 
-IMP_Ubiq()
-IMPORT_1_3(Char(toLower))
+#include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(IdLoop)	-- IdInfo is a dependency-loop ranch, and
-			-- we break those loops by using IdLoop and
-			-- *not* importing much of anything else,
-			-- except from the very general "utils".
-#else
-import {-# SOURCE #-} SpecEnv
-import {-# SOURCE #-} Id
-import {-# SOURCE #-} CoreUnfold
-import {-# SOURCE #-} StdIdInfo
-#endif
 
+import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding )
+import {-# SOURCE #-} CoreSyn	 ( SimplifiableCoreExpr )
+
+import SpecEnv	        ( SpecEnv, emptySpecEnv, isEmptySpecEnv )
 import BasicTypes	( NewOrData )
-import CmdLineOpts	( opt_OmitInterfacePragmas )
 
 import Demand
 import Maybes		( firstJust )
-import Outputable	( ifaceStyle, PprStyle(..), Outputable(..){-instances-} )
-import Pretty
-import PprType          ()
+import Outputable	
 import Unique		( pprUnique )
-import Util		( mapAccumL, panic, assertPanic, pprPanic )
+import Util		( mapAccumL )
 
-#ifdef REALLY_HASKELL_1_3
 ord = fromEnum :: Char -> Int
-#endif
-
 showTypeCategory = panic "IdInfo.showTypeCategory"
 \end{code}
 
@@ -97,7 +81,7 @@ data IdInfo
 	DemandInfo		-- Whether or not it is definitely
 				-- demanded
 
-	SpecEnv			-- Specialisations of this function which exist
+	IdSpecEnv		-- Specialisations of this function which exist
 
 	StrictnessInfo		-- Strictness properties
 
@@ -112,7 +96,7 @@ data IdInfo
 \end{code}
 
 \begin{code}
-noIdInfo = IdInfo UnknownArity UnknownDemand nullSpecEnv NoStrictnessInfo noUnfolding
+noIdInfo = IdInfo UnknownArity UnknownDemand emptySpecEnv NoStrictnessInfo noUnfolding
 		  NoUpdateInfo NoArgUsageInfo NoFBTypeInfo 
 \end{code}
 
@@ -122,7 +106,7 @@ nasty loop, friends...)
 \begin{code}
 apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
 			      update arg_usage fb_ww)
-  | isNullSpecEnv spec
+  | isEmptySpecEnv spec
   = idinfo
   | otherwise
   = panic "IdInfo:apply_to_IdInfo"
@@ -136,19 +120,18 @@ applySubstToIdInfo s0 (IdInfo arity demand spec strictness unfold
 \end{code}
 
 \begin{code}
-ppIdInfo :: PprStyle
-	 -> Bool	-- True <=> print specialisations, please
+ppIdInfo :: Bool	-- True <=> print specialisations, please
 	 -> IdInfo
-	 -> Doc
+	 -> SDoc
 
-ppIdInfo sty specs_please
+ppIdInfo specs_please
     	 (IdInfo arity demand specenv strictness unfold update arg_usage fbtype)
   = hsep [
 		    -- order is important!:
-		    ppArityInfo sty arity,
-		    ppUpdateInfo sty update,
+		    ppArityInfo arity,
+		    ppUpdateInfo update,
 
-		    ppStrictnessInfo sty strictness,
+		    ppStrictnessInfo strictness,
 
 		    if specs_please
 		    then empty -- ToDo -- sty (not (isDataCon for_this_id))
@@ -156,8 +139,8 @@ ppIdInfo sty specs_please
 		    else empty,
 
 		    -- DemandInfo needn't be printed since it has no effect on interfaces
-		    ppDemandInfo sty demand,
-		    ppFBTypeInfo sty fbtype
+		    ppDemandInfo demand,
+		    ppFBTypeInfo fbtype
 	]
 \end{code}
 
@@ -183,9 +166,9 @@ arityInfo (IdInfo arity _ _ _ _ _ _ _) = arity
 
 addArityInfo (IdInfo _ a b c d e f g) arity	     = IdInfo arity a b c d e f g
 
-ppArityInfo sty UnknownArity	     = empty
-ppArityInfo sty (ArityExactly arity) = hsep [ptext SLIT("_A_"), int arity]
-ppArityInfo sty (ArityAtLeast arity) = hsep [ptext SLIT("_A>_"), int arity]
+ppArityInfo UnknownArity	     = empty
+ppArityInfo (ArityExactly arity) = hsep [ptext SLIT("_A_"), int arity]
+ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("_A>_"), int arity]
 \end{code}
 
 %************************************************************************
@@ -223,9 +206,8 @@ demandInfo (IdInfo _ demand _ _ _ _ _ _) = demand
 
 addDemandInfo (IdInfo a _ c d e f g h) demand = IdInfo a demand c d e f g h
 
-ppDemandInfo PprInterface _	      = empty
-ppDemandInfo sty UnknownDemand	      = text "{-# L #-}"
-ppDemandInfo sty (DemandedAsPer info) = hsep [text "{-#", text (showList [info] ""), text "#-}"]
+ppDemandInfo UnknownDemand	      = text "{-# L #-}"
+ppDemandInfo (DemandedAsPer info) = hsep [text "{-#", text (showList [info] ""), text "#-}"]
 \end{code}
 
 %************************************************************************
@@ -234,14 +216,46 @@ ppDemandInfo sty (DemandedAsPer info) = hsep [text "{-#", text (showList [info] 
 %*									*
 %************************************************************************
 
-See SpecEnv.lhs
+A @IdSpecEnv@ holds details of an @Id@'s specialisations. 
 
 \begin{code}
+type IdSpecEnv = SpecEnv SimplifiableCoreExpr
+\end{code}
+
+For example, if \tr{f}'s @SpecEnv@ contains the mapping:
+\begin{verbatim}
+	[List a, b]  ===>  (\d -> f' a b)
+\end{verbatim}
+then when we find an application of f to matching types, we simply replace
+it by the matching RHS:
+\begin{verbatim}
+	f (List Int) Bool ===>  (\d -> f' Int Bool)
+\end{verbatim}
+All the stuff about how many dictionaries to discard, and what types
+to apply the specialised function to, are handled by the fact that the
+SpecEnv contains a template for the result of the specialisation.
+
+There is one more exciting case, which is dealt with in exactly the same
+way.  If the specialised value is unboxed then it is lifted at its
+definition site and unlifted at its uses.  For example:
+
+	pi :: forall a. Num a => a
+
+might have a specialisation
+
+	[Int#] ===>  (case pi' of Lift pi# -> pi#)
+
+where pi' :: Lift Int# is the specialised version of pi.
+
+
+\begin{code}
+specInfo :: IdInfo -> IdSpecEnv
 specInfo (IdInfo _ _ spec _ _ _ _ _) = spec
 
-addSpecInfo id_info spec | isNullSpecEnv spec = id_info
+addSpecInfo id_info spec | isEmptySpecEnv spec = id_info
 addSpecInfo (IdInfo a b _ d e f g h) spec   = IdInfo a b spec d e f g h
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -305,10 +319,10 @@ strictnessInfo (IdInfo _ _ _ strict _ _ _ _) = strict
 addStrictnessInfo id_info 		     NoStrictnessInfo = id_info
 addStrictnessInfo (IdInfo a b d _ e f g h) strict	      = IdInfo a b d strict e f g h
 
-ppStrictnessInfo sty NoStrictnessInfo = empty
-ppStrictnessInfo sty BottomGuaranteed = ptext SLIT("_bot_")
+ppStrictnessInfo NoStrictnessInfo = empty
+ppStrictnessInfo BottomGuaranteed = ptext SLIT("_bot_")
 
-ppStrictnessInfo sty (StrictnessInfo wrapper_args wrkr_maybe)
+ppStrictnessInfo (StrictnessInfo wrapper_args wrkr_maybe)
   = hsep [ptext SLIT("_S_"), text (showList wrapper_args "")]
 \end{code}
 
@@ -376,9 +390,9 @@ updateInfo (IdInfo _ _ _ _ _ update _ _) = update
 addUpdateInfo id_info			 NoUpdateInfo = id_info
 addUpdateInfo (IdInfo a b d e f _ g h) upd_info     = IdInfo a b d e f upd_info g h
 
-ppUpdateInfo sty NoUpdateInfo	       = empty
-ppUpdateInfo sty (SomeUpdateInfo [])   = empty
-ppUpdateInfo sty (SomeUpdateInfo spec) = (<>) (ptext SLIT("_U_ ")) (hcat (map int spec))
+ppUpdateInfo NoUpdateInfo	       = empty
+ppUpdateInfo (SomeUpdateInfo [])   = empty
+ppUpdateInfo (SomeUpdateInfo spec) = (<>) (ptext SLIT("_U_ ")) (hcat (map int spec))
 \end{code}
 
 %************************************************************************
@@ -413,8 +427,8 @@ argUsageInfo (IdInfo _ _ _ _ _ _ au _) = au
 addArgUsageInfo id_info			   NoArgUsageInfo = id_info
 addArgUsageInfo (IdInfo a b d e f g _ h) au_info	  = IdInfo a b d e f g au_info h
 
-ppArgUsageInfo sty NoArgUsageInfo	  = empty
-ppArgUsageInfo sty (SomeArgUsageInfo aut) = (<>) (ptext SLIT("_L_ ")) (ppArgUsageType aut)
+ppArgUsageInfo NoArgUsageInfo	  = empty
+ppArgUsageInfo (SomeArgUsageInfo aut) = (<>) (ptext SLIT("_L_ ")) (ppArgUsageType aut)
 
 ppArgUsage (ArgUsage n)      = int n
 ppArgUsage (UnknownArgUsage) = char '-'
@@ -456,8 +470,8 @@ fbTypeInfo (IdInfo _ _ _ _ _ _ _ fb) = fb
 addFBTypeInfo id_info NoFBTypeInfo = id_info
 addFBTypeInfo (IdInfo a b d e f g h _) fb_info = IdInfo a b d e f g h fb_info
 
-ppFBTypeInfo sty NoFBTypeInfo = empty
-ppFBTypeInfo sty (SomeFBTypeInfo (FBType cons prod))
+ppFBTypeInfo NoFBTypeInfo = empty
+ppFBTypeInfo (SomeFBTypeInfo (FBType cons prod))
       = (<>) (ptext SLIT("_F_ ")) (ppFBType cons prod)
 
 ppFBType cons prod = hcat

@@ -1,19 +1,15 @@
 \begin{code}
-#include "HsVersions.h"
-
 module TcType (
-  SYN_IE(TcIdBndr), TcIdOcc(..),
-	
-  -----------------------------------------
-  SYN_IE(TcTyVar),
-  SYN_IE(TcTyVarSet),
+  
+  TcTyVar, TcBox,
+  TcTyVarSet,
   newTcTyVar,
   newTyVarTy,	-- Kind -> NF_TcM s (TcType s)
   newTyVarTys,	-- Int -> Kind -> NF_TcM s [TcType s]
 
   -----------------------------------------
-  SYN_IE(TcType), TcMaybe(..),
-  SYN_IE(TcTauType), SYN_IE(TcThetaType), SYN_IE(TcRhoType),
+  TcType, TcMaybe(..),
+  TcTauType, TcThetaType, TcRhoType,
 
 	-- Find the type to which a type variable is bound
   tcWriteTyVar,		-- :: TcTyVar s -> TcType s -> NF_TcM (TcType s)
@@ -24,50 +20,49 @@ module TcType (
 
   tcInstTyVars,
   tcInstSigTyVars, 
-  tcInstType, tcInstSigType, tcInstTcType, tcInstSigTcType,
-  tcInstTheta, tcInstId,
+  tcInstType,
+  tcInstSigType, tcInstTcType, tcInstSigTcType,
+  tcInstTheta,
 
   zonkTcTyVars, zonkSigTyVar,
-  zonkTcType, zonkTcTheta,
+  zonkTcType, zonkTcTypes, zonkTcThetaType,
   zonkTcTypeToType,
   zonkTcTyVar,
   zonkTcTyVarToTyVar
 
   ) where
 
+#include "HsVersions.h"
 
 
 -- friends:
-import Type	( SYN_IE(Type), SYN_IE(ThetaType), GenType(..),
-		  tyVarsOfTypes, getTyVar_maybe,
-		  splitForAllTy, splitRhoTy, isTyVarTy,
+import Type	( Type, ThetaType, GenType(..), mkAppTy,
+		  tyVarsOfTypes, getTyVar_maybe, splitDictTy_maybe,
+		  splitForAllTys, splitRhoTy, isTyVarTy,
 		  mkForAllTys, instantiateTy
 		)
-import TyVar	( SYN_IE(TyVar), GenTyVar(..), SYN_IE(TyVarSet), SYN_IE(GenTyVarSet), 
-		  SYN_IE(TyVarEnv), lookupTyVarEnv, addOneToTyVarEnv,
-		  nullTyVarEnv, mkTyVarEnv,
+import TyVar	( TyVar, GenTyVar(..), TyVarSet, GenTyVarSet, 
+		  TyVarEnv, lookupTyVarEnv, addToTyVarEnv,
+		  emptyTyVarEnv, mkTyVarEnv, zipTyVarEnv,
 		  tyVarSetToList
 		)
-import PprType	( GenType, GenTyVar )	-- Instances only
 
 -- others:
-import Class	( GenClass, SYN_IE(Class) )
+import Class	( Class )
 import TyCon	( isFunTyCon )
-import Id	( idType, GenId, SYN_IE(Id) )
 import Kind	( Kind )
 import TcKind	( TcKind )
 import TcMonad
-import Usage	( SYN_IE(Usage), GenUsage, SYN_IE(UVar), duffUsage )
 
 import TysPrim		( voidTy )
 
-IMP_Ubiq()
 import Name		( NamedThing(..) )
 import Unique		( Unique )
 import UniqFM		( UniqFM )
 import Maybes		( assocMaybe )
-import Outputable	( Outputable(..) )
-import Util		( zipEqual, nOfThem, panic{-, pprPanic, pprTrace ToDo:rm-} )
+import BasicTypes	( unused )
+import Util		( zipEqual, nOfThem )
+import Outputable
 \end{code}
 
 
@@ -75,58 +70,33 @@ import Util		( zipEqual, nOfThem, panic{-, pprPanic, pprTrace ToDo:rm-} )
 Data types
 ~~~~~~~~~~
 
-\begin{code}
-type TcIdBndr s = GenId  (TcType s)	-- Binders are all TcTypes
-data TcIdOcc  s = TcId   (TcIdBndr s)	-- Bindees may be either
-		| RealId Id
-
-instance Eq (TcIdOcc s) where
-  (TcId id1)   == (TcId id2)   = id1 == id2
-  (RealId id1) == (RealId id2) = id1 == id2
-  _	       == _	       = False
-
-instance Outputable (TcIdOcc s) where
-  ppr sty (TcId id)   = ppr sty id
-  ppr sty (RealId id) = ppr sty id
-
-instance NamedThing (TcIdOcc s) where
-  getName (TcId id)   = getName id
-  getName (RealId id) = getName id
-\end{code}
-
 
 \begin{code}
-type TcType s = GenType (TcTyVar s) UVar	-- Used during typechecker
+type TcType s = GenType (TcBox s)	-- Used during typechecker
 	-- Invariant on ForAllTy in TcTypes:
 	-- 	forall a. T
 	-- a cannot occur inside a MutTyVar in T; that is,
 	-- T is "flattened" before quantifying over a
 
-type TcThetaType s = [(Class, TcType s)]
+type TcThetaType s = [(Class, [TcType s])]
 type TcRhoType s   = TcType s		-- No ForAllTys
 type TcTauType s   = TcType s		-- No DictTys or ForAllTys
 
-type Box s = MutableVar s (TcMaybe s)
+type TcBox s = TcRef s (TcMaybe s)
 
 data TcMaybe s = UnBound
 	       | BoundTo (TcType s)
-	       | DontBind		-- This variant is used for tyvars
-					-- arising from type signatures, or
-					-- existentially quantified tyvars;
-					-- The idea is that we must not unify
-					-- such tyvars with anything except
-					-- themselves.
 
 -- Interestingly, you can't use (Maybe (TcType s)) instead of (TcMaybe s),
 -- because you get a synonym loop if you do!
 
-type TcTyVar s    = GenTyVar (Box s)
-type TcTyVarSet s = GenTyVarSet (Box s)
+type TcTyVar s    = GenTyVar (TcBox s)
+type TcTyVarSet s = GenTyVarSet (TcBox s)
 \end{code}
 
 \begin{code}
 tcTyVarToTyVar :: TcTyVar s -> TyVar
-tcTyVarToTyVar (TyVar uniq kind name _) = TyVar uniq kind name duffUsage
+tcTyVarToTyVar (TyVar uniq kind name _) = TyVar uniq kind name unused
 \end{code}
 
 Utility functions
@@ -140,27 +110,28 @@ tcSplitForAllTy t
   = go t t []
   where
     go syn_t (ForAllTy tv t) tvs = go t t (tv:tvs)
-    go syn_t (SynTy _ _ t)   tvs = go syn_t t tvs
+    go syn_t (SynTy _ t)     tvs = go syn_t t tvs
     go syn_t (TyVarTy tv)    tvs = tcReadTyVar tv	`thenNF_Tc` \ maybe_ty ->
 				   case maybe_ty of
 					BoundTo ty | not (isTyVarTy ty) -> go syn_t ty tvs
 					other				-> returnNF_Tc (reverse tvs, syn_t)
     go syn_t t	             tvs = returnNF_Tc (reverse tvs, syn_t)
 
-tcSplitRhoTy :: TcType s -> NF_TcM s ([(Class,TcType s)], TcType s)
+tcSplitRhoTy :: TcType s -> NF_TcM s (TcThetaType s, TcType s)
 tcSplitRhoTy t
   = go t t []
  where
-    go syn_t (FunTy (DictTy c t _) r _) ts = go r r ((c,t):ts)
-    go syn_t (AppTy (AppTy (TyConTy tycon _) (DictTy c t _)) r) ts
-			      | isFunTyCon tycon
-			      = go r r ((c,t):ts)
-    go syn_t (SynTy _ _ t) ts = go syn_t t ts
-    go syn_t (TyVarTy tv)  ts = tcReadTyVar tv	`thenNF_Tc` \ maybe_ty ->
-				case maybe_ty of
-				  BoundTo ty | not (isTyVarTy ty) -> go syn_t ty ts
-				  other				  -> returnNF_Tc (reverse ts, syn_t)
-    go syn_t t		   ts = returnNF_Tc (reverse ts, syn_t)
+	-- A type variable is never instantiated to a dictionary type,
+	-- so we don't need to do a tcReadVar on the "arg".
+    go syn_t (FunTy arg res) ts = case splitDictTy_maybe arg of
+					Just pair -> go res res (pair:ts)
+					Nothing   -> returnNF_Tc (reverse ts, syn_t)
+    go syn_t (SynTy _ t)     ts = go syn_t t ts
+    go syn_t (TyVarTy tv)    ts = tcReadTyVar tv	`thenNF_Tc` \ maybe_ty ->
+				  case maybe_ty of
+				    BoundTo ty | not (isTyVarTy ty) -> go syn_t ty ts
+				    other			    -> returnNF_Tc (reverse ts, syn_t)
+    go syn_t t		     ts = returnNF_Tc (reverse ts, syn_t)
 \end{code}
 
 
@@ -183,28 +154,37 @@ newTyVarTys :: Int -> Kind -> NF_TcM s [TcType s]
 newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
 
 
--- For signature type variables, mark them as "DontBind"
+-- For signature type variables, use the user name for the type variable
 tcInstTyVars, tcInstSigTyVars
 	:: [GenTyVar flexi] 
-  	-> NF_TcM s ([TcTyVar s], [TcType s], [(GenTyVar flexi, TcType s)])
+  	-> NF_TcM s ([TcTyVar s], [TcType s], TyVarEnv (TcType s))
 
-tcInstTyVars    tyvars = inst_tyvars UnBound  tyvars
-tcInstSigTyVars tyvars = inst_tyvars DontBind tyvars
+tcInstTyVars    tyvars = inst_tyvars inst_tyvar     tyvars
+tcInstSigTyVars tyvars = inst_tyvars inst_sig_tyvar tyvars
 
-inst_tyvars initial_cts tyvars
-  = mapNF_Tc (inst_tyvar initial_cts) tyvars	`thenNF_Tc` \ tc_tyvars ->
+inst_tyvars inst tyvars
+  = mapNF_Tc inst tyvars	`thenNF_Tc` \ tc_tyvars ->
     let
 	tys = map TyVarTy tc_tyvars
     in
-    returnNF_Tc (tc_tyvars, tys, zipEqual "inst_tyvars" tyvars tys)
+    returnNF_Tc (tc_tyvars, tys, zipTyVarEnv tyvars tys)
 
-inst_tyvar initial_cts (TyVar _ kind name _) 
+inst_tyvar (TyVar _ kind name _) 
   = tcGetUnique 		`thenNF_Tc` \ uniq ->
-    tcNewMutVar initial_cts	`thenNF_Tc` \ box ->
+    tcNewMutVar UnBound		`thenNF_Tc` \ box ->
     returnNF_Tc (TyVar uniq kind Nothing box)
 	-- The "Nothing" means that it'll always print with its 
 	-- unique (or something similar).  If we leave the original (Just Name)
 	-- in there then error messages will say "can't match (T a) against (T a)"
+
+inst_sig_tyvar (TyVar _ kind name _) 
+  = tcGetUnique 		`thenNF_Tc` \ uniq ->
+
+    tcNewMutVar UnBound		`thenNF_Tc` \ box ->
+	-- Was DontBind, but we've nuked that "optimisation"
+
+    returnNF_Tc (TyVar uniq kind name box)
+	-- We propagate the name of the sigature type variable
 \end{code}
 
 @tcInstType@ and @tcInstSigType@ both create a fresh instance of a
@@ -212,8 +192,8 @@ type, returning a @TcType@. All inner for-alls are instantiated with
 fresh TcTyVars.
 
 The difference is that tcInstType instantiates all forall'd type
-variables (and their bindees) with UnBound type variables, whereas
-tcInstSigType instantiates them with DontBind types variables.
+variables (and their bindees) with anonymous type variables, whereas
+tcInstSigType instantiates them with named type variables.
 @tcInstSigType@ also doesn't take an environment.
 
 On the other hand, @tcInstTcType@ instantiates a TcType. It uses
@@ -236,27 +216,28 @@ tcInstSigTcType ty
 	other -> tcInstSigTyVars tyvars		`thenNF_Tc` \ (tyvars', _, tenv)  ->
 		 returnNF_Tc (tyvars', instantiateTy tenv rho)
     
-tcInstType :: [(GenTyVar flexi,TcType s)] 
-	   -> GenType (GenTyVar flexi) UVar 
+tcInstType :: TyVarEnv (TcType s)
+	   -> GenType flexi
 	   -> NF_TcM s (TcType s)
 tcInstType tenv ty_to_inst
-  = tcConvert bind_fn occ_fn (mkTyVarEnv tenv) ty_to_inst
+  = tcConvert bind_fn occ_fn tenv ty_to_inst
   where
-    bind_fn = inst_tyvar UnBound
+    bind_fn = inst_tyvar
     occ_fn env tyvar = case lookupTyVarEnv env tyvar of
 			 Just ty -> returnNF_Tc ty
-			 Nothing -> panic "tcInstType:1" --(vcat [ppr PprDebug ty_to_inst, 
-							--	      ppr PprDebug tyvar])
+			 Nothing -> panic "tcInstType:1" --(vcat [ppr ty_to_inst, 
+							--	      ppr tyvar])
 
-tcInstSigType :: GenType (GenTyVar flexi) UVar -> NF_TcM s (TcType s)
+tcInstSigType :: GenType flexi -> NF_TcM s (TcType s)
 tcInstSigType ty_to_inst
-  = tcConvert bind_fn occ_fn nullTyVarEnv ty_to_inst
+  = tcConvert bind_fn occ_fn emptyTyVarEnv ty_to_inst
   where
-    bind_fn = inst_tyvar DontBind
+    bind_fn = inst_sig_tyvar	-- Note: inst_sig_tyvar, not inst_tyvar
+				-- I don't think that can lead to strange error messages
     occ_fn env tyvar = case lookupTyVarEnv env tyvar of
 			 Just ty -> returnNF_Tc ty
-			 Nothing -> panic "tcInstType:2"-- (vcat [ppr PprDebug ty_to_inst, 
-							--	      ppr PprDebug tyvar])
+			 Nothing -> panic "tcInstType:2"-- (vcat [ppr ty_to_inst, 
+							--	      ppr tyvar])
 
 zonkTcTyVarToTyVar :: TcTyVar s -> NF_TcM s TyVar
 zonkTcTyVarToTyVar tv
@@ -265,7 +246,7 @@ zonkTcTyVarToTyVar tv
 
       TyVarTy tv' ->    returnNF_Tc (tcTyVarToTyVar tv')
 
-      _ -> --pprTrace "zonkTcTyVarToTyVar:" (hsep [ppr PprDebug tv, ppr PprDebug tv_ty]) $
+      _ -> --pprTrace "zonkTcTyVarToTyVar:" (hsep [ppr tv, ppr tv_ty]) $
 	   returnNF_Tc (tcTyVarToTyVar tv)
 
 
@@ -288,25 +269,20 @@ zonkTcTypeToType env ty
 tcConvert bind_fn occ_fn env ty_to_convert
   = doo env ty_to_convert
   where
-    doo env (TyConTy tycon usage) = returnNF_Tc (TyConTy tycon usage)
+    doo env (TyConApp tycon tys) = mapNF_Tc (doo env) tys	`thenNF_Tc` \ tys' ->
+				   returnNF_Tc (TyConApp tycon tys')
 
-    doo env (SynTy tycon tys ty)  = mapNF_Tc (doo env) tys	`thenNF_Tc` \ tys' ->
-				   doo env ty			`thenNF_Tc` \ ty' ->
-				   returnNF_Tc (SynTy tycon tys' ty')
+    doo env (SynTy ty1 ty2)      = doo env ty1			`thenNF_Tc` \ ty1' ->
+				   doo env ty2			`thenNF_Tc` \ ty2' ->
+				   returnNF_Tc (SynTy ty1' ty2')
 
-    doo env (FunTy arg res usage) = doo env arg		`thenNF_Tc` \ arg' ->
+    doo env (FunTy arg res)      = doo env arg		`thenNF_Tc` \ arg' ->
 				   doo env res		`thenNF_Tc` \ res' ->
-				   returnNF_Tc (FunTy arg' res' usage)
-
+				   returnNF_Tc (FunTy arg' res')
+ 
     doo env (AppTy fun arg)	 = doo env fun		`thenNF_Tc` \ fun' ->
 				   doo env arg		`thenNF_Tc` \ arg' ->
-				   returnNF_Tc (AppTy fun' arg')
-
-    doo env (DictTy clas ty usage)= doo env ty		`thenNF_Tc` \ ty' ->
-				   returnNF_Tc (DictTy clas ty' usage)
-
-    doo env (ForAllUsageTy u us ty) = doo env ty	`thenNF_Tc` \ ty' ->
-				     returnNF_Tc (ForAllUsageTy u us ty')
+				   returnNF_Tc (mkAppTy fun' arg')
 
 	-- The two interesting cases!
     doo env (TyVarTy tv) 	 = occ_fn env tv
@@ -314,36 +290,18 @@ tcConvert bind_fn occ_fn env ty_to_convert
     doo env (ForAllTy tyvar ty)
 	= bind_fn tyvar		`thenNF_Tc` \ tyvar' ->
 	  let
-		new_env = addOneToTyVarEnv env tyvar (TyVarTy tyvar')
+		new_env = addToTyVarEnv env tyvar (TyVarTy tyvar')
 	  in
 	  doo new_env ty		`thenNF_Tc` \ ty' ->
 	  returnNF_Tc (ForAllTy tyvar' ty')
 
 
-tcInstTheta :: [(TyVar,TcType s)] -> ThetaType -> NF_TcM s (TcThetaType s)
+tcInstTheta :: TyVarEnv (TcType s) -> ThetaType -> NF_TcM s (TcThetaType s)
 tcInstTheta tenv theta
   = mapNF_Tc go theta
   where
-    go (clas,ty) = tcInstType tenv ty 	`thenNF_Tc` \ tc_ty ->
-		   returnNF_Tc (clas, tc_ty)
-
--- A useful function that takes an occurrence of a global thing
--- and instantiates its type with fresh type variables
-tcInstId :: Id
-	 -> NF_TcM s ([TcTyVar s], 	-- It's instantiated type
-		      TcThetaType s,	--
-		      TcType s)		--
-
-tcInstId id
-  = let
-      (tyvars, rho) = splitForAllTy (idType id)
-    in
-    tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
-    tcInstType tenv rho		`thenNF_Tc` \ rho' ->
-    let
-	(theta', tau') = splitRhoTy rho'
-    in
-    returnNF_Tc (tyvars', theta', tau')
+    go (clas,tys) = mapNF_Tc (tcInstType tenv) tys 	`thenNF_Tc` \ tc_tys ->
+		    returnNF_Tc (clas, tc_tys)
 \end{code}
 
 Reading and writing TcTyVars
@@ -420,6 +378,15 @@ zonkSigTyVar tyvar
 	BoundTo other		    -> panic "zonkSigTyVar"	-- Should only be bound to another tyvar
 	other			    -> returnNF_Tc tyvar
 
+zonkTcTypes :: [TcType s] -> NF_TcM s [TcType s]
+zonkTcTypes tys = mapNF_Tc zonkTcType tys
+
+zonkTcThetaType :: TcThetaType s -> NF_TcM s (TcThetaType s)
+zonkTcThetaType theta = mapNF_Tc zonk theta
+		    where
+		      zonk (c,ts) = zonkTcTypes ts	`thenNF_Tc` \ new_ts ->
+				    returnNF_Tc (c, new_ts)
+
 zonkTcType :: TcType s -> NF_TcM s (TcType s)
 
 zonkTcType (TyVarTy tyvar) = zonkTcTyVar tyvar
@@ -427,41 +394,28 @@ zonkTcType (TyVarTy tyvar) = zonkTcTyVar tyvar
 zonkTcType (AppTy ty1 ty2)
   = zonkTcType ty1		`thenNF_Tc` \ ty1' ->
     zonkTcType ty2		`thenNF_Tc` \ ty2' ->
-    returnNF_Tc (AppTy ty1' ty2')
+    returnNF_Tc (mkAppTy ty1' ty2')
 
-zonkTcType (TyConTy tc u)
-  = returnNF_Tc (TyConTy tc u)
-
-zonkTcType (SynTy tc tys ty)
+zonkTcType (TyConApp tc tys)
   = mapNF_Tc zonkTcType tys	`thenNF_Tc` \ tys' ->
-    zonkTcType ty 		`thenNF_Tc` \ ty' ->
-    returnNF_Tc (SynTy tc tys' ty')
+    returnNF_Tc (TyConApp tc tys')
+
+zonkTcType (SynTy ty1 ty2)
+  = zonkTcType ty1 		`thenNF_Tc` \ ty1' ->
+    zonkTcType ty2 		`thenNF_Tc` \ ty2' ->
+    returnNF_Tc (SynTy ty1' ty2')
 
 zonkTcType (ForAllTy tv ty)
   = zonkTcTyVar tv		`thenNF_Tc` \ tv_ty ->
     zonkTcType ty 		`thenNF_Tc` \ ty' ->
     case tv_ty of	-- Should be a tyvar!
-      TyVarTy tv' -> 
-		     returnNF_Tc (ForAllTy tv' ty')
-      _ -> --pprTrace "zonkTcType:ForAllTy:" (hsep [ppr PprDebug tv, ppr PprDebug tv_ty]) $
-	   
-	   returnNF_Tc (ForAllTy tv{-(tcTyVarToTyVar tv)-} ty')
+      TyVarTy tv' -> returnNF_Tc (ForAllTy tv' ty')
+      _ -> panic "zonkTcType"
+	   -- pprTrace "zonkTcType:ForAllTy:" (hsep [ppr tv, ppr tv_ty]) $
+	   -- returnNF_Tc (ForAllTy tv{-(tcTyVarToTyVar tv)-} ty')
 
-zonkTcType (ForAllUsageTy uv uvs ty)
-  = panic "zonk:ForAllUsageTy"
-
-zonkTcType (FunTy ty1 ty2 u)
+zonkTcType (FunTy ty1 ty2)
   = zonkTcType ty1 		`thenNF_Tc` \ ty1' ->
     zonkTcType ty2 		`thenNF_Tc` \ ty2' ->
-    returnNF_Tc (FunTy ty1' ty2' u)
-
-zonkTcType (DictTy c ty u)
-  = zonkTcType ty 		`thenNF_Tc` \ ty' ->
-    returnNF_Tc (DictTy c ty' u)
-
-
-zonkTcTheta  theta = mapNF_Tc zonk theta
-	where
-	  zonk (c,t) = zonkTcType t	`thenNF_Tc` \ t' ->
-		       returnNF_Tc (c,t')
+    returnNF_Tc (FunTy ty1' ty2')
 \end{code}

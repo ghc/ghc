@@ -6,30 +6,26 @@
 ``Long-distance'' floating of bindings towards the top level.
 
 \begin{code}
-#include "HsVersions.h"
-
 module FloatOut ( floatOutwards ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(List(partition))
+#include "HsVersions.h"
 
 import CoreSyn
 
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_simplifier_stats )
 import CostCentre	( dupifyCC, CostCentre )
-import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList, SYN_IE(IdEnv),
-			  GenId{-instance Outputable-}, SYN_IE(Id)
+import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList, IdEnv,
+			  GenId{-instance Outputable-}, Id
 			)
-import Outputable	( PprStyle(..), Outputable(..){-instance (,)-} )
 import PprCore
 import PprType		( GenTyVar )
-import Pretty		( Doc, int, ptext, hcat, vcat )
 import SetLevels	-- all of it
-import TyVar		( GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
+import BasicTypes	( Unused )
+import TyVar		( GenTyVar{-instance Eq-}, TyVar )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply       ( UniqSupply )
-import Usage		( SYN_IE(UVar) )
-import Util		( pprTrace, panic )
+import List		( partition )
+import Outputable
 \end{code}
 
 Random comments
@@ -65,8 +61,8 @@ which might usefully be separated to
 Well, maybe.  We don't do this at the moment.
 
 \begin{code}
-type LevelledExpr  = GenCoreExpr    (Id, Level) Id TyVar UVar
-type LevelledBind  = GenCoreBinding (Id, Level) Id TyVar UVar
+type LevelledExpr  = GenCoreExpr    (Id, Level) Id Unused
+type LevelledBind  = GenCoreBinding (Id, Level) Id Unused
 type FloatingBind  = (Level, Floater)
 type FloatingBinds = [FloatingBind]
 
@@ -96,7 +92,7 @@ floatOutwards us pgm
 
     (if opt_D_verbose_core2core
      then pprTrace "Levels added:\n"
-		   (vcat (map (ppr PprDebug) annotated_w_levels))
+		   (vcat (map (ppr) annotated_w_levels))
      else id
     )
     ( if not (opt_D_simplifier_stats) then
@@ -213,9 +209,6 @@ floatExpr env _ (Con con as) = (zero_stats, [], Con con as)
 floatExpr env lvl (App e a)
   = case (floatExpr env lvl e) of { (fs, floating_defns, e') ->
     (fs, floating_defns, App e' a) }
-
-floatExpr env lvl (Lam (UsageBinder _) e)
-  = panic "FloatOut.floatExpr: Lam UsageBinder"
 
 floatExpr env lvl (Lam (TyBinder tv) e)
   = let

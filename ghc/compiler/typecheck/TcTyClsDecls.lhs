@@ -4,45 +4,43 @@
 \section[TcTyClsDecls]{Typecheck type and class declarations}
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcTyClsDecls (
 	tcTyAndClassDecls1
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), TyDecl(..),  ConDecl(..), ConDetails(..), BangType(..),
-			  ClassDecl(..), HsType(..), HsTyVar, DefaultDecl, InstDecl,
-			  IfaceSig, Sig(..), MonoBinds, Fake, InPat, HsBinds(..), HsExpr, NewOrData,
+import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..), 
+			  HsType(..), HsTyVar,
+			  ConDecl(..), ConDetails(..), BangType(..),
+			  Sig(..),
 			  hsDeclName
 			)
-import RnHsSyn		( RenamedTyDecl(..), RenamedClassDecl(..), SYN_IE(RenamedHsDecl)
-			)
-import TcHsSyn		( SYN_IE(TcHsBinds) )
+import RnHsSyn		( RenamedTyDecl(..), RenamedClassDecl(..), RenamedHsDecl )
+import TcHsSyn		( TcHsBinds )
+import BasicTypes	( RecFlag(..) )
 
 import TcMonad
-import Inst		( SYN_IE(InstanceMapper) )
+import Inst		( InstanceMapper )
 import TcClassDcl	( tcClassDecl1 )
-import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv )
-import SpecEnv		( SpecEnv )
-import TcKind		( TcKind, newKindVars )
+import TcEnv		( TcIdOcc(..), tcExtendTyConEnv, tcExtendClassEnv )
+import TcKind		( TcKind, newKindVar, newKindVars, tcDefaultKind, kindToTcKind )
 import TcTyDecls	( tcTyDecl, mkDataBinds )
 import TcMonoType	( tcTyVarScope )
-import TcType		( TcIdOcc(..) )
 
+import TyCon		( tyConKind, tyConArity, isSynTyCon )
+import Class		( Class, classBigSig )
+import TyVar		( tyVarKind )
 import Bag	
-import Class		( SYN_IE(Class) )
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( Name, getSrcLoc, isTvOcc, nameOccName )
+import Name		( Name, NamedThing(..), getSrcLoc, isTvOcc, nameOccName )
 import Outputable
-import Pretty
 import Maybes		( mapMaybe )
-import UniqSet		( SYN_IE(UniqSet), emptyUniqSet,
+import UniqSet		( UniqSet, emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import SrcLoc		( SrcLoc )
-import TyCon		( TyCon, SYN_IE(Arity) )
+import TyCon		( TyCon, Arity )
 import Unique		( Unique, Uniquable(..) )
 import Util		( panic{-, pprTrace-} )
 
@@ -64,80 +62,100 @@ tcGroups unf_env inst_mapper []
     returnTc env
 
 tcGroups unf_env inst_mapper (group:groups)
-  = tcGroup unf_env inst_mapper group	`thenTc` \ new_env ->
+  = tcGroup unf_env inst_mapper group	`thenTc` \ (group_tycons, group_classes) ->
 
 	-- Extend the environment using the new tycons and classes
-    tcSetEnv new_env $
+    tcExtendTyConEnv [(getName tycon, (kindToTcKind (tyConKind tycon),
+				       if isSynTyCon tycon then Just (tyConArity tycon) else Nothing,
+				       tycon))
+		     | tycon <- group_tycons]	 $
+
+    tcExtendClassEnv [(getName clas, (classKind clas, clas))
+		     | clas <- group_classes]	 $
+
 
 	-- Do the remaining groups
     tcGroups unf_env inst_mapper groups
+  where
+    classKind clas = map (kindToTcKind . tyVarKind) tyvars
+		   where
+		     (tyvars, _, _, _, _) = classBigSig clas
 \end{code}
 
 Dealing with a group
 ~~~~~~~~~~~~~~~~~~~~
+
+Notice the uses of @zipLazy@, which makes sure
+that the knot-tied TyVars, TyCons and Classes aren't looked at too early.
+
+    
 \begin{code}
-tcGroup :: TcEnv s -> InstanceMapper -> Bag RenamedHsDecl -> TcM s (TcEnv s)
-tcGroup unf_env inst_mapper decls
+tcGroup :: TcEnv s -> InstanceMapper -> SCC RenamedHsDecl -> TcM s ([TyCon], [Class])
+tcGroup unf_env inst_mapper scc
   = 	-- TIE THE KNOT
-    fixTc ( \ ~(tycons,classes,_) ->
+    fixTc ( \ ~(rec_tycons, rec_classes) ->
 
 		-- EXTEND TYPE AND CLASS ENVIRONMENTS
-		-- NB: it's important that the tycons and classes come back in just
-		-- the same order from this fix as from get_binders, so that these
-		-- extend-env things work properly.  A bit UGH-ish.
-      tcExtendTyConEnv tycon_names_w_arities tycons		  $
-      tcExtendClassEnv class_names classes			  $
+      let
+        mk_tycon_bind (name, arity) = newKindVar	`thenNF_Tc` \ kind ->
+				      returnNF_Tc (name, (kind, arity, find name rec_tycons))
+
+	mk_class_bind (name, arity) = newKindVars arity	 `thenNF_Tc` \ kinds ->
+				      returnNF_Tc (name, (kinds, find name rec_classes))
+
+        find name []		 = pprPanic "tcGroup" (ppr name)
+	find name (thing:things) | name == getName thing = thing
+				 | otherwise		 = find name things
+
+      in
+      mapNF_Tc mk_tycon_bind tycon_names_w_arities    `thenNF_Tc` \ tycon_binds ->
+      mapNF_Tc mk_class_bind class_names_w_arities    `thenNF_Tc` \ class_binds ->
+      tcExtendTyConEnv tycon_binds	  $
+      tcExtendClassEnv class_binds	  $
 
 		-- DEAL WITH TYPE VARIABLES
       tcTyVarScope tyvar_names 			( \ tyvars ->
 
 		-- DEAL WITH THE DEFINITIONS THEMSELVES
-	foldBag combine (tcDecl unf_env inst_mapper)
-		(returnTc (emptyBag, emptyBag))
-		decls
-      )						`thenTc` \ (tycon_bag,class_bag) ->
-      let
-	tycons = bagToList tycon_bag
-	classes = bagToList class_bag
-      in 
+	foldlTc (tcDecl is_rec_group unf_env inst_mapper) ([], []) decls
+      )						`thenTc` \ (tycons, classes) ->
 
-		-- SNAFFLE ENV TO RETURN
-      tcGetEnv					`thenNF_Tc` \ final_env ->
-
-      returnTc (tycons, classes, final_env)
-    ) `thenTc` \ (_, _, final_env) ->
-
-    returnTc final_env
-
+      returnTc (tycons, classes)
+    )
   where
-    (tyvar_names, tycon_names_w_arities, class_names) = get_binders decls
+    is_rec_group = case scc of
+			AcyclicSCC _ -> NonRecursive
+			CyclicSCC _  -> Recursive
 
-    combine do_a do_b
-      = do_a `thenTc` \ (a1,a2) ->
-        do_b `thenTc` \ (b1,b2) ->
-	returnTc (a1 `unionBags` b1, a2 `unionBags` b2)
+    decls = case scc of
+		AcyclicSCC decl -> [decl]
+		CyclicSCC decls -> decls
+
+    (tyvar_names, tycon_names_w_arities, class_names_w_arities) = get_binders decls
 \end{code}
 
 Dealing with one decl
 ~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcDecl  :: TcEnv s -> InstanceMapper
+tcDecl  :: RecFlag 			-- True => recursive group
+	-> TcEnv s -> InstanceMapper
+	-> ([TyCon], [Class])		-- Accumulating parameter
 	-> RenamedHsDecl
-	-> TcM s (Bag TyCon, Bag Class)
+	-> TcM s ([TyCon], [Class])
 
-tcDecl unf_env inst_mapper (TyD decl)
-  = tcTyDecl decl	`thenTc` \ tycon ->
-    returnTc (unitBag tycon, emptyBag)
+tcDecl is_rec_group unf_env inst_mapper (tycons, classes) (TyD decl)
+  = tcTyDecl is_rec_group decl	`thenTc` \ tycon ->
+    returnTc (tycon:tycons, classes)
 
-tcDecl unf_env inst_mapper (ClD decl)
+tcDecl is_rec_group unf_env inst_mapper (tycons, classes) (ClD decl)
   = tcClassDecl1 unf_env inst_mapper decl   `thenTc` \ clas ->
-    returnTc (emptyBag, unitBag clas)
+    returnTc (tycons, clas:classes)
 \end{code}
 
 Dependency analysis
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-sortByDependency :: [RenamedHsDecl] -> TcM s [Bag RenamedHsDecl]
+sortByDependency :: [RenamedHsDecl] -> TcM s [SCC RenamedHsDecl]
 sortByDependency decls
   = let		-- CHECK FOR SYNONYM CYCLES
 	syn_sccs   = stronglyConnComp (filter is_syn_decl edges)
@@ -156,9 +174,8 @@ sortByDependency decls
 		-- DO THE MAIN DEPENDENCY ANALYSIS
     let
 	decl_sccs  = stronglyConnComp (filter is_ty_cls_decl edges)
-	scc_bags   = map bag_acyclic decl_sccs
     in
-    returnTc (scc_bags)
+    returnTc decl_sccs
 
   where
     edges = mapMaybe mk_edges decls
@@ -188,7 +205,7 @@ mk_edges decl@(TyD (TyData _ ctxt name _ condecls derivs _ _))
 mk_edges decl@(TyD (TySynonym name _ rhs _))
   = Just (decl, uniqueOf name, uniqSetToList (get_ty rhs))
 
-mk_edges decl@(ClD (ClassDecl ctxt name _ sigs _ _ _))
+mk_edges decl@(ClD (ClassDecl ctxt name _ sigs _ _ _ _ _))
   = Just (decl, uniqueOf name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
 				         get_sigs sigs))
 
@@ -264,16 +281,16 @@ Monad c in bop's type signature means that D must have kind Type->Type.
 
 
 \begin{code}
-get_binders :: Bag RenamedHsDecl
+get_binders :: [RenamedHsDecl]
 	    -> ([HsTyVar Name],		-- TyVars;  no dups
 		[(Name, Maybe Arity)],	-- Tycons;  no dups; arities for synonyms
-		[Name])			-- Classes; no dups
+		[(Name, Arity)])	-- Classes; no dups; with their arities
 
 get_binders decls = (bagToList tyvars, bagToList tycons, bagToList classes)
   where
-    (tyvars, tycons, classes) = foldBag union3 get_binders1
-					(emptyBag,emptyBag,emptyBag)
-					decls
+    (tyvars, tycons, classes) = foldr (union3 . get_binders1)
+				      (emptyBag,emptyBag,emptyBag)
+				      decls
 
     union3 (a1,a2,a3) (b1,b2,b3)
       = (a1 `unionBags` b1, a2 `unionBags` b2, a3 `unionBags` b3)
@@ -282,9 +299,9 @@ get_binders1 (TyD (TyData _ _ name tyvars _ _ _ _))
  = (listToBag tyvars, unitBag (name,Nothing), emptyBag)
 get_binders1 (TyD (TySynonym name tyvars _ _))
  = (listToBag tyvars, unitBag (name, Just (length tyvars)), emptyBag)
-get_binders1 (ClD (ClassDecl _ name tyvar sigs _ _ _))
- = (unitBag tyvar `unionBags` sigs_tvs sigs,
-    emptyBag, unitBag name)
+get_binders1 (ClD (ClassDecl _ name tyvars sigs _ _ _ _ _))
+ = (listToBag tyvars `unionBags` sigs_tvs sigs,
+    emptyBag, unitBag (name, length tyvars))
 
 sigs_tvs sigs = unionManyBags (map sig_tvs sigs)
   where 
@@ -295,18 +312,18 @@ sigs_tvs sigs = unionManyBags (map sig_tvs sigs)
 
 
 \begin{code}
-typeCycleErr syn_cycles sty
-  = vcat (map (pp_cycle sty "Cycle in type declarations ...") syn_cycles)
+typeCycleErr syn_cycles
+  = vcat (map (pp_cycle "Cycle in type declarations:") syn_cycles)
 
-classCycleErr cls_cycles sty
-  = vcat (map (pp_cycle sty "Cycle in class declarations ...") cls_cycles)
+classCycleErr cls_cycles
+  = vcat (map (pp_cycle "Cycle in class declarations:") cls_cycles)
 
-pp_cycle sty str decls
+pp_cycle str decls
   = hang (text str)
 	 4 (vcat (map pp_decl decls))
   where
     pp_decl decl
-      = hsep [ppr sty name, ppr sty (getSrcLoc name)]
+      = hsep [quotes (ppr name), ptext SLIT("at"), ppr (getSrcLoc name)]
      where
         name = hsDeclName decl
 \end{code}

@@ -4,25 +4,23 @@
 \section[LambdaLift]{A STG-code lambda lifter}
 
 \begin{code}
-#include "HsVersions.h"
-
 module LambdaLift ( liftProgram ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import StgSyn
 
 import Bag		( Bag, emptyBag, unionBags, unitBag, snocBag, bagToList )
 import Id		( idType, mkSysLocal, addIdArity, 
 			  mkIdSet, unitIdSet, minusIdSet, setIdVisibility,
-			  unionManyIdSets, idSetToList, SYN_IE(IdSet),
-			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv),
-			  SYN_IE(Id)
+			  unionManyIdSets, idSetToList, IdSet,
+			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv,
+			  Id
 			)
 import IdInfo		( ArityInfo, exactArity )
-import Name             ( SYN_IE(Module) )
+import Name             ( Module )
 import SrcLoc		( noSrcLoc )
-import Type		( splitForAllTy, mkForAllTys, mkFunTys, SYN_IE(Type) )
+import Type		( splitForAllTys, mkForAllTys, mkFunTys, Type )
 import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )
 import Util		( zipEqual, panic, assertPanic )
 \end{code}
@@ -382,7 +380,7 @@ mkScPieces extra_arg_set (id, StgRhsClosure cc bi _ upd args body)
 	-- Construct the supercombinator type
     type_of_original_id = idType id
     extra_arg_tys       = map idType extra_args
-    (tyvars, rest)      = splitForAllTy type_of_original_id
+    (tyvars, rest)      = splitForAllTys type_of_original_id
     sc_ty 	        = mkForAllTys tyvars (mkFunTys extra_arg_tys rest)
 
     sc_rhs = StgRhsClosure cc bi [] upd (extra_args ++ args) body

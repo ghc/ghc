@@ -4,25 +4,12 @@
 \section[Util]{Highly random utility functions}
 
 \begin{code}
-#include "HsVersions.h"
-#define IF_NOT_GHC(a) {--}
-
-#ifndef __GLASGOW_HASKELL__
-# undef TAG_
-# undef LT_
-# undef EQ_
-# undef GT_
-# undef tagCmp_
-#endif
+-- IF_NOT_GHC is meant to make this module useful outside the context of GHC
+#define IF_NOT_GHC(a)
 
 module Util (
-	-- Haskell-version support
-#ifndef __GLASGOW_HASKELL__
-	tagCmp_,
-	TAG_(..),
-#endif
 	-- The Eager monad
-	SYN_IE(Eager), thenEager, returnEager, mapEager, appEager, runEager,
+	Eager, thenEager, returnEager, mapEager, appEager, runEager,
 
 	-- general list processing
 	IF_NOT_GHC(forall COMMA exists COMMA)
@@ -30,7 +17,7 @@ module Util (
         zipLazy,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, lengthExceeds, isSingleton,
-	startsWith, endsWith,
+	startsWith, endsWith, snocView,
 	isIn, isn'tIn,
 
 	-- association lists
@@ -52,23 +39,23 @@ module Util (
 	mapAccumL, mapAccumR, mapAccumB,
 
 	-- comparisons
-	Ord3(..), thenCmp, cmpList,
-	cmpPString, FAST_STRING,
+	thenCmp, cmpList,
+	FastString,
 
 	-- pairs
 	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
 	IF_NOT_GHC(applyToSnd COMMA foldPair COMMA)
-	unzipWith
+	unzipWith,
 
 	-- error handling
-	, panic, panic#, pprPanic, pprPanic#, pprError, pprTrace
-	, assertPanic, assertPprPanic
+	panic, panic#, assertPanic
 
     ) where
 
-CHK_Ubiq() -- debugging consistency check
-IMPORT_1_3(List(zipWith4))
-import Pretty	
+#include "HsVersions.h"
+
+import FastString	( FastString )
+import List		( zipWith4 )
 
 infixr 9 `thenCmp`
 \end{code}
@@ -103,22 +90,6 @@ mapEager f [] = returnEager []
 mapEager f (x:xs) = f x			`thenEager` \ y ->
 		    mapEager f xs	`thenEager` \ ys ->
 		    returnEager (y:ys)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[Utils-version-support]{Functions to help pre-1.2 versions of (non-Glasgow) Haskell}
-%*									*
-%************************************************************************
-
-This is our own idea:
-\begin{code}
-#ifndef __GLASGOW_HASKELL__
-data TAG_ = LT_ | EQ_ | GT_
-
-tagCmp_ :: Ord a => a -> a -> TAG_
-tagCmp_ a b = if a == b then EQ_ else if a < b then LT_ else GT_
-#endif
 \end{code}
 
 %************************************************************************
@@ -232,7 +203,16 @@ endsWith cs ss
       Just rs -> Just (reverse rs)
 \end{code}
 
+\begin{code}
+snocView :: [a] -> ([a], a)	-- Split off the last element
+snocView xs = go xs []
+	    where
+	      go [x]    acc = (reverse acc, x)
+	      go (x:xs) acc = go xs (x:acc)
+\end{code}
+
 Debugging/specialising versions of \tr{elem} and \tr{notElem}
+
 \begin{code}
 isIn, isn'tIn :: (Eq a) => String -> a -> [a] -> Bool
 
@@ -314,7 +294,7 @@ hasNoDups xs = f [] xs
 \end{code}
 
 \begin{code}
-equivClasses :: (a -> a -> TAG_) 	-- Comparison
+equivClasses :: (a -> a -> Ordering) 	-- Comparison
 	     -> [a]
 	     -> [[a]]
 
@@ -323,8 +303,8 @@ equivClasses cmp stuff@[item] = [stuff]
 equivClasses cmp items
   = runs eq (sortLt lt items)
   where
-    eq a b = case cmp a b of { EQ_ -> True; _ -> False }
-    lt a b = case cmp a b of { LT_ -> True; _ -> False }
+    eq a b = case cmp a b of { EQ -> True; _ -> False }
+    lt a b = case cmp a b of { LT -> True; _ -> False }
 \end{code}
 
 The first cases in @equivClasses@ above are just to cut to the point
@@ -345,7 +325,7 @@ runs p (x:xs) = case (span (p x) xs) of
 \end{code}
 
 \begin{code}
-removeDups :: (a -> a -> TAG_) 	-- Comparison function
+removeDups :: (a -> a -> Ordering) 	-- Comparison function
 	   -> [a]
 	   -> ([a], 	-- List with no duplicates
 	       [[a]])	-- List of duplicate groups.  One representative from
@@ -360,6 +340,7 @@ removeDups cmp xs
     collect_dups dups_so_far [x]         = (dups_so_far,      x)
     collect_dups dups_so_far dups@(x:xs) = (dups:dups_so_far, x)
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -452,12 +433,12 @@ rqpart lt x (y:ys) rle rgt r =
 %************************************************************************
 
 \begin{code}
-mergesort :: (a -> a -> TAG_) -> [a] -> [a]
+mergesort :: (a -> a -> Ordering) -> [a] -> [a]
 
 mergesort cmp xs = merge_lists (split_into_runs [] xs)
   where
-    a `le` b = case cmp a b of { LT_ -> True;  EQ_ -> True; GT__ -> False }
-    a `ge` b = case cmp a b of { LT_ -> False; EQ_ -> True; GT__ -> True  }
+    a `le` b = case cmp a b of { LT -> True;  EQ -> True; GT -> False }
+    a `ge` b = case cmp a b of { LT -> False; EQ -> True; GT -> True  }
 
     split_into_runs []        []	    	= []
     split_into_runs run       []	    	= [run]
@@ -473,9 +454,9 @@ mergesort cmp xs = merge_lists (split_into_runs [] xs)
     merge xs [] = xs
     merge xl@(x:xs) yl@(y:ys)
       = case cmp x y of
-	  EQ_  -> x : y : (merge xs ys)
-	  LT_  -> x : (merge xs yl)
-	  GT__ -> y : (merge xl ys)
+	  EQ  -> x : y : (merge xs ys)
+	  LT  -> x : (merge xs yl)
+	  GT -> y : (merge xl ys)
 \end{code}
 
 %************************************************************************
@@ -676,68 +657,37 @@ mapAccumB f a b (x:xs) = (a'',b'',y:ys)
 %*									*
 %************************************************************************
 
-See also @tagCmp_@ near the versions-compatibility section.
-
-The Ord3 class will be subsumed into Ord in Haskell 1.3.
-
 \begin{code}
-class Ord3 a where
-  cmp :: a -> a -> TAG_
-
-thenCmp :: TAG_ -> TAG_ -> TAG_
+thenCmp :: Ordering -> Ordering -> Ordering
 {-# INLINE thenCmp #-}
-thenCmp EQ_   any = any
+thenCmp EQ   any = any
 thenCmp other any = other
 
-cmpList :: (a -> a -> TAG_) -> [a] -> [a] -> TAG_
+cmpList :: (a -> a -> Ordering) -> [a] -> [a] -> Ordering
     -- `cmpList' uses a user-specified comparer
 
-cmpList cmp []     [] = EQ_
-cmpList cmp []     _  = LT_
-cmpList cmp _      [] = GT_
+cmpList cmp []     [] = EQ
+cmpList cmp []     _  = LT
+cmpList cmp _      [] = GT
 cmpList cmp (a:as) (b:bs)
-  = case cmp a b of { EQ_ -> cmpList cmp as bs; xxx -> xxx }
+  = case cmp a b of { EQ -> cmpList cmp as bs; xxx -> xxx }
 \end{code}
 
 \begin{code}
-instance Ord3 a => Ord3 [a] where
-  cmp []     []     = EQ_
-  cmp (x:xs) []     = GT_
-  cmp []     (y:ys) = LT_
-  cmp (x:xs) (y:ys) = (x `cmp` y) `thenCmp` (xs `cmp` ys)
+cmpString :: String -> String -> Ordering
 
-instance Ord3 a => Ord3 (Maybe a) where
-  cmp Nothing  Nothing  = EQ_
-  cmp Nothing  (Just y) = LT_
-  cmp (Just x) Nothing  = GT_
-  cmp (Just x) (Just y) = x `cmp` y
-
-instance Ord3 Int where
-  cmp a b | a < b     = LT_
- 	  | a > b     = GT_
-	  | otherwise = EQ_
-\end{code}
-
-\begin{code}
-cmpString :: String -> String -> TAG_
-
-cmpString []     []	= EQ_
+cmpString []     []	= EQ
 cmpString (x:xs) (y:ys) = if	  x == y then cmpString xs ys
-			  else if x  < y then LT_
-			  else		      GT_
-cmpString []     ys	= LT_
-cmpString xs     []	= GT_
+			  else if x  < y then LT
+			  else		      GT
+cmpString []     ys	= LT
+cmpString xs     []	= GT
 
-cmpString _ _ = panic# "cmpString"
+cmpString _ _ = panic "cmpString"
 \end{code}
 
-\begin{code}
-cmpPString :: FAST_STRING -> FAST_STRING -> TAG_
 
-cmpPString x y
-  = case (tagCmpFS x y) of { _LT -> LT_ ; _EQ -> EQ_ ; _GT -> GT_ }
-\end{code}
-
+y
 %************************************************************************
 %*									*
 \subsection[Utils-pairs]{Pairs}
@@ -775,6 +725,7 @@ unzipWith :: (a -> b -> c) -> [(a, b)] -> [c]
 unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
 \end{code}
 
+
 %************************************************************************
 %*									*
 \subsection[Utils-errors]{Error handling}
@@ -787,33 +738,13 @@ panic x = error ("panic! (the `impossible' happened):\n\t"
 	      ++ "Please report it as a compiler bug "
 	      ++ "to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\n" )
 
-pprPanic heading pretty_msg = panic (heading++ " " ++ (show pretty_msg))
-pprError heading pretty_msg = error (heading++ " " ++ (show pretty_msg))
-# if __GLASGOW_HASKELL__ == 201
-pprTrace heading pretty_msg = GHCbase.trace (heading++" "++(show pretty_msg))
-# elif __GLASGOW_HASKELL__ >= 202
-pprTrace heading pretty_msg = GlaExts.trace (heading++" "++(show pretty_msg))
-# else
-pprTrace heading pretty_msg = trace (heading++" "++(show pretty_msg))
-# endif
-
 -- #-versions because panic can't return an unboxed int, and that's
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)
 -- No, man -- Too Beautiful! (Will)
 
-panic# :: String -> TAG_
-panic# s = case (panic s) of () -> EQ_
-
-pprPanic# heading pretty_msg = panic# (heading++(show pretty_msg))
+panic# :: String -> FAST_INT
+panic# s = case (panic s) of () -> ILIT(0)
 
 assertPanic :: String -> Int -> a
-assertPanic file line = panic ("ASSERT failed! file "++file++", line "++show line)
-
-assertPprPanic :: String -> Int -> Doc -> a
-assertPprPanic file line msg
-  = panic (show (sep [hsep[text "ASSERT failed! file", 
-		 	   text file, 
-			   text "line", int line], 
-		      msg]))
-
+assertPanic file line = panic ("ASSERT failed! file " ++ file ++ ", line " ++ show line)
 \end{code}

@@ -4,13 +4,11 @@
 \section[FoldrBuildWW]{Spliting suitable functions into Workers and Wrappers}
 
 \begin{code}
-#include "HsVersions.h"
-
 module FoldrBuildWW ( mkFoldrBuildWW ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import CoreSyn		( SYN_IE(CoreBinding) )
+import CoreSyn		( CoreBinding )
 import UniqSupply	( UniqSupply )
 import Util		( panic{-ToDo:rm?-} )
 
@@ -19,7 +17,7 @@ import Util		( panic{-ToDo:rm?-} )
 --import TysPrim		( alphaTy )
 --import TyVar		( alphaTyVar )
 --
---import Type		( SYN_IE(Type) ) -- **** CAN SEE THE CONSTRUCTORS ****
+--import Type		( Type ) -- **** CAN SEE THE CONSTRUCTORS ****
 --import UniqSupply	( runBuiltinUs )
 --import WwLib            -- share the same monad (is this eticit ?)
 --import PrelInfo		( listTyCon, mkListTy, nilDataCon, consDataCon,
@@ -117,7 +115,7 @@ try_split_bind id expr =
 	|  FBGoodProd == prod ->
 {-      || any (== FBGoodConsum) consum -}
       let
-	(use_args,big_args,args,body) = collectBinders expr'
+	(big_args,args,body) = collectBinders expr'
       in
 	if length args /= length consum   -- funny number of arguments
 	then returnWw [(id,expr')]
@@ -127,7 +125,7 @@ try_split_bind id expr =
 	-- f_wrk /\ t1 .. tn t_new \ v1 .. vn c n -> foldr <exprTy> <nTy> c n e
 	-- f /\ t1 .. tn \ v1 .. vn
 	--	-> build exprTy (\ c n -> f_wrk t1 .. tn t_new v1 .. vn c n)
-	pprTrace "WW:" (ppr PprDebug id) (returnWw ())
+	pprTrace "WW:" (ppr id) (returnWw ())
 				`thenWw` \ () ->
 	getUniqueWw             `thenWw` \ ty_new_uq ->
 	getUniqueWw             `thenWw` \ worker_new_uq ->

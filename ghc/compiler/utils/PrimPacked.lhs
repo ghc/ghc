@@ -8,20 +8,13 @@ of bytes (character strings). Used by the interface lexer input
 subsystem, mostly.
 
 \begin{code}
-#include "HsVersions.h"
-
 module PrimPacked
        (
         strLength,          -- :: _Addr -> Int
-        copyPrefixStr,      -- :: _Addr -> Int -> _ByteArray Int
-        copySubStr,         -- :: _Addr -> Int -> Int -> _ByteArray Int
-        copySubStrFO,       -- :: ForeignObj -> Int -> Int -> _ByteArray Int
-        copySubStrBA,       -- :: _ByteArray Int -> Int -> Int -> _ByteArray Int
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205
-        stringToByteArray,  -- :: String -> _ByteArray Int
-	byteArrayToString,  -- :: _ByteArray Int -> String
-#endif
+        copyPrefixStr,      -- :: _Addr -> Int -> ByteArray Int
+        copySubStr,         -- :: _Addr -> Int -> Int -> ByteArray Int
+        copySubStrFO,       -- :: ForeignObj -> Int -> Int -> ByteArray Int
+        copySubStrBA,       -- :: ByteArray Int -> Int -> Int -> ByteArray Int
 
         eqStrPrefix,        -- :: Addr# -> ByteArray# -> Int# -> Bool
         eqCharStrPrefix,    -- :: Addr# -> Addr# -> Int# -> Bool
@@ -33,41 +26,29 @@ module PrimPacked
         indexCharOffFO#     -- :: ForeignObj# -> Int# -> Char#
        ) where
 
-#if __GLASGOW_HASKELL__ <= 201
-import PreludeGlaST
-import PreludeGlaMisc
-#else
+-- This #define suppresses the "import FastString" that
+-- HsVersions otherwise produces
+#define COMPILING_FAST_STRING
+#include "HsVersions.h"
+
 import GlaExts
-import Foreign
+import Addr	( Addr(..) )
 import GHC
 import ArrBase
 import ST
 import STBase
-
-# if __GLASGOW_HASKELL__ == 202
-import PrelBase ( Char(..) )
-# endif
-
-# if __GLASGOW_HASKELL__ >= 206
-import PackBase
-# endif
-
-# if __GLASGOW_HASKELL__ >= 209
-import Addr
-# endif
-
-#endif
-
+import IOBase	( ForeignObj(..) )
+import PackBase ( unpackCStringBA, packString )
 \end{code} 
 
 Return the length of a @\\NUL@ terminated character string:
 
 \begin{code}
-strLength :: _Addr -> Int
+strLength :: Addr -> Int
 strLength a =
- unsafePerformPrimIO (
-    _ccall_ strlen a  `thenPrimIO` \ len@(I# _) ->
-    returnPrimIO len
+ unsafePerformIO (
+    _ccall_ strlen a  >>= \ len@(I# _) ->
+    return len
  )
 
 \end{code}
@@ -77,21 +58,24 @@ Copying a char string prefix into a byte array,
 NULs.
 
 \begin{code}
-
-copyPrefixStr :: _Addr -> Int -> _ByteArray Int
+copyPrefixStr :: Addr -> Int -> ByteArray Int
 copyPrefixStr (A# a) len@(I# length#) =
- unsafePerformST (
+ runST (
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
   -}
-  new_ps_array (length# +# 1#)               `thenStrictlyST` \ ch_array ->
+  (new_ps_array (length# +# 1#))             >>= \ ch_array ->
+{- Revert back to Haskell-only solution for the moment.
+   _ccall_ memcpy ch_array (A# a) len        >>=  \ () ->
+   write_ps_array ch_array length# (chr# 0#) >>
+-}
    -- fill in packed string from "addr"
-  fill_in ch_array 0#			     `thenStrictlyST` \ _ ->
+  fill_in ch_array 0#			     >>
    -- freeze the puppy:
-  freeze_ps_array ch_array		     `thenStrictlyST` \ barr ->
+  freeze_ps_array ch_array length#	     `thenStrictlyST` \ barr ->
   returnStrictlyST barr )
   where
-    fill_in :: _MutableByteArray s Int -> Int# -> _ST s ()
+    fill_in :: MutableByteArray s Int -> Int# -> ST s ()
 
     fill_in arr_in# idx
       | idx ==# length#
@@ -108,20 +92,20 @@ Copying out a substring, assume a 0-indexed string:
 (and positive lengths, thank you).
 
 \begin{code}
-copySubStr :: _Addr -> Int -> Int -> _ByteArray Int
+copySubStr :: Addr -> Int -> Int -> ByteArray Int
 copySubStr a start length =
-  unsafePerformPrimIO (
+  unsafePerformIO (
     _casm_ `` %r= (char *)((char *)%0 + (int)%1); '' a start 
-                                                     `thenPrimIO` \ a_start ->
-    returnPrimIO (copyPrefixStr a_start length))
+                                                     >>= \ a_start ->
+    return (copyPrefixStr a_start length))
 \end{code}
 
-Copying a sub-string out of a ForeignObj
+pCopying a sub-string out of a ForeignObj
 
 \begin{code}
-copySubStrFO :: _ForeignObj -> Int -> Int -> _ByteArray Int
-copySubStrFO (_ForeignObj fo) (I# start#) len@(I# length#) =
- unsafePerformST (
+copySubStrFO :: ForeignObj -> Int -> Int -> ByteArray Int
+copySubStrFO (ForeignObj fo) (I# start#) len@(I# length#) =
+ runST (
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
   -}
@@ -129,9 +113,9 @@ copySubStrFO (_ForeignObj fo) (I# start#) len@(I# length#) =
    -- fill in packed string from "addr"
   fill_in ch_array 0#   `seqStrictlyST`
    -- freeze the puppy:
-  freeze_ps_array ch_array)
+  freeze_ps_array ch_array length#)
   where
-    fill_in :: _MutableByteArray s Int -> Int# -> _ST s ()
+    fill_in :: MutableByteArray s Int -> Int# -> ST s ()
 
     fill_in arr_in# idx
       | idx ==# length#
@@ -146,7 +130,7 @@ copySubStrFO (_ForeignObj fo) (I# start#) len@(I# length#) =
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <=205
 indexCharOffFO# :: ForeignObj# -> Int# -> Char#
 indexCharOffFO# fo# i# = 
-  case unsafePerformPrimIO (_casm_ ``%r=(char)*((char *)%0 + (int)%1); '' (_ForeignObj fo#) (I# i#)) of
+  case unsafePerformIO (_casm_ ``%r=(char)*((char *)%0 + (int)%1); '' (ForeignObj fo#) (I# i#)) of
     C# c -> c
 #else
 indexCharOffFO# :: ForeignObj# -> Int# -> Char#
@@ -156,22 +140,22 @@ indexCharOffFO# fo i = indexCharOffForeignObj# fo i
 -- step on (char *) pointer by x units.
 addrOffset# :: Addr# -> Int# -> Addr# 
 addrOffset# a# i# =
-  case unsafePerformPrimIO (_casm_ ``%r=(char *)((char *)%0 + (int)%1); '' (A# a#) (I# i#)) of
+  case unsafePerformIO (_casm_ ``%r=(char *)((char *)%0 + (int)%1); '' (A# a#) (I# i#)) of
     A# a -> a
 
-copySubStrBA :: _ByteArray Int -> Int -> Int -> _ByteArray Int
-copySubStrBA (_ByteArray _ barr#) (I# start#) len@(I# length#) =
- unsafePerformST (
+copySubStrBA :: ByteArray Int -> Int -> Int -> ByteArray Int
+copySubStrBA (ByteArray _ barr#) (I# start#) len@(I# length#) =
+ runST (
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
   -}
   new_ps_array (length# +# 1#)  `thenStrictlyST` \ ch_array ->
    -- fill in packed string from "addr"
-  fill_in ch_array 0#   `seqStrictlyST`
+  fill_in ch_array 0#   	`seqStrictlyST`
    -- freeze the puppy:
-  freeze_ps_array ch_array)
+  freeze_ps_array ch_array length#)
   where
-    fill_in :: _MutableByteArray s Int -> Int# -> _ST s ()
+    fill_in :: MutableByteArray s Int -> Int# -> ST s ()
 
     fill_in arr_in# idx
       | idx ==# length#
@@ -185,146 +169,98 @@ copySubStrBA (_ByteArray _ barr#) (I# start#) len@(I# length#) =
 \end{code}
 
 (Very :-) ``Specialised'' versions of some CharArray things...
+[Copied from PackBase; no real reason -- UGH]
 
 \begin{code}
-new_ps_array	:: Int# -> _ST s (_MutableByteArray s Int)
-write_ps_array	:: _MutableByteArray s Int -> Int# -> Char# -> _ST s () 
-freeze_ps_array :: _MutableByteArray s Int -> _ST s (_ByteArray Int)
+new_ps_array	:: Int# -> ST s (MutableByteArray s Int)
+write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s () 
+freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
-new_ps_array size =
-    MkST ( \ STATE_TOK(s#) ->
-    case (newCharArray# size s#)  of { StateAndMutableByteArray# s2# barr# ->
-    ST_RET(_MutableByteArray (0, max 0 (I# (size -# 1#))) barr#, STATE_TOK(s2#))})
+new_ps_array size = ST $ \ s ->
+    case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
+    STret s2# (MutableByteArray bot barr#) }
+  where
+    bot = error "new_ps_array"
 
-write_ps_array (_MutableByteArray _ barr#) n ch =
-    MkST ( \ STATE_TOK(s#) ->
+write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ s# ->
     case writeCharArray# barr# n ch s#	of { s2#   ->
-    ST_RET((), STATE_TOK(s2#) )})
+    STret s2# () }
 
 -- same as unsafeFreezeByteArray
-freeze_ps_array (_MutableByteArray ixs arr#) =
-    MkST ( \ STATE_TOK(s#) ->
+freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ s# ->
     case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
-    ST_RET((_ByteArray ixs frozen#), STATE_TOK(s2#))})
+    STret s2# (ByteArray (0,I# len#) frozen#) }
 \end{code}
+
 
 Compare two equal-length strings for equality:
 
 \begin{code}
 eqStrPrefix :: Addr# -> ByteArray# -> Int# -> Bool
 eqStrPrefix a# barr# len# = 
-  unsafePerformPrimIO (
-   _ccall_ strncmp (A# a#) (_ByteArray bottom barr#) (I# len#) `thenPrimIO` \ (I# x#) ->
-   returnPrimIO (x# ==# 0#))
+  unsafePerformIO (
+   _ccall_ strncmp (A# a#) (ByteArray bottom barr#) (I# len#) >>= \ (I# x#) ->
+   return (x# ==# 0#))
   where
    bottom :: (Int,Int)
    bottom = error "eqStrPrefix"
 
 eqCharStrPrefix :: Addr# -> Addr# -> Int# -> Bool
 eqCharStrPrefix a1# a2# len# = 
-  unsafePerformPrimIO (
-   _ccall_ strncmp (A# a1#) (A# a2#) (I# len#) `thenPrimIO` \ (I# x#) ->
-   returnPrimIO (x# ==# 0#))
+  unsafePerformIO (
+   _ccall_ strncmp (A# a1#) (A# a2#) (I# len#) >>= \ (I# x#) ->
+   return (x# ==# 0#))
   where
    bottom :: (Int,Int)
    bottom = error "eqStrPrefix"
 
 eqStrPrefixBA :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 eqStrPrefixBA b1# b2# start# len# = 
-  unsafePerformPrimIO (
+  unsafePerformIO (
    _casm_ ``%r=(int)strncmp((char *)%0+(int)%1,%2,%3); '' 
-	  (_ByteArray bottom b2#) 
+	  (ByteArray bottom b2#) 
 	  (I# start#) 
-          (_ByteArray bottom b1#) 
-          (I# len#)                  `thenPrimIO` \ (I# x#) ->
-   returnPrimIO (x# ==# 0#))
+          (ByteArray bottom b1#) 
+          (I# len#)                  >>= \ (I# x#) ->
+   return (x# ==# 0#))
   where
    bottom :: (Int,Int)
    bottom = error "eqStrPrefixBA"
 
 eqCharStrPrefixBA :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
 eqCharStrPrefixBA a# b2# start# len# = 
-  unsafePerformPrimIO (
+  unsafePerformIO (
    _casm_ ``%r=(int)strncmp((char *)%0+(int)%1,%2,%3); '' 
-	  (_ByteArray bottom b2#) 
+	  (ByteArray bottom b2#) 
 	  (I# start#) 
           (A# a#)
-          (I# len#)                  `thenPrimIO` \ (I# x#) ->
-   returnPrimIO (x# ==# 0#))
+          (I# len#)                  >>= \ (I# x#) ->
+   return (x# ==# 0#))
   where
    bottom :: (Int,Int)
    bottom = error "eqCharStrPrefixBA"
 
 eqStrPrefixFO :: ForeignObj# -> ByteArray# -> Int# -> Int# -> Bool
 eqStrPrefixFO fo# barr# start# len# = 
-  unsafePerformPrimIO (
+  unsafePerformIO (
    _casm_ ``%r=(int)strncmp((char *)%0+(int)%1,%2,%3); '' 
-	  (_ForeignObj fo#) 
+	  (ForeignObj fo#) 
 	  (I# start#) 
-          (_ByteArray bottom barr#) 
-          (I# len#)                  `thenPrimIO` \ (I# x#) ->
-   returnPrimIO (x# ==# 0#))
+          (ByteArray bottom barr#) 
+          (I# len#)                  >>= \ (I# x#) ->
+   return (x# ==# 0#))
   where
    bottom :: (Int,Int)
    bottom = error "eqStrPrefixFO"
 \end{code}
 
 \begin{code}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205	
-byteArrayToString :: _ByteArray Int -> String
-byteArrayToString (_ByteArray (I# start#,I# end#) barr#) =
- unpack start#
- where
-  unpack nh#
-   | nh# >=# end# = []
-   | otherwise    = C# ch : unpack (nh# +# 1#)
-     where
-      ch = indexCharArray# barr# nh#
-#elif defined(__GLASGOW_HASKELL__)
-byteArrayToString :: _ByteArray Int -> String
+byteArrayToString :: ByteArray Int -> String
 byteArrayToString = unpackCStringBA
-#else
-#error "byteArrayToString: cannot handle this!"
-#endif
-
 \end{code}
 
 
 \begin{code}
-stringToByteArray :: String -> (_ByteArray Int)
-#if __GLASGOW_HASKELL__ >= 206
+stringToByteArray :: String -> (ByteArray Int)
 stringToByteArray = packString
-#elif defined(__GLASGOW_HASKELL__)
-stringToByteArray str = _runST (packStringST str)
-
-packStringST :: [Char] -> _ST s (_ByteArray Int)
-packStringST str =
-  let len = length str  in
-  packNCharsST len str
-
-packNCharsST :: Int -> [Char] -> _ST s (_ByteArray Int)
-packNCharsST len@(I# length#) str =
-  {- 
-   allocate an array that will hold the string
-   (not forgetting the NUL byte at the end)
-  -}
- new_ps_array (length# +# 1#) `thenStrictlyST` \ ch_array ->
-   -- fill in packed string from "str"
- fill_in ch_array 0# str      `seqStrictlyST`
-   -- freeze the puppy:
- freeze_ps_array ch_array     `thenStrictlyST` \ (_ByteArray _ frozen#) ->
- returnStrictlyST (_ByteArray (0,len) frozen#)
- where
-  fill_in :: _MutableByteArray s Int -> Int# -> [Char] -> _ST s ()
-  fill_in arr_in# idx [] =
-   write_ps_array arr_in# idx (chr# 0#) `seqStrictlyST`
-   returnStrictlyST ()
-
-  fill_in arr_in# idx (C# c : cs) =
-   write_ps_array arr_in# idx c	 `seqStrictlyST`
-   fill_in arr_in# (idx +# 1#) cs
-#else
-#error "stringToByteArray: cannot handle this"
-#endif
-
 \end{code}

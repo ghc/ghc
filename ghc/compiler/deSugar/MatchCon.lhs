@@ -4,16 +4,11 @@
 \section[MatchCon]{Pattern-matching constructors}
 
 \begin{code}
-#include "HsVersions.h"
-
 module MatchCon ( matchConFamily ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)		( match )	-- break match-ish loop
-#else
-import {-# SOURCE #-} Match
-#endif
+#include "HsVersions.h"
+
+import {-# SOURCE #-} Match	( match )
 
 import HsSyn		( OutPat(..), HsLit, HsExpr )
 import DsHsSyn		( outPatType )
@@ -21,7 +16,7 @@ import DsHsSyn		( outPatType )
 import DsMonad
 import DsUtils
 
-import Id		( GenId{-instances-}, SYN_IE(Id) )
+import Id		( GenId{-instances-}, Id )
 import Util		( panic, assertPanic )
 \end{code}
 

@@ -6,30 +6,26 @@
 If compiled without \tr{#define COMPILING_GHC}, you get
 (part of) a Haskell-abstract-syntax library.  With it,
 you get part of GHC.
-[OLD COMMENT -- SOF 7/97]
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsTypes (
 	HsType(..), HsTyVar(..),
-	SYN_IE(Context), SYN_IE(ClassAssertion)
+	Context, ClassAssertion
 
 	, mkHsForAllTy
 	, getTyVarName, replaceTyVarName
 	, pprParendHsType
-	, pprContext
-	, cmpHsType, cmpContext
+	, pprContext, pprClassAssertion
+	, cmpHsType, cmpHsTypes, cmpContext
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import CmdLineOpts      ( opt_PprUserLength )
-import Outputable	( Outputable(..), PprStyle(..), pprQuote, interppSP )
+import Outputable
 import Kind		( Kind {- instance Outputable -} )
 import Name		( nameOccName )
-import Pretty
-import Util		( thenCmp, cmpList, isIn, panic# )
+import Util		( thenCmp, cmpList, isIn, panic )
+import GlaExts		( Int#, (<#) )
 \end{code}
 
 This is the syntax for types as seen in type signatures.
@@ -37,7 +33,7 @@ This is the syntax for types as seen in type signatures.
 \begin{code}
 type Context name = [ClassAssertion name]
 
-type ClassAssertion name = (name, HsType name)
+type ClassAssertion name = (name, [HsType name])
 	-- The type is usually a type variable, but it
 	-- doesn't have to be when reading interface files
 
@@ -71,7 +67,7 @@ data HsType name
 
   -- these next two are only used in unfoldings in interfaces
   | MonoDictTy		name	-- Class
-			(HsType name)
+			[HsType name]
 
 mkHsForAllTy []  []   ty = ty
 mkHsForAllTy tvs ctxt ty = HsForAllTy tvs ctxt ty
@@ -101,27 +97,27 @@ replaceTyVarName (IfaceTyVar n k) n' = IfaceTyVar n' k
 \begin{code}
 
 instance (Outputable name) => Outputable (HsType name) where
-    ppr sty ty = pprQuote sty $ \ sty -> pprHsType sty ty
+    ppr ty = pprHsType ty
 
 instance (Outputable name) => Outputable (HsTyVar name) where
-    ppr sty (UserTyVar name)       = ppr sty name
-    ppr sty (IfaceTyVar name kind) = pprQuote sty $ \ sty ->
-				     hsep [ppr sty name, ptext SLIT("::"), ppr sty kind]
+    ppr (UserTyVar name)       = ppr name
+    ppr (IfaceTyVar name kind) = hsep [ppr name, ptext SLIT("::"), ppr kind]
 
-ppr_forall sty ctxt_prec [] [] ty
-   = ppr_mono_ty sty ctxt_prec ty
-ppr_forall sty ctxt_prec tvs ctxt ty
+ppr_forall ctxt_prec [] [] ty
+   = ppr_mono_ty ctxt_prec ty
+ppr_forall ctxt_prec tvs ctxt ty
    = maybeParen (ctxt_prec >= pREC_FUN) $
-     sep [ptext SLIT("_forall_"), brackets (interppSP sty tvs),
-	    pprContext sty ctxt,  ptext SLIT("=>"),
-	    pprHsType sty ty]
+     sep [ptext SLIT("_forall_"), brackets (interppSP tvs),
+	    pprContext ctxt,  ptext SLIT("=>"),
+	    pprHsType ty]
 
-pprContext :: (Outputable name) => PprStyle -> (Context name) -> Doc
-pprContext sty []	        = empty
-pprContext sty context
-  = pprQuote sty $ \ sty -> parens (hsep (punctuate comma (map ppr_assert context)))
-  where
-    ppr_assert (clas, ty) = hsep [ppr sty clas, ppr sty ty]
+pprContext :: (Outputable name) => Context name -> SDoc
+pprContext []	   = empty
+pprContext context = parens (hsep (punctuate comma (map pprClassAssertion context)))
+
+pprClassAssertion :: (Outputable name) => ClassAssertion name -> SDoc
+pprClassAssertion (clas, tys) 
+  = ppr clas <+> hsep (map ppr tys)
 \end{code}
 
 \begin{code}
@@ -129,41 +125,41 @@ pREC_TOP = (0 :: Int)
 pREC_FUN = (1 :: Int)
 pREC_CON = (2 :: Int)
 
-maybeParen :: Bool -> Doc -> Doc
+maybeParen :: Bool -> SDoc -> SDoc
 maybeParen True  p = parens p
 maybeParen False p = p
 	
 -- printing works more-or-less as for Types
 
-pprHsType, pprParendHsType :: (Outputable name) => PprStyle -> HsType name -> Doc
+pprHsType, pprParendHsType :: (Outputable name) => HsType name -> SDoc
 
-pprHsType sty ty       = ppr_mono_ty sty pREC_TOP ty
-pprParendHsType sty ty = ppr_mono_ty sty pREC_CON ty
+pprHsType ty       = ppr_mono_ty pREC_TOP ty
+pprParendHsType ty = ppr_mono_ty pREC_CON ty
 
-ppr_mono_ty sty ctxt_prec (HsPreForAllTy ctxt ty)     = ppr_forall sty ctxt_prec [] ctxt ty
-ppr_mono_ty sty ctxt_prec (HsForAllTy tvs ctxt ty)    = ppr_forall sty ctxt_prec tvs ctxt ty
+ppr_mono_ty ctxt_prec (HsPreForAllTy ctxt ty)     = ppr_forall ctxt_prec [] ctxt ty
+ppr_mono_ty ctxt_prec (HsForAllTy tvs ctxt ty)    = ppr_forall ctxt_prec tvs ctxt ty
 
-ppr_mono_ty sty ctxt_prec (MonoTyVar name) = ppr sty name
+ppr_mono_ty ctxt_prec (MonoTyVar name) = ppr name
 
-ppr_mono_ty sty ctxt_prec (MonoFunTy ty1 ty2)
-  = let p1 = ppr_mono_ty sty pREC_FUN ty1
-	p2 = ppr_mono_ty sty pREC_TOP ty2
+ppr_mono_ty ctxt_prec (MonoFunTy ty1 ty2)
+  = let p1 = ppr_mono_ty pREC_FUN ty1
+	p2 = ppr_mono_ty pREC_TOP ty2
     in
     maybeParen (ctxt_prec >= pREC_FUN)
 	       (sep [p1, (<>) (ptext SLIT("-> ")) p2])
 
-ppr_mono_ty sty ctxt_prec (MonoTupleTy _ tys)
- = parens (sep (punctuate comma (map (ppr sty) tys)))
+ppr_mono_ty ctxt_prec (MonoTupleTy _ tys)
+ = parens (sep (punctuate comma (map ppr tys)))
 
-ppr_mono_ty sty ctxt_prec (MonoListTy _ ty)
- = brackets (ppr_mono_ty sty pREC_TOP ty)
+ppr_mono_ty ctxt_prec (MonoListTy _ ty)
+ = brackets (ppr_mono_ty pREC_TOP ty)
 
-ppr_mono_ty sty ctxt_prec (MonoTyApp fun_ty arg_ty)
+ppr_mono_ty ctxt_prec (MonoTyApp fun_ty arg_ty)
   = maybeParen (ctxt_prec >= pREC_CON)
-	       (hsep [ppr_mono_ty sty pREC_FUN fun_ty, ppr_mono_ty sty pREC_CON arg_ty])
+	       (hsep [ppr_mono_ty pREC_FUN fun_ty, ppr_mono_ty pREC_CON arg_ty])
 
-ppr_mono_ty sty ctxt_prec (MonoDictTy clas ty)
-  = hsep [ppr sty clas, ppr_mono_ty sty pREC_CON ty]
+ppr_mono_ty ctxt_prec (MonoDictTy clas tys)
+  = ppr clas <+> hsep (map (ppr_mono_ty pREC_CON) tys)
 \end{code}
 
 
@@ -178,20 +174,26 @@ in checking interfaces.  Most any other use is likely to be {\em
 wrong}, so be careful!
 
 \begin{code}
-cmpHsTyVar :: (a -> a -> TAG_) -> HsTyVar a -> HsTyVar a -> TAG_
---cmpHsType :: (a -> a -> TAG_) -> HsType a -> HsType a -> TAG_
---cmpContext  :: (a -> a -> TAG_) -> Context  a -> Context  a -> TAG_
+cmpHsTyVar  :: (a -> a -> Ordering) -> HsTyVar a  -> HsTyVar a  -> Ordering
+cmpHsType   :: (a -> a -> Ordering) -> HsType a   -> HsType a   -> Ordering
+cmpHsTypes  :: (a -> a -> Ordering) -> [HsType a] -> [HsType a] -> Ordering
+cmpContext  :: (a -> a -> Ordering) -> Context  a -> Context  a -> Ordering
 
 cmpHsTyVar cmp (UserTyVar v1)    (UserTyVar v2)    = v1 `cmp` v2
 cmpHsTyVar cmp (IfaceTyVar v1 _) (IfaceTyVar v2 _) = v1 `cmp` v2
-cmpHsTyVar cmp (UserTyVar _)	 other		   = LT_
-cmpHsTyVar cmp other1	 	 other2		   = GT_
+cmpHsTyVar cmp (UserTyVar _)	 other		   = LT
+cmpHsTyVar cmp other1	 	 other2		   = GT
 
+
+cmpHsTypes cmp [] []   = EQ
+cmpHsTypes cmp [] tys2 = LT
+cmpHsTypes cmp tys1 [] = GT
+cmpHsTypes cmp (ty1:tys1) (ty2:tys2) = cmpHsType cmp ty1 ty2 `thenCmp` cmpHsTypes cmp tys1 tys2
 
 -- We assume that HsPreForAllTys have been smashed by now.
 # ifdef DEBUG
-cmpHsType _ (HsPreForAllTy _ _) _ = panic# "cmpHsType:HsPreForAllTy:1st arg"
-cmpHsType _ _ (HsPreForAllTy _ _) = panic# "cmpHsType:HsPreForAllTy:2nd arg"
+cmpHsType _ (HsPreForAllTy _ _) _ = panic "cmpHsType:HsPreForAllTy:1st arg"
+cmpHsType _ _ (HsPreForAllTy _ _) = panic "cmpHsType:HsPreForAllTy:2nd arg"
 # endif
 
 cmpHsType cmp (HsForAllTy tvs1 c1 t1) (HsForAllTy tvs2 c2 t2)
@@ -213,21 +215,21 @@ cmpHsType cmp (MonoTyApp fun_ty1 arg_ty1) (MonoTyApp fun_ty2 arg_ty2)
 cmpHsType cmp (MonoFunTy a1 b1) (MonoFunTy a2 b2)
   = cmpHsType cmp a1 a2 `thenCmp` cmpHsType cmp b1 b2
 
-cmpHsType cmp (MonoDictTy c1 ty1)   (MonoDictTy c2 ty2)
-  = cmp c1 c2 `thenCmp` cmpHsType cmp ty1 ty2
+cmpHsType cmp (MonoDictTy c1 tys1)   (MonoDictTy c2 tys2)
+  = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
 
 cmpHsType cmp ty1 ty2 -- tags must be different
   = let tag1 = tag ty1
 	tag2 = tag ty2
     in
-    if tag1 _LT_ tag2 then LT_ else GT_
+    if tag1 _LT_ tag2 then LT else GT
   where
     tag (MonoTyVar n1)		= (ILIT(1) :: FAST_INT)
     tag (MonoTupleTy _ tys1)	= ILIT(2)
     tag (MonoListTy _ ty1)	= ILIT(3)
     tag (MonoTyApp tc1 tys1)	= ILIT(4)
     tag (MonoFunTy a1 b1)	= ILIT(5)
-    tag (MonoDictTy c1 ty1)	= ILIT(7)
+    tag (MonoDictTy c1 tys1)	= ILIT(7)
     tag (HsForAllTy _ _ _)	= ILIT(8)
     tag (HsPreForAllTy _ _)	= ILIT(9)
 
@@ -235,6 +237,6 @@ cmpHsType cmp ty1 ty2 -- tags must be different
 cmpContext cmp a b
   = cmpList cmp_ctxt a b
   where
-    cmp_ctxt (c1, ty1) (c2, ty2)
-      = cmp c1 c2 `thenCmp` cmpHsType cmp ty1 ty2
+    cmp_ctxt (c1, tys1) (c2, tys2)
+      = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
 \end{code}

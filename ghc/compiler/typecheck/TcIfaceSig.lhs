@@ -4,12 +4,11 @@
 \section[TcIfaceSig]{Type checking of type signatures in interface files}
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcIfaceSig ( tcInterfaceSigs ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
+import HsSyn		( HsDecl(..), IfaceSig(..) )
 import TcMonad
 import TcMonoType	( tcHsType, tcHsTypeKind )
 import TcEnv		( tcLookupGlobalValue, tcExtendTyVarEnv, tcExtendGlobalValEnv,
@@ -18,8 +17,6 @@ import TcEnv		( tcLookupGlobalValue, tcExtendTyVarEnv, tcExtendGlobalValEnv,
 			)
 import TcKind		( TcKind, kindToTcKind )
 
-import HsSyn		( IfaceSig(..), HsDecl(..), TyDecl, ClassDecl, InstDecl, DefaultDecl, HsBinds,
-			  Fake, InPat, HsType )
 import RnHsSyn		( RenamedHsDecl(..) )
 import HsCore
 import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
@@ -29,12 +26,11 @@ import CoreUtils	( coreExprType )
 import CoreUnfold
 import MagicUFs		( MagicUnfoldingFun )
 import WwLib		( mkWrapper )
-import SpecEnv		( SpecEnv )
 import PrimOp		( PrimOp(..) )
 
 import Id		( GenId, mkImported, mkUserId, addInlinePragma,
-			  isPrimitiveId_maybe, dataConArgTys, SYN_IE(Id) )
-import Type		( mkSynTy, getAppDataTyConExpandingDicts )
+			  isPrimitiveId_maybe, dataConArgTys, Id )
+import Type		( mkSynTy, splitAlgTyConApp )
 import TyVar		( mkSysTyVar )
 import Name		( Name )
 import Unique		( rationalTyConKey, uniqueOf )
@@ -42,9 +38,8 @@ import TysWiredIn	( integerTy )
 import PragmaInfo	( PragmaInfo(..) )
 import ErrUtils		( pprBagOfErrors )
 import Maybes		( maybeToBool )
-import Pretty
-import Outputable	( Outputable(..), PprStyle(..) )
-import Util		( zipWithEqual, panic, pprTrace, pprPanic )
+import Outputable	
+import Util		( zipWithEqual )
 
 import IdInfo
 \end{code}
@@ -129,7 +124,7 @@ tcWorker unf_env (Just (worker_name,_))
     maybe_worker_id = tcExplicitLookupGlobal unf_env worker_name
 
 	-- The trace is so we can see what's getting dropped
-    trace_maybe Nothing  = pprTrace "tcWorker failed:" (ppr PprDebug worker_name) Nothing
+    trace_maybe Nothing  = pprTrace "tcWorker failed:" (ppr worker_name) Nothing
     trace_maybe (Just x) = Just x
 \end{code}
 
@@ -149,7 +144,7 @@ tcUnfolding unf_env name core_expr
 	-- compiler hackers who want to improve it!
     no_unfolding = getErrsTc		`thenNF_Tc` \ (warns,errs) ->
 		   returnNF_Tc (pprTrace "tcUnfolding failed with:" 
-				   	(hang (ppr PprDebug name) 4 (pprBagOfErrors PprDebug errs))
+				   	(hang (ppr name) 4 (pprBagOfErrors errs))
 					NoUnfolding)
 \end{code}
 
@@ -165,10 +160,10 @@ tcVar name
   = tcLookupGlobalValueMaybe name	`thenNF_Tc` \ maybe_id ->
     case maybe_id of {
 	Just id -> returnTc id;
-	Nothing -> failTc (noDecl name)
+	Nothing -> failWithTc (noDecl name)
     }
 
-noDecl name sty = hsep [ptext SLIT("Warning: no binding for"), ppr sty name]
+noDecl name = hsep [ptext SLIT("Warning: no binding for"), ppr name]
 \end{code}
 
 UfCore expressions.
@@ -262,9 +257,6 @@ tcCoreLamBndr (UfTyBinder name kind) thing_inside
     tcExtendTyVarEnv [name] [(kindToTcKind kind, tyvar)] $
     thing_inside (TyBinder tyvar)
     
-tcCoreLamBndr (UfUsageBinder name) thing_inside
-  = error "tcCoreLamBndr: usage"
-
 tcCoreValBndr (UfValBinder name ty) thing_inside
   = tcHsType ty			`thenTc` \ ty' ->
     let
@@ -291,7 +283,6 @@ mk_id name ty = mkUserId name ty NoPragmaInfo
 tcCoreArg (UfVarArg v)	 = tcVar v 		`thenTc` \ v' -> returnTc (VarArg v')
 tcCoreArg (UfTyArg ty)	 = tcHsTypeKind ty	`thenTc` \ (_,ty') -> returnTc (TyArg ty')
 tcCoreArg (UfLitArg lit) = returnTc (LitArg lit)
-tcCoreArg (UfUsageArg u) = error "tcCoreArg: usage"
 
 tcCoreAlts scrut_ty (UfAlgAlts alts deflt)
   = mapTc tc_alt alts			`thenTc` \ alts' ->
@@ -302,7 +293,7 @@ tcCoreAlts scrut_ty (UfAlgAlts alts deflt)
       =	tcVar con			`thenTc` \ con' ->
 	let
 	    arg_tys		    = dataConArgTys con' inst_tys
-	    (tycon, inst_tys, cons) = getAppDataTyConExpandingDicts scrut_ty
+	    (tycon, inst_tys, cons) = splitAlgTyConApp scrut_ty
 	    arg_ids		    = zipWithEqual "tcCoreAlts" mk_id names arg_tys
 	in
 	tcExtendGlobalValEnv arg_ids 	$
@@ -334,7 +325,7 @@ tcCorePrim (UfOtherOp op)
   = tcVar op		`thenTc` \ op_id ->
     case isPrimitiveId_maybe op_id of
 	Just prim_op -> returnTc prim_op
-	Nothing	     -> pprPanic "tcCorePrim" (ppr PprDebug op_id)
+	Nothing	     -> pprPanic "tcCorePrim" (ppr op_id)
 
 tcCorePrim (UfCCallOp str casm gc arg_tys res_ty)
   = mapTc tcHsType arg_tys	`thenTc` \ arg_tys' ->
@@ -343,7 +334,7 @@ tcCorePrim (UfCCallOp str casm gc arg_tys res_ty)
 \end{code}
 
 \begin{code}
-ifaceSigCtxt sig_name sty
-  = hsep [ptext SLIT("In an interface-file signature for"), ppr sty sig_name]
+ifaceSigCtxt sig_name
+  = hsep [ptext SLIT("In an interface-file signature for"), ppr sig_name]
 \end{code}
 

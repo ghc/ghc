@@ -4,32 +4,27 @@
 \section[MatchLit]{Pattern-matching literal patterns}
 
 \begin{code}
-#include "HsVersions.h"
-
 module MatchLit ( matchLiterals ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)		-- break match-ish and dsExpr-ish loops
-#else
-import {-# SOURCE #-} Match
+#include "HsVersions.h"
+
+import {-# SOURCE #-} Match  ( match )
 import {-# SOURCE #-} DsExpr ( dsExpr )
-#endif
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..), Fixity,
 			  Match, HsBinds, Stmt(..), DoOrListComp, HsType, ArithSeqInfo )
-import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
-			  SYN_IE(TypecheckedPat)
+import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
+			  TypecheckedPat
 			)
-import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding), GenCoreExpr(..), GenCoreBinding(..) )
-import Id		( GenId {- instance Eq -}, SYN_IE(Id) )
+import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr(..), GenCoreBinding(..) )
+import Id		( GenId {- instance Eq -}, Id )
 
 import DsMonad
 import DsUtils
 
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
-import Type		( isPrimType, SYN_IE(Type) )
+import Type		( isUnpointedType, Type )
 import Util		( panic, assertPanic )
 \end{code}
 
@@ -79,7 +74,7 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
 	mk_core_lit ty (HsStringPrim  s) = MachStr    s
 	mk_core_lit ty (HsFloatPrim   f) = MachFloat  f
 	mk_core_lit ty (HsDoublePrim  d) = MachDouble d
-	mk_core_lit ty (HsLitLit      s) = ASSERT(isPrimType ty)
+	mk_core_lit ty (HsLitLit      s) = ASSERT(isUnpointedType ty)
 					   MachLitLit s (panic "MatchLit.matchLiterals:mk_core_lit:HsLitLit; typePrimRep???")
     	mk_core_lit ty other	         = panic "matchLiterals:mk_core_lit:unhandled"
 \end{code}

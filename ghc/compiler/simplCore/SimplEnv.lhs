@@ -4,13 +4,11 @@
 \section[SimplEnv]{Environment stuff for the simplifier}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SimplEnv (
 	nullSimplEnv, combineSimplEnv,
 	pprSimplEnv, -- debugging only
 
-	extendTyEnv, extendTyEnvList,
+	extendTyEnv, extendTyEnvList, extendTyEnvEnv,
 	simplTy, simplTyInId,
 
 	extendIdEnvWithAtom, extendIdEnvWithAtoms,
@@ -31,24 +29,20 @@ module SimplEnv (
 	setEnclosingCC, getEnclosingCC,
 
 	-- Types
-	SYN_IE(SwitchChecker),
+	SwitchChecker,
 	SimplEnv, 
-	SYN_IE(InIdEnv), SYN_IE(InTypeEnv),
+	InIdEnv, InTypeEnv,
 	UnfoldConApp,
 	RhsInfo(..),
 
-	SYN_IE(InId),  SYN_IE(InBinder),  SYN_IE(InBinding),  SYN_IE(InType),
-	SYN_IE(OutId), SYN_IE(OutBinder), SYN_IE(OutBinding), SYN_IE(OutType),
+	InId,  InBinder,  InBinding,  InType,
+	OutId, OutBinder, OutBinding, OutType,
 
-	SYN_IE(InExpr),  SYN_IE(InAlts),  SYN_IE(InDefault),  SYN_IE(InArg),
-	SYN_IE(OutExpr), SYN_IE(OutAlts), SYN_IE(OutDefault), SYN_IE(OutArg)
+	InExpr,  InAlts,  InDefault,  InArg,
+	OutExpr, OutAlts, OutDefault, OutArg
     ) where
 
-IMP_Ubiq(){-uitous-}
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(SmplLoop)		-- breaks the MagicUFs / SimplEnv loop
-#endif
+#include "HsVersions.h"
 
 import BinderInfo	( orBinderInfo, andBinderInfo, noBinderInfo, isOneOcc,
 			  okToInline, 
@@ -70,26 +64,23 @@ import Id		( idType, getIdUnfolding, getIdStrictness, idWantsToBeINLINEd,
 			  applyTypeEnvToId, getInlinePragma,
 			  nullIdEnv, growIdEnvList, rngIdEnv, lookupIdEnv,
 			  addOneToIdEnv, modifyIdEnv, mkIdSet, modifyIdEnv_Directly,
-			  SYN_IE(IdEnv), SYN_IE(IdSet), GenId, SYN_IE(Id) )
+			  IdEnv, IdSet, GenId, Id )
 import Literal		( isNoRepLit, Literal{-instances-} )
 import Maybes		( maybeToBool, expectJust )
 import Name		( isLocallyDefined )
 import OccurAnal	( occurAnalyseExpr )
-import Outputable	( PprStyle(..), Outputable(..){-instances-} )
 import PprCore		-- various instances
 import PprType		( GenType, GenTyVar )
-import Pretty
-import Type		( eqTy, applyTypeEnvToTy, SYN_IE(Type) )
-import TyVar		( nullTyVarEnv, addOneToTyVarEnv, growTyVarEnvList,
-			  SYN_IE(TyVarEnv), GenTyVar{-instance Eq-} ,
-			  SYN_IE(TyVar)
+import Type		( instantiateTy, Type )
+import TyVar		( emptyTyVarEnv, plusTyVarEnv, addToTyVarEnv, growTyVarEnvList,
+			  TyVarEnv, GenTyVar{-instance Eq-} ,
+			  TyVar
 			)
 import Unique		( Unique{-instance Outputable-}, Uniquable(..) )
 import UniqFM		( addToUFM, addToUFM_C, ufmToList )
-import Usage		( SYN_IE(UVar), GenUsage{-instances-} )
-import Util		( SYN_IE(Eager), appEager, returnEager, runEager,
-			  zipEqual, thenCmp, cmpList, panic, panic#, assertPanic, Ord3(..) )
-
+import Util		( Eager, appEager, returnEager, runEager,
+			  zipEqual, thenCmp, cmpList )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -155,7 +146,7 @@ data SimplEnv
 nullSimplEnv :: SwitchChecker -> SimplEnv
 
 nullSimplEnv sw_chkr
-  = SimplEnv sw_chkr subsumedCosts nullTyVarEnv nullIdEnv nullIdEnv nullConApps
+  = SimplEnv sw_chkr subsumedCosts emptyTyVarEnv nullIdEnv nullIdEnv nullConApps
 
 combineSimplEnv :: SimplEnv -> SimplEnv -> SimplEnv
 combineSimplEnv env@(SimplEnv chkr _       _      _         out_id_env con_apps)
@@ -261,7 +252,7 @@ extendTyEnv :: SimplEnv -> TyVar -> Type -> SimplEnv
 extendTyEnv (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) tyvar ty
   = SimplEnv chkr encl_cc new_ty_env in_id_env out_id_env con_apps
   where
-    new_ty_env = addOneToTyVarEnv ty_env tyvar ty
+    new_ty_env = addToTyVarEnv ty_env tyvar ty
 
 extendTyEnvList :: SimplEnv -> [(TyVar,Type)] -> SimplEnv
 extendTyEnvList (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) pairs
@@ -269,7 +260,13 @@ extendTyEnvList (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) pai
   where
     new_ty_env = growTyVarEnvList ty_env pairs
 
-simplTy     (SimplEnv _ _ ty_env _ _ _) ty = returnEager (applyTypeEnvToTy ty_env ty)
+extendTyEnvEnv :: SimplEnv -> TypeEnv -> SimplEnv
+extendTyEnvEnv (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) new_ty_env
+  = SimplEnv chkr encl_cc new_ty_env in_id_env out_id_env con_apps
+  where
+    new_ty_env = ty_env `plusTyVarEnv` new_ty_env
+
+simplTy     (SimplEnv _ _ ty_env _ _ _) ty = returnEager (instantiateTy ty_env ty)
 simplTyInId (SimplEnv _ _ ty_env _ _ _) id = returnEager (applyTypeEnvToId ty_env id)
 \end{code}
 
@@ -486,7 +483,7 @@ lookForConstructor (SimplEnv _ _ _ _ _ con_apps) con args
 	Nothing     -> Nothing
 
 	Just assocs -> case [id | (tys, id) <- assocs, 
-				  and (zipWith eqTy tys ty_args)]
+				  and (zipWith (==) tys ty_args)]
 		       of
 			  []     -> Nothing
 			  (id:_) -> Just id
@@ -520,36 +517,31 @@ it, so we can use it for a @FiniteMap@ key.
 
 \begin{code}
 instance Eq  UnfoldConApp where
-    a == b = case (a `cmp` b) of { EQ_ -> True;   _ -> False }
-    a /= b = case (a `cmp` b) of { EQ_ -> False;  _ -> True  }
+    a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
+    a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }
 
 instance Ord UnfoldConApp where
-    a <= b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
-    a <  b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> False; GT__ -> False }
-    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    a >  b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-    _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
-
-instance Ord3 UnfoldConApp where
-    cmp = cmp_app
+    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
+    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
+    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
+    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
+    compare a b = cmp_app a b
 
 cmp_app (UCA c1 as1) (UCA c2 as2)
-  = cmp c1 c2 `thenCmp` cmpList cmp_arg as1 as2
+  = compare c1 c2 `thenCmp` cmpList cmp_arg as1 as2
   where
-    -- ToDo: make an "instance Ord3 CoreArg"???
+    -- ToDo: make an "instance Ord CoreArg"???
 
-    cmp_arg (VarArg   x) (VarArg   y) = x `cmp` y
-    cmp_arg (LitArg   x) (LitArg   y) = x `cmp` y
-    cmp_arg (TyArg    x) (TyArg    y) = panic# "SimplEnv.cmp_app:TyArgs"
-    cmp_arg (UsageArg x) (UsageArg y) = panic# "SimplEnv.cmp_app:UsageArgs"
+    cmp_arg (VarArg   x) (VarArg   y) = x `compare` y
+    cmp_arg (LitArg   x) (LitArg   y) = x `compare` y
+    cmp_arg (TyArg    x) (TyArg    y) = panic "SimplEnv.cmp_app:TyArgs"
     cmp_arg x y
-      | tag x _LT_ tag y = LT_
-      | otherwise	 = GT_
+      | tag x _LT_ tag y = LT
+      | otherwise	 = GT
       where
 	tag (VarArg   _) = ILIT(1)
 	tag (LitArg   _) = ILIT(2)
 	tag (TyArg    _) = panic# "SimplEnv.cmp_app:TyArg"
-	tag (UsageArg _) = panic# "SimplEnv.cmp_app:UsageArg"
 \end{code}
 
 

@@ -8,28 +8,26 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsSyn (
 
 	-- NB: don't reexport HsCore or HsPragmas;
 	-- this module tells about "real Haskell"
 
-	EXP_MODULE(HsSyn) ,
-	EXP_MODULE(HsBinds) ,
-	EXP_MODULE(HsDecls) ,
-	EXP_MODULE(HsExpr) ,
-	EXP_MODULE(HsImpExp) ,
-	EXP_MODULE(HsBasic) ,
-	EXP_MODULE(HsMatches) ,
-	EXP_MODULE(HsPat) ,
-	EXP_MODULE(HsTypes),
+	module HsSyn,
+	module HsBinds,
+	module HsDecls,
+	module HsExpr,
+	module HsImpExp,
+	module HsBasic,
+	module HsMatches,
+	module HsPat,
+	module HsTypes,
 	Fixity, NewOrData, IfaceFlavour,
 
 	collectTopBinders, collectMonoBinders
      ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 -- friends:
 import HsBinds
@@ -49,29 +47,19 @@ import HsTypes
 import HsPragmas	( ClassPragmas, ClassOpPragmas,
 			  DataPragmas, GenPragmas, InstancePragmas )
 import HsCore
-import BasicTypes	( Fixity, SYN_IE(Version), NewOrData, IfaceFlavour )
+import BasicTypes	( Fixity, Version, NewOrData, IfaceFlavour, Module )
 
 -- others:
 import FiniteMap	( FiniteMap )
-import Outputable	( ifPprShowAll, ifnotPprForUser, interpp'SP, Outputable(..) )
-import Pretty
+import Outputable
 import SrcLoc		( SrcLoc )
 import Bag
-#if __GLASGOW_HASKELL__ >= 202
-import Name
-#endif
-\end{code}
-
-@Fake@ is a placeholder type; for when tyvars and uvars aren't used.
-\begin{code}
-data Fake = Fake
-instance Eq Fake
-instance Outputable Fake
+import Name		( NamedThing )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.
 \begin{code}
-data HsModule tyvar uvar name pat
+data HsModule flexi name pat
   = HsModule
 	Module			-- module name
 	(Maybe Version)		-- source interface version number
@@ -83,25 +71,22 @@ data HsModule tyvar uvar name pat
 				-- info to TyDecls/etc; so this list is
 				-- often empty, downstream.
 	[FixityDecl name]
-	[HsDecl tyvar uvar name pat]	-- Type, class, value, and interface signature decls
+	[HsDecl flexi name pat]	-- Type, class, value, and interface signature decls
 	SrcLoc
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	=> Outputable (HsModule tyvar uvar name pat) where
+instance (NamedThing name, Outputable name, Outputable pat)
+	=> Outputable (HsModule flexi name pat) where
 
-    ppr sty (HsModule name iface_version exports imports fixities
+    ppr (HsModule name iface_version exports imports fixities
 		      decls src_loc)
       = vcat [
-	    ifPprShowAll sty (ppr sty src_loc),
-	    ifnotPprForUser sty (pp_iface_version iface_version),
 	    case exports of
 	      Nothing -> hsep [ptext SLIT("module"), ptext name, ptext SLIT("where")]
 	      Just es -> vcat [
 			    hsep [ptext SLIT("module"), ptext name, lparen],
-			    nest 8 (interpp'SP sty es),
+			    nest 8 (interpp'SP es),
 			    nest 4 (ptext SLIT(") where"))
 			  ],
 	    pp_nonnull imports,
@@ -110,7 +95,7 @@ instance (NamedThing name, Outputable name, Outputable pat,
 	]
       where
 	pp_nonnull [] = empty
-	pp_nonnull xs = vcat (map (ppr sty) xs)
+	pp_nonnull xs = vcat (map ppr xs)
 
 	pp_iface_version Nothing  = empty
 	pp_iface_version (Just n) = hsep [text "{-# INTERFACE", int n, text "#-}"]
@@ -137,13 +122,13 @@ where
 it should return @[x, y, f, a, b]@ (remember, order important).
 
 \begin{code}
-collectTopBinders :: HsBinds tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
+collectTopBinders :: HsBinds flexi name (InPat name) -> Bag (name,SrcLoc)
 collectTopBinders EmptyBinds     = emptyBag
 collectTopBinders (MonoBind b _ _) = collectMonoBinders b
 collectTopBinders (ThenBinds b1 b2)
  = collectTopBinders b1 `unionBags` collectTopBinders b2
 
-collectMonoBinders :: MonoBinds tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
+collectMonoBinders :: MonoBinds flexi name (InPat name) -> Bag (name,SrcLoc)
 collectMonoBinders EmptyMonoBinds		       = emptyBag
 collectMonoBinders (PatMonoBind pat grhss_w_binds loc) = listToBag (map (\v->(v,loc)) (collectPatBinders pat))
 collectMonoBinders (FunMonoBind f _ matches loc)       = unitBag (f,loc)

@@ -4,8 +4,6 @@
 \section[PrimOp]{Primitive operations (machine-level)}
 
 \begin{code}
-#include "HsVersions.h"
-
 module PrimOp (
 	PrimOp(..), allThePrimOps,
 	tagOf_PrimOp, -- ToDo: rm
@@ -29,7 +27,7 @@ module PrimOp (
 	pprPrimOp, showPrimOp
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import PrimRep		-- most of it
 import TysPrim
@@ -38,17 +36,18 @@ import TysWiredIn
 import CStrings		( identToC )
 import Constants   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
-import Outputable	( PprStyle, Outputable(..), codeStyle, ifaceStyle )
+import Outputable
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
-import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import TyCon		( TyCon{-instances-} )
-import Type		( mkForAllTys, mkFunTy, mkFunTys, applyTyCon, typePrimRep,
-			  getAppDataTyConExpandingDicts, SYN_IE(Type)
+import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyConApp, typePrimRep,
+			  splitAlgTyConApp, Type
 			)
 import TyVar		--( alphaTyVar, betaTyVar, gammaTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
 import Util		( panic#, assoc, panic{-ToDo:rm-} )
+
+import GlaExts		( Int(..), Int#, (==#) )
 \end{code}
 
 %************************************************************************
@@ -1404,7 +1403,7 @@ primOpInfo ErrorIOPrimOp
 primOpInfo (CCallOp _ _ _ arg_tys result_ty)
   = AlgResult SLIT("ccall#") [] arg_tys result_tycon tys_applied
   where
-    (result_tycon, tys_applied, _) = getAppDataTyConExpandingDicts result_ty
+    (result_tycon, tys_applied, _) = splitAlgTyConApp result_ty
 
 #ifdef DEBUG
 primOpInfo op = panic ("primOpInfo:"++ show (I# (tagOf_PrimOp op)))
@@ -1728,10 +1727,10 @@ primOpType op
       Coercing str ty1 ty2 -> mkFunTy ty1 ty2
 
       PrimResult str tyvars arg_tys prim_tycon kind res_tys ->
-	mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon prim_tycon res_tys))
+	mkForAllTys tyvars (mkFunTys arg_tys (mkTyConApp prim_tycon res_tys))
 
       AlgResult str tyvars arg_tys tycon res_tys ->
-	mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon tycon res_tys))
+	mkForAllTys tyvars (mkFunTys arg_tys (mkTyConApp tycon res_tys))
 \end{code}
 
 \begin{code}
@@ -1798,12 +1797,12 @@ compare_fun_ty ty = mkFunTys [ty, ty] boolTy
 
 Output stuff:
 \begin{code}
-pprPrimOp  :: PprStyle -> PrimOp -> Doc
-showPrimOp :: PprStyle -> PrimOp -> String
+pprPrimOp  :: PrimOp -> SDoc
+showPrimOp :: PrimOp -> String
 
-showPrimOp sty op = render (pprPrimOp sty op)
+showPrimOp op = showSDoc (pprPrimOp op)
 
-pprPrimOp sty (CCallOp fun is_casm may_gc arg_tys res_ty)
+pprPrimOp (CCallOp fun is_casm may_gc arg_tys res_ty)
   = let
 	before
 	  = if is_casm then
@@ -1815,24 +1814,22 @@ pprPrimOp sty (CCallOp fun is_casm may_gc arg_tys res_ty)
 	  = if is_casm then text "''" else empty
 
 	pp_tys
-	  = hsep (map (pprParendGenType sty) (res_ty:arg_tys))
+	  = hsep (map pprParendGenType (res_ty:arg_tys))
     in
     hcat [text before, ptext fun, after, space, brackets pp_tys]
 
-pprPrimOp sty other_op
-  | codeStyle sty 	-- For C just print the primop itself
-  = identToC str
-
-  | ifaceStyle sty	-- For interfaces Print it qualified with GHC.
-  = ptext SLIT("GHC.") <> ptext str
-
-  | otherwise		-- Unqualified is good enough
-  = ptext str
+pprPrimOp other_op
+  = getPprStyle $ \ sty ->
+    if codeStyle sty then	-- For C just print the primop itself
+       identToC str
+    else if ifaceStyle sty then	-- For interfaces Print it qualified with GHC.
+       ptext SLIT("GHC.") <> ptext str
+    else		  	-- Unqualified is good enough
+       ptext str
   where
     str = primOp_str other_op
 
 
-
 instance Outputable PrimOp where
-    ppr sty op = pprPrimOp sty op
+    ppr op = pprPrimOp op
 \end{code}

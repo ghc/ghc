@@ -8,9 +8,7 @@
 %************************************************************************
 
 \begin{code}
-#include "HsVersions.h"
-
-module SrcLoc {- (
+module SrcLoc (
 	SrcLoc,			-- Abstract
 
 	mkSrcLoc,
@@ -21,14 +19,16 @@ module SrcLoc {- (
 
 	mkBuiltinSrcLoc,	-- Something wired into the compiler
 
-	mkGeneratedSrcLoc	-- Code generated within the compiler
-    ) -} where
+	mkGeneratedSrcLoc,	-- Code generated within the compiler
 
-IMP_Ubiq()
+	incSrcLine
+    ) where
+
+#include "HsVersions.h"
 
 import Outputable
-import Pretty
-
+import FastString	( unpackFS )
+import GlaExts		( Int(..), Int#, (+#) )
 \end{code}
 
 %************************************************************************
@@ -43,7 +43,7 @@ this is the obvious stuff:
 data SrcLoc
   = NoSrcLoc
 
-  | SrcLoc	FAST_STRING	-- A precise location
+  | SrcLoc	FAST_STRING	-- A precise location (file name)
 		FAST_INT
 
   | UnhelpfulSrcLoc FAST_STRING	-- Just a general indication
@@ -71,6 +71,10 @@ mkGeneratedSrcLoc   = UnhelpfulSrcLoc SLIT("<compiler-generated-code>")
 
 isNoSrcLoc NoSrcLoc = True
 isNoSrcLoc other    = False
+
+incSrcLine :: SrcLoc -> SrcLoc
+incSrcLine (SrcLoc s l) = SrcLoc s (l +# 1#)
+incSrcLine loc  	= loc
 \end{code}
 
 %************************************************************************
@@ -81,20 +85,25 @@ isNoSrcLoc other    = False
 
 \begin{code}
 instance Outputable SrcLoc where
-    ppr sty (SrcLoc src_file src_line)
-      | userStyle sty
-      = hcat [ ptext src_file, char ':', text (show IBOX(src_line)) ]
+    ppr (SrcLoc src_path src_line)
+      = getPprStyle $ \ sty ->
+        if userStyle sty then
+	   hcat [ text src_file, char ':', int IBOX(src_line) ]
+	else
+	if debugStyle sty then
+	   hcat [ ptext src_path, char ':', int IBOX(src_line) ]
+	else
+	   hcat [text "{-# LINE ", int IBOX(src_line), space,
+		 char '\"', ptext src_path, text " #-}"]
+      where
+	src_file = remove_directory_prefix (unpackFS src_path)
 
-      | otherwise
-      = hcat [text "{-# LINE ", text (show IBOX(src_line)), space,
-		   char '\"', ptext src_file, text " #-}"]
-    ppr sty (UnhelpfulSrcLoc s) = ptext s
+	remove_directory_prefix path = case break (== '/') path of
+					  (filename, [])           -> filename
+					  (prefix,   slash : rest) -> ASSERT( slash == '/' )
+								      remove_directory_prefix rest
 
-    ppr sty NoSrcLoc = text "<NoSrcLoc>"
+    ppr (UnhelpfulSrcLoc s) = ptext s
+
+    ppr NoSrcLoc = text "<NoSrcLoc>"
 \end{code}
-
-{-
-      = hcat [ptext SLIT("{-# LINE "), text (show IBOX(src_line)), space,
-		   char '"', ptext src_file, ptext SLIT(" #-}")]
- --ptext SLIT("\" #-}")]
--}

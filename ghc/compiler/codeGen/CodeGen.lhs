@@ -15,11 +15,9 @@ functions drive the mangling of top-level bindings.
 %************************************************************************
 
 \begin{code}
-#include "HsVersions.h"
-
 module CodeGen ( codeGen ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import StgSyn
 import CgMonad
@@ -38,11 +36,11 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC,
 import CostCentre       ( CostCentre )
 import CStrings		( modnameToC )
 import FiniteMap	( FiniteMap )
-import Id               ( SYN_IE(Id) )
+import Id               ( Id )
 import Maybes		( maybeToBool )
-import Name             ( SYN_IE(Module) )
+import Name             ( Module )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
-import Type             ( SYN_IE(Type) )
+import Type             ( Type )
 import TyCon            ( TyCon )
 import Util		( panic, assertPanic )
 \end{code}

@@ -4,52 +4,48 @@
 \section[CoreLint]{A ``lint'' pass to check for Core correctness}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CoreLint (
 	lintCoreBindings,
 	lintUnfolding
     ) where
 
-IMP_Ubiq()
-IMPORT_1_3(IO(hPutStr,stderr))
+#include "HsVersions.h"
 
-import CmdLineOpts      ( opt_D_show_passes, opt_PprUserLength, opt_DoCoreLinting )
+import IO	( hPutStr, stderr )
+
+import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting )
 import CoreSyn
 
 import Bag
 import Kind		( hasMoreBoxityInfo, Kind{-instance-}, 
 			  isTypeKind, isBoxedTypeKind {- TEMP --SOF -} )
 import Literal		( literalType, Literal{-instance-} )
-import Id		( idType, isBottomingId, dataConRepType, isDataCon, isNewCon,
+import Id		( idType, isBottomingId, dataConRepType, isDataCon, isNewCon, isAlgCon,
 			  dataConArgTys, GenId{-instances-},
 			  emptyIdSet, mkIdSet, intersectIdSets,
-			  unionIdSets, elementOfIdSet, SYN_IE(IdSet),
-			  SYN_IE(Id)
+			  unionIdSets, elementOfIdSet, IdSet,
+			  Id
 			)
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-},
 			  NamedThing(..) )
 import PprCore
-import Outputable	( PprStyle(..), Outputable(..), pprDumpStyle, printErrs )
 import ErrUtils		( doIfSet, ghcExit )
 import PprType		( GenType, GenTyVar, TyCon )
-import Pretty
 import PrimOp		( primOpType, PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc )
-import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,mkForAllTys,getForAllTy_maybe,
-			  getFunTyExpandingDicts_maybe,
-			  getForAllTyExpandingDicts_maybe,
-			  isPrimType,typeKind,instantiateTy,splitSigmaTy,
-			  mkForAllUsageTy,getForAllUsageTy,instantiateUsage,
-			  maybeAppDataTyConExpandingDicts, eqTy, SYN_IE(Type)
+import Type		( mkFunTy, splitFunTy_maybe, mkForAllTy,
+			  splitForAllTy_maybe,
+			  isUnpointedType, typeKind, instantiateTy, splitSigmaTy,
+			  splitAlgTyConApp_maybe, Type
 			)
 import TyCon		( isPrimTyCon, isDataTyCon )
-import TyVar		( tyVarKind, GenTyVar{-instances-} )
+import TyVar		( TyVar, tyVarKind, mkTyVarEnv )
+import ErrUtils		( ErrMsg )
 import Unique		( Unique )
-import Usage		( GenUsage, SYN_IE(Usage) )
-import Util		( zipEqual, pprTrace, pprPanic, assertPanic, panic )
+import Util		( zipEqual )
+import Outputable
 
 infixr 9 `thenL`, `seqL`, `thenMaybeL`, `seqMaybeL`
 \end{code}
@@ -99,7 +95,7 @@ lintCoreBindings whoDunnit spec_done binds
       Nothing       -> doIfSet opt_D_show_passes
 			(hPutStr stderr ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
 
-      Just bad_news -> printErrs (display bad_news)	>>
+      Just bad_news -> printDump (display bad_news)	>>
 		       ghcExit 1
   where
     lint_binds [] = returnL ()
@@ -110,9 +106,9 @@ lintCoreBindings whoDunnit spec_done binds
     display bad_news
       = vcat [
 		text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
-		bad_news pprDumpStyle,
+		bad_news,
 		ptext SLIT("*** Offending Program ***"),
-		pprCoreBindings pprDumpStyle binds,
+		pprCoreBindings binds,
 		ptext SLIT("*** End of Offense ***")
 	]
 \end{code}
@@ -137,9 +133,9 @@ lintUnfolding locn expr
       Nothing  -> Just expr
       Just msg ->
         pprTrace "WARNING: Discarded bad unfolding from interface:\n"
-	(vcat [msg (PprForUser opt_PprUserLength),
+	(vcat [msg,
 		   ptext SLIT("*** Bad unfolding ***"),
-		   ppr PprDebug expr,
+		   ppr expr,
 		   ptext SLIT("*** End unfolding ***")])
 	Nothing
 \end{code}
@@ -177,8 +173,8 @@ lintSingleBinding (binder,rhs)
 	  Just ty -> checkTys (idType binder) ty (mkRhsMsg binder ty))
 
 	`seqL`
-	-- Check (not isPrimType)
-	checkIfSpecDoneL (not (isPrimType (idType binder)))
+	-- Check (not isUnpointedType)
+	checkIfSpecDoneL (not (isUnpointedType (idType binder)))
 	  (mkRhsPrimMsg binder rhs)
 
 	-- We should check the unfolding, if any, but this is tricky because
@@ -195,7 +191,20 @@ lintSingleBinding (binder,rhs)
 \begin{code}
 lintCoreExpr :: CoreExpr -> LintM (Maybe Type)	-- Nothing if error found
 
-lintCoreExpr (Var var) = checkInScope var `seqL` returnL (Just (idType var))
+lintCoreExpr (Var var) 
+  | isAlgCon var = returnL (Just (idType var))
+	-- Micro-hack here... Class decls generate applications of their
+	-- dictionary constructor, but don't generate a binding for the
+	-- constructor (since it would never be used).  After a single round
+	-- of simplification, these dictionary constructors have been
+	-- inlined (from their UnfoldInfo) to CoCons.  Just between
+	-- desugaring and simplfication, though, they appear as naked, unbound
+	-- variables as the function in an application.
+	-- The hack here simply doesn't check for out-of-scope-ness for
+	-- data constructors (at least, in a function position).
+
+  | otherwise    = checkInScope var `seqL` returnL (Just (idType var))
+
 lintCoreExpr (Lit lit) = returnL (Just (literalType lit))
 lintCoreExpr (SCC _ expr) = lintCoreExpr expr
 lintCoreExpr e@(Coerce coercion ty expr)
@@ -272,8 +281,8 @@ lintCoreArg :: {-Bool ->-} CoreExpr -> Type -> CoreArg -> LintM (Maybe Type)
 
 lintCoreArg e ty (LitArg lit)
   = -- Make sure function type matches argument
-    case (getFunTyExpandingDicts_maybe False{-no peeking in newtypes-} ty) of
-      Just (arg,res) | (lit_ty `eqTy` arg) -> returnL(Just res)
+    case (splitFunTy_maybe ty) of
+      Just (arg,res) | (lit_ty == arg) -> returnL(Just res)
       _ -> addErrL (mkAppMsg ty lit_ty e) `seqL` returnL Nothing
   where
     lit_ty = literalType lit
@@ -282,15 +291,15 @@ lintCoreArg e ty (VarArg v)
   = -- Make sure variable is bound
     checkInScope v `seqL`
     -- Make sure function type matches argument
-    case (getFunTyExpandingDicts_maybe False{-as above-} ty) of
-      Just (arg,res) | (var_ty `eqTy` arg) -> returnL(Just res)
+    case (splitFunTy_maybe ty) of
+      Just (arg,res) | (var_ty == arg) -> returnL(Just res)
       _ -> addErrL (mkAppMsg ty var_ty e) `seqL` returnL Nothing
   where
     var_ty = idType v
 
 lintCoreArg e ty a@(TyArg arg_ty)
   = -- ToDo: Check that ty is well-kinded and has no unbound tyvars
-    case (getForAllTyExpandingDicts_maybe ty) of
+    case (splitForAllTy_maybe ty) of
       Nothing -> addErrL (mkTyAppMsg SLIT("Illegal") ty arg_ty e) `seqL` returnL Nothing
 
       Just (tyvar,body) ->
@@ -304,18 +313,10 @@ lintCoreArg e ty a@(TyArg arg_ty)
 		-- 	error :: forall a:*. String -> a
 		-- and then apply it to both boxed and unboxed types.
 	 then
-	    returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
+	    returnL(Just(instantiateTy (mkTyVarEnv [(tyvar,arg_ty)]) body))
 	else
-	    pprTrace "lintCoreArg:kinds:" (hsep [ppr PprDebug tyvar_kind, ppr PprDebug argty_kind]) $
-	    addErrL (mkTyAppMsg SLIT("Kinds not right in") ty arg_ty e) `seqL` returnL Nothing
-	
-lintCoreArg e ty (UsageArg u)
-  = -- ToDo: Check that usage has no unbound usage variables
-    case (getForAllUsageTy ty) of
-      Just (uvar,bounds,body) ->
-        -- ToDo: Check argument satisfies bounds
-        returnL(Just(panic "lintCoreArg:instantiateUsage uvar u body"))
-      _ -> addErrL (mkUsageAppMsg ty u e) `seqL` returnL Nothing
+	    pprTrace "lintCoreArg:kinds:" (hsep [ppr tyvar_kind, ppr argty_kind]) $
+	    addErrL (mkKindErrMsg tyvar arg_ty e) `seqL` returnL Nothing
 \end{code}
 
 %************************************************************************
@@ -369,7 +370,7 @@ lintCoreAlts whole_alts@(PrimAlts alts deflt) ty --tycon
 	  check ty = checkTys first_ty ty (mkCaseAltMsg whole_alts)
 
 lintAlgAlt scrut_ty (con,args,rhs)
-  = (case maybeAppDataTyConExpandingDicts scrut_ty of
+  = (case splitAlgTyConApp_maybe scrut_ty of
       Just (tycon, tys_applied, cons) | isDataTyCon tycon ->
 	 let
 	   arg_tys = dataConArgTys con tys_applied
@@ -432,8 +433,6 @@ type LintM a = Bool		-- True <=> specialisation has been done
 	    -> Bag ErrMsg	-- Error messages so far
 	    -> (a, Bag ErrMsg)	-- Result and error messages (if any)
 
-type ErrMsg = PprStyle -> Doc
-
 data LintLocInfo
   = RhsOf Id		-- The variable bound
   | LambdaBodyOf Id	-- The lambda-binder
@@ -441,25 +440,27 @@ data LintLocInfo
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
 
 instance Outputable LintLocInfo where
-    ppr sty (RhsOf v)
-      = hcat [ppr sty (getSrcLoc v), ptext SLIT(": [RHS of "), pp_binders sty [v], char ']']
+    ppr (RhsOf v)
+      = ppr (getSrcLoc v) <> colon <+> 
+	brackets (ptext SLIT("RHS of") <+> pp_binders [v])
 
-    ppr sty (LambdaBodyOf b)
-      = hcat [ppr sty (getSrcLoc b),
-		ptext SLIT(": [in body of lambda with binder "), pp_binder sty b, char ']']
+    ppr (LambdaBodyOf b)
+      = ppr (getSrcLoc b) <> colon <+>
+	brackets (ptext SLIT("in body of lambda with binder") <+> pp_binder b)
 
-    ppr sty (BodyOfLetRec bs)
-      = hcat [ppr sty (getSrcLoc (head bs)),
-		ptext SLIT(": [in body of letrec with binders "), pp_binders sty bs, char ']']
+    ppr (BodyOfLetRec bs)
+      = ppr (getSrcLoc (head bs)) <> colon <+>
+	brackets (ptext SLIT("in body of letrec with binders") <+> pp_binders bs)
 
-    ppr sty (ImportedUnfolding locn)
-      = (<>) (ppr sty locn) (ptext SLIT(": [in an imported unfolding]"))
+    ppr (ImportedUnfolding locn)
+      = ppr locn <> colon <+>
+	brackets (ptext SLIT("in an imported unfolding"))
 
-pp_binders :: PprStyle -> [Id] -> Doc
-pp_binders sty bs = sep (punctuate comma (map (pp_binder sty) bs))
+pp_binders :: [Id] -> SDoc
+pp_binders bs = sep (punctuate comma (map pp_binder bs))
 
-pp_binder :: PprStyle -> Id -> Doc
-pp_binder sty b = hsep [ppr sty b, text "::", ppr sty (idType b)]
+pp_binder :: Id -> SDoc
+pp_binder b = hsep [ppr b, text "::", ppr (idType b)]
 \end{code}
 
 \begin{code}
@@ -469,9 +470,7 @@ initL m spec_done
     if isEmptyBag errs then
 	Nothing
     else
-	Just ( \ sty ->
-	  vcat [ msg sty | msg <- bagToList errs ]
-	)
+	Just (vcat (bagToList errs))
     }
 
 returnL :: a -> LintM a
@@ -535,9 +534,7 @@ addErr :: Bag ErrMsg -> ErrMsg -> [LintLocInfo] -> Bag ErrMsg
 
 addErr errs_so_far msg locs
   = ASSERT (not (null locs))
-    errs_so_far `snocBag` ( \ sty ->
-    hang (ppr sty (head locs)) 4 (msg sty)
-    )
+    errs_so_far `snocBag` (hang (ppr (head locs)) 4 msg)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m spec loc scope errs
@@ -558,7 +555,7 @@ addInScopeVars ids m spec loc scope errs
 --  names after all.  WDP 94/07
 --  (if isEmptyUniqSet shadowed
 --  then id
---  else pprTrace "Shadowed vars:" (ppr PprDebug (uniqSetToList shadowed))) (
+--  else pprTrace "Shadowed vars:" (ppr (uniqSetToList shadowed))) (
     m spec loc (scope `unionIdSets` new_set) errs
 --  )
 \end{code}
@@ -570,134 +567,133 @@ checkInScope id spec loc scope errs
 	id_name = getName id
     in
     if isLocallyDefined id_name && not (id `elementOfIdSet` scope) then
-      ((),addErr errs (\sty -> hsep [ppr sty id, ptext SLIT("is out of scope")]) loc)
+      ((), addErr errs (hsep [ppr id, ptext SLIT("is out of scope")]) loc)
     else
       ((),errs)
 
 checkTys :: Type -> Type -> ErrMsg -> LintM ()
 checkTys ty1 ty2 msg spec loc scope errs
-  = if ty1 `eqTy` ty2 then ((), errs) else ((), addErr errs msg loc)
+  = if ty1 == ty2 then ((), errs) else ((), addErr errs msg loc)
 \end{code}
 
 \begin{code}
-mkConErrMsg e sty
+mkConErrMsg e
   = ($$) (ptext SLIT("Application of newtype constructor:"))
-	    (ppr sty e)
+	    (ppr e)
 
-mkCoerceErrMsg e sty
+mkCoerceErrMsg e
   = ($$) (ptext SLIT("Coercion using a datatype constructor:"))
-	 (ppr sty e)
+	 (ppr e)
 
 
 mkCaseAltMsg :: CoreCaseAlts -> ErrMsg
-mkCaseAltMsg alts sty
+mkCaseAltMsg alts
   = ($$) (ptext SLIT("Type of case alternatives not the same:"))
-	    (ppr sty alts)
+	    (ppr alts)
 
 mkCaseDataConMsg :: CoreExpr -> ErrMsg
-mkCaseDataConMsg expr sty
+mkCaseDataConMsg expr
   = ($$) (ptext SLIT("A case scrutinee not of data constructor type:"))
-	    (pp_expr sty expr)
+	    (pprCoreExpr expr)
 
 mkCaseNotPrimMsg :: TyCon -> ErrMsg
-mkCaseNotPrimMsg tycon sty
+mkCaseNotPrimMsg tycon
   = ($$) (ptext SLIT("A primitive case on a non-primitive type:"))
-	    (ppr sty tycon)
+	    (ppr tycon)
 
 mkCasePrimMsg :: TyCon -> ErrMsg
-mkCasePrimMsg tycon sty
+mkCasePrimMsg tycon
   = ($$) (ptext SLIT("An algebraic case on a primitive type:"))
-	    (ppr sty tycon)
+	    (ppr tycon)
 
 mkCaseAbstractMsg :: TyCon -> ErrMsg
-mkCaseAbstractMsg tycon sty
+mkCaseAbstractMsg tycon
   = ($$) (ptext SLIT("An algebraic case on some weird type:"))
-	    (ppr sty tycon)
+	    (ppr tycon)
 
 mkDefltMsg :: CoreCaseDefault -> ErrMsg
-mkDefltMsg deflt sty
+mkDefltMsg deflt
   = ($$) (ptext SLIT("Binder in case default doesn't match type of scrutinee:"))
-	    (ppr sty deflt)
+	    (ppr deflt)
 
 mkAppMsg :: Type -> Type -> CoreExpr -> ErrMsg
-mkAppMsg fun arg expr sty
+mkAppMsg fun arg expr
   = vcat [ptext SLIT("Argument value doesn't match argument type:"),
-	      hang (ptext SLIT("Fun type:")) 4 (ppr sty fun),
-	      hang (ptext SLIT("Arg type:")) 4 (ppr sty arg),
-	      hang (ptext SLIT("Expression:")) 4 (pp_expr sty expr)]
+	      hang (ptext SLIT("Fun type:")) 4 (ppr fun),
+	      hang (ptext SLIT("Arg type:")) 4 (ppr arg),
+	      hang (ptext SLIT("Expression:")) 4 (pprCoreExpr expr)]
+
+mkKindErrMsg :: TyVar -> Type -> CoreExpr -> ErrMsg
+mkKindErrMsg tyvar arg_ty expr
+  = vcat [ptext SLIT("Kinds don't match in type application:"),
+	  hang (ptext SLIT("Type variable:"))
+		 4 (ppr tyvar <+> ptext SLIT("::") <+> ppr (tyVarKind tyvar)),
+	  hang (ptext SLIT("Arg type:"))   
+	         4 (ppr arg_ty <+> ptext SLIT("::") <+> ppr (typeKind arg_ty)),
+	  hang (ptext SLIT("Expression:")) 4 (pprCoreExpr expr)]
 
 mkTyAppMsg :: FAST_STRING -> Type -> Type -> CoreExpr -> ErrMsg
-mkTyAppMsg msg ty arg expr sty
+mkTyAppMsg msg ty arg expr
   = vcat [hsep [ptext msg, ptext SLIT("type application:")],
-	      hang (ptext SLIT("Exp type:"))   4 (ppr sty ty),
-	      hang (ptext SLIT("Arg type:"))   4 (ppr sty arg),
-	      hang (ptext SLIT("Expression:")) 4 (pp_expr sty expr)]
-
-mkUsageAppMsg :: Type -> Usage -> CoreExpr -> ErrMsg
-mkUsageAppMsg ty u expr sty
-  = vcat [ptext SLIT("Illegal usage application:"),
-	      hang (ptext SLIT("Exp type:")) 4 (ppr sty ty),
-	      hang (ptext SLIT("Usage exp:")) 4 (ppr sty u),
-	      hang (ptext SLIT("Expression:")) 4 (pp_expr sty expr)]
+	      hang (ptext SLIT("Exp type:"))
+		 4 (ppr ty <+> ptext SLIT("::") <+> ppr (typeKind ty)),
+	      hang (ptext SLIT("Arg type:"))   
+	         4 (ppr arg <+> ptext SLIT("::") <+> ppr (typeKind arg)),
+	      hang (ptext SLIT("Expression:")) 4 (pprCoreExpr expr)]
 
 mkAlgAltMsg1 :: Type -> ErrMsg
-mkAlgAltMsg1 ty sty
+mkAlgAltMsg1 ty
   = ($$) (text "In some case statement, type of scrutinee is not a data type:")
-	    (ppr sty ty)
---	    (($$) (ppr sty ty) (ppr sty (expandTy ty))) -- ToDo: rm
+	    (ppr ty)
 
 mkAlgAltMsg2 :: Type -> Id -> ErrMsg
-mkAlgAltMsg2 ty con sty
+mkAlgAltMsg2 ty con
   = vcat [
 	text "In some algebraic case alternative, constructor is not a constructor of scrutinee type:",
-	ppr sty ty,
-	ppr sty con
+	ppr ty,
+	ppr con
     ]
 
 mkAlgAltMsg3 :: Id -> [Id] -> ErrMsg
-mkAlgAltMsg3 con alts sty
+mkAlgAltMsg3 con alts
   = vcat [
 	text "In some algebraic case alternative, number of arguments doesn't match constructor:",
-	ppr sty con,
-	ppr sty alts
+	ppr con,
+	ppr alts
     ]
 
 mkAlgAltMsg4 :: Type -> Id -> ErrMsg
-mkAlgAltMsg4 ty arg sty
+mkAlgAltMsg4 ty arg
   = vcat [
 	text "In some algebraic case alternative, type of argument doesn't match data constructor:",
-	ppr sty ty,
-	ppr sty arg
+	ppr ty,
+	ppr arg
     ]
 
 mkPrimAltMsg :: (Literal, CoreExpr) -> ErrMsg
-mkPrimAltMsg alt sty
+mkPrimAltMsg alt
   = ($$)
     (text "In a primitive case alternative, type of literal doesn't match type of scrutinee:")
-	    (ppr sty alt)
+	    (ppr alt)
 
 mkRhsMsg :: Id -> Type -> ErrMsg
-mkRhsMsg binder ty sty
+mkRhsMsg binder ty
   = vcat
     [hsep [ptext SLIT("The type of this binder doesn't match the type of its RHS:"),
-	    ppr sty binder],
-     hsep [ptext SLIT("Binder's type:"), ppr sty (idType binder)],
-     hsep [ptext SLIT("Rhs type:"), ppr sty ty]]
+	    ppr binder],
+     hsep [ptext SLIT("Binder's type:"), ppr (idType binder)],
+     hsep [ptext SLIT("Rhs type:"), ppr ty]]
 
 mkRhsPrimMsg :: Id -> CoreExpr -> ErrMsg
-mkRhsPrimMsg binder rhs sty
+mkRhsPrimMsg binder rhs
   = vcat [hsep [ptext SLIT("The type of this binder is primitive:"),
-		     ppr sty binder],
-	      hsep [ptext SLIT("Binder's type:"), ppr sty (idType binder)]
+		     ppr binder],
+	      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]
 	     ]
 
 mkSpecTyAppMsg :: CoreArg -> ErrMsg
-mkSpecTyAppMsg arg sty
+mkSpecTyAppMsg arg
   = ($$)
       (ptext SLIT("Unboxed types in a type application (after specialisation):"))
-      (ppr sty arg)
-
-pp_expr :: PprStyle -> CoreExpr -> Doc
-pp_expr sty expr
-  = pprCoreExpr sty (pprBigCoreBinder sty) (pprTypedCoreBinder sty) (pprTypedCoreBinder sty) expr
+      (ppr arg)
 \end{code}

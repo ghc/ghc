@@ -21,16 +21,14 @@ The program gather statistics about
 \end{enumerate}
 
 \begin{code}
-#include "HsVersions.h"
-
 module StgStats ( showStgStats ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import StgSyn
 
 import FiniteMap	( emptyFM, plusFM_C, unitFM, fmToList, FiniteMap )
-import Id (SYN_IE(Id))
+import Id (Id)
 \end{code}
 
 \begin{code}

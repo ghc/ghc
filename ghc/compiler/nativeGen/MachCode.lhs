@@ -9,12 +9,10 @@ This is a big module, but, if you pay attention to
 structure should not be too overwhelming.
 
 \begin{code}
+module MachCode ( stmt2Instrs, asmVoid, InstrList ) where
+
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
-
-module MachCode ( stmt2Instrs, asmVoid, SYN_IE(InstrList) ) where
-
-IMP_Ubiq(){-uitious-}
 
 import MachMisc		-- may differ per-platform
 import MachRegs
@@ -24,17 +22,15 @@ import AbsCUtils	( magicIdPrimRep )
 import CLabel		( isAsmTemp, CLabel )
 import Maybes		( maybeToBool, expectJust )
 import OrdList		-- quite a bit of it
-import Outputable	( PprStyle(..) )
-import Pretty		( ptext, rational )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..), showPrimOp )
 import Stix		( getUniqLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..)
 			)
 import UniqSupply	( returnUs, thenUs, mapUs, mapAndUnzipUs,
-			  mapAccumLUs, SYN_IE(UniqSM)
+			  mapAccumLUs, UniqSM
 			)
-import Util		( panic, assertPanic )
+import Outputable
 \end{code}
 
 Code extractor for an entire stix tree---stix statement level.
@@ -755,7 +751,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    src1 = registerName register tmp
 	    src2 = ImmInt (fromInteger y)
 	    code__2 dst = code .
-			  mkSeqInstr (LEA sz (OpAddr (Address (Just src1) Nothing src2)) (OpReg dst))
+			  mkSeqInstr (LEA sz (OpAddr (AddrBaseIndex (Just src1) Nothing src2)) (OpReg dst))
 	in
 	returnUs (Any IntRep code__2)
 
@@ -812,7 +808,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    code2 = registerCode register2 tmp2 asmVoid
 	    src2  = registerName register2 tmp2
 	    code__2 dst = asmParThen [code1, code2] .
-			  mkSeqInstr (LEA sz (OpAddr (Address (Just src1) (Just (src2,1)) (ImmInt 0))) (OpReg dst))
+			  mkSeqInstr (LEA sz (OpAddr (AddrBaseIndex (Just src1) (Just (src2,1)) (ImmInt 0))) (OpReg dst))
 	in
 	returnUs (Any IntRep code__2)
 
@@ -827,7 +823,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    src1 = registerName register tmp
 	    src2 = ImmInt (-(fromInteger y))
 	    code__2 dst = code .
-			  mkSeqInstr (LEA sz (OpAddr (Address (Just src1) Nothing src2)) (OpReg dst))
+			  mkSeqInstr (LEA sz (OpAddr (AddrBaseIndex (Just src1) Nothing src2)) (OpReg dst))
 	in
 	returnUs (Any IntRep code__2)
 
@@ -870,10 +866,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    src2    = ImmInt (fromInteger i)
 	    code__2 = asmParThen [code1] .
 		      mkSeqInstrs [-- we put src2 in (ebx)
-				   MOV L (OpImm src2) (OpAddr (Address (Just ebx) Nothing (ImmInt OFFSET_R1))),
+				   MOV L (OpImm src2) (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1))),
 				   MOV L (OpReg src1) (OpReg eax),
 				   CLTD,
-				   IDIV sz (OpAddr (Address (Just ebx) Nothing (ImmInt OFFSET_R1)))]
+				   IDIV sz (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1)))]
 	in
 	returnUs (Fixed IntRep (if is_division then eax else edx) code__2)
 
@@ -893,10 +889,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 					 CLTD,
 					 IDIV sz (OpReg src2)]
 		      else mkSeqInstrs [ -- we put src2 in (ebx)
-					 MOV L (OpReg src2) (OpAddr (Address (Just ebx) Nothing (ImmInt OFFSET_R1))),
+					 MOV L (OpReg src2) (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1))),
 					 MOV L (OpReg src1) (OpReg eax),
 					 CLTD,
-					 IDIV sz (OpAddr (Address (Just ebx) Nothing (ImmInt OFFSET_R1)))]
+					 IDIV sz (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1)))]
 	in
 	returnUs (Fixed IntRep (if is_division then eax else edx) code__2)
 	-----------------------
@@ -1011,7 +1007,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      DoubleSinhOp  -> (False, SLIT("sinh"))
 	      DoubleCoshOp  -> (False, SLIT("cosh"))
 	      DoubleTanhOp  -> (False, SLIT("tanh"))
-	      _             -> panic ("Monadic PrimOp not handled: " ++ showPrimOp PprDebug primop)
+	      _             -> panic ("Monadic PrimOp not handled: " ++ showPrimOp primop)
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
@@ -1133,7 +1129,7 @@ getRegister leaf
 
 @Amode@s: Memory addressing modes passed up the tree.
 \begin{code}
-data Amode = Amode Address InstrBlock
+data Amode = Amode MachRegsAddr InstrBlock
 
 amodeAddr (Amode addr _) = addr
 amodeCode (Amode _ code) = code
@@ -1197,7 +1193,7 @@ getAmode (StPrim IntSubOp [x, StInt i])
     	reg  = registerName register tmp
     	off  = ImmInt (-(fromInteger i))
     in
-    returnUs (Amode (Address (Just reg) Nothing off) code)
+    returnUs (Amode (AddrBaseIndex (Just reg) Nothing off) code)
 
 getAmode (StPrim IntAddOp [x, StInt i])
   | maybeToBool imm
@@ -1217,7 +1213,7 @@ getAmode (StPrim IntAddOp [x, StInt i])
     	reg  = registerName register tmp
     	off  = ImmInt (fromInteger i)
     in
-    returnUs (Amode (Address (Just reg) Nothing off) code)
+    returnUs (Amode (AddrBaseIndex (Just reg) Nothing off) code)
 
 getAmode (StPrim IntAddOp [x, y])
   = getNewRegNCG PtrRep		`thenUs` \ tmp1 ->
@@ -1231,7 +1227,7 @@ getAmode (StPrim IntAddOp [x, y])
     	reg2  = registerName register2 tmp2
     	code__2 = asmParThen [code1, code2]
     in
-    returnUs (Amode (Address (Just reg1) (Just (reg2,4)) (ImmInt 0)) code__2)
+    returnUs (Amode (AddrBaseIndex (Just reg1) (Just (reg2,4)) (ImmInt 0)) code__2)
 
 getAmode leaf
   | maybeToBool imm
@@ -1251,7 +1247,7 @@ getAmode other
     	reg  = registerName register tmp
     	off  = Nothing
     in
-    returnUs (Amode (Address (Just reg) Nothing (ImmInt 0)) code)
+    returnUs (Amode (AddrBaseIndex (Just reg) Nothing (ImmInt 0)) code)
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2327,7 +2323,7 @@ genCCall fn kind [StInt i]
 	call = [MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
 		MOV L (OpImm (ImmCLbl lbl))
 		      -- this is hardwired
-		      (OpAddr (Address (Just ebx) Nothing (ImmInt 104))),
+		      (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt 104))),
 		JMP (OpImm (ImmLit (ptext (if underscorePrefix then (SLIT ("_PerformGC_wrapper")) else (SLIT ("PerformGC_wrapper")))))),
 		LABEL lbl]
     in
@@ -2338,11 +2334,12 @@ genCCall fn kind args
   = mapUs get_call_arg args `thenUs` \ argCode ->
     let
 	nargs = length args
+
 {- OLD: Since there's no attempt at stealing %esp at the moment, 
    restoring %esp from MainRegTable.rCstkptr is not done.  -- SOF 97/09
    (ditto for saving away old-esp in MainRegTable.Hp (!!) )
-	code1 = asmParThen [asmSeq [ -- MOV L (OpReg esp) (OpAddr (Address (Just ebx) Nothing (ImmInt 80))),
-			MOV L (OpAddr (Address (Just ebx) Nothing (ImmInt 100))) (OpReg esp)
+	code1 = asmParThen [asmSeq [ -- MOV L (OpReg esp) (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt 80))),
+			MOV L (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt 100))) (OpReg esp)
 				   ]
 			   ]
 -}
@@ -2352,7 +2349,7 @@ genCCall fn kind args
 		ADD L (OpImm (ImmInt (nargs * 4))) (OpReg esp) --,
 		
 		-- Don't restore %esp (see above)
-		-- MOV L (OpAddr (Address (Just ebx) Nothing (ImmInt 80))) (OpReg esp)
+		-- MOV L (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt 80))) (OpReg esp)
 		]
     in
     returnSeq (code2) call
@@ -3149,8 +3146,8 @@ coerceInt2FP pk x
 
     	code__2 dst = code . mkSeqInstrs [
 	-- to fix: should spill instead of using R1
-    	              MOV L (OpReg src) (OpAddr (Address (Just ebx) Nothing (ImmInt OFFSET_R1))),
-    	              FILD (primRepToSize pk) (Address (Just ebx) Nothing (ImmInt OFFSET_R1)) dst]
+    	              MOV L (OpReg src) (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1))),
+    	              FILD (primRepToSize pk) (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1)) dst]
     in
     returnUs (Any pk code__2)
 
@@ -3166,8 +3163,8 @@ coerceFP2Int x
     	code__2 dst = let
 		      in code . mkSeqInstrs [
     	                        FRNDINT,
-    	                        FIST L (Address (Just ebx) Nothing (ImmInt OFFSET_R1)),
-    	                        MOV L (OpAddr (Address (Just ebx) Nothing (ImmInt OFFSET_R1))) (OpReg dst)]
+    	                        FIST L (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1)),
+    	                        MOV L (OpAddr (AddrBaseIndex (Just ebx) Nothing (ImmInt OFFSET_R1))) (OpReg dst)]
     in
     returnUs (Any IntRep code__2)
 

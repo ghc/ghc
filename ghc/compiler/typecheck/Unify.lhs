@@ -7,37 +7,31 @@ The unifier is now squarely in the typechecker monad (because of the
 updatable substitution).
 
 \begin{code}
-#include "HsVersions.h"
-
 module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists, 
-	       unifyFunTy, unifyListTy, unifyTupleTy
+	       unifyFunTy, unifyListTy, unifyTupleTy,
+	       Subst, unifyTysX, unifyTyListsX
  ) where
 
-IMP_Ubiq()
-
+#include "HsVersions.h"
 
 -- friends: 
 import TcMonad
-import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe, splitAppTys )
-import TyCon	( TyCon, mkFunTyCon, isTupleTyCon, tyConArity, SYN_IE(Arity) )
-import Class	( GenClass )
-import TyVar	( GenTyVar(..), SYN_IE(TyVar), tyVarKind )
-import TcType	( SYN_IE(TcType), TcMaybe(..), SYN_IE(TcTauType), SYN_IE(TcTyVar),
+import Type	( GenType(..), Type, tyVarsOfType,
+		  typeKind, mkFunTy, splitFunTy_maybe, splitAppTys, splitTyConApp_maybe )
+import TyCon	( TyCon, mkFunTyCon, isTupleTyCon, tyConArity, Arity )
+import TyVar	( GenTyVar(..), TyVar, tyVarKind, tyVarSetToList,
+		  TyVarEnv, lookupTyVarEnv, emptyTyVarEnv, addToTyVarEnv
+		)
+import TcType	( TcType, TcMaybe(..), TcTauType, TcTyVar,
 		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
 		)
 -- others:
 import Kind	( Kind, hasMoreBoxityInfo, mkTypeKind, mkBoxedTypeKind )
 import TysWiredIn ( listTyCon, mkListTy, mkTupleTy )
-import Usage	( duffUsage )
-import PprType	( GenTyVar, GenType )	-- instances
-import Pretty
-import Unique	( Unique )		-- instances
+import Maybes	( maybeToBool )
+import PprType	()		-- Instances
 import Util
-
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-#endif
-
 \end{code}
 
 
@@ -103,54 +97,54 @@ uTys :: TcTauType s -> TcTauType s	-- Error reporting ty1 and real ty1
      -> TcTauType s -> TcTauType s	-- Error reporting ty2 and real ty2
      -> TcM s ()
 
+	-- Always expand synonyms (see notes at end)
+uTys ps_ty1 (SynTy _ ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
+uTys ps_ty1 ty1 ps_ty2 (SynTy _ ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
+
 	-- Variables; go for uVar
 uTys ps_ty1 (TyVarTy tyvar1) ps_ty2 ty2 = uVar tyvar1 ps_ty2 ty2
 uTys ps_ty1 ty1 ps_ty2 (TyVarTy tyvar2) = uVar tyvar2 ps_ty1 ty1
 
-	-- Applications and functions; just check the two parts
-uTys _ (FunTy fun1 arg1 _) _ (FunTy fun2 arg2 _)
+	-- Functions; just check the two parts
+uTys _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
   = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
 
+	-- Type constructors must match
+uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
+  = checkTc (con1 == con2 && length tys1 == length tys2) 
+	    (unifyMisMatch ps_ty1 ps_ty2)		`thenTc_`
+    unifyTauTyLists tys1 tys2
+
+	-- Applications need a bit of care!
+	-- They can match FunTy and TyConApp
 uTys _ (AppTy s1 t1) _ (AppTy s2 t2)
   = uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
 
-	-- Special case: converts  a -> b to (->) a b
-uTys _ (AppTy s1 t1) _ (FunTy fun2 arg2 _)
+uTys _ (AppTy s1 t1) _ (FunTy fun2 arg2)
   = uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
   where
-    s2 = AppTy (TyConTy mkFunTyCon duffUsage) fun2
+	 -- Converts  a -> b to (->) a b
+    s2 = TyConApp mkFunTyCon [fun2]
     t2 = arg2
 
-uTys _ (FunTy fun1 arg1 _) _ (AppTy s2 t2)
-  = uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
-  where
-    s1 = AppTy (TyConTy mkFunTyCon duffUsage) fun1
-    t1 = arg1
+uTys _ (AppTy s1 t1) _ (TyConApp tc tys@(_:_))
+  = case snocView tys of
+	(ts2, t2) -> uTys s1 s1 s2 s2	`thenTc_`   uTys t1 t1 t2 t2
+		  where
+			-- Not efficient, but simple
+		     s2 = TyConApp tc ts2
 
-	-- Type constructors must match
-uTys ps_ty1 (TyConTy con1 _) ps_ty2 (TyConTy con2 _)
-  = checkTc (con1 == con2) (unifyMisMatch ps_ty1 ps_ty2)
-
-	-- Dictionary types must match.  (They can only occur when
-	-- unifying signature contexts in TcBinds.)
-uTys ps_ty1 (DictTy c1 t1 _) ps_ty2 (DictTy c2 t2 _)
-  = checkTc (c1 == c2) (unifyMisMatch ps_ty1 ps_ty2)	`thenTc_`
-    uTys t1 t1 t2 t2
-
-	-- Always expand synonyms (see notes at end)
-uTys ps_ty1 (SynTy con1 args1 ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
-uTys ps_ty1 ty1 ps_ty2 (SynTy con2 args2 ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
+uTys ps1 s1 ps2 s2@(AppTy _ _) = uTys ps2 s2 ps1 s1
+	-- Swap arguments if the App is in the second argument
 
 	-- Not expecting for-alls in unification
 #ifdef DEBUG
 uTys ps_ty1 (ForAllTy _ _)	  ps_ty2 ty2 = panic "Unify.uTys:ForAllTy (1st arg)"
 uTys ps_ty1 ty1 ps_ty2	      (ForAllTy _ _) = panic "Unify.uTys:ForAllTy (2nd arg)"
-uTys ps_ty1 (ForAllUsageTy _ _ _) ps_ty2 ty2 = panic "Unify.uTys:ForAllUsageTy (1st arg)"
-uTys ps_ty1 ty1 ps_ty2 (ForAllUsageTy _ _ _) = panic "Unify.uTys:ForAllUsageTy (2nd arg)"
 #endif
 
 	-- Anything else fails
-uTys ps_ty1 ty1 ps_ty2 ty2  = failTc (unifyMisMatch ps_ty1 ps_ty2)
+uTys ps_ty1 ty1 ps_ty2 ty2  = failWithTc (unifyMisMatch ps_ty1 ps_ty2)
 \end{code}
 
 Notes on synonyms
@@ -233,7 +227,7 @@ uVar tv1 ps_ty2 ty2
 	other       -> uUnboundVar tv1 maybe_ty1 ps_ty2 ty2
 
 	-- Expand synonyms
-uUnboundVar tv1 maybe_ty1 ps_ty2 (SynTy _ _ ty2)
+uUnboundVar tv1 maybe_ty1 ps_ty2 (SynTy _ ty2)
   = uUnboundVar tv1 maybe_ty1 ps_ty2 ty2
 
 
@@ -251,58 +245,44 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
 	-- ASSERT maybe_ty1 /= BoundTo
   | otherwise
   = tcReadTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
-    case (maybe_ty1, maybe_ty2) of
-	(_, BoundTo ty2') -> uUnboundVar tv1 maybe_ty1 ty2' ty2'
+    case maybe_ty2 of
+	BoundTo ty2' -> uUnboundVar tv1 maybe_ty1 ty2' ty2'
 
-	(UnBound, _) |  kind2 `hasMoreBoxityInfo` kind1
-		     -> tcWriteTyVar tv1 ps_ty2		`thenNF_Tc_` returnTc ()
+	UnBound |  (kind1 == kind2 && not (maybeToBool name1))	-- Same kinds and tv1 is anonymous
+								-- so update tv1
+		-> tcWriteTyVar tv1 ps_ty2		`thenNF_Tc_` returnTc ()
 	
-	(_, UnBound) |  kind1 `hasMoreBoxityInfo` kind2
-		     -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
+	        |  kind1 `hasMoreBoxityInfo` kind2		-- Update tv2 if possible
+		-> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
 
--- Allow two type-sig variables to be bound together.
--- They may be from the same binding group, so it may be OK.
-	(DontBind,DontBind) |  kind2 `hasMoreBoxityInfo` kind1
-		            -> tcWriteTyVar tv1 ps_ty2		`thenNF_Tc_` returnTc ()
+		| kind2 `hasMoreBoxityInfo` kind1		-- Update tv1 if possible
+		-> tcWriteTyVar tv1 ps_ty2		`thenNF_Tc_` returnTc ()
 	
-			    |  kind1 `hasMoreBoxityInfo` kind2
-			    -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
-
-	other	     -> failTc (unifyKindErr tv1 ps_ty2)
+	other	-> failWithTc (unifyKindErr tv1 ps_ty2)
 
 	-- Second one isn't a type variable
 uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1) maybe_ty1 ps_ty2 non_var_ty2
-  = case maybe_ty1 of
-	DontBind -> failTc (unifyDontBindErr tv1 ps_ty2)
+  |  typeKind non_var_ty2 `hasMoreBoxityInfo` kind1
+  =  occur_check non_var_ty2			`thenTc_`
+     tcWriteTyVar tv1 ps_ty2			`thenNF_Tc_`
+     returnTc ()
 
-	UnBound	 |  typeKind non_var_ty2 `hasMoreBoxityInfo` kind1
-		 -> occur_check non_var_ty2			`thenTc_`
-		    tcWriteTyVar tv1 ps_ty2			`thenNF_Tc_`
-		    returnTc ()
+  | otherwise 
+  = failWithTc (unifyKindErr tv1 ps_ty2)
 
-	other	 -> failTc (unifyKindErr tv1 ps_ty2)
   where
-    occur_check (TyVarTy tv2@(TyVar uniq2 _ _ box2))
+    occur_check ty = mapTc occur_check_tv (tyVarSetToList (tyVarsOfType ty))	`thenTc_`
+		     returnTc ()
+
+    occur_check_tv tv2@(TyVar uniq2 _ _ box2)
        | uniq1 == uniq2		-- Same tyvar; fail
-       = failTc (unifyOccurCheck tv1 ps_ty2)
+       = failWithTc (unifyOccurCheck tv1 ps_ty2)
 
        | otherwise		-- A different tyvar
        = tcReadTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
 	 case maybe_ty2 of
 		BoundTo ty2' -> occur_check ty2'
 		other	     -> returnTc ()
-
-    occur_check (AppTy fun arg)   = occur_check fun `thenTc_` occur_check arg
-    occur_check (FunTy fun arg _) = occur_check fun `thenTc_` occur_check arg
-    occur_check (TyConTy _ _)	  = returnTc ()
-    occur_check (SynTy _ _ ty2)   = occur_check ty2
-
-	-- DictTys and ForAllTys can occur when pattern matching against
-	-- constructors with universally quantified fields.
-    occur_check (DictTy c ty2 _)  = occur_check ty2
-    occur_check (ForAllTy tv ty2) | tv == tv1 = returnTc ()
-				  | otherwise = occur_check ty2
-    occur_check other		  = panic "Unexpected ForAllUsage in occurCheck"
 \end{code}
 
 %************************************************************************
@@ -324,7 +304,7 @@ unifyFunTy ty@(TyVarTy tyvar)
 	other	    -> unify_fun_ty_help ty
 
 unifyFunTy ty
-  = case getFunTy_maybe ty of
+  = case splitFunTy_maybe ty of
 	Just arg_and_res -> returnTc arg_and_res
 	Nothing 	 -> unify_fun_ty_help ty
 
@@ -345,11 +325,10 @@ unifyListTy ty@(TyVarTy tyvar)
 	BoundTo ty' -> unifyListTy ty'
 	other	    -> unify_list_ty_help ty
 
-unifyListTy (AppTy (TyConTy tycon _) arg_ty)
-  | tycon == listTyCon
-  = returnTc arg_ty
-
-unifyListTy ty = unify_list_ty_help ty
+unifyListTy ty
+  = case splitTyConApp_maybe ty of
+	Just (tycon, [arg_ty]) | tycon == listTyCon -> returnTc arg_ty
+	other					    -> unify_list_ty_help ty
 
 unify_list_ty_help ty	-- Revert to ordinary unification
   = newTyVarTy mkBoxedTypeKind		`thenNF_Tc` \ elt_ty ->
@@ -366,10 +345,10 @@ unifyTupleTy arity ty@(TyVarTy tyvar)
 	other	    -> unify_tuple_ty_help arity ty
 
 unifyTupleTy arity ty
-  = case splitAppTys ty of
-	(TyConTy tycon _, arg_tys) |  isTupleTyCon tycon 
-				   && tyConArity tycon == arity
-				   -> returnTc arg_tys
+  = case splitTyConApp_maybe ty of
+	Just (tycon, arg_tys) |  isTupleTyCon tycon 
+			 && tyConArity tycon == arity
+			 -> returnTc arg_tys
 	other -> unify_tuple_ty_help arity ty
 
 unify_tuple_ty_help arity ty
@@ -377,6 +356,106 @@ unify_tuple_ty_help arity ty
     unifyTauTy (mkTupleTy arity arg_tys) ty			`thenTc_`
     returnTc arg_tys
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Unification wih a explicit substitution}
+%*									*
+%************************************************************************
+
+Unify types with an explicit substitution and no monad.
+
+\begin{code}
+type Subst  = TyVarEnv Type	-- Not necessarily idempotent
+
+unifyTysX :: Type -> Type -> Maybe Subst
+unifyTysX ty1 ty2 = uTysX ty1 ty2 (\s -> Just s) emptyTyVarEnv
+
+unifyTyListsX :: [Type] -> [Type] -> Maybe Subst
+unifyTyListsX tys1 tys2 = uTyListsX tys1 tys2 (\s -> Just s) emptyTyVarEnv
+
+
+uTysX :: Type -> Type
+      -> (Subst -> Maybe Subst)
+      -> Subst
+      -> Maybe Subst
+
+uTysX ty1 (SynTy _ ty2) k subst = uTysX ty1 ty2 k subst
+
+	-- Variables; go for uVar
+uTysX (TyVarTy tyvar1) ty2 k subst = uVarX tyvar1 ty2 k subst
+uTysX ty1 (TyVarTy tyvar2) k subst = uVarX tyvar2 ty1 k subst
+
+	-- Functions; just check the two parts
+uTysX (FunTy fun1 arg1) (FunTy fun2 arg2) k subst
+  = uTysX fun1 fun2 (uTysX arg1 arg2 k) subst
+
+	-- Type constructors must match
+uTysX (TyConApp con1 tys1) (TyConApp con2 tys2) k subst
+  | (con1 == con2 && length tys1 == length tys2)
+  = uTyListsX tys1 tys2 k subst
+
+	-- Applications need a bit of care!
+	-- They can match FunTy and TyConApp
+uTysX (AppTy s1 t1) (AppTy s2 t2) k subst
+  = uTysX s1 s2 (uTysX t1 t2 k) subst
+
+uTysX (AppTy s1 t1) (FunTy fun2 arg2) k subst
+  = uTysX s1 s2 (uTysX t1 t2 k) subst
+  where
+	 -- Converts  a -> b to (->) a b
+    s2 = TyConApp mkFunTyCon [fun2]
+    t2 = arg2
+
+uTysX (AppTy s1 t1) (TyConApp tc tys@(_:_)) k subst
+  = case snocView tys of
+	(ts2, t2) -> uTysX s1 s2 (uTysX t1 t2 k) subst
+		  where
+			-- Not efficient, but simple
+		     s2 = TyConApp tc ts2
+
+uTysX s1 s2@(AppTy _ _) k subst = uTysX s2 s1 k subst
+	-- Swap arguments if the App is in the second argument
+
+	-- Not expecting for-alls in unification
+#ifdef DEBUG
+uTysX (ForAllTy _ _) ty2 k subst = panic "Unify.uTysX subst:ForAllTy (1st arg)"
+uTysX ty1 (ForAllTy _ _) k subst = panic "Unify.uTysX subst:ForAllTy (2nd arg)"
+#endif
+
+	-- Anything else fails
+uTysX ty1 ty2 k subst = Nothing
+
+
+uTyListsX []         []         k subst = k subst
+uTyListsX (ty1:tys1) (ty2:tys2) k subst = uTysX ty1 ty2 (uTyListsX tys1 tys2 k) subst
+uTyListsX tys1	     tys2	k subst = Nothing   -- Fail if the lists are different lengths
+\end{code}
+
+\begin{code}
+uVarX tv1 (TyVarTy tv2) k subst | tv1 == tv2 = k subst
+      -- Binding a variable to itself is a no-op
+
+uVarX tv1 ty2 k subst
+  = case lookupTyVarEnv subst tv1 of
+      Just ty1 ->    -- Already bound
+		     uTysX ty1 ty2 k subst
+
+      Nothing	     -- Not already bound
+	       |  typeKind ty2 `hasMoreBoxityInfo` tyVarKind tv1
+	       && occur_check_ok ty2
+	       ->     -- No kind mismatch nor occur check
+	          k (addToTyVarEnv subst tv1 ty2)
+
+	       | otherwise -> Nothing	-- Fail if kind mis-match or occur check
+  where
+    occur_check_ok ty = all occur_check_ok_tv (tyVarSetToList (tyVarsOfType ty))
+    occur_check_ok_tv tv | tv1 == tv = False
+			 | otherwise = case lookupTyVarEnv subst tv of
+				         Nothing -> True
+					 Just ty -> occur_check_ok ty
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -393,33 +472,27 @@ unifyCtxt ty1 ty2		-- ty1 expected, ty2 inferred
     zonkTcType ty2	`thenNF_Tc` \ ty2' ->
     returnNF_Tc (err ty1' ty2')
   where
-    err ty1' ty2' sty = vcat [
-			   hsep [ptext SLIT("Expected:"), ppr sty ty1'],
-			   hsep [ptext SLIT("Inferred:"), ppr sty ty2']
+    err ty1' ty2' = vcat [
+			   hsep [ptext SLIT("Expected:"), ppr ty1'],
+			   hsep [ptext SLIT("Inferred:"), ppr ty2']
 		        ]
 
-unifyMisMatch ty1 ty2 sty
+unifyMisMatch ty1 ty2
   = hang (ptext SLIT("Couldn't match the type"))
-	 4 (sep [ppr sty ty1, ptext SLIT("against"), ppr sty ty2])
+	 4 (sep [quotes (ppr ty1), ptext SLIT("against"), quotes (ppr ty2)])
 
-expectedFunErr ty sty
+expectedFunErr ty
   = hang (text "Function type expected, but found the type")
-	 4 (ppr sty ty)
+	 4 (ppr ty)
 
-unifyKindErr tyvar ty sty
+unifyKindErr tyvar ty
   = hang (ptext SLIT("Compiler bug: kind mis-match between"))
-	 4 (sep [hsep [ppr sty tyvar, ptext SLIT("::"), ppr sty (tyVarKind tyvar)],
-		   ptext SLIT("and"), 
-		   hsep [ppr sty ty, ptext SLIT("::"), ppr sty (typeKind ty)]])
+	 4 (sep [quotes (hsep [ppr tyvar, ptext SLIT("::"), ppr (tyVarKind tyvar)]),
+		 ptext SLIT("and"), 
+		 quotes (hsep [ppr ty, ptext SLIT("::"), ppr (typeKind ty)])])
 
-unifyDontBindErr tyvar ty sty
-  = hang (ptext SLIT("Couldn't match the signature/existential type variable"))
-	 4 (sep [ppr sty tyvar,
-		   ptext SLIT("with the type"), 
-		   ppr sty ty])
-
-unifyOccurCheck tyvar ty sty
-  = hang (ptext SLIT("Cannot construct the infinite type (occur check)"))
-	 4 (sep [ppr sty tyvar, char '=', ppr sty ty])
+unifyOccurCheck tyvar ty
+  = hang (ptext SLIT("Occurs check: cannot construct the infinite type:"))
+	 8 (sep [ppr tyvar, char '=', ppr ty])
 \end{code}
 

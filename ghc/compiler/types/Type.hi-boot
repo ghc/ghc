@@ -1,13 +1,8 @@
 _interface_ Type 1
-_usages_
-TyVar 1 :: TyVar 1;
-Usage 1 :: Uage 1;
 _exports_
-Type Type GenType splitFunTy splitSigmaTy splitRhoTy applyTy;
+Type Type GenType ;
 _declarations_
-1 type Type = GenType TyVar!TyVar Usage.UVar ;
-1 data GenType a b;
-1 splitFunTy _:_ _forall_ [a b] => GenType a b -> ([GenType a b], GenType a b) ;;
-1 splitSigmaTy _:_ _forall_ [a b] => GenType a b -> ([a],[(Class.Class,GenType a b)], GenType a b) ;;
-1 splitRhoTy   _:_ _forall_ [t u] => GenType t u -> ([(Class.Class,GenType t u)], GenType t u) ;;
-1 applyTy _:_ Type -> Type -> Type ;;
+
+1 type Type = GenType BasicTypes.Unused ;
+1 data GenType a ;
+

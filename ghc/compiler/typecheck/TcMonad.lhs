@@ -1,8 +1,6 @@
 \begin{code}
-#include "HsVersions.h"
-
 module TcMonad(
-	SYN_IE(TcM), SYN_IE(NF_TcM), TcDown, TcEnv, 
+	TcM, NF_TcM, TcDown, TcEnv, 
 	SST_R, FSST_R,
 
 	initTc,
@@ -12,12 +10,13 @@ module TcMonad(
 
 	uniqSMToTcM,
 
-	returnNF_Tc, thenNF_Tc, thenNF_Tc_, mapNF_Tc, fixNF_Tc, forkNF_Tc,
+	returnNF_Tc, thenNF_Tc, thenNF_Tc_, mapNF_Tc, 
+	fixNF_Tc, forkNF_Tc, foldrNF_Tc, foldlNF_Tc,
 
 	listNF_Tc, mapAndUnzipNF_Tc, mapBagNF_Tc,
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
-	failTc, warnTc, recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
+	failTc, failWithTc, addErrTc, warnTc, recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
 
 	tcGetEnv, tcSetEnv,
 	tcGetDefaultTys, tcSetDefaultTys,
@@ -27,35 +26,20 @@ module TcMonad(
 	tcAddErrCtxtM, tcSetErrCtxtM,
 	tcAddErrCtxt, tcSetErrCtxt,
 
-	tcNewMutVar, tcReadMutVar, tcWriteMutVar,
+	tcNewMutVar, tcReadMutVar, tcWriteMutVar, TcRef,
 
-	SYN_IE(TcError), SYN_IE(TcWarning),
-	mkTcErr, arityErr,
-
-	-- For closure
-	SYN_IE(MutableVar),
-#if __GLASGOW_HASKELL__ == 201
-	GHCbase.MutableArray
-#elif __GLASGOW_HASKELL__ == 201
-	GlaExts.MutableArray
-#else
-	_MutableArray
-#endif
+	TcError, TcWarning,
+	arityErr
   ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(TcMLoop) ( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
-#else
 import {-# SOURCE #-} TcEnv  ( TcEnv, initEnv )
 import {-# SOURCE #-} TcType ( TcMaybe, TcTyVarSet )
-#endif
 
-import Type		( SYN_IE(Type), GenType )
-import TyVar		( SYN_IE(TyVar), GenTyVar )
-import Usage		( SYN_IE(Usage), GenUsage )
-import ErrUtils		( SYN_IE(Error), SYN_IE(Message), SYN_IE(Warning) )
+import Type		( Type, GenType )
+import TyVar		( TyVar, GenTyVar )
+import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
 import CmdLineOpts      ( opt_PprStyle_All, opt_PprUserLength )
 
 import SST
@@ -66,11 +50,12 @@ import Maybes		( MaybeErr(..) )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
 import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply,
-			  SYN_IE(UniqSM), initUs )
+			  UniqSM, initUs )
 import Unique		( Unique )
 import Util
-import Pretty
-import Outputable	( PprStyle(..), Outputable(..) )
+import Outputable
+
+import GlaExts		( State#, RealWorld )
 
 
 infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenNF_Tc_` 
@@ -86,19 +71,12 @@ type TcM    s r =  TcDown s -> TcEnv s -> FSST s r ()
 \end{code}
 
 \begin{code}
-#if __GLASGOW_HASKELL__ >= 200
-# define REAL_WORLD RealWorld
-#else
-# define REAL_WORLD _RealWorld
-#endif
-
 -- With a builtin polymorphic type for runSST the type for
 -- initTc should use  TcM s r  instead of  TcM RealWorld r 
 
 initTc :: UniqSupply
-       -> TcM REAL_WORLD r
-       -> MaybeErr (r, Bag Warning)
-		   (Bag Error, Bag  Warning)
+       -> TcM RealWorld r
+       -> (Maybe r, Bag WarnMsg, Bag ErrMsg)
 
 initTc us do_this
   = runSST (
@@ -117,9 +95,7 @@ initTc us do_this
 	 returnFSST (Just res))
       					`thenSST` \ maybe_res ->
       readMutVarSST errs_var 		`thenSST` \ (warns,errs) ->
-      case (maybe_res, isEmptyBag errs) of
-        (Just res, True) -> returnSST (Succeeded (res, warns))
-	_ 		 -> returnSST (Failed (errs, warns))
+      returnSST (maybe_res, warns, errs)
     )
 
 thenNF_Tc :: NF_TcM s a
@@ -152,6 +128,16 @@ mapNF_Tc f []     = returnNF_Tc []
 mapNF_Tc f (x:xs) = f x			`thenNF_Tc` \ r ->
 		    mapNF_Tc f xs	`thenNF_Tc` \ rs ->
 		    returnNF_Tc (r:rs)
+
+foldrNF_Tc :: (a -> b -> NF_TcM s b) -> b -> [a] -> NF_TcM s b
+foldrNF_Tc k z []     = returnNF_Tc z
+foldrNF_Tc k z (x:xs) = foldrNF_Tc k z xs	`thenNF_Tc` \r ->
+		        k x r
+
+foldlNF_Tc :: (a -> b -> NF_TcM s a) -> a -> [b] -> NF_TcM s a
+foldlNF_Tc k z []     = returnNF_Tc z
+foldlNF_Tc k z (x:xs) = k z x		`thenNF_Tc` \r ->
+		        foldlNF_Tc k r xs
 
 listNF_Tc    :: [NF_TcM s a] -> NF_TcM s [a]
 listNF_Tc []     = returnNF_Tc []
@@ -271,35 +257,47 @@ forkNF_Tc m (TcDown deflts u_var src_loc err_cxt err_var) env
 Error handling
 ~~~~~~~~~~~~~~
 \begin{code}
-getErrsTc :: NF_TcM s (Bag Error, Bag  Warning)
+getErrsTc :: NF_TcM s (Bag ErrMsg, Bag  WarnMsg)
 getErrsTc down env
   = readMutVarSST errs_var 
   where
     errs_var = getTcErrs down
 
-failTc :: Message -> TcM s a
-failTc err_msg down env
+
+failTc :: TcM s a
+failTc down env
+  = failFSST ()
+
+failWithTc :: Message -> TcM s a		-- Add an error message and fail
+failWithTc err_msg
+  = addErrTc err_msg	`thenNF_Tc_`
+    failTc
+
+addErrTc :: Message -> NF_TcM s ()	-- Add an error message but don't fail
+addErrTc err_msg down env
   = readMutVarSST errs_var	`thenSST` \ (warns,errs) ->
     listNF_Tc ctxt down env	`thenSST` \ ctxt_msgs ->
     let
-	err = mkTcErr loc ctxt_msgs err_msg
+	err = addShortErrLocLine loc $
+	      hang err_msg 4 (vcat (ctxt_to_use ctxt_msgs))
     in
     writeMutVarSST errs_var (warns, errs `snocBag` err)	`thenSST_`
-    failFSST ()
+    returnSST ()
   where
     errs_var = getTcErrs down
     ctxt     = getErrCtxt down
     loc      = getLoc down
 
 warnTc :: Bool -> Message -> NF_TcM s ()
-warnTc warn_if_true warn down env
+warnTc warn_if_true warn_msg down env
   = if warn_if_true then
-	readMutVarSST errs_var					`thenSST` \ (warns,errs) ->
+	readMutVarSST errs_var	`thenSST` \ (warns,errs) ->
 	listNF_Tc ctxt down env	`thenSST` \ ctxt_msgs ->
 	let
-	    full_warn = mkTcErr loc ctxt_msgs warn
+	    warn = addShortWarnLocLine loc $
+	           hang warn_msg 4 (vcat (ctxt_to_use ctxt_msgs))
 	in
-	writeMutVarSST errs_var (warns `snocBag` full_warn, errs) 	`thenSST_`
+	writeMutVarSST errs_var (warns `snocBag` warn, errs) 	`thenSST_`
     	returnSST ()
     else
 	returnSST ()
@@ -329,26 +327,26 @@ checkNoErrsTc m down env
   = newMutVarSST (emptyBag,emptyBag)	`thenSST` \ m_errs_var ->
     let
 	errs_var = getTcErrs down
-	propagate_errs
+	propagate_errs _
 	 = readMutVarSST m_errs_var	`thenSST` \ (m_warns, m_errs) ->
 	   readMutVarSST errs_var	`thenSST` \ (warns, errs) ->
 	   writeMutVarSST errs_var (warns `unionBags` m_warns,
 				    errs  `unionBags` m_errs)	`thenSST_`
-	   returnSST m_errs
+	   failFSST()
     in
 					    
-    recoverFSST (\ _ -> propagate_errs	`thenSST_` failFSST ()) $
+    recoverFSST propagate_errs $
 
     m (setTcErrs down m_errs_var) env	`thenFSST` \ result ->
 
 	-- Check that m has no errors; if it has internal recovery
 	-- mechanisms it might "succeed" but having found a bunch of
 	-- errors along the way.
-    propagate_errs 			`thenSST` \ errs ->
-    if isEmptyBag errs then
+    readMutVarSST m_errs_var		`thenSST` \ (m_warns, m_errs) ->
+    if isEmptyBag m_errs then
 	returnFSST result
     else
-	failFSST ()
+	failFSST ()	-- This triggers the recoverFSST
 
 -- (tryTc r m) tries m; if it succeeds it returns it,
 -- otherwise it returns r.  Any error messages added by m are discarded,
@@ -371,14 +369,17 @@ tryTc recover m down env
 	recover down env
 
 -- Run the thing inside, but throw away all its error messages.
-discardErrsTc :: TcM s r -> TcM s r
+-- discardErrsTc :: TcM s r -> TcM s r
+-- discardErrsTc :: NF_TcM s r -> NF_TcM s r
+discardErrsTc :: (TcDown s -> TcEnv s -> State# s -> a)
+	      -> (TcDown s -> TcEnv s -> State# s -> a)
 discardErrsTc m down env
   = newMutVarSST (emptyBag,emptyBag)	`thenSST` \ new_errs_var ->
     m (setTcErrs down new_errs_var) env
 
 checkTc :: Bool -> Message -> TcM s ()		-- Check that the boolean is true
 checkTc True  err = returnTc ()
-checkTc False err = failTc err
+checkTc False err = failWithTc err
 
 checkTcM :: Bool -> TcM s () -> TcM s ()	-- Check that the boolean is true
 checkTcM True  err = returnTc ()
@@ -386,7 +387,7 @@ checkTcM False err = err
 
 checkMaybeTc :: Maybe val -> Message -> TcM s val
 checkMaybeTc (Just val) err = returnTc val
-checkMaybeTc Nothing    err = failTc err
+checkMaybeTc Nothing    err = failWithTc err
 
 checkMaybeTcM :: Maybe val -> TcM s val -> TcM s val
 checkMaybeTcM (Just val) err = returnTc val
@@ -396,13 +397,15 @@ checkMaybeTcM Nothing    err = err
 Mutable variables
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-tcNewMutVar :: a -> NF_TcM s (MutableVar s a)
+type TcRef s a = SSTRef s a
+
+tcNewMutVar :: a -> NF_TcM s (TcRef s a)
 tcNewMutVar val down env = newMutVarSST val
 
-tcWriteMutVar :: MutableVar s a -> a -> NF_TcM s ()
+tcWriteMutVar :: TcRef s a -> a -> NF_TcM s ()
 tcWriteMutVar var val down env = writeMutVarSST var val
 
-tcReadMutVar :: MutableVar s a -> NF_TcM s a
+tcReadMutVar :: TcRef s a -> NF_TcM s a
 tcReadMutVar var down env = readMutVarSST var
 \end{code}
 
@@ -415,7 +418,7 @@ tcGetEnv down env = returnSST env
 
 tcSetEnv :: TcEnv s
 	  -> (TcDown s -> TcEnv s -> State# s -> b)
-	  -> TcDown s -> TcEnv s -> State# s -> b
+	  ->  TcDown s -> TcEnv s -> State# s -> b
 -- tcSetEnv :: TcEnv s -> TcM s a -> TcM s a
 -- tcSetEnv :: TcEnv s -> NF_TcM s a -> NF_TcM s a
 
@@ -445,7 +448,11 @@ tcSetErrCtxtM, tcAddErrCtxtM :: NF_TcM s Message -> TcM s a -> TcM s a
 tcSetErrCtxtM msg m down env = m (setErrCtxt down msg) env
 tcAddErrCtxtM msg m down env = m (addErrCtxt down msg) env
 
-tcSetErrCtxt, tcAddErrCtxt :: Message -> TcM s a -> TcM s a
+tcSetErrCtxt, tcAddErrCtxt 
+	  :: Message
+	  -> (TcDown s -> TcEnv s -> State# s -> b)
+	  ->  TcDown s -> TcEnv s -> State# s -> b
+-- Usual thing
 tcSetErrCtxt msg m down env = m (setErrCtxt down (returnNF_Tc msg)) env
 tcAddErrCtxt msg m down env = m (addErrCtxt down (returnNF_Tc msg)) env
 \end{code}
@@ -499,12 +506,12 @@ data TcDown s
   = TcDown
 	[Type]				-- Types used for defaulting
 
-	(MutableVar s UniqSupply)	-- Unique supply
+	(TcRef s UniqSupply)	-- Unique supply
 
 	SrcLoc				-- Source location
 	(ErrCtxt s)			-- Error context
-	(MutableVar s (Bag Warning, 
-		       Bag Error))
+	(TcRef s (Bag WarnMsg, 
+		  Bag ErrMsg))
 
 type ErrCtxt s = [NF_TcM s Message]	-- Innermost first.  Monadic so that we have a chance
 					-- to deal with bound type variables just before error
@@ -540,28 +547,16 @@ TypeChecking Errors
 type TcError   = Message
 type TcWarning = Message
 
-mkTcErr :: SrcLoc 		-- Where
-	-> [Message] 		-- Context
-	-> Message 		-- What went wrong
-	-> TcError		-- The complete error report
+ctxt_to_use ctxt | opt_PprStyle_All = ctxt
+		 | otherwise	    = takeAtMost 3 ctxt
+		 where
+		   takeAtMost :: Int -> [a] -> [a]
+     		   takeAtMost 0 ls = []
+     		   takeAtMost n [] = []
+     		   takeAtMost n (x:xs) = x:takeAtMost (n-1) xs
 
-mkTcErr locn ctxt msg sty
-  = hang (hcat [ppr (PprForUser opt_PprUserLength) locn, ptext SLIT(": "), msg sty])
-    	 4 (vcat [msg sty | msg <- ctxt_to_use])
-    where
-     ctxt_to_use =
-       if opt_PprStyle_All then
-	  ctxt
-       else
-	  takeAtMost 4 ctxt
-
-     takeAtMost :: Int -> [a] -> [a]
-     takeAtMost 0 ls = []
-     takeAtMost n [] = []
-     takeAtMost n (x:xs) = x:takeAtMost (n-1) xs
-
-arityErr kind name n m sty
-  = hsep [ ppr sty name, ptext SLIT("should have"),
+arityErr kind name n m
+  = hsep [ ppr name, ptext SLIT("should have"),
 	   n_arguments <> comma, text "but has been given", int m, char '.']
     where
 	errmsg = kind ++ " has too " ++ quantity ++ " arguments"

@@ -4,29 +4,20 @@
 \section[IdUtils]{Constructing PrimOp Ids}
 
 \begin{code}
-#include "HsVersions.h"
-
 module IdUtils ( primOpName ) where
 
-IMP_Ubiq()
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(PrelLoop)		-- here for paranoia checking
-IMPORT_DELOOPER(IdLoop) (SpecEnv)
-#else
-import {-# SOURCE #-} SpecEnv ( SpecEnv )
-#endif
+#include "HsVersions.h"
 
 import CoreSyn
-import CoreUnfold	( UnfoldingGuidance(..), Unfolding )
-import Id		( mkPrimitiveId, mkTemplateLocals )
+import CoreUnfold	( UnfoldingGuidance(..), Unfolding, mkUnfolding )
+import Id		( mkPrimitiveId )
 import IdInfo		-- quite a few things
 import StdIdInfo
 import Name		( mkWiredInIdName, Name )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
 			  PrimOpInfo(..), PrimOpResultInfo(..), PrimOp )
 import PrelMods		( gHC__ )
-import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyVarTy, applyTyCon )
+import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyVarTy, mkTyConApp )
 import TysWiredIn	( boolTy )
 import Unique		( mkPrimOpIdUnique )
 import Util		( panic )
@@ -52,14 +43,14 @@ primOpName op
 	mk_prim_name op str
 	    tyvars
 	    arg_tys
-	    (mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon prim_tycon res_tys)))
+	    (mkForAllTys tyvars (mkFunTys arg_tys (mkTyConApp prim_tycon res_tys)))
 	    (length arg_tys) -- arity
 
       AlgResult str tyvars arg_tys tycon res_tys ->
 	mk_prim_name op str
 	    tyvars
 	    arg_tys
-	    (mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon tycon res_tys)))
+	    (mkForAllTys tyvars (mkFunTys arg_tys (mkTyConApp tycon res_tys)))
 	    (length arg_tys) -- arity
   where
     mk_prim_name prim_op occ_name tyvar_tmpls arg_tys ty arity

@@ -4,8 +4,6 @@
 \section[PatSyntax]{Abstract Haskell syntax---patterns}
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsPat (
 	InPat(..),
 	OutPat(..),
@@ -17,27 +15,20 @@ module HsPat (
 	collectPatBinders
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 -- friends:
--- IMPORT_DELOOPER(IdLoop)
 import HsBasic		( HsLit )
 import HsExpr		( HsExpr )
 import BasicTypes	( Fixity )
 
 -- others:
-import Id		( SYN_IE(Id), dataConTyCon, GenId )
+import Id		( Id, dataConTyCon, GenId )
 import Maybes		( maybeToBool )
-import Outputable	( PprStyle(..), userStyle, interppSP, 
-			  interpp'SP, ifPprShowAll, Outputable(..) 
-			)
-import Pretty
+import Outputable	
 import TyCon		( maybeTyConSingleCon )
 import PprType		( GenType )
-import CmdLineOpts      ( opt_PprUserLength )
-#if __GLASGOW_HASKELL__ >= 202
-import Name
-#endif
+import Name		( NamedThing )
 \end{code}
 
 Patterns come in distinct before- and after-typechecking flavo(u)rs.
@@ -71,46 +62,46 @@ data InPat name
   | RecPatIn	    name 		-- record
 		    [(name, InPat name, Bool)]	-- True <=> source used punning
 
-data OutPat tyvar uvar id
-  = WildPat	    (GenType tyvar uvar)	-- wild card
+data OutPat flexi id
+  = WildPat	    (GenType flexi)	-- wild card
 
   | VarPat	    id				-- variable (type is in the Id)
 
-  | LazyPat	    (OutPat tyvar uvar id)	-- lazy pattern
+  | LazyPat	    (OutPat flexi id)	-- lazy pattern
 
   | AsPat	    id				-- as pattern
-		    (OutPat tyvar uvar id)
+		    (OutPat flexi id)
 
   | ConPat	    Id				-- Constructor is always an Id
-		    (GenType tyvar uvar)    	-- the type of the pattern
-		    [OutPat tyvar uvar id]
+		    (GenType flexi)    	-- the type of the pattern
+		    [OutPat flexi id]
 
-  | ConOpPat	    (OutPat tyvar uvar id)	-- just a special case...
+  | ConOpPat	    (OutPat flexi id)	-- just a special case...
 		    Id
-		    (OutPat tyvar uvar id)
-		    (GenType tyvar uvar)
+		    (OutPat flexi id)
+		    (GenType flexi)
   | ListPat		 	    		-- syntactic list
-		    (GenType tyvar uvar)	-- the type of the elements
-   	    	    [OutPat tyvar uvar id]
+		    (GenType flexi)	-- the type of the elements
+   	    	    [OutPat flexi id]
 
-  | TuplePat	    [OutPat tyvar uvar id]	-- tuple
+  | TuplePat	    [OutPat flexi id]	-- tuple
 						-- UnitPat is TuplePat []
 
   | RecPat	    Id 				-- record constructor
-		    (GenType tyvar uvar)    	-- the type of the pattern
-		    [(Id, OutPat tyvar uvar id, Bool)]	-- True <=> source used punning
+		    (GenType flexi)    	-- the type of the pattern
+		    [(Id, OutPat flexi id, Bool)]	-- True <=> source used punning
 
   | LitPat	    -- Used for *non-overloaded* literal patterns:
 		    -- Int#, Char#, Int, Char, String, etc.
 		    HsLit
-		    (GenType tyvar uvar) 	-- type of pattern
+		    (GenType flexi) 	-- type of pattern
 
   | NPat	    -- Used for *overloaded* literal patterns
 		    HsLit			-- the literal is retained so that
 						-- the desugarer can readily identify
 						-- equations with identical literal-patterns
-		    (GenType tyvar uvar) 	-- type of pattern, t
-   	    	    (HsExpr tyvar uvar id (OutPat tyvar uvar id))
+		    (GenType flexi) 	-- type of pattern, t
+   	    	    (HsExpr flexi id (OutPat flexi id))
 						-- of type t -> Bool; detects match
 
   | NPlusKPat	    id
@@ -118,9 +109,9 @@ data OutPat tyvar uvar id
 						-- (This could be an Integer, but then
 						-- it's harder to partitionEqnsByLit
 						-- in the desugarer.)
-		    (GenType tyvar uvar)    	-- Type of pattern, t
-   	    	    (HsExpr tyvar uvar id (OutPat tyvar uvar id)) 	-- Of type t -> Bool; detects match
-   	    	    (HsExpr tyvar uvar id (OutPat tyvar uvar id)) 	-- Of type t -> t; subtracts k
+		    (GenType flexi)    	-- Type of pattern, t
+   	    	    (HsExpr flexi id (OutPat flexi id)) 	-- Of type t -> Bool; detects match
+   	    	    (HsExpr flexi id (OutPat flexi id)) 	-- Of type t -> t; subtracts k
 
   | DictPat	    -- Used when destructing Dictionaries with an explicit case
 		    [id]			-- superclass dicts
@@ -136,101 +127,95 @@ JJQC-2-12-97
 instance (Outputable name) => Outputable (InPat name) where
     ppr = pprInPat
 
-pprInPat :: (Outputable name) => PprStyle -> InPat name -> Doc
+pprInPat :: (Outputable name) => InPat name -> SDoc
 
-pprInPat sty (WildPatIn)	= char '_'
-pprInPat sty (VarPatIn var)	= ppr sty var
-pprInPat sty (LitPatIn s)	= ppr sty s
-pprInPat sty (LazyPatIn pat)	= (<>) (char '~') (ppr sty pat)
-pprInPat sty (AsPatIn name pat)
-    = parens (hcat [ppr sty name, char '@', ppr sty pat])
+pprInPat (WildPatIn)	    = char '_'
+pprInPat (VarPatIn var)	    = ppr var
+pprInPat (LitPatIn s)	    = ppr s
+pprInPat (LazyPatIn pat)    = char '~' <> ppr pat
+pprInPat (AsPatIn name pat) = parens (hcat [ppr name, char '@', ppr pat])
 
-pprInPat sty (ConPatIn c pats)
- = if null pats then
-      ppr sty c
-   else
-      hsep [ppr sty c, interppSP sty pats] -- ParPats put in the parens
+pprInPat (ConPatIn c pats)
+  | null pats = ppr c
+  | otherwise = hsep [ppr c, interppSP pats] -- ParPats put in the parens
 
-pprInPat sty (ConOpPatIn pat1 op fixity pat2)
- = hsep [ppr sty pat1, ppr sty op, ppr sty pat2] -- ParPats put in parens
+pprInPat (ConOpPatIn pat1 op fixity pat2)
+ = hsep [ppr pat1, ppr op, ppr pat2] -- ParPats put in parens
 
 	-- ToDo: use pprSym to print op (but this involves fiddling various
 	-- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
 
-pprInPat sty (NegPatIn pat)
+pprInPat (NegPatIn pat)
   = let
-	pp_pat = pprInPat sty pat
+	pp_pat = pprInPat pat
     in
-    (<>) (char '-') (
+    char '-' <> (
     case pat of
       LitPatIn _ -> pp_pat
       _          -> parens pp_pat
     )
 
-pprInPat sty (ParPatIn pat)
-  = parens (pprInPat sty pat)
+pprInPat (ParPatIn pat)
+  = parens (pprInPat pat)
 
-pprInPat sty (ListPatIn pats)
-  = brackets (interpp'SP sty pats)
-pprInPat sty (TuplePatIn pats)
-  = parens (interpp'SP sty pats)
-pprInPat sty (NPlusKPatIn n k)
-  = parens (hcat [ppr sty n, char '+', ppr sty k])
+pprInPat (ListPatIn pats)
+  = brackets (interpp'SP pats)
+pprInPat (TuplePatIn pats)
+  = parens (interpp'SP pats)
+pprInPat (NPlusKPatIn n k)
+  = parens (hcat [ppr n, char '+', ppr k])
 
-pprInPat sty (RecPatIn con rpats)
-  = hsep [ppr sty con, braces (hsep (punctuate comma (map (pp_rpat sty) rpats)))]
+pprInPat (RecPatIn con rpats)
+  = hsep [ppr con, braces (hsep (punctuate comma (map (pp_rpat) rpats)))]
   where
-    pp_rpat sty (v, _, True) | userStyle sty = ppr (PprForUser opt_PprUserLength) v
-    pp_rpat sty (v, p, _)    		     = hsep [ppr sty v, char '=', ppr sty p]
+    pp_rpat (v, _, True) = ppr v
+    pp_rpat (v, p, _)    = hsep [ppr v, char '=', ppr p]
 \end{code}
 
 \begin{code}
-instance (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar, Outputable id)
-       => Outputable (OutPat tyvar uvar id) where
+instance (Outputable id) => Outputable (OutPat flexi id) where
     ppr = pprOutPat
 \end{code}
 
 \begin{code}
-pprOutPat sty (WildPat ty)	= char '_'
-pprOutPat sty (VarPat var)	= ppr sty var
-pprOutPat sty (LazyPat pat)	= hcat [char '~', ppr sty pat]
-pprOutPat sty (AsPat name pat)
-  = parens (hcat [ppr sty name, char '@', ppr sty pat])
+pprOutPat (WildPat ty)	= char '_'
+pprOutPat (VarPat var)	= ppr var
+pprOutPat (LazyPat pat)	= hcat [char '~', ppr pat]
+pprOutPat (AsPat name pat)
+  = parens (hcat [ppr name, char '@', ppr pat])
 
-pprOutPat sty (ConPat name ty [])
-  = (<>) (ppr sty name)
-	(ifPprShowAll sty (pprConPatTy sty ty))
+pprOutPat (ConPat name ty [])
+  = ppr name
 
-pprOutPat sty (ConPat name ty pats)
-  = hcat [parens (hcat [ppr sty name, space, interppSP sty pats]),
-	       ifPprShowAll sty (pprConPatTy sty ty) ]
+pprOutPat (ConPat name ty pats)
+  = hcat [parens (hcat [ppr name, space, interppSP pats])]
 
-pprOutPat sty (ConOpPat pat1 op pat2 ty)
-  = parens (hcat [ppr sty pat1, space, ppr sty op, space, ppr sty pat2])
+pprOutPat (ConOpPat pat1 op pat2 ty)
+  = parens (hcat [ppr pat1, space, ppr op, space, ppr pat2])
 
-pprOutPat sty (ListPat ty pats)
-  = brackets (interpp'SP sty pats)
-pprOutPat sty (TuplePat pats)
-  = parens (interpp'SP sty pats)
+pprOutPat (ListPat ty pats)
+  = brackets (interpp'SP pats)
+pprOutPat (TuplePat pats)
+  = parens (interpp'SP pats)
 
-pprOutPat sty (RecPat con ty rpats)
-  = hcat [ppr sty con, braces (hsep (punctuate comma (map (pp_rpat sty) rpats)))]
+pprOutPat (RecPat con ty rpats)
+  = hcat [ppr con, braces (hsep (punctuate comma (map (pp_rpat) rpats)))]
   where
-    pp_rpat sty (v, _, True) | userStyle sty = ppr (PprForUser opt_PprUserLength) v
-    pp_rpat sty (v, p, _)           	     = hsep [ppr sty v, char '=', ppr sty p]
+    pp_rpat (v, _, True) = ppr v
+    pp_rpat (v, p, _)    = hsep [ppr v, char '=', ppr p]
 
-pprOutPat sty (LitPat l ty) 	= ppr sty l	-- ToDo: print more
-pprOutPat sty (NPat   l ty e)	= ppr sty l	-- ToDo: print more
-pprOutPat sty (NPlusKPat n k ty e1 e2)		-- ToDo: print more
-  = parens (hcat [ppr sty n, char '+', ppr sty k])
+pprOutPat (LitPat l ty) 	= ppr l	-- ToDo: print more
+pprOutPat (NPat   l ty e)	= ppr l	-- ToDo: print more
+pprOutPat (NPlusKPat n k ty e1 e2)		-- ToDo: print more
+  = parens (hcat [ppr n, char '+', ppr k])
 
-pprOutPat sty (DictPat dicts methods)
+pprOutPat (DictPat dicts methods)
  = parens (sep [ptext SLIT("{-dict-}"),
-		  brackets (interpp'SP sty dicts),
-		  brackets (interpp'SP sty methods)])
+		  brackets (interpp'SP dicts),
+		  brackets (interpp'SP methods)])
 
-pprConPatTy sty ty
- = parens (ppr sty ty)
+pprConPatTy ty
+ = parens (ppr ty)
 \end{code}
 
 %************************************************************************
@@ -262,7 +247,7 @@ patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 \begin{code}
-irrefutablePats :: [OutPat a b c] -> Bool
+irrefutablePats :: [OutPat a b] -> Bool
 irrefutablePats pat_list = all irrefutablePat pat_list
 
 irrefutablePat (AsPat	_ pat)	= irrefutablePat pat
@@ -272,7 +257,7 @@ irrefutablePat (LazyPat	_)	= True
 irrefutablePat (DictPat ds ms)	= (length ds + length ms) <= 1
 irrefutablePat other		= False
 
-failureFreePat :: OutPat a b c -> Bool
+failureFreePat :: OutPat a b -> Bool
 
 failureFreePat (WildPat _) 		  = True
 failureFreePat (VarPat _)  		  = True
@@ -290,7 +275,7 @@ only_con con = maybeToBool (maybeTyConSingleCon (dataConTyCon con))
 \end{code}
 
 \begin{code}
-patsAreAllCons :: [OutPat a b c] -> Bool
+patsAreAllCons :: [OutPat a b] -> Bool
 patsAreAllCons pat_list = all isConPat pat_list
 
 isConPat (AsPat _ pat)		= isConPat pat
@@ -302,7 +287,7 @@ isConPat (RecPat _ _ _)		= True
 isConPat (DictPat ds ms)	= (length ds + length ms) > 1
 isConPat other			= False
 
-patsAreAllLits :: [OutPat a b c] -> Bool
+patsAreAllLits :: [OutPat a b] -> Bool
 patsAreAllLits pat_list = all isLitPat pat_list
 
 isLitPat (AsPat _ pat)	       = isLitPat pat

@@ -4,11 +4,9 @@
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SpecUtils (
 	specialiseCallTys,
-	SYN_IE(ConstraintVector),
+	ConstraintVector,
 	getIdOverloading,
 	isUnboxedSpecialisation,
 
@@ -20,41 +18,63 @@ module SpecUtils (
 	pprSpecErrs
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CmdLineOpts	( opt_SpecialiseOverloaded, opt_SpecialiseUnboxed,
 			  opt_SpecialiseAll, opt_PprUserLength
 			)
 import Bag		( isEmptyBag, bagToList, Bag )
-import Class		( GenClass{-instance NamedThing-}, SYN_IE(Class) )
+import Class		( Class )
 import FiniteMap	( emptyFM, addListToFM_C, plusFM_C, keysFM,
 			  lookupWithDefaultFM
 			)
 import Id		( idType, isDictFunId, 
-			  isDefaultMethodId_maybe, mkSameSpecCon,
-			  GenId {-instance NamedThing -}, SYN_IE(Id)
+			  isDefaultMethodId_maybe, 
+			  Id
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
 import Name		( OccName, pprOccName, modAndOcc, NamedThing(..) )
-import Outputable	( PprStyle(..), Outputable(..) )
+import Outputable
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
-			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar
+			  TyCon
 			)
-import Pretty		-- plenty of it
-import TyCon		( tyConTyVars, TyCon{-instance NamedThing-} )
-import Type		( splitSigmaTy, mkTyVarTy, mkForAllTys,
-			  getTyVar_maybe, isUnboxedType, SYN_IE(Type)
+import TyCon		( tyConTyVars )
+import Type		( mkSigmaTy, instantiateTauTy, instantiateThetaTy,
+			  splitSigmaTy, mkTyVarTy, mkForAllTys,
+			  getTyVar_maybe, isUnboxedType, Type
 			)
-import TyVar		( GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
-import Unique		( Unique{-instance Eq-} )
-import Util		( equivClasses, zipWithEqual, cmpPString,
+import TyVar		( TyVar, mkTyVarEnv )
+import Util		( equivClasses, zipWithEqual,
 			  assertPanic, panic{-ToDo:rm-}
 			)
 
 
 cmpType = panic "SpecUtils.cmpType (ToDo: get rid of)"
 getInstIdModule = panic "SpecUtils.getInstIdModule (ToDo)"
+mkSameSpecCon = panic "SpecUtils.mkSameSpecCon (ToDo)"
 \end{code}
+
+
+\begin{code}
+specialiseTy :: Type		-- The type of the Id of which the SpecId 
+				-- is a specialised version
+	     -> [Maybe Type]	-- The types at which it is specialised
+	     -> Int		-- Number of leading dictionary args to ignore
+	     -> Type
+
+specialiseTy main_ty maybe_tys dicts_to_ignore
+  = mkSigmaTy remaining_tyvars 
+	      (instantiateThetaTy inst_env remaining_theta)
+	      (instantiateTauTy   inst_env tau)
+  where
+    (tyvars, theta, tau) = splitSigmaTy main_ty	-- A prefix of, but usually all, 
+						-- the theta is discarded!
+    remaining_theta      = drop dicts_to_ignore theta
+    tyvars_and_maybe_tys = tyvars `zip` maybe_tys
+    remaining_tyvars     = [tyvar      | (tyvar, Nothing) <- tyvars_and_maybe_tys]
+    inst_env             = mkTyVarEnv [(tyvar,ty) | (tyvar, Just ty) <- tyvars_and_maybe_tys]
+\end{code}
+
 
 @specialiseCallTys@ works out which type args don't need to be specialised on,
 based on flags, the overloading constraint vector, and the types.
@@ -102,6 +122,11 @@ gained by specialising wrt them.
 \begin{code}
 getIdOverloading :: Id
 		 -> ([TyVar], [(Class,TyVar)])
+getIdOverloading = panic "getIdOverloading"
+
+-- Looks suspicious to me; and I'm not sure what corresponds to
+-- (Class,TyVar) pairs in the multi-param type class world.
+{-
 getIdOverloading id
   = (tyvars, tyvar_part_of theta)
   where
@@ -111,6 +136,7 @@ getIdOverloading id
     tyvar_part_of ((c,ty):theta) = case (getTyVar_maybe ty) of
 				     Nothing -> []
 				     Just tv -> (c, tv) : tyvar_part_of theta
+-}
 \end{code}
 
 \begin{code}
@@ -157,20 +183,20 @@ with a list of specialising types. An error message is returned if not.
 \begin{code}
 argTysMatchSpecTys_error :: [Maybe Type]
 			 -> [Type]
-			 -> Maybe Doc
+			 -> Maybe SDoc
 argTysMatchSpecTys_error spec_tys arg_tys
   = if match spec_tys arg_tys
     then Nothing
     else Just (sep [ptext SLIT("Spec and Arg Types Inconsistent:"),
-		      ptext SLIT("spectys="), sep [pprMaybeTy PprDebug ty | ty <- spec_tys],
-		      ptext SLIT("argtys="), sep [pprParendGenType PprDebug ty | ty <- arg_tys]])
+		      ptext SLIT("spectys="), sep [pprMaybeTy ty | ty <- spec_tys],
+		      ptext SLIT("argtys="), sep [pprParendGenType ty | ty <- arg_tys]])
   where
     match (Nothing:spec_tys) (arg:arg_tys)
       = not (isUnboxedType arg) &&
 	match spec_tys arg_tys
     match (Just spec:spec_tys) (arg:arg_tys)
       = case (cmpType True{-properly-} spec arg) of
-	  EQ_   -> match spec_tys arg_tys
+	  EQ   -> match spec_tys arg_tys
 	  other -> False
     match [] [] = True
     match _  _  = False
@@ -184,7 +210,7 @@ pprSpecErrs :: FAST_STRING			-- module name
 	    -> (Bag (Id,[Maybe Type]))	-- errors
 	    -> (Bag (Id,[Maybe Type]))	-- warnings
 	    -> (Bag (TyCon,[Maybe Type]))	-- errors
-	    -> Doc
+	    -> SDoc
 
 pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
   | not any_errs && not any_warn
@@ -237,26 +263,26 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 	(mod_name, ty_name) = modAndOcc ty
 
     module_names    = concat [keysFM idspecs_fm, keysFM tyspecs_fm]
-    mods            = map head (equivClasses _CMP_STRING_ module_names)
+    mods            = map head (equivClasses compare module_names)
 
     (unks, known)   = if null mods
 		      then ([], [])
-		      else case _CMP_STRING_ (head mods) _NIL_ of
-			    EQ_   -> ([_NIL_], tail mods)
+		      else case head mods `compare` _NIL_ of
+			    EQ   -> ([_NIL_], tail mods)
 			    other -> ([], mods)
 
     use_modules     = unks ++ known
 
-    pp_module_specs :: FAST_STRING -> Doc
+    pp_module_specs :: FAST_STRING -> SDoc
     pp_module_specs mod
       | mod == _NIL_
       = ASSERT (null mod_tyspecs)
-	vcat (map (pp_idspec ty_sty (ptext SLIT("UNKNOWN:"))) mod_idspecs)
+	vcat (map (pp_idspec (ptext SLIT("UNKNOWN:"))) mod_idspecs)
 
       | have_specs
       = vcat [
-	    vcat (map (pp_tyspec ty_sty (pp_module mod)) mod_tyspecs),
-	    vcat (map (pp_idspec ty_sty (pp_module mod)) mod_idspecs)
+	    vcat (map (pp_tyspec (pp_module mod)) mod_tyspecs),
+	    vcat (map (pp_idspec (pp_module mod)) mod_idspecs)
 	    ]
 
       | otherwise
@@ -266,17 +292,16 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 	mod_tyspecs = lookupWithDefaultFM tyspecs_fm [] mod
 	mod_idspecs = lookupWithDefaultFM idspecs_fm [] mod
 	have_specs  = not (null mod_tyspecs && null mod_idspecs)
-	ty_sty = PprInterface
 
 pp_module mod
   = hcat [ptext mod, char ':']
 
-pp_tyspec :: PprStyle -> Doc -> (OccName, TyCon, [Maybe Type]) -> Doc
+pp_tyspec :: SDoc -> (OccName, TyCon, [Maybe Type]) -> SDoc
 
-pp_tyspec sty pp_mod (_, tycon, tys)
+pp_tyspec pp_mod (_, tycon, tys)
   = hsep [pp_mod,
 	   text "{-# SPECIALIZE data",
-	   ppr (PprForUser opt_PprUserLength) tycon, hsep (map (pprParendGenType sty) spec_tys),
+	   ppr tycon, hsep (map pprParendGenType spec_tys),
 	   text "-} {- Essential -}"
 	   ]
   where
@@ -287,16 +312,16 @@ pp_tyspec sty pp_mod (_, tycon, tys)
     choose_ty (tv, Nothing) = (mkTyVarTy tv, Just tv)
     choose_ty (tv, Just ty) = (ty, Nothing)
 
-pp_idspec :: PprStyle -> Doc -> (OccName, Id, [Maybe Type], Bool) -> Doc
+pp_idspec :: SDoc -> (OccName, Id, [Maybe Type], Bool) -> SDoc
 pp_idspec = error "pp_idspec"
 
 {-	LATER
 
-pp_idspec sty pp_mod (_, id, tys, is_err)
+pp_idspec pp_mod (_, id, tys, is_err)
   | isDictFunId id
   = hsep [pp_mod,
 	   text "{-# SPECIALIZE instance",
-	   pprGenType sty spec_ty,
+	   pprGenType spec_ty,
 	   text "#-}", pp_essential ]
 
   | is_const_method_id
@@ -305,10 +330,10 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
     in
     hsep [pp_mod,
 	   text "{-# SPECIALIZE",
-	   ppr sty clsop, text "::",
-	   pprGenType sty spec_ty,
+	   ppr clsop, text "::",
+	   pprGenType spec_ty,
 	   text "#-} {- IN instance",
-	   pprOccName sty (getOccName cls), pprParendGenType sty clsty,
+	   pprOccName (getOccName cls), pprParendGenType clsty,
 	   text "-}", pp_essential ]
 
   | is_default_method_id
@@ -317,17 +342,17 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
     in
     hsep [pp_mod,
 	   text "{- instance",
-	   pprOccName sty (getOccName cls),
+	   pprOccName (getOccName cls),
 	   ptext SLIT("EXPLICIT METHOD REQUIRED"),
-	   ppr sty clsop, text "::",
-	   pprGenType sty spec_ty,
+	   ppr clsop, text "::",
+	   pprGenType spec_ty,
 	   text "-}", pp_essential ]
 
   | otherwise
   = hsep [pp_mod,
 	   text "{-# SPECIALIZE",
-	   ppr (PprForUser opt_PprUserLength) id, ptext SLIT("::"),
-	   pprGenType sty spec_ty,
+	   ppr id, ptext SLIT("::"),
+	   pprGenType spec_ty,
 	   text "#-}", pp_essential ]
   where
     spec_ty = specialiseTy (idType id) tys 100   -- HACK to drop all dicts!!!

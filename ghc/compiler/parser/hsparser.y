@@ -230,7 +230,7 @@ BOOLEAN inpat;
 		constrs constr1 fields 
 		types atypes batypes
 		types_and_maybe_ids
-  		pats context context_list /* tyvar_list */
+  		pats simple_context simple_context_list 
 		export_list enames
   		import_list inames
  		impdecls maybeimpdecls impdecl
@@ -270,10 +270,9 @@ BOOLEAN inpat;
 
 %type <upbinding> valrhs1 altrest
 
-%type <uttype>    simple ctype sigtype sigarrowtype type atype bigatype btype
-		  gtyconvars 
+%type <uttype>    ctype sigtype sigarrowtype type atype bigatype btype
 		  bbtype batype bxtype wierd_atype
-		  class tyvar contype
+		  simple_con_app simple_con_app1 tyvar contype inst_type
 
 %type <uconstr>	  constr constr_after_context field
 
@@ -284,7 +283,7 @@ BOOLEAN inpat;
 
 %type <uentid>	  export import
 
-%type <ulong>     commas importkey
+%type <ulong>     commas importkey get_line_no
 
 /**********************************************************************
 *                                                                     *
@@ -451,8 +450,8 @@ fix	:  INFIXL INTEGER	{ Precedence = checkfixity($2); Fixity = INFIXL; }
 	   ops  		{ $$ = $3; }
 	;
 
-ops	:  op		 { $$ = lsing(mkfixop(mknoqual($1),infixint(Fixity),Precedence)); }
-	|  ops COMMA op  { $$ = lapp($1,mkfixop(mknoqual($3),infixint(Fixity),Precedence)); }
+ops	:  op		 { $$ = lsing(mkfixop(mknoqual($1),infixint(Fixity),Precedence,startlineno)); }
+	|  ops COMMA op  { $$ = lapp($1,mkfixop(mknoqual($3),infixint(Fixity),Precedence,startlineno)); }
 	;
 
 topdecls:  topdecl
@@ -484,19 +483,19 @@ topdecl	:  typed				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  decl 				{ $$ = $1; }
 	;
 
-typed	:  typekey simple EQUAL type		{ $$ = mknbind($2,$4,startlineno); }
+typed	:  typekey simple_con_app EQUAL type		{ $$ = mknbind($2,$4,startlineno); }
 	;
 
 
-datad	:  datakey simple EQUAL constrs deriving
+datad	:  datakey simple_con_app EQUAL constrs deriving
 		{ $$ = mktbind(Lnil,$2,$4,$5,startlineno); }
-	|  datakey context DARROW simple EQUAL constrs deriving
+	|  datakey simple_context DARROW simple_con_app EQUAL constrs deriving
 		{ $$ = mktbind($2,$4,$6,$7,startlineno); }
 	;
 
-newtd	:  newtypekey simple EQUAL constr1 deriving
+newtd	:  newtypekey simple_con_app EQUAL constr1 deriving
 		{ $$ = mkntbind(Lnil,$2,$4,$5,startlineno); }
-	|  newtypekey context DARROW simple EQUAL constr1 deriving
+	|  newtypekey simple_context DARROW simple_con_app EQUAL constr1 deriving
 		{ $$ = mkntbind($2,$4,$6,$7,startlineno); }
 	;
 
@@ -504,9 +503,9 @@ deriving: /* empty */				{ $$ = mknothing(); }
         | DERIVING dtyclses                     { $$ = mkjust($2); }
 	;
 
-classd	:  classkey context DARROW class cbody
+classd	:  classkey simple_context DARROW simple_con_app1 cbody
 		{ $$ = mkcbind($2,$4,$5,startlineno); }
-	|  classkey class cbody		 	
+	|  classkey simple_con_app1 cbody		 	
 		{ $$ = mkcbind(Lnil,$2,$3,startlineno); }
 	;
 
@@ -515,38 +514,21 @@ cbody	:  /* empty */				{ $$ = mknullbind(); }
 	|  WHERE vocurly decls vccurly		{ checkorder($3); $$ = $3; }
 	;
 
-instd	:  instkey context DARROW gtycon atype rinst
-		{ $$ = mkibind($2,$4,$5,$6,startlineno); }
-	|  instkey gtycon atype rinst
-	 	{ $$ = mkibind(Lnil,$2,$3,$4,startlineno); }
+instd	:  instkey inst_type rinst		{ $$ = mkibind($2,$3,startlineno); }
 	;
+
+/* Compare ctype */
+inst_type : type DARROW type			{ is_context_format( $3, 0 );   /* Check the instance head */
+						  $$ = mkcontext(type2context($1),$3); }
+	  | type				{ is_context_format( $1, 0 );   /* Check the instance head */
+						  $$ = $1; }
+	  ;
+
 
 rinst	:  /* empty */			  			{ $$ = mknullbind(); }
 	|  WHERE ocurly  instdefs ccurly  			{ $$ = $3; }
 	|  WHERE vocurly instdefs vccurly 			{ $$ = $3; }
 	;
-
-/*	I now allow a general type in instance declarations, relying
-	on the type checker to reject instance decls which are ill-formed.
-	Some (non-standard) extensions of Haskell may allow more general
-	types than the Report syntax permits, and in any case not all things
-	can be checked in the syntax (eg repeated type variables).
-		SLPJ Jan 97
-
-restrict_inst : gtycon				{ $$ = mktname($1); }
-	|  OPAREN gtyconvars CPAREN		{ $$ = $2; }
-	|  OPAREN tyvar COMMA tyvar_list CPAREN	{ $$ = mkttuple(mklcons($2,$4)); }
-	|  OBRACK tyvar CBRACK			{ $$ = mktllist($2); }
-	|  OPAREN tyvar RARROW tyvar CPAREN	{ $$ = mktfun($2,$4); }
-	;
-
-general_inst : gtycon				{ $$ = mktname($1); }
-	|  OPAREN gtyconapp1 CPAREN		{ $$ = $2; }
-	|  OPAREN type COMMA types CPAREN	{ $$ = mkttuple(mklcons($2,$4)); }
-	|  OBRACK type CBRACK			{ $$ = mktllist($2); }
-	|  OPAREN btype RARROW type CPAREN	{ $$ = mktfun($2,$4); }
-	;
-*/
 
 defaultd:  defaultkey OPAREN types CPAREN       { $$ = mkdbind($3,startlineno); }
 	|  defaultkey OPAREN CPAREN		{ $$ = mkdbind(Lnil,startlineno); }
@@ -721,23 +703,22 @@ commas	: COMMA					{ $$ = 1; }
 *                                                                     *
 **********************************************************************/
 
-simple	:  gtycon				{ $$ = mktname($1); }
-	|  gtyconvars	  			{ $$ = $1; }
+/* C a b c, where a,b,c are type variables */
+/* C can be a class or tycon */
+simple_con_app: gtycon                          { $$ = mktname($1); }
+        |  simple_con_app1                      { $$ = $1; }
+	;
+   
+simple_con_app1:  gtycon tyvar			{ $$ = mktapp(mktname($1),$2); }
+	|  simple_con_app tyvar			{ $$ = mktapp($1, $2); } 
 	;
 
-gtyconvars: gtycon tyvar			{ $$ = mktapp(mktname($1),$2); }
-	|  gtyconvars tyvar			{ $$ = mktapp($1,$2); }
+simple_context	:  OPAREN simple_context_list CPAREN		{ $$ = $2; }
+	|  simple_con_app1					{ $$ = lsing($1); }
 	;
 
-context	:  OPAREN context_list CPAREN		{ $$ = $2; }
-	|  class				{ $$ = lsing($1); }
-	;
-
-context_list:  class				{ $$ = lsing($1); }
-	|  context_list COMMA class	 	{ $$ = lapp($1,$3); }
-	;
-
-class	:  gtycon tyvar 			{ $$ = mktapp(mktname($1),$2); }
+simple_context_list:  simple_con_app1				{ $$ = lsing($1); }
+	|  simple_context_list COMMA simple_con_app1		{ $$ = lapp($1,$3); }
 	;
 
 constrs	:  constr				{ $$ = lsing($1); }
@@ -873,6 +854,7 @@ instdef :
 
 
 valdef	:  vallhs
+
 		{
 		  tree fn = function($1);
 		  PREVPATT = $1;
@@ -897,21 +879,26 @@ valdef	:  vallhs
 #else
 		    fprintf(stderr,"%u\tvaldef\n",startlineno);
 #endif
-		}
+		}	
+
+	   get_line_no
 	   valrhs
 	  	{
 		  if ( lhs_is_patt($1) )
 		    {
-		      $$ = mkpbind($3, startlineno);
+		      $$ = mkpbind($4, $3);
 		      FN = NULL;
 		      SAMEFN = 0;
 		    }
 		  else
-		    $$ = mkfbind($3,startlineno);
+		    $$ = mkfbind($4, $3);
 
 		  PREVPATT = NULL;
 		}
 	;
+
+get_line_no : 					{ $$ = startlineno }
+	    ;
 
 vallhs  : patk					{ $$ = $1; }
 	| patk qvarop pat			{ $$ = mkinfixap($2,$1,$3); }
@@ -1047,7 +1034,12 @@ kexpLno	:  LAMBDA
 	/* SCC Expression */
 	|  SCC STRING exp
 		{ if (ignoreSCC) {
-		    $$ = $3;
+		    $$ = mkpar($3);	/* Note the mkpar().  If we don't have it, then
+					   (x >> _scc_ y >> z) parses as (x >> (y >> z)),
+					   right associated.  But the precedence reorganiser expects
+					   the parser to *left* associate all operators unless there
+					   are explicit parens.  The _scc_ acts like an explicit paren,
+					   so if we omit it we'd better add explicit parens instead. */
 		  } else {
 		    $$ = mkscc($2, $3);
 		  }

@@ -4,8 +4,6 @@
 \section[CoreUtils]{Utility functions on @Core@ syntax}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CoreUtils (
 	coreExprType, coreAltsType, coreExprCc,
 
@@ -20,7 +18,7 @@ module CoreUtils (
 	, squashableDictishCcExpr
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 import CoreSyn
 
@@ -29,37 +27,33 @@ import Id		( idType, mkSysLocal, isBottomingId,
 			  toplevelishId, mkIdWithNewUniq, applyTypeEnvToId,
 			  dataConRepType,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
-			  isNullIdEnv, SYN_IE(IdEnv),
-			  GenId{-instances-}, SYN_IE(Id)
+			  isNullIdEnv, IdEnv, Id
 			)
 import Literal		( literalType, isNoRepLit, Literal(..) )
 import Maybes		( catMaybes, maybeToBool )
 import PprCore
-import Outputable	( PprStyle(..), Outputable(..) )
-import PprType		( GenType{-instances-}, GenTyVar )
-import Pretty		( Doc, vcat )
 import PrimOp		( primOpType, PrimOp(..) )
 import SrcLoc		( noSrcLoc )
 import TyVar		( cloneTyVar,
-			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv),
-			  SYN_IE(TyVar), GenTyVar
+			  isEmptyTyVarEnv, addToTyVarEnv, TyVarEnv,
+			  TyVar, GenTyVar
 			)
-import Type		( mkFunTy, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
-			  getFunTyExpandingDicts_maybe, applyTy, isPrimType,
-			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy,
-			  SYN_IE(Type)
+import Type		( mkFunTy, mkForAllTy, mkTyVarTy,
+			  splitFunTy_maybe, applyTy, isUnpointedType,
+			  splitSigmaTy, splitFunTys, instantiateTy,
+			  Type
 			)
 import TysWiredIn	( trueDataCon, falseDataCon )
 import Unique		( Unique )
+import BasicTypes	( Unused )
 import UniqSupply	( initUs, returnUs, thenUs,
 			  mapUs, mapAndUnzipUs, getUnique,
-			  SYN_IE(UniqSM), UniqSupply
+			  UniqSM, UniqSupply
 			)
-import Usage		( SYN_IE(UVar) )
-import Util		( zipEqual, panic, pprTrace, pprPanic, assertPanic )
+import Util		( zipEqual )
+import Outputable
 
 type TypeEnv = TyVarEnv Type
-applyUsage = panic "CoreUtils.applyUsage:ToDo"
 \end{code}
 
 %************************************************************************
@@ -84,9 +78,9 @@ coreExprType (Coerce _ ty _)	= ty -- that's the whole point!
 -- a Prim is <ditto> of a PrimOp
 
 coreExprType (Con con args) = 
---			      pprTrace "appTyArgs" (hsep [ppr PprDebug con, semi, 
---						 	   ppr PprDebug con_ty, semi,
---							   ppr PprDebug args]) $
+--			      pprTrace "appTyArgs" (hsep [ppr con, semi, 
+--						 	   ppr con_ty, semi,
+--							   ppr args]) $
     			      applyTypeToArgs con_ty args
 			    where
 				con_ty = dataConRepType con
@@ -99,30 +93,23 @@ coreExprType (Lam (ValBinder binder) expr)
 coreExprType (Lam (TyBinder tyvar) expr)
   = mkForAllTy tyvar (coreExprType expr)
 
-coreExprType (Lam (UsageBinder uvar) expr)
-  = mkForAllUsageTy uvar (panic "coreExprType:Lam UsageBinder") (coreExprType expr)
-
 coreExprType (App expr (TyArg ty))
   = 
---  pprTrace "appTy1" (hsep [ppr PprDebug fun_ty, space, ppr PprDebug ty]) $
+--  pprTrace "appTy1" (hsep [ppr fun_ty, space, ppr ty]) $
     applyTy fun_ty ty
   where
     fun_ty = coreExprType expr
-
-coreExprType (App expr (UsageArg use))
-  = applyUsage (coreExprType expr) use
 
 coreExprType (App expr val_arg)
   = ASSERT(isValArg val_arg)
     let
 	fun_ty = coreExprType expr
     in
-    case (getFunTyExpandingDicts_maybe False{-no peeking-} fun_ty) of
+    case (splitFunTy_maybe fun_ty) of
 	  Just (_, result_ty) -> result_ty
 #ifdef DEBUG
 	  Nothing -> pprPanic "coreExprType:\n"
-		(vcat [ppr PprDebug fun_ty,
-			   ppr PprShowAll (App expr val_arg)])
+	  		(vcat [ppr fun_ty,  ppr (App expr val_arg)])
 #endif
 \end{code}
 
@@ -143,8 +130,7 @@ default_ty (BindDefault _ rhs) = coreExprType rhs
 applyTypeToArgs op_ty args	    = foldl applyTypeToArg op_ty args
 
 applyTypeToArg op_ty (TyArg ty)     = applyTy op_ty ty
-applyTypeToArg op_ty (UsageArg _)   = panic "applyTypeToArg: UsageArg"
-applyTypeToArg op_ty val_or_lit_arg = case (getFunTyExpandingDicts_maybe False{-no peeking-} op_ty) of
+applyTypeToArg op_ty val_or_lit_arg = case (splitFunTy_maybe op_ty) of
 					Just (_, res_ty) -> res_ty
 \end{code}
 
@@ -152,7 +138,7 @@ coreExprCc gets the cost centre enclosing an expression, if any.
 It looks inside lambdas because (scc "foo" \x.e) = \x.scc "foo" e
 
 \begin{code}
-coreExprCc :: GenCoreExpr val_bdr val_occ tyvar uvar -> CostCentre
+coreExprCc :: GenCoreExpr val_bdr val_occ flexi -> CostCentre
 coreExprCc (SCC cc e) = cc
 coreExprCc (Lam _ e)  = coreExprCc e
 coreExprCc other      = noCostCentre
@@ -223,7 +209,7 @@ co_thing thing arg_exprs
 
 \begin{code}
 argToExpr ::
-  GenCoreArg val_occ tyvar uvar -> GenCoreExpr val_bdr val_occ tyvar uvar
+  GenCoreArg val_occ flexi -> GenCoreExpr val_bdr val_occ flexi
 
 argToExpr (VarArg v)   = Var v
 argToExpr (LitArg lit) = Lit lit
@@ -234,15 +220,15 @@ transformation on them; ie. the function @(\ x -> (x,False))@
 annotates all binders with False.
 
 \begin{code}
-unTagBinders :: GenCoreExpr (Id,tag) bdee tv uv -> GenCoreExpr Id bdee tv uv
+unTagBinders :: GenCoreExpr (Id,tag) bdee flexi -> GenCoreExpr Id bdee flexi
 unTagBinders expr = bop_expr fst expr
 
-unTagBindersAlts :: GenCoreCaseAlts (Id,tag) bdee tv uv -> GenCoreCaseAlts Id bdee tv uv
+unTagBindersAlts :: GenCoreCaseAlts (Id,tag) bdee flexi -> GenCoreCaseAlts Id bdee flexi
 unTagBindersAlts alts = bop_alts fst alts
 \end{code}
 
 \begin{code}
-bop_expr  :: (a -> b) -> GenCoreExpr a bdee tv uv -> GenCoreExpr b bdee tv uv
+bop_expr  :: (a -> b) -> GenCoreExpr a bdee flexi -> GenCoreExpr b bdee flexi
 
 bop_expr f (Var b)	     = Var b
 bop_expr f (Lit lit)	     = Lit lit
@@ -257,7 +243,6 @@ bop_expr f (Case expr alts)  = Case (bop_expr f expr) (bop_alts f alts)
 
 bop_binder f (ValBinder   v) = ValBinder (f v)
 bop_binder f (TyBinder    t) = TyBinder    t
-bop_binder f (UsageBinder u) = UsageBinder u
 
 bop_bind f (NonRec b e)	= NonRec (f b) (bop_expr f e)
 bop_bind f (Rec pairs)	= Rec [(f b, bop_expr f e) | (b, e) <- pairs]
@@ -305,7 +290,7 @@ Example:
 Notice that the \tr{<alts>} don't get duplicated.
 
 \begin{code}
-nonErrorRHSs :: GenCoreCaseAlts a Id TyVar UVar -> [GenCoreExpr a Id TyVar UVar]
+nonErrorRHSs :: GenCoreCaseAlts a Id Unused -> [GenCoreExpr a Id Unused]
 
 nonErrorRHSs alts
   = filter not_error_app (find_rhss alts)
@@ -365,30 +350,30 @@ That is, we discard en+1 .. em
 
 \begin{code}
 maybeErrorApp
-	:: GenCoreExpr a Id TyVar UVar	-- Expr to look at
+	:: GenCoreExpr a Id Unused	-- Expr to look at
 	-> Maybe Type			-- Just ty => a result type *already cloned*;
 					-- Nothing => don't know result ty; we
 					-- *pretend* that the result ty won't be
 					-- primitive -- somebody later must
 					-- ensure this.
-	-> Maybe (GenCoreExpr b Id TyVar UVar)
+	-> Maybe (GenCoreExpr b Id Unused)
 
 maybeErrorApp expr result_ty_maybe
   = case (collectArgs expr) of
-      (Var fun, [{-no usage???-}], [ty], other_args)
+      (Var fun, [ty], other_args)
 	| isBottomingId fun
 	&& maybeToBool result_ty_maybe -- we *know* the result type
 				       -- (otherwise: live a fairy-tale existence...)
-	&& not (isPrimType result_ty) ->
+	&& not (isUnpointedType result_ty) ->
 
 	case (splitSigmaTy (idType fun)) of
 	  ([tyvar], [], tau_ty) ->
-	      case (splitFunTy tau_ty) of { (arg_tys, res_ty) ->
+	      case (splitFunTys tau_ty) of { (arg_tys, res_ty) ->
 	      let
 		  n_args_to_keep = length arg_tys
 		  args_to_keep   = take n_args_to_keep other_args
 	      in
-	      if  (res_ty `eqTy` mkTyVarTy tyvar)
+	      if  (res_ty == mkTyVarTy tyvar)
 	       && n_args_to_keep <= length other_args
 	      then
 		    -- Phew!  We're in business
@@ -404,7 +389,7 @@ maybeErrorApp expr result_ty_maybe
 \end{code}
 
 \begin{code}
-squashableDictishCcExpr :: CostCentre -> GenCoreExpr a b c d -> Bool
+squashableDictishCcExpr :: CostCentre -> GenCoreExpr a b c -> Bool
 
 squashableDictishCcExpr cc expr
   = if not (isDictCC cc) then
@@ -439,13 +424,13 @@ substCoreExpr	:: ValEnv
 
 substCoreBindings venv tenv binds
   -- if the envs are empty, then avoid doing anything
-  = if (isNullIdEnv venv && isNullTyVarEnv tenv) then
+  = if (isNullIdEnv venv && isEmptyTyVarEnv tenv) then
        returnUs binds
     else
        do_CoreBindings venv tenv binds
 
 substCoreExpr venv tenv expr
-  = if (isNullIdEnv venv && isNullTyVarEnv tenv) then
+  = if (isNullIdEnv venv && isEmptyTyVarEnv tenv) then
        returnUs expr
     else
        do_CoreExpr venv tenv expr
@@ -514,7 +499,7 @@ do_CoreArg venv tenv a@(VarArg v)
     )
 
 do_CoreArg venv tenv (TyArg ty)
-  = returnUs (AnArg (TyArg (applyTypeEnvToTy tenv ty)))
+  = returnUs (AnArg (TyArg (instantiateTy tenv ty)))
 
 do_CoreArg venv tenv other_arg = returnUs (AnArg other_arg)
 \end{code}
@@ -546,8 +531,8 @@ do_CoreExpr venv tenv (Prim op as)
   where
     do_PrimOp (CCallOp label is_asm may_gc arg_tys result_ty)
       = let
-	    new_arg_tys   = map (applyTypeEnvToTy tenv) arg_tys
-	    new_result_ty = applyTypeEnvToTy tenv result_ty
+	    new_arg_tys   = map (instantiateTy tenv) arg_tys
+	    new_result_ty = instantiateTy tenv result_ty
 	in
 	returnUs (CCallOp label is_asm may_gc new_arg_tys new_result_ty)
 
@@ -562,12 +547,10 @@ do_CoreExpr venv tenv (Lam (ValBinder binder) expr)
 do_CoreExpr venv tenv (Lam (TyBinder tyvar) expr)
   = dup_tyvar tyvar	   `thenUs` \ (new_tyvar, (old, new)) ->
     let
-	new_tenv = addOneToTyVarEnv tenv old new
+	new_tenv = addToTyVarEnv tenv old new
     in
     do_CoreExpr venv new_tenv expr  `thenUs` \ new_expr ->
     returnUs (Lam (TyBinder new_tyvar) new_expr)
-
-do_CoreExpr venv tenv (Lam _ expr) = panic "CoreUtils.do_CoreExpr:Lam UsageBinder"
 
 do_CoreExpr venv tenv (App expr arg)
   = do_CoreExpr venv tenv expr	`thenUs` \ new_expr ->
@@ -620,7 +603,7 @@ do_CoreExpr venv tenv (SCC label expr)
 
 do_CoreExpr venv tenv (Coerce c ty expr)
   = do_CoreExpr venv tenv expr	    	`thenUs` \ new_expr ->
-    returnUs (Coerce c (applyTypeEnvToTy tenv ty) new_expr)
+    returnUs (Coerce c (instantiateTy tenv ty) new_expr)
 \end{code}
 
 \begin{code}

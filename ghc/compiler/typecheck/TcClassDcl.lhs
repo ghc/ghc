@@ -4,50 +4,45 @@
 \section[TcClassDcl]{Typechecking class declarations}
 
 \begin{code}
+module TcClassDcl ( tcClassDecl1, tcClassDecls2, tcMethodBind, badMethodErr ) where
+
 #include "HsVersions.h"
 
-module TcClassDcl ( tcClassDecl1, tcClassDecls2, 
-		    badMethodErr, tcMethodBind
-		  ) where
-
-IMP_Ubiq()
-
-import HsSyn		( HsDecl(..), ClassDecl(..), HsBinds(..), MonoBinds(..),
-			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..), 
-			  DefaultDecl, TyDecl, InstDecl, IfaceSig, Fixity,
-			  HsLit(..), OutPat(..), Sig(..), HsType(..), HsTyVar, InPat(..),
-			  SYN_IE(RecFlag), nonRecursive, andMonoBinds, collectMonoBinders,
-			  Stmt, DoOrListComp, ArithSeqInfo, Fake )
-import HsTypes		( getTyVarName )
-import HsPragmas	( ClassPragmas(..) )
-import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
-			  RenamedClassOpSig(..), SYN_IE(RenamedMonoBinds),
-			  RenamedGenPragmas(..), RenamedContext(..), SYN_IE(RenamedHsDecl)
+import HsSyn		( HsDecl(..), ClassDecl(..), Sig(..), MonoBinds(..),
+			  InPat(..),
+			  andMonoBinds, collectMonoBinders,
+			  getTyVarName
 			)
-import TcHsSyn		( SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(TcExpr),
+import HsPragmas	( ClassPragmas(..) )
+import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
+import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
+			  RenamedClassOpSig(..), RenamedMonoBinds,
+			  RenamedGenPragmas(..), RenamedContext(..), RenamedHsDecl
+			)
+import TcHsSyn		( TcHsBinds, TcMonoBinds, TcExpr,
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, tcIdType )
 
-import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
-import TcEnv		( tcLookupClass, tcLookupTyVar, newLocalIds, tcAddImportedIdInfo,
+import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, newDicts, newMethod )
+import TcEnv		( TcIdOcc(..), newLocalIds, tcAddImportedIdInfo,
+			  tcLookupClass, tcLookupTyVar, 
 			  tcExtendGlobalTyVars )
-import TcBinds		( tcBindWithSigs, TcSigInfo(..) )
-import TcKind		( unifyKind, TcKind )
+import TcBinds		( tcBindWithSigs, checkSigTyVars, sigCtxt, sigThetaCtxt, TcSigInfo(..) )
+import TcKind		( unifyKinds, TcKind )
 import TcMonad
 import TcMonoType	( tcHsType, tcContext )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( TcIdOcc(..), SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcInstSigTyVars, 
-			  tcInstSigType, tcInstSigTcType )
+import TcType		( TcType, TcTyVar, TcTyVarSet, tcInstSigTyVars, 
+			  zonkSigTyVar, tcInstSigTcType
+			)
 import PragmaInfo	( PragmaInfo(..) )
 
 import Bag		( bagToList, unionManyBags )
-import Class		( GenClass, mkClass, classBigSig, 
-			  classDefaultMethodId,
-			  SYN_IE(Class)
-			)
-import CmdLineOpts      ( opt_PprUserLength )
-import Id		( GenId, mkSuperDictSelId, mkMethodSelId, 
-			  mkDefaultMethodId, getIdUnfolding,
-			  idType, SYN_IE(Id)
+import Class		( mkClass, classBigSig, Class )
+import CmdLineOpts      ( opt_PprUserLength, opt_GlasgowExts )
+import Id		( Id, StrictnessMark(..),
+			  mkSuperDictSelId, mkMethodSelId, 
+			  mkDefaultMethodId, getIdUnfolding, mkDataCon, 
+			  idType
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
@@ -55,15 +50,14 @@ import Name		( Name, isLocallyDefined, moduleString, getSrcLoc,
 			  OccName, nameOccName,
 			  nameString, NamedThing(..) )
 import Outputable
-import Pretty
-import PprType		( GenClass, GenType, GenTyVar )
-import SpecEnv		( SpecEnv )
 import SrcLoc		( mkGeneratedSrcLoc )
 import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy, splitRhoTy,
-			  mkForAllTy, mkSigmaTy, splitSigmaTy, SYN_IE(Type)
+			  mkForAllTy, mkSigmaTy, splitSigmaTy, mkForAllTys, Type, ThetaType
 			)
 import TysWiredIn	( stringTy )
-import TyVar		( unitTyVarSet, GenTyVar, SYN_IE(TyVar) )
+import TyVar		( unitTyVarSet, tyVarSetToList, mkTyVarSet, tyVarKind, TyVar )
+import TyCon		( mkDataTyCon )
+import Kind		( mkBoxedTypeKind, mkArrowKind )
 import Unique		( Unique, Uniquable(..) )
 import Util
 import Maybes		( assocMaybe, maybeToBool )
@@ -113,107 +107,112 @@ Death to "ExpandingDicts".
 \begin{code}
 tcClassDecl1 rec_env rec_inst_mapper
       	     (ClassDecl context class_name
-			tyvar_name class_sigs def_methods pragmas src_loc)
+			tyvar_names class_sigs def_methods pragmas 
+			tycon_name datacon_name src_loc)
   = tcAddSrcLoc src_loc	$
     tcAddErrCtxt (classDeclCtxt class_name) $
 
+        -- CHECK ARITY 1 FOR HASKELL 1.4
+    checkTc (opt_GlasgowExts || length tyvar_names == 1)
+	    (classArityErr class_name)		`thenTc_`
+
 	-- LOOK THINGS UP IN THE ENVIRONMENT
-    tcLookupClass class_name			`thenTc` \ (class_kind, rec_class) ->
-    tcLookupTyVar (getTyVarName tyvar_name)	`thenNF_Tc` \ (tyvar_kind, rec_tyvar) ->
-    let
-	rec_class_inst_env = rec_inst_mapper rec_class
-    in
+    tcLookupClass class_name			`thenTc` \ (class_kinds, rec_class) ->
+    mapAndUnzipNF_Tc (tcLookupTyVar . getTyVarName) tyvar_names
+						`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
 
 	-- FORCE THE CLASS AND ITS TYVAR TO HAVE SAME KIND
-    unifyKind class_kind tyvar_kind	`thenTc_`
+    unifyKinds class_kinds tyvar_kinds	`thenTc_`
 
 	-- CHECK THE CONTEXT
-    tcClassContext rec_class rec_tyvar context pragmas	
-				`thenTc` \ (scs, sc_sel_ids) ->
+    tcClassContext rec_class rec_tyvars context pragmas	
+						`thenTc` \ (sc_theta, sc_tys, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig rec_env rec_class rec_tyvar) class_sigs
-				`thenTc` \ sig_stuff ->
+    mapTc (tcClassSig rec_env rec_class rec_tyvars) class_sigs
+						`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS OBJECT ITSELF
     let
-	(op_sel_ids, defm_ids) = unzip sig_stuff
-	clas = mkClass (uniqueOf class_name) (getName class_name) rec_tyvar
-		       scs sc_sel_ids op_sel_ids defm_ids
+	(op_tys, op_sel_ids, defm_ids) = unzip3 sig_stuff
+	rec_class_inst_env = rec_inst_mapper rec_class
+	clas = mkClass (getName class_name) rec_tyvars
+		       sc_theta sc_sel_ids op_sel_ids defm_ids
+		       tycon
 		       rec_class_inst_env
+
+	dict_component_tys = sc_tys ++ op_tys
+ 	new_or_data = case dict_component_tys of
+			[_]   -> NewType
+			other -> DataType
+
+        dict_con_id = mkDataCon datacon_name
+			   [NotMarkedStrict | _ <- dict_component_tys]
+			   [{- No labelled fields -}]
+		      	   rec_tyvars
+		      	   [{-No context-}]
+			   [{-No existential tyvars-}] [{-Or context-}]
+			   dict_component_tys
+		      	   tycon
+
+	tycon = mkDataTyCon tycon_name
+			    (foldr (mkArrowKind . tyVarKind) mkBoxedTypeKind rec_tyvars)
+			    rec_tyvars
+			    []			-- No context
+			    [dict_con_id]	-- Constructors
+			    []			-- No derivings
+			    (Just clas)		-- Yes!  It's a dictionary 
+			    new_or_data
+			    NonRecursive
     in
     returnTc clas
 \end{code}
 
 
-    let
-	clas_ty = mkTyVarTy clas_tyvar
-	dict_component_tys = classDictArgTys clas_ty
- 	new_or_data = case dict_component_tys of
-			[_]   -> NewType
-			other -> DataType
-
-        dict_con_id = mkDataCon class_name
-			   [NotMarkedStrict]
-			   [{- No labelled fields -}]
-		      	   [clas_tyvar]
-		      	   [{-No context-}]
-			   dict_component_tys
-		      	   tycon
-
-	tycon = mkDataTyCon class_name
-			    (tyVarKind rec_tyvar `mkArrowKind` mkBoxedTypeKind)
-			    [rec_tyvar]
-			    [{- Empty context -}]
-			    [dict_con_id]
-			    [{- No derived classes -}]
-			    new_or_data
-    in
-
-
 \begin{code}
-tcClassContext :: Class -> TyVar
+tcClassContext :: Class -> [TyVar]
 	       -> RenamedContext 	-- class context
 	       -> RenamedClassPragmas	-- pragmas for superclasses  
-	       -> TcM s ([Class],	-- the superclasses
-			 [Id])  	-- superclass selector Ids
+	       -> TcM s (ThetaType,	-- the superclass context
+			 [Type],	-- types of the superclass dictionaries
+		         [Id])  	-- superclass selector Ids
 
-tcClassContext rec_class rec_tyvar context pragmas
+tcClassContext rec_class rec_tyvars context pragmas
   = 	-- Check the context.
 	-- The renamer has already checked that the context mentions
 	-- only the type variable of the class decl.
-    tcContext context			`thenTc` \ theta ->
+    tcContext context			`thenTc` \ sc_theta ->
     let
-      super_classes = [ supers | (supers, _) <- theta ]
+       sc_tys = [mkDictTy sc tys | (sc,tys) <- sc_theta]
     in
 
 	-- Make super-class selector ids
-    mapTc (mk_super_id rec_class) super_classes	`thenTc` \ sc_sel_ids ->
+    mapTc mk_super_id sc_theta		`thenTc` \ sc_sel_ids ->
 
 	-- Done
-    returnTc (super_classes, sc_sel_ids)
+    returnTc (sc_theta, sc_tys, sc_sel_ids)
 
   where
-    rec_tyvar_ty = mkTyVarTy rec_tyvar
+    rec_tyvar_tys = mkTyVarTys rec_tyvars
 
-    mk_super_id rec_class super_class
+    mk_super_id (super_class, tys)
         = tcGetUnique			`thenNF_Tc` \ uniq ->
 	  let
-		ty = mkForAllTy rec_tyvar $
-		     mkFunTy (mkDictTy rec_class   rec_tyvar_ty)
-			     (mkDictTy super_class rec_tyvar_ty)
+		ty = mkForAllTys rec_tyvars $
+		     mkFunTy (mkDictTy rec_class rec_tyvar_tys) (mkDictTy super_class tys)
 	  in
 	  returnTc (mkSuperDictSelId uniq rec_class super_class ty)
 
 
 tcClassSig :: TcEnv s			-- Knot tying only!
 	   -> Class	    		-- ...ditto...
-	   -> TyVar		 	-- The class type variable, used for error check only
+	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> RenamedClassOpSig
-	   -> TcM s (Id,		-- selector id
+	   -> TcM s (Type,		-- Type of the method
+		     Id,		-- selector id
 		     Maybe Id)		-- default-method ids
 
-tcClassSig rec_env rec_clas rec_clas_tyvar
+tcClassSig rec_env rec_clas rec_clas_tyvars
 	   (ClassOpSig op_name maybe_dm_name
 		       op_ty
 		       src_loc)
@@ -226,8 +225,8 @@ tcClassSig rec_env rec_clas rec_clas_tyvar
     -- and that it is not constrained by theta
     tcHsType op_ty				`thenTc` \ local_ty ->
     let
-	global_ty   = mkSigmaTy [rec_clas_tyvar] 
-			        [(rec_clas, mkTyVarTy rec_clas_tyvar)]
+	global_ty   = mkSigmaTy rec_clas_tyvars 
+			        [(rec_clas, mkTyVarTys rec_clas_tyvars)]
 			        local_ty
     in
 
@@ -241,7 +240,7 @@ tcClassSig rec_env rec_clas rec_clas_tyvar
 					   in
 					   Just (tcAddImportedIdInfo rec_env dm_id)
     in
-    returnTc (sel_id, maybe_dm_id)
+    returnTc (local_ty, sel_id, maybe_dm_id)
 \end{code}
 
 
@@ -289,7 +288,7 @@ tcClassDecl2 :: RenamedClassDecl	-- The class declaration
 	     -> NF_TcM s (LIE s, TcMonoBinds s)
 
 tcClassDecl2 (ClassDecl context class_name
-			tyvar_name class_sigs default_binds pragmas src_loc)
+			tyvar_names class_sigs default_binds pragmas _ _ src_loc)
 
   | not (isLocallyDefined class_name)
   = returnNF_Tc (emptyLIE, EmptyMonoBinds)
@@ -301,7 +300,7 @@ tcClassDecl2 (ClassDecl context class_name
 	-- Get the relevant class
     tcLookupClass class_name		`thenTc` \ (_, clas) ->
     let
-	(tyvar, scs, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
+	(tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
 
 	-- The selector binds are already in the selector Id's unfoldings
 	sel_binds = [ CoreMonoBind (RealId sel_id) (getUnfoldingTemplate (getIdUnfolding sel_id))
@@ -399,22 +398,20 @@ tcDefaultMethodBinds
 
 tcDefaultMethodBinds clas default_binds
   = 	-- Construct suitable signatures
-    tcInstSigTyVars [tyvar]		`thenNF_Tc` \ ([clas_tyvar], [inst_ty], inst_env) ->
+    tcInstSigTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, inst_env) ->
 
 	-- Typecheck the default bindings
     let
-	clas_tyvar_set = unitTyVarSet clas_tyvar
-
 	tc_dm meth_bind
 	  | not (maybeToBool maybe_stuff)
 	  =	-- Binding for something that isn't in the class signature
-	    failTc (badMethodErr bndr_name clas)
+	    failWithTc (badMethodErr bndr_name clas)
 
 	  | otherwise
 	  =	-- Normal case
-	    tcMethodBind clas origin inst_ty sel_id meth_bind
+	    tcMethodBind clas origin inst_tys clas_tyvars sel_id meth_bind
 						`thenTc` \ (bind, insts, (_, local_dm_id)) ->
-	    returnTc (bind, insts, ([clas_tyvar], RealId dm_id, local_dm_id))
+	    returnTc (bind, insts, (clas_tyvars, RealId dm_id, local_dm_id))
 	  where
 	    bndr_name  = case meth_bind of
 				FunMonoBind name _ _ _		-> name
@@ -428,23 +425,25 @@ tcDefaultMethodBinds clas default_binds
 		 -- We're looking at a default-method binding, so the dm_id
 		 -- is sure to be there!  Hence the inner "Just".
     in	   
-    tcExtendGlobalTyVars clas_tyvar_set (
-	mapAndUnzip3Tc tc_dm (flatten default_binds [])
-    )						`thenTc` \ (defm_binds, insts_needed, abs_bind_stuff) ->
+    mapAndUnzip3Tc tc_dm 
+	(flatten default_binds [])		`thenTc` \ (defm_binds, insts_needed, abs_bind_stuff) ->
 
 	-- Check the context
-    newDicts origin [(clas,inst_ty)]		`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
+    newDicts origin [(clas,inst_tys)]		`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
     let
-	avail_insts   = this_dict
+	avail_insts = this_dict
     in
-    tcSimplifyAndCheck
-	clas_tyvar_set
+    tcAddErrCtxt (classDeclCtxt clas) $
+    tcAddErrCtxtM (sigThetaCtxt avail_insts) $
+    mapNF_Tc zonkSigTyVar clas_tyvars		`thenNF_Tc` \ clas_tyvars' ->
+    tcSimplifyAndCheck (text "classDecl")
+	(mkTyVarSet clas_tyvars')
 	avail_insts
 	(unionManyBags insts_needed)		`thenTc` \ (const_lie, dict_binds) ->
 
     let
 	full_binds = AbsBinds
-		 	[clas_tyvar]
+		 	clas_tyvars'
 			[this_dict_id]
 			abs_bind_stuff
 			(dict_binds `AndMonoBinds` andMonoBinds defm_binds)
@@ -452,7 +451,7 @@ tcDefaultMethodBinds clas default_binds
     returnTc (const_lie, full_binds)
 
   where
-    (tyvar, scs, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
+    (tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
     origin = ClassDeclOrigin
 
     flatten EmptyMonoBinds rest	      = rest
@@ -469,24 +468,38 @@ tyvar sets.
 tcMethodBind 
 	:: Class
 	-> InstOrigin s
-	-> TcType s					-- Instance type
+	-> [TcType s]					-- Instance types
+	-> [TcTyVar s]					-- Free variables of those instance types
+							--  they'll be signature tyvars, and we
+							--  want to check that they don't bound
 	-> Id						-- The method selector
 	-> RenamedMonoBinds				-- Method binding (just one)
 	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
 
-tcMethodBind clas origin inst_ty sel_id meth_bind
+tcMethodBind clas origin inst_tys inst_tyvars sel_id meth_bind
  = tcAddSrcLoc src_loc	 		        $
-   newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId local_meth_id) ->
+   newMethod origin (RealId sel_id) inst_tys	`thenNF_Tc` \ meth@(_, TcId local_meth_id) ->
    tcInstSigTcType (idType local_meth_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
    let
 	(theta', tau')  = splitRhoTy rho_ty'
 	sig_info        = TySigInfo bndr_name local_meth_id tyvars' theta' tau' src_loc
    in
-   tcBindWithSigs [bndr_name] meth_bind [sig_info]
-		  nonRecursive (\_ -> NoPragmaInfo)	`thenTc` \ (binds, insts, _) ->
+   tcExtendGlobalTyVars inst_tyvars (
+     tcAddErrCtxt (methodCtxt sel_id)		$
+     tcBindWithSigs NotTopLevel [bndr_name] meth_bind [sig_info]
+		    NonRecursive (\_ -> NoPragmaInfo)	
+   )							`thenTc` \ (binds, insts, _) ->
+
+	-- Now check that the instance type variables
+	-- (or, in the case of a class decl, the class tyvars)
+	-- have not been unified with anything in the environment
+   tcAddErrCtxt (monoCtxt sel_id) (
+     tcAddErrCtxt (sigCtxt sel_id) $
+     checkSigTyVars inst_tyvars (idType local_meth_id)
+   )							`thenTc_` 
 
    returnTc (binds, insts, meth)
-  where
+ where
    (bndr_name, src_loc) = case meth_bind of
 				FunMonoBind name _ _ loc	  -> (name, loc)
 				PatMonoBind (VarPatIn name) _ loc -> (name, loc)
@@ -495,9 +508,21 @@ tcMethodBind clas origin inst_ty sel_id meth_bind
 Contexts and errors
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-badMethodErr bndr clas sty
-  = hsep [ptext SLIT("Class"), ppr sty clas, ptext SLIT("does not have a method"), ppr sty bndr]
+classArityErr class_name
+  = ptext SLIT("Too many parameters for class") <+> quotes (ppr class_name)
 
-classDeclCtxt class_name sty
-  = hsep [ptext SLIT("In the class declaration for"), ppr sty class_name]
+classDeclCtxt class_name
+  = ptext SLIT("In the class declaration for") <+> quotes (ppr class_name)
+
+methodCtxt sel_id
+  = ptext SLIT("In the definition for method") <+> quotes (ppr sel_id)
+
+monoCtxt sel_id
+  = sep [ptext SLIT("Probable cause: the right hand side of") <+> quotes (ppr sel_id),
+         nest 4 (ptext SLIT("mentions a top-level variable subject to the dreaded monomorphism restriction"))
+    ]
+
+badMethodErr bndr clas
+  = hsep [ptext SLIT("Class"), quotes (ppr clas), 
+	  ptext SLIT("does not have a method"), quotes (ppr bndr)]
 \end{code}

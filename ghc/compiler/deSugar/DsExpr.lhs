@@ -4,25 +4,22 @@
 \section[DsExpr]{Matching expressions (Exprs)}
 
 \begin{code}
-#include "HsVersions.h"
-
 module DsExpr ( dsExpr ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)		-- partly to get dsBinds, partly to chk dsExpr
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} DsBinds (dsBinds )
-#endif
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
 			  Stmt(..), DoOrListComp(..), Match(..), HsBinds, HsType, Fixity,
 			  GRHSsAndBinds
 			)
-import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
-			  SYN_IE(TypecheckedRecordBinds), SYN_IE(TypecheckedPat),
-			  SYN_IE(TypecheckedStmt)
+import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
+			  TypecheckedRecordBinds, TypecheckedPat,
+			  TypecheckedStmt,
+			  maybeBoxedPrimType
+
 			)
 import CoreSyn
 
@@ -32,7 +29,7 @@ import DsHsSyn		( outPatType )
 import DsListComp	( dsListComp )
 import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtomGivenTy, mkTupleExpr,
 			  mkErrorAppDs, showForErr, EquationInfo,
-			  MatchResult, SYN_IE(DsCoreArg)
+			  MatchResult, DsCoreArg
 			)
 import Match		( matchWrapper )
 
@@ -41,29 +38,27 @@ import CoreUtils	( coreExprType, substCoreExpr, argToExpr,
 import CostCentre	( mkUserCC )
 import FieldLabel	( fieldLabelType, FieldLabel )
 import Id		( idType, nullIdEnv, addOneToIdEnv,
-			  dataConArgTys, dataConFieldLabels,
-			  recordSelectorFieldLabel, SYN_IE(Id)
+			  dataConTyCon, dataConArgTys, dataConFieldLabels,
+			  recordSelectorFieldLabel, Id
 			)
 import Literal		( mkMachInt, Literal(..) )
 import Name		( Name{--O only-} )
-import Outputable	( PprStyle(..), Outputable(..) )
-import PprType		( GenType )
 import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, voidId )
-import Pretty		( Doc, hcat, ptext, text )
-import Type		( splitSigmaTy, splitFunTy, typePrimRep, 
-			  getAppDataTyConExpandingDicts, maybeAppTyCon, getAppTyCon, applyTy,
-			  maybeBoxedPrimType, splitAppTy, SYN_IE(Type)
+import TyCon		( isNewTyCon )
+import Type		( splitSigmaTy, splitFunTys, typePrimRep, mkTyConApp,
+			  splitAlgTyConApp, splitTyConApp_maybe, applyTy,
+			  splitAppTy, Type
 			)
 import TysPrim		( voidTy )
 import TysWiredIn	( mkTupleTy, tupleCon, nilDataCon, consDataCon, listTyCon, mkListTy,
 			  charDataCon, charTy
 			)
-import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
-import Usage		( SYN_IE(UVar) )
+import TyVar		( addToTyVarEnv, GenTyVar{-instance Eq-} )
 import Maybes		( maybeToBool )
-import Util		( zipEqual, pprError, panic, assertPanic )
+import Util		( zipEqual )
+import Outputable
 
-mk_nil_con ty = mkCon nilDataCon [] [ty] []  -- micro utility...
+mk_nil_con ty = mkCon nilDataCon [ty] []  -- micro utility...
 \end{code}
 
 The funny business to do with variables is that we look them up in the
@@ -110,7 +105,7 @@ dsExpr (HsLitOut (HsString s) _)
 
   | _LENGTH_ s == 1
   = let
-	the_char = mkCon charDataCon [] [] [LitArg (MachChar (_HEAD_ s))]
+	the_char = mkCon charDataCon [] [LitArg (MachChar (_HEAD_ s))]
 	the_nil  = mk_nil_con charTy
     in
     mkConDs consDataCon [TyArg charTy, VarArg the_char, VarArg the_nil]
@@ -145,15 +140,15 @@ dsExpr (HsLitOut (HsString str) _)
   = returnDs (Lit (NoRepStr str))
 
 dsExpr (HsLitOut (HsLitLit s) ty)
-  = returnDs ( mkCon data_con [] [] [LitArg (MachLitLit s kind)] )
+  = returnDs ( mkCon data_con [] [LitArg (MachLitLit s kind)] )
   where
     (data_con, kind)
       = case (maybeBoxedPrimType ty) of
 	  Just (boxing_data_con, prim_ty)
 	    -> (boxing_data_con, typePrimRep prim_ty)
 	  Nothing
-	    -> pprError "ERROR: ``literal-literal'' not a single-constructor type: "
-			(hcat [ptext s, text "; type: ", ppr PprDebug ty])
+	    -> pprPanic "ERROR: ``literal-literal'' not a single-constructor type: "
+			(hcat [ptext s, text "; type: ", ppr ty])
 
 dsExpr (HsLitOut (HsInt i) ty)
   = returnDs (Lit (NoRepInteger i ty))
@@ -178,7 +173,7 @@ dsExpr (HsLitOut (HsDoublePrim d) _)
     -- ToDo: range checking needed!
 
 dsExpr (HsLitOut (HsChar c) _)
-  = returnDs ( mkCon charDataCon [] [] [LitArg (MachChar c)] )
+  = returnDs ( mkCon charDataCon [] [LitArg (MachChar c)] )
 
 dsExpr (HsLitOut (HsCharPrim c) _)
   = returnDs (Lit (MachChar c))
@@ -226,7 +221,7 @@ dsExpr (OpApp e1 op _ e2)
   = dsExpr op						`thenDs` \ core_op ->
     -- for the type of y, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = splitFunTy (coreExprType core_op)
+	(x_ty:y_ty:_, _) = splitFunTys (coreExprType core_op)
     in
     dsExpr e1				`thenDs` \ x_core ->
     dsExpr e2				`thenDs` \ y_core ->
@@ -238,7 +233,7 @@ dsExpr (SectionL expr op)
   = dsExpr op						`thenDs` \ core_op ->
     -- for the type of y, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = splitFunTy (coreExprType core_op)
+	(x_ty:y_ty:_, _) = splitFunTys (coreExprType core_op)
     in
     dsExpr expr				`thenDs` \ x_core ->
     dsExprToAtomGivenTy x_core x_ty	$ \ x_atom ->
@@ -251,7 +246,7 @@ dsExpr (SectionR op expr)
   = dsExpr op			`thenDs` \ core_op ->
     -- for the type of x, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = splitFunTy (coreExprType core_op)
+	(x_ty:y_ty:_, _) = splitFunTys (coreExprType core_op)
     in
     dsExpr expr				`thenDs` \ y_expr ->
     dsExprToAtomGivenTy y_expr y_ty	$ \ y_atom ->
@@ -291,7 +286,7 @@ dsExpr (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty src_loc)
     dsDo do_or_lc stmts return_id then_id zero_id result_ty
   where
     maybe_list_comp 
-	= case (do_or_lc, maybeAppTyCon result_ty) of
+	= case (do_or_lc, splitTyConApp_maybe result_ty) of
 	    (ListComp, Just (tycon, [elt_ty]))
 		  | tycon == listTyCon
 		 -> Just elt_ty
@@ -347,6 +342,18 @@ dsExpr (ExplicitTuple expr_list)
     mkConDs (tupleCon (length expr_list))
 	    (map (TyArg . coreExprType) core_exprs ++ map VarArg core_exprs)
 
+dsExpr (HsCon con_id [ty] [arg])
+  | isNewTyCon tycon
+  = dsExpr arg		     `thenDs` \ arg' ->
+    returnDs (Coerce (CoerceIn con_id) result_ty arg')
+  where
+    result_ty = mkTyConApp tycon [ty]
+    tycon     = dataConTyCon con_id
+
+dsExpr (HsCon con_id tys args)
+  = mapDs dsExpr args	 	  `thenDs` \ args2  ->
+    mkConDs con_id (map TyArg tys ++ map VarArg args2)
+
 dsExpr (ArithSeqOut expr (From from))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->
@@ -390,10 +397,10 @@ before printing it as
 
 
 \begin{code}
-dsExpr (RecordConOut con_id con_expr rbinds)
+dsExpr (RecordCon con_id con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
-	(arg_tys, _) = splitFunTy (coreExprType con_expr')
+	(arg_tys, _) = splitFunTys (coreExprType con_expr')
 
 	mk_arg (arg_ty, lbl)
 	  = case [rhs | (sel_id,rhs,_) <- rbinds,
@@ -436,8 +443,8 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
     dsRbinds rbinds		$ \ rbinds' ->
     let
 	record_in_ty		   = coreExprType record_expr'
-	(tycon, in_inst_tys, cons) = getAppDataTyConExpandingDicts record_in_ty
-	(_,     out_inst_tys, _)   = getAppDataTyConExpandingDicts record_out_ty
+	(tycon, in_inst_tys, cons) = splitAlgTyConApp record_in_ty
+	(_,     out_inst_tys, _)   = splitAlgTyConApp record_out_ty
 	cons_to_upd  	 	   = filter has_all_fields cons
 
 	-- initial_args are passed to every constructor
@@ -497,46 +504,8 @@ dsExpr (DictApp expr dicts)	-- becomes a curried application
     returnDs (foldl (\f d -> f `App` (VarArg d)) core_expr core_dicts)
 \end{code}
 
-@SingleDicts@ become @Locals@; @Dicts@ turn into tuples, unless
-of length 0 or 1.
-@ClassDictLam dictvars methods expr@ is ``the opposite'':
-\begin{verbatim}
-\ x -> case x of ( dictvars-and-methods-tuple ) -> expr
-\end{verbatim}
 \begin{code}
-dsExpr (SingleDict dict)	-- just a local
-  = lookupEnvDs dict	`thenDs` \ dict' ->
-    returnDs (Var dict')
 
-dsExpr (Dictionary [] [])	-- Empty dictionary represented by void,
-  = returnDs (Var voidId)	-- (not, as would happen if we took the next case, by ())
-
-dsExpr (Dictionary dicts methods)
-  = mapDs lookupEnvDs (dicts ++ methods)	`thenDs` \ d_and_ms' ->
-    returnDs (mkTupleExpr d_and_ms')
-
-dsExpr (ClassDictLam dicts methods expr)
-  = dsExpr expr		`thenDs` \ core_expr ->
-    case num_of_d_and_ms of
-	0 -> newSysLocalDs voidTy `thenDs` \ new_x ->
-	     returnDs (mkValLam [new_x] core_expr)
-
-	1 -> -- no untupling
-	    returnDs (mkValLam dicts_and_methods core_expr)
-
-	_ ->				-- untuple it
-	    newSysLocalDs tuple_ty `thenDs` \ new_x ->
-	    returnDs (
-	      Lam (ValBinder new_x)
-		(Case (Var new_x)
-		    (AlgAlts
-			[(tuple_con, dicts_and_methods, core_expr)]
-			NoDefault)))
-  where
-    num_of_d_and_ms	    = length dicts + length methods
-    dicts_and_methods	    = dicts ++ methods
-    tuple_ty		    = mkTupleTy  num_of_d_and_ms (map idType dicts_and_methods)
-    tuple_con		    = tupleCon   num_of_d_and_ms
 
 #ifdef DEBUG
 -- HsSyn constructs that just shouldn't be here:
@@ -578,7 +547,7 @@ dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
 
 \begin{code}
 -- do_unfold ty_env val_env (Lam (TyBinder tyvar) body) (TyArg ty : args)
---   = do_unfold (addOneToTyVarEnv ty_env tyvar ty) val_env body args
+--   = do_unfold (addToTyVarEnv ty_env tyvar ty) val_env body args
 -- 
 -- do_unfold ty_env val_env (Lam (ValBinder binder) body) (arg@(VarArg expr) : args)
 --   = dsExprToAtom arg  $ \ arg_atom ->

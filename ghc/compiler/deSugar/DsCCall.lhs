@@ -4,29 +4,26 @@
 \section[DsCCall]{Desugaring \tr{_ccall_}s and \tr{_casm_}s}
 
 \begin{code}
-#include "HsVersions.h"
-
 module DsCCall ( dsCCall ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import CmdLineOpts (opt_PprUserLength)
 import CoreSyn
 
 import DsMonad
 import DsUtils
 
+import TcHsSyn		( maybeBoxedPrimType )
 import CoreUtils	( coreExprType )
 import Id		( Id(..), dataConArgTys, dataConTyCon, idType )
 import Maybes		( maybeToBool )
-import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instances-} )
-import Pretty
 import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )
-import Type		( isPrimType, maybeAppDataTyConExpandingDicts, maybeAppTyCon,
-			  eqTy, maybeBoxedPrimType, SYN_IE(Type), GenType(..),
-			  splitFunTy, splitForAllTy, splitAppTys )
+import Type		( isUnpointedType, splitAlgTyConApp_maybe, 
+			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
+			  Type
+			)
 import TyCon		( tyConDataCons )
 import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
@@ -34,8 +31,7 @@ import TysWiredIn	( getStatePairingConInfo,
 			  unitDataCon, stringTy,
 			  realWorldStateTy, stateDataCon
 			)
-import Util		( pprPanic, pprError, panic )
-
+import Outputable
 \end{code}
 
 Desugaring of @ccall@s consists of adding some state manipulation,
@@ -121,11 +117,11 @@ unboxArg arg
   --  which generates the boiler-plate box-unbox code for you, i.e., it may help
   --  us nuke this very module :-)
   --
-  | isPrimType arg_ty
+  | isUnpointedType arg_ty
   = returnDs (arg, \body -> body)
 
   -- Strings
-  | arg_ty `eqTy` stringTy
+  | arg_ty == stringTy
   -- ToDo (ADR): - allow synonyms of Strings too?
   = newSysLocalDs byteArrayPrimTy		`thenDs` \ prim_arg ->
     mkAppDs (Var packStringForCId) [VarArg arg]	`thenDs` \ pack_appn ->
@@ -160,14 +156,14 @@ unboxArg arg
     )
 
   | otherwise
-  = pprPanic "unboxArg: " (ppr PprDebug arg_ty)
+  = pprPanic "unboxArg: " (ppr arg_ty)
   where
     arg_ty = coreExprType arg
 
     maybe_boxed_prim_arg_ty = maybeBoxedPrimType arg_ty
     (Just (box_data_con, the_prim_arg_ty)) = maybe_boxed_prim_arg_ty
 
-    maybe_data_type 			   = maybeAppDataTyConExpandingDicts arg_ty
+    maybe_data_type 			   = splitAlgTyConApp_maybe arg_ty
     is_data_type			   = maybeToBool maybe_data_type
     (Just (tycon, tycon_arg_tys, data_cons)) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
@@ -175,12 +171,12 @@ unboxArg arg
     data_con_arg_tys = dataConArgTys the_data_con tycon_arg_tys
     (data_con_arg_ty1 : data_con_arg_ty2 : _) = data_con_arg_tys
 
-    maybe_arg2_tycon = maybeAppTyCon data_con_arg_ty2
+    maybe_arg2_tycon = splitTyConApp_maybe data_con_arg_ty2
     Just (arg2_tycon,_) = maybe_arg2_tycon
 
 can't_see_datacons_error thing ty
-  = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
-	     (hcat [text thing, text "; type: ", ppr (PprForUser opt_PprUserLength) ty, text "(try compiling with -fno-prune-tydecls ..)\n"])
+  = pprPanic "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
+	     (hcat [text thing, text "; type: ", ppr ty, text "(try compiling with -fno-prune-tydecls ..)\n"])
 \end{code}
 
 
@@ -195,12 +191,11 @@ boxResult ioOkDataCon result_ty
   -- oops! can't see the data constructors
   = can't_see_datacons_error "result" result_ty
 
-  -- Data types with a single constructor, 
-  -- which has a single, primitive-typed arg.
-  | (maybeToBool maybe_data_type) &&			   -- Data type
-    (null other_data_cons) &&				   -- Just one constr
-    not (null data_con_arg_tys) && null other_args_tys	&& -- Just one arg
-    isPrimType the_prim_result_ty			   -- of primitive type
+  -- Data types with a single constructor, which has a single, primitive-typed arg
+  | (maybeToBool maybe_data_type) &&				-- Data type
+    (null other_data_cons) &&					-- Just one constr
+    not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
+    isUnpointedType the_prim_result_ty				-- of primitive type
   =
     newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
     newSysLocalDs the_prim_result_ty 		`thenDs` \ prim_result_id ->
@@ -236,10 +231,10 @@ boxResult ioOkDataCon result_ty
     )
 
   | otherwise
-  = pprPanic "boxResult: " (ppr PprDebug result_ty)
+  = pprPanic "boxResult: " (ppr result_ty)
 
   where
-    maybe_data_type 			   = maybeAppDataTyConExpandingDicts result_ty
+    maybe_data_type 			   = splitAlgTyConApp_maybe result_ty
     Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
 
@@ -262,19 +257,21 @@ newtype IO a = IO (State# RealWorld -> IOResult a)
 the constructor IO has type (State# RealWorld -> IOResult a) -> IO a
 
 \begin{code}
-getIoOkDataCon :: Type -> (Id,Type)
-getIoOkDataCon io_result_ty =  
-    let 
-  	AppTy (TyConTy ioTyCon _) result_ty = io_result_ty
+getIoOkDataCon :: Type 		-- IO t
+	       -> (Id,Type)	-- Returns (IOok, t)
+
+getIoOkDataCon io_ty
+  = let 
+  	Just (ioTyCon, [t]) 	        = splitTyConApp_maybe io_ty
   	[ioDataCon]    			= tyConDataCons ioTyCon
 	ioDataConTy			= idType ioDataCon
-	(_,ioDataConTy')                = splitForAllTy ioDataConTy
-	([arg],_) 		        = splitFunTy ioDataConTy'
-	(_,AppTy (TyConTy ioResultTyCon _) _) = splitFunTy arg
-	[ioOkDataCon,ioFailDataCon]     = tyConDataCons ioResultTyCon
+	(_, ioDataConTy')               = splitForAllTys ioDataConTy
+	([arg_ty], _) 		        = splitFunTys ioDataConTy'
+	(_, io_result_ty)		= splitFunTys arg_ty
+	Just (io_result_tycon, _)	= splitTyConApp_maybe io_result_ty
+	[ioOkDataCon,ioFailDataCon]     = tyConDataCons io_result_tycon
     in
-    (ioOkDataCon, result_ty)
-
+    (ioOkDataCon, t)
 \end{code}
 
 Another way to do it, more sensitive:

@@ -6,27 +6,20 @@
 The @Match@, @GRHSsAndBinds@ and @GRHS@ datatypes.
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsMatches where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 -- Friends
 import HsExpr		( HsExpr, Stmt )
 import HsBinds		( HsBinds, nullBinds )
 
 -- Others
-import Outputable	( ifPprShowAll, PprStyle, interpp'SP )
 import PprType		( GenType{-instance Outputable-} )
-import Pretty
 import SrcLoc		( SrcLoc{-instances-} )
 import Util		( panic )
-import Outputable	( Outputable(..) )
-#if __GLASGOW_HASKELL__ >= 202
-import Name
-#endif
-       
+import Outputable
+import Name		( NamedThing )
 \end{code}
 
 %************************************************************************
@@ -50,12 +43,12 @@ a function defined by pattern matching must have the same number of
 patterns in each equation.
 
 \begin{code}
-data Match tyvar uvar id pat
+data Match flexi id pat
   = PatMatch	    pat
-		    (Match tyvar uvar id pat)
-  | GRHSMatch	    (GRHSsAndBinds tyvar uvar id pat)
+		    (Match flexi id pat)
+  | GRHSMatch	    (GRHSsAndBinds flexi id pat)
 
-  | SimpleMatch	    (HsExpr tyvar uvar id pat)		-- Used in translations
+  | SimpleMatch	    (HsExpr flexi id pat)		-- Used in translations
 \end{code}
 
 Sets of guarded right hand sides (GRHSs). In:
@@ -70,21 +63,31 @@ For each match, there may be several guarded right hand
 sides, as the definition of @f@ shows.
 
 \begin{code}
-data GRHSsAndBinds tyvar uvar id pat
-  = GRHSsAndBindsIn 	[GRHS tyvar uvar id pat]	    -- at least one GRHS
-			(HsBinds tyvar uvar id pat)
+data GRHSsAndBinds flexi id pat
+  = GRHSsAndBindsIn 	[GRHS flexi id pat]	    -- at least one GRHS
+			(HsBinds flexi id pat)
 
-  | GRHSsAndBindsOut 	[GRHS tyvar uvar id pat]	    -- at least one GRHS
-			(HsBinds tyvar uvar id pat)
-			(GenType tyvar uvar)
+  | GRHSsAndBindsOut 	[GRHS flexi id pat]	    -- at least one GRHS
+			(HsBinds flexi id pat)
+			(GenType flexi)
 
-data GRHS tyvar uvar id pat
-  = GRHS	    [Stmt tyvar uvar id pat]	-- guard(ed)...
-		    (HsExpr tyvar uvar id pat)	-- ... right-hand side
+data GRHS flexi id pat
+  = GRHS	    [Stmt flexi id pat]	-- guard(ed)...
+		    (HsExpr flexi id pat)	-- ... right-hand side
 		    SrcLoc
 
-  | OtherwiseGRHS   (HsExpr tyvar uvar id pat)	-- guard-free
-		    SrcLoc
+unguardedRHS :: (HsExpr flexi id pat) -> SrcLoc -> [GRHS flexi id pat]
+unguardedRHS rhs loc = [GRHS [] rhs loc]
+\end{code}
+
+@getMatchLoc@ takes a @Match@ and returns the
+source-location gotten from the GRHS inside.
+THis is something of a nuisance, but no more.
+
+\begin{code}
+getMatchLoc :: Match flexi id pat -> SrcLoc
+getMatchLoc (PatMatch _ m)				       = getMatchLoc m
+getMatchLoc (GRHSMatch (GRHSsAndBindsIn (GRHS _ _ loc : _) _)) = loc
 \end{code}
 
 %************************************************************************
@@ -95,75 +98,66 @@ data GRHS tyvar uvar id pat
 
 We know the list must have at least one @Match@ in it.
 \begin{code}
-pprMatches :: (NamedThing id, Outputable id, Outputable pat,
-	       Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		PprStyle -> (Bool, Doc) -> [Match tyvar uvar id pat] -> Doc
+pprMatches :: (NamedThing id, Outputable id, Outputable pat)
+	   => (Bool, SDoc) -> [Match flexi id pat] -> SDoc
 
-pprMatches sty print_info@(is_case, name) [match]
+pprMatches print_info@(is_case, name) [match]
   = if is_case then
-    	pprMatch sty is_case match
+    	pprMatch is_case match
     else
-    	name <+> (pprMatch sty is_case match)
+    	name <+> (pprMatch is_case match)
 
-pprMatches sty print_info (match1 : rest)
- = ($$) (pprMatches sty print_info [match1])
-	   (pprMatches sty print_info rest)
+pprMatches print_info (match1 : rest)
+ = ($$) (pprMatches print_info [match1])
+	   (pprMatches print_info rest)
 
 ---------------------------------------------
-pprMatch :: (NamedThing id, Outputable id, Outputable pat,
-	       Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-	PprStyle -> Bool -> Match tyvar uvar id pat -> Doc
+pprMatch :: (NamedThing id, Outputable id, Outputable pat)
+	 => Bool -> Match flexi id pat -> SDoc
 
-pprMatch sty is_case first_match
- = sep [(sep (map (ppr sty) row_of_pats)),
+pprMatch is_case first_match
+ = sep [(sep (map (ppr) row_of_pats)),
 	grhss_etc_stuff]
  where
-    (row_of_pats, grhss_etc_stuff) = ppr_match sty is_case first_match
+    (row_of_pats, grhss_etc_stuff) = ppr_match is_case first_match
 
-    ppr_match sty is_case (PatMatch pat match)
+    ppr_match is_case (PatMatch pat match)
       = (pat:pats, grhss_stuff)
       where
-	(pats, grhss_stuff) = ppr_match sty is_case match
+	(pats, grhss_stuff) = ppr_match is_case match
 
-    ppr_match sty is_case (GRHSMatch grhss_n_binds)
-      = ([], pprGRHSsAndBinds sty is_case grhss_n_binds)
+    ppr_match is_case (GRHSMatch grhss_n_binds)
+      = ([], pprGRHSsAndBinds is_case grhss_n_binds)
 
-    ppr_match sty is_case (SimpleMatch expr)
-      = ([], text (if is_case then "->" else "=") <+> ppr sty expr)
+    ppr_match is_case (SimpleMatch expr)
+      = ([], text (if is_case then "->" else "=") <+> ppr expr)
 
 ----------------------------------------------------------
 
-pprGRHSsAndBinds :: (NamedThing id, Outputable id, Outputable pat,
-	            Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		PprStyle -> Bool -> GRHSsAndBinds tyvar uvar id pat -> Doc
+pprGRHSsAndBinds :: (NamedThing id, Outputable id, Outputable pat)
+		 => Bool -> GRHSsAndBinds flexi id pat -> SDoc
 
-pprGRHSsAndBinds sty is_case (GRHSsAndBindsIn grhss binds)
- = ($$) (vcat (map (pprGRHS sty is_case) grhss))
+pprGRHSsAndBinds is_case (GRHSsAndBindsIn grhss binds)
+ = ($$) (vcat (map (pprGRHS is_case) grhss))
 	   (if (nullBinds binds)
 	    then empty
-	    else vcat [ text "where", nest 4 (ppr sty binds) ])
+	    else vcat [ text "where", nest 4 (ppr binds) ])
 
-pprGRHSsAndBinds sty is_case (GRHSsAndBindsOut grhss binds ty)
- = ($$) (vcat (map (pprGRHS sty is_case) grhss))
+pprGRHSsAndBinds is_case (GRHSsAndBindsOut grhss binds ty)
+ = ($$) (vcat (map (pprGRHS is_case) grhss))
 	   (if (nullBinds binds)
 	    then empty
-	    else vcat [ ifPprShowAll sty
-				(hsep [text "{- ty:", ppr sty ty, text "-}"]),
-			    text "where", nest 4 (ppr sty binds) ])
+	    else vcat [text "where", nest 4 (ppr binds) ])
 
 ---------------------------------------------
-pprGRHS :: (NamedThing id, Outputable id, Outputable pat,
-	    Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	=> PprStyle -> Bool -> GRHS tyvar uvar id pat -> Doc
+pprGRHS :: (NamedThing id, Outputable id, Outputable pat)
+	=> Bool -> GRHS flexi id pat -> SDoc
 
-pprGRHS sty is_case (GRHS [] expr locn)
- =  text (if is_case then "->" else "=") <+> ppr sty expr
+pprGRHS is_case (GRHS [] expr locn)
+ =  text (if is_case then "->" else "=") <+> ppr expr
 
-pprGRHS sty is_case (GRHS guard expr locn)
- = sep [char '|' <+> interpp'SP sty guard,
-	text (if is_case then "->" else "=") <+> ppr sty expr
+pprGRHS is_case (GRHS guard expr locn)
+ = sep [char '|' <+> interpp'SP guard,
+	text (if is_case then "->" else "=") <+> ppr expr
    ]
-
-pprGRHS sty is_case (OtherwiseGRHS  expr locn)
-  = text (if is_case then "->" else "=") <+> ppr sty expr
 \end{code}

@@ -2,86 +2,83 @@
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-#include "HsVersions.h"
-
 module SST(
-	SYN_IE(SST), SST_R, SYN_IE(FSST), FSST_R,
+	SST, SST_R, FSST, FSST_R,
 
-	runSST, sstToST, stToSST,
+	runSST, sstToST, stToSST, ioToSST,
 	thenSST, thenSST_, returnSST, fixSST,
 	thenFSST, thenFSST_, returnFSST, failFSST,
 	recoverFSST, recoverSST, fixFSST,
 	unsafeInterleaveSST, 
 
-	newMutVarSST, readMutVarSST, writeMutVarSST
-#if __GLASGOW_HASKELL__ >= 200
-	, MutableVar
-#else
-	, MutableVar(..), _MutableArray
-#endif
+	newMutVarSST, readMutVarSST, writeMutVarSST,
+	SSTRef
   ) where
 
-#if __GLASGOW_HASKELL__ == 201
-import GHCbase
-#elif __GLASGOW_HASKELL__ >= 202
+#include "HsVersions.h"
+
 import GlaExts
 import STBase
+import IOBase	( IO(..), IOResult(..) )
 import ArrBase
 import ST
-#else
-import PreludeGlaST ( MutableVar(..), _MutableArray(..), ST(..) )
-#endif
-
-CHK_Ubiq() -- debugging consistency check
 \end{code}
 
+@SST@ is very like the standard @ST@ monad, but it comes with its
+friend @FSST@.  Because we want the monadic bind operator to work
+for mixtures of @SST@ and @FSST@, we can't use @ST@ at all.
+
+For simplicity we don't even dress them up in newtypes.
+
+%************************************************************************
+%*									*
+\subsection{The data types}
+%*									*
+%************************************************************************
+
 \begin{code}
+type SST  s r     = State# s -> SST_R s r
+type FSST s r err = State# s -> FSST_R s r err
+
 data SST_R s r = SST_R r (State# s)
-type SST s r = State# s -> SST_R s r
 
+data FSST_R s r err
+  = FSST_R_OK   r   (State# s)
+  | FSST_R_Fail err (State# s)
 \end{code}
 
-\begin{code}
--- converting to/from ST
+Converting to/from ST
 
+\begin{code}
 sstToST :: SST s r -> ST s r
 stToSST :: ST s r -> SST s r
 
-#if __GLASGOW_HASKELL__ >= 200 && __GLASGOW_HASKELL__ < 209
+sstToST sst = ST (\ s -> case sst s of SST_R r s' -> STret s' r)
 
-sstToST sst = ST $ \ (S# s) ->
-   case sst s of SST_R r s' -> (r, S# s')
+stToSST (ST st) = \ s -> case st s of STret s' r -> SST_R r s'
+\end{code}
 
-stToSST (ST st) = \ s ->
-   case st (S# s) of (r, S# s') -> SST_R r s'
+...and IO
 
-#elif __GLASGOW_HASKELL__ >= 209
+\begin{code}
+ioToSST :: IO a -> SST RealWorld (Either IOError a)
+ioToSST (IO io)
+  = \s -> case io s of
+	    IOok   s' r   -> SST_R (Right r) s'
+	    IOfail s' err -> SST_R (Left err) s'
+\end{code}
 
-sstToST sst = ST $ \ s ->
-   case sst s of SST_R r s' -> STret s' r
+%************************************************************************
+%*									*
+\subsection{The @SST@ operations}
+%*									*
+%************************************************************************
 
-stToSST (ST st) = \ s ->
-   case st s of STret s' r -> SST_R r s'
-
-#else
-sstToST sst (S# s)
-  = case sst s of SST_R r s' -> (r, S# s')
-stToSST st s
-  = case st (S# s) of (r, S# s') -> SST_R r s'
-#endif
-
+\begin{code}
 -- Type of runSST should be builtin ...
 -- runSST :: forall r. (forall s. SST s r) -> r
 
-#if __GLASGOW_HASKELL__ >= 200
-# define REAL_WORLD RealWorld
-# define MUT_ARRAY  MutableArray
-#else
-# define REAL_WORLD _RealWorld
-# define MUT_ARRAY  _MutableArray
-#endif
-
-runSST :: SST REAL_WORLD r  -> r
+runSST :: SST RealWorld r  -> r
 runSST m = case m realWorld# of SST_R r s -> r
 
 unsafeInterleaveSST :: SST s r -> SST s r
@@ -90,13 +87,24 @@ unsafeInterleaveSST m s = SST_R r s		-- Duplicates the state!
 			  SST_R r _ = m s
 
 returnSST :: r -> SST s r
-thenSST   :: SST s r -> (r -> State# s -> b) -> State# s -> b
-thenSST_  :: SST s r -> (State# s -> b) -> State# s -> b
 fixSST    :: (r -> SST s r) -> SST s r
 {-# INLINE returnSST #-}
 {-# INLINE thenSST #-}
 {-# INLINE thenSST_ #-}
 
+returnSST r s = SST_R r s
+
+fixSST m s = result
+	   where
+	     result 	  = m loop s
+	     SST_R loop _ = result
+\end{code}
+
+OK, here comes the clever bind operator.
+
+\begin{code}
+thenSST   :: SST s r -> (r -> State# s -> b) -> State# s -> b
+thenSST_  :: SST s r -> (State# s -> b) -> State# s -> b
 -- Hence:
 --	thenSST :: SST s r -> (r -> SST  s r')     -> SST  s r'
 -- and  thenSST :: SST s r -> (r -> FSST s r' err) -> FSST s r' err
@@ -108,26 +116,14 @@ fixSST    :: (r -> SST s r) -> SST s r
 thenSST  m k s = case m s of { SST_R r s' -> k r s' }
 
 thenSST_ m k s = case m s of { SST_R r s' -> k s' }
-
-returnSST r s = SST_R r s
-
-fixSST m s = result
-	   where
-	     result 	  = m loop s
-	     SST_R loop _ = result
 \end{code}
 
 
-\section{FSST: the failable strict state transformer monad}
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-\begin{code}
-data FSST_R s r err
-  = FSST_R_OK   r   (State# s)
-  | FSST_R_Fail err (State# s)
-
-type FSST s r err = State# s -> FSST_R s r err
-\end{code}
+%************************************************************************
+%*									*
+\subsection{FSST: the failable strict state transformer monad}
+%*									*
+%************************************************************************
 
 \begin{code}
 failFSST    :: err -> FSST s r err
@@ -170,26 +166,32 @@ fixFSST m s = result
 	      FSST_R_OK loop _ = result
 \end{code}
 
-Mutables
-~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{Mutables}
+%*									*
+%************************************************************************
+
 Here we implement mutable variables.  ToDo: get rid of the array impl.
 
 \begin{code}
-newMutVarSST   :: a -> SST s (MutableVar s a)
-readMutVarSST  :: MutableVar s a -> SST s a
-writeMutVarSST :: MutableVar s a -> a -> SST s ()
+type SSTRef s a = MutableArray s Int a
+
+newMutVarSST   :: a -> SST s (SSTRef s a)
+readMutVarSST  :: SSTRef s a -> SST s a
+writeMutVarSST :: SSTRef s a -> a -> SST s ()
 
 newMutVarSST init s#
   = case (newArray# 1# init s#)     of { StateAndMutableArray# s2# arr# ->
-    SST_R (MUT_ARRAY vAR_IXS arr#) s2# }
+    SST_R (MutableArray vAR_IXS arr#) s2# }
   where
     vAR_IXS = error "Shouldn't access `bounds' of a MutableVar\n"
 
-readMutVarSST (MUT_ARRAY _ var#) s#
+readMutVarSST (MutableArray _ var#) s#
   = case readArray# var# 0# s#	of { StateAndPtr# s2# r ->
     SST_R r s2# }
 
-writeMutVarSST (MUT_ARRAY _ var#) val s#
+writeMutVarSST (MutableArray _ var#) val s#
   = case writeArray# var# 0# val s# of { s2# ->
     SST_R () s2# }
 \end{code}

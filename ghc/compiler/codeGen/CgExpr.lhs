@@ -8,14 +8,9 @@
 %********************************************************
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgExpr ( cgExpr, getPrimOpArgAmodes ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(CgLoop2)	-- here for paranoia-checking
-#endif
+#include "HsVersions.h"
 
 import Constants	( mAX_SPEC_SELECTEE_SIZE )
 import StgSyn
@@ -40,22 +35,21 @@ import CLabel		( mkPhantomInfoTableLabel, mkInfoTableVecTblLabel )
 import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo, mkVapLFInfo,
 			  layOutDynCon )
 import CostCentre	( sccAbleCostCentre, isDictCC, isSccCountCostCentre )
-import HeapOffs		( SYN_IE(VirtualSpBOffset), intOffsetIntoGoods )
+import HeapOffs		( VirtualSpBOffset, intOffsetIntoGoods )
 import Id		( dataConTyCon, idPrimRep, getIdArity, 
 			  mkIdSet, unionIdSets, GenId{-instance Outputable-},
-			  SYN_IE(Id)
+			  Id
 			)
 import IdInfo		( ArityInfo(..) )
 import Name		( isLocallyDefined )
-import Outputable	( PprStyle(..), Outputable(..) )
-import Pretty		( Doc )
 import PrimOp		( primOpCanTriggerGC, primOpHeapReq, HeapRequirement(..),
 			  getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..)
 			)
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, maybeTyConSingleCon  )
 import Maybes		( assocMaybe, maybeToBool )
-import Util		( panic, isIn, pprPanic, assertPanic )
+import Util		( isIn )
+import Outputable
 \end{code}
 
 This module provides the support code for @StgToAbstractC@ to deal
@@ -193,7 +187,7 @@ cgExpr x@(StgPrim op args live_vars)
 			    mkIntCLit (length rs)) -- for ticky-ticky only
 
     	    	      ReturnInHeap
-			-> pprPanic "CgExpr: can't return prim in heap:" (ppr PprDebug data_con)
+			-> pprPanic "CgExpr: can't return prim in heap:" (ppr data_con)
 			  -- Never used, and no point in generating
 			  -- the code for it!
   where

@@ -4,59 +4,48 @@
 \section[ErrsUtils]{Utilities for error reporting}
 
 \begin{code}
-#include "HsVersions.h"
-
 module ErrUtils (
-	SYN_IE(Error), SYN_IE(Warning), SYN_IE(Message),
-	addErrLoc,
+	ErrMsg, WarnMsg, Message,
 	addShortErrLocLine, addShortWarnLocLine,
 	dontAddErrLoc,
-	pprBagOfErrors,
+	pprBagOfErrors, pprBagOfWarnings,
 	ghcExit,
 	doIfSet, dumpIfSet
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import CmdLineOpts      ( opt_PprUserLength )
-import Bag		--( bagToList )
-import Outputable	( PprStyle(..), Outputable(..), printErrs )
-import Pretty
-import SrcLoc		( noSrcLoc, SrcLoc{-instance-} )
+import Bag		( Bag, bagToList )
+import SrcLoc		( SrcLoc )
+import Outputable
 \end{code}
 
 \begin{code}
-type Error   = PprStyle -> Doc
-type Warning = PprStyle -> Doc
-type Message = PprStyle -> Doc
+type ErrMsg   = SDoc
+type WarnMsg = SDoc
+type Message = SDoc
 
-addErrLoc :: SrcLoc -> String -> Error -> Error
-addErrLoc locn title rest_of_err_msg sty
-  = hang (hcat [ppr (PprForUser opt_PprUserLength) locn,
-		if null title then empty else text (": " ++ title),
-		char ':'])
-    	 4 (rest_of_err_msg sty)
+addShortErrLocLine, addShortWarnLocLine :: SrcLoc -> ErrMsg -> ErrMsg
 
-addShortErrLocLine, addShortWarnLocLine :: SrcLoc -> Error -> Error
+addShortErrLocLine locn rest_of_err_msg
+  = hang (ppr locn <> colon)
+	 4 rest_of_err_msg
 
-addShortErrLocLine locn rest_of_err_msg sty
-  = hang ((<>) (ppr (PprForUser opt_PprUserLength) locn) (char ':'))
-	 4 (rest_of_err_msg sty)
+addShortWarnLocLine locn rest_of_err_msg
+  = hang (ppr locn <> ptext SLIT(": Warning:"))
+	 4 rest_of_err_msg
 
-addShortWarnLocLine locn rest_of_err_msg sty
-  = hang ((<>) (ppr (PprForUser opt_PprUserLength) locn) (ptext SLIT(":warning:")))
-	 4 (rest_of_err_msg sty)
-
-dontAddErrLoc :: String -> Error -> Error
-dontAddErrLoc title rest_of_err_msg sty
+dontAddErrLoc :: String -> ErrMsg -> ErrMsg
+dontAddErrLoc title rest_of_err_msg
   = hang (hcat [text title, char ':'])
-    	 4 (rest_of_err_msg sty)
+    	 4 rest_of_err_msg
 
-pprBagOfErrors :: PprStyle -> Bag Error -> Doc
-pprBagOfErrors sty bag_of_errors
-  = let  pretties = map ( \ e -> e sty ) (bagToList bag_of_errors)
-    in
-    vcat (map (\ p -> ($$) space p) pretties)
+pprBagOfErrors :: Bag ErrMsg -> SDoc
+pprBagOfErrors bag_of_errors
+  = vcat [space $$ p | p <- bagToList bag_of_errors]
+
+pprBagOfWarnings :: Bag ErrMsg -> SDoc
+pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns
 \end{code}
 
 \begin{code}
@@ -75,15 +64,14 @@ doIfSet flag action | flag      = action
 \end{code}
 
 \begin{code}
-dumpIfSet :: Bool -> String -> Doc -> IO ()
+dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
   | not flag  = return ()
-  | otherwise = printErrs dump
+  | otherwise = printDump dump
   where
-    dump = (line <+> text hdr <+> line)
-	   $$
-	   doc
-	   $$
-	   text ""
+    dump = vcat [text "", 
+		 line <+> text hdr <+> line,
+		 doc,
+		 text ""]
     line = text (take 20 (repeat '='))
 \end{code}

@@ -2,10 +2,10 @@
 #include "hspincl.h"
 %}
 %{{
+module U_pbinding where
+
 #include "HsVersions.h"
 
-module U_pbinding where
-IMP_Ubiq() --  debugging consistency check
 import UgenUtil
 
 import U_constr		( U_constr )	-- interface only

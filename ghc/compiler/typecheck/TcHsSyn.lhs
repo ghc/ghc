@@ -7,65 +7,61 @@ This module is an extension of @HsSyn@ syntax, for use in the type
 checker.
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcHsSyn (
-	SYN_IE(TcMonoBinds), SYN_IE(TcHsBinds), SYN_IE(TcPat),
-	SYN_IE(TcExpr), SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS), SYN_IE(TcMatch),
-	SYN_IE(TcStmt), SYN_IE(TcArithSeqInfo), SYN_IE(TcRecordBinds),
-	SYN_IE(TcHsModule), SYN_IE(TcCoreExpr), SYN_IE(TcDictBinds),
+	TcMonoBinds, TcHsBinds, TcPat,
+	TcExpr, TcGRHSsAndBinds, TcGRHS, TcMatch,
+	TcStmt, TcArithSeqInfo, TcRecordBinds,
+	TcHsModule, TcCoreExpr, TcDictBinds,
 	
-	SYN_IE(TypecheckedHsBinds), 
-	SYN_IE(TypecheckedMonoBinds), SYN_IE(TypecheckedPat),
-	SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedArithSeqInfo),
-	SYN_IE(TypecheckedStmt),
-	SYN_IE(TypecheckedMatch), SYN_IE(TypecheckedHsModule),
-	SYN_IE(TypecheckedGRHSsAndBinds), SYN_IE(TypecheckedGRHS),
-	SYN_IE(TypecheckedRecordBinds), SYN_IE(TypecheckedDictBinds),
+	TypecheckedHsBinds, 
+	TypecheckedMonoBinds, TypecheckedPat,
+	TypecheckedHsExpr, TypecheckedArithSeqInfo,
+	TypecheckedStmt,
+	TypecheckedMatch, TypecheckedHsModule,
+	TypecheckedGRHSsAndBinds, TypecheckedGRHS,
+	TypecheckedRecordBinds, TypecheckedDictBinds,
 
 	mkHsTyApp, mkHsDictApp,
 	mkHsTyLam, mkHsDictLam,
-	tcIdType, tcIdTyVars,
 
-	zonkTopBinds, zonkBinds, zonkMonoBinds
+	-- re-exported from TcEnv
+	TcIdOcc(..), TcIdBndr, tcIdType, tcIdTyVars, tcInstId,
+
+	maybeBoxedPrimType,
+
+	zonkTopBinds, zonkBinds, zonkMonoBinds, zonkTcId
   ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 -- friends:
 import HsSyn	-- oodles of it
 import Id	( GenId(..), IdDetails,	-- Can meddle modestly with Ids
-		  SYN_IE(DictVar), idType,
-		  SYN_IE(Id)
+		  DictVar, idType, dataConArgTys,
+		  Id
 		)
 
 -- others:
-import Name	( Name{--O only-}, NamedThing(..) )
-import BasicTypes ( IfaceFlavour )
-import TcEnv	( tcLookupGlobalValueMaybe, tcExtendGlobalValEnv )
-import TcMonad
-import TcType	( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar),
-		  zonkTcTypeToType, zonkTcTyVarToTyVar
+import Name	( NamedThing(..) )
+import BasicTypes ( IfaceFlavour, Unused )
+import TcEnv	( tcLookupGlobalValueMaybe, tcExtendGlobalValEnv,
+		  TcIdOcc(..), TcIdBndr, tcIdType, tcIdTyVars, tcInstId
 		)
-import Usage	( SYN_IE(UVar) )
-import Util	( zipEqual, panic, 
-		  pprPanic, pprTrace
-#ifdef DEBUG
-	          , assertPanic
-#endif
-	        )
 
-import PprType  ( GenType, GenTyVar ) 	-- instances
-import Type	( mkTyVarTy, tyVarsOfType, SYN_IE(Type) )
-import TyVar	( GenTyVar {- instances -}, SYN_IE(TyVar),
-		  SYN_IE(TyVarEnv), nullTyVarEnv, growTyVarEnvList, emptyTyVarSet )
+import TcMonad
+import TcType	( TcType, TcMaybe, TcTyVar, TcBox,
+		  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType
+		)
+import TyCon	( isDataTyCon )
+import Type	( mkTyVarTy, tyVarsOfType, splitAlgTyConApp_maybe, isUnpointedType, Type )
+import TyVar	( TyVar, TyVarEnv, emptyTyVarEnv, growTyVarEnvList, emptyTyVarSet )
 import TysPrim	( voidTy )
 import CoreSyn  ( GenCoreExpr )
 import Unique	( Unique )		-- instances
 import Bag
 import UniqFM
+import Util	( zipEqual )
 import Outputable
-import Pretty
 \end{code}
 
 
@@ -80,33 +76,33 @@ At the end of type checking we zonk everything to @Typechecked...@ datatypes,
 which have immutable type variables in them.
 
 \begin{code}
-type TcHsBinds s     	= HsBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcMonoBinds s	= MonoBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
+type TcHsBinds s     	= HsBinds (TcBox s) (TcIdOcc s) (TcPat s)
+type TcMonoBinds s	= MonoBinds (TcBox s) (TcIdOcc s) (TcPat s)
 type TcDictBinds s	= TcMonoBinds s
-type TcPat s	     	= OutPat (TcTyVar s) UVar (TcIdOcc s)
-type TcExpr s	     	= HsExpr (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcGRHSsAndBinds s	= GRHSsAndBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcGRHS s		= GRHS (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcMatch s		= Match (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcStmt s		= Stmt (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcArithSeqInfo s	= ArithSeqInfo (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcRecordBinds s	= HsRecordBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcHsModule s	= HsModule (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
+type TcPat s	     	= OutPat (TcBox s) (TcIdOcc s)
+type TcExpr s	     	= HsExpr (TcBox s) (TcIdOcc s) (TcPat s)
+type TcGRHSsAndBinds s	= GRHSsAndBinds (TcBox s) (TcIdOcc s) (TcPat s)
+type TcGRHS s		= GRHS (TcBox s) (TcIdOcc s) (TcPat s)
+type TcMatch s		= Match (TcBox s) (TcIdOcc s) (TcPat s)
+type TcStmt s		= Stmt (TcBox s) (TcIdOcc s) (TcPat s)
+type TcArithSeqInfo s	= ArithSeqInfo (TcBox s) (TcIdOcc s) (TcPat s)
+type TcRecordBinds s	= HsRecordBinds (TcBox s) (TcIdOcc s) (TcPat s)
+type TcHsModule s	= HsModule (TcBox s) (TcIdOcc s) (TcPat s)
 
-type TcCoreExpr s	= GenCoreExpr (TcIdOcc s) (TcIdOcc s) (TcTyVar s) UVar
+type TcCoreExpr s	= GenCoreExpr (TcIdOcc s) (TcIdOcc s) (TcBox s)
 
-type TypecheckedPat		= OutPat	TyVar UVar Id
-type TypecheckedMonoBinds 	= MonoBinds	TyVar UVar Id TypecheckedPat
+type TypecheckedPat		= OutPat	Unused Id
+type TypecheckedMonoBinds 	= MonoBinds	Unused Id TypecheckedPat
 type TypecheckedDictBinds 	= TypecheckedMonoBinds
-type TypecheckedHsBinds		= HsBinds	TyVar UVar Id TypecheckedPat
-type TypecheckedHsExpr		= HsExpr	TyVar UVar Id TypecheckedPat
-type TypecheckedArithSeqInfo	= ArithSeqInfo	TyVar UVar Id TypecheckedPat
-type TypecheckedStmt		= Stmt		TyVar UVar Id TypecheckedPat
-type TypecheckedMatch		= Match		TyVar UVar Id TypecheckedPat
-type TypecheckedGRHSsAndBinds	= GRHSsAndBinds TyVar UVar Id TypecheckedPat
-type TypecheckedGRHS		= GRHS		TyVar UVar Id TypecheckedPat
-type TypecheckedRecordBinds	= HsRecordBinds TyVar UVar Id TypecheckedPat
-type TypecheckedHsModule	= HsModule	TyVar UVar Id TypecheckedPat
+type TypecheckedHsBinds		= HsBinds	Unused Id TypecheckedPat
+type TypecheckedHsExpr		= HsExpr	Unused Id TypecheckedPat
+type TypecheckedArithSeqInfo	= ArithSeqInfo	Unused Id TypecheckedPat
+type TypecheckedStmt		= Stmt		Unused Id TypecheckedPat
+type TypecheckedMatch		= Match		Unused Id TypecheckedPat
+type TypecheckedGRHSsAndBinds	= GRHSsAndBinds Unused Id TypecheckedPat
+type TypecheckedGRHS		= GRHS		Unused Id TypecheckedPat
+type TypecheckedRecordBinds	= HsRecordBinds Unused Id TypecheckedPat
+type TypecheckedHsModule	= HsModule	Unused Id TypecheckedPat
 \end{code}
 
 \begin{code}
@@ -121,13 +117,6 @@ mkHsTyLam tyvars expr = TyLam tyvars expr
 
 mkHsDictLam []    expr = expr
 mkHsDictLam dicts expr = DictLam dicts expr
-
-tcIdType :: TcIdOcc s -> TcType s
-tcIdType (TcId   id) = idType id
-tcIdType (RealId id) = pprPanic "tcIdType:" (ppr PprDebug id)
-
-tcIdTyVars (TcId id)  = tyVarsOfType (idType id)
-tcIdTyVars (RealId _) = emptyTyVarSet		-- Top level Ids have no free type variables
 \end{code}
 
 %************************************************************************
@@ -135,6 +124,39 @@ tcIdTyVars (RealId _) = emptyTyVarSet		-- Top level Ids have no free type variab
 \subsection[BackSubst-HsBinds]{Running a substitution over @HsBinds@}
 %*									*
 %************************************************************************
+
+Some gruesome hackery for desugaring ccalls. It's here because if we put it
+in Type.lhs we get irritating loops, and it's only used by TcInstDcls.lhs and
+DsCCall.lhs.
+
+\begin{code}
+maybeBoxedPrimType :: Type -> Maybe (Id, Type)
+maybeBoxedPrimType ty
+  = case splitAlgTyConApp_maybe ty of					-- Data type,
+      Just (tycon, tys_applied, [data_con]) | isDataTyCon tycon 	-- with exactly one constructor
+        -> case (dataConArgTys data_con tys_applied) of
+	     [data_con_arg_ty]			    	-- Applied to exactly one type,
+	        | isUnpointedType data_con_arg_ty 	-- which is primitive
+	        -> Just (data_con, data_con_arg_ty)
+	     other_cases -> Nothing
+      other_cases -> Nothing
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[BackSubst-HsBinds]{Running a substitution over @HsBinds@}
+%*									*
+%************************************************************************
+
+@zonkTcId@ just works on TcIdOccs.  It's used when zonking Method insts.
+
+\begin{code}
+zonkTcId :: TcIdOcc s -> NF_TcM s (TcIdOcc s)
+zonkTcId tc_id@(RealId id) = returnNF_Tc tc_id
+zonkTcId (TcId (Id u n ty details prags info))
+  = zonkTcType ty    `thenNF_Tc` \ ty' ->
+    returnNF_Tc (TcId (Id u n ty' details prags info))
+\end{code}
 
 This zonking pass runs over the bindings
 
@@ -155,16 +177,15 @@ were previously in the LVE of the Tc monad.)
 It's all pretty boring stuff, because HsSyn is such a large type, and 
 the environment manipulation is tiresome.
 
-
 \begin{code}
 extend_te te tyvars = growTyVarEnvList te [(tyvar, mkTyVarTy tyvar) | tyvar <- tyvars]
 
 zonkIdBndr :: TyVarEnv Type -> TcIdOcc s -> NF_TcM s Id
+zonkIdBndr te (RealId id) = returnNF_Tc id
 zonkIdBndr te (TcId (Id u n ty details prags info))
   = zonkTcTypeToType te ty	`thenNF_Tc` \ ty' ->
     returnNF_Tc (Id u n ty' details prags info)
 
-zonkIdBndr te (RealId id) = returnNF_Tc id
 
 zonkIdOcc :: TcIdOcc s -> NF_TcM s Id
 zonkIdOcc (RealId id) = returnNF_Tc id
@@ -173,7 +194,7 @@ zonkIdOcc (TcId id)
     let
 	new_id = case maybe_id' of
 		    Just id' -> id'
-		    Nothing  -> pprTrace "zonkIdOcc: " (ppr PprDebug id) $
+		    Nothing  -> pprTrace "zonkIdOcc: " (ppr id) $
 				    Id u n voidTy details prags info
 			        where
 				    Id u n _ details prags info = id
@@ -187,7 +208,7 @@ zonkTopBinds :: TcMonoBinds s -> NF_TcM s (TypecheckedMonoBinds, TcEnv s)
 zonkTopBinds binds	-- Top level is implicitly recursive
   = fixNF_Tc (\ ~(_, new_ids) ->
 	tcExtendGlobalValEnv (bagToList new_ids)	$
-	zonkMonoBinds nullTyVarEnv binds		`thenNF_Tc` \ (binds', new_ids) ->
+	zonkMonoBinds emptyTyVarEnv binds		`thenNF_Tc` \ (binds', new_ids) ->
 	tcGetEnv					`thenNF_Tc` \ env ->
 	returnNF_Tc ((binds', env), new_ids)
     )					`thenNF_Tc` \ (stuff, _) ->
@@ -318,10 +339,6 @@ zonkGRHSsAndBinds te (GRHSsAndBindsOut grhss binds ty)
 	    tcSetEnv new_env $
 	    zonkExpr te expr	`thenNF_Tc` \ new_expr  ->
 	    returnNF_Tc (GRHS new_guard new_expr locn)
-
-        zonk_grhs (OtherwiseGRHS expr locn)
-          = zonkExpr te expr	`thenNF_Tc` \ new_expr  ->
-	    returnNF_Tc (OtherwiseGRHS new_expr locn)
     in
     mapNF_Tc zonk_grhs grhss 	`thenNF_Tc` \ new_grhss ->
     zonkTcTypeToType te ty 	`thenNF_Tc` \ new_ty ->
@@ -415,11 +432,16 @@ zonkExpr te (ExplicitTuple exprs)
   = mapNF_Tc (zonkExpr te) exprs  `thenNF_Tc` \ new_exprs ->
     returnNF_Tc (ExplicitTuple new_exprs)
 
-zonkExpr te (RecordConOut con_id con_expr rbinds)
+zonkExpr te (HsCon con_id tys exprs)
+  = mapNF_Tc (zonkTcTypeToType te) tys	`thenNF_Tc` \ new_tys ->
+    mapNF_Tc (zonkExpr te) exprs	`thenNF_Tc` \ new_exprs ->
+    returnNF_Tc (HsCon con_id new_tys new_exprs)
+
+zonkExpr te (RecordCon con_id con_expr rbinds)
   = zonkIdOcc con_id		`thenNF_Tc` \ new_con_id ->
-    zonkExpr te con_expr		`thenNF_Tc` \ new_con_expr ->
+    zonkExpr te con_expr	`thenNF_Tc` \ new_con_expr ->
     zonkRbinds te rbinds	`thenNF_Tc` \ new_rbinds ->
-    returnNF_Tc (RecordConOut new_con_id new_con_expr new_rbinds)
+    returnNF_Tc (RecordCon new_con_id new_con_expr new_rbinds)
 
 zonkExpr te (RecordUpd _ _) = panic "zonkExpr te:RecordUpd"
 
@@ -471,20 +493,6 @@ zonkExpr te (DictApp expr dicts)
     mapNF_Tc zonkIdOcc dicts	`thenNF_Tc` \ new_dicts ->
     returnNF_Tc (DictApp new_expr new_dicts)
 
-zonkExpr te (ClassDictLam dicts methods expr)
-  = zonkExpr te expr    	    `thenNF_Tc` \ new_expr ->
-    mapNF_Tc zonkIdOcc dicts	`thenNF_Tc` \ new_dicts ->
-    mapNF_Tc zonkIdOcc methods	`thenNF_Tc` \ new_methods ->
-    returnNF_Tc (ClassDictLam new_dicts new_methods new_expr)
-
-zonkExpr te (Dictionary dicts methods)
-  = mapNF_Tc zonkIdOcc dicts	`thenNF_Tc` \ new_dicts ->
-    mapNF_Tc zonkIdOcc methods	`thenNF_Tc` \ new_methods ->
-    returnNF_Tc (Dictionary new_dicts new_methods)
-
-zonkExpr te (SingleDict name)
-  = zonkIdOcc name	`thenNF_Tc` \ name' ->
-    returnNF_Tc (SingleDict name')
 
 
 -------------------------------------------------------------------------

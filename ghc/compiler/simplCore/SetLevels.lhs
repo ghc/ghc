@@ -10,18 +10,15 @@ We also let-ify many applications (notably case scrutinees), so they
 will have a fighting chance of being floated sensible.
 
 \begin{code}
-#include "HsVersions.h"
-
 module SetLevels (
 	setLevels,
 
 	Level(..), tOP_LEVEL,
 
 	incMinorLvl, ltMajLvl, ltLvl, isTopLvl
--- not exported: , incMajorLvl, isTopMajLvl, unTopify
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import AnnCoreSyn
 import CoreSyn
@@ -32,27 +29,24 @@ import FreeVars		-- all of it
 import Id		( idType, mkSysLocal, 
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  unionManyIdSets, minusIdSet, mkIdSet,
-			  idSetToList, SYN_IE(Id),
-			  lookupIdEnv, SYN_IE(IdEnv)
+			  idSetToList, Id,
+			  lookupIdEnv, IdEnv
 			)
-import Pretty		( ptext, hcat, char, int )
 import SrcLoc		( noSrcLoc )
-import Type		( isPrimType, mkTyVarTys, mkForAllTys, tyVarsOfTypes, SYN_IE(Type) )
-import TyVar		( nullTyVarEnv, addOneToTyVarEnv,
+import Type		( isUnpointedType, mkTyVarTys, mkForAllTys, tyVarsOfTypes, Type )
+import TyVar		( emptyTyVarEnv, addToTyVarEnv,
 			  growTyVarEnvList, lookupTyVarEnv,
 			  tyVarSetToList, 
-			  SYN_IE(TyVarEnv), SYN_IE(TyVar),
+			  TyVarEnv, TyVar,
 			  unionManyTyVarSets, unionTyVarSets
 			)
 import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
-			  mapAndUnzip3Us, getUnique, SYN_IE(UniqSM),
+			  mapAndUnzip3Us, getUnique, UniqSM,
 			  UniqSupply
 			)
-import Usage		( SYN_IE(UVar) )
+import BasicTypes	( Unused )
 import Util		( mapAccumL, zipWithEqual, zipEqual, panic, assertPanic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
+import Outputable
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
@@ -96,9 +90,9 @@ sub-expression so that it will indeed float. This context level starts
 at @Level 0 0@; it is never @Top@.
 
 \begin{code}
-type LevelledExpr  = GenCoreExpr    (Id, Level) Id TyVar UVar
-type LevelledArg   = GenCoreArg			Id TyVar UVar
-type LevelledBind  = GenCoreBinding (Id, Level) Id TyVar UVar
+type LevelledExpr  = GenCoreExpr    (Id, Level) Id Unused
+type LevelledArg   = GenCoreArg			Id Unused
+type LevelledBind  = GenCoreBinding (Id, Level) Id Unused
 
 type LevelEnvs = (IdEnv    Level, -- bind Ids to levels
 		  TyVarEnv Level) -- bind type variables to levels
@@ -146,8 +140,8 @@ unTopify Top = Level 0 0
 unTopify lvl = lvl
 
 instance Outputable Level where
-  ppr sty Top		  = ptext SLIT("<Top>")
-  ppr sty (Level maj min) = hcat [ char '<', int maj, char ',', int min, char '>' ]
+  ppr Top	      = ptext SLIT("<Top>")
+  ppr (Level maj min) = hcat [ char '<', int maj, char ',', int min, char '>' ]
 \end{code}
 
 %************************************************************************
@@ -175,7 +169,7 @@ setLevels binds us
 	do_them bs	 `thenLvl` \ lvld_binds ->
     	returnLvl (lvld_bind ++ lvld_binds)
 
-initial_envs = (nullIdEnv, nullTyVarEnv)
+initial_envs = (nullIdEnv, emptyTyVarEnv)
 
 lvlTopBind (NonRec binder rhs)
   = lvlBind (Level 0 0) initial_envs (AnnNonRec binder (freeVars rhs))
@@ -194,7 +188,7 @@ lvlTopBind (Rec pairs)
 The binding stuff works for top level too.
 
 \begin{code}
-type CoreBindingWithFVs = AnnCoreBinding Id Id TyVar UVar FVInfo
+type CoreBindingWithFVs = AnnCoreBinding Id Id Unused FVInfo
 
 lvlBind :: Level
 	-> LevelEnvs
@@ -296,10 +290,7 @@ lvlExpr ctxt_lvl (venv, tenv) (_, AnnLam (TyBinder tyvar) body)
     returnLvl (Lam (TyBinder tyvar) body')
   where
     incd_lvl = incMinorLvl ctxt_lvl
-    new_tenv = addOneToTyVarEnv tenv tyvar incd_lvl
-
-lvlExpr ctxt_lvl (venv, tenv) (_, AnnLam (UsageBinder u) e)
-  = panic "SetLevels.lvlExpr:AnnLam UsageBinder"
+    new_tenv = addToTyVarEnv tenv tyvar incd_lvl
 
 lvlExpr ctxt_lvl envs (_, AnnLet bind body)
   = lvlBind ctxt_lvl envs bind		`thenLvl` \ (binds', new_envs) ->
@@ -356,7 +347,7 @@ lvlMFE ::  Level		-- Level of innermost enclosing lambda/tylam
 	-> LvlM LevelledExpr	-- Result expression
 
 lvlMFE ctxt_lvl envs@(venv,_) ann_expr
-  | isPrimType ty	-- Can't let-bind it
+  | isUnpointedType ty	-- Can't let-bind it
   = lvlExpr ctxt_lvl envs ann_expr
 
   | otherwise		-- Not primitive type so could be let-bound

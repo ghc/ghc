@@ -8,44 +8,37 @@ in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
-#include "HsVersions.h"
-
 module DsBinds ( dsBinds, dsMonoBinds ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)		-- break dsExpr-ish loop
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} DsExpr
-#endif
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import CoreUtils	( coreExprType )
-import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr),
-			  SYN_IE(TypecheckedMonoBinds),
-			  SYN_IE(TypecheckedPat)
+import TcHsSyn		( TypecheckedHsBinds, TypecheckedHsExpr,
+			  TypecheckedMonoBinds,
+			  TypecheckedPat
 			)
 import DsMonad
 import DsGRHSs		( dsGuarded )
 import DsUtils
 import Match		( matchWrapper )
 
-import BasicTypes       ( SYN_IE(Module) )
+import BasicTypes       ( Module, RecFlag(..) )
 import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs, 
 			  opt_AutoSccsOnExportedToplevs
 		        )
 import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC, preludeDictsCostCentre )
-import Id		( idType, SYN_IE(DictVar), GenId, SYN_IE(Id) )
---ToDo: rm import ListSetOps	( minusList, intersectLists )
+import Id		( idType, DictVar, Id )
 import Name		( isExported )
-import PprType		( GenType )
-import Outputable	( PprStyle(..) )
 import Type		( mkTyVarTy, isDictTy, instantiateTy
 			)
-import TyVar		( tyVarSetToList, GenTyVar{-instance Eq-} )
+import TyVar		( tyVarSetToList, zipTyVarEnv )
 import TysPrim		( voidTy )
-import Util		( isIn, panic, assertPanic  )
+import Util		( isIn )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -69,11 +62,10 @@ dsBinds auto_scc (ThenBinds binds_1 binds_2)
   = andDs (++) (dsBinds auto_scc binds_1) (dsBinds auto_scc binds_2)
 
 dsBinds auto_scc (MonoBind binds sigs is_rec)
-  = dsMonoBinds auto_scc is_rec binds []  `thenDs` \ prs ->
-    returnDs (if is_rec then
-		[Rec prs]
-	      else
-		[NonRec binder rhs | (binder,rhs) <- prs]
+  = dsMonoBinds auto_scc binds []  `thenDs` \ prs ->
+    returnDs (case is_rec of
+		Recursive    -> [Rec prs]
+	        NonRecursive -> [NonRec binder rhs | (binder,rhs) <- prs]
     )
 \end{code}
 
@@ -86,21 +78,20 @@ dsBinds auto_scc (MonoBind binds sigs is_rec)
 
 \begin{code}
 dsMonoBinds :: Bool		-- False => don't (auto-)annotate scc on toplevs.
-	    -> RecFlag 
 	    -> TypecheckedMonoBinds
 	    -> [(Id,CoreExpr)]		-- Put this on the end (avoid quadratic append)
 	    -> DsM [(Id,CoreExpr)]	-- Result
 
-dsMonoBinds _ is_rec EmptyMonoBinds rest = returnDs rest
+dsMonoBinds _ EmptyMonoBinds rest = returnDs rest
 
-dsMonoBinds auto_scc is_rec (AndMonoBinds  binds_1 binds_2) rest
-  = dsMonoBinds auto_scc is_rec binds_2 rest	`thenDs` \ rest' ->
-    dsMonoBinds auto_scc is_rec binds_1 rest'
+dsMonoBinds auto_scc (AndMonoBinds  binds_1 binds_2) rest
+  = dsMonoBinds auto_scc binds_2 rest	`thenDs` \ rest' ->
+    dsMonoBinds auto_scc binds_1 rest'
 
-dsMonoBinds _ is_rec (CoreMonoBind var core_expr) rest
+dsMonoBinds _ (CoreMonoBind var core_expr) rest
   = returnDs ((var, core_expr) : rest)
 
-dsMonoBinds _ is_rec (VarMonoBind var expr) rest
+dsMonoBinds _ (VarMonoBind var expr) rest
   = dsExpr expr			`thenDs` \ core_expr ->
 
 	-- Dictionary bindings are always VarMonoBinds, so
@@ -109,7 +100,7 @@ dsMonoBinds _ is_rec (VarMonoBind var expr) rest
 
     returnDs ((var, core_expr') : rest)
 
-dsMonoBinds auto_scc is_rec (FunMonoBind fun _ matches locn) rest
+dsMonoBinds auto_scc (FunMonoBind fun _ matches locn) rest
   = putSrcLocDs locn	$
     matchWrapper (FunMatch fun) matches error_string	`thenDs` \ (args, body) ->
     addAutoScc auto_scc (fun, mkValLam args body)       `thenDs` \ pair ->
@@ -117,35 +108,35 @@ dsMonoBinds auto_scc is_rec (FunMonoBind fun _ matches locn) rest
   where
     error_string = "function " ++ showForErr fun
 
-dsMonoBinds _ is_rec (PatMonoBind pat grhss_and_binds locn) rest
+dsMonoBinds _ (PatMonoBind pat grhss_and_binds locn) rest
   = putSrcLocDs locn $
     dsGuarded grhss_and_binds		`thenDs` \ body_expr ->
     mkSelectorBinds pat body_expr	`thenDs` \ sel_binds ->
     returnDs (sel_binds ++ rest)
 
 	-- Common special case: no type or dictionary abstraction
-dsMonoBinds auto_scc is_rec (AbsBinds [] [] exports binds) rest
+dsMonoBinds auto_scc (AbsBinds [] [] exports binds) rest
   = mapDs (addAutoScc auto_scc) [(global, Var local) | (_, global, local) <- exports] `thenDs` \ exports' ->
-    dsMonoBinds False is_rec binds (exports' ++ rest)
+    dsMonoBinds False binds (exports' ++ rest)
 
 	-- Another common case: one exported variable
 	-- All non-recursive bindings come through this way
-dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds) rest
+dsMonoBinds auto_scc (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds) rest
   = ASSERT( all (`elem` tyvars) all_tyvars )
-    dsMonoBinds False is_rec binds []			`thenDs` \ core_prs ->
+    dsMonoBinds False binds []			`thenDs` \ core_prs ->
     let 
-	core_binds | is_rec    = [Rec core_prs]
-		   | otherwise = [NonRec b e | (b,e) <- core_prs]
+	-- Always treat the binds as recursive, because the typechecker
+	-- makes rather mixed-up dictionary bindings
+	core_binds = [Rec core_prs]
     in
     addAutoScc auto_scc (global, mkLam tyvars dicts $ 
 			         mkCoLetsAny core_binds (Var local)) `thenDs` \ global' ->
     returnDs (global' : rest)
 
-dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts exports binds) rest
-  = dsMonoBinds False is_rec binds []			`thenDs` \ core_prs ->
+dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports binds) rest
+  = dsMonoBinds False binds []			`thenDs` \ core_prs ->
     let 
-	core_binds | is_rec    = [Rec core_prs]
-		   | otherwise = [NonRec b e | (b,e) <- core_prs]
+	core_binds = [Rec core_prs]
 
 	tup_expr = mkLam all_tyvars dicts $
 		   mkCoLetsAny core_binds $
@@ -169,7 +160,7 @@ dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts exports binds) rest
 	    mk_ty_arg all_tyvar | all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
 				| otherwise		  = voidTy
 	    ty_args = map mk_ty_arg all_tyvars
-	    env     = all_tyvars `zip` ty_args
+	    env     = all_tyvars `zipTyVarEnv` ty_args
     in
     zipWithDs mk_bind exports [0..]		`thenDs` \ export_binds ->
      -- don't scc (auto-)annotate the tuple itself.

@@ -8,11 +8,9 @@ ToDo:
    (i1 + i2) only if it results	in a valid Float.
 
 \begin{code}
-#include "HsVersions.h"
-
 module ConFold	( completePrim ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CoreSyn
 import CoreUnfold	( Unfolding, SimpleUnfolding )
@@ -24,9 +22,7 @@ import SimplEnv
 import SimplMonad
 import TysWiredIn	( trueDataCon, falseDataCon )
 
-#ifdef REALLY_HASKELL_1_3
-import Char(ord,chr)
-#endif
+import Char		( ord, chr )
 \end{code}
 
 \begin{code}

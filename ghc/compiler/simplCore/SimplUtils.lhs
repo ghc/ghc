@@ -4,8 +4,6 @@
 \section[SimplUtils]{The simplifier utilities}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SimplUtils (
 
 	floatExposesHNF,
@@ -19,17 +17,14 @@ module SimplUtils (
 	singleConstructorType, typeOkForCase
     ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
-#endif
+#include "HsVersions.h"
 
 import BinderInfo
 import CmdLineOpts	( opt_DoEtaReduction, SimplifierSwitch(..) )
 import CoreSyn
 import CoreUnfold	( SimpleUnfolding, mkFormSummary, exprIsTrivial, FormSummary(..) )
 import Id		( idType, isBottomingId, addInlinePragma, addIdDemandInfo,
-			  idWantsToBeINLINEd, dataConArgTys, SYN_IE(Id),
+			  idWantsToBeINLINEd, dataConArgTys, Id,
 			  getIdArity, GenId{-instance Eq-}
 			)
 import IdInfo		( ArityInfo(..), DemandInfo )
@@ -38,8 +33,8 @@ import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
-import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, isPrimType, getTyVar_maybe,
-			  maybeAppDataTyConExpandingDicts, SYN_IE(Type)
+import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, getTyVar_maybe,
+			  splitAlgTyConApp_maybe, Type
 			)
 import TyCon		( isDataTyCon )
 import TyVar		( elementOfTyVarSet,
@@ -60,7 +55,7 @@ floatExposesHNF
 	:: Bool 		-- Float let(rec)s out of rhs
 	-> Bool 		-- Float cheap primops out of rhs
 	-> Bool 		-- OK to duplicate code
-	-> GenCoreExpr bdr Id tyvar uvar
+	-> GenCoreExpr bdr Id flexi
 	-> Bool
 
 floatExposesHNF float_lets float_primops ok_to_dup rhs
@@ -320,7 +315,7 @@ arguments as you care to give it.  For this special case we return
 100, to represent "infinity", which is a bit of a hack.
 
 \begin{code}
-etaExpandCount :: GenCoreExpr bdr Id tyvar uvar
+etaExpandCount :: GenCoreExpr bdr Id flexi
 	       -> Int	-- Number of extra args you can safely abstract
 
 etaExpandCount (Lam (ValBinder _) body)
@@ -349,7 +344,7 @@ etaExpandCount other = 0    -- Give up
 	-- Case with non-whnf scrutinee
 
 -----------------------------
-eta_fun :: GenCoreExpr bdr Id tv uv -- The function
+eta_fun :: GenCoreExpr bdr Id flexi -- The function
 	-> Int			    -- How many args it can safely be applied to
 
 eta_fun (App fun arg) | notValArg arg = eta_fun fun
@@ -384,7 +379,7 @@ which aren't WHNF but are ``cheap'' are:
 	where op is a cheap primitive operator
 
 \begin{code}
-manifestlyCheap :: GenCoreExpr bndr Id tv uv -> Bool
+manifestlyCheap :: GenCoreExpr bndr Id flexi -> Bool
 
 manifestlyCheap (Var _)        = True
 manifestlyCheap (Lit _)        = True
@@ -401,7 +396,7 @@ manifestlyCheap (Case scrut alts)
   = manifestlyCheap scrut && all manifestlyCheap (rhssOfAlts alts)
 
 manifestlyCheap other_expr   -- look for manifest partial application
-  = case (collectArgs other_expr) of { (fun, _, _, vargs) ->
+  = case (collectArgs other_expr) of { (fun, _, vargs) ->
     case fun of
 
       Var f | isBottomingId f -> True	-- Application of a function which
@@ -458,13 +453,13 @@ idMinArity id = case getIdArity id of
 
 singleConstructorType :: Type -> Bool
 singleConstructorType ty
-  = case (maybeAppDataTyConExpandingDicts ty) of
+  = case (splitAlgTyConApp_maybe ty) of
       Just (tycon, ty_args, [con]) | isDataTyCon tycon -> True
       other			   		       -> False
 
 typeOkForCase :: Type -> Bool
 typeOkForCase ty
-  = case (maybeAppDataTyConExpandingDicts ty) of
+  = case (splitAlgTyConApp_maybe ty) of
       Just (tycon, ty_args, [])                 		    -> False
       Just (tycon, ty_args, non_null_data_cons) | isDataTyCon tycon -> True
       other	                                   		    -> False

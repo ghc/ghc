@@ -3,21 +3,14 @@
 %
 
 \begin{code}
-#include "HsVersions.h"
-
 module StixMacro ( macroCode, heapCheck ) where
 
-IMP_Ubiq(){-uitious-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(NcgLoop)		( amodeToStix )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} StixPrim ( amodeToStix )
-#endif
 
 import MachMisc
-
 import MachRegs
-
 import AbsCSyn		( CStmtMacro(..), MagicId(..), mkIntCLit, CAddrMode )
 import Constants	( uF_RET, uF_SUA, uF_SUB, uF_UPDATEE,
 			  sTD_UF_SIZE
@@ -26,7 +19,7 @@ import OrdList		( OrdList )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix
-import UniqSupply	( returnUs, thenUs, SYN_IE(UniqSM) )
+import UniqSupply	( returnUs, thenUs, UniqSM )
 \end{code}
 
 The @ARGS_CHK_A{_LOAD_NODE}@ macros check for sufficient arguments on

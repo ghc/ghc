@@ -192,7 +192,7 @@ instance  Integral Int	where
     a@(I# _) `quotRem` b@(I# _)	= (a `quotInt` b, a `remInt` b)
     -- OK, so I made it a little stricter.  Shoot me.  (WDP 94/10)
 
-    -- following chks for zero divisor are non-standard (WDP)
+    -- Following chks for zero divisor are non-standard (WDP)
     a `quot` b	=  if b /= 0
 		   then a `quotInt` b
 		   else error "Integral.Int.quot{PreludeCore}: divide by 0\n"
@@ -716,7 +716,7 @@ numericEnumFromThenTo n m p = takeWhile (if m >= n then (<= p) else (>= p))
 %*********************************************************
 
 \begin{code}
-data  (Integral a)	=> Ratio a = !a :% !a  deriving (Eq)
+data  (Eval a, Integral a)	=> Ratio a = !a :% !a  deriving (Eq)
 type  Rational		=  Ratio Integer
 \end{code}
 

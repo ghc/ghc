@@ -4,8 +4,6 @@
 \section[Demand]{@Demand@: the amount of demand on a value}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Demand(
 	Demand(..),
 
@@ -15,9 +13,10 @@ module Demand(
 	showDemands
      ) where
 
+#include "HsVersions.h"
+
 import BasicTypes	( NewOrData(..) )
 import Outputable
-import Pretty		( Doc, text )
 import Util		( panic )
 \end{code}
 
@@ -147,5 +146,5 @@ show_demand (WwUnpack nd wu args) rest = ch:'(':showList args (')' : rest)
 							 | otherwise -> 'n'
 
 instance Outputable Demand where
-    ppr sty si = text (showList [si] "")
+    ppr si = text (showList [si] "")
 \end{code}

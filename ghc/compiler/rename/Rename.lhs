@@ -4,27 +4,17 @@
 \section[Rename]{Renaming and dependency analysis passes}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Rename ( renameModule ) where
 
-#if __GLASGOW_HASKELL__ <= 201
-import PreludeGlaST	( thenPrimIO )
-#else
-import GlaExts
-import IO
-#endif
-
-IMP_Ubiq()
-IMPORT_1_3(List(partition))
+#include "HsVersions.h"
 
 import HsSyn
-import RdrHsSyn		( RdrName(..), SYN_IE(RdrNameHsModule), SYN_IE(RdrNameImportDecl) )
-import RnHsSyn		( SYN_IE(RenamedHsModule), SYN_IE(RenamedHsDecl), extractHsTyNames )
+import RdrHsSyn		( RdrName(..), RdrNameHsModule, RdrNameImportDecl )
+import RnHsSyn		( RenamedHsModule, RenamedHsDecl, extractHsTyNames )
 
 import CmdLineOpts	( opt_HiMap, opt_WarnNameShadowing, opt_D_show_rn_trace,
 			  opt_D_dump_rn, opt_D_show_rn_stats,
-			  opt_D_show_unused_imports, opt_PprUserLength
+			  opt_WarnUnusedNames
 		        )
 import RnMonad
 import RnNames		( getGlobalNames )
@@ -33,10 +23,10 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpeci
 			  getDeferredDataDecls,
 			  mkSearchPath, getSlurpedNames, getRnStats
 			)
-import RnEnv		( availsToNameSet, addAvailToNameSet, 
+import RnEnv		( availsToNameSet, addAvailToNameSet,
 			  addImplicitOccsRn, lookupImplicitOccRn )
-import Id		( GenId {- instance NamedThing -} )
-import Name		( Name, Provenance, ExportFlag(..), isLocallyDefined,
+import Name		( Name, PrintUnqualified, Provenance, ExportFlag(..), 
+			  isLocallyDefined,
 			  NameSet(..), elemNameSet, mkNameSet, unionNameSets, 
 			  nameSetToList, minusNameSet, NamedThing(..),
 			  nameModule, pprModule, pprOccName, nameOccName
@@ -45,19 +35,16 @@ import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
 import TyCon		( TyCon )
 import PrelMods		( mAIN, gHC_MAIN )
 import PrelInfo		( ioTyCon_NAME )
-import ErrUtils		( SYN_IE(Error), SYN_IE(Warning), pprBagOfErrors, 
+import ErrUtils		( pprBagOfErrors, pprBagOfWarnings,
 			  doIfSet, dumpIfSet, ghcExit
 			)
 import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, FiniteMap )
-import Pretty
-import Outputable	( Outputable(..), PprStyle(..), 
-			  pprErrorsStyle, pprDumpStyle, printErrs
-			)
 import Bag		( isEmptyBag )
-import Util		( cmpPString, equivClasses, panic, assertPanic, pprTrace )
-#if __GLASGOW_HASKELL__ >= 202
-import UniqSupply
-#endif
+import UniqSupply	( UniqSupply )
+import Util		( equivClasses )
+import Maybes		( maybeToBool )
+import List		( partition )
+import Outputable
 \end{code}
 
 
@@ -78,11 +65,11 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
 
 	-- Check for warnings
     doIfSet (not (isEmptyBag rn_warns_bag))
-	    (print_errs rn_warns_bag)			>>
+	    (printErrs (pprBagOfWarnings rn_warns_bag))	>>
 
 	-- Check for errors; exit if so
     doIfSet (not (isEmptyBag rn_errs_bag))
-	    (print_errs rn_errs_bag	 >>
+	    (printErrs (pprBagOfErrors rn_errs_bag)	 >>
 	     ghcExit 1
 	    )						 >>
 
@@ -91,29 +78,28 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
 	Nothing  -> return ()
 	Just results@(rn_mod, _, _, _)
 		 -> dumpIfSet opt_D_dump_rn "Renamer:"
-			      (ppr pprDumpStyle rn_mod)
+			      (ppr rn_mod)
     )							>>
 
 	-- Return results
     return maybe_rn_stuff
-
-
-print_errs errs = printErrs (pprBagOfErrors pprErrorsStyle errs)
 \end{code}
 
 
 \begin{code}
 rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc)
-  = 	-- FIND THE GLOBAL NAME ENVIRONMENT
-    getGlobalNames this_mod			`thenRn` \ global_name_info ->
+  =  	-- FIND THE GLOBAL NAME ENVIRONMENT
+    getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
 
-    case global_name_info of {
-	Nothing -> 	-- Everything is up to date; no need to recompile further
-			rnStats []		`thenRn_`
-			returnRn Nothing ;
-
-			-- Otherwise, just carry on
-	Just (export_env, rn_env, explicit_names) ->
+	-- CHECK FOR EARLY EXIT
+    if not (maybeToBool maybe_stuff) then
+	-- Everything is up to date; no need to recompile further
+	rnStats []		`thenRn_`
+	returnRn Nothing
+    else
+    let
+  	Just (export_env, rn_env, explicit_names, print_unqual) = maybe_stuff
+    in
 
 	-- RENAME THE SOURCE
     initRnMS rn_env mod_name SourceMode (
@@ -122,8 +108,15 @@ rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc
     )							`thenRn` \ rn_local_decls ->
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
-    slurpDecls rn_local_decls				`thenRn` \ rn_all_decls ->
+    slurpDecls print_unqual rn_local_decls		`thenRn` \ rn_all_decls ->
 
+	-- EXIT IF ERRORS FOUND
+    checkErrsRn				`thenRn` \ no_errs_so_far ->
+    if not no_errs_so_far then
+	-- Found errors already, so exit now
+	rnStats []		`thenRn_`
+	returnRn Nothing
+    else
 
 	-- GENERATE THE VERSION/USAGE INFO
     getImportVersions mod_name exports			`thenRn` \ import_versions ->
@@ -160,7 +153,6 @@ rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc
 		    (import_versions, export_env, special_inst_mods),
 		     name_supply,
 		     import_mods))
-    }
   where
     trashed_exports  = {-trace "rnSource:trashed_exports"-} Nothing
     trashed_imports  = {-trace "rnSource:trashed_imports"-} []
@@ -188,21 +180,24 @@ addImplicits mod_name
 
 
 \begin{code}
-slurpDecls decls
+slurpDecls print_unqual decls
   = 	-- First of all, get all the compulsory decls
     slurp_compulsories decls	`thenRn` \ decls1 ->
 
 	-- Next get the optional ones
-    closeDecls Optional decls1	`thenRn` \ decls2 ->
+    closeDecls optional_mode decls1	`thenRn` \ decls2 ->
 
 	-- Finally get those deferred data type declarations
-    getDeferredDataDecls			`thenRn` \ data_decls ->
-    mapRn rn_data_decl data_decls		`thenRn` \ rn_data_decls ->
+    getDeferredDataDecls				`thenRn` \ data_decls ->
+    mapRn (rn_data_decl compulsory_mode) data_decls	`thenRn` \ rn_data_decls ->
 
 	-- Done
     returnRn (rn_data_decls ++ decls2)
 
   where
+    compulsory_mode = InterfaceMode Compulsory print_unqual
+    optional_mode   = InterfaceMode Optional   print_unqual
+
 	-- The "slurp_compulsories" function is a loop that alternates
 	-- between slurping compulsory decls and slurping the instance
 	-- decls thus made relavant.
@@ -215,7 +210,7 @@ slurpDecls decls
 	-- 	whose decl we must slurp, which might let in some new instance decls,
 	--	and so on.  Example:  instance Foo a => Baz [a] where ...
     slurp_compulsories decls
-      = closeDecls Compulsory decls	`thenRn` \ decls1 ->
+      = closeDecls compulsory_mode decls	`thenRn` \ decls1 ->
 	
 		-- Instance decls still pending?
         getImportedInstDecls			`thenRn` \ inst_decls ->
@@ -225,55 +220,53 @@ slurpDecls decls
 	else
 		-- Yes, there are some, so rename them and loop
 	     traceRn (sep [ptext SLIT("Slurped"), int (length inst_decls), ptext SLIT("instance decls")])
-						`thenRn_`
-	     mapRn rn_inst_decl inst_decls	`thenRn` \ new_inst_decls ->
+								`thenRn_`
+	     mapRn (rn_inst_decl compulsory_mode) inst_decls	`thenRn` \ new_inst_decls ->
     	     slurp_compulsories (new_inst_decls ++ decls1)
 \end{code}
 
 \begin{code}
-closeDecls :: Necessity
+closeDecls :: RnSMode
 	   -> [RenamedHsDecl]			-- Declarations got so far
 	   -> RnMG [RenamedHsDecl]		-- input + extra decls slurped
 	-- The monad includes a list of possibly-unresolved Names
 	-- This list is empty when closeDecls returns
 
-closeDecls necessity decls 
-  = popOccurrenceName necessity		`thenRn` \ maybe_unresolved ->
+closeDecls mode decls 
+  = popOccurrenceName mode		`thenRn` \ maybe_unresolved ->
     case maybe_unresolved of
 
 	-- No more unresolved names
 	Nothing -> returnRn decls
 			
 	-- An unresolved name
-	Just name
+	Just name_w_loc
 	  -> 	-- Slurp its declaration, if any
---	     traceRn (sep [ptext SLIT("Considering"), ppr PprDebug name])	`thenRn_`
-	     importDecl name necessity		`thenRn` \ maybe_decl ->
+--	     traceRn (sep [ptext SLIT("Considering"), ppr name_w_loc])	`thenRn_`
+	     importDecl name_w_loc mode		`thenRn` \ maybe_decl ->
 	     case maybe_decl of
 
 		-- No declaration... (wired in thing or optional)
-		Nothing   -> closeDecls necessity decls
+		Nothing   -> closeDecls mode decls
 
 		-- Found a declaration... rename it
-		Just decl -> rn_iface_decl mod_name necessity decl	`thenRn` \ new_decl ->
-			     closeDecls necessity (new_decl : decls)
+		Just decl -> rn_iface_decl mod_name mode decl	`thenRn` \ new_decl ->
+			     closeDecls mode (new_decl : decls)
 			 where
-		           mod_name = nameModule name
+		           mod_name = nameModule (fst name_w_loc)
 
-
-rn_iface_decl mod_name necessity decl	-- Notice that the rnEnv starts empty
-  = initRnMS emptyRnEnv mod_name (InterfaceMode necessity) (rnDecl decl)
+rn_iface_decl mod_name mode decl
+  = initRnMS emptyRnEnv mod_name mode (rnDecl decl)
 					
-rn_inst_decl (mod_name,decl)      = rn_iface_decl mod_name Compulsory (InstD decl)
-
-rn_data_decl (tycon_name,ty_decl) = rn_iface_decl mod_name Compulsory (TyD ty_decl)
-				  where
-				    mod_name = nameModule tycon_name
+rn_inst_decl mode (mod_name,decl)      = rn_iface_decl mod_name mode (InstD decl)
+rn_data_decl mode (tycon_name,ty_decl) = rn_iface_decl mod_name mode (TyD ty_decl)
+				       where
+					 mod_name = nameModule tycon_name
 \end{code}
 
 \begin{code}
 reportUnusedNames explicit_avail_names
-  | not opt_D_show_unused_imports
+  | not opt_WarnUnusedNames
   = returnRn ()
 
   | otherwise
@@ -282,15 +275,15 @@ reportUnusedNames explicit_avail_names
 	unused	      = explicit_avail_names `minusNameSet` slurped_names
 	(local_unused, imported_unused) = partition isLocallyDefined (nameSetToList unused)
 	imports_by_module = equivClasses cmp imported_unused
-	name1 `cmp` name2 = nameModule name1 `_CMP_STRING_` nameModule name2 
+	name1 `cmp` name2 = nameModule name1 `compare` nameModule name2 
 
-	pp_imp sty = sep [text "For information: the following unqualified imports are unused:",
-			  nest 4 (vcat (map (pp_group sty) imports_by_module))]
-	pp_group sty (n:ns) = sep [hcat [text "Module ", pprModule (PprForUser opt_PprUserLength) (nameModule n), char ':'],
-				   nest 4 (sep (map (pprOccName sty . nameOccName) (n:ns)))]
+	pp_imp = sep [text "For information: the following unqualified imports are unused:",
+			  nest 4 (vcat (map pp_group imports_by_module))]
+	pp_group (n:ns) = sep [hcat [text "Module ", pprModule (nameModule n), char ':'],
+				   nest 4 (sep (map (pprOccName . nameOccName) (n:ns)))]
 
-	pp_local sty = sep [text "For information: the following local top-level definitions are unused:",
-			    nest 4 (sep (map (pprOccName sty . nameOccName) local_unused))]
+	pp_local = sep [text "For information: the following local top-level definitions are unused:",
+			    nest 4 (sep (map (pprOccName . nameOccName) local_unused))]
     in
     (if null imported_unused 
      then returnRn ()

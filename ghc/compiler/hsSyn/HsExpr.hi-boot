@@ -2,5 +2,5 @@ _interface_ HsExpr 1
 _exports_
 HsExpr HsExpr pprExpr;
 _declarations_
-1 data HsExpr a b c d;
-1 pprExpr _:_ _forall_ [a b c d] {Name.NamedThing c, Outputable.Outputable c, Outputable.Outputable d, PrelBase.Eq a, Outputable.Outputable a, PrelBase.Eq b, Outputable.Outputable b} => Outputable.PprStyle -> HsExpr.HsExpr a b c d -> Pretty.Doc ;;
+1 data HsExpr f i p;
+1 pprExpr _:_ _forall_ [i p f] {Name.NamedThing i, Outputable.Outputable i, Outputable.Outputable p} => HsExpr.HsExpr f i p -> Outputable.SDoc ;;

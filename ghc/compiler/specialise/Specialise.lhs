@@ -4,8 +4,6 @@
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Specialise (
 	specProgram,
 	initSpecData,
@@ -13,13 +11,12 @@ module Specialise (
 	SpecialiseData(..)
     ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(List(partition))
+#include "HsVersions.h"
 
 import Bag		( emptyBag, unitBag, isEmptyBag, unionBags,
 			  partitionBag, listToBag, bagToList, Bag
 			)
-import Class		( GenClass{-instance Eq-}, SYN_IE(Class) )
+import Class		( Class )
 import CmdLineOpts	( opt_SpecialiseImports, opt_D_simplifier_stats,
 			  opt_SpecialiseTrace
 			)
@@ -34,33 +31,29 @@ import Id		( idType, isDefaultMethodId_maybe, toplevelishId,
 			  isImportedId, mkIdWithNewUniq,
 			  dataConTyCon, applyTypeEnvToId,
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
-			  lookupIdEnv, SYN_IE(IdEnv),
+			  lookupIdEnv, IdEnv,
 			  emptyIdSet, mkIdSet, unitIdSet,
 			  elementOfIdSet, minusIdSet,
-			  unionIdSets, unionManyIdSets, SYN_IE(IdSet),
-			  GenId{-instance Eq-}, SYN_IE(Id)
+			  unionIdSets, unionManyIdSets, IdSet,
+			  GenId{-instance Eq-}, Id
 			)
 import Literal		( Literal{-instance Outputable-} )
 import Maybes		( catMaybes, firstJust, maybeToBool )
 import Name		( isLocallyDefined )
-import Outputable	( PprStyle(..), interppSP, Outputable(..){-instance * []-} )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  GenType{-instance Outputable-}, GenTyVar{-ditto-},
 			  TyCon{-ditto-}
 			)
-import Pretty		( hang, hsep, text, vcat, hcat, ptext, char,
-			  int, space, empty, Doc
-			)
 import PrimOp		( PrimOp(..) )
 import SpecUtils
-import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, getAppDataTyConExpandingDicts,
-			  tyVarsOfTypes, applyTypeEnvToTy, isUnboxedType, isDictTy,
-			  SYN_IE(Type)
+import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, splitAlgTyConApp,
+			  tyVarsOfTypes, instantiateTy, isUnboxedType, isDictTy,
+			  Type
 			)
 import TyCon		( TyCon{-instance Eq-} )
 import TyVar		( cloneTyVar, mkSysTyVar,
-			  elementOfTyVarSet, SYN_IE(TyVarSet),
-			  nullTyVarEnv, growTyVarEnvList, SYN_IE(TyVarEnv),
+			  elementOfTyVarSet, TyVarSet,
+			  emptyTyVarEnv, growTyVarEnvList, TyVarEnv,
 			  GenTyVar{-instance Eq-}
 			)
 import TysWiredIn	( liftDataCon )
@@ -68,8 +61,10 @@ import Unique		( Unique{-instance Eq-} )
 import UniqSet		( mkUniqSet, unionUniqSets, uniqSetToList )
 import UniqSupply	( splitUniqSupply, getUniques, getUnique )
 import Util		( equivClasses, mapAccumL, assoc, zipEqual, zipWithEqual,
-			  thenCmp, panic, pprTrace, pprPanic, assertPanic
+			  thenCmp
 			)
+import List		( partition )
+import Outputable
 
 infixr 9 `thenSM`
 
@@ -717,18 +712,18 @@ data CallInstance
 \begin{code}
 pprCI :: CallInstance -> Doc
 pprCI (CallInstance id spec_tys dicts _ maybe_specinfo)
-  = hang (hsep [ptext SLIT("Call inst for"), ppr PprDebug id])
-	 4 (vcat [hsep (text "types" : [pprMaybeTy PprDebug ty | ty <- spec_tys]),
+  = hang (hsep [ptext SLIT("Call inst for"), ppr id])
+	 4 (vcat [hsep (text "types" : [pprMaybeTy ty | ty <- spec_tys]),
 		      case maybe_specinfo of
-			Nothing -> hsep (text "dicts" : [ppr_arg PprDebug dict | dict <- dicts])
+			Nothing -> hsep (text "dicts" : [ppr_arg dict | dict <- dicts])
 			Just (SpecInfo _ _ spec_id)
-				-> hsep [ptext SLIT("Explicit SpecId"), ppr PprDebug spec_id]
+				-> hsep [ptext SLIT("Explicit SpecId"), ppr spec_id]
 		     ])
 
 -- ToDo: instance Outputable CoreArg?
-ppr_arg sty (TyArg  t) = ppr sty t
-ppr_arg sty (LitArg i) = ppr sty i
-ppr_arg sty (VarArg v) = ppr sty v
+ppr_arg (TyArg  t) = ppr sty t
+ppr_arg (LitArg i) = ppr sty i
+ppr_arg (VarArg v) = ppr sty v
 
 isUnboxedCI :: CallInstance -> Bool
 isUnboxedCI (CallInstance _ spec_tys _ _ _)
@@ -745,17 +740,17 @@ Comparisons are based on the {\em types}, ignoring the dictionary args:
 
 \begin{code}
 
-cmpCI :: CallInstance -> CallInstance -> TAG_
+cmpCI :: CallInstance -> CallInstance -> Ordering
 cmpCI (CallInstance id1 tys1 _ _ _) (CallInstance id2 tys2 _ _ _)
-  = cmp id1 id2 `thenCmp` cmpUniTypeMaybeList tys1 tys2
+  = compare id1 id2 `thenCmp` cmpUniTypeMaybeList tys1 tys2
 
-cmpCI_tys :: CallInstance -> CallInstance -> TAG_
+cmpCI_tys :: CallInstance -> CallInstance -> Ordering
 cmpCI_tys (CallInstance _ tys1 _ _ _) (CallInstance _ tys2 _ _ _)
   = cmpUniTypeMaybeList tys1 tys2
 
 eqCI_tys :: CallInstance -> CallInstance -> Bool
 eqCI_tys c1 c2
-  = case cmpCI_tys c1 c2 of { EQ_ -> True; other -> False }
+  = case cmpCI_tys c1 c2 of { EQ -> True; other -> False }
 
 isCIofTheseIds :: [Id] -> CallInstance -> Bool
 isCIofTheseIds ids (CallInstance ci_id _ _ _ _)
@@ -795,7 +790,7 @@ getCIs top_lev ids (UsageDetails cis tycon_cis dbs fvs c i)
     in
     -- pprTrace "getCIs:"
     -- (hang (hcat [char '{',
-    --			   interppSP PprDebug ids,
+    --			   interppSP ids,
     --			   char '}'])
     --	     4 (vcat (map pprCI cis_here_list)))
     (cis_here_list, UsageDetails cis_not_here tycon_cis dbs fvs c i)
@@ -824,7 +819,7 @@ dumpCIs cis top_lev floating inst_cis bound_ids full_ids
        pprTrace ("dumpCIs: dumping CI which was not instantiated ... \n" ++
 		 "         (may be a non-HM recursive call)\n")
        (hang (hcat [char '{',
-			   interppSP PprDebug bound_ids,
+			   interppSP bound_ids,
 			   char '}'])
 	     4 (vcat [ptext SLIT("Dumping CIs:"),
 			  vcat (map pprCI (bagToList cis_of_bound_id)),
@@ -837,7 +832,7 @@ dumpCIs cis top_lev floating inst_cis bound_ids full_ids
        (if not (isEmptyBag cis_dump_unboxed)
 	then pprTrace "dumpCIs: bound dictionary arg ... WITH UNBOXED TYPES!\n"
 	     (hang (hcat [char '{',
-				 interppSP PprDebug full_ids,
+				 interppSP full_ids,
 				 char '}'])
 		   4 (vcat (map pprCI (bagToList cis_dump))))
 	else id)
@@ -890,11 +885,11 @@ data TyConInstance
   = TyConInstance TyCon			-- Type Constructor
 		  [Maybe Type]	-- Applied to these specialising types
 
-cmpTyConI :: TyConInstance -> TyConInstance -> TAG_
+cmpTyConI :: TyConInstance -> TyConInstance -> Ordering
 cmpTyConI (TyConInstance tc1 tys1) (TyConInstance tc2 tys2)
-  = cmp tc1 tc2 `thenCmp` cmpUniTypeMaybeList tys1 tys2
+  = compare tc1 tc2 `thenCmp` cmpUniTypeMaybeList tys1 tys2
 
-cmpTyConI_tys :: TyConInstance -> TyConInstance -> TAG_
+cmpTyConI_tys :: TyConInstance -> TyConInstance -> Ordering
 cmpTyConI_tys (TyConInstance _ tys1) (TyConInstance _ tys2)
   = cmpUniTypeMaybeList tys1 tys2
 
@@ -1237,7 +1232,7 @@ specTyConsAndScope scopeM
     (if opt_SpecialiseTrace && not (null tycon_specs_list) then
 	 pprTrace "Specialising TyCons:\n"
 	 (vcat [ if not (null specs) then
-			 hang (hsep [(ppr PprDebug tycon), ptext SLIT("at types")])
+			 hang (hsep [(ppr tycon), ptext SLIT("at types")])
 			      4 (vcat (map pp_specs specs))
 		     else empty
 		   | (tycon, specs) <- tycon_specs_list])
@@ -1254,7 +1249,7 @@ specTyConsAndScope scopeM
 	uniq_cis = map head (equivClasses cmpTyConI_tys tycon_cis)
 	tycon_specs = [(False, spec_tys) | TyConInstance _ spec_tys <- uniq_cis]
 
-    pp_specs (False, spec_tys) = hsep [pprMaybeTy PprDebug spec_ty | spec_ty <- spec_tys]
+    pp_specs (False, spec_tys) = hsep [pprMaybeTy spec_ty | spec_ty <- spec_tys]
 
 \end{code}
 
@@ -1535,7 +1530,7 @@ specAlts (AlgAlts alts deflt) scrutinee_ty args
     -- alternatives:
 
     (_, ty_args, _) = --trace "Specialise.specAlts:getAppData..." $
-		      getAppDataTyConExpandingDicts scrutinee_ty
+		      splitAlgTyConApp scrutinee_ty
 
     specAlgAlt ty_args (con,binders,rhs)
       = specLambdaOrCaseBody binders rhs args	`thenSM` \ (binders, rhs, rhs_uds) ->
@@ -1841,9 +1836,9 @@ instBind top_lev new_ids@(first_binder:other_binders) bind equiv_ciss inst_cis
     then pprTrace "dumpCIs: not same overloading ... top level \n"
     else (\ x y -> y)
    ) (hang (hcat [ptext SLIT("{"),
-			 interppSP PprDebug new_ids,
+			 interppSP new_ids,
 			 ptext SLIT("}")])
-   	   4 (vcat [vcat (map (pprGenType PprDebug . idType) new_ids),
+   	   4 (vcat [vcat (map (pprGenType . idType) new_ids),
 			vcat (map pprCI (concat equiv_ciss))]))
    (returnSM ([], emptyUDs, []))
 
@@ -2022,7 +2017,7 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
 	    	                mkCoLetsNoUnboxed local_dict_binds (mkTyLam poly_tyvars inst_rhs)),
 			  tickSpecInsts final_uds, spec_info)
 	  where
-	    lookup_orig_spec = lookupSpecEnv (getIdSpecialisation orig_id) arg_tys
+	    lookup_orig_spec = matchSpecEnv (getIdSpecialisation orig_id) arg_tys
 
 	    explicit_cis_for_this_id = filter (isCIofTheseIds [new_id]) explicit_cis
 	    [CallInstance _ _ _ _ (Just explicit_spec_info)] = explicit_cis_for_this_id
@@ -2031,19 +2026,19 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
 	    trace_nospec :: String -> Id -> a -> a
 	    trace_nospec str spec_id
 	      = pprTrace str
-	     	(hsep [ppr PprDebug new_id, hsep (map pp_ty arg_tys),
-			ptext SLIT("==>"), ppr PprDebug spec_id])
+	     	(hsep [ppr new_id, hsep (map pp_ty arg_tys),
+			ptext SLIT("==>"), ppr spec_id])
     in
     (if opt_SpecialiseTrace then
 	pprTrace "Specialising:"
 	(hang (hcat [char '{',
-			    interppSP PprDebug new_ids,
+			    interppSP new_ids,
 			    char '}'])
 	      4 (vcat [
 		 hcat [ptext SLIT("types: "), hsep (map pp_ty arg_tys)],
 		 if isExplicitCI do_cis then empty else
 		 hcat [ptext SLIT("dicts: "), hsep (map pp_dict dict_args)],
-		 hcat [ptext SLIT("specs: "), ppr PprDebug spec_ids]]))
+		 hcat [ptext SLIT("specs: "), ppr spec_ids]]))
      else id) (
 
     do_bind orig_bind		`thenSM` \ (maybe_inst_bind, inst_uds, spec_infos) ->
@@ -2051,8 +2046,8 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
     returnSM (maybe_inst_bind, inst_uds, spec_infos)
     )
   where
-    pp_dict d = ppr_arg PprDebug d
-    pp_ty t   = pprParendGenType PprDebug t
+    pp_dict d = ppr_arg d
+    pp_ty t   = pprParendGenType t
 
     do_the_wotsit (tyvar:tyvars) Nothing   = (tyvars, mkTyVarTy tyvar)
     do_the_wotsit tyvars         (Just ty) = (tyvars, ty)
@@ -2139,16 +2134,16 @@ mkTyConInstance con tys
     case record_inst of
       Nothing				-- No TyCon instance
 	-> -- pprTrace "NoTyConInst:"
-	   -- (hsep [ppr PprDebug tycon, ptext SLIT("at"),
-	   --	      ppr PprDebug con, hsep (map (ppr PprDebug) tys)])
+	   -- (hsep [ppr tycon, ptext SLIT("at"),
+	   --	      ppr con, hsep (map (ppr) tys)])
 	   (returnSM (singleConUDs con))
 
       Just spec_tys			-- Record TyCon instance
 	-> -- pprTrace "TyConInst:"
-	   -- (hsep [ppr PprDebug tycon, ptext SLIT("at"),
-	   --	      ppr PprDebug con, hsep (map (ppr PprDebug) tys),
+	   -- (hsep [ppr tycon, ptext SLIT("at"),
+	   --	      ppr con, hsep (map (ppr) tys),
 	   --	      hcat [char '(',
-	   --			 hsep [pprMaybeTy PprDebug ty | ty <- spec_tys],
+	   --			 hsep [pprMaybeTy ty | ty <- spec_tys],
 	   --			 char ')']])
 	   (returnSM (singleTyConI tycon spec_tys `unionUDs` singleConUDs con))
   where
@@ -2172,7 +2167,7 @@ recordTyConInst con tys
     in
     -- pprTrace "ConSpecExists?: "
     -- (vcat [ptext (if spec_exists then SLIT("True") else SLIT("False")),
-    --		  ppr PprShowAll con, hsep (map (ppr PprDebug) tys)])
+    --		  ppr PprShowAll con, hsep (map ppr tys)])
     (if (not spec_exists && do_tycon_spec)
      then returnSM (Just spec_tys)
      else returnSM Nothing)
@@ -2203,7 +2198,7 @@ type SpecM result
   -> UniqSupply
   -> result
 
-initSM m uniqs = m nullTyVarEnv nullIdEnv uniqs
+initSM m uniqs = m emptyTyVarEnv nullIdEnv uniqs
 
 returnSM :: a -> SpecM a
 thenSM	 :: SpecM a -> (a -> SpecM b) -> SpecM b
@@ -2348,8 +2343,7 @@ bindSpecIds olds clones spec_infos specm tvenv idenv us
        mk_old_to_clone rest_olds rest_clones spec_infos_rest
      where
        add_spec_info (NoLift (VarArg new))
-	 = NoLift (VarArg (new `addIdSpecialisation`
-				  (mkSpecEnv spec_infos_this_id)))
+	 = NoLift (VarArg (new `addIdSpecialisation` (mkSpecEnv spec_infos_this_id)))
        add_spec_info lifted
 	 = lifted		-- no specialised instances for unboxed lifted values
 
@@ -2376,7 +2370,7 @@ lookupId id tvenv idenv us
 specTy :: Type -> SpecM Type	-- Apply the current type envt to the type
 
 specTy ty tvenv idenv us
-  = applyTypeEnvToTy tvenv ty
+  = instantiateTy tvenv ty
 \end{code}
 
 \begin{code}
@@ -2488,10 +2482,10 @@ mkCall new_id arg_infos = returnSM (
 						      (Var unlift_spec_id))
 		       else
 			   pprPanic "Specialise:mkCall: unboxed spec_id not top-level ...\n"
-				    (hsep [ppr PprDebug new_id,
-					    hsep (map (pprParendGenType PprDebug) ty_args),
+				    (hsep [ppr new_id,
+					    hsep (map (pprParendGenType) ty_args),
 					    ptext SLIT("==>"),
-					    ppr PprDebug spec_id])
+					    ppr spec_id])
 		   else
 		   let
 		       (vals_left, _, unlifts_left) = unzip3 args_left
@@ -2526,18 +2520,18 @@ checkUnspecOK :: Id -> [Type] -> a -> a
 checkUnspecOK check_id tys
   = if isLocallyDefined check_id && any isUnboxedType tys
     then pprPanic "Specialise:checkUnspecOK: unboxed instance for local id not found\n"
-		  (hsep [ppr PprDebug check_id,
-			  hsep (map (pprParendGenType PprDebug) tys)])
+		  (hsep [ppr check_id,
+			  hsep (map (pprParendGenType) tys)])
     else id
 
 checkSpecOK :: Id -> [Type] -> Id -> [Type] -> a -> a
 checkSpecOK check_id tys spec_id tys_left
   = if any isUnboxedType tys_left
     then pprPanic "Specialise:checkSpecOK: unboxed type args in specialised application\n"
-		  (vcat [hsep [ppr PprDebug check_id,
-				    hsep (map (pprParendGenType PprDebug) tys)],
-			     hsep [ppr PprDebug spec_id,
-				    hsep (map (pprParendGenType PprDebug) tys_left)]])
+		  (vcat [hsep [ppr check_id,
+				    hsep (map (pprParendGenType) tys)],
+			     hsep [ppr spec_id,
+				    hsep (map (pprParendGenType) tys_left)]])
     else id
 -}
 \end{code}

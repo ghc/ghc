@@ -11,6 +11,8 @@ GHC
   ->
 
   All	-- Pseudo class used for universal quantification
+  CCallable
+  CReturnable
 
   Void
 -- void CAF is defined in PrelBase
@@ -60,6 +62,7 @@ GHC
   +#
   -#
   *#
+  /#
   quotInt#
   remInt#
   negateInt#
@@ -227,6 +230,10 @@ indexDoubleOffForeignObj#
   StablePtr#
   makeStablePtr#
   deRefStablePtr#
-
   reallyUnsafePtrEquality#
 ;
+
+_declarations_
+
+1 class CCallable a :: ** ;
+1 class CReturnable a :: ** ;

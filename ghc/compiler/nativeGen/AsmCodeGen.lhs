@@ -3,12 +3,11 @@
 %
 
 \begin{code}
-#include "HsVersions.h"
-
 module AsmCodeGen ( writeRealAsm, dumpRealAsm ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(IO(Handle))
+#include "HsVersions.h"
+
+import IO		( Handle )
 
 import MachMisc
 import MachRegs
@@ -23,9 +22,8 @@ import PrimOp		( commutableOp, PrimOp(..) )
 import PrimRep		( PrimRep{-instance Eq-} )
 import RegAllocInfo	( mkMRegsState, MRegsState )
 import Stix		( StixTree(..), StixReg(..), CodeSegment )
-import UniqSupply	( returnUs, thenUs, mapUs, SYN_IE(UniqSM), UniqSupply )
-import Outputable	( printDoc )
-import Pretty		( Doc, vcat, Mode(..) )
+import UniqSupply	( returnUs, thenUs, mapUs, UniqSM, UniqSupply )
+import Outputable	
 \end{code}
 
 The 96/03 native-code generator has machine-independent and
@@ -77,9 +75,9 @@ So, here we go:
 \begin{code}
 writeRealAsm :: Handle -> AbstractC -> UniqSupply -> IO ()
 writeRealAsm handle absC us
-  = _scc_ "writeRealAsm" (printDoc LeftMode handle (runNCG absC us))
+  = _scc_ "writeRealAsm" (printForAsm handle (runNCG absC us))
 
-dumpRealAsm :: AbstractC -> UniqSupply -> Doc
+dumpRealAsm :: AbstractC -> UniqSupply -> SDoc
 dumpRealAsm = runNCG
 
 runNCG absC
@@ -92,7 +90,7 @@ runNCG absC
 
 @codeGen@ is the top-level code-generation function:
 \begin{code}
-codeGen :: [[StixTree]] -> UniqSM Doc
+codeGen :: [[StixTree]] -> UniqSM SDoc
 
 codeGen trees
   = mapUs genMachCode trees	`thenUs` \ dynamic_codes ->

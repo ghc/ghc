@@ -6,7 +6,6 @@
 The (machine-independent) allocator itself is in @AsmRegAlloc@.
 
 \begin{code}
-#include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
 module RegAllocInfo (
@@ -24,8 +23,8 @@ module RegAllocInfo (
 	regUsage,
 
 	FutureLive(..),
-	SYN_IE(RegAssignment),
-	SYN_IE(RegConflicts),
+	RegAssignment,
+	RegConflicts,
 	RegFuture(..),
 	RegHistory(..),
 	RegInfo(..),
@@ -37,7 +36,7 @@ module RegAllocInfo (
 	regLiveness,
 	spillReg,
 
-	SYN_IE(RegSet),
+	RegSet,
 	elementOfRegSet,
 	emptyRegSet,
 	isEmptyRegSet,
@@ -51,18 +50,12 @@ module RegAllocInfo (
 	freeRegSet
     ) where
 
-#if __GLASGOW_HASKELL__ >= 202
-import GlaExts
-import FastString
-#else
-IMP_Ubiq(){-uitous-}
-import Pretty ( Doc )
-#endif
-IMPORT_1_3(List(partition))
+#include "HsVersions.h"
 
+import List		( partition )
 import MachMisc
 import MachRegs
-import MachCode		( SYN_IE(InstrList) )
+import MachCode		( InstrList )
 
 import AbsCSyn		( MagicId )
 import BitSet		( unitBS, mkBS, minusBS, unionBS, listBS, BitSet )
@@ -72,6 +65,7 @@ import OrdList		( mkUnitList, OrdList )
 import PrimRep		( PrimRep(..) )
 import Stix		( StixTree, CodeSegment )
 import UniqSet		-- quite a bit of it
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -448,7 +442,7 @@ regUsage instr = case instr of
     opToReg (OpImm imm)   = []
     opToReg (OpAddr  ea)  = addrToRegs ea
 
-    addrToRegs (Address base index _) = baseToReg base ++ indexToReg index
+    addrToRegs (AddrBaseIndex base index _) = baseToReg base ++ indexToReg index
       where  baseToReg Nothing       = []
 	     baseToReg (Just r)      = [r]
 	     indexToReg Nothing      = []
@@ -538,8 +532,8 @@ regLiveness instr info@(RL live future@(FL all env))
 	lookup lbl
 	  = case (lookupFM env lbl) of
 	    Just rs -> rs
-	    Nothing -> trace ("Missing " ++ (show (pprCLabel_asm lbl)) ++
-			      " in future?") emptyRegSet
+	    Nothing -> pprTrace "Missing" (pprCLabel_asm lbl <+> text "in future?") 
+		       emptyRegSet
     in
     case instr of -- the rest is machine-specific...
 
@@ -715,8 +709,8 @@ patchRegs instr env = case instr of
     patchOp (OpAddr ea)  = OpAddr (lookupAddr ea)
 
     lookupAddr (ImmAddr imm off) = ImmAddr imm off
-    lookupAddr (Address base index disp)
-      = Address (lookupBase base) (lookupIndex index) disp
+    lookupAddr (AddrBaseIndex base index disp)
+      = AddrBaseIndex (lookupBase base) (lookupIndex index) disp
       where
 	lookupBase Nothing       = Nothing
 	lookupBase (Just r)      = Just (env r)

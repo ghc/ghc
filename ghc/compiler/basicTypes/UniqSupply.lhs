@@ -4,15 +4,13 @@
 \section[UniqSupply]{The @UniqueSupply@ data type and a (monadic) supply thereof}
 
 \begin{code}
-#include "HsVersions.h"
-
 module UniqSupply (
 
 	UniqSupply,		-- Abstractly
 
 	getUnique, getUniques,	-- basic ops
 
-	SYN_IE(UniqSM),		-- type: unique supply monad
+	UniqSM,		-- type: unique supply monad
 	initUs, thenUs, returnUs, fixUs,
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 	thenMaybeUs, mapAccumLUs,
@@ -21,30 +19,15 @@ module UniqSupply (
 	splitUniqSupply
   ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import Unique
 import Util
 
 
-#if __GLASGOW_HASKELL__ == 201
-import PreludeGlaST
-# define WHASH	    GHCbase.W#
-#elif __GLASGOW_HASKELL__ >= 202
 import GlaExts
-import STBase
-# if __GLASGOW_HASKELL__ == 202
+import IOBase	( IO(..), IOResult(..) )
 import PrelBase ( Char(..) )
-# endif
-# define WHASH      GlaExts.W#
-#else
-import PreludeGlaST
-# define WHASH	    W#
-#endif
-
-#if __GLASGOW_HASKELL__ >= 209
-import Unsafe ( unsafeInterleaveIO )
-#endif
 
 w2i x = word2Int# x
 i2w x = int2Word# x
@@ -91,41 +74,19 @@ mkSplitUniqSupply (C# c#)
 
 	-- here comes THE MAGIC:
 
+	-- This is one of the most hammered bits in the whole compiler
 	mk_supply#
-	  = unsafe_interleave (
-		mk_unique   `thenPrimIO` \ uniq ->
-		mk_supply#  `thenPrimIO` \ s1 ->
-		mk_supply#  `thenPrimIO` \ s2 ->
-		returnPrimIO (MkSplitUniqSupply uniq s1 s2)
+	  = unsafeInterleaveIO (
+		mk_unique   >>= \ uniq ->
+		mk_supply#  >>= \ s1 ->
+		mk_supply#  >>= \ s2 ->
+		return (MkSplitUniqSupply uniq s1 s2)
 	    )
-	  where
---
-	    -- inlined copy of unsafeInterleavePrimIO;
-	    -- this is the single-most-hammered bit of code
-	    -- in the compiler....
-	    -- Too bad it's not 1.3-portable...
-	    unsafe_interleave m =
-#if __GLASGOW_HASKELL__ >= 209
-               unsafeInterleaveIO m
-#else
-	       MkST ( \ s ->
-	        let
-		    (MkST m') = m
-		    ST_RET(r, new_s) = m' s
-	        in
-	        ST_RET(r, s))
-#endif
 
-	mk_unique = _ccall_ genSymZh		`thenPrimIO` \ (WHASH u#) ->
-		    returnPrimIO (I# (w2i (mask# `or#` u#)))
+	mk_unique = _ccall_ genSymZh		>>= \ (W# u#) ->
+		    return (I# (w2i (mask# `or#` u#)))
     in
-#if __GLASGOW_HASKELL__ >= 200
-    primIOToIO mk_supply#	>>= \ s ->
-    return s
-#else
-    mk_supply#	`thenPrimIO` \ s ->
-    return s
-#endif
+    mk_supply#
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}

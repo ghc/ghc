@@ -6,8 +6,6 @@
 Support routines for reading prefix-form from the Lex/Yacc parser.
 
 \begin{code}
-#include "HsVersions.h"
-
 module PrefixToHs (
 	cvValSig,
 	cvClassOpSig,
@@ -19,13 +17,14 @@ module PrefixToHs (
 	cvOtherDecls
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import PrefixSyn	-- and various syntaxen.
 import HsSyn
 import RdrHsSyn
 import HsPragmas	( noGenPragmas, noClassOpPragmas )
 
+import BasicTypes	( RecFlag(..) )
 import SrcLoc		( mkSrcLoc )
 import Util		( mapAndUnzip, panic, assertPanic )
 \end{code}
@@ -66,7 +65,7 @@ analyser.
 cvBinds :: SrcFile -> SigConverter -> RdrBinding -> RdrNameHsBinds
 cvBinds sf sig_cvtr binding
   = case (cvMonoBindsAndSigs sf sig_cvtr binding) of { (mbs, sigs) ->
-    MonoBind mbs sigs recursive
+    MonoBind mbs sigs Recursive
     }
 \end{code}
 
@@ -130,7 +129,7 @@ cvMonoBindsAndSigs sf sig_cvtr fb
 cvPatMonoBind :: SrcFile -> RdrMatch -> (RdrNamePat, [RdrNameGRHS], RdrNameHsBinds)
 
 cvPatMonoBind sf (RdrMatch_NoGuard srcline srcfun pat expr binding)
-  = (pat, [OtherwiseGRHS expr (mkSrcLoc sf srcline)], cvBinds sf cvValSig binding)
+  = (pat, unguardedRHS expr (mkSrcLoc sf srcline), cvBinds sf cvValSig binding)
 
 cvPatMonoBind sf (RdrMatch_Guards srcline srcfun pat guardedexprs binding)
   = (pat, map (cvGRHS sf srcline) guardedexprs, cvBinds sf cvValSig binding)
@@ -175,7 +174,7 @@ cvMatch sf is_case rdr_match
   where
     (pat, binding, guarded_exprs)
       = case rdr_match of
-	  RdrMatch_NoGuard ln b c expr    d -> (c,d, [OtherwiseGRHS expr (mkSrcLoc sf ln)])
+	  RdrMatch_NoGuard ln b c expr    d -> (c,d, unguardedRHS expr (mkSrcLoc sf ln))
 	  RdrMatch_Guards  ln b c gd_exps d -> (c,d, map (cvGRHS sf ln) gd_exps)
 
 cvGRHS :: SrcFile -> SrcLine -> ([RdrNameStmt], RdrNameHsExpr) -> RdrNameGRHS

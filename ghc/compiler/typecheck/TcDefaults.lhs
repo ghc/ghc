@@ -4,30 +4,24 @@
 \section[TcDefaults]{Typechecking \tr{default} declarations}
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcDefaults ( tcDefaults ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), TyDecl, ClassDecl, InstDecl, HsBinds,
-			  DefaultDecl(..), HsType, IfaceSig,
-			  HsExpr, HsLit, ArithSeqInfo, Fake, InPat)
+import HsSyn		( HsDecl(..), DefaultDecl(..) )
 import RnHsSyn		( RenamedHsDecl(..), RenamedDefaultDecl(..) )
 
 import TcMonad
 import Inst		( InstOrigin(..) )
-import TcEnv		( tcLookupClassByKey )
-import SpecEnv		( SpecEnv )
+import TcEnv		( TcIdOcc, tcLookupClassByKey )
 import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyCheckThetas )
-import TcType		( TcIdOcc )
 
 import TysWiredIn	( intTy, doubleTy, unitTy )
-import Type             ( SYN_IE(Type) )
+import Type             ( Type )
 import Unique		( numClassKey )
-import Pretty		( ptext, vcat )
 import ErrUtils		( addShortErrLocLine )
+import Outputable
 import Util
 \end{code}
 
@@ -53,25 +47,28 @@ tc_defaults [DefaultDecl mono_tys locn]
 	    -- Check that all the types are instances of Num
 	    -- We only care about whether it worked or not
 
-	tcLookupClassByKey numClassKey			`thenNF_Tc` \ num ->
+	tcAddErrCtxt defaultDeclCtxt		$
+	tcLookupClassByKey numClassKey		`thenNF_Tc` \ num ->
 	tcSimplifyCheckThetas
-		[ (num, ty) | ty <- tau_tys ]		`thenTc_`
+		[{- Nothing given -}]
+		[ (num, [ty]) | ty <- tau_tys ]	`thenTc_`
 
 	returnTc tau_tys
 
 tc_defaults decls
-  = failTc (dupDefaultDeclErr decls)
+  = failWithTc (dupDefaultDeclErr decls)
 
 
-dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things) sty
+defaultDeclCtxt =  ptext SLIT("when checking that each type in a default declaration")
+		    $$ ptext SLIT("is an instance of class Num")
+
+
+dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things)
   = vcat (item1 : map dup_item dup_things)
   where
     item1
-      = addShortErrLocLine locn1 (\ sty ->
-	ptext SLIT("multiple default declarations")) sty
+      = addShortErrLocLine locn1 (ptext SLIT("multiple default declarations"))
 
     dup_item (DefaultDecl _ locn)
-      = addShortErrLocLine locn (\ sty ->
-	ptext SLIT("here was another default declaration")) sty
-
+      = addShortErrLocLine locn (ptext SLIT("here was another default declaration"))
 \end{code}

@@ -4,8 +4,6 @@
 \section[CgHeapery]{Heap management functions}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgHeapery (
 	heapCheck,
 	allocHeap, allocDynClosure
@@ -14,7 +12,7 @@ module CgHeapery (
         , heapCheckOnly, fetchAndReschedule, yield
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import AbsCSyn
 import CgMonad
@@ -27,7 +25,7 @@ import ClosureInfo	( closureSize, closureHdrSize, closureGoodStuffSize,
 			  slopSize, allocProfilingMsg, closureKind, ClosureInfo
 			)
 import HeapOffs		( isZeroOff, addOff, intOff,
-			  SYN_IE(VirtualHeapOffset), HeapOffset
+			  VirtualHeapOffset, HeapOffset
 			)
 import PrimRep		( PrimRep(..) )
 \end{code}

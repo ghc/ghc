@@ -4,8 +4,6 @@
 \section[MagicUFs]{Magic unfoldings that the simplifier knows about}
 
 \begin{code}
-#include "HsVersions.h"
-
 module MagicUFs (
 	MagicUnfoldingFun,  -- absolutely abstract
 
@@ -13,15 +11,12 @@ module MagicUFs (
 	applyMagicUnfoldingFun
     ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(IdLoop)		-- paranoia checking
-#endif
+#include "HsVersions.h"
 
 import Id		( addInlinePragma )
 import CoreSyn
 import SimplEnv		( SimplEnv )
-import SimplMonad	( SYN_IE(SmplM), SimplCount )
+import SimplMonad	( SmplM, SimplCount )
 import Type		( mkFunTys )
 import TysWiredIn	( mkListTy )
 import Unique		( Unique{-instances-} )

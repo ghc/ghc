@@ -7,8 +7,6 @@ Much of the rationale for these things is in the ``details'' part of
 the STG paper.
 
 \begin{code}
-#include "HsVersions.h"
-
 module ClosureInfo (
 	ClosureInfo, LambdaFormInfo, SMRep, 	-- all abstract
 	StandardFormInfo,
@@ -29,7 +27,7 @@ module ClosureInfo (
 	mkVirtHeapOffsets,
 
 	nodeMustPointToIt, getEntryConvention, 
-	SYN_IE(FCode), CgInfoDownwards, CgState, 
+	FCode, CgInfoDownwards, CgState, 
 
 	blackHoleOnEntry,
 
@@ -43,7 +41,7 @@ module ClosureInfo (
 	entryLabelFromCI, 
 	closureLFInfo, closureSMRep, closureUpdReqd,
 	closureSingleEntry, closureSemiTag, closureType,
-	closureReturnsUnboxedType, getStandardFormThunkInfo,
+	closureReturnsUnpointedType, getStandardFormThunkInfo,
 	GenStgArg,
 
 	isToplevClosure,
@@ -56,10 +54,7 @@ module ClosureInfo (
     	dataConLiveness				-- concurrency
     ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(AbsCLoop)		-- here for paranoia-checking
-#endif
+#include "HsVersions.h"
 
 import AbsCSyn		( MagicId, node, mkLiveRegsMask,
 			  {- GHC 0.29 only -} AbstractC, CAddrMode
@@ -84,30 +79,28 @@ import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 			)
 import CmdLineOpts	( opt_SccProfilingOn, opt_ForConcurrent )
 import HeapOffs		( intOff, addOff, totHdrSize, varHdrSize,
-			  SYN_IE(VirtualHeapOffset), HeapOffset
+			  VirtualHeapOffset, HeapOffset
 			)
 import Id		( idType, getIdArity,
 			  externallyVisibleId,
 			  dataConTag, fIRST_TAG,
 			  isDataCon, isNullaryDataCon, dataConTyCon,
-			  isTupleCon, SYN_IE(DataCon),
-			  GenId{-instance Eq-}, SYN_IE(Id)
+			  isTupleCon, DataCon,
+			  GenId{-instance Eq-}, Id
 			)
 import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
 import Name		( getOccString )
-import Outputable	( PprStyle(..), Outputable(..) )
-import PprType		( getTyDescription, GenType{-instance Outputable-} )
-import Pretty		--ToDo:rm
+import PprType		( getTyDescription )
 import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
 import SMRep		-- all of it
-import TyCon		( TyCon{-instance NamedThing-} )
-import Type		( isPrimType, splitFunTyExpandingDictsAndPeeking,
-			  mkFunTys, maybeAppSpecDataTyConExpandingDicts,
-			  SYN_IE(Type)
+import TyCon		( TyCon, isNewTyCon )
+import Type		( isUnpointedType, splitForAllTys, splitFunTys, mkFunTys, splitAlgTyConApp_maybe,
+			  Type
 			)
-import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
+import Util		( isIn, mapAccumL )
+import Outputable
 \end{code}
 
 The ``wrapper'' data type for closure information:
@@ -1100,12 +1093,12 @@ closureType :: ClosureInfo -> Maybe (TyCon, [Type], [Id])
 -- rather than take it from the Id. The Id is probably just "f"!
 
 closureType (MkClosureInfo id (LFThunk _ _ _ (VapThunk fun_id args _)) _)
-  = maybeAppSpecDataTyConExpandingDicts (fun_result_ty (length args) fun_id)
+  = splitAlgTyConApp_maybe (fun_result_ty (length args) (idType fun_id))
 
-closureType (MkClosureInfo id lf _) = maybeAppSpecDataTyConExpandingDicts (idType id)
+closureType (MkClosureInfo id lf _) = splitAlgTyConApp_maybe (idType id)
 \end{code}
 
-@closureReturnsUnboxedType@ is used to check whether a closure, {\em
+@closureReturnsUnpointedType@ is used to check whether a closure, {\em
 once it has eaten its arguments}, returns an unboxed type.  For
 example, the closure for a function:
 \begin{verbatim}
@@ -1114,23 +1107,38 @@ example, the closure for a function:
 returns an unboxed type.  This is important when dealing with stack
 overflow checks.
 \begin{code}
-closureReturnsUnboxedType :: ClosureInfo -> Bool
+closureReturnsUnpointedType :: ClosureInfo -> Bool
 
-closureReturnsUnboxedType (MkClosureInfo fun_id (LFReEntrant _ arity _) _)
-  = isPrimType (fun_result_ty arity fun_id)
+closureReturnsUnpointedType (MkClosureInfo fun_id (LFReEntrant _ arity _) _)
+  = isUnpointedType (fun_result_ty arity (idType fun_id))
 
-closureReturnsUnboxedType other_closure = False
+closureReturnsUnpointedType other_closure = False
 	-- All non-function closures aren't functions,
 	-- and hence are boxed, since they are heap alloc'd
 
--- ToDo: need anything like this in Type.lhs?
-fun_result_ty arity id
-  = let
-	(arg_tys, res_ty)  = splitFunTyExpandingDictsAndPeeking (idType id)
-    in
---    ASSERT(arity >= 0 && length arg_tys >= arity)
-    (if (arity >= 0 && length arg_tys >= arity) then (\x->x) else pprPanic "fun_result_ty:" (hsep [int arity, ppr PprShowAll id, ppr PprDebug (idType id)])) $
-    mkFunTys (drop arity arg_tys) res_ty
+-- fun_result_ty is a disgusting little bit of code that finds the result
+-- type of a function application.  It looks "through" new types.
+-- We don't have type args available any more, so we are pretty cavilier,
+-- and quite possibly plain wrong. Let's hope it doesn't matter if we are!
+
+fun_result_ty arity ty
+  | arity <= n_arg_tys
+  = mkFunTys (drop arity arg_tys) res_ty
+
+  | otherwise
+  = case splitAlgTyConApp_maybe res_ty of
+      Nothing -> pprPanic "fun_result_ty:" (hsep [int arity,
+						  ppr ty])
+
+      Just (tycon, _, [con]) | isNewTyCon tycon
+	   -> fun_result_ty (arity - n_arg_tys) rep_ty
+	   where
+	      ([rep_ty], _) = splitFunTys rho_ty
+	      (_, rho_ty)   = splitForAllTys (idType con)
+  where
+     (_, rho_ty)	= splitForAllTys ty
+     (arg_tys, res_ty)  = splitFunTys rho_ty
+     n_arg_tys		= length arg_tys
 \end{code}
 
 \begin{code}
@@ -1167,7 +1175,7 @@ fastLabelFromCI (MkClosureInfo id lf_info _)
 -}
   = case getIdArity id of
 	ArityExactly arity -> mkFastEntryLabel id arity
-	other	    	   -> pprPanic "fastLabelFromCI" (ppr PprDebug id)
+	other	    	   -> pprPanic "fastLabelFromCI" (ppr id)
 
 infoTableLabelFromCI :: ClosureInfo -> CLabel
 infoTableLabelFromCI (MkClosureInfo id lf_info rep)

@@ -4,55 +4,48 @@
 \section[RnHsSyn]{Specialisations of the @HsSyn@ syntax for the renamer}
 
 \begin{code}
-#include "HsVersions.h"
-
 module RnHsSyn where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 import HsSyn
-#if __GLASGOW_HASKELL__ >= 202
-import HsPragmas
-#endif
+import HsPragmas	( InstancePragmas, GenPragmas, DataPragmas, ClassPragmas, ClassOpPragmas )
 
-import Id		( GenId, SYN_IE(Id) )
-import BasicTypes	( NewOrData, IfaceFlavour )
+import Id		( GenId, Id )
+import BasicTypes	( Unused, NewOrData, IfaceFlavour )
 import Name		( Name )
-import Outputable	( PprStyle(..), Outputable(..){-instance * []-} )
-import PprType		( GenType, GenTyVar, TyCon )
-import Pretty
-import Name		( SYN_IE(NameSet), unitNameSet, mkNameSet, minusNameSet, unionNameSets, emptyNameSet )
-import TyCon		( TyCon )
+import Name		( NameSet, unitNameSet, mkNameSet, minusNameSet, unionNameSets, emptyNameSet )
 import TyVar		( GenTyVar )
 import Unique		( Unique )
-import Util		( panic, pprPanic{-, pprTrace ToDo:rm-} )
+import Util
+import Outputable
 \end{code}
 
 
 \begin{code}
-type RenamedArithSeqInfo	= ArithSeqInfo		Fake Fake Name RenamedPat
-type RenamedClassDecl		= ClassDecl		Fake Fake Name RenamedPat
+type RenamedArithSeqInfo	= ArithSeqInfo		Unused Name RenamedPat
+type RenamedClassDecl		= ClassDecl		Unused Name RenamedPat
 type RenamedClassOpSig		= Sig			Name
 type RenamedConDecl		= ConDecl		Name
 type RenamedContext		= Context 		Name
-type RenamedHsDecl		= HsDecl		Fake Fake Name RenamedPat
+type RenamedHsDecl		= HsDecl		Unused Name RenamedPat
 type RenamedSpecDataSig		= SpecDataSig		Name
 type RenamedDefaultDecl		= DefaultDecl		Name
 type RenamedFixityDecl		= FixityDecl		Name
-type RenamedGRHS		= GRHS			Fake Fake Name RenamedPat
-type RenamedGRHSsAndBinds	= GRHSsAndBinds		Fake Fake Name RenamedPat
-type RenamedHsBinds		= HsBinds		Fake Fake Name RenamedPat
-type RenamedHsExpr		= HsExpr		Fake Fake Name RenamedPat
-type RenamedHsModule		= HsModule		Fake Fake Name RenamedPat
-type RenamedInstDecl		= InstDecl		Fake Fake Name RenamedPat
-type RenamedMatch		= Match			Fake Fake Name RenamedPat
-type RenamedMonoBinds		= MonoBinds		Fake Fake Name RenamedPat
+type RenamedGRHS		= GRHS			Unused Name RenamedPat
+type RenamedGRHSsAndBinds	= GRHSsAndBinds		Unused Name RenamedPat
+type RenamedHsBinds		= HsBinds		Unused Name RenamedPat
+type RenamedHsExpr		= HsExpr		Unused Name RenamedPat
+type RenamedHsModule		= HsModule		Unused Name RenamedPat
+type RenamedInstDecl		= InstDecl		Unused Name RenamedPat
+type RenamedMatch		= Match			Unused Name RenamedPat
+type RenamedMonoBinds		= MonoBinds		Unused Name RenamedPat
 type RenamedPat			= InPat			Name
 type RenamedHsType		= HsType		Name
-type RenamedRecordBinds		= HsRecordBinds		Fake Fake Name RenamedPat
+type RenamedRecordBinds		= HsRecordBinds		Unused Name RenamedPat
 type RenamedSig			= Sig			Name
 type RenamedSpecInstSig		= SpecInstSig 		Name
-type RenamedStmt		= Stmt			Fake Fake Name RenamedPat
+type RenamedStmt		= Stmt			Unused Name RenamedPat
 type RenamedTyDecl		= TyDecl		Name
 
 type RenamedClassOpPragmas	= ClassOpPragmas	Name
@@ -68,23 +61,29 @@ type RenamedInstancePragmas	= InstancePragmas	Name
 %*									*
 %************************************************************************
 
-\begin{code}
-extractCtxtTyNames :: RenamedContext -> NameSet
-extractCtxtTyNames ctxt = foldr (unionNameSets . extractHsTyNames . snd) emptyNameSet ctxt
+These free-variable finders returns tycons and classes too.
 
-extractHsTyNames   :: RenamedHsType  -> NameSet
+\begin{code}
+extractHsTyNames   :: RenamedHsType -> NameSet
 extractHsTyNames ty
   = get ty
   where
     get (MonoTyApp ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (MonoListTy tc ty)       = unitNameSet tc `unionNameSets` get ty
-    get (MonoTupleTy tc tys)     = foldr (unionNameSets . get) (unitNameSet tc) tys
+    get (MonoTupleTy tc tys)     = unitNameSet tc `unionNameSets` extractHsTyNames_s tys
     get (MonoFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
-    get (MonoDictTy cls ty)      = unitNameSet cls `unionNameSets` get ty
+    get (MonoDictTy cls tys)     = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
     get (MonoTyVar tv)	         = unitNameSet tv
-    get (HsForAllTy tvs ctxt ty) = foldr (unionNameSets . get . snd) (get ty) ctxt
+    get (HsForAllTy tvs ctxt ty) = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
 					    `minusNameSet`
 				    mkNameSet (map getTyVarName tvs)
 
+extractHsTyNames_s  :: [RenamedHsType] -> NameSet
+extractHsTyNames_s tys = foldr (unionNameSets . extractHsTyNames) emptyNameSet tys
+
+extractHsCtxtTyNames :: RenamedContext -> NameSet
+extractHsCtxtTyNames ctxt = foldr (unionNameSets . get) emptyNameSet ctxt
+  where
+    get (cls, tys) = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
 \end{code}
 

@@ -58,15 +58,24 @@ readHandle  :: Handle   -> IO Handle__
 writeHandle :: Handle -> Handle__ -> IO ()
 
 #if defined(__CONCURRENT_HASKELL__)
-newHandle   = newMVar
-readHandle  = takeMVar
-writeHandle = putMVar
-#else 
-newHandle v     = stToIO (newVar   v)
-readHandle h    = stToIO (readVar  h)
-writeHandle h v = stToIO (writeVar h v)
-#endif
 
+-- Use MVars for concurrent Haskell
+newHandle hc  = newMVar	hc 	>>= \ h ->
+	        return (Handle h)
+
+readHandle  (Handle h)    = takeMVar h
+writeHandle (Handle h) hc = putMVar h hc
+
+#else 
+
+-- Use ordinary MutableVars for non-concurrent Haskell
+newHandle hc  = stToIO (newVar	hc 	>>= \ h ->
+		        return (Handle h))
+
+readHandle  (Handle h)    = stToIO (readVar h)
+writeHandle (Handle h) hc = stToIO (writeVar h hc)
+
+#endif
 \end{code}
 
 %*********************************************************
@@ -885,5 +894,4 @@ access of a closed file.
 
 ioe_closedHandle :: Handle -> IO a
 ioe_closedHandle h = fail (IOError (Just h) IllegalOperation "handle is closed")
-
 \end{code}

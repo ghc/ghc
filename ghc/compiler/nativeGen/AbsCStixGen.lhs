@@ -3,18 +3,15 @@
 %
 
 \begin{code}
-#include "HsVersions.h"
-
 module AbsCStixGen ( genCodeAbstractC ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(Ratio(Rational))
+#include "HsVersions.h"
+
+import Ratio	( Rational )
 
 import AbsCSyn
 import Stix
-
 import MachMisc
-import MachRegs
 
 import AbsCUtils	( getAmodeRep, mixedTypeLocn,
 			  nonemptyAbsC, mkAbsCStmts, mkAbsCStmtList
@@ -33,7 +30,7 @@ import PrimRep	    	( isFloatingRep, PrimRep(..) )
 import StixInfo	    	( genCodeInfoTable )
 import StixMacro	( macroCode )
 import StixPrim		( primCode, amodeToStix, amodeToStix' )
-import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
+import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM )
 import Util		( naturalMergeSortLe, panic )
 
 #ifdef REALLY_HASKELL_1_3

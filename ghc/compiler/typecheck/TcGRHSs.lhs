@@ -4,26 +4,20 @@
 \section[TcGRHSs]{Typecheck guarded right-hand-sides}
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcGRHSs ( tcGRHSsAndBinds ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(TcLoop) -- for paranoia checking
-#endif
+#include "HsVersions.h"
 
-import HsSyn		( GRHSsAndBinds(..), GRHS(..), MonoBinds, Stmt, DoOrListComp(..),
-			  HsExpr, HsBinds(..), InPat, OutPat, Sig, Fake )
-import RnHsSyn		( SYN_IE(RenamedGRHSsAndBinds), SYN_IE(RenamedGRHS) )
-import TcHsSyn		( SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS) )
+import HsSyn		( HsBinds(..), GRHSsAndBinds(..), GRHS(..), DoOrListComp(..) )
+import RnHsSyn		( RenamedGRHSsAndBinds, RenamedGRHS )
+import TcHsSyn		( TcGRHSsAndBinds, TcGRHS )
 
 import TcMonad
-import Inst		( Inst, SYN_IE(LIE), plusLIE )
-import Kind             ( mkTypeKind )
+import Inst		( Inst, LIE, plusLIE )
 import TcBinds		( tcBindsAndThen )
 import TcExpr		( tcExpr, tcStmt )
-import TcType		( SYN_IE(TcType), TcIdOcc(..), newTyVarTy ) 
+import TcType		( TcType, newTyVarTy ) 
+import TcEnv		( TcIdOcc(..) )
 
 import TysWiredIn	( boolTy )
 \end{code}
@@ -40,21 +34,15 @@ tcGRHSs expected_ty (grhs:grhss)
     tcGRHSs expected_ty grhss	`thenTc` \ (grhss', lie2) ->
     returnTc (grhs' : grhss', lie1 `plusLIE` lie2)
 
-
-tcGRHS expected_ty (OtherwiseGRHS expr locn)
-  = tcAddSrcLoc locn	 $
-    tcExpr expr	expected_ty        `thenTc`    \ (expr, lie) ->
-    returnTc (OtherwiseGRHS expr locn, lie)
-
 tcGRHS expected_ty (GRHS guard expr locn)
   = tcAddSrcLoc locn		$
-    tc_stmts  guard	`thenTc` \ ((guard', expr'), lie) ->
+    tcStmts guard		`thenTc` \ ((guard', expr'), lie) ->
     returnTc (GRHS guard' expr' locn, lie)
   where
-    tc_stmts []		  = tcExpr expr expected_ty	  `thenTc`    \ (expr2, expr_lie) ->
-			    returnTc (([], expr2), expr_lie)
-    tc_stmts (stmt:stmts) = tcStmt tcExpr Guard (\x->x) combine stmt $
-			    tc_stmts stmts
+    tcStmts []		 = tcExpr expr expected_ty	  `thenTc`    \ (expr2, expr_lie) ->
+	                   returnTc (([], expr2), expr_lie)
+    tcStmts (stmt:stmts) = tcStmt tcExpr Guard (\x->x) combine stmt $
+			   tcStmts stmts
 
     combine stmt _ (stmts, expr) = (stmt:stmts, expr)
 \end{code}
@@ -68,13 +56,16 @@ tcGRHSsAndBinds :: TcType s			-- Expected type of RHSs
 		-> RenamedGRHSsAndBinds
 		-> TcM s (TcGRHSsAndBinds s, LIE s)
 
+-- Shortcut for common case
+tcGRHSsAndBinds expected_ty (GRHSsAndBindsIn grhss EmptyBinds)	
+  = tcGRHSs expected_ty grhss	       `thenTc` \ (grhss', lie) ->
+    returnTc (GRHSsAndBindsOut grhss' EmptyBinds expected_ty, lie)
+
 tcGRHSsAndBinds expected_ty (GRHSsAndBindsIn grhss binds)
   = tcBindsAndThen
 	 combiner binds
-	 (tcGRHSs expected_ty grhss	`thenTc` \ (grhss', lie) ->
-	  returnTc (GRHSsAndBindsOut grhss' EmptyBinds expected_ty, lie)
-	 )
+	 (tcGRHSs expected_ty grhss)
   where
-    combiner is_rec binds1 (GRHSsAndBindsOut grhss binds2 ty)
- 	= GRHSsAndBindsOut grhss ((MonoBind binds1 [] is_rec) `ThenBinds` binds2) ty
+    combiner is_rec binds grhss
+ 	= GRHSsAndBindsOut grhss (MonoBind binds [] is_rec) expected_ty
 \end{code}

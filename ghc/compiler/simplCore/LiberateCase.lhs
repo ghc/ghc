@@ -6,11 +6,10 @@
 96/03: We aren't using this at the moment
 
 \begin{code}
-#include "HsVersions.h"
-
 module LiberateCase ( liberateCase ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
+
 import Util		( panic )
 
 liberateCase = panic "LiberateCase.liberateCase: ToDo"
@@ -20,7 +19,6 @@ import CoreUnfold	( UnfoldingGuidance(..), PragmaInfo(..) )
 import Id		( localiseId )
 import Maybes
 import Outputable
-import Pretty
 import Util
 \end{code}
 

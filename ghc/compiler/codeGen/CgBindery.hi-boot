@@ -1,8 +1,11 @@
 _interface_ CgBindery 1
 _exports_
-CgBindery CgBindings CgIdInfo(MkCgIdInfo) VolatileLoc nukeVolatileBinds;
+CgBindery CgBindings CgIdInfo(MkCgIdInfo) VolatileLoc StableLoc nukeVolatileBinds maybeAStkLoc maybeBStkLoc;
 _declarations_
 1 type CgBindings = Id.IdEnv CgIdInfo;
-1 data CgIdInfo = MkCgIdInfo Id.Id CgBindery.VolatileLoc CgMonad.StableLoc ClosureInfo!LambdaFormInfo;
+1 data CgIdInfo = MkCgIdInfo Id.Id VolatileLoc StableLoc ClosureInfo!LambdaFormInfo;
 1 data VolatileLoc;
-1 nukeVolatileBinds _:_ CgBindery.CgBindings -> CgBindery.CgBindings ;;
+1 data StableLoc;
+1 nukeVolatileBinds _:_ CgBindings -> CgBindings ;;
+1 maybeAStkLoc _:_ StableLoc  -> PrelMaybe.Maybe HeapOffs.VirtualSpAOffset ;;
+1 maybeBStkLoc _:_ StableLoc  -> PrelMaybe.Maybe HeapOffs.VirtualSpBOffset ;;

@@ -12,8 +12,6 @@
 #include "constants.h"
 #include "utils.h"
 
-static void is_context_format PROTO((ttype, int)); /* forward */
-
 /* 
     partain: see also the comment by "decl" in hsparser.y.
 
@@ -75,7 +73,7 @@ type2context(t)
 /* is_context_format is the same as "type2context" except that it just performs checking */
 /* ttype is either "tycon" [class] or "tycon (named)tvar" [class var] */
 
-static void
+void
 is_context_format(t, tyvars)
   ttype t;
   int tyvars;
@@ -89,18 +87,12 @@ is_context_format(t, tyvars)
 	  /* should be just: ":: C a =>" */
 
 	  if (tyvars == 0)
-	    hsperror("is_context_format: variable missing after class name");
+	    hsperror("is_context_format: type missing after class name");
 
-	  else if (tyvars > 1)
-	    hsperror ("is_context_format: too many variables after class name");
-
-	  /* tyvars == 1; everything is cool */
+	  /* tyvars > 0; everything is cool */
 	  break;
 
 	case tapp:
-	  if (tttype(gtarg(t)) != namedtvar)
-	      hsperror ("is_context_format: something wrong with variable after class name");
-
 	  is_context_format(gtapp(t), tyvars+1);
 	  break;
 
@@ -123,4 +115,5 @@ is_context_format(t, tyvars)
 	    hsperror ("is_context_format: totally unexpected input");
       }
 }
+
 

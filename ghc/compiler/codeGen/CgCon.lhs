@@ -8,15 +8,13 @@ with {\em constructors} on the RHSs of let(rec)s.  See also
 @CgClosure@, which deals with closures.
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgCon (
 	cgTopRhsCon, buildDynCon,
 	bindConArgs,
 	cgReturnDataCon
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CgMonad
 import AbsCSyn
@@ -44,8 +42,8 @@ import CostCentre	( currentOrSubsumedCosts, useCurrentCostCentre,
 			  dontCareCostCentre, CostCentre
 			)
 import Id		( idPrimRep, dataConTag, dataConTyCon,
-			  isDataCon, SYN_IE(DataCon),
-			  emptyIdSet, SYN_IE(Id)
+			  isDataCon, DataCon,
+			  emptyIdSet, Id
 			)
 import Literal		( Literal(..) )
 import Maybes		( maybeToBool )

@@ -1,8 +1,6 @@
 This module deals with printing (a) C string literals and (b) C labels.
 
 \begin{code}
-#include "HsVersions.h"
-
 module CStrings(
 
 	cSEP,
@@ -14,14 +12,10 @@ module CStrings(
 
   ) where
 
-IMPORT_1_3(Char (isAlphanum,ord,chr))
-CHK_Ubiq() -- debugging consistency check
+#include "HsVersions.h"
 
-import Pretty
-#if __GLASGOW_HASKELL__ >= 209
-import Addr
-#endif
-
+import Char	( isAlphanum, ord, chr )
+import Outputable
 \end{code}
 
 
@@ -42,7 +36,7 @@ Prelude<x>	ZP<x>
 cSEP    = SLIT("_")	-- official C separator
 pp_cSEP = char '_'
 
-identToC    :: FAST_STRING -> Doc
+identToC    :: FAST_STRING -> SDoc
 modnameToC  :: FAST_STRING -> FAST_STRING
 stringToC   :: String -> String
 charToC, charToEasyHaskell :: Char -> String

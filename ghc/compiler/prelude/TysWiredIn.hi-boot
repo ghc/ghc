@@ -1,6 +1,11 @@
 _interface_ TysWiredIn 1
 _exports_
-TysWiredIn tupleCon tupleTyCon;
+TysWiredIn tupleCon ;
 _declarations_
-1 tupleCon _:_ BasicTypes.Arity -> Id.Id ;;
-1 tupleTyCon _:_ BasicTypes.Arity -> TyCon.TyCon ;;
+-- Let's try not having this either!
+-- 1 tupleTyCon _:_ BasicTypes.Arity -> TyCon.TyCon ;;
+
+-- Needed by TyCon.lhs
+1 tupleCon _:_ BasicTypes.Arity -> Id!Id ;;
+
+

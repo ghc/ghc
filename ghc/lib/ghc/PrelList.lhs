@@ -330,10 +330,16 @@ tuples are in the List library
 
 \begin{code}
 zip                     :: [a] -> [b] -> [(a,b)]
-zip                     =  zipWith (,)
+-- Specification
+-- zip =  zipWith (,)
+zip (a:as) (b:bs) = (a,b) : zip as bs
+zip _      _      = []
 
 zip3                    :: [a] -> [b] -> [c] -> [(a,b,c)]
-zip3                    =  zipWith3 (,,)
+-- Specification
+-- zip3 =  zipWith3 (,,)
+zip3 (a:as) (b:bs) (c:cs) = (a,b,c) : zip3 as bs cs
+zip3 _      _      _      = []
 
 -- The zipWith family generalises the zip family by zipping with the
 -- function given as the first argument, instead of a tupling function.

@@ -4,37 +4,31 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcMonoType ( tcHsType, tcHsTypeKind, tcContext, tcTyVarScope ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import HsSyn		( HsType(..), HsTyVar(..), Fake )
+import HsSyn		( HsType(..), HsTyVar(..), pprContext )
 import RnHsSyn		( RenamedHsType(..), RenamedContext(..) )
 
 import TcMonad
 import TcEnv		( tcLookupTyVar, tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv	)
-import TcKind		( TcKind, mkTcTypeKind, mkBoxedTypeKind,
-			  mkTcArrowKind, unifyKind, newKindVar,
+import TcKind		( TcKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind,
+			  unifyKind, unifyKinds, newKindVar,
 			  kindToTcKind, tcDefaultKind
 			)
-import Type		( GenType, SYN_IE(Type), SYN_IE(ThetaType), 
-			  mkTyVarTy, mkTyConTy, mkFunTy, mkAppTy, mkSynTy,
-			  mkSigmaTy, mkDictTy, mkAppTys
+import Type		( Type, ThetaType, 
+			  mkTyVarTy, mkFunTy, mkAppTy, mkSynTy,
+			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys
 			)
-import TyVar		( GenTyVar, SYN_IE(TyVar), mkTyVar )
-import Outputable
+import TyVar		( TyVar, mkTyVar )
 import PrelInfo		( cCallishClassKeys )
 import TyCon		( TyCon )
 import Name		( Name, OccName, isTvOcc, getOccName )
 import TysWiredIn	( mkListTy, mkTupleTy )
 import Unique		( Unique, Uniquable(..) )
-import Pretty
-import Util		( zipWithEqual, zipLazy, panic{-, pprPanic ToDo:rm-} )
-
-
-
+import Util		( zipWithEqual, zipLazy )
+import Outputable
 \end{code}
 
 
@@ -47,8 +41,13 @@ tcHsType checks that the type really is of kind Type!
 tcHsType :: RenamedHsType -> TcM s Type
 
 tcHsType ty
-  = tcHsTypeKind ty			`thenTc` \ (kind,ty) ->
-    unifyKind kind mkTcTypeKind		`thenTc_`
+  = tcAddErrCtxt (typeCtxt ty)		$
+    tc_hs_type ty
+
+tc_hs_type ty
+  = tc_hs_type_kind ty			`thenTc` \ (kind,ty) ->
+	-- Check that it really is a type
+    unifyKind mkTypeKind kind		`thenTc_`
     returnTc ty
 \end{code}
 
@@ -57,45 +56,56 @@ tcHsTypeKind does the real work.  It returns a kind and a type.
 \begin{code}
 tcHsTypeKind :: RenamedHsType -> TcM s (TcKind s, Type)
 
+tcHsTypeKind ty
+  = tcAddErrCtxt (typeCtxt ty)		$
+    tc_hs_type_kind ty
+
+
 	-- This equation isn't needed (the next one would handle it fine)
 	-- but it's rather a common case, so we handle it directly
-tcHsTypeKind (MonoTyVar name)
+tc_hs_type_kind (MonoTyVar name)
   | isTvOcc (getOccName name)
   = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
     returnTc (kind, mkTyVarTy tyvar)
 
-tcHsTypeKind ty@(MonoTyVar name)
+tc_hs_type_kind ty@(MonoTyVar name)
   = tcFunType ty []
     
-tcHsTypeKind (MonoListTy _ ty)
-  = tcHsType ty	`thenTc` \ tau_ty ->
-    returnTc (mkTcTypeKind, mkListTy tau_ty)
+tc_hs_type_kind (MonoListTy _ ty)
+  = tc_hs_type ty	`thenTc` \ tau_ty ->
+    returnTc (mkBoxedTypeKind, mkListTy tau_ty)
 
-tcHsTypeKind (MonoTupleTy _ tys)
-  = mapTc tcHsType  tys	`thenTc` \ tau_tys ->
-    returnTc (mkTcTypeKind, mkTupleTy (length tys) tau_tys)
+tc_hs_type_kind (MonoTupleTy _ tys)
+  = mapTc tc_hs_type  tys	`thenTc` \ tau_tys ->
+    returnTc (mkBoxedTypeKind, mkTupleTy (length tys) tau_tys)
 
-tcHsTypeKind (MonoFunTy ty1 ty2)
-  = tcHsType ty1	`thenTc` \ tau_ty1 ->
-    tcHsType ty2	`thenTc` \ tau_ty2 ->
-    returnTc (mkTcTypeKind, mkFunTy tau_ty1 tau_ty2)
+tc_hs_type_kind (MonoFunTy ty1 ty2)
+  = tc_hs_type ty1	`thenTc` \ tau_ty1 ->
+    tc_hs_type ty2	`thenTc` \ tau_ty2 ->
+    returnTc (mkBoxedTypeKind, mkFunTy tau_ty1 tau_ty2)
 
-tcHsTypeKind (MonoTyApp ty1 ty2)
+tc_hs_type_kind (MonoTyApp ty1 ty2)
   = tcTyApp ty1 [ty2]
 
-tcHsTypeKind (HsForAllTy tv_names context ty)
+tc_hs_type_kind (HsForAllTy tv_names context ty)
   = tcTyVarScope tv_names		 	$ \ tyvars ->
 	tcContext context			`thenTc` \ theta ->
-	tcHsType ty				`thenTc` \ tau ->
+	tc_hs_type ty				`thenTc` \ tau ->
 		-- For-all's are of kind type!
-	returnTc (mkTcTypeKind, mkSigmaTy tyvars theta tau)
+	returnTc (mkBoxedTypeKind, mkSigmaTy tyvars theta tau)
 
--- for unfoldings only:
-tcHsTypeKind (MonoDictTy class_name ty)
-  = tcHsTypeKind ty			`thenTc` \ (arg_kind, arg_ty) ->
-    tcLookupClass class_name		`thenTc` \ (class_kind, clas) ->
-    unifyKind class_kind arg_kind	`thenTc_`
-    returnTc (mkTcTypeKind, mkDictTy clas arg_ty)
+-- for unfoldings, and instance decls, only:
+tc_hs_type_kind (MonoDictTy class_name tys)
+  = mapAndUnzipTc tc_hs_type_kind tys	`thenTc` \ (arg_kinds, arg_tys) ->
+    tcLookupClass class_name		`thenTc` \ (class_kinds, clas) ->
+    let
+	arity  = length class_kinds
+	n_args = length arg_kinds
+	err = arityErr "Class" class_name arity n_args
+    in
+    checkTc (arity == n_args) err	`thenTc_`
+    unifyKinds class_kinds arg_kinds	`thenTc_`
+    returnTc (mkBoxedTypeKind, mkDictTy clas arg_tys)
 \end{code}
 
 Help functions for type applications
@@ -109,12 +119,12 @@ tcTyApp ty tys
   = tcFunType ty []
 
   | otherwise
-  = mapAndUnzipTc tcHsTypeKind tys	`thenTc` \ (arg_kinds, arg_tys) ->
+  = mapAndUnzipTc tc_hs_type_kind tys	`thenTc` \ (arg_kinds, arg_tys) ->
     tcFunType ty arg_tys		`thenTc` \ (fun_kind, result_ty) ->
 
 	-- Check argument compatibility
     newKindVar				`thenNF_Tc` \ result_kind ->
-    unifyKind fun_kind (foldr mkTcArrowKind result_kind arg_kinds)
+    unifyKind fun_kind (foldr mkArrowKind result_kind arg_kinds)
 					`thenTc_`
     returnTc (result_kind, result_ty)
 
@@ -130,8 +140,11 @@ tcFunType (MonoTyVar name) arg_tys
   | otherwise		 	-- Must be a type constructor
   = tcLookupTyCon name			`thenTc` \ (tycon_kind,maybe_arity, tycon) ->
     case maybe_arity of
-	Nothing    -> returnTc (tycon_kind, mkAppTys (mkTyConTy tycon) arg_tys)
-	Just arity -> checkTc (arity <= n_args) err_msg	`thenTc_`
+	Nothing    -> 	-- Data type or newtype 
+		      returnTc (tycon_kind, mkTyConApp tycon arg_tys)
+
+	Just arity -> 	-- Type synonym
+		      checkTc (arity <= n_args) err_msg	`thenTc_`
 		      returnTc (tycon_kind, result_ty)
 		   where
 			-- It's OK to have an *over-applied* type synonym
@@ -144,7 +157,7 @@ tcFunType (MonoTyVar name) arg_tys
 		      n_args  = length arg_tys
 
 tcFunType ty arg_tys
-  = tcHsTypeKind ty		`thenTc` \ (fun_kind, fun_ty) ->
+  = tc_hs_type_kind ty		`thenTc` \ (fun_kind, fun_ty) ->
     returnTc (fun_kind, mkAppTys fun_ty arg_tys)
 \end{code}
 
@@ -154,18 +167,19 @@ Contexts
 \begin{code}
 
 tcContext :: RenamedContext -> TcM s ThetaType
-tcContext context = mapTc tcClassAssertion context
+tcContext context = tcAddErrCtxt (thetaCtxt context) $
+		    mapTc tcClassAssertion context
 
-tcClassAssertion (class_name, ty)
+tcClassAssertion (class_name, tys)
   = checkTc (canBeUsedInContext class_name)
 	    (naughtyCCallContextErr class_name)	`thenTc_`
 
-    tcLookupClass class_name		`thenTc` \ (class_kind, clas) ->
-    tcHsTypeKind ty			`thenTc` \ (ty_kind, ty) ->
+    tcLookupClass class_name		`thenTc` \ (class_kinds, clas) ->
+    mapAndUnzipTc tc_hs_type_kind tys	`thenTc` \ (ty_kinds, tc_tys) ->
 
-    unifyKind class_kind ty_kind	`thenTc_`
+    unifyKinds class_kinds ty_kinds	`thenTc_`
 
-    returnTc (clas, ty)
+    returnTc (clas, tc_tys)
 \end{code}
 
 HACK warning: Someone discovered that @CCallable@ and @CReturnable@
@@ -220,6 +234,10 @@ tcHsTyVar (IfaceTyVar name kind)
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-naughtyCCallContextErr clas_name sty
-  = sep [ptext SLIT("Can't use class"), ppr sty clas_name, ptext SLIT("in a context")]
+naughtyCCallContextErr clas_name
+  = sep [ptext SLIT("Can't use class"), quotes (ppr clas_name), ptext SLIT("in a context")]
+
+typeCtxt ty = ptext SLIT("In the type") <+> quotes (ppr ty)
+
+thetaCtxt theta = ptext SLIT("In the context") <+> quotes (pprContext theta)
 \end{code}

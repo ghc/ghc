@@ -3,20 +3,15 @@
 %
 
 \begin{code}
-#include "HsVersions.h"
-
 module StixInteger (
 	gmpTake1Return1, gmpTake2Return1, gmpTake2Return2, gmpCompare,
 	gmpInteger2Int, gmpInt2Integer, gmpString2Integer,
 	encodeFloatingKind, decodeFloatingKind
     ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(NcgLoop)		( amodeToStix )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} StixPrim ( amodeToStix )
-#endif
 import MachMisc
 import MachRegs
 
@@ -28,11 +23,11 @@ import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..), SMSpecRepKind, SMUpdateKind )
 import Stix		( getUniqLabelNCG, sStLitLbl, stgHp, stgHpLim,
-			  StixTree(..), SYN_IE(StixTreeList),
+			  StixTree(..), StixTreeList,
 			  CodeSegment, StixReg
 			)
 import StixMacro	( macroCode, heapCheck )
-import UniqSupply	( returnUs, thenUs, SYN_IE(UniqSM) )
+import UniqSupply	( returnUs, thenUs, UniqSM )
 import Util		( panic )
 \end{code}
 

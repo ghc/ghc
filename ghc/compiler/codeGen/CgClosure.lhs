@@ -8,16 +8,11 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 @CgCon@, which deals with constructors.
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgClosure ( cgTopRhsClosure, cgRhsClosure ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(CgLoop2)	( cgExpr )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} CgExpr ( cgExpr )
-#endif
 
 import CgMonad
 import AbsCSyn
@@ -56,21 +51,19 @@ import CostCentre	( useCurrentCostCentre, currentOrSubsumedCosts,
 			  isCafCC, isDictCC, overheadCostCentre, showCostCentre,
 			  CostCentre
 			)
-import HeapOffs		( SYN_IE(VirtualHeapOffset) )
+import HeapOffs		( VirtualHeapOffset )
 import Id		( idType, idPrimRep, 
 			  showId, getIdStrictness, dataConTag,
 			  emptyIdSet,
-			  GenId{-instance Outputable-}, SYN_IE(Id)
+			  Id
 			)
 import ListSetOps	( minusList )
 import Maybes		( maybeToBool )
-import Outputable	( Outputable(..){-instances-}, PprStyle(..) )
-import PprType		( GenType{-instance Outputable-}, TyCon{-ditto-} )
-import Pretty		( Doc, hcat, char, ptext, hsep, text )
 import PrimRep		( isFollowableRep, PrimRep(..) )
 import TyCon		( isPrimTyCon, tyConDataCons )
 import Type             ( showTypeCategory )
-import Util		( isIn, panic, pprPanic, assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( isIn )
+import Outputable
 
 getWrapperArgTypeCategories = panic "CgClosure.getWrapperArgTypeCategories (ToDo)"
 \end{code}
@@ -108,7 +101,7 @@ cgTopRhsClosure name cc binder_info args body lf_info
 	-- Don't build Vap info tables etc for
 	-- a function whose result is an unboxed type,
 	-- because we can never have thunks with such a type.
-    (if closureReturnsUnboxedType closure_info then
+    (if closureReturnsUnpointedType closure_info then
 	nopC
     else
 	let
@@ -260,7 +253,7 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
 	-- Don't build Vap info tables etc for
 	-- a function whose result is an unboxed type,
 	-- because we can never have thunks with such a type.
-    (if closureReturnsUnboxedType closure_info then
+    (if closureReturnsUnpointedType closure_info then
 	nopC
     else
 	cgVapInfoTables False {- Not top level -} nopC binder_info binder args lf_info
@@ -398,7 +391,7 @@ closureCodeBody binder_info closure_info cc [] body
 	      Just (tc,_,_) -> (True,  tc)
     in
     if has_tycon && isPrimTyCon tycon then
-	pprPanic "closureCodeBody:thunk:prim type!" (ppr PprDebug tycon)
+	pprPanic "closureCodeBody:thunk:prim type!" (ppr tycon)
     else
 #endif
     getAbsC body_code 	`thenFC` \ body_absC ->
@@ -471,7 +464,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	-- Old version (reschedule combined with heap check);
 	-- see argSatisfactionCheck for new version
 	--slow_entry_code = forceHeapCheck [node] True slow_entry_code'
-	--		  where node = VanillaReg PtrRep 1
+	--		  where node = UnusedReg PtrRep 1
 	--slow_entry_code = forceHeapCheck [] True slow_entry_code'
 
     	slow_entry_code
@@ -507,7 +500,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	fast_entry_code
 	  = profCtrC SLIT("ENT_FUN_DIRECT") [
 		    CLbl (mkRednCountsLabel id) PtrRep,
-		    CString (_PK_ (showId PprDebug id)),
+		    CString (_PK_ (showId id)),
 		    mkIntCLit stg_arity,	-- total # of args
 		    mkIntCLit spA_stk_args,	-- # passed on A stk
 		    mkIntCLit spB_stk_args,	-- B stk (rest in regs)
@@ -570,7 +563,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	      Just xx -> get_ultimate_wrapper (Just xx) xx
 
     show_wrapper_name Nothing   = ""
-    show_wrapper_name (Just xx) = showId PprDebug xx
+    show_wrapper_name (Just xx) = showId xx
 
     show_wrapper_arg_kinds Nothing   = ""
     show_wrapper_arg_kinds (Just xx)
@@ -605,7 +598,7 @@ enterCostCentreCode closure_info cc is_thunk
 	if costsAreSubsumed cc then
 	    --ASSERT(isToplevClosure closure_info)
 	    --ASSERT(is_thunk == IsFunction)
-	    (if isToplevClosure closure_info && is_thunk == IsFunction then \x->x else pprTrace "enterCostCenterCode:" (hsep [ppr PprDebug (is_thunk == IsFunction){-, ppr PprDebug closure_info-}, text (showCostCentre PprDebug False cc)])) $
+	    (if isToplevClosure closure_info && is_thunk == IsFunction then \x->x else pprTrace "enterCostCenterCode:" (hsep [ppr (is_thunk == IsFunction){-, ppr closure_info-}, text (showCostCentre False cc)])) $
 	    costCentresC SLIT("ENTER_CC_FSUB") []
 
 	else if currentOrSubsumedCosts cc then 
@@ -809,7 +802,7 @@ stackCheck closure_info regs node_reqd code
     all_regs = if node_reqd then node:regs else regs
     liveness_mask = mkLiveRegsMask all_regs
 
-    returns_prim_type = closureReturnsUnboxedType closure_info
+    returns_prim_type = closureReturnsUnpointedType closure_info
 \end{code}
 
 %************************************************************************
@@ -918,11 +911,11 @@ closureDescription :: FAST_STRING	-- Module
 	-- CgConTbls.lhs with a description generated from the data constructor
 
 closureDescription mod_name name args body
-  = show (
+  = showSDoc (
 	hcat [char '<',
 		   ptext mod_name,
 		   char '.',
-		   ppr PprDebug name,
+		   ppr name,
 		   char '>'])
 \end{code}
 
@@ -975,7 +968,7 @@ mkWrapperArgTypeCategories
 	-> String	-- a string saying lots about the args
 
 mkWrapperArgTypeCategories wrapper_ty wrap_info
-  = case (splitFunTyExpandingDicts wrapper_ty) of { (arg_tys,_) ->
+  = case (splitFunTy_maybe wrapper_ty) of { Just (arg_tys,_) ->
     map do_one (wrap_info `zip` (map showTypeCategory arg_tys)) }
   where
     -- ToDo: this needs FIXING UP (it was a hack anyway...)

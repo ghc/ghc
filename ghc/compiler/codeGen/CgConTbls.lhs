@@ -4,11 +4,9 @@
 \section[CgConTbls]{Info tables and update bits for constructors}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgConTbls ( genStaticConBits ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import AbsCSyn
 import CgMonad
@@ -34,17 +32,17 @@ import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			)
 import CostCentre	( dontCareCostCentre, CostCentre )
 import FiniteMap	( fmToList, FiniteMap )
-import HeapOffs		( zeroOff, SYN_IE(VirtualHeapOffset) )
+import HeapOffs		( zeroOff, VirtualHeapOffset )
 import Id		( dataConTag, dataConRawArgTys,
 			  dataConNumFields, fIRST_TAG,
 			  emptyIdSet,
-			  GenId{-instance NamedThing-}, SYN_IE(Id)
+			  GenId{-instance NamedThing-}, Id
 			)
 import Name		( getOccString )
 import PrelInfo		( maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, mkSpecTyCon, TyCon )
-import Type		( typePrimRep, SYN_IE(Type) )
+import Type		( typePrimRep, Type )
 import Util		( panic )
 
 mkSameSpecCon = panic "CgConTbls.mkSameSpecCon (ToDo)"

@@ -8,8 +8,6 @@
 %************************************************************************
 
 \begin{code}
-#include "HsVersions.h"
-
 module BinderInfo (
 	BinderInfo(..),
 	FunOrArg, DuplicationDanger, InsideSCC,  -- NB: all abstract (yay!)
@@ -27,13 +25,11 @@ module BinderInfo (
 	isFun, isDupDanger -- for Simon Marlow deforestation
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import Pretty
 import Util		( panic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable 
-#endif
+import GlaExts		( Int(..), (+#) )
+import Outputable
 
 \end{code}
 
@@ -286,9 +282,9 @@ getBinderInfoArity (OneOcc _ _ _ _ i) = i
 
 \begin{code}
 instance Outputable BinderInfo where
-  ppr sty DeadCode     = ptext SLIT("Dead")
-  ppr sty (ManyOcc ar) = hcat [ ptext SLIT("Many-"), int ar ]
-  ppr sty (OneOcc posn dup_danger in_scc n_alts ar)
+  ppr DeadCode     = ptext SLIT("Dead")
+  ppr (ManyOcc ar) = hcat [ ptext SLIT("Many-"), int ar ]
+  ppr (OneOcc posn dup_danger in_scc n_alts ar)
     = hcat [ ptext SLIT("One-"), pp_posn posn, char '-', pp_danger dup_danger,
 		  char '-', pp_scc in_scc,  char '-', int n_alts,
 		  char '-', int ar ]

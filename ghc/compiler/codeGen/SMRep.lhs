@@ -7,8 +7,6 @@ This is here, rather than in ClosureInfo, just to keep nhc happy.
 Other modules should access this info through ClosureInfo.
 
 \begin{code}
-#include "HsVersions.h"
-
 module SMRep (
 	SMRep(..), SMSpecRepKind(..), SMUpdateKind(..),
 	getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr,
@@ -17,13 +15,11 @@ module SMRep (
 	isIntLikeRep
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import Pretty		( text )
-import Util		( panic )
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-#endif
+import Util		( panic )
+import GlaExts		( Int(..), Int#, (<#), (==#), (<#), (>#) )
 \end{code}
 
 %************************************************************************
@@ -221,7 +217,7 @@ instance Text SMRep where
 	   MuTupleRep _	            	 	 -> "MUTUPLE")
 
 instance Outputable SMRep where
-    ppr sty rep = text (show rep)
+    ppr rep = text (show rep)
 
 getSMInfoStr :: SMRep -> String
 getSMInfoStr (StaticRep _ _)				= "STATIC"

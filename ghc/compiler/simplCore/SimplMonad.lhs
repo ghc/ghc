@@ -4,10 +4,8 @@
 \section[SimplMonad]{The simplifier Monad}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SimplMonad (
-	SYN_IE(SmplM),
+	SmplM,
 	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
 	mapSmpl, mapAndUnzipSmpl,
 
@@ -20,28 +18,23 @@ module SimplMonad (
 	cloneId, cloneIds, cloneTyVarSmpl, newIds, newId
     ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(Ix)
+#include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(SmplLoop)		-- well, cheating sort of
-#else
-import {-# SOURCE #-} Simplify
-import {-# SOURCE #-} MagicUFs
-#endif
+-- import {-# SOURCE #-} Simplify
+-- import {-# SOURCE #-} MagicUFs
 
-import Id		( GenId, mkSysLocal, mkIdWithNewUniq, SYN_IE(Id) )
+import Id		( GenId, mkSysLocal, mkIdWithNewUniq, Id )
 import CoreUnfold	( SimpleUnfolding )
 import SimplEnv
 import SrcLoc		( noSrcLoc )
-import TyVar		( cloneTyVar, SYN_IE(TyVar) )
-import Type             ( SYN_IE(Type) )
+import TyVar		( cloneTyVar, TyVar )
+import Type             ( Type )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply,
 			  UniqSupply
 			)
-import Util		( zipWithEqual, panic, SYN_IE(Eager), appEager, pprTrace )
-import Pretty
-import Outputable	( PprStyle(..), Outputable(..) )
+import Util		( zipWithEqual, Eager, appEager )
+import Outputable
+import Ix
 
 infixr 9  `thenSmpl`, `thenSmpl_`
 \end{code}
@@ -204,7 +197,7 @@ instance Text TickType where
 showSimplCount :: SimplCount -> String
 
 showSimplCount (SimplCount _ stuff (_, unf1, unf2))
-  = shw stuff ++ "\nMost recent unfoldings: " ++ show (ppr PprDebug (reverse unf2 ++ reverse unf1))
+  = shw stuff ++ "\nMost recent unfoldings: " ++ showSDoc (ppr (reverse unf2 ++ reverse unf1))
   where
     shw []	    = ""
     shw ((t,n):tns) | n /= 0	= show t ++ ('\t' : show n) ++ ('\n' : shw tns)
@@ -273,7 +266,7 @@ maxUnfoldHistory = 20
 
 tickUnfold :: Id -> SmplM ()
 tickUnfold id us (SimplCount n stuff (n_unf, unf1, unf2))
-  = -- pprTrace "Unfolding: " (ppr PprDebug id) $
+  = -- pprTrace "Unfolding: " (ppr id) $
     new_stuff `seqL`
     new_unf   `seqTriple`
     ((), SimplCount (n _ADD_ ILIT(1)) new_stuff new_unf)

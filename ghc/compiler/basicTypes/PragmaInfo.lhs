@@ -4,11 +4,10 @@
 \section[PragmaInfo]{@PragmaInfos@: The user's pragma requests}
 
 \begin{code}
-#include "HsVersions.h"
-
 module PragmaInfo where
 
-IMP_Ubiq()
+#include "HsVersions.h"
+
 \end{code}
 
 \begin{code}

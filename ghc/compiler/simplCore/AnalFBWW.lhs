@@ -4,13 +4,11 @@
 \section[AnalFBWW]{Spoting good functions for splitting into workers/wrappers}
 
 \begin{code}
-#include "HsVersions.h"
-
 module AnalFBWW ( analFBWW ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import CoreSyn		( SYN_IE(CoreBinding) )
+import CoreSyn		( CoreBinding )
 import Util		( panic{-ToDo:rm-} )
 
 --import Util
@@ -104,7 +102,7 @@ analExprFBWW (App (App (App
 		(CoTyApp (CoTyApp (Var foldr_id) _) _) (VarArg c)) _) _)
 		env
 	| pprTrace ("FOLDR:" ++ show (foldr_id == foldrId,isCons c))
-		(ppr PprDebug foldr_id)
+		(ppr foldr_id)
 		(foldr_id == foldrId && isCons c) = goodProdFBType
    where
 	isCons c = case lookupIdEnv env c of
@@ -188,7 +186,7 @@ analBind (NonRec (v,bnd) e) env =
 analBind (Rec binds) env =
    let
 	first_set = [ (v,IsFB (FBType [FBBadConsum | _ <- args ] FBGoodProd)) | ((v,_),e) <- binds,
-				(_,_,args,_) <- [collectBinders e]]
+				(_,args,_) <- [collectBinders e]]
 	env' = delManyFromIdEnv env (map (fst.fst) binds)
    in
 	growIdEnvList env' (fixpoint 0 binds env' first_set)
@@ -252,7 +250,7 @@ annotateBindingFBWW env bnds = (env',bnds')
 	fixId v =
 		(case lookupIdEnv env' v of
 		   Just (IsFB ty@(FBType xs p))
-		    | not (null xs) -> pprTrace "ADDED to:" (ppr PprDebug v)
+		    | not (null xs) -> pprTrace "ADDED to:" (ppr v)
 					(addIdFBTypeInfo v (mkFBTypeInfo ty))
 		   _ -> v)
 -}

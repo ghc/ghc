@@ -4,20 +4,15 @@
 \section[DsListComp]{Desugaring list comprehensions}
 
 \begin{code}
-#include "HsVersions.h"
-
 module DsListComp ( dsListComp ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)		-- break dsExpr-ish loop
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} DsExpr ( dsExpr )
 import {-# SOURCE #-} DsBinds ( dsBinds )
-#endif
 
 import HsSyn		( Stmt(..), HsExpr, HsBinds )
-import TcHsSyn		( SYN_IE(TypecheckedStmt), SYN_IE(TypecheckedHsExpr) , SYN_IE(TypecheckedHsBinds) )
+import TcHsSyn		( TypecheckedStmt, TypecheckedHsExpr , TypecheckedHsBinds )
 import DsHsSyn		( outPatType )
 import CoreSyn
 
@@ -26,9 +21,9 @@ import DsUtils
 
 import CmdLineOpts	( opt_FoldrBuildOn )
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
-import Id               ( SYN_IE(Id) )
+import Id               ( Id )
 import PrelVals		( mkBuild, foldrId )
-import Type		( mkTyVarTy, mkForAllTy, mkFunTys, mkFunTy, SYN_IE(Type) )
+import Type		( mkTyVarTy, mkForAllTy, mkFunTys, mkFunTy, Type )
 import TysPrim		( alphaTy )
 import TysWiredIn	( nilDataCon, consDataCon, listTyCon )
 import TyVar		( alphaTyVar )
@@ -72,7 +67,7 @@ dsListComp quals elt_ty
 
     returnDs (mkBuild elt_ty n_tyvar c n g result)
   where
-    nil_expr    = mkCon nilDataCon [] [elt_ty] []
+    nil_expr    = mkCon nilDataCon [elt_ty] []
 \end{code}
 
 %************************************************************************

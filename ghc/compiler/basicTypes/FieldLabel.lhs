@@ -4,14 +4,12 @@
 \section[FieldLabel]{The @FieldLabel@ type}
 
 \begin{code}
-#include "HsVersions.h"
-
 module FieldLabel where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import Name		( Name{-instance Eq/Outputable-}, NamedThing(..), nameUnique )
-import Type		( SYN_IE(Type) )
+import Type		( Type )
 
 import Outputable
 import Unique           ( Uniquable(..) )
@@ -48,7 +46,7 @@ instance Eq FieldLabel where
     (FieldLabel n1 _ _) == (FieldLabel n2 _ _) = n1 == n2
 
 instance Outputable FieldLabel where
-    ppr sty (FieldLabel n _ _) = ppr sty n
+    ppr (FieldLabel n _ _) = ppr n
 
 instance NamedThing FieldLabel where
     getName (FieldLabel n _ _) = n

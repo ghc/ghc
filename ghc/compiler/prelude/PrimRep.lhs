@@ -8,8 +8,6 @@ At various places in the back end, we want to be to tag things with a
 types.
 
 \begin{code}
-#include "HsVersions.h"
-
 module PrimRep (
 	PrimRep(..),
 
@@ -19,13 +17,10 @@ module PrimRep (
 	guessPrimRep, decodePrimRep
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import Pretty		-- pretty-printing code
 import Util
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-#endif
 
 -- Oh dear.
 #include "../../includes/GhcConstants.h"
@@ -152,11 +147,11 @@ retPrimRepSize = getPrimRepSize RetRep
 
 \begin{code}
 instance Outputable PrimRep where
-    ppr sty kind = text (showPrimRep kind)
+    ppr kind = text (showPrimRep kind)
 
 showPrimRep  :: PrimRep -> String
 -- dumping PrimRep tag for unfoldings
-ppPrimRep  :: PrimRep -> Doc
+ppPrimRep  :: PrimRep -> SDoc
 
 guessPrimRep :: String -> PrimRep	-- a horrible "inverse" function
 decodePrimRep :: Char  -> PrimRep       -- of equal nature

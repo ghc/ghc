@@ -38,11 +38,10 @@ Experimental Evidence: Heap: +/- 7%
 		       Instrs: Always improves for 2 or more Static Args.
 
 \begin{code}
-#include "HsVersions.h"
-
 module SAT ( doStaticArgs ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
+
 import Util		( panic )
 
 doStaticArgs = panic "SAT.doStaticArgs (ToDo)"

@@ -9,8 +9,6 @@ symbolic}---are sufficiently turgid that they get their own module.
 INTERNAL MODULE: should be accessed via @AbsCSyn.hi@.
 
 \begin{code}
-#include "HsVersions.h"
-
 module HeapOffs (
 	HeapOffset,
 
@@ -26,25 +24,22 @@ module HeapOffs (
 	hpRelToInt,
 #endif
 
-	SYN_IE(VirtualHeapOffset), SYN_IE(HpRelOffset),
-	SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset),
-	SYN_IE(SpARelOffset), SYN_IE(SpBRelOffset)
+	VirtualHeapOffset, HpRelOffset,
+	VirtualSpAOffset, VirtualSpBOffset,
+	SpARelOffset, SpBRelOffset
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
+
 #if ! OMIT_NATIVE_CODEGEN
-# if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(AbsCLoop)		( fixedHdrSizeInWords, varHdrSizeInWords )
-# else
 import {-# SOURCE #-} MachMisc
-# endif
 #endif
 
 import Maybes		( catMaybes )
 import SMRep
-import Pretty		-- ********** NOTE **********
 import Util		( panic )
-import Outputable       ( PprStyle )
+import Outputable
+import GlaExts		( Int(..), Int#, (+#), negateInt#, (<=#), (>=#), (==#) )
 \end{code}
 
 %************************************************************************
@@ -269,36 +264,35 @@ print either a single value, or a parenthesised value.  No need for
 the caller to parenthesise.
 
 \begin{code}
-pprHeapOffset :: PprStyle -> HeapOffset -> Doc
+pprHeapOffset :: HeapOffset -> SDoc
 
-pprHeapOffset sty ZeroHeapOffset = char '0'
+pprHeapOffset ZeroHeapOffset = char '0'
 
-pprHeapOffset sty (MaxHeapOffset off1 off2)
+pprHeapOffset (MaxHeapOffset off1 off2)
   = (<>) (ptext SLIT("STG_MAX"))
-      (parens (hcat [pprHeapOffset sty off1, comma, pprHeapOffset sty off2]))
+      (parens (hcat [pprHeapOffset off1, comma, pprHeapOffset off2]))
 
-pprHeapOffset sty (AddHeapOffset off1 off2)
-  = parens (hcat [pprHeapOffset sty off1, char '+',
-			pprHeapOffset sty off2])
-pprHeapOffset sty (SubHeapOffset off1 off2)
-  = parens (hcat [pprHeapOffset sty off1, char '-',
-			pprHeapOffset sty off2])
+pprHeapOffset (AddHeapOffset off1 off2)
+  = parens (hcat [pprHeapOffset off1, char '+',
+			pprHeapOffset off2])
+pprHeapOffset (SubHeapOffset off1 off2)
+  = parens (hcat [pprHeapOffset off1, char '-',
+			pprHeapOffset off2])
 
-pprHeapOffset sty (MkHeapOffset int_offs fxdhdr_offs varhdr_offs tothdr_offs)
-  = pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
+pprHeapOffset (MkHeapOffset int_offs fxdhdr_offs varhdr_offs tothdr_offs)
+  = pprHeapOffsetPieces int_offs fxdhdr_offs varhdr_offs tothdr_offs
 \end{code}
 
 \begin{code}
-pprHeapOffsetPieces :: PprStyle
-		    -> FAST_INT		-- Words
+pprHeapOffsetPieces :: FAST_INT		-- Words
 		    -> FAST_INT		-- Fixed hdrs
 		    -> [SMRep__Int]	-- Var hdrs
 		    -> [SMRep__Int]	-- Tot hdrs
-		    -> Doc
+		    -> SDoc
 
-pprHeapOffsetPieces sty n ILIT(0) [] [] = int IBOX(n) -- Deals with zero case too
+pprHeapOffsetPieces n ILIT(0) [] [] = int IBOX(n) -- Deals with zero case too
 
-pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
+pprHeapOffsetPieces int_offs fxdhdr_offs varhdr_offs tothdr_offs
   = let pp_int_offs =
 	    if int_offs _EQ_ ILIT(0)
 	    then Nothing
@@ -326,7 +320,7 @@ pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
     pp_hdrs hdr_pp hdrs = Just (parens (hsep (punctuate (char '+')
 						(map (pp_hdr hdr_pp) hdrs))))
 
-    pp_hdr :: Doc -> SMRep__Int -> Doc
+    pp_hdr :: SDoc -> SMRep__Int -> SDoc
     pp_hdr pp_str (SMRI(rep, n))
       = if n _EQ_ ILIT(1) then
 	  (<>) (text (show rep)) pp_str

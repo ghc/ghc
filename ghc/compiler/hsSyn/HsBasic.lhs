@@ -4,16 +4,12 @@
 \section[HsLit]{Abstract syntax: source-language literals}
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsBasic where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-IMPORT_1_3(Ratio(Rational))
-
-import Pretty
 import Outputable
+import Ratio	( Rational )
 \end{code}
 
 %************************************************************************
@@ -60,16 +56,16 @@ negLiteral (HsFrac f) = HsFrac (-f)
 
 \begin{code}
 instance Outputable HsLit where
-    ppr sty (HsChar c)		= text (show c)
-    ppr sty (HsCharPrim c)	= (<>) (text (show c)) (char '#')
-    ppr sty (HsString s)	= text (show s)
-    ppr sty (HsStringPrim s)	= (<>) (text (show s)) (char '#')
-    ppr sty (HsInt i)		= integer i
-    ppr sty (HsFrac f)		= rational f
-    ppr sty (HsFloatPrim f)	= (<>) (rational f) (char '#')
-    ppr sty (HsDoublePrim d)	= (<>) (rational d) (text "##")
-    ppr sty (HsIntPrim i)	= (<>) (integer i) (char '#')
-    ppr sty (HsLitLit s)	= hcat [text "``", ptext s, text "''"]
+    ppr (HsChar c)	 = text (show c)
+    ppr (HsCharPrim c)	 = (<>) (text (show c)) (char '#')
+    ppr (HsString s)	 = text (show s)
+    ppr (HsStringPrim s) = (<>) (text (show s)) (char '#')
+    ppr (HsInt i)	 = integer i
+    ppr (HsFrac f)	 = rational f
+    ppr (HsFloatPrim f)	 = (<>) (rational f) (char '#')
+    ppr (HsDoublePrim d) = (<>) (rational d) (text "##")
+    ppr (HsIntPrim i)	 = (<>) (integer i) (char '#')
+    ppr (HsLitLit s)	 = hcat [text "``", ptext s, text "''"]
 \end{code}
 
 

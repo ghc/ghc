@@ -7,25 +7,23 @@ See the beginning of the top-level @CodeGen@ module, to see how this
 monadic stuff fits into the Big Picture.
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgMonad (
-	SYN_IE(Code),	-- type
-	SYN_IE(FCode),	-- type
+	Code,	-- type
+	FCode,	-- type
 
 	initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
 	returnFC, fixC, absC, nopC, getAbsC,
 
 	forkClosureBody, forkStatics, forkAlts, forkEval,
 	forkEvalHelp, forkAbsC,
-	SYN_IE(SemiTaggingStuff),
+	SemiTaggingStuff,
 
 	addBindC, addBindsC, modifyBindC, lookupBindC,
 
 	EndOfBlockInfo(..),
 	setEndOfBlockInfo, getEndOfBlockInfo,
 
-	SYN_IE(AStackUsage), SYN_IE(BStackUsage), SYN_IE(HeapUsage),
+	AStackUsage, BStackUsage, HeapUsage,
 	StubFlag,
 	isStubbed,
 
@@ -42,22 +40,17 @@ module CgMonad (
 	Sequel(..), -- ToDo: unabstract?
 	sequelToAmode,
 
-	StableLoc(..), maybeAStkLoc, maybeBStkLoc,
-
 	-- out of general friendliness, we also export ...
 	CgInfoDownwards(..), CgState(..),	-- non-abstract
 	CompilationInfo(..)
     ) where
 
-IMPORT_1_3(List(nub))
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(CgLoop1)		-- stuff from CgBindery and CgUsages
-#else
-import {-# SOURCE #-} CgBindery 
+import	List	( nub )
+
+import {-# SOURCE #-} CgBindery ( CgIdInfo(..), CgBindings, maybeAStkLoc, maybeBStkLoc, nukeVolatileBinds )
 import {-# SOURCE #-} CgUsages
-#endif
 
 import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )
@@ -65,26 +58,24 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling,
 			  opt_OmitBlackHoling
 			)
 import HeapOffs		( maxOff,
-			  SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset),
+			  VirtualSpAOffset, VirtualSpBOffset,
 			  HeapOffset
 			)
 import CLabel           ( CLabel )
 import Id		( idType,
 			  nullIdEnv, mkIdEnv, addOneToIdEnv,
-			  modifyIdEnv, lookupIdEnv, rngIdEnv, SYN_IE(IdEnv),
-			  SYN_IE(ConTag), GenId{-instance Outputable-},
-			  SYN_IE(Id)
+			  modifyIdEnv, lookupIdEnv, rngIdEnv, IdEnv,
+			  ConTag, GenId{-instance Outputable-},
+			  Id
 			)
 import Literal          ( Literal )
 import Maybes		( maybeToBool )
-import Outputable	( PprStyle(..), Outputable(..) )
-import PprType		( GenType{-instance Outputable-} )
-import Pretty		( Doc, vcat, hsep, ptext )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
-import StgSyn		( SYN_IE(StgLiveVars) )
+import StgSyn		( StgLiveVars )
 import Type		( typePrimRep )
 import UniqSet		( elementOfUniqSet )
-import Util		( sortLt, panic, pprPanic )
+import Util		( sortLt )
+import Outputable
 
 infixr 9 `thenC`	-- Right-associative!
 infixr 9 `thenFC`
@@ -219,33 +210,6 @@ sequelToAmode InRetReg		 = returnFC (CReg RetReg)
 --WAS: sequelToAmode (UpdateCode amode) = returnFC amode
 sequelToAmode (UpdateCode amode) = returnFC (CReg StdUpdRetVecReg)
 sequelToAmode (CaseAlts amode _) = returnFC amode
-\end{code}
-
-@StableLoc@ encodes where an Id can be found, used by
-the @CgBindings@ environment in @CgBindery@.
-
-The natural home for @StableLoc@ is @CgBindery@, but it is
-stuck out here to avoid giving the type for @maybeBStkLoc@
-and @maybeAStkLoc@ in the @.hi-boot@ file for @CgBindery@.
-This is problematic since they're both returning @Maybe@ types,
-which lives in @PrelBase@ (< ghc-2.09) or @PrelMaybe@ (> 2.09).
-ToDo: after the next major release, move it back.
-
-\begin{code}
-data StableLoc
-  = NoStableLoc
-  | VirAStkLoc		VirtualSpAOffset
-  | VirBStkLoc		VirtualSpBOffset
-  | LitLoc		Literal
-  | StableAmodeLoc	CAddrMode
-
--- these are so StableLoc can be abstract:
-
-maybeAStkLoc (VirAStkLoc offset) = Just offset
-maybeAStkLoc _			 = Nothing
-
-maybeBStkLoc (VirBStkLoc offset) = Just offset
-maybeBStkLoc _			 = Nothing
 \end{code}
 
 See the NOTES about the details of stack/heap usage tracking.
@@ -728,12 +692,12 @@ lookupBindC name info_down@(MkCgInfoDown _ static_binds _)
 		   Nothing
 		     -> pprPanic "lookupBindC:no info!\n"
 			(vcat [
-			    hsep [ptext SLIT("for:"), ppr PprShowAll name],
+			    hsep [ptext SLIT("for:"), ppr name],
 			    ptext SLIT("(probably: data dependencies broken by an optimisation pass)"),
 			    ptext SLIT("static binds for:"),
-			    vcat [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv static_binds ],
+			    vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngIdEnv static_binds ],
 			    ptext SLIT("local binds for:"),
-			    vcat [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv local_binds ]
+			    vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngIdEnv local_binds ]
 			 ])
 \end{code}
 

@@ -6,17 +6,11 @@
 Support code for @Simplify@.
 
 \begin{code}
-#include "HsVersions.h"
-
 module SimplCase ( simplCase, bindLargeRhs ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(SmplLoop)		( simplBind, simplExpr, MagicUnfoldingFun )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} Simplify ( simplBind, simplExpr )
---import {-# SOURCE #-} MagicUFs ( MagicUnfoldingFun )
-#endif
 
 import BinderInfo	-- too boring to try to select things...
 import CmdLineOpts	( SimplifierSwitch(..) )
@@ -26,8 +20,8 @@ import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
 			  unTagBindersAlts, unTagBinders, coreExprType
 			)
 import Id		( idType, isDataCon, getIdDemandInfo, dataConArgTys,
-			  SYN_IE(DataCon), GenId{-instance Eq-},
-			  SYN_IE(Id)
+			  DataCon, GenId{-instance Eq-},
+			  Id
 			)
 import IdInfo		( willBeDemanded, DemandInfo )
 import Literal		( isNoRepLit, Literal{-instance Eq-} )
@@ -36,12 +30,11 @@ import PrelVals		( voidId )
 import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
 import SimplEnv
 import SimplMonad
-import Type		( isPrimType, maybeAppDataTyConExpandingDicts, getAppDataTyConExpandingDicts, mkFunTy, mkFunTys, eqTy )
+import Type		( isUnpointedType, splitAlgTyConApp_maybe, splitAlgTyConApp, mkFunTy, mkFunTys )
 import TyCon		( isDataTyCon )
 import TysPrim		( voidTy )
 import Unique		( Unique{-instance Eq-} )
-import Usage		( GenUsage{-instance Eq-} )
-import Util		( SYN_IE(Eager), runEager, appEager,
+import Util		( Eager, runEager, appEager,
 			  isIn, isSingleton, zipEqual, panic, assertPanic )
 \end{code}
 
@@ -441,7 +434,7 @@ bindLargeRhs :: SimplEnv
 		       InExpr)		-- Modified rhs
 
 bindLargeRhs env args rhs_ty rhs_c
-  | null used_args && isPrimType rhs_ty
+  | null used_args && isUnpointedType rhs_ty
 	-- If we try to lift a primitive-typed something out
 	-- for let-binding-purposes, we will *caseify* it (!),
 	-- with potentially-disastrous strictness results.  So
@@ -521,12 +514,12 @@ simplAlts env scrut (AlgAlts [] (BindDefault bndr@(id,occ_info) rhs)) rhs_c
     newIds inst_con_arg_tys	`thenSmpl` \ new_bindees ->
     let
 	new_args = [ (b, bad_occ_info) | b <- new_bindees ]
-	con_app  = mkCon con [] ty_args (map VarArg new_bindees)
+	con_app  = mkCon con ty_args (map VarArg new_bindees)
 	new_rhs  = Let (NonRec bndr con_app) rhs
     in
     simplAlts env scrut (AlgAlts [(con,new_args,new_rhs)] NoDefault) rhs_c
   where
-    maybe_data_ty		= maybeAppDataTyConExpandingDicts (idType id)
+    maybe_data_ty		= splitAlgTyConApp_maybe (idType id)
     Just (tycon, ty_args, cons)	= maybe_data_ty
     (con:other_cons)		= cons
     inst_con_arg_tys 		= dataConArgTys con ty_args
@@ -545,7 +538,7 @@ simplAlts env scrut (AlgAlts alts deflt) rhs_c
 	    new_env = case scrut of
 		       Var v -> extendEnvGivenNewRhs env1 v (Con con args)
 			     where
-				(_, ty_args, _) = getAppDataTyConExpandingDicts (idType v)
+				(_, ty_args, _) = splitAlgTyConApp (idType v)
 				args = map TyArg ty_args ++ map VarArg con_args'
 
 		       other -> env1
@@ -809,7 +802,7 @@ mkCoCase env scrut (AlgAlts outer_alts
 	 v | scrut_is_var = Var scrut_var
 	   | otherwise    = Con con (map TyArg arg_tys ++ map VarArg args)
 
-    arg_tys = case (getAppDataTyConExpandingDicts (idType deflt_var)) of
+    arg_tys = case (splitAlgTyConApp (idType deflt_var)) of
 		(_, arg_tys, _) -> arg_tys
 
 mkCoCase env scrut (PrimAlts
@@ -957,7 +950,6 @@ eq_args _	 _        = False
 
 eq_arg (LitArg 	 l1) (LitArg   l2) = l1	== l2
 eq_arg (VarArg 	 v1) (VarArg   v2) = v1	== v2
-eq_arg (TyArg  	 t1) (TyArg    t2) = t1 `eqTy` t2
-eq_arg (UsageArg u1) (UsageArg u2) = u1 == u2
+eq_arg (TyArg  	 t1) (TyArg    t2) = t1 == t2
 eq_arg _	     _		   =  False
 \end{code}

@@ -13,21 +13,34 @@ types that
 \end{itemize}
 
 \begin{code}
-#include "HsVersions.h"
-
 module BasicTypes(
-	SYN_IE(Version), SYN_IE(Arity),
-	SYN_IE(Module), moduleString, pprModule,
+	Version, Arity, 
+	Unused, unused,
+	Module, moduleString, pprModule,
 	Fixity(..), FixityDirection(..),
-	NewOrData(..), IfaceFlavour(..)
+	NewOrData(..), IfaceFlavour(..), TopLevelFlag(..), RecFlag(..)
    ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import Pretty
 import Outputable
-
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[Unused]{Unused}
+%*									*
+%************************************************************************
+
+Used as a placeholder in types.
+
+\begin{code}
+type Unused = Void
+
+unused :: Unused
+unused = error "Unused is used!"
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -63,8 +76,8 @@ type Module   = FAST_STRING
 moduleString :: Module -> String
 moduleString mod = _UNPK_ mod
 
-pprModule :: PprStyle -> Module -> Doc
-pprModule sty m = ptext m
+pprModule :: Module -> SDoc
+pprModule m = ptext m
 \end{code}
 
 %************************************************************************
@@ -112,12 +125,12 @@ data FixityDirection = InfixL | InfixR | InfixN
 		     deriving(Eq)
 
 instance Outputable Fixity where
-    ppr sty (Fixity prec dir) = hcat [ppr sty dir, space, int prec]
+    ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
 
 instance Outputable FixityDirection where
-    ppr sty InfixL = ptext SLIT("infixl")
-    ppr sty InfixR = ptext SLIT("infixr")
-    ppr sty InfixN = ptext SLIT("infix")
+    ppr InfixL = ptext SLIT("infixl")
+    ppr InfixR = ptext SLIT("infixr")
+    ppr InfixN = ptext SLIT("infix")
 
 instance Eq Fixity where		-- Used to determine if two fixities conflict
   (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
@@ -132,7 +145,35 @@ instance Eq Fixity where		-- Used to determine if two fixities conflict
 
 \begin{code}
 data NewOrData
-  = NewType	    -- "newtype Blah ..."
-  | DataType	    -- "data Blah ..."
-  deriving( Eq )
+  = NewType  	-- "newtype Blah ..."
+  | DataType 	-- "data Blah ..."
+  deriving( Eq )	-- Needed because Demand derives Eq
+\end{code}
+
+The @RecFlag@ tells whether the thing is part of a recursive group or not.
+
+
+%************************************************************************
+%*									*
+\subsection[Top-level/local]{Top-level/not-top level flag}
+%*									*
+%************************************************************************
+
+\begin{code}
+data TopLevelFlag
+  = TopLevel
+  | NotTopLevel
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[Top-level/local]{Top-level/not-top level flag}
+%*									*
+%************************************************************************
+
+\begin{code} 
+data RecFlag
+  = Recursive 
+  | NonRecursive
 \end{code}

@@ -4,12 +4,9 @@
 \section[SimplStg]{Driver for simplifying @STG@ programs}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SimplStg ( stg2stg ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(IO(hPutStr,stderr))
+#include "HsVersions.h"
 
 import StgSyn
 
@@ -29,16 +26,17 @@ import CmdLineOpts	( opt_SccGroup, --Not used:opt_EnsureSplittableC,
 			  StgToDo(..)
 			)
 import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
-			  growIdEnvList, isNullIdEnv, SYN_IE(IdEnv),
-			  GenId{-instance Eq/Outputable -}, SYN_IE(Id)
+			  growIdEnvList, isNullIdEnv, IdEnv,
+			  GenId{-instance Eq/Outputable -}, Id
 			)
 import Maybes		( maybeToBool )
 import PprType		( GenType{-instance Outputable-} )
 import ErrUtils		( doIfSet )
-import Outputable       ( PprStyle, Outputable(..), printErrs, pprDumpStyle )
-import Pretty		( Doc, ($$), vcat, text, ptext )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import Util		( mapAccumL, panic, assertPanic )
+import IO		( hPutStr, stderr )
+import Outputable
+import GlaExts		( trace )
 \end{code}
 
 \begin{code}
@@ -57,7 +55,7 @@ stg2stg stg_todos module_name us binds
     doIfSet do_verbose_stg2stg
 	(printErrs (text "VERBOSE STG-TO-STG:" $$
 		    text "*** Core2Stg:" $$
-		    vcat (map (ppr pprDumpStyle) (setStgVarInfo False binds)))) >>
+		    vcat (map ppr (setStgVarInfo False binds)))) >>
 
 	-- Do the main business!
     foldl_mn do_stg_pass (binds, us4now, ([],[])) stg_todos
@@ -107,7 +105,7 @@ stg2stg stg_todos module_name us binds
 
     -------------
     stg_linter = if False --LATER: opt_DoStgLinting (ToDo)
-		 then lintStgBindings pprDumpStyle
+		 then lintStgBindings
 		 else ( \ whodunnit binds -> binds )
 
     -------------------------------------------
@@ -149,9 +147,8 @@ stg2stg stg_todos module_name us binds
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
 	(if do_verbose_stg2stg then
-	    hPutStr stderr (show
-	    (($$) (text ("*** "++what++":"))
-		     (vcat (map (ppr pprDumpStyle) binds2))
+	    hPutStr stderr (showSDoc
+	      (text ("*** "++what++":") $$ vcat (map ppr binds2)
 	    ))
 	 else return ()) >>
 	let

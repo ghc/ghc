@@ -4,13 +4,14 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Main ( main ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(IO(stderr,hPutStr,hClose,openFile,IOMode(..)))
+#include "HsVersions.h"
 
+import IO	( IOMode(..),
+		  hGetContents, hPutStr, hClose, openFile,
+		  stdin,stderr
+		)
 import HsSyn
 import RdrHsSyn		( RdrName )
 import BasicTypes	( NewOrData(..) )
@@ -21,11 +22,7 @@ import RnMonad		( ExportEnv )
 
 import MkIface		-- several functions
 import TcModule		( typecheckModule )
-import Desugar		( deSugar, pprDsWarnings
-#if __GLASGOW_HASKELL__ <= 200
-		          , DsMatchContext 
-#endif
-			)
+import Desugar		( deSugar, pprDsWarnings )
 import SimplCore	( core2core )
 import CoreToStg	( topCoreBindsToStg )
 import StgSyn		( collectFinalStgBinders, pprStgBindings )
@@ -46,20 +43,13 @@ import Specialise	( SpecialiseData(..) )
 import StgSyn		( GenStgBinding )
 import TcInstUtil	( InstInfo )
 import TyCon		( isDataTyCon )
+import Class		( classTyCon )
 import UniqSupply	( mkSplitUniqSupply )
 
 import PprAbsC		( dumpRealC, writeRealC )
 import PprCore		( pprCoreBinding )
-import Pretty
-
-import Id		( GenId )		-- instances
-import Name		( Name )		-- instances
-import PprType		( GenType, GenTyVar )	-- instances
-import TyVar		( GenTyVar )		-- instances
-import Unique		( Unique )		-- instances
-
-import Outputable	( PprStyle(..), Outputable(..), pprDumpStyle, pprErrorsStyle )
-
+import FiniteMap	( emptyFM )
+import Outputable
 \end{code}
 
 \begin{code}
@@ -85,8 +75,7 @@ doIt (core_cmds, stg_cmds)
     _scc_     "Reader"
     rdModule		>>= \ (mod_name, rdr_module) ->
 
-    dumpIfSet opt_D_dump_rdr "Reader"
-	(ppr pprDumpStyle rdr_module)		>>
+    dumpIfSet opt_D_dump_rdr "Reader" (ppr rdr_module)		>>
 
     dumpIfSet opt_D_source_stats "Source Statistics"
 	(ppSourceStats rdr_module)	 	>>
@@ -140,7 +129,7 @@ doIt (core_cmds, stg_cmds)
 	Nothing -> ghcExit 1;	-- Type checker failed
 
 	Just (all_binds,
-	      local_tycons, local_classes, inst_info, pragma_tycon_specs,
+	      local_tycons, local_classes, inst_info, 
 	      ddump_deriv) ->
 
 
@@ -157,10 +146,11 @@ doIt (core_cmds, stg_cmds)
 	local_data_tycons = filter isDataTyCon local_tycons
     in
     core2core core_cmds mod_name
-	      sm_uniqs local_data_tycons pragma_tycon_specs desugared
+	      sm_uniqs local_data_tycons desugared
 						>>=
-	 \ (simplified,
-	    SpecData _ _ _ gen_data_tycons all_tycon_specs _ _ _) ->
+	 \ (simplified, spec_data
+		{- SpecData _ _ _ gen_data_tycons all_tycon_specs _ _ _ -}
+	   ) ->
 
 
     -- ******* STG-TO-STG SIMPLIFICATION
@@ -176,9 +166,7 @@ doIt (core_cmds, stg_cmds)
 						>>=
 	\ (stg_binds2, cost_centre_info) ->
 
-    dumpIfSet opt_D_dump_stg "STG syntax:"
-	(pprStgBindings pprDumpStyle stg_binds2)
-						>>
+    dumpIfSet opt_D_dump_stg "STG syntax:" (pprStgBindings stg_binds2)	>>
 
 	-- Dump instance decls and type signatures into the interface file
     let
@@ -195,10 +183,17 @@ doIt (core_cmds, stg_cmds)
     show_pass "CodeGen" 			>>
     _scc_     "CodeGen"
     let
+	all_local_data_tycons = filter isDataTyCon (map classTyCon local_classes)
+				++ local_data_tycons
+					-- Generate info tables  for the data constrs arising
+					-- from class decls as well
+
+	all_tycon_specs       = emptyFM	-- Not specialising tycons any more
+
 	abstractC      = codeGen mod_name		-- module name for CC labelling
 				 cost_centre_info
 				 imported_modules	-- import names for CC registering
-				 gen_data_tycons	-- type constructors generated locally
+				 all_local_data_tycons	-- type constructors generated locally
 				 all_tycon_specs	-- tycon specialisations
 				 stg_binds2
 
@@ -364,7 +359,7 @@ ppSourceStats (HsModule name version exports imports fixities decls src_loc)
     data_info (TyData _ _ _ _ constrs derivs _ _)
 	= (length constrs, case derivs of {Nothing -> 0; Just ds -> length ds})
 
-    class_info (ClassDecl _ _ _ meth_sigs def_meths _ _)
+    class_info (ClassDecl _ _ _ meth_sigs def_meths _ _ _ _)
 	= case count_sigs meth_sigs of
 	    (_,classops,_,_) ->
 	       (classops, addpr (count_monobinds def_meths))

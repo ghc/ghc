@@ -6,69 +6,55 @@
 Handles @deriving@ clauses on @data@ declarations.
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcDeriv ( tcDeriving ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import HsSyn		( HsDecl, FixityDecl, Fixity, InstDecl, 
-			  Sig, HsBinds(..), MonoBinds(..),
-			  GRHSsAndBinds, Match, HsExpr, HsLit, InPat,
-			  ArithSeqInfo, Fake, HsType,
-			  collectMonoBinders
-			)
+import HsSyn		( HsBinds(..), MonoBinds(..), collectMonoBinders )
 import HsPragmas	( InstancePragmas(..) )
-import RdrHsSyn		( RdrName, SYN_IE(RdrNameMonoBinds) )
-import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedMonoBinds), SYN_IE(RenamedFixityDecl) )
+import RdrHsSyn		( RdrName, RdrNameMonoBinds )
+import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedFixityDecl )
 
 import TcMonad
-import Inst		( SYN_IE(InstanceMapper) )
-import TcEnv		( getEnv_TyCons, tcLookupClassByKey )
-import SpecEnv		( SpecEnv )
+import Inst		( InstanceMapper )
+import TcEnv		( TcIdOcc, getEnv_TyCons, tcLookupClassByKey )
 import TcKind		( TcKind )
 import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
-import TcType		( TcIdOcc )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( newDfunName, bindLocatedLocalsRn )
-import RnMonad		( SYN_IE(RnM), RnDown, GDown, SDown, RnNameSupply(..), 
+import RnMonad		( RnM, RnDown, GDown, SDown, RnNameSupply(..), 
 			  setNameSupplyRn, renameSourceCode, thenRn, mapRn, returnRn )
 
 import Bag		( Bag, emptyBag, isEmptyBag, unionBags, listToBag )
-import Class		( classKey, GenClass, SYN_IE(Class) )
-import ErrUtils		( addErrLoc, SYN_IE(Error) )
+import Class		( classKey, Class )
+import ErrUtils		( ErrMsg )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance, 
-			  Name{--O only-}, SYN_IE(Module), NamedThing(..)
+			  Name{--O only-}, Module, NamedThing(..)
 			)
-import Outputable	( PprStyle(..), Outputable(..){-instances e.g., (,)-} )
-import PprType		( GenType, GenTyVar, GenClass, TyCon )
-import Pretty		( ($$), vcat, hsep, hcat, parens, empty, (<+>),
-		          ptext, char, hang, Doc )
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, isAlgTyCon, TyCon
 			)
-import Type		( GenType(..), SYN_IE(TauType), mkTyVarTys, applyTyCon,
-			  mkSigmaTy, mkDictTy, isPrimType, instantiateTy,
-			  getAppDataTyCon, getAppTyCon
+import Type		( GenType(..), TauType, mkTyVarTys, mkTyConApp,
+			  mkSigmaTy, mkDictTy, isUnboxedType,
+			  splitAlgTyConApp
 			)
 import TysPrim		( voidTy )
-import TyVar		( GenTyVar, SYN_IE(TyVar) )
+import TyVar		( GenTyVar, TyVar )
 import UniqFM		( emptyUFM )
 import Unique		-- Keys stuff
 import Bag		( bagToList )
 import Util		( zipWithEqual, zipEqual, sortLt, removeDups,  assoc,
-			  thenCmp, cmpList, panic, panic#, pprPanic, pprPanic#,
-			  Ord3(..), assertPanic-- , pprTrace{-ToDo:rm-}
-    
+			  thenCmp, cmpList
 			)
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -161,7 +147,7 @@ type DerivEqn = (Class, TyCon, [TyVar], DerivRhs)
 			 -- NEW: it's convenient to re-use InstInfo
 			 -- We'll "panic" out some fields...
 
-type DerivRhs = [(Class, TauType)]	-- Same as a ThetaType!
+type DerivRhs = [(Class, [TauType])]	-- Same as a ThetaType!
 
 type DerivSoln = DerivRhs
 \end{code}
@@ -203,15 +189,18 @@ tcDeriving  :: Module			-- name of module under scrutiny
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
 		      RenamedHsBinds,	-- Extra generated bindings
-		      PprStyle -> Doc)  -- Printable derived instance decls;
+		      SDoc)		-- Printable derived instance decls;
 				     	   -- for debugging via -ddump-derivings.
 
 tcDeriving modname rn_name_supply inst_decl_infos_in
-  = recoverTc (returnTc (emptyBag, EmptyBinds, \_ -> empty)) $
+  = recoverTc (returnTc (emptyBag, EmptyBinds, empty)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
     makeDerivEqns			    	`thenTc` \ eqns ->
+    if null eqns then
+	returnTc (emptyBag, EmptyBinds, text "No derivings")
+    else
 
 	-- Take the equation list and solve it, to deliver a list of
 	-- solutions, a.k.a. the contexts for the instance decls
@@ -238,7 +227,7 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 	-- method bindings for the instances.
 	(dfun_names_w_method_binds, rn_extra_binds)
 		= renameSourceCode modname rn_name_supply (
-			bindLocatedLocalsRn (\_ -> ptext (SLIT("deriving"))) mbinders	$ \ _ ->
+			bindLocatedLocalsRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
 			rnTopMonoBinds extra_mbinds []		`thenRn` \ rn_extra_binds ->
 			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
 			returnRn (dfun_names_w_method_binds, rn_extra_binds)
@@ -252,20 +241,20 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 
 	ddump_deriv = ddump_deriving really_new_inst_infos rn_extra_binds
     in
-    --pprTrace "derived:\n" (ddump_deriv PprDebug) $
+    --pprTrace "derived:\n" (ddump_deriv) $
 
     returnTc (listToBag really_new_inst_infos,
 	      rn_extra_binds,
 	      ddump_deriv)
   where
-    ddump_deriving :: [InstInfo] -> RenamedHsBinds -> (PprStyle -> Doc)
+    ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
 
-    ddump_deriving inst_infos extra_binds sty
-      = vcat ((map pp_info inst_infos) ++ [ppr sty extra_binds])
+    ddump_deriving inst_infos extra_binds
+      = vcat ((map pp_info inst_infos) ++ [ppr extra_binds])
       where
-	pp_info (InstInfo clas tvs ty inst_decl_theta _ _ mbinds _ _)
-	  = ($$) (ppr sty (mkSigmaTy tvs inst_decl_theta (mkDictTy clas ty)))
-		    (ppr sty mbinds)
+	pp_info (InstInfo clas tvs [ty] inst_decl_theta _ _ mbinds _ _)
+	  = ($$) (ppr (mkSigmaTy tvs inst_decl_theta (mkDictTy clas [ty])))
+		    (ppr mbinds)
 \end{code}
 
 
@@ -361,9 +350,9 @@ makeDerivEqns
 		 (is_enumeration || is_single_con)
 
     ------------------------------------------------------------------
-    cmp_deriv :: (Class, TyCon) -> (Class, TyCon) -> TAG_
+    cmp_deriv :: (Class, TyCon) -> (Class, TyCon) -> Ordering
     cmp_deriv (c1, t1) (c2, t2)
-      = (c1 `cmp` c2) `thenCmp` (t1 `cmp` t2)
+      = (c1 `compare` c2) `thenCmp` (t1 `compare` t2)
 
     ------------------------------------------------------------------
     mk_eqn :: (Class, TyCon) -> DerivEqn
@@ -390,9 +379,9 @@ makeDerivEqns
 	    offensive_class = clas_key `elem` needsDataDeclCtxtClassKeys
 
 	mk_constraints data_con
-	   = [ (clas, arg_ty)
+	   = [ (clas, [arg_ty])
 	     | arg_ty <- instd_arg_tys,
-	       not (isPrimType arg_ty)	-- No constraints for primitive types
+	       not (isUnboxedType arg_ty)	-- No constraints for unboxed types?
 	     ]
 	   where
 	     instd_arg_tys  = dataConArgTys data_con tyvar_tys
@@ -441,7 +430,7 @@ solveDerivEqns inst_decl_infos_in orig_eqns
     iterateDeriv :: [DerivSoln] ->TcM s [InstInfo]
     iterateDeriv current_solns
       = checkNoErrsTc (iterateOnce current_solns)	`thenTc` \ (new_inst_infos, new_solns) ->
-	if (current_solns `eq_solns` new_solns) then
+	if (current_solns == new_solns) then
 	    returnTc new_inst_infos
 	else
 	    iterateDeriv new_solns
@@ -452,62 +441,46 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 	    -- with the current set of solutions, giving a
 
 	add_solns inst_decl_infos_in orig_eqns current_solns
-				`thenTc` \ (new_inst_infos, inst_mapper) ->
+				`thenNF_Tc` \ (new_inst_infos, inst_mapper) ->
 	let
 	   class_to_inst_env cls = inst_mapper cls
 	in
 	    -- Simplify each RHS
 
 	listTc [ tcAddErrCtxt (derivCtxt tc) $
-		 tcSimplifyThetas class_to_inst_env [{-Nothing "given"-}] deriv_rhs
+		 tcSimplifyThetas class_to_inst_env deriv_rhs
 	       | (_,tc,_,deriv_rhs) <- orig_eqns ]  `thenTc` \ next_solns ->
 
 	    -- Canonicalise the solutions, so they compare nicely
 	let canonicalised_next_solns
-	      = [ sortLt lt_rhs next_soln | next_soln <- next_solns ]
+	      = [ sortLt (<) next_soln | next_soln <- next_solns ]
 	in
 	returnTc (new_inst_infos, canonicalised_next_solns)
-
-    ------------------------------------------------------------------
-    lt_rhs    r1 r2 = case cmp_rhs   r1 r2 of { LT_ -> True; _ -> False }
-    eq_solns  s1 s2 = case cmp_solns s1 s2 of { EQ_ -> True; _ -> False }
-    cmp_solns s1 s2 = cmpList (cmpList cmp_rhs) s1 s2
-    cmp_rhs (c1, TyVarTy tv1) (c2, TyVarTy tv2)
-	  = (tv1 `cmp` tv2) `thenCmp` (c1 `cmp` c2)
-#ifdef DEBUG
-    cmp_rhs other_1 other_2
-	  = panic# "tcDeriv:cmp_rhs:" --(hsep [ppr PprDebug other_1, ppr PprDebug other_2])
-#endif
-
 \end{code}
 
 \begin{code}
 add_solns :: Bag InstInfo			-- The global, non-derived ones
 	  -> [DerivEqn] -> [DerivSoln]
-	  -> TcM s ([InstInfo], 		-- The new, derived ones
-		    InstanceMapper)
+	  -> NF_TcM s ([InstInfo], 		-- The new, derived ones
+		       InstanceMapper)
     -- the eqns and solns move "in lockstep"; we have the eqns
     -- because we need the LHS info for addClassInstance.
 
 add_solns inst_infos_in eqns solns
 
--- ------------------
--- OLD: checkErrsTc above now deals with this
--- = discardErrsTc (buildInstanceEnvs all_inst_infos	`thenTc` \ inst_mapper ->
+  = discardErrsTc (buildInstanceEnvs all_inst_infos)	`thenNF_Tc` \ inst_mapper ->
 	-- We do the discard-errs so that we don't get repeated error messages
 	-- about duplicate instances.
 	-- They'll appear later, when we do the top-level buildInstanceEnvs.
--- ------------------
 
-  = buildInstanceEnvs all_inst_infos	`thenTc` \ inst_mapper ->
-    returnTc (new_inst_infos, inst_mapper)
+    returnNF_Tc (new_inst_infos, inst_mapper)
   where
     new_inst_infos = zipWithEqual "add_solns" mk_deriv_inst_info eqns solns
 
     all_inst_infos = inst_infos_in `unionBags` listToBag new_inst_infos
 
     mk_deriv_inst_info (clas, tycon, tyvars, _) theta
-      = InstInfo clas tyvars (applyTyCon tycon (mkTyVarTys tyvars))
+      = InstInfo clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)]
 		 theta
 		 (my_panic "dfun_theta")
 
@@ -534,7 +507,7 @@ add_solns inst_infos_in eqns solns
 		-- We can't leave it as a panic because to get the theta part we
 		-- have to run down the type!
 
-	my_panic str = panic "add_soln" -- pprPanic ("add_soln:"++str) (hsep [char ':', ppr PprDebug clas, ppr PprDebug tycon])
+	my_panic str = panic "add_soln" -- pprPanic ("add_soln:"++str) (hsep [char ':', ppr clas, ppr tycon])
 \end{code}
 
 %************************************************************************
@@ -602,7 +575,7 @@ the renamer.  What a great hack!
 \begin{code}
 -- Generate the method bindings for the required instance
 gen_bind :: InstInfo -> RdrNameMonoBinds
-gen_bind (InstInfo clas _ ty _ _ _ _ _ _)
+gen_bind (InstInfo clas _ [ty] _ _ _ _ _ _)
   | not from_here 
   = EmptyMonoBinds
   | otherwise
@@ -620,7 +593,7 @@ gen_bind (InstInfo clas _ ty _ _ _ _ _ _)
 	  tycon
   where
       from_here   = isLocallyDefined tycon
-      (tycon,_,_) = getAppDataTyCon ty	
+      (tycon,_,_) = splitAlgTyConApp ty	
 	    
 
 gen_inst_info :: Module					-- Module name
@@ -628,21 +601,21 @@ gen_inst_info :: Module					-- Module name
 	      -> InstInfo				-- the gen'd (filled-in) "instance decl"
 
 gen_inst_info modname
-    (InstInfo clas tyvars ty inst_decl_theta _ _ _ locn _, (dfun_name, meth_binds))
+    (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ _ locn _, (dfun_name, meth_binds))
   =
 	-- Generate the various instance-related Ids
-    InstInfo clas tyvars ty inst_decl_theta
+    InstInfo clas tyvars tys inst_decl_theta
 	       dfun_theta dfun_id
 	       meth_binds
 	       locn []
   where
    (dfun_id, dfun_theta) = mkInstanceRelatedIds
 					dfun_name
-					clas tyvars ty
+					clas tyvars tys
 					inst_decl_theta
 
    from_here = isLocallyDefined tycon
-   (tycon,_,_) = getAppDataTyCon ty
+   (tycon,_,_) = splitAlgTyConApp ty
 \end{code}
 
 
@@ -685,16 +658,16 @@ gen_taggery_Names :: [InstInfo]
 			     TagThingWanted)]
 
 gen_taggery_Names inst_infos
-  = --pprTrace "gen_taggery:\n" (vcat [hsep [ppr PprDebug c, ppr PprDebug t] | (c,t) <- all_CTs]) $
+  = --pprTrace "gen_taggery:\n" (vcat [hsep [ppr c, ppr t] | (c,t) <- all_CTs]) $
     foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
     foldlTc do_tag2con names_so_far tycons_of_interest
   where
-    all_CTs = [ mk_CT c ty | (InstInfo c _ ty _ _ _ _ _ _) <- inst_infos ]
+    all_CTs = [ (c, get_tycon ty) | (InstInfo c _ [ty] _ _ _ _ _ _) <- inst_infos ]
 		    
-    mk_CT c ty = (c, fst (getAppTyCon ty))
+    get_tycon ty = case splitAlgTyConApp ty of { (tc, _, _) -> tc }
 
     all_tycons = map snd all_CTs
-    (tycons_of_interest, _) = removeDups cmp all_tycons
+    (tycons_of_interest, _) = removeDups compare all_tycons
     
     do_con2tag acc_Names tycon
       | isDataTyCon tycon &&
@@ -731,13 +704,13 @@ gen_taggery_Names inst_infos
 \end{code}
 
 \begin{code}
-derivingThingErr :: FAST_STRING -> FAST_STRING -> TyCon -> Error
+derivingThingErr :: FAST_STRING -> FAST_STRING -> TyCon -> ErrMsg
 
-derivingThingErr thing why tycon sty
+derivingThingErr thing why tycon
   = hang (hsep [ptext SLIT("Can't make a derived instance of"), ptext thing])
-	 0 (hang (hsep [ptext SLIT("for the type"), ppr sty tycon])
+	 0 (hang (hsep [ptext SLIT("for the type"), quotes (ppr tycon)])
 	         0 (parens (ptext why)))
 
-derivCtxt tycon sty
-  = ptext SLIT("When deriving classes for") <+> ppr sty tycon
+derivCtxt tycon
+  = ptext SLIT("When deriving classes for") <+> quotes (ppr tycon)
 \end{code}

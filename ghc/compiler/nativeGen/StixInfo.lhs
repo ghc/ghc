@@ -3,11 +3,9 @@
 %
 
 \begin{code}
-#include "HsVersions.h"
-
 module StixInfo ( genCodeInfoTable ) where
 
-IMP_Ubiq(){-uitious-}
+#include "HsVersions.h"
 
 import AbsCSyn		( AbstractC(..), CAddrMode, ReturnInfo,
 			  RegRelative, MagicId, CStmtMacro
@@ -25,8 +23,8 @@ import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..),
 			)
 import Stix		-- all of it
 import StixPrim		( amodeToStix )
-import UniqSupply	( returnUs, SYN_IE(UniqSM) )
-import Pretty		( hcat, ptext, int, char )
+import UniqSupply	( returnUs, UniqSM )
+import Outputable	( hcat, ptext, int, char )
 \end{code}
 
 Generating code for info tables (arrays of data).

@@ -107,6 +107,12 @@ instance Eq IOError where
     e1==e2 && str1==str2 && h1==h2
 
 instance Eq Handle where
+ (Handle h1) == (Handle h2) = h1 == h2
+
+{-	OLD equality instance. The simpler one above
+	seems more accurate!
+
+instance Eq Handle where
  h1 == h2 =
   unsafePerformIO (do
     h1_ <- readHandle h1
@@ -123,6 +129,7 @@ instance Eq Handle where
       (AppendHandle v1 _ _ ,    AppendHandle v2 _ _) -> v1 == v2
       (ReadWriteHandle v1 _ _ , ReadWriteHandle v2 _ _) -> v1 == v2
       _ -> False))
+-}
 
 instance Show Handle where {showsPrec p h = showString "<<Handle>>"}
 

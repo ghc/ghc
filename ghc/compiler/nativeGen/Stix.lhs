@@ -3,10 +3,8 @@
 %
 
 \begin{code}
-#include "HsVersions.h"
-
 module Stix (
-	CodeSegment(..), StixReg(..), StixTree(..), SYN_IE(StixTreeList),
+	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
 	sStLitLbl,
 
 	stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg,
@@ -15,8 +13,9 @@ module Stix (
 	getUniqLabelNCG
     ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(Ratio(Rational))
+#include "HsVersions.h"
+
+import Ratio		( Rational )
 
 import AbsCSyn		( node, infoptr, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
@@ -24,8 +23,8 @@ import CLabel		( mkAsmTempLabel, CLabel )
 import PrimRep          ( PrimRep )
 import PrimOp           ( PrimOp )
 import Unique           ( Unique )
-import UniqSupply	( returnUs, thenUs, getUnique, SYN_IE(UniqSM) )
-import Pretty		( ptext, Doc )
+import UniqSupply	( returnUs, thenUs, getUnique, UniqSM )
+import Outputable
 \end{code}
 
 Here is the tag at the nodes of our @StixTree@.	 Notice its
@@ -42,7 +41,7 @@ data StixTree
   | StInt	Integer	    -- ** add Kind at some point
   | StDouble	Rational
   | StString	FAST_STRING
-  | StLitLbl	Doc    -- literal labels
+  | StLitLbl	SDoc    -- literal labels
 			    -- (will be _-prefixed on some machines)
   | StLitLit	FAST_STRING -- innards from CLitLit
   | StCLbl	CLabel	    -- labels that we might index into

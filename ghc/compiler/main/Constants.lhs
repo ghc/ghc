@@ -8,8 +8,6 @@
 *** This SHOULD BE the only module that is CPP'd with "stgdefs.h" stuff.
 
 \begin{code}
-#include "HsVersions.h"
-
 module Constants (
 	uNFOLDING_USE_THRESHOLD,
 	uNFOLDING_CREATION_THRESHOLD,
@@ -72,9 +70,8 @@ module Constants (
 -- we want; if we just hope a -I... will get the right one, we could
 -- be in trouble.
 
+#include "HsVersions.h"
 #include "../../includes/GhcConstants.h"
-
-CHK_Ubiq() -- debugging consistency check
 
 import Util
 \end{code}

@@ -64,6 +64,7 @@ void	 pprogram PROTO((tree));
 
 void	 format_string PROTO((FILE *, unsigned char *, int));
 list	 type2context PROTO((ttype));
+void     is_context_format PROTO((ttype, int));
 pbinding createpat PROTO((pbinding, binding));
 void	 process_args PROTO((int, char **));
 void	 hash_init PROTO((void));

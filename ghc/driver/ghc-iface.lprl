@@ -148,6 +148,20 @@ sub constructNewHiFile {
 }
 \end{code}
 
+Read the .hi file made by the compiler, or the old one.
+All the declarations in the file are stored in
+
+	$Decl{"$mod:$v"}
+
+where $mod is "new" or "old", depending on whether it's the new or old
+	.hi file that's being read.
+
+and $v is
+	for values v	"v"
+	for tycons T	"type T" or "data T"
+	for classes C	"class C"
+
+
 \begin{code}
 sub readHiFile {
     local($mod,		    # module to read; can be special tag 'old'
@@ -219,25 +233,29 @@ sub readHiFile {
 	   }
 	
 	    if ( /^(\S+)\s+_:_\s+/ ) {
+			# Value declaration
 		$current_name = $1;
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
 	    } elsif ( /^type\s+(\S+)/ ) {
-		$current_name = $1;
+			# Type declaration	
+		$current_name = "type $1";
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
 	    } elsif ( /^(newtype|data)\s+(.*\s+=>\s+)?(\S+)\s+/ ) {
-		$current_name = $3;
+			# Data declaration	
+		$current_name = "data $3";
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
 	    } elsif ( /^class\s+(\{[^{}]*\}\s+=>\s+)?(\S+)\s+/ ) {
+			# Class declaration	
 		# must be wary of => bit matching after "where"...
 		# ..hence the [^{}] part
 		# NB: a class decl may not have a where part at all
-		$current_name = $2;
+		$current_name = "class $2";
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 

@@ -6,43 +6,37 @@
 The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcInstUtil (
 	InstInfo(..),
 	mkInstanceRelatedIds,
-	buildInstanceEnvs
+	buildInstanceEnvs,
+	classDataCon
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import HsSyn		( MonoBinds, Fake, InPat, Sig )
-import RnHsSyn		( SYN_IE(RenamedMonoBinds), RenamedSig(..), 
+import RnHsSyn		( RenamedMonoBinds, RenamedSig(..), 
 			  RenamedInstancePragmas(..) )
 
 import TcMonad
-import Inst		( SYN_IE(InstanceMapper) )
+import Inst		( InstanceMapper )
 
 import Bag		( bagToList, Bag )
-import Class		( GenClass, SYN_IE(ClassInstEnv),
-			  classBigSig, SYN_IE(Class)
-			)
-import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
-import Id		( GenId, mkDictFunId, mkSysLocal, SYN_IE(Id) )
-import MatchEnv		( nullMEnv, insertMEnv )
+import Class		( ClassInstEnv, Class, classBigSig )
+import Id		( mkDictFunId, Id )
+import SpecEnv		( emptySpecEnv, addToSpecEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
-import Name		( getSrcLoc, Name{--O only-} )
-import PprType		( GenClass, GenType, GenTyVar, pprParendType )
-import Pretty
-import SpecEnv		( SpecEnv, nullSpecEnv, addOneToSpecEnv )
+import Name		( getSrcLoc, Name )
 import SrcLoc		( SrcLoc )
-import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTys,
-			  instantiateTy, matchTy, SYN_IE(ThetaType),
-			  SYN_IE(Type) )
-import TyVar		( GenTyVar, SYN_IE(TyVar) )
+import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTys, instantiateThetaTy,
+			  ThetaType, Type
+			)
+import PprType		( pprConstraint )
+import Class		( classTyCon )
+import TyCon		( tyConDataCons )
+import TyVar		( TyVar, zipTyVarEnv )
 import Unique		( Unique )
-import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-}, Ord3(..) )
-
+import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-}, assertPanic )
 import Outputable
 \end{code}
 
@@ -53,7 +47,7 @@ data InstInfo
   = InstInfo
       Class	        -- Class, k
       [TyVar]		-- Type variables, tvs
-      Type		-- The type at which the class is being instantiated
+      [Type]		-- The types at which the class is being instantiated
       ThetaType		-- inst_decl_theta: the original context, c, from the
 			--   instance declaration.  It constrains (some of)
 			--   the TyVars above
@@ -66,6 +60,22 @@ data InstInfo
       [RenamedSig]	-- User pragmas recorded for generating specialised instances
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Creating instance related Ids}
+%*									*
+%************************************************************************
+
+A tiny function which doesn't belong anywhere else.
+It makes a nasty mutual-recursion knot if you put it in Class.
+
+\begin{code}
+classDataCon :: Class -> Id
+classDataCon clas = case tyConDataCons (classTyCon clas) of
+		      (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr 
+\end{code}		      
+
 %************************************************************************
 %*									*
 \subsection{Creating instance related Ids}
@@ -76,28 +86,28 @@ data InstInfo
 mkInstanceRelatedIds :: Name		-- Name to use for the dict fun;
 		     -> Class 
 		     -> [TyVar]
-		     -> Type
+		     -> [Type]
 		     -> ThetaType
 		     -> (Id, ThetaType)
 
-mkInstanceRelatedIds dfun_name clas inst_tyvars inst_ty inst_decl_theta
+mkInstanceRelatedIds dfun_name clas inst_tyvars inst_tys inst_decl_theta
   = (dfun_id, dfun_theta)
   where
-    (_, super_classes, _, _, _) = classBigSig clas
-    super_class_theta = super_classes `zip` repeat inst_ty
+    (class_tyvars, sc_theta, _, _, _) = classBigSig clas
+    sc_theta' = instantiateThetaTy (zipTyVarEnv class_tyvars inst_tys) sc_theta
 
     dfun_theta = case inst_decl_theta of
 			[]    -> []	-- If inst_decl_theta is empty, then we don't
 					-- want to have any dict arguments, so that we can
 					-- expose the constant methods.
 
-			other -> inst_decl_theta ++ super_class_theta
+			other -> inst_decl_theta ++ sc_theta'
 					-- Otherwise we pass the superclass dictionaries to
 					-- the dictionary function; the Mark Jones optimisation.
 
-    dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_ty)
+    dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 
-    dfun_id = mkDictFunId dfun_name dfun_ty clas inst_ty
+    dfun_id = mkDictFunId dfun_name dfun_ty clas inst_tys
 \end{code}
 
 
@@ -109,32 +119,32 @@ mkInstanceRelatedIds dfun_name clas inst_tyvars inst_ty inst_decl_theta
 
 \begin{code}
 buildInstanceEnvs :: Bag InstInfo
-		  -> TcM s InstanceMapper
+		  -> NF_TcM s InstanceMapper
 
 buildInstanceEnvs info
   = let
-    	icmp :: InstInfo -> InstInfo -> TAG_
+    	icmp :: InstInfo -> InstInfo -> Ordering
     	(InstInfo c1 _ _ _ _ _ _ _ _) `icmp` (InstInfo c2 _ _ _ _ _ _ _ _)
-	  = c1 `cmp` c2
+	  = c1 `compare` c2
 
 	info_by_class = equivClasses icmp (bagToList info)
     in
-    mapTc buildInstanceEnv info_by_class    `thenTc` \ inst_env_entries ->
+    mapNF_Tc buildInstanceEnv info_by_class    `thenNF_Tc` \ inst_env_entries ->
     let
-	class_lookup_fn = mkLookupFunDef (==) inst_env_entries nullMEnv
+	class_lookup_fn = mkLookupFunDef (==) inst_env_entries emptySpecEnv
     in
-    returnTc class_lookup_fn
+    returnNF_Tc class_lookup_fn
 \end{code}
 
 \begin{code}
 buildInstanceEnv :: [InstInfo]		-- Non-empty, and all for same class
-		 -> TcM s (Class, ClassInstEnv)
+		 -> NF_TcM s (Class, ClassInstEnv)
 
 buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _ _) : _)
-  = foldlTc addClassInstance
-	    nullMEnv
-	    inst_infos				`thenTc` \ class_inst_env ->
-    returnTc (clas, class_inst_env)
+  = foldrNF_Tc addClassInstance
+	    emptySpecEnv
+	    inst_infos				`thenNF_Tc` \ class_inst_env ->
+    returnNF_Tc (clas, class_inst_env)
 \end{code}
 
 @addClassInstance@ adds the appropriate stuff to the @ClassInstEnv@
@@ -143,73 +153,29 @@ about any overlap with an existing instance.
 
 \begin{code}
 addClassInstance
-    :: ClassInstEnv
-    -> InstInfo
-    -> TcM s ClassInstEnv
+    :: InstInfo
+    -> ClassInstEnv
+    -> NF_TcM s ClassInstEnv
 
-addClassInstance class_inst_env
-    (InstInfo clas inst_tyvars inst_ty _ _ 
+addClassInstance 
+    (InstInfo clas inst_tyvars inst_tys _ _ 
 	      dfun_id _ src_loc _)
+    class_inst_env
   = 	-- Add the instance to the class's instance environment
-    case insertMEnv matchTy class_inst_env inst_ty dfun_id of
-	Failed (ty', dfun_id')    -> recoverTc (returnTc class_inst_env) $
-				     dupInstFailure clas (inst_ty, src_loc) 
-							 (ty', getSrcLoc dfun_id');
-	Succeeded class_inst_env' -> returnTc class_inst_env'
+    case addToSpecEnv class_inst_env inst_tys dfun_id of
+	Failed (ty', dfun_id')    -> addErrTc (dupInstErr clas (inst_tys, src_loc) 
+							       (ty', getSrcLoc dfun_id'))
+						`thenNF_Tc_`
+				     returnNF_Tc class_inst_env
 
-{- 		OLD STUFF FOR CONSTANT METHODS 
-
-	-- If there are any constant methods, then add them to 
-	-- the SpecEnv of each class op (ie selector)
-	--
-	-- Example.  class    Foo a     where { op :: Baz b => a -> b; ... }
-	--	     instance Foo (p,q) where { op (x,y) = ...       ; ... }
-	--
-	-- The class decl means that 
-	--	op :: forall a. Foo a => forall b. Baz b => a -> b
-	--
-	-- The constant method from the instance decl will be:
-	--	op_Pair :: forall p q b. Baz b => (p,q) -> b
-	--
-	-- What we put in op's SpecEnv is
-	--	(p,q) |-->  (\d::Foo (p,q) -> op_Pair p q)
-	--
-	-- Here, [p,q] are the inst_tyvars, and d is a dict whose only
-	-- purpose is to cancel with the dict to which op is applied.
-	-- 
-	-- NOTE THAT this correctly deals with the case where there are
-	-- constant methods even though there are type variables in the
-	-- instance declaration.
-
-    tcGetUnique				`thenNF_Tc` \ uniq ->
-    let 
-      dict = mkSysLocal SLIT("dict_tpl") uniq (mkDictTy clas inst_ty) src_loc
-		-- Slightly disgusting, but it's only a placeholder for
-		-- a dictionary to be chucked away.
-
-      op_spec_envs' | null const_meth_ids = op_spec_envs
-		    | otherwise		  = zipWithEqual "add_const_meth" add_const_meth op_spec_envs const_meth_ids
-
-      add_const_meth (op,spec_env) meth_id
-        = (op, case addOneToSpecEnv spec_env [inst_ty] rhs of
-		 Failed (tys', rhs') -> panic "TcInstDecls:add_const_meth"
-	         Succeeded spec_env' -> spec_env' )
-        where
-	  rhs = mkValLam [dict] (mkTyApp (Var meth_id) (mkTyVarTys inst_tyvars))
-    in
-    returnTc (class_inst_env', op_spec_envs')
-		END OF OLD STUFF -}
-
+	Succeeded class_inst_env' -> returnNF_Tc class_inst_env'
 \end{code}
 
 \begin{code}
-dupInstFailure clas info1@(ty1, locn1) info2@(ty2, locn2)
+dupInstErr clas info1@(tys1, locn1) info2@(tys2, locn2)
 	-- Overlapping/duplicate instances for given class; msg could be more glamourous
-  = tcAddErrCtxt ctxt $
-    failTc (\sty -> ptext SLIT("Duplicate or overlapping instance declarations"))
-  where
-    ctxt sty = sep [hsep [ptext SLIT("for"), 
-			  pprQuote sty $ \ sty -> ppr sty clas <+> pprParendType sty ty1],
-		    nest 4 (sep [ptext SLIT("at")  <+> ppr sty locn1,
-		    	         ptext SLIT("and") <+> ppr sty locn2])]
+  = hang (ptext SLIT("Duplicate or overlapping instance declarations"))
+         4 (sep [ptext SLIT("for") <+> quotes (pprConstraint clas tys1),
+		 nest 4 (sep [ptext SLIT("at")  <+> ppr locn1,
+		    	      ptext SLIT("and") <+> ppr locn2])])
 \end{code}

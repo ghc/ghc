@@ -4,8 +4,6 @@
 \section[Lexical analysis]{Lexical analysis}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Lex (
 
 	isLexCon, isLexVar, isLexId, isLexSym,
@@ -13,57 +11,33 @@ module Lex (
 	mkTupNameStr, ifaceParseErr,
 
 	-- Monad for parser
-	IfaceToken(..), lexIface, SYN_IE(IfM), thenIf, returnIf, happyError,
+	IfaceToken(..), lexIface, IfM, thenIf, returnIf, getSrcLocIf,
+	happyError,
 	StringBuffer
 
     ) where
 
+#include "HsVersions.h"
 
-IMPORT_1_3(Char(isDigit, isAlpha, isAlphanum, isUpper,isLower, isSpace, ord))
+import Char 		(isDigit, isAlpha, isAlphanum, isUpper,isLower, isSpace, ord )
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(Ubiq)
-IMPORT_DELOOPER(IdLoop)    -- get the CostCentre type&constructors from here
-#else
 import {-# SOURCE #-} CostCentre
-# if __GLASGOW_HASKELL__ == 202
-import PrelBase ( Char(..) )
-# endif
-# if __GLASGOW_HASKELL__ >= 209
-import Addr ( Addr(..) )
-import ST   ( runST )
-# endif
-#endif
 
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
 import BasicTypes	( NewOrData(..), IfaceFlavour(..) )
+import SrcLoc		( SrcLoc, incSrcLine )
 
-#if __GLASGOW_HASKELL__ >= 202
 import Maybes		( MaybeErr(..) )
-#else
-import Maybes		( Maybe(..), MaybeErr(..) )
-#endif
-import Pretty
-
-
-
-import ErrUtils		( Error(..) )
-import Outputable	( Outputable(..), PprStyle(..) )
+import ErrUtils		( ErrMsg(..) )
+import Outputable
 import Util		( nOfThem, panic )
 
 import FastString
 import StringBuffer
-
-#if __GLASGOW_HASKELL__ <= 201
-import PreludeGlaST 
-#else
 import GlaExts
-#if __GLASGOW_HASKELL__ < 209
-import ST ( thenST, seqST )
-#endif
-#endif
+import ST		( runST )
 \end{code}
 
 %************************************************************************
@@ -257,7 +231,7 @@ lexIface cont buf =
       -- whitespace and comments, ignore.
     ' '#  -> lexIface cont (stepOn buf)
     '\t'# -> lexIface cont (stepOn buf)
-    '\n'# -> \line -> lexIface cont (stepOn buf) (line+1)
+    '\n'# -> \ loc -> lexIface cont (stepOn buf) (incSrcLine loc)
 
 -- Numbers and comments
     '-'#  ->
@@ -542,26 +516,29 @@ lex_tuple cont module_dot buf =
 
 -- Similarly ' itself is ok inside an identifier, but not at the start
 
-id_arr :: _ByteArray Int
+-- id_arr is an array of bytes, indexed by characters,
+-- containing 0 if the character isn't a valid character from an identifier
+-- and 1 if it is.  It's just a memo table for is_id_char.
+id_arr :: ByteArray Int
 id_arr =
- unsafePerformST (
-  newCharArray (0,255) `thenStrictlyST` \ barr ->
+ runST (
+  newCharArray (0,255) >>= \ barr ->
   let
-   loop 256# = returnStrictlyST ()
+   loop 256# = return ()
    loop i# =
     if isAlphanum (C# (chr# i#)) || is_sym (chr# i#) then
-       writeCharArray barr (I# i#) '\1' `seqStrictlyST`
+       writeCharArray barr (I# i#) '\1'		>>
        loop (i# +# 1#)
     else
-       writeCharArray barr (I# i#) '\0' `seqStrictlyST`
+       writeCharArray barr (I# i#) '\0'		>>
        loop (i# +# 1#)
   in
-  loop 0#                    `seqStrictlyST`
+  loop 0#                 			>>
   unsafeFreezeByteArray barr)
 
 is_id_char (C# c#) = 
  let
-  _ByteArray _ arr# = id_arr
+  ByteArray _ arr# = id_arr
  in
  case ord# (indexCharArray# arr# (ord# c#)) of
   0# -> False
@@ -581,27 +558,30 @@ is_sym c# =
 --isAlphanum c || c `elem` ":_'!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
 
 
-mod_arr :: _ByteArray Int
+-- mod_arr is an array of bytes, indexed by characters,
+-- containing 0 if the character isn't a valid character from a module name,
+-- and 1 if it is.
+mod_arr :: ByteArray Int
 mod_arr =
- unsafePerformST (
-  newCharArray (0,255) `thenStrictlyST` \ barr ->
+ runST (
+  newCharArray (0,255) >>= \ barr ->
   let
-   loop 256# = returnStrictlyST ()
+   loop 256# = return ()
    loop i# =
     if isAlphanum (C# (chr# i#)) || i# ==# (ord# '_'#) || i# ==# (ord# '\''#) then
-       writeCharArray barr (I# i#) '\1' `seqStrictlyST`
+       writeCharArray barr (I# i#) '\1' 	>>
        loop (i# +# 1#)
     else
-       writeCharArray barr (I# i#) '\0' `seqStrictlyST`
+       writeCharArray barr (I# i#) '\0'		>>
        loop (i# +# 1#)
   in
-  loop 0#                    `seqStrictlyST`
+  loop 0#					>>
   unsafeFreezeByteArray barr)
 
              
 is_mod_char (C# c#) = 
  let
-  _ByteArray _ arr# = mod_arr
+  ByteArray _ arr# = mod_arr
  in
  case ord# (indexCharArray# arr# (ord# c#)) of
   0# -> False
@@ -860,7 +840,9 @@ end{code}
 %************************************************************************
 
 \begin{code}
-type IfM a = StringBuffer -> Int -> MaybeErr a Error
+type IfM a = StringBuffer	-- Input string
+	  -> SrcLoc
+	  -> MaybeErr a ErrMsg
 
 returnIf   :: a -> IfM a
 returnIf a s l = Succeeded a
@@ -871,11 +853,15 @@ m `thenIf` k = \s l ->
 		Succeeded a -> k a s l
 		Failed err  -> Failed err
 
+getSrcLocIf :: IfM SrcLoc
+getSrcLocIf s l = Succeeded l
+
 happyError :: IfM a
 happyError s l = Failed (ifaceParseErr l ([]::[IfaceToken]){-Todo-})
 
 -----------------------------------------------------------------
 
-ifaceParseErr l toks sty
-  = hsep [ptext SLIT("Interface-file parse error: line"), int l, ptext SLIT("toks="), text (show (take 10 toks))]
+ifaceParseErr l toks
+  = hsep [ppr l, ptext SLIT("Interface-file parse error;"),
+          ptext SLIT("toks="), text (show (take 10 toks))]
 \end{code}

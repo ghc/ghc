@@ -4,7 +4,6 @@
 \section[MachMisc]{Description of various machine-specific things}
 
 \begin{code}
-#include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
 module MachMisc (
@@ -41,13 +40,7 @@ module MachMisc (
 #endif
     ) where
 
-IMPORT_1_3(Char(isDigit))
-IMP_Ubiq(){-uitous-}
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(AbsCLoop)		( fixedHdrSizeInWords, varHdrSizeInWords ) -- paranoia
-IMPORT_DELOOPER(NcgLoop)		( underscorePrefix, fmtAsmLbl ) -- paranoia
-#endif
+#include "HsVersions.h"
 
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )
@@ -55,9 +48,9 @@ import CLabel           ( CLabel )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Literal		( mkMachInt, Literal(..) )
 import MachRegs		( stgReg, callerSaves, RegLoc(..),
-			  Imm(..), Reg(..), Address(..)
+			  Imm(..), Reg(..), 
+			  MachRegsAddr(..)
 			)
-
 import OrdList		( OrdList )
 import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
@@ -65,10 +58,12 @@ import Stix		( StixTree(..), StixReg(..), sStLitLbl,
 			  CodeSegment
 			)
 import Util		( panic )
+import Char		( isDigit )
+import GlaExts		( word2Int#, int2Word#, shiftRA#, and#, (/=#) )
 \end{code}
 
 \begin{code}
-underscorePrefix :: Bool   -- leading underscore on labels?
+underscorePrefix :: Bool   -- leading underscore on assembler labels?
 
 underscorePrefix
   = IF_ARCH_alpha(False
@@ -449,12 +444,12 @@ data Instr
 
 -- Loads and stores.
 
-	      |	LD	      Size Reg Address -- size, dst, src
-	      | LDA	      Reg Address      -- dst, src
-	      | LDAH	      Reg Address      -- dst, src
-	      | LDGP	      Reg Address      -- dst, src
+	      |	LD	      Size Reg MachRegsAddr -- size, dst, src
+	      | LDA	      Reg MachRegsAddr      -- dst, src
+	      | LDAH	      Reg MachRegsAddr      -- dst, src
+	      | LDGP	      Reg MachRegsAddr      -- dst, src
 	      | LDI	      Size Reg Imm     -- size, dst, src
-	      | ST	      Size Reg Address -- size, src, dst
+	      | ST	      Size Reg MachRegsAddr -- size, src, dst
 
 -- Int Arithmetic.
 
@@ -509,9 +504,9 @@ data Instr
 	      | BI	      Cond Reg Imm
 	      | BF	      Cond Reg Imm
 	      | BR	      Imm
-	      | JMP	      Reg Address Int
+	      | JMP	      Reg MachRegsAddr Int
 	      | BSR	      Imm Int
-	      | JSR	      Reg Address Int
+	      | JSR	      Reg MachRegsAddr Int
 
 -- Alpha-specific pseudo-ops.
 
@@ -572,25 +567,25 @@ data RI
     	      | FABS
 	      | FADD	      Size Operand -- src
 	      | FADDP
-	      | FIADD	      Size Address -- src
+	      | FIADD	      Size MachRegsAddr -- src
     	      | FCHS
     	      | FCOM	      Size Operand -- src
     	      | FCOS
 	      | FDIV	      Size Operand -- src
 	      | FDIVP
-	      | FIDIV	      Size Address -- src
+	      | FIDIV	      Size MachRegsAddr -- src
 	      | FDIVR	      Size Operand -- src
 	      | FDIVRP
-	      | FIDIVR	      Size Address -- src
-    	      | FICOM	      Size Address -- src
-    	      | FILD	      Size Address Reg -- src, dst
-    	      | FIST	      Size Address -- dst
+	      | FIDIVR	      Size MachRegsAddr -- src
+    	      | FICOM	      Size MachRegsAddr -- src
+    	      | FILD	      Size MachRegsAddr Reg -- src, dst
+    	      | FIST	      Size MachRegsAddr -- dst
     	      | FLD	      Size Operand -- src
     	      | FLD1
     	      | FLDZ
     	      | FMUL	      Size Operand -- src
     	      | FMULP
-    	      | FIMUL	      Size Address -- src
+    	      | FIMUL	      Size MachRegsAddr -- src
     	      | FRNDINT
     	      | FSIN
     	      | FSQRT
@@ -598,10 +593,10 @@ data RI
     	      | FSTP	      Size Operand -- dst
 	      | FSUB	      Size Operand -- src
 	      | FSUBP
-	      | FISUB	      Size Address -- src
+	      | FISUB	      Size MachRegsAddr -- src
 	      | FSUBR	      Size Operand -- src
 	      | FSUBRP
-	      | FISUBR	      Size Address -- src
+	      | FISUBR	      Size MachRegsAddr -- src
 	      | FTST
     	      | FCOMP	      Size Operand -- src
     	      | FUCOMPP
@@ -633,7 +628,7 @@ data RI
 data Operand
   = OpReg  Reg	        -- register
   | OpImm  Imm	        -- immediate value
-  | OpAddr Address	-- memory reference
+  | OpAddr MachRegsAddr	-- memory reference
 
 #endif {- i386_TARGET_ARCH -}
 \end{code}
@@ -645,8 +640,8 @@ data Operand
 
 -- Loads and stores.
 
-	      | LD	      Size Address Reg -- size, src, dst
-	      | ST	      Size Reg Address -- size, src, dst
+	      | LD	      Size MachRegsAddr Reg -- size, src, dst
+	      | ST	      Size Reg MachRegsAddr -- size, src, dst
 
 -- Int Arithmetic.
 
@@ -688,7 +683,7 @@ data Operand
 	      | BI	      Cond Bool Imm -- cond, annul?, target
     	      | BF  	      Cond Bool Imm -- cond, annul?, target
 
-	      | JMP	      Address      -- target
+	      | JMP	      MachRegsAddr      -- target
 	      | CALL	      Imm Int Bool -- target, args, terminal
 
 data RI = RIReg Reg

@@ -10,8 +10,6 @@ defined here so as to avod
  and gobbled whoever was writing the above :-) -- SOF ]
 
 \begin{code}
-#include "HsVersions.h"
-
 module PrelMods
         (
          gHC__, pRELUDE, pREL_BASE,
@@ -23,9 +21,9 @@ module PrelMods
 	 cCALL     , aDDR
 	) where
 
-CHK_Ubiq() -- debugging consistency check
+#include "HsVersions.h"
 
-import BasicTypes( SYN_IE(Module) )
+import BasicTypes( Module )
 \end{code}
 
 \begin{code}

@@ -4,11 +4,9 @@
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Name (
 	-- Re-export the Module type
-	SYN_IE(Module),
+	Module,
 	pprModule, moduleString,
 
 	-- The OccName type
@@ -21,7 +19,7 @@ module Name (
 	Name,					-- Abstract
 	mkLocalName, mkSysLocalName, 
 
-	mkCompoundName, mkGlobalName, mkInstDeclName,
+	mkCompoundName, mkGlobalName,
 
 	mkWiredInIdName,   mkWiredInTyConName,
 	maybeWiredInIdName, maybeWiredInTyConName,
@@ -39,13 +37,14 @@ module Name (
         pprNameProvenance,
 
 	-- Sets of Names
-	SYN_IE(NameSet),
+	NameSet,
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
 	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, isEmptyNameSet,
 
 	-- Misc
 	Provenance(..), pprProvenance,
-	ExportFlag(..),
+	ExportFlag(..), 
+	PrintUnqualified,
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
@@ -53,29 +52,25 @@ module Name (
 	getSrcLoc, isLocallyDefined, getOccString
     ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(TyLoop)	( GenId, Id(..), TyCon )			-- Used inside Names
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} Id    ( Id )
 import {-# SOURCE #-} TyCon ( TyCon )
-#endif
 
 import CStrings		( identToC, modnameToC, cSEP )
-import CmdLineOpts	( opt_OmitInterfacePragmas, opt_EnsureSplittableC, all_toplev_ids_visible )
-import BasicTypes	( SYN_IE(Module), IfaceFlavour(..), moduleString, pprModule )
+import CmdLineOpts	( opt_PprStyle_All, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
+import BasicTypes	( Module, IfaceFlavour(..), moduleString, pprModule )
 
-import Outputable	( Outputable(..), PprStyle(..), codeStyle, ifaceStyle, userStyle )
 import PrelMods		( gHC__ )
-import Pretty
 import Lex		( isLexSym, isLexConId )
-import SrcLoc		( noSrcLoc, SrcLoc )
-import Usage            ( SYN_IE(UVar), SYN_IE(Usage) )
+import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
 import Unique		( pprUnique, showUnique, Unique, Uniquable(..) )
-import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, isEmptyUniqSet,
-		 	  unionManyUniqSets, minusUniqSet, mkUniqSet, elementOfUniqSet, addListToUniqSet, addOneToUniqSet )
+import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, 
+			  isEmptyUniqSet, unionManyUniqSets, minusUniqSet, mkUniqSet, 
+			  elementOfUniqSet, addListToUniqSet, addOneToUniqSet
+			)
 import UniqFM		( UniqFM )
-import Util		( Ord3(..), cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
+import Outputable
 \end{code}
 
 
@@ -90,10 +85,11 @@ data OccName  = VarOcc  FAST_STRING	-- Variables and data constructors
 	      | TvOcc	FAST_STRING	-- Type variables
 	      | TCOcc	FAST_STRING	-- Type constructors and classes
 
-pprOccName :: PprStyle -> OccName -> Doc
-pprOccName sty      n = if codeStyle sty 
-			then identToC (occNameString n)
-			else ptext (occNameString n)
+pprOccName :: OccName -> SDoc
+pprOccName n = getPprStyle $ \ sty ->
+	       if codeStyle sty 
+	       then identToC (occNameString n)
+	       else ptext (occNameString n)
 
 occNameString :: OccName -> FAST_STRING
 occNameString (VarOcc s)  = s
@@ -125,27 +121,25 @@ isTCOcc (TCOcc s) = True
 isTCOcc other     = False
 
 instance Eq OccName where
-    a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
-    a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True }
+    a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
+    a /= b = case (a `compare` b) of { EQ -> False; _ -> True }
 
 instance Ord OccName where
-    a <= b = case (a `cmp` b) of { LT_ -> True;	 EQ_ -> True;  GT__ -> False }
-    a <	 b = case (a `cmp` b) of { LT_ -> True;	 EQ_ -> False; GT__ -> False }
-    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
+    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
+    a <	 b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
+    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
+    a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
+    compare a b = cmpOcc a b
 
-instance Ord3 OccName where
-    cmp = cmpOcc
+(VarOcc s1) `cmpOcc` (VarOcc s2) = s1 `compare` s2
+(VarOcc s1) `cmpOcc` other2      = LT
 
-(VarOcc s1) `cmpOcc` (VarOcc s2) = s1 `_CMP_STRING_` s2
-(VarOcc s1) `cmpOcc` other2      = LT_
+(TvOcc s1)  `cmpOcc` (VarOcc s2) = GT
+(TvOcc s1)  `cmpOcc` (TvOcc s2)  = s1 `compare` s2
+(TvOcc s1)  `cmpOcc` other	 = LT
 
-(TvOcc s1)  `cmpOcc` (VarOcc s2) = GT_
-(TvOcc s1)  `cmpOcc` (TvOcc s2)  = s1 `_CMP_STRING_` s2
-(TvOcc s1)  `cmpOcc` other	 = LT_
-
-(TCOcc s1) `cmpOcc` (TCOcc s2) = s1 `_CMP_STRING_` s2
-(TCOcc s1) `cmpOcc` other      = GT_
+(TCOcc s1) `cmpOcc` (TCOcc s2) = s1 `compare` s2
+(TCOcc s1) `cmpOcc` other      = GT
 
 instance Outputable OccName where
   ppr = pprOccName
@@ -177,13 +171,23 @@ must be made @Global@ first.
 
 \begin{code}
 data Provenance
-  = LocalDef ExportFlag SrcLoc		-- Locally defined
-  | Imported Module SrcLoc IfaceFlavour	-- Directly imported from M; 
-					-- 		gives name of module in import statement
-					--		and locn of import statement
-  | Implicit IfaceFlavour		-- Implicitly imported
+  = NoProvenance
+
+  | LocalDef			-- Defined locally
+	SrcLoc 			-- Defn site
+	ExportFlag		-- Whether it's exported
+
+  | NonLocalDef  		-- Defined non-locally
+	SrcLoc			-- Defined non-locally; src-loc gives defn site
+	IfaceFlavour		-- Whether the defn site is an .hi-boot file or not
+	PrintUnqualified
+
   | WiredInTyCon TyCon			-- There's a wired-in version
   | WiredInId    Id			-- ...ditto...
+
+type PrintUnqualified = Bool		-- True <=> the unqualified name of this thing is
+					-- in scope in this module, so print it unqualified
+					-- in error messages
 \end{code}
 
 Something is "Exported" if it may be mentioned by another module without
@@ -236,25 +240,17 @@ mkCompoundName str_fn uniq (Global _ mod occ prov)
 mkCompoundName str_fn uniq (Local _ occ loc)
   = Local uniq (VarOcc (str_fn (occNameString occ))) loc
 
-	-- Rather a wierd one that's used for names generated for instance decls
-mkInstDeclName :: Unique -> Module -> OccName -> SrcLoc -> Bool -> Name
-mkInstDeclName uniq mod occ loc from_here
-  = Global uniq mod occ prov
-  where
-    prov | from_here = LocalDef Exported loc
-         | otherwise = Implicit HiFile		-- Odd
-
 
 setNameProvenance :: Name -> Provenance -> Name	
 	-- setNameProvenance used to only change the provenance of Implicit-provenance things,
 	-- but that gives bad error messages for names defined twice in the same
-	-- module, so I changed it to set the proveance of *any* global (SLPJ Jun 97)
+	-- module, so I changed it to set the provenance of *any* global (SLPJ Jun 97)
 setNameProvenance (Global uniq mod occ _) prov = Global uniq mod occ prov
 setNameProvenance other_name 		  prov = other_name
 
 getNameProvenance :: Name -> Provenance
 getNameProvenance (Global uniq mod occ prov) = prov
-getNameProvenance (Local uniq occ locn)      = LocalDef NotExported locn
+getNameProvenance (Local uniq occ locn)      = LocalDef locn NotExported
 
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached
@@ -304,7 +300,7 @@ are exported.  But also:
 \begin{code}
 setNameVisibility :: Maybe Module -> Unique -> Name -> Name
 
-setNameVisibility maybe_mod occ_uniq name@(Global uniq mod occ (LocalDef NotExported loc))
+setNameVisibility maybe_mod occ_uniq name@(Global uniq mod occ (LocalDef loc NotExported))
   | not all_toplev_ids_visible || not_top_level maybe_mod
   = Local uniq (uniqToOccName occ_uniq) loc	-- Localise Global name
 
@@ -315,7 +311,7 @@ setNameVisibility (Just mod) occ_uniq (Local uniq occ loc)
   | all_toplev_ids_visible
   = Global uniq mod	 			-- Globalise Local name
 	   (uniqToOccName occ_uniq)
-	   (LocalDef NotExported loc)
+	   (LocalDef loc NotExported)
 
 setNameVisibility maybe_mod occ_uniq (Local uniq occ loc)
   = Local uniq (uniqToOccName occ_uniq) loc	-- New OccName for Local
@@ -326,6 +322,8 @@ uniqToOccName uniq = VarOcc (_PK_ ('$':showUnique uniq))
 not_top_level (Just m) = False
 not_top_level Nothing  = True
 
+all_toplev_ids_visible = not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
+			 opt_EnsureSplittableC            -- Splitting requires visiblilty
 \end{code}
 
 %************************************************************************
@@ -361,15 +359,17 @@ nameModAndOcc (Global _ mod occ _) = (mod,occ)
 nameString (Local _ occ _)      = occNameString occ
 nameString (Global _ mod occ _) = mod _APPEND_ SLIT(".") _APPEND_ occNameString occ
 
-isExportedName (Global _ _ _ (LocalDef Exported _)) = True
+isExportedName (Global _ _ _ (LocalDef _ Exported)) = True
 isExportedName other				    = False
 
 nameSrcLoc (Local _ _ loc)     = loc
-nameSrcLoc (Global _ _ _ (LocalDef _ loc))   = loc
-nameSrcLoc (Global _ _ _ (Imported _ loc _)) = loc
-nameSrcLoc other			     = noSrcLoc
+nameSrcLoc (Global _ _ _ (LocalDef loc _))      = loc
+nameSrcLoc (Global _ _ _ (NonLocalDef loc _ _)) = loc
+nameSrcLoc (Global _ _ _ (WiredInTyCon _))      = mkBuiltinSrcLoc
+nameSrcLoc (Global _ _ _ (WiredInId _))         = mkBuiltinSrcLoc
+nameSrcLoc other			        = noSrcLoc
   
-isLocallyDefinedName (Local  _ _ _)	     	     = True
+isLocallyDefinedName (Local  _ _ _)	     	   = True
 isLocallyDefinedName (Global _ _ _ (LocalDef _ _)) = True
 isLocallyDefinedName other		           = False
 
@@ -379,7 +379,7 @@ isLocallyDefinedName other		           = False
 -- them out, often in combination with isLocallyDefined.
 isWiredInName (Global _ _ _ (WiredInTyCon _)) = True
 isWiredInName (Global _ _ _ (WiredInId    _)) = True
-isWiredInName _				          = False
+isWiredInName _				      = False
 
 maybeWiredInIdName :: Name -> Maybe Id
 maybeWiredInIdName (Global _ _ _ (WiredInId id)) = Just id
@@ -404,25 +404,23 @@ isLocalName _ 		  = False
 \begin{code}
 cmpName n1 n2 = c n1 n2
   where
-    c (Local  u1 _ _)   (Local  u2 _ _)   = cmp u1 u2
-    c (Local   _ _ _)	  _		  = LT_
-    c (Global u1 _ _ _) (Global u2 _ _ _) = cmp u1 u2
-    c (Global  _ _ _ _)   _		  = GT_
+    c (Local  u1 _ _)   (Local  u2 _ _)   = compare u1 u2
+    c (Local   _ _ _)	  _		  = LT
+    c (Global u1 _ _ _) (Global u2 _ _ _) = compare u1 u2
+    c (Global  _ _ _ _)   _		  = GT
 \end{code}
 
 \begin{code}
 instance Eq Name where
-    a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
-    a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True }
+    a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
+    a /= b = case (a `compare` b) of { EQ -> False; _ -> True }
 
 instance Ord Name where
-    a <= b = case (a `cmp` b) of { LT_ -> True;	 EQ_ -> True;  GT__ -> False }
-    a <	 b = case (a `cmp` b) of { LT_ -> True;	 EQ_ -> False; GT__ -> False }
-    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-
-instance Ord3 Name where
-    cmp = cmpName
+    a <= b = case (a `compare` b) of { LT -> True;	EQ -> True;  GT -> False }
+    a <	 b = case (a `compare` b) of { LT -> True;	EQ -> False; GT -> False }
+    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
+    a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
+    compare a b = cmpName a b
 
 instance Uniquable Name where
     uniqueOf = nameUnique
@@ -441,64 +439,72 @@ instance NamedThing Name where
 
 \begin{code}
 instance Outputable Name where
-    ppr PprQuote name@(Local _ _ _)  = quotes (ppr (PprForUser 1) name)
-
 	-- When printing interfaces, all Locals have been given nice print-names
-    ppr (PprForUser _) (Local _ n _) = ptext (occNameString n)
-    ppr PprInterface   (Local _ n _) = ptext (occNameString n)
+    ppr name = pprName name
 
-    ppr sty (Local u n _) | codeStyle sty = pprUnique u
+pprName name
+  = getPprStyle $ \ sty ->
+    let
+       ppr (Local u n _) 
+         |  userStyle sty 
+	 || ifaceStyle sty = ptext (occNameString n)
+         |  codeStyle sty  = pprUnique u
+         |  otherwise      = hcat [ptext (occNameString n), ptext SLIT("_"), pprUnique u]
+   
+       ppr name@(Global u m n prov)
+	 | codeStyle sty
+	 = identToC (m _APPEND_ SLIT(".") _APPEND_ occNameString n)
+   
+	 | otherwise  
+	 = hcat [pp_mod_dot, ptext (occNameString n), pp_debug sty name]
+	 where
+	   pp_mod_dot 
+		= case prov of		-- Omit home module qualifier if its in scope 
+			   LocalDef _ _           -> pp_qual dot (user_sty || iface_sty)
+			   NonLocalDef _ hif omit -> pp_qual (pp_hif hif) (omit && user_sty)
+			   WiredInTyCon _	  -> pp_qual dot user_sty -- Hack: omit qualifers on wired in things
+			   WiredInId _ 		  -> pp_qual dot user_sty -- in user style only
+			   NoProvenance		  -> pp_qual dot False
+   
+	   pp_qual sep omit_qual
+	    | omit_qual  = empty
+	    | otherwise	 = pprModule m <> sep
 
-    ppr sty (Local u n _) = hcat [ptext (occNameString n), ptext SLIT("_"), pprUnique u]
+	   dot = text "."
+	   pp_hif HiFile     = dot	 -- Vanilla case
+	   pp_hif HiBootFile = text "!"  -- M!t indicates a name imported from a .hi-boot interface
 
-    ppr PprQuote name@(Global _ _ _ _) = quotes (ppr (PprForUser 1) name)
+	   user_sty  = userStyle sty
+	   iface_sty = ifaceStyle sty
+    in
+    ppr name
+   
+   
+pp_debug sty (Global uniq m n prov) 
+  | debugStyle sty = hcat [text "{-", pprUnique uniq, prov_p, text "-}"]
+  | otherwise	   = empty
+	           where
+		     prov_p | opt_PprStyle_All = comma <> pp_prov prov
+			    | otherwise	       = empty
 
-    ppr sty name@(Global u m n _)
-	| codeStyle sty
-	= identToC (m _APPEND_ SLIT(".") _APPEND_ occNameString n)
-
-    ppr sty name@(Global u m n prov)
-	= hcat [pp_mod_dot, ptext (occNameString n), pp_debug sty name]
-	where
-	  pp_mod = pprModule (PprForUser 1) m 
-
-	  pp_mod_dot | userStyle sty		-- Omit qualifier in user style
-		     = empty
-		     | otherwise
-	  	     = case prov of		-- Omit home module qualifier
-			LocalDef _ _     -> empty
-			Imported _ _ hif -> pp_mod <> pp_dot hif
-			Implicit hif     -> pp_mod <> pp_dot hif
-			other		 -> pp_mod <> text "."
-
-	  pp_dot HiFile     = text "."		-- Vanilla case
-	  pp_dot HiBootFile = text "!"		-- M!t indicates a name imported from 
-						-- a .hi-boot interface
-
-
-pp_debug PprDebug (Global uniq m n prov) = hcat [text "{-", pprUnique uniq, char ',', 
-						        pp_prov prov, text "-}"]
-					where
-						pp_prov (LocalDef Exported _)    = char 'x'
-						pp_prov (LocalDef NotExported _) = char 'l'
-						pp_prov (Imported _ _ _) = char 'i'
-						pp_prov (Implicit _)     = char 'p'
-						pp_prov (WiredInTyCon _) = char 'W'
-						pp_prov (WiredInId _)    = char 'w'
-pp_debug other    name 		        = empty
+pp_prov (LocalDef _ Exported)    = char 'x'
+pp_prov (LocalDef _ NotExported) = char 'l'
+pp_prov (NonLocalDef _ _ _)    	 = char 'n'
+pp_prov (WiredInTyCon _)   	 = char 'W'
+pp_prov (WiredInId _)      	 = char 'w'
+pp_prov NoProvenance     	 = char '?'
 
 -- pprNameProvenance is used in error messages to say where a name came from
-pprNameProvenance :: PprStyle -> Name -> Doc
-pprNameProvenance sty (Local _ _ loc)     = pprProvenance sty (LocalDef NotExported loc)
-pprNameProvenance sty (Global _ _ _ prov) = pprProvenance sty prov
+pprNameProvenance :: Name -> SDoc
+pprNameProvenance (Local _ _ loc)     = pprProvenance (LocalDef loc NotExported)
+pprNameProvenance (Global _ _ _ prov) = pprProvenance prov
 
-pprProvenance :: PprStyle -> Provenance -> Doc
-pprProvenance sty (Imported mod loc _)
-  = sep [ptext SLIT("Imported from"), pprModule sty mod, ptext SLIT("at"), ppr sty loc]
-pprProvenance sty (LocalDef _ loc)  = sep [ptext SLIT("Defined at"), ppr sty loc]
-pprProvenance sty (Implicit _)      = panic "pprNameProvenance: Implicit"
-pprProvenance sty (WiredInTyCon tc) = ptext SLIT("Wired-in tycon")
-pprProvenance sty (WiredInId id)    = ptext SLIT("Wired-in id")
+pprProvenance :: Provenance -> SDoc
+pprProvenance (LocalDef loc _)      = ptext SLIT("Locally defined at")     <+> ppr loc
+pprProvenance (NonLocalDef loc _ _) = ptext SLIT("Non-locally defined at") <+> ppr loc
+pprProvenance (WiredInTyCon tc)     = ptext SLIT("Wired-in tycon")
+pprProvenance (WiredInId id)        = ptext SLIT("Wired-in id")
+pprProvenance NoProvenance	    = ptext SLIT("No provenance")
 \end{code}
 
 

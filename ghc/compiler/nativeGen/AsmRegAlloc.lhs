@@ -4,16 +4,13 @@
 \section[AsmRegAlloc]{Register allocator}
 
 \begin{code}
-#include "HsVersions.h"
-
 module AsmRegAlloc ( runRegAllocate, runHairyRegAllocate ) where	
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import MachCode		( SYN_IE(InstrList) )
+import MachCode		( InstrList )
 import MachMisc		( Instr )
 import MachRegs
-
 import RegAllocInfo
 
 import AbsCSyn		( MagicId )
@@ -26,6 +23,7 @@ import OrdList		( mkEmptyList, mkUnitList, mkSeqList, mkParList,
 import Stix		( StixTree )
 import Unique		( mkBuiltinUnique )
 import Util		( mapAccumB, panic )
+import GlaExts		( trace )
 \end{code}
 
 This is the generic register allocator.

@@ -8,8 +8,6 @@
 %********************************************************
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgTailCall (
 	cgTailCall,
 	performReturn,
@@ -19,7 +17,7 @@ module CgTailCall (
 	tailCallBusiness
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CgMonad
 import AbsCSyn
@@ -38,15 +36,15 @@ import ClosureInfo	( nodeMustPointToIt,
 			  LambdaFormInfo
 			)
 import CmdLineOpts	( opt_DoSemiTagging )
-import HeapOffs		( zeroOff, SYN_IE(VirtualSpAOffset) )
+import HeapOffs		( zeroOff, VirtualSpAOffset )
 import Id		( idType, dataConTyCon, dataConTag,
-			  fIRST_TAG, SYN_IE(Id)
+			  fIRST_TAG, Id
 			)
 import Literal		( mkMachInt )
 import Maybes		( assocMaybe )
 import PrimRep		( PrimRep(..) )
-import StgSyn		( SYN_IE(StgArg), GenStgArg(..), SYN_IE(StgLiveVars) )
-import Type		( isPrimType )
+import StgSyn		( StgArg, GenStgArg(..), StgLiveVars )
+import Type		( isUnpointedType )
 import TyCon            ( TyCon )
 import Util		( zipWithEqual, panic, assertPanic )
 \end{code}
@@ -101,7 +99,7 @@ mode for the local instead of (CLit lit) in the assignment.
 Case for unboxed @Ids@ first:
 \begin{code}
 cgTailCall atom@(StgVarArg fun) [] live_vars
-  | isPrimType (idType fun)
+  | isUnpointedType (idType fun)
   = getCAddrMode fun `thenFC` \ amode ->
     performPrimReturn amode live_vars
 \end{code}

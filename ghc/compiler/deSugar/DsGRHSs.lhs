@@ -4,42 +4,32 @@
 \section[DsGRHSs]{Matching guarded right-hand-sides (GRHSs)}
 
 \begin{code}
-#include "HsVersions.h"
-
 module DsGRHSs ( dsGuarded, dsGRHSs ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)		-- break dsExpr/dsBinds-ish loop
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} DsExpr  ( dsExpr )
 import {-# SOURCE #-} DsBinds ( dsBinds )
 import {-# SOURCE #-} Match   ( matchExport )
-#endif
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 			  HsExpr(..), HsBinds, Stmt(..), 
 			  HsLit, Match, Fixity, DoOrListComp, HsType, ArithSeqInfo
 			 )
-import TcHsSyn		( SYN_IE(TypecheckedGRHSsAndBinds), SYN_IE(TypecheckedGRHS),
-			  SYN_IE(TypecheckedPat), SYN_IE(TypecheckedHsBinds),
-			  SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedStmt)
+import TcHsSyn		( TypecheckedGRHSsAndBinds, TypecheckedGRHS,
+			  TypecheckedPat, TypecheckedHsBinds,
+			  TypecheckedHsExpr, TypecheckedStmt
 			)
-import CoreSyn		( SYN_IE(CoreBinding), GenCoreBinding(..), SYN_IE(CoreExpr), mkCoLetsAny )
+import CoreSyn		( CoreBinding, GenCoreBinding(..), CoreExpr, mkCoLetsAny )
 
 import DsMonad
 import DsUtils
-
-#if __GLASGOW_HASKELL__ < 200
-import Id		( GenId )
-#endif
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PrelVals		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
-import Outputable	( PprStyle(..) )
 import SrcLoc		( SrcLoc{-instance-} )
-import Type             ( SYN_IE(Type) )
+import Type             ( Type )
 import Unique		( Unique, otherwiseIdKey, trueDataConKey, Uniquable(..) )
-import Util		( panic )
+import Outputable
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
@@ -89,14 +79,6 @@ dsGRHSs ty kind pats (grhs:grhss)
   = dsGRHS ty kind pats grhs	`thenDs` \ match_result1 ->
     dsGRHSs ty kind pats grhss	`thenDs` \ match_result2 ->
     combineGRHSMatchResults match_result1 match_result2
-
-dsGRHS ty kind pats (OtherwiseGRHS expr locn)
-  = putSrcLocDs locn $
-    dsExpr expr 	`thenDs` \ core_expr ->
-    let
-	expr_fn = \ ignore -> core_expr
-    in
-    returnDs (MatchResult CantFail ty expr_fn ) --(DsMatchContext kind pats locn))
 
 dsGRHS ty kind pats (GRHS guard expr locn)
   = putSrcLocDs locn $

@@ -11,8 +11,6 @@ Basically, the things need to be in class @Uniquable@, and we use the
 (A similar thing to @UniqSet@, as opposed to @Set@.)
 
 \begin{code}
-#include "HsVersions.h"
-
 module UniqFM (
 	UniqFM,   -- abstract type
 
@@ -41,23 +39,19 @@ module UniqFM (
 	lookupUFM, lookupUFM_Directly,
 	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
 	eltsUFM, keysUFM,
-	ufmToList
-	,FAST_STRING
+	ufmToList, 
+	FastString
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER( SpecLoop )
-#else
-import {-# SOURCE #-} Name
-#endif
+import {-# SOURCE #-} Name	( Name )
 
 import Unique		( Uniquable(..), Unique, u2i, mkUniqueGrimily )
 import Util
-import Pretty		( Doc )
-import Outputable	( PprStyle, Outputable(..) )
+import Outputable	( Outputable(..) )
 import SrcLoc		( SrcLoc )
+import GlaExts		-- Lots of Int# operations
 
 #if ! OMIT_NATIVE_CODEGEN
 #define IF_NCG(a) a

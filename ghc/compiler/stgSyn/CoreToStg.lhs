@@ -10,12 +10,9 @@
 Convert a @CoreSyntax@ program to a @StgSyntax@ program.
 
 \begin{code}
-#include "HsVersions.h"
-
 module CoreToStg ( topCoreBindsToStg ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(Ratio(numerator,denominator))
+#include "HsVersions.h"
 
 import CoreSyn		-- input
 import StgSyn		-- output
@@ -27,7 +24,7 @@ import Id		( mkSysLocal, idType, isBottomingId,
 			  externallyVisibleId,
 
 			  nullIdEnv, addOneToIdEnv, lookupIdEnv, growIdEnvList,
-			  SYN_IE(IdEnv), GenId{-instance NamedThing-}, SYN_IE(Id)
+			  IdEnv, GenId{-instance NamedThing-}, Id
 			)
 import Literal		( mkMachInt, Literal(..) )
 import PrelVals		( unpackCStringId, unpackCString2Id,
@@ -35,16 +32,15 @@ import PrelVals		( unpackCStringId, unpackCString2Id,
 			  integerPlusTwoId, integerMinusOneId
 			)
 import PrimOp		( PrimOp(..) )
-import SpecUtils	( mkSpecialisedCon )
 import SrcLoc		( noSrcLoc )
 import TyCon		( TyCon{-instance Uniquable-} )
-import Type		( getAppDataTyConExpandingDicts, SYN_IE(Type) )
+import Type		( splitAlgTyConApp, Type )
 import TysWiredIn	( stringTy )
 import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
 import UniqSupply	-- all of it, really
-import Util		( zipLazy, panic, assertPanic, pprTrace {-TEMP-} )
-import Pretty
+import Util		( zipLazy )
 import Outputable
+import Ratio 		( numerator, denominator )
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
@@ -208,7 +204,6 @@ coreArgsToStg env [] = ([], [])
 coreArgsToStg env (a:as)
   = case a of
 	TyArg    t -> (t:trest, vrest)
-	UsageArg u -> (trest,   vrest)
 	VarArg   v -> (trest,   stgLookup env v : vrest)
 	LitArg   l -> (trest,   StgLitArg l     : vrest)
   where
@@ -234,9 +229,8 @@ coreExprToStg env (Var var)
 coreExprToStg env (Con con args)
   = let
 	(types, stg_atoms) = coreArgsToStg env args
-	spec_con = mkSpecialisedCon con types
     in
-    returnUs (StgCon spec_con stg_atoms bOGUS_LVs)
+    returnUs (StgCon con stg_atoms bOGUS_LVs)
 
 coreExprToStg env (Prim op args)
   = let
@@ -254,7 +248,7 @@ coreExprToStg env (Prim op args)
 \begin{code}
 coreExprToStg env expr@(Lam _ _)
   = let
-	(_,_, binders, body) = collectBinders expr
+	(_, binders, body) = collectBinders expr
     in
     coreExprToStg env body		`thenUs` \ stg_body ->
 
@@ -310,7 +304,6 @@ coreExprToStg env expr@(App _ _)
   where
 	-- Collect arguments, discarding type/usage applications
     collect_args (App e   (TyArg _))    args = collect_args e   args
-    collect_args (App e   (UsageArg _)) args = collect_args e   args
     collect_args (App fun arg)          args = collect_args fun (arg:args)
     collect_args (Coerce _ _ expr)      args = collect_args expr args
     collect_args fun                    args = (fun, args)
@@ -336,7 +329,7 @@ coreExprToStg env (Case discrim alts)
     )
   where
     discrim_ty		    = coreExprType discrim
-    (_, discrim_ty_args, _) = getAppDataTyConExpandingDicts discrim_ty
+    (_, discrim_ty_args, _) = splitAlgTyConApp discrim_ty
 
     alts_to_stg discrim (AlgAlts alts deflt)
       = default_to_stg discrim deflt		`thenUs` \ stg_deflt ->
@@ -345,9 +338,7 @@ coreExprToStg env (Case discrim alts)
       where
 	boxed_alt_to_stg (con, bs, rhs)
 	  = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
-	    returnUs (spec_con, bs, [ True | b <- bs ]{-bogus use mask-}, stg_rhs)
-	  where
-	    spec_con = mkSpecialisedCon con discrim_ty_args
+	    returnUs (con, bs, [ True | b <- bs ]{-bogus use mask-}, stg_rhs)
 
     alts_to_stg discrim (PrimAlts alts deflt)
       = default_to_stg discrim deflt		`thenUs` \ stg_deflt ->

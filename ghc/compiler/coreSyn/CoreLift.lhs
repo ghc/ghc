@@ -4,8 +4,6 @@
 \section[CoreLift]{Lifts unboxed bindings and any references to them}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CoreLift (
 	liftCoreBindings,
 
@@ -16,18 +14,18 @@ module CoreLift (
 
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CoreSyn
 import CoreUtils	( coreExprType )
 import Id		( idType, mkSysLocal,
 			  nullIdEnv, growIdEnvList, lookupIdEnv,
 			  mkIdWithNewType,
-			  SYN_IE(IdEnv), GenId{-instances-}, SYN_IE(Id)
+			  IdEnv, GenId{-instances-}, Id
 			)
 import Name		( isLocallyDefined, getSrcLoc, getOccString )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
-import Type		( maybeAppDataTyConExpandingDicts, eqTy )
+import Type		( splitAlgTyConApp_maybe )
 import TysPrim		( statePrimTyCon )
 import TysWiredIn	( liftDataCon, mkLiftTy )
 import Unique           ( Unique )
@@ -82,7 +80,6 @@ liftBindAndScope top_lev bind scopeM
 liftCoreArg :: CoreArg -> LiftM (CoreArg, CoreExpr -> CoreExpr)
 
 liftCoreArg arg@(TyArg     _) = returnL (arg, id)
-liftCoreArg arg@(UsageArg  _) = returnL (arg, id)
 liftCoreArg arg@(LitArg    _) = returnL (arg, id)
 liftCoreArg arg@(VarArg v)
  = isLiftedId v			`thenL` \ lifted ->
@@ -289,7 +286,7 @@ mkLiftedId id u
 bindUnlift :: Id -> Id -> CoreExpr -> CoreExpr
 bindUnlift vlift vunlift expr
   = ASSERT (isUnboxedButNotState unlift_ty)
-    ASSERT (lift_ty `eqTy` mkLiftTy unlift_ty)
+    ASSERT (lift_ty == mkLiftTy unlift_ty)
     Case (Var vlift)
 	   (AlgAlts [(liftDataCon, [vunlift], expr)] NoDefault)
   where
@@ -299,9 +296,9 @@ bindUnlift vlift vunlift expr
 liftExpr :: Id -> CoreExpr -> CoreExpr
 liftExpr vunlift rhs
   = ASSERT (isUnboxedButNotState unlift_ty)
-    ASSERT (rhs_ty `eqTy` unlift_ty)
+    ASSERT (rhs_ty == unlift_ty)
     Case rhs (PrimAlts []
-	(BindDefault vunlift (mkCon liftDataCon [] [unlift_ty] [VarArg vunlift])))
+	(BindDefault vunlift (mkCon liftDataCon [unlift_ty] [VarArg vunlift])))
   where
     rhs_ty    = coreExprType rhs
     unlift_ty = idType vunlift
@@ -312,7 +309,7 @@ applyBindUnlifts []     expr = expr
 applyBindUnlifts (f:fs) expr = f (applyBindUnlifts fs expr)
 
 isUnboxedButNotState ty = 
-    case (maybeAppDataTyConExpandingDicts ty) of
+    case (splitAlgTyConApp_maybe ty) of
       Nothing -> False
       Just (tycon, _, _) ->
 	not (isBoxedTyCon tycon) && not (tycon == statePrimTyCon)

@@ -4,8 +4,6 @@
 \section[CoreSyn]{A data type for the Haskell compiler midsection}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CoreSyn (
 	GenCoreBinding(..), GenCoreExpr(..),
 	GenCoreArg(..), GenCoreBinder(..), GenCoreCaseAlts(..),
@@ -14,11 +12,11 @@ module CoreSyn (
 
 	bindersOf, pairsFromCoreBinds, rhssOfBind,
 
-	mkGenApp, mkValApp, mkTyApp, mkUseApp,
+	mkGenApp, mkValApp, mkTyApp, 
 	mkApp, mkCon, mkPrim,
-	mkValLam, mkTyLam, mkUseLam,
+	mkValLam, mkTyLam, 
 	mkLam,
-	collectBinders, collectUsageAndTyBinders, collectValBinders, 
+	collectBinders, collectValBinders, collectTyBinders,
 	isValBinder, notValBinder,
 	
 	collectArgs, initialTyArgs, initialValArgs, isValArg, notValArg, numValArgs,
@@ -30,42 +28,40 @@ module CoreSyn (
 	rhssOfAlts,
 
 	-- Common type instantiation...
-	SYN_IE(CoreBinding),
-	SYN_IE(CoreExpr),
-	SYN_IE(CoreBinder),
-	SYN_IE(CoreArg),
-	SYN_IE(CoreCaseAlts),
-	SYN_IE(CoreCaseDefault),
+	CoreBinding,
+	CoreExpr,
+	CoreBinder,
+	CoreArg,
+	CoreCaseAlts,
+	CoreCaseDefault,
 
 	-- And not-so-common type instantiations...
-	SYN_IE(TaggedCoreBinding),
-	SYN_IE(TaggedCoreExpr),
-	SYN_IE(TaggedCoreBinder),
-	SYN_IE(TaggedCoreArg),
-	SYN_IE(TaggedCoreCaseAlts),
-	SYN_IE(TaggedCoreCaseDefault),
+	TaggedCoreBinding,
+	TaggedCoreExpr,
+	TaggedCoreBinder,
+	TaggedCoreArg,
+	TaggedCoreCaseAlts,
+	TaggedCoreCaseDefault,
 
-	SYN_IE(SimplifiableCoreBinding),
-	SYN_IE(SimplifiableCoreExpr),
-	SYN_IE(SimplifiableCoreBinder),
-	SYN_IE(SimplifiableCoreArg),
-	SYN_IE(SimplifiableCoreCaseAlts),
-	SYN_IE(SimplifiableCoreCaseDefault)
+	SimplifiableCoreBinding,
+	SimplifiableCoreExpr,
+	SimplifiableCoreBinder,
+	SimplifiableCoreArg,
+	SimplifiableCoreCaseAlts,
+	SimplifiableCoreCaseDefault
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CostCentre	( showCostCentre, CostCentre )
-import Id		( idType, GenId{-instance Eq-}, SYN_IE(Id) )
-import Type		( isUnboxedType,GenType, SYN_IE(Type) )
-import TyVar		( GenTyVar, SYN_IE(TyVar) )
-import Usage		( SYN_IE(UVar),GenUsage,SYN_IE(Usage) )
+import Id		( idType, GenId{-instance Eq-}, Id )
+import Type		( isUnboxedType,GenType, Type )
+import TyVar		( GenTyVar, TyVar )
 import Util		( panic, assertPanic {-pprTrace:ToDo:rm-} )
-#if __GLASGOW_HASKELL__ >= 202
-import Literal          ( Literal )
 import BinderInfo       ( BinderInfo )
+import BasicTypes	( Unused )
+import Literal          ( Literal )
 import PrimOp           ( PrimOp )
-#endif
 \end{code}
 
 %************************************************************************
@@ -83,19 +79,19 @@ bounder}.  Or {\em binder} and {\em var}.]
 A @GenCoreBinding@ is either a single non-recursive binding of a
 ``binder'' to an expression, or a mutually-recursive blob of same.
 \begin{code}
-data GenCoreBinding val_bdr val_occ tyvar uvar
-  = NonRec	val_bdr (GenCoreExpr val_bdr val_occ tyvar uvar)
-  | Rec		[(val_bdr, GenCoreExpr val_bdr val_occ tyvar uvar)]
+data GenCoreBinding val_bdr val_occ flexi
+  = NonRec	val_bdr (GenCoreExpr val_bdr val_occ flexi)
+  | Rec		[(val_bdr, GenCoreExpr val_bdr val_occ flexi)]
 \end{code}
 
 \begin{code}
-bindersOf :: GenCoreBinding val_bdr val_occ tyvar uvar -> [val_bdr]
+bindersOf :: GenCoreBinding val_bdr val_occ flexi -> [val_bdr]
 
 pairsFromCoreBinds ::
-  [GenCoreBinding val_bdr val_occ tyvar uvar] ->
-  [(val_bdr, GenCoreExpr val_bdr val_occ tyvar uvar)]
+  [GenCoreBinding val_bdr val_occ flexi] ->
+  [(val_bdr, GenCoreExpr val_bdr val_occ flexi)]
 
-rhssOfBind :: GenCoreBinding val_bdr val_occ tyvar uvar -> [GenCoreExpr val_bdr val_occ tyvar uvar]
+rhssOfBind :: GenCoreBinding val_bdr val_occ flexi -> [GenCoreExpr val_bdr val_occ flexi]
 
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
@@ -118,7 +114,7 @@ rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 (more-or-less) boiled-down second-order polymorphic lambda calculus.
 For types in the core world, we just keep using @Types@.
 \begin{code}
-data GenCoreExpr val_bdr val_occ tyvar uvar
+data GenCoreExpr val_bdr val_occ flexi
      = Var    val_occ
      | Lit    Literal	-- literal constants
 \end{code}
@@ -129,7 +125,7 @@ simplifier (and by the desugarer when it knows what it's doing).  The
 desugarer sets up constructors as applications of global @Vars@s.
 
 \begin{code}
-     | Con	Id [GenCoreArg val_occ tyvar uvar]
+     | Con	Id [GenCoreArg val_occ flexi]
 		-- Saturated constructor application:
 		-- The constructor is a function of the form:
 		--	/\ a1 -> ... /\ am -> \ b1 -> ... \ bn ->
@@ -137,7 +133,7 @@ desugarer sets up constructors as applications of global @Vars@s.
 		-- regular kind; there will be "m" Types and
 		-- "n" bindees in the Con args.
 
-     | Prim	PrimOp [GenCoreArg val_occ tyvar uvar]
+     | Prim	PrimOp [GenCoreArg val_occ flexi]
 		-- saturated primitive operation;
 
 		-- comment on Cons applies here, too.
@@ -145,11 +141,11 @@ desugarer sets up constructors as applications of global @Vars@s.
 
 Ye olde abstraction and application operators.
 \begin{code}
-     | Lam	(GenCoreBinder val_bdr tyvar uvar)
-		(GenCoreExpr   val_bdr val_occ tyvar uvar)
+     | Lam	(GenCoreBinder val_bdr flexi)
+		(GenCoreExpr   val_bdr val_occ flexi)
 
-     | App	(GenCoreExpr val_bdr val_occ tyvar uvar)
-		(GenCoreArg  val_occ tyvar uvar)
+     | App	(GenCoreExpr val_bdr val_occ flexi)
+		(GenCoreArg  val_occ flexi)
 \end{code}
 
 Case expressions (\tr{case <expr> of <List of alternatives>}): there
@@ -157,8 +153,8 @@ are really two flavours masquerading here---those for scrutinising
 {\em algebraic} types and those for {\em primitive} types.  Please see
 under @GenCoreCaseAlts@.
 \begin{code}
-     | Case	(GenCoreExpr val_bdr val_occ tyvar uvar)
-		(GenCoreCaseAlts val_bdr val_occ tyvar uvar)
+     | Case	(GenCoreExpr val_bdr val_occ flexi)
+		(GenCoreCaseAlts val_bdr val_occ flexi)
 \end{code}
 
 A Core case expression \tr{case e of v -> ...} implies evaluation of
@@ -169,8 +165,8 @@ Non-recursive @Lets@ only have one binding; having more than one
 doesn't buy you much, and it is an easy way to mess up variable
 scoping.
 \begin{code}
-     | Let	(GenCoreBinding val_bdr val_occ tyvar uvar)
-		(GenCoreExpr val_bdr val_occ tyvar uvar)
+     | Let	(GenCoreBinding val_bdr val_occ flexi)
+		(GenCoreExpr val_bdr val_occ flexi)
 		-- both recursive and non-.
 		-- The "GenCoreBinding" records that information
 \end{code}
@@ -181,7 +177,7 @@ alternative of using a new PrimativeOp may result in a bad
 transformations of which we are unaware.
 \begin{code}
      | SCC	CostCentre				    -- label of scc
-		(GenCoreExpr val_bdr val_occ tyvar uvar)    -- scc expression
+		(GenCoreExpr val_bdr val_occ flexi)    -- scc expression
 \end{code}
 
 Coercions arise from uses of the constructor of a @newtype@
@@ -190,8 +186,8 @@ pattern matching (resulting in a @CoerceOut@).
 
 \begin{code}
     | Coerce	Coercion
-		(GenType tyvar uvar)		-- Type of the whole expression
-		(GenCoreExpr val_bdr val_occ tyvar uvar)
+		(GenType flexi)		-- Type of the whole expression
+		(GenCoreExpr val_bdr val_occ flexi)
 \end{code}
 
 \begin{code}
@@ -215,16 +211,16 @@ being bound has unboxed type. We have different variants ...
 				(unboxed bindings in a letrec are still prohibited)
 
 \begin{code}
-mkCoLetAny :: GenCoreBinding Id Id tyvar uvar
-	   -> GenCoreExpr    Id Id tyvar uvar
-	   -> GenCoreExpr    Id Id tyvar uvar
-mkCoLetsAny :: [GenCoreBinding Id Id tyvar uvar] ->
-		GenCoreExpr Id Id tyvar uvar ->
-		GenCoreExpr Id Id tyvar uvar
+mkCoLetAny :: GenCoreBinding Id Id flexi
+	   -> GenCoreExpr    Id Id flexi
+	   -> GenCoreExpr    Id Id flexi
+mkCoLetsAny :: [GenCoreBinding Id Id flexi] ->
+		GenCoreExpr Id Id flexi ->
+		GenCoreExpr Id Id flexi
 
-mkCoLetrecAny :: [(val_bdr, GenCoreExpr val_bdr val_occ tyvar uvar)]
-	      -> GenCoreExpr val_bdr val_occ tyvar uvar
-	      -> GenCoreExpr val_bdr val_occ tyvar uvar
+mkCoLetrecAny :: [(val_bdr, GenCoreExpr val_bdr val_occ flexi)]
+	      -> GenCoreExpr val_bdr val_occ flexi
+	      -> GenCoreExpr val_bdr val_occ flexi
 
 mkCoLetrecAny []    body = body
 mkCoLetrecAny binds body = Let (Rec binds) body
@@ -303,24 +299,24 @@ Case e [ BindDefaultAlt x -> b ]
 \end{verbatim}
 
 \begin{code}
-data GenCoreCaseAlts val_bdr val_occ tyvar uvar
+data GenCoreCaseAlts val_bdr val_occ flexi
   = AlgAlts	[(Id,				-- alts: data constructor,
 		  [val_bdr],			-- constructor's parameters,
-		  GenCoreExpr val_bdr val_occ tyvar uvar)]	-- rhs.
-		(GenCoreCaseDefault val_bdr val_occ tyvar uvar)
+		  GenCoreExpr val_bdr val_occ flexi)]	-- rhs.
+		(GenCoreCaseDefault val_bdr val_occ flexi)
 
   | PrimAlts	[(Literal,			-- alts: unboxed literal,
-		  GenCoreExpr val_bdr val_occ tyvar uvar)]	-- rhs.
-		(GenCoreCaseDefault val_bdr val_occ tyvar uvar)
+		  GenCoreExpr val_bdr val_occ flexi)]	-- rhs.
+		(GenCoreCaseDefault val_bdr val_occ flexi)
 
 -- obvious things: if there are no alts in the list, then the default
 -- can't be NoDefault.
 
-data GenCoreCaseDefault val_bdr val_occ tyvar uvar
+data GenCoreCaseDefault val_bdr val_occ flexi
   = NoDefault					-- small con family: all
 						-- constructor accounted for
   | BindDefault val_bdr				-- form: var -> expr;
-		(GenCoreExpr val_bdr val_occ tyvar uvar)	-- "val_bdr" may or may not
+		(GenCoreExpr val_bdr val_occ flexi)	-- "val_bdr" may or may not
 						-- be used in RHS.
 \end{code}
 
@@ -339,10 +335,9 @@ rhssOfDeflt (BindDefault _ rhs) = [rhs]
 %************************************************************************
 
 \begin{code}
-data GenCoreBinder val_bdr tyvar uvar
+data GenCoreBinder val_bdr flexi
   = ValBinder	val_bdr
-  | TyBinder	tyvar
-  | UsageBinder	uvar
+  | TyBinder	(GenTyVar flexi)
 
 isValBinder (ValBinder _) = True
 isValBinder _		  = False
@@ -354,22 +349,18 @@ Clump Lams together if possible.
 
 \begin{code}
 mkValLam :: [val_bdr]
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-mkTyLam  :: [tyvar]
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-mkUseLam :: [uvar]
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> GenCoreExpr val_bdr val_occ flexi
+	 -> GenCoreExpr val_bdr val_occ flexi
+mkTyLam  :: [GenTyVar flexi]
+	 -> GenCoreExpr val_bdr val_occ flexi
+	 -> GenCoreExpr val_bdr val_occ flexi
 
 mkValLam binders body = foldr (Lam . ValBinder)   body binders
 mkTyLam  binders body = foldr (Lam . TyBinder)    body binders
-mkUseLam binders body = foldr (Lam . UsageBinder) body binders
 
-mkLam :: [tyvar] -> [val_bdr] -- ToDo: could add a [uvar] arg...
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+mkLam :: [GenTyVar flexi] -> [val_bdr] -- ToDo: could add a [uvar] arg...
+	 -> GenCoreExpr val_bdr val_occ flexi
+	 -> GenCoreExpr val_bdr val_occ flexi
 
 mkLam tyvars valvars body
   = mkTyLam tyvars (mkValLam valvars body)
@@ -383,45 +374,24 @@ order.
 
 \begin{code}
 collectBinders ::
-  GenCoreExpr val_bdr val_occ tyvar uvar ->
-  ([uvar], [tyvar], [val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
+  GenCoreExpr val_bdr val_occ flexi ->
+  ([GenTyVar flexi], [val_bdr], GenCoreExpr val_bdr val_occ flexi)
 
 collectBinders expr
-  = case collectValBinders body1 of { (vals,body) -> (usages, tyvars, vals, body) }
+  = case collectValBinders body1 of { (vals,body) -> (tyvars, vals, body) }
   where
-    (usages, tyvars, body1) = collectUsageAndTyBinders expr
---    (vals, body) 	    = collectValBinders body1
+    (tyvars, body1) = collectTyBinders expr
 
-
-collectUsageAndTyBinders expr
-  = case usages expr [] of
-      ([],tyvars,body) -> ([],tyvars,body)
-      v                -> v
+collectTyBinders expr
+  = tyvars expr []
   where
-    usages (Lam (UsageBinder u) body) uacc = usages body (u:uacc)
-    usages other uacc
-      = case (tyvars other []) of { (tacc, expr) ->
-	(reverse uacc, tacc, expr) }
-
     tyvars (Lam (TyBinder t) body) tacc = tyvars body (t:tacc)
-    tyvars other tacc
-      = ASSERT(not (usage_lambda other))
-	(reverse tacc, other)
+    tyvars other tacc = (reverse tacc, other)
 
-    ---------------------------------------
-    usage_lambda (Lam (UsageBinder _) _) = True
-    usage_lambda _			 = False
-
-    tyvar_lambda (Lam (TyBinder _) _)    = True
-    tyvar_lambda _			 = False
-
-
-collectValBinders :: GenCoreExpr val_bdr val_occ tyvar uvar ->
-		     ([val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
+collectValBinders :: GenCoreExpr val_bdr val_occ flexi ->
+		     ([val_bdr], GenCoreExpr val_bdr val_occ flexi)
 collectValBinders expr
-  = case go [] expr of
-      ([],body) -> ([],body)
-      v         -> v
+  = go [] expr
   where
     go acc (Lam (ValBinder v) b) = go (v:acc) b
     go acc body 		 = (reverse acc, body)
@@ -435,31 +405,26 @@ collectValBinders expr
 %************************************************************************
 
 \begin{code}
-data GenCoreArg val_occ tyvar uvar
+data GenCoreArg val_occ flexi
   = LitArg	Literal
   | VarArg	val_occ
-  | TyArg	(GenType tyvar uvar)
-  | UsageArg	(GenUsage uvar)
+  | TyArg	(GenType flexi)
 \end{code}
 
 General and specific forms:
 \begin{code}
-mkGenApp :: GenCoreExpr val_bdr val_occ tyvar uvar
-	 -> [GenCoreArg val_occ tyvar uvar]
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-mkTyApp  :: GenCoreExpr val_bdr val_occ tyvar uvar
-	 -> [GenType tyvar uvar]
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-mkUseApp :: GenCoreExpr val_bdr val_occ tyvar uvar
-	 -> [GenUsage uvar]
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
-mkValApp :: GenCoreExpr val_bdr val_occ tyvar uvar
-	 -> [GenCoreArg val_occ tyvar uvar] -- but we ASSERT they are LitArg or VarArg
-	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+mkGenApp :: GenCoreExpr val_bdr val_occ flexi
+	 -> [GenCoreArg val_occ flexi]
+	 -> GenCoreExpr val_bdr val_occ flexi
+mkTyApp  :: GenCoreExpr val_bdr val_occ flexi
+	 -> [GenType flexi]
+	 -> GenCoreExpr val_bdr val_occ flexi
+mkValApp :: GenCoreExpr val_bdr val_occ flexi
+	 -> [GenCoreArg val_occ flexi] -- but we ASSERT they are LitArg or VarArg
+	 -> GenCoreExpr val_bdr val_occ flexi
 
 mkGenApp f args = foldl App		  		   f args
 mkTyApp  f args = foldl (\ e a -> App e (TyArg a))	   f args
-mkUseApp f args = foldl (\ e a -> App e (UsageArg a))	   f args
 mkValApp f args = foldl (\ e a -> App e (is_Lit_or_Var a)) f args
 
 #ifndef DEBUG
@@ -483,49 +448,43 @@ mkApp  fun = mk_thing (mkGenApp fun)
 mkCon  con = mk_thing (Con      con)
 mkPrim op  = mk_thing (Prim     op)
 
-mk_thing thing uses tys vals
-  = thing (map UsageArg uses ++ map TyArg tys ++ map is_Lit_or_Var vals)
+mk_thing thing tys vals
+  = ASSERT( all isValArg vals )
+    thing (map TyArg tys ++ vals)
 \end{code}
 
 @collectArgs@ takes an application expression, returning the function
 and the arguments to which it is applied.
 
 \begin{code}
-collectArgs :: GenCoreExpr val_bdr val_occ tyvar uvar
-	    -> (GenCoreExpr val_bdr val_occ tyvar uvar,
-		[GenUsage uvar],
-		[GenType tyvar uvar],
-	        [GenCoreArg val_occ tyvar uvar]{-ValArgs-})
+collectArgs :: GenCoreExpr val_bdr val_occ flexi
+	    -> (GenCoreExpr val_bdr val_occ flexi,
+		[GenType flexi],
+	        [GenCoreArg val_occ flexi]{-ValArgs-})
 
 collectArgs expr
   = valvars expr []
   where
     valvars (App fun v) vacc | isValArg v = valvars fun (v:vacc)
     valvars fun vacc
-      = case (tyvars fun []) of { (expr, uacc, tacc) ->
-	(expr, uacc, tacc, vacc) }
+      = case (tyvars fun []) of { (expr, tacc) ->
+	(expr, tacc, vacc) }
 
-    tyvars (App fun (TyArg t))    tacc = tyvars fun (t:tacc)
-    tyvars fun tacc
-      = case (usages fun []) of { (expr, uacc) ->
-	(expr, uacc, tacc) }
-
-    usages (App fun (UsageArg u)) uacc = usages fun (u:uacc)
-    usages fun uacc
-      = (fun,uacc)
+    tyvars (App fun (TyArg t)) tacc = tyvars fun (t:tacc)
+    tyvars fun tacc		    = (expr, tacc)
 \end{code}
 
 
 \begin{code}
-initialTyArgs :: [GenCoreArg val_occ tyvar uvar]
-	      -> ([GenType tyvar uvar], [GenCoreArg val_occ tyvar uvar])
+initialTyArgs :: [GenCoreArg val_occ flexi]
+	      -> ([GenType flexi], [GenCoreArg val_occ flexi])
 initialTyArgs (TyArg ty : args) = (ty:tys, args') 
 				where
 				  (tys, args') = initialTyArgs args
 initialTyArgs other 		= ([],other)
 
-initialValArgs :: [GenCoreArg val_occ tyvar uvar]
-	      -> ([GenCoreArg val_occ tyvar uvar], [GenCoreArg val_occ tyvar uvar])
+initialValArgs :: [GenCoreArg val_occ flexi]
+	      -> ([GenCoreArg val_occ flexi], [GenCoreArg val_occ flexi])
 initialValArgs args = span isValArg args
 \end{code}
 
@@ -537,13 +496,13 @@ initialValArgs args = span isValArg args
 %************************************************************************
 
 \begin{code}
-type CoreBinding = GenCoreBinding  Id Id TyVar UVar
-type CoreExpr    = GenCoreExpr     Id Id TyVar UVar
-type CoreBinder	 = GenCoreBinder   Id    TyVar UVar
-type CoreArg     = GenCoreArg         Id TyVar UVar
+type CoreBinding = GenCoreBinding  Id Id Unused
+type CoreExpr    = GenCoreExpr     Id Id Unused
+type CoreBinder	 = GenCoreBinder   Id    Unused
+type CoreArg     = GenCoreArg         Id Unused
 
-type CoreCaseAlts    = GenCoreCaseAlts    Id Id TyVar UVar
-type CoreCaseDefault = GenCoreCaseDefault Id Id TyVar UVar
+type CoreCaseAlts    = GenCoreCaseAlts    Id Id Unused
+type CoreCaseDefault = GenCoreCaseDefault Id Id Unused
 \end{code}
 
 %************************************************************************
@@ -556,13 +515,13 @@ Binders are ``tagged'' with a \tr{t}:
 \begin{code}
 type Tagged t = (Id, t)
 
-type TaggedCoreBinding t = GenCoreBinding (Tagged t) Id TyVar UVar
-type TaggedCoreExpr    t = GenCoreExpr    (Tagged t) Id TyVar UVar
-type TaggedCoreBinder  t = GenCoreBinder  (Tagged t)    TyVar UVar
-type TaggedCoreArg     t = GenCoreArg                Id TyVar UVar
+type TaggedCoreBinding t = GenCoreBinding (Tagged t) Id Unused
+type TaggedCoreExpr    t = GenCoreExpr    (Tagged t) Id Unused
+type TaggedCoreBinder  t = GenCoreBinder  (Tagged t)    Unused
+type TaggedCoreArg     t = GenCoreArg                Id Unused
 
-type TaggedCoreCaseAlts    t = GenCoreCaseAlts    (Tagged t) Id TyVar UVar
-type TaggedCoreCaseDefault t = GenCoreCaseDefault (Tagged t) Id TyVar UVar
+type TaggedCoreCaseAlts    t = GenCoreCaseAlts    (Tagged t) Id Unused
+type TaggedCoreCaseDefault t = GenCoreCaseDefault (Tagged t) Id Unused
 \end{code}
 
 %************************************************************************
@@ -575,11 +534,11 @@ Binders are tagged with @BinderInfo@:
 \begin{code}
 type Simplifiable = (Id, BinderInfo)
 
-type SimplifiableCoreBinding = GenCoreBinding Simplifiable Id TyVar UVar
-type SimplifiableCoreExpr    = GenCoreExpr    Simplifiable Id TyVar UVar
-type SimplifiableCoreBinder  = GenCoreBinder  Simplifiable    TyVar UVar
-type SimplifiableCoreArg     = GenCoreArg                  Id TyVar UVar
+type SimplifiableCoreBinding = GenCoreBinding Simplifiable Id Unused
+type SimplifiableCoreExpr    = GenCoreExpr    Simplifiable Id Unused
+type SimplifiableCoreBinder  = GenCoreBinder  Simplifiable    Unused
+type SimplifiableCoreArg     = GenCoreArg                  Id Unused
 
-type SimplifiableCoreCaseAlts    = GenCoreCaseAlts    Simplifiable Id TyVar UVar
-type SimplifiableCoreCaseDefault = GenCoreCaseDefault Simplifiable Id TyVar UVar
+type SimplifiableCoreCaseAlts    = GenCoreCaseAlts    Simplifiable Id Unused
+type SimplifiableCoreCaseDefault = GenCoreCaseDefault Simplifiable Id Unused
 \end{code}

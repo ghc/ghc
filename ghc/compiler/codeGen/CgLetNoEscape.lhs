@@ -8,16 +8,11 @@
 %********************************************************
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgLetNoEscape ( cgLetNoEscapeClosure ) where
 
-IMP_Ubiq(){-uitious-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(CgLoop2)		( cgExpr )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} CgExpr ( cgExpr )
-#endif
 
 import StgSyn
 import CgMonad
@@ -34,8 +29,8 @@ import CgUsages		( setRealAndVirtualSps, getVirtSps )
 import CLabel		( mkStdEntryLabel )
 import ClosureInfo	( mkLFLetNoEscape )
 import CostCentre       ( CostCentre )
-import HeapOffs		( SYN_IE(VirtualSpBOffset) )
-import Id		( idPrimRep, SYN_IE(Id) )
+import HeapOffs		( VirtualSpBOffset )
+import Id		( idPrimRep, Id )
 \end{code}
 
 %************************************************************************

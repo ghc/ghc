@@ -4,40 +4,35 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcPat ( tcPat ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
-			  Match, HsBinds, HsType, Fixity,
-			  ArithSeqInfo, Stmt, DoOrListComp, Fake )
-import RnHsSyn		( SYN_IE(RenamedPat) )
-import TcHsSyn		( SYN_IE(TcPat) )
+import HsSyn		( InPat(..), OutPat(..), HsLit(..), HsExpr(..) )
+import RnHsSyn		( RenamedPat )
+import TcHsSyn		( TcPat )
 
 import TcMonad
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
-			  emptyLIE, plusLIE, plusLIEs, SYN_IE(LIE),
+			  emptyLIE, plusLIE, plusLIEs, LIE,
 			  newMethod, newOverloadedLit
 			)
 import Name		( Name {- instance Outputable -} )
-import TcEnv		( tcLookupGlobalValue, tcLookupGlobalValueByKey, 
-			  tcLookupLocalValueOK )
-import SpecEnv		( SpecEnv )
-import TcType 		( TcIdOcc(..), SYN_IE(TcType), TcMaybe, newTyVarTy, newTyVarTys, tcInstId )
+import TcEnv		( TcIdOcc(..), tcLookupGlobalValue, tcLookupGlobalValueByKey, 
+			  tcLookupLocalValueOK, tcInstId
+			)
+import TcType 		( TcType, TcMaybe, newTyVarTy, newTyVarTys )
 import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
 import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
-import Id		( GenId, idType, SYN_IE(Id) )
+import Id		( GenId, idType, Id )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 import Maybes		( maybeToBool )
 import PprType		( GenType, GenTyVar )
-import Pretty
-import Type		( splitFunTy, splitRhoTy, splitSigmaTy, mkTyVarTys,
-			  getFunTy_maybe, maybeAppDataTyCon,
-			  SYN_IE(Type), GenType
+import Type		( splitFunTys, splitRhoTy, splitSigmaTy, mkTyVarTys,
+			  splitFunTy_maybe, splitAlgTyConApp_maybe,
+			  Type, GenType
 			)
 import TyVar		( GenTyVar )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
@@ -46,10 +41,7 @@ import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy, addrTy )
 import Unique		( Unique, eqClassOpKey, geClassOpKey, minusClassOpKey )
 import Util		( assertPanic, panic )
-
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-#endif
 \end{code}
 
 \begin{code}
@@ -203,10 +195,10 @@ tcPat pat_in@(RecPatIn name rpats)
 	     -- Ignore the con_theta; overloaded constructors only
 	     -- behave differently when called, not when used for
 	     -- matching.
-	(_, record_ty) = splitFunTy con_tau
+	(_, record_ty) = splitFunTys con_tau
     in
 	-- Con is syntactically constrained to be a data constructor
-    ASSERT( maybeToBool (maybeAppDataTyCon record_ty) )
+    ASSERT( maybeToBool (splitAlgTyConApp_maybe record_ty) )
 
     mapAndUnzipTc (do_bind record_ty) rpats	`thenTc` \ (rpats', lies) ->
 
@@ -221,10 +213,10 @@ tcPat pat_in@(RecPatIn name rpats)
 
 		-- Record selectors all have type
 		-- 	forall a1..an.  T a1 .. an -> tau
-	ASSERT( maybeToBool (getFunTy_maybe tau) )
+	ASSERT( maybeToBool (splitFunTy_maybe tau) )
 	let
 		-- Selector must have type RecordType -> FieldType
-	  Just (record_ty, field_ty) = getFunTy_maybe tau
+	  Just (record_ty, field_ty) = splitFunTy_maybe tau
 	in
 	tcAddErrCtxt (recordLabel field_label) (
 	  unifyTauTy expected_record_ty record_ty
@@ -363,7 +355,7 @@ matchConArgTys con arg_tys
 	     -- behave differently when called, not when used for
 	     -- matching.
     let
-	(con_args, con_result) = splitFunTy con_tau
+	(con_args, con_result) = splitFunTys con_tau
 	con_arity  = length con_args
 	no_of_args = length arg_tys
     in
@@ -380,13 +372,14 @@ matchConArgTys con arg_tys
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-patCtxt pat sty = hang (ptext SLIT("In the pattern:")) 4 (ppr sty pat)
+patCtxt pat = hang (ptext SLIT("In the pattern:")) 
+		 4 (ppr pat)
 
-recordLabel field_label sty
-  = hang (hcat [ptext SLIT("When matching record field"), ppr sty field_label])
+recordLabel field_label
+  = hang (hcat [ptext SLIT("When matching record field"), ppr field_label])
 	 4 (hcat [ptext SLIT("with its immediately enclosing constructor")])
 
-recordRhs field_label pat sty
+recordRhs field_label pat
   = hang (ptext SLIT("In the record field pattern"))
-	 4 (sep [ppr sty field_label, char '=', ppr sty pat])
+	 4 (sep [ppr field_label, char '=', ppr pat])
 \end{code}

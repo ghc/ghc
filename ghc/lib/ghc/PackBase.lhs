@@ -36,9 +36,15 @@ module PackBase
 
 
 	unpackFoldrCString#,  -- **
-	unpackAppendCString#  -- **
+	unpackAppendCString#,  -- **
 
-       ) where
+	new_ps_array,		-- Int# -> ST s (MutableByteArray s Int)
+	write_ps_array,		-- MutableByteArray s Int -> Int# -> Char# -> ST s () 
+	freeze_ps_array		-- MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
+
+
+       ) 
+	where
 
 import PrelBase
 import {-# SOURCE #-} Error ( error )

@@ -4,77 +4,68 @@
 \section[MkIface]{Print an interface for a module}
 
 \begin{code}
-#include "HsVersions.h"
-
 module MkIface (
 	startIface, endIface,
 	ifaceMain,
 	ifaceDecls
     ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(IO(Handle,hPutStr,openFile,hClose,IOMode(..)))
+#include "HsVersions.h"
+
+import IO		( Handle, hPutStr, openFile, hClose, IOMode(..) )
 
 import HsSyn
 import RdrHsSyn		( RdrName(..) )
-import RnHsSyn		( SYN_IE(RenamedHsModule) )
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..) )
+import RnHsSyn		( RenamedHsModule )
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..),
+			  pprModule
+			)
 import RnMonad
 import RnEnv		( availName, ifaceFlavour )
 
 import TcInstUtil	( InstInfo(..) )
+import WorkWrap		( getWorkerIdAndCons )
 
 import CmdLineOpts
 import Id		( idType, dataConRawArgTys, dataConFieldLabels, 
 			  getIdInfo, getInlinePragma, omitIfaceSigForId,
 			  dataConStrictMarks, StrictnessMark(..), 
-			  SYN_IE(IdSet), idSetToList, unionIdSets, unitIdSet, minusIdSet, 
-			  isEmptyIdSet, elementOfIdSet, emptyIdSet, mkIdSet, pprId,
-			  GenId{-instance NamedThing/Outputable-}, SYN_IE(Id)
+			  IdSet, idSetToList, unionIdSets, unitIdSet, minusIdSet, 
+			  isEmptyIdSet, elementOfIdSet, emptyIdSet, mkIdSet,
+			  pprId,
+			  Id
 
 			)
-import IdInfo		( StrictnessInfo, ArityInfo, 
+import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, 
 			  arityInfo, ppArityInfo, strictnessInfo, ppStrictnessInfo, 
-			  workerExists, bottomIsGuaranteed, IdInfo
+			  bottomIsGuaranteed, workerExists, 
 			)
-import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding), GenCoreExpr, GenCoreBinding(..) )
+import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr, GenCoreBinding(..) )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding )
 import FreeVars		( addExprFVs )
-import WorkWrap		( getWorkerIdAndCons )
 import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule, pprOccName,
 			  OccName, occNameString, nameOccName, nameString, isExported,
 			  Name {-instance NamedThing-}, Provenance, NamedThing(..)
 			)
-import TyCon		( TyCon {-instance NamedThing-},
-			  isSynTyCon, isAlgTyCon, isNewTyCon, tyConDataCons,
-			  tyConTheta, tyConTyVars,
-			  getSynTyConDefn
+import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
+			  tyConTheta, tyConTyVars, tyConDataCons
 			)
-import Class		( GenClass(..){-instance NamedThing-}, SYN_IE(Class), classBigSig )
-import FieldLabel	( FieldLabel{-instance NamedThing-}, 
-		          fieldLabelName, fieldLabelType )
-import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitSigmaTy,
-			  mkTyVarTy, SYN_IE(Type)
+import Class		( Class, classBigSig )
+import FieldLabel	( fieldLabelName, fieldLabelType )
+import Type		( mkSigmaTy, splitSigmaTy, mkDictTy,
+			  mkTyVarTys, Type, ThetaType
 		        )
-import TyVar		( GenTyVar {- instance Eq -} )
-import Unique		( Unique {- instance Eq -} )
 
 import PprEnv		-- not sure how much...
-import Outputable	( PprStyle(..), Outputable(..) )
 import PprType
 import PprCore		( pprIfaceUnfolding )
-import Pretty
-import Outputable	( printDoc )
-
 
 import Bag		( bagToList, isEmptyBag )
 import Maybes		( catMaybes, maybeToBool )
 import FiniteMap	( emptyFM, addToFM, addToFM_C, lookupFM, fmToList, eltsFM, FiniteMap )
 import UniqFM		( UniqFM, lookupUFM, listToUFM )
-import Util		( sortLt, zipWithEqual, zipWith3Equal, mapAccumL,
-			  assertPanic, panic{-ToDo:rm-}, pprTrace,
-			  pprPanic 
-			)
+import Util		( sortLt, zipWithEqual, zipWith3Equal, mapAccumL )
+import Outputable
 \end{code}
 
 We have a function @startIface@ to open the output file and put
@@ -155,20 +146,22 @@ ifaceUsages if_hdl import_usages
   = hPutStr if_hdl "_usages_\n"   >>
     hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
   where
-    upp_uses (m, hif, mv, versions)
-      = hsep [upp_module m, pp_hif hif, int mv, ptext SLIT("::"),
-	      upp_import_versions (sort_versions versions)
+    upp_uses (m, hif, mv, whats_imported)
+      = hsep [pprModule m, pp_hif hif, int mv, ptext SLIT("::"),
+	      upp_import_versions whats_imported
 	] <> semi
 
-	-- For imported versions we do print the version number
-    upp_import_versions nvs
-      = hsep [ hsep [ppr_unqual_name n, int v] | (n,v) <- nvs ]
+	-- Importing the whole module is indicated by an empty list
+    upp_import_versions Everything = empty
 
+	-- For imported versions we do print the version number
+    upp_import_versions (Specifically nvs)
+      = hsep [ hsep [ppr_unqual_name n, int v] | (n,v) <- sort_versions nvs ]
 
 ifaceInstanceModules if_hdl [] = return ()
 ifaceInstanceModules if_hdl imods
   = hPutStr if_hdl "_instance_modules_\n" >>
-    printDoc OneLineMode if_hdl (hsep (map ptext (sortLt (<) imods))) >>
+    printForIface if_hdl (hsep (map ptext (sortLt (<) imods))) >>
     hPutStr if_hdl "\n"
 
 ifaceExports if_hdl [] = return ()
@@ -188,7 +181,7 @@ ifaceExports if_hdl avails
 	-- Print one module's worth of stuff
     do_one_module (mod_name, avails@(avail1:_))
 	= hsep [pp_hif (ifaceFlavour (availName avail1)), 
-		upp_module mod_name,
+		pprModule mod_name,
 		hsep (map upp_avail (sortLt lt_avail avails))
 	  ] <> semi
 
@@ -229,12 +222,12 @@ ifaceInstances if_hdl inst_infos
 	-- occurrence, and this makes as good a sort order as any
 
     -------			 
-    pp_inst (InstInfo clas tvs ty theta _ dfun_id _ _ _)
+    pp_inst (InstInfo clas tvs tys theta _ dfun_id _ _ _)
       = let			 
-	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas ty)
+	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas tys)
 	    renumbered_ty = nmbrGlobalType forall_ty
 	in			 
-	hcat [ptext SLIT("instance "), ppr_ty renumbered_ty, 
+	hcat [ptext SLIT("instance "), pprType renumbered_ty, 
 		    ptext SLIT(" = "), ppr_unqual_name dfun_id, semi]
 \end{code}
 
@@ -255,7 +248,7 @@ ifaceId :: (Id -> IdInfo)		-- This function "knows" the extra info added
 	    -> Bool			-- True <=> recursive, so don't print unfolding
 	    -> Id
 	    -> CoreExpr			-- The Id's right hand side
-	    -> Maybe (Doc, IdSet)	-- The emitted stuff, plus a possibly-augmented set of needed Ids
+	    -> Maybe (SDoc, IdSet)	-- The emitted stuff, plus a possibly-augmented set of needed Ids
 
 ifaceId get_idinfo needed_ids is_rec id rhs
   | not (id `elementOfIdSet` needed_ids ||		-- Needed [no id in needed_ids has omitIfaceSigForId]
@@ -269,24 +262,25 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     idinfo         = get_idinfo id
     inline_pragma  = getInlinePragma id 
 
-    ty_pretty  = pprType PprInterface (nmbrGlobalType (idType id))
-    sig_pretty = hcat [ppr PprInterface (getOccName id), ptext SLIT(" _:_ "), ty_pretty]
+    ty_pretty  = pprType (nmbrGlobalType (idType id))
+    sig_pretty = hcat [ppr (getOccName id), ptext SLIT(" _:_ "), ty_pretty]
 
     prag_pretty 
      | opt_OmitInterfacePragmas = empty
      | otherwise		= hsep [arity_pretty, strict_pretty, unfold_pretty, pp_double_semi]
 
     ------------  Arity  --------------
-    arity_pretty  = ppArityInfo PprInterface (arityInfo idinfo)
+    arity_pretty  = ppArityInfo (arityInfo idinfo)
 
     ------------  Strictness  --------------
     strict_info   = strictnessInfo idinfo
     has_worker    = workerExists strict_info
-    strict_pretty = ppStrictnessInfo PprInterface strict_info <+> wrkr_pretty
+    strict_pretty = ppStrictnessInfo strict_info <+> wrkr_pretty
 
     wrkr_pretty | not has_worker = empty
-		| null con_list  = pprId PprInterface work_id
-		| otherwise      = pprId PprInterface work_id <+> braces (hsep (map (pprId PprInterface) con_list))
+		| null con_list  = pprId work_id
+		| otherwise      = pprId work_id <+> 
+				   braces (hsep (map (pprId) con_list))
 
     (work_id, wrapper_cons) = getWorkerIdAndCons id rhs
     con_list 		   = idSetToList wrapper_cons
@@ -338,20 +332,20 @@ ifaceBinds :: Handle
 	   -> IO ()
 
 ifaceBinds hdl needed_ids final_ids binds
-  = mapIO (printDoc OneLineMode hdl) pretties >>
+  = mapIO (printForIface hdl) pretties >>
     hPutStr hdl "\n"
   where
     final_id_map  = listToUFM [(id,id) | id <- final_ids]
     get_idinfo id = case lookupUFM final_id_map id of
 			Just id' -> getIdInfo id'
-			Nothing  -> pprTrace "ifaceBinds not found:" (ppr PprDebug id) $
+			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
 				    getIdInfo id
 
     pretties = go needed_ids (reverse binds)	-- Reverse so that later things will 
 						-- provoke earlier ones to be emitted
     go needed [] = if not (isEmptyIdSet needed) then
 			pprTrace "ifaceBinds: free vars:" 
-				  (sep (map (ppr PprDebug) (idSetToList needed))) $
+				  (sep (map ppr (idSetToList needed))) $
 			[]
 		   else
 			[]
@@ -371,7 +365,7 @@ ifaceBinds hdl needed_ids final_ids binds
 	  needed'' = needed' `minusIdSet` mkIdSet (map fst pairs)
 		-- Later ones may spuriously cause earlier ones to be "needed" again
 
-    go_rec :: IdSet -> [(Id,CoreExpr)] -> (IdSet, [Doc])
+    go_rec :: IdSet -> [(Id,CoreExpr)] -> (IdSet, [SDoc])
     go_rec needed pairs
 	| null pretties = (needed, [])
 	| otherwise	= (final_needed, more_pretties ++ pretties)
@@ -400,32 +394,31 @@ ifaceClasses hdl classes = hPutCol hdl upp_class (sortLt (<) (filter (for_iface_
 for_iface_name name = isLocallyDefined name && 
 		      not (isWiredInName name)
 
-upp_tycon tycon = ifaceTyCon PprInterface tycon
-upp_class clas  = ifaceClass PprInterface clas
+upp_tycon tycon = ifaceTyCon tycon
+upp_class clas  = ifaceClass clas
 \end{code}
 
 
 \begin{code}
-ifaceTyCon :: PprStyle -> TyCon -> Doc	
-
-ifaceTyCon sty tycon
+ifaceTyCon :: TyCon -> SDoc
+ifaceTyCon tycon
   | isSynTyCon tycon
   = hsep [ ptext SLIT("type"),
-	   ppr sty (getName tycon),
-	   hsep (map (pprTyVarBndr sty) tyvars),
+	   ppr (getName tycon),
+	   pprTyVarBndrs tyvars,
 	   ptext SLIT("="),
-	   ppr sty ty,
+	   ppr ty,
 	   semi
     ]
   where
     (tyvars, ty) = getSynTyConDefn tycon
 
-ifaceTyCon sty tycon
+ifaceTyCon tycon
   | isAlgTyCon tycon
   = hsep [ ptext keyword,
-	   ppr_decl_context sty (tyConTheta tycon),
-	   ppr sty (getName tycon),
-	   hsep (map (pprTyVarBndr sty) (tyConTyVars tycon)),
+	   ppr_decl_context (tyConTheta tycon),
+	   ppr (getName tycon),
+	   pprTyVarBndrs (tyConTyVars tycon),
 	   ptext SLIT("="),
 	   hsep (punctuate (ptext SLIT(" | ")) (map ppr_con (tyConDataCons tycon))),
 	   semi
@@ -436,12 +429,12 @@ ifaceTyCon sty tycon
 
     ppr_con data_con 
 	| null field_labels
-	= hsep [ ppr sty name,
+	= hsep [ ppr name,
 		  hsep (map ppr_arg_ty (strict_marks `zip` arg_tys))
 	        ]
 
 	| otherwise
-	= hsep [ ppr sty name,
+	= hsep [ ppr name,
 		  braces $ hsep $ punctuate comma (map ppr_field (strict_marks `zip` field_labels))
 	 	]
           where
@@ -450,7 +443,7 @@ ifaceTyCon sty tycon
            strict_marks   = dataConStrictMarks data_con
 	   name           = getName            data_con
 
-    ppr_arg_ty (strict_mark, ty) = ppr_strict_mark strict_mark <> pprParendType sty ty
+    ppr_arg_ty (strict_mark, ty) = ppr_strict_mark strict_mark <> pprParendType ty
 
     ppr_strict_mark NotMarkedStrict = empty
     ppr_strict_mark MarkedStrict    = ptext SLIT("! ")
@@ -459,25 +452,24 @@ ifaceTyCon sty tycon
 				-- distinction, so "!a" is a valid identifier so far as it is concerned
 
     ppr_field (strict_mark, field_label)
-	= hsep [ ppr sty (fieldLabelName field_label),
+	= hsep [ ppr (fieldLabelName field_label),
 		  ptext SLIT("::"),
-		  ppr_strict_mark strict_mark <> pprParendType sty (fieldLabelType field_label)
+		  ppr_strict_mark strict_mark <> pprParendType (fieldLabelType field_label)
 		]
 
-ifaceTyCon sty tycon
-  = pprPanic "pprIfaceTyDecl" (ppr PprDebug tycon)
+ifaceTyCon tycon
+  = pprPanic "pprIfaceTyDecl" (ppr tycon)
 
-ifaceClass sty clas
+ifaceClass clas
   = hsep [ptext SLIT("class"),
-	   ppr_decl_context sty theta,
-	   ppr sty clas,			-- Print the name
-	   pprTyVarBndr sty clas_tyvar,
+	   ppr_decl_context sc_theta,
+	   ppr clas,			-- Print the name
+	   pprTyVarBndrs clas_tyvars,
 	   pp_ops,
 	   semi
 	  ]
    where
-     (clas_tyvar, super_classes, _, sel_ids, defms) = classBigSig clas
-     theta = super_classes `zip` repeat (mkTyVarTy clas_tyvar)
+     (clas_tyvars, sc_theta, _, sel_ids, defms) = classBigSig clas
 
      pp_ops | null sel_ids  = empty
 	    | otherwise = hsep [ptext SLIT("where"),
@@ -485,23 +477,23 @@ ifaceClass sty clas
 			  ]
 
      ppr_classop sel_id maybe_defm
-	= ASSERT( sel_tyvars == [clas_tyvar])
-	  hsep [ppr sty (getOccName sel_id),
+	= ASSERT( sel_tyvars == clas_tyvars)
+	  hsep [ppr (getOccName sel_id),
 		if maybeToBool maybe_defm then equals else empty,
 	        ptext SLIT("::"),
-		ppr sty op_ty
+		ppr op_ty
 	  ]
 	where
 	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
 
-ppr_decl_context :: PprStyle -> [(Class,Type)] -> Doc
-ppr_decl_context sty [] = empty
-ppr_decl_context sty theta
+ppr_decl_context :: ThetaType -> SDoc
+ppr_decl_context [] = empty
+ppr_decl_context theta
   = braces (hsep (punctuate comma (map (ppr_dict) theta)))
     <> 
     ptext SLIT(" =>")
   where
-    ppr_dict (clas,ty) = hsep [ppr sty clas, ppr sty ty]
+    ppr_dict (clas,tys) = ppr clas <+> hsep (map pprParendType tys)
 \end{code}
 
 %************************************************************************
@@ -528,32 +520,13 @@ upp_avail (AvailTC name ns) = hcat [upp_occname (getOccName name), bang, upp_exp
 upp_export []    = empty
 upp_export names = parens (hsep (map (upp_occname . getOccName) names)) 
 
-upp_fixity (occ, (Fixity prec dir, prov)) = hcat [upp_dir dir, space, 
-						        int prec, space, 
-					       	        upp_occname occ, semi]
-upp_dir InfixR = ptext SLIT("infixr")
-upp_dir InfixL = ptext SLIT("infixl")
-upp_dir InfixN = ptext SLIT("infix")
+upp_fixity (occ, fixity) = hcat [ppr fixity, space, upp_occname occ, semi]
 
-ppr_unqual_name :: NamedThing a => a -> Doc		-- Just its occurrence name
+ppr_unqual_name :: NamedThing a => a -> SDoc		-- Just its occurrence name
 ppr_unqual_name name = upp_occname (getOccName name)
 
-ppr_name :: NamedThing a => a -> Doc		-- Its full name
-ppr_name   n = ptext (nameString (getName n))
-
-upp_occname :: OccName -> Doc
+upp_occname :: OccName -> SDoc
 upp_occname occ = ptext (occNameString occ)
-
-upp_module :: Module -> Doc
-upp_module mod = ptext mod
-
-uppSemid   x = ppr PprInterface x <> semi -- micro util
-
-ppr_ty	  ty = pprType PprInterface ty
-ppr_tyvar tv = ppr PprInterface tv
-ppr_tyvar_bndr tv = pprTyVarBndr PprInterface tv
-
-ppr_decl decl = ppr PprInterface decl <> semi
 \end{code}
 
 
@@ -591,10 +564,10 @@ lt_vers (n1,v1) (n2,v2) = n1 `lt_name` n2
 
 \begin{code}
 hPutCol :: Handle 
-	-> (a -> Doc)
+	-> (a -> SDoc)
 	-> [a]
 	-> IO ()
-hPutCol hdl fmt xs = mapIO (printDoc OneLineMode hdl . fmt) xs
+hPutCol hdl fmt xs = mapIO (printForIface hdl . fmt) xs
 
 mapIO :: (a -> IO b) -> [a] -> IO ()
 mapIO f []     = return ()

@@ -26,49 +26,13 @@ you will screw up the layout where they are used in case expressions!
 #define CAT2(a,b)a/**/b
 #endif
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ == 201
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 202
 # define REALLY_HASKELL_1_3
 # define SYN_IE(a) a
 # define EXP_MODULE(a) module a
 # define IMPORT_DELOOPER(mod) import mod
 # define IMPORT_1_3(mod) import mod
-# define _tagCmp compare
-# define _LT LT
-# define _EQ EQ
-# define _GT GT
-# define _Addr GHCbase.Addr
-# define _ByteArray GHCbase.ByteArray
-# define _MutableByteArray GHCbase.MutableByteArray
-# define _MutableArray GHCbase.MutableArray
-# define _RealWorld GHCbase.RealWorld
-# define _ST GHCbase.ST
-# define _ForeignObj GHCbase.ForeignObj
-# define _runST STbase.runST
-# define failWith fail
-# define MkST ST
-# define STATE_TOK(x)  (S# x)
-# define ST_RET(x,y)   (x,y)
-# define unsafePerformST(x)  unsafePerformPrimIO (x)
-# define ST_TO_PrimIO(x) x
-# define MkIOError(h,errt,msg) (errt msg)
-# define Text Show
-# define IMP_FASTSTRING()
-# define IMP_Ubiq() IMPORT_DELOOPER(Ubiq); import qualified GHCbase
-# define CHK_Ubiq() IMPORT_DELOOPER(Ubiq); import qualified GHCbase
-# define minInt (minBound::Int)
-# define maxInt (maxBound::Int)
-#elif defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 202
-# define REALLY_HASKELL_1_3
-# define SYN_IE(a) a
-# define EXP_MODULE(a) module a
-# define IMPORT_DELOOPER(mod) import mod
-# define IMPORT_1_3(mod) import mod
-# define _CMP_TAG Ordering
-# define _tagCmp compare
-# define _LT LT
-# define _EQ EQ
-# define _GT GT
-# define _Addr GlaExts.Addr
+# define _Addr Addr
 # define _ByteArray GlaExts.ByteArray
 # define _MutableByteArray GlaExts.MutableByteArray
 # define _MutableArray GlaExts.MutableArray
@@ -126,37 +90,19 @@ you will screw up the layout where they are used in case expressions!
 # define MkIOError(h,errt,msg) (errt msg)
 #endif
 
-#if __GLASGOW_HASKELL__ >= 26 && __GLASGOW_HASKELL__ < 200
-#define trace _trace
-#endif
-
-#define TAG_ Int#
-#define LT_ -1#
-#define EQ_ 0#
-#define GT_ 1#
-#define GT__ _
-
 #if defined(__GLASGOW_HASKELL__)
+
+-- Import the beggars
+import GlaExts	( Int(..), Int#, (+#), (-#), (*#), 
+		  quotInt#, negateInt#, (==#), (<#), (<=#), (>=#), (>#)
+		)
+
 #define FAST_INT Int#
 #define ILIT(x) (x#)
 #define IBOX(x) (I# (x))
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-#define _ADD_ `plusInt#`
-#define _SUB_ `minusInt#`
-#define _MUL_ `timesInt#`
-#define _DIV_ `divInt#`
-#define _QUOT_ `quotInt#`
-#define _NEG_ negateInt#
-#define _EQ_ `eqInt#`
-#define _LT_ `ltInt#`
-#define _LE_ `leInt#`
-#define _GE_ `geInt#`
-#define _GT_ `gtInt#`
-#else
 #define _ADD_ +#
 #define _SUB_ -#
 #define _MUL_ *#
-#define _DIV_ /#
 #define _QUOT_ `quotInt#`
 #define _NEG_ negateInt#
 #define _EQ_ ==#
@@ -164,7 +110,6 @@ you will screw up the layout where they are used in case expressions!
 #define _LE_ <=#
 #define _GE_ >=#
 #define _GT_ >#
-#endif
 
 #define FAST_BOOL Int#
 #define _TRUE_ 1#
@@ -196,45 +141,29 @@ you will screw up the layout where they are used in case expressions!
 #endif  {- ! __GLASGOW_HASKELL__ -}
 
 #if __GLASGOW_HASKELL__ >= 23
+
+-- This #ifndef lets us switch off the "import FastString"
+-- when compiling FastString itself
+#ifndef COMPILING_FAST_STRING
+-- 
+import FastString	( FastString, mkFastString, mkFastCharString#, nullFastString, 
+			  consFS, headFS, tailFS, lengthFS, unpackFS, appendFS, concatFS
+			)
+#endif
+
 # define USE_FAST_STRINGS 1
-# if __GLASGOW_HASKELL__ < 200 || __GLASGOW_HASKELL__ >= 202
-#  define FAST_STRING	FastString {-_PackedString -}
-#  if __GLASGOW_HASKELL__ < 200
-#    define SLIT(x)	(mkFastCharString (A# (x#)))
-#  elif __GLASGOW_HASKELL__ < 209
-#    define SLIT(x)	(mkFastCharString (GlaExts.A# (x#)))
-#  else
-#    define SLIT(x)	(mkFastCharString (Addr.A# (x#)))
-#  endif
-#  define _CMP_STRING_	cmpPString
-	/* cmpPString defined in utils/Util.lhs */
-#  define _NULL_	nullFastString {-_nullPS-}
-#  define _NIL_		(mkFastString "") {-_nilPS -}
-#  define _CONS_	consFS {-_consPS-}
-#  define _HEAD_	headFS {-_headPS-}
-#  define _TAIL_	tailFS {-_tailPS-} 
-#  define _LENGTH_	lengthFS {-_lengthPS-}
-#  define _PK_		mkFastString {-_packString-}
-#  define _UNPK_	unpackFS {-_unpackPS-}
-     /* #  define _SUBSTR_	_substrPS */
-#  define _APPEND_	`appendFS` {-`_appendPS`-}
-#  define _CONCAT_	concatFS {-_concatPS-}
-# else
-#  define FAST_STRING	GHCbase.PackedString
-#  define SLIT(x)	(packCString (GHCbase.A# x#))
-#  define _CMP_STRING_	cmpPString
-#  define _NULL_	nullPS
-#  define _NIL_		nilPS
-#  define _CONS_	consPS
-#  define _HEAD_	headPS
-#  define _TAIL_	tailPS
-#  define _LENGTH_	lengthPS
-#  define _PK_		packString
-#  define _UNPK_	unpackPS
-#  define _SUBSTR_	substrPS
-#  define _APPEND_	`appendPS`
-#  define _CONCAT_	concatPS
-# endif
+# define FAST_STRING	FastString
+# define SLIT(x)	(mkFastCharString# (x#))
+# define _NULL_		nullFastString
+# define _NIL_		(mkFastString "")
+# define _CONS_		consFS
+# define _HEAD_		headFS
+# define _TAIL_		tailFS
+# define _LENGTH_	lengthFS
+# define _PK_		mkFastString
+# define _UNPK_		unpackFS
+# define _APPEND_	`appendFS`
+# define _CONCAT_	concatFS
 #else
 # define FAST_STRING String
 # define SLIT(x)      (x)

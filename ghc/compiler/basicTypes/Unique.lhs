@@ -16,10 +16,6 @@ Some of the other hair in this code is to be able to use a
 Haskell).
 
 \begin{code}
-#include "HsVersions.h"
-
---<mkdependHS:friends> UniqSupply
-
 module Unique (
 	Unique, Uniquable(..),
 	u2i,				-- hack: used in UniqFM
@@ -229,18 +225,14 @@ module Unique (
 	, allClassKey
     ) where
 
-#if __GLASGOW_HASKELL__ <= 201
-import PreludeGlaST
-#else
+#include "HsVersions.h"
+
+import FastString	( uniqueOfFS )
 import GlaExts
 import ST
 import PrelBase ( Char(..), chr, ord )
-#endif
-
-IMP_Ubiq(){-uitous-}
 
 import Outputable
-import Pretty
 import Util
 \end{code}
 
@@ -255,9 +247,6 @@ Fast comparison is everything on @Uniques@:
 
 \begin{code}
 data Unique = MkUnique Int#
-
-class Uniquable a where
-    uniqueOf :: a -> Unique
 \end{code}
 
 \begin{code}
@@ -304,6 +293,26 @@ unpkUnique (MkUnique u)
     shiftr x y = shiftRA# x y
 \end{code}
 
+
+
+%************************************************************************
+%*									*
+\subsection[Uniquable-class]{The @Uniquable@ class}
+%*									*
+%************************************************************************
+
+\begin{code}
+class Uniquable a where
+    uniqueOf :: a -> Unique
+
+instance Uniquable FastString where
+ uniqueOf fs = mkUniqueGrimily (uniqueOfFS fs)
+
+instance Uniquable Int where
+ uniqueOf (I# i#) = mkUniqueGrimily i#
+\end{code}
+
+
 %************************************************************************
 %*									*
 \subsection[Unique-instances]{Instance declarations for @Unique@}
@@ -320,7 +329,7 @@ ltUnique (MkUnique u1) (MkUnique u2) = u1 <#  u2
 leUnique (MkUnique u1) (MkUnique u2) = u1 <=# u2
 
 cmpUnique (MkUnique u1) (MkUnique u2)
-  = if u1 ==# u2 then EQ_ else if u1 <# u2 then LT_ else GT_
+  = if u1 ==# u2 then EQ else if u1 <# u2 then LT else GT
 
 instance Eq Unique where
     a == b = eqUnique a b
@@ -331,10 +340,7 @@ instance Ord Unique where
     a <= b = leUnique a b
     a  > b = not (leUnique a b)
     a >= b = not (ltUnique a b)
-    _tagCmp a b = case cmpUnique a b of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
-
-instance Ord3 Unique where
-    cmp = cmpUnique
+    compare a b = cmpUnique a b
 
 -----------------
 instance Uniquable Unique where
@@ -343,7 +349,7 @@ instance Uniquable Unique where
 
 We do sometimes make strings with @Uniques@ in them:
 \begin{code}
-pprUnique, pprUnique10 :: Unique -> Doc
+pprUnique, pprUnique10 :: Unique -> SDoc
 
 pprUnique uniq
   = case unpkUnique uniq of
@@ -360,10 +366,10 @@ finish_ppr 't' u pp_u | u < 26
 finish_ppr tag u pp_u = char tag <> pp_u
 
 showUnique :: Unique -> String
-showUnique uniq = show (pprUnique uniq)
+showUnique uniq = showSDoc (pprUnique uniq)
 
 instance Outputable Unique where
-    ppr sty u = pprUnique u
+    ppr u = pprUnique u
 
 instance Text Unique where
     showsPrec p uniq rest = showUnique uniq
@@ -399,7 +405,7 @@ Code stolen from Lennart.
 # define RETURN	    returnStrictlyST
 #endif
 
-iToBase62 :: Int -> Doc
+iToBase62 :: Int -> SDoc
 
 iToBase62 n@(I# n#)
   = ASSERT(n >= 0)

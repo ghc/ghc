@@ -8,32 +8,26 @@ string from the current Haskell parser is converted.  Given in an
 order that follows the \tr{Prefix_Form} document.
 
 \begin{code}
-#include "HsVersions.h"
-
 module PrefixSyn (
 	RdrBinding(..),
-	SYN_IE(RdrId),
+	RdrId,
 	RdrMatch(..),
-	SYN_IE(SigConverter),
-	SYN_IE(SrcFile),
-	SYN_IE(SrcFun),
-	SYN_IE(SrcLine),
+	SigConverter,
+	SrcFile,
+	SrcFun,
+	SrcLine,
 
 	readInteger
     ) where
 
-IMP_Ubiq()
-IMPORT_1_3(Char(isDigit))
+#include "HsVersions.h"
 
 import HsSyn
 import RdrHsSyn
 import BasicTypes	( IfaceFlavour )
 import Util		( panic )
 import SrcLoc           ( SrcLoc )
-
-#ifdef REALLY_HASKELL_1_3
-ord = fromEnum :: Char -> Int
-#endif
+import Char		( isDigit, ord )
 
 type RdrId   = RdrName
 type SrcLine = Int

@@ -7,11 +7,9 @@ Definitions for: @FixityDecl@, @TyDecl@ and @ConDecl@, @ClassDecl@,
 @InstDecl@, @DefaultDecl@.
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsDecls where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 -- friends:
 import HsBinds		( HsBinds, MonoBinds, Sig, nullMonoBinds )
@@ -19,17 +17,14 @@ import HsPragmas	( DataPragmas, ClassPragmas,
 			  InstancePragmas, ClassOpPragmas
 			)
 import HsTypes
-import IdInfo
-import SpecEnv		( SpecEnv )
 import HsCore		( UfExpr )
 import BasicTypes	( Fixity, NewOrData(..) )
+import IdInfo		( ArgUsageInfo, FBTypeInfo, ArityInfo, UpdateInfo )
+import Demand		( Demand )
 
 -- others:
 import Name		( getOccName, OccName, NamedThing(..) )
-import Outputable	( interppSP, interpp'SP,
-			  PprStyle(..), Outputable(..){-instance * []-}
-			)
-import Pretty
+import Outputable	
 import SrcLoc		( SrcLoc )
 import Util
 \end{code}
@@ -42,52 +37,58 @@ import Util
 %************************************************************************
 
 \begin{code}
-data HsDecl tyvar uvar name pat
+data HsDecl flexi name pat
   = TyD		(TyDecl name)
-  | ClD		(ClassDecl tyvar uvar name pat)
-  | InstD	(InstDecl  tyvar uvar name pat)
+  | ClD		(ClassDecl flexi name pat)
+  | InstD	(InstDecl  flexi name pat)
   | DefD	(DefaultDecl name)
-  | ValD	(HsBinds tyvar uvar name pat)
+  | ValD	(HsBinds flexi name pat)
   | SigD	(IfaceSig name)
 \end{code}
 
 \begin{code}
 #ifdef DEBUG
-hsDeclName :: (NamedThing name, Outputable name, Outputable pat,
-	       Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	   => HsDecl tyvar uvar name pat -> name
+hsDeclName :: (NamedThing name, Outputable name, Outputable pat)
+	   => HsDecl flexi name pat -> name
 #endif
 hsDeclName (TyD (TyData _ _ name _ _ _ _ _))  	  = name
 hsDeclName (TyD (TySynonym name _ _ _))       	  = name
-hsDeclName (ClD (ClassDecl _ name _ _ _ _ _)) 	  = name
+hsDeclName (ClD (ClassDecl _ name _ _ _ _ _ _ _)) = name
 hsDeclName (SigD (IfaceSig name _ _ _))	      	  = name
 hsDeclName (InstD (InstDecl _ _ _ (Just name) _)) = name
 -- Others don't make sense
 #ifdef DEBUG
-hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr PprDebug x)
+hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
 #endif
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	=> Outputable (HsDecl tyvar uvar name pat) where
+instance (NamedThing name, Outputable name, Outputable pat)
+	=> Outputable (HsDecl flexi name pat) where
 
-    ppr sty (TyD td)     = ppr sty td
-    ppr sty (ClD cd)     = ppr sty cd
-    ppr sty (SigD sig)   = ppr sty sig
-    ppr sty (ValD binds) = ppr sty binds
-    ppr sty (DefD def)   = ppr sty def
-    ppr sty (InstD inst) = ppr sty inst
+    ppr (TyD td)     = ppr td
+    ppr (ClD cd)     = ppr cd
+    ppr (SigD sig)   = ppr sig
+    ppr (ValD binds) = ppr binds
+    ppr (DefD def)   = ppr def
+    ppr (InstD inst) = ppr inst
 
 #ifdef DEBUG
-instance (Ord3 name, Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar,
-	  NamedThing name, Outputable name, Outputable pat) => 
-	  Ord3 (HsDecl tyvar uvar name pat) where
+-- hsDeclName needs more context when DEBUG is on
+instance (NamedThing name, Outputable name, Outputable pat, Eq name)
+      => Eq (HsDecl flex name pat) where
+   d1 == d2 = hsDeclName d1 == hsDeclName d2
+	
+instance (NamedThing name, Outputable name, Outputable pat, Ord name)
+      => Ord (HsDecl flex name pat) where
+	d1 `compare` d2 = hsDeclName d1 `compare` hsDeclName d2
 #else
-instance (Ord3 name) => Ord3 (HsDecl tyvar uvar name pat) where
+instance (Eq name) => Eq (HsDecl flex name pat) where
+	d1 == d2 = hsDeclName d1 == hsDeclName d2
+	
+instance (Ord name) => Ord (HsDecl flexi name pat) where
+	d1 `compare` d2 = hsDeclName d1 `compare` hsDeclName d2
 #endif
-  d1 `cmp` d2 = hsDeclName d1 `cmp` hsDeclName d2
 \end{code}
 
 
@@ -101,7 +102,7 @@ instance (Ord3 name) => Ord3 (HsDecl tyvar uvar name pat) where
 data FixityDecl name  = FixityDecl name Fixity SrcLoc
 
 instance Outputable name => Outputable (FixityDecl name) where
-  ppr sty (FixityDecl name fixity loc) = sep [ppr sty fixity, ppr sty name]
+  ppr (FixityDecl name fixity loc) = sep [ppr fixity, ppr name]
 \end{code}
 
 
@@ -136,40 +137,39 @@ data TyDecl name
 instance (NamedThing name, Outputable name)
 	      => Outputable (TyDecl name) where
 
-    ppr sty (TySynonym tycon tyvars mono_ty src_loc)
-      = hang (pp_decl_head sty SLIT("type") empty tycon tyvars)
-	     4 (ppr sty mono_ty)
+    ppr (TySynonym tycon tyvars mono_ty src_loc)
+      = hang (pp_decl_head SLIT("type") empty tycon tyvars)
+	     4 (ppr mono_ty)
 
-    ppr sty (TyData new_or_data context tycon tyvars condecls derivings pragmas src_loc)
-      = pp_tydecl sty
-		  (pp_decl_head sty keyword (pp_context_and_arrow sty context) tycon tyvars)
-		  (pp_condecls sty condecls)
+    ppr (TyData new_or_data context tycon tyvars condecls derivings pragmas src_loc)
+      = pp_tydecl
+		  (pp_decl_head keyword (pp_context_and_arrow context) tycon tyvars)
+		  (pp_condecls condecls)
 		  derivings
       where
 	keyword = case new_or_data of
 			NewType  -> SLIT("newtype")
 			DataType -> SLIT("data")
 
-pp_decl_head sty str pp_context tycon tyvars
-  = hsep [ptext str, pp_context, ppr sty tycon,
-	   interppSP sty tyvars, ptext SLIT("=")]
+pp_decl_head str pp_context tycon tyvars
+  = hsep [ptext str, pp_context, ppr tycon,
+	   interppSP tyvars, ptext SLIT("=")]
 
-pp_condecls sty [] = empty		-- Curious!
-pp_condecls sty (c:cs)
-  = sep (ppr sty c : map (\ c -> (<>) (ptext SLIT("| ")) (ppr sty c)) cs)
+pp_condecls [] = empty		-- Curious!
+pp_condecls (c:cs)
+  = sep (ppr c : map (\ c -> (<>) (ptext SLIT("| ")) (ppr c)) cs)
 
-pp_tydecl sty pp_head pp_decl_rhs derivings
+pp_tydecl pp_head pp_decl_rhs derivings
   = hang pp_head 4 (sep [
 	pp_decl_rhs,
-	case (derivings, sty) of
-	  (Nothing,_) 	   -> empty
-	  (_,PprInterface) -> empty	-- No derivings in interfaces
-	  (Just ds,_)	   -> hsep [ptext SLIT("deriving"), parens (interpp'SP sty ds)]
+	case derivings of
+	  Nothing 	   -> empty
+	  Just ds	   -> hsep [ptext SLIT("deriving"), parens (interpp'SP ds)]
     ])
 
-pp_context_and_arrow :: Outputable name => PprStyle -> Context name -> Doc
-pp_context_and_arrow sty [] = empty
-pp_context_and_arrow sty theta = hsep [pprContext sty theta, ptext SLIT("=>")]
+pp_context_and_arrow :: Outputable name => Context name -> SDoc
+pp_context_and_arrow [] = empty
+pp_context_and_arrow theta = hsep [pprContext theta, ptext SLIT("=>")]
 \end{code}
 
 A type for recording what types a datatype should be specialised to.
@@ -185,8 +185,8 @@ data SpecDataSig name
 instance (NamedThing name, Outputable name)
 	      => Outputable (SpecDataSig name) where
 
-    ppr sty (SpecDataSig tycon ty _)
-      = hsep [text "{-# SPECIALIZE data", ppr sty ty, text "#-}"]
+    ppr (SpecDataSig tycon ty _)
+      = hsep [text "{-# SPECIALIZE data", ppr ty, text "#-}"]
 \end{code}
 
 %************************************************************************
@@ -223,27 +223,27 @@ data BangType name
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
-    ppr sty (ConDecl con cxt con_details  loc)
-      = pp_context_and_arrow sty cxt <+> ppr_con_details sty con con_details
+    ppr (ConDecl con cxt con_details  loc)
+      = pp_context_and_arrow cxt <+> ppr_con_details con con_details
 
-ppr_con_details sty con (InfixCon ty1 ty2)
-  = hsep [ppr_bang sty ty1, ppr sty con, ppr_bang sty ty2]
+ppr_con_details con (InfixCon ty1 ty2)
+  = hsep [ppr_bang ty1, ppr con, ppr_bang ty2]
 
-ppr_con_details sty con (VanillaCon tys)
-  = ppr sty con <+> hsep (map (ppr_bang sty) tys)
+ppr_con_details con (VanillaCon tys)
+  = ppr con <+> hsep (map (ppr_bang) tys)
 
-ppr_con_details sty con (NewCon ty)
-  = ppr sty con <+> pprParendHsType sty ty
+ppr_con_details con (NewCon ty)
+  = ppr con <+> pprParendHsType ty
 
-ppr_con_details sty con (RecCon fields)
-  = ppr sty con <+> braces (hsep (punctuate comma (map ppr_field fields)))
+ppr_con_details con (RecCon fields)
+  = ppr con <+> braces (hsep (punctuate comma (map ppr_field fields)))
   where
-    ppr_field (ns, ty) = hsep (map (ppr sty) ns) <+> 
+    ppr_field (ns, ty) = hsep (map (ppr) ns) <+> 
 			 ptext SLIT("::") <+>
-			 ppr_bang sty ty
+			 ppr_bang ty
 
-ppr_bang sty (Banged   ty) = ptext SLIT("!") <> pprParendHsType sty ty
-ppr_bang sty (Unbanged ty) = pprParendHsType sty ty
+ppr_bang (Banged   ty) = ptext SLIT("!") <> pprParendHsType ty
+ppr_bang (Unbanged ty) = pprParendHsType ty
 \end{code}
 
 %************************************************************************
@@ -253,34 +253,35 @@ ppr_bang sty (Unbanged ty) = pprParendHsType sty ty
 %************************************************************************
 
 \begin{code}
-data ClassDecl tyvar uvar name pat
+data ClassDecl flexi name pat
   = ClassDecl	(Context name)	    		-- context...
 		name		    		-- name of the class
-		(HsTyVar name)	    		-- the class type variable
+		[HsTyVar name]	    		-- the class type variables
 		[Sig name]			-- methods' signatures
-		(MonoBinds tyvar uvar name pat)	-- default methods
+		(MonoBinds flexi name pat)	-- default methods
 		(ClassPragmas name)
+		name name			-- The names of the tycon and datacon for this class
+						-- These are filled in by the renamer
 		SrcLoc
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-		=> Outputable (ClassDecl tyvar uvar name pat) where
+instance (NamedThing name, Outputable name, Outputable pat)
+		=> Outputable (ClassDecl flexi name pat) where
 
-    ppr sty (ClassDecl context clas tyvar sigs methods pragmas src_loc)
+    ppr (ClassDecl context clas tyvars sigs methods pragmas _ _ src_loc)
       | null sigs	-- No "where" part
       = top_matter
 
       | otherwise	-- Laid out
       = sep [hsep [top_matter, ptext SLIT("where {")],
 	       nest 4 (vcat [sep (map ppr_sig sigs),
-				   ppr sty methods,
+				   ppr methods,
 				   char '}'])]
       where
-        top_matter = hsep [ptext SLIT("class"), pp_context_and_arrow sty context,
-                            ppr sty clas, ppr sty tyvar]
-	ppr_sig sig = ppr sty sig <> semi
+        top_matter = hsep [ptext SLIT("class"), pp_context_and_arrow context,
+                            ppr clas, hsep (map (ppr) tyvars)]
+	ppr_sig sig = ppr sig <> semi
 \end{code}
 
 %************************************************************************
@@ -290,12 +291,12 @@ instance (NamedThing name, Outputable name, Outputable pat,
 %************************************************************************
 
 \begin{code}
-data InstDecl tyvar uvar name pat
+data InstDecl flexi name pat
   = InstDecl	(HsType name)	-- Context => Class Instance-type
 				-- Using a polytype means that the renamer conveniently
 				-- figures out the quantified type variables for us.
 
-		(MonoBinds tyvar uvar name pat)
+		(MonoBinds flexi name pat)
 
 		[Sig name]		-- User-supplied pragmatic info
 
@@ -305,19 +306,17 @@ data InstDecl tyvar uvar name pat
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	      => Outputable (InstDecl tyvar uvar name pat) where
+instance (NamedThing name, Outputable name, Outputable pat)
+	      => Outputable (InstDecl flexi name pat) where
 
-    ppr sty (InstDecl inst_ty binds uprags dfun_name src_loc)
-      | case sty of { PprInterface -> True; other -> False} ||
-	nullMonoBinds binds && null uprags
-      = hsep [ptext SLIT("instance"), ppr sty inst_ty]
-
-      | otherwise
-      =	vcat [hsep [ptext SLIT("instance"), ppr sty inst_ty, ptext SLIT("where")],
-	          nest 4 (ppr sty uprags),
-	          nest 4 (ppr sty binds) ]
+    ppr (InstDecl inst_ty binds uprags dfun_name src_loc)
+      = getPprStyle $ \ sty ->
+        if ifaceStyle sty || (nullMonoBinds binds && null uprags) then
+           hsep [ptext SLIT("instance"), ppr inst_ty]
+	else
+	   vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
+	         nest 4 (ppr uprags),
+	         nest 4 (ppr binds) ]
 \end{code}
 
 A type for recording what instances the user wants to specialise;
@@ -332,8 +331,8 @@ data SpecInstSig name
 instance (NamedThing name, Outputable name)
 	      => Outputable (SpecInstSig name) where
 
-    ppr sty (SpecInstSig clas ty _)
-      = hsep [text "{-# SPECIALIZE instance", ppr sty clas, ppr sty ty, text "#-}"]
+    ppr (SpecInstSig clas ty _)
+      = hsep [text "{-# SPECIALIZE instance", ppr clas, ppr ty, text "#-}"]
 \end{code}
 
 %************************************************************************
@@ -354,8 +353,8 @@ data DefaultDecl name
 instance (NamedThing name, Outputable name)
 	      => Outputable (DefaultDecl name) where
 
-    ppr sty (DefaultDecl tys src_loc)
-      = (<>) (ptext SLIT("default ")) (parens (interpp'SP sty tys))
+    ppr (DefaultDecl tys src_loc)
+      = ptext SLIT("default") <+> parens (interpp'SP tys)
 \end{code}
 
 %************************************************************************
@@ -372,9 +371,9 @@ data IfaceSig name
 		SrcLoc
 
 instance (NamedThing name, Outputable name) => Outputable (IfaceSig name) where
-    ppr sty (IfaceSig var ty _ _)
-      = hang (hsep [ppr sty var, ptext SLIT("::")])
-	     4 (ppr sty ty)
+    ppr (IfaceSig var ty _ _)
+      = hang (hsep [ppr var, ptext SLIT("::")])
+	     4 (ppr ty)
 
 data HsIdInfo name
   = HsArity		ArityInfo

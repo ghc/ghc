@@ -4,81 +4,118 @@
 \section[SpecEnv]{Specialisation info about an @Id@}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SpecEnv (
-	SYN_IE(SpecEnv), MatchEnv,
-	nullSpecEnv, isNullSpecEnv,
-	addOneToSpecEnv, lookupSpecEnv
+	SpecEnv,
+	emptySpecEnv, isEmptySpecEnv,
+	addToSpecEnv, matchSpecEnv, unifySpecEnv
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-import MatchEnv
-import Type		--( matchTys, isTyVarTy )
-import Usage		( SYN_IE(UVar) )
-import OccurAnal	( occurAnalyseGlobalExpr )
-import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(SimplifiableCoreExpr) )
-import Maybes		( MaybeErr(..) )
-import TyVar --ToDo:rm
+import Type		( Type, GenType, matchTys, tyVarsOfTypes )
+import TyVar		( TyVar, TyVarEnv, lookupTyVarEnv, tyVarSetToList )
+import Unify		( Subst, unifyTyListsX )
+import Maybes
+import Util		( assertPanic )
 \end{code}
 
 
-A @SpecEnv@ holds details of an @Id@'s specialisations.  It should be
-a newtype (ToDo), but for 1.2 compatibility we make it a data type.
-It can't be a synonym because there's an IdInfo instance of it
-that doesn't work if it's (MatchEnv a b).
-Furthermore, making it a data type makes it easier to break the IdInfo loop.
+
+%************************************************************************
+%*									*
+\section{SpecEnv}
+%*									*
+%************************************************************************
 
 \begin{code}
-data SpecEnv = SpecEnv (MatchEnv [Type] SimplifiableCoreExpr)
+data SpecEnv value 
+  = EmptySE 
+  | SpecEnv [([Type], value)]	-- No pair of templates unify with each others
 \end{code}
 
-For example, if \tr{f}'s @SpecEnv@ contains the mapping:
-\begin{verbatim}
-	[List a, b]  ===>  (\d -> f' a b)
-\end{verbatim}
-then when we find an application of f to matching types, we simply replace
-it by the matching RHS:
-\begin{verbatim}
-	f (List Int) Bool ===>  (\d -> f' Int Bool)
-\end{verbatim}
-All the stuff about how many dictionaries to discard, and what types
-to apply the specialised function to, are handled by the fact that the
-SpecEnv contains a template for the result of the specialisation.
-
-There is one more exciting case, which is dealt with in exactly the same
-way.  If the specialised value is unboxed then it is lifted at its
-definition site and unlifted at its uses.  For example:
-
-	pi :: forall a. Num a => a
-
-might have a specialisation
-
-	[Int#] ===>  (case pi' of Lift pi# -> pi#)
-
-where pi' :: Lift Int# is the specialised version of pi.
-
+For now we just use association lists.
 
 \begin{code}
-nullSpecEnv :: SpecEnv
-nullSpecEnv = SpecEnv nullMEnv
+emptySpecEnv :: SpecEnv a
+emptySpecEnv = EmptySE
 
-isNullSpecEnv :: SpecEnv -> Bool
-isNullSpecEnv (SpecEnv env) = null (mEnvToList env)
-
-addOneToSpecEnv :: SpecEnv -> [Type] -> CoreExpr -> MaybeErr SpecEnv ([Type], SimplifiableCoreExpr)
-addOneToSpecEnv (SpecEnv env) tys rhs 
-  = --pprTrace "addOneToSpecEnv" (($$) (ppr PprDebug tys) (ppr PprDebug rhs)) $
-    case (insertMEnv matchTys env tys (occurAnalyseGlobalExpr rhs)) of
-	Succeeded menv -> Succeeded (SpecEnv menv)
-	Failed err     -> Failed err
-
-lookupSpecEnv :: SpecEnv -> [Type] -> Maybe (SimplifiableCoreExpr, ([(TyVar,Type)], [Type]))
-lookupSpecEnv (SpecEnv env) tys 
-  | all isTyVarTy tys = Nothing	-- Short cut: no specialisation for simple tyvars
-  | otherwise	      = --pprTrace "lookupSpecEnv" (ppr PprDebug tys) $
-			lookupMEnv matchTys env tys
+isEmptySpecEnv EmptySE = True
+isEmptySpecEnv _       = False
 \end{code}
 
+@lookupSpecEnv@ looks up in a @SpecEnv@.  Since no pair of templates
+unify, the first match must be the only one.
 
+\begin{code}
+data SpecEnvResult val
+  = Match Subst	val	-- Match, instantiating only
+			-- type variables in the template
+
+  | CouldMatch		-- A match could happen if the
+			-- some of the type variables in the key
+			-- were further instantiated.
+
+  | NoMatch		-- No match possible, regardless of how
+			-- the key is further instantiated
+
+-- If the key *unifies* with one of the templates, then the
+-- result is Match or CouldMatch, depending on whether any of the 
+-- type variables in the key had to be instantiated
+
+unifySpecEnv :: SpecEnv value	-- The envt
+	      -> [Type]		-- Key
+	      -> SpecEnvResult value
+		     
+
+unifySpecEnv EmptySE key = NoMatch
+unifySpecEnv (SpecEnv alist) key
+  = find alist
+  where
+    find [] = NoMatch
+    find ((tpl, val) : rest)
+      = case unifyTyListsX tpl key of
+	  Nothing    -> find rest
+	  Just subst |  all uninstantiated (tyVarSetToList (tyVarsOfTypes key)) 
+		     -> Match subst val
+	             |  otherwise
+		     -> CouldMatch
+		     where
+		       uninstantiated tv = case lookupTyVarEnv subst tv of
+					     Just xx -> False
+					     Nothing -> True
+
+-- matchSpecEnv does a one-way match only, but in return
+-- it is more polymorphic than unifySpecEnv
+
+matchSpecEnv :: SpecEnv value	-- The envt
+	     -> [GenType flexi]		-- Key
+	     -> Maybe (TyVarEnv (GenType flexi), value)
+		     
+matchSpecEnv EmptySE key = Nothing
+matchSpecEnv (SpecEnv alist) key
+  = find alist
+  where
+    find [] = Nothing
+    find ((tpl, val) : rest)
+      = case matchTys tpl key of
+	  Nothing    -> find rest
+	  Just (subst, leftovers) -> ASSERT( null leftovers )
+				     Just (subst, val)
+\end{code}
+
+@addToSpecEnv@ extends a @SpecEnv@, checking for overlaps.
+
+\begin{code}
+addToSpecEnv :: SpecEnv value			-- Envt
+	      -> [Type] -> value		-- New item
+	      -> MaybeErr (SpecEnv value)	-- Success...
+		          ([Type], value)	-- Failure: Offending overlap
+
+addToSpecEnv EmptySE         key value = returnMaB (SpecEnv [(key, value)])
+addToSpecEnv (SpecEnv alist) key value
+  = case filter matches_key alist of
+      []        -> returnMaB (SpecEnv ((key,value) : alist))	-- No match
+      (bad : _) -> failMaB bad					-- At least one match
+  where
+    matches_key (tpl, val) = maybeToBool (unifyTyListsX tpl key)
+\end{code}

@@ -98,8 +98,6 @@ Relative to John's original paper, there are the following new features:
 
 
 \begin{code}
-#include "HsVersions.h"
-
 module Pretty (
 	Doc, 		-- Abstract
 	Mode(..), TextDetails(..),
@@ -124,21 +122,9 @@ module Pretty (
   ) where
 
 #include "HsVersions.h"
-#if defined(__GLASGOW_HASKELL__)
 
 import FastString
-
-#if __GLASGOW_HASKELL__ >= 202
-
 import GlaExts
-
-#else
-
-	-- Horrible import to satisfy GHC 0.29
-import Ubiq		( Unique, Uniquable(..), Name )
-
-#endif
-#endif
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
 

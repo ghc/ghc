@@ -7,8 +7,6 @@ This module provides the functions to access (\tr{get*} functions) and
 modify (\tr{set*} functions) the stacks and heap usage information.
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgUsages (
 	initHeapUsage, setVirtHp, getVirtAndRealHp, setRealHp,
 	setRealAndVirtualSps,
@@ -20,19 +18,16 @@ module CgUsages (
 	freeBStkSlot
     ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(CgLoop1)	-- here for paranoia-checking
-#endif
+#include "HsVersions.h"
 
 import AbsCSyn		( RegRelative(..), AbstractC, CAddrMode )
 import CgMonad
 import HeapOffs		( zeroOff,
-			  SYN_IE(VirtualHeapOffset),
-			  SYN_IE(VirtualSpAOffset),
-			  SYN_IE(VirtualSpBOffset)
+			  VirtualHeapOffset,
+			  VirtualSpAOffset,
+			  VirtualSpBOffset
 			)
-import Id		( SYN_IE(IdEnv) )
+import Id		( IdEnv )
 \end{code}
 
 %************************************************************************

@@ -4,8 +4,6 @@
 \section[Bags]{@Bag@: an unordered collection with duplicates}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Bag (
 	Bag,	-- abstract type
 
@@ -17,12 +15,14 @@ module Bag (
 	listToBag, bagToList
     ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(List(partition))
+#include "HsVersions.h"
 
-import Outputable	--( interpp'SP )
-import Pretty
+import Outputable
+import List		( partition )
+\end{code}
 
+
+\begin{code}
 data Bag a
   = EmptyBag
   | UnitBag	a
@@ -149,10 +149,10 @@ bagToList b = foldrBag (:) [] b
 
 \begin{code}
 instance (Outputable a) => Outputable (Bag a) where
-    ppr sty EmptyBag	    = ptext SLIT("emptyBag")
-    ppr sty (UnitBag a)     = ppr sty a
-    ppr sty (TwoBags b1 b2) = hsep [ppr sty b1 <> comma, ppr sty b2]
-    ppr sty (ListBag as)    = interpp'SP sty as
-    ppr sty (ListOfBags bs) = brackets (interpp'SP sty bs)
+    ppr EmptyBag	= ptext SLIT("emptyBag")
+    ppr (UnitBag a)     = ppr a
+    ppr (TwoBags b1 b2) = hsep [ppr b1 <> comma, ppr b2]
+    ppr (ListBag as)    = interpp'SP as
+    ppr (ListOfBags bs) = brackets (interpp'SP bs)
 
 \end{code}

@@ -10,11 +10,10 @@
 96/03: We aren't using the static-argument transformation right now.
 
 \begin{code}
-#include "HsVersions.h"
-
 module SATMonad where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
+
 import Util		( panic )
 
 junk_from_SATMonad = panic "SATMonad.junk"
@@ -31,9 +30,9 @@ module SATMonad (
     ) where
 
 import Type		( mkTyVarTy, mkSigmaTy, TyVarTemplate,
-			  splitSigmaTy, splitFunTy,
-			  glueTyArgs, instantiateTy, SYN_IE(TauType),
-			  Class, SYN_IE(ThetaType), SYN_IE(SigmaType),
+			  splitSigmaTy, splitFunTys,
+			  glueTyArgs, instantiateTy, TauType,
+			  Class, ThetaType, SigmaType,
 			  InstTyEnv(..)
 			)
 import Id		( mkSysLocal, idType )
@@ -145,7 +144,7 @@ newSATName id ty us env
 getArgLists :: CoreExpr -> ([Arg Type],[Arg Id])
 getArgLists expr
   = let
-	(uvs, tvs, lambda_bounds, body) = collectBinders expr
+	(tvs, lambda_bounds, body) = collectBinders expr
     in
     ([ Static (mkTyVarTy tv) | tv <- tvs ],
      [ Static v		     | v <- lambda_bounds ])
@@ -239,7 +238,7 @@ saTransform binder rhs
       where
 	-- get type info for the local function:
 	(tv_tmpl, dict_tys, tau_ty) = (splitSigmaTy . idType) binder
-	(reg_arg_tys, res_type)	    = splitFunTy tau_ty
+	(reg_arg_tys, res_type)	    = splitFunTys tau_ty
 
 	-- now, we drop the ones that are
 	-- static, that is, the ones we will not pass to the local function
@@ -249,8 +248,8 @@ saTransform binder rhs
 	reg_arg_tys' = dropStatics (drop l args) reg_arg_tys
 	tau_ty'	     = glueTyArgs reg_arg_tys' res_type
 
-	mk_inst_tyenv []		    _ = []
-	mk_inst_tyenv (Static s:args) (t:ts)  = (t,s) : mk_inst_tyenv args ts
+	mk_inst_tyenv []		    _ = emptyTyVarEnv
+	mk_inst_tyenv (Static s:args) (t:ts)  = addToTyVarEnv (mk_inst_tyenv args ts) t s
 	mk_inst_tyenv (_:args)	    (_:ts)    = mk_inst_tyenv args ts
 
 dropStatics [] t = t

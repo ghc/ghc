@@ -6,7 +6,12 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
-#include "HsVersions.h"
+
+{-# OPTIONS -fno-prune-tydecls #-}
+-- Don't really understand this!
+-- ERROR: Can't see the data constructor(s) for _ccall_/_casm_  argument; 
+-- type: ForeignObj(try compiling with -fno-prune-tydecls ..)
+
 
 module StringBuffer
        (
@@ -56,32 +61,20 @@ module StringBuffer
         lexemeToBuffer,     -- :: StringBuffer -> StringBuffer
 
         FastString,
-	_ByteArray
+	ByteArray
        ) where
 
-#if __GLASGOW_HASKELL__ <= 200
-import PreludeGlaST
-import PreludeGlaMisc
-import HandleHack
-import Ubiq
-#else
+#include "HsVersions.h"
+
 import GlaExts
+import Addr 		( Addr(..) )
 import Foreign
 import IOBase
 import IOHandle
 import ST
 import STBase
-import Char (isDigit)
-# if __GLASGOW_HASKELL__ == 202
-import PrelBase ( Char(..) )
-# endif
-# if __GLASGOW_HASKELL__ >= 206
+import Char 		(isDigit)
 import PackBase 
-# endif
-# if __GLASGOW_HASKELL__ >= 209
-import Addr
-# endif
-#endif
 import PrimPacked
 import FastString
 
@@ -112,36 +105,36 @@ hGetStringBuffer fname =
       -- Allocate an array for system call to store its bytes into.
       -- ToDo: make it robust
 --    trace (show ((len_i::Int)+1)) $
-    (_casm_ `` %r=(char *)malloc(sizeof(char)*(int)%0); '' (len_i::Int))  `CCALL_THEN` \ arr@(A# a#) ->
+    _casm_ `` %r=(char *)malloc(sizeof(char)*(int)%0); '' (len_i::Int)  >>= \ arr@(A# a#) ->
     if addr2Int# a# ==# 0# then
        failWith MkIOError(hndl,UserError,("hGetStringBuffer: Could not allocate "++show len_i ++ " bytes"))
     else
 
---   _casm_ `` %r=NULL; ''		                     `thenPrimIO` \ free_p ->
---    makeForeignObj arr free_p		                     `thenPrimIO` \ fo@(_ForeignObj fo#) ->
-     _readHandle hndl        >>= \ hndl_ ->
-     _writeHandle hndl hndl_ >>
+--   _casm_ `` %r=NULL; ''		                     >>= \ free_p ->
+--    makeForeignObj arr free_p		                     >>= \ fo@(_ForeignObj fo#) ->
+     readHandle hndl        >>= \ hndl_ ->
+     writeHandle hndl hndl_ >>
      let ptr = _filePtr hndl_ in
-     _ccall_ fread arr (1::Int) len_i ptr                     `CCALL_THEN` \  (I# read#) ->
+     _ccall_ fread arr (1::Int) len_i ptr                     >>= \  (I# read#) ->
 --     trace ("DEBUG: opened " ++ fname ++ show (I# read#)) $
      hClose hndl		     >>
      if read# ==# 0# then -- EOF or other error
         failWith MkIOError(hndl,UserError,"hGetStringBuffer: EOF reached or some other error")
      else
         -- Add a sentinel NUL
-        _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' arr (I# (read# -# 1#)) `CCALL_THEN` \ () ->
+        _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' arr (I# (read# -# 1#)) >>= \ () ->
         return (StringBuffer a# read# 0# 0#)
 
 freeStringBuffer :: StringBuffer -> IO ()
 freeStringBuffer (StringBuffer a# _ _ _) =
- _casm_ `` free((char *)%0); '' (A# a#) `CCALL_THEN` \ () ->
- return ()
+ _casm_ `` free((char *)%0); '' (A# a#)
 
 unsafeWriteBuffer :: StringBuffer -> Int# -> Char# -> StringBuffer
 unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
- unsafePerformPrimIO (
-   _casm_ `` ((char *)%0)[(int)%1]=(char)%2; '' (A# a) (I# i#) (C# ch#) `thenPrimIO` \ () ->
-   returnPrimIO s)
+ unsafePerformIO (
+   _casm_ `` ((char *)%0)[(int)%1]=(char)%2; '' (A# a) (I# i#) (C# ch#) >>= \ () ->
+   return s
+ )
 
 \end{code}
 

@@ -4,8 +4,6 @@
 \section[SaAbsInt]{Abstract interpreter for strictness analysis}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SaAbsInt (
 	findStrictness,
 	findDemand,
@@ -15,35 +13,33 @@ module SaAbsInt (
 	isBot
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
 import CoreUnfold	( Unfolding(..), UfExpr, RdrName, SimpleUnfolding(..), FormSummary )
 import CoreUtils	( unTagBinders )
 import Id		( idType, getIdStrictness, getIdUnfolding,
-			  dataConTyCon, dataConArgTys, SYN_IE(Id)
+			  dataConTyCon, dataConArgTys, Id
 			)
 import IdInfo		( StrictnessInfo(..) )
 import Demand		( Demand(..), wwPrim, wwStrict, wwEnum, wwUnpackData, wwUnpackNew )
 import MagicUFs		( MagicUnfoldingFun )
 import Maybes		( maybeToBool )
-import Outputable	
-import Pretty		--TEMP:( Doc, ptext )
 import PrimOp		( PrimOp(..) )
 import SaLib
-import TyCon		( maybeTyConSingleCon, isEnumerationTyCon, isNewTyCon, 
+import TyCon		( isProductTyCon, isEnumerationTyCon, isNewTyCon, 
 			  TyCon{-instance Eq-}
 			)
 import BasicTypes	( NewOrData(..) )
-import Type		( maybeAppDataTyConExpandingDicts, 
-		          isPrimType, SYN_IE(Type) )
+import Type		( splitAlgTyConApp_maybe, 
+		          isUnpointedType, Type )
 import TysWiredIn	( intTyCon, integerTyCon, doubleTyCon,
 			  floatTyCon, wordTyCon, addrTyCon
 			)
-import Util		( isIn, isn'tIn, nOfThem, zipWithEqual,
-			  pprTrace, panic, pprPanic, assertPanic
-			)
+import Util		( isIn, isn'tIn, nOfThem, zipWithEqual )
+import GlaExts		( trace )
+import Outputable	
 
 returnsRealWorld x = False -- ToDo: panic "SaAbsInt.returnsRealWorld (ToDo)"
 \end{code}
@@ -165,7 +161,7 @@ combineCaseValues AbsAnal other_scrutinee branches
 
 	tracer = if at_least_one_AbsFun && at_least_one_AbsTop
 		    && no_AbsBots then
-		    pprTrace "combineCase:" (ppr PprDebug branches)
+		    pprTrace "combineCase:" (ppr branches)
 		 else
 		    id
     in
@@ -359,7 +355,7 @@ evalStrictness WwPrim val
 
       other  ->   -- A primitive value should be defined, never bottom;
 		  -- hence this paranoia check
-		pprPanic "evalStrictness: WwPrim:" (ppr PprDebug other)
+		pprPanic "evalStrictness: WwPrim:" (ppr other)
 \end{code}
 
 For absence analysis, we're interested in whether "poison" in the
@@ -438,7 +434,7 @@ absId anal var env
 			-- Try the strictness info
 			absValFromStrictness anal strictness_info
     in
-    -- pprTrace "absId:" (hcat [ppr PprDebug var, ptext SLIT("=:"), pp_anal anal, text SLIT(":="),ppr PprDebug result]) $
+    -- pprTrace "absId:" (hcat [ppr var, ptext SLIT("=:"), pp_anal anal, text SLIT(":="),ppr result]) $
     result
   where
     pp_anal StrAnal = ptext SLIT("STR")
@@ -507,8 +503,8 @@ absEval AbsAnal (Prim op as) env
 	-- For absence analysis, we want to see if the poison shows up...
 
 absEval anal (Con con as) env
-  | has_single_con
-  = --pprTrace "absEval.Con" (cat[ text "con: ", (ppr PprDebug con), text "args: ", interppSP PprDebug as]) $
+  | isProductTyCon (dataConTyCon con)
+  = --pprTrace "absEval.Con" (cat[ text "con: ", (ppr con), text "args: ", interppSP as]) $
     AbsProd [absEvalAtom anal a env | a <- as, isValArg a]
 
   | otherwise	-- Not single-constructor
@@ -521,8 +517,6 @@ absEval anal (Con con as) env
 		   if any anyBot [absEvalAtom AbsAnal a env | a <- as, isValArg a]
 		   then AbsBot
 		   else AbsTop
-  where
-    has_single_con = maybeToBool (maybeTyConSingleCon (dataConTyCon con))
 \end{code}
 
 \begin{code}
@@ -565,7 +559,7 @@ absEval anal (Case expr (AlgAlts alts deflt)) env
 {-
     (case anal of
 	StrAnal -> id
-	_ -> pprTrace "absCase:ABS:" (($$) (hsep [ppr PprDebug expr, ppr PprDebug result, ppr PprDebug expr_val, ppr PprDebug abs_deflt, ppr PprDebug abs_alts]) (ppr PprDebug (keysFM env `zip` eltsFM env)))
+	_ -> pprTrace "absCase:ABS:" (($$) (hsep [ppr expr, ppr result, ppr expr_val, ppr abs_deflt, ppr abs_alts]) (ppr (keysFM env `zip` eltsFM env)))
     )
 -}
     result
@@ -701,7 +695,7 @@ absApply AbsAnal (AbsApproxFun demand val) arg
     else val
 
 #ifdef DEBUG
-absApply anal f@(AbsProd _)       arg = pprPanic ("absApply: Duff function: AbsProd." ++ show anal) ((ppr PprDebug f) <+> (ppr PprDebug arg))
+absApply anal f@(AbsProd _)       arg = pprPanic ("absApply: Duff function: AbsProd." ++ show anal) ((ppr f) <+> (ppr arg))
 #endif
 \end{code}
 
@@ -739,7 +733,7 @@ findStrictness [] str_val abs_val = []
 
 findStrictness (ty:tys) str_val abs_val
   = let
-	demand 	     = findRecDemand [] str_fn abs_fn ty
+	demand 	     = findRecDemand str_fn abs_fn ty
 	str_fn val   = absApply StrAnal str_val val
 	abs_fn val   = absApply AbsAnal abs_val val
 
@@ -753,14 +747,14 @@ findStrictness (ty:tys) str_val abs_val
 
 \begin{code}
 findDemandStrOnly str_env expr binder 	-- Only strictness environment available
-  = findRecDemand [] str_fn abs_fn (idType binder)
+  = findRecDemand str_fn abs_fn (idType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = AbsBot		-- Always says poison; so it looks as if
 				-- nothing is absent; safe
 
 findDemandAbsOnly abs_env expr binder 	-- Only absence environment available
-  = findRecDemand [] str_fn abs_fn (idType binder)
+  = findRecDemand str_fn abs_fn (idType binder)
   where
     str_fn val = AbsBot		-- Always says non-termination;
 				-- that'll make findRecDemand peer into the
@@ -769,7 +763,7 @@ findDemandAbsOnly abs_env expr binder 	-- Only absence environment available
 
 
 findDemand str_env abs_env expr binder
-  = findRecDemand [] str_fn abs_fn (idType binder)
+  = findRecDemand str_fn abs_fn (idType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
@@ -808,15 +802,13 @@ then we'd let-to-case it:
 Ho hum.
 
 \begin{code}
-findRecDemand :: [TyCon]	    -- TyCons already seen; used to avoid
-				    -- zooming into recursive types
-	      -> (AbsVal -> AbsVal) -- The strictness function
+findRecDemand :: (AbsVal -> AbsVal) -- The strictness function
 	      -> (AbsVal -> AbsVal) -- The absence function
 	      -> Type 	    -- The type of the argument
 	      -> Demand
 
-findRecDemand seen str_fn abs_fn ty
-  = if isPrimType ty then -- It's a primitive type!
+findRecDemand str_fn abs_fn ty
+  = if isUnpointedType ty then -- It's a primitive type!
        wwPrim
 
     else if not (anyBot (abs_fn AbsBot)) then -- It's absent
@@ -830,13 +822,12 @@ findRecDemand seen str_fn abs_fn ty
 
     else -- It's strict (or we're pretending it is)!
 
-       case (maybeAppDataTyConExpandingDicts ty) of
+       case (splitAlgTyConApp_maybe ty) of
 
 	 Nothing    -> wwStrict
 
-	 Just (tycon,tycon_arg_tys,[data_con]) | tycon `not_elem` seen ->
-	   -- Single constructor case, tycon not already seen higher up
-
+	 Just (tycon,tycon_arg_tys,[data_con]) | isProductTyCon tycon ->
+	   -- Non-recursive, single constructor case
 	   let
 	      cmpnt_tys = dataConArgTys data_con tycon_arg_tys
 	      prod_len = length cmpnt_tys
@@ -845,7 +836,7 @@ findRecDemand seen str_fn abs_fn ty
 	   if isNewTyCon tycon then	-- A newtype!
 		ASSERT( null (tail cmpnt_tys) )
 		let
-		    demand = findRecDemand (tycon:seen) str_fn abs_fn (head cmpnt_tys)
+		    demand = findRecDemand str_fn abs_fn (head cmpnt_tys)
 		in
 		case demand of		-- No point in unpacking unless there is more to see inside
 		  WwUnpack _ _ _ -> wwUnpackNew demand
@@ -854,7 +845,7 @@ findRecDemand seen str_fn abs_fn ty
 	   else				-- A data type!
 	   let
 	      compt_strict_infos
-		= [ findRecDemand (tycon:seen)
+		= [ findRecDemand
 			 (\ cmpnt_val ->
 			       str_fn (mkMainlyTopProd prod_len i cmpnt_val)
 			 )
@@ -868,8 +859,6 @@ findRecDemand seen str_fn abs_fn ty
 		 if isEnumerationTyCon tycon then wwEnum else wwStrict
 	   else
 		 wwUnpackData compt_strict_infos
-	  where
-	   not_elem = isn'tIn "findRecDemand"
 
 	 Just (tycon,_,_) ->
 		-- Multi-constr data types, *or* an abstract data
@@ -882,7 +871,7 @@ findRecDemand seen str_fn abs_fn ty
 		wwStrict
   where
     is_numeric_type ty
-      = case (maybeAppDataTyConExpandingDicts ty) of -- NB: duplicates stuff done above
+      = case (splitAlgTyConApp_maybe ty) of -- NB: duplicates stuff done above
 	  Nothing -> False
 	  Just (tycon, _, _)
 	    | tycon `is_elem`

@@ -4,8 +4,6 @@
 \section[ListSetOps]{Set-like operations on lists}
 
 \begin{code}
-#include "HsVersions.h"
-
 module ListSetOps (
 	unionLists,
 	--UNUSED: intersectLists,
@@ -13,13 +11,10 @@ module ListSetOps (
 
    ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import Util	( isIn, isn'tIn )
-
-#if __GLASGOW_HASKELL__ >= 202
-import List
-#endif
+import List	( union )
 \end{code}
 
 \begin{code}

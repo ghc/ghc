@@ -5,40 +5,33 @@
 
 \begin{code}
 
-#include "HsVersions.h"
 
-module Check ( check , SYN_IE(ExhaustivePat), SYN_IE(WarningPat), BoxedString(..) ) where
+module Check ( check , ExhaustivePat, WarningPat, BoxedString(..) ) where
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(DsLoop)	-- here for paranoia-checking reasons
-			-- and to break dsExpr/dsBinds-ish loop
-#else
+
 import {-# SOURCE #-} DsExpr  ( dsExpr  )
 import {-# SOURCE #-} DsBinds ( dsBinds )
-#endif
 
 import HsSyn		
-import TcHsSyn		( SYN_IE(TypecheckedPat), 
-                          SYN_IE(TypecheckedMatch),
-			  SYN_IE(TypecheckedHsBinds), 
-                          SYN_IE(TypecheckedHsExpr)	
+import TcHsSyn		( TypecheckedPat, 
+                          TypecheckedMatch,
+			  TypecheckedHsBinds, 
+                          TypecheckedHsExpr	
                         )
 import DsHsSyn		( outPatType ) 
 import CoreSyn		
 
-import DsMonad		( SYN_IE(DsM), DsMatchContext(..),
+import DsMonad		( DsM, DsMatchContext(..),
 			  DsMatchKind(..)
                         )
 import DsUtils		( EquationInfo(..),
 			  MatchResult(..),
-			  SYN_IE(EqnNo),
-			  SYN_IE(EqnSet),
+			  EqnNo,
+			  EqnSet,
 			  CanItFail(..)
  			)
 import Id		( idType,
-			  GenId{-instance-}, 
-                          SYN_IE(Id),
+			  Id,
 			  idName,
                           isTupleCon,			   
                           getIdArity
@@ -52,19 +45,11 @@ import Name             ( occNameString,
                           getOccName,
                           getOccString
                         )
-import Outputable	( PprStyle(..),
-                          Outputable(..)
+import Type		( Type, 
+                          isUnboxedType, 
+                          splitTyConApp_maybe
 			)
-import PprType		( GenType{-instance-}, 
-                          GenTyVar{-ditto-} 
-                        )        
-import Pretty		
-import Type		( isPrimType, 
-                          eqTy, 
-                          SYN_IE(Type), 
-                          getAppTyCon
-			)
-import TyVar		( GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
+import TyVar		( TyVar )
 import TysPrim		( intPrimTy, 
                           charPrimTy, 
                           floatPrimTy, 
@@ -84,11 +69,10 @@ import TysWiredIn	( nilDataCon, consDataCon,
 			)
 import TyCon            ( tyConDataCons )
 import UniqSet
-import Unique		( Unique{-instance Eq-} )
-import Util		( pprTrace, 
-                          panic, 
-                          pprPanic 
-                        )
+import Unique		( Unique )
+import Outputable
+
+#include "HsVersions.h"
 \end{code}
 
 This module perfoms checks about if one list of equations are:
@@ -140,7 +124,7 @@ type ExhaustivePat = ([WarningPat], [(BoxedString, [HsLit])])
 
 
 instance Outputable BoxedString where
-    ppr sty (BS s) = text s
+    ppr (BS s) = text s
 
 
 check :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
@@ -390,7 +374,7 @@ get_unused_cons :: [TypecheckedPat] -> [Id]
 get_unused_cons used_cons = unused_cons
      where
        (ConPat _ ty _) = head used_cons
-       (ty_con,_)      = getAppTyCon ty
+       Just (ty_con,_) = splitTyConApp_maybe ty
        all_cons        = tyConDataCons ty_con
        used_cons_as_id = map (\ (ConPat id _ _) -> id) used_cons
        unused_cons     = uniqSetToList (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
@@ -562,23 +546,23 @@ simplify_pat (RecPat id ty idps) = ConPat id ty pats
                                    pats = map (\ (id,p,_)-> simplify_pat p) idps
 
 simplify_pat pat@(LitPat lit lit_ty) 
-  | isPrimType lit_ty = LitPat lit lit_ty
+  | isUnboxedType lit_ty = LitPat lit lit_ty
 
-  | lit_ty `eqTy` charTy = ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy]
+  | lit_ty == charTy = ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy]
 
-  | otherwise = pprPanic "tidy1:LitPat:" (ppr PprDebug pat)
+  | otherwise = pprPanic "tidy1:LitPat:" (ppr pat)
   where
     mk_char (HsChar c)    = HsCharPrim c
 
 simplify_pat (NPat lit lit_ty hsexpr) = better_pat
   where
     better_pat
-      | lit_ty `eqTy` charTy   = ConPat charDataCon   lit_ty [LitPat (mk_char lit)   charPrimTy]
-      | lit_ty `eqTy` intTy    = ConPat intDataCon    lit_ty [LitPat (mk_int lit)    intPrimTy]
-      | lit_ty `eqTy` wordTy   = ConPat wordDataCon   lit_ty [LitPat (mk_word lit)   wordPrimTy]
-      | lit_ty `eqTy` addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
-      | lit_ty `eqTy` floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
-      | lit_ty `eqTy` doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
+      | lit_ty == charTy   = ConPat charDataCon   lit_ty [LitPat (mk_char lit)   charPrimTy]
+      | lit_ty == intTy    = ConPat intDataCon    lit_ty [LitPat (mk_int lit)    intPrimTy]
+      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [LitPat (mk_word lit)   wordPrimTy]
+      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
+      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
+      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
 
 		-- Convert the literal pattern "" to the constructor pattern [].
       | null_str_lit lit       = ConPat nilDataCon    lit_ty [] 

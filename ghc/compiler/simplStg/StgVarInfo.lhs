@@ -7,11 +7,9 @@ And, as we have the info in hand, we may convert some lets to
 let-no-escapes.
 
 \begin{code}
-#include "HsVersions.h"
-
 module StgVarInfo ( setStgVarInfo ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import StgSyn
 
@@ -19,20 +17,18 @@ import Id		( emptyIdSet, mkIdSet, minusIdSet,
 			  unionIdSets, unionManyIdSets, isEmptyIdSet,
 			  unitIdSet, intersectIdSets,
 			  addIdArity, getIdArity,
-			  addOneToIdSet, SYN_IE(IdSet),
+			  addOneToIdSet, IdSet,
 			  nullIdEnv, growIdEnvList, lookupIdEnv,
 			  unitIdEnv, combineIdEnvs, delManyFromIdEnv,
-			  rngIdEnv, SYN_IE(IdEnv),
-			  GenId{-instance Eq-}, SYN_IE(Id)
+			  rngIdEnv, IdEnv,
+			  GenId{-instance Eq-}, Id
 			)
 import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined )
-import BasicTypes       ( SYN_IE(Arity) )
-import Outputable	( PprStyle(..), Outputable(..) )
+import BasicTypes       ( Arity )
 import PprType		( GenType{-instance Outputable-} )
-import Util		( panic, pprPanic, assertPanic )
-import Pretty		( Doc )
+import Outputable
 
 infixr 9 `thenLne`, `thenLne_`
 \end{code}
@@ -724,7 +720,7 @@ lookupLiveVarsForSet fvs sw env lvs_cont
 	    case (lookupIdEnv env v) of
 	      Just (_, LetrecBound _ lvs) -> addOneToIdSet lvs v
 	      Just _		            -> unitIdSet v
-	      Nothing -> pprPanic "lookupVarEnv/do_one:" (ppr PprShowAll v)
+	      Nothing -> pprPanic "lookupVarEnv/do_one:" (ppr v)
 	else
 	    emptyIdSet
 \end{code}

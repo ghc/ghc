@@ -11,15 +11,13 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 @TyVars@ as well.  Currently trying the former... MEGA SIGH.
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsCore (
 	UfExpr(..), UfAlts(..), UfBinder(..), UfCoercion(..),
 	UfDefault(..), UfBinding(..),
 	UfArg(..), UfPrimOp(..)
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 -- friends:
 import HsTypes		( HsType, pprParendHsType )
@@ -29,12 +27,9 @@ import Type		( GenType {- instance Outputable -} )
 
 -- others:
 import Literal		( Literal )
-import Outputable	( Outputable(..) )
-import Pretty
 import Util		( panic )
-#if __GLASGOW_HASKELL__ >= 202
 import CostCentre
-#endif
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -86,13 +81,11 @@ data UfBinding name
 data UfBinder name
   = UfValBinder	name (HsType name)
   | UfTyBinder	name Kind
-  | UfUsageBinder name
 
 data UfArg name
   = UfVarArg	name
   | UfLitArg	Literal
   | UfTyArg	(HsType name)
-  | UfUsageArg	name
 \end{code}
 
 %************************************************************************
@@ -103,74 +96,72 @@ data UfArg name
 
 \begin{code}
 instance Outputable name => Outputable (UfExpr name) where
-    ppr sty (UfVar v) = ppr sty v
-    ppr sty (UfLit l) = ppr sty l
+    ppr (UfVar v) = ppr v
+    ppr (UfLit l) = ppr l
 
-    ppr sty (UfCon c as)
-      = hsep [text "UfCon", ppr sty c, ppr sty as, char ')']
-    ppr sty (UfPrim o as)
-      = hsep [text "UfPrim", ppr sty o, ppr sty as, char ')']
+    ppr (UfCon c as)
+      = hsep [text "UfCon", ppr c, ppr as, char ')']
+    ppr (UfPrim o as)
+      = hsep [text "UfPrim", ppr o, ppr as, char ')']
 
-    ppr sty (UfLam b body)
-      = hsep [char '\\', ppr sty b, ptext SLIT("->"), ppr sty body]
+    ppr (UfLam b body)
+      = hsep [char '\\', ppr b, ptext SLIT("->"), ppr body]
 
-    ppr sty (UfApp fun (UfTyArg ty))
-      = hsep [ppr sty fun, char '@', pprParendHsType sty ty]
+    ppr (UfApp fun (UfTyArg ty))
+      = hsep [ppr fun, char '@', pprParendHsType ty]
 
-    ppr sty (UfApp fun (UfLitArg lit))
-      = hsep [ppr sty fun, ppr sty lit]
+    ppr (UfApp fun (UfLitArg lit))
+      = hsep [ppr fun, ppr lit]
 
-    ppr sty (UfApp fun (UfVarArg var))
-      = hsep [ppr sty fun, ppr sty var]
+    ppr (UfApp fun (UfVarArg var))
+      = hsep [ppr fun, ppr var]
 
-    ppr sty (UfCase scrut alts)
-      = hsep [ptext SLIT("case"), ppr sty scrut, ptext SLIT("of {"), pp_alts alts, char '}']
+    ppr (UfCase scrut alts)
+      = hsep [ptext SLIT("case"), ppr scrut, ptext SLIT("of {"), pp_alts alts, char '}']
       where
     	pp_alts (UfAlgAlts alts deflt)
 	  = hsep [hsep (punctuate semi (map pp_alt alts)), pp_deflt deflt]
 	  where
-	   pp_alt (c,bs,rhs) = hsep [ppr sty c, ppr sty bs, ppr_arrow, ppr sty rhs]
+	   pp_alt (c,bs,rhs) = hsep [ppr c, ppr bs, ppr_arrow, ppr rhs]
     	pp_alts (UfPrimAlts alts deflt)
 	  = hsep [hsep (punctuate semi (map pp_alt alts)), pp_deflt deflt]
 	  where
-	   pp_alt (l,rhs) = hsep [ppr sty l, ppr_arrow, ppr sty rhs]
+	   pp_alt (l,rhs) = hsep [ppr l, ppr_arrow, ppr rhs]
 
 	pp_deflt UfNoDefault = empty
-	pp_deflt (UfBindDefault b rhs) = hsep [ppr sty b, ppr_arrow, ppr sty rhs]
+	pp_deflt (UfBindDefault b rhs) = hsep [ppr b, ppr_arrow, ppr rhs]
 
         ppr_arrow = ptext SLIT("->")
 
-    ppr sty (UfLet (UfNonRec b rhs) body)
-      = hsep [ptext SLIT("let"), ppr sty b, equals, ppr sty rhs, ptext SLIT("in"), ppr sty body]
-    ppr sty (UfLet (UfRec pairs) body)
-      = hsep [ptext SLIT("letrec"), braces (hsep (punctuate semi (map pp_pair pairs))), ptext SLIT("in"), ppr sty body]
+    ppr (UfLet (UfNonRec b rhs) body)
+      = hsep [ptext SLIT("let"), ppr b, equals, ppr rhs, ptext SLIT("in"), ppr body]
+    ppr (UfLet (UfRec pairs) body)
+      = hsep [ptext SLIT("letrec"), braces (hsep (punctuate semi (map pp_pair pairs))), ptext SLIT("in"), ppr body]
       where
-	pp_pair (b,rhs) = hsep [ppr sty b, equals, ppr sty rhs]
+	pp_pair (b,rhs) = hsep [ppr b, equals, ppr rhs]
 
-    ppr sty (UfSCC uf_cc body)
-      = hsep [ptext SLIT("_scc_ <cost-centre[ToDo]>"), ppr sty body]
+    ppr (UfSCC uf_cc body)
+      = hsep [ptext SLIT("_scc_ <cost-centre[ToDo]>"), ppr body]
 
 instance Outputable name => Outputable (UfPrimOp name) where
-    ppr sty (UfCCallOp str is_casm can_gc arg_tys result_ty)
+    ppr (UfCCallOp str is_casm can_gc arg_tys result_ty)
       = let
 	    before = ptext (if is_casm then SLIT("_casm_ ``") else SLIT("_ccall_ "))
 	    after  = if is_casm then text "'' " else space
 	in
 	hcat [before, ptext str, after,
-		   brackets (ppr sty arg_tys), space, ppr sty result_ty]
+		   brackets (ppr arg_tys), space, ppr result_ty]
 
-    ppr sty (UfOtherOp op)
-      = ppr sty op
+    ppr (UfOtherOp op)
+      = ppr op
 
 instance Outputable name => Outputable (UfArg name) where
-    ppr sty (UfVarArg v)	= ppr sty v
-    ppr sty (UfLitArg l)	= ppr sty l
-    ppr sty (UfTyArg ty)	= pprParendHsType sty ty
-    ppr sty (UfUsageArg name)	= ppr sty name
+    ppr (UfVarArg v)	= ppr v
+    ppr (UfLitArg l)	= ppr l
+    ppr (UfTyArg ty)	= pprParendHsType ty
 
 instance Outputable name => Outputable (UfBinder name) where
-    ppr sty (UfValBinder name ty)  = hsep [ppr sty name, ptext SLIT("::"), ppr sty ty]
-    ppr sty (UfTyBinder name kind) = hsep [ppr sty name, ptext SLIT("::"), ppr sty kind]
-    ppr sty (UfUsageBinder name)   = ppr sty name
+    ppr (UfValBinder name ty)  = hsep [ppr name, ptext SLIT("::"), ppr ty]
+    ppr (UfTyBinder name kind) = hsep [ppr name, ptext SLIT("::"), ppr kind]
 \end{code}
 

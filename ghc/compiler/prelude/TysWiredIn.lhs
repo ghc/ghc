@@ -10,8 +10,6 @@ This module tracks the ``state interface'' document, ``GHC prelude:
 types and operations.''
 
 \begin{code}
-#include "HsVersions.h"
-
 module TysWiredIn (
 	addrDataCon,
 	addrTy,
@@ -92,65 +90,53 @@ module TysWiredIn (
 	wordTyCon
     ) where
 
---ToDo:rm
---import Pretty
---import Util
---import PprType
---import Kind
+#include "HsVersions.h"
 
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(TyLoop)	( mkDataCon, mkTupleCon, StrictnessMark(..) )
-IMPORT_DELOOPER(IdLoop)	( SpecEnv, nullSpecEnv, 
-		          mkTupleCon, mkDataCon, 
-			  StrictnessMark(..) )
-#else
 import {-# SOURCE #-} Id ( Id, mkDataCon, mkTupleCon, StrictnessMark(..) )
-import {-# SOURCE #-} SpecEnv ( SpecEnv, nullSpecEnv )
-#endif
 
 -- friends:
 import PrelMods
 import TysPrim
 
 -- others:
-import FieldLabel	()	--
 import Kind		( mkBoxedTypeKind, mkArrowKind )
 import Name		( mkWiredInTyConName, mkWiredInIdName )
 import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
-			  TyCon, SYN_IE(Arity)
+			  TyCon, Arity
 			)
-import BasicTypes	( SYN_IE(Module), NewOrData(..) )
-import Type		( SYN_IE(Type), mkTyConTy, applyTyCon, mkSigmaTy, mkTyVarTys, 
-			  mkFunTy, mkFunTys, maybeAppTyCon, maybeAppDataTyCon,
-			  GenType(..), SYN_IE(ThetaType), SYN_IE(TauType) )
-import TyVar		( GenTyVar, SYN_IE(TyVar), tyVarKind, alphaTyVars, alphaTyVar, betaTyVar )
+import BasicTypes	( Module, NewOrData(..), RecFlag(..) )
+import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
+			  mkFunTy, mkFunTys, splitTyConApp_maybe, splitAlgTyConApp_maybe,
+			  GenType(..), ThetaType, TauType )
+import TyVar		( GenTyVar, TyVar, tyVarKind, alphaTyVars, alphaTyVar, betaTyVar )
 import Lex		( mkTupNameStr )
 import Unique
 import Util		( assoc, panic )
-
---nullSpecEnv =  error "TysWiredIn:nullSpecEnv =  "
-addOneToSpecEnv =  error "TysWiredIn:addOneToSpecEnv =  "
-pc_gen_specs = error "TysWiredIn:pc_gen_specs  "
-mkSpecInfo = error "TysWiredIn:SpecInfo"
 
 alpha_tyvar	  = [alphaTyVar]
 alpha_ty	  = [alphaTy]
 alpha_beta_tyvars = [alphaTyVar, betaTyVar]
 
-pcDataTyCon, pcNewTyCon
+pcRecDataTyCon, pcNonRecDataTyCon, pcNonRecNewTyCon
 	:: Unique{-TyConKey-} -> Module -> FAST_STRING
 	-> [TyVar] -> [Id] -> TyCon
 
-pcDataTyCon = pc_tycon DataType
-pcNewTyCon  = pc_tycon NewType
+pcRecDataTyCon    = pc_tycon DataType Recursive
+pcNonRecDataTyCon = pc_tycon DataType NonRecursive
+pcNonRecNewTyCon  = pc_tycon NewType  NonRecursive
 
-pc_tycon new_or_data key mod str tyvars cons
+pc_tycon new_or_data is_rec key mod str tyvars cons
   = tycon
   where
     tycon = mkDataTyCon name tycon_kind 
-		tyvars [{-no context-}] cons [{-no derivings-}]
+		tyvars 
+		[] 		-- No context
+		cons
+		[]		-- No derivings
+		Nothing		-- Not a dictionary
 		new_or_data
+		is_rec
+
     name = mkWiredInTyConName key mod str tycon
     tycon_kind = foldr (mkArrowKind . tyVarKind) mkBoxedTypeKind tyvars
 
@@ -161,8 +147,8 @@ pcSynTyCon key mod str kind arity tyvars expansion
     name  = mkWiredInTyConName key mod str tycon
 
 pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
-	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> SpecEnv -> Id
-pcDataCon key mod str tyvars context arg_tys tycon specenv
+	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> Id
+pcDataCon key mod str tyvars context arg_tys tycon
   = data_con
   where
     data_con = mkDataCon name 
@@ -170,12 +156,6 @@ pcDataCon key mod str tyvars context arg_tys tycon specenv
 		[ {- no labelled fields -} ]
 		tyvars context [] [] arg_tys tycon
     name = mkWiredInIdName key mod str data_con
-
-pcGenerateDataSpecs :: Type -> SpecEnv
-pcGenerateDataSpecs ty
-  = pc_gen_specs --False err err err ty
-  where
-    err = panic "PrelUtils:GenerateDataSpecs"
 \end{code}
 
 %************************************************************************
@@ -204,7 +184,7 @@ tupleCon arity
     name      = mkWiredInIdName uniq mod_name (mkTupNameStr arity) tuple_con
     mod_name  | arity == 0 = pREL_BASE
 	      | otherwise  = pREL_TUP
-    ty 		= mkSigmaTy tyvars [] (mkFunTys tyvar_tys (applyTyCon tycon tyvar_tys))
+    ty 		= mkSigmaTy tyvars [] (mkFunTys tyvar_tys (mkTyConApp tycon tyvar_tys))
     tyvars	= take arity alphaTyVars
     tyvar_tys	= mkTyVarTys tyvars
     tycon	= tupleTyCon arity
@@ -226,8 +206,8 @@ pairDataCon = tupleCon 2
 \begin{code}
 charTy = mkTyConTy charTyCon
 
-charTyCon = pcDataTyCon charTyConKey  pREL_BASE  SLIT("Char") [] [charDataCon]
-charDataCon = pcDataCon charDataConKey pREL_BASE SLIT("C#") [] [] [charPrimTy] charTyCon nullSpecEnv
+charTyCon = pcNonRecDataTyCon charTyConKey  pREL_BASE  SLIT("Char") [] [charDataCon]
+charDataCon = pcDataCon charDataConKey pREL_BASE SLIT("C#") [] [] [charPrimTy] charTyCon
 
 stringTy = mkListTy charTy -- convenience only
 \end{code}
@@ -235,12 +215,12 @@ stringTy = mkListTy charTy -- convenience only
 \begin{code}
 intTy = mkTyConTy intTyCon 
 
-intTyCon = pcDataTyCon intTyConKey pREL_BASE SLIT("Int") [] [intDataCon]
-intDataCon = pcDataCon intDataConKey pREL_BASE SLIT("I#") [] [] [intPrimTy] intTyCon nullSpecEnv
+intTyCon = pcNonRecDataTyCon intTyConKey pREL_BASE SLIT("Int") [] [intDataCon]
+intDataCon = pcDataCon intDataConKey pREL_BASE SLIT("I#") [] [] [intPrimTy] intTyCon
 
-isIntTy :: GenType (GenTyVar flexi) uvar -> Bool
+isIntTy :: GenType flexi -> Bool
 isIntTy ty
-  = case (maybeAppDataTyCon ty) of
+  = case (splitAlgTyConApp_maybe ty) of
 	Just (tycon, [], _) -> uniqueOf tycon == intTyConKey
 	_		    -> False
 
@@ -255,59 +235,59 @@ min_int = toInteger minInt
 \begin{code}
 wordTy = mkTyConTy wordTyCon
 
-wordTyCon = pcDataTyCon wordTyConKey   fOREIGN SLIT("Word") [] [wordDataCon]
-wordDataCon = pcDataCon wordDataConKey fOREIGN SLIT("W#") [] [] [wordPrimTy] wordTyCon nullSpecEnv
+wordTyCon = pcNonRecDataTyCon wordTyConKey   fOREIGN SLIT("Word") [] [wordDataCon]
+wordDataCon = pcDataCon wordDataConKey fOREIGN SLIT("W#") [] [] [wordPrimTy] wordTyCon
 \end{code}
 
 \begin{code}
 addrTy = mkTyConTy addrTyCon
 
-addrTyCon = pcDataTyCon addrTyConKey   aDDR SLIT("Addr") [] [addrDataCon]
-addrDataCon = pcDataCon addrDataConKey aDDR SLIT("A#") [] [] [addrPrimTy] addrTyCon nullSpecEnv
+addrTyCon = pcNonRecDataTyCon addrTyConKey   aDDR SLIT("Addr") [] [addrDataCon]
+addrDataCon = pcDataCon addrDataConKey aDDR SLIT("A#") [] [] [addrPrimTy] addrTyCon
 \end{code}
 
 \begin{code}
 floatTy	= mkTyConTy floatTyCon
 
-floatTyCon = pcDataTyCon floatTyConKey pREL_BASE SLIT("Float") [] [floatDataCon]
-floatDataCon = pcDataCon floatDataConKey pREL_BASE SLIT("F#") [] [] [floatPrimTy] floatTyCon nullSpecEnv
+floatTyCon = pcNonRecDataTyCon floatTyConKey pREL_BASE SLIT("Float") [] [floatDataCon]
+floatDataCon = pcDataCon floatDataConKey pREL_BASE SLIT("F#") [] [] [floatPrimTy] floatTyCon
 \end{code}
 
 \begin{code}
 doubleTy = mkTyConTy doubleTyCon
 
-doubleTyCon = pcDataTyCon doubleTyConKey pREL_BASE SLIT("Double") [] [doubleDataCon]
-doubleDataCon = pcDataCon doubleDataConKey pREL_BASE SLIT("D#") [] [] [doublePrimTy] doubleTyCon nullSpecEnv
+doubleTyCon = pcNonRecDataTyCon doubleTyConKey pREL_BASE SLIT("Double") [] [doubleDataCon]
+doubleDataCon = pcDataCon doubleDataConKey pREL_BASE SLIT("D#") [] [] [doublePrimTy] doubleTyCon
 \end{code}
 
 \begin{code}
-mkStateTy ty	 = applyTyCon stateTyCon [ty]
+mkStateTy ty	 = mkTyConApp stateTyCon [ty]
 realWorldStateTy = mkStateTy realWorldTy -- a common use
 
-stateTyCon = pcDataTyCon stateTyConKey sT_BASE SLIT("State") alpha_tyvar [stateDataCon]
+stateTyCon = pcNonRecDataTyCon stateTyConKey sT_BASE SLIT("State") alpha_tyvar [stateDataCon]
 stateDataCon
   = pcDataCon stateDataConKey sT_BASE SLIT("S#")
-	alpha_tyvar [] [mkStatePrimTy alphaTy] stateTyCon nullSpecEnv
+	alpha_tyvar [] [mkStatePrimTy alphaTy] stateTyCon
 \end{code}
 
 \begin{code}
 stablePtrTyCon
-  = pcDataTyCon stablePtrTyConKey fOREIGN SLIT("StablePtr")
+  = pcNonRecDataTyCon stablePtrTyConKey fOREIGN SLIT("StablePtr")
 	alpha_tyvar [stablePtrDataCon]
   where
     stablePtrDataCon
       = pcDataCon stablePtrDataConKey fOREIGN SLIT("StablePtr")
-	    alpha_tyvar [] [mkStablePtrPrimTy alphaTy] stablePtrTyCon nullSpecEnv
+	    alpha_tyvar [] [mkStablePtrPrimTy alphaTy] stablePtrTyCon
 \end{code}
 
 \begin{code}
 foreignObjTyCon
-  = pcDataTyCon foreignObjTyConKey fOREIGN SLIT("ForeignObj")
+  = pcNonRecDataTyCon foreignObjTyConKey fOREIGN SLIT("ForeignObj")
 	[] [foreignObjDataCon]
   where
     foreignObjDataCon
       = pcDataCon foreignObjDataConKey fOREIGN SLIT("ForeignObj")
-	    [] [] [foreignObjPrimTy] foreignObjTyCon nullSpecEnv
+	    [] [] [foreignObjPrimTy] foreignObjTyCon
 \end{code}
 
 %************************************************************************
@@ -318,37 +298,37 @@ foreignObjTyCon
 
 @Integer@ and its pals are not really primitive.  @Integer@ itself, first:
 \begin{code}
-integerTy :: GenType t u
+integerTy :: GenType t
 integerTy    = mkTyConTy integerTyCon
 
-integerTyCon = pcDataTyCon integerTyConKey pREL_BASE SLIT("Integer") [] [integerDataCon]
+integerTyCon = pcNonRecDataTyCon integerTyConKey pREL_BASE SLIT("Integer") [] [integerDataCon]
 
 integerDataCon = pcDataCon integerDataConKey pREL_BASE SLIT("J#")
-		[] [] [intPrimTy, intPrimTy, byteArrayPrimTy] integerTyCon nullSpecEnv
+		[] [] [intPrimTy, intPrimTy, byteArrayPrimTy] integerTyCon
 
-isIntegerTy :: GenType (GenTyVar flexi) uvar -> Bool
+isIntegerTy :: GenType flexi -> Bool
 isIntegerTy ty
-  = case (maybeAppDataTyCon ty) of
+  = case (splitAlgTyConApp_maybe ty) of
 	Just (tycon, [], _) -> uniqueOf tycon == integerTyConKey
 	_		    -> False
 \end{code}
 
 And the other pairing types:
 \begin{code}
-return2GMPsTyCon = pcDataTyCon return2GMPsTyConKey
+return2GMPsTyCon = pcNonRecDataTyCon return2GMPsTyConKey
 	pREL_NUM SLIT("Return2GMPs") [] [return2GMPsDataCon]
 
 return2GMPsDataCon
   = pcDataCon return2GMPsDataConKey pREL_NUM SLIT("Return2GMPs") [] []
 	[intPrimTy, intPrimTy, byteArrayPrimTy,
-	 intPrimTy, intPrimTy, byteArrayPrimTy] return2GMPsTyCon nullSpecEnv
+	 intPrimTy, intPrimTy, byteArrayPrimTy] return2GMPsTyCon
 
-returnIntAndGMPTyCon = pcDataTyCon returnIntAndGMPTyConKey
+returnIntAndGMPTyCon = pcNonRecDataTyCon returnIntAndGMPTyConKey
 	pREL_NUM SLIT("ReturnIntAndGMP") [] [returnIntAndGMPDataCon]
 
 returnIntAndGMPDataCon
   = pcDataCon returnIntAndGMPDataConKey pREL_NUM SLIT("ReturnIntAndGMP") [] []
-	[intPrimTy, intPrimTy, intPrimTy, byteArrayPrimTy] returnIntAndGMPTyCon nullSpecEnv
+	[intPrimTy, intPrimTy, intPrimTy, byteArrayPrimTy] returnIntAndGMPTyCon
 \end{code}
 
 %************************************************************************
@@ -366,120 +346,120 @@ We fish one of these \tr{StateAnd<blah>#} things with
 
 \begin{code}
 stateAndPtrPrimTyCon
-  = pcDataTyCon stateAndPtrPrimTyConKey sT_BASE SLIT("StateAndPtr#")
+  = pcNonRecDataTyCon stateAndPtrPrimTyConKey sT_BASE SLIT("StateAndPtr#")
 		alpha_beta_tyvars [stateAndPtrPrimDataCon]
 stateAndPtrPrimDataCon
   = pcDataCon stateAndPtrPrimDataConKey sT_BASE SLIT("StateAndPtr#")
 		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy]
-		stateAndPtrPrimTyCon nullSpecEnv
+		stateAndPtrPrimTyCon
 
 stateAndCharPrimTyCon
-  = pcDataTyCon stateAndCharPrimTyConKey sT_BASE SLIT("StateAndChar#")
+  = pcNonRecDataTyCon stateAndCharPrimTyConKey sT_BASE SLIT("StateAndChar#")
 		alpha_tyvar [stateAndCharPrimDataCon]
 stateAndCharPrimDataCon
   = pcDataCon stateAndCharPrimDataConKey sT_BASE SLIT("StateAndChar#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, charPrimTy]
-		stateAndCharPrimTyCon nullSpecEnv
+		stateAndCharPrimTyCon
 
 stateAndIntPrimTyCon
-  = pcDataTyCon stateAndIntPrimTyConKey sT_BASE SLIT("StateAndInt#")
+  = pcNonRecDataTyCon stateAndIntPrimTyConKey sT_BASE SLIT("StateAndInt#")
 		alpha_tyvar [stateAndIntPrimDataCon]
 stateAndIntPrimDataCon
   = pcDataCon stateAndIntPrimDataConKey sT_BASE SLIT("StateAndInt#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, intPrimTy]
-		stateAndIntPrimTyCon nullSpecEnv
+		stateAndIntPrimTyCon
 
 stateAndWordPrimTyCon
-  = pcDataTyCon stateAndWordPrimTyConKey sT_BASE SLIT("StateAndWord#")
+  = pcNonRecDataTyCon stateAndWordPrimTyConKey sT_BASE SLIT("StateAndWord#")
 		alpha_tyvar [stateAndWordPrimDataCon]
 stateAndWordPrimDataCon
   = pcDataCon stateAndWordPrimDataConKey sT_BASE SLIT("StateAndWord#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, wordPrimTy]
-		stateAndWordPrimTyCon nullSpecEnv
+		stateAndWordPrimTyCon
 
 stateAndAddrPrimTyCon
-  = pcDataTyCon stateAndAddrPrimTyConKey sT_BASE SLIT("StateAndAddr#")
+  = pcNonRecDataTyCon stateAndAddrPrimTyConKey sT_BASE SLIT("StateAndAddr#")
 		alpha_tyvar [stateAndAddrPrimDataCon]
 stateAndAddrPrimDataCon
   = pcDataCon stateAndAddrPrimDataConKey sT_BASE SLIT("StateAndAddr#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, addrPrimTy]
-		stateAndAddrPrimTyCon nullSpecEnv
+		stateAndAddrPrimTyCon
 
 stateAndStablePtrPrimTyCon
-  = pcDataTyCon stateAndStablePtrPrimTyConKey fOREIGN SLIT("StateAndStablePtr#")
+  = pcNonRecDataTyCon stateAndStablePtrPrimTyConKey fOREIGN SLIT("StateAndStablePtr#")
 		alpha_beta_tyvars [stateAndStablePtrPrimDataCon]
 stateAndStablePtrPrimDataCon
   = pcDataCon stateAndStablePtrPrimDataConKey fOREIGN SLIT("StateAndStablePtr#")
 		alpha_beta_tyvars []
-		[mkStatePrimTy alphaTy, applyTyCon stablePtrPrimTyCon [betaTy]]
-		stateAndStablePtrPrimTyCon nullSpecEnv
+		[mkStatePrimTy alphaTy, mkTyConApp stablePtrPrimTyCon [betaTy]]
+		stateAndStablePtrPrimTyCon
 
 stateAndForeignObjPrimTyCon
-  = pcDataTyCon stateAndForeignObjPrimTyConKey fOREIGN SLIT("StateAndForeignObj#")
+  = pcNonRecDataTyCon stateAndForeignObjPrimTyConKey fOREIGN SLIT("StateAndForeignObj#")
 		alpha_tyvar [stateAndForeignObjPrimDataCon]
 stateAndForeignObjPrimDataCon
   = pcDataCon stateAndForeignObjPrimDataConKey fOREIGN SLIT("StateAndForeignObj#")
 		alpha_tyvar []
-		[mkStatePrimTy alphaTy, applyTyCon foreignObjPrimTyCon []]
-		stateAndForeignObjPrimTyCon nullSpecEnv
+		[mkStatePrimTy alphaTy, mkTyConTy foreignObjPrimTyCon]
+		stateAndForeignObjPrimTyCon
 
 stateAndFloatPrimTyCon
-  = pcDataTyCon stateAndFloatPrimTyConKey sT_BASE SLIT("StateAndFloat#")
+  = pcNonRecDataTyCon stateAndFloatPrimTyConKey sT_BASE SLIT("StateAndFloat#")
 		alpha_tyvar [stateAndFloatPrimDataCon]
 stateAndFloatPrimDataCon
   = pcDataCon stateAndFloatPrimDataConKey sT_BASE SLIT("StateAndFloat#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, floatPrimTy]
-		stateAndFloatPrimTyCon nullSpecEnv
+		stateAndFloatPrimTyCon
 
 stateAndDoublePrimTyCon
-  = pcDataTyCon stateAndDoublePrimTyConKey sT_BASE SLIT("StateAndDouble#")
+  = pcNonRecDataTyCon stateAndDoublePrimTyConKey sT_BASE SLIT("StateAndDouble#")
 		alpha_tyvar [stateAndDoublePrimDataCon]
 stateAndDoublePrimDataCon
   = pcDataCon stateAndDoublePrimDataConKey sT_BASE SLIT("StateAndDouble#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, doublePrimTy]
-		stateAndDoublePrimTyCon nullSpecEnv
+		stateAndDoublePrimTyCon
 \end{code}
 
 \begin{code}
 stateAndArrayPrimTyCon
-  = pcDataTyCon stateAndArrayPrimTyConKey aRR_BASE SLIT("StateAndArray#")
+  = pcNonRecDataTyCon stateAndArrayPrimTyConKey aRR_BASE SLIT("StateAndArray#")
 		alpha_beta_tyvars [stateAndArrayPrimDataCon]
 stateAndArrayPrimDataCon
   = pcDataCon stateAndArrayPrimDataConKey aRR_BASE SLIT("StateAndArray#")
 		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkArrayPrimTy betaTy]
-		stateAndArrayPrimTyCon nullSpecEnv
+		stateAndArrayPrimTyCon
 
 stateAndMutableArrayPrimTyCon
-  = pcDataTyCon stateAndMutableArrayPrimTyConKey aRR_BASE SLIT("StateAndMutableArray#")
+  = pcNonRecDataTyCon stateAndMutableArrayPrimTyConKey aRR_BASE SLIT("StateAndMutableArray#")
 		alpha_beta_tyvars [stateAndMutableArrayPrimDataCon]
 stateAndMutableArrayPrimDataCon
   = pcDataCon stateAndMutableArrayPrimDataConKey aRR_BASE SLIT("StateAndMutableArray#")
 		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkMutableArrayPrimTy alphaTy betaTy]
-		stateAndMutableArrayPrimTyCon nullSpecEnv
+		stateAndMutableArrayPrimTyCon
 
 stateAndByteArrayPrimTyCon
-  = pcDataTyCon stateAndByteArrayPrimTyConKey aRR_BASE SLIT("StateAndByteArray#")
+  = pcNonRecDataTyCon stateAndByteArrayPrimTyConKey aRR_BASE SLIT("StateAndByteArray#")
 		alpha_tyvar [stateAndByteArrayPrimDataCon]
 stateAndByteArrayPrimDataCon
   = pcDataCon stateAndByteArrayPrimDataConKey aRR_BASE SLIT("StateAndByteArray#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, byteArrayPrimTy]
-		stateAndByteArrayPrimTyCon nullSpecEnv
+		stateAndByteArrayPrimTyCon
 
 stateAndMutableByteArrayPrimTyCon
-  = pcDataTyCon stateAndMutableByteArrayPrimTyConKey aRR_BASE SLIT("StateAndMutableByteArray#")
+  = pcNonRecDataTyCon stateAndMutableByteArrayPrimTyConKey aRR_BASE SLIT("StateAndMutableByteArray#")
 		alpha_tyvar [stateAndMutableByteArrayPrimDataCon]
 stateAndMutableByteArrayPrimDataCon
   = pcDataCon stateAndMutableByteArrayPrimDataConKey aRR_BASE SLIT("StateAndMutableByteArray#")
-		alpha_tyvar [] [mkStatePrimTy alphaTy, applyTyCon mutableByteArrayPrimTyCon alpha_ty]
-		stateAndMutableByteArrayPrimTyCon nullSpecEnv
+		alpha_tyvar [] [mkStatePrimTy alphaTy, mkTyConApp mutableByteArrayPrimTyCon alpha_ty]
+		stateAndMutableByteArrayPrimTyCon
 
 stateAndSynchVarPrimTyCon
-  = pcDataTyCon stateAndSynchVarPrimTyConKey cONC_BASE SLIT("StateAndSynchVar#")
+  = pcNonRecDataTyCon stateAndSynchVarPrimTyConKey cONC_BASE SLIT("StateAndSynchVar#")
 		alpha_beta_tyvars [stateAndSynchVarPrimDataCon]
 stateAndSynchVarPrimDataCon
   = pcDataCon stateAndSynchVarPrimDataConKey cONC_BASE SLIT("StateAndSynchVar#")
 		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkSynchVarPrimTy alphaTy betaTy]
-		stateAndSynchVarPrimTyCon nullSpecEnv
+		stateAndSynchVarPrimTyCon
 \end{code}
 
 The ccall-desugaring mechanism uses this function to figure out how to
@@ -493,12 +473,12 @@ getStatePairingConInfo
 	    Type)	-- type of state pair
 
 getStatePairingConInfo prim_ty
-  = case (maybeAppTyCon prim_ty) of
+  = case (splitTyConApp_maybe prim_ty) of
       Nothing -> panic "getStatePairingConInfo:1"
       Just (prim_tycon, tys_applied) ->
 	let
 	    (pair_con, pair_tycon, num_tys) = assoc "getStatePairingConInfo" tbl prim_tycon
-	    pair_ty = applyTyCon pair_tycon (realWorldTy : drop num_tys tys_applied)
+	    pair_ty = mkTyConApp pair_tycon (realWorldTy : drop num_tys tys_applied)
 	in
 	(pair_con, pair_ty)
   where
@@ -530,24 +510,24 @@ The only reason this is wired in is because we have to represent the
 type of runST.
 
 \begin{code}
-mkStateTransformerTy s a = applyTyCon stTyCon [s, a]
+mkStateTransformerTy s a = mkTyConApp stTyCon [s, a]
 
-stTyCon = pcNewTyCon stTyConKey sT_BASE SLIT("ST") alpha_beta_tyvars [stDataCon]
+stTyCon = pcNonRecNewTyCon stTyConKey sT_BASE SLIT("ST") alpha_beta_tyvars [stDataCon]
 
 stDataCon = pcDataCon stDataConKey sT_BASE SLIT("ST")
-			alpha_beta_tyvars [] [ty] stTyCon nullSpecEnv
+			alpha_beta_tyvars [] [ty] stTyCon
   where
     ty = mkFunTy (mkStatePrimTy alphaTy) (mkSTretTy alphaTy betaTy)
 
-mkSTretTy alpha beta = applyTyCon stRetTyCon [alpha,beta]
+mkSTretTy alpha beta = mkTyConApp stRetTyCon [alpha,beta]
 
 stRetTyCon
-  = pcDataTyCon stRetTyConKey sT_BASE SLIT("STret") 
+  = pcNonRecDataTyCon stRetTyConKey sT_BASE SLIT("STret") 
 	alpha_beta_tyvars [stRetDataCon]
 stRetDataCon
   = pcDataCon stRetDataConKey sT_BASE SLIT("STret")
 	alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy] 
-		stRetTyCon nullSpecEnv
+		stRetTyCon
 \end{code}
 
 %************************************************************************
@@ -601,10 +581,10 @@ primitive counterpart.
 \begin{code}
 boolTy = mkTyConTy boolTyCon
 
-boolTyCon = pcDataTyCon boolTyConKey pREL_BASE SLIT("Bool") [] [falseDataCon, trueDataCon]
+boolTyCon = pcNonRecDataTyCon boolTyConKey pREL_BASE SLIT("Bool") [] [falseDataCon, trueDataCon]
 
-falseDataCon = pcDataCon falseDataConKey pREL_BASE SLIT("False") [] [] [] boolTyCon nullSpecEnv
-trueDataCon  = pcDataCon trueDataConKey	 pREL_BASE SLIT("True")  [] [] [] boolTyCon nullSpecEnv
+falseDataCon = pcDataCon falseDataConKey pREL_BASE SLIT("False") [] [] [] boolTyCon
+trueDataCon  = pcDataCon trueDataConKey	 pREL_BASE SLIT("True")  [] [] [] boolTyCon
 \end{code}
 
 %************************************************************************
@@ -623,19 +603,17 @@ data (,) a b = (,,) a b
 \end{verbatim}
 
 \begin{code}
-mkListTy :: GenType t u -> GenType t u
-mkListTy ty = applyTyCon listTyCon [ty]
+mkListTy :: GenType t -> GenType t
+mkListTy ty = mkTyConApp listTyCon [ty]
 
-alphaListTy = mkSigmaTy alpha_tyvar [] (applyTyCon listTyCon alpha_ty)
+alphaListTy = mkSigmaTy alpha_tyvar [] (mkTyConApp listTyCon alpha_ty)
 
-listTyCon = pcDataTyCon listTyConKey pREL_BASE SLIT("[]") 
+listTyCon = pcRecDataTyCon listTyConKey pREL_BASE SLIT("[]") 
 			alpha_tyvar [nilDataCon, consDataCon]
 
 nilDataCon  = pcDataCon nilDataConKey  pREL_BASE SLIT("[]") alpha_tyvar [] [] listTyCon
-		(pcGenerateDataSpecs alphaListTy)
 consDataCon = pcDataCon consDataConKey pREL_BASE SLIT(":")
-		alpha_tyvar [] [alphaTy, applyTyCon listTyCon alpha_ty] listTyCon
-		(pcGenerateDataSpecs alphaListTy)
+		alpha_tyvar [] [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
@@ -688,9 +666,9 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 \end{itemize}
 
 \begin{code}
-mkTupleTy :: Int -> [GenType t u] -> GenType t u
+mkTupleTy :: Int -> [GenType t] -> GenType t
 
-mkTupleTy arity tys = applyTyCon (tupleTyCon arity) tys
+mkTupleTy arity tys = mkTyConApp (tupleTyCon arity) tys
 
 unitTy    = mkTupleTy 0 []
 \end{code}
@@ -704,16 +682,16 @@ unitTy    = mkTupleTy 0 []
 Again, deeply turgid: \tr{data _Lift a = _Lift a}.
 
 \begin{code}
-mkLiftTy ty = applyTyCon liftTyCon [ty]
+mkLiftTy ty = mkTyConApp liftTyCon [ty]
 
 {-
 mkLiftTy ty
-  = mkSigmaTy tvs theta (applyTyCon liftTyCon [tau])
+  = mkSigmaTy tvs theta (mkTyConApp liftTyCon [tau])
   where
     (tvs, theta, tau) = splitSigmaTy ty
 
 isLiftTy ty
-  = case (maybeAppDataTyConExpandingDicts tau) of
+  = case (splitAlgTyConApp_maybeExpandingDicts tau) of
       Just (tycon, tys, _) -> tycon == liftTyCon
       Nothing -> False
   where
@@ -721,16 +699,14 @@ isLiftTy ty
 -}
 
 
-alphaLiftTy = mkSigmaTy alpha_tyvar [] (applyTyCon liftTyCon alpha_ty)
+alphaLiftTy = mkSigmaTy alpha_tyvar [] (mkTyConApp liftTyCon alpha_ty)
 
 liftTyCon
-  = pcDataTyCon liftTyConKey pREL_BASE SLIT("Lift") alpha_tyvar [liftDataCon]
+  = pcNonRecDataTyCon liftTyConKey pREL_BASE SLIT("Lift") alpha_tyvar [liftDataCon]
 
 liftDataCon
   = pcDataCon liftDataConKey pREL_BASE SLIT("Lift")
 		alpha_tyvar [] alpha_ty liftTyCon
-		((pcGenerateDataSpecs alphaLiftTy) `addOneToSpecEnv`
-		 (mkSpecInfo [Just realWorldStatePrimTy] 0 bottom))
   where
     bottom = panic "liftDataCon:State# _RealWorld"
 \end{code}

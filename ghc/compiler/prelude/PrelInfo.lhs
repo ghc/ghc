@@ -4,12 +4,10 @@
 \section[PrelInfo]{The @PrelInfo@ interface to the compiler's prelude knowledge}
 
 \begin{code}
-#include "HsVersions.h"
-
 module PrelInfo (
 	-- finite maps for built-in things (for the renamer and typechecker):
 	builtinNames, derivingOccurrences,
-	SYN_IE(BuiltinNames),
+	BuiltinNames,
 
 	maybeCharLikeTyCon, maybeIntLikeTyCon,
 
@@ -37,13 +35,9 @@ module PrelInfo (
 	isNumericClass, isStandardClass, isCcallishClass
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-#if __GLASGOW_HASKELL__ >= 202
 import IdUtils ( primOpName )
-#else
-IMPORT_DELOOPER(PrelLoop) ( primOpName )
-#endif
 
 -- friends:
 import PrelMods		-- Prelude module names
@@ -54,13 +48,13 @@ import TysPrim		-- TYPES
 import TysWiredIn
 
 -- others:
-import SpecEnv		( SpecEnv )
 import RdrHsSyn		( RdrName(..), varQual, tcQual, qual )
 import BasicTypes	( IfaceFlavour )
-import Id		( GenId, SYN_IE(Id) )
+import Id		( GenId, Id )
 import Name		( Name, OccName(..), Provenance(..),
-			  getName, mkGlobalName, modAndOcc )
-import Class		( Class(..), GenClass, classKey )
+			  getName, mkGlobalName, modAndOcc
+			)
+import Class		( Class, classKey )
 import TyCon		( tyConDataCons, mkFunTyCon, TyCon )
 import Type
 import Bag
@@ -254,7 +248,7 @@ Ids, Synonyms, Classes and ClassOps with builtin keys.
 \begin{code}
 mkKnownKeyGlobal :: (RdrName, Unique) -> Name
 mkKnownKeyGlobal (Qual mod occ hif, uniq)
-  = mkGlobalName uniq mod occ (Implicit hif)
+  = mkGlobalName uniq mod occ NoProvenance
 
 allClass_NAME    = mkKnownKeyGlobal (allClass_RDR,   allClassKey)
 ioTyCon_NAME	 = mkKnownKeyGlobal (ioTyCon_RDR,    ioTyConKey)
@@ -375,8 +369,8 @@ realFracClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFrac"))
 realFloatClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFloat"))
 readClass_RDR		= tcQual (pREL_READ, SLIT("Read"))
 ixClass_RDR		= tcQual (iX,	     SLIT("Ix"))
-ccallableClass_RDR	= tcQual (cCALL,     SLIT("CCallable"))
-creturnableClass_RDR	= tcQual (cCALL,     SLIT("CReturnable"))
+ccallableClass_RDR	= tcQual (gHC__,   SLIT("CCallable"))
+creturnableClass_RDR	= tcQual (gHC__,   SLIT("CReturnable"))
 
 fromInt_RDR	   = varQual (pREL_BASE, SLIT("fromInt"))
 fromInteger_RDR	   = varQual (pREL_BASE, SLIT("fromInteger"))
@@ -541,7 +535,8 @@ cCallishClassKeys = [ cCallableClassKey, cReturnableClassKey ]
 
 	-- Renamer always imports these data decls replete with constructors
 	-- so that desugarer can always see the constructor.  Ugh!
-cCallishTyKeys = [ addrTyConKey, wordTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ]
+cCallishTyKeys = [ addrTyConKey, wordTyConKey, byteArrayTyConKey, 
+		   mutableByteArrayTyConKey, foreignObjTyConKey ]
 
 standardClassKeys
   = derivableClassKeys ++ numericClassKeys ++ cCallishClassKeys

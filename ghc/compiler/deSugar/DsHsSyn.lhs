@@ -4,19 +4,17 @@
 \section[DsHsSyn]{Haskell abstract syntax---added things for desugarer}
 
 \begin{code}
-#include "HsVersions.h"
-
 module DsHsSyn where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 import HsSyn		( OutPat(..), HsBinds(..), MonoBinds(..),
 			  Sig, HsExpr, GRHSsAndBinds, Match, HsLit )
-import TcHsSyn		( SYN_IE(TypecheckedPat),
-			  SYN_IE(TypecheckedMonoBinds) )
+import TcHsSyn		( TypecheckedPat,
+			  TypecheckedMonoBinds )
 
-import Id		( idType, SYN_IE(Id) )
-import Type             ( SYN_IE(Type) )
+import Id		( idType, Id )
+import Type             ( Type )
 import TysWiredIn	( mkListTy, mkTupleTy, unitTy )
 import Util		( panic )
 \end{code}

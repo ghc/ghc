@@ -4,18 +4,12 @@
 \section[HsExpr]{Abstract Haskell syntax: expressions}
 
 \begin{code}
-#include "HsVersions.h"
-
 module HsExpr where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 -- friends:
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(HsLoop) ( pprMatches, pprMatch, Match )
-#else
 import {-# SOURCE #-} HsMatches ( pprMatches, pprMatch, Match )
-#endif
 
 import HsBinds		( HsBinds )
 import HsBasic		( HsLit )
@@ -23,16 +17,11 @@ import BasicTypes	( Fixity(..), FixityDirection(..) )
 import HsTypes		( HsType )
 
 -- others:
-import Id		( SYN_IE(DictVar), GenId, SYN_IE(Id) )
-import Outputable	( pprQuote, interppSP, interpp'SP, ifnotPprForUser, 
-			  PprStyle(..), userStyle, Outputable(..) )
-import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )
-import Pretty
+import Name		( NamedThing )
+import Id		( Id )
+import Outputable	
+import PprType		( pprGenType, pprParendGenType, GenType, GenTyVar )
 import SrcLoc		( SrcLoc )
-import Usage		( GenUsage{-instance-} )
-#if __GLASGOW_HASKELL__ >= 202
-import Name
-#endif
 \end{code}
 
 %************************************************************************
@@ -42,15 +31,15 @@ import Name
 %************************************************************************
 
 \begin{code}
-data HsExpr tyvar uvar id pat
+data HsExpr flexi id pat
   = HsVar	id				-- variable
   | HsLit	HsLit				-- literal
   | HsLitOut	HsLit				-- TRANSLATION
-		(GenType tyvar uvar)		-- (with its type)
+		(GenType flexi)		-- (with its type)
 
-  | HsLam	(Match  tyvar uvar id pat)	-- lambda
-  | HsApp	(HsExpr tyvar uvar id pat)	-- application
-		(HsExpr tyvar uvar id pat)
+  | HsLam	(Match  flexi id pat)	-- lambda
+  | HsApp	(HsExpr flexi id pat)	-- application
+		(HsExpr flexi id pat)
 
   -- Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
@@ -58,89 +47,91 @@ data HsExpr tyvar uvar id pat
   -- NB We need an expr for the operator in an OpApp/Section since
   -- the typechecker may need to apply the operator to a few types.
 
-  | OpApp	(HsExpr tyvar uvar id pat)	-- left operand
-		(HsExpr tyvar uvar id pat)	-- operator
+  | OpApp	(HsExpr flexi id pat)	-- left operand
+		(HsExpr flexi id pat)	-- operator
 		Fixity				-- Renamer adds fixity; bottom until then
-		(HsExpr tyvar uvar id pat)	-- right operand
+		(HsExpr flexi id pat)	-- right operand
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
   -- They are eventually removed by the type checker.
 
-  | NegApp	(HsExpr tyvar uvar id pat)	-- negated expr
-		(HsExpr tyvar uvar id pat)	-- the negate id (in a HsVar)
+  | NegApp	(HsExpr flexi id pat)	-- negated expr
+		(HsExpr flexi id pat)	-- the negate id (in a HsVar)
 
-  | HsPar	(HsExpr tyvar uvar id pat)	-- parenthesised expr
+  | HsPar	(HsExpr flexi id pat)	-- parenthesised expr
 
-  | SectionL	(HsExpr tyvar uvar id pat)	-- operand
-		(HsExpr tyvar uvar id pat)	-- operator
-  | SectionR	(HsExpr tyvar uvar id pat)	-- operator
-		(HsExpr tyvar uvar id pat)	-- operand
+  | SectionL	(HsExpr flexi id pat)	-- operand
+		(HsExpr flexi id pat)	-- operator
+  | SectionR	(HsExpr flexi id pat)	-- operator
+		(HsExpr flexi id pat)	-- operand
 				
-  | HsCase	(HsExpr tyvar uvar id pat)
-		[Match  tyvar uvar id pat]	-- must have at least one Match
+  | HsCase	(HsExpr flexi id pat)
+		[Match  flexi id pat]	-- must have at least one Match
 		SrcLoc
 
-  | HsIf	(HsExpr tyvar uvar id pat)	--  predicate
-		(HsExpr tyvar uvar id pat)	--  then part
-		(HsExpr tyvar uvar id pat)	--  else part
+  | HsIf	(HsExpr flexi id pat)	--  predicate
+		(HsExpr flexi id pat)	--  then part
+		(HsExpr flexi id pat)	--  else part
 		SrcLoc
 
-  | HsLet	(HsBinds tyvar uvar id pat)	-- let(rec)
-		(HsExpr  tyvar uvar id pat)
+  | HsLet	(HsBinds flexi id pat)	-- let(rec)
+		(HsExpr  flexi id pat)
 
   | HsDo	DoOrListComp
-		[Stmt tyvar uvar id pat]	-- "do":one or more stmts
+		[Stmt flexi id pat]	-- "do":one or more stmts
 		SrcLoc
 
   | HsDoOut	DoOrListComp
-		[Stmt   tyvar uvar id pat]	-- "do":one or more stmts
+		[Stmt   flexi id pat]	-- "do":one or more stmts
 		id				-- id for return
 		id				-- id for >>=
 		id				-- id for zero
-		(GenType tyvar uvar)		-- Type of the whole expression
+		(GenType flexi)		-- Type of the whole expression
 		SrcLoc
 
   | ExplicitList		-- syntactic list
-		[HsExpr tyvar uvar id pat]
+		[HsExpr flexi id pat]
   | ExplicitListOut		-- TRANSLATION
-		(GenType tyvar uvar)	-- Gives type of components of list
-		[HsExpr tyvar uvar id pat]
+		(GenType flexi)	-- Gives type of components of list
+		[HsExpr flexi id pat]
 
   | ExplicitTuple		-- tuple
-		[HsExpr tyvar uvar id pat]
+		[HsExpr flexi id pat]
 				-- NB: Unit is ExplicitTuple []
 				-- for tuples, we can get the types
 				-- direct from the components
 
-	-- Record construction
-  | RecordCon	id
-		(HsRecordBinds tyvar uvar id pat)
+  | HsCon Id			-- TRANSLATION; a saturated constructor application
+	  [GenType flexi]
+	  [HsExpr flexi id pat]
 
-  | RecordConOut id				-- The constructor
-		 (HsExpr tyvar uvar id pat)	-- The constructor applied to type/dict args
-		 (HsRecordBinds tyvar uvar id pat)
+	-- Record construction
+  | RecordCon	id				-- The constructor
+		(HsExpr flexi id pat)		-- Always (HsVar id) until type checker,
+						-- but the latter adds its type args too
+		(HsRecordBinds flexi id pat)
 
 	-- Record update
-  | RecordUpd	(HsExpr tyvar uvar id pat)
-		(HsRecordBinds tyvar uvar id pat)
+  | RecordUpd	(HsExpr flexi id pat)
+		(HsRecordBinds flexi id pat)
 
-  | RecordUpdOut (HsExpr tyvar uvar id pat)	-- TRANSLATION
-		 (GenType tyvar uvar)		-- Type of *result* record (may differ from
+  | RecordUpdOut (HsExpr flexi id pat)	-- TRANSLATION
+		 (GenType flexi)		-- Type of *result* record (may differ from
 						-- type of input record)
 		 [id]				-- Dicts needed for construction
-		 (HsRecordBinds tyvar uvar id pat)
+		 (HsRecordBinds flexi id pat)
 
   | ExprWithTySig		-- signature binding
-		(HsExpr tyvar uvar id pat)
+		(HsExpr flexi id pat)
 		(HsType id)
   | ArithSeqIn			-- arithmetic sequence
-		(ArithSeqInfo tyvar uvar id pat)
+		(ArithSeqInfo flexi id pat)
   | ArithSeqOut
-		(HsExpr       tyvar uvar id pat) -- (typechecked, of course)
-		(ArithSeqInfo tyvar uvar id pat)
+		(HsExpr       flexi id pat) -- (typechecked, of course)
+		(ArithSeqInfo flexi id pat)
 
   | CCall	FAST_STRING	-- call into the C world; string is
-		[HsExpr tyvar uvar id pat]	-- the C function; exprs are the
+		[HsExpr flexi id pat]	-- the C function; exprs are the
 				-- arguments to pass.
 		Bool		-- True <=> might cause Haskell
 				-- garbage-collection (must generate
@@ -149,45 +140,33 @@ data HsExpr tyvar uvar id pat
 				-- NOTE: this CCall is the *boxed*
 				-- version; the desugarer will convert
 				-- it into the unboxed "ccall#".
-		(GenType tyvar uvar)	-- The result type; will be *bottom*
+		(GenType flexi)	-- The result type; will be *bottom*
 				-- until the typechecker gets ahold of it
 
   | HsSCC	FAST_STRING	-- "set cost centre" (_scc_) annotation
-		(HsExpr tyvar uvar id pat) -- expr whose cost is to be measured
+		(HsExpr flexi id pat) -- expr whose cost is to be measured
 \end{code}
 
 Everything from here on appears only in typechecker output.
 
 \begin{code}
   | TyLam			-- TRANSLATION
-		[tyvar]
-		(HsExpr tyvar uvar id pat)
+		[GenTyVar flexi]
+		(HsExpr flexi id pat)
   | TyApp			-- TRANSLATION
-		(HsExpr  tyvar uvar id pat) -- generated by Spec
-		[GenType tyvar uvar]
+		(HsExpr  flexi id pat) -- generated by Spec
+		[GenType flexi]
 
   -- DictLam and DictApp are "inverses"
   |  DictLam
 		[id]
-		(HsExpr tyvar uvar id pat)
+		(HsExpr flexi id pat)
   |  DictApp
-		(HsExpr tyvar uvar id pat)
+		(HsExpr flexi id pat)
 		[id]
 
-  -- ClassDictLam and Dictionary are "inverses" (see note below)
-  |  ClassDictLam
-		[id]		-- superclass dicts
-		[id]		-- methods
-		(HsExpr tyvar uvar id pat)
-  |  Dictionary
-		[id]		-- superclass dicts
-		[id]		-- methods
-
-  |  SingleDict			-- a simple special case of Dictionary
-		id		-- local dictionary name
-
-type HsRecordBinds tyvar uvar id pat
-  = [(id, HsExpr tyvar uvar id pat, Bool)]
+type HsRecordBinds flexi id pat
+  = [(id, HsExpr flexi id pat, Bool)]
 	-- True <=> source code used "punning",
 	-- i.e. {op1, op2} rather than {op1=e1, op2=e2}
 \end{code}
@@ -199,188 +178,172 @@ A @Dictionary@, unless of length 0 or 1, becomes a tuple.  A
 \end{verbatim}
 
 \begin{code}
-instance (NamedThing id, Outputable id, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (HsExpr tyvar uvar id pat) where
-    ppr sty expr = pprQuote sty $ \ sty -> pprExpr sty expr
+instance (NamedThing id, Outputable id, Outputable pat) =>
+		Outputable (HsExpr flexi id pat) where
+    ppr expr = pprExpr expr
 \end{code}
 
 \begin{code}
-pprExpr :: (NamedThing id, Outputable id, Outputable pat, 
-	    Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-        => PprStyle -> HsExpr tyvar uvar id pat -> Doc
+pprExpr :: (NamedThing id, Outputable id, Outputable pat)
+        => HsExpr flexi id pat -> SDoc
 
-pprExpr sty (HsVar v) = ppr sty v
+pprExpr e = pprDeeper (ppr_expr e)
 
-pprExpr sty (HsLit    lit)   = ppr sty lit
-pprExpr sty (HsLitOut lit _) = ppr sty lit
+ppr_expr (HsVar v) = ppr v
 
-pprExpr sty (HsLam match)
-  = hsep [char '\\', nest 2 (pprMatch sty True match)]
+ppr_expr (HsLit    lit)   = ppr lit
+ppr_expr (HsLitOut lit _) = ppr lit
 
-pprExpr sty expr@(HsApp e1 e2)
+ppr_expr (HsLam match)
+  = hsep [char '\\', nest 2 (pprMatch True match)]
+
+ppr_expr expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
-    (pprExpr sty fun) <+> (sep (map (pprExpr sty) args))
+    (pprExpr fun) <+> (sep (map pprExpr args))
   where
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)
 
-pprExpr sty (OpApp e1 op fixity e2)
+ppr_expr (OpApp e1 op fixity e2)
   = case op of
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
   where
-    pp_e1 = pprParendExpr sty e1		-- Add parens to make precedence clear
-    pp_e2 = pprParendExpr sty e2
+    pp_e1 = pprParendExpr e1		-- Add parens to make precedence clear
+    pp_e2 = pprParendExpr e2
 
     pp_prefixly
-      = hang (pprExpr sty op) 4 (sep [pp_e1, pp_e2])
+      = hang (pprExpr op) 4 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = sep [pp_e1, hsep [ppr sty v, pp_e2]]
+      = sep [pp_e1, hsep [ppr v, pp_e2]]
 
-pprExpr sty (NegApp e _)
-  = (<>) (char '-') (pprParendExpr sty e)
+ppr_expr (NegApp e _)
+  = (<>) (char '-') (pprParendExpr e)
 
-pprExpr sty (HsPar e)
-  = parens (pprExpr sty e)
+ppr_expr (HsPar e)
+  = parens (ppr_expr e)
 
-pprExpr sty (SectionL expr op)
+ppr_expr (SectionL expr op)
   = case op of
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
   where
-    pp_expr = pprParendExpr sty expr
+    pp_expr = pprParendExpr expr
 
-    pp_prefixly = hang (hsep [text " \\ x_ ->", ppr sty op])
+    pp_prefixly = hang (hsep [text " \\ x_ ->", ppr op])
 		       4 (hsep [pp_expr, ptext SLIT("x_ )")])
-    pp_infixly v = parens (sep [pp_expr, ppr sty v])
+    pp_infixly v = parens (sep [pp_expr, ppr v])
 
-pprExpr sty (SectionR op expr)
+ppr_expr (SectionR op expr)
   = case op of
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
   where
-    pp_expr = pprParendExpr sty expr
+    pp_expr = pprParendExpr expr
 
-    pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr sty op, ptext SLIT("x_")])
+    pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext SLIT("x_")])
 		       4 ((<>) pp_expr rparen)
     pp_infixly v
-      = parens (sep [ppr sty v, pp_expr])
+      = parens (sep [ppr v, pp_expr])
 
-pprExpr sty (HsCase expr matches _)
-  = sep [ sep [ptext SLIT("case"), nest 4 (pprExpr sty expr), ptext SLIT("of")],
-	    nest 2 (pprMatches sty (True, empty) matches) ]
+ppr_expr (HsCase expr matches _)
+  = sep [ sep [ptext SLIT("case"), nest 4 (ppr_expr expr), ptext SLIT("of")],
+	    nest 2 (pprMatches (True, empty) matches) ]
 
-pprExpr sty (HsIf e1 e2 e3 _)
-  = sep [hsep [ptext SLIT("if"), nest 2 (pprExpr sty e1), ptext SLIT("then")],
-	   nest 4 (pprExpr sty e2),
+ppr_expr (HsIf e1 e2 e3 _)
+  = sep [hsep [ptext SLIT("if"), nest 2 (ppr_expr e1), ptext SLIT("then")],
+	   nest 4 (ppr_expr e2),
 	   ptext SLIT("else"),
-	   nest 4 (pprExpr sty e3)]
+	   nest 4 (ppr_expr e3)]
 
 -- special case: let ... in let ...
-pprExpr sty (HsLet binds expr@(HsLet _ _))
-  = sep [hang (ptext SLIT("let")) 2 (hsep [ppr sty binds, ptext SLIT("in")]),
-	   ppr sty expr]
+ppr_expr (HsLet binds expr@(HsLet _ _))
+  = sep [hang (ptext SLIT("let")) 2 (hsep [ppr binds, ptext SLIT("in")]),
+	 ppr_expr expr]
 
-pprExpr sty (HsLet binds expr)
-  = sep [hang (ptext SLIT("let")) 2 (ppr sty binds),
-	   hang (ptext SLIT("in"))  2 (ppr sty expr)]
+ppr_expr (HsLet binds expr)
+  = sep [hang (ptext SLIT("let")) 2 (ppr binds),
+	 hang (ptext SLIT("in"))  2 (ppr expr)]
 
-pprExpr sty (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp sty stmts
-pprExpr sty (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp sty stmts
+ppr_expr (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp stmts
+ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts
 
-pprExpr sty (ExplicitList exprs)
-  = brackets (fsep (punctuate comma (map (pprExpr sty) exprs)))
-pprExpr sty (ExplicitListOut ty exprs)
-  = hcat [ brackets (fsep (punctuate comma (map (pprExpr sty) exprs))),
-	   ifnotPprForUser sty ((<>) space (parens (pprGenType sty ty))) ]
+ppr_expr (ExplicitList exprs)
+  = brackets (fsep (punctuate comma (map pprExpr exprs)))
+ppr_expr (ExplicitListOut ty exprs)
+  = hcat [ brackets (fsep (punctuate comma (map pprExpr exprs))),
+	   ifNotPprForUser ((<>) space (parens (pprGenType ty))) ]
 
-pprExpr sty (ExplicitTuple exprs)
-  = parens (sep (punctuate comma (map (pprExpr sty) exprs)))
+ppr_expr (ExplicitTuple exprs)
+  = parens (sep (punctuate comma (map pprExpr exprs)))
 
-pprExpr sty (RecordCon con rbinds)
-  = pp_rbinds sty (ppr sty con) rbinds
-pprExpr sty (RecordConOut con_id con_expr rbinds)
-  = pp_rbinds sty (ppr sty con_expr) rbinds
+ppr_expr (HsCon con_id tys args)
+  = ppr con_id <+> sep (map pprParendGenType tys ++
+		        map pprParendExpr args)
 
-pprExpr sty (RecordUpd aexp rbinds)
-  = pp_rbinds sty (pprParendExpr sty aexp) rbinds
-pprExpr sty (RecordUpdOut aexp _ _ rbinds)
-  = pp_rbinds sty (pprParendExpr sty aexp) rbinds
+ppr_expr (RecordCon con_id con rbinds)
+  = pp_rbinds (ppr con) rbinds
 
-pprExpr sty (ExprWithTySig expr sig)
-  = hang ((<>) (nest 2 (pprExpr sty expr)) (ptext SLIT(" ::")))
-	 4 (ppr sty sig)
+ppr_expr (RecordUpd aexp rbinds)
+  = pp_rbinds (pprParendExpr aexp) rbinds
+ppr_expr (RecordUpdOut aexp _ _ rbinds)
+  = pp_rbinds (pprParendExpr aexp) rbinds
 
-pprExpr sty (ArithSeqIn info)
-  = brackets (ppr sty info)
-pprExpr sty (ArithSeqOut expr info)
-  | userStyle sty = brackets (ppr sty info)
-  | otherwise     = brackets (hcat [parens (ppr sty expr), space, ppr sty info])
+ppr_expr (ExprWithTySig expr sig)
+  = hang (nest 2 (pprExpr expr) <+> ptext SLIT("::"))
+	 4 (ppr sig)
 
-pprExpr sty (CCall fun args _ is_asm result_ty)
+ppr_expr (ArithSeqIn info)
+  = brackets (ppr info)
+ppr_expr (ArithSeqOut expr info)
+  = brackets (ppr info)
+
+ppr_expr (CCall fun args _ is_asm result_ty)
   = hang (if is_asm
-	    then hcat [ptext SLIT("_casm_ ``"), ptext fun, ptext SLIT("''")]
-	    else (<>)  (ptext SLIT("_ccall_ ")) (ptext fun))
-	 4 (sep (map (pprParendExpr sty) args))
+	  then ptext SLIT("_casm_ ``") <> ptext fun <> ptext SLIT("''")
+	  else ptext SLIT("_ccall_") <+> ptext fun)
+       4 (sep (map pprParendExpr args))
 
-pprExpr sty (HsSCC label expr)
-  = sep [ (<>) (ptext SLIT("_scc_ ")) (hcat [char '"', ptext label, char '"']),
-	    pprParendExpr sty expr ]
+ppr_expr (HsSCC label expr)
+  = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ptext label), pprParendExpr expr ]
 
-pprExpr sty (TyLam tyvars expr)
-  = hang (hsep [ptext SLIT("/\\"), interppSP sty tyvars, ptext SLIT("->")])
-	 4 (pprExpr sty expr)
+ppr_expr (TyLam tyvars expr)
+  = hang (hsep [ptext SLIT("/\\"), interppSP tyvars, ptext SLIT("->")])
+	 4 (pprExpr expr)
 
-pprExpr sty (TyApp expr [ty])
-  = hang (pprExpr sty expr) 4 (pprParendGenType sty ty)
+ppr_expr (TyApp expr [ty])
+  = hang (pprExpr expr) 4 (pprParendGenType ty)
 
-pprExpr sty (TyApp expr tys)
-  = hang (pprExpr sty expr)
-	 4 (brackets (interpp'SP sty tys))
+ppr_expr (TyApp expr tys)
+  = hang (pprExpr expr)
+	 4 (brackets (interpp'SP tys))
 
-pprExpr sty (DictLam dictvars expr)
-  = hang (hsep [ptext SLIT("\\{-dict-}"), interppSP sty dictvars, ptext SLIT("->")])
-	 4 (pprExpr sty expr)
+ppr_expr (DictLam dictvars expr)
+  = hang (hsep [ptext SLIT("\\{-dict-}"), interppSP dictvars, ptext SLIT("->")])
+	 4 (pprExpr expr)
 
-pprExpr sty (DictApp expr [dname])
-  = hang (pprExpr sty expr) 4 (ppr sty dname)
+ppr_expr (DictApp expr [dname])
+  = hang (pprExpr expr) 4 (ppr dname)
 
-pprExpr sty (DictApp expr dnames)
-  = hang (pprExpr sty expr)
-	 4 (brackets (interpp'SP sty dnames))
-
-pprExpr sty (ClassDictLam dicts methods expr)
-  = hang (hsep [ptext SLIT("\\{-classdict-}"),
-		   brackets (interppSP sty dicts),
-		   brackets (interppSP sty methods),
-		   ptext SLIT("->")])
-	 4 (pprExpr sty expr)
-
-pprExpr sty (Dictionary dicts methods)
-  = parens (sep [ptext SLIT("{-dict-}"),
-		   brackets (interpp'SP sty dicts),
-		   brackets (interpp'SP sty methods)])
-
-pprExpr sty (SingleDict dname)
-  = hsep [ptext SLIT("{-singleDict-}"), ppr sty dname]
+ppr_expr (DictApp expr dnames)
+  = hang (pprExpr expr)
+	 4 (brackets (interpp'SP dnames))
 
 \end{code}
 
 Parenthesize unless very simple:
 \begin{code}
-pprParendExpr :: (NamedThing id, Outputable id, Outputable pat,
-		  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	      => PprStyle -> HsExpr tyvar uvar id pat -> Doc
+pprParendExpr :: (NamedThing id, Outputable id, Outputable pat)
+	      => HsExpr flexi id pat -> SDoc
 
-pprParendExpr sty expr
+pprParendExpr expr
   = let
-	pp_as_was = pprExpr sty expr
+	pp_as_was = pprExpr expr
     in
     case expr of
-      HsLit l		    -> ppr sty l
-      HsLitOut l _	    -> ppr sty l
+      HsLit l		    -> ppr l
+      HsLitOut l _	    -> ppr l
 
       HsVar _		    -> pp_as_was
       ExplicitList _	    -> pp_as_was
@@ -398,17 +361,20 @@ pprParendExpr sty expr
 %************************************************************************
 
 \begin{code}
-pp_rbinds :: (NamedThing id, Outputable id, Outputable pat,
-		  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	      => PprStyle -> Doc 
-	      -> HsRecordBinds tyvar uvar id pat -> Doc
+pp_rbinds :: (NamedThing id, Outputable id, Outputable pat)
+	      => SDoc 
+	      -> HsRecordBinds flexi id pat -> SDoc
 
-pp_rbinds sty thing rbinds
+pp_rbinds thing rbinds
   = hang thing 
-	 4 (braces (hsep (punctuate comma (map (pp_rbind sty) rbinds))))
+	 4 (braces (hsep (punctuate comma (map (pp_rbind) rbinds))))
   where
-    pp_rbind sty (v, _, True) | userStyle sty = ppr sty v
-    pp_rbind sty (v, e, _)    		      = hsep [ppr sty v, char '=', ppr sty e]
+    pp_rbind (v, e, pun_flag) 
+      = getPprStyle $ \ sty ->
+        if pun_flag && userStyle sty then
+	   ppr v
+	else
+	   hsep [ppr v, char '=', ppr e]
 \end{code}
 
 %************************************************************************
@@ -420,50 +386,49 @@ pp_rbinds sty thing rbinds
 \begin{code}
 data DoOrListComp = DoStmt | ListComp | Guard
 
-pprDo DoStmt sty stmts
-  = hang (ptext SLIT("do")) 2 (vcat (map (ppr sty) stmts))
-pprDo ListComp sty stmts
+pprDo DoStmt stmts
+  = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
+pprDo ListComp stmts
   = brackets $
-    hang (pprExpr sty expr <+> char '|')
-       4 (interpp'SP sty quals)
+    hang (pprExpr expr <+> char '|')
+       4 (interpp'SP quals)
   where
     ReturnStmt expr = last stmts	-- Last stmt should be a ReturnStmt for list comps
     quals	    = init stmts
 \end{code}
 
 \begin{code}
-data Stmt tyvar uvar id pat
+data Stmt flexi id pat
   = BindStmt	pat
-		(HsExpr  tyvar uvar id pat)
+		(HsExpr  flexi id pat)
 		SrcLoc
 
-  | LetStmt	(HsBinds tyvar uvar id pat)
+  | LetStmt	(HsBinds flexi id pat)
 
-  | GuardStmt	(HsExpr  tyvar uvar id pat)		-- List comps only
+  | GuardStmt	(HsExpr  flexi id pat)		-- List comps only
 		SrcLoc
 
-  | ExprStmt	(HsExpr  tyvar uvar id pat)		-- Do stmts only
+  | ExprStmt	(HsExpr  flexi id pat)		-- Do stmts only
 		SrcLoc
 
-  | ReturnStmt	(HsExpr  tyvar uvar id pat)		-- List comps only, at the end
+  | ReturnStmt	(HsExpr  flexi id pat)		-- List comps only, at the end
 \end{code}
 
 \begin{code}
-instance (NamedThing id, Outputable id, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (Stmt tyvar uvar id pat) where
-    ppr sty stmt = pprQuote sty $ \ sty -> pprStmt sty stmt
+instance (NamedThing id, Outputable id, Outputable pat) =>
+		Outputable (Stmt flexi id pat) where
+    ppr stmt = pprStmt stmt
 
-pprStmt sty (BindStmt pat expr _)
- = hsep [ppr sty pat, ptext SLIT("<-"), ppr sty expr]
-pprStmt sty (LetStmt binds)
- = hsep [ptext SLIT("let"), ppr sty binds]
-pprStmt sty (ExprStmt expr _)
- = ppr sty expr
-pprStmt sty (GuardStmt expr _)
- = ppr sty expr
-pprStmt sty (ReturnStmt expr)
- = hsep [ptext SLIT("return"), ppr sty expr]    
+pprStmt (BindStmt pat expr _)
+ = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
+pprStmt (LetStmt binds)
+ = hsep [ptext SLIT("let"), ppr binds]
+pprStmt (ExprStmt expr _)
+ = ppr expr
+pprStmt (GuardStmt expr _)
+ = ppr expr
+pprStmt (ReturnStmt expr)
+ = hsep [ptext SLIT("return"), ppr expr]    
 \end{code}
 
 %************************************************************************
@@ -473,26 +438,25 @@ pprStmt sty (ReturnStmt expr)
 %************************************************************************
 
 \begin{code}
-data ArithSeqInfo  tyvar uvar id pat
-  = From	    (HsExpr tyvar uvar id pat)
-  | FromThen 	    (HsExpr tyvar uvar id pat)
-		    (HsExpr tyvar uvar id pat)
-  | FromTo	    (HsExpr tyvar uvar id pat)
-		    (HsExpr tyvar uvar id pat)
-  | FromThenTo	    (HsExpr tyvar uvar id pat)
-		    (HsExpr tyvar uvar id pat)
-		    (HsExpr tyvar uvar id pat)
+data ArithSeqInfo  flexi id pat
+  = From	    (HsExpr flexi id pat)
+  | FromThen 	    (HsExpr flexi id pat)
+		    (HsExpr flexi id pat)
+  | FromTo	    (HsExpr flexi id pat)
+		    (HsExpr flexi id pat)
+  | FromThenTo	    (HsExpr flexi id pat)
+		    (HsExpr flexi id pat)
+		    (HsExpr flexi id pat)
 \end{code}
 
 \begin{code}
-instance (NamedThing id, Outputable id, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (ArithSeqInfo tyvar uvar id pat) where
-    ppr sty (From e1)		= hcat [ppr sty e1, pp_dotdot]
-    ppr sty (FromThen e1 e2)	= hcat [ppr sty e1, comma, space, ppr sty e2, pp_dotdot]
-    ppr sty (FromTo e1 e3)	= hcat [ppr sty e1, pp_dotdot, ppr sty e3]
-    ppr sty (FromThenTo e1 e2 e3)
-      = hcat [ppr sty e1, comma, space, ppr sty e2, pp_dotdot, ppr sty e3]
+instance (NamedThing id, Outputable id, Outputable pat) =>
+		Outputable (ArithSeqInfo flexi id pat) where
+    ppr (From e1)		= hcat [ppr e1, pp_dotdot]
+    ppr (FromThen e1 e2)	= hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
+    ppr (FromTo e1 e3)	= hcat [ppr e1, pp_dotdot, ppr e3]
+    ppr (FromThenTo e1 e2 e3)
+      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot, ppr e3]
 
 pp_dotdot = ptext SLIT(" .. ")
 \end{code}

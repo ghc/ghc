@@ -2,10 +2,10 @@
 #include "hspincl.h"
 %}
 %{{
+module U_entidt where
+
 #include "HsVersions.h"
 
-module U_entidt where
-IMP_Ubiq() --  debugging consistency check
 import UgenUtil
 
 import U_list

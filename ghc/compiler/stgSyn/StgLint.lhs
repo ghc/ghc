@@ -4,11 +4,9 @@
 \section[StgLint]{A ``lint'' pass to check for Stg correctness}
 
 \begin{code}
-#include "HsVersions.h"
-
 module StgLint ( lintStgBindings ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import StgSyn
 
@@ -16,22 +14,23 @@ import Bag		( Bag, emptyBag, isEmptyBag, snocBag, foldBag )
 import Id		( idType, isAlgCon, dataConArgTys,
 			  emptyIdSet, isEmptyIdSet, elementOfIdSet,
 			  mkIdSet, intersectIdSets, 
-			  unionIdSets, idSetToList, SYN_IE(IdSet),
-			  GenId{-instanced NamedThing-}, SYN_IE(Id)
+			  unionIdSets, idSetToList, IdSet,
+			  GenId{-instanced NamedThing-}, Id
 			)
 import Literal		( literalType, Literal{-instance Outputable-} )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc )
-import Outputable	( PprStyle, Outputable(..){-instance * []-} )
+import ErrUtils		( ErrMsg )
 import PprType		( GenType{-instance Outputable-}, TyCon )
-import Pretty		-- quite a bit of it
 import PrimOp		( primOpType )
 import SrcLoc		( SrcLoc{-instance Outputable-} )
-import Type		( mkFunTys, splitFunTy, maybeAppDataTyConExpandingDicts,
-			  isTyVarTy, eqTy, splitFunTyExpandingDicts, SYN_IE(Type)
+import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe,
+			  isTyVarTy, Type
 			)
 import TyCon		( isDataTyCon )
-import Util		( zipEqual, pprPanic, panic, panic# )
+import Util		( zipEqual )
+import GlaExts		( trace )
+import Outputable
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
 
@@ -51,17 +50,17 @@ Checks for
 @lintStgBindings@ is the top-level interface function.
 
 \begin{code}
-lintStgBindings :: PprStyle -> String -> [StgBinding] -> [StgBinding]
+lintStgBindings :: String -> [StgBinding] -> [StgBinding]
 
-lintStgBindings sty whodunnit binds
+lintStgBindings whodunnit binds
   = _scc_ "StgLint"
     case (initL (lint_binds binds)) of
       Nothing  -> binds
       Just msg -> pprPanic "" (vcat [
-			ptext SLIT("*** Stg Lint Errors: in "),text whodunnit, ptext SLIT(" ***"),
-			msg sty,
+			ptext SLIT("*** Stg Lint ErrMsgs: in "),text whodunnit, ptext SLIT(" ***"),
+			msg,
 			ptext SLIT("*** Offending Program ***"),
-			pprStgBindings sty binds,
+			pprStgBindings binds,
 			ptext SLIT("*** End of Offense ***")])
   where
     lint_binds :: [StgBinding] -> LintM ()
@@ -181,7 +180,7 @@ lintStgExpr e@(StgCase scrut _ _ _ alts)
   = lintStgExpr scrut		`thenMaybeL` \ _ ->
 
 	-- Check that it is a data type
-    case (maybeAppDataTyConExpandingDicts scrut_ty) of
+    case (splitAlgTyConApp_maybe scrut_ty) of
       Just (tycon, _, _) | isDataTyCon tycon
 	      -> lintStgAlts alts scrut_ty tycon
       other   -> addErrL (mkCaseDataConMsg e)	`thenL_`
@@ -221,7 +220,7 @@ lintStgAlts alts scrut_ty case_tycon
 	  check ty = checkTys first_ty ty (mkCaseAltMsg alts)
 
 lintAlgAlt scrut_ty (con, args, _, rhs)
-  = (case maybeAppDataTyConExpandingDicts scrut_ty of
+  = (case splitAlgTyConApp_maybe scrut_ty of
       Nothing ->
 	 addErrL (mkAlgAltMsg1 scrut_ty)
       Just (tycon, tys_applied, cons) ->
@@ -271,31 +270,29 @@ type LintM a = [LintLocInfo] 	-- Locations
 	    -> Bag ErrMsg	-- Error messages so far
 	    -> (a, Bag ErrMsg)	-- Result and error messages (if any)
 
-type ErrMsg = PprStyle -> Doc
-
 data LintLocInfo
   = RhsOf Id		-- The variable bound
   | LambdaBodyOf [Id]	-- The lambda-binder
   | BodyOfLetRec [Id]	-- One of the binders
 
 instance Outputable LintLocInfo where
-    ppr sty (RhsOf v)
-      = hcat [ppr sty (getSrcLoc v), ptext SLIT(": [RHS of "), pp_binders sty [v], char ']']
+    ppr (RhsOf v)
+      = hcat [ppr (getSrcLoc v), ptext SLIT(": [RHS of "), pp_binders [v], char ']']
 
-    ppr sty (LambdaBodyOf bs)
-      = hcat [ppr sty (getSrcLoc (head bs)),
-		ptext SLIT(": [in body of lambda with binders "), pp_binders sty bs, char ']']
+    ppr (LambdaBodyOf bs)
+      = hcat [ppr (getSrcLoc (head bs)),
+		ptext SLIT(": [in body of lambda with binders "), pp_binders bs, char ']']
 
-    ppr sty (BodyOfLetRec bs)
-      = hcat [ppr sty (getSrcLoc (head bs)),
-		ptext SLIT(": [in body of letrec with binders "), pp_binders sty bs, char ']']
+    ppr (BodyOfLetRec bs)
+      = hcat [ppr (getSrcLoc (head bs)),
+		ptext SLIT(": [in body of letrec with binders "), pp_binders bs, char ']']
 
-pp_binders :: PprStyle -> [Id] -> Doc
-pp_binders sty bs
+pp_binders :: [Id] -> SDoc
+pp_binders bs
   = sep (punctuate comma (map pp_binder bs))
   where
     pp_binder b
-      = hsep [ppr sty b, ptext SLIT("::"), ppr sty (idType b)]
+      = hsep [ppr b, ptext SLIT("::"), ppr (idType b)]
 \end{code}
 
 \begin{code}
@@ -305,9 +302,7 @@ initL m
     if isEmptyBag errs then
 	Nothing
     else
-	Just ( \ sty ->
-	  foldBag ($$) ( \ msg -> msg sty ) empty errs
-	)
+	Just (foldBag ($$) (\ msg -> msg) empty errs)
     }
 
 returnL :: a -> LintM a
@@ -362,9 +357,7 @@ addErrL msg loc scope errs = ((), addErr errs msg loc)
 addErr :: Bag ErrMsg -> ErrMsg -> [LintLocInfo] -> Bag ErrMsg
 
 addErr errs_so_far msg locs
-  = errs_so_far `snocBag` ( \ sty ->
-    hang (ppr sty (head locs)) 4 (msg sty)
-    )
+  = errs_so_far `snocBag` (hang (ppr (head locs)) 4 msg)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs
@@ -385,7 +378,7 @@ addInScopeVars ids m loc scope errs
 --  names after all.  WDP 94/07
 --  (if isEmptyIdSet shadowed
 --  then id
---  else pprTrace "Shadowed vars:" (ppr PprDebug (idSetToList shadowed))) $
+--  else pprTrace "Shadowed vars:" (ppr (idSetToList shadowed))) $
     m loc (scope `unionIdSets` new_set) errs
 \end{code}
 
@@ -398,7 +391,7 @@ checkFunApp :: Type 		-- The function type
 checkFunApp fun_ty arg_tys msg loc scope errs
   = cfa res_ty expected_arg_tys arg_tys
   where
-    (expected_arg_tys, res_ty) = splitFunTyExpandingDicts fun_ty
+    (expected_arg_tys, res_ty) = splitFunTys fun_ty
 
     cfa res_ty expected []	-- Args have run out; that's fine
       = (Just (mkFunTys expected res_ty), errs)
@@ -410,7 +403,7 @@ checkFunApp fun_ty arg_tys msg loc scope errs
       | isTyVarTy res_ty
       = (Just res_ty, errs)
       | otherwise
-      = case splitFunTy (unDictifyTy res_ty) of
+      = case splitFunTys (unDictifyTy res_ty) of
 	  ([], _) 		  -> (Nothing, addErr errs msg loc)	-- Too many args
 	  (new_expected, new_res) -> cfa new_res new_expected arg_tys
 
@@ -424,7 +417,7 @@ checkFunApp fun_ty arg_tys msg loc scope errs
 checkInScope :: Id -> LintM ()
 checkInScope id loc scope errs
   = if isLocallyDefined id && not (isAlgCon id) && not (id `elementOfIdSet` scope) then
-	((), addErr errs (\ sty -> hsep [ppr sty id, ptext SLIT("is out of scope")]) loc)
+	((), addErr errs (hsep [ppr id, ptext SLIT("is out of scope")]) loc)
     else
 	((), errs)
 
@@ -437,99 +430,99 @@ checkTys ty1 ty2 msg loc scope errs
 
 \begin{code}
 mkCaseAltMsg :: StgCaseAlts -> ErrMsg
-mkCaseAltMsg alts sty
+mkCaseAltMsg alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
-	    -- LATER: (ppr sty alts)
+	    -- LATER: (ppr alts)
 	    (panic "mkCaseAltMsg")
 
 mkCaseDataConMsg :: StgExpr -> ErrMsg
-mkCaseDataConMsg expr sty
+mkCaseDataConMsg expr
   = ($$) (ptext SLIT("A case scrutinee not a type-constructor type:"))
-	    (pp_expr sty expr)
+	    (pp_expr expr)
 
 mkCaseAbstractMsg :: TyCon -> ErrMsg
-mkCaseAbstractMsg tycon sty
+mkCaseAbstractMsg tycon
   = ($$) (ptext SLIT("An algebraic case on an abstract type:"))
-	    (ppr sty tycon)
+	    (ppr tycon)
 
 mkDefltMsg :: StgCaseDefault -> ErrMsg
-mkDefltMsg deflt sty
+mkDefltMsg deflt
   = ($$) (ptext SLIT("Binder in default case of a case expression doesn't match type of scrutinee:"))
-	    --LATER: (ppr sty deflt)
+	    --LATER: (ppr deflt)
 	    (panic "mkDefltMsg")
 
 mkFunAppMsg :: Type -> [Type] -> StgExpr -> ErrMsg
-mkFunAppMsg fun_ty arg_tys expr sty
+mkFunAppMsg fun_ty arg_tys expr
   = vcat [text "In a function application, function type doesn't match arg types:",
-	      hang (ptext SLIT("Function type:")) 4 (ppr sty fun_ty),
-	      hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr sty) arg_tys)),
-	      hang (ptext SLIT("Expression:")) 4 (pp_expr sty expr)]
+	      hang (ptext SLIT("Function type:")) 4 (ppr fun_ty),
+	      hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr) arg_tys)),
+	      hang (ptext SLIT("Expression:")) 4 (pp_expr expr)]
 
 mkRhsConMsg :: Type -> [Type] -> ErrMsg
-mkRhsConMsg fun_ty arg_tys sty
+mkRhsConMsg fun_ty arg_tys
   = vcat [text "In a RHS constructor application, con type doesn't match arg types:",
-	      hang (ptext SLIT("Constructor type:")) 4 (ppr sty fun_ty),
-	      hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr sty) arg_tys))]
+	      hang (ptext SLIT("Constructor type:")) 4 (ppr fun_ty),
+	      hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr) arg_tys))]
 
 mkUnappTyMsg :: Id -> Type -> ErrMsg
-mkUnappTyMsg var ty sty
+mkUnappTyMsg var ty
   = vcat [text "Variable has a for-all type, but isn't applied to any types.",
-	      (<>) (ptext SLIT("Var:      ")) (ppr sty var),
-	      (<>) (ptext SLIT("Its type: ")) (ppr sty ty)]
+	      (<>) (ptext SLIT("Var:      ")) (ppr var),
+	      (<>) (ptext SLIT("Its type: ")) (ppr ty)]
 
 mkAlgAltMsg1 :: Type -> ErrMsg
-mkAlgAltMsg1 ty sty
+mkAlgAltMsg1 ty
   = ($$) (text "In some case statement, type of scrutinee is not a data type:")
-	    (ppr sty ty)
+	    (ppr ty)
 
 mkAlgAltMsg2 :: Type -> Id -> ErrMsg
-mkAlgAltMsg2 ty con sty
+mkAlgAltMsg2 ty con
   = vcat [
 	text "In some algebraic case alternative, constructor is not a constructor of scrutinee type:",
-	ppr sty ty,
-	ppr sty con
+	ppr ty,
+	ppr con
     ]
 
 mkAlgAltMsg3 :: Id -> [Id] -> ErrMsg
-mkAlgAltMsg3 con alts sty
+mkAlgAltMsg3 con alts
   = vcat [
 	text "In some algebraic case alternative, number of arguments doesn't match constructor:",
-	ppr sty con,
-	ppr sty alts
+	ppr con,
+	ppr alts
     ]
 
 mkAlgAltMsg4 :: Type -> Id -> ErrMsg
-mkAlgAltMsg4 ty arg sty
+mkAlgAltMsg4 ty arg
   = vcat [
 	text "In some algebraic case alternative, type of argument doesn't match data constructor:",
-	ppr sty ty,
-	ppr sty arg
+	ppr ty,
+	ppr arg
     ]
 
 mkPrimAltMsg :: (Literal, StgExpr) -> ErrMsg
-mkPrimAltMsg alt sty
+mkPrimAltMsg alt
   = ($$) (text "In a primitive case alternative, type of literal doesn't match type of scrutinee:")
-	    (ppr sty alt)
+	    (ppr alt)
 
 mkRhsMsg :: Id -> Type -> ErrMsg
-mkRhsMsg binder ty sty
+mkRhsMsg binder ty
   = vcat [hsep [ptext SLIT("The type of this binder doesn't match the type of its RHS:"),
-		     ppr sty binder],
-	      hsep [ptext SLIT("Binder's type:"), ppr sty (idType binder)],
-	      hsep [ptext SLIT("Rhs type:"), ppr sty ty]
+		     ppr binder],
+	      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)],
+	      hsep [ptext SLIT("Rhs type:"), ppr ty]
 	     ]
 
-pp_expr :: PprStyle -> StgExpr -> Doc
-pp_expr sty expr = ppr sty expr
+pp_expr :: StgExpr -> SDoc
+pp_expr expr = ppr expr
 
 sleazy_eq_ty ty1 ty2
 	-- NB: probably severe overkill (WDP 95/04)
   = trace "StgLint.sleazy_eq_ty:use eqSimplTy?" $
-    case (splitFunTyExpandingDicts ty1) of { (tyargs1,tyres1) ->
-    case (splitFunTyExpandingDicts ty2) of { (tyargs2,tyres2) ->
+    case (splitFunTys ty1) of { (tyargs1,tyres1) ->
+    case (splitFunTys ty2) of { (tyargs2,tyres2) ->
     let
 	ty11 = mkFunTys tyargs1 tyres1
 	ty22 = mkFunTys tyargs2 tyres2
     in
-    ty11 `eqTy` ty22 }}
+    ty11 == ty22 }}
 \end{code}

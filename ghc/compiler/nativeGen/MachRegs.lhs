@@ -10,16 +10,15 @@ often/usually quite entangled with registers.
 modules --- the pleasure has been foregone.)
 
 \begin{code}
-#include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
 module MachRegs (
 
 	Reg(..),
 	Imm(..),
-	Address(..),
+	MachRegsAddr(..),
 	RegLoc(..),
-	SYN_IE(RegNo),
+	RegNo,
 
 	addrOffset,
 	argRegs,
@@ -59,23 +58,21 @@ module MachRegs (
 #endif
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import AbsCSyn		( MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel )
-import Outputable       ( Outputable(..) )
-import Pretty		( Doc, text, rational )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix		( sStLitLbl, StixTree(..), StixReg(..),
 			  CodeSegment
 			)
 import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
-			  Unique{-instance Ord3-}, Uniquable(..)
+			  Uniquable(..), Unique
 			)
-import UniqSupply	( getUnique, returnUs, thenUs, SYN_IE(UniqSM) )
-import Util		( panic, Ord3(..) )
+import UniqSupply	( getUnique, returnUs, thenUs, UniqSM )
+import Outputable
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -85,8 +82,8 @@ data Imm
   = ImmInt	Int
   | ImmInteger	Integer	    -- Sigh.
   | ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
-  | ImmLab	Doc    -- Simple string label (underscore-able)
-  | ImmLit	Doc    -- Simple string
+  | ImmLab	SDoc    -- Simple string label (underscore-able)
+  | ImmLit	SDoc    -- Simple string
   IF_ARCH_sparc(
   | LO Imm		    -- Possible restrictions...
   | HI Imm
@@ -103,7 +100,7 @@ dblImmLit r
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 \begin{code}
-data Address
+data MachRegsAddr
 #if alpha_TARGET_ARCH
   = AddrImm	Imm
   | AddrReg	Reg
@@ -111,8 +108,8 @@ data Address
 #endif
 
 #if i386_TARGET_ARCH
-  = Address	Base Index Displacement
-  | ImmAddr	Imm Int
+  = AddrBaseIndex	Base Index Displacement
+  | ImmAddr		Imm Int
 
 type Base         = Maybe Reg
 type Index        = Maybe (Reg, Int)	-- Int is 2, 4 or 8
@@ -124,7 +121,7 @@ type Displacement = Imm
   | AddrRegImm	Reg Imm
 #endif
 
-addrOffset :: Address -> Int -> Maybe Address
+addrOffset :: MachRegsAddr -> Int -> Maybe MachRegsAddr
 
 addrOffset addr off
   = case addr of
@@ -132,10 +129,10 @@ addrOffset addr off
       _ -> panic "MachMisc.addrOffset not defined for Alpha"
 #endif
 #if i386_TARGET_ARCH
-      ImmAddr i off0	     -> Just (ImmAddr i (off0 + off))
-      Address r i (ImmInt n) -> Just (Address r i (ImmInt (n + off)))
-      Address r i (ImmInteger n)
-	-> Just (Address r i (ImmInt (fromInteger (n + toInteger off))))
+      ImmAddr i off0	  -> Just (ImmAddr i (off0 + off))
+      AddrBaseIndex r i (ImmInt n) -> Just (AddrBaseIndex r i (ImmInt (n + off)))
+      AddrBaseIndex r i (ImmInteger n)
+	-> Just (AddrBaseIndex r i (ImmInt (fromInteger (n + toInteger off))))
       _ -> Nothing
 #endif
 #if sparc_TARGET_ARCH
@@ -251,17 +248,17 @@ applicable, is the same but for the frame pointer.
 
 \begin{code}
 spRel :: Int	-- desired stack offset in words, positive or negative
-      -> Address
+      -> MachRegsAddr
 
 spRel n
 #if i386_TARGET_ARCH
-  = Address (Just esp) Nothing (ImmInt (n * BYTES_PER_WORD))
+  = AddrBaseIndex (Just esp) Nothing (ImmInt (n * BYTES_PER_WORD))
 #else
   = AddrRegImm sp (ImmInt (n * BYTES_PER_WORD))
 #endif
 
 #if sparc_TARGET_ARCH
-fpRel :: Int -> Address
+fpRel :: Int -> MachRegsAddr
     -- Duznae work for offsets greater than 13 bits; we just hope for
     -- the best
 fpRel n
@@ -313,43 +310,37 @@ instance Text Reg where
 
 #ifdef DEBUG
 instance Outputable Reg where
-    ppr sty r = text (show r)
+    ppr r = text (show r)
 #endif
 
 cmpReg (FixedReg i)      (FixedReg i')      = cmp_ihash i i'
 cmpReg (MappedReg i)     (MappedReg i')     = cmp_ihash i i'
-cmpReg (MemoryReg i _)   (MemoryReg i' _)   = cmp_i i i'
-cmpReg (UnmappedReg u _) (UnmappedReg u' _) = cmp u u'
+cmpReg (MemoryReg i _)   (MemoryReg i' _)   = i `compare` i'
+cmpReg (UnmappedReg u _) (UnmappedReg u' _) = compare u u'
 cmpReg r1 r2
   = let tag1 = tagReg r1
 	tag2 = tagReg r2
     in
-	if tag1 _LT_ tag2 then LT_ else GT_
+	if tag1 _LT_ tag2 then LT else GT
     where
 	tagReg (FixedReg _)	 = (ILIT(1) :: FAST_INT)
 	tagReg (MappedReg _)	 = ILIT(2)
 	tagReg (MemoryReg _ _)	 = ILIT(3)
 	tagReg (UnmappedReg _ _) = ILIT(4)
 
-cmp_i :: Int -> Int -> TAG_
-cmp_i a1 a2 = if a1 == a2 then EQ_ else if a1 < a2 then LT_ else GT_
-
-cmp_ihash :: FAST_INT -> FAST_INT -> TAG_
-cmp_ihash a1 a2 = if a1 _EQ_ a2 then EQ_ else if a1 _LT_ a2 then LT_ else GT_
-
-instance Ord3 Reg where
-    cmp = cmpReg
+cmp_ihash :: FAST_INT -> FAST_INT -> Ordering
+cmp_ihash a1 a2 = if a1 _EQ_ a2 then EQ else if a1 _LT_ a2 then LT else GT
 
 instance Eq Reg where
-    a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
-    a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True  }
+    a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
+    a /= b = case (a `compare` b) of { EQ -> False; _ -> True  }
 
 instance Ord Reg where
-    a <= b = case (a `cmp` b) of { LT_ -> True;	EQ_ -> True;  GT__ -> False }
-    a <	 b = case (a `cmp` b) of { LT_ -> True;	EQ_ -> False; GT__ -> False }
-    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-    _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
+    a <= b = case (a `compare` b) of { LT -> True;	EQ -> True;  GT -> False }
+    a <	 b = case (a `compare` b) of { LT -> True;	EQ -> False; GT -> False }
+    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
+    a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
+    compare a b = cmpReg a b
 
 instance Uniquable Reg where
     uniqueOf (UnmappedReg u _) = u

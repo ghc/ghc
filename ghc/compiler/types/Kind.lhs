@@ -4,10 +4,9 @@
 \section[Kind]{The @Kind@ datatype}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Kind (
-	Kind(..),		-- Only visible to friends: TcKind
+        GenKind(..),	-- Only visible to friends: TcKind
+	Kind,	
 
 	mkArrowKind,
 	mkTypeKind,
@@ -19,44 +18,53 @@ module Kind (
 
 	pprKind, pprParendKind,
 
-	isUnboxedTypeKind, isTypeKind, isBoxedTypeKind,
-	notArrowKind
+	isUnboxedTypeKind, isTypeKind, isBoxedTypeKind
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
 import Util		( panic, assertPanic )
-
-import Outputable	( Outputable(..), pprQuote )
-import Pretty
+import Unique		( Unique, pprUnique )
+import BasicTypes	( Unused )
+import Outputable
 \end{code}
 
 \begin{code}
-data Kind
+data GenKind flexi
   = TypeKind		-- Any type (incl unboxed types)
   | BoxedTypeKind	-- Any boxed type
   | UnboxedTypeKind	-- Any unboxed type
-  | ArrowKind Kind Kind
-  deriving Eq
+  | ArrowKind (GenKind flexi) (GenKind flexi)
+  | VarKind Unique flexi
+
+type Kind = GenKind Unused	-- No variables at all
+
+instance Eq (GenKind flexi) where
+  TypeKind          == TypeKind          = True
+  BoxedTypeKind     == BoxedTypeKind	 = True
+  UnboxedTypeKind   == UnboxedTypeKind	 = True
+  (ArrowKind j1 j2) == (ArrowKind k1 k2) = j1==k1 && j2==k2
+  (VarKind u1 _)    == (VarKind u2 _)    = u1==u2
+  k1		    == k2		 = False
 
 mkArrowKind 	  = ArrowKind
 mkTypeKind  	  = TypeKind
 mkUnboxedTypeKind = UnboxedTypeKind
 mkBoxedTypeKind   = BoxedTypeKind
 
-isTypeKind :: Kind -> Bool
+isTypeKind :: GenKind flexi -> Bool
 isTypeKind TypeKind = True
 isTypeKind other    = False
 
-isBoxedTypeKind :: Kind -> Bool
+isBoxedTypeKind :: GenKind flexi -> Bool
 isBoxedTypeKind BoxedTypeKind = True
 isBoxedTypeKind other         = False
 
-isUnboxedTypeKind :: Kind -> Bool
+isUnboxedTypeKind :: GenKind flexi -> Bool
 isUnboxedTypeKind UnboxedTypeKind = True
 isUnboxedTypeKind other	 	  = False
 
-hasMoreBoxityInfo :: Kind -> Kind -> Bool
+hasMoreBoxityInfo :: GenKind flexi -> GenKind flexi -> Bool
 
 BoxedTypeKind 	`hasMoreBoxityInfo` TypeKind	    = True
 BoxedTypeKind   `hasMoreBoxityInfo` BoxedTypeKind   = True
@@ -66,22 +74,21 @@ UnboxedTypeKind `hasMoreBoxityInfo` UnboxedTypeKind = True
 
 TypeKind	`hasMoreBoxityInfo` TypeKind	    = True
 
-kind1@(ArrowKind _ _) `hasMoreBoxityInfo` kind2@(ArrowKind _ _) = ASSERT( kind1 == kind2 )
-								  True
+kind1@(ArrowKind _ _) `hasMoreBoxityInfo` kind2@(ArrowKind _ _)
+  = ASSERT( if kind1 == kind2 then True
+	    else pprPanic "hadMoreBoxityInfo" (ppr kind1 <> comma <+> ppr kind2) )
+    True
 	-- The two kinds can be arrow kinds; for example when unifying
 	-- (m1 Int) and (m2 Int) we end up unifying m1 and m2, which should
 	-- have the same kind.
 
 kind1		`hasMoreBoxityInfo` kind2	    = False
 
-notArrowKind (ArrowKind _ _) = False
-notArrowKind other_kind	     = True
-
-resultKind :: Kind -> Kind	-- Get result from arrow kind
+resultKind :: GenKind flexi -> GenKind flexi	-- Get result from arrow kind
 resultKind (ArrowKind _ res_kind) = res_kind
 resultKind other_kind 		  = panic "resultKind"
 
-argKind :: Kind -> Kind		-- Get argument from arrow kind
+argKind :: GenKind flexi -> GenKind flexi		-- Get argument from arrow kind
 argKind (ArrowKind arg_kind _) = arg_kind
 argKind other_kind 	       = panic "argKind"
 \end{code}
@@ -89,13 +96,14 @@ argKind other_kind 	       = panic "argKind"
 Printing
 ~~~~~~~~
 \begin{code}
-instance Outputable Kind where
-  ppr sty kind = pprQuote sty $ \ _ -> pprKind kind
+instance Outputable (GenKind flexi) where
+  ppr kind = pprKind kind
 
-pprKind TypeKind        = text "**"	-- Can be boxed or unboxed
-pprKind BoxedTypeKind   = char '*'
-pprKind UnboxedTypeKind = text  "*#"	-- Unboxed
+pprKind TypeKind          = text "**"	-- Can be boxed or unboxed
+pprKind BoxedTypeKind     = char '*'
+pprKind UnboxedTypeKind   = text  "*#"	-- Unboxed
 pprKind (ArrowKind k1 k2) = sep [pprParendKind k1, text "->", pprKind k2]
+pprKind (VarKind u _)     = char 'k' <> pprUnique u
 
 pprParendKind k@(ArrowKind _ _) = parens (pprKind k)
 pprParendKind k		 	= pprKind k

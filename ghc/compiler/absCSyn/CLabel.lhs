@@ -4,8 +4,6 @@
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
 \begin{code}
-#include "HsVersions.h"
-
 module CLabel (
 	CLabel,	-- abstract type
 
@@ -47,15 +45,11 @@ module CLabel (
 #endif
     ) where
 
-IMP_Ubiq(){-uitous-}
 
+#include "HsVersions.h"
 
 #if ! OMIT_NATIVE_CODEGEN
-# if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(NcgLoop)		( underscorePrefix, fmtAsmLbl )
-# else
 import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
-# endif
 #endif
 
 import CgRetConv	( CtrlReturnConvention(..), ctrlReturnConvAlg )
@@ -64,16 +58,15 @@ import Id		( externallyVisibleId, cmpId_withSpecDataCon,
 			  isDataCon, isDictFunId,
 			  isDefaultMethodId_maybe,
 			  isSuperDictSelId_maybe, fIRST_TAG,
-			  SYN_IE(ConTag), GenId{-instance Outputable-},
-			  SYN_IE(Id)
+			  ConTag, GenId{-instance Outputable-},
+			  Id
 			)
 import Maybes		( maybeToBool )
-import Outputable	( Outputable(..), PprStyle(..) )
 import PprType		( showTyCon, GenType{-instance Outputable-} )
 import TyCon		( TyCon{-instance Eq-} )
 import Unique		( showUnique, pprUnique, Unique{-instance Eq-} )
-import Pretty
-import Util		( assertPanic{-, pprTraceToDo:rm-}, Ord3(..) )
+import Util		( assertPanic{-, pprTraceToDo:rm-} )
+import Outputable
 \end{code}
 
 things we want to find out:
@@ -115,19 +108,16 @@ unspecialised constructors are compared.
 \begin{code}
 data CLabelId = CLabelId Id
 
-instance Ord3 CLabelId where
-    cmp (CLabelId a) (CLabelId b) = cmpId_withSpecDataCon a b
-
 instance Eq CLabelId where
-    CLabelId a == CLabelId b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
-    CLabelId a /= CLabelId b = case (a `cmp` b) of { EQ_ -> False; _ -> True  }
+    CLabelId a == CLabelId b = case (a `compare` b) of { EQ -> True;  _ -> False }
+    CLabelId a /= CLabelId b = case (a `compare` b) of { EQ -> False; _ -> True  }
 
 instance Ord CLabelId where
-    CLabelId a <= CLabelId b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
-    CLabelId a <  CLabelId b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> False; GT__ -> False }
-    CLabelId a >= CLabelId b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    CLabelId a >  CLabelId b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-    _tagCmp (CLabelId a) (CLabelId b) = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
+    CLabelId a <= CLabelId b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
+    CLabelId a <  CLabelId b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
+    CLabelId a >= CLabelId b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
+    CLabelId a >  CLabelId b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
+    compare (CLabelId a) (CLabelId b) = a `cmpId_withSpecDataCon` b
 \end{code}
 
 \begin{code}
@@ -316,77 +306,82 @@ duplicate declarations in generating C (see @labelSeenTE@ in
 \begin{code}
 -- specialised for PprAsm: saves lots of arg passing in NCG
 #if ! OMIT_NATIVE_CODEGEN
-pprCLabel_asm = pprCLabel (PprForAsm underscorePrefix fmtAsmLbl)
+pprCLabel_asm = pprCLabel
 #endif
 
-pprCLabel :: PprStyle -> CLabel -> Doc
+pprCLabel :: CLabel -> SDoc
 
-pprCLabel (PprForAsm _ fmtAsmLbl) (AsmTempLabel u)
+pprCLabel (AsmTempLabel u)
   = text (fmtAsmLbl (showUnique u))
 
-pprCLabel (PprForAsm prepend_cSEP _) lbl
-  = if prepend_cSEP
-    then (<>) pp_cSEP prLbl
-    else prLbl
-  where
-    prLbl = pprCLabel PprForC lbl
+pprCLabel lbl
+  = getPprStyle $ \ sty ->
+    if asmStyle sty && underscorePrefix then
+       pp_cSEP <> pprCLbl lbl
+    else
+       pprCLbl lbl
 
-pprCLabel sty (TyConLabel tc UnvecConUpdCode)
-  = hcat [ptext SLIT("ret"), pp_cSEP, ppr_tycon sty tc,
+
+pprCLbl (TyConLabel tc UnvecConUpdCode)
+  = hcat [ptext SLIT("ret"), pp_cSEP, ppr_tycon tc,
 	       pp_cSEP, ptext SLIT("upd")]
 
-pprCLabel sty (TyConLabel tc (VecConUpdCode tag))
-  = hcat [ptext SLIT("ret"), pp_cSEP, ppr_tycon sty tc, pp_cSEP,
+pprCLbl (TyConLabel tc (VecConUpdCode tag))
+  = hcat [ptext SLIT("ret"), pp_cSEP, ppr_tycon tc, pp_cSEP,
 		     int tag, pp_cSEP, ptext SLIT("upd")]
 
-pprCLabel sty (TyConLabel tc (StdUpdCode tag))
+pprCLbl (TyConLabel tc (StdUpdCode tag))
   = case (ctrlReturnConvAlg tc) of
 	UnvectoredReturn _ -> ptext SLIT("IndUpdRetDir")
     	VectoredReturn _ -> (<>) (ptext SLIT("IndUpdRetV")) (int (tag - fIRST_TAG))
 
-pprCLabel sty (TyConLabel tc InfoTblVecTbl)
-  = hcat [ppr_tycon sty tc, pp_cSEP, ptext SLIT("itblvtbl")]
+pprCLbl (TyConLabel tc InfoTblVecTbl)
+  = hcat [ppr_tycon tc, pp_cSEP, ptext SLIT("itblvtbl")]
 
-pprCLabel sty (TyConLabel tc StdUpdVecTbl)
-  = hcat [ptext SLIT("vtbl"), pp_cSEP, ppr_tycon sty tc,
+pprCLbl (TyConLabel tc StdUpdVecTbl)
+  = hcat [ptext SLIT("vtbl"), pp_cSEP, ppr_tycon tc,
     	       pp_cSEP, ptext SLIT("upd")]
 
-pprCLabel sty (CaseLabel u CaseReturnPt)
+pprCLbl (CaseLabel u CaseReturnPt)
   = hcat [ptext SLIT("ret"), pp_cSEP, ppr_u u]
-pprCLabel sty (CaseLabel u CaseVecTbl)
+pprCLbl (CaseLabel u CaseVecTbl)
   = hcat [ptext SLIT("vtbl"), pp_cSEP, ppr_u u]
-pprCLabel sty (CaseLabel u (CaseAlt tag))
+pprCLbl (CaseLabel u (CaseAlt tag))
   = hcat [ptext SLIT("djn"), pp_cSEP, ppr_u u, pp_cSEP, int tag]
-pprCLabel sty (CaseLabel u CaseDefault)
+pprCLbl (CaseLabel u CaseDefault)
   = hcat [ptext SLIT("djn"), pp_cSEP, ppr_u u]
 
-pprCLabel sty (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("StdErrorCode")
+pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("StdErrorCode")
 
-pprCLabel sty (RtsLabel RtsBlackHoleInfoTbl) = ptext SLIT("BH_UPD_info")
+pprCLbl (RtsLabel RtsBlackHoleInfoTbl) = ptext SLIT("BH_UPD_info")
 
-pprCLabel sty (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
+pprCLbl (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
   = hcat [ptext SLIT("__sel_info_"), text (show offset),
 		ptext (if upd_reqd then SLIT("upd") else SLIT("noupd")),
 		ptext SLIT("__")]
 
-pprCLabel sty (RtsLabel (RtsSelectorEntry upd_reqd offset))
+pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
   = hcat [ptext SLIT("__sel_entry_"), text (show offset),
 		ptext (if upd_reqd then SLIT("upd") else SLIT("noupd")),
 		ptext SLIT("__")]
 
-pprCLabel sty (IdLabel (CLabelId id) flavor)
-  = (<>) (ppr sty id) (ppFlavor flavor)
+pprCLbl (IdLabel (CLabelId id) flavor)
+  = ppr id <> ppFlavor flavor
+
 
 ppr_u u = pprUnique u
 
-ppr_tycon sty tc
+ppr_tycon :: TyCon -> SDoc
+ppr_tycon tc = ppr tc
+{- 
   = let
-	str = showTyCon sty tc
+	str = showTyCon tc
     in
     --pprTrace "ppr_tycon:" (text str) $
     text str
+-}
 
-ppFlavor :: IdLabelInfo -> Doc
+ppFlavor :: IdLabelInfo -> SDoc
 
 ppFlavor x = (<>) pp_cSEP
 	     	      (case x of

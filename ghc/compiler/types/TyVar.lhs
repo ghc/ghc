@@ -1,8 +1,7 @@
 \begin{code}
-#include "HsVersions.h"
-
 module TyVar (
-	GenTyVar(..), SYN_IE(TyVar),
+	GenTyVar(..), TyVar, 
+
 	mkTyVar, mkSysTyVar,
 	tyVarKind,		-- TyVar -> Kind
 	cloneTyVar, nameTyVar,
@@ -12,21 +11,20 @@ module TyVar (
 
 	-- We also export "environments" keyed off of
 	-- TyVars and "sets" containing TyVars:
-	SYN_IE(TyVarEnv),
-	nullTyVarEnv, mkTyVarEnv, addOneToTyVarEnv,
-	growTyVarEnvList, isNullTyVarEnv, lookupTyVarEnv, delFromTyVarEnv,
+	TyVarEnv,
+	emptyTyVarEnv, mkTyVarEnv, zipTyVarEnv, addToTyVarEnv, plusTyVarEnv,
+	growTyVarEnvList, isEmptyTyVarEnv, lookupTyVarEnv, delFromTyVarEnv,
 
-	SYN_IE(GenTyVarSet), SYN_IE(TyVarSet),
+	GenTyVarSet, TyVarSet,
 	emptyTyVarSet, unitTyVarSet, unionTyVarSets,
 	unionManyTyVarSets, intersectTyVarSets, mkTyVarSet,
 	tyVarSetToList, elementOfTyVarSet, minusTyVarSet,
 	isEmptyTyVarSet
   ) where
 
-CHK_Ubiq() 	-- debugging consistency check
+#include "HsVersions.h"
 
 -- friends
-import Usage		( GenUsage, SYN_IE(Usage), usageOmega )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 
 -- others
@@ -34,12 +32,12 @@ import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
 			  plusUFM, sizeUFM, delFromUFM, UniqFM
 			)
+import BasicTypes	( Unused, unused )
 import Name		( mkSysLocalName, mkLocalName, Name, NamedThing(..), OccName )
-import Pretty		( Doc, (<>), ptext )
-import Outputable	( PprStyle(..), Outputable(..) )
 import SrcLoc		( noSrcLoc, SrcLoc )
 import Unique		( mkAlphaTyVarUnique, Unique, Uniquable(..) )
-import Util		( panic, Ord3(..) )
+import Util		( zipEqual )
+import Outputable
 \end{code}
 
 \begin{code}
@@ -51,7 +49,7 @@ data GenTyVar flexi_slot
 	flexi_slot		-- Extra slot used during type and usage
 				-- inference, and to contain usages.
 
-type TyVar = GenTyVar Usage	-- Usage slot makes sense only if Kind = Type
+type TyVar   = GenTyVar Unused
 \end{code}
 
 
@@ -62,20 +60,20 @@ mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar  (uniqueOf name)
 			   kind
 			   (Just name)
-			   usageOmega
+			   unused
 
 mkSysTyVar :: Unique -> Kind -> TyVar
 mkSysTyVar uniq kind = TyVar uniq
 			     kind
 			     Nothing
-			     usageOmega
+			     unused
 
 tyVarKind :: GenTyVar flexi -> Kind
 tyVarKind (TyVar _ kind _ _) = kind
 
 cloneTyVar :: GenTyVar flexi -> Unique -> GenTyVar flexi
-cloneTyVar (TyVar _ k n x) u = TyVar u k n x
-	-- Dodgy: doesn't (yet) change the unique in the Name)
+cloneTyVar (TyVar _ k n x) u = TyVar u k Nothing x
+	-- Zaps its name
 
 nameTyVar :: GenTyVar flexi -> OccName -> GenTyVar flexi
 	-- Give the TyVar a print-name
@@ -89,9 +87,9 @@ Fixed collection of type variables
 	-- openAlphaTyVar is prepared to be instantiated
 	-- to a boxed or unboxed type variable.  It's used for the 
 	-- result type for "error", so that we can have (error Int# "Help")
-openAlphaTyVar = TyVar (mkAlphaTyVarUnique 1) mkTypeKind Nothing usageOmega
+openAlphaTyVar = TyVar (mkAlphaTyVarUnique 1) mkTypeKind Nothing unused
 
-alphaTyVars = [ TyVar u mkBoxedTypeKind Nothing usageOmega
+alphaTyVars = [ TyVar u mkBoxedTypeKind Nothing unused
 	      | u <- map mkAlphaTyVarUnique [2..] ]
 
 (alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars
@@ -104,22 +102,26 @@ Environments
 \begin{code}
 type TyVarEnv elt = UniqFM elt
 
-nullTyVarEnv	 :: TyVarEnv a
+emptyTyVarEnv	 :: TyVarEnv a
 mkTyVarEnv	 :: [(GenTyVar flexi, a)] -> TyVarEnv a
-addOneToTyVarEnv :: TyVarEnv a -> GenTyVar flexi -> a -> TyVarEnv a
+zipTyVarEnv	 :: [GenTyVar flexi] -> [a] -> TyVarEnv a
+addToTyVarEnv :: TyVarEnv a -> GenTyVar flexi -> a -> TyVarEnv a
 growTyVarEnvList :: TyVarEnv a -> [(GenTyVar flexi, a)] -> TyVarEnv a
-isNullTyVarEnv	 :: TyVarEnv a -> Bool
+isEmptyTyVarEnv	 :: TyVarEnv a -> Bool
 lookupTyVarEnv	 :: TyVarEnv a -> GenTyVar flexi -> Maybe a
 delFromTyVarEnv	 :: TyVarEnv a -> GenTyVar flexi -> TyVarEnv a
+plusTyVarEnv     :: TyVarEnv a -> TyVarEnv a -> TyVarEnv a
 
-nullTyVarEnv	 = emptyUFM
+emptyTyVarEnv	 = emptyUFM
 mkTyVarEnv	 = listToUFM
-addOneToTyVarEnv = addToUFM
+addToTyVarEnv    = addToUFM
 lookupTyVarEnv   = lookupUFM
 delFromTyVarEnv  = delFromUFM
+plusTyVarEnv     = plusUFM
 
+zipTyVarEnv tyvars tys     = listToUFM (zipEqual "zipTyVarEnv" tyvars tys)
 growTyVarEnvList env pairs = plusUFM env (listToUFM pairs)
-isNullTyVarEnv   env	   = sizeUFM env == 0
+isEmptyTyVarEnv   env	   = sizeUFM env == 0
 \end{code}
 
 Sets
@@ -157,8 +159,8 @@ Instance delarations
 instance Eq (GenTyVar a) where
     (TyVar u1 _ _ _) == (TyVar u2 _ _ _) = u1 == u2
 
-instance Ord3 (GenTyVar a) where
-    cmp (TyVar u1 _ _ _) (TyVar u2 _ _ _) = u1 `cmp` u2
+instance Ord (GenTyVar a) where
+    compare (TyVar u1 _ _ _) (TyVar u2 _ _ _) = u1 `compare` u2
 
 instance Uniquable (GenTyVar a) where
     uniqueOf (TyVar u _ _ _) = u

@@ -7,24 +7,27 @@ Compact representations of character strings with
 unique identifiers (hash-cons'ish).
 
 \begin{code}
-#include "HsVersions.h"
-
 module FastString
        (
 	FastString(..),     -- not abstract, for now.
 
          --names?
         mkFastString,       -- :: String -> FastString
-	mkFastCharString,   -- :: _Addr -> FastString
-	mkFastCharString2,  -- :: _Addr -> Int -> FastString
-        mkFastSubString,    -- :: _Addr -> Int -> Int -> FastString
+        mkFastSubString,    -- :: Addr -> Int -> Int -> FastString
         mkFastSubStringFO,  -- :: ForeignObj -> Int -> Int -> FastString
+
+	-- These ones hold on to the Addr after they return, and aren't hashed; 
+	-- they are used for literals
+	mkFastCharString,   -- :: Addr -> FastString
+	mkFastCharString#,  -- :: Addr# -> FastString
+	mkFastCharString2,  -- :: Addr -> Int -> FastString
 
 	mkFastString#,      -- :: Addr# -> Int# -> FastString
         mkFastSubStringBA#, -- :: ByteArray# -> Int# -> Int# -> FastString
         mkFastSubString#,   -- :: Addr# -> Int# -> Int# -> FastString
         mkFastSubStringFO#, -- :: ForeignObj# -> Int# -> Int# -> FastString
        
+        uniqueOfFS,	    -- :: FastString -> Int#
 	lengthFS,	    -- :: FastString -> Int
 	nullFastString,     -- :: FastString -> Bool
 
@@ -37,43 +40,32 @@ module FastString
 	concatFS,	    -- :: [FastString] -> FastString
         consFS,             -- :: Char -> FastString -> FastString
 
-        hPutFS,		    -- :: Handle -> FastString -> IO ()
-        tagCmpFS	    -- :: FastString -> FastString -> _CMP_TAG
+        hPutFS		    -- :: Handle -> FastString -> IO ()
        ) where
 
-#if __GLASGOW_HASKELL__ <= 201
-import PreludeGlaST
-import PreludeGlaMisc
-import HandleHack
-import Ubiq
-#else
-import GlaExts
-import Foreign
-import IOBase
-import IOHandle
-import ST
-import STBase
-import {-# SOURCE #-} Unique  ( mkUniqueGrimily, Unique, Uniquable(..) )
-#if __GLASGOW_HASKELL__ == 202
-import PrelBase ( Char (..) )
-#endif
-#if __GLASGOW_HASKELL__ >= 206
+-- This #define suppresses the "import FastString" that
+-- HsVersions otherwise produces
+#define COMPILING_FAST_STRING
+#include "HsVersions.h"
+
 import PackBase
-#endif
-#if __GLASGOW_HASKELL__ >= 209
-import Addr
-import IOExts
-# define newVar   newIORef
-# define readVar  readIORef
-# define writeVar writeIORef
-#endif
-
-#endif
-
 import PrimPacked
+import GlaExts
+import Addr	( Addr(..) )
+import STBase	( StateAndPtr#(..) )
+import ArrBase	( MutableArray(..) )
+import Foreign	( ForeignObj(..) )
+import IOExts	( IOArray(..), newIOArray,
+		  IORef, newIORef, readIORef, writeIORef
+		)
+import IO
+import IOHandle	( filePtr, readHandle, writeHandle )
+import IOBase	( Handle__(..), IOError(..), IOErrorType(..),
+		  IOResult(..), IO(..),
+		  constructError
+		)
 
 #define hASH_TBL_SIZE 993
-
 \end{code} 
 
 @FastString@s are packed representations of strings
@@ -96,32 +88,19 @@ data FastString
       Int#       -- length  (cached)
 
 instance Eq FastString where
-  a == b = case tagCmpFS a b of { _LT -> False; _EQ -> True;  _GT -> False }
-  a /= b = case tagCmpFS a b of { _LT -> True;  _EQ -> False; _GT -> True  }
+  a == b = case cmpFS a b of { LT -> False; EQ -> True;  GT -> False }
+  a /= b = case cmpFS a b of { LT -> True;  EQ -> False; GT -> True  }
 
-{-
- (FastString u1# _ _) == (FastString u2# _ _) = u1# ==# u2#
--}
-
-instance Uniquable FastString where
- uniqueOf (FastString u# _ _) = mkUniqueGrimily u#
- uniqueOf (CharStr a# l#) =
-   {-
-     [A somewhat moby hack]: to avoid entering all sorts
-     of junk into the hash table, all C char strings
-     are by default left out. The benefit of being in
-     the table is that string comparisons are lightning fast,
-     just an Int# comparison.
-   
-     But, if you want to get the Unique of a CharStr, we 
-     enter it into the table and return that unique. This
-     works, but causes the CharStr to be looked up in the hash
-     table each time it is accessed..
-   -}
-   mkUniqueGrimily (case mkFastString# a# l# of { FastString u# _ _ -> u#}) -- Ugh!
-
-instance Uniquable Int where
- uniqueOf (I# i#) = mkUniqueGrimily i#
+instance Ord FastString where
+    a <= b = case cmpFS a b of { LT -> True;  EQ -> True;  GT -> False }
+    a <	 b = case cmpFS a b of { LT -> True;  EQ -> False; GT -> False }
+    a >= b = case cmpFS a b of { LT -> False; EQ -> True;  GT -> True  }
+    a >	 b = case cmpFS a b of { LT -> False; EQ -> False; GT -> True  }
+    max x y | x >= y	=  x
+            | otherwise	=  y
+    min x y | x <= y	=  x
+            | otherwise	=  y
+    compare a b = cmpFS a b
 
 instance Text FastString  where
     showsPrec p ps@(FastString u# _ _) r = showsPrec p (unpackFS ps) r
@@ -130,8 +109,8 @@ instance Text FastString  where
 getByteArray# :: FastString -> ByteArray#
 getByteArray# (FastString _ _ ba#) = ba#
 
-getByteArray :: FastString -> _ByteArray Int
-getByteArray (FastString _ l# ba#) = _ByteArray (0,I# l#) ba#
+getByteArray :: FastString -> ByteArray Int
+getByteArray (FastString _ l# ba#) = ByteArray (0,I# l#) ba#
 
 lengthFS :: FastString -> Int
 lengthFS (FastString _ l# _) = I# l#
@@ -142,11 +121,7 @@ nullFastString (FastString _ l# _) = l# ==# 0#
 nullFastString (CharStr _ l#) = l# ==# 0#
 
 unpackFS :: FastString -> String
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205
-unpackFS (FastString _ l# ba#) = byteArrayToString (_ByteArray (0,I# l#) ba#)
-#else
 unpackFS (FastString _ l# ba#) = unpackCStringBA# ba# l#
-#endif
 unpackFS (CharStr addr len#) =
  unpack 0#
  where
@@ -174,6 +149,21 @@ tailFS (FastString _ l# ba#) = mkFastSubStringBA# ba# 1# (l# -# 1#)
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c:unpackFS fs)
 
+uniqueOfFS :: FastString -> Int#
+uniqueOfFS (FastString u# _ _) = u#
+uniqueOfFS (CharStr a# l#)     = case mkFastString# a# l# of { FastString u# _ _ -> u#} -- Ugh!
+   {-
+     [A somewhat moby hack]: to avoid entering all sorts
+     of junk into the hash table, all C char strings
+     are by default left out. The benefit of being in
+     the table is that string comparisons are lightning fast,
+     just an Int# comparison.
+   
+     But, if you want to get the Unique of a CharStr, we 
+     enter it into the table and return that unique. This
+     works, but causes the CharStr to be looked up in the hash
+     table each time it is accessed..
+   -}
 \end{code}
 
 Internally, the compiler will maintain a fast string symbol
@@ -185,54 +175,46 @@ new @FastString@s then covertly does a lookup, re-using the
 data FastStringTable = 
  FastStringTable
     Int#
-    (MutableArray# _RealWorld [FastString])
+    (MutableArray# RealWorld [FastString])
 
-#if __GLASGOW_HASKELL__ < 209
-type FastStringTableVar = MutableVar _RealWorld FastStringTable
-#else
 type FastStringTableVar = IORef FastStringTable
-#endif
 
 string_table :: FastStringTableVar
 string_table = 
- unsafePerformPrimIO (
-   ST_TO_PrimIO (newArray (0::Int,hASH_TBL_SIZE) []) `thenPrimIO` \ (_MutableArray _ arr#) ->
-   newVar (FastStringTable 0# arr#))
+ unsafePerformIO (
+   stToIO (newArray (0::Int,hASH_TBL_SIZE) [])		>>= \ (MutableArray _ arr#) ->
+   newIORef (FastStringTable 0# arr#))
 
-lookupTbl :: FastStringTable -> Int# -> PrimIO [FastString]
+lookupTbl :: FastStringTable -> Int# -> IO [FastString]
 lookupTbl (FastStringTable _ arr#) i# =
-  ST_TO_PrimIO (
-  MkST ( \ STATE_TOK(s#) ->
+  IO ( \ s# ->
   case readArray# arr# i# s# of { StateAndPtr# s2# r ->
-    ST_RET(r, STATE_TOK(s2#)) }))
+  IOok s2# r })
 
-updTbl :: FastStringTableVar -> FastStringTable -> Int# -> [FastString] -> PrimIO ()
-updTbl ref (FastStringTable uid# arr#) i# ls =
- ST_TO_PrimIO (
- MkST ( \ STATE_TOK(s#) ->
- case writeArray# arr# i# ls s# of { s2# ->
-  ST_RET((), STATE_TOK(s2#)) })) `thenPrimIO` \ _ ->
- writeVar ref (FastStringTable (uid# +# 1#) arr#)
+updTbl :: FastStringTableVar -> FastStringTable -> Int# -> [FastString] -> IO ()
+updTbl fs_table_var (FastStringTable uid# arr#) i# ls =
+ IO (\ s# -> case writeArray# arr# i# ls s# of { s2# -> IOok s2# () })	>>
+ writeIORef fs_table_var (FastStringTable (uid# +# 1#) arr#)
 
 mkFastString# :: Addr# -> Int# -> FastString
 mkFastString# a# len# =
- unsafePerformPrimIO  (
-  readVar string_table `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
+ unsafePerformIO  (
+  readIORef string_table	>>= \ ft@(FastStringTable uid# tbl#) ->
   let
    h = hashStr a# len#
   in
 --  _trace ("hashed: "++show (I# h)) $
-  lookupTbl ft h	`thenPrimIO` \ lookup_result ->
+  lookupTbl ft h	>>= \ lookup_result ->
   case lookup_result of
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
        -- _trace "empty bucket" $
        case copyPrefixStr (A# a#) (I# len#) of
-	 (_ByteArray _ barr#) ->  
+	 (ByteArray _ barr#) ->  
 	   let f_str = FastString uid# len# barr# in
-           updTbl string_table ft h [f_str] `seqPrimIO`
-           ({- _trace ("new: " ++ show f_str)   $ -} returnPrimIO f_str)
+           updTbl string_table ft h [f_str] >>
+           ({- _trace ("new: " ++ show f_str)   $ -} return f_str)
     ls -> 
        -- non-empty `bucket', scan the list looking
        -- entry with same length and compare byte by byte.
@@ -240,11 +222,11 @@ mkFastString# a# len# =
        case bucket_match ls len# a# of
 	 Nothing -> 
            case copyPrefixStr (A# a#) (I# len#) of
-  	    (_ByteArray _ barr#) ->  
+  	    (ByteArray _ barr#) ->  
               let f_str = FastString uid# len# barr# in
-              updTbl string_table ft h (f_str:ls) `seqPrimIO`
-	      ( {- _trace ("new: " ++ show f_str)  $ -} returnPrimIO f_str)
-	 Just v  -> {- _trace ("re-use: "++show v) $ -} returnPrimIO v)
+              updTbl string_table ft h (f_str:ls) >>
+	      ( {- _trace ("new: " ++ show f_str)  $ -} return f_str)
+	 Just v  -> {- _trace ("re-use: "++show v) $ -} return v)
   where
    bucket_match [] _ _ = Nothing
    bucket_match (v@(FastString _ l# ba#):ls) len# a# =
@@ -258,32 +240,32 @@ mkFastSubString# a# start# len# = mkFastCharString2 (A# (addrOffset# a# start#))
 
 mkFastSubStringFO# :: ForeignObj# -> Int# -> Int# -> FastString
 mkFastSubStringFO# fo# start# len# =
- unsafePerformPrimIO  (
-  readVar string_table `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
+ unsafePerformIO  (
+  readIORef string_table >>= \ ft@(FastStringTable uid# tbl#) ->
   let
    h = hashSubStrFO fo# start# len#
   in
-  lookupTbl ft h	`thenPrimIO` \ lookup_result ->
+  lookupTbl ft h	>>= \ lookup_result ->
   case lookup_result of
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
        case copySubStrFO (_ForeignObj fo#) (I# start#) (I# len#) of
-	 (_ByteArray _ barr#) ->  
+	 (ByteArray _ barr#) ->  
 	   let f_str = FastString uid# len# barr# in
-           updTbl string_table ft h [f_str]       `seqPrimIO`
-	   returnPrimIO f_str
+           updTbl string_table ft h [f_str]       >>
+	   return f_str
     ls -> 
        -- non-empty `bucket', scan the list looking
        -- entry with same length and compare byte by byte.
        case bucket_match ls start# len# fo# of
 	 Nothing -> 
            case copySubStrFO (_ForeignObj fo#) (I# start#) (I# len#) of
-   	     (_ByteArray _ barr#) ->  
+   	     (ByteArray _ barr#) ->  
               let f_str = FastString uid# len# barr# in
-              updTbl string_table ft  h (f_str:ls) `seqPrimIO`
-	      ( {- _trace ("new: " ++ show f_str) $ -} returnPrimIO f_str)
-	 Just v  -> {- _trace ("re-use: "++show v) $ -} returnPrimIO v)
+              updTbl string_table ft  h (f_str:ls) >>
+	      ( {- _trace ("new: " ++ show f_str) $ -} return f_str)
+	 Just v  -> {- _trace ("re-use: "++show v) $ -} return v)
   where
    bucket_match [] _ _ _ = Nothing
    bucket_match (v@(FastString _ l# barr#):ls) start# len# fo# =
@@ -295,39 +277,39 @@ mkFastSubStringFO# fo# start# len# =
 
 mkFastSubStringBA# :: ByteArray# -> Int# -> Int# -> FastString
 mkFastSubStringBA# barr# start# len# =
- unsafePerformPrimIO  (
-  readVar string_table `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
+ unsafePerformIO  (
+  readIORef string_table	>>= \ ft@(FastStringTable uid# tbl#) ->
   let
    h = hashSubStrBA barr# start# len#
   in
 --  _trace ("hashed(b): "++show (I# h)) $
-  lookupTbl ft h	`thenPrimIO` \ lookup_result ->
+  lookupTbl ft h		>>= \ lookup_result ->
   case lookup_result of
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
        -- _trace "empty bucket(b)" $
-       case copySubStrBA (_ByteArray btm barr#) (I# start#) (I# len#) of
-         (_ByteArray _ ba#) ->  
+       case copySubStrBA (ByteArray btm barr#) (I# start#) (I# len#) of
+         (ByteArray _ ba#) ->  
           let f_str = FastString uid# len# ba# in
-          updTbl string_table ft h [f_str]     `seqPrimIO`
+          updTbl string_table ft h [f_str]     >>
           -- _trace ("new(b): " ++ show f_str)   $
-	  returnPrimIO f_str
+	  return f_str
     ls -> 
        -- non-empty `bucket', scan the list looking
        -- entry with same length and compare byte by byte. 
        -- _trace ("non-empty bucket(b)"++show ls) $
        case bucket_match ls start# len# barr# of
 	 Nothing -> 
-          case copySubStrBA (_ByteArray (error "") barr#) (I# start#) (I# len#) of
-            (_ByteArray _ ba#) ->  
+          case copySubStrBA (ByteArray (error "") barr#) (I# start#) (I# len#) of
+            (ByteArray _ ba#) ->  
               let f_str = FastString uid# len# ba# in
-              updTbl string_table ft h (f_str:ls) `seqPrimIO`
+              updTbl string_table ft h (f_str:ls) >>
 	      -- _trace ("new(b): " ++ show f_str)   $
-	      returnPrimIO f_str
+	      return f_str
 	 Just v  -> 
               -- _trace ("re-use(b): "++show v) $
-	      returnPrimIO v
+	      return v
   )
  where
    btm = error ""
@@ -341,33 +323,32 @@ mkFastSubStringBA# barr# start# len# =
       else
 	 bucket_match ls start# len# ba#
 
-mkFastCharString :: _Addr -> FastString
+mkFastCharString :: Addr -> FastString
 mkFastCharString a@(A# a#) = 
  case strLength a of{ (I# len#) -> CharStr a# len# }
 
-mkFastCharString2 :: _Addr -> Int -> FastString
+mkFastCharString# :: Addr# -> FastString
+mkFastCharString# a# = 
+ case strLength (A# a#) of { (I# len#) -> CharStr a# len# }
+
+mkFastCharString2 :: Addr -> Int -> FastString
 mkFastCharString2 a@(A# a#) (I# len#) = CharStr a# len#
 
 mkFastString :: String -> FastString
 mkFastString str = 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205
- case stringToByteArray str of
-#else
  case packString str of
-#endif
-  (_ByteArray (_,I# len#) frozen#) -> 
+  (ByteArray (_,I# len#) frozen#) -> 
     mkFastSubStringBA# frozen# 0# len#
     {- 0-indexed array, len# == index to one beyond end of string,
        i.e., (0,1) => empty string.    -}
 
-mkFastSubString :: _Addr -> Int -> Int -> FastString
+mkFastSubString :: Addr -> Int -> Int -> FastString
 mkFastSubString (A# a#) (I# start#) (I# len#) =
  mkFastString# (addrOffset# a# start#) len#
 
 mkFastSubStringFO :: _ForeignObj -> Int -> Int -> FastString
 mkFastSubStringFO (_ForeignObj fo#) (I# start#) (I# len#) =
  mkFastSubStringFO# fo# start# len#
-
 \end{code}
 
 \begin{code}
@@ -424,58 +405,47 @@ hashSubStrBA ba# start# len# =
 \end{code}
 
 \begin{code}
-tagCmpFS :: FastString -> FastString -> _CMP_TAG
-tagCmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null chars
+cmpFS :: FastString -> FastString -> Ordering
+cmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null chars
   if u1# ==# u2# then
-     _EQ
+     EQ
   else
-   unsafePerformPrimIO (
-    _ccall_ strcmp (_ByteArray bottom b1#) (_ByteArray bottom b2#) `thenPrimIO` \ (I# res) ->
-    returnPrimIO (
-    if      res <#  0# then _LT
-    else if res ==# 0# then _EQ
-    else		    _GT
+   unsafePerformIO (
+    _ccall_ strcmp (ByteArray bottom b1#) (ByteArray bottom b2#)	>>= \ (I# res) ->
+    return (
+    if      res <#  0# then LT
+    else if res ==# 0# then EQ
+    else		    GT
     ))
   where
    bottom :: (Int,Int)
    bottom = error "tagCmp"
-tagCmpFS (CharStr bs1 len1) (CharStr bs2 len2)
-  = unsafePerformPrimIO (
-    _ccall_ strcmp ba1 ba2  `thenPrimIO` \ (I# res) ->
-    returnPrimIO (
-    if      res <#  0# then _LT
-    else if res ==# 0# then _EQ
-    else		    _GT
+cmpFS (CharStr bs1 len1) (CharStr bs2 len2)
+  = unsafePerformIO (
+    _ccall_ strcmp ba1 ba2	>>= \ (I# res) ->
+    return (
+    if      res <#  0# then LT
+    else if res ==# 0# then EQ
+    else		    GT
     ))
   where
     ba1 = A# bs1
     ba2 = A# bs2
-tagCmpFS (FastString _ len1 bs1) (CharStr bs2 len2)
- = unsafePerformPrimIO (
-    _ccall_ strcmp ba1 ba2 `thenPrimIO` \ (I# res) ->
-    returnPrimIO (
-     if      res <#  0# then _LT
-     else if res ==# 0# then _EQ
-     else		    _GT
+cmpFS (FastString _ len1 bs1) (CharStr bs2 len2)
+ = unsafePerformIO (
+    _ccall_ strcmp ba1 ba2	>>= \ (I# res) ->
+    return (
+     if      res <#  0# then LT
+     else if res ==# 0# then EQ
+     else		     GT
     ))
   where
-    ba1 = _ByteArray ((error "")::(Int,Int)) bs1
+    ba1 = ByteArray ((error "")::(Int,Int)) bs1
     ba2 = A# bs2
 
-tagCmpFS a@(CharStr _ _) b@(FastString _ _ _)
+cmpFS a@(CharStr _ _) b@(FastString _ _ _)
   = -- try them the other way 'round
-    case (tagCmpFS b a) of { _LT -> _GT; _EQ -> _EQ; _GT -> _LT }
-
-instance Ord FastString where
-    a <= b = case tagCmpFS a b of { _LT -> True;  _EQ -> True;  _GT -> False }
-    a <	 b = case tagCmpFS a b of { _LT -> True;  _EQ -> False; _GT -> False }
-    a >= b = case tagCmpFS a b of { _LT -> False; _EQ -> True;  _GT -> True  }
-    a >	 b = case tagCmpFS a b of { _LT -> False; _EQ -> False; _GT -> True  }
-    max x y | x >= y	=  x
-            | otherwise	=  y
-    min x y | x <= y	=  x
-            | otherwise	=  y
-    _tagCmp a b = tagCmpFS a b
+    case (cmpFS b a) of { LT -> GT; EQ -> EQ; GT -> LT }
 
 \end{code}
 
@@ -483,16 +453,6 @@ Outputting @FastString@s is quick, just block copying the chunk (using
 @fwrite@).
 
 \begin{code}
-#if __GLASGOW_HASKELL__ >= 201
-#define _ErrorHandle IOBase.ErrorHandle
-#define _ReadHandle IOBase.ReadHandle
-#define _ClosedHandle IOBase.ClosedHandle
-#define _SemiClosedHandle IOBase.SemiClosedHandle
-#define _constructError  IOBase.constructError
-#define _filePtr IOHandle.filePtr
-#define failWith fail
-#endif
-
 hPutFS :: Handle -> FastString -> IO ()
 hPutFS handle (FastString _ l# ba#) =
  if l# ==# 0# then
@@ -500,54 +460,54 @@ hPutFS handle (FastString _ l# ba#) =
  else
     _readHandle handle				    >>= \ htype ->
     case htype of 
-      _ErrorHandle ioError ->
+      ErrorHandle ioError ->
 	  _writeHandle handle htype		    >>
-          failWith ioError
-      _ClosedHandle ->
+          fail ioError
+      ClosedHandle ->
 	  _writeHandle handle htype		    >>
-	  failWith MkIOError(handle,IllegalOperation,"handle is closed")
-      _SemiClosedHandle _ _ ->
+	  fail MkIOError(handle,IllegalOperation,"handle is closed")
+      SemiClosedHandle _ _ ->
 	  _writeHandle handle htype		    >>
-	  failWith MkIOError(handle,IllegalOperation,"handle is closed")
-      _ReadHandle _ _ _ ->
+	  fail MkIOError(handle,IllegalOperation,"handle is closed")
+      ReadHandle _ _ _ ->
 	  _writeHandle handle htype		    >>
-	  failWith MkIOError(handle,IllegalOperation,"handle is not open for writing")
+	  fail MkIOError(handle,IllegalOperation,"handle is not open for writing")
       other -> 
-          let fp = _filePtr htype in
+          let fp = filePtr htype in
 	   -- here we go..
-          _ccall_ writeFile (_ByteArray ((error "")::(Int,Int)) ba#) fp (I# l#) `CCALL_THEN` \rc ->
+          _ccall_ writeFile (ByteArray ((error "")::(Int,Int)) ba#) fp (I# l#) >>= \rc ->
           if rc==0 then
               return ()
           else
-              _constructError "hPutFS"   `CCALL_THEN` \ err ->
-	      failWith err
+              constructError "hPutFS"   >>= \ err ->
+	      fail err
 hPutFS handle (CharStr a# l#) =
  if l# ==# 0# then
     return ()
  else
     _readHandle handle				    >>= \ htype ->
     case htype of 
-      _ErrorHandle ioError ->
+      ErrorHandle ioError ->
 	  _writeHandle handle htype		    >>
-          failWith ioError
-      _ClosedHandle ->
+          fail ioError
+      ClosedHandle ->
 	  _writeHandle handle htype		    >>
-	  failWith MkIOError(handle,IllegalOperation,"handle is closed")
-      _SemiClosedHandle _ _ ->
+	  fail MkIOError(handle,IllegalOperation,"handle is closed")
+      SemiClosedHandle _ _ ->
 	  _writeHandle handle htype		    >>
-	  failWith MkIOError(handle,IllegalOperation,"handle is closed")
-      _ReadHandle _ _ _ ->
+	  fail MkIOError(handle,IllegalOperation,"handle is closed")
+      ReadHandle _ _ _ ->
 	  _writeHandle handle htype		    >>
-	  failWith MkIOError(handle,IllegalOperation,"handle is not open for writing")
+	  fail MkIOError(handle,IllegalOperation,"handle is not open for writing")
       other -> 
-          let fp = _filePtr htype in
+          let fp = filePtr htype in
 	   -- here we go..
-          _ccall_ writeFile (A# a#) fp (I# l#) `CCALL_THEN` \rc ->
+          _ccall_ writeFile (A# a#) fp (I# l#)	>>= \rc ->
           if rc==0 then
               return ()
           else
-              _constructError "hPutFS"   `CCALL_THEN` \ err ->
-	      failWith err
+              constructError "hPutFS"   	>>= \ err ->
+	      fail err
 
 --ToDo: avoid silly code duplic.
 \end{code}

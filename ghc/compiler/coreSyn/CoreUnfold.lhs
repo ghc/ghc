@@ -13,8 +13,6 @@ literal'').  In the corner of a @SimpleUnfolding@ unfolding, you will
 find, unsurprisingly, a Core expression.
 
 \begin{code}
-#include "HsVersions.h"
-
 module CoreUnfold (
 	SimpleUnfolding(..), Unfolding(..), UnfoldingGuidance(..), -- types
 	UfExpr,	RdrName, -- For closure (delete in 1.3)
@@ -31,15 +29,9 @@ module CoreUnfold (
 	PragmaInfo(..)		-- Re-export
     ) where
 
-IMP_Ubiq()
-#if defined (__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking;
-		 -- and also to get mkMagicUnfoldingFun
-IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
-IMPORT_DELOOPER(SmplLoop)
-#else
-import {-# SOURCE #-} MagicUFs
-#endif
+#include "HsVersions.h"
+
+import {-# SOURCE #-} MagicUFs	( MagicUnfoldingFun, mkMagicUnfoldingFun )
 
 import Bag		( emptyBag, unitBag, unionBags, Bag )
 
@@ -61,27 +53,21 @@ import HsCore		( UfExpr )
 import RdrHsSyn		( RdrName )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( coreExprType )
---import CostCentre	( ccMentionsId )
-import Id		( SYN_IE(Id), idType, getIdArity,  isBottomingId, isDataCon,
+import Id		( Id, idType, getIdArity,  isBottomingId, isDataCon,
 			  idWantsToBeINLINEd, idMustBeINLINEd, idMustNotBeINLINEd,
-			  SYN_IE(IdSet), GenId{-instances-} )
+			  IdSet, GenId{-instances-} )
 import PrimOp		( primOpCanTriggerGC, fragilePrimOp, PrimOp(..) )
 import IdInfo		( ArityInfo(..), bottomIsGuaranteed )
 import Literal		( isNoRepLit, isLitLitLit )
-import Pretty
 import TyCon		( tyConFamilySize )
-import Type		( maybeAppDataTyConExpandingDicts )
+import Type		( splitAlgTyConApp_maybe )
 import Unique           ( Unique )
 import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  addOneToUniqSet, unionUniqSets
 			)
-import Usage		( SYN_IE(UVar) )
 import Maybes		( maybeToBool )
 import Util		( isIn, panic, assertPanic )
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-
-#endif
 \end{code}
 
 %************************************************************************
@@ -154,8 +140,8 @@ data UnfoldingGuidance
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
-    ppr sty UnfoldAlways    	= ptext SLIT("_ALWAYS_")
-    ppr sty (UnfoldIfGoodArgs t v cs size discount)
+    ppr UnfoldAlways    	= ptext SLIT("_ALWAYS_")
+    ppr (UnfoldIfGoodArgs t v cs size discount)
       = hsep [ptext SLIT("_IF_ARGS_"), int t, int v,
 	       if null cs	-- always print *something*
 	       	then char 'X'
@@ -180,12 +166,12 @@ data FormSummary
   | OtherForm		-- Anything else
 
 instance Outputable FormSummary where
-   ppr sty VarForm    = ptext SLIT("Var")
-   ppr sty ValueForm  = ptext SLIT("Value")
-   ppr sty BottomForm = ptext SLIT("Bot")
-   ppr sty OtherForm  = ptext SLIT("Other")
+   ppr VarForm    = ptext SLIT("Var")
+   ppr ValueForm  = ptext SLIT("Value")
+   ppr BottomForm = ptext SLIT("Bot")
+   ppr OtherForm  = ptext SLIT("Other")
 
-mkFormSummary ::GenCoreExpr bndr Id tyvar uvar -> FormSummary
+mkFormSummary ::GenCoreExpr bndr Id flexi -> FormSummary
 
 mkFormSummary expr
   = go (0::Int) expr		-- The "n" is the number of (value) arguments so far
@@ -240,7 +226,7 @@ exprSmallEnoughToDup (Prim op _)    = not (fragilePrimOp op) -- Could check # of
 exprSmallEnoughToDup (Lit lit)      = not (isNoRepLit lit)
 exprSmallEnoughToDup (Coerce _ _ e) = exprSmallEnoughToDup e
 exprSmallEnoughToDup expr
-  = case (collectArgs expr) of { (fun, _, _, vargs) ->
+  = case (collectArgs expr) of { (fun, _, vargs) ->
     case fun of
       Var v | length vargs <= 4 -> True
       _				-> False
@@ -267,7 +253,7 @@ calcUnfoldingGuidance IWantToBeINLINEd  bOMB_OUT_SIZE expr = UnfoldAlways	-- Alw
 calcUnfoldingGuidance IMustNotBeINLINEd bOMB_OUT_SIZE expr = UnfoldNever	-- ...and vice versa...
 
 calcUnfoldingGuidance NoPragmaInfo bOMB_OUT_SIZE expr
-  = case collectBinders expr of { (use_binders, ty_binders, val_binders, body) ->
+  = case collectBinders expr of { (ty_binders, val_binders, body) ->
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
       TooBig -> UnfoldNever
@@ -285,7 +271,7 @@ calcUnfoldingGuidance NoPragmaInfo bOMB_OUT_SIZE expr
 		 | otherwise = 0
 		 where
 		   (is_data, tycon)
-		     = case (maybeAppDataTyConExpandingDicts (idType b)) of
+		     = case (splitAlgTyConApp_maybe (idType b)) of
 			  Nothing       -> (False, panic "discount")
 			  Just (tc,_,_) -> (True,  tc)
 
@@ -327,7 +313,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 
     size_up expr@(Lam _ _)
       = let
-	    (uvars, tyvars, args, body) = collectBinders expr
+	    (tyvars, args, body) = collectBinders expr
 	in
 	size_up body `addSizeN` length args
 
@@ -376,7 +362,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 
 	alt_cost :: Int
 	alt_cost
-	  = case (maybeAppDataTyConExpandingDicts scrut_ty) of
+	  = case (splitAlgTyConApp_maybe scrut_ty) of
 	      Nothing       -> 1
 	      Just (tc,_,_) -> tyConFamilySize tc
 

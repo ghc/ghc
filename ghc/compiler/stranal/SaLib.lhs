@@ -6,29 +6,26 @@
 See also: the ``library'' for the ``back end'' (@SaBackLib@).
 
 \begin{code}
-#include "HsVersions.h"
-
 module SaLib (
 	AbsVal(..),
 	AnalysisKind(..),
-	AbsValEnv{-abstract-}, SYN_IE(StrictEnv), SYN_IE(AbsenceEnv),
+	AbsValEnv{-abstract-}, StrictEnv, AbsenceEnv,
 	nullAbsValEnv, addOneToAbsValEnv, growAbsValEnvList,
 	lookupAbsValEnv,
 	absValFromStrictness
     ) where
 
-IMP_Ubiq(){-uitous-}
+#include "HsVersions.h"
 
-import CoreSyn		( SYN_IE(CoreExpr) )
+import CoreSyn		( CoreExpr )
 import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList,
-			  lookupIdEnv, SYN_IE(IdEnv),
-			  GenId{-instance Outputable-}, SYN_IE(Id)
+			  lookupIdEnv, IdEnv,
+			  GenId{-instance Outputable-}, Id
 			)
 import IdInfo		( StrictnessInfo(..) )
 import Demand		( Demand{-instance Outputable-} )
-import Outputable	( Outputable(..){-instance * []-} )
+import Outputable
 import PprType		( GenType{-instance Outputable-} )
-import Pretty		( ptext, hsep, char )
 \end{code}
 
 %************************************************************************
@@ -73,15 +70,15 @@ data AbsVal
 			    -- argument if the  Demand so indicates.
 
 instance Outputable AbsVal where
-    ppr sty AbsTop = ptext SLIT("AbsTop")
-    ppr sty AbsBot = ptext SLIT("AbsBot")
-    ppr sty (AbsProd prod) = hsep [ptext SLIT("AbsProd"), ppr sty prod]
-    ppr sty (AbsFun arg body env)
-      = hsep [ptext SLIT("AbsFun{"), ppr sty arg,
-	       ptext SLIT("???"), -- text "}{env:", ppr sty (keysFM env `zip` eltsFM env),
+    ppr AbsTop = ptext SLIT("AbsTop")
+    ppr AbsBot = ptext SLIT("AbsBot")
+    ppr (AbsProd prod) = hsep [ptext SLIT("AbsProd"), ppr prod]
+    ppr (AbsFun arg body env)
+      = hsep [ptext SLIT("AbsFun{"), ppr arg,
+	       ptext SLIT("???"), -- text "}{env:", ppr (keysFM env `zip` eltsFM env),
 	       char '}' ]
-    ppr sty (AbsApproxFun demand val)
-      = hsep [ptext SLIT("AbsApprox "), ppr sty demand, ppr sty val ]
+    ppr (AbsApproxFun demand val)
+      = hsep [ptext SLIT("AbsApprox "), ppr demand, ppr val]
 \end{code}
 
 %-----------

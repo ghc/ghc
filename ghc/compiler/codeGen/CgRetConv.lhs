@@ -7,8 +7,6 @@ The datatypes and functions here encapsulate what there is to know
 about return conventions.
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgRetConv (
 	CtrlReturnConvention(..), DataReturnConvention(..),
 
@@ -22,10 +20,7 @@ module CgRetConv (
 	assignRegs
     ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(AbsCLoop)		-- paranoia checking
-#endif
+#include "HsVersions.h"
 
 import AbsCSyn		-- quite a few things
 import AbsCUtils	( mkAbstractCs, getAmodeRep,
@@ -37,11 +32,10 @@ import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			)
 import CmdLineOpts	( opt_ReturnInRegsThreshold )
 import Id		( isDataCon, dataConRawArgTys,
-			  SYN_IE(DataCon), GenId{-instance Eq-},
-			  SYN_IE(Id)
+			  DataCon, GenId{-instance Eq-},
+			  Id
 			)
 import Maybes		( catMaybes )
-import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( TyCon{-instance Outputable-} )
 import PrimOp		( primOpCanTriggerGC,
 			  getPrimOpResultInfo, PrimOpResultInfo(..),
@@ -50,10 +44,8 @@ import PrimOp		( primOpCanTriggerGC,
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import TyCon		( tyConDataCons, tyConFamilySize )
 import Type		( typePrimRep )
-import Pretty		( Doc )
-import Util		( zipWithEqual, mapAccumL, isn'tIn,
-			  pprError, pprTrace, panic, assertPanic, assertPprPanic
-			)
+import Util		( zipWithEqual, mapAccumL, isn'tIn )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -96,7 +88,7 @@ ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
 
 ctrlReturnConvAlg tycon
   = case (tyConFamilySize tycon) of
-      0 -> pprTrace "ctrlReturnConvAlg:" (ppr PprDebug tycon) $
+      0 -> pprTrace "ctrlReturnConvAlg:" (ppr tycon) $
 	   UnvectoredReturn 0 -- e.g., w/ "data Bin"
 
       size -> -- we're supposed to know...
@@ -120,7 +112,7 @@ then it gives up, returning @ReturnInHeap@.
 dataReturnConvAlg :: DataCon -> DataReturnConvention
 
 dataReturnConvAlg data_con
-  = ASSERT2(isDataCon data_con, (ppr PprDebug data_con))
+  = ASSERT2(isDataCon data_con, (ppr data_con))
     case leftover_kinds of
 	[]    ->	ReturnInRegs reg_assignment
 	other ->	ReturnInHeap	-- Didn't fit in registers
@@ -231,7 +223,7 @@ makePrimOpArgsRobust op arg_amodes
 		-- Check that all the args fit before returning arg_regs
 	final_arg_regs = case extra_args of
 			   []    -> arg_regs
-			   other -> pprError "Cannot allocate enough registers for primop (try rearranging code or reducing number of arguments?)" (ppr PprDebug op)
+			   other -> pprPanic "Cannot allocate enough registers for primop (try rearranging code or reducing number of arguments?)" (ppr op)
 
 	arg_assts
 	  = mkAbstractCs (zipWithEqual "assign_to_reg" assign_to_reg final_arg_regs non_robust_amodes)

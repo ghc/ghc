@@ -18,14 +18,6 @@ The code is SPECIALIZEd to various highly-desirable types (e.g., Id)
 near the end.
 
 \begin{code}
-#include "HsVersions.h"
-#define IF_NOT_GHC(a) {--}
-
-#if defined(DEBUG_FINITEMAPS)/* NB NB NB */
-#define OUTPUTABLE_key , Outputable key
-#else
-#define OUTPUTABLE_key {--}
-#endif
 
 module FiniteMap (
 	FiniteMap,		-- abstract type
@@ -53,27 +45,26 @@ module FiniteMap (
 	fmToList, keysFM, eltsFM
 
 	, bagToFM
-	, SYN_IE(FiniteSet), emptySet, mkSet, isEmptySet
+	, FiniteSet, emptySet, mkSet, isEmptySet
 	, elementOf, setToList, union, minusSet
 
     ) where
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(SpecLoop)
+#include "HsVersions.h"
+#define IF_NOT_GHC(a) {--}
+
+#if defined(DEBUG_FINITEMAPS)/* NB NB NB */
+#define OUTPUTABLE_key , Outputable key
 #else
-import {-# SOURCE #-} Name
+#define OUTPUTABLE_key {--}
 #endif
 
-#if __GLASGOW_HASKELL__ >= 202
+import {-# SOURCE #-} Name
 import GlaExts
-#endif
-#if defined(USE_FAST_STRINGS)
 import FastString
-#endif
 import Maybes
 import Bag	  ( Bag, foldrBag )
-import Outputable ( PprStyle, Outputable(..) )
-import Pretty	( Doc )
+import Outputable
 
 #if ! OMIT_NATIVE_CODEGEN
 #  define IF_NCG(a) a
@@ -223,16 +214,10 @@ addToFM fm key elt = addToFM_C (\ old new -> new) fm key elt
 
 addToFM_C combiner EmptyFM key elt = unitFM key elt
 addToFM_C combiner (Branch key elt size fm_l fm_r) new_key new_elt
-#ifdef __GLASGOW_HASKELL__
-  = case _tagCmp new_key key of
-	_LT -> mkBalBranch key elt (addToFM_C combiner fm_l new_key new_elt) fm_r
-	_GT -> mkBalBranch key elt fm_l (addToFM_C combiner fm_r new_key new_elt)
-	_EQ -> Branch new_key (combiner elt new_elt) size fm_l fm_r
-#else
-  | new_key < key = mkBalBranch key elt (addToFM_C combiner fm_l new_key new_elt) fm_r
-  | new_key > key = mkBalBranch key elt fm_l (addToFM_C combiner fm_r new_key new_elt)
-  | otherwise	  = Branch new_key (combiner elt new_elt) size fm_l fm_r
-#endif
+  = case compare new_key key of
+	LT -> mkBalBranch key elt (addToFM_C combiner fm_l new_key new_elt) fm_r
+	GT -> mkBalBranch key elt fm_l (addToFM_C combiner fm_r new_key new_elt)
+	EQ -> Branch new_key (combiner elt new_elt) size fm_l fm_r
 
 addListToFM fm key_elt_pairs = addListToFM_C (\ old new -> new) fm key_elt_pairs
 
@@ -245,21 +230,10 @@ addListToFM_C combiner fm key_elt_pairs
 \begin{code}
 delFromFM EmptyFM del_key = emptyFM
 delFromFM (Branch key elt size fm_l fm_r) del_key
-#ifdef __GLASGOW_HASKELL__
-  = case _tagCmp del_key key of
-	_GT -> mkBalBranch key elt fm_l (delFromFM fm_r del_key)
-	_LT -> mkBalBranch key elt (delFromFM fm_l del_key) fm_r
-	_EQ -> glueBal fm_l fm_r
-#else
-  | del_key > key
-  = mkBalBranch key elt fm_l (delFromFM fm_r del_key)
-
-  | del_key < key
-  = mkBalBranch key elt (delFromFM fm_l del_key) fm_r
-
-  | key == del_key
-  = glueBal fm_l fm_r
-#endif
+  = case compare del_key key of
+	GT -> mkBalBranch key elt fm_l (delFromFM fm_r del_key)
+	LT -> mkBalBranch key elt (delFromFM fm_l del_key) fm_r
+	EQ -> glueBal fm_l fm_r
 
 delListFromFM fm keys = foldl delFromFM fm keys
 \end{code}
@@ -365,16 +339,10 @@ isEmptyFM fm = sizeFM fm == 0
 
 lookupFM EmptyFM key = Nothing
 lookupFM (Branch key elt _ fm_l fm_r) key_to_find
-#ifdef __GLASGOW_HASKELL__
-  = case _tagCmp key_to_find key of
-	_LT -> lookupFM fm_l key_to_find
-	_GT -> lookupFM fm_r key_to_find
-	_EQ -> Just elt
-#else
-  | key_to_find < key = lookupFM fm_l key_to_find
-  | key_to_find > key = lookupFM fm_r key_to_find
-  | otherwise	  = Just elt
-#endif
+  = case compare key_to_find key of
+	LT -> lookupFM fm_l key_to_find
+	GT -> lookupFM fm_r key_to_find
+	EQ -> Just elt
 
 key `elemFM` fm
   = case (lookupFM fm key) of { Nothing -> False; Just elt -> True }
@@ -427,10 +395,10 @@ mkBranch which key elt fm_l fm_r
   = --ASSERT( left_ok && right_ok && balance_ok )
 #if defined(DEBUG_FINITEMAPS)
     if not ( left_ok && right_ok && balance_ok ) then
-	pprPanic ("mkBranch:"++show which) (vcat [ppr PprDebug [left_ok, right_ok, balance_ok],
-				       ppr PprDebug key,
-				       ppr PprDebug fm_l,
-				       ppr PprDebug fm_r])
+	pprPanic ("mkBranch:"++show which) (vcat [ppr [left_ok, right_ok, balance_ok],
+				       ppr key,
+				       ppr fm_l,
+				       ppr fm_r])
     else
 #endif
     let
@@ -439,7 +407,7 @@ mkBranch which key elt fm_l fm_r
 --    if sizeFM result <= 8 then
 	result
 --    else
---	pprTrace ("mkBranch:"++(show which)) (ppr PprDebug result) (
+--	pprTrace ("mkBranch:"++(show which)) (ppr result) (
 --	result
 --	)
   where
@@ -639,29 +607,17 @@ splitLT, splitGT :: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> key -> Fini
 
 splitLT EmptyFM split_key = emptyFM
 splitLT (Branch key elt _ fm_l fm_r) split_key
-#ifdef __GLASGOW_HASKELL__
-  = case _tagCmp split_key key of
-	_LT -> splitLT fm_l split_key
-	_GT -> mkVBalBranch key elt fm_l (splitLT fm_r split_key)
-	_EQ -> fm_l
-#else
-  | split_key < key = splitLT fm_l split_key
-  | split_key > key = mkVBalBranch key elt fm_l (splitLT fm_r split_key)
-  | otherwise	    = fm_l
-#endif
+  = case compare split_key key of
+	LT -> splitLT fm_l split_key
+	GT -> mkVBalBranch key elt fm_l (splitLT fm_r split_key)
+	EQ -> fm_l
 
 splitGT EmptyFM split_key = emptyFM
 splitGT (Branch key elt _ fm_l fm_r) split_key
-#ifdef __GLASGOW_HASKELL__
-  = case _tagCmp split_key key of
-	_GT -> splitGT fm_r split_key
-	_LT -> mkVBalBranch key elt (splitGT fm_l split_key) fm_r
-	_EQ -> fm_r
-#else
-  | split_key > key = splitGT fm_r split_key
-  | split_key < key = mkVBalBranch key elt (splitGT fm_l split_key) fm_r
-  | otherwise	    = fm_r
-#endif
+  = case compare split_key key of
+	GT -> splitGT fm_r split_key
+	LT -> mkVBalBranch key elt (splitGT fm_l split_key) fm_r
+	EQ -> fm_r
 
 findMin :: FiniteMap key elt -> (key,elt)
 findMin (Branch key elt _ EmptyFM _) = (key,elt)
@@ -690,13 +646,13 @@ deleteMax (Branch key elt _ fm_l    fm_r) = mkBalBranch key elt fm_l (deleteMax 
 #if defined(DEBUG_FINITEMAPS)
 
 instance (Outputable key) => Outputable (FiniteMap key elt) where
-    ppr sty fm = pprX sty fm
+    ppr fm = pprX fm
 
-pprX sty EmptyFM = char '!'
-pprX sty (Branch key elt sz fm_l fm_r)
- = parens (hcat [pprX sty fm_l, space,
-		      ppr sty key, space, int (IF_GHC(I# sz, sz)), space,
-		      pprX sty fm_r])
+pprX EmptyFM = char '!'
+pprX (Branch key elt sz fm_l fm_r)
+ = parens (hcat [pprX fm_l, space,
+		      ppr key, space, int (IF_GHC(I# sz, sz)), space,
+		      pprX fm_r])
 #endif
 
 #if 0

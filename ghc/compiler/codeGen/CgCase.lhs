@@ -8,16 +8,11 @@
 %********************************************************
 
 \begin{code}
-#include "HsVersions.h"
-
 module CgCase (	cgCase, saveVolatileVarsAndRegs ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(CgLoop2)		( cgExpr, getPrimOpArgAmodes )
-#else
+#include "HsVersions.h"
+
 import {-# SOURCE #-} CgExpr
-#endif
 
 import CgMonad
 import StgSyn
@@ -50,17 +45,15 @@ import CLabel		( mkVecTblLabel, mkReturnPtLabel, mkDefaultLabel,
 import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynCon )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( useCurrentCostCentre, CostCentre )
-import HeapOffs		( SYN_IE(VirtualSpBOffset), SYN_IE(VirtualHeapOffset) )
+import HeapOffs		( VirtualSpBOffset, VirtualHeapOffset )
 import Id		( idPrimRep, toplevelishId,
-			  dataConTag, fIRST_TAG, SYN_IE(ConTag),
-			  isDataCon, SYN_IE(DataCon),
-			  idSetToList, GenId{-instance Uniquable,Eq-}, SYN_IE(Id)
+			  dataConTag, fIRST_TAG, ConTag,
+			  isDataCon, DataCon,
+			  idSetToList, GenId{-instance Uniquable,Eq-}, Id
 			)
 import Literal          ( Literal )
 import Maybes		( catMaybes )
-import Outputable       ( Outputable(..), PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
-import Pretty		( Doc )
 import PrimOp		( primOpCanTriggerGC, PrimOp(..),
 			  primOpStackRequired, StackRequirement(..)
 			)
@@ -69,15 +62,12 @@ import PrimRep		( getPrimRepSize, isFollowableRep, retPrimRepSize,
 			)
 import TyCon		( isEnumerationTyCon )
 import Type		( typePrimRep,
-			  getAppSpecDataTyConExpandingDicts,
-			  maybeAppSpecDataTyConExpandingDicts,
-			  SYN_IE(Type)
+			  splitAlgTyConApp, splitAlgTyConApp_maybe,
+			  Type
 			)
 import Unique           ( Unique, Uniquable(..) )
-import Util		( sortLt, isIn, isn'tIn, zipEqual,
-			  pprError, panic, assertPanic
-			)
-
+import Util		( sortLt, isIn, isn'tIn, zipEqual )
+import Outputable
 \end{code}
 
 \begin{code}
@@ -411,7 +401,7 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts (StgBindDefault _ True {- used -
     -- A temporary variable to hold the tag; this is unaffected by GC because
     -- the heap-checks in the branches occur after the switch
     tag_amode     = CTemp uniq IntRep
-    (spec_tycon, _, _) = getAppSpecDataTyConExpandingDicts ty
+    (spec_tycon, _, _) = splitAlgTyConApp ty
 
 getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
 	-- Default is either StgNoDefault or StgBindDefault with unused binder
@@ -477,7 +467,7 @@ cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
 	-- which is worse than having the alt code in the switch statement
 
     let
-	(spec_tycon, _, _) = getAppSpecDataTyConExpandingDicts ty
+	(spec_tycon, _, _) = splitAlgTyConApp ty
 
 	use_labelled_alts
 	  = case ctrlReturnConvAlg spec_tycon of
@@ -628,7 +618,7 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
     default_join_lbl = mkDefaultLabel uniq
     jump_instruction = CJump (CLbl default_join_lbl CodePtrRep)
 
-    (spec_tycon, _, spec_cons) = getAppSpecDataTyConExpandingDicts ty
+    (spec_tycon, _, spec_cons) = splitAlgTyConApp ty
 
     alt_cons = [ con | (con,_,_,_) <- alts ]
 
@@ -1101,7 +1091,7 @@ mkReturnVector :: Unique
 
 mkReturnVector uniq ty tagged_alt_absCs deflt_absC
   = let
-     (return_vec_amode, vtbl_body) = case (ctrlReturnConvAlg spec_tycon) of {
+     (return_vec_amode, vtbl_body) = case (ctrlReturnConvAlg tycon) of {
 
       UnvectoredReturn _ ->
     	(CUnVecLbl ret_label vtbl_label,
@@ -1129,9 +1119,13 @@ mkReturnVector uniq ty tagged_alt_absCs deflt_absC
     -- )
   where
 
-    (spec_tycon,_,_) = case (maybeAppSpecDataTyConExpandingDicts ty) of -- *must* be a real "data" type constructor
+    (tycon,_,_) = case splitAlgTyConApp_maybe ty of -- *must* be a real "data" type constructor
 	      Just xx -> xx
-	      Nothing -> pprError "ERROR: can't generate code for polymorphic case;\nprobably a mis-use of `seq' or `par';\nthe User's Guide has more details.\nOffending type: " (ppr PprDebug ty)
+	      Nothing -> pprPanic "ERROR: can't generate code for polymorphic case"
+				  (vcat [text "probably a mis-use of `seq' or `par';",
+					 text "the User's Guide has more details.",
+					 text "Offending type:" <+> ppr ty
+				  ])
 
     vtbl_label = mkVecTblLabel uniq
     ret_label = mkReturnPtLabel uniq

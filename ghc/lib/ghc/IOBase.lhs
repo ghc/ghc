@@ -98,10 +98,9 @@ instance  Show (IO a)  where
 
 \begin{code}
 stToIO	   :: ST RealWorld a -> IO a
-ioToST	   :: IO a -> ST RealWorld a
-
 stToIO (ST m) = IO $ \ s -> case (m s) of STret new_s r -> IOok new_s r
 
+ioToST	   :: IO a -> ST RealWorld a
 ioToST (IO io) = ST $ \ s ->
     case (io s) of
       IOok   new_s a -> STret new_s a
@@ -122,8 +121,8 @@ fputs :: Addr{-FILE*-} -> String -> IO Bool
 fputs stream [] = return True
 
 fputs stream (c : cs)
-  = _ccall_ stg_putc c stream >> -- stg_putc expands to putc
-    fputs stream cs		 -- (just does some casting stream)
+  = _ccall_ stg_putc c stream >>	 -- stg_putc expands to putc
+    fputs stream cs			 -- (just does some casting stream)
 \end{code}
 
 
@@ -307,9 +306,9 @@ data MVar a = MVar (SynchVar# RealWorld a)
 data ForeignObj = ForeignObj ForeignObj#   -- another one
 
 #if defined(__CONCURRENT_HASKELL__)
-type Handle = MVar Handle__
+newtype Handle = Handle (MVar Handle__)
 #else
-type Handle = MutableVar RealWorld Handle__
+newtype Handle = Handle (MutableVar RealWorld Handle__)
 #endif
 
 data Handle__

@@ -1,18 +1,16 @@
-%
+
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Id]{@Ids@: Value and constructor identifiers}
 
 \begin{code}
-#include "HsVersions.h"
-
 module Id (
 	-- TYPES
 	GenId(..), -- *naughtily* used in some places (e.g., TcHsSyn)
-	SYN_IE(Id), IdDetails,
+	Id, IdDetails,
 	StrictnessMark(..),
-	SYN_IE(ConTag), fIRST_TAG,
-	SYN_IE(DataCon), SYN_IE(DictFun), SYN_IE(DictVar),
+	ConTag, fIRST_TAG,
+	DataCon, DictFun, DictVar,
 
 	-- CONSTRUCTION
 	mkDataCon,
@@ -22,7 +20,6 @@ module Id (
 	mkImported,
 	mkMethodSelId,
 	mkRecordSelId,
-	mkSameSpecCon,
 	mkSuperDictSelId,
 	mkSysLocal,
 	mkTemplateLocals,
@@ -108,7 +105,7 @@ module Id (
 	addInlinePragma, nukeNoInlinePragma, addNoInlinePragma,
 
 	-- IdEnvs AND IdSets
-	SYN_IE(IdEnv), SYN_IE(GenIdSet), SYN_IE(IdSet),
+	IdEnv, GenIdSet, IdSet,
 	addOneToIdEnv,
 	addOneToIdSet,
 	combineIdEnvs,
@@ -138,68 +135,51 @@ module Id (
 	unitIdSet
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(IdLoop)   -- for paranoia checking
-IMPORT_DELOOPER(TyLoop)   -- for paranoia checking
-#else
-import {-# SOURCE #-} SpecEnv    ( SpecEnv   )
 import {-# SOURCE #-} CoreUnfold ( Unfolding )
 import {-# SOURCE #-} StdIdInfo  ( addStandardIdInfo )
--- Let's see how much we can leave out..
---import {-# SOURCE #-} TysPrim
-#endif
 
+import CmdLineOpts      ( opt_PprStyle_All )
+import SpecEnv	        ( SpecEnv   )
 import Bag
-import Class		( SYN_IE(Class), GenClass )
-import BasicTypes	( SYN_IE(Arity) )
+import Class		( Class )
+import BasicTypes	( Arity )
 import IdInfo
 import Maybes		( maybeToBool )
 import Name	 	( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
-			  mkCompoundName, mkInstDeclName,
+			  mkCompoundName,
 			  isLocallyDefinedName, occNameString, modAndOcc,
 			  isLocallyDefined, changeUnique, isWiredInName,
 			  nameString, getOccString, setNameVisibility,
 			  isExported, ExportFlag(..), Provenance,
-			  OccName(..), Name, SYN_IE(Module),
+			  OccName(..), Name, Module,
 			  NamedThing(..)
 			) 
+import PrimOp		( PrimOp )
 import PrelMods		( pREL_TUP, pREL_BASE )
 import Lex		( mkTupNameStr )
 import FieldLabel	( fieldLabelName, FieldLabel(..){-instances-} )
 import PragmaInfo	( PragmaInfo(..) )
-#if __GLASGOW_HASKELL__ >= 202
-import PrimOp	        ( PrimOp )
-#endif
-import PprType		( getTypeString, specMaybeTysSuffix,
-			  GenType, GenTyVar
-			)
-import Pretty
-import MatchEnv		( MatchEnv )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TysWiredIn	( tupleTyCon )
 import TyCon		( TyCon, tyConDataCons, isDataTyCon, isNewTyCon, mkSpecTyCon )
-import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy, splitSigmaTy,
-			  applyTyCon, instantiateTy, mkForAllTys,
-			  tyVarsOfType, applyTypeEnvToTy, typePrimRep,
-			  specialiseTy, instantiateTauTy,
-			  GenType, SYN_IE(ThetaType), SYN_IE(TauType), SYN_IE(Type)
+import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, splitSigmaTy,
+			  mkTyConApp, instantiateTy, mkForAllTys,
+			  tyVarsOfType, instantiateTy, typePrimRep,
+			  instantiateTauTy,
+			  GenType, ThetaType, TauType, Type
 			)
-import TyVar		( SYN_IE(TyVar), GenTyVar, alphaTyVars, isEmptyTyVarSet, SYN_IE(TyVarEnv) )
-import Usage		( SYN_IE(UVar) )
+import TyVar		( TyVar, alphaTyVars, isEmptyTyVarSet, 
+			  TyVarEnv, zipTyVarEnv, mkTyVarEnv
+			)
 import UniqFM
 import UniqSet		-- practically all of it
-import Unique		( getBuiltinUniques, pprUnique,
-			  incrUnique, 
-			  Unique{-instance Ord3-},
-			  Uniquable(..)
-			)
-import Outputable	( ifPprDebug, Outputable(..), PprStyle(..) )
+import Unique		( getBuiltinUniques, pprUnique, Unique, Uniquable(..) )
+import Outputable
 import SrcLoc		( SrcLoc )
-import Util		( Ord3(..), mapAccumL, nOfThem, zipEqual, assoc,
-			  panic, panic#, pprPanic, assertPanic
-			)
+import Util		( mapAccumL, nOfThem, zipEqual, assoc )
+import GlaExts		( Int# )
 \end{code}
 
 Here are the @Id@ and @IdDetails@ datatypes; also see the notes that
@@ -255,8 +235,8 @@ data IdDetails
 		[FieldLabel]	-- Field labels for this constructor; 
 				--length = 0 (not a record) or arity
 
-		[TyVar] [(Class,Type)] 	-- Type vars and context for the data type decl
-		[TyVar] [(Class,Type)] 	-- Ditto for the context of the constructor, 
+		[TyVar] ThetaType 	-- Type vars and context for the data type decl
+		[TyVar] ThetaType 	-- Ditto for the context of the constructor, 
 					-- the existentially quantified stuff
 		[Type] TyCon		-- Args and result tycon
 				-- the type is:
@@ -287,7 +267,7 @@ data IdDetails
 
 				-- see below
   | DictFunId	Class		-- A DictFun is uniquely identified
-		Type		-- by its class and type; this type has free type vars,
+		[Type]		-- by its class and type; this type has free type vars,
 				-- whose identity is irrelevant.  Eg Class = Eq
 				--				     Type  = Tree a
 				-- The "a" is irrelevant.  As it is too painful to
@@ -632,7 +612,7 @@ type TypeEnv = TyVarEnv Type
 applyTypeEnvToId :: TypeEnv -> Id -> Id
 applyTypeEnvToId type_env id@(Id _ _ ty _ _ _)
   = apply_to_Id ( \ ty ->
-	applyTypeEnvToTy type_env ty
+	instantiateTy type_env ty
     ) id
 \end{code}
 
@@ -701,10 +681,10 @@ mkMethodSelId op_name rec_c ty
 mkDefaultMethodId dm_name rec_c ty
   = Id (uniqueOf dm_name) dm_name ty (DefaultMethodId rec_c) NoPragmaInfo noIdInfo
 
-mkDictFunId dfun_name full_ty clas ity
+mkDictFunId dfun_name full_ty clas itys
   = Id (nameUnique dfun_name) dfun_name full_ty details NoPragmaInfo noIdInfo
   where
-    details  = DictFunId clas ity
+    details  = DictFunId clas itys
 
 mkWorkerId u unwrkr ty info
   = Id u name ty details NoPragmaInfo info
@@ -732,16 +712,12 @@ mkPrimitiveId n ty primop
 \end{code}
 
 \begin{code}
-
-type MyTy a b = GenType (GenTyVar a) b
-type MyId a b = GenId (MyTy a b)
-
 no_free_tvs ty = isEmptyTyVarSet (tyVarsOfType ty)
 
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
-mkSysLocal  :: FAST_STRING -> Unique -> MyTy a b -> SrcLoc -> MyId a b
-mkUserLocal :: OccName     -> Unique -> MyTy a b -> SrcLoc -> MyId a b
+mkSysLocal  :: FAST_STRING -> Unique -> GenType flexi -> SrcLoc -> GenId (GenType flexi)
+mkUserLocal :: OccName     -> Unique -> GenType flexi -> SrcLoc -> GenId (GenType flexi)
 
 mkSysLocal str uniq ty loc
   = Id uniq (mkSysLocalName uniq str loc) ty (SysLocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
@@ -749,7 +725,7 @@ mkSysLocal str uniq ty loc
 mkUserLocal occ uniq ty loc
   = Id uniq (mkLocalName uniq occ loc) ty (LocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
 
-mkUserId :: Name -> MyTy a b -> PragmaInfo -> MyId a b
+mkUserId :: Name -> GenType flexi -> PragmaInfo -> GenId (GenType flexi)
 mkUserId name ty pragma_info
   = Id (nameUnique name) name ty (LocalId (no_free_tvs ty)) pragma_info noIdInfo
 \end{code}
@@ -772,6 +748,7 @@ mkIdWithNewType :: Id -> Type -> Id
 mkIdWithNewType (Id u name _ details pragma info) ty 
   = Id u name ty details pragma info
 
+{-
 -- Specialised version of constructor: only used in STG and code generation
 -- Note: The specialsied Id has the same unique as the unspeced Id
 
@@ -783,7 +760,8 @@ mkSameSpecCon ty_maybes unspec@(Id u name ty details pragma info)
     new_ty = specialiseTy ty ty_maybes 0
 
     -- pprTrace "SameSpecCon:Unique:"
-    --	        (ppSep (ppr PprDebug unspec: [pprMaybeTy PprDebug ty | ty <- ty_maybes]))
+    --	        (ppSep (ppr unspec: [pprMaybeTy ty | ty <- ty_maybes]))
+-}
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -865,7 +843,7 @@ mkDataCon n stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon
 
     data_con_ty
       = mkSigmaTy (tvs++con_tvs) (ctxt++con_ctxt)
-	(mkFunTys args_tys (applyTyCon tycon (mkTyVarTys tvs)))
+	(mkFunTys args_tys (mkTyConApp tycon (mkTyVarTys tvs)))
 
 
 mkTupleCon :: Arity -> Name -> Type -> Id
@@ -888,7 +866,8 @@ dictionaries
 
 \begin{code}
 dataConNumFields id
-  = ASSERT(isDataCon id)
+  = ASSERT( if (isDataCon id) then True else
+	    pprTrace "dataConNumFields" (ppr id) False )
     case (dataConSig id) of { (_, _, _, con_theta, arg_tys, _) ->
     length con_theta + length arg_tys }
 
@@ -918,6 +897,7 @@ dataConSig (Id _ _ _ (TupleConId arity) _ _)
   where
     tyvars	= take arity alphaTyVars
     tyvar_tys	= mkTyVarTys tyvars
+
 dataConSig (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
   = (spec_tyvars, spec_theta_ty, spec_con_tyvars, spec_con_theta, spec_arg_tys, spec_tycon)
   where
@@ -925,15 +905,10 @@ dataConSig (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
 
     ty_env = tyvars `zip` ty_maybes
 
-    spec_tyvars     = foldr nothing_tyvars [] ty_env
-    spec_con_tyvars = foldr nothing_tyvars [] (con_tyvars `zip` ty_maybes) -- Hmm..
+    spec_tyvars     = [tyvar | (tyvar, Nothing) <- ty_env]
+    spec_con_tyvars = [tyvar | (tyvar, Nothing) <- con_tyvars `zip` ty_maybes] -- Hmm..
 
-    nothing_tyvars (tyvar, Nothing) l = tyvar : l
-    nothing_tyvars (tyvar, Just ty) l = l
-
-    spec_env = foldr just_env [] ty_env
-    just_env (tyvar, Nothing) l = l
-    just_env (tyvar, Just ty) l = (tyvar, ty) : l
+    spec_env = mkTyVarEnv [(tyvar, ty) | (tyvar, Just ty) <- ty_env]
     spec_arg_tys = map (instantiateTauTy spec_env) arg_tys
 
     spec_theta_ty  = if null theta_ty then []
@@ -946,7 +921,10 @@ dataConSig (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
 -- dataConRepType returns the type of the representation of a contructor
 -- This may differ from the type of the contructor Id itself for two reasons:
 --	a) the constructor Id may be overloaded, but the dictionary isn't stored
+--	   e.g.    data Eq a => T a = MkT a a
+--
 --	b) the constructor may store an unboxed version of a strict field.
+--
 -- Here's an example illustrating both:
 --	data Ord a => T a = MkT Int! a
 -- Here
@@ -955,11 +933,13 @@ dataConSig (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
 --	Trep :: Int# -> a -> T a
 -- Actually, the unboxed part isn't implemented yet!
 
-dataConRepType :: GenId (GenType tv u) -> GenType tv u
-dataConRepType con
-  = mkForAllTys tyvars tau
-  where
-    (tyvars, theta, tau) = splitSigmaTy (idType con)
+dataConRepType :: Id -> Type
+dataConRepType (Id _ _ _ (AlgConId _ _ _ tyvars theta con_tyvars con_theta arg_tys tycon) _ _)
+  = mkForAllTys (tyvars++con_tyvars) 
+		(mkFunTys arg_tys (mkTyConApp tycon (mkTyVarTys tyvars)))
+dataConRepType other_id
+  = ASSERT( isDataCon other_id )
+    idType other_id
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels (Id _ _ _ (AlgConId _ _ fields _ _ _ _ _ _) _ _) = fields
@@ -996,7 +976,7 @@ dataConArgTys con_id inst_tys
  = map (instantiateTy tenv) arg_tys
  where
     (tyvars, _, _, _, arg_tys, _) = dataConSig con_id
-    tenv 		          = zipEqual "dataConArgTys" tyvars inst_tys
+    tenv 		          = zipTyVarEnv tyvars inst_tys
 \end{code}
 
 \begin{code}
@@ -1129,10 +1109,10 @@ addIdFBTypeInfo (Id u n ty info details) upd_info
 \end{code}
 
 \begin{code}
-getIdSpecialisation :: Id -> SpecEnv
+getIdSpecialisation :: Id -> IdSpecEnv
 getIdSpecialisation (Id _ _ _ _ _ info) = specInfo info
 
-addIdSpecialisation :: Id -> SpecEnv -> Id
+addIdSpecialisation :: Id -> IdSpecEnv -> Id
 addIdSpecialisation (Id u n ty details prags info) spec_info
   = Id u n ty details prags (info `addSpecInfo` spec_info)
 \end{code}
@@ -1158,24 +1138,21 @@ addIdStrictness (Id u n ty details prags info) strict_info
 Comparison: equality and ordering---this stuff gets {\em hammered}.
 
 \begin{code}
-cmpId (Id u1 _ _ _ _ _) (Id u2 _ _ _ _ _) = cmp u1 u2
+cmpId (Id u1 _ _ _ _ _) (Id u2 _ _ _ _ _) = compare u1 u2
 -- short and very sweet
 \end{code}
 
 \begin{code}
-instance Ord3 (GenId ty) where
-    cmp = cmpId
-
 instance Eq (GenId ty) where
-    a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
-    a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True  }
+    a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
+    a /= b = case (a `compare` b) of { EQ -> False; _ -> True  }
 
 instance Ord (GenId ty) where
-    a <= b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
-    a <	 b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> False; GT__ -> False }
-    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-    _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
+    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
+    a <	 b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
+    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
+    a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
+    compare a b = cmpId a b
 \end{code}
 
 @cmpId_withSpecDataCon@ ensures that any spectys are taken into
@@ -1184,7 +1161,7 @@ because a specialised data constructor has the same Unique as its
 unspecialised counterpart.
 
 \begin{code}
-cmpId_withSpecDataCon :: Id -> Id -> TAG_
+cmpId_withSpecDataCon :: Id -> Id -> Ordering
 
 cmpId_withSpecDataCon id1 id2
   | eq_ids && isDataCon id1 && isDataCon id2
@@ -1194,14 +1171,14 @@ cmpId_withSpecDataCon id1 id2
   = cmp_ids
   where
     cmp_ids = cmpId id1 id2
-    eq_ids  = case cmp_ids of { EQ_ -> True; other -> False }
+    eq_ids  = case cmp_ids of { EQ -> True; other -> False }
 
 cmpEqDataCon (Id _ _ _ (SpecId _ mtys1 _) _ _) (Id _ _ _ (SpecId _ mtys2 _) _ _)
-  = panic# "Id.cmpEqDataCon:cmpUniTypeMaybeList mtys1 mtys2"
+  = panic "Id.cmpEqDataCon:cmpUniTypeMaybeList mtys1 mtys2"
 
-cmpEqDataCon _ (Id _ _ _ (SpecId _ _ _) _ _) = LT_
-cmpEqDataCon (Id _ _ _ (SpecId _ _ _) _ _) _ = GT_
-cmpEqDataCon _				   _ = EQ_
+cmpEqDataCon _ (Id _ _ _ (SpecId _ _ _) _ _) = LT
+cmpEqDataCon (Id _ _ _ (SpecId _ _ _) _ _) _ = GT
+cmpEqDataCon _				   _ = EQ
 \end{code}
 
 %************************************************************************
@@ -1212,28 +1189,25 @@ cmpEqDataCon _				   _ = EQ_
 
 \begin{code}
 instance Outputable ty => Outputable (GenId ty) where
-    ppr sty id = pprId sty id
+    ppr id = pprId id
 
--- and a SPECIALIZEd one:
-instance Outputable {-Id, i.e.:-}(GenId Type) where
-    ppr sty id = pprId sty id
-
-showId :: PprStyle -> Id -> String
-showId sty id = show (pprId sty id)
+showId :: Id -> String
+showId id = showSDoc (pprId id)
 \end{code}
 
 Default printing code (not used for interfaces):
 \begin{code}
-pprId :: Outputable ty => PprStyle -> GenId ty -> Doc
+pprId :: Outputable ty => GenId ty -> SDoc
 
-pprId sty (Id u n _ _ prags _)
-  = hcat [ppr sty n, pp_prags]
+pprId (Id u n _ _ prags _)
+  = hcat [ppr n, pp_prags]
   where
-    pp_prags = ifPprDebug sty (case prags of
-				IMustNotBeINLINEd -> text "{n}"
-				IWantToBeINLINEd  -> text "{i}"
-				IMustBeINLINEd    -> text "{I}"
-				other		  -> empty)
+    pp_prags | opt_PprStyle_All = case prags of
+				     IMustNotBeINLINEd -> text "{n}"
+				     IWantToBeINLINEd  -> text "{i}"
+				     IMustBeINLINEd    -> text "{I}"
+				     other	       -> empty
+	     | otherwise        = empty
 
   -- WDP 96/05/06: We can re-elaborate this as we go along...
 \end{code}

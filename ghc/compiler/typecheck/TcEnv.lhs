@@ -1,7 +1,7 @@
 \begin{code}
-#include "HsVersions.h"
-
 module TcEnv(
+	TcIdOcc(..), TcIdBndr, tcIdType, tcIdTyVars, tcInstId,
+
 	TcEnv, 
 
 	initEnv, getEnv_LocalIds, getEnv_TyCons, getEnv_Classes,
@@ -22,25 +22,20 @@ module TcEnv(
 	tcGetGlobalTyVars, tcExtendGlobalTyVars
   ) where
 
-
-IMP_Ubiq()
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
-#endif
+#include "HsVersions.h"
 
 import HsTypes	( HsTyVar(..) )
-import Id	( SYN_IE(Id), GenId, idType, mkUserLocal, mkUserId, replaceIdInfo, getIdInfo )
+import Id	( Id, GenId, idType, mkUserLocal, mkUserId, replaceIdInfo, getIdInfo )
 import PragmaInfo ( PragmaInfo(..) )
 import TcKind	( TcKind, newKindVars, newKindVar, tcDefaultKind, kindToTcKind, Kind )
-import TcType	( SYN_IE(TcIdBndr), TcIdOcc(..),
-		  SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar), SYN_IE(TcTyVarSet),
-		  newTyVarTys, tcInstTyVars, zonkTcTyVars
+import TcType	( TcType, TcMaybe, TcTyVar, TcTyVarSet, TcThetaType,
+		  newTyVarTys, tcInstTyVars, zonkTcTyVars, tcInstType
 		)
-import TyVar	( unionTyVarSets, emptyTyVarSet, tyVarSetToList, SYN_IE(TyVar) )
+import TyVar	( mkTyVarSet, unionTyVarSets, emptyTyVarSet, tyVarSetToList, TyVar )
 import PprType	( GenTyVar )
-import Type	( tyVarsOfTypes, splitForAllTy )
-import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon, SYN_IE(Arity) )
-import Class	( SYN_IE(Class), GenClass )
+import Type	( tyVarsOfType, tyVarsOfTypes, splitForAllTys, splitRhoTy )
+import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon, Arity )
+import Class	( Class )
 
 import TcMonad
 
@@ -49,15 +44,79 @@ import Name		( Name, OccName(..), getSrcLoc, occNameString,
 			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
 			  NamedThing(..)
 			)
-import Pretty
 import Unique		( pprUnique10{-, pprUnique ToDo:rm-}, Unique, Uniquable(..) )
 import UniqFM	     
-import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy,
-			  panic, pprPanic, pprTrace
+import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy
 			)
 import Maybes		( maybeToBool )
 import Outputable
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{TcId, TcIdOcc}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+type TcIdBndr s = GenId  (TcType s)	-- Binders are all TcTypes
+data TcIdOcc  s = TcId   (TcIdBndr s)	-- Bindees may be either
+		| RealId Id
+
+instance Eq (TcIdOcc s) where
+  (TcId id1)   == (TcId id2)   = id1 == id2
+  (RealId id1) == (RealId id2) = id1 == id2
+  _	       == _	       = False
+
+instance Ord (TcIdOcc s) where
+  (TcId id1)   `compare` (TcId id2)   = id1 `compare` id2
+  (RealId id1) `compare` (RealId id2) = id1 `compare` id2
+  (TcId _)     `compare` (RealId _)   = LT
+  (RealId _)   `compare` (TcId _)     = GT
+
+instance Outputable (TcIdOcc s) where
+  ppr (TcId id)   = ppr id
+  ppr (RealId id) = ppr id
+
+instance NamedThing (TcIdOcc s) where
+  getName (TcId id)   = getName id
+  getName (RealId id) = getName id
+
+
+tcIdType :: TcIdOcc s -> TcType s
+tcIdType (TcId   id) = idType id
+tcIdType (RealId id) = pprPanic "tcIdType:" (ppr id)
+
+tcIdTyVars (TcId id)  = tyVarsOfType (idType id)
+tcIdTyVars (RealId _) = emptyTyVarSet		-- Top level Ids have no free type variables
+
+
+-- A useful function that takes an occurrence of a global thing
+-- and instantiates its type with fresh type variables
+tcInstId :: Id
+	 -> NF_TcM s ([TcTyVar s], 	-- It's instantiated type
+		      TcThetaType s,	--
+		      TcType s)		--
+
+tcInstId id
+  = let
+      (tyvars, rho) = splitForAllTys (idType id)
+    in
+    tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
+    tcInstType tenv rho		`thenNF_Tc` \ rho' ->
+    let
+	(theta', tau') = splitRhoTy rho'
+    in
+    returnNF_Tc (tyvars', theta', tau')
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{TcEnv}
+%*									*
+%************************************************************************
 
 Data type declarations
 ~~~~~~~~~~~~~~~~~~~~~
@@ -69,15 +128,16 @@ data TcEnv s = TcEnv
 		  (ClassEnv s)
 		  (ValueEnv Id)			-- Globals
 		  (ValueEnv (TcIdBndr s))	-- Locals
-		  (MutableVar s (TcTyVarSet s))	-- Free type variables of locals
+		  (TcRef s (TcTyVarSet s))	-- Free type variables of locals
 						-- ...why mutable? see notes with tcGetGlobalTyVars
 
 type TyVarEnv s  = UniqFM (TcKind s, TyVar)
 type TyConEnv s  = UniqFM (TcKind s, Maybe Arity, TyCon)	-- Arity present for Synonyms only
-type ClassEnv s  = UniqFM (TcKind s, Class)
+type ClassEnv s  = UniqFM ([TcKind s], Class)		-- The kinds are the kinds of the args
+							-- to the class
 type ValueEnv id = UniqFM id
 
-initEnv :: MutableVar s (TcTyVarSet s) -> TcEnv s
+initEnv :: TcRef s (TcTyVarSet s) -> TcEnv s
 initEnv mut = TcEnv emptyUFM emptyUFM emptyUFM emptyUFM emptyUFM mut 
 
 getEnv_LocalIds (TcEnv _ _ _ _ ls _) = eltsUFM ls
@@ -100,36 +160,26 @@ tcExtendTyVarEnv names kinds_w_types scope
 The Kind, TyVar, Class and TyCon envs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Extending the environments.  Notice the uses of @zipLazy@, which makes sure
-that the knot-tied TyVars, TyCons and Classes aren't looked at too early.
+Extending the environments. 
 
 \begin{code}
-tcExtendTyConEnv :: [(Name,Maybe Arity)] -> [TyCon] -> TcM s r -> TcM s r
+tcExtendTyConEnv :: [(Name, (TcKind s, Maybe Arity, TyCon))] -> TcM s r -> TcM s r
 
-tcExtendTyConEnv names_w_arities tycons scope
-  = newKindVars (length names_w_arities)	`thenNF_Tc` \ kinds ->
-    tcGetEnv					`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+tcExtendTyConEnv bindings scope
+  = tcGetEnv					`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let
-	tce' = addListToUFM tce [ (name, (kind, arity, tycon)) 
-				| ((name,arity), (kind,tycon))
-				  <- zipEqual "tcExtendTyConEnv" names_w_arities (kinds `zipLazy` tycons)
-				]
+	tce' = addListToUFM tce bindings
     in
-    tcSetEnv (TcEnv tve tce' ce gve lve gtvs) scope	`thenTc` \ result ->
-    mapNF_Tc tcDefaultKind kinds			`thenNF_Tc_`
-    returnTc result 
+    tcSetEnv (TcEnv tve tce' ce gve lve gtvs) scope
 
 
-tcExtendClassEnv :: [Name] -> [Class] -> TcM s r -> TcM s r
-tcExtendClassEnv names classes scope
-  = newKindVars (length names)	`thenNF_Tc` \ kinds ->
-    tcGetEnv			`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+tcExtendClassEnv :: [(Name, ([TcKind s], Class))] -> TcM s r -> TcM s r
+tcExtendClassEnv bindings scope
+  = tcGetEnv				`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let
-	ce' = addListToUFM ce (zipEqual "tcExtendClassEnv" names (kinds `zipLazy` classes))
+	ce' = addListToUFM ce bindings
     in
-    tcSetEnv (TcEnv tve tce ce' gve lve gtvs) scope	`thenTc` \ result ->
-    mapNF_Tc tcDefaultKind kinds			`thenNF_Tc_`
-    returnTc result 
+    tcSetEnv (TcEnv tve tce ce' gve lve gtvs) scope
 \end{code}
 
 
@@ -138,7 +188,7 @@ Looking up in the environments.
 \begin{code}
 tcLookupTyVar name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-    returnNF_Tc (lookupWithDefaultUFM tve (pprPanic "tcLookupTyVar:" (ppr PprShowAll name)) name)
+    returnNF_Tc (lookupWithDefaultUFM tve (pprPanic "tcLookupTyVar:" (ppr name)) name)
 
 
 tcLookupTyCon name
@@ -161,8 +211,8 @@ tcLookupTyCon name
 
 		-- Could be that he's using a class name as a type constructor
 	       case lookupUFM ce name of
-		 Just _  -> failTc (classAsTyConErr name)
-		 Nothing -> pprPanic "tcLookupTyCon:" (ppr PprDebug name)
+		 Just _  -> failWithTc (classAsTyConErr name)
+		 Nothing -> pprPanic "tcLookupTyCon:" (ppr name)
 	    } } 
 
 tcLookupTyConByKey uniq
@@ -183,10 +233,10 @@ tcLookupClass name
 	Nothing		   -- Could be that he's using a type constructor as a class
 	  |  maybeToBool (maybeWiredInTyConName name)
 	  || maybeToBool (lookupUFM tce name)
-	  -> failTc (tyConAsClassErr name)
+	  -> failWithTc (tyConAsClassErr name)
 
 	  | otherwise      -- Wierd!  Renamer shouldn't let this happen
-	  -> pprPanic "tcLookupClass:" (ppr PprShowAll name)
+	  -> pprPanic "tcLookupClass" (ppr name)
 
 tcLookupClassByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
@@ -246,7 +296,7 @@ tcExtendGlobalTyVars extra_global_tvs scope
   = tcGetEnv				`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
     let
-	new_global_tyvars = global_tvs `unionTyVarSets` extra_global_tvs
+	new_global_tyvars = global_tvs `unionTyVarSets` mkTyVarSet extra_global_tvs
     in
     tcNewMutVar new_global_tyvars	`thenNF_Tc` \ gtvs' ->
     tcSetEnv (TcEnv tve tce ce gve lve gtvs') scope
@@ -276,7 +326,7 @@ tcLookupGlobalValue name
 	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
 		   returnNF_Tc (lookupWithDefaultUFM gve def name)
   where
-    def = pprPanic "tcLookupGlobalValue:" (ppr PprDebug name)
+    def = pprPanic "tcLookupGlobalValue:" (ppr name)
 
 tcLookupGlobalValueMaybe :: Name -> NF_TcM s (Maybe Id)
 tcLookupGlobalValueMaybe name
@@ -320,7 +370,7 @@ tcAddImportedIdInfo unf_env id
   = id `replaceIdInfo` new_info
 	-- The Id must be returned without a data dependency on maybe_id
   where
-    new_info = -- pprTrace "tcAdd" (ppr PprDebug id) $
+    new_info = -- pprTrace "tcAdd" (ppr id) $
 	       case tcExplicitLookupGlobal unf_env (getName id) of
 		     Nothing	      -> noIdInfo
 		     Just imported_id -> getIdInfo imported_id
@@ -362,10 +412,11 @@ newLocalIds names tys
     returnNF_Tc new_ids
 \end{code}
 
-\begin{code}
-classAsTyConErr name sty
-  = hcat [ptext SLIT("Class used as a type constructor: "), ppr sty name]
 
-tyConAsClassErr name sty
-  = hcat [ptext SLIT("Type constructor used as a class: "), ppr sty name]
+\begin{code}
+classAsTyConErr name
+  = ptext SLIT("Class used as a type constructor:") <+> ppr name
+
+tyConAsClassErr name
+  = ptext SLIT("Type constructor used as a class:") <+> ppr name
 \end{code}

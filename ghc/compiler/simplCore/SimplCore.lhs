@@ -4,12 +4,9 @@
 \section[SimplCore]{Driver for simplifying @Core@ programs}
 
 \begin{code}
-#include "HsVersions.h"
-
 module SimplCore ( core2core ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(IO(hPutStr,stderr))
+#include "HsVersions.h"
 
 import AnalFBWW		( analFBWW )
 import Bag		( isEmptyBag, foldBag )
@@ -32,7 +29,7 @@ import SimplUtils	( etaCoreExpr, typeOkForCase )
 import CoreUnfold
 import Literal		( Literal(..), literalType, mkMachInt )
 import ErrUtils		( ghcExit, dumpIfSet, doIfSet )
-import FiniteMap	( FiniteMap )
+import FiniteMap	( FiniteMap, emptyFM )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
@@ -40,14 +37,14 @@ import Id		( mkSysLocal, setIdVisibility, replaceIdInfo,
                           replacePragmaInfo, getIdDemandInfo, idType,
 			  getIdInfo, getPragmaInfo, mkIdWithNewUniq,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
- 			  lookupIdEnv, SYN_IE(IdEnv), omitIfaceSigForId,
+ 			  lookupIdEnv, IdEnv, omitIfaceSigForId,
 			  apply_to_Id,
-			  GenId{-instance Outputable-}, SYN_IE(Id)
+			  GenId{-instance Outputable-}, Id
 			)
 import IdInfo		( willBeDemanded, DemandInfo )
 import Name		( isExported, isLocallyDefined, 
 			  isLocalName, uniqToOccName,
-			  SYN_IE(Module), NamedThing(..), OccName(..)
+			  Module, NamedThing(..), OccName(..)
 			)
 import TyCon		( TyCon )
 import PrimOp		( PrimOp(..) )
@@ -55,27 +52,21 @@ import PrelVals		( unpackCStringId, unpackCString2Id,
 			  integerZeroId, integerPlusOneId,
 			  integerPlusTwoId, integerMinusOneId
 			)
-import Type		( maybeAppDataTyCon, isPrimType, SYN_IE(Type) )
+import Type		( splitAlgTyConApp_maybe, isUnpointedType, Type )
 import TysWiredIn	( stringTy, isIntegerTy )
 import LiberateCase	( liberateCase )
 import MagicUFs		( MagicUnfoldingFun )
-import Outputable	( pprDumpStyle, printErrs,
-			  PprStyle(..), Outputable(..){-instance * (,) -}
-			)
 import PprCore
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-},
 			  nmbrType
 			)
-import Pretty		( Doc, vcat, ($$), hsep )
 import SAT		( doStaticArgs )
 import SimplMonad	( zeroSimplCount, showSimplCount, SimplCount )
 import SimplPgm		( simplifyPgm )
 import Specialise
 import SpecUtils	( pprSpecErrs )
 import StrictAnal	( saWwTopBinds )
-import TyVar		( SYN_IE(TyVar), nullTyVarEnv, GenTyVar{-instance Eq-},
-			  nameTyVar
-		        )
+import TyVar		( TyVar, nameTyVar )
 import Unique		( Unique{-instance Eq-}, Uniquable(..),
 			  integerTyConKey, ratioTyConKey,
 			  mkUnique, incrUnique,
@@ -85,13 +76,13 @@ import UniqSupply	( UniqSupply, mkSplitUniqSupply,
                           splitUniqSupply, getUnique
 		        )
 import UniqFM           ( UniqFM, lookupUFM, addToUFM )
-import Usage            ( SYN_IE(UVar), cloneUVar )
-import Util		( mapAccumL, assertPanic, panic{-ToDo:rm-}, pprTrace, pprPanic )
+import Util		( mapAccumL )
 import SrcLoc		( noSrcLoc )
 import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
 import Bag
 import Maybes
-
+import IO		( hPutStr, stderr )
+import Outputable
 \end{code}
 
 \begin{code}
@@ -99,13 +90,12 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	  -> FAST_STRING		-- module name (profiling only)
 	  -> UniqSupply		-- a name supply
 	  -> [TyCon]			-- local data tycons and tycon specialisations
-	  -> FiniteMap TyCon [(Bool, [Maybe Type])]
 	  -> [CoreBinding]		-- input...
 	  -> IO
 	      ([CoreBinding],		-- results: program, plus...
 	      SpecialiseData)		--  specialisation data
 
-core2core core_todos module_name us local_tycons tycon_specs binds
+core2core core_todos module_name us local_tycons binds
   = 	-- Do the main business
      foldl_mn do_core_pass
 		(binds, us, init_specdata, zeroSimplCount)
@@ -122,7 +112,7 @@ core2core core_todos module_name us local_tycons tycon_specs binds
 	-- Dump output
      dumpIfSet (opt_D_dump_simpl || opt_D_verbose_core2core)
 	"Core transformations" 
-	(pprCoreBindings pprDumpStyle final_binds)			>>
+	(pprCoreBindings final_binds)			>>
 
 	-- Report statistics
      doIfSet opt_D_simplifier_stats
@@ -133,7 +123,7 @@ core2core core_todos module_name us local_tycons tycon_specs binds
 	-- Return results
     return (final_binds, spec_data)
   where
-    init_specdata = initSpecData local_tycons tycon_specs
+    init_specdata = initSpecData local_tycons emptyFM {- tycon_specs -}
 
     --------------
     do_core_pass info@(binds, us, spec_data, simpl_stats) to_do =
@@ -218,7 +208,7 @@ core2core core_todos module_name us local_tycons tycon_specs binds
 
 	  CoreDoPrintCore	-- print result of last pass
 	    -> dumpIfSet (not opt_D_verbose_core2core) "Print Core"
-	 	  (pprCoreBindings pprDumpStyle binds)	>>
+	 	  (pprCoreBindings binds)	>>
 	       return (binds, us1, spec_data, simpl_stats)
 
     -------------------------------------------------
@@ -233,9 +223,13 @@ core2core core_todos module_name us local_tycons tycon_specs binds
 	     simpl_stats2 what
       = -- Report verbosely, if required
 	dumpIfSet opt_D_verbose_core2core what
-	    (pprCoreBindings pprDumpStyle binds2)		>>
+	    (pprCoreBindings binds2)		>>
 
-	lintCoreBindings what spec_done binds2		>>
+	lintCoreBindings what True {- spec_done -} binds2		>>
+		-- The spec_done flag tells the linter to
+		-- complain about unboxed let-bindings
+		-- But we're not specialising unboxed types any more,
+		-- so its irrelevant.
 
 	return
 	  (binds2,	-- processed binds, possibly run thru CoreLint
@@ -481,18 +475,13 @@ tidyCoreExpr (Lam (TyBinder tv) body)
     tidyCoreExpr body		`thenTM` \ body' ->
     returnTM (Lam (TyBinder tv') body')
 
-tidyCoreExpr (Lam (UsageBinder uv) body)
-  = newUVar uv			$ \ uv' ->
-    tidyCoreExpr body		`thenTM` \ body' ->
-    returnTM (Lam (UsageBinder uv') body')
-
 	-- Try for let-to-case (see notes in Simplify.lhs for why
 	-- some let-to-case stuff is deferred to now).
 tidyCoreExpr (Let (NonRec bndr rhs) body)
   | willBeDemanded (getIdDemandInfo bndr) && 
     not rhs_is_whnf &&		-- Don't do it if RHS is already in WHNF
     typeOkForCase (idType bndr)
-  = ASSERT( not (isPrimType (idType bndr)) )
+  = ASSERT( not (isUnpointedType (idType bndr)) )
     tidyCoreExpr (Case rhs (AlgAlts [] (BindDefault bndr body)))
   where
     rhs_is_whnf = case mkFormSummary rhs of
@@ -534,7 +523,7 @@ tidyCoreExpr (Case scrut@(Prim op args) (PrimAlts _ (BindDefault binder rhs)))
 -- Eliminate polymorphic case, for which we can't generate code just yet
 tidyCoreExpr (Case scrut (AlgAlts [] (BindDefault deflt_bndr rhs)))
   | not (typeOkForCase (idType deflt_bndr))
-  = pprTrace "Warning: discarding polymorphic case:" (ppr PprDebug scrut) $
+  = pprTrace "Warning: discarding polymorphic case:" (ppr scrut) $
     case scrut of
 	Var v -> lookupId v	`thenTM` \ v' ->
 		 extendEnvTM deflt_bndr v' (tidyCoreExpr rhs)
@@ -603,7 +592,6 @@ tidyCoreArg (LitArg lit)
 
 tidyCoreArg (TyArg ty)   = tidyTy ty 	`thenTM` \ ty' ->
 			   returnTM (TyArg ty')
-tidyCoreArg (UsageArg u) = returnTM (UsageArg u)
 \end{code}
 
 \begin{code}
@@ -673,7 +661,7 @@ litToRep (NoRepRational r rational_ty)
     returnTM (rational_ty, Con ratio_data_con [TyArg integer_ty, num_arg, denom_arg])
   where
     (ratio_data_con, integer_ty)
-      = case (maybeAppDataTyCon rational_ty) of
+      = case (splitAlgTyConApp_maybe rational_ty) of
 	  Just (tycon, [i_ty], [con])
 	    -> ASSERT(isIntegerTy i_ty && uniqueOf tycon == ratioTyConKey)
 	       (con, i_ty)
@@ -806,14 +794,6 @@ newTyVar tyvar thing_inside mod env (gus, local_uniq, floats)
 	env'	    = addToUFM env tyvar (TyBinder tyvar')
     in
     thing_inside tyvar' mod env' (gus, local_uniq', floats)
-
-newUVar uvar thing_inside mod env (gus, local_uniq, floats)
-  = let
-	local_uniq' = incrUnique local_uniq	
-	uvar'       = cloneUVar uvar local_uniq
-	env'	    = addToUFM env uvar (UsageBinder uvar')
-    in
-    thing_inside uvar' mod env' (gus, local_uniq', floats)
 \end{code}
 
 Re-numbering types
@@ -826,17 +806,12 @@ tidyTy ty mod env usf@(_, local_uniq, _)
 
 -- This little impedance-matcher calls nmbrType with the right arguments
 nmbr_ty env uniq ty
-  = nmbrType tv_env u_env uniq ty
+  = nmbrType tv_env uniq ty
   where
     tv_env :: TyVar -> TyVar
     tv_env tyvar = case lookupUFM env tyvar of
 			Just (TyBinder tyvar') -> tyvar'
 			other		       -> tyvar
-
-    u_env :: UVar -> UVar
-    u_env uvar = case lookupUFM env uvar of
-			Just (UsageBinder uvar') -> uvar'
-			other		         -> uvar
 \end{code}
 
 

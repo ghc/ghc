@@ -4,43 +4,34 @@
 \section[TcMatches]{Typecheck some @Matches@}
 
 \begin{code}
-#include "HsVersions.h"
-
 module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchExpected ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
-#else
 import {-# SOURCE #-} TcGRHSs ( tcGRHSsAndBinds )
-#endif
 
-import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat, 
-			  HsExpr(..), HsBinds(..), MonoBinds(..), OutPat, Fake, Stmt,
-			  Sig, HsLit, DoOrListComp, Fixity, HsType, ArithSeqInfo, 
-			  collectPatBinders, pprMatch )
-import RnHsSyn		( SYN_IE(RenamedMatch) )
-import TcHsSyn		( SYN_IE(TcMatch) )
+import HsSyn		( HsBinds(..), Match(..), GRHSsAndBinds(..), GRHS(..),
+			  HsExpr(..), MonoBinds(..),
+			  collectPatBinders, pprMatch, getMatchLoc
+			)
+import RnHsSyn		( RenamedMatch )
+import TcHsSyn		( TcIdBndr, TcMatch )
 
 import TcMonad
-import Inst		( Inst, SYN_IE(LIE), plusLIE )
-import TcEnv		( newMonoIds )
+import Inst		( Inst, LIE, plusLIE )
+import TcEnv		( TcIdOcc(..), newMonoIds )
 import TcPat		( tcPat )
-import TcType		( TcIdOcc(..), SYN_IE(TcType), TcMaybe, zonkTcType )
+import TcType		( TcType, TcMaybe, zonkTcType )
 import TcSimplify	( bindInstsOfLocalFuns )
 import Unify		( unifyTauTy, unifyTauTyList, unifyFunTy )
 import Name		( Name {- instance Outputable -} )
 
 import Kind		( Kind, mkTypeKind )
-import Pretty
-import Type		( isTyVarTy, isTauTy, mkFunTy, getFunTy_maybe )
+import BasicTypes	( RecFlag(..) )
+import Type		( isTyVarTy, isTauTy, mkFunTy, splitFunTy_maybe )
 import Util
 import Outputable
-#if __GLASGOW_HASKELL__ >= 202
 import SrcLoc           (SrcLoc)
-#endif
-
 \end{code}
 
 @tcMatchesFun@ typechecks a @[Match]@ list which occurs in a
@@ -61,7 +52,7 @@ tcMatchesFun fun_name expected_ty matches@(first_match:_)
 	 -- ann-grabbing, because we don't always have annotations in
 	 -- hand when we call tcMatchesFun...
 
-    tcAddSrcLoc (get_Match_loc first_match)	 (
+    tcAddSrcLoc (getMatchLoc first_match)	 (
 
 	 -- Check that they all have the same no of arguments
     checkTc (all_same (noOfArgs matches))
@@ -102,15 +93,15 @@ tcMatchesExpected :: TcType s
 		  -> TcM s ([TcMatch s], LIE s)
 
 tcMatchesExpected expected_ty fun_or_case [match]
-  = tcAddSrcLoc (get_Match_loc match)		$
+  = tcAddSrcLoc (getMatchLoc match)		$
     tcAddErrCtxt (matchCtxt fun_or_case match)	$
-    tcMatchExpected expected_ty match	`thenTc` \ (match',  lie) ->
+    tcMatchExpected [] expected_ty match	`thenTc` \ (match',  lie) ->
     returnTc ([match'], lie)
 
 tcMatchesExpected expected_ty fun_or_case (match1 : matches)
-  = tcAddSrcLoc (get_Match_loc match1)	(
+  = tcAddSrcLoc (getMatchLoc match1)	(
 	tcAddErrCtxt (matchCtxt fun_or_case match1)	$
-  	tcMatchExpected expected_ty  match1
+  	tcMatchExpected [] expected_ty  match1
     )						    	`thenTc` \ (match1',  lie1) ->
     tcMatchesExpected expected_ty fun_or_case matches	`thenTc` \ (matches', lie2) ->
     returnTc (match1' : matches', plusLIE lie1 lie2)
@@ -118,14 +109,15 @@ tcMatchesExpected expected_ty fun_or_case (match1 : matches)
 
 \begin{code}
 tcMatchExpected
-	:: TcType s 		-- This gives the expected
+	:: [TcIdBndr s]		-- Ids bound by enclosing matches
+	-> TcType s 		-- This gives the expected
 				-- result-type of the Match.  Early unification
 				-- with this guy gives better error messages
 	-> RenamedMatch
 	-> TcM s (TcMatch s,LIE s)	-- NB No type returned, because it was passed
 					-- in instead!
 
-tcMatchExpected expected_ty the_match@(PatMatch pat match)
+tcMatchExpected matched_ids expected_ty the_match@(PatMatch pat match)
   = unifyFunTy expected_ty		`thenTc` \ (arg_ty, rest_ty) ->
 
     let binders = collectPatBinders pat
@@ -133,35 +125,32 @@ tcMatchExpected expected_ty the_match@(PatMatch pat match)
     newMonoIds binders mkTypeKind (\ mono_ids ->
 	tcPat pat			`thenTc` \ (pat', lie_pat, pat_ty) ->
 	unifyTauTy pat_ty arg_ty	`thenTc_`
-	tcMatchExpected rest_ty  match	`thenTc` \ (match', lie_match) ->
-		-- In case there are any polymorpic, overloaded binders in the pattern
-		-- (which can happen in the case of rank-2 type signatures, or data constructors
-		-- with polymorphic arguments), we must do a bindInstsOfLocalFns here
-		--
-		-- 99% of the time there are no bindings.  In the unusual case we
-		-- march down the match to dump them in the right place (boring but easy).
-        bindInstsOfLocalFuns lie_match mono_ids 	`thenTc` \ (lie_match', inst_mbinds) ->
-	let
-	   inst_binds = MonoBind inst_mbinds [] False
-	   match'' = case inst_mbinds of
-			EmptyMonoBinds -> match'
-			other          -> glue_on match'
-	   glue_on (PatMatch p m) = PatMatch p (glue_on m)
-	   glue_on (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
-		= (GRHSMatch (GRHSsAndBindsOut grhss 
-					       (inst_binds `ThenBinds` binds)
-					       ty))
-	   glue_on (SimpleMatch expr) = SimpleMatch (HsLet inst_binds expr)
-	in		
-	returnTc (PatMatch pat' match'',
-		  plusLIE lie_pat lie_match')
+
+	tcMatchExpected (mono_ids ++ matched_ids)
+			rest_ty match	`thenTc` \ (match', lie_match) ->
+
+	returnTc (PatMatch pat' match',
+		  plusLIE lie_pat lie_match)
     )
 
-tcMatchExpected expected_ty (GRHSMatch grhss_and_binds)
-  = tcGRHSsAndBinds expected_ty grhss_and_binds   	`thenTc` \ (grhss_and_binds', lie) ->
+tcMatchExpected matched_ids expected_ty (GRHSMatch grhss_and_binds)
+  =     -- Check that the remaining "expected type" is not a rank-2 type
+	-- If it is it'll mess up the unifier when checking the RHS
     checkTc (isTauTy expected_ty)
 	    lurkingRank2SigErr 		`thenTc_`
-    returnTc (GRHSMatch grhss_and_binds', lie)
+
+    tcGRHSsAndBinds expected_ty grhss_and_binds   	`thenTc` \ (GRHSsAndBindsOut grhss binds ty, lie) ->
+
+    	-- In case there are any polymorpic, overloaded binders in the pattern
+	-- (which can happen in the case of rank-2 type signatures, or data constructors
+	-- with polymorphic arguments), we must do a bindInstsOfLocalFns here
+    bindInstsOfLocalFuns lie matched_ids 	`thenTc` \ (lie', inst_mbinds) ->
+    let
+        binds' = case inst_mbinds of
+		   EmptyMonoBinds -> binds	-- The common case
+		   other	  -> MonoBind inst_mbinds [] Recursive `ThenBinds` binds
+    in
+    returnTc (GRHSMatch (GRHSsAndBindsOut grhss binds' ty), lie')
 \end{code}
 
 
@@ -180,38 +169,23 @@ noOfArgs ms = map args_in_match ms
     args_in_match (PatMatch _ match) = 1 + args_in_match match
 \end{code}
 
-@get_Match_loc@ takes a @RenamedMatch@ and returns the
-source-location gotten from the GRHS inside.
-THis is something of a nuisance, but no more.
-
-\begin{code}
-get_Match_loc     :: RenamedMatch   -> SrcLoc
-
-get_Match_loc (PatMatch _ m)    = get_Match_loc m
-get_Match_loc (GRHSMatch (GRHSsAndBindsIn (g:_) _))
-      = get_GRHS_loc g
-      where
-	get_GRHS_loc (OtherwiseGRHS _ locn) = locn
-	get_GRHS_loc (GRHS _ _ locn)	    = locn
-\end{code}
-
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-matchCtxt MCase match sty
+matchCtxt MCase match
   = hang (ptext SLIT("In a \"case\" branch:"))
-	 4 (pprMatch sty True{-is_case-} match)
+	 4 (pprMatch True{-is_case-} match)
 
-matchCtxt (MFun fun) match sty
-  = hang (hcat [ptext SLIT("In an equation for function "), ppr sty fun, char ':'])
-	 4 (pprQuote sty $ \sty -> hcat [ppr sty fun, space, pprMatch sty False{-not case-} match])
+matchCtxt (MFun fun) match
+  = hang (hcat [ptext SLIT("In an equation for function "), quotes (ppr fun), char ':'])
+	 4 (hcat [ppr fun, space, pprMatch False{-not case-} match])
 \end{code}
 
 
 \begin{code}
-varyingArgsErr name matches sty
-  = sep [ptext SLIT("Varying number of arguments for function"), ppr sty name]
+varyingArgsErr name matches
+  = sep [ptext SLIT("Varying number of arguments for function"), quotes (ppr name)]
 
-lurkingRank2SigErr sty
+lurkingRank2SigErr
   = ptext SLIT("Too few explicit arguments when defining a function with a rank-2 type")
 \end{code}

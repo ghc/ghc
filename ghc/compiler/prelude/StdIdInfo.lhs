@@ -12,17 +12,14 @@ have a standard form, namely:
 	* primitive operations
 
 \begin{code}
-#include "HsVersions.h"
-
 module StdIdInfo (
 	addStandardIdInfo
     ) where
 
-IMP_Ubiq()
+#include "HsVersions.h"
 
 import Type
 import TyVar		( alphaTyVar )
-import CmdLineOpts      ( opt_PprUserLength )
 import CoreSyn
 import Literal
 import CoreUnfold	( mkUnfolding, PragmaInfo(..) )
@@ -34,19 +31,16 @@ import Id		( GenId, mkTemplateLocals, idType,
 			  isAlgCon, isMethodSelId_maybe, isSuperDictSelId_maybe,
 			  isRecordSelector, isPrimitiveId_maybe, 
 			  addIdUnfolding, addIdArity,
-			  SYN_IE(Id)
+			  Id
 			)
 import IdInfo		( ArityInfo, exactArity )
-import Class		( GenClass, classBigSig, classDictArgTys )
-import TyCon		( isNewTyCon, isDataTyCon, isAlgTyCon )
+import Class		( classBigSig, classTyCon )
+import TyCon		( isNewTyCon, isDataTyCon, isAlgTyCon, tyConDataCons )
 import FieldLabel	( FieldLabel )
 import PrelVals		( pAT_ERROR_ID )
 import Maybes
-import Outputable	( PprStyle(..), Outputable(..) )
-import Pretty
-import Util		( assertPanic, pprTrace, 
-			  assoc
-			)
+import Outputable
+import Util		( assoc )
 \end{code}		
 
 
@@ -93,10 +87,10 @@ addStandardIdInfo con_id
 
 	(tyvars, theta, con_tyvars, con_theta, arg_tys, tycon) = dataConSig con_id
 
-	dict_tys     = [mkDictTy clas ty | (clas,ty) <- theta]
-	con_dict_tys = [mkDictTy clas ty | (clas,ty) <- con_theta]
+	dict_tys     = [mkDictTy clas tys | (clas,tys) <- theta]
+	con_dict_tys = [mkDictTy clas tys | (clas,tys) <- con_theta]
 	n_dicts	     = length dict_tys
-	result_ty    = applyTyCon tycon (mkTyVarTys tyvars)
+	result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
 
 	locals        = mkTemplateLocals (dict_tys ++ con_dict_tys ++ arg_tys)
 	data_args     = drop n_dicts locals
@@ -116,7 +110,7 @@ addStandardIdInfo con_id
 		  mkValLam locals $
 		  foldr mk_case con_app strict_args
 
-	mk_case arg body | isUnboxedType (idType arg)
+	mk_case arg body | isUnpointedType (idType arg)
 			 = body			-- "!" on unboxed arg does nothing
 			 | otherwise
 			 = Case (Var arg) (AlgAlts [] (BindDefault arg body))
@@ -153,9 +147,9 @@ addStandardIdInfo sel_id
 
 	(tyvars, theta, tau)  = splitSigmaTy (idType sel_id)
 	field_lbl	      = recordSelectorFieldLabel sel_id
-	(data_ty,rhs_ty)      = expectJust "StdIdInfoRec" (getFunTy_maybe tau)
+	(data_ty,rhs_ty)      = expectJust "StdIdInfoRec" (splitFunTy_maybe tau)
 					-- tau is of form (T a b c -> field-type)
-	(tycon, _, data_cons) = getAppDataTyCon data_ty
+	(tycon, _, data_cons) = splitAlgTyConApp data_ty
 	tyvar_tys	      = mkTyVarTys tyvars
 	
 	[data_id] = mkTemplateLocals [data_ty]
@@ -173,15 +167,15 @@ addStandardIdInfo sel_id
 	    field_lbls	     = dataConFieldLabels data_con
 	    maybe_the_arg_id = assocMaybe (field_lbls `zip` arg_ids) field_lbl
 
-	error_expr = mkApp (Var pAT_ERROR_ID) [] [rhs_ty] [LitArg msg_lit]
- 	full_msg   = show (sep [text "No match in record selector", ppr (PprForUser opt_PprUserLength) sel_id]) 
+	error_expr = mkApp (Var pAT_ERROR_ID) [rhs_ty] [LitArg msg_lit]
+ 	full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
 	msg_lit    = NoRepStr (_PK_ full_msg)
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Super selectors}
+\subsection{Dictionary selectors}
 %*									*
 %************************************************************************
 
@@ -219,8 +213,8 @@ addStandardIdInfo prim_id
 
     unfolding = mkUnfolding IWantToBeINLINEd {- Always inline PrimOps -} rhs
 
-    (tyvars, tau) = splitForAllTy (idType prim_id)
-    (arg_tys, _)  = splitFunTy tau
+    (tyvars, tau) = splitForAllTys (idType prim_id)
+    (arg_tys, _)  = splitFunTys tau
 
     args = mkTemplateLocals arg_tys
     rhs =  mkLam tyvars args $
@@ -238,7 +232,7 @@ addStandardIdInfo prim_id
 
 \begin{code}
 addStandardIdInfo id
-  = pprTrace "addStandardIdInfo missing:" (ppr PprDebug id) id
+  = pprTrace "addStandardIdInfo missing:" (ppr id) id
 \end{code}
 
 
@@ -256,21 +250,19 @@ mk_selector_unfolding clas sel_id
   = mkUnfolding IWantToBeINLINEd {- Always inline selectors -} rhs
 	-- The always-inline thing means we don't need any other IdInfo
   where
-    rhs	       = mk_dict_selector [alphaTyVar] dict_id arg_ids the_arg_id
-    tyvar_ty   = mkTyVarTy alphaTyVar
-    [dict_id]  = mkTemplateLocals [mkDictTy clas tyvar_ty]
-    arg_tys    = classDictArgTys clas tyvar_ty
-    arg_ids    = mkTemplateLocals arg_tys
+    (tyvars, _, sc_sel_ids, op_sel_ids, defms) = classBigSig clas
+
+    tycon      = classTyCon clas
+    [data_con] = tyConDataCons tycon
+    tyvar_tys  = mkTyVarTys tyvars
+    arg_tys    = dataConArgTys data_con tyvar_tys
     the_arg_id = assoc "StdIdInfo:mk_sel" ((sc_sel_ids ++ op_sel_ids) `zip` arg_ids) sel_id
 
-    (_, _, sc_sel_ids, op_sel_ids, defms) = classBigSig clas
+    (dict_id:arg_ids) = mkTemplateLocals (mkDictTy clas tyvar_tys : arg_tys)
 
-mk_dict_selector tyvars dict_id [arg_id] the_arg_id
-  = mkLam tyvars [dict_id] (Var dict_id)
-
-mk_dict_selector tyvars dict_id arg_ids the_arg_id
-  = mkLam tyvars [dict_id] $
-    Case (Var dict_id) (AlgAlts [(tup_con, arg_ids, Var the_arg_id)] NoDefault)
-  where
-    tup_con = tupleCon (length arg_ids)
+    rhs | isNewTyCon tycon = mkLam tyvars [dict_id] $
+			     Coerce (CoerceOut data_con) (head arg_tys) (Var dict_id)
+	| otherwise	   = mkLam tyvars [dict_id] $
+			     Case (Var dict_id) $
+			     AlgAlts [(data_con, arg_ids, Var the_arg_id)] NoDefault
 \end{code}

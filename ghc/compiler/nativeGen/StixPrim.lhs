@@ -3,14 +3,9 @@
 %
 
 \begin{code}
-#include "HsVersions.h"
-
 module StixPrim ( primCode, amodeToStix, amodeToStix' ) where
 
-IMP_Ubiq(){-uitous-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
-IMPORT_DELOOPER(NcgLoop)		-- paranoia checking only
-#endif
+#include "HsVersions.h"
 
 import MachMisc
 import MachRegs
@@ -26,14 +21,12 @@ import PrimOp		( PrimOp(..), isCompareOp, showPrimOp,
 			)
 import PrimRep		( PrimRep(..), isFloatingRep )
 import OrdList		( OrdList )
-import Outputable	( PprStyle(..) )
 import SMRep		( SMRep(..), SMSpecRepKind, SMUpdateKind )
 import Stix
 import StixMacro	( heapCheck )
 import StixInteger	{- everything -}
-import UniqSupply	( returnUs, thenUs, SYN_IE(UniqSM) )
-import Pretty		( (<>), ptext, int )
-import Util		( panic )
+import UniqSupply	( returnUs, thenUs, UniqSM )
+import Outputable
 
 #ifdef REALLY_HASKELL_1_3
 ord = fromEnum :: Char -> Int
@@ -485,7 +478,7 @@ simplePrim [lhs] op rest
 simplePrim as op bs = simplePrim_error op
 
 simplePrim_error op
-    = error ("ERROR: primitive operation `"++showPrimOp PprDebug op++"'cannot be handled\nby the native-code generator.  Workaround: use -fvia-C.\n(Perhaps you should report it as a GHC bug, also.)\n")
+    = error ("ERROR: primitive operation `"++showPrimOp op++"'cannot be handled\nby the native-code generator.  Workaround: use -fvia-C.\n(Perhaps you should report it as a GHC bug, also.)\n")
 \end{code}
 
 %---------------------------------------------------------------------
