@@ -317,7 +317,7 @@ sub init_TARGET_STUFF {
     $T_create_word  = "\t.long";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^sparc-.*-solaris2/ ) {
+    } elsif ( $TargetPlatform =~ /^sparc-.*-(solaris2|openbsd)/ ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
