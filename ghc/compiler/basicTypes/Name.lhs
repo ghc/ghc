@@ -65,7 +65,7 @@ import CStrings		( identToC, modnameToC, cSEP )
 import CmdLineOpts	( opt_OmitInterfacePragmas, opt_EnsureSplittableC, all_toplev_ids_visible )
 import BasicTypes	( SYN_IE(Module), IfaceFlavour(..), moduleString, pprModule )
 
-import Outputable	( Outputable(..), PprStyle(..), codeStyle, ifaceStyle )
+import Outputable	( Outputable(..), PprStyle(..), codeStyle, ifaceStyle, userStyle )
 import PrelMods		( gHC__ )
 import Pretty
 import Lex		( isLexSym, isLexConId )
