@@ -430,14 +430,13 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		-- emit an error message.  This in turn means that we don't
 		-- mention the constructor, which doesn't exist for CCallable, CReturnable
 		-- Hardly beautiful, but only three extra lines.
-	   HsApp (TyApp (HsVar (RealId eRROR_ID)) [tcIdType this_dict_id])
-		 (HsLitOut (HsString msg) stringTy)
+	    HsApp (TyApp (HsVar (RealId eRROR_ID)) [tcIdType this_dict_id])
+		  (HsLitOut (HsString msg) stringTy)
 
 	  | otherwise	-- The common case
-	  = foldl HsApp (TyApp (HsVar (RealId dict_constr)) inst_tys')
-			       (map HsVar (sc_dict_ids ++ meth_ids))
+	  = HsCon dict_constr inst_tys' (map HsVar (sc_dict_ids ++ meth_ids))
 		-- We don't produce a binding for the dict_constr; instead we
-		-- rely on the simplifier to unfold this saturated application
+		-- just generate the saturated constructor directly
 	  where
 	    msg = _PK_ ("Compiler error: bad dictionary " ++ showSDoc (ppr clas))
 

@@ -96,14 +96,7 @@ lookupSpecEnv doc (SpecEnv alist) key
   where
     find [] = Nothing
     find ((tpl, val) : rest)
-      = 
-#ifdef DEBUG
-	if length tpl > length key then
-		pprTrace "lookupSpecEnv" (doc <+> ppr tpl <+> ppr key) $
-		Nothing
-	else
-#endif
-	case matchTys tpl key of
+      = case matchTys tpl key of
 	  Nothing                 -> find rest
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
 				     Just (subst, val)

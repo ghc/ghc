@@ -721,7 +721,13 @@ specBind (NonRec bndr rhs) body_uds
     specDefn (calls body_uds) (bndr,rhs)	`thenSM` \ ((bndr',rhs'), spec_defns, spec_uds) ->
     let
 	(all_uds, (dict_binds, dump_calls)) 
-		= splitUDs [ValBinder bndr] (spec_uds `plusUDs` body_uds)
+		= splitUDs [ValBinder bndr]
+			   (body_uds `plusUDs` spec_uds)
+			-- It's important that the `plusUDs` is this way round,
+			-- because body_uds may bind dictionaries that are
+			-- used in the calls passed to specDefn.  So the
+			-- dictionary bindings in spec_uds may mention 
+			-- dictionaries bound in body_uds.
 
         -- If we make specialisations then we Rec the whole lot together
         -- If not, leave it as a NonRec
@@ -736,8 +742,12 @@ specBind (Rec pairs) body_uds
 	(pairs', spec_defns_s, spec_uds_s) = unzip3 stuff
 	spec_defns = concat spec_defns_s
 	spec_uds   = plusUDList spec_uds_s
+
 	(all_uds, (dict_binds, dump_calls)) 
-		= splitUDs (map (ValBinder . fst) pairs) (spec_uds `plusUDs` body_uds)
+		= splitUDs (map (ValBinder . fst) pairs)
+			   (body_uds `plusUDs` spec_uds)
+			-- See notes for non-rec case
+
         new_bind = Rec (spec_defns ++ pairs')
     in
     returnSM (	new_bind : mkDictBinds dict_binds, all_uds )

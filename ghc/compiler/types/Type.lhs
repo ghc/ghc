@@ -659,7 +659,7 @@ match ty1	    (SynTy _ ty2) k = match ty1 ty2 k
 match _ _ _ = \s -> Nothing
 
 match_list []         tys2       k = \s -> k (s, tys2)
-match_list (ty1:tys1) []         k = panic "match_list"
+match_list (ty1:tys1) []         k = \s -> Nothing	-- Not enough arg tys => failure
 match_list (ty1:tys1) (ty2:tys2) k = match ty1 ty2 (match_list tys1 tys2 k)
 \end{code}
 

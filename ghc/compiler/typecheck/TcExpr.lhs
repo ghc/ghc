@@ -650,7 +650,7 @@ tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
 	tcMonoExpr expr sig_tc_ty
 
    else	-- Signature is polymorphic
-	tcPolyExpr in_expr sig_tc_ty		`thenTc` \ (_, _, expr, expr_ty, lie) ->
+	tcPolyExpr expr sig_tc_ty		`thenTc` \ (_, _, expr, expr_ty, lie) ->
 
 	    -- Now match the signature type with res_ty.
 	    -- We must not do this earlier, because res_ty might well

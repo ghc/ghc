@@ -155,6 +155,9 @@ tcModule rn_name_supply
     	
     	-- Create any necessary record selector Ids and their bindings
     	-- "Necessary" includes data and newtype declarations
+	-- We don't create bindings for dictionary constructors;
+	-- they are always fully applied, and the bindings are just there
+	-- to support partial applications
     	let
     	    tycons       = getEnv_TyCons env
     	    classes      = getEnv_Classes env
