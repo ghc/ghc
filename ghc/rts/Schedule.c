@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.72 2000/06/20 15:15:44 simonmar Exp $
+ * $Id: Schedule.c,v 1.73 2000/07/17 15:15:40 rrt Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -516,7 +516,7 @@ schedule( void )
     }
     
     /* check for signals each time around the scheduler */
-#ifndef __MINGW32__
+#ifndef mingw32_TARGET_OS
     if (signals_pending()) {
       start_signal_handlers();
     }

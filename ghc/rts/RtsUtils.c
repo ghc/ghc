@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.16 2000/05/24 11:01:07 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.17 2000/07/17 15:15:40 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -218,7 +218,7 @@ resetNonBlockingFd(int fd)
 {
   long fd_flags;
 
-#if !defined(_WIN32) || defined(__CYGWIN__) || defined(__CYGWIN32__)
+#if !defined(mingw32_TARGET_OS)
   /* clear the non-blocking flag on this file descriptor */
   fd_flags = fcntl(fd, F_GETFL);
   if (fd_flags & O_NONBLOCK) {

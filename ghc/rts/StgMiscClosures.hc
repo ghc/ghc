@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.45 2000/06/25 17:25:42 panne Exp $
+ * $Id: StgMiscClosures.hc,v 1.46 2000/07/17 15:15:40 rrt Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -26,7 +26,7 @@
 #include <stdio.h>
 #endif
 
-/* ToDo: make the printing of panics more Win32-friendly, i.e.,
+/* ToDo: make the printing of panics more win32-friendly, i.e.,
  *       pop up some lovely message boxes (as well).
  */
 #define DUMP_ERRMSG(msg) STGCALL2(fprintf,stderr,msg)

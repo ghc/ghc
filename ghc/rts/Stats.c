@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.20 2000/01/12 15:15:18 simonmar Exp $
+ * $Id: Stats.c,v 1.21 2000/07/17 15:15:40 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,7 +21,7 @@
 #include <unistd.h>
 #endif
 
-#ifndef __MINGW32__
+#ifndef mingw32_TARGET_OS
 # ifdef HAVE_SYS_TIMES_H
 #  include <sys/times.h>
 # endif
@@ -37,7 +37,7 @@
 # endif
 #endif
 
-#if ! irix_TARGET_OS && ! defined(__MINGW32__)
+#if ! irix_TARGET_OS && ! defined(mingw32_TARGET_OS)
 # if defined(HAVE_SYS_RESOURCE_H)
 #  include <sys/resource.h>
 # endif
