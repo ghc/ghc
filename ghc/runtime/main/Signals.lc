@@ -35,6 +35,12 @@ much pain.
 # define NON_POSIX_SOURCE
 #endif
 
+#if defined(linux_TARGET_OS) 
+# define NON_POSIX_SOURCE
+/* sigh, linux w/ glibc needs _BSD_SOURCE to get caddr_t... (ToDo) */
+# define _BSD_SOURCE
+#endif
+
 #if defined(osf3_TARGET_OS) || defined(osf1_TARGET_OS)
     /* The include files for OSF1 do not normally define SA_SIGINFO */
 # define _OSF_SOURCE 1
