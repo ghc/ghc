@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.10 2000/04/03 15:54:49 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.11 2000/04/05 15:32:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -22,6 +22,9 @@
 #include "Storage.h"
 #include "ProfHeap.h"
 #include "Stats.h"
+#include "Hash.h"
+#include "StrHash.h"
+
 #ifdef DEBUG_HEAP_PROF
 #include "Printer.h"
 static void initSymbolHash(void);
@@ -30,6 +33,119 @@ static void fprint_data(FILE *fp);
 #endif
 
 char prof_filename[128];	/* urk */
+
+/* -----------------------------------------------------------------------------
+ * Hash tables.
+ *
+ * For profiling by module, constructor or closure type we need to be
+ * able to get from a string describing the category to a structure
+ * containing the counters for that category.  The strings aren't
+ * unique (although gcc will do a fairly good job of commoning them up
+ * where possible), so we have a many->one mapping.
+ *
+ * We represent the many->one mapping with a hash table.  In order to
+ * find the unique counter associated with a string the first time we
+ * encounter a particular string, we need another hash table, mapping
+ * hashed strings to buckets of counters.  The string is hashed, then
+ * the bucket is searched for an existing counter for the same
+ * string. 
+ *
+ * -------------------------------------------------------------------------- */
+
+typedef struct _ctr {
+    const char *str;
+    unsigned long mem_resid;
+    struct _ctr *next;
+    struct _ctr *next_bucket;
+} prof_ctr;
+
+/* Linked list of all existing ctr structs */
+prof_ctr *all_ctrs;
+
+/* Hash table mapping (char *) -> (struct _ctr) */
+HashTable *str_to_ctr;
+
+/* Hash table mapping hash_t (hashed string) -> (struct _ctr) */
+HashTable *hashstr_to_ctrs;
+
+static void
+initHashTables( void )
+{
+    str_to_ctr      = allocHashTable();
+    hashstr_to_ctrs = allocHashTable();
+    all_ctrs = NULL;
+}
+
+static prof_ctr *
+strToCtr(const char *str)
+{
+    prof_ctr *ctr;
+
+    ctr = lookupHashTable( str_to_ctr, (W_)str );
+
+    if (ctr != NULL) { return ctr; }
+
+    else {
+	hash_t str_hash = hash_str((char *)str);
+	prof_ctr *prev;
+
+	ctr = lookupHashTable( hashstr_to_ctrs, (W_)str_hash );
+	prev = NULL;
+
+	for (; ctr != NULL; prev = ctr, ctr = ctr->next_bucket ) {
+	    if (!strcmp(ctr->str, str)) {
+		insertHashTable( str_to_ctr, (W_)str, ctr );
+#ifdef DEBUG
+		fprintf(stderr,"strToCtr: existing ctr for `%s'\n",str);
+#endif
+		return ctr;
+	    }
+	}
+
+	ctr = stgMallocBytes(sizeof(prof_ctr), "strToCtr");
+	ctr->mem_resid = 0;
+	ctr->str = str;
+	ctr->next_bucket = NULL;
+	ctr->next = all_ctrs;
+	all_ctrs = ctr;
+
+#ifdef DEBUG
+	fprintf(stderr,"strToCtr: new ctr for `%s'\n",str);
+#endif
+
+	if (prev != NULL) {
+	    prev->next_bucket = ctr;
+	} else {
+	    insertHashTable( hashstr_to_ctrs, str_hash, ctr );
+	}
+	insertHashTable( str_to_ctr, (W_)str, ctr);
+	return ctr;
+    }
+}
+
+static void
+clearCtrResid( void )
+{
+    prof_ctr *ctr;
+    
+    for (ctr = all_ctrs; ctr != NULL; ctr = ctr->next) {
+	ctr->mem_resid = 0;
+    }
+}
+
+static void
+reportCtrResid(FILE *fp)
+{
+    prof_ctr *ctr;
+    
+    for (ctr = all_ctrs; ctr != NULL; ctr = ctr->next) {
+	if (ctr->mem_resid != 0) {
+	    fprintf(fp,"   %s %ld\n", ctr->str, ctr->mem_resid * sizeof(W_));
+	}
+    }
+}
+
+/* -------------------------------------------------------------------------- */
 
 #ifdef DEBUG_HEAP_PROF
 FILE *prof_file;
@@ -68,6 +184,10 @@ initHeapProfiling(void)
 #ifdef DEBUG_HEAP_PROF
     DEBUG_LoadSymbols(prog_argv[0]);
     initSymbolHash();
+#endif
+
+#ifdef PROFILING
+    initHashTables();
 #endif
 
     return 0;
@@ -343,14 +463,19 @@ heapCensus(void)
 #ifdef PROFILING
   switch (RtsFlags.ProfFlags.doHeapProfile) {
   case NO_HEAP_PROFILING:
-    return;
+      return;
   case HEAP_BY_CCS:
-    break;
+      /* zero all the residency counters */
+      clearCCSResid(CCS_MAIN);
+      break;
+  case HEAP_BY_MOD:
+  case HEAP_BY_DESCR:
+  case HEAP_BY_TYPE:
+      clearCtrResid();
+      break;
   default:
-    barf("heapCensus; doHeapProfile");
+      barf("heapCensus; doHeapProfile");
   }
-  /* zero all the residency counters */
-  clearCCSResid(CCS_MAIN);
 #endif
 
   /* Only do heap profiling in a two-space heap */
@@ -449,7 +574,25 @@ heapCensus(void)
 #endif
 
 #ifdef PROFILING      
-      ((StgClosure *)p)->header.prof.ccs->mem_resid += size;
+      switch (RtsFlags.ProfFlags.doHeapProfile) {
+      case HEAP_BY_CCS:
+	  ((StgClosure *)p)->header.prof.ccs->mem_resid += size;
+	  break;
+      case HEAP_BY_MOD:
+	  strToCtr(((StgClosure *)p)->header.prof.ccs->cc->module)
+	      ->mem_resid += size;
+	  break;
+      case HEAP_BY_DESCR:
+	  strToCtr(get_itbl(((StgClosure *)p))->prof.closure_desc)->mem_resid 
+	      += size;
+	  break;
+      case HEAP_BY_TYPE:
+	  strToCtr(get_itbl(((StgClosure *)p))->prof.closure_type)->mem_resid
+	      += size;
+	  break;
+      default:
+	  barf("heapCensus; doHeapProfile");
+  }
 #endif
       p += size;
     }
@@ -468,7 +611,18 @@ heapCensus(void)
 #endif
     
 #ifdef PROFILING
-  reportCCSResid(prof_file,CCS_MAIN);
+  switch (RtsFlags.ProfFlags.doHeapProfile) {
+  case HEAP_BY_CCS:
+      reportCCSResid(prof_file,CCS_MAIN);
+      break;
+  case HEAP_BY_MOD:
+  case HEAP_BY_DESCR:
+  case HEAP_BY_TYPE:
+      reportCtrResid(prof_file);
+      break;
+  default:
+      barf("heapCensus; doHeapProfile");
+  }
 #endif
 
   fprintf(prof_file, "END_SAMPLE %0.2f\n", time);
