@@ -4439,14 +4439,37 @@ but you do need it to <emphasis>build</emphasis> GHC.</para>
 
 <para> Install Cygwin from <ulink url="http://www.cygwin.com/">http://www.cygwin.com/</ulink>.
 The installation process is straightforward; we install it in <Filename>c:/cygwin</Filename>.
-During the installation dialogue, make sure that you select:
-<command>cvs</command>, <command>openssh</command>,
-<command>autoconf</command>,
-<command>binutils</command> (includes ld and (I think) ar),
-<command>gcc</command>,
-<command>flex</command>,
-<command>make</command>.
-
+During the installation dialogue, make sure that you select all of the following:
+<itemizedlist>
+<listitem><para>
+	      <command>cvs</command>, 
+</para></listitem>
+<listitem><para>
+	      <command>openssh</command>,
+</para></listitem>
+<listitem><para>
+	      <command>autoconf</command>,
+</para></listitem>
+<listitem><para>
+	      <command>automake</command>,
+</para></listitem>
+<listitem><para>
+	      <command>binutils</command> (includes ld and (I think) ar),
+</para></listitem>
+<listitem><para>
+	      <command>gcc</command>,
+</para></listitem>
+<listitem><para>
+	      <command>flex</command>,
+</para></listitem>
+<listitem><para>
+	      <command>make</command>.
+</para></listitem>
+</itemizedlist>
+If you miss out any of these, strange things will happen to you.   To see thse packages, 
+click on the "View" button in the "Select Packages" 
+stage of Cygwin's installation dialogue, until the view says "Full".  The default view, which is
+"Category" isn't very helpful, and the "View" button is rather unobtrousive.
 </para>
 <para> Now set the following user environment variables:
 <itemizedlist>
