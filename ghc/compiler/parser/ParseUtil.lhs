@@ -186,7 +186,6 @@ checkPat (HsApp f x) args =
 checkPat e [] = case e of
 	EWildPat	   -> returnP WildPatIn
 	HsVar x		   -> returnP (VarPatIn x)
-	HsLit (HsLitLit _) -> patFail
 	HsLit l 	   -> returnP (LitPatIn l)
 	ELazyPat e	   -> checkPat e [] `thenP` (returnP . LazyPatIn)
 	EAsPat n e	   -> checkPat e [] `thenP` (returnP . AsPatIn n)
