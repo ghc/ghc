@@ -542,7 +542,12 @@ mkExportAvails mod_name unqual_imp name_env avails
 	-- we delete f from avails
 
     unqual_avails | not unqual_imp = []	-- Short cut when no unqualified imports
-		  | otherwise      = [prune avail | avail <- avails]
+		  | otherwise      = [ avail' | avail  <- avails 
+					      , let avail' = prune avail
+					      , case avail' of
+					          NotAvailable -> False
+						  _            -> True
+					      ]
 
     prune (Avail n) | unqual_in_scope n = Avail n
     prune (Avail n) | otherwise		= NotAvailable
