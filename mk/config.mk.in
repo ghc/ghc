@@ -473,7 +473,7 @@ INSTALL			= @INSTALL@
 # install-sh script (if chosen). This not terribly useful to us, so we convert
 # it into an abs. path.
 # 
-if "$(INSTALL)" ".././install-sh"
+ifeq "$(INSTALL)" ".././install-sh"
 INSTALL			= $(FPTOOLS_TOP_ABS)/install-sh
 endif
 LATEX			= latex
