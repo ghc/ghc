@@ -1,11 +1,9 @@
 _interface_ HsExpr 1
 _exports_
-HsExpr HsExpr Stmt;
-_instances_
-instance _forall_ [a b c d] => {Outputable.Outputable (HsExpr a b c d)} = $d1;
-instance _forall_ [a b c d] => {Outputable.Outputable (Stmt a b c d)} = $d2;
+HsExpr HsExpr pprExpr ;
 _declarations_
-1 $d1 _:_ _forall_ [a b c d] => {Outputable.Outputable (HsExpr a b c d)} ;;
-1 $d2 _:_ _forall_ [a b c d] => {Outputable.Outputable (Stmt a b c d)} ;;
 1 data HsExpr a b c d;
-1 data Stmt a b c d;
+1 pprExpr _:_ _forall_ [a b c d] {Name.NamedThing c, Outputable.Outputable c, 
+				  Outputable.Outputable d, PrelBase.Eq a, 
+				  Outputable.Outputable a, PrelBase.Eq b, Outputable.Outputable b}
+		   => Outputable.PprStyle -> HsExpr a b c d -> Pretty.Doc ;;
