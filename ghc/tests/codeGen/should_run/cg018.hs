@@ -1,5 +1,6 @@
 -- !!! test of datatype with many unboxed fields
 --
+import PrelGHC( Float# )
 import PrelFloat
 
 main = putStr (shows (selectee1 + selectee2) "\n")
