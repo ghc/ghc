@@ -59,7 +59,7 @@ import Outputable
 import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, dropList, equalLength, zipLazy )
 import Maybes		( expectJust )
-import CmdLineOpts	( DynFlag(..) )
+import CmdLineOpts	( DynFlag(..), dopt )
 \end{code}
 
 This module takes
@@ -487,11 +487,22 @@ loadImportedInsts cls tys
 	; eps_var <- getEpsVar
 	; eps <- readMutVar eps_var
 
+	-- For interest: report the no-type-constructor case.
+	-- Don't report when -fallow-undecidable-instances is on, because then
+	-- we call loadImportedInsts when looking up even predicates like (C a)
+	-- But without undecidable instances it's rare to see C (a b) and 
+	-- somethat interesting
+#ifdef DEBUG
+	; dflags  <- getDOpts
+	; WARN( not (dopt Opt_AllowUndecidableInstances dflags) && null tc_gates, 
+		ptext SLIT("Interesting! No tycons in Inst:") 
+			<+> pprClassPred cls tys )
+ 	  return ()
+#endif
+
 	-- Suck in the instances
 	; let { (inst_pool', iface_insts) 
-		    = WARN( null tc_gates, ptext SLIT("Interesting! No tycons in Inst:") 
-						<+> pprClassPred cls tys )
-		      selectInsts (eps_insts eps) cls_gate tc_gates }
+		    = selectInsts (eps_insts eps) cls_gate tc_gates }
 
 	-- Empty => finish up rapidly, without writing to eps
 	; if null iface_insts then
