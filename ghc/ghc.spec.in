@@ -125,38 +125,37 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %files -f rpm-noprof-lib-files
 %defattr(-,root,root)
-%doc %{prefix}/share/doc/ghc-%{version}/ANNOUNCE
-%doc %{prefix}/share/doc/ghc-%{version}/README
-%{prefix}/bin/*
+%doc ghc/ANNOUNCE
+%doc ghc/LICENSE
+%doc ghc/README
+%{prefix}/bin/ghc
+%{prefix}/bin/ghc-%{version}
+%{prefix}/bin/ghc-pkg
+%{prefix}/bin/ghc-pkg-%{version}
+%{prefix}/bin/ghci
+%{prefix}/bin/ghci-%{version}
+%{prefix}/bin/ghcprof
+%{prefix}/bin/hasktags
+%{prefix}/bin/hp2ps
+%{prefix}/bin/hsc2hs
+%{prefix}/bin/runghc
+%{prefix}/bin/stat2resid
 
 %files prof -f rpm-prof-lib-files
 %defattr(-,root,root)
 
 %files doc
 %defattr(-,root,root)
-
 %doc docs/building/building
 %doc docs/building/building.ps
-
 %doc docs/docbook-cheat-sheet/docbook-cheat-sheet
 %doc docs/docbook-cheat-sheet/docbook-cheat-sheet.ps
-
 %doc ghc/docs/ext-core/core.ps
-
 %doc ghc/docs/storage-mgt/ldv.ps
-
 %doc ghc/docs/storage-mgt/rp.ps
-
 %doc ghc/docs/storage-mgt/sm.ps
-
 %doc ghc/docs/users_guide/users_guide
 %doc ghc/docs/users_guide/users_guide.ps
-
 %doc hslibs/doc/hslibs
 %doc hslibs/doc/hslibs.ps
-
-%doc ghc/ANNOUNCE
-%doc ghc/LICENSE
-%doc ghc/README
-
 %doc html/*
