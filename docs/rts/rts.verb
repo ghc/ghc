@@ -5,12 +5,11 @@
 
 % TODO:
 %
-% o I think it would be worth making the connection with CPS explicit.
+% o I (ADR) think it would be worth making the connection with CPS explicit.
 %   Now that we have explicit activation records (on the stack), we can
 %   explain the whole system in terms of CPS and tail calls --- with the
 %   one requirement that we carefuly distinguish stack-allocated objects
 %   from heap-allocated objects.
-
 
 % \documentstyle[preprint]{acmconf}
 \documentclass[11pt]{article}
@@ -20,7 +19,7 @@
 \marginparsep 0 in 
 \sloppy
 
-\usepackage{epsfig}
+%\usepackage{epsfig}
 
 \newcommand{\note}[1]{{\em Note: #1}}
 % DIMENSION OF TEXT:
@@ -91,6 +90,12 @@ architectures.  It has been partly replaced by unboxed tuples
 explicitly state where results should be returned in registers (or on
 the stack) instead of on the heap.
 
+\item
+
+Lazy black-holing has been replaced by eager black-holing.  The
+problem with lazy black-holing is that it leaves slop in the heap
+which conflicts with the use of a mostly-copying collector.
+
 \end{itemize} 
 
 \subsection{Wish list}
@@ -131,6 +136,11 @@ mutually-exclusive choices.
 \begin{description}
 \item[@SEQUENTIAL@] No concurrency or parallelism support.
   This configuration might not support interrupt recovery.
+
+  \note{There's probably not much point in supporting this option.  If
+    we've gone to the effort of supporting concurency, we don't gain
+    much by being able to turn it off.}
+    
 \item[@CONCURRENT@]  Support for concurrency but not for parallelism.
 \item[@CONCURRENT@+@GRANSIM@] Concurrency support and simulated parallelism.
 \item[@CONCURRENT@+@PARALLEL@]     Concurrency support and real parallelism.
@@ -172,7 +182,7 @@ pointed types are the only things which can be lazily evaluated.  In
 the STG machine, this means that they are the only things that can be 
 {\em entered} or {\em updated} and it requires that they be boxed.
 
-\item An {\em unpointed} type is one that does not contains $\bot$.
+\item An {\em unpointed} type is one that does not contain $\bot$.
 Variables with unpointed types are never delayed --- they are always
 evaluated when they are constructed.  In the STG machine, this means
 that they cannot be {\em entered} or {\em updated}.  Unpointed objects
@@ -200,7 +210,7 @@ words and pointers are the same size.
 \subsection{Subtle Dependencies}
 
 Some decisions have very subtle consequences which should be written
-down in case we want to change our minds.
+down in case we want to change our minds.  
 
 \begin{itemize}
 
@@ -234,9 +244,15 @@ discusses who does the stack check and how much space they need.
 Heap objects never contain slop --- this is required if we want to
 support mostly-copying garbage collection.
 
+This is a big problem when updating since the updatee is usually
+bigger than an indirection object.  The fix is to overwrite the end of
+the updatee with ``slop objects'' (described in
+section~\ref{sect:slop-objects}).
 This is hard to arrange if we do \emph{lazy} blackholing
 (section~\ref{sect:lazy-black-holing}) so we currently plan to
 blackhole an object when we push the update frame.
+
+
 
 \item
 
@@ -267,12 +283,6 @@ instead of
 
 
 \subsection{Unboxed tuples}\label{sect:unboxed-tuples}
-
-\Note{We're not planning to implement this right away.  There doesn't
-seem to be any real difficulty adding it to the runtime system but
-it'll take a lot of work adding it to the compiler.  Since unboxed
-tuples do not trigger allocation, the syntax could be modified to allow
-unboxed tuples in expressions.}
 
 Functions can take multiple arguments as easily as they can take one
 argument: there's no cost for adding another argument.  But functions
@@ -314,20 +324,44 @@ or multiple stack slots.  At first sight, this seems a little strange
 but it's no different from passing double precision floats in two
 registers.
 
-Note that unboxed tuples can only have one constructor and that
+Notes:
+\begin{itemize}
+\item
+Unboxed tuples can only have one constructor and that
 thunks never have unboxed types --- so we'll never try to update an
 unboxed constructor.  The restriction to a single constructor is
 largely to avoid garbage collection complications.
+
+\item
+The core syntax does not allow variables to be bound to
+unboxed tuples (ie in default case alternatives or as function arguments)
+and does not allow unboxed tuples to be fields of other constructors.
+However, there's no harm in allowing it in the source syntax as a
+convenient, but easily removed, syntactic sugar.
+
+\item
+The compiler generates a closure of the form
+@
+> c = \ x y z -> C x y z
+@
+for every constructor (whether boxed or unboxed).  
+
+This closure is normally used during desugaring to ensure that
+constructors are saturated and to apply any strictness annotations.
+They are also used when returning unboxed constructors to the machine
+code evaluator from the bytecode evaluator and when a heap check fails
+in a return continuation for an unboxed-tuple scrutinee.
+
+\end{itemize}
 
 \subsection{STG Syntax}
 
 \ToDo{Insert STG syntax with appropriate changes.}
 
 
-%-----------------------------------------------------------------------------
-\part{Evaluation Model}
-
-\section{Overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\part{System Overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 This part is concerned with defining the external interfaces of the
 major components of the system; the next part is concerned with their
@@ -336,16 +370,373 @@ inner workings.
 The major components of the system are:
 \begin{itemize}
 \item The scheduler
-\item The loader
 \item The storage manager
-\item The machine code evaluator (compiled code)
-\item The bytecode evaluator (interpreted code)
+\item The evaluators
+\item The loader
 \item The compilers
 \end{itemize}
 
+\ToDo{Insert diagram showing all components underneath the scheduler
+and communicating only with the scheduler}
+
+\section{Scheduler}
+
+The Scheduler is the heart of the run-time system.  A running program
+consists of a single running thread, and a list of runnable and
+blocked threads.  All threads consist of a stack and a few words of
+status information.  Except for the running thread, all threads have a
+closure on top of their stack; the scheduler restarts a thread by
+entering an evaluator which performs some reduction and returns.
+
+\subsection{The scheduler's main loop}
+
+The scheduler consists of a loop which chooses a runnable thread and
+invokes one of the evaluators which performs some reduction and
+returns.
+
+The scheduler also takes care of system-wide issues such as heap
+overflow or communication with other processors (in the parallel
+system) and thread-specific problems such as stack overflow.
+
+\subsection{Creating a thread}
+
+Threads are created:
+
+\begin{itemize}
+
+\item
+
+When the scheduler is first invoked.
+
+\item
+
+When a message is received from another processor (I think). (Parallel
+system only.)
+
+\item
+
+When a C program calls some Haskell code.
+
+\end{itemize}
+
+
+\subsection{Restarting a thread}
+
+The evaluators can reduce almost all types of closure except that only
+the machine code evaluator can reduce GHC-compiled closures and only
+the bytecode evaluator can reduce Hugs-compiled closures.
+Consequently, the scheduler may use either evaluator to restart a
+thread unless the top closure is a @BCO@ or contains machine code.
+
+However, if the top of the stack contains a constructor, the scheduler
+should use the machine code evaluator to restart the thread.  This
+allows the bytecode evaluator to return a constructor to a machine
+code return address by pushing the constructor on top of the stack and
+returning to the scheduler.  If the return address under the
+constructor is @HUGS_RET@, the entry code for @HUGS_RET@ will
+rearrange the stack so that the return @BCO@ is on top of the stack
+and return to the scheduler which will then call the bytecode
+evaluator.  There is little point in trying to shorten this slightly
+indirect route since it will happen very rarely if at all.
+
+\subsection{Returning from a thread}
+
+The evaluators return to the scheduler when any of the following
+conditions arise:
+
+\begin{itemize}
+\item A heap check fails, and a garbage collection is required
+\item Compiled code needs to switch to interpreted code, and vice versa.
+\item The evaluator needs to perform an ``unsafe'' C call.
+\item The thread becomes blocked.
+\item The thread is preempted.
+\item The thread terminates.
+\end{itemize}
+
+Except when the thread terminates, the thread always terminates with a
+closure on the top of the stack.  
+
+\subsection{Preempting a thread}
+
+Strictly speaking, threads cannot be preempted --- the scheduler
+merely sets a preemption request flag which the thread must arrange to
+test on a regular basis.  When an evaluator finds that the preemption
+request flag is set, it pushes an appropriate closure onto the stack
+and returns to the scheduler.
+
+In the bytecode interpreter, the flag is tested whenever we enter a
+closure.  If the preemption flag is set, it leaves the closure on top
+of the stack and returns to the scheduler.
+
+In the machine code evaluator, the flag is only tested when a heap or
+stack check fails.  This is less expensive than testing the flag on
+entering every closure but runs the risk that a thread will enter an
+infinite loop which does not allocate any space.  If the flag is set,
+the evaluator returns to the scheduler exactly as if a heap check had
+failed.
+
+\subsection{``Safe'' and ``unsafe'' C calls}
+
+There are two ways of calling C: 
+
+\begin{description}
+
+\item[``Safe'' C calls]
+are used if the programer is certain that the C function will not
+do anything dangerous such as calling a Haskell function or an
+operating system call which blocks the thread for a long period of time.
+\footnote{Warning: this use of ``safe'' and ``unsafe'' is the exact
+opposite of the usage for functions like @unsafePerformIO@.}
+Safe C calls are faster but must be hand-checked by the programmer.
+
+Safe C calls are performed by pushing the arguments onto the C stack
+and jumping to the C function's entry point.  On exit, the result of
+the function is in a register which is returned to the Haskell code as
+an unboxed value.
+
+\item[``Unsafe'' C calls] are used if the programmer suspects that the
+thread may do something dangerous like blocking or calling a Haskell
+function.  Unsafe C calls are relatively slow but are less problematic.
+
+Unsafe C calls are performed by pushing the arguments onto the Haskell
+stack, pushing a return continuation and returning a \emph{C function
+descriptor} to the scheduler.  The scheduler suspends the Haskell thread,
+spawns a new operating system thread which pops the arguments off the
+Haskell stack onto the C stack, calls the C function, pushes the
+function result onto the Haskell stack and informs the scheduler that
+the C function has completed and the Haskell thread is now runnable.
+
+\end{description}
+
+The bytecode evaluator will probably treat all C calls as being unsafe.
+
+\ToDo{It might be good for the programmer to indicate how the program is 
+unsafe.  For example, if we distinguish between C functions which might
+call Haskell functions and those which might block, we could perform a 
+safe call for blocking functions in a single-threaded system or, perhaps, in a multi-threaded system which only happens to have a single thread at the moment.}
+
+
+\section{The Evaluators}
+
+All the scheduler needs to know about evaluation is how to manipulate
+threads and how to find the closure on top of the stack.  The
+evaluators need to agree on the representations of certain objects and
+on how to return from the scheduler.
+
+\subsection{Returning to the Scheduler}
+\label{sect:switching-worlds}
+
+The evaluators return to the scheduler under three circumstances:
+\begin{itemize}
+
+\item
+
+When they enter a closure built by the other evaluator.  That is, when
+the bytecode interpreter enters a closure compiled by GHC or when the
+machine code evaluator enters a BCO.
+
+\item
+
+When they return to a return continuation built by the other
+evaluator.  That is, when the machine code evaluator returns to a
+continuation built by Hugs or when the bytecode evaluator returns to a
+continuation built by GHC.
+
+\item
+
+When a heap or stack check fails or when the preemption flag is set.
+
+\end{itemize}
+
+In all cases, they return to the scheduler with a closure on top of
+the stack.  The mechanism used to trigger the world switch and the
+choice of closure left on top of the stack varies according to which
+world is being left and what is being returned.
+
+\subsubsection{Leaving the bytecode evaluator}
+\label{sect:hugs-to-ghc-switch}
+
+\paragraph{Entering a machine code closure}
+
+When it enters a closure, the bytecode evaluator performs a switch
+based on the type of closure (@AP@, @PAP@, @Ind@, etc).  On entering a
+machine code closure, it returns to the scheduler with the closure on
+top of the stack.
+
+\paragraph{Returning a constructor}
+
+When it enters a constructor, the bytecode evaluator tests the return
+continuation on top of the stack.  If it is a machine code
+continuation, it returns to the scheduler with the constructor on top
+of the stack.
+
+\note{This is why the scheduler must enter the machine code evaluator
+if it finds a constructor on top of the stack.}
+
+\paragraph{Returning an unboxed value}
+
+\note{Hugs doesn't support unboxed values in source programs but they
+are used for a few complex primops.}
+
+When it enters a constructor, the bytecode evaluator tests the return
+continuation on top of the stack.  If it is a machine code
+continuation, it returns to the scheduler with the unboxed value and a
+special closure on top of the stack.  When the closure is entered (by
+the machine code evaluator), it returns the unboxed value on top of
+the stack to the return continuation under it.
+
+The runtime system (or GHC?) provides one of these closures for each 
+unboxed type.  Hugs cannot generate them itself since the entry code is
+really very tricky.
+
+\paragraph{Heap/Stack overflow and preemption}
+
+The bytecode evaluator tests for heap/stack overflow and preemption
+when entering a BCO and simply returns with the BCO on top of the
+stack.
+
+\subsubsection{Leaving the machine code evaluator}
+\label{sect:ghc-to-hugs-switch}
+
+\paragraph{Entering a BCO}
+
+The entry code for a BCO pushes the BCO onto the stack and returns to
+the scheduler.
+
+\paragraph{Returning a constructor}
+
+We avoid the need to test return addresses in the machine code
+evaluator by pushing a special return address on top of a pointer to
+the bytecode return continuation.  Figure~\ref{fig:hugs-return-stack}
+shows the state of the stack just before evaluating the scrutinee.
+
+\begin{figure}[ht]
+\begin{center}
+@
+| stack    |
++----------+
+| bco      |--> BCO
++----------+
+| HUGS_RET |
++----------+
+@
+%\input{hugs_return1.pstex_t}
+\end{center}
+\caption{Stack layout for evaluating a scrutinee}
+\label{fig:hugs-return-stack}
+\end{figure}
+
+This return address rearranges the stack so that the bco pointer is
+above the constructor on the stack (as shown in
+figure~\ref{fig:hugs-boxed-return}) and returns to the scheduler.
+
+\begin{figure}[ht]
+\begin{center}
+@
+| stack    |
++----------+
+| con      |--> Constructor
++----------+
+| bco      |--> BCO
++----------+
+@
+%\input{hugs_return2.pstex_t}
+\end{center}
+\caption{Stack layout for entering a Hugs return address}
+\label{fig:hugs-boxed-return}
+\end{figure}
+
+\paragraph{Returning an unboxed value}
+
+We avoid the need to test return addresses in the machine code
+evaluator by pushing a special return address on top of a pointer to
+the bytecode return continuation.  This return address rearranges the
+stack so that the bco pointer is above the unboxed value (as shown in
+figure~\ref{fig:hugs-entering-unboxed-return}) and returns to the scheduler.
+
+\begin{figure}[ht]
+\begin{center}
+@
+| stack    |
++----------+
+| 1#       |
++----------+
+| I#       |
++----------+
+| bco      |--> BCO
++----------+
+@
+%\input{hugs_return2.pstex_t}
+\end{center}
+\caption{Stack layout for returning an unboxed value}
+\label{fig:hugs-entering-unboxed-return}
+\end{figure}
+
+\paragraph{Heap/Stack overflow and preemption}
+
+\ToDo{}
+
+\subsection{Shared Representations}
+
+We share @AP@s, @PAP@s, constructors, indirections, selectors(?) and
+update frames.  These are described in section~\ref{sect:heap-objects}.
+
+
+\section{The Storage Manager}
+
+The storage manager is responsible for managing the heap and all
+objects stored in it.  Most objects are just copied in the normal way
+but a number receive special treatment by the storage manager:
+
+\begin{itemize}
+\item
+
+Indirections are shorted out.
+
+\item
+
+Weak pointers and stable pointers are treated specially.
+
+\item
+
+Thread State Objects (TSOs) and the stacks within them are treated specially.
+In particular:
+
+\begin{itemize}
+\item
+
+Update frames pointing to unreachable objects are squeezed out.
+
+\item
+
+Adjacent update frames (for different closures) are compressed to a
+single update frame pointing to a single black hole.
+
+\item
+
+If the stack contains a large amount of free space, the storage
+manager may shrink the stack.  If it shrinks the stack, it guarantees
+never to leave less than @MIN_SIZE_SHRUNKEN_STACK@ empty words on the
+stack when it does so.
+
+\ToDo{Would it be useful for the storage manager to enlarge the stack?}
+
+\end{itemize}
+
+\item
+
+Very large objects (eg large arrays and TSOs) are not moved if
+possible.
+
+\end{itemize}
+
+
 \section{The Compilers}
 
-Need to describe interface files.
+Need to describe interface files, format of bytecode files, symbols
+defined by machine code files.
+
+\subsection{Interface Files}
 
 Here's an example - but I don't know the grammar - ADR.
 @
@@ -356,235 +747,23 @@ _declarations_
 1 main _:_ IOBase.IO PrelBase.();;
 @
 
-\section{The Scheduler}
+\subsection{Bytecode files}
 
-The Scheduler is the heart of the run-time system.  A running program
-consists of a single running thread, and a list of runnable and
-blocked threads.  The running thread returns to the scheduler when any
-of the following conditions arises:
+(All that matters here is what the loader sees.)
 
-\begin{itemize}
-\item A heap check fails, and a garbage collection is required
-\item Compiled code needs to switch to interpreted code, and vice
-versa.
-\item The thread becomes blocked.
-\item The thread is preempted.
-\end{itemize}
+\subsection{Machine code files}
 
-A running system has a global state, consisting of
-
-\begin{itemize}
-\item @Hp@, the current heap pointer, which points to the next
-available address in the Heap.
-\item @HpLim@, the heap limit pointer, which points to the end of the
-heap.
-\item The Thread Preemption Flag, which is set whenever the currently
-running thread should be preempted at the next opportunity.
-\item A list of runnable threads. 
-\item A list of blocked threads.
-\end{itemize}
-
-Each thread is represented by a Thread State Object (TSO), which is
-described in detail in Section \ref{sect:TSO}.
-
-The following is pseudo-code for the inner loop of the scheduler
-itself.
-
-@
-while (threads_exist) {
-  // handle global problems: GC, parallelism, etc
-  if (need_gc) gc();  
-  if (external_message) service_message();
-  // deal with other urgent stuff
-
-  pick a runnable thread;
-  do {
-    // enter object on top of stack
-    // if the top object is a BCO, we must enter it
-    // otherwise appply any heuristic we wish.
-    if (thread->stack[thread->sp]->info.type == BCO) {
-	status = runHugs(thread,&smInfo);
-    } else {
-	status = runGHC(thread,&smInfo);
-    }
-    switch (status) {  // handle local problems
-      case (StackOverflow): enlargeStack; break;
-      case (Error e)      : error(thread,e); break;
-      case (ExitWith e)   : exit(e); break;
-      case (Yield)        : break;
-    }
-  } while (thread_runnable);
-}
-@
-
-\subsection{Invoking the garbage collector}
-\subsection{Putting the thread to sleep}
-
-\subsection{Calling C from Haskell}
-
-We distinguish between "safe calls" where the programmer guarantees
-that the C function will not call a Haskell function or, in a
-multithreaded system, block for a long period of time and "unsafe
-calls" where the programmer cannot make that guarantee.  
-
-Safe calls are performed without returning to the scheduler and are
-discussed elsewhere (\ToDo{discuss elsewhere}).
-
-Unsafe calls are performed by returning an array (outside the Haskell
-heap) of arguments and a C function pointer to the scheduler.  The
-scheduler allocates a new thread from the operating system
-(multithreaded system only), spawns a call to the function and
-continues executing another thread.  When the ccall completes, the
-thread informs the scheduler and the scheduler adds the thread to the
-runnable threads list.  
-
-\ToDo{Describe this in more detail.}
+(Again, all that matters is what the loader sees.)
 
 
-\subsection{Calling Haskell from C}
+\subsection{Bytecode files}
 
-When C calls a Haskell closure, it sends a message to the scheduler
-thread.  On receiving the message, the scheduler creates a new Haskell
-thread, pushes the arguments to the C function onto the thread's stack
-(with tags for unboxed arguments) pushes the Haskell closure and adds
-the thread to the runnable list so that it can be entered in the
-normal way.
+(All that matters here is what the loader sees.)
 
-When the closure returns, the scheduler sends back a message which
-awakens the (C) thread.  
+\subsection{Machine code files}
 
-\ToDo{Do we need to worry about the garbage collector deallocating the
-thread if it gets blocked?}
+(Again, all that matters is what the loader sees.)
 
-\subsection{Switching Worlds}
-\label{sect:switching-worlds}
-
-\ToDo{This has all changed: we always leave a closure on top of the
-stack if we mean to continue executing it.  The scheduler examines the
-top of the stack and tries to guess which world we want to be in.  If
-it finds a @BCO@, it certainly enters Hugs, if it finds a @GHC@
-closure, it certainly enters GHC and if it finds a standard closure,
-it is free to choose either one but it's probably best to enter GHC
-for everything except @BCO@s and perhaps @AP@s.}
-
-Because this is a combined compiled/interpreted system, the
-interpreter will sometimes encounter compiled code, and vice-versa.
-
-All world-switches go via the scheduler, ensuring that the world is in
-a known state ready to enter either compiled code or the interpreter.
-When a thread is run from the scheduler, the @whatNext@ field in the
-TSO (Section \ref{sect:TSO}) is checked to find out how to execute the
-thread.
-
-\begin{itemize}
-\item If @whatNext@ is set to @ReturnGHC@, we load up the required
-registers from the TSO and jump to the address at the top of the user
-stack.
-\item If @whatNext@ is set to @EnterGHC@, we load up the required
-registers from the TSO and enter the closure pointed to by the top
-word of the stack.
-\item If @whatNext@ is set to @EnterHugs@, we enter the top thing on
-the stack, using the interpreter.
-\end{itemize}
-
-There are four cases we need to consider:
-
-\begin{enumerate}
-\item A GHC thread enters a Hugs-built closure.
-\item A GHC thread returns to a Hugs-compiled return address.
-\item A Hugs thread enters a GHC-built closure.
-\item A Hugs thread returns to a Hugs-compiled return address.
-\end{enumerate}
-
-GHC-compiled modules cannot call functions in a Hugs-compiled module
-directly, because the compiler has no information about arities in the
-external module.  Therefore it must assume any top-level objects are
-CAFs, and enter their closures.
-
-\ToDo{Hugs-built constructors?}
-
-We now examine the various cases one by one and describe how the
-switch happens in each situation.
-
-\subsection{A GHC thread enters a Hugs-built closure}
-\label{sect:ghc-to-hugs-closure}
-
-There is three possibilities: GHC has entered a @PAP@, or it has
-entered a @AP@, or it has entered the BCO directly (for a top-level
-function closure).  @AP@s and @PAP@s are ``standard closures'' and
-so do not require us to enter the bytecode interpreter.
-
-The entry code for a BCO does the following:
-
-\begin{itemize}
-\item Push the address of the object entered on the stack.
-\item Save the current state of the thread in its TSO.
-\item Return to the scheduler, setting @whatNext@ to @EnterHugs@.
-\end{itemize}
-
-BCO's for thunks and functions have the same entry conventions as
-slow entry points: they expect to find their arguments on the stac
-with unboxed arguments preceded by appropriate tags.
-
-\subsection{A GHC thread returns to a Hugs-compiled return address}
-\label{sect:ghc-to-hugs-return}
-
-Hugs return addresses are laid out as in Figure
-\ref{fig:hugs-return-stack}.  If GHC is returning, it will return to
-the address at the top of the stack, namely @HUGS_RET@.  The code at
-@HUGS_RET@ performs the following:
-
-\begin{itemize}
-\item pushes \Arg{1} (the return value) on the stack.
-\item saves the thread state in the TSO
-\item returns to the scheduler with @whatNext@ set to @EnterHugs@.
-\end{itemize}
-
-\noindent When Hugs runs, it will enter the return value, which will
-return using the correct Hugs convention (Section
-\ref{sect:hugs-return-convention}) to the return address underneath it
-on the stack.
-
-\subsection{A Hugs thread enters a GHC-compiled closure}
-\label{sect:hugs-to-ghc-closure}
-
-Hugs can recognise a GHC-built closure as not being one of the
-following types of object:
-
-\begin{itemize}
-\item A @BCO@,
-\item A @AP@,
-\item A @PAP@,
-\item An indirection, or
-\item A constructor.
-\end{itemize}
-
-When Hugs is called on to enter a GHC closure, it executes the
-following sequence of instructions:
-
-\begin{itemize}
-\item Push the address of the closure on the stack.
-\item Save the current state of the thread in the TSO.
-\item Return to the scheduler, with the @whatNext@ field set to
-@EnterGHC@.
-\end{itemize}
-
-\subsection{A Hugs thread returns to a GHC-compiled return address}
-\label{sect:hugs-to-ghc-return}
-
-When Hugs encounters a return address on the stack that is not
-@HUGS_RET@, it knows that a world-switch is required.  At this point
-the stack contains a pointer to the return value, followed by the GHC
-return address.  The following sequence is then performed:
-
-\begin{itemize}
-\item save the state of the thread in the TSO.
-\item return to the scheduler, setting @whatNext@ to @EnterGHC@.
-\end{itemize}
-
-The first thing that GHC will do is enter the object on the top of the
-stack, which is a pointer to the return value.  This value will then
-return itself to the return address using the GHC return convention.
 
 \section{The Loader}
 
@@ -647,7 +826,2260 @@ hit for doing this.
 
 \end{description}
 
-\section{Compiled Execution}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\part{Internal details}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+This part is concerned with the internal details of the components
+described in the previous part.
+
+The major components of the system are:
+\begin{itemize}
+\item The scheduler
+\item The storage manager
+\item The evaluators
+\item The loader
+\item The compilers
+\end{itemize}
+
+\section{The Scheduler}
+
+\section{The Storage Manager}
+\label{sect:storage-manager-internals}
+
+\ToDo{Fix this picture}
+
+\begin{figure}
+\begin{center}
+\input{closure}
+\end{center}
+\caption{A closure}
+\label{fig:closure}
+\end{figure}
+
+Every {\em heap object} is a contiguous block
+of memory, consisting of a fixed-format {\em header} followed
+by zero or more {\em data words}.
+
+\ToDo{I absolutely do not believe that every heap object has a header
+like this - ADR.  I believe that they all have an info pointer but I
+see no readon why stack objects and unpointed heap objects would have
+an entry count since this will always be zero.}
+
+The header consists of the following fields:
+\begin{itemize}
+\item A one-word {\em info pointer}, which points to
+the object's static {\em info table}.
+\item Zero or more {\em admin words} that support
+\begin{itemize}
+\item Profiling (notably a {\em cost centre} word).
+  \note{We could possibly omit the cost centre word from some 
+  administrative objects.}
+\item Parallelism (e.g. GranSim keeps the object's global address here,
+though GUM keeps a separate hash table).
+\item Statistics (e.g. a word to track how many times a thunk is entered.).
+
+We add a Ticky word to the fixed-header part of closures.  This is
+used to indicate if a closure has been updated but not yet entered. It
+is set when the closure is updated and cleared when subsequently
+entered.
+
+NB: It is {\em not} an ``entry count'', it is an
+``entries-after-update count.''  The commoning up of @CONST@,
+@CHARLIKE@ and @INTLIKE@ closures is turned off(?) if this is
+required. This has only been done for 2s collection.
+
+\end{itemize}
+\end{itemize}
+
+Most of the RTS is completely insensitive to the number of admin words.
+The total size of the fixed header is @FIXED_HS@.
+
+Many heap objects contain fields allowing them to be inserted onto lists
+during evaluation or during garbage collection. The lists required by
+the evaluator and storage manager are as follows.
+
+\begin{itemize}
+\item 2 lists of threads: runnable threads and sleeping threads.
+
+\item The {\em static object list} is a list of all statically
+allocated objects which might contain pointers into the heap.
+(Section~\ref{sect:static-objects}.)
+
+\item The {\em updated thunk list} is a list of all thunks in the old
+generation which have been updated with an indirection.  
+(Section~\ref{sect:IND_OLDGEN}.)
+
+\item The {\em mutables list} is a list of all other objects in the
+old generation which might contain pointers into the new generation.
+Most of the object on this list are ``mutable.''
+(Section~\ref{sect:mutables}.)
+
+\item The {\em Foreign Object list} is a list of all foreign objects
+ which have not yet been deallocated. (Section~\ref{sect:FOREIGN}.)
+
+\item The {\em Spark pool} is a doubly(?) linked list of Spark objects
+maintained by the parallel system.  (Section~\ref{sect:SPARK}.)
+
+\item The {\em Blocked Fetch list} (or
+lists?). (Section~\ref{sect:BLOCKED_FETCH}.)
+
+\item For each thread, there is a list of all update frames on the
+stack.  (Section~\ref{sect:data-updates}.)
+
+
+\end{itemize}
+
+\ToDo{The links for these fields are usually inserted immediately
+after the fixed header except ...}
+
+\subsection{Info Tables}
+
+An {\em info table} is a contiguous block of memory, {\em laid out
+backwards}.  That is, the first field in the list that follows
+occupies the highest memory address, and the successive fields occupy
+successive decreasing memory addresses.
+
+\begin{center}
+\begin{tabular}{|c|}
+   \hline Parallelism Info 
+\\ \hline Profile Info 
+\\ \hline Debug Info 
+\\ \hline Tag / Static reference table
+\\ \hline Storage manager layout info
+\\ \hline Closure type 
+\\ \hline entry code
+\\       \vdots
+\end{tabular}
+\end{center}
+An info table has the following contents (working backwards in memory
+addresses):
+\begin{itemize}
+\item The {\em entry code} for the closure.
+This code appears literally as the (large) last entry in the
+info table, immediately preceded by the rest of the info table.
+An {\em info pointer} always points to the first byte of the entry code.
+
+\item A one-word {\em closure type field}, @INFO_TYPE@, identifies what kind
+of closure the object is.  The various types of closure are described
+in Section~\ref{sect:closures}.
+In some configurations, some useful properties of 
+closures (is it a HNF?  can it be sparked?)
+are represented as high-order bits so they can be tested quickly.
+
+\item A single pointer or word --- the {\em storage manager info field},
+@INFO_SM@, contains auxiliary information describing the closure's
+precise layout, for the benefit of the garbage collector and the code
+that stuffs graph into packets for transmission over the network.
+
+\item A one-word {\em Tag/Static Reference Table} field, @INFO_SRT@.
+For data constructors, this field contains the constructor tag, in the
+range $0..n-1$ where $n$ is the number of constructors.  For all other
+objects it contains a pointer to a table which enables the garbage
+collector to identify all accessible code and CAFs.  They are fully
+described in Section~\ref{sect:srt}.
+
+\item {\em Profiling info\/}
+
+\ToDo{The profiling info is completely bogus.  I've not deleted it
+from the document but I've commented it all out.}
+
+% change to \iftrue to uncomment this section
+\iffalse
+
+Closure category records are attached to the info table of the
+closure. They are declared with the info table. We put pointers to
+these ClCat things in info tables.  We need these ClCat things because
+they are mutable, whereas info tables are immutable.  Hashing will map
+similar categories to the same hash value allowing statistics to be
+grouped by closure category.
+
+Cost Centres and Closure Categories are hashed to provide indexes
+against which arbitrary information can be stored. These indexes are
+memoised in the appropriate cost centre or category record and
+subsequent hashes avoided by the index routine (it simply returns the
+memoised index).
+
+There are different features which can be hashed allowing information
+to be stored for different groupings. Cost centres have the cost
+centre recorded (using the pointer), module and group. Closure
+categories have the closure description and the type
+description. Records with the same feature will be hashed to the same
+index value.
+
+The initialisation routines, @init_index_<feature>@, allocate a hash
+table in which the cost centre / category records are stored. The
+lower bound for the table size is taken from @max_<feature>_no@. They
+return the actual table size used (the next power of 2). Unused
+locations in the hash table are indicated by a 0 entry. Successive
+@init_index_<feature>@ calls just return the actual table size.
+
+Calls to @index_<feature>@ will insert the cost centre / category
+record in the @<feature>@ hash table, if not already inserted. The hash
+index is memoised in the record and returned. 
+
+CURRENTLY ONLY ONE MEMOISATION SLOT IS AVILABLE IN EACH RECORD SO
+HASHING CAN ONLY BE DONE ON ONE FEATURE FOR EACH RECORD. This can be
+easily relaxed at the expense of extra memoisation space or continued
+rehashing.
+
+The initialisation routines must be called before initialisation of
+the stacks and heap as they require to allocate storage. It is also
+expected that the caller may want to allocate additional storage in
+which to store profiling information based on the return table size
+value(s).
+
+\begin{center}
+\begin{tabular}{|l|}
+   \hline Hash Index
+\\ \hline Selected
+\\ \hline Kind
+\\ \hline Description String
+\\ \hline Type String
+\\ \hline
+\end{tabular}
+\end{center}
+
+\begin{description}
+\item[Hash Index] Memoised copy
+\item[Selected] 
+  Is this category selected (-1 == not memoised, selected? 0 or 1)
+\item[Kind]
+One of the following values (defined in CostCentre.lh):
+
+\begin{description}
+\item[@CON_K@]
+A constructor.
+\item[@FN_K@]
+A literal function.
+\item[@PAP_K@]
+A partial application.
+\item[@THK_K@]
+A thunk, or suspension.
+\item[@BH_K@]
+A black hole.
+\item[@ARR_K@]
+An array.
+\item[@ForeignObj_K@]
+A Foreign object (non-Haskell heap resident).
+\item[@SPT_K@]
+The Stable Pointer table.  (There should only be one of these but it
+represents a form of weak space leak since it can't shrink to meet
+non-demand so it may be worth watching separately? ADR)
+\item[@INTERNAL_KIND@]
+Something internal to the runtime system.
+\end{description}
+
+
+\item[Description] Source derived string detailing closure description.
+\item[Type] Source derived string detailing closure type.
+\end{description}
+
+\fi % end of commented out stuff
+
+\item {\em Parallelism info\/}
+\ToDo{}
+
+\item {\em Debugging info\/}
+\ToDo{}
+
+\end{itemize}
+
+
+%-----------------------------------------------------------------------------
+\subsection{Kinds of Heap Object}
+\label{sect:closures}
+
+Heap objects can be classified in several ways, but one useful one is
+this:
+\begin{itemize}
+\item 
+{\em Static closures} occupy fixed, statically-allocated memory
+locations, with globally known addresses.
+
+\item 
+{\em Dynamic closures} are individually allocated in the heap.
+
+\item 
+{\em Stack closures} are closures allocated within a thread's stack
+(which is itself a heap object).  Unlike other closures, there are
+never any pointers to stack closures.  Stack closures are discussed in
+Section~\ref{sect:stacks}.
+
+\end{itemize}
+A second useful classification is this:
+\begin{itemize}
+\item 
+{\em Executive objects}, such as thunks and data constructors,
+participate directly in a program's execution.  They can be subdivided into
+three kinds of objects according to their type:
+\begin{itemize}
+\item 
+{\em Pointed objects}, represent values of a {\em pointed} type
+(<.pointed types launchbury.>) --i.e.~a type that includes $\bottom$ such as @Int@ or @Int# -> Int#@.
+
+\item {\em Unpointed objects}, represent values of a {\em unpointed} type --i.e.~a type that does not include $\bottom$ such as @Int#@ or @Array#@.
+
+\item {\em Activation frames}, represent ``continuations''.  They are
+always stored on the stack and are never pointed to by heap objects or
+passed as arguments.  \note{It's not clear if this will still be true
+once we support speculative evaluation.}
+
+\end{itemize}
+
+\item {\em Administrative objects}, such as stack objects and thread
+state objects, do not represent values in the original program.
+\end{itemize}
+
+Only pointed objects can be entered.  All pointed objects share a
+common header format: the ``pointed header''; while all unpointed
+objects share a common header format: the ``unpointed header''.
+\ToDo{Describe the difference and update the diagrams to mention
+an appropriate header type.}
+
+This section enumerates all the kinds of heap objects in the system.
+Each is identified by a distinct @INFO_TYPE@ tag in its info table.
+
+\begin{tabular}{|l|l|l|l|l|l|l|l|l|l|l|}
+\hline
+
+closure kind          & Section \\
+		      
+\hline                          
+{\em Pointed} \\      
+\hline 		      
+		      
+@CONSTR@              & \ref{sect:CONSTR}    \\
+@CONSTR_STATIC@       & \ref{sect:CONSTR}    \\
+@CONSTR_STATIC_NOCAF@ & \ref{sect:CONSTR}    \\
+		      
+@FUN@                 & \ref{sect:FUN}       \\
+@FUN_STATIC@          & \ref{sect:FUN}       \\
+		      
+@THUNK@               & \ref{sect:THUNK}     \\
+@THUNK_STATIC@        & \ref{sect:THUNK}     \\
+@THUNK_SELECTOR@      & \ref{sect:THUNK_SEL} \\
+		      
+@BCO@		      & \ref{sect:BCO}       \\
+@BCO_CAF@	      & \ref{sect:BCO}       \\
+		      
+@AP@	      	      & \ref{sect:AP}   	 \\
+@PAP@                 & \ref{sect:PAP}       \\
+		      
+@IND@                 & \ref{sect:IND}       \\
+@IND_OLDGEN@          & \ref{sect:IND}       \\
+@IND_PERM@            & \ref{sect:IND}       \\
+@IND_OLDGEN_PERM@     & \ref{sect:IND}       \\
+@IND_STATIC@          & \ref{sect:IND}       \\
+		      
+\hline		      
+{\em Unpointed} \\    
+\hline		      
+		      		      
+@ARR_WORDS@           & \ref{sect:ARR_WORDS1},\ref{sect:ARR_WORDS2} \\
+@ARR_PTRS@            & \ref{sect:ARR_PTRS}  \\
+@MUTVAR@              & \ref{sect:MUTVAR}    \\
+@MUTARR_PTRS@         & \ref{sect:MUTARR_PTRS} \\
+@MUTARR_PTRS_FROZEN@  & \ref{sect:MUTARR_PTRS_FROZEN} \\
+		      
+@FOREIGN@             & \ref{sect:FOREIGN}   \\
+		      
+@BH@                  & \ref{sect:BH}        \\
+@MVAR@ 		      & \ref{sect:MVAR}      \\
+@IVAR@ 		      & \ref{sect:IVAR}      \\
+@FETCHME@             & \ref{sect:FETCHME}   \\
+\hline
+\end{tabular}
+
+Activation frames do not live (directly) on the heap --- but they have
+a similar organisation.
+
+\begin{tabular}{|l|l|}\hline
+closure kind		& Section			\\ \hline
+@RET_SMALL@ 		& \ref{sect:activation-records}	\\
+@RET_VEC_SMALL@ 	& \ref{sect:activation-records}	\\
+@RET_BIG@		& \ref{sect:activation-records}	\\
+@RET_VEC_BIG@		& \ref{sect:activation-records}	\\
+@UPDATE_FRAME@ 		& \ref{sect:activation-records}	\\
+\hline
+\end{tabular}
+
+There are also a number of administrative objects.
+
+\begin{tabular}{|l|l|}\hline
+closure kind		& Section 			\\ \hline
+@TSO@                   & \ref{sect:TSO} 		\\
+@STACK_OBJECT@          & \ref{sect:STACK_OBJECT} 	\\
+@STABLEPTR_TABLE@       & \ref{sect:STABLEPTR_TABLE} 	\\
+@SPARK_OBJECT@          & \ref{sect:SPARK}		\\
+@BLOCKED_FETCH@       	& \ref{sect:BLOCKED_FETCH} 	\\
+\hline
+\end{tabular}
+
+\ToDo{I guess the parallel system has something like a stable ptr
+table.  Is there any opportunity for sharing code/data structures
+here?}
+
+
+\subsection{Predicates}
+
+\ToDo{The following is a first attempt at defining a useful set of
+predicates.  Some (such as @isWHNF@ and @isSparkable@) may need their
+definitions tweaked a little.}
+
+The runtime system sometimes needs to be able to distinguish objects
+according to their properties: is the object updateable? is it in weak
+head normal form? etc.  These questions can be answered by examining
+the @INFO_TYPE@ field of the object's info table.  
+
+We define the following predicates to detect families of related
+info types.  They are mutually exclusive and exhaustive.
+
+\begin{itemize}
+\item @isCONSTR@ is true for @CONSTR@s.
+\item @isFUN@ is true for @FUN@s.
+\item @isTHUNK@ is true for @THUNK@s.
+\item @isBCO@ is true for @BCO@s.
+\item @isAP@ is true for @AP@s.
+\item @isPAP@ is true for @PAP@s.
+\item @isINDIRECTION@ is true for indirection objects. 
+\item @isBH@ is true for black holes.
+\item @isFOREIGN_OBJECT@ is true for foreign objects.
+\item @isARRAY@ is true for array objects.
+\item @isMVAR@ is true for @MVAR@s.
+\item @isIVAR@ is true for @IVAR@s.
+\item @isFETCHME@ is true for @FETCHME@s.
+\item @isSLOP@ is true for slop objects.
+\item @isRET_ADDR@ is true for return addresses.
+\item @isUPD_ADDR@ is true for update frames.
+\item @isTSO@ is true for @TSO@s.
+\item @isSTABLE_PTR_TABLE@ is true for the stable pointer table.
+\item @isSPARK_OBJECT@ is true for spark objects.
+\item @isBLOCKED_FETCH@ is true for blocked fetch objects.
+\item @isINVALID_INFOTYPE@ is true for all other info types.
+
+\end{itemize}
+
+The following predicates detect other interesting properties:
+
+\begin{itemize}
+
+\item @isPOINTED@ is true if an object has a pointed type.
+
+If an object is pointed, the following predicates may be true
+(otherwise they are false).  @isWHNF@ and @isUPDATEABLE@ are
+mutually exclusive.
+
+\begin{itemize} 
+\item @isWHNF@ is true if the object is in Weak Head Normal Form.  
+Note that unpointed objects are (arbitrarily) not considered to be in WHNF.
+
+@isWHNF@ is true for @PAP@s, @CONSTR@s, @FUN@s and some @BCO@s.
+
+\ToDo{Need to distinguish between whnf BCOs and non-whnf BCOs in their
+@INFO_TYPE@}
+
+\item @isBOTTOM@ is true if the object is known to be $\bot$.  It is
+true of @BH@s.  \note{I suspect we'll want to add other kinds of
+infotype which are known to be bottom later.}
+
+\item @isUPDATEABLE@ is true if the object may be overwritten with an
+ indirection object.
+
+@isUPDATEABLE@ is true for @THUNK@s, @AP@s and @BH@s.
+
+\end{itemize}
+
+It is possible for a pointed object to be neither updatable nor in
+WHNF.  For example, indirections.
+
+\item @isUNPOINTED@ is true if an object has an unpointed type.
+All such objects are boxed since only boxed objects have info pointers.
+
+It is true for @ARR_WORDS@, @ARR_PTRS@, @MUTVAR@, @MUTARR_PTRS@,
+@MUTARR_PTRS_FROZEN@, @FOREIGN@ objects, @MVAR@s and @IVAR@s.
+
+\item @isACTIVATION_FRAME@ is true for activation frames of all sorts.
+
+It is true for return addresses and update frames.
+\begin{itemize}
+\item @isVECTORED_RETADDR@ is true for vectored return addresses.
+\item @isDIRECT_RETADDR@ is true for direct return addresses.
+\end{itemize}
+
+\item @isADMINISTRATIVE@ is true for administrative objects:
+@TSO@s, the stable pointer table, spark objects and blocked fetches.
+
+\end{itemize}
+
+\begin{itemize}
+
+\item @isSTATIC@ is true for any statically allocated closure.
+
+\item @isMUTABLE@ is true for objects with mutable pointer fields:
+  @MUT_ARR@s, @MUTVAR@s, @MVAR@s and @IVAR@s.
+
+\item @isSparkable@ is true if the object can (and should) be sparked.
+It is true of updateable objects which are not in WHNF with the
+exception of @THUNK_SELECTOR@s and black holes.
+
+\end{itemize}
+
+As a minor optimisation, we might use the top bits of the @INFO_TYPE@
+field to ``cache'' the answers to some of these predicates.
+
+An indirection either points to HNF (post update); or is result of
+overwriting a FetchMe, in which case the thing fetched is either
+under evaluation (BH), or by now an HNF.  Thus, indirections get NoSpark flag.
+
+
+\iffalse
+@
+#define _NF			0x0001  /* Normal form  */
+#define _NS			0x0002	/* Don't spark  */
+#define _ST			0x0004	/* Is static    */
+#define _MU 	    	    	0x0008  /* Is mutable   */
+#define _UP			0x0010	/* Is updatable (but not mutable) */
+#define _BM			0x0020	/* Is a "primitive" array */
+#define _BH			0x0040	/* Is a black hole */
+#define _IN			0x0080	/* Is an indirection */
+#define _TH			0x0100	/* Is a thunk */
+
+
+
+SPEC	
+SPEC_N		SPEC | _NF | _NS
+SPEC_S		SPEC | _TH
+SPEC_U		SPEC | _UP | _TH
+		
+GEN	
+GEN_N		GEN | _NF | _NS
+GEN_S		GEN | _TH
+GEN_U		GEN | _UP | _TH
+		
+DYN	        _NF | _NS
+TUPLE		_NF | _NS | _BM
+DATA		_NF | _NS | _BM
+MUTUPLE		_NF | _NS | _MU | _BM
+IMMUTUPLE	_NF | _NS | _BM
+STATIC		_NS | _ST
+CONST		_NF | _NS
+CHARLIKE	_NF | _NS
+INTLIKE		_NF | _NS
+
+BH		_NS | _BH
+BH_N		BH
+BH_U		BH | _UP
+		
+BQ		_NS | _MU | _BH
+IND		_NS | _IN
+CAF		_NF | _NS | _ST | _IN
+
+FM		
+FETCHME		FM | _MU
+FMBQ		FM | _MU | _BH
+
+TSO		_MU
+
+STKO	
+STKO_DYNAMIC	STKO | _MU
+STKO_STATIC	STKO | _ST
+		
+SPEC_RBH	_NS | _MU | _BH
+GEN_RBH		_NS | _MU | _BH
+BF		_NS | _MU | _BH
+INTERNAL	
+
+@
+\fi
+
+
+\subsection{Pointed Objects}
+
+All pointed objects can be entered.
+
+\subsubsection{Function closures}\label{sect:FUN}
+
+Function closures represent lambda abstractions.  For example,
+consider the top-level declaration:
+@
+  f = \x -> let g = \y -> x+y
+	    in g x
+@
+Both @f@ and @g@ are represented by function closures.  The closure
+for @f@ is {\em static} while that for @g@ is {\em dynamic}.
+
+The layout of a function closure is as follows:
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} \\ \hline
+\end{tabular}
+\end{center}
+The data words (pointers and non-pointers) are the free variables of
+the function closure.  
+The number of pointers
+and number of non-pointers are stored in the @INFO_SM@ word, in the least significant
+and most significant half-word respectively.
+
+There are several different sorts of function closure, distinguished
+by their @INFO_TYPE@ field:
+\begin{itemize}
+\item @FUN@: a vanilla, dynamically allocated on the heap. 
+
+\item $@FUN_@p@_@np$: to speed up garbage collection a number of
+specialised forms of @FUN@ are provided, for particular $(p,np)$ pairs,
+where $p$ is the number of pointers and $np$ the number of non-pointers.
+
+\item @FUN_STATIC@.  Top-level, static, function closures (such as
+@f@ above) have a different
+layout than dynamic ones:
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+{\em Fixed header}  & {\em Static object link} \\ \hline
+\end{tabular}
+\end{center}
+Static function closures have no free variables.  (However they may refer to other 
+static closures; these references are recorded in the function closure's SRT.)
+They have one field that is not present in dynamic closures, the {\em static object
+link} field.  This is used by the garbage collector in the same way that to-space
+is, to gather closures that have been determined to be live but that have not yet
+been scavenged.
+\note{Static function closures that have no static references, and hence
+a null SRT pointer, don't need the static object link field.  Is it worth
+taking advantage of this?  See @CONSTR_STATIC_NOCAF@.}
+\end{itemize}
+
+Each lambda abstraction, $f$, in the STG program has its own private info table.
+The following labels are relevant:
+\begin{itemize}
+\item $f$@_info@  is $f$'s info table.
+\item $f$@_entry@ is $f$'s slow entry point (i.e. the entry code of its
+info table; so it will label the same byte as $f$@_info@).
+\item $f@_fast_@k$ is $f$'s fast entry point.  $k$ is the number of arguments
+$f$ takes; encoding this number in the fast-entry label occasionally catches some nasty
+code-generation errors.
+\end{itemize}
+
+\subsubsection{Data Constructors}\label{sect:CONSTR}
+
+Data-constructor closures represent values constructed with
+algebraic data type constructors.
+The general layout of data constructors is the same as that for function
+closures.  That is
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} \\ \hline
+\end{tabular}
+\end{center}
+
+The SRT pointer in a data constructor's info table is used for the
+constructor tag, since a constructor never has any static references.
+
+There are several different sorts of constructor:
+\begin{itemize}
+\item @CONSTR@: a vanilla, dynamically allocated constructor.
+\item @CONSTR_@$p$@_@$np$: just like $@FUN_@p@_@np$.
+\item @CONSTR_INTLIKE@.
+A dynamically-allocated heap object that looks just like an @Int@.  The 
+garbage collector checks to see if it can common it up with one of a fixed
+set of static int-like closures, thus getting it out of the dynamic heap
+altogether.
+
+\item @CONSTR_CHARLIKE@:  same deal, but for @Char@.
+
+\item @CONSTR_STATIC@ is similar to @FUN_STATIC@, with the complication that
+the layout of the constructor must mimic that of a dynamic constructor,
+because a static constructor might be returned to some code that unpacks it.
+So its layout is like this:
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} & {\em Static object link}\\ \hline
+\end{tabular}
+\end{center}
+The static object link, at the end of the closure, serves the same purpose
+as that for @FUN_STATIC@.  The pointers in the static constructor can point
+only to other static closures.
+
+The static object link occurs last in the closure so that static
+constructors can store their data fields in exactly the same place as
+dynamic constructors.
+
+\item @CONSTR_STATIC_NOCAF@.  A statically allocated data constructor
+that guarantees not to point (directly or indirectly) to any CAF
+(section~\ref{sect:CAF}).  This means it does not need a static object
+link field.  Since we expect that there might be quite a lot of static
+constructors this optimisation makes sense.  Furthermore, the @NOCAF@
+tag allows the compiler to indicate that no CAFs can be reached
+anywhere {\em even indirectly}.
+
+
+\end{itemize}
+
+For each data constructor $Con$, two
+info tables are generated:
+\begin{itemize}
+\item $Con$@_info@ labels $Con$'s dynamic info table, 
+shared by all dynamic instances of the constructor.
+\item $Con$@_static@ labels $Con$'s static info table, 
+shared by all static instances of the constructor.
+\end{itemize}
+
+\subsubsection{Thunks}
+\label{sect:THUNK}
+\label{sect:THUNK_SEL}
+
+A thunk represents an expression that is not obviously in head normal 
+form.  For example, consider the following top-level definitions:
+@
+  range = between 1 10
+  f = \x -> let ys = take x range
+	    in sum ys
+@
+Here the right-hand sides of @range@ and @ys@ are both thunks; the former
+is static while the latter is dynamic.
+
+The layout of a thunk is the same as that for a function closure,
+except that it may have some words of ``slop'' at the end to make sure
+that it has 
+at least @MIN_UPD_PAYLOAD@ words in addition to its
+fixed header.
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} & {\em Slop} \\ \hline
+\end{tabular}
+\end{center}
+The @INFO_SM@ word contains the same information as for function
+closures; that is, number of pointers and number of non-pointers (excluding slop).
+
+A thunk differs from a function closure in that it can be updated.
+
+There are several forms of thunk:
+\begin{itemize}
+\item @THUNK@: a vanilla, dynamically allocated thunk.
+The garbage collection code for thunks whose
+pointer + non-pointer words is less than @MIN_UPD_PAYLOAD@ differs from
+that for function closures and data constructors, because the GC code
+has to account for the slop.
+\item $@THUNK_@p@_@np$.  Similar comments apply.
+\item @THUNK_STATIC@.  A static thunk is also known as 
+a {\em constant applicative form}, or {\em CAF}.
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Pointers} & {\em Non-pointers} & {\em Slop} & {\em Static object link}\\ \hline
+\end{tabular}
+\end{center}
+
+\item @THUNK_SELECTOR@ is a (dynamically allocated) thunk
+whose entry code performs a simple selection operation from
+a data constructor drawn from a single-constructor type.  For example,
+the thunk
+@
+	x = case y of (a,b) -> a
+@
+is a selector thunk.  A selector thunk is laid out like this:
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+{\em Fixed header}  & {\em Selectee pointer} \\ \hline
+\end{tabular}
+\end{center}
+The @INFO_SM@ word contains the byte offset of the desired word in
+the selectee.  Note that this is different from all other thunks.
+
+The garbage collector ``peeks'' at the selectee's
+tag (in its info table).  If it is evaluated, then it goes ahead and do
+the selection, and then behaves just as if the selector thunk was an
+indirection to the selected field.
+If it is not
+evaluated, it treats the selector thunk like any other thunk of that
+shape.  [Implementation notes.  
+Copying: only the evacuate routine needs to be special.
+Compacting: only the PRStart (marking) routine needs to be special.]
+\end{itemize}
+
+
+The only label associated with a thunk is its info table:
+\begin{description}
+\item[$f$@_info@] is $f$'s info table.
+\end{description}
+
+
+\subsubsection{Byte-Code Objects}
+\label{sect:BCO}
+
+A Byte-Code Object (BCO) is a container for a a chunk of byte-code,
+which can be executed by Hugs.  The byte-code represents a
+supercombinator in the program: when hugs compiles a module, it
+performs lambda lifting and each resulting supercombinator becomes a
+byte-code object in the heap.
+
+There are two kinds of BCO: a standard @BCO@ which has an arity of one
+or more, and a @BCO_CAF@ which takes no arguments and can be updated.
+When a @BCO_CAF@ is updated, the code is thrown away!
+
+The semantics of BCOs are described in Section
+\ref{sect:hugs-heap-objects}.  A BCO has the following structure:
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|l|}
+\hline 
+\emph{Fixed Header} & \emph{Layout} & \emph{Offset} & \emph{Size} &
+\emph{Literals} & \emph{Byte code} \\
+\hline
+\end{tabular}
+\end{center}
+
+\noindent where:
+\begin{itemize}
+\item The entry code is a static code fragment/info table that
+returns to the scheduler to invoke Hugs (Section
+\ref{sect:ghc-to-hugs-switch}).
+\item \emph{Layout} contains the number of pointer literals in the
+\emph{Literals} field.
+\item \emph{Offset} is the offset to the byte code from the start of
+the object.
+\item \emph{Size} is the number of words of byte code in the object.
+\item \emph{Literals} contains any pointer and non-pointer literals used in
+the byte-codes (including jump addresses), pointers first.
+\item \emph{Byte code} contains \emph{Size} words of non-pointer byte
+code.
+\end{itemize}
+
+\subsubsection{Partial applications (PAPs)}\label{sect:PAP}
+
+A partial application (PAP) represents a function applied to too few arguments.
+It is only built as a result of updating after an argument-satisfaction
+check failure.  A PAP has the following shape:
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+{\em Fixed header}  & {\em No of arg words} & {\em Function closure} & {\em Arg stack} \\ \hline
+\end{tabular}
+\end{center}
+The ``arg stack'' is a copy of the chunk of stack above the update
+frame; ``no of arg words'' tells how many words it consists of.  The
+function closure is (a pointer to) the closure for the function whose
+argument-satisfaction check failed.
+
+There is just one standard form of PAP with @INFO_TYPE@ = @PAP@.
+There is just one info table too, called @PAP_info@.
+Its entry code simply copies the arg stack chunk back on top of the
+stack and enters the function closure.  (It has to do a stack overflow test first.)
+
+PAPs are also used to implement Hugs functions (where the arguments are free variables).
+PAPs generated by Hugs can be static.
+
+\subsubsection{@AP@ objects}
+\label{sect:AP}
+
+@AP@ objects are used to represent thunks built by Hugs.  The only distintion between
+an @AP@ and a @PAP@ is that an @AP@ is updateable.
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\emph{Fixed Header} & {\em No of arg words} & {\em Function closure} & {\em Arg stack} \\
+\hline
+\end{tabular}
+\end{center}
+
+The entry code pushes an update frame, copies the arg stack chunk on
+top of the stack, and enters the function closure.  (It has to do a
+stack overflow test first.)
+
+The ``arg stack'' is a block of (tagged) arguments representing the
+free variables of the thunk; ``no of arg words'' tells how many words
+it consists of.  The function closure is (a pointer to) the closure
+for the thunk.  The argument stack may be empty if the thunk has no
+free variables.
+
+
+\subsubsection{Indirections}
+\label{sect:IND}
+\label{sect:IND_OLDGEN}
+
+Indirection closures just point to other closures. They are introduced
+when a thunk is updated to point to its value. 
+The entry code for all indirections simply enters the closure it points to.
+
+There are several forms of indirection:
+\begin{description}
+\item[@IND@] is the vanilla, dynamically-allocated indirection.
+It is removed by the garbage collector. It has the following
+shape:
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+{\em Fixed header} & {\em Target closure} \\ \hline
+\end{tabular}
+\end{center}
+
+\item[@IND_OLDGEN@] is the indirection used to update an old-generation
+thunk. Its shape is like this:
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+{\em Fixed header} & {\em Mutable link field} & {\em Target closure} \\ \hline
+\end{tabular}
+\end{center}
+It contains a {\em mutable link field} that is used to string together
+all old-generation indirections that might have a pointer into
+the new generation.
+
+
+\item[@IND_PERMANENT@ and @IND_OLDGEN_PERMANENT@.]
+for lexical profiling, it is necessary to maintain cost centre
+information in an indirection, so ``permanent indirections'' are
+retained forever.  Otherwise they are just like vanilla indirections.
+\note{If a permanent indirection points to another permanent
+indirection or a @CONST@ closure, it is possible to elide the indirection
+since it will have no effect on the profiler.}
+\note{Do we still need @IND@ and @IND_OLDGEN@
+in the profiling build, or can we just make
+do with one pair whose behaviour changes when profiling is built?}
+
+\item[@IND_STATIC@] is used for overwriting CAFs when they have been
+evaluated.  Static indirections are not removed by the garbage
+collector; and are statically allocated outside the heap (and should
+stay there).  Their static object link field is used just as for
+@FUN_STATIC@ closures.
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+{\em Fixed header} & {\em Target closure} & {\em Static object link} \\
+\hline
+\end{tabular}
+\end{center}
+
+\end{description}
+
+\subsubsection{Activation Records}
+
+Activation records are parts of the stack described by return address
+info tables (closures with @INFO_TYPE@ values of @RET_SMALL@,
+@RET_VEC_SMALL@, @RET_BIG@ and @RET_VEC_BIG@). They are described in
+section~\ref{sect:activation-records}.
+
+
+\subsubsection{Black holes, MVars and IVars}
+\label{sect:BH}
+\label{sect:MVAR}
+\label{sect:IVAR}
+
+Black hole closures are used to overwrite closures currently being
+evaluated. They inform the garbage collector that there are no live
+roots in the closure, thus removing a potential space leak.  
+
+Black holes also become synchronization points in the threaded world.
+They contain a pointer to a list of blocked threads to be awakened
+when the black hole is updated (or @NULL@ if the list is empty).
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline 
+{\em Fixed header} & {\em Mutable link} & {\em Blocked thread link} \\
+\hline
+\end{tabular}
+\end{center}
+The {\em Blocked thread link} points to the TSO of the first thread
+waiting for the value of this thunk.  All subsequent TSOs in the list
+are linked together using their @TSO_LINK@ field.
+
+When the blocking queue is non-@NULL@, the black hole must be added to
+the mutables list since the TSOs on the list may contain pointers into
+the new generation.  There is no need to clutter up the mutables list
+with black holes with empty blocking queues.
+
+\ToDo{MVars}
+
+
+\subsubsection{FetchMes}\label{sect:FETCHME}
+
+In the parallel systems, FetchMes are used to represent pointers into
+the global heap.  When evaluated, the value they point to is read from
+the global heap.
+
+\ToDo{Describe layout}
+
+Because there may be offsets into these arrays, a primitive array
+cannot be handled as a FetchMe in the parallel system, but must be
+shipped in its entirety if its parent closure is shipped.
+
+
+
+\subsection{Unpointed Objects}
+
+A variable of unpointed type is always bound to a {\em value}, never to a {\em thunk}.
+For this reason, unpointed objects cannot be entered.
+
+A {\em value} may be:
+\begin{itemize}
+\item {\em Boxed}, i.e.~represented indirectly by a pointer to a heap object (e.g.~foreign objects, arrays); or
+\item {\em Unboxed}, i.e.~represented directly by a bit-pattern in one or more registers (e.g.~@Int#@ and @Float#@).
+\end{itemize}
+All {\em pointed} values are {\em boxed}.  
+
+\subsubsection{Immutable Objects}
+\label{sect:ARR_WORDS1}
+\label{sect:ARR_PTRS}
+
+\begin{description}
+\item[@ARR_WORDS@] is a variable-sized object consisting solely of
+non-pointers.  It is used for arrays of all
+sorts of things (bytes, words, floats, doubles... it doesn't matter).
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em No of non-pointers} & {\em Non-pointers\ldots}	\\ \hline
+\end{tabular}
+\end{center}
+
+\item[@ARR_PTRS@] is an immutable, variable sized array of pointers.
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Mutable link} & {\em No of pointers} & {\em Pointers\ldots}	\\ \hline
+\end{tabular}
+\end{center}
+The mutable link is present so that we can easily freeze and thaw an
+array (by changing the header and adding/removing the array to the
+mutables list).
+
+\end{description}
+
+\subsubsection{Mutable Objects}
+\label{sect:mutables}
+\label{sect:ARR_WORDS2}
+\label{sect:MUTVAR}
+\label{sect:MUTARR_PTRS}
+\label{sect:MUTARR_PTRS_FROZEN}
+
+Some of these objects are {\em mutable}; they represent objects which
+are explicitly mutated by Haskell code through the @ST@ monad.
+They're not used for thunks which are updated precisely once.
+Depending on the garbage collector, mutable closures may contain extra
+header information which allows a generational collector to implement
+the ``write barrier.''
+
+\begin{description}
+
+\item[@ARR_WORDS@] is also used to represent {\em mutable} arrays of
+bytes, words, floats, doubles, etc.  It's possible to use the same
+object type because even generational collectors don't need to
+distinguish them.
+
+\item[@MUTVAR@] is a mutable variable.
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Mutable link} & {\em Pointer} \\ \hline
+\end{tabular}
+\end{center}
+
+\item[@MUTARR_PTRS@] is a mutable array of pointers.
+Such an array may be {\em frozen}, becoming an @SM_MUTARR_PTRS_FROZEN@, with a
+different info-table.
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Mutable link} & {\em No of ptrs} & {\em Pointers\ldots} \\ \hline
+\end{tabular}
+\end{center}
+
+\item[@MUTARR_PTRS_FROZEN@] is a frozen @MUTARR_PTRS@ closure.
+The garbage collector converts @MUTARR_PTRS_FROZEN@ to @ARR_PTRS@ as it removes them from
+the mutables list.
+
+\end{description}
+
+
+\subsubsection{Foreign Objects}\label{sect:FOREIGN}
+
+Here's what a ForeignObj looks like:
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|}
+\hline 
+{\em Fixed header} & {\em Data} & {\em Free Routine} & {\em Foreign object link} \\
+\hline
+\end{tabular}
+\end{center}
+
+The @FreeRoutine@ is a reference to the finalisation routine to call
+when the @ForeignObj@ becomes garbage.  If @freeForeignObject@ is
+called on a Foreign Object, the @FreeRoutine@ is set to zero and the
+garbage collector will not attempt to call @FreeRoutine@ when the 
+object becomes garbage.
+
+The Foreign object link is a link to the next foreign object in the
+list.  This list is traversed at the end of garbage collection: if an
+object is about to be deallocated (e.g.~it was not marked or
+evacuated), the free routine is called and the object is deleted from
+the list.  
+
+
+The remaining objects types are all administrative --- none of them may be entered.
+
+\subsection{Other weird objects}
+\label{sect:SPARK}
+\label{sect:BLOCKED_FETCH}
+
+\begin{description}
+\item[@BlockedFetch@ heap objects (`closures')] (parallel only)
+
+@BlockedFetch@s are inbound fetch messages blocked on local closures.
+They arise as entries in a local blocking queue when a fetch has been
+received for a local black hole.  When awakened, we look at their
+contents to figure out where to send a resume.
+
+A @BlockedFetch@ closure has the form:
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|l|}\hline
+{\em Fixed header} & link & node & gtid & slot & weight \\ \hline
+\end{tabular}
+\end{center}
+
+\item[Spark Closures] (parallel only)
+
+Spark closures are used to link together all closures in the spark pool.  When
+the current processor is idle, it may choose to speculatively evaluate some of
+the closures in the pool.  It may also choose to delete sparks from the pool.
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|l|}\hline
+{\em Fixed header} & {\em Spark pool link} & {\em Sparked closure} \\ \hline
+\end{tabular}
+\end{center}
+
+\item[Slop Objects]\label{sect:slop-objects}
+
+Slop objects are used to overwrite the end of an updatee if it is
+larger than an indirection.  Normal slop objects consist of an info
+pointer a size word and a number of slop words.  
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|l|}\hline
+{\em Info Pointer} & {\em Size} & {\em Slop Words} \\ \hline
+\end{tabular}
+\end{center}
+
+This is too large for single word slop objects which consist of a
+single info table.
+
+Note that slop objects only contain an info pointer, not a standard
+fixed header.  This doesn't cause problems because slop objects are
+always unreachable --- they can only be accessed by linearly scanning
+the heap.
+
+\end{description}
+
+\subsection{Thread State Objects (TSOs)}\label{sect:TSO}
+
+\ToDo{This is very out of date.  We now embed a single stack object
+within the TSO.  TSOs include an ID number which can be used to
+generate a hash value.  The gransim, profiling and ticky info is
+surely bogus.}
+
+In the multi-threaded system, the state of a suspended thread is
+packed up into a Thread State Object (TSO) which contains all the
+information needed to restart the thread and for the garbage collector
+to find all reachable objects.  When a thread is running, it may be
+``unpacked'' into machine registers and various other memory locations
+to provide faster access.
+
+Single-threaded systems don't really {\em need\/} TSOs --- but they do
+need some way to tell the storage manager about live roots so it is
+convenient to use a single TSO to store the mutator state even in
+single-threaded systems.
+
+Rather than manage TSOs' alloc/dealloc, etc., in some {\em ad hoc}
+way, we instead alloc/dealloc/etc them in the heap; then we can use
+all the standard garbage-collection/fetching/flushing/etc machinery on
+them.  So that's why TSOs are ``heap objects,'' albeit very special
+ones.
+\begin{center}
+\begin{tabular}{|l|l|}
+   \hline {\em Fixed header}
+\\ \hline @TSO_LINK@
+\\ \hline @TSO_WHATNEXT@
+\\ \hline @TSO_WHATNEXT_INFO@ 
+\\ \hline @TSO_STACK@ 
+\\ \hline {\em Exception Handlers}
+\\ \hline {\em Ticky Info}
+\\ \hline {\em Profiling Info}
+\\ \hline {\em Parallel Info}
+\\ \hline {\em GranSim Info}
+\\ \hline
+\end{tabular}
+\end{center}
+The contents of a TSO are:
+\begin{itemize}
+
+\item A pointer (@TSO_LINK@) used to maintain a list of threads with a similar
+  state (e.g.~all runnable, all sleeping, all blocked on the same black
+  hole, all blocked on the same MVar, etc.)
+
+\item A word (@TSO_WHATNEXT@) which is in suspended threads to record
+ how to awaken it.  This typically requires a program counter which is stored
+ in the pointer @TSO_WHATNEXT_INFO@
+
+\item A pointer (@TSO_STACK@) to the top stack block.
+
+\item Optional information for ``Ticky Ticky'' statistics: @TSO_STK_HWM@ is
+  the maximum number of words allocated to this thread.
+
+\item Optional information for profiling: 
+  @TSO_CCC@ is the current cost centre.
+
+\item Optional information for parallel execution:
+\begin{itemize}
+
+\item The types of threads (@TSO_TYPE@):
+\begin{description}
+\item[@T_MAIN@]     Must be executed locally.
+\item[@T_REQUIRED@] A required thread  -- may be exported.
+\item[@T_ADVISORY@] An advisory thread -- may be exported.
+\item[@T_FAIL@]     A failure thread   -- may be exported.
+\end{description}
+
+\item I've no idea what else
+
+\end{itemize}
+
+\item Optional information for GranSim execution:
+\begin{itemize}
+\item locked         
+\item sparkname	 
+\item started at	 
+\item exported	 
+\item basic blocks	 
+\item allocs	 
+\item exectime	 
+\item fetchtime	 
+\item fetchcount	 
+\item blocktime	 
+\item blockcount	 
+\item global sparks	 
+\item local sparks	 
+\item queue		 
+\item priority	 
+\item clock          (gransim light only)
+\end{itemize}
+
+
+Here are the various queues for GrAnSim-type events.
+@
+Q_RUNNING   
+Q_RUNNABLE  
+Q_BLOCKED   
+Q_FETCHING  
+Q_MIGRATING 
+@
+
+\end{itemize}
+
+\subsection{Stack Objects}
+\label{sect:STACK_OBJECT}
+\label{sect:stacks}
+
+These are ``stack objects,'' which are used in the threaded world as
+the stack for each thread is allocated from the heap in smallish
+chunks.  (The stack in the sequential world is allocated outside of
+the heap.)
+
+Each reduction thread has to have its own stack space.  As there may
+be many such threads, and as any given one may need quite a big stack,
+a naive give-'em-a-big-stack-and-let-'em-run approach will cost a {\em
+lot} of memory.
+
+Our approach is to give a thread a small stack space, and then link
+on/off extra ``chunks'' as the need arises.  Again, this is a
+storage-management problem, and, yet again, we choose to graft the
+whole business onto the existing heap-management machinery.  So stack
+objects will live in the heap, be garbage collected, etc., etc..
+
+A stack object is laid out like this:
+
+\begin{center}
+\begin{tabular}{|l|}
+\hline
+{\em Fixed header} 
+\\ \hline
+{\em Link to next stack object (0 for last)}
+\\ \hline
+{\em N, the payload size in words}
+\\ \hline
+{\em @Sp@ (byte offset from head of object)}
+\\ \hline
+{\em @Su@ (byte offset from head of object)}
+\\ \hline
+{\em Payload (N words)}
+\\ \hline
+\end{tabular}
+\end{center}
+
+\ToDo{Are stack objects on the mutable list?}
+
+The stack grows downwards, towards decreasing
+addresses.  This makes it easier to print out the stack
+when debugging, and it means that a return address is
+at the lowest address of the chunk of stack it ``knows about''
+just like an info pointer on a closure.
+
+The garbage collector needs to be able to find all the
+pointers in a stack.  How does it do this?
+
+\begin{itemize}
+
+\item Within the stack there are return addresses, pushed
+by @case@ expressions.  Below a return address (i.e. at higher
+memory addresses, since the stack grows downwards) is a chunk
+of stack that the return address ``knows about'', namely the
+activation record of the currently running function.
+
+\item Below each such activation record is a {\em pending-argument
+section}, a chunk of
+zero or more words that are the arguments to which the result
+of the function should be applied.  The return address does not
+statically
+``know'' how many pending arguments there are, or their types.
+(For example, the function might return a result of type $\alpha$.)
+
+\item Below each pending-argument section is another return address,
+and so on.  Actually, there might be an update frame instead, but we
+can consider update frames as a special case of a return address with
+a well-defined activation record.
+
+\ToDo{Doesn't it {\em have} to be an update frame?  After all, the arg
+satisfaction check is @Su - Sp >= ...@.}
+
+\end{itemize}
+
+The game plan is this.  The garbage collector
+walks the stack from the top, traversing pending-argument sections and
+activation records alternately.  Next we discuss how it finds
+the pointers in each of these two stack regions.
+
+
+\subsubsection{Activation records}\label{sect:activation-records}
+
+An {\em activation record} is a contiguous chunk of stack,
+with a return address as its first word, followed by as many
+data words as the return address ``knows about''.  The return
+address is actually a fully-fledged info pointer.  It points
+to an info table, replete with:
+
+\begin{itemize}
+\item entry code (i.e. the code to return to).
+\item @INFO_TYPE@ is either @RET_SMALL/RET_VEC_SMALL@ or @RET_BIG/RET_VEC_BIG@, depending
+on whether the activation record has more than 32 data words (\note{64 for 8-byte-word architectures}) and on whether 
+to use a direct or a vectored return.
+\item @INFO_SM@ for @RET_SMALL@ is a bitmap telling the layout
+of the activation record, one bit per word.  The least-significant bit
+describes the first data word of the record (adjacent to the fixed
+header) and so on.  A ``@1@'' indicates a non-pointer, a ``@0@''
+indicates
+a pointer.  We don't need to indicate exactly how many words there
+are,
+because when we get to all zeros we can treat the rest of the 
+activation record as part of the next pending-argument region.
+
+For @RET_BIG@ the @INFO_SM@ field points to a block of bitmap
+words, starting with a word that tells how many words are in
+the block.
+
+\item @INFO_SRT@ is the Static Reference Table for the return
+address (Section~\ref{sect:srt}).
+\end{itemize}
+
+The activation record is a fully fledged closure too.
+As well as an info pointer, it has all the other attributes of
+a fixed header (Section~\ref{sect:fixed-header}) including a saved cost
+centre which is reloaded when the return address is entered.
+
+In other words, all the attributes of closures are needed for
+activation records, so it's very convenient to make them look alike.
+
+
+\subsubsection{Pending arguments}
+
+So that the garbage collector can correctly identify pointers
+in pending-argument sections we explicitly tag all non-pointers.
+Every non-pointer in a pending-argument section is preceded
+(at the next lower memory word) by a one-word byte count that
+says how many bytes to skip over (excluding the tag word).
+
+The garbage collector traverses a pending argument section from 
+the top (i.e. lowest memory address).  It looks at each word in turn:
+
+\begin{itemize}
+\item If it is less than or equal to a small constant @MAX_STACK_TAG@
+then
+it treats it as a tag heralding zero or more words of non-pointers,
+so it just skips over them.
+
+\item If it points to the code segment, it must be a return
+address, so we have come to the end of the pending-argument section.
+
+\item Otherwise it must be a bona fide heap pointer.
+\end{itemize}
+
+
+\subsection{The Stable Pointer Table}\label{sect:STABLEPTR_TABLE}
+
+A stable pointer is a name for a Haskell object which can be passed to
+the external world.  It is ``stable'' in the sense that the name does
+not change when the Haskell garbage collector runs---in contrast to
+the address of the object which may well change.
+
+A stable pointer is represented by an index into the
+@StablePointerTable@.  The Haskell garbage collector treats the
+@StablePointerTable@ as a source of roots for GC.
+
+In order to provide efficient access to stable pointers and to be able
+to cope with any number of stable pointers (eg $0 \ldots 100000$), the
+table of stable pointers is an array stored on the heap and can grow
+when it overflows.  (Since we cannot compact the table by moving
+stable pointers about, it seems unlikely that a half-empty table can
+be reduced in size---this could be fixed if necessary by using a
+hash table of some sort.)
+
+In general a stable pointer table closure looks like this:
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|l|l|l|l|l|l|}
+\hline
+{\em Fixed header} & {\em No of pointers} & {\em Free} & $SP_0$ & \ldots & $SP_{n-1}$ 
+\\\hline
+\end{tabular}
+\end{center}
+
+The fields are:
+\begin{description}
+
+\item[@NPtrs@:] number of (stable) pointers.
+
+\item[@Free@:] the byte offset (from the first byte of the object) of the first free stable pointer.
+
+\item[$SP_i$:] A stable pointer slot.  If this entry is in use, it is
+an ``unstable'' pointer to a closure.  If this entry is not in use, it
+is a byte offset of the next free stable pointer slot.
+
+\end{description}
+
+When a stable pointer table is evacuated
+\begin{enumerate}
+\item the free list entries are all set to @NULL@ so that the evacuation
+  code knows they're not pointers;
+
+\item The stable pointer slots are scanned linearly: non-@NULL@ slots
+are evacuated and @NULL@-values are chained together to form a new free list.
+\end{enumerate}
+
+There's no need to link the stable pointer table onto the mutable
+list because we always treat it as a root.
+
+
+
+\section{The Bytecode Evaluator}
+
+This section describes how the Hugs interpreter interprets code in the
+same environment as compiled code executes.  Both evaluation models
+use a common garbage collector, so they must agree on the form of
+objects in the heap.
+
+Hugs interprets code by converting it to byte-code and applying a
+byte-code interpreter to it.  Wherever possible, we try to ensure that
+the byte-code is all that is required to interpret a section of code.
+This means not dynamically generating info tables, and hence we can
+only have a small number of possible heap objects each with a statically
+compiled info table.  Similarly for stack objects: in fact we only
+have one Hugs stack object, in which all information is tagged for the
+garbage collector.
+
+There is, however, one exception to this rule.  Hugs must generate
+info tables for any constructors it is asked to compile, since the
+alternative is to force a context-switch each time compiled code
+enters a Hugs-built constructor, which would be prohibitively
+expensive.
+
+We achieve this simplicity by forgoing some of the optimisations used
+by compiled code:
+\begin{itemize}
+\item
+
+Whereas compiled code has five different ways of entering a closure
+(section~\ref{sect:entering-closures}), interpreted code has only one.
+The entry point for interpreted code behaves like slow entry points for
+compiled code.
+
+\item
+
+We use just one info table for {\em all\/} direct returns.  
+This introduces two problems:
+\begin{enumerate}
+\item How does the interpreter know what code to execute?
+
+Instead of pushing just a return address, we push a return BCO and a 
+trivial return address which just enters the return BCO.
+
+(In a purely interpreted system, we could avoid pushing the trivial
+return address.)
+
+\item How can the garbage collector follow pointers within the
+activation record?
+
+We could push a third word ---a bitmask describing the location of any
+pointers within the record--- but, since we're already tagging unboxed
+function arguments on the stack, we use the same mechanism for unboxed
+values within the activation record.
+
+\ToDo{Do we have to stub out dead variables in the activation frame?}
+
+\end{enumerate}
+
+\item
+
+We trivially support vectored returns by pushing a return vector whose
+entries are all the same.
+
+\item
+
+We avoid the need to build SRTs by putting bytecode objects on the
+heap and restricting BCOs to a single basic block.
+
+\end{itemize}
+
+\subsection{Hugs Info Tables}
+
+Hugs requires the following info tables and closures:
+\begin{description}
+\item [@HUGS_RET@].
+
+Contains both a vectored return table and a direct entry point.  All
+entry points are the same: they rearrange the stack to match the Hugs
+return convention (section~\label{sect:hugs-return-convention}) and return
+to the scheduler.  When the scheduler restarts the thread, it will
+find a BCO on top of the stack and will enter the Hugs interpreter.
+
+\item [@UPD_RET@].
+
+This is just the standard info table for an update frame.
+
+\item [Constructors].
+
+The entry code for a constructor jumps to a generic entry point in the
+runtime system which decides whether to do a vectored or unvectored
+return depending on the shape of the constructor/type.  This implies that
+info tables must have enough info to make that decision.
+
+\item [@AP@ and @PAP@].
+
+\item [Indirections].
+
+\item [Selectors].
+
+Hugs doesn't generate them itself but it ought to recognise them
+
+\item [Complex primops].
+
+Some of the primops are too complex for GHC to generate inline.
+Instead, these primops are hand-written and called as normal functions.
+Hugs only needs to know their names and types but doesn't care whether
+they are generated by GHC or by hand.  Two things to watch:
+
+\begin{enumerate}
+\item
+Hugs must be able to enter these primops even if it is working on a
+standalone system that does not support genuine GHC generated code.
+
+\item The complex primops often involve unboxed tuple types (which
+Hugs does not support at the source level) so we cannot specify their
+types in a Haskell source file.
+
+\end{enumerate}
+
+\end{description}
+
+\subsection{Hugs Heap Objects}
+\label{sect:hugs-heap-objects}
+
+\subsubsection{Byte-Code Objects}
+
+Compiled byte code lives on the global heap, in objects called
+Byte-Code Objects (or BCOs).  The layout of BCOs is described in
+detail in Section \ref{sect:BCO}, in this section we will describe
+their semantics.
+
+Since byte-code lives on the heap, it can be garbage collected just
+like any other heap-resident data.  Hugs arranges that any BCO's
+referred to by the Hugs symbol tables are treated as live objects by
+the garbage collector.  When a module is unloaded, the pointers to its
+BCOs are removed from the symbol table, and the code will be garbage
+collected some time later.
+
+A BCO represents a basic block of code - all entry points are at the
+beginning of a BCO, and it is impossible to jump into the middle of
+one.  A BCO represents not only the code for a function, but also its
+closure; a BCO can be entered just like any other closure.  Hugs
+performs lambda-lifting during compilation to byte-code, and each
+top-level combinator becomes a BCO in the heap.
+
+\ToDo{The phrase "all entry points..." suggests that BCOs have multiple 
+entry points.  If so, we need to say a lot more about it...}
+
+\subsubsection{Thunks and partial applications}
+
+A thunk consists of a code pointer, and values for the free variables
+of that code.  Since Hugs byte-code is lambda-lifted, free variables
+become arguments and are expected to be on the stack by the called
+function.
+
+Hugs represents updateable thunks with @AP@ objects applying a closure
+to a list of arguments.  (As for @PAP@s, unboxed arguments should be
+preceded by a tag.)  When it is entered, it pushes an update frame
+followed by its payload on the stack, and enters the first word (which
+will be a pointer to a BCO).  The layout of @AP@ objects is described
+in more detail in Section \ref{sect:AP}.
+
+Partial applications are represented by @PAP@ objects, which are
+non-updatable.
+
+\ToDo{Hugs Constructors}.
+
+\subsection{Calling conventions}
+\label{sect:hugs-calling-conventions}
+\label{sect:standard-closures}
+
+The calling convention for any byte-code function is straightforward:
+\begin{itemize}
+\item Push any arguments on the stack.
+\item Push a pointer to the BCO.
+\item Begin interpreting the byte code.
+\end{itemize}
+
+In a system containing both GHC and Hugs, the bytecode interpreter
+only has to be able to enter BCOs: everything else can be handled by
+returning to the compiled world (as described in
+Section~\ref{sect:hugs-to-ghc-switch}) and entering the closure
+there.
+
+This would work but it would obviously be very inefficient if
+we entered a @AP@ by switching worlds, entering the @AP@,
+pushing the arguments and function onto the stack, and entering the
+function which, likely as not, will be a byte-code object which we
+will enter by \emph{returning} to the byte-code interpreter.  To avoid
+such gratuitious world switching, we choose to recognise certain
+closure types as being ``standard'' --- and duplicate the entry code
+for the ``standard closures'' in the bytecode interpreter.
+
+A closure is said to be ``standard'' if its entry code is entirely
+determined by its info table.  \emph{Standard Closures} have the
+desirable property that the byte-code interpreter can enter
+the closure by simply ``interpreting'' the info table instead of
+switching to the compiled world.  The standard closures include:
+
+\begin{description}
+\item[Constructor]
+To enter a constructor, we simply return (see Section
+\ref{sect:hugs-return-convention}).
+
+\item[Indirection]
+To enter an indirection, we simply enter the object it points to
+after possibly adjusting the current cost centre.
+
+\item[@AP@] 
+
+To enter an @AP@, we push an update frame, push the
+arguments, push the function and enter the function.
+(Not forgetting a stack check at the start.)
+
+\item[@PAP@]
+
+To enter a @PAP@, we push the arguments, push the function and enter
+the function.  (Not forgetting a stack check at the start.)
+
+\item[Selector] 
+To enter a selector, we test whether the selectee is a value.  If so,
+we simply select the appropriate component; if not, it's simplest to
+treat it as a GHC-built closure --- though we could interpret it if we
+wanted.
+
+\end{description}
+
+The most obvious omissions from the above list are @BCO@s (which we
+dealt with above) and GHC-built closures (which are covered in Section
+\ref{sect:hugs-to-ghc-switch}).
+
+
+\subsection{Return convention}
+\label{sect:hugs-return-convention}
+
+When Hugs pushes a return address, it pushes both a pointer to the BCO
+to return to, and a pointer to a static code fragment @HUGS_RET@ (this
+is described in Section \ref{sect:ghc-to-hugs-switch}).  The
+stack layout is shown in Figure \ref{fig:hugs-return-stack}.
+
+\begin{figure}[ht]
+\begin{center}
+@
+| stack    |
++----------+
+| bco      |--> BCO
++----------+
+| HUGS_RET |
++----------+
+@
+%\input{hugs_ret.pstex_t}
+\end{center}
+\caption{Stack layout for a Hugs return address}
+\label{fig:hugs-return-stack}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{center}
+@
+| stack    |
++----------+
+| con      |--> CON
++----------+
+@
+%\input{hugs_ret2.pstex_t}
+\end{center}
+\caption{Stack layout on enterings a Hugs return address}
+\label{fig:hugs-return2}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{center}
+@
+| stack    |
++----------+
+| 3#       |
++----------+
+| I#       |
++----------+
+@
+%\input{hugs_ret2.pstex_t}
+\end{center}
+\caption{Stack layout on entering a Hugs return address with an unboxed value}
+\label{fig:hugs-return-int}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{center}
+@
+| stack    |
++----------+
+| ghc_ret  |
++----------+
+| con      |--> CON
++----------+
+@
+%\input{hugs_ret3.pstex_t}
+\end{center}
+\caption{Stack layout on enterings a GHC return address}
+\label{fig:hugs-return3}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{center}
+@
+| stack    |
++----------+
+| ghc_ret  |
++----------+
+| 3#       |
++----------+
+| I#       |
++----------+
+| restart  |--> id_Int#_closure
++----------+
+@
+%\input{hugs_ret2.pstex_t}
+\end{center}
+\caption{Stack layout on enterings a GHC return address with an unboxed value}
+\label{fig:hugs-return-int}
+\end{figure}
+
+When a Hugs byte-code sequence enters a closure, it examines the 
+return address on top of the stack.
+
+\begin{itemize}
+
+\item If the return address is @HUGS_RET@, pop the @HUGS_RET@ and the
+bco for the continuation off the stack, push a pointer to the constructor onto
+the stack and enter the BCO with the current object pointer set to the BCO
+(Figure \ref{fig:hugs-return2}).
+
+\item If the top of the stack is not @HUGS_RET@, we need to do a world
+switch as described in Section \ref{sect:hugs-to-ghc-switch}.
+
+\end{itemize}
+
+\ToDo{This duplicates what we say about switching worlds
+(section~\ref{sect:switching-worlds}) - kill one or t'other.}
+
+
+\ToDo{This was in the evaluation model part but it really belongs in
+this part which is about the internal details of each of the major
+sections.}
+
+\subsection{Addressing Modes}
+
+To avoid potential alignment problems and simplify garbage collection,
+all literal constants are stored in two tables (one boxed, the other
+unboxed) within each BCO and are referred to by offsets into the tables.
+Slots in the constant tables are word aligned.
+
+\ToDo{How big can the offsets be?  Is the offset specified in the
+address field or in the instruction?}
+
+Literals can have the following types: char, int, nat, float, double,
+and pointer to boxed object.  There is no real difference between
+char, int, nat and float since they all occupy 32 bits --- but it
+costs almost nothing to distinguish them and may improve portability
+and simplify debugging.
+
+\subsection{Compilation}
+
+
+\def\is{\mbox{\it is}}
+\def\ts{\mbox{\it ts}}
+\def\as{\mbox{\it as}}
+\def\bs{\mbox{\it bs}}
+\def\cs{\mbox{\it cs}}
+\def\rs{\mbox{\it rs}}
+\def\us{\mbox{\it us}}
+\def\vs{\mbox{\it vs}}
+\def\ws{\mbox{\it ws}}
+\def\xs{\mbox{\it xs}}
+
+\def\e{\mbox{\it e}}
+\def\alts{\mbox{\it alts}}
+\def\fail{\mbox{\it fail}}
+\def\panic{\mbox{\it panic}}
+\def\ua{\mbox{\it ua}}
+\def\obj{\mbox{\it obj}}
+\def\bco{\mbox{\it bco}}
+\def\tag{\mbox{\it tag}}
+\def\entry{\mbox{\it entry}}
+\def\su{\mbox{\it su}}
+
+\def\Ind#1{{\mbox{\it Ind}\ {#1}}}
+\def\update#1{{\mbox{\it update}\ {#1}}}
+
+\def\next{$\Longrightarrow$}
+\def\append{\mathrel{+\mkern-6mu+}}
+\def\reverse{\mbox{\it reverse}}
+\def\size#1{{\vert {#1} \vert}}
+\def\arity#1{{\mbox{\it arity}{#1}}}
+
+\def\AP{\mbox{\it AP}}
+\def\PAP{\mbox{\it PAP}}
+\def\GHCRET{\mbox{\it GHCRET}}
+\def\GHCOBJ{\mbox{\it GHCOBJ}}
+
+To make sense of the instructions, we need a sense of how they will be
+used.  Here is a small compiler for the STG language.
+
+@
+> cg (f{a1, ... am}) = do
+>   pushAtom am; ... pushAtom a1
+>   pushVar f
+>   SLIDE (m+1) |env|
+>   ENTER
+> cg (let{x1=rhs1; ... xm=rhsm in e) = do
+>   ALLOC x1 |rhs1|, ... ALLOC xm |rhsm|
+>   build x1 rhs1,   ... build xm rhsm
+>   cg e
+> cg (case e of alts) = do
+>   PUSHALTS (cgAlts alts)
+>   cg e
+
+> cgAlts { alt1; ... altm }  = cgAlt alt1 $ ... $ cgAlt altm pmFail
+>
+> cgAlt (x@C{xs} -> e) fail = do
+>   TEST C fail
+>   HEAPCHECK (heapUse e)
+>   UNPACK xs
+>   cg e
+
+> build x (C{a1, ... am}) = do 
+>   pushUntaggedAtom am; ... pushUntaggedAtom a1
+>   PACK x C
+> build x ({v1, ... vm} \ {}. e) = do 
+>   pushVar vm; ... pushVar v1
+>   PUSHBCO (cgRhs ({v1, ... vm} \ {}. e))
+>   MKAP x m
+> build x ({v1, ... vm} \ {x1, ... xm}. e) = do 
+>   pushVar vm; ... pushVar v1
+>   PUSHBCO (cgRhs ({v1, ... vm} \ {x1, ... xm}. e))
+>   MKPAP x m
+
+> cgRhs (vs \ xs. e) = do
+>   ARGCHECK   (xs ++ vs)  -- can be omitted if xs == {}
+>   STACKCHECK min(stackUse e,heapOverflowSlop)
+>   HEAPCHECK  (heapUse e)
+>   cg e
+
+> pushAtom x  = pushVar x
+> pushAtom i# = PUSHINT i#
+
+> pushVar x = if isGlobalVar x then PUSHGLOBAL x else PUSHLOCAL x 
+
+> pushUntaggedAtom x  = pushVar x
+> pushUntaggedAtom i# = PUSHUNTAGGEDINT i#
+
+> pushVar x = if isGlobalVar x then PUSHGLOBAL x else PUSHLOCAL x 
+@
+
+\ToDo{Is there an easy way to add semi-tagging?  Would it be that different?}
+
+\ToDo{Optimise thunks of the form @f{x1,...xm}@ so that we build an AP directly}
+
+\subsection{Instructions}
+
+We specify the semantics of instructions using transition rules of
+the form:
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& $\is$		& $s$ 	& $\su$ 	& $h$  & $hp$  & $\sigma$ \\
+\next	& $\is'$	& $s'$ 	& $\su'$	& $h'$ & $hp'$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+where $\is$ is an instruction stream, $s$ is the stack, $\su$ is the 
+update frame pointer and $h$ is the heap.
+
+
+\subsection{Stack manipulation}
+
+\begin{description}
+
+\item[ Push a global variable ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& PUSHGLOBAL $o$ : $\is$ & $s$ 		& $su$ & $h$ & $hp$ & $\sigma$ \\
+\next	& $\is$			 & $\sigma!o:s$ & $su$ & $h$ & $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\item[ Push a local variable ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& PUSHLOCAL $o$ : $\is$	& $s$ 		& $su$ & $h$ & $hp$ & $\sigma$ \\
+\next	& $\is$			& $s!o : s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\item[ Push an unboxed int ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& PUSHINT $o$ : $\is$	& $s$ 		        & $su$ & $h$ & $hp$ & $\sigma$ \\
+\next	& $\is$			& $I\# : \sigma!o : s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+The $I\#$ is a tag included for the benefit of the garbage collector.
+Similar rules exist for floats, doubles, chars, etc.
+
+\item[ Push an unboxed int ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& PUSHUNTAGGEDINT $o$ : $\is$	& $s$ 		        & $su$ & $h$ & $hp$ & $\sigma$ \\
+\next	& $\is$			& $\sigma!o : s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+Similar rules exist for floats, doubles, chars, etc.
+
+\item[ Delete environment from stack --- ready for tail call ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& SLIDE $m$ $n$ : $\is$	& $\as \append \bs \append \cs$		& $su$ & $h$ & $hp$ & $\sigma$ \\
+\next	& $\is$			& $\as \append \cs$			& $su$ & $h$ & $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+where $\size{\as} = m$ and $\size{\bs} = n$.
+
+
+\item[ Push a return address ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& PUSHALTS $o$:$\is$	& $s$ 			& $su$ & $h$ & $hp$ & $\sigma$ \\
+\next	& $\is$			& $@HUGS_RET@:\sigma!o:s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\item[ Push a BCO ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& PUSHBCO $o$ : $\is$	& $s$ 			& $su$ & $h$ & $hp$ & $\sigma$ \\
+\next	& $\is$			& $\sigma!o : s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\end{description}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Heap manipulation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{description}
+
+\item[ Allocate a heap object ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& ALLOC $m$ : $\is$	& $s$    & $su$ & $h$ & $hp$   & $\sigma$ \\
+\next	& $\is$			& $hp:s$ & $su$ & $h$ & $hp+m$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\item[ Build a constructor ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& PACK $o$ $o'$ : $\is$	& $\ws \append s$ 	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
+\next	& $\is$			& $s$ 			& $su$ & $h[s!o \mapsto Pack C\{\ws\}]$	& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+where $C = \sigma!o'$ and $\size{\ws} = \arity{C}$.
+
+\item[ Build an AP or  PAP ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& MKAP $o$ $m$:$\is$	& $f : \ws \append s$	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
+\next	& $\is$			& $s$ 			& $su$ & $h[s!o \mapsto \AP(f,\ws)]$ 	& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+where $\size{\ws} = m$.
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& MKPAP $o$ $m$:$\is$	& $f : \ws \append s$	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
+\next	& $\is$			& $s$ 			& $su$ & $h[s!o \mapsto \PAP(f,\ws)]$ 	& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+where $\size{\ws} = m$.
+
+\item[ Unpacking a constructor ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& UNPACK : $is$ 	& $a : s$ 				& $su$ & $h[a \mapsto C\ \ws]$  	& $hp$ & $\sigma$ \\
+\next	& $is'$			& $(\reverse\ \ws) \append a : s$ 	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+The $\reverse\ \ws$ looks expensive but, since the stack grows down
+and the heap grows up, that's actually the cheap way of copying from
+heap to stack.  Looking at the compilation rules, you'll see that we
+always push the args in reverse order.
+
+\end{description}
+
+
+\subsection{Entering a closure}
+
+\begin{description}
+
+\item[ Enter a BCO ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& [ENTER]	& $a : s$ 	& $su$ & $h[a \mapsto BCO\{\is\} ]$  	& $hp$ & $\sigma$ \\
+\next	& $\is$ 	& $a : s$ 	& $su$ & $h$ 				& $hp$ & $a$ \\
+\hline
+\end{tabular}
+
+\item[ Enter a PAP closure ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& [ENTER]	& $a : s$ 		& $su$ & $h[a \mapsto \PAP(f,\ws)]$  	& $hp$ & $\sigma$ \\
+\next	& [ENTER] 	& $f : \ws \append s$ 	& $su$ & $h$ 				& $hp$ & $???$ \\
+\hline
+\end{tabular}
+
+\item[ Entering an AP closure ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& [ENTER]	& $a : s$ 				& $su$ 	& $h[a \mapsto \AP(f,ws)]$  	& $hp$ & $\sigma$ \\
+\next	& [ENTER] 	& $f : \ws \append @UPD_RET@:\su:a:s$ 	& $su'$	& $h$ 				& $hp$ & $???$ \\
+\hline
+\end{tabular}
+
+Optimisations:
+\begin{itemize}
+\item Instead of blindly pushing an update frame for $a$, we can first test whether there's already
+ an update frame there.  If so, overwrite the existing updatee with an indirection to $a$ and
+ overwrite the updatee field with $a$.  (Overwriting $a$ with an indirection to the updatee also
+ works.)  This results in update chains of maximum length 2. 
+\end{itemize}
+
+
+\item[ Returning a constructor ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& [ENTER]		& $a : @HUGS_RET@ : \alts : s$ 	& $su$ & $h[a \mapsto C\{\ws\}]$  	& $hp$ & $\sigma$ \\
+\next	& $\alts.\entry$	& $a:s$ 			& $su$ & $h$ 				& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+
+\item[ Entering an indirection node ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& [ENTER]	& $a  : s$ 	& $su$ & $h[a \mapsto \Ind{a'}]$ 	& $hp$ & $\sigma$ \\
+\next	& [ENTER]	& $a' : s$ 	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\item[Entering GHC closure].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& [ENTER]	& $a : s$ 	& $su$ & $h[a \mapsto \GHCOBJ]$  	& $hp$ & $\sigma$ \\
+\next	& [ENTERGHC] 	& $a : s$ 	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\item[Returning a constructor to GHC].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& [ENTER]	& $a : \GHCRET : s$ 	& $su$ & $h[a \mapsto C \ws]$  	& $hp$ & $\sigma$ \\
+\next	& [ENTERGHC]	& $a : \GHCRET : s$ 	& $su$ & $h$ 			& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\end{description}
+
+
+\subsection{Updates}
+
+\begin{description}
+
+\item[ Updating with a constructor].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& [ENTER]	& $a : @UPD_RET@ : ua : s$ 	& $su$ & $h[a \mapsto C\{\ws\}]$  & $hp$ & $\sigma$ \\
+\next	& [ENTER]	& $a \append s$ 		& $su$ & $h[au \mapsto \Ind{a}$   & $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+
+\item[ Argument checks].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& ARGCHECK $m$:$\is$	& $a : \as \append s$ 	& $su$ & $h$ 	& $hp$ & $\sigma$ \\
+\next	& $\is$			& $a : \as \append s$ 	& $su$ & $h'$ 	& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+where $m \ge (su - sp)$
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& ARGCHECK $m$:$\is$	& $a : \as \append @UPD_RET@:su:ua:s$ 	& $su$ & $h$ 	& $hp$ & $\sigma$ \\
+\next	& $\is$			& $a : \as \append s$ 			& $su$ & $h'$ 	& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+where $m < (su - sp)$ and
+      $h' = h[ua \mapsto \Ind{a'}, a' \mapsto \PAP(a,\reverse\ \as) ]$
+
+Again, we reverse the list of values as we transfer them from the
+stack to the heap --- reflecting the fact that the stack and heap grow
+in different directions.
+
+\end{description}
+
+\subsection{Branches}
+
+\begin{description}
+
+\item[ Testing a constructor ].
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& TEST $tag$ $is'$ : $is$ 	& $a : s$ 	& $su$ & $h[a \mapsto C\ \ws]$ 	& $hp$ & $\sigma$ \\
+\next	& $is$				& $a : s$ 	& $su$ & $h$ 			& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+where $C.\tag = tag$
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& TEST $tag$ $is'$ : $is$ 	& $a : s$ 	& $su$ & $h[a \mapsto C\ \ws]$  & $hp$ & $\sigma$ \\
+\next	& $is'$				& $a : s$ 	& $su$ & $h$ 			& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+where $C.\tag \neq tag$
+
+\end{description}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Heap and stack checks}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& STACKCHECK $stk$:$\is$	& $s$ 	& $su$ & $h$  	& $hp$ & $\sigma$ \\
+\next	& $\is$ 			& $s$ 	& $su$ & $h$	& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+if $s$ has $stk$ free slots.
+
+\begin{tabular}{|llrrrrr|}
+\hline
+	& HEAPCHECK $hp$:$\is$		& $s$ 	& $su$ & $h$  	& $hp$ & $\sigma$ \\
+\next	& $\is$ 			& $s$ 	& $su$ & $h$	& $hp$ & $\sigma$ \\
+\hline
+\end{tabular}
+\\
+if $h$ has $hp$ free slots.
+
+If either check fails, we push the current bco ($\sigma$) onto the
+stack and return to the scheduler.  When the scheduler has fixed the
+problem, it pops the top object off the stack and reenters it.
+
+
+Optimisations:
+\begin{itemize}
+\item The bytecode CHECK1000 conservatively checks for 1000 words of heap space and 1000 words of stack space.
+      We use it to reduce code space and instruction decoding time.
+\item The bytecode HEAPCHECK1000 conservatively checks for 1000 words of heap space.
+      It is used in case alternatives.
+\end{itemize}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Primops}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\ToDo{primops take m words and return n words. The expect boxed arguments on the stack.}
+
+
+\section{The Machine Code Evaluator}
 
 This section describes the framework in which compiled code evaluates
 expressions.  Only at certain points will compiled code need to be
@@ -1152,325 +3584,246 @@ May have to keep C stack pointer in register to placate OS?
 May have to revert black holes - ouch!
 @
 
-\section{Interpreted Execution}
 
-This section describes how the Hugs interpreter interprets code in the
-same environment as compiled code executes.  Both evaluation models
-use a common garbage collector, so they must agree on the form of
-objects in the heap.
 
-Hugs interprets code by converting it to byte-code and applying a
-byte-code interpreter to it.  Wherever possible, we try to ensure that
-the byte-code is all that is required to interpret a section of code.
-This means not dynamically generating info tables, and hence we can
-only have a small number of possible heap objects each with a statically
-compiled info table.  Similarly for stack objects: in fact we only
-have one Hugs stack object, in which all information is tagged for the
-garbage collector.
+\section{The Loader}
+\section{The Compilers}
 
-There is, however, one exception to this rule.  Hugs must generate
-info tables for any constructors it is asked to compile, since the
-alternative is to force a context-switch each time compiled code
-enters a Hugs-built constructor, which would be prohibitively
-expensive.
+\iffalse
+\part{Old stuff - needs to be mined for useful info}
 
-We achieve this simplicity by forgoing some of the optimisations used
-by compiled code:
+\section{The Scheduler}
+
+The Scheduler is the heart of the run-time system.  A running program
+consists of a single running thread, and a list of runnable and
+blocked threads.  The running thread returns to the scheduler when any
+of the following conditions arises:
+
 \begin{itemize}
-\item
+\item A heap check fails, and a garbage collection is required
+\item Compiled code needs to switch to interpreted code, and vice
+versa.
+\item The thread becomes blocked.
+\item The thread is preempted.
+\end{itemize}
 
-Whereas compiled code has five different ways of entering a closure
-(section~\ref{sect:entering-closures}), interpreted code has only one.
-The entry point for interpreted code behaves like slow entry points for
-compiled code.
+A running system has a global state, consisting of
 
-\item
+\begin{itemize}
+\item @Hp@, the current heap pointer, which points to the next
+available address in the Heap.
+\item @HpLim@, the heap limit pointer, which points to the end of the
+heap.
+\item The Thread Preemption Flag, which is set whenever the currently
+running thread should be preempted at the next opportunity.
+\item A list of runnable threads. 
+\item A list of blocked threads.
+\end{itemize}
 
-We use just one info table for {\em all\/} direct returns.  
-This introduces two problems:
+Each thread is represented by a Thread State Object (TSO), which is
+described in detail in Section \ref{sect:TSO}.
+
+The following is pseudo-code for the inner loop of the scheduler
+itself.
+
+@
+while (threads_exist) {
+  // handle global problems: GC, parallelism, etc
+  if (need_gc) gc();  
+  if (external_message) service_message();
+  // deal with other urgent stuff
+
+  pick a runnable thread;
+  do {
+    // enter object on top of stack
+    // if the top object is a BCO, we must enter it
+    // otherwise appply any heuristic we wish.
+    if (thread->stack[thread->sp]->info.type == BCO) {
+	status = runHugs(thread,&smInfo);
+    } else {
+	status = runGHC(thread,&smInfo);
+    }
+    switch (status) {  // handle local problems
+      case (StackOverflow): enlargeStack; break;
+      case (Error e)      : error(thread,e); break;
+      case (ExitWith e)   : exit(e); break;
+      case (Yield)        : break;
+    }
+  } while (thread_runnable);
+}
+@
+
+\subsection{Invoking the garbage collector}
+\subsection{Putting the thread to sleep}
+
+\subsection{Calling C from Haskell}
+
+We distinguish between "safe calls" where the programmer guarantees
+that the C function will not call a Haskell function or, in a
+multithreaded system, block for a long period of time and "unsafe
+calls" where the programmer cannot make that guarantee.  
+
+Safe calls are performed without returning to the scheduler and are
+discussed elsewhere (\ToDo{discuss elsewhere}).
+
+Unsafe calls are performed by returning an array (outside the Haskell
+heap) of arguments and a C function pointer to the scheduler.  The
+scheduler allocates a new thread from the operating system
+(multithreaded system only), spawns a call to the function and
+continues executing another thread.  When the ccall completes, the
+thread informs the scheduler and the scheduler adds the thread to the
+runnable threads list.  
+
+\ToDo{Describe this in more detail.}
+
+
+\subsection{Calling Haskell from C}
+
+When C calls a Haskell closure, it sends a message to the scheduler
+thread.  On receiving the message, the scheduler creates a new Haskell
+thread, pushes the arguments to the C function onto the thread's stack
+(with tags for unboxed arguments) pushes the Haskell closure and adds
+the thread to the runnable list so that it can be entered in the
+normal way.
+
+When the closure returns, the scheduler sends back a message which
+awakens the (C) thread.  
+
+\ToDo{Do we need to worry about the garbage collector deallocating the
+thread if it gets blocked?}
+
+\subsection{Switching Worlds}
+\label{sect:switching-worlds}
+
+\ToDo{This has all changed: we always leave a closure on top of the
+stack if we mean to continue executing it.  The scheduler examines the
+top of the stack and tries to guess which world we want to be in.  If
+it finds a @BCO@, it certainly enters Hugs, if it finds a @GHC@
+closure, it certainly enters GHC and if it finds a standard closure,
+it is free to choose either one but it's probably best to enter GHC
+for everything except @BCO@s and perhaps @AP@s.}
+
+Because this is a combined compiled/interpreted system, the
+interpreter will sometimes encounter compiled code, and vice-versa.
+
+All world-switches go via the scheduler, ensuring that the world is in
+a known state ready to enter either compiled code or the interpreter.
+When a thread is run from the scheduler, the @whatNext@ field in the
+TSO (Section \ref{sect:TSO}) is checked to find out how to execute the
+thread.
+
+\begin{itemize}
+\item If @whatNext@ is set to @ReturnGHC@, we load up the required
+registers from the TSO and jump to the address at the top of the user
+stack.
+\item If @whatNext@ is set to @EnterGHC@, we load up the required
+registers from the TSO and enter the closure pointed to by the top
+word of the stack.
+\item If @whatNext@ is set to @EnterHugs@, we enter the top thing on
+the stack, using the interpreter.
+\end{itemize}
+
+There are four cases we need to consider:
+
 \begin{enumerate}
-\item How does the interpreter know what code to execute?
-
-Instead of pushing just a return address, we push a return BCO and a 
-trivial return address which just enters the return BCO.
-
-(In a purely interpreted system, we could avoid pushing the trivial
-return address.)
-
-\item How can the garbage collector follow pointers within the
-activation record?
-
-We could push a third word ---a bitmask describing the location of any
-pointers within the record--- but, since we're already tagging unboxed
-function arguments on the stack, we use the same mechanism for unboxed
-values within the activation record.
-
-\ToDo{Do we have to stub out dead variables in the activation frame?}
-
+\item A GHC thread enters a Hugs-built closure.
+\item A GHC thread returns to a Hugs-compiled return address.
+\item A Hugs thread enters a GHC-built closure.
+\item A Hugs thread returns to a Hugs-compiled return address.
 \end{enumerate}
 
-\item
+GHC-compiled modules cannot call functions in a Hugs-compiled module
+directly, because the compiler has no information about arities in the
+external module.  Therefore it must assume any top-level objects are
+CAFs, and enter their closures.
 
-We trivially support vectored returns by pushing a return vector whose
-entries are all the same.
+\ToDo{Hugs-built constructors?}
 
-\item
+We now examine the various cases one by one and describe how the
+switch happens in each situation.
 
-We avoid the need to build SRTs by putting bytecode objects on the
-heap and restricting BCOs to a single basic block.
+\subsection{A GHC thread enters a Hugs-built closure}
+\label{sect:ghc-to-hugs-switch}
 
-\end{itemize}
+There is three possibilities: GHC has entered a @PAP@, or it has
+entered a @AP@, or it has entered the BCO directly (for a top-level
+function closure).  @AP@s and @PAP@s are ``standard closures'' and
+so do not require us to enter the bytecode interpreter.
 
-\subsubsection{Hugs Info Tables}
-
-Hugs requires the following info tables and closures:
-\begin{description}
-\item [@HUGS_RET@].
-
-Contains both a vectored return table and a direct entry point.  All
-entry points are the same: they rearrange the stack to match the Hugs
-return convention (section~{sect:hugs-return-convention}) and return
-to the scheduler.  When the scheduler restarts the thread, it will
-find a BCO on top of the stack and will enter the Hugs interpreter.
-
-\item [@UPD_RET@].
-
-\item [Constructors].
-
-The entry code for a constructor jumps to a generic entry point in the
-runtime system which decides whether to do a vectored or unvectored
-return depending on the shape of the constructor/type.  This implies that
-info tables must have enough info to make that decision.
-
-\item [@AP@ and @PAP@].
-
-\item [Indirections].
-
-\item [Selectors].
-
--- doesn't generate them itself but it ought to recognise them
-
-\item [Complex primops].
-
-\end{description}
-
-
-\subsection{Hugs Heap Objects}
-\label{sect:hugs-heap-objects}
-
-\subsubsection{Byte-Code Objects}
-
-Compiled byte code lives on the global heap, in objects called
-Byte-Code Objects (or BCOs).  The layout of BCOs is described in
-detail in Section \ref{sect:BCO}, in this section we will describe
-their semantics.
-
-Since byte-code lives on the heap, it can be garbage collected just
-like any other heap-resident data.  Hugs arranges that any BCO's
-referred to by the Hugs symbol tables are treated as live objects by
-the garbage collectr.  When a module is unloaded, the pointers to its
-BCOs are removed from the symbol table, and the code will be garbage
-collected some time later.
-
-A BCO represents a basic block of code - all entry points are at the
-beginning of a BCO, and it is impossible to jump into the middle of
-one.  A BCO represents not only the code for a function, but also its
-closure; a BCO can be entered just like any other closure.  Hugs
-performs lambda-lifting during compilation to byte-code, and each
-top-level combinator becomes a BCO in the heap.
-
-\ToDo{The phrase "all entry points..." suggests that BCOs have multiple 
-entry points.  If so, we need to say a lot more about it...}
-
-\subsubsection{Thunks and partial applications}
-
-A thunk consists of a code pointer, and values for the free variables
-of that code.  Since Hugs byte-code is lambda-lifted, free variables
-become arguments and are expected to be on the stack by the called
-function.
-
-Hugs represents updateable thunks with @AP@ objects applying a closure
-to a list of arguments.  (As for @PAP@s, unboxed arguments should be
-preceded by a tag.)  When it is entered, it pushes an update frame
-followed by its payload on the stack, and enters the first word (which
-will be a pointer to a BCO).  The layout of @AP@ objects is described
-in more detail in Section \ref{sect:AP}.
-
-Partial applications are represented by @PAP@ objects, which are
-non-updatable.
-
-\ToDo{Hugs Constructors}.
-
-\subsection{Calling conventions}
-\label{sect:hugs-calling-conventions}
-\label{sect:standard-closures}
-
-The calling convention for any byte-code function is straightforward:
-\begin{itemize}
-\item Push any arguments on the stack.
-\item Push a pointer to the BCO.
-\item Begin interpreting the byte code.
-\end{itemize}
-
-In a system containing both GHC and Hugs, the bytecode interpreter
-only has to be able to enter BCOs: everything else can be handled by
-returning to the compiled world (as described in
-Section~\ref{sect:hugs-to-ghc-closure}) and entering the closure
-there.
-
-This would work but it would obviously be very inefficient if
-we entered a @AP@ by switching worlds, entering the @AP@,
-pushing the arguments and function onto the stack, and entering the
-function which, likely as not, will be a byte-code object which we
-will enter by \emph{returning} to the byte-code interpreter.  To avoid
-such gratuitious world switching, we choose to recognise certain
-closure types as being ``standard'' --- and duplicate the entry code
-for the ``standard closures'' in the bytecode interpreter.
-
-A closure is said to be ``standard'' if its entry code is entirely
-determined by its info table.  \emph{Standard Closures} have the
-desirable property that the byte-code interpreter can enter
-the closure by simply ``interpreting'' the info table instead of
-switching to the compiled world.  The standard closures include:
-
-\begin{description}
-\item[Constructor]
-To enter a constructor, we simply return (see Section
-\ref{sect:hugs-return-convention}).
-
-\item[Indirection]
-To enter an indirection, we simply enter the object it points to
-after possibly adjusting the current cost centre.
-
-\item[@AP@] 
-
-To enter an @AP@, we push an update frame, push the
-arguments, push the function and enter the function.
-(Not forgetting a stack check at the start.)
-
-\item[@PAP@]
-
-To enter a @PAP@, we push the arguments, push the function and enter
-the function.  (Not forgetting a stack check at the start.)
-
-\item[Selector] 
-To enter a selector, we test whether the selectee is a value.  If so,
-we simply select the appropriate component; if not, it's simplest to
-treat it as a GHC-built closure --- though we could interpret it if we
-wanted.
-
-\end{description}
-
-The most obvious omissions from the above list are @BCO@s (which we
-dealt with above) and GHC-built closures (which are covered in Section
-\ref{sect:hugs-to-ghc-closure}).
-
-
-\subsection{Return convention}
-\label{sect:hugs-return-convention}
-
-When Hugs pushes a return address, it pushes both a pointer to the BCO
-to return to, and a pointer to a static code fragment @HUGS_RET@ (this
-will be described in Section \ref{sect:ghc-to-hugs-return}).  The
-stack layout is shown in Figure \ref{fig:hugs-return-stack}.
-
-\begin{figure}
-\begin{center}
-@
-| stack    |
-+----------+
-| bco      |--> BCO
-+----------+
-| HUGS_RET |
-+----------+
-@
-%\input{hugs_ret.pstex_t}
-\end{center}
-\caption{Stack layout for a Hugs return address}
-\label{fig:hugs-return-stack}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-@
-| stack    |
-+----------+
-| con      |--> CON
-+----------+
-@
-%\input{hugs_ret2.pstex_t}
-\end{center}
-\caption{Stack layout on enterings a Hugs return address}
-\label{fig:hugs-return2}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-@
-| stack    |
-+----------+
-| 3#       |
-+----------+
-| I#       |
-+----------+
-@
-%\input{hugs_ret2.pstex_t}
-\end{center}
-\caption{Stack layout on enterings a Hugs return address with an unboxed value}
-\label{fig:hugs-return-int}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-@
-| stack    |
-+----------+
-| ghc_ret  |
-+----------+
-| con      |--> CON
-+----------+
-@
-%\input{hugs_ret3.pstex_t}
-\end{center}
-\caption{Stack layout on enterings a GHC return address}
-\label{fig:hugs-return3}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-@
-| stack    |
-+----------+
-| ghc_ret  |
-+----------+
-| 3#       |
-+----------+
-| I#       |
-+----------+
-| restart  |--> id_Int#_closure
-+----------+
-@
-%\input{hugs_ret2.pstex_t}
-\end{center}
-\caption{Stack layout on enterings a GHC return address with an unboxed value}
-\label{fig:hugs-return-int}
-\end{figure}
-
-When a Hugs byte-code sequence enters a closure, it examines the 
-return address on top of the stack.
+The entry code for a BCO does the following:
 
 \begin{itemize}
-
-\item If the return address is @HUGS_RET@, pop the @HUGS_RET@ and the
-bco for the continuation off the stack, push a pointer to the constructor onto
-the stack and enter the BCO with the current object pointer set to the BCO
-(Figure \ref{fig:hugs-return2}).
-
-\item If the top of the stack is not @HUGS_RET@, we need to do a world
-switch as described in Section \ref{sect:hugs-to-ghc-return}.
-
+\item Push the address of the object entered on the stack.
+\item Save the current state of the thread in its TSO.
+\item Return to the scheduler, setting @whatNext@ to @EnterHugs@.
 \end{itemize}
 
+BCO's for thunks and functions have the same entry conventions as
+slow entry points: they expect to find their arguments on the stac
+with unboxed arguments preceded by appropriate tags.
+
+\subsection{A GHC thread returns to a Hugs-compiled return address}
+\label{sect:ghc-to-hugs-switch}
+
+Hugs return addresses are laid out as in Figure
+\ref{fig:hugs-return-stack}.  If GHC is returning, it will return to
+the address at the top of the stack, namely @HUGS_RET@.  The code at
+@HUGS_RET@ performs the following:
+
+\begin{itemize}
+\item pushes \Arg{1} (the return value) on the stack.
+\item saves the thread state in the TSO
+\item returns to the scheduler with @whatNext@ set to @EnterHugs@.
+\end{itemize}
+
+\noindent When Hugs runs, it will enter the return value, which will
+return using the correct Hugs convention (Section
+\ref{sect:hugs-return-convention}) to the return address underneath it
+on the stack.
+
+\subsection{A Hugs thread enters a GHC-compiled closure}
+\label{sect:hugs-to-ghc-switch}
+
+Hugs can recognise a GHC-built closure as not being one of the
+following types of object:
+
+\begin{itemize}
+\item A @BCO@,
+\item A @AP@,
+\item A @PAP@,
+\item An indirection, or
+\item A constructor.
+\end{itemize}
+
+When Hugs is called on to enter a GHC closure, it executes the
+following sequence of instructions:
+
+\begin{itemize}
+\item Push the address of the closure on the stack.
+\item Save the current state of the thread in the TSO.
+\item Return to the scheduler, with the @whatNext@ field set to
+@EnterGHC@.
+\end{itemize}
+
+\subsection{A Hugs thread returns to a GHC-compiled return address}
+\label{sect:hugs-to-ghc-switch}
+
+When Hugs encounters a return address on the stack that is not
+@HUGS_RET@, it knows that a world-switch is required.  At this point
+the stack contains a pointer to the return value, followed by the GHC
+return address.  The following sequence is then performed:
+
+\begin{itemize}
+\item save the state of the thread in the TSO.
+\item return to the scheduler, setting @whatNext@ to @EnterGHC@.
+\end{itemize}
+
+The first thing that GHC will do is enter the object on the top of the
+stack, which is a pointer to the return value.  This value will then
+return itself to the return address using the GHC return convention.
+
+
+\fi
 
 \part{Implementation}
 
@@ -1488,477 +3841,10 @@ The major components of the system are:
 \item The bytecode evaluator (interpreted code)
 \end{itemize}
 
-
-
-\section{Hugs Bytecodes}
-\label{sect:hugs-bytecodes}
-
-\ToDo{This was in the evaluation model part but it really belongs in
-this part which is about the internal details of each of the major
-sections.}
-
-\subsubsection{Addressing Modes}
-
-To avoid potential alignment problems and simplify garbage collection,
-all literal constants are stored in two tables (one boxed, the other
-unboxed) within each BCO and are referred to by offsets into the tables.
-Slots in the constant tables are word aligned.
-
-\ToDo{How big can the offsets be?  Is the offset specified in the
-address field or in the instruction?}
-
-Literals can have the following types: char, int, nat, float, double,
-and pointer to boxed object.  There is no real difference between
-char, int, nat and float since they all occupy 32 bits --- but it
-costs almost nothing to distinguish them and may improve portability
-and simplify debugging.
-
-\subsubsection{Compilation}
-
-
-\def\is{\mbox{\it is}}
-\def\ts{\mbox{\it ts}}
-\def\as{\mbox{\it as}}
-\def\bs{\mbox{\it bs}}
-\def\cs{\mbox{\it cs}}
-\def\rs{\mbox{\it rs}}
-\def\us{\mbox{\it us}}
-\def\vs{\mbox{\it vs}}
-\def\ws{\mbox{\it ws}}
-\def\xs{\mbox{\it xs}}
-
-\def\e{\mbox{\it e}}
-\def\alts{\mbox{\it alts}}
-\def\fail{\mbox{\it fail}}
-\def\panic{\mbox{\it panic}}
-\def\ua{\mbox{\it ua}}
-\def\obj{\mbox{\it obj}}
-\def\bco{\mbox{\it bco}}
-\def\tag{\mbox{\it tag}}
-\def\entry{\mbox{\it entry}}
-\def\su{\mbox{\it su}}
-
-\def\Ind#1{{\mbox{\it Ind}\ {#1}}}
-\def\update#1{{\mbox{\it update}\ {#1}}}
-
-\def\next{$\Longrightarrow$}
-\def\append{\mathrel{+\mkern-6mu+}}
-\def\reverse{\mbox{\it reverse}}
-\def\size#1{{\vert {#1} \vert}}
-\def\arity#1{{\mbox{\it arity}{#1}}}
-
-\def\AP{\mbox{\it AP}}
-\def\PAP{\mbox{\it PAP}}
-\def\GHCRET{\mbox{\it GHCRET}}
-\def\GHCOBJ{\mbox{\it GHCOBJ}}
-
-To make sense of the instructions, we need a sense of how they will be
-used.  Here is a small compiler for the STG language.
-
-@
-> cg (f{a1, ... am}) = do
->   pushAtom am; ... pushAtom a1
->   pushVar f
->   SLIDE (m+1) |env|
->   ENTER
-> cg (let{x1=rhs1; ... xm=rhsm in e) = do
->   ALLOC x1 |rhs1|, ... ALLOC xm |rhsm|
->   build x1 rhs1,   ... build xm rhsm
->   cg e
-> cg (case e of alts) = do
->   PUSHALTS (cgAlts alts)
->   cg e
-
-> cgAlts { alt1; ... altm }  = cgAlt alt1 $ ... $ cgAlt altm pmFail
->
-> cgAlt (x@C{xs} -> e) fail = do
->   TEST C fail
->   HEAPCHECK (heapUse e)
->   UNPACK xs
->   cg e
-
-> build x (C{a1, ... am}) = do 
->   pushUntaggedAtom am; ... pushUntaggedAtom a1
->   PACK x C
-> build x ({v1, ... vm} \ {}. e) = do 
->   pushVar vm; ... pushVar v1
->   PUSHBCO (cgRhs ({v1, ... vm} \ {}. e))
->   MKAP x m
-> build x ({v1, ... vm} \ {x1, ... xm}. e) = do 
->   pushVar vm; ... pushVar v1
->   PUSHBCO (cgRhs ({v1, ... vm} \ {x1, ... xm}. e))
->   MKPAP x m
-
-> cgRhs (vs \ xs. e) = do
->   ARGCHECK   (xs ++ vs)  -- can be omitted if xs == {}
->   STACKCHECK min(stackUse e,heapOverflowSlop)
->   HEAPCHECK  (heapUse e)
->   cg e
-
-> pushAtom x  = pushVar x
-> pushAtom i# = PUSHINT i#
-
-> pushVar x = if isGlobalVar x then PUSHGLOBAL x else PUSHLOCAL x 
-
-> pushUntaggedAtom x  = pushVar x
-> pushUntaggedAtom i# = PUSHUNTAGGEDINT i#
-
-> pushVar x = if isGlobalVar x then PUSHGLOBAL x else PUSHLOCAL x 
-@
-
-\ToDo{Is there an easy way to add semi-tagging?  Would it be that different?}
-
-\ToDo{Optimise thunks of the form @f{x1,...xm}@ so that we build an AP directly}
-
-\subsubsection{Instructions}
-
-We specify the semantics of instructions using transition rules of
-the form:
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& $\is$		& $s$ 	& $\su$ 	& $h$  & $hp$  & $\sigma$ \\
-\next	& $\is'$	& $s'$ 	& $\su'$	& $h'$ & $hp'$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-where $\is$ is an instruction stream, $s$ is the stack, $\su$ is the 
-update frame pointer and $h$ is the heap.
-
-
-\subsubsection{Stack manipulation}
-
-\begin{description}
-
-\item[ Push a global variable ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& PUSHGLOBAL $o$ : $\is$ & $s$ 		& $su$ & $h$ & $hp$ & $\sigma$ \\
-\next	& $\is$			 & $\sigma!o:s$ & $su$ & $h$ & $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\item[ Push a local variable ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& PUSHLOCAL $o$ : $\is$	& $s$ 		& $su$ & $h$ & $hp$ & $\sigma$ \\
-\next	& $\is$			& $s!o : s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\item[ Push an unboxed int ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& PUSHINT $o$ : $\is$	& $s$ 		        & $su$ & $h$ & $hp$ & $\sigma$ \\
-\next	& $\is$			& $I\# : \sigma!o : s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-The $I\#$ is a tag included for the benefit of the garbage collector.
-Similar rules exist for floats, doubles, chars, etc.
-
-\item[ Push an unboxed int ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& PUSHUNTAGGEDINT $o$ : $\is$	& $s$ 		        & $su$ & $h$ & $hp$ & $\sigma$ \\
-\next	& $\is$			& $\sigma!o : s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-Similar rules exist for floats, doubles, chars, etc.
-
-\item[ Delete environment from stack --- ready for tail call ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& SLIDE $m$ $n$ : $\is$	& $\as \append \bs \append \cs$		& $su$ & $h$ & $hp$ & $\sigma$ \\
-\next	& $\is$			& $\as \append \cs$			& $su$ & $h$ & $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-where $\size{\as} = m$ and $\size{\bs} = n$.
-
-
-\item[ Push a return address ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& PUSHALTS $o$:$\is$	& $s$ 			& $su$ & $h$ & $hp$ & $\sigma$ \\
-\next	& $\is$			& $@HUGS_RET@:\sigma!o:s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\item[ Push a BCO ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& PUSHBCO $o$ : $\is$	& $s$ 			& $su$ & $h$ & $hp$ & $\sigma$ \\
-\next	& $\is$			& $\sigma!o : s$ 	& $su$ & $h$ & $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\end{description}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsubsection{Heap manipulation}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{description}
-
-\item[ Allocate a heap object ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& ALLOC $m$ : $\is$	& $s$    & $su$ & $h$ & $hp$   & $\sigma$ \\
-\next	& $\is$			& $hp:s$ & $su$ & $h$ & $hp+m$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\item[ Build a constructor ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& PACK $o$ $o'$ : $\is$	& $\ws \append s$ 	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
-\next	& $\is$			& $s$ 			& $su$ & $h[s!o \mapsto Pack C\{\ws\}]$	& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-where $C = \sigma!o'$ and $\size{\ws} = \arity{C}$.
-
-\item[ Build an AP or  PAP ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& MKAP $o$ $m$:$\is$	& $f : \ws \append s$	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
-\next	& $\is$			& $s$ 			& $su$ & $h[s!o \mapsto \AP(f,\ws)]$ 	& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-where $\size{\ws} = m$.
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& MKPAP $o$ $m$:$\is$	& $f : \ws \append s$	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
-\next	& $\is$			& $s$ 			& $su$ & $h[s!o \mapsto \PAP(f,\ws)]$ 	& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-where $\size{\ws} = m$.
-
-\item[ Unpacking a constructor ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& UNPACK : $is$ 	& $a : s$ 				& $su$ & $h[a \mapsto C\ \ws]$  	& $hp$ & $\sigma$ \\
-\next	& $is'$			& $(\reverse\ \ws) \append a : s$ 	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-The $\reverse\ \ws$ looks expensive but, since the stack grows down
-and the heap grows up, that's actually the cheap way of copying from
-heap to stack.  Looking at the compilation rules, you'll see that we
-always push the args in reverse order.
-
-\end{description}
-
-
-\subsubsection{Entering a closure}
-
-\begin{description}
-
-\item[ Enter a BCO ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& [ENTER]	& $a : s$ 	& $su$ & $h[a \mapsto BCO\{\is\} ]$  	& $hp$ & $\sigma$ \\
-\next	& $\is$ 	& $a : s$ 	& $su$ & $h$ 				& $hp$ & $a$ \\
-\hline
-\end{tabular}
-
-\item[ Enter a PAP closure ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& [ENTER]	& $a : s$ 		& $su$ & $h[a \mapsto \PAP(f,\ws)]$  	& $hp$ & $\sigma$ \\
-\next	& [ENTER] 	& $f : \ws \append s$ 	& $su$ & $h$ 				& $hp$ & $???$ \\
-\hline
-\end{tabular}
-
-\item[ Entering an AP closure ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& [ENTER]	& $a : s$ 				& $su$ 	& $h[a \mapsto \AP(f,ws)]$  	& $hp$ & $\sigma$ \\
-\next	& [ENTER] 	& $f : \ws \append @UPD_RET@:\su:a:s$ 	& $su'$	& $h$ 				& $hp$ & $???$ \\
-\hline
-\end{tabular}
-
-Optimisations:
-\begin{itemize}
-\item Instead of blindly pushing an update frame for $a$, we can first test whether there's already
- an update frame there.  If so, overwrite the existing updatee with an indirection to $a$ and
- overwrite the updatee field with $a$.  (Overwriting $a$ with an indirection to the updatee also
- works.)  This results in update chains of maximum length 2. 
-\end{itemize}
-
-
-\item[ Returning a constructor ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& [ENTER]		& $a : @HUGS_RET@ : \alts : s$ 	& $su$ & $h[a \mapsto C\{\ws\}]$  	& $hp$ & $\sigma$ \\
-\next	& $\alts.\entry$	& $a:s$ 			& $su$ & $h$ 				& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-
-\item[ Entering an indirection node ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& [ENTER]	& $a  : s$ 	& $su$ & $h[a \mapsto \Ind{a'}]$ 	& $hp$ & $\sigma$ \\
-\next	& [ENTER]	& $a' : s$ 	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\item[Entering GHC closure].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& [ENTER]	& $a : s$ 	& $su$ & $h[a \mapsto \GHCOBJ]$  	& $hp$ & $\sigma$ \\
-\next	& [ENTERGHC] 	& $a : s$ 	& $su$ & $h$ 				& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\item[Returning a constructor to GHC].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& [ENTER]	& $a : \GHCRET : s$ 	& $su$ & $h[a \mapsto C \ws]$  	& $hp$ & $\sigma$ \\
-\next	& [ENTERGHC]	& $a : \GHCRET : s$ 	& $su$ & $h$ 			& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\end{description}
-
-
-\subsubsection{Updates}
-
-\begin{description}
-
-\item[ Updating with a constructor].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& [ENTER]	& $a : @UPD_RET@ : ua : s$ 	& $su$ & $h[a \mapsto C\{\ws\}]$  & $hp$ & $\sigma$ \\
-\next	& [ENTER]	& $a \append s$ 		& $su$ & $h[au \mapsto \Ind{a}$   & $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-
-\item[ Argument checks].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& ARGCHECK $m$:$\is$	& $a : \as \append s$ 	& $su$ & $h$ 	& $hp$ & $\sigma$ \\
-\next	& $\is$			& $a : \as \append s$ 	& $su$ & $h'$ 	& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-where $m \ge (su - sp)$
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& ARGCHECK $m$:$\is$	& $a : \as \append @UPD_RET@:su:ua:s$ 	& $su$ & $h$ 	& $hp$ & $\sigma$ \\
-\next	& $\is$			& $a : \as \append s$ 			& $su$ & $h'$ 	& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-where $m < (su - sp)$ and
-      $h' = h[ua \mapsto \Ind{a'}, a' \mapsto \PAP(a,\reverse\ \as) ]$
-
-Again, we reverse the list of values as we transfer them from the
-stack to the heap --- reflecting the fact that the stack and heap grow
-in different directions.
-
-\end{description}
-
-\subsubsection{Branches}
-
-\begin{description}
-
-\item[ Testing a constructor ].
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& TEST $tag$ $is'$ : $is$ 	& $a : s$ 	& $su$ & $h[a \mapsto C\ \ws]$ 	& $hp$ & $\sigma$ \\
-\next	& $is$				& $a : s$ 	& $su$ & $h$ 			& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-where $C.\tag = tag$
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& TEST $tag$ $is'$ : $is$ 	& $a : s$ 	& $su$ & $h[a \mapsto C\ \ws]$  & $hp$ & $\sigma$ \\
-\next	& $is'$				& $a : s$ 	& $su$ & $h$ 			& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-where $C.\tag \neq tag$
-
-\end{description}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsubsection{Heap and stack checks}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& STACKCHECK $stk$:$\is$	& $s$ 	& $su$ & $h$  	& $hp$ & $\sigma$ \\
-\next	& $\is$ 			& $s$ 	& $su$ & $h$	& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-if $s$ has $stk$ free slots.
-
-\begin{tabular}{|llrrrrr|}
-\hline
-	& HEAPCHECK $hp$:$\is$		& $s$ 	& $su$ & $h$  	& $hp$ & $\sigma$ \\
-\next	& $\is$ 			& $s$ 	& $su$ & $h$	& $hp$ & $\sigma$ \\
-\hline
-\end{tabular}
-\\
-if $h$ has $hp$ free slots.
-
-If either check fails, we push the current bco ($\sigma$) onto the
-stack and return to the scheduler.  When the scheduler has fixed the
-problem, it pops the top object off the stack and reenters it.
-
-
-Optimisations:
-\begin{itemize}
-\item The bytecode CHECK1000 conservatively checks for 1000 words of heap space and 1000 words of stack space.
-      We use it to reduce code space and instruction decoding time.
-\item The bytecode HEAPCHECK1000 conservatively checks for 1000 words of heap space.
-      It is used in case alternatives.
-\end{itemize}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsubsection{Primops}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\ToDo{primops take m words and return n words. The expect boxed arguments on the stack.}
-
-
-
-
+\iffalse
 
 \section{Heap objects}
+\label{sect:heap-objects}
 \label{sect:fixed-header}
 
 \ToDo{Fix this picture}
@@ -2460,7 +4346,7 @@ The semantics of BCOs are described in Section
 \begin{itemize}
 \item The entry code is a static code fragment/info table that
 returns to the scheduler to invoke Hugs (Section
-\ref{sect:ghc-to-hugs-closure}).
+\ref{sect:ghc-to-hugs-switch}).
 \item \emph{Layout} contains the number of pointer literals in the
 \emph{Literals} field.
 \item \emph{Offset} is the offset to the byte code from the start of
@@ -3284,7 +5170,7 @@ are evacuated and @NULL@-values are chained together to form a new free list.
 There's no need to link the stable pointer table onto the mutable
 list because we always treat it as a root.
 
-
+\fi
 
 \section{The Storage Manager}
 
@@ -3409,12 +5295,15 @@ which are still live.
 
 \end{description}
 
-
 %************************************************************************
 %*									*
 \subsection{``What really happens in a garbage collection?''}
 %*									*
 %************************************************************************
+
+\ToDo{I commented out this long, out of date section - ADR}
+
+\iffalse
 
 This is a brief tutorial on ``what really happens'' going to/from the
 storage manager in a garbage collection.
@@ -3526,7 +5415,7 @@ parallel system, we will now loop back around, and make sure there is
 enough space before continuing.
 \end{description}
 
-
+\fi % end of commented out part
 
 \subsection{Static Reference Tables (SRTs)}
 \label{sect:srt}
@@ -3718,6 +5607,11 @@ place between each.
 
 \subsection{Squeezing identical updates}
 
+\Note{This can also be done by testing whether @Sp == Su@ when we push
+an update frame.  If so, we can overwrite the updatee with an
+indirection to the existing updatee (and some slop objects) and avoid
+pushing an update frame.}
+
 \iffalse
 
 \ToDo{Insert text stolen from update paper}
@@ -3883,8 +5777,6 @@ to implement than Sparud's.
 \subsection{Internal workings of the Generational Collector}
 
 
-\section{Dynamic Linking}
-
 \section{Profiling}
 
 Registering costs centres looks awkward - can we tidy it up?
@@ -3919,7 +5811,7 @@ Measure what proportion of ...:
 
 %************************************************************************
 %*									*
-\subsubsection[ticky-stk-heap-use]{Stack and heap usage}
+\subsection[ticky-stk-heap-use]{Stack and heap usage}
 %*									*
 %************************************************************************
 
@@ -3943,7 +5835,7 @@ Re-use of stack slots, and stubbing of stack slots:
 
 %************************************************************************
 %*									*
-\subsubsection[ticky-allocs]{Allocations}
+\subsection[ticky-allocs]{Allocations}
 %*									*
 %************************************************************************
 
@@ -3977,7 +5869,7 @@ admin/goods/slop breakdown.)
 
 %************************************************************************
 %*									*
-\subsubsection[ticky-enters]{Enters}
+\subsection[ticky-enters]{Enters}
 %*									*
 %************************************************************************
 
@@ -4002,7 +5894,7 @@ struct ent_counter {
 
 %************************************************************************
 %*									*
-\subsubsection[ticky-returns]{Returns}
+\subsection[ticky-returns]{Returns}
 %*									*
 %************************************************************************
 
@@ -4042,7 +5934,7 @@ vectored?  (The rest were obviously unvectored).
 
 %************************************************************************
 %*									*
-\subsubsection[ticky-update-frames]{Update frames}
+\subsection[ticky-update-frames]{Update frames}
 %*									*
 %************************************************************************
 
@@ -4062,7 +5954,7 @@ Macro			&	Counts					\\ \hline
 
 %************************************************************************
 %*									*
-\subsubsection[ticky-updates]{Updates}
+\subsection[ticky-updates]{Updates}
 %*									*
 %************************************************************************
 
@@ -4086,7 +5978,7 @@ Macro			&	Where						\\ \hline
 
 %************************************************************************
 %*									*
-\subsubsection[ticky-selectors]{Doing selectors at GC time}
+\subsection[ticky-selectors]{Doing selectors at GC time}
 %*									*
 %************************************************************************
 
@@ -4187,6 +6079,10 @@ reflect the new closure. @CAF@ indirections require special garbage
 collection code.
 
 \section{Old stuff about SRTs}
+
+\ToDo{Commented out}
+
+\iffalse
 
 Garbage collection of @CAF@s is tricky.  We have to cope with explicit
 collection from the @CAFlist@ as well as potential references from the
@@ -4304,7 +6200,13 @@ shorted out.
 This scheme has not been adopted but has been implemented. The code is
 commented out with @#if 0@.
 
+\fi
+
 \subsection{The virtual register set}
+
+\ToDo{Commented out}
+
+\iffalse
 
 We refer to any (atomic) part of the virtual machine state as a ``register.''
 These ``registers'' may be shared between all threads in the system or may be
@@ -4356,6 +6258,7 @@ basis:
   allow faster access to all the other non-machine registers.
 @
 
+\fi
 
 \end{document}
 
