@@ -592,9 +592,10 @@ pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
 		      (ptext SLIT("RET_VEC_BIG"))
 
 
-pprAbsC stmt@(CModuleInitBlock lbl code) _
+pprAbsC stmt@(CModuleInitBlock plain_lbl lbl code) _
   = vcat [
-	ptext SLIT("START_MOD_INIT") <> parens (pprCLabel lbl),
+	ptext SLIT("START_MOD_INIT") <> 
+	    parens (pprCLabel plain_lbl <> comma <> pprCLabel lbl),
 	case (pprTempAndExternDecls stmt) of { (_, pp_exts) -> pp_exts },
 	pprAbsC code (costs code),
 	hcat [ptext SLIT("END_MOD_INIT"), lparen, rparen]
@@ -1708,7 +1709,7 @@ ppr_decls_AbsC (CSRT _ closure_lbls)
 
 ppr_decls_AbsC (CRetDirect     _ code _ _)   = ppr_decls_AbsC code
 ppr_decls_AbsC (CRetVector _ amodes _ _)     = ppr_decls_Amodes amodes
-ppr_decls_AbsC (CModuleInitBlock _ code)     = ppr_decls_AbsC code
+ppr_decls_AbsC (CModuleInitBlock _ _ code)   = ppr_decls_AbsC code
 
 ppr_decls_AbsC (_) = returnTE (Nothing, Nothing)
 \end{code}

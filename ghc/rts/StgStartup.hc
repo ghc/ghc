@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.18 2002/02/12 15:17:23 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.19 2002/07/16 14:56:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -155,8 +155,3 @@ STGFUN(stg_init)
   JMP_(POP_INIT_STACK());
   FE_
 }
-
-/* GHC.Prim doesn't really exist... */
-
-START_MOD_INIT(__stginit_GHCziPrim);
-END_MOD_INIT();

@@ -181,7 +181,7 @@ Here we handle top-level things, like @CCodeBlock@s and
                                       (tyConDataCons tycon) )
              ]
 
- gentopcode stmt@(CModuleInitBlock lbl absC)
+ gentopcode stmt@(CModuleInitBlock plain_lbl lbl absC)
   = gencode absC			`thenUs` \ code ->
     getUniqLabelNCG 	    	    	`thenUs` \ tmp_lbl ->
     getUniqLabelNCG 	    	    	`thenUs` \ flag_lbl ->
@@ -189,6 +189,8 @@ Here we handle top-level things, like @CCodeBlock@s and
 	     : StLabel flag_lbl
 	     : StData IntRep [StInt 0]
 	     : StSegment TextSegment
+	     : StLabel plain_lbl
+	     : StJump NoDestInfo (StCLbl lbl)
 	     : StLabel lbl
 	     : StCondJump tmp_lbl (StMachOp MO_Nat_Ne
 				     [StInd IntRep (StCLbl flag_lbl),

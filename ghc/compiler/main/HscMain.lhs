@@ -46,7 +46,6 @@ import StringBuffer	( hGetStringBuffer, freeStringBuffer )
 import Parser
 import Lex		( ParseResult(..), ExtFlags(..), mkPState )
 import SrcLoc		( mkSrcLoc )
-import Finder		( findModule )
 import Rename		( checkOldIface, renameModule, renameExtCore, 
 			  closeIfaceDecls, RnResult(..) )
 import Rules		( emptyRuleBase )
@@ -84,6 +83,7 @@ import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import Module		( Module )
+import BasicTypes	( Version )
 import FastString
 import Maybes		( expectJust )
 import Util		( seqList )
@@ -98,7 +98,6 @@ import IO
 import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
-
 \end{code}
 
 
@@ -227,17 +226,22 @@ hscRecomp ghci_mode dflags have_object
 	    	   pcs_tc, ds_details, foreign_stuff) -> do {
 
 	  let {
+	    imported_module_names :: [ModuleName];
  	    imported_module_names = 
 		filter (/= gHC_PRIM_Name) $
 		map ideclName (hsModuleImports rdr_module);
 
+	    imported_modules :: [(Module,Version)];
             imported_modules =
-		map (moduleNameToModule hit (pcs_PIT pcs_tc))
+		map (getModuleAndVersion hit (pcs_PIT pcs_tc))
 			imported_module_names;
 	  }
 
 	-- force this out now, so we don't keep a hold of rdr_module or pcs_tc
 	; seqList imported_modules (return ())
+
+	-- this module's version
+	; version <- return $! vers_module (mi_version new_iface)
 
  	    -------------------
  	    -- FLATTENING
@@ -275,6 +279,7 @@ hscRecomp ghci_mode dflags have_object
 	--	flat_details
 	-- 	imported_modules (seq'd)
 	-- 	new_iface
+	--	version
 
  	    -------------------
  	    -- SIMPLIFY
@@ -392,7 +397,8 @@ hscRecomp ghci_mode dflags have_object
 	              else do
 		          ------------------  Code generation ------------------
 			  abstractC <- _scc_ "CodeGen"
-				       codeGen dflags this_mod imported_modules
+				       codeGen dflags this_mod version
+					       imported_modules
 					       cost_centre_info fe_binders
 					       local_tycons stg_binds
 			  

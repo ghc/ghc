@@ -13,7 +13,7 @@ module HscTypes (
 	HomeSymbolTable, emptySymbolTable,
 	PackageTypeEnv,
 	HomeIfaceTable, PackageIfaceTable, emptyIfaceTable,
-	lookupIface, lookupIfaceByModName, moduleNameToModule,
+	lookupIface, lookupIfaceByModName, getModuleAndVersion,
 	emptyModIface,
 
 	InteractiveContext(..),
@@ -302,10 +302,11 @@ lookupIfaceByModName hit pit mod
 -- Use instead of Finder.findModule if possible: this way doesn't
 -- require filesystem operations, and it is guaranteed not to fail
 -- when the IfaceTables are properly populated (i.e. after the renamer).
-moduleNameToModule :: HomeIfaceTable -> PackageIfaceTable -> ModuleName
-   -> Module
-moduleNameToModule hit pit mod 
-   = mi_module (fromJust (lookupIfaceByModName hit pit mod))
+getModuleAndVersion :: HomeIfaceTable -> PackageIfaceTable -> ModuleName
+   -> (Module,Version)
+getModuleAndVersion hit pit mod 
+   = ((,) $! mi_module iface) $! vers_module (mi_version iface)
+   where iface = fromJust (lookupIfaceByModName hit pit mod)
 \end{code}
 
 

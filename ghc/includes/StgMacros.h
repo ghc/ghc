@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.46 2002/02/15 22:14:27 sof Exp $
+ * $Id: StgMacros.h,v 1.47 2002/07/16 14:56:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -774,6 +774,33 @@ LoadThreadState (void)
 
 /* -----------------------------------------------------------------------------
    Module initialisation
+
+   The module initialisation code looks like this, roughly:
+
+	FN(__stginit_Foo) {
+ 	  JMP_(__stginit_Foo_1_p)
+	}
+
+	FN(__stginit_Foo_1_p) {
+	...
+	}
+
+   We have one version of the init code with a module version and the
+   'way' attached to it.  The version number helps to catch cases
+   where modules are not compiled in dependency order before being
+   linked: if a module has been compiled since any modules which depend on
+   it, then the latter modules will refer to a different version in their
+   init blocks and a link error will ensue.
+
+   The 'way' suffix helps to catch cases where modules compiled in different
+   ways are linked together (eg. profiled and non-profiled).
+
+   We provide a plain, unadorned, version of the module init code
+   which just jumps to the version with the label and way attached.  The
+   reason for this is that when using foreign exports, the caller of
+   startupHaskell() must supply the name of the init function for the "top"
+   module in the program, and we don't want to require that this name
+   has the version and way info appended to it.
    -------------------------------------------------------------------------- */
 
 #define PUSH_INIT_STACK(reg_function)		\
@@ -782,9 +809,18 @@ LoadThreadState (void)
 #define POP_INIT_STACK()			\
 	*(--Sp)
 
-#define START_MOD_INIT(reg_mod_name)		\
+#define MOD_INIT_WRAPPER(label,real_init)	\
+
+
+#define START_MOD_INIT(plain_lbl, real_lbl)	\
 	static int _module_registered = 0;	\
-	FN_(reg_mod_name) {			\
+	EF_(real_lbl);				\
+	FN_(plain_lbl) {			\
+            FB_					\
+            JMP_(real_lbl);			\
+	    FE_					\
+        }					\
+	FN_(real_lbl) {			\
 	    FB_;				\
 	    if (! _module_registered) {		\
 	        _module_registered = 1;		\

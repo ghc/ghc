@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.47 2002/04/29 14:03:39 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.48 2002/07/16 14:56:09 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -221,7 +221,8 @@ stored in a mixed type location.)
 	TyCon			-- which TyCon this table is for
 
   | CModuleInitBlock		-- module initialisation block
-	CLabel			-- label for init block
+	CLabel			-- "plain" label for init block
+	CLabel			-- label for init block (with ver + way info)
 	AbstractC		-- initialisation code
 
   | CCostCentreDecl		-- A cost centre *declaration*
