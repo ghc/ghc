@@ -267,13 +267,13 @@ getEcho fd = do
    then ioException (ioe_unk_error "getEcho" "failed to get echoing")
    else return (r == 1)
 
-foreign import ccall unsafe "HsBase.h consUtils.h set_console_buffering__"
+foreign import ccall unsafe "consUtils.h set_console_buffering__"
    set_console_buffering :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h consUtils.h set_console_echo__"
+foreign import ccall unsafe "consUtils.h set_console_echo__"
    set_console_echo :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h consUtils.h get_console_echo__"
+foreign import ccall unsafe "consUtils.h get_console_echo__"
    get_console_echo :: CInt -> IO CInt
 
 #endif
