@@ -16,7 +16,7 @@ import PprType ( specMaybeTysSuffix )
 import Name    ( Name )
 import TyCon   ( TyCon )
 import TyVar   ( GenTyVar, TyVar )
-import Type    ( splitSigmaTy, splitFunTy, GenType, Type )
+import Type    ( splitSigmaTy, splitFunTy, splitRhoTy, applyTy, GenType, Type )
 import Usage   ( GenUsage )
 import Class   ( Class, GenClass )
 import TysPrim ( voidTy )
@@ -38,6 +38,8 @@ isNullaryDataCon :: Id -> Bool
 specMaybeTysSuffix :: [Maybe Type] -> FastString
 idType :: Id -> Type
 splitSigmaTy :: GenType t u -> ([t], [(Class,GenType t u)], GenType t u)
+splitRhoTy   :: GenType t u -> ([(Class,GenType t u)], GenType t u)
+applyTy :: Type -> Type -> Type
 splitFunTy   :: GenType t u -> ([GenType t u], GenType t u)
 instance Eq (GenClass a b)
 
