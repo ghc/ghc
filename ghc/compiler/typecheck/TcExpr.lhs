@@ -63,7 +63,7 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  boxedTypeKind, mkArrowKind,
 			  tidyOpenType
 			)
-import TyCon		( tyConTyVars )
+import TyCon		( TyCon, tyConTyVars )
 import Subst		( mkTopTyVarSubst, substClasses, substTy )
 import UsageSPUtils     ( unannotTy )
 import VarSet		( emptyVarSet, unionVarSet, elemVarSet, mkVarSet )
@@ -477,6 +477,7 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
     tcId con_name			`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
     let
 	(_, record_ty) = splitFunTys con_tau
+	(tycon, ty_args, _) = splitAlgTyConApp record_ty
     in
     ASSERT( maybeToBool (splitAlgTyConApp_maybe record_ty ) )
     unifyTauTy res_ty record_ty          `thenTc_`
@@ -493,7 +494,7 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
     else
 
 	-- Typecheck the record bindings
-    tcRecordBinds record_ty rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
+    tcRecordBinds tycon ty_args rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
     
     let
       missing_s_fields = missingStrictFields rbinds data_con
@@ -585,7 +586,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	result_record_ty = mkTyConApp tycon result_inst_tys
     in
     unifyTauTy res_ty result_record_ty          `thenTc_`
-    tcRecordBinds result_record_ty rbinds	`thenTc` \ (rbinds', rbinds_lie) ->
+    tcRecordBinds tycon result_inst_tys rbinds	`thenTc` \ (rbinds', rbinds_lie) ->
 
 	-- STEP 4
 	-- Use the un-updated fields to find a vector of booleans saying
@@ -1000,24 +1001,18 @@ This extends OK when the field types are universally quantified.
 	
 \begin{code}
 tcRecordBinds
-	:: TcType		-- Expected type of whole record
+	:: TyCon		-- Type constructor for the record
+	-> [TcType]		-- Args of this type constructor
 	-> RenamedRecordBinds
 	-> TcM s (TcRecordBinds, LIE)
 
-tcRecordBinds expected_record_ty rbinds
-  = tcLookupValue first_field_lbl_name		`thenNF_Tc` \ first_sel_id ->
-    let
-	tycon = fieldLabelTyCon (recordSelectorFieldLabel first_sel_id)
-    in
-    tcInstTyVars (tyConTyVars tycon)		`thenTc` \ (_, arg_tys, tenv) ->
-    unifyTauTy expected_record_ty
-	       (mkTyConApp tycon arg_tys)	`thenTc_`
-    mapAndUnzipTc (do_bind tycon tenv) rbinds	`thenTc` \ (rbinds', lies) ->
+tcRecordBinds tycon ty_args rbinds
+  = mapAndUnzipTc do_bind rbinds	`thenTc` \ (rbinds', lies) ->
     returnTc (rbinds', plusLIEs lies)
   where
-    (first_field_lbl_name, _, _) = head rbinds
+    tenv = mkTopTyVarSubst (tyConTyVars tycon) ty_args
 
-    do_bind tycon tenv (field_lbl_name, rhs, pun_flag)
+    do_bind (field_lbl_name, rhs, pun_flag)
       = tcLookupValue field_lbl_name	`thenNF_Tc` \ sel_id ->
 	let
 	    field_lbl = recordSelectorFieldLabel sel_id
