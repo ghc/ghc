@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.24 2001/11/13 13:38:02 simonmar Exp $
+ * $Id: Itimer.c,v 1.25 2001/11/21 20:55:10 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -99,7 +99,7 @@ handle_tick(int unused STG_UNUSED)
 
 LPTIMECALLBACK vtalrm_cback;
 
-nat
+int
 initialize_virtual_timer(nat ms)
 {
   /* On Win32 setups that don't have support for
@@ -109,13 +109,23 @@ initialize_virtual_timer(nat ms)
      The delivery of ticks isn't free; the performance hit should be checked.
   */
   unsigned int delay;
-  static unsigned int vtalrm_id;
+  static unsigned int vtalrm_id = 0;
+  static unsigned int period = -1;
  
-  if (ms) {
-    delay = timeBeginPeriod(1);
-    if (delay == TIMERR_NOCANDO) { /* error of some sort. */
-      return delay;
+  /* A zero argument value means shutdown. */
+  if (ms != 0) {
+    TIMECAPS tc;
+    
+    if ( timeGetDevCaps(&tc, sizeof(TIMECAPS)) == TIMERR_NOERROR) {
+      period = tc.wPeriodMin;
+      delay = timeBeginPeriod(period);
+      if (delay == TIMERR_NOCANDO) { /* error of some sort. */
+	return -1;
+      }
+    } else {
+      return -1;
     }
+    
     vtalrm_id =
       timeSetEvent(ms,      /* event every `delay' milliseconds. */
 		   1,       /* precision is within 1 ms */
@@ -123,8 +133,13 @@ initialize_virtual_timer(nat ms)
 		   TIME_CALLBACK_FUNCTION,     /* ordinary callback */
 		   TIME_PERIODIC);
   } else {
-    timeKillEvent(vtalrm_id);
-    timeEndPeriod(1);
+    /* Shutdown the MM timer */
+    if ( vtalrm_id != 0 ) {
+      timeKillEvent(vtalrm_id);
+    }
+    if (period > 0) {
+      timeEndPeriod(period);
+    }
   }
 
   return 0;
@@ -132,7 +147,7 @@ initialize_virtual_timer(nat ms)
  
 #else
 
-nat
+int
 initialize_virtual_timer(nat ms)
 {
 # ifndef HAVE_SETITIMER
@@ -150,11 +165,11 @@ initialize_virtual_timer(nat ms)
 # endif
 }
 
-#endif /* !cygwin32_TARGET_OS */
+#endif /* !{mingw,cygwin32}_TARGET_OS */
 
 # if 0
 /* This is a potential POSIX version */
-nat
+int
 initialize_virtual_timer(nat ms)
 {
     struct sigevent se;
@@ -172,7 +187,7 @@ initialize_virtual_timer(nat ms)
     it.it_value.tv_sec = ms / 1000;
     it.it_value.tv_nsec = 1000000 * (ms - 1000 * it.it_value.tv_sec);
     it.it_interval = it.it_value;
-    timer_settime(tid, TIMER_RELTIME, &it, NULL);
+    return timer_settime(tid, TIMER_RELTIME, &it, NULL);
 }
 # endif
 

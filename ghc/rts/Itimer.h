@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.h,v 1.7 2000/08/25 13:12:07 simonmar Exp $
+ * $Id: Itimer.h,v 1.8 2001/11/21 20:55:10 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -20,7 +20,7 @@ extern rtsBool do_prof_ticks;	/* profiling ticks on/off */
 /* Total number of ticks since startup */
 extern lnat total_ticks;
 
-nat  initialize_virtual_timer  ( nat ms );
+int  initialize_virtual_timer  ( nat ms );
 int  install_vtalrm_handler    ( void );
 void block_vtalrm_signal       ( void );
 void unblock_vtalrm_signal     ( void );
