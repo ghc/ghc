@@ -514,13 +514,9 @@ your machine to run GHC (at least that's the intention ;-)
 <Sect2><Title>System requirements</Title>
 
 <Para>
-An installation of GHC requires ca. 70M of disk space. The size of the
-installed GHC distribution is just(!) 17M, the rest is needed by
-supporting software.
-</Para>
-
-<Para>
-To run GHC comfortably, your machine should have at least 32M of memory.
+An installation of GHC requires ca. 200M of disk space, which is split
+roughly 50-50 between GHC and the supporting software. To run GHC
+comfortably, your machine should have at least 64M of memory.
 </Para>
 
 </Sect2>
@@ -532,7 +528,7 @@ To run GHC comfortably, your machine should have at least 32M of memory.
 You need two chunks of software other than GHC itself: the Cygwin toolchain, and Perl.  Here's how to get and install them.
 </Para>
 
-<Sect3><Title>The cygwin toolchain (beta20.1)</Title>
+<Sect3><Title>The cygwin toolchain (1.1)</Title>
 
 <Para>
 GHC depends at the moment on the cygwin tools to operate, which
@@ -577,15 +573,15 @@ Here's how to install Cygwin.
 
 <ListItem>
 <Para>
-Download cygwin, beta20.1 (<filename>full.exe</filename>) from
-<ULink URL="http://sourceware.cygnus.com/cygwin/">sourceware.cygnus.com</ULink>
-Install this somewhere locally.
+Install Cygwin 1.1 from
+<ULink URL="http://sources.redhat.com/cygwin/">sources.redhat.com</ULink>
+Install this somewhere locally. Despite the warnings, things seem to work better if you install Cygwin into the root directory rather than <Filename>cygwin</Filename>, which is the default. If you're upgrading from Cygwin B20.1, running <Command>mount --import-old-mounts</Command> immediately after installation may help. Either way, you want to end up with your main drive mounted in <Emphasis><Constant>textmode</Constant></Emphasis>, and only the <Filename>bin</Filename> directories mounted in <Constant>binmode</Constant>.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-Create the following directories (if they aren't already there):
+Create the following directories (if they aren't already there; substitute the drive you installed Cygwin on for <Filename>c:</Filename>):
 </Para>
 
 <ItemizedList>
@@ -603,7 +599,7 @@ Create the following directories (if they aren't already there):
 <Para>
 Copy <Filename>bash.exe</Filename> from the <Filename>bin</Filename>
 directory of the cygwin tree
-(<Filename>cygwin-b20/H-i586-cygwin32/bin/bash.exe</Filename>) to
+(<Filename>cygwin/bin/bash.exe</Filename>) to
 <Filename>/bin</Filename> as <Filename>sh.exe</Filename>.  You might
 think that it was easier to use bash directly from it original Cygwin
 directory, but (a) some UNIX utils have got
@@ -724,15 +720,9 @@ this you get very weird messages when you type `<Command>make</Command>', such a
 <Entry><Constant>TMPDIR</Constant></Entry>
 <Entry>User</Entry>
 <Entry><Para>
-Set to <Filename>c:/tmp</Filename>. For some reason, Win2k invisibly sets
-this variable to point to a temporary directory in your profile, that
-contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant>
-variable set, it tries to use it for temporary files, but Cygwin
-doesn't grok filenames with spaces, so disaster results.
+Set to <Filename>c:/tmp</Filename> (note the forward slash). For some reason, Win2k invisibly sets this variable to point to a temporary directory in your profile, that contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant> variable set, it tries to use it for temporary files, but Cygwin doesn't grok filenames with spaces, so disaster results.
 </Para><Para>
-Furthermore, it seems that <Constant>TMPDIR</Constant> must be set to a directory
-in the same file system in which you invoke GHC.  Otherwise you get very weird messages
-when you invoke GHC, such as:
+Furthermore, it seems that <Constant>TMPDIR</Constant> must be set to a directory in the same file system in which you invoke GHC.  Otherwise you get very weird messages when you invoke GHC, such as:
 <Screen>
 does not exist
 Action: openFile
@@ -788,7 +778,7 @@ URL="http://www.haskell.org/ghc/dist/ghc-4-08.exe">http</ULink>
 
 <ListItem>
 <Para>
-(The version number may change.) It is packaged up using an installer that should be familiar-looking to Windows users. Unpack and double click on <Filename>setup.exe</Filename>.
+(The version number may change.) It is packaged up using an installer that should be familiar-looking to Windows users.
 </Para>
 
 <Para>
@@ -796,11 +786,6 @@ Note: The cygwin support for long file names containing
 spaces is not 100%, so make sure that you install ghc in a directory
 that has no embedded spaces (i.e., resist the temptation to put it
 in <Filename>/Program Files/</Filename>!)
-</Para>
-
-<Para>
-When the installer has completed its job, you may delete the
-<Filename>ghcInstall</Filename> directory.
 </Para>
 
 <Para>
@@ -813,9 +798,10 @@ system directory, for example).
 </Para>
 
 <Para>
-Note: In case you haven't got perl already installed,
-you will have to manually copy the <Filename>perl.exe</Filename> binary from the
-ghc <Filename>bin/</Filename> into your <Filename>/bin</Filename> directory before continuing&mdash;the installer will not currently do this.
+Note: If you haven't got perl already installed, you will have to manually
+copy the <Filename>perl.exe</Filename> binary from the ghc
+<Filename>bin/</Filename> into your <Filename>/bin</Filename> directory
+before continuing&mdash;the installer will not currently do this.
 </Para>
 </ListItem>
 
@@ -849,7 +835,7 @@ Haskell programs :-) If not, consult the installation FAQ (<XRef LinkEnd="winfaq
 </Para>
 
 <Para>
-Further information on using GHC under Windows can be found in <ULink URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's pages</ULink>.
+Further information on using GHC under Windows can be found in <ULink URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's pages</ULink>. Note: ignore the installation instructions, which are rather out of date; the <Emphasis>Miscellaneous</Emphasis> section at the bottom of the page is of most interest, covering topics beyond the scope of this manual.
 </Para>
 
 </Sect2>
@@ -896,6 +882,22 @@ I'm having trouble with symlinks.
 Symlinks only work under Cygwin (<Xref LinkEnd="sec-install">), so binaries
 not linked to the Cygwin DLL, in particular those built for Mingwin, will not
 work with symlinks.
+</Para>
+</Answer>
+
+</QandAEntry>
+
+<QandAEntry>
+
+<Question>
+<Para>
+I'm having trouble with <Option>-static</Option>.
+</Para>
+</Question>
+
+<Answer>
+<Para>
+Static linking is no longer supported under Windows, and probably won't work.
 </Para>
 </Answer>
 

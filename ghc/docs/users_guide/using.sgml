@@ -2697,7 +2697,7 @@ Where to find user-supplied libraries&hellip;  Prepend the directory
 <ListItem>
 <Para>
 <IndexTerm><Primary>-static option</Primary></IndexTerm>
-Tell the linker to avoid shared libraries.
+Tell the linker to avoid shared libraries. <Emphasis>This option should not be used under Windows</Emphasis>.
 </Para>
 </ListItem>
 </VarListEntry>

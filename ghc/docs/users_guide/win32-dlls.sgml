@@ -54,9 +54,7 @@ will give you a binary as before, but the <Filename>main.exe</Filename> generate
 <IndexTerm><Primary>-static option (Win32)</Primary></IndexTerm></Title>
 
 <Para>
-If you want to build an executable that doesn't depend on any
-ghc-compiled DLLs, use the <Option>-static</Option> option to link in
-the code statically.
+This is no longer supported, and probably doesn't work; but if you want to build an executable that doesn't depend on any ghc-compiled DLLs, use the <Option>-static</Option> option to link in the code statically.
 </Para>
 
 <Para>
