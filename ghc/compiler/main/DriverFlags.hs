@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.60 2001/06/26 16:32:03 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.61 2001/07/03 16:45:15 rrt Exp $
 --
 -- Driver flags
 --
@@ -302,13 +302,19 @@ dynamic_flags = [
   ,  ( "opta",		HasArg (addOpt_a) )
 
 	------ HsCpp opts ---------------------------------------------------
-	-- These options used to put ticks around their arguments for unknown
-	-- reasons. These quotes are stripped by the shell executing system()
-	-- on Unix, but not on Windows, where it therefore goes on to disturb
-	-- gcc. Hence they are now gone; if they need to be replaced later on
-	-- Unix, there will need to be #ifdefery.
+	-- With a C compiler whose system() doesn't use a UNIX shell (i.e.
+	-- mingwin gcc), -D and -U args must *not* be quoted, as the quotes
+	-- will be interpreted as part of the arguments, and not stripped;
+	-- on all other systems, quoting is necessary, to avoid interpretation
+	-- of shell metacharacters in the arguments (e.g. green-card's
+	-- -DBEGIN_GHC_ONLY='}-' trick).
+#ifndef mingw32_TARGET_OS
+  ,  ( "D",		Prefix (\s -> addOpt_P ("-D'"++s++"'") ) )
+  ,  ( "U",		Prefix (\s -> addOpt_P ("-U'"++s++"'") ) )
+#else
   ,  ( "D",		Prefix (\s -> addOpt_P ("-D"++s) ) )
   ,  ( "U",		Prefix (\s -> addOpt_P ("-U"++s) ) )
+#endif
 
 	------ Debugging ----------------------------------------------------
   ,  ( "dstg-stats",	NoArg (writeIORef v_StgStats True) )
