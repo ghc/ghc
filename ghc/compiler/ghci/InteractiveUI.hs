@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.94 2001/10/16 13:29:35 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.95 2001/10/16 14:44:51 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -16,7 +16,7 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
 import Packages
 import CompManager
-import HscTypes		( GhciMode(..), TyThing(..) )
+import HscTypes		( TyThing(..) )
 import MkIface
 import ByteCodeLink
 import DriverFlags
@@ -49,6 +49,7 @@ import Dynamic
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
 import Readline 
 #endif
+import Concurrent
 import IOExts
 
 import Numeric
@@ -209,15 +210,22 @@ runGHCi = do
   		  Left e    -> return ()
   		  Right hdl -> fileLoop hdl False
 
+  interactiveLoop
+
+  -- and finally, exit
+  io $ do putStrLn "Leaving GHCi."
+
+
+interactiveLoop = do
+  -- ignore ^C exceptions caught here
+  ghciHandleDyn (\e -> case e of Interrupted -> ghciUnblock interactiveLoop
+			         _other      -> return ()) $ do
   -- read commands from stdin
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
   readlineLoop
 #else
   fileLoop stdin True
 #endif
-
-  -- and finally, exit
-  io $ do putStrLn "Leaving GHCi." 
 
 
 -- NOTE: We only read .ghci files if they are owned by the current user,
@@ -280,6 +288,7 @@ readlineLoop :: GHCi ()
 readlineLoop = do
    st <- getGHCiState
    mod <- io (cmGetContext (cmstate st))
+   io yield
    l <- io (readline (mod ++ "> "))
    case l of
 	Nothing -> return ()
@@ -706,6 +715,10 @@ startGHCi g state = do ref <- newIORef state; unGHCi g ref
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
   return a  = GHCi $ \s -> return a
+
+ghciHandleDyn :: Typeable t => (t -> GHCi a) -> GHCi a -> GHCi a
+ghciHandleDyn h (GHCi m) = GHCi $ \s -> 
+   Exception.catchDyn (m s) (\e -> unGHCi (h e) s)
 
 getGHCiState   = GHCi $ \r -> readIORef r
 setGHCiState s = GHCi $ \r -> writeIORef r s
