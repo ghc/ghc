@@ -223,6 +223,9 @@ install-bin:
 	for i in $(PACKAGE_BINS) ""; do \
 	   if test -n "$$i" ; then $(INSTALL_BIN) bin/$(platform)/$$i$(exeext) $(bindir); fi; \
 	done;
+	for i in $(PACKAGE_OPT_BINS) ""; do \
+	   if test -n "$$i" -a ! -e "$(bindir)/$$i" ; then $(INSTALL_BIN) bin/$(platform)/$$i$(exeext) $(bindir); fi; \
+	done;
 	@for i in $(VERSION_SYMLINKS_FOR) ""; do \
 	   if [ "x$$i" != "x" ]; then 		\
 	   	( cd $(bindir); 		\
