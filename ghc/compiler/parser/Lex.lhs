@@ -54,8 +54,14 @@ import StringBuffer
 import GlaExts
 import Ctype
 import Char		( chr, ord )
+
+import Bits		( Bits(..) )	   -- non-std
+
+#if __GLASGOW_HASKELL__ >= 503
+import GHC.Read 	( readRational__ ) -- Glasgow non-std
+#else
 import PrelRead 	( readRational__ ) -- Glasgow non-std
-import PrelBits		( Bits(..) )	   -- non-std
+#endif
 \end{code}
 
 %************************************************************************
@@ -925,9 +931,9 @@ lex_num cont exts acc buf =
 		    do_exponent 
 			= let buf3 = incLexeme buf2 in
 			  case currentChar# buf3 of
-				'-'# | is_digit (lookAhead# buf 1#)
+				'-'# | is_digit (lookAhead# buf3 1#)
 				   -> expandWhile# is_digit (incLexeme buf3)
-				'+'# | is_digit (lookAhead# buf 1#)
+				'+'# | is_digit (lookAhead# buf3 1#)
 				   -> expandWhile# is_digit (incLexeme buf3)
 				x | is_digit x -> expandWhile# is_digit buf3
 				_ -> buf2
@@ -1366,7 +1372,7 @@ popContext = \ buf s@(PState{ context = ctx, loc = loc }) ->
 -}
 checkVersion :: Maybe Integer -> P ()
 checkVersion mb@(Just v) buf s@(PState{loc = loc})
- | (v==0) || (v == fromInt opt_HiVersion) || opt_NoHiCheck = POk s ()
+ | (v==0) || (v == fromIntegral opt_HiVersion) || opt_NoHiCheck = POk s ()
  | otherwise = PFailed (ifaceVersionErr mb loc ([]::[Token]){-Todo-})
 checkVersion mb@Nothing  buf s@(PState{loc = loc})
  | "hi-boot" `isSuffixOf` (_UNPK_ (srcLocFile loc)) = POk s ()
