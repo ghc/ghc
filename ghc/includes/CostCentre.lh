@@ -308,6 +308,7 @@ On entering a closure we only count the enter to thunks ...
 	ASSERT_IS_REGISTERED(cc,1);			\
 	if ( ! IS_CAF_OR_DICT_OR_SUB_CC(cc) ) {		\
 	    CCC = cc;					\
+	    CCC->scc_count++;				\
 	} else {					\
 	    CCC_DETAIL_COUNT(cc->caffun_subsumed); 	\
 	    CCC_DETAIL_COUNT(CCC->subsumed_caf_count);  \
