@@ -265,17 +265,26 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
 	   dumpIfSet opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
 
-		-- Simplify
-	   let { (binds', counts') = initSmpl sw_chkr us1 imported_rule_ids 
-					      black_list_fn 
-					      (simplTopBinds tagged_binds);
+		-- SIMPLIFY
+		-- We do this with a *case* not a *let* because lazy pattern
+		-- matching bit us with bad space leak!
+		-- With a let, we ended up with
+		--   let
+		--	t = initSmpl ...
+		--	counts' = snd t
+		--   in
+		-- 	case t of {(_,counts') -> if counts'=0 then ...
+		-- So the conditional didn't force counts', because the
+		-- selection got duplicated.  Sigh!
+	   case initSmpl sw_chkr us1 imported_rule_ids black_list_fn 
+			 (simplTopBinds tagged_binds)
+	  	of { (binds', counts') -> do {
 			-- The imported_rule_ids are used by initSmpl to initialise
 			-- the in-scope set.  That way, the simplifier will change any
 			-- occurrences of the imported id to the one in the imported_rule_ids
 			-- set, which are decorated with their rules.
 
-	         all_counts        = counts `plusSimplCount` counts'
-	       } ;
+	   let { all_counts = counts `plusSimplCount` counts' } ;
 
 		-- Stop if nothing happened; don't dump output
 	   if isZeroSimplCount counts' then
@@ -312,7 +321,7 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
 
 		-- Else loop
   	   else iteration us2 (iteration_no + 1) all_counts binds'
-	}  }
+	}  } } }
       where
   	  (us1, us2) = splitUniqSupply us
 \end{code}
