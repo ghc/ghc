@@ -20,8 +20,10 @@ module LazyST (
 	ST.STRef,
 	newSTRef, readSTRef, writeSTRef,
 
-	ST.STArray,
-	newSTArray, readSTArray, writeSTArray, Ix,
+	STArray,
+	newSTArray, readSTArray, writeSTArray, boundsSTArray, 
+	thawSTArray, freezeSTArray, unsafeFreezeSTArray, 
+	Ix,
 
 	strictToLazyST, lazyToStrictST
     ) where

@@ -22,7 +22,9 @@ module ST (
 	newSTRef, readSTRef, writeSTRef,
 
 	STArray,
-	newSTArray, readSTArray, writeSTArray, Ix
+	newSTArray, readSTArray, writeSTArray, boundsSTArray, 
+	thawSTArray, freezeSTArray, unsafeFreezeSTArray, 
+	Ix
 
     ) where
 
