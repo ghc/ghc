@@ -65,7 +65,7 @@ unifyTauTyLists :: [TcTauType s] -> [TcTauType s] ->  TcM s ()
 unifyTauTyLists [] 	     []	        = returnTc ()
 unifyTauTyLists (ty1:tys1) (ty2:tys2) = uTys ty1 ty1 ty2 ty2   `thenTc_`
 					unifyTauTyLists tys1 tys2
-unifyTauTypeLists ty1s ty2s = panic "Unify.unifyTauTypeLists: mismatched type lists!"
+unifyTauTyLists ty1s ty2s = panic "Unify.unifyTauTyLists: mismatched type lists!"
 \end{code}
 
 @unifyTauTyList@ takes a single list of @TauType@s and unifies them
