@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.36 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Updates.hc,v 1.37 2001/11/28 14:29:33 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -287,23 +287,14 @@ EXTFUN(__stg_update_PAP)
 	 * such as removing the update frame.
 	 */
 	if ((Hp += PapSize) > HpLim) {
-#ifdef PROFILING
-          // @LDV profiling
-          // Not filling the slop for the object (because there is none), but
-          // filling in the trailing words in the current block.
-          // This is unnecessary because we fills the entire nursery with
-          // zeroes after each garbage collection.
-          // FILL_SLOP(HpLim, PapSize - (Hp - HpLim));
-#endif
+	  HpAlloc = PapSize;
 	  Sp -= 1;
 	  Sp[0] = (W_)Fun;	    
 	  JMP_(stg_gc_entertop);
 	}
 
 	TICK_ALLOC_UPD_PAP(1/*fun*/ + Words, 0);
-#ifdef PROFILING
 	CCS_ALLOC(CCS_pap, PapSize);
-#endif
 
 	PapClosure = (StgPAP *)(Hp + 1 - PapSize); /* The new PapClosure */
 
