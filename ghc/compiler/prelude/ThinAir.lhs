@@ -92,6 +92,7 @@ buildId = lookupThinAirId buildIdKey
 \end{code}
 
 \begin{code}
+{-# NOINLINE thinAirIdMapRef #-}
 thinAirIdMapRef :: IORef (UniqFM Id)
 thinAirIdMapRef = unsafePerformIO (newIORef (panic "thinAirIdMap: still empty"))
 
