@@ -27,7 +27,7 @@ import TcType		( Type, tcTyConAppTyCon,
 import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
-import UniqFM		( UniqFM, lookupWithDefaultUFM, emptyUFM, eltsUFM, addToUFM_C )
+import UniqFM		( UniqFM, lookupWithDefaultUFM, emptyUFM, addToUFM_C )
 import Id		( idType )
 import CmdLineOpts
 import Util             ( notNull )

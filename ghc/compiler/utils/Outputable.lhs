@@ -62,7 +62,7 @@ import Panic
 import DATA_WORD	( Word32 )
 
 import IO		( Handle, stderr, stdout, hFlush )
-import Char             ( chr, ord )
+import Char             ( ord )
 \end{code}
 
 
