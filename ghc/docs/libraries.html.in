@@ -25,9 +25,9 @@
 	Haskell 98 and FFI Standard Libraries.
       </DD>
       <DT>
-	<A HREF="parsec/index.html"><TT>parsec</TT></a>
+	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>
       </DT><DD>
-	monadic parser combinators.
+	manipulating Haskell source code.
       </DD>
       <DT>
 	<A HREF="network/index.html"><TT>network</TT></a>
@@ -35,9 +35,9 @@
 	networking support libraries.
       </DD>
       <DT>
-	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>
+	<A HREF="parsec/index.html"><TT>parsec</TT></a>
       </DT><DD>
-	manipulating Haskell source code.
+	monadic parser combinators.
       </DD>
       <DT>
 	<A HREF="readline/index.html"><TT>readline</TT></a>
@@ -94,11 +94,12 @@
 	<A HREF="base/index.html"><TT>base</TT></a> package
 	and all the modules in the
 	<A HREF="haskell98/index.html"><TT>haskell98</TT></a>,
-	<A HREF="network/index.html"><TT>network</TT></a>,
-	<A HREF="parsec/index.html"><TT>parsec</TT></a> and
-	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a> packages.
+	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>,
+	<A HREF="network/index.html"><TT>network</TT></a> and
+	<A HREF="parsec/index.html"><TT>parsec</TT></a> packages.
 @unixHTMLStart@
-	Most of the modules in the <A HREF="unix/index.html"><TT>unix</TT></a> package are supported, too.
+	Most of the modules in the <A HREF="unix/index.html"><TT>unix</TT></a>
+	package are supported too.
 @unixHTMLEnd@
 	All those modules are always available, as a single hierarchy;
 	Hugs does not use the package subdivision.
@@ -106,7 +107,9 @@
 
       <DT><A HREF="http://www.haskell.org/nhc98/">Nhc98</A></DT>
       <DD>
-	To use modules from a package <i>P</i> with Nhc98,
+	The modules of the <tt>haskell98</tt> package are available
+	without the need to use any additional compile-time options.
+	To use modules from some other package <i>P</i> with Nhc98,
 	add the compile-time option <tt>-package</tt> <i>P</i>.
 	Nhc98 currently provides many of the modules in the
 	<tt>base</tt> package (see the
