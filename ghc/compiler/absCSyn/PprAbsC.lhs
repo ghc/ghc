@@ -25,12 +25,13 @@ import ClosureInfo
 import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			  mixedPtrLocn, mixedTypeLocn
 			)
+import CallConv		( CallConv, callConvAttribute, cCallConv )
 import Constants	( spARelToInt, spBRelToInt, mIN_UPD_SIZE )
 import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  isReadOnly, needsCDecl, pprCLabel,
 			  CLabel{-instance Ord-}
 			)
-import CmdLineOpts	( opt_SccProfilingOn )
+import CmdLineOpts	( opt_SccProfilingOn, opt_EmitCExternDecls )
 import CostCentre	( uppCostCentre, uppCostCentreDecl )
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
 import CStrings		( stringToC )
@@ -39,7 +40,7 @@ import HeapOffs		( isZeroOff, subOff, pprHeapOffset )
 import Literal		( showLiteral, Literal(..) )
 import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..) )
-import PrimRep		( isFloatingRep, PrimRep(..) )
+import PrimRep		( isFloatingRep, PrimRep(..), showPrimRep )
 import SMRep		( getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr,
 			  isConstantRep, isSpecRep, isPhantomRep
 			)
@@ -59,16 +60,16 @@ call to a cost evaluation function @GRAN_EXEC@. For that,
 @pprAbsC@ has a new ``costs'' argument.  %% HWL
 
 \begin{code}
-writeRealC :: Handle -> AbstractC -> IO ()
---writeRealC handle absC = 
+writeRealC :: Handle -> AbstractC -> SDoc -> IO ()
+--writeRealC handle absC postlude = 
 -- _scc_ "writeRealC" 
 -- printDoc LeftMode handle (pprAbsC absC (costs absC))
-writeRealC handle absC = 
+writeRealC handle absC postlude = 
  _scc_ "writeRealC" 
- printForC handle (pprAbsC absC (costs absC))
+ printForC handle (pprAbsC absC (costs absC) $$ postlude)
 
-dumpRealC :: AbstractC -> SDoc
-dumpRealC absC = pprAbsC absC (costs absC)
+dumpRealC :: AbstractC -> SDoc -> SDoc
+dumpRealC absC postlude = pprCode CStyle (pprAbsC absC (costs absC) $$ postlude)
 \end{code}
 
 This emits the macro,  which is used in GrAnSim  to compute the total costs
@@ -182,7 +183,7 @@ pprAbsC (CSwitch discrim alts deflt) c -- general case
     -- Costs for addressing header of switch and cond. branching        -- HWL
     switch_head_cost = addrModeCosts discrim Rhs + (Cost (0, 1, 0, 0, 0))
 
-pprAbsC stmt@(COpStmt results op@(CCallOp _ _ _ _ _) args liveness_mask vol_regs) _
+pprAbsC stmt@(COpStmt results op@(CCallOp _ _ _ _ _ _) args liveness_mask vol_regs) _
   = pprCCall op args results liveness_mask vol_regs
 
 pprAbsC stmt@(COpStmt results op args liveness_mask vol_regs) _
@@ -554,7 +555,7 @@ Some rough notes on generating code for @CCallOp@:
    be restarted during the call.
 
 3) Save any temporary registers that are currently in use.
-4) Do the call putting result into a local variable
+4) Do the call, putting result into a local variable
 5) Restore essential registers
 6) Restore temporaries
 
@@ -594,30 +595,34 @@ Amendment to the above: if we can GC, we have to:
   that the runtime check that PerformGC is being used sensibly will work.
 
 \begin{code}
-pprCCall op@(CCallOp op_str is_asm may_gc _ _) args results liveness_mask vol_regs
+pprCCall op@(CCallOp op_str is_asm may_gc cconv _ _) args results liveness_mask vol_regs
   = if (may_gc && liveness_mask /= noLiveRegsMask)
     then pprPanic "Live register in _casm_GC_ " 
 		  (doubleQuotes (text casm_str) <+> hsep pp_non_void_args)
     else
     vcat [
       char '{',
+      declare_fun_extern,   -- declare expected function type.
       declare_local_vars,   -- local var for *result*
       vcat local_arg_decls,
-      -- if is_asm then empty else declareExtern,
       pp_save_context,
-      process_casm local_vars pp_non_void_args casm_str,
+        process_casm local_vars pp_non_void_args casm_str,
       pp_restore_context,
       assign_results,
       char '}'
     ]
   where
     (pp_saves, pp_restores) = ppr_vol_regs vol_regs
-    (pp_save_context, pp_restore_context) =
-	if may_gc
-	then (	text "do { extern StgInt inCCallGC; SaveAllStgRegs(); inCCallGC++;",
-		text "inCCallGC--; RestoreAllStgRegs();} while(0);")
-	else (	pp_basic_saves $$ pp_saves,
-		pp_basic_restores $$ pp_restores)
+
+    (pp_save_context, pp_restore_context)
+	| may_gc =
+	     ( text "do { extern StgInt inCCallGC; SaveAllStgRegs(); inCCallGC++;"
+	     , text "inCCallGC--; RestoreAllStgRegs();} while(0);"
+	     )
+        | otherwise = 
+	     ( pp_basic_saves $$ pp_saves
+	     , pp_basic_restores $$ pp_restores
+	     )
 
     non_void_args =
 	let nvas = tail args
@@ -636,24 +641,97 @@ pprCCall op@(CCallOp op_str is_asm may_gc _ _) args results liveness_mask vol_re
 
     pp_liveness = pprAmode (mkIntCLit liveness_mask)
 
+    {-
+      In the non-casm case, to ensure that we're entering the given external
+      entry point using the correct calling convention, we have to do the following:
+
+	- When entering via a function pointer (the `dynamic' case) using the specified
+	  calling convention, we emit a typedefn declaration attributed with the
+	  calling convention to use together with the result and parameter types we're
+	  assuming. Coerce the function pointer to this type and go.
+
+        - to enter the function at a given code label, we emit an extern declaration
+	  for the label here, stating the calling convention together with result and
+          argument types we're assuming. 
+
+          The C compiler will hopefully use this extern declaration to good effect,
+          reporting any discrepancies between our extern decl and any other that
+	  may be in scope.
+    
+	  Re: calling convention, notice that gcc (2.8.1 and egcs-1.0.2) will for
+  	  the external function `foo' use the calling convention of the first `foo'
+	  prototype it encounters (nor does it complain about conflicting attribute
+	  declarations). The consequence of this is that you cannot override the
+	  calling convention of `foo' using an extern declaration (you'd have to use
+	  a typedef), but why you would want to do such a thing in the first place
+	  is totally beyond me.
+	  
+	  ToDo: petition the gcc folks to add code to warn about conflicting attribute
+	  declarations.
+
+    -}
+    declare_fun_extern
+      | is_asm	|| not opt_EmitCExternDecls = empty
+      | otherwise			    =
+         hsep [ typedef_or_extern
+	      , ccall_res_ty
+	      , fun_nm
+	      , parens (hsep (punctuate comma ccall_decl_ty_args))
+	      ] <> semi
+       where
+	typedef_or_extern
+	  | is_dynamic     = ptext SLIT("typedef")
+	  | otherwise      = ptext SLIT("extern")
+
+        fun_nm 
+	  | is_dynamic     = parens (text (callConvAttribute cconv) <+> char '*' <> ccall_fun_ty)
+	  | otherwise      = text (callConvAttribute cconv) <+> ptext asm_str
+
+	  -- leave out function pointer
+	ccall_decl_ty_args
+	  | is_dynamic     = tail ccall_arg_tys
+	  | otherwise      = ccall_arg_tys
+
+    ccall_arg_tys = map (text.showPrimRep.getAmodeRep) non_void_args
+
+    ccall_res_ty = 
+       case non_void_results of
+          []       -> ptext SLIT("void")
+	  [amode]  -> text (showPrimRep (getAmodeRep amode))
+	  _	   -> panic "pprCCall: ccall_res_ty"
+
+    ccall_fun_ty = ptext SLIT("_ccall_fun_ty")
+
     (declare_local_vars, local_vars, assign_results)
       = ppr_casm_results non_void_results pp_liveness
 
-    casm_str = if is_asm then _UNPK_ op_str else ccall_str
+    (Just asm_str) = op_str
+    is_dynamic = not (maybeToBool op_str)
+
+    casm_str = if is_asm then _UNPK_ asm_str else ccall_str
 
     -- Remainder only used for ccall
+
+    fun_name 
+      | is_dynamic = parens (parens (ccall_fun_ty) <> text "%0")
+      | otherwise  = ptext asm_str
 
     ccall_str = showSDoc
 	(hcat [
 		if null non_void_results
 		  then empty
 		  else text "%r = ",
-		lparen, ptext op_str, lparen,
-		  hcat (punctuate comma ccall_args),
+		lparen, fun_name, lparen,
+		  hcat (punctuate comma ccall_fun_args),
 		text "));"
 	])
-    num_args = length non_void_args
-    ccall_args = take num_args [ (<>) (char '%') (int i) | i <- [0..] ]
+
+    ccall_fun_args
+     | is_dynamic = tail ccall_args
+     | otherwise  = ccall_args
+
+    ccall_args    = zipWith (\ _ i -> char '%' <> int i) non_void_args [0..]
+
 \end{code}
 
 If the argument is a heap object, we need to reach inside and pull out
@@ -762,12 +840,10 @@ ToDo: Any chance of giving line numbers when process-casm fails?
       Or maybe we should do a check _much earlier_ in compiler. ADR
 
 \begin{code}
-process_casm ::
-	[SDoc]		-- results (length <= 1)
-	-> [SDoc]		-- arguments
-	-> String		-- format string (with embedded %'s)
-	->
-	SDoc			-- code being generated
+process_casm :: [SDoc]		-- results (length <= 1)
+	     -> [SDoc]		-- arguments
+	     -> String		-- format string (with embedded %'s)
+	     ->	SDoc		-- code being generated
 
 process_casm results args string = process results args string
  where
@@ -832,6 +908,11 @@ pprAssign FloatRep dest@(CVal reg_rel _) src
 
 pprAssign DoubleRep dest@(CVal reg_rel _) src
   = hcat [ ptext SLIT("ASSIGN_DBL"),char '(', ppr_amode (CAddr reg_rel), comma, pprAmode src, pp_paren_semi ]
+
+pprAssign Int64Rep dest@(CVal reg_rel _) src
+  = hcat [ ptext SLIT("ASSIGN_Int64"),char '(', ppr_amode (CAddr reg_rel), comma, pprAmode src, pp_paren_semi ]
+pprAssign Word64Rep dest@(CVal reg_rel _) src
+  = hcat [ ptext SLIT("ASSIGN_Word64"),char '(', ppr_amode (CAddr reg_rel), comma, pprAmode src, pp_paren_semi ]
 \end{code}
 
 Lastly, the question is: will the C compiler think the types of the
@@ -903,6 +984,10 @@ pprAmode (CVal reg_rel FloatRep)
   = hcat [ text "PK_FLT(", ppr_amode (CAddr reg_rel), rparen ]
 pprAmode (CVal reg_rel DoubleRep)
   = hcat [ text "PK_DBL(", ppr_amode (CAddr reg_rel), rparen ]
+pprAmode (CVal reg_rel Int64Rep)
+  = hcat [ text "PK_Int64(", ppr_amode (CAddr reg_rel), rparen ]
+pprAmode (CVal reg_rel Word64Rep)
+  = hcat [ text "PK_Word64(", ppr_amode (CAddr reg_rel), rparen ]
 \end{code}
 
 Next comes the case where there is some other cast need, and the
@@ -1043,6 +1128,7 @@ pprMagicId (VanillaReg pk n)
 						  pprUnionTag pk ]
 pprMagicId (FloatReg  n)        = (<>) (ptext SLIT("FltReg")) (int IBOX(n))
 pprMagicId (DoubleReg n)	    = (<>) (ptext SLIT("DblReg")) (int IBOX(n))
+pprMagicId (LongReg _ n)	    = (<>) (ptext SLIT("LngReg")) (int IBOX(n))
 pprMagicId TagReg		    = ptext SLIT("TagReg")
 pprMagicId RetReg		    = ptext SLIT("RetReg")
 pprMagicId SpA		    = ptext SLIT("SpA")
