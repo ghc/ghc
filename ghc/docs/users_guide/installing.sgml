@@ -772,7 +772,7 @@ Download a GHC distribution:
 <VariableList>
 
 <VarListEntry>
-<Term>ghc-4.08&mdash;InstallShield installer, 20M: <ULink
+<Term>ghc-4.08&mdash;InstallShield installer, 15M: <ULink
 URL="http://www.haskell.org/ghc/dist/ghc-4-08.exe">http</ULink>
 </Term>
 
