@@ -16,7 +16,8 @@ module Id (
 	-- Construction and modification
 	mkId, mkIdWithNewUniq, mkIdWithNewName, mkIdWithNewType,
 	mkTemplateLocals, 
-	setIdVisibility, mkVanillaId,
+	setIdVisibility, mkIdVisible,
+	mkVanillaId,
 
 	-- DESTRUCTION (excluding pragmatic info)
 	idPrimRep,
@@ -112,7 +113,8 @@ import CmdLineOpts      ( opt_PprStyle_All )
 import Bag
 import IdInfo
 import Name	 	( nameUnique, isLocalName, mkSysLocalName,
-			  isWiredInName, setNameVisibility, changeUnique,
+			  isWiredInName, setNameVisibility, mkNameVisible,
+			  changeUnique,
 			  ExportFlag(..), Provenance,
 			  OccName(..), Name, Module,
 			  NamedThing(..)
@@ -263,6 +265,9 @@ mkTemplateLocals tys
 setIdVisibility :: Maybe Module -> Unique -> Id -> Id
 setIdVisibility maybe_mod u id 
   = id {idName = setNameVisibility maybe_mod u (idName id)}
+
+mkIdVisible :: Module -> Unique -> Id -> Id
+mkIdVisible mod u id = id {idName = mkNameVisible mod u (idName id)}
 
 replaceIdInfo :: GenId ty -> IdInfo -> GenId ty
 replaceIdInfo id info = id {idInfo = info}
