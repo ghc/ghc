@@ -1,0 +1,1 @@
+rnfail038.hs:3: Module `List' does not export `wibble'
