@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+# $Id: Makefile,v 1.3 2001/07/04 10:48:16 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -58,10 +58,10 @@ CLEAN_FILES += $(ALL_HS_OBJS) $(ALL_HS_HIS)
 
 all :: $(LIBNAME)
 
-$(ALL_HS_OBJS) : srcs
+lib : srcs
 	$(GHC_INPLACE) $(HC_OPTS) --make $(ALL_HS_SRCS) $(ALL_LHS_SRCS)
 
-$(LIBNAME) : $(ALL_HS_OBJS)
+$(LIBNAME) : lib
 	$(RM) $@
 	$(AR) $(AR_OPTS) $@ $(ALL_HS_OBJS)
 	$(RANLIB) $@
