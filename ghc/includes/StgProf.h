@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.7 1999/09/15 13:45:14 simonmar Exp $
+ * $Id: StgProf.h,v 1.8 2000/03/08 17:48:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -34,33 +34,8 @@
 
  -------------------------------------------------------------------------- */
 
-extern F_ *register_stack;
-
 extern CostCentre *CC_LIST;               /* registered CC list */
 extern CostCentreStack *CCS_LIST;         /* registered CCS list */
-
-# define PUSH_REGISTER_STACK(reg_function)				\
-	*(register_stack++) = (F_)reg_function
-
-# define POP_REGISTER_STACK()						\
-	*(--register_stack)
-
-# define START_REGISTER_CCS(reg_mod_name)				\
-	static int _module_registered = 0;				\
-	FN_(reg_mod_name) {						\
-	    FB_;							\
-	    if (! _module_registered) { 				\
-		_module_registered = 1
-
-# define REGISTER_IMPORT(reg_mod_name)					\
-	do { EF_(reg_mod_name);						\
-	  PUSH_REGISTER_STACK(reg_mod_name) ;				\
-	} while (0)
-	
-# define END_REGISTER_CCS()						\
-        };								\
-	JMP_(POP_REGISTER_STACK());					\
-	FE_ }
 
 #define REGISTER_CC(cc)					\
 	do {						\
@@ -84,15 +59,14 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  * Declaring Cost Centres & Cost Centre Stacks.
  * -------------------------------------------------------------------------- */
 
-# define CC_DECLARE(cc_ident,name,module,group,subsumed,is_local)	\
-     is_local CostCentre cc_ident[1]					\
-	= {{ 0,								\
-	     name,							\
-	     module,							\
-	     group,							\
-             0,								\
-	     0,								\
-	     subsumed,							\
+# define CC_DECLARE(cc_ident,name,module,subsumed,is_local)	\
+     is_local CostCentre cc_ident[1]				\
+	= {{ 0,							\
+	     name,						\
+	     module,						\
+             0,							\
+	     0,							\
+	     subsumed,						\
 	     0 }};
 
 # define CCS_DECLARE(ccs_ident,cc_ident,subsumed,is_local)	\

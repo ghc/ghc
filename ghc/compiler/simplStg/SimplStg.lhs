@@ -19,8 +19,7 @@ import StgVarInfo	( setStgVarInfo )
 import UpdAnal		( updateAnalyse )
 import SRT		( computeSRTs )
 
-import CmdLineOpts	( opt_SccGroup,
-			  opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
+import CmdLineOpts	( opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
 			  opt_DoStgLinting, opt_D_dump_stg,
 			  StgToDo(..)
 			)
@@ -81,11 +80,6 @@ stg2stg stg_todos module_name us binds
    }
 
   where
-    grp_name  = case (opt_SccGroup) of
-		  Just xx -> _PK_ xx
-		  Nothing -> _PK_ (moduleString module_name) -- default: module name
-
-    -------------
     stg_linter = if opt_DoStgLinting
 		 then lintStgBindings
 		 else ( \ whodunnit binds -> binds )
@@ -121,7 +115,7 @@ stg2stg stg_todos module_name us binds
 	     _scc_ "ProfMassage"
 	     let
 		 (collected_CCs, binds3)
-		   = stgMassageForProfiling module_name grp_name us1 binds
+		   = stgMassageForProfiling module_name us1 binds
 	     in
 	     end_pass us2 "ProfMassage" collected_CCs binds3
 

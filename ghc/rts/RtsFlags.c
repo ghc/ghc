@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.26 2000/02/17 17:19:42 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.27 2000/03/08 17:48:24 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -208,7 +208,6 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.ProfFlags.ccSelector    = NULL;
     RtsFlags.ProfFlags.modSelector   = NULL;
-    RtsFlags.ProfFlags.grpSelector   = NULL;
     RtsFlags.ProfFlags.descrSelector = NULL;
     RtsFlags.ProfFlags.typeSelector  = NULL;
     RtsFlags.ProfFlags.kindSelector  = NULL;
@@ -355,7 +354,7 @@ usage_text[] = {
 # if defined(PROFILING)
 "",
 "  -h<break-down> Heap residency profile      (output file <program>.hp)",
-"     break-down: C = cost centre stack (default), M = module, G = group",
+"     break-down: C = cost centre stack (default), M = module",
 "                 D = closure description, Y = type description",
 "                 T<ints>,<start> = time closure created",
 "                    ints:  no. of interval bands plotted (default 18)",
@@ -363,7 +362,6 @@ usage_text[] = {
 "  A subset of closures may be selected by the attached cost centre using:",
 "    -c{mod:lab,mod:lab...}, specific module:label cost centre(s)",
 "    -m{mod,mod...} all cost centres from the specified modules(s)",
-"    -g{grp,grp...} all cost centres from the specified group(s)",
 "  Selections can also be made by description, type, kind and age:",
 "    -d{des,des...} closures with specified closure descriptions",
 "    -y{typ,typ...} closures with specified type descriptions",
@@ -741,9 +739,6 @@ error = rtsTrue;
 		  case MODchar:
 		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
 		    break;
-		  case GRPchar:
-		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_GRP;
-		    break;
 		  case DESCRchar:
 		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
 		    break;
@@ -791,13 +786,6 @@ error = rtsTrue;
 		      error = rtsTrue;
 		    }
 		    break;
-		  case GRPchar:
-		    max_grp_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_grp_no == 0) {
-		      prog_belch("bad number of groups %s", rts_argv[arg]);
-		      error = rtsTrue;
-		    }
-		    break;
 		  case DESCRchar:
 		    max_descr_no = (hash_t) decode(rts_argv[arg]+3);
 		    if (max_descr_no == 0) {
@@ -822,7 +810,6 @@ error = rtsTrue;
 		) break;
 
 	      case 'c': /* cost centre label select */
-	      case 'g': /* cost centre group select */
 	      case 'd': /* closure descr select */
 	      case 'y': /* closure type select */
 		PROFILING_BUILD_ONLY(
@@ -843,9 +830,6 @@ error = rtsTrue;
 			break;
 		      case 'm': /* cost centre module select */
 			RtsFlags.ProfFlags.modSelector = left + 1;
-			break;
-		      case 'g': /* cost centre group select */
-			RtsFlags.ProfFlags.grpSelector = left + 1;
 			break;
 		      case 'd': /* closure descr select */
 			RtsFlags.ProfFlags.descrSelector = left + 1;

@@ -564,7 +564,7 @@ sub mangle_asm {
 		unless $KNOWN_FUNNY_THING{$thing}
 		    || /^$TUS[@]?stg_.*$TPOSTLBL[@]?$/o    # RTS internals
 		    || /^$TUS[@]__fexp_.*$TPOSTLBL$/o	   # foreign export
-		    || /^$TUS[@]?_reg.*$TPOSTLBL$/o	   # PROF: __reg<module>
+		    || /^$TUS[@]?__init.*$TPOSTLBL$/o	   # __init<module>
 		    || /^$TUS[@]?.*_btm$TPOSTLBL$/o        # large bitmaps
 		    || /^$TUS[@]?.*_closure_tbl$TPOSTLBL$/o; # closure tables
 	    $chk[++$i]   = $_;
@@ -887,7 +887,7 @@ sub mangle_asm {
                 };
  		&print_doctored($chk[$i], 0);
                 if ($TargetPlatform =~ /^powerpc-|^rs6000-/ && $printDS) { 
-#ok                   if ($chksymb[$i] !~ /\_regMain/) {
+#ok                   if ($chksymb[$i] !~ /\__init_Main/) {
   		     print OUTASM "\.csect ${chksymb[$i]}[DS]\n"; 	
   		     print OUTASM "${p}TOC[tc0], 0\n";
 #ok                   }
@@ -1168,7 +1168,7 @@ sub print_doctored {
 
     if ( $TargetPlatform !~ /^i386-/ 
       || ! /^\t[a-z]/  # no instructions in here, apparently
-      || /^${T_US}_reg[A-Za-z0-9_]+${T_POST_LBL}/) {
+      || /^${T_US}__init_[A-Za-z0-9_]+${T_POST_LBL}/) {
 	print OUTASM $_;
 	return;
     }

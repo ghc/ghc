@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfRts.h,v 1.9 2000/03/07 11:53:12 simonmar Exp $
+ * $Id: ProfRts.h,v 1.10 2000/03/08 17:48:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -8,8 +8,9 @@
  * ---------------------------------------------------------------------------*/
 
 #if defined(PROFILING) || defined(DEBUG)
-void initProfiling ( void );
-void endProfiling  ( void );
+void initProfiling1 ( void );
+void initProfiling2 ( void );
+void endProfiling   ( void );
 
 extern FILE *prof_file;
 #endif

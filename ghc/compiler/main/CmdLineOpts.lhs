@@ -75,7 +75,6 @@ module CmdLineOpts (
 	opt_AutoSccsOnExportedToplevs,
 	opt_AutoSccsOnIndividualCafs,
 	opt_AutoSccsOnDicts,
-	opt_SccGroup,
 	opt_SccProfilingOn,
 	opt_DoTickyProfiling,
 
@@ -172,8 +171,7 @@ import PrelArr  ( Array(..) )
 \end{code}
 
 A command-line {\em switch} is (generally) either on or off; e.g., the
-``verbose'' (-v) switch is either on or off.  (The \tr{-G<group>}
-switch is an exception; it's set to a string, or nothing.)
+``verbose'' (-v) switch is either on or off.
 
 A list of {\em ToDo}s is things to be done in a particular part of
 processing.  A (fictitious) example for the Core-to-Core simplifier
@@ -366,7 +364,6 @@ opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
 opt_AutoSccsOnDicts		= lookUp  SLIT("-fauto-sccs-on-dicts")
-opt_SccGroup  			= lookup_str "-G="
 opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
 opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 
@@ -555,8 +552,8 @@ matchSwInt opt str sw = case startsWith str opt of
 %*									*
 %************************************************************************
 
-In spite of the @Produce*@ and @SccGroup@ constructors, these things
-behave just like enumeration types.
+In spite of the @Produce*@ constructor, these things behave just like
+enumeration types.
 
 \begin{code}
 instance Eq SimplifierSwitch where

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.h,v 1.7 2000/02/29 16:58:08 simonmar Exp $
+ * $Id: Profiling.h,v 1.8 2000/03/08 17:48:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -57,7 +57,6 @@ typedef struct _CostCentre {
 
   char *label;
   char *module;
-  char *group;
  
   /* used for accumulating costs at the end of the run... */
   unsigned long time_ticks;
@@ -145,7 +144,6 @@ extern hash_t time_intervals;
  * charge of ordering and displaying output.  */
 extern hash_t max_cc_no;                        /* Hash on CC ptr */
 extern hash_t max_mod_no;                       /* Hash on CC module */
-extern hash_t max_grp_no;                       /* Hash on CC group */
 extern hash_t max_descr_no;                     /* Hash on closure description */
 extern hash_t max_type_no;                      /* Hash on type description */
 

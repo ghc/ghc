@@ -29,7 +29,7 @@ import Name		( isLocallyDefined )
 import VarEnv
 import VarSet
 import Bag		( isEmptyBag, unionBags )
-import CmdLineOpts	( opt_SccGroup, opt_SccProfilingOn )
+import CmdLineOpts	( opt_SccProfilingOn )
 import CoreLint		( beginPass, endPass )
 import ErrUtils		( doIfSet, pprBagOfWarnings )
 import Outputable
@@ -49,7 +49,7 @@ start.
 deSugar :: Module 
 	-> UniqSupply
         -> TcResults
-	-> IO ([CoreBind], [ProtoCoreRule], SDoc, SDoc)
+	-> IO ([CoreBind], [ProtoCoreRule], SDoc, SDoc, [CoreBndr])
 
 deSugar mod_name us (TcResults {tc_env = global_val_env,
 			        tc_binds = all_binds,
@@ -58,9 +58,10 @@ deSugar mod_name us (TcResults {tc_env = global_val_env,
   = do
 	beginPass "Desugar"
 	-- Do desugaring
-	let (result, ds_warns) = initDs us global_val_env module_and_group 
-				        (dsProgram mod_name all_binds rules fo_decls)    
-	    (ds_binds, ds_rules, _, _) = result
+	let (result, ds_warns) = 
+		initDs us global_val_env mod_name
+			(dsProgram mod_name all_binds rules fo_decls)    
+	    (ds_binds, ds_rules, _, _, _) = result
 
 	 -- Display any warnings
         doIfSet (not (isEmptyBag ds_warns))
@@ -72,11 +73,6 @@ deSugar mod_name us (TcResults {tc_env = global_val_env,
 	doIfSet opt_D_dump_ds (printDump (ppr_ds_rules ds_rules))
 
         return result
-  where
-    module_and_group = (mod_name, grp_name)
-    grp_name  = case opt_SccGroup of
-	          Just xx -> _PK_ xx
-	    	  Nothing -> _PK_ (moduleString mod_name) -- default: module name
 
 dsProgram mod_name all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
@@ -84,8 +80,9 @@ dsProgram mod_name all_binds rules fo_decls
     mapDs dsRule rules			`thenDs` \ rules' ->
     let 
 	ds_binds = fi_binds ++ [Rec core_prs] ++ fe_binds
+	fe_binders = bindersOfBinds fe_binds
     in
-    returnDs (ds_binds, rules', h_code, c_code)
+    returnDs (ds_binds, rules', h_code, c_code, fe_binders)
   where
     auto_scc | opt_SccProfilingOn = TopLevel
 	     | otherwise          = NoSccs

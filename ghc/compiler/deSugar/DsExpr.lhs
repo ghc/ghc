@@ -296,8 +296,8 @@ dsExpr (CCall lbl args may_gc is_asm result_ty)
 
 dsExpr (HsSCC cc expr)
   = dsExpr expr			`thenDs` \ core_expr ->
-    getModuleAndGroupDs		`thenDs` \ (mod_name, group_name) ->
-    returnDs (Note (SCC (mkUserCC cc mod_name group_name)) core_expr)
+    getModuleDs			`thenDs` \ mod_name ->
+    returnDs (Note (SCC (mkUserCC cc mod_name)) core_expr)
 
 -- special case to handle unboxed tuple patterns.
 

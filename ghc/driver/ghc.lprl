@@ -12,6 +12,8 @@ It is written in \tr{perl}.  The first section includes a long
 %************************************************************************
 
 \begin{code}
+use 5;   # require Perl version 5 or later.
+
 ($Pgm = $0) =~ s|.*/||;
 $ShortUsage  =  "\nUsage: For basic information, try the `-help' option.\n";
 $LongUsage = "\n" . <<EOUSAGE;
@@ -476,7 +478,6 @@ $CollectingGCstats = 0;
 $CollectGhcTimings = 0;
 $DEBUGging = '';	# -DDEBUG and all that it entails (um... not really)
 $PROFing = '';		# set to p or e if profiling
-$PROFgroup = '';	# set to group if an explicit -Ggroup specified
 $PROFauto = '';	        # set to relevant hsc flag if -auto or -auto-all
 $PROFcaf  = '';	        # set to relevant hsc flag if -caf-all
 $PROFdict = '';		# set to relevant hsc flag if -auto-dicts
@@ -1101,12 +1102,10 @@ sub setupLinkOpts {
           ,'-u', "${uscore}PrelException_stackOverflow_closure"
           ,'-u', "${uscore}PrelException_heapOverflow_closure"
           ,'-u', "${uscore}PrelException_NonTermination_static_closure"
+          ,'-u', "${uscore}__init_Prelude"
 	));
   if (!$NoHaskellMain) {
    unshift (@Ld_flags,'-u', "${uscore}PrelMain_mainIO_closure");
-  }
-  if ($PROFing ne '') {
-   unshift (@Ld_flags,'-u', "${uscore}_regPrelude");
   }
   if ($TargetPlatform =~ /^powerpc-|^rs6000-/) {
     # sometimes we have lots of toc entries...
@@ -3032,9 +3031,6 @@ arg: while($_ = $Args[0]) {
 	        # forces ignore of scc annotations even if profiling
 		$PROFignore_scc = '-W';
 		next arg; };
-
-    /^-G(.*)$/	&& do { push(@HsC_flags, "-G=$1");   # set group for cost centres
-			next arg; };
 
     /^-unprof-scc-auto/ && do {
 		# generate auto SCCs on top level bindings when not profiling.

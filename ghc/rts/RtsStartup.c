@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.30 2000/02/22 12:09:24 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.31 2000/03/08 17:48:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,6 +19,8 @@
 #include "Itimer.h"
 #include "Weak.h"
 #include "Ticky.h"
+#include "StgRun.h"
+#include "StgStartup.h"
 
 #if defined(PROFILING) || defined(DEBUG)
 # include "ProfRts.h"
@@ -45,6 +47,8 @@ static int rts_has_started_up = 0;
 #if defined(PAR)
 static ullong startTime = 0;
 #endif
+
+static void initModules ( void );
 
 void
 startupHaskell(int argc, char *argv[])
@@ -125,7 +129,14 @@ startupHaskell(int argc, char *argv[])
     initStablePtrTable();
 
 #if defined(PROFILING) || defined(DEBUG)
-    initProfiling();
+    initProfiling1();
+#endif
+
+    /* run the per-module initialisation code */
+    initModules();
+
+#if defined(PROFILING) || defined(DEBUG)
+    initProfiling2();
 #endif
 
     /* start the ticker */
@@ -166,11 +177,54 @@ startupHaskell(int argc, char *argv[])
     end_init();
 }
 
-/*
+/* -----------------------------------------------------------------------------
+   Per-module initialisation
+
+   This process traverses all the compiled modules in the program
+   starting with "Main", and performing per-module initialisation for
+   each one.
+
+   So far, two things happen at initialisation time:
+
+      - we register stable names for each foreign-exported function
+        in that module.  This prevents foreign-exported entities, and
+	things they depend on, from being garbage collected.
+
+      - we supply a unique integer to each statically declared cost
+        centre and cost centre stack in the program.
+
+   The code generator inserts a small function "__init_<moddule>" in each
+   module and calls the registration functions in each of the modules
+   it imports.  So, if we call "__init_Main", each reachable module in the
+   program will be registered.
+
+   The init* functions are compiled in the same way as STG code,
+   i.e. without normal C call/return conventions.  Hence we must use
+   StgRun to call this stuff.
+   -------------------------------------------------------------------------- */
+
+/* The init functions use an explicit stack... 
+ */
+#define INIT_STACK_SIZE  (BLOCK_SIZE * 4)
+F_ *init_stack;
+
+static void
+initModules ( void )
+{
+  /* this storage will be reclaimed by the garbage collector,
+   * as a large block.
+   */
+  init_stack = (F_ *)allocate(INIT_STACK_SIZE / sizeof(W_));
+
+  StgRun((StgFunPtr)stg_init, NULL/* no reg table */);
+}
+
+/* -----------------------------------------------------------------------------
  * Shutting down the RTS - two ways of doing this, one which
  * calls exit(), one that doesn't.
  *
  * (shutdownHaskellAndExit() is called by System.exitWith).
+ * -----------------------------------------------------------------------------
  */
 void
 shutdownHaskellAndExit(int n)

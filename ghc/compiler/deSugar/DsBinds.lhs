@@ -205,8 +205,8 @@ addAutoScc :: AutoScc		-- if needs be, decorate toplevs?
 
 addAutoScc (TopLevelAddSccs auto_scc_fn) pair@(bndr, core_expr) 
  | do_auto_scc && worthSCC core_expr
-     = getModuleAndGroupDs `thenDs` \ (mod,grp) ->
-       returnDs (bndr, Note (SCC (mkAutoCC top_bndr mod grp NotCafCC)) core_expr)
+     = getModuleDs `thenDs` \ mod ->
+       returnDs (bndr, Note (SCC (mkAutoCC top_bndr mod NotCafCC)) core_expr)
  where do_auto_scc = isJust maybe_auto_scc
        maybe_auto_scc = auto_scc_fn bndr
        (Just top_bndr) = maybe_auto_scc

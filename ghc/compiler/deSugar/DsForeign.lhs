@@ -287,7 +287,7 @@ dsFExport i ty mod_name ext_name cconv isDyn =
          getFun_wrapper $
  	 mkApps (Var i) (map (Type . mkTyVarTy) tvs ++ map Var fe_args)
      in
-     getModuleAndGroupDs		`thenDs` \ (mod,_) -> 
+     getModuleDs			`thenDs` \ mod -> 
      getUniqueDs			`thenDs` \ uniq ->
      let
       the_body = mkLams (tvs ++ wrapper_args) the_app

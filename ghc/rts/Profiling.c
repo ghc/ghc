@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.15 2000/03/07 11:53:12 simonmar Exp $
+ * $Id: Profiling.c,v 1.16 2000/03/08 17:48:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -13,8 +13,6 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "ProfRts.h"
-#include "StgRun.h"
-#include "StgStartup.h"
 #include "Storage.h"
 #include "Proftimer.h"
 #include "Itimer.h"
@@ -89,12 +87,12 @@ CostCentreStack *CCS_LIST;
  *           constructors.  It should *never* accumulate any costs.
  */
 
-CC_DECLARE(CC_MAIN,      "MAIN", 	"MAIN",      "MAIN",  CC_IS_BORING,);
-CC_DECLARE(CC_SYSTEM,    "SYSTEM",   	"MAIN",      "MAIN",  CC_IS_BORING,);
-CC_DECLARE(CC_GC,        "GC",   	"GC",        "GC",    CC_IS_BORING,);
-CC_DECLARE(CC_OVERHEAD,  "OVERHEAD_of", "PROFILING", "PROFILING", CC_IS_CAF,);
-CC_DECLARE(CC_SUBSUMED,  "SUBSUMED",    "MAIN",      "MAIN",  CC_IS_SUBSUMED,);
-CC_DECLARE(CC_DONTZuCARE,"DONT_CARE",   "MAIN",      "MAIN",  CC_IS_BORING,);
+CC_DECLARE(CC_MAIN,      "MAIN", 	"MAIN",      CC_IS_BORING,);
+CC_DECLARE(CC_SYSTEM,    "SYSTEM",   	"MAIN",      CC_IS_BORING,);
+CC_DECLARE(CC_GC,        "GC",   	"GC",        CC_IS_BORING,);
+CC_DECLARE(CC_OVERHEAD,  "OVERHEAD_of", "PROFILING", CC_IS_CAF,);
+CC_DECLARE(CC_SUBSUMED,  "SUBSUMED",    "MAIN",      CC_IS_SUBSUMED,);
+CC_DECLARE(CC_DONTZuCARE,"DONT_CARE",   "MAIN",      CC_IS_BORING,);
 
 CCS_DECLARE(CCS_MAIN, 	    CC_MAIN,       CC_IS_BORING,   );
 CCS_DECLARE(CCS_SYSTEM,	    CC_SYSTEM,     CC_IS_BORING,   );
@@ -120,7 +118,6 @@ CCS_DECLARE(CCS_DONTZuCARE, CC_DONTZuCARE, CC_IS_BORING,   );
 static CostCentreStack * ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, 
 				       CostCentreStack *new_ccs );
 
-static    void registerCostCentres ( void );
 static rtsBool ccs_to_ignore       ( CostCentreStack *ccs );
 static    void count_ticks         ( CostCentreStack *ccs );
 static    void reportCCS           ( CostCentreStack *ccs, nat indent );
@@ -147,10 +144,8 @@ static    void reportCCS_XML       ( CostCentreStack *ccs );
    -------------------------------------------------------------------------- */
 
 void
-initProfiling (void)
+initProfiling1 (void)
 {
-  CostCentreStack *ccs, *next;
-
   /* for the benefit of allocate()... */
   CCCS = CCS_SYSTEM;
 
@@ -180,12 +175,21 @@ initProfiling (void)
   REGISTER_CCS(CCS_DONTZuCARE);
 
   CCCS = CCS_OVERHEAD;
-  registerCostCentres();
+
+  /* cost centres are registered by the per-module 
+   * initialisation code now... 
+   */
+}
+
+void
+initProfiling2 (void)
+{
+  CostCentreStack *ccs, *next;
+
   CCCS = CCS_SYSTEM;
 
   /* Set up the log file, and dump the header and cost centre
-   * information into it.
-   */
+   * information into it.  */
   initProfilingLogFile();
 
   /* find all the "special" cost centre stacks, and make them children
@@ -234,8 +238,8 @@ initProfilingLogFile(void)
     {
       CostCentre *cc;
       for (cc = CC_LIST; cc != NULL; cc = cc->link) {
-	fprintf(prof_file, "%d %d \"%s\" \"%s\" \"%s\"\n",
-		CC_UQ, cc->ccID, cc->label, cc->module, cc->group);
+	fprintf(prof_file, "%d %d \"%s\" \"%s\"\n",
+		CC_UQ, cc->ccID, cc->label, cc->module);
       }
     }
   }
@@ -262,47 +266,7 @@ endProfiling ( void )
 }
 
 /* -----------------------------------------------------------------------------
-   Register Cost Centres
-
-   At the moment, this process just supplies a unique integer to each
-   statically declared cost centre and cost centre stack in the
-   program.
-
-   The code generator inserts a small function "reg<moddule>" in each
-   module which registers any cost centres from that module and calls
-   the registration functions in each of the modules it imports.  So,
-   if we call "regMain", each reachable module in the program will be
-   registered. 
-
-   The reg* functions are compiled in the same way as STG code,
-   i.e. without normal C call/return conventions.  Hence we must use
-   StgRun to call this stuff.
-   -------------------------------------------------------------------------- */
-
-/* The registration functions use an explicit stack... 
- */
-#define REGISTER_STACK_SIZE  (BLOCK_SIZE * 4)
-F_ *register_stack;
-
-static void
-registerCostCentres ( void )
-{
-  /* this storage will be reclaimed by the garbage collector,
-   * as a large block.
-   */
-  register_stack = (F_ *)allocate(REGISTER_STACK_SIZE / sizeof(W_));
-
-  StgRun((StgFunPtr)stg_register, &MainRegTable);
-}
-
-
-/* -----------------------------------------------------------------------------
-   Set cost centre stack when entering a function.  Here we implement
-   the rule
-
-      "if CCSfn is an initial segment of CCCS, 
-          then set CCCS to CCSfn,
-	  else append CCSfn to CCCS"
+   Set cost centre stack when entering a function.
    -------------------------------------------------------------------------- */
 rtsBool entering_PAP;
 
@@ -315,10 +279,11 @@ EnterFunCCS ( CostCentreStack *cccs, CostCentreStack *ccsfn )
     return CCCS;
   }
 
-  if (cccs->root == ccsfn->root) {
-    return ccsfn;
-  } else {
+  if (ccsfn->root->is_subsumed == CC_IS_CAF
+      || ccsfn->root->is_subsumed == CC_IS_SUBSUMED) {
     return AppendCCS(cccs,ccsfn);
+  } else {
+    return ccsfn;
   }
 }
 
@@ -515,11 +480,9 @@ print_ccs (FILE *fp, CostCentreStack *ccs)
   if (ccs != CCS_MAIN)
     {
       print_ccs(fp, ccs->prevStack);
-      fprintf(fp, "->[%s,%s,%s]", 
-	      ccs->cc->label, ccs->cc->module, ccs->cc->group);
+      fprintf(fp, "->[%s,%s]", ccs->cc->label, ccs->cc->module);
     } else {
-      fprintf(fp, "[%s,%s,%s]", 
-	      ccs->cc->label, ccs->cc->module, ccs->cc->group);
+      fprintf(fp, "[%s,%s]", ccs->cc->label, ccs->cc->module);
     }
       
   if (ccs == CCCS) {
@@ -647,11 +610,6 @@ fprint_header( void )
 {
   fprintf(prof_file, "%-24s %-10s", "COST CENTRE", "MODULE");  
 
-#ifdef NOT_YET
-  do_groups = have_interesting_groups(Registered_CC);
-  if (do_groups) fprintf(prof_file, " %-11.11s", "GROUP");
-#endif
-
   fprintf(prof_file, "%8s %5s %5s %8s %5s", "scc", "%time", "%alloc", "inner", "cafs");
 
   if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
@@ -670,9 +628,6 @@ report_ccs_profiling( void )
 {
     nat count;
     char temp[128]; /* sigh: magic constant */
-#ifdef NOT_YET
-    rtsBool do_groups = rtsFalse;
-#endif
 
     stopProfTimer();
 
@@ -741,10 +696,6 @@ reportCCS(CostCentreStack *ccs, nat indent)
 
     fprintf(prof_file, "%-*s%-*s %-10s", 
 	    indent, "", 24-indent, cc->label, cc->module);
-
-#ifdef NOT_YET
-    if (do_groups) fprintf(prof_file, " %-11.11s",cc->group);
-#endif
 
     fprintf(prof_file, "%8ld %5.1f %5.1f %8ld %5ld",
 	    ccs->scc_count, 

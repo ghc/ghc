@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.26 1999/11/02 15:05:39 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.27 2000/03/08 17:48:24 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -201,6 +201,10 @@ stored in a mixed type location.)
   | CClosureTbl 		-- table of constructors for enumerated types
 	TyCon			-- which TyCon this table is for
 
+  | CModuleInitBlock		-- module initialisation block
+	CAddrMode		-- label for init block
+	AbstractC		-- initialisation code
+
   | CCostCentreDecl		-- A cost centre *declaration*
 	Bool			-- True  <=> local => full declaration
 				-- False <=> extern; just say so
@@ -235,6 +239,10 @@ data CStmtMacro
   | PUSH_SEQ_FRAME			-- push seq frame
   | UPDATE_SU_FROM_UPD_FRAME		-- pull Su out of the update frame
   | SET_TAG				-- set TagReg if it exists
+
+  | REGISTER_FOREIGN_EXPORT		-- register a foreign exported fun
+  | REGISTER_IMPORT			-- register an imported module
+
   | GRAN_FETCH	    		-- for GrAnSim only  -- HWL
   | GRAN_RESCHEDULE   		-- for GrAnSim only  -- HWL
   | GRAN_FETCH_AND_RESCHEDULE	-- for GrAnSim only  -- HWL

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.h,v 1.3 1999/02/05 16:03:00 simonm Exp $
+ * $Id: StgStartup.h,v 1.4 2000/03/08 17:48:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -12,8 +12,6 @@ EXTFUN(stg_stop_thread_entry);
 EXTFUN(stg_returnToStackTop);
 EXTFUN(stg_enterStackTop);
 
-#ifdef PROFILING
-EXTFUN(stg_register_ret);
-EXTFUN(stg_register);
-EXTFUN(regPrelGHC);
-#endif
+EXTFUN(stg_init_ret);
+EXTFUN(stg_init);
+EXTFUN(__init_PrelGHC);

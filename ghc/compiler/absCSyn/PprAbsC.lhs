@@ -563,6 +563,14 @@ pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
 		   LvLarge _ -> SLIT("RET_VEC_BIG")
 
 
+pprAbsC stmt@(CModuleInitBlock label code) _
+  = vcat [
+	ptext SLIT("START_MOD_INIT") <> parens (ppr_amode label),
+	case (pprTempAndExternDecls stmt) of { (_, pp_exts) -> pp_exts },
+	pprAbsC code (costs code),
+	hcat [ptext SLIT("END_MOD_INIT"), lparen, rparen]
+    ]
+
 pprAbsC (CCostCentreDecl is_local cc) _ = pprCostCentreDecl is_local cc
 pprAbsC (CCostCentreStackDecl ccs)    _ = pprCostCentreStackDecl ccs
 \end{code}
@@ -1157,6 +1165,8 @@ cStmtMacroText PUSH_UPD_FRAME		= SLIT("PUSH_UPD_FRAME")
 cStmtMacroText PUSH_SEQ_FRAME		= SLIT("PUSH_SEQ_FRAME")
 cStmtMacroText UPDATE_SU_FROM_UPD_FRAME	= SLIT("UPDATE_SU_FROM_UPD_FRAME")
 cStmtMacroText SET_TAG			= SLIT("SET_TAG")
+cStmtMacroText REGISTER_FOREIGN_EXPORT	= SLIT("REGISTER_FOREIGN_EXPORT")
+cStmtMacroText REGISTER_IMPORT		= SLIT("REGISTER_IMPORT")
 cStmtMacroText GRAN_FETCH	    	= SLIT("GRAN_FETCH")
 cStmtMacroText GRAN_RESCHEDULE   	= SLIT("GRAN_RESCHEDULE")
 cStmtMacroText GRAN_FETCH_AND_RESCHEDULE= SLIT("GRAN_FETCH_AND_RESCHEDULE")
@@ -1511,6 +1521,9 @@ ppr_decls_AbsC (CSRT lbl closure_lbls)
 
 ppr_decls_AbsC (CRetDirect     _ code _ _)   = ppr_decls_AbsC code
 ppr_decls_AbsC (CRetVector _ amodes _ _)     = ppr_decls_Amodes amodes
+ppr_decls_AbsC (CModuleInitBlock _ code)     = ppr_decls_AbsC code
+
+ppr_decls_AbsC (_) = returnTE (Nothing, Nothing)
 \end{code}
 
 \begin{code}

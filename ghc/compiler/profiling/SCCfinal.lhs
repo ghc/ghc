@@ -53,12 +53,12 @@ type CollectedCCs = ([CostCentre],	-- locally defined ones
 		     [CostCentreStack]) -- singleton stacks (for CAFs)
 
 stgMassageForProfiling
-	:: Module -> FAST_STRING	-- module name, group name
+	:: Module			-- module name
 	-> UniqSupply		    	-- unique supply
 	-> [StgBinding]		    	-- input
 	-> (CollectedCCs, [StgBinding])
 
-stgMassageForProfiling mod_name grp_name us stg_binds
+stgMassageForProfiling mod_name us stg_binds
   = let
 	((local_ccs, extern_ccs, cc_stacks),
 	 stg_binds2)
@@ -78,7 +78,7 @@ stgMassageForProfiling mod_name grp_name us stg_binds
       fixed_cc_stacks ++ cc_stacks), stg_binds2)
   where
 
-    all_cafs_cc  = mkAllCafsCC mod_name grp_name
+    all_cafs_cc  = mkAllCafsCC mod_name
     all_cafs_ccs = mkSingletonCCS all_cafs_cc
 
     ----------
@@ -130,7 +130,7 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 	-- Top level CAF without a cost centre attached
 	-- Attach CAF cc (collect if individual CAF ccs)
       = (if opt_AutoSccsOnIndividualCafs 
-		then let cc = mkAutoCC binder mod_name grp_name CafCC
+		then let cc = mkAutoCC binder mod_name CafCC
 			 ccs = mkSingletonCCS cc
 		     in
 		     collectCC  cc  `thenMM_`
@@ -281,6 +281,9 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 %*									*
 %************************************************************************
 
+Boxing is *turned off* at the moment, until we can figure out how to
+do it properly in general.
+
 \begin{code}
 boxHigherOrderArgs
     :: ([StgArg] -> StgExpr)
@@ -288,6 +291,10 @@ boxHigherOrderArgs
     -> [StgArg]		-- arguments which we might box
     -> MassageM StgExpr
 
+#ifndef PROF_DO_BOXING
+boxHigherOrderArgs almost_expr args
+   = returnMM (almost_expr args)
+#else
 boxHigherOrderArgs almost_expr args
   = getTopLevelIshIds		`thenMM` \ ids ->
     mapAccumMM (do_arg ids) [] args	`thenMM` \ (let_bindings, new_args) ->
@@ -329,7 +336,7 @@ isFunType var_type
 	(_, ty) -> case splitTyConApp_maybe ty of
 			Just (tycon,_) | isFunTyCon tycon -> True
 			_ -> False
-
+#endif
 \end{code}
 
 %************************************************************************

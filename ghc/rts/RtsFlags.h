@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.21 2000/02/17 17:19:42 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.22 2000/03/08 17:48:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -87,7 +87,6 @@ struct PROFILING_FLAGS {
 # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
 # define HEAP_BY_CCS		1
 # define HEAP_BY_MOD		2
-# define HEAP_BY_GRP		3
 # define HEAP_BY_DESCR		4
 # define HEAP_BY_TYPE		5
 # define HEAP_BY_TIME		6
@@ -96,14 +95,12 @@ struct PROFILING_FLAGS {
   
 # define CCchar    'C'
 # define MODchar   'M'
-# define GRPchar   'G'
 # define DESCRchar 'D'
 # define TYPEchar  'Y'
 # define TIMEchar  'T'
 
     char *ccSelector;
     char *modSelector;
-    char *grpSelector;
     char *descrSelector;
     char *typeSelector;
     char *kindSelector;

@@ -823,10 +823,10 @@ ccall_string	:: { FAST_STRING }
 
 ------------------------------------------------------------------------
 scc     :: { CostCentre }
-        :  '__sccC' '{' mod_name STRING '}'                      { AllCafsCC $3 $4 }
-        |  '__scc' '{' cc_name mod_name STRING cc_dup cc_caf '}'
-                             { NormalCC { cc_name = $3, cc_mod = $4, cc_grp = $5,
-                                          cc_is_dupd = $6, cc_is_caf = $7 } }
+        :  '__sccC' '{' mod_name '}'                      { AllCafsCC $3 }
+        |  '__scc' '{' cc_name mod_name cc_dup cc_caf '}'
+                             { NormalCC { cc_name = $3, cc_mod = $4,
+                                          cc_is_dupd = $5, cc_is_caf = $6 } }
 
 cc_name :: { EncodedFS }
         : CONID                 { $1 }

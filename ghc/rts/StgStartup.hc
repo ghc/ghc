@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.5 1999/05/13 17:31:13 simonm Exp $
+ * $Id: StgStartup.hc,v 1.6 2000/03/08 17:48:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -131,29 +131,25 @@ STGFUN(stg_enterStackTop)
    Special STG entry points for module registration.
    -------------------------------------------------------------------------- */
 
-#ifdef PROFILING
-
-STGFUN(stg_register_ret)
+STGFUN(stg_init_ret)
 {
   FB_
   JMP_(StgReturn);
   FE_
 }
 
-STGFUN(stg_register)
+STGFUN(stg_init)
 {
-  EF_(_regMain);
-  EF_(_regPrelude);
+  EF_(__init_Main);
+  EF_(__init_Prelude);
   FB_
-  PUSH_REGISTER_STACK(stg_register_ret);
-  PUSH_REGISTER_STACK(_regPrelude);
-  JMP_(_regMain);
+  PUSH_INIT_STACK(stg_init_ret);
+  PUSH_INIT_STACK(__init_Prelude);
+  JMP_(__init_Main);
   FE_
 }
 
 /* PrelGHC doesn't really exist... */
 
-START_REGISTER_CCS(_regPrelGHC);
-END_REGISTER_CCS();
-
-#endif
+START_MOD_INIT(__init_PrelGHC);
+END_MOD_INIT();

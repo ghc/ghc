@@ -13,7 +13,7 @@ module DsMonad (
 	duplicateLocalDs, newSysLocalDs, newSysLocalsDs,
 	newFailLocalDs,
 	getSrcLocDs, putSrcLocDs,
-	getModuleAndGroupDs,
+	getModuleDs,
 	getUniqueDs,
 	dsLookupGlobalValue,
 
@@ -55,14 +55,12 @@ type DsM result =
 	UniqSupply
         -> ValueEnv
 	-> SrcLoc		 -- to put in pattern-matching error msgs
-	-> (Module, Group)       -- module + group name : for SCC profiling
+	-> Module       	 -- module: for SCC profiling
 	-> DsWarnings
 	-> (result, DsWarnings)
 
 type DsWarnings = Bag WarnMsg           -- The desugarer reports matches which are
 					-- completely shadowed or incomplete patterns
-
-type Group = FAST_STRING
 
 {-# INLINE andDs #-}
 {-# INLINE thenDs #-}
@@ -72,29 +70,29 @@ type Group = FAST_STRING
 
 initDs  :: UniqSupply
 	-> ValueEnv
-	-> (Module, Group)      -- module name: for profiling; (group name: from switches)
+	-> Module   -- module name: for profiling
 	-> DsM a
 	-> (a, DsWarnings)
 
-initDs init_us genv module_and_group action
-  = action init_us genv noSrcLoc module_and_group emptyBag
+initDs init_us genv mod action
+  = action init_us genv noSrcLoc mod emptyBag
 
 thenDs :: DsM a -> (a -> DsM b) -> DsM b
 andDs  :: (a -> a -> a) -> DsM a -> DsM a -> DsM a
 
-thenDs m1 m2 us genv loc mod_and_grp warns
+thenDs m1 m2 us genv loc mod warns
   = case splitUniqSupply us		    of { (s1, s2) ->
-    case (m1 s1 genv loc mod_and_grp warns)  of { (result, warns1) ->
-    m2 result s2 genv loc mod_and_grp warns1}}
+    case (m1 s1 genv loc mod warns)  of { (result, warns1) ->
+    m2 result s2 genv loc mod warns1}}
 
-andDs combiner m1 m2 us genv loc mod_and_grp warns
+andDs combiner m1 m2 us genv loc mod warns
   = case splitUniqSupply us		    of { (s1, s2) ->
-    case (m1 s1 genv loc mod_and_grp warns)  of { (result1, warns1) ->
-    case (m2 s2 genv loc mod_and_grp warns1) of { (result2, warns2) ->
+    case (m1 s1 genv loc mod warns)  of { (result1, warns1) ->
+    case (m2 s2 genv loc mod warns1) of { (result2, warns2) ->
     (combiner result1 result2, warns2) }}}
 
 returnDs :: a -> DsM a
-returnDs result us genv loc mod_and_grp warns = (result, warns)
+returnDs result us genv loc mod warns = (result, warns)
 
 listDs :: [DsM a] -> DsM [a]
 listDs []     = returnDs []
@@ -141,29 +139,29 @@ it easier to read debugging output.
 
 \begin{code}
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
-newSysLocalDs ty us genv loc mod_and_grp warns
+newSysLocalDs ty us genv loc mod warns
   = case uniqFromSupply us of { assigned_uniq ->
     (mkSysLocal SLIT("ds") assigned_uniq ty, warns) }
 
 newSysLocalsDs tys = mapDs newSysLocalDs tys
 
-newFailLocalDs ty us genv loc mod_and_grp warns
+newFailLocalDs ty us genv loc mod warns
   = case uniqFromSupply us of { assigned_uniq ->
     (mkSysLocal SLIT("fail") assigned_uniq ty, warns) }
 	-- The UserLocal bit just helps make the code a little clearer
 
 getUniqueDs :: DsM Unique
-getUniqueDs us genv loc mod_and_grp warns
+getUniqueDs us genv loc mod warns
   = case (uniqFromSupply us) of { assigned_uniq ->
     (assigned_uniq, warns) }
 
 duplicateLocalDs :: Id -> DsM Id
-duplicateLocalDs old_local us genv loc mod_and_grp warns
+duplicateLocalDs old_local us genv loc mod warns
   = case uniqFromSupply us of { assigned_uniq ->
     (setIdUnique old_local assigned_uniq, warns) }
 
 cloneTyVarsDs :: [TyVar] -> DsM [TyVar]
-cloneTyVarsDs tyvars us genv loc mod_and_grp warns
+cloneTyVarsDs tyvars us genv loc mod warns
   = case uniqsFromSupply (length tyvars) us of { uniqs ->
     (zipWithEqual "cloneTyVarsDs" setTyVarUnique tyvars uniqs, warns) }
 \end{code}
@@ -171,7 +169,7 @@ cloneTyVarsDs tyvars us genv loc mod_and_grp warns
 \begin{code}
 newTyVarsDs :: [TyVar] -> DsM [TyVar]
 
-newTyVarsDs tyvar_tmpls us genv loc mod_and_grp warns
+newTyVarsDs tyvar_tmpls us genv loc mod warns
   = case uniqsFromSupply (length tyvar_tmpls) us of { uniqs ->
     (zipWithEqual "newTyVarsDs" setTyVarUnique tyvar_tmpls uniqs, warns) }
 \end{code}
@@ -181,31 +179,30 @@ the @SrcLoc@ being carried around.
 \begin{code}
 uniqSMtoDsM :: UniqSM a -> DsM a
 
-uniqSMtoDsM u_action us genv loc mod_and_grp warns
+uniqSMtoDsM u_action us genv loc mod warns
   = (initUs_ us u_action, warns)
 
 getSrcLocDs :: DsM SrcLoc
-getSrcLocDs us genv loc mod_and_grp warns
+getSrcLocDs us genv loc mod warns
   = (loc, warns)
 
 putSrcLocDs :: SrcLoc -> DsM a -> DsM a
-putSrcLocDs new_loc expr us genv old_loc mod_and_grp warns
-  = expr us genv new_loc mod_and_grp warns
+putSrcLocDs new_loc expr us genv old_loc mod warns
+  = expr us genv new_loc mod warns
 
 dsWarn :: WarnMsg -> DsM ()
-dsWarn warn us genv loc mod_and_grp warns = ((), warns `snocBag` warn)
+dsWarn warn us genv loc mod warns = ((), warns `snocBag` warn)
 
 \end{code}
 
 \begin{code}
-getModuleAndGroupDs :: DsM (Module, Group)
-getModuleAndGroupDs us genv loc mod_and_grp warns
-  = (mod_and_grp, warns)
+getModuleDs :: DsM Module
+getModuleDs us genv loc mod warns = (mod, warns)
 \end{code}
 
 \begin{code}
 dsLookupGlobalValue :: Name -> DsM Id
-dsLookupGlobalValue name us genv loc mod_and_grp warns
+dsLookupGlobalValue name us genv loc mod warns
   = case maybeWiredInIdName name of
 	Just id -> (id, warns)
 	Nothing -> (lookupWithDefaultUFM genv def name, warns)

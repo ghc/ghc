@@ -376,6 +376,7 @@ flatAbsC stmt@(CCostCentreDecl _ _) 		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CCostCentreStackDecl _)		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CSplitMarker) 			= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CRetVector _ _ _ _)              = returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CModuleInitBlock _ _)            = returnFlt (AbsCNop, stmt)
 \end{code}
 
 \begin{code}

@@ -152,7 +152,7 @@ doIt (core_cmds, stg_cmds)
 
 	--------------------------  Desugaring ----------------
     _scc_     "DeSugar"
-    deSugar this_mod ds_uniqs tc_results	>>= \ (desugared, rules, h_code, c_code) ->
+    deSugar this_mod ds_uniqs tc_results	>>= \ (desugared, rules, h_code, c_code, fe_binders) ->
 
 
 	--------------------------  Main Core-language transformations ----------------
@@ -200,6 +200,7 @@ doIt (core_cmds, stg_cmds)
     _scc_     "CodeGen"
     codeGen this_mod imported_modules
 	    cost_centre_info
+	    fe_binders
 	    local_tycons local_classes 
 	    stg_binds2				>>= \ abstractC ->
 

@@ -98,26 +98,19 @@ data CostCentreStack
 A Cost Centre is the argument of an _scc_ expression.
  
 \begin{code}
-type Group = FAST_STRING	-- "Group" that this CC is in; eg directory
-
 data CostCentre
   = NoCostCentre	-- Having this constructor avoids having
 			-- to use "Maybe CostCentre" all the time.
 
   | NormalCC {  
-		cc_name :: CcName,		-- Name of the cost centre itself
-		cc_mod  :: ModuleName,		-- Name of module defining this CC.
-		cc_grp  :: Group,	  	-- "Group" that this CC is in.
-		cc_is_dupd :: IsDupdCC,		-- see below
-		cc_is_caf  :: IsCafCC		-- see below
+		cc_name :: CcName,	-- Name of the cost centre itself
+		cc_mod  :: ModuleName,	-- Name of module defining this CC.
+		cc_is_dupd :: IsDupdCC,	-- see below
+		cc_is_caf  :: IsCafCC	-- see below
     }
 
   | AllCafsCC {	
-		cc_mod  :: ModuleName,		-- Name of module defining this CC.
-		cc_grp  :: Group	  	-- "Group" that this CC is in
-			-- Again, one "big" CAF cc per module, where all
-			-- CAF costs are attributed unless the user asked for
-			-- per-individual-CAF cost attribution.
+		cc_mod  :: ModuleName	-- Name of module defining this CC.
     }
 
 type CcName = EncodedFS
@@ -185,23 +178,21 @@ currentOrSubsumedCCS _			= False
 Building cost centres
 
 \begin{code}
-mkUserCC :: UserFS -> Module -> Group -> CostCentre
+mkUserCC :: UserFS -> Module -> CostCentre
 
-mkUserCC cc_name mod group_name
-  = NormalCC { cc_name = encodeFS cc_name,
-	       cc_mod =  moduleName mod, cc_grp = group_name,
+mkUserCC cc_name mod
+  = NormalCC { cc_name = encodeFS cc_name, cc_mod =  moduleName mod,
 	       cc_is_dupd = OriginalCC, cc_is_caf = NotCafCC {-might be changed-}
     }
 
-mkAutoCC :: Id -> Module -> Group -> IsCafCC -> CostCentre
+mkAutoCC :: Id -> Module -> IsCafCC -> CostCentre
 
-mkAutoCC id mod group_name is_caf
-  = NormalCC { cc_name = occNameFS (getOccName id), 
-	       cc_mod =  moduleName mod, cc_grp = group_name,
+mkAutoCC id mod is_caf
+  = NormalCC { cc_name = occNameFS (getOccName id), cc_mod =  moduleName mod,
 	       cc_is_dupd = OriginalCC, cc_is_caf = is_caf
     }
 
-mkAllCafsCC m g = AllCafsCC  { cc_mod = moduleName m, cc_grp = g }
+mkAllCafsCC m = AllCafsCC  { cc_mod = moduleName m }
 
 mkSingletonCCS :: CostCentre -> CostCentreStack
 mkSingletonCCS cc = SingletonCCS cc
@@ -343,14 +334,13 @@ instance Outputable CostCentre where
 	   else text (costCentreUserName cc)
 
 -- Printing in an interface file or in Core generally
-pprCostCentreCore (AllCafsCC {cc_mod = m, cc_grp = g})
-  = text "__sccC" <+> braces (pprModuleName m <+> doubleQuotes (ptext g))
-pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m, cc_grp = g,
+pprCostCentreCore (AllCafsCC {cc_mod = m})
+  = text "__sccC" <+> braces (pprModuleName m)
+pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m,
 			     cc_is_caf = caf, cc_is_dupd = dup})
   = text "__scc" <+> braces (hsep [
 	ptext n,
 	pprModuleName m,	
-	doubleQuotes (ptext g),
 	pp_dup dup,
 	pp_caf caf
     ])
@@ -391,7 +381,6 @@ pprCostCentreDecl is_local cc
 	    cc_ident, 		  					comma,
 	    doubleQuotes (text (costCentreUserName cc)),		comma,
 	    doubleQuotes (text (moduleNameUserString mod_name)),	comma,
-	    doubleQuotes (ptext grp_name),				comma,
 	    ptext is_subsumed,						comma,
 	    empty,	-- Now always externally visible
 	    text ");"]
@@ -400,7 +389,6 @@ pprCostCentreDecl is_local cc
   where
     cc_ident    = ppCostCentreLbl cc
     mod_name 	= cc_mod cc
-    grp_name 	= cc_grp cc
     is_subsumed = ccSubsumed cc
 
 ccSubsumed :: CostCentre -> FAST_STRING		-- subsumed value

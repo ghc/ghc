@@ -32,12 +32,13 @@ import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC, 
-			  opt_D_dump_absC,    opt_SccGroup
+			  opt_D_dump_absC
 			)
 import CostCentre       ( CostCentre, CostCentreStack )
 import FiniteMap	( FiniteMap )
 import Id               ( Id, idName )
-import Module           ( Module, moduleString, ModuleName, moduleNameString )
+import Module           ( Module, moduleString, moduleName, 
+			  ModuleName, moduleNameString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Type             ( Type )
 import TyCon            ( TyCon, isDataTyCon )
@@ -57,19 +58,21 @@ codeGen :: Module		-- Module name
 	-> ([CostCentre],	-- Local cost-centres needing declaring/registering
 	    [CostCentre],	-- "extern" cost-centres needing declaring
 	    [CostCentreStack])  -- Pre-defined "singleton" cost centre stacks
+	-> [Id]			-- foreign-exported binders
 	-> [TyCon] -> [Class]	-- Local tycons and classes
 	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
 	-> IO AbstractC		-- Output
 
-codeGen mod_name imported_modules cost_centre_info
+codeGen mod_name imported_modules cost_centre_info fe_binders
 	tycons classes stg_binds
   = mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
     let
 	datatype_stuff 	  = genStaticConBits cinfo data_tycons
 	code_stuff     	  = initC cinfo (cgTopBindings maybe_split stg_binds)
-	cost_centre_stuff = mkCostCentreStuff mod_name imported_modules cost_centre_info
+	init_stuff        = mkModuleInit fe_binders mod_name imported_modules 
+					 cost_centre_info
 
-	abstractC = mkAbstractCs [ cost_centre_stuff, 
+	abstractC = mkAbstractCs [ init_stuff, 
 				   datatype_stuff,
 				   code_stuff ]
 
@@ -89,52 +92,77 @@ codeGen mod_name imported_modules cost_centre_info
     cinfo       = MkCompInfo mod_name
 \end{code}
 
-Cost-centre profiling:
-Besides the usual stuff, we must produce:
-
-* Declarations for the cost-centres defined in this module;
-* Code to participate in "registering" all the cost-centres
-  in the program (done at startup time when the pgm is run).
-
-(The local cost-centres involved in this are passed
-into the code-generator, as are the imported-modules' names.)
+%************************************************************************
+%*									*
+\subsection[codegen-init]{Module initialisation code}
+%*									*
+%************************************************************************
 
 \begin{code}
-mkCostCentreStuff mod_name import_names (local_CCs, extern_CCs, singleton_CCSs)
-  | not opt_SccProfilingOn = AbsCNop
-  | otherwise = mkAbstractCs (
-		    map (CCostCentreDecl True)   local_CCs ++
-		    map (CCostCentreDecl False)  extern_CCs ++
-		    map CCostCentreStackDecl     singleton_CCSs ++
-		    mkCcRegister local_CCs singleton_CCSs import_names
-		)
+mkModuleInit 
+	:: [Id]			-- foreign exported functions
+	-> Module		-- module name
+	-> [ModuleName]		-- import names
+	-> ([CostCentre],	-- cost centre info
+	    [CostCentre],	
+	    [CostCentreStack])
+	-> AbstractC
+mkModuleInit fe_binders mod imps cost_centre_info
+  = let
+	register_fes = 
+	   map (\f -> CMacroStmt REGISTER_FOREIGN_EXPORT [f]) fe_labels
 
+    	fe_labels = 
+	   map (\f -> CLbl (mkClosureLabel (idName f)) PtrRep) fe_binders
+
+	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
+
+	mk_reg_lbl mod_name
+	  = CLitLit (_PK_ ("__init_" ++ moduleNameString mod_name)) AddrRep
+
+	mk_import_register import_name
+	  = CMacroStmt REGISTER_IMPORT [mk_reg_lbl import_name]
+
+	register_imports = map mk_import_register imps
+    in
+    mkAbstractCs [ 
+	cc_decls,
+        CModuleInitBlock (mk_reg_lbl (Module.moduleName mod))
+		         (mkAbstractCs (register_fes ++
+				        cc_regs :
+				        register_imports))
+    ]
+\end{code}
+
+Cost-centre profiling: Besides the usual stuff, we must produce
+declarations for the cost-centres defined in this module;
+
+(The local cost-centres involved in this are passed into the
+code-generator.)
+
+\begin{code}
+mkCostCentreStuff (local_CCs, extern_CCs, singleton_CCSs)
+  | not opt_SccProfilingOn = (AbsCNop, AbsCNop)
+  | otherwise = 
+	( mkAbstractCs (
+		map (CCostCentreDecl True)   local_CCs ++
+		map (CCostCentreDecl False)  extern_CCs ++
+		map CCostCentreStackDecl     singleton_CCSs),
+  	  mkAbstractCs (mkCcRegister local_CCs singleton_CCSs)
+	)
   where
-    mkCcRegister ccs cc_stacks import_names
+    mkCcRegister ccs cc_stacks
       = let
-	    register_ccs     = mkAbstractCs (map mk_register ccs)
-	    register_imports
-	      = foldr (mkAbsCStmts . mk_import_register) AbsCNop import_names
+	    register_ccs       = mkAbstractCs (map mk_register ccs)
 	    register_cc_stacks = mkAbstractCs (map mk_register_ccs cc_stacks)
 	in
-	[
-	    CCallProfCCMacro SLIT("START_REGISTER_CCS") 
-	       [ CLitLit (_PK_ ("_reg" ++ moduleString mod_name)) AddrRep],
-	    register_ccs,
-	    register_cc_stacks,
-	    register_imports,
-	    CCallProfCCMacro SLIT("END_REGISTER_CCS") []
-	]
+	[ register_ccs, register_cc_stacks ]
       where
 	mk_register cc
 	  = CCallProfCCMacro SLIT("REGISTER_CC") [mkCCostCentre cc]
 
 	mk_register_ccs ccs
 	  = CCallProfCCMacro SLIT("REGISTER_CCS") [mkCCostCentreStack ccs]
-
-	mk_import_register import_name
-	  = CCallProfCCMacro SLIT("REGISTER_IMPORT") 
-	      [CLitLit (_PK_ ("_reg" ++ moduleNameString import_name)) AddrRep]
 \end{code}
 
 %************************************************************************
