@@ -58,7 +58,7 @@ data PrimRep
   | WeakPtrRep
   | ForeignObjRep	
 
-  | StablePtrRep	-- guaranteed to be a represented by a pointer
+  | StablePtrRep	-- guaranteed to be represented by a pointer
 
   | StableNameRep	-- A stable name is a real heap object, unpointed,
 			-- with one field containing an index into the
