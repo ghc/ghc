@@ -43,6 +43,7 @@ module Foreign.C.String (   -- representation of strings in C
 import Foreign.Marshal.Array
 import Foreign.C.Types
 import Foreign.Ptr
+import Foreign.Storable
 
 import Data.Word
 
@@ -82,12 +83,32 @@ type CStringLen = (CString, Int)	-- strings with explicit length
 -- marshal a NUL terminated C string into a Haskell string 
 --
 peekCString    :: CString -> IO String
+#ifndef __GLASGOW_HASKELL__
 peekCString cp  = do cs <- peekArray0 nUL cp; return (cCharsToChars cs)
+#else
+peekCString cp = loop 0
+  where
+    loop i = do
+        val <- peekElemOff cp i
+        if val == nUL then return [] else do
+            rest <- loop (i+1)
+            return (castCCharToChar val : rest)
+#endif
 
 -- marshal a C string with explicit length into a Haskell string 
 --
 peekCStringLen           :: CStringLen -> IO String
+#ifndef __GLASGOW_HASKELL__
 peekCStringLen (cp, len)  = do cs <- peekArray len cp; return (cCharsToChars cs)
+#else
+peekCStringLen (cp, len) = loop 0
+  where
+    loop i | i == len  = return []
+	   | otherwise = do
+        	val <- peekElemOff cp i
+        	rest <- loop (i+1)
+        	return (castCCharToChar val : rest)
+#endif
 
 -- marshal a Haskell string into a NUL terminated C strings
 --
@@ -96,7 +117,17 @@ peekCStringLen (cp, len)  = do cs <- peekArray len cp; return (cCharsToChars cs)
 -- * new storage is allocated for the C string and must be explicitly freed
 --
 newCString :: String -> IO CString
+#ifndef __GLASGOW_HASKELL__
 newCString  = newArray0 nUL . charsToCChars
+#else
+newCString str = do
+  ptr <- mallocArray0 (length str)
+  let
+	go [] n#     = pokeElemOff ptr (I# n#) nUL
+    	go (c:cs) n# = do pokeElemOff ptr (I# n#) (castCharToCChar c); go cs (n# +# 1#)
+  go str 0#
+  return ptr
+#endif
 
 -- marshal a Haskell string into a C string (ie, character array) with
 -- explicit length information
@@ -104,8 +135,20 @@ newCString  = newArray0 nUL . charsToCChars
 -- * new storage is allocated for the C string and must be explicitly freed
 --
 newCStringLen     :: String -> IO CStringLen
+#ifndef __GLASGOW_HASKELL__
 newCStringLen str  = do a <- newArray (charsToCChars str)
 			return (pairLength str a)
+#else
+newCStringLen str = do
+  ptr <- mallocArray0 len
+  let
+	go [] n#     = return ()
+    	go (c:cs) n# = do pokeElemOff ptr (I# n#) (castCharToCChar c); go cs (n# +# 1#)
+  go str 0#
+  return (ptr, len)
+  where
+    len = length str
+#endif
 
 -- marshal a Haskell string into a NUL terminated C strings using temporary
 -- storage
@@ -115,7 +158,18 @@ newCStringLen str  = do a <- newArray (charsToCChars str)
 -- * see the lifetime constraints of `MarshalAlloc.alloca'
 --
 withCString :: String -> (CString -> IO a) -> IO a
+#ifndef __GLASGOW_HASKELL__
 withCString  = withArray0 nUL . charsToCChars
+#else
+withCString str f =
+  allocaArray0 (length str) $ \ptr ->
+      let
+	go [] n#     = pokeElemOff ptr (I# n#) nUL
+    	go (c:cs) n# = do pokeElemOff ptr (I# n#) (castCharToCChar c); go cs (n# +# 1#)
+      in do
+      go str 0#
+      f ptr
+#endif
 
 -- marshal a Haskell string into a NUL terminated C strings using temporary
 -- storage
@@ -125,7 +179,20 @@ withCString  = withArray0 nUL . charsToCChars
 -- * see the lifetime constraints of `MarshalAlloc.alloca'
 --
 withCStringLen         :: String -> (CStringLen -> IO a) -> IO a
+#ifndef __GLASGOW_HASKELL__
 withCStringLen str act  = withArray (charsToCChars str) $ act . pairLength str
+#else
+withCStringLen str f =
+  allocaArray len $ \ptr ->
+      let
+	go [] n#     = return ()
+    	go (c:cs) n# = do pokeElemOff ptr (I# n#) (castCharToCChar c); go cs (n# +# 1#)
+      in do
+      go str 0#
+      f (ptr,len)
+  where
+    len = length str
+#endif
 
 -- auxilliary definitions
 -- ----------------------
@@ -143,12 +210,12 @@ pairLength  = flip (,) . length
 -- cast [CChar] to [Char]
 --
 cCharsToChars :: [CChar] -> [Char]
-cCharsToChars  = map castCCharToChar
+cCharsToChars xs  = map castCCharToChar xs
 
 -- cast [Char] to [CChar]
 --
 charsToCChars :: [Char] -> [CChar]
-charsToCChars  = map castCharToCChar
+charsToCChars xs  = map castCharToCChar xs
 
 castCCharToChar :: CChar -> Char
 castCCharToChar ch = unsafeChr (fromIntegral (fromIntegral ch :: Word8))
