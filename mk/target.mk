@@ -318,6 +318,7 @@ $(AR) $(AR_OPTS) $@ $(ArSupportsInput) $@.list
 $(RM) $@.list
 $(RANLIB) $@
 endef
+endif
 
 # Extra stuff for compiling Haskell files with $(SplitObjs):
 
@@ -359,7 +360,6 @@ extraclean ::
 	$(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
 	-rmdir $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) > /dev/null 2>&1
 
-endif # $(way) == u
 endif # $(SplitObjs)
 endif # $(HS_SRCS)
 
