@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsCore.h,v 1.3 2001/09/13 11:40:28 simonmar Exp $
+ * $Id: HsCore.h,v 1.4 2001/09/14 11:25:57 simonmar Exp $
  *
  * Definitions for package `core' which are visible in Haskell land.
  *
@@ -9,6 +9,7 @@
 #define HSCORE_H
 
 #include "config.h"
+#include "HsFFI.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -91,6 +92,26 @@ extern inline int s_ischr_wrap(m)  { return S_ISCHR(m);  }
 #ifdef S_ISSOCK
 extern inline int s_issock_wrap(m) { return S_ISSOCK(m); }
 #endif
+
+extern inline void *
+memcpy_wrap_dst_off(char *dst, int dst_off, char *src, size_t sz)
+{ return memcpy(dst+dst_off, src, sz); }
+
+extern inline void *
+memcpy_wrap_src_off(char *dst, char *src, int src_off, size_t sz)
+{ return memcpy(dst, src+src_off, sz); }
+
+extern inline int
+read_ba_wrap(int fd, void *ptr, HsInt off, int size)
+{ return read(fd, ptr + off, size); }
+
+extern inline int
+write_wrap(int fd, void *ptr, HsInt off, int size)
+{ return write(fd, ptr + off, size); }
+
+extern inline int
+read_wrap(int fd, void *ptr, HsInt off, int size)
+{ return read(fd, ptr + off, size); }
 
 #include "lockFile.h"
 
