@@ -92,7 +92,7 @@ tidyLitPat lit lit_ty default_pat
   | lit_ty == floatTy  	  = ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
   | lit_ty == doubleTy 	  = ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
 
-		-- Convert literal patterns like "foo" to 'f':'o':'o':[]
+	-- Convert short string-literal patterns like "f" to 'f':[]
   | str_lit lit           = mk_list lit
 
   | otherwise = default_pat
@@ -116,10 +116,7 @@ tidyLitPat lit lit_ty default_pat
     mk_double (HsFrac f)     = HsDoublePrim f
     mk_double l@(HsLitLit s) = l
 
-    null_str_lit (HsString s) = _NULL_ s
-    null_str_lit other_lit    = False
-
-    str_lit (HsString s)     = True
+    str_lit (HsString s)     = _LENGTH_ s <= 1	-- Short string literals only
     str_lit _                = False
 
     mk_list (HsString s)     = foldr

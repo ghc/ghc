@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.36 2000/08/29 17:42:17 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.37 2000/09/07 09:10:07 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -108,14 +108,14 @@ default ()		-- Double isn't available yet
 %*********************************************************
 
 \begin{code}
-{-		
+{-
 data  Bool  =  False | True
 data Ordering = LT | EQ | GT 
 data Char = C# Char#
 type  String = [Char]
 data Int = I# Int#
 data  ()  =  ()
--- data [] a = MkNil
+data [] a = MkNil
 
 not True = False
 (&&) True True = True
@@ -195,7 +195,6 @@ class  Monad m  where
 
     m >> k      =  m >>= \_ -> k
     fail s      = error s
-
 \end{code}
 
 
@@ -454,6 +453,20 @@ ord :: Char -> Int
 ord (C# c) =  I# (ord# c)
 \end{code}
 
+String equality is used when desugaring pattern-matches against strings.
+It's worth making it fast, and providing a rule to use the fast version
+where possible.
+
+\begin{code}
+eqString :: String -> String -> Bool
+eqString []            []            = True
+eqString (C# c1 : cs1) (C# c2 : cs2) = c1 `eqChar#` c2 && cs1 `eqString` cs2
+eqString _	       _	     = False
+
+{-# RULES
+"eqString"  (==) = eqString
+  #-}  
+\end{code}
 
 %*********************************************************
 %*							*
@@ -715,5 +728,4 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
 -- 	unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}
-
 \end{code}
