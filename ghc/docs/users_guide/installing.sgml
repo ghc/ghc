@@ -681,7 +681,7 @@ The following environment variables must be set:
 <Entry><Constant>PATH</Constant></Entry>
 <Entry>System</Entry>
 <Entry><Para>
-Add <Filename>C:\cygnus\cygwin-b20\H-i586-cygwin32\bin</Filename>.
+Add <Filename>C:/cygnus/cygwin-b20/H-i586-cygwin32/bin</Filename>.
 <Command>bash</Command> needs this, and when it is invoked from <Filename>/bin</Filename> it can't
 find it. <Filename>c:/bin</Filename> and <Filename>c:/usr/local/bin</Filename> should also be added.
 </Para></Entry>
