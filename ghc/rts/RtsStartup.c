@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.31 2000/03/08 17:48:24 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.32 2000/03/09 11:49:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -133,7 +133,9 @@ startupHaskell(int argc, char *argv[])
 #endif
 
     /* run the per-module initialisation code */
+#if !defined(INTERPRETER)
     initModules();
+#endif
 
 #if defined(PROFILING) || defined(DEBUG)
     initProfiling2();
@@ -203,6 +205,8 @@ startupHaskell(int argc, char *argv[])
    StgRun to call this stuff.
    -------------------------------------------------------------------------- */
 
+#ifndef INTERPRETER
+
 /* The init functions use an explicit stack... 
  */
 #define INIT_STACK_SIZE  (BLOCK_SIZE * 4)
@@ -218,6 +222,8 @@ initModules ( void )
 
   StgRun((StgFunPtr)stg_init, NULL/* no reg table */);
 }
+
+#endif /* !INTERPRETER */
 
 /* -----------------------------------------------------------------------------
  * Shutting down the RTS - two ways of doing this, one which
