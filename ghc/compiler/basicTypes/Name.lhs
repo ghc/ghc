@@ -17,7 +17,7 @@ module Name (
 
 	nameUnique, setNameUnique,
 	nameOccName, nameModule, nameModule_maybe,
-	setNameOcc, setNameModuleAndLoc, 
+	setNameOcc, setNameSrcLoc, 
 	hashName, externaliseName, localiseName,
 
 	nameSrcLoc, eqNameByOcc,
@@ -230,10 +230,8 @@ externaliseName n mod = n { n_sort = External mod }
 localiseName :: Name -> Name
 localiseName n = n { n_sort = Internal }
 				
-setNameModuleAndLoc :: Name -> Module -> SrcLoc -> Name
-setNameModuleAndLoc name mod loc = name {n_sort = set (n_sort name), n_loc = loc}
-		       where
-			 set (External _) = External mod
+setNameSrcLoc :: Name -> SrcLoc -> Name
+setNameSrcLoc name loc = name {n_loc = loc}
 \end{code}
 
 

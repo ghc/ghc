@@ -31,7 +31,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 import TcRnMonad
 import Name		( Name, getName, getSrcLoc, nameIsLocalOrFrom, isWiredInName,
 			  mkInternalName, mkExternalName, mkIPName, nameSrcLoc,
-			  nameOccName, setNameModuleAndLoc, nameModule	)
+			  nameOccName, setNameSrcLoc, nameModule	)
 import NameSet
 import OccName		( OccName, tcName, isDataOcc, occNameUserString, occNameFlavour )
 import Module		( Module, ModuleName, moduleName, mkHomeModule,
@@ -66,13 +66,6 @@ import FastString	( FastString )
 
 \begin{code}
 newTopBinder :: Module -> RdrName -> SrcLoc -> TcRn m Name
-	-- newTopBinder puts into the cache the binder with the
-	-- module information set correctly.  When the decl is later renamed,
-	-- the binding site will thereby get the correct module.
-	-- There maybe occurrences that don't have the correct Module, but
-	-- by the typechecker will propagate the binding definition to all 
-	-- the occurrences, so that doesn't matter
-
 newTopBinder mod rdr_name loc
   | Just name <- isExact_maybe rdr_name
   = returnM name
@@ -88,15 +81,21 @@ newGlobalName mod occ loc
 
 	-- A hit in the cache!  We are at the binding site of the name.
 	-- This is the moment when we know the defining SrcLoc
-	-- of the Name.  However, since we must have encountered an 
-	-- occurrence before the binding site, this must be an 
-	-- implicitly-imported name and we can't give a useful SrcLoc to
-	-- it.  So we just leave it alone.
+	-- of the Name, so we set the SrcLoc of the name we return.
 	--
-	-- IMPORTANT: don't mess with wired-in names.  
-	-- Their wired-in-ness is in the SrcLoc
+	-- Main reason: then (bogus) multiple bindings of the same Name
+	-- 		get different SrcLocs can can be reported as such.
+	--
+	-- Possible other reason: it might be in the cache because we
+	-- 	encountered an occurrence before the binding site for an
+	--	implicitly-imported Name.  Perhaps the current SrcLoc is
+	--	better... but not really: it'll still just say 'imported'
+	--
+	-- IMPORTANT: Don't mess with wired-in names.  
+	-- 	      Their wired-in-ness is in the SrcLoc
 
-	Just name -> returnM name
+	Just name | isWiredInName name -> returnM name
+		  | otherwise	       -> returnM (setNameSrcLoc name loc)
 		     
 	-- Miss in the cache!
 	-- Build a completely new Name, and put it in the cache
