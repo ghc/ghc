@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.23 2002/02/28 08:53:13 sof Exp $
+ * $Id: HeapStackCheck.hc,v 1.24 2002/02/28 16:25:15 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -1256,14 +1256,14 @@ FN_(stg_block_1)
  *      
  *       ret. addr
  *       ptr to MVar   (R1)
- *       stg_block_takemvar_ret
+ *       stg_block_takemvar_info
  *
  * Stack layout for a thread blocked in putMVar:
  *      
  *       ret. addr
  *       ptr to Value  (R2)
  *       ptr to MVar   (R1)
- *       stg_block_putmvar_ret
+ *       stg_block_putmvar_info
  *
  * See PrimOps.hc for a description of the workings of take/putMVar.
  * 
@@ -1287,7 +1287,7 @@ FN_(stg_block_takemvar)
   FB_
   Sp -= 2;
   Sp[1] = R1.w;
-  Sp[0] = (W_)&stg_block_takemvar_ret;
+  Sp[0] = (W_)&stg_block_takemvar_info;
   BLOCK_GENERIC;
   FE_
 }
@@ -1312,7 +1312,7 @@ FN_(stg_block_putmvar)
   Sp -= 3;
   Sp[2] = R2.w;
   Sp[1] = R1.w;
-  Sp[0] = (W_)&stg_block_putmvar_ret;
+  Sp[0] = (W_)&stg_block_putmvar_info;
   BLOCK_GENERIC;
   FE_
 }
