@@ -398,7 +398,7 @@ instFunDeps orig theta
 
 instFunDepsOfTheta theta
   = let ifd (Class clas tys) = instantiateFdClassTys clas tys
-	ifd _ = []
+	ifd (IParam n ty)    = [([], [ty])]
     in concat (map ifd theta)
 
 newMethodWithGivenTy orig id tys theta tau

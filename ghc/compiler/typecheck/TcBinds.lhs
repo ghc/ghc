@@ -554,7 +554,6 @@ getTyVarsToGen is_unrestricted mono_id_tys lie
 	let tvFundep 	    = tyVarFunDep fds'
 	    extended_tyvars = oclose tvFundep body_tyvars
  	in
-	-- pprTrace "gTVTG" (ppr (lie, body_tyvars, extended_tyvars)) $
 	returnNF_Tc (emptyVarSet, extended_tyvars)
     else
 	-- This recover and discard-errs is to avoid duplicate error
