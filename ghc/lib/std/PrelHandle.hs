@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hs,v 1.5 2001/11/26 23:55:27 sof Exp $
+-- $Id: PrelHandle.hs,v 1.6 2001/11/27 01:53:23 sof Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -307,10 +307,9 @@ handleFinalizer m = do
   flushWriteBufferOnly h_
   let fd = fromIntegral (haFD h_)
   unlockFile fd
-  -- ToDo: closesocket() for a WINSOCK socket?
   when (fd /= -1) 
 #ifdef mingw32_TARGET_OS
-       (closeFd (haIsStream handle_) fd >> return ())
+       (closeFd (haIsStream h_) fd >> return ())
 #else
        (c_close fd >> return ())
 #endif
