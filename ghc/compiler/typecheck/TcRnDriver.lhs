@@ -35,7 +35,7 @@ import PrelNames	( iNTERACTIVE, ioTyConName, printName,
 			  dollarMainName, itName, mAIN_Name
 			)
 import MkId		( unsafeCoerceId )
-import RdrName		( RdrName, getRdrName, mkUnqual, mkRdrUnqual, 
+import RdrName		( RdrName, getRdrName, mkRdrUnqual, 
 			  lookupRdrEnv, elemRdrEnv )
 
 import RnHsSyn		( RenamedStmt, RenamedTyClDecl, 
@@ -71,16 +71,15 @@ import TcInstDcls	( tcInstDecls1, tcIfaceInstDecls, tcInstDecls2 )
 import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
 
-import RnNames		( rnImports, exportsFromAvail, reportUnusedNames )
+import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail, 
+			  reportUnusedNames, main_RDR_Unqual )
 import RnIfaces		( slurpImpDecls, checkVersions, RecompileRequired, outOfDate )
 import RnHiFiles	( readIface, loadOldIface )
 import RnEnv		( lookupSrcName, lookupOccRn, plusGlobalRdrEnv,
 			  ubiquitousNames, implicitModuleFVs, implicitStmtFVs, dataTcOccs )
 import RnExpr		( rnStmts, rnExpr )
-import RnNames		( importsFromLocalDecls )
 import RnSource		( rnSrcDecls, checkModDeprec, rnStats )
 
-import OccName		( varName )
 import CoreUnfold	( unfoldingTemplate )
 import CoreSyn		( IdCoreRule, Bind(..) )
 import PprCore		( pprIdRules, pprCoreBindings )
@@ -178,8 +177,12 @@ tcRnModule hsc_env pcs
 	updGblEnv (\gbl -> gbl { tcg_exports = export_avails })
 		  $  do {
 
-		-- Get the supporting decls for the exports
-		-- This is important *only* to gether usage information
+		-- Get any supporting decls for the exports that have not already
+		-- been sucked in for the declarations in the body of the module.
+		-- (This can happen if something is imported only to be re-exported.)
+		--
+		-- Importing these supporting declarations is required 
+		--	*only* to gether usage information
 		--	(see comments with MkIface.mkImportInfo for why)
 		-- For OneShot compilation we could just throw away the decls
 		-- but for Batch or Interactive we must put them in the type
@@ -1112,12 +1115,6 @@ check_main ghci_mode tcg_env
     mod_name = moduleName (tcg_mod tcg_env) 
     rdr_env  = tcg_rdr_env tcg_env
  
-    main_RDR_Unqual :: RdrName
-    main_RDR_Unqual = mkUnqual varName FSLIT("main")
-	-- Don't get a RdrName from PrelNames.mainName, because 
-	-- nameRdrNamegets an Orig RdrName, and we want a Qual or Unqual one.  
-	-- An Unqual one will do just fine
-
     complain_no_main | ghci_mode == Interactive = return ()
 		     | otherwise 		= addErr noMainMsg
 	-- In interactive mode, don't worry about the absence of 'main'
