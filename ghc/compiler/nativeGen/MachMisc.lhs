@@ -320,7 +320,7 @@ primRepToSize CodePtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc(
 primRepToSize DataPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize RetRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize CostCentreRep = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize CharRep	    = IF_ARCH_alpha( BU, IF_ARCH_i386( L, IF_ARCH_sparc( BU,)))
+primRepToSize CharRep	    = IF_ARCH_alpha( BU, IF_ARCH_i386( B, IF_ARCH_sparc( BU,)))
 primRepToSize IntRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize WordRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize AddrRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
@@ -478,8 +478,8 @@ current translation.
 -- Moves.
 
 	      |	MOV	      Size Operand Operand
-	      | MOVZX	      Size Operand Operand -- size is the size of operand 2
-	      | MOVSX	      Size Operand Operand -- size is the size of operand 2
+	      | MOVZxL	      Size Operand Operand -- size is the size of operand 1
+	      | MOVSxL	      Size Operand Operand -- size is the size of operand 1
 
 -- Load effective address (also a very useful three-operand add instruction :-)
 

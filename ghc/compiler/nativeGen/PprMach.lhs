@@ -10,7 +10,7 @@ We start with the @pprXXX@s with some cross-platform commonality
 \begin{code}
 #include "nativeGen/NCG.h"
 
-module PprMach ( pprInstr ) where
+module PprMach ( pprInstr, pprSize ) where
 
 #include "HsVersions.h"
 
@@ -398,11 +398,10 @@ pprInstr (COMMENT s)
      ,)))
 
 pprInstr (SEGMENT TextSegment)
-    = ptext
-	 IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
-	,IF_ARCH_sparc(SLIT("\t.text\n\t.align 4") {-word boundary-}
-	,IF_ARCH_i386(SLIT(".text\n\t.align 4,0x90") {-needs per-OS variation!-}
-	,)))
+    =  IF_ARCH_alpha(ptext SLIT("\t.text\n\t.align 3") {-word boundary-}
+      ,IF_ARCH_sparc(ptext SLIT("\t.text\n\t.align 4") {-word boundary-}
+      ,IF_ARCH_i386((text ".text\n\t.align 4,0x90") {-needs per-OS variation!-}
+      ,)))
 
 pprInstr (SEGMENT DataSegment)
     = ptext
@@ -946,8 +945,8 @@ pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack
 #endif
 pprInstr (MOV size src dst)
   = pprSizeOpOp SLIT("mov") size src dst
-pprInstr (MOVZX size src dst) = pprSizeOpOpCoerce SLIT("movzx") L size src dst
-pprInstr (MOVSX size src dst) = pprSizeOpOpCoerce SLIT("movxs") L size src dst
+pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce SLIT("movz") sizes L src dst
+pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce SLIT("movs") sizes L src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
@@ -1084,6 +1083,7 @@ gtab  = char '\t'
 gsp   = char ' '
 gregno (FixedReg i) = I# i
 gregno (MappedReg i) = I# i
+gregno other = pprPanic "gregno" (text (show other))
 
 pprG :: Instr -> SDoc -> SDoc
 pprG fake actual
@@ -1255,7 +1255,7 @@ pprOpOp name size op1 op2
 
 pprSizeOpOpCoerce :: FAST_STRING -> Size -> Size -> Operand -> Operand -> SDoc
 pprSizeOpOpCoerce name size1 size2 op1 op2
-  = hcat [ char '\t', ptext name, space,
+  = hcat [ char '\t', ptext name, pprSize size1, pprSize size2, space,
 	pprOperand size1 op1,
 	comma,
 	pprOperand size2 op2

@@ -22,8 +22,9 @@ import AsmRegAlloc	( runRegAllocate )
 import OrdList		( OrdList )
 import PrimOp		( commutableOp, PrimOp(..) )
 import RegAllocInfo	( mkMRegsState, MRegsState )
-import Stix		( StixTree(..), StixReg(..), pprStixTrees )
-import PrimRep		( isFloatingRep )
+import Stix		( StixTree(..), StixReg(..), 
+                          pprStixTrees, CodeSegment(..) )
+import PrimRep		( isFloatingRep, PrimRep(..) )
 import UniqSupply	( returnUs, thenUs, mapUs, initUs, 
                           initUs_, UniqSM, UniqSupply )
 import UniqFM		( UniqFM, emptyUFM, addToUFM, lookupUFM )

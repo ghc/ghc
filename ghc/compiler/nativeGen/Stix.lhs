@@ -5,7 +5,7 @@
 \begin{code}
 module Stix (
 	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
-	sStLitLbl, pprStixTrees,
+	sStLitLbl, pprStixTrees, ppStixReg,
 
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
         stgHp, stgHpLim, stgTagReg, stgR9, stgR10,
@@ -100,6 +100,14 @@ data StixTree
 
   | StCall FAST_STRING CallConv PrimRep [StixTree]
 
+    -- A volatile memory scratch array, which is allocated
+    -- relative to the stack pointer.  It is an array of
+    -- ptr/word/int sized things.  Do not expect to be preserved
+    -- beyond basic blocks or over a ccall.  Current max size
+    -- is 6, used in StixInteger.
+
+  | StScratchWord Int
+
     -- Assembly-language comments
 
   | StComment FAST_STRING
@@ -146,8 +154,9 @@ ppStixTree t
        StCall nm cc k args
           -> paren (text "Call" <+> ptext nm <+>
                pprCallConv cc <+> pprPrimRep k <+> hsep (map ppStixTree args))
-     where 
-        pprPrimRep = text . showPrimRep
+       StScratchWord i -> text "ScratchWord" <> paren (int i)
+
+pprPrimRep = text . showPrimRep
 \end{code}
 
 Stix registers can have two forms.  They {\em may} or {\em may not}
@@ -167,10 +176,10 @@ ppStixReg (StixTemp u pr)
 
 
 ppMId BaseReg              = text "BaseReg"
-ppMId (VanillaReg kind n)  = hcat [text "IntReg(", int (I# n), char ')']
+ppMId (VanillaReg kind n)  = hcat [pprPrimRep kind, text "IntReg(", int (I# n), char ')']
 ppMId (FloatReg n)         = hcat [text "FltReg(", int (I# n), char ')']
 ppMId (DoubleReg n)        = hcat [text "DblReg(", int (I# n), char ')']
-ppMId (LongReg kind n)     = hcat [text "LongReg(", int (I# n), char ')']
+ppMId (LongReg kind n)     = hcat [pprPrimRep kind, text "LongReg(", int (I# n), char ')']
 ppMId Sp                   = text "Sp"
 ppMId Su                   = text "Su"
 ppMId SpLim                = text "SpLim"

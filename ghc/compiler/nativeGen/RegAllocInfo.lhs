@@ -355,8 +355,8 @@ regUsage instr = case instr of
 
 regUsage instr = case instr of
     MOV  sz src dst	-> usage2 src dst
-    MOVZX sz src dst	-> usage2 src dst
-    MOVSX sz src dst	-> usage2 src dst
+    MOVZxL sz src dst	-> usage2 src dst
+    MOVSxL sz src dst	-> usage2 src dst
     LEA  sz src dst	-> usage2 src dst
     ADD  sz src dst	-> usage2 src dst
     SUB  sz src dst	-> usage2 src dst
@@ -409,7 +409,7 @@ regUsage instr = case instr of
     LABEL _		-> noUsage
     ASCII _ _		-> noUsage
     DATA _ _		-> noUsage
-    _			-> error ("regUsage: " ++ showSDoc (pprInstr instr)) --noUsage
+    _			-> error ("regUsage(x86): " ++ showSDoc (pprInstr instr))
  where
     usage2 :: Operand -> Operand -> RegUsage
     usage2 op (OpReg reg) = usage (opToReg op) [reg]
@@ -640,8 +640,8 @@ patchRegs instr env = case instr of
 
 patchRegs instr env = case instr of
     MOV  sz src dst	-> patch2 (MOV  sz) src dst
-    MOVZX sz src dst	-> patch2 (MOVZX sz) src dst
-    MOVSX sz src dst	-> patch2 (MOVSX sz) src dst
+    MOVZxL sz src dst	-> patch2 (MOVZxL sz) src dst
+    MOVSxL sz src dst	-> patch2 (MOVSxL sz) src dst
     LEA  sz src dst	-> patch2 (LEA  sz) src dst
     ADD  sz src dst	-> patch2 (ADD  sz) src dst
     SUB  sz src dst	-> patch2 (SUB  sz) src dst

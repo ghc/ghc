@@ -53,19 +53,20 @@ and modify our heap check accordingly.
 \begin{code}
 -- NB: ordering of clauses somewhere driven by
 -- the desire to getting sane patt-matching behavior
-primCode res@[ar,sr,dr] IntegerNegOp arg@[aa,sa,da]
-  = gmpNegate (ar,sr,dr) (aa,sa,da)
-\end{code}
+primCode res@[sr,dr] IntegerNegOp arg@[sa,da]
+  = gmpNegate (sr,dr) (sa,da)
 
-\begin{code}
-primCode [res] IntegerCmpOp args@[aa1,sa1,da1, aa2,sa2,da2]
-  = gmpCompare res (aa1,sa1,da1, aa2,sa2,da2)
+primCode [res] IntegerCmpOp args@[sa1,da1, sa2,da2]
+  = gmpCompare res (sa1,da1, sa2,da2)
 
-primCode [res] Integer2IntOp arg@[aa,sa,da]
-  = gmpInteger2Int res (aa,sa,da)
+primCode [res] IntegerCmpIntOp args@[sa1,da1,ai]
+  = gmpCompareInt res (sa1,da1,ai)
 
-primCode [res] Integer2WordOp arg@[aa,sa,da]
-  = gmpInteger2Word res (aa,sa,da)
+primCode [res] Integer2IntOp arg@[sa,da]
+  = gmpInteger2Int res (sa,da)
+
+primCode [res] Integer2WordOp arg@[sa,da]
+  = gmpInteger2Word res (sa,da)
 
 primCode [res] Int2AddrOp [arg]
   = simpleCoercion AddrRep res arg
@@ -350,7 +351,7 @@ amodeToStix (CCharLike (CLit (MachChar c)))
     off = charLikeSize * ord c
 
 amodeToStix (CCharLike x)
-  = StIndex PtrRep charLike off
+  = StIndex CharRep charLike off
   where
     off = StPrim IntMulOp [amodeToStix x, StInt (toInteger charLikeSize)]
 

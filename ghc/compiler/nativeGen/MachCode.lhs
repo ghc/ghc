@@ -27,12 +27,14 @@ import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
 import CallConv		( cCallConv )
 import Stix		( getUniqLabelNCG, StixTree(..),
-			  StixReg(..), CodeSegment(..), pprStixTrees
+			  StixReg(..), CodeSegment(..), 
+                          pprStixTrees, ppStixReg
 			)
 import UniqSupply	( returnUs, thenUs, mapUs, mapAndUnzipUs,
 			  mapAccumLUs, UniqSM
 			)
 import Outputable
+import PprMach 		( pprSize )
 \end{code}
 
 Code extractor for an entire stix tree---stix statement level.
@@ -44,30 +46,7 @@ stmt2Instrs stmt = case stmt of
     StComment s    -> returnInstr (COMMENT s)
     StSegment seg  -> returnInstr (SEGMENT seg)
 
-#if 1
-    -- StFunBegin, normal non-debugging code for all architectures
     StFunBegin lab -> returnInstr (IF_ARCH_alpha(FUNBEGIN lab,LABEL lab))
-#else
-    -- StFunBegin, special tracing code for x86-Linux only
-    -- requires you to supply
-    -- void native_trace ( char* str )
-    StFunBegin lab -> getUniqLabelNCG `thenUs` \ str_lbl ->
-                      returnUs (mkSeqInstrs [
-                         LABEL lab,
-                         COMMENT SLIT("begin trace sequence"),
-                         SEGMENT DataSegment,
-                         LABEL str_lbl,
-                         ASCII True (showSDoc (pprCLabel_asm lab)),
-                         SEGMENT TextSegment,
-                         PUSHA,
-                         PUSH L (OpImm (ImmCLbl str_lbl)),
-                         CALL (ImmLit (text "native_trace")),
-		         ADD L (OpImm (ImmInt 4)) (OpReg esp),
-                         POPA,
-                         COMMENT SLIT("end trace sequence")
-                      ])
-#endif
-
     StFunEnd lab   -> IF_ARCH_alpha(returnInstr (FUNEND lab),returnUs id)
     StLabel lab	   -> returnInstr (LABEL lab)
 
@@ -152,29 +131,17 @@ mangleIndexTree (StIndex pk base (StInt i))
   where
     off = StInt (i * sizeOf pk)
 
-#ifndef i386_TARGET_ARCH
 mangleIndexTree (StIndex pk base off)
-  = StPrim IntAddOp [base,
-      case pk of
-    	CharRep -> off
-    	_	-> let
-			s = shift pk
-		   in
-		   ASSERT(toInteger s == expectJust "MachCode" (exactLog2 (sizeOf pk)))
-		   StPrim SllOp [off, StInt s]
-    ]
+  = StPrim IntAddOp [
+       base,
+       let s = shift pk
+       in  ASSERT(toInteger s == expectJust "MachCode" (exactLog2 (sizeOf pk)))
+           if s == 0 then off else StPrim SllOp [off, StInt s]
+      ]
   where
     shift DoubleRep 	= 3::Integer
+    shift CharRep       = 0::Integer
     shift _ 	       	= IF_ARCH_alpha(3,2)
-#else
--- Hmm..this is an attempt at fixing Adress amodes (i.e., *[disp](base,index,<n>),
--- that do include the size of the primitive kind we're addressing. When StIndex
--- is expanded to actual code, the index (in units) is by the above code approp.
--- shifted to get the no. of bytes. Since Address amodes do contain size info
--- explicitly, we disable the shifting for x86s.
-mangleIndexTree (StIndex pk base off) = StPrim IntAddOp [base, off]
-#endif
-
 \end{code}
 
 \begin{code}
@@ -517,6 +484,9 @@ getRegister (StDouble d)
     in
     returnUs (Any DoubleRep code)
 
+getRegister (StScratchWord i)
+   = let code dst = mkSeqInstr (LEA L (OpAddr (spRel (-1000+i))) (OpReg dst))
+     in returnUs (Any PtrRep code)
 
 getRegister (StPrim primop [x]) -- unary PrimOps
   = case primop of
@@ -580,6 +550,10 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      DoubleCoshOp  -> (False, SLIT("cosh"))
 	      DoubleTanhOp  -> (False, SLIT("tanh"))
 
+              other
+                 -> pprPanic "getRegister(x86,unary primop)" 
+                             (pprStixTrees [StPrim primop [x]])
+
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
       CharGtOp -> condIntReg GTT x y
@@ -624,15 +598,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       DoubleLtOp -> condFltReg LTT x y
       DoubleLeOp -> condFltReg LE x y
 
-      IntAddOp  -> {- ToDo: fix this, whatever it is (WDP 96/04)...
-		   -- this should be optimised by the generic Opts,
-		   -- I don't know why it is not (sometimes)!
-		   case args of
-		    [x, StInt 0] -> getRegister x
-		    _ -> add_code L x y
-		   -}
-		   add_code  L x y
-
+      IntAddOp  -> add_code  L x y
       IntSubOp  -> sub_code  L x y
       IntQuotOp -> quot_code L x y True{-division-}
       IntRemOp  -> quot_code L x y False{-remainder-}
@@ -669,6 +635,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 		       where promote x = StPrim Float2DoubleOp [x]
       DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep 
                                            [x, y])
+      other
+         -> pprPanic "getRegister(x86,dyadic primop)" 
+                     (pprStixTrees [StPrim primop [x, y]])
   where
 
     --------------------
@@ -743,7 +712,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    src2 = ImmInt (fromInteger y)
 	    code__2 dst 
                = code .
-		 mkSeqInstr (LEA sz (OpAddr (AddrBaseIndex (Just src1) Nothing src2)) 
+		 mkSeqInstr (LEA sz (OpAddr (AddrBaseIndex (Just src1) Nothing src2))
                                     (OpReg dst))
 	in
 	returnUs (Any IntRep code__2)
@@ -891,7 +860,6 @@ getRegister leaf
     	returnUs (Any PtrRep code)
   | otherwise
   = pprPanic "getRegister(x86)" (pprStixTrees [leaf])
-
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
@@ -1182,7 +1150,8 @@ getAmode (StPrim IntAddOp [x, StInt i])
     in
     returnUs (Amode (AddrBaseIndex (Just reg) Nothing off) code)
 
-getAmode (StPrim IntAddOp [x, y])
+getAmode (StPrim IntAddOp [x, StPrim SllOp [y, StInt shift]])
+  | shift == 0 || shift == 1 || shift == 2 || shift == 3
   = getNewRegNCG PtrRep		`thenUs` \ tmp1 ->
     getNewRegNCG IntRep    	`thenUs` \ tmp2 ->
     getRegister x    	    	`thenUs` \ register1 ->
@@ -1193,8 +1162,10 @@ getAmode (StPrim IntAddOp [x, y])
     	code2 = registerCode register2 tmp2 asmVoid
     	reg2  = registerName register2 tmp2
     	code__2 = asmParThen [code1, code2]
+        base = case shift of 0 -> 1 ; 1 -> 2; 2 -> 4; 3 -> 8
     in
-    returnUs (Amode (AddrBaseIndex (Just reg1) (Just (reg2,4)) (ImmInt 0)) code__2)
+    returnUs (Amode (AddrBaseIndex (Just reg1) (Just (reg2,base)) (ImmInt 0))
+                    code__2)
 
 getAmode leaf
   | maybeToBool imm
@@ -1609,24 +1580,24 @@ assignIntCode pk dst src
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
-assignIntCode pk (StInd _ dst) src
+assignIntCode pk dd@(StInd _ dst) src
   = getAmode dst		`thenUs` \ amode ->
-    get_op_RI src		`thenUs` \ (codesrc, opsrc, sz) ->
+    get_op_RI src		`thenUs` \ (codesrc, opsrc) ->
     let
     	code1   = amodeCode amode asmVoid
     	dst__2  = amodeAddr amode
     	code__2 = asmParThen [code1, codesrc asmVoid] .
-		  mkSeqInstr (MOV sz opsrc (OpAddr dst__2))
+		  mkSeqInstr (MOV (primRepToSize pk) opsrc (OpAddr dst__2))
     in
     returnUs code__2
   where
     get_op_RI
 	:: StixTree
-	-> UniqSM (InstrBlock,Operand, Size)	-- code, operator, size
+	-> UniqSM (InstrBlock,Operand)	-- code, operator
 
     get_op_RI op
       | maybeToBool imm
-      = returnUs (asmParThen [], OpImm imm_op, L)
+      = returnUs (asmParThen [], OpImm imm_op)
       where
 	imm    = maybeImm op
 	imm_op = case imm of Just x -> x
@@ -1638,12 +1609,10 @@ assignIntCode pk (StInd _ dst) src
 	let
 	    code = registerCode register tmp
 	    reg  = registerName register tmp
-	    pk   = registerRep  register
-	    sz   = primRepToSize pk
 	in
-	returnUs (code, OpReg reg, sz)
+	returnUs (code, OpReg reg)
 
-assignIntCode pk dst (StInd _ src)
+assignIntCode pk dst (StInd pks src)
   = getNewRegNCG IntRep    	    `thenUs` \ tmp ->
     getAmode src    	    	    `thenUs` \ amode ->
     getRegister dst	    	    	    `thenUs` \ register ->
@@ -1652,9 +1621,11 @@ assignIntCode pk dst (StInd _ src)
     	src__2  = amodeAddr amode
     	code2   = registerCode register tmp asmVoid
     	dst__2  = registerName register tmp
-    	sz      = primRepToSize pk
+    	szs     = primRepToSize pks
     	code__2 = asmParThen [code1, code2] .
-		  mkSeqInstr (MOV sz (OpAddr src__2) (OpReg dst__2))
+                  case szs of
+                     L -> mkSeqInstr (MOV L (OpAddr src__2) (OpReg dst__2))
+                     B -> mkSeqInstr (MOVZxL B (OpAddr src__2) (OpReg dst__2))
     in
     returnUs code__2
 
@@ -3056,7 +3027,6 @@ chrCode x
 
 chrCode x
   = getRegister x		`thenUs` \ register ->
-    --getNewRegNCG IntRep	`thenUs` \ reg ->
     let
     	code__2 dst = let
     	                  code = registerCode register dst
