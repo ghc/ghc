@@ -317,10 +317,10 @@ setErrsVar v = updEnv (\ env@(Env { env_top = top_env }) ->
 			 env { env_top = top_env { top_errs = v }})
 
 addErr :: Message -> TcRn m ()
-addErr msg = do { loc <- getSrcLocM ; add_err loc msg }
+addErr msg = do { loc <- getSrcLocM ; addErrAt loc msg }
 
-add_err :: SrcLoc -> Message -> TcRn m ()
-add_err loc msg
+addErrAt :: SrcLoc -> Message -> TcRn m ()
+addErrAt loc msg
  = do {  errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
 	 let { err = addShortErrLocLine loc (unQualInScope rdr_env) msg } ;
@@ -330,7 +330,7 @@ add_err loc msg
 addErrs :: [(SrcLoc,Message)] -> TcRn m ()
 addErrs msgs = mappM_ add msgs
 	     where
-	       add (loc,msg) = add_err loc msg
+	       add (loc,msg) = addErrAt loc msg
 
 addWarn :: Message -> TcRn m ()
 addWarn msg
@@ -625,7 +625,7 @@ warnTc warn_if_true warn_msg
 \begin{code}
 add_err_tcm tidy_env err_msg loc ctxt
  = do { ctxt_msgs <- do_ctxt tidy_env ctxt ;
-	add_err loc (vcat (err_msg : ctxt_to_use ctxt_msgs)) }
+	addErrAt loc (vcat (err_msg : ctxt_to_use ctxt_msgs)) }
 
 do_ctxt tidy_env []
  = return []

@@ -463,13 +463,13 @@ checkLoops is_rec decls
 	cls_edges  = mapMaybe mkClassEdges decls
 	cls_cycles = findCycles cls_edges
     in
-    checkTc (null cls_cycles) (classCycleErr cls_cycles)	`thenM_`
+    mapM_ (cycleErr "class") cls_cycles		`thenM_`
 
     let		-- CHECK FOR SYNONYM CYCLES
 	syn_edges  = map mkEdges (filter isSynDecl decls)
 	syn_cycles = findCycles syn_edges
     in
-    checkTc (null syn_cycles) (typeCycleErr syn_cycles)		`thenM_`
+    mapM_ (cycleErr "type synonym") syn_cycles	`thenM_`
 
     let 	-- CHECK FOR NEWTYPE CYCLES
 	newtype_edges  = map mkEdges (filter is_nt_cycle_decl decls)
@@ -517,21 +517,17 @@ mkClassEdges other_decl				   	       = Nothing
 %************************************************************************
 
 \begin{code}
-typeCycleErr, classCycleErr :: [[RenamedTyClDecl]] -> Message
+cycleErr :: String -> [RenamedTyClDecl] -> TcM ()
 
-typeCycleErr syn_cycles
-  = vcat (map (pp_cycle "Cycle in type declarations:") syn_cycles)
+cycleErr kind_of_decl decls
+  = addErrAt loc (ppr_cycle kind_of_decl decls)
+  where
+    loc = tcdLoc (head decls)
 
-classCycleErr cls_cycles
-  = vcat (map (pp_cycle "Cycle in class declarations:") cls_cycles)
-
-pp_cycle str decls
-  = hang (text str)
+ppr_cycle kind_of_decl decls
+  = hang (ptext SLIT("Cycle in") <+> text kind_of_decl <+> ptext SLIT("declarations:"))
 	 4 (vcat (map pp_decl decls))
   where
-    pp_decl decl
-      = hsep [quotes (ppr name), ptext SLIT("at"), ppr (getSrcLoc name)]
-     where
-        name = tyClDeclName decl
-
+    pp_decl decl = hsep [quotes (ppr (tcdName decl)), 
+			 ptext SLIT("at"), ppr (tcdLoc decl)]
 \end{code}
