@@ -209,7 +209,9 @@ endif
 
 %.html : %.tex
 	@$(RM) $@
-	$(LATEX2HTML) $(LATEX2HTML_OPTS) $<
+	$(LATEX2HTML) $(LATEX2HTML_OPTS) $(patsubst %.tex,%.hva,$<) $<
+	$(LATEX2HTML) $(LATEX2HTML_OPTS) $(patsubst %.tex,%.hva,$<) $<
+# Make twice to resolve xrefs
 
 %.rtf : %.sgml
 	@$(RM) $@
