@@ -47,13 +47,13 @@ stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
 stg2stg stg_todos module_name us binds
   = case (splitUniqSupply us)	of { (us4now, us4later) ->
 
-    doIfSet do_verbose_stg2stg
-	(printErrs (text "VERBOSE STG-TO-STG:" $$
-		    text "*** Core2Stg:" $$
-		    vcat (map ppr (setStgVarInfo False binds)))) >>
+    doIfSet opt_D_verbose_stg2stg (printErrs (text "VERBOSE STG-TO-STG:")) >>
+
+    end_pass us4now "Core2Stg" ([],[],[]) binds
+		>>= \ (binds', us, ccs) ->
 
 	-- Do the main business!
-    foldl_mn do_stg_pass (binds, us4now, ([],[],[])) stg_todos
+    foldl_mn do_stg_pass (binds', us, ccs) stg_todos
 		>>= \ (processed_binds, _, cost_centres) ->
 
 	-- 	Do essential wind-up
@@ -70,7 +70,7 @@ stg2stg stg_todos module_name us binds
 	--
 
     let
-	annotated_binds = setStgVarInfo do_let_no_escapes processed_binds
+	annotated_binds = setStgVarInfo opt_StgDoLetNoEscapes processed_binds
 	srt_binds       = computeSRTs annotated_binds
     in
 
@@ -79,10 +79,8 @@ stg2stg stg_todos module_name us binds
 
     return (srt_binds, cost_centres)
    }
-  where
-    do_let_no_escapes  = opt_StgDoLetNoEscapes
-    do_verbose_stg2stg = opt_D_verbose_stg2stg
 
+  where
     grp_name  = case (opt_SccGroup) of
 		  Just xx -> _PK_ xx
 		  Nothing -> _PK_ (moduleString module_name) -- default: module name
@@ -115,7 +113,7 @@ stg2stg stg_todos module_name us binds
 	     _scc_ "StgLambdaLift"
 		-- NB We have to do setStgVarInfo first!
 	     let
-		binds3 = liftProgram module_name us1 (setStgVarInfo do_let_no_escapes binds)
+		binds3 = liftProgram module_name us1 (setStgVarInfo opt_StgDoLetNoEscapes binds)
 	     in
 	     end_pass us2 "LambdaLift" ccs binds3
 
@@ -129,7 +127,7 @@ stg2stg stg_todos module_name us binds
 
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
-	(if do_verbose_stg2stg then
+	(if opt_D_verbose_stg2stg then
 	    hPutStr stderr (showSDoc
 	      (text ("*** "++what++":") $$ vcat (map ppr binds2)
 	    ))
