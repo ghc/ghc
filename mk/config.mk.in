@@ -555,7 +555,7 @@ COMPRESS_SUFFIX         = @CompressSuffix@
 
 CONTEXT_DIFF		= @ContextDiffCmd@
 CP			= cp
-CPP			= @RAWCPP@
+CPP			= @CPP@
 CTAGS 			= $(ETAGS)
 RAWCPP                  = @RAWCPP@
 GNUCPP                  = @GNUCPP@
