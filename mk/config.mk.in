@@ -86,6 +86,8 @@ HostVendor_CPP	                = @HostVendor_CPP@
 #
 LeadingUnderscore=@LeadingUnderscore@
 
+# Pin a suffix on executables? If so, what. (cygwin32 only).
+exeext=@exeext@
 
 #################################################################################
 #
@@ -135,7 +137,7 @@ IncludeTestDirsInBuild=NO
 # 
 GhcProjectName       =The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort  =ghc
-GhcProjectVersion    =2.07
+GhcProjectVersion    =2.08
 GhcProjectPatchLevel =0
 
 #
@@ -238,7 +240,17 @@ GhcLibWays=p
 # 	-O is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
 
+#
+# Splitting profiled code produces awfully large archives under ELF, so
+# we turn it off here.
+#
+# ToDo: track down the source of this.
+#
+ifneq "$(strip $(way))" "p"
 GhcLibHcOpts= -O -split-objs -odir $*
+else
+GhcLibHcOpts= -O
+endif
 
 
 #################################################################################
@@ -590,6 +602,12 @@ REAL_SHELL=$(SHELL)
 SIZE			= size
 STRIP			= strip
 TAR			= @TarCmd@
+
+#
+# Under cygwin32, we have to deal with .exe suffixes
+#
+EXE_SUFFIX=@ExeSuffix@
+
 #
 # This is special to literate/, ToDo: add literate-specific
 # configure setup to literate/.
