@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.52 2002/07/17 09:21:50 simonmar Exp $
+ * $Id: Printer.c,v 1.53 2002/07/24 18:18:13 sof Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -980,7 +980,7 @@ findPtr(P_ p, int follow)
 		  if (*q == (W_)p) {
 		      if (i < arr_size) {
 			  r = q;
-			  while (!LOOKS_LIKE_GHC_INFO(*r) || *r == NULL) {
+			  while (!LOOKS_LIKE_GHC_INFO(*r) || (P_)*r == NULL) {
 			      r--;
 			  }
 			  fprintf(stdout, "%p = ", r);
