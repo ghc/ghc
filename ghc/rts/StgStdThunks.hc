@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.18 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: StgStdThunks.hc,v 1.19 2002/03/01 18:11:20 keithw Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -56,6 +56,7 @@
   INFO_TABLE_SELECTOR(stg_sel_##offset##_upd_info, stg_sel_##offset##_upd_entry, offset,, EF_, "stg_sel" #offset "_upd_entry", "stg_sel" #offset "_upd_entry");\
   EF_(stg_sel_##offset##_upd_entry) {					\
     FB_									\
+      TICK_ENT_DYN_THK();  /* is it static or dynamic?? */              \
       STK_CHK_NP(UPD_FRAME_SIZE,1,);					\
       UPD_BH_UPDATABLE(&stg_sel_##offset##_upd_info);			\
       LDV_ENTER(R1.cl);							\
@@ -102,9 +103,11 @@ SELECTOR_CODE_UPD(15);
   INFO_TABLE_SELECTOR(stg_sel_##offset##_noupd_info, stg_sel_##offset##_noupd_entry, offset,, EF_, "stg_sel" #offset "_noupd_entry", "stg_sel" #offset "_noupd_entry");\
   EF_(stg_sel_##offset##_noupd_entry) {					\
     FB_									\
+      TICK_ENT_DYN_THK();  /* is it static or dynamic?? */              \
       STK_CHK_NP(NOUPD_FRAME_SIZE,1,)					\
       UPD_BH_SINGLE_ENTRY(&stg_sel_##offset##_noupd_info);		\
       LDV_ENTER(R1.cl);							\
+      TICK_UPDF_OMITTED();						\
       ENTER_CCS(R1.p);							\
       SAVE_CCCS(NOUPD_FRAME_SIZE);					\
       Sp[-NOUPD_FRAME_SIZE]=(W_)&stg_sel_ret_##offset##_noupd_info;	\
@@ -163,6 +166,7 @@ FN_(stg_ap_8_upd_entry);
 INFO_TABLE_SRT(stg_ap_1_upd_info,stg_ap_1_upd_entry,1,1,0,0,0,THUNK_1_0,,EF_,"stg_ap_1_upd_info","stg_ap_1_upd_info");
 FN_(stg_ap_1_upd_entry) {
   FB_
+  TICK_ENT_DYN_THK();  /* is it static or dynamic?? */
   STK_CHK_NP(sizeofW(StgUpdateFrame),1,);
   UPD_BH_UPDATABLE(&stg_ap_1_upd_info);
   LDV_ENTER(R1.cl);
@@ -177,6 +181,7 @@ FN_(stg_ap_1_upd_entry) {
 INFO_TABLE_SRT(stg_ap_2_upd_info,stg_ap_2_upd_entry,2,0,0,0,0,THUNK_2_0,,EF_,"stg_ap_2_upd_info","stg_ap_2_upd_info");
 FN_(stg_ap_2_upd_entry) {
   FB_
+  TICK_ENT_DYN_THK();  /* is it static or dynamic?? */
   STK_CHK_NP(sizeofW(StgUpdateFrame)+1,1,);
   UPD_BH_UPDATABLE(&stg_ap_2_upd_info);
   LDV_ENTER(R1.cl);
@@ -192,6 +197,7 @@ FN_(stg_ap_2_upd_entry) {
 INFO_TABLE_SRT(stg_ap_3_upd_info,stg_ap_3_upd_entry,3,0,0,0,0,THUNK,,EF_,"stg_ap_3_upd_info","stg_ap_3_upd_info");
 FN_(stg_ap_3_upd_entry) {
   FB_
+  TICK_ENT_DYN_THK();  /* is it static or dynamic?? */
   STK_CHK_NP(sizeofW(StgUpdateFrame)+2,1,);
   UPD_BH_UPDATABLE(&stg_ap_3_upd_info);
   LDV_ENTER(R1.cl);
@@ -208,6 +214,7 @@ FN_(stg_ap_3_upd_entry) {
 INFO_TABLE_SRT(stg_ap_4_upd_info,stg_ap_4_upd_entry,4,0,0,0,0,THUNK,,EF_,"stg_ap_4_upd_info","stg_ap_4_upd_info");
 FN_(stg_ap_4_upd_entry) {
   FB_
+  TICK_ENT_DYN_THK();  /* is it static or dynamic?? */
   STK_CHK_NP(sizeofW(StgUpdateFrame)+3,1,);
   UPD_BH_UPDATABLE(&stg_ap_4_upd_info);
   LDV_ENTER(R1.cl);
@@ -225,6 +232,7 @@ FN_(stg_ap_4_upd_entry) {
 INFO_TABLE_SRT(stg_ap_5_upd_info,stg_ap_5_upd_entry,5,0,0,0,0,THUNK,,EF_,"stg_ap_5_upd_info","stg_ap_5_upd_info");
 FN_(stg_ap_5_upd_entry) {
   FB_
+  TICK_ENT_DYN_THK();  /* is it static or dynamic?? */
   STK_CHK_NP(sizeofW(StgUpdateFrame)+4,1,);
   UPD_BH_UPDATABLE(&stg_ap_5_upd_info);
   LDV_ENTER(R1.cl);
@@ -243,6 +251,7 @@ FN_(stg_ap_5_upd_entry) {
 INFO_TABLE_SRT(stg_ap_6_upd_info,stg_ap_6_upd_entry,6,0,0,0,0,THUNK,,EF_,"stg_ap_6_upd_info","stg_ap_6_upd_info");
 FN_(stg_ap_6_upd_entry) {
   FB_
+  TICK_ENT_DYN_THK();  /* is it static or dynamic?? */
   STK_CHK_NP(sizeofW(StgUpdateFrame)+5,1,);
   UPD_BH_UPDATABLE(&stg_ap_6_upd_info);
   LDV_ENTER(R1.cl);
@@ -262,6 +271,7 @@ FN_(stg_ap_6_upd_entry) {
 INFO_TABLE_SRT(stg_ap_7_upd_info,stg_ap_7_upd_entry,7,0,0,0,0,THUNK,,EF_,"stg_ap_7_upd_info","stg_ap_7_upd_info");
 FN_(stg_ap_7_upd_entry) {
   FB_
+  TICK_ENT_DYN_THK();  /* is it static or dynamic?? */
   STK_CHK_NP(sizeofW(StgUpdateFrame)+6,1,);
   UPD_BH_UPDATABLE(&stg_ap_7_upd_info);
   LDV_ENTER(R1.cl);
@@ -282,6 +292,7 @@ FN_(stg_ap_7_upd_entry) {
 INFO_TABLE_SRT(stg_ap_8_upd_info,stg_ap_8_upd_entry,8,0,0,0,0,THUNK,,EF_,"stg_ap_8_upd_info","stg_ap_8_upd_info");
 FN_(stg_ap_8_upd_entry) {
   FB_
+  TICK_ENT_DYN_THK();  /* is it static or dynamic?? */
   STK_CHK_NP(sizeofW(StgUpdateFrame)+7,1,);
   UPD_BH_UPDATABLE(&stg_ap_8_upd_info);
   LDV_ENTER(R1.cl);

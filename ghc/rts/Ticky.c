@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.14 2002/02/14 11:56:05 njn Exp $
+ * $Id: Ticky.c,v 1.15 2002/03/01 18:11:20 keithw Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -431,7 +431,7 @@ PrintTickyInfo(void)
  * 
  * This of course refers to the -ticky version that uses PERM_INDs to
  * determine the number of closures entered 0/1/>1.  KSW 1999-04.  */
-  COND_PR_CTR(ENT_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue,"E!NT_PERM_IND_ctr requires +RTS -Z");
+  COND_PR_CTR(ENT_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsFalse,"E!NT_PERM_IND_ctr requires +RTS -Z");
 
   PR_CTR(ENT_PAP_ctr);
   PR_CTR(ENT_AP_UPD_ctr);
