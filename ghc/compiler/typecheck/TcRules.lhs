@@ -19,7 +19,7 @@ import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcMonoExpr )
-import TcEnv		( tcExtendLocalValEnv, tcLookupGlobalId )
+import TcEnv		( tcExtendLocalValEnv, tcLookupGlobalId, tcLookupId )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
 import Outputable
@@ -39,8 +39,15 @@ tcRule (IfaceRule name act vars fun args rhs src_loc)
     tcCoreExpr rhs			`thenM` \ rhs' ->
     returnM (IfaceRuleOut fun' (Rule name act vars' args' rhs'))
 
-tcRule (IfaceRuleOut fun rule)	-- Built-in rules come this way
-  = tcLookupGlobalId fun		`thenM` \ fun' ->
+tcRule (IfaceRuleOut fun rule)	-- Built-in rules, and only built-in rules, 
+				-- come this way.  Usually IfaceRuleOut is only
+				-- used for the *output* of the type checker
+  = tcLookupId fun		`thenM` \ fun' ->
+	-- NB: tcLookupId, not tcLookupGlobalId
+	-- Reason: when compiling GHC.Base, where eqString is defined,
+	--	   we'll get the builtin rule for eqString, but eqString
+	--	   will be in the *local* type environment.
+	-- Seems like a bit of a hack
     returnM (IfaceRuleOut fun' rule)   
 
 tcRule (HsRule name act vars lhs rhs src_loc)
