@@ -106,7 +106,7 @@ type TypecheckedRecordBinds	= HsRecordBinds Id TypecheckedPat
 type TypecheckedHsModule	= HsModule	Id TypecheckedPat
 type TypecheckedForeignDecl     = ForeignDecl Id
 type TypecheckedRuleDecl	= RuleDecl      Id TypecheckedPat
-type TypecheckedCoreBind        = (Id, CoreExpr)
+type TypecheckedCoreBind        = (Id, Type, CoreExpr)
 \end{code}
 
 \begin{code}
@@ -792,13 +792,14 @@ zonkRule (IfaceRuleOut fun rule)
 \end{code}
 
 \begin{code}
-zonkCoreBinds :: [(Id, Type, CoreExpr)] -> NF_TcM [(Id, CoreExpr)]
+zonkCoreBinds :: [TypecheckedCoreBind] -> NF_TcM [TypecheckedCoreBind]
 zonkCoreBinds ls = mapNF_Tc zonkOne ls
  where
   zonkOne (i, t, e) = 
     zonkIdOcc          i `thenNF_Tc` \ i' ->
+    zonkTcTypeToType t   `thenNF_Tc` \ t' ->
     zonkCoreExpr       e `thenNF_Tc` \ e' ->
-    returnNF_Tc (i',e')
+    returnNF_Tc (i',t',e')
 
 -- needed?
 zonkCoreExpr :: CoreExpr -> NF_TcM CoreExpr

@@ -17,7 +17,6 @@ failP s s' _ = FailP (s ++ ":" ++ s')
 
 data Token =
    TKmodule
- | TKimport
  | TKdata
  | TKnewtype
  | TKforall

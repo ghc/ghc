@@ -75,7 +75,6 @@ lexName cont cstr cs = cont (cstr name) rest
 lexKeyword cont cs = 
    case span isKeywordChar cs of
       ("module",rest) -> cont TKmodule rest
-      ("import",rest) -> cont TKimport rest
       ("data",rest)  -> cont TKdata rest
       ("newtype",rest) -> cont TKnewtype rest
       ("forall",rest) -> cont TKforall rest	

@@ -25,7 +25,6 @@ import SrcLoc
 
 %token
  '%module'	{ TKmodule }
- '%import'	{ TKimport }
  '%data'	{ TKdata }
  '%newtype'	{ TKnewtype }
  '%forall'	{ TKforall }
@@ -65,15 +64,8 @@ import SrcLoc
 %%
 
 module	:: { RdrNameHsModule }
-	: '%module' modid imports tdefs vdefgs
-		{ HsModule $2 Nothing Nothing $3 ($4 ++ concat $5) Nothing noSrcLoc}
-
-imports :: { [ImportDecl RdrName] }
-        : {- empty -}     { [] }
-	| imp ';' imports { $1 : $3 }
-
-imp  :: { ImportDecl RdrName }
-        : '%import' modid { ImportDecl $2 ImportByUser True{-qual-} Nothing Nothing noSrcLoc }
+	: '%module' modid tdefs vdefgs
+		{ HsModule $2 Nothing Nothing [] ($3 ++ concat $4) Nothing noSrcLoc}
 
 tdefs	:: { [RdrNameHsDecl] }
 	: {- empty -}	{[]}

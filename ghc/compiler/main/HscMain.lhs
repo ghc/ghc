@@ -18,7 +18,7 @@ import Interpreter
 import ByteCodeGen	( byteCodeGen )
 import TidyPgm		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
-import Rename		( renameStmt, renameRdrName, slurpIface )
+import Rename		( renameStmt,    renameRdrName, slurpIface )
 import RdrName          ( rdrNameOcc, setRdrNameOcc )
 import RdrHsSyn		( RdrNameStmt )
 import OccName          ( dataName, tcClsName, 
@@ -47,7 +47,8 @@ import Parser
 import Lex		( ParseResult(..), ExtFlags(..), mkPState )
 import SrcLoc		( mkSrcLoc )
 import Finder		( findModule )
-import Rename		( checkOldIface, renameModule, closeIfaceDecls )
+import Rename		( checkOldIface, renameModule, renameExtCore, 
+			  closeIfaceDecls, RnResult(..) )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelRules	( builtinRules )
@@ -70,6 +71,7 @@ import CodeOutput	( codeOutput, outputForeignStubs )
 import Module		( ModuleName, moduleName, mkHomeModule )
 import CmdLineOpts
 import DriverState	( v_HCHeader )
+import DriverPhases     ( isExtCore_file )
 import ErrUtils		( dumpIfSet_dyn, showPass, printError )
 import Util		( unJust )
 import UniqSupply	( mkSplitUniqSupply )
@@ -204,50 +206,23 @@ hscRecomp ghci_mode dflags have_object
 	  mod location maybe_checked_iface hst hit pcs_ch
  = do	{
       	  -- what target are we shooting for?
-      	; let toInterp = dopt_HscLang dflags == HscInterpreted
+      	; let toInterp  = dopt_HscLang dflags == HscInterpreted
 	; let toNothing = dopt_HscLang dflags == HscNothing
+	; let toCore    = isJust (ml_hs_file location) &&
+			  isExtCore_file (fromJust (ml_hs_file location))
 
       	; when (ghci_mode /= OneShot && verbosity dflags >= 1) $
 		hPutStrLn stderr ("Compiling " ++ 
 			showModMsg (not toInterp) mod location);
-
- 	    -------------------
- 	    -- PARSE
- 	    -------------------
-	; maybe_parsed <- myParseModule dflags 
-                             (unJust "hscRecomp:hspp" (ml_hspp_file location))
-	; case maybe_parsed of {
-      	     Nothing -> return (HscFail pcs_ch);
-      	     Just rdr_module -> do {
-	; let this_mod = mkHomeModule (hsModuleName rdr_module)
-    
- 	    -------------------
- 	    -- RENAME
- 	    -------------------
-	; (pcs_rn, print_unqual, maybe_rn_result) 
-      	     <- _scc_ "Rename" 
-		 renameModule dflags ghci_mode hit hst pcs_ch this_mod rdr_module
-      	; case maybe_rn_result of {
-      	     Nothing -> return (HscFail pcs_ch);
-      	     Just (dont_discard, new_iface, rn_result) -> do {
-
- 	    -------------------
- 	    -- TYPECHECK
- 	    -------------------
-	; maybe_tc_result 
-	    <- _scc_ "TypeCheck" 
-	       typecheckModule dflags pcs_rn hst print_unqual rn_result
-	; case maybe_tc_result of {
-      	     Nothing -> return (HscFail pcs_ch);
-      	     Just (pcs_tc, tc_result) -> do {
-    
- 	    -------------------
- 	    -- DESUGAR
- 	    -------------------
-	; (ds_details, foreign_stuff) 
-             <- _scc_ "DeSugar" 
-		deSugar dflags pcs_tc hst this_mod print_unqual tc_result
-
+			
+	; front_res <- 
+		(if toCore then hscCoreFrontEnd else hscFrontEnd)
+		   ghci_mode dflags location hst hit pcs_ch
+	; case front_res of
+	    Left flure -> return flure;
+	    Right (this_mod, rdr_module, 
+	    	   Just (dont_discard, new_iface, rn_result), 
+	    	   pcs_tc, ds_details, foreign_stuff) -> do {
  	    -------------------
  	    -- FLATTENING
  	    -------------------
@@ -421,19 +396,92 @@ hscRecomp ghci_mode dflags have_object
 			    final_iface
                             stub_h_exists stub_c_exists
       			    maybe_bcos)
-      	  }}}}}}}
+      	 }}
+
+hscCoreFrontEnd ghci_mode dflags location hst hit pcs_ch = do {
+ 	    -------------------
+ 	    -- PARSE
+ 	    -------------------
+	; inp <- readFile (unJust "hscCoreFrontEnd:hspp" (ml_hspp_file location))
+	; case parseCore inp 1 of
+	    FailP s        -> hPutStrLn stderr s >> return (Left (HscFail pcs_ch));
+	    OkP rdr_module -> do {
+	; let this_mod = mkHomeModule (hsModuleName rdr_module)
+    
+ 	    -------------------
+ 	    -- RENAME
+ 	    -------------------
+	; (pcs_rn, print_unqual, maybe_rn_result) 
+      	     <- renameExtCore dflags hit hst pcs_ch this_mod rdr_module
+      	; case maybe_rn_result of {
+      	     Nothing -> return (Left (HscFail pcs_ch));
+      	     Just (dont_discard, new_iface, rn_result) -> do {
+
+ 	    -------------------
+ 	    -- TYPECHECK
+ 	    -------------------
+	; maybe_tc_result 
+	    <- _scc_ "TypeCheck" 
+	       typecheckCoreModule dflags pcs_rn hst new_iface (rr_decls rn_result)
+	; case maybe_tc_result of {
+      	     Nothing -> return (Left (HscFail pcs_ch));
+      	     Just (pcs_tc, ty_env, core_binds) -> do {
+    
+ 	    -------------------
+ 	    -- DESUGAR
+ 	    -------------------
+	; (ds_details, foreign_stuff) <- deSugarCore ty_env core_binds
+	; return (Right (this_mod, rdr_module, maybe_rn_result, 
+		         pcs_tc, ds_details, foreign_stuff))
+	}}}}}}
+	 
+
+hscFrontEnd ghci_mode dflags location hst hit pcs_ch = do {
+ 	    -------------------
+ 	    -- PARSE
+ 	    -------------------
+	; maybe_parsed <- myParseModule dflags 
+                             (unJust "hscRecomp:hspp" (ml_hspp_file location))
+	; case maybe_parsed of {
+      	     Nothing -> return (Left (HscFail pcs_ch));
+      	     Just rdr_module -> do {
+	; let this_mod = mkHomeModule (hsModuleName rdr_module)
+    
+ 	    -------------------
+ 	    -- RENAME
+ 	    -------------------
+	; (pcs_rn, print_unqual, maybe_rn_result) 
+      	     <- _scc_ "Rename" 
+		 renameModule dflags ghci_mode hit hst pcs_ch this_mod rdr_module
+      	; case maybe_rn_result of {
+      	     Nothing -> return (Left (HscFail pcs_ch));
+      	     Just (dont_discard, new_iface, rn_result) -> do {
+
+ 	    -------------------
+ 	    -- TYPECHECK
+ 	    -------------------
+	; maybe_tc_result 
+	    <- _scc_ "TypeCheck" 
+	       typecheckModule dflags pcs_rn hst print_unqual rn_result
+	; case maybe_tc_result of {
+      	     Nothing -> return (Left (HscFail pcs_ch));
+      	     Just (pcs_tc, tc_result) -> do {
+    
+ 	    -------------------
+ 	    -- DESUGAR
+ 	    -------------------
+	; (ds_details, foreign_stuff) 
+             <- _scc_ "DeSugar" 
+		deSugar dflags pcs_tc hst this_mod print_unqual tc_result
+	; return (Right (this_mod, rdr_module, maybe_rn_result, 
+		         pcs_tc, ds_details, foreign_stuff))
+	}}}}}}}
+
 
 myParseModule dflags src_filename
  = do --------------------------  Parser  ----------------
       showPass dflags "Parser"
       _scc_  "Parser" do
-      if dopt_HscLang dflags == HscCore 
-       then do
-         inp <- readFile src_filename
-	 case parseCore inp 1 of
-	   OkP m   -> return (Just m)
-	   FailP s -> hPutStrLn stderr s >> return Nothing
-       else do
       buf <- hGetStringBuffer src_filename
 
       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,

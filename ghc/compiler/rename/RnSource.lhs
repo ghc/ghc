@@ -72,13 +72,13 @@ Checks the @(..)@ etc constraints in the export list.
 %*********************************************************
 
 \begin{code}
-rnSourceDecls :: GlobalRdrEnv -> AvailEnv -> LocalFixityEnv
+rnSourceDecls :: GlobalRdrEnv -> AvailEnv -> LocalFixityEnv -> RnMode
 	      -> [RdrNameHsDecl] 
 	      -> RnMG ([RenamedHsDecl], FreeVars)
 	-- The decls get reversed, but that's ok
 
-rnSourceDecls gbl_env avails local_fixity_env decls
-  = initRnMS gbl_env avails emptyRdrEnv local_fixity_env SourceMode (go emptyFVs [] decls)
+rnSourceDecls gbl_env avails local_fixity_env mode decls
+  = initRnMS gbl_env avails emptyRdrEnv local_fixity_env mode (go emptyFVs [] decls)
   where
 	-- Fixity and deprecations have been dealt with already; ignore them
     go fvs ds' []             = returnRn (ds', fvs)

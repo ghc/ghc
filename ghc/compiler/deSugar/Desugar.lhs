@@ -4,15 +4,17 @@
 \section[Desugar]{@deSugar@: the main function}
 
 \begin{code}
-module Desugar ( deSugar, deSugarExpr ) where
+module Desugar ( deSugar, deSugarExpr,
+                 deSugarCore ) where
 
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_SccProfilingOn )
-import HscTypes		( ModDetails(..) )
+import HscTypes		( ModDetails(..), TypeEnv )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
-import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
+import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr,
+                          TypecheckedCoreBind )
 import TcModule		( TcResults(..) )
 import Id		( Id )
 import CoreSyn
@@ -58,7 +60,7 @@ deSugar dflags pcs hst mod_name unqual
 		    tc_binds  = all_binds,
 		    tc_insts  = insts,
 		    tc_rules  = rules,
-		    tc_cbinds = core_binds,
+--		    tc_cbinds = core_binds,
 		    tc_fords  = fo_decls})
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
@@ -69,15 +71,16 @@ deSugar dflags pcs hst mod_name unqual
 
 	      (ds_binds, ds_rules, foreign_stuff) = ds_result
 	      
+{-
 	      addCoreBinds ls =
 	        case core_binds of
 		  [] -> ls
 		  cs -> (Rec cs) : ls
-	
+-}	
 	      mod_details = ModDetails { md_types = type_env,
 					 md_insts = insts,
 					 md_rules = ds_rules,
-					 md_binds = addCoreBinds ds_binds }
+					 md_binds = ds_binds }
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
@@ -157,6 +160,25 @@ ppr_ds_rules [] = empty
 ppr_ds_rules rules
   = text "" $$ text "-------------- DESUGARED RULES -----------------" $$
     pprIdRules rules
+\end{code}
+
+Simplest thing in the world, desugaring External Core:
+
+\begin{code}
+deSugarCore :: TypeEnv -> [TypecheckedCoreBind]
+	    -> IO (ModDetails, (SDoc, SDoc, [FAST_STRING], [CoreBndr]))
+deSugarCore type_env cs = do
+  let
+    mod_details 
+      = ModDetails { md_types = type_env
+	  	   , md_insts = []
+		   , md_rules = []
+		   , md_binds = [Rec (map (\ (lhs,_,rhs) -> (lhs,rhs)) cs)]
+		   }
+
+    no_foreign_stuff = (empty,empty,[],[])
+  return (mod_details, no_foreign_stuff)
+    
 \end{code}
 
 

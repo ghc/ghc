@@ -6,7 +6,7 @@
 \begin{code}
 module TcModule (
 	typecheckModule, typecheckIface, typecheckStmt, typecheckExpr,
-	typecheckExtraDecls,
+	typecheckExtraDecls, typecheckCoreModule,
 	TcResults(..)
     ) where
 
@@ -353,7 +353,6 @@ data TcResults
 	tc_insts   :: [DFunId],			-- Instances 
 	tc_rules   :: [TypecheckedRuleDecl],	-- Transformation rules
 	tc_binds   :: TypecheckedMonoBinds,	-- Bindings
-	tc_cbinds  :: [TypecheckedCoreBind],    -- (external)Core value decls/bindings.
 	tc_fords   :: [TypecheckedForeignDecl]	-- Foreign import & exports.
     }
 
@@ -405,7 +404,6 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
         traceTc (text "Tc5")				`thenNF_Tc_`
 	tcTopBinds (val_binds `ThenBinds` deriv_binds)	`thenTc` \ ((val_binds, env2), lie_valdecls) ->
 	
-        tcCoreBinds core_binds                          `thenTc` \ core_binds' -> 
      	-- Second pass over class and instance declarations, 
 	-- plus rules and foreign exports, to generate bindings
 	tcSetEnv env2				$
@@ -461,7 +459,6 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
 	in
  	traceTc (text "Tc7")		`thenNF_Tc_`
 	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', final_env)  ->
-	zonkCoreBinds core_binds'       `thenNF_Tc` \ core_binds' ->
 	tcSetEnv final_env		$
 		-- zonkTopBinds puts all the top-level Ids into the tcGEnv
  	traceTc (text "Tc8")		`thenNF_Tc_`
@@ -480,7 +477,6 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
 			      tc_insts   = map iDFunId inst_info,
 			      tc_binds   = all_binds', 
 			      tc_fords   = foi_decls ++ foe_decls',
-			      tc_cbinds  = core_binds',
 			      tc_rules   = src_rules'
 			    }
 	)
@@ -678,6 +674,57 @@ addIfaceRules rule_base rules
   where
     add_rule rule_base (IfaceRuleOut id rule) = extendRuleBase rule_base (id, rule)
 \end{code}    
+
+\begin{code}
+typecheckCoreModule
+	:: DynFlags
+	-> PersistentCompilerState
+	-> HomeSymbolTable
+	-> ModIface		-- Iface for this module (just module & fixities)
+	-> [RenamedHsDecl]
+	-> IO (Maybe (PersistentCompilerState, TypeEnv, [TypecheckedCoreBind]))
+typecheckCoreModule dflags pcs hst mod_iface decls
+  = do	{ maybe_tc_stuff <- typecheck dflags pcs hst alwaysQualify $
+                            (tcCoreDecls this_mod decls `thenTc` \ (env,bs) ->
+			     zonkCoreBinds bs           `thenNF_Tc` \ bs' ->
+			     returnTc (env, bs'))
+
+--	; printIfaceDump dflags maybe_tc_stuff
+
+           -- Q: Is it OK not to extend PCS here?
+	   -- (in the event that it needs to be, I'm returning the PCS passed in.)
+        ; case maybe_tc_stuff of
+	    Nothing -> return Nothing
+	    Just (e,bs) -> return (Just (pcs, e, bs)) }
+  where
+    this_mod = mi_module mod_iface
+    core_decls = [d | (TyClD d) <- decls, isCoreDecl d]
+
+tcCoreDecls :: Module 
+	    -> [RenamedHsDecl]	-- All interface-file decls
+	    -> TcM (TypeEnv, [TypecheckedCoreBind])
+tcCoreDecls this_mod decls
+-- The decls are all TyClD declarations coming from External Core input.
+  = let
+	tycl_decls = [d | TyClD d <- decls]
+	core_decls = filter isCoreDecl tycl_decls
+    in
+    fixTc (\ ~(unf_env, _) ->
+	-- This fixTc follows the same general plan as tcImports,
+	-- which is better commented.
+	-- [ Q: do we need to tie a knot for External Core? ]
+	tcTyAndClassDecls unf_env this_mod tycl_decls	`thenTc` \ tycl_things ->
+	tcExtendGlobalEnv tycl_things			$
+	tcCoreBinds tycl_decls                          `thenTc` \ core_binds ->
+	tcGetEnv					`thenTc` \ env ->
+    	returnTc (env, core_binds)
+    ) `thenTc` \ ~(final_env,bs) ->
+    let	
+      src_things = filter (isLocalThing this_mod) (typeEnvElts (getTcGEnv final_env))
+    in  
+    returnTc (mkTypeEnv src_things, bs)
+
+\end{code}
 
 
 %************************************************************************

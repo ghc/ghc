@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.17 2002/03/29 21:39:37 sof Exp $
+-- $Id: DriverPhases.hs,v 1.18 2002/04/05 15:18:26 sof Exp $
 --
 -- GHC Driver
 --
@@ -18,7 +18,8 @@ module DriverPhases (
    haskellish_src_file, haskellish_src_suffix,
    hsbootish_file, hsbootish_suffix,
    objish_file, objish_suffix,
-   cish_file, cish_suffix
+   cish_file, cish_suffix,
+   isExtCore_file
  ) where
 
 import DriverUtil
@@ -102,6 +103,7 @@ haskellish_suffix     = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "ra
 haskellish_src_suffix = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr"])
 cish_suffix           = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
 hsbootish_suffix      = (`elem` [ "hs-boot" ])
+extcoreish_suffix     = (`elem` [ "hcr" ])
 
 #if mingw32_TARGET_OS || cygwin32_TARGET_OS
 objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
@@ -114,3 +116,5 @@ haskellish_src_file = haskellish_src_suffix . getFileSuffix
 cish_file           = cish_suffix           . getFileSuffix
 objish_file         = objish_suffix         . getFileSuffix
 hsbootish_file      = hsbootish_suffix      . getFileSuffix
+
+isExtCore_file      = extcoreish_suffix     . getFileSuffix
