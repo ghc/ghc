@@ -374,7 +374,7 @@ GhcRtsThreaded=@ThreadedRts@
 
 # Build the Haskell Readline bindings?
 #
-GhcLibsWithReadline=@HaveReadlineHeaders@
+GhcLibsWithReadline=@GhcLibsWithReadline@
 
 # Libraries needed for linking with readline
 LibsReadline=@LibsReadline@

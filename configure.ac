@@ -846,13 +846,13 @@ AC_CHECK_HEADER(readline/readline.h, [HaveReadlineReadlineH=YES], [HaveReadlineR
 AC_CHECK_HEADER(readline/history.h, [HaveReadlineHistoryH=YES], [HaveReadlineHistoryH=NO])
 
 if test $HaveReadlineReadlineH = YES && test $HaveReadlineHistoryH = YES ; then
-  HaveReadlineHeaders=YES
+  GhcLibsWithReadline=YES
   AC_DEFINE([HAVE_READLINE_HEADERS], [1], [Define to 1 if readline/readline.h and readline/history.h exist.])
 else
-  HaveReadlineHeaders=NO
+  GhcLibsWithReadline=NO
   AC_DEFINE([HAVE_READLINE_HEADERS], [0], [Define to 1 if readline/readline.h and readline/history.h exist.])
 fi
-AC_SUBST(HaveReadlineHeaders)
+AC_SUBST(GhcLibsWithReadline)
 
 dnl ** check for DOS include files
 AC_CHECK_HEADERS(dos.h conio.h io.h std.h) 
