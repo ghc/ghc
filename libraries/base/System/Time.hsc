@@ -11,7 +11,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: Time.hsc,v 1.2 2001/07/31 13:05:02 simonmar Exp $
 --
 -- The standard Time library.
 --
@@ -208,8 +208,8 @@ noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 getClockTime = do
   allocaBytes (#const sizeof(struct timeval)) $ \ p_timeval -> do
     throwErrnoIfMinus1_ "getClockTime" $ gettimeofday p_timeval nullPtr
-    sec  <- (#peek struct timeval,tv_sec)  p_timeval :: IO CLong
-    usec <- (#peek struct timeval,tv_usec) p_timeval :: IO CLong
+    sec  <- (#peek struct timeval,tv_sec)  p_timeval :: IO Int32
+    usec <- (#peek struct timeval,tv_usec) p_timeval :: IO Int32
     return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000))
  
 #elif HAVE_FTIME
