@@ -15,7 +15,10 @@
 
 -- #hide
 module System.Process.Internals (
-	ProcessHandle(..), PHANDLE, pPrPr_disableITimers, c_execvpe
+	ProcessHandle(..), PHANDLE,
+#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+	 pPrPr_disableITimers, c_execvpe
+#endif
   ) where
 
 #if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
@@ -51,6 +54,8 @@ newtype ProcessHandle = ProcessHandle PHANDLE
 
 -- ----------------------------------------------------------------------------
 
+#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+
 -- this function disables the itimer, which would otherwise cause confusing
 -- signals to be sent to the new process.
 foreign import ccall unsafe "pPrPr_disableITimers"
@@ -58,3 +63,5 @@ foreign import ccall unsafe "pPrPr_disableITimers"
 
 foreign import ccall unsafe "execvpe"
   c_execvpe :: CString -> Ptr CString -> Ptr CString -> IO CInt
+
+#endif
