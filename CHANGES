@@ -1,3 +1,26 @@
+Changes in version 0.4:
+
+  * Import declarations which list entities in parentheses, or with
+    hiding clauses, are now properly supported.  Modulo one or two
+    small infelicities, the full Haskell modules system is now supported.
+
+  * Haddock is now more flexible about the placing of separators
+    (commas, semicolons) in relation to doc comments.
+
+  * There is support for generating and reading "interface files"
+    which describe the exports of a set of modules.  This is useful
+    for generating documentation which hyperlinks to
+    previously-generated documentation.
+    
+  * Support for generating the extra files required by the Microsoft
+    Help compiler.
+
+  * New option: --prologue specifies a file of documentation which is
+    placed on the contents page.
+
+  * Many bugs fixed
+
+-----------------------------------------------------------------------------
 Changes in version 0.3:
   
   * Documentation on individual function arguments is now implemented 
