@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.16 1999/06/25 10:23:08 panne Exp $
+# $Id: Makefile,v 1.17 1999/08/06 10:55:26 simonmar Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -25,7 +25,9 @@ HS_SRCS	= $(wildcard *.lhs)
 ifneq "$(GhcLibsWithReadline)" "YES"
   HS_SRCS := $(filter-out Readline.lhs,$(HS_SRCS))
 else
-  SRC_HC_OPTS += -I$(ReadlineIncludePath)
+  ifneq "$(ReadlineIncludePath)" ""
+     SRC_HC_OPTS += -I$(ReadlineIncludePath)
+  endif
 endif
 
 HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
