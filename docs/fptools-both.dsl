@@ -130,6 +130,12 @@ Options added:
 
 (define %section-autolabel% #t)
 
+;; Uncomment the setting below if you want .html output as one 
+;; big page. [ Notice that 'jade' dumps the output on stdout 
+;; rather than on honour the -o option...at least my copy does.]
+;;
+;;(define nochunks #t)
+
 </style-specification-body>
 </style-specification>
 
