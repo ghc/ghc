@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.8 2002/02/17 18:38:07 panne Exp $
+# $Id: package.mk,v 1.9 2002/02/22 22:20:25 panne Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -128,7 +128,7 @@ ifneq "$(DONT_WANT_STD_GHCI_LIB_RULE)" "YES"
 # when we can use a "fixed" ld.
 #
 $(GHCI_LIBRARY) : $(LIBOBJS)
-	$(LD) -r $(LD_X) -o $@ $(LIBOBJS)
+	$(LD) -r $(LD_X) -o $@ $(STUBOBJS) $(LIBOBJS)
 
 endif # DONT_WANT_STD_GHCI_LIB_RULE
 endif # GhcWithInterpreter
