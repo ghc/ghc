@@ -13,11 +13,8 @@ main = do
   s <- readFile filename
 
   -- This open should fail, because the readFile hasn't been forced
-  -- and the file is therefore still locked.  But GHC currently has a
-  -- bug in that the openFile truncates the file before checking
-  -- whether it was locked or not.
-  --    r <- try (openFile filename WriteMode)
-  --    print r
+  -- and the file is therefore still locked.
+  try (openFile filename WriteMode) >>= print
 
   putStrLn s
 
