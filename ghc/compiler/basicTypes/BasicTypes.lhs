@@ -34,7 +34,7 @@ import Outputable
 Used as a placeholder in types.
 
 \begin{code}
-type Unused = Void
+type Unused = ()
 
 unused :: Unused
 unused = error "Unused is used!"
