@@ -20,4 +20,15 @@ directly, <tt/CPP/ will now by default not be run over the input
 files. To have CPP wash your input files, use the command-line option
 <tt/-cpp/.
 
+<item> Working specialiser (ToDo: more here)
+
+<item> Added <tt/unsafeCoerce#/.
+
+<item> Fixed compilation of real floating-point literals: they were
+previously generated as applications of <tt/fromRational/, even when
+not overloaded.
+
+<item> The object splitter had a bug in it that increased binary sizes
+significantly on i386-unknown-linux and sparc-sun-solaris2.  Now fixed.
+
 </itemize>
