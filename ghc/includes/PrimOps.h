@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.79 2001/07/24 06:31:35 ken Exp $
+ * $Id: PrimOps.h,v 1.80 2001/08/08 10:50:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -664,7 +664,12 @@ EXTFUN_RTS(unsafeThawArrayzh_fast);
 /* and the out-of-line ones... */
 
 EXTFUN_RTS(newByteArrayzh_fast);
+EXTFUN_RTS(newPinnedByteArrayzh_fast);
 EXTFUN_RTS(newArrayzh_fast);
+
+// Highly unsafe, for use with a pinned ByteArray 
+// being kept alive with touch# 
+#define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
 
 /* encoding and decoding of floats/doubles. */
 

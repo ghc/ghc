@@ -228,12 +228,12 @@ __export PrelGHC
   ByteArrayzh
   MutableArrayzh
   MutableByteArrayzh
-
   sameMutableArrayzh
   sameMutableByteArrayzh
-
   newArrayzh
   newByteArrayzh
+  newPinnedByteArrayzh
+  byteArrayContentszh
 
   indexArrayzh
   indexCharArrayzh

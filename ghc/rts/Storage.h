@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.35 2001/07/24 06:31:36 ken Exp $
+ * $Id: Storage.h,v 1.36 2001/08/08 10:50:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -24,12 +24,24 @@ extern void exitStorage(void);
 /* -----------------------------------------------------------------------------
    Generic allocation
 
-   StgPtr allocate(int n)       Allocates a chunk of contiguous store
+   StgPtr allocate(nat n)       Allocates a chunk of contiguous store
    				n words long, returning a pointer to
 				the first word.  Always succeeds.
 				
+   StgPtr allocatePinned(nat n) Allocates a chunk of contiguous store
+   				n words long, which is at a fixed
+				address (won't be moved by GC).  
+				Returns a pointer to the first word.
+				Always succeeds.
+				
+				NOTE: the GC can't in general handle
+				pinned objects, so allocatePinned()
+				can only be used for ByteArrays at the
+				moment.
+
 				Don't forget to TICK_ALLOC_XXX(...)
-				after calling allocate, for the
+				after calling allocate or
+				allocatePinned, for the
 				benefit of the ticky-ticky profiler.
 
    rtsBool doYouWantToGC(void)  Returns True if the storage manager is
@@ -43,12 +55,15 @@ extern void exitStorage(void);
    surrounded by a mutex.
    -------------------------------------------------------------------------- */
 
-extern StgPtr  allocate(nat n);
-static inline rtsBool doYouWantToGC(void)
+extern StgPtr  allocate        ( nat n );
+extern StgPtr  allocatePinned  ( nat n );
+extern lnat    allocated_bytes ( void );
+
+static inline rtsBool
+doYouWantToGC( void )
 {
   return (alloc_blocks >= alloc_blocks_lim);
 }
-extern lnat allocated_bytes(void);
 
 /* -----------------------------------------------------------------------------
    ExtendNursery(hp,hplim)      When hplim is reached, try to grab

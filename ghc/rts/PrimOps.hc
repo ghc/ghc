@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.82 2001/07/26 03:08:39 ken Exp $
+ * $Id: PrimOps.hc,v 1.83 2001/08/08 10:50:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -261,6 +261,24 @@ FN_(newByteArrayzh_fast)				\
      TICK_RET_UNBOXED_TUP(1)				\
      RET_P(p);						\
    FE_							\
+ }
+
+FN_(newPinnedByteArrayzh_fast)					\
+ {								\
+   W_ size, stuff_size, n;					\
+   StgArrWords* p;						\
+   FB_								\
+     MAYBE_GC(NO_PTRS,newPinnedByteArrayzh_fast);		\
+     n = R1.w;							\
+     stuff_size = BYTES_TO_STGWORDS(n);				\
+     size = sizeofW(StgArrWords)+ stuff_size;			\
+     p = (StgArrWords *)RET_STGCALL1(P_,allocatePinned,size);	\
+     TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0);	\
+     SET_HDR(p, &stg_ARR_WORDS_info, CCCS);			\
+     p->words = stuff_size;					\
+     TICK_RET_UNBOXED_TUP(1)					\
+     RET_P(p);							\
+   FE_								\
  }
 
 FN_(newArrayzh_fast)

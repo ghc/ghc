@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.16 2001/08/02 15:33:35 ken Exp $
+ * $Id: StoragePriv.h,v 1.17 2001/08/08 10:50:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -33,6 +33,7 @@ extern StgClosure *caf_list;
 
 extern bdescr *small_alloc_list;
 extern bdescr *large_alloc_list;
+extern bdescr *pinned_object_block;
 
 extern StgPtr alloc_Hp;
 extern StgPtr alloc_HpLim;

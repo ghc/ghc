@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.1 2001/08/04 06:19:54 ken Exp $
+-- $Id: primops.txt.pp,v 1.2 2001/08/08 10:50:36 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -534,6 +534,12 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutByteArr# s #)
    with out_of_line = True
 
+primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
+   Int# -> State# s -> (# State# s, MutByteArr# s #)
+   with out_of_line = True
+
+primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
+   ByteArr# -> Addr#
 
 primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
    ByteArr# -> Int# -> Char#

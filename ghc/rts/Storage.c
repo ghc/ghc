@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.43 2001/08/07 09:20:52 simonmar Exp $
+ * $Id: Storage.c,v 1.44 2001/08/08 10:50:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -29,6 +29,7 @@ StgClosure    *caf_list         = NULL;
 
 bdescr *small_alloc_list;	/* allocate()d small objects */
 bdescr *large_alloc_list;	/* allocate()d large objects */
+bdescr *pinned_object_block;    /* allocate pinned objects into this block */
 nat alloc_blocks;		/* number of allocate()d blocks since GC */
 nat alloc_blocks_lim;		/* approximate limit on alloc_blocks */
 
@@ -408,7 +409,7 @@ resizeNursery ( nat blocks )
    -------------------------------------------------------------------------- */
 
 StgPtr
-allocate(nat n)
+allocate( nat n )
 {
   bdescr *bd;
   StgPtr p;
@@ -459,9 +460,69 @@ allocate(nat n)
   return p;
 }
 
-lnat allocated_bytes(void)
+lnat
+allocated_bytes( void )
 {
   return (alloc_blocks * BLOCK_SIZE_W - (alloc_HpLim - alloc_Hp));
+}
+
+/* ---------------------------------------------------------------------------
+   Allocate a fixed/pinned object.
+
+   We allocate small pinned objects into a single block, allocating a
+   new block when the current one overflows.  The block is chained
+   onto the large_object_list of generation 0 step 0.
+
+   NOTE: The GC can't in general handle pinned objects.  This
+   interface is only safe to use for ByteArrays, which have no
+   pointers and don't require scavenging.  It works because the
+   block's descriptor has the BF_LARGE flag set, so the block is
+   treated as a large object and chained onto various lists, rather
+   than the individual objects being copied.  However, when it comes
+   to scavenge the block, the GC will only scavenge the first object.
+   The reason is that the GC can't linearly scan a block of pinned
+   objects at the moment (doing so would require using the
+   mostly-copying techniques).  But since we're restricting ourselves
+   to pinned ByteArrays, not scavenging is ok.
+
+   This function is called by newPinnedByteArray# which immediately
+   fills the allocated memory with a MutableByteArray#.
+   ------------------------------------------------------------------------- */
+
+StgPtr
+allocatePinned( nat n )
+{
+    StgPtr p;
+    bdescr *bd = pinned_object_block;
+
+    ACQUIRE_LOCK(&sm_mutex);
+    
+    TICK_ALLOC_HEAP_NOCTR(n);
+    CCS_ALLOC(CCCS,n);
+
+    // If the request is for a large object, then allocate()
+    // will give us a pinned object anyway.
+    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+	RELEASE_LOCK(&sm_mutex);
+	return allocate(n);
+    }
+
+    // If we don't have a block of pinned objects yet, or the current
+    // one isn't large enough to hold the new object, allocate a new one.
+    if (bd == NULL || (bd->free + n) > (bd->start + BLOCK_SIZE_W)) {
+	pinned_object_block = bd = allocBlock();
+	dbl_link_onto(bd, &g0s0->large_objects);
+	bd->gen_no = 0;
+	bd->step   = g0s0;
+	bd->flags  = BF_LARGE;
+	bd->free   = bd->start;
+	alloc_blocks++;
+    }
+
+    p = bd->free;
+    bd->free += n;
+    RELEASE_LOCK(&sm_mutex);
+    return p;
 }
 
 /* -----------------------------------------------------------------------------

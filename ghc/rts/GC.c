@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.115 2001/08/07 10:49:49 simonmar Exp $
+ * $Id: GC.c,v 1.116 2001/08/08 10:50:37 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -793,6 +793,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   alloc_Hp = NULL;
   alloc_HpLim = NULL;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
+
+  // Start a new pinned_object_block
+  pinned_object_block = NULL;
 
   /* Free the mark stack.
    */
