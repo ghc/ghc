@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.61 2002/10/05 22:18:45 panne Exp $
+ * $Id: RtsFlags.c,v 1.62 2002/12/11 15:36:47 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -61,7 +61,7 @@ char   *rts_argv[MAX_RTS_ARGS];
 
 char *debug_opts_prefix[] = {
   "_-", /* scheduler */
-  "_.", /* evaluator */
+  "_.", /* interpreter */
   "_,", /* codegen */
   "_;", /* weak */
   "_~", /* gccafs */
@@ -229,7 +229,7 @@ void initRtsFlagsDefaults(void)
 
 #ifdef DEBUG
     RtsFlags.DebugFlags.scheduler	= rtsFalse;
-    RtsFlags.DebugFlags.evaluator	= rtsFalse;
+    RtsFlags.DebugFlags.interpreter	= rtsFalse;
     RtsFlags.DebugFlags.codegen		= rtsFalse;
     RtsFlags.DebugFlags.weak		= rtsFalse;
     RtsFlags.DebugFlags.gccafs		= rtsFalse;
@@ -463,7 +463,7 @@ usage_text[] = {
 "",
 #if defined(DEBUG)
 "  -Ds  DEBUG: scheduler",
-"  -De  DEBUG: evaluator",
+"  -Di  DEBUG: interpreter",
 "  -Dc  DEBUG: codegen",
 "  -Dw  DEBUG: weak",
 "  -DG  DEBUG: gccafs",
@@ -733,8 +733,8 @@ error = rtsTrue;
 		      case 's':
 			  RtsFlags.DebugFlags.scheduler = rtsTrue;
 			  break;
-		      case 'e':
-			  RtsFlags.DebugFlags.evaluator = rtsTrue;
+		      case 'i':
+			  RtsFlags.DebugFlags.interpreter = rtsTrue;
 			  break;
 		      case 'c':
 			  RtsFlags.DebugFlags.codegen = rtsTrue;
@@ -768,6 +768,9 @@ error = rtsTrue;
 			  break;
 		      case 'l':
 			  RtsFlags.DebugFlags.linker = rtsTrue;
+			  break;
+		      case 'a':
+			  RtsFlags.DebugFlags.apply = rtsTrue;
 			  break;
 		      default:
 			  bad_option( rts_argv[arg] );

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.30 2002/12/05 14:20:55 stolz Exp $
+ * $Id: Signals.c,v 1.31 2002/12/11 15:36:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -137,7 +137,8 @@ generic_handler(int sig)
 
     // stack full?
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
-	barf("too many pending signals");
+	prog_belch("too many pending signals");
+	stg_exit(EXIT_FAILURE);
     }
     
     // re-establish the signal handler, and carry on

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ClosureFlags.c,v 1.12 2002/04/19 12:23:11 simonmar Exp $
+ * $Id: ClosureFlags.c,v 1.13 2002/12/11 15:36:41 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -54,8 +54,9 @@ StgWord16 closure_flags[] = {
 /* THUNK_STATIC	   	= */ (     _BTM|    _STA|_THU|        _SRT    	 ),
 /* THUNK_SELECTOR	= */ (     _BTM|         _THU|        _SRT    	 ),
 /* BCO		   	= */ (_HNF|     _NS                           	 ),
-/* AP_UPD		= */ (     _BTM|         _THU                 	 ),
+/* AP			= */ (                   _THU                 	 ),
 /* PAP		   	= */ (_HNF|     _NS				 ),
+/* AP_STACK	   	= */ (          	 _THU			 ),
 /* IND		   	= */ (          _NS|			    _IND ),
 /* IND_OLDGEN	   	= */ (          _NS|			    _IND ),
 /* IND_PERM		= */ (          _NS|			    _IND ),
@@ -67,10 +68,10 @@ StgWord16 closure_flags[] = {
 /* RET_BIG		= */ (                                 _SRT      ),
 /* RET_VEC_BIG	   	= */ (                                 _SRT      ),
 /* RET_DYN		= */ (                                 _SRT      ),
+/* RET_FUN		= */ ( 0                                         ),
 /* UPDATE_FRAME        	= */ (     _BTM                                  ),
 /* CATCH_FRAME	   	= */ (     _BTM                                  ),
 /* STOP_FRAME	   	= */ (     _BTM                                  ),
-/* SEQ_FRAME 	   	= */ (     _BTM                                  ),
 /* CAF_BLACKHOLE   	= */ ( 	   _BTM|_NS|              _UPT           ),
 /* BLACKHOLE		= */ ( 	        _NS|              _UPT           ),
 /* BLACKHOLE_BQ	   	= */ ( 	        _NS|         _MUT|_UPT           ),
@@ -91,5 +92,6 @@ StgWord16 closure_flags[] = {
 /* FETCH_ME_BQ          = */ ( 	        _NS|         _MUT|_UPT           ),
 /* RBH                  = */ ( 	        _NS|         _MUT|_UPT           ),
 /* EVACUATED		= */ ( 0                                         ),
-/* REMOTE_REF		= */ (_HNF|     _NS|              _UPT           )
+/* REMOTE_REF		= */ (_HNF|     _NS|              _UPT           ),
+/* STACK		= */ (_HNF|     _NS|         _MUT                )
 };

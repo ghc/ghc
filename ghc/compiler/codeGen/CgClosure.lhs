@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.58 2002/09/13 15:02:27 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.59 2002/12/11 15:36:25 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -20,36 +20,25 @@ module CgClosure ( cgTopRhsClosure,
 import {-# SOURCE #-} CgExpr ( cgExpr )
 
 import CgMonad
-import AbsCSyn
-import StgSyn
-
-import AbsCUtils	( mkAbstractCs, getAmodeRep )
-import CgBindery	( getCAddrMode, getArgAmodes,
-			  getCAddrModeAndInfo, bindNewToNode,
-			  bindNewToStack,
-			  bindNewToReg, bindArgsToRegs,
-			  stableAmodeIdInfo, heapIdInfo, CgIdInfo
-			)
+import CgBindery
 import CgUpdate		( pushUpdateFrame )
-import CgHeapery	( allocDynClosure, 
-			  fetchAndReschedule, yield,  -- HWL
-			  fastEntryChecks, thunkChecks
-			)
-import CgStackery	( mkTaggedVirtStkOffsets, freeStackSlots )
-import CgUsages		( adjustSpAndHp, setRealAndVirtualSp, getVirtSp,
-			  getSpRelOffset, getHpRelOffset
-			)
-import CLabel		( CLabel, mkClosureLabel, mkFastEntryLabel,
-			  mkRednCountsLabel, mkInfoTableLabel
-			)
+import CgHeapery
+import CgStackery
+import CgUsages
 import ClosureInfo	-- lots and lots of stuff
+
+import AbsCUtils	( getAmodeRep, mkAbstractCs )
+import AbsCSyn
+import CLabel
+
+import StgSyn
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
 import CostCentre	
 import Id		( Id, idName, idType, idPrimRep )
 import Name		( Name, isInternalName )
 import Module		( Module, pprModule )
 import ListSetOps	( minusList )
-import PrimRep		( PrimRep(..) )
+import PrimRep		( PrimRep(..), getPrimRepSize )
 import PprType          ( showTypeCategory )
 import Util		( isIn, splitAtList )
 import CmdLineOpts	( opt_SccProfilingOn )
@@ -58,7 +47,6 @@ import FastString
 
 import Name             ( nameOccName )
 import OccName          ( occNameFS )
-import FastTypes	( iBox )
 \end{code}
 
 %********************************************************
@@ -84,9 +72,11 @@ cgTopRhsClosure id ccs binder_info srt args body lf_info
   = 
     -- LAY OUT THE OBJECT
     getSRTInfo srt		`thenFC` \ srt_info ->
+    moduleName			`thenFC` \ mod_name ->
     let
     	name          = idName id
-	closure_info  = layOutStaticNoFVClosure name lf_info srt_info
+	descr         = closureDescription mod_name name
+	closure_info  = layOutStaticNoFVClosure id lf_info srt_info descr
 	closure_label = mkClosureLabel name
     	cg_id_info    = stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info
     in
@@ -95,7 +85,7 @@ cgTopRhsClosure id ccs binder_info srt args body lf_info
     (
      ({- if staticClosureRequired name binder_info lf_info
       then -}
-	absC (mkStaticClosure closure_info ccs [] True)
+	absC (mkStaticClosure closure_label closure_info ccs [] True)
       {- else
 	nopC -}
      )
@@ -135,14 +125,18 @@ cgStdRhsClosure binder cc binder_info fvs args body lf_info payload
 		-- AHA!  A STANDARD-FORM THUNK
   = (
 	-- LAY OUT THE OBJECT
-    getArgAmodes payload			`thenFC` \ amodes ->
+    getArgAmodes payload		`thenFC` \ amodes ->
+    moduleName				`thenFC` \ mod_name ->
     let
+	descr = closureDescription mod_name (idName binder)
+
 	(closure_info, amodes_w_offsets)
-	  = layOutDynClosure (idName binder) getAmodeRep amodes lf_info NoC_SRT
+	  = layOutDynClosure binder getAmodeRep amodes lf_info NoC_SRT descr
 		-- No SRT for a standard-form closure
 
 	(use_cc, blame_cc) = chooseDynCostCentres cc args fvs body
     in
+
 	-- BUILD THE OBJECT
     allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
     )
@@ -184,15 +178,19 @@ cgRhsClosure binder cc binder_info srt fvs args body lf_info
 			 then fvs `minusList` [binder]
 			 else fvs
     in
+
     mapFCs getCAddrModeAndInfo reduced_fvs	`thenFC` \ fvs_w_amodes_and_info ->
     getSRTInfo srt				`thenFC` \ srt_info ->
+    moduleName					`thenFC` \ mod_name ->
     let
+	descr = closureDescription mod_name (idName binder)
+
 	closure_info :: ClosureInfo
 	bind_details :: [((Id, CAddrMode, LambdaFormInfo), VirtualHeapOffset)]
 
 	(closure_info, bind_details)
-	  = layOutDynClosure (idName binder) get_kind
-			     fvs_w_amodes_and_info lf_info srt_info
+	  = layOutDynClosure binder get_kind
+			     fvs_w_amodes_and_info lf_info srt_info descr
 
 	bind_fv ((id, _, lf_info), offset) = bindNewToNode id offset lf_info
 
@@ -200,6 +198,7 @@ cgRhsClosure binder cc binder_info srt fvs args body lf_info
 
 	get_kind (id, _, _) = idPrimRep id
     in
+
 	-- BUILD ITS INFO TABLE AND CODE
     forkClosureBody (
 		-- Bind the fvs
@@ -243,23 +242,15 @@ closureCodeBody :: StgBinderInfo
 
 There are two main cases for the code for closures.  If there are {\em
 no arguments}, then the closure is a thunk, and not in normal form.
-So it should set up an update frame (if it is shared).  Also, it has
-no argument satisfaction check, so fast and slow entry-point labels
-are the same.
+So it should set up an update frame (if it is shared).
 
 \begin{code}
 closureCodeBody binder_info closure_info cc [] body
   = -- thunks cannot have a primitive type!
     getAbsC body_code 	`thenFC` \ body_absC ->
-    moduleName		`thenFC` \ mod_name ->
 
-    absC (CClosureInfoAndCode closure_info body_absC Nothing
-			      (cl_descr mod_name))
+    absC (CClosureInfoAndCode closure_info body_absC)
   where
-    cl_descr mod_name = closureDescription mod_name (closureName closure_info)
-
-    body_label   = entryLabelFromCI closure_info
-    
     is_box  = case body of { StgApp fun [] -> True; _ -> False }
 
     ticky_ent_lit = if (isStaticClosure closure_info)
@@ -269,7 +260,7 @@ closureCodeBody binder_info closure_info cc [] body
     body_code   = profCtrC ticky_ent_lit []			`thenC`
 		  -- node always points when profiling, so this is ok:
 		  ldvEnter					`thenC`
-		  thunkWrapper closure_info body_label (
+		  thunkWrapper closure_info (
 			-- We only enter cc after setting up update so
 			-- that cc of enclosing scope will be recorded
 			-- in update frame CAF/DICT functions will be
@@ -280,10 +271,8 @@ closureCodeBody binder_info closure_info cc [] body
 
 \end{code}
 
-If there is {\em at least one argument}, then this closure is in
-normal form, so there is no need to set up an update frame.  On the
-other hand, we do have to check that there are enough args, and
-perform an update if not!
+If there is /at least one argument/, then this closure is in
+normal form, so there is no need to set up an update frame.
 
 The Macros for GrAnSim are produced at the beginning of the
 argSatisfactionCheck (by calling fetchAndReschedule).  There info if
@@ -291,87 +280,48 @@ Node points to closure is available. -- HWL
 
 \begin{code}
 closureCodeBody binder_info closure_info cc all_args body
-  = getEntryConvention name lf_info
-		       (map idPrimRep all_args)		`thenFC` \ entry_conv ->
+  = let arg_reps = map idPrimRep all_args in
+
+    getEntryConvention name lf_info arg_reps  `thenFC` \ entry_conv ->
+
+    let
+	-- Arg mapping for the entry point; as many args as poss in
+	-- registers; the rest on the stack
+    	-- 	arg_regs are the registers used for arg passing
+	-- 	stk_args are the args which are passed on the stack
+	--
+	-- Args passed on the stack are not tagged.
+	--
+    	arg_regs = case entry_conv of
+		DirectEntry lbl arity regs -> regs
+		_ -> panic "closureCodeBody"
+    in
+
+    -- If this function doesn't have a specialised ArgDescr, we need
+    -- to generate the function's arg bitmap, slow-entry code, and
+    -- register-save code for the heap-check failure
+    --
+    (case closureFunInfo closure_info of
+	Just (_, ArgGen slow_lbl liveness) -> 
+		absC (CBitmap liveness) `thenC`
+		absC (mkSlowEntryCode name slow_lbl arg_regs arg_reps) `thenC`
+		returnFC (mkRegSaveCode arg_regs arg_reps)
+
+	other -> returnFC AbsCNop
+     )		
+	`thenFC` \ reg_save_code ->
 
     -- get the current virtual Sp (it might not be zero, eg. if we're
     -- compiling a let-no-escape).
     getVirtSp `thenFC` \vSp ->
 
     let
-    	-- Figure out what is needed and what isn't
-
-	-- SDM: need everything for now in case the heap/stack check refers
-	-- to it. (ToDo)
-	slow_code_needed   = True 
-		   --slowFunEntryCodeRequired name binder_info entry_conv
-	info_table_needed  = True
-		   --funInfoTableRequired name binder_info lf_info
-
-	-- Arg mapping for standard (slow) entry point; all args on stack,
-	-- with tagging.
-    	(sp_all_args, arg_offsets, _)
-	   = mkTaggedVirtStkOffsets vSp idPrimRep all_args
-
-	-- Arg mapping for the fast entry point; as many args as poss in
-	-- registers; the rest on the stack
-    	-- 	arg_regs are the registers used for arg passing
-	-- 	stk_args are the args which are passed on the stack
-	--
-	-- Args passed on the stack are tagged, but the tags may not
-	-- actually be present (just gaps) if the function is called 
-	-- by jumping directly to the fast entry point.
-	--
-    	arg_regs = case entry_conv of
-		DirectEntry lbl arity regs -> regs
-		other 		           -> []  -- "(HWL ignored; no args passed in regs)"
-
     	(reg_args, stk_args) = splitAtList arg_regs all_args
 
-    	(sp_stk_args, stk_offsets, stk_tags)
-	  = mkTaggedVirtStkOffsets vSp idPrimRep stk_args
+    	(sp_stk_args, stk_offsets)
+	  = mkVirtStkOffsets vSp idPrimRep stk_args
 
-	-- HWL; Note: empty list of live regs in slow entry code
-	-- Old version (reschedule combined with heap check);
-	-- see argSatisfactionCheck for new version
-	--slow_entry_code = forceHeapCheck [node] True slow_entry_code'
-	--		  where node = UnusedReg PtrRep 1
-	--slow_entry_code = forceHeapCheck [] True slow_entry_code'
-
-    	slow_entry_code
-	  = profCtrC slow_ticky_ent_lit [
-		    CLbl ticky_ctr_label DataPtrRep
-	    ] `thenC`
-
-	    -- Bind args, and record expected position of stk ptrs
-	    mapCs bindNewToStack arg_offsets	  	    `thenC`
-	    setRealAndVirtualSp sp_all_args		    `thenC`
-
-	    argSatisfactionCheck closure_info	arg_regs	    `thenC`
-
-	    -- OK, so there are enough args.  Now we need to stuff as
-	    -- many of them in registers as the fast-entry code
-	    -- expects. Note that the zipWith will give up when it hits
-	    -- the end of arg_regs.
-
-	    mapFCs getCAddrMode all_args	    `thenFC` \ stk_amodes ->
-	    absC (mkAbstractCs (zipWith assign_to_reg arg_regs stk_amodes)) 
-							    `thenC`
-
-	    -- Now adjust real stack pointers (no need to adjust Hp,
-	    -- but call this function for convenience).
-	    adjustSpAndHp sp_stk_args			`thenC`
-
-    	    absC (CFallThrough (CLbl fast_label CodePtrRep))
-
-	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
-
-	-- HWL
-	-- Old version (reschedule combined with heap check);
-	-- see argSatisfactionCheck for new version
-	-- fast_entry_code = forceHeapCheck [] True fast_entry_code'
-
-	fast_entry_code = do
+	entry_code = do
 		mod_name <- moduleName
 		profCtrC FSLIT("TICK_CTR") [ 
 			CLbl ticky_ctr_label DataPtrRep,
@@ -381,14 +331,9 @@ closureCodeBody binder_info closure_info cc all_args body
 			mkCString (mkFastString (map (showTypeCategory . idType) all_args))
 			] 
 		let prof = 
-			profCtrC fast_ticky_ent_lit [
+			profCtrC ticky_ent_lit [
 				CLbl ticky_ctr_label DataPtrRep
 			] 
-
--- Nuked for now; see comment at end of file
---		    CString (mkFastString (show_wrapper_name wrapper_maybe)),
---		    CString (mkFastString (show_wrapper_arg_kinds wrapper_maybe))
-
 
 		-- Bind args to regs/stack as appropriate, and
 		-- record expected position of sps.
@@ -396,54 +341,35 @@ closureCodeBody binder_info closure_info cc all_args body
 		mapCs bindNewToStack stk_offsets		    
 		setRealAndVirtualSp sp_stk_args		    
 
-	    	-- free up the stack slots containing tags
-		freeStackSlots (map fst stk_tags)
-
 		-- Enter the closures cc, if required
 		enterCostCentreCode closure_info cc IsFunction False
 
 		-- Do the business
-		funWrapper closure_info arg_regs stk_tags info_label 
+		funWrapper closure_info arg_regs reg_save_code
 			(prof >> cgExpr body)
     in
 
     setTickyCtrLabel ticky_ctr_label (
 
- 	-- Make a labelled code-block for the slow and fast entry code
-      forkAbsC (if slow_code_needed then slow_entry_code else absC AbsCNop)
-				`thenFC` \ slow_abs_c ->
-      forkAbsC fast_entry_code	`thenFC` \ fast_abs_c ->
+      forkAbsC entry_code	`thenFC` \ entry_abs_c ->
       moduleName		`thenFC` \ mod_name ->
 
-	-- Now either construct the info table, or put the fast code in alone
-	-- (We never have slow code without an info table)
-	-- XXX probably need the info table and slow entry code in case of
-	-- a heap check failure.
-      absC (
-       if info_table_needed then
-	  CClosureInfoAndCode closure_info slow_abs_c (Just fast_abs_c)
-			(cl_descr mod_name)
-       else
-	CCodeBlock fast_label fast_abs_c
-       )
+      -- Now construct the info table
+      absC (CClosureInfoAndCode closure_info entry_abs_c)
     )
   where
     ticky_ctr_label = mkRednCountsLabel name
 
-    (slow_ticky_ent_lit, fast_ticky_ent_lit) = 
+    ticky_ent_lit = 
         if (isStaticClosure closure_info)
-        then (FSLIT("TICK_ENT_STATIC_FUN_STD"), FSLIT("TICK_ENT_STATIC_FUN_DIRECT"))
-        else (FSLIT("TICK_ENT_DYN_FUN_STD"), FSLIT("TICK_ENT_DYN_FUN_DIRECT"))
+        then FSLIT("TICK_ENT_STATIC_FUN_DIRECT")
+        else FSLIT("TICK_ENT_DYN_FUN_DIRECT")
         
     stg_arity = length all_args
     lf_info = closureLFInfo closure_info
 
-    cl_descr mod_name = closureDescription mod_name name
-
 	-- Manufacture labels
     name       = closureName closure_info
-    fast_label = mkFastEntryLabel name stg_arity
-    info_label = mkInfoTableLabel name
 
 
 -- When printing the name of a thing in a ticky file, we want to
@@ -452,6 +378,47 @@ closureCodeBody binder_info closure_info cc all_args body
 ppr_for_ticky_name mod_name name
   | isInternalName name = showSDocDebug (ppr name <+> (parens (ppr mod_name)))
   | otherwise	     = showSDocDebug (ppr name)
+\end{code}
+
+The "slow entry" code for a function.  This entry point takes its
+arguments on the stack.  It loads the arguments into registers
+according to the calling convention, and jumps to the function's
+normal entry point.  The function's closure is assumed to be in
+R1/node.
+
+The slow entry point is used in two places:
+
+ (a) unknown calls: eg. stg_PAP_entry 
+ (b) returning from a heap-check failure
+
+\begin{code}
+mkSlowEntryCode :: Name -> CLabel -> [MagicId] -> [PrimRep] -> AbstractC
+mkSlowEntryCode name lbl regs reps
+   = CCodeBlock lbl (
+	mkAbstractCs [assts, stk_adj, jump]
+      )
+  where
+     stk_offsets = scanl (\off rep -> off - getPrimRepSize rep) 0 reps
+
+     assts = mkAbstractCs (zipWith3 mk_asst reps regs stk_offsets)
+     mk_asst rep reg offset = CAssign (CReg reg) (CVal (spRel 0 offset) rep)
+
+     stk_adj = CAssign (CReg Sp) (CAddr (spRel 0 stk_final_offset))
+     stk_final_offset = head (drop (length regs) stk_offsets)
+
+     jump = CJump (CLbl (mkEntryLabel name) CodePtrRep)
+
+mkRegSaveCode :: [MagicId] -> [PrimRep] -> AbstractC
+mkRegSaveCode regs reps 
+  = mkAbstractCs [stk_adj, assts]
+  where
+     stk_adj = CAssign (CReg Sp) (CAddr (spRel 0 (negate stk_final_offset)))
+
+     stk_final_offset = head (drop (length regs) stk_offsets)
+     stk_offsets = scanl (\off rep -> off - getPrimRepSize rep) 0 reps
+
+     assts = mkAbstractCs (zipWith3 mk_asst reps regs stk_offsets)
+     mk_asst rep reg offset = CAssign (CVal (spRel 0 offset) rep) (CReg reg) 
 \end{code}
 
 For lexically scoped profiling we have to load the cost centre from
@@ -506,65 +473,13 @@ enterCostCentreCode closure_info ccs is_thunk is_box
 
 %************************************************************************
 %*									*
-\subsubsection[pre-closure-code-stuff]{Pre-closure-code code}
-%*									*
-%************************************************************************
-
-The argument-satisfaction check code is placed after binding
-the arguments to their stack locations. Hence, the virtual stack
-pointer is pointing after all the args, and virtual offset 1 means
-the base of frame and hence most distant arg.  Hence
-virtual offset 0 is just beyond the most distant argument; the
-relative offset of this word tells how many words of arguments
-are expected.
-
-\begin{code}
-argSatisfactionCheck :: ClosureInfo -> [MagicId] {-GRAN-} -> Code
-
-argSatisfactionCheck closure_info arg_regs
-
-  = nodeMustPointToIt (closureLFInfo closure_info)   `thenFC` \ node_points ->
-
---      let
---         emit_gran_macros = opt_GranMacros
---      in
-
-    -- HWL  ngo' ngoq:
-    -- absC (CMacroStmt GRAN_FETCH []) 			`thenC`
-    -- forceHeapCheck [] node_points (absC AbsCNop)			`thenC`
-    --(if opt_GranMacros
-    --  then if node_points 
-    --         then fetchAndReschedule  arg_regs node_points 
-    --         else yield arg_regs node_points
-    --  else absC AbsCNop)                       `thenC`
-
-        getSpRelOffset 0 	`thenFC` \ (SpRel sp) ->
-	let
-	    off     = iBox sp
-	    rel_arg = mkIntCLit off
-	in
-	ASSERT(off /= 0)
-	if node_points then
-	    absC (CMacroStmt ARGS_CHK [rel_arg]) -- node already points
-	else
-	    absC (CMacroStmt ARGS_CHK_LOAD_NODE [rel_arg, set_Node_to_this])
-  where
-    -- We must tell the arg-satis macro whether Node is pointing to
-    -- the closure or not.  If it isn't so pointing, then we give to
-    -- the macro the (static) address of the closure.
-
-    set_Node_to_this = CLbl (closureLabelFromCI closure_info) PtrRep
-\end{code}
-
-%************************************************************************
-%*									*
 \subsubsection[closure-code-wrappers]{Wrappers around closure code}
 %*									*
 %************************************************************************
 
 \begin{code}
-thunkWrapper:: ClosureInfo -> CLabel -> Code -> Code
-thunkWrapper closure_info lbl thunk_code
+thunkWrapper:: ClosureInfo -> Code -> Code
+thunkWrapper closure_info thunk_code
   = 	-- Stack and heap overflow checks
     nodeMustPointToIt (closureLFInfo closure_info) `thenFC` \ node_points ->
 
@@ -576,8 +491,13 @@ thunkWrapper closure_info lbl thunk_code
               else yield [] node_points
        else absC AbsCNop)                       `thenC`
 
+    let closure_lbl
+		| node_points = Nothing
+		| otherwise   = Just (closureLabelFromCI closure_info)
+    in
+
         -- stack and/or heap checks
-    thunkChecks lbl node_points (
+    thunkChecks closure_lbl (
 
 	-- Overwrite with black hole if necessary
     blackHoleIt closure_info node_points  `thenC`
@@ -590,11 +510,10 @@ thunkWrapper closure_info lbl thunk_code
 
 funWrapper :: ClosureInfo 	-- Closure whose code body this is
 	   -> [MagicId] 	-- List of argument registers (if any)
-	   -> [(VirtualSpOffset,Int)] -- tagged stack slots
-	   -> CLabel		-- info table for heap check ret.
+	   -> AbstractC		-- reg saves for the heap check failure
 	   -> Code		-- Body of function being compiled
 	   -> Code
-funWrapper closure_info arg_regs stk_tags info_label fun_body
+funWrapper closure_info arg_regs reg_save_code fun_body
   = 	-- Stack overflow check
     nodeMustPointToIt (closureLFInfo closure_info)  `thenFC` \ node_points ->
 
@@ -605,8 +524,13 @@ funWrapper closure_info arg_regs stk_tags info_label fun_body
        then yield arg_regs node_points
        else absC AbsCNop)                           `thenC`
 
+    let closure_lbl
+		| node_points = Nothing
+		| otherwise   = Just (closureLabelFromCI closure_info)
+    in
+
         -- heap and/or stack checks
-    fastEntryChecks arg_regs stk_tags info_label node_points (
+    funEntryChecks closure_lbl reg_save_code (
 
 	-- Finally, do the business
     fun_body
@@ -722,7 +646,7 @@ closureDescription mod_name name
 		   ppr name,
 		   char '>'])
 \end{code}
-
+  
 \begin{code}
 chooseDynCostCentres ccs args fvs body
   = let

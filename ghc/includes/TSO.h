@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.27 2002/06/26 08:18:41 stolz Exp $
+ * $Id: TSO.h,v 1.28 2002/12/11 15:36:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -88,9 +88,8 @@ typedef enum {
  * The what_next field of a TSO indicates how the thread is to be run. 
  */
 typedef enum {
-  ThreadEnterGHC,		/* enter top thunk on stack */
   ThreadRunGHC,			/* return to address on top of stack */
-  ThreadEnterInterp,		/* enter top thunk on stack (w/ interpreter) */
+  ThreadInterpret,		/* interpret this thread */
   ThreadKilled,			/* thread has died, don't run it */
   ThreadRelocated,		/* thread has moved, link points to new locn */
   ThreadComplete		/* thread has finished */
@@ -189,7 +188,6 @@ typedef struct StgTSO_ {
   StgWord    	     stack_size;     /* stack size in *words* */
   StgWord            max_stack_size; /* maximum stack size in *words* */
   StgPtr             sp;
-  StgUpdateFrame*    su;
   
   StgWord            stack[FLEXIBLE_ARRAY];
 } StgTSO;

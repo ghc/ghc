@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.18 2001/10/03 13:57:42 simonmar Exp $
+ * $Id: StgTypes.h,v 1.19 2002/12/11 15:36:39 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -81,10 +81,12 @@ typedef unsigned __int64       StgWord64;
 #if SIZEOF_VOID_P == 8
 typedef StgInt64           StgInt;
 typedef StgWord64          StgWord;
+typedef StgWord32          StgHalfWord;
 #else
 #if SIZEOF_VOID_P == 4
 typedef StgInt32           StgInt; 
 typedef StgWord32          StgWord;
+typedef StgWord16          StgHalfWord;
 #else
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
 #endif

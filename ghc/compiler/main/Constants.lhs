@@ -26,6 +26,7 @@ module Constants (
         rESERVED_STACK_WORDS,
 
 	sTD_ITBL_SIZE,
+	rET_ITBL_SIZE,
 	pROF_ITBL_SIZE,
 	gRAN_ITBL_SIZE,
 	tICKY_ITBL_SIZE,
@@ -36,12 +37,7 @@ module Constants (
 	pROF_UF_SIZE,
 	gRAN_UF_SIZE,  -- HWL
 	uF_RET,
-	uF_SU,
 	uF_UPDATEE,
-
-	sEQ_FRAME_SIZE,
-	pROF_SEQ_FRAME_SIZE,
-	gRAN_SEQ_FRAME_SIZE, -- HWL
 
 	mAX_Vanilla_REG,
 	mAX_Float_REG,
@@ -67,8 +63,9 @@ module Constants (
 	wORD_SIZE,
 
 	bLOCK_SIZE,
-	bLOCK_SIZE_W
+	bLOCK_SIZE_W,
 
+	bITMAP_BITS_SHIFT,
     ) where
 
 -- This magical #include brings in all the everybody-knows-these magic
@@ -158,16 +155,7 @@ gRAN_UF_SIZE = (GRAN_UF_SIZE::Int)
 
 -- Offsets in an update frame.  They don't change with profiling!
 uF_RET         = (UF_RET::Int)
-uF_SU          = (UF_SU::Int)
 uF_UPDATEE     = (UF_UPDATEE::Int)
-\end{code}
-
-Seq frame sizes.
-
-\begin{code}
-sEQ_FRAME_SIZE = (STD_SEQ_FRAME_SIZE::Int)
-pROF_SEQ_FRAME_SIZE = (PROF_SEQ_FRAME_SIZE::Int)
-gRAN_SEQ_FRAME_SIZE = (GRAN_SEQ_FRAME_SIZE::Int)
 \end{code}
 
 \begin{code}
@@ -200,6 +188,7 @@ Info Table sizes.
 
 \begin{code}
 sTD_ITBL_SIZE   = (STD_ITBL_SIZE   :: Int)
+rET_ITBL_SIZE   = (RET_ITBL_SIZE   :: Int)
 pROF_ITBL_SIZE  = (PROF_ITBL_SIZE  :: Int)
 gRAN_ITBL_SIZE  = (GRAN_ITBL_SIZE  :: Int)
 tICKY_ITBL_SIZE = (TICKY_ITBL_SIZE :: Int)
@@ -238,4 +227,10 @@ Size of a storage manager block (in bytes).
 \begin{code}
 bLOCK_SIZE = (BLOCK_SIZE :: Int)
 bLOCK_SIZE_W = (bLOCK_SIZE `div` wORD_SIZE :: Int)
+\end{code}
+
+Number of bits to shift a bitfield left by in an info table.
+
+\begin{code}
+bITMAP_BITS_SHIFT = (BITMAP_BITS_SHIFT :: Int)
 \end{code}

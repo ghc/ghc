@@ -4,20 +4,39 @@ for various bits of the RTS.  They are linked
 in instead of the defaults.
 */
 
+#include <string.h>
+
 #if __GLASGOW_HASKELL__ >= 400
-#include "Rts.h"
+#include "../rts/Rts.h"
 #else
 #include "rtsdefs.h"
 #endif
 
-#if __GLASGOW_HASKELL__ >= 408
+#if __GLASGOW_HASKELL__ >= 505
+#include "../rts/Rts.h"
 #include "../includes/RtsFlags.h"
+#else
+#include "Rts.h"
+#include "RtsFlags.h"
+#endif
+
+#if __GLASGOW_HASKELL__ >= 502
+#include "RtsFlags.h"
+#endif
+
+#if __GLASGOW_HASKELL__ >= 408
 #include "HsFFI.h"
 #endif
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+
+#if __GLASGOW_HASKELL__ >= 504
+
+char *ghc_rts_opts = "-H8m -K8m";
+
+#else
 
 void
 defaultsHook (void)
@@ -31,11 +50,12 @@ defaultsHook (void)
     RtsFlags.GcFlags.statsFile = stderr;
 #endif
 }
+#endif
 
 void
 enableTimingStats( void )	/* called from the driver */
 {
-#if __GLASGOW_HASKELL__ >= 411
+#if __GLASGOW_HASKELL__ >= 505
     RtsFlags.GcFlags.giveStats = ONELINE_GC_STATS;
 #endif
     /* ignored when bootstrapping with an older GHC */
@@ -69,7 +89,6 @@ PostTraceHook (long fd)
 #endif
 }
 
-#if __GLASGOW_HASKELL__ >= 400
 void
 OutOfHeapHook (unsigned long request_size, unsigned long heap_size)
   /* both in bytes */
@@ -84,24 +103,6 @@ StackOverflowHook (unsigned long stack_size)    /* in bytes */
 {
     fprintf(stderr, "GHC stack-space overflow: current size %ld bytes.\nUse the `-K<size>' option to increase it.\n", stack_size);
 }
-
-#else /* GHC < 4.00 */
-
-void
-OutOfHeapHook (W_ request_size, W_ heap_size)  /* both in bytes */
-{
-    fprintf(stderr, "GHC's heap exhausted;\nwhile trying to allocate %lu bytes in a %lu-byte heap;\nuse the `-H<size>' option to increase the total heap size.\n",
-	request_size,
-	heap_size);
-}
-
-void
-StackOverflowHook (I_ stack_size)    /* in bytes */
-{
-    fprintf(stderr, "GHC stack-space overflow: current size %ld bytes.\nUse the `-K<size>' option to increase it.\n", stack_size);
-}
-
-#endif
 
 HsInt
 ghc_strlen( HsAddr a )

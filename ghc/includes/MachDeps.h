@@ -1,9 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachDeps.h,v 1.7 2001/10/03 13:57:42 simonmar Exp $
+ * $Id: MachDeps.h,v 1.8 2002/12/11 15:36:37 simonmar Exp $
  *
- * (c) The GRASP/AQUA Project, Glasgow University, 1998
- * (c) The GHC Team, 1998-1999
- * (c) The University of Glasgow 2001
+ * (c) The University of Glasgow 2002
  * 
  * Definitions that characterise machine specific properties of basic
  * types (C & Haskell).

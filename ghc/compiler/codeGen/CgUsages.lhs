@@ -107,27 +107,27 @@ setRealAndVirtualSp :: VirtualSpOffset 	-- New real Sp
 		     -> Code
 
 setRealAndVirtualSp sp = do
-	((vsp,f,realSp,hwsp), h_usage) <- getUsage
-	let new_usage = ((sp, f, sp, sp), h_usage)
+	((vsp,frame,f,realSp,hwsp), h_usage) <- getUsage
+	let new_usage = ((sp, frame, f, sp, sp), h_usage)
 	setUsage new_usage
 \end{code}
 
 \begin{code}
 getVirtSp :: FCode VirtualSpOffset
 getVirtSp = do 
-	((virtSp,_,_,_), _) <- getUsage
+	((virtSp,_,_,_,_), _) <- getUsage
 	return virtSp
 
 getRealSp :: FCode VirtualSpOffset
 getRealSp = do
-	((_,_,realSp,_),_) <- getUsage
+	((_,_,_,realSp,_),_) <- getUsage
 	return realSp
 \end{code}
 
 \begin{code}
 getSpRelOffset :: VirtualSpOffset -> FCode RegRelative
 getSpRelOffset virtual_offset = do
-	((_,_,realSp,_),_) <- getUsage
+	((_,_,_,realSp,_),_) <- getUsage
   	return $ spRel realSp virtual_offset
 \end{code}
 
@@ -153,7 +153,7 @@ adjustSpAndHp :: VirtualSpOffset 	-- New offset for Arg stack ptr
 adjustSpAndHp newRealSp = do
 	(MkCgInfoDown _ _ _ ticky_ctr _) <- getInfoDown
 	(MkCgState absC binds
-		   ((vSp,fSp,realSp,hwSp),	
+		   ((vSp,frame,fSp,realSp,hwSp),	
 		   (vHp, rHp))) <- getState
 	let move_sp = if (newRealSp == realSp) then AbsCNop
 	      else (CAssign (CReg Sp)
@@ -165,6 +165,6 @@ adjustSpAndHp newRealSp = do
 			profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
 			[ mkIntCLit (vHp - rHp), CLbl ticky_ctr DataPtrRep ]
 		]
-	let new_usage = ((vSp, fSp, newRealSp, hwSp), (vHp,vHp))
+	let new_usage = ((vSp, frame, fSp, newRealSp, hwSp), (vHp,vHp))
 	setState $ MkCgState (mkAbstractCs [absC,move_sp,move_hp]) binds new_usage
 \end{code}

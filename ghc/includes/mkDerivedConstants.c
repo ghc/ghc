@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkDerivedConstants.c,v 1.3 2002/01/29 18:32:18 sof Exp $
+ * $Id: mkDerivedConstants.c,v 1.4 2002/12/11 15:36:40 simonmar Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -7,7 +7,8 @@
  *
  * ------------------------------------------------------------------------*/
 
-#include "Rts.h"
+#define IN_STG_CODE 0
+#include "Stg.h"
 
 #define OFFSET(s_type, field) ((unsigned int)&(((s_type*)0)->field))
 
@@ -27,6 +28,7 @@ main(int argc, char *argv[])
 	   sizeofW(StgMutArrPtrs) - sizeofW(StgHeader));
 
     printf("#define STD_ITBL_SIZE   %d\n", sizeofW(StgInfoTable));
+    printf("#define RET_ITBL_SIZE   %d\n", sizeofW(StgRetInfoTable) - sizeofW(StgInfoTable));
     printf("#define PROF_ITBL_SIZE  %d\n", sizeofW(StgProfInfo));
     printf("#define GRAN_ITBL_SIZE  %d\n", 0);
     printf("#define TICKY_ITBL_SIZE %d\n", sizeofW(StgTickyInfo));
@@ -40,17 +42,8 @@ main(int argc, char *argv[])
     printf("#define UF_RET     %d\n",
 	   OFFSET(StgUpdateFrame,header.info));
 
-    printf("#define UF_SU      %d\n",  
-	   OFFSET(StgUpdateFrame,link) / sizeof(W_));
-
     printf("#define UF_UPDATEE %d\n",
 	   OFFSET(StgUpdateFrame,updatee) / sizeof(W_));
-
-    printf("#define STD_SEQ_FRAME_SIZE   %d\n", sizeofW(StgSeqFrame));
-    printf("#define GRAN_SEQ_FRAME_SIZE   %d\n",  
-	   sizeofW(StgSeqFrame) + sizeofW(StgGranHeader));
-    printf("#define PROF_SEQ_FRAME_SIZE   %d\n",  
-	   sizeofW(StgSeqFrame) + sizeofW(StgProfHeader));
 
     printf("#define BLOCK_SIZE   %d\n", BLOCK_SIZE);
     printf("#define MBLOCK_SIZE   %d\n", MBLOCK_SIZE);  

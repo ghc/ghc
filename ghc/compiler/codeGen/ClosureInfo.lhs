@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.53 2002/09/13 15:02:29 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.54 2002/12/11 15:36:28 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -11,9 +11,9 @@ the STG paper.
 \begin{code}
 module ClosureInfo (
 	ClosureInfo, LambdaFormInfo, SMRep, 	-- all abstract
-	StandardFormInfo,
+	StandardFormInfo, ArgDescr(..),
 
-	EntryConvention(..),
+	CallingConvention(..),
 
 	mkClosureLFInfo, mkConLFInfo, mkSelectorLFInfo,
 	mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
@@ -23,8 +23,8 @@ module ClosureInfo (
 	closureGoodStuffSize, closurePtrsSize,
 	slopSize,
 
-	layOutDynClosure, layOutDynConstr, layOutStaticClosure,
-	layOutStaticNoFVClosure, layOutStaticConstr,
+	layOutDynClosure, layOutStaticClosure, layOutStaticNoFVClosure,
+	layOutDynConstr, layOutStaticConstr,
 	mkVirtHeapOffsets, mkStaticClosure,
 
 	nodeMustPointToIt, getEntryConvention, 
@@ -33,14 +33,13 @@ module ClosureInfo (
 	blackHoleOnEntry,
 
 	staticClosureRequired,
-	slowFunEntryCodeRequired, funInfoTableRequired,
 
-	closureName, infoTableLabelFromCI, fastLabelFromCI,
+	closureName, infoTableLabelFromCI,
 	closureLabelFromCI, closureSRT,
 	entryLabelFromCI, 
 	closureLFInfo, closureSMRep, closureUpdReqd,
 	closureSingleEntry, closureReEntrant, closureSemiTag,
-	isStandardFormThunk,
+	closureFunInfo,	isStandardFormThunk,
 	GenStgArg,
 
 	isToplevClosure,
@@ -49,49 +48,48 @@ module ClosureInfo (
 	isStaticClosure,
 	allocProfilingMsg,
 	cafBlackHoleClosureInfo, seCafBlackHoleClosureInfo,
-	maybeSelectorInfo,
 
 	staticClosureNeedsLink,
+
+	mkInfoTable, mkRetInfoTable, mkVecInfoTable,
     ) where
 
+#include "../includes/config.h"
+#include "../includes/MachDeps.h"
 #include "HsVersions.h"
 
 import AbsCSyn		
 import StgSyn
 import CgMonad
 
-import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject,
-			  mAX_SPEC_FUN_SIZE, mAX_SPEC_THUNK_SIZE, mAX_SPEC_CONSTR_SIZE )
+import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject )
 import CgRetConv	( assignRegs )
-import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
-			  mkInfoTableLabel,
-			  mkConInfoTableLabel, 
-			  mkCAFBlackHoleInfoTableLabel, 
-			  mkSECAFBlackHoleInfoTableLabel, 
-			  mkStaticInfoTableLabel, mkStaticConEntryLabel,
-			  mkConEntryLabel, mkClosureLabel,
-			  mkSelectorInfoLabel, mkSelectorEntryLabel,
-			  mkApInfoTableLabel, mkApEntryLabel,
-			  mkReturnPtLabel
-			)
+import CLabel
 import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling,
-			  opt_SMP )
-import Id		( Id, idType, idArity )
+			  opt_SMP, opt_Unregisterised )
+import Id		( Id, idType, idArity, idName, idPrimRep )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 			  isNullaryDataCon, dataConName
 			)
-import TyCon		( isBoxedTupleTyCon )
-import Name		( Name, nameUnique, getOccName )
+import Name		( Name, nameUnique, getOccName, getName )
 import OccName		( occNameUserString )
 import PprType		( getTyDescription )
-import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
+import PrimRep
 import SMRep		-- all of it
-import Type		( isUnLiftedType, Type )
+import Type		( isUnLiftedType, Type, repType, splitTyConApp_maybe )
+import TyCon		( isFunTyCon )
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel, isTopLevel )
 import Util		( mapAccumL, listLengthCmp, lengthIs )
 import FastString
 import Outputable
+import Literal
+import Constants
+import BitSet
+
+import Maybe		( isJust )
+import DATA_WORD
+import DATA_BITS
 \end{code}
 
 %************************************************************************
@@ -100,15 +98,35 @@ import Outputable
 %*									*
 %************************************************************************
 
-The ``wrapper'' data type for closure information:
+Information about a closure, from the code generator's point of view.
+
+A ClosureInfo decribes the info pointer of a closure.  It has
+enough information 
+  a) to construct the info table itself
+  b) to allocate a closure containing that info pointer (i.e.
+	it knows the info table label)
+
+We make a ClosureInfo for
+	- each let binding (both top level and not)
+	- each data constructor (for its shared static and
+		dynamic info tables)
 
 \begin{code}
 data ClosureInfo
-  = MkClosureInfo {
-	closureName   :: Name,			-- The thing bound to this closure
-	closureLFInfo :: LambdaFormInfo,	-- Info derivable from the *source*
-	closureSMRep  :: SMRep,			-- representation used by storage manager
-	closureSRT    :: C_SRT			-- What SRT applies to this closure
+  = ClosureInfo {
+	closureName   :: !Name,		  -- The thing bound to this closure
+	closureLFInfo :: !LambdaFormInfo, -- NOTE: not an LFCon (see below)
+	closureSMRep  :: !SMRep,	  -- representation used by storage mgr
+	closureSRT    :: !C_SRT,	  -- What SRT applies to this closure
+	closureType   :: !Type,		  -- Type of closure (ToDo: remove)
+	closureDescr  :: !String	  -- closure description (for profiling)
+    }
+
+  -- constructor closures don't have a unique info table label (they use
+  -- the constructor's info table), and they don't have an SRT.
+  | ConInfo {
+	closureCon       :: !DataCon,
+	closureSMRep     :: !SMRep
     }
 \end{code}
 
@@ -118,41 +136,43 @@ data ClosureInfo
 %*									*
 %************************************************************************
 
+Information about an identifier, from the code generator's point of
+view.  Every identifier is bound to a LambdaFormInfo in the
+environment, which gives the code generator enough info to be able to
+tail call or return that identifier.
+
+Note that a closure is usually bound to an identifier, so a
+ClosureInfo contains a LambdaFormInfo.
+
 \begin{code}
 data LambdaFormInfo
-  = LFReEntrant		-- Reentrant closure; used for PAPs too
-	Type		-- Type of closure    (ToDo: remove)
+  = LFReEntrant		-- Reentrant closure (a function)
 	TopLevelFlag	-- True if top level
 	!Int		-- Arity
 	!Bool		-- True <=> no fvs
+	ArgDescr	-- Argument descriptor (should reall be in ClosureInfo)
 
   | LFCon		-- Constructor
 	DataCon		-- The constructor
-	Bool		-- True <=> zero arity
-
-  | LFTuple		-- Tuples
-	DataCon		-- The tuple constructor
-	Bool		-- True <=> zero arity
 
   | LFThunk		-- Thunk (zero arity)
-	Type		-- Type of the thunk   (ToDo: remove)
 	TopLevelFlag
 	!Bool		-- True <=> no free vars
-	Bool		-- True <=> updatable (i.e., *not* single-entry)
+	!Bool		-- True <=> updatable (i.e., *not* single-entry)
 	StandardFormInfo
+	!Bool		-- True <=> *might* be a function type
 
-  | LFArgument		-- Used for function arguments.  We know nothing about
-			-- this closure.  Treat like updatable "LFThunk"...
-
-  | LFImported		-- Used for imported things.  We know nothing about this
-			-- closure.  Treat like updatable "LFThunk"...
+  | LFUnknown		-- Used for function arguments and imported things.
+			--  We know nothing about  this closure.  Treat like
+			-- updatable "LFThunk"...
 			-- Imported things which we do know something about use
 			-- one of the other LF constructors (eg LFReEntrant for
 			-- known functions)
+	!Bool		-- True <=> *might* be a function type
 
   | LFLetNoEscape	-- See LetNoEscape module for precise description of
 			-- these "lets".
-	Int		-- arity;
+	!Int		-- arity;
 
   | LFBlackHole		-- Used for the closures allocated to hold the result
 			-- of a CAF.  We want the target of the update frame to
@@ -209,50 +229,50 @@ mkClosureLFInfo :: Id		-- The binder
 		-> LambdaFormInfo
 
 mkClosureLFInfo bndr top fvs upd_flag args@(_:_) -- Non-empty args
-  = LFReEntrant (idType bndr) top (length args) (null fvs)
-
-mkClosureLFInfo bndr top fvs ReEntrant []
-  = LFReEntrant (idType bndr) top 0 (null fvs)
+  = LFReEntrant top (length args) (null fvs) (mkArgDescr (getName bndr) args)
 
 mkClosureLFInfo bndr top fvs upd_flag []
-#ifdef DEBUG
-  | isUnLiftedType ty = pprPanic "mkClosureLFInfo" (ppr bndr <+> ppr ty)
-#endif
-  | otherwise
-  = LFThunk ty top (null fvs) (isUpdatable upd_flag) NonStandardThunk
+  = ASSERT( not updatable || not (isUnLiftedType id_ty) )
+    LFThunk top (null fvs) updatable NonStandardThunk 
+	(might_be_a_function id_ty)
   where
-    ty = idType bndr
+	updatable = isUpdatable upd_flag
+	id_ty = idType bndr
+
+might_be_a_function :: Type -> Bool
+might_be_a_function ty
+  | Just (tc,_) <- splitTyConApp_maybe (repType ty), 
+    not (isFunTyCon tc) = False
+  | otherwise = True
 \end{code}
 
 @mkConLFInfo@ is similar, for constructors.
 
 \begin{code}
 mkConLFInfo :: DataCon -> LambdaFormInfo
+mkConLFInfo con = LFCon con
 
-mkConLFInfo con
-  = -- the isNullaryDataCon will do this: ASSERT(isDataCon con)
-    (if isBoxedTupleTyCon (dataConTyCon con) then LFTuple else LFCon) 
-	con (isNullaryDataCon con)
+mkSelectorLFInfo id offset updatable
+  = LFThunk NotTopLevel False updatable (SelectorThunk offset) 
+	(might_be_a_function (idType id))
 
-mkSelectorLFInfo rhs_ty offset updatable
-  = LFThunk rhs_ty NotTopLevel False updatable (SelectorThunk offset)
-
-mkApLFInfo rhs_ty upd_flag arity
-  = LFThunk rhs_ty NotTopLevel (arity == 0)
-	    (isUpdatable upd_flag) (ApThunk arity)
+mkApLFInfo id upd_flag arity
+  = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
+	(might_be_a_function (idType id))
 \end{code}
 
 Miscellaneous LF-infos.
 
 \begin{code}
-mkLFArgument	= LFArgument
+mkLFArgument id = LFUnknown (might_be_a_function (idType id))
+
 mkLFLetNoEscape = LFLetNoEscape
 
 mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
   = case idArity id of
-      n | n > 0 -> LFReEntrant (idType id) TopLevel n True  -- n > 0
-      other -> LFImported	-- Not sure of exact arity
+      n | n > 0 -> LFReEntrant TopLevel n True (panic "arg_descr")  -- n > 0
+      other -> mkLFArgument id -- Not sure of exact arity
 \end{code}
 
 %************************************************************************
@@ -269,15 +289,23 @@ closureNonHdrSize :: ClosureInfo -> Int
 closureNonHdrSize cl_info
   = tot_wds + computeSlopSize tot_wds 
 			      (closureSMRep cl_info)
-			      (closureUpdReqd cl_info) 
+			      (closureNeedsUpdSpace cl_info) 
   where
     tot_wds = closureGoodStuffSize cl_info
+
+-- we leave space for an update if either (a) the closure is updatable
+-- or (b) it is a static thunk.  This is because a static thunk needs
+-- a static link field in a predictable place (after the slop), regardless
+-- of whether it is updatable or not.
+closureNeedsUpdSpace (ClosureInfo { closureLFInfo = 
+					LFThunk TopLevel _ _ _ _ }) = True
+closureNeedsUpdSpace cl_info = closureUpdReqd cl_info
 
 slopSize :: ClosureInfo -> Int
 slopSize cl_info
   = computeSlopSize (closureGoodStuffSize cl_info)
 		    (closureSMRep cl_info)
-		    (closureUpdReqd cl_info)
+		    (closureNeedsUpdSpace cl_info)
 
 closureGoodStuffSize :: ClosureInfo -> Int
 closureGoodStuffSize cl_info
@@ -341,106 +369,107 @@ computeSlopSize tot_wds BlackHoleRep _			-- Updatable
 
 %************************************************************************
 %*									*
-\subsection[layOutDynClosure]{Lay out a dynamic closure}
+\subsection[layOutDynClosure]{Lay out a closure}
 %*									*
 %************************************************************************
 
 \begin{code}
 layOutDynClosure, layOutStaticClosure
-	:: Name			    -- STG identifier of this closure
+	:: Id			    -- STG identifier of this closure
 	-> (a -> PrimRep)    	    -- how to get a PrimRep for the fields
 	-> [a]			    -- the "things" being layed out
 	-> LambdaFormInfo	    -- what sort of closure it is
-	-> C_SRT
+	-> C_SRT		    -- its SRT
+	-> String		    -- closure description
 	-> (ClosureInfo,	    -- info about the closure
 	    [(a, VirtualHeapOffset)])	-- things w/ offsets pinned on them
 
-layOutDynClosure name kind_fn things lf_info srt_info
-  = (MkClosureInfo { closureName = name, closureLFInfo = lf_info,
-		     closureSMRep = sm_rep, closureSRT = srt_info },
+layOutDynClosure    = layOutClosure False
+layOutStaticClosure = layOutClosure True
+
+layOutStaticNoFVClosure id lf_info srt_info descr
+  = fst (layOutClosure True id (panic "kind_fn") [] lf_info srt_info descr)
+
+layOutClosure
+ 	:: Bool			    -- True <=> static closure
+	-> Id			    -- STG identifier of this closure
+	-> (a -> PrimRep)    	    -- how to get a PrimRep for the fields
+	-> [a]			    -- the "things" being layed out
+	-> LambdaFormInfo	    -- what sort of closure it is
+	-> C_SRT		    -- its SRT
+	-> String		    -- closure description
+	-> (ClosureInfo,	    -- info about the closure
+	    [(a, VirtualHeapOffset)])	-- things w/ offsets pinned on them
+
+layOutClosure is_static id kind_fn things lf_info srt_info descr
+  = (ClosureInfo { closureName = name, 
+		   closureLFInfo = lf_info,
+		   closureSMRep = sm_rep, 
+		   closureSRT = srt_info,
+		   closureType = idType id,
+		   closureDescr = descr },
      things_w_offsets)
   where
+    name = idName id
     (tot_wds,		 -- #ptr_wds + #nonptr_wds
      ptr_wds,		 -- #ptr_wds
      things_w_offsets) = mkVirtHeapOffsets kind_fn things
-    sm_rep = chooseDynSMRep lf_info tot_wds ptr_wds
-\end{code}
+    sm_rep = chooseSMRep is_static lf_info tot_wds ptr_wds
 
-Wrappers for when used with data constructors:
 
-\begin{code}
 layOutDynConstr, layOutStaticConstr
-	:: Name 	-- Of the closure
-	-> DataCon 	
-	-> (a -> PrimRep) -> [a]
-	-> (ClosureInfo, [(a,VirtualHeapOffset)])
+	:: DataCon 	
+	-> (a -> PrimRep)
+	-> [a]
+	-> (ClosureInfo,
+	    [(a,VirtualHeapOffset)])
 
-layOutDynConstr name data_con kind_fn args
-  = layOutDynClosure name kind_fn args (mkConLFInfo data_con) NoC_SRT
+layOutDynConstr    = layOutConstr False
+layOutStaticConstr = layOutConstr True
 
-layOutStaticConstr name data_con kind_fn things
-  = layOutStaticClosure name kind_fn things (mkConLFInfo data_con) NoC_SRT
+layOutConstr is_static data_con kind_fn args
+   = (ConInfo { closureSMRep = sm_rep,
+		closureCon = data_con },
+      things_w_offsets)
+  where
+    (tot_wds,		 -- #ptr_wds + #nonptr_wds
+     ptr_wds,		 -- #ptr_wds
+     things_w_offsets) = mkVirtHeapOffsets kind_fn args
+    sm_rep = chooseSMRep is_static (mkConLFInfo data_con) tot_wds ptr_wds
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[layOutStaticClosure]{Lay out a static closure}
+\subsection[mkStaticClosure]{Make a static closure}
 %*									*
 %************************************************************************
 
-layOutStaticClosure is only used for laying out static constructors at
-the moment.  
-
-Static closures for functions are laid out using
-layOutStaticNoFVClosure.
+Make a static closure, adding on any extra padding needed for CAFs,
+and adding a static link field if necessary.
 
 \begin{code}
-layOutStaticClosure name kind_fn things lf_info srt_info
-  = (MkClosureInfo { closureName = name, closureLFInfo = lf_info,
-		     closureSMRep = rep, closureSRT = srt_info },
-     things_w_offsets)
-  where
-    rep = GenericRep is_static ptr_wds (tot_wds - ptr_wds) closure_type
-
-    (tot_wds,		 -- #ptr_wds + #nonptr_wds
-     ptr_wds,		 -- #ptr_wds
-     things_w_offsets) = mkVirtHeapOffsets kind_fn things
-
-    -- constructors with no pointer fields will definitely be NOCAF things.
-    -- this is a compromise until we can generate both kinds of constructor
-    -- (a normal static kind and the NOCAF_STATIC kind).
-    closure_type = getClosureType is_static tot_wds ptr_wds lf_info
-    is_static    = True
-
-layOutStaticNoFVClosure :: Name -> LambdaFormInfo -> C_SRT -> ClosureInfo
-layOutStaticNoFVClosure name lf_info srt_info
-  = MkClosureInfo { closureName = name, closureLFInfo = lf_info,
-		    closureSMRep = rep, closureSRT = srt_info }
-  where
-    rep = GenericRep is_static 0 0 (getClosureType is_static 0 0 lf_info)
-    is_static = True
-
-
--- make a static closure, adding on any extra padding needed for CAFs,
--- and adding a static link field if necessary.
-
-mkStaticClosure closure_info ccs fields cafrefs
+mkStaticClosure lbl cl_info ccs fields cafrefs
   | opt_SccProfilingOn =
 	     CStaticClosure
-		closure_info
+		lbl
+		cl_info
 	    	(mkCCostCentreStack ccs)
 		all_fields
   | otherwise =
 	     CStaticClosure
-		closure_info
+		lbl
+		cl_info
 	    	(panic "absent cc")
 		all_fields
 
    where
     all_fields = fields ++ padding_wds ++ static_link_field
 
-    upd_reqd = closureUpdReqd closure_info
+    upd_reqd = closureUpdReqd cl_info
 
+    -- for the purposes of laying out the static closure, we consider all
+    -- thunks to be "updatable", so that the static link field is always
+    -- in the same place.
     padding_wds
 	| not upd_reqd = []
 	| otherwise    = replicate n (mkIntCLit 0) -- a bunch of 0s
@@ -450,8 +479,8 @@ mkStaticClosure closure_info ccs fields cafrefs
 	-- save the closure's info pointer when we're reverting CAFs
 	-- (see comment in Storage.c)
     static_link_field
-	| upd_reqd || staticClosureNeedsLink closure_info = [static_link_value]
-	| otherwise 	     		                  = []
+	| upd_reqd || staticClosureNeedsLink cl_info = [static_link_value]
+	| otherwise 	     		             = []
 
 	-- for a static constructor which has NoCafRefs, we set the
 	-- static link field to a non-zero value so the garbage
@@ -468,14 +497,14 @@ mkStaticClosure closure_info ccs fields cafrefs
 %************************************************************************
 
 \begin{code}
-chooseDynSMRep
-	:: LambdaFormInfo
+chooseSMRep
+	:: Bool			-- True <=> static closure
+	-> LambdaFormInfo
 	-> Int -> Int		-- Tot wds, ptr wds
 	-> SMRep
 
-chooseDynSMRep lf_info tot_wds ptr_wds
+chooseSMRep is_static lf_info tot_wds ptr_wds
   = let
-	 is_static    = False
 	 nonptr_wds   = tot_wds - ptr_wds
 	 closure_type = getClosureType is_static tot_wds ptr_wds lf_info
     in
@@ -489,31 +518,12 @@ chooseDynSMRep lf_info tot_wds ptr_wds
 getClosureType :: Bool -> Int -> Int -> LambdaFormInfo -> ClosureType
 getClosureType is_static tot_wds ptr_wds lf_info
   = case lf_info of
-	LFCon con zero_arity
-		| is_static && ptr_wds == 0	       -> CONSTR_NOCAF
-		| specialised_rep mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n
-		| otherwise			       -> CONSTR
-
-	LFTuple _ zero_arity
-		| is_static && ptr_wds == 0	       -> CONSTR_NOCAF
-		| specialised_rep mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n
-		| otherwise			       -> CONSTR
-
-  	LFReEntrant _ _ _ _ 
-		| specialised_rep mAX_SPEC_FUN_SIZE -> FUN_p_n
-		| otherwise			    -> FUN
-
-	LFThunk _ _ _ _ (SelectorThunk _) -> THUNK_SELECTOR
-
-	LFThunk _ _ _ _ _
-		| specialised_rep mAX_SPEC_THUNK_SIZE -> THUNK_p_n
-		| otherwise			      -> THUNK
-
+	LFCon con | is_static && ptr_wds == 0	-> CONSTR_NOCAF
+		  | otherwise			-> CONSTR
+  	LFReEntrant _ _ _ _ 			-> FUN
+	LFThunk _ _ _ (SelectorThunk _) _ 	-> THUNK_SELECTOR
+	LFThunk _ _ _ _ _ 			-> THUNK
 	_ -> panic "getClosureType"
-  where
-    specialised_rep max_size =  not is_static
-			     && tot_wds > 0
-			     && tot_wds <= max_size
 \end{code}
 
 %************************************************************************
@@ -565,7 +575,7 @@ nodeMustPointToIt :: LambdaFormInfo -> FCode Bool
 nodeMustPointToIt lf_info
 
   = case lf_info of
-	LFReEntrant ty top arity no_fvs -> returnFC (
+	LFReEntrant top _ no_fvs _ -> returnFC (
 	    not no_fvs ||   -- Certainly if it has fvs we need to point to it
 	    isNotTopLevel top
 		    -- If it is not top level we will point to it
@@ -578,8 +588,7 @@ nodeMustPointToIt lf_info
 		-- the  not top  case above ensures this is ok.
 	    )
 
-	LFCon	_ zero_arity -> returnFC True
-	LFTuple _ zero_arity -> returnFC True
+	LFCon _ -> returnFC True
 
 	-- Strictly speaking, the above two don't need Node to point
 	-- to it if the arity = 0.  But this is a *really* unlikely
@@ -592,7 +601,7 @@ nodeMustPointToIt lf_info
 	-- having Node point to the result of an update.  SLPJ
 	-- 27/11/92.
 
-	LFThunk _ _ no_fvs updatable NonStandardThunk
+	LFThunk _ no_fvs updatable NonStandardThunk _
 	  -> returnFC (updatable || not no_fvs || opt_SccProfilingOn)
 
 	  -- For the non-updatable (single-entry case):
@@ -602,12 +611,11 @@ nodeMustPointToIt lf_info
 	  -- or profiling (in which case we need to recover the cost centre
 	  --		 from inside it)
 
-	LFThunk _ _ no_fvs updatable some_standard_form_thunk
+	LFThunk _ no_fvs updatable some_standard_form_thunk _
 	  -> returnFC True
 	  -- Node must point to any standard-form thunk.
 
-	LFArgument    -> returnFC True
-	LFImported    -> returnFC True
+	LFUnknown _   -> returnFC True
 	LFBlackHole _ -> returnFC True
 		    -- BH entry may require Node to point
 
@@ -643,10 +651,18 @@ When black-holing, single-entry closures could also be entered via node
 (rather than directly) to catch double-entry.
 
 \begin{code}
-data EntryConvention
-  = ViaNode				-- The "normal" convention
+data CallingConvention
+  = EnterIt				-- no args, not a function
 
-  | StdEntry CLabel			-- Jump to this code, with args on stack
+  | JumpToIt CLabel			-- no args, not a function, but we
+					-- know what its entry code is
+
+  | ReturnIt				-- it's a function, but we have
+					-- zero args to apply to it, so just
+					-- return it.
+
+  | SlowCall				-- Unknown fun, or known fun with
+					-- too few args.
 
   | DirectEntry 			-- Jump directly, with args in regs
 	CLabel 				--   The code label
@@ -657,7 +673,7 @@ data EntryConvention
 getEntryConvention :: Name		-- Function being applied
 		   -> LambdaFormInfo	-- Its info
 		   -> [PrimRep]		-- Available arguments
-		   -> FCode EntryConvention
+		   -> FCode CallingConvention
 
 getEntryConvention name lf_info arg_kinds
  =  nodeMustPointToIt lf_info	`thenFC` \ node_points ->
@@ -666,7 +682,7 @@ getEntryConvention name lf_info arg_kinds
     -- if we're parallel, then we must always enter via node.  The reason
     -- is that the closure may have been fetched since we allocated it.
 
-    if (node_points && opt_Parallel) then ViaNode else
+    if (node_points && opt_Parallel) then EnterIt else
 
     -- Commented out by SDM after futher thoughts:
     --   - the only closure type that can be blackholed is a thunk
@@ -675,48 +691,54 @@ getEntryConvention name lf_info arg_kinds
 
     case lf_info of
 
-	LFReEntrant _ _ arity _ ->
-	    if arity == 0 || (listLengthCmp arg_kinds arity == LT) then
-		StdEntry (mkStdEntryLabel name)
+	LFReEntrant _ arity _ _ ->
+	    if null arg_kinds then
+		if arity == 0 then
+		   EnterIt		-- a non-updatable thunk
+	    	else 
+		   ReturnIt		-- no args at all
+	    else if listLengthCmp arg_kinds arity == LT then
+		SlowCall		-- not enough args
 	    else
-		DirectEntry (mkFastEntryLabel name arity) arity arg_regs
+		DirectEntry (mkEntryLabel name) arity arg_regs
 	  where
-	    (arg_regs, _) = assignRegs live_regs (take arity arg_kinds)
-    	    live_regs = if node_points then [node] else []
+	    (arg_regs, _) = assignRegs [node] (take arity arg_kinds)
+		-- we don't use node to pass args now (SDM)
 
-	LFCon con True{-zero_arity-}
+	LFCon con
+	    | isNullaryDataCon con
 	      -- a real constructor.  Don't bother entering it, just jump
 	      -- to the constructor entry code directly.
 			  -> --false:ASSERT (null arg_kinds)	
 			     -- Should have no args (meaning what?)
-			     StdEntry (mkStaticConEntryLabel (dataConName con))
+			     JumpToIt (mkStaticConEntryLabel (dataConName con))
 
-	LFCon con False{-non-zero_arity-}
+	     | otherwise {- not nullary -}
 			  -> --false:ASSERT (null arg_kinds)	
 			     -- Should have no args (meaning what?)
-			     StdEntry (mkConEntryLabel (dataConName con))
+			     JumpToIt (mkConEntryLabel (dataConName con))
 
-	LFTuple tup zero_arity
-			  -> --false:ASSERT (null arg_kinds)	
-			     -- Should have no args (meaning what?)
-			     StdEntry (mkConEntryLabel (dataConName tup))
-
-	LFThunk _ _ _ updatable std_form_info
-	  -> if updatable || opt_DoTickyProfiling  -- to catch double entry
+	LFThunk _ _ updatable std_form_info is_fun
+	  -- must always "call" a function-typed thing, cannot just enter it
+	  | is_fun -> SlowCall
+	  | updatable || opt_DoTickyProfiling  -- to catch double entry
 		|| opt_SMP  -- always enter via node on SMP, since the
 			    -- thunk might have been blackholed in the 
 			    -- meantime.
-	     then ViaNode
-             else StdEntry (thunkEntryLabel name std_form_info updatable)
+	     -> ASSERT(null arg_kinds) EnterIt
+	  | otherwise
+	     -> ASSERT(null arg_kinds) 
+		JumpToIt (thunkEntryLabel name std_form_info updatable)
 
-	LFArgument    -> ViaNode
-	LFImported    -> ViaNode
-	LFBlackHole _ -> ViaNode -- Presumably the black hole has by now
-				 -- been updated, but we don't know with
-				 -- what, so we enter via Node
+	LFUnknown True  -> SlowCall -- might be a function
+	LFUnknown False -> ASSERT2 (null arg_kinds, ppr name <+> ppr arg_kinds) EnterIt -- not a function
+
+	LFBlackHole _ -> SlowCall -- Presumably the black hole has by now
+				  -- been updated, but we don't know with
+				  -- what, so we slow call it
 
 	LFLetNoEscape 0
-	  -> StdEntry (mkReturnPtLabel (nameUnique name))
+	  -> JumpToIt (mkReturnPtLabel (nameUnique name))
 
 	LFLetNoEscape arity
 	  -> if (not (arg_kinds `lengthIs` arity)) then pprPanic "let-no-escape: " (ppr name <+> ppr arity) else
@@ -735,15 +757,16 @@ blackHoleOnEntry :: ClosureInfo -> Bool
 -- Single-entry ones have no fvs to plug, and we trust they don't form part 
 -- of a loop.
 
-blackHoleOnEntry cl_info
-  | isStaticRep (closureSMRep cl_info)
+blackHoleOnEntry ConInfo{} = False
+blackHoleOnEntry (ClosureInfo { closureLFInfo = lf_info, closureSMRep = rep })
+  | isStaticRep rep
   = False	-- Never black-hole a static closure
 
   | otherwise
-  = case closureLFInfo cl_info of
+  = case lf_info of
 	LFReEntrant _ _ _ _	  -> False
 	LFLetNoEscape _		  -> False
-	LFThunk _ _ no_fvs updatable _
+	LFThunk _ no_fvs updatable _ _
 	  -> if updatable
 	     then not opt_OmitBlackHoling
 	     else opt_DoTickyProfiling || not no_fvs
@@ -754,13 +777,10 @@ blackHoleOnEntry cl_info
 
 isStandardFormThunk :: LambdaFormInfo -> Bool
 
-isStandardFormThunk (LFThunk _ _ _ _ (SelectorThunk _)) = True
-isStandardFormThunk (LFThunk _ _ _ _ (ApThunk _))	= True
+isStandardFormThunk (LFThunk _ _ _ (SelectorThunk _) _) = True
+isStandardFormThunk (LFThunk _ _ _ (ApThunk _) _)	= True
 isStandardFormThunk other_lf_info 			= False
 
-maybeSelectorInfo (MkClosureInfo { closureLFInfo = LFThunk _ _ _ _ (SelectorThunk offset) }) 
-		    = Just offset
-maybeSelectorInfo _ = Nothing
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -774,24 +794,15 @@ staticClosureNeedsLink :: ClosureInfo -> Bool
 --	b) it's a constructor with one or more pointer fields
 -- In case (b), the constructor's fields themselves play the role
 -- of the SRT.
-staticClosureNeedsLink (MkClosureInfo { closureName = name, 
-					closureSRT = srt, 
-					closureLFInfo = lf_info,
-					closureSMRep = sm_rep })
-  = needsSRT srt || (constr_with_fields && not_nocaf_constr)
+staticClosureNeedsLink (ClosureInfo { closureSRT = srt })
+  = needsSRT srt
+staticClosureNeedsLink (ConInfo { closureSMRep = sm_rep, closureCon = con })
+  = not (isNullaryDataCon con) && not_nocaf_constr
   where
     not_nocaf_constr = 
 	case sm_rep of 
 	   GenericRep _ _ _ CONSTR_NOCAF -> False
 	   _other			 -> True
-
-    constr_with_fields =
-	case lf_info of
-	  LFThunk _ _ _ _ _    -> False
-	  LFReEntrant _ _ _ _  -> False
-	  LFCon   _ is_nullary -> not is_nullary
-	  LFTuple _ is_nullary -> not is_nullary
-	  _other	       -> pprPanic "staticClosureNeedsLink" (ppr name)
 \end{code}
 
 Avoiding generating entries and info tables
@@ -862,34 +873,12 @@ staticClosureRequired
 	-> LambdaFormInfo
 	-> Bool
 staticClosureRequired binder bndr_info
-		      (LFReEntrant _ top_level _ _)	-- It's a function
+		      (LFReEntrant top_level _ _ _)	-- It's a function
   = ASSERT( isTopLevel top_level )
 	-- Assumption: it's a top-level, no-free-var binding
 	not (satCallsOnly bndr_info)
 
 staticClosureRequired binder other_binder_info other_lf_info = True
-
-slowFunEntryCodeRequired	-- Assumption: it's a function, not a thunk.
-	:: Name
-	-> StgBinderInfo
-	-> EntryConvention
-	-> Bool
-slowFunEntryCodeRequired binder bndr_info entry_conv
-  =    not (satCallsOnly bndr_info)
-    || (case entry_conv of { DirectEntry _ _ _ -> False; other -> True })
-	    {- The last case deals with the parallel world; a function usually
-	       as a DirectEntry convention, but if it doesn't we must generate slow-entry code -}
-
-funInfoTableRequired
-	:: Name
-	-> StgBinderInfo
-	-> LambdaFormInfo
-	-> Bool
-funInfoTableRequired binder bndr_info (LFReEntrant _ top_level _ _)
-  =    isNotTopLevel top_level
-    || not (satCallsOnly bndr_info)
-
-funInfoTableRequired other_binder_info binder other_lf_info = True
 \end{code}
 
 %************************************************************************
@@ -904,67 +893,68 @@ isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
 
 closureUpdReqd :: ClosureInfo -> Bool
-closureUpdReqd (MkClosureInfo { closureLFInfo = LFThunk _ _ _ upd _ }) = upd
-closureUpdReqd (MkClosureInfo { closureLFInfo = LFBlackHole _ })           = True
+closureUpdReqd (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _ }) = upd
+closureUpdReqd (ClosureInfo { closureLFInfo = LFBlackHole _ })     = True
 	-- Black-hole closures are allocated to receive the results of an
 	-- alg case with a named default... so they need to be updated.
 closureUpdReqd other_closure = False
 
 closureSingleEntry :: ClosureInfo -> Bool
-closureSingleEntry (MkClosureInfo { closureLFInfo = LFThunk _ _ _ upd _ }) = not upd
+closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd
 closureSingleEntry other_closure = False
 
 closureReEntrant :: ClosureInfo -> Bool
-closureReEntrant (MkClosureInfo { closureLFInfo = LFReEntrant _ _ _ _ }) = True
+closureReEntrant (ClosureInfo { closureLFInfo = LFReEntrant _ _ _ _ }) = True
 closureReEntrant other_closure = False
-\end{code}
 
-\begin{code}
 closureSemiTag :: ClosureInfo -> Maybe Int
-closureSemiTag (MkClosureInfo { closureLFInfo = lf_info })
-  = case lf_info of
-      LFCon data_con _ -> Just (dataConTag data_con - fIRST_TAG)
-      LFTuple _ _      -> Just 0
-      _	    	       -> Nothing
+closureSemiTag (ConInfo { closureCon = data_con })
+      = Just (dataConTag data_con - fIRST_TAG)
+closureSemiTag _ = Nothing
+
+closureFunInfo :: ClosureInfo -> Maybe (Int, ArgDescr)
+closureFunInfo (ClosureInfo { closureLFInfo = LFReEntrant _ arity _ arg_desc})
+  = Just (arity, arg_desc)
+closureFunInfo _
+  = Nothing
 \end{code}
 
 \begin{code}
 isToplevClosure :: ClosureInfo -> Bool
-
-isToplevClosure (MkClosureInfo { closureLFInfo = lf_info })
+isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
   = case lf_info of
-      LFReEntrant _ TopLevel _ _ -> True
-      LFThunk _ TopLevel _ _ _   -> True
+      LFReEntrant TopLevel _ _ _ -> True
+      LFThunk TopLevel _ _ _ _   -> True
       other -> False
+isToplevClosure _ = False
 \end{code}
 
 Label generation.
 
 \begin{code}
-fastLabelFromCI :: ClosureInfo -> CLabel
-fastLabelFromCI (MkClosureInfo { closureName = name, closureLFInfo = LFReEntrant _ _ arity _ })
-  = mkFastEntryLabel name arity
-
-fastLabelFromCI cl_info
-  = pprPanic "fastLabelFromCI" (ppr (closureName cl_info))
-
 infoTableLabelFromCI :: ClosureInfo -> CLabel
-infoTableLabelFromCI (MkClosureInfo { closureName = id, closureLFInfo = lf_info, closureSMRep = rep })
+infoTableLabelFromCI (ClosureInfo { closureName = name,
+				    closureLFInfo = lf_info, 
+				    closureSMRep = rep })
   = case lf_info of
-	LFCon con _ 	 -> mkConInfoPtr con rep
-	LFTuple tup _	 -> mkConInfoPtr tup rep
-
 	LFBlackHole info -> info
 
-	LFThunk _ _ _ upd_flag (SelectorThunk offset) -> 
+	LFThunk _ _ upd_flag (SelectorThunk offset) _ -> 
 		mkSelectorInfoLabel upd_flag offset
 
-	LFThunk _ _ _ upd_flag (ApThunk arity) -> 
+	LFThunk _ _ upd_flag (ApThunk arity) _ -> 
 		mkApInfoTableLabel upd_flag arity
 
-	other -> {-NO: if isStaticRep rep
-		 then mkStaticInfoTableLabel id
-		 else -} mkInfoTableLabel id
+	LFThunk{}      -> mkInfoTableLabel name
+
+	LFReEntrant _ _ _ (ArgGen _ _) -> mkInfoTableLabel name
+	LFReEntrant _ _ _ _             -> mkInfoTableLabel name
+
+	other -> panic "infoTableLabelFromCI"
+
+infoTableLabelFromCI (ConInfo { closureCon = con, closureSMRep = rep })
+  =  mkConInfoPtr con rep
+
 
 mkConInfoPtr :: DataCon -> SMRep -> CLabel
 mkConInfoPtr con rep
@@ -978,15 +968,21 @@ mkConEntryPtr con rep
   | isStaticRep rep = mkStaticConEntryLabel (dataConName con)
   | otherwise       = mkConEntryLabel       (dataConName con)
 
-closureLabelFromCI cl_info = mkClosureLabel (closureName cl_info)
+closureLabelFromCI (ClosureInfo { closureName = nm }) = mkClosureLabel nm
+closureLabelFromCI _ = panic "closureLabelFromCI"
 
 entryLabelFromCI :: ClosureInfo -> CLabel
-entryLabelFromCI (MkClosureInfo { closureName = id, closureLFInfo = lf_info, closureSMRep = rep })
+entryLabelFromCI (ClosureInfo { closureName = id, 
+			        closureLFInfo = lf_info, 
+			        closureSMRep = rep })
   = case lf_info of
-	LFThunk _ _ _ upd_flag std_form_info -> thunkEntryLabel id std_form_info upd_flag
-	LFCon con _			     -> mkConEntryPtr con rep
-	LFTuple tup _			     -> mkConEntryPtr tup rep
-	other				     -> mkStdEntryLabel id
+	LFThunk _ _ upd_flag std_form_info _ -> 
+		thunkEntryLabel id std_form_info upd_flag
+	other -> mkEntryLabel id
+
+entryLabelFromCI (ConInfo { closureCon = con, closureSMRep = rep })
+  = mkConEntryPtr con rep
+
 
 -- thunkEntryLabel is a local help function, not exported.  It's used from both
 -- entryLabelFromCI and getEntryConvention.
@@ -996,21 +992,19 @@ thunkEntryLabel thunk_id (ApThunk arity) is_updatable
 thunkEntryLabel thunk_id (SelectorThunk offset) upd_flag
   = mkSelectorEntryLabel upd_flag offset
 thunkEntryLabel thunk_id _ is_updatable
-  = mkStdEntryLabel thunk_id
+  = mkEntryLabel thunk_id
 \end{code}
 
 \begin{code}
 allocProfilingMsg :: ClosureInfo -> FastString
-
-allocProfilingMsg cl_info
-  = case closureLFInfo cl_info of
+allocProfilingMsg ConInfo{} = FSLIT("TICK_ALLOC_CON")
+allocProfilingMsg ClosureInfo{ closureLFInfo = lf_info }
+  = case lf_info of
       LFReEntrant _ _ _ _   -> FSLIT("TICK_ALLOC_FUN")
-      LFCon _ _		    -> FSLIT("TICK_ALLOC_CON")
-      LFTuple _ _	    -> FSLIT("TICK_ALLOC_CON")
-      LFThunk _ _ _ True _  -> FSLIT("TICK_ALLOC_UP_THK")  -- updatable
-      LFThunk _ _ _ False _ -> FSLIT("TICK_ALLOC_SE_THK")  -- nonupdatable
+      LFThunk _ _ True _ _  -> FSLIT("TICK_ALLOC_UP_THK")  -- updatable
+      LFThunk _ _ False _ _ -> FSLIT("TICK_ALLOC_SE_THK")  -- nonupdatable
       LFBlackHole _	    -> FSLIT("TICK_ALLOC_BH")
-      LFImported	    -> panic "TICK_ALLOC_IMP"
+      _			    -> panic "allocProfilingMsg"
 \end{code}
 
 We need a black-hole closure info to pass to @allocDynClosure@ when we
@@ -1019,17 +1013,25 @@ ways to build an LFBlackHole, maintaining the invariant that it really
 is a black hole and not something else.
 
 \begin{code}
-cafBlackHoleClosureInfo cl_info
-  = MkClosureInfo { closureName   = closureName cl_info,
-		    closureLFInfo = LFBlackHole mkCAFBlackHoleInfoTableLabel,
-		    closureSMRep  = BlackHoleRep,
-		    closureSRT    = NoC_SRT  }
+cafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
+				       closureType = ty })
+  = ClosureInfo { closureName   = nm,
+		  closureLFInfo = LFBlackHole mkCAFBlackHoleInfoTableLabel,
+		  closureSMRep  = BlackHoleRep,
+		  closureSRT    = NoC_SRT,
+		  closureType   = ty,
+		  closureDescr  = "" }
+cafBlackHoleClosureInfo _ = panic "cafBlackHoleClosureInfo"
 
-seCafBlackHoleClosureInfo cl_info
-  = MkClosureInfo { closureName   = closureName cl_info,
-		    closureLFInfo = LFBlackHole mkSECAFBlackHoleInfoTableLabel,
-		    closureSMRep  = BlackHoleRep,
-		    closureSRT    = NoC_SRT }
+seCafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
+				         closureType = ty })
+  = ClosureInfo { closureName   = nm,
+		  closureLFInfo = LFBlackHole mkSECAFBlackHoleInfoTableLabel,
+		  closureSMRep  = BlackHoleRep,
+		  closureSRT    = NoC_SRT,
+		  closureType   = ty,
+		  closureDescr  = ""  }
+seCafBlackHoleClosureInfo _ = panic "seCafBlackHoleClosureInfo"
 \end{code}
 
 %************************************************************************
@@ -1049,10 +1051,281 @@ in the closure info using @closureTypeDescr@.
 
 \begin{code}
 closureTypeDescr :: ClosureInfo -> String
-closureTypeDescr cl_info
-  = case closureLFInfo cl_info of
-	LFThunk ty _ _ _ _   -> getTyDescription ty
-	LFReEntrant ty _ _ _ -> getTyDescription ty
-	LFCon data_con _     -> occNameUserString (getOccName (dataConTyCon data_con))
-	other		     -> showSDoc (ppr (closureName cl_info))
+closureTypeDescr (ClosureInfo { closureType = ty })
+  = getTyDescription ty
+closureTypeDescr (ConInfo { closureCon = data_con })
+  = occNameUserString (getOccName (dataConTyCon data_con))
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Making argument bitmaps}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- bring in ARG_P, ARG_N, etc.
+#include "../includes/StgFun.h"
+
+data ArgDescr
+  = ArgSpec
+	!Int		-- ARG_P, ARG_N, ...
+  | ArgGen 
+	CLabel		-- label for a slow-entry point
+	Liveness	-- the arg bitmap: describes pointedness of arguments
+
+mkArgDescr :: Name -> [Id] -> ArgDescr
+mkArgDescr nm args = argDescr nm (filter nonVoidRep (map idPrimRep args))
+  where nonVoidRep VoidRep = False
+	nonVoidRep _ = True
+
+argDescr nm [PtrRep]    = ArgSpec ARG_P
+argDescr nm [FloatRep]  = ArgSpec ARG_F
+argDescr nm [DoubleRep] = ArgSpec ARG_D
+argDescr nm [r] | is64BitRep r  = ArgSpec ARG_L
+argDescr nm [r] | isNonPtrRep r = ArgSpec ARG_N
+
+argDescr nm [r1,r2] | isNonPtrRep r1 && isNonPtrRep r2 = ArgSpec ARG_NN
+argDescr nm [r1,PtrRep] | isNonPtrRep r1 = ArgSpec ARG_NP
+argDescr nm [PtrRep,r1] | isNonPtrRep r1 = ArgSpec ARG_PN
+argDescr nm [PtrRep,PtrRep] = ArgSpec ARG_PP
+
+argDescr nm [r1,r2,r3] | isNonPtrRep r1 && isNonPtrRep r2 && isNonPtrRep r3 = ArgSpec ARG_NNN
+argDescr nm [r1,r2,PtrRep] | isNonPtrRep r1 && isNonPtrRep r2 = ArgSpec ARG_NNP
+argDescr nm [r1,PtrRep,r2] | isNonPtrRep r1 && isNonPtrRep r2 = ArgSpec ARG_NPN
+argDescr nm [r1,PtrRep,PtrRep] | isNonPtrRep r1 = ArgSpec ARG_NPP
+argDescr nm [PtrRep,r1,r2] | isNonPtrRep r1 && isNonPtrRep r2 = ArgSpec ARG_PNN
+argDescr nm [PtrRep,r1,PtrRep] | isNonPtrRep r1 = ArgSpec ARG_PNP
+argDescr nm [PtrRep,PtrRep,r1] | isNonPtrRep r1 = ArgSpec ARG_PPN
+argDescr nm [PtrRep,PtrRep,PtrRep] = ArgSpec ARG_PPP
+
+argDescr nm [PtrRep,PtrRep,PtrRep,PtrRep] = ArgSpec ARG_PPPP
+argDescr nm [PtrRep,PtrRep,PtrRep,PtrRep,PtrRep] = ArgSpec ARG_PPPPP
+argDescr nm [PtrRep,PtrRep,PtrRep,PtrRep,PtrRep,PtrRep] = ArgSpec ARG_PPPPPP
+
+argDescr name reps = ArgGen (mkSlowEntryLabel name) liveness
+ where bitmap = argBits reps
+       lbl = mkBitmapLabel name
+       liveness = Liveness lbl (length bitmap) 
+			(map chunkToLiveness (mkChunks bitmap))
+
+argBits [] = []
+argBits (rep : args)
+  | isFollowableRep rep = False : argBits args
+  | otherwise = take (getPrimRepSize rep) (repeat True) ++ argBits args
+
+mkChunks [] = []
+mkChunks stuff = chunk : mkChunks rest
+  where (chunk, rest) = splitAt 32 stuff
+
+chunkToLiveness chunk = mkBS [ n | (True,n) <- zip chunk [0..] ]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Generating info tables}
+%*									*
+%************************************************************************
+
+Here we make a concrete info table, represented as a list of CAddrMode
+(it can't be simply a list of Word, because the SRT field is
+represented by a label+offset expression).
+
+\begin{code}
+#if SIZEOF_HSWORD == 4
+type StgWord = Word32
+#define HALF_WORD 16
+#elif SIZEOF_HSWORD == 8
+type StgWord = Word64
+#define HALF_WORD 32
+#endif
+
+mkInfoTable :: ClosureInfo -> [CAddrMode]
+mkInfoTable cl_info
+ | opt_Unregisterised = std_info ++ extra_bits
+ | otherwise          = extra_bits ++ std_info
+ where
+    std_info = mkStdInfoTable entry_amode
+		  ty_descr_amode cl_descr_amode cl_type srt_len layout_amode
+
+    entry_amode = CLbl (entryLabelFromCI cl_info) CodePtrRep 
+
+    closure_descr = 
+	case cl_info of
+	  ClosureInfo { closureDescr = descr } -> descr
+	  ConInfo { closureCon = con } -> occNameUserString (getOccName con)
+
+    ty_descr_amode = CLit (MachStr (mkFastString (closureTypeDescr cl_info)))
+    cl_descr_amode = CLit (MachStr (mkFastString closure_descr))
+
+    cl_type = getSMRepClosureTypeInt (closureSMRep cl_info)
+
+    srt = closureSRT cl_info	     
+    needs_srt = needsSRT srt
+
+    semi_tag = closureSemiTag cl_info
+    is_con = isJust semi_tag
+
+    (srt_label,srt_len)
+	| Just tag <- semi_tag = (mkIntCLit 0, tag) -- constructor
+	| otherwise = 
+	  case srt of
+	    NoC_SRT -> (mkIntCLit 0, 0)
+	    C_SRT lbl off len -> 
+	      (CAddr (CIndex (CLbl lbl DataPtrRep) (mkIntCLit off) WordRep),
+	       len)
+
+    ptrs  = closurePtrsSize cl_info
+    nptrs = size - ptrs
+    size  = closureNonHdrSize cl_info
+
+    layout_info :: StgWord
+#ifdef WORDS_BIGENDIAN
+    layout_info = (fromIntegral ptrs `shiftL` HALF_WORD) .|. fromIntegral nptrs
+#else 
+    layout_info = (fromIntegral ptrs) .|. (fromIntegral nptrs `shiftL` HALF_WORD)
+#endif	     
+
+    layout_amode = CLit (MachWord (fromIntegral layout_info))
+
+    extra_bits
+	| is_fun    = fun_extra_bits
+	| is_con    = []
+	| needs_srt = [srt_label]
+ 	| otherwise = []
+
+    maybe_fun_stuff = closureFunInfo cl_info
+    is_fun = isJust maybe_fun_stuff
+    (Just (arity, arg_descr)) = maybe_fun_stuff
+
+    fun_extra_bits
+	| opt_Unregisterised = reverse reg_fun_extra_bits
+	| otherwise 	     = reg_fun_extra_bits
+
+    reg_fun_extra_bits
+	| ArgGen slow_lbl liveness <- arg_descr
+		= [
+		   CLbl slow_lbl CodePtrRep, 
+		   livenessToAddrMode liveness,
+		   srt_label,
+		   mkIntCLit fun_desc
+		  ]
+	| needs_srt = [srt_label, mkIntCLit fun_desc]
+	| otherwise = [mkIntCLit fun_desc]
+
+#ifdef WORDS_BIGENDIAN
+    fun_desc = (fromIntegral fun_type `shiftL` HALF_WORD) .|. fromIntegral arity
+#else 
+    fun_desc = (fromIntegral fun_type) .|. (fromIntegral arity `shiftL` HALF_WORD)
+#endif	     
+
+    fun_type = case arg_descr of
+		ArgSpec n -> n
+		ArgGen _ (Liveness _ size _)
+			| size <= mAX_SMALL_BITMAP_SIZE -> ARG_GEN
+			| otherwise 			-> ARG_GEN_BIG
+
+-- Return info tables come in two flavours: direct returns and
+-- vectored returns.
+
+mkRetInfoTable :: CLabel -> C_SRT -> Liveness -> [CAddrMode]
+mkRetInfoTable entry_lbl srt liveness
+ = mkBitmapInfoTable (CLbl entry_lbl CodePtrRep) srt liveness []
+
+mkVecInfoTable :: [CAddrMode] -> C_SRT -> Liveness -> [CAddrMode]
+mkVecInfoTable vector srt liveness
+ = mkBitmapInfoTable zero_amode srt liveness vector
+
+mkBitmapInfoTable
+   :: CAddrMode
+   -> C_SRT -> Liveness
+   -> [CAddrMode]
+   -> [CAddrMode]
+mkBitmapInfoTable entry_amode srt liveness vector
+ | opt_Unregisterised = std_info ++ extra_bits
+ | otherwise          = extra_bits ++ std_info
+ where
+   std_info = mkStdInfoTable entry_amode zero_amode zero_amode 
+		cl_type srt_len liveness_amode
+
+   liveness_amode = livenessToAddrMode liveness
+   
+   (srt_label,srt_len) =
+	  case srt of
+	    NoC_SRT -> (mkIntCLit 0, 0)
+	    C_SRT lbl off len -> 
+	      (CAddr (CIndex (CLbl lbl DataPtrRep) (mkIntCLit off) WordRep),
+	       len)
+
+   cl_type = case (null vector, isBigLiveness liveness) of
+		(True, True)   -> rET_BIG
+		(True, False)  -> rET_SMALL
+		(False, True)  -> rET_VEC_BIG
+		(False, False) -> rET_VEC_SMALL
+
+   srt_bit | needsSRT srt || not (null vector) = [srt_label]
+	   | otherwise = []
+
+   extra_bits | opt_Unregisterised = srt_bit ++ vector
+	      | otherwise          = reverse vector ++ srt_bit
+
+-- The standard bits of an info table.  This part of the info table
+-- corresponds to the StgInfoTable type defined in InfoTables.h.
+
+mkStdInfoTable
+   :: CAddrMode				-- entry label
+   -> CAddrMode				-- closure type descr (profiling)
+   -> CAddrMode				-- closure descr (profiling)
+   -> Int				-- closure type
+   -> Int				-- SRT length
+   -> CAddrMode				-- layout field
+   -> [CAddrMode]
+mkStdInfoTable entry_lbl type_descr closure_descr cl_type srt_len layout_amode
+ = std_info
+ where  
+    std_info
+	| opt_Unregisterised  = entry_lbl : std_info'
+	| otherwise 	      = std_info'
+
+    std_info' =
+	  -- par info
+	  prof_info ++
+ 	  -- ticky info
+	  -- debug info
+	  [layout_amode] ++
+	  CLit (MachWord (fromIntegral type_info)) :
+	  []
+
+    prof_info 
+	| opt_SccProfilingOn = [ type_descr, closure_descr ]
+	| otherwise = []
+
+    -- sigh: building up the info table is endian-dependent.
+    -- ToDo: do this using .byte and .word directives.
+    type_info :: StgWord
+#ifdef WORDS_BIGENDIAN
+    type_info = (fromIntegral cl_type `shiftL` HALF_WORD) .|.
+		(fromIntegral srt_len)
+#else 
+    type_info = (fromIntegral cl_type) .|.
+		(fromIntegral srt_len `shiftL` HALF_WORD)
+#endif
+
+isBigLiveness (Liveness _ size _) = size > mAX_SMALL_BITMAP_SIZE
+
+livenessToAddrMode :: Liveness -> CAddrMode
+livenessToAddrMode (Liveness lbl size bits)
+	| size <= mAX_SMALL_BITMAP_SIZE = small
+	| otherwise = CLbl lbl DataPtrRep
+	where
+	  small = mkIntCLit (fromIntegral size .|. (small_bits `shiftL` bITMAP_BITS_SHIFT))
+	  small_bits = case bits of 
+			[]  -> 0
+			[b] -> intBS b
+			_   -> panic "livenessToAddrMode"
+
+mAX_SMALL_BITMAP_SIZE = (wORD_SIZE * 8) - bITMAP_BITS_SHIFT
+
+zero_amode = mkIntCLit 0
 \end{code}

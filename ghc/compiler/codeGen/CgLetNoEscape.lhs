@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.18 2002/09/13 15:02:28 simonpj Exp $
+% $Id: CgLetNoEscape.lhs,v 1.19 2002/12/11 15:36:26 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -24,20 +24,23 @@ import CgBindery	( letNoEscapeIdInfo, bindArgsToRegs,
 			  bindNewToStack, buildContLivenessMask, CgIdInfo,
 			  nukeDeadBindings
 			)
-import CgHeapery	( altHeapCheck )
+import CgHeapery	( unbxTupleHeapCheck )
 import CgRetConv	( assignRegs )
-import CgStackery	( mkTaggedVirtStkOffsets, 
+import CgStackery	( mkVirtStkOffsets, 
 			  allocStackTop, deAllocStackTop, freeStackSlots )
 import CgUsages		( setRealAndVirtualSp, getRealSp, getSpRelOffset )
 import CLabel		( mkReturnInfoLabel )
 import ClosureInfo	( mkLFLetNoEscape )
 import CostCentre       ( CostCentreStack )
+import Name		( getName )
 import Id		( idPrimRep, Id )
 import Var		( idUnique )
-import PrimRep		( PrimRep(..), retPrimRepSize )
+import PrimRep		( PrimRep(..), retPrimRepSize, isFollowableRep )
 import BasicTypes	( RecFlag(..) )
 import Unique		( Unique )
 import Util		( splitAtList )
+
+import List		( partition )
 \end{code}
 
 %************************************************************************
@@ -172,7 +175,7 @@ cgLetNoEscapeClosure
 	 nukeDeadBindings full_live_in_rhss)
 
 	(deAllocStackTop retPrimRepSize		`thenFC` \_ ->
-	 buildContLivenessMask uniq		`thenFC` \ liveness ->
+	 buildContLivenessMask (getName binder)	`thenFC` \ liveness ->
      	 forkAbsC (cgLetNoEscapeBody binder cc args body uniq) 
 						`thenFC` \ code ->
 	 getSRTInfo srt				`thenFC` \ srt_info -> 
@@ -196,24 +199,33 @@ cgLetNoEscapeBody binder cc all_args body uniq
      -- this is where the stack frame lives:
      getRealSp   `thenFC` \sp -> 
 
+     -- This is very much like bindUnboxedTupleComponents (ToDo)
      let
 	arg_kinds	     = map idPrimRep all_args
 	(arg_regs, _)	     = assignRegs [{-nothing live-}] arg_kinds
 	(reg_args, stk_args) = splitAtList arg_regs all_args
 
-    	(sp_stk_args, stk_offsets, stk_tags)
-	  = mkTaggedVirtStkOffsets sp idPrimRep stk_args
+	-- separate the rest of the args into pointers and non-pointers
+	( ptr_args, nptr_args ) = 
+	   partition (isFollowableRep . idPrimRep) stk_args
+
+	(ptr_sp,  ptr_offsets)  = mkVirtStkOffsets sp     idPrimRep ptr_args
+	(nptr_sp, nptr_offsets) = mkVirtStkOffsets ptr_sp idPrimRep nptr_args
+
+        ptrs  = ptr_sp - sp
+	nptrs = nptr_sp - ptr_sp
      in
 
 	-- Bind args to appropriate regs/stk locns
      bindArgsToRegs reg_args arg_regs		    `thenC`
-     mapCs bindNewToStack stk_offsets		    `thenC`
-     setRealAndVirtualSp sp_stk_args		    `thenC`
+     mapCs bindNewToStack ptr_offsets		    `thenC`
+     mapCs bindNewToStack nptr_offsets		    `thenC`
 
-	-- free up the stack slots containing tags, and the slot
-	-- containing the return address (really frame header).
- 	-- c.f. CgCase.cgUnboxedTupleAlt.
-     freeStackSlots (sp : map fst stk_tags)	    `thenC`
+     setRealAndVirtualSp nptr_sp		    `thenC`
+
+	-- free up the stack slots containing the return address
+	-- (frame header itbl).  c.f. CgCase.cgUnboxedTupleAlt.
+     freeStackSlots [sp]			    `thenC`
 
 	-- Enter the closures cc, if required
      --enterCostCentreCode closure_info cc IsFunction  `thenC`
@@ -227,8 +239,7 @@ cgLetNoEscapeBody binder cc all_args body uniq
 
 	-- Do heap check [ToDo: omit for non-recursive case by recording in
 	--	in envt and absorbing at call site]
-     altHeapCheck False True arg_regs stk_tags frame_hdr_asst (Just uniq) (
+     unbxTupleHeapCheck arg_regs ptrs nptrs frame_hdr_asst (
 	cgExpr body
      )
-
 \end{code}

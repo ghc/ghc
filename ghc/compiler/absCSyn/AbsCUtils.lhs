@@ -144,7 +144,6 @@ magicIdPrimRep (FloatReg _)	    = FloatRep
 magicIdPrimRep (DoubleReg _)	    = DoubleRep
 magicIdPrimRep (LongReg kind _)	    = kind
 magicIdPrimRep Sp		    = PtrRep
-magicIdPrimRep Su		    = PtrRep
 magicIdPrimRep SpLim		    = PtrRep
 magicIdPrimRep Hp		    = PtrRep
 magicIdPrimRep HpLim		    = PtrRep
@@ -320,11 +319,10 @@ flatAbsC (AbsCStmts s1 s2)
     returnFlt (mkAbsCStmts inline_s1 inline_s2,
 	       mkAbsCStmts top_s1    top_s2)
 
-flatAbsC (CClosureInfoAndCode cl_info slow maybe_fast descr)
-  = flatAbsC slow		`thenFlt` \ (slow_heres, slow_tops) ->
-    flat_maybe maybe_fast	`thenFlt` \ (fast_heres, fast_tops) ->
-    returnFlt (AbsCNop, mkAbstractCs [slow_tops, fast_tops,
-       CClosureInfoAndCode cl_info slow_heres fast_heres descr]
+flatAbsC (CClosureInfoAndCode cl_info entry)
+  = flatAbsC entry		`thenFlt` \ (entry_heres, entry_tops) ->
+    returnFlt (AbsCNop, mkAbstractCs [entry_tops, 
+       CClosureInfoAndCode cl_info entry_heres]
     )
 
 flatAbsC (CCodeBlock lbl abs_C)
@@ -418,10 +416,10 @@ flatAbsC (CSequential abcs)
 
 -- Some statements only make sense at the top level, so we always float
 -- them.  This probably isn't necessary.
-flatAbsC stmt@(CStaticClosure _ _ _)  		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CStaticClosure _ _ _ _) 		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CClosureTbl _)			= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CSRT _ _)	  		= returnFlt (AbsCNop, stmt)
-flatAbsC stmt@(CBitmap _ _)	  		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CBitmap _)	  		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CCostCentreDecl _ _) 		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CCostCentreStackDecl _)		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CSplitMarker) 			= returnFlt (AbsCNop, stmt)

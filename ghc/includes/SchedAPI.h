@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.15 2002/06/19 20:45:17 sof Exp $
+ * $Id: SchedAPI.h,v 1.16 2002/12/11 15:36:39 simonmar Exp $
  *
- * (c) The GHC Team 1998
+ * (c) The GHC Team 1998-2002
  *
  * External API for the scheduler.  For most uses, the functions in
  * RtsAPI.h should be enough.
@@ -32,15 +32,11 @@ extern void taskStart(void);
 extern void scheduleThread(StgTSO *tso);
 extern SchedulerStatus scheduleWaitThread(StgTSO *tso, /*out*/HaskellObj* ret);
 
-static inline void pushClosure   (StgTSO *tso, StgClosure *c) {
+static inline void pushClosure   (StgTSO *tso, StgWord c) {
   tso->sp--;
   tso->sp[0] = (W_) c;
 }
 
-static inline void pushRealWorld (StgTSO *tso) {
-  tso->sp--;
-  tso->sp[0] = (W_) REALWORLD_TAG;
-}
 static inline StgTSO *
 createGenThread(nat stack_size,  StgClosure *closure) {
   StgTSO *t;
@@ -49,7 +45,8 @@ createGenThread(nat stack_size,  StgClosure *closure) {
 #else
   t = createThread(stack_size);
 #endif
-  pushClosure(t,closure);
+  pushClosure(t, (W_)closure);
+  pushClosure(t, (W_)&stg_enter_info);
   return t;
 }
 
@@ -61,8 +58,10 @@ createIOThread(nat stack_size,  StgClosure *closure) {
 #else
   t = createThread(stack_size);
 #endif
-  pushRealWorld(t);
-  pushClosure(t,closure);
+  pushClosure(t, (W_)&stg_noforceIO_info);
+  pushClosure(t, (W_)&stg_ap_v_info);
+  pushClosure(t, (W_)closure);
+  pushClosure(t, (W_)&stg_enter_info);
   return t;
 }
 
@@ -79,8 +78,10 @@ createStrictIOThread(nat stack_size,  StgClosure *closure) {
 #else
   t = createThread(stack_size);
 #endif
-  pushClosure(t,closure);
-  pushClosure(t,(StgClosure*)&stg_forceIO_closure);
+  pushClosure(t, (W_)&stg_forceIO_info);
+  pushClosure(t, (W_)&stg_ap_v_info);
+  pushClosure(t, (W_)closure);
+  pushClosure(t, (W_)&stg_enter_info);
   return t;
 }
 

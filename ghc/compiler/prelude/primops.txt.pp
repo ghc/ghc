@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.22 2002/10/18 09:51:04 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.23 2002/12/11 15:36:35 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -1634,7 +1634,7 @@ primop   AddrToHValueOp "addrToHValue#" GenPrimOp
    {Convert an Addr\# to a followable type.}
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
-   a -> (# a #)
+   BCO# -> (# a #)
    with
    out_of_line = True
 

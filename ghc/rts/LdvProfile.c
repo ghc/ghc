@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LdvProfile.c,v 1.2 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: LdvProfile.c,v 1.3 2002/12/11 15:36:42 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -22,10 +22,6 @@
 #include "RtsUtils.h"
 #include "Schedule.h"
 
-// ldvTimeSave is set in LdvCensusKillAll(), and stores the final number of
-// times that LDV profiling was proformed.
-static nat ldvTimeSave;
-
 /* --------------------------------------------------------------------------
  * Fills in the slop when a *dynamic* closure changes its type.
  * First calls LDV_recordDead() to declare the closure is dead, and then
@@ -44,10 +40,12 @@ static nat ldvTimeSave;
 void 
 LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p )
 {
+    StgInfoTable *info;
+    nat nw, i;
+
     if (era > 0) {
-	StgInfoTable *inf = get_itbl((p));
-	nat nw, i;
-	switch (inf->type) {
+	info = get_itbl((p));
+	switch (info->type) {
 	case THUNK_1_0:
 	case THUNK_0_1:
 	case THUNK_2_0:
@@ -57,21 +55,25 @@ LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p )
 	    nw = MIN_UPD_SIZE;
 	    break;
 	case THUNK:
-	    nw = inf->layout.payload.ptrs + inf->layout.payload.nptrs;
+	    nw = info->layout.payload.ptrs + info->layout.payload.nptrs;
 	    if (nw < MIN_UPD_SIZE)
 		nw = MIN_UPD_SIZE;
 	    break;
-	case AP_UPD:
+	case AP:
 	    nw = sizeofW(StgPAP) - sizeofW(StgHeader) + ((StgPAP *)p)->n_args;
+	    break;
+	case AP_STACK:
+	    nw = sizeofW(StgAP_STACK) - sizeofW(StgHeader)
+		+ ((StgAP_STACK *)p)->size;
 	    break;
 	case CAF_BLACKHOLE:
 	case BLACKHOLE:
 	case SE_BLACKHOLE:
 	case SE_CAF_BLACKHOLE:
-	    nw = inf->layout.payload.ptrs + inf->layout.payload.nptrs;
+	    nw = info->layout.payload.ptrs + info->layout.payload.nptrs;
 	    break;
 	default:
-	    barf("Unexpected closure type %u in LDV_recordDead_FILL_SLOP_DYNAMIC()", inf->type);
+	    barf("Unexpected closure type %u in LDV_recordDead_FILL_SLOP_DYNAMIC()", info->type);
 	    break;
 	}
 	LDV_recordDead((StgClosure *)(p), nw + sizeofW(StgHeader));
@@ -156,9 +158,13 @@ processHeapClosureForDead( StgClosure *c )
 	size = sizeofW(StgHeader) + MIN_UPD_SIZE;
 	break;
 
-    case AP_UPD:
+    case AP:
     case PAP:
 	size = pap_sizeW((StgPAP *)c);
+	break;
+
+    case AP_STACK:
+	size = ap_stack_sizeW((StgAP_STACK *)c);
 	break;
 
     case CONSTR:
@@ -229,7 +235,6 @@ processHeapClosureForDead( StgClosure *c )
     case UPDATE_FRAME:
     case CATCH_FRAME:
     case STOP_FRAME:
-    case SEQ_FRAME:
     case RET_DYN:
     case RET_BCO:
     case RET_SMALL:

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.70 2002/11/01 11:05:47 simonmar Exp $
+ * $Id: Storage.c,v 1.71 2002/12/11 15:36:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -88,25 +88,12 @@ initStorage( void )
     macosx_get_memory_layout();
 #endif
 
-    /* Sanity check to make sure we are able to make the distinction
-     * between closures and infotables
+    /* Sanity check to make sure the LOOKS_LIKE_ macros appear to be
+     * doing something reasonable.
      */
-  if (!LOOKS_LIKE_GHC_INFO(&stg_BLACKHOLE_info)) {
-    barf("LOOKS_LIKE_GHC_INFO+ is incorrectly defined");
-    exit(0);
-  }
-  if (LOOKS_LIKE_GHC_INFO(&stg_dummy_ret_closure)) {
-    barf("LOOKS_LIKE_GHC_INFO- is incorrectly defined");
-    exit(0);
-  }
-  if (LOOKS_LIKE_STATIC_CLOSURE(&stg_BLACKHOLE_info)) {
-    barf("LOOKS_LIKE_STATIC_CLOSURE- is incorrectly defined");
-    exit(0);
-  }
-  if (!LOOKS_LIKE_STATIC_CLOSURE(&stg_dummy_ret_closure)) {
-    barf("LOOKS_LIKE_STATIC_CLOSURE+ is incorrectly defined");
-    exit(0);
-  }
+    ASSERT(LOOKS_LIKE_INFO_PTR(&stg_BLACKHOLE_info));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(&stg_dummy_ret_closure));
+    ASSERT(!HEAP_ALLOCED(&stg_dummy_ret_closure));
 
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
       RtsFlags.GcFlags.heapSizeSuggestion > 
@@ -302,7 +289,7 @@ newCAF(StgClosure* caf)
    */
   ACQUIRE_SM_LOCK;
 
-  if (is_dynamically_loaded_rwdata_ptr((StgPtr)caf)) {
+  if (0 /*TODO: is_dynamically_loaded_rwdata_ptr((StgPtr)caf)*/) {
       ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
       ((StgIndStatic *)caf)->static_link = caf_list;
       caf_list = caf;

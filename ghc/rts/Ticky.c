@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.16 2002/03/04 10:35:43 keithw Exp $
+ * $Id: Ticky.c,v 1.17 2002/12/11 15:36:54 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -37,7 +37,7 @@ PrintTickyInfo(void)
 #ifdef PAR
 	ALLOC_FMBQ_ctr + ALLOC_FME_ctr + ALLOC_BF_ctr +
 #endif
-	ALLOC_BH_ctr  + ALLOC_UPD_PAP_ctr + ALLOC_PRIM_ctr;
+	ALLOC_BH_ctr  + ALLOC_PAP_ctr + ALLOC_PRIM_ctr;
 
   unsigned long tot_adm_wds = /* total number of admin words allocated */
 	ALLOC_FUN_adm + ALLOC_THK_adm + ALLOC_CON_adm + ALLOC_TUP_adm +
@@ -45,7 +45,7 @@ PrintTickyInfo(void)
 #ifdef PAR
 	ALLOC_FMBQ_adm + ALLOC_FME_adm + ALLOC_BF_adm +
 #endif
-	ALLOC_BH_adm  + ALLOC_UPD_PAP_adm + ALLOC_PRIM_adm;
+	ALLOC_BH_adm  + ALLOC_PAP_adm + ALLOC_PRIM_adm;
 
   unsigned long tot_gds_wds = /* total number of words of ``good stuff'' allocated */
 	ALLOC_FUN_gds + ALLOC_THK_gds + ALLOC_CON_gds + ALLOC_TUP_gds +
@@ -54,7 +54,7 @@ PrintTickyInfo(void)
 	ALLOC_FMBQ_gds + ALLOC_FME_gds + ALLOC_BF_gds +
 #endif
 
-	ALLOC_BH_gds  + ALLOC_UPD_PAP_gds + ALLOC_PRIM_gds;
+	ALLOC_BH_gds  + ALLOC_PAP_gds + ALLOC_PRIM_gds;
 
   unsigned long tot_slp_wds = /* total number of ``slop'' words allocated */
 	ALLOC_FUN_slp + ALLOC_THK_slp + ALLOC_CON_slp + ALLOC_TUP_slp +
@@ -62,7 +62,7 @@ PrintTickyInfo(void)
 #ifdef PAR
 	ALLOC_FMBQ_slp + ALLOC_FME_slp + ALLOC_BF_slp +
 #endif
-	ALLOC_BH_slp  + ALLOC_UPD_PAP_slp + ALLOC_PRIM_slp;
+	ALLOC_BH_slp  + ALLOC_PAP_slp + ALLOC_PRIM_slp;
 
   unsigned long tot_wds = /* total words */
 	tot_adm_wds + tot_gds_wds + tot_slp_wds;
@@ -70,21 +70,21 @@ PrintTickyInfo(void)
   unsigned long tot_thk_enters = ENT_STATIC_THK_ctr + ENT_DYN_THK_ctr;
   unsigned long tot_con_enters = ENT_STATIC_CON_ctr + ENT_DYN_CON_ctr;
   unsigned long tot_fun_direct_enters = ENT_STATIC_FUN_DIRECT_ctr + ENT_DYN_FUN_DIRECT_ctr;
-  unsigned long tot_fun_std_enters = ENT_STATIC_FUN_STD_ctr + ENT_DYN_FUN_STD_ctr;
   unsigned long tot_ind_enters = ENT_STATIC_IND_ctr + ENT_DYN_IND_ctr;
   
+  // This is the number of function calls which went via a
+  // slow/unknown application (one of the stg_ap_ functions).
+  unsigned long tot_fun_slow_enters =
+      SLOW_CALL_ctr - SLOW_CALL_BUILT_PAP_ctr - SLOW_CALL_NEW_PAP_ctr;
+
   unsigned long tot_enters =
 	tot_con_enters + tot_fun_direct_enters +
 	tot_ind_enters + ENT_PERM_IND_ctr + ENT_PAP_ctr + tot_thk_enters;
   unsigned long jump_direct_enters =
 	tot_enters - ENT_VIA_NODE_ctr;
-  unsigned long bypass_enters =
-	tot_fun_direct_enters -
-	(tot_fun_std_enters - UPD_PAP_IN_NEW_ctr);
 
   unsigned long tot_returns =
-	RET_NEW_ctr + RET_OLD_ctr + RET_UNBOXED_TUP_ctr +
-        RET_SEMI_IN_HEAP_ctr + RET_SEMI_BY_DEFAULT_ctr/*?*/;
+      RET_NEW_ctr + RET_OLD_ctr + RET_UNBOXED_TUP_ctr;
 
   unsigned long tot_returns_of_new = RET_NEW_ctr;
 
@@ -151,10 +151,10 @@ PrintTickyInfo(void)
       fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(PRIM));
 
   fprintf(tf,"\n%7ld (%5.1f%%) partial applications",
-	ALLOC_UPD_PAP_ctr,
-	PC(INTAVG(ALLOC_UPD_PAP_ctr, tot_allocs)));
-  if (ALLOC_UPD_PAP_ctr != 0)
-      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(UPD_PAP));
+	ALLOC_PAP_ctr,
+	PC(INTAVG(ALLOC_PAP_ctr, tot_allocs)));
+  if (ALLOC_PAP_ctr != 0)
+      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(PAP));
 
   fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
 	ALLOC_TSO_ctr,
@@ -194,20 +194,18 @@ PrintTickyInfo(void)
   fprintf(tf,"%7ld (%5.1f%%) data values\n",
 	tot_con_enters,
 	PC(INTAVG(tot_con_enters,tot_enters)));
-  fprintf(tf,"%7ld (%5.1f%%) function values\n\t\t  [of which %ld (%.1f%%) bypassed arg-satisfaction chk]\n",
-	tot_fun_direct_enters,
-	PC(INTAVG(tot_fun_direct_enters,tot_enters)),
-	bypass_enters,
-	PC(INTAVG(bypass_enters,tot_fun_direct_enters)));
-  fprintf(tf,"%7ld (%5.1f%%) partial applications\n",
-	ENT_PAP_ctr,
-	PC(INTAVG(ENT_PAP_ctr,tot_enters)));
   fprintf(tf,"%7ld (%5.1f%%) normal indirections\n",
 	tot_ind_enters,
 	PC(INTAVG(tot_ind_enters,tot_enters)));
   fprintf(tf,"%7ld (%5.1f%%) permanent indirections\n",
 	ENT_PERM_IND_ctr,
 	PC(INTAVG(ENT_PERM_IND_ctr,tot_enters)));
+
+  fprintf(tf,"\nCALLS: %ld  of which %ld (%.lf%%) were slow/unknown calls\n\t\t  [the rest went direct to the fast entry point]\n",
+	  tot_fun_direct_enters,
+	  tot_fun_slow_enters,
+	  PC(INTAVG(tot_fun_slow_enters,tot_fun_direct_enters))
+      );
 
   fprintf(tf,"\nRETURNS: %ld\n", tot_returns);
   fprintf(tf,"%7ld (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
@@ -238,8 +236,6 @@ PrintTickyInfo(void)
   fprintf(tf,"\nUPDATE FRAMES: %ld (%ld omitted from thunks)",
 	UPDF_PUSHED_ctr,
 	UPDF_OMITTED_ctr);
-
-  fprintf(tf,"\nSEQ FRAMES:    %ld", SEQF_PUSHED_ctr);
 
   fprintf(tf,"\nCATCH FRAMES:  %ld", CATCHF_PUSHED_ctr);
 
@@ -358,15 +354,15 @@ PrintTickyInfo(void)
   PR_HST(ALLOC_PRIM_hst,2);
   PR_HST(ALLOC_PRIM_hst,3);
   PR_HST(ALLOC_PRIM_hst,4);
-  PR_CTR(ALLOC_UPD_PAP_ctr);
-  PR_CTR(ALLOC_UPD_PAP_adm);
-  PR_CTR(ALLOC_UPD_PAP_gds);
-  PR_CTR(ALLOC_UPD_PAP_slp);
-  PR_HST(ALLOC_UPD_PAP_hst,0);
-  PR_HST(ALLOC_UPD_PAP_hst,1);
-  PR_HST(ALLOC_UPD_PAP_hst,2);
-  PR_HST(ALLOC_UPD_PAP_hst,3);
-  PR_HST(ALLOC_UPD_PAP_hst,4);
+  PR_CTR(ALLOC_PAP_ctr);
+  PR_CTR(ALLOC_PAP_adm);
+  PR_CTR(ALLOC_PAP_gds);
+  PR_CTR(ALLOC_PAP_slp);
+  PR_HST(ALLOC_PAP_hst,0);
+  PR_HST(ALLOC_PAP_hst,1);
+  PR_HST(ALLOC_PAP_hst,2);
+  PR_HST(ALLOC_PAP_hst,3);
+  PR_HST(ALLOC_PAP_hst,4);
 
   PR_CTR(ALLOC_TSO_ctr);
   PR_CTR(ALLOC_TSO_adm);
@@ -411,8 +407,6 @@ PrintTickyInfo(void)
   PR_CTR(ENT_VIA_NODE_ctr);
   PR_CTR(ENT_STATIC_CON_ctr);
   PR_CTR(ENT_DYN_CON_ctr);
-  PR_CTR(ENT_STATIC_FUN_STD_ctr);
-  PR_CTR(ENT_DYN_FUN_STD_ctr);
   PR_CTR(ENT_STATIC_FUN_DIRECT_ctr);
   PR_CTR(ENT_DYN_FUN_DIRECT_ctr);
   PR_CTR(ENT_STATIC_IND_ctr);
@@ -433,19 +427,28 @@ PrintTickyInfo(void)
  * determine the number of closures entered 0/1/>1.  KSW 1999-04.  */
   COND_PR_CTR(ENT_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsFalse,"E!NT_PERM_IND_ctr requires +RTS -Z");
 
+  PR_CTR(ENT_AP_ctr);
   PR_CTR(ENT_PAP_ctr);
-  PR_CTR(ENT_AP_UPD_ctr);
+  PR_CTR(ENT_AP_STACK_ctr);
   PR_CTR(ENT_BH_ctr);
   PR_CTR(ENT_STATIC_THK_ctr);
   PR_CTR(ENT_DYN_THK_ctr);
 
+  PR_CTR(SLOW_CALL_ctr);
+  PR_CTR(SLOW_CALL_BUILT_PAP_ctr);
+  PR_CTR(SLOW_CALL_NEW_PAP_ctr);
+  PR_HST(SLOW_CALL_hst,0);
+  PR_HST(SLOW_CALL_hst,1);
+  PR_HST(SLOW_CALL_hst,2);
+  PR_HST(SLOW_CALL_hst,3);
+  PR_HST(SLOW_CALL_hst,4);
+  PR_HST(SLOW_CALL_hst,5);
+  PR_HST(SLOW_CALL_hst,6);
+  PR_HST(SLOW_CALL_hst,7);
+
   PR_CTR(RET_NEW_ctr);
   PR_CTR(RET_OLD_ctr);
   PR_CTR(RET_UNBOXED_TUP_ctr);
-  PR_CTR(RET_SEMI_BY_DEFAULT_ctr);
-  PR_CTR(RET_SEMI_IN_HEAP_ctr);
-  PR_CTR(RET_SEMI_FAILED_IND_ctr);
-  PR_CTR(RET_SEMI_FAILED_UNEVAL_ctr);
   PR_CTR(VEC_RETURN_ctr);
 
   PR_HST(RET_NEW_hst,0);
@@ -475,15 +478,6 @@ PrintTickyInfo(void)
   PR_HST(RET_UNBOXED_TUP_hst,6);
   PR_HST(RET_UNBOXED_TUP_hst,7);
   PR_HST(RET_UNBOXED_TUP_hst,8);
-  PR_HST(RET_SEMI_IN_HEAP_hst,0);
-  PR_HST(RET_SEMI_IN_HEAP_hst,1);
-  PR_HST(RET_SEMI_IN_HEAP_hst,2);
-  PR_HST(RET_SEMI_IN_HEAP_hst,3);
-  PR_HST(RET_SEMI_IN_HEAP_hst,4);
-  PR_HST(RET_SEMI_IN_HEAP_hst,5);
-  PR_HST(RET_SEMI_IN_HEAP_hst,6);
-  PR_HST(RET_SEMI_IN_HEAP_hst,7);
-  PR_HST(RET_SEMI_IN_HEAP_hst,8);
   PR_HST(RET_VEC_RETURN_hst,0);
   PR_HST(RET_VEC_RETURN_hst,1);
   PR_HST(RET_VEC_RETURN_hst,2);
@@ -494,11 +488,8 @@ PrintTickyInfo(void)
   PR_HST(RET_VEC_RETURN_hst,7);
   PR_HST(RET_VEC_RETURN_hst,8);
 
-  PR_CTR(RET_SEMI_loads_avoided);
-
   PR_CTR(UPDF_OMITTED_ctr);
   PR_CTR(UPDF_PUSHED_ctr);
-  PR_CTR(SEQF_PUSHED_ctr);
   PR_CTR(CATCHF_PUSHED_ctr);
 
   PR_CTR(UPDF_RCC_PUSHED_ctr);
@@ -568,9 +559,8 @@ printRegisteredCounterInfo (FILE *tf)
     /* Function name at the end so it doesn't mess up the tabulation */
 
     for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
-	fprintf(tf, "%11ld%11ld%11ld %6u%6u    %-11s%-30s",
+	fprintf(tf, "%11ld%11ld %6u%6u    %-11s%-30s",
 		p->entry_count,
-		p->slow_entry_count,
 		p->allocs,
 		p->arity,
 		p->stk_args,
@@ -586,9 +576,9 @@ printRegisteredCounterInfo (FILE *tf)
  * here.
  */
 StgEntCounter top_ct
-	= { 0, 0, 0,
+        = { 0, 0, 0,
 	    "TOP", "",
-	    0, 0, 0, NULL };
+	    0, 0, NULL };
 
 #endif /* TICKY_TICKY */
 

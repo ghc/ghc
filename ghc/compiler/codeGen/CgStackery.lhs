@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.22 2002/09/13 15:02:29 simonpj Exp $
+% $Id: CgStackery.lhs,v 1.23 2002/12/11 15:36:27 simonmar Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -11,25 +11,29 @@ Stack-twiddling operations, which are pretty low-down and grimy.
 \begin{code}
 module CgStackery (
 	allocStack, allocPrimStack, allocStackTop, deAllocStackTop,
-	adjustStackHW, getFinalStackHW,
-	mkTaggedVirtStkOffsets, mkTaggedStkAmodes, mkTagAssts,
+	adjustStackHW, getFinalStackHW, 
+	setStackFrame, getStackFrame,
+	mkVirtStkOffsets, mkStkAmodes,
 	freeStackSlots, dataStackSlots, addFreeSlots,
-	updateFrameSize, seqFrameSize
+	updateFrameSize,
+	constructSlowCall, slowArgs,
     ) where
 
 #include "HsVersions.h"
 
 import CgMonad
 import AbsCSyn
+import CLabel		( mkRtsApplyInfoLabel, mkRtsApplyEntryLabel )
 
 import CgUsages		( getRealSp )
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
-import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
+import PrimRep
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
-import Panic		( panic )
 import Constants
 import Util		( sortLt )
-
+import FastString	( LitString )
+import Panic
+	
 import TRACE		( trace )
 \end{code}
 
@@ -39,93 +43,121 @@ import TRACE		( trace )
 %*									*
 %************************************************************************
 
-@mkTaggedVirtStkOffsets@ is given a list of arguments.  The first
-argument gets the {\em largest} virtual stack offset (remember,
-virtual offsets increase towards the top of stack).  This function
-also computes the correct tagging arrangement for standard function
-entry points.  Each non-pointer on the stack is preceded by a tag word
-indicating the number of non-pointer words above it on the stack.
-
-		offset --> |       |  <---- last allocated stack word
-			   ---------  <
-			   |       |  .
-			   ---------  .
-			   |       |  total_nptrs (words)
-			   ---------  .
-			   |       |  .
-			   ---------  <
-offset + tot_nptrs + 1 --> |  tag  |  
-			   ---------
+'mkVirtStkOffsets' is given a list of arguments.  The first argument
+gets the /largest/ virtual stack offset (remember, virtual offsets
+increase towards the top of stack).
 
 \begin{code}
-mkTaggedVirtStkOffsets
+mkVirtStkOffsets
 	  :: VirtualSpOffset 	-- Offset of the last allocated thing
 	  -> (a -> PrimRep)	-- to be able to grab kinds
 	  -> [a]			-- things to make offsets for
 	  -> (VirtualSpOffset,		-- OUTPUTS: Topmost allocated word
-	      [(a, VirtualSpOffset)],	-- things with offsets
-	      [(VirtualSpOffset,Int)])  -- offsets for tags
+	      [(a, VirtualSpOffset)])	-- things with offsets
 
-mkTaggedVirtStkOffsets init_Sp_offset kind_fun things
-    = loop init_Sp_offset [] [] (reverse things)
+mkVirtStkOffsets init_Sp_offset kind_fun things
+    = loop init_Sp_offset [] (reverse things)
   where
-    loop offset tags offs [] = (offset,offs,tags)
-    loop offset tags offs (t:things) 
-	 | isFollowableRep (kind_fun t) =
-	     loop (offset+1) tags ((t,offset+1):offs) things
-	 | otherwise =
+    loop offset offs [] = (offset,offs)
+    loop offset offs (t:things) =
 	     let
 		 size = getPrimRepSize (kind_fun t)
-		 tag_slot = offset+size+1
+		 thing_slot = offset + size
 	     in
-	     loop tag_slot ((tag_slot,size):tags) ((t,offset+size):offs) things
+	     loop thing_slot ((t,thing_slot):offs) things
     -- offset of thing is offset+size, because we're growing the stack
     -- *downwards* as the offsets increase.
-\end{code}
 
-@mkTaggedStkAmodes@ is a higher-level version of
-@mkTaggedVirtStkOffsets@.  It starts from the tail-call locations.  It
-returns a single list of addressing modes for the stack locations, and
-therefore is in the monad.
 
-It *doesn't* adjust the high water mark.  
+-- | 'mkStkAmodes' is a higher-level version of
+-- 'mkVirtStkOffsets'.  It starts from the tail-call locations.
+-- It returns a single list of addressing modes for the stack
+-- locations, and therefore is in the monad.  It /doesn't/ adjust the
+-- high water mark.
 
-\begin{code}
-mkTaggedStkAmodes 
+mkStkAmodes 
 	:: VirtualSpOffset	    -- Tail call positions
 	-> [CAddrMode]		    -- things to make offsets for
 	-> FCode (VirtualSpOffset,  -- OUTPUTS: Topmost allocated word
-	          AbstractC,	    -- Assignments to appropriate stk slots
-		  AbstractC)	    -- Assignments for tagging
+	          AbstractC)	    -- Assignments to appropriate stk slots
 
-mkTaggedStkAmodes tail_Sp things
+mkStkAmodes tail_Sp things
   = getRealSp `thenFC` \ realSp ->
     let
-      (last_Sp_offset, offsets, tags)
-    	= mkTaggedVirtStkOffsets tail_Sp getAmodeRep things
+      (last_Sp_offset, offsets) = mkVirtStkOffsets tail_Sp getAmodeRep things
 
       abs_cs =
 	  [ CAssign (CVal (spRel realSp offset) (getAmodeRep thing)) thing
 	  | (thing, offset) <- offsets
 	  ]
- 
-      tag_cs =
-	  [ CAssign (CVal (spRel realSp offset) WordRep)
-		    (CMacroExpr WordRep ARG_TAG [mkIntCLit size])
-	  | (offset,size) <- tags
-	  ]
     in
-    returnFC (last_Sp_offset, mkAbstractCs abs_cs, mkAbstractCs tag_cs)
+    returnFC (last_Sp_offset, mkAbstractCs abs_cs)
+\end{code}
 
-mkTagAssts :: [(VirtualSpOffset,Int)] -> FCode AbstractC
-mkTagAssts tags = 
-   getRealSp `thenFC` \realSp ->
-   returnFC (mkAbstractCs
-	  [ CAssign (CVal (spRel realSp offset) WordRep)
-		    (CMacroExpr WordRep ARG_TAG [mkIntCLit size])
-	  | (offset,size) <- tags
-	  ])
+%************************************************************************
+%*									*
+\subsection{Pushing the arguments for a slow call}
+%*									*
+%************************************************************************
 
+For a slow call, we must take a bunch of arguments and intersperse
+some stg_ap_<pattern>_ret_info return addresses.
+
+\begin{code}
+constructSlowCall :: [CAddrMode] -> (CAddrMode, [CAddrMode])
+   -- don't forget the zero case
+constructSlowCall [] = (CLbl stg_ap_0 CodePtrRep , []) 
+constructSlowCall amodes = 
+  -- traceSlowCall amodes $ 	
+  (CLbl lbl CodePtrRep, these ++ slowArgs rest)
+  where (tag, these, rest) = matchSlowPattern amodes
+	lbl = mkRtsApplyEntryLabel tag
+
+stg_ap_0 = mkRtsApplyEntryLabel SLIT("0")
+
+-- | 'slowArgs' takes a list of function arguments and prepares them for
+-- pushing on the stack for "extra" arguments to a function which requires
+-- fewer arguments than we currently have.
+slowArgs :: [CAddrMode] -> [CAddrMode]
+slowArgs [] = []
+slowArgs amodes = CLbl lbl RetRep : args ++ slowArgs rest
+  where	(tag, args, rest) = matchSlowPattern amodes
+	lbl = mkRtsApplyInfoLabel tag
+  
+matchSlowPattern :: [CAddrMode] -> (LitString, [CAddrMode], [CAddrMode])
+matchSlowPattern amodes = (tag, these, rest)
+  where reps = map getAmodeRep amodes
+        (tag, n) = findMatch (map primRepToArgRep reps)
+	(these, rest) = splitAt n amodes
+
+-- These cases were found to cover about 99% of all slow calls:
+findMatch (RepP: RepP: RepP: RepP: RepP: RepP: RepP: _) = (SLIT("ppppppp"), 7)
+findMatch (RepP: RepP: RepP: RepP: RepP: RepP: _)       = (SLIT("pppppp"), 6)
+findMatch (RepP: RepP: RepP: RepP: RepP: _) 	   	= (SLIT("ppppp"), 5)
+findMatch (RepP: RepP: RepP: RepP: _) 		     	= (SLIT("pppp"), 4)
+findMatch (RepP: RepP: RepP: _)       		     	= (SLIT("ppp"), 3)
+findMatch (RepP: RepP: RepV: _)       		     	= (SLIT("ppv"), 3)
+findMatch (RepP: RepP: _)				= (SLIT("pp"), 2)
+findMatch (RepP: RepV: _)				= (SLIT("pv"), 2)
+findMatch (RepP: _)					= (SLIT("p"), 1)
+findMatch (RepV: _)					= (SLIT("v"), 1)
+findMatch (RepN: _)					= (SLIT("n"), 1)
+findMatch (RepF: _)					= (SLIT("f"), 1)
+findMatch (RepD: _)					= (SLIT("d"), 1)
+findMatch (RepL: _)					= (SLIT("l"), 1)
+findMatch _  = panic "CgStackery.findMatch"
+
+#ifdef DEBUG
+primRepChar p | isFollowableRep p     = 'p'
+primRepChar VoidRep                   = 'v'
+primRepChar FloatRep                  = 'f'
+primRepChar DoubleRep                 = 'd'
+primRepChar p | getPrimRepSize p == 1 = 'n'
+primRepChar p | is64BitRep p          = 'l'
+
+traceSlowCall amodes and_then 
+ = trace ("call: " ++ map primRepChar (map getAmodeRep amodes)) and_then
+#endif
 \end{code}
 
 %************************************************************************
@@ -142,15 +174,18 @@ allocStack = allocPrimStack 1
 
 allocPrimStack :: Int -> FCode VirtualSpOffset
 allocPrimStack size = do
-	((virt_sp, free_stk, real_sp, hw_sp),h_usage) <- getUsage
+	((virt_sp, frame, free_stk, real_sp, hw_sp),h_usage) <- getUsage
 	let push_virt_sp = virt_sp + size
 	let (chosen_slot, new_stk_usage) = 
 		case find_block free_stk of
-			Nothing -> (push_virt_sp, (push_virt_sp, free_stk, real_sp,
-				       hw_sp `max` push_virt_sp))
+		   Nothing -> (push_virt_sp, 
+				 (push_virt_sp, frame, free_stk, real_sp,
+				  hw_sp `max` push_virt_sp))
 						-- Adjust high water mark
-			Just slot -> (slot, (virt_sp, 
-						delete_block free_stk slot, real_sp, hw_sp))	
+		   Just slot -> (slot, 
+				  (virt_sp, frame, 
+				   delete_block free_stk slot, 
+				   real_sp, hw_sp))
 	setUsage (new_stk_usage, h_usage)
 	return chosen_slot
 	
@@ -181,9 +216,10 @@ free list.
 \begin{code}
 allocStackTop :: Int -> FCode VirtualSpOffset
 allocStackTop size = do
-	((virt_sp, free_stk, real_sp, hw_sp), h_usage) <- getUsage
+	((virt_sp, frame, free_stk, real_sp, hw_sp), h_usage) <- getUsage
 	let push_virt_sp = virt_sp + size
-	let new_stk_usage = (push_virt_sp, free_stk, real_sp, hw_sp `max` push_virt_sp)
+	let new_stk_usage = (push_virt_sp, frame, free_stk, real_sp, 
+				hw_sp `max` push_virt_sp)
 	setUsage (new_stk_usage, h_usage)
 	return push_virt_sp
 \end{code}
@@ -194,9 +230,9 @@ de-allocating the return address in a case alternative.
 \begin{code}
 deAllocStackTop :: Int -> FCode VirtualSpOffset
 deAllocStackTop size = do
-	((virt_sp, free_stk, real_sp, hw_sp), h_usage) <- getUsage
+	((virt_sp, frame, free_stk, real_sp, hw_sp), h_usage) <- getUsage
 	let pop_virt_sp = virt_sp - size
-	let new_stk_usage = (pop_virt_sp, free_stk, real_sp, hw_sp)
+	let new_stk_usage = (pop_virt_sp, frame, free_stk, real_sp, hw_sp)
 	setUsage (new_stk_usage, h_usage)
 	return pop_virt_sp
 \end{code}
@@ -204,8 +240,8 @@ deAllocStackTop size = do
 \begin{code}
 adjustStackHW :: VirtualSpOffset -> Code
 adjustStackHW offset = do
-	((vSp,fSp,realSp,hwSp), h_usage) <- getUsage
-	setUsage ((vSp, fSp, realSp, max offset hwSp), h_usage)
+	((vSp,fTop,fSp,realSp,hwSp), h_usage) <- getUsage
+	setUsage ((vSp, fTop, fSp, realSp, max offset hwSp), h_usage)
 \end{code}
 
 A knot-tying beast.
@@ -215,19 +251,27 @@ getFinalStackHW :: (VirtualSpOffset -> Code) -> Code
 getFinalStackHW fcode = do
 	fixC (\hwSp -> do
 		fcode hwSp
-		((_,_,_, hwSp),_) <- getUsage
+		((_,_,_,_, hwSp),_) <- getUsage
 		return hwSp)
 	return ()
+\end{code}
+
+\begin{code}
+setStackFrame :: VirtualSpOffset -> Code
+setStackFrame offset = do
+	((vSp,_,fSp,realSp,hwSp), h_usage) <- getUsage
+	setUsage ((vSp, offset, fSp, realSp, hwSp), h_usage)
+
+getStackFrame :: FCode VirtualSpOffset
+getStackFrame = do
+	((vSp,frame,fSp,realSp,hwSp), h_usage) <- getUsage
+	return frame
 \end{code}
 
 \begin{code}
 updateFrameSize | opt_SccProfilingOn = pROF_UF_SIZE
 		| opt_GranMacros     = trace ("updateFrameSize = " ++ (show gRAN_UF_SIZE))gRAN_UF_SIZE
 		| otherwise          = uF_SIZE
-
-seqFrameSize    | opt_SccProfilingOn  = pROF_SEQ_FRAME_SIZE
-	        | opt_GranMacros      = gRAN_SEQ_FRAME_SIZE
-		| otherwise           = sEQ_FRAME_SIZE
 \end{code}			
 
 %************************************************************************
@@ -241,10 +285,10 @@ Explicitly free some stack space.
 \begin{code}
 addFreeStackSlots :: [VirtualSpOffset] -> Slot -> Code
 addFreeStackSlots extra_free slot = do
-	((vsp, free, real, hw),heap_usage) <- getUsage
+	((vsp, frame,free, real, hw),heap_usage) <- getUsage
 	let all_free = addFreeSlots free (zip (sortLt (<) extra_free) (repeat slot))
 	let (new_vsp, new_free) = trim vsp all_free
-	let new_usage = ((new_vsp, new_free, real, hw), heap_usage)
+	let new_usage = ((new_vsp, frame, new_free, real, hw), heap_usage)
 	setUsage new_usage
 
 freeStackSlots :: [VirtualSpOffset] -> Code

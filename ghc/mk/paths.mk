@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.42 2002/09/30 10:13:23 simonmar Exp $
+# $Id: paths.mk,v 1.43 2002/12/11 15:36:41 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -23,6 +23,7 @@ GHC_HSTAGS_DIR_REL	= $(GHC_UTILS_DIR_REL)/hasktags
 GHC_TOUCHY_DIR_REL	= $(GHC_UTILS_DIR_REL)/touchy
 GHC_PKG_DIR_REL		= $(GHC_UTILS_DIR_REL)/ghc-pkg
 GHC_GENPRIMOP_DIR_REL	= $(GHC_UTILS_DIR_REL)/genprimopcode
+GHC_GENAPPLY_DIR_REL	= $(GHC_UTILS_DIR_REL)/genapply
 GHC_MANGLER_DIR_REL 	= $(GHC_DRIVER_DIR_REL)/mangler
 GHC_SPLIT_DIR_REL 	= $(GHC_DRIVER_DIR_REL)/split
 GHC_SYSMAN_DIR_REL	= $(GHC_RUNTIME_DIR_REL)/parallel
@@ -34,6 +35,7 @@ GHC_UTILS_DIR	 	= $(GHC_TOP)/$(GHC_UTILS_DIR_REL)
 GHC_DRIVER_DIR		= $(GHC_TOP)/$(GHC_DRIVER_DIR_REL)
 GHC_PKG_DIR		= $(GHC_TOP)/$(GHC_PKG_DIR_REL)
 GHC_GENPRIMOP_DIR	= $(GHC_TOP)/$(GHC_GENPRIMOP_DIR_REL)
+GHC_GENAPPLY_DIR	= $(GHC_TOP)/$(GHC_GENAPPLY_DIR_REL)
 GHC_MANGLER_DIR         = $(GHC_TOP)/$(GHC_MANGLER_DIR_REL)
 GHC_SPLIT_DIR           = $(GHC_TOP)/$(GHC_SPLIT_DIR_REL)
 
@@ -53,6 +55,7 @@ GHC_SPLIT_PGM		= ghc-split
 GHC_SYSMAN_PGM 		= SysMan
 GHC_PKG_INPLACE_PGM	= ghc-pkg-inplace
 GHC_GENPRIMOP_PGM	= genprimopcode
+GHC_GENAPPLY_PGM	= genapply
 
 # -----------------------------------------------------------------------------
 # Auxilliary programs used by GHC
@@ -74,3 +77,4 @@ GHC_SPLIT		= $(GHC_SPLIT_DIR)/$(GHC_SPLIT_PGM)
 GHC_SYSMAN 		= $(GHC_SYSMAN_DIR)/$(GHC_SYSMAN_PGM)
 GHC_PKG_INPLACE		= $(GHC_PKG_DIR)/$(GHC_PKG_INPLACE_PGM)
 GHC_GENPRIMOP		= $(GHC_GENPRIMOP_DIR)/$(GHC_GENPRIMOP_PGM)
+GHC_GENAPPLY		= $(GHC_GENAPPLY_DIR)/$(GHC_GENAPPLY_PGM)

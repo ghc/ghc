@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.43 2002/03/02 17:46:03 sof Exp $
+ * $Id: StgMiscClosures.h,v 1.44 2002/12/11 15:36:39 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2002
  *
  * Entry code for various built-in closure types.
  *
@@ -12,48 +12,10 @@
  * these objects can be found in StgMiscClosures.hc.
  */
 
-/* entry code */
+/* Various entry points */
+STGFUN(stg_PAP_entry);
 
-STGFUN(stg_IND_entry);
-STGFUN(stg_IND_STATIC_entry);
-STGFUN(stg_IND_PERM_entry);
-STGFUN(stg_IND_OLDGEN_entry);
-STGFUN(stg_IND_OLDGEN_PERM_entry);
-STGFUN(stg_CAF_UNENTERED_entry);
-STGFUN(stg_CAF_ENTERED_entry);
-STGFUN(stg_BLACKHOLE_entry);
-STGFUN(stg_CAF_BLACKHOLE_entry);
-STGFUN(stg_BLACKHOLE_BQ_entry);
-#ifdef SMP
-STGFUN(stg_WHITEHOLE_entry);
-#endif
-#ifdef TICKY_TICKY
-STGFUN(stg_SE_BLACKHOLE_entry);
-STGFUN(stg_SE_CAF_BLACKHOLE_entry);
-#endif
-#if defined(PAR) || defined(GRAN)
-STGFUN(stg_RBH_entry);
-#endif
-STGFUN(stg_BCO_entry);
-STGFUN(stg_EVACUATED_entry);
-STGFUN(stg_FOREIGN_entry);
-STGFUN(stg_WEAK_entry);
-STGFUN(stg_NO_FINALIZER_entry);
-STGFUN(stg_DEAD_WEAK_entry);
-STGFUN(stg_STABLE_NAME_entry);
-STGFUN(stg_TSO_entry);
-STGFUN(stg_FULL_MVAR_entry);
-STGFUN(stg_EMPTY_MVAR_entry);
-STGFUN(stg_ARR_WORDS_entry);
-STGFUN(stg_MUT_ARR_PTRS_entry);
-STGFUN(stg_MUT_ARR_PTRS_FROZEN_entry);
-STGFUN(stg_MUT_VAR_entry);
-STGFUN(stg_END_TSO_QUEUE_entry);
-STGFUN(stg_MUT_CONS_entry);
-STGFUN(stg_END_MUT_LIST_entry);
-STGFUN(stg_dummy_ret_entry);
-
-/* entry code for constructors created by the bytecode interpreter */
+/* Entry code for constructors created by the bytecode interpreter */
 STGFUN(stg_interp_constr_entry);
 STGFUN(stg_interp_constr1_entry);
 STGFUN(stg_interp_constr2_entry);
@@ -66,19 +28,15 @@ STGFUN(stg_interp_constr8_entry);
 
 /* Magic glue code for when compiled code returns a value in R1/F1/D1
    or a VoidRep to the interpreter. */
-extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_R1p_info;
-extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_R1n_info;
-extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_F1_info;
-extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_D1_info;
-extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_V_info;
+extern DLL_IMPORT_RTS const StgPolyInfoTable stg_ctoi_ret_R1p_info;
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_ctoi_ret_R1unpt_info;
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_ctoi_ret_R1n_info;
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_ctoi_ret_F1_info;
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_ctoi_ret_D1_info;
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_ctoi_ret_L1_info;
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_ctoi_ret_V_info;
 
-/* Used by the interpreter to return an unboxed value on the stack to
-   compiled code. */
-extern DLL_IMPORT_RTS const StgInfoTable stg_gc_unbx_r1_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_gc_f1_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_gc_d1_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_gc_l1_info;
-
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_apply_interp_info;
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
@@ -117,7 +75,7 @@ extern DLL_IMPORT_RTS const StgInfoTable stg_RBH_info;
 #if defined(PAR)
 extern DLL_IMPORT_RTS const StgInfoTable stg_FETCH_ME_BQ_info;
 #endif
-extern DLL_IMPORT_RTS const StgInfoTable stg_BCO_info;
+extern DLL_IMPORT_RTS const StgFunInfoTable stg_BCO_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_EVACUATED_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_FOREIGN_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_WEAK_info;
@@ -135,9 +93,14 @@ extern DLL_IMPORT_RTS const StgInfoTable stg_END_TSO_QUEUE_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_MUT_CONS_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_END_MUT_LIST_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_catch_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_seq_info;
+extern DLL_IMPORT_RTS const StgPolyInfoTable stg_seq_frame_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_PAP_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_AP_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_AP_STACK_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_dummy_ret_info;
-
+extern DLL_IMPORT_RTS const StgInfoTable stg_raise_info;
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_forceIO_info;
+extern DLL_IMPORT_RTS const StgRetInfoTable stg_noforceIO_info;
 /* closures */
 
 extern DLL_IMPORT_RTS StgClosure stg_END_TSO_QUEUE_closure;
@@ -149,11 +112,8 @@ extern DLL_IMPORT_RTS StgClosure stg_forceIO_closure;
 extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_CHARLIKE_closure[];
 extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_INTLIKE_closure[];
 
+
 /* standard entry points */
-
-/* EXTFUN_RTS(stg_error_entry); No longer used */
-
-  /* (see also below  -- KSW 1998-12) */
 
 /* standard selector thunks */
 
@@ -229,75 +189,96 @@ EXTFUN_RTS(stg_sel_13_noupd_entry);
 EXTFUN_RTS(stg_sel_14_noupd_entry);
 EXTFUN_RTS(stg_sel_15_noupd_entry);
 
-/* standard ap thunks */
+// standard ap thunks
 
-EXTINFO_RTS stg_ap_1_upd_info;
-EXTINFO_RTS stg_ap_2_upd_info;
-EXTINFO_RTS stg_ap_3_upd_info;
-EXTINFO_RTS stg_ap_4_upd_info;
-EXTINFO_RTS stg_ap_5_upd_info;
-EXTINFO_RTS stg_ap_6_upd_info;
-EXTINFO_RTS stg_ap_7_upd_info;
-EXTINFO_RTS stg_ap_8_upd_info;
+ETI_RTS stg_ap_1_upd_info;
+ETI_RTS stg_ap_2_upd_info;
+ETI_RTS stg_ap_3_upd_info;
+ETI_RTS stg_ap_4_upd_info;
+ETI_RTS stg_ap_5_upd_info;
+ETI_RTS stg_ap_6_upd_info;
+ETI_RTS stg_ap_7_upd_info;
+ETI_RTS stg_ap_8_upd_info;
 
-/* standard GC & stack check entry points */
+// standard application routines (see also rts/gen_apply.py, 
+// and compiler/codeGen/CgStackery.lhs).
 
-EXTFUN(stg_gc_entertop);
-EXTFUN(stg_gc_enter_1_hponly);
-EXTFUN(__stg_gc_enter_1);
-EXTFUN(stg_gc_enter_2);
-EXTFUN(stg_gc_enter_3);
-EXTFUN(stg_gc_enter_4);
-EXTFUN(stg_gc_enter_5);
-EXTFUN(stg_gc_enter_6);
-EXTFUN(stg_gc_enter_7);
-EXTFUN(stg_gc_enter_8);
-EXTFUN(stg_gc_seq_1);
+extern DLL_IMPORT_RTS const StgPolyInfoTable stg_ap_0_info;
+ERI_(stg_ap_v_info);
+ERI_(stg_ap_f_info);
+ERI_(stg_ap_d_info);
+ERI_(stg_ap_l_info);
+ERI_(stg_ap_n_info);
+ERI_(stg_ap_p_info);
+ERI_(stg_ap_pv_info);
+ERI_(stg_ap_pp_info);
+ERI_(stg_ap_ppv_info);
+ERI_(stg_ap_ppp_info);
+ERI_(stg_ap_pppp_info);
+ERI_(stg_ap_ppppp_info);
+ERI_(stg_ap_pppppp_info);
+ERI_(stg_ap_ppppppp_info);
 
-EI_(stg_gc_noregs_info);
+EXTFUN(stg_ap_0_ret);
+EXTFUN(stg_ap_v_ret);
+EXTFUN(stg_ap_f_ret);
+EXTFUN(stg_ap_d_ret);
+EXTFUN(stg_ap_l_ret);
+EXTFUN(stg_ap_n_ret);
+EXTFUN(stg_ap_p_ret);
+EXTFUN(stg_ap_pv_ret);
+EXTFUN(stg_ap_pp_ret);
+EXTFUN(stg_ap_ppv_ret);
+EXTFUN(stg_ap_ppp_ret);
+EXTFUN(stg_ap_pppp_ret);
+EXTFUN(stg_ap_ppppp_ret);
+EXTFUN(stg_ap_pppppp_ret);
+EXTFUN(stg_ap_ppppppp_ret);
+
+/* standard GC & stack check entry points, all defined in HeapStackCheck.hc */
+
+ERI_(stg_enter_info);
+EF_(stg_enter_ret);
+
+ERI_(stg_gc_void_info);
+
+EF_(__stg_gc_enter_1);
+
 EF_(stg_gc_noregs);
 
-EI_(stg_gc_unpt_r1_info);
+ERI_(stg_gc_unpt_r1_info);
 EF_(stg_gc_unpt_r1);
 
-EI_(stg_ut_1_0_unreg_info);
-
-EI_(stg_gc_unbx_r1_info);
+ERI_(stg_gc_unbx_r1_info);
 EF_(stg_gc_unbx_r1);
 
-EI_(stg_gc_f1_info);
+ERI_(stg_gc_f1_info);
 EF_(stg_gc_f1);
 
-EI_(stg_gc_d1_info);
+ERI_(stg_gc_d1_info);
 EF_(stg_gc_d1);
 
-EI_(stg_gc_ut_1_0_info);
-EI_(stg_gc_l1_info);
+ERI_(stg_gc_l1_info);
 EF_(stg_gc_l1);
-EF_(stg_gc_ut_1_0);
 
-EI_(stg_gc_ut_0_1_info);
-EF_(stg_gc_ut_0_1);
+EF_(__stg_gc_fun);
+ERI_(stg_gc_fun_info);
+EF_(stg_gc_fun_ret);
 
-EXTFUN(__stg_chk_0);
-EXTFUN(__stg_chk_1);
-EXTFUN(stg_chk_1n);
-EXTFUN(stg_chk_2);
-EXTFUN(stg_chk_3);
-EXTFUN(stg_chk_4);
-EXTFUN(stg_chk_5);
-EXTFUN(stg_chk_6);
-EXTFUN(stg_chk_7);
-EXTFUN(stg_chk_8);
-EXTFUN(stg_gen_chk_ret);
-EXTFUN(stg_gen_chk);
-EXTFUN(stg_gen_hp);
-EXTFUN(stg_gen_yield);
-EXTFUN(stg_yield_noregs);
-EXTFUN(stg_yield_to_interpreter);
-EXTFUN(stg_gen_block);
-EXTFUN(stg_block_noregs);
-EXTFUN(stg_block_1);
-EXTFUN(stg_block_takemvar);
-EXTFUN(stg_block_putmvar);
+EF_(stg_gc_gen);
+ERI_(stg_gc_gen_info);
+
+EF_(stg_ut_1_0_unreg_ret);
+ERI_(stg_ut_1_0_unreg_info);
+
+EF_(stg_gc_gen_hp);
+EF_(stg_gc_ut);
+EF_(stg_gen_yield);
+EF_(stg_yield_noregs);
+EF_(stg_yield_to_interpreter);
+EF_(stg_gen_block);
+EF_(stg_block_noregs);
+EF_(stg_block_1);
+EF_(stg_block_takemvar);
+EF_(stg_block_putmvar);
 

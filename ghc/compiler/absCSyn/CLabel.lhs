@@ -1,7 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-% $Id: CLabel.lhs,v 1.55 2002/09/13 15:02:26 simonpj Exp $
+% (c) The University of Glasgow, 1992-2002
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -12,8 +10,8 @@ module CLabel (
 	mkClosureLabel,
 	mkSRTLabel,
 	mkInfoTableLabel,
-	mkStdEntryLabel,
-	mkFastEntryLabel,
+	mkEntryLabel,
+	mkSlowEntryLabel,
 	mkConEntryLabel,
 	mkStaticConEntryLabel,
 	mkRednCountsLabel,
@@ -61,6 +59,9 @@ module CLabel (
 
 	mkSelectorInfoLabel,
 	mkSelectorEntryLabel,
+
+	mkRtsApplyInfoLabel,
+	mkRtsApplyEntryLabel,
 
 	mkForeignLabel,
 
@@ -149,20 +150,17 @@ data CLabel
 \begin{code}
 data IdLabelInfo
   = Closure		-- Label for (static???) closure
-
   | SRT                 -- Static reference table
-
-  | InfoTbl		-- Info table for a closure; always read-only
-
-  | EntryStd		-- Thunk, or "slow", code entry point
-
-  | EntryFast Int	-- entry pt when no arg satisfaction chk needed;
-			-- Int is the arity of the function (to be
-			-- encoded into the name)
+  | InfoTbl		-- Info tables for closures; always read-only
+  | Entry		-- entry point
+  | Slow		-- slow entry point
 
 			-- Ticky-ticky counting
   | RednCounts		-- Label of place to keep reduction-count info for 
 			-- this Id
+
+  | Bitmap		-- A bitmap (function or case return)
+
   deriving (Eq, Ord)
 
 data DataConLabelInfo
@@ -178,13 +176,12 @@ data CaseLabelInfo
   | CaseVecTbl
   | CaseAlt ConTag
   | CaseDefault
-  | CaseBitmap
   deriving (Eq, Ord)
 
 data RtsLabelInfo
   = RtsShouldNeverHappenCode
 
-  | RtsBlackHoleInfoTbl FastString  -- black hole with info table name
+  | RtsBlackHoleInfoTbl LitString  -- black hole with info table name
 
   | RtsUpdInfo            	-- upd_frame_info
   | RtsSeqInfo			-- seq_frame_info
@@ -206,12 +203,16 @@ data RtsLabelInfo
 
   | RtsModuleRegd
 
+  | RtsApplyInfoLabel  LitString
+  | RtsApplyEntryLabel LitString
+
   deriving (Eq, Ord)
 
 -- Label Type: for generating C declarations.
 
 data CLabelType
-  = InfoTblType
+  = RetInfoTblType
+  | InfoTblType
   | ClosureType
   | VecTblType
   | ClosureTblType
@@ -222,11 +223,10 @@ data CLabelType
 \begin{code}
 mkClosureLabel	      	id 		= IdLabel id  Closure
 mkSRTLabel		id		= IdLabel id  SRT
-mkInfoTableLabel      	id 		= IdLabel id  InfoTbl
-mkStdEntryLabel	      	id 		= IdLabel id  EntryStd
-mkFastEntryLabel      	id arity	= ASSERT(arity > 0)
-					  IdLabel id  (EntryFast arity)
-
+mkInfoTableLabel  	id 		= IdLabel id  InfoTbl
+mkEntryLabel	      	id 		= IdLabel id  Entry
+mkSlowEntryLabel      	id 		= IdLabel id  Slow
+mkBitmapLabel   	id		= IdLabel id  Bitmap
 mkRednCountsLabel     	id		= IdLabel id  RednCounts
 
 mkStaticInfoTableLabel  con		= DataConLabel con StaticInfoTbl
@@ -240,7 +240,7 @@ mkReturnInfoLabel uniq		= CaseLabel uniq CaseReturnInfo
 mkVecTblLabel   uniq		= CaseLabel uniq CaseVecTbl
 mkAltLabel      uniq tag	= CaseLabel uniq (CaseAlt tag)
 mkDefaultLabel  uniq 		= CaseLabel uniq CaseDefault
-mkBitmapLabel   uniq		= CaseLabel uniq CaseBitmap
+
 
 mkClosureTblLabel tycon		= TyConLabel tycon
 
@@ -266,10 +266,10 @@ mkMAP_FROZEN_infoLabel		= RtsLabel (Rts_Info "stg_MUT_ARR_PTRS_FROZEN_info")
 mkEMPTY_MVAR_infoLabel		= RtsLabel (Rts_Info "stg_EMPTY_MVAR_info")
 
 mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
-mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl FSLIT("stg_BLACKHOLE_info"))
-mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl FSLIT("stg_CAF_BLACKHOLE_info"))
+mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_BLACKHOLE_info"))
+mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_CAF_BLACKHOLE_info"))
 mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
-                                    RtsLabel (RtsBlackHoleInfoTbl FSLIT("stg_SE_CAF_BLACKHOLE_info"))
+                                    RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_SE_CAF_BLACKHOLE_info"))
                                   else  -- RTS won't have info table unless -ticky is on
                                     panic "mkSECAFBlackHoleInfoTableLabel requires -ticky"
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
@@ -291,6 +291,11 @@ mkForeignLabel str is_dynamic	= ForeignLabel str is_dynamic
 
 mkCC_Label	cc		= CC_Label cc
 mkCCS_Label	ccs		= CCS_Label ccs
+
+-- Std RTS application routines
+
+mkRtsApplyInfoLabel  = RtsLabel . RtsApplyInfoLabel
+mkRtsApplyEntryLabel = RtsLabel . RtsApplyEntryLabel
 \end{code}
 
 \begin{code}
@@ -312,6 +317,10 @@ Declarations for direct return points are needed, because they may be
 let-no-escapes, which can be recursive.
 
 \begin{code}
+  -- don't bother declaring SRT & Bitmap labels, we always make sure
+  -- they are defined before use.
+needsCDecl (IdLabel _ SRT)		= False
+needsCDecl (IdLabel _ Bitmap)		= False
 needsCDecl (IdLabel _ _)		= True
 needsCDecl (CaseLabel _ CaseReturnPt)	= True
 needsCDecl (DataConLabel _ _)		= True
@@ -354,27 +363,36 @@ externallyVisibleCLabel (CC_Label _)	   = False -- not strictly true
 externallyVisibleCLabel (CCS_Label _)	   = False -- not strictly true
 \end{code}
 
-For generating correct types in label declarations...
+For generating correct types in label declarations, and also for
+deciding whether the C compiler would like us to use '&' before the
+label to get its address:
 
 \begin{code}
 labelType :: CLabel -> CLabelType
 labelType (RtsLabel (RtsBlackHoleInfoTbl _))  = InfoTblType
 labelType (RtsLabel (RtsSelectorInfoTbl _ _)) = InfoTblType
 labelType (RtsLabel (RtsApInfoTbl _ _))       = InfoTblType
-labelType (RtsLabel RtsUpdInfo)       	      = InfoTblType
+labelType (RtsLabel RtsUpdInfo)       	      = RetInfoTblType
+labelType (RtsLabel RtsSeqInfo)       	      = RetInfoTblType
+labelType (RtsLabel RtsTopTickyCtr)	      = CodeType -- XXX
 labelType (RtsLabel (Rts_Info _))             = InfoTblType
-labelType (CaseLabel _ CaseReturnInfo)        = InfoTblType
+labelType (RtsLabel (RtsApplyInfoLabel _))    = RetInfoTblType
+labelType (RtsLabel (RtsApplyEntryLabel _))   = CodeType
+labelType (CaseLabel _ CaseReturnInfo)        = RetInfoTblType
 labelType (CaseLabel _ CaseReturnPt)	      = CodeType
 labelType (CaseLabel _ CaseVecTbl)            = VecTblType
 labelType (TyConLabel _)		      = ClosureTblType
 labelType (ModuleInitLabel _ _)               = CodeType
 labelType (PlainModuleInitLabel _)            = CodeType
+labelType (CC_Label _)			      = CodeType -- hack
+labelType (CCS_Label _)			      = CodeType -- hack
 
 labelType (IdLabel _ info) = 
   case info of
-    InfoTbl       -> InfoTblType
-    Closure	  -> ClosureType
-    _		  -> CodeType
+    InfoTbl   -> InfoTblType
+    Closure   -> ClosureType
+    Bitmap    -> DataType
+    _	      -> CodeType
 
 labelType (DataConLabel _ info) = 
   case info of
@@ -429,6 +447,7 @@ internal names. <type> is one of the following:
 	 info			Info table
 	 srt			Static reference table
 	 entry			Entry code
+	 slow			Slow entry code (if any)
 	 ret			Direct return address	 
 	 vtbl			Vector table
 	 <n>_alt		Case alternative (tag n)
@@ -471,8 +490,6 @@ pprCLbl (CaseLabel u (CaseAlt tag))
   = hcat [pprUnique u, pp_cSEP, int tag, pp_cSEP, ptext SLIT("alt")]
 pprCLbl (CaseLabel u CaseDefault)
   = hcat [pprUnique u, pp_cSEP, ptext SLIT("dflt")]
-pprCLbl (CaseLabel u CaseBitmap)
-  = hcat [pprUnique u, pp_cSEP, ptext SLIT("btm")]
 
 pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("NULL")
 -- used to be stg_error_entry but Windows can't have DLL entry points as static
@@ -488,7 +505,7 @@ pprCLbl (RtsLabel (Rts_Code str))        = text str
 
 pprCLbl (RtsLabel RtsTopTickyCtr) = ptext SLIT("top_ct")
 
-pprCLbl (RtsLabel (RtsBlackHoleInfoTbl info)) = ftext info
+pprCLbl (RtsLabel (RtsBlackHoleInfoTbl info)) = ptext info
 
 pprCLbl (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
   = hcat [ptext SLIT("stg_sel_"), text (show offset),
@@ -517,6 +534,12 @@ pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
 			then SLIT("_upd_entry") 
 			else SLIT("_noupd_entry"))
 	]
+
+pprCLbl (RtsLabel (RtsApplyInfoLabel  fs))
+  = ptext SLIT("stg_ap_") <> ptext fs <> ptext SLIT("_info")
+
+pprCLbl (RtsLabel (RtsApplyEntryLabel fs))
+  = ptext SLIT("stg_ap_") <> ptext fs <> ptext SLIT("_ret")
 
 pprCLbl (RtsLabel (RtsPrimOp primop)) 
   = ppr primop <> ptext SLIT("_fast")
@@ -549,11 +572,11 @@ ppIdFlavor x = pp_cSEP <>
 	       (case x of
 		       Closure	    	-> ptext SLIT("closure")
 		       SRT		-> ptext SLIT("srt")
-		       InfoTbl	    	-> ptext SLIT("info")
-		       EntryStd	    	-> ptext SLIT("entry")
-		       EntryFast arity	-> --false:ASSERT (arity > 0)
-					   (<>) (ptext SLIT("fast")) (int arity)
+		       InfoTbl    	-> ptext SLIT("info")
+		       Entry	    	-> ptext SLIT("entry")
+		       Slow	    	-> ptext SLIT("slow")
 		       RednCounts	-> ptext SLIT("ct")
+		       Bitmap		-> ptext SLIT("btm")
 		      )
 
 ppConFlavor x = pp_cSEP <>
@@ -564,4 +587,3 @@ ppConFlavor x = pp_cSEP <>
 		       StaticInfoTbl 	-> ptext SLIT("static_info")
 		)
 \end{code}
-

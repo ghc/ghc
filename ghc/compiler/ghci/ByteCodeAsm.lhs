@@ -1,67 +1,54 @@
 %
-% (c) The University of Glasgow 2000
+% (c) The University of Glasgow 2002
 %
 \section[ByteCodeLink]{Bytecode assembler and linker}
 
 \begin{code}
-
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module ByteCodeAsm (  
 	assembleBCOs, assembleBCO,
 
 	CompiledByteCode(..), 
-	UnlinkedBCO(..), UnlinkedBCOExpr, nameOfUnlinkedBCO, bcosFreeNames,
+	UnlinkedBCO(..), BCOPtr(..), bcoFreeNames,
 	SizedSeq, sizeSS, ssElts,
 	iNTERP_STACK_CHECK_THRESH
   ) where
 
 #include "HsVersions.h"
 
-import ByteCodeInstr	( BCInstr(..), ProtoBCO(..) )
+import ByteCodeInstr
 import ByteCodeItbls	( ItblEnv, mkITbls )
 
 import Name		( Name, getName )
 import NameSet
 import FiniteMap	( addToFM, lookupFM, emptyFM )
-import CoreSyn
 import Literal		( Literal(..) )
 import TyCon		( TyCon )
 import PrimOp		( PrimOp )
-import PrimRep		( PrimRep(..), isFollowableRep )
+import PrimRep		( PrimRep(..), isFollowableRep, is64BitRep )
 import Constants	( wORD_SIZE )
 import FastString	( FastString(..), unpackFS )
 import FiniteMap
 import Outputable
 
-import Control.Monad	( foldM )
-import Control.Monad.ST	( runST )
+import Control.Monad	( foldM, zipWithM )
+import Control.Monad.ST	( ST, runST )
 
 import GHC.Word		( Word(..) )
-import Data.Array.MArray ( MArray, newArray_, readArray, writeArray )
+import Data.Array.MArray
+import Data.Array.Base	( STUArray, UArray(..), unsafeWrite )
 import Data.Array.ST	( castSTUArray )
-import Foreign.Ptr	( nullPtr )
 import Foreign		( Word16, free )
 import Data.Int		( Int64 )
 
-#if __GLASGOW_HASKELL__ >= 503
+import GHC.Base		( ByteArray# )
 import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..) )
-#else
-import PrelIOBase	( IO(..) )
-import Ptr		( Ptr(..) )
-#endif
-\end{code}
 
+-- -----------------------------------------------------------------------------
+-- Unlinked BCOs
 
-
-%************************************************************************
-%*									*
-			Unlinked BCOs
-%*									*
-%************************************************************************
-
-\begin{code}
 -- CompiledByteCode represents the result of byte-code 
 -- compiling a bunch of functions and data types
 
@@ -74,58 +61,53 @@ instance Outputable CompiledByteCode where
 
 
 data UnlinkedBCO
-   = UnlinkedBCO Name
-                 (SizedSeq Word16)		 -- insns
-                 (SizedSeq (Either Word FastString))	 -- literals
+   = UnlinkedBCO {
+	unlinkedBCOName   :: Name,
+	unlinkedBCOArity  :: Int,
+	unlinkedBCOInstrs :: ByteArray#,			 -- insns
+        unlinkedBCOLits   :: (SizedSeq (Either Word FastString)), -- literals
 			-- Either literal words or a pointer to a asciiz
 			-- string, denoting a label whose *address* should
 			-- be determined at link time
-                 (SizedSeq (Either Name PrimOp)) -- ptrs
-                 (SizedSeq Name)		 -- itbl refs
+        unlinkedBCOPtrs   :: (SizedSeq BCOPtr), 	-- ptrs
+ 	unlinkedBCOItbls  :: (SizedSeq Name)	 	-- itbl refs
+   }
 
-nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _) = nm
+data BCOPtr
+  = BCOPtrName   Name
+  | BCOPtrPrimOp PrimOp
+  | BCOPtrBCO    UnlinkedBCO
 
-bcosFreeNames :: [UnlinkedBCO] -> NameSet
--- Finds external references.  Remember to remove the names
+-- | Finds external references.  Remember to remove the names
 -- defined by this group of BCOs themselves
-bcosFreeNames bcos
-  = free_names `minusNameSet` defined_names
+bcoFreeNames :: UnlinkedBCO -> NameSet
+bcoFreeNames bco
+  = bco_refs bco `minusNameSet` mkNameSet [unlinkedBCOName bco]
   where
-    defined_names = mkNameSet (map nameOfUnlinkedBCO bcos)
-    free_names    = foldr (unionNameSets . bco_refs) emptyNameSet bcos
-
-    bco_refs (UnlinkedBCO _ _ _ ptrs itbls)
-	= mkNameSet [n | Left n <- ssElts ptrs] `unionNameSets`
-	  mkNameSet (ssElts itbls)
-
--- When translating expressions, we need to distinguish the root
--- BCO for the expression
-type UnlinkedBCOExpr = (UnlinkedBCO, [UnlinkedBCO])
+    bco_refs (UnlinkedBCO _ _ _ _ ptrs itbls)
+	= unionManyNameSets (
+	     mkNameSet [ n | BCOPtrName n <- ssElts ptrs ] :
+	     mkNameSet (ssElts itbls) :
+	     map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]
+	  )
 
 instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm insns lits ptrs itbls)
+   ppr (UnlinkedBCO nm arity insns lits ptrs itbls)
       = sep [text "BCO", ppr nm, text "with", 
-             int (sizeSS insns), text "insns",
              int (sizeSS lits), text "lits",
              int (sizeSS ptrs), text "ptrs",
              int (sizeSS itbls), text "itbls"]
-\end{code}
 
+-- -----------------------------------------------------------------------------
+-- The bytecode assembler
 
-%************************************************************************
-%*									*
-\subsection{The bytecode assembler}
-%*									*
-%************************************************************************
+-- The object format for bytecodes is: 16 bits for the opcode, and 16
+-- for each field -- so the code can be considered a sequence of
+-- 16-bit ints.  Each field denotes either a stack offset or number of
+-- items on the stack (eg SLIDE), and index into the pointer table (eg
+-- PUSH_G), an index into the literal table (eg PUSH_I/D/L), or a
+-- bytecode address in this BCO.
 
-The object format for bytecodes is: 16 bits for the opcode, and 16 for
-each field -- so the code can be considered a sequence of 16-bit ints.
-Each field denotes either a stack offset or number of items on the
-stack (eg SLIDE), and index into the pointer table (eg PUSH_G), an
-index into the literal table (eg PUSH_I/D/L), or a bytecode address in
-this BCO.
-
-\begin{code}
 -- Top level assembler fn.
 assembleBCOs :: [ProtoBCO Name] -> [TyCon] -> IO CompiledByteCode
 assembleBCOs proto_bcos tycons
@@ -134,8 +116,7 @@ assembleBCOs proto_bcos tycons
         return (ByteCode bcos itblenv)
 
 assembleBCO :: ProtoBCO Name -> IO UnlinkedBCO
-
-assembleBCO (ProtoBCO nm instrs origin malloced)
+assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
    = let
          -- pass 1: collect up the offsets of the local labels.
          -- Remember that the first insn starts at offset 1 since offset 0
@@ -156,13 +137,23 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
      do  -- pass 2: generate the instruction, ptr and nonptr bits
          insns <- return emptySS :: IO (SizedSeq Word16)
          lits  <- return emptySS :: IO (SizedSeq (Either Word FastString))
-         ptrs  <- return emptySS :: IO (SizedSeq (Either Name PrimOp))
+         ptrs  <- return emptySS :: IO (SizedSeq BCOPtr)
          itbls <- return emptySS :: IO (SizedSeq Name)
          let init_asm_state = (insns,lits,ptrs,itbls)
          (final_insns, final_lits, final_ptrs, final_itbls) 
             <- mkBits findLabel init_asm_state instrs
 
-         let ul_bco = UnlinkedBCO nm final_insns final_lits final_ptrs final_itbls
+	 let asm_insns = ssElts final_insns
+	     n_insns   = sizeSS final_insns
+
+             insns_arr
+		 | n_insns > 65535 = panic "linkBCO: >= 64k insns in BCO"
+                 | otherwise = runST (mkInstrArray arity bitmap 
+					bsize n_insns asm_insns)
+             insns_barr = case insns_arr of UArray _lo _hi barr -> barr
+
+         let ul_bco = UnlinkedBCO nm arity insns_barr final_lits 
+					final_ptrs final_itbls
 
          -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
          -- objects, since they might get run too early.  Disable this until
@@ -174,10 +165,30 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
          zonk ptr = do -- putStrLn ("freeing malloc'd block at " ++ show (A# a#))
                            free ptr
 
+
+mkInstrArray :: Int -> [StgWord] -> Int -> Int -> [Word16]
+	-> ST s (UArray Int Word16)
+mkInstrArray arity bitmap bsize n_insns asm_insns = do
+  (arr :: STUArray s Int Word16) <- newArray_ (0, n_insns + bco_info_w16s)
+  zipWithM (unsafeWrite arr) [bco_info_w16s ..] 
+	(fromIntegral n_insns : asm_insns)
+  (arr' :: STUArray s Int StgWord) <- castSTUArray arr
+  writeArray arr' 0 (fromIntegral arity)
+  writeArray arr' 1 (fromIntegral bsize)
+  zipWithM (writeArray arr') [2..] bitmap
+  arr <- castSTUArray arr'
+  unsafeFreeze arr
+ where
+     -- The BCO info (arity, bitmap) goes at the beginning of
+     -- the instruction stream.  See Closures.h for details.	   
+     bco_info_w16s = (1 {- for the arity -} +
+		      1 {- for the bitmap size -} +
+		      length bitmap) * (wORD_SIZE `quot` 2)
+
 -- instrs nonptrs ptrs itbls
 type AsmState = (SizedSeq Word16, 
                  SizedSeq (Either Word FastString),
-                 SizedSeq (Either Name PrimOp), 
+                 SizedSeq BCOPtr, 
                  SizedSeq Name)
 
 data SizedSeq a = SizedSeq !Int [a]
@@ -194,6 +205,9 @@ ssElts (SizedSeq n r_xs) = reverse r_xs
 sizeSS :: SizedSeq a -> Int
 sizeSS (SizedSeq n r_xs) = n
 
+-- Bring in all the bci_ bytecode constants.
+#include "Bytecodes.h"
+
 -- This is where all the action is (pass 2 of the assembler)
 mkBits :: (Int -> Int) 			-- label finder
        -> AsmState
@@ -206,60 +220,80 @@ mkBits findLabel st proto_insns
        doInstr :: AsmState -> BCInstr -> IO AsmState
        doInstr st i
           = case i of
-               SWIZZLE   stkoff n -> instr3 st i_SWIZZLE stkoff n
-               ARGCHECK  n        -> instr2 st i_ARGCHECK n
-               STKCHECK  n        -> instr2 st i_STKCHECK n
-               PUSH_L    o1       -> instr2 st i_PUSH_L o1
-               PUSH_LL   o1 o2    -> instr3 st i_PUSH_LL o1 o2
-               PUSH_LLL  o1 o2 o3 -> instr4 st i_PUSH_LLL o1 o2 o3
-               PUSH_G    nm       -> do (p, st2) <- ptr st nm
-                                        instr2 st2 i_PUSH_G p
-               PUSH_AS   nm pk    -> do (p, st2)  <- ptr st (Left nm)
-                                        (np, st3) <- ctoi_itbl st2 pk
-                                        instr3 st3 i_PUSH_AS p np
+               STKCHECK  n        -> instr2 st bci_STKCHECK n
+               PUSH_L    o1       -> instr2 st bci_PUSH_L o1
+               PUSH_LL   o1 o2    -> instr3 st bci_PUSH_LL o1 o2
+               PUSH_LLL  o1 o2 o3 -> instr4 st bci_PUSH_LLL o1 o2 o3
+               PUSH_G    nm       -> do (p, st2) <- ptr st (BCOPtrName nm)
+                                        instr2 st2 bci_PUSH_G p
+               PUSH_PRIMOP op     -> do (p, st2) <- ptr st (BCOPtrPrimOp op)
+                                        instr2 st2 bci_PUSH_G p
+               PUSH_BCO proto     -> do ul_bco <- assembleBCO proto
+ 					(p, st2) <- ptr st (BCOPtrBCO ul_bco)
+                                        instr2 st2 bci_PUSH_G p
+               PUSH_ALTS proto    -> do ul_bco <- assembleBCO proto
+ 					(p, st2) <- ptr st (BCOPtrBCO ul_bco)
+                                        instr2 st2 bci_PUSH_ALTS p
+               PUSH_ALTS_UNLIFTED proto pk -> do 
+					ul_bco <- assembleBCO proto
+ 					(p, st2) <- ptr st (BCOPtrBCO ul_bco)
+                                        instr2 st2 (push_alts pk) p
                PUSH_UBX  (Left lit) nws  
                                   -> do (np, st2) <- literal st lit
-                                        instr3 st2 i_PUSH_UBX np nws
+                                        instr3 st2 bci_PUSH_UBX np nws
                PUSH_UBX  (Right aa) nws  
                                   -> do (np, st2) <- addr st aa
-                                        instr3 st2 i_PUSH_UBX np nws
+                                        instr3 st2 bci_PUSH_UBX np nws
 
-               PUSH_TAG  tag      -> instr2 st i_PUSH_TAG tag
-               SLIDE     n by     -> instr3 st i_SLIDE n by
-               ALLOC     n        -> instr2 st i_ALLOC n
-               MKAP      off sz   -> instr3 st i_MKAP off sz
-               UNPACK    n        -> instr2 st i_UNPACK n
-               UPK_TAG   n m k    -> instr4 st i_UPK_TAG n m k
+	       PUSH_APPLY_N	    -> do instr1 st bci_PUSH_APPLY_N
+	       PUSH_APPLY_V	    -> do instr1 st bci_PUSH_APPLY_V
+	       PUSH_APPLY_F	    -> do instr1 st bci_PUSH_APPLY_F
+	       PUSH_APPLY_D	    -> do instr1 st bci_PUSH_APPLY_D
+	       PUSH_APPLY_L	    -> do instr1 st bci_PUSH_APPLY_L
+	       PUSH_APPLY_P	    -> do instr1 st bci_PUSH_APPLY_P
+	       PUSH_APPLY_PP	    -> do instr1 st bci_PUSH_APPLY_PP
+	       PUSH_APPLY_PPP	    -> do instr1 st bci_PUSH_APPLY_PPP
+	       PUSH_APPLY_PPPP	    -> do instr1 st bci_PUSH_APPLY_PPPP
+	       PUSH_APPLY_PPPPP	    -> do instr1 st bci_PUSH_APPLY_PPPPP
+	       PUSH_APPLY_PPPPPP    -> do instr1 st bci_PUSH_APPLY_PPPPPP
+	       PUSH_APPLY_PPPPPPP   -> do instr1 st bci_PUSH_APPLY_PPPPPPP
+
+               SLIDE     n by     -> instr3 st bci_SLIDE n by
+               ALLOC_AP  n        -> instr2 st bci_ALLOC_AP n
+               ALLOC_PAP arity n  -> instr3 st bci_ALLOC_PAP arity n
+               MKAP      off sz   -> instr3 st bci_MKAP off sz
+               UNPACK    n        -> instr2 st bci_UNPACK n
                PACK      dcon sz  -> do (itbl_no,st2) <- itbl st dcon
-                                        instr3 st2 i_PACK itbl_no sz
+                                        instr3 st2 bci_PACK itbl_no sz
                LABEL     lab      -> return st
                TESTLT_I  i l      -> do (np, st2) <- int st i
-                                        instr3 st2 i_TESTLT_I np (findLabel l)
+                                        instr3 st2 bci_TESTLT_I np (findLabel l)
                TESTEQ_I  i l      -> do (np, st2) <- int st i
-                                        instr3 st2 i_TESTEQ_I np (findLabel l)
+                                        instr3 st2 bci_TESTEQ_I np (findLabel l)
                TESTLT_F  f l      -> do (np, st2) <- float st f
-                                        instr3 st2 i_TESTLT_F np (findLabel l)
+                                        instr3 st2 bci_TESTLT_F np (findLabel l)
                TESTEQ_F  f l      -> do (np, st2) <- float st f
-                                        instr3 st2 i_TESTEQ_F np (findLabel l)
+                                        instr3 st2 bci_TESTEQ_F np (findLabel l)
                TESTLT_D  d l      -> do (np, st2) <- double st d
-                                        instr3 st2 i_TESTLT_D np (findLabel l)
+                                        instr3 st2 bci_TESTLT_D np (findLabel l)
                TESTEQ_D  d l      -> do (np, st2) <- double st d
-                                        instr3 st2 i_TESTEQ_D np (findLabel l)
-               TESTLT_P  i l      -> instr3 st i_TESTLT_P i (findLabel l)
-               TESTEQ_P  i l      -> instr3 st i_TESTEQ_P i (findLabel l)
-               CASEFAIL           -> instr1 st i_CASEFAIL
-               JMP       l        -> instr2 st i_JMP (findLabel l)
-               ENTER              -> instr1 st i_ENTER
-               RETURN    rep      -> do (itbl_no,st2) <- itoc_itbl st rep
-                                        instr2 st2 i_RETURN itbl_no
-               CCALL     m_addr   -> do (np, st2) <- addr st m_addr
-                                        instr2 st2 i_CCALL np
+                                        instr3 st2 bci_TESTEQ_D np (findLabel l)
+               TESTLT_P  i l      -> instr3 st bci_TESTLT_P i (findLabel l)
+               TESTEQ_P  i l      -> instr3 st bci_TESTEQ_P i (findLabel l)
+               CASEFAIL           -> instr1 st bci_CASEFAIL
+               SWIZZLE   stkoff n -> instr3 st bci_SWIZZLE stkoff n
+               JMP       l        -> instr2 st bci_JMP (findLabel l)
+               ENTER              -> instr1 st bci_ENTER
+               RETURN             -> instr1 st bci_RETURN
+               RETURN_UBX rep     -> instr1 st (return_ubx rep)
+               CCALL off m_addr   -> do (np, st2) <- addr st m_addr
+                                        instr3 st2 bci_CCALL off np
 
        i2s :: Int -> Word16
        i2s = fromIntegral
 
        instr1 (st_i0,st_l0,st_p0,st_I0) i1
-          = do st_i1 <- addToSS st_i0 (i2s i1)
+          = do st_i1 <- addToSS st_i0 i1
                return (st_i1,st_l0,st_p0,st_I0)
 
        instr2 (st_i0,st_l0,st_p0,st_I0) i1 i2
@@ -327,84 +361,78 @@ mkBits findLabel st proto_insns
        literal st (MachWord64 ii) = int64 st (fromIntegral ii)
        literal st other           = pprPanic "ByteCodeLink.literal" (ppr other)
 
-       ctoi_itbl st pk
-          = addr st ret_itbl_addr
-            where
-               ret_itbl_addr 
-                  = case pk of
-                       WordRep   -> stg_ctoi_ret_R1n_info
-                       IntRep    -> stg_ctoi_ret_R1n_info
-                       AddrRep   -> stg_ctoi_ret_R1n_info
-                       CharRep   -> stg_ctoi_ret_R1n_info
-                       FloatRep  -> stg_ctoi_ret_F1_info
-                       DoubleRep -> stg_ctoi_ret_D1_info
-                       VoidRep   -> stg_ctoi_ret_V_info
-                       other | isFollowableRep pk -> stg_ctoi_ret_R1p_info
-				-- Includes ArrayRep, ByteArrayRep, as well as
-				-- the obvious PtrRep
-			     | otherwise
-			     -> pprPanic "ByteCodeLink.ctoi_itbl" (ppr pk)
 
-       itoc_itbl st pk
-          = addr st ret_itbl_addr
-            where
-               ret_itbl_addr 
-                  = case pk of
-                       CharRep   -> stg_gc_unbx_r1_info
-                       IntRep    -> stg_gc_unbx_r1_info
-                       WordRep   -> stg_gc_unbx_r1_info
-                       AddrRep   -> stg_gc_unbx_r1_info
-                       FloatRep  -> stg_gc_f1_info
-                       DoubleRep -> stg_gc_d1_info
-                       VoidRep   -> nullPtr	-- Interpreter.c spots this special case
-                       other | isFollowableRep pk -> stg_gc_unpt_r1_info
-			     | otherwise
-			    -> pprPanic "ByteCodeLink.itoc_itbl" (ppr pk)
-                     
-foreign label "stg_ctoi_ret_R1p_info" stg_ctoi_ret_R1p_info :: Ptr ()
-foreign label "stg_ctoi_ret_R1n_info" stg_ctoi_ret_R1n_info :: Ptr ()
-foreign label "stg_ctoi_ret_F1_info"  stg_ctoi_ret_F1_info :: Ptr ()
-foreign label "stg_ctoi_ret_D1_info"  stg_ctoi_ret_D1_info :: Ptr ()
-foreign label "stg_ctoi_ret_V_info"   stg_ctoi_ret_V_info :: Ptr ()
+push_alts WordRep   = bci_PUSH_ALTS_N
+push_alts IntRep    = bci_PUSH_ALTS_N
+push_alts AddrRep   = bci_PUSH_ALTS_N
+push_alts CharRep   = bci_PUSH_ALTS_N
+push_alts FloatRep  = bci_PUSH_ALTS_F
+push_alts DoubleRep = bci_PUSH_ALTS_D
+push_alts VoidRep   = bci_PUSH_ALTS_V
+push_alts pk
+ | is64BitRep pk      = bci_PUSH_ALTS_L
+ | isFollowableRep pk = bci_PUSH_ALTS_P
 
-foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Ptr ()
-foreign label "stg_gc_unpt_r1_info" stg_gc_unpt_r1_info :: Ptr ()
-foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Ptr ()
-foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Ptr ()
+return_ubx WordRep   = bci_RETURN_N
+return_ubx IntRep    = bci_RETURN_N
+return_ubx AddrRep   = bci_RETURN_N
+return_ubx CharRep   = bci_RETURN_N
+return_ubx FloatRep  = bci_RETURN_F
+return_ubx DoubleRep = bci_RETURN_D
+return_ubx VoidRep   = bci_RETURN_V
+return_ubx pk
+ | is64BitRep pk      = bci_RETURN_L
+ | isFollowableRep pk = bci_RETURN_P
+
 
 -- The size in 16-bit entities of an instruction.
 instrSize16s :: BCInstr -> Int
 instrSize16s instr
    = case instr of
-        STKCHECK _     -> 2
-        ARGCHECK _     -> 2
-        PUSH_L   _     -> 2
-        PUSH_LL  _ _   -> 3
-        PUSH_LLL _ _ _ -> 4
-        PUSH_G   _     -> 2
-        PUSH_AS  _ _   -> 3
-        PUSH_UBX _ _   -> 3
-        PUSH_TAG _     -> 2
-        SLIDE    _ _   -> 3
-        ALLOC    _     -> 2
-        MKAP     _ _   -> 3
-        UNPACK   _     -> 2
-        UPK_TAG  _ _ _ -> 4
-        PACK     _ _   -> 3
-        LABEL    _     -> 0	-- !!
-        TESTLT_I _ _   -> 3
-        TESTEQ_I _ _   -> 3
-        TESTLT_F _ _   -> 3
-        TESTEQ_F _ _   -> 3
-        TESTLT_D _ _   -> 3
-        TESTEQ_D _ _   -> 3
-        TESTLT_P _ _   -> 3
-        TESTEQ_P _ _   -> 3
-        JMP      _     -> 2
-        CASEFAIL       -> 1
-        ENTER          -> 1
-        RETURN   _     -> 2
-
+        STKCHECK{}		-> 2
+        PUSH_L{}		-> 2
+        PUSH_LL{}		-> 3
+        PUSH_LLL{}		-> 4
+        PUSH_G{}		-> 2
+        PUSH_PRIMOP{}		-> 2
+        PUSH_BCO{}		-> 2
+        PUSH_ALTS{}		-> 2
+        PUSH_ALTS_UNLIFTED{}	-> 2
+	PUSH_UBX{}		-> 3
+	PUSH_APPLY_N{}		-> 1
+	PUSH_APPLY_V{}		-> 1
+	PUSH_APPLY_F{}		-> 1
+	PUSH_APPLY_D{}		-> 1
+	PUSH_APPLY_L{}		-> 1
+	PUSH_APPLY_P{}		-> 1
+	PUSH_APPLY_PP{}		-> 1
+	PUSH_APPLY_PPP{}	-> 1
+	PUSH_APPLY_PPPP{}	-> 1
+	PUSH_APPLY_PPPPP{}	-> 1
+	PUSH_APPLY_PPPPPP{}	-> 1
+	PUSH_APPLY_PPPPPPP{}	-> 1
+        SLIDE{}			-> 3
+        ALLOC_AP{}		-> 2
+        ALLOC_PAP{}		-> 3
+        MKAP{}			-> 3
+        UNPACK{}		-> 2
+        PACK{}			-> 3
+        LABEL{}			-> 0	-- !!
+        TESTLT_I{}		-> 3
+        TESTEQ_I{}		-> 3
+        TESTLT_F{}		-> 3
+        TESTEQ_F{}		-> 3
+        TESTLT_D{}		-> 3
+        TESTEQ_D{}		-> 3
+        TESTLT_P{}		-> 3
+        TESTEQ_P{}		-> 3
+        JMP{}			-> 2
+        CASEFAIL{}		-> 1
+        ENTER{}			-> 1
+        RETURN{}		-> 1
+        RETURN_UBX{}		-> 1
+	CCALL{}			-> 3
+        SWIZZLE{}		-> 3
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
@@ -479,53 +507,6 @@ mkLitPtr a
         w0 <- readArray a_arr 0
         return [w0 :: Word]
      )
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Connect to actual values for bytecode opcodes}
-%*									*
-%************************************************************************
-
-\begin{code}
-
-#include "Bytecodes.h"
-
-i_ARGCHECK = (bci_ARGCHECK :: Int)
-i_PUSH_L   = (bci_PUSH_L :: Int)
-i_PUSH_LL  = (bci_PUSH_LL :: Int)
-i_PUSH_LLL = (bci_PUSH_LLL :: Int)
-i_PUSH_G   = (bci_PUSH_G :: Int)
-i_PUSH_AS  = (bci_PUSH_AS :: Int)
-i_PUSH_UBX = (bci_PUSH_UBX :: Int)
-i_PUSH_TAG = (bci_PUSH_TAG :: Int)
-i_SLIDE    = (bci_SLIDE :: Int)
-i_ALLOC    = (bci_ALLOC :: Int)
-i_MKAP     = (bci_MKAP :: Int)
-i_UNPACK   = (bci_UNPACK :: Int)
-i_UPK_TAG  = (bci_UPK_TAG :: Int)
-i_PACK     = (bci_PACK :: Int)
-i_TESTLT_I = (bci_TESTLT_I :: Int)
-i_TESTEQ_I = (bci_TESTEQ_I :: Int)
-i_TESTLT_F = (bci_TESTLT_F :: Int)
-i_TESTEQ_F = (bci_TESTEQ_F :: Int)
-i_TESTLT_D = (bci_TESTLT_D :: Int)
-i_TESTEQ_D = (bci_TESTEQ_D :: Int)
-i_TESTLT_P = (bci_TESTLT_P :: Int)
-i_TESTEQ_P = (bci_TESTEQ_P :: Int)
-i_CASEFAIL = (bci_CASEFAIL :: Int)
-i_ENTER    = (bci_ENTER :: Int)
-i_RETURN   = (bci_RETURN :: Int)
-i_STKCHECK = (bci_STKCHECK :: Int)
-i_JMP      = (bci_JMP :: Int)
-#ifdef bci_CCALL
-i_CCALL    = (bci_CCALL :: Int)
-i_SWIZZLE  = (bci_SWIZZLE :: Int)
-#else
-i_CCALL    = error "Sorry pal, you need to bootstrap to use i_CCALL."
-i_SWIZZLE  = error "Sorry pal, you need to bootstrap to use i_SWIZZLE."
-#endif
 
 iNTERP_STACK_CHECK_THRESH = (INTERP_STACK_CHECK_THRESH :: Int)
 \end{code}
-

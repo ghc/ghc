@@ -46,9 +46,9 @@ machine-dependent modules (those \tr{#include}'ing \tr{NCG.h}).
 
 This module (@AsmCodeGen@) is the top-level machine-independent
 module.  It uses @AbsCStixGen.genCodeAbstractC@ to produce @StixTree@s
-(defined in module @Stix@), using support code from @StixInfo@ (info
-tables), @StixPrim@ (primitive operations), @StixMacro@ (Abstract C
-macros), and @StixInteger@ (GMP arbitrary-precision operations).
+(defined in module @Stix@), using support code from @StixPrim@
+(primitive operations), @StixMacro@ (Abstract C macros), and
+@StixInteger@ (GMP arbitrary-precision operations).
 
 Before entering machine-dependent land, we do some machine-independent
 @genericOpt@imisations (defined below) on the @StixTree@s.

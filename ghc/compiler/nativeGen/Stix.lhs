@@ -11,7 +11,7 @@ module Stix (
         liftStrings, repOfStixExpr,
 	DestInfo(..), hasDestInfo,
 
-	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
+	stgBaseReg, stgNode, stgSp, stgSpLim, 
         stgHp, stgHpLim, stgHpAlloc, stgTagReg, stgR9, stgR10, 
 	stgCurrentTSO, stgCurrentNursery,
 
@@ -270,7 +270,6 @@ ppMId (DoubleReg n)        = hcat [text "DblReg(", int (iBox n), char ')']
 ppMId (LongReg kind n)     = hcat [ppr kind, text "LongReg(", 
                                    int (iBox n), char ')']
 ppMId Sp                   = text "Sp"
-ppMId Su                   = text "Su"
 ppMId SpLim                = text "SpLim"
 ppMId Hp                   = text "Hp"
 ppMId HpLim                = text "HpLim"
@@ -296,14 +295,12 @@ type StixStmtList = [StixStmt] -> [StixStmt]
 
 Stix Trees for STG registers:
 \begin{code}
-stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, stgHp, stgHpLim 
-	:: StixReg
+stgBaseReg, stgNode, stgSp, stgSpLim, stgHp, stgHpLim :: StixReg
 
 stgBaseReg 	    = StixMagicId BaseReg
 stgNode    	    = StixMagicId node
 stgTagReg	    = StixMagicId tagreg
 stgSp 		    = StixMagicId Sp
-stgSu 		    = StixMagicId Su
 stgSpLim	    = StixMagicId SpLim
 stgHp		    = StixMagicId Hp
 stgHpLim	    = StixMagicId HpLim

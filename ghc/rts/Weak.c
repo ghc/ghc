@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.25 2002/06/19 12:01:28 simonmar Exp $
+ * $Id: Weak.c,v 1.26 2002/12/11 15:36:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -99,6 +99,7 @@ scheduleFinalizers(StgWeak *list)
     IF_DEBUG(weak,fprintf(stderr,"weak: batching %d finalizers\n", n));
 
     arr = (StgMutArrPtrs *)allocate(sizeofW(StgMutArrPtrs) + n);
+    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
     SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
     arr->ptrs = n;
 

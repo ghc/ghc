@@ -54,7 +54,7 @@ printf "\n%-20s %6d %6d\n\n\n", 'TOTAL:', $tot, $totcmts;
 
 $tot = 0;
 $totcmts = 0;
-printf "\n                      Code  Comments\n"
+printf "\n                      Code  Comments\n";
 foreach $m (sort (keys %ModCount)) {
     printf "%-20s %6d %6d\n", $m, $ModCount{$m}, $ModComments{$m};
     $tot += $ModCount{$m};

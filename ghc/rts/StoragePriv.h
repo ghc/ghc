@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.22 2002/11/01 11:05:47 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.23 2002/12/11 15:36:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -83,16 +83,6 @@ extern void memInventory(void);
 extern void checkSanity(void);
 extern nat  countBlocks(bdescr *);
 #endif
-
-/* 
- * These three are used by the garbage collector when we have
- * dynamically-linked object modules.  (see Storage.h,
- * IS_DATA_PTR etc.). 
- * Defined in Linker.c.
- */
-int is_dynamically_loaded_code_or_rodata_ptr ( void* p );
-int is_dynamically_loaded_rwdata_ptr         ( void* p );
-int is_not_dynamically_loaded_ptr            ( void* p );
 
 /* Functions from GC.c 
  */

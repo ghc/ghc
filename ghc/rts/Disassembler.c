@@ -1,12 +1,11 @@
-
 /* -----------------------------------------------------------------------------
  * Bytecode disassembler
  *
- * Copyright (c) 1994-1998.
+ * Copyright (c) 1994-2002.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.25 $
- * $Date: 2002/07/17 09:21:49 $
+ * $Revision: 1.26 $
+ * $Date: 2002/12/11 15:36:41 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
@@ -30,12 +29,12 @@
  * Disassembler
  * ------------------------------------------------------------------------*/
 
-int disInstr ( StgBCO *bco, int pc )
+int
+disInstr ( StgBCO *bco, int pc )
 {
    int i;
 
-   StgArrWords*   instr_arr   = bco->instrs;
-   UShort*        instrs      = (UShort*)(&instr_arr->payload[0]);
+   StgWord16*     instrs      = (StgWord16*)(BCO_INSTRS(bco));
 
    StgArrWords*   literal_arr = bco->literals;
    StgWord*       literals    = (StgWord*)(&literal_arr->payload[0]);
@@ -58,9 +57,6 @@ int disInstr ( StgBCO *bco, int pc )
       case bci_STKCHECK: 
          fprintf(stderr, "STKCHECK %d\n", instrs[pc] );
          pc += 1; break;
-      case bci_ARGCHECK: 
-         fprintf(stderr, "ARGCHECK %d\n", instrs[pc] );
-         pc += 1; break;
       case bci_PUSH_L: 
          fprintf(stderr, "PUSH_L   %d\n", instrs[pc] );
          pc += 1; break;
@@ -75,92 +71,169 @@ int disInstr ( StgBCO *bco, int pc )
          fprintf(stderr, "PUSH_G   " ); printPtr( ptrs[instrs[pc]] );
          fprintf(stderr, "\n" );
          pc += 1; break;
-      case bci_PUSH_AS:
-         fprintf(stderr, "PUSH_AS  " ); printPtr( ptrs[instrs[pc]] );
-         fprintf(stderr, " 0x%x", literals[instrs[pc+1]] );
+
+      case bci_PUSH_ALTS:
+         fprintf(stderr, "PUSH_ALTS  " ); printPtr( ptrs[instrs[pc]] );
          fprintf(stderr, "\n");
-         pc += 2; break;
+         pc += 1; break;
+      case bci_PUSH_ALTS_P:
+         fprintf(stderr, "PUSH_ALTS_P  " ); printPtr( ptrs[instrs[pc]] );
+         fprintf(stderr, "\n");
+         pc += 1; break;
+      case bci_PUSH_ALTS_N:
+         fprintf(stderr, "PUSH_ALTS_N  " ); printPtr( ptrs[instrs[pc]] );
+         fprintf(stderr, "\n");
+         pc += 1; break;
+      case bci_PUSH_ALTS_F:
+         fprintf(stderr, "PUSH_ALTS_F  " ); printPtr( ptrs[instrs[pc]] );
+         fprintf(stderr, "\n");
+         pc += 1; break;
+      case bci_PUSH_ALTS_D:
+         fprintf(stderr, "PUSH_ALTS_D  " ); printPtr( ptrs[instrs[pc]] );
+         fprintf(stderr, "\n");
+         pc += 1; break;
+      case bci_PUSH_ALTS_L:
+         fprintf(stderr, "PUSH_ALTS_L  " ); printPtr( ptrs[instrs[pc]] );
+         fprintf(stderr, "\n");
+         pc += 1; break;
+      case bci_PUSH_ALTS_V:
+         fprintf(stderr, "PUSH_ALTS_V  " ); printPtr( ptrs[instrs[pc]] );
+         fprintf(stderr, "\n");
+         pc += 1; break;
+
       case bci_PUSH_UBX:
          fprintf(stderr, "PUSH_UBX ");
          for (i = 0; i < instrs[pc+1]; i++) 
             fprintf(stderr, "0x%x ", literals[i + instrs[pc]] );
          fprintf(stderr, "\n");
          pc += 2; break;
-      case bci_PUSH_TAG:
-         fprintf(stderr, "PUSH_TAG %d\n", instrs[pc] );
-         pc += 1; break;
+      case bci_PUSH_APPLY_N:
+	  fprintf(stderr, "PUSH_APPLY_N\n");
+	  break;
+      case bci_PUSH_APPLY_V:
+	  fprintf(stderr, "PUSH_APPLY_V\n");
+	  break;
+      case bci_PUSH_APPLY_F:
+	  fprintf(stderr, "PUSH_APPLY_F\n");
+	  break;
+      case bci_PUSH_APPLY_D:
+	  fprintf(stderr, "PUSH_APPLY_D\n");
+	  break;
+      case bci_PUSH_APPLY_L:
+	  fprintf(stderr, "PUSH_APPLY_L\n");
+	  break;
+      case bci_PUSH_APPLY_P:
+	  fprintf(stderr, "PUSH_APPLY_P\n");
+	  break;
+      case bci_PUSH_APPLY_PP:
+	  fprintf(stderr, "PUSH_APPLY_PP\n");
+	  break;
+      case bci_PUSH_APPLY_PPP:
+	  fprintf(stderr, "PUSH_APPLY_PPP\n");
+	  break;
+      case bci_PUSH_APPLY_PPPP:
+	  fprintf(stderr, "PUSH_APPLY_PPPP\n");
+	  break;
+      case bci_PUSH_APPLY_PPPPP:
+	  fprintf(stderr, "PUSH_APPLY_PPPPP\n");
+	  break;
+      case bci_PUSH_APPLY_PPPPPP:
+	  fprintf(stderr, "PUSH_APPLY_PPPPPP\n");
+	  break;
+      case bci_PUSH_APPLY_PPPPPPP:
+	  fprintf(stderr, "PUSH_APPLY_PPPPPPP\n");
+	  break;
       case bci_SLIDE: 
-         fprintf(stderr, "SLIDE    %d down by %d\n", instrs[pc], instrs[pc+1] );
+         fprintf(stderr, "SLIDE     %d down by %d\n", instrs[pc], instrs[pc+1] );
          pc += 2; break;
-      case bci_ALLOC:
-         fprintf(stderr, "ALLOC    %d words\n", instrs[pc] );
+      case bci_ALLOC_AP:
+         fprintf(stderr, "ALLOC_AP  %d words\n", instrs[pc] );
          pc += 1; break;
+      case bci_ALLOC_PAP:
+         fprintf(stderr, "ALLOC_PAP %d words, %d arity\n",
+		 instrs[pc], instrs[pc+1] );
+         pc += 2; break;
       case bci_MKAP:
-         fprintf(stderr, "MKAP     %d words, %d stkoff\n", instrs[pc+1], 
+         fprintf(stderr, "MKAP      %d words, %d stkoff\n", instrs[pc+1], 
                                                            instrs[pc] );
          pc += 2; break;
       case bci_UNPACK:
-         fprintf(stderr, "UNPACK   %d\n", instrs[pc] );
+         fprintf(stderr, "UNPACK    %d\n", instrs[pc] );
          pc += 1; break;
-      case bci_UPK_TAG:
-         fprintf(stderr, "UPK_TAG  %d words, %d conoff, %d stkoff\n",
-                         instrs[pc], instrs[pc+1], instrs[pc+2] );
-         pc += 3; break;
       case bci_PACK:
-         fprintf(stderr, "PACK     %d words with itbl ", instrs[pc+1] );
+         fprintf(stderr, "PACK      %d words with itbl ", instrs[pc+1] );
          printPtr( (StgPtr)itbls[instrs[pc]] );
          fprintf(stderr, "\n");
          pc += 2; break;
 
-      case bci_CASEFAIL: 
-         fprintf(stderr, "CASEFAIL\n" );
-         break;
-      case bci_JMP:
-         fprintf(stderr, "JMP to   %d\n", instrs[pc]);
-         pc += 1; break;
-
       case bci_TESTLT_I:
-         fprintf(stderr, "TESTLT_I %d, fail to %d\n", literals[instrs[pc]],
+         fprintf(stderr, "TESTLT_I  %d, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_I:
-         fprintf(stderr, "TESTEQ_I %d, fail to %d\n", literals[instrs[pc]],
+         fprintf(stderr, "TESTEQ_I  %d, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 
       case bci_TESTLT_F:
-         fprintf(stderr, "TESTLT_F %d, fail to %d\n", literals[instrs[pc]],
+         fprintf(stderr, "TESTLT_F  %d, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_F:
-         fprintf(stderr, "TESTEQ_F %d, fail to %d\n", literals[instrs[pc]],
+         fprintf(stderr, "TESTEQ_F  %d, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 
       case bci_TESTLT_D:
-         fprintf(stderr, "TESTLT_D %d, fail to %d\n", literals[instrs[pc]],
+         fprintf(stderr, "TESTLT_D  %d, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_D:
-         fprintf(stderr, "TESTEQ_D %d, fail to %d\n", literals[instrs[pc]],
+         fprintf(stderr, "TESTEQ_D  %d, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 
       case bci_TESTLT_P:
-         fprintf(stderr, "TESTLT_P %d, fail to %d\n", instrs[pc],
+         fprintf(stderr, "TESTLT_P  %d, fail to %d\n", instrs[pc],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_P:
-         fprintf(stderr, "TESTEQ_P %d, fail to %d\n", instrs[pc],
+         fprintf(stderr, "TESTEQ_P  %d, fail to %d\n", instrs[pc],
                                                       instrs[pc+1]);
          pc += 2; break;
-      case bci_RETURN:
-         fprintf(stderr, "RETURN  " ); printPtr( (StgPtr)itbls[instrs[pc]] );
-         fprintf(stderr, "\n");
+      case bci_CASEFAIL: 
+         fprintf(stderr, "CASEFAIL\n" );
+         break;
+      case bci_JMP:
+         fprintf(stderr, "JMP to    %d\n", instrs[pc]);
          pc += 1; break;
+
       case bci_ENTER:
          fprintf(stderr, "ENTER\n");
          break;
+
+      case bci_RETURN:
+         fprintf(stderr, "RETURN\n" );
+	 break;
+      case bci_RETURN_P:
+         fprintf(stderr, "RETURN_P\n" );
+	 break;
+      case bci_RETURN_N:
+         fprintf(stderr, "RETURN_N\n" );
+	 break;
+      case bci_RETURN_F:
+         fprintf(stderr, "RETURN_F\n" );
+	 break;
+      case bci_RETURN_D:
+         fprintf(stderr, "RETURN_D\n" );
+	 break;
+      case bci_RETURN_L:
+         fprintf(stderr, "RETURN_L\n" );
+	 break;
+      case bci_RETURN_V:
+         fprintf(stderr, "RETURN_V\n" );
+	 break;
+
       default:
          barf("disInstr: unknown opcode");
    }
@@ -176,8 +249,7 @@ int disInstr ( StgBCO *bco, int pc )
 void disassemble( StgBCO *bco )
 {
    nat i, j;
-   StgArrWords*   instr_arr = bco->instrs;
-   UShort*        instrs    = (UShort*)(&instr_arr->payload[0]);
+   StgWord16*     instrs    = (StgWord16*)(BCO_INSTRS(bco));
    StgMutArrPtrs* ptrs      = bco->ptrs;
    nat            nbcs      = (int)instrs[0];
    nat            pc        = 1;

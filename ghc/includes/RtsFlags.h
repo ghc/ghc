@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.43 2002/08/05 10:11:03 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.44 2002/12/11 15:36:39 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -47,7 +47,7 @@ struct GC_FLAGS {
 struct DEBUG_FLAGS {  
     // flags to control debugging output & extra checking in various subsystems
     rtsBool scheduler;      // 's'
-    rtsBool evaluator;	    // 'e'
+    rtsBool interpreter;    // 'i'
     rtsBool codegen;        // 'c'
     rtsBool weak;           // 'w'
     rtsBool gccafs;         // 'G'
@@ -59,6 +59,7 @@ struct DEBUG_FLAGS {
     rtsBool gran;           // 'r'
     rtsBool par;            // 'P'
     rtsBool linker;         // 'l'   the object linker
+    rtsBool apply;          // 'a'
 };
 
 struct COST_CENTRE_FLAGS {

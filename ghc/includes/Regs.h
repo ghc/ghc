@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.11 2002/01/24 00:40:28 sof Exp $
+ * $Id: Regs.h,v 1.12 2002/12/11 15:36:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -33,10 +33,8 @@ typedef struct StgSparkPool_ {
 } StgSparkPool;
 
 typedef struct {
-  StgFunPtr      stgChk0;
-  StgFunPtr      stgChk1;
   StgFunPtr      stgGCEnter1;
-  StgFunPtr      stgUpdatePAP;
+  StgFunPtr      stgGCFun;
 } StgFunTable;
 
 typedef struct StgRegTable_ {
@@ -58,7 +56,6 @@ typedef struct StgRegTable_ {
   StgDouble 	  rD2;
   StgWord64       rL1;
   StgPtr 	  rSp;
-  StgUpdateFrame *rSu;
   StgPtr 	  rSpLim;
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
@@ -98,7 +95,7 @@ extern DLL_IMPORT_RTS Capability  MainCapability;
  * Registers Hp and HpLim are global across the entire system, and are
  * copied into the RegTable before executing a thread.
  *
- * Registers Sp, Su, and SpLim are saved in the TSO for the
+ * Registers Sp and SpLim are saved in the TSO for the
  * thread, but are copied into the RegTable before executing a thread.
  *
  * All other registers are "general purpose", and are used for passing
@@ -124,7 +121,6 @@ extern DLL_IMPORT_RTS Capability  MainCapability;
  */
 
 #define SAVE_Sp    	    (CurrentTSO->sp)
-#define SAVE_Su    	    (CurrentTSO->su)
 #define SAVE_SpLim    	    (CurrentTSO->splim)
 
 #define SAVE_Hp	    	    (BaseReg->rHp)
@@ -304,12 +300,6 @@ GLOBAL_REG_DECL(P_,Sp,REG_Sp)
 #define Sp (BaseReg->rSp)
 #endif
 
-#ifdef REG_Su
-GLOBAL_REG_DECL(StgUpdateFrame *,Su,REG_Su)
-#else
-#define Su (BaseReg->rSu)
-#endif
-
 #ifdef REG_SpLim
 GLOBAL_REG_DECL(P_,SpLim,REG_SpLim)
 #else
@@ -398,10 +388,8 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 
 #define FunReg ((StgFunTable *)((void *)BaseReg - sizeof(StgFunTable)))
 
-#define stg_chk_0          (FunReg->stgChk0)
-#define stg_chk_1          (FunReg->stgChk1)
 #define stg_gc_enter_1     (FunReg->stgGCEnter1)
-#define stg_update_PAP     (FunReg->stgUpdatePAP)
+#define stg_gc_fun         (FunReg->stgGCFun)
 
 /* -----------------------------------------------------------------------------
    For any registers which are denoted "caller-saves" by the C calling
@@ -553,14 +541,6 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 #define CALLER_RESTORE_Sp	/* nothing */
 #endif
 
-#ifdef CALLER_SAVES_Su
-#define CALLER_SAVE_Su	    	SAVE_Su = Su;
-#define CALLER_RESTORE_Su  	Su = SAVE_Su;
-#else
-#define CALLER_SAVE_Su	    	/* nothing */
-#define CALLER_RESTORE_Su	/* nothing */
-#endif
-
 #ifdef CALLER_SAVES_SpLim
 #define CALLER_SAVE_SpLim    	SAVE_SpLim = SpLim;
 #define CALLER_RESTORE_SpLim  	SpLim = SAVE_SpLim;
@@ -681,7 +661,6 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 	be addressed relative to it */
 #define CALLER_SAVE_SYSTEM			\
   CALLER_SAVE_Sp				\
-  CALLER_SAVE_Su				\
   CALLER_SAVE_SpLim				\
   CALLER_SAVE_Hp				\
   CALLER_SAVE_HpLim				\
@@ -715,7 +694,6 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 #define CALLER_RESTORE_SYSTEM			\
   CALLER_RESTORE_Base				\
   CALLER_RESTORE_Sp				\
-  CALLER_RESTORE_Su				\
   CALLER_RESTORE_SpLim				\
   CALLER_RESTORE_Hp				\
   CALLER_RESTORE_HpLim				\

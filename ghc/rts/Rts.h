@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.19 2002/07/18 06:07:37 sof Exp $
+ * $Id$
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -59,6 +59,12 @@ extern void* GetFiberData ( void );
 #define IF_DEBUG(c,s)  if (RtsFlags.DebugFlags.c) { s; }
 #else
 #define IF_DEBUG(c,s)  doNothing()
+#endif
+
+#ifdef DEBUG
+#define DEBUG_ONLY(s) s
+#else
+#define DEBUG_ONLY(s) doNothing()
 #endif
 
 #if defined(GRAN) && defined(DEBUG)

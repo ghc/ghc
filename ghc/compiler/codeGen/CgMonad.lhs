@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.35 2002/09/13 15:02:28 simonpj Exp $
+% $Id: CgMonad.lhs,v 1.36 2002/12/11 15:36:26 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -53,10 +53,10 @@ import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 import {-# SOURCE #-} CgUsages  ( getSpRelOffset )
 
 import AbsCSyn
+import CLabel
 import StgSyn		( SRT(..) )
 import AbsCUtils	( mkAbsCStmts )
 import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
-import CLabel           ( CLabel, mkUpdInfoLabel, mkTopTickyCtrLabel )
 import Module		( Module )
 import DataCon		( ConTag )
 import Id		( Id )
@@ -143,9 +143,8 @@ data Sequel
 		      -- addressing mode (I think)
 	  SemiTaggingStuff
 
-  | SeqFrame			-- like CaseAlts but push a seq frame too.
-	  CAddrMode
-	  SemiTaggingStuff
+	  Bool	      -- True <=> polymorphic, push a SEQ frame too
+
 
 type SemiTaggingStuff
   = Maybe			    -- Maybe[1] we don't have any semi-tagging stuff...
@@ -185,8 +184,9 @@ sequelToAmode (OnStack virt_sp_offset)
     returnFC (CVal sp_rel RetRep)
 
 sequelToAmode UpdateCode = returnFC (CLbl mkUpdInfoLabel RetRep)
-sequelToAmode (CaseAlts amode _) = returnFC amode
-sequelToAmode (SeqFrame _ _) = panic "sequelToAmode: SeqFrame"
+
+sequelToAmode (CaseAlts amode _ False) = returnFC amode
+sequelToAmode (CaseAlts amode _ True)  = returnFC (CLbl mkSeqInfoLabel RetRep)
 
 type CgStksAndHeapUsage		-- stacks and heap usage information
   = (StackUsage, HeapUsage)
@@ -200,10 +200,11 @@ data Slot = Free | NonPointer
 #endif
 
 type StackUsage =
-	(Int,		   -- virtSp: Virtual offset of topmost allocated slot
-	 [(Int,Slot)],     -- free:   List of free slots, in increasing order
-	 Int,		   -- realSp: Virtual offset of real stack pointer
-	 Int)		   -- hwSp:   Highest value ever taken by virtSp
+	(Int,		   -- virtSp:  Virtual offset of topmost allocated slot
+	 Int,		   -- frameSp: End of the current stack frame
+	 [(Int,Slot)],     -- free:    List of free slots, in increasing order
+	 Int,		   -- realSp:  Virtual offset of real stack pointer
+	 Int)		   -- hwSp:    Highest value ever taken by virtSp
 
 type HeapUsage =
 	(HeapOffset,	-- virtHp: Virtual offset of highest-allocated word
@@ -220,26 +221,8 @@ Initialisation.
 initialStateC = MkCgState AbsCNop emptyVarEnv initUsage
 
 initUsage :: CgStksAndHeapUsage
-initUsage  = ((0,[],0,0), (0,0))
+initUsage  = ((0,0,[],0,0), (0,0))
 \end{code}
-
-"envInitForAlternatives" initialises the environment for a case alternative,
-assuming that the alternative is entered after an evaluation.
-This involves:
-
-   - zapping any volatile bindings, which aren't valid.
-   
-   - zapping the heap usage. It should be restored by a heap check.
-   
-   - setting the virtual AND real stack pointer fields to the given
-   virtual stack offsets.  this doesn't represent any {\em code}; it is a
-   prediction of where the real stack pointer will be when we come back
-   from the case analysis.
-   
-   - BUT LEAVING the rest of the stack-usage info because it is all
-   valid.  In particular, we leave the tail stack pointers unchanged,
-   becuase the alternative has to de-allocate the original @case@
-   expression's stack.  \end{itemize}
 
 @stateIncUsage@$~e_1~e_2$ incorporates in $e_1$ the stack and heap high water
 marks found in $e_2$.
@@ -247,11 +230,11 @@ marks found in $e_2$.
 \begin{code}
 stateIncUsage :: CgState -> CgState -> CgState
 
-stateIncUsage (MkCgState abs_c bs ((v,f,r,h1),(vH1,rH1)))
-	      (MkCgState _     _  ((_,_,_,h2),(vH2, _)))
+stateIncUsage (MkCgState abs_c bs ((v,t,f,r,h1),(vH1,rH1)))
+	      (MkCgState _     _  ((_,_,_,_,h2),(vH2, _)))
      = MkCgState abs_c
 		 bs
-		 ((v,f,r,h1 `max` h2),
+		 ((v,t,f,r,h1 `max` h2),
 		  (vH1 `max` vH2, rH1))
 \end{code}
 
@@ -438,9 +421,9 @@ forkAbsC (FCode code) =
 	do
 		info_down <- getInfoDown
 		(MkCgState absC1 bs usage) <- getState
-		let ((),MkCgState absC2 _ ((_, _, _,h2), _)) = code info_down (MkCgState AbsCNop bs usage)
-		let ((v, f, r, h1), heap_usage) = usage
-		let new_usage = ((v, f, r, h1 `max` h2), heap_usage)
+		let ((),MkCgState absC2 _ ((_, _, _, _,h2), _)) = code info_down (MkCgState AbsCNop bs usage)
+		let ((v, t, f, r, h1), heap_usage) = usage
+		let new_usage = ((v, t, f, r, h1 `max` h2), heap_usage)
 		setState $ MkCgState absC1 bs new_usage
 		return absC2
 \end{code}
@@ -504,24 +487,24 @@ forkEvalHelp body_eob_info env_code body_code =
 		info_down@(MkCgInfoDown cg_info statics srt ticky _) <- getInfoDown
 		state <- getState
 		let info_down_for_body = MkCgInfoDown cg_info statics srt ticky body_eob_info
-		let (_,MkCgState _ binds ((v,f,_,_),_)) = 
+		let (_,MkCgState _ binds ((v,t,f,_,_),_)) = 
 			doFCode env_code info_down_for_body state
 		let state_for_body = MkCgState AbsCNop
 	 		     (nukeVolatileBinds binds)
-			     ((v,f,v,v), (0,0))
+			     ((v,t,f,v,v), (0,0))
 		let (value_returned, state_at_end_return) = 
 			doFCode body_code info_down_for_body state_for_body		
 		setState $ state `stateIncUsageEval` state_at_end_return
 		return (v,value_returned)
 		
 stateIncUsageEval :: CgState -> CgState -> CgState
-stateIncUsageEval (MkCgState absC1 bs ((v,f,r,h1),heap_usage))
-		  (MkCgState absC2 _  ((_,_,_,h2),         _))
+stateIncUsageEval (MkCgState absC1 bs ((v,t,f,r,h1),heap_usage))
+		  (MkCgState absC2 _  ((_,_,_,_,h2),         _))
      = MkCgState (absC1 `mkAbsCStmts` absC2)
 		 -- The AbsC coming back should consist only of nested declarations,
 		 -- notably of the return vector!
 		 bs
-		 ((v,f,r,h1 `max` h2), heap_usage)
+		 ((v,t,f,r,h1 `max` h2), heap_usage)
 	-- We don't max the heap high-watermark because stateIncUsageEval is
 	-- used only in forkEval, which in turn is only used for blocks of code
 	-- which do their own heap-check.

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.12 2002/04/09 11:00:11 njn Exp $
+ * $Id: StgTicky.h,v 1.13 2002/12/11 15:36:39 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -77,10 +77,10 @@
 	ALLOC_BH_gds += (g);	ALLOC_BH_slp += (s);	\
 	TICK_ALLOC_HISTO(BH,_HS,g,s)
 
-#define TICK_ALLOC_UPD_PAP(g,s)					\
-	ALLOC_UPD_PAP_ctr++;  	ALLOC_UPD_PAP_adm += sizeofW(StgPAP)-1; \
-	ALLOC_UPD_PAP_gds += (g); ALLOC_UPD_PAP_slp += (s);	\
-	TICK_ALLOC_HISTO(UPD_PAP,sizeofW(StgPAP)-1,g,s)
+#define TICK_ALLOC_PAP(g,s)					\
+	ALLOC_PAP_ctr++;      ALLOC_PAP_adm += sizeofW(StgPAP)-1; \
+	ALLOC_PAP_gds += (g); ALLOC_PAP_slp += (s);	\
+	TICK_ALLOC_HISTO(PAP,sizeofW(StgPAP)-1,g,s)
 
 #define TICK_ALLOC_TSO(g,s)						\
 	ALLOC_TSO_ctr++;	ALLOC_TSO_adm += sizeofW(StgTSO);	\
@@ -146,7 +146,6 @@ typedef struct _StgEntCounter {
     char   	*str;		/* name of the thing */
     char   	*arg_kinds;	/* info about the args types */
     I_		entry_count;	  /* Trips to fast entry code */
-    I_		slow_entry_count; /* Trips to slow entry code */
     I_          allocs;         /* number of allocations by this fun */
     struct _StgEntCounter *link;/* link to chain them all together */
 } StgEntCounter;
@@ -155,18 +154,7 @@ typedef struct _StgEntCounter {
    static StgEntCounter f_ct			\
 	= { 0, arity, args,			\
 	    str, arg_kinds, 			\
-	    0, 0, 0, NULL };
-
-/* The slow entry point for a function always goes to
-   the fast entry point, which will register the stats block,
-   so no need to do so here */
-#define TICK_ENT_STATIC_FUN_STD(f_ct)                          	\
-        f_ct.slow_entry_count++;                                \
-        ENT_STATIC_FUN_STD_ctr++     /* The static total one */
-
-#define TICK_ENT_DYN_FUN_STD(f_ct)                          	\
-        f_ct.slow_entry_count++;                                \
-        ENT_DYN_FUN_STD_ctr++        /* The dynamic total one */
+	    0, 0, NULL };
 
 #define TICK_ENT_FUN_DIRECT_BODY(f_ct)                          \
 	{							\
@@ -178,7 +166,7 @@ typedef struct _StgEntCounter {
 	    f_ct.registeredp = 1;				\
 	  }							\
 	  f_ct.entry_count += 1;				\
-	}							\
+	}
 
 #define TICK_ENT_STATIC_FUN_DIRECT(f_ct)			\
         TICK_ENT_FUN_DIRECT_BODY(f_ct)                          \
@@ -197,21 +185,30 @@ extern StgEntCounter *ticky_entry_ctrs;
 #define TICK_ENT_DYN_IND(n)	ENT_DYN_IND_ctr++     /* enter dynamic indirection */
 #define TICK_ENT_PERM_IND(n)    ENT_PERM_IND_ctr++    /* enter permanent indirection */
 #define TICK_ENT_PAP(n)		ENT_PAP_ctr++	      /* enter PAP */
-#define TICK_ENT_AP_UPD(n) 	ENT_AP_UPD_ctr++      /* enter AP_UPD */
+#define TICK_ENT_AP(n) 	        ENT_AP_ctr++          /* enter AP_UPD */
+#define TICK_ENT_AP_STACK(n)    ENT_AP_STACK_ctr++    /* enter AP_STACK_UPD */
 #define TICK_ENT_BH()		ENT_BH_ctr++          /* enter BLACKHOLE */
 
+
+#define TICK_SLOW_HISTO(n)				\
+ { unsigned __idx;					\
+   __idx = (n);						\
+   SLOW_CALL_hst[((__idx > 8) ? 8 : __idx)] += 1;	\
+ }
+
+// A slow call with n arguments
+#define TICK_SLOW_CALL(n)       SLOW_CALL_ctr++; \
+                                TICK_SLOW_HISTO(n)
+
+// A slow call to a FUN found insufficient arguments, and built a PAP
+#define TICK_SLOW_CALL_BUILT_PAP(n) SLOW_CALL_BUILT_PAP_ctr++
+
+// A slow call to a PAP found insufficient arguments, and build a new PAP
+#define TICK_SLOW_CALL_NEW_PAP(n)   SLOW_CALL_NEW_PAP_ctr++
 
 /* -----------------------------------------------------------------------------
    Returns
    -------------------------------------------------------------------------- */
-
-/* Whenever a ``return'' occurs, it is returning the constituent parts of
- * a data constructor.  The parts can be returned either in registers, or
- * by allocating some heap to put it in (the TICK_ALLOC_* macros account for
- * the allocation).  The constructor can either be an existing one
- * *OLD* or we could have {\em just} figured out this stuff
- * *NEW*.
- */
 
 #define TICK_RET_HISTO(categ,n)					\
 	{ I_ __idx;						\
@@ -227,18 +224,6 @@ extern StgEntCounter *ticky_entry_ctrs;
 #define TICK_RET_UNBOXED_TUP(n)  RET_UNBOXED_TUP_ctr++; \
                          TICK_RET_HISTO(UNBOXED_TUP,n)
 
-#define TICK_RET_SEMI(n) RET_SEMI_IN_HEAP_ctr++; \
-			 TICK_RET_HISTO(SEMI_IN_HEAP,n)
-
-#define TICK_RET_SEMI_BY_DEFAULT()/*???*/ RET_SEMI_BY_DEFAULT_ctr++
-
-#define TICK_RET_SEMI_FAILED(tag)	do {				\
-				if ((tag) == INFO_IND_TAG)		\
-				    RET_SEMI_FAILED_IND_ctr++;		\
-				else					\
-				    RET_SEMI_FAILED_UNEVAL_ctr++;	\
-				} while (0)
-
 #define TICK_VEC_RETURN(n)	VEC_RETURN_ctr++;	    \
 				TICK_RET_HISTO(VEC_RETURN,n)
 
@@ -248,7 +233,6 @@ extern StgEntCounter *ticky_entry_ctrs;
    Macro			   Counts
    ------------------              -------------------------------------------
    TICK_UPDF_PUSHED	 	   Update frame pushed
-   TICK_SEQF_PUSHED	 	   Seq frame pushed
    TICK_CATCHF_PUSHED	 	   Catch frame pushed
    TICK_UPDF_OMITTED		   A thunk decided not to push an update frame
    TICK_UPDF_RCC_PUSHED		   Cost Centre restore frame pushed
@@ -259,7 +243,6 @@ extern StgEntCounter *ticky_entry_ctrs;
 #define TICK_UPDF_OMITTED()	UPDF_OMITTED_ctr++
 #define TICK_UPDF_PUSHED(tgt,inf)	UPDF_PUSHED_ctr++ \
 /*                              ; fprintf(stderr,"UPDF_PUSHED:%p:%p\n",tgt,inf) */
-#define TICK_SEQF_PUSHED()      SEQF_PUSHED_ctr++
 #define TICK_CATCHF_PUSHED()    CATCHF_PUSHED_ctr++
 #define TICK_UPDF_RCC_PUSHED()	UPDF_RCC_PUSHED_ctr++
 #define TICK_UPDF_RCC_OMITTED()	UPDF_RCC_OMITTED_ctr++
@@ -423,11 +406,11 @@ EXTERN unsigned long ALLOC_PRIM_hst[5]
 #endif
 ;
 
-EXTERN unsigned long ALLOC_UPD_PAP_ctr INIT(0);
-EXTERN unsigned long ALLOC_UPD_PAP_adm INIT(0);
-EXTERN unsigned long ALLOC_UPD_PAP_gds INIT(0);
-EXTERN unsigned long ALLOC_UPD_PAP_slp INIT(0);
-EXTERN unsigned long ALLOC_UPD_PAP_hst[5]
+EXTERN unsigned long ALLOC_PAP_ctr INIT(0);
+EXTERN unsigned long ALLOC_PAP_adm INIT(0);
+EXTERN unsigned long ALLOC_PAP_gds INIT(0);
+EXTERN unsigned long ALLOC_PAP_slp INIT(0);
+EXTERN unsigned long ALLOC_PAP_hst[5]
 #ifdef TICKY_C
    = {0,0,0,0,0}
 #endif
@@ -473,13 +456,11 @@ EXTERN unsigned long ALLOC_BF_hst[5]
    = {0,0,0,0,0}
 #endif
 ;
-#endif
+#endif // PAR
 
 EXTERN unsigned long ENT_VIA_NODE_ctr INIT(0);
 EXTERN unsigned long ENT_STATIC_THK_ctr INIT(0);
 EXTERN unsigned long ENT_DYN_THK_ctr INIT(0);
-EXTERN unsigned long ENT_STATIC_FUN_STD_ctr INIT(0);
-EXTERN unsigned long ENT_DYN_FUN_STD_ctr INIT(0);
 EXTERN unsigned long ENT_STATIC_FUN_DIRECT_ctr INIT(0);
 EXTERN unsigned long ENT_DYN_FUN_DIRECT_ctr INIT(0);
 EXTERN unsigned long ENT_STATIC_CON_ctr INIT(0);
@@ -488,16 +469,23 @@ EXTERN unsigned long ENT_STATIC_IND_ctr INIT(0);
 EXTERN unsigned long ENT_DYN_IND_ctr INIT(0);
 EXTERN unsigned long ENT_PERM_IND_ctr INIT(0);
 EXTERN unsigned long ENT_PAP_ctr INIT(0);
-EXTERN unsigned long ENT_AP_UPD_ctr INIT(0);
+EXTERN unsigned long ENT_AP_ctr INIT(0);
+EXTERN unsigned long ENT_AP_STACK_ctr INIT(0);
 EXTERN unsigned long ENT_BH_ctr INIT(0);
+
+EXTERN unsigned long SLOW_CALL_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_BUILT_PAP_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_NEW_PAP_ctr INIT(0);
+
+EXTERN unsigned long SLOW_CALL_hst[8]
+#ifdef TICKY_C
+   = {0,0,0,0,0,0,0,0}
+#endif
+;
 
 EXTERN unsigned long RET_NEW_ctr INIT(0);
 EXTERN unsigned long RET_OLD_ctr INIT(0);
 EXTERN unsigned long RET_UNBOXED_TUP_ctr INIT(0);
-EXTERN unsigned long RET_SEMI_BY_DEFAULT_ctr INIT(0);
-EXTERN unsigned long RET_SEMI_IN_HEAP_ctr INIT(0);
-EXTERN unsigned long RET_SEMI_FAILED_IND_ctr INIT(0);
-EXTERN unsigned long RET_SEMI_FAILED_UNEVAL_ctr INIT(0);
 
 EXTERN unsigned long VEC_RETURN_ctr INIT(0);
 
@@ -531,7 +519,6 @@ EXTERN unsigned long RET_SEMI_loads_avoided INIT(0);
 
 EXTERN unsigned long UPDF_OMITTED_ctr INIT(0);
 EXTERN unsigned long UPDF_PUSHED_ctr INIT(0);
-EXTERN unsigned long SEQF_PUSHED_ctr INIT(0);
 EXTERN unsigned long CATCHF_PUSHED_ctr INIT(0);
 EXTERN unsigned long UPDF_RCC_PUSHED_ctr INIT(0);
 EXTERN unsigned long UPDF_RCC_OMITTED_ctr INIT(0);
@@ -594,7 +581,7 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 #define TICK_ALLOC_CON(g,s)
 #define TICK_ALLOC_TUP(g,s)
 #define TICK_ALLOC_BH(g,s)
-#define TICK_ALLOC_UPD_PAP(g,s)
+#define TICK_ALLOC_PAP(g,s)
 #define TICK_ALLOC_TSO(g,s)
 #define TICK_ALLOC_FMBQ(a,g,s)
 #define TICK_ALLOC_FME(a,g,s)
@@ -606,19 +593,21 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 				
 #define TICK_ENT_STATIC_THK()
 #define TICK_ENT_DYN_THK()
-#define TICK_ENT_STATIC_FUN_STD(n)
-#define TICK_ENT_DYN_FUN_STD(n)
 #define TICK_ENT_STATIC_FUN_DIRECT(n)
 #define TICK_ENT_DYN_FUN_DIRECT(n)
-				
 #define TICK_ENT_STATIC_CON(n)
 #define TICK_ENT_DYN_CON(n)
 #define TICK_ENT_STATIC_IND(n)
 #define TICK_ENT_DYN_IND(n)
 #define TICK_ENT_PERM_IND(n)
 #define TICK_ENT_PAP(n)
-#define TICK_ENT_AP_UPD(n)
+#define TICK_ENT_AP(n)
+#define TICK_ENT_AP_STACK(n)
 #define TICK_ENT_BH()
+
+#define TICK_SLOW_CALL(n)
+#define TICK_SLOW_CALL_BUILT_PAP(n)
+#define TICK_SLOW_CALL_NEW_PAP(n)
 
 #define TICK_RET_NEW(n)
 #define TICK_RET_OLD(n)
@@ -630,7 +619,6 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 
 #define TICK_UPDF_OMITTED()
 #define TICK_UPDF_PUSHED(tgt,inf)
-#define TICK_SEQF_PUSHED()
 #define TICK_CATCHF_PUSHED()
 #define TICK_UPDF_RCC_PUSHED()
 #define TICK_UPDF_RCC_OMITTED()

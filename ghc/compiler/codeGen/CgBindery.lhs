@@ -23,7 +23,7 @@ module CgBindery (
 	getCAddrModeAndInfo, getCAddrMode,
 	getCAddrModeIfVolatile, getVolatileRegs,
 
-	buildLivenessMask, buildContLivenessMask
+	buildContLivenessMask
     ) where
 
 #include "HsVersions.h"
@@ -32,7 +32,7 @@ import AbsCSyn
 import CgMonad
 
 import CgUsages		( getHpRelOffset, getSpRelOffset, getRealSp )
-import CgStackery	( freeStackSlots )
+import CgStackery	( freeStackSlots, getStackFrame )
 import CLabel		( mkClosureLabel,
 			  mkBitmapLabel, pprCLabel )
 import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
@@ -44,7 +44,7 @@ import VarEnv
 import VarSet		( varSetElems )
 import Literal		( Literal )
 import Maybes		( catMaybes, maybeToBool, seqMaybe )
-import Name		( isInternalName, NamedThing(..) )
+import Name		( Name, isInternalName, NamedThing(..) )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
@@ -85,7 +85,7 @@ data VolatileLoc
   | TempVarLoc	Unique
 
   | RegLoc	MagicId			-- in one of the magic registers
-					-- (probably {Int,Float,Char,etc}Reg
+					-- (probably {Int,Float,Char,etc}Reg)
 
   | VirHpLoc	VirtualHeapOffset	-- Hp+offset (address of closure)
 
@@ -361,7 +361,7 @@ bindNewToStack :: (Id, VirtualSpOffset) -> Code
 bindNewToStack (name, offset)
   = addBindC name info
   where
-    info = MkCgIdInfo name NoVolatileLoc (VirStkLoc offset) mkLFArgument
+    info = MkCgIdInfo name NoVolatileLoc (VirStkLoc offset) (mkLFArgument name)
 
 bindNewToNode :: Id -> VirtualHeapOffset -> LambdaFormInfo -> Code
 bindNewToNode name offset lf_info
@@ -374,7 +374,7 @@ bindNewToNode name offset lf_info
 -- temporary.
 bindNewToTemp :: Id -> FCode CAddrMode
 bindNewToTemp name
-  = let (temp_amode, id_info) = newTempAmodeAndIdInfo name mkLFArgument
+  = let (temp_amode, id_info) = newTempAmodeAndIdInfo name (mkLFArgument name)
 		-- This is used only for things we don't know
 		-- anything about; values returned by a case statement,
 		-- for example.
@@ -392,7 +392,7 @@ bindArgsToRegs :: [Id] -> [MagicId] -> Code
 bindArgsToRegs args regs
   = listCs (zipWithEqual "bindArgsToRegs" bind args regs)
   where
-    arg `bind` reg = bindNewToReg arg reg mkLFArgument
+    arg `bind` reg = bindNewToReg arg reg (mkLFArgument arg)
 \end{code}
 
 @bindNewPrimToAmode@ works only for certain addressing modes.  Making
@@ -449,43 +449,41 @@ pointer has its own bitmap to describe the update frame).
 
 \begin{code}
 buildLivenessMask 
-	:: Unique		-- unique for for large bitmap label
-	-> VirtualSpOffset	-- offset from which the bitmap should start
-	-> FCode Liveness	-- mask for free/unlifted slots
+	:: VirtualSpOffset	-- offset from which the bitmap should start
+	-> FCode LivenessMask	-- mask for free/unlifted slots
 
-buildLivenessMask uniq sp = do	
+buildLivenessMask sp = do {
 
-	-- find all unboxed stack-resident ids
-	binds <- getBinds
-	((vsp, free, _, _), heap_usage) <- getUsage
-	
-	let unboxed_slots = 
-		[ (ofs, size) | 
-		(MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
-		let rep = idPrimRep id; size = getPrimRepSize rep,
-		not (isFollowableRep rep),
-		size > 0
-		]	
-		
-	-- flatten this list into a list of unboxed stack slots
-	let flatten_slots = sortLt (<) 
-		(foldr (\(ofs,size) r -> [ofs-size+1 .. ofs] ++ r) []
-		      unboxed_slots)
+    -- find all unboxed stack-resident ids
+    binds <- getBinds;
+    ((vsp, _, free, _, _), heap_usage) <- getUsage;
+    
+    let { 
+	unboxed_slots = 
+    	    [ (ofs, size) | 
+    	    (MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
+    	    let rep = idPrimRep id; size = getPrimRepSize rep,
+    	    not (isFollowableRep rep),
+    	    size > 0
+    	    ];
+      
+    -- flatten this list into a list of unboxed stack slots
+        flatten_slots = sortLt (<) 
+    	    (foldr (\(ofs,size) r -> [ofs-size+1 .. ofs] ++ r) []
+    		  unboxed_slots);
+    
+    -- merge in the free slots
+	all_slots = mergeSlots flatten_slots (map fst free) ++ 
+		    if vsp < sp then [vsp+1 .. sp] else [];
 
-	-- merge in the free slots
-	let all_slots = mergeSlots flatten_slots (map fst free) ++ 
-		    if vsp < sp then [vsp+1 .. sp] else []
+    -- recalibrate the list to be sp-relative
+	rel_slots = reverse (map (sp-) all_slots);
+    };
 
-        -- recalibrate the list to be sp-relative
-	let rel_slots = reverse (map (sp-) all_slots)
+    ASSERT(all (>=0) rel_slots && rel_slots == sortLt (<) rel_slots)
+     return (listToLivenessMask rel_slots)
+  }
 
-	-- build the bitmap
-	let liveness_mask 
-               = ASSERT(all (>=0) rel_slots 
-                        && rel_slots == sortLt (<) rel_slots) 
-                 (listToLivenessMask rel_slots)
-	
-	livenessToAbsC uniq liveness_mask
 
 mergeSlots :: [Int] -> [Int] -> [Int]
 mergeSlots cs [] = cs
@@ -503,24 +501,27 @@ listToLivenessMask []    = []
 listToLivenessMask slots = 
    mkBS this : listToLivenessMask (map (\x -> x-32) rest)
    where (this,rest) = span (<32) slots
-
-livenessToAbsC :: Unique -> LivenessMask -> FCode Liveness
-livenessToAbsC uniq mask  =
-        absC (CBitmap lbl mask) `thenC`
-        returnFC (Liveness lbl mask)
-  where lbl = mkBitmapLabel uniq       
 \end{code}
 
 In a continuation, we want a liveness mask that starts from just after
 the return address, which is on the stack at realSp.
 
 \begin{code}
-buildContLivenessMask
-	:: Unique
-	-> FCode Liveness
-buildContLivenessMask uniq = do
+buildContLivenessMask :: Name -> FCode Liveness
+buildContLivenessMask name = do
 	realSp <- getRealSp
-	buildLivenessMask uniq (realSp-1)
+	mask <- buildLivenessMask (realSp-1)
+
+        let lbl = mkBitmapLabel name
+
+	-- realSp points to the frame-header for the current stack frame,
+	-- and the end of this frame is frame_sp.  The size is therefore
+	-- realSp - frame_sp - 1 (subtract one for the frame-header).
+	frame_sp <- getStackFrame
+	let liveness = Liveness lbl (realSp-1-frame_sp) mask
+
+	absC (CBitmap liveness)
+	return liveness
 \end{code}
 
 %************************************************************************

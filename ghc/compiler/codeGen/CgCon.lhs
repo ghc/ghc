@@ -26,25 +26,22 @@ import CgBindery	( getArgAmodes, bindNewToNode,
 			  idInfoToAmode, stableAmodeIdInfo,
 			  heapIdInfo, CgIdInfo, bindNewToStack
 			)
-import CgStackery	( mkTaggedVirtStkOffsets, freeStackSlots, 
-			  updateFrameSize
-			)
+import CgStackery	( mkVirtStkOffsets, freeStackSlots, updateFrameSize )
 import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp,
 			  getSpRelOffset )
 import CgRetConv	( assignRegs )
 import Constants	( mAX_INTLIKE, mIN_INTLIKE, mAX_CHARLIKE, mIN_CHARLIKE,
 			  mIN_UPD_SIZE )
 import CgHeapery	( allocDynClosure, inPlaceAllocDynClosure )
-import CgTailCall	( performReturn, mkStaticAlgReturnCode, doTailCall,
-			  mkUnboxedTupleReturnCode )
+import CgTailCall	( performReturn, mkStaticAlgReturnCode,
+			  returnUnboxedTuple )
 import CLabel		( mkClosureLabel )
-import ClosureInfo	( mkConLFInfo, mkLFArgument, closureLFInfo,
-			  layOutDynConstr, layOutDynClosure,
+import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynConstr, 
 			  layOutStaticConstr, closureSize, mkStaticClosure
 			)
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
-import DataCon		( DataCon, dataConName, dataConTag, 
+import DataCon		( DataCon, dataConTag, 
 			  isUnboxedTupleCon, isNullaryDataCon, dataConWorkId, 
 			  dataConWrapId, dataConRepArity
 			)
@@ -55,6 +52,8 @@ import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Uniquable(..) )
 import Util
 import Outputable
+
+import List		( partition )
 \end{code}
 
 %************************************************************************
@@ -78,14 +77,15 @@ cgTopRhsCon id con args srt
 
     let
 	name          = idName id
-	lf_info	      = closureLFInfo closure_info
+	lf_info	      = mkConLFInfo con
     	closure_label = mkClosureLabel name
 	(closure_info, amodes_w_offsets) 
-		= layOutStaticConstr name con getAmodeRep amodes
+		= layOutStaticConstr con getAmodeRep amodes
     in
 
 	-- BUILD THE OBJECT
     absC (mkStaticClosure
+	    closure_label
 	    closure_info
 	    dontCareCCS			-- because it's static data
 	    (map fst amodes_w_offsets)  -- Sorted into ptrs first, then nonptrs
@@ -186,9 +186,9 @@ buildDynCon binder ccs con args
   = allocDynClosure closure_info use_cc blame_cc amodes_w_offsets `thenFC` \ hp_off ->
     returnFC (heapIdInfo binder hp_off lf_info)
   where
-    (closure_info, amodes_w_offsets)
-      = layOutDynClosure (idName binder) getAmodeRep args lf_info NoC_SRT
     lf_info = mkConLFInfo con
+
+    (closure_info, amodes_w_offsets) = layOutDynConstr con getAmodeRep args
 
     use_cc	-- cost-centre to stick in the object
       = if currentOrSubsumedCCS ccs
@@ -220,10 +220,8 @@ bindConArgs con args
   = ASSERT(not (isUnboxedTupleCon con))
     mapCs bind_arg args_w_offsets
    where
-     bind_arg (arg, offset) = bindNewToNode arg offset mkLFArgument
-     (_, args_w_offsets)    = layOutDynConstr bogus_name con idPrimRep args
-
-bogus_name = panic "bindConArgs"
+     bind_arg (arg, offset) = bindNewToNode arg offset (mkLFArgument arg)
+     (_, args_w_offsets)    = layOutDynConstr con idPrimRep args
 \end{code}
 
 Unboxed tuples are handled slightly differently - the object is
@@ -231,33 +229,44 @@ returned in registers and on the stack instead of the heap.
 
 \begin{code}
 bindUnboxedTupleComponents
-	:: [Id]					-- args
-	-> FCode ([MagicId], 			-- regs assigned
-		  [(VirtualSpOffset,Int)], 	-- tag slots
-		  Bool)				-- any components on stack?
+	:: [Id]				-- args
+	-> FCode ([MagicId], 		-- regs assigned
+		  Int,			-- number of pointer stack slots
+		  Int,			-- number of non-pointer stack slots
+		  Bool)			-- any components on stack?
 
 bindUnboxedTupleComponents args
  =  -- Assign as many components as possible to registers
     let (arg_regs, _leftovers) = assignRegs [] (map idPrimRep args)
 	(reg_args, stk_args)   = splitAtList arg_regs args
-    in
 
-    -- Allocate the rest on the stack (ToDo: separate out pointers)
+	-- separate the rest of the args into pointers and non-pointers
+	( ptr_args, nptr_args ) = 
+	   partition (isFollowableRep . idPrimRep) stk_args
+    in
+  
+    -- Allocate the rest on the stack
     getVirtSp `thenFC` \ vsp ->
     getRealSp `thenFC` \ rsp ->
-    let (top_sp, stk_offsets, tags) = 
-		mkTaggedVirtStkOffsets rsp idPrimRep stk_args
+    let 
+	(ptr_sp,  ptr_offsets)  = mkVirtStkOffsets rsp    idPrimRep ptr_args
+	(nptr_sp, nptr_offsets) = mkVirtStkOffsets ptr_sp idPrimRep nptr_args
     in
 
     -- The stack pointer points to the last stack-allocated component
-    setRealAndVirtualSp top_sp  		`thenC`
+    setRealAndVirtualSp nptr_sp  		`thenC`
 
     -- need to explicitly free any empty slots we just jumped over
     (if vsp < rsp then freeStackSlots [vsp+1 .. rsp] else nopC) `thenC`
 
     bindArgsToRegs reg_args arg_regs 		`thenC`
-    mapCs bindNewToStack stk_offsets 		`thenC`
-    returnFC (arg_regs,tags, notNull stk_offsets)
+    mapCs bindNewToStack ptr_offsets 		`thenC`
+    mapCs bindNewToStack nptr_offsets 		`thenC`
+
+    returnFC (arg_regs, 
+	      ptr_sp - rsp, nptr_sp - ptr_sp, 
+	      notNull ptr_offsets || notNull ptr_offsets
+	     )
 \end{code}
 
 %************************************************************************
@@ -278,7 +287,7 @@ cgReturnDataCon con amodes
 
     case sequel of
 
-      CaseAlts _ (Just (alts, Just (maybe_deflt, (_,deflt_lbl))))
+      CaseAlts _ (Just (alts, Just (maybe_deflt, (_,deflt_lbl)))) False
 	| not (dataConTag con `is_elem` map fst alts)
 	->
 		-- Special case!  We're returning a constructor to the default case
@@ -328,9 +337,6 @@ cgReturnDataCon con amodes
 	   inPlaceAllocDynClosure closure_info temp (CReg CurCostCentre) stuff 
 		`thenC`
 
-		-- don't forget to update Su from the update frame
-	   absC (CMacroStmt UPDATE_SU_FROM_UPD_FRAME [CAddr sp_rel])  `thenC`
-
 		-- set Node to point to the closure being returned
 		-- (can't be done earlier: node might conflict with amodes)
 	   absC (CAssign (CReg node) temp) `thenC`
@@ -342,28 +348,11 @@ cgReturnDataCon con amodes
 	   performReturn (AbsCNop) (mkStaticAlgReturnCode con)
 
 	where
-	   (closure_info, stuff) 
-		  = layOutDynConstr (dataConName con) con getAmodeRep amodes
+	   (closure_info, stuff) = layOutDynConstr con getAmodeRep amodes
 
       other_sequel	-- The usual case
-
-	  | isUnboxedTupleCon con ->
-			-- Return unboxed tuple in registers
-		  let (ret_regs, leftovers) = 
-			 assignRegs [] (map getAmodeRep amodes)
-		  in
-		  profCtrC FSLIT("TICK_RET_UNBOXED_TUP") 
-				[mkIntCLit (length amodes)] `thenC`
-
-		  doTailCall amodes ret_regs 
-			mkUnboxedTupleReturnCode
-			(length leftovers)  {- fast args arity -}
-			AbsCNop {-no pending assigments-}
-			Nothing {-not a let-no-escape-}
-			False   {-node doesn't point-}
-		
-          | otherwise ->
-		build_it_then (mkStaticAlgReturnCode con)
+	  | isUnboxedTupleCon con -> returnUnboxedTuple amodes
+          | otherwise ->	     build_it_then (mkStaticAlgReturnCode con)
 
   where
     move_to_reg :: CAddrMode -> MagicId -> AbstractC

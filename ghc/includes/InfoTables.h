@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.27 2002/05/14 08:15:49 matthewc Exp $
+ * $Id: InfoTables.h,v 1.28 2002/12/11 15:36:37 simonmar Exp $
  * 
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2002
  *
  * Info Tables
  *
@@ -159,61 +159,71 @@ extern StgWord16 closure_flags[];
 #define ip_IND(ip)          	 (  ipFlags(ip) & _IND)
 
 /* -----------------------------------------------------------------------------
-   Info Tables
+   Bitmaps
+
+   These are used to describe the pointerhood of a sequence of words
+   (usually on the stack) to the garbage collector.  The two primary
+   uses are for stack frames, and functions (where we need to describe
+   the layout of a PAP to the GC).
    -------------------------------------------------------------------------- */
 
-/* A large bitmap.  Small 32-bit ones live in the info table, but sometimes
- * 32 bits isn't enough and we have to generate a larger one.  (sizes
- * differ for 64-bit machines.
- */
+//
+// Small bitmaps:  for a small bitmap, we store the size and bitmap in 
+// the same word, using the following macros.  If the bitmap doesn't
+// fit in a single word, we use a pointer to an StgLargeBitmap below.
+// 
+#define MK_SMALL_BITMAP(size,bits) (((bits)<<BITMAP_BITS_SHIFT) | (size))
 
+#define BITMAP_SIZE(bitmap) ((bitmap) & BITMAP_SIZE_MASK)
+#define BITMAP_BITS(bitmap) ((bitmap) >> BITMAP_BITS_SHIFT)
+
+//
+// A large bitmap.
+//
 typedef struct {
   StgWord size;
   StgWord bitmap[FLEXIBLE_ARRAY];
 } StgLargeBitmap;
 
-/*
- * Stuff describing the closure layout.  Well, actually, it might
- * contain the selector index for a THUNK_SELECTOR.  If we're on a
- * 64-bit architecture then we can enlarge some of these fields, since
- * the union contains a pointer field.
- */
+/* ----------------------------------------------------------------------------
+   Info Tables
+   ------------------------------------------------------------------------- */
 
+//
+// Stuff describing the closure layout.  Well, actually, it might
+// contain the selector index for a THUNK_SELECTOR.  This union is one
+// word long.
+//
 typedef union {
-  struct {
-#if SIZEOF_VOID_P == 8
-    StgWord32 ptrs;		/* number of pointers     */
-    StgWord32 nptrs;		/* number of non-pointers */
-#else
-    StgWord16 ptrs;		/* number of pointers     */
-    StgWord16 nptrs;		/* number of non-pointers */
-#endif
-  } payload;
+    struct {			// Heap closure payload layout:
+	StgHalfWord ptrs;	// number of pointers
+	StgHalfWord nptrs;	// number of non-pointers
+    } payload;
+    
+    StgWord bitmap;		  // word-sized bit pattern describing
+				  //  a stack frame: see below
 
-  StgWord bitmap;		/* bit pattern, 1 = pointer, 0 = non-pointer */
-  StgWord selector_offset;	/* used in THUNK_SELECTORs */
-  StgLargeBitmap* large_bitmap;	/* pointer to large bitmap structure */
-  
+    StgLargeBitmap* large_bitmap; // pointer to large bitmap structure
+    
+    StgWord selector_offset;	  // used in THUNK_SELECTORs
+
 } StgClosureInfo;
 
-/*
- * Info tables.  All info tables are the same type, to simplify code
- * generation.  However, the mangler removes any unused SRT fields
- * from the asm to save space (convention: if srt_len is zero, or the
- * type is a CONSTR_ type, then the SRT field isn't present.
- */
 
+//
+// An SRT.
+//
 typedef StgClosure* StgSRT[];
 
-/*
- * The entry code pointer must be the first word of an info table.
- * See the comment in ghc/rts/Storage.h (Plan C) for details.
- */
+//
+// The "standard" part of an info table.  Every info table has this bit.
+//
 typedef struct _StgInfoTable {
+
 #ifndef TABLES_NEXT_TO_CODE
-    StgFunPtr       entry;
+    StgFunPtr       entry;	// pointer to the entry code
 #endif
-    StgSRT         *srt;	/* pointer to the SRT table */
+
 #if defined(PAR) || defined(GRAN)
     struct _StgInfoTable    *rbh_infoptr;
 #endif
@@ -226,34 +236,86 @@ typedef struct _StgInfoTable {
 #ifdef DEBUG_CLOSURE
     StgDebugInfo    debug;
 #endif
-    StgClosureInfo  layout;	/* closure layout info (pointer-sized) */
-#if SIZEOF_VOID_P == 8
-    StgWord32       type;	/* } These 2 elements fit into 64 bits */
-    StgWord32       srt_len;    /* }                                   */
-#else
-    StgWord         type : 16;	/* } These 2 elements fit into 32 bits */
-    StgWord         srt_len : 16; /* }                                   */
-#endif
+
+    StgClosureInfo  layout;	// closure layout info (one word)
+
+    StgHalfWord     type;	// closure type
+    StgHalfWord     srt_len;    // number of entries in SRT (or constructor tag)
+
 #ifdef TABLES_NEXT_TO_CODE
     StgCode         code[FLEXIBLE_ARRAY];
-#else
-    StgFunPtr       vector[FLEXIBLE_ARRAY];
 #endif
 } StgInfoTable;
 
-/* Info tables are read-only, therefore we uniformly declare them with
- * C's const attribute.  This isn't just a nice thing to do: it's
- * necessary because the garbage collector has to distinguish between 
- * closure pointers and info table pointers when traversing the
- * stack.  We distinguish the two by checking whether the pointer is
- * into text-space or not.
- */
 
-#if ia64_TARGET_ARCH
-/* We need to give the compiler a gentle hint to put it in text-space */
-#define INFO_TBL_CONST  const __attribute__((section (".text")))
+/* -----------------------------------------------------------------------------
+   Function info tables
+
+   This is the general form of function info tables.  The compiler
+   will omit some of the fields in common cases:
+
+   -  If fun_type is not ARG_GEN or ARG_GEN_BIG, then the slow_apply
+      and bitmap fields may be left out (they are at the end, so omitting
+      them doesn't affect the layout).
+      
+   -  If srt_len (in the std info table part) is zero, then the srt
+      field may be omitted.  This only applies if the slow_apply and
+      bitmap fields have also been omitted.
+   -------------------------------------------------------------------------- */
+
+typedef struct _StgFunInfoTable {
+#if defined(TABLES_NEXT_TO_CODE)
+    StgFun         *slow_apply; // apply to args on the stack
+    StgWord        bitmap;	// arg ptr/nonptr bitmap
+    StgSRT         *srt;	// pointer to the SRT table
+    StgHalfWord    fun_type;    // function type
+    StgHalfWord    arity;       // function arity
+    StgInfoTable i;
 #else
-#define INFO_TBL_CONST  const
+    StgInfoTable i;
+    StgHalfWord    fun_type;    // function type
+    StgHalfWord    arity;       // function arity
+    StgSRT         *srt;	// pointer to the SRT table
+    StgWord        bitmap;	// arg ptr/nonptr bitmap
+    StgFun         *slow_apply; // apply to args on the stack
 #endif
+} StgFunInfoTable;
+
+/* -----------------------------------------------------------------------------
+   Return info tables
+   -------------------------------------------------------------------------- */
+
+// When info tables are laid out backwards, we can omit the SRT
+// pointer iff srt_len is zero.
+
+typedef struct _StgRetInfoTable {
+#if !defined(TABLES_NEXT_TO_CODE)
+    StgInfoTable i;
+#endif
+    StgSRT         *srt;	// pointer to the SRT table
+#if defined(TABLES_NEXT_TO_CODE)
+    StgInfoTable i;
+#endif
+#if !defined(TABLES_NEXT_TO_CODE)
+    StgFunPtr vector[FLEXIBLE_ARRAY];
+#endif
+} StgRetInfoTable;
+
+/* -----------------------------------------------------------------------------
+   Thunk info tables
+   -------------------------------------------------------------------------- */
+
+// When info tables are laid out backwards, we can omit the SRT
+// pointer iff srt_len is zero.
+
+typedef struct _StgThunkInfoTable {
+#if !defined(TABLES_NEXT_TO_CODE)
+    StgInfoTable i;
+#endif
+    StgSRT         *srt;	// pointer to the SRT table
+#if defined(TABLES_NEXT_TO_CODE)
+    StgInfoTable i;
+#endif
+} StgThunkInfoTable;
 
 #endif /* INFOTABLES_H */

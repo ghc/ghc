@@ -27,22 +27,17 @@ module Linker ( HValue, initLinker, showLinkerState,
 import ObjLink		( loadDLL, loadObj, unloadObj, resolveObjs, initLinker )
 import ByteCodeLink	( HValue, ClosureEnv, extendClosureEnv, linkBCO )
 import ByteCodeItbls	( ItblEnv )
-import ByteCodeAsm	( CompiledByteCode(..), bcosFreeNames,
-			  UnlinkedBCO, UnlinkedBCOExpr, nameOfUnlinkedBCO )
+import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
-import Packages		( PackageConfig(..), PackageName, PackageConfigMap, lookupPkg,
-			  packageDependents, packageNameString )
-import DriverState	( v_Library_paths, v_Cmdline_libraries, getPackageConfigMap )
+import Packages
+import DriverState	( v_Library_paths, v_Cmdline_libraries, 
+			  getPackageConfigMap )
 import Finder		( findModule, findLinkable )
-import HscTypes		( Linkable(..), isObjectLinkable, nameOfObject, byteCodeOfObject,
-			  Unlinked(..), isInterpretable, isObject, Dependencies(..),
-			  HscEnv(..), PersistentCompilerState(..), ExternalPackageState(..),
-			  HomePackageTable, PackageIfaceTable, ModIface(..), HomeModInfo(..),
-			  lookupIface )
+import HscTypes
 import Name		( Name,  nameModule, isExternalName )
 import NameEnv
 import NameSet		( nameSetToList )
-import Module		( ModLocation(..), Module, ModuleName, isHomeModule, moduleName, lookupModuleEnvByName )
+import Module
 import FastString	( FastString(..), unpackFS )
 import ListSetOps	( minusList )
 import CmdLineOpts	( DynFlags(verbosity) )
@@ -50,7 +45,6 @@ import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import Panic            ( GhcException(..) )
 import Util             ( zipLazy, global )
-import ErrUtils		( Message )
 
 -- Standard libraries
 import Control.Monad	( when, filterM, foldM )
@@ -59,7 +53,7 @@ import Data.IORef	( IORef, readIORef, writeIORef )
 import Data.List	( partition, nub )
 
 import System.IO	( putStr, putStrLn, hPutStrLn, stderr, fixIO )
-import System.Directory	( doesFileExist, getModificationTime )
+import System.Directory	( doesFileExist )
 
 import Control.Exception ( block, throwDyn )
 
@@ -169,7 +163,7 @@ showLinkerState
 
 \begin{code}
 linkExpr :: HscEnv -> PersistentCompilerState
-	 -> UnlinkedBCOExpr -> IO HValue 	  -- IO BCO# really
+	 -> UnlinkedBCO -> IO HValue
 
 -- Link a single expression, *including* first linking packages and 
 -- modules that this expression depends on.
@@ -177,7 +171,7 @@ linkExpr :: HscEnv -> PersistentCompilerState
 -- Raises an IO exception if it can't find a compiled version of the
 -- dependents to link.
 
-linkExpr hsc_env pcs (root_ul_bco, aux_ul_bcos)
+linkExpr hsc_env pcs root_ul_bco
   = do {  
 	-- Find what packages and linkables are required
      (lnks, pkgs) <- getLinkDeps hpt pit needed_mods ;
@@ -195,16 +189,15 @@ linkExpr hsc_env pcs (root_ul_bco, aux_ul_bcos)
 	 ce = closure_env pls
 
 	-- Link the necessary packages and linkables
-   ; (_, (root_hval:_)) <- linkSomeBCOs False ie ce all_bcos
+   ; (_, (root_hval:_)) <- linkSomeBCOs False ie ce [root_ul_bco]
    ; return root_hval
    }}
    where
      pit    = eps_PIT (pcs_EPS pcs)
      hpt    = hsc_HPT hsc_env
      dflags = hsc_dflags hsc_env
-     all_bcos   = root_ul_bco : aux_ul_bcos
-     free_names = nameSetToList (bcosFreeNames all_bcos)
-  
+     free_names = nameSetToList (bcoFreeNames root_ul_bco)
+
      needed_mods :: [Module]
      needed_mods = [ nameModule n | n <- free_names, isExternalName n ]
  
@@ -490,7 +483,7 @@ linkSomeBCOs :: Bool 	-- False <=> add _all_ BCOs to returned closure env
 					
 
 linkSomeBCOs toplevs_only ie ce_in ul_bcos
-   = do let nms = map nameOfUnlinkedBCO ul_bcos
+   = do let nms = map unlinkedBCOName ul_bcos
         hvals <- fixIO 
                     ( \ hvs -> let ce_out = extendClosureEnv ce_in (zipLazy nms hvs)
                                in  mapM (linkBCO ie ce_out) ul_bcos )

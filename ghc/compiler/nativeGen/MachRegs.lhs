@@ -782,7 +782,6 @@ baseRegOffset (FloatReg  4#)         = OFFSET_F4
 baseRegOffset (DoubleReg 1#)         = OFFSET_D1
 baseRegOffset (DoubleReg 2#)         = OFFSET_D2
 baseRegOffset Sp		     = OFFSET_Sp
-baseRegOffset Su		     = OFFSET_Su
 baseRegOffset SpLim		     = OFFSET_SpLim
 #ifdef OFFSET_L1
 baseRegOffset (LongReg _ 1#)         = OFFSET_L1
@@ -852,9 +851,6 @@ callerSaves (LongReg _ ILIT(1))		= True
 #endif
 #ifdef CALLER_SAVES_Sp
 callerSaves Sp				= True
-#endif
-#ifdef CALLER_SAVES_Su
-callerSaves Su				= True
 #endif
 #ifdef CALLER_SAVES_SpLim
 callerSaves SpLim			= True
@@ -937,9 +933,6 @@ magicIdRegMaybe (LongReg _ ILIT(1))	= Just (RealReg REG_Lng1)
 #ifdef REG_Lng2			 	
 magicIdRegMaybe (LongReg _ ILIT(2))	= Just (RealReg REG_Lng2)
 #endif
-#ifdef REG_Su	    			
-magicIdRegMaybe Su		   	= Just (RealReg REG_Su)
-#endif	    				
 #ifdef REG_SpLim	    			
 magicIdRegMaybe SpLim		   	= Just (RealReg REG_SpLim)
 #endif	    				

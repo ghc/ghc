@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.h,v 1.9 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: Sanity.h,v 1.10 2002/12/11 15:36:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -20,11 +20,11 @@
 extern void checkHeap      ( bdescr *bd );
 extern void checkHeapChunk ( StgPtr start, StgPtr end );
 extern void checkChain     ( bdescr *bd );
-extern void checkStack     ( StgPtr sp, StgPtr stack_end, StgUpdateFrame* su );
 extern void checkTSO       ( StgTSO* tso );
 extern void checkGlobalTSOList ( rtsBool checkTSOs );
 extern void checkStaticObjects ( StgClosure* static_objects );
 extern void checkStackChunk    ( StgPtr sp, StgPtr stack_end );
+extern StgOffset checkStackFrame ( StgPtr sp );
 extern StgOffset checkClosure  ( StgClosure* p );
 
 extern void checkMutableList   ( StgMutClosure *p, nat gen );

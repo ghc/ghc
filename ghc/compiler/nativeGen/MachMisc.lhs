@@ -112,7 +112,7 @@ volatileSaves, volatileRestores :: [MagicId] -> [StixStmt]
 volatileSaves    = volatileSavesOrRestores True
 volatileRestores = volatileSavesOrRestores False
 
-save_cands    = [BaseReg,Sp,Su,SpLim,Hp,HpLim]
+save_cands    = [BaseReg,Sp,SpLim,Hp,HpLim]
 restore_cands = save_cands
 
 volatileSavesOrRestores do_saves vols

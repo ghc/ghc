@@ -146,6 +146,20 @@ MKDEPENDC_SRCS     = $(C_SRCS) $(HC_SRCS)
 SRC_MKDEPENDC_OPTS += -I. -I../includes
 
 # -----------------------------------------------------------------------------
+# The auto-generated apply code
+
+AUTO_APPLY = AutoApply.hc
+
+gen_apply : GenApply.hs
+	$(GHC) -o $@ -I$(GHC_INCLUDE_DIR) GenApply.hs 
+
+$(AUTO_APPLY): $(GHC_GENAPPLY)
+	@$(RM) $@
+	$(GHC_GENAPPLY) >$@
+
+EXTRA_SRCS += $(AUTO_APPLY)
+
+# -----------------------------------------------------------------------------
 #
 #  Building DLLs is only supported on mingw32 at the moment.
 #

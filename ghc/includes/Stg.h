@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.49 2002/09/06 14:34:14 simonmar Exp $
+ * $Id: Stg.h,v 1.50 2002/12/11 15:36:39 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -170,6 +170,7 @@ typedef StgWord64       LW_;
 #include "StgLdvProf.h"
 
 /* Storage format definitions */
+#include "StgFun.h"
 #include "Closures.h"
 #include "ClosureTypes.h"
 #include "InfoTables.h"

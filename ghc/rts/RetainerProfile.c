@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.5 2002/07/18 09:12:35 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.6 2002/12/11 15:36:47 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -30,6 +30,7 @@
 #include "Itimer.h"
 #include "Proftimer.h"
 #include "ProfHeap.h"
+#include "Apply.h"
 
 /*
   Note: what to change in order to plug-in a new retainer profiling scheme?
@@ -63,7 +64,7 @@ StgWord flip = 0;     // flip bit
 #define setRetainerSetToNull(c)   \
   (c)->header.prof.hp.rs = (RetainerSet *)((StgWord)NULL | flip)
 
-static void retainStack(StgClosure *, retainer, StgClosure *, StgPtr, StgPtr);
+static void retainStack(StgClosure *, retainer, StgPtr, StgPtr);
 static void retainClosure(StgClosure *, StgClosure *, retainer);
 #ifdef DEBUG_RETAINER
 static void belongToHeap(StgPtr p);
@@ -299,11 +300,19 @@ find_ptrs( stackPos *info )
  *  Initializes *info from SRT information stored in *infoTable.
  * -------------------------------------------------------------------------- */
 static inline void
-init_srt( stackPos *info, StgInfoTable *infoTable )
+init_srt_fun( stackPos *info, StgFunInfoTable *infoTable )
 {
     info->type = posTypeSRT;
     info->next.srt.srt = (StgClosure **)(infoTable->srt);
-    info->next.srt.srt_end = info->next.srt.srt + infoTable->srt_len;
+    info->next.srt.srt_end = info->next.srt.srt + infoTable->i.srt_len;
+}
+
+static inline void
+init_srt_thunk( stackPos *info, StgThunkInfoTable *infoTable )
+{
+    info->type = posTypeSRT;
+    info->next.srt.srt = (StgClosure **)(infoTable->srt);
+    info->next.srt.srt_end = info->next.srt.srt + infoTable->i.srt_len;
 }
 
 /* -----------------------------------------------------------------------------
@@ -342,7 +351,7 @@ find_srt( stackPos *info )
 
  *  Invariants:
  *     *c_child_r is the most recent retainer of *c's children.
- *     *c is not any of TSO, PAP, or AP_UPD, which means that
+ *     *c is not any of TSO, AP, PAP, AP_STACK, which means that
  *        there cannot be any stack objects.
  *  Note: SRTs are considered to  be children as well.
  * -------------------------------------------------------------------------- */
@@ -357,8 +366,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 #endif
 
     ASSERT(get_itbl(c)->type != TSO);
-    ASSERT(get_itbl(c)->type != PAP);
-    ASSERT(get_itbl(c)->type != AP_UPD);
+    ASSERT(get_itbl(c)->type != AP_STACK);
 
     //
     // fill in se
@@ -458,35 +466,55 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     // layout.payload.ptrs, SRT
     case FUN:           // *c is a heap object.
     case FUN_2_0:
+	init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, (StgPtr)c->payload);
+	*first_child = find_ptrs(&se.info);
+	if (*first_child == NULL)
+	    // no child from ptrs, so check SRT
+	    goto fun_srt_only;
+	break;
+
     case THUNK:
     case THUNK_2_0:
 	init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, (StgPtr)c->payload);
 	*first_child = find_ptrs(&se.info);
 	if (*first_child == NULL)
 	    // no child from ptrs, so check SRT
-	    goto srt_only;
+	    goto thunk_srt_only;
 	break;
 
 	// 1 fixed child, SRT
     case FUN_1_0:
     case FUN_1_1:
+	*first_child = c->payload[0];
+	ASSERT(*first_child != NULL);
+	init_srt_fun(&se.info, get_fun_itbl(c));
+	break;
+
     case THUNK_1_0:
     case THUNK_1_1:
 	*first_child = c->payload[0];
 	ASSERT(*first_child != NULL);
-	init_srt(&se.info, get_itbl(c));
+	init_srt_thunk(&se.info, get_thunk_itbl(c));
 	break;
 
-    // SRT only
-    case THUNK_STATIC:
     case FUN_STATIC:      // *c is a heap object.
 	ASSERT(get_itbl(c)->srt_len != 0);
     case FUN_0_1:
     case FUN_0_2:
+    fun_srt_only:
+        init_srt_fun(&se.info, get_fun_itbl(c));
+	*first_child = find_srt(&se.info);
+	if (*first_child == NULL)
+	    return;     // no child
+	break;
+
+    // SRT only
+    case THUNK_STATIC:
+	ASSERT(get_itbl(c)->srt_len != 0);
     case THUNK_0_1:
     case THUNK_0_2:
-    srt_only:
-        init_srt(&se.info, get_itbl(c));
+    thunk_srt_only:
+        init_srt_thunk(&se.info, get_thunk_itbl(c));
 	*first_child = find_srt(&se.info);
 	if (*first_child == NULL)
 	    return;     // no child
@@ -494,7 +522,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
 	// cannot appear
     case PAP:
-    case AP_UPD:
+    case AP:
+    case AP_STACK:
     case TSO:
     case IND_STATIC:
     case CONSTR_INTLIKE:
@@ -504,7 +533,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case UPDATE_FRAME:
     case CATCH_FRAME:
     case STOP_FRAME:
-    case SEQ_FRAME:
     case RET_DYN:
     case RET_BCO:
     case RET_SMALL:
@@ -738,6 +766,17 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	    // layout.payload.ptrs, SRT
 	case FUN:         // always a heap object
 	case FUN_2_0:
+	    if (se->info.type == posTypePtrs) {
+		*c = find_ptrs(&se->info);
+		if (*c != NULL) {
+		    *cp = se->c;
+		    *r = se->c_child_r;
+		    return;
+		}
+		init_srt_fun(&se->info, get_fun_itbl(se->c));
+	    }
+	    goto do_srt;
+
 	case THUNK:
 	case THUNK_2_0:
 	    if (se->info.type == posTypePtrs) {
@@ -747,11 +786,12 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 		    *r = se->c_child_r;
 		    return;
 		}
-		init_srt(&se->info, get_itbl(se->c));
+		init_srt_thunk(&se->info, get_thunk_itbl(se->c));
 	    }
-	    // fall through
+	    goto do_srt;
 
 	    // SRT
+	do_srt:
 	case THUNK_STATIC:
 	case FUN_STATIC:
 	case FUN_0_1:
@@ -790,7 +830,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case CONSTR_1_1:
 	    // cannot appear
 	case PAP:
-	case AP_UPD:
+	case AP:
+	case AP_STACK:
 	case TSO:
 	case IND_STATIC:
 	case CONSTR_INTLIKE:
@@ -801,7 +842,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case UPDATE_FRAME:
 	case CATCH_FRAME:
 	case STOP_FRAME:
-	case SEQ_FRAME:
 	case RET_BCO:
 	case RET_SMALL:
 	case RET_VEC_SMALL:
@@ -895,7 +935,8 @@ isRetainer( StgClosure *c )
     case THUNK_1_1:
     case THUNK_0_2:
     case THUNK_SELECTOR:
-    case AP_UPD:
+    case AP:
+    case AP_STACK:
 
 	// Static thunks, or CAFS, are obviously retainers.
     case THUNK_STATIC:
@@ -960,7 +1001,6 @@ isRetainer( StgClosure *c )
     case UPDATE_FRAME:
     case CATCH_FRAME:
     case STOP_FRAME:
-    case SEQ_FRAME:
     case RET_DYN:
     case RET_BCO:
     case RET_SMALL:
@@ -1029,14 +1069,89 @@ associate( StgClosure *c, RetainerSet *s )
 }
 
 /* -----------------------------------------------------------------------------
+ * Call retainClosure for each of the closures in an SRT.
+ * ------------------------------------------------------------------------- */
+
+static inline void
+retainSRT (StgClosure **srt, nat srt_len, StgClosure *c, retainer c_child_r)
+{
+  StgClosure **srt_end;
+
+  srt_end = srt + srt_len;
+
+  for (; srt < srt_end; srt++) {
+    /* Special-case to handle references to closures hiding out in DLLs, since
+       double indirections required to get at those. The code generator knows
+       which is which when generating the SRT, so it stores the (indirect)
+       reference to the DLL closure in the table by first adding one to it.
+       We check for this here, and undo the addition before evacuating it.
+
+       If the SRT entry hasn't got bit 0 set, the SRT entry points to a
+       closure that's fixed at link-time, and no extra magic is required.
+    */
+#ifdef ENABLE_WIN32_DLL_SUPPORT
+    if ( (unsigned long)(*srt) & 0x1 ) {
+       retainClosure(*stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)), 
+		     c, c_child_r);
+    } else {
+       retainClosure(*srt,c,c_child_r);
+    }
+#else
+    retainClosure(*srt,c,c_child_r);
+#endif
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Call retainClosure for each of the closures covered by a large bitmap.
+   -------------------------------------------------------------------------- */
+
+static void
+retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, nat size,
+		     StgClosure *c, retainer c_child_r)
+{
+    nat i, b;
+    StgWord bitmap;
+    
+    b = 0;
+    bitmap = large_bitmap->bitmap[b];
+    for (i = 0; i < size; ) {
+	if ((bitmap & 1) == 0) {
+	    retainClosure((StgClosure *)*p, c, c_child_r);
+	}
+	i++;
+	p++;
+	if (i % BITS_IN(W_) == 0) {
+	    b++;
+	    bitmap = large_bitmap->bitmap[b];
+	} else {
+	    bitmap = bitmap >> 1;
+	}
+    }
+}
+
+static inline StgPtr
+retain_small_bitmap (StgPtr p, nat size, StgWord bitmap,
+		     StgClosure *c, retainer c_child_r)
+{
+    while (size > 0) {
+	if ((bitmap & 1) == 0) {
+	    retainClosure((StgClosure *)*p, c, c_child_r);
+	}
+	p++;
+	bitmap = bitmap >> 1;
+	size--;
+    }
+    return p;
+}
+
+/* -----------------------------------------------------------------------------
  *  Process all the objects in the stack chunk from stackStart to stackEnd
  *  with *c and *c_child_r being their parent and their most recent retainer,
  *  respectively. Treat stackOptionalFun as another child of *c if it is
  *  not NULL.
  *  Invariants:
- *    *c is one of the following: TSO, PAP, and AP_UPD.
- *    If *c is AP_UPD or PAP, stackOptionalFun is not NULL. Otherwise,
- *    it is NULL.
+ *    *c is one of the following: TSO, AP_STACK.
  *    If *c is TSO, c == c_child_r.
  *    stackStart < stackEnd.
  *    RSET(c) and RSET(c_child_r) are valid, i.e., their
@@ -1050,13 +1165,13 @@ associate( StgClosure *c, RetainerSet *s )
  * -------------------------------------------------------------------------- */
 static void
 retainStack( StgClosure *c, retainer c_child_r,
-	     StgClosure *stackOptionalFun, StgPtr stackStart,
-	     StgPtr stackEnd )
+	     StgPtr stackStart, StgPtr stackEnd )
 {
     stackElement *oldStackBoundary;
-    StgPtr p, q;
-    StgInfoTable *info;
+    StgPtr p;
+    StgRetInfoTable *info;
     StgWord32 bitmap;
+    nat size;
 
 #ifdef DEBUG_RETAINER
     cStackSize++;
@@ -1076,62 +1191,16 @@ retainStack( StgClosure *c, retainer c_child_r,
     // fprintf(stderr, "retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n", oldStackBoundary, currentStackBoundary);
 #endif
 
-    if (stackOptionalFun != NULL) {
-	ASSERT(get_itbl(c)->type == AP_UPD || get_itbl(c)->type == PAP);
-	retainClosure(stackOptionalFun, c, c_child_r);
-    } else {
-	ASSERT(get_itbl(c)->type == TSO);
-	ASSERT(((StgTSO *)c)->what_next != ThreadRelocated &&
-	       ((StgTSO *)c)->what_next != ThreadComplete &&
-	       ((StgTSO *)c)->what_next != ThreadKilled);
-    }
-
+    ASSERT(get_itbl(c)->type != TSO || 
+	   (((StgTSO *)c)->what_next != ThreadRelocated &&
+	    ((StgTSO *)c)->what_next != ThreadComplete &&
+	    ((StgTSO *)c)->what_next != ThreadKilled));
+    
     p = stackStart;
     while (p < stackEnd) {
-	q = *(StgPtr *)p;
+	info = get_ret_itbl((StgClosure *)p);
 
-    //
-    // Note & Todo:
-    //   The correctness of retainer profiling is subject to the
-    //   correctness of the two macros IS_ARG_TAG() and
-    //   LOOKS_LIKE_GHC_INFO(). Since LOOKS_LIKE_GHC_INFO() is a bit
-    //   precarious macro, so I believe that the current
-    //   implementation may not be quite safe. Also, scavenge_stack()
-    //   in GC.c also exploits this macro in order to identify shallow
-    //   pointers.  I am not sure whether scavenge_stack() takes
-    //   further measurements to discern real shallow pointers.
-    //
-    //   I think this can be a serious problem if a stack chunk
-    //   contains some word which looks like a pointer but is
-    //   actually, say, a word constituting a floating number.
-    //
-
-	// skip tagged words
-	if (IS_ARG_TAG((StgWord)q)) {
-	    p += 1 + ARG_SIZE(q);
-	    continue;
-	}
-
-	// check if *p is a shallow closure pointer
-	if (!LOOKS_LIKE_GHC_INFO(q)) {
-	    retainClosure((StgClosure *)q, c, c_child_r);
-	    p++;
-	    continue;
-	}
-
-	// regular stack objects
-	info = get_itbl((StgClosure *)p);
-	switch(info->type) {
-	case RET_DYN:
-	    bitmap = ((StgRetDyn *)p)->liveness;
-	    p = ((StgRetDyn *)p)->payload;
-	    goto small_bitmap;
-
-	    // FUN and FUN_STATIC keep only their info pointer.
-	case FUN:
-	case FUN_STATIC:
-	    p++;
-	    goto follow_srt;
+	switch(info->i.type) {
 
 	case UPDATE_FRAME:
 	    retainClosure(((StgUpdateFrame *)p)->updatee, c, c_child_r);
@@ -1140,70 +1209,95 @@ retainStack( StgClosure *c, retainer c_child_r,
 
 	case STOP_FRAME:
 	case CATCH_FRAME:
-	case SEQ_FRAME:
-	case RET_BCO:
 	case RET_SMALL:
 	case RET_VEC_SMALL:
-	    bitmap = info->layout.bitmap;
+	    bitmap = BITMAP_BITS(info->i.layout.bitmap);
+	    size   = BITMAP_SIZE(info->i.layout.bitmap);
 	    p++;
-	small_bitmap:
-	    while (bitmap != 0) {
-		if ((bitmap & 1) == 0)
-		    retainClosure((StgClosure *)*p, c, c_child_r);
-		p++;
-		bitmap = bitmap >> 1;
-	    }
-	follow_srt:
-	    {
-		StgClosure **srt, **srt_end;
+	    p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 
-		srt = (StgClosure **)(info->srt);
-		srt_end = srt + info->srt_len;
-		for (; srt < srt_end; srt++) {
-		    // See scavenge_srt() in GC.c for details.
-#ifdef ENABLE_WIN32_DLL_SUPPORT
-		    if ((unsigned long)(*srt) & 0x1)
-			retainClosure(*(StgClosure **)(((unsigned long)*srt & ~0x1)), c, c_child_r);
-		    else
-			retainClosure(*srt, c, c_child_r);
-#else
-		    retainClosure(*srt, c, c_child_r);
-#endif
-		}
-	    }
+	follow_srt:
+	    retainSRT((StgClosure **)info->srt, info->i.srt_len, c, c_child_r);
 	    continue;
 
+	case RET_BCO: {
+	    StgBCO *bco;
+	    
+	    p++;
+	    retainClosure((StgClosure *)*p, c, c_child_r);
+	    bco = (StgBCO *)*p;
+	    p++;
+	    size = BCO_BITMAP_SIZE(bco);
+	    retain_large_bitmap(p, BCO_BITMAP(bco), size, c, c_child_r);
+	    p += size;
+	    continue;
+	}
+
+	    // large bitmap (> 32 entries, or > 64 on a 64-bit machine) 
 	case RET_BIG:
 	case RET_VEC_BIG:
-	{
-	    StgPtr q;
-	    StgLargeBitmap *large_bitmap;
-	    nat i;
-
-	    large_bitmap = info->layout.large_bitmap;
+	    size = info->i.layout.large_bitmap->size;
 	    p++;
+	    retain_large_bitmap(p, info->i.layout.large_bitmap,
+				size, c, c_child_r);
+	    p += size;
+	    // and don't forget to follow the SRT 
+	    goto follow_srt;
 
-	    for (i = 0; i < large_bitmap->size; i++) {
-		bitmap = large_bitmap->bitmap[i];
-		q = p + sizeofW(StgWord) * 8;
-		while (bitmap != 0) {
-		    if ((bitmap & 1) == 0)
-			retainClosure((StgClosure *)*p, c, c_child_r);
-		    p++;
-		    bitmap = bitmap >> 1;
-		}
-		if (i + 1 < large_bitmap->size) {
-		    while (p < q) {
-			retainClosure((StgClosure *)*p, c, c_child_r);
-			p++;
-		    }
-		}
+	    // Dynamic bitmap: the mask is stored on the stack 
+	case RET_DYN: {
+	    StgWord dyn;
+	    dyn = ((StgRetDyn *)p)->liveness;
+
+	    // traverse the bitmap first
+	    bitmap = GET_LIVENESS(dyn);
+	    p      = (P_)&((StgRetDyn *)p)->payload[0];
+	    size   = RET_DYN_SIZE;
+	    p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
+	    
+	    // skip over the non-ptr words
+	    p += GET_NONPTRS(dyn);
+	    
+	    // follow the ptr words
+	    for (size = GET_PTRS(dyn); size > 0; size--) {
+		retainClosure((StgClosure *)*p, c, c_child_r);
+		p++;
 	    }
+	    continue;
 	}
-	goto follow_srt;
+
+	case RET_FUN: {
+	    StgRetFun *ret_fun = (StgRetFun *)p;
+	    StgFunInfoTable *fun_info;
+	    
+	    retainClosure(ret_fun->fun, c, c_child_r);
+	    fun_info = get_fun_itbl(ret_fun->fun);
+	    
+	    p = (P_)&ret_fun->payload;
+	    switch (fun_info->fun_type) {
+	    case ARG_GEN:
+		bitmap = BITMAP_BITS(fun_info->bitmap);
+		size = BITMAP_SIZE(fun_info->bitmap);
+		p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
+		break;
+	    case ARG_GEN_BIG:
+		size = ((StgLargeBitmap *)fun_info->bitmap)->size;
+		retain_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap, 
+				    size, c, c_child_r);
+		p += size;
+		break;
+	    default:
+		bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
+		size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->fun_type]);
+		p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
+		break;
+	    }
+	    goto follow_srt;
+	}
+
 	default:
 	    barf("Invalid object found in retainStack(): %d",
-		 (int)(info->type));
+		 (int)(info->i.type));
 	}
     }
 
@@ -1216,6 +1310,49 @@ retainStack( StgClosure *c, retainer c_child_r,
 #ifdef DEBUG_RETAINER
     cStackSize--;
 #endif
+}
+
+/* ----------------------------------------------------------------------------
+ * Call retainClosure for each of the children of a PAP/AP
+ * ------------------------------------------------------------------------- */
+
+static inline StgPtr
+retain_PAP (StgPAP *pap, retainer c_child_r)
+{
+    StgPtr p;
+    StgWord bitmap, size;
+    StgFunInfoTable *fun_info;
+
+    retainClosure(pap->fun, (StgClosure *)pap, c_child_r);
+    fun_info = get_fun_itbl(pap->fun);
+    ASSERT(fun_info->i.type != PAP);
+
+    p = (StgPtr)pap->payload;
+    size = pap->n_args;
+
+    switch (fun_info->fun_type) {
+    case ARG_GEN:
+	bitmap = BITMAP_BITS(fun_info->bitmap);
+	p = retain_small_bitmap(p, pap->n_args, bitmap, 
+				(StgClosure *)pap, c_child_r);
+	break;
+    case ARG_GEN_BIG:
+	retain_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap,
+			    size, (StgClosure *)pap, c_child_r);
+	p += size;
+	break;
+    case ARG_BCO:
+	retain_large_bitmap((StgPtr)pap->payload, BCO_BITMAP(pap->fun),
+			    size, (StgClosure *)pap, c_child_r);
+	p += size;
+	break;
+    default:
+	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
+	p = retain_small_bitmap(p, pap->n_args, bitmap, 
+				(StgClosure *)pap, c_child_r);
+	break;
+    }
+    return p;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1232,7 +1369,7 @@ retainStack( StgClosure *c, retainer c_child_r,
  *    its descendants.
  *  Note:
  *    stackTop must be the same at the beginning and the exit of this function.
- *    *c0 can be TSO (as well as PAP and AP_UPD).
+ *    *c0 can be TSO (as well as AP_STACK).
  * -------------------------------------------------------------------------- */
 static void
 retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
@@ -1439,27 +1576,27 @@ inner_loop:
 
     // process child
 
-    if (typeOfc == TSO) {
+    // Special case closures: we process these all in one go rather
+    // than attempting to save the current position, because doing so
+    // would be hard.
+    switch (typeOfc) {
+    case TSO:
 	retainStack(c, c_child_r,
-		    NULL,
 		    ((StgTSO *)c)->sp,
 		    ((StgTSO *)c)->stack + ((StgTSO *)c)->stack_size);
-	// no more children
 	goto loop;
-    } else if (typeOfc == PAP) {
-	retainStack(c, c_child_r,
-		    ((StgPAP *)c)->fun,
-		    (StgPtr)((StgPAP *)c)->payload,
-		    (StgPtr)((StgPAP *)c)->payload + ((StgPAP *)c)->n_args);
-	// no more children
+
+    case PAP:
+    case AP:
+	retain_PAP((StgPAP *)c, c_child_r);
 	goto loop;
-    } else if (typeOfc == AP_UPD) {
+
+    case AP_STACK:
+	retainClosure(((StgAP_STACK *)c)->fun, c, c_child_r);
 	retainStack(c, c_child_r,
-		    ((StgAP_UPD *)c)->fun,
-		    (StgPtr)((StgAP_UPD *)c)->payload,
-		    (StgPtr)((StgAP_UPD *)c)->payload +
-		             ((StgAP_UPD *)c)->n_args);
-	// no more children
+		    (StgPtr)((StgAP_STACK *)c)->payload,
+		    (StgPtr)((StgAP_STACK *)c)->payload +
+		             ((StgAP_STACK *)c)->size);
 	goto loop;
     }
 
@@ -1874,9 +2011,12 @@ sanityCheckHeapClosure( StgClosure *c )
     case MUT_ARR_PTRS_FROZEN:
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs *)c);
 
-    case AP_UPD:
+    case AP:
     case PAP:
 	return pap_sizeW((StgPAP *)c);
+
+    case AP:
+	return ap_stack_sizeW((StgAP_STACK *)c);
 
     case ARR_WORDS:
 	return arr_words_sizeW((StgArrWords *)c);
@@ -1925,7 +2065,6 @@ sanityCheckHeapClosure( StgClosure *c )
     case UPDATE_FRAME:
     case CATCH_FRAME:
     case STOP_FRAME:
-    case SEQ_FRAME:
     case RET_DYN:
     case RET_BCO:
     case RET_SMALL:

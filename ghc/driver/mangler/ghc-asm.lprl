@@ -110,7 +110,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\.text\n\t\.align 3\n";
     $T_HDR_info	    = "\.text\n\t\.align 3\n";
     $T_HDR_entry    = "\.text\n\t\.align 3\n";
-    $T_HDR_fast	    = "\.text\n\t\.align 3\n";
     $T_HDR_vector   = "\.text\n\t\.align 3\n";
     $T_HDR_direct   = "\.text\n\t\.align 3\n";
     $T_create_word  = "\t.quad";
@@ -138,7 +137,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\t.SPACE \$PRIVATE\$\n\t.SUBSPA \$DATA\$\n\t\.align 4\n";
     $T_HDR_info	    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
     $T_HDR_entry    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
-    $T_HDR_fast	    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
     $T_HDR_vector   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
     $T_create_word  = "\t.word";
@@ -166,11 +164,9 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\.data\n\t\.align 2\n";
     $T_HDR_consist  = "\.text\n";
     $T_HDR_closure  = "\.data\n\t\.align 2\n";
-    $T_HDR_closure  = "\.data\n\t\.align 2\n\t.long 0\n" if ( $TargetPlatform =~ /.*-mingw32$/ );
     $T_HDR_srt      = "\.text\n\t\.align 2\n";
     $T_HDR_info	    = "\.text\n\t\.align 2\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
-    $T_HDR_fast	    = "\.text\n\t\.align 2,0x90\n";
     $T_HDR_vector   = "\.text\n\t\.align 2\n"; # NB: requires padding
     $T_HDR_direct   = "\.text\n\t\.align 2,0x90\n";
     $T_create_word  = "\t.word";
@@ -207,7 +203,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\.text\n\t\.align 4\n"; # ToDo: change align?
     $T_HDR_info	    = "\.text\n\t\.align 4\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
-    $T_HDR_fast	    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n"; # NB: requires padding
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
     $T_create_word  = "\t.word";
@@ -235,7 +230,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\.text\n\t\.align 8\n";
     $T_HDR_info     = "\.text\n\t\.align 8\n";
     $T_HDR_entry    = "\.text\n\t\.align 16\n";
-    $T_HDR_fast     = "\.text\n\t\.align 16\n";
     $T_HDR_vector   = "\.text\n\t\.align 8\n";
     $T_HDR_direct   = "\.text\n\t\.align 8\n";
     $T_create_word  = "\t.word";
@@ -263,7 +257,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\.text\n\t\.even\n";
     $T_HDR_info	    = "\.text\n\t\.even\n";
     $T_HDR_entry    = "\.text\n\t\.even\n";
-    $T_HDR_fast	    = "\.text\n\t\.even\n";
     $T_HDR_vector   = "\.text\n\t\.even\n";
     $T_HDR_direct   = "\.text\n\t\.even\n";
     $T_create_word  = "\t.long";
@@ -291,7 +284,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\t\.text\n\t\.align 2\n";
     $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
-    $T_HDR_fast	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
     $T_HDR_direct   = "\t\.text\n\t\.align 2\n";
     $T_create_word  = "\t.word";
@@ -320,7 +312,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\t\.text\n\t\.align 2\n";
     $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
-    $T_HDR_fast	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
     $T_HDR_direct   = "\t\.text\n\t\.align 2\n";
     $T_create_word  = "\t.long";
@@ -348,7 +339,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\.data\n\t\.align 4\n";
     $T_HDR_info	    = "\.text\n\t\.align 4\n";
     $T_HDR_entry    = "\.text\n\t\.align 4\n";
-    $T_HDR_fast	    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
     $T_create_word  = "\t.word";
@@ -376,7 +366,6 @@ sub init_TARGET_STUFF {
     $T_HDR_srt      = "\.data\n\t\.align 4\n";
     $T_HDR_info	    = "\.text\n\t\.align 4\n";
     $T_HDR_entry    = "\.text\n\t\.align 4\n";
-    $T_HDR_fast	    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
     $T_create_word  = "\t.word";
@@ -409,7 +398,6 @@ print STDERR "T_HDR_consist: $T_HDR_consist\n";
 print STDERR "T_HDR_closure: $T_HDR_closure\n";
 print STDERR "T_HDR_info: $T_HDR_info\n";
 print STDERR "T_HDR_entry: $T_HDR_entry\n";
-print STDERR "T_HDR_fast: $T_HDR_fast\n";
 print STDERR "T_HDR_vector: $T_HDR_vector\n";
 print STDERR "T_HDR_direct: $T_HDR_direct\n";
 }
@@ -447,8 +435,7 @@ sub mangle_asm {
     $numchks = 0;	# number of them
     @chkcat = ();	# what category of thing in each chunk
     @chksymb = ();	# what symbol(base) is defined in this chunk
-    %slowchk = ();	# ditto, its regular "slow" entry code
-    %fastchk = ();	# ditto, fast entry code
+    %entrychk = ();	# ditto, its entry code
     %closurechk = ();	# ditto, the (static) closure
     %srtchk = ();	# ditto, its SRT (for top-level things)
     %infochk = (); 	# given a symbol base, say what chunk its info tbl is in
@@ -517,17 +504,10 @@ sub mangle_asm {
 
 	} elsif ( /^${T_US}([A-Za-z0-9_]+)_(entry|ret)${T_POST_LBL}$/o ) {
 	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'slow';
+	    $chkcat[$i]  = 'entry';
 	    $chksymb[$i] = $1;
 
-	    $slowchk{$1} = $i;
-
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_fast\d*${T_POST_LBL}$/o ) {
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'fast';
-	    $chksymb[$i] = $1;
-
-	    $fastchk{$1} = $i;
+	    $entrychk{$1} = $i;
 
 	} elsif ( /^${T_US}([A-Za-z0-9_]+)_closure${T_POST_LBL}$/o ) {
 	    $chk[++$i]   = $_;
@@ -547,10 +527,6 @@ sub mangle_asm {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
-
-	} elsif ( /^${T_US}ghc.*c_ID${T_POST_LBL}/o ) {
-	    $chk[++$i]  = $_;
-	    $chkcat[$i] = 'consist';
 
 	} elsif ( /^(${T_US}__gnu_compiled_c|gcc2_compiled\.)${T_POST_LBL}/o ) {
 	    ; # toss it
@@ -619,8 +595,10 @@ sub mangle_asm {
 		       /^${T_US}stg_.*${T_POST_LBL}$/o          # RTS internals
 		    || /^${T_US}__stg_.*${T_POST_LBL}$/o        # more RTS internals
 		    || /^${T_US}__fexp_.*${T_POST_LBL}$/o       # foreign export
+		    || /^${T_US}.*_slow${T_POST_LBL}$/o         # slow entry
 		    || /^${T_US}__stginit.*${T_POST_LBL}$/o     # __stginit<module>
 		    || /^${T_US}.*_btm${T_POST_LBL}$/o          # large bitmaps
+		    || /^${T_US}.*_fast${T_POST_LBL}$/o         # primops
 		    || /^${T_US}.*_closure_tbl${T_POST_LBL}$/o  # closure tables
                     || /^_uname:/o;			        # x86/Solaris2
 	    $chk[++$i]   = $_;
@@ -1065,8 +1043,7 @@ sub mangle_asm {
 	} elsif ( $chkcat[$i] eq 'closure'
 	       || $chkcat[$i] eq 'srt'
 	       || $chkcat[$i] eq 'infotbl'
-	       || $chkcat[$i] eq 'slow'
-	       || $chkcat[$i] eq 'fast' ) { # do them in that order
+	       || $chkcat[$i] eq 'entry') { # do them in that order
 	    $symb = $chksymb[$i];
 
 	    # CLOSURE
@@ -1095,103 +1072,17 @@ sub mangle_asm {
 	    }
 
 	    # STD ENTRY POINT
-	    if ( defined($slowchk{$symb}) ) {
+	    if ( defined($entrychk{$symb}) ) {
 
-		# teach it to drop through to the fast entry point:
-		$c = $chk[$slowchk{$symb}];
-
-		if ( defined($fastchk{$symb}) ) {
-		    if ( $TargetPlatform =~ /^alpha-/ ) {
-			$c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
-		    } elsif ( $TargetPlatform =~ /^hppa/ ) {
-			$c =~ s/^\s+ldil.*\n\s+ldo.*\n\s+bv.*\n(.*\n)?\s+\.EXIT/$1\t.EXIT/;
-		    } elsif ( $TargetPlatform =~ /^i386-/ ) {
-			# Reg alloc depending, gcc generated code may jump to the fast entry point via
-			# a number of registers.
-			$c =~ s/^\tmovl\s+\$${T_US}${symb}_fast\d*,\s*\%edx\n\tjmp\s+\*\%edx\n//;
-			$c =~ s/^\tmovl\s+\$${T_US}${symb}_fast\d*,\s*\%ecx\n\tjmp\s+\*\%ecx\n//;
-			$c =~ s/^\tmovl\s+\$${T_US}${symb}_fast\d*,\s*\%eax\n\tjmp\s+\*\%eax\n//;
-			# The next two only apply if we're not stealing %esi or %edi.
-			$c =~ s/^\tmovl\s+\$${T_US}${symb}_fast\d*,\s*\%esi\n\tjmp\s+\*\%esi\n// if ($StolenX86Regs < 3);
-			$c =~ s/^\tmovl\s+\$${T_US}${symb}_fast\d*,\s*\%edi\n\tjmp\s+\*\%edi\n// if ($StolenX86Regs < 4);
-		    } elsif ( $TargetPlatform =~ /^ia64-/ ) {
-			#$c =~ s/^\tbr\.few ${symb}_fast\d*#\n\t;;\n(\t;;\n\t\.endp ${symb}_entry#\n)/$1/;
-			$c =~ s/^\tbr\.few ${symb}_fast\d*#\n(\t;;\n\t\.endp ${symb}_entry#\n)/$1/;
-		    } elsif ( $TargetPlatform =~ /^mips-/ ) {
-			$c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
-		    } elsif ( $TargetPlatform =~ /^m68k-/ ) {
-			$c =~ s/^\tjmp ${T_US}${symb}_fast\d+.*\n\tnop\n//;
-			$c =~ s/^\tjmp ${T_US}${symb}_fast\d+.*\n//;
-		    } elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ ) {
-			if ( $c =~ s/^\taddis r9,r31,ha16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\n\tlwz r9,lo16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\(r9\)\n\tmtctr r9\n\tbctr$// ) {
-				#	for Position-Independent Code, GCC 2:
-				#	addis r9,r31,ha16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)
-				#	lwz r9,lo16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)(r9)
-				#	mtctr r9
-				#	bctr
-			
-			} elsif ( $c =~ s/^\taddis r9,r31,ha16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\n\tlwz r29,lo16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\(r9\)\nL(\d+):\n\tmtctr r29\n\tbctr$// ) {
-				#	for Position-Independent Code, GCC 3:
-				#	addis r9,r31,ha16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)
-				#	lwz r29,lo16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)(r9)
-				# Lyyy:
-				#	mtctr r29
-				#	bctr
-			    $label = $1;
-			    $c =~ s/^\tb L${label}\n/\tmtctr r29\n\tbctr\n/g;
-			} elsif ( $c =~ s/^\tlis r9,ha16\(L_${symb}_fast\d*\$non_lazy_ptr\)\n\tlwz r31,lo16\(L_${symb}_fast\d*\$non_lazy_ptr\)\(r9\)\nL(\d+):\n\tmtctr r31\n\tbctr$// ) {
-				#	for -mdynamic-no-pic Code, GCC 3:
-				#	lis r9,ha16(L_XXXX_fast3$non_lazy_ptr)
-				#	lwz r31,lo16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)(r9)
-				# Lyyy:
-				#	mtctr r31
-				#	bctr
-			    $label = $1;
-			    $c =~ s/^\tb L${label}\n/\tmtctr r31\n\tbctr\n/g;
-			} else {
-			    
-			    print STDERR "slow-fast dropthrough not mangled\n";
-			    print STDERR $c;
-			    print STDERR "\n\n";
-			}
-		    } elsif ( $TargetPlatform =~ /^sparc-/ ) {
-			$c =~ s/^\tcall\s+${T_US}${symb}_fast\d+,.*\n\t\s*nop\n//;
-			$c =~ s/^\tcall\s+${T_US}${symb}_fast\d+,.*\n(\t\s*[a-z].*\n)/$1/;
-		    } else {
-			print STDERR "$Pgm: mystery slow-fast dropthrough: $TargetPlatform\n";
-		    }
-		}
-
-		if ( $TargetPlatform !~ /^(alpha-|hppa|mips-|powerpc-apple-)/) {
-		    # On alphas, hppa: no very good way to look for "dangling"
-		    # references to fast-entry point.
-		    # (questionable re hppa and mips...)
-		    print STDERR "still has jump to fast entry point:\n$c"
-			if $c =~ /\b${T_US}${symb}_fast/;
-		}
+		$c = $chk[$entrychk{$symb}];
 
 		print OUTASM $T_HDR_entry;
 
 		&print_doctored($c, 1); # NB: the 1!!!
 
-		$chkcat[$slowchk{$symb}] = 'DONE ALREADY';
+		$chkcat[$entrychk{$symb}] = 'DONE ALREADY';
 	    }
 	    
-	    # FAST ENTRY POINT
-	    if ( defined($fastchk{$symb}) ) {
- 		$c = $chk[$fastchk{$symb}];
-    	    	if ( ! defined($slowchk{$symb})
-		   # ToDo: the || clause can go once we're no longer
-		   # concerned about producing exactly the same output as before
-#OLD:		   || $TargetPlatform =~ /^(m68k|sparc|i386)-/
-		   ) {
-		    print OUTASM $T_HDR_fast;
-		}
-                  
- 		&print_doctored($c, 0);
-		$chkcat[$fastchk{$symb}] = 'DONE ALREADY';
-	    }
-
 	} elsif ( $chkcat[$i] eq 'vector'
 	       || $chkcat[$i] eq 'direct' ) { # do them in that order
 	    $symb = $chksymb[$i];
@@ -1199,27 +1090,7 @@ sub mangle_asm {
 	    # VECTOR TABLE
 	    if ( defined($vectorchk{$symb}) ) {
 		print OUTASM $T_HDR_vector;
-                
 		print OUTASM &rev_tbl($symb, $chk[$vectorchk{$symb}], 0);
-                  # DO NOT DELETE THE NEXT LINE.  It fixes a rather subtle GC bug 
-                  # which showed up as a segfault reported by Ryszard Kubiak.
-                  # Problem is with vector tables.  They wind up as follows:
-                  #      .word some-word
-                  #      .word some-other-word
-                  #   fooble_vtbl:
-                  # Problem is that we want the label fooble_vtbl to be considered 
-                  # in the same section as the vtbl itself, but the label actually 
-                  # lives at the next word along.  If a data segment should happen 
-                  # to immediately follow the vtbl, as it can in GHCi, the label will 
-                  # be malclassified as in the data rather than text segment (during 
-                  # GC), and so we will regard references to it as static closure 
-                  # pointers rather than as code pointers, which is an error which 
-                  # usually crashes the garbage collectors.
-                  # To fix this, we place a dummy word after the label, so as to
-                  # ensure that the label is in the same segment as the vtbl proper.
-                  # The native code generator has an analogous fix; see
-                  # ghc/compiler/nativeGen/AbsCStixGen.lhs line 107.
-		print OUTASM "${T_create_word} 0\n";
 
 		# direct return code will be put here!
 		$chkcat[$vectorchk{$symb}] = 'DONE ALREADY';
@@ -1364,7 +1235,7 @@ sub print_doctored {
     # Offsets into register table - you'd better update these magic
     # numbers should you change its contents!
     # local($OFFSET_R1)=0;  No offset for R1 in new RTS.
-    local($OFFSET_Hp)=92;
+    local($OFFSET_Hp)=88;
 
 	# Note funky ".=" stuff; we're *adding* to these _patch guys
     if ( $StolenX86Regs <= 2
@@ -1479,13 +1350,18 @@ sub rev_tbl {
 	}
     }
 
-    # now throw away the first word (SRT) iff it is empty.
+    # Now throw away any initial zero word from the table.  This is a hack
+    # that lets us reduce the size of info tables when the SRT field is not
+    # needed: see comments StgFunInfoTable in InfoTables.h.
+    #
     # The .zero business is for Linux/ELF.
     # The .skip business is for Sparc/Solaris/ELF.
     # The .blockz business is for HPPA.
-    if ($discard1 && $words[0] =~ /^\t?(${T_DOT_WORD}\s+0|\.zero\s+4|\.skip\s+4|\.blockz\s+4)/) {
-	shift(@words)
-    }
+#    if ($discard1) {
+#	if ($words[0] =~ /^\t?(${T_DOT_WORD}\s+0|\.zero\s+4|\.skip\s+4|\.blockz\s+4)/) {
+#		shift(@words);
+#    	}
+#    }
 
     for (; $i <= $#lines; $i++) {
 	$after .= $lines[$i] . "\n";

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.10 2001/10/03 13:57:42 simonmar Exp $
+ * $Id: Block.h,v 1.11 2002/12/11 15:36:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,7 +14,7 @@
  * includes/Constants.h, all constants here are derived from these.
  */
 
-/* Block related constants (4k blocks) */
+/* Block related constants (BLOCK_SHIFT is defined in Constants.h) */
 
 #define BLOCK_SIZE   (1<<BLOCK_SHIFT)
 #define BLOCK_SIZE_W (BLOCK_SIZE/sizeof(W_))
@@ -23,7 +23,7 @@
 #define BLOCK_ROUND_UP(p)   ((void *) (((W_)(p)+BLOCK_SIZE-1) & ~BLOCK_MASK))
 #define BLOCK_ROUND_DOWN(p) ((void *) ((W_)(p) & ~BLOCK_MASK))
 
-/* Megablock related constants (1M megablocks) */
+/* Megablock related constants (MBLOCK_SHIFT is defined in Constants.h) */
 
 #define MBLOCK_SIZE    (1<<MBLOCK_SHIFT)
 #define MBLOCK_SIZE_W  (MBLOCK_SIZE/sizeof(W_))

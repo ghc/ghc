@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.53 2002/07/24 18:18:13 sof Exp $
+ * $Id: Printer.c,v 1.54 2002/12/11 15:36:45 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -28,7 +28,7 @@
 #if defined(GRAN) || defined(PAR)
 // HWL: explicit fixed header size to make debugging easier
 int fixed_hs = FIXED_HS, itbl_sz = sizeofW(StgInfoTable), 
-    uf_sz=sizeofW(StgUpdateFrame), sf_sz=sizeofW(StgSeqFrame); 
+    uf_sz=sizeofW(StgUpdateFrame); 
 #endif
 
 /* --------------------------------------------------------------------------
@@ -36,6 +36,7 @@ int fixed_hs = FIXED_HS, itbl_sz = sizeofW(StgInfoTable),
  * ------------------------------------------------------------------------*/
 
 static void    printStdObject( StgClosure *obj, char* tag );
+static void    printStdObjPayload( StgClosure *obj );
 static void    reset_table   ( int size );
 static void    prepare_table ( void );
 static void    insert        ( unsigned value, const char *name );
@@ -58,43 +59,48 @@ void printPtr( StgPtr p )
     if (raw != NULL) {
         printZcoded(raw);
     } else {
-        fprintf(stdout, "%p", p);
+        fprintf(stderr, "%p", p);
     }
 }
   
 void printObj( StgClosure *obj )
 {
-    fprintf(stdout,"Object "); printPtr((StgPtr)obj); fprintf(stdout," = ");
+    fprintf(stderr,"Object "); printPtr((StgPtr)obj); fprintf(stderr," = ");
     printClosure(obj);
 }
 
 static inline void
 printStdObjHdr( StgClosure *obj, char* tag )
 {
-    fprintf(stdout,"%s(",tag);
+    fprintf(stderr,"%s(",tag);
     printPtr((StgPtr)obj->header.info);
 #ifdef PROFILING
-    fprintf(stdout,", %s", obj->header.prof.ccs->cc->label);
+    fprintf(stderr,", %s", obj->header.prof.ccs->cc->label);
 #endif
+}
+
+static void
+printStdObjPayload( StgClosure *obj )
+{
+    StgWord i, j;
+    const StgInfoTable* info;
+
+    info = get_itbl(obj);
+    for (i = 0; i < info->layout.payload.ptrs; ++i) {
+        fprintf(stderr,", ");
+        printPtr((StgPtr)obj->payload[i]);
+    }
+    for (j = 0; j < info->layout.payload.nptrs; ++j) {
+        fprintf(stderr,", %pd#",obj->payload[i+j]);
+    }
+    fprintf(stderr,")\n");
 }
 
 static void
 printStdObject( StgClosure *obj, char* tag )
 {
-    StgWord i, j;
-    const StgInfoTable* info;
-
     printStdObjHdr( obj, tag );
-
-    info = get_itbl(obj);
-    for (i = 0; i < info->layout.payload.ptrs; ++i) {
-        fprintf(stdout,", ");
-        printPtr((StgPtr)obj->payload[i]);
-    }
-    for (j = 0; j < info->layout.payload.nptrs; ++j) {
-        fprintf(stdout,", %pd#",obj->payload[i+j]);
-    }
-    fprintf(stdout,")\n");
+    printStdObjPayload( obj );
 }
 
 void
@@ -114,20 +120,33 @@ printClosure( StgClosure *obj )
     case MUT_VAR:
         {
 	  StgMutVar* mv = (StgMutVar*)obj;
-	  fprintf(stdout,"MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
+	  fprintf(stderr,"MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
           break;
         }
 
-    case AP_UPD:
+    case AP_STACK:
         {
-	    StgAP_UPD* ap = stgCast(StgAP_UPD*,obj);
+	    StgAP_STACK* ap = stgCast(StgAP_STACK*,obj);
             StgWord i;
-            fprintf(stdout,"AP_UPD("); printPtr((StgPtr)ap->fun);
-            for (i = 0; i < ap->n_args; ++i) {
-                fprintf(stdout,", ");
+            fprintf(stderr,"AP_STACK("); printPtr((StgPtr)ap->fun);
+            for (i = 0; i < ap->size; ++i) {
+                fprintf(stderr,", ");
                 printPtr((P_)ap->payload[i]);
             }
-            fprintf(stdout,")\n");
+            fprintf(stderr,")\n");
+            break;
+        }
+
+    case AP:
+        {
+	    StgPAP* ap = stgCast(StgPAP*,obj);
+            StgWord i;
+            fprintf(stderr,"AP("); printPtr((StgPtr)ap->fun);
+            for (i = 0; i < ap->n_args; ++i) {
+                fprintf(stderr,", ");
+                printPtr((P_)ap->payload[i]);
+            }
+            fprintf(stderr,")\n");
             break;
         }
 
@@ -135,103 +154,110 @@ printClosure( StgClosure *obj )
         {
 	    StgPAP* pap = stgCast(StgPAP*,obj);
             StgWord i;
-            fprintf(stdout,"PAP("); printPtr((StgPtr)pap->fun);
+            fprintf(stderr,"PAP/%d(",pap->arity); 
+	    printPtr((StgPtr)pap->fun);
             for (i = 0; i < pap->n_args; ++i) {
-                fprintf(stdout,", ");
+                fprintf(stderr,", ");
                 printPtr((StgPtr)pap->payload[i]);
             }
-            fprintf(stdout,")\n");
+            fprintf(stderr,")\n");
             break;
         }
 
     case FOREIGN:
-            fprintf(stdout,"FOREIGN("); 
+            fprintf(stderr,"FOREIGN("); 
             printPtr((StgPtr)( ((StgForeignObj*)obj)->data ));
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
             break;
 
     case IND:
-            fprintf(stdout,"IND("); 
+            fprintf(stderr,"IND("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
+            break;
+
+    case IND_PERM:
+            fprintf(stderr,"IND("); 
+            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            fprintf(stderr,")\n"); 
             break;
 
     case IND_STATIC:
-            fprintf(stdout,"IND_STATIC("); 
+            fprintf(stderr,"IND_STATIC("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
             break;
 
     case IND_OLDGEN:
-            fprintf(stdout,"IND_OLDGEN("); 
+            fprintf(stderr,"IND_OLDGEN("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
             break;
 
     case CAF_BLACKHOLE:
-            fprintf(stdout,"CAF_BH("); 
+            fprintf(stderr,"CAF_BH("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
             break;
 
     case SE_BLACKHOLE:
-            fprintf(stdout,"SE_BH\n"); 
+            fprintf(stderr,"SE_BH\n"); 
             break;
 
     case SE_CAF_BLACKHOLE:
-            fprintf(stdout,"SE_CAF_BH\n"); 
+            fprintf(stderr,"SE_CAF_BH\n"); 
             break;
 
     case BLACKHOLE:
-            fprintf(stdout,"BH\n"); 
+            fprintf(stderr,"BH\n"); 
             break;
 
     case BLACKHOLE_BQ:
-            fprintf(stdout,"BQ("); 
+            fprintf(stderr,"BQ("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
             break;
 
     case TSO:
-      fprintf(stdout,"TSO("); 
-      fprintf(stdout,"%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
-      fprintf(stdout,")\n"); 
+      fprintf(stderr,"TSO("); 
+      fprintf(stderr,"%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
+      fprintf(stderr,")\n"); 
       break;
 
 #if defined(PAR)
     case BLOCKED_FETCH:
-      fprintf(stdout,"BLOCKED_FETCH("); 
+      fprintf(stderr,"BLOCKED_FETCH("); 
       printGA(&(stgCast(StgBlockedFetch*,obj)->ga));
       printPtr((StgPtr)(stgCast(StgBlockedFetch*,obj)->node));
-      fprintf(stdout,")\n"); 
+      fprintf(stderr,")\n"); 
       break;
 
     case FETCH_ME:
-      fprintf(stdout,"FETCH_ME("); 
+      fprintf(stderr,"FETCH_ME("); 
       printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      fprintf(stdout,")\n"); 
+      fprintf(stderr,")\n"); 
       break;
 
 #ifdef DIST      
     case REMOTE_REF:
-      fprintf(stdout,"REMOTE_REF("); 
+      fprintf(stderr,"REMOTE_REF("); 
       printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      fprintf(stdout,")\n"); 
+      fprintf(stderr,")\n"); 
       break;
 #endif
   
     case FETCH_ME_BQ:
-      fprintf(stdout,"FETCH_ME_BQ("); 
+      fprintf(stderr,"FETCH_ME_BQ("); 
       // printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
       printPtr((StgPtr)stgCast(StgFetchMeBlockingQueue*,obj)->blocking_queue);
-      fprintf(stdout,")\n"); 
+      fprintf(stderr,")\n"); 
       break;
 #endif
 #if defined(GRAN) || defined(PAR)
     case RBH:
-      fprintf(stdout,"RBH("); 
+      fprintf(stderr,"RBH("); 
       printPtr((StgPtr)stgCast(StgRBH*,obj)->blocking_queue);
-      fprintf(stdout,")\n"); 
+      fprintf(stderr,")\n"); 
       break;
 
 #endif
@@ -249,21 +275,21 @@ printClosure( StgClosure *obj )
 	     */
             StgWord i, j;
 #ifdef PROFILING
-	    fprintf(stdout,"%s(", info->prof.closure_desc);
-	    fprintf(stdout,"%s", obj->header.prof.ccs->cc->label);
+	    fprintf(stderr,"%s(", info->prof.closure_desc);
+	    fprintf(stderr,"%s", obj->header.prof.ccs->cc->label);
 #else
-            fprintf(stdout,"CONSTR(");
+            fprintf(stderr,"CONSTR(");
             printPtr((StgPtr)obj->header.info);
-            fprintf(stdout,"(tag=%d)",info->srt_len);
+            fprintf(stderr,"(tag=%d)",info->srt_len);
 #endif
             for (i = 0; i < info->layout.payload.ptrs; ++i) {
-		fprintf(stdout,", ");
+		fprintf(stderr,", ");
                 printPtr((StgPtr)obj->payload[i]);
             }
             for (j = 0; j < info->layout.payload.nptrs; ++j) {
-                fprintf(stdout,", %p#", obj->payload[i+j]);
+                fprintf(stderr,", %p#", obj->payload[i+j]);
             }
-            fprintf(stdout,")\n");
+            fprintf(stderr,")\n");
             break;
         }
 
@@ -274,12 +300,12 @@ printClosure( StgClosure *obj )
             StgWord i;
             StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,obj);
 
-            fprintf(stdout,"Row<%i>(",p->ptrs);
+            fprintf(stderr,"Row<%i>(",p->ptrs);
             for (i = 0; i < p->ptrs; ++i) {
-                if (i > 0) fprintf(stdout,", ");
+                if (i > 0) fprintf(stderr,", ");
                 printPtr((StgPtr)(p->payload[i]));
             }
-            fprintf(stdout,")\n");
+            fprintf(stderr,")\n");
             break;
           }
 #endif  
@@ -288,8 +314,13 @@ printClosure( StgClosure *obj )
     case FUN_1_0: case FUN_0_1: 
     case FUN_1_1: case FUN_0_2: case FUN_2_0:
     case FUN_STATIC:
-            printStdObject(obj,"FUN");
-            break;
+	fprintf(stderr,"FUN/%d(",itbl_to_fun_itbl(info)->arity);
+	printPtr((StgPtr)obj->header.info);
+#ifdef PROFILING
+	fprintf(stderr,", %s", obj->header.prof.ccs->cc->label);
+#endif
+	printStdObjPayload(obj);
+	break;
 
     case THUNK:
     case THUNK_1_0: case THUNK_0_1:
@@ -305,71 +336,63 @@ printClosure( StgClosure *obj )
 
     case THUNK_SELECTOR:
 	printStdObjHdr(obj, "THUNK_SELECTOR");
-	fprintf(stdout, ", %p)\n", ((StgSelector *)obj)->selectee);
+	fprintf(stderr, ", %p)\n", ((StgSelector *)obj)->selectee);
+	break;
+
+    case MUT_ARR_PTRS:
+	fprintf(stderr,"MUT_ARR_PTRS(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
+	break;
+    case MUT_ARR_PTRS_FROZEN:
+	fprintf(stderr,"MUT_ARR_PTRS_FROZEN(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case ARR_WORDS:
         {
             StgWord i;
-            fprintf(stdout,"ARR_WORDS(\"");
+            fprintf(stderr,"ARR_WORDS(\"");
             /* ToDo: we can't safely assume that this is a string! 
             for (i = 0; arrWordsGetChar(obj,i); ++i) {
                 putchar(arrWordsGetChar(obj,i));
 		} */
 	    for (i=0; i<((StgArrWords *)obj)->words; i++)
-	      fprintf(stdout, "%u", ((StgArrWords *)obj)->payload[i]);
-            fprintf(stdout,"\")\n");
+	      fprintf(stderr, "%u", ((StgArrWords *)obj)->payload[i]);
+            fprintf(stderr,"\")\n");
             break;
         }
 
     case UPDATE_FRAME:
         {
             StgUpdateFrame* u = stgCast(StgUpdateFrame*,obj);
-            fprintf(stdout,"UpdateFrame(");
+            fprintf(stderr,"UPDATE_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stdout,",");
+            fprintf(stderr,",");
             printPtr((StgPtr)u->updatee);
-            fprintf(stdout,",");
-            printPtr((StgPtr)u->link);
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
             break;
         }
 
     case CATCH_FRAME:
         {
             StgCatchFrame* u = stgCast(StgCatchFrame*,obj);
-            fprintf(stdout,"CatchFrame(");
+            fprintf(stderr,"CATCH_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stdout,",");
+            fprintf(stderr,",");
             printPtr((StgPtr)u->handler);
-            fprintf(stdout,",");
-            printPtr((StgPtr)u->link);
-            fprintf(stdout,")\n"); 
-            break;
-        }
-
-    case SEQ_FRAME:
-        {
-            StgSeqFrame* u = stgCast(StgSeqFrame*,obj);
-            fprintf(stdout,"SeqFrame(");
-            printPtr((StgPtr)GET_INFO(u));
-            fprintf(stdout,",");
-            printPtr((StgPtr)u->link);
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
             break;
         }
 
     case STOP_FRAME:
         {
             StgStopFrame* u = stgCast(StgStopFrame*,obj);
-            fprintf(stdout,"StopFrame(");
+            fprintf(stderr,"STOP_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stdout,")\n"); 
+            fprintf(stderr,")\n"); 
             break;
         }
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
-            fprintf(stdout, "*** printClosure: unknown type %d ****\n",
+            fprintf(stderr, "*** printClosure: unknown type %d ****\n",
                     get_itbl(obj)->type );
             barf("printClosure %d",get_itbl(obj)->type);
             return;
@@ -383,159 +406,163 @@ void printGraph( StgClosure *obj )
 }
 */
 
-StgPtr printStackObj( StgPtr sp )
+StgPtr
+printStackObj( StgPtr sp )
 {
-    /*fprintf(stdout,"Stack[%d] = ", &stgStack[STACK_SIZE] - sp); */
+    /*fprintf(stderr,"Stack[%d] = ", &stgStack[STACK_SIZE] - sp); */
 
-    if (IS_ARG_TAG(*sp)) {
-        nat i;
-        StgWord tag = *sp++;
-        fprintf(stdout,"Tagged{");
-        for (i = 0; i < tag; i++) {
-            fprintf(stdout,"0x%x#", (unsigned)(*sp++));
-            if (i < tag-1) fprintf(stdout, ", ");
-        }
-        fprintf(stdout, "}\n");
-    } else {
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
         if (c == (StgClosure*)&stg_ctoi_ret_R1p_info) {
-           fprintf(stdout, "\t\t\tstg_ctoi_ret_R1p_info\n" );
+           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1p_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_R1n_info) {
-           fprintf(stdout, "\t\t\tstg_ctoi_ret_R1n_info\n" );
+           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1n_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_F1_info) {
-           fprintf(stdout, "\t\t\tstg_ctoi_ret_F1_info\n" );
+           fprintf(stderr, "\t\t\tstg_ctoi_ret_F1_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_D1_info) {
-           fprintf(stdout, "\t\t\tstg_ctoi_ret_D1_info\n" );
+           fprintf(stderr, "\t\t\tstg_ctoi_ret_D1_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_V_info) {
-           fprintf(stdout, "\t\t\tstg_ctoi_ret_V_info\n" );
+           fprintf(stderr, "\t\t\tstg_ctoi_ret_V_info\n" );
 	} else
         if (get_itbl(c)->type == BCO) {
-           fprintf(stdout, "\t\t\t");
-           fprintf(stdout, "BCO(...)\n"); 
+           fprintf(stderr, "\t\t\t");
+           fprintf(stderr, "BCO(...)\n"); 
         }
         else {
-           fprintf(stdout, "\t\t\t");
+           fprintf(stderr, "\t\t\t");
            printClosure ( (StgClosure*)(*sp));
         }
         sp += 1;
-    }
+
     return sp;
     
 }
 
-void printStackChunk( StgPtr sp, StgPtr spBottom )
+static void
+printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
+{
+    StgPtr p;
+    nat i;
+
+    p = payload;
+    for(i = 0; i < size; i++, bitmap >>= 1 ) {
+	fprintf(stderr,"   stk[%d] (%p) = ", spBottom-(payload+i), payload+i);
+	if ((bitmap & 1) == 0) {
+	    printPtr((P_)payload[i]);
+	    fprintf(stderr,"\n");
+	} else {
+	    fprintf(stderr,"Word# %d\n", payload[i]);
+	}
+    }
+}
+
+static void
+printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap, nat size )
+{
+    StgWord bmp;
+    nat i, j;
+
+    i = 0;
+    for (bmp=0; i < size; bmp++) {
+	StgWord bitmap = large_bitmap->bitmap[bmp];
+	j = 0;
+	for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
+	    fprintf(stderr,"   stk[%d] (%p) = ", spBottom-(payload+i), payload+i);
+	    if ((bitmap & 1) == 0) {
+		printPtr((P_)payload[i]);
+		fprintf(stderr,"\n");
+	    } else {
+		fprintf(stderr,"Word# %d\n", payload[i]);
+	    }
+	}
+    }
+}
+
+void
+printStackChunk( StgPtr sp, StgPtr spBottom )
 {
     StgWord bitmap;
     const StgInfoTable *info;
 
     ASSERT(sp <= spBottom);
-    while (sp < spBottom) {
-      if (!IS_ARG_TAG(*sp) && LOOKS_LIKE_GHC_INFO(*sp)) {
+    for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
+
 	info = get_itbl((StgClosure *)sp);
+
 	switch (info->type) {
-
+	    
 	case UPDATE_FRAME:
-	    printObj( stgCast(StgClosure*,sp) );
-	    sp += sizeofW(StgUpdateFrame);
-	    continue;
-
-	case SEQ_FRAME:
-	    printObj( stgCast(StgClosure*,sp) );
-	    sp += sizeofW(StgSeqFrame);
-	    continue;
-
 	case CATCH_FRAME:
-	    printObj( stgCast(StgClosure*,sp) );
-	    sp += sizeofW(StgCatchFrame);
-	    continue;
-
 	case STOP_FRAME:
-	    /* not quite: ASSERT(stgCast(StgPtr,su) == spBottom); */
-	    printObj( stgCast(StgClosure*,sp) );
+	    printObj((StgClosure*)sp);
 	    continue;
 
 	case RET_DYN:
-	  fprintf(stdout, "RET_DYN (%p)\n", sp);
-	  bitmap = *++sp;
-	  ++sp;
-	  fprintf(stdout, "Bitmap: 0x%x\n", bitmap);
-	  goto small_bitmap;
+	{ 
+	    StgRetDyn* r;
+	    StgPtr p;
+	    StgWord dyn;
+	    nat size;
+
+	    r = (StgRetDyn *)sp;
+	    dyn = r->liveness;
+	    fprintf(stderr, "RET_DYN (%p)\n", r);
+
+	    p = (P_)(r->payload);
+	    printSmallBitmap(spBottom, sp,
+			     GET_LIVENESS(r->liveness), RET_DYN_SIZE);
+	    p += RET_DYN_SIZE;
+
+	    for (size = GET_NONPTRS(dyn); size > 0; size--) {
+		fprintf(stderr,"   stk[%ld] (%p) = ", spBottom-p, p);
+		fprintf(stderr,"Word# %ld\n", *p);
+		p++;
+	    }
+	
+	    for (size = GET_PTRS(dyn); size > 0; size--) {
+		fprintf(stderr,"   stk[%ld] (%p) = ", spBottom-p, p);
+		printPtr(p);
+		p++;
+	    }
+	    continue;
+	}
 
 	case RET_SMALL:
 	case RET_VEC_SMALL:
-	  fprintf(stdout, "RET_SMALL (%p)\n", sp);
-	  bitmap = info->layout.bitmap;
-	  sp++;
-	small_bitmap:
-	  while (bitmap != 0) {
-	    fprintf(stdout,"   stk[%ld] (%p) = ", spBottom-sp, sp);
-	    if ((bitmap & 1) == 0) {
-	      printPtr((P_)*sp);
-	      fprintf(stdout,"\n");
-	    } else {
-	      fprintf(stdout,"Word# %ld\n", *sp);
-	    }	      
-	    sp++;
-	    bitmap = bitmap >> 1;
-	    }
-	  continue;
+	    fprintf(stderr, "RET_SMALL (%p)\n", sp);
+	    bitmap = info->layout.bitmap;
+	    printSmallBitmap(spBottom, sp+1, 
+			     BITMAP_BITS(bitmap), BITMAP_SIZE(bitmap));
+	    continue;
+
+	case RET_BCO: {
+	    StgBCO *bco;
+	    
+	    bco = ((StgBCO *)sp[1]);
+
+	    fprintf(stderr, "RET_BCO (%p)\n", sp);
+	    printLargeBitmap(spBottom, sp+2,
+			     BCO_BITMAP(bco), BCO_BITMAP_SIZE(bco));
+	    continue;
+	}
 
 	case RET_BIG:
 	case RET_VEC_BIG:
-	  barf("todo");
+	    barf("todo");
 
 	default:
-	  break;
+	    barf("printStackChunk");
 	}
-      }
-      fprintf(stdout,"Stack[%ld] (%p) = ", spBottom-sp, sp);
-      sp = printStackObj(sp);
     }
-}
-
-void printStack( StgPtr sp, StgPtr spBottom, StgUpdateFrame* su )
-{
-    /* check everything down to the first update frame */
-    printStackChunk( sp, stgCast(StgPtr,su) );
-    while ( stgCast(StgPtr,su) < spBottom) {
-	sp = stgCast(StgPtr,su);
-	switch (get_itbl(su)->type) {
-	case UPDATE_FRAME:
-                printObj( stgCast(StgClosure*,su) );
-                sp += sizeofW(StgUpdateFrame);
-		su = su->link;
-		break;
-	case SEQ_FRAME:
-                printObj( stgCast(StgClosure*,su) );
-                sp += sizeofW(StgSeqFrame);
-		su = stgCast(StgSeqFrame*,su)->link;
-		break;
-	case CATCH_FRAME:
-                printObj( stgCast(StgClosure*,su) );
-                sp += sizeofW(StgCatchFrame);
-		su = stgCast(StgCatchFrame*,su)->link;
-		break;
-	case STOP_FRAME:
-		/* not quite: ASSERT(stgCast(StgPtr,su) == spBottom); */
-                printObj( stgCast(StgClosure*,su) );
-		return;
-	default:
-		barf("printStack: weird record found on update frame list.");
-	}
-	printStackChunk( sp, stgCast(StgPtr,su) );
-    }
-    ASSERT(stgCast(StgPtr,su) == spBottom);
 }
 
 void printTSO( StgTSO *tso )
 {
-    printStack( tso->sp, tso->stack+tso->stack_size,tso->su);
-    /* printStackChunk( tso->sp, tso->stack+tso->stack_size); */
+    printStackChunk( tso->sp, tso->stack+tso->stack_size);
 }
 
 /* -----------------------------------------------------------------------------
@@ -545,72 +572,73 @@ void printTSO( StgTSO *tso )
    -------------------------------------------------------------------------- */
 
 static char *closure_type_names[] = {
-  "INVALID_OBJECT",          	/* 0  */
-  "CONSTR",                  	/* 1  */
-  "CONSTR_1_0",			/* 2  */
-  "CONSTR_0_1",			/* 3  */
-  "CONSTR_2_0",			/* 4  */
-  "CONSTR_1_1",			/* 5  */
-  "CONSTR_0_2",			/* 6  */
-  "CONSTR_INTLIKE",	        /* 7  */
-  "CONSTR_CHARLIKE",	        /* 8  */
-  "CONSTR_STATIC",	        /* 9  */
-  "CONSTR_NOCAF_STATIC",     	/* 10 */
-  "FUN",		        /* 11 */
-  "FUN_1_0",		  	/* 12 */
-  "FUN_0_1",		  	/* 13 */
-  "FUN_2_0",		  	/* 14 */
-  "FUN_1_1",		  	/* 15 */
-  "FUN_0_2",			/* 16 */
-  "FUN_STATIC",	        	/* 17 */
-  "THUNK",		        /* 18 */
-  "THUNK_1_0",	  		/* 19 */
-  "THUNK_0_1",	  		/* 20 */
-  "THUNK_2_0",	  		/* 21 */
-  "THUNK_1_1",	  		/* 22 */
-  "THUNK_0_2",			/* 23 */
-  "THUNK_STATIC",	        /* 24 */
-  "THUNK_SELECTOR",	        /* 25 */
-  "BCO",		        /* 26 */
-  "AP_UPD",		        /* 27 */
-  "PAP",			/* 28 */
-  "IND",		        /* 29 */
-  "IND_OLDGEN",	        	/* 30 */
-  "IND_PERM",	        	/* 31 */
-  "IND_OLDGEN_PERM",	        /* 32 */
-  "IND_STATIC",	        	/* 33 */
-  "CAF_BLACKHOLE",		/* 36 */
-  "RET_BCO",                 	/* 37 */
-  "RET_SMALL",	        	/* 38 */
-  "RET_VEC_SMALL",	        /* 39 */
-  "RET_BIG",		        /* 40 */
-  "RET_VEC_BIG",	        /* 41 */
-  "RET_DYN",		        /* 42 */
-  "UPDATE_FRAME",	        /* 43 */
-  "CATCH_FRAME",	        /* 44 */
-  "STOP_FRAME",	        	/* 45 */
-  "SEQ_FRAME",	        	/* 46 */
-  "BLACKHOLE",	        	/* 47 */
-  "BLACKHOLE_BQ",	        /* 48 */
-  "SE_BLACKHOLE",		/* 49 */
-  "SE_CAF_BLACKHOLE",		/* 50 */
-  "MVAR",		        /* 51 */
-  "ARR_WORDS",	        	/* 52 */
-  "MUT_ARR_PTRS",	        /* 53 */
-  "MUT_ARR_PTRS_FROZEN",     	/* 54 */
-  "MUT_VAR",		        /* 55 */
-  "WEAK",		        /* 56 */
-  "FOREIGN",		        /* 57 */
-  "STABLE_NAME",	        /* 58 */
-  "TSO",		        /* 59 */
-  "BLOCKED_FETCH",	        /* 60 */
-  "FETCH_ME",                   /* 61 */
-  "FETCH_ME_BQ",                /* 62 */
-  "RBH",                        /* 63 */
-  "EVACUATED",                  /* 64 */
-  "REMOTE_REF",                 /* 65 */
-  "N_CLOSURE_TYPES"         	/* 66 */
+    "INVALID_OBJECT",
+    "CONSTR",
+    "CONSTR_1",
+    "CONSTR_0",
+    "CONSTR_2",
+    "CONSTR_1",
+    "CONSTR_0",
+    "CONSTR_INTLIKE",
+    "CONSTR_CHARLIKE",
+    "CONSTR_STATIC",
+    "CONSTR_NOCAF_STATIC",
+    "FUN",
+    "FUN_1_0",
+    "FUN_0_1",
+    "FUN_2_0",
+    "FUN_1_1",
+    "FUN_0",
+    "FUN_STATIC",
+    "THUNK",
+    "THUNK_1_0",
+    "THUNK_0_1",
+    "THUNK_2_0",
+    "THUNK_1_1",
+    "THUNK_0",
+    "THUNK_STATIC",
+    "THUNK_SELECTOR",
+    "BCO",
+    "AP_UPD",
+    "PAP",
+    "IND",
+    "IND_OLDGEN",
+    "IND_PERM",
+    "IND_OLDGEN_PERM",
+    "IND_STATIC",
+    "RET_BCO",
+    "RET_SMALL",
+    "RET_VEC_SMALL",
+    "RET_BIG",
+    "RET_VEC_BIG",
+    "RET_DYN",
+    "RET_FUN",
+    "UPDATE_FRAME",
+    "CATCH_FRAME",
+    "STOP_FRAME",
+    "CAF_BLACKHOLE",
+    "BLACKHOLE",
+    "BLACKHOLE_BQ",
+    "SE_BLACKHOLE",
+    "SE_CAF_BLACKHOLE",
+    "MVAR",
+    "ARR_WORDS",
+    "MUT_ARR_PTRS",
+    "MUT_ARR_PTRS_FROZEN",
+    "MUT_VAR",
+    "MUT_CONS",
+    "WEAK",
+    "FOREIGN",
+    "STABLE_NAME",
+    "TSO",
+    "BLOCKED_FETCH",
+    "FETCH_ME",
+    "FETCH_ME_BQ",
+    "RBH",
+    "EVACUATED",
+    "REMOTE_REF"
 };
+
 
 char *
 info_type(StgClosure *closure){ 
@@ -832,10 +860,10 @@ static void printZcoded( const char *raw )
     
     while ( raw[j] != '\0' ) {
         if (raw[j] == 'Z') {
-            fputc(unZcode(raw[j+1]),stdout);
+            fputc(unZcode(raw[j+1]),stderr);
             j = j + 2;
         } else {
-            fputc(raw[j],stdout);
+            fputc(raw[j],stderr);
             j = j + 1;
         }
     }
@@ -919,14 +947,14 @@ extern void DEBUG_LoadSymbols( char *name )
         for( i = 0; i != number_of_symbols; ++i ) {
             symbol_info info;
             bfd_get_symbol_info(abfd,symbol_table[i],&info);
-            /*fprintf(stdout,"\t%c\t0x%x      \t%s\n",info.type,(nat)info.value,info.name); */
+            /*fprintf(stderr,"\t%c\t0x%x      \t%s\n",info.type,(nat)info.value,info.name); */
             if (isReal(info.type, info.name)) {
                 num_real_syms += 1;
             }
         }
     
-        IF_DEBUG(evaluator,
-                 fprintf(stdout,"Loaded %ld symbols. Of which %ld are real symbols\n", 
+        IF_DEBUG(interpreter,
+                 fprintf(stderr,"Loaded %ld symbols. Of which %ld are real symbols\n", 
                          number_of_symbols, num_real_syms)
                  );
 
@@ -939,7 +967,7 @@ extern void DEBUG_LoadSymbols( char *name )
                 insert( info.value, info.name );
             }
         }
-        
+
         free(symbol_table);
     }
     prepare_table();
@@ -980,10 +1008,10 @@ findPtr(P_ p, int follow)
 		  if (*q == (W_)p) {
 		      if (i < arr_size) {
 			  r = q;
-			  while (!LOOKS_LIKE_GHC_INFO(*r) || (P_)*r == NULL) {
+			  while (!LOOKS_LIKE_INFO_PTR(*r) || (P_)*r == NULL) {
 			      r--;
 			  }
-			  fprintf(stdout, "%p = ", r);
+			  fprintf(stderr, "%p = ", r);
 			  printClosure((StgClosure *)r);
 			  arr[i++] = r;
 		      } else {
@@ -995,7 +1023,7 @@ findPtr(P_ p, int follow)
       }
   }
   if (follow && i == 1) {
-      fprintf(stdout, "-->\n");
+      fprintf(stderr, "-->\n");
       findPtr(arr[0], 1);
   }
 }
@@ -1003,11 +1031,11 @@ findPtr(P_ p, int follow)
 #else /* DEBUG */
 void printPtr( StgPtr p )
 {
-    fprintf(stdout, "ptr 0x%p (enable -DDEBUG for more info) " , p );
+    fprintf(stderr, "ptr 0x%p (enable -DDEBUG for more info) " , p );
 }
   
 void printObj( StgClosure *obj )
 {
-    fprintf(stdout, "obj 0x%p (enable -DDEBUG for more info) " , obj );
+    fprintf(stderr, "obj 0x%p (enable -DDEBUG for more info) " , obj );
 }
 #endif /* DEBUG */

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.17 2002/03/26 11:09:34 simonmar Exp $
+ * $Id: ClosureTypes.h,v 1.18 2002/12/11 15:36:37 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -40,44 +40,45 @@
 #define THUNK_STATIC	        24
 #define THUNK_SELECTOR	        25
 #define BCO		        26
-#define AP_UPD		        27
+#define AP		        27
 #define PAP			28
-#define IND		        29
-#define IND_OLDGEN	        30
-#define IND_PERM	        31
-#define IND_OLDGEN_PERM	        32
-#define IND_STATIC	        33
-#define RET_BCO                 34
-#define RET_SMALL	        35
-#define RET_VEC_SMALL	        36
-#define RET_BIG		        37
-#define RET_VEC_BIG	        38
-#define RET_DYN		        39
-#define UPDATE_FRAME	        40
-#define CATCH_FRAME	        41
-#define STOP_FRAME	        42
-#define SEQ_FRAME	        43
-#define CAF_BLACKHOLE		44
-#define BLACKHOLE	        45
-#define BLACKHOLE_BQ	        46
-#define SE_BLACKHOLE		47
-#define SE_CAF_BLACKHOLE	48
-#define MVAR		        49
-#define ARR_WORDS	        50
-#define MUT_ARR_PTRS	        51
-#define MUT_ARR_PTRS_FROZEN     52
-#define MUT_VAR		        53
-#define MUT_CONS                54
-#define WEAK		        55
-#define FOREIGN		        56
-#define STABLE_NAME	        57
-#define TSO		        58
-#define BLOCKED_FETCH	        59
-#define FETCH_ME                60
-#define FETCH_ME_BQ             61
-#define RBH                     62
-#define EVACUATED               63
-#define REMOTE_REF              64
-#define N_CLOSURE_TYPES         65
-
+#define AP_STACK                29
+#define IND		        30
+#define IND_OLDGEN	        31
+#define IND_PERM	        32
+#define IND_OLDGEN_PERM	        33
+#define IND_STATIC	        34
+#define RET_BCO                 35
+#define RET_SMALL	        36
+#define RET_VEC_SMALL	        37
+#define RET_BIG		        38
+#define RET_VEC_BIG	        39
+#define RET_DYN		        40
+#define RET_FUN                 41
+#define UPDATE_FRAME	        42
+#define CATCH_FRAME	        43
+#define STOP_FRAME	        44
+#define CAF_BLACKHOLE		45
+#define BLACKHOLE	        46
+#define BLACKHOLE_BQ	        47
+#define SE_BLACKHOLE		48
+#define SE_CAF_BLACKHOLE	49
+#define MVAR		        50
+#define ARR_WORDS	        51
+#define MUT_ARR_PTRS	        52
+#define MUT_ARR_PTRS_FROZEN     53
+#define MUT_VAR		        54
+#define MUT_CONS                55
+#define WEAK		        56
+#define FOREIGN		        57
+#define STABLE_NAME	        58
+#define TSO		        59
+#define BLOCKED_FETCH	        60
+#define FETCH_ME                61
+#define FETCH_ME_BQ             62
+#define RBH                     63
+#define EVACUATED               64
+#define REMOTE_REF              65
+#define N_CLOSURE_TYPES         66
+				
 #endif /* CLOSURETYPES_H */

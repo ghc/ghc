@@ -8,16 +8,19 @@ At various places in the back end, we want to be to tag things with a
 types.
 
 \begin{code}
-module PrimRep 
-      ( PrimRep(..)
-      , separateByPtrFollowness
-      , isFollowableRep
-      , isFloatingRep
-      , is64BitRep
-      , getPrimRepSize
-      , getPrimRepSizeInBytes
-      , retPrimRepSize
-      ) where
+module PrimRep (
+	PrimRep(..),
+	separateByPtrFollowness,
+	isFollowableRep,
+	isFloatingRep,
+	isNonPtrRep,	 
+	is64BitRep,
+	getPrimRepSize,
+	getPrimRepSizeInBytes,
+	retPrimRepSize,
+
+	ArgRep(..), primRepToArgRep,
+ ) where
 
 #include "HsVersions.h"
 
@@ -110,6 +113,15 @@ isFloatingRep FloatRep  = True
 isFloatingRep _         = False
 \end{code}
 
+Identify anything which is one word large and not a pointer.
+
+\begin{code}
+isNonPtrRep :: PrimRep -> Bool
+isNonPtrRep PtrRep  = False
+isNonPtrRep VoidRep = False
+isNonPtrRep r       = not (isFloatingRep r)
+\end{code}
+
 \begin{code}
 is64BitRep :: PrimRep -> Bool
 is64BitRep Int64Rep  = True
@@ -163,6 +175,36 @@ getPrimRepSizeInBytes other         = pprPanic "getPrimRepSizeInBytes" (ppr othe
 
 %************************************************************************
 %*									*
+\subsection{ArgReps}
+%*									*
+%************************************************************************
+
+An ArgRep is similar to a PrimRep, except that it is slightly
+narrower.  It corresponds to the distinctions we make between
+different type of function arguments for the purposes of a function's
+calling convention.  These reps are used to decide which of the RTS's
+generic apply functions to call when applying an unknown function.
+
+All 64-bit PrimReps map to the same ArgRep, because they're passed in
+the same register, but a PtrRep is still different from an IntRep
+(RepP vs. RepN respectively) because the function's entry convention
+has to take into account the pointer-hood of arguments for the
+purposes of describing the stack on entry to the garbage collector.
+
+\begin{code}
+data ArgRep = RepV | RepP | RepN | RepF | RepD | RepL
+
+primRepToArgRep VoidRep   = RepV
+primRepToArgRep FloatRep  = RepF
+primRepToArgRep DoubleRep = RepD
+primRepToArgRep r
+   | isFollowableRep r     = RepP
+   | is64BitRep r          = RepL
+   | otherwise             = ASSERT(getPrimRepSize r == 1) RepN
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection[PrimRep-instances]{Boring instance decls for @PrimRep@}
 %*									*
 %************************************************************************
@@ -194,3 +236,5 @@ showPrimRep DoubleRep	   = "StgDouble"
 showPrimRep StablePtrRep   = "StgStablePtr"
 showPrimRep VoidRep	   = "!!VOID_KIND!!"
 \end{code}
+
+

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.41 2002/11/26 07:02:04 mthomas Exp $
+ * $Id: MBlock.c,v 1.42 2002/12/11 15:36:42 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -188,10 +188,10 @@ getMBlocks(nat n)
 
       if (((W_)ret & MBLOCK_MASK) != 0) {
 	  // misaligned block!
-#ifdef DEBUG
+#if 0 // defined(DEBUG)
 	  belch("warning: getMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
 #endif
-	  
+
 	  // unmap this block...
 	  if (munmap(ret, size) == -1) {
 	      barf("getMBlock: munmap failed");

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.106 2002/10/23 08:52:26 simonmar Exp $
+ * $Id: Linker.c,v 1.107 2002/12/11 15:36:42 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -75,6 +75,9 @@
 
 /* Hash table mapping symbol names to Symbol */
 static /*Str*/HashTable *symhash;
+
+/* List of currently loaded objects */
+ObjectCode *objects = NULL;	/* initially empty */
 
 #if defined(OBJFORMAT_ELF)
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
@@ -293,35 +296,37 @@ typedef struct _RtsSymbolVal {
       Maybe_Stable_Names			\
       Sym(StgReturn)				\
       Sym(init_stack)				\
-      SymX(__stg_chk_0)				\
-      SymX(__stg_chk_1)				\
-      SymX(stg_chk_2)				\
-      SymX(stg_chk_3)				\
-      SymX(stg_chk_4)				\
-      SymX(stg_chk_5)				\
-      SymX(stg_chk_6)				\
-      SymX(stg_chk_7)				\
-      SymX(stg_chk_8)				\
-      Sym(stg_enterStackTop)			\
-      SymX(stg_gc_d1)				\
-      SymX(stg_gc_l1)				\
+      SymX(stg_enter_info)			\
+      SymX(stg_enter_ret)			\
+      SymX(stg_gc_void_info)			\
       SymX(__stg_gc_enter_1)			\
-      SymX(stg_gc_enter_2)			\
-      SymX(stg_gc_enter_3)			\
-      SymX(stg_gc_enter_4)			\
-      SymX(stg_gc_enter_5)			\
-      SymX(stg_gc_enter_6)			\
-      SymX(stg_gc_enter_7)			\
-      SymX(stg_gc_enter_8)			\
-      SymX(stg_gc_f1)				\
       SymX(stg_gc_noregs)			\
-      SymX(stg_gc_seq_1)			\
-      SymX(stg_gc_unbx_r1)			\
+      SymX(stg_gc_unpt_r1_info)			\
       SymX(stg_gc_unpt_r1)			\
-      SymX(stg_gc_ut_0_1)			\
-      SymX(stg_gc_ut_1_0)			\
-      SymX(stg_gen_chk)				\
+      SymX(stg_gc_unbx_r1_info)			\
+      SymX(stg_gc_unbx_r1)			\
+      SymX(stg_gc_f1_info)			\
+      SymX(stg_gc_f1)				\
+      SymX(stg_gc_d1_info)			\
+      SymX(stg_gc_d1)				\
+      SymX(stg_gc_l1_info)			\
+      SymX(stg_gc_l1)				\
+      SymX(__stg_gc_fun)			\
+      SymX(stg_gc_fun_info)			\
+      SymX(stg_gc_fun_ret)			\
+      SymX(stg_gc_gen)				\
+      SymX(stg_gc_gen_info)			\
+      SymX(stg_gc_gen_hp)			\
+      SymX(stg_gc_ut)				\
+      SymX(stg_gen_yield)			\
+      SymX(stg_yield_noregs)			\
       SymX(stg_yield_to_interpreter)		\
+      SymX(stg_gen_block)			\
+      SymX(stg_block_noregs)			\
+      SymX(stg_block_1)				\
+      SymX(stg_block_takemvar)			\
+      SymX(stg_block_putmvar)			\
+      SymX(stg_seq_frame_info)			\
       SymX(ErrorHdrHook)			\
       MAIN_CAP_SYM                              \
       SymX(MallocFailHook)			\
@@ -451,6 +456,35 @@ typedef struct _RtsSymbolVal {
       SymX(stg_INTLIKE_closure)			\
       SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
       SymX(stg_WEAK_info)                       \
+      SymX(stg_ap_v_info)			\
+      SymX(stg_ap_f_info)			\
+      SymX(stg_ap_d_info)			\
+      SymX(stg_ap_l_info)			\
+      SymX(stg_ap_n_info)			\
+      SymX(stg_ap_p_info)			\
+      SymX(stg_ap_pv_info)			\
+      SymX(stg_ap_pp_info)			\
+      SymX(stg_ap_ppv_info)			\
+      SymX(stg_ap_ppp_info)			\
+      SymX(stg_ap_pppp_info)			\
+      SymX(stg_ap_ppppp_info)			\
+      SymX(stg_ap_pppppp_info)			\
+      SymX(stg_ap_ppppppp_info)			\
+      SymX(stg_ap_0_ret)			\
+      SymX(stg_ap_v_ret)			\
+      SymX(stg_ap_f_ret)			\
+      SymX(stg_ap_d_ret)			\
+      SymX(stg_ap_l_ret)			\
+      SymX(stg_ap_n_ret)			\
+      SymX(stg_ap_p_ret)			\
+      SymX(stg_ap_pv_ret)			\
+      SymX(stg_ap_pp_ret)			\
+      SymX(stg_ap_ppv_ret)			\
+      SymX(stg_ap_ppp_ret)			\
+      SymX(stg_ap_pppp_ret)			\
+      SymX(stg_ap_ppppp_ret)			\
+      SymX(stg_ap_pppppp_ret)			\
+      SymX(stg_ap_ppppppp_ret)			\
       SymX(stg_ap_1_upd_info)			\
       SymX(stg_ap_2_upd_info)			\
       SymX(stg_ap_3_upd_info)			\
@@ -476,9 +510,7 @@ typedef struct _RtsSymbolVal {
       SymX(stg_sel_7_upd_info)			\
       SymX(stg_sel_8_upd_info)			\
       SymX(stg_sel_9_upd_info)			\
-      SymX(stg_seq_frame_info)			\
       SymX(stg_upd_frame_info)			\
-      SymX(__stg_update_PAP)			\
       SymX(suspendThread)			\
       SymX(takeMVarzh_fast)			\
       SymX(timesIntegerzh_fast)			\
@@ -816,14 +848,16 @@ void ghci_enquire ( char* addr )
       for (i = 0; i < oc->n_symbols; i++) {
          sym = oc->symbols[i];
          if (sym == NULL) continue;
-         /* fprintf(stderr, "enquire %p %p\n", sym, oc->lochash); */
+         // fprintf(stderr, "enquire %p %p\n", sym, oc->lochash);
          a = NULL;
-         if (oc->lochash != NULL)
+         if (oc->lochash != NULL) {
             a = lookupStrHashTable(oc->lochash, sym);
-         if (a == NULL)
-            a = lookupStrHashTable(symhash, sym);
+	 }
          if (a == NULL) {
-            /* fprintf(stderr, "ghci_enquire: can't find %s\n", sym); */
+            a = lookupStrHashTable(symhash, sym);
+	 }
+         if (a == NULL) {
+	     // fprintf(stderr, "ghci_enquire: can't find %s\n", sym);
          }
          else if (addr-DELTA <= a && a <= addr+DELTA) {
             fprintf(stderr, "%p + %3d  ==  `%s'\n", addr, a - addr, sym);

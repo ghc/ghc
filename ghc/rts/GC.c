@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.145 2002/10/25 09:40:47 simonmar Exp $
+ * $Id: GC.c,v 1.146 2002/12/11 15:36:42 simonmar Exp $
  *
- * (c) The GHC Team 1998-1999
+ * (c) The GHC Team 1998-2002
  *
  * Generational garbage collector
  *
@@ -11,6 +11,7 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "Apply.h"
 #include "Storage.h"
 #include "StoragePriv.h"
 #include "Stats.h"
@@ -137,6 +138,7 @@ static lnat thunk_selector_depth = 0;
    Static function declarations
    -------------------------------------------------------------------------- */
 
+static bdescr *     gc_alloc_block          ( step *stp );
 static void         mark_root               ( StgClosure **root );
 static StgClosure * evacuate                ( StgClosure *q );
 static void         zero_static_object_list ( StgClosure* first_static );
@@ -147,14 +149,19 @@ static void         mark_weak_ptr_list      ( StgWeak **list );
 
 static StgClosure * eval_thunk_selector     ( nat field, StgSelector * p );
 
-static void         scavenge                ( step * );
-static void         scavenge_mark_stack     ( void );
-static void         scavenge_stack          ( StgPtr p, StgPtr stack_end );
-static rtsBool      scavenge_one            ( StgPtr p );
-static void         scavenge_large          ( step * );
-static void         scavenge_static         ( void );
-static void         scavenge_mutable_list   ( generation *g );
-static void         scavenge_mut_once_list  ( generation *g );
+
+static void    scavenge                ( step * );
+static void    scavenge_mark_stack     ( void );
+static void    scavenge_stack          ( StgPtr p, StgPtr stack_end );
+static rtsBool scavenge_one            ( StgPtr p );
+static void    scavenge_large          ( step * );
+static void    scavenge_static         ( void );
+static void    scavenge_mutable_list   ( generation *g );
+static void    scavenge_mut_once_list  ( generation *g );
+
+static void    scavenge_large_bitmap   ( StgPtr p, 
+					 StgLargeBitmap *large_bitmap, 
+					 nat size );
 
 #if 0 && defined(DEBUG)
 static void         gcCAFs                  ( void );
@@ -208,20 +215,67 @@ pop_mark_stack(void)
 }
 
 /* -----------------------------------------------------------------------------
+   Allocate a new to-space block in the given step.
+   -------------------------------------------------------------------------- */
+
+static bdescr *
+gc_alloc_block(step *stp)
+{
+    bdescr *bd = allocBlock();
+    bd->gen_no = stp->gen_no;
+    bd->step = stp;
+    bd->link = NULL;
+
+    // blocks in to-space in generations up to and including N
+    // get the BF_EVACUATED flag.
+    if (stp->gen_no <= N) {
+	bd->flags = BF_EVACUATED;
+    } else {
+	bd->flags = 0;
+    }
+
+    // Start a new to-space block, chain it on after the previous one.
+    if (stp->hp_bd == NULL) {
+	stp->hp_bd = bd;
+    } else {
+	stp->hp_bd->free = stp->hp;
+	stp->hp_bd->link = bd;
+	stp->hp_bd = bd;
+    }
+
+    stp->hp    = bd->start;
+    stp->hpLim = stp->hp + BLOCK_SIZE_W;
+
+    stp->n_to_blocks++;
+    new_blocks++;
+
+    return bd;
+}
+
+/* -----------------------------------------------------------------------------
    GarbageCollect
 
-   For garbage collecting generation N (and all younger generations):
+   Rough outline of the algorithm: for garbage collecting generation N
+   (and all younger generations):
 
      - follow all pointers in the root set.  the root set includes all 
-       mutable objects in all steps in all generations.
+       mutable objects in all generations (mutable_list and mut_once_list).
 
      - for each pointer, evacuate the object it points to into either
-       + to-space in the next higher step in that generation, if one exists,
-       + if the object's generation == N, then evacuate it to the next
-         generation if one exists, or else to-space in the current
-	 generation.
-       + if the object's generation < N, then evacuate it to to-space
-         in the next generation.
+
+       + to-space of the step given by step->to, which is the next
+         highest step in this generation or the first step in the next
+         generation if this is the last step.
+
+       + to-space of generations[evac_gen]->steps[0], if evac_gen != 0.
+         When we evacuate an object we attempt to evacuate
+         everything it points to into the same generation - this is
+         achieved by setting evac_gen to the desired generation.  If
+         we can't do this, then an entry in the mut_once list has to
+         be made for the cross-generation pointer.
+
+       + if the object is already in a generation > N, then leave
+         it alone.
 
      - repeatedly scavenge to-space from each step in each generation
        being collected until no more objects can be evacuated.
@@ -325,9 +379,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
    */
   new_blocks = 0;
 
-  /* Initialise to-space in all the generations/steps that we're
-   * collecting.
-   */
+  // Initialise to-space in all the generations/steps that we're
+  // collecting.
+  //
   for (g = 0; g <= N; g++) {
     generations[g].mut_once_list = END_MUT_LIST;
     generations[g].mut_list = END_MUT_LIST;
@@ -339,28 +393,26 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	continue; 
       }
 
-      /* Get a free block for to-space.  Extra blocks will be chained on
-       * as necessary.
-       */
-      bd = allocBlock();
       stp = &generations[g].steps[s];
       ASSERT(stp->gen_no == g);
-      ASSERT(stp->hp ? Bdescr(stp->hp)->step == stp : rtsTrue);
-      bd->gen_no = g;
-      bd->step = stp;
-      bd->link = NULL;
-      bd->flags        = BF_EVACUATED;	// it's a to-space block 
-      stp->hp          = bd->start;
-      stp->hpLim       = stp->hp + BLOCK_SIZE_W;
-      stp->hp_bd       = bd;
+
+      // start a new to-space for this step.
+      stp->hp        = NULL;
+      stp->hp_bd     = NULL;
+      stp->to_blocks = NULL;
+
+      // allocate the first to-space block; extra blocks will be
+      // chained on as necessary.
+      bd = gc_alloc_block(stp);
       stp->to_blocks   = bd;
-      stp->n_to_blocks = 1;
       stp->scan        = bd->start;
       stp->scan_bd     = bd;
+
+      // initialise the large object queues.
       stp->new_large_objects = NULL;
       stp->scavenged_large_objects = NULL;
       stp->n_scavenged_large_blocks = 0;
-      new_blocks++;
+
       // mark the large objects as not evacuated yet 
       for (bd = stp->large_objects; bd; bd = bd->link) {
 	bd->flags = BF_LARGE;
@@ -398,24 +450,16 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   }
 
   /* make sure the older generations have at least one block to
-   * allocate into (this makes things easier for copy(), see below.
+   * allocate into (this makes things easier for copy(), see below).
    */
   for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
       stp = &generations[g].steps[s];
       if (stp->hp_bd == NULL) {
 	  ASSERT(stp->blocks == NULL);
-	  bd = allocBlock();
-	  bd->gen_no = g;
-	  bd->step = stp;
-	  bd->link = NULL;
-	  bd->flags = 0;	// *not* a to-space block or a large object
-	  stp->hp = bd->start;
-	  stp->hpLim = stp->hp + BLOCK_SIZE_W;
-	  stp->hp_bd = bd;
+	  bd = gc_alloc_block(stp);
 	  stp->blocks = bd;
 	  stp->n_blocks = 1;
-	  new_blocks++;
       }
       /* Set the scan pointer for older generations: remember we
        * still have to scavenge objects that have been promoted. */
@@ -636,8 +680,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       for (s = 0; s < generations[g].n_steps; s++) {
 	  stp = &generations[g].steps[s];
 	  if (!(g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1)) {
+	      ASSERT(Bdescr(stp->hp) == stp->hp_bd);
 	      stp->hp_bd->free = stp->hp;
-	      stp->hp_bd->link = NULL;
 	  }
       }
   }
@@ -760,6 +804,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
 	// add the new blocks we promoted during this GC 
 	stp->n_blocks += stp->n_to_blocks;
+	stp->n_to_blocks = 0;
 	stp->n_large_blocks += stp->n_scavenged_large_blocks;
       }
     }
@@ -1292,18 +1337,22 @@ isAlive(StgClosure *p)
 
   while (1) {
 
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
 
-    /* ToDo: for static closures, check the static link field.
-     * Problem here is that we sometimes don't set the link field, eg.
-     * for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
-     */
-
-  loop:
-    bd = Bdescr((P_)p);
+    // ignore static closures 
+    //
+    // ToDo: for static closures, check the static link field.
+    // Problem here is that we sometimes don't set the link field, eg.
+    // for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
+    //
+    if (!HEAP_ALLOCED(p)) {
+	return p;
+    }
 
     // ignore closures in generations that we're not collecting. 
-    if (LOOKS_LIKE_STATIC(p) || bd->gen_no > N) {
+    bd = Bdescr((P_)p);
+    if (bd->gen_no > N) {
 	return p;
     }
 
@@ -1340,8 +1389,9 @@ isAlive(StgClosure *p)
     case TSO:
       if (((StgTSO *)p)->what_next == ThreadRelocated) {
 	p = (StgClosure *)((StgTSO *)p)->link;
-	goto loop;
-      }
+	continue;
+      } 
+      return NULL;
 
     default:
       // dead. 
@@ -1355,29 +1405,6 @@ mark_root(StgClosure **root)
 {
   *root = evacuate(*root);
 }
-
-static void
-addBlock(step *stp)
-{
-  bdescr *bd = allocBlock();
-  bd->gen_no = stp->gen_no;
-  bd->step = stp;
-
-  if (stp->gen_no <= N) {
-    bd->flags = BF_EVACUATED;
-  } else {
-    bd->flags = 0;
-  }
-
-  stp->hp_bd->free = stp->hp;
-  stp->hp_bd->link = bd;
-  stp->hp = bd->start;
-  stp->hpLim = stp->hp + BLOCK_SIZE_W;
-  stp->hp_bd = bd;
-  stp->n_to_blocks++;
-  new_blocks++;
-}
-
 
 static __inline__ void 
 upd_evacuee(StgClosure *p, StgClosure *dest)
@@ -1418,7 +1445,7 @@ copy(StgClosure *src, nat size, step *stp)
    * necessary.
    */
   if (stp->hp + size >= stp->hpLim) {
-    addBlock(stp);
+    gc_alloc_block(stp);
   }
 
   for(to = stp->hp, from = (P_)src; size>0; --size) {
@@ -1461,7 +1488,7 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
   }
 
   if (stp->hp + size_to_reserve >= stp->hpLim) {
-    addBlock(stp);
+    gc_alloc_block(stp);
   }
 
   for(to = stp->hp, from = (P_)src; size_to_copy>0; --size_to_copy) {
@@ -1556,7 +1583,6 @@ evacuate_large(StgPtr p)
    the promotion until the next GC.
    -------------------------------------------------------------------------- */
 
-
 static StgClosure *
 mkMutCons(StgClosure *ptr, generation *gen)
 {
@@ -1569,7 +1595,7 @@ mkMutCons(StgClosure *ptr, generation *gen)
    * necessary.
    */
   if (stp->hp + sizeofW(StgIndOldGen) >= stp->hpLim) {
-    addBlock(stp);
+    gc_alloc_block(stp);
   }
 
   q = (StgMutVar *)stp->hp;
@@ -1668,16 +1694,14 @@ loop:
 #endif
 
   // make sure the info pointer is into text space 
-  ASSERT(q && (LOOKS_LIKE_GHC_INFO(GET_INFO(q))
-	       || IS_HUGS_CONSTR_INFO(GET_INFO(q))));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
   info = get_itbl(q);
   
   switch (info -> type) {
 
   case MUT_VAR:
   case MVAR:
-      to = copy(q,sizeW_fromITBL(info),stp);
-      return to;
+      return copy(q,sizeW_fromITBL(info),stp);
 
   case CONSTR_0_1:
   { 
@@ -1761,6 +1785,12 @@ loop:
 	    p = evacuate(p);
 	    thunk_selector_depth--;
 	    upd_evacuee(q,p);
+#ifdef PROFILING
+	    // We store the size of the just evacuated object in the
+	    // LDV word so that the profiler can guess the position of
+	    // the next object later.
+	    SET_EVACUAEE_FOR_LDV(q, THUNK_SELECTOR_sizeW());
+#endif
 	    return p;
 	}
     }
@@ -1824,16 +1854,15 @@ loop:
   case UPDATE_FRAME:
   case STOP_FRAME:
   case CATCH_FRAME:
-  case SEQ_FRAME:
     // shouldn't see these 
     barf("evacuate: stack frame at %p\n", q);
 
-  case AP_UPD:
   case PAP:
-    /* PAPs and AP_UPDs are special - the payload is a copy of a chunk
-     * of stack, tagging and all.
-     */
+  case AP:
       return copy(q,pap_sizeW((StgPAP*)q),stp);
+
+  case AP_STACK:
+      return copy(q,ap_stack_sizeW((StgAP_STACK*)q),stp);
 
   case EVACUATED:
     /* Already evacuated, just return the forwarding address.
@@ -2037,7 +2066,7 @@ selector_loop:
 	  }
       }
 
-      case AP_UPD:
+      case AP:
       case THUNK:
       case THUNK_1_0:
       case THUNK_0_1:
@@ -2078,81 +2107,26 @@ selector_loop:
    -------------------------------------------------------------------------- */
 
 void
-move_TSO(StgTSO *src, StgTSO *dest)
+move_TSO (StgTSO *src, StgTSO *dest)
 {
     ptrdiff_t diff;
 
     // relocate the stack pointers... 
     diff = (StgPtr)dest - (StgPtr)src; // In *words* 
     dest->sp = (StgPtr)dest->sp + diff;
-    dest->su = (StgUpdateFrame *) ((P_)dest->su + diff);
-
-    relocate_stack(dest, diff);
 }
 
-/* -----------------------------------------------------------------------------
-   relocate_stack is called to update the linkage between
-   UPDATE_FRAMEs (and SEQ_FRAMEs etc.) when a stack is moved from one
-   place to another.
-   -------------------------------------------------------------------------- */
-
-StgTSO *
-relocate_stack(StgTSO *dest, ptrdiff_t diff)
-{
-  StgUpdateFrame *su;
-  StgCatchFrame  *cf;
-  StgSeqFrame    *sf;
-
-  su = dest->su;
-
-  while ((P_)su < dest->stack + dest->stack_size) {
-    switch (get_itbl(su)->type) {
-   
-      // GCC actually manages to common up these three cases! 
-
-    case UPDATE_FRAME:
-      su->link = (StgUpdateFrame *) ((StgPtr)su->link + diff);
-      su = su->link;
-      continue;
-
-    case CATCH_FRAME:
-      cf = (StgCatchFrame *)su;
-      cf->link = (StgUpdateFrame *) ((StgPtr)cf->link + diff);
-      su = cf->link;
-      continue;
-
-    case SEQ_FRAME:
-      sf = (StgSeqFrame *)su;
-      sf->link = (StgUpdateFrame *) ((StgPtr)sf->link + diff);
-      su = sf->link;
-      continue;
-
-    case STOP_FRAME:
-      // all done! 
-      break;
-
-    default:
-      barf("relocate_stack %d", (int)(get_itbl(su)->type));
-    }
-    break;
-  }
-
-  return dest;
-}
-
-
-
+/* evacuate the SRT.  If srt_len is zero, then there isn't an
+ * srt field in the info table.  That's ok, because we'll
+ * never dereference it.
+ */
 static inline void
-scavenge_srt(const StgInfoTable *info)
+scavenge_srt (StgClosure **srt, nat srt_len)
 {
-  StgClosure **srt, **srt_end;
+  StgClosure **srt_end;
 
-  /* evacuate the SRT.  If srt_len is zero, then there isn't an
-   * srt field in the info table.  That's ok, because we'll
-   * never dereference it.
-   */
-  srt = (StgClosure **)(info->srt);
-  srt_end = srt + info->srt_len;
+  srt_end = srt + srt_len;
+
   for (; srt < srt_end; srt++) {
     /* Special-case to handle references to closures hiding out in DLLs, since
        double indirections required to get at those. The code generator knows
@@ -2175,6 +2149,34 @@ scavenge_srt(const StgInfoTable *info)
   }
 }
 
+
+static inline void
+scavenge_thunk_srt(const StgInfoTable *info)
+{
+    StgThunkInfoTable *thunk_info;
+
+    thunk_info = itbl_to_thunk_itbl(info);
+    scavenge_srt((StgClosure **)thunk_info->srt, thunk_info->i.srt_len);
+}
+
+static inline void
+scavenge_fun_srt(const StgInfoTable *info)
+{
+    StgFunInfoTable *fun_info;
+
+    fun_info = itbl_to_fun_itbl(info);
+    scavenge_srt((StgClosure **)fun_info->srt, fun_info->i.srt_len);
+}
+
+static inline void
+scavenge_ret_srt(const StgInfoTable *info)
+{
+    StgRetInfoTable *ret_info;
+
+    ret_info = itbl_to_ret_itbl(info);
+    scavenge_srt((StgClosure **)ret_info->srt, ret_info->i.srt_len);
+}
+
 /* -----------------------------------------------------------------------------
    Scavenge a TSO.
    -------------------------------------------------------------------------- */
@@ -2182,24 +2184,108 @@ scavenge_srt(const StgInfoTable *info)
 static void
 scavengeTSO (StgTSO *tso)
 {
-  // chase the link field for any TSOs on the same queue 
-  (StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
-  if (   tso->why_blocked == BlockedOnMVar
-	 || tso->why_blocked == BlockedOnBlackHole
-	 || tso->why_blocked == BlockedOnException
+    // chase the link field for any TSOs on the same queue 
+    (StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
+    if (   tso->why_blocked == BlockedOnMVar
+	|| tso->why_blocked == BlockedOnBlackHole
+	|| tso->why_blocked == BlockedOnException
 #if defined(PAR)
-	 || tso->why_blocked == BlockedOnGA
-	 || tso->why_blocked == BlockedOnGA_NoSend
+	|| tso->why_blocked == BlockedOnGA
+	|| tso->why_blocked == BlockedOnGA_NoSend
 #endif
-	 ) {
-    tso->block_info.closure = evacuate(tso->block_info.closure);
-  }
-  if ( tso->blocked_exceptions != NULL ) {
-    tso->blocked_exceptions = 
-      (StgTSO *)evacuate((StgClosure *)tso->blocked_exceptions);
-  }
-  // scavenge this thread's stack 
-  scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+	) {
+	tso->block_info.closure = evacuate(tso->block_info.closure);
+    }
+    if ( tso->blocked_exceptions != NULL ) {
+	tso->blocked_exceptions = 
+	    (StgTSO *)evacuate((StgClosure *)tso->blocked_exceptions);
+    }
+    
+    // scavenge this thread's stack 
+    scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+}
+
+/* -----------------------------------------------------------------------------
+   Blocks of function args occur on the stack (at the top) and
+   in PAPs.
+   -------------------------------------------------------------------------- */
+
+static inline StgPtr
+scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
+{
+    StgPtr p;
+    StgWord bitmap;
+    nat size;
+
+    p = (StgPtr)args;
+    switch (fun_info->fun_type) {
+    case ARG_GEN:
+	bitmap = BITMAP_BITS(fun_info->bitmap);
+	size = BITMAP_SIZE(fun_info->bitmap);
+	goto small_bitmap;
+    case ARG_GEN_BIG:
+	size = ((StgLargeBitmap *)fun_info->bitmap)->size;
+	scavenge_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap, size);
+	p += size;
+	break;
+    default:
+	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
+	size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->fun_type]);
+    small_bitmap:
+	while (size > 0) {
+	    if ((bitmap & 1) == 0) {
+		(StgClosure *)*p = evacuate((StgClosure *)*p);
+	    }
+	    p++;
+	    bitmap = bitmap >> 1;
+	    size--;
+	}
+	break;
+    }
+    return p;
+}
+
+static inline StgPtr
+scavenge_PAP (StgPAP *pap)
+{
+    StgPtr p;
+    StgWord bitmap, size;
+    StgFunInfoTable *fun_info;
+
+    pap->fun = evacuate(pap->fun);
+    fun_info = get_fun_itbl(pap->fun);
+    ASSERT(fun_info->i.type != PAP);
+
+    p = (StgPtr)pap->payload;
+    size = pap->n_args;
+
+    switch (fun_info->fun_type) {
+    case ARG_GEN:
+	bitmap = BITMAP_BITS(fun_info->bitmap);
+	goto small_bitmap;
+    case ARG_GEN_BIG:
+	scavenge_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap, size);
+	p += size;
+	break;
+    case ARG_BCO:
+	scavenge_large_bitmap((StgPtr)pap->payload, BCO_BITMAP(pap->fun), size);
+	p += size;
+	break;
+    default:
+	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
+    small_bitmap:
+	size = pap->n_args;
+	while (size > 0) {
+	    if ((bitmap & 1) == 0) {
+		(StgClosure *)*p = evacuate((StgClosure *)*p);
+	    }
+	    p++;
+	    bitmap = bitmap >> 1;
+	    size--;
+	}
+	break;
+    }
+    return p;
 }
 
 /* -----------------------------------------------------------------------------
@@ -2241,8 +2327,8 @@ scavenge(step *stp)
       continue;
     }
 
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl((StgClosure *)p);
-    ASSERT(p && (LOOKS_LIKE_GHC_INFO(info) || IS_HUGS_CONSTR_INFO(info)));
     
     ASSERT(thunk_selector_depth == 0);
 
@@ -2266,9 +2352,15 @@ scavenge(step *stp)
 	break;
     }
 
-    case THUNK_2_0:
     case FUN_2_0:
-	scavenge_srt(info);
+	scavenge_fun_srt(info);
+	((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
+	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	p += sizeofW(StgHeader) + 2;
+	break;
+
+    case THUNK_2_0:
+	scavenge_thunk_srt(info);
     case CONSTR_2_0:
 	((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
 	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
@@ -2276,49 +2368,62 @@ scavenge(step *stp)
 	break;
 	
     case THUNK_1_0:
-	scavenge_srt(info);
+	scavenge_thunk_srt(info);
 	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 2; // MIN_UPD_SIZE 
 	break;
 	
     case FUN_1_0:
-	scavenge_srt(info);
+	scavenge_fun_srt(info);
     case CONSTR_1_0:
 	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 1;
 	break;
 	
     case THUNK_0_1:
-	scavenge_srt(info);
+	scavenge_thunk_srt(info);
 	p += sizeofW(StgHeader) + 2; // MIN_UPD_SIZE 
 	break;
 	
     case FUN_0_1:
-	scavenge_srt(info);
+	scavenge_fun_srt(info);
     case CONSTR_0_1:
 	p += sizeofW(StgHeader) + 1;
 	break;
 	
     case THUNK_0_2:
+	scavenge_thunk_srt(info);
+	p += sizeofW(StgHeader) + 2;
+	break;
+	
     case FUN_0_2:
-	scavenge_srt(info);
+	scavenge_fun_srt(info);
     case CONSTR_0_2:
 	p += sizeofW(StgHeader) + 2;
 	break;
 	
     case THUNK_1_1:
+	scavenge_thunk_srt(info);
+	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	p += sizeofW(StgHeader) + 2;
+	break;
+
     case FUN_1_1:
-	scavenge_srt(info);
+	scavenge_fun_srt(info);
     case CONSTR_1_1:
 	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 2;
 	break;
 	
     case FUN:
+	scavenge_fun_srt(info);
+	goto gen_obj;
+
     case THUNK:
-	scavenge_srt(info);
+	scavenge_thunk_srt(info);
 	// fall through 
 	
+    gen_obj:
     case CONSTR:
     case WEAK:
     case FOREIGN:
@@ -2405,20 +2510,22 @@ scavenge(step *stp)
 	break;
     }
 
-    case AP_UPD: // same as PAPs 
-    case PAP:
-	/* Treat a PAP just like a section of stack, not forgetting to
-	 * evacuate the function pointer too...
-	 */
-    { 
-	StgPAP* pap = (StgPAP *)p;
+    // A chunk of stack saved in a heap object
+    case AP_STACK:
+    {
+	StgAP_STACK *ap = (StgAP_STACK *)p;
 
-	pap->fun = evacuate(pap->fun);
-	scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
-	p += pap_sizeW(pap);
+	ap->fun = evacuate(ap->fun);
+	scavenge_stack((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
+	p = (StgPtr)ap->payload + ap->size;
 	break;
     }
-      
+
+    case PAP:
+    case AP:
+	p = scavenge_PAP((StgPAP *)p);
+	break;
+
     case ARR_WORDS:
 	// nothing to follow 
 	p += arr_words_sizeW((StgArrWords *)p);
@@ -2575,8 +2682,8 @@ linear_scan:
     while (!mark_stack_empty()) {
 	p = pop_mark_stack();
 
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 	info = get_itbl((StgClosure *)p);
-	ASSERT(p && (LOOKS_LIKE_GHC_INFO(info) || IS_HUGS_CONSTR_INFO(info)));
 	
 	q = p;
 	switch (info->type) {
@@ -2597,8 +2704,13 @@ linear_scan:
 	}
 
 	case FUN_2_0:
+	    scavenge_fun_srt(info);
+	    ((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
+	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	    break;
+
 	case THUNK_2_0:
-	    scavenge_srt(info);
+	    scavenge_thunk_srt(info);
 	case CONSTR_2_0:
 	    ((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
 	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
@@ -2606,9 +2718,13 @@ linear_scan:
 	
 	case FUN_1_0:
 	case FUN_1_1:
+	    scavenge_fun_srt(info);
+	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	    break;
+
 	case THUNK_1_0:
 	case THUNK_1_1:
-	    scavenge_srt(info);
+	    scavenge_thunk_srt(info);
 	case CONSTR_1_0:
 	case CONSTR_1_1:
 	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
@@ -2616,18 +2732,27 @@ linear_scan:
 	
 	case FUN_0_1:
 	case FUN_0_2:
+	    scavenge_fun_srt(info);
+	    break;
+
 	case THUNK_0_1:
 	case THUNK_0_2:
-	    scavenge_srt(info);
+	    scavenge_thunk_srt(info);
+	    break;
+
 	case CONSTR_0_1:
 	case CONSTR_0_2:
 	    break;
 	
 	case FUN:
+	    scavenge_fun_srt(info);
+	    goto gen_obj;
+
 	case THUNK:
-	    scavenge_srt(info);
+	    scavenge_thunk_srt(info);
 	    // fall through 
 	
+	gen_obj:
 	case CONSTR:
 	case WEAK:
 	case FOREIGN:
@@ -2694,18 +2819,20 @@ linear_scan:
 	    break;
 	}
 
-	case AP_UPD: // same as PAPs 
-	case PAP:
-	    /* Treat a PAP just like a section of stack, not forgetting to
-	     * evacuate the function pointer too...
-	     */
-	{ 
-	    StgPAP* pap = (StgPAP *)p;
+	// A chunk of stack saved in a heap object
+	case AP_STACK:
+	{
+	    StgAP_STACK *ap = (StgAP_STACK *)p;
 	    
-	    pap->fun = evacuate(pap->fun);
-	    scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
+	    ap->fun = evacuate(ap->fun);
+	    scavenge_stack((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
 	    break;
 	}
+
+	case PAP:
+	case AP:
+	    scavenge_PAP((StgPAP *)p);
+	    break;
       
 	case MUT_ARR_PTRS:
 	    // follow everything 
@@ -2874,9 +3001,7 @@ scavenge_one(StgPtr p)
     nat saved_evac_gen = evac_gen;
     rtsBool no_luck;
     
-    ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO((StgClosure *)p))
-		 || IS_HUGS_CONSTR_INFO(GET_INFO((StgClosure *)p))));
-    
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl((StgClosure *)p);
     
     switch (info->type) {
@@ -2929,7 +3054,7 @@ scavenge_one(StgPtr p)
     case ARR_WORDS:
 	// nothing to follow 
 	break;
-      
+
     case MUT_ARR_PTRS:
     {
 	// follow everything 
@@ -2970,14 +3095,20 @@ scavenge_one(StgPtr p)
 	break;
     }
   
-    case AP_UPD:
-    case PAP:
-    { 
-	StgPAP* pap = (StgPAP *)p;
-	pap->fun = evacuate(pap->fun);
-	scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
+    case AP_STACK:
+    {
+	StgAP_STACK *ap = (StgAP_STACK *)p;
+
+	ap->fun = evacuate(ap->fun);
+	scavenge_stack((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
+	p = (StgPtr)ap->payload + ap->size;
 	break;
     }
+
+    case PAP:
+    case AP:
+	p = scavenge_PAP((StgPAP *)p);
+	break;
 
     case IND_OLDGEN:
 	// This might happen if for instance a MUT_CONS was pointing to a
@@ -3018,10 +3149,7 @@ scavenge_mut_once_list(generation *gen)
 
   for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
 
-    // make sure the info pointer is into text space 
-    ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
-		 || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
-    
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
     /*
     if (info->type==RBH)
@@ -3123,10 +3251,7 @@ scavenge_mutable_list(generation *gen)
 
   for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
 
-    // make sure the info pointer is into text space 
-    ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
-		 || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
-    
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
     /*
     if (info->type==RBH)
@@ -3311,14 +3436,13 @@ scavenge_static(void)
      list... */
   while (p != END_OF_STATIC_LIST) {
 
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
     /*
     if (info->type==RBH)
       info = REVERT_INFOPTR(info); // if it's an RBH, look at the orig closure
     */
     // make sure the info pointer is into text space 
-    ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
-		 || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
     
     /* Take this object *off* the static_objects list,
      * and put it on the scavenged_static_objects list.
@@ -3349,8 +3473,11 @@ scavenge_static(void)
       }
       
     case THUNK_STATIC:
+      scavenge_thunk_srt(info);
+      break;
+
     case FUN_STATIC:
-      scavenge_srt(info);
+      scavenge_fun_srt(info);
       break;
       
     case CONSTR_STATIC:
@@ -3380,200 +3507,163 @@ scavenge_static(void)
 }
 
 /* -----------------------------------------------------------------------------
+   scavenge a chunk of memory described by a bitmap
+   -------------------------------------------------------------------------- */
+
+static void
+scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
+{
+    nat i, b;
+    StgWord bitmap;
+    
+    b = 0;
+    bitmap = large_bitmap->bitmap[b];
+    for (i = 0; i < size; ) {
+	if ((bitmap & 1) == 0) {
+	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	}
+	i++;
+	p++;
+	if (i % BITS_IN(W_) == 0) {
+	    b++;
+	    bitmap = large_bitmap->bitmap[b];
+	} else {
+	    bitmap = bitmap >> 1;
+	}
+    }
+}
+
+static inline StgPtr
+scavenge_small_bitmap (StgPtr p, nat size, StgWord bitmap)
+{
+    while (size > 0) {
+	if ((bitmap & 1) == 0) {
+	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	}
+	p++;
+	bitmap = bitmap >> 1;
+	size--;
+    }
+    return p;
+}
+
+/* -----------------------------------------------------------------------------
    scavenge_stack walks over a section of stack and evacuates all the
    objects pointed to by it.  We can use the same code for walking
-   PAPs, since these are just sections of copied stack.
+   AP_STACK_UPDs, since these are just sections of copied stack.
    -------------------------------------------------------------------------- */
+
 
 static void
 scavenge_stack(StgPtr p, StgPtr stack_end)
 {
-  StgPtr q;
-  const StgInfoTable* info;
+  const StgRetInfoTable* info;
   StgWord bitmap;
+  nat size;
 
   //IF_DEBUG(sanity, belch("  scavenging stack between %p and %p", p, stack_end));
 
   /* 
    * Each time around this loop, we are looking at a chunk of stack
-   * that starts with either a pending argument section or an 
-   * activation record. 
+   * that starts with an activation record. 
    */
 
   while (p < stack_end) {
-    q = *(P_ *)p;
-
-    // If we've got a tag, skip over that many words on the stack 
-    if (IS_ARG_TAG((W_)q)) {
-      p += ARG_SIZE(q);
-      p++; continue;
-    }
-     
-    /* Is q a pointer to a closure?
-     */
-    if (! LOOKS_LIKE_GHC_INFO(q) ) {
-#ifdef DEBUG
-      if ( 0 && LOOKS_LIKE_STATIC_CLOSURE(q) ) {  // Is it a static closure? 
-	ASSERT(closure_STATIC((StgClosure *)q));
-      }
-      // otherwise, must be a pointer into the allocation space. 
-#endif
-
-      (StgClosure *)*p = evacuate((StgClosure *)q);
-      p++; 
-      continue;
-    }
+    info  = get_ret_itbl((StgClosure *)p);
       
-    /* 
-     * Otherwise, q must be the info pointer of an activation
-     * record.  All activation records have 'bitmap' style layout
-     * info.
-     */
-    info  = get_itbl((StgClosure *)p);
-      
-    switch (info->type) {
+    switch (info->i.type) {
 	
-      // Dynamic bitmap: the mask is stored on the stack 
-    case RET_DYN:
-      bitmap = ((StgRetDyn *)p)->liveness;
-      p      = (P_)&((StgRetDyn *)p)->payload[0];
-      goto small_bitmap;
-
-      // probably a slow-entry point return address: 
-    case FUN:
-    case FUN_STATIC:
-      {
-#if 0	
-	StgPtr old_p = p;
-	p++; p++; 
-	IF_DEBUG(sanity, 
-		 belch("HWL: scavenge_stack: FUN(_STATIC) adjusting p from %p to %p (instead of %p)",
-		       old_p, p, old_p+1));
-#else
-      p++; // what if FHS!=1 !? -- HWL 
-#endif
-      goto follow_srt;
-      }
-
-      /* Specialised code for update frames, since they're so common.
-       * We *know* the updatee points to a BLACKHOLE, CAF_BLACKHOLE,
-       * or BLACKHOLE_BQ, so just inline the code to evacuate it here.  
-       */
     case UPDATE_FRAME:
-      {
-	StgUpdateFrame *frame = (StgUpdateFrame *)p;
-
+	((StgUpdateFrame *)p)->updatee 
+	    = evacuate(((StgUpdateFrame *)p)->updatee);
 	p += sizeofW(StgUpdateFrame);
-
-#ifndef not_yet
-	frame->updatee = evacuate(frame->updatee);
 	continue;
-#else // specialised code for update frames, not sure if it's worth it.
-	StgClosure *to;
-	nat type = get_itbl(frame->updatee)->type;
-
-	if (type == EVACUATED) {
-	  frame->updatee = evacuate(frame->updatee);
-	  continue;
-	} else {
-	  bdescr *bd = Bdescr((P_)frame->updatee);
-	  step *stp;
-	  if (bd->gen_no > N) { 
-	    if (bd->gen_no < evac_gen) {
-	      failed_to_evac = rtsTrue;
-	    }
-	    continue;
-	  }
-
-	  // Don't promote blackholes 
-	  stp = bd->step;
-	  if (!(stp->gen_no == 0 && 
-		stp->no != 0 &&
-		stp->no == stp->gen->n_steps-1)) {
-	    stp = stp->to;
-	  }
-
-	  switch (type) {
-	  case BLACKHOLE:
-	  case CAF_BLACKHOLE:
-	    to = copyPart(frame->updatee, BLACKHOLE_sizeW(), 
-			  sizeofW(StgHeader), stp);
-	    frame->updatee = to;
-	    continue;
-	  case BLACKHOLE_BQ:
-	    to = copy(frame->updatee, BLACKHOLE_sizeW(), stp);
-	    frame->updatee = to;
-	    recordMutable((StgMutClosure *)to);
-	    continue;
-	  default:
-            /* will never be SE_{,CAF_}BLACKHOLE, since we
-               don't push an update frame for single-entry thunks.  KSW 1999-01. */
-	    barf("scavenge_stack: UPDATE_FRAME updatee");
-	  }
-	}
-#endif
-      }
 
       // small bitmap (< 32 entries, or 64 on a 64-bit machine) 
     case STOP_FRAME:
     case CATCH_FRAME:
-    case SEQ_FRAME:
-    case RET_BCO:
     case RET_SMALL:
     case RET_VEC_SMALL:
-      bitmap = info->layout.bitmap;
-      p++;
-      // this assumes that the payload starts immediately after the info-ptr 
-    small_bitmap:
-      while (bitmap != 0) {
-	if ((bitmap & 1) == 0) {
-	  (StgClosure *)*p = evacuate((StgClosure *)*p);
-	}
+	bitmap = BITMAP_BITS(info->i.layout.bitmap);
+	size   = BITMAP_SIZE(info->i.layout.bitmap);
+	// NOTE: the payload starts immediately after the info-ptr, we
+	// don't have an StgHeader in the same sense as a heap closure.
 	p++;
-	bitmap = bitmap >> 1;
-      }
-      
+	p = scavenge_small_bitmap(p, size, bitmap);
+
     follow_srt:
-      scavenge_srt(info);
-      continue;
+	scavenge_srt((StgClosure **)info->srt, info->i.srt_len);
+	continue;
+
+    case RET_BCO: {
+	StgBCO *bco;
+	nat size;
+
+	p++;
+	(StgClosure *)*p = evacuate((StgClosure *)*p);
+	bco = (StgBCO *)*p;
+	p++;
+	size = BCO_BITMAP_SIZE(bco);
+	scavenge_large_bitmap(p, BCO_BITMAP(bco), size);
+	p += size;
+	continue;
+    }
 
       // large bitmap (> 32 entries, or > 64 on a 64-bit machine) 
     case RET_BIG:
     case RET_VEC_BIG:
-      {
-	StgPtr q;
-	StgLargeBitmap *large_bitmap;
-	nat i;
+    {
+	nat size;
 
-	large_bitmap = info->layout.large_bitmap;
+	size = info->i.layout.large_bitmap->size;
 	p++;
-
-	for (i=0; i<large_bitmap->size; i++) {
-	  bitmap = large_bitmap->bitmap[i];
-	  q = p + BITS_IN(W_);
-	  while (bitmap != 0) {
-	    if ((bitmap & 1) == 0) {
-	      (StgClosure *)*p = evacuate((StgClosure *)*p);
-	    }
-	    p++;
-	    bitmap = bitmap >> 1;
-	  }
-	  if (i+1 < large_bitmap->size) {
-	    while (p < q) {
-	      (StgClosure *)*p = evacuate((StgClosure *)*p);
-	      p++;
-	    }
-	  }
-	}
-
+	scavenge_large_bitmap(p, info->i.layout.large_bitmap, size);
+	p += size;
 	// and don't forget to follow the SRT 
 	goto follow_srt;
-      }
+    }
+
+      // Dynamic bitmap: the mask is stored on the stack, and
+      // there are a number of non-pointers followed by a number
+      // of pointers above the bitmapped area.  (see StgMacros.h,
+      // HEAP_CHK_GEN).
+    case RET_DYN:
+    {
+	StgWord dyn;
+	dyn = ((StgRetDyn *)p)->liveness;
+
+	// traverse the bitmap first
+	bitmap = GET_LIVENESS(dyn);
+	p      = (P_)&((StgRetDyn *)p)->payload[0];
+	size   = RET_DYN_SIZE;
+	p = scavenge_small_bitmap(p, size, bitmap);
+
+	// skip over the non-ptr words
+	p += GET_NONPTRS(dyn);
+	
+	// follow the ptr words
+	for (size = GET_PTRS(dyn); size > 0; size--) {
+	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    p++;
+	}
+	continue;
+    }
+
+    case RET_FUN:
+    {
+	StgRetFun *ret_fun = (StgRetFun *)p;
+	StgFunInfoTable *fun_info;
+
+	ret_fun->fun = evacuate(ret_fun->fun);
+ 	fun_info = get_fun_itbl(ret_fun->fun);
+	p = scavenge_arg_block(fun_info, ret_fun->payload);
+	goto follow_srt;
+    }
 
     default:
-      barf("scavenge_stack: weird activation record found on stack: %d", (int)(info->type));
+	barf("scavenge_stack: weird activation record found on stack: %d", (int)(info->i.type));
     }
-  }
+  }		     
 }
 
 /*-----------------------------------------------------------------------------
@@ -3745,65 +3835,63 @@ gcCAFs(void)
 static void
 threadLazyBlackHole(StgTSO *tso)
 {
-  StgUpdateFrame *update_frame;
-  StgBlockingQueue *bh;
-  StgPtr stack_end;
+    StgClosure *frame;
+    StgRetInfoTable *info;
+    StgBlockingQueue *bh;
+    StgPtr stack_end;
+    
+    stack_end = &tso->stack[tso->stack_size];
+    
+    frame = (StgClosure *)tso->sp;
 
-  stack_end = &tso->stack[tso->stack_size];
-  update_frame = tso->su;
-
-  while (1) {
-    switch (get_itbl(update_frame)->type) {
-
-    case CATCH_FRAME:
-      update_frame = ((StgCatchFrame *)update_frame)->link;
-      break;
-
-    case UPDATE_FRAME:
-      bh = (StgBlockingQueue *)update_frame->updatee;
-
-      /* if the thunk is already blackholed, it means we've also
-       * already blackholed the rest of the thunks on this stack,
-       * so we can stop early.
-       *
-       * The blackhole made for a CAF is a CAF_BLACKHOLE, so they
-       * don't interfere with this optimisation.
-       */
-      if (bh->header.info == &stg_BLACKHOLE_info) {
-	return;
-      }
-
-      if (bh->header.info != &stg_BLACKHOLE_BQ_info &&
-	  bh->header.info != &stg_CAF_BLACKHOLE_info) {
+    while (1) {
+	info = get_ret_itbl(frame);
+	
+	switch (info->i.type) {
+	    
+	case UPDATE_FRAME:
+	    bh = (StgBlockingQueue *)((StgUpdateFrame *)frame)->updatee;
+	    
+	    /* if the thunk is already blackholed, it means we've also
+	     * already blackholed the rest of the thunks on this stack,
+	     * so we can stop early.
+	     *
+	     * The blackhole made for a CAF is a CAF_BLACKHOLE, so they
+	     * don't interfere with this optimisation.
+	     */
+	    if (bh->header.info == &stg_BLACKHOLE_info) {
+		return;
+	    }
+	    
+	    if (bh->header.info != &stg_BLACKHOLE_BQ_info &&
+		bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-        belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
+		belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
 #ifdef PROFILING
-        // @LDV profiling
-        // We pretend that bh is now dead.
-        LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
+		// @LDV profiling
+		// We pretend that bh is now dead.
+		LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
 #endif
-	SET_INFO(bh,&stg_BLACKHOLE_info);
+		SET_INFO(bh,&stg_BLACKHOLE_info);
 #ifdef PROFILING
-        // @LDV profiling
-        // We pretend that bh has just been created.
-        LDV_recordCreate(bh);
+		// @LDV profiling
+		// We pretend that bh has just been created.
+		LDV_recordCreate(bh);
 #endif
-      }
-
-      update_frame = update_frame->link;
-      break;
-
-    case SEQ_FRAME:
-      update_frame = ((StgSeqFrame *)update_frame)->link;
-      break;
-
-    case STOP_FRAME:
-      return;
-    default:
-      barf("threadPaused");
+	    }
+	    
+	    frame = (StgClosure *) ((StgUpdateFrame *)frame + 1);
+	    break;
+	    
+	case STOP_FRAME:
+	    return;
+	    
+	    // normal stack frames; do nothing except advance the pointer
+	default:
+	    (StgPtr)frame += stack_frame_sizeW(frame);
+	}
     }
-  }
 }
 
 
@@ -3815,277 +3903,204 @@ threadLazyBlackHole(StgTSO *tso)
  *
  * -------------------------------------------------------------------------- */
 
+struct stack_gap { StgWord gap_size; struct stack_gap *next_gap; };
+
 static void
 threadSqueezeStack(StgTSO *tso)
 {
-  lnat displacement = 0;
-  StgUpdateFrame *frame;
-  StgUpdateFrame *next_frame;		        // Temporally next 
-  StgUpdateFrame *prev_frame;			// Temporally previous 
-  StgPtr bottom;
-  rtsBool prev_was_update_frame;
-#if DEBUG
-  StgUpdateFrame *top_frame;
-  nat upd_frames=0, stop_frames=0, catch_frames=0, seq_frames=0,
-      bhs=0, squeezes=0;
-  void printObj( StgClosure *obj ); // from Printer.c
+    StgPtr frame;
+    rtsBool prev_was_update_frame;
+    StgClosure *updatee = NULL;
+    StgPtr bottom;
+    StgRetInfoTable *info;
+    StgWord current_gap_size;
+    struct stack_gap *gap;
 
-  top_frame  = tso->su;
-#endif
-  
-  bottom = &(tso->stack[tso->stack_size]);
-  frame  = tso->su;
+    // Stage 1: 
+    //    Traverse the stack upwards, replacing adjacent update frames
+    //    with a single update frame and a "stack gap".  A stack gap
+    //    contains two values: the size of the gap, and the distance
+    //    to the next gap (or the stack top).
 
-  /* There must be at least one frame, namely the STOP_FRAME.
-   */
-  ASSERT((P_)frame < bottom);
+    bottom = &(tso->stack[tso->stack_size]);
 
-  /* Walk down the stack, reversing the links between frames so that
-   * we can walk back up as we squeeze from the bottom.  Note that
-   * next_frame and prev_frame refer to next and previous as they were
-   * added to the stack, rather than the way we see them in this
-   * walk. (It makes the next loop less confusing.)  
-   *
-   * Stop if we find an update frame pointing to a black hole 
-   * (see comment in threadLazyBlackHole()).
-   */
-  
-  next_frame = NULL;
-  // bottom - sizeof(StgStopFrame) is the STOP_FRAME 
-  while ((P_)frame < bottom - sizeofW(StgStopFrame)) {  
-    prev_frame = frame->link;
-    frame->link = next_frame;
-    next_frame = frame;
-    frame = prev_frame;
-#if DEBUG
-    IF_DEBUG(sanity,
-	     if (!(frame>=top_frame && frame<=(StgUpdateFrame *)bottom)) {
-	       printObj((StgClosure *)prev_frame);
-	       barf("threadSqueezeStack: current frame is rubbish %p; previous was %p\n", 
-		    frame, prev_frame);
-	     })
-    switch (get_itbl(frame)->type) {
-    case UPDATE_FRAME:
-	upd_frames++;
-	if (frame->updatee->header.info == &stg_BLACKHOLE_info)
-	    bhs++;
-	break;
-    case STOP_FRAME:
-	stop_frames++;
-	break;
-    case CATCH_FRAME:
-	catch_frames++;
-	break;
-    case SEQ_FRAME:
-	seq_frames++;
-	break;
-    default:
-      barf("Found non-frame during stack squeezing at %p (prev frame was %p)\n",
-	   frame, prev_frame);
-      printObj((StgClosure *)prev_frame);
-    }
-#endif
-    if (get_itbl(frame)->type == UPDATE_FRAME
-	&& frame->updatee->header.info == &stg_BLACKHOLE_info) {
-        break;
-    }
-  }
+    frame = tso->sp;
 
-  /* Now, we're at the bottom.  Frame points to the lowest update
-   * frame on the stack, and its link actually points to the frame
-   * above. We have to walk back up the stack, squeezing out empty
-   * update frames and turning the pointers back around on the way
-   * back up.
-   *
-   * The bottom-most frame (the STOP_FRAME) has not been altered, and
-   * we never want to eliminate it anyway.  Just walk one step up
-   * before starting to squeeze. When you get to the topmost frame,
-   * remember that there are still some words above it that might have
-   * to be moved.  
-   */
-  
-  prev_frame = frame;
-  frame = next_frame;
-
-  prev_was_update_frame = (get_itbl(prev_frame)->type == UPDATE_FRAME);
-
-  /*
-   * Loop through all of the frames (everything except the very
-   * bottom).  Things are complicated by the fact that we have 
-   * CATCH_FRAMEs and SEQ_FRAMEs interspersed with the update frames.
-   * We can only squeeze when there are two consecutive UPDATE_FRAMEs.
-   */
-  while (frame != NULL) {
-    StgPtr sp;
-    StgPtr frame_bottom = (P_)frame + sizeofW(StgUpdateFrame);
-    rtsBool is_update_frame;
+    ASSERT(frame < bottom);
     
-    next_frame = frame->link;
-    is_update_frame = (get_itbl(frame)->type == UPDATE_FRAME);
+    prev_was_update_frame = rtsFalse;
+    current_gap_size = 0;
+    gap = (struct stack_gap *) (tso->sp - sizeofW(StgUpdateFrame));
 
-    /* Check to see if 
-     *   1. both the previous and current frame are update frames
-     *   2. the current frame is empty
-     */
-    if (prev_was_update_frame && is_update_frame &&
-	(P_)prev_frame == frame_bottom + displacement) {
-      
-      // Now squeeze out the current frame 
-      StgClosure *updatee_keep   = prev_frame->updatee;
-      StgClosure *updatee_bypass = frame->updatee;
-      
-#if DEBUG
-      IF_DEBUG(gc, belch("@@ squeezing frame at %p", frame));
-      squeezes++;
-#endif
+    while (frame < bottom) {
+	
+	info = get_ret_itbl((StgClosure *)frame);
+	switch (info->i.type) {
 
-      /* Deal with blocking queues.  If both updatees have blocked
-       * threads, then we should merge the queues into the update
-       * frame that we're keeping.
-       *
-       * Alternatively, we could just wake them up: they'll just go
-       * straight to sleep on the proper blackhole!  This is less code
-       * and probably less bug prone, although it's probably much
-       * slower --SDM
-       */
-#if 0 // do it properly... 
-#  if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-#    error Unimplemented lazy BH warning.  (KSW 1999-01)
-#  endif
-      if (GET_INFO(updatee_bypass) == stg_BLACKHOLE_BQ_info
-	  || GET_INFO(updatee_bypass) == stg_CAF_BLACKHOLE_info
-	  ) {
-	// Sigh.  It has one.  Don't lose those threads! 
-	  if (GET_INFO(updatee_keep) == stg_BLACKHOLE_BQ_info) {
-	  // Urgh.  Two queues.  Merge them. 
-	  P_ keep_tso = ((StgBlockingQueue *)updatee_keep)->blocking_queue;
-	  
-	  while (keep_tso->link != END_TSO_QUEUE) {
-	    keep_tso = keep_tso->link;
-	  }
-	  keep_tso->link = ((StgBlockingQueue *)updatee_bypass)->blocking_queue;
+	case UPDATE_FRAME:
+	{ 
+	    StgUpdateFrame *upd = (StgUpdateFrame *)frame;
 
-	} else {
-	  // For simplicity, just swap the BQ for the BH 
-	  P_ temp = updatee_keep;
-	  
-	  updatee_keep = updatee_bypass;
-	  updatee_bypass = temp;
-	  
-	  // Record the swap in the kept frame (below) 
-	  prev_frame->updatee = updatee_keep;
-	}
-      }
-#endif
+	    if (upd->updatee->header.info == &stg_BLACKHOLE_info) {
 
-      TICK_UPD_SQUEEZED();
-      /* wasn't there something about update squeezing and ticky to be
-       * sorted out?  oh yes: we aren't counting each enter properly
-       * in this case.  See the log somewhere.  KSW 1999-04-21
-       *
-       * Check two things: that the two update frames don't point to
-       * the same object, and that the updatee_bypass isn't already an
-       * indirection.  Both of these cases only happen when we're in a
-       * block hole-style loop (and there are multiple update frames
-       * on the stack pointing to the same closure), but they can both
-       * screw us up if we don't check.
-       */
-      if (updatee_bypass != updatee_keep && !closure_IND(updatee_bypass)) {
-	  // this wakes the threads up 
-	  UPD_IND_NOLOCK(updatee_bypass, updatee_keep);
-      }
-      
-      sp = (P_)frame - 1;	// sp = stuff to slide 
-      displacement += sizeofW(StgUpdateFrame);
-      
-    } else {
-      // No squeeze for this frame 
-      sp = frame_bottom - 1;	// Keep the current frame 
-      
-      /* Do lazy black-holing.
-       */
-      if (is_update_frame) {
-	StgBlockingQueue *bh = (StgBlockingQueue *)frame->updatee;
-	if (bh->header.info != &stg_BLACKHOLE_info &&
-	    bh->header.info != &stg_BLACKHOLE_BQ_info &&
-	    bh->header.info != &stg_CAF_BLACKHOLE_info) {
+		// found a BLACKHOLE'd update frame; we've been here
+		// before, in a previous GC, so just break out.
+
+		// Mark the end of the gap, if we're in one.
+		if (current_gap_size != 0) {
+		    gap = (struct stack_gap *)(frame-sizeofW(StgUpdateFrame));
+		}
+		
+		frame += sizeofW(StgUpdateFrame);
+		goto done_traversing;
+	    }
+
+	    if (prev_was_update_frame) {
+
+		TICK_UPD_SQUEEZED();
+		/* wasn't there something about update squeezing and ticky to be
+		 * sorted out?  oh yes: we aren't counting each enter properly
+		 * in this case.  See the log somewhere.  KSW 1999-04-21
+		 *
+		 * Check two things: that the two update frames don't point to
+		 * the same object, and that the updatee_bypass isn't already an
+		 * indirection.  Both of these cases only happen when we're in a
+		 * block hole-style loop (and there are multiple update frames
+		 * on the stack pointing to the same closure), but they can both
+		 * screw us up if we don't check.
+		 */
+		if (upd->updatee != updatee && !closure_IND(upd->updatee)) {
+		    // this wakes the threads up 
+		    UPD_IND_NOLOCK(upd->updatee, updatee);
+		}
+
+		// now mark this update frame as a stack gap.  The gap
+		// marker resides in the bottom-most update frame of
+		// the series of adjacent frames, and covers all the
+		// frames in this series.
+		current_gap_size += sizeofW(StgUpdateFrame);
+		((struct stack_gap *)frame)->gap_size = current_gap_size;
+		((struct stack_gap *)frame)->next_gap = gap;
+
+		frame += sizeofW(StgUpdateFrame);
+		continue;
+	    } 
+
+	    // single update frame, or the topmost update frame in a series
+	    else {
+		StgBlockingQueue *bh = (StgBlockingQueue *)upd->updatee;
+
+		// Do lazy black-holing
+		if (bh->header.info != &stg_BLACKHOLE_info &&
+		    bh->header.info != &stg_BLACKHOLE_BQ_info &&
+		    bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-          belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
+		    belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
 #ifdef DEBUG
-	  /* zero out the slop so that the sanity checker can tell
-	   * where the next closure is.
-	   */
-	  { 
-	      StgInfoTable *info = get_itbl(bh);
-	      nat np = info->layout.payload.ptrs, nw = info->layout.payload.nptrs, i;
-	      /* don't zero out slop for a THUNK_SELECTOR, because its layout
-	       * info is used for a different purpose, and it's exactly the
-	       * same size as a BLACKHOLE in any case.
-	       */
-	      if (info->type != THUNK_SELECTOR) {
-		for (i = np; i < np + nw; i++) {
-		  ((StgClosure *)bh)->payload[i] = 0;
+		    /* zero out the slop so that the sanity checker can tell
+		     * where the next closure is.
+		     */
+		    { 
+			StgInfoTable *bh_info = get_itbl(bh);
+			nat np = bh_info->layout.payload.ptrs, 
+			    nw = bh_info->layout.payload.nptrs, i;
+			/* don't zero out slop for a THUNK_SELECTOR,
+			 * because its layout info is used for a
+			 * different purpose, and it's exactly the
+			 * same size as a BLACKHOLE in any case.
+			 */
+			if (bh_info->type != THUNK_SELECTOR) {
+			    for (i = np; i < np + nw; i++) {
+				((StgClosure *)bh)->payload[i] = 0;
+			    }
+			}
+		    }
+#endif
+#ifdef PROFILING
+		    // We pretend that bh is now dead.
+		    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
+#endif
+		    // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+		    SET_INFO(bh,&stg_BLACKHOLE_info);
+#ifdef PROFILING
+		    // We pretend that bh has just been created.
+		    LDV_recordCreate(bh);
+#endif
 		}
-	      }
-	  }
-#endif
-#ifdef PROFILING
-          // @LDV profiling
-          // We pretend that bh is now dead.
-          LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
-#endif
-          // 
-          // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
-          // 
-	  SET_INFO(bh,&stg_BLACKHOLE_info);
-#ifdef PROFILING
-          // @LDV profiling
-          // We pretend that bh has just been created.
-          LDV_recordCreate(bh);
-#endif
+
+		prev_was_update_frame = rtsTrue;
+		updatee = upd->updatee;
+		frame += sizeofW(StgUpdateFrame);
+		continue;
+	    }
 	}
-      }
+	    
+	default:
+	    prev_was_update_frame = rtsFalse;
 
-      // Fix the link in the current frame (should point to the frame below) 
-      frame->link = prev_frame;
-      prev_was_update_frame = is_update_frame;
+	    // we're not in a gap... check whether this is the end of a gap
+	    // (an update frame can't be the end of a gap).
+	    if (current_gap_size != 0) {
+		gap = (struct stack_gap *) (frame - sizeofW(StgUpdateFrame));
+	    }
+	    current_gap_size = 0;
+
+	    frame += stack_frame_sizeW((StgClosure *)frame);
+	    continue;
+	}
     }
-    
-    // Now slide all words from sp up to the next frame 
-    
-    if (displacement > 0) {
-      P_ next_frame_bottom;
 
-      if (next_frame != NULL)
-	next_frame_bottom = (P_)next_frame + sizeofW(StgUpdateFrame);
-      else
-	next_frame_bottom = tso->sp - 1;
-      
-#if 0
-      IF_DEBUG(gc,
-	       belch("sliding [%p, %p] by %ld", sp, next_frame_bottom,
-		     displacement))
-#endif
-      
-      while (sp >= next_frame_bottom) {
-	sp[displacement] = *sp;
-	sp -= 1;
-      }
+done_traversing:
+	    
+    // Now we have a stack with gaps in it, and we have to walk down
+    // shoving the stack up to fill in the gaps.  A diagram might
+    // help:
+    //
+    //    +| ********* |
+    //     | ********* | <- sp
+    //     |           |
+    //     |           | <- gap_start
+    //     | ......... |                |
+    //     | stack_gap | <- gap         | chunk_size
+    //     | ......... |                | 
+    //     | ......... | <- gap_end     v
+    //     | ********* | 
+    //     | ********* | 
+    //     | ********* | 
+    //    -| ********* | 
+    //
+    // 'sp'  points the the current top-of-stack
+    // 'gap' points to the stack_gap structure inside the gap
+    // *****   indicates real stack data
+    // .....   indicates gap
+    // <empty> indicates unused
+    //
+    {
+	void *sp;
+	void *gap_start, *next_gap_start, *gap_end;
+	nat chunk_size;
+
+	next_gap_start = (void *)gap + sizeof(StgUpdateFrame);
+	sp = next_gap_start;
+
+	while ((StgPtr)gap > tso->sp) {
+
+	    // we're working in *bytes* now...
+	    gap_start = next_gap_start;
+	    gap_end = gap_start - gap->gap_size * sizeof(W_);
+
+	    gap = gap->next_gap;
+	    next_gap_start = (void *)gap + sizeof(StgUpdateFrame);
+
+	    chunk_size = gap_end - next_gap_start;
+	    sp -= chunk_size;
+	    memmove(sp, next_gap_start, chunk_size);
+	}
+
+	tso->sp = (StgPtr)sp;
     }
-    (P_)prev_frame = (P_)frame + displacement;
-    frame = next_frame;
-  }
-
-  tso->sp += displacement;
-  tso->su = prev_frame;
-#if 0
-  IF_DEBUG(gc,
-	   belch("@@ threadSqueezeStack: squeezed %d update-frames; found %d BHs; found %d update-, %d stop-, %d catch, %d seq-frames",
-		   squeezes, bhs, upd_frames, stop_frames, catch_frames, seq_frames))
-#endif
-}
-
+}    
 
 /* -----------------------------------------------------------------------------
  * Pausing a thread

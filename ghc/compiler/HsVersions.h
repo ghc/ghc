@@ -58,9 +58,11 @@ name = Util.global (value) :: IORef (ty); \
 #define ASSERT(e) if (not (e)) then (assertPanic __FILE__ __LINE__) else
 #define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
 #define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg))
+#define ASSERTM(e) ASSERT(e) do
 #else
 #define ASSERT(e)
 #define ASSERT2(e,msg)
+#define ASSERTM(e)
 #define WARN(e,msg)
 #endif
 

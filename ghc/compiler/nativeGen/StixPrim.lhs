@@ -259,10 +259,6 @@ save_thread_state
              (StMachOp MO_Nat_Add
 		       [StReg tso, StInt (toInteger (TSO_SP*BYTES_PER_WORD))])
 	     (StReg stgSp)
-        : StAssignMem PtrRep 
-	     (StMachOp MO_Nat_Add
-		       [StReg tso, StInt (toInteger (TSO_SU*BYTES_PER_WORD))])
-	     (StReg stgSu)
         : StAssignMem PtrRep
 	     (StMachOp MO_Nat_Add
 		       [StReg stgCurrentNursery, 
@@ -282,11 +278,6 @@ load_thread_state
 	     (StInd PtrRep 
                   (StMachOp MO_Nat_Add
                             [StReg tso, StInt (toInteger (TSO_SP*BYTES_PER_WORD))]))
-	: StAssignReg PtrRep 
-             stgSu
-	     (StInd PtrRep 
-                  (StMachOp MO_Nat_Add
-		            [StReg tso, StInt (toInteger (TSO_SU*BYTES_PER_WORD))]))
 	: StAssignReg PtrRep 
              stgSpLim
 	     (StMachOp MO_Nat_Add 

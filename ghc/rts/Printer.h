@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.h,v 1.6 2001/11/28 15:43:23 simonmar Exp $
+ * $Id: Printer.h,v 1.7 2002/12/11 15:36:45 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -14,8 +14,6 @@ extern void   	   printObj        ( StgClosure *obj );
 extern void   	   printClosure    ( StgClosure *obj );
 extern StgStackPtr printStackObj   ( StgStackPtr sp );
 extern void        printStackChunk ( StgStackPtr sp, StgStackPtr spLim );
-extern void        printStack      ( StgStackPtr sp, StgStackPtr spLim, 
-				     StgUpdateFrame* su );
 extern void        printTSO        ( StgTSO *tso );
 
 void   	           info_hdr_type   ( StgClosure *closure, char *res );

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.37 2002/12/02 14:33:10 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.38 2002/12/11 15:36:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -17,6 +17,8 @@
 #include "Prelude.h"
 #include "OSThreads.h"
 #include "Schedule.h"
+
+#include <stdlib.h>
 
 #if defined(RTS_SUPPORTS_THREADS)
 /* Cheesy locking scheme while waiting for the 
@@ -503,10 +505,13 @@ rts_checkSchedStatus ( char* site, SchedulerStatus rc )
     case Success:
 	return;
     case Killed:
-	barf("%s: uncaught exception",site);
+	prog_belch("%s: uncaught exception",site);
+	stg_exit(EXIT_FAILURE);
     case Interrupted:
-	barf("%s: interrupted", site);
+	prog_belch("%s: interrupted", site);
+	stg_exit(EXIT_FAILURE);
     default:
-	barf("%s: Return code (%d) not ok",(site),(rc));	
+	prog_belch("%s: Return code (%d) not ok",(site),(rc));	
+	stg_exit(EXIT_FAILURE);
     }
 }

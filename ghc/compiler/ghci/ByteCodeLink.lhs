@@ -16,7 +16,7 @@ module ByteCodeLink (
 #include "HsVersions.h"
 
 import ByteCodeItbls	( ItblEnv, ItblPtr )
-import ByteCodeAsm	( UnlinkedBCO(..), sizeSS, ssElts )
+import ByteCodeAsm	( UnlinkedBCO(..), BCOPtr(..), sizeSS, ssElts )
 import ObjLink		( lookupSymbol )
 
 import Name		( Name,  nameModule, nameOccName, isExternalName )
@@ -31,11 +31,13 @@ import Panic            ( GhcException(..) )
 -- Standard libraries
 import GHC.Word		( Word(..) )
 
-import Data.Array.IArray ( array )
-import Data.Array.Base	( UArray(..) )
-import Foreign		( Word16 )
+import Data.Array.IArray ( listArray )
+import Data.Array.Base
+import GHC.Arr		( STArray(..) )
 
 import Control.Exception ( throwDyn )
+import Control.Monad	( zipWithM )
+import Control.Monad.ST ( stToIO )
 
 import GHC.Exts		( BCO#, newBCO#, unsafeCoerce#, 
 			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
@@ -43,6 +45,7 @@ import GHC.Exts		( BCO#, newBCO#, unsafeCoerce#,
 import GHC.Arr		( Array(..) )
 import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..) )
+import GHC.Base		( writeArray#, RealWorld, Int(..) )
 \end{code}
 
 
@@ -54,7 +57,7 @@ import GHC.Ptr		( Ptr(..) )
 
 \begin{code}
 type ClosureEnv = NameEnv (Name, HValue)
-data HValue     = HValue  -- dummy type, actually a pointer to some Real Code.
+newtype HValue = HValue (forall a . a)
 
 emptyClosureEnv = emptyNameEnv
 
@@ -79,51 +82,91 @@ data BCO# = BCO# ByteArray# 		-- instrs   :: Array Word16#
 -}
 
 linkBCO :: ItblEnv -> ClosureEnv -> UnlinkedBCO -> IO HValue
-linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
--- Raises an IO exception on failure
-   = do let insns    = ssElts insnsSS
- 	    literals = ssElts literalsSS
+linkBCO ie ce ul_bco
+   = do BCO bco# <- linkBCO' ie ce ul_bco
+	-- SDM: Why do we need mkApUpd0 here?  I *think* it's because
+	-- otherwise top-level interpreted CAFs don't get updated 
+ 	-- after evaluation.   A top-level BCO will evaluate itself and
+	-- return its value when entered, but it won't update itself.
+	-- Wrapping the BCO in an AP_UPD thunk will take care of the
+	-- update for us.
+	--
+	-- Update: the above is true, but now we also have extra invariants:
+	--   (a) An AP thunk *must* point directly to a BCO
+	--   (b) A zero-arity BCO *must* be wrapped in an AP thunk
+	--   (c) An AP is always fully saturated, so we *can't* wrap
+	--       non-zero arity BCOs in an AP thunk.
+	-- 
+	if (unlinkedBCOArity ul_bco > 0) 
+	   then return (unsafeCoerce# bco#)
+	   else case mkApUpd0# bco# of { (# final_bco #) -> return final_bco }
+
+
+linkBCO' :: ItblEnv -> ClosureEnv -> UnlinkedBCO -> IO BCO
+linkBCO' ie ce (UnlinkedBCO nm arity insns_barr literalsSS ptrsSS itblsSS)
+   -- Raises an IO exception on failure
+   = do let literals = ssElts literalsSS
 	    ptrs     = ssElts ptrsSS
 	    itbls    = ssElts itblsSS
 
-        linked_ptrs     <- mapM (lookupCE ce) ptrs
         linked_itbls    <- mapM (lookupIE ie) itbls
         linked_literals <- mapM lookupLiteral literals
 
-        let n_insns    = sizeSS insnsSS
-            n_literals = sizeSS literalsSS
+        let n_literals = sizeSS literalsSS
             n_ptrs     = sizeSS ptrsSS
             n_itbls    = sizeSS itblsSS
 
-        let ptrs_arr = array (0, n_ptrs-1) (indexify linked_ptrs)
-                       :: Array Int HValue
+	ptrs_arr <- mkPtrsArray ie ce n_ptrs ptrs
+
+        let 
             ptrs_parr = case ptrs_arr of Array lo hi parr -> parr
 
-            itbls_arr = array (0, n_itbls-1) (indexify linked_itbls)
+            itbls_arr = listArray (0, n_itbls-1) linked_itbls
                         :: UArray Int ItblPtr
             itbls_barr = case itbls_arr of UArray lo hi barr -> barr
 
-            insns_arr | n_insns > 65535
-                      = panic "linkBCO: >= 64k insns in BCO"
-                      | otherwise 
-                      = array (0, n_insns) 
-                              (indexify (fromIntegral n_insns:insns))
-                        :: UArray Int Word16
-            insns_barr = case insns_arr of UArray lo hi barr -> barr
-
-            literals_arr = array (0, n_literals-1) (indexify linked_literals)
+            literals_arr = listArray (0, n_literals-1) linked_literals
                            :: UArray Int Word
             literals_barr = case literals_arr of UArray lo hi barr -> barr
 
-            indexify :: [a] -> [(Int, a)]
-            indexify xs = zip [0..] xs
+        newBCO insns_barr literals_barr ptrs_parr itbls_barr
 
-        BCO bco# <- newBCO insns_barr literals_barr ptrs_parr itbls_barr
 
-        -- WAS: return (unsafeCoerce# bco#)
-        case mkApUpd0# (unsafeCoerce# bco#) of
-           (# final_bco #) -> return final_bco
+-- we recursively link any sub-BCOs while making the ptrs array
+mkPtrsArray :: ItblEnv -> ClosureEnv -> Int -> [BCOPtr] -> IO (Array Int HValue)
+mkPtrsArray ie ce n_ptrs ptrs = do
+  marr <- newArray_ (0, n_ptrs-1)
+  let 
+    fill (BCOPtrName n)     i = do
+	ptr <- lookupName ce n
+	unsafeWrite marr i ptr
+    fill (BCOPtrPrimOp op)  i = do
+ 	ptr <- lookupPrimOp op
+	unsafeWrite marr i ptr
+    fill (BCOPtrBCO ul_bco) i = do
+	BCO bco# <- linkBCO' ie ce ul_bco
+	writeArrayBCO marr i bco#
+  zipWithM fill ptrs [0..]
+  unsafeFreeze marr
 
+newtype IOArray i e = IOArray (STArray RealWorld i e)
+
+instance HasBounds IOArray where
+    bounds (IOArray marr) = bounds marr
+
+instance MArray IOArray e IO where
+    newArray lu init = stToIO $ do
+        marr <- newArray lu init; return (IOArray marr)
+    newArray_ lu = stToIO $ do
+        marr <- newArray_ lu; return (IOArray marr)
+    unsafeRead (IOArray marr) i = stToIO (unsafeRead marr i)
+    unsafeWrite (IOArray marr) i e = stToIO (unsafeWrite marr i e)
+
+-- XXX HACK: we should really have a new writeArray# primop that takes a BCO#.
+writeArrayBCO :: IOArray Int a -> Int -> BCO# -> IO ()
+writeArrayBCO (IOArray (STArray _ _ marr#)) (I# i#) bco# = IO $ \s# ->
+  case (unsafeCoerce# writeArray#) marr# i# bco# s# of { s# ->
+  (# s#, () #) }
 
 data BCO = BCO BCO#
 
@@ -150,8 +193,8 @@ lookupStaticPtr addr_of_label_string
            Nothing  -> linkFail "ByteCodeLink: can't find label" 
                                 label_to_find
 
-lookupCE :: ClosureEnv -> Either Name PrimOp -> IO HValue
-lookupCE ce (Right primop)
+lookupPrimOp :: PrimOp -> IO HValue
+lookupPrimOp primop
    = do let sym_to_find = primopToCLabel primop "closure"
         m <- lookupSymbol sym_to_find
         case m of
@@ -159,7 +202,8 @@ lookupCE ce (Right primop)
                                  (# hval #) -> return hval
            Nothing -> linkFail "ByteCodeLink.lookupCE(primop)" sym_to_find
 
-lookupCE ce (Left nm)
+lookupName :: ClosureEnv -> Name -> IO HValue
+lookupName ce nm
    = case lookupNameEnv ce nm of
         Just (_,aa) -> return aa
         Nothing 

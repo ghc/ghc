@@ -29,9 +29,8 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe,
 			  playThreadSafe, ccallConvAttribute )
 import CLabel		( externallyVisibleCLabel,
-			  needsCDecl, pprCLabel,
+			  needsCDecl, pprCLabel, mkClosureLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
-			  mkClosureLabel, mkErrorStdEntryLabel,
 			  CLabel, CLabelType(..), labelType, labelDynamic
 			)
 
@@ -39,18 +38,17 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( pprCostCentreDecl, pprCostCentreStackDecl )
 
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
-import CStrings		( pprStringInCStyle, pprCLabelString )
+import CStrings		( pprCLabelString )
 import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
 import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
 import DataCon		( dataConWrapId )
-import Maybes		( maybeToBool, catMaybes )
+import Maybes		( catMaybes )
 import PrimOp		( primOpNeedsWrapper )
 import MachOp		( MachOp(..) )
 import ForeignCall	( ForeignCall(..) )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize )
-import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, UniqSet
@@ -59,12 +57,18 @@ import StgSyn		( StgOp(..) )
 import BitSet		( BitSet, intBS )
 import Outputable
 import FastString
-import Util		( lengthExceeds, listLengthCmp )
+import Util		( lengthExceeds )
+import Constants	( wORD_SIZE )
 
 #if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST
 #endif
 
+#ifdef DEBUG
+import Util		( listLengthCmp )
+#endif
+
+import Maybe		( isJust )
 import GLAEXTS
 import MONAD_ST
 
@@ -191,7 +195,7 @@ pprAbsC (CSwitch discrim [(tag1@(MachInt i1), alt_code1),
     else
 	do_if_stmt discrim tag2 alt_code2 alt_code1 c
   where
-    empty_deflt = not (maybeToBool (nonemptyAbsC deflt))
+    empty_deflt = not (isJust (nonemptyAbsC deflt))
 
 pprAbsC (CSwitch discrim alts deflt) c -- general case
   | isFloatingRep (getAmodeRep discrim)
@@ -295,11 +299,11 @@ pprAbsC stmt@(CSRT lbl closures) c
          <> ptext SLIT("};")
   }
 
-pprAbsC stmt@(CBitmap lbl mask) c
-  = pp_bitmap_switch mask semi $
+pprAbsC stmt@(CBitmap liveness@(Liveness lbl size mask)) c
+  = pp_liveness_switch liveness semi $
     hcat [ ptext SLIT("BITMAP"), lparen,
            pprCLabel lbl, comma,
-           int (length mask), comma,
+           int size, comma,
            pp_bitmap mask, rparen ]
 
 pprAbsC (CSimultaneous abs_c) c
@@ -390,7 +394,7 @@ pprAbsC stmt@(CCallTypedef is_tdef (CCallSpec op_str cconv _) uniq results args)
 	in ASSERT (listLengthCmp nvrs 1 /= GT) nvrs
 
 pprAbsC (CCodeBlock lbl abs_C) _
-  = if not (maybeToBool(nonemptyAbsC abs_C)) then
+  = if not (isJust(nonemptyAbsC abs_C)) then
 	pprTrace "pprAbsC: curious empty code block for" (pprCLabel lbl) empty
     else
     case (pprTempAndExternDecls abs_C) of { (pp_temps, pp_exts) ->
@@ -399,7 +403,7 @@ pprAbsC (CCodeBlock lbl abs_C) _
 	pp_exts, 
 	hcat [text (if (externallyVisibleCLabel lbl)
 			  then "FN_("	-- abbreviations to save on output
-			  else "IFN_("),
+			  else "IF_("),
 		   pprCLabel lbl, text ") {"],
 
 	pp_temps,
@@ -423,7 +427,7 @@ pprAbsC (CInitHdr cl_info amode cost_centre size) _
     info_lbl	= infoTableLabelFromCI cl_info
 
 
-pprAbsC stmt@(CStaticClosure cl_info cost_centre amodes) _
+pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
   = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
     vcat [
 	pp_exts,
@@ -440,7 +444,6 @@ pprAbsC stmt@(CStaticClosure cl_info cost_centre amodes) _
 	ptext SLIT("};") ]
     }
   where
-    closure_lbl = closureLabelFromCI cl_info
     info_lbl    = infoTableLabelFromCI cl_info
 
     ppr_payload [] = empty
@@ -457,81 +460,13 @@ pprAbsC stmt@(CStaticClosure cl_info cost_centre amodes) _
       where 
 	rep  = getAmodeRep item
 
-
-pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast cl_descr) _
-  = vcat [
-	hcat [
-	     ptext SLIT("INFO_TABLE"),
-	     ( if is_selector then
-	         ptext SLIT("_SELECTOR")
-	       else if is_constr then
-		 ptext SLIT("_CONSTR")
-	       else if needs_srt then
-	         ptext SLIT("_SRT")
-               else empty ), char '(',
-
-	    pprCLabel info_lbl,			        comma,
-	    pprCLabel slow_lbl,				comma,
-	    pp_rest, {- ptrs,nptrs,[srt,]type,-}	comma,
-
-	    ppLocalness info_lbl,			   comma,
-	    ppLocalnessMacro True{-include dyn-} slow_lbl, comma,
-
-	    if_profiling pp_descr, comma,
-	    if_profiling pp_type,
-	    text ");"
-	     ],
-	pp_slow,
-	case maybe_fast of
-	    Nothing -> empty
-	    Just fast -> let stuff = CCodeBlock fast_lbl fast in
-			 pprAbsC stuff (costs stuff)
-    ]
+pprAbsC stmt@(CClosureInfoAndCode cl_info entry) _
+  =  pprInfoTable info_lbl (mkInfoTable cl_info)
+  $$ let stuff = CCodeBlock entry_lbl entry in
+     pprAbsC stuff (costs stuff)
   where
-    info_lbl	= infoTableLabelFromCI cl_info
-    fast_lbl    = fastLabelFromCI cl_info
-
-    (slow_lbl, pp_slow)
-      = case (nonemptyAbsC slow) of
-	  Nothing -> (mkErrorStdEntryLabel, empty)
-	  Just xx -> (entryLabelFromCI cl_info,
-		       let stuff = CCodeBlock slow_lbl xx in
-		       pprAbsC stuff (costs stuff))
-
-    maybe_selector = maybeSelectorInfo cl_info
-    is_selector = maybeToBool maybe_selector
-    (Just select_word_i) = maybe_selector
-
-    maybe_tag = closureSemiTag cl_info
-    is_constr = maybeToBool maybe_tag
-    (Just tag) = maybe_tag
-
-    srt       = closureSRT cl_info
-    needs_srt = case srt of
-		   NoC_SRT -> False
-		   other   -> True
-
-
-    size = closureNonHdrSize cl_info
-
-    ptrs        = closurePtrsSize cl_info
-    nptrs	= size - ptrs
-
-    pp_rest | is_selector      = int select_word_i
-            | otherwise        = hcat [
-	          int ptrs,		comma,
-		  int nptrs,		comma,
-		  if is_constr then
-			hcat [ int tag, comma ]
-                  else if needs_srt then
-			pp_srt_info srt
-		  else empty,
-		  type_str ]
-
-    type_str = pprSMRep (closureSMRep cl_info)
-
-    pp_descr = pprStringInCStyle cl_descr
-    pp_type  = pprStringInCStyle (closureTypeDescr cl_info)
+	entry_lbl = entryLabelFromCI cl_info
+	info_lbl  = infoTableLabelFromCI cl_info
 
 pprAbsC stmt@(CClosureTbl tycon) _
   = vcat (
@@ -543,58 +478,15 @@ pprAbsC stmt@(CClosureTbl tycon) _
    ) $$ ptext SLIT("};")
 
 pprAbsC stmt@(CRetDirect uniq code srt liveness) _
-  = vcat [
-      hcat [
-	  ptext SLIT("INFO_TABLE_SRT_BITMAP"), lparen, 
-	  pprCLabel info_lbl, 		comma,
-	  pprCLabel entry_lbl, 		comma,
-          pp_liveness liveness,		comma,	  -- bitmap
-	  pp_srt_info srt,			  -- SRT
-	  closure_type,			comma,	  -- closure type
-	  ppLocalness info_lbl, 	comma,	  -- info table storage class
-	  ppLocalnessMacro True{-include dyn-} entry_lbl, 	comma,    -- entry pt storage class
-	  int 0, comma,
-	  int 0, text ");"
-      ],
-      pp_code
-    ]
+  =  pprInfoTable info_lbl (mkRetInfoTable entry_lbl srt liveness)
+  $$ let stuff = CCodeBlock entry_lbl code in
+     pprAbsC stuff (costs stuff)
   where
-     info_lbl     = mkReturnInfoLabel uniq
-     entry_lbl    = mkReturnPtLabel uniq
-
-     pp_code      = let stuff = CCodeBlock entry_lbl code in
-	            pprAbsC stuff (costs stuff)
-
-     closure_type = pp_liveness_switch liveness
-		       (ptext SLIT("RET_SMALL"))
-		       (ptext SLIT("RET_BIG"))
+     info_lbl  = mkReturnInfoLabel uniq
+     entry_lbl = mkReturnPtLabel uniq
 
 pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
-  = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
-    vcat [
-	pp_exts,
-	hcat [
-	  ptext SLIT("VEC_INFO_") <> int size,
-	  lparen, 
-	  pprCLabel lbl, comma,
-	  pp_liveness liveness, comma,	-- bitmap liveness mask
-	  pp_srt_info srt,		-- SRT
-	  closure_type, comma,
-	  ppLocalness lbl, comma
-	],
-	nest 2 (sep (punctuate comma (map ppr_item amodes))),
-	text ");"
-    ]
-    }
-
-  where
-    ppr_item item = (<>) (text "(F_) ") (ppr_amode item)
-    size = length amodes
-
-    closure_type = pp_liveness_switch liveness
-		      (ptext SLIT("RET_VEC_SMALL"))
-		      (ptext SLIT("RET_VEC_BIG"))
-
+  = pprInfoTable lbl (mkVecInfoTable amodes srt liveness)
 
 pprAbsC stmt@(CModuleInitBlock plain_lbl lbl code) _
   = vcat [
@@ -607,6 +499,22 @@ pprAbsC stmt@(CModuleInitBlock plain_lbl lbl code) _
 
 pprAbsC (CCostCentreDecl is_local cc) _ = pprCostCentreDecl is_local cc
 pprAbsC (CCostCentreStackDecl ccs)    _ = pprCostCentreStackDecl ccs
+\end{code}
+
+Info tables... just arrays of words (the translation is done in
+ClosureInfo).
+
+\begin{code}
+pprInfoTable info_lbl amodes
+  = (case snd (initTE (ppr_decls_Amodes amodes)) of
+	Just pp -> pp
+	Nothing -> empty)
+  $$ hcat [ ppLocalness info_lbl, ptext SLIT("StgWord "), 
+	    pprCLabel info_lbl, ptext SLIT("[] = {") ]
+  $$ hcat (punctuate comma (map (castToWord.pprAmode) amodes))
+  $$ ptext SLIT("};")
+
+castToWord s = text "(W_)(" <> s <> char ')'
 \end{code}
 
 \begin{code}
@@ -750,11 +658,12 @@ ppLocalnessMacro include_dyn_prefix clabel =
         visiblity_prefix,
 	dyn_prefix,
         case label_type of
-	  ClosureType    -> ptext SLIT("C_")
-	  CodeType       -> ptext SLIT("F_")
-	  InfoTblType    -> ptext SLIT("I_")
-	  ClosureTblType -> ptext SLIT("CP_")
-	  DataType       -> ptext SLIT("D_")
+	  ClosureType        -> ptext SLIT("C_")
+	  CodeType           -> ptext SLIT("F_")
+	  InfoTblType        -> ptext SLIT("I_")
+	  RetInfoTblType     -> ptext SLIT("RI_")
+	  ClosureTblType     -> ptext SLIT("CP_")
+	  DataType           -> ptext SLIT("D_")
      ]
   where
    is_visible = externallyVisibleCLabel clabel
@@ -805,7 +714,7 @@ ppr_vol_regs (r:rs)
     (($$) ((<>) (ptext SLIT("CALLER_SAVE_"))    pp_reg) more_saves,
      ($$) ((<>) (ptext SLIT("CALLER_RESTORE_")) pp_reg) more_restores)
 
--- pp_basic_{saves,restores}: The BaseReg, Sp, Su, Hp and
+-- pp_basic_{saves,restores}: The BaseReg, Sp, Hp and
 -- HpLim (see StgRegs.lh) may need to be saved/restored around CCalls,
 -- depending on the platform.  (The "volatile regs" stuff handles all
 -- other registers.)  Just be *sure* BaseReg is OK before trying to do
@@ -813,15 +722,6 @@ ppr_vol_regs (r:rs)
 -- encoded by the CALLER_*_SYSTEM macros.
 pp_basic_saves    = ptext SLIT("CALLER_SAVE_SYSTEM")
 pp_basic_restores = ptext SLIT("CALLER_RESTORE_SYSTEM")
-\end{code}
-
-\begin{code}
-pp_srt_info NoC_SRT = hcat [ int 0, comma, 
-			     int 0, comma, 
-			     int 0, comma ]
-pp_srt_info (C_SRT lbl off len) = hcat [ pprCLabel lbl, comma,
-				         int off, comma,
-				       	 int len, comma ]
 \end{code}
 
 \begin{code}
@@ -1251,7 +1151,7 @@ ppr_amode (CVal reg_rel _)
 ppr_amode (CAddr reg_rel)
   = case (pprRegRelative True{-sign wanted-} reg_rel) of
 	(pp_reg, Nothing)     -> pp_reg
-	(pp_reg, Just offset) -> (<>) pp_reg offset
+	(pp_reg, Just offset) -> pp_reg <> offset
 
 ppr_amode (CReg magic_id) = pprMagicId magic_id
 
@@ -1284,14 +1184,10 @@ cExprMacroText BYTE_ARR_CTS	 	= SLIT("BYTE_ARR_CTS")
 cExprMacroText PTRS_ARR_CTS	 	= SLIT("PTRS_ARR_CTS")
 cExprMacroText ForeignObj_CLOSURE_DATA  = SLIT("ForeignObj_CLOSURE_DATA")
 
-cStmtMacroText ARGS_CHK			= SLIT("ARGS_CHK")
-cStmtMacroText ARGS_CHK_LOAD_NODE	= SLIT("ARGS_CHK_LOAD_NODE")
 cStmtMacroText UPD_CAF			= SLIT("UPD_CAF")
 cStmtMacroText UPD_BH_UPDATABLE		= SLIT("UPD_BH_UPDATABLE")
 cStmtMacroText UPD_BH_SINGLE_ENTRY	= SLIT("UPD_BH_SINGLE_ENTRY")
 cStmtMacroText PUSH_UPD_FRAME		= SLIT("PUSH_UPD_FRAME")
-cStmtMacroText PUSH_SEQ_FRAME		= SLIT("PUSH_SEQ_FRAME")
-cStmtMacroText UPDATE_SU_FROM_UPD_FRAME	= SLIT("UPDATE_SU_FROM_UPD_FRAME")
 cStmtMacroText SET_TAG			= SLIT("SET_TAG")
 cStmtMacroText DATA_TO_TAGZH            = SLIT("dataToTagzh")
 cStmtMacroText REGISTER_FOREIGN_EXPORT	= SLIT("REGISTER_FOREIGN_EXPORT")
@@ -1306,18 +1202,16 @@ cStmtMacroText GRAN_YIELD   		= SLIT("GRAN_YIELD")
 cCheckMacroText	HP_CHK_NP		= SLIT("HP_CHK_NP")
 cCheckMacroText	STK_CHK_NP		= SLIT("STK_CHK_NP")
 cCheckMacroText	HP_STK_CHK_NP		= SLIT("HP_STK_CHK_NP")
-cCheckMacroText	HP_CHK_SEQ_NP		= SLIT("HP_CHK_SEQ_NP")
-cCheckMacroText	HP_CHK			= SLIT("HP_CHK")
-cCheckMacroText	STK_CHK			= SLIT("STK_CHK")
-cCheckMacroText	HP_STK_CHK		= SLIT("HP_STK_CHK")
+cCheckMacroText	HP_CHK_FUN		= SLIT("HP_CHK_FUN")
+cCheckMacroText	STK_CHK_FUN		= SLIT("STK_CHK_FUN")
+cCheckMacroText	HP_STK_CHK_FUN		= SLIT("HP_STK_CHK_FUN")
 cCheckMacroText	HP_CHK_NOREGS		= SLIT("HP_CHK_NOREGS")
 cCheckMacroText	HP_CHK_UNPT_R1		= SLIT("HP_CHK_UNPT_R1")
 cCheckMacroText	HP_CHK_UNBX_R1		= SLIT("HP_CHK_UNBX_R1")
 cCheckMacroText	HP_CHK_F1		= SLIT("HP_CHK_F1")
 cCheckMacroText	HP_CHK_D1		= SLIT("HP_CHK_D1")
 cCheckMacroText	HP_CHK_L1		= SLIT("HP_CHK_L1")
-cCheckMacroText	HP_CHK_UT_ALT		= SLIT("HP_CHK_UT_ALT")
-cCheckMacroText	HP_CHK_GEN		= SLIT("HP_CHK_GEN")
+cCheckMacroText	HP_CHK_UNBX_TUPLE	= SLIT("HP_CHK_UNBX_TUPLE")
 \end{code}
 
 \begin{code}
@@ -1330,15 +1224,17 @@ cCheckMacroText	HP_CHK_GEN		= SLIT("HP_CHK_GEN")
 %************************************************************************
 
 \begin{code}
-pp_bitmap_switch :: [BitSet] -> SDoc -> SDoc -> SDoc
-pp_bitmap_switch ([   ]) small large = small
-pp_bitmap_switch ([_  ]) small large = small
-pp_bitmap_switch ([_,_]) small large = hcat
-    [ptext SLIT("BITMAP_SWITCH64"), lparen, small, comma, large, rparen]
-pp_bitmap_switch (_    ) small large = large
+pp_bitmap_switch :: Int -> SDoc -> SDoc -> SDoc
+pp_bitmap_switch size small large 
+  | size <= mAX_SMALL_BITMAP_SIZE = small
+  | otherwise = large
+
+-- magic numbers, must agree with BITMAP_BITS_SHIFT in InfoTables.h
+mAX_SMALL_BITMAP_SIZE  | wORD_SIZE == 4 = 27
+		       | otherwise      = 58
 
 pp_liveness_switch :: Liveness -> SDoc -> SDoc -> SDoc
-pp_liveness_switch (Liveness lbl mask) = pp_bitmap_switch mask
+pp_liveness_switch (Liveness _ size _) = pp_bitmap_switch size
 
 pp_bitset :: BitSet -> SDoc
 pp_bitset s
@@ -1348,8 +1244,7 @@ pp_bitset s
 
 pp_bitmap :: [BitSet] -> SDoc
 pp_bitmap [] = int 0
-pp_bitmap ss = hcat (punctuate delayed_comma (bundle ss)) where
-  delayed_comma         = hcat [space, ptext SLIT("COMMA"), space]
+pp_bitmap ss = hcat (punctuate (ptext SLIT(" COMMA ")) (bundle ss)) where
   bundle []         = []
   bundle [s]        = [hcat bitmap32]
      where bitmap32 = [ptext SLIT("BITMAP32"), lparen,
@@ -1357,10 +1252,6 @@ pp_bitmap ss = hcat (punctuate delayed_comma (bundle ss)) where
   bundle (s1:s2:ss) = hcat bitmap64 : bundle ss
      where bitmap64 = [ptext SLIT("BITMAP64"), lparen,
                        pp_bitset s1, comma, pp_bitset s2, rparen]
-
-pp_liveness :: Liveness -> SDoc
-pp_liveness (Liveness lbl mask)
- = pp_bitmap_switch mask (pp_bitmap mask) (char '&' <> pprCLabel lbl)
 \end{code}
 
 %************************************************************************
@@ -1429,7 +1320,6 @@ pprMagicId (FloatReg  n)            = ptext SLIT("F") <> int (I# n)
 pprMagicId (DoubleReg n)	    = ptext SLIT("D") <> int (I# n)
 pprMagicId (LongReg _ n)	    = ptext SLIT("L") <> int (I# n)
 pprMagicId Sp			    = ptext SLIT("Sp")
-pprMagicId Su			    = ptext SLIT("Su")
 pprMagicId SpLim		    = ptext SLIT("SpLim")
 pprMagicId Hp			    = ptext SLIT("Hp")
 pprMagicId HpLim		    = ptext SLIT("HpLim")
@@ -1651,22 +1541,16 @@ ppr_decls_AbsC (CCallProfCtrMacro   _ amodes)	= ppr_decls_Amodes [] -- *****!!!
   -- no real reason to, anyway.
 ppr_decls_AbsC (CCallProfCCMacro    _ amodes)	= ppr_decls_Amodes amodes
 
-ppr_decls_AbsC (CStaticClosure closure_info cost_centre amodes)
+ppr_decls_AbsC (CStaticClosure _ closure_info cost_centre amodes)
 	-- ToDo: strictly speaking, should chk "cost_centre" amode
   = ppr_decls_Amodes amodes
 
-ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast _)
+ppr_decls_AbsC (CClosureInfoAndCode cl_info entry)
   = ppr_decls_Amodes [entry_lbl]	    	`thenTE` \ p1 ->
-    ppr_decls_AbsC slow				`thenTE` \ p2 ->
-    (case maybe_fast of
-	Nothing   -> returnTE (Nothing, Nothing)
-	Just fast -> ppr_decls_AbsC fast)	`thenTE` \ p3 ->
-    returnTE (maybe_vcat [p1, p2, p3])
+    ppr_decls_AbsC entry			`thenTE` \ p2 ->
+    returnTE (maybe_vcat [p1, p2])
   where
-    entry_lbl = CLbl slow_lbl CodePtrRep
-    slow_lbl    = case (nonemptyAbsC slow) of
-		    Nothing -> mkErrorStdEntryLabel
-		    Just _  -> entryLabelFromCI cl_info
+    entry_lbl = CLbl (entryLabelFromCI cl_info) CodePtrRep
 
 ppr_decls_AbsC (CSRT _ closure_lbls)
   = mapTE labelSeenTE closure_lbls		`thenTE` \ seen ->
@@ -1747,14 +1631,16 @@ When just generating a declaration for the label, use pprCLabel.
 pprCLabelAddr :: CLabel -> SDoc
 pprCLabelAddr clabel =
   case labelType clabel of
-     InfoTblType -> addr_of_label
-     ClosureType -> addr_of_label
-     VecTblType  -> addr_of_label
-     _           -> pp_label
+     InfoTblType    -> addr_of_label
+     RetInfoTblType -> addr_of_label
+     ClosureType    -> addr_of_label
+     VecTblType     -> addr_of_label
+     DataType	    -> addr_of_label
+
+     _              -> pp_label
   where
     addr_of_label = ptext SLIT("(P_)&") <> pp_label
     pp_label = pprCLabel clabel
-
 \end{code}
 
 -----------------------------------------------------------------------------

@@ -14,9 +14,7 @@ import CgMonad
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
 import ClosureInfo	( layOutStaticConstr, layOutDynConstr, ClosureInfo )
-import DataCon		( DataCon, dataConName, dataConRepArgTys, isNullaryDataCon )
-import Name		( getOccName )
-import OccName		( occNameUserString )
+import DataCon		( DataCon, dataConRepArgTys, isNullaryDataCon )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
 import Type		( typePrimRep )
 import CmdLineOpts
@@ -115,7 +113,7 @@ genConInfo comp_info data_con
     -- To allow the debuggers, interpreters, etc to cope with static
     -- data structures (ie those built at compile time), we take care that
     -- info-table contains the information we need.
-    (static_ci,_) = layOutStaticConstr con_name data_con typePrimRep arg_tys
+    (static_ci,_) = layOutStaticConstr data_con typePrimRep arg_tys
 
     static_body  = initC comp_info (
                       profCtrC FSLIT("TICK_ENT_STATIC_CON") [CReg node] `thenC`
@@ -127,15 +125,13 @@ genConInfo comp_info data_con
 
     ldv_enter_and_body_code = ldvEnter `thenC` body_code
 
-    con_descr  = occNameUserString (getOccName data_con)
-
     -- Don't need any dynamic closure code for zero-arity constructors
     closure_code = if zero_arity_con then 
 			AbsCNop 
 		   else 
-			CClosureInfoAndCode closure_info closure_body Nothing con_descr
+			CClosureInfoAndCode closure_info closure_body
 
-    static_code  = CClosureInfoAndCode static_ci static_body Nothing con_descr
+    static_code  = CClosureInfoAndCode static_ci static_body
 
     zero_arity_con   = isNullaryDataCon data_con
 	-- We used to check that all the arg-sizes were zero, but we don't
@@ -143,7 +139,6 @@ genConInfo comp_info data_con
 	-- just one more thing to go wrong.
 
     arg_tys	    = dataConRepArgTys  data_con
-    con_name	    = dataConName data_con
 \end{code}
 
 \begin{code}
@@ -154,8 +149,7 @@ mkConCodeAndInfo con
   = let
 	arg_tys = dataConRepArgTys con
 
-	(closure_info, arg_things)
-		= layOutDynConstr (dataConName con) con typePrimRep arg_tys
+	(closure_info, arg_things) = layOutDynConstr con typePrimRep arg_tys
 
 	body_code
 		= -- NB: We don't set CC when entering data (WDP 94/06)

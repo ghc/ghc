@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.39 2002/11/01 11:05:46 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.40 2002/12/11 15:36:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -31,6 +31,7 @@
 #include "Printer.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
@@ -127,7 +128,8 @@ static char *type_names[] = {
     , "THUNK_SELECTOR"
 
     , "BCO"
-    , "AP_UPD"
+    , "AP_STACK"
+    , "AP"
 
     , "PAP"
 
@@ -146,7 +148,6 @@ static char *type_names[] = {
     , "UPDATE_FRAME"
     , "CATCH_FRAME"
     , "STOP_FRAME"
-    , "SEQ_FRAME"
 
     , "BLACKHOLE"
     , "BLACKHOLE_BQ"
@@ -329,7 +330,8 @@ nextEra( void )
 	era++;
 
 	if (era == max_era) {
-	    barf("maximum number of censuses reached; use +RTS -i to reduce");
+	    prog_belch("maximum number of censuses reached; use +RTS -i to reduce");
+	    stg_exit(EXIT_FAILURE);
 	}
 	
 	if (era == n_censuses) {
@@ -339,7 +341,7 @@ nextEra( void )
 	}
     }
 #endif // PROFILING
-	
+
     initEra( &censuses[era] );
 }
 
@@ -870,9 +872,13 @@ heapCensusChain( Census *census, bdescr *bd )
 		size = sizeofW(StgHeader) + MIN_UPD_SIZE;
 		break;
 
+	    case AP:
 	    case PAP:
-	    case AP_UPD:
 		size = pap_sizeW((StgPAP *)p);
+		break;
+
+	    case AP_STACK:
+		size = ap_stack_sizeW((StgAP_STACK *)p);
 		break;
 		
 	    case ARR_WORDS:

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.51 2002/09/13 15:02:28 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.52 2002/12/11 15:36:26 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -32,12 +32,12 @@ import CgLetNoEscape	( cgLetNoEscapeClosure )
 import CgRetConv	( dataReturnConvPrim )
 import CgTailCall	( cgTailCall, performReturn, performPrimReturn,
 			  mkDynamicAlgReturnCode, mkPrimReturnCode,
-			  tailCallPrimOp, returnUnboxedTuple
+			  tailCallPrimOp, ccallReturnUnboxedTuple
 			)
 import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo,
 			  mkApLFInfo, layOutDynConstr )
 import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
-import Id		( idPrimRep, idType, Id )
+import Id		( idPrimRep, Id )
 import VarSet
 import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, 
 			  PrimOp(..), PrimOpResultInfo(..) )
@@ -331,14 +331,12 @@ mkRhsClosure	bndr cc	bi srt
     -- will evaluate to.
     cgStdRhsClosure bndr cc bi [the_fv] [] body lf_info [StgVarArg the_fv]
   where
-    lf_info 		  = mkSelectorLFInfo (idType bndr) offset_into_int 
-						(isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr bogus_name con idPrimRep params
+    lf_info 		  = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag)
+    (_, params_w_offsets) = layOutDynConstr con idPrimRep params
 				-- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset
     offset_into_int       = the_offset - fixedHdrSize
-    bogus_name		  = panic "mkRhsClosure"
 \end{code}
 
 Ap thunks
@@ -373,7 +371,7 @@ mkRhsClosure 	bndr cc bi srt
 	= cgStdRhsClosure bndr cc bi fvs [] body lf_info payload
 
    where
-	lf_info = mkApLFInfo (idType bndr) upd_flag arity
+	lf_info = mkApLFInfo bndr upd_flag arity
 	-- the payload has to be in the correct order, hence we can't
  	-- just use the fvs.
 	payload    = StgVarArg fun_id : args
@@ -486,7 +484,9 @@ primRetUnboxedTuple op args res_ty
       temp_uniqs  = map mkBuiltinUnique [ n_args .. n_args + length ty_args - 1]
       temp_amodes = zipWith CTemp temp_uniqs prim_reps
     in
-    returnUnboxedTuple temp_amodes (absC (COpStmt temp_amodes op arg_temps []))
+    ccallReturnUnboxedTuple temp_amodes 	
+	(absC (COpStmt temp_amodes op arg_temps []))
+
 
 shimFCallArg arg amode
   | tycon == foreignObjPrimTyCon

@@ -718,8 +718,16 @@ mkStgRhs env rhs_fvs binder_info rhs
 		  (getFVs rhs_fvs)		 
 	          upd_flag [] rhs
   where
+   upd_flag = Updatable
+  {-
+    SDM: disabled.  Eval/Apply can't handle functions with arity zero very
+    well; and making these into simple non-updatable thunks breaks other
+    assumptions (namely that they will be entered only once).
+
     upd_flag | isPAP env rhs  = ReEntrant
 	     | otherwise      = Updatable
+  -}
+
 {- ToDo:
           upd = if isOnceDem dem
       		    then (if isNotTop toplev 
@@ -1185,7 +1193,8 @@ rhsIsNonUpd p other_expr
 idAppIsNonUpd :: IdEnv HowBound -> Id -> Int -> [CoreExpr] -> Bool
 idAppIsNonUpd p id n_val_args args
   | Just con <- isDataConId_maybe id = not (isCrossDllConApp con args)
-  | otherwise 			     = n_val_args < stgArity id (lookupBinding p id)
+  | otherwise = False 	-- SDM: disbled.  See comment with isPAP above.
+			-- n_val_args < stgArity id (lookupBinding p id)
 
 stgArity :: Id -> HowBound -> Arity
 stgArity f (LetBound _ arity) = arity

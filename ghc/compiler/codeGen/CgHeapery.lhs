@@ -1,13 +1,13 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.34 2002/09/13 15:02:28 simonpj Exp $
+% $Id: CgHeapery.lhs,v 1.35 2002/12/11 15:36:26 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
 \begin{code}
 module CgHeapery (
-	fastEntryChecks, altHeapCheck, thunkChecks,
+	funEntryChecks, altHeapCheck, unbxTupleHeapCheck, thunkChecks,
 	allocDynClosure, inPlaceAllocDynClosure
 
         -- new functions, basically inserting macro calls into Code -- HWL
@@ -20,7 +20,7 @@ import AbsCSyn
 import CLabel
 import CgMonad
 
-import CgStackery	( getFinalStackHW, mkTaggedStkAmodes, mkTagAssts )
+import CgStackery	( getFinalStackHW )
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgUsages		( getVirtAndRealHp, getRealSp, setVirtHp, setRealHp,
 			  initHeapUsage
@@ -29,7 +29,6 @@ import ClosureInfo	( closureSize, closureGoodStuffSize,
 			  slopSize, allocProfilingMsg, ClosureInfo
 			)
 import PrimRep		( PrimRep(..), isFollowableRep )
-import Unique		( Unique )
 import CmdLineOpts	( opt_GranMacros )
 import Outputable
 
@@ -55,157 +54,85 @@ closures. If fetching is necessary (i.e. current closure is not local) then
 an automatic context switch is done.
 
 -----------------------------------------------------------------------------
-A heap/stack check at a fast entry point.
+A heap/stack check at a function or thunk entry point.
 
 \begin{code}
+funEntryChecks :: Maybe CLabel -> AbstractC -> Code -> Code
+funEntryChecks closure_lbl reg_save_code code 
+  = hpStkCheck closure_lbl True reg_save_code code
 
-fastEntryChecks
-	:: [MagicId]			-- Live registers
-	-> [(VirtualSpOffset,Int)]	-- stack slots to tag
-	-> CLabel			-- return point
-	-> Bool				-- node points to closure
+thunkChecks :: Maybe CLabel -> Code -> Code
+thunkChecks closure_lbl code 
+  = hpStkCheck closure_lbl False AbsCNop code
+
+hpStkCheck
+	:: Maybe CLabel			-- function closure
+	-> Bool 			-- is a function? (not a thunk)
+	-> AbstractC			-- register saves
 	-> Code
 	-> Code
 
-fastEntryChecks regs tags ret node_points code
-  =  mkTagAssts tags			         `thenFC` \tag_assts ->
-     getFinalStackHW				 (\ spHw -> 
+hpStkCheck closure_lbl is_fun reg_save_code code
+  =  getFinalStackHW				 (\ spHw -> 
      getRealSp					 `thenFC` \ sp ->
      let stk_words = spHw - sp in
      initHeapUsage				 (\ hHw  ->
 
      getTickyCtrLabel `thenFC` \ ticky_ctr ->
 
-     ( if all_pointers then -- heap checks are quite easy
-          -- HWL: gran-yield immediately before heap check proper
-          --(if node `elem` regs
-          --   then yield regs True
-          --   else absC AbsCNop ) `thenC`
-	  absC (checking_code stk_words hHw tag_assts 
-			free_reg (length regs) ticky_ctr)
+     absC (checking_code stk_words hHw ticky_ctr) `thenC`
 
-       else -- they are complicated
-
-	  -- save all registers on the stack and adjust the stack pointer.
-	  -- ToDo: find the initial all-pointer segment and don't save them.
-
-	  mkTaggedStkAmodes sp addrmode_regs 
-	  	  `thenFC` \(new_sp, stk_assts, more_tag_assts) ->
-
-	  -- only let the extra stack assignments affect the stack
-	  -- high water mark if we were doing a stack check anyway;
-	  -- otherwise we end up generating unnecessary stack checks.
-	  -- Careful about knot-tying loops!
-	  let real_stk_words =  if new_sp - sp > stk_words && stk_words /= 0
-					then new_sp - sp
-					else stk_words
-	  in
-
-	  let adjust_sp = CAssign (CReg Sp) (CAddr (spRel sp new_sp)) in
-
-	  absC (checking_code real_stk_words hHw 
-	            (mkAbstractCs [tag_assts, stk_assts, more_tag_assts,
-				   adjust_sp])
-	            (CReg node) 0 ticky_ctr)
-
-      ) `thenC`
-
-      setRealHp hHw `thenC`
-      code))
+     setRealHp hHw `thenC`
+     code))
 
   where
-	
-    checking_code stk hp assts ret regs ctr
+    node_asst
+	| Just lbl <- closure_lbl = CAssign nodeReg (CLbl lbl PtrRep)
+	| otherwise = AbsCNop
+
+    save_code = mkAbstractCs [node_asst, reg_save_code]
+
+    checking_code stk hp ctr
         = mkAbstractCs 
-	  [ real_check,
-            if hp == 0 then AbsCNop 
-	    else profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
-		  [ mkIntCLit hp, CLbl ctr DataPtrRep ]
+	  [ if is_fun
+		then do_checks_fun stk hp save_code
+		else do_checks_np  stk hp save_code,
+            if hp == 0
+		then AbsCNop 
+	    	else profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
+			  [ mkIntCLit hp, CLbl ctr DataPtrRep ]
 	  ]
 
-        where real_check
-		  | node_points = do_checks_np stk hp assts (regs+1)
-        	  | otherwise   = do_checks    stk hp assts ret regs
 
-    -- When node points to the closure for the function:
+-- For functions:
 
-    do_checks_np
-	:: Int				-- stack headroom
-	-> Int				-- heap  headroom
-	-> AbstractC			-- assignments to perform on failure
-	-> Int				-- number of pointer registers live
+do_checks_fun
+	:: Int		-- stack headroom
+	-> Int		-- heap  headroom
+	-> AbstractC	-- assignments to perform on failure
 	-> AbstractC
-    do_checks_np 0 0 _ _ = AbsCNop
-    do_checks_np 0 hp_words tag_assts ptrs =
-	    CCheck HP_CHK_NP [
-		  mkIntCLit hp_words,
-		  mkIntCLit ptrs
-	         ]
-	         tag_assts
-    do_checks_np stk_words 0 tag_assts ptrs =
-	    CCheck STK_CHK_NP [
-		  mkIntCLit stk_words,
-		  mkIntCLit ptrs
-		 ]
-		 tag_assts
-    do_checks_np stk_words hp_words tag_assts ptrs =
-	    CCheck HP_STK_CHK_NP [
-		  mkIntCLit stk_words,
-		  mkIntCLit hp_words,
-		  mkIntCLit ptrs
-		 ]
-		 tag_assts
+do_checks_fun 0 0 _ = AbsCNop
+do_checks_fun 0 hp_words assts =
+    CCheck HP_CHK_FUN [ mkIntCLit hp_words ] assts
+do_checks_fun stk_words 0 assts =
+    CCheck STK_CHK_FUN [ mkIntCLit stk_words ] assts
+do_checks_fun stk_words hp_words assts =
+    CCheck HP_STK_CHK_FUN [ mkIntCLit stk_words, mkIntCLit hp_words ] assts
 
-    -- When node doesn't point to the closure (we need an explicit retn addr)
+-- For thunks:
 
-    do_checks 
-	:: Int				-- stack headroom
-	-> Int				-- heap  headroom
-	-> AbstractC			-- assignments to perform on failure
-	-> CAddrMode			-- a register to hold the retn addr.
-	-> Int				-- number of pointer registers live
+do_checks_np
+	:: Int		-- stack headroom
+	-> Int		-- heap  headroom
+	-> AbstractC	-- assignments to perform on failure
 	-> AbstractC
-
-    do_checks 0 0 _ _ _ = AbsCNop
-    do_checks 0 hp_words tag_assts ret_reg ptrs =
-	    CCheck HP_CHK [
-		  mkIntCLit hp_words,
-		  CLbl ret CodePtrRep,
-		  ret_reg,
-		  mkIntCLit ptrs
-		 ]
-		 tag_assts
-    do_checks stk_words 0 tag_assts ret_reg ptrs =
-	    CCheck STK_CHK [
-		  mkIntCLit stk_words,
-		  CLbl ret CodePtrRep,
-		  ret_reg,
-		  mkIntCLit ptrs
-		 ]
-		 tag_assts
-    do_checks stk_words hp_words tag_assts ret_reg ptrs =
-	    CCheck HP_STK_CHK [
-		  mkIntCLit stk_words,
-		  mkIntCLit hp_words,
-		  CLbl ret CodePtrRep,
-		  ret_reg,
-		  mkIntCLit ptrs
-		 ]
-		 tag_assts
-
-    free_reg  = case length regs + 1 of 
-		       I# x -> CReg (VanillaReg PtrRep x)
-
-    all_pointers = all pointer regs
-    pointer (VanillaReg rep _) = isFollowableRep rep
-    pointer _ = False
-
-    addrmode_regs = map CReg regs
-
--- Checking code for thunks is just a special case of fast entry points:
-
-thunkChecks :: CLabel -> Bool -> Code -> Code
-thunkChecks ret node_points code = fastEntryChecks [] [] ret node_points code
+do_checks_np 0 0 _ = AbsCNop
+do_checks_np 0 hp_words assts =
+    CCheck HP_CHK_NP [ mkIntCLit hp_words ] assts
+do_checks_np stk_words 0 assts =
+    CCheck STK_CHK_NP [ mkIntCLit stk_words ] assts
+do_checks_np stk_words hp_words assts =
+    CCheck HP_STK_CHK_NP [ mkIntCLit stk_words, mkIntCLit hp_words ] assts
 \end{code}
 
 Heap checks in a case alternative are nice and easy, provided this is
@@ -219,7 +146,7 @@ stack, saying 'EnterGHC' to return.  The scheduler will return by
 entering the top value on the stack, which in turn will return through
 the return address, getting us back to where we were.  This is
 therefore only valid if the return value is *lifted* (just being
-boxed isn't good enough).  Only a PtrRep will do.
+boxed isn't good enough).
 
 For primitive returns, we have an unlifted value in some register
 (either R1 or FloatReg1 or DblReg1).  This means using specialised
@@ -236,80 +163,15 @@ have to do something about saving and restoring the other registers.
 
 \begin{code}
 altHeapCheck 
-	:: Bool				-- is a polymorphic case alt
-	-> Bool				-- is an primitive case alt
-	-> [MagicId]			-- live registers
-	-> [(VirtualSpOffset,Int)]	-- stack slots to tag
-	-> AbstractC
-	-> Maybe Unique			-- uniq of ret address (possibly)
-	-> Code
+	:: Bool			-- do not enter node on return
+	-> [MagicId]		-- live registers
+	-> Code			-- continuation
 	-> Code
 
--- unboxed tuple alternatives and let-no-escapes (the two most annoying
--- constructs to generate code for!):
-
-altHeapCheck is_poly is_prim regs tags fail_code (Just ret_addr) code
-  = mkTagAssts tags `thenFC` \tag_assts1 ->
-    let tag_assts = mkAbstractCs [fail_code, tag_assts1]
-    in
-    initHeapUsage (\ hHw -> do_heap_chk hHw tag_assts `thenC` code)
-  where
-    do_heap_chk words_required tag_assts
-      = getTickyCtrLabel `thenFC` \ ctr ->
-	absC ( if words_required == 0
-		  then  AbsCNop
-		  else  mkAbstractCs 
-			[ checking_code tag_assts,
-          	          profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
-			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
-			]
-	)  `thenC`
-	setRealHp words_required
-
-      where
-      	non_void_regs = filter (/= VoidReg) regs
-
-	checking_code tag_assts = 
-	  case non_void_regs of
-
-{- no: there might be stuff on top of the retn. addr. on the stack.
-	    [{-no regs-}] ->
-		CCheck HP_CHK_NOREGS
-		    [mkIntCLit words_required]
-		    tag_assts
--}
-	    -- this will cover all cases for x86
-	    [VanillaReg rep 1#] 
-
-	       | isFollowableRep rep ->
-	          CCheck HP_CHK_UT_ALT
-		      [mkIntCLit words_required, mkIntCLit 1, mkIntCLit 0,
-			CReg (VanillaReg RetRep 2#),
-			CLbl (mkReturnInfoLabel ret_addr) RetRep]
-		      tag_assts
-
-	       | otherwise ->
-	          CCheck HP_CHK_UT_ALT
-		      [mkIntCLit words_required, mkIntCLit 0, mkIntCLit 1,
-			CReg (VanillaReg RetRep 2#),
-			CLbl (mkReturnInfoLabel ret_addr) RetRep]
-		      tag_assts
-
-	    several_regs ->
-                let liveness = mkRegLiveness several_regs
- 		in
-		CCheck HP_CHK_GEN
-		     [mkIntCLit words_required, 
-		      mkIntCLit (I# (word2Int# liveness)),
-			-- HP_CHK_GEN needs a direct return address,
-			-- not an info table (might be different if
-			-- we're not assembly-mangling/tail-jumping etc.)
-		      CLbl (mkReturnPtLabel ret_addr) RetRep] 
-		     tag_assts
 
 -- normal algebraic and primitive case alternatives:
 
-altHeapCheck is_poly is_prim regs [] AbsCNop Nothing code
+altHeapCheck no_enter regs code
   = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
   where
     do_heap_chk :: HeapOffset -> Code
@@ -335,19 +197,15 @@ altHeapCheck is_poly is_prim regs [] AbsCNop Nothing code
 	    [] ->
 	       CCheck HP_CHK_NOREGS [mkIntCLit words_required] AbsCNop
 
-	    -- R1 is boxed, but unlifted: DO NOT enter R1 when we return.
-	    --
-	    -- We also lump the polymorphic case in here, because we don't
-	    -- want to enter R1 if it is a function, and we're guarnateed
-	    -- that the return point has a direct return.
 	    [VanillaReg rep 1#]
-		| isFollowableRep rep && (is_poly || is_prim) ->
+	    -- R1 is boxed, but unlifted: DO NOT enter R1 when we return.
+		| isFollowableRep rep && no_enter ->
 		  CCheck HP_CHK_UNPT_R1 [mkIntCLit words_required] AbsCNop
 
 	    -- R1 is lifted (the common case)
 	        | isFollowableRep rep ->
  	          CCheck HP_CHK_NP
-			[mkIntCLit words_required, mkIntCLit 1{-regs live-}]
+			[mkIntCLit words_required]
 			AbsCNop
 
 	    -- R1 is unboxed
@@ -370,6 +228,44 @@ altHeapCheck is_poly is_prim regs [] AbsCNop Nothing code
 	    _ -> panic ("CgHeapery.altHeapCheck: unimplemented heap-check, live regs = " ++ showSDoc (sep (map pprMagicId non_void_regs)))
 #endif
 
+-- unboxed tuple alternatives and let-no-escapes (the two most annoying
+-- constructs to generate code for!):
+
+unbxTupleHeapCheck 
+	:: [MagicId]		-- live registers
+	-> Int			-- no. of stack slots containing ptrs
+	-> Int			-- no. of stack slots containing nonptrs
+	-> AbstractC		-- code to insert in the failure path
+	-> Code
+	-> Code
+
+unbxTupleHeapCheck regs ptrs nptrs fail_code code
+  -- we can't manage more than 255 pointers/non-pointers in a generic
+  -- heap check.
+  | ptrs > 255 || nptrs > 255 = panic "altHeapCheck"
+  | otherwise = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
+  where
+    do_heap_chk words_required 
+      = getTickyCtrLabel `thenFC` \ ctr ->
+	absC ( if words_required == 0
+		  then  AbsCNop
+		  else  mkAbstractCs 
+			[ checking_code,
+          	          profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
+			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
+			]
+	)  `thenC`
+	setRealHp words_required
+
+      where
+	checking_code = 
+                let liveness = mkRegLiveness regs ptrs nptrs
+ 		in
+		CCheck HP_CHK_UNBX_TUPLE
+		     [mkIntCLit words_required, 
+		      mkIntCLit (I# (word2Int# liveness))]
+		     fail_code
+
 -- build up a bitmap of the live pointer registers
 
 #if __GLASGOW_HASKELL__ >= 503
@@ -378,11 +274,12 @@ shiftL = uncheckedShiftL#
 shiftL = shiftL#
 #endif
 
-mkRegLiveness :: [MagicId] -> Word#
-mkRegLiveness []  =  int2Word# 0#
-mkRegLiveness (VanillaReg rep i : regs) | isFollowableRep rep 
-  =  ((int2Word# 1#) `shiftL` (i -# 1#)) `or#` mkRegLiveness regs
-mkRegLiveness (_ : regs)  =  mkRegLiveness regs
+mkRegLiveness :: [MagicId] -> Int -> Int -> Word#
+mkRegLiveness [] (I# ptrs) (I# nptrs) =  
+  (int2Word# nptrs `shiftL` 16#) `or#` (int2Word# ptrs `shiftL` 24#)
+mkRegLiveness (VanillaReg rep i : regs) ptrs nptrs | isFollowableRep rep 
+  =  ((int2Word# 1#) `shiftL` (i -# 1#)) `or#` mkRegLiveness regs ptrs nptrs
+mkRegLiveness (_ : regs)  ptrs nptrs =  mkRegLiveness regs ptrs nptrs
 
 -- The two functions below are only used in a GranSim setup
 -- Emit macro for simulating a fetch and then reschedule
@@ -396,7 +293,7 @@ fetchAndReschedule regs node_reqd  =
 	then fetch_code `thenC` reschedule_code
 	else absC AbsCNop
       where
-        liveness_mask = mkRegLiveness regs
+        liveness_mask = mkRegLiveness regs 0 0
 	reschedule_code = absC  (CMacroStmt GRAN_RESCHEDULE [
                                  mkIntCLit (I# (word2Int# liveness_mask)), 
 				 mkIntCLit (if node_reqd then 1 else 0)])
@@ -429,7 +326,7 @@ yield regs node_reqd =
      then yield_code
      else absC AbsCNop
    where
-     liveness_mask = mkRegLiveness regs
+     liveness_mask = mkRegLiveness regs 0 0
      yield_code = 
        absC (CMacroStmt GRAN_YIELD 
                           [mkIntCLit (I# (word2Int# liveness_mask))])

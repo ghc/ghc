@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.21 2002/09/23 14:33:50 simonmar Exp $
+ * $Id: Constants.h,v 1.22 2002/12/11 15:36:37 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2002
  *
  * Constants
  *
@@ -64,6 +64,7 @@
  */
 
 #define MAX_SPEC_AP_SIZE       8
+/* ToDo: make it 8 again */
 
 /* Specialised FUN/THUNK/CONSTR closure types */
 
@@ -151,5 +152,23 @@
  */
 #define LARGE_OBJECT_THRESHOLD ((nat)(BLOCK_SIZE * 8 / 10))
 
-#endif /* CONSTANTS_H */
+/* -----------------------------------------------------------------------------
+   Bitmap/size fields (used in info tables)
+   -------------------------------------------------------------------------- */
 
+/* In a 32-bit bitmap field, we use 5 bits for the size, and 27 bits
+ * for the bitmap.  If the bitmap requires more than 27 bits, then we
+ * store it in a separate array, and leave a pointer in the bitmap
+ * field.  On a 64-bit machine, the sizes are extended accordingly.
+ */
+#if SIZEOF_VOID_P == 4
+#define BITMAP_SIZE_MASK     0x1f
+#define BITMAP_BITS_SHIFT    5
+#elif SIZEOF_VOID_P == 8
+#define BITMAP_SIZE_MASK     0x3f
+#define BITMAP_BITS_SHIFT    6
+#else
+#error unknown SIZEOF_VOID_P
+#endif
+
+#endif /* CONSTANTS_H */

@@ -81,10 +81,8 @@ static
 void
 initCapability( Capability *cap )
 {
-    cap->f.stgChk0         = (F_)__stg_chk_0;
-    cap->f.stgChk1         = (F_)__stg_chk_1;
     cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
-    cap->f.stgUpdatePAP    = (F_)__stg_update_PAP;
+    cap->f.stgGCFun        = (F_)__stg_gc_fun;
 }
 
 #if defined(SMP)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.66 2002/08/16 13:29:06 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.67 2002/12/11 15:36:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -242,7 +242,7 @@ initModules ( void (*init_root)(void) )
     bd = allocGroup(INIT_STACK_BLOCKS);
     init_stack = (F_ *)bd->start;
     init_stack[init_sp++] = (F_)stg_init_ret;
-    init_stack[init_sp++] = (F_)__stginit_Prelude;
+//    init_stack[init_sp++] = (F_)__stginit_Prelude;
     if (init_root != NULL) {
 	init_stack[init_sp++] = (F_)init_root;
     }
@@ -356,7 +356,7 @@ static int exit_started=rtsFalse;
 #endif
 
 void  
-stg_exit(I_ n)
+stg_exit(int n)
 { 
 #ifdef PAR
   /* HACK: avoid a loop when exiting due to a stupid error */

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.80 2002/09/17 12:34:31 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.81 2002/12/11 15:36:51 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2002
  *
  * Entry code for various built-in closure types.
  *
@@ -37,10 +37,10 @@
 */
 
 #define NON_ENTERABLE_ENTRY_CODE(type)		\
-STGFUN(stg_##type##_entry)			\
+IF_(stg_##type##_entry)			\
 {						\
   FB_						\
-    STGCALL1(barf, #type " object entered!\n");	\
+    STGCALL1(barf, #type " object entered!");	\
   FE_						\
 }
 
@@ -104,190 +104,153 @@ FN_(stg_interp_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
    haven't got a good story about that yet.
 */
 
-/* When the returned value is in R1 and it is a pointer, so doesn't
-   need tagging ... */
-#define STG_CtoI_RET_R1p_Template(label) 	\
-   IFN_(label)			        \
-   {                                    \
-      StgPtr bco;                       \
-      FB_				\
-      bco = ((StgPtr*)Sp)[1];           \
-      Sp -= 1;				\
-      ((StgPtr*)Sp)[0] = R1.p;		\
-      Sp -= 1;				\
-      ((StgPtr*)Sp)[0] = bco;		\
-      JMP_(stg_yield_to_interpreter);   \
-      FE_                               \
+// When the returned value is a pointer in R1...
+#define STG_CtoI_RET_R1p_Template(label)	\
+   IF_(label)					\
+   {						\
+      FB_					\
+      Sp -= 2;					\
+      Sp[1] = R1.w;				\
+      Sp[0] = (W_)&stg_enter_info;		\
+      JMP_(stg_yield_to_interpreter);		\
+      FE_					\
    }
 
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_entry);
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_0_entry);
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_1_entry);
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_2_entry);
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_3_entry);
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_4_entry);
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_5_entry);
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_6_entry);
-STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_7_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_ret);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_0_ret);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_1_ret);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_2_ret);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_3_ret);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_4_ret);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_5_ret);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_6_ret);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_7_ret);
 
-VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1p,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+VEC_POLY_INFO_TABLE( stg_ctoi_ret_R1p, 0/* special layout */,
+		     0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, 
+		     RET_BCO,, EF_);
 
-
-
-/* When the returned value is in R1 and it isn't a pointer. */
-#define STG_CtoI_RET_R1n_Template(label) 	\
-   IFN_(label)			        \
-   {                                    \
-      StgPtr bco;                       \
-      FB_				\
-      bco = ((StgPtr*)Sp)[1];           \
-      Sp -= 1;				\
-      ((StgPtr*)Sp)[0] = (StgPtr)R1.i;	\
-      Sp -= 1;                          \
-      ((StgPtr*)Sp)[0] = (StgPtr)1; /* tag */   \
-      Sp -= 1;				\
-      ((StgPtr*)Sp)[0] = bco;		\
-      JMP_(stg_yield_to_interpreter);   \
-      FE_                               \
-   }
-
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_entry);
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_0_entry);
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_1_entry);
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_2_entry);
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_3_entry);
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_4_entry);
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_5_entry);
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_6_entry);
-STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_7_entry);
-
-VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1n,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
-
-
-
-/* When the returned value is in F1 ... */
-#define STG_CtoI_RET_F1_Template(label) 	\
-   IFN_(label)			        \
-   {                                    \
-      StgPtr bco;                       \
-      FB_				\
-      bco = ((StgPtr*)Sp)[1];           \
-      Sp -= sizeofW(StgFloat);		\
-      ASSIGN_FLT((W_*)Sp, F1);          \
-      Sp -= 1;                          \
-      ((StgPtr*)Sp)[0] = (StgPtr)sizeofW(StgFloat); \
-      Sp -= 1;				\
-      ((StgPtr*)Sp)[0] = bco;		\
-      JMP_(stg_yield_to_interpreter);   \
-      FE_                               \
-   }
-
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_entry);
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_0_entry);
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_1_entry);
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_2_entry);
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_3_entry);
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_4_entry);
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_5_entry);
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_6_entry);
-STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_7_entry);
-
-VEC_POLY_INFO_TABLE(stg_ctoi_ret_F1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
-
-
-/* When the returned value is in D1 ... */
-#define STG_CtoI_RET_D1_Template(label) 	\
-   IFN_(label)			        \
-   {                                    \
-      StgPtr bco;                       \
-      FB_				\
-      bco = ((StgPtr*)Sp)[1];           \
-      Sp -= sizeofW(StgDouble);		\
-      ASSIGN_DBL((W_*)Sp, D1);          \
-      Sp -= 1;                          \
-      ((StgPtr*)Sp)[0] = (StgPtr)sizeofW(StgDouble); \
-      Sp -= 1;				\
-      ((StgPtr*)Sp)[0] = bco;		\
-      JMP_(stg_yield_to_interpreter);   \
-      FE_                               \
-   }
-
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_entry);
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_0_entry);
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_1_entry);
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_2_entry);
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_3_entry);
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_4_entry);
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_5_entry);
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_6_entry);
-STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_7_entry);
-
-VEC_POLY_INFO_TABLE(stg_ctoi_ret_D1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
-
-
-/* When the returned value a VoidRep ... */
-#define STG_CtoI_RET_V_Template(label) 	\
-   IFN_(label)			        \
-   {                                    \
-      StgPtr bco;                       \
-      FB_				\
-      bco = ((StgPtr*)Sp)[1];           \
-      Sp -= 1;                          \
-      ((StgPtr*)Sp)[0] = 0; /* VoidRep tag */ \
-      Sp -= 1;				\
-      ((StgPtr*)Sp)[0] = bco;		\
-      JMP_(stg_yield_to_interpreter);   \
-      FE_                               \
-   }
-
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_entry);
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_0_entry);
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_1_entry);
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_2_entry);
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_3_entry);
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_4_entry);
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_5_entry);
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_6_entry);
-STG_CtoI_RET_V_Template(stg_ctoi_ret_V_7_entry);
-
-VEC_POLY_INFO_TABLE(stg_ctoi_ret_V,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
-
-
-/* The other way round: when the interpreter returns a value to
-   compiled code.  The stack looks like this:
-
-      return info table (pushed by compiled code)
-      return value (pushed by interpreter)
-
-   If the value is ptr-rep'd, the interpreter simply returns to the
-   scheduler, instructing it to ThreadEnterGHC.
-
-   Otherwise (unboxed return value), we replace the top stack word,
-   which must be the tag, with stg_gc_unbx_r1_info (or f1_info or d1_info),
-   and return to the scheduler, instructing it to ThreadRunGHC.
-
-   No supporting code needed!
-*/
-
-
-/* Entering a BCO.  Heave it on the stack and defer to the
-   scheduler. */
-INFO_TABLE(stg_BCO_info,stg_BCO_entry,4,0,BCO,,EF_,"BCO","BCO");
-STGFUN(stg_BCO_entry) {
-  FB_
-    Sp -= 1;
-    Sp[0] = R1.w;
-    JMP_(stg_yield_to_interpreter);
-  FE_
+// When the returned value is a pointer, but unlifted, in R1 ...
+INFO_TABLE_RET( stg_ctoi_ret_R1unpt_info, stg_ctoi_ret_R1unpt_entry,
+		0/* special layout */,
+		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+IF_(stg_ctoi_ret_R1unpt_entry)
+{
+   FB_
+   Sp -= 2;
+   Sp[1] = R1.w;
+   Sp[0] = (W_)&stg_gc_unpt_r1_info;
+   JMP_(stg_yield_to_interpreter);
+   FE_
 }
 
+// When the returned value is a non-pointer in R1 ...
+INFO_TABLE_RET( stg_ctoi_ret_R1n_info, stg_ctoi_ret_R1n_entry,
+		0/* special layout */,
+		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+IF_(stg_ctoi_ret_R1n_entry)
+{
+   FB_
+   Sp -= 2;
+   Sp[1] = R1.w;
+   Sp[0] = (W_)&stg_gc_unbx_r1_info;
+   JMP_(stg_yield_to_interpreter);
+   FE_
+}
+
+
+// When the returned value is in F1 ...
+INFO_TABLE_RET( stg_ctoi_ret_F1_info, stg_ctoi_ret_F1_entry, 
+		0/* special layout */,
+		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+IF_(stg_ctoi_ret_F1_entry)
+{
+   FB_
+   Sp -= 2;
+   ASSIGN_FLT(Sp+1, F1);
+   Sp[0] = (W_)&stg_gc_f1_info;
+   JMP_(stg_yield_to_interpreter);
+   FE_
+}
+
+// When the returned value is in D1 ...
+INFO_TABLE_RET( stg_ctoi_ret_D1_info, stg_ctoi_ret_D1_entry,
+		0/* special layout */,
+		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+IF_(stg_ctoi_ret_D1_entry)
+{
+   FB_
+   Sp -= 1 + sizeofW(StgDouble);
+   ASSIGN_DBL(Sp+1, D1);
+   Sp[0] = (W_)&stg_gc_d1_info;
+   JMP_(stg_yield_to_interpreter);
+   FE_
+}
+
+// When the returned value is in L1 ...
+INFO_TABLE_RET( stg_ctoi_ret_L1_info, stg_ctoi_ret_L1_entry,
+		0/* special layout */,
+		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+IF_(stg_ctoi_ret_L1_entry)
+{
+   FB_
+   Sp -= 1 + sizeofW(StgInt64);
+   ASSIGN_Word64(Sp+1, L1);
+   Sp[0] = (W_)&stg_gc_l1_info;
+   JMP_(stg_yield_to_interpreter);
+   FE_
+}
+
+// When the returned value a VoidRep ...
+INFO_TABLE_RET( stg_ctoi_ret_V_info, stg_ctoi_ret_V_entry,
+		0/* special layout */,
+		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+IF_(stg_ctoi_ret_V_entry)
+{
+   FB_
+   Sp--;
+   Sp[0] = (W_)&stg_gc_void_info;
+   JMP_(stg_yield_to_interpreter);
+   FE_
+}
+
+// Dummy info table pushed on the top of the stack when the interpreter
+// should apply the BCO on the stack to its arguments, also on the stack.
+INFO_TABLE_RET( stg_apply_interp_info, stg_apply_interp_entry,
+		0/* special layout */,
+		0/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, IF_, 0, 0);
+IF_(stg_apply_interp_entry)
+{
+    FB_
+    // Just in case we end up in here... (we shouldn't)
+    JMP_(stg_yield_to_interpreter);
+    FE_
+}
+
+/* -----------------------------------------------------------------------------
+   Entry code for a BCO
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_FUN_GEN(stg_BCO_info,stg_BCO_entry,4,0,
+	      0,0,0,  /* no SRT */
+	      ARG_BCO, 0/*dummy arity*/, 0/*dummy bitmap*/, NULL/*slow_apply*/,
+	      BCO,,IF_,"BCO","BCO");
+IF_(stg_BCO_entry) {
+  FB_
+  // entering a BCO means "apply it", same as a function
+  Sp -= 2;
+  Sp[1] = R1.w;
+  Sp[0] = (W_)&stg_apply_interp_info;
+  JMP_(stg_yield_to_interpreter);
+  FE_
+}
 
 /* -----------------------------------------------------------------------------
    Entry code for an indirection.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_IND_info,stg_IND_entry,1,0,IND,,EF_,"IND","IND");
-STGFUN(stg_IND_entry)
+INFO_TABLE(stg_IND_info,stg_IND_entry,1,0,IND,,IF_,"IND","IND");
+IF_(stg_IND_entry)
 {
     FB_
     TICK_ENT_DYN_IND(Node);	/* tick */
@@ -297,8 +260,8 @@ STGFUN(stg_IND_entry)
     FE_
 }
 
-INFO_TABLE(stg_IND_STATIC_info,stg_IND_STATIC_entry,1,0,IND_STATIC,,EF_,"IND_STATIC","IND_STATIC");
-STGFUN(stg_IND_STATIC_entry)
+INFO_TABLE(stg_IND_STATIC_info,stg_IND_STATIC_entry,1,0,IND_STATIC,,IF_,"IND_STATIC","IND_STATIC");
+IF_(stg_IND_STATIC_entry)
 {
     FB_
     TICK_ENT_STATIC_IND(Node);	/* tick */
@@ -308,8 +271,8 @@ STGFUN(stg_IND_STATIC_entry)
     FE_
 }
 
-INFO_TABLE(stg_IND_PERM_info,stg_IND_PERM_entry,1,1,IND_PERM,,EF_,"IND_PERM","IND_PERM");
-STGFUN(stg_IND_PERM_entry)
+INFO_TABLE(stg_IND_PERM_info,stg_IND_PERM_entry,1,1,IND_PERM,,IF_,"IND_PERM","IND_PERM");
+IF_(stg_IND_PERM_entry)
 {
     FB_
     /* Don't add INDs to granularity cost */
@@ -352,8 +315,8 @@ STGFUN(stg_IND_PERM_entry)
     FE_
 }  
 
-INFO_TABLE(stg_IND_OLDGEN_info,stg_IND_OLDGEN_entry,1,1,IND_OLDGEN,,EF_,"IND_OLDGEN","IND_OLDGEN");
-STGFUN(stg_IND_OLDGEN_entry)
+INFO_TABLE(stg_IND_OLDGEN_info,stg_IND_OLDGEN_entry,1,1,IND_OLDGEN,,IF_,"IND_OLDGEN","IND_OLDGEN");
+IF_(stg_IND_OLDGEN_entry)
 {
     FB_
     TICK_ENT_STATIC_IND(Node);	/* tick */
@@ -363,8 +326,8 @@ STGFUN(stg_IND_OLDGEN_entry)
     FE_
 }
 
-INFO_TABLE(stg_IND_OLDGEN_PERM_info,stg_IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PERM,,EF_,"IND_OLDGEN_PERM","IND_OLDGEN_PERM");
-STGFUN(stg_IND_OLDGEN_PERM_entry)
+INFO_TABLE(stg_IND_OLDGEN_PERM_info,stg_IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PERM,,IF_,"IND_OLDGEN_PERM","IND_OLDGEN_PERM");
+IF_(stg_IND_OLDGEN_PERM_entry)
 {
     FB_
     /* Dont: TICK_ENT_STATIC_IND(Node); for ticky-ticky; this ind is here only to help profiling */
@@ -409,8 +372,8 @@ STGFUN(stg_IND_OLDGEN_PERM_entry)
  * old-generation indirection. 
  */
 
-INFO_TABLE(stg_BLACKHOLE_info, stg_BLACKHOLE_entry,0,2,BLACKHOLE,,EF_,"BLACKHOLE","BLACKHOLE");
-STGFUN(stg_BLACKHOLE_entry)
+INFO_TABLE(stg_BLACKHOLE_info, stg_BLACKHOLE_entry,0,2,BLACKHOLE,,IF_,"BLACKHOLE","BLACKHOLE");
+IF_(stg_BLACKHOLE_entry)
 {
   FB_
 #if defined(GRAN)
@@ -473,8 +436,8 @@ STGFUN(stg_BLACKHOLE_entry)
   FE_
 }
 
-INFO_TABLE(stg_BLACKHOLE_BQ_info, stg_BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,,EF_,"BLACKHOLE","BLACKHOLE");
-STGFUN(stg_BLACKHOLE_BQ_entry)
+INFO_TABLE(stg_BLACKHOLE_BQ_info, stg_BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,,IF_,"BLACKHOLE","BLACKHOLE");
+IF_(stg_BLACKHOLE_BQ_entry)
 {
   FB_
 #if defined(GRAN)
@@ -530,8 +493,8 @@ STGFUN(stg_BLACKHOLE_BQ_entry)
 
 #if defined(PAR) || defined(GRAN)
 
-INFO_TABLE(stg_RBH_info, stg_RBH_entry,1,1,RBH,,EF_,"RBH","RBH");
-STGFUN(stg_RBH_entry)
+INFO_TABLE(stg_RBH_info, stg_RBH_entry,1,1,RBH,,IF_,"RBH","RBH");
+IF_(stg_RBH_entry)
 {
   FB_
 # if defined(GRAN)
@@ -554,19 +517,19 @@ STGFUN(stg_RBH_entry)
   FE_
 }
 
-INFO_TABLE(stg_RBH_Save_0_info, stg_RBH_Save_0_entry,0,2,CONSTR,,EF_,"RBH_Save_0","RBH_Save_0");
+INFO_TABLE(stg_RBH_Save_0_info, stg_RBH_Save_0_entry,0,2,CONSTR,,IF_,"RBH_Save_0","RBH_Save_0");
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_0);
 
-INFO_TABLE(stg_RBH_Save_1_info, stg_RBH_Save_1_entry,1,1,CONSTR,,EF_,"RBH_Save_1","RBH_Save_1");
+INFO_TABLE(stg_RBH_Save_1_info, stg_RBH_Save_1_entry,1,1,CONSTR,,IF_,"RBH_Save_1","RBH_Save_1");
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_1);
 
-INFO_TABLE(stg_RBH_Save_2_info, stg_RBH_Save_2_entry,2,0,CONSTR,,EF_,"RBH_Save_2","RBH_Save_2");
+INFO_TABLE(stg_RBH_Save_2_info, stg_RBH_Save_2_entry,2,0,CONSTR,,IF_,"RBH_Save_2","RBH_Save_2");
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_2);
 #endif /* defined(PAR) || defined(GRAN) */
 
 /* identical to BLACKHOLEs except for the infotag */
-INFO_TABLE(stg_CAF_BLACKHOLE_info, stg_CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
-STGFUN(stg_CAF_BLACKHOLE_entry)
+INFO_TABLE(stg_CAF_BLACKHOLE_info, stg_CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,IF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
+IF_(stg_CAF_BLACKHOLE_entry)
 {
   FB_
 #if defined(GRAN)
@@ -618,8 +581,8 @@ STGFUN(stg_CAF_BLACKHOLE_entry)
 }
 
 #ifdef TICKY_TICKY
-INFO_TABLE(stg_SE_BLACKHOLE_info, stg_SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,,EF_,"SE_BLACKHOLE","SE_BLACKHOLE");
-STGFUN(stg_SE_BLACKHOLE_entry)
+INFO_TABLE(stg_SE_BLACKHOLE_info, stg_SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,,IF_,"SE_BLACKHOLE","SE_BLACKHOLE");
+IF_(stg_SE_BLACKHOLE_entry)
 {
   FB_
     STGCALL3(fprintf,stderr,"SE_BLACKHOLE at %p entered!\n",R1.p);
@@ -627,8 +590,8 @@ STGFUN(stg_SE_BLACKHOLE_entry)
   FE_
 }
 
-INFO_TABLE(stg_SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,EF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
-STGFUN(stg_SE_CAF_BLACKHOLE_entry)
+INFO_TABLE(stg_SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,IF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
+IF_(stg_SE_CAF_BLACKHOLE_entry)
 {
   FB_
     STGCALL3(fprintf,stderr,"SE_CAF_BLACKHOLE at %p entered!\n",R1.p);
@@ -638,11 +601,11 @@ STGFUN(stg_SE_CAF_BLACKHOLE_entry)
 #endif
 
 #ifdef SMP
-INFO_TABLE(stg_WHITEHOLE_info, stg_WHITEHOLE_entry,0,2,CONSTR_NOCAF_STATIC,,EF_,"WHITEHOLE","WHITEHOLE");
-STGFUN(stg_WHITEHOLE_entry)
+INFO_TABLE(stg_WHITEHOLE_info, stg_WHITEHOLE_entry,0,2,CONSTR_NOCAF_STATIC,,IF_,"WHITEHOLE","WHITEHOLE");
+IF_(stg_WHITEHOLE_entry)
 {
   FB_
-     JMP_(GET_ENTRY(R1.cl));
+    JMP_(GET_ENTRY(R1.cl));
   FE_
 }
 #endif
@@ -653,7 +616,7 @@ STGFUN(stg_WHITEHOLE_entry)
    NON_ENTERABLE_ENTRY_CODE now defined at the beginning of the file
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_TSO_info, stg_TSO_entry, 0,0,TSO,,EF_,"TSO","TSO");
+INFO_TABLE(stg_TSO_info, stg_TSO_entry, 0,0,TSO,,IF_,"TSO","TSO");
 NON_ENTERABLE_ENTRY_CODE(TSO);
 
 /* -----------------------------------------------------------------------------
@@ -661,7 +624,7 @@ NON_ENTERABLE_ENTRY_CODE(TSO);
    one is a real bug.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_EVACUATED_info,stg_EVACUATED_entry,1,0,EVACUATED,,EF_,"EVACUATED","EVACUATED");
+INFO_TABLE(stg_EVACUATED_info,stg_EVACUATED_entry,1,0,EVACUATED,,IF_,"EVACUATED","EVACUATED");
 NON_ENTERABLE_ENTRY_CODE(EVACUATED);
 
 /* -----------------------------------------------------------------------------
@@ -672,7 +635,7 @@ NON_ENTERABLE_ENTRY_CODE(EVACUATED);
    live weak pointers with dead ones).
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_WEAK_info,stg_WEAK_entry,0,4,WEAK,,EF_,"WEAK","WEAK");
+INFO_TABLE(stg_WEAK_info,stg_WEAK_entry,0,4,WEAK,,IF_,"WEAK","WEAK");
 NON_ENTERABLE_ENTRY_CODE(WEAK);
 
 // It's important when turning an existing WEAK into a DEAD_WEAK
@@ -680,7 +643,7 @@ NON_ENTERABLE_ENTRY_CODE(WEAK);
 // field and break the linked list of weak pointers.  Hence, we give
 // DEAD_WEAK 4 non-pointer fields, the same as WEAK.
 
-INFO_TABLE_CONSTR(stg_DEAD_WEAK_info,stg_DEAD_WEAK_entry,0,4,0,CONSTR,,EF_,"DEAD_WEAK","DEAD_WEAK");
+INFO_TABLE_CONSTR(stg_DEAD_WEAK_info,stg_DEAD_WEAK_entry,0,4,0,CONSTR,,IF_,"DEAD_WEAK","DEAD_WEAK");
 NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 
 /* -----------------------------------------------------------------------------
@@ -690,24 +653,24 @@ NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
    finalizer in a weak pointer object.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_NO_FINALIZER_info,stg_NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,"NO_FINALIZER","NO_FINALIZER");
+INFO_TABLE_CONSTR(stg_NO_FINALIZER_info,stg_NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,,IF_,"NO_FINALIZER","NO_FINALIZER");
 NON_ENTERABLE_ENTRY_CODE(NO_FINALIZER);
 
-SET_STATIC_HDR(stg_NO_FINALIZER_closure,stg_NO_FINALIZER_info,0/*CC*/,,EI_)
+SET_STATIC_HDR(stg_NO_FINALIZER_closure,stg_NO_FINALIZER_info,0/*CC*/,,extern StgInfoTable)
 , /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
    Foreign Objects are unlifted and therefore never entered.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_FOREIGN_info,stg_FOREIGN_entry,0,1,FOREIGN,,EF_,"FOREIGN","FOREIGN");
+INFO_TABLE(stg_FOREIGN_info,stg_FOREIGN_entry,0,1,FOREIGN,,IF_,"FOREIGN","FOREIGN");
 NON_ENTERABLE_ENTRY_CODE(FOREIGN);
 
 /* -----------------------------------------------------------------------------
    Stable Names are unlifted too.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_STABLE_NAME_info,stg_STABLE_NAME_entry,0,1,STABLE_NAME,,EF_,"STABLE_NAME","STABLE_NAME");
+INFO_TABLE(stg_STABLE_NAME_info,stg_STABLE_NAME_entry,0,1,STABLE_NAME,,IF_,"STABLE_NAME","STABLE_NAME");
 NON_ENTERABLE_ENTRY_CODE(STABLE_NAME);
 
 /* -----------------------------------------------------------------------------
@@ -717,10 +680,10 @@ NON_ENTERABLE_ENTRY_CODE(STABLE_NAME);
    and entry code for each type.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_FULL_MVAR_info,stg_FULL_MVAR_entry,4,0,MVAR,,EF_,"MVAR","MVAR");
+INFO_TABLE(stg_FULL_MVAR_info,stg_FULL_MVAR_entry,4,0,MVAR,,IF_,"MVAR","MVAR");
 NON_ENTERABLE_ENTRY_CODE(FULL_MVAR);
 
-INFO_TABLE(stg_EMPTY_MVAR_info,stg_EMPTY_MVAR_entry,4,0,MVAR,,EF_,"MVAR","MVAR");
+INFO_TABLE(stg_EMPTY_MVAR_info,stg_EMPTY_MVAR_entry,4,0,MVAR,,IF_,"MVAR","MVAR");
 NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
 
 /* -----------------------------------------------------------------------------
@@ -730,10 +693,10 @@ NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
    end of a linked TSO queue.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_END_TSO_QUEUE_info,stg_END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,"END_TSO_QUEUE","END_TSO_QUEUE");
+INFO_TABLE_CONSTR(stg_END_TSO_QUEUE_info,stg_END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STATIC,,IF_,"END_TSO_QUEUE","END_TSO_QUEUE");
 NON_ENTERABLE_ENTRY_CODE(END_TSO_QUEUE);
 
-SET_STATIC_HDR(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE_info,0/*CC*/,,EI_)
+SET_STATIC_HDR(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE_info,0/*CC*/,,extern StgInfoTable)
 , /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
@@ -744,26 +707,26 @@ SET_STATIC_HDR(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE_info,0/*CC*/,,EI_)
    an END_MUT_LIST closure.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_END_MUT_LIST_info,stg_END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,"END_MUT_LIST","END_MUT_LIST");
+INFO_TABLE_CONSTR(stg_END_MUT_LIST_info,stg_END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,IF_,"END_MUT_LIST","END_MUT_LIST");
 NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
 
-SET_STATIC_HDR(stg_END_MUT_LIST_closure,stg_END_MUT_LIST_info,0/*CC*/,,EI_)
+SET_STATIC_HDR(stg_END_MUT_LIST_closure,stg_END_MUT_LIST_info,0/*CC*/,,extern StgInfoTable)
 , /*payload*/{} };
 
-INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 1, 1, MUT_CONS, , EF_, "MUT_CONS", "MUT_CONS");
+INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 1, 1, MUT_CONS, , IF_, "MUT_CONS", "MUT_CONS");
 NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
 
 /* -----------------------------------------------------------------------------
    Exception lists
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_END_EXCEPTION_LIST_info,stg_END_EXCEPTION_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,"END_EXCEPTION_LIST","END_EXCEPTION_LIST");
+INFO_TABLE_CONSTR(stg_END_EXCEPTION_LIST_info,stg_END_EXCEPTION_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,IF_,"END_EXCEPTION_LIST","END_EXCEPTION_LIST");
 NON_ENTERABLE_ENTRY_CODE(END_EXCEPTION_LIST);
 
-SET_STATIC_HDR(stg_END_EXCEPTION_LIST_closure,stg_END_EXCEPTION_LIST_info,0/*CC*/,,EI_)
+SET_STATIC_HDR(stg_END_EXCEPTION_LIST_closure,stg_END_EXCEPTION_LIST_info,0/*CC*/,,extern StgInfoTable)
 , /*payload*/{} };
 
-INFO_TABLE(stg_EXCEPTION_CONS_info, stg_EXCEPTION_CONS_entry, 1, 1, CONSTR, , EF_, "EXCEPTION_CONS", "EXCEPTION_CONS");
+INFO_TABLE(stg_EXCEPTION_CONS_info, stg_EXCEPTION_CONS_entry, 1, 1, CONSTR, , IF_, "EXCEPTION_CONS", "EXCEPTION_CONS");
 NON_ENTERABLE_ENTRY_CODE(EXCEPTION_CONS);
 
 /* -----------------------------------------------------------------------------
@@ -782,7 +745,7 @@ NON_ENTERABLE_ENTRY_CODE(EXCEPTION_CONS);
    -------------------------------------------------------------------------- */
 
 #define ArrayInfo(type)					\
-INFO_TABLE(stg_##type##_info, stg_##type##_entry, 0, 0, type, , EF_,"" # type "","" # type "");
+INFO_TABLE(stg_##type##_info, stg_##type##_entry, 0, 0, type, , IF_,"" # type "","" # type "");
 
 ArrayInfo(ARR_WORDS);
 NON_ENTERABLE_ENTRY_CODE(ARR_WORDS);
@@ -797,26 +760,9 @@ NON_ENTERABLE_ENTRY_CODE(MUT_ARR_PTRS_FROZEN);
    Mutable Variables
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_MUT_VAR_info, stg_MUT_VAR_entry, 1, 1, MUT_VAR, , EF_, "MUT_VAR", "MUT_VAR");
+INFO_TABLE(stg_MUT_VAR_info, stg_MUT_VAR_entry, 1, 1, MUT_VAR, , IF_, "MUT_VAR", "MUT_VAR");
 NON_ENTERABLE_ENTRY_CODE(MUT_VAR);
 
-/* -----------------------------------------------------------------------------
-   Standard Error Entry.
-
-   This is used for filling in vector-table entries that can never happen,
-   for instance.
-   -------------------------------------------------------------------------- */
-/* No longer used; we use NULL, because a) it never happens, right? and b)
-   Windows doesn't like DLL entry points being used as static initialisers
-STGFUN(stg_error_entry)							\
-{									\
-  FB_									\
-    DUMP_ERRMSG("fatal: stg_error_entry");                              \
-    STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);			\
-    return NULL;							\
-  FE_									\
-}
-*/
 /* -----------------------------------------------------------------------------
    Dummy return closure
  
@@ -825,74 +771,17 @@ STGFUN(stg_error_entry)							\
    just enter the top stack word to start the thread.  (see deleteThread)
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_dummy_ret_info, stg_dummy_ret_entry, 0, 0, CONSTR_NOCAF_STATIC, , EF_, "DUMMY_RET", "DUMMY_RET");
+INFO_TABLE( stg_dummy_ret_info, stg_dummy_ret_entry, 
+	    0, 0, CONSTR_NOCAF_STATIC, , EF_, "DUMMY_RET", "DUMMY_RET");
+
 STGFUN(stg_dummy_ret_entry)
 {
-  W_ ret_addr;
   FB_
-  ret_addr = Sp[0];
-  Sp++;
-  JMP_(ENTRY_CODE(ret_addr));
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
-SET_STATIC_HDR(stg_dummy_ret_closure,stg_dummy_ret_info,CCS_DONT_CARE,,EI_)
+SET_STATIC_HDR(stg_dummy_ret_closure,stg_dummy_ret_info,CCS_DONT_CARE,,extern StgInfoTable)
 , /*payload*/{} };
-
-/* -----------------------------------------------------------------------------
-    Strict IO application - performing an IO action and entering its result.
-    
-    rts_evalIO() lets you perform Haskell IO actions from outside of Haskell-land,
-    returning back to you their result. Want this result to be evaluated to WHNF
-    by that time, so that we can easily get at the int/char/whatever using the
-    various get{Ty} functions provided by the RTS API.
-
-    forceIO takes care of this, performing the IO action and entering the
-    results that comes back.
-
- * -------------------------------------------------------------------------- */
-
-#ifdef REG_R1
-INFO_TABLE_SRT_BITMAP(stg_forceIO_ret_info,stg_forceIO_ret_entry,0,0,0,0,RET_SMALL,,EF_,0,0);
-STGFUN(stg_forceIO_ret_entry)
-{
-  FB_
-  Sp++;
-  Sp -= sizeofW(StgSeqFrame);
-  PUSH_SEQ_FRAME(Sp);
-  JMP_(GET_ENTRY(R1.cl));
-}
-#else
-INFO_TABLE_SRT_BITMAP(stg_forceIO_ret_info,stg_forceIO_ret_entry,0,0,0,0,RET_SMALL,,EF_,0,0);
-STGFUN(stg_forceIO_ret_entry)
-{
-  StgClosure *rval;
-  FB_
-  rval = (StgClosure *)Sp[0];
-  Sp += 2;
-  Sp -= sizeofW(StgSeqFrame);
-  PUSH_SEQ_FRAME(Sp);
-  R1.cl = rval;
-  JMP_(GET_ENTRY(R1.cl));
-}
-#endif
-
-INFO_TABLE(stg_forceIO_info,stg_forceIO_entry,1,0,FUN_STATIC,,EF_,"FORCE_IO","FORCE_IO");
-FN_(stg_forceIO_entry)
-{
-  FB_
-  /* Sp[0] contains the IO action we want to perform */
-  R1.p  = (P_)Sp[0];
-  /* Replace it with the return continuation that enters the result. */
-  Sp[0] = (W_)&stg_forceIO_ret_info;
-  Sp--;
-  /* Push the RealWorld# tag and enter */
-  Sp[0] =(W_)REALWORLD_TAG;
-  JMP_(GET_ENTRY(R1.cl));
-  FE_
-}
-SET_STATIC_HDR(stg_forceIO_closure,stg_forceIO_info,CCS_DONT_CARE,,EI_)
-, /*payload*/{} };
-
 
 /* -----------------------------------------------------------------------------
    CHARLIKE and INTLIKE closures.  

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.26 2002/03/02 17:43:44 sof Exp $
+ * $Id: HeapStackCheck.hc,v 1.27 2002/12/11 15:36:42 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2002
  *
  * Canned Heap-Check and Stack-Check sequences.
  *
@@ -12,6 +12,10 @@
 #include "Storage.h"   	/* for CurrentTSO */
 #include "StgRun.h"	/* for StgReturn and register saving */
 #include "Schedule.h"   /* for context_switch */
+#include "RtsFlags.h"
+#include "Apply.h"
+
+#include <stdio.h>
 
 /* Stack/Heap Check Failure
  * ------------------------
@@ -48,14 +52,14 @@
  */
 
 #define GC_GENERIC					\
+  DEBUG_ONLY(heapCheckFail());				\
   if (Hp > HpLim) {					\
     Hp -= HpAlloc;					\
     if (HpAlloc <= BLOCK_SIZE_W && ExtendNursery(Hp,HpLim)) {\
 	if (context_switch) {				\
 	    R1.i = ThreadYielding;			\
 	} else {					\
- 	   Sp++;					\
-	   JMP_(ENTRY_CODE(Sp[-1]));			\
+	   JMP_(ENTRY_CODE(Sp[0]));			\
 	}						\
     } else {						\
       R1.i = HeapOverflow;				\
@@ -67,82 +71,32 @@
   CurrentTSO->what_next = ThreadRunGHC;			\
   JMP_(StgReturn);
 
-#define GC_ENTER					\
-  if (Hp > HpLim) {					\
-    Hp -= HpAlloc;					\
-    if (HpAlloc <= BLOCK_SIZE_W && ExtendNursery(Hp,HpLim)) {\
-	if (context_switch) {				\
-	    R1.i = ThreadYielding;			\
-	} else {					\
- 	   R1.w = *Sp;					\
-  	   Sp++;					\
-	   JMP_(ENTRY_CODE(*R1.p));			\
-	}						\
-    } else {						\
-      R1.i = HeapOverflow;				\
-    }							\
-  } else {						\
-    R1.i = StackOverflow;				\
-  }							\
-  SaveThreadState();					\
-  CurrentTSO->what_next = ThreadEnterGHC;		\
+#define HP_GENERIC				\
+  SaveThreadState();				\
+  CurrentTSO->what_next = ThreadRunGHC;		\
+  R1.i = HeapOverflow;				\
   JMP_(StgReturn);
 
-#define HP_GENERIC			\
-  SaveThreadState();			\
-  CurrentTSO->what_next = ThreadRunGHC;	\
-  R1.i = HeapOverflow;			\
+#define YIELD_GENERIC				\
+  SaveThreadState();				\
+  CurrentTSO->what_next = ThreadRunGHC;		\
+  R1.i = ThreadYielding;			\
   JMP_(StgReturn);
 
-#define STK_GENERIC 			\
-  SaveThreadState();			\
-  CurrentTSO->what_next = ThreadRunGHC;	\
-  R1.i = StackOverflow;			\
+#define YIELD_TO_INTERPRETER			\
+  SaveThreadState();				\
+  CurrentTSO->what_next = ThreadInterpret;	\
+  R1.i = ThreadYielding;			\
   JMP_(StgReturn);
 
-#define YIELD_GENERIC			\
-  SaveThreadState();			\
-  CurrentTSO->what_next = ThreadRunGHC;	\
-  R1.i = ThreadYielding;		\
-  JMP_(StgReturn);
-
-#define YIELD_TO_INTERPRETER		  \
-  SaveThreadState();			  \
-  CurrentTSO->what_next = ThreadEnterInterp; \
-  R1.i = ThreadYielding;		  \
-  JMP_(StgReturn);
-
-#define BLOCK_GENERIC			\
-  SaveThreadState();			\
-  CurrentTSO->what_next = ThreadRunGHC;	\
-  R1.i = ThreadBlocked;			\
-  JMP_(StgReturn);
-
-#define BLOCK_ENTER			\
-  SaveThreadState();			\
-  CurrentTSO->what_next = ThreadEnterGHC;\
-  R1.i = ThreadBlocked;			\
+#define BLOCK_GENERIC				\
+  SaveThreadState();				\
+  CurrentTSO->what_next = ThreadRunGHC;		\
+  R1.i = ThreadBlocked;				\
   JMP_(StgReturn);
 
 /* -----------------------------------------------------------------------------
-   Heap Checks
-   -------------------------------------------------------------------------- */
-
-/*
- * This one is used when we want to *enter* the top thing on the stack
- * when we return, instead of the just returning to an address.  See
- * UpdatePAP for an example.
- */
-
-EXTFUN(stg_gc_entertop)
-{
-  FB_
-  GC_ENTER
-  FE_
-}
-
-/* -----------------------------------------------------------------------------
-   Heap checks in non-top-level thunks/functions.
+   Heap checks in thunks/functions.
 
    In these cases, node always points to the function closure.  This gives
    us an easy way to return to the function: just leave R1 on the top of
@@ -151,15 +105,30 @@ EXTFUN(stg_gc_entertop)
    There are canned sequences for 'n' pointer values in registers.
    -------------------------------------------------------------------------- */
 
-EXTFUN(__stg_gc_enter_1)
+INFO_TABLE_RET( stg_enter_info, stg_enter_ret, 
+	       	MK_SMALL_BITMAP(1/*framesize*/, 0/*bitmap*/),
+	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, EF_, 0, 0);
+EXTFUN(stg_enter_ret)
 {
   FB_
-  Sp -= 1;
-  Sp[0] = R1.w;
-  GC_ENTER
+  R1.w = Sp[1];
+  Sp += 2;
+  ENTER();
   FE_
 }
 
+EXTFUN(__stg_gc_enter_1)
+{
+  FB_
+  Sp -= 2;
+  Sp[1] = R1.w;
+  Sp[0] = (W_)&stg_enter_info;
+  GC_GENERIC
+  FE_
+}
+
+#ifdef SMP
 EXTFUN(stg_gc_enter_1_hponly)
 {
   FB_
@@ -167,115 +136,11 @@ EXTFUN(stg_gc_enter_1_hponly)
   Sp[0] = R1.w;
   R1.i = HeapOverflow;
   SaveThreadState();
-  CurrentTSO->what_next = ThreadEnterGHC;
+  CurrentTSO->what_next = ThreadRunGHC;
   JMP_(StgReturn);
   FE_
 }
-
-/*- 2 Regs--------------------------------------------------------------------*/
-
-EXTFUN(stg_gc_enter_2)
-{
-  FB_
-  Sp -= 2;
-  Sp[1] = R2.w;
-  Sp[0] = R1.w;
-  GC_ENTER;
-  FE_
-}
-
-/*- 3 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_gc_enter_3)
-{
-  FB_
-  Sp -= 3;
-  Sp[2] = R3.w;
-  Sp[1] = R2.w;
-  Sp[0] = R1.w;
-  GC_ENTER;
-  FE_
-}
-
-/*- 4 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_gc_enter_4)
-{
-  FB_
-  Sp -= 4;
-  Sp[3] = R4.w;
-  Sp[2] = R3.w;
-  Sp[1] = R2.w;
-  Sp[0] = R1.w;
-  GC_ENTER;
-  FE_
-}
-
-/*- 5 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_gc_enter_5)
-{
-  FB_
-  Sp -= 5;
-  Sp[4] = R5.w;
-  Sp[3] = R4.w;
-  Sp[2] = R3.w;
-  Sp[1] = R2.w;
-  Sp[0] = R1.w;
-  GC_ENTER;
-  FE_
-}
-
-/*- 6 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_gc_enter_6)
-{
-  FB_
-  Sp -= 6;
-  Sp[5] = R6.w;
-  Sp[4] = R5.w;
-  Sp[3] = R4.w;
-  Sp[2] = R3.w;
-  Sp[1] = R2.w;
-  Sp[0] = R1.w;
-  GC_ENTER;
-  FE_
-}
-
-/*- 7 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_gc_enter_7)
-{
-  FB_
-  Sp -= 7;
-  Sp[6] = R7.w;
-  Sp[5] = R6.w;
-  Sp[4] = R5.w;
-  Sp[3] = R4.w;
-  Sp[2] = R3.w;
-  Sp[1] = R2.w;
-  Sp[0] = R1.w;
-  GC_ENTER;
-  FE_
-}
-
-/*- 8 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_gc_enter_8)
-{
-  FB_
-  Sp -= 8;
-  Sp[7] = R8.w;
-  Sp[6] = R7.w;
-  Sp[5] = R6.w;
-  Sp[4] = R5.w;
-  Sp[3] = R4.w;
-  Sp[2] = R3.w;
-  Sp[1] = R2.w;
-  Sp[0] = R1.w;
-  GC_ENTER;
-  FE_
-}
+#endif
 
 #if defined(GRAN)
 /*
@@ -290,7 +155,7 @@ EXTFUN(gran_yield_0)
 {
   FB_
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -302,7 +167,7 @@ EXTFUN(gran_yield_1)
   Sp -= 1;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -317,7 +182,7 @@ EXTFUN(gran_yield_2)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -333,7 +198,7 @@ EXTFUN(gran_yield_3)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -350,7 +215,7 @@ EXTFUN(gran_yield_4)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -368,7 +233,7 @@ EXTFUN(gran_yield_5)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -387,7 +252,7 @@ EXTFUN(gran_yield_6)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -407,7 +272,7 @@ EXTFUN(gran_yield_7)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -428,7 +293,7 @@ EXTFUN(gran_yield_8)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -442,7 +307,7 @@ EXTFUN(gran_block_1)
   Sp -= 1;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -457,7 +322,7 @@ EXTFUN(gran_block_2)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -473,7 +338,7 @@ EXTFUN(gran_block_3)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -490,7 +355,7 @@ EXTFUN(gran_block_4)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -508,7 +373,7 @@ EXTFUN(gran_block_5)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -527,7 +392,7 @@ EXTFUN(gran_block_6)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -547,7 +412,7 @@ EXTFUN(gran_block_7)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -568,7 +433,7 @@ EXTFUN(gran_block_8)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -597,34 +462,13 @@ EXTFUN(par_block_1_no_jump)
 EXTFUN(par_jump)
 {
   FB_
-  CurrentTSO->what_next = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadRunGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
 }
 
 #endif
-
-/* -----------------------------------------------------------------------------
-   For a case expression on a polymorphic or function-typed object, if
-   the default branch (there can only be one branch) of the case fails
-   a heap-check, instead of using stg_gc_enter_1 as normal, we must
-   push a new SEQ frame on the stack, followed by the object returned.  
-
-   Otherwise, if the object is a function, it won't return to the
-   correct activation record on returning from garbage collection.  It will
-   assume it has some arguments and apply itself.
-   -------------------------------------------------------------------------- */
-
-EXTFUN(stg_gc_seq_1)
-{
-  FB_
-  Sp -= 1 + sizeofW(StgSeqFrame);
-  PUSH_SEQ_FRAME(Sp+1);
-  *Sp = R1.w;
-  GC_ENTER;
-  FE_
-}
 
 /* -----------------------------------------------------------------------------
    Heap checks in Primitive case alternatives
@@ -634,43 +478,42 @@ EXTFUN(stg_gc_seq_1)
    cases are covered below.
    -------------------------------------------------------------------------- */
 
-/*-- No registers live (probably a void return) ----------------------------- */
-
-/* If we change the policy for thread startup to *not* remove the
- * return address from the stack, we can get rid of this little
- * function/info table...  
- */
-INFO_TABLE_SRT_BITMAP(stg_gc_noregs_info, stg_gc_noregs_ret, 0/*BITMAP*/, 
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
-
-EXTFUN(stg_gc_noregs_ret)
-{
-  FB_
-  JMP_(ENTRY_CODE(Sp[0]));
-  FE_
-}
+/*-- No Registers live ------------------------------------------------------ */
 
 EXTFUN(stg_gc_noregs)
 {
   FB_
-  Sp -= 1;
-  Sp[0] = (W_)&stg_gc_noregs_info;
   GC_GENERIC
+  FE_
+}
+
+/*-- void return ------------------------------------------------------------ */
+
+INFO_TABLE_RET( stg_gc_void_info, stg_gc_void_ret, 
+	       	MK_SMALL_BITMAP(0/*framesize*/, 0/*bitmap*/),
+	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, EF_, 0, 0);
+
+EXTFUN(stg_gc_void_ret)
+{
+  FB_
+  Sp += 1;
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
 /*-- R1 is boxed/unpointed -------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_unpt_r1_info, stg_gc_unpt_r1_ret, 0/*BITMAP*/, 
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
+INFO_TABLE_RET( stg_gc_unpt_r1_info, stg_gc_unpt_r1_ret, 
+	       	MK_SMALL_BITMAP(1/*framesize*/, 0/*bitmap*/),
+	       	0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_unpt_r1_ret)
 {
   FB_
-  R1.w = Sp[0];
-  Sp += 1;
+  R1.w = Sp[1];
+  Sp += 2;
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
@@ -685,32 +528,20 @@ EXTFUN(stg_gc_unpt_r1)
   FE_
 }
 
-/*-- Unboxed tuple return (unregisterised build only)------------------ */
-
-INFO_TABLE_SRT_BITMAP(stg_ut_1_0_unreg_info, stg_ut_1_0_unreg_ret, 0/*BITMAP*/, 
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
-
-EXTFUN(stg_ut_1_0_unreg_ret)
-{
-  FB_
-  /* R1 is on the stack (*Sp) */
-  JMP_(ENTRY_CODE(Sp[1]));
-  FE_
-}
-
 /*-- R1 is unboxed -------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_unbx_r1_info, stg_gc_unbx_r1_ret, 1/*BITMAP*/,
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
+INFO_TABLE_RET(	stg_gc_unbx_r1_info, stg_gc_unbx_r1_ret, 
+	       	MK_SMALL_BITMAP(1/*framesize*/, 1/*bitmap*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, EF_, 0, 0);
+
 /* the 1 is a bitmap - i.e. 1 non-pointer word on the stack. */
 
 EXTFUN(stg_gc_unbx_r1_ret)
 {
   FB_
-  R1.w = Sp[0];
-  Sp += 1;
+  R1.w = Sp[1];
+  Sp += 2;
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
@@ -727,15 +558,16 @@ EXTFUN(stg_gc_unbx_r1)
 
 /*-- F1 contains a float ------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_f1_info, stg_gc_f1_ret, 1/*BITMAP*/,
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
+INFO_TABLE_RET(	stg_gc_f1_info, stg_gc_f1_ret, 
+	       	MK_SMALL_BITMAP(1/*framesize*/, 1/*bitmap*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_f1_ret)
 {
   FB_
-  F1 = PK_FLT(Sp);
-  Sp += 1;
+  F1 = PK_FLT(Sp+1);
+  Sp += 2;
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
@@ -756,19 +588,22 @@ EXTFUN(stg_gc_f1)
 
 #if SIZEOF_DOUBLE == SIZEOF_VOID_P
 #  define DBL_BITMAP 1
+#  define DBL_WORDS  1
 #else
 #  define DBL_BITMAP 3
+#  define DBL_WORDS  2
 #endif 
 
-INFO_TABLE_SRT_BITMAP(stg_gc_d1_info, stg_gc_d1_ret, DBL_BITMAP,
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
+INFO_TABLE_RET(	stg_gc_d1_info, stg_gc_d1_ret, 
+	       	MK_SMALL_BITMAP(DBL_WORDS/*framesize*/, DBL_BITMAP/*bitmap*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_d1_ret)
 {
   FB_
-  D1 = PK_DBL(Sp);
-  Sp += sizeofW(StgDouble);
+  D1 = PK_DBL(Sp+1);
+  Sp += 1 + sizeofW(StgDouble);
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
@@ -790,19 +625,22 @@ EXTFUN(stg_gc_d1)
 
 #if SIZEOF_VOID_P == 8
 #  define LLI_BITMAP 1
+#  define LLI_WORDS  1
 #else
 #  define LLI_BITMAP 3
+#  define LLI_WORDS  2
 #endif 
 
-INFO_TABLE_SRT_BITMAP(stg_gc_l1_info, stg_gc_l1_ret, LLI_BITMAP,
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
+INFO_TABLE_RET( stg_gc_l1_info, stg_gc_l1_ret, 
+	       	MK_SMALL_BITMAP(LLI_WORDS/*framesize*/, LLI_BITMAP/*bitmap*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_l1_ret)
 {
   FB_
-  L1 = PK_Int64(Sp);
-  Sp += sizeofW(StgWord64);
+  L1 = PK_Int64(Sp+1);
+  Sp += 1 + sizeofW(StgWord64);
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
@@ -817,260 +655,136 @@ EXTFUN(stg_gc_l1)
   FE_
 }
 
+/*-- Unboxed tuple return, one pointer (unregisterised build only) ---------- */
+
+INFO_TABLE_RET( stg_ut_1_0_unreg_info, stg_ut_1_0_unreg_ret, 
+		MK_SMALL_BITMAP(1/*size*/, 0/*BITMAP*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, EF_, 0, 0);
+
+EXTFUN(stg_ut_1_0_unreg_ret)
+{
+  FB_
+  Sp++;
+  /* one ptr is on the stack (Sp[0]) */
+  JMP_(ENTRY_CODE(Sp[1]));
+  FE_
+}
+
 /* -----------------------------------------------------------------------------
-   Heap checks for unboxed tuple case alternatives
+   Generic function entry heap check code.
 
-   The story is: 
+   At a function entry point, the arguments are as per the calling convention,
+   i.e. some in regs and some on the stack.  There may or may not be 
+   a pointer to the function closure in R1 - if there isn't, then the heap
+   check failure code in the function will arrange to load it.
 
-      - for an unboxed tuple with n components, we rearrange the components
-	with pointers first followed by non-pointers. (NB: not done yet)
- 
-      - The first k components are allocated registers, where k is the
-        number of components that will fit in real registers.
+   The function's argument types are described in its info table, so we
+   can just jump to this bit of generic code to save away all the
+   registers and return to the scheduler.
 
-      - The rest are placed on the stack, with space left for tagging
-        of the non-pointer block if necessary.
+   This code arranges the stack like this:
+	 
+         |        ....         |
+         |        args         |
+	 +---------------------+
+         |      f_closure      |
+	 +---------------------+
+         |        size         |
+	 +---------------------+
+         |   stg_gc_fun_info   |
+	 +---------------------+
 
-      - On failure of a heap check:
-		- the tag is filled in if necessary,
-		- we load Ri with the address of the continuation,
-		  where i is the lowest unused vanilla register.
-		- jump to 'stg_gc_ut_x_y' where x is the number of pointer
-		  registers and y the number of non-pointers.
-		- if the required canned sequence isn't available, it will
-		  have to be generated at compile-time by the code
-		  generator (this will probably happen if there are
-		  floating-point values, for instance).
-  
-   For now, just deal with R1, hence R2 contains the sequel address.
+   The size is the number of words of arguments on the stack, and is cached
+   in the frame in order to simplify stack walking: otherwise the size of
+   this stack frame would have to be calculated by looking at f's info table.
+
    -------------------------------------------------------------------------- */
 
-/*---- R1 contains a pointer: ------ */
-
-INFO_TABLE_SRT_BITMAP(stg_gc_ut_1_0_info, stg_gc_ut_1_0_ret, 1/*BITMAP*/, 
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
-
-EXTFUN(stg_gc_ut_1_0_ret)
+EXTFUN(__stg_gc_fun)
 {
-  FB_
-  R1.w = Sp[1];
-  Sp += 2;
-  JMP_(ENTRY_CODE(Sp[-2]));
-  FE_
-}
+    StgWord size;
+    StgFunInfoTable *info;
+    FB_
 
-EXTFUN(stg_gc_ut_1_0)
-{
-  FB_
-  Sp -= 3;
-  Sp[2] = R1.w;
-  Sp[1] = R2.w;
-  Sp[0] = (W_)&stg_gc_ut_1_0_info;
-  GC_GENERIC
-  FE_
-}
+    info = get_fun_itbl(R1.cl);
 
-/*---- R1 contains a non-pointer: ------ */
+    // cache the size
+    if (info->fun_type == ARG_GEN) {
+	size = BITMAP_SIZE(info->bitmap);
+    } else if (info->fun_type == ARG_GEN_BIG) {
+	size = ((StgLargeBitmap *)info->bitmap)->size;
+    } else {
+	size = BITMAP_SIZE(stg_arg_bitmaps[info->fun_type]);
+    }
+    
+#ifdef NO_ARG_REGS
+    // we don't have to save any registers away
+    Sp -= 3;
+    Sp[2] = R1.w;
+    Sp[1] = size;
+    Sp[0] = (W_)&stg_gc_fun_info;
+    GC_GENERIC
+#else
+    if (info->fun_type == ARG_GEN || info->fun_type == ARG_GEN_BIG) {
+        // regs already saved by the heap check code
+        Sp -= 3;
+        Sp[2] = R1.w;
+        Sp[1] = size;
+        Sp[0] = (W_)&stg_gc_fun_info;
+        DEBUG_ONLY(fprintf(stderr, "stg_fun_gc_gen(ARG_GEN)"););
+        GC_GENERIC
+    } else {
+        JMP_(stg_stack_save_entries[info->fun_type]);
+        // jumps to stg_gc_noregs after saving stuff
+    }
+#endif // !NO_ARG_REGS
 
-INFO_TABLE_SRT_BITMAP(stg_gc_ut_0_1_info, stg_gc_ut_0_1_ret, 3/*BITMAP*/, 
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
-
-EXTFUN(stg_gc_ut_0_1_ret)
-{
-  FB_
-  R1.w = Sp[1];
-  Sp += 2;
-  JMP_(ENTRY_CODE(Sp[-2]));
-  FE_
-}
-
-EXTFUN(stg_gc_ut_0_1)
-{
-  FB_
-  Sp -= 3;
-  Sp[0] = (W_)&stg_gc_ut_0_1_info;
-  Sp[1] = R2.w;
-  Sp[2] = R1.w;
-  GC_GENERIC
-  FE_
-}
+    FE_
+}   
 
 /* -----------------------------------------------------------------------------
-   Standard top-level fast-entry heap checks.
+   Generic Apply (return point)
 
-   - we want to make the stack look like it should at the slow entry
-     point for the function.  That way we can just push the slow
-     entry point on the stack and return using ThreadRunGHC.
+   The dual to stg_fun_gc_gen (above): this fragment returns to the
+   function, passing arguments in the stack and in registers
+   appropriately.  The stack layout is given above.
+   -------------------------------------------------------------------------- */
 
-   - The compiler will generate code to fill in any tags on the stack,
-     in case we arrived directly at the fast entry point and these tags
-     aren't present.
+INFO_TABLE_RET( stg_gc_fun_info,stg_gc_fun_ret,
+	       	MK_SMALL_BITMAP(0/*framesize*/, 0/*bitmap*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_FUN,, EF_, 0, 0);
 
-   - The rest is hopefully handled by jumping to a canned sequence.
-     We currently have canned sequences for 0-8 pointer registers.  If
-     any registers contain non-pointers, we must reduce to an all-pointers
-     situation by pushing as many registers on the stack as necessary.
-
-     eg. if R1, R2 contain pointers and R3 contains a word, the heap check
-         failure sequence looks like this:
-
-		Sp[-1] = R3.w;
-	 	Sp[-2] = WORD_TAG;
-		Sp -= 2;
-		JMP_(stg_chk_2)
-
-	  after pushing R3, we have pointers in R1 and R2 which corresponds
-	  to the 2-pointer canned sequence.
-
-  -------------------------------------------------------------------------- */
-
-/*- 0 Regs -------------------------------------------------------------------*/
-
-EXTFUN(__stg_chk_0)
+EXTFUN(stg_gc_fun_ret)
 {
   FB_
-  Sp -= 1;
-  Sp[0] = R1.w;
-  GC_GENERIC;
-  FE_
-}
+  R1.w = Sp[2];
+  Sp += 3;
+#ifdef NO_ARG_REGS
+  // there are no argument registers to load up, so we can just jump
+  // straight to the function's entry point.
+  JMP_(GET_ENTRY(R1.cl));
+#else
+  {
+      StgFunInfoTable *info;
 
-/*- 1 Reg --------------------------------------------------------------------*/
-
-EXTFUN(__stg_chk_1)
-{
-  FB_
-  Sp -= 2;
-  Sp[1] = R1.w;
-  Sp[0] = R2.w;
-  GC_GENERIC;
-  FE_
-}
-
-/*- 1 Reg (non-ptr) ----------------------------------------------------------*/
-
-EXTFUN(stg_chk_1n)
-{
-  FB_
-  Sp -= 3;
-  Sp[2] = R1.w;
-  Sp[1] = WORD_TAG; /* ToDo: or maybe its an int? */
-  Sp[0] = R2.w;
-  GC_GENERIC;
-  FE_
-}
-
-/*- 2 Regs--------------------------------------------------------------------*/
-
-EXTFUN(stg_chk_2)
-{
-  FB_
-  Sp -= 3;
-  Sp[2] = R2.w;
-  Sp[1] = R1.w;
-  Sp[0] = R3.w;
-  GC_GENERIC;
-  FE_
-}
-
-/*- 3 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_chk_3)
-{
-  FB_
-  Sp -= 4;
-  Sp[3] = R3.w;
-  Sp[2] = R2.w;
-  Sp[1] = R1.w;
-  Sp[0] = R4.w;
-  GC_GENERIC;
-  FE_
-}
-
-/*- 4 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_chk_4)
-{
-  FB_
-  Sp -= 5;
-  Sp[4] = R4.w;
-  Sp[3] = R3.w;
-  Sp[2] = R2.w;
-  Sp[1] = R1.w;
-  Sp[0] = R5.w;
-  GC_GENERIC;
-  FE_
-}
-
-/*- 5 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_chk_5)
-{
-  FB_
-  Sp -= 6;
-  Sp[5] = R5.w;
-  Sp[4] = R4.w;
-  Sp[3] = R3.w;
-  Sp[2] = R2.w;
-  Sp[1] = R1.w;
-  Sp[0] = R6.w;
-  GC_GENERIC;
-  FE_
-}
-
-/*- 6 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_chk_6)
-{
-  FB_
-  Sp -= 7;
-  Sp[6] = R6.w;
-  Sp[5] = R5.w;
-  Sp[4] = R4.w;
-  Sp[3] = R3.w;
-  Sp[2] = R2.w;
-  Sp[1] = R1.w;
-  Sp[0] = R7.w;
-  GC_GENERIC;
-  FE_
-}
-
-/*- 7 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_chk_7)
-{
-  FB_
-  Sp -= 8;
-  Sp[7] = R7.w;
-  Sp[6] = R6.w;
-  Sp[5] = R5.w;
-  Sp[4] = R4.w;
-  Sp[3] = R3.w;
-  Sp[2] = R2.w;
-  Sp[1] = R1.w;
-  Sp[0] = R8.w;
-  GC_GENERIC;
-  FE_
-}
-
-/*- 8 Regs -------------------------------------------------------------------*/
-
-EXTFUN(stg_chk_8)
-{
-  FB_
-  Sp -= 9;
-  Sp[8] = R8.w;
-  Sp[7] = R7.w;
-  Sp[6] = R6.w;
-  Sp[5] = R5.w;
-  Sp[4] = R4.w;
-  Sp[3] = R3.w;
-  Sp[2] = R2.w;
-  Sp[1] = R1.w;
-  Sp[0] = R9.w;
-  GC_GENERIC;
+      info = get_fun_itbl(R1.cl);
+      if (info->fun_type == ARG_GEN || info->fun_type == ARG_GEN_BIG) {
+	  // regs already saved by the heap check code
+	  DEBUG_ONLY(fprintf(stderr, "stg_gc_fun_ret(ARG_GEN)\n"););
+	  JMP_(info->slow_apply);
+      } else if (info->fun_type == ARG_BCO) {
+	  // cover this case just to be on the safe side
+	  Sp -= 2;
+	  Sp[1] = R1.cl;
+	  Sp[0] = (W_)&stg_apply_interp_info;
+	  JMP_(stg_yield_to_interpreter);
+      } else {
+	  JMP_(stg_ap_stack_entries[info->fun_type]);
+      }
+  }
+#endif
   FE_
 }
 
@@ -1078,112 +792,74 @@ EXTFUN(stg_chk_8)
    Generic Heap Check Code.
 
    Called with Liveness mask in R9,  Return address in R10.
-   Stack must be consistent (tagged, and containing all necessary info pointers
+   Stack must be consistent (containing all necessary info pointers
    to relevant SRTs).
+
+   See StgMacros.h for a description of the RET_DYN stack frame.
 
    We also define an stg_gen_yield here, because it's very similar.
    -------------------------------------------------------------------------- */
 
-#if SIZEOF_DOUBLE > SIZEOF_VOID_P
+// For simplicity, we assume that SIZEOF_DOUBLE == 2*SIZEOF_VOID_P
+// on a 64-bit machine, we'll end up wasting a couple of words, but
+// it's not a big deal.
 
 #define RESTORE_EVERYTHING			\
-    D2   = PK_DBL(Sp+16);			\
-    D1   = PK_DBL(Sp+14);			\
-    F4   = PK_FLT(Sp+13);			\
-    F3   = PK_FLT(Sp+12);			\
-    F2   = PK_FLT(Sp+11);			\
-    F1   = PK_FLT(Sp+10);			\
-    R8.w = Sp[9];				\
-    R7.w = Sp[8];				\
-    R6.w = Sp[7];				\
-    R5.w = Sp[6];				\
-    R4.w = Sp[5];				\
-    R3.w = Sp[4];				\
-    R2.w = Sp[3];				\
-    R1.w = Sp[2];				\
-    Sp += 18;
+    D2   = PK_DBL(Sp+17);			\
+    D1   = PK_DBL(Sp+15);			\
+    F4   = PK_FLT(Sp+14);			\
+    F3   = PK_FLT(Sp+13);			\
+    F2   = PK_FLT(Sp+12);			\
+    F1   = PK_FLT(Sp+11);			\
+    R8.w = Sp[10];				\
+    R7.w = Sp[9];				\
+    R6.w = Sp[8];				\
+    R5.w = Sp[7];				\
+    R4.w = Sp[6];				\
+    R3.w = Sp[5];				\
+    R2.w = Sp[4];				\
+    R1.w = Sp[3];				\
+    Sp += 19;
 
 #define RET_OFFSET (-17)
 
 #define SAVE_EVERYTHING				\
-    ASSIGN_DBL(Sp-2,D2);			\
-    ASSIGN_DBL(Sp-4,D1);			\
-    ASSIGN_FLT(Sp-5,F4);			\
-    ASSIGN_FLT(Sp-6,F3);			\
-    ASSIGN_FLT(Sp-7,F2);			\
-    ASSIGN_FLT(Sp-8,F1);			\
-    Sp[-9]  = R8.w;				\
-    Sp[-10] = R7.w;				\
-    Sp[-11] = R6.w;				\
-    Sp[-12] = R5.w;				\
-    Sp[-13] = R4.w;				\
-    Sp[-14] = R3.w;				\
-    Sp[-15] = R2.w;				\
-    Sp[-16] = R1.w;				\
-    Sp[-17] = R10.w;    /* return address */	\
-    Sp[-18] = R9.w;     /* liveness mask  */	\
-    Sp[-19] = (W_)&stg_gen_chk_info;		\
-    Sp -= 19;
+    Sp -= 19;					\
+    ASSIGN_DBL(Sp+17,D2);			\
+    ASSIGN_DBL(Sp+15,D1);			\
+    ASSIGN_FLT(Sp+14,F4);			\
+    ASSIGN_FLT(Sp+13,F3);			\
+    ASSIGN_FLT(Sp+12,F2);			\
+    ASSIGN_FLT(Sp+11,F1);			\
+    Sp[10] = R8.w;				\
+    Sp[9] = R7.w;				\
+    Sp[8] = R6.w;				\
+    Sp[7] = R5.w;				\
+    Sp[6] = R4.w;				\
+    Sp[5] = R3.w;				\
+    Sp[4] = R2.w;				\
+    Sp[3] = R1.w;				\
+    Sp[2] = R10.w;    /* return address */	\
+    Sp[1] = R9.w;     /* liveness mask  */	\
+    Sp[0] = (W_)&stg_gc_gen_info;		\
 
-#else
-
-#define RESTORE_EVERYTHING			\
-    D2   = PK_DBL(Sp+15);			\
-    D1   = PK_DBL(Sp+14);			\
-    F4   = PK_FLT(Sp+13);			\
-    F3   = PK_FLT(Sp+12);			\
-    F2   = PK_FLT(Sp+11);			\
-    F1   = PK_FLT(Sp+10);			\
-    R8.w = Sp[9];				\
-    R7.w = Sp[8];				\
-    R6.w = Sp[7];				\
-    R5.w = Sp[6];				\
-    R4.w = Sp[5];				\
-    R3.w = Sp[4];				\
-    R2.w = Sp[3];				\
-    R1.w = Sp[2];				\
-    Sp += 16;
-
-#define RET_OFFSET (-15)
-
-#define SAVE_EVERYTHING				\
-    ASSIGN_DBL(Sp-1,D2);			\
-    ASSIGN_DBL(Sp-2,D1);			\
-    ASSIGN_FLT(Sp-3,F4);			\
-    ASSIGN_FLT(Sp-4,F3);			\
-    ASSIGN_FLT(Sp-5,F2);			\
-    ASSIGN_FLT(Sp-6,F1);			\
-    Sp[-7]  = R8.w;				\
-    Sp[-8]  = R7.w;				\
-    Sp[-9]  = R6.w;				\
-    Sp[-10] = R5.w;				\
-    Sp[-11] = R4.w;				\
-    Sp[-12] = R3.w;				\
-    Sp[-13] = R2.w;				\
-    Sp[-14] = R1.w;				\
-    Sp[-15] = R10.w;    /* return address */	\
-    Sp[-16] = R9.w;     /* liveness mask  */	\
-    Sp[-17] = (W_)&stg_gen_chk_info;		\
-    Sp -= 17;
-
-#endif
-
-INFO_TABLE_SRT_BITMAP(stg_gen_chk_info, stg_gen_chk_ret, 0,
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-	              RET_DYN,, EF_, 0, 0);
+INFO_TABLE_RET( stg_gc_gen_info, stg_gc_gen_ret, 
+		0/*bitmap*/,
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_DYN,, EF_, 0, 0);
 
 /* bitmap in the above info table is unused, the real one is on the stack. 
  */
 
-FN_(stg_gen_chk_ret)
+FN_(stg_gc_gen_ret)
 {
   FB_
   RESTORE_EVERYTHING;
-  JMP_(Sp[RET_OFFSET]); /* NO ENTRY_CODE() - this is a direct ret address */
+  JMP_(Sp[RET_OFFSET]); /* No ENTRY_CODE() - this is an actual code ptr */
   FE_
 }
 
-FN_(stg_gen_chk)
+FN_(stg_gc_gen)
 {
   FB_
   SAVE_EVERYTHING;
@@ -1191,12 +867,24 @@ FN_(stg_gen_chk)
   FE_
 }	  
 
+// A heap check at an unboxed tuple return point.  The return address
+// is on the stack, and we can find it by using the offsets given
+// to us in the liveness mask.
+FN_(stg_gc_ut)
+{
+  FB_
+  R10.w = (W_)ENTRY_CODE(Sp[GET_NONPTRS(R9.w) + GET_PTRS(R9.w)]);
+  SAVE_EVERYTHING;
+  GC_GENERIC
+  FE_
+}
+
 /*
  * stg_gen_hp is used by MAYBE_GC, where we can't use GC_GENERIC
  * because we've just failed doYouWantToGC(), not a standard heap
  * check.  GC_GENERIC would end up returning StackOverflow.
  */
-FN_(stg_gen_hp)
+FN_(stg_gc_gen_hp)
 {
   FB_
   SAVE_EVERYTHING;
@@ -1219,17 +907,18 @@ FN_(stg_gen_yield)
 FN_(stg_yield_noregs)
 {
   FB_
-  Sp--;
-  Sp[0] = (W_)&stg_gc_noregs_info;
   YIELD_GENERIC;
   FE_
 }
 
+/* -----------------------------------------------------------------------------
+   Yielding to the interpreter... top of stack says what to do next.
+   -------------------------------------------------------------------------- */
+
 FN_(stg_yield_to_interpreter)
 {
   FB_
-  /* No need to save everything - no live registers */
-  YIELD_TO_INTERPRETER
+  YIELD_TO_INTERPRETER;
   FE_
 }
 
@@ -1248,8 +937,6 @@ FN_(stg_gen_block)
 FN_(stg_block_noregs)
 {
   FB_
-  Sp--;
-  Sp[0] = (W_)&stg_gc_noregs_info;
   BLOCK_GENERIC;
   FE_
 }
@@ -1257,9 +944,10 @@ FN_(stg_block_noregs)
 FN_(stg_block_1)
 {
   FB_
-  Sp--;
-  Sp[0] = R1.w;
-  BLOCK_ENTER;
+  Sp -= 2;
+  Sp[1] = R1.w;
+  Sp[0] = (W_)&stg_enter_info;
+  BLOCK_GENERIC;
   FE_
 }
 
@@ -1283,15 +971,16 @@ FN_(stg_block_1)
  * 
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_block_takemvar_info,  stg_block_takemvar_ret,
-		      0/*BITMAP*/, 0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, IF_, 0, 0);
+INFO_TABLE_RET( stg_block_takemvar_info,  stg_block_takemvar_ret,
+	       	MK_SMALL_BITMAP(1/*framesize*/, 0/*bitmap*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, IF_, 0, 0);
 
 IF_(stg_block_takemvar_ret)
 {
   FB_
-  R1.w = Sp[0];
-  Sp++;
+  R1.w = Sp[1];
+  Sp += 2;
   JMP_(takeMVarzh_fast);
   FE_
 }
@@ -1306,16 +995,17 @@ FN_(stg_block_takemvar)
   FE_
 }
 
-INFO_TABLE_SRT_BITMAP(stg_block_putmvar_info,  stg_block_putmvar_ret,
-		      0/*BITMAP*/, 0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, IF_, 0, 0);
+INFO_TABLE_RET( stg_block_putmvar_info,  stg_block_putmvar_ret,
+	       	MK_SMALL_BITMAP(2/*framesize*/, 0/*bitmap*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, IF_, 0, 0);
 
 IF_(stg_block_putmvar_ret)
 {
   FB_
-  R2.w = Sp[1];
-  R1.w = Sp[0];
-  Sp += 2;
+  R2.w = Sp[2];
+  R1.w = Sp[1];
+  Sp += 3;
   JMP_(putMVarzh_fast);
   FE_
 }

@@ -17,25 +17,16 @@ import AbsCUtils	( getAmodeRep, mixedTypeLocn,
 			  nonemptyAbsC, mkAbsCStmts
 			)
 import PprAbsC          ( dumpRealC )
-import SMRep		( fixedItblSize, 
-			  rET_SMALL, rET_BIG, 
-			  rET_VEC_SMALL, rET_VEC_BIG 
-			)
-import Constants   	( mIN_UPD_SIZE, wORD_SIZE )
+import SMRep		( retItblSize )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
                           mkClosureTblLabel, mkClosureLabel,
 			  labelDynamic, mkSplitMarkerLabel )
-import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
-			  closureLabelFromCI, fastLabelFromCI
-			)
+import ClosureInfo
 import Literal		( Literal(..), word2IntLit )
-import Maybes	    	( maybeToBool )
 import StgSyn		( StgOp(..) )
 import MachOp		( MachOp(..), resultRepOfMachOp )
 import PrimRep	    	( isFloatingRep, is64BitRep, 
 			  PrimRep(..), getPrimRepSizeInBytes )
-import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable,
-			  livenessIsSmall, bitmapToIntegers )
 import StixMacro	( macroCode, checkCode )
 import StixPrim		( foreignCallCode, amodeToStix, amodeToStix' )
 import Outputable       ( pprPanic, ppr )
@@ -43,16 +34,19 @@ import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Util		( naturalMergeSortLe )
 import Panic		( panic )
 import TyCon		( tyConDataCons )
+import Constants	( wORD_SIZE, bITMAP_BITS_SHIFT )
 import DataCon		( dataConWrapId )
 import Name             ( NamedThing(..) )
 import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
 import Outputable	( assertPanic )
+import BitSet		( BitSet, intBS )
 
 -- DEBUGGING ONLY
 --import TRACE		( trace )
 --import Outputable	( showSDoc )
 --import MachOp		( pprMachOp )
 
+#include "nativeGen/NCG.h"
 \end{code}
 
 For each independent chunk of AbstractC code, we generate a list of
@@ -88,7 +82,7 @@ Here we handle top-level things, like @CCodeBlock@s and
   = gencode absC				`thenUs` \ code ->
     returnUs (StSegment TextSegment : StFunBegin lbl : code [StFunEnd lbl])
 
- gentopcode stmt@(CStaticClosure closure_info _ _)
+ gentopcode stmt@(CStaticClosure lbl closure_info _ _)
   = genCodeStaticClosure stmt			`thenUs` \ code ->
     returnUs (
        if   opt_Static
@@ -98,59 +92,39 @@ Here we handle top-level things, like @CCodeBlock@s and
             : StData PtrRep [StInt 0] -- DLLised world, need extra zero word
             : StLabel lbl : code []
     )
-  where
-	lbl = closureLabelFromCI closure_info
 
- gentopcode stmt@(CRetVector lbl _ _ _)
-  = genCodeVecTbl stmt				`thenUs` \ code ->
-    returnUs (StSegment TextSegment 
-              : code [StLabel lbl, vtbl_post_label_word])
-    where
-       -- We put a dummy word after the vtbl label so as to ensure the label
-       -- is in the same (Text) section as the vtbl it labels.  This is critical
-       -- for ensuring the GC works correctly, although GC crashes due to
-       -- misclassification are much more likely to show up in the interactive 
-       -- system than in compile code.  For details see comment near line 1164 
-       -- of ghc/driver/mangler/ghc-asm.lprl, which contains an analogous fix
-       -- for the mangled via-C route.
-       vtbl_post_label_word = StData PtrRep [StInt 0]
+ gentopcode stmt@(CRetVector lbl amodes srt liveness)
+  = returnUs ( StSegment TextSegment
+	     : StData PtrRep table
+	     : StLabel lbl
+	     : []
+	     )
+  where
+    table = map amodeToStix (mkVecInfoTable amodes srt liveness)
 
  gentopcode stmt@(CRetDirect uniq absC srt liveness)
   = gencode absC				       `thenUs` \ code ->
-    genBitmapInfoTable liveness srt closure_type False `thenUs` \ itbl ->
-    returnUs (StSegment TextSegment : 
-              itbl (StLabel lbl_info : StLabel lbl_ret : code []))
+    returnUs ( StSegment TextSegment
+	     : StData PtrRep table
+	     : StLabel info_lbl
+	     : StLabel ret_lbl
+	     : code [])
   where 
-	lbl_info = mkReturnInfoLabel uniq
-	lbl_ret  = mkReturnPtLabel uniq
- 	closure_type = if livenessIsSmall liveness then rET_SMALL else rET_BIG
+    info_lbl = mkReturnInfoLabel uniq
+    ret_lbl  = mkReturnPtLabel uniq
+    table    = map amodeToStix (mkRetInfoTable ret_lbl srt liveness)
 
- gentopcode stmt@(CClosureInfoAndCode cl_info slow Nothing _)
-
-  | slow_is_empty
-  = genCodeInfoTable stmt		`thenUs` \ itbl ->
-    returnUs (StSegment TextSegment : itbl [])
-
-  | otherwise
-  = genCodeInfoTable stmt		`thenUs` \ itbl ->
-    gencode slow			`thenUs` \ slow_code ->
-    returnUs (StSegment TextSegment : itbl (StFunBegin slow_lbl :
-	      slow_code [StFunEnd slow_lbl]))
+ gentopcode stmt@(CClosureInfoAndCode cl_info entry)
+  = gencode entry			`thenUs` \ slow_code ->
+    returnUs ( StSegment TextSegment
+	     : StData PtrRep table
+	     : StLabel info_lbl
+	     : StFunBegin entry_lbl
+	     : slow_code [StFunEnd entry_lbl])
   where
-    slow_is_empty = not (maybeToBool (nonemptyAbsC slow))
-    slow_lbl = entryLabelFromCI cl_info
-
- gentopcode stmt@(CClosureInfoAndCode cl_info slow (Just fast) _) =
- -- ToDo: what if this is empty? ------------------------^^^^
-    genCodeInfoTable stmt		`thenUs` \ itbl ->
-    gencode slow			`thenUs` \ slow_code ->
-    gencode fast			`thenUs` \ fast_code ->
-    returnUs (StSegment TextSegment : itbl (StFunBegin slow_lbl :
-	      slow_code (StFunEnd slow_lbl : StFunBegin fast_lbl :
-	      fast_code [StFunEnd fast_lbl])))
-  where
-    slow_lbl = entryLabelFromCI cl_info
-    fast_lbl = fastLabelFromCI cl_info
+    entry_lbl = entryLabelFromCI cl_info
+    info_lbl = infoTableLabelFromCI cl_info
+    table    = map amodeToStix (mkInfoTable cl_info)
 
  gentopcode stmt@(CSRT lbl closures)
   = returnUs [ StSegment TextSegment 
@@ -165,14 +139,19 @@ Here we handle top-level things, like @CCodeBlock@s and
           | otherwise
           = StCLbl label
 
- gentopcode stmt@(CBitmap lbl mask)
-  = returnUs $ case bitmapToIntegers mask of
-	       mask'@(_:_:_) ->
-		 [ StSegment TextSegment 
-		 , StLabel lbl 
-		 , StData WordRep (map StInt (toInteger (length mask') : mask'))
-		 ]
-	       _ -> []
+ gentopcode stmt@(CBitmap l@(Liveness lbl size mask))
+  | isBigLiveness l
+  = returnUs 
+	[ StSegment TextSegment 
+	, StLabel lbl 
+	, StData WordRep (map StInt (toInteger size : bitmapToIntegers mask))
+	]
+  | otherwise
+  = returnUs []
+  where
+    -- ToDo: translate out bitmaps earlier, like info tables
+    isBigLiveness (Liveness _ size _) = size > mAX_SMALL_BITMAP_SIZE
+    mAX_SMALL_BITMAP_SIZE = (wORD_SIZE * 8) - bITMAP_BITS_SHIFT
 
  gentopcode stmt@(CClosureTbl tycon)
   = returnUs [ StSegment TextSegment
@@ -210,26 +189,11 @@ Here we handle top-level things, like @CCodeBlock@s and
 
 \begin{code}
  {-
- genCodeVecTbl
-    :: AbstractC
-    -> UniqSM StixTreeList
- -}
- genCodeVecTbl (CRetVector lbl amodes srt liveness)
-  = genBitmapInfoTable liveness srt closure_type True `thenUs` \itbl ->
-    returnUs (\xs -> vectbl : itbl xs)
-  where
-    vectbl = StData PtrRep (reverse (map a2stix amodes))
-    closure_type = if livenessIsSmall liveness then rET_VEC_SMALL else rET_VEC_BIG
-
-\end{code}
-
-\begin{code}
- {-
  genCodeStaticClosure
     :: AbstractC
     -> UniqSM StixTreeList
  -}
- genCodeStaticClosure (CStaticClosure cl_info cost_centre amodes)
+ genCodeStaticClosure (CStaticClosure lbl cl_info cost_centre amodes)
   = returnUs (\xs -> table ++ xs)
   where
     table = StData PtrRep [StCLbl (infoTableLabelFromCI cl_info)] : 
@@ -376,14 +340,14 @@ which varies depending on whether we're profiling etc.
   = returnUs (\xs -> StJump NoDestInfo dest : xs)
   where
     dest = StInd PtrRep (StIndex PtrRep (a2stix table)
-    	    	      	    	  (StInt (toInteger (-n-fixedItblSize-1))))
+    	    	      	    	  (StInt (toInteger (-n-retItblSize-1))))
 
  gencode (CReturn table (DynamicVectoredReturn am))
   = returnUs (\xs -> StJump NoDestInfo dest : xs)
   where
     dest = StInd PtrRep (StIndex PtrRep (a2stix table) dyn_off)
     dyn_off = StMachOp MO_Nat_Sub [StMachOp MO_NatS_Neg [a2stix am], 
-			           StInt (toInteger (fixedItblSize+1))]
+			           StInt (toInteger (retItblSize+1))]
 
 \end{code}
 
@@ -691,6 +655,25 @@ mkJoin :: AbstractC -> CLabel -> AbstractC
 mkJoin code lbl
   | mightFallThrough code = mkAbsCStmts code (CJump (CLbl lbl PtrRep))
   | otherwise = code
+\end{code}
+
+%---------------------------------------------------------------------------
+
+\begin{code}
+bitmapToIntegers :: [BitSet] -> [Integer]
+bitmapToIntegers = bundle . map (toInteger . intBS)
+  where
+#if BYTES_PER_WORD == 4
+    bundle = id
+#else
+    bundle [] = []
+    bundle is = case splitAt (BYTES_PER_WORD/4) is of
+                (these, those) ->
+		    ( foldr1 (\x y -> x + 4294967296 * y)
+			     [x `mod` 4294967296 | x <- these]
+		    : bundle those
+		    )
+#endif
 \end{code}
 
 %---------------------------------------------------------------------------

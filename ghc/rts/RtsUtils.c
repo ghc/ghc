@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.28 2002/10/05 22:31:04 panne Exp $
+ * $Id: RtsUtils.c,v 1.29 2002/12/11 15:36:48 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2002
  *
  * General utility functions used in the RTS.
  *
@@ -35,26 +35,29 @@
 #include <string.h>
 #include <stdarg.h>
 
-/* variable-argument error function. */
+/* variable-argument internal error function. */
 
-void barf(char *s, ...)
+void
+barf(char *s, ...)
 {
   va_list ap;
   va_start(ap,s);
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   if (prog_argv != NULL && prog_argv[0] != NULL) {
-    fprintf(stderr, "%s: fatal error: ", prog_argv[0]);
+    fprintf(stderr, "%s: internal error: ", prog_argv[0]);
   } else {
-    fprintf(stderr, "fatal error: ");
+    fprintf(stderr, "internal error: ");
   }
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
+  fprintf(stderr, "    Please report this as a bug to glasgow-haskell-bugs@haskell.org,\n    or http://www.sourceforge.net/projects/ghc/\n");
   fflush(stderr);
   stg_exit(EXIT_INTERNAL_ERROR);
   va_end(ap);
 }
 
-void prog_belch(char *s, ...)
+void
+prog_belch(char *s, ...)
 {
   va_list ap;
   va_start(ap,s);
@@ -67,7 +70,8 @@ void prog_belch(char *s, ...)
   va_end(ap);
 }
 
-void belch(char *s, ...)
+void
+belch(char *s, ...)
 {
   va_list ap;
   va_start(ap,s);
@@ -318,3 +322,13 @@ ullong_format_string(ullong x, char *s, rtsBool with_commas)
 		(lnat)((x)%(ullong)1000));
     return s;
 }
+
+
+// Can be used as a breakpoint to set on every heap check failure.
+#ifdef DEBUG
+void
+heapCheckFail( void )
+{
+}
+#endif
+

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.34 2002/09/25 20:44:23 wolfgang Exp $
+ * $Id: ClosureMacros.h,v 1.35 2002/12/11 15:36:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,26 +52,43 @@
  
    -------------------------------------------------------------------------- */
 
-#define INIT_INFO(i)  info : &(i)
+#define INIT_INFO(i)  info : (StgInfoTable *)&(i)
 #define SET_INFO(c,i) ((c)->header.info = (i))
 #define GET_INFO(c)   ((c)->header.info)
 #define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
+
 #define get_itbl(c)   (INFO_PTR_TO_STRUCT((c)->header.info))
+#define get_ret_itbl(c) (RET_INFO_PTR_TO_STRUCT((c)->header.info))
+#define get_fun_itbl(c) (FUN_INFO_PTR_TO_STRUCT((c)->header.info))
+#define get_thunk_itbl(c) (THUNK_INFO_PTR_TO_STRUCT((c)->header.info))
+
 
 #ifdef TABLES_NEXT_TO_CODE
 #define INIT_ENTRY(e)
 #define ENTRY_CODE(info) (info)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)(info) - 1)
+#define RET_INFO_PTR_TO_STRUCT(info) ((StgRetInfoTable *)(info) - 1)
+#define FUN_INFO_PTR_TO_STRUCT(info) ((StgFunInfoTable *)(info) - 1)
+#define THUNK_INFO_PTR_TO_STRUCT(info) ((StgThunkInfoTable *)(info) - 1)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
     return (StgFunPtr)(itbl+1);
 }
+#define itbl_to_fun_itbl(i) ((StgFunInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
+#define itbl_to_ret_itbl(i) ((StgRetInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
+#define itbl_to_thunk_itbl(i) ((StgThunkInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
 #else
 #define INIT_ENTRY(e)    entry : (F_)(e)
 #define ENTRY_CODE(info) (((StgInfoTable *)info)->entry)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)info)
+#define RET_INFO_PTR_TO_STRUCT(info) ((StgRetInfoTable *)info)
+#define FUN_INFO_PTR_TO_STRUCT(info) ((StgFunInfoTable *)info)
+#define THUNK_INFO_PTR_TO_STRUCT(info) ((StgThunkInfoTable *)info)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
     return itbl->entry;
 }
+#define itbl_to_fun_itbl(i) ((StgFunInfoTable *)(i))
+#define itbl_to_ret_itbl(i) ((StgRetInfoTable *)(i))
+#define itbl_to_thunk_itbl(i) ((StgThunkInfoTable *)(i))
 #endif
 
 /* -----------------------------------------------------------------------------

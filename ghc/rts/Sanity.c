@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.30 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Sanity.c,v 1.31 2002/12/11 15:36:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -27,131 +27,49 @@
 #include "Storage.h"
 #include "Schedule.h"
 #include "StoragePriv.h"   // for END_OF_STATIC_LIST
-
-/* -----------------------------------------------------------------------------
-   A valid pointer is either:
-
-     - a pointer to a static closure, or
-     - a pointer into the heap, and
-       - the block is not free
-       - either: - the object is large, or 
-                 - it is not after the free pointer in the block
-       - the contents of the pointer is not 0xaaaaaaaa
-
-   -------------------------------------------------------------------------- */
-
-#define LOOKS_LIKE_PTR(r)			\
-  ({ bdescr *bd = Bdescr((P_)r);		\
-     LOOKS_LIKE_STATIC_CLOSURE(r) ||		\
-	(HEAP_ALLOCED(r) 			\
-	 && bd != (void *)-1			\
-	 && ((StgWord)(*(StgPtr)r)!=0xaaaaaaaa)	\
-	);					\
-   })
-
-// NOT always true, but can be useful for spotting bugs: (generally
-// true after GC, but not for things just allocated using allocate(),
-// for example):
-//	    (bd->flags & BF_LARGE || bd->free > (P_)r) 
+#include "Apply.h"
 
 /* -----------------------------------------------------------------------------
    Forward decls.
    -------------------------------------------------------------------------- */
 
-static StgOffset checkStackClosure   ( StgClosure* c );
-static StgOffset checkStackObject    ( StgPtr sp );
-static StgOffset checkSmallBitmap    ( StgPtr payload, StgWord bitmap );
-static StgOffset checkLargeBitmap    ( StgPtr payload, StgLargeBitmap* );
-static void      checkClosureShallow ( StgClosure* p );
+static void      checkSmallBitmap    ( StgPtr payload, StgWord bitmap, nat );
+static void      checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, nat );
+static void      checkClosureShallow ( StgClosure * );
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
    -------------------------------------------------------------------------- */
 
-static StgOffset 
-checkSmallBitmap( StgPtr payload, StgWord bitmap )
+static void
+checkSmallBitmap( StgPtr payload, StgWord bitmap, nat size )
 {
-    StgOffset i;
+    StgPtr p;
+    nat i;
 
-    i = 0;
-    for(; bitmap != 0; ++i, bitmap >>= 1 ) {
+    p = payload;
+    for(i = 0; i < size; i++, bitmap >>= 1 ) {
 	if ((bitmap & 1) == 0) {
-	    checkClosure((StgClosure *)payload[i]);
+	    checkClosureShallow((StgClosure *)payload[i]);
 	}
     }
-    return i;
 }
 
-static StgOffset 
-checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap )
+static void
+checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, nat size )
 {
     StgWord bmp;
-    StgOffset i;
+    nat i, j;
 
     i = 0;
-    for (bmp=0; bmp<large_bitmap->size; bmp++) {
+    for (bmp=0; i < size; bmp++) {
 	StgWord bitmap = large_bitmap->bitmap[bmp];
-	for(; bitmap != 0; ++i, bitmap >>= 1 ) {
+	j = 0;
+	for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
 	    if ((bitmap & 1) == 0) {
-		checkClosure((StgClosure *)payload[i]);
+		checkClosureShallow((StgClosure *)payload[i]);
 	    }
 	}
-    }
-    return i;
-}
-
-static StgOffset 
-checkStackClosure( StgClosure* c )
-{    
-    const StgInfoTable* info = get_itbl(c);
-
-    /* All activation records have 'bitmap' style layout info. */
-    switch (info->type) {
-    case RET_DYN: /* Dynamic bitmap: the mask is stored on the stack */
-	{
-	    StgRetDyn* r = (StgRetDyn *)c;
-	    return sizeofW(StgRetDyn) + 
-	           checkSmallBitmap(r->payload,r->liveness);
-	}
-    case RET_BCO: /* small bitmap (<= 32 entries) */
-    case RET_SMALL:
-    case RET_VEC_SMALL:
-            return 1 + checkSmallBitmap((StgPtr)c + 1,info->layout.bitmap);
-      
-    case UPDATE_FRAME:
-      ASSERT(LOOKS_LIKE_PTR(((StgUpdateFrame*)c)->updatee));
-    case CATCH_FRAME:
-    case SEQ_FRAME:
-      /* check that the link field points to another stack frame */
-      ASSERT(get_itbl(((StgFrame*)c)->link)->type == UPDATE_FRAME ||
-	     get_itbl(((StgFrame*)c)->link)->type == CATCH_FRAME ||
-	     get_itbl(((StgFrame*)c)->link)->type == STOP_FRAME ||
-	     get_itbl(((StgFrame*)c)->link)->type == SEQ_FRAME);
-      /* fall through */
-    case STOP_FRAME:
-#if defined(GRAN)
-            return 2 +
-#else
-            return 1 +
-#endif
-	               checkSmallBitmap((StgPtr)c + 1,info->layout.bitmap);
-    case RET_BIG: /* large bitmap (> 32 entries) */
-    case RET_VEC_BIG:
-	    return 1 + checkLargeBitmap((StgPtr)c + 1,info->layout.large_bitmap);
-    case FUN:
-    case FUN_STATIC: /* probably a slow-entry point return address: */
-#if 0 && defined(GRAN)
-            return 2;
-#else
-            return 1;
-#endif
-    default:
-       	    /* if none of the above, maybe it's a closure which looks a
-       	     * little like an infotable
-       	     */
-	    checkClosureShallow(*(StgClosure **)c);
-	    return 1;
-	    /* barf("checkStackClosure: weird activation record found on stack (%p).",c); */
     }
 }
 
@@ -161,36 +79,111 @@ checkStackClosure( StgClosure* c )
  * chunks.
  */
  
-void 
+static void 
 checkClosureShallow( StgClosure* p )
 {
-    ASSERT(p);
-    ASSERT(LOOKS_LIKE_GHC_INFO(GET_INFO(p))
-           || IS_HUGS_CONSTR_INFO(GET_INFO(p)));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
-    /* Is it a static closure (i.e. in the data segment)? */
-    if (LOOKS_LIKE_STATIC(p)) {
+    /* Is it a static closure? */
+    if (!HEAP_ALLOCED(p)) {
 	ASSERT(closure_STATIC(p));
     } else {
 	ASSERT(!closure_STATIC(p));
-	ASSERT(LOOKS_LIKE_PTR(p));
     }
 }
 
 // check an individual stack object
 StgOffset 
-checkStackObject( StgPtr sp )
+checkStackFrame( StgPtr c )
 {
-    if (IS_ARG_TAG(*sp)) {
-        // Tagged words might be "stubbed" pointers, so there's no
-	// point checking to see whether they look like pointers or
-	// not (some of them will).
-	return ARG_SIZE(*sp) + 1;
-    } else if (LOOKS_LIKE_GHC_INFO(*(StgPtr *)sp)) {
-        return checkStackClosure((StgClosure *)sp);
-    } else { // must be an untagged closure pointer in the stack
-	checkClosureShallow(*(StgClosure **)sp);
-	return 1;
+    nat size;
+    const StgRetInfoTable* info;
+
+    info = get_ret_itbl((StgClosure *)c);
+
+    /* All activation records have 'bitmap' style layout info. */
+    switch (info->i.type) {
+    case RET_DYN: /* Dynamic bitmap: the mask is stored on the stack */
+    {
+	StgWord dyn;
+	StgPtr p;
+	StgRetDyn* r;
+	
+	r = (StgRetDyn *)c;
+	dyn = r->liveness;
+	
+	p = (P_)(r->payload);
+	checkSmallBitmap(p,GET_LIVENESS(r->liveness),RET_DYN_SIZE);
+	p += RET_DYN_SIZE;
+
+	// skip over the non-pointers
+	p += GET_NONPTRS(dyn);
+	
+	// follow the ptr words
+	for (size = GET_PTRS(dyn); size > 0; size--) {
+	    checkClosureShallow((StgClosure *)*p);
+	    p++;
+	}
+	
+	return sizeofW(StgRetDyn) + RET_DYN_SIZE + 
+	    GET_NONPTRS(dyn) + GET_PTRS(dyn);
+    }
+
+    case UPDATE_FRAME:
+      ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgUpdateFrame*)c)->updatee));
+    case CATCH_FRAME:
+      // small bitmap cases (<= 32 entries)
+    case STOP_FRAME:
+    case RET_SMALL:
+    case RET_VEC_SMALL:
+	size = BITMAP_SIZE(info->i.layout.bitmap);
+	checkSmallBitmap((StgPtr)c + 1, 
+			 BITMAP_BITS(info->i.layout.bitmap), size);
+	return 1 + size;
+
+    case RET_BCO: {
+	StgBCO *bco;
+	nat size;
+	bco = (StgBCO *)*(c+1);
+	size = BCO_BITMAP_SIZE(bco);
+	checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
+	return 2 + size;
+    }
+
+    case RET_BIG: // large bitmap (> 32 entries)
+    case RET_VEC_BIG:
+	size = info->i.layout.large_bitmap->size;
+	checkLargeBitmap((StgPtr)c + 1, info->i.layout.large_bitmap, size);
+	return 1 + size;
+
+    case RET_FUN:
+    {
+	StgFunInfoTable *fun_info;
+	StgRetFun *ret_fun;
+
+	ret_fun = (StgRetFun *)c;
+	fun_info = get_fun_itbl(ret_fun->fun);
+	size = ret_fun->size;
+	switch (fun_info->fun_type) {
+	case ARG_GEN:
+	    checkSmallBitmap((StgPtr)ret_fun->payload, 
+			     BITMAP_BITS(fun_info->bitmap), size);
+	    break;
+	case ARG_GEN_BIG:
+	    checkLargeBitmap((StgPtr)ret_fun->payload,
+			     (StgLargeBitmap *)fun_info->bitmap, size);
+	    break;
+	default:
+	    checkSmallBitmap((StgPtr)ret_fun->payload,
+			     BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]),
+			     size);
+	    break;
+	}
+	return sizeofW(StgRetFun) + size;
+    }
+
+    default:
+	barf("checkStackFrame: weird activation record found on stack (%p).",c);
     }
 }
 
@@ -202,7 +195,7 @@ checkStackChunk( StgPtr sp, StgPtr stack_end )
 
     p = sp;
     while (p < stack_end) {
-	p += checkStackObject( p );
+	p += checkStackFrame( p );
     }
     // ASSERT( p == stack_end ); -- HWL
 }
@@ -212,14 +205,13 @@ checkClosure( StgClosure* p )
 {
     const StgInfoTable *info;
 
-    ASSERT(LOOKS_LIKE_GHC_INFO(p->header.info));
+    ASSERT(LOOKS_LIKE_INFO_PTR(p->header.info));
 
     /* Is it a static closure (i.e. in the data segment)? */
-    if (LOOKS_LIKE_STATIC(p)) {
+    if (!HEAP_ALLOCED(p)) {
 	ASSERT(closure_STATIC(p));
     } else {
 	ASSERT(!closure_STATIC(p));
-	ASSERT(LOOKS_LIKE_PTR(p));
     }
 
     info = get_itbl(p);
@@ -228,9 +220,9 @@ checkClosure( StgClosure* p )
     case MVAR:
       { 
 	StgMVar *mvar = (StgMVar *)p;
-	ASSERT(LOOKS_LIKE_PTR(mvar->head));
-	ASSERT(LOOKS_LIKE_PTR(mvar->tail));
-	ASSERT(LOOKS_LIKE_PTR(mvar->value));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->head));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->tail));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->value));
 #if 0
 #if defined(PAR)
 	checkBQ((StgBlockingQueueElement *)mvar->head, p);
@@ -250,7 +242,7 @@ checkClosure( StgClosure* p )
       {
 	nat i;
 	for (i = 0; i < info->layout.payload.ptrs; i++) {
-	  ASSERT(LOOKS_LIKE_PTR(p->payload[i]));
+	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
 	}
 	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader) + MIN_UPD_SIZE);
       }
@@ -293,13 +285,13 @@ checkClosure( StgClosure* p )
 	{
 	    nat i;
 	    for (i = 0; i < info->layout.payload.ptrs; i++) {
-		ASSERT(LOOKS_LIKE_PTR(p->payload[i]));
+		ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
 	    }
 	    return sizeW_fromITBL(info);
 	}
 
     case IND_STATIC: /* (1, 0) closure */
-      ASSERT(LOOKS_LIKE_PTR(((StgIndStatic*)p)->indirectee));
+      ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgIndStatic*)p)->indirectee));
       return sizeW_fromITBL(info);
 
     case WEAK:
@@ -307,17 +299,17 @@ checkClosure( StgClosure* p )
        * representative of the actual layout.
        */
       { StgWeak *w = (StgWeak *)p;
-	ASSERT(LOOKS_LIKE_PTR(w->key));
-	ASSERT(LOOKS_LIKE_PTR(w->value));
-	ASSERT(LOOKS_LIKE_PTR(w->finalizer));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->key));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->value));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->finalizer));
 	if (w->link) {
-	  ASSERT(LOOKS_LIKE_PTR(w->link));
+	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->link));
 	}
 	return sizeW_fromITBL(info);
       }
 
     case THUNK_SELECTOR:
-	    ASSERT(LOOKS_LIKE_PTR(((StgSelector *)p)->selectee));
+	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
 	    return sizeofW(StgHeader) + MIN_UPD_SIZE;
 
     case IND:
@@ -327,7 +319,7 @@ checkClosure( StgClosure* p )
 	     */
 	    P_ q;
 	    StgInd *ind = (StgInd *)p;
-	    ASSERT(LOOKS_LIKE_PTR(ind->indirectee));
+	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
 	    q = (P_)p + sizeofW(StgInd);
 	    while (!*q) { q++; }; /* skip padding words (see GC.c: evacuate())*/
 	    return q - (P_)p;
@@ -342,19 +334,49 @@ checkClosure( StgClosure* p )
     case UPDATE_FRAME:
     case STOP_FRAME:
     case CATCH_FRAME:
-    case SEQ_FRAME:
 	    barf("checkClosure: stack frame");
 
-    case AP_UPD: /* we can treat this as being the same as a PAP */
+    case AP: /* we can treat this as being the same as a PAP */
     case PAP:
 	{ 
-	    StgPAP *pap = (StgPAP *)p;
-	    ASSERT(LOOKS_LIKE_PTR(pap->fun));
-	    checkStackChunk((StgPtr)pap->payload, 
-			    (StgPtr)pap->payload + pap->n_args
-			    );
+	    StgFunInfoTable *fun_info;
+	    StgPAP* pap = (StgPAP *)p;
+
+	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(pap->fun));
+	    fun_info = get_fun_itbl(pap->fun);
+
+	    p = (StgClosure *)pap->payload;
+	    switch (fun_info->fun_type) {
+	    case ARG_GEN:
+		checkSmallBitmap( (StgPtr)pap->payload, 
+				  BITMAP_BITS(fun_info->bitmap), pap->n_args );
+		break;
+	    case ARG_GEN_BIG:
+		checkLargeBitmap( (StgPtr)pap->payload, 
+				  (StgLargeBitmap *)fun_info->bitmap, 
+				  pap->n_args );
+		break;
+	    case ARG_BCO:
+		checkLargeBitmap( (StgPtr)pap->payload, 
+				  BCO_BITMAP(pap->fun), 
+				  pap->n_args );
+		break;
+	    default:
+		checkSmallBitmap( (StgPtr)pap->payload, 
+				  BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]),
+				  pap->n_args );
+		break;
+	    }
 	    return pap_sizeW(pap);
 	}
+
+    case AP_STACK:
+    { 
+	StgAP_STACK *ap = (StgAP_STACK *)p;
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(ap->fun));
+	checkStackChunk((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
+	return ap_stack_sizeW(ap);
+    }
 
     case ARR_WORDS:
 	    return arr_words_sizeW((StgArrWords *)p);
@@ -365,7 +387,7 @@ checkClosure( StgClosure* p )
 	    StgMutArrPtrs* a = (StgMutArrPtrs *)p;
 	    nat i;
 	    for (i = 0; i < a->ptrs; i++) {
-		ASSERT(LOOKS_LIKE_PTR(a->payload[i]));
+		ASSERT(LOOKS_LIKE_CLOSURE_PTR(a->payload[i]));
 	    }
 	    return mut_arr_ptrs_sizeW(a);
 	}
@@ -378,7 +400,7 @@ checkClosure( StgClosure* p )
 
     case BLOCKED_FETCH:
       ASSERT(LOOKS_LIKE_GA(&(((StgBlockedFetch *)p)->ga)));
-      ASSERT(LOOKS_LIKE_PTR((((StgBlockedFetch *)p)->node)));
+      ASSERT(LOOKS_LIKE_CLOSURE_PTR((((StgBlockedFetch *)p)->node)));
       return sizeofW(StgBlockedFetch);  // see size used in evacuate()
 
 #ifdef DIST
@@ -399,7 +421,7 @@ checkClosure( StgClosure* p )
       ASSERT(((StgRBH *)p)->blocking_queue!=NULL);
       if (((StgRBH *)p)->blocking_queue!=END_BQ_QUEUE)
 	checkBQ(((StgRBH *)p)->blocking_queue, p);
-      ASSERT(LOOKS_LIKE_GHC_INFO(REVERT_INFOPTR(get_itbl((StgClosure *)p))));
+      ASSERT(LOOKS_LIKE_INFO_PTR(REVERT_INFOPTR(get_itbl((StgClosure *)p))));
       return BLACKHOLE_sizeW();   // see size used in evacuate()
       // sizeW_fromITBL(REVERT_INFOPTR(get_itbl((StgClosure *)p)));
 
@@ -477,7 +499,7 @@ checkHeap(bdescr *bd)
 	    
 	    /* skip over slop */
 	    while (p < bd->free &&
-		   (*p < 0x1000 || !LOOKS_LIKE_GHC_INFO((void*)*p))) { p++; } 
+		   (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR((void*)*p))) { p++; } 
 	}
     }
 }
@@ -494,7 +516,7 @@ checkHeapChunk(StgPtr start, StgPtr end)
   nat size;
 
   for (p=start; p<end; p+=size) {
-    ASSERT(LOOKS_LIKE_GHC_INFO((void*)*p));
+    ASSERT(LOOKS_LIKE_INFO_PTR((void*)*p));
     if (get_itbl((StgClosure*)p)->type == FETCH_ME &&
 	*(p+1) == 0x0000eeee /* ie. unpack garbage (see SetGAandCommonUp) */) {
       /* if it's a FM created during unpack and commoned up, it's not global */
@@ -518,7 +540,7 @@ checkHeapChunk(StgPtr start, StgPtr end)
   nat size;
 
   for (p=start; p<end; p+=size) {
-    ASSERT(LOOKS_LIKE_GHC_INFO((void*)*p));
+    ASSERT(LOOKS_LIKE_INFO_PTR((void*)*p));
     size = checkClosure((StgClosure *)p);
     /* This is the smallest size of closure that can live in the heap. */
     ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
@@ -535,42 +557,11 @@ checkChain(bdescr *bd)
   }
 }
 
-/* check stack - making sure that update frames are linked correctly */
-void 
-checkStack(StgPtr sp, StgPtr stack_end, StgUpdateFrame* su )
-{
-    /* check everything down to the first update frame */
-    checkStackChunk( sp, (StgPtr)su );
-    while ( (StgPtr)su < stack_end) {
-	sp = (StgPtr)su;
-	switch (get_itbl(su)->type) {
-	case UPDATE_FRAME:
-		su = su->link;
-		break;
-	case SEQ_FRAME:
-		su = ((StgSeqFrame *)su)->link;
-		break;
-	case CATCH_FRAME:
-		su = ((StgCatchFrame *)su)->link;
-		break;
-	case STOP_FRAME:
-      	        /* not quite: ASSERT((StgPtr)su == stack_end); */
-		return;
-	default:
-		barf("checkStack: weird record found on update frame list.");
-	}
-	checkStackChunk( sp, (StgPtr)su );
-    }
-    ASSERT((StgPtr)su == stack_end);
-}
-
-
 void
 checkTSO(StgTSO *tso)
 {
     StgPtr sp = tso->sp;
     StgPtr stack = tso->stack;
-    StgUpdateFrame* su = tso->su;
     StgOffset stack_size = tso->stack_size;
     StgPtr stack_end = stack + stack_size;
 
@@ -579,7 +570,7 @@ checkTSO(StgTSO *tso)
       return;
     }
 
-    if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
+    if (tso->what_next == ThreadKilled) {
       /* The garbage collector doesn't bother following any pointers
        * from dead threads, so don't check sanity here.  
        */
@@ -587,7 +578,6 @@ checkTSO(StgTSO *tso)
     }
 
     ASSERT(stack <= sp && sp < stack_end);
-    ASSERT(sp <= (StgPtr)su);
 
 #if defined(PAR)
     ASSERT(tso->par.magic==TSO_MAGIC);
@@ -635,7 +625,7 @@ checkTSO(StgTSO *tso)
 	   get_itbl(tso->link)->type == CONSTR);
 #endif
 
-    checkStack(sp, stack_end, su);
+    checkStackChunk(sp, stack_end);
 }
 
 #if defined(GRAN)
@@ -703,7 +693,7 @@ checkGlobalTSOList (rtsBool checkTSOs)
   extern  StgTSO *all_threads;
   StgTSO *tso;
   for (tso=all_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
-      ASSERT(LOOKS_LIKE_PTR(tso));
+      ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
       ASSERT(get_itbl(tso)->type == TSO);
       if (checkTSOs)
 	  checkTSO(tso);
@@ -723,7 +713,7 @@ checkMutableList( StgMutClosure *p, nat gen )
 	bd = Bdescr((P_)p);
 	ASSERT(closure_MUTABLE(p));
 	ASSERT(bd->gen_no == gen);
-	ASSERT(LOOKS_LIKE_PTR(p->mut_link));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->mut_link));
     }
 }
 
@@ -739,7 +729,7 @@ checkMutOnceList( StgMutClosure *p, nat gen )
 
 	ASSERT(!closure_MUTABLE(p));
 	ASSERT(ip_STATIC(info) || bd->gen_no == gen);
-	ASSERT(LOOKS_LIKE_PTR(p->mut_link));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->mut_link));
 
 	switch (info->type) {
 	case IND_STATIC:
@@ -752,44 +742,6 @@ checkMutOnceList( StgMutClosure *p, nat gen )
 		 p, info_type((StgClosure *)p));
 	}
     }
-}
-
-/* -----------------------------------------------------------------------------
-   Check Blackhole Sanity
-
-   Test whether an object is already on the update list.
-   It isn't necessarily an rts error if it is - it might be a programming
-   error.
-
-   Future versions might be able to test for a blackhole without traversing
-   the update frame list.
-
-   -------------------------------------------------------------------------- */
-rtsBool 
-isBlackhole( StgTSO* tso, StgClosure* p )
-{
-  StgUpdateFrame* su = tso->su;
-  do {
-    switch (get_itbl(su)->type) {
-    case UPDATE_FRAME:
-      if (su->updatee == p) {
-	return rtsTrue;
-      } else {
-	su = su->link;
-      }
-      break;
-    case SEQ_FRAME:
-      su = ((StgSeqFrame *)su)->link;
-      break;
-    case CATCH_FRAME:
-      su = ((StgCatchFrame *)su)->link;
-      break;
-    case STOP_FRAME:
-      return rtsFalse;
-    default:
-      barf("isBlackhole: weird record found on update frame list.");
-    }
-  } while (1);
 }
 
 /*
@@ -809,8 +761,8 @@ checkStaticObjects ( StgClosure* static_objects )
       { 
 	StgClosure *indirectee = ((StgIndStatic *)p)->indirectee;
 
-	ASSERT(LOOKS_LIKE_PTR(indirectee));
-	ASSERT(LOOKS_LIKE_GHC_INFO(indirectee->header.info));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(indirectee));
+	ASSERT(LOOKS_LIKE_INFO_PTR(indirectee->header.info));
 	p = IND_STATIC_LINK((StgClosure *)p);
 	break;
       }
@@ -950,7 +902,7 @@ checkLAGAtable(rtsBool check_closures)
     n++;
     gala0 = lookupHashTable(LAtoGALAtable, (StgWord) gala->la);
     ASSERT(!gala->preferred || gala == gala0);
-    ASSERT(LOOKS_LIKE_GHC_INFO(((StgClosure *)gala->la)->header.info));
+    ASSERT(LOOKS_LIKE_INFO_PTR(((StgClosure *)gala->la)->header.info));
     ASSERT(gala->next!=gala); // detect direct loops
     if ( check_closures ) {
       checkClosure((StgClosure *)gala->la);
@@ -961,7 +913,7 @@ checkLAGAtable(rtsBool check_closures)
     m++;
     gala0 = lookupHashTable(LAtoGALAtable, (StgWord) gala->la);
     ASSERT(!gala->preferred || gala == gala0);
-    ASSERT(LOOKS_LIKE_GHC_INFO(((StgClosure *)gala->la)->header.info));
+    ASSERT(LOOKS_LIKE_INFO_PTR(((StgClosure *)gala->la)->header.info));
     ASSERT(gala->next!=gala); // detect direct loops
     /*
     if ( check_closures ) {

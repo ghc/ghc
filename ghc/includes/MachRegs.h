@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.12 2002/10/02 09:08:44 wolfgang Exp $
+ * $Id: MachRegs.h,v 1.13 2002/12/11 15:36:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -33,7 +33,7 @@
      CALLER_SAVES_USER		one or more of R<n>, F, D
  			        are caller-saves.
 
-     CALLER_SAVES_SYSTEM        one or more of Sp, Su, SpLim, Hp, HpLim
+     CALLER_SAVES_SYSTEM        one or more of Sp, SpLim, Hp, HpLim
      				are caller-saves.
 
    This is so that the callWrapper mechanism knows which kind of
@@ -69,7 +69,6 @@
    t6	$7	R7
    t7	$8	R8
    s0	$9	Sp
-   s1	$10	Su
    s2	$11	SpLim
    s3	$12	Hp   
    s4	$13	HpLim
@@ -108,7 +107,6 @@
 #  define REG_D2	f7
   
 #  define REG_Sp    	9
-#  define REG_Su    	10
 #  define REG_SpLim     11
 
 #  define REG_Hp	12
@@ -164,7 +162,6 @@
 #define REG_D2		fr21	/* L & R */
 
 #define REG_Sp    	r4
-#define REG_Su    	r5
 #define REG_SpLim    	r6
 
 #define REG_Hp	    	r7
@@ -194,7 +191,7 @@
    esi     R1
    edi     Hp
 
-   Leaving Su, SpLim, and HpLim out of the picture.
+   Leaving SpLim, and HpLim out of the picture.
    -------------------------------------------------------------------------- */
 
 
@@ -206,7 +203,6 @@
 #define REG_Base    ebx
 #endif
 #define REG_Sp	    ebp
-/* #define REG_Su      ebx*/
 
 #if STOLEN_X86_REGS >= 3
 # define REG_R1	    esi
@@ -262,7 +258,6 @@
 #define REG_Base	a2
 
 #define REG_Sp		a3
-#define REG_Su     	a4
 #define REG_SpLim	d3
 
 #define REG_Hp	    	d4
@@ -331,7 +326,6 @@
 #define REG_D2		f30
 
 #define REG_Sp    	16
-#define REG_Su    	17
 #define REG_SpLim    	18
 
 #define REG_Hp	    	19
@@ -383,7 +377,6 @@
 #define REG_D2		f19
 
 #define REG_Sp    	r22
-#define REG_Su    	r23
 #define REG_SpLim    	r24
 
 #define REG_Hp	    	r25
@@ -431,7 +424,6 @@
 #define REG_D2		f21
 
 #define REG_Sp		loc24
-#define REG_Su		loc25
 #define REG_SpLim	loc26
 
 #define REG_Hp		loc27
@@ -525,7 +517,6 @@
 #define REG_D2	    	f4
 
 #define REG_Sp    	i0
-#define REG_Su    	i1
 #define REG_SpLim    	i2
 
 #define REG_Hp	    	i3
@@ -542,27 +533,84 @@
 
 #endif /* sparc */
 
-/* These constants define how many stg registers are *actually* in
- * registers: the code generator uses this information to avoid
- * generating code to load/store registers which are really offsets
- * from BaseReg.
+#endif /* NO_REGS */
+
+/* -----------------------------------------------------------------------------
+ * These constants define how many stg registers will be used for
+ * passing arguments (and results, in the case of an unboxed-tuple
+ * return).
+ *
+ * We usually set MAX_REAL_VANILLA_REG and co. to be the number of the
+ * highest STG register to occupy a real machine register, otherwise
+ * the calling conventions will needlessly shuffle data between the
+ * stack and memory-resident STG registers.  We might occasionally
+ * set these macros to other values for testing, though.
  *
  * Registers above these values might still be used, for instance to
  * communicate with PrimOps and RTS functions.
  */
 
 #ifndef MAX_REAL_VANILLA_REG
-#define MAX_REAL_VANILLA_REG 8
+#  if   defined(REG_R8)
+#  define MAX_REAL_VANILLA_REG 8
+#  elif defined(REG_R7)
+#  define MAX_REAL_VANILLA_REG 7
+#  elif defined(REG_R6)
+#  define MAX_REAL_VANILLA_REG 6
+#  elif defined(REG_R5)
+#  define MAX_REAL_VANILLA_REG 5
+#  elif defined(REG_R4)
+#  define MAX_REAL_VANILLA_REG 4
+#  elif defined(REG_R3)
+#  define MAX_REAL_VANILLA_REG 3
+#  elif defined(REG_R2)
+#  define MAX_REAL_VANILLA_REG 2
+#  elif defined(REG_R1)
+#  define MAX_REAL_VANILLA_REG 1
+#  else
+#  define MAX_REAL_VANILLA_REG 0
+#  endif
 #endif
 
 #ifndef MAX_REAL_FLOAT_REG
-#define MAX_REAL_FLOAT_REG 4
+#  if   defined(REG_F4)
+#  define MAX_REAL_FLOAT_REG 4
+#  elif defined(REG_F3)
+#  define MAX_REAL_FLOAT_REG 3
+#  elif defined(REG_F2)
+#  define MAX_REAL_FLOAT_REG 2
+#  elif defined(REG_F1)
+#  define MAX_REAL_FLOAT_REG 1
+#  else
+#  define MAX_REAL_FLOAT_REG 0
+#  endif
 #endif
 
 #ifndef MAX_REAL_DOUBLE_REG
-#define MAX_REAL_DOUBLE_REG 2
+#  if   defined(REG_D2)
+#  define MAX_REAL_DOUBLE_REG 2
+#  elif defined(REG_D1)
+#  define MAX_REAL_DOUBLE_REG 1
+#  else
+#  define MAX_REAL_DOUBLE_REG 0
+#  endif
 #endif
 
-#endif /* NO_REGS */
+#ifndef MAX_REAL_LONG_REG
+#  if   defined(REG_L1)
+#  define MAX_REAL_LONG_REG 1
+#  else
+#  define MAX_REAL_LONG_REG 0
+#  endif
+#endif
+
+/* define NO_ARG_REGS if we have no argument registers at all (we can
+ * optimise certain code paths using this predicate).
+ */
+#if MAX_REAL_VANILLA_REG < 2
+#define NO_ARG_REGS 
+#else
+#undef NO_ARG_REGS
+#endif
 
 #endif /* MACHREGS_H */

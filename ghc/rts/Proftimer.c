@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Proftimer.c,v 1.10 2002/07/18 09:12:34 simonmar Exp $
+ * $Id: Proftimer.c,v 1.11 2002/12/11 15:36:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -49,7 +49,8 @@ stopHeapProfTimer( void )
 void
 startHeapProfTimer( void )
 {
-    if (RtsFlags.ProfFlags.doHeapProfile) {
+    if (RtsFlags.ProfFlags.doHeapProfile && 
+	RtsFlags.ProfFlags.profileIntervalTicks > 0) {
 	do_heap_prof_ticks = rtsTrue;
     }
 }

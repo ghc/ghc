@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.158 2002/12/10 13:38:40 wolfgang Exp $
+ * $Id: Schedule.c,v 1.159 2002/12/11 15:36:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -278,10 +278,10 @@ rtsBool emitSchedule = rtsTrue;
 
 #if DEBUG
 static char *whatNext_strs[] = {
-  "ThreadEnterGHC",
   "ThreadRunGHC",
-  "ThreadEnterInterp",
+  "ThreadInterpret",
   "ThreadKilled",
+  "ThreadRelocated",
   "ThreadComplete"
 };
 #endif
@@ -367,6 +367,7 @@ schedule( void )
 # endif
 #endif
   rtsBool was_interrupted = rtsFalse;
+  StgTSOWhatNext prev_what_next;
   
   ACQUIRE_LOCK(&sched_mutex);
  
@@ -443,7 +444,8 @@ schedule( void )
 	switch (m->tso->what_next) {
 	case ThreadComplete:
 	  if (m->ret) {
-	    *(m->ret) = (StgClosure *)m->tso->sp[0];
+              // NOTE: return val is tso->sp[1] (see StgStartup.hc)
+	      *(m->ret) = (StgClosure *)m->tso->sp[1]; 
 	  }
 	  *prev = m->link;
 	  m->stat = Success;
@@ -488,10 +490,11 @@ schedule( void )
 #endif
 	main_threads = main_threads->link;
 	if (m->tso->what_next == ThreadComplete) {
-	  /* we finished successfully, fill in the return value */
-	  if (m->ret) { *(m->ret) = (StgClosure *)m->tso->sp[0]; };
-	  m->stat = Success;
-	  return;
+	    // We finished successfully, fill in the return value
+	    // NOTE: return val is tso->sp[1] (see StgStartup.hc)
+	    if (m->ret) { *(m->ret) = (StgClosure *)m->tso->sp[1]; };
+	    m->stat = Success;
+	    return;
 	} else {
 	  if (m->ret) { *(m->ret) = NULL; };
 	  if (was_interrupted) {
@@ -1020,11 +1023,7 @@ schedule( void )
      * the user specified "context switch as often as possible", with
      * +RTS -C0
      */
-    if (
-#ifdef PROFILING
-	RtsFlags.ProfFlags.profileInterval == 0 ||
-#endif
-	(RtsFlags.ConcFlags.ctxtSwitchTicks == 0
+    if ((RtsFlags.ConcFlags.ctxtSwitchTicks == 0
 	 && (run_queue_hd != END_TSO_QUEUE
 	     || blocked_queue_hd != END_TSO_QUEUE
 	     || sleeping_queue != END_TSO_QUEUE)))
@@ -1034,8 +1033,8 @@ schedule( void )
 
     RELEASE_LOCK(&sched_mutex);
 
-    IF_DEBUG(scheduler, sched_belch("-->> Running TSO %ld (%p) %s ...", 
-			      t->id, t, whatNext_strs[t->what_next]));
+    IF_DEBUG(scheduler, sched_belch("-->> running thread %ld %s ...", 
+			      t->id, whatNext_strs[t->what_next]));
 
 #ifdef PROFILING
     startHeapProfTimer();
@@ -1044,19 +1043,17 @@ schedule( void )
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     /* Run the current thread 
      */
-    switch (cap->r.rCurrentTSO->what_next) {
+    prev_what_next = t->what_next;
+    switch (prev_what_next) {
     case ThreadKilled:
     case ThreadComplete:
 	/* Thread already finished, return to scheduler. */
 	ret = ThreadFinished;
 	break;
-    case ThreadEnterGHC:
-	ret = StgRun((StgFunPtr) stg_enterStackTop, &cap->r);
-	break;
     case ThreadRunGHC:
 	ret = StgRun((StgFunPtr) stg_returnToStackTop, &cap->r);
 	break;
-    case ThreadEnterInterp:
+    case ThreadInterpret:
 	ret = interpretBCO(cap);
 	break;
     default:
@@ -1104,9 +1101,8 @@ schedule( void )
 	  
 	  blocks = (nat)BLOCK_ROUND_UP(cap->r.rHpAlloc * sizeof(W_)) / BLOCK_SIZE;
 
-	  IF_DEBUG(scheduler,belch("--<< thread %ld (%p; %s) stopped: requesting a large block (size %d)", 
-				   t->id, t,
-				   whatNext_strs[t->what_next], blocks));
+	  IF_DEBUG(scheduler,belch("--<< thread %ld (%s) stopped: requesting a large block (size %d)", 
+				   t->id, whatNext_strs[t->what_next], blocks));
 
 	  // don't do this if it would push us over the
 	  // alloc_blocks_lim limit; we'll GC first.
@@ -1140,12 +1136,13 @@ schedule( void )
 		      x->step = g0s0;
 		      x->gen_no = 0;
 		      x->flags = 0;
-		      x->free = x->start;
 		  }
 	      }
 
 	      // don't forget to update the block count in g0s0.
 	      g0s0->n_blocks += blocks;
+	      // This assert can be a killer if the app is doing lots
+	      // of large block allocations.
 	      ASSERT(countBlocks(g0s0->blocks) == g0s0->n_blocks);
 
 	      // now update the nursery to point to the new block
@@ -1164,8 +1161,8 @@ schedule( void )
        * maybe set context_switch and wait till they all pile in,
        * then have them wait on a GC condition variable.
        */
-      IF_DEBUG(scheduler,belch("--<< thread %ld (%p; %s) stopped: HeapOverflow", 
-			       t->id, t, whatNext_strs[t->what_next]));
+      IF_DEBUG(scheduler,belch("--<< thread %ld (%s) stopped: HeapOverflow", 
+			       t->id, whatNext_strs[t->what_next]));
       threadPaused(t);
 #if defined(GRAN)
       ASSERT(!is_on_queue(t,CurrentProc));
@@ -1196,8 +1193,8 @@ schedule( void )
       // DumpGranEvent(GR_DESCHEDULE, t);
       globalParStats.tot_stackover++;
 #endif
-      IF_DEBUG(scheduler,belch("--<< thread %ld (%p; %s) stopped, StackOverflow", 
-			       t->id, t, whatNext_strs[t->what_next]));
+      IF_DEBUG(scheduler,belch("--<< thread %ld (%s) stopped, StackOverflow", 
+			       t->id, whatNext_strs[t->what_next]));
       /* just adjust the stack for this thread, then pop it back
        * on the run queue.
        */
@@ -1237,15 +1234,15 @@ schedule( void )
        * GC is finished.
        */
       IF_DEBUG(scheduler,
-               if (t->what_next == ThreadEnterInterp) {
+               if (t->what_next != prev_what_next) {
 		   /* ToDo: or maybe a timer expired when we were in Hugs?
 		    * or maybe someone hit ctrl-C
                     */
-                   belch("--<< thread %ld (%p; %s) stopped to switch to Hugs", 
-			 t->id, t, whatNext_strs[t->what_next]);
+		   belch("--<< thread %ld (%s) stopped to switch evaluators", 
+			 t->id, whatNext_strs[t->what_next]);
                } else {
-                   belch("--<< thread %ld (%p; %s) stopped, yielding", 
-			 t->id, t, whatNext_strs[t->what_next]);
+                   belch("--<< thread %ld (%s) stopped, yielding", 
+			 t->id, whatNext_strs[t->what_next]);
                }
                );
 
@@ -1271,8 +1268,13 @@ schedule( void )
 	PUSH_ON_RUN_QUEUE(t);
       }
 #else
-      /* this does round-robin scheduling; good for concurrency */
-      APPEND_TO_RUN_QUEUE(t);
+      if (t->what_next != prev_what_next) {
+	  // switching evaluators; don't context-switch
+	  PUSH_ON_RUN_QUEUE(t);
+      } else {
+	  // this does round-robin scheduling; good for concurrency
+	  APPEND_TO_RUN_QUEUE(t);
+      }
 #endif
 #if defined(GRAN)
       /* add a ContinueThread event to actually process the thread */
@@ -1285,7 +1287,7 @@ schedule( void )
 	       G_CURR_THREADQ(0));
 #endif /* GRAN */
       break;
-      
+
     case ThreadBlocked:
 #if defined(GRAN)
       IF_DEBUG(scheduler,
@@ -1329,7 +1331,8 @@ schedule( void )
        * case it'll be on the relevant queue already.
        */
       IF_DEBUG(scheduler,
-	       fprintf(stderr, "--<< thread %d (%p) stopped: ", t->id, t);
+	       fprintf(stderr, "--<< thread %d (%s) stopped: ", 
+		       t->id, whatNext_strs[t->what_next]);
 	       printThreadBlockage(t);
 	       fprintf(stderr, "\n"));
 
@@ -1350,7 +1353,8 @@ schedule( void )
       /* We also end up here if the thread kills itself with an
        * uncaught exception, see Exception.hc.
        */
-      IF_DEBUG(scheduler,belch("--++ thread %d (%p) finished", t->id, t));
+      IF_DEBUG(scheduler,belch("--++ thread %d (%s) finished", 
+			       t->id, whatNext_strs[t->what_next]));
 #if defined(GRAN)
       endThread(t, CurrentProc); // clean-up the thread
 #elif defined(PAR)
@@ -1374,7 +1378,11 @@ schedule( void )
     }
 
 #ifdef PROFILING
-    if (RtsFlags.ProfFlags.profileInterval==0 || performHeapProfile) {
+    // When we have +RTS -i0 and we're heap profiling, do a census at
+    // every GC.  This lets us get repeatable runs for debugging.
+    if (performHeapProfile ||
+	(RtsFlags.ProfFlags.profileInterval==0 &&
+	 RtsFlags.ProfFlags.doHeapProfile && ready_to_gc)) {
 	GarbageCollect(GetRoots, rtsTrue);
 	heapCensus();
 	performHeapProfile = rtsFalse;
@@ -1564,6 +1572,9 @@ suspendThread( StgRegTable *reg,
 
   IF_DEBUG(scheduler,
 	   sched_belch("thread %d did a _ccall_gc (is_concurrent: %d)", cap->r.rCurrentTSO->id,concCall));
+
+  // XXX this might not be necessary --SDM
+  cap->r.rCurrentTSO->what_next = ThreadRunGHC;
 
   threadPaused(cap->r.rCurrentTSO);
   cap->r.rCurrentTSO->link = suspended_ccalling_threads;
@@ -1757,7 +1768,9 @@ createThread(nat size)
 #if defined(GRAN)
   SET_GRAN_HDR(tso, ThisPE);
 #endif
-  tso->what_next     = ThreadEnterGHC;
+
+  // Always start with the compiled code evaluator
+  tso->what_next = ThreadRunGHC;
 
   /* tso->id needs to be unique.  For now we use a heavyweight mutex to
    * protect the increment operation on next_thread_id.
@@ -1782,8 +1795,6 @@ createThread(nat size)
   /* put a stop frame on the stack */
   tso->sp -= sizeofW(StgStopFrame);
   SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_SYSTEM);
-  tso->su = (StgUpdateFrame*)tso->sp;
-
   // ToDo: check this
 #if defined(GRAN)
   tso->link = END_TSO_QUEUE;
@@ -2023,7 +2034,7 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret)
      see (==> it got stuck waiting.)    -- sof 6/02.
   */
   ACQUIRE_LOCK(&sched_mutex);
-  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
+  IF_DEBUG(scheduler, sched_belch("waiting for thread (%d)\n", tso->id));
   
   m->link = main_threads;
   main_threads = m;
@@ -2229,11 +2240,10 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
 
   /* see scheduleWaitThread() comment */
   ACQUIRE_LOCK(&sched_mutex);
-  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
   m->link = main_threads;
   main_threads = m;
 
-  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
+  IF_DEBUG(scheduler, sched_belch("waiting for thread %d", tso->id));
 #if defined(THREADED_RTS)
   return waitThread_(m, rtsFalse);	// waitThread_ releases sched_mutex
 #else
@@ -2601,24 +2611,19 @@ threadStackOverflow(StgTSO *tso)
 
   /* relocate the stack pointers... */
   diff = (P_)new_sp - (P_)tso->sp; /* In *words* */
-  dest->su    = (StgUpdateFrame *) ((P_)dest->su + diff);
   dest->sp    = new_sp;
   dest->stack_size = new_stack_size;
 	
-  /* and relocate the update frame list */
-  relocate_stack(dest, diff);
-
   /* Mark the old TSO as relocated.  We have to check for relocated
    * TSOs in the garbage collector and any primops that deal with TSOs.
    *
-   * It's important to set the sp and su values to just beyond the end
+   * It's important to set the sp value to just beyond the end
    * of the stack, so we don't attempt to scavenge any part of the
    * dead TSO's stack.
    */
   tso->what_next = ThreadRelocated;
   tso->link = dest;
   tso->sp = (P_)&(tso->stack[tso->stack_size]);
-  tso->su = (StgUpdateFrame *)tso->sp;
   tso->why_blocked = NotBlocked;
   dest->mut_link = NULL;
 
@@ -3233,12 +3238,12 @@ unblockThread(StgTSO *tso)
  * the top of the stack.
  * 
  * How exactly do we save all the active computations?  We create an
- * AP_UPD for every UpdateFrame on the stack.  Entering one of these
- * AP_UPDs pushes everything from the corresponding update frame
+ * AP_STACK for every UpdateFrame on the stack.  Entering one of these
+ * AP_STACKs pushes everything from the corresponding update frame
  * upwards onto the stack.  (Actually, it pushes everything up to the
- * next update frame plus a pointer to the next AP_UPD object.
- * Entering the next AP_UPD object pushes more onto the stack until we
- * reach the last AP_UPD object - at which point the stack should look
+ * next update frame plus a pointer to the next AP_STACK object.
+ * Entering the next AP_STACK object pushes more onto the stack until we
+ * reach the last AP_STACK object - at which point the stack should look
  * exactly as it did when we killed the TSO and we can continue
  * execution by entering the closure on top of the stack.
  *
@@ -3270,194 +3275,169 @@ raiseAsyncWithLock(StgTSO *tso, StgClosure *exception)
 void
 raiseAsync(StgTSO *tso, StgClosure *exception)
 {
-  StgUpdateFrame* su = tso->su;
-  StgPtr          sp = tso->sp;
+    StgRetInfoTable *info;
+    StgPtr sp;
   
-  /* Thread already dead? */
-  if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
-    return;
-  }
-
-  IF_DEBUG(scheduler, sched_belch("raising exception in thread %ld.", tso->id));
-
-  /* Remove it from any blocking queues */
-  unblockThread(tso);
-
-  /* The stack freezing code assumes there's a closure pointer on
-   * the top of the stack.  This isn't always the case with compiled
-   * code, so we have to push a dummy closure on the top which just
-   * returns to the next return address on the stack.
-   */
-  if ( LOOKS_LIKE_GHC_INFO((void*)*sp) ) {
-    *(--sp) = (W_)&stg_dummy_ret_closure;
-  }
-
-  while (1) {
-    nat words = ((P_)su - (P_)sp) - 1;
-    nat i;
-    StgAP_UPD * ap;
-
-    ASSERT((P_)su > (P_)sp);
-    
-    /* If we find a CATCH_FRAME, and we've got an exception to raise,
-     * then build the THUNK raise(exception), and leave it on
-     * top of the CATCH_FRAME ready to enter.
-     */
-    if (get_itbl(su)->type == CATCH_FRAME && exception != NULL) {
-#ifdef PROFILING
-      StgCatchFrame *cf = (StgCatchFrame *)su;
-#endif
-      StgClosure *raise;
-
-      /* we've got an exception to raise, so let's pass it to the
-       * handler in this frame.
-       */
-      raise = (StgClosure *)allocate(sizeofW(StgClosure)+1);
-      TICK_ALLOC_SE_THK(1,0);
-      SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
-      raise->payload[0] = exception;
-
-      /* throw away the stack from Sp up to the CATCH_FRAME.
-       */
-      sp = (P_)su - 1;
-
-      /* Ensure that async excpetions are blocked now, so we don't get
-       * a surprise exception before we get around to executing the
-       * handler.
-       */
-      if (tso->blocked_exceptions == NULL) {
-	  tso->blocked_exceptions = END_TSO_QUEUE;
-      }
-
-      /* Put the newly-built THUNK on top of the stack, ready to execute
-       * when the thread restarts.
-       */
-      sp[0] = (W_)raise;
-      tso->sp = sp;
-      tso->su = su;
-      tso->what_next = ThreadEnterGHC;
-      IF_DEBUG(sanity, checkTSO(tso));
-      return;
+    // Thread already dead?
+    if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
+	return;
     }
 
-    /* First build an AP_UPD consisting of the stack chunk above the
-     * current update frame, with the top word on the stack as the
-     * fun field.
-     */
-    ap = (StgAP_UPD *)allocate(AP_sizeW(words));
+    IF_DEBUG(scheduler, 
+	     sched_belch("raising exception in thread %ld.", tso->id));
     
-    ap->n_args = words;
-    ap->fun    = (StgClosure *)sp[0];
-    sp++;
-    for(i=0; i < (nat)words; ++i) {
-      ap->payload[i] = (StgClosure *)*sp++;
+    // Remove it from any blocking queues
+    unblockThread(tso);
+
+    sp = tso->sp;
+    
+    // The stack freezing code assumes there's a closure pointer on
+    // the top of the stack, so we have to arrange that this is the case...
+    //
+    if (sp[0] == (W_)&stg_enter_info) {
+	sp++;
+    } else {
+	sp--;
+	sp[0] = (W_)&stg_dummy_ret_closure;
     }
-    
-    switch (get_itbl(su)->type) {
-      
-    case UPDATE_FRAME:
-      {
-	SET_HDR(ap,&stg_AP_UPD_info,su->header.prof.ccs /* ToDo */); 
-	TICK_ALLOC_UP_THK(words+1,0);
+
+    while (1) {
+	nat i;
+
+	// 1. Let the top of the stack be the "current closure"
+	//
+	// 2. Walk up the stack until we find either an UPDATE_FRAME or a
+	// CATCH_FRAME.
+	//
+	// 3. If it's an UPDATE_FRAME, then make an AP_STACK containing the
+	// current closure applied to the chunk of stack up to (but not
+	// including) the update frame.  This closure becomes the "current
+	// closure".  Go back to step 2.
+	//
+	// 4. If it's a CATCH_FRAME, then leave the exception handler on
+	// top of the stack applied to the exception.
+	// 
+	// 5. If it's a STOP_FRAME, then kill the thread.
 	
-	IF_DEBUG(scheduler,
-		 fprintf(stderr,  "scheduler: Updating ");
-		 printPtr((P_)su->updatee); 
-		 fprintf(stderr,  " with ");
-		 printObj((StgClosure *)ap);
-		 );
+	StgPtr frame;
 	
-	/* Replace the updatee with an indirection - happily
-	 * this will also wake up any threads currently
-	 * waiting on the result.
-	 *
-	 * Warning: if we're in a loop, more than one update frame on
-	 * the stack may point to the same object.  Be careful not to
-	 * overwrite an IND_OLDGEN in this case, because we'll screw
-	 * up the mutable lists.  To be on the safe side, don't
-	 * overwrite any kind of indirection at all.  See also
-	 * threadSqueezeStack in GC.c, where we have to make a similar
-	 * check.
-	 */
-	if (!closure_IND(su->updatee)) {
-	    UPD_IND_NOLOCK(su->updatee,ap);  /* revert the black hole */
+	frame = sp + 1;
+	info = get_ret_itbl((StgClosure *)frame);
+	
+	while (info->i.type != UPDATE_FRAME
+	       && (info->i.type != CATCH_FRAME || exception == NULL)
+	       && info->i.type != STOP_FRAME) {
+	    frame += stack_frame_sizeW((StgClosure *)frame);
+	    info = get_ret_itbl((StgClosure *)frame);
 	}
-	su = su->link;
-	sp += sizeofW(StgUpdateFrame) -1;
-	sp[0] = (W_)ap; /* push onto stack */
-	break;
-      }
+	
+	switch (info->i.type) {
+	    
+	case CATCH_FRAME:
+	    // If we find a CATCH_FRAME, and we've got an exception to raise,
+	    // then build the THUNK raise(exception), and leave it on
+	    // top of the CATCH_FRAME ready to enter.
+	    //
+	{
+#ifdef PROFILING
+	    StgCatchFrame *cf = (StgCatchFrame *)frame;
+#endif
+	    StgClosure *raise;
+	    
+	    // we've got an exception to raise, so let's pass it to the
+	    // handler in this frame.
+	    //
+	    raise = (StgClosure *)allocate(sizeofW(StgClosure)+1);
+	    TICK_ALLOC_SE_THK(1,0);
+	    SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
+	    raise->payload[0] = exception;
+	    
+	    // throw away the stack from Sp up to the CATCH_FRAME.
+	    //
+	    sp = frame - 1;
+	    
+	    /* Ensure that async excpetions are blocked now, so we don't get
+	     * a surprise exception before we get around to executing the
+	     * handler.
+	     */
+	    if (tso->blocked_exceptions == NULL) {
+		tso->blocked_exceptions = END_TSO_QUEUE;
+	    }
+	    
+	    /* Put the newly-built THUNK on top of the stack, ready to execute
+	     * when the thread restarts.
+	     */
+	    sp[0] = (W_)raise;
+	    sp[-1] = (W_)&stg_enter_info;
+	    tso->sp = sp-1;
+	    tso->what_next = ThreadRunGHC;
+	    IF_DEBUG(sanity, checkTSO(tso));
+	    return;
+	}
+	
+	case UPDATE_FRAME:
+	{
+	    StgAP_STACK * ap;
+	    nat words;
+	    
+	    // First build an AP_STACK consisting of the stack chunk above the
+	    // current update frame, with the top word on the stack as the
+	    // fun field.
+	    //
+	    words = frame - sp - 1;
+	    ap = (StgAP_STACK *)allocate(PAP_sizeW(words));
+	    
+	    ap->size = words;
+	    ap->fun  = (StgClosure *)sp[0];
+	    sp++;
+	    for(i=0; i < (nat)words; ++i) {
+		ap->payload[i] = (StgClosure *)*sp++;
+	    }
+	    
+	    SET_HDR(ap,&stg_AP_STACK_info,
+		    ((StgClosure *)frame)->header.prof.ccs /* ToDo */); 
+	    TICK_ALLOC_UP_THK(words+1,0);
+	    
+	    IF_DEBUG(scheduler,
+		     fprintf(stderr,  "scheduler: Updating ");
+		     printPtr((P_)((StgUpdateFrame *)frame)->updatee); 
+		     fprintf(stderr,  " with ");
+		     printObj((StgClosure *)ap);
+		);
 
-    case CATCH_FRAME:
-      {
-	StgCatchFrame *cf = (StgCatchFrame *)su;
-	StgClosure* o;
+	    // Replace the updatee with an indirection - happily
+	    // this will also wake up any threads currently
+	    // waiting on the result.
+	    //
+	    // Warning: if we're in a loop, more than one update frame on
+	    // the stack may point to the same object.  Be careful not to
+	    // overwrite an IND_OLDGEN in this case, because we'll screw
+	    // up the mutable lists.  To be on the safe side, don't
+	    // overwrite any kind of indirection at all.  See also
+	    // threadSqueezeStack in GC.c, where we have to make a similar
+	    // check.
+	    //
+	    if (!closure_IND(((StgUpdateFrame *)frame)->updatee)) {
+		// revert the black hole
+		UPD_IND_NOLOCK(((StgUpdateFrame *)frame)->updatee,ap);
+	    }
+	    sp += sizeofW(StgUpdateFrame) - 1;
+	    sp[0] = (W_)ap; // push onto stack
+	    break;
+	}
 	
-	/* We want a PAP, not an AP_UPD.  Fortunately, the
-	 * layout's the same.
-	 */
-	SET_HDR(ap,&stg_PAP_info,su->header.prof.ccs /* ToDo */);
-	TICK_ALLOC_UPD_PAP(words+1,0);
-	
-	/* now build o = FUN(catch,ap,handler) */
-	o = (StgClosure *)allocate(sizeofW(StgClosure)+2);
-	TICK_ALLOC_FUN(2,0);
-	SET_HDR(o,&stg_catch_info,su->header.prof.ccs /* ToDo */);
-	o->payload[0] = (StgClosure *)ap;
-	o->payload[1] = cf->handler;
-	
-	IF_DEBUG(scheduler,
-		 fprintf(stderr,  "scheduler: Built ");
-		 printObj((StgClosure *)o);
-		 );
-	
-	/* pop the old handler and put o on the stack */
-	su = cf->link;
-	sp += sizeofW(StgCatchFrame) - 1;
-	sp[0] = (W_)o;
-	break;
-      }
-      
-    case SEQ_FRAME:
-      {
-	StgSeqFrame *sf = (StgSeqFrame *)su;
-	StgClosure* o;
-	
-	SET_HDR(ap,&stg_PAP_info,su->header.prof.ccs /* ToDo */);
-	TICK_ALLOC_UPD_PAP(words+1,0);
-	
-	/* now build o = FUN(seq,ap) */
-	o = (StgClosure *)allocate(sizeofW(StgClosure)+1);
-	TICK_ALLOC_SE_THK(1,0);
-	SET_HDR(o,&stg_seq_info,su->header.prof.ccs /* ToDo */);
-	o->payload[0] = (StgClosure *)ap;
-	
-	IF_DEBUG(scheduler,
-		 fprintf(stderr,  "scheduler: Built ");
-		 printObj((StgClosure *)o);
-		 );
-	
-	/* pop the old handler and put o on the stack */
-	su = sf->link;
-	sp += sizeofW(StgSeqFrame) - 1;
-	sp[0] = (W_)o;
-	break;
-      }
-      
-    case STOP_FRAME:
-      /* We've stripped the entire stack, the thread is now dead. */
-      sp += sizeofW(StgStopFrame) - 1;
-      sp[0] = (W_)exception;	/* save the exception */
-      tso->what_next = ThreadKilled;
-      tso->su = (StgUpdateFrame *)(sp+1);
-      tso->sp = sp;
-      return;
-
-    default:
-      barf("raiseAsync");
+	case STOP_FRAME:
+	    // We've stripped the entire stack, the thread is now dead.
+	    sp += sizeofW(StgStopFrame);
+	    tso->what_next = ThreadKilled;
+	    tso->sp = sp;
+	    return;
+	    
+	default:
+	    barf("raiseAsync");
+	}
     }
-  }
-  barf("raiseAsync");
+    barf("raiseAsync");
 }
 
 /* -----------------------------------------------------------------------------
@@ -3516,52 +3496,54 @@ resurrectThreads( StgTSO *threads )
 static void
 detectBlackHoles( void )
 {
-    StgTSO *t = all_threads;
-    StgUpdateFrame *frame;
+    StgTSO *tso = all_threads;
+    StgClosure *frame;
     StgClosure *blocked_on;
+    StgRetInfoTable *info;
 
-    for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
+    for (tso = all_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
 
-	while (t->what_next == ThreadRelocated) {
-	    t = t->link;
-	    ASSERT(get_itbl(t)->type == TSO);
+	while (tso->what_next == ThreadRelocated) {
+	    tso = tso->link;
+	    ASSERT(get_itbl(tso)->type == TSO);
 	}
       
-	if (t->why_blocked != BlockedOnBlackHole) {
+	if (tso->why_blocked != BlockedOnBlackHole) {
 	    continue;
 	}
 
-	blocked_on = t->block_info.closure;
+	blocked_on = tso->block_info.closure;
 
-	for (frame = t->su; ; frame = frame->link) {
-	    switch (get_itbl(frame)->type) {
+	frame = (StgClosure *)tso->sp;
+
+	while(1) {
+	    info = get_ret_itbl(frame);
+	    switch (info->i.type) {
 
 	    case UPDATE_FRAME:
-		if (frame->updatee == blocked_on) {
+		if (((StgUpdateFrame *)frame)->updatee == blocked_on) {
 		    /* We are blocking on one of our own computations, so
 		     * send this thread the NonTermination exception.  
 		     */
 		    IF_DEBUG(scheduler, 
-			     sched_belch("thread %d is blocked on itself", t->id));
-		    raiseAsync(t, (StgClosure *)NonTermination_closure);
+			     sched_belch("thread %d is blocked on itself", tso->id));
+		    raiseAsync(tso, (StgClosure *)NonTermination_closure);
 		    goto done;
 		}
-		else {
-		    continue;
-		}
-
-	    case CATCH_FRAME:
-	    case SEQ_FRAME:
-		continue;
 		
-	    case STOP_FRAME:
-		break;
-	    }
-	    break;
-	}
+		frame = (StgClosure *) ((StgUpdateFrame *)frame + 1);
+		continue;
 
-    done: ;
-    }   
+	    case STOP_FRAME:
+		goto done;
+
+		// normal stack frames; do nothing except advance the pointer
+	    default:
+		(StgPtr)frame += stack_frame_sizeW(frame);
+	    }
+	}   
+	done: ;
+    }
 }
 
 //@node Debugging Routines, Index, Exception Handling Routines, Main scheduling code

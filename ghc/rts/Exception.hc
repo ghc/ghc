@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.25 2002/04/23 06:34:26 sof Exp $
+ * $Id: Exception.hc,v 1.26 2002/12/11 15:36:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -51,7 +51,7 @@ FN_(blockAsyncExceptionszh_fast)
 {
   FB_
     /* Args: R1 :: IO a */
-    STK_CHK_GEN( 2/* worst case */, R1_PTR, blockAsyncExceptionszh_fast, );
+    STK_CHK_GEN( 2/* worst case */, R1_PTR, blockAsyncExceptionszh_fast);
 
     if (CurrentTSO->blocked_exceptions == NULL) {
       CurrentTSO->blocked_exceptions = END_TSO_QUEUE;
@@ -64,12 +64,17 @@ FN_(blockAsyncExceptionszh_fast)
       }
     }
     Sp--;
-    Sp[0] = ARG_TAG(0);
-    JMP_(GET_ENTRY(R1.cl));
+    JMP_(stg_ap_v_ret);
   FE_
 }
 
-INFO_TABLE_SRT_BITMAP(stg_unblockAsyncExceptionszh_ret_info, stg_unblockAsyncExceptionszh_ret_entry, 0, 0, 0, 0, RET_SMALL, , EF_, 0, 0);
+INFO_TABLE_RET( \
+  stg_unblockAsyncExceptionszh_ret_info, \
+  stg_unblockAsyncExceptionszh_ret_entry, \
+  MK_SMALL_BITMAP(0/*framesize*/, 0/*bitmap*/), \
+  0, 0, 0, RET_SMALL, , EF_, 0, 0 \
+);
+
 FN_(stg_unblockAsyncExceptionszh_ret_entry)
 {
   FB_
@@ -101,7 +106,7 @@ FN_(unblockAsyncExceptionszh_fast)
 {
   FB_
     /* Args: R1 :: IO a */
-    STK_CHK_GEN(2, R1_PTR, unblockAsyncExceptionszh_fast, );
+    STK_CHK_GEN(2, R1_PTR, unblockAsyncExceptionszh_fast);
 
     if (CurrentTSO->blocked_exceptions != NULL) {
 #if defined(GRAN)
@@ -126,12 +131,17 @@ FN_(unblockAsyncExceptionszh_fast)
       }
     }
     Sp--;
-    Sp[0] = ARG_TAG(0);
-    JMP_(GET_ENTRY(R1.cl));
+    JMP_(stg_ap_v_ret);
   FE_
 }
 
-INFO_TABLE_SRT_BITMAP(stg_blockAsyncExceptionszh_ret_info, stg_blockAsyncExceptionszh_ret_entry, 0, 0, 0, 0, RET_SMALL, , EF_, 0, 0);
+INFO_TABLE_RET( \
+  stg_blockAsyncExceptionszh_ret_info, \
+  stg_blockAsyncExceptionszh_ret_entry, \
+  MK_SMALL_BITMAP(0/*framesize*/, 0/*bitmap*/), \
+  0, 0, 0, RET_SMALL, , EF_, 0, 0 \
+);
+
 FN_(stg_blockAsyncExceptionszh_ret_entry)
 {
   FB_
@@ -195,14 +205,10 @@ FN_(killThreadzh_fast)
 	if (CurrentTSO->what_next == ThreadKilled) {
 		R1.w = ThreadFinished;
 		JMP_(StgReturn);
-	}
-	LoadThreadState();
-	if (CurrentTSO->what_next == ThreadEnterGHC) {
-		R1.w = Sp[0];
-		Sp++;
-		JMP_(GET_ENTRY(R1.cl));
 	} else {
-	  	barf("killThreadzh_fast");
+		LoadThreadState();
+		ASSERT(CurrentTSO->what_next == ThreadRunGHC);
+		JMP_(ENTRY_CODE(Sp[0]));
 	}
   } else {
 	STGCALL2(raiseAsyncWithLock, R1.t, R2.cl);
@@ -223,7 +229,6 @@ FN_(killThreadzh_fast)
    FN_(label)					\
    {						\
       FB_					\
-      Su = ((StgCatchFrame *)Sp)->link;		\
       Sp += sizeofW(StgCatchFrame);		\
       JMP_(ret);				\
       FE_					\
@@ -237,7 +242,6 @@ FN_(killThreadzh_fast)
       FB_					\
       rval = Sp[0];				\
       Sp++;					\
-      Su = ((StgCatchFrame *)Sp)->link;		\
       Sp += sizeofW(StgCatchFrame) - 1;		\
       Sp[0] = rval;				\
       JMP_(ret);				\
@@ -251,20 +255,22 @@ FN_(killThreadzh_fast)
 #define SP_OFF 1
 #endif
 
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_entry,ENTRY_CODE(Sp[SP_OFF]));
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_0_entry,RET_VEC(Sp[SP_OFF],0));
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_1_entry,RET_VEC(Sp[SP_OFF],1));
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_2_entry,RET_VEC(Sp[SP_OFF],2));
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_3_entry,RET_VEC(Sp[SP_OFF],3));
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_4_entry,RET_VEC(Sp[SP_OFF],4));
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_5_entry,RET_VEC(Sp[SP_OFF],5));
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_6_entry,RET_VEC(Sp[SP_OFF],6));
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_entry,RET_VEC(Sp[SP_OFF],7));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_ret,ENTRY_CODE(Sp[SP_OFF]));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_0_ret,RET_VEC(Sp[SP_OFF],0));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_1_ret,RET_VEC(Sp[SP_OFF],1));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_2_ret,RET_VEC(Sp[SP_OFF],2));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_3_ret,RET_VEC(Sp[SP_OFF],3));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_4_ret,RET_VEC(Sp[SP_OFF],4));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_5_ret,RET_VEC(Sp[SP_OFF],5));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_6_ret,RET_VEC(Sp[SP_OFF],6));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_ret,RET_VEC(Sp[SP_OFF],7));
 
 #if defined(PROFILING)
-#define CATCH_FRAME_BITMAP 15
+#define CATCH_FRAME_BITMAP 7
+#define CATCH_FRAME_WORDS  4
 #else
-#define CATCH_FRAME_BITMAP 3
+#define CATCH_FRAME_BITMAP 1
+#define CATCH_FRAME_WORDS  2
 #endif
 
 /* Catch frames are very similar to update frames, but when entering
@@ -272,7 +278,9 @@ CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_entry,RET_VEC(Sp[SP_OFF],7));
  * kind of return to the activation record underneath us on the stack.
  */
 
-VEC_POLY_INFO_TABLE(stg_catch_frame, CATCH_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, CATCH_FRAME,, EF_);
+VEC_POLY_INFO_TABLE(stg_catch_frame, \
+	MK_SMALL_BITMAP(CATCH_FRAME_WORDS, CATCH_FRAME_BITMAP), \
+	NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, CATCH_FRAME,, EF_);
 
 /* -----------------------------------------------------------------------------
  * The catch infotable
@@ -300,7 +308,7 @@ FN_(catchzh_fast)
   FB_
 
     /* args: R1 = m :: IO a, R2 = handler :: Exception -> IO a */
-    STK_CHK_GEN(sizeofW(StgCatchFrame) + 1, R1_PTR | R2_PTR, catchzh_fast, );
+    STK_CHK_GEN(sizeofW(StgCatchFrame) + 1, R1_PTR | R2_PTR, catchzh_fast);
   
     /* Set up the catch frame */
     Sp -= sizeofW(StgCatchFrame);
@@ -308,16 +316,12 @@ FN_(catchzh_fast)
     SET_HDR(fp,(StgInfoTable *)&stg_catch_frame_info,CCCS);
     fp -> handler = R2.cl;
     fp -> exceptions_blocked = (CurrentTSO->blocked_exceptions != NULL);
-    fp -> link = Su;
-    Su = (StgUpdateFrame *)fp;
     TICK_CATCHF_PUSHED();
 
-    /* Push realworld token and enter R1. */
+
+/* Apply R1 to the realworld token */
     Sp--;
-    Sp[0] = ARG_TAG(0);
-    TICK_ENT_VIA_NODE();
-    JMP_(GET_ENTRY(R1.cl));
-    
+    JMP_(stg_ap_v_ret);
   FE_
 }      
 
@@ -343,7 +347,7 @@ STGFUN(stg_raise_entry)
 FN_(raisezh_fast)
 {
   StgClosure *handler;
-  StgUpdateFrame *p;
+  StgPtr p;
   StgClosure *raise_closure;
   FB_
     /* args : R1 = exception */
@@ -359,8 +363,6 @@ FN_(raisezh_fast)
       STGCALL2(fprintCCS,stderr,CCCS);
     }
 #endif
-
-    p = Su;
 
     /* This closure represents the expression 'raise# E' where E
      * is the exception raise.  It is used to overwrite all the
@@ -381,45 +383,50 @@ FN_(raisezh_fast)
     SET_HDR(raise_closure, &stg_raise_info, CCCS);
     raise_closure->payload[0] = R1.cl;
 
-    while (1) {
+    // Walk up the stack, looking for the catch frame.  On the way,
+    // we update any closures pointed to from update frames with the
+    // raise closure that we just built.
+    {		
+	StgPtr next;
+	StgRetInfoTable *info;
 
-      switch (get_itbl(p)->type) {
+	p = Sp;
+	while(1) {
 
-      case UPDATE_FRAME:
-	UPD_IND(p->updatee,raise_closure);
-	p = p->link;
-	continue;
+	    info = get_ret_itbl((StgClosure *)p);
+	    next = p + stack_frame_sizeW((StgClosure *)p);
+	    switch (info->i.type) {
 
-      case SEQ_FRAME:
-	p = ((StgSeqFrame *)p)->link;
-	continue;
+	    case UPDATE_FRAME:
+		UPD_IND(((StgUpdateFrame *)p)->updatee,raise_closure);
+		p = next;
+		continue;
 
-      case CATCH_FRAME:
-	/* found it! */
-	break;
+	    case CATCH_FRAME:
+		/* found it! */
+		break;
 
-      case STOP_FRAME:
-	/* We've stripped the entire stack, the thread is now dead. */
-	Sp = CurrentTSO->stack + CurrentTSO->stack_size - 1;
-	Sp[0] = R1.w;		/* save the exception */
-	Su = (StgUpdateFrame *)(Sp+1);
-	CurrentTSO->what_next = ThreadKilled;
-	SaveThreadState();	/* inline! */
-	R1.w = ThreadFinished;
-	JMP_(StgReturn);
+	    case STOP_FRAME:
+		/* We've stripped the entire stack, the thread is now dead. */
+		Sp = CurrentTSO->stack + CurrentTSO->stack_size - 1;
+		Sp[0] = R1.w;		/* save the exception */
+		CurrentTSO->what_next = ThreadKilled;
+		SaveThreadState();	/* inline! */
+		R1.w = ThreadFinished;
+		JMP_(StgReturn);
+		
+	    default:
+		p = next; 
+		continue;
+	    }
       
-      default:
-	barf("raisezh_fast: weird activation record");
-      }
-      
-      break;
-
+	    break;
+	}
     }
     
     /* Ok, p points to the enclosing CATCH_FRAME.  Pop everything down to
      * and including this frame, update Su, push R1, and enter the handler.
      */
-    Su = ((StgCatchFrame *)p)->link; 
     handler = ((StgCatchFrame *)p)->handler;
     
     Sp = (P_)p + sizeofW(StgCatchFrame);
@@ -441,15 +448,14 @@ FN_(raisezh_fast)
       CurrentTSO->blocked_exceptions = END_TSO_QUEUE;
     }
 
-    /* Enter the handler, passing the exception value and a realworld
+    /* Call the handler, passing the exception value and a realworld
      * token as arguments.
      */
     Sp -= 2;
+    Sp[1] = (W_)&stg_ap_v_info;
     Sp[0] = R1.w;
-    Sp[1] = ARG_TAG(0);
-    TICK_ENT_VIA_NODE();
     R1.cl = handler;
-    JMP_(GET_ENTRY(R1.cl));
-
+    Sp--;
+    JMP_(stg_ap_p_ret);
   FE_
 }

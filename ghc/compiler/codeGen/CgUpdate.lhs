@@ -4,14 +4,14 @@
 \section[CgUpdate]{Manipulating update frames}
 
 \begin{code}
-module CgUpdate ( pushUpdateFrame, reserveSeqFrame, pushSeqFrame ) where
+module CgUpdate ( pushUpdateFrame ) where
 
 #include "HsVersions.h"
 
 import CgMonad
 import AbsCSyn
 
-import CgStackery	( allocStackTop, updateFrameSize, seqFrameSize )
+import CgStackery	( allocStackTop, updateFrameSize, setStackFrame )
 import CgUsages		( getVirtSp, getSpRelOffset )
 import Panic		( assertPanic )
 \end{code}
@@ -45,6 +45,8 @@ pushUpdateFrame updatee code
     allocStackTop updateFrameSize	`thenFC` \ _ ->
     getVirtSp				`thenFC` \ vsp ->
 
+    setStackFrame vsp			`thenC`
+
     setEndOfBlockInfo (EndOfBlockInfo vsp UpdateCode) (
 
 		-- Emit the push macro
@@ -56,25 +58,4 @@ pushUpdateFrame updatee code
     )
 
 int_CLit0 = mkIntCLit 0 -- out here to avoid pushUpdateFrame CAF (sigh)
-\end{code}
-
-We push a SEQ frame just before evaluating the scrutinee of a case, if
-the scrutinee has a polymorphic or function type.  The SEQ frame acts
-as a barrier in case the scrutinee evaluates to a partial application.
-
-reserveSeqFrame takes the EndOfBlockInfo for the case expression and
-updates the sequel to a SeqFrame, reserving room for the frame at
-args_sp.  When the scrutinee comes around to pushing a return address,
-it will also push the SEQ frame, using pushSeqFrame.
-
-\begin{code}
-reserveSeqFrame :: EndOfBlockInfo -> EndOfBlockInfo
-reserveSeqFrame (EndOfBlockInfo args_sp (CaseAlts amode stuff)) 
-  = EndOfBlockInfo (args_sp + seqFrameSize) (SeqFrame amode stuff)
-
-pushSeqFrame :: VirtualSpOffset -> FCode VirtualSpOffset
-pushSeqFrame args_sp
-  = getSpRelOffset args_sp  `thenFC` \ sp_rel ->
-    absC (CMacroStmt PUSH_SEQ_FRAME [CAddr sp_rel]) `thenC`
-    returnFC (args_sp - seqFrameSize)
 \end{code}

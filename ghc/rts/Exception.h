@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.h,v 1.4 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: Exception.h,v 1.5 2002/12/11 15:36:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -7,8 +7,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-extern const StgInfoTable stg_blockAsyncExceptionszh_ret_info;
-extern const StgInfoTable stg_unblockAsyncExceptionszh_ret_info;
+extern const StgRetInfoTable stg_blockAsyncExceptionszh_ret_info;
+extern const StgRetInfoTable stg_unblockAsyncExceptionszh_ret_info;
 
 /* Determine whether a thread is interruptible (ie. blocked
  * indefinitely).  Interruptible threads can be sent an exception with

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.31 2002/01/02 12:32:19 simonmar Exp $
+% $Id: Costs.lhs,v 1.32 2002/12/11 15:36:22 simonmar Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -217,13 +217,13 @@ costs absC =
 
    CCallTypedef _ _ _ _ _    -> nullCosts
 
-   CStaticClosure _ _ _      -> nullCosts
+   CStaticClosure _ _ _ _    -> nullCosts
 
    CSRT _ _                  -> nullCosts
 
-   CBitmap _ _               -> nullCosts
+   CBitmap _                 -> nullCosts
 
-   CClosureInfoAndCode _ _ _ _ -> nullCosts
+   CClosureInfoAndCode _ _   -> nullCosts
 
    CRetVector _ _ _ _        -> nullCosts
 
@@ -309,15 +309,10 @@ stmtMacroCosts :: CStmtMacro -> [CAddrMode] -> CostRes
 
 stmtMacroCosts macro modes =
   case macro of
-    ARGS_CHK_LOAD_NODE  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
-		-- p=probability of PAP (instead of AP): + p*(3,1,0,0,0)
-    ARGS_CHK		  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
     UPD_CAF		  ->  Cost (7, 0, 1, 3, 0)	 {- SMupdate.lh	 -}
     UPD_BH_UPDATABLE	  ->  Cost (3, 0, 0, 1, 0)	 {- SMupdate.lh	 -}
     UPD_BH_SINGLE_ENTRY	  ->  Cost (3, 0, 0, 1, 0)	 {- SMupdate.lh	 -}
     PUSH_UPD_FRAME	  ->  Cost (3, 0, 0, 4, 0)	 {- Updates.h	 -}
-    PUSH_SEQ_FRAME	  ->  Cost (2, 0, 0, 3, 0)	 {- StgMacros.h	 !-}
-    UPDATE_SU_FROM_UPD_FRAME -> Cost (1, 0, 1, 0, 0)     {- StgMacros.h	 !-}
     SET_TAG		  ->  nullCosts		    {- COptRegs.lh -}
     GRAN_FETCH			->  nullCosts	  {- GrAnSim bookkeeping -}
     GRAN_RESCHEDULE		->  nullCosts	  {- GrAnSim bookkeeping -}

@@ -1,8 +1,7 @@
-
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.8 2001/08/09 11:19:16 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.9 2002/12/11 15:36:37 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2002
  *
  * Bytecode definitions.
  *
@@ -25,35 +24,57 @@
    I hope that's clear :-)
 */
 
-#define bci_ARGCHECK  1
-#define bci_PUSH_L    2
-#define bci_PUSH_LL   3
-#define bci_PUSH_LLL  4
-#define bci_PUSH_G    5
-#define bci_PUSH_AS   6
-#define bci_PUSH_UBX  7
-#define bci_PUSH_TAG  8
-#define bci_SLIDE     9
-#define bci_ALLOC     10
-#define bci_MKAP      11
-#define bci_UNPACK    12
-#define bci_UPK_TAG   13
-#define bci_PACK      14
-#define bci_TESTLT_I  15 
-#define bci_TESTEQ_I  16
-#define bci_TESTLT_F  17
-#define bci_TESTEQ_F  18
-#define bci_TESTLT_D  19
-#define bci_TESTEQ_D  20
-#define bci_TESTLT_P  21
-#define bci_TESTEQ_P  22
-#define bci_CASEFAIL  23
-#define bci_ENTER     24
-#define bci_RETURN    25
-#define bci_STKCHECK  26
-#define bci_JMP       27
-#define bci_CCALL     28
-#define bci_SWIZZLE   29
+#define bci_STKCHECK  			1
+#define bci_PUSH_L    			2
+#define bci_PUSH_LL   			3
+#define bci_PUSH_LLL  			4
+#define bci_PUSH_G    			5
+#define bci_PUSH_ALTS  			6
+#define bci_PUSH_ALTS_P			7
+#define bci_PUSH_ALTS_N			8 
+#define bci_PUSH_ALTS_F			9 
+#define bci_PUSH_ALTS_D			10
+#define bci_PUSH_ALTS_L			11
+#define bci_PUSH_ALTS_V			12
+#define bci_PUSH_UBX  			13
+#define bci_PUSH_APPLY_N		14
+#define bci_PUSH_APPLY_F		15
+#define bci_PUSH_APPLY_D		16
+#define bci_PUSH_APPLY_L		17
+#define bci_PUSH_APPLY_V		18
+#define bci_PUSH_APPLY_P		19
+#define bci_PUSH_APPLY_PP		20
+#define bci_PUSH_APPLY_PPP		21
+#define bci_PUSH_APPLY_PPPP		22
+#define bci_PUSH_APPLY_PPPPP		23
+#define bci_PUSH_APPLY_PPPPPP		24
+#define bci_PUSH_APPLY_PPPPPPP		25
+#define bci_SLIDE     			26
+#define bci_ALLOC_AP   			27
+#define bci_ALLOC_PAP  			28
+#define bci_MKAP      			29
+#define bci_UNPACK    			30
+#define bci_PACK      			31
+#define bci_TESTLT_I   			32
+#define bci_TESTEQ_I  			33
+#define bci_TESTLT_F  			34
+#define bci_TESTEQ_F  			35
+#define bci_TESTLT_D  			36
+#define bci_TESTEQ_D  			37
+#define bci_TESTLT_P  			38
+#define bci_TESTEQ_P  			39
+#define bci_CASEFAIL  			40
+#define bci_JMP       			41
+#define bci_CCALL     			42
+#define bci_SWIZZLE   			43
+#define bci_ENTER     			44
+#define bci_RETURN    			45
+#define bci_RETURN_P 			46
+#define bci_RETURN_N 			47
+#define bci_RETURN_F 			48
+#define bci_RETURN_D 			49
+#define bci_RETURN_L 			50
+#define bci_RETURN_V 			51
 
 /* If a BCO definitely requires less than this many words of stack,
    don't include an explicit STKCHECK insn in it.  The interpreter

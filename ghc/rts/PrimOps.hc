@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.102 2002/10/22 11:01:19 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.103 2002/12/11 15:36:45 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2002
  *
  * Primitive functions / data
  *
@@ -58,10 +58,17 @@ StgWord GHC_ZCCReturnable_static_info[1];
  * We only define the cases actually used, to avoid having too much
  * garbage in this section.  Warning: any bugs in here will be hard to
  * track down.
+ *
+ * The return convention for an unboxed tuple is as follows:
+ *   - fit as many fields as possible in registers (as per the
+ *     function fast-entry point calling convention).
+ *   - sort the rest of the fields into pointers and non-pointers.
+ *     push the pointers on the stack, followed by the non-pointers.
+ *     (so the pointers have higher addresses).
  */
 
 /*------ All Regs available */
-#if defined(REG_R8)
+#if MAX_REAL_VANILLA_REG == 8
 # define RET_P(a)     R1.w = (W_)(a); JMP_(ENTRY_CODE(Sp[0]));
 # define RET_N(a)     RET_P(a)
 
@@ -81,17 +88,11 @@ StgWord GHC_ZCCReturnable_static_info[1];
         R1.w = (W_)(a); R2.w = (W_)(b); R3.w = (W_)(c); R4.w = (W_)(d); \
 	JMP_(ENTRY_CODE(Sp[0]));
 
-# define RET_NNPNNP(a,b,c,d,e,f) \
-        R1.w = (W_)(a); R2.w = (W_)(b); R3.w = (W_)(c); \
-        R4.w = (W_)(d); R5.w = (W_)(e); R6.w = (W_)(f); \
-	JMP_(ENTRY_CODE(Sp[0]));
-
-#elif defined(REG_R7) || defined(REG_R6) || defined(REG_R5) || \
-      defined(REG_R4) || defined(REG_R3)
+#elif MAX_REAL_VANILLA_REG > 2 && MAX_REAL_VANILLA_REG < 8
 # error RET_n macros not defined for this setup.
 
 /*------ 2 Registers available */
-#elif defined(REG_R2)
+#elif MAX_REAL_VANILLA_REG == 2
 
 # define RET_P(a)     R1.w = (W_)(a); JMP_(ENTRY_CODE(Sp[0]));
 # define RET_N(a)     RET_P(a)
@@ -101,45 +102,38 @@ StgWord GHC_ZCCReturnable_static_info[1];
 # define RET_NN(a,b)   RET_PP(a,b)
 # define RET_NP(a,b)   RET_PP(a,b)
 
-# define RET_PPP(a,b,c) \
-	R1.w = (W_)(a); R2.w = (W_)(b); Sp[-1] = (W_)(c); Sp -= 1; \
+# define RET_PPP(a,b,c)				\
+	R1.w = (W_)(a);				\
+	R2.w = (W_)(b);				\
+	Sp[-1] = (W_)(c);			\
+	Sp -= 1;				\
 	JMP_(ENTRY_CODE(Sp[1]));
-# define RET_NNP(a,b,c) \
-	R1.w = (W_)(a); R2.w = (W_)(b); Sp[-1] = (W_)(c); Sp -= 1; \
+
+# define RET_NNP(a,b,c)				\
+	R1.w = (W_)(a);				\
+	R2.w = (W_)(b);				\
+	Sp[-1] = (W_)(c);			\
+	Sp -= 1;				\
 	JMP_(ENTRY_CODE(Sp[1]));
 
 # define RET_NNNP(a,b,c,d)			\
 	R1.w = (W_)(a); 			\
         R2.w = (W_)(b); 			\
-    /*  Sp[-3] = ARGTAG(1); */			\
         Sp[-2] = (W_)(c); 			\
         Sp[-1] = (W_)(d); 			\
-        Sp -= 3;				\
-        JMP_(ENTRY_CODE(Sp[3]));
+        Sp -= 2;				\
+        JMP_(ENTRY_CODE(Sp[2]));
 
 # define RET_NPNP(a,b,c,d)			\
 	R1.w = (W_)(a); 			\
         R2.w = (W_)(b); 			\
-    /*  Sp[-3] = ARGTAG(1); */			\
         Sp[-2] = (W_)(c); 			\
         Sp[-1] = (W_)(d); 			\
-        Sp -= 3;				\
-        JMP_(ENTRY_CODE(Sp[3]));
-
-# define RET_NNPNNP(a,b,c,d,e,f)		\
-        R1.w = (W_)(a);				\
-	R2.w = (W_)(b);				\
-	Sp[-6] = (W_)(c);			\
-	/* Sp[-5] = ARGTAG(1); */		\
-	Sp[-4] = (W_)(d);			\
-	/* Sp[-3] = ARGTAG(1); */		\
-	Sp[-2] = (W_)(e);			\
-	Sp[-1] = (W_)(f);			\
-	Sp -= 6;				\
-	JMP_(ENTRY_CODE(Sp[6]));
+        Sp -= 2;				\
+        JMP_(ENTRY_CODE(Sp[2]));
 
 /*------ 1 Register available */
-#elif defined(REG_R1)
+#elif MAX_REAL_VANILLA_REG == 1
 # define RET_P(a)     R1.w = (W_)(a); JMP_(ENTRY_CODE(Sp[0]));
 # define RET_N(a)     RET_P(a)
 
@@ -149,88 +143,54 @@ StgWord GHC_ZCCReturnable_static_info[1];
 		       JMP_(ENTRY_CODE(Sp[2]));
 # define RET_NP(a,b)   RET_PP(a,b)
 
-# define RET_PPP(a,b,c) \
-	R1.w = (W_)(a); Sp[-2] = (W_)(b); Sp[-1] = (W_)(c); Sp -= 2; \
+# define RET_PPP(a,b,c)				\
+	R1.w = (W_)(a);				\
+	Sp[-2] = (W_)(b);			\
+	Sp[-1] = (W_)(c);			\
+	Sp -= 2;				\
 	JMP_(ENTRY_CODE(Sp[2]));
-# define RET_NNP(a,b,c) \
-	R1.w = (W_)(a); Sp[-2] = (W_)(b); Sp[-1] = (W_)(c); Sp -= 3; \
-	JMP_(ENTRY_CODE(Sp[3]));
+
+# define RET_NNP(a,b,c)				\
+	R1.w = (W_)(a);				\
+	Sp[-2] = (W_)(b);			\
+	Sp[-1] = (W_)(c);			\
+	Sp -= 2;				\
+	JMP_(ENTRY_CODE(Sp[2]));
 
 # define RET_NNNP(a,b,c,d)			\
 	R1.w = (W_)(a); 			\
-    /*  Sp[-5] = ARGTAG(1); */			\
-        Sp[-4] = (W_)(b); 			\
-    /*  Sp[-3] = ARGTAG(1); */			\
+        Sp[-3] = (W_)(b); 			\
         Sp[-2] = (W_)(c); 			\
         Sp[-1] = (W_)(d); 			\
-        Sp -= 5;				\
-        JMP_(ENTRY_CODE(Sp[5]));
+        Sp -= 3;				\
+        JMP_(ENTRY_CODE(Sp[3]));
 
 # define RET_NPNP(a,b,c,d)			\
 	R1.w = (W_)(a); 			\
-        Sp[-4] = (W_)(b); 			\
-    /*  Sp[-3] = ARGTAG(1); */			\
-        Sp[-2] = (W_)(c); 			\
+        Sp[-3] = (W_)(c); 			\
+        Sp[-2] = (W_)(b); 			\
         Sp[-1] = (W_)(d); 			\
-        Sp -= 4;				\
-        JMP_(ENTRY_CODE(Sp[4]));
-
-# define RET_NNPNNP(a,b,c,d,e,f)		\
-        R1.w = (W_)(a);				\
-	Sp[-1] = (W_)(f);			\
-	Sp[-2] = (W_)(e);			\
-	/* Sp[-3] = ARGTAG(1); */		\
-	Sp[-4] = (W_)(d);			\
-	/* Sp[-5] = ARGTAG(1); */		\
-	Sp[-6] = (W_)(c);			\
-	Sp[-7] = (W_)(b);			\
-	/* Sp[-8] = ARGTAG(1); */		\
-	Sp -= 8;				\
-	JMP_(ENTRY_CODE(Sp[8]));
+        Sp -= 3;				\
+        JMP_(ENTRY_CODE(Sp[3]));
 
 #else /* 0 Regs available */
 
-#define PUSH_P(o,x) Sp[-o] = (W_)(x)
-
-#ifdef DEBUG
-#define PUSH_N(o,x) Sp[1-o] = (W_)(x);  Sp[-o] = ARG_TAG(1);
-#else
-#define PUSH_N(o,x) Sp[1-o] = (W_)(x);
-#endif
+#define PUSH(o,x) Sp[-o] = (W_)(x)
 
 #define PUSHED(m)   Sp -= (m); JMP_(ENTRY_CODE(Sp[m]));
 
-/* Here's how to construct these macros:
- *
- *   N = number of N's in the name;
- *   P = number of P's in the name;
- *   s = N * 2 + P;
- *   while (nonNull(name)) {
- *     if (nextChar == 'P') {
- *       PUSH_P(s,_);
- *       s -= 1;
- *     } else {
- *       PUSH_N(s,_);
- *       s -= 2
- *     }
- *   }
- *   PUSHED(N * 2 + P);
- */
+# define RET_P(a)     PUSH(1,a); PUSHED(1)
+# define RET_N(a)     PUSH(1,a); PUSHED(2)
 
-# define RET_P(a)     PUSH_P(1,a); PUSHED(1)
-# define RET_N(a)     PUSH_N(2,a); PUSHED(2)
+# define RET_PP(a,b)   PUSH(2,a); PUSH(1,b); PUSHED(2)
+# define RET_NN(a,b)   PUSH(2,a); PUSH(1,b); PUSHED(2)
+# define RET_NP(a,b)   PUSH(2,a); PUSH(1,b); PUSHED(2)
 
-# define RET_PP(a,b)   PUSH_P(2,a); PUSH_P(1,b); PUSHED(2)
-# define RET_NN(a,b)   PUSH_N(4,a); PUSH_N(2,b); PUSHED(4)
-# define RET_NP(a,b)   PUSH_N(3,a); PUSH_P(1,b); PUSHED(3)
+# define RET_PPP(a,b,c) PUSH(3,a); PUSH(2,b); PUSH(1,c); PUSHED(3)
+# define RET_NNP(a,b,c) PUSH(3,a); PUSH(2,b); PUSH(1,c); PUSHED(3)
 
-# define RET_PPP(a,b,c) PUSH_P(3,a); PUSH_P(2,b); PUSH_P(1,c); PUSHED(3)
-# define RET_NNP(a,b,c) PUSH_N(5,a); PUSH_N(3,b); PUSH_P(1,c); PUSHED(5)
-
-# define RET_NNNP(a,b,c,d) PUSH_N(7,a); PUSH_N(5,b); PUSH_N(3,c); PUSH_P(1,d); PUSHED(7)	
-# define RET_NPNP(a,b,c,d) PUSH_N(6,a); PUSH_P(4,b); PUSH_N(3,c); PUSH_P(1,d); PUSHED(6)	
-# define RET_NNPNNP(a,b,c,d,e,f) PUSH_N(10,a); PUSH_N(8,b); PUSH_P(6,c); PUSH_N(5,d); PUSH_N(3,e); PUSH_P(1,f); PUSHED(10)
-
+# define RET_NNNP(a,b,c,d) PUSH(4,a); PUSH(3,b); PUSH(2,c); PUSH(1,d); PUSHED(4)	
+# define RET_NPNP(a,b,c,d) PUSH(4,a); PUSH(3,c); PUSH(2,b); PUSH(1,d); PUSHED(4)	
 #endif
 
 /*-----------------------------------------------------------------------------
@@ -337,7 +297,7 @@ FN_(newMutVarzh_fast)
   /* Args: R1.p = initialisation value */
   FB_
 
-  HP_CHK_GEN_TICKY(sizeofW(StgMutVar), R1_PTR, newMutVarzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgMutVar), R1_PTR, newMutVarzh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,1, 0); /* hack, dependent on rep. */
   CCS_ALLOC(CCCS,sizeofW(StgMutVar));
 
@@ -376,14 +336,14 @@ FN_(atomicModifyMutVarzh_fast)
 #define THUNK_SIZE(n) (sizeofW(StgHeader) + stg_max((n), MIN_UPD_SIZE))
 #define SIZE (THUNK_SIZE(2) + THUNK_SIZE(1) + THUNK_SIZE(1))
 
-   HP_CHK_GEN_TICKY(SIZE, R1_PTR|R2_PTR, atomicModifyMutVarzh_fast,);
+   HP_CHK_GEN_TICKY(SIZE, R1_PTR|R2_PTR, atomicModifyMutVarzh_fast);
    CCS_ALLOC(CCCS,SIZE);
 
    x = ((StgMutVar *)R1.cl)->var;
 
    TICK_ALLOC_UP_THK(2,0); // XXX
    z = (StgClosure *) Hp - THUNK_SIZE(2) + 1;
-   SET_HDR(z, &stg_ap_2_upd_info, CCCS);
+   SET_HDR(z, (StgInfoTable *)&stg_ap_2_upd_info, CCCS);
    z->payload[0] = R2.cl;
    z->payload[1] = x;
 
@@ -415,7 +375,7 @@ FN_(mkForeignObjzh_fast)
   StgForeignObj *result;
   FB_
 
-  HP_CHK_GEN_TICKY(sizeofW(StgForeignObj), NO_PTRS, mkForeignObjzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgForeignObj), NO_PTRS, mkForeignObjzh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgHeader),
 		  sizeofW(StgForeignObj)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgForeignObj)); /* ccs prof */
@@ -459,7 +419,7 @@ FN_(mkWeakzh_fast)
     R3.cl = &stg_NO_FINALIZER_closure;
   }
 
-  HP_CHK_GEN_TICKY(sizeofW(StgWeak),R1_PTR|R2_PTR|R3_PTR, mkWeakzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgWeak),R1_PTR|R2_PTR|R3_PTR, mkWeakzh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,  // +1 is for the link field
 		  sizeofW(StgWeak)-sizeofW(StgHeader)-1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgWeak)); /* ccs prof */
@@ -559,7 +519,7 @@ FN_(int2Integerzh_fast)
    FB_
 
    val = R1.i;
-   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, int2Integerzh_fast,);
+   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, int2Integerzh_fast);
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -596,7 +556,7 @@ FN_(word2Integerzh_fast)
    FB_
 
    val = R1.w;
-   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, word2Integerzh_fast,)
+   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, word2Integerzh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -645,7 +605,7 @@ FN_(int64ToIntegerzh_fast)
        /* minimum is one word */
        words_needed = 1;
    }
-   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+words_needed, NO_PTRS, int64ToIntegerzh_fast,)
+   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+words_needed, NO_PTRS, int64ToIntegerzh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
@@ -696,7 +656,7 @@ FN_(word64ToIntegerzh_fast)
    } else {
       words_needed = 1;
    }
-   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+words_needed, NO_PTRS, word64ToIntegerzh_fast,)
+   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+words_needed, NO_PTRS, word64ToIntegerzh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
@@ -1012,7 +972,7 @@ FN_(decodeFloatzh_fast)
   /* arguments: F1 = Float# */
   arg = F1;
 
-  HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, decodeFloatzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, decodeFloatzh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
   CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -1044,7 +1004,7 @@ FN_(decodeDoublezh_fast)
   /* arguments: D1 = Double# */
   arg = D1;
 
-  HP_CHK_GEN_TICKY(ARR_SIZE, NO_PTRS, decodeDoublezh_fast,);
+  HP_CHK_GEN_TICKY(ARR_SIZE, NO_PTRS, decodeDoublezh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgArrWords),DOUBLE_MANTISSA_SIZE,0);
   CCS_ALLOC(CCCS,ARR_SIZE); /* ccs prof */
 
@@ -1180,7 +1140,7 @@ FN_(newMVarzh_fast)
   FB_
   /* args: none */
 
-  HP_CHK_GEN_TICKY(sizeofW(StgMVar), NO_PTRS, newMVarzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgMVar), NO_PTRS, newMVarzh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgMutVar)-1, // consider head,tail,link as admin wds
 	 	  1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgMVar)); /* ccs prof */
@@ -1211,8 +1171,7 @@ FN_(newMVarzh_fast)
 
 #define PerformPut(tso) ({				\
     StgClosure *val = (StgClosure *)(tso)->sp[2];	\
-    (tso)->sp[2] = (W_)&stg_gc_noregs_info;		\
-    (tso)->sp += 2;					\
+    (tso)->sp += 3;					\
     val;						\
   })
 
@@ -1503,7 +1462,7 @@ FN_(makeStableNamezh_fast)
   StgStableName *sn_obj;
   FB_
 
-  HP_CHK_GEN_TICKY(sizeofW(StgStableName), R1_PTR, makeStableNamezh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgStableName), R1_PTR, makeStableNamezh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgHeader), 
 		  sizeofW(StgStableName)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgStableName)); /* ccs prof */
@@ -1562,11 +1521,11 @@ FN_(newBCOzh_fast)
   StgBCO *bco;
   FB_
 
-  HP_CHK_GEN_TICKY(sizeofW(StgBCO),R1_PTR|R2_PTR|R3_PTR|R4_PTR, newBCOzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgBCO),R1_PTR|R2_PTR|R3_PTR|R4_PTR, newBCOzh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgHeader), sizeofW(StgBCO)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgBCO)); /* ccs prof */
   bco = (StgBCO *) (Hp + 1 - sizeofW(StgBCO));
-  SET_HDR(bco, &stg_BCO_info, CCCS);
+  SET_HDR(bco, (const StgInfoTable *)&stg_BCO_info, CCCS);
 
   bco->instrs     = (StgArrWords*)R1.cl;
   bco->literals   = (StgArrWords*)R2.cl;
@@ -1580,15 +1539,21 @@ FN_(newBCOzh_fast)
 
 FN_(mkApUpd0zh_fast)
 {
-  /* R1.p = the fn for the AP_UPD
-  */
-  StgAP_UPD* ap;
+  // R1.p = the BCO# for the AP
+  //
+  StgPAP* ap;
   FB_
-  HP_CHK_GEN_TICKY(AP_sizeW(0), R1_PTR, mkApUpd0zh_fast,);
-  TICK_ALLOC_PRIM(sizeofW(StgHeader), AP_sizeW(0)-sizeofW(StgHeader), 0);
-  CCS_ALLOC(CCCS,AP_sizeW(0)); /* ccs prof */
-  ap = (StgAP_UPD *) (Hp + 1 - AP_sizeW(0));
-  SET_HDR(ap, &stg_AP_UPD_info, CCCS);
+
+  // This function is *only* used to wrap zero-arity BCOs in an
+  // updatable wrapper (see ByteCodeLink.lhs).  An AP thunk is always
+  // saturated and always points directly to a FUN or BCO.
+  ASSERT(get_itbl(R1.cl)->type == BCO && BCO_ARITY(R1.p) == 0);
+
+  HP_CHK_GEN_TICKY(PAP_sizeW(0), R1_PTR, mkApUpd0zh_fast);
+  TICK_ALLOC_PRIM(sizeofW(StgHeader), PAP_sizeW(0)-sizeofW(StgHeader), 0);
+  CCS_ALLOC(CCCS,PAP_sizeW(0)); /* ccs prof */
+  ap = (StgPAP *) (Hp + 1 - PAP_sizeW(0));
+  SET_HDR(ap, &stg_AP_info, CCCS);
 
   ap->n_args = 0;
   ap->fun = R1.cl;

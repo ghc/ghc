@@ -4,12 +4,12 @@
 \section[ByteCodeGen]{Generate machine-code sequences for foreign import}
 
 \begin{code}
-module ByteCodeFFI ( taggedSizeW, untaggedSizeW, mkMarshalCode, moan64 ) where
+module ByteCodeFFI ( mkMarshalCode, moan64 ) where
 
 #include "HsVersions.h"
 
 import Outputable
-import PrimRep		( PrimRep(..), getPrimRepSize, isFollowableRep )
+import PrimRep		( PrimRep(..), getPrimRepSize )
 import ForeignCall	( CCallConv(..) )
 
 -- DON'T remove apparently unused imports here .. 
@@ -22,33 +22,6 @@ import Foreign		( Ptr )
 import System.IO.Unsafe ( unsafePerformIO )
 import IO		( hPutStrLn, stderr )
 -- import Debug.Trace	( trace )
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{The sizes of things.  These are platform-independent.}
-%*									*
-%************************************************************************
-
-\begin{code}
-
--- When I push one of these on the H stack, how much does Sp move by?
-taggedSizeW :: PrimRep -> Int
-taggedSizeW pr
-   | isFollowableRep pr = 1 {-it's a pointer, Jim-}
-   | otherwise          = 1 {-the tag-} + getPrimRepSize pr
-
--- The plain size of something, without tag.
-untaggedSizeW :: PrimRep -> Int
-untaggedSizeW pr
-   | isFollowableRep pr = 1
-   | otherwise          = getPrimRepSize pr
-
--- How big is this thing's tag?
-sizeOfTagW :: PrimRep -> Int
-sizeOfTagW pr
-   | isFollowableRep pr = 0
-   | otherwise          = 1
 \end{code}
 
 %************************************************************************
@@ -114,18 +87,10 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
    = let -- Don't change this without first consulting Intel Corp :-)
          bytes_per_word = 4
 
-         -- addr and result bits offsetsW
-         offset_of_addr_bitsW = addr_offW + sizeOfTagW AddrRep
-         offset_of_res_bitsW  = r_offW + sizeOfTagW r_rep
-
          offsets_to_pushW
             = concat
-              [ let -- where this arg's bits start
-                    a_bits_offW = a_offW + sizeOfTagW a_rep
-                in 
-                    -- reversed because x86 is little-endian
-                    reverse 
-                    [a_bits_offW .. a_bits_offW + untaggedSizeW a_rep - 1]
+              [   -- reversed because x86 is little-endian
+                  reverse [a_offW .. a_offW + getPrimRepSize a_rep - 1]
 
                 -- reversed because args are pushed L -> R onto C stack
                 | (a_offW, a_rep) <- reverse arg_offs_n_reps
@@ -221,10 +186,9 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      -}
      ++ movl_offespmem_esi 32
 
-     {- For each arg in args_offs_n_reps, examine the associated PrimRep 
-        to determine how many payload (non-tag) words there are, and 
-        whether or not there is a tag.  This gives a bunch of offsets on 
-        the H stack to copy to the C stack:
+     {- For each arg in args_offs_n_reps, examine the associated
+        PrimRep to determine how many words there are.  This gives a
+        bunch of offsets on the H stack to copy to the C stack:
 
            movl        off1(%esi), %ecx
            pushl       %ecx
@@ -239,7 +203,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
            movl        4*(1 /*tag*/ +addr_offW)(%esi), %ecx
            call        * %ecx
      -}
-     ++ movl_offesimem_ecx (bytes_per_word * offset_of_addr_bitsW)
+     ++ movl_offesimem_ecx (bytes_per_word * addr_offW)
      ++ call_star_ecx
 
      {- Nuke the args just pushed and re-establish %esi at the 
@@ -265,10 +229,10 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
         or
            fstps       4(%esi)
      -}
-     ++ let i32 = movl_eax_offesimem 4
-            i64 = movl_eax_offesimem 4 ++ movl_edx_offesimem 8
-            f32 = fstps_offesimem 4
-            f64 = fstpl_offesimem 4
+     ++ let i32 = movl_eax_offesimem 0
+            i64 = movl_eax_offesimem 0 ++ movl_edx_offesimem 4
+            f32 = fstps_offesimem 0
+            f64 = fstpl_offesimem 0
         in
         case r_rep of
            CharRep   -> i32
@@ -312,16 +276,9 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                 fromIntegral (0xFF .&. (w `shiftR` 8)),
                 fromIntegral (0xFF .&. w)]
 
-         -- addr and result bits offsetsW
-         offset_of_addr_bitsW = addr_offW + sizeOfTagW AddrRep
-         offset_of_res_bitsW  = r_offW + sizeOfTagW r_rep
-
          offsets_to_pushW
             = concat
-              [ let -- where this arg's bits start
-                    a_bits_offW = a_offW + sizeOfTagW a_rep
-                in 
-                    [a_bits_offW .. a_bits_offW + untaggedSizeW a_rep - 1]
+              [  [a_offW .. a_offW + getPrimRepSize a_rep - 1]
 
                 | (a_offW, a_rep) <- arg_offs_n_reps
               ]
@@ -427,11 +384,11 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      -}
      [mkSAVE sp (- ({-92-}112 + 4*argWs_on_stack_ROUNDED_UP)) sp]
 
-     {- For each arg in args_offs_n_reps, examine the associated PrimRep 
-        to determine how many payload (non-tag) words there are, and 
-        whether or not there is a tag.  This gives a bunch of offsets on 
-        the H stack.  Move the first 6 words into %o0 .. %o5 and the
-        rest on the stack, starting at [%sp+92].  Use %g1 as a temp.
+     {- For each arg in args_offs_n_reps, examine the associated
+        PrimRep to determine how many words there are.  This gives a
+        bunch of offsets on the H stack.  Move the first 6 words into
+        %o0 .. %o5 and the rest on the stack, starting at [%sp+92].
+        Use %g1 as a temp. 
      -}
      ++ let doArgW (offW, wordNo)
               | wordNo < 6
@@ -448,7 +405,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
            ld     [4*(1 /*tag*/ +addr_offW) + %i0], %g1
            call   %g1
      -}
-     ++ [mkLD i0 (bytes_per_word * offset_of_addr_bitsW) g1,
+     ++ [mkLD i0 (bytes_per_word * addr_offW) g1,
          mkCALL g1,
          mkNOP]
 
@@ -466,10 +423,10 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
            st          %f1, [%i0 + 8]        -- or the other way round?
 
      -}
-     ++ let i32 = [mkST o0 i0 4]
-            i64 = [mkST o0 i0 4, mkST o1 i0 8]
-            f32 = [mkSTF f0 i0 4]
-            f64 = [mkSTF f0 i0 4, mkSTF f1 i0 8]
+     ++ let i32 = [mkST o0 i0 0]
+            i64 = [mkST o0 i0 0, mkST o1 i0 4]
+            f32 = [mkSTF f0 i0 0]
+            f64 = [mkSTF f0 i0 0, mkSTF f1 i0 4]
         in
             case r_rep of
                CharRep   -> i32
@@ -499,11 +456,11 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                 fromIntegral (0xFF .&. w)]
 
          -- addr and result bits offsetsW
-         a_off = (addr_offW + sizeOfTagW AddrRep) * bytes_per_word
-         result_off  = (r_offW + sizeOfTagW r_rep) * bytes_per_word
+         a_off = addr_offW * bytes_per_word
+         result_off  = r_offW * bytes_per_word
 
          linkageArea = 24
-         parameterArea = sum [ untaggedSizeW a_rep * bytes_per_word
+         parameterArea = sum [ getPrimRepSize a_rep * bytes_per_word
                         | (_, a_rep) <- arg_offs_n_reps ]
          savedRegisterArea = 4
          frameSize = padTo16 (linkageArea + min parameterArea 32 + savedRegisterArea)
@@ -514,9 +471,8 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
          pass_parameters [] _ _ = []
          pass_parameters ((a_offW, a_rep):args) nextFPR offsetW =
             let
-               haskellArgOffset = (a_offW + sizeOfTagW a_rep)
-                                  * bytes_per_word
-               offsetW' = offsetW + untaggedSizeW a_rep
+               haskellArgOffset = a_offW * bytes_per_word
+               offsetW' = offsetW + getPrimRepSize a_rep
                
                pass_word w 
                    | w < 8 =
@@ -544,7 +500,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                         .|. (fromIntegral nextFPR `shiftL` 21))
                       : pass_parameters args (nextFPR+1) offsetW'
                   _ ->
-                      concatMap pass_word [0 .. untaggedSizeW a_rep - 1]
+                      concatMap pass_word [0 .. getPrimRepSize a_rep - 1]
                       ++ pass_parameters args nextFPR offsetW'              
                
          gather_result = case r_rep of
@@ -555,12 +511,12 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             DoubleRep -> 
                [0xd83f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
                -- stfs f1, result_off(r31)
-            _ | untaggedSizeW r_rep == 2 ->
+            _ | getPrimRepSize r_rep == 2 ->
                [0x907f0000 .|. (fromIntegral result_off .&. 0xFFFF),
                 0x909f0000 .|. (fromIntegral (result_off+4) .&. 0xFFFF)]
                -- stw r3, result_off(r31)
                -- stw r4, result_off+4(r31)
-            _ | untaggedSizeW r_rep == 1 ->
+            _ | getPrimRepSize r_rep == 1 ->
                [0x907f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
                -- stw r3, result_off(r31)
      in

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.50 2002/09/13 15:02:25 simonpj Exp $
+% $Id: AbsCSyn.lhs,v 1.51 2002/12/11 15:36:21 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -191,6 +191,7 @@ stored in a mixed type location.)
   -- *** the next three [or so...] are DATA (those above are CODE) ***
 
   | CStaticClosure
+	CLabel			-- The closure's label
 	ClosureInfo		-- Todo: maybe info_lbl & closure_lbl instead?
 	CAddrMode		-- cost centre identifier to place in closure
 	[CAddrMode]		-- free vars; ptrs, then non-ptrs.
@@ -198,18 +199,12 @@ stored in a mixed type location.)
   | CSRT CLabel [CLabel]  	-- SRT declarations: basically an array of 
 				-- pointers to static closures.
   
-  | CBitmap CLabel LivenessMask	-- A bitmap to be emitted if and only if
+  | CBitmap Liveness		-- A bitmap to be emitted if and only if
 				-- it is larger than a target machine word.
 
   | CClosureInfoAndCode
 	ClosureInfo		-- Explains placement and layout of closure
-	AbstractC		-- Slow entry point code
-	(Maybe AbstractC)
-				-- Fast entry point code, if any
-	String			-- Closure description; NB we can't get this
-				-- from ClosureInfo, because the latter refers 
-				-- to the *right* hand side of a defn, whereas
-				-- the  "description" refers to *left* hand side
+	AbstractC		-- Entry point code
 
   | CRetVector			-- A labelled block of static data
 	CLabel
@@ -260,14 +255,10 @@ macros.  An example is @STK_CHK@, which checks for stack-space
 overflow.  This enumeration type lists all such macros:
 \begin{code}
 data CStmtMacro
-  = ARGS_CHK				-- arg satisfaction check
-  | ARGS_CHK_LOAD_NODE			-- arg check for top-level functions
-  | UPD_CAF				-- update CAF closure with indirection
+  = UPD_CAF				-- update CAF closure with indirection
   | UPD_BH_UPDATABLE			-- eager backholing
   | UPD_BH_SINGLE_ENTRY			-- more eager blackholing
   | PUSH_UPD_FRAME			-- push update frame
-  | PUSH_SEQ_FRAME			-- push seq frame
-  | UPDATE_SU_FROM_UPD_FRAME		-- pull Su out of the update frame
   | SET_TAG				-- set TagReg if it exists
       -- dataToTag# primop -- *only* used in unregisterised builds.
       -- (see AbsCUtils.dsCOpStmt)
@@ -293,11 +284,10 @@ data CCheckMacro
   = HP_CHK_NP				-- heap/stack checks when
   | STK_CHK_NP				-- node points to the closure
   | HP_STK_CHK_NP
-  | HP_CHK_SEQ_NP			-- for 'seq' style case alternatives
 
-  | HP_CHK				-- heap/stack checks when
-  | STK_CHK				-- node doesn't point
-  | HP_STK_CHK
+  | HP_CHK_FUN				-- heap/stack checks when
+  | STK_CHK_FUN				-- node doesn't point
+  | HP_STK_CHK_FUN
 					-- case alternative heap checks:
 
   | HP_CHK_NOREGS			--   no registers live
@@ -306,9 +296,8 @@ data CCheckMacro
   | HP_CHK_F1				--   FloatReg1 (only) is live 
   | HP_CHK_D1				--   DblReg1   (only) is live
   | HP_CHK_L1				--   LngReg1   (only) is live
-  | HP_CHK_UT_ALT			--   unboxed tuple return.
 
-  | HP_CHK_GEN				-- generic heap check
+  | HP_CHK_UNBX_TUPLE			-- unboxed tuple heap check
 \end{code}
 
 \item[@CCallProfCtrMacro@:]
@@ -469,7 +458,7 @@ bitmap to C compilation time (or rather, C preprocessing time).
 \begin{code}
 type LivenessMask = [BitSet]
 
-data Liveness = Liveness CLabel LivenessMask
+data Liveness = Liveness CLabel !Int LivenessMask
 \end{code}
 
 %************************************************************************
@@ -515,7 +504,6 @@ data MagicId
 
   -- STG registers
   | Sp			-- Stack ptr; points to last occupied stack location.
-  | Su     		-- Stack update frame pointer
   | SpLim		-- Stack limit
   | Hp			-- Heap ptr; points to last occupied heap location.
   | HpLim		-- Heap limit register
@@ -545,7 +533,6 @@ instance Eq MagicId where
      where
 	tag BaseReg	     = (_ILIT(0) :: FastInt)
 	tag Sp		     = _ILIT(1)
-	tag Su		     = _ILIT(2)
 	tag SpLim	     = _ILIT(3)
 	tag Hp		     = _ILIT(4)
 	tag HpLim	     = _ILIT(5)

@@ -12,7 +12,7 @@ import {-# SOURCE #-} StixPrim ( amodeToStix )
 
 import MachRegs
 import AbsCSyn		( CStmtMacro(..), CAddrMode, tagreg, CCheckMacro(..) )
-import Constants	( uF_RET, uF_SU, uF_UPDATEE, uF_SIZE )
+import Constants	( uF_RET, uF_UPDATEE, uF_SIZE )
 import ForeignCall	( CCallConv(..) )
 import MachOp		( MachOp(..) )
 import PrimRep		( PrimRep(..) )
@@ -20,8 +20,7 @@ import Stix
 import Panic		( panic )
 import UniqSupply	( returnUs, thenUs, UniqSM )
 import CLabel		( mkBlackHoleInfoTableLabel, mkIndStaticInfoLabel,
-			  mkIndInfoLabel, mkUpdInfoLabel, mkSeqInfoLabel,
-			  mkRtsGCEntryLabel )
+			  mkIndInfoLabel, mkUpdInfoLabel, mkRtsGCEntryLabel )
 \end{code}
 
 The @ARGS_CHK_A{_LOAD_NODE}@ macros check for sufficient arguments on
@@ -34,32 +33,6 @@ macroCode
     :: CStmtMacro   	    -- statement macro
     -> [CAddrMode]  	    -- args
     -> UniqSM StixStmtList
-\end{code}
-
------------------------------------------------------------------------------
-Argument satisfaction checks.
-
-\begin{code}
-macroCode ARGS_CHK_LOAD_NODE args
-  = getUniqLabelNCG					`thenUs` \ ulbl ->
-    let
-	  [words, lbl] = map amodeToStix args
-	  temp = StIndex PtrRep (StReg stgSp) words
-	  test = StMachOp MO_NatU_Ge [StReg stgSu, temp]
-	  cjmp = StCondJump ulbl test
-	  assign = StAssignReg PtrRep stgNode lbl
-	  join = StLabel ulbl
-    in
-    returnUs (\xs -> cjmp : assign : updatePAP : join : xs)
-
-macroCode ARGS_CHK [words]
-  = getUniqLabelNCG					`thenUs` \ ulbl ->
-    let temp = StIndex PtrRep (StReg stgSp) (amodeToStix words)
-	test = StMachOp MO_NatU_Ge [StReg stgSu, temp]
-	cjmp = StCondJump ulbl test
-	join = StLabel ulbl
-    in
-    returnUs (\xs -> cjmp : updatePAP : join : xs)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -110,8 +83,7 @@ macroCode UPD_BH_SINGLE_ENTRY args = returnUs id
 -----------------------------------------------------------------------------
 Update frames
 
-Push a four word update frame on the stack and slide the Su registers
-to the current Sp location.
+Push an update frame on the stack.
 
 \begin{code}
 macroCode PUSH_UPD_FRAME args
@@ -121,33 +93,9 @@ macroCode PUSH_UPD_FRAME args
 
         -- HWL: these values are *wrong* in a GranSim setup; ToDo: fix
 	a1 = StAssignMem PtrRep (frame uF_RET)     upd_frame_info
-	a3 = StAssignMem PtrRep (frame uF_SU)      (StReg stgSu)
 	a4 = StAssignMem PtrRep (frame uF_UPDATEE) bhptr
-
-	updSu = StAssignReg 
-                   PtrRep 
-                   stgSu
-	           (StIndex PtrRep (StReg stgSp) (StInt (toInteger (-uF_SIZE))))
     in
-    returnUs (\xs -> a1 : a3 : a4 : updSu : xs)
-
-
-macroCode PUSH_SEQ_FRAME args
-   = let [arg_frame] = map amodeToStix args
-         frame n = StIndex PtrRep arg_frame (StInt (toInteger n))
-         a1 = StAssignMem PtrRep (frame 0) seq_frame_info
-         a2 = StAssignMem PtrRep (frame 1) (StReg stgSu)
-         updSu = StAssignReg PtrRep stgSu arg_frame 
-     in
-     returnUs (\xs -> a1 : a2 : updSu : xs)
-
-
-macroCode UPDATE_SU_FROM_UPD_FRAME args
-   = let [arg_frame] = map amodeToStix args
-         frame n = StIndex PtrRep arg_frame (StInt (toInteger n))
-         updSu = StAssignReg PtrRep stgSu (StInd PtrRep (frame uF_SU))
-     in
-     returnUs (\xs -> updSu : xs)
+    returnUs (\xs -> a1 : a4 : xs)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -203,13 +151,8 @@ bh_info   	= StCLbl mkBlackHoleInfoTableLabel
 ind_static_info	= StCLbl mkIndStaticInfoLabel
 ind_info  	= StCLbl mkIndInfoLabel
 upd_frame_info	= StCLbl mkUpdInfoLabel
-seq_frame_info	= StCLbl mkSeqInfoLabel
 
 -- Some common call trees
-
-updatePAP :: StixStmt
-updatePAP = mkStJump_to_RegTable_offw OFFSET_stgUpdatePAP
-
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -251,46 +194,40 @@ checkCode macro args assts
     returnUs (
     case macro of
 	HP_CHK_NP      -> 
-		let [words,ptrs] = args_stix
+		let [words] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (hp_alloc words : gc_enter ptrs : join : xs))
-
-	HP_CHK_SEQ_NP  -> 
-		let [words,ptrs] = args_stix
-		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (hp_alloc words : gc_seq ptrs : join : xs))
+			    assts (hp_alloc words : gc_enter : join : xs))
 
 	STK_CHK_NP     -> 
-		let [words,ptrs] = args_stix
+		let [words] = args_stix
 		in  (\xs -> cjmp_sp_pass words :
-			    assts (gc_enter ptrs : join : xs))
+			    assts (gc_enter : join : xs))
 
 	HP_STK_CHK_NP  -> 
-		let [sp_words,hp_words,ptrs] = args_stix
+		let [sp_words,hp_words] = args_stix
 		in  (\xs -> cjmp_sp_fail sp_words : 
 			    assign_hp hp_words : cjmp_hp :
 			    fail :
-			    assts (hp_alloc hp_words : gc_enter ptrs
+			    assts (hp_alloc hp_words : gc_enter
 				   : join : xs))
 
-	HP_CHK	       -> 
-		let [words,ret,r,ptrs] = args_stix
+	HP_CHK_FUN       -> 
+		let [words] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp :
-			    assts (hp_alloc words : assign_ret r ret
-				   : gc_chk ptrs : join : xs))
+			    assts (hp_alloc words : gc_fun : join : xs))
 
-	STK_CHK	       -> 
-		let [words,ret,r,ptrs] = args_stix
+	STK_CHK_FUN       -> 
+		let [words] = args_stix
 		in  (\xs -> cjmp_sp_pass words :
-			    assts (assign_ret r ret : gc_chk ptrs : join : xs))
+			    assts (gc_fun : join : xs))
 
-	HP_STK_CHK     -> 
-		let [sp_words,hp_words,ret,r,ptrs] = args_stix
+	HP_STK_CHK_FUN    -> 
+		let [sp_words,hp_words] = args_stix
 		in  (\xs -> cjmp_sp_fail sp_words :
 			    assign_hp hp_words : cjmp_hp :
 			    fail :
-			    assts (hp_alloc hp_words : assign_ret r ret
-				  : gc_chk ptrs : join : xs))
+			    assts (hp_alloc hp_words
+				  : gc_fun : join : xs))
 
 	HP_CHK_NOREGS  -> 
 		let [words] = args_stix
@@ -322,19 +259,11 @@ checkCode macro args assts
 		in  (\xs -> assign_hp words : cjmp_hp : 
 			    assts (hp_alloc words : gc_l1 : join : xs))
 
-	HP_CHK_UT_ALT  -> 
-                let [words,ptrs,nonptrs,r,ret] = args_stix
-                in (\xs -> assign_hp words : cjmp_hp :
-                           assts (hp_alloc words : assign_ret r ret
-				  : gc_ut ptrs nonptrs 
-                                  : join : xs))
-
-	HP_CHK_GEN     -> 
-                let [words,liveness,reentry] = args_stix
+	HP_CHK_UNBX_TUPLE  -> 
+                let [words,liveness] = args_stix
                 in (\xs -> assign_hp words : cjmp_hp :
                            assts (hp_alloc words : assign_liveness liveness :
-                                  assign_reentry reentry :
-                                  gc_gen : join : xs))
+                                  gc_ut : join : xs))
     )
 
 -- Various canned heap-check routines
@@ -353,21 +282,14 @@ mkStJump_to_RegTable_offw regtable_offw
 --   | otherwise
 --   do something plausible for cross-DLL jump
 
-gc_chk (StInt 0)   = mkStJump_to_RegTable_offw OFFSET_stgChk0
-gc_chk (StInt 1)   = mkStJump_to_RegTable_offw OFFSET_stgChk1
-gc_chk (StInt n)   = mkStJump_to_GCentry_name ("stg_chk_" ++ show n)
+gc_enter = mkStJump_to_RegTable_offw OFFSET_stgGCEnter1
+gc_fun   = mkStJump_to_RegTable_offw OFFSET_stgGCFun
 
-gc_enter (StInt 1) = mkStJump_to_RegTable_offw OFFSET_stgGCEnter1
-gc_enter (StInt n) = mkStJump_to_GCentry_name ("stg_gc_enter_" ++ show n)
-
-gc_seq (StInt n)   = mkStJump_to_GCentry_name ("stg_gc_seq_" ++ show n)
 gc_noregs          = mkStJump_to_GCentry_name "stg_gc_noregs"
 gc_unpt_r1         = mkStJump_to_GCentry_name "stg_gc_unpt_r1"
 gc_unbx_r1         = mkStJump_to_GCentry_name "stg_gc_unbx_r1"
 gc_f1              = mkStJump_to_GCentry_name "stg_gc_f1"
 gc_d1              = mkStJump_to_GCentry_name "stg_gc_d1"
 gc_l1              = mkStJump_to_GCentry_name "stg_gc_l1"
-gc_gen             = mkStJump_to_GCentry_name "stg_gen_chk"
-gc_ut (StInt p) (StInt np)
-                   = mkStJump_to_GCentry_name ("stg_gc_ut_" ++ show p ++ "_" ++ show np)
+gc_ut              = mkStJump_to_GCentry_name "stg_gc_ut"
 \end{code}

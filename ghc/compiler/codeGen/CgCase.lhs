@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.60 2002/09/13 15:02:27 simonpj Exp $
+% $Id: CgCase.lhs,v 1.61 2002/12/11 15:36:25 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -24,7 +24,6 @@ import AbsCSyn
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
 			  getAmodeRep, nonemptyAbsC
 			)
-import CgUpdate		( reserveSeqFrame )
 import CgBindery	( getVolatileRegs, getArgAmodes,
 			  bindNewToReg, bindNewToTemp,
 			  bindNewPrimToAmode, getCAddrModeAndInfo,
@@ -32,14 +31,14 @@ import CgBindery	( getVolatileRegs, getArgAmodes,
 			  buildContLivenessMask, nukeDeadBindings,
 			)
 import CgCon		( bindConArgs, bindUnboxedTupleComponents )
-import CgHeapery	( altHeapCheck )
+import CgHeapery	( altHeapCheck, unbxTupleHeapCheck )
 import CgRetConv	( dataReturnConvPrim, ctrlReturnConvAlg,
 			  CtrlReturnConvention(..)
 			)
 import CgStackery	( allocPrimStack, allocStackTop,
 			  deAllocStackTop, freeStackSlots, dataStackSlots
 			)
-import CgTailCall	( tailCallFun )
+import CgTailCall	( performTailCall )
 import CgUsages		( getSpRelOffset )
 import CLabel		( mkVecTblLabel, mkClosureTblLabel,
 			  mkDefaultLabel, mkAltLabel, mkReturnInfoLabel
@@ -54,6 +53,7 @@ import PrimOp		( primOpOutOfLine, PrimOp(..) )
 import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 			)
 import TyCon		( isEnumerationTyCon, isUnboxedTupleTyCon, tyConPrimRep	)
+import Name		( getName )
 import Unique           ( Unique, Uniquable(..), newTagUnique )
 import Maybes		( maybeToBool )
 import Util		( only )
@@ -177,9 +177,9 @@ cgCase (StgOpApp op args _)
 						`thenC`
 
 	-- compile the alts
-    cgAlgAlts NoGC (getUnique bndr) Nothing{-cc_slot-} False{-no semi-tagging-}
-		False{-not poly case-} alts deflt
-                False{-don't emit yield-}  	`thenFC` \ (tagged_alts, deflt_c) ->
+    cgAlgAlts NoGC False{-not polymorphic-} (getUnique bndr) 
+		Nothing{-cc_slot-} False{-no semi-tagging-}
+		alts deflt False{-don't emit yield-}  	`thenFC` \ (tagged_alts, deflt_c) ->
 
 	-- Do the switch
     absC (mkAlgAltsCSwitch tag_amode tagged_alts deflt_c)
@@ -265,23 +265,28 @@ we can reuse/trim the stack slot holding the variable (if it is in one).
 \begin{code}
 cgCase (StgApp fun args)
 	live_in_whole_case live_in_alts bndr srt alts
-  = getCAddrModeAndInfo fun			`thenFC` \ (fun', fun_amode, lf_info) ->
-    getArgAmodes args				`thenFC` \ arg_amodes ->
+  = getCAddrModeAndInfo fun		`thenFC` \ (fun', fun_amode, lf_info) ->
+    getArgAmodes args			`thenFC` \ arg_amodes ->
 
-       -- Squish the environment
+	-- Nuking dead bindings *before* calculating the saves is the
+	-- value-add here.  We might end up freeing up some slots currently
+	-- occupied by variables only required for the call.
+	-- NOTE: we need to look up the variables used in the call before
+	-- doing this, because some of them may not be in the environment
+	-- afterward.
     nukeDeadBindings live_in_alts	`thenC`
     saveVolatileVarsAndRegs live_in_alts
     	    	    	`thenFC` \ (save_assts, alts_eob_info, maybe_cc_slot) ->
 
-    allocStackTop retPrimRepSize	`thenFC` \_ ->
-
-    forkEval alts_eob_info nopC (
-	     deAllocStackTop retPrimRepSize `thenFC` \_ ->
-	     cgEvalAlts maybe_cc_slot bndr srt alts) 
+    forkEval alts_eob_info 
+	( allocStackTop retPrimRepSize
+	 `thenFC` \_ -> nopC )
+	( deAllocStackTop retPrimRepSize `thenFC` \_ ->
+	  cgEvalAlts maybe_cc_slot bndr srt alts ) 
 					 `thenFC` \ scrut_eob_info ->
 
     setEndOfBlockInfo (maybeReserveSeqFrame alts scrut_eob_info)	$
-    tailCallFun fun' fun_amode lf_info arg_amodes save_assts
+    performTailCall fun' fun_amode lf_info arg_amodes save_assts
 \end{code}
 
 Note about return addresses: we *always* push a return address, even
@@ -317,7 +322,7 @@ cgCase expr live_in_whole_case live_in_alts bndr srt alts
 	(deAllocStackTop retPrimRepSize `thenFC` \_ ->
 	 cgEvalAlts maybe_cc_slot bndr srt alts) `thenFC` \ scrut_eob_info ->
 
-    setEndOfBlockInfo (maybeReserveSeqFrame alts scrut_eob_info) $
+    setEndOfBlockInfo (maybeReserveSeqFrame alts scrut_eob_info)	$
     cgExpr expr
 \end{code}
 
@@ -356,9 +361,11 @@ don't follow the layout of closures when we're profiling.  The CCS
 could be anywhere within the record).
 
 \begin{code}
--- We need to reserve a seq frame for a polymorphic case
-maybeReserveSeqFrame (StgAlgAlts Nothing _ _) scrut_eob_info = reserveSeqFrame scrut_eob_info
-maybeReserveSeqFrame other		      scrut_eob_info = scrut_eob_info
+maybeReserveSeqFrame (StgAlgAlts Nothing _ _) 
+   (EndOfBlockInfo args_sp (CaseAlts amode stuff _))
+   = EndOfBlockInfo (args_sp + retPrimRepSize) (CaseAlts amode stuff True)
+
+maybeReserveSeqFrame other scrut_eob_info = scrut_eob_info
 \end{code}
 
 %************************************************************************
@@ -384,7 +391,7 @@ cgEvalAlts cc_slot bndr srt alts
   = 	
     let uniq = getUnique bndr in
 
-    buildContLivenessMask uniq	        `thenFC` \ liveness_mask ->
+    buildContLivenessMask (getName bndr)  `thenFC` \ liveness ->
 
     case alts of
 
@@ -392,7 +399,7 @@ cgEvalAlts cc_slot bndr srt alts
       StgAlgAlts maybe_tycon alts deflt ->
 
 	   -- bind the default binder (it covers all the alternatives)
-    	bindNewToReg bndr node mkLFArgument	 `thenC`
+    	bindNewToReg bndr node (mkLFArgument bndr) `thenC`
 
 	-- Generate sequel info for use downstream
 	-- At the moment, we only do it if the type is vector-returnable.
@@ -421,8 +428,8 @@ cgEvalAlts cc_slot bndr srt alts
  	    in
 	    cgUnboxedTupleAlt uniq cc_slot True alt		`thenFC` \ abs_c ->
 	    getSRTInfo srt				 	`thenFC` \ srt_info -> 
-	    absC (CRetDirect uniq abs_c srt_info liveness_mask) `thenC`
-	    returnFC (CaseAlts (CLbl lbl RetRep) Nothing)
+	    absC (CRetDirect uniq abs_c srt_info liveness) `thenC`
+	    returnFC (CaseAlts (CLbl lbl RetRep) Nothing False)
 
     	-- normal algebraic (or polymorphic) case alternatives
     	else let
@@ -440,13 +447,13 @@ cgEvalAlts cc_slot bndr srt alts
 			Nothing -- no semi-tagging info
 
       	in
-      	cgAlgAlts GCMayHappen uniq cc_slot use_labelled_alts (not is_alg) 
+      	cgAlgAlts GCMayHappen (not is_alg) uniq cc_slot use_labelled_alts
 		alts deflt True	`thenFC` \ (tagged_alt_absCs, deflt_absC) ->
 
-      	mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness_mask 
+      	mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness 
 		ret_conv  `thenFC` \ return_vec ->
 
-      	returnFC (CaseAlts return_vec semi_tagged_stuff)
+      	returnFC (CaseAlts return_vec semi_tagged_stuff False)
 
       -- primitive alts...
       StgPrimAlts tycon alts deflt ->
@@ -460,10 +467,10 @@ cgEvalAlts cc_slot bndr srt alts
     	-- Generate the labelled block, starting with restore-cost-centre
     	getSRTInfo srt					`thenFC` \srt_info ->
     	absC (CRetDirect uniq (cc_restore `mkAbsCStmts` abs_c) 
-			 srt_info liveness_mask)	`thenC`
+			 srt_info liveness)	`thenC`
 
 	-- Return an amode for the block
-    	returnFC (CaseAlts (CLbl (mkReturnInfoLabel uniq) RetRep) Nothing)
+    	returnFC (CaseAlts (CLbl (mkReturnInfoLabel uniq) RetRep) Nothing False)
 \end{code}
 
 
@@ -489,10 +496,10 @@ are inlined alternatives.
 
 \begin{code}
 cgAlgAlts :: GCFlag
+	  -> Bool				-- polymorphic case
 	  -> Unique
 	  -> Maybe VirtualSpOffset
 	  -> Bool				-- True <=> branches must be labelled
-	  -> Bool				-- True <=> polymorphic case
 	  -> [(DataCon, [Id], [Bool], StgExpr)]	-- The alternatives
 	  -> StgCaseDefault			-- The default
           -> Bool                               -- Context switch at alts?
@@ -500,7 +507,7 @@ cgAlgAlts :: GCFlag
 		    AbstractC			-- The default case
 	     )
 
-cgAlgAlts gc_flag uniq restore_cc must_label_branches is_poly alts deflt
+cgAlgAlts gc_flag is_poly uniq restore_cc must_label_branches alts deflt
           emit_yield{-should a yield macro be emitted?-}
 
   = forkAlts (map (cgAlgAlt gc_flag uniq restore_cc must_label_branches emit_yield) alts)
@@ -509,7 +516,7 @@ cgAlgAlts gc_flag uniq restore_cc must_label_branches is_poly alts deflt
 
 \begin{code}
 cgAlgDefault :: GCFlag
-	     -> Bool 			-- could be a function-typed result?
+	     -> Bool			-- polymorphic case
 	     -> Unique -> Maybe VirtualSpOffset -> Bool -- turgid state...
 	     -> StgCaseDefault		-- input
 	     -> Bool
@@ -529,7 +536,7 @@ cgAlgDefault gc_flag is_poly uniq cc_slot must_label_branch
              --(if emit_yield
              --   then yield [node] True
              --   else absC AbsCNop)                            `thenC`     
-	     algAltHeapCheck gc_flag is_poly [node] [] Nothing (cgExpr rhs)
+	     algAltHeapCheck gc_flag is_poly [node] (cgExpr rhs)
 	-- Node is live, but doesn't need to point at the thing itself;
 	-- it's ok for Node to point to an indirection or FETCH_ME
 	-- Hence no need to re-enter Node.
@@ -565,7 +572,7 @@ cgAlgAlt gc_flag uniq cc_slot must_label_branch
 		NoGC   	    -> mapFCs bindNewToTemp args `thenFC` \_ -> nopC
     		GCMayHappen -> bindConArgs con args
     	     )	`thenC`
-    	     algAltHeapCheck gc_flag False [node] [] Nothing (
+    	     algAltHeapCheck gc_flag False{-not poly-} [node] (
 	     cgExpr rhs)
             ) `thenFC` \ abs_c -> 
     let
@@ -587,7 +594,7 @@ cgUnboxedTupleAlt
 cgUnboxedTupleAlt lbl cc_slot emit_yield (con,args,use_mask,rhs)
   = getAbsC (
   	bindUnboxedTupleComponents args 
-  		      `thenFC` \ (live_regs,tags,stack_res) ->
+  		      `thenFC` \ (live_regs, ptrs, nptrs, stack_res) ->
 
         restoreCurrentCostCentre cc_slot `thenFC` \restore_cc ->
 	absC restore_cc `thenC`
@@ -596,18 +603,9 @@ cgUnboxedTupleAlt lbl cc_slot emit_yield (con,args,use_mask,rhs)
   	-- (if emit_yield
   	--    then yield live_regs True		-- XXX live regs wrong?
   	--    else absC AbsCNop)                         `thenC`     
-  	let 
-	      -- ToDo: could maybe use Nothing here if stack_res is False
-	      -- since the heap-check can just return to the top of the 
-	      -- stack.
-  	      ret_addr = Just lbl
-  	in
-
-	-- free up stack slots containing tags,
-	freeStackSlots (map fst tags) 		`thenC`
 
 	-- generate a heap check if necessary
-  	primAltHeapCheck GCMayHappen live_regs tags ret_addr (
+  	possibleUnbxTupleHeapCheck GCMayHappen live_regs ptrs nptrs (
 
 	-- and finally the code for the alternative
   	cgExpr rhs)
@@ -703,7 +701,7 @@ cgPrimAlt gc_flag regs (lit, rhs)
   = getAbsC rhs_code	 `thenFC` \ absC ->
     returnFC (lit,absC)
   where
-    rhs_code = primAltHeapCheck gc_flag regs [] Nothing (cgExpr rhs)
+    rhs_code = primAltHeapCheck gc_flag regs (cgExpr rhs)
 
 cgPrimDefault :: GCFlag
 	      -> [MagicId]		-- live registers
@@ -714,7 +712,7 @@ cgPrimDefault gc_flag regs StgNoDefault
   = panic "cgPrimDefault: No default in prim case"
 
 cgPrimDefault gc_flag regs (StgBindDefault rhs)
-  = getAbsC (primAltHeapCheck gc_flag regs [] Nothing (cgExpr rhs))
+  = getAbsC (primAltHeapCheck gc_flag regs (cgExpr rhs))
 \end{code}
 
 
@@ -841,8 +839,7 @@ mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
     	(CLbl ret_label RetRep,
 	 absC (CRetDirect uniq 
 			    (mkAlgAltsCSwitch tag tagged_alt_absCs deflt_absC)
-			    srt_info
-			    liveness));
+			    srt_info liveness));
 
       VectoredReturn table_size ->
 	let
@@ -885,27 +882,40 @@ mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
 %*									*
 %************************************************************************
 
-@possibleHeapCheck@ tests a flag passed in to decide whether to do a
+'possibleHeapCheck' tests a flag passed in to decide whether to do a
 heap check or not.  These heap checks are always in a case
 alternative, so we use altHeapCheck.
 
 \begin{code}
-algAltHeapCheck 
+algAltHeapCheck
 	:: GCFlag 
-	-> Bool				--  True <=> polymorphic case
-	-> [MagicId]			--  live registers
-	-> [(VirtualSpOffset,Int)]	--  stack slots to tag
-	-> Maybe Unique			--  return address unique
-	-> Code				--  continuation
+	-> Bool			--  polymorphic case
+	-> [MagicId]		--  live registers
+	-> Code			--  continuation
 	-> Code
 
-algAltHeapCheck GCMayHappen is_poly regs tags lbl code 
-  = altHeapCheck is_poly False regs tags AbsCNop lbl code
-algAltHeapCheck NoGC	_ _ tags lbl code 
-  = code
+algAltHeapCheck GCMayHappen is_poly regs code = altHeapCheck is_poly regs code
+algAltHeapCheck NoGC _ _ code                 = code
 
-primAltHeapCheck GCMayHappen regs tags lbl code
-  = altHeapCheck False True regs tags AbsCNop lbl code
-primAltHeapCheck NoGC _ _ _ code 
-  = code
+primAltHeapCheck 
+	:: GCFlag 
+	-> [MagicId]		--  live registers
+	-> Code			--  continuation
+	-> Code
+
+primAltHeapCheck GCMayHappen regs code        = altHeapCheck True regs code
+primAltHeapCheck NoGC _ code                  = code
+
+possibleUnbxTupleHeapCheck
+	:: GCFlag 
+	-> [MagicId]		--  live registers
+	-> Int			--  no. of stack slots containing ptrs
+	-> Int			--  no. of stack slots containing nonptrs
+	-> Code			--  continuation
+	-> Code
+
+possibleUnbxTupleHeapCheck GCMayHappen regs ptrs nptrs code 
+  = unbxTupleHeapCheck regs ptrs nptrs AbsCNop code
+possibleUnbxTupleHeapCheck NoGC _ _ _ code
+   = code
 \end{code}

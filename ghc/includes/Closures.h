@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.31 2002/01/29 16:52:46 simonmar Exp $
+ * $Id: Closures.h,v 1.32 2002/12/11 15:36:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -89,17 +89,21 @@ typedef struct {
 
 typedef struct {
     StgHeader   header;
-    StgWord     n_args;
-    StgClosure *fun;
+    StgHalfWord arity;		/* zero if it is an AP */
+    StgHalfWord n_args;
+    StgClosure *fun;		/* really points to a fun */
     StgClosure *payload[FLEXIBLE_ARRAY];
 } StgPAP;
 
+// AP closures have the same layout, for convenience
+typedef StgPAP StgAP;
+
 typedef struct {
     StgHeader   header;
-    StgWord     n_args;
+    StgWord     size;                    // number of words in payload
     StgClosure *fun;
-    StgClosure *payload[FLEXIBLE_ARRAY];
-} StgAP_UPD;
+    StgClosure *payload[FLEXIBLE_ARRAY]; // contains a chunk of *stack*
+} StgAP_STACK;
 
 typedef struct {
     StgHeader   header;
@@ -138,37 +142,13 @@ typedef struct {
     StgMutClosure *mut_link;
 } StgMutVar;
 
-typedef struct {
-    StgHeader      header;
-    StgArrWords   *instrs;	/* a pointer to an ArrWords */
-    StgArrWords   *literals;	/* a pointer to an ArrWords */
-    StgMutArrPtrs *ptrs;	/* a pointer to a MutArrPtrs */
-    StgArrWords   *itbls;	/* a pointer to an ArrWords */
-} StgBCO;
-
-/* 
-   A collective typedef for all linkable stack frames i.e.
-     StgUpdateFrame, StgSeqFrame, StgCatchFrame
-*/
-typedef struct _StgFrame {
-    StgHeader  header;
-    struct _StgFrame *link;
-} StgFrame;
-
 typedef struct _StgUpdateFrame {
     StgHeader  header;
-    struct _StgUpdateFrame *link;
     StgClosure *updatee;
 } StgUpdateFrame;
 
 typedef struct {
     StgHeader  header;
-    struct _StgUpdateFrame *link;
-} StgSeqFrame;  
-
-typedef struct {
-    StgHeader  header;
-    struct _StgUpdateFrame *link;
     StgInt      exceptions_blocked;
     StgClosure *handler;
 } StgCatchFrame;
@@ -215,17 +195,67 @@ typedef struct _StgDeadWeak {	/* Weak v */
   struct _StgWeak *link;
 } StgDeadWeak;
 
+/* Byte code objects.  These are fixed size objects with pointers to
+ * four arrays, designed so that a BCO can be easily "re-linked" to
+ * other BCOs, to facilitate GHC's intelligent recompilation.  The
+ * array of instructions is static and not re-generated when the BCO
+ * is re-linked, but the other 3 arrays will be regenerated.
+ *
+ * A BCO represents either a function or a stack frame.  In each case,
+ * it needs a bitmap to describe to the garbage collector the
+ * pointerhood of its arguments/free variables respectively, and in
+ * the case of a function it also needs an arity.  These pieces of
+ * information are stored at the beginning of the instruction array.
+ */
+
+typedef struct {
+    StgHeader      header;
+    StgArrWords   *instrs;	/* a pointer to an ArrWords */
+    StgArrWords   *literals;	/* a pointer to an ArrWords */
+    StgMutArrPtrs *ptrs;	/* a pointer to a MutArrPtrs */
+    StgArrWords   *itbls;	/* a pointer to an ArrWords */
+} StgBCO;
+
+typedef struct {
+    StgWord arity;
+    StgWord bitmap[FLEXIBLE_ARRAY];  // really an StgLargeBitmap
+} StgBCOInfo;
+
+#define BCO_INFO(bco)  ((StgBCOInfo *)(((StgBCO *)(bco))->instrs->payload))
+#define BCO_ARITY(bco) (BCO_INFO(bco)->arity)
+#define BCO_BITMAP(bco) ((StgLargeBitmap *)BCO_INFO(bco)->bitmap)
+#define BCO_BITMAP_SIZE(bco) (BCO_BITMAP(bco)->size)
+#define BCO_BITMAP_BITS(bco) (BCO_BITMAP(bco)->bitmap)
+#define BCO_BITMAP_SIZEW(bco) ((BCO_BITMAP_SIZE(bco) + BITS_IN(StgWord) - 1) \
+			        / BITS_IN(StgWord))
+#define BCO_INSTRS(bco) ((StgWord16 *)(BCO_BITMAP_BITS(bco) + \
+                                       BCO_BITMAP_SIZEW(bco)))
+
 /* Dynamic stack frames - these have a liveness mask in the object
  * itself, rather than in the info table.  Useful for generic heap
- * check code.
+ * check code.  See StgMacros.h, HEAP_CHK_GEN().
  */
  
 typedef struct {
-  const struct _StgInfoTable* info;
-  StgWord        liveness;
-  StgWord        ret_addr;
-  StgWord        payload[FLEXIBLE_ARRAY];
+    const struct _StgInfoTable* info;
+    StgWord        liveness;
+    StgWord        ret_addr;
+    StgClosure *   payload[FLEXIBLE_ARRAY];
 } StgRetDyn;
+
+/* A function return stack frame: used when saving the state for a
+ * garbage collection at a function entry point.  The function
+ * arguments are on the stack, and we also save the function (its
+ * info table describes the pointerhood of the arguments).
+ *
+ * The stack frame size is also cached in the frame for convenience.
+ */
+typedef struct {
+    const struct _StgInfoTable* info;
+    StgWord        size;
+    StgClosure *   fun;
+    StgClosure *   payload[FLEXIBLE_ARRAY];
+} StgRetFun;
 
 /* Concurrent communication objects */
 
