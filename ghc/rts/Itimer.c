@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.3 1999/02/05 16:02:44 simonm Exp $
+ * $Id: Itimer.c,v 1.4 1999/03/03 19:00:07 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -36,6 +36,10 @@
 #   include <time.h>
 #  endif
 # endif
+
+#if HAVE_WINDOWS_H
+# include <windows.h>
+#endif
  
 /*
  * Handling timer events under cygwin32 is not done with signal/setitimer.
@@ -48,20 +52,17 @@
  * 11/98: if the cygwin DLL supports setitimer(), then use it instead.
  */
 
-#if defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER)
-
-#include <windows.h>  /* OK, bring it all in... */
+#if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
 
 /*
-  vtalrm_handler is assigned and set up in
-  main/Signals.lc.
+  vtalrm_handler is assigned and set up in Signals.c
 
-  vtalrm_id (defined in main/Signals.lc) holds
+  vtalrm_id (defined in Signals.c) holds
   the system id for the current timer (used to 
-  later block/kill the timer)
+  later block/kill it.)
 */
 extern nat vtalrm_id;
-extern TIMECALLBACK *vtalrm_cback;
+TIMECALLBACK *vtalrm_cback;
  
 nat
 initialize_virtual_timer(nat ms)
@@ -129,6 +130,15 @@ initialize_virtual_timer(nat ms)
 }
 # endif
 
+#if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
+int
+install_vtalrm_handler(void (*handler)(int))
+{
+  vtalrm_cback = handler;
+  return 0;
+}
+
+#else
 int
 install_vtalrm_handler(void (*handler)(int))
 {
@@ -163,3 +173,4 @@ unblock_vtalrm_signal(void)
 
     (void) sigprocmask(SIG_UNBLOCK, &signals, NULL);
 }
+#endif
