@@ -409,7 +409,7 @@ mkRecordSelId tycon field_label unpack_id
 		   mkFunTys dict_tys $  mkFunTy data_ty field_tau
       
     info = mkIdInfo (RecordSelId field_label)
-	   `setArityInfo`	exactArity 1
+	   `setArityInfo`	exactArity (1 + length dict_tys)
 	   `setUnfoldingInfo`	unfolding	
 	   `setCafInfo`		NoCafRefs
 	-- ToDo: consider adding further IdInfo
