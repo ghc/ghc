@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.11 2001/08/29 14:55:58 sewardj Exp $
+ * $Id: RtsUtils.h,v 1.12 2001/10/31 10:30:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,7 +21,8 @@ extern void _stgAssert (char *filename, unsigned int linenum);
 
 extern void heapOverflow(void);
 
-void resetNonBlockingFd(int fd);
+extern void setNonBlockingFd(int fd);
+extern void resetNonBlockingFd(int fd);
 
 extern nat stg_strlen(char *str);
 
