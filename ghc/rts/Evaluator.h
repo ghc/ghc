@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.h,v 1.6 1999/11/08 15:30:37 sewardj Exp $
+ * $Id: Evaluator.h,v 1.7 2000/04/25 17:47:43 andy Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -51,3 +51,5 @@ extern void   PushTaggedDouble     ( StgDouble    );
 
 extern void   PushPtr        ( StgPtr );
 extern StgPtr PopPtr         ( void );
+
+extern int    numEnters;

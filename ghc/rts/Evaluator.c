@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.48 $
- * $Date: 2000/04/14 15:18:06 $
+ * $Revision: 1.49 $
+ * $Date: 2000/04/25 17:47:42 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -490,6 +490,8 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
     LLL;
 
     enterLoop:
+
+    numEnters++;
 
 #ifdef DEBUG
     assert(gSp == tSp);
@@ -3518,5 +3520,4 @@ void B__decodeFloat (B* man, I_* exp, StgFloat flt)
 }
 
 #endif	/* FLOATS_AS_DOUBLES */
-
 #endif /* INTERPRETER */
