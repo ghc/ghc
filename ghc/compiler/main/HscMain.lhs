@@ -240,9 +240,6 @@ hscRecomp ghci_mode dflags have_object
 	-- force this out now, so we don't keep a hold of rdr_module or pcs_tc
 	; seqList imported_modules (return ())
 
-	-- this module's version
-	; version <- return $! vers_module (mi_version new_iface)
-
  	    -------------------
  	    -- FLATTENING
  	    -------------------
@@ -279,7 +276,6 @@ hscRecomp ghci_mode dflags have_object
 	--	flat_details
 	-- 	imported_modules (seq'd)
 	-- 	new_iface
-	--	version
 
  	    -------------------
  	    -- SIMPLIFY
@@ -391,6 +387,10 @@ hscRecomp ghci_mode dflags have_object
 		    final_iface <- _scc_ "MkFinalIface" 
 			  mkFinalIface ghci_mode dflags location 
                                    maybe_checked_iface new_iface tidy_details
+
+		    -- get this module's version
+		    version <- return $! vers_module (mi_version final_iface)
+
 		    if toNothing 
                       then do
 			  return (False, False, Nothing, final_iface)
