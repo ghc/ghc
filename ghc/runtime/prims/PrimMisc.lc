@@ -43,6 +43,8 @@ stg_exit (n) /* can't call regular "exit" from Haskell
 		because it has no return value */
   I_ n;
 {
+    /* Storage manager shutdown */
+    shutdownHaskell();
     EXIT(n);
     return(0); /* GCC warning food */
 }

@@ -6,6 +6,6 @@ include $(TOP)/mk/boilerplate.mk
 #
 export WAYS=
 
-SUBDIRS = users_guide install_guide release_notes state_interface
+SUBDIRS = users_guide
 
 include $(TOP)/mk/target.mk

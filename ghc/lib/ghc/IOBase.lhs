@@ -399,11 +399,19 @@ type Handle = MutableVar RealWorld Handle__
 data Handle__
   = ErrorHandle		IOError
   | ClosedHandle
+#ifndef PAR
   | SemiClosedHandle	ForeignObj (Addr, Int)
   | ReadHandle		ForeignObj (Maybe BufferMode) Bool
   | WriteHandle		ForeignObj (Maybe BufferMode) Bool
   | AppendHandle	ForeignObj (Maybe BufferMode) Bool
   | ReadWriteHandle	ForeignObj (Maybe BufferMode) Bool
+#else
+  | SemiClosedHandle	Addr (Addr, Int)
+  | ReadHandle		Addr (Maybe BufferMode) Bool
+  | WriteHandle		Addr (Maybe BufferMode) Bool
+  | AppendHandle	Addr (Maybe BufferMode) Bool
+  | ReadWriteHandle	Addr (Maybe BufferMode) Bool
+#endif
 
 -- Standard Instances as defined by the Report..
 

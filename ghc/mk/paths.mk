@@ -10,9 +10,13 @@ HaskellCompilerType	= $(WithGhcHcType)
 # What ways to build the RTS+libs
 WAYS=$(GhcLibWays)
 
+GCap=-optc-DGCap
+#GC2s=-optc-DGC2s
+#GC1s=-optc-DGC1s
 
 MKDEPENDHSSRC 		= $(GHC_UTILS_DIR)/mkdependHS
 UNLIT	 		= $(GHC_UNLIT_DIR)/unlit
+GHC_UNLIT		= $(GHC_UNLIT_DIR)/unlit
 GHC_UNLIT_DIR 		= $(GHC_UTILS_DIR)/unlit
 
 #-----------------------------------------------------------------------------
@@ -29,10 +33,10 @@ endif
 # Ugen
 
 ifdef UseInstalledUtils
-UGEN		=  ugen
+UGEN		= ugen
 else
 UGEN		= $(UGEN_DIR)/ugen
-UGENSRC 	= $(GHC_UTILS_DIR)/ugen
+UGEN_DIR 	= $(GHC_UTILS_DIR)/ugen
 endif
 
 #-----------------------------------------------------------------------------

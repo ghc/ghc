@@ -468,7 +468,6 @@ addOccurrenceName necessity name (RnDown loc names_var errs_var occs_var) l_down
 
   | otherwise
   = readMutVarSST occs_var			`thenSST` \ occs ->
---     pprTrace "Add occurrence:" (ppr PprDebug name) $
     writeMutVarSST occs_var ((name,necessity) : occs)	`thenSST_`
     returnSST name
   where

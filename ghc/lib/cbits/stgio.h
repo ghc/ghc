@@ -59,6 +59,10 @@ StgInt	getBufferMode PROTO((StgForeignObj));
 
 /* getClockTime.lc */
 StgInt	getClockTime PROTO((StgByteArray, StgByteArray));
+StgAddr	showTime     PROTO((I_, StgByteArray, StgByteArray));
+StgAddr	toClockSec   PROTO((I_, I_, I_, I_, I_, I_, I_, StgByteArray));
+StgAddr	toLocalTime  PROTO((I_, StgByteArray, StgByteArray));
+StgAddr	toUTCTime    PROTO((I_, StgByteArray, StgByteArray));
 
 /* getCPUTime.lc */
 StgByteArray getCPUTime PROTO((StgByteArray));

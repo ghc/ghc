@@ -23,7 +23,7 @@ import IOBase
 import PrelTup
 import PrelBase
 import GHC
-import Foreign  ( makeForeignObj )
+import Foreign  ( makeForeignObj, writeForeignObj )
 import PrelList (span)
 #if defined(__CONCURRENT_HASKELL__)
 import ConcBase
@@ -68,7 +68,11 @@ writeHandle h v = stToIO (writeVar h v)
 %*********************************************************
 
 \begin{code}
+#ifndef PAR
 filePtr :: Handle__ -> ForeignObj
+#else
+filePtr :: Handle__ -> Addr
+#endif
 filePtr (SemiClosedHandle fp _)  = fp
 filePtr (ReadHandle fp _ _)	 = fp
 filePtr (WriteHandle fp _ _)	 = fp
@@ -116,8 +120,13 @@ stdin = unsafePerformPrimIO (
     _ccall_ getLock (``stdin''::Addr) 0		>>= \ rc ->
     (case rc of
        0 -> new_handle ClosedHandle
-       1 -> makeForeignObj (``stdin''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+       1 -> 
+#ifndef PAR
+            makeForeignObj (``stdin''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
 	    new_handle (ReadHandle fp Nothing False)
+#else
+	    new_handle (ReadHandle ``stdin'' Nothing False)
+#endif
        _ -> constructError "stdin"		>>= \ ioError -> 
             new_handle (ErrorHandle ioError)
     )						>>= \ handle ->
@@ -130,8 +139,13 @@ stdout = unsafePerformPrimIO (
     _ccall_ getLock (``stdout''::Addr) 1	>>= \ rc ->
     (case rc of
        0 -> new_handle ClosedHandle
-       1 -> makeForeignObj (``stdout''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+       1 -> 
+#ifndef PAR
+            makeForeignObj (``stdout''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
 	    new_handle (WriteHandle fp Nothing False)
+#else
+	    new_handle (WriteHandle ``stdout'' Nothing False)
+#endif
        _ -> constructError "stdout"		>>= \ ioError -> 
             new_handle (ErrorHandle ioError)
     )						>>= \ handle ->
@@ -144,8 +158,13 @@ stderr = unsafePerformPrimIO (
     _ccall_ getLock (``stderr''::Addr) 1	>>= \ rc ->
     (case rc of
        0 -> new_handle ClosedHandle
-       1 -> makeForeignObj (``stderr''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+       1 -> 
+#ifndef PAR
+            makeForeignObj (``stderr''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
             new_handle (WriteHandle fp (Just NoBuffering) False)	
+#else
+            new_handle (WriteHandle ``stderr'' (Just NoBuffering) False)	
+#endif
        _ -> constructError "stderr"		>>= \ ioError -> 
             new_handle (ErrorHandle ioError)
     )						>>= \ handle ->
@@ -170,8 +189,12 @@ openFile :: FilePath -> IOMode -> IO Handle
 openFile f m = 
     stToIO (_ccall_ openFile f m')		             >>= \ ptr ->
     if ptr /= ``NULL'' then
-        stToIO (makeForeignObj ptr ((``&freeFile'')::Addr))  >>= \ fp ->
+#ifndef PAR
+        makeForeignObj ptr ((``&freeFile'')::Addr)   `thenIO_Prim` \ fp ->
         newHandle (htype fp Nothing False)
+#else
+        newHandle (htype ptr Nothing False)
+#endif
     else
 	stToIO (constructError "openFile")	    >>= \ ioError@(IOError hn iot msg) -> 
 	let
@@ -226,11 +249,12 @@ hClose :: Handle -> IO ()
 
 hClose handle =
     readHandle handle				    >>= \ htype ->
-    writeHandle handle ClosedHandle		    >>
     case htype of 
       ErrorHandle ioError ->
+	  writeHandle handle htype >>
 	  fail ioError
       ClosedHandle -> 
+          writeHandle handle htype		    >>
 	  ioe_closedHandle handle
       SemiClosedHandle fp (buf,_) ->
           (if buf /= ``NULL'' then
@@ -245,19 +269,30 @@ hClose handle =
 	             has been performed, the ForeignObj embedded in the Handle
                      is still lying around in the heap, so care is taken
                      to avoid closing the file object when the ForeignObj
-	             is finalised. (see freeFile()) -}
+	             is finalised.  -}
                 if rc == 0 then 
-	          return ()
+#ifndef PAR
+		  -- Mark the foreign object data value as gone to the finaliser (freeFile())
+		  writeForeignObj fp ``NULL''       `thenIO_Prim` \ () ->
+#endif
+		  writeHandle handle ClosedHandle
                 else
+		  writeHandle handle htype >>
 	          constructErrorAndFail "hClose"
 
               else			    
-                  return ()
+                  writeHandle handle htype
       other -> 
-          _ccall_ closeFile (filePtr other)	    `thenIO_Prim` \ rc ->
+	  let fp = filePtr other in
+          _ccall_ closeFile fp	    `thenIO_Prim` \ rc ->
           if rc == 0 then 
-	      return ()
+#ifndef PAR
+		  -- Mark the foreign object data
+		  writeForeignObj fp ``NULL''       `thenIO_Prim` \ () ->
+#endif
+	      writeHandle handle ClosedHandle
           else
+ 	      writeHandle handle htype >>
 	      constructErrorAndFail "hClose"
 \end{code}
 
@@ -427,7 +462,11 @@ hSetBuffering handle mode =
               BlockBuffering Nothing -> -2
               BlockBuffering (Just n) -> n
 
+#ifndef PAR
     hcon :: Handle__ -> (ForeignObj -> (Maybe BufferMode) -> Bool -> Handle__)
+#else
+    hcon :: Handle__ -> (Addr -> (Maybe BufferMode) -> Bool -> Handle__)
+#endif
     hcon (ReadHandle _ _ _) = ReadHandle
     hcon (WriteHandle _ _ _) = WriteHandle
     hcon (AppendHandle _ _ _) = AppendHandle

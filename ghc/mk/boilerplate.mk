@@ -24,11 +24,9 @@ TOP:=$(GHC_TOP)
 # -----------------------------------------------------------------
 # Everything after this point
 # augments or overrides previously set variables.
-# (these files are optional, so `make' won't fret if
-#  cannot get to them).
 # -----------------------------------------------------------------
 
--include $(TOP)/mk/paths.mk
--include $(TOP)/mk/opts.mk
+include $(TOP)/mk/paths.mk
+include $(TOP)/mk/opts.mk
 include $(TOP)/mk/suffix.mk
 

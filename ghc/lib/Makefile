@@ -4,7 +4,7 @@
 #
 #		Makefile for building the GHC Prelude libraries umpteen ways
 #
-# 	$Id: Makefile,v 1.5 1997/03/14 05:30:36 sof Exp $
+# 	$Id: Makefile,v 1.6 1997/03/17 20:34:49 simonpj Exp $
 #
 #	
 #################################################################################
@@ -52,14 +52,15 @@ endif
 
 # per-module flags
 
-ghc/PackedString_HC_OPTS    = -monly-3-regs
-required/Directory_HC_OPTS  = -monly-3-regs
-concurrent/Parallel_HC_OPTS = -fglasgow-exts
+ghc/PackedString_HC_OPTS    += -monly-3-regs
+required/Directory_HC_OPTS  += -monly-3-regs 
+concurrent/Parallel_HC_OPTS += -fglasgow-exts
+required/Time_HC_OPTS       += -monly-3-regs
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
 
-SRC_MKDEPENDHS_OPTS += -irequired:ghc:hbc:glaExts:concurrent
+SRC_MKDEPENDHS_OPTS += -irequired:ghc:hbc:glaExts:concurrent -I$(GHC_INCLUDE_DIR)
 
 #-----------------------------------------------------------------------------
 # 	Rules

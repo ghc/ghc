@@ -747,20 +747,22 @@ ppr_casm_results sty [r] liveness
 
 	(result_type, assign_result)
 	  = case r_kind of
-{- @ForeignObj@s replaces MallocPtrs and are *not* CReturnable.
-   Instead, external references have to be turned into ForeignObjs
+{- 
+   @ForeignObj@s replaces MallocPtrs and are *not* CReturnable.
+   Instead, external references have to explicitly turned into ForeignObjs
    using the primop makeForeignObj#. Benefit: Multiple finalisation
    routines can be accommodated and the below special case is not needed.
    Price is, of course, that you have to explicitly wrap `foreign objects'
    with makeForeignObj#.
-+ 
+
 	      ForeignObjRep ->
 		(uppPStr SLIT("StgForeignObj"),
 		 uppBesides [ uppPStr SLIT("constructForeignObj"),uppChar '(',
 				liveness, uppComma,
 				result_reg, uppComma,
 				local_var,
-			     pp_paren_semi ]) -}
+			     pp_paren_semi ]) 
+-}
 	      _ ->
 		(pprPrimKind sty r_kind,
 		 uppBesides [ result_reg, uppEquals, local_var, uppSemi ])

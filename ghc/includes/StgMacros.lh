@@ -2094,7 +2094,7 @@ do {							 \
   StorageMgrInfo.ForeignObjList = result;			   \
 							\
 							\
-/*fprintf(stderr,"DEBUG: ForeignObj(0x%x) = <0x%x, 0x%x, 0x%x, 0x%x>\n",	\
+ /*fprintf(stderr,"DEBUG: ForeignObj(0x%x) = <0x%x, 0x%x, 0x%x, 0x%x>\n",	\
       result,						\
       result[0],result[1],				\
       result[2],result[3]);*/				\
@@ -2105,11 +2105,20 @@ do {							 \
   (r) = (P_) result;					\
 } while (0)
 
+#define writeForeignObjZh(res,datum)	((PP_) ForeignObj_CLOSURE_DATA(res)) = ((P_)datum)
+
 #else
 #define makeForeignObjZh(r, liveness, mptr, finalise)	            \
 do {								    \
     fflush(stdout);						    \
     fprintf(stderr, "makeForeignObj#: no foreign object support.\n");\
+    EXIT(EXIT_FAILURE);						    \
+} while(0)
+
+#define writeForeignObjZh(res,datum)	\
+do {								    \
+    fflush(stdout);						    \
+    fprintf(stderr, "writeForeignObj#: no foreign object support.\n");\
     EXIT(EXIT_FAILURE);						    \
 } while(0)
 

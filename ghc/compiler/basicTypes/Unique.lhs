@@ -195,6 +195,7 @@ module Unique (
 	stateTyConKey,
 	synchVarPrimTyConKey,
 	thenMClassOpKey,
+	toEnumClassOpKey,
 	traceIdKey,
 	trueDataConKey,
 	unpackCString2IdKey,
@@ -680,4 +681,5 @@ mainPrimIoKey		= mkPreludeMiscIdUnique 67
 returnMClassOpKey	= mkPreludeMiscIdUnique 68
 -- Used for minusClassOp			69
 otherwiseIdKey		= mkPreludeMiscIdUnique 70
+toEnumClassOpKey	= mkPreludeMiscIdUnique 71
 \end{code}

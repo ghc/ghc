@@ -9,6 +9,8 @@ clock times, including timezone information (i.e, the functionality of
 its use of Coordinated Universal Time (UTC).
 
 \begin{code}
+{-# OPTIONS -#include "cbits/timezone.h" -#include "cbits/stgio.h"  #-}
+
 module Time 
        (
 	CalendarTime(..),
@@ -16,20 +18,23 @@ module Time
 	Day,
         CalendarTime(CalendarTime),
         TimeDiff(TimeDiff),
-	ClockTime,
+	ClockTime(..), -- non-standard, lib. report gives this as abstract
 	getClockTime, addToClockTime, diffClockTimes,
 	toCalendarTime,	toUTCTime, toClockTime,
-        calendarToTimeString, formatCalendarTime
+        calendarTimeToString, formatCalendarTime
        ) where
 
 import PrelBase
 import ST
-import IOBase ( IOError(..), constructErrorAndFail )
+import IOBase
 import ArrBase
 import STBase
-
+import ST
+import Ix
+import Char (intToDigit)
 import PackedString (unpackPS, packCBytesST)
-import PosixUtil    (allocWords, allocChars)
+import Locale
+
 \end{code}
 
 One way to partition and give name to chunks of a year and a week:
@@ -53,8 +58,7 @@ Clock times may be compared, converted to strings, or converted to an
 external calendar time @CalendarTime@.
 
 \begin{code}
-data ClockTime = TOD Integer Integer
-                 deriving (Eq, Ord)
+data ClockTime = TOD Integer Integer deriving (Eq, Ord)
 \end{code}
 
 When a @ClockTime@ is shown, it is converted to a string of the form
@@ -244,7 +248,7 @@ toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO $
         _ccall_ strlen zone				>>= \ len ->
         packCBytesST len zone				>>= \ tzname ->
         returnPrimIO (CalendarTime (1900+year) mon mday hour min sec psec 
-                      wday yday (unpackPS tzname) tz (isdst /= 0))
+                      (toEnum wday) yday (unpackPS tzname) tz (isdst /= 0))
 
 toUTCTime :: ClockTime -> CalendarTime
 toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO (
@@ -265,7 +269,7 @@ toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO (
 	_casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm	>>= \ wday ->
 	_casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm	>>= \ yday ->
         returnPrimIO (CalendarTime (1900+year) mon mday hour min sec psec 
-                      wday yday "UTC" 0 False)
+                      (toEnum wday) yday "UTC" 0 False)
     )
 
 toClockTime :: CalendarTime -> ClockTime
@@ -287,79 +291,93 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
 
 bottom :: (Int,Int)
 bottom = error "Time.bottom"
+
+
+-- (copied from PosixUtil, for now)
+-- Allocate a mutable array of characters with no indices.
+
+allocChars :: Int -> ST s (MutableByteArray s ())
+allocChars (I# size#) = ST $ \ (S# s#) ->
+    case newCharArray# size# s# of 
+      StateAndMutableByteArray# s2# barr# -> (MutableByteArray bot barr#, S# s2#)
+  where
+    bot = error "Time.allocChars"
+
+-- Allocate a mutable array of words with no indices
+
+allocWords :: Int -> ST s (MutableByteArray s ())
+allocWords (I# size#) = ST $ \ (S# s#) ->
+    case newIntArray# size# s# of 
+      StateAndMutableByteArray# s2# barr# -> (MutableByteArray bot barr#, S# s2#)
+  where
+    bot = error "Time.allocWords"
+
 \end{code}
 
 \begin{code}
-calendarTimeToString :: CalendarTime -> String
-calendarTimeToString  =  formatCalendarTime defaultTimeLocale "%c"
+calendarTimeToString  :: CalendarTime -> String
+calendarTimeToString  =  formatCalendarTime defaultTimeLocale "%c"
 
-formatCalendarTime :: TimeLocale -> String -> CalendarTime -> String
-formatCalendarTime l 
-	           fmt 
-		   ct@(CalendarTime 
-			year mon 
-			day hour 
-			min sec 
-			sdec 
-                        wday yday tzname _ _)
- = doFmt fmt
-  where 
-   doFmt ('%':c:cs) = decode c ++ doFmt cs
-   doFmt (c:cs) = c : doFmt cs
-   doFmt "" = ""
+formatCalendarTime :: TimeLocale -> String -> CalendarTime -> String
+formatCalendarTime l fmt ct@(CalendarTime year mon day hour min sec sdec 
+                                           wday yday tzname _ _) =
+        doFmt fmt
+  where doFmt ('%':c:cs) = decode c ++ doFmt cs
+        doFmt (c:cs) = c : doFmt cs
+        doFmt "" = ""
+        to12 h = let h' = h `mod` 12 in if h == 0 then 12 else h
+        decode 'A' = fst (wDays l  !! fromEnum wday)
+        decode 'a' = snd (wDays l  !! fromEnum wday)
+        decode 'B' = fst (months l !! fromEnum mon)
+        decode 'b' = snd (months l !! fromEnum mon)
+        decode 'h' = snd (months l !! fromEnum mon)
+        decode 'C' = show2 (year `quot` 100)
+        decode 'c' = doFmt (dateTimeFmt l)
+        decode 'D' = doFmt "%m/%d/%y"
+        decode 'd' = show2 day
+        decode 'e' = show2' day
+        decode 'H' = show2 hour
+        decode 'I' = show2 (to12 hour)
+        decode 'j' = show3 yday
+        decode 'k' = show2' hour
+        decode 'l' = show2' (to12 hour)
+        decode 'M' = show2 min
+        decode 'm' = show2 (fromEnum mon+1)
+        decode 'n' = "\n"
+        decode 'p' = (if hour < 12 then fst else snd) (amPm l)
+        decode 'R' = doFmt "%H:%M"
+        decode 'r' = doFmt (time12Fmt l)
+        decode 'T' = doFmt "%H:%M:%S"
+        decode 't' = "\t"
+        decode 'S' = show2 sec
+        decode 's' = show2 sec -- Implementation-dependent, sez the lib doc..
+        decode 'U' = show2 ((yday + 7 - fromEnum wday) `div` 7)
+        decode 'u' = show (let n = fromEnum wday in 
+                           if n == 0 then 7 else n)
+        decode 'V' = 
+            let (week, days) = 
+                   (yday + 7 - if fromEnum wday > 0 then 
+                               fromEnum wday - 1 else 6) `divMod` 7
+            in  show2 (if days >= 4 then
+                          week+1 
+                       else if week == 0 then 53 else week)
 
-   to12 h = let h' = h `mod` 12 in if h == 0 then 12 else h
+        decode 'W' = 
+            show2 ((yday + 7 - if fromEnum wday > 0 then 
+                               fromEnum wday - 1 else 6) `div` 7)
+        decode 'w' = show (fromEnum wday)
+        decode 'X' = doFmt (timeFmt l)
+        decode 'x' = doFmt (dateFmt l)
+        decode 'Y' = show year
+        decode 'y' = show2 (year `rem` 100)
+        decode 'Z' = tzname
+        decode '%' = "%"
+        decode c   = [c]
 
-   decode 'A' = fst (wdays l  !! fromEnum wday)
-   decode 'a' = snd (wdays l  !! fromEnum wday)
-   decode 'B' = fst (months l !! fromEnum mon)
-   decode 'b' = snd (months l !! fromEnum mon)
-   decode 'h' = snd (months l !! fromEnum mon)
-   decode 'C' = show2 (year `quot` 100)
-   decode 'c' = doFmt (dateTimeFmt l)
-   decode 'D' = doFmt "%m/%d/%y"
-   decode 'd' = show2 day
-   decode 'e' = show2' day
-   decode 'H' = show2 hour
-   decode 'I' = show2 (to12 hour)
-   decode 'j' = show3 yday
-   decode 'k' = show2' hour
-   decode 'l' = show2' (to12 hour)
-   decode 'M' = show2 min
-   decode 'm' = show2 (fromEnum mon+1)
-   decode 'n' = "\n"
-   decode 'p' = (if hour < 12 then fst else snd) (amPm l)
-   decode 'R' = doFmt "%H:%M"
-   decode 'r' = doFmt (time12Fmt l)
-   decode 'T' = doFmt "%H:%M:%S"
-   decode 't' = "\t"
-   decode 'S' = show2 sec
-   decode 's' = show2 sec -- Implementation-dependent, sez the lib doc..
-   decode 'U' = show2 ((yday + 7 - fromEnum wday) `div` 7)
-   decode 'u' = show (let n = fromEnum wday in if n == 0 then 7 else n)
-   decode 'V' = 
-    let (week, days) = 
-          (yday + 7 - if fromEnum wday > 0 then 
-                         fromEnum wday - 1 else 6) `divMod` 7
-    in  
-    show2 (if   days >= 4 
-           then week+1 
-           else if week == 0 then 53 else week)
-   decode 'W' = 
-    show2 ((yday + 7 - if fromEnum wday > 0 then 
-                          fromEnum wday - 1 else 6) `div` 7)
-   decode 'w' = show (fromEnum wday)
-   decode 'X' = doFmt (timeFmt l)
-   decode 'x' = doFmt (dateFmt l)
-   decode 'Y' = show year
-   decode 'y' = show2 (year `rem` 100)
-   decode 'Z' = tzname
-   decode '%' = "%"
-   decode c   = [c]
+show2, show2', show3 :: Int -> String
+show2 x = [intToDigit (x `quot` 10), intToDigit (x `rem` 10)]
 
-show2, show2', show3 :: Int -> String
-show2 x = [intToDigit (x `quot` 10), intToDigit (x `rem` 10)]
-show2' x = if x < 10 then [ ' ', intToDigit x] else show2 x
-show3 x = intToDigit (x `quot` 100) : show2 (x `rem` 100)
+show2' x = if x < 10 then [ ' ', intToDigit x] else show2 x
 
+show3 x = intToDigit (x `quot` 100) : show2 (x `rem` 100)
 \end{code}

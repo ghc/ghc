@@ -79,12 +79,21 @@ instance CReturnable () -- Why, exactly?
 instance CCallable ForeignObj
 instance CCallable ForeignObj#
 
-eqForeignObj   :: ForeignObj -> ForeignObj -> Bool
-makeForeignObj :: Addr       -> Addr       -> PrimIO ForeignObj
+eqForeignObj    :: ForeignObj  -> ForeignObj -> Bool
+makeForeignObj  :: Addr        -> Addr       -> PrimIO ForeignObj
+writeForeignObj :: ForeignObj  -> Addr       -> PrimIO ()
 
-makeForeignObj (A# obj) (A# finaliser) = ST $ \ (S# s#) ->
+{- derived op - attaching a free() finaliser to a malloc() allocated reference. -}
+makeMallocPtr   :: Addr        -> PrimIO ForeignObj
+
+makeForeignObj (A# obj) (A# finaliser) = ST ( \ (S# s#) ->
     case makeForeignObj# obj finaliser s# of
-      StateAndForeignObj# s1# fo# -> (ForeignObj fo#, S# s1#)
+      StateAndForeignObj# s1# fo# -> (ForeignObj fo#, S# s1#))
+
+writeForeignObj (ForeignObj fo#) (A# datum#) = ST ( \ (S# s#) ->
+    case writeForeignObj# fo# datum# s# of { s1# -> ((), S# s1#) } )
+
+makeMallocPtr a = makeForeignObj a (``&free''::Addr)
 
 eqForeignObj mp1 mp2
   = unsafePerformPrimIO (_ccall_ eqForeignObj mp1 mp2) /= (0::Int)

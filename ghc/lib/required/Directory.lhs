@@ -1,8 +1,7 @@
 %
 % (c) The AQUA Project, Glasgow University, 1994-1997
 %
-
-\section[Directory]{Module @Directory@}
+\section[Directory]{Directory interface}
 
 A directory contains a series of entries, each of which is a named
 reference to a file system object (file, directory etc.).  Some
@@ -18,23 +17,36 @@ some operating systems, it may also be possible to have paths which
 are relative to the current directory.
 
 \begin{code}
-module Directory ( 
---    Permissions(Permissions),
-    createDirectory, removeDirectory, removeFile, 
-    renameDirectory, renameFile, getDirectoryContents,
-    getCurrentDirectory, setCurrentDirectory
-{-
-    ,doesFileExist, doesDirectoryExist,
-    getPermissions, setPermissions,
-    getModificationTime
--}
-  ) where
+{-# OPTIONS -#include <sys/stat.h> #-}
+module Directory 
+   ( 
+    Permissions(Permissions),
 
-import Prelude
+    createDirectory, 
+    removeDirectory, 
+    renameDirectory, 
+    getDirectoryContents,
+    getCurrentDirectory, 
+    setCurrentDirectory,
+
+    removeFile, 
+    renameFile, 
+
+    doesFileExist,
+    doesDirectoryExist,
+    getPermissions, 
+    setPermissions,
+    getModificationTime
+   ) where
+
+import PrelBase
 import Foreign
 import IOBase
-import STBase		( PrimIO )
-import PackedString	( packCBytesST, unpackPS )
+import STBase
+import ArrBase
+import PackedString	( packCBytesST, unpackPS, psToByteArrayST )
+import Time             ( ClockTime(..) )
+
 \end{code}
 
 %*********************************************************
@@ -52,6 +64,11 @@ renameFile 		:: FilePath -> FilePath -> IO ()
 getDirectoryContents 	:: FilePath -> IO [FilePath]
 getCurrentDirectory 	:: IO FilePath
 setCurrentDirectory 	:: FilePath -> IO ()
+doesFileExist           :: FilePath -> IO Bool
+doesDirectoryExist      :: FilePath -> IO Bool
+getPermissions          :: FilePath -> IO Permissions
+setPermissions          :: FilePath -> Permissions -> IO ()
+getModificationTime     :: FilePath -> IO ClockTime
 \end{code}
 
 
@@ -61,8 +78,9 @@ setCurrentDirectory 	:: FilePath -> IO ()
 %*							*
 %*********************************************************
 
-The @Permissions@ type is used to record whether certain operations are permissible on a
-file/directory:
+The @Permissions@ type is used to record whether certain
+operations are permissible on a file/directory:
+[to whom? - owner/group/world - the Report don't say much]
 
 \begin{code}
 data Permissions
@@ -70,7 +88,6 @@ data Permissions
     readable,   writeable, 
     executable, searchable :: Bool 
    } deriving (Eq, Ord, Read, Show)
-
 \end{code}
 
 %*********************************************************
@@ -410,25 +427,26 @@ setCurrentDirectory path =
 
 
 \begin{code}
-{-
-doesFileExist :: FilePath -> IO Bool
+--doesFileExist :: FilePath -> IO Bool
 doesFileExist name =
   psToByteArrayST name			    `thenIO_Prim` \ path ->
   _ccall_ access path (``F_OK''::Int)	    `thenIO_Prim` \ rc ->
   return (rc == 0)
 
-doesDirectoryExist :: FilePath -> IO Bool
-doesDirectoryExist name =  
- (getFileStatus >>= isDirectory) `catch` (\ _ -> return False)
+--doesDirectoryExist :: FilePath -> IO Bool
+doesDirectoryExist name = 
+ (getFileStatus name >>= \ st -> return (isDirectory st))  
+   `catch` 
+ (\ _ -> return False)
 
-getModificationTime :: FilePath -> IO Bool
+--getModificationTime :: FilePath -> IO ClockTime
 getModificationTime name =
- getFileStatus >>= \ st ->
- return (modificationTime st)
+ getFileStatus name >>= \ st ->
+ modificationTime st
 
-getPermissions :: FilePath -> IO Permissions
+--getPermissions :: FilePath -> IO Permissions
 getPermissions name =
-  getFileStatus >>= \ st ->
+  getFileStatus name >>= \ st ->
   let
    fm = fileMode st
    isect v = intersectFileMode v fm == v
@@ -441,5 +459,99 @@ getPermissions name =
       searchable = not (isRegularFile st) && isect ownerExecuteMode
     }
   )
--}
+
+--setPermissions :: FilePath -> Permissions -> IO ()
+setPermissions name (Permissions r w e s) = 
+    let
+     read#  = case (if r then ownerReadMode else ``0'') of { W# x# -> x# }
+     write# = case (if w then ownerWriteMode else ``0'') of { W# x# -> x# }
+     exec#  = case (if e || s then ownerExecuteMode else ``0'') of { W# x# -> x# }
+
+     mode  = I# (word2Int# (read# `or#` write# `or#` exec#))
+    in
+    psToByteArrayST name			    `thenIO_Prim` \ path ->
+    _ccall_ chmod path mode			    `thenIO_Prim` \ rc ->
+    if rc == 0 then
+	return ()
+    else
+	fail (IOError Nothing SystemError "Directory.setPermissions")
+
+\end{code}
+
+
+(Sigh)..copied from Posix.Files to avoid dep. on posix library
+
+\begin{code}
+type FileStatus = ByteArray Int
+
+getFileStatus :: FilePath -> IO FileStatus
+getFileStatus name =
+    psToByteArrayST name			    `thenIO_Prim` \ path ->
+    newCharArray (0,``sizeof(struct stat)'')        `thenIO_Prim` \ bytes ->
+    _casm_ ``%r = stat(%0,(struct stat *)%1);'' path bytes
+						    `thenIO_Prim` \ rc ->
+    if rc == 0 then
+	unsafeFreezeByteArray bytes          	    `thenIO_Prim` \ stat ->
+	return stat
+    else
+	fail (IOError Nothing SystemError "Directory.getFileStatus")
+
+modificationTime :: FileStatus -> IO ClockTime
+modificationTime stat =
+    malloc1					           `thenIO_Prim` \ i1 ->
+    _casm_ ``((unsigned long *)%1)[0] = ((struct stat *)%0)->st_mtime;'' stat i1 `thenIO_Prim` \ () ->
+    cvtUnsigned i1                                         `thenIO_Prim` \ secs ->
+    return (TOD secs 0)
+  where
+    malloc1 = ST $ \ (S# s#) ->
+	case newIntArray# 1# s# of 
+          StateAndMutableByteArray# s2# barr# -> (MutableByteArray bnds barr#, S# s2#)
+
+    bnds = (0,1)
+    -- The C routine fills in an unsigned word.  We don't have `unsigned2Integer#,'
+    -- so we freeze the data bits and use them for an MP_INT structure.  Note that
+    -- zero is still handled specially, although (J# 1# 1# (ptr to 0#)) is probably
+    -- acceptable to gmp.
+
+    cvtUnsigned (MutableByteArray _ arr#) = ST $ \ (S# s#) ->
+	case readIntArray# arr# 0# s# of 
+	  StateAndInt# s2# r# ->
+            if r# ==# 0# then
+                (0, S# s2#)
+            else
+                case unsafeFreezeByteArray# arr# s2# of
+                  StateAndByteArray# s3# frozen# -> (J# 1# 1# frozen#, S# s3#)
+
+isDirectory :: FileStatus -> Bool
+isDirectory stat = unsafePerformPrimIO $
+    _casm_ ``%r = S_ISDIR(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
+    return (rc /= 0)
+
+isRegularFile :: FileStatus -> Bool
+isRegularFile stat = unsafePerformPrimIO $
+    _casm_ ``%r = S_ISREG(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
+    return (rc /= 0)
+
+
+\end{code}
+
+\begin{code}
+type FileMode = Word
+ownerReadMode :: FileMode
+ownerReadMode = ``S_IRUSR''
+
+ownerWriteMode :: FileMode
+ownerWriteMode = ``S_IWUSR''
+
+ownerExecuteMode :: FileMode
+ownerExecuteMode = ``S_IXUSR''
+
+intersectFileMode :: FileMode -> FileMode -> FileMode
+intersectFileMode (W# m1#) (W# m2#) = W# (m1# `and#` m2#)
+
+fileMode :: FileStatus -> FileMode
+fileMode stat = unsafePerformPrimIO $
+    _casm_ ``%r = ((struct stat *)%0)->st_mode;'' stat >>= \ mode ->
+    return mode
+
 \end{code}

@@ -181,6 +181,11 @@ GhcLibHcOpts= -split-objs -odir $(basename $*)
 # Build the Haskell Readline bindings?
 #
 HsLibsWithReadline=YES
+#
+# Include path to readline.h
+# (no path == in standard include path)
+#
+ReadlineIncludePath=
 
 # Build the socket libraries?
 #
@@ -192,6 +197,9 @@ HsLibsWithSockets=YES
 #
 HsLibWays=$(GhcLibWays)
 
+# Option flags for hslibs are by default the same as for the options
+# used for the prelude libs (see above).
+HsLibHcOpts=$(GhcLibHcOpts)
 
 #################################################################################
 #
@@ -265,37 +273,32 @@ NoFibHcOpts=
 #
 #################################################################################
 
-# These variables are all ":=" variables so that you can easily attach
-# extra stuff to the end of them, like this:
-#
-#	libdir := $(libdir)/ghc
-
-TMPDIR			:= /tmp
+TMPDIR			= /tmp
 
 # FPTOOLS_TOP: the top of the fptools hierarchy, absolute path.
 
-FPTOOLS_TOP_ABS		:= @hardtop@
+FPTOOLS_TOP_ABS		= @hardtop@
 
 #
 # Installation directories, we don't use half of these,
 # but since the configure script has them on offer while
 # passing through, we might as well set them.
 
-prefix                  := @prefix@
-exec_prefix             := @exec_prefix@
-bindir                  := @bindir@
-sbindir                 := @sbindir@
-libexecdir              := @libexecdir@
-datadir                 := @datadir@
-sysconfdir              := @datadir@
-sharedstatedir          := @sharedstatedir@
-localstatedir           := @localstatedir@
-libdir                  := @libdir@
-infodir		        := @infodir@
-includedir              := @includedir@
-oldincludedir           := @oldincludedir@
-mandir			:= @mandir@
-srcdir                  := @srcdir@
+prefix                  = @prefix@
+exec_prefix             = @exec_prefix@
+bindir                  = @bindir@
+sbindir                 = @sbindir@
+libexecdir              = @libexecdir@
+datadir                 = @datadir@
+sysconfdir              = @datadir@
+sharedstatedir          = @sharedstatedir@
+localstatedir           = @localstatedir@
+libdir                  = @libdir@
+infodir		        = @infodir@
+includedir              = @includedir@
+oldincludedir           = @oldincludedir@
+mandir			= @mandir@
+srcdir                  = @srcdir@
 
 #################################################################################
 #

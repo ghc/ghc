@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 1997/03/14 07:53:55 simonpj Exp $
+# $Id: Makefile,v 1.4 1997/03/17 20:34:29 simonpj Exp $
 #
 
 TOP=.
@@ -49,7 +49,7 @@ boot ::
 	$(line)
 	@echo "Booting Prelude libraries"
 	$(line)
-	@$(MAKE) -C compiler boot
+	@$(MAKE) -C lib boot
 
 
 # "CONTRIB" is also a SUBDIR, but there is nothing to build there.

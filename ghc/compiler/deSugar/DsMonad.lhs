@@ -282,7 +282,7 @@ pprDsWarnings sty warns
       = ppCat [ppPStr SLIT("in the definition of function"), ppQuote (ppr sty fun)]
 
     pp_match CaseMatch pats
-      = ppHang (ppPStr SLIT("in a group of case alternative beginning:"))
+      = ppHang (ppPStr SLIT("in a group of case alternatives beginning:"))
 	4 (ppSep [ppSep (map (ppr sty) pats), pp_arrow_dotdotdot])
 
     pp_match PatBindMatch pats

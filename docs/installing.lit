@@ -784,6 +784,19 @@ and you're on the road again.
 You need to be a bit careful, though, that any new files you create
 (if you do any development work) are in the source tree, not a build tree!
 
+Remember, that the source files in the build tree are {\em symbolic
+links} to the files in the source tree.  (The build tree soon
+accumulates lots of built files like @Foo.o@, as well.)  You can {\em
+delete} a source file from the build tree without affecting the source
+tree (though it's an odd thing to do).  On the other hand, if you {\em
+edit} a source file from the build tree, you'll edit the source-tree
+file directly.  (You can set up Emacs so that if you edit a source
+file from the build tree, Emacs will silently create an edited copy of
+the source file in the build tree, leaving the source file unchanged;
+but the danger is that you think you've edited the source file whereas
+actually all you've done is edit the build-tree copy.  More commonly
+you do want to edit the source file.)
+
 Like the source tree, the top level of your build tree must (a linked copy of)
 the root directory of the @fptools@ suite.
 Inside Makefiles, the root of your build tree is called @$(FPTOOLS_TOP)@.
@@ -813,27 +826,32 @@ Or, you might want to compile it with debugging on (so that
 extra consistency-checking code gets included) or off.  And so on.
 
 All of this stuff is called the {\em configuration} of your build.
-You set the configuration using an exciting two-step process.
+You set the configuration using an exciting three-step process.
 \begin{description}
-\item[Step 1: system configuration.]  This is easy, provided you
-have the programs mentioned in Section~\ref{sect_std-utils}.  Just
-@cd@ to @$(FPTOOLS)@ and say @gmake configure@.  This 
-command does three things:
-\begin{itemize}
-\item
-It runs a GNU program called @autoconf@, which
+\item[Step 1: get ready for configuration.]
+Change directory to @$(FPTOOLS)@ and issue the following two commands (with no arguments):
+\begin{enumerate}
+\item @autoconf@. This GNU program
 converts @$(FPTOOLS)/configure.in@ to a shell script 
 called @$(FPTOOLS)/configure@.
 
-This step is completely platform-independent; it just means
-that the human-written file (@configure.in@) can be short, although
-the resulting shell script, @configure@ is long. 
-
-\item It runs a second GNU program called @autoheader@, which converts
+\item @autoheader@.  This second GNU program converts
 @$(FPTOOLS)/configure.in@ to @$(FPTOOLS)/mk/config.h.in@.
-Again, this step is platform-independent.
+\end{enumerate}
+Both these steps are completely platform-independent; they just mean
+that the human-written file (@configure.in@) can be short, although
+the resulting shell script, @configure@, and @mk/config.h.in@, are long.
 
-\item It then runs the newly-created @configure@ script.  @configure@'s mission
+In case you don't have @autoconf@ and @autoheader@ we distribute
+the results, @configure@, and @mk/config.h.in@, with the source distribution.
+They aren't kept in the repository, though.
+
+\item[Step 2: system configuration.]
+Runs the newly-created @configure@ script, thus:
+\begin{verbatim}
+  ./configure
+\end{verbatim}
+@configure@'s mission
 is to scurry round your computer working out what architecture it has,
 what operating system, whether it has the @vfork@ system call,
 where @yacc@ is kept, whether @gcc@ is available, where various
@@ -853,10 +871,9 @@ all Makefiles.
 The latter is @#include@d by various C programs, which
 can thereby make use of configuration information.
 \end{itemize}
-\end{itemize}
 
 
-\item[Step 2: build configuration.] Next, you say how this build
+\item[Step 3: build configuration.] Next, you say how this build
 of @fptools@ is to differ from the standard defaults by creating a new 
 file @mk/build.mk@
 {\em in the build tree}.  This file is the one and only
@@ -883,18 +900,18 @@ want to change.  (The override occurs because the main boilerplate file,
 
 For example, @config.mk.in@ contains the definition:
 \begin{verbatim}
-  SUBDIRS = glafp-utils literate ghc
+  ProjectsToBuild = glafp-utils literate ghc hslibs
 \end{verbatim}
 The accompanying comment explains that this is the list of enabled
 projects; that is, if (after configuring) you type @gmake all@
 in @FPTOOLS_TOP@ three specified projects will be made.
 If you want to add @happy@, you can add this line to @build.mk@:
 \begin{verbatim}
-  SUBDIRS += happy
+  ProjectsToBuild += happy
 \end{verbatim}
 or, if you prefer,
 \begin{verbatim}
-  SUBDIRS = glafp-utils literate ghc happy
+  ProjectsToBuild = glafp-utils literate ghc hslibs happy
 \end{verbatim}
 (GNU @make@ allows existing definitions to have new text appended using
 the ``@+=@'' operator, which is quite a convenient feature.)
@@ -941,10 +958,19 @@ to happen there now.
 \begin{verbatim}
     cd /scratch/joe-bloggs/myfptools-sun4
 \end{verbatim}
+\item Prepare for system configuration:
+\begin{verbatim}
+    autoconf
+    autoheader
+\end{verbatim}
+(You can skip this step if you are starting from a source distribution,
+and you already have @configure@ and @mk/config.h.in@.)
+
 \item Do system configuration:
 \begin{verbatim}
-    gmake configure
+    ./configure
 \end{verbatim}
+
 \item Create the file @mk/build.mk@, 
 adding definitions for your desired configuration options.
 \begin{verbatim}

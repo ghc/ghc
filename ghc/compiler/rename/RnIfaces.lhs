@@ -32,7 +32,9 @@ import HsPragmas	( noGenPragmas )
 import RdrHsSyn		( SYN_IE(RdrNameHsDecl), SYN_IE(RdrNameInstDecl), 
 			  RdrName, rdrNameOcc
 			)
-import RnEnv		( newGlobalName, lookupRn, addImplicitOccsRn, availName, availNames, addAvailToNameSet )
+import RnEnv		( newGlobalName, lookupRn, addImplicitOccsRn, 
+			  availName, availNames, addAvailToNameSet, pprAvail
+			)
 import RnSource		( rnHsType )
 import RnMonad
 import ParseIface	( parseIface )
@@ -275,6 +277,7 @@ importDecl :: Name -> Necessity -> RnMG (Maybe RdrNameHsDecl)
 importDecl name necessity
   = checkSlurped name			`thenRn` \ already_slurped ->
     if already_slurped then
+	-- traceRn (ppSep [ppStr "Already slurped:", ppr PprDebug name])	`thenRn_`
 	returnRn Nothing	-- Already dealt with
     else
     if isWiredInName name then
@@ -336,43 +339,57 @@ that we know just what instances to bring into scope.
 	
 \begin{code}
 getWiredInDecl name
-  = 	-- Force in the home module in case it has instance decls for
-	-- the thing we are interested in
-    (if not is_tycon || mod == gHC__ then
-	returnRn ()			-- Mini hack 1: no point for non-tycons; and if we
-					-- do this we find PrelNum trying to import PackedString,
-					-- because PrelBase's .hi file mentions PackedString.unpackString
-					-- But PackedString.hi isn't built by that point!
-					--
-					-- Mini hack 2; GHC is guaranteed not to have
-					-- instance decls, so it's a waste of time
-					-- to read it
+  = get_wired				`thenRn` \ avail ->
+    recordSlurp Nothing avail		`thenRn_`
+
+   	-- Force in the home module in case it has instance decls for
+	-- the thing we are interested in.
+	--
+	-- Mini hack 1: no point for non-tycons/class; and if we
+	-- do this we find PrelNum trying to import PackedString,
+	-- because PrelBase's .hi file mentions PackedString.unpackString
+	-- But PackedString.hi isn't built by that point!
+	--
+	-- Mini hack 2; GHC is guaranteed not to have
+	-- instance decls, so it's a waste of time to read it
+	--
+	-- NB: We *must* look at the availName of the slurped avail, 
+	-- not the name passed to getWiredInDecl!  Why?  Because if a data constructor 
+	-- or class op is passed to getWiredInDecl we'll pull in the whole data/class
+	-- decl, and recordSlurp will record that fact.  But since the data constructor
+	-- isn't a tycon/class we won't force in the home module.  And even if the
+	-- type constructor/class comes along later, loadDecl will say that it's already
+	-- been slurped, so getWiredInDecl won't even be called.  Pretty obscure bug, this was.
+    let
+	main_name  = availName avail
+	main_is_tc = case avail of { AvailTC _ _ -> True; Avail _ -> False }
+	(mod,_)    = modAndOcc main_name
+	doc_str    = ppSep [ppPStr SLIT("Need home module for wired in thing"), ppr PprDebug name]
+    in
+    (if not main_is_tc || mod == gHC__ then
+	returnRn ()		
     else
 	loadInterface doc_str mod	`thenRn_`
 	returnRn ()
     )				 	`thenRn_`
 
-    get_wired				`thenRn` \ avail ->
-    recordSlurp Nothing avail		`thenRn_`
     returnRn Nothing		-- No declaration to process further
   where
-    doc_str = ppSep [ppPStr SLIT("Need home module for wired in thing"), ppr PprDebug name]
-    (mod,_) = modAndOcc name
-    maybe_wired_in_tycon = maybeWiredInTyConName name
-    is_tycon		 = maybeToBool maybe_wired_in_tycon
-    maybe_wired_in_id    = maybeWiredInIdName    name
-    Just the_tycon	 = maybe_wired_in_tycon
-    Just the_id 	 = maybe_wired_in_id
 
     get_wired | is_tycon			-- ... a type constructor
 	      = get_wired_tycon the_tycon
-	      -- Else, must be a wired-in-Id
 
 	      | (isDataCon the_id) 		-- ... a wired-in data constructor
 	      = get_wired_tycon (dataConTyCon the_id)
 
 	      | otherwise			-- ... a wired-in non data-constructor
 	      = get_wired_id the_id
+
+    maybe_wired_in_tycon = maybeWiredInTyConName name
+    is_tycon		 = maybeToBool maybe_wired_in_tycon
+    maybe_wired_in_id    = maybeWiredInIdName    name
+    Just the_tycon	 = maybe_wired_in_tycon
+    Just the_id 	 = maybe_wired_in_id
 
 
 get_wired_id id
@@ -406,7 +423,8 @@ checkSlurped name
     returnRn (name `elemNameSet` slurped_names)
 
 recordSlurp maybe_version avail
-  = getIfacesRn 	`thenRn` \ ifaces ->
+  = -- traceRn (ppSep [ppStr "Record slurp:", pprAvail PprDebug avail])	`thenRn_`
+    getIfacesRn 	`thenRn` \ ifaces ->
     let
 	Ifaces this_mod mod_vers export_envs decls slurped_names imp_names insts inst_mods = ifaces
 	new_slurped_names = addAvailToNameSet slurped_names avail

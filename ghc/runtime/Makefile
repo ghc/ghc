@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 1997/03/14 05:11:52 sof Exp $
+# $Id: Makefile,v 1.5 1997/03/17 20:34:59 simonpj Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -159,9 +159,9 @@ LIBOBJS = $(patsubst %.lc,%.$(way_)o,$(SRCS_RTS_LC)) \
 #
 # dependencies
 #
-SRC_HC_OPTS += -I$(GHC_INCLUDE_DIR) -O -optc-DIN_GHC_RTS=1 -I$(GHC_RUNTIME_DIR)/storage 
+SRC_HC_OPTS += -I$(GHC_INCLUDE_DIR) $(GCap) $(GC2s) $(GC1s) -O -optc-DIN_GHC_RTS=1 -I$(GHC_RUNTIME_DIR)/storage 
 
-SRC_MKDEPENDC_OPTS += $(GCap) $(GC2s) $(GC1s)
+SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR) $(GCap) $(GC2s) $(GC1s)
 
 #-----------------------------------------------------------------------------
 # file-specific options 

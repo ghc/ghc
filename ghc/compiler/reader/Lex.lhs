@@ -531,7 +531,7 @@ is_sym c#=
    '&'# -> True; '*'# -> True; '+'# -> True; '.'# -> True; 
    '/'# -> True; '<'# -> True; '='# -> True; '>'# -> True; 
    '?'# -> True; '\\'# -> True; '^'# -> True; '|'# -> True; 
-   '-'# -> True; '~'# -> True; _ -> False }
+   '-'# -> True; '~'# -> True; '@'# -> True; _ -> False }
 
 --isAlphanum c || c `elem` ":_'!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
 

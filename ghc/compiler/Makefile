@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.8 1997/03/14 07:55:43 simonpj Exp $
+# $Id: Makefile,v 1.9 1997/03/17 20:34:30 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -226,6 +226,7 @@ all :: hsp
 hsp: parser/printtree.o parser/main.o libhsp.a 
 	$(CC) -o $@ $(CC_OPTS) $^
 
+CLEAN_FILES += hsp
 #-----------------------------------------------------------------------------
 # 		Interface files
 

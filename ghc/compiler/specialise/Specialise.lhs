@@ -1291,27 +1291,13 @@ specExpr :: CoreExpr
 				-- expression.
 
 specExpr (Var v) args
-  = specId v			$ \ lookupId v			`thenSM` \ vlookup ->
-    case vlookup of
-       Lifted vl vu
-	     -> -- Binding has been lifted, need to extract un-lifted value
-		-- NB: a function binding will never be lifted => args always null
-		--     i.e. no call instance required or call to be constructed
-		ASSERT (null args)
-		returnSM (bindUnlift vl vu (Var vu), singleFvUDs (VarArg vl))
+  = specId v		$ \ v_arg -> 
+    case v_arg of
+       LitArg lit -> ASSERT( null args )
+		     returnSM (Lit lit, emptyUDs)
 
-       NoLift vatom@(VarArg new_v)
-	     -> mapSM specOutArg args			`thenSM` \ arg_info ->
-		mkCallInstance v new_v arg_info		`thenSM` \ call_uds ->
-    		mkCall new_v arg_info			`thenSM` \ call ->
-		let
-		    call mkGenApp (Var new_id) [arg | (arg, _, _) <- arg_infos])
-		    uds = unionUDList [call_uds,
-				       singleFvUDs vatom,
-				       unionUDList [uds | (_,uds,_) <- arg_info]
-				      ]
-		in
-    		returnSM (call, {- tickSpecCall speced -} uds)
+       VarArg new_v -> mkCallInstance v new_v args	`thenSM` \ uds ->
+		       returnSM (mkGenApp (Var new_v) args, uds)
 
 specExpr expr@(Lit _) null_args
   = ASSERT (null null_args)
@@ -1354,9 +1340,8 @@ specPrimOp :: PrimOp
 
 
 specExpr (App fun arg) args
-  = 	-- If TyArg, arg will be processed; otherwise, left alone
-    specArg arg 			`thenSM` \ new_arg    ->
-    specExpr   fun (new_arg : args)	`thenSM` \ (expr,uds) ->
+  = specArg arg 			`thenSM` \ new_arg    ->
+    specExpr fun (new_arg : args)	`thenSM` \ (expr,uds) ->
     returnSM (expr, uds)
 
 specExpr (Lam (ValBinder binder) body) (arg : args) | isValArg arg
@@ -1564,18 +1549,18 @@ partition_args args
 
 ----------
 specId :: Id
-       -> (Id -> SpecM (CoreExpr, UsageDetails))
+       -> (CoreArg -> SpecM (CoreExpr, UsageDetails))
        -> SpecM (CoreExpr, UsageDetails)
 specId v
   = lookupId v		`thenSM` \ vlookup ->
     case vlookup of
 
       Lifted vl vu
-	 -> thing_inside vu		`thenSM` \ (expr, uds) -> 
+	 -> thing_inside (VarArg vu)	`thenSM` \ (expr, uds) -> 
 	    returnSM (bindUnlift vl vu expr, singleFvUDs (VarArg vl) `unionUDs` uds)
 
       NoLift vatom
-	 -> thing_inside vatom	`thenSM` \ (expr, uds) ->
+	 -> thing_inside vatom		`thenSM` \ (expr, uds) ->
 	    returnSM (expr, singleFvUDs vatom `unionUDs` uds)
 
 specArg :: CoreArg
@@ -1933,7 +1918,7 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
     newTyVars (length [() | Nothing <- spec_tys])   	`thenSM` \ poly_tyvars ->
     let
 	-- arg_tys is spec_tys with tyvars instead of the Nothing spec_tys
-	-- which correspond to unspeciailsed args
+	-- which correspond to unspecialised args
 	arg_tys  :: [Type]
 	(_,arg_tys) = mapAccumL do_the_wotsit poly_tyvars spec_tys
 
@@ -2060,246 +2045,53 @@ mkCallInstance :: Id
 	       -> [CoreArg]
 	       -> SpecM UsageDetails
 
-mkCallInstance id new_id []
-  = returnSM emptyUDs
-
 mkCallInstance id new_id args
-
-	-- No specialised versions for "error" and friends are req'd.
-	-- This is a special case in core lint etc.
-
-  | isBottomingId id
+  | null args		  ||		-- No args at all
+    isBottomingId id      ||		-- No point in specialising "error" and friends
+					-- even at unboxed types
+    idWantsToBeINLINEd id ||		-- It's going to be inlined anyway
+    not enough_args       ||		-- Not enough type and dict args
+    not interesting_overloading		-- Overloaded types are just tyvars
   = returnSM emptyUDs
-
-	-- No call instances for SuperDictSelIds
-	-- These are a special case in mkCall
-
-  | maybeToBool (isSuperDictSelId_maybe id)
-  = returnSM emptyUDs
-
-	-- There are also no call instances for ClassOpIds
-	-- However, we need to process it to get any second-level call
-	-- instances for a ConstMethodId extracted from its SpecEnv
 
   | otherwise
-  = let
-	(tyvars, class_tyvar_pairs) = getIdOverloading id
-	constrained_tyvars   	    = map snd class_tyvar_pairs 	-- May contain dups
-	constraint_vec		    = [tyvar `elem` constrained_tyvars | tyvar <- tyvars]
+  = returnSM (singleCI new_id spec_tys dicts)
 
-	arg_res     = take_type_args tyvars class_tyvar_pairs args
-	enough_args = maybeToBool arg_res
+  where
+    (tyvars, class_tyvar_pairs) = getIdOverloading id
+    constrained_tyvars   	= map snd class_tyvar_pairs 	-- May contain dups
+    constraint_vec		= [tyvar `elem` constrained_tyvars | tyvar <- tyvars]
+    
+    arg_res     		   = take_type_args tyvars class_tyvar_pairs args
+    enough_args		           = maybeToBool arg_res
+    (Just (tys, dicts, rest_args)) = arg_res
+    
+    interesting_overloading = any (not . isTyVarTy) (catMaybes spec_tys)
+    spec_tys = specialiseCallTys constraint_vec tys
 
-
-	(Just (tys, dicts, rest_args)) = arg_res
-
-	record_spec id tys
-	  = (record, lookup, spec_tys)
-	  where
-	    spec_tys = specialiseCallTys constraint_vec tys
-
-	    record = any (not . isTyVarTy) (catMaybes spec_tys)
-
-	    lookup = lookupSpecEnv (getIdSpecialisation id) tys
-    in
-    if (not enough_args) then
-	pprTrace "Specialise:recordCallInst: Unsaturated Type & Dict Application:\n\t"
-		 (ppCat (ppr PprDebug id : map (ppr_arg PprDebug) args)) $
-	returnSM emptyUDs
-
-    else
-    case record_spec id tys of
-	(False, _, _)
-	     -> -- pprTrace "CallInst:NotReqd\n"
-	   	-- (ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)])
-		(returnSM emptyUDs)
-
-	(True, Nothing, spec_tys)
-	     -> if isClassOpId id then	-- No CIs for class ops, dfun will give SPEC inst
-		    returnSM emptyUDs
-		else
-		    -- pprTrace "CallInst:Reqd\n"
-		    -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
-		    --	          ppCat [ppPStr SLIT("CI"), ppCat (map (pprMaybeTy PprDebug) spec_tys),
-	   	    --		                     ppCat (map (ppr PprDebug) dicts)]])
-		    (returnSM (singleCI new_id spec_tys dicts))
-
-	(True, Just (spec_id, tys_left, toss), _)
-	     -> if maybeToBool (isConstMethodId_maybe spec_id) then
-			-- If we got a const method spec_id see if further spec required
-			-- NB: const method is top-level so spec_id will not be cloned
-		    case record_spec spec_id tys_left of
-		      (False, _, _)
-		    	-> -- pprTrace "CallInst:Exists\n"
-		    	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
-		    	   --	         ppCat [ppPStr SLIT("->"), ppr PprDebug spec_id,
-		    	   --		        ppr PprDebug (tys_left ++ drop toss dicts)]])
-			   (returnSM emptyUDs)
-
-		      (True, Nothing, spec_tys)
-			-> -- pprTrace "CallInst:Exists:Reqd\n"
-		    	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
-		    	   --	         ppCat [ppPStr SLIT("->"), ppr PprDebug spec_id,
-		    	   --		        ppr PprDebug (tys_left ++ drop toss dicts)],
-			   --	         ppCat [ppPStr SLIT("CI"), ppCat (map (pprMaybeTy PprDebug) spec_tys),
-	   		   --		                    ppCat (map (ppr PprDebug) (drop toss dicts))]])
-			   (returnSM (singleCI spec_id spec_tys (drop toss dicts)))
-
-		      (True, Just (spec_spec_id, tys_left_left, toss_toss), _)
-			-> -- pprTrace "CallInst:Exists:Exists\n"
-		    	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
-		    	   --	         ppCat [ppPStr SLIT("->"), ppr PprDebug spec_id,
-		    	   --		        ppr PprDebug (tys_left ++ drop toss dicts)],
-		    	   --	         ppCat [ppPStr SLIT("->"), ppr PprDebug spec_spec_id,
-		    	   --		        ppr PprDebug (tys_left_left ++ drop (toss + toss_toss) dicts)]])
-			   (returnSM emptyUDs)
-
-		else
-		    -- pprTrace "CallInst:Exists\n"
-		    -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
-		    --	          ppCat [ppPStr SLIT("->"), ppr PprDebug spec_id,
-		    --		         ppr PprDebug (tys_left ++ drop toss dicts)]])
-		    (returnSM emptyUDs)
-
-
-take_type_args (_:tyvars) class_tyvar_pairs (TyArg ty : args)
-	= case (take_type_args tyvars class_tyvar_pairs args) of
-	    Nothing 	          -> Nothing
+    ----------------- Rather a gruesome help-function ---------------
+    take_type_args (_:tyvars) (TyArg ty : args)
+	= case (take_type_args tyvars args) of
+	    Nothing 	              -> Nothing
 	    Just (tys, dicts, others) -> Just (ty:tys, dicts, others)
 
-take_type_args (_:tyvars) class_tyvar_pairs [] = Nothing
+    take_type_args (_:tyvars) [] = Nothing
 
-take_type_args [] class_tyvar_pairs args
+    take_type_args [] args
 	= case (take_dict_args class_tyvar_pairs args) of
 	    Nothing              -> Nothing
 	    Just (dicts, others) -> Just ([], dicts, others)
 
-take_dict_args (_:class_tyvar_pairs) (dict : args) | isValArg dict
+    take_dict_args (_:class_tyvar_pairs) (dict : args) | isValArg dict
 	= case (take_dict_args class_tyvar_pairs args) of
 	    Nothing              -> Nothing
 	    Just (dicts, others) -> Just (dict:dicts, others)
 
-take_dict_args (_:class_tyvar_pairs) [] = Nothing
+    take_dict_args (_:class_tyvar_pairs) args = Nothing
 
-take_dict_args [] args = Just ([], args)
+    take_dict_args [] args = Just ([], args)
 \end{code}
 
-\begin{code}
-mkCall :: Id
-       -> [(CoreArg, UsageDetails, CoreExpr -> CoreExpr)]
-       -> SpecM CoreExpr
-
-mkCall new_id arg_infos = returnSM (
-
-{- 
-  | maybeToBool (isSuperDictSelId_maybe new_id)
-    && any isUnboxedType ty_args
-	-- No specialisations for super-dict selectors
-	-- Specialise unboxed calls to SuperDictSelIds by extracting
-	-- the super class dictionary directly form the super class
-	-- NB: This should be dead code since all uses of this dictionary should
-	--     have been specialised. We only do this to keep core-lint happy.
-    = let
-	 Just (_, super_class) = isSuperDictSelId_maybe new_id
-	 super_dict_id = case lookupClassInstAtSimpleType super_class (head ty_args) of
-			 Nothing -> panic "Specialise:mkCall:SuperDictId"
-			 Just id -> id
-      in
-      returnSM (False, Var super_dict_id)
-
-  | otherwise
-    = case lookupSpecEnv (getIdSpecialisation new_id) ty_args of
-	Nothing -> checkUnspecOK new_id ty_args (
-		   returnSM (False, unspec_call)
-		   )
-
-	Just spec_1_details@(spec_id_1, tys_left_1, dicts_to_toss_1)
-		-> let
-			-- It may be necessary to specialsie a constant method spec_id again
-		       (spec_id, tys_left, dicts_to_toss) =
-			    case (maybeToBool (isConstMethodId_maybe spec_id_1),
-				  lookupSpecEnv (getIdSpecialisation spec_id_1) tys_left_1) of
-				 (False, _ )	 -> spec_1_details
-				 (True, Nothing) -> spec_1_details
-				 (True, Just (spec_id_2, tys_left_2, dicts_to_toss_2))
-						 -> (spec_id_2, tys_left_2, dicts_to_toss_1 + dicts_to_toss_2)
-
-		       args_left = toss_dicts dicts_to_toss val_args
-		   in
-		   checkSpecOK new_id ty_args spec_id tys_left (
-
-			-- The resulting spec_id may be a top-level unboxed value
-			-- This can arise for:
-			-- 1) constant method values
-			--    eq: class Num a where pi :: a
-			--	  instance Num Double# where pi = 3.141#
-			-- 2) specilised overloaded values
-			--    eq: i1 :: Num a => a
-			--	  i1 Int# d.Num.Int# ==> i1.Int#
-			-- These top level defns should have been lifted.
-			-- We must add code to unlift such a spec_id.
-
-		   if isUnboxedType (idType spec_id) then
-		       ASSERT (null tys_left && null args_left)
-		       if toplevelishId spec_id then
-		 	   liftId spec_id 	`thenSM` \ (lift_spec_id, unlift_spec_id) ->
-			   returnSM (True, bindUnlift lift_spec_id unlift_spec_id
-						      (Var unlift_spec_id))
-		       else
-			   pprPanic "Specialise:mkCall: unboxed spec_id not top-level ...\n"
-				    (ppCat [ppr PprDebug new_id,
-					    ppInterleave ppNil (map (pprParendGenType PprDebug) ty_args),
-					    ppPStr SLIT("==>"),
-					    ppr PprDebug spec_id])
-		   else
-		   let
-		       (vals_left, _, unlifts_left) = unzip3 args_left
-		       applied_tys  = mkTyApp (Var spec_id) tys_left
-		       applied_vals = mkGenApp applied_tys vals_left
-		   in
-		   returnSM (True, applyBindUnlifts unlifts_left applied_vals)
-		   )
-  where
-    (tys_and_vals, _, unlifts) = unzip3 args
-    unspec_call = applyBindUnlifts unlifts (mkGenApp (Var new_id) tys_and_vals)
-
-
-	-- ty_args is the types at the front of the arg list
-	-- val_args is the rest of the arg-list
-
-    (ty_args, val_args) = get args
-      where
-	get ((TyArg ty,_,_) : args) = (ty : tys, rest) where (tys,rest) = get args
-	get args		    = ([],       args)
-
-
-	-- toss_dicts chucks away dict args, checking that they ain't types!
-    toss_dicts 0 args 		    = args
-    toss_dicts n ((a,_,_) : args)
-      | isValArg a		    = toss_dicts (n-1) args
-
-\end{code}
-
-\begin{code}
-checkUnspecOK :: Id -> [Type] -> a -> a
-checkUnspecOK check_id tys
-  = if isLocallyDefined check_id && any isUnboxedType tys
-    then pprPanic "Specialise:checkUnspecOK: unboxed instance for local id not found\n"
-		  (ppCat [ppr PprDebug check_id,
-			  ppInterleave ppNil (map (pprParendGenType PprDebug) tys)])
-    else id
-
-checkSpecOK :: Id -> [Type] -> Id -> [Type] -> a -> a
-checkSpecOK check_id tys spec_id tys_left
-  = if any isUnboxedType tys_left
-    then pprPanic "Specialise:checkSpecOK: unboxed type args in specialised application\n"
-		  (ppAboves [ppCat [ppr PprDebug check_id,
-				    ppInterleave ppNil (map (pprParendGenType PprDebug) tys)],
-			     ppCat [ppr PprDebug spec_id,
-				    ppInterleave ppNil (map (pprParendGenType PprDebug) tys_left)]])
-    else id
--}
-\end{code}
 
 \begin{code}
 mkTyConInstance :: Id
@@ -2374,8 +2166,7 @@ type SpecM result
   -> UniqSupply
   -> result
 
-initSM m uniqs
-  = m nullTyVarEnv nullIdEnv uniqs
+initSM m uniqs = m nullTyVarEnv nullIdEnv uniqs
 
 returnSM :: a -> SpecM a
 thenSM	 :: SpecM a -> (a -> SpecM b) -> SpecM b
@@ -2404,7 +2195,7 @@ newSpecIds :: [Id]		-- The id of which to make a specialised version
 
 newSpecIds new_ids maybe_tys dicts_to_ignore tvenv idenv us
   = [ mkSpecId uniq id maybe_tys (spec_id_ty id) (selectIdInfoForSpecId id)
-      | (id,uniq) <- zipEqual "newSpecIds" new_ids uniqs ]
+    | (id,uniq) <- zipEqual "newSpecIds" new_ids uniqs ]
   where
     uniqs = getUniques (length new_ids) us
     spec_id_ty id = specialiseTy (idType id) maybe_tys dicts_to_ignore
@@ -2590,5 +2381,126 @@ mapAndUnzip4SM f [] = returnSM ([],[],[],[])
 mapAndUnzip4SM f (x:xs) = f x 			`thenSM` \ (r1,r2,r3,r4) ->
 			  mapAndUnzip4SM f xs	`thenSM` \ (rs1,rs2,rs3,rs4) ->
 			  returnSM ((r1:rs1),(r2:rs2),(r3:rs3),(r4:rs4))
+-}
+\end{code}
+
+
+
+=====================	OLD CODE, scheduled for deletion  =================
+
+\begin{code}
+{- 
+mkCall :: Id
+       -> [(CoreArg, UsageDetails, CoreExpr -> CoreExpr)]
+       -> SpecM CoreExpr
+
+mkCall new_id arg_infos = returnSM (
+
+  | maybeToBool (isSuperDictSelId_maybe new_id)
+    && any isUnboxedType ty_args
+	-- No specialisations for super-dict selectors
+	-- Specialise unboxed calls to SuperDictSelIds by extracting
+	-- the super class dictionary directly form the super class
+	-- NB: This should be dead code since all uses of this dictionary should
+	--     have been specialised. We only do this to keep core-lint happy.
+    = let
+	 Just (_, super_class) = isSuperDictSelId_maybe new_id
+	 super_dict_id = case lookupClassInstAtSimpleType super_class (head ty_args) of
+			 Nothing -> panic "Specialise:mkCall:SuperDictId"
+			 Just id -> id
+      in
+      returnSM (False, Var super_dict_id)
+
+  | otherwise
+    = case lookupSpecEnv (getIdSpecialisation new_id) ty_args of
+	Nothing -> checkUnspecOK new_id ty_args (
+		   returnSM (False, unspec_call)
+		   )
+
+	Just spec_1_details@(spec_id_1, tys_left_1, dicts_to_toss_1)
+		-> let
+			-- It may be necessary to specialsie a constant method spec_id again
+		       (spec_id, tys_left, dicts_to_toss) =
+			    case (maybeToBool (isConstMethodId_maybe spec_id_1),
+				  lookupSpecEnv (getIdSpecialisation spec_id_1) tys_left_1) of
+				 (False, _ )	 -> spec_1_details
+				 (True, Nothing) -> spec_1_details
+				 (True, Just (spec_id_2, tys_left_2, dicts_to_toss_2))
+						 -> (spec_id_2, tys_left_2, dicts_to_toss_1 + dicts_to_toss_2)
+
+		       args_left = toss_dicts dicts_to_toss val_args
+		   in
+		   checkSpecOK new_id ty_args spec_id tys_left (
+
+			-- The resulting spec_id may be a top-level unboxed value
+			-- This can arise for:
+			-- 1) constant method values
+			--    eq: class Num a where pi :: a
+			--	  instance Num Double# where pi = 3.141#
+			-- 2) specilised overloaded values
+			--    eq: i1 :: Num a => a
+			--	  i1 Int# d.Num.Int# ==> i1.Int#
+			-- These top level defns should have been lifted.
+			-- We must add code to unlift such a spec_id.
+
+		   if isUnboxedType (idType spec_id) then
+		       ASSERT (null tys_left && null args_left)
+		       if toplevelishId spec_id then
+		 	   liftId spec_id 	`thenSM` \ (lift_spec_id, unlift_spec_id) ->
+			   returnSM (True, bindUnlift lift_spec_id unlift_spec_id
+						      (Var unlift_spec_id))
+		       else
+			   pprPanic "Specialise:mkCall: unboxed spec_id not top-level ...\n"
+				    (ppCat [ppr PprDebug new_id,
+					    ppInterleave ppNil (map (pprParendGenType PprDebug) ty_args),
+					    ppPStr SLIT("==>"),
+					    ppr PprDebug spec_id])
+		   else
+		   let
+		       (vals_left, _, unlifts_left) = unzip3 args_left
+		       applied_tys  = mkTyApp (Var spec_id) tys_left
+		       applied_vals = mkGenApp applied_tys vals_left
+		   in
+		   returnSM (True, applyBindUnlifts unlifts_left applied_vals)
+		   )
+  where
+    (tys_and_vals, _, unlifts) = unzip3 args
+    unspec_call = applyBindUnlifts unlifts (mkGenApp (Var new_id) tys_and_vals)
+
+
+	-- ty_args is the types at the front of the arg list
+	-- val_args is the rest of the arg-list
+
+    (ty_args, val_args) = get args
+      where
+	get ((TyArg ty,_,_) : args) = (ty : tys, rest) where (tys,rest) = get args
+	get args		    = ([],       args)
+
+
+	-- toss_dicts chucks away dict args, checking that they ain't types!
+    toss_dicts 0 args 		    = args
+    toss_dicts n ((a,_,_) : args)
+      | isValArg a		    = toss_dicts (n-1) args
+
+\end{code}
+
+\begin{code}
+checkUnspecOK :: Id -> [Type] -> a -> a
+checkUnspecOK check_id tys
+  = if isLocallyDefined check_id && any isUnboxedType tys
+    then pprPanic "Specialise:checkUnspecOK: unboxed instance for local id not found\n"
+		  (ppCat [ppr PprDebug check_id,
+			  ppInterleave ppNil (map (pprParendGenType PprDebug) tys)])
+    else id
+
+checkSpecOK :: Id -> [Type] -> Id -> [Type] -> a -> a
+checkSpecOK check_id tys spec_id tys_left
+  = if any isUnboxedType tys_left
+    then pprPanic "Specialise:checkSpecOK: unboxed type args in specialised application\n"
+		  (ppAboves [ppCat [ppr PprDebug check_id,
+				    ppInterleave ppNil (map (pprParendGenType PprDebug) tys)],
+			     ppCat [ppr PprDebug spec_id,
+				    ppInterleave ppNil (map (pprParendGenType PprDebug) tys_left)]])
+    else id
 -}
 \end{code}

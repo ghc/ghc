@@ -134,10 +134,10 @@ concatFS :: [FastString] -> FastString
 concatFS ls = mkFastString (concat (map (unpackFS) ls)) -- ToDo: do better
 
 headFS :: FastString -> Char
-headFS (FastString _ l# ba#) = 
- if l# ># 0# then C# (indexCharArray# ba# 0#) else error "headFS: empty FS"
-headFS (CharStr a# l#) = 
- if l# ># 0# then C# (indexCharOffAddr# a# 0#) else error "headFS: empty FS"
+headFS f@(FastString _ l# ba#) = 
+ if l# ># 0# then C# (indexCharArray# ba# 0#) else error ("headFS: empty FS: " ++ unpackFS f)
+headFS f@(CharStr a# l#) = 
+ if l# ># 0# then C# (indexCharOffAddr# a# 0#) else error ("headFS: empty FS: " ++ unpackFS f)
 
 tailFS :: FastString -> FastString
 tailFS (FastString _ l# ba#) = mkFastSubStringBA# ba# 1# (l# -# 1#)

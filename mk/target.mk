@@ -689,15 +689,16 @@ ifneq "$(filter -monolithic,$(TEXI2HTML_OPTS))" ""
 	$(LIT2TEXI) -S -c $(LIT2TEXI_OPTS) -o $(patsubst %.html,%.itxi,$@) $(addsuffix .lit,$(basename $@))
 	$(LIT2TEXI) -S $(LIT2TEXI_OPTS) -o $(patsubst %.html,%.texi,$@) $(addsuffix .itxi,$(basename $@))
 	$(TEXI2HTML) $(TEXI2HTML_OPTS) $(patsubst %.html,%.texi,$@)
+	cp $(TEXI2HTML_PREFIX)invisible.xbm .
 else
 	$(RM) html/$(basename $@)*
 	$(MKDIRHIER) html
 	$(LIT2TEXI) -S -c $(LIT2TEXI_OPTS) -o $(patsubst %.html,%.itxi,$@) $(addsuffix .lit,$(basename $@))
 	$(LIT2TEXI) -S $(LIT2TEXI_OPTS) -o html/$(patsubst %.html,%.texi,$@) $(addsuffix .itxi,$(basename $@))
 	(cd html; ../$(TEXI2HTML) $(TEXI2HTML_OPTS) $(patsubst %.html,%.texi,$@); cd ..)
+	cp $(TEXI2HTML_PREFIX)invisible.xbm html/
 	@touch $@
 endif
-
 ###########################################
 #
 #	Targets: clean

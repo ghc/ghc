@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-DOC_SRCS = installing.lit release.lit
+DOC_SRCS = installing.lit
 
 SRC_TEXI2HTML_OPTS += -number -monolithic -invisible xbm
 

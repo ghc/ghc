@@ -65,28 +65,3 @@ dist :: dist-pre
 include $(TOP)/mk/target.mk
 dist :: dist-post
 
-#
-# Automatically remake update configuration files
-# (from autoconf manual)
-#
-configure: configure.in
-	autoconf
-#     
-# autoheader might not change config.h.in, so touch a stamp file.
-#
-mk/config.h.in: mk/stamp-h.in
-mk/stamp-h.in: configure.in
-	autoheader
-	echo timestamp > mk/stamp-h.in
-
-mk/config.h: mk/stamp-h
-mk/stamp-h: mk/config.h.in config.status
-	./config.status
-     
-config.status: configure
-	./config.status --recheck
-
-.PHONY: config
-
-config: config.status
-	@:

@@ -366,6 +366,8 @@ we use both @con2tag_Foo@ and @tag2con_Foo@ functions, as well as a
 
 \begin{verbatim}
 instance ... Enum (Foo ...) where
+    toEnum i = tag2con_Foo i
+
     enumFrom a = map tag2con_Foo [con2tag_Foo a .. maxtag_Foo]
 
     -- or, really...
@@ -390,11 +392,17 @@ For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 gen_Enum_binds :: TyCon -> RdrNameMonoBinds
 
 gen_Enum_binds tycon
-  = enum_from		`AndMonoBinds`
+  = to_enum             `AndMonoBinds`
+    enum_from		`AndMonoBinds`
     enum_from_then	`AndMonoBinds`
     from_enum
   where
     tycon_loc = getSrcLoc tycon
+
+    to_enum
+      = mk_easy_FunMonoBind tycon_loc toEnum_RDR [a_Pat] [] $
+        mk_easy_App (tag2con_RDR tycon) [a_RDR]
+
     enum_from
       = mk_easy_FunMonoBind tycon_loc enumFrom_RDR [a_Pat] [] $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $

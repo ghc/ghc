@@ -15,7 +15,7 @@ module PrelInfo (
 
 	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, compare_RDR, 
 	minBound_RDR, maxBound_RDR, enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, 
-	enumFromThenTo_RDR, fromEnum_RDR,
+	enumFromThenTo_RDR, fromEnum_RDR, toEnum_RDR,
 	range_RDR, index_RDR, inRange_RDR, readsPrec_RDR, readList_RDR, 
 	showsPrec_RDR, showList_RDR, plus_RDR, times_RDR, ltTag_RDR, eqTag_RDR, gtTag_RDR, 
 	eqH_Char_RDR, ltH_Char_RDR, eqH_Word_RDR, ltH_Word_RDR, eqH_Addr_RDR, ltH_Addr_RDR, 
@@ -299,6 +299,7 @@ knownKeyNames
     , (enumFromTo_RDR,		enumFromToClassOpKey)
     , (enumFromThenTo_RDR,	enumFromThenToClassOpKey)
     , (fromEnum_RDR,		fromEnumClassOpKey)
+    , (toEnum_RDR,		toEnumClassOpKey)
     , (eq_RDR,			eqClassOpKey)
     , (thenM_RDR,		thenMClassOpKey)
     , (returnM_RDR,		returnMClassOpKey)
@@ -361,6 +362,7 @@ creturnableClass_RDR	= tcQual (fOREIGN,   SLIT("CReturnable"))
 fromInt_RDR	   = varQual (pREL_BASE, SLIT("fromInt"))
 fromInteger_RDR	   = varQual (pREL_BASE, SLIT("fromInteger"))
 minus_RDR	   = varQual (pREL_BASE, SLIT("-"))
+toEnum_RDR	   = varQual (pREL_BASE, SLIT("toEnum"))
 fromEnum_RDR	   = varQual (pREL_BASE, SLIT("fromEnum"))
 enumFrom_RDR	   = varQual (pREL_BASE, SLIT("enumFrom"))
 enumFromTo_RDR	   = varQual (pREL_BASE, SLIT("enumFromTo"))

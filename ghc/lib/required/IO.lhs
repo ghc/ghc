@@ -39,7 +39,7 @@ import IOHandle		-- much of the real stuff is in here
 import PackedString	( nilPS, packCBytesST, unpackPS )
 import PrelBase
 import GHC
-import Foreign          ( makeForeignObj )
+import Foreign          ( makeForeignObj, writeForeignObj )
 \end{code}
 
 %*********************************************************
@@ -289,11 +289,14 @@ lazyReadBlock handle =
 	  then return nilPS
 	  else packCBytesST bytes buf)		    >>= \ some ->
           if bytes < 0 then
-	      makeForeignObj ``NULL'' ``&freeFile'' >>= \ null_fp ->
-	      ioToST (writeHandle handle (SemiClosedHandle null_fp (``NULL'', 0)))
-						    >>
               _ccall_ free buf			    >>= \ () ->
               _ccall_ closeFile fp	            >>
+#ifndef PAR
+	      writeForeignObj fp ``NULL''           >>
+	      ioToST (writeHandle handle (SemiClosedHandle fp (``NULL'', 0))) >>
+#else
+	      ioToST (writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))) >>
+#endif
 	      returnPrimIO (unpackPS some)
 	  else
 	      ioToST (writeHandle handle htype)	    >>
@@ -314,11 +317,14 @@ lazyReadLine handle =
 	  then return nilPS
 	  else packCBytesST bytes buf)		    >>= \ some ->
           if bytes < 0 then
-	      makeForeignObj ``NULL'' ``&freeFile'' >>= \ null_fp ->
-	      ioToST (writeHandle handle (SemiClosedHandle null_fp (``NULL'', 0)))
-						    >>
               _ccall_ free buf			    >>= \ () ->
               _ccall_ closeFile fp	            >>
+#ifndef PAR
+	      writeForeignObj fp ``NULL''           >>
+	      ioToST (writeHandle handle (SemiClosedHandle fp (``NULL'', 0))) >>
+#else
+	      ioToST (writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))) >>
+#endif
 	      returnPrimIO (unpackPS some)
 	  else
 	      ioToST (writeHandle handle htype)	    >>
@@ -336,10 +342,13 @@ lazyReadChar handle =
       SemiClosedHandle fp buf_info ->
 	  _ccall_ readChar fp			    >>= \ char ->
           if char == ``EOF'' then
-	      makeForeignObj ``NULL'' ``&freeFile'' >>= \ null_fp ->
-	      ioToST (writeHandle handle (SemiClosedHandle null_fp buf_info))
-						    >>
               _ccall_ closeFile fp	            >>
+#ifndef PAR
+	      writeForeignObj fp ``NULL''           >>
+	      ioToST (writeHandle handle (SemiClosedHandle fp (``NULL'', 0))) >>
+#else
+	      ioToST (writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))) >>
+#endif
 	      returnPrimIO ""
 	  else
 	      ioToST (writeHandle handle htype)	    >>
@@ -425,10 +434,18 @@ hPutStr handle str =
           else
               constructErrorAndFail "hPutStr"
   where
+#ifndef PAR
     writeLines :: ForeignObj -> String -> PrimIO Bool
+#else
+    writeLines :: Addr -> String -> PrimIO Bool
+#endif
     writeLines = writeChunks ``BUFSIZ'' True 
 
+#ifndef PAR
     writeBlocks :: ForeignObj -> Int -> String -> PrimIO Bool
+#else
+    writeBlocks :: Addr -> Int -> String -> PrimIO Bool
+#endif
     writeBlocks fp size s = writeChunks size False fp s
  
     {-
@@ -443,8 +460,11 @@ hPutStr handle str =
       a whole lot quicker. -- SOF 3/96
     -}
 
+#ifndef PAR
     writeChunks :: Int -> Bool -> ForeignObj -> String -> PrimIO Bool
-
+#else
+    writeChunks :: Int -> Bool -> Addr -> String -> PrimIO Bool
+#endif
     writeChunks (I# bufLen) chopOnNewLine fp s =
      newCharArray (0,I# bufLen) >>= \ arr@(MutableByteArray _ arr#) ->
      let
@@ -478,7 +498,11 @@ hPutStr handle str =
      in
      shoveString 0# s
 
+#ifndef PAR
     writeChars :: ForeignObj -> String -> PrimIO Bool
+#else
+    writeChars :: Addr -> String -> PrimIO Bool
+#endif
     writeChars fp "" = returnPrimIO True
     writeChars fp (c:cs) =
 	_ccall_ filePutc fp (ord c) >>= \ rc ->

@@ -433,7 +433,7 @@ data MagicId
 
   -- Argument and return registers
   | VanillaReg		-- pointers, unboxed ints and chars
-	PrimRep	-- PtrRep, IntRep, CharRep, StablePtrRep or ForeignObjRep
+	PrimRep	        -- PtrRep, IntRep, CharRep, StablePtrRep or ForeignObjRep
 			--	(in case we need to distinguish)
 	FAST_INT	-- its number (1 .. mAX_Vanilla_REG)
 

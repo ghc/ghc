@@ -154,7 +154,8 @@ data PrimOp
     | TakeMVarOp | PutMVarOp
     | ReadIVarOp | WriteIVarOp
 
-    | MakeForeignObjOp -- foreign objects (malloc pointers or any old URL)
+    | MakeForeignObjOp  -- foreign objects (malloc pointers or any old URL)
+    | WriteForeignObjOp -- modifying foreign objects [obscuro factor: 200]
     | MakeStablePtrOp | DeRefStablePtrOp
 \end{code}
 
@@ -413,26 +414,27 @@ tagOf_PrimOp PutMVarOp		    	    = ILIT(152)
 tagOf_PrimOp ReadIVarOp		    	    = ILIT(153)
 tagOf_PrimOp WriteIVarOp		    = ILIT(154)
 tagOf_PrimOp MakeForeignObjOp		    = ILIT(155)
-tagOf_PrimOp MakeStablePtrOp		    = ILIT(156)
-tagOf_PrimOp DeRefStablePtrOp		    = ILIT(157)
-tagOf_PrimOp (CCallOp _ _ _ _ _)	    = ILIT(158)
-tagOf_PrimOp ErrorIOPrimOp		    = ILIT(159)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	    = ILIT(160)
-tagOf_PrimOp SeqOp			    = ILIT(161)
-tagOf_PrimOp ParOp			    = ILIT(162)
-tagOf_PrimOp ForkOp			    = ILIT(163)
-tagOf_PrimOp DelayOp			    = ILIT(164)
-tagOf_PrimOp WaitReadOp			    = ILIT(165)
-tagOf_PrimOp WaitWriteOp		    = ILIT(166)
+tagOf_PrimOp WriteForeignObjOp		    = ILIT(156)
+tagOf_PrimOp MakeStablePtrOp		    = ILIT(157)
+tagOf_PrimOp DeRefStablePtrOp		    = ILIT(158)
+tagOf_PrimOp (CCallOp _ _ _ _ _)	    = ILIT(159)
+tagOf_PrimOp ErrorIOPrimOp		    = ILIT(160)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	    = ILIT(161)
+tagOf_PrimOp SeqOp			    = ILIT(162)
+tagOf_PrimOp ParOp			    = ILIT(163)
+tagOf_PrimOp ForkOp			    = ILIT(164)
+tagOf_PrimOp DelayOp			    = ILIT(165)
+tagOf_PrimOp WaitReadOp			    = ILIT(166)
+tagOf_PrimOp WaitWriteOp		    = ILIT(167)
 
-tagOf_PrimOp ParGlobalOp		    = ILIT(167)
-tagOf_PrimOp ParLocalOp			    = ILIT(168)
-tagOf_PrimOp ParAtOp			    = ILIT(169)
-tagOf_PrimOp ParAtAbsOp			    = ILIT(170)
-tagOf_PrimOp ParAtRelOp			    = ILIT(171)
-tagOf_PrimOp ParAtForNowOp		    = ILIT(172)
-tagOf_PrimOp CopyableOp			    = ILIT(173)
-tagOf_PrimOp NoFollowOp			    = ILIT(174)
+tagOf_PrimOp ParGlobalOp		    = ILIT(168)
+tagOf_PrimOp ParLocalOp			    = ILIT(169)
+tagOf_PrimOp ParAtOp			    = ILIT(170)
+tagOf_PrimOp ParAtAbsOp			    = ILIT(171)
+tagOf_PrimOp ParAtRelOp			    = ILIT(172)
+tagOf_PrimOp ParAtForNowOp		    = ILIT(173)
+tagOf_PrimOp CopyableOp			    = ILIT(174)
+tagOf_PrimOp NoFollowOp			    = ILIT(175)
 
 tagOf_PrimOp _ = panic# "tagOf_PrimOp: pattern-match"
 
@@ -597,6 +599,7 @@ allThePrimOps
 	ReadIVarOp,
 	WriteIVarOp,
 	MakeForeignObjOp,
+	WriteForeignObjOp,
 	MakeStablePtrOp,
 	DeRefStablePtrOp,
 	ReallyUnsafePtrEqualityOp,
@@ -1147,7 +1150,7 @@ primOpInfo WaitWriteOp
 
 %************************************************************************
 %*									*
-\subsubsection[PrimOps-makeForeignObj]{PrimOpInfo for Foreign Objects}
+\subsubsection[PrimOps-ForeignObj]{PrimOpInfo for Foreign Objects}
 %*									*
 %************************************************************************
 
@@ -1164,7 +1167,7 @@ When a @ForeignObj@ becomes garbage, a user-defined finalisation routine
 associated with the object is invoked (currently, each ForeignObj has a
 direct reference to its finaliser).  -- SOF
 
-The only function defined over @ForeignObj@s is:
+A @ForeignObj@ is created by the @makeForeignObj#@ primitive:
 
 \begin{pseudocode}
 makeForeignObj# :: Addr#  -- foreign object
@@ -1172,11 +1175,40 @@ makeForeignObj# :: Addr#  -- foreign object
 		-> StateAndForeignObj# _RealWorld# ForeignObj#
 \end{pseudocode}
 
+
 \begin{code}
 primOpInfo MakeForeignObjOp
   = AlgResult SLIT("makeForeignObj#") [] 
 	[addrPrimTy, addrPrimTy, realWorldStatePrimTy] 
 	stateAndForeignObjPrimTyCon [realWorldTy]
+\end{code}
+
+[Experimental--SOF]
+In addition, another @ForeignObj@ primitive is provided for destructively modifying
+the external object wrapped up inside a @ForeignObj@. This primitive is used
+when a mixed programming interface of implicit and explicit de-allocation is used,
+e.g., if @ForeignObj@s are used to implement @Handle@s, then @Handle@s can be
+released either explicitly (through @hClose@) or implicitly (via a finaliser).
+When releasing/closing the @Handle@ explicitly, care must be taken to avoid having 
+the finaliser for the embedded @ForeignObj@ attempt the same thing later.
+We deal with this situation, by allowing the programmer to destructively modify
+the data field of the @ForeignObj@ to hold a special value the finaliser recognises,
+and does not attempt to free (e.g., filling the data slot with \tr{NULL}).
+
+\begin{pseudocode}
+writeForeignObj# :: ForeignObj#  -- foreign object
+                -> Addr#        -- new data value
+		-> StateAndForeignObj# _RealWorld# ForeignObj#
+\end{pseudocode}
+
+\begin{code}
+primOpInfo WriteForeignObjOp
+ = let {
+	s = alphaTy; s_tv = alphaTyVar
+    } in
+   PrimResult SLIT("writeForeignObj#") [s_tv]
+	[foreignObjPrimTy, addrPrimTy, mkStatePrimTy s]
+	statePrimTyCon VoidRep [s]
 \end{code}
 
 %************************************************************************
@@ -1411,6 +1443,7 @@ primOpHeapReq (CCallOp _ _ mayGC@True  _ _) = VariableHeapRequired
 primOpHeapReq (CCallOp _ _ mayGC@False _ _) = NoHeapRequired
 
 primOpHeapReq MakeForeignObjOp	= VariableHeapRequired
+primOpHeapReq WriteForeignObjOp	= NoHeapRequired
 
 -- this occasionally has to expand the Stable Pointer table
 primOpHeapReq MakeStablePtrOp	= VariableHeapRequired
@@ -1557,7 +1590,8 @@ fragilePrimOp :: PrimOp -> Bool
 fragilePrimOp ParOp = True
 fragilePrimOp ForkOp = True
 fragilePrimOp SeqOp = True
-fragilePrimOp MakeForeignObjOp = True  -- SOF
+fragilePrimOp MakeForeignObjOp  = True  -- SOF
+fragilePrimOp WriteForeignObjOp = True  -- SOF
 fragilePrimOp MakeStablePtrOp  = True
 fragilePrimOp DeRefStablePtrOp = True  -- ??? JSM & ADR
 
@@ -1629,6 +1663,7 @@ primOpNeedsWrapper DoubleEncodeOp   	= True
 primOpNeedsWrapper DoubleDecodeOp	= True
 
 primOpNeedsWrapper MakeForeignObjOp	= True
+primOpNeedsWrapper WriteForeignObjOp	= True
 primOpNeedsWrapper MakeStablePtrOp	= True
 primOpNeedsWrapper DeRefStablePtrOp	= True
 
