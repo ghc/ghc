@@ -115,9 +115,6 @@ tcClassDecl1 is_rec rec_env
 		-- or if we're looking at an interface file decl
     in		-- (in which case def_methods = Nothing
 
-    checkTc (gla_exts || length tyvar_names == 1)
-	    (classArityErr class_name)			`thenTc_`
-
 	-- LOOK THINGS UP IN THE ENVIRONMENT
     tcLookupClass class_name				`thenTc` \ clas ->
     let
@@ -130,8 +127,14 @@ tcClassDecl1 is_rec rec_env
 
 	-- SOURCE-CODE CONSISTENCY CHECKS
     (case def_methods of
-	Nothing  -> returnTc Nothing	-- Not source
-	Just dms -> checkDefaultBinds clas op_names dms	  `thenTc` \ dm_env ->
+	Nothing  -> 	-- Not source
+		    returnTc Nothing	
+
+	Just dms -> 	-- Source so do error checks
+		    checkTc (gla_exts || length tyvar_names == 1)
+			    (classArityErr class_name)			`thenTc_`
+
+		    checkDefaultBinds clas op_names dms	  `thenTc` \ dm_env ->
 		    checkGenericClassIsUnary clas dm_env  `thenTc_`
 		    returnTc (Just dm_env)
     )							   `thenTc` \ mb_dm_env ->
