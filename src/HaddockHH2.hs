@@ -89,7 +89,7 @@ ppHH2Index odir package ifaces = do
 	
 	ppList [] = empty
 	ppList ((name,mdls):vs)  =
-		text "<Keyword Term=\"" <> text (show name) <> text "\">" $$
+		text "<Keyword Term=\"" <> text (escapeStr (show name)) <> text "\">" $$
 		nest 4 (vcat (map (ppJump name) mdls)) $$
 		text "</Keyword>" $$
 		ppList vs
