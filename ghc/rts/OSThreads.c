@@ -112,8 +112,8 @@ void
 initCondition( Condition* pCond )
 {
   HANDLE h =  CreateEvent(NULL, 
-			  TRUE,  /* manual reset */
-			  TRUE,  /* initially signalled */
+			  FALSE,  /* auto reset */
+			  FALSE,  /* initially not signalled */
 			  NULL); /* unnamed => process-local. */
   
   if ( h == NULL ) {
@@ -157,6 +157,13 @@ waitCondition ( Condition* pCond, Mutex* pMut )
 }
 
 void
+yieldThread()
+{
+  Sleep(0);
+  return;
+}
+
+void
 shutdownThread()
 {
   _endthreadex(0);
@@ -174,12 +181,12 @@ int
 createOSThread ( OSThreadId* pId, void (*startProc)(void))
 {
   
-  return _beginthreadex ( NULL,  /* default security attributes */
-			  0,
-			  startProcWrapper,
-			  (void*)startProc,
-			  0,
-			  (unsigned*)pId);
+  return (_beginthreadex ( NULL,  /* default security attributes */
+			   0,
+			   startProcWrapper,
+			   (void*)startProc,
+			   0,
+			   (unsigned*)pId) == NULL);
 }
 
 OSThreadId
