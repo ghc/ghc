@@ -1410,7 +1410,7 @@ hIsTerminalDevice handle = do
 -- hSetBinaryMode
 
 -- | Select binary mode ('True') or text mode ('False') on a open handle.
--- (GHC only; see also 'openBinaryFile'.)
+-- (See also 'openBinaryFile'.)
 
 hSetBinaryMode :: Handle -> Bool -> IO ()
 hSetBinaryMode handle bin =
