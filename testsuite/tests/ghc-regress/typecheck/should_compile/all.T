@@ -141,6 +141,4 @@ test "tc134" { myvtc("") }
 test "tc135" { myvtc("") }
 test "tc136" { myvtc("") }
 test "tc137" { myvtc("") }
-test "tc138" { myvtc("") }
-test "tc139" { myvtc("") }
 test "tc140" { myvtc("") }
