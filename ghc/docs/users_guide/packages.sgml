@@ -322,6 +322,23 @@
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>&ndash;&ndash;list-packages-local</option></term>
+	  <term><option>-L</option></term>
+	  <indexterm><primary><option>&ndash;&ndash;list-packages-local</option></primary></indexterm>
+	  <listitem>
+	    <para>Displays the list of packages installed in the
+	    topmost configuration file only: that will be the
+	    configuration file specified using <option>-f</option> on
+	    the command line, or the system configuration file
+	    otherwise.</para>
+	    
+	    <para>This option may be more convenient than
+	    <option>-l</option> when the output needs to be parsed by
+	    a script.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>&ndash;&ndash;remove-package <replaceable>foo</replaceable></option></term>
 	  <term><option>-r <replaceable>foo</replaceable></option></term>
 	  <indexterm><primary><option>&ndash;&ndash;delete-package</option></primary>
