@@ -21,3 +21,8 @@ test "read017" { vtcf("") }
 test "read018" { vtcf("") }
 test "read019" { vtcf("") }
 test "read020" { vtcf("") }
+
+-- empty file (length zero) is a legal Haskell module.  It fails to compile
+-- because it doesn't contain a definition of Main.main.  GHC 5.02 crashed
+-- on this example.
+test "read021" { vtcf("") }
