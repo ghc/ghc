@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.25 2001/01/19 15:26:37 simonmar Exp $
+-- $Id: DriverState.hs,v 1.26 2001/02/01 11:47:53 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -115,7 +115,6 @@ osuf_ify f = do
 -----------------------------------------------------------------------------
 -- Hi Files
 
-GLOBAL_VAR(v_ProduceHi,    	True,	Bool)
 GLOBAL_VAR(v_Hi_on_stdout, 	False,	Bool)
 GLOBAL_VAR(v_Hi_suf,          	"hi",	String)
 
