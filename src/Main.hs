@@ -335,12 +335,13 @@ fullContentsOfThisModule mod decl_map =
   where mkExportItem (x,HsDocGroup loc lev doc) = ExportGroup lev "" doc
 	mkExportItem (x,decl) = ExportDecl (Qual mod x) decl
 
-keepDecl HsTypeSig{}     = True
-keepDecl HsTypeDecl{}    = True
-keepDecl HsNewTypeDecl{} = True
-keepDecl HsDataDecl{}    = True
-keepDecl HsClassDecl{}   = True
-keepDecl HsDocGroup{}	 = True
+keepDecl HsTypeSig{}       = True
+keepDecl HsTypeDecl{}      = True
+keepDecl HsNewTypeDecl{}   = True
+keepDecl HsDataDecl{}      = True
+keepDecl HsClassDecl{}     = True
+keepDecl HsDocGroup{}	   = True
+keepDecl HsForeignImport{} = True
 keepDecl _ = False
 
 -- Sometimes the declaration we want to export is not the "main" declaration:
