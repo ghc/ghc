@@ -886,7 +886,7 @@ generator and bypass GCC altogether!
 <nidx>-Onot option</nidx>
 <nidx>optimising, reset</nidx>
 
-This option will make GHC ``forget'' any -Oish options it has seen so
+This option will make GHC ``forget'' any @-O@ish options it has seen so
 far.  Sometimes useful; for example: @make all EXTRA_HC_OPTS=-Onot@.
 
 <tag>@-Ofile <file>@:</tag>
@@ -908,7 +908,7 @@ At Glasgow, we don't use a @-O*@ flag for day-to-day work.  We use
 something.  When we want to go for broke, we tend to use @-O -fvia-C
 -O2-for-C@ (and we go for lots of coffee breaks).
 
-The easiest way to see what @-O@ (etc) ``really mean'' is to run with
+The easiest way to see what @-O@ (etc.) ``really mean'' is to run with
 @-v@, then stand back in amazement.  Alternatively, just look at the
 @HsC_minus<blah>@ lists in the @ghc@ driver script.
 
