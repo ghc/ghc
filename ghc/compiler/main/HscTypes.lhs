@@ -4,7 +4,7 @@
 \section[HscTypes]{Types for the per-module compiler}
 
 \begin{code}
-module HscTypes  ( )
+module HscTypes ( TyThing(..) )
 where
 
 #include "HsVersions.h"

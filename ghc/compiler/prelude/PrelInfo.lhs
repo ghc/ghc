@@ -49,6 +49,7 @@ import Type		( funTyCon )
 import Bag
 import BasicTypes	( Boxity(..) )
 import Util		( isIn )
+import Outputable	( ppr, pprPanic )
 \end{code}
 
 %************************************************************************
@@ -75,13 +76,14 @@ wiredInThings
     ]
 
 wiredInNames :: [Name]
-wiredInNames = [n | thing <- wiredInThings, n <- tyThingNames]
+wiredInNames = [n | thing <- wiredInThings, n <- tyThingNames thing]
 
-tyThingNames :: TyCon -> [Name]
-tyThingNames (AnClass cl) = pprPanic "tyThingNames" (ppr cl)	-- Not used
-tyThingNames (AnId    id) = [getName id]
-tyThingNames (ATyCon  tc) = getName tycon : [ getName n | dc <- tyConDataConsIfAvailable tycon, 
-							  n  <- [dataConId dc, dataConWrapId dc] ]
+tyThingNames :: TyThing -> [Name]
+tyThingNames (AClass cl) = pprPanic "tyThingNames" (ppr cl)	-- Not used
+tyThingNames (AnId   id) = [getName id]
+tyThingNames (ATyCon tc) 
+   = getName tc : [ getName n | dc <- tyConDataConsIfAvailable tc, 
+                                n  <- [dataConId dc, dataConWrapId dc] ]
 						-- Synonyms return empty list of constructors
 \end{code}
 
