@@ -1,0 +1,4 @@
+
+tc161.hs:17:
+    Warning: No explicit method nor default method for `op'
+	     In the instance declaration for `Foo Int'
