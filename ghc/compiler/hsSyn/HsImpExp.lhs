@@ -11,7 +11,6 @@ module HsImpExp where
 IMP_Ubiq()
 
 import Outputable
-import PprStyle		( PprStyle(..) )
 import Pretty
 import SrcLoc		( SrcLoc )
 #if __GLASGOW_HASKELL__ >= 202
