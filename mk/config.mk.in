@@ -169,9 +169,6 @@ GhcProjectPatchLevel   = 0
 
 WithGhcHc = ghc-2.10
 
-# Unused, we think
-# WithGhcHcType=HC_GLASGOW_GHC
-
 # Extra ways in which to build the compiler (for example, you might want to
 # build a profiled compiler so you can see where it spends its time)
 GhcCompilerWays=
