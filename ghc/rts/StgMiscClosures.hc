@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.58 2001/01/15 16:55:25 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.59 2001/01/16 12:41:05 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -58,7 +58,7 @@ FN_(stg_interp_constr_entry)
 { 
   /* R1 points at the constructor */
   FB_ 
-    STGCALL2(fprintf,stderr,"stg_interp_constr_entry (direct return)!\n");
+    /* STGCALL2(fprintf,stderr,"stg_interp_constr_entry (direct return)!\n"); */
     /* Pointless, since SET_TAG doesn't do anything */
     SET_TAG( GET_TAG(GET_INFO(R1.cl))); 
     JMP_(ENTRY_CODE((P_)(*Sp))); 
