@@ -331,16 +331,16 @@ tcExpr expr@(HsDo do_or_lc stmts src_loc)
 \end{code}
 
 \begin{code}
-tcExpr (ExplicitList [])
-  = newTyVarTy mkBoxedTypeKind		`thenNF_Tc` \ tyvar_ty ->
-    returnTc (ExplicitListOut tyvar_ty [], emptyLIE, mkListTy tyvar_ty)
-
-
 tcExpr in_expr@(ExplicitList exprs)	-- Non-empty list
-  = tcExprs exprs			`thenTc` \ (exprs', lie, tys@(elt_ty:_)) ->
-    tcAddErrCtxt (listCtxt in_expr) $
-    unifyTauTyList tys 			`thenTc_`
-    returnTc (ExplicitListOut elt_ty exprs', lie, mkListTy elt_ty)
+  = newTyVarTy mkBoxedTypeKind		`thenNF_Tc` \ elt_ty ->
+    mapAndUnzipTc (tc_elt elt_ty) exprs	`thenTc` \ (exprs', lies) ->
+    returnTc (ExplicitListOut elt_ty exprs', plusLIEs lies, mkListTy elt_ty)
+  where
+    tc_elt elt_ty expr
+      = tcAddErrCtxt (listCtxt expr) $
+	tcExpr expr			`thenTc` \ (expr', lie, expr_ty) ->
+	unifyTauTy elt_ty expr_ty	`thenTc_`
+	returnTc (expr', lie)
 
 tcExpr (ExplicitTuple exprs)
   = tcExprs exprs			`thenTc` \ (exprs', lie, tys) ->
@@ -993,28 +993,28 @@ branchCtxt b1 b2 sty
 	   pp_nest_hang "`else' branch:" (ppr sty b2)]
 
 caseCtxt expr sty
-  = hang (ptext SLIT("In a case expression:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In the case expression")) 4 (ppr sty expr)
 
 exprSigCtxt expr sty
   = hang (ptext SLIT("In an expression with a type signature:"))
 	 4 (ppr sty expr)
 
 listCtxt expr sty
-  = hang (ptext SLIT("In a list expression:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In the list element")) 4 (ppr sty expr)
 
 predCtxt expr sty
-  = hang (ptext SLIT("In a predicate expression:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In the predicate expression")) 4 (ppr sty expr)
 
 sectionRAppCtxt expr sty
-  = hang (ptext SLIT("In a right section:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In the right section")) 4 (ppr sty expr)
 
 sectionLAppCtxt expr sty
-  = hang (ptext SLIT("In a left section:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In the left section")) 4 (ppr sty expr)
 
 funAppCtxt fun arg_no arg sty
   = hang (hsep [ ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 
 		    ppr sty fun <> text ", namely"])
-	 4 (pprParendExpr sty arg)
+	 4 (ppr sty arg)
 
 stmtCtxt ListComp stmt sty
   = hang (ptext SLIT("In a list-comprehension qualifer:")) 
