@@ -341,7 +341,9 @@ module X where
       </varlistentry>
       
       <varlistentry>
+	<term><option>-V</option></term>
 	<term><option>&ndash;&ndash;version</option></term>
+	<indexterm><primary><option>-V</option></primary></indexterm>
 	<indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
 	<listitem>
 	  <para>Print a one-line string including GHC's version number.</para>

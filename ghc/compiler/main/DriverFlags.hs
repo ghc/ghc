@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.120 2003/08/20 15:07:56 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.121 2003/08/27 13:28:01 panne Exp $
 --
 -- Driver flags
 --
@@ -156,9 +156,8 @@ static_flags =
   ,  ( "-help"	 	 , NoArg showGhcUsage)
   ,  ( "-print-libdir"   , NoArg (do getTopDir >>= putStrLn
 				     exitWith ExitSuccess))  
-  ,  ( "-version"	 , NoArg (do putStrLn (cProjectName
-				      ++ ", version " ++ cProjectVersion)
-				     exitWith ExitSuccess))
+  ,  ( "V"	 	 , NoArg showVersion)
+  ,  ( "-version"	 , NoArg showVersion)
   ,  ( "-numeric-version", NoArg (do putStrLn cProjectVersion
 				     exitWith ExitSuccess))
 
@@ -647,3 +646,8 @@ setVerbosity n
   | otherwise     = throwDyn (UsageError "can't parse verbosity flag (-v<n>)")
 
 addCmdlineHCInclude a = updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
+
+showVersion :: IO ()
+showVersion = do
+  putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
+  exitWith ExitSuccess
