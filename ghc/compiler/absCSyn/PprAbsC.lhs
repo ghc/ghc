@@ -991,13 +991,8 @@ pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
 		  hcat (punctuate comma ccall_fun_args),
 		text "));"
 	])
-\end{code}
 
-If the argument is a heap object, we need to reach inside and pull out
-the bit the C world wants to see.  The only heap objects which can be
-passed are @Array@s and @ByteArray@s.
 
-\begin{code}
 ppr_casm_arg :: CAddrMode -> Int -> (SDoc, SDoc)
     -- (a) decl and assignment, (b) local var to be used later
 
@@ -1009,25 +1004,8 @@ ppr_casm_arg amode a_num
 
 	local_var  = (<>) (ptext SLIT("_ccall_arg")) (int a_num)
 
-	(arg_type, pp_amode2)
-	  = case a_kind of
-
-	      -- for array arguments, pass a pointer to the body of the array
-	      -- (PTRS_ARR_CTS skips over all the header nonsense)
-	      ArrayRep	    -> (pp_kind,
-				hcat [ptext SLIT("PTRS_ARR_CTS"),char '(', pp_amode, rparen])
-	      ByteArrayRep -> (pp_kind,
-				hcat [ptext SLIT("BYTE_ARR_CTS"),char '(', pp_amode, rparen])
-
-	      -- for ForeignObj, use FOREIGN_OBJ_DATA to fish out the contents.
-	      ForeignObjRep -> (pp_kind,
-				hcat [ptext SLIT("ForeignObj_CLOSURE_DATA"),
-				      char '(', pp_amode, char ')'])
-
-	      other	    -> (pp_kind, pp_amode)
-
 	declare_local_var
-	  = hcat [ arg_type, space, local_var, equals, pp_amode2, semi ]
+	  = hcat [ pp_kind, space, local_var, equals, pp_amode, semi ]
     in
     (declare_local_var, local_var)
 \end{code}
@@ -1182,13 +1160,6 @@ pprAssign kind dest src
 		text "(P_)(",	-- Here is the cast
 		ppr_amode src, pp_paren_semi ]
 
-pprAssign ByteArrayRep dest src
-  | mixedPtrLocn src
-    -- Add in a cast iff the source is mixed
-  = hcat [ ppr_amode dest, equals,
-		text "(StgByteArray)(",	-- Here is the cast
-		ppr_amode src, pp_paren_semi ]
-
 pprAssign kind other_dest src
   = hcat [ ppr_amode other_dest, equals,
 		pprAmode  src, semi ]
@@ -1305,6 +1276,9 @@ cExprMacroText ARG_TAG    		= SLIT("ARG_TAG")
 cExprMacroText GET_TAG    		= SLIT("GET_TAG")
 cExprMacroText UPD_FRAME_UPDATEE 	= SLIT("UPD_FRAME_UPDATEE")
 cExprMacroText CCS_HDR		 	= SLIT("CCS_HDR")
+cExprMacroText BYTE_ARR_CTS	 	= SLIT("BYTE_ARR_CTS")
+cExprMacroText PTRS_ARR_CTS	 	= SLIT("PTRS_ARR_CTS")
+cExprMacroText ForeignObj_CLOSURE_DATA  = SLIT("ForeignObj_CLOSURE_DATA")
 
 cStmtMacroText ARGS_CHK			= SLIT("ARGS_CHK")
 cStmtMacroText ARGS_CHK_LOAD_NODE	= SLIT("ARGS_CHK_LOAD_NODE")
@@ -1480,16 +1454,6 @@ pprUnionTag FloatRep		= char 'f'
 pprUnionTag DoubleRep		= panic "pprUnionTag:Double?"
 
 pprUnionTag StablePtrRep	= char 'p'
-pprUnionTag StableNameRep	= char 'p'
-pprUnionTag WeakPtrRep		= char 'p'
-pprUnionTag ForeignObjRep	= char 'p'
-pprUnionTag PrimPtrRep		= char 'p'
-
-pprUnionTag ThreadIdRep		= char 't'
-
-pprUnionTag ArrayRep		= char 'p'
-pprUnionTag ByteArrayRep	= char 'b'
-pprUnionTag BCORep		= char 'p'
 
 pprUnionTag _                   = panic "pprUnionTag:Odd kind"
 \end{code}

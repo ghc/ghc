@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.31 2002/01/28 16:52:37 simonpj Exp $
+% $Id: CgRetConv.lhs,v 1.32 2002/08/02 13:08:34 simonmar Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -79,6 +79,7 @@ ctrlReturnConvAlg tycon
 \begin{code}
 dataReturnConvPrim :: PrimRep -> MagicId
 
+dataReturnConvPrim PtrRep       = VanillaReg PtrRep  (_ILIT 1)
 dataReturnConvPrim IntRep	= VanillaReg IntRep  (_ILIT 1)
 dataReturnConvPrim WordRep	= VanillaReg WordRep (_ILIT 1)
 dataReturnConvPrim Int32Rep	= VanillaReg Int32Rep (_ILIT 1)
@@ -90,17 +91,8 @@ dataReturnConvPrim CharRep	= VanillaReg CharRep (_ILIT 1)
 dataReturnConvPrim Int8Rep	= VanillaReg Int8Rep (_ILIT 1)
 dataReturnConvPrim FloatRep	= FloatReg  (_ILIT 1)
 dataReturnConvPrim DoubleRep	= DoubleReg (_ILIT 1)
+dataReturnConvPrim StablePtrRep = VanillaReg StablePtrRep  (_ILIT 1)
 dataReturnConvPrim VoidRep	= VoidReg
-
--- Return a primitive-array pointer in the usual register:
-dataReturnConvPrim ArrayRep     = VanillaReg ArrayRep     (_ILIT 1)
-dataReturnConvPrim ByteArrayRep = VanillaReg ByteArrayRep (_ILIT 1)
-dataReturnConvPrim PrimPtrRep   = VanillaReg PrimPtrRep   (_ILIT 1)
-dataReturnConvPrim ThreadIdRep  = VanillaReg ThreadIdRep  (_ILIT 1)
-
-dataReturnConvPrim StablePtrRep  = VanillaReg StablePtrRep  (_ILIT 1)
-dataReturnConvPrim ForeignObjRep = VanillaReg ForeignObjRep (_ILIT 1)
-dataReturnConvPrim WeakPtrRep    = VanillaReg WeakPtrRep    (_ILIT 1)
 
 #ifdef DEBUG
 dataReturnConvPrim rep		= pprPanic "dataReturnConvPrim:" (ppr rep)

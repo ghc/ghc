@@ -150,7 +150,7 @@ magicIdPrimRep Hp		    = PtrRep
 magicIdPrimRep HpLim		    = PtrRep
 magicIdPrimRep CurCostCentre	    = CostCentreRep
 magicIdPrimRep VoidReg		    = VoidRep
-magicIdPrimRep CurrentTSO	    = ThreadIdRep
+magicIdPrimRep CurrentTSO	    = PtrRep
 magicIdPrimRep CurrentNursery	    = PtrRep
 magicIdPrimRep HpAlloc              = WordRep
 \end{code}
@@ -1120,7 +1120,7 @@ dscCOpStmt [] WriteOffAddrOp_Int        [a,i,x] vols = doWriteOffAddrOp Nothing 
 dscCOpStmt [] WriteOffAddrOp_Word       [a,i,x] vols = doWriteOffAddrOp Nothing WordRep a i x
 dscCOpStmt [] WriteOffAddrOp_Addr       [a,i,x] vols = doWriteOffAddrOp Nothing AddrRep a i x
 dscCOpStmt [] WriteOffAddrOp_Float      [a,i,x] vols = doWriteOffAddrOp Nothing FloatRep a i x
-dscCOpStmt [] WriteOffAddrOp_ForeignObj [a,i,x] vols = doWriteOffAddrOp Nothing ForeignObjRep a i x
+dscCOpStmt [] WriteOffAddrOp_ForeignObj [a,i,x] vols = doWriteOffAddrOp Nothing PtrRep a i x
 dscCOpStmt [] WriteOffAddrOp_Double     [a,i,x] vols = doWriteOffAddrOp Nothing DoubleRep a i x
 dscCOpStmt [] WriteOffAddrOp_StablePtr  [a,i,x] vols = doWriteOffAddrOp Nothing StablePtrRep a i x
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.49 2002/06/18 13:58:23 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.50 2002/08/02 13:08:34 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -18,7 +18,7 @@ import Constants	( mAX_SPEC_SELECTEE_SIZE, mAX_SPEC_AP_SIZE )
 import StgSyn
 import CgMonad
 import AbsCSyn
-import AbsCUtils	( mkAbstractCs )
+import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CLabel		( mkClosureTblLabel )
 
 import SMRep		( fixedHdrSize )
@@ -39,7 +39,11 @@ import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo,
 import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
 import Id		( idPrimRep, idType, Id )
 import VarSet
-import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..) )
+import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, 
+			  PrimOp(..), PrimOpResultInfo(..) )
+import TysPrim		( foreignObjPrimTyCon, arrayPrimTyCon, 
+			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
+			  mutableArrayPrimTyCon )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( isUnboxedTupleTyCon, isEnumerationTyCon )
 import Type		( Type, typePrimRep, tyConAppArgs, tyConAppTyCon, repType )
@@ -451,7 +455,17 @@ Little helper for primitives that return unboxed tuples.
 \begin{code}
 primRetUnboxedTuple :: StgOp -> [StgArg] -> Type -> Code
 primRetUnboxedTuple op args res_ty
-  = getArgAmodes args	    `thenFC` \ arg_amodes ->
+  = getArgAmodes args	    `thenFC` \ arg_amodes1 ->
+    {-
+      For a foreign call, we might need to fiddle with some of the args:
+      for example, when passing a ByteArray#, we pass a ptr to the goods
+      rather than the heap object.
+    -}
+    let 
+	arg_amodes
+	  | StgFCallOp{} <- op = zipWith shimFCallArg args arg_amodes1
+	  | otherwise          = arg_amodes1
+    in
     {-
       put all the arguments in temporaries so they don't get stomped when
       we push the return address.
@@ -459,7 +473,7 @@ primRetUnboxedTuple op args res_ty
     let
       n_args		  = length args
       arg_uniqs	          = map mkBuiltinUnique [0 .. n_args-1]
-      arg_reps		  = map getArgPrimRep args
+      arg_reps		  = map getAmodeRep arg_amodes
       arg_temps		  = zipWith CTemp arg_uniqs arg_reps
     in
     absC (mkAbstractCs (zipWith CAssign arg_temps arg_amodes)) `thenC`
@@ -473,4 +487,16 @@ primRetUnboxedTuple op args res_ty
       temp_amodes = zipWith CTemp temp_uniqs prim_reps
     in
     returnUnboxedTuple temp_amodes (absC (COpStmt temp_amodes op arg_temps []))
+
+shimFCallArg arg amode
+  | tycon == foreignObjPrimTyCon
+	= CMacroExpr AddrRep ForeignObj_CLOSURE_DATA [amode]
+  | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
+	= CMacroExpr PtrRep PTRS_ARR_CTS [amode]
+  | tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon
+	= CMacroExpr AddrRep BYTE_ARR_CTS [amode]
+  | otherwise = amode
+  where	
+	-- should be a tycon app, since this is a foreign call
+	tycon = tyConAppTyCon (repType (stgArgType arg))
 \end{code}

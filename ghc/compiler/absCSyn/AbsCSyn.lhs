@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.48 2002/07/16 14:56:09 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.49 2002/08/02 13:08:33 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -392,7 +392,9 @@ data CExprMacro
   | GET_TAG				-- get current constructor tag
   | UPD_FRAME_UPDATEE
   | CCS_HDR
-
+  | BYTE_ARR_CTS		-- used when passing a ByteArray# to a ccall
+  | PTRS_ARR_CTS		-- similarly for an Array#
+  | ForeignObj_CLOSURE_DATA	-- and again for a ForeignObj#
 \end{code}
 
 Convenience functions:

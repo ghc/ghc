@@ -224,11 +224,11 @@ statePrimTyCon	 = pcPrimTyCon statePrimTyConName vrcsZ VoidRep
 \end{code}
 
 RealWorld is deeply magical.  It is *primitive*, but it is not
-*unlifted* (hence PrimPtrRep).  We never manipulate values of type
+*unlifted* (hence PtrRep).  We never manipulate values of type
 RealWorld; it's only used in the type system, to parameterise State#.
 
 \begin{code}
-realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind 0 [] PrimPtrRep
+realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind 0 [] PtrRep
 realWorldTy	     = mkTyConTy realWorldTyCon
 realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 \end{code}
@@ -244,10 +244,10 @@ defined in \tr{TysWiredIn.lhs}, not here.
 %************************************************************************
 
 \begin{code}
-arrayPrimTyCon		  = pcPrimTyCon  arrayPrimTyConName	       vrcsP  ArrayRep
-mutableArrayPrimTyCon	  = pcPrimTyCon  mutableArrayPrimTyConName     vrcsZP ArrayRep
-mutableByteArrayPrimTyCon = pcPrimTyCon  mutableByteArrayPrimTyConName vrcsZ  ByteArrayRep
-byteArrayPrimTyCon	  = pcPrimTyCon0 byteArrayPrimTyConName	              ByteArrayRep
+arrayPrimTyCon		  = pcPrimTyCon  arrayPrimTyConName	       vrcsP  PtrRep
+mutableArrayPrimTyCon	  = pcPrimTyCon  mutableArrayPrimTyConName     vrcsZP PtrRep
+mutableByteArrayPrimTyCon = pcPrimTyCon  mutableByteArrayPrimTyConName vrcsZ  PtrRep
+byteArrayPrimTyCon	  = pcPrimTyCon0 byteArrayPrimTyConName	              PtrRep
 
 mkArrayPrimTy elt    	    = mkTyConApp arrayPrimTyCon [elt]
 byteArrayPrimTy	    	    = mkTyConTy byteArrayPrimTyCon
@@ -262,7 +262,7 @@ mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
 %************************************************************************
 
 \begin{code}
-mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName vrcsZP PrimPtrRep
+mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName vrcsZP PtrRep
 
 mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 \end{code}
@@ -274,7 +274,7 @@ mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
-mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName vrcsZP PrimPtrRep
+mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName vrcsZP PtrRep
 
 mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 \end{code}
@@ -298,7 +298,7 @@ mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 %************************************************************************
 
 \begin{code}
-stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName vrcsP StableNameRep
+stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName vrcsP PtrRep
 
 mkStableNamePrimTy ty = mkTyConApp stableNamePrimTyCon [ty]
 \end{code}
@@ -321,9 +321,9 @@ dead before it really was.
 
 \begin{code}
 foreignObjPrimTy    = mkTyConTy foreignObjPrimTyCon
-foreignObjPrimTyCon = pcPrimTyCon0 foreignObjPrimTyConName ForeignObjRep
+foreignObjPrimTyCon = pcPrimTyCon0 foreignObjPrimTyConName PtrRep
 \end{code}
-  
+
 %************************************************************************
 %*									*
 \subsection[TysPrim-BCOs]{The ``bytecode object'' type}
@@ -332,7 +332,7 @@ foreignObjPrimTyCon = pcPrimTyCon0 foreignObjPrimTyConName ForeignObjRep
 
 \begin{code}
 bcoPrimTy    = mkTyConTy bcoPrimTyCon
-bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName BCORep
+bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName PtrRep
 \end{code}
   
 %************************************************************************
@@ -342,7 +342,7 @@ bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName BCORep
 %************************************************************************
 
 \begin{code}
-weakPrimTyCon = pcPrimTyCon weakPrimTyConName vrcsP WeakPtrRep
+weakPrimTyCon = pcPrimTyCon weakPrimTyConName vrcsP PtrRep
 
 mkWeakPrimTy v = mkTyConApp weakPrimTyCon [v]
 \end{code}
@@ -364,5 +364,5 @@ to the thread id internally.
 
 \begin{code}
 threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
-threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName ThreadIdRep
+threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName PtrRep
 \end{code}

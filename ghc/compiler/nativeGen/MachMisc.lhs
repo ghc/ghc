@@ -296,15 +296,7 @@ primRepToSize WordRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W, 
 primRepToSize AddrRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize FloatRep	    = IF_ARCH_alpha(TF, IF_ARCH_i386(F,  IF_ARCH_sparc(F,  )))
 primRepToSize DoubleRep	    = IF_ARCH_alpha(TF, IF_ARCH_i386(DF, IF_ARCH_sparc(DF, )))
-primRepToSize ArrayRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize ByteArrayRep  = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize PrimPtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize WeakPtrRep    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize ForeignObjRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize BCORep        = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize StablePtrRep  = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize StableNameRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
-primRepToSize ThreadIdRep   = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 
 primRepToSize Word64Rep     = primRepToSize_fail "Word64Rep"
 primRepToSize Int64Rep      = primRepToSize_fail "Int64Rep"
@@ -315,7 +307,6 @@ primRepToSize_fail str
             ++ "Workaround: use -fvia-C.\n\t" 
             ++ "Perhaps you should report it as a GHC bug,\n\t" 
             ++ "to glasgow-haskell-bugs@haskell.org.")
-
 \end{code}
 
 %************************************************************************

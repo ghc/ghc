@@ -17,7 +17,7 @@ import AbsCUtils	( getAmodeRep, mixedTypeLocn )
 import SMRep		( fixedHdrSize )
 import Literal		( Literal(..), word2IntLit )
 import MachOp		( MachOp(..) )
-import PrimRep		( PrimRep(..), getPrimRepArrayElemSize )
+import PrimRep		( PrimRep(..), getPrimRepSizeInBytes )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( wORD_SIZE,
 			  mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
@@ -100,15 +100,7 @@ foreignCallCode lhs call@(CCall (CCallSpec ctarget cconv safety)) rhs
                 -> ncgPrimopMoan "Native code generator can't handle foreign call" 
                                  (ppr call)
 
-    stix_args = map amodeCodeForCCall cargs
-    amodeCodeForCCall x =
-	let base = amodeToStix' x
-	in
-	    case getAmodeRep x of
-	      ArrayRep      -> StIndex PtrRep base arrPtrsHS
-	      ByteArrayRep  -> StIndex IntRep base arrWordsHS
-	      ForeignObjRep -> StInd PtrRep (StIndex PtrRep base fixedHS)
-	      other         -> base
+    stix_args = map amodeToStix' cargs
 
     ccall = case lhs of
       []    -> StVoidable (StCall stix_target cconv VoidRep stix_args)
@@ -201,24 +193,32 @@ amodeToStix (CLit core)
       _ -> panic "amodeToStix:core literal"
 
 amodeToStix (CMacroExpr _ macro [arg])
-  = case macro of
-      ENTRY_CODE -> amodeToStix arg
-      ARG_TAG    -> amodeToStix arg -- just an integer no. of words
+  = let 
+	arg_amode = amodeToStix arg
+    in	
+    case macro of
+      ENTRY_CODE -> arg_amode
+      ARG_TAG    -> arg_amode -- just an integer no. of words
       GET_TAG    -> 
 #ifdef WORDS_BIGENDIAN
                     StMachOp MO_Nat_And
-			[StInd WordRep (StIndex PtrRep (amodeToStix arg)
+			[StInd WordRep (StIndex PtrRep arg_amode
                                                 (StInt (toInteger (-1)))),
 			 StInt 65535]
 #else
                     StMachOp MO_Nat_Shr
-			[StInd WordRep (StIndex PtrRep (amodeToStix arg)
+			[StInd WordRep (StIndex PtrRep arg_amode
                                                 (StInt (toInteger (-1)))),
 			 StInt 16]
 #endif
       UPD_FRAME_UPDATEE
-         -> StInd PtrRep (StIndex PtrRep (amodeToStix arg) 
+         -> StInd PtrRep (StIndex PtrRep arg_amode 
                                          (StInt (toInteger uF_UPDATEE)))
+
+      BYTE_ARR_CTS -> StIndex IntRep arg_amode arrWordsHS
+      PTRS_ARR_CTS -> StIndex PtrRep arg_amode arrPtrsHS
+      ForeignObj_CLOSURE_DATA -> StInd PtrRep (StIndex PtrRep arg_amode fixedHS)
+
 
 amodeToStix other
    = pprPanic "StixPrim.amodeToStix" (pprAmode other)
@@ -244,17 +244,17 @@ cHARLIKE_closure = StCLbl mkCharlikeClosureLabel
 mutArrPtrsFrozen_info = StCLbl mkMAP_FROZEN_infoLabel
 
 -- these are the sizes of charLike and intLike closures, in _bytes_.
-charLikeSize = (fixedHdrSize + 1) * (getPrimRepArrayElemSize PtrRep)
-intLikeSize  = (fixedHdrSize + 1) * (getPrimRepArrayElemSize PtrRep)
+charLikeSize = (fixedHdrSize + 1) * (getPrimRepSizeInBytes PtrRep)
+intLikeSize  = (fixedHdrSize + 1) * (getPrimRepSizeInBytes PtrRep)
 \end{code}
 
 
 \begin{code}
 save_thread_state 
    = getUniqueUs   `thenUs` \ tso_uq -> 
-     let tso = StixTemp (StixVReg tso_uq ThreadIdRep) in
+     let tso = StixTemp (StixVReg tso_uq PtrRep) in
      returnUs (\xs ->
-	StAssignReg ThreadIdRep tso (StReg stgCurrentTSO)
+	StAssignReg PtrRep tso (StReg stgCurrentTSO)
 	: StAssignMem PtrRep
              (StMachOp MO_Nat_Add
 		       [StReg tso, StInt (toInteger (TSO_SP*BYTES_PER_WORD))])
@@ -274,9 +274,9 @@ save_thread_state
 
 load_thread_state 
    = getUniqueUs   `thenUs` \ tso_uq -> 
-     let tso = StixTemp (StixVReg tso_uq ThreadIdRep) in
+     let tso = StixTemp (StixVReg tso_uq PtrRep) in
      returnUs (\xs ->
-	StAssignReg ThreadIdRep tso (StReg stgCurrentTSO)
+	StAssignReg PtrRep tso (StReg stgCurrentTSO)
 	: StAssignReg PtrRep 
              stgSp
 	     (StInd PtrRep 

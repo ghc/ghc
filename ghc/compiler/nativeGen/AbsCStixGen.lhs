@@ -33,7 +33,7 @@ import Maybes	    	( maybeToBool )
 import StgSyn		( StgOp(..) )
 import MachOp		( MachOp(..), resultRepOfMachOp )
 import PrimRep	    	( isFloatingRep, is64BitRep, 
-			  PrimRep(..), getPrimRepArrayElemSize )
+			  PrimRep(..), getPrimRepSizeInBytes )
 import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable,
 			  livenessIsSmall, bitmapToIntegers )
 import StixMacro	( macroCode, checkCode )
@@ -243,8 +243,8 @@ Here we handle top-level things, like @CCodeBlock@s and
 
     -- We need to promote any item smaller than a word to a word
     promote_to_word pk 
-       | getPrimRepArrayElemSize pk >= getPrimRepArrayElemSize IntRep  = pk
-       | otherwise                                                     = IntRep
+       | getPrimRepSizeInBytes pk >= getPrimRepSizeInBytes IntRep  = pk
+       | otherwise                                                 = IntRep
 \end{code}
 
 Now the individual AbstractC statements.

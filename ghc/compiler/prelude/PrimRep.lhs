@@ -9,15 +9,13 @@ types.
 
 \begin{code}
 module PrimRep 
-      (
-	PrimRep(..)
+      ( PrimRep(..)
       , separateByPtrFollowness
       , isFollowableRep
       , isFloatingRep
       , is64BitRep
       , getPrimRepSize
       , getPrimRepSizeInBytes
-      , getPrimRepArrayElemSize
       , retPrimRepSize
       ) where
 
@@ -32,6 +30,8 @@ import Outputable
 \subsection[PrimRep-datatype]{The @PrimRep@ datatype}
 %*									*
 %************************************************************************
+
+These pretty much correspond to the C types declared in StgTypes.h.
 
 \begin{code}
 data PrimRep
@@ -59,43 +59,13 @@ data PrimRep
   | Word32Rep           --         32 bit unsigned integers
   | Word64Rep	        --         64 bit unsigned integers
 
-  | WeakPtrRep
-  | ForeignObjRep	
-  | BCORep
-
   | StablePtrRep	-- guaranteed to be represented by a pointer
-
-  | StableNameRep	-- A stable name is a real heap object, unpointed,
-			-- with one field containing an index into the
-			-- stable pointer table.  It has to be a heap
-			-- object so the garbage collector can track these
-			-- objects and reclaim stable pointer entries.
-
-  | ThreadIdRep		-- Really a pointer to a TSO
-
-  | ArrayRep		-- Primitive array of Haskell pointers
-  | ByteArrayRep	-- Primitive array of bytes (no Haskell pointers)
-
-  | PrimPtrRep		-- Used for MutVars and MVars; 
-			-- a pointer to a primitive object
-			-- ToDo: subsumes WeakPtrRep, ThreadIdRep, 
-			-- StableNameRep, ForeignObjRep, and BCORep ?
 
   | VoidRep		-- Occupies no space at all!
 			-- (Primitive states are mapped onto this)
   deriving (Eq, Ord)
-	-- Kinds are used in PrimTyCons, which need both Eq and Ord
 \end{code}
 
-These pretty much correspond to the C types declared in StgTypes.h,
-with the following exceptions:
-
-   - when an Array or ByteArray is passed to C, we again pass a pointer
-     to the contents.  The actual type that is passed is StgPtr for
-     ArrayRep, and StgByteArray (probably a char *) for ByteArrayRep.
-
-These hacks are left until the final printing of the C, in
-PprAbsC.lhs.
 
 %************************************************************************
 %*									*
@@ -112,22 +82,11 @@ the pointer/object possibly will have to be saved onto, and the
 computation of GC liveness info.
 
 \begin{code}
-isFollowableRep :: PrimRep -> Bool
-
-isFollowableRep PtrRep        = True
-isFollowableRep ArrayRep      = True	-- all heap objects:
-isFollowableRep ByteArrayRep  = True	-- 	''
-isFollowableRep WeakPtrRep    = True	-- 	''
-isFollowableRep ForeignObjRep = True	-- 	''
-isFollowableRep StableNameRep = True    --      ''
-isFollowableRep PrimPtrRep    = True    --      ''
-isFollowableRep ThreadIdRep   = True	-- pointer to a TSO
-isFollowableRep BCORep        = True
-
+isFollowableRep :: PrimRep -> Bool  -- True <=> points to a heap object
+isFollowableRep PtrRep 	      = True
 isFollowableRep other	      = False
 
 separateByPtrFollowness :: (a -> PrimRep) -> [a] -> ([a], [a])
-
 separateByPtrFollowness kind_fun things
   = sep_things kind_fun things [] []
     -- accumulating params for follow-able and don't-follow things...
@@ -156,11 +115,11 @@ is64BitRep :: PrimRep -> Bool
 is64BitRep Int64Rep  = True
 is64BitRep Word64Rep = True
 is64BitRep _         = False
-\end{code}
 
-\begin{code}
+-- Size in words.
+
 getPrimRepSize :: PrimRep -> Int
-getPrimRepSize DoubleRep = dOUBLE_SIZE -- "words", of course
+getPrimRepSize DoubleRep = dOUBLE_SIZE
 getPrimRepSize Word64Rep = wORD64_SIZE
 getPrimRepSize Int64Rep  = iNT64_SIZE
 getPrimRepSize VoidRep   = 0
@@ -169,11 +128,21 @@ getPrimRepSize _         = 1
 retPrimRepSize :: Int
 retPrimRepSize = getPrimRepSize RetRep
 
--- sizes in bytes.
--- (used in some settings to figure out how many bytes
--- we have to push onto the stack when calling external
--- entry points (e.g., stdcalling on win32)
+-- Sizes in bytes.  (used in some settings to figure out how many
+-- bytes we have to push onto the stack when calling external entry
+-- points (e.g., stdcalling on win32)
+
+-- Note: the "size in bytes" is also the scaling factor used when we
+-- have an array of these things.  For example, a ByteArray# of
+-- Int16Rep will use a scaling factor of 2 when accessing the
+-- elements.
+
 getPrimRepSizeInBytes :: PrimRep -> Int
+getPrimRepSizeInBytes PtrRep        = wORD_SIZE
+getPrimRepSizeInBytes CodePtrRep    = wORD_SIZE
+getPrimRepSizeInBytes DataPtrRep    = wORD_SIZE
+getPrimRepSizeInBytes RetRep        = wORD_SIZE
+getPrimRepSizeInBytes CostCentreRep = wORD_SIZE
 getPrimRepSizeInBytes CharRep       = 4
 getPrimRepSizeInBytes IntRep        = wORD_SIZE
 getPrimRepSizeInBytes WordRep       = wORD_SIZE
@@ -188,41 +157,8 @@ getPrimRepSizeInBytes Word8Rep      = 1
 getPrimRepSizeInBytes Word16Rep     = 2
 getPrimRepSizeInBytes Word32Rep     = 4
 getPrimRepSizeInBytes Word64Rep     = 8
-getPrimRepSizeInBytes WeakPtrRep    = wORD_SIZE
-getPrimRepSizeInBytes ForeignObjRep = wORD_SIZE
 getPrimRepSizeInBytes StablePtrRep  = wORD_SIZE
-getPrimRepSizeInBytes StableNameRep = wORD_SIZE
-getPrimRepSizeInBytes ArrayRep      = wORD_SIZE
-getPrimRepSizeInBytes ByteArrayRep  = wORD_SIZE
 getPrimRepSizeInBytes other         = pprPanic "getPrimRepSizeInBytes" (ppr other)
-
-
--- Sizes in bytes of things when they are array elements,
--- so that we can generate the correct indexing code
--- inside the compiler.  This is not the same as the above
--- getPrimRepSizeInBytes, the rationale behind which is
--- unclear to me.
-getPrimRepArrayElemSize :: PrimRep -> Int
-getPrimRepArrayElemSize CharRep       = 4
-getPrimRepArrayElemSize DataPtrRep    = wORD_SIZE
-getPrimRepArrayElemSize PtrRep        = wORD_SIZE
-getPrimRepArrayElemSize IntRep        = wORD_SIZE
-getPrimRepArrayElemSize WordRep       = wORD_SIZE
-getPrimRepArrayElemSize AddrRep       = wORD_SIZE
-getPrimRepArrayElemSize StablePtrRep  = wORD_SIZE
-getPrimRepArrayElemSize ForeignObjRep = wORD_SIZE
-getPrimRepArrayElemSize Word8Rep      = 1
-getPrimRepArrayElemSize Word16Rep     = 2
-getPrimRepArrayElemSize Word32Rep     = 4
-getPrimRepArrayElemSize Word64Rep     = 8
-getPrimRepArrayElemSize Int8Rep       = 1
-getPrimRepArrayElemSize Int16Rep      = 2
-getPrimRepArrayElemSize Int32Rep      = 4
-getPrimRepArrayElemSize Int64Rep      = 8
-getPrimRepArrayElemSize FloatRep      = 4
-getPrimRepArrayElemSize DoubleRep     = 8
-getPrimRepArrayElemSize other         = pprPanic "getPrimRepArrayElemSize" (ppr other)
-
 \end{code}
 
 %************************************************************************
@@ -255,18 +191,6 @@ showPrimRep Word64Rep      = "LW_"       -- short for StgLongWord
 showPrimRep AddrRep	   = "StgAddr"
 showPrimRep FloatRep	   = "StgFloat"
 showPrimRep DoubleRep	   = "StgDouble"
-showPrimRep ArrayRep	   = "P_" -- see comment below
-showPrimRep PrimPtrRep	   = "P_"
-showPrimRep ByteArrayRep   = "StgByteArray"
 showPrimRep StablePtrRep   = "StgStablePtr"
-showPrimRep StableNameRep  = "P_"
-showPrimRep ThreadIdRep	   = "StgTSO*"
-showPrimRep WeakPtrRep     = "P_"
-showPrimRep ForeignObjRep  = "StgAddr"
 showPrimRep VoidRep	   = "!!VOID_KIND!!"
-showPrimRep BCORep         = "P_"  	-- not sure -- JRS 000708
 \end{code}
-
-Foreign Objects and Arrays are treated specially by the code for
-_ccall_s: we pass a pointer to the contents of the object, not the
-object itself.

@@ -125,8 +125,7 @@ mkStAssign rep (StInd rep' addr) rhs
         isCloseEnoughTo r1 r2
            = r1 == r2 || (wordIsh r1 && wordIsh r2)
         wordIsh rep
-           = rep `elem` [IntRep, WordRep, PtrRep, AddrRep, CodePtrRep, 
-                         RetRep, ArrayRep, PrimPtrRep, StableNameRep, BCORep]
+           = rep `elem` [IntRep, WordRep, PtrRep, AddrRep, CodePtrRep, RetRep ]
                         -- determined by looking at PrimRep.showPrimRep
 
 -- Stix trees which denote a value.

@@ -29,7 +29,7 @@ import CLabel 		( isAsmTemp )
 #endif
 import Maybes		( maybeToBool )
 import PrimRep		( isFloatingRep, is64BitRep, PrimRep(..),
-                          getPrimRepArrayElemSize )
+			  getPrimRepSizeInBytes )
 import Stix		( getNatLabelNCG, StixStmt(..), StixExpr(..),
 			  StixReg(..), pprStixReg, StixVReg(..), CodeSegment(..), 
                           DestInfo, hasDestInfo,
@@ -131,7 +131,7 @@ stmtToInstrs stmt = case stmt of
 	-- the linker can handle simple arithmetic...
 	getData (StIndex rep (StCLbl lbl) (StInt off)) =
 		returnNat (nilOL,
-                           ImmIndex lbl (fromInteger off * getPrimRepArrayElemSize rep))
+                           ImmIndex lbl (fromInteger off * getPrimRepSizeInBytes rep))
 
     -- Top-level lifted-out string.  The segment will already have been set
     -- (see Stix.liftStrings).
@@ -185,7 +185,7 @@ mangleIndexTree :: StixExpr -> StixExpr
 mangleIndexTree (StIndex pk base (StInt i))
   = StMachOp MO_Nat_Add [base, off]
   where
-    off = StInt (i * toInteger (getPrimRepArrayElemSize pk))
+    off = StInt (i * toInteger (getPrimRepSizeInBytes pk))
 
 mangleIndexTree (StIndex pk base off)
   = StMachOp MO_Nat_Add [
@@ -196,7 +196,7 @@ mangleIndexTree (StIndex pk base off)
     ]
   where
     shift :: PrimRep -> Int
-    shift rep = case getPrimRepArrayElemSize rep of
+    shift rep = case getPrimRepSizeInBytes rep of
                    1 -> 0
                    2 -> 1
                    4 -> 2
@@ -211,7 +211,7 @@ maybeImm :: StixExpr -> Maybe Imm
 maybeImm (StCLbl l)       
    = Just (ImmCLbl l)
 maybeImm (StIndex rep (StCLbl l) (StInt off)) 
-   = Just (ImmIndex l (fromInteger off * getPrimRepArrayElemSize rep))
+   = Just (ImmIndex l (fromInteger off * getPrimRepSizeInBytes rep))
 maybeImm (StInt i)
   | i >= toInteger (minBound::Int) && i <= toInteger (maxBound::Int)
   = Just (ImmInt (fromInteger i))
