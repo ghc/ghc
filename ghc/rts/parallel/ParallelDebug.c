@@ -293,7 +293,7 @@ StgClosure *node;
 #endif
 
 #if defined(USE_COST_CENTRES)
-  fprintf(stderr,"Cost Centre (???):       0x%lx\n",INFO_CAT(info_ptr));
+  fprintf(stderr,"Cost Centre (?):       0x%lx\n",INFO_CAT(info_ptr));
 #endif
 
 #if defined(_INFO_COPYING)
@@ -766,7 +766,7 @@ StgPtr node;
 #endif
 
 #if defined(PROFILING)
-  fprintf(stderr,"Cost Centre (???):       0x%lx\n",INFO_CAT(info_ptr));
+  fprintf(stderr,"Cost Centre (?):       0x%lx\n",INFO_CAT(info_ptr));
 #endif
 
 #if defined(_INFO_COPYING)
