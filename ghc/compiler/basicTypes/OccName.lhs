@@ -574,6 +574,7 @@ encode cs = case maybe_tuple cs of
 maybe_tuple ('(' : cs) = check_tuple 0 cs
 maybe_tuple other      = Nothing
 
+check_tuple :: Int -> String -> Maybe Int
 check_tuple n (',' : cs) = check_tuple (n+1) cs
 check_tuple n ")"	 = Just n
 check_tuple n other      = Nothing

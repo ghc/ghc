@@ -563,6 +563,7 @@ escape_msg sig_tv tv globs
 			       ptext SLIT("which is mentioned in the environment")
 	      | otherwise    = ptext SLIT("It is mentioned in the environment")
 
+    vcat_first :: Int -> [SDoc] -> SDoc
     vcat_first n []     = empty
     vcat_first 0 (x:xs) = text "...others omitted..."
     vcat_first n (x:xs) = x $$ vcat_first (n-1) xs

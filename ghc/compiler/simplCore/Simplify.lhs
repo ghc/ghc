@@ -309,6 +309,7 @@ zapLambdaBndr bndr body body_cont
 				      -> ICanSafelyBeINLINEd InsideLam nalts
 				other -> inline_prag
 
+    definitely_saturated :: Int -> CoreExpr -> SimplCont -> Bool
     definitely_saturated 0 _	        _		     = False	-- Too expensive to find out
     definitely_saturated n (Lam _ body) (ApplyTo _ _ _ cont) = definitely_saturated (n-1) body cont
     definitely_saturated n (Lam _ _)    other_cont	     = False

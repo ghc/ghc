@@ -493,9 +493,10 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ, n_prov = prov})
 
     pp_mod_dot sty
       = case prov of
-    	   SystemProv	  			     -> pp_qual mod  dot    user_sty
-		-- Hack alert!  Omit the qualifier on SystemProv things, which I claim
-		-- will also be WiredIn things. We can't get the omit flag right
+    	   SystemProv	  			     -> pp_qual mod  pp_sep    user_sty
+		-- Hack alert!  Omit the qualifier on SystemProv things in user style
+                -- I claim such SystemProv things will also be WiredIn things.
+		-- We can't get the omit flag right
 		-- on wired in tycons etc (sigh) so we just leave it out in user style, 
 		-- and hope that leaving it out isn't too consfusing.
 		-- (e.g. if the programmer hides Bool and  redefines it.  If so, use -dppr-debug.)

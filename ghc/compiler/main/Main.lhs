@@ -397,6 +397,14 @@ ppSourceStats short (HsModule name version exports imports decls src_loc)
 	    (_,_,ss,is) ->
 	       (addpr (count_monobinds inst_meths), ss, is)
 
+    addpr :: (Int,Int) -> Int
+    add1  :: Int -> Int -> Int
+    add2  :: (Int,Int) -> (Int,Int) -> (Int, Int)
+    add3  :: (Int,Int,Int) -> (Int,Int,Int) -> (Int, Int, Int)
+    add4  :: (Int,Int,Int,Int) -> (Int,Int,Int,Int) -> (Int, Int, Int, Int)
+    add5  :: (Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int)
+    add6  :: (Int,Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int, Int)
+
     addpr (x,y) = x+y
     add1 x1 y1  = x1+y1
     add2 (x1,x2) (y1,y2) = (x1+y1,x2+y2)

@@ -227,5 +227,6 @@ The version of the interface file format we're
 using:
 
 \begin{code}
+interfaceFileFormatVersion :: Int
 interfaceFileFormatVersion = HscIfaceFileVersion
 \end{code}

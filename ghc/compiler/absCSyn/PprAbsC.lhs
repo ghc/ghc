@@ -1559,7 +1559,7 @@ big_doubles = (getPrimRepSize DoubleRep) /= 1
 floatToWord :: CAddrMode -> CAddrMode
 floatToWord (CLit (MachFloat r))
   = runST (do
-	arr <- newFloatArray (0,0)
+	arr <- newFloatArray ((0::Int),0)
 	writeFloatArray arr 0 (fromRational r)
 	i <- readIntArray arr 0
 	return (CLit (MachInt (toInteger i) True))
@@ -1569,7 +1569,7 @@ doubleToWords :: CAddrMode -> [CAddrMode]
 doubleToWords (CLit (MachDouble r))
   | big_doubles				-- doubles are 2 words
   = runST (do
-	arr <- newDoubleArray (0,1)
+	arr <- newDoubleArray ((0::Int),1)
 	writeDoubleArray arr 0 (fromRational r)
 	i1 <- readIntArray arr 0
 	i2 <- readIntArray arr 1
@@ -1579,7 +1579,7 @@ doubleToWords (CLit (MachDouble r))
     )
   | otherwise				-- doubles are 1 word
   = runST (do
-	arr <- newDoubleArray (0,0)
+	arr <- newDoubleArray ((0::Int),0)
 	writeDoubleArray arr 0 (fromRational r)
 	i <- readIntArray arr 0
 	return [ CLit (MachInt (toInteger i) True) ]

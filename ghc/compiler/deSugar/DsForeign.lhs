@@ -524,7 +524,8 @@ fexportEntry c_nm helper args res cc isDyn = (header_bits, c_bits)
 				, head args : addrTy : tail args)
     | otherwise = (mkCArgNames 0 args, args)
 
-  mkCArgNames n as = zipWith (\ _ n -> text ('a':show n)) as [n..] 
+mkCArgNames :: Int -> [a] -> [SDoc]
+mkCArgNames n as = zipWith (\ _ n -> text ('a':show n)) as [n..] 
 
 mkHObj :: Type -> SDoc
 mkHObj t = text "rts_mk" <> showFFIType t

@@ -630,7 +630,7 @@ findStrictness :: [Type]		-- Types of args in which strictness is wanted
 findStrictness tys str_val abs_val
   = (map find_str tys_w_index, isBot (foldl (absApply StrAnal) str_val all_tops))
   where
-    tys_w_index = tys `zip` [1..]
+    tys_w_index = tys `zip` [(1::Int) ..]
 
     find_str (ty,n) = findRecDemand str_fn abs_fn ty
 		    where
