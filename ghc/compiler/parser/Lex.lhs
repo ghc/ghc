@@ -319,7 +319,7 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "export",	ITexport ),
 	( "label",	ITlabel ),
 	( "dynamic",	ITdynamic ),
-	( "safe",	ITunsafe ),
+	( "safe",	ITsafe ),
 	( "unsafe",	ITunsafe ),
 	( "with",	ITwith ),
 	( "stdcall",    ITstdcallconv),
