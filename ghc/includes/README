@@ -56,7 +56,7 @@ Here is a rough hierarchy of the header files by dependency.
 
 Rts.h
   Stg.h
-    config.h		// configuration info derived by the configure script.
+    ghcconfig.h		// configuration info derived by the configure script.
     RtsConfig.h		// settings for Rts things (eg. eager vs. lazy BH)
     MachDeps.h		// sizes of various basic types
     StgTypes.h		// basic types specific to the virtual machine
