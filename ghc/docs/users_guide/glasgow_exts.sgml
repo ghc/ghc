@@ -210,6 +210,7 @@ program), you may wish to check if there are libraries that provide a
       <varlistentry>
 	<term><option>-fallow-overlapping-instances</option></term>
 	<term><option>-fallow-undecidable-instances</option></term>
+	<term><option>-fallow-incoherent-instances</option></term>
 	<term><option>-fcontext-stack</option></term>
 	<indexterm><primary><option>-fallow-overlapping-instances</option></primary></indexterm>
 	<indexterm><primary><option>-fallow-undecidable-instances</option></primary></indexterm>
@@ -955,9 +956,9 @@ declarations
 
 However, if you give the command line option
 <option>-fallow-overlapping-instances</option><indexterm><primary>-fallow-overlapping-instances
-option</primary></indexterm> then two overlapping instance declarations are permitted
-iff
-
+option</primary></indexterm> then overlapping instance declarations are permitted.
+However, GHC arranges never to commit to using an instance declaration
+if another instance declaration also applies, either now or later.
 
 <itemizedlist>
 <listitem>
@@ -970,22 +971,11 @@ iff
 
 <para>
  OR <literal>type2</literal> is a substitution instance of <literal>type1</literal>
-(but not identical to <literal>type1</literal>)
+(but not identical to <literal>type1</literal>), or vice versa.
 </para>
 </listitem>
-<listitem>
-
-<para>
- OR vice versa
-</para>
-</listitem>
-
 </itemizedlist>
-
-
 Notice that these rules
-
-
 <itemizedlist>
 <listitem>
 
@@ -1005,8 +995,34 @@ Reason: you can pick which instance decl
 </listitem>
 
 </itemizedlist>
-
-
+However the rules are over-conservative.  Two instance declarations can overlap,
+but it can still be clear in particular situations which to use.  For example:
+<programlisting>
+  instance C (Int,a) where ...
+  instance C (a,Bool) where ...
+</programlisting>
+These are rejected by GHC's rules, but it is clear what to do when trying
+to solve the constraint <literal>C (Int,Int)</literal> because the second instance
+cannot apply.  Yell if this restriction bites you.
+</para>
+<para>
+GHC is also conservative about committing to an overlapping instance.  For example:
+<programlisting>
+  class C a where { op :: a -> a }
+  instance C [Int] where ...
+  instance C a => C [a] where ...
+  
+  f :: C b => [b] -> [b]
+  f x = op x
+</programlisting>
+From the RHS of f we get the constraint <literal>C [b]</literal>.  But
+GHC does not commit to the second instance declaration, because in a paricular
+call of f, b might be instantiate to Int, so the first instance declaration
+would be appropriate.  So GHC rejects the program.  If you add <option>-fallow-incoherent-instances</option>
+GHC will instead silently pick the second instance, without complaining about 
+the problem of subsequent instantiations.
+</para>
+<para>
 Regrettably, GHC doesn't guarantee to detect overlapping instance
 declarations if they appear in different modules.  GHC can "see" the
 instance declarations in the transitive closure of all the modules
@@ -1365,56 +1381,78 @@ There should be more documentation, but there isn't (yet).  Yell if you need it.
 </title>
 
 <para>
-GHC's type system supports explicit universal quantification in
-constructor fields and function arguments.  This is useful for things
-like defining <literal>runST</literal> from the state-thread world. 
-GHC's syntax for this now agrees with Hugs's, namely:
-</para>
-
-<para>
-
-<programlisting>
-        forall a b. (Ord a, Eq  b) => a -> b -> a
-</programlisting>
-
-</para>
-
-<para>
-The context is, of course, optional.  You can't use <literal>forall</literal> as
-a type variable any more!
-</para>
-
-<para>
-Haskell type signatures are implicitly quantified.  The <literal>forall</literal>
+Haskell type signatures are implicitly quantified.  The new keyword <literal>forall</literal>
 allows us to say exactly what this means.  For example:
 </para>
-
 <para>
-
 <programlisting>
         g :: b -> b
 </programlisting>
-
-</para>
-
-<para>
 means this:
-</para>
-
-<para>
-
 <programlisting>
         g :: forall b. (b -> b)
 </programlisting>
-
-</para>
-
-<para>
 The two are treated identically.
 </para>
 
+<para>
+However, GHC's type system supports <emphasis>arbitrary-rank</emphasis> 
+explicit universal quantification in
+types. 
+For example, all the following types are legal:
+<programlisting>
+    f1 :: forall a b. a -> b -> a
+    g1 :: forall a b. (Ord a, Eq  b) => a -> b -> a
+
+    f2 :: (forall a. a->a) -> Int -> Int
+    g2 :: (forall a. Eq a => [a] -> a -> Bool) -> Int -> Int
+
+    f3 :: ((forall a. a->a) -> Int) -> Bool -> Bool
+</programlisting>
+Here, <literal>f1</literal> and <literal>g1</literal> are rank-1 types, and
+can be written in standard Haskell (e.g. <literal>f1 :: a->b->a</literal>).
+The <literal>forall</literal> makes explicit the universal quantification that
+is implicitly added by Haskell.
+</para>
+<para>
+The functions <literal>f2</literal> and <literal>g2</literal> have rank-2 types;
+the <literal>forall</literal> is on the left of a function arrrow.  As <literal>g2</literal>
+shows, the polymorphic type on the left of the function arrow can be overloaded.
+</para>
+<para>
+The functions <literal>f3</literal> and <literal>g3</literal> have rank-3 types;
+they have rank-2 types on the left of a function arrow.
+</para>
+<para>
+GHC allows types of arbitrary rank; you can nest <literal>forall</literal>s
+arbitrarily deep in function arrows.   (GHC used to be restricted to rank 2, but
+that restriction has now been lifted.)
+In particular, a forall-type (also called a "type scheme"),
+including an operational type class context, is legal:
+<itemizedlist>
+<listitem> <para> On the left of a function arrow </para> </listitem>
+<listitem> <para> On the right of a function arrow (see <xref linkend="hoist">) </para> </listitem>
+<listitem> <para> As the argument of a constructor, or type of a field, in a data type declaration. For
+example, any of the <literal>f1,f2,f3,g1,g2,g3</literal> above would be valid
+field type signatures.</para> </listitem>
+<listitem> <para> As the type of an implicit parameter </para> </listitem>
+<listitem> <para> In a pattern type signature (see <xref linkend="scoped-type-variables">) </para> </listitem>
+</itemizedlist>
+There is one place you cannot put a <literal>forall</literal>:
+you cannot instantiate a type variable with a forall-type.  So you cannot 
+make a forall-type the argument of a type constructor.  So these types are illegal:
+<programlisting>
+    x1 :: [forall a. a->a]
+    x2 :: (forall a. a->a, Int)
+    x3 :: Maybe (forall a. a->a)
+</programlisting>
+Of course <literal>forall</literal> becomes a keyword; you can't use <literal>forall</literal> as
+a type variable any more!
+</para>
+
+
 <sect2 id="univ">
-<title>Universally-quantified data type fields
+<title>Examples
 </title>
 
 <para>
@@ -1437,8 +1475,7 @@ newtype Swizzle = MkSwizzle (Ord a => [a] -> [a])
 </para>
 
 <para>
-The constructors now have so-called <emphasis>rank 2</emphasis> polymorphic
-types, in which there is a for-all in the argument types.:
+The constructors have rank-2 types:
 </para>
 
 <para>
@@ -1482,11 +1519,6 @@ to <emphasis>require</emphasis> explicit quantification on constructor arguments
 where that is what is wanted.  Feedback welcomed.)
 </para>
 
-</sect2>
-
-<sect2>
-<title>Construction </title>
-
 <para>
 You construct values of types <literal>T1, MonadT, Swizzle</literal> by applying
 the constructor to suitable values, just as usual.  For example,
@@ -1495,17 +1527,23 @@ the constructor to suitable values, just as usual.  For example,
 <para>
 
 <programlisting>
-(T1 (\xy->x) 3) :: T Int
+    a1 :: T Int
+    a1 = T1 (\xy->x) 3
+    
+    a2, a3 :: Swizzle
+    a2 = MkSwizzle sort
+    a3 = MkSwizzle reverse
+    
+    a4 :: MonadT Maybe
+    a4 = let r x = Just x
+	     b m k = case m of
+		       Just y -> k y
+		       Nothing -> Nothing
+         in
+         MkMonad r b
 
-(MkSwizzle sort)    :: Swizzle
-(MkSwizzle reverse) :: Swizzle
-
-(let r x = Just x
-     b m k = case m of
-                Just y -> k y
-                Nothing -> Nothing
-  in
-  MkMonad r b) :: MonadT Maybe
+    mkTs :: (forall b. b -> b -> b) -> a -> [T a]
+    mkTs f x y = [T1 f x, T1 f y]
 </programlisting>
 
 </para>
@@ -1516,11 +1554,6 @@ required, as <literal>(MkSwizzle reverse)</literal> shows.  (<function>reverse</
 does not need the <literal>Ord</literal> constraint.)
 </para>
 
-</sect2>
-
-<sect2>
-<title>Pattern matching</title>
-
 <para>
 When you use pattern matching, the bound variables may now have
 polymorphic types.  For example:
@@ -1529,17 +1562,17 @@ polymorphic types.  For example:
 <para>
 
 <programlisting>
-        f :: T a -> a -> (a, Char)
-        f (T1 f k) x = (f k x, f 'c' 'd')
+    f :: T a -> a -> (a, Char)
+    f (T1 w k) x = (w k x, w 'c' 'd')
 
-        g :: (Ord a, Ord b) => Swizzle -> [a] -> (a -> b) -> [b]
-        g (MkSwizzle s) xs f = s (map f (s xs))
+    g :: (Ord a, Ord b) => Swizzle -> [a] -> (a -> b) -> [b]
+    g (MkSwizzle s) xs f = s (map f (s xs))
 
-        h :: MonadT m -> [m a] -> m [a]
-        h m [] = return m []
-        h m (x:xs) = bind m x           $ \y ->
-                      bind m (h m xs)   $ \ys ->
-                      return m (y:ys)
+    h :: MonadT m -> [m a] -> m [a]
+    h m [] = return m []
+    h m (x:xs) = bind m x          $ \y ->
+                 bind m (h m xs)   $ \ys ->
+                 return m (y:ys)
 </programlisting>
 
 </para>
@@ -1550,187 +1583,50 @@ and <literal>bind</literal> to extract the polymorphic bind and return functions
 from the <literal>MonadT</literal> data structure, rather than using pattern
 matching.
 </para>
-
-<para>
-You cannot pattern-match against an argument that is polymorphic.
-For example:
-
-<programlisting>
-        newtype TIM s a = TIM (ST s (Maybe a))
-
-        runTIM :: (forall s. TIM s a) -> Maybe a
-        runTIM (TIM m) = runST m
-</programlisting>
-
-</para>
-
-<para>
-Here the pattern-match fails, because you can't pattern-match against
-an argument of type <literal>(forall s. TIM s a)</literal>.  Instead you
-must bind the variable and pattern match in the right hand side:
-
-<programlisting>
-        runTIM :: (forall s. TIM s a) -> Maybe a
-        runTIM tm = case tm of { TIM m -> runST m }
-</programlisting>
-
-The <literal>tm</literal> on the right hand side is (invisibly) instantiated, like
-any polymorphic value at its occurrence site, and now you can pattern-match
-against it.
-</para>
-
 </sect2>
 
 <sect2>
-<title>The partial-application restriction</title>
+<title>Type inference</title>
 
 <para>
-There is really only one way in which data structures with polymorphic
-components might surprise you: you must not partially apply them.
-For example, this is illegal:
+In general, type inference for arbitrary-rank types is undecideable.
+GHC uses an algorithm proposed by Odersky and Laufer ("Putting type annotations to work", POPL'96)
+to get a decidable algorithm by requiring some help from the programmer.
+We do not yet have a formal specification of "some help" but the rule is this:
 </para>
-
 <para>
-
+<emphasis>For a lambda-bound or case-bound variable, x, either the programmer
+provides an explicit polymorphic type for x, or GHC's type inference will assume
+that x's type has no foralls in it</emphasis>.
+</para>
+<para>
+What does it mean to "provide" an explicit type for x?  You can do that by 
+giving a type signature for x directly, using a pattern type signature
+(<xref linkend="scoped-type-variables">), thus:
 <programlisting>
-        map MkSwizzle [sort, reverse]
+     \ f :: (forall a. a->a) -> (f True, f 'c')
 </programlisting>
-
-</para>
-
-<para>
-The restriction is this: <emphasis>every subexpression of the program must
-have a type that has no for-alls, except that in a function
-application (f e1&hellip;en) the partial applications are not subject to
-this rule</emphasis>.  The restriction makes type inference feasible.
-</para>
-
-<para>
-In the illegal example, the sub-expression <literal>MkSwizzle</literal> has the
-polymorphic type <literal>(Ord b => [b] -> [b]) -> Swizzle</literal> and is not
-a sub-expression of an enclosing application.  On the other hand, this
-expression is OK:
-</para>
-
-<para>
-
+Alternatively, you can give a type signature to the enclosing
+context, which GHC can "push down" to find the type for the variable:
 <programlisting>
-        map (T1 (\a b -> a)) [1,2,3]
+     (\ f -> (f True, f 'c')) :: (forall a. a->a) -> (Bool,Char)
 </programlisting>
-
-</para>
-
-<para>
-even though it involves a partial application of <function>T1</function>, because
-the sub-expression <literal>T1 (\a b -> a)</literal> has type <literal>Int -> T
-Int</literal>.
-</para>
-
-</sect2>
-
-<sect2 id="sigs">
-<title>Type signatures
-</title>
-
-<para>
-Once you have data constructors with universally-quantified fields, or
-constants such as <Constant>runST</Constant> that have rank-2 types, it isn't long
-before you discover that you need more!  Consider:
-</para>
-
-<para>
-
+Here the type signature on the expression can be pushed inwards
+to give a type signature for f.  Similarly, and more commonly,
+one can give a type signature for the function itself:
 <programlisting>
-  mkTs f x y = [T1 f x, T1 f y]
+     h :: (forall a. a->a) -> (Bool,Char)
+     h f = (f True, f 'c')
 </programlisting>
-
-</para>
-
-<para>
-<function>mkTs</function> is a fuction that constructs some values of type
-<literal>T</literal>, using some pieces passed to it.  The trouble is that since
-<literal>f</literal> is a function argument, Haskell assumes that it is
-monomorphic, so we'll get a type error when applying <function>T1</function> to
-it.  This is a rather silly example, but the problem really bites in
-practice.  Lots of people trip over the fact that you can't make
-"wrappers functions" for <Constant>runST</Constant> for exactly the same reason.
-In short, it is impossible to build abstractions around functions with
-rank-2 types.
-</para>
-
-<para>
-The solution is fairly clear.  We provide the ability to give a rank-2
-type signature for <emphasis>ordinary</emphasis> functions (not only data
-constructors), thus:
-</para>
-
-<para>
-
+You don't need to give a type signature if the lambda bound variable
+is a constructor argument.  Here is an example we saw earlier:
 <programlisting>
-  mkTs :: (forall b. b -> b -> b) -> a -> [T a]
-  mkTs f x y = [T1 f x, T1 f y]
+    f :: T a -> a -> (a, Char)
+    f (T1 w k) x = (w k x, w 'c' 'd')
 </programlisting>
-
-</para>
-
-<para>
-This type signature tells the compiler to attribute <literal>f</literal> with
-the polymorphic type <literal>(forall b. b -> b -> b)</literal> when type
-checking the body of <function>mkTs</function>, so now the application of
-<function>T1</function> is fine.
-</para>
-
-<para>
-There are two restrictions:
-</para>
-
-<para>
-
-<itemizedlist>
-<listitem>
-
-<para>
- You can only define a rank 2 type, specified by the following
-grammar:
-
-
-<programlisting>
-rank2type ::= [forall tyvars .] [context =>] funty
-funty     ::= ([forall tyvars .] [context =>] ty) -> funty
-            | ty
-ty        ::= ...current Haskell monotype syntax...
-</programlisting>
-
-
-Informally, the universal quantification must all be right at the beginning,
-or at the top level of a function argument.
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- There is a restriction on the definition of a function whose
-type signature is a rank-2 type: the polymorphic arguments must be
-matched on the left hand side of the "<literal>=</literal>" sign.  You can't
-define <function>mkTs</function> like this:
-
-
-<programlisting>
-mkTs :: (forall b. b -> b -> b) -> a -> [T a]
-mkTs = \ f x y -> [T1 f x, T1 f y]
-</programlisting>
-
-
-
-The same partial-application rule applies to ordinary functions with
-rank-2 types as applied to data constructors.
-
-</para>
-</listitem>
-
-</itemizedlist>
-
+Here we do not need to give a type signature to <literal>w</literal>, because
+it is an argument of constructor <literal>T1</literal> and that tells GHC all
+it needs to know.
 </para>
 
 </sect2>
@@ -3669,6 +3565,181 @@ Just to finish with, here's another example I rather like:
 </para>
 </sect2>
 </sect1>
+
+<sect1 id="newtype-deriving">
+<title>Generalised derived instances for newtypes</title>
+
+<para>
+When you define an abstract type using <literal>newtype</literal>, you may want
+the new type to inherit some instances from its representation. In
+Haskell 98, you can inherit instances of <literal>Eq</literal>, <literal>Ord</literal>,
+<literal>Enum</literal> and <literal>Bounded</literal> by deriving them, but for any
+other classes you have to write an explicit instance declaration. For
+example, if you define
+
+<programlisting> 
+  newtype Dollars = Dollars Int 
+</programlisting> 
+
+and you want to use arithmetic on <literal>Dollars</literal>, you have to
+explicitly define an instance of <literal>Num</literal>:
+
+<programlisting> 
+  instance Num Dollars where
+    Dollars a + Dollars b = Dollars (a+b)
+    ...
+</programlisting>
+All the instance does is apply and remove the <literal>newtype</literal>
+constructor. It is particularly galling that, since the constructor
+doesn't appear at run-time, this instance declaration defines a
+dictionary which is <emphasis>wholly equivalent</emphasis> to the <literal>Int</literal>
+dictionary, only slower!
+</para>
+
+<sect2> <title> Generalising the deriving clause </title>
+<para>
+GHC now permits such instances to be derived instead, so one can write 
+<programlisting> 
+  newtype Dollars = Dollars Int deriving (Eq,Show,Num)
+</programlisting> 
+
+and the implementation uses the <emphasis>same</emphasis> <literal>Num</literal> dictionary
+for <literal>Dollars</literal> as for <literal>Int</literal>. Notionally, the compiler
+derives an instance declaration of the form
+
+<programlisting> 
+  instance Num Int => Num Dollars
+</programlisting> 
+
+which just adds or removes the <literal>newtype</literal> constructor according to the type.
+</para>
+<para>
+
+We can also derive instances of constructor classes in a similar
+way. For example, suppose we have implemented state and failure monad
+transformers, such that
+
+<programlisting> 
+  instance Monad m => Monad (State s m) 
+  instance Monad m => Monad (Failure m)
+</programlisting> 
+In Haskell 98, we can define a parsing monad by 
+<programlisting> 
+  type Parser tok m a = State [tok] (Failure m) a
+</programlisting> 
+
+which is automatically a monad thanks to the instance declarations
+above. With the extension, we can make the parser type abstract,
+without needing to write an instance of class <literal>Monad</literal>, via
+
+<programlisting> 
+  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
+                         deriving Monad
+</programlisting>
+In this case the derived instance declaration is of the form 
+<programlisting> 
+  instance Monad (State [tok] (Failure m)) => Monad (Parser tok m) 
+</programlisting> 
+
+Notice that, since <literal>Monad</literal> is a constructor class, the
+instance is a <emphasis>partial application</emphasis> of the new type, not the
+entire left hand side. We can imagine that the type declaration is
+``eta-converted'' to generate the context of the instance
+declaration.
+</para>
+<para>
+
+We can even derive instances of multi-parameter classes, provided the
+newtype is the last class parameter. In this case, a ``partial
+application'' of the class appears in the <literal>deriving</literal>
+clause. For example, given the class
+
+<programlisting> 
+  class StateMonad s m | m -> s where ... 
+  instance Monad m => StateMonad s (State s m) where ... 
+</programlisting> 
+then we can derive an instance of <literal>StateMonad</literal> for <literal>Parser</literal>s by 
+<programlisting> 
+  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
+                         deriving (Monad, StateMonad [tok])
+</programlisting>
+
+The derived instance is obtained by completing the application of the
+class to the new type:
+
+<programlisting> 
+  instance StateMonad [tok] (State [tok] (Failure m)) =>
+           StateMonad [tok] (Parser tok m)
+</programlisting>
+</para>
+<para>
+
+As a result of this extension, all derived instances in newtype
+declarations are treated uniformly (and implemented just by reusing
+the dictionary for the representation type), <emphasis>except</emphasis>
+<literal>Show</literal> and <literal>Read</literal>, which really behave differently for
+the newtype and its representation.
+</para>
+</sect2>
+
+<sect2> <title> A more precise specification </title>
+<para>
+Derived instance declarations are constructed as follows. Consider the
+declaration (after expansion of any type synonyms)
+
+<programlisting> 
+  newtype T v1...vn = T' (S t1...tk vk+1...vn) deriving (c1...cm) 
+</programlisting> 
+
+where <literal>S</literal> is a type constructor, <literal>t1...tk</literal> are 
+types,
+<literal>vk+1...vn</literal> are type variables which do not occur in any of
+the <literal>ti</literal>, and the <literal>ci</literal> are partial applications of
+classes of the form <literal>C t1'...tj'</literal>.  The derived instance
+declarations are, for each <literal>ci</literal>,
+
+<programlisting> 
+  instance ci (S t1...tk vk+1...v) => ci (T v1...vp)
+</programlisting>
+where <literal>p</literal> is chosen so that <literal>T v1...vp</literal> is of the 
+right <emphasis>kind</emphasis> for the last parameter of class <literal>Ci</literal>.
+</para>
+<para>
+
+As an example which does <emphasis>not</emphasis> work, consider 
+<programlisting> 
+  newtype NonMonad m s = NonMonad (State s m s) deriving Monad 
+</programlisting> 
+Here we cannot derive the instance 
+<programlisting> 
+  instance Monad (State s m) => Monad (NonMonad m) 
+</programlisting> 
+
+because the type variable <literal>s</literal> occurs in <literal>State s m</literal>,
+and so cannot be "eta-converted" away. It is a good thing that this
+<literal>deriving</literal> clause is rejected, because <literal>NonMonad m</literal> is
+not, in fact, a monad --- for the same reason. Try defining
+<literal>>>=</literal> with the correct type: you won't be able to.
+</para>
+<para>
+
+Notice also that the <emphasis>order</emphasis> of class parameters becomes
+important, since we can only derive instances for the last one. If the
+<literal>StateMonad</literal> class above were instead defined as
+
+<programlisting> 
+  class StateMonad m s | m -> s where ... 
+</programlisting>
+
+then we would not have been able to derive an instance for the
+<literal>Parser</literal> type above. We hypothesise that multi-parameter
+classes usually have one "main" parameter for which deriving new
+instances is most interesting.
+</para>
+</sect2>
+</sect1>
+
+
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
