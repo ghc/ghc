@@ -38,7 +38,6 @@ import Outputable
 import Util		( removeDups, equivClasses, thenCmp )
 import List		( nub )
 import Maybes		( mapMaybe )
-import Char	        ( isAlphanum )
 \end{code}
 
 
