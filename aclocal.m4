@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.72 2001/05/25 13:56:25 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.73 2001/05/27 05:00:08 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -891,7 +891,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.72 2001/05/25 13:56:25 simonmar Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.73 2001/05/27 05:00:08 sof Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -979,7 +979,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.72 2001/05/25 13:56:25 simonmar Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.73 2001/05/27 05:00:08 sof Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,
@@ -1052,3 +1052,17 @@ dnl and we don't want to be global namespace polluters.
 ])
 
 # LocalWords:  fi
+
+dnl 
+dnl acspecific.m4's defn of AC_PROG_LEX is a bit too permissive, as it
+dnl defaults to 'lex' if 'flex' isn't found (without checking whether
+dnl 'lex' is actually present along the user's PATH).
+dnl
+AC_DEFUN(AC_PROG_LEX_STRICT,
+[AC_CHECK_PROG(LEX, flex, flex)
+if test -z "$LEX"
+then
+  AC_CHECK_PROG(LEX,lex,lex)
+  test -z "$LEX" && AC_MSG_ERROR(['lex' or 'flex' is required to compile GHC.])
+fi
+])

@@ -528,10 +528,10 @@ dnl (FPTOOLS_PROG_YACCY is AC_PROG_YACC, but with some extra testing
 dnl  on the suitability of the 'yacc' returned.)
 FPTOOLS_PROG_YACCY
 
-dnl ** Find lex command (lex or flex) and library (-ll or -lfl)
-dnl     ( not that we care about the latter, see mk/config.mk.in )
-AC_PROG_LEX
-
+dnl ** Find lex command (lex or flex) - *doesn't* use autoconf's
+dnl    AC_PROG_LEX, since it doesn't actually check whether 'lex'
+dnl    exists if 'flex' doesn't.
+AC_PROG_LEX_STRICT
 
 dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL
