@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.178 2004/10/13 08:48:47 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.179 2004/11/12 15:51:37 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -906,13 +906,11 @@ setOptions wds =
       -- don't forget about the extra command-line flags from the 
       -- extra_ghc_opts fields in the new packages
       new_package_details <- io (getPackageDetails new_packages)
-      let pkg_extra_opts = concatMap extra_ghc_opts new_package_details
-      pkg_extra_dyn <- io (processArgs static_flags pkg_extra_opts [])
 
       -- then, dynamic flags
       io $ do 
 	restoreDynFlags
-        leftovers <- processArgs dynamic_flags (leftovers ++ pkg_extra_dyn) []
+        leftovers <- processArgs dynamic_flags leftovers []
 	saveDynFlags
 
         if (not (null leftovers))
