@@ -42,10 +42,11 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
   = returnUs (\xs -> StData PtrRep table : StLabel info_lbl : xs)
 
     where
-	info_lbl = infoTableLabelFromCI cl_info
+	info_lbl  = infoTableLabelFromCI cl_info
+        needs_srt = infoTblNeedsSRT cl_info
 
-	table | infoTblNeedsSRT cl_info	= srt_label : rest_of_table
-	      | otherwise               = rest_of_table
+	table | needs_srt = srt_label : rest_of_table
+	      | otherwise = rest_of_table
 
 	rest_of_table = 
 		[
@@ -68,12 +69,14 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 #endif	     
 	srt = getSRTInfo cl_info	     
 
-	(srt_label,srt_len) = 
-	     case srt of
-		(lbl, NoSRT) -> (StInt 0, 0)
+	(srt_label,srt_len)
+           | needs_srt
+	   = case srt of
 		(lbl, SRT off len) -> 
 			(StIndex DataPtrRep (StCLbl lbl) 
 				(StInt (toInteger off)), len)
+           | otherwise
+           = (StInt 0, 0)
 
 	layout_info :: Word32
 #ifdef WORDS_BIGENDIAN
