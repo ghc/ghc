@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.39 2000/01/12 15:15:17 simonmar Exp $
+ * $Id: Schedule.c,v 1.40 2000/01/13 10:37:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -442,9 +442,9 @@ schedule( void )
     ACQUIRE_LOCK(&sched_mutex);
 
 #ifdef SMP
-    IF_DEBUG(scheduler,fprintf(stderr,"schedule (task %ld): ", pthread_self()););
+    IF_DEBUG(scheduler,fprintf(stderr,"scheduler (task %ld): ", pthread_self()););
 #else
-    IF_DEBUG(scheduler,fprintf(stderr,"schedule: "););
+    IF_DEBUG(scheduler,fprintf(stderr,"scheduler: "););
 #endif
     t = cap->rCurrentTSO;
     
@@ -864,11 +864,13 @@ void initScheduler(void)
     free_capabilities = cap;
     n_free_capabilities = RtsFlags.ParFlags.nNodes;
   }
-  IF_DEBUG(scheduler,fprintf(stderr,"schedule: Allocated %d capabilities\n",
+  IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Allocated %d capabilities\n",
 			     n_free_capabilities););
 #endif
 
+#if defined(SMP) || defined(PAR)
   initSparkPools();
+#endif
 }
 
 #ifdef SMP
@@ -895,7 +897,7 @@ startTasks( void )
     task_ids[i].gc_time = 0.0;
     task_ids[i].gc_etime = 0.0;
     task_ids[i].elapsedtimestart = elapsedtime();
-    IF_DEBUG(scheduler,fprintf(stderr,"schedule: Started task: %ld\n",tid););
+    IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Started task: %ld\n",tid););
   }
 }
 #endif
@@ -918,7 +920,7 @@ exitScheduler( void )
   
   /* Wait for all the tasks to terminate */
   for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-    IF_DEBUG(scheduler,fprintf(stderr,"schedule: waiting for task %ld\n", 
+    IF_DEBUG(scheduler,fprintf(stderr,"scheduler: waiting for task %ld\n", 
 			       task_ids[i].id));
     pthread_join(task_ids[i].id, NULL);
   }
@@ -981,7 +983,7 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
   m->link = main_threads;
   main_threads = m;
 
-  IF_DEBUG(scheduler, fprintf(stderr, "schedule: new main thread (%d)\n", 
+  IF_DEBUG(scheduler, fprintf(stderr, "scheduler: new main thread (%d)\n", 
 			      m->tso->id));
 
 #ifdef SMP
@@ -999,7 +1001,7 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
   pthread_cond_destroy(&m->wakeup);
 #endif
 
-  IF_DEBUG(scheduler, fprintf(stderr, "schedule: main thread (%d) finished\n", 
+  IF_DEBUG(scheduler, fprintf(stderr, "scheduler: main thread (%d) finished\n", 
 			      m->tso->id));
   free(m);
 
@@ -1155,7 +1157,7 @@ threadStackOverflow(StgTSO *tso)
   new_tso_size = round_to_mblocks(new_tso_size);  /* Be MBLOCK-friendly */
   new_stack_size = new_tso_size - TSO_STRUCT_SIZEW;
 
-  IF_DEBUG(scheduler, fprintf(stderr,"schedule: increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
+  IF_DEBUG(scheduler, fprintf(stderr,"scheduler: increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
 
   dest = (StgTSO *)allocate(new_tso_size);
   TICK_ALLOC_TSO(new_tso_size-sizeofW(StgTSO),0);
@@ -1502,7 +1504,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	TICK_ALLOC_UP_THK(words+1,0);
 	
 	IF_DEBUG(scheduler,
-		 fprintf(stderr,  "schedule: Updating ");
+		 fprintf(stderr,  "scheduler: Updating ");
 		 printPtr((P_)su->updatee); 
 		 fprintf(stderr,  " with ");
 		 printObj((StgClosure *)ap);
@@ -1538,7 +1540,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	o->payload[1] = cf->handler;
 	
 	IF_DEBUG(scheduler,
-		 fprintf(stderr,  "schedule: Built ");
+		 fprintf(stderr,  "scheduler: Built ");
 		 printObj((StgClosure *)o);
 		 );
 	
@@ -1564,7 +1566,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	payloadCPtr(o,0) = (StgClosure *)ap;
 	
 	IF_DEBUG(scheduler,
-		 fprintf(stderr,  "schedule: Built ");
+		 fprintf(stderr,  "scheduler: Built ");
 		 printObj((StgClosure *)o);
 		 );
 	
