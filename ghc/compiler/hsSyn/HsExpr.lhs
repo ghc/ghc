@@ -10,16 +10,13 @@ module HsExpr where
 
 -- friends:
 import HsBinds		( HsBinds(..), nullBinds )
-import HsTypes		( PostTcType )
 import HsLit		( HsLit, HsOverLit )
 import BasicTypes	( Fixity(..) )
-import HsTypes		( HsType )
+import HsTypes		( HsType, PostTcType, SyntaxName )
 import HsImpExp		( isOperator )
 
 -- others:
-import Name		( Name )
 import ForeignCall	( Safety )
-import Outputable	
 import PprType		( pprParendType )
 import Type		( Type  )
 import Var		( TyVar )
@@ -27,6 +24,7 @@ import DataCon		( DataCon )
 import CStrings		( CLabelString, pprCLabelString )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import SrcLoc		( SrcLoc )
+import Outputable	
 import FastString
 \end{code}
 
@@ -62,7 +60,7 @@ data HsExpr id pat
   -- They are eventually removed by the type checker.
 
   | NegApp	(HsExpr id pat)	-- negated expr
-		Name		-- Name of 'negate' (see RnEnv.lookupSyntaxName)
+		SyntaxName	-- Name of 'negate' (see RnEnv.lookupSyntaxName)
 
   | HsPar	(HsExpr id pat)	-- parenthesised expr
 

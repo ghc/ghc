@@ -22,7 +22,7 @@ module HsPat (
 -- friends:
 import HsLit		( HsLit, HsOverLit )
 import HsExpr		( HsExpr )
-import HsTypes		( HsType )
+import HsTypes		( HsType, SyntaxName )
 import BasicTypes	( Fixity, Boxity, tupleParens )
 
 -- others:
@@ -55,13 +55,12 @@ data InPat name
 		    (InPat name)
 
   | NPatIn	    HsOverLit 		-- Always positive
-		    (Maybe Name)	-- Just (Name of 'negate') for negative
+		    (Maybe SyntaxName)	-- Just (Name of 'negate') for negative
 					-- patterns, Nothing otherwise
-					--  (see RnEnv.lookupSyntaxName)
 
   | NPlusKPatIn	    name		-- n+k pattern
 		    HsOverLit		-- It'll always be an HsIntegral
-		    Name		-- Name of '-' (see RnEnv.lookupSyntaxName)
+		    SyntaxName		-- Name of '-' (see RnEnv.lookupSyntaxName)
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
 

@@ -9,8 +9,7 @@ module HsLit where
 #include "HsVersions.h"
 
 import Type	( Type )
-import Name	( Name )
-import HsTypes	( PostTcType )
+import HsTypes	( SyntaxName, PostTcType )
 import Outputable
 import FastString
 import Ratio	( Rational )
@@ -58,9 +57,9 @@ instance Eq HsLit where
   lit1		    == lit2		 = False
 
 data HsOverLit 			-- An overloaded literal
-  = HsIntegral	    Integer  Name	-- Integer-looking literals;
+  = HsIntegral	    Integer  SyntaxName	-- Integer-looking literals;
 					-- The name is fromInteger
-  | HsFractional    Rational Name	-- Frac-looking literals
+  | HsFractional    Rational SyntaxName	-- Frac-looking literals
 					-- The name is fromRational
 
 instance Eq HsOverLit where

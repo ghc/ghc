@@ -17,6 +17,9 @@ module HsTypes (
 	-- Type place holder
 	, PostTcType, placeHolderType,
 
+	-- Name place holder
+	, SyntaxName, placeHolderName,
+
 	-- Printing
 	, pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context, pprHsTyVarBndr
 
@@ -37,17 +40,18 @@ import TcType		( Type, Kind, ThetaType, SourceType(..),
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
 import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, isNewTyCon, getSynTyConDefn )
 import RdrName		( RdrName, mkUnqual )
-import Name		( Name, getName )
-import OccName		( NameSpace, tvName )
+import Name		( Name, getName, mkInternalName )
+import OccName		( NameSpace, mkVarOcc, tvName )
 import Var		( TyVar, tyVarKind )
 import Subst		( substTyWith )
 import PprType		( {- instance Outputable Kind -}, pprParendKind, pprKind )
 import BasicTypes	( Boxity(..), Arity, IPName, tupleParens )
 import PrelNames	( mkTupConRdrName, listTyConKey, parrTyConKey,
-			  usOnceTyConKey, usManyTyConKey, hasKey,
+			  usOnceTyConKey, usManyTyConKey, hasKey, unboundKey,
 			  usOnceTyConName, usManyTyConName )
-import FiniteMap
+import SrcLoc		( builtinSrcLoc )
 import Util		( eqListBy, lengthIs )
+import FiniteMap
 import Outputable
 \end{code}
 
@@ -66,6 +70,18 @@ type PostTcType = Type		-- Used for slots in the abstract syntax
 
 placeHolderType :: PostTcType	-- Used before typechecking
 placeHolderType  = panic "Evaluated the place holder for a PostTcType"
+
+
+type SyntaxName = Name		-- These names are filled in by the renamer
+				-- Before then they are a placeHolderName (so that
+				--	we can still print the HsSyn)
+				-- They correspond to "rebindable syntax";
+				-- See RnEnv.lookupSyntaxName
+
+placeHolderName :: SyntaxName
+placeHolderName = mkInternalName unboundKey 
+			(mkVarOcc FSLIT("syntaxPlaceHolder")) 
+			builtinSrcLoc
 \end{code}
 
 
