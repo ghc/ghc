@@ -10,7 +10,7 @@ implementation of the state thread is lazy.
 \begin{code}
 module LazyST (
 
-	STBase.ST,
+	ST,
 
 	unsafeInterleaveST,
 
@@ -29,7 +29,7 @@ module LazyST (
 import qualified ST
 import qualified STBase
 import ArrBase
-import Unsafe   ( unsafeInterleaveST )
+import qualified Unsafe   ( unsafeInterleaveST )
 import PrelBase	( Eq(..), Int, Bool, ($), ()(..) )
 import Monad
 import Ix
@@ -73,7 +73,7 @@ writeSTRef r a = strictToLazyST (ST.writeSTRef r a)
 %*********************************************************
 
 \begin{code}
-type STArray s ix elt = MutableArray s ix elt
+newtype STArray s ix elt = STArray (MutableArray s ix elt)
 
 newSTArray 	    :: Ix ix => (ix,ix) -> elt -> ST s (STArray s ix elt)
 readSTArray   	    :: Ix ix => STArray s ix elt -> ix -> ST s elt 
@@ -83,13 +83,18 @@ thawSTArray 	    :: Ix ix => Array ix elt -> ST s (STArray s ix elt)
 freezeSTArray	    :: Ix ix => STArray s ix elt -> ST s (Array ix elt)
 unsafeFreezeSTArray :: Ix ix => STArray s ix elt -> ST s (Array ix elt)
 
-newSTArray ixs init   	= strictToLazyST (newArray ixs init)
-readSTArray arr ix    	= strictToLazyST (readArray arr ix)
-writeSTArray arr ix v 	= strictToLazyST (writeArray arr ix v)
-boundsSTArray     	= boundsOfArray
-thawSTArray 		= strictToLazyST . thawArray
-freezeSTArray 		= strictToLazyST . freezeArray
-unsafeFreezeSTArray 	= strictToLazyST . unsafeFreezeArray
+newSTArray ixs init   	= 
+	   strictToLazyST (newArray ixs init) >>= \arr ->
+	   return (STArray arr)
+
+readSTArray (STArray arr) ix = strictToLazyST (readArray arr ix)
+writeSTArray (STArray arr) ix v = strictToLazyST (writeArray arr ix v)
+boundsSTArray (STArray arr) = boundsOfArray arr
+thawSTArray arr	= 
+	    strictToLazyST (thawArray arr) >>= \arr -> 
+	    return (STArray arr)
+freezeSTArray (STArray arr) = strictToLazyST (freezeArray arr)
+unsafeFreezeSTArray (STArray arr) = strictToLazyST (unsafeFreezeArray arr)
 
 strictToLazyST :: STBase.ST s a -> ST s a
 strictToLazyST (STBase.ST m) = ST $ \s ->
@@ -100,5 +105,7 @@ lazyToStrictST :: ST s a -> STBase.ST s a
 lazyToStrictST (ST m) = STBase.ST $ \s ->
         case (m (STBase.S# s)) of (a, STBase.S# s') -> STBase.STret s' a
 
+unsafeInterleaveST :: ST s a -> ST s a
+unsafeInterleaveST = strictToLazyST . ST.unsafeInterleaveST . lazyToStrictST
 
 \end{code}
