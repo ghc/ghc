@@ -5,7 +5,7 @@
 \section[System]{Module @System@}
 
 \begin{code}
-{-# OPTIONS -#include "cbits/stgio.h" #-}
+{-# OPTIONS -#include "cbits/stgio.h" -#include "RtsAPI.h" #-}
 module System 
     ( 
       ExitCode(ExitSuccess,ExitFailure)
@@ -142,7 +142,7 @@ exitWith (ExitFailure n)
     primExit n
     ioError (IOError Nothing OtherError "exitWith" "exit should not return")
 
-foreign import ccall "libHS_cbits.so" "exit" unsafe primExit :: Int -> IO ()
+foreign import ccall "shutdownHaskellAndExit" primExit :: Int -> IO ()
 
 exitFailure :: IO a
 exitFailure = exitWith (ExitFailure 1)
