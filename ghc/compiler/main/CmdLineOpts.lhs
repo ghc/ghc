@@ -364,7 +364,9 @@ defaultDynFlags = DynFlags {
   opt_I                 = [],
   opt_i                 = [],
 #endif
-  flags = standardWarnings,
+  flags = [Opt_Generics] ++ standardWarnings,
+	-- Generating the helper-functions for
+	-- generics is now on by default
   }
 
 {- 
