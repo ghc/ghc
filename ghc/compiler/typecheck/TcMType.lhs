@@ -913,8 +913,6 @@ checkAmbiguity forall_tyvars theta tau_tyvars
     ambig_var ct_var  = (ct_var `elem` forall_tyvars) &&
 		        not (ct_var `elemVarSet` extended_tau_vars)
 
-    is_free ct_var    = not (ct_var `elem` forall_tyvars)
-
 ambigErr pred
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
 	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$

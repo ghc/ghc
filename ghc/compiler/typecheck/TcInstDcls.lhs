@@ -234,7 +234,7 @@ tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags Nothing src_loc)
     in
     checkValidTheta InstThetaCtxt theta			`thenM_`
     checkAmbiguity tyvars theta (tyVarsOfType tau)	`thenM_`
-    checkValidInstHead tau			`thenM` \ (clas,inst_tys) ->
+    checkValidInstHead tau				`thenM` \ (clas,inst_tys) ->
     checkTc (checkInstFDs theta clas inst_tys)
 	    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenM_`
     newDFunName clas inst_tys src_loc				`thenM` \ dfun_name ->
