@@ -16,7 +16,7 @@ import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports,
 
 import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..), TyClDecl(..),
 		  IE(..), ieName, 
-		  ForeignDecl(..), ExtName(..), ForKind(..),
+		  ForeignDecl(..), ForKind(..), isDynamic,
 		  FixitySig(..), Sig(..),
 		  collectTopBinders
 		)
@@ -291,9 +291,9 @@ getLocalDeclBinders new_name (ValD binds)
     do_one (rdr_name, loc) = new_name rdr_name loc	`thenRn` \ name ->
 			     returnRn (Avail name)
 
-    -- foreign import declaration
-getLocalDeclBinders new_name (ForD (ForeignDecl nm kind _ _ _ loc))
-  | binds_haskell_name kind
+    -- foreign declarations
+getLocalDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
+  | binds_haskell_name kind dyn
   = new_name nm loc		    `thenRn` \ name ->
     returnRn [Avail name]
 
@@ -306,9 +306,9 @@ getLocalDeclBinders new_name decl
 	NotAvailable -> returnRn []		-- Instance decls and suchlike
 	other	     -> returnRn [avail]
 
-binds_haskell_name (FoImport _) = True
-binds_haskell_name FoLabel      = True
-binds_haskell_name FoExport     = False
+binds_haskell_name (FoImport _) _   = True
+binds_haskell_name FoLabel      _   = True
+binds_haskell_name FoExport  ext_nm = isDynamic ext_nm
 
 fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG FixityEnv
 fixitiesFromLocalDecls gbl_env decls
