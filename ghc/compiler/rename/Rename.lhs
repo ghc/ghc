@@ -44,6 +44,7 @@ import Name		( Name, Provenance, ExportFlag(..), isLocallyDefined,
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
 import TyCon		( TyCon )
 import PrelMods		( mAIN, gHC_MAIN )
+import PrelInfo		( ioTyCon_NAME )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning), pprBagOfErrors, 
 			  doIfSet, dumpIfSet, ghcExit
 			)
@@ -171,13 +172,18 @@ mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
 addImplicits mod_name
-  = addImplicitOccsRn default_tys
+  = addImplicitOccsRn (implicit_main ++ default_tys)
   where
 	-- Add occurrences for Int, Double, and (), because they
 	-- are the types to which ambigious type variables may be defaulted by
 	-- the type checker; so they won't every appear explicitly.
 	-- [The () one is a GHC extension for defaulting CCall results.]
     default_tys = [getName intTyCon, getName doubleTyCon, getName unitTyCon ]
+
+	-- Add occurrences for IO or PrimIO
+    implicit_main |  mod_name == mAIN
+		  || mod_name == gHC_MAIN = [ioTyCon_NAME]
+		  |  otherwise 		  = []
 \end{code}
 
 
