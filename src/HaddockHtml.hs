@@ -303,7 +303,7 @@ mkNode ss (Node s leaf pkg short ts) id = htmlNode
     genSubTree :: HtmlTable -> Int -> [ModuleTree] -> (Html,Int)
     genSubTree htmlTable id [] = (sub_tree,id)
       where
-        sub_tree = vanillaTable ! [identifier id_s, thestyle "display:none;"] << htmlTable
+        sub_tree = collapsed vanillaTable id_s htmlTable
     genSubTree htmlTable id (x:xs) = genSubTree (htmlTable </> u) id' xs      
       where
         (u,id') = mkNode (s:ss) x id
@@ -664,7 +664,7 @@ ppHsDataDecl summary instances is_newty
 	   | otherwise
 	   =  inst_hdr inst_id </>
 		 tda [theclass "body"] << 
-		    collapsed inst_id (
+		    collapsed thediv inst_id (
 			spacedTable1 << (
 			   aboves (map (declBox.ppInstHead) instances)
 		        )
@@ -843,7 +843,7 @@ ppHsClassDecl summary instances orig_c
 	   | otherwise 
 	   =  s8 </> inst_hdr inst_id </>
 		 tda [theclass "body"] << 
-		   collapsed inst_id (
+		   collapsed thediv inst_id (
 		      spacedTable1 << (
 			aboves (map (declBox.ppInstHead) instances)
 		  ))
@@ -1168,13 +1168,18 @@ namedAnchor n = anchor ! [name (escapeStr n)]
 --
 -- A section of HTML which is collapsible via a +/- button.
 --
+
+-- TODO: Currently the initial state is non-collapsed. Change the 'minusFile'
+-- below to a 'plusFile' and the 'display:block;' to a 'display:none;' when we
+-- use cookies from JavaScript to have a more persistent state.
+
 collapsebutton :: String -> Html
 collapsebutton id = 
-  image ! [ src plusFile, theclass "coll", onclick ("toggle(this,'" ++ id ++ "')"), alt "show/hide" ]
+  image ! [ src minusFile, theclass "coll", onclick ("toggle(this,'" ++ id ++ "')"), alt "show/hide" ]
 
-collapsed :: String -> Html -> Html
-collapsed id html =
-  thediv ! [identifier id, thestyle "display:none;"] << html
+collapsed :: (HTML a) => (Html -> Html) -> String -> a -> Html
+collapsed fn id html =
+  fn ! [identifier id, thestyle "display:block;"] << html
 
 -- A quote is a valid part of a Haskell identifier, but it would interfere with
 -- the ECMA script string delimiter used in collapsebutton above.
