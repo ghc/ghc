@@ -25,14 +25,15 @@ import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
 import PrimOp		( PrimOp(..)  )
 import CoreFVs		( freeVars )
-import Type		( typePrimRep, splitTyConApp_maybe )
+import Type		( typePrimRep, splitTyConApp_maybe, isTyVarTy, splitForAllTys )
 import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, 
                           dataConWrapId, isUnboxedTupleCon )
-import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons )
+import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
+			  isFunTyCon )
 import Class		( Class, classTyCon )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
 import Var		( isTyVar )
-import VarSet		( VarSet, varSetElems )
+import VarSet		( VarSet, varSetElems, unitVarSet, unionVarSet )
 import PrimRep		( getPrimRepSize, isFollowableRep )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
@@ -318,6 +319,40 @@ schemeE d s p (fvs, AnnLet binds b)
      schemeE d' s p' b   				`thenBc`  \ bodyCode ->
      mapBc (schemeR False) (zip xs rhss)		`thenBc_`
      returnBc (allocCode `appOL` thunkCode `appOL` bodyCode)
+
+
+
+
+
+schemeE d s p (fvs_case, AnnCase (fvs_scrut, scrut) bndr 
+                                 [(DEFAULT, [], (fvs_rhs, rhs))])
+
+   | let isFunType var_type 
+            = case splitForAllTys var_type of
+                 (_, ty) -> case splitTyConApp_maybe ty of
+                               Just (tycon,_) | isFunTyCon tycon -> True
+                               _ -> False
+         ty_bndr = idType bndr
+     in isFunType ty_bndr || isTyVarTy ty_bndr
+
+   -- Nasty hack; treat
+   --     case scrut::suspect of bndr { DEFAULT -> rhs }
+   --     as 
+   --     let bndr = scrut in rhs
+   --     when suspect is polymorphic or arrowtyped
+   -- So the required strictness properties are not observed.
+   -- At some point, must fix this properly.
+   = let new_expr
+            = (fvs_case, 
+               AnnLet 
+                  (AnnNonRec bndr (fvs_scrut, scrut)) (fvs_rhs, rhs)
+              )
+
+     in  trace ("WARNING: ignoring polymorphic case in interpreted mode.\n" ++
+                "   Possibly due to strict polymorphic/functional constructor args.\n" ++
+                "   Your program may leak space unexpectedly.\n")
+                -- ++ showSDoc (char ' ' $$ pprCoreExpr (deAnnotate new_expr) $$ char ' '))
+         (schemeE d s p new_expr)
 
 
 schemeE d s p (fvs, AnnCase scrut bndr alts)
