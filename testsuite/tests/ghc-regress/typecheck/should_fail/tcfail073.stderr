@@ -1,12 +1,5 @@
 
-Duplicate or overlapping instance declarations:
-  tcfail073.hs:7: {Eq (a, b)}
-  /home/simonmar/builds/i386-unknown-linux/ghc/compiler/../lib/std/PrelTup.hi:66: {Eq (a,
-										       b)}
-
-tcfail073.hs:8:
-    Could not deduce `Eq a' from the context (Eq (a, b))
-    Probable fix:
-	Add `Eq a' to the instance declaration context
-    arising from use of `==' at tcfail073.hs:8
-    In the right-hand side of an equation for `==': m == o
+Duplicate instance declarations:
+  tcfail073.hs:7: Eq (a, b)
+  /home/simonpj/builds/HEAD/ghc/driver/../lib/std/PrelTup.hi:87: Eq (a,
+								     b)

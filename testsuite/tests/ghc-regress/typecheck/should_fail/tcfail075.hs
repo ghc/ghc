@@ -6,8 +6,6 @@ module ShouldFail where
 
 import PrelGHC
 
-x = 1#
-
 y :: Int#
 y = x +# 1#
 
@@ -16,3 +14,4 @@ main =  let
 	in
 	if z ># 3# then putStrLn "Yes"
 		   else putStrLn "No"
+

@@ -1,4 +1,7 @@
 
-tcfail062.hs:37:
-    Illegal polymorphic type as argument: BehaviouralRelation
-    In the type synonym declaration for `BehaviouralRelationList'
+tcfail062.hs:33:
+    Type variable not in scope: `behaviouralExpression'
+
+tcfail062.hs:33:
+    Type variable not in scope: `behaviouralExpression'
+

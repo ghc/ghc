@@ -1,4 +1,7 @@
+[-# -fglasgow-exts #-}
+
 -- !!! Multi-param type classes test: ambiguity bug
+
 module ShouldFail where
 
 class Collection c a where
