@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelArr.lhs,v 1.29 2001/08/29 09:34:05 simonmar Exp $
+% $Id: PrelArr.lhs,v 1.30 2001/09/13 15:54:43 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -37,7 +37,7 @@ default ()
 %*********************************************************
 
 \begin{code}
-class Ix a where
+class (Ord a) => Ix a where
     range		:: (a,a) -> [a]
     index, unsafeIndex	:: (a,a) -> a -> Int
     inRange		:: (a,a) -> a -> Bool
@@ -448,14 +448,14 @@ ixmap (l,u) f arr =
     unsafeArray (l,u) [(unsafeIndex (l,u) i, arr ! f i) | i <- range (l,u)]
 
 {-# INLINE eqArray #-}
-eqArray :: (Ix i, Eq i, Eq e) => Array i e -> Array i e -> Bool
+eqArray :: (Ix i, Eq e) => Array i e -> Array i e -> Bool
 eqArray arr1@(Array l1 u1 _) arr2@(Array l2 u2 _) =
     if rangeSize (l1,u1) == 0 then rangeSize (l2,u2) == 0 else
     l1 == l2 && u1 == u2 &&
     and [unsafeAt arr1 i == unsafeAt arr2 i | i <- [0 .. rangeSize (l1,u1) - 1]]
 
 {-# INLINE cmpArray #-}
-cmpArray :: (Ix i, Ord i, Ord e) => Array i e -> Array i e -> Ordering
+cmpArray :: (Ix i, Ord e) => Array i e -> Array i e -> Ordering
 cmpArray arr1 arr2 = compare (assocs arr1) (assocs arr2)
 
 {-# INLINE cmpIntArray #-}
@@ -485,10 +485,10 @@ cmpIntArray arr1@(Array l1 u1 _) arr2@(Array l2 u2 _) =
 instance Ix i => Functor (Array i) where
     fmap = amap
 
-instance (Ix i, Eq i, Eq e) => Eq (Array i e) where
+instance (Ix i, Eq e) => Eq (Array i e) where
     (==) = eqArray
 
-instance (Ix i, Ord i, Ord e) => Ord (Array i e) where
+instance (Ix i, Ord e) => Ord (Array i e) where
     compare = cmpArray
 
 instance (Ix a, Show a, Show b) => Show (Array a b) where
