@@ -61,10 +61,10 @@ mungePackagePaths top_dir ps = map munge_pkg ps
 
 \begin{code}
 showPackages :: [PackageConfig] -> IO ()
--- Show package info on console, if verbosity is >=2
+-- Show package info on console, if verbosity is >= 3
 showPackages ps
   = do  { verb <- dynFlag verbosity
-	; dumpIfSet (verb >= 2) "Packages"
+	; dumpIfSet (verb >= 3) "Packages"
 	  	    (docToSDoc (vcat (map dumpPkgGuts ps)))
 	}
 \end{code}
