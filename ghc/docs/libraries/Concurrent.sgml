@@ -108,7 +108,7 @@ will a thread block when performing a <tt/takeMVar/ on that
 Please notice that the Boolean value returned from <tt/isEmptyMVar/
 represent just a snapshot of the state of the <tt/MVar/. By the
 time a thread gets to inspect the result and act upon it, other
-threads may have accessed the <tt/MVar/ and changed its 'filled-in'
-status of the variable. Please be wary of this.
+threads may have accessed the <tt/MVar/ and changed the 'filled-in'
+status of the variable. 
 
 </itemize>

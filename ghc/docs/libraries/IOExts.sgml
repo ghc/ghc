@@ -20,10 +20,12 @@ for opening binary files.
 <tt/performGC/ triggers an immediate garbage collection
 
 <item>
-When called, <tt/trace/ prints the string in its first argument, and then
-returns the second argument as its result.  The <tt/trace/ function is not
-referentially transparent, and should only be used for debugging, or for
-monitoring execution. 
+When called, <tt/trace/ prints the string in its first argument to
+standard error, before returning the second argument as its result.
+The <tt/trace/ function is not referentially transparent, and should
+only be used for debugging, or for monitoring execution. Some
+implementations of <tt/trace/ may decorate the string that's output
+to indicate that you're tracing.
 
 <!--
   You should also be warned that, unless you understand some of the
@@ -58,7 +60,7 @@ simplified memoisation function:
 
 <item>
 Operations for coercing an <tt/ST/ action into an <tt/IO/ one, and
-vice versa are also provided. Notice that coercing an <tt/IO action
+vice versa are also provided. Notice that coercing an <tt/IO/ action
 into an <tt/ST/ action is 'lossy', since any exception raised within the
 <tt/IO/ action will not be caught within the <tt/ST/ monad, as it
 doesn't support (monadic) exceptions.

@@ -20,7 +20,7 @@ For each type <it/I/ above, we provide the following instances.
 <tscreen><verb>
 data I            -- Signed Ints
 iToInt            :: I -> Int  -- not provided for Int64
-intToi            :: Int -> I  -- not provided for Int64
+intToI            :: Int -> I  -- not provided for Int64
 instance Eq       I
 instance Ord      I
 instance Show     I

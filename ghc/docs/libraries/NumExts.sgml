@@ -12,6 +12,13 @@ floatToDouble :: Float  -> Double
 
 showHex       :: Integral a => a -> ShowS
 showOct       :: Integral a => a -> ShowS
+showBin       :: Integral a => a -> ShowS
+
+showIntAtBase :: Integral a 
+	      => a            -- base
+	      -> (a -> Char)  -- digit to char
+	      -> a            -- number to show.
+	      -> ShowS
 </verb> </tscreen>
 
 Notes: 
@@ -25,7 +32,24 @@ Notes:
     No loss of precision occurs in the other direction with
     <tt/floatToDouble/, the floating value remains unchanged.
 <item>
-    <tt/showOct/ and <tt/showHex/ will prefix <tt/0o/ and <tt/0x/
-    respectively. Like <tt/Numeric.showInt/, these show functions
-    work on positive numbers only.
+    <tt/showOct/, <tt/showHex/ and <tt/showBin/ will prefix <tt/0o/,
+    <tt/0x/ and <tt/0b/, respectively. Like <tt/Numeric.showInt/,
+    these show functions work on positive numbers only.
+<item>
+    <tt/showIntAtBase/ is the more general function for converting
+    a number at some base into a series of characters. The above
+    <tt/show*/ functions use it, for instance, here's how <tt/showHex/
+    could be defined
+
+<tscreen><verb>
+
+</verb></tscreen>
+showHex :: Integral a => a -> ShowS
+showHex n r = 
+ showString "0x" $
+ showIntAtBase 16 (toChrHex) n r
+ where  
+  toChrHex d
+    | d < 10    = chr (ord '0' + fromIntegral d)
+    | otherwise = chr (ord 'a' + fromIntegral (d - 10))
 </itemize>

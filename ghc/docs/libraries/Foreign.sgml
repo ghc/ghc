@@ -1,0 +1,95 @@
+    <sect> <idx/Foreign/
+<label id="sec:Foreign">
+<p>
+
+This module provides two types to better allow the Haskell world to
+share its data with the outside world (and vice versa), <em/foreign
+objects/ and <em/stable pointers/:
+
+<tscreen><verb>
+module Foreign where
+data ForeignObj  -- abstract, instance of: Eq
+
+makeForeignObj  :: Addr{-object-} -> Addr{-finaliser-} -> IO ForeignObj
+writeForeignObj :: ForeignObj -> Addr{-new value-} -> IO ()
+
+data StablePtr a  -- abstract, instance of: Eq.
+makeStablePtr  :: a -> IO (StablePtr a)
+deRefStablePtr :: StablePtr a -> IO a
+freeStablePtr  :: StablePtr a -> IO ()
+</verb> </tscreen>
+
+<itemize>
+<item>The <tt/ForeignObj/ type provides foreign objects, encapsulated
+references to values outside the Haskell heap. Foreign objects are
+finalised by the garbage collector when they become dead. The
+finaliser to use is given as second argument to <tt/makeForeignOj/,
+and is currently a function pointer to a C function with
+the following signature
+
+<tscreen><verb>
+void finaliseFO(void* obj);
+</verb></tscreen>
+
+The finaliser is passed the reference to the external object (i.e.,
+the first argument to <tt/makeForeignObj/.)
+
+<item>
+The <tt/writeForeignObj/ lets you overwrite the encapsulated foreign
+reference with another.
+
+<item>
+Stable pointers allow you to hand out references to Haskell heap
+objects to the outside world. <bf/ToDo:/ <em/say more./
+</itemize>
+
+In addition to the above, the following operations for indexing via
+a <tt/ForeignObj/ are also, mirrored on the same operations provided
+over <tt/Addr/s:
+
+<tscreen><verb>
+indexCharOffForeignObj   :: ForeignObj -> Int -> Char
+indexIntOffForeignObj    :: ForeignObj -> Int -> Int
+indexAddrOffForeignObj   :: ForeignObj -> Int -> Addr
+indexFloatOffForeignObj  :: ForeignObj -> Int -> Float
+indexDoubleOffForeignObj :: ForeignObj -> Int -> Double
+indexWord8OffForeignObj  :: ForeignObj -> Int -> Word8
+indexWord16OffForeignObj :: ForeignObj -> Int -> Word16
+indexWord32OffForeignObj :: ForeignObj -> Int -> Word32
+indexWord64OffForeignObj :: ForeignObj -> Int -> Word64
+
+indexInt8OffForeignObj  :: ForeignObj -> Int -> Int8
+indexInt16OffForeignObj :: ForeignObj -> Int -> Int16
+indexInt32OffForeignObj :: ForeignObj -> Int -> Int32
+indexInt64OffForeignObj :: ForeignObj -> Int -> Int64
+
+-- read value out of mutable memory
+readCharOffForeignObj    :: ForeignObj -> Int -> IO Char
+readIntOffForeignObj     :: ForeignObj -> Int -> IO Int
+readAddrOffForeignObj    :: ForeignObj -> Int -> IO Addr
+readFloatOffForeignObj   :: ForeignObj -> Int -> IO Float
+readDoubleOffForeignObj  :: ForeignObj -> Int -> IO Double
+readWord8OffForeignObj   :: ForeignObj -> Int -> IO Word8
+readWord16OffForeignObj  :: ForeignObj -> Int -> IO Word16
+readWord32OffForeignObj  :: ForeignObj -> Int -> IO Word32
+readWord64OffForeignObj  :: ForeignObj -> Int -> IO Word64
+readInt8OffForeignObj    :: ForeignObj -> Int -> IO Int8
+readInt16OffForeignObj   :: ForeignObj -> Int -> IO Int16
+readInt32OffForeignObj   :: ForeignObj -> Int -> IO Int32
+readInt64OffForeignObj   :: ForeignObj -> Int -> IO Int64
+
+writeCharOffForeignObj   :: ForeignObj -> Int -> Char   -> IO ()
+writeIntOffForeignObj    :: ForeignObj -> Int -> Int    -> IO ()
+writeAddrOffForeignObj   :: ForeignObj -> Int -> Addr   -> IO ()
+writeFloatOffForeignObj  :: ForeignObj -> Int -> Float  -> IO ()
+writeDoubleOffForeignObj :: ForeignObj -> Int -> Double -> IO ()
+writeWord8OffForeignObj  :: ForeignObj -> Int -> Word8  -> IO ()
+writeWord16OffForeignObj :: ForeignObj -> Int -> Word16 -> IO ()
+writeWord32OffForeignObj :: ForeignObj -> Int -> Word32 -> IO ()
+writeWord64OffForeignObj :: ForeignObj -> Int -> Word64 -> IO ()
+writeInt8OffForeignObj   :: ForeignObj -> Int -> Int8   -> IO ()
+writeInt16OffForeignObj  :: ForeignObj -> Int -> Int16  -> IO ()
+writeInt32OffForeignObj  :: ForeignObj -> Int -> Int32  -> IO ()
+writeInt64OffForeignObj  :: ForeignObj -> Int -> Int64  -> IO ()
+</verb></tscreen>
+

@@ -4,6 +4,7 @@
   <!ENTITY concurrent SYSTEM "Concurrent.sgml">
   <!ENTITY dynamic    SYSTEM "Dynamic.sgml">
   <!ENTITY exception  SYSTEM "Exception.sgml">
+  <!ENTITY foreign    SYSTEM "Foreign.sgml">
   <!ENTITY glaexts    SYSTEM "GlaExts.sgml">
   <!ENTITY ioexts     SYSTEM "IOExts.sgml">
   <!ENTITY int	      SYSTEM "Int.sgml">
@@ -23,14 +24,12 @@
 <article>
 
 <title>The Hugs-GHC Extension Libraries
-<author>Alastair Reid <tt/reid-alastair@cs.yale.edu/ 
-        Simon Marlow <tt/simonm@dcs.gla.ac.uk/
-<date>v0.8, 28 January 1998
+<author>The Hugs/GHC Team 
+<date>January 1999
 <abstract>
 Hugs and GHC provide a common set of libraries to aid portability.
 This document specifies the interfaces to these libraries and documents
-known differences.  We hope that these modules will be adopted for inclusion
-as Standard Haskell Libraries sometime soon.
+known differences.
 </abstract>
 
 <toc>
@@ -82,16 +81,14 @@ the form <tt/getXContents/, e.g., <tt/Channel.getChanContents/ and
 &concurrent
 &dynamic
 &exception
-
-<sect> <idx/Foreign/
-<label id="sec:Foreign">
-<p>
-This module is provided by GHC but not by Hugs.
-GreenCard for Hugs provides the <tt/ForeignObj/ type.
-
+&foreign
 &glaexts
 &ioexts
 &int
+
+&numexts
+&pretty
+&st
 
 <sect> <idx/LazyST/ 
 <label id="sec:LazyST">
@@ -113,9 +110,6 @@ semantics with respect to laziness are as you would expect: the strict
 state thread passed to <tt/strictToLazyST/ is not performed until the
 result of the lazy state thread it returns is demanded.
 
-&numexts
-&pretty
-&st
 &weak
 &word
 

@@ -9,13 +9,14 @@ use in creating foreign function interfaces using GreenCard.
 module Addr where
 data Addr  -- Address type
 instance Eq Addr
+instance Ord Addr
 
 nullAddr           :: Addr
 plusAddr           :: Addr -> Int -> Addr
 
 -- read value out of _immutable_ memory
 indexCharOffAddr   :: Addr -> Int -> Char
-indexIntOffAddr    :: Addr -> Int -> Int     -- should we drop this?
+indexIntOffAddr    :: Addr -> Int -> Int
 indexAddrOffAddr   :: Addr -> Int -> Addr
 indexFloatOffAddr  :: Addr -> Int -> Float
 indexDoubleOffAddr :: Addr -> Int -> Double
@@ -30,7 +31,7 @@ indexInt64OffAddr  :: Addr -> Int -> Int64
 
 -- read value out of mutable memory
 readCharOffAddr    :: Addr -> Int -> IO Char
-readIntOffAddr     :: Addr -> Int -> IO Int  -- should we drop this?
+readIntOffAddr     :: Addr -> Int -> IO Int
 readAddrOffAddr    :: Addr -> Int -> IO Addr
 readFloatOffAddr   :: Addr -> Int -> IO Float
 readDoubleOffAddr  :: Addr -> Int -> IO Double
@@ -45,7 +46,7 @@ readInt64OffAddr   :: Addr -> Int -> IO Int64
 
 -- write value into mutable memory
 writeCharOffAddr   :: Addr -> Int -> Char   -> IO ()
-writeIntOffAddr    :: Addr -> Int -> Int    -> IO ()  -- should we drop this?
+writeIntOffAddr    :: Addr -> Int -> Int    -> IO ()
 writeAddrOffAddr       :: Addr -> Int -> Addr   -> IO ()
 writeForeignObjOffAddr :: Addr -> Int -> ForeignObj -> IO ()
 writeFloatOffAddr  :: Addr -> Int -> Float  -> IO ()

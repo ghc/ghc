@@ -53,7 +53,7 @@ Notes:
 <item>
   All arithmetic is performed modulo 2^n
 
-  One non-obvious consequequence of this is that <tt/negate/
+  One non-obvious consequence of this is that <tt/negate/
   should <em/not/ raise an error on negative arguments.
 
 <item>

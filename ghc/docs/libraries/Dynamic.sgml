@@ -8,13 +8,14 @@ information with it at run-time, and is represented here by the
 abstract type <tt/Dynamic/. Values can be converted into <tt/Dynamic/
 ones, which can then be combined and manipulated by the program using
 the operations provided over the abstract, dynamic type. One of
-these operations allows you to convert a dynamically-typed value back
-into a value with the same (monomorphic) type it had before converting
-it into a dynamically-typed value.
+these operations allows you to (try to) convert a dynamically-typed
+value back into a value with the same (monomorphic) type it had before
+converting it into a dynamically-typed value. If the dynamically-typed
+value isn't of the desired type, the coercion will fail.
 
 The <tt/Dynamic/ library is capable of dealing with monomorphic types
 only; no support for polymorphic dynamic values, but hopefully that
-can be added at a later stage.
+will be added at a later stage.
 
 Examples where this library may come in handy (dynamic types, really -
 hopefully the library provided here will suffice) are: persistent
@@ -109,7 +110,7 @@ i.e., (<tt/mkTyCon ",,,,"/), is shown as an <tt/(n+1)/ tuple in infix
 form.
 </itemize>
 
-<sect1>The <tt/Typeable/ class
+<sect1><idx>The Typeable class</idx>
 <nidx>Typeable class</nidx>
 <label id="sec:Dynamic:Typeable">
 <p>
