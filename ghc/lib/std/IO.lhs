@@ -59,6 +59,30 @@ module IO (
     bracket,		       -- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
     bracket_,		       -- :: IO a -> (a -> IO b) -> IO c -> IO c
 
+    -- Non-standard extension (but will hopefully become standard with 1.5) is
+    -- to export the Prelude io functions via IO (in addition to exporting them
+    -- from the prelude...for now.) 
+    putChar,		       -- :: Char   -> IO ()
+    putStr,		       -- :: String -> IO () 
+    putStrLn,		       -- :: String -> IO ()
+    print,		       -- :: Show a => a -> IO ()
+    getChar,		       -- :: IO Char
+    getLine,		       -- :: IO String
+    getContents,	       -- :: IO String
+    interact,		       -- :: (String -> String) -> IO ()
+    readFile,		       -- :: FilePath -> IO String
+    writeFile,		       -- :: FilePath -> String -> IO ()
+    appendFile,		       -- :: FilePath -> String -> IO ()
+    readIO,		       -- :: Read a => String -> IO a
+    readLn,		       -- :: Read a => IO a
+    FilePath,		       -- :: String
+    fail,		       -- :: IOError -> IO a
+    catch,		       -- :: IO a    -> (IOError -> IO a) -> IO a
+    userError,		       -- :: String  -> IOError
+
+    IO,		-- non-standard, amazingly enough.
+    IOError,    -- ditto
+
     -- extensions
     hPutBuf,
     hPutBufBA,
@@ -71,8 +95,10 @@ import PrelBase
 import PrelIOBase
 import PrelHandle		-- much of the real stuff is in here
 
-import PrelRead         ( readParen, Read(..), reads, lex )
-import PrelNum		( toInteger )
+import PrelRead         ( readParen, Read(..), reads, lex,
+			  readIO 
+			)
+--import PrelNum		( toInteger )
 import PrelBounded      ()  -- Bounded Int instance.
 import PrelEither	( Either(..) )
 import PrelAddr		( Addr(..), nullAddr )
@@ -482,7 +508,7 @@ hPutStrLn hndl str = do
 %*							*
 %*********************************************************
 
-The construct $try comp$ exposes errors which occur within a
+The construct @try comp@ exposes errors which occur within a
 computation, and which are not fully handled.  It always succeeds.
 
 \begin{code}
@@ -509,4 +535,62 @@ bracket_ before after m = do
          case rs of
             Right r -> return r
             Left  e -> fail e
+\end{code}
+
+%*********************************************************
+%*							 *
+\subsection{Standard IO}
+%*							 *
+%*********************************************************
+
+The Prelude has from Day 1 provided a collection of common
+IO functions. We define these here, but let the Prelude
+export them.
+
+\begin{code}
+putChar         :: Char -> IO ()
+putChar c       =  hPutChar stdout c
+
+putStr          :: String -> IO ()
+putStr s        =  hPutStr stdout s
+
+putStrLn        :: String -> IO ()
+putStrLn s      =  do putStr s
+                      putChar '\n'
+
+print           :: Show a => a -> IO ()
+print x         =  putStrLn (show x)
+
+getChar         :: IO Char
+getChar         =  hGetChar stdin
+
+getLine         :: IO String
+getLine         =  hGetLine stdin
+            
+getContents     :: IO String
+getContents     =  hGetContents stdin
+
+interact        ::  (String -> String) -> IO ()
+interact f      =   do s <- getContents
+                       putStr (f s)
+
+readFile        :: FilePath -> IO String
+readFile name	=  openFile name ReadMode >>= hGetContents
+
+writeFile       :: FilePath -> String -> IO ()
+writeFile name str = do
+    hdl <- openFile name WriteMode
+    hPutStr hdl str
+    hClose hdl
+
+appendFile      :: FilePath -> String -> IO ()
+appendFile name str = do
+    hdl <- openFile name AppendMode
+    hPutStr hdl str
+    hClose hdl
+
+readLn          :: Read a => IO a
+readLn          =  do l <- getLine
+                      r <- readIO l
+                      return r
 \end{code}
