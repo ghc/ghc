@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelErr.lhs,v 1.19 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelErr.lhs,v 1.20 2001/07/24 16:04:21 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -28,6 +28,7 @@ module PrelErr
        , absentErr, parError       -- :: a
        , seqError                  -- :: a
 
+       , errorCString		   -- :: Addr# -> a	-- Arg is a ptr to C string 
        , error		           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
        
@@ -49,6 +50,9 @@ import PrelException
 -- error stops execution and displays an error message
 error :: String -> a
 error s = throw (ErrorCall s)
+
+errorCString :: Addr# -> a
+errorCString s = error (unpackCString s)
 
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which undefined 
