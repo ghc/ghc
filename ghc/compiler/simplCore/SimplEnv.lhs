@@ -48,7 +48,6 @@ import IdInfo		( IdInfo, vanillaIdInfo, occInfo, setOccInfo, specInfo, setSpecIn
 import CoreSyn
 import Rules		( RuleBase )
 import CoreUtils	( needsCaseBinding )
-import PprCore		()	-- Instances
 import CostCentre	( CostCentreStack, subsumedCCS )
 import Var	
 import VarEnv
@@ -62,7 +61,6 @@ import Type             ( Type, TvSubst(..), TvSubstEnv, composeTvSubst,
 			  isUnLiftedType, seqType, tyVarsOfType )
 import BasicTypes	( OccInfo(..), isFragileOcc )
 import CmdLineOpts	( SimplifierMode(..) )
-import Util		( mapAccumL )
 import Outputable
 \end{code}
 

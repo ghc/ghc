@@ -32,25 +32,24 @@ import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
-import Id		( Id, idType, idInfo, isDataConWorkId, idOccInfo,
+import Id		( idType, isDataConWorkId, idOccInfo,
 			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
 			  idUnfolding, idNewStrictness, idInlinePragma,
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
-import Type		( Type, seqType, splitFunTys, dropForAlls, isStrictType,
+import Type		( Type, splitFunTys, dropForAlls, isStrictType,
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys
 			)
 import TcType		( isDictTy )
 import Name		( mkSysTvName )
-import OccName		( EncodedFS )
 import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConTyVars, dataConArgTys, isVanillaDataCon )
 import Var		( tyVarKind, mkTyVar )
 import VarSet
 import BasicTypes	( TopLevelFlag(..), isTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
 			  Activation, isAlwaysActive, isActive )
-import Util		( lengthExceeds, mapAccumL )
+import Util		( lengthExceeds )
 import Outputable
 \end{code}
 
