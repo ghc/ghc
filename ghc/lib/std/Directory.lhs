@@ -445,7 +445,7 @@ doesFileExist name = do
    (getFileStatus name >>= \ st -> return (not (isDirectory st)))
    (\ _ -> return False)
 
-foreign import ccall "libHS_cbits.so" "const_F_OK" unsafe const_F_OK  :: Int
+foreign import ccall "libHS_cbits" "const_F_OK" unsafe const_F_OK  :: Int
 
 #ifndef __HUGS__
 getModificationTime :: FilePath -> IO ClockTime
@@ -510,7 +510,7 @@ modificationTime stat = do
     secs <- stToIO (readWordArray i1 0)
     return (TOD (toInteger (wordToInt secs)) 0)
 
-foreign import ccall "libHS_cbits.so" "set_stat_st_mtime" unsafe
+foreign import ccall "libHS_cbits" "set_stat_st_mtime" unsafe
    setFileMode :: PrimMutableByteArray RealWorld -> FileStatus -> IO ()
 #endif
 
@@ -520,13 +520,13 @@ isDirectory stat = prim_S_ISDIR (fileMode stat) /= 0
 isRegularFile :: FileStatus -> Bool
 isRegularFile stat = prim_S_ISREG (fileMode stat) /= 0
 
-foreign import ccall "libHS_cbits.so" "sizeof_stat" unsafe sizeof_stat :: Int
-foreign import ccall "libHS_cbits.so" "prim_stat"   unsafe
+foreign import ccall "libHS_cbits" "sizeof_stat" unsafe sizeof_stat :: Int
+foreign import ccall "libHS_cbits" "prim_stat"   unsafe
   primStat :: PrimByteArray -> PrimMutableByteArray RealWorld -> IO Int
 
-foreign import ccall "libHS_cbits.so" "get_stat_st_mode" unsafe fileMode     :: FileStatus -> FileMode
-foreign import ccall "libHS_cbits.so" "prim_S_ISDIR"     unsafe prim_S_ISDIR :: FileMode -> Int
-foreign import ccall "libHS_cbits.so" "prim_S_ISREG"     unsafe prim_S_ISREG :: FileMode -> Int
+foreign import ccall "libHS_cbits" "get_stat_st_mode" unsafe fileMode     :: FileStatus -> FileMode
+foreign import ccall "libHS_cbits" "prim_S_ISDIR"     unsafe prim_S_ISDIR :: FileMode -> Int
+foreign import ccall "libHS_cbits" "prim_S_ISREG"     unsafe prim_S_ISREG :: FileMode -> Int
 \end{code}
 
 \begin{code}
@@ -536,9 +536,9 @@ emptyFileMode     :: FileMode
 unionFileMode     :: FileMode -> FileMode -> FileMode
 intersectFileMode :: FileMode -> FileMode -> FileMode
 
-foreign import ccall "libHS_cbits.so" "const_S_IRUSR" unsafe ownerReadMode    :: FileMode
-foreign import ccall "libHS_cbits.so" "const_S_IWUSR" unsafe ownerWriteMode   :: FileMode
-foreign import ccall "libHS_cbits.so" "const_S_IXUSR" unsafe ownerExecuteMode :: FileMode
+foreign import ccall "libHS_cbits" "const_S_IRUSR" unsafe ownerReadMode    :: FileMode
+foreign import ccall "libHS_cbits" "const_S_IWUSR" unsafe ownerWriteMode   :: FileMode
+foreign import ccall "libHS_cbits" "const_S_IXUSR" unsafe ownerExecuteMode :: FileMode
 
 #ifdef __HUGS__
 emptyFileMode     = primIntToWord 0
@@ -575,18 +575,18 @@ primNewByteArray :: Int -> IO (PrimMutableByteArray s)
 primNewByteArray sz_in_bytes = stToIO (newCharArray (0,sz_in_bytes))
 #endif
 
-foreign import ccall "libHS_cbits.so" "createDirectory"  	unsafe primCreateDirectory     :: CString -> IO Int
-foreign import ccall "libHS_cbits.so" "removeDirectory"  	unsafe primRemoveDirectory     :: CString -> IO Int
-foreign import ccall "libHS_cbits.so" "removeFile"       	unsafe primRemoveFile          :: CString -> IO Int
-foreign import ccall "libHS_cbits.so" "renameDirectory"  	unsafe primRenameDirectory     :: CString -> CString -> IO Int
-foreign import ccall "libHS_cbits.so" "renameFile"       	unsafe primRenameFile          :: CString -> CString -> IO Int
-foreign import ccall "libHS_cbits.so" "openDir__"        	unsafe primOpenDir     	:: CString -> IO Addr
-foreign import ccall "libHS_cbits.so" "readDir__"        	unsafe primReadDir     	:: Addr -> IO Addr
-foreign import ccall "libHS_cbits.so" "get_dirent_d_name"   unsafe primGetDirentDName      :: Addr -> IO Addr
-foreign import ccall "libHS_cbits.so" "setCurrentDirectory" unsafe primSetCurrentDirectory :: CString -> IO Int
-foreign import ccall "libHS_cbits.so" "getCurrentDirectory" unsafe primGetCurrentDirectory :: IO Addr
-foreign import ccall "libc.so.6"        "free"                unsafe primFree                :: Addr -> IO ()
-foreign import ccall "libc.so.6"        "malloc"              unsafe primMalloc              :: Word -> IO Addr
-foreign import ccall "libc.so.6"        "chmod"               unsafe primChmod               :: CString -> Word -> IO Int
+foreign import ccall "libHS_cbits" "createDirectory"  	unsafe primCreateDirectory     :: CString -> IO Int
+foreign import ccall "libHS_cbits" "removeDirectory"  	unsafe primRemoveDirectory     :: CString -> IO Int
+foreign import ccall "libHS_cbits" "removeFile"       	unsafe primRemoveFile          :: CString -> IO Int
+foreign import ccall "libHS_cbits" "renameDirectory"  	unsafe primRenameDirectory     :: CString -> CString -> IO Int
+foreign import ccall "libHS_cbits" "renameFile"       	unsafe primRenameFile          :: CString -> CString -> IO Int
+foreign import ccall "libHS_cbits" "openDir__"        	unsafe primOpenDir     	:: CString -> IO Addr
+foreign import ccall "libHS_cbits" "readDir__"        	unsafe primReadDir     	:: Addr -> IO Addr
+foreign import ccall "libHS_cbits" "get_dirent_d_name"   unsafe primGetDirentDName      :: Addr -> IO Addr
+foreign import ccall "libHS_cbits" "setCurrentDirectory" unsafe primSetCurrentDirectory :: CString -> IO Int
+foreign import ccall "libHS_cbits" "getCurrentDirectory" unsafe primGetCurrentDirectory :: IO Addr
+foreign import ccall "libc"        "free"                unsafe primFree                :: Addr -> IO ()
+foreign import ccall "libc"        "malloc"              unsafe primMalloc              :: Word -> IO Addr
+foreign import ccall "libc"        "chmod"               unsafe primChmod               :: CString -> Word -> IO Int
 \end{code}
 
