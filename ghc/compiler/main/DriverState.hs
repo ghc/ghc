@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.102 2004/03/24 10:50:35 simonmar Exp $
+-- $Id: DriverState.hs,v 1.103 2004/04/30 09:46:58 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -65,6 +65,7 @@ setMode m flag = do
 
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
+isCompManagerMode DoEval        = True
 isCompManagerMode _             = False
 
 -----------------------------------------------------------------------------
