@@ -75,14 +75,24 @@ module Prelude (
     reads, shows, read, lex, 
     showChar, showString, readParen, showParen,
     
-    -- * Simple I\/O operations
-    ioError, userError, catch,
-    FilePath, IOError,
+    -- * Basic Input and output
+    -- ** Simple I\/O operations
+    -- All I/O functions defined here are character oriented.  The
+    -- treatment of the newline character will vary on different systems.
+    -- For example, two characters of input, return and linefeed, may
+    -- read as a single newline character.  These functions cannot be
+    -- used portably for binary I/O.
+    -- *** Output functions
     putChar,
     putStr, putStrLn, print,
+    -- *** Input functions
     getChar,
     getLine, getContents, interact,
+    -- *** Files
+    FilePath,
     readFile, writeFile, appendFile, readIO, readLn,
+    -- ** Exception handling in the I\/O monad
+    IOError, ioError, userError, catch,
 
     -- * Monads
     Monad((>>=), (>>), return, fail),

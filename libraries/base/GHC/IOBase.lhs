@@ -743,13 +743,18 @@ throwIO err	=  IO $ raiseIO# err
 ioException	:: IOException -> IO a
 ioException err =  IO $ raiseIO# (IOException err)
 
+-- | Raise an 'IOError' in the 'IO' monad.
 ioError         :: IOError -> IO a 
 ioError		=  ioException
 
 -- ---------------------------------------------------------------------------
 -- IOError type
 
--- | The Haskell 98 type for exceptions in the @IO@ monad.
+-- | The Haskell 98 type for exceptions in the 'IO' monad.
+-- Any I\/O operation may raise an 'IOError' instead of returning a result.
+-- For a more general type of exception, including also those that arise
+-- in pure code, see 'Control.Exception.Exception'.
+--
 -- In Haskell 98, this is an opaque type.
 type IOError = IOException
 
@@ -771,6 +776,7 @@ instance Eq IOException where
   (IOError h1 e1 loc1 str1 fn1) == (IOError h2 e2 loc2 str2 fn2) = 
     e1==e2 && str1==str2 && h1==h2 && loc1==loc2 && fn1==fn2
 
+-- | An abstract type that contains a value for each variant of 'IOError'.
 data IOErrorType
   -- Haskell 98:
   = AlreadyExists
@@ -826,6 +832,14 @@ instance Show IOErrorType where
       UnsupportedOperation -> "unsupported operation"
       DynIOError{}      -> "unknown IO error"
 
+-- | Construct an 'IOError' value with a string describing the error.
+-- The 'fail' method of the 'IO' instance of the 'Monad' class raises a
+-- 'userError', thus:
+--
+-- > instance Monad IO where 
+-- >   ...
+-- >   fail s = ioError (userError s)
+--
 userError       :: String  -> IOError
 userError str	=  IOError Nothing UserError "" str Nothing
 
