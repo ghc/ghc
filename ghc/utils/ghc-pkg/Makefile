@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.14 2002/02/12 15:17:24 simonmar Exp $
+# $Id: Makefile,v 1.15 2002/02/12 16:55:22 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -9,7 +9,7 @@ INSTALLING=1
 
 # ghc-pkg is needed to boot in ghc/rts and library dirs
 ifneq "$(BootingFromHc)" "YES"
-boot :: all
+boot :: depend all
 endif
 
 # -----------------------------------------------------------------------------
