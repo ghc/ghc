@@ -43,7 +43,7 @@ package_details installing =
 	       		      else ghc_src_dir _GHC_RUNTIME_DIR ],
 	libraries      = [ "HSrts" ],
 	include_dir    = if installing 
-			    then "" 
+			    then _libdir ++ "/includes"
 			    else ghc_src_dir _GHC_INCLUDE_DIR,
 	c_include      = "Stg.h",		-- ha!
 	package_deps   = [ "gmp" ],
