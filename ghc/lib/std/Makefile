@@ -120,7 +120,7 @@ else
 HSstd.o :: $(GHCI_LIBOBJS)
 	ld -r -x -o HSstd1.o $(filter     Prel%, $(GHCI_LIBOBJS))
 	ld -r -x -o HSstd2.o $(filter-out Prel%, $(GHCI_LIBOBJS))
-endif # TARGETPLATFORM = win32
+endif # TARGETPLATFORM = i386-unknown-mingw32
 
 
 
