@@ -30,7 +30,7 @@ import Ratio		( Rational )
 
 import AbsCSyn		( node, tagreg, MagicId(..) )
 import CallConv		( CallConv, pprCallConv )
-import CLabel		( mkAsmTempLabel, CLabel, pprCLabel, pprCLabel_asm )
+import CLabel		( mkAsmTempLabel, CLabel, pprCLabel )
 import PrimRep          ( PrimRep(..), showPrimRep )
 import PrimOp           ( PrimOp, pprPrimOp )
 import Unique           ( Unique )

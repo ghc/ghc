@@ -380,9 +380,9 @@ initPersistentRenamerState :: IO PersistentRenamerState
        return (
         PRS { prsOrig  = Orig { origNames  = initOrigNames,
 			        origIParam = emptyFM },
-	      prsDecls = emptyNameEnv,
-	      prsInsts = emptyBag,
-	      prsRules = emptyBag,
+	      prsDecls = (emptyNameEnv, 0),
+	      prsInsts = (emptyBag, 0),
+	      prsRules = (emptyBag, 0),
 	      prsNS    = ns
             }
         )

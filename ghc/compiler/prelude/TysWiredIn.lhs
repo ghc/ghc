@@ -169,7 +169,6 @@ pcTyCon new_or_data is_rec name tyvars argvrcs cons
                 argvrcs
                 cons
                 (length cons)
-                []              -- No derivings
                 new_or_data
                 is_rec
 		gen_info

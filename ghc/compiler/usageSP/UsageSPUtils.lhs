@@ -26,7 +26,7 @@ module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
 
 import CoreSyn
 import CoreFVs		( mustHaveLocalBinding )
-import Var              ( Var, varName, varType, setVarType, mkUVar )
+import Var              ( Var, varType, setVarType, mkUVar )
 import Id               ( isExportedId )
 import Name             ( isLocallyDefined )
 import TypeRep          ( Type(..), TyNote(..) )  -- friend

@@ -17,8 +17,7 @@ import Id		( setIdArityInfo, idArity, setIdOccInfo, Id )
 import VarSet
 import VarEnv
 import Var
-import IdInfo		( ArityInfo(..), OccInfo(..), 
-			  setInlinePragInfo )
+import IdInfo		( ArityInfo(..), OccInfo(..) )
 import PrimOp		( PrimOp(..), ccallMayGC )
 import TysWiredIn       ( isForeignObjTy )
 import Maybes		( maybeToBool, orElse )

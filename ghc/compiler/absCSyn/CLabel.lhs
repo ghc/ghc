@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.40 2000/10/16 13:57:43 sewardj Exp $
+% $Id: CLabel.lhs,v 1.41 2000/11/06 08:15:20 simonpj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -83,15 +83,14 @@ import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 
 import CmdLineOpts      ( opt_Static, opt_DoTickyProfiling )
 import CStrings		( pp_cSEP )
-import DataCon		( ConTag, DataCon )
-import Module		( ModuleName, moduleName, moduleNameFS, 
+import DataCon		( ConTag )
+import Module		( moduleName, moduleNameFS, 
 			  Module, isModuleInThisPackage )
 import Name		( Name, getName, isDllName, isExternallyVisibleName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
 import PrimOp		( PrimOp, pprPrimOp )
 import CostCentre	( CostCentre, CostCentreStack )
-import Util
 import Outputable
 \end{code}
 

@@ -21,7 +21,7 @@ module SaLib (
 import Type		( Type )
 import VarEnv
 import IdInfo		( StrictnessInfo(..) )
-import Demand		( Demand, pprDemands )
+import Demand		( Demand )
 import Outputable
 \end{code}
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.27 2000/10/03 08:43:00 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.28 2000/11/06 08:15:21 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -50,13 +50,12 @@ import Id		( Id, idType, idName )
 import DataCon		( DataCon, dataConTyCon, dataConTag, fIRST_TAG )
 import Maybes		( maybeToBool )
 import PrimRep		( PrimRep(..) )
-import StgSyn		( StgArg, GenStgArg(..) )
+import StgSyn		( StgArg )
 import Type		( isUnLiftedType )
 import TyCon            ( TyCon )
 import PrimOp		( PrimOp )
 import Util		( zipWithEqual )
 import ListSetOps	( assocMaybe )
-import Unique		( mkPseudoUnique1 )
 import Outputable
 import Panic		( panic, assertPanic )
 \end{code}

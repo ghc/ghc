@@ -14,11 +14,10 @@ import PprMach		( pprInstr )	-- Just for debugging
 import MachRegs
 import RegAllocInfo
 
-import FiniteMap	( FiniteMap, emptyFM, addListToFM, delListFromFM, 
-			  lookupFM, keysFM, eltsFM, mapFM, addToFM_C, addToFM,
-			  listToFM, fmToList, lookupWithDefaultFM )
-import Unique		( mkBuiltinUnique )
-import OrdList		( unitOL, appOL, fromOL, concatOL )
+import FiniteMap	( FiniteMap, emptyFM, 
+			  lookupFM, eltsFM, addToFM_C, addToFM,
+			  listToFM, fmToList )
+import OrdList		( fromOL )
 import Outputable
 import Unique		( Unique, Uniquable(..), mkPseudoUnique3 )
 import CLabel		( CLabel, pprCLabel )

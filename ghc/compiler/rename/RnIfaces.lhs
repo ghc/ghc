@@ -24,23 +24,25 @@ import HsSyn		( HsDecl(..), Sig(..), TyClDecl(..), ConDecl(..), ConDetails(..),
 			  InstDecl(..), HsType(..), hsTyVarNames, getBangType
 			)
 import HsImpExp		( ImportDecl(..) )
-import RdrHsSyn		( RdrNameHsDecl, RdrNameTyClDecl, RdrNameInstDecl )
-import RnHsSyn		( RenamedHsDecl, extractHsTyNames, extractHsCtxtTyNames, tyClDeclFVs )
+import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl )
+import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl,
+			  extractHsTyNames, extractHsCtxtTyNames, 
+			  tyClDeclFVs, ruleDeclFVs, instDeclFVs
+			)
 import RnHiFiles	( tryLoadInterface, loadHomeInterface, loadInterface, 
 			  loadOrphanModules
 			)
-import RnSource		( rnTyClDecl, rnDecl )
+import RnSource		( rnTyClDecl, rnInstDecl, rnIfaceRuleDecl )
 import RnEnv
 import RnMonad
 import Id		( idType )
-import DataCon		( classDataCon, dataConId )
 import Type		( namesOfType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocalName, nameUnique,
-			  NamedThing(..),
+			  NamedThing(..)
 			 )
-import Name 		( elemNameEnv )
+import Name 		( elemNameEnv, delFromNameEnv )
 import Module		( Module, ModuleEnv, 
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),
@@ -254,12 +256,7 @@ slurpImpDecls source_fvs
     slurpSourceRefs source_binders source_fvs	`thenRn` \ (decls, needed) ->
 
 	-- Then get everything else
-    closeDecls decls needed			`thenRn` \ decls1 ->
-
-	-- Finally, get any deferred data type decls
-    slurpDeferredDecls decls1			`thenRn` \ final_decls -> 
-
-    returnRn final_decls
+    closeDecls decls needed
 
 
 -------------------------------------------------------
@@ -280,24 +277,15 @@ slurpSourceRefs source_binders source_fvs
 	-- and the instance decls 
 
 	-- The outer loop is needed because consider
-	--	instance Foo a => Baz (Maybe a) where ...
-	-- It may be that @Baz@ and @Maybe@ are used in the source module,
-	-- but not @Foo@; so we need to chase @Foo@ too.
-	--
-	-- We also need to follow superclass refs.  In particular, 'chasing @Foo@' must
-	-- include actually getting in Foo's class decl
-	--	class Wib a => Foo a where ..
-	-- so that its superclasses are discovered.  The point is that Wib is a gate too.
-	-- We do this for tycons too, so that we look through type synonyms.
 
     go_outer decls fvs all_gates []	
 	= returnRn (decls, fvs)
 
     go_outer decls fvs all_gates refs	-- refs are not necessarily slurped yet
 	= traceRn (text "go_outer" <+> ppr refs)		`thenRn_`
+	  getImportedInstDecls all_gates			`thenRn` \ inst_decls ->
 	  foldlRn go_inner (decls, fvs, emptyFVs) refs		`thenRn` \ (decls1, fvs1, gates1) ->
-	  getImportedInstDecls (all_gates `plusFV` gates1)	`thenRn` \ inst_decls ->
-	  rnInstDecls decls1 fvs1 gates1 inst_decls		`thenRn` \ (decls2, fvs2, gates2) ->
+	  rnIfaceInstDecls decls1 fvs1 gates1 inst_decls	`thenRn` \ (decls2, fvs2, gates2) ->
 	  go_outer decls2 fvs2 (all_gates `plusFV` gates2)
 			       (nameSetToList (gates2 `minusNameSet` all_gates))
 		-- Knock out the all_gates because even if we don't slurp any new
@@ -308,21 +296,11 @@ slurpSourceRefs source_binders source_fvs
 	  case import_result of
 	    AlreadySlurped     -> returnRn (decls, fvs, gates)
 	    InTypeEnv ty_thing -> returnRn (decls, fvs, gates `plusFV` getWiredInGates ty_thing)
-	    Deferred           -> returnRn (decls, fvs, gates `addOneFV` wanted_name)	-- It's a type constructor
 			
 	    HereItIs decl -> rnIfaceTyClDecl decl		`thenRn` \ (new_decl, fvs1) ->
 			     returnRn (TyClD new_decl : decls, 
 				       fvs1 `plusFV` fvs,
 			   	       gates `plusFV` getGates source_fvs new_decl)
-
-rnInstDecls decls fvs gates []
-  = returnRn (decls, fvs, gates)
-rnInstDecls decls fvs gates (d:ds) 
-  = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
-    rnInstDecls (new_decl:decls) 
-	        (fvs1 `plusFV` fvs)
-		(gates `plusFV` getInstDeclGates new_decl)
-		ds
 \end{code}
 
 
@@ -338,8 +316,9 @@ closeDecls decls needed
   = getImportedRules 			`thenRn` \ rule_decls ->
     case rule_decls of
 	[]    -> returnRn decls	-- No new rules, so we are done
-	other -> rnIfaceDecls decls emptyFVs rule_decls 	`thenRn` \ (decls1, needed1) ->
-		 closeDecls decls1 needed1
+	other -> rnIfaceDecls rnIfaceRuleDecl rule_decls	`thenRn` \ rule_decls' ->
+		 closeDecls (map RuleD rule_decls' ++ decls)
+			    (plusFVs (map ruleDeclFVs rule_decls'))
 		 
 
 -------------------------------------------------------
@@ -365,14 +344,15 @@ slurpDecl decls fvs wanted_name
 
 
 -------------------------------------------------------
-rnIfaceDecls :: [RenamedHsDecl] -> FreeVars
-	     -> [(Module, RdrNameHsDecl)]
-	     -> RnM d ([RenamedHsDecl], FreeVars)
-rnIfaceDecls decls fvs []     = returnRn (decls, fvs)
-rnIfaceDecls decls fvs (d:ds) = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
-				rnIfaceDecls (new_decl:decls) (fvs1 `plusFV` fvs) ds
+rnIfaceDecls rn decls	   = mapRn (rnIfaceDecl rn) decls
+rnIfaceDecl rn (mod, decl) = initIfaceRnMS mod (rn decl)	
 
-rnIfaceDecl	(mod, decl) = initIfaceRnMS mod (rnDecl decl)	
+rnIfaceInstDecls decls fvs gates inst_decls
+  = rnIfaceDecls rnInstDecl inst_decls	`thenRn` \ inst_decls' ->
+    returnRn (map InstD inst_decls' ++ decls,
+	      fvs `plusFV` plusFVs (map instDeclFVs inst_decls'),
+	      gates `plusFV` plusFVs (map getInstDeclGates inst_decls'))
+
 rnIfaceTyClDecl (mod, decl) = initIfaceRnMS mod (rnTyClDecl decl)	`thenRn` \ decl' ->
 			      returnRn (decl', tyClDeclFVs decl')
 \end{code}
@@ -383,13 +363,18 @@ getSlurped
   = getIfacesRn 	`thenRn` \ ifaces ->
     returnRn (iSlurp ifaces)
 
-recordSlurp ifaces@(Ifaces { iSlurp = slurped_names, iVSlurp = (imp_mods, imp_names) })
+recordSlurp ifaces@(Ifaces { iDecls = (decls_map, n_slurped),
+			     iSlurp = slurped_names, 
+			     iVSlurp = (imp_mods, imp_names) })
 	    avail
   = ASSERT2( not (isLocalName (availName avail)), ppr avail )
-    ifaces { iSlurp  = new_slurped_names, iVSlurp = new_vslurp }
+    ifaces { iDecls = (decls_map', n_slurped+1),
+	     iSlurp  = new_slurped_names, 
+	     iVSlurp = new_vslurp }
   where
-    main_name = availName avail
-    mod	      = nameModule main_name
+    decls_map' = foldl delFromNameEnv decls_map (availNames avail)
+    main_name  = availName avail
+    mod	       = nameModule main_name
     new_slurped_names = addAvailToNameSet slurped_names avail
     new_vslurp | isModuleInThisPackage mod = (imp_mods, addOneToNameSet imp_names main_name)
     	       | otherwise		   = (extendModuleSet imp_mods mod, imp_names)
@@ -406,53 +391,6 @@ recordLocalSlurps local_avails
 
 %*********************************************************
 %*						 	 *
-\subsection{Deferred declarations}
-%*							 *
-%*********************************************************
-
-The idea of deferred declarations is this.  Suppose we have a function
-	f :: T -> Int
-	data T = T1 A | T2 B
-	data A = A1 X | A2 Y
-	data B = B1 P | B2 Q
-Then we don't want to load T and all its constructors, and all
-the types those constructors refer to, and all the types *those*
-constructors refer to, and so on.  That might mean loading many more
-interface files than is really necessary.  So we 'defer' loading T.
-
-But f might be strict, and the calling convention for evaluating
-values of type T depends on how many constructors T has, so 
-we do need to load T, but not the full details of the type T.
-So we load the full decl for T, but only skeleton decls for A and B:
-	f :: T -> Int
-	data T = {- 2 constructors -}
-
-Whether all this is worth it is moot.
-
-\begin{code}
-slurpDeferredDecls :: [RenamedHsDecl] -> RnMG [RenamedHsDecl]
-slurpDeferredDecls decls = returnRn decls
-
-{-	OMIT FOR NOW
-slurpDeferredDecls :: [RenamedHsDecl] -> RnMG [RenamedHsDecl]
-slurpDeferredDecls decls
-  = getDeferredDecls						`thenRn` \ def_decls ->
-    rnIfaceDecls decls emptyFVs (map stripDecl def_decls)	`thenRn` \ (decls1, fvs) ->
-    ASSERT( isEmptyFVs fvs )
-    returnRn decls1
-
-stripDecl (mod, TyClD (TyData dt _ tc tvs _ nconstrs _ loc name1 name2))
-  = (mod, TyClD (TyData dt [] tc tvs [] nconstrs Nothing loc
-		name1 name2))
-	-- Nuke the context and constructors
-	-- But retain the *number* of constructors!
-	-- Also the tvs will have kinds on them.
--}
-\end{code}
-
-
-%*********************************************************
-%*						 	 *
 \subsection{Extracting the `gates'}
 %*							 *
 %*********************************************************
@@ -465,52 +403,64 @@ its 'head' are all available in the program being compiled.  E.g.
 
 	instance (..) => C (T1 a) (T2 b) where ...
 
-is only useful if C, T1 and T2 are all available.  So we keep
+is only useful if C, T1 and T2 are all "available".  So we keep
 instance decls that have been parsed from .hi files, but not yet
 slurped in, in a pool called the 'gated instance pool'.
 Each has its set of 'gates': {C, T1, T2} in the above example.
 
-THE GATING INVARIANT 
+More precisely, the gates of a module are the types and classes 
+that are mentioned in:
 
-    *All* the instances whose gates are entirely in the stuff that's
-    already been through the type checker (i.e. are already in the
-    Persistent Type Environment or Home Symbol Table) have already been
-    slurped in, and are no longer in the gated instance pool.
+	a) the source code
+	b) the type of an Id that's mentioned in the source code
+	   [includes constructors and selectors]
+	c) the RHS of a type synonym that is a gate
+	d) the superclasses of a class that is a gate
+	e) the context of an instance decl that is slurped in
 
-Hence, when we read a new module, we see what new gates we have,
-and let in any instance decls whose gates are 
-	either	in the new gates, 
-	or	in the HST/PTE
+We slurp in an instance decl from the gated instance pool iff
+	
+	all its gates are either in the gates of the module, 
+	or are a previously-loaded class.  
 
-An earlier optimisation: now infeasible
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The latter constraint is because there might have been an instance
+decl slurped in during an earlier compilation, like this:
+
+	instance Foo a => Baz (Maybe a) where ...
+
+In the module being compiled we might need (Baz (Maybe T)), where T
+is defined in this module, and hence we need (Foo T).  So @Foo@ becomes
+a gate.  But there's no way to 'see' that, so we simply treat all 
+previously-loaded classes as gates.
+
+Consructors and class operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we import a declaration like
-\begin{verbatim}
+
 	data T = T1 Wibble | T2 Wobble
-\end{verbatim}
+
 we don't want to treat @Wibble@ and @Wobble@ as gates {\em unless}
-@T1@, @T2@ respectively are mentioned by the user program.  If only
+@T1@, @T2@ respectively are mentioned by the user program. If only
 @T@ is mentioned we want only @T@ to be a gate; that way we don't suck
 in useless instance decls for (say) @Eq Wibble@, when they can't
 possibly be useful.
 
-BUT, I can't see how to do this and still maintain the GATING INVARIANT.
-So I've simply ditched the optimisation to get things working.
+And that's just what (b) says: we only treat T1's type as a gate if
+T1 is mentioned.  getGates, which deals with decls we are slurping in,
+has to be a bit careful, because a mention of T1 will slurp in T's whole
+declaration.
 
-
-
-
+-----------------------------
 @getGates@ takes a newly imported (and renamed) decl, and the free
 vars of the source program, and extracts from the decl the gate names.
 
 \begin{code}
 getGates :: FreeVars		-- Things mentioned in the source program
-	 -> RenamedHsDecl
+	 -> RenamedTyClDecl
 	 -> FreeVars
 
-get_gates source_fvs decl = get_gates (\n -> True) decl
-	-- We'd use (\n -> n `elemNameSet` source_fvs)
-	-- if we were using the 'earlier optimisation above
+getGates source_fvs decl 
+  = get_gates (\n -> n `elemNameSet` source_fvs) decl
 
 get_gates is_used (IfaceSig _ ty _ _)
   = extractHsTyNames ty
@@ -569,38 +519,34 @@ get_gates is_used (TyData _ ctxt tycon tvs cons _ _ _ _ _)
     get_bang bty = extractHsTyNames (getBangType bty)
 \end{code}
 
-@getWiredInGates@ is just like @getGates@, but it sees a wired-in @Name@
-rather than a declaration.
+@getWiredInGates@ is just like @getGates@, but it sees a previously-loaded
+thing rather than a declaration.
 
 \begin{code}
 getWiredInGates :: TyThing -> FreeVars
 -- The TyThing is one that we already have in our type environment, either
 --	a) because the TyCon or Id is wired in, or
 --	b) from a previous compile
--- Either way, we might have instance decls in the (persistend) collection
+-- Either way, we might have instance decls in the (persistent) collection
 -- of parsed-but-not-slurped instance decls that should be slurped in.
 -- This might be the first module that mentions both the type and the class
 -- for that instance decl, even though both the type and the class were
 -- mentioned in other modules, and hence are in the type environment
 
-getWiredInGates (AnId the_id) = getWiredInGates_s (namesOfType (idType the_id))
-getWiredInGates (AClass cl)   = namesOfType (idType (dataConId (classDataCon cl)))	-- Cunning
+getWiredInGates (AnId the_id) = namesOfType (idType the_id)
+getWiredInGates (AClass cl)   = emptyFVs	-- The superclasses must also be previously
+						-- loaded, and hence are automatically gates
 getWiredInGates (ATyCon tc)
-  | isSynTyCon tc = getWiredInGates_s (delListFromNameSet (namesOfType ty) (map getName tyvars))
+  | isSynTyCon tc = delListFromNameSet (namesOfType ty) (map getName tyvars)
   | otherwise	  = unitFV (getName tc)
   where
     (tyvars,ty)  = getSynTyConDefn tc
 
-getWiredInGates_s names = foldr (plusFV . getWiredInGates) emptyFVs (nameSetToList names)
+getInstDeclGates (InstDecl inst_ty _ _ _ _) = extractHsTyNames inst_ty
 \end{code}
 
 \begin{code}
-getInstDeclGates (InstD (InstDecl inst_ty _ _ _ _)) = extractHsTyNames inst_ty
-getInstDeclGates other				    = emptyFVs
-\end{code}
-
-\begin{code}
-getImportedInstDecls :: NameSet -> RnMG [(Module,RdrNameHsDecl)]
+getImportedInstDecls :: NameSet -> RnMG [(Module,RdrNameInstDecl)]
 getImportedInstDecls gates
   =    	-- First, load any orphan-instance modules that aren't aready loaded
 	-- Orphan-instance modules are recorded in the module dependecnies
@@ -629,12 +575,12 @@ getImportedInstDecls gates
   where
     gate_list      = nameSetToList gates
 
-ppr_brief_inst_decl (mod, InstD (InstDecl inst_ty _ _ _ _))
+ppr_brief_inst_decl (mod, InstDecl inst_ty _ _ _ _)
   = case inst_ty of
 	HsForAllTy _ _ tau -> ppr tau
 	other		   -> ppr inst_ty
 
-getImportedRules :: RnMG [(Module,RdrNameHsDecl)]
+getImportedRules :: RnMG [(Module,RdrNameRuleDecl)]
 getImportedRules 
   | opt_IgnoreIfacePragmas = returnRn []
   | otherwise
@@ -653,18 +599,24 @@ getImportedRules
 		  text "Slurped" <+> int (length decls) <+> text "rules"])   `thenRn_`
     returnRn decls
 
-selectGated gates lookup decl_bag
+selectGated gates lookup (decl_bag, n_slurped)
 	-- Select only those decls whose gates are *all* in 'gates'
-	-- or are in the range of lookup
+	-- or are a class in 'lookup'
 #ifdef DEBUG
   | opt_NoPruneDecls	-- Just to try the effect of not gating at all
-  = (foldrBag (\ (_,d) ds -> d:ds) [] decl_bag, emptyBag)	-- Grab them all
+  = let
+	decls = foldrBag (\ (_,d) ds -> d:ds) [] decl_bag	-- Grab them all
+    in
+    (decls, (emptyBag, n_slurped + length decls))
 
   | otherwise
 #endif
-  = foldrBag select ([], emptyBag) decl_bag
+  = case foldrBag select ([], emptyBag) decl_bag of
+	(decls, new_bag) -> (decls, (new_bag, n_slurped + length decls))
   where
-    available n = n `elemNameSet` gates || maybeToBool (lookup n)
+    available n = n `elemNameSet` gates 
+		|| case lookup n of { Just (AClass c) -> True; other -> False }
+
     select (reqd, decl) (yes, no)
 	| all available reqd = (decl:yes, no)
 	| otherwise	     = (yes,      (reqd,decl) `consBag` no)
@@ -683,7 +635,6 @@ importDecl :: Name -> RnMG ImportDeclResult
 data ImportDeclResult
   = AlreadySlurped
   | InTypeEnv TyThing
-  | Deferred
   | HereItIs (Module, RdrNameTyClDecl)
 
 importDecl name
@@ -700,10 +651,10 @@ importDecl name
 		      -> 	-- When we find a wired-in name we must load its home
 				-- module so that we find any instance decls lurking therein
 			 loadHomeInterface wi_doc name	`thenRn_`
-			 returnRn (InTypeEnv (getWiredInGates ty_thing))
+			 returnRn (InTypeEnv ty_thing)
 
 		      | otherwise
-		      ->  returnRn (InTypeEnv ty_thing) ;
+		      -> returnRn (InTypeEnv ty_thing) ;
 
 	Nothing -> 
 
@@ -720,7 +671,10 @@ importDecl name
     getIfacesRn				`thenRn` \ ifaces ->
 
 	-- STEP 5: Get the declaration out
-    case lookupNameEnv (iDecls ifaces) name of
+    let
+	(decls_map, _) = iDecls ifaces
+    in
+    case lookupNameEnv decls_map name of
       Just (avail,_,decl)
 	-> setIfacesRn (recordSlurp ifaces avail)	`thenRn_`
 	   returnRn (HereItIs decl)
@@ -733,80 +687,8 @@ importDecl name
     wi_doc = ptext SLIT("need home module for wired in thing") <+> ppr name
     nd_doc = ptext SLIT("need decl for") <+> ppr name
 
-
-{- 		OMIT DEFERRED STUFF FOR NOW, TILL GHCI WORKS
-      Just (version, avail, is_tycon_name, decl@(_, TyClD (TyData DataType _ _ _ _ ncons _ _ _ _)))
-	-- This case deals with deferred import of algebraic data types
-
-	|  not opt_NoPruneTyDecls
-
-	&& (opt_IgnoreIfacePragmas || ncons > 1)
-		-- We only defer if imported interface pragmas are ingored
-		-- or if it's not a product type.
-		-- Sole reason: The wrapper for a strict function may need to look
-		-- inside its arg, and hence need to see its arg type's constructors.
-
-	&& not (getUnique tycon_name `elem` cCallishTyKeys)
-		-- Never defer ccall types; we have to unbox them, 
-		-- and importing them does no harm
-
-
-	->  	-- OK, so we're importing a deferrable data type
-	    if needed_name == tycon_name
-	 	-- The needed_name is the TyCon of a data type decl
-		-- Record that it's slurped, put it in the deferred set
-		-- and don't return a declaration at all
-		setIfacesRn (recordSlurp (ifaces {iDeferred = iDeferred ifaces 
-							      `addOneToNameSet` tycon_name})
-				    	 version (AvailTC needed_name [needed_name]))	`thenRn_`
-		returnRn Deferred
-
-	    else
-	  	-- The needed name is a constructor of a data type decl,
-		-- getting a constructor, so remove the TyCon from the deferred set
-		-- (if it's there) and return the full declaration
-		setIfacesRn (recordSlurp (ifaces {iDeferred = iDeferred ifaces 
-							       `delFromNameSet` tycon_name})
-				    version avail)	`thenRn_`
-		returnRn (HereItIs decl)
-	where
-	   tycon_name = availName avail
--}
-
-{-		OMIT FOR NOW
-getDeferredDecls :: RnMG [(Module, RdrNameHsDecl)]
-getDeferredDecls 
-  = getIfacesRn		`thenRn` \ ifaces ->
-    let
-	decls_map   	    = iDecls ifaces
-	deferred_names	    = nameSetToList (iDeferred ifaces)
-        get_abstract_decl n = case lookupNameEnv decls_map n of
-				 Just (_, _, _, decl) -> decl
-    in
-    traceRn (sep [text "getDeferredDecls", nest 4 (fsep (map ppr deferred_names))])	`thenRn_`
-    returnRn (map get_abstract_decl deferred_names)
--}
 \end{code}
 
-@getWiredInDecl@ maps a wired-in @Name@ to what it makes available.
-It behaves exactly as if the wired in decl were actually in an interface file.
-Specifically,
-\begin{itemize}
-\item	if the wired-in name is a data type constructor or a data constructor, 
-	it brings in the type constructor and all the data constructors; and
-	marks as ``occurrences'' any free vars of the data con.
-
-\item 	similarly for synonum type constructor
-
-\item 	if the wired-in name is another wired-in Id, it marks as ``occurrences''
-	the free vars of the Id's type.
-
-\item	it loads the interface file for the wired-in thing for the
-	sole purpose of making sure that its instance declarations are available
-\end{itemize}
-All this is necessary so that we know all types that are ``in play'', so
-that we know just what instances to bring into scope.
-	
 
 %********************************************************
 %*							*

@@ -38,7 +38,6 @@ import CLabel		( mkClosureLabel,
 import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
 import BitSet		( mkBS, emptyBS )
 import PrimRep		( isFollowableRep, getPrimRepSize )
-import DataCon		( DataCon, dataConName )
 import Id		( Id, idPrimRep, idType, isDataConWrapId )
 import Type		( typePrimRep )
 import VarEnv
@@ -397,11 +396,6 @@ bindNewToReg name magic_id lf_info
   = addBindC name info
   where
     info = MkCgIdInfo name (RegLoc magic_id) NoStableLoc lf_info
-
-bindNewToLit name lit
-  = addBindC name info
-  where
-    info = MkCgIdInfo name NoVolatileLoc (LitLoc lit) (error "bindNewToLit")
 
 bindArgsToRegs :: [Id] -> [MagicId] -> Code
 bindArgsToRegs args regs

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.42 2000/10/24 08:40:09 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.43 2000/11/06 08:15:21 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -58,8 +58,6 @@ import Outputable
 import Name             ( nameOccName )
 import OccName          ( occNameFS )
 import FastTypes	( iBox )
-	
-getWrapperArgTypeCategories = panic "CgClosure.getWrapperArgTypeCategories (ToDo)"
 \end{code}
 
 %********************************************************
@@ -744,44 +742,4 @@ chooseDynCostCentres ccs args fvs body
 \end{code}
 
 
-
-========================================================================
-OLD CODE THAT EMITTED INFORMATON FOR QUANTITATIVE ANALYSIS
-
-It's pretty wierd, so I've nuked it for now.  SLPJ Nov 96
-
-\begin{pseudocode}
-getWrapperArgTypeCategories
-	:: Type				-- wrapper's type
-	-> StrictnessInfo bdee		-- strictness info about its args
-	-> Maybe String
-
-getWrapperArgTypeCategories _ NoStrictnessInfo	    = Nothing
-getWrapperArgTypeCategories _ BottomGuaranteed
-  = trace "getWrapperArgTypeCategories:BottomGuaranteed!" Nothing  -- wrong
-getWrapperArgTypeCategories _ (StrictnessInfo [] _) = Nothing
-
-getWrapperArgTypeCategories ty (StrictnessInfo arg_info _)
-  = Just (mkWrapperArgTypeCategories ty arg_info)
-
-mkWrapperArgTypeCategories
-	:: Type		-- wrapper's type
-	-> [Demand]	-- info about its arguments
-	-> String	-- a string saying lots about the args
-
-mkWrapperArgTypeCategories wrapper_ty wrap_info
-  = case (splitFunTy_maybe wrapper_ty) of { Just (arg_tys,_) ->
-    map do_one (wrap_info `zip` (map showTypeCategory arg_tys)) }
-  where
-    -- ToDo: this needs FIXING UP (it was a hack anyway...)
-    do_one (WwPrim, _) = 'P'
-    do_one (WwEnum, _) = 'E'
-    do_one (WwStrict, arg_ty_char) = arg_ty_char
-    do_one (WwUnpack _ _ _, arg_ty_char)
-      = if arg_ty_char `elem` "CIJFDTS"
-	then toLower arg_ty_char
-	else if arg_ty_char == '+' then 't'
-	else trace ("mkWrapp..:funny char:"++[arg_ty_char]) '-'
-    do_one (other_wrap_info, _) = '-'
-\end{pseudocode}
 

@@ -17,7 +17,7 @@ import ClosureInfo	( closurePtrsSize,
 			  infoTblNeedsSRT, getSRTInfo, closureSemiTag
 			)
 import PrimRep		( PrimRep(..) )
-import SMRep		( SMRep(..), getSMRepClosureTypeInt )
+import SMRep		( getSMRepClosureTypeInt )
 import Stix		-- all of it
 import UniqSupply	( returnUs, UniqSM )
 import BitSet		( intBS )

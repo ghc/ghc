@@ -33,7 +33,7 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, simpleInstInfoTy, 
 			  newDFunName, tcExtendTyVarEnv
 			)
-import InstEnv		( InstEnv, classDataCon, extendInstEnv )
+import InstEnv		( InstEnv, extendInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )
@@ -42,6 +42,7 @@ import HscTypes		( HomeSymbolTable, DFunId,
 			)
 
 import Bag		( unionManyBags	)
+import DataCon		( classDataCon )
 import Class		( Class, DefMeth(..), classBigSig )
 import Var		( idName, idType )
 import Maybes 		( maybeToBool )
@@ -52,7 +53,7 @@ import Name		( getSrcLoc )
 import NameSet		( emptyNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprConstraint, pprPred )
-import TyCon		( TyCon, isSynTyCon, tyConDerivings )
+import TyCon		( TyCon, isSynTyCon )
 import Type		( splitDFunTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy,
 			  splitAlgTyConApp_maybe, splitForAllTys,
@@ -172,8 +173,9 @@ tcInstDecls1 :: PackageInstEnv
 
 tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod tycons decls
   = let
-	inst_decls = [inst_decl | InstD inst_decl <- decls]
-	clas_decls = [clas_decl | TyClD clas_decl <- decls, isClassDecl clas_decl]
+	inst_decls = [inst_decl | InstD inst_decl <- decls]	
+	tycl_decls = [decl      | TyClD decl <- decls]
+	clas_decls = filter isClassDecl tycl_decls
     in
    	-- (1) Do the ordinary instance declarations
     mapNF_Tc (tcInstDecl1 mod unf_env) inst_decls    	`thenNF_Tc` \ inst_infos ->
@@ -205,7 +207,7 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod tycons decls
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hecne inst_env4
-    tcDeriving prs mod inst_env4 get_fixity tycons	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    tcDeriving prs mod inst_env4 get_fixity tycl_decls	`thenTc` \ (deriv_inst_info, deriv_binds) ->
     addInstInfos inst_env4 deriv_inst_info		`thenNF_Tc` \ final_inst_env ->
 
     returnTc (inst_env1, 
@@ -687,13 +689,6 @@ scrutiniseInstanceHead clas inst_taus
             && not (creturnable_type first_inst_tau))
      -> addErrTc (nonBoxedPrimCCallErr clas first_inst_tau)
 
-  	-- DERIVING CHECK
-	-- It is obviously illegal to have an explicit instance
-	-- for something that we are also planning to `derive'
-     |  maybeToBool alg_tycon_app_maybe && clas `elem` (tyConDerivings alg_tycon)
-     -> addErrTc (derivingWhenInstanceExistsErr clas first_inst_tau)
-	   -- Kind check will have ensured inst_taus is of length 1
-
 	-- Allow anything for AllowUndecidableInstances
      |  dopt Opt_AllowUndecidableInstances dflags
      -> returnNF_Tc ()
@@ -789,12 +784,6 @@ instTypeErr clas tys msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> quotes (pprConstraint clas tys),
 	 nest 4 (parens msg)
     ]
-
-derivingWhenInstanceExistsErr clas tycon
-  = hang (hsep [ptext SLIT("Deriving class"), 
-		       quotes (ppr clas), 
-		       ptext SLIT("type"), quotes (ppr tycon)])
-         4 (ptext SLIT("when an explicit instance exists"))
 
 nonBoxedPrimCCallErr clas inst_ty
   = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))

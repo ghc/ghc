@@ -43,7 +43,7 @@ import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
 import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
-import DataCon		( DataCon{-instance NamedThing-}, dataConWrapId )
+import DataCon		( dataConWrapId )
 import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper, pprPrimOp, pprCCallOp, 
 			  PrimOp(..), CCall(..), CCallTarget(..), isDynamicTarget )
@@ -60,7 +60,6 @@ import GlaExts
 import Util		( nOfThem )
 
 import ST
-import MutableArray
 
 infixr 9 `thenTE`
 \end{code}
@@ -648,9 +647,6 @@ pp_basic_restores = ptext SLIT("CALLER_RESTORE_SYSTEM")
 \end{code}
 
 \begin{code}
-has_srt (_, NoSRT) = False
-has_srt _ = True
-
 pp_srt_info srt = 
     case srt of
 	(lbl, NoSRT) -> 

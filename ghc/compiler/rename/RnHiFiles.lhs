@@ -26,7 +26,7 @@ import HscTypes		( ModuleLocation(..),
 			  DeclsMap, GatedDecl, IfaceInsts, IfaceRules,
 			  AvailInfo, GenAvailInfo(..), Avails, Deprecations(..)
 			 )
-import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..),
+import HsSyn		( TyClDecl(..), InstDecl(..),
 			  HsType(..), ConDecl(..), 
 			  FixitySig(..), RuleDecl(..),
 			  tyClDeclNames
@@ -50,7 +50,6 @@ import Module		( Module,
 			  extendModuleEnv, mkVanillaModule
 			)
 import RdrName		( RdrName, rdrNameOcc )
-import NameSet
 import SrcLoc		( mkSrcLoc )
 import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
@@ -175,7 +174,7 @@ tryLoadInterface doc_str mod_name from
 
     loadDecls mod		(iDecls ifaces)	  (pi_decls iface)	`thenRn` \ (decls_vers, new_decls) ->
     loadRules mod		(iRules ifaces)   (pi_rules iface)	`thenRn` \ (rule_vers, new_rules) ->
-    foldlRn (loadInstDecl mod)	(iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
+    loadInstDecls mod		(iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
     loadExports 			 	  (pi_exports iface)	`thenRn` \ (export_vers, avails) ->
     loadFixDecls mod		 		  (pi_fixity iface)	`thenRn` \ fix_env ->
     loadDeprecs mod				  (pi_deprecs iface)	`thenRn` \ deprec_env ->
@@ -283,13 +282,10 @@ loadDecls :: Module
 	  -> DeclsMap
 	  -> [(Version, RdrNameTyClDecl)]
 	  -> RnM d (NameEnv Version, DeclsMap)
-loadDecls mod decls_map decls
-  = foldlRn (loadDecl mod) (emptyNameEnv, decls_map) decls
+loadDecls mod (decls_map, n_slurped) decls
+  = foldlRn (loadDecl mod) (emptyNameEnv, decls_map) decls	`thenRn` \ (vers, decls_map') -> 
+    returnRn (vers, (decls_map', n_slurped))
 
-loadDecl :: Module 
-	 -> (NameEnv Version, DeclsMap)
-	 -> (Version, RdrNameTyClDecl)
-	 -> RnM d (NameEnv Version, DeclsMap)
 loadDecl mod (version_map, decls_map) (version, decl)
   = getIfaceDeclBinders mod decl	`thenRn` \ full_avail ->
     let
@@ -321,13 +317,18 @@ loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
 --	Loading instance decls
 -----------------------------------------------------
 
-loadInstDecl :: Module
-	     -> IfaceInsts
-	     -> RdrNameInstDecl
-	     -> RnM d IfaceInsts
-loadInstDecl mod insts decl@(InstDecl inst_ty binds uprags dfun_name src_loc)
-  = 
-	-- Find out what type constructors and classes are "gates" for the
+loadInstDecls :: Module
+	      -> IfaceInsts
+	      -> [RdrNameInstDecl]
+	      -> RnM d IfaceInsts
+loadInstDecls mod (insts, n_slurped) decls
+  = setModuleRn mod $
+    foldlRn (loadInstDecl mod) insts decls 	`thenRn` \ insts' ->
+    returnRn (insts', n_slurped)
+
+
+loadInstDecl mod insts decl@(InstDecl inst_ty _ _ _ _)
+  = 	-- Find out what type constructors and classes are "gates" for the
 	-- instance declaration.  If all these "gates" are slurped in then
 	-- we should slurp the instance decl too.
 	-- 
@@ -340,9 +341,8 @@ loadInstDecl mod insts decl@(InstDecl inst_ty binds uprags dfun_name src_loc)
 	munged_inst_ty = removeContext inst_ty
 	free_names     = extractHsTyRdrNames munged_inst_ty
     in
-    setModuleRn mod $
     mapRn lookupIfaceName free_names	`thenRn` \ gate_names ->
-    returnRn ((gate_names, (mod, InstD decl)) `consBag` insts)
+    returnRn ((gate_names, (mod, decl)) `consBag` insts)
 
 
 -- In interface files, the instance decls now look like
@@ -363,20 +363,20 @@ removeFuns ty		    = ty
 loadRules :: Module -> IfaceRules 
 	  -> (Version, [RdrNameRuleDecl])
 	  -> RnM d (Version, IfaceRules)
-loadRules mod rule_bag (version, rules)
+loadRules mod (rule_bag, n_slurped) (version, rules)
   | null rules || opt_IgnoreIfacePragmas 
-  = returnRn (version, rule_bag)
+  = returnRn (version, (rule_bag, n_slurped))
   | otherwise
   = setModuleRn mod		 	$
     mapRn (loadRule mod) rules		`thenRn` \ new_rules ->
-    returnRn (version, rule_bag `unionBags` listToBag new_rules)
+    returnRn (version, (rule_bag `unionBags` listToBag new_rules, n_slurped))
 
-loadRule :: Module -> RdrNameRuleDecl -> RnM d GatedDecl
+loadRule :: Module -> RdrNameRuleDecl -> RnM d (GatedDecl RdrNameRuleDecl)
 -- "Gate" the rule simply by whether the rule variable is
 -- needed.  We can refine this later.
 loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
   = lookupIfaceName var		`thenRn` \ var_name ->
-    returnRn ([var_name], (mod, RuleD decl))
+    returnRn ([var_name], (mod, decl))
 
 
 -----------------------------------------------------

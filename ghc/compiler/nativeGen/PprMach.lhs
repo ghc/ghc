@@ -18,8 +18,7 @@ import MachRegs		-- may differ per-platform
 import MachMisc
 
 import CLabel		( pprCLabel_asm, externallyVisibleCLabel, labelDynamic )
-import Stix		( CodeSegment(..), StixTree(..) )
-import Char		( isPrint, isDigit )
+import Stix		( CodeSegment(..) )
 import Outputable
 
 import ST

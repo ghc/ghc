@@ -48,7 +48,6 @@ import RdrName		( RdrNameEnv, emptyRdrEnv )
 import Name		( Name, NamedThing, isLocallyDefined, 
 			  getName, nameModule, nameSrcLoc )
 import Name -- Env
-import NameSet		( NameSet )
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
 			  lookupModuleEnv, lookupModuleEnvByName, emptyModuleEnv
@@ -62,7 +61,7 @@ import TyCon		( TyCon )
 import BasicTypes	( Version, initialVersion, Fixity )
 
 import HsSyn		( DeprecTxt )
-import RdrHsSyn		( RdrNameHsDecl, RdrNameTyClDecl )
+import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameTyClDecl )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( IdCoreRule )
@@ -471,12 +470,14 @@ including the constructors of a type decl etc.  The Bool is True just
 for the 'main' Name.
 
 \begin{code}
-type DeclsMap = NameEnv (AvailInfo, Bool, (Module, RdrNameTyClDecl))
+type DeclsMap = (NameEnv (AvailInfo, Bool, (Module, RdrNameTyClDecl)), Int)
+						-- The Int says how many have been sucked in
 
-type IfaceInsts = Bag GatedDecl
-type IfaceRules = Bag GatedDecl
+type IfaceInsts = GatedDecls RdrNameInstDecl
+type IfaceRules = GatedDecls RdrNameRuleDecl
 
-type GatedDecl = ([Name], (Module, RdrNameHsDecl))
+type GatedDecls d = (Bag (GatedDecl d), Int)	-- The Int says how many have been sucked in
+type GatedDecl  d = ([Name], (Module, d))
 \end{code}
 
 

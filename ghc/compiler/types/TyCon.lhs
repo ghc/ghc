@@ -31,7 +31,6 @@ module TyCon(
 	tyConArgVrcs_maybe,
 	tyConDataCons, tyConDataConsIfAvailable,
 	tyConFamilySize,
-	tyConDerivings,
 	tyConTheta,
 	tyConPrimRep,
 	tyConArity,
@@ -55,7 +54,7 @@ import {-# SOURCE #-} TypeRep ( Type, Kind, SuperKind )
 import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
 
-import Class 		( Class, ClassContext )
+import Class 		( ClassContext )
 import Var   		( TyVar, Id )
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), 
 			  isBoxed, EP(..) )
@@ -110,8 +109,6 @@ data TyCon
 				-- abstractly we still need to know the number of constructors
 				-- so we can get the return convention right.  Tiresome!
 				
-	algTyConDerivings   :: [Class],	-- Classes which have derived instances
-
 	algTyConFlavour	:: AlgTyConFlavour,
 	algTyConRec     :: RecFlag,		-- Tells whether the data type is part of 
 						-- a mutually-recursive group or not
@@ -243,7 +240,7 @@ tyConGenIds tycon = case tyConGenInfo tycon of
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyConRep name kind tyvars theta argvrcs cons ncons derivs flavour rec 
+mkAlgTyConRep name kind tyvars theta argvrcs cons ncons flavour rec 
 	      gen_info
   = AlgTyCon {	
 	tyConName 		= name,
@@ -255,7 +252,6 @@ mkAlgTyConRep name kind tyvars theta argvrcs cons ncons derivs flavour rec
 	algTyConTheta		= theta,
 	dataCons		= cons, 
 	noOfDataCons		= ncons,
-	algTyConDerivings	= derivs,
 	algTyConClass		= False,
 	algTyConFlavour 	= flavour,
 	algTyConRec		= rec,
@@ -273,7 +269,6 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour
 	algTyConTheta		= [],
 	dataCons		= [con],
 	noOfDataCons		= 1,
-	algTyConDerivings	= [],
 	algTyConClass		= True,
 	algTyConFlavour		= flavour,
 	algTyConRec		= NonRecursive,
@@ -411,12 +406,6 @@ tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
 tyConPrimRep _			              = PtrRep
-\end{code}
-
-\begin{code}
-tyConDerivings :: TyCon -> [Class]
-tyConDerivings (AlgTyCon {algTyConDerivings = derivs}) = derivs
-tyConDerivings other				       = []
 \end{code}
 
 \begin{code}

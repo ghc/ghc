@@ -24,8 +24,7 @@ import SMRep		( fixedItblSize,
 import Constants   	( mIN_UPD_SIZE )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
                           mkClosureTblLabel, mkClosureLabel,
-			  moduleRegdLabel, labelDynamic,
-			  mkSplitMarkerLabel )
+			  labelDynamic, mkSplitMarkerLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd,
 			  staticClosureNeedsLink
@@ -45,7 +44,6 @@ import TyCon		( tyConDataCons )
 import DataCon		( dataConWrapId )
 import BitSet 		( intBS )
 import Name             ( NamedThing(..) )
-import Char		( ord )
 import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
 \end{code}
 

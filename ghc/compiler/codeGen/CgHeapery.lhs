@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.24 2000/10/24 08:40:10 simonpj Exp $
+% $Id: CgHeapery.lhs,v 1.25 2000/11/06 08:15:21 simonpj Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -26,8 +26,7 @@ import CgUsages		( getVirtAndRealHp, getRealSp, setVirtHp, setRealHp,
 			  initHeapUsage
 			)
 import ClosureInfo	( closureSize, closureGoodStuffSize,
-			  slopSize, allocProfilingMsg, ClosureInfo,
-			  closureSMRep
+			  slopSize, allocProfilingMsg, ClosureInfo
 			)
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Unique )

@@ -10,13 +10,16 @@ module TcDeriv ( tcDeriving ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsBinds(..), MonoBinds(..), collectLocatedMonoBinders )
+import HsSyn		( HsBinds(..), MonoBinds(..), TyClDecl(..),
+			  collectLocatedMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
-import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
+import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl )
 import CmdLineOpts	( DynFlag(..), DynFlags )
 
 import TcMonad
-import TcEnv		( TcEnv, tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo )
+import TcEnv		( TcEnv, tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
+			  tcLookupClass, tcLookupTyCon
+			)
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( InstEnv, simpleDFunClassTyCon, extendInstEnv )
 import TcSimplify	( tcSimplifyThetas )
@@ -35,19 +38,20 @@ import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
 import Module		( Module )
-import Name		( Name, isFrom, getSrcLoc )
+import Name		( Name, getSrcLoc )
 import RdrName		( RdrName )
 
-import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
+import TyCon		( tyConTyVars, tyConDataCons,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, TyCon
 			)
 import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp, isUnboxedType )
 import Var		( TyVar )
 import PrelNames
-import Util		( zipWithEqual, sortLt, thenCmp )
+import Util		( zipWithEqual, sortLt )
 import ListSetOps	( removeDups,  assoc )
 import Outputable
+import List		( nub )
 \end{code}
 
 %************************************************************************
@@ -181,16 +185,16 @@ tcDeriving  :: PersistentRenamerState
 	    -> Module			-- name of module under scrutiny
 	    -> InstEnv			-- What we already know about instances
 	    -> (Name -> Maybe Fixity)	-- used in deriving Show and Read
-	    -> [TyCon]			-- All type constructors
+	    -> [RenamedTyClDecl]	-- All type constructors
 	    -> TcM ([InstInfo],		-- The generated "instance decls".
 		    RenamedHsBinds)	-- Extra generated bindings
 
-tcDeriving prs mod inst_env_in get_fixity tycons
+tcDeriving prs mod inst_env_in get_fixity tycl_decls
   = recoverTc (returnTc ([], EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns mod tycons	    	`thenTc` \ eqns ->
+    makeDerivEqns mod tycl_decls	    	`thenTc` \ eqns ->
     if null eqns then
 	returnTc ([], EmptyBinds)
     else
@@ -273,68 +277,57 @@ or} has just one data constructor (e.g., tuples).
 all those.
 
 \begin{code}
-makeDerivEqns :: Module -> [TyCon] -> TcM [DerivEqn]
+makeDerivEqns :: Module -> [RenamedTyClDecl] -> TcM [DerivEqn]
 
-makeDerivEqns this_mod tycons
-  = let
-	think_about_deriving = need_deriving tycons
-	(derive_these, _)    = removeDups cmp_deriv think_about_deriving
-    in
-    if null think_about_deriving then
-	returnTc []	-- Bale out now
-    else
-    mapTc mk_eqn derive_these `thenTc`	\ maybe_eqns ->
+makeDerivEqns this_mod tycl_decls
+  = mapTc mk_eqn derive_these	 	`thenTc` \ maybe_eqns ->
     returnTc (catMaybes maybe_eqns)
   where
     ------------------------------------------------------------------
-    need_deriving :: [TyCon] -> [(Class, TyCon)]
-	-- find the tycons that have `deriving' clauses;
-
-    need_deriving tycons_to_consider
-      = [ (clas,tycon) | tycon <- tycons_to_consider,
-			 isFrom this_mod tycon,
-			 clas <- tyConDerivings tycon ]
-
-    ------------------------------------------------------------------
-    cmp_deriv :: (Class, TyCon) -> (Class, TyCon) -> Ordering
-    cmp_deriv (c1, t1) (c2, t2)
-      = (c1 `compare` c2) `thenCmp` (t1 `compare` t2)
+    derive_these :: [(Name, Name)]
+	-- Find the (Class,TyCon) pairs that must be `derived'
+	-- NB: only source-language decls have deriving, no imported ones do
+    derive_these = [ (clas,tycon) 
+		   | TyData _ _ tycon _ _ _ (Just classes) _ _ _ <- tycl_decls,
+		     clas <- nub classes ]
 
     ------------------------------------------------------------------
-    mk_eqn :: (Class, TyCon) -> NF_TcM (Maybe DerivEqn)
+    mk_eqn :: (Name, Name) -> NF_TcM (Maybe DerivEqn)
 	-- we swizzle the tyvars and datacons out of the tycon
 	-- to make the rest of the equation
 
-    mk_eqn (clas, tycon)
-      = case chk_out clas tycon of
+    mk_eqn (clas_name, tycon_name)
+      = tcLookupClass clas_name					`thenNF_Tc` \ clas ->
+	tcLookupTyCon tycon_name				`thenNF_Tc` \ tycon ->
+	let
+	    clas_key  = classKey clas
+	    tyvars    = tyConTyVars tycon
+	    tyvar_tys = mkTyVarTys tyvars
+	    ty	      = mkTyConApp tycon tyvar_tys
+	    data_cons = tyConDataCons tycon
+	    locn      = getSrcLoc tycon
+	    constraints = extra_constraints ++ concat (map mk_constraints data_cons)
+
+	    -- "extra_constraints": see notes above about contexts on data decls
+	    extra_constraints
+	      | offensive_class = tyConTheta tycon
+	      | otherwise	= []
+
+	    offensive_class = clas_key `elem` needsDataDeclCtxtClassKeys
+    
+	    mk_constraints data_con
+	       = [ (clas, [arg_ty])
+		 | arg_ty <- dataConArgTys data_con tyvar_tys,
+		   not (isUnboxedType arg_ty)	-- No constraints for unboxed types?
+		 ]
+	in
+	case chk_out clas tycon of
 	   Just err ->  addErrTc err				`thenNF_Tc_` 
 			returnNF_Tc Nothing
 	   Nothing  ->  newDFunName this_mod clas [ty] locn `thenNF_Tc` \ dfun_name ->
 			returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints))
-      where
-	clas_key  = classKey clas
-	tyvars    = tyConTyVars tycon
-	tyvar_tys = mkTyVarTys tyvars
-	ty	  = mkTyConApp tycon tyvar_tys
-	data_cons = tyConDataCons tycon
-	locn	  = getSrcLoc tycon
 
-	constraints = extra_constraints ++ concat (map mk_constraints data_cons)
 
-	-- "extra_constraints": see notes above about contexts on data decls
-	extra_constraints
-	  | offensive_class = tyConTheta tycon
-	  | otherwise	    = []
-	   where
-	    offensive_class = clas_key `elem` needsDataDeclCtxtClassKeys
-
-	mk_constraints data_con
-	   = [ (clas, [arg_ty])
-	     | arg_ty <- instd_arg_tys,
-	       not (isUnboxedType arg_ty)	-- No constraints for unboxed types?
-	     ]
-	   where
-	     instd_arg_tys  = dataConArgTys data_con tyvar_tys
 
     ------------------------------------------------------------------
     chk_out :: Class -> TyCon -> Maybe Message

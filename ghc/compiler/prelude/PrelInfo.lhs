@@ -40,7 +40,7 @@ import TysWiredIn	( wiredInTyCons )
 import HscTypes 	( TyThing(..), TypeEnv, mkTypeEnv )
 
 -- others:
-import TyCon		( tyConDataConsIfAvailable, TyCon )
+import TyCon		( tyConDataConsIfAvailable, tyConGenIds, TyCon )
 import Class	 	( Class, classKey )
 import Type		( funTyCon )
 import Util		( isIn )
@@ -70,9 +70,13 @@ wiredInThings
     ]
 
 wiredInTyConThings :: TyCon -> [TyThing]
+-- This is a bit of a cheat (c.f. TcTyDecls.mkImplicitDataBinds
+-- It assumes that wired in tycons have no record selectors
 wiredInTyConThings tc
-   = ATyCon tc : [ AnId n | dc <- tyConDataConsIfAvailable tc, 
-                            n  <- [dataConId dc, dataConWrapId dc] ]
+   = [ATyCon tc] 
+   ++ [ AnId i | i <- tyConGenIds tc ]
+   ++ [ AnId n | dc <- tyConDataConsIfAvailable tc, 
+                 n  <- [dataConId dc, dataConWrapId dc] ] 
 			-- Synonyms return empty list of constructors
 
 wiredInThingEnv :: TypeEnv

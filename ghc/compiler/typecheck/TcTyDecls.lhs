@@ -88,13 +88,9 @@ tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings src_loc
 
 	-- Typecheck the pieces
     tcClassContext context					`thenTc` \ ctxt ->
-    tc_derivs derivings						`thenTc` \ derived_classes ->
     mapTc (tcConDecl new_or_data tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
 
-    returnTc (tycon_name, DataTyDetails ctxt data_cons derived_classes)
-  where
-    tc_derivs Nothing   = returnTc []
-    tc_derivs (Just ds) = mapTc tcLookupClass ds
+    returnTc (tycon_name, DataTyDetails ctxt data_cons)
 \end{code}
 
 \begin{code}

@@ -11,9 +11,9 @@ module StixMacro ( macroCode, checkCode ) where
 import {-# SOURCE #-} StixPrim ( amodeToStix )
 
 import MachRegs
-import AbsCSyn		( CStmtMacro(..), MagicId(..), CAddrMode, tagreg,
+import AbsCSyn		( CStmtMacro(..), CAddrMode, tagreg,
 			  CCheckMacro(..) )
-import Constants	( uF_RET, uF_SU, uF_UPDATEE, uF_SIZE, sEQ_FRAME_SIZE )
+import Constants	( uF_RET, uF_SU, uF_UPDATEE, uF_SIZE )
 import CallConv		( cCallConv )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )

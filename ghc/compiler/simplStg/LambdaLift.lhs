@@ -543,8 +543,4 @@ co_rec_ify binds = StgRec (concat (map f binds))
 
 getScBinds :: LiftInfo -> [StgBinding]
 getScBinds binds = bagToList binds
-
-looksLikeSATRhs [(f,StgRhsClosure _ _ _ _ _ ls _)] (StgApp f' args)
-  = (f == f') && (length args == length ls)
-looksLikeSATRhs _ _ = False
 \end{code}

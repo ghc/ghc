@@ -36,11 +36,11 @@ module RegAllocInfo (
 
 #include "HsVersions.h"
 
-import List		( partition, sort )
+import List		( sort )
 import MachMisc
 import MachRegs
 import Stix		( DestInfo(..) )
-import CLabel		( pprCLabel_asm, isAsmTemp, CLabel{-instance Ord-} )
+import CLabel		( isAsmTemp, CLabel{-instance Ord-} )
 import FiniteMap	( addToFM, lookupFM, FiniteMap )
 import Outputable
 import Constants	( rESERVED_C_STACK_BYTES )

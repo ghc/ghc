@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.25 2000/09/04 14:07:29 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.26 2000/11/06 08:15:21 simonpj Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -42,7 +42,7 @@ module CgMonad (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} CgBindery ( CgIdInfo, CgBindings, nukeVolatileBinds )
+import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 import {-# SOURCE #-} CgUsages  ( getSpRelOffset )
 
 import AbsCSyn

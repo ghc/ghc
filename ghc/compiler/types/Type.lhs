@@ -860,7 +860,7 @@ namesOfType (NoteTy other_note    ty2)	= namesOfType ty2
 namesOfType (PredTy p)			= namesOfType (predRepTy p)
 namesOfType (FunTy arg res)		= namesOfType arg `unionNameSets` namesOfType res
 namesOfType (AppTy fun arg)		= namesOfType fun `unionNameSets` namesOfType arg
-namesOfType (ForAllTy tyvar ty)		= namesOfType ty `minusNameSet` unitNameSet (getName tyvar)
+namesOfType (ForAllTy tyvar ty)		= namesOfType ty `delFromNameSet` getName tyvar
 
 namesOfTypes tys = foldr (unionNameSets . namesOfType) emptyNameSet tys
 \end{code}

@@ -419,8 +419,6 @@ We use the strongly-connected component algorithm, in which
 type CVertex = (Int, AbstractC)  -- Give each vertex a unique number,
 				 -- for fast comparison
 
-type CEdge = (CVertex, CVertex)
-
 doSimultaneously abs_c
   = let
 	enlisted = en_list abs_c

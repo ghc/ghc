@@ -735,39 +735,31 @@ getRnStats imported_decls ifaces
   where
     n_mods = length [() | _ <- moduleEnvElts (iPIT ifaces)]
 	-- This is really only right for a one-shot compile
+
+    (decls_map, n_decls_slurped) = iDecls ifaces
     
-    decls_read     = [decl | (avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces)
+    n_decls_left   = length [decl | (avail, True, (_,decl)) <- nameEnvElts decls_map
     			-- Data, newtype, and class decls are in the decls_fm
     			-- under multiple names; the tycon/class, and each
     			-- constructor/class op too.
     			-- The 'True' selects just the 'main' decl
     		     ]
     
-    (cd_rd, dd_rd, nd_rd, sd_rd, vd_rd)        = countTyClDecls decls_read
-    (cd_sp, dd_sp, nd_sp, sd_sp, vd_sp, id_sp) = count_decls imported_decls
+    (insts_left, n_insts_slurped) = iInsts ifaces
+    n_insts_left  = length (bagToList insts_left)
     
-    unslurped_insts       = iInsts ifaces
-    inst_decls_unslurped  = length (bagToList unslurped_insts)
-    inst_decls_read	      = id_sp + inst_decls_unslurped
+    (rules_left, n_rules_slurped) = iRules ifaces
+    n_rules_left  = length (bagToList rules_left)
     
     stats = vcat 
     	[int n_mods <+> text "interfaces read",
-    	 hsep [ int cd_sp, text "class decls imported, out of", 
-    	        int cd_rd, text "read"],
-    	 hsep [ int dd_sp, text "data decls imported, out of",  
-    		int dd_rd, text "read"],
-    	 hsep [ int nd_sp, text "newtype decls imported, out of",  
-    	        int nd_rd, text "read"],
-    	 hsep [int sd_sp, text "type synonym decls imported, out of",  
-    	        int sd_rd, text "read"],
-    	 hsep [int vd_sp, text "value signatures imported, out of",  
-    	        int vd_rd, text "read"],
-    	 hsep [int id_sp, text "instance decls imported, out of",  
-    	        int inst_decls_read, text "read"],
-    	 text "cls dcls slurp" <+> fsep (map (ppr . tyClDeclName) 
-    				   [d | TyClD d <- imported_decls, isClassDecl d]),
-    	 text "cls dcls read"  <+> fsep (map (ppr . tyClDeclName) 
-					   [d | d <- decls_read, isClassDecl d])]
+    	 hsep [ int n_decls_slurped, text "class decls imported, out of", 
+    	        int (n_decls_slurped + n_decls_left), text "read"],
+    	 hsep [ int n_insts_slurped, text "instance decls imported, out of",  
+    	        int (n_insts_slurped + n_insts_left), text "read"],
+    	 hsep [ int n_rules_slurped, text "rule decls imported, out of",  
+    	        int (n_rules_slurped + n_rules_left), text "read"]
+	]
 
 count_decls decls
   = (class_decls, 

@@ -17,11 +17,9 @@ import CLabel		( mkConEntryLabel )
 import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			  mkConLFInfo, ClosureInfo
 			)
-import CostCentre	( dontCareCCS )
 import DataCon		( DataCon, dataConName, dataConRepArgTys, isNullaryDataCon )
 import Name		( getOccName )
 import OccName		( occNameUserString )
-import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
 import Type		( typePrimRep )
 \end{code}
@@ -140,7 +138,6 @@ genConInfo comp_info tycon data_con
 	-- just one more thing to go wrong.
 
     arg_tys	    = dataConRepArgTys  data_con
-    entry_label     = mkConEntryLabel      con_name
     con_name	    = dataConName data_con
 \end{code}
 

@@ -23,7 +23,7 @@ import CmdLineOpts	( DynFlags, DynFlag(..), dopt,
 			  StgToDo(..), dopt_StgToDo
 			)
 import Id		( Id )
-import Module		( Module, moduleString )
+import Module		( Module )
 import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import IO		( hPutStr, stdout )

@@ -108,6 +108,7 @@ type RdrNameHsTyVar		= HsTyVarBndr		RdrName
 type RdrNameSig			= Sig			RdrName
 type RdrNameStmt		= Stmt			RdrName RdrNamePat
 type RdrNameTyClDecl		= TyClDecl		RdrName RdrNamePat
+
 type RdrNameRuleBndr            = RuleBndr              RdrName
 type RdrNameRuleDecl            = RuleDecl              RdrName RdrNamePat
 type RdrNameDeprecation         = DeprecDecl            RdrName

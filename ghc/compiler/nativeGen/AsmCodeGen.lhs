@@ -16,23 +16,23 @@ import MachCode
 import PprMach
 
 import AbsCStixGen	( genCodeAbstractC )
-import AbsCSyn		( AbstractC, MagicId )
+import AbsCSyn		( AbstractC )
 import AbsCUtils	( mkAbsCStmtList )
 import AsmRegAlloc	( runRegAllocate )
 import PrimOp		( commutableOp, PrimOp(..) )
 import RegAllocInfo	( findReservedRegs )
 import Stix		( StixTree(..), StixReg(..), 
-                          pprStixTrees, pprStixTree, CodeSegment(..),
+                          pprStixTrees, pprStixTree, 
                           stixCountTempUses, stixSubst,
-                          NatM, initNat, mapNat,
-                          NatM_State, mkNatM_State,
+                          initNat, mapNat,
+                          mkNatM_State,
                           uniqOfNatM_State, deltaOfNatM_State )
-import UniqSupply	( returnUs, thenUs, mapUs, initUs, 
-                          initUs_, UniqSM, UniqSupply,
-			  lazyThenUs, lazyMapUs )
+import UniqSupply	( returnUs, thenUs, initUs, 
+                          UniqSM, UniqSupply,
+			  lazyMapUs )
 import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
 
-import OrdList		( fromOL, concatOL )
+import OrdList		( concatOL )
 import Outputable
 
 \end{code}

@@ -10,7 +10,7 @@ module StgLint ( lintStgBindings ) where
 
 import StgSyn
 
-import Bag		( Bag, emptyBag, isEmptyBag, snocBag, foldBag )
+import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import Id		( Id, idType )
 import VarSet
 import DataCon		( DataCon, dataConArgTys, dataConRepType )
@@ -22,7 +22,7 @@ import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErr
 import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, 
 			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
 			)
-import TyCon		( TyCon, isDataTyCon )
+import TyCon		( TyCon )
 import Util		( zipEqual )
 import Outputable
 
@@ -389,8 +389,6 @@ addInScopeVars ids m loc scope errs
     -- a real error out of it...
     let
 	new_set = mkVarSet ids
-
-	shadowed = scope `intersectVarSet` new_set
     in
 --  After adding -fliberate-case, Simon decided he likes shadowed
 --  names after all.  WDP 94/07

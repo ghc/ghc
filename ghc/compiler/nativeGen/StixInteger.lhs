@@ -14,17 +14,13 @@ module StixInteger (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} StixPrim ( amodeToStix )
-import MachMisc
-import MachRegs
 
 import AbsCSyn		hiding (spRel) -- bits and bobs..
-import Literal		( Literal(..) )
 import CallConv		( cCallConv )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
-import SMRep		( arrWordsHdrSize )
 import Stix		( StixTree(..), StixTreeList, arrWordsHS )
-import UniqSupply	( returnUs, thenUs, UniqSM )
+import UniqSupply	( returnUs, UniqSM )
 \end{code}
 
 Although gmpCompare doesn't allocate space, it does temporarily use
