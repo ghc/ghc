@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.10 1998/12/18 17:40:53 simonpj Exp $
+% $Id: CgStackery.lhs,v 1.11 1999/06/08 15:56:47 simonmar Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -11,10 +11,9 @@ Stack-twiddling operations, which are pretty low-down and grimy.
 \begin{code}
 module CgStackery (
 	allocStack, allocPrimStack, allocStackTop, deAllocStackTop,
-	allocUpdateFrame,
-	adjustRealSp, adjustStackHW, getFinalStackHW,
+	adjustStackHW, getFinalStackHW,
 	mkTaggedVirtStkOffsets, mkTaggedStkAmodes, mkTagAssts,
-	freeStackSlots, addFreeSlots
+	freeStackSlots, dataStackSlots, addFreeSlots
     ) where
 
 #include "HsVersions.h"
@@ -26,6 +25,7 @@ import CgUsages		( getRealSp )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
 import Panic		( panic )
+import IOExts		( trace )
 \end{code}
 
 %************************************************************************
@@ -152,21 +152,29 @@ allocPrimStack size info_down (MkCgState absC binds
 				    delete_block free_stk slot, real_sp, hw_sp))
 
     -- find_block looks for a contiguous chunk of free slots
-    find_block :: [VirtualSpOffset] -> Maybe VirtualSpOffset
+    find_block :: [(VirtualSpOffset,Slot)] -> Maybe VirtualSpOffset
     find_block [] = Nothing
-    find_block (slot:slots)
-      | take size (slot:slots) == [slot..top_slot] = Just top_slot
+    find_block ((off,free):slots)
+      | take size ((off,free):slots) == 
+		zip [off..top_slot] (repeat Free) = Just top_slot
       | otherwise				   = find_block slots
 	-- The stack grows downwards, with increasing virtual offsets.
 	-- Therefore, the address of a multi-word object is the *highest*
 	-- virtual offset it occupies (top_slot below).
-      where top_slot = slot+size-1
+      where top_slot = off+size-1
 
-    delete_block free_stk slot = [s | s <- free_stk, (s<=slot-size) || (s>slot)]
+    delete_block free_stk slot = [ (s,f) | (s,f) <- free_stk, 
+				           (s<=slot-size) || (s>slot) ]
 			      -- Retain slots which are not in the range
 			      -- slot-size+1..slot
+\end{code}
 
--- Allocate a chunk ON TOP OF the stack
+Allocate a chunk ON TOP OF the stack.  
+
+ToDo: should really register this memory as NonPointer stuff in the
+free list.
+
+\begin{code}
 allocStackTop :: Int -> FCode VirtualSpOffset
 allocStackTop size info_down (MkCgState absC binds
 	                     ((virt_sp, free_stk, real_sp, hw_sp), h_usage))
@@ -188,33 +196,6 @@ deAllocStackTop size info_down (MkCgState absC binds
   where
     pop_virt_sp = virt_sp - size
     new_stk_usage = (pop_virt_sp, free_stk, real_sp, hw_sp)
-\end{code}
-
-@allocUpdateFrame@ allocates enough space for an update frame on the
-stack, records the fact in the end-of-block info (in the ``args''
-fields), and passes on the old ``args'' fields to the enclosed code.
-
-This is all a bit disgusting.
-
-\begin{code}
-allocUpdateFrame :: Int			-- Size of frame
-		 -> Code		-- Scope of update
-		 -> Code
-
-allocUpdateFrame size code
-	(MkCgInfoDown c_info statics srt (EndOfBlockInfo args_Sp sequel))
-	(MkCgState absc binds ((vSp,rr,qq,hwSp),h_usage))
-  = case sequel of
-
-	OnStack _ -> code (MkCgInfoDown c_info statics srt new_eob_info)
-			  (MkCgState absc binds new_usage)
-
-	other     -> panic "allocUpdateFrame"
-
-  where
-    new_vSp = vSp + size
-    new_eob_info = EndOfBlockInfo new_vSp UpdateCode
-    new_usage = ((new_vSp,rr,qq,hwSp `max` new_vSp), h_usage)
 \end{code}
 
 \begin{code}
@@ -241,34 +222,6 @@ getFinalStackHW fcode info_down (MkCgState absC binds usages) = state1
 
 %************************************************************************
 %*									*
-\subsection[CgStackery-adjust]{Adjusting the stack pointers}
-%*									*
-%************************************************************************
-
-@adjustRealSpX@ generates code to alter the actual stack pointer, and
-adjusts the environment accordingly.  We are careful to push the
-conditional inside the abstract C code to avoid black holes.
-ToDo: combine together?
-
-These functions {\em do not} deal with high-water-mark adjustment.
-That's done by functions which allocate stack space.
-
-\begin{code}
-adjustRealSp :: VirtualSpOffset 	-- New offset for Arg stack ptr
-	      -> Code
-adjustRealSp newRealSp info_down (MkCgState absC binds
-					((vSp,fSp,realSp,hwSp),	h_usage))
-  = MkCgState (mkAbsCStmts absC move_instr) binds new_usage
-    where
-    move_instr = if (newRealSp == realSp) then AbsCNop
-		 else (CAssign
-			    (CReg Sp)
-			    (CAddr (spRel realSp newRealSp)))
-    new_usage = ((vSp, fSp, newRealSp, hwSp), h_usage)
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection[CgStackery-free]{Free stack slots}
 %*									*
 %************************************************************************
@@ -276,37 +229,51 @@ adjustRealSp newRealSp info_down (MkCgState absC binds
 Explicitly free some stack space.
 
 \begin{code}
-freeStackSlots :: [VirtualSpOffset] -> Code
-freeStackSlots extra_free info_down
+addFreeStackSlots :: [VirtualSpOffset] -> Slot -> Code
+addFreeStackSlots extra_free slot info_down
 	state@(MkCgState abs_c binds ((vsp, free, real, hw), heap_usage))
   = MkCgState abs_c binds new_usage
   where
     new_usage = ((new_vsp, new_free, real, hw), heap_usage)
-    (new_vsp, new_free) = trim vsp (addFreeSlots free extra_free)
+    (new_vsp, new_free) = trim vsp all_free
+    all_free = addFreeSlots free (zip extra_free (repeat slot))
 
-addFreeSlots :: [Int] -> [Int] -> [Int]
+freeStackSlots :: [VirtualSpOffset] -> Code
+freeStackSlots slots = addFreeStackSlots slots Free
+
+dataStackSlots :: [VirtualSpOffset] -> Code
+dataStackSlots slots = addFreeStackSlots slots NonPointer
+
+addFreeSlots :: [(Int,Slot)] -> [(Int,Slot)] -> [(Int,Slot)]
 addFreeSlots cs [] = cs
 addFreeSlots [] ns = ns
-addFreeSlots (c:cs) (n:ns)
+addFreeSlots ((c,s):cs) ((n,s'):ns)
  = if c < n then
-	c : addFreeSlots cs (n:ns)
+	(c,s) : addFreeSlots cs ((n,s'):ns)
    else if c > n then
-	n : addFreeSlots (c:cs) ns
+	(n,s') : addFreeSlots ((c,s):cs) ns
+   else if s /= s' then -- c == n
+	(c,s') : addFreeSlots cs ns
    else
-	panic ("addFreeSlots: equal slots: " ++ show (c:cs) ++ show (n:ns))
+	panic ("addFreeSlots: equal slots: " ++ show (c:map fst cs)
+					     ++ show (n:map fst ns))
 
-trim :: Int{-offset-} -> [Int] -> (Int{-offset-}, [Int])
+trim :: Int{-offset-} -> [(Int,Slot)] -> (Int{-offset-}, [(Int,Slot)])
 trim current_sp free_slots
-  = try current_sp (reverse free_slots)
+  = try current_sp free_slots
   where
-    try csp [] = (csp, [])
-    try csp (slot:slots)
-      = if csp < slot then
-	    try csp slots		-- Free slot off top of stk; ignore
+	try csp [] = (csp,[])
 
-	else if csp == slot then
-    	    try (csp-1) slots		-- Free slot at top of stk; trim
-
-	else
-	    (csp, reverse (slot:slots))	-- Otherwise gap; give up
+	try csp (slot@(off,state):slots) = 
+		if state == Free && null slots' then
+		    if csp' < off then 
+			(csp', [])
+		    else if csp' == off then
+			(csp'-1, [])
+		    else 
+			(csp',[slot])
+		else
+		    (csp', slot:slots')
+		where
+		    (csp',slots') = try csp slots
 \end{code}

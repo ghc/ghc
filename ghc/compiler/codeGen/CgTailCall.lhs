@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.20 1999/05/28 19:24:28 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.21 1999/06/08 15:56:48 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -35,8 +35,8 @@ import CgRetConv	( dataReturnConvPrim,
 			  ctrlReturnConvAlg, CtrlReturnConvention(..),
 			  assignAllRegs, assignRegs
 			)
-import CgStackery	( adjustRealSp, mkTaggedStkAmodes, adjustStackHW )
-import CgUsages		( getSpRelOffset )
+import CgStackery	( mkTaggedStkAmodes, adjustStackHW )
+import CgUsages		( getSpRelOffset, adjustSpAndHp )
 import CgUpdate		( pushSeqFrame )
 import CLabel		( mkUpdInfoLabel, mkRtsPrimOpLabel )
 import ClosureInfo	( nodeMustPointToIt,
@@ -266,8 +266,8 @@ performReturn sim_assts finish_code
 	--  stack location)
     pushReturnAddress eob		`thenC`
 
-	-- Adjust stack pointer
-    adjustRealSp args_sp		`thenC`
+	-- Adjust Sp/Hp
+    adjustSpAndHp args_sp		`thenC`
 
 	-- Do the return
     finish_code sequel		-- "sequel" is `robust' in that it doesn't
@@ -299,8 +299,8 @@ returnUnboxedTuple amodes before_jump
     pushReturnAddress eob		`thenC`
     setEndOfBlockInfo (EndOfBlockInfo args_sp (OnStack args_sp)) (
 
-	-- Adjust stack pointer
-    adjustRealSp args_sp		`thenC`
+	-- Adjust Sp/Hp
+    adjustSpAndHp args_sp		`thenC`
 
     before_jump				`thenC`
 
@@ -458,8 +458,8 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
 		then nopC
 		else pushReturnAddress eob)		`thenC`
 
-		-- Final adjustment of stack pointer
-	adjustRealSp final_sp		`thenC`
+		-- Final adjustment of Sp/Hp
+	adjustSpAndHp final_sp		`thenC`
 	
 		-- Now decide about semi-tagging
 	let

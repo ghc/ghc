@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.29 1999/05/18 15:03:46 simonpj Exp $
+% $Id: CgCase.lhs,v 1.30 1999/06/08 15:56:45 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -10,8 +10,7 @@
 %********************************************************
 
 \begin{code}
-module CgCase (	cgCase, saveVolatileVarsAndRegs, 
-		restoreCurrentCostCentre, freeCostCentreSlot
+module CgCase (	cgCase, saveVolatileVarsAndRegs, restoreCurrentCostCentre
 	) where
 
 #include "HsVersions.h"
@@ -39,7 +38,7 @@ import CgRetConv	( dataReturnConvPrim, ctrlReturnConvAlg,
 			  CtrlReturnConvention(..)
 			)
 import CgStackery	( allocPrimStack, allocStackTop,
-			  deAllocStackTop, freeStackSlots
+			  deAllocStackTop, freeStackSlots, dataStackSlots
 			)
 import CgTailCall	( tailCallFun )
 import CgUsages		( getSpRelOffset, getRealSp )
@@ -434,9 +433,6 @@ cgEvalAlts cc_slot bndr srt alts
   = 	
     let uniq = getUnique bndr in
 
-    -- get the stack liveness for the info table (after the CC slot has
-    -- been freed - this is important).
-    freeCostCentreSlot cc_slot		`thenC`
     buildContLivenessMask uniq	        `thenFC` \ liveness_mask ->
 
     case alts of
@@ -500,12 +496,14 @@ cgEvalAlts cc_slot bndr srt alts
       -- primitive alts...
       (StgPrimAlts ty alts deflt) ->
 
+	-- Restore the cost centre
+	restoreCurrentCostCentre cc_slot 	`thenFC` \ cc_restore ->
+
     	-- Generate the switch
     	getAbsC (cgPrimEvalAlts bndr ty alts deflt)  	`thenFC` \ abs_c ->
 
     	-- Generate the labelled block, starting with restore-cost-centre
     	getSRTLabel 					`thenFC` \srt_label ->
-	restoreCurrentCostCentre cc_slot 	`thenFC` \ cc_restore ->
     	absC (CRetDirect uniq (cc_restore `mkAbsCStmts` abs_c) 
 			(srt_label,srt) liveness_mask)	`thenC`
 
@@ -855,19 +853,19 @@ saveCurrentCostCentre
   = if not opt_SccProfilingOn then
 	returnFC (Nothing, AbsCNop)
     else
-	allocPrimStack (getPrimRepSize CostCentreRep)  `thenFC` \ slot ->
+	allocPrimStack (getPrimRepSize CostCentreRep) `thenFC` \ slot ->
+	dataStackSlots [slot]			      `thenC`
 	getSpRelOffset slot   		     	      `thenFC` \ sp_rel ->
 	returnFC (Just slot,
 		  CAssign (CVal sp_rel CostCentreRep) (CReg CurCostCentre))
-
-freeCostCentreSlot :: Maybe VirtualSpOffset -> Code
-freeCostCentreSlot Nothing = nopC
-freeCostCentreSlot (Just slot) = freeStackSlots [slot]
 
 restoreCurrentCostCentre :: Maybe VirtualSpOffset -> FCode AbstractC
 restoreCurrentCostCentre Nothing = returnFC AbsCNop
 restoreCurrentCostCentre (Just slot)
  = getSpRelOffset slot				 `thenFC` \ sp_rel ->
+   freeStackSlots [slot]			 `thenC`
+   (\info_down state@(MkCgState abs_c binds ((vsp, free, real, hw), heap_usage))
+	-> trace (show slot ++ "   " ++ show vsp ++ "   " ++ show free) $ state) `thenC`
    returnFC (CCallProfCCMacro SLIT("RESTORE_CCCS") [CVal sp_rel CostCentreRep])
     -- we use the RESTORE_CCCS macro, rather than just
     -- assigning into CurCostCentre, in case RESTORE_CCC

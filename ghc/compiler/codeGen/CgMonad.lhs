@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.20 1999/05/18 15:03:49 simonpj Exp $
+% $Id: CgMonad.lhs,v 1.21 1999/06/08 15:56:47 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -27,7 +27,7 @@ module CgMonad (
 
 	setSRTLabel, getSRTLabel,
 
-	StackUsage, HeapUsage,
+	StackUsage, Slot(..), HeapUsage,
 
 	profCtrC, cgPanic,
 
@@ -182,9 +182,11 @@ sequelToAmode (SeqFrame _ _) = cgPanic (text "sequelToAmode: SeqFrame")
 type CgStksAndHeapUsage		-- stacks and heap usage information
   = (StackUsage, HeapUsage)
 
+data Slot = Free | NonPointer deriving (Eq,Show)
+
 type StackUsage =
 	(Int,		   -- virtSp: Virtual offset of topmost allocated slot
-	 [Int],            -- free:   List of free slots, in increasing order
+	 [(Int,Slot)],     -- free:   List of free slots, in increasing order
 	 Int,		   -- realSp: Virtual offset of real stack pointer
 	 Int)		   -- hwSp:   Highest value ever taken by virtSp
 
@@ -203,9 +205,7 @@ Initialisation.
 initialStateC = MkCgState AbsCNop emptyVarEnv initUsage
 
 initUsage :: CgStksAndHeapUsage
-initUsage  = ((0,[],0,0), (initVirtHp, initRealHp))
-initVirtHp = panic "Uninitialised virtual Hp"
-initRealHp = panic "Uninitialised real Hp"
+initUsage  = ((0,[],0,0), (0,0))
 \end{code}
 
 "envInitForAlternatives" initialises the environment for a case alternative,
@@ -462,8 +462,7 @@ forkEvalHelp body_eob_info env_code body_code
 
     state_for_body = MkCgState AbsCNop
 	 		     (nukeVolatileBinds binds)
-			     ((v,f,v,v),
-			      (initVirtHp, initRealHp))
+			     ((v,f,v,v), (0,0))
 
 
 stateIncUsageEval :: CgState -> CgState -> CgState

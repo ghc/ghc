@@ -422,7 +422,7 @@ problems.
   1) Find all the pointer words by searching through the binding list.
      Invert this to find the non-pointer words and build the bitmap.
 
-  2) Find all the non-pointer words by search through the binding list.
+  2) Find all the non-pointer words by searching through the binding list.
      Merge this with the list of currently free slots.  Build the
      bitmap.
 
@@ -473,7 +473,7 @@ buildLivenessMask uniq sp info_down
 		      unboxed_slots)
 
 	-- merge in the free slots
-	all_slots = addFreeSlots flatten_slots free ++ 
+	all_slots = mergeSlots flatten_slots (map fst free) ++ 
 		    if vsp < sp then [vsp+1 .. sp] else []
 
         -- recalibrate the list to be sp-relative
@@ -481,6 +481,17 @@ buildLivenessMask uniq sp info_down
 
 	-- build the bitmap
 	liveness_mask = listToLivenessMask rel_slots
+
+mergeSlots :: [Int] -> [Int] -> [Int]
+mergeSlots cs [] = cs
+mergeSlots [] ns = ns
+mergeSlots (c:cs) (n:ns)
+ = if c < n then
+	c : mergeSlots cs (n:ns)
+   else if c > n then
+	n : mergeSlots (c:cs) ns
+   else
+	panic ("mergeSlots: equal slots: " ++ show (c:cs) ++ show (n:ns))
 
 {- ALTERNATE version that doesn't work because update frames aren't
    recorded in the environment.

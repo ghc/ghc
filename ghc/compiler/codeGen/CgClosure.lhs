@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.31 1999/05/18 15:03:47 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.32 1999/06/08 15:56:46 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -35,8 +35,8 @@ import CgHeapery	( allocDynClosure,
 			  fetchAndReschedule, yield,  -- HWL
 			  fastEntryChecks, thunkChecks
 			)
-import CgStackery	( adjustRealSp, mkTaggedVirtStkOffsets, freeStackSlots )
-import CgUsages		( setRealAndVirtualSp, getVirtSp,
+import CgStackery	( mkTaggedVirtStkOffsets, freeStackSlots )
+import CgUsages		( adjustSpAndHp, setRealAndVirtualSp, getVirtSp,
 			  getSpRelOffset, getHpRelOffset
 			)
 import CLabel		( CLabel, mkClosureLabel, mkFastEntryLabel,
@@ -357,8 +357,9 @@ closureCodeBody binder_info closure_info cc all_args body
 	    absC (mkAbstractCs (zipWith assign_to_reg arg_regs stk_amodes)) 
 							    `thenC`
 
-	    -- Now adjust real stack pointers
-	    adjustRealSp sp_stk_args			`thenC`
+	    -- Now adjust real stack pointers (no need to adjust Hp,
+	    -- but call this function for convenience).
+	    adjustSpAndHp sp_stk_args			`thenC`
 
     	    absC (CFallThrough (CLbl fast_label CodePtrRep))
 

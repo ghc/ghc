@@ -13,8 +13,8 @@ import AbsCSyn
 
 import Constants	( uF_SIZE, sCC_UF_SIZE, sEQ_FRAME_SIZE, sCC_SEQ_FRAME_SIZE )
 import PrimRep		( PrimRep(..) )
-import CgStackery	( allocUpdateFrame )
-import CgUsages		( getSpRelOffset )
+import CgStackery	( allocStackTop )
+import CgUsages		( getVirtSp, getSpRelOffset )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Panic		( assertPanic )
 \end{code}
@@ -44,21 +44,26 @@ pushUpdateFrame updatee code
 		     then sCC_UF_SIZE
 		     else uF_SIZE
     in
+#ifdef DEBUG
     getEndOfBlockInfo 	    	    	`thenFC` \ eob_info ->
     ASSERT(case eob_info of { EndOfBlockInfo _ (OnStack _) -> True; 
 			      _ -> False})
-    allocUpdateFrame frame_size (
+#endif
+
+    allocStackTop frame_size	`thenFC` \ _ ->
+    getVirtSp			`thenFC` \ vsp ->
+
+    setEndOfBlockInfo (EndOfBlockInfo vsp UpdateCode) (
 
 		-- Emit the push macro
 	    absC (CMacroStmt PUSH_UPD_FRAME [
 			updatee,
-			int_CLit0 	-- Known to be zero because we have just
+			int_CLit0  -- we just entered a closure, so must be zero
 	    ])
 	    `thenC` code
     )
 
 int_CLit0 = mkIntCLit 0 -- out here to avoid pushUpdateFrame CAF (sigh)
-
 \end{code}
 
 We push a SEQ frame just before evaluating the scrutinee of a case, if
