@@ -19,7 +19,7 @@ module PprType(
 -- friends:
 -- (PprType can see all the representations it's trying to print)
 import Type		( Type(..), TyNote(..), Kind, ThetaType, 
-			  splitFunTys, splitDictTy_maybe,
+			  splitDictTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
 			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
 			  boxedTypeKind
@@ -180,12 +180,13 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
 
 
 ppr_ty env ctxt_prec (FunTy ty1 ty2)
-    -- We fiddle the precedences passed to left/right branches,
-    -- so that right associativity comes out nicely...
-  = maybeParen ctxt_prec fUN_PREC (sep (ppr_ty env fUN_PREC ty1 : pp_rest))
+  = maybeParen ctxt_prec fUN_PREC (sep (ppr_ty env fUN_PREC ty1 : pp_rest ty2))
+  -- we don't want to lose usage annotations or synonyms,
+  -- so we can't use splitFunTys here.
   where
-    (arg_tys, result_ty) = splitFunTys ty2
-    pp_rest = [ ptext SLIT("-> ") <> ppr_ty env fUN_PREC ty | ty <- arg_tys ++ [result_ty] ]
+    pp_rest (FunTy ty1 ty2) = pp_codom ty1 : pp_rest ty2
+    pp_rest ty              = [pp_codom ty]
+    pp_codom ty             = ptext SLIT("->") <+> ppr_ty env fUN_PREC ty
 
 ppr_ty env ctxt_prec (AppTy ty1 ty2)
   = maybeParen ctxt_prec tYCON_PREC $
