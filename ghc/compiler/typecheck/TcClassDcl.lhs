@@ -10,10 +10,11 @@ module TcClassDcl ( tcClassDecl1, tcClassDecls2 ) where
 
 IMP_Ubiq()
 
-import HsSyn		( HsDecl(..), ClassDecl(..), HsBinds(..), Bind(..), MonoBinds(..),
+import HsSyn		( HsDecl(..), ClassDecl(..), HsBinds(..), MonoBinds(..),
 			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..), 
 			  DefaultDecl, TyDecl, InstDecl, IfaceSig, Fixity,
 			  HsLit(..), OutPat(..), Sig(..), HsType(..), HsTyVar,
+			  SYN_IE(RecFlag), nonRecursive, andMonoBinds,
 			  Stmt, DoOrListComp, ArithSeqInfo, InPat, Fake )
 import HsTypes		( getTyVarName )
 import HsPragmas	( ClassPragmas(..) )
@@ -27,7 +28,7 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(Tc
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
 import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcAddImportedIdInfo,
 			  tcExtendGlobalTyVars )
-import TcInstDcls	( processInstBinds )
+import TcInstDcls	( tcMethodBind )
 import TcKind		( unifyKind, TcKind )
 import TcMonad
 import TcMonoType	( tcHsType, tcContext )
@@ -36,25 +37,31 @@ import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcInstSigTyVars, t
 
 import Bag		( foldBag, unionManyBags )
 import Class		( GenClass, GenClassOp, mkClass, mkClassOp, classBigSig, 
-			  classOps, classOpString, classOpLocalType,
-			  classOpTagByOccName, SYN_IE(ClassOp)
+			  classOps, classOpString, classOpLocalType, classDefaultMethodId,
+			  classOpTagByOccName, SYN_IE(ClassOp), SYN_IE(Class)
 			)
-import Id		( GenId, mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId, getIdUnfolding,
-			  idType )
+import Id		( GenId, mkSuperDictSelId, mkMethodSelId, 
+			  mkDefaultMethodId, getIdUnfolding,
+			  idType, SYN_IE(Id)
+			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
-import Name		( Name, isLocallyDefined, moduleString, modAndOcc, nameString )
+import Name		( Name, isLocallyDefined, moduleString, 
+			  modAndOcc, nameString, NamedThing(..) )
+import Outputable
 import PrelVals		( nO_DEFAULT_METHOD_ERROR_ID )
 import PprStyle
 import Pretty
-import PprType		( GenType, GenTyVar, GenClassOp )
+import PprType		( GenClass, GenType, GenTyVar, GenClassOp )
 import SpecEnv		( SpecEnv )
 import SrcLoc		( mkGeneratedSrcLoc )
 import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
-			  mkForAllTy, mkSigmaTy, splitSigmaTy)
+			  mkForAllTy, mkSigmaTy, splitSigmaTy, SYN_IE(Type)
+			)
 import TysWiredIn	( stringTy )
-import TyVar		( unitTyVarSet, GenTyVar )
-import Unique		( Unique )			 
+import TyVar		( unitTyVarSet, GenTyVar, SYN_IE(TyVar) )
+import Unique		( Unique )
+import UniqFM		( Uniquable(..) )
 import Util
 
 
@@ -299,18 +306,22 @@ tcClassDecl2 (ClassDecl context class_name
 	  = classBigSig clas
 
 	-- The selector binds are already in the selector Id's unfoldings
-    	sel_binds = SingleBind $ NonRecBind $ foldr AndMonoBinds EmptyMonoBinds $
-		    [ CoreMonoBind (RealId sel_id) (getUnfoldingTemplate (getIdUnfolding sel_id))
+	sel_binds = [ CoreMonoBind (RealId sel_id) (getUnfoldingTemplate (getIdUnfolding sel_id))
 		    | sel_id <- sc_sel_ids ++ op_sel_ids, 
 		      isLocallyDefined sel_id
 		    ]
+
+    	final_sel_binds = MonoBind (andMonoBinds sel_binds) [] nonRecursive 
     in
 	-- Generate bindings for the default methods
     tcInstSigTyVars [tyvar]		`thenNF_Tc` \ ([clas_tyvar], _, _) ->
-    buildDefaultMethodBinds clas clas_tyvar defm_ids default_binds
-					`thenTc` \ (const_insts, meth_binds) ->
+    mapAndUnzipTc (buildDefaultMethodBind clas clas_tyvar default_binds) 
+		  (op_sel_ids `zip` [0..])
+					`thenTc` \ (const_insts_s, meth_binds) ->
 
-    returnTc (const_insts, sel_binds `ThenBinds` meth_binds)
+    returnTc (unionManyBags const_insts_s, 
+	      final_sel_binds `ThenBinds`
+	      MonoBind (andMonoBinds meth_binds) [] nonRecursive)
 \end{code}
 
 %************************************************************************
@@ -387,151 +398,54 @@ dfun.Foo.List
 \end{verbatim}
 
 \begin{code}
-buildDefaultMethodBinds
+buildDefaultMethodBind
 	:: Class
 	-> TcTyVar s
-	-> [Id]
 	-> RenamedMonoBinds
-	-> TcM s (LIE s, TcHsBinds s)
+	-> (Id, Int)
+	-> TcM s (LIE s, TcMonoBinds s)
 
-buildDefaultMethodBinds clas clas_tyvar
-			default_method_ids default_binds
+buildDefaultMethodBind clas clas_tyvar default_binds (sel_id, idx)
   = newDicts origin [(clas,inst_ty)]			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
-    mapAndUnzipNF_Tc mk_method default_method_ids	`thenNF_Tc` \ (insts_s, local_defm_ids) ->
     let
-	avail_insts    = this_dict `plusLIE` unionManyBags insts_s 	-- Insts available
-	clas_tyvar_set = unitTyVarSet clas_tyvar
+	avail_insts = this_dict
+	defm_id     = classDefaultMethodId clas idx
     in
     tcExtendGlobalTyVars clas_tyvar_set (
-	processInstBinds
-	   clas
-	   (makeClassDeclDefaultMethodRhs clas local_defm_ids)
-	   avail_insts
-	   local_defm_ids
-	   default_binds
-    )					`thenTc` \ (insts_needed, default_binds') ->
+	tcMethodBind noDefmExpr inst_ty default_binds (sel_id, idx)
+    )						`thenTc` \ (defm_bind, insts_needed, (_, local_defm_id)) ->
 
+	-- CHECK THE CONTEXT OF THE DEFAULT-METHOD BINDS
     tcSimplifyAndCheck
 	clas_tyvar_set
 	avail_insts
 	insts_needed			`thenTc` \ (const_lie, dict_binds) ->
-	
 
     let
 	defm_binds = AbsBinds
 		 	[clas_tyvar]
 			[this_dict_id]
-			(local_defm_ids `zip` map RealId default_method_ids)
-			dict_binds
-			(RecBind default_binds')
+			[([clas_tyvar], RealId defm_id, local_defm_id)]
+			(dict_binds `AndMonoBinds` defm_bind)
     in
     returnTc (const_lie, defm_binds)
+
   where
-    inst_ty = mkTyVarTy clas_tyvar
-    mk_method defm_id = newMethod origin (RealId defm_id) [inst_ty]
-    origin = ClassDeclOrigin
+    clas_tyvar_set    = unitTyVarSet clas_tyvar
+    inst_ty           = mkTyVarTy clas_tyvar
+    origin            = ClassDeclOrigin
+    noDefmExpr _      = HsApp (HsVar (getName nO_DEFAULT_METHOD_ERROR_ID)) 
+			      (HsLit (HsString (_PK_ error_msg)))
+
+    error_msg = show (sep [text "Class",  ppr PprForUser clas,
+				  text "Method", ppr PprForUser sel_id])
 \end{code}
 
-====================
-buildDefaultMethodBinds
-	:: Class
-	-> TcTyVar s
-	-> [Id]
-	-> RenamedMonoBinds
-	-> TcM s (LIE s, TcHsBinds s)
-
-buildDefaultMethodBinds clas clas_tyvar
-			default_method_ids default_binds
-  = newDicts origin [(clas,inst_ty)]			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
-    tcExtendGlobalTyVars clas_tyvar_set (
-	tcDefaultMethodBinds default_binds
-    )
-
-tcDefaultMethodBinds default_meth_ids default_binds
-  where
-    go (AndMonoBinds b1 b2)
-      = go b1		`thenTc` \ (new_b1, lie1) ->
-        go b2		`thenTc` \ (new_b2, lie2) ->
-	returnTc (new_b1 `ThenBinds` new_b2, lie1 `plusLIE` lie2)
-
-    go EmptyMonoBinds = EmptyBinds
-
-    go mbind = processInstBinds1 clas clas_dict meth_ids mbind	`thenTc` \ (tags
-
-tcDefaultMethodBinds EmptyMonoBinds
-  
-
-
-	processInstBinds
-	   clas
-	   (makeClassDeclDefaultMethodRhs clas local_defm_ids)
-	   avail_insts
-	   local_defm_ids
-	   default_binds
-    )					`thenTc` \ (insts_needed, default_binds') ->
-
-    let
-    mapAndUnzipNF_Tc mk_method default_method_ids	`thenNF_Tc` \ (insts_s, local_defm_ids) ->
-    let
-	avail_insts    = this_dict `plusLIE` unionManyBags insts_s 	-- Insts available
-	clas_tyvar_set = unitTyVarSet clas_tyvar
-    in
-
-    tcSimplifyAndCheck
-	clas_tyvar_set
-	avail_insts
-	insts_needed			`thenTc` \ (const_lie, dict_binds) ->
-	
-
-    let
-	defm_binds = AbsBinds
-		 	[clas_tyvar]
-			[this_dict_id]
-			(local_defm_ids `zip` map RealId default_method_ids)
-			dict_binds
-			(RecBind default_binds')
-    in
-    returnTc (const_lie, defm_binds)
-  where
-    inst_ty = mkTyVarTy clas_tyvar
-    mk_method defm_id = newMethod origin (RealId defm_id) [inst_ty]
-    origin = ClassDeclOrigin
-==================
-
-@makeClassDeclDefaultMethodRhs@ builds the default method for a
-class declaration when no explicit default method is given.
-
-\begin{code}
-makeClassDeclDefaultMethodRhs
-	:: Class
-	-> [TcIdOcc s]
-	-> Int
-	-> NF_TcM s (TcExpr s)
-
-makeClassDeclDefaultMethodRhs clas method_ids tag
-  = 	-- Return the expression
-	--	error ty "No default method for ..."
-	-- The interesting thing is that method_ty is a for-all type;
-	-- this is fun, although unusual in a type application!
-
-    returnNF_Tc (HsApp (mkHsTyApp (HsVar (RealId nO_DEFAULT_METHOD_ERROR_ID)) [tcIdType method_id])
-		       (HsLitOut (HsString (_PK_ error_msg)) stringTy))
-
-  where
-    (clas_mod, clas_name) = modAndOcc clas
-
-    method_id = method_ids  !! (tag-1)
-    class_op  = (classOps clas) !! (tag-1)
-
-    error_msg =  _UNPK_ (nameString (getName clas))
-		 ++ (ppShow 80 (ppr PprForUser class_op))
---		 ++ "\""		Don't know what this trailing quote is for!
-\end{code}
 
 
 Contexts
 ~~~~~~~~
 \begin{code}
 classDeclCtxt class_name sty
-  = ppCat [ppPStr SLIT("In the class declaration for"), ppr sty class_name]
+  = hsep [ptext SLIT("In the class declaration for"), ppr sty class_name]
 \end{code}

@@ -31,27 +31,30 @@ module Inst (
 IMP_Ubiq()
 IMPORT_1_3(Ratio(Rational))
 
-import HsSyn	( HsLit(..), HsExpr(..), HsBinds, Fixity,
-		  InPat, OutPat, Stmt, DoOrListComp, Match,
+import HsSyn	( HsLit(..), HsExpr(..), HsBinds, Fixity, MonoBinds(..),
+		  InPat, OutPat, Stmt, DoOrListComp, Match, GRHSsAndBinds,
 		  ArithSeqInfo, HsType, Fake )
 import RnHsSyn	( SYN_IE(RenamedArithSeqInfo), SYN_IE(RenamedHsExpr) )
-import TcHsSyn	( TcIdOcc(..), SYN_IE(TcExpr), SYN_IE(TcIdBndr),
+import TcHsSyn	( TcIdOcc(..), SYN_IE(TcExpr), SYN_IE(TcIdBndr), 
+		  SYN_IE(TcDictBinds), SYN_IE(TcMonoBinds),
 		  mkHsTyApp, mkHsDictApp, tcIdTyVars )
 
 import TcMonad
 import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
 import TcType	( SYN_IE(TcType), SYN_IE(TcRhoType), TcMaybe, SYN_IE(TcTyVarSet),
-		  tcInstType, zonkTcType )
+		  tcInstType, zonkTcType, tcSplitForAllTy, tcSplitRhoTy )
 
-import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
+import Bag	( emptyBag, unitBag, unionBags, unionManyBags, 
+		  listToBag, consBag, Bag )
 import Class	( classInstEnv,
 		  SYN_IE(Class), GenClass, SYN_IE(ClassInstEnv), SYN_IE(ClassOp)
 		)
 import ErrUtils ( addErrLoc, SYN_IE(Error) )
-import Id	( GenId, idType, mkInstId )
+import Id	( GenId, idType, mkInstId, SYN_IE(Id) )
 import PrelInfo	( isCcallishClass, isNoDictClass )
 import MatchEnv	( lookupMEnv, insertMEnv )
-import Name	( OccName(..), Name, mkLocalName, mkSysLocalName, occNameString )
+import Name	( OccName(..), Name, mkLocalName, 
+		  mkSysLocalName, occNameString, getOccName )
 import Outputable
 import PprType	( GenClass, TyCon, GenType, GenTyVar, pprParendGenType )	
 import PprStyle	( PprStyle(..) )
@@ -61,7 +64,7 @@ import SrcLoc	( SrcLoc, noSrcLoc )
 import Type	( GenType, eqSimpleTy, instantiateTy,
 		  isTyVarTy, mkDictTy, splitForAllTy, splitSigmaTy,
 		  splitRhoTy, matchTy, tyVarsOfType, tyVarsOfTypes,
-		  mkSynTy
+		  mkSynTy, SYN_IE(Type)
 		)
 import TyVar	( unionTyVarSets, GenTyVar )
 import TysPrim	  ( intPrimTy )
@@ -70,6 +73,9 @@ import Unique	( showUnique, fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
 import Util	( panic, zipEqual, zipWithEqual, assoc, assertPanic, pprTrace{-ToDo:rm-} )
+#if __GLASGOW_HASKELL__ >= 202
+import Maybes
+#endif
 \end{code}
 
 %************************************************************************
@@ -198,8 +204,8 @@ newMethod orig id tys
 		    in
 		    (if length tyvars /= length tys then pprTrace "newMethod" (ppr PprDebug (idType id)) else \x->x) $
 		    tcInstType (zip{-Equal "newMethod"-} tyvars tys) rho
-       TcId   id -> let (tyvars, rho) = splitForAllTy (idType id)
-		    in returnNF_Tc (instantiateTy (zipEqual "newMethod(2)" tyvars tys) rho)
+       TcId   id -> tcSplitForAllTy (idType id) 	`thenNF_Tc` \ (tyvars, rho) -> 
+		    returnNF_Tc (instantiateTy (zipEqual "newMethod(2)" tyvars tys) rho)
     )						`thenNF_Tc` \ rho_ty ->
 	 -- Our friend does the rest
     newMethodWithGivenTy orig id tys rho_ty
@@ -249,11 +255,13 @@ instToId (Dict u clas ty orig loc)
     str = VarOcc (SLIT("d.") _APPEND_ (occNameString (getOccName clas)))
 
 instToId (Method u id tys rho_ty orig loc)
-  = TcId (mkInstId u tau_ty (mkLocalName u str loc))
+  = TcId (mkInstId u tau_ty (mkLocalName u occ loc))
   where
-    (_, tau_ty) = splitRhoTy rho_ty	-- NB The method Id has just the tau type
-    str = VarOcc (SLIT("m.") _APPEND_ (occNameString (getOccName id)))
-
+    occ = getOccName id
+    (_, tau_ty) = splitRhoTy rho_ty	
+		-- I hope we don't need tcSplitRhoTy...
+		-- NB The method Id has just the tau type
+    
 instToId (LitInst u list ty orig loc)
   = TcId (mkInstId u ty (mkSysLocalName u SLIT("lit") loc))
 \end{code}
@@ -358,35 +366,35 @@ relevant in error messages.
 
 \begin{code}
 instance Outputable (Inst s) where
-    ppr sty inst = ppr_inst sty ppNil (\ o l -> ppNil) inst
+    ppr sty inst = ppr_inst sty empty (\ o l -> empty) inst
 
 pprInst sty hdr inst = ppr_inst sty hdr (\ o l -> pprOrigin hdr o l sty) inst
 
 ppr_inst sty hdr ppr_orig (LitInst u lit ty orig loc)
-  = ppHang (ppr_orig orig loc)
-	 4 (ppCat [case lit of
-		      OverloadedIntegral   i -> ppInteger i
-		      OverloadedFractional f -> ppRational f,
-		   ppPStr SLIT("at"),
+  = hang (ppr_orig orig loc)
+	 4 (hsep [case lit of
+		      OverloadedIntegral   i -> integer i
+		      OverloadedFractional f -> rational f,
+		   ptext SLIT("at"),
 		   ppr sty ty,
 		   show_uniq sty u])
 
 ppr_inst sty hdr ppr_orig (Dict u clas ty orig loc)
-  = ppHang (ppr_orig orig loc)
-	 4 (ppCat [ppr sty clas, pprParendGenType sty ty, show_uniq sty u])
+  = hang (ppr_orig orig loc)
+	 4 (hsep [ppr sty clas, pprParendGenType sty ty, show_uniq sty u])
 
 ppr_inst sty hdr ppr_orig (Method u id tys rho orig loc)
-  = ppHang (ppr_orig orig loc)
-	 4 (ppCat [ppr sty id, ppPStr SLIT("at"), interppSP sty tys, show_uniq sty u])
+  = hang (ppr_orig orig loc)
+	 4 (hsep [ppr sty id, ptext SLIT("at"), interppSP sty tys, show_uniq sty u])
 
 show_uniq PprDebug u = ppr PprDebug u
-show_uniq sty	   u = ppNil
+show_uniq sty	   u = empty
 \end{code}
 
 Printing in error messages
 
 \begin{code}
-noInstanceErr inst sty = ppHang (ppPStr SLIT("No instance for:")) 4 (ppr sty inst)
+noInstanceErr inst sty = hang (ptext SLIT("No instance for:")) 4 (ppr sty inst)
 \end{code}
 
 %************************************************************************
@@ -417,7 +425,7 @@ the dfun type.
 \begin{code}
 lookupInst :: Inst s 
 	   -> TcM s ([Inst s], 
-		     (TcIdOcc s, TcExpr s))	-- The new binding
+		     TcDictBinds s)	-- The new binding
 
 -- Dictionaries
 
@@ -441,16 +449,15 @@ lookupInst dict@(Dict _ clas ty orig loc)
 	   let 
 		rhs = mkHsDictApp (mkHsTyApp (HsVar (RealId dfun_id)) ty_args) dict_ids
 	   in
-	   returnTc (dicts, (instToId dict, rhs))
+	   returnTc (dicts, VarMonoBind (instToId dict) rhs)
 			     
 
 -- Methods
 
 lookupInst inst@(Method _ id tys rho orig loc)
-  = newDictsAtLoc orig loc theta	`thenNF_Tc` \ (dicts, dict_ids) ->
-    returnTc (dicts, (instToId inst, mkHsDictApp (mkHsTyApp (HsVar id) tys) dict_ids))
-  where
-    (theta,_) = splitRhoTy rho
+  = tcSplitRhoTy rho			`thenNF_Tc` \ (theta, _) ->
+    newDictsAtLoc orig loc theta	`thenNF_Tc` \ (dicts, dict_ids) ->
+    returnTc (dicts, VarMonoBind (instToId inst) (mkHsDictApp (mkHsTyApp (HsVar id) tys) dict_ids))
 
 -- Literals
 
@@ -459,13 +466,13 @@ lookupInst inst@(LitInst u (OverloadedIntegral i) ty orig loc)
   =	-- It's overloaded but small enough to fit into an Int
     tcLookupGlobalValueByKey fromIntClassOpKey	`thenNF_Tc` \ from_int ->
     newMethodAtLoc orig loc from_int [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
-    returnTc ([method_inst], (instToId inst, HsApp (HsVar method_id) int_lit))
+    returnTc ([method_inst], VarMonoBind (instToId inst) (HsApp (HsVar method_id) int_lit))
 
   | otherwise 
   =     -- Alas, it is overloaded and a big literal!
     tcLookupGlobalValueByKey fromIntegerClassOpKey	`thenNF_Tc` \ from_integer ->
     newMethodAtLoc orig loc from_integer [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
-    returnTc ([method_inst], (instToId inst, HsApp (HsVar method_id) (HsLitOut (HsInt i) integerTy)))
+    returnTc ([method_inst], VarMonoBind (instToId inst) (HsApp (HsVar method_id) (HsLitOut (HsInt i) integerTy)))
   where
     intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
     int_lit        = HsApp (HsVar (RealId intDataCon)) intprim_lit
@@ -480,7 +487,7 @@ lookupInst inst@(LitInst u (OverloadedFractional f) ty orig loc)
 	rational_lit = HsLitOut (HsFrac f) rational_ty
     in
     newMethodAtLoc orig loc from_rational [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
-    returnTc ([method_inst], (instToId inst, HsApp (HsVar method_id) rational_lit))
+    returnTc ([method_inst], VarMonoBind (instToId inst) (HsApp (HsVar method_id) rational_lit))
 \end{code}
 
 There is a second, simpler interface, when you want an instance of a
@@ -502,8 +509,8 @@ lookupSimpleInst class_inst_env clas ty
 		          (_, theta, _) = splitSigmaTy (idType dfun)
 
 noSimpleInst clas ty sty
-  = ppSep [ppPStr SLIT("No instance for class"), ppQuote (ppr sty clas),
-	   ppPStr SLIT("at type"), ppQuote (ppr sty ty)]
+  = sep [ptext SLIT("No instance for class"), ppr sty clas,
+	   ptext SLIT("at type"), ppr sty ty]
 \end{code}
 
 
@@ -636,37 +643,32 @@ pprOrigin hdr orig locn
   = addErrLoc locn hdr $ \ sty ->
     case orig of
       OccurrenceOf id ->
-        ppBesides [ppPStr SLIT("at a use of an overloaded identifier: `"),
-		   ppr sty id, ppChar '\'']
+        hsep [ptext SLIT("at a use of an overloaded identifier:"), ppr sty id]
       OccurrenceOfCon id ->
-        ppBesides [ppPStr SLIT("at a use of an overloaded constructor: `"),
-		   ppr sty id, ppChar '\'']
+        hsep [ptext SLIT("at a use of an overloaded constructor:"), ppr sty id]
       InstanceDeclOrigin ->
-	ppPStr SLIT("in an instance declaration")
+	ptext SLIT("in an instance declaration")
       LiteralOrigin lit ->
-	ppCat [ppPStr SLIT("at an overloaded literal:"), ppr sty lit]
+	hsep [ptext SLIT("at an overloaded literal:"), ppr sty lit]
       ArithSeqOrigin seq ->
-	ppCat [ppPStr SLIT("at an arithmetic sequence:"), ppr sty seq]
+	hsep [ptext SLIT("at an arithmetic sequence:"), ppr sty seq]
       SignatureOrigin ->
-	ppPStr SLIT("in a type signature")
+	ptext SLIT("in a type signature")
       DoOrigin ->
-	ppPStr SLIT("in a do statement")
+	ptext SLIT("in a do statement")
       ClassDeclOrigin ->
-	ppPStr SLIT("in a class declaration")
+	ptext SLIT("in a class declaration")
       InstanceSpecOrigin _ clas ty ->
-	ppBesides [ppStr "in a SPECIALIZE instance pragma; class \"",
-	 	   ppr sty clas, ppStr "\" type: ", ppr sty ty]
+	hsep [text "in a SPECIALIZE instance pragma; class",
+	 	   ppr sty clas, text "type:", ppr sty ty]
       ValSpecOrigin name ->
-	ppBesides [ppPStr SLIT("in a SPECIALIZE user-pragma for `"),
-		   ppr sty name, ppChar '\'']
+	hsep [ptext SLIT("in a SPECIALIZE user-pragma for"), ppr sty name]
       CCallOrigin clabel Nothing{-ccall result-} ->
-	ppBesides [ppPStr SLIT("in the result of the _ccall_ to `"),
-		   ppStr clabel, ppChar '\'']
+	hsep [ptext SLIT("in the result of the _ccall_ to"), text clabel]
       CCallOrigin clabel (Just arg_expr) ->
-	ppBesides [ppPStr SLIT("in an argument in the _ccall_ to `"),
-		  ppStr clabel, ppStr "', namely: ", ppr sty arg_expr]
+	hsep [ptext SLIT("in an argument in the _ccall_ to"), text clabel <> comma, text "namely:", ppr sty arg_expr]
       LitLitOrigin s ->
-	ppBesides [ppPStr SLIT("in this ``literal-literal'': "), ppStr s]
+	hcat [ptext SLIT("in this ``literal-literal'': "), text s]
       UnknownOrigin ->
-	ppPStr SLIT("in... oops -- I don't know where the overloading came from!")
+	ptext SLIT("in... oops -- I don't know where the overloading came from!")
 \end{code}
