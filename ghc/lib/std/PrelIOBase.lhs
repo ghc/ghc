@@ -20,7 +20,7 @@ import PrelMaybe
 import PrelAddr
 import PrelPack	( unpackCString )
 import PrelBase
-import PrelArr	( ByteArray(..), MutableVar(..) )
+import PrelArr	( ByteArray(..), MutableVar )
 import PrelGHC
 
 \end{code}
@@ -216,15 +216,15 @@ the exact strings to be used for particular errors.  For errors not
 explicitly mentioned in the standard, any descriptive string may be
 used.
 
-\begin{change}
-SOF & 4/96 & added argument to indicate function that flagged error
-\end{change}
-% Hmm..does these envs work?!...SOF
-
 \begin{code}
 constructErrorAndFail :: String -> IO a
 constructErrorAndFail call_site
   = constructError call_site >>= \ io_error ->
+    fail io_error
+
+constructErrorAndFailWithInfo :: String -> String -> IO a
+constructErrorAndFailWithInfo call_site reason
+  = constructErrorMsg call_site (Just reason) >>= \ io_error ->
     fail io_error
 
 \end{code}
@@ -243,7 +243,10 @@ information.
 
 \begin{code}
 constructError	      :: String -> IO IOError
-constructError call_site =
+constructError call_site = constructErrorMsg call_site Nothing
+
+constructErrorMsg	      :: String -> Maybe String -> IO IOError
+constructErrorMsg call_site reason =
  _casm_ ``%r = ghc_errtype;''    >>= \ (I# errtype#) ->
  _casm_ ``%r = ghc_errstr;''	 >>= \ str ->
  let
@@ -271,9 +274,12 @@ constructError call_site =
 
   msg = 
    call_site ++ ':' : ' ' : unpackCString str ++
-   case iot of
+   (case iot of
      OtherError -> "(error code: " ++ show (I# errtype#) ++ ")"
-     _ -> ""
+     _ -> "") ++
+   (case reason of
+      Nothing -> ""
+      Just m  -> ' ':m)
  in
  return (IOError Nothing iot msg)
 \end{code}

@@ -12,7 +12,7 @@ module System (
 
 import Prelude
 import PrelAddr
-import PrelIOBase	( IOError(..), IOErrorType(..), constructErrorAndFail )
+import PrelIOBase	( IOError(..), IOErrorType(..), constructErrorAndFailWithInfo )
 import PrelArr		( indexAddrOffAddr )
 import PrelPack    	( unpackCString )
 
@@ -103,7 +103,7 @@ system cmd = do
     status <- _ccall_ systemCmd cmd
     case status of
         0  -> return ExitSuccess
-        -1 -> constructErrorAndFail "system"
+        -1 -> constructErrorAndFailWithInfo "system" cmd
         n  -> return (ExitFailure n)
 
 \end{code}

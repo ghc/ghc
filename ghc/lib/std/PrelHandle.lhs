@@ -206,15 +206,7 @@ openFileEx f m = do
 	newHandle (htype ptr Nothing False)
 #endif
       else do
-	ioError@(IOError hn iot msg) <- constructError "openFile"
-	let
-	    improved_error -- a HACK, I guess
-	      = case iot of
-		  AlreadyExists    -> IOError hn AlreadyExists    (msg ++ ": " ++ f)
-		  NoSuchThing      -> IOError hn NoSuchThing      (msg ++ ": " ++ f)
-		  PermissionDenied -> IOError hn PermissionDenied (msg ++ ": " ++ f)
-		  _		   -> ioError
-        fail improved_error
+	constructErrorAndFailWithInfo "openFile" f
   where
     imo = case m of
            BinaryMode imo -> imo

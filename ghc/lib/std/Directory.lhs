@@ -133,7 +133,7 @@ The path refers to an existing non-directory object.
 createDirectory path = do
     rc <- _ccall_ createDirectory path
     if rc == 0 then return () else
-        constructErrorAndFail "createDirectory"
+        constructErrorAndFailWithInfo "createDirectory" path
 \end{code}
 
 @removeDirectory dir@ removes an existing directory {\em dir}.  The
@@ -176,7 +176,7 @@ removeDirectory path = do
     if rc == 0 then 
 	return ()
      else 
-        constructErrorAndFail "removeDirectory"
+        constructErrorAndFailWithInfo "removeDirectory" path
 \end{code}
 
 @removeFile file@ removes the directory entry for an existing file
@@ -213,7 +213,7 @@ removeFile path = do
     if rc == 0 then
         return ()
      else
-        constructErrorAndFail "removeFile"
+        constructErrorAndFailWithInfo "removeFile" path
 \end{code}
 
 @renameDirectory old@ {\em new} changes the name of an existing
@@ -260,7 +260,7 @@ renameDirectory opath npath = do
     if rc == 0 then
         return ()
      else
-        constructErrorAndFail "renameDirectory"
+        constructErrorAndFailWithInfo "renameDirectory" opath
 \end{code}
 
 @renameFile old@ {\em new} changes the name of an existing file system
@@ -305,7 +305,7 @@ renameFile opath npath = do
     if rc == 0 then
         return ()
      else
-        constructErrorAndFail	"renameFile"
+        constructErrorAndFailWithInfo	"renameFile" opath
 \end{code}
 
 @getDirectoryContents dir@ returns a list of {\em all} entries
@@ -338,7 +338,7 @@ The path refers to an existing non-directory object.
 getDirectoryContents path = do
     dir <- _ccall_ openDir__ path
     if dir == ``NULL'' 
-	then constructErrorAndFail "getDirectoryContents"
+	then constructErrorAndFailWithInfo "getDirectoryContents" path
      	else loop dir
   where
     loop :: Addr -> IO [String]
@@ -346,6 +346,8 @@ getDirectoryContents path = do
       dirent_ptr <- _ccall_ readDir__ dir
       if (dirent_ptr::Addr) == ``NULL'' 
        then do
+	  -- readDir__ implicitly performs closedir() when the
+	  -- end is reached.
 	  return [] 
        else do
           str     <- _casm_ `` %r=(char*)((struct dirent*)%0)->d_name; '' dirent_ptr
@@ -423,7 +425,7 @@ setCurrentDirectory path = do
     rc <- _ccall_ setCurrentDirectory path
     if rc == 0 
 	then return ()
-	else constructErrorAndFail "setCurrentDirectory"
+	else constructErrorAndFailWithInfo "setCurrentDirectory" path
 \end{code}
 
 
