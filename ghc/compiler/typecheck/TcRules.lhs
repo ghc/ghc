@@ -16,7 +16,7 @@ import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyAndCheck )
 import TcType		( zonkTcTypes, zonkTcTyVarToTyVar, newTyVarTy )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
-import TcMonoType	( kcTyVarScope, kcHsSigType, tcHsSigType, newSigTyVars, checkSigTyVars )
+import TcMonoType	( kcHsSigType, tcHsSigType, tcTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
 import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv	)
 import Inst		( LIE, emptyLIE, plusLIEs, instToId )
@@ -51,11 +51,8 @@ tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
     newTyVarTy openTypeKind				`thenNF_Tc` \ rule_ty ->
 
 	-- Deal with the tyvars mentioned in signatures
-	-- Yuk to the UserTyVar
-    kcTyVarScope (map UserTyVar sig_tvs)
-		 (mapTc_ kcHsSigType sig_tys)	`thenTc` \ sig_tv_kinds ->
-    newSigTyVars sig_tv_kinds			`thenNF_Tc` \ sig_tyvars ->
-    tcExtendTyVarEnv sig_tyvars 		(	
+    tcTyVars sig_tvs (mapTc_ kcHsSigType sig_tys) 	`thenTc` \ sig_tyvars ->
+    tcExtendTyVarEnv sig_tyvars (
 
 		-- Ditto forall'd variables
 	mapNF_Tc new_id vars					`thenNF_Tc` \ ids ->
@@ -65,8 +62,8 @@ tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
 	tcExpr lhs rule_ty					`thenTc` \ (lhs', lhs_lie) ->
 	tcExpr rhs rule_ty					`thenTc` \ (rhs', rhs_lie) ->
 	
-	returnTc (ids, lhs', rhs', lhs_lie, rhs_lie)
-    )						`thenTc` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->
+	returnTc (sig_tyvars, ids, lhs', rhs', lhs_lie, rhs_lie)
+    )						`thenTc` \ (sig_tyvars, ids, lhs', rhs', lhs_lie, rhs_lie) ->
 
 		-- Check that LHS has no overloading at all
     tcSimplifyToDicts lhs_lie				`thenTc` \ (lhs_dicts, lhs_binds) ->

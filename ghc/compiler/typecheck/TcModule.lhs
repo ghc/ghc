@@ -39,14 +39,17 @@ import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkImplicitDataBinds )
 
+import CoreUnfold	( unfoldingTemplate )
+import Type		( funResultTy, splitForAllTys )
 import RnMonad		( RnNameSupply, FixityEnv )
 import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet )
-import Id		( idType, idName )
+import Id		( idType, idName, idUnfolding )
 import Module           ( pprModuleName, mkThisModule )
 import Name		( nameOccName, isLocallyDefined, isGlobalName,
 			  toRdrName, nameEnvElts, 
 			)
+import TyCon		( TyCon, isDataTyCon, tyConName, tyConGenInfo )
 import OccName		( isSysOcc )
 import TyCon		( TyCon, isClassTyCon )
 import Class		( Class )
@@ -54,8 +57,10 @@ import PrelNames	( mAIN_Name, mainKey )
 import UniqSupply       ( UniqSupply )
 import Maybes		( maybeToBool )
 import Util
+import BasicTypes       ( EP(..) )
 import Bag		( Bag, isEmptyBag )
 import Outputable
+
 \end{code}
 
 Outside-world interface:
@@ -97,31 +102,6 @@ typecheckModule us rn_name_supply fixity_env mod
 	    else 
 		Nothing)
 
-dump_tc results
-  = ppr (tc_binds results) $$ pp_rules (tc_rules results) 
-
-dump_sigs results	-- Print type signatures
-  = 	-- Convert to HsType so that we get source-language style printing
-	-- And sort by RdrName
-    vcat $ map ppr_sig $ sortLt lt_sig $
-    [(toRdrName id, toHsType (idType id)) | id <- nameEnvElts (tc_env results), 
-					    want_sig id
-    ]
-  where
-    lt_sig (n1,_) (n2,_) = n1 < n2
-    ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
-
-    want_sig id | opt_PprStyle_Debug = True
-	        | otherwise	     = isLocallyDefined n && 
-				       isGlobalName n && 
-				       not (isSysOcc (nameOccName n))
-				     where
-				       n = idName id
-
-pp_rules [] = empty
-pp_rules rs = vcat [ptext SLIT("{-# RULES"),
-		    nest 4 (vcat (map ppr rs)),
-		    ptext SLIT("#-}")]
 \end{code}
 
 The internal monster:
@@ -145,10 +125,9 @@ tcModule rn_name_supply fixities
 
 		 -- Type-check the type and class decls
 	tcTyAndClassDecls unf_env decls	`thenTc` \ env ->
-    
-		 -- Typecheck the instance decls, includes deriving
 	tcSetEnv env $
 
+    		 -- Typecheck the instance decls, includes deriving
 	tcInstDecls1 unf_env decls 
 		     (mkThisModule mod_name)
 		     fixities rn_name_supply	`thenTc` \ (inst_info, deriv_binds) ->
@@ -290,3 +269,60 @@ noMainErr
 	  ptext SLIT("must include a definition for"), quotes (ptext SLIT("main"))]
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Dumping output}
+%*									*
+%************************************************************************
+
+\begin{code}
+dump_tc results
+  = vcat [ppr (tc_binds results),
+	  pp_rules (tc_rules results),
+	  ppr_gen_tycons (tc_tycons results)
+    ]
+
+dump_sigs results	-- Print type signatures
+  = 	-- Convert to HsType so that we get source-language style printing
+	-- And sort by RdrName
+    vcat $ map ppr_sig $ sortLt lt_sig $
+    [(toRdrName id, toHsType (idType id)) | id <- nameEnvElts (tc_env results), 
+					    want_sig id
+    ]
+  where
+    lt_sig (n1,_) (n2,_) = n1 < n2
+    ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
+
+    want_sig id | opt_PprStyle_Debug = True
+	        | otherwise	     = isLocallyDefined n && 
+				       isGlobalName n && 
+				       not (isSysOcc (nameOccName n))
+				     where
+				       n = idName id
+
+ppr_gen_tycons tcs = vcat [ptext SLIT("{-# Generic type constructor details"),
+			   vcat (map ppr_gen_tycon (filter isLocallyDefined tcs)),
+		   	   ptext SLIT("#-}")
+		     ]
+
+-- x&y are now Id's, not CoreExpr's 
+ppr_gen_tycon tycon 
+  | Just ep <- tyConGenInfo tycon
+  = (ppr tycon <> colon) $$ nest 4 (ppr_ep ep)
+
+  | otherwise = ppr tycon <> colon <+> ptext SLIT("Not derivable")
+
+ppr_ep (EP from to)
+  = vcat [ ptext SLIT("Rep type:") <+> ppr (funResultTy from_tau),
+	   ptext SLIT("From:") <+> ppr (unfoldingTemplate (idUnfolding from)),
+	   ptext SLIT("To:")   <+> ppr (unfoldingTemplate (idUnfolding to))
+    ]
+  where
+    (_,from_tau) = splitForAllTys (idType from)
+
+pp_rules [] = empty
+pp_rules rs = vcat [ptext SLIT("{-# RULES"),
+		    nest 4 (vcat (map ppr rs)),
+		    ptext SLIT("#-}")]
+\end{code}

@@ -163,7 +163,8 @@ import VarSet
 import FiniteMap
 import CmdLineOpts	( opt_GlasgowExts )
 import Outputable
-import Util
+import ListSetOps	( equivClasses )
+import Util		( zipEqual, mapAccumL )
 import List		( partition )
 import Maybe		( fromJust )
 import Maybes		( maybeToBool )

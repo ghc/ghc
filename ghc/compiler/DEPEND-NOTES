@@ -16,7 +16,7 @@ then
 then
 	Class (loop TyCon.TyCon, loop Type.Type)
 then
-	TyCon (loop Type.Type, loop Type.Kind, loop DataCon.DataCon)
+	TyCon (loop Type.Type, loop Type.Kind, loop DataCon.DataCon, loop Generics.GenInfo)
 then
 	Type (loop DataCon.DataCon, loop Subst.substTy)
 then
@@ -26,7 +26,7 @@ then
 then
 	Literal (TysPrim, PprType), DataCon
 then
-	TysWiredIn (DataCon.mkDataCon, loop MkId.mkDataConId)
+	TysWiredIn (DataCon.mkDataCon, loop MkId.mkDataConId, loop Generics.mkGenInfo)
 then
 	PrimOp (PprType, TysWiredIn)
 then
@@ -45,7 +45,7 @@ then
 then
 	CoreUnfold (OccurAnal.occurAnalyseGlobalExpr)
 then
-	Rules (Unfolding), Subst (Unfolding, CoreFVs), CoreTidy (noUnfolding)
+	Rules (Unfolding), Subst (Unfolding, CoreFVs), CoreTidy (noUnfolding), Generics (mkTopUnfolding)
 then
 	MkId (CoreUnfold.mkUnfolding, Subst)
 then

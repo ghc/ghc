@@ -15,14 +15,14 @@ import HsTypes		( hsTyVarNames, pprHsContext )
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, mkRdrNameWkr )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
 			  extractRuleBndrsTyVars, extractHsTyRdrTyVars,
-			  extractHsCtxtRdrTyVars
+			  extractHsCtxtRdrTyVars, extractGenericPatTyVars
 			)
 import RnHsSyn
 import HsCore
 
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
 import RnEnv		( lookupTopBndrRn, lookupOccRn, newIPName,
-			  lookupOrigNames, lookupSysBinder,
+			  lookupOrigNames, lookupSysBinder, newLocalsRn,
 			  bindLocalsFVRn, bindUVarRn,
 			  bindTyVarsFVRn, bindTyVarsFV2Rn, extendTyVarEnvFVRn,
 			  bindCoreLocalFVRn, bindCoreLocalsFVRn, bindLocalNames,
@@ -33,9 +33,10 @@ import RnEnv		( lookupTopBndrRn, lookupOccRn, newIPName,
 import RnMonad
 
 import FunDeps		( oclose )
-import Class		( FunDep )
+import Class		( FunDep, DefMeth (..) )
 import Name		( Name, OccName, nameOccName, NamedThing(..) )
 import NameSet
+import OccName		( mkDefaultMethodOcc, isTvOcc )
 import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys, cCallishClassKeys )
 import PrelNames	( deRefStablePtr_RDR, makeStablePtr_RDR, 
@@ -49,7 +50,7 @@ import CmdLineOpts	( opt_GlasgowExts, opt_WarnUnusedMatches )	-- Warn of unused 
 import Unique		( Uniquable(..) )
 import ErrUtils		( Message )
 import CStrings		( isCLabelString )
-import Util
+import ListSetOps	( minusList, removeDupsEq )
 \end{code}
 
 @rnDecl@ `renames' declarations.
@@ -134,17 +135,19 @@ and then go over it again to rename the tyvars!
 However, we can also do some scoping checks at the same time.
 
 \begin{code}
-rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivings pragmas src_loc))
+rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivings pragmas src_loc gen_name1 gen_name2))
   = pushSrcLocRn src_loc $
     lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
     bindTyVarsFVRn data_doc tyvars		$ \ tyvars' ->
     rnContext data_doc context 			`thenRn` \ (context', cxt_fvs) ->
     checkDupOrQualNames data_doc con_names	`thenRn_`
     mapFvRn rnConDecl condecls			`thenRn` \ (condecls', con_fvs) ->
+    lookupSysBinder gen_name1	                `thenRn` \ name1' ->
+    lookupSysBinder gen_name2		        `thenRn` \ name2' ->
     rnDerivs derivings				`thenRn` \ (derivings', deriv_fvs) ->
     ASSERT(isNoDataPragmas pragmas)
     returnRn (TyClD (TyData new_or_data context' tycon' tyvars' condecls' nconstrs
-                     derivings' noDataPragmas src_loc),
+                     derivings' noDataPragmas src_loc name1' name2'),
 	      cxt_fvs `plusFV` con_fvs `plusFV` deriv_fvs)
   where
     data_doc = text "the data type declaration for" <+> quotes (ppr tycon)
@@ -165,7 +168,7 @@ rnDecl (TyClD (TySynonym name tyvars ty src_loc))
     unquantify ty				   	          = ty
 
 rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
-               tname dname dwname snames src_loc))
+               names src_loc))
   = pushSrcLocRn src_loc $
 
     lookupTopBndrRn cname			`thenRn` \ cname' ->
@@ -177,10 +180,8 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 	-- So the 'Imported' part of this call is not relevant. 
 	-- Unclean; but since these two are the only place this happens
 	-- I can't work up the energy to do it more beautifully
-    lookupSysBinder tname			`thenRn` \ tname' ->
-    lookupSysBinder dname			`thenRn` \ dname' ->
-    lookupSysBinder dwname			`thenRn` \ dwname' ->
-    mapRn lookupSysBinder snames		`thenRn` \ snames' ->
+
+    mapRn lookupSysBinder names		`thenRn` \ names' ->
 
 	-- Tyvars scope over bindings and context
     bindTyVarsFV2Rn cls_doc tyvars		( \ clas_tyvar_names tyvars' ->
@@ -189,23 +190,40 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
     rnContext cls_doc context			`thenRn` \ (context', cxt_fvs) ->
 
 	-- Check the functional dependencies
-    rnFds cls_doc fds			`thenRn` \ (fds', fds_fvs) ->
+    rnFds cls_doc fds				`thenRn` \ (fds', fds_fvs) ->
 
 	-- Check the signatures
+	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
     let
-	    -- First process the class op sigs, then the fixity sigs.
-	  (op_sigs, non_op_sigs) = partition isClassOpSig sigs
+	(op_sigs, non_op_sigs) = partition isClassOpSig sigs
+	sig_rdr_names_w_locs   = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
     in
     checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	  `thenRn_` 
     mapFvRn (rn_op cname' clas_tyvar_names fds') op_sigs  `thenRn` \ (sigs', sig_fvs) ->
     let
-     binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
+	binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
     in
     renameSigs (okClsDclSig binders) non_op_sigs	  `thenRn` \ (non_ops', fix_fvs) ->
 
 	-- Check the methods
+	-- The newLocals call is tiresome: given a generic class decl
+	--	class C a where
+	--	  op :: a -> a
+	--	  op {| x+y |} (Inl a) = ...
+	--	  op {| x+y |} (Inr b) = ...
+	--	  op {| a*b |} (a*b)   = ...
+	-- we want to name both "x" tyvars with the same unique, so that they are
+	-- easy to group together in the typechecker.  
+	-- Hence the 
+    getLocalNameEnv					`thenRn` \ name_env ->
+    let
+	meth_rdr_names_w_locs = collectLocatedMonoBinders mbinds
+	gen_rdr_tyvars_w_locs = [(tv,src_loc) | tv <- extractGenericPatTyVars mbinds,
+						not (tv `elemFM` name_env)]
+    in
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
-    rnMethodBinds mbinds				`thenRn` \ (mbinds', meth_fvs) ->
+    newLocalsRn mkLocalName gen_rdr_tyvars_w_locs	`thenRn` \ gen_tyvars ->
+    rnMethodBinds gen_tyvars mbinds			`thenRn` \ (mbinds', meth_fvs) ->
 
 	-- Typechecker is responsible for checking that we only
 	-- give default-method bindings for things in this class.
@@ -214,8 +232,9 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 
     ASSERT(isNoClassPragmas pragmas)
     returnRn (TyClD (ClassDecl context' cname' tyvars' fds' (non_ops' ++ sigs') mbinds'
-			       NoClassPragmas tname' dname' dwname' snames' src_loc),
+			       NoClassPragmas names' src_loc),
 	      sig_fvs	`plusFV`
+
 	      fix_fvs	`plusFV`
 	      cxt_fvs	`plusFV`
 	      fds_fvs	`plusFV`
@@ -226,9 +245,6 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
     cls_doc  = text "the declaration for class" 	<+> ppr cname
     sig_doc  = text "the signatures for class"  	<+> ppr cname
     meth_doc = text "the default-methods for class"	<+> ppr cname
-
-    sig_rdr_names_w_locs  = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
-    meth_rdr_names_w_locs = bagToList (collectMonoBinders mbinds)
 
     rn_op clas clas_tyvars clas_fds sig@(ClassOpSig op maybe_dm_stuff ty locn)
       = pushSrcLocRn locn $
@@ -247,15 +263,18 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 	(case maybe_dm_stuff of 
 	    Nothing -> returnRn (Nothing, emptyFVs)		-- Source-file class decl
 
-	    Just (dm_rdr_name, explicit_dm)
+	    Just (DefMeth dm_rdr_name)
 		-> 	-- Imported class that has a default method decl
 			-- See comments with tname, snames, above
 		    lookupSysBinder dm_rdr_name 	`thenRn` \ dm_name ->
-		    returnRn (Just (dm_name, explicit_dm), 
-			      if explicit_dm then unitFV dm_name else emptyFVs)
+		    returnRn (Just (DefMeth dm_name), unitFV dm_name)
 			-- An imported class decl for a class decl that had an explicit default
 			-- method, mentions, rather than defines,
 			-- the default method, so we must arrange to pull it in
+	    Just GenDefMeth
+		-> returnRn (Just GenDefMeth, emptyFVs)
+	    Just NoDefMeth
+		-> returnRn (Just NoDefMeth, emptyFVs)
 	)						`thenRn` \ (maybe_dm_stuff', dm_fvs) ->
 
 	returnRn (ClassOpSig op_name maybe_dm_stuff' new_ty locn, op_ty_fvs `plusFV` dm_fvs)
@@ -283,11 +302,11 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc))
 	-- Rename the bindings
 	-- NB meth_names can be qualified!
     checkDupNames meth_doc meth_names 		`thenRn_`
-    extendTyVarEnvFVRn inst_tyvars (		
-	rnMethodBinds mbinds
+    extendTyVarEnvFVRn (map hsTyVarName inst_tyvars) (		
+	rnMethodBinds [] mbinds
     )						`thenRn` \ (mbinds', meth_fvs) ->
     let 
-	binders    = map fst (bagToList (collectMonoBinders mbinds'))
+	binders    = collectMonoBinders mbinds'
 	binder_set = mkNameSet binders
     in
 	-- Rename the prags and signatures.
@@ -312,8 +331,8 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc))
     returnRn (InstD (InstDecl inst_ty' mbinds' new_uprags maybe_dfun_name src_loc),
 	      inst_fvs `plusFV` meth_fvs `plusFV` prag_fvs `plusFV` dfun_fv)
   where
-    meth_doc = text "the bindings in an instance declaration"
-    meth_names   = bagToList (collectMonoBinders mbinds)
+    meth_doc   = text "the bindings in an instance declaration"
+    meth_names = collectLocatedMonoBinders mbinds
 \end{code}
 
 %*********************************************************
@@ -560,6 +579,17 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 rnHsType doc (HsTyVar tyvar)
   = lookupOccRn tyvar 		`thenRn` \ tyvar' ->
     returnRn (HsTyVar tyvar', unitFV tyvar')
+
+rnHsType doc (HsOpTy ty1 opname ty2)
+  = lookupOccRn opname	`thenRn` \ name' ->
+    rnHsType doc ty1	`thenRn` \ (ty1', fvs1) ->
+    rnHsType doc ty2	`thenRn` \ (ty2',fvs2) -> 
+    returnRn (HsOpTy ty1' name' ty2', fvs1 `plusFV` fvs2 `addOneFV` name')
+
+rnHsType doc (HsNumTy i)
+  | i == 1    = returnRn (HsNumTy i, emptyFVs)
+  | otherwise = failWithRn (HsNumTy i, emptyFVs)
+			   (ptext SLIT("Only unit numeric type pattern is valid"))
 
 rnHsType doc (HsFunTy ty1 ty2)
   = rnHsType doc ty1	`thenRn` \ (ty1', fvs1) ->

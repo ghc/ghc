@@ -30,10 +30,12 @@ import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
 import Module		( ModuleName, moduleName, mkVanillaModule, pprModuleName )
 import FiniteMap
+import Unique		( Unique )
 import UniqSupply
 import SrcLoc		( SrcLoc )
 import Outputable
-import Util		( removeDups, equivClasses, thenCmp, sortLt )
+import ListSetOps	( removeDups, equivClasses )
+import Util		( thenCmp, sortLt )
 import List		( nub )
 \end{code}
 
@@ -344,23 +346,11 @@ unQualInScope env
 %*********************************************************
 
 \begin{code}
-bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
-	   	    -> [(RdrName,SrcLoc)]
-	    	    -> ([Name] -> RnMS a)
-	    	    -> RnMS a
-bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
-  = checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
-
-    getModeRn 				`thenRn` \ mode ->
-    getLocalNameEnv			`thenRn` \ name_env ->
-
-	-- Warn about shadowing, but only in source modules
-    (case mode of
-	SourceMode | opt_WarnNameShadowing -> mapRn_ (check_shadow name_env) rdr_names_w_loc
-	other				   -> returnRn ()
-    )					`thenRn_`
-	
-    getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
+newLocalsRn :: (Unique -> OccName -> SrcLoc -> Name)
+	    -> [(RdrName,SrcLoc)]
+	    -> RnMS [Name]
+newLocalsRn mk_name rdr_names_w_loc
+ =  getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let
 	n	   = length rdr_names_w_loc
 	(us', us1) = splitUniqSupply us
@@ -368,18 +358,40 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 	names	   = [ mk_name uniq (rdrNameOcc rdr_name) loc
 		     | ((rdr_name,loc), uniq) <- rdr_names_w_loc `zip` uniqs
 		     ]
+    in
+    setNameSupplyRn (us', cache, ipcache)	`thenRn_`
+    returnRn names
+
+
+bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
+	   	    -> [(RdrName,SrcLoc)]
+	    	    -> ([Name] -> RnMS a)
+	    	    -> RnMS a
+bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
+  = getModeRn 				`thenRn` \ mode ->
+    getLocalNameEnv			`thenRn` \ name_env ->
+
+	-- Check for duplicate names
+    checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
+
+    	-- Warn about shadowing, but only in source modules
+    (case mode of
+	SourceMode | opt_WarnNameShadowing -> mapRn_ (check_shadow name_env) rdr_names_w_loc
+	other				   -> returnRn ()
+    )					`thenRn_`
+	
+    let
 	mk_name    = case mode of
 			SourceMode    -> mkLocalName 
 			InterfaceMode -> mkImportedLocalName 
 		     -- Keep track of whether the name originally came from 
 		     -- an interface file.
     in
-    setNameSupplyRn (us', cache, ipcache)	`thenRn_`
-
+    newLocalsRn mk_name rdr_names_w_loc		`thenRn` \ names ->
     let
-	new_name_env = addListToRdrEnv name_env (map fst rdr_names_w_loc `zip` names)
+	new_local_env = addListToRdrEnv name_env (map fst rdr_names_w_loc `zip` names)
     in
-    setLocalNameEnv new_name_env (enclosed_scope names)
+    setLocalNameEnv new_local_env (enclosed_scope names)
 
   where
     check_shadow name_env (rdr_name,loc)
@@ -449,13 +461,11 @@ bindUVarRn :: SDoc -> RdrName -> (Name -> RnMS (a, FreeVars)) -> RnMS (a, FreeVa
 bindUVarRn = bindLocalRn
 
 -------------------------------------
-extendTyVarEnvFVRn :: [HsTyVarBndr Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)
+extendTyVarEnvFVRn :: [Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)
 	-- This tiresome function is used only in rnDecl on InstDecl
 extendTyVarEnvFVRn tyvars enclosed_scope
-  = bindLocalNames tyvar_names enclosed_scope 	`thenRn` \ (thing, fvs) -> 
-    returnRn (thing, delListFromNameSet fvs tyvar_names)
-  where
-    tyvar_names = hsTyVarNames tyvars
+  = bindLocalNames tyvars enclosed_scope 	`thenRn` \ (thing, fvs) -> 
+    returnRn (thing, delListFromNameSet fvs tyvars)
 
 bindTyVarsRn :: SDoc -> [HsTyVarBndr RdrName]
 	      -> ([HsTyVarBndr Name] -> RnMS a)
@@ -490,6 +500,18 @@ bindTyVarsFV2Rn :: SDoc -> [HsTyVarBndr RdrName]
 bindTyVarsFV2Rn doc_str rdr_names enclosed_scope
   = bindTyVars2Rn doc_str rdr_names	$ \ names tyvars ->
     enclosed_scope names tyvars		`thenRn` \ (thing, fvs) ->
+    returnRn (thing, delListFromNameSet fvs names)
+
+bindNakedTyVarsFVRn :: SDoc -> [RdrName]
+	            -> ([Name] -> RnMS (a, FreeVars))
+		    -> RnMS (a, FreeVars)
+bindNakedTyVarsFVRn doc_str tyvar_names enclosed_scope
+  = getSrcLocRn					`thenRn` \ loc ->
+    let
+	located_tyvars = [(tv, loc) | tv <- tyvar_names] 
+    in
+    bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
+    enclosed_scope names			`thenRn` \ (thing, fvs) ->
     returnRn (thing, delListFromNameSet fvs names)
 
 

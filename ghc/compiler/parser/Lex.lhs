@@ -184,6 +184,8 @@ data Token
 
   | ITocurly  			-- special symbols
   | ITccurly
+  | ITocurlybar                 -- {|, for type applications
+  | ITccurlybar                 -- |}, for type applications
   | ITvccurly
   | ITobrack
   | ITcbrack
@@ -381,7 +383,7 @@ lexer cont buf s@(PState{
   where
 	line = srcLocLine loc
 
-	tab y bol atbol buf = --trace ("tab: " ++ show (I# y) ++ " : " ++ show (currentChar buf)) $
+	tab y bol atbol buf = -- trace ("tab: " ++ show (I# y) ++ " : " ++ show (currentChar buf)) $
 	  case currentChar# buf of
 
 	    '\NUL'# ->
@@ -407,8 +409,7 @@ lexer cont buf s@(PState{
 		-- and throw out any unrecognised pragmas as comments.  Any
 		-- pragmas we know about are dealt with later (after any layout
 		-- processing if necessary).
-
-	    '{'# | lookAhead# buf 1# `eqChar#` '-'# ->
+            '{'# | lookAhead# buf 1# `eqChar#` '-'# ->
 		if lookAhead# buf 2# `eqChar#` '#'# then
 		  if lookAhead# buf 3# `eqChar#` '#'# then is_a_token else
 		  case expandWhile# is_space (setCurrentPos# buf 3#) of { buf1->
@@ -472,8 +473,7 @@ nested_comment cont buf = loop buf
    loop buf = 
      case currentChar# buf of
 	'\NUL'# | bufferExhausted (stepOn buf) -> 
-		lexError "unterminated `{-'" buf
-
+		lexError "unterminated `{-'" buf -- -}
 	'-'# | lookAhead# buf 1# `eqChar#` '}'# ->
 		cont (stepOnBy# buf 2#)
 
@@ -526,7 +526,7 @@ lexBOL cont buf s@(PState{
 
 lexToken :: (Token -> P a) -> Int# -> P a
 lexToken cont glaexts buf =
- --trace "lexToken" $
+ -- trace "lexToken" $
   case currentChar# buf of
 
     -- special symbols ----------------------------------------------------
@@ -540,12 +540,16 @@ lexToken cont glaexts buf =
     ']'# -> cont ITcbrack    (incLexeme buf)
     ','# -> cont ITcomma     (incLexeme buf)
     ';'# -> cont ITsemi      (incLexeme buf)
-
     '}'# -> \ s@PState{context = ctx} ->
 	    case ctx of	
 		(_:ctx') -> cont ITccurly (incLexeme buf) s{context=ctx'}
 		_  	 -> lexError "too many '}'s" buf s
+    '|'# -> case lookAhead# buf 1# of
+	         '}'#  | flag glaexts -> cont ITccurlybar 
+                                              (setCurrentPos# buf 2#)
+                 _                    -> lex_sym cont (incLexeme buf)
 
+                
     '#'# -> case lookAhead# buf 1# of
 		')'#  | flag glaexts -> cont ITcubxparen (setCurrentPos# buf 2#)
 		'-'# -> case lookAhead# buf 2# of
@@ -559,16 +563,18 @@ lexToken cont glaexts buf =
 	   	-> cont ITbackquote (incLexeme buf)
 
     '{'# ->	-- look for "{-##" special iface pragma
-	case lookAhead# buf 1# of
+            case lookAhead# buf 1# of
+           '|'# | flag glaexts 
+                -> cont ITocurlybar (setCurrentPos# buf 2#)
 	   '-'# -> case lookAhead# buf 2# of
 		    '#'# -> case lookAhead# buf 3# of
-				'#'# ->  
+				'#'# -> 
 				   let (lexeme, buf') 
 					  = doDiscard False (stepOnBy# (stepOverLexeme buf) 4#) in
-				   cont (ITpragma lexeme) buf'
+                                            cont (ITpragma lexeme) buf'
 				_ -> lex_prag cont (setCurrentPos# buf 3#)
-	   	    _    -> cont ITocurly (incLexeme buf)
-	   _ -> (layoutOff `thenP_` cont ITocurly)  (incLexeme buf)
+	   	    _    -> cont ITocurly (incLexeme buf) 
+	   _ -> (layoutOff `thenP_` cont ITocurly)  (incLexeme buf) 
 
     -- strings/characters -------------------------------------------------
     '\"'#{-"-} -> lex_string cont glaexts [] (incLexeme buf)
@@ -908,6 +914,7 @@ lex_id cont glaexts buf =
  }}}
 
 lex_sym cont buf =
+ -- trace "lex_sym" $
  case expandWhile# is_symbol buf of
    buf' -> case lookupUFM haskellKeySymsFM lexeme of {
 	 	Just kwd_token -> --trace ("keysym: "++unpackFS lexeme) $
@@ -919,6 +926,7 @@ lex_sym cont buf =
 
 
 lex_con cont glaexts buf = 
+ -- trace ("con: "{-++unpackFS lexeme-}) $
  case expandWhile# is_ident buf          of { buf1 ->
  case slurp_trailing_hashes buf1 glaexts of { buf' ->
 
@@ -927,13 +935,13 @@ lex_con cont glaexts buf =
      _    -> just_a_conid
  
    where
-    just_a_conid = --trace ("con: "++unpackFS lexeme) $
-		   cont (ITconid lexeme) buf'
+    just_a_conid = cont (ITconid lexeme) buf'
     lexeme = lexemeToFastString buf'
     munch = lex_qid cont glaexts lexeme (incLexeme buf') just_a_conid
  }}
 
 lex_qid cont glaexts mod buf just_a_conid =
+ -- trace ("quid: "{-++unpackFS lexeme-}) $
  case currentChar# buf of
   '['# -> 	-- Special case for []
     case lookAhead# buf 1# of
@@ -961,6 +969,7 @@ lex_id3 cont glaexts mod buf just_a_conid
      let 
 	start_new_lexeme = stepOverLexeme buf
      in
+     -- trace ("lex_id31 "{-++unpackFS lexeme-}) $
      case expandWhile# is_symbol start_new_lexeme of { buf' ->
      let
        lexeme  = lexemeToFastString buf'
@@ -975,6 +984,7 @@ lex_id3 cont glaexts mod buf just_a_conid
      let 
 	start_new_lexeme = stepOverLexeme buf
      in
+     -- trace ("lex_id32 "{-++unpackFS lexeme-}) $
      case expandWhile# is_ident start_new_lexeme of { buf1 ->
      if emptyLexeme buf1 
     	    then just_a_conid
@@ -1007,8 +1017,10 @@ mk_var_token pk_str
   | otherwise		= ITvarsym pk_str
   where
       (C# f) = _HEAD_ pk_str
+      -- tl     = _TAIL_ pk_str
 
 mk_qvar_token m token =
+-- trace ("mk_qvar ") $ 
  case mk_var_token token of
    ITconid n  -> ITqconid  (m,n)
    ITvarid n  -> ITqvarid  (m,n)

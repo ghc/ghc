@@ -9,12 +9,14 @@ The bits common to TcInstDcls and TcDeriv.
 module TcInstUtil (
 	InstInfo(..),
 	buildInstanceEnv,
-	classDataCon
+	instInfoClass, simpleInstInfoTy, simpleInstInfoTyCon, classDataCon,
+	pprInstInfo
     ) where
 
 #include "HsVersions.h"
 
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
+import HsTypes		( toHsType )
 
 import CmdLineOpts	( opt_AllowOverlappingInstances )
 import TcMonad
@@ -23,13 +25,13 @@ import Bag		( bagToList, Bag )
 import Class		( Class )
 import Var		( TyVar, Id, idName )
 import Maybes		( MaybeErr(..) )
-import Name		( getSrcLoc, nameModule, isLocallyDefined )
+import Name		( getSrcLoc, nameModule, isLocallyDefined, toRdrName )
 import SrcLoc		( SrcLoc )
-import Type		( Type, ClassContext )
+import Type		( Type, ThetaType, splitTyConApp_maybe, mkSigmaTy, mkDictTy )
 import PprType		( pprConstraint )
 import Class		( classTyCon )
 import DataCon		( DataCon )
-import TyCon		( tyConDataCons )
+import TyCon		( TyCon, tyConDataCons )
 import Outputable
 \end{code}
 
@@ -41,13 +43,30 @@ data InstInfo
       Class	        -- Class, k
       [TyVar]		-- Type variables, tvs
       [Type]		-- The types at which the class is being instantiated
-      ClassContext	-- inst_decl_theta: the original context, c, from the
+      ThetaType		-- inst_decl_theta: the original context, c, from the
 			--   instance declaration.  It constrains (some of)
 			--   the TyVars above
       Id		-- The dfun id
       RenamedMonoBinds	-- Bindings, b
       SrcLoc		-- Source location assoc'd with this instance's defn
       [RenamedSig]	-- User pragmas recorded for generating specialised instances
+
+pprInstInfo (InstInfo clas tvs tys inst_decl_theta _ mbinds _ _)
+ = vcat [ptext SLIT("InstInfo:") <+> ppr (mkSigmaTy tvs inst_decl_theta (mkDictTy clas tys)),
+	 nest 4 (ppr mbinds)]
+
+instInfoClass :: InstInfo -> Class
+instInfoClass (InstInfo clas _ _ _ _ _ _ _) = clas
+
+simpleInstInfoTy :: InstInfo -> Type
+simpleInstInfoTy (InstInfo _ _ [ty] _ _ _ _ _) = ty
+
+simpleInstInfoTyCon :: InstInfo -> TyCon
+  -- Gets the type constructor for a simple instance declaration,
+  -- i.e. one of the form 	instance (...) => C (T a b c) where ...
+simpleInstInfoTyCon inst
+   = case splitTyConApp_maybe (simpleInstInfoTy inst) of 
+	Just (tycon, _) -> tycon
 \end{code}
 
 
@@ -75,7 +94,8 @@ classDataCon clas = case tyConDataCons (classTyCon clas) of
 \begin{code}
 buildInstanceEnv :: Bag InstInfo -> NF_TcM s InstEnv
 
-buildInstanceEnv info = foldrNF_Tc addClassInstance emptyInstEnv (bagToList info)
+buildInstanceEnv info = --pprTrace "BuildInstanceEnv" (ppr info)
+			foldrNF_Tc addClassInstance emptyInstEnv (bagToList info)
 \end{code}
 
 @addClassInstance@ adds the appropriate stuff to the @ClassInstEnv@

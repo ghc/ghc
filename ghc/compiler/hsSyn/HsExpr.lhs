@@ -153,6 +153,7 @@ data HsExpr id pat
 
   | HsSCC	FAST_STRING	-- "set cost centre" (_scc_) annotation
 		(HsExpr id pat) -- expr whose cost is to be measured
+
 \end{code}
 
 These constructors only appear temporarily in the parser.
@@ -165,6 +166,8 @@ The renamer translates them into the Right Thing.
 		(HsExpr id pat)
 
   | ELazyPat	(HsExpr id pat) -- ~ pattern
+
+  | HsType      (HsType id)     -- Explicit type argument; e.g  f {| Int |} x y
 \end{code}
 
 Everything from here on appears only in typechecker output.
@@ -362,6 +365,8 @@ ppr_expr (DictApp expr dnames)
   = hang (ppr_expr expr)
 	 4 (brackets (interpp'SP dnames))
 
+ppr_expr (HsType id) = ppr id
+    
 \end{code}
 
 Parenthesize unless very simple:

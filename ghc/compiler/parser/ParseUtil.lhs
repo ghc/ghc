@@ -70,7 +70,16 @@ splitForConApp :: RdrNameHsType -> [RdrNameBangType]
 splitForConApp  t ts = split t ts
  where
 	split (HsAppTy t u) ts = split t (Unbanged u : ts)
-
+{-	split (HsOpTy t1 t ty2) ts = 
+		-- check that we've got a type constructor at the head
+	   if occNameSpace t_occ /= tcClsName
+		then parseError 
+			(showSDoc (text "not a constructor: (type pattern)`" <> 
+					ppr t <> char '\''))
+		else returnP (con, ts)
+	   where t_occ = rdrNameOcc t
+		 con   = setRdrNameOcc t (setOccNameSpace t_occ dataName)
+-}
 	split (HsTyVar t)   ts  = 
 		-- check that we've got a type constructor at the head
 	   if occNameSpace t_occ /= tcClsName
@@ -136,8 +145,12 @@ checkDictTy (HsTyVar t) args@(_:_) | not (isRdrTyVar t)
 checkDictTy (HsAppTy l r) args = checkDictTy l (r:args)
 checkDictTy _ _ = parseError "Illegal class assertion"
 
+-- Put more comments!
+-- Checks that the lhs of a datatype declaration
+-- is of the form Context => T a b ... z
 checkDataHeader :: RdrNameHsType 
 	-> P (RdrNameContext, RdrName, [RdrNameHsTyVar])
+
 checkDataHeader (HsForAllTy Nothing cs t) =
    checkSimple t []	     `thenP` \(c,ts) ->
    returnP (cs,c,map UserTyVar ts)
@@ -145,17 +158,23 @@ checkDataHeader t =
    checkSimple t []	     `thenP` \(c,ts) ->
    returnP ([],c,map UserTyVar ts)
 
+-- Checks the type part of the lhs of a datatype declaration
 checkSimple :: RdrNameHsType -> [RdrName] -> P ((RdrName,[RdrName]))
 checkSimple (HsAppTy l (HsTyVar a)) xs | isRdrTyVar a 
    = checkSimple l (a:xs)
-checkSimple (HsTyVar t) xs | not (isRdrTyVar t) = returnP (t,xs)
-checkSimple t _ = trace (showSDoc (ppr t)) $ parseError "Illegal data/newtype declaration"
+checkSimple (HsTyVar tycon) xs | not (isRdrTyVar tycon) = returnP (tycon,xs)
+
+checkSimple (HsOpTy (HsTyVar t1) tycon (HsTyVar t2)) [] 
+  | not (isRdrTyVar tycon) && isRdrTyVar t1 && isRdrTyVar t2
+  = returnP (tycon,[t1,t2])
+
+checkSimple t _ = parseError "Illegal left hand side in data/newtype declaration"
 
 ---------------------------------------------------------------------------
 -- Checking Patterns.
 
 -- We parse patterns as expressions and check for valid patterns below,
--- nverting the expression into a pattern at the same time.
+-- converting the expression into a pattern at the same time.
 
 checkPattern :: RdrNameHsExpr -> P RdrNamePat
 checkPattern e = checkPat e []
@@ -204,6 +223,8 @@ checkPat e [] = case e of
 
 	RecordCon c fs     -> mapP checkPatField fs `thenP` \fs ->
 			      returnP (RecPatIn c fs)
+-- Generics 
+	HsType ty          -> returnP (TypePatIn ty) 
 	_ -> patFail
 
 checkPat _ _ = patFail
@@ -249,6 +270,7 @@ checkValSig other     ty loc = parseError "Type signature given for an expressio
 -- A variable binding is parsed as an RdrNameFunMonoBind.
 -- See comments with HsBinds.MonoBinds
 
+isFunLhs :: RdrNameHsExpr -> [RdrNameHsExpr] -> Maybe (RdrName, Bool, [RdrNameHsExpr])
 isFunLhs (OpApp l (HsVar op) fix r) es  | not (isRdrDataCon op)
 			  	= Just (op, True, (l:r:es))
 isFunLhs (HsVar f) es | not (isRdrDataCon f)
@@ -282,6 +304,7 @@ mkRecConstrOrUpdate _ _
 -- it's external name will be "++". Too bad; it's important because we don't
 -- want z-encoding (e.g. names with z's in them shouldn't be doubled)
 -- (This is why we use occNameUserString.)
+
 mkExtName :: Maybe ExtName -> RdrName -> ExtName
 mkExtName Nothing rdrNm = ExtName (_PK_ (occNameUserString (rdrNameOcc rdrNm)))
 				  Nothing

@@ -25,6 +25,7 @@ module HsTypes (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} HsExpr ( HsExpr ) 
 import Class		( FunDep )
 import Type		( Type, Kind, PredType(..), UsageAnn(..), ClassContext,
 			  getTyVar_maybe, splitSigmaTy, unUsgTy, boxedTypeKind
@@ -41,6 +42,7 @@ import PrelNames	( mkTupConRdrName, listTyConKey, hasKey, Uniquable(..) )
 import Maybes		( maybeToBool )
 import FiniteMap
 import Outputable
+
 \end{code}
 
 This is the syntax for types as seen in type signatures.
@@ -56,7 +58,7 @@ data HsType name
 		(HsContext name)
 		(HsType name)
 
-  | HsTyVar		name		-- Type variable
+  | HsTyVar		name		-- Type variable or type constructor
 
   | HsAppTy		(HsType name)
 			(HsType name)
@@ -68,7 +70,9 @@ data HsType name
 
   | HsTupleTy		(HsTupCon name)
 			[HsType name]	-- Element types (length gives arity)
-
+  -- Generics
+  | HsOpTy		(HsType name) name (HsType name)
+  | HsNumTy             Integer
   -- these next two are only used in interfaces
   | HsPredTy		(HsPred name)
 
@@ -253,6 +257,9 @@ ppr_mono_ty ctxt_prec (HsUsgTy u ty)
               HsUsOnce   -> ptext SLIT("-")
               HsUsMany   -> ptext SLIT("!")
               HsUsVar uv -> ppr uv
+-- Generics
+ppr_mono_ty ctxt_prec (HsNumTy n) = integer  n
+ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) = ppr ty1 <+> ppr op <+> ppr ty2
 \end{code}
 
 
@@ -410,6 +417,9 @@ eq_hsType env (HsFunTy a1 b1) (HsFunTy a2 b2)
 
 eq_hsType env (HsPredTy p1) (HsPredTy p2)
   = eq_hsPred env p1 p2
+
+eq_hsType env (HsOpTy lty1 op1 rty1) (HsOpTy lty2 op2 rty2)
+  = eq_hsVar env op1 op2 && eq_hsType env lty1 lty2 && eq_hsType env rty1 rty2
 
 eq_hsType env (HsUsgTy u1 ty1) (HsUsgTy u2 ty2)
   = eqUsg u1 u2 && eq_hsType env ty1 ty2

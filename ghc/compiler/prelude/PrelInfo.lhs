@@ -8,12 +8,7 @@ module PrelInfo (
 	module PrelNames,
 	module MkId,
 
-	builtinNames, 	-- Names of things whose *unique* must be known, but 
-			-- that is all. If something is in here, you know that
-			-- if it's used at all then it's Name will be just as
-			-- it is here, unique and all.  Includes all the 
-
-
+	wiredInNames, 	-- Names of wired in things
 
 	
 	-- Primop RdrNames
@@ -34,17 +29,18 @@ module PrelInfo (
 #include "HsVersions.h"
 
 -- friends:
-import MkId		-- Ditto
 import PrelNames	-- Prelude module names
 
 import PrimOp		( PrimOp(..), allThePrimOps, primOpRdrName )
 import DataCon		( DataCon, dataConId, dataConWrapId )
-import TysPrim		-- TYPES
-import TysWiredIn
+import MkId		( mkPrimOpId, wiredInIds )
+import MkId		-- All of it, for re-export
+import TysPrim		( primTyCons )
+import TysWiredIn	( wiredInTyCons )
 
 -- others:
 import RdrName		( RdrName )
-import Name		( Name, mkKnownKeyGlobal, getName )
+import Name		( Name, getName )
 import TyCon		( tyConDataConsIfAvailable, TyCon )
 import Class	 	( Class, classKey )
 import Type		( funTyCon )
@@ -63,21 +59,18 @@ We have two ``builtin name funs,'' one to look up @TyCons@ and
 @Classes@, the other to look up values.
 
 \begin{code}
-builtinNames :: Bag Name
-builtinNames
-  = unionManyBags
-	[	-- Wired in TyCons
-	  unionManyBags (map getTyConNames wired_in_tycons)
+wiredInNames :: [Name]
+wiredInNames
+  = bagToList $ unionManyBags
+    [		-- Wired in TyCons
+	  unionManyBags (map getTyConNames ([funTyCon] ++ primTyCons ++ wiredInTyCons))
 
 		-- Wired in Ids
 	, listToBag (map getName wiredInIds)
 
 		-- PrimOps
 	, listToBag (map (getName . mkPrimOpId) allThePrimOps)
-
-		-- Other names with magic keys
-	, listToBag (map mkKnownKeyGlobal knownKeyRdrNames)
-	]
+    ]
 \end{code}
 
 
@@ -124,60 +117,6 @@ leH_RDR		= primOpRdrName IntLeOp
 minusH_RDR	= primOpRdrName IntSubOp
 
 tagToEnumH_RDR	= primOpRdrName TagToEnumOp
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Wired in TyCons}
-%*									*
-%************************************************************************
-
-\begin{code}
-wired_in_tycons = [funTyCon] ++
-		  prim_tycons ++
-		  tuple_tycons ++
-		  unboxed_tuple_tycons ++
-		  data_tycons
-
-prim_tycons
-  = [ addrPrimTyCon
-    , arrayPrimTyCon
-    , byteArrayPrimTyCon
-    , charPrimTyCon
-    , doublePrimTyCon
-    , floatPrimTyCon
-    , intPrimTyCon
-    , int64PrimTyCon
-    , foreignObjPrimTyCon
-    , bcoPrimTyCon
-    , weakPrimTyCon
-    , mutableArrayPrimTyCon
-    , mutableByteArrayPrimTyCon
-    , mVarPrimTyCon
-    , mutVarPrimTyCon
-    , realWorldTyCon
-    , stablePtrPrimTyCon
-    , stableNamePrimTyCon
-    , statePrimTyCon
-    , threadIdPrimTyCon
-    , wordPrimTyCon
-    , word64PrimTyCon
-    ]
-
-tuple_tycons = unitTyCon : [tupleTyCon Boxed i | i <- [2..37] ]
-unboxed_tuple_tycons = [tupleTyCon Unboxed i | i <- [1..37] ]
-
-data_tycons
-  = [ addrTyCon
-    , boolTyCon
-    , charTyCon
-    , doubleTyCon
-    , floatTyCon
-    , intTyCon
-    , integerTyCon
-    , listTyCon
-    , wordTyCon
-    ]
 \end{code}
 
 

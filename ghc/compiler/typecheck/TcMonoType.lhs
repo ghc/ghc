@@ -10,7 +10,7 @@ module TcMonoType ( tcHsType, tcHsSigType, tcHsBoxedSigType,
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
 		    kcHsType, kcHsSigType, kcHsBoxedSigType, kcHsContext,
-		    kcTyVarScope, newSigTyVars, mkImmutTyVars,
+		    tcTyVars, tcHsTyVars, mkImmutTyVars,
 
 		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
 		    checkSigTyVars, sigCtxt, sigPatCtxt
@@ -55,15 +55,16 @@ import Var		( TyVar, mkTyVar, tyVarKind, mkNamedUVar )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
-import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
+import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind, tyConName )
 import Class		( ClassContext, classArity, classTyCon )
 import Name		( Name, isLocallyDefined )
-import TysWiredIn	( mkListTy, mkTupleTy )
+import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
 import UniqFM		( elemUFM )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
 import Util		( mapAccumL, isSingleton )
 import Outputable
+
 \end{code}
 
 
@@ -90,7 +91,7 @@ To do step 1, we proceed thus:
 1b. Apply the kind checker
 1c. Zonk the resulting kinds
 
-The kind checker is passed to kcTyVarScope as an argument.  
+The kind checker is passed to tcHsTyVars as an argument.  
 
 For example, when we find
 	(forall a m. m a -> m a)
@@ -98,7 +99,7 @@ we bind a,m to kind varibles and kind-check (m a -> m a).  This
 makes a get kind *, and m get kind *->*.  Now we typecheck (m a -> m a)
 in an environment that binds a and m suitably.
 
-The kind checker passed to kcTyVarScope needs to look at enough to
+The kind checker passed to tcHsTyVars needs to look at enough to
 establish the kind of the tyvar:
   * For a group of type and class decls, it's just the group, not
 	the rest of the program
@@ -116,22 +117,33 @@ But equally valid would be
 				a::(*->*)-> *, b::*->*
 
 \begin{code}
-kcTyVarScope :: [HsTyVarBndr Name] 
-	     -> TcM s a				-- The kind checker
-	     -> TcM s [(Name,Kind)]
-	-- Do a kind check to find out the kinds of the type variables
-	-- Then return a bunch of name-kind pairs, from which to 
-	-- construct the type variables.  We don't return the tyvars
-	-- themselves because sometimes we want mutable ones and 
-	-- sometimes we want immutable ones.
+tcHsTyVars :: [HsTyVarBndr Name] 
+	   -> TcM s a				-- The kind checker
+	   -> ([TyVar] -> TcM s b)
+	   -> TcM s b
 
-kcTyVarScope [] kind_check = returnTc []
+tcHsTyVars [] kind_check thing_inside = thing_inside []
 	-- A useful short cut for a common case!
   
-kcTyVarScope tv_names kind_check 
+tcHsTyVars tv_names kind_check thing_inside
   = kcHsTyVars tv_names 				`thenNF_Tc` \ tv_names_w_kinds ->
     tcExtendKindEnv tv_names_w_kinds kind_check		`thenTc_`
-    zonkKindEnv tv_names_w_kinds
+    zonkKindEnv tv_names_w_kinds			`thenNF_Tc` \ tvs_w_kinds ->
+    let
+	tyvars = mkImmutTyVars tvs_w_kinds
+    in
+    tcExtendTyVarEnv tyvars (thing_inside tyvars)
+
+tcTyVars :: [Name] 
+	     -> TcM s a				-- The kind checker
+	     -> TcM s [TyVar]
+tcTyVars [] kind_check = returnTc []
+
+tcTyVars tv_names kind_check
+  = mapNF_Tc newNamedKindVar tv_names		`thenTc` \ kind_env ->
+    tcExtendKindEnv kind_env kind_check		`thenTc_`
+    zonkKindEnv kind_env			`thenNF_Tc` \ tvs_w_kinds ->
+    listNF_Tc [tcNewSigTyVar name kind | (name,kind) <- tvs_w_kinds]
 \end{code}
     
 
@@ -139,11 +151,13 @@ kcTyVarScope tv_names kind_check
 kcHsTyVar  :: HsTyVarBndr name   -> NF_TcM s (name, TcKind)
 kcHsTyVars :: [HsTyVarBndr name] -> NF_TcM s [(name, TcKind)]
 
-kcHsTyVar (UserTyVar name)       = newKindVar	`thenNF_Tc` \ kind ->
-				   returnNF_Tc (name, kind)
+kcHsTyVar (UserTyVar name)       = newNamedKindVar name
 kcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (name, kind)
 
 kcHsTyVars tvs = mapNF_Tc kcHsTyVar tvs
+
+newNamedKindVar name = newKindVar	`thenNF_Tc` \ kind ->
+		       returnNF_Tc (name, kind)
 
 ---------------------------
 kcBoxedType :: RenamedHsType -> TcM s ()
@@ -169,14 +183,7 @@ kcHsBoxedSigType = kcBoxedType
 
 ---------------------------
 kcHsType :: RenamedHsType -> TcM s TcKind
-kcHsType (HsTyVar name)	      
-  = tcLookupTy name	`thenTc` \ thing ->
-    case thing of
-	ATyVar tv -> returnTc (tyVarKind tv)
-	ATyCon tc -> returnTc (tyConKind tc)
-	AThing k  -> returnTc k
-	other	  -> failWithTc (wrongThingErr "type" thing name)
-
+kcHsType (HsTyVar name)	      = kcTyVar name
 kcHsType (HsUsgTy _ ty)       = kcHsType ty
 kcHsType (HsUsgForAllTy _ ty) = kcHsType ty
 
@@ -198,27 +205,27 @@ kcHsType (HsFunTy ty1 ty2)
     kcFunResType ty2	`thenTc_`
     returnTc boxedTypeKind
 
+kcHsType ty@(HsOpTy ty1 op ty2)
+  = kcTyVar op				`thenTc` \ op_kind ->
+    kcHsType ty1			`thenTc` \ ty1_kind ->
+    kcHsType ty2			`thenTc` \ ty2_kind ->
+    tcAddErrCtxt (appKindCtxt (ppr ty))	$
+    kcAppKind op_kind  ty1_kind		`thenTc` \ op_kind' ->
+    kcAppKind op_kind' ty2_kind
+   
 kcHsType (HsPredTy pred)
   = kcHsPred pred		`thenTc_`
     returnTc boxedTypeKind
 
 kcHsType ty@(HsAppTy ty1 ty2)
-  = kcHsType ty1		`thenTc` \ tc_kind ->
-    kcHsType ty2		`thenTc` \ arg_kind ->
-
+  = kcHsType ty1			`thenTc` \ tc_kind ->
+    kcHsType ty2			`thenTc` \ arg_kind ->
     tcAddErrCtxt (appKindCtxt (ppr ty))	$
-    case splitFunTy_maybe tc_kind of 
-	Just (arg_kind', res_kind)
-		-> unifyKind arg_kind arg_kind'	`thenTc_`
-		   returnTc res_kind
-
-	Nothing -> newKindVar 						`thenNF_Tc` \ res_kind ->
-		   unifyKind tc_kind (mkArrowKind arg_kind res_kind)	`thenTc_`
-		   returnTc res_kind
+    kcAppKind tc_kind arg_kind
 
 kcHsType (HsForAllTy (Just tv_names) context ty)
-  = kcHsTyVars tv_names			`thenNF_Tc` \ kind_env ->
-    tcExtendKindEnv kind_env		$
+  = kcHsTyVars tv_names		`thenNF_Tc` \ kind_env ->
+    tcExtendKindEnv kind_env	$
     kcHsContext context		`thenTc_`
  
 	-- Context behaves like a function type
@@ -232,6 +239,16 @@ kcHsType (HsForAllTy (Just tv_names) context ty)
 	kcFunResType ty		`thenTc_`
 	returnTc boxedTypeKind
 
+---------------------------
+kcTyVar name
+  = tcLookupTy name	`thenTc` \ thing ->
+    case thing of
+	ATyVar tv -> returnTc (tyVarKind tv)
+	ATyCon tc -> returnTc (tyConKind tc)
+	AThing k  -> returnTc k
+	other	  -> failWithTc (wrongThingErr "type" thing name)
+
+---------------------------
 kcFunResType :: RenamedHsType -> TcM s TcKind
 -- The only place an unboxed tuple type is allowed
 -- is at the right hand end of an arrow
@@ -240,6 +257,17 @@ kcFunResType (HsTupleTy (HsTupCon _ Unboxed) tys)
     returnTc unboxedTypeKind
 
 kcFunResType ty = kcHsType ty
+
+---------------------------
+kcAppKind fun_kind arg_kind
+  = case splitFunTy_maybe fun_kind of 
+	Just (arg_kind', res_kind)
+		-> unifyKind arg_kind arg_kind'	`thenTc_`
+		   returnTc res_kind
+
+	Nothing -> newKindVar 						`thenNF_Tc` \ res_kind ->
+		   unifyKind fun_kind (mkArrowKind arg_kind res_kind)	`thenTc_`
+		   returnTc res_kind
 
 
 ---------------------------
@@ -316,6 +344,15 @@ tcHsType (HsFunTy ty1 ty2)
     tcHsType ty2	`thenTc` \ tau_ty2 ->
     returnTc (mkFunTy tau_ty1 tau_ty2)
 
+tcHsType (HsNumTy n)
+  = ASSERT(n== 1)
+    returnTc (mkTyConApp genUnitTyCon [])
+
+tcHsType (HsOpTy ty1 op ty2) =
+  tcHsType ty1 `thenTc` \ tau_ty1 ->
+  tcHsType ty2 `thenTc` \ tau_ty2 ->
+  tc_fun_type op [tau_ty1,tau_ty2]
+
 tcHsType (HsAppTy ty1 ty2)
   = tc_app ty1 [ty2]
 
@@ -343,81 +380,88 @@ tcHsType (HsUsgForAllTy uv_name ty)
     returnTc (mkUsForAllTy uv tc_ty)
 
 tcHsType full_ty@(HsForAllTy (Just tv_names) ctxt ty)
-  = kcTyVarScope tv_names 
-		 (kcHsContext ctxt `thenTc_` kcFunResType ty)  `thenTc` \ tv_kinds ->
-    let
-	forall_tyvars = mkImmutTyVars tv_kinds
+  = let
+	kind_check = kcHsContext ctxt `thenTc_` kcFunResType ty
     in
-    tcExtendTyVarEnv forall_tyvars	$
-    tcContext ctxt			`thenTc` \ theta ->
-    tcHsType ty				`thenTc` \ tau ->
-    let
-	-- Check for ambiguity
-	--   forall V. P => tau
-	-- is ambiguous if P contains generic variables
-	-- (i.e. one of the Vs) that are not mentioned in tau
-	--
-	-- However, we need to take account of functional dependencies
-	-- when we speak of 'mentioned in tau'.  Example:
-	--	class C a b | a -> b where ...
-	-- Then the type
-	--	forall x y. (C x y) => x
-	-- is not ambiguous because x is mentioned and x determines y
-	--
-	-- NOTE: In addition, GHC insists that at least one type variable
-	-- in each constraint is in V.  So we disallow a type like
-	--	forall a. Eq b => b -> b
-	-- even in a scope where b is in scope.
-	-- This is the is_free test below.
+    tcHsTyVars tv_names kind_check		$ \ tyvars ->
+    tcContext ctxt				`thenTc` \ theta ->
+    tcHsType ty					`thenTc` \ tau ->
+    checkAmbiguity full_ty tyvars theta tau	`thenTc_`
+    returnTc (mkSigmaTy tyvars theta tau)
 
-	tau_vars	    = tyVarsOfType tau
-	fds		    = instFunDepsOfTheta theta
-	tvFundep	    = tyVarFunDep fds
-	extended_tau_vars   = oclose tvFundep tau_vars
-	is_ambig ct_var	    = (ct_var `elem` forall_tyvars) &&
-			      not (ct_var `elemUFM` extended_tau_vars)
-	is_free ct_var	    = not (ct_var `elem` forall_tyvars)
+  -- Check for ambiguity
+  --   forall V. P => tau
+  -- is ambiguous if P contains generic variables
+  -- (i.e. one of the Vs) that are not mentioned in tau
+  --
+  -- However, we need to take account of functional dependencies
+  -- when we speak of 'mentioned in tau'.  Example:
+  --	class C a b | a -> b where ...
+  -- Then the type
+  --	forall x y. (C x y) => x
+  -- is not ambiguous because x is mentioned and x determines y
+  --
+  -- NOTE: In addition, GHC insists that at least one type variable
+  -- in each constraint is in V.  So we disallow a type like
+  --	forall a. Eq b => b -> b
+  -- even in a scope where b is in scope.
+  -- This is the is_free test below.
 
-	check_pred pred = checkTc (not any_ambig) (ambigErr pred full_ty) `thenTc_`
-			  checkTc (not all_free)  (freeErr  pred full_ty)
-	      where 
-		ct_vars	  = varSetElems (tyVarsOfPred pred)
-		any_ambig = is_source_polytype && any is_ambig ct_vars
-		all_free  = all is_free  ct_vars
+checkAmbiguity full_ty forall_tyvars theta tau
+  = mapTc check_pred theta
+  where
+    tau_vars	      = tyVarsOfType tau
+    fds		      = instFunDepsOfTheta theta
+    tvFundep	      = tyVarFunDep fds
+    extended_tau_vars = oclose tvFundep tau_vars
 
-	-- Check ambiguity only for source-program types, not
-	-- for types coming from inteface files.  The latter can
-	-- legitimately have ambiguous types. Example
-	--    class S a where s :: a -> (Int,Int)
-	--    instance S Char where s _ = (1,1)
-	--    f:: S a => [a] -> Int -> (Int,Int)
-	--    f (_::[a]) x = (a*x,b)
-	--	where (a,b) = s (undefined::a)
-	-- Here the worker for f gets the type
-	--	fw :: forall a. S a => Int -> (# Int, Int #)
-	--
-	-- If the list of tv_names is empty, we have a monotype,
-	-- and then we don't need to check for ambiguity either,
-	-- because the test can't fail (see is_ambig).
-	is_source_polytype = case tv_names of
-				(UserTyVar _ : _) -> True
-				other		  -> False
-    in
-    mapTc check_pred theta		`thenTc_`
-    returnTc (mkSigmaTy forall_tyvars theta tau)
+    is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
+		        not (ct_var `elemUFM` extended_tau_vars)
+    is_free ct_var    = not (ct_var `elem` forall_tyvars)
+    
+    check_pred pred = checkTc (not any_ambig) (ambigErr pred full_ty) `thenTc_`
+	    	      checkTc (not all_free)  (freeErr  pred full_ty)
+             where 
+	    	ct_vars	  = varSetElems (tyVarsOfPred pred)
+	    	all_free  = all is_free ct_vars
+	    	any_ambig = is_source_polytype && any is_ambig ct_vars
+    
+    -- Notes on the 'is_source_polytype' test above
+    -- Check ambiguity only for source-program types, not
+    -- for types coming from inteface files.  The latter can
+    -- legitimately have ambiguous types. Example
+    --    class S a where s :: a -> (Int,Int)
+    --    instance S Char where s _ = (1,1)
+    --    f:: S a => [a] -> Int -> (Int,Int)
+    --    f (_::[a]) x = (a*x,b)
+    --	where (a,b) = s (undefined::a)
+    -- Here the worker for f gets the type
+    --	fw :: forall a. S a => Int -> (# Int, Int #)
+    --
+    -- If the list of tv_names is empty, we have a monotype,
+    -- and then we don't need to check for ambiguity either,
+    -- because the test can't fail (see is_ambig).
+    is_source_polytype 
+	= case full_ty of
+	    HsForAllTy (Just (UserTyVar _ : _)) _ _ -> True
+    	    other			  	    -> False
 \end{code}
 
 Help functions for type applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
+tc_app :: RenamedHsType -> [RenamedHsType] -> TcM s Type
 tc_app (HsAppTy ty1 ty2) tys
   = tc_app ty1 (ty2:tys)
 
 tc_app ty tys
   = tcAddErrCtxt (appKindCtxt pp_app)	$
     mapTc tcHsType tys			`thenTc` \ arg_tys ->
-    tc_fun_type ty arg_tys
+    case ty of
+	HsTyVar fun -> tc_fun_type fun arg_tys
+	other	    -> tcHsType ty		`thenTc` \ fun_ty ->
+		       returnNF_Tc (mkAppTys fun_ty arg_tys)
   where
     pp_app = ppr ty <+> sep (map pprParendHsType tys)
 
@@ -425,7 +469,7 @@ tc_app ty tys
 -- But not quite; for synonyms it checks the correct arity, and builds a SynTy
 -- 	hence the rather strange functionality.
 
-tc_fun_type (HsTyVar name) arg_tys
+tc_fun_type name arg_tys
   = tcLookupTy name			`thenTc` \ thing ->
     case thing of
 	ATyVar tv -> returnTc (mkAppTys (mkTyVarTy tv) arg_tys)
@@ -447,10 +491,6 @@ tc_fun_type (HsTyVar name) arg_tys
 		    n_args  = length arg_tys
 
 	other -> failWithTc (wrongThingErr "type constructor" thing name)
-
-tc_fun_type ty arg_tys
-  = tcHsType ty		`thenTc` \ fun_ty ->
-    returnNF_Tc (mkAppTys fun_ty arg_tys)
 \end{code}
 
 
@@ -495,10 +535,7 @@ tcClassAssertion ccall_ok assn@(HsPIParam name ty)
 
 \begin{code}
 mkImmutTyVars :: [(Name,Kind)] -> [TyVar]
-newSigTyVars  :: [(Name,Kind)] -> NF_TcM s [TcTyVar]
-
 mkImmutTyVars pairs = [mkTyVar name kind | (name, kind) <- pairs]
-newSigTyVars  pairs = listNF_Tc [tcNewSigTyVar name kind | (name,kind) <- pairs]
 
 mkTyClTyVars :: Kind 			-- Kind of the tycon or class
 	     -> [HsTyVarBndr Name]

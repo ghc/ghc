@@ -40,7 +40,7 @@ import TysWiredIn	( boolTy, charTy, mkListTy )
 import PrelNames	( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
-import Type		( Type, ClassContext, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
+import Type		( Type, ThetaType, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
 			  mkFunTys, mkFunTy, mkSigmaTy, classesToPreds,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType, tyVarsOfTypes,
 			  splitSigmaTy, splitFunTy_maybe, 
@@ -92,7 +92,7 @@ import Maybes
 import PrelNames
 import Maybe            ( isJust )
 import Outputable
-import Util		( assoc )
+import ListSetOps	( assoc, assocMaybe )
 import UnicodeUtil      ( stringToUtf8 )
 import Char             ( ord )
 \end{code}		
@@ -111,8 +111,9 @@ wiredInIds
 	-- is 'open'; that is can be unified with an unboxed type
 	-- 
 	-- [The interface file format now carry such information, but there's
-	--  no way yet of expressing at the definition site for these error-reporting
-	--  functions that they have an 'open' result type. -- sof 1/99]
+	-- no way yet of expressing at the definition site for these 
+	-- error-reporting
+	-- functions that they have an 'open' result type. -- sof 1/99]
 
       aBSENT_ERROR_ID
     , eRROR_ID
@@ -618,13 +619,13 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Class 
 	    -> [TyVar]
 	    -> [Type]
-	    -> ClassContext
+	    -> ThetaType
 	    -> Id
 
-mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
+mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
   = mkVanillaId dfun_name dfun_ty
   where
-    dfun_theta = classesToPreds inst_decl_theta
+    dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 
 {-  1 dec 99: disable the Mark Jones optimisation for the sake
     of compatibility with Hugs.
@@ -653,7 +654,6 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
 				--   instance Wob b => Baz T b where..
 				-- Now sc_theta' has Foo T
 -}
-    dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 \end{code}
 
 

@@ -46,10 +46,7 @@ import BSD
 import IOExts		( unsafePerformIO )
 import NativeInfo       ( os, arch )
 #endif
-#ifdef GHCI
 import StgInterp	( runStgI )
-import CompManager
-#endif
 
 \end{code}
 
@@ -84,7 +81,7 @@ doIt :: ([CoreToDo], [StgToDo]) -> IO ()
 
 doIt (core_cmds, stg_cmds)
   = doIfSet opt_Verbose 
-	(hPutStr stderr "Glasgow Haskell Compiler, version " 	>>
+	(hPutStr stderr "Glasgow Haskell Compiler, Version " 	>>
  	 hPutStr stderr compiler_version                    	>>
 	 hPutStr stderr ", for Haskell 98, compiled by GHC version " >>
 	 hPutStr stderr booter_version				>>
@@ -338,11 +335,11 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     spec_info (Just (False, _)) = (0,0,0,0,1,0)
     spec_info (Just (True, _))  = (0,0,0,0,0,1)
 
-    data_info (TyData _ _ _ _ _ nconstrs derivs _ _)
+    data_info (TyData _ _ _ _ _ nconstrs derivs _ _ _ _)
 	= (nconstrs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
-    class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ _ _ _ _)
+    class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ _ )
 	= case count_sigs meth_sigs of
 	    (_,classops,_,_) ->
 	       (classops, addpr (count_monobinds def_meths))

@@ -47,7 +47,7 @@ import CmdLineOpts	( opt_UnboxStrictFields )
 import PprType		()	-- Instances
 import Maybes		( maybeToBool )
 import Maybe
-import Util		( assoc )
+import ListSetOps	( assoc )
 \end{code}
 
 

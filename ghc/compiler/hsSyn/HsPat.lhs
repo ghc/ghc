@@ -72,6 +72,15 @@ data InPat name
   | RecPatIn	    name 		-- record
 		    [(name, InPat name, Bool)]	-- True <=> source used punning
 
+-- Generics
+  | TypePatIn       (HsType name)       -- Type pattern for generic definitions
+                                        -- e.g  f{| a+b |} = ...
+                                        -- These show up only in class 
+					-- declarations,
+                                        -- and should be a top-level pattern
+
+-- /Generics
+
 data OutPat id
   = WildPat	    Type	-- wild card
   | VarPat	    id		-- variable (type is in the Id)
@@ -163,6 +172,8 @@ pprInPat (RecPatIn con rpats)
   where
     pp_rpat (v, _, True) = ppr v
     pp_rpat (v, p, _)    = hsep [ppr v, char '=', ppr p]
+
+pprInPat (TypePatIn ty) = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
 \end{code}
 
 \begin{code}
@@ -317,8 +328,10 @@ collect (ParPatIn  pat)     	 bndrs = collect pat bndrs
 collect (ListPatIn pats)    	 bndrs = foldr collect bndrs pats
 collect (TuplePatIn pats _)  	 bndrs = foldr collect bndrs pats
 collect (RecPatIn c fields) 	 bndrs = foldr (\ (f,pat,_) bndrs -> collect pat bndrs) bndrs fields
+-- Generics
+collect (TypePatIn ty)           bndrs = bndrs
+-- assume the type variables do not need to be bound
 \end{code}
-
 
 \begin{code}
 collectSigTysFromPats :: [InPat name] -> [HsType name]
@@ -338,4 +351,7 @@ collect_pat (ParPatIn  pat)        acc = collect_pat pat acc
 collect_pat (ListPatIn pats)       acc = foldr collect_pat acc pats
 collect_pat (TuplePatIn pats _)    acc = foldr collect_pat acc pats
 collect_pat (RecPatIn c fields)    acc = foldr (\ (f,pat,_) acc -> collect_pat pat acc) acc fields
+-- Generics
+collect_pat (TypePatIn ty)         acc = ty:acc
 \end{code}
+

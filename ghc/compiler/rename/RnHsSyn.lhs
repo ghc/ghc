@@ -12,7 +12,7 @@ import HsSyn
 import HsPragmas	( InstancePragmas, GenPragmas, DataPragmas, ClassPragmas, ClassOpPragmas )
 
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
-import Name		( Name, getName )
+import Name		( Name, getName, isTyVarName )
 import NameSet
 import BasicTypes	( Boxity )
 import Outputable
@@ -71,24 +71,29 @@ listTyCon_name    = getName listTyCon
 tupleTyCon_name :: Boxity -> Int -> Name
 tupleTyCon_name boxity n = getName (tupleTyCon boxity n)
 
+extractHsTyVars :: RenamedHsType -> NameSet
+extractHsTyVars x = filterNameSet isTyVarName (extractHsTyNames x)
+
 extractHsTyNames   :: RenamedHsType -> NameSet
 extractHsTyNames ty
   = get ty
   where
     get (HsAppTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
-    get (HsListTy ty)          = unitNameSet listTyCon_name 
-				   `unionNameSets` get ty
+    get (HsListTy ty)          = unitNameSet listTyCon_name `unionNameSets` get ty
     get (HsTupleTy (HsTupCon n _) tys) = unitNameSet n
 				   	 `unionNameSets` extractHsTyNames_s tys
     get (HsFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsPredTy p)	       = extractHsPredTyNames p
     get (HsUsgForAllTy uv ty)  = get ty
     get (HsUsgTy u ty)         = get ty
+    get (HsOpTy ty1 tycon ty2) = get ty1 `unionNameSets` get ty2 `unionNameSets`
+				 unitNameSet tycon
+    get (HsNumTy n)            = emptyNameSet
     get (HsTyVar tv)	       = unitNameSet tv
     get (HsForAllTy (Just tvs) 
 		    ctxt ty)   = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
 					    `minusNameSet`
-				    mkNameSet (hsTyVarNames tvs)
+				  mkNameSet (hsTyVarNames tvs)
     get ty@(HsForAllTy Nothing _ _) = pprPanic "extractHsTyNames" (ppr ty)
 
 extractHsTyNames_s  :: [RenamedHsType] -> NameSet
@@ -97,11 +102,31 @@ extractHsTyNames_s tys = foldr (unionNameSets . extractHsTyNames) emptyNameSet t
 extractHsCtxtTyNames :: RenamedContext -> NameSet
 extractHsCtxtTyNames ctxt = foldr (unionNameSets . extractHsPredTyNames) emptyNameSet ctxt
 
--- You don't import or export implicit parameters, so don't mention
--- the IP names
+-- You don't import or export implicit parameters,
+-- so don't mention the IP names
 extractHsPredTyNames (HsPClass cls tys)
   = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
 extractHsPredTyNames (HsPIParam n ty)
   = extractHsTyNames ty
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{A few functions on generic defintions
+%*									*
+%************************************************************************
+
+These functions on generics are defined over RenamedMatches, which is
+why they are here and not in HsMatches.
+
+\begin{code}
+maybeGenericMatch :: RenamedMatch -> Maybe (RenamedHsType, RenamedMatch)
+  -- Tells whether a Match is for a generic definition
+  -- and extract the type from a generic match and put it at the front
+
+maybeGenericMatch (Match tvs (TypePatIn ty : pats) sig_ty grhss)
+  = Just (ty, Match tvs pats sig_ty grhss)
+
+maybeGenericMatch other_match = Nothing
+\end{code}

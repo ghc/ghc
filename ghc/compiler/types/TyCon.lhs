@@ -13,7 +13,7 @@ module TyCon(
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
 	isRecursiveTyCon, newTyConRep,
 
-	mkAlgTyCon,
+	mkAlgTyConRep, --mkAlgTyCon, 
 	mkClassTyCon,
 	mkFunTyCon,
 	mkPrimTyCon,
@@ -24,6 +24,7 @@ module TyCon(
 
 	setTyConName,
 
+	tyConName,
 	tyConKind,
 	tyConUnique,
 	tyConTyVars,
@@ -39,7 +40,10 @@ module TyCon(
 
         maybeTyConSingleCon,
 
-	matchesTyCon
+	matchesTyCon,
+
+	-- Generics
+        tyConGenIds, tyConGenInfo
 ) where
 
 #include "HsVersions.h"
@@ -50,9 +54,11 @@ import {-# SOURCE #-} TypeRep ( Type, Kind, SuperKind )
 
 import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
+
 import Class 		( Class, ClassContext )
-import Var   		( TyVar )
-import BasicTypes	( Arity, NewOrData(..), RecFlag(..), Boxity(..), isBoxed )
+import Var   		( TyVar, Id )
+import BasicTypes	( Arity, NewOrData(..), RecFlag(..), Boxity(..), 
+			  isBoxed, EP(..) )
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
@@ -110,6 +116,11 @@ data TyCon
 	algTyConRec     :: RecFlag,		-- Tells whether the data type is part of 
 						-- a mutually-recursive group or not
 
+	genInfo :: Maybe (EP Id),	-- Convert T <-> Tring
+					-- Some TyCons don't have it; 
+					-- e.g. the TyCon for a Class dictionary,
+					-- and TyCons with unboxed arguments
+
 	algTyConClass :: Bool		-- True if this tycon comes from a class declaration
     }
 
@@ -131,7 +142,8 @@ data TyCon
 	tyConArity  :: Arity,
 	tyConBoxed  :: Boxity,
 	tyConTyVars :: [TyVar],
-	dataCon     :: DataCon
+	dataCon     :: DataCon,
+	genInfo     :: Maybe (EP Id)		-- Generic type and conv funs 
     }
 
   | SynTyCon {
@@ -216,8 +228,23 @@ mkFunTyCon name kind
 	tyConKind   = kind,
 	tyConArity  = 2
     }
-			    
-mkAlgTyCon name kind tyvars theta argvrcs cons ncons derivs flavour rec
+
+tyConGenInfo :: TyCon -> Maybe (EP Id)
+tyConGenInfo (AlgTyCon   { genInfo = info }) = info
+tyConGenInfo (TupleTyCon { genInfo = info }) = info
+tyConGenInfo other			     = Nothing
+
+tyConGenIds :: TyCon -> [Id]
+-- Returns the generic-programming Ids; these Ids need bindings
+tyConGenIds tycon = case tyConGenInfo tycon of
+			Nothing		  -> []
+			Just (EP from to) -> [from,to]
+
+-- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
+-- but now you also have to pass in the generic information about the type
+-- constructor - you can get hold of it easily (see Generics module)
+mkAlgTyConRep name kind tyvars theta argvrcs cons ncons derivs flavour rec 
+	      gen_info
   = AlgTyCon {	
 	tyConName 		= name,
 	tyConUnique		= nameUnique name,
@@ -231,7 +258,8 @@ mkAlgTyCon name kind tyvars theta argvrcs cons ncons derivs flavour rec
 	algTyConDerivings	= derivs,
 	algTyConClass		= False,
 	algTyConFlavour 	= flavour,
-	algTyConRec		= rec
+	algTyConRec		= rec,
+	genInfo   	        = gen_info
     }
 
 mkClassTyCon name kind tyvars argvrcs con clas flavour
@@ -248,11 +276,12 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour
 	algTyConDerivings	= [],
 	algTyConClass		= True,
 	algTyConFlavour		= flavour,
-	algTyConRec		= NonRecursive
+	algTyConRec		= NonRecursive,
+	genInfo   	        = Nothing
     }
 
 
-mkTupleTyCon name kind arity tyvars con boxed
+mkTupleTyCon name kind arity tyvars con boxed gen_info
   = TupleTyCon {
 	tyConUnique = nameUnique name,
 	tyConName = name,
@@ -260,7 +289,8 @@ mkTupleTyCon name kind arity tyvars con boxed
 	tyConArity = arity,
 	tyConBoxed = boxed,
 	tyConTyVars = tyvars,
-	dataCon = con
+	dataCon = con,
+	genInfo = gen_info
     }
 
 mkPrimTyCon name kind arity arg_vrcs rep 
@@ -285,6 +315,7 @@ mkSynTyCon name kind arity tyvars rhs argvrcs
     }
 
 setTyConName tc name = tc {tyConName = name, tyConUnique = nameUnique name}
+
 \end{code}
 
 \begin{code}
@@ -459,7 +490,7 @@ instance Uniquable TyCon where
     getUnique tc = tyConUnique tc
 
 instance Outputable TyCon where
-    ppr tc  = ppr (getName tc)
+    ppr tc  = ppr (getName tc) 
 
 instance NamedThing TyCon where
     getName = tyConName
@@ -486,3 +517,6 @@ matchesTyCon tc1 tc2 =  uniq1 == uniq2 || uniq1 == anyBoxConKey
 			uniq1 = tyConUnique tc1
 			uniq2 = tyConUnique tc2
 \end{code}
+
+
+

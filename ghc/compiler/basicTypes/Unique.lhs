@@ -41,7 +41,7 @@ module Unique (
 	mkPreludeMiscIdUnique, mkPreludeDataConUnique,
 	mkPreludeTyConUnique, mkPreludeClassUnique,
 
-	getBuiltinUniques, mkBuiltinUnique,
+	getNumBuiltinUniques, getBuiltinUniques, mkBuiltinUnique,
 	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3
     ) where
 
@@ -286,7 +286,7 @@ Allocation of unique supply characters:
 mkAlphaTyVarUnique i            = mkUnique '1' i
 
 mkPreludeClassUnique i		= mkUnique '2' i
-mkPreludeTyConUnique i		= mkUnique '3' i
+mkPreludeTyConUnique i		= mkUnique '3' (3*i)
 mkTupleTyConUnique Boxed   a	= mkUnique '4' a
 mkTupleTyConUnique Unboxed a	= mkUnique '5' a
 
@@ -329,5 +329,10 @@ mkPseudoUnique3 i = mkUnique 'E' i -- used in NCG spiller to create spill Virtua
 
 getBuiltinUniques :: Int -> [Unique]
 getBuiltinUniques n = map (mkUnique 'B') [1 .. n]
+
+getNumBuiltinUniques :: Int        -- First unique
+                     -> Int        -- Number required
+                     -> [Unique]
+getNumBuiltinUniques base n = map (mkUnique 'B') [base .. base+n-1]
 \end{code}
 

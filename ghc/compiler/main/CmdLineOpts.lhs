@@ -166,7 +166,7 @@ import Argv
 import Constants	-- Default values for some flags
 
 import FastString	( headFS )
-import Maybes		( assocMaybe, firstJust, maybeToBool )
+import Maybes		( firstJust, maybeToBool )
 import Panic		( panic, panic# )
 
 #if __GLASGOW_HASKELL__ < 301
@@ -258,7 +258,7 @@ lookup_def_int   :: String -> Int -> Int
 lookup_def_float :: String -> Float -> Float
 lookup_str       :: String -> Maybe String
 
-lookUp     sw = maybeToBool (assoc_opts sw)
+lookUp     sw = sw `elem` argv
 	
 lookup_str sw = firstJust (map (startsWith sw) unpacked_opts)
 
@@ -278,7 +278,6 @@ lookup_def_float sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> read xx
 
-assoc_opts    = assocMaybe [ (a, True) | a <- argv ]
 unpacked_opts = map _UNPK_ argv
 
 {-
@@ -286,8 +285,6 @@ unpacked_opts = map _UNPK_ argv
  may turn out to be necessary later on if we turn hsc into
  a pure Win32 application where I think there's a command-line
  length limit of 255. unpacked_opts understands the @ option.
-
-assoc_opts    = assocMaybe [ (_PK_ a, True) | a <- unpacked_opts ]
 
 unpacked_opts :: [String]
 unpacked_opts =

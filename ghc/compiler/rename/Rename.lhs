@@ -249,7 +249,7 @@ implicitFVs mod_name decls
 	-- Virtually every program has error messages in it somewhere
     string_occs = [unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR]
 
-    get (TyClD (TyData _ _ _ _ _ _ (Just deriv_classes) _ _))
+    get (TyClD (TyData _ _ _ _ _ _ (Just deriv_classes) _ _ _ _))
        = concat (map get_deriv deriv_classes)
     get other = []
 
@@ -469,8 +469,9 @@ slurpDeferredDecls decls
     ASSERT( isEmptyFVs fvs )
     returnRn decls1
 
-stripDecl (mod, TyClD (TyData dt _ tc tvs _ nconstrs _ _ loc))
-  = (mod, TyClD (TyData dt [] tc tvs [] nconstrs Nothing NoDataPragmas loc))
+stripDecl (mod, TyClD (TyData dt _ tc tvs _ nconstrs _ _ loc name1 name2))
+  = (mod, TyClD (TyData dt [] tc tvs [] nconstrs Nothing NoDataPragmas loc
+		name1 name2))
 	-- Nuke the context and constructors
 	-- But retain the *number* of constructors!
 	-- Also the tvs will have kinds on them.
@@ -501,7 +502,7 @@ vars of the source program, and extracts from the decl the gate names.
 getGates source_fvs (SigD (IfaceSig _ ty _ _))
   = extractHsTyNames ty
 
-getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ _ _ _))
+getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ ))
   = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
 		        (hsTyVarNames tvs)
      `addOneToNameSet` cls)
@@ -526,7 +527,7 @@ getGates source_fvs (TyClD (TySynonym tycon tvs ty _))
 		       (hsTyVarNames tvs)
 	-- A type synonym type constructor isn't a "gate" for instance decls
 
-getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _))
+getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _ _ _))
   = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
 		       (hsTyVarNames tvs)
     `addOneToNameSet` tycon
@@ -602,7 +603,7 @@ fixitiesFromLocalDecls gbl_env decls
     getFixities acc (FixD fix)
       = fix_decl acc fix
 
-    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ _ _ _))
+    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ ))
       = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
 		-- Get fixities from class decl sigs too.
     getFixities acc other_decl

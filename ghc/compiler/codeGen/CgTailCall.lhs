@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.26 2000/07/14 08:14:53 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.27 2000/10/03 08:43:00 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -48,13 +48,14 @@ import ClosureInfo	( nodeMustPointToIt,
 import CmdLineOpts	( opt_DoSemiTagging )
 import Id		( Id, idType, idName )
 import DataCon		( DataCon, dataConTyCon, dataConTag, fIRST_TAG )
-import Maybes		( assocMaybe, maybeToBool )
+import Maybes		( maybeToBool )
 import PrimRep		( PrimRep(..) )
 import StgSyn		( StgArg, GenStgArg(..) )
 import Type		( isUnLiftedType )
 import TyCon            ( TyCon )
 import PrimOp		( PrimOp )
 import Util		( zipWithEqual )
+import ListSetOps	( assocMaybe )
 import Unique		( mkPseudoUnique1 )
 import Outputable
 import Panic		( panic, assertPanic )

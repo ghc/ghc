@@ -11,45 +11,16 @@ defined here so as to avod
 
 \begin{code}
 module PrelNames (
-	
 	Unique, Uniquable(..), hasKey, 	-- Re-exported for convenience
+
+	-----------------------------------------------------------
+	module PrelNames,	-- A huge bunch of (a) RdrNames, e.g. intTyCon_RDR
+				--		   (b) Uniques   e.g. intTyConKey
+				-- So many that we export them all
+
+	-----------------------------------------------------------
 	knownKeyRdrNames, 
         mkTupNameStr, mkTupConRdrName,
-
-	------------------------------------------------------------
-	-- Prelude modules
-	pREL_GHC, pREL_BASE, pREL_ADDR, pREL_STABLE,
-	pREL_IO_BASE, pREL_PACK, pREL_ERR, pREL_NUM, pREL_FLOAT, pREL_REAL,
-
-	------------------------------------------------------------
-	-- Module names (both Prelude and otherwise)
-	pREL_GHC_Name, pRELUDE_Name, pREL_MAIN_Name, mAIN_Name, 
-
-	------------------------------------------------------------
-	-- Original RdrNames for a few things
-        main_RDR, 
-	deRefStablePtr_RDR, makeStablePtr_RDR, 
-	ioTyCon_RDR, ioDataCon_RDR, bindIO_RDR, returnIO_RDR,
-	unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
-	eqClass_RDR, foldr_RDR, build_RDR,
-	ccallableClass_RDR, creturnableClass_RDR, 
-	monadClass_RDR, enumClass_RDR, ordClass_RDR,
-	ratioDataCon_RDR, negate_RDR, assertErr_RDR,
-	plusInteger_RDR, timesInteger_RDR, eqString_RDR,
-
-	-- Plus a whole lot more needed only in TcGenDeriv
-	eq_RDR, ne_RDR, not_RDR, compare_RDR, ge_RDR, le_RDR, gt_RDR,
-	ltTag_RDR, eqTag_RDR, gtTag_RDR, getTag_RDR,
-	and_RDR, true_RDR, false_RDR,
-	succ_RDR, pred_RDR, toEnum_RDR, fromEnum_RDR, 
-	minBound_RDR, maxBound_RDR,
-	enumFrom_RDR, enumFromThen_RDR, enumFromTo_RDR, enumFromThenTo_RDR,
-	map_RDR, append_RDR, compose_RDR,
-	plus_RDR, times_RDR, mkInt_RDR, 
-	error_RDR,
-	range_RDR, inRange_RDR, index_RDR,
-	readList___RDR, readList_RDR, readsPrec_RDR, lex_RDR, readParen_RDR,
-	showList_RDR, showList___RDR, showsPrec_RDR, showString_RDR, showSpace_RDR, showParen_RDR,
 
 	------------------------------------------------------------
 	-- Goups of classes and types
@@ -58,53 +29,7 @@ module PrelNames (
 	derivingOccurrences, 	-- For a given class C, this tells what other 
 	derivableClassKeys,	-- things are needed as a result of a 
 				-- deriving(C) clause
-	numericTyKeys, cCallishTyKeys, 
-
-	------------------------------------------------------------
-	-- Keys
-	absentErrorIdKey, addrDataConKey, addrPrimTyConKey, addrTyConKey,
-	appendIdKey, arrayPrimTyConKey, assertIdKey, augmentIdKey,
-	bcoPrimTyConKey, bindIOIdKey, boolTyConKey, boundedClassKey,
-	boxedConKey, buildIdKey, byteArrayPrimTyConKey, byteArrayTyConKey,
-	cCallableClassKey, cReturnableClassKey, charDataConKey,
-	charPrimTyConKey, charTyConKey, concatIdKey, consDataConKey,
-	deRefStablePtrIdKey, doubleDataConKey, doublePrimTyConKey,
-	doubleTyConKey, enumClassKey, enumFromClassOpKey,
-	enumFromThenClassOpKey, enumFromThenToClassOpKey,
-	enumFromToClassOpKey, eqClassKey, eqClassOpKey, eqStringIdKey,
-	errorIdKey, falseDataConKey, failMClassOpKey, filterIdKey,
-	floatDataConKey, floatPrimTyConKey, floatTyConKey, floatingClassKey,
-	foldlIdKey, foldrIdKey, foreignObjDataConKey, foreignObjPrimTyConKey,
-	foreignObjTyConKey, fractionalClassKey, fromEnumClassOpKey,
-	fromIntClassOpKey, fromIntegerClassOpKey, fromRationalClassOpKey,
-	funTyConKey, functorClassKey, geClassOpKey, getTagIdKey,
-	intDataConKey, intPrimTyConKey, intTyConKey, int8TyConKey,
-	int16TyConKey, int32TyConKey, int64PrimTyConKey, int64TyConKey,
-	smallIntegerDataConKey, largeIntegerDataConKey, integerMinusOneIdKey,
-	integerPlusOneIdKey, integerPlusTwoIdKey, int2IntegerIdKey,
-	integerTyConKey, integerZeroIdKey, integralClassKey,
-	irrefutPatErrorIdKey, ixClassKey, listTyConKey, mainKey,
-	makeStablePtrIdKey, mapIdKey, minusClassOpKey, monadClassKey,
-	monadPlusClassKey, mutableArrayPrimTyConKey,
-	mutableByteArrayPrimTyConKey, mutableByteArrayTyConKey,
-	mutVarPrimTyConKey, nilDataConKey, noMethodBindingErrorIdKey,
-	nonExhaustiveGuardsErrorIdKey, numClassKey, anyBoxConKey, ordClassKey,
-	orderingTyConKey, otherwiseIdKey, parErrorIdKey, parIdKey,
-	patErrorIdKey, plusIntegerIdKey, ratioDataConKey, ratioTyConKey,
-	rationalTyConKey, readClassKey, realClassKey, realFloatClassKey,
-	realFracClassKey, realWorldPrimIdKey, realWorldTyConKey,
-	recConErrorIdKey, recSelErrIdKey, recUpdErrorIdKey, returnIOIdKey,
-	returnMClassOpKey, runSTRepIdKey, showClassKey, ioTyConKey,
-	ioDataConKey, stablePtrDataConKey, stablePtrPrimTyConKey,
-	stablePtrTyConKey, stableNameDataConKey, stableNamePrimTyConKey,
-	stableNameTyConKey, statePrimTyConKey, timesIntegerIdKey, typeConKey,
-	kindConKey, boxityConKey, mVarPrimTyConKey, thenMClassOpKey,
-	threadIdPrimTyConKey, toEnumClassOpKey, traceIdKey, trueDataConKey,
-	unboundKey, unboxedConKey, unpackCStringUtf8IdKey,
-	unpackCStringAppendIdKey, unpackCStringFoldrIdKey, unpackCStringIdKey,
-	unsafeCoerceIdKey, ushowListIdKey, weakPrimTyConKey, wordDataConKey,
-	wordPrimTyConKey, wordTyConKey, word8TyConKey, word16TyConKey,
-	word32TyConKey, word64PrimTyConKey, word64TyConKey, zipIdKey
+	numericTyKeys, cCallishTyKeys
 
     ) where
 
@@ -132,7 +57,8 @@ import Panic	  ( panic )
 %************************************************************************
 
 This section tells what the compiler knows about the
-assocation of names with uniques
+assocation of names with uniques.  These ones are the *non* wired-in ones.
+The wired in ones are defined in TysWiredIn etc.
 
 \begin{code}
 knownKeyRdrNames :: [(RdrName, Unique)]
@@ -323,32 +249,32 @@ to write them all down in one place.
 \begin{code}
 main_RDR		= varQual mAIN_Name      SLIT("main")
 
-ioTyCon_RDR		= tcQual   pREL_IO_BASE_Name SLIT("IO")
-ioDataCon_RDR  	   	= dataQual pREL_IO_BASE_Name SLIT("IO")
-bindIO_RDR	        = varQual  pREL_IO_BASE_Name SLIT("bindIO")
-returnIO_RDR	        = varQual  pREL_IO_BASE_Name SLIT("returnIO")
+-- Stuff from PrelGHC
+funTyCon_RDR		= tcQual  pREL_GHC_Name SLIT("(->)") 
+ccallableClass_RDR	= clsQual pREL_GHC_Name SLIT("CCallable")
+creturnableClass_RDR	= clsQual pREL_GHC_Name SLIT("CReturnable")
 
-
-rationalTyCon_RDR	= tcQual   pREL_REAL_Name  SLIT("Rational")
-ratioTyCon_RDR		= tcQual   pREL_REAL_Name  SLIT("Ratio")
-ratioDataCon_RDR	= dataQual pREL_REAL_Name  SLIT(":%")
-
-byteArrayTyCon_RDR		= tcQual pREL_BYTEARR_Name  SLIT("ByteArray")
-mutableByteArrayTyCon_RDR	= tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray")
-
-foreignObjTyCon_RDR	= tcQual   pREL_IO_BASE_Name SLIT("ForeignObj")
-bcoPrimTyCon_RDR	= tcQual   pREL_BASE_Name SLIT("BCO#")
-stablePtrTyCon_RDR	= tcQual   pREL_STABLE_Name SLIT("StablePtr")
-stablePtrDataCon_RDR	= dataQual pREL_STABLE_Name SLIT("StablePtr")
-deRefStablePtr_RDR      = varQual  pREL_STABLE_Name SLIT("deRefStablePtr")
-makeStablePtr_RDR       = varQual  pREL_STABLE_Name SLIT("makeStablePtr")
-
--- Random PrelBase data types and constructors
+-- PrelBase data types and constructors
+charTyCon_RDR	   = tcQual   pREL_BASE_Name SLIT("Char")
+charDataCon_RDR    = dataQual pREL_BASE_Name SLIT("C#")
 intTyCon_RDR	   = tcQual   pREL_BASE_Name SLIT("Int")
-orderingTyCon_RDR  = tcQual   pREL_BASE_Name SLIT("Ordering")
 mkInt_RDR	   = dataQual pREL_BASE_Name SLIT("I#")
+orderingTyCon_RDR  = tcQual   pREL_BASE_Name SLIT("Ordering")
+boolTyCon_RDR	   = tcQual   pREL_BASE_Name SLIT("Bool")
 false_RDR	   = dataQual pREL_BASE_Name SLIT("False")
 true_RDR	   = dataQual pREL_BASE_Name SLIT("True")
+listTyCon_RDR	   = tcQual   pREL_BASE_Name SLIT("[]")
+nil_RDR		   = dataQual pREL_BASE_Name SLIT("[]")
+cons_RDR	   = dataQual pREL_BASE_Name SLIT(":")
+
+-- Generics
+crossTyCon_RDR     = tcQual   pREL_BASE_Name SLIT(":*:")
+crossDataCon_RDR   = dataQual pREL_BASE_Name SLIT(":*:")
+plusTyCon_RDR      = tcQual   pREL_BASE_Name SLIT(":+:")
+inlDataCon_RDR     = dataQual pREL_BASE_Name SLIT("Inl")
+inrDataCon_RDR     = dataQual pREL_BASE_Name SLIT("Inr")
+genUnitTyCon_RDR   = tcQual   pREL_BASE_Name SLIT("Unit")
+genUnitDataCon_RDR = dataQual pREL_BASE_Name SLIT("Unit")
 
 -- Random PrelBase functions
 otherwiseId_RDR    = varQual pREL_BASE_Name SLIT("otherwise")
@@ -369,20 +295,20 @@ unpackCStringFoldr_RDR  = varQual pREL_BASE_Name SLIT("unpackFoldrCString#")
 unpackCStringUtf8_RDR   = varQual pREL_BASE_Name SLIT("unpackCStringUtf8#")
 
 -- Classes Eq and Ord
-eqClass_RDR		= clsQual pREL_BASE_Name SLIT("Eq")
-ordClass_RDR		= clsQual pREL_BASE_Name SLIT("Ord")
-eq_RDR		   = varQual pREL_BASE_Name SLIT("==")
-ne_RDR		   = varQual pREL_BASE_Name SLIT("/=")
-le_RDR		   = varQual pREL_BASE_Name SLIT("<=")
-lt_RDR		   = varQual pREL_BASE_Name SLIT("<")
-ge_RDR		   = varQual pREL_BASE_Name SLIT(">=")
-gt_RDR		   = varQual pREL_BASE_Name SLIT(">")
+eqClass_RDR	   = clsQual pREL_BASE_Name SLIT("Eq")
+ordClass_RDR	   = clsQual pREL_BASE_Name SLIT("Ord")
+eq_RDR		   = varQual  pREL_BASE_Name SLIT("==")
+ne_RDR		   = varQual  pREL_BASE_Name SLIT("/=")
+le_RDR		   = varQual  pREL_BASE_Name SLIT("<=")
+lt_RDR		   = varQual  pREL_BASE_Name SLIT("<")
+ge_RDR		   = varQual  pREL_BASE_Name SLIT(">=")
+gt_RDR		   = varQual  pREL_BASE_Name SLIT(">")
 ltTag_RDR	   = dataQual pREL_BASE_Name SLIT("LT")
 eqTag_RDR	   = dataQual pREL_BASE_Name SLIT("EQ")
 gtTag_RDR	   = dataQual pREL_BASE_Name SLIT("GT")
-max_RDR		   = varQual pREL_BASE_Name SLIT("max")
-min_RDR		   = varQual pREL_BASE_Name SLIT("min")
-compare_RDR	   = varQual pREL_BASE_Name SLIT("compare")
+max_RDR		   = varQual  pREL_BASE_Name SLIT("max")
+min_RDR		   = varQual  pREL_BASE_Name SLIT("min")
+compare_RDR	   = varQual  pREL_BASE_Name SLIT("compare")
 
 -- Class Monad
 monadClass_RDR	   = clsQual pREL_BASE_Name SLIT("Monad")
@@ -392,7 +318,7 @@ returnM_RDR	   = varQual pREL_BASE_Name SLIT("return")
 failM_RDR	   = varQual pREL_BASE_Name SLIT("fail")
 
 -- Class Functor
-functorClass_RDR	= clsQual pREL_BASE_Name SLIT("Functor")
+functorClass_RDR   = clsQual pREL_BASE_Name SLIT("Functor")
 
 -- Class Show
 showClass_RDR	   = clsQual pREL_SHOW_Name SLIT("Show")
@@ -403,7 +329,6 @@ showSpace_RDR	   = varQual pREL_SHOW_Name SLIT("showSpace")
 showString_RDR	   = varQual pREL_SHOW_Name SLIT("showString")
 showParen_RDR	   = varQual pREL_SHOW_Name SLIT("showParen")
 
-
 -- Class Read
 readClass_RDR	   = clsQual pREL_READ_Name SLIT("Read")
 readsPrec_RDR	   = varQual pREL_READ_Name SLIT("readsPrec")
@@ -413,7 +338,7 @@ lex_RDR		   = varQual pREL_READ_Name SLIT("lex")
 readList___RDR     = varQual pREL_READ_Name SLIT("readList__")
 
 
--- Class Num
+-- Module PrelNum
 numClass_RDR	   = clsQual pREL_NUM_Name SLIT("Num")
 fromInt_RDR	   = varQual pREL_NUM_Name SLIT("fromInt")
 fromInteger_RDR	   = varQual pREL_NUM_Name SLIT("fromInteger")
@@ -423,26 +348,33 @@ plus_RDR	   = varQual pREL_NUM_Name SLIT("+")
 times_RDR	   = varQual pREL_NUM_Name SLIT("*")
 plusInteger_RDR	   = varQual pREL_NUM_Name SLIT("plusInteger")
 timesInteger_RDR   = varQual pREL_NUM_Name SLIT("timesInteger")
+integerTyCon_RDR   = tcQual  pREL_NUM_Name SLIT("Integer")
+smallIntegerDataCon_RDR = dataQual pREL_NUM_Name SLIT("S#")
+largeIntegerDataCon_RDR = dataQual pREL_NUM_Name SLIT("J#")
 
--- Other numberic classes
-realClass_RDR		= clsQual pREL_REAL_Name  SLIT("Real")
-integralClass_RDR	= clsQual pREL_REAL_Name  SLIT("Integral")
-realFracClass_RDR	= clsQual pREL_REAL_Name  SLIT("RealFrac")
-fractionalClass_RDR	= clsQual pREL_REAL_Name  SLIT("Fractional")
-fromRational_RDR   	= varQual pREL_REAL_Name  SLIT("fromRational")
+-- PrelReal types and classes
+rationalTyCon_RDR	= tcQual   pREL_REAL_Name  SLIT("Rational")
+ratioTyCon_RDR		= tcQual   pREL_REAL_Name  SLIT("Ratio")
+ratioDataCon_RDR	= dataQual pREL_REAL_Name  SLIT(":%")
+realClass_RDR		= clsQual  pREL_REAL_Name  SLIT("Real")
+integralClass_RDR	= clsQual  pREL_REAL_Name  SLIT("Integral")
+realFracClass_RDR	= clsQual  pREL_REAL_Name  SLIT("RealFrac")
+fractionalClass_RDR	= clsQual  pREL_REAL_Name  SLIT("Fractional")
+fromRational_RDR   	= varQual  pREL_REAL_Name  SLIT("fromRational")
 
-floatingClass_RDR	= clsQual pREL_FLOAT_Name  SLIT("Floating")
-realFloatClass_RDR	= clsQual pREL_FLOAT_Name  SLIT("RealFloat")
+-- PrelFloat classes
+floatTyCon_RDR		= tcQual   pREL_FLOAT_Name SLIT("Float")
+floatDataCon_RDR	= dataQual pREL_FLOAT_Name SLIT("F#")
+doubleTyCon_RDR		= tcQual   pREL_FLOAT_Name SLIT("Double")
+doubleDataCon_RDR	= dataQual pREL_FLOAT_Name SLIT("D#")
+floatingClass_RDR	= clsQual  pREL_FLOAT_Name SLIT("Floating")
+realFloatClass_RDR	= clsQual  pREL_FLOAT_Name SLIT("RealFloat")
 
 -- Class Ix
 ixClass_RDR	   = clsQual pREL_ARR_Name SLIT("Ix")
 range_RDR	   = varQual pREL_ARR_Name SLIT("range")
 index_RDR	   = varQual pREL_ARR_Name SLIT("index")
 inRange_RDR	   = varQual pREL_ARR_Name SLIT("inRange")
-
--- Class CCallable and CReturnable
-ccallableClass_RDR	= clsQual pREL_GHC_Name  SLIT("CCallable")
-creturnableClass_RDR	= clsQual pREL_GHC_Name  SLIT("CReturnable")
 
 -- Class Enum
 enumClass_RDR 	   = clsQual pREL_ENUM_Name SLIT("Enum")
@@ -466,21 +398,48 @@ concat_RDR	   = varQual pREL_LIST_Name SLIT("concat")
 filter_RDR	   = varQual pREL_LIST_Name SLIT("filter")
 zip_RDR		   = varQual pREL_LIST_Name SLIT("zip")
 
+-- IOBase things
+ioTyCon_RDR		= tcQual   pREL_IO_BASE_Name SLIT("IO")
+ioDataCon_RDR  	   	= dataQual pREL_IO_BASE_Name SLIT("IO")
+bindIO_RDR	        = varQual  pREL_IO_BASE_Name SLIT("bindIO")
+returnIO_RDR	        = varQual  pREL_IO_BASE_Name SLIT("returnIO")
+
+-- Int, Word, and Addr things
 int8TyCon_RDR    = tcQual iNT_Name       SLIT("Int8")
 int16TyCon_RDR   = tcQual iNT_Name       SLIT("Int16")
 int32TyCon_RDR   = tcQual iNT_Name       SLIT("Int32")
 int64TyCon_RDR   = tcQual pREL_ADDR_Name SLIT("Int64")
 
-word8TyCon_RDR    = tcQual wORD_Name      SLIT("Word8")
-word16TyCon_RDR   = tcQual wORD_Name      SLIT("Word16")
-word32TyCon_RDR   = tcQual wORD_Name      SLIT("Word32")
-word64TyCon_RDR   = tcQual pREL_ADDR_Name SLIT("Word64")
+wordTyCon_RDR     = tcQual   pREL_ADDR_Name SLIT("Word")
+wordDataCon_RDR   = dataQual pREL_ADDR_Name SLIT("W#")
+word8TyCon_RDR    = tcQual   wORD_Name      SLIT("Word8")
+word16TyCon_RDR   = tcQual   wORD_Name      SLIT("Word16")
+word32TyCon_RDR   = tcQual   wORD_Name      SLIT("Word32")
+word64TyCon_RDR   = tcQual   pREL_ADDR_Name SLIT("Word64")
+
+addrTyCon_RDR	  = tcQual   pREL_ADDR_Name SLIT("Addr")
+addrDataCon_RDR	  = dataQual pREL_ADDR_Name SLIT("A#")
+
+
+-- Byte array types
+byteArrayTyCon_RDR		= tcQual pREL_BYTEARR_Name  SLIT("ByteArray")
+mutableByteArrayTyCon_RDR	= tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray")
+
+-- Forign objects and weak pointers
+foreignObjTyCon_RDR	= tcQual   pREL_IO_BASE_Name SLIT("ForeignObj")
+foreignObjDataCon_RDR	= dataQual pREL_IO_BASE_Name SLIT("ForeignObj")
+bcoPrimTyCon_RDR	= tcQual   pREL_BASE_Name SLIT("BCO#")
+stablePtrTyCon_RDR	= tcQual   pREL_STABLE_Name SLIT("StablePtr")
+stablePtrDataCon_RDR	= dataQual pREL_STABLE_Name SLIT("StablePtr")
+deRefStablePtr_RDR      = varQual  pREL_STABLE_Name SLIT("deRefStablePtr")
+makeStablePtr_RDR       = varQual  pREL_STABLE_Name SLIT("makeStablePtr")
 
 error_RDR	   = varQual pREL_ERR_Name SLIT("error")
 assert_RDR         = varQual pREL_GHC_Name SLIT("assert")
 getTag_RDR	   = varQual pREL_GHC_Name SLIT("getTag#")
 assertErr_RDR      = varQual pREL_ERR_Name SLIT("assertError")
 runSTRep_RDR	   = varQual pREL_ST_Name  SLIT("runSTRep")
+
 \end{code}
 
 
@@ -590,6 +549,11 @@ boxityConKey				= mkPreludeTyConUnique 68
 typeConKey				= mkPreludeTyConUnique 69
 threadIdPrimTyConKey			= mkPreludeTyConUnique 70
 bcoPrimTyConKey				= mkPreludeTyConUnique 71
+
+-- Generic Type Constructors
+crossTyConKey		      		= mkPreludeTyConUnique 72
+plusTyConKey		      		= mkPreludeTyConUnique 73
+genUnitTyConKey				= mkPreludeTyConUnique 74
 \end{code}
 
 %************************************************************************
@@ -616,6 +580,12 @@ stableNameDataConKey			= mkPreludeDataConUnique 13
 trueDataConKey				= mkPreludeDataConUnique 14
 wordDataConKey				= mkPreludeDataConUnique 15
 ioDataConKey				= mkPreludeDataConUnique 16
+
+-- Generic data constructors
+crossDataConKey		      		= mkPreludeDataConUnique 17
+inlDataConKey		      		= mkPreludeDataConUnique 18
+inrDataConKey		      		= mkPreludeDataConUnique 19
+genUnitDataConKey			= mkPreludeDataConUnique 20
 \end{code}
 
 %************************************************************************
@@ -703,6 +673,43 @@ runSTRepIdKey		      = mkPreludeMiscIdUnique 122
 
 %************************************************************************
 %*									*
+\subsection{Standard groups of types}
+%*									*
+%************************************************************************
+
+\begin{code}
+numericTyKeys = 
+	[ addrTyConKey
+	, wordTyConKey
+	, intTyConKey
+	, integerTyConKey
+	, doubleTyConKey
+	, floatTyConKey
+	]
+
+	-- Renamer always imports these data decls replete with constructors
+	-- so that desugarer can always see their constructors.  Ugh!
+cCallishTyKeys = 
+	[ addrTyConKey
+	, wordTyConKey
+	, byteArrayTyConKey
+	, mutableByteArrayTyConKey
+	, foreignObjTyConKey
+	, stablePtrTyConKey
+	, int8TyConKey
+	, int16TyConKey
+	, int32TyConKey
+	, int64TyConKey
+	, word8TyConKey
+	, word16TyConKey
+	, word32TyConKey
+	, word64TyConKey
+	]
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection[Class-std-groups]{Standard groups of Prelude classes}
 %*									*
 %************************************************************************
@@ -782,15 +789,6 @@ fractionalClassKeys =
 
 	-- the strictness analyser needs to know about numeric types
 	-- (see SaAbsInt.lhs)
-numericTyKeys = 
-	[ addrTyConKey
-	, wordTyConKey
-	, intTyConKey
-	, integerTyConKey
-	, doubleTyConKey
-	, floatTyConKey
-	]
-
 needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
   	[ readClassKey
     	]
@@ -798,25 +796,6 @@ needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
 cCallishClassKeys = 
 	[ cCallableClassKey
 	, cReturnableClassKey
-	]
-
-	-- Renamer always imports these data decls replete with constructors
-	-- so that desugarer can always see their constructors.  Ugh!
-cCallishTyKeys = 
-	[ addrTyConKey
-	, wordTyConKey
-	, byteArrayTyConKey
-	, mutableByteArrayTyConKey
-	, foreignObjTyConKey
-	, stablePtrTyConKey
-	, int8TyConKey
-	, int16TyConKey
-	, int32TyConKey
-	, int64TyConKey
-	, word8TyConKey
-	, word16TyConKey
-	, word32TyConKey
-	, word64TyConKey
 	]
 
 standardClassKeys

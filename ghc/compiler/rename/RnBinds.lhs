@@ -28,14 +28,14 @@ import RnMonad
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, 
 			  lookupGlobalOccRn, lookupSigOccRn,
-			  warnUnusedLocalBinds, mapFvRn, 
+			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV
 			)
 import CmdLineOpts	( opt_WarnMissingSigs )
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( OccName, Name, nameOccName, mkUnboundName, isUnboundName )
 import NameSet
-import RdrName		( RdrName, rdrNameOcc  )
+import RdrName		( RdrName, rdrNameOcc )
 import BasicTypes	( RecFlag(..) )
 import List		( partition )
 import Bag		( bagToList )
@@ -180,7 +180,7 @@ rnTopMonoBinds mbinds sigs
     rn_mono_binds siglist mbinds		   `thenRn` \ (final_binds, bind_fvs) ->
     returnRn (final_binds, bind_fvs `plusFV` sig_fvs)
   where
-    binder_rdr_names = map fst (bagToList (collectMonoBinders mbinds))
+    binder_rdr_names = collectMonoBinders mbinds
 \end{code}
 
 %************************************************************************
@@ -246,7 +246,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
     warnUnusedLocalBinds unused_binders	`thenRn_`
     returnRn (result, delListFromNameSet all_fvs new_mbinders)
   where
-    mbinders_w_srclocs = bagToList (collectMonoBinders mbinds)
+    mbinders_w_srclocs = collectLocatedMonoBinders mbinds
 \end{code}
 
 
@@ -364,27 +364,40 @@ in many ways the @op@ in an instance decl is just like an occurrence, not
 a binder.
 
 \begin{code}
-rnMethodBinds :: RdrNameMonoBinds -> RnMS (RenamedMonoBinds, FreeVars)
+rnMethodBinds :: [Name]			-- Names for generic type variables
+	      -> RdrNameMonoBinds
+	      -> RnMS (RenamedMonoBinds, FreeVars)
 
-rnMethodBinds EmptyMonoBinds = returnRn (EmptyMonoBinds, emptyFVs)
+rnMethodBinds gen_tyvars EmptyMonoBinds = returnRn (EmptyMonoBinds, emptyFVs)
 
-rnMethodBinds (AndMonoBinds mb1 mb2)
-  = rnMethodBinds mb1	`thenRn` \ (mb1', fvs1) ->
-    rnMethodBinds mb2	`thenRn` \ (mb2', fvs2) ->
+rnMethodBinds gen_tyvars (AndMonoBinds mb1 mb2)
+  = rnMethodBinds gen_tyvars mb1	`thenRn` \ (mb1', fvs1) ->
+    rnMethodBinds gen_tyvars mb2	`thenRn` \ (mb2', fvs2) ->
     returnRn (mb1' `AndMonoBinds` mb2', fvs1 `plusFV` fvs2)
 
-rnMethodBinds (FunMonoBind name inf matches locn)
+rnMethodBinds gen_tyvars (FunMonoBind name inf matches locn)
   = pushSrcLocRn locn				   	$
 
     lookupGlobalOccRn name				`thenRn` \ sel_name -> 
 	-- We use the selector name as the binder
 
-    mapFvRn rnMatch matches				`thenRn` \ (new_matches, fvs) ->
+    mapFvRn rn_match matches				`thenRn` \ (new_matches, fvs) ->
     mapRn_ (checkPrecMatch inf sel_name) new_matches	`thenRn_`
     returnRn (FunMonoBind sel_name inf new_matches locn, fvs `addOneFV` sel_name)
+  where
+	-- Gruesome; bring into scope the correct members of the generic type variables
+	-- See comments in RnSource.rnDecl(ClassDecl)
+    rn_match match@(Match _ (TypePatIn ty : _) _ _)
+	= extendTyVarEnvFVRn gen_tvs (rnMatch match)
+	where
+	  tvs     = map rdrNameOcc (extractHsTyRdrNames ty)
+	  gen_tvs = [tv | tv <- gen_tyvars, nameOccName tv `elem` tvs] 
+
+    rn_match match = rnMatch match
+	
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBinds mbind@(PatMonoBind other_pat _ locn)
+rnMethodBinds gen_tyvars mbind@(PatMonoBind other_pat _ locn)
   = pushSrcLocRn locn	$
     failWithRn (EmptyMonoBinds, emptyFVs) (methodBindErr mbind)
 \end{code}
@@ -496,7 +509,7 @@ renameSigs ok_sig sigs
 -- Doesn't seem worth much trouble to sort this.
 
 renameSig :: Sig RdrName -> RnMS (Sig Name, FreeVars)
-
+-- ClassOpSig is renamed elsewhere.
 renameSig (Sig v ty src_loc)
   = pushSrcLocRn src_loc $
     lookupSigOccRn v				`thenRn` \ new_v ->

@@ -64,6 +64,7 @@ import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_InPackage )
 import Outputable
 import List		( insert )
+import Class            ( DefMeth (..) )
 
 import GlaExts
 import FastString	( tailFS )
@@ -163,6 +164,8 @@ import FastString	( tailFS )
 
  '{'		{ ITocurly } 			-- special symbols
  '}'		{ ITccurly }
+ '{|'		{ ITocurlybar } 			-- special symbols
+ '|}'		{ ITccurlybar } 			-- special symbols
  '['		{ ITobrack }
  ']'		{ ITcbrack }
  '('		{ IToparen }
@@ -332,8 +335,10 @@ csigs1		: 				{ [] }
 		| csig ';' csigs1		{ $1 : $3 }
 
 csig		:: { RdrNameSig }
-csig		:  src_loc var_name '::' type		{ mkClassOpSig False $2 $4 $1 }
-	        |  src_loc var_name '=' '::' type	{ mkClassOpSig True  $2 $5 $1 }
+csig		:  src_loc var_name '::' type		{ mkClassOpSig NoDefMeth $2 $4 $1 }
+	        |  src_loc var_name '=' '::' type	{ mkClassOpSig (DefMeth (error "DefMeth") )
+								$2 $5 $1 }
+	        |  src_loc var_name ';' '::' type	{ mkClassOpSig GenDefMeth  $2 $5 $1 }		
 
 --------------------------------------------------------------------------
 
@@ -363,9 +368,9 @@ decl    : src_loc var_name '::' type maybe_idinfo
 	| src_loc 'type' tc_name tv_bndrs '=' type 		       
 			{ TyClD (TySynonym $3 $4 $6 $1) }
 	| src_loc 'data' opt_decl_context tc_name tv_bndrs constrs 	       
-	       		{ TyClD (TyData DataType $3 $4 $5 $6 (length $6) Nothing noDataPragmas $1) }
+	       		{ TyClD (mkTyData DataType $3 $4 $5 $6 (length $6) Nothing noDataPragmas $1) }
 	| src_loc 'newtype' opt_decl_context tc_name tv_bndrs newtype_constr
-			{ TyClD (TyData NewType $3 $4 $5 $6 1 Nothing noDataPragmas $1) }
+			{ TyClD (mkTyData NewType $3 $4 $5 $6 1 Nothing noDataPragmas $1) }
 	| src_loc 'class' opt_decl_context tc_name tv_bndrs fds csigs
 			{ TyClD (mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds 
 					noClassPragmas $1) }

@@ -39,13 +39,13 @@ import BasicTypes	( Version, defaultFixity )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg, Message
 			)
-import RdrName		( RdrName, dummyRdrVarName, rdrNameOcc,
+import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			  RdrNameEnv, emptyRdrEnv, extendRdrEnv, 
 			  lookupRdrEnv, addListToRdrEnv, rdrEnvToList, rdrEnvElts
 			)
 import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  isLocallyDefinedName, nameModule, nameOccName,
-			  decode, mkLocalName, mkUnboundName,
+			  decode, mkLocalName, mkUnboundName, mkKnownKeyGlobal,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnvList
 			)
 import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
@@ -53,10 +53,10 @@ import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
 			)
 import NameSet		
 import CmdLineOpts	( opt_D_dump_rn_trace, opt_HiMap )
-import PrelInfo		( builtinNames )
+import PrelInfo		( wiredInNames, knownKeyRdrNames )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
-import FiniteMap	( FiniteMap, emptyFM, bagToFM )
+import FiniteMap	( FiniteMap, emptyFM, listToFM, plusFM )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
@@ -401,10 +401,13 @@ emptyIfaces = Ifaces { iImpModInfo = emptyFM,
 	      }
 
 builtins :: FiniteMap (ModuleName,OccName) Name
-builtins = 
-   bagToFM (
-   mapBag (\ name ->  ((moduleName (nameModule name), nameOccName name), name))
- 	  builtinNames)
+builtins = listToFM wired_in `plusFM` listToFM known_key
+	 where
+	   wired_in = [ ((moduleName (nameModule name), nameOccName name), name)
+		      | name <- wiredInNames ]
+
+	   known_key = [ ((rdrNameModule rdr_name, rdrNameOcc rdr_name), mkKnownKeyGlobal rdr_name uniq) 
+		       | (rdr_name, uniq) <- knownKeyRdrNames ]
 \end{code}
 
 @renameSourceCode@ is used to rename stuff ``out-of-line'';

@@ -6,6 +6,7 @@
 \begin{code}
 module Class (
 	Class, ClassOpItem, ClassPred, ClassContext, FunDep,
+	DefMeth (..),
 
 	mkClass, classTyVars, classArity,
 	classKey, className, classSelIds, classTyCon,
@@ -58,10 +59,14 @@ type ClassContext = [ClassPred]
 type FunDep a	  = ([a],[a])	--  e.g. class C a b c |  a b -> c, a c -> b  where ...
 				--  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 
-type ClassOpItem = (Id, 	--   Selector function; contains unfolding
-		    Id, 	--   Default methods
-		    Bool)	--   True <=> an explicit default method was 
-				--	      supplied in the class decl
+type ClassOpItem = (Id, DefMeth Id)
+	-- Selector function; contains unfolding
+	-- Default-method info
+
+data DefMeth id = NoDefMeth 		-- No default method
+	        | DefMeth id 		-- A polymorphic default method (named id)
+	        | GenDefMeth 		-- A generic default method
+                deriving Eq  
 \end{code}
 
 The @mkClass@ function fills in the indirect superclasses.
@@ -100,7 +105,7 @@ classArity clas = length (classTyVars clas)
 	-- Could memoise this
 
 classSelIds (Class {classSCSels = sc_sels, classOpStuff = op_stuff})
-  = sc_sels ++ [op_sel | (op_sel, _, _) <- op_stuff]
+  = sc_sels ++ [op_sel | (op_sel, _) <- op_stuff]
 
 classTvsFds c
   = (classTyVars c, classFunDeps c)

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.36 2000/09/22 15:56:13 simonpj Exp $
+$Id: Parser.y,v 1.37 2000/10/03 08:43:02 simonpj Exp $
 
 Haskell grammar.
 
@@ -14,6 +14,7 @@ module Parser ( parse ) where
 import HsSyn
 import HsPragmas
 import HsTypes		( mkHsTupCon )
+import HsPat            ( InPat(..) )
 
 import RdrHsSyn
 import Lex
@@ -30,6 +31,7 @@ import Panic
 
 import GlaExts
 import FastString	( tailFS )
+import Outputable
 
 #include "HsVersions.h"
 }
@@ -158,6 +160,8 @@ Conflicts: 14 shift/reduce
 
  '{'		{ ITocurly } 			-- special symbols
  '}'		{ ITccurly }
+ '{|'           { ITocurlybar }
+ '|}'           { ITccurlybar }
  vccurly	{ ITvccurly } -- virtual close curly (from layout)
  '['		{ ITobrack }
  ']'		{ ITcbrack }
@@ -328,13 +332,13 @@ topdecl :: { RdrBinding }
 	| srcloc 'data' ctype '=' constrs deriving
 		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
 		   returnP (RdrHsDecl (TyClD
-		      (TyData DataType cs c ts (reverse $5) (length $5) $6
+		      (mkTyData DataType cs c ts (reverse $5) (length $5) $6
 			NoDataPragmas $1))) }
 
 	| srcloc 'newtype' ctype '=' newconstr deriving
 		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
 		   returnP (RdrHsDecl (TyClD
-		      (TyData NewType cs c ts [$5] 1 $6
+		      (mkTyData NewType cs c ts [$5] 1 $6
 			NoDataPragmas $1))) }
 
 	| srcloc 'class' ctype fds where
@@ -486,7 +490,7 @@ sigtypes :: { [RdrNameHsType] }
 	| sigtypes ',' sigtype		{ $3 : $1 }
 
 sigtype :: { RdrNameHsType }
-	: ctype				{ mkHsForAllTy Nothing [] $1 }
+	: ctype				{ (mkHsForAllTy Nothing [] $1) }
 
 sig_vars :: { [RdrName] }
 	 : sig_vars ',' var		{ $3 : $1 }
@@ -499,16 +503,21 @@ sig_vars :: { [RdrName] }
 ctype	:: { RdrNameHsType }
 	: 'forall' tyvars '.' ctype	{ mkHsForAllTy (Just $2) [] $4 }
 	| context type			{ mkHsForAllTy Nothing   $1 $2 }
-		-- A type of form (context => type) is an *implicit* HsForAllTy
+	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| type				{ $1 }
 
 type :: { RdrNameHsType }
-	: btype '->' type		{ HsFunTy $1 $3 }
+	: gentype '->' type		{ HsFunTy $1 $3 }
 	| ipvar '::' type		{ mkHsIParamTy $1 $3 }
-	| btype				{ $1 }
+	| gentype			{ $1 }
+
+gentype :: { RdrNameHsType }
+        : btype                         { $1 }
+-- Generics
+        | atype tyconop atype           { HsOpTy $1 $2 $3 }
 
 btype :: { RdrNameHsType }
-	: btype atype			{ HsAppTy $1 $2 }
+	: btype atype			{ (HsAppTy $1 $2) }
 	| atype				{ $1 }
 
 atype :: { RdrNameHsType }
@@ -517,7 +526,9 @@ atype :: { RdrNameHsType }
 	| '(' type ',' types ')'	{ HsTupleTy (mkHsTupCon tcName Boxed  ($2:$4)) ($2 : reverse $4) }
 	| '(#' types '#)'		{ HsTupleTy (mkHsTupCon tcName Unboxed     $2) (reverse $2)	 }
 	| '[' type ']'			{ HsListTy $2 }
-	| '(' ctype ')'			{ $2 }
+	| '(' ctype ')'		        { $2 }
+-- Generics
+        | INTEGER                       { HsNumTy $1 }
 
 -- An inst_type is what occurs in the head of an instance decl
 --	e.g.  (Foo a, Gaz b) => Wibble a b
@@ -648,15 +659,16 @@ dclasses :: { [RdrName] }
 -}
 
 valdef :: { RdrBinding }
-	: infixexp srcloc opt_sig rhs		{% checkValDef $1 $3 $4 $2 }
-	| infixexp srcloc '::' sigtype		{% checkValSig $1 $4 $2 }
+	: infixexp srcloc opt_sig rhs		{% (checkValDef $1 $3 $4 $2) }
+	| infixexp srcloc '::' sigtype		{% (checkValSig $1 $4 $2) }
 	| var ',' sig_vars srcloc '::' sigtype	{ foldr1 RdrAndBindings 
 							 [ RdrSig (Sig n $6 $4) | n <- $1:$3 ]
-						}
+                                                }
+
 
 rhs	:: { RdrNameGRHSs }
-	: '=' srcloc exp wherebinds	{ GRHSs (unguardedRHS $3 $2) 
-								$4 Nothing}
+	: '=' srcloc exp wherebinds	{ (GRHSs (unguardedRHS $3 $2) 
+								$4 Nothing)}
 	| gdrhs	wherebinds		{ GRHSs (reverse $1) $2 Nothing }
 
 gdrhs :: { [RdrNameGRHS] }
@@ -670,13 +682,14 @@ gdrh :: { RdrNameGRHS }
 -- Expressions
 
 exp   :: { RdrNameHsExpr }
-	: infixexp '::' sigtype		{ ExprWithTySig $1 $3 }
+	: infixexp '::' sigtype		{ (ExprWithTySig $1 $3) }
 	| infixexp 'with' dbinding	{ HsWith $1 $3 }
 	| infixexp			{ $1 }
 
 infixexp :: { RdrNameHsExpr }
 	: exp10				{ $1 }
-	| infixexp qop exp10		{ OpApp $1 $2 (panic "fixity") $3 }
+	| infixexp qop exp10		{ (OpApp $1 (HsVar $2) 
+						(panic "fixity") $3 )}
 
 exp10 :: { RdrNameHsExpr }
 	: '\\' aexp aexps opt_asig '->' srcloc exp	
@@ -706,24 +719,29 @@ ccallid :: { FAST_STRING }
 	|  CONID				{ $1 }
 
 fexp 	:: { RdrNameHsExpr }
-	: fexp aexp				{ HsApp $1 $2 }
+	: fexp aexp				{ (HsApp $1 $2) }
   	| aexp					{ $1 }
 
 aexps0 	:: { [RdrNameHsExpr] }
-	: aexps					{ reverse $1 }
+	: aexps					{ (reverse $1) }
 
 aexps 	:: { [RdrNameHsExpr] }
 	: aexps aexp				{ $2 : $1 }
   	| {- empty -}				{ [] }
 
 aexp	:: { RdrNameHsExpr }
-  	: aexp '{' fbinds '}' 		{% mkRecConstrOrUpdate $1 (reverse $3) }
-  	| aexp1				{ $1 }
+        : var_or_con '{|' gentype '|}'          { (HsApp $1 (HsType $3)) }
+  	| aexp '{' fbinds '}' 			{% (mkRecConstrOrUpdate $1 
+							(reverse $3)) }
+  	| aexp1					{ $1 }
+
+var_or_con :: { RdrNameHsExpr }
+        : qvar                          { HsVar $1 }
+        | gcon                          { HsVar $1 }
 
 aexp1	:: { RdrNameHsExpr }
-	: qvar				{ HsVar $1 }
-	| ipvar				{ HsIPVar $1 }
-	| gcon				{ HsVar $1 }
+	: ipvar				{ HsIPVar $1 }
+	| var_or_con			{ $1 }
 	| literal			{ HsLit $1 }
 	| INTEGER			{ HsOverLit (mkHsIntegralLit $1) }
 	| RATIONAL			{ HsOverLit (mkHsFractionalLit $1) }
@@ -731,8 +749,8 @@ aexp1	:: { RdrNameHsExpr }
 	| '(' exp ',' texps ')'		{ ExplicitTuple ($2 : reverse $4) Boxed}
 	| '(#' texps '#)'		{ ExplicitTuple (reverse $2)      Unboxed }
 	| '[' list ']'                  { $2 }
-	| '(' infixexp qop ')'		{ SectionL $2 $3  }
-	| '(' qopm infixexp ')'		{ SectionR $2 $3 }
+	| '(' infixexp qop ')'		{ (SectionL $2 (HsVar $3))  }
+	| '(' qopm infixexp ')'		{ (SectionR $2 $3) }
 	| qvar '@' aexp			{ EAsPat $1 $3 }
 	| '_'				{ EWildPat }
 	| '~' aexp1			{ ELazyPat $2 }
@@ -740,6 +758,7 @@ aexp1	:: { RdrNameHsExpr }
 texps :: { [RdrNameHsExpr] }
 	: texps ',' exp			{ $3 : $1 }
 	| exp				{ [$1] }
+
 
 -----------------------------------------------------------------------------
 -- List expressions
@@ -792,9 +811,9 @@ alts1 	:: { [RdrNameMatch] }
 
 alt 	:: { RdrNameMatch }
 	: infixexp opt_sig ralt wherebinds
-					{% checkPattern $1 `thenP` \p ->
+					{% (checkPattern $1 `thenP` \p ->
 				   	   returnP (Match [] [p] $2
-					             (GRHSs $3 $4 Nothing)) }
+					             (GRHSs $3 $4 Nothing))  )}
 
 ralt :: { [RdrNameGRHS] }
 	: '->' srcloc exp		{ [GRHS [ExprStmt $3 $2] $2] }
@@ -927,9 +946,9 @@ op	:: { RdrName }   -- used in infix decls
 	: varop			{ $1 }
 	| conop 		{ $1 }
 
-qop	:: { RdrNameHsExpr }   -- used in sections
-	: qvarop		{ HsVar $1 }
-	| qconop		{ HsVar $1 }
+qop	:: { RdrName {-HsExpr-} }   -- used in sections
+	: qvarop		{ $1 }
+	| qconop		{ $1 }
 
 qopm	:: { RdrNameHsExpr }   -- used in sections
 	: qvaropm		{ HsVar $1 }
@@ -1051,6 +1070,9 @@ modid 	:: { ModuleName }
 
 tycon 	:: { RdrName }
 	: CONID			{ mkSrcUnqual tcClsName $1 }
+
+tyconop	:: { RdrName }
+	: CONSYM		{ mkSrcUnqual tcClsName $1 }
 
 qtycon :: { RdrName }
 	: tycon			{ $1 }

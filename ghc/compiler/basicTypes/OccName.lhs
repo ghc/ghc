@@ -18,6 +18,7 @@ module OccName (
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
+	mkGenOcc1, mkGenOcc2, 
 	
 	isSysOcc, isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc, isValOcc,
 
@@ -308,7 +309,8 @@ mkDictOcc	   = mk_simple_deriv varName  "$d"
 mkIPOcc		   = mk_simple_deriv varName  "$i"
 mkSpecOcc	   = mk_simple_deriv varName  "$s"
 mkForeignExportOcc = mk_simple_deriv varName  "$f"
-
+mkGenOcc1           = mk_simple_deriv varName  "$gfrom"      -- Generics
+mkGenOcc2           = mk_simple_deriv varName  "$gto"        -- Generics
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
 

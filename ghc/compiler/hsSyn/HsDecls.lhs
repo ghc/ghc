@@ -15,7 +15,10 @@ module HsDecls (
 	BangType(..), getBangType,
 	IfaceSig(..),  SpecDataSig(..), 
 	DeprecDecl(..), DeprecTxt,
-	hsDeclName, instDeclName, tyClDeclName, isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule
+	hsDeclName, instDeclName, tyClDeclName, isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule,
+	toClassDeclNameList, 
+	fromClassDeclNameList
+
     ) where
 
 #include "HsVersions.h"
@@ -91,12 +94,13 @@ hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
 
 
 tyClDeclName :: TyClDecl name pat -> name
-tyClDeclName (TyData _ _ name _ _ _ _ _ _)          = name
+tyClDeclName (TyData _ _ name _ _ _ _ _ _ _ _)      = name
 tyClDeclName (TySynonym name _ _ _)                 = name
-tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ _ _ _) = name
+tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ )      = name
 
 instDeclName :: InstDecl name pat -> name
 instDeclName (InstDecl _ _ _ (Just name) _) = name
+
 \end{code}
 
 \begin{code}
@@ -186,10 +190,12 @@ data TyClDecl name pat
 				 -- expect...
 		(DataPragmas name)
 		SrcLoc
+		name             -- generic converter functions
+		name             -- generic converter functions
 
-  | TySynonym	name		-- type constructor
-		[HsTyVarBndr name]	-- type variables
-		(HsType name)	-- synonym expansion
+  | TySynonym	name		        -- type constructor
+                [HsTyVarBndr name]	-- type variables
+		(HsType name)	        -- synonym expansion
 		SrcLoc
 
   | ClassDecl	(HsContext name)    	-- context...
@@ -199,15 +205,29 @@ data TyClDecl name pat
 		[Sig name]		-- methods' signatures
 		(MonoBinds name pat)	-- default methods
 		(ClassPragmas name)
-		name name name [name]	-- The names of the tycon, datacon wrapper, datacon worker,
-					-- and superclass selectors for this class.
-					-- These are filled in as the ClassDecl is made.
+		[name]	                -- The names of the tycon, datacon 
+					-- wrapper, datacon worker,
+					-- and superclass selectors for this 
+					-- class (the first 3 are at the front 
+					-- of the list in this order)
+					-- These are filled in as the 
+					-- ClassDecl is made.
 		SrcLoc
+
+-- Put type signatures in and explain further!!
+                -- The names of the tycon, datacon 
+					-- wrapper, datacon worker,
+					-- and superclass selectors for this 
+					-- class (the first 3 are at the front 
+					-- of the list in this order)
+					-- These are filled in as the 
+toClassDeclNameList (a,b,c,ds) = a:b:c:ds
+fromClassDeclNameList (a:b:c:ds) = (a,b,c,ds)
 
 instance Ord name => Eq (TyClDecl name pat) where
 	-- Used only when building interface files
-  (==) (TyData nd1 cxt1 n1 tvs1 cons1 _ _ _ _)
-       (TyData nd2 cxt2 n2 tvs2 cons2 _ _ _ _)
+  (==) (TyData nd1 cxt1 n1 tvs1 cons1 _ _ _ _ _ _)
+       (TyData nd2 cxt2 n2 tvs2 cons2 _ _ _ _ _ _)
     = n1 == n2 &&
       nd1 == nd2 &&
       eqWithHsTyVars tvs1 tvs2 (\ env -> 
@@ -220,8 +240,8 @@ instance Ord name => Eq (TyClDecl name pat) where
     =  n1 == n2 &&
        eqWithHsTyVars tvs1 tvs2 (\ env -> eq_hsType env ty1 ty2)
 
-  (==) (ClassDecl cxt1 n1 tvs1 fds1 sigs1 _ _ _ _ _ _ _)
-       (ClassDecl cxt2 n2 tvs2 fds2 sigs2 _ _ _ _ _ _ _)
+  (==) (ClassDecl cxt1 n1 tvs1 fds1 sigs1 _ _ _ _ )
+       (ClassDecl cxt2 n2 tvs2 fds2 sigs2 _ _ _ _ )
     =  n1 == n2 &&
        eqWithHsTyVars tvs1 tvs2 (\ env -> 
 	  eq_hsContext env cxt1 cxt2 &&
@@ -242,7 +262,7 @@ eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
 	-- This is used for comparing declarations before putting
 	-- them into interface files, and the name of the default 
 	-- method isn't relevant
-    (Just (_,explicit_dm1)) `eq_dm` (Just (_,explicit_dm2)) = explicit_dm1 == explicit_dm2
+    (Just (explicit_dm1)) `eq_dm` (Just (explicit_dm2)) = explicit_dm1 == explicit_dm2
     Nothing		    `eq_dm` Nothing		    = True
     dm1			    `eq_dm` dm2			    = False
 \end{code}
@@ -251,9 +271,9 @@ eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
 countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
- = (length [() | ClassDecl _ _ _ _ _ _ _ _ _ _ _ _ <- decls],
-    length [() | TyData DataType _ _ _ _ _ _ _ _   <- decls],
-    length [() | TyData NewType  _ _ _ _ _ _ _ _   <- decls],
+ = (length [() | ClassDecl _ _ _ _ _ _ _ _ _  <- decls],
+    length [() | TyData DataType _ _ _ _ _ _ _ _ _ _  <- decls],
+    length [() | TyData NewType  _ _ _ _ _ _ _ _ _ _  <- decls],
     length [() | TySynonym _ _ _ _	           <- decls])
 
 isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
@@ -261,10 +281,10 @@ isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
 isSynDecl (TySynonym _ _ _ _) = True
 isSynDecl other		      = False
 
-isDataDecl (TyData _ _ _ _ _ _ _ _ _) = True
-isDataDecl other		      = False
+isDataDecl (TyData _ _ _ _ _ _ _ _ _ _ _) = True
+isDataDecl other		          = False
 
-isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _ _ _ _) = True
+isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _ ) = True
 isClassDecl other		 	        = False
 \end{code}
 
@@ -276,7 +296,7 @@ instance (Outputable name, Outputable pat)
       = hang (ptext SLIT("type") <+> pp_decl_head [] tycon tyvars <+> equals)
 	     4 (ppr mono_ty)
 
-    ppr (TyData new_or_data context tycon tyvars condecls ncons derivings pragmas src_loc)
+    ppr (TyData new_or_data context tycon tyvars condecls ncons derivings pragmas src_loc gen_conv1 gen_conv2) -- The generic names are not printed out ATM
       = pp_tydecl
 		  (ptext keyword <+> pp_decl_head context tycon tyvars <+> equals)
 		  (pp_condecls condecls ncons)
@@ -286,7 +306,7 @@ instance (Outputable name, Outputable pat)
 			NewType  -> SLIT("newtype")
 			DataType -> SLIT("data")
 
-    ppr (ClassDecl context clas tyvars fds sigs methods pragmas _ _ _ _ src_loc)
+    ppr (ClassDecl context clas tyvars fds sigs methods pragmas _ src_loc)
       | null sigs	-- No "where" part
       = top_matter
 

@@ -25,6 +25,7 @@ import BasicTypes	( RecFlag(..), Fixity )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Var		( TyVar )
+import Class            ( DefMeth (..) )
 \end{code}
 
 %************************************************************************
@@ -236,11 +237,9 @@ data Sig name
 		(HsType name)
 		SrcLoc
 
-  | ClassOpSig	name		-- Selector name
-		(Maybe 		-- Nothing for source-file class signatures
-		      (name,		-- Default-method name (if any)
-		       Bool))		-- True <=> there is an explicit, programmer-supplied
-					-- 	    default declaration in the class decl
+  | ClassOpSig	name			-- Selector name
+                (Maybe (DefMeth name))	-- Nothing for source-file class signatures
+					-- Gives DefMeth info for interface files sigs
 		(HsType name)
 		SrcLoc
 
@@ -338,8 +337,15 @@ ppr_sig (ClassOpSig var dm ty _)
       = sep [ppr var <+> pp_dm <+> dcolon, nest 4 (ppr ty)]
       where
 	pp_dm = case dm of 
-		  Just (_, True) -> equals 	-- Default-method indicator
-		  other		 -> empty
+		  Just (DefMeth _) -> equals 	-- Default method indicator
+		  Just GenDefMeth  -> semi      -- Generic method indicator
+		  Just NoDefMeth   -> empty     -- No Method at all
+		  -- Not convinced this is right...
+		  -- Not used in interface file output hopefully
+		  -- but needed for ddump-rn ??
+		  other		   -> dot
+				   -- empty     -- No method at all
+
 
 ppr_sig (SpecSig var ty _)
       = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],

@@ -36,7 +36,7 @@ import Module		( Module )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
 import VarSet
-import Util		( removeDups )
+import ListSetOps	( removeDups )
 import Outputable	
 
 infixr 9 `thenMM`, `thenMM_`

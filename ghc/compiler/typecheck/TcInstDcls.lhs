@@ -4,57 +4,79 @@
 \section[TcInstDecls]{Typechecking instance declarations}
 
 \begin{code}
-module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
+module TcInstDcls ( tcInstDecls1, tcInstDecls2, tcAddDeclCtxt ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), InstDecl(..),
-			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..),
-			  andMonoBindList
-			)
-import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl )
-import TcHsSyn		( TcMonoBinds, mkHsConApp )
 
+import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances, opt_D_dump_deriv )
+
+import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..),
+			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..),
+			  andMonoBindList, collectMonoBinders, isClassDecl
+			)
+import HsTypes          ( HsType (..), HsTyVarBndr(..), toHsTyVar )
+import HsPat            ( InPat (..) )
+import HsMatches        ( Match (..) )
+import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, extractHsTyVars )
+import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
-import TcClassDcl	( tcMethodBind, checkFromThisClass )
-import TcMonad
+import TcClassDcl	( tcMethodBind, badMethodErr )
+import TcMonad       
 import RnMonad		( RnNameSupply, FixityEnv )
 import Inst		( InstOrigin(..),
 			  newDicts, newClassDicts,
 			  LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( ValueEnv, tcExtendGlobalValEnv, tcExtendTyVarEnvForMeths,
-			  tcAddImportedIdInfo, tcInstId, newDFunName
+import TcEnv		( ValueEnv, tcExtendGlobalValEnv, 
+			  tcExtendTyVarEnvForMeths, TyThing (..),
+			  tcAddImportedIdInfo, tcInstId, tcLookupTy,
+			  newDFunName, tcExtendTyVarEnv
 			)
-import TcInstUtil	( InstInfo(..), classDataCon )
-import TcMonoType	( tcHsSigType )
+import TcInstUtil	( InstInfo(..), pprInstInfo, classDataCon, simpleInstInfoTyCon, simpleInstInfoTy )
+import TcMonoType	( tcTyVars, tcHsSigType, tcHsType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
-			  foldBag, Bag
+			  foldBag, Bag, listToBag
 			)
-import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances )
-import Class		( classBigSig )
+import Class		( Class, DefMeth(..), classBigSig )
 import Var		( idName, idType )
 import Maybes 		( maybeToBool, expectJust )
 import MkId		( mkDictFunId )
+import Generics		( validGenericInstanceType )
 import Module		( Module )
 import Name		( isLocallyDefined )
-import NameSet		( emptyNameSet )
+import NameSet		( emptyNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
-import PprType		( pprConstraint )
+import PprType		( pprConstraint, pprPred )
 import TyCon		( isSynTyCon, tyConDerivings )
 import Type		( mkTyVarTys, splitSigmaTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy_maybe,
-			  splitAlgTyConApp_maybe,
-			  classesToPreds, classesOfPreds,
-			  unUsgTy, tyVarsOfTypes
+			  splitAlgTyConApp_maybe, classesToPreds, classesOfPreds,
+			  unUsgTy, tyVarsOfTypes, mkClassPred, mkTyVarTy,
+			  getClassTys_maybe
 			)
-import Subst		( mkTopTyVarSubst, substClasses )
+import Subst		( mkTopTyVarSubst, substClasses, substTheta )
 import VarSet		( mkVarSet, varSetElems )
-import TysWiredIn	( isFFIArgumentTy, isFFIResultTy )
+import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIResultTy )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
+import Name             ( Name, NameEnv, extendNameEnv_C, emptyNameEnv, 
+			  plusNameEnv_C, nameEnvElts )
+import FiniteMap        ( mapFM )
+import SrcLoc           ( SrcLoc )
+import RnHsSyn          -- ( RenamedMonoBinds )
+import VarSet           ( varSetElems )
+import UniqFM           ( mapUFM )
+import Unique		( Uniquable(..) )
+import BasicTypes	( NewOrData(..) )
+import ErrUtils		( dumpIfSet )
+import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc, 
+			  assocElts, extendAssoc_C,
+			  equivClassesByUniq, minusList
+			)
+import List             ( intersect, (\\) )
 import Outputable
 \end{code}
 
@@ -131,6 +153,15 @@ Here, Bop1 \ldots Bopn bind the methods op1 \ldots opn,
 and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 \end{enumerate}
 
+
+%************************************************************************
+%*									*
+\subsection{Extracting instance decls}
+%*									*
+%************************************************************************
+
+Gather up the instance declarations from their various sources
+
 \begin{code}
 tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 	     -> [RenamedHsDecl]
@@ -141,26 +172,36 @@ tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 		       RenamedHsBinds)
 
 tcInstDecls1 unf_env decls mod fixs rn_name_supply
-  = 	-- Do the ordinary instance declarations
+  = 	-- (1) Do the ordinary instance declarations
     mapNF_Tc (tcInstDecl1 mod unf_env) 
 	     [inst_decl | InstD inst_decl <- decls]	`thenNF_Tc` \ inst_info_bags ->
     let
 	decl_inst_info = unionManyBags inst_info_bags
     in
-	-- Handle "derived" instances; note that we only do derivings
+	-- (2) Instances from "deriving" clauses; note that we only do derivings
 	-- for things in this module; we ignore deriving decls from
 	-- interfaces!
-    tcDeriving mod fixs rn_name_supply decl_inst_info
-		    	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    tcDeriving mod fixs rn_name_supply decl_inst_info  	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+
+	-- (3) Instances from generic class declarations
+    mapTc (getGenericInstances mod) 
+	  [cl_decl | TyClD cl_decl <- decls, isClassDecl cl_decl]	`thenTc` \ cls_inst_info ->
 
     let
-	full_inst_info = deriv_inst_info `unionBags` decl_inst_info
+	generic_insts  = concat cls_inst_info
+	full_inst_info = deriv_inst_info `unionBags` 
+			 unionManyBags inst_info_bags `unionBags` 
+			 (listToBag generic_insts)
     in
-    returnTc (full_inst_info, deriv_binds)
+    ioToTc (dumpIfSet opt_D_dump_deriv "Generic instances" 
+		      (vcat (map pprInstInfo generic_insts)))	`thenNF_Tc_`
 
+    (returnTc (full_inst_info, deriv_binds)) 
+\end{code} 
 
+\begin{code}
 tcInstDecl1 :: Module -> ValueEnv -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
-
+-- Deal with a single instance declaration
 tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
   = 	-- Prime error recovery, set source location
     recoverNF_Tc (returnNF_Tc emptyBag)	$
@@ -170,7 +211,6 @@ tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
     tcHsSigType poly_ty			`thenTc` \ poly_ty' ->
     let
 	(tyvars, theta, dict_ty) = splitSigmaTy poly_ty'
-	constr			 = classesOfPreds theta
 	(clas, inst_tys)	 = case splitDictTy_maybe dict_ty of
 				     Just ct -> ct
 				     Nothing -> pprPanic "tcInstDecl1" (ppr poly_ty)
@@ -185,21 +225,143 @@ tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
 		-- contain something illegal in normal Haskell, notably
 		--	instance CCallable [Char] 
 	    scrutiniseInstanceHead clas inst_tys		`thenNF_Tc_`
-	    mapNF_Tc scrutiniseInstanceConstraint constr	`thenNF_Tc_`
+	    mapNF_Tc scrutiniseInstanceConstraint theta		`thenNF_Tc_`
 
 		-- Make the dfun id and return it
 	    newDFunName mod clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
-	    returnNF_Tc (mkDictFunId dfun_name clas tyvars inst_tys constr)
+	    returnNF_Tc (mkDictFunId dfun_name clas tyvars inst_tys theta)
 
 	Just dfun_name -> 	-- An interface-file instance declaration
     		-- Make the dfun id and add info from interface file
 	    let
-		dfun_id = mkDictFunId dfun_name clas tyvars inst_tys constr
+		dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
 	    in
 	    returnNF_Tc (tcAddImportedIdInfo unf_env dfun_id)
     )						`thenNF_Tc` \ dfun_id ->
 
-    returnTc (unitBag (InstInfo clas tyvars inst_tys constr dfun_id binds src_loc uprags))
+    returnTc (unitBag (InstInfo clas tyvars inst_tys theta dfun_id binds src_loc uprags))
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Extracting generic instance declaration from class declarations}
+%*									*
+%************************************************************************
+
+@getGenericInstances@ extracts the generic instance declarations from a class
+declaration.  For exmaple
+
+	class C a where
+	  op :: a -> a
+	
+	  op{ x+y } (Inl v)   = ...
+	  op{ x+y } (Inr v)   = ...
+	  op{ x*y } (v :*: w) = ...
+	  op{ 1   } Unit      = ...
+
+gives rise to the instance declarations
+
+	instance C (x+y) where
+	  op (Inl v)   = ...
+	  op (Inr v)   = ...
+	
+	instance C (x*y) where
+	  op (v :*: w) = ...
+
+	instance C 1 where
+	  op Unit      = ...
+
+
+\begin{code}
+getGenericInstances :: Module -> RenamedTyClDecl -> TcM s [InstInfo] 
+getGenericInstances mod decl@(ClassDecl context class_name tyvar_names 
+	 			        fundeps class_sigs def_methods pragmas 
+				        name_list loc)
+  | null groups		
+  = returnTc []		-- The comon case
+
+  | otherwise
+  = recoverNF_Tc (returnNF_Tc [])				$
+    tcAddDeclCtxt decl						$
+    tcLookupTy class_name					`thenTc` \ (AClass clas) ->
+
+	-- Make an InstInfo out of each group
+    mapTc (mkGenericInstance mod clas loc) groups		`thenTc` \ inst_infos ->
+
+	-- Check that there is only one InstInfo for each type constructor
+  	-- The main way this can fail is if you write
+	--	f {| a+b |} ... = ...
+	--	f {| x+y |} ... = ...
+	-- Then at this point we'll have an InstInfo for each
+    let
+	bad_groups = [group | group <- equivClassesByUniq get_uniq inst_infos,
+			      length group > 1]
+	get_uniq inst = getUnique (simpleInstInfoTyCon inst)
+    in
+    mapTc (addErrTc . dupGenericInsts) bad_groups	`thenTc_`
+
+	-- Check that there is an InstInfo for each generic type constructor
+    let
+	missing = genericTyCons `minusList` map simpleInstInfoTyCon inst_infos
+    in
+    checkTc (null missing) (missingGenericInstances missing)	`thenTc_`
+
+    returnTc inst_infos
+
+  where
+	-- Group the declarations by type pattern
+	groups :: [(RenamedHsType, RenamedMonoBinds)]
+	groups = assocElts (getGenericBinds def_methods)
+
+
+---------------------------------
+getGenericBinds :: RenamedMonoBinds -> Assoc RenamedHsType RenamedMonoBinds
+  -- Takes a group of method bindings, finds the generic ones, and returns
+  -- them in finite map indexed by the type parameter in the definition.
+
+getGenericBinds EmptyMonoBinds    = emptyAssoc
+getGenericBinds (AndMonoBinds m1 m2) 
+  = plusAssoc_C AndMonoBinds (getGenericBinds m1) (getGenericBinds m2)
+
+getGenericBinds (FunMonoBind id infixop matches loc)
+  = mapAssoc wrap (foldr add emptyAssoc matches)
+  where
+    add match env = case maybeGenericMatch match of
+		      Nothing		-> env
+		      Just (ty, match') -> extendAssoc_C (++) env (ty, [match'])
+
+    wrap ms = FunMonoBind id infixop ms loc
+
+---------------------------------
+mkGenericInstance :: Module -> Class -> SrcLoc
+		  -> (RenamedHsType, RenamedMonoBinds)
+		  -> TcM s InstInfo
+
+mkGenericInstance mod clas loc (hs_ty, binds)
+  -- Make a generic instance declaration
+  -- For example:	instance (C a, C b) => C (a+b) where { binds }
+
+  = 	-- Extract the universally quantified type variables
+    tcTyVars (nameSetToList (extractHsTyVars hs_ty)) 
+	     (kcHsSigType hs_ty)		`thenTc` \ tyvars ->
+    tcExtendTyVarEnv tyvars					$
+
+	-- Type-check the instance type, and check its form
+    tcHsSigType hs_ty				`thenTc` \ inst_ty ->
+    checkTc (validGenericInstanceType inst_ty)
+	    (badGenericInstanceType binds)	`thenTc_`
+
+	-- Make the dictionary function.
+    newDFunName mod clas [inst_ty] loc		`thenNF_Tc` \ dfun_name ->
+    let
+	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
+	inst_tys   = [inst_ty]
+	dfun_id    = mkDictFunId dfun_name clas tyvars inst_tys inst_theta
+    in
+
+    returnTc (InstInfo clas tyvars inst_tys inst_theta dfun_id binds loc [])
+	-- The "[]" means "no pragmas"
 \end{code}
 
 
@@ -221,7 +383,6 @@ tcInstDecls2 inst_decls
 		      returnNF_Tc (lie1 `plusLIE` lie2,
 				   binds1 `AndMonoBinds` binds2)
 \end{code}
-
 
 ======= New documentation starts here (Sept 92)	 ==============
 
@@ -304,39 +465,42 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))  $
     tcAddSrcLoc locn					   $
 
-	 -- Check that all the method bindings come from this class
-    checkFromThisClass clas monobinds			`thenNF_Tc_`
-
 	-- Instantiate the instance decl with tc-style type variables
     tcInstId dfun_id		`thenNF_Tc` \ (inst_tyvars', dfun_theta', dict_ty') ->
     let
-	(clas, inst_tys')	= expectJust "tcInstDecl2" (splitDictTy_maybe dict_ty')
-
-	origin			= InstanceDeclOrigin
+	(clas, inst_tys') = expectJust "tcInstDecl2" (splitDictTy_maybe dict_ty')
+	origin		  = InstanceDeclOrigin
 
         (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
-	dm_ids = [dm_id | (_, dm_id, _) <- op_items]
+	dm_ids	  = [dm_id | (_, DefMeth dm_id) <- op_items]
+	sel_names = [idName sel_id | (sel_id, _) <- op_items]
 
 	-- Instantiate the theta found in the original instance decl
-	inst_decl_theta' = substClasses (mkTopTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars'))
-				        inst_decl_theta
+	inst_decl_theta' = substTheta (mkTopTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars'))
+				      inst_decl_theta
 
-         -- Instantiate the super-class context with inst_tys
+        -- Instantiate the super-class context with inst_tys
 	sc_theta' = substClasses (mkTopTyVarSubst class_tyvars inst_tys') sc_theta
+
+	-- Find any definitions in monobinds that aren't from the class
+	bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
     in
+	 -- Check that all the method bindings come from this class
+    mapTc (addErrTc . badMethodErr clas) bad_bndrs		`thenNF_Tc_`
+
 	 -- Create dictionary Ids from the specified instance contexts.
-    newClassDicts origin sc_theta'	`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
-    newDicts origin dfun_theta'		`thenNF_Tc` \ (dfun_arg_dicts,  dfun_arg_dicts_ids)  ->
-    newClassDicts origin inst_decl_theta' `thenNF_Tc` \ (inst_decl_dicts, _) ->
-    newClassDicts origin [(clas,inst_tys')] `thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
+    newClassDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
+    newDicts origin dfun_theta'			`thenNF_Tc` \ (dfun_arg_dicts,  dfun_arg_dicts_ids)  ->
+    newDicts origin inst_decl_theta'		`thenNF_Tc` \ (inst_decl_dicts, _) ->
+    newClassDicts origin [(clas,inst_tys')]	`thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
 
     tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
  	tcExtendGlobalValEnv dm_ids (
 		-- Default-method Ids may be mentioned in synthesised RHSs 
 
 	mapAndUnzip3Tc (tcMethodBind clas origin inst_tyvars' inst_tys'
-				     (classesToPreds inst_decl_theta')
+				     inst_decl_theta'
 				     monobinds uprags True)
 		       op_items
     ))		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
@@ -469,10 +633,16 @@ compiled elsewhere). In these cases, we let them go through anyway.
 We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
-scrutiniseInstanceConstraint (clas, tys)
-  |  all isTyVarTy tys 
-  || opt_AllowUndecidableInstances = returnNF_Tc ()
-  | otherwise	      	           = addErrTc (instConstraintErr clas tys)
+scrutiniseInstanceConstraint pred
+  | opt_AllowUndecidableInstances
+  = returnNF_Tc ()
+
+  | Just (clas,tys) <- getClassTys_maybe pred,
+    all isTyVarTy tys
+  = returnNF_Tc ()
+
+  | otherwise
+  = addErrTc (instConstraintErr pred)
 
 scrutiniseInstanceHead clas inst_taus
   |	-- CCALL CHECK
@@ -532,13 +702,52 @@ ccallable_type   ty = isFFIArgumentTy False {- Not safe call -} ty
 creturnable_type ty = isFFIResultTy ty
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Error messages}
+%*									*
+%************************************************************************
+
 \begin{code}
-instConstraintErr clas tys
+tcAddDeclCtxt decl thing_inside
+  = tcAddSrcLoc loc 	$
+    tcAddErrCtxt ctxt 	$
+    thing_inside
+  where
+     (name, loc, thing)
+	= case decl of
+	    (ClassDecl _ name _ _ _ _ _ _ loc)	       -> (name, loc, "class")
+	    (TySynonym name _ _ loc)	               -> (name, loc, "type synonym")
+	    (TyData NewType  _ name _ _ _ _ _ loc _ _) -> (name, loc, "newtype")
+	    (TyData DataType _ name _ _ _ _ _ loc _ _) -> (name, loc, "data type")
+
+     ctxt = hsep [ptext SLIT("In the"), text thing, 
+		  ptext SLIT("declaration for"), quotes (ppr name)]
+\end{code}
+
+\begin{code}
+instConstraintErr pred
   = hang (ptext SLIT("Illegal constraint") <+> 
-	  quotes (pprConstraint clas tys) <+> 
+	  quotes (pprPred pred) <+> 
 	  ptext SLIT("in instance context"))
 	 4 (ptext SLIT("(Instance contexts must constrain only type variables)"))
 	
+badGenericInstanceType binds
+  = vcat [ptext SLIT("Illegal type pattern in the generic bindings"),
+	  nest 4 (ppr binds)]
+
+missingGenericInstances missing
+  = ptext SLIT("Missing type patterns for") <+> pprQuotedList missing
+	  
+
+
+dupGenericInsts inst_infos
+  = vcat [ptext SLIT("More than one type pattern for a single generic type constructor:"),
+	  nest 4 (vcat (map (ppr . simpleInstInfoTy) inst_infos)),
+	  ptext SLIT("All the type patterns for a generic type constructor must be identical")
+    ]
+
 instTypeErr clas tys msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> quotes (pprConstraint clas tys),
 	 nest 4 (parens msg)

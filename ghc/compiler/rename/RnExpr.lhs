@@ -45,8 +45,7 @@ import NameSet
 import UniqFM		( isNullUFM )
 import FiniteMap	( elemFM )
 import UniqSet		( emptyUniqSet )
-import Util		( removeDups )
-import ListSetOps	( unionLists )
+import ListSetOps	( unionLists, removeDups )
 import Maybes		( maybeToBool )
 import Outputable
 \end{code}
@@ -145,6 +144,9 @@ rnPat (RecPatIn con rpats)
   = lookupOccRn con 	`thenRn` \ con' ->
     rnRpats rpats	`thenRn` \ (rpats', fvs) ->
     returnRn (RecPatIn con' rpats', fvs `addOneFV` con')
+rnPat (TypePatIn name) =
+    (rnHsType (text "type pattern") name) `thenRn` \ (name', fvs) ->
+    returnRn (TypePatIn name', fvs)
 \end{code}
 
 ************************************************************************
@@ -172,7 +174,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
 	doc_sig        = text "a pattern type-signature"
 	doc_pats       = text "in a pattern match"
     in
-    bindTyVarsFVRn doc_sig (map UserTyVar forall_tyvars)	$ \ sig_tyvars ->
+    bindNakedTyVarsFVRn doc_sig forall_tyvars	$ \ sig_tyvars ->
 
 	-- Note that we do a single bindLocalsRn for all the
 	-- matches together, so that we spot the repeated variable in
@@ -416,6 +418,11 @@ rnExpr (HsIf p b1 b2 src_loc)
     rnExpr b1		`thenRn` \ (b1', fvB1) ->
     rnExpr b2		`thenRn` \ (b2', fvB2) ->
     returnRn (HsIf p' b1' b2' src_loc, plusFVs [fvP, fvB1, fvB2])
+
+rnExpr (HsType a) = 
+    (rnHsType doc a) `thenRn` \ (t, fvT) -> returnRn (HsType t, fvT)
+       where doc = text "renaming a type pattern"
+		    
 
 rnExpr (ArithSeqIn seq)
   = lookupOrigName enumClass_RDR	`thenRn` \ enum ->

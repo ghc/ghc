@@ -20,8 +20,8 @@ import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 import BasicTypes	( NewOrData(..) )
 
-import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, kcTyVarScope, tcClassContext,
-			  kcHsContext, kcHsSigType, mkImmutTyVars
+import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, tcHsTyVars, tcClassContext,
+			  kcHsContext, kcHsSigType
 			)
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupValueByKey, TyThing(..), TyThingDetails(..) )
 import TcMonad
@@ -37,7 +37,7 @@ import Var		( Id, TyVar )
 import Name		( Name, isLocallyDefined, NamedThing(..) )
 import Outputable
 import TyCon		( TyCon, isSynTyCon, isNewTyCon,
-			  tyConDataConsIfAvailable, tyConTyVars
+			  tyConDataConsIfAvailable, tyConTyVars, tyConGenIds
 			)
 import Type		( tyVarsOfTypes, splitFunTy, applyTys,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, 
@@ -46,7 +46,7 @@ import Type		( tyVarsOfTypes, splitFunTy, applyTys,
 import TysWiredIn	( unitTy )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import PrelNames	( unpackCStringIdKey, unpackCStringUtf8IdKey )
-import Util		( equivClasses )
+import ListSetOps	( equivClasses )
 \end{code}
 
 %************************************************************************
@@ -75,7 +75,7 @@ tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
 
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
-tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings _  src_loc)
+tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings _ src_loc name1 name2)
   = tcLookupTy tycon_name			`thenNF_Tc` \ (ATyCon tycon) ->
     let
 	tyvars = tyConTyVars tycon
@@ -142,11 +142,7 @@ tcConDecl :: NewOrData -> TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> 
 
 tcConDecl new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
   = tcAddSrcLoc src_loc					$
-    kcTyVarScope ex_tvs (kcConDetails ex_ctxt details)	`thenTc` \ ex_tv_kinds ->
-    let
-	ex_tyvars = mkImmutTyVars ex_tv_kinds
-    in
-    tcExtendTyVarEnv ex_tyvars				$
+    tcHsTyVars ex_tvs (kcConDetails ex_ctxt details)	$ \ ex_tyvars ->
     tcClassContext ex_ctxt				`thenTc` \ ex_theta ->
     case details of
 	VanillaCon btys    -> tc_datacon ex_tyvars ex_theta btys
@@ -231,8 +227,8 @@ mkImplicitDataBinds (tycon : tycons)
 mkImplicitDataBinds_one tycon
   = mapTc (mkRecordSelector tycon) groups	`thenTc` \ sel_ids ->
     let
-	unf_ids = sel_ids ++ data_con_wrapper_ids
-	all_ids = map dataConId data_cons ++ unf_ids 
+	unf_ids = sel_ids ++ data_con_wrapper_ids ++ gen_ids
+	all_ids = map dataConId data_cons ++ unf_ids
 
 	-- For the locally-defined things
 	-- we need to turn the unfoldings inside the selector Ids into bindings,
@@ -245,7 +241,7 @@ mkImplicitDataBinds_one tycon
     data_cons = tyConDataConsIfAvailable tycon
 	-- Abstract types mean we don't bring the 
 	-- data cons into scope, which should be fine
-
+    gen_ids = tyConGenIds tycon
     data_con_wrapper_ids = map dataConWrapId data_cons
 
     fields = [ (con, field) | con   <- data_cons,

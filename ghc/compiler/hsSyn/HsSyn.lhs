@@ -24,7 +24,7 @@ module HsSyn (
 	module HsTypes,
 	Fixity, NewOrData, 
 
-	collectTopBinders, collectMonoBinders
+	collectTopBinders, collectMonoBinders, collectLocatedMonoBinders
      ) where
 
 #include "HsVersions.h"
@@ -116,18 +116,25 @@ it should return @[x, y, f, a, b]@ (remember, order important).
 
 \begin{code}
 collectTopBinders :: HsBinds name (InPat name) -> Bag (name,SrcLoc)
-collectTopBinders EmptyBinds     = emptyBag
-collectTopBinders (MonoBind b _ _) = collectMonoBinders b
-collectTopBinders (ThenBinds b1 b2)
- = collectTopBinders b1 `unionBags` collectTopBinders b2
+collectTopBinders EmptyBinds        = emptyBag
+collectTopBinders (MonoBind b _ _)  = listToBag (collectLocatedMonoBinders b)
+collectTopBinders (ThenBinds b1 b2) = collectTopBinders b1 `unionBags` collectTopBinders b2
 
-collectMonoBinders :: MonoBinds name (InPat name) -> Bag (name,SrcLoc)
-collectMonoBinders EmptyMonoBinds		 = emptyBag
-collectMonoBinders (PatMonoBind pat _ loc)	 = listToBag (map (\v->(v,loc)) (collectPatBinders pat))
-collectMonoBinders (FunMonoBind f _ matches loc) = unitBag (f,loc)
-collectMonoBinders (VarMonoBind v expr) 	 = error "collectMonoBinders"
-collectMonoBinders (CoreMonoBind v expr) 	 = error "collectMonoBinders"
-collectMonoBinders (AndMonoBinds bs1 bs2)	 = collectMonoBinders bs1 `unionBags`
-						   collectMonoBinders bs2
+collectLocatedMonoBinders :: MonoBinds name (InPat name) -> [(name,SrcLoc)]
+collectLocatedMonoBinders binds
+  = go binds []
+  where
+    go EmptyMonoBinds	       acc = acc
+    go (PatMonoBind pat _ loc) acc = map (\v->(v,loc)) (collectPatBinders pat) ++ acc
+    go (FunMonoBind f _ _ loc) acc = (f,loc) : acc
+    go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
+
+collectMonoBinders :: MonoBinds name (InPat name) -> [name]
+collectMonoBinders binds
+  = go binds []
+  where
+    go EmptyMonoBinds	       acc = acc
+    go (PatMonoBind pat _ loc) acc = collectPatBinders pat ++ acc
+    go (FunMonoBind f _ _ loc) acc = f : acc
+    go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
 \end{code}
-

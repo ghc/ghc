@@ -13,7 +13,7 @@ module Name (
 	mkLocalName, mkImportedLocalName, mkSysLocalName, mkCCallName,
 	mkTopName, mkIPName,
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal,
-	mkWiredInIdName,   mkWiredInTyConName,
+	mkWiredInIdName, mkWiredInTyConName,
 	mkUnboundName, isUnboundName,
 
 	maybeWiredInIdName, maybeWiredInTyConName,
@@ -28,6 +28,7 @@ module Name (
 	nameSrcLoc, isLocallyDefinedName, isDllName,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
+	isTyVarName,
 	
 	-- Environment
 	NameEnv, mkNameEnv,
@@ -121,8 +122,8 @@ mkGlobalName uniq mod occ prov = Name { n_uniq = uniq, n_sort = Global mod,
 					n_occ = occ, n_prov = prov }
 				
 
-mkKnownKeyGlobal :: (RdrName, Unique) -> Name
-mkKnownKeyGlobal (rdr_name, uniq)
+mkKnownKeyGlobal :: RdrName -> Unique -> Name
+mkKnownKeyGlobal rdr_name uniq
   = mkGlobalName uniq (mkVanillaModule (rdrNameModule rdr_name))
 		      (rdrNameOcc rdr_name)
 		      systemProvenance
@@ -166,13 +167,10 @@ mkWiredInIdName :: Unique -> Module -> OccName -> Id -> Name
 mkWiredInIdName uniq mod occ id = Name { n_uniq = uniq, n_sort = WiredInId mod id,
 					 n_occ = occ, n_prov = SystemProv }
 
--- mkWiredInTyConName takes a FAST_STRING instead of
--- an OccName, which is a bit yukky but that's what the 
--- clients find easiest.
-mkWiredInTyConName :: Unique -> Module -> FAST_STRING -> TyCon -> Name
-mkWiredInTyConName uniq mod fs tycon
+mkWiredInTyConName :: Unique -> Module -> OccName -> TyCon -> Name
+mkWiredInTyConName uniq mod occ tycon
   = Name { n_uniq = uniq, n_sort = WiredInTyCon mod tycon,
-	   n_occ = mkSrcOccFS tcName fs, n_prov = SystemProv }
+	   n_occ = occ, n_prov = SystemProv }
 
 
 ---------------------------------------------------------------------
@@ -493,6 +491,9 @@ isLocalName _ 		            = False
 isGlobalName (Name {n_sort = Local}) = False
 isGlobalName other	             = True
 
+isTyVarName :: Name -> Bool
+isTyVarName name = isTvOcc (nameOccName name)
+
 -- Global names are by definition those that are visible
 -- outside the module, *as seen by the linker*.  Externally visible
 -- does not mean visible at the source level (that's isExported).
@@ -567,6 +568,7 @@ elemNameEnv    	 :: Name -> NameEnv a -> Bool
 unitNameEnv    	 :: Name -> a -> NameEnv a
 lookupNameEnv  	 :: NameEnv a -> Name -> Maybe a
 lookupNameEnv_NF :: NameEnv a -> Name -> a
+mapNameEnv	 :: (a->b) -> NameEnv a -> NameEnv b
 
 emptyNameEnv   	 = emptyUFM
 mkNameEnv	 = listToUFM
@@ -578,6 +580,7 @@ plusNameEnv_C  	 = plusUFM_C
 extendNameEnvList= addListToUFM
 delFromNameEnv 	 = delFromUFM
 elemNameEnv    	 = elemUFM
+mapNameEnv	 = mapUFM
 unitNameEnv    	 = unitUFM
 
 lookupNameEnv  	       = lookupUFM

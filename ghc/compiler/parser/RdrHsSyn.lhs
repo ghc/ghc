@@ -53,7 +53,7 @@ module RdrHsSyn (
 	extractHsTyRdrTyVars, extractHsTysRdrTyVars,
 	extractPatsTyVars, 
 	extractRuleBndrsTyVars,
-	extractHsCtxtRdrTyVars,
+	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
 	mkHsOpApp, mkClassDecl, mkClassOpSig, mkConDecl,
 	mkHsNegApp, mkHsIntegralLit, mkHsFractionalLit, mkNPlusKPatIn,
@@ -67,7 +67,8 @@ module RdrHsSyn (
 	cvBinds,
 	cvMonoBindsAndSigs,
 	cvTopDecls,
-	cvValSig, cvClassOpSig, cvInstDeclSig
+	cvValSig, cvClassOpSig, cvInstDeclSig,
+        mkTyData
     ) where
 
 #include "HsVersions.h"
@@ -76,8 +77,8 @@ import HsSyn		-- Lots of it
 import CmdLineOpts	( opt_NoImplicitPrelude )
 import HsPat		( collectSigTysFromPats )
 import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
-                          mkSuperDictSelOcc, mkDefaultMethodOcc,
-			  varName, dataName, tcName
+                          mkSuperDictSelOcc, mkDefaultMethodOcc, mkGenOcc1,
+			  mkGenOcc2, varName, dataName, tcName
                       	)
 import PrelNames	( pRELUDE_Name, mkTupNameStr )
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
@@ -86,6 +87,8 @@ import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
 import HsPragmas	
 import List		( nub )
 import BasicTypes	( Boxity(..), RecFlag(..) )
+import Class            ( DefMeth (..) )
+import Outputable
 \end{code}
 
  
@@ -183,6 +186,10 @@ extract_ty (HsUsgTy usg ty)           acc = extract_ty ty acc
 extract_ty (HsUsgForAllTy uv ty)      acc = extract_ty ty acc
 extract_ty (HsTyVar tv)               acc = tv : acc
 extract_ty (HsForAllTy Nothing ctxt ty) acc = extract_ctxt ctxt (extract_ty ty acc)
+-- Generics
+extract_ty (HsOpTy ty1 nam ty2)         acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (HsNumTy num)              acc = acc
+-- Generics
 extract_ty (HsForAllTy (Just tvs) ctxt ty) 
                                 acc = acc ++
                                       (filter (`notElem` locals) $
@@ -196,6 +203,19 @@ extractPatsTyVars = filter isRdrTyVar .
 		    nub . 
 		    extract_tys .
 		    collectSigTysFromPats
+
+extractGenericPatTyVars :: RdrNameMonoBinds -> [RdrName]
+-- Get the type variables out of the type patterns in a bunch of
+-- possibly-generic bindings in a class declaration
+extractGenericPatTyVars binds
+  = filter isRdrTyVar (nub (get binds []))
+  where
+    get (AndMonoBinds b1 b2)   acc = get b1 (get b2 acc)
+    get (FunMonoBind _ _ ms _) acc = foldr get_m acc ms
+    get other		       acc = acc
+
+    get_m (Match _ (TypePatIn ty : _) _ _) acc = extract_ty ty acc
+    get_m other				   acc = acc
 \end{code}
 
 
@@ -215,7 +235,7 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
   
 \begin{code}
 mkClassDecl cxt cname tyvars fds sigs mbinds prags loc
-  = ClassDecl cxt cname tyvars fds sigs mbinds prags tname dname dwname sc_sel_names loc
+  = ClassDecl cxt cname tyvars fds sigs mbinds prags new_names loc
   where
     cls_occ  = rdrNameOcc cname
     data_occ = mkClassDataConOcc cls_occ
@@ -231,11 +251,22 @@ mkClassDecl cxt cname tyvars fds sigs mbinds prags loc
       --      D_sc1, D_sc2
       -- (We used to call them D_C, but now we can have two different
       --  superclasses both called C!)
+    new_names = toClassDeclNameList (tname, dname, dwname, sc_sel_names)
 
-mkClassOpSig has_default_method op ty loc
-  = ClassOpSig op (Just (dm_rn, has_default_method)) ty loc
+-- mkTyData :: ??
+mkTyData new_or_data context tname list_var list_con i maybe pragmas src =
+    let t_occ  = rdrNameOcc tname
+        name1 = mkRdrUnqual (mkGenOcc1 t_occ) 
+	name2 = mkRdrUnqual (mkGenOcc2 t_occ) 
+    in TyData new_or_data context 
+         tname list_var list_con i maybe pragmas src name1 name2
+
+mkClassOpSig (DefMeth x) op ty loc
+  = ClassOpSig op (Just (DefMeth dm_rn)) ty loc
   where
     dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc op))
+mkClassOpSig x op ty loc =
+    ClassOpSig op (Just x) ty loc
 
 mkConDecl cname ex_vars cxt details loc
   = ConDecl cname wkr_name ex_vars cxt details loc

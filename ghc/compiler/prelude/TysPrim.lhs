@@ -12,6 +12,8 @@ module TysPrim(
 	alphaTy, betaTy, gammaTy, deltaTy,
 	openAlphaTy, openAlphaTyVar, openAlphaTyVars,
 
+	primTyCons,
+
 	charPrimTyCon, 		charPrimTy,
 	intPrimTyCon,		intPrimTy,
 	wordPrimTyCon,		wordPrimTy,
@@ -48,16 +50,58 @@ module TysPrim(
 
 import Var		( TyVar, mkSysTyVar )
 import Name		( mkWiredInTyConName )
+import OccName		( mkSrcOccFS, tcName )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( mkPrimTyCon, TyCon, ArgVrcs )
 import Type		( Type, 
 			  mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unboxedTypeKind, boxedTypeKind, openTypeKind, mkArrowKinds
 			)
-import Unique		( mkAlphaTyVarUnique )
+import Unique		( Unique, mkAlphaTyVarUnique )
 import PrelNames
 import Outputable
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Primitive type constructors}
+%*									*
+%************************************************************************
+
+\begin{code}
+primTyCons :: [TyCon]
+primTyCons 
+  = [ addrPrimTyCon
+    , arrayPrimTyCon
+    , byteArrayPrimTyCon
+    , charPrimTyCon
+    , doublePrimTyCon
+    , floatPrimTyCon
+    , intPrimTyCon
+    , int64PrimTyCon
+    , foreignObjPrimTyCon
+    , bcoPrimTyCon
+    , weakPrimTyCon
+    , mutableArrayPrimTyCon
+    , mutableByteArrayPrimTyCon
+    , mVarPrimTyCon
+    , mutVarPrimTyCon
+    , realWorldTyCon
+    , stablePtrPrimTyCon
+    , stableNamePrimTyCon
+    , statePrimTyCon
+    , threadIdPrimTyCon
+    , wordPrimTyCon
+    , word64PrimTyCon
+    ]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Support code}
+%*									*
+%************************************************************************
 
 \begin{code}
 alphaTyVars :: [TyVar]
@@ -94,6 +138,7 @@ vrcsZ  = [vrcZero]
 vrcsZP = [vrcZero,vrcPos]
 \end{code}
 
+
 %************************************************************************
 %*									*
 \subsection[TysPrim-basic]{Basic primitive types (@Char#@, @Int#@, etc.)}
@@ -106,7 +151,7 @@ pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> ArgVrcs -> PrimRep ->
 pcPrimTyCon key str arity arg_vrcs rep
   = the_tycon
   where
-    name      = mkWiredInTyConName key pREL_GHC str the_tycon
+    name      = mkWiredInTyConName key pREL_GHC (mkSrcOccFS tcName str) the_tycon
     the_tycon = mkPrimTyCon name kind arity arg_vrcs rep
     kind      = mkArrowKinds (take arity (repeat boxedTypeKind)) result_kind
     result_kind | isFollowableRep rep = boxedTypeKind	-- Represented by a GC-ish ptr

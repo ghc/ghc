@@ -34,8 +34,9 @@ module BasicTypes(
 	OccInfo(..), seqOccInfo, isFragileOcc, isDeadOcc, isLoopBreaker,
 
 	InsideLam, insideLam, notInsideLam,
-	OneBranch, oneBranch, notOneBranch
+	OneBranch, oneBranch, notOneBranch,
 
+        EP(..)
    ) where
 
 #include "HsVersions.h"
@@ -196,6 +197,42 @@ isNonRec :: RecFlag -> Bool
 isNonRec Recursive    = False
 isNonRec NonRecursive = True
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[Generic]{Generic flag}
+%*									*
+%************************************************************************
+
+This is the "Embedding-Projection pair" datatype, it contains 
+two pieces of code (normally either RenamedHsExpr's or Id's)
+If we have a such a pair (EP from to), the idea is that 'from' and 'to'
+represents functions of type 
+
+	from :: T -> Tring
+	to   :: Tring -> T
+
+And we should have 
+
+	to (from x) = x
+
+T and Tring are arbitrary, but typically T is the 'main' type while
+Tring is the 'representation' type.  (This just helps us remember 
+whether to use 'from' or 'to'.
+
+\begin{code}
+data EP a = EP { fromEP :: a,	-- :: T -> Tring
+		 toEP   :: a }	-- :: Tring -> T
+\end{code}
+
+Embedding-projection pairs are used in several places:
+
+First of all, each type constructor has an EP associated with it, the
+code in EP converts (datatype T) from T to Tring and back again.
+
+Secondly, when we are filling in Generic methods (in the typechecker, 
+tcMethodBinds), we are constructing bimaps by induction on the structure
+of the type of the method signature.
 
 
 %************************************************************************

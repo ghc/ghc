@@ -12,7 +12,7 @@ import IO		( openFile, hClose, IOMode(..) )
 
 import HsSyn
 import HsCore		( HsIdInfo(..), toUfExpr )
-import RdrHsSyn		( RdrNameRuleDecl )
+import RdrHsSyn		( RdrNameRuleDecl, mkTyData )
 import HsPragmas	( DataPragmas(..), ClassPragmas(..) )
 import HsTypes		( toHsTyVars )
 import BasicTypes	( Fixity(..), NewOrData(..),
@@ -26,7 +26,7 @@ import CmdLineOpts
 import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId, hasNoBinding,
 			  idSpecialisation
 			)
-import Var		( isId )
+import Var		( isId, varName )
 import VarSet
 import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo(..), 
@@ -48,7 +48,7 @@ import OccName		( OccName, pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize
 			)
-import Class		( classExtraBigSig )
+import Class		( classExtraBigSig, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
 import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType,
 			  deNoteType, classesToPreds
@@ -105,8 +105,8 @@ writeIface this_mod old_iface new_iface
 	  Just final_iface ->
 
        do  let mod_vers_unchanged = case old_iface of
-				   Just iface -> pi_vers iface == pi_vers final_iface
-				   Nothing -> False
+				      Just iface -> pi_vers iface == pi_vers final_iface
+				      Nothing -> False
      	   when (mod_vers_unchanged && opt_D_dump_rn_trace) $
 	        putStrLn "Module version unchanged, but usages differ; hence need new hi file"
 
@@ -390,8 +390,7 @@ ifaceInstances inst_infos
 		--	instance Foo Tibble where ...
 		-- and this instance decl wouldn't get imported into a module
 		-- that mentioned T but not Tibble.
-	    forall_ty     = mkSigmaTy tvs (classesToPreds theta)
-				      (deNoteType (mkDictTy clas tys))
+	    forall_ty     = mkSigmaTy tvs theta (deNoteType (mkDictTy clas tys))
 	    tidy_ty = tidyTopType forall_ty
 	in			 
 	InstDecl (toHsType tidy_ty) EmptyMonoBinds [] (Just (toRdrName dfun_id)) noSrcLoc 
@@ -409,7 +408,7 @@ ifaceTyCon tycon
 
 ifaceTyCon tycon
   | isAlgTyCon tycon
-  = TyClD (TyData new_or_data (toHsContext (tyConTheta tycon))
+  = TyClD (mkTyData new_or_data (toHsContext (tyConTheta tycon))
 		  (toRdrName tycon)
 		  (toHsTyVars tyvars)
 		  (map ifaceConDecl (tyConDataCons tycon))
@@ -454,24 +453,28 @@ ifaceClass clas
 		     (toHsFDs clas_fds)
 		     (map toClassOpSig op_stuff)
 		     EmptyMonoBinds NoClassPragmas
-		     bogus bogus bogus [] noSrcLoc
+		     [] noSrcLoc
     )
   where
      bogus = error "ifaceClass"
      (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
 
-     toClassOpSig (sel_id, dm_id, explicit_dm)
-	= ASSERT( sel_tyvars == clas_tyvars)
-	  ClassOpSig (toRdrName sel_id) (Just (bogus, explicit_dm)) (toHsType op_ty) noSrcLoc
+     toClassOpSig (sel_id, def_meth) = 
+	ASSERT(sel_tyvars == clas_tyvars)
+	  ClassOpSig (toRdrName sel_id) (Just def_meth') (toHsType op_ty) noSrcLoc
 	where
 	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
+	  def_meth' = case def_meth of
+			 NoDefMeth  -> NoDefMeth
+			 GenDefMeth -> GenDefMeth
+			 DefMeth id -> DefMeth (toRdrName id)
 \end{code}
 
 
 %************************************************************************
 %*				 					*
 \subsection{Value bindings}
-%*				 					*
+%*				 					* 
 %************************************************************************
 
 \begin{code}
@@ -665,7 +668,6 @@ ifaceId get_idinfo is_rec id rhs
 
     find_fvs expr = exprSomeFreeVars interestingId expr
 
-    
 interestingId id = isId id && isLocallyDefined id && not (hasNoBinding id)
 \end{code}
 

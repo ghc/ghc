@@ -737,6 +737,7 @@ splitRhoTy ty = split ty ty []
   split orig_ty ty		ts = (reverse ts, orig_ty)
 \end{code}
 
+
 isSigmaType returns true of any qualified type.  It doesn't *necessarily* have 
 any foralls.  E.g.
 	f :: (?x::Int) => Int -> Int
@@ -811,8 +812,8 @@ typeKind (ForAllTy tv ty)	= typeKind ty
 		Free variables of a type
 		~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tyVarsOfType :: Type -> TyVarSet
 
+tyVarsOfType :: Type -> TyVarSet
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs

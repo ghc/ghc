@@ -104,6 +104,9 @@ tcPat :: (Name -> TcType -> TcM s TcId)	-- How to construct a suitable (monomorp
 %************************************************************************
 
 \begin{code}
+tcPat tc_bndr pat@(TypePatIn ty) pat_ty
+  = failWithTc (badTypePat pat)
+
 tcPat tc_bndr (VarPatIn name) pat_ty
   = tc_bndr name pat_ty		`thenTc` \ bndr_id ->
     returnTc (VarPat bndr_id, emptyLIE, emptyBag, unitBag (name, bndr_id), emptyLIE)
@@ -441,5 +444,7 @@ polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
   = hang (ptext SLIT("Illegal polymorphic type signature in pattern:"))
 	 4 (ppr sig_ty)
+
+badTypePat pat = ptext SLIT("Illegal type pattern") <+> ppr pat
 \end{code}
 

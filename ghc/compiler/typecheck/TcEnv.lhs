@@ -398,7 +398,10 @@ tcLookupValue name
 	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
 		   returnNF_Tc (lookupWithDefaultUFM ve def name)
   where
-    def = pprPanic "tcLookupValue:" (ppr name)
+    wired_in = case maybeWiredInIdName name of
+	Just id -> True
+	Nothing -> False
+    def = pprPanic "tcLookupValue:" (ppr name <+> ppr wired_in)
 
 tcLookupValueMaybe :: Name -> NF_TcM s (Maybe Id)
 tcLookupValueMaybe name

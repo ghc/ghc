@@ -601,7 +601,7 @@ getNonWiredInDecl needed_name
     loadHomeInterface doc_str needed_name	`thenRn` \ ifaces ->
     case lookupNameEnv (iDecls ifaces) needed_name of
 
-      Just (version, avail, is_tycon_name, decl@(_, TyClD (TyData DataType _ _ _ _ ncons _ _ _)))
+      Just (version, avail, is_tycon_name, decl@(_, TyClD (TyData DataType _ _ _ _ ncons _ _ _ _ _)))
 	-- This case deals with deferred import of algebraic data types
 
 	|  not opt_NoPruneTyDecls
@@ -1013,7 +1013,7 @@ getDeclBinders :: (RdrName -> SrcLoc -> RnM d Name)	-- New-name function
 		-> RdrNameHsDecl
 		-> RnM d (Maybe AvailInfo)
 
-getDeclBinders new_name (TyClD (TyData _ _ tycon _ condecls _ _ _ src_loc))
+getDeclBinders new_name (TyClD (TyData _ _ tycon _ condecls _ _ _ src_loc _ _))
   = new_name tycon src_loc			`thenRn` \ tycon_name ->
     getConFieldNames new_name condecls		`thenRn` \ sub_names ->
     returnRn (Just (AvailTC tycon_name (tycon_name : nub sub_names)))
@@ -1024,7 +1024,7 @@ getDeclBinders new_name (TyClD (TySynonym tycon _ _ src_loc))
   = new_name tycon src_loc		`thenRn` \ tycon_name ->
     returnRn (Just (AvailTC tycon_name [tycon_name]))
 
-getDeclBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ _ _ _ _ src_loc))
+getDeclBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ _ src_loc))
   = new_name cname src_loc			`thenRn` \ class_name ->
 
 	-- Record the names for the class ops
@@ -1089,10 +1089,11 @@ and the dict fun of an instance decl, because both of these have
 bindings of their own elsewhere.
 
 \begin{code}
-getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ tname dname dwname snames src_loc))
-  = sequenceRn [new_name n src_loc | n <- (tname : dname : dwname : snames)]
+getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ names 
+				   src_loc))
+  = sequenceRn [new_name n src_loc | n <- names]
 
-getDeclSysBinders new_name (TyClD (TyData _ _ _ _ cons _ _ _ _))
+getDeclSysBinders new_name (TyClD (TyData _ _ _ _ cons _ _ _ _ _ _))
   = sequenceRn [new_name wkr_name src_loc | ConDecl _ wkr_name _ _ _ src_loc <- cons]
 
 getDeclSysBinders new_name other_decl

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.38 2000/09/26 16:45:34 simonpj Exp $
+% $Id: PrelBase.lhs,v 1.39 2000/10/03 08:43:05 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -556,6 +556,19 @@ instance CCallable   Int
 instance CReturnable Int
 
 instance CReturnable () -- Why, exactly?
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Generics}
+%*							*
+%*********************************************************
+
+\begin{code}
+data Unit = Unit
+data a :+: b = Inl a | Inr b
+data a :*: b = a :*: b
 \end{code}
 
 

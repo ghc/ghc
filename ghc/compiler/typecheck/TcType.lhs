@@ -57,7 +57,7 @@ import PrimRep		( PrimRep(VoidRep) )
 import Var		( TyVar, tyVarKind, tyVarName, isTyVar, isMutTyVar, mkTyVar )
 
 -- others:
-import TcMonad
+import TcMonad          -- TcType, amongst others
 import TysWiredIn	( voidTy )
 
 import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,

@@ -9,7 +9,7 @@ module Id (
 
 	-- Simple construction
 	mkId, mkVanillaId, mkSysLocal, mkUserLocal,
-	mkTemplateLocals, mkWildId, mkTemplateLocal,
+	mkTemplateLocals, mkTemplateLocalsNum, mkWildId, mkTemplateLocal,
 
 	-- Taking an Id apart
 	idName, idType, idUnique, idInfo,
@@ -29,7 +29,8 @@ module Id (
 	isIP,
 	isSpecPragmaId,	isRecordSelector,
 	isPrimOpId, isPrimOpId_maybe, 
-	isDataConId, isDataConId_maybe, isDataConWrapId, isDataConWrapId_maybe,
+	isDataConId, isDataConId_maybe, isDataConWrapId, 
+		isDataConWrapId_maybe,
 	isBottomingId,
 	isExportedId, isUserExportedId,
 	hasNoBinding,
@@ -62,24 +63,28 @@ module Id (
 	idCafInfo,
 	idCprInfo,
 	idLBVarInfo,
-	idOccInfo
+	idOccInfo,
 
     ) where
 
 #include "HsVersions.h"
 
 
-import CoreSyn		( Unfolding, CoreRules )
+import CoreSyn		( Unfolding, CoreRules, CoreExpr, Expr(..),
+			  AltCon (..), Alt, mkApps, Arg )
 import BasicTypes	( Arity )
 import Var		( Id, DictId,
 			  isId, mkIdVar,
 			  idName, idType, idUnique, idInfo,
 			  setIdName, setVarType, setIdUnique, 
-			  setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
+			  setIdInfo, lazySetIdInfo, modifyIdInfo, 
+			  maybeModifyIdInfo,
 			  externallyVisibleId
 			)
 import VarSet
-import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars, seqType, splitTyConApp_maybe )
+import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars, 
+			  seqType, splitAlgTyConApp_maybe, mkTyVarTy,
+			  mkTyConApp, splitTyConApp_maybe)
 
 import IdInfo 
 
@@ -95,9 +100,14 @@ import PrimOp		( PrimOp, primOpIsCheap )
 import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
 import SrcLoc		( SrcLoc )
-import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques )
+import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques, 
+			  getNumBuiltinUniques )
 import Outputable
-
+import TyCon            ( TyCon, AlgTyConFlavour(..), ArgVrcs, mkSynTyCon, 
+			  mkAlgTyConRep, tyConName, 
+			  tyConTyVars, tyConDataCons )
+import DataCon 		( DataCon, dataConWrapId, dataConOrigArgTys )
+import Var 		( Var )
 infixl 	1 `setIdUnfolding`,
 	  `setIdArityInfo`,
 	  `setIdDemandInfo`,
@@ -158,6 +168,11 @@ mkWildId ty = mkSysLocal SLIT("wild") (mkBuiltinUnique 1) ty
 mkTemplateLocals :: [Type] -> [Id]
 mkTemplateLocals tys = zipWith (mkSysLocal SLIT("tpl"))
 			       (getBuiltinUniques (length tys))
+			       tys
+
+mkTemplateLocalsNum :: Int -> [Type] -> [Id]
+mkTemplateLocalsNum n tys = zipWith (mkSysLocal SLIT("tpl"))
+			       (getNumBuiltinUniques n (length tys))
 			       tys
 
 mkTemplateLocal :: Int -> Type -> Id
@@ -450,4 +465,14 @@ zapFragileIdInfo id = maybeModifyIdInfo zapFragileInfo id
 zapLamIdInfo :: Id -> Id
 zapLamIdInfo id = maybeModifyIdInfo zapLamInfo id
 \end{code}
+
+
+
+
+
+
+
+
+
+
 

@@ -41,7 +41,8 @@ import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
 import Maybes	( maybeToBool, catMaybes, mapMaybe )
 import UniqFM   ( emptyUFM, listToUFM )
-import Util	( removeDups, sortLt )
+import ListSetOps ( removeDups )
+import Util	( sortLt )
 import List	( partition )
 \end{code}
 

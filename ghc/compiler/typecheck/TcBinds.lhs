@@ -233,7 +233,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	newTyVar boxedTypeKind		`thenNF_Tc` \ alpha_tv ->
 	let
 	  forall_a_a    = mkForAllTy alpha_tv (mkTyVarTy alpha_tv)
-          binder_names  = map fst (bagToList (collectMonoBinders mbind))
+          binder_names  = collectMonoBinders mbind
 	  poly_ids      = map mk_dummy binder_names
 	  mk_dummy name = case maybeSig tc_ty_sigs name of
 			    Just (TySigInfo _ poly_id _ _ _ _ _ _) -> poly_id	-- Signature
@@ -398,8 +398,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 		-- at all.
 	
 	pat_binders :: [Name]
-	pat_binders = map fst $ bagToList $ collectMonoBinders $ 
-		      (justPatBindings mbind EmptyMonoBinds)
+	pat_binders = collectMonoBinders (justPatBindings mbind EmptyMonoBinds)
     in
 	-- CHECK FOR UNBOXED BINDERS IN PATTERN BINDINGS
     mapTc (\id -> checkTc (not (idName id `elem` pat_binders

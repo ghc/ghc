@@ -15,9 +15,6 @@ module Maybes (
 	expectJust,
 	maybeToBool,
 
-	assocMaybe,
-	mkLookupFun, mkLookupFunDef,
-
 	failMaB,
 	failMaybe,
 	seqMaybe,
@@ -118,49 +115,6 @@ orElse :: Maybe a -> a -> a
 Nothing  `orElse` y = y
 \end{code}
 
-Lookup functions
-~~~~~~~~~~~~~~~~
-
-@assocMaybe@ looks up in an assocation list, returning
-@Nothing@ if it fails.
-
-\begin{code}
-assocMaybe :: (Eq a) => [(a,b)] -> a -> Maybe b
-
-assocMaybe alist key
-  = lookup alist
-  where
-    lookup []		  = Nothing
-    lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
-\end{code}
-
-@mkLookupFun eq alist@ is a function which looks up
-its argument in the association list @alist@, returning a Maybe type.
-@mkLookupFunDef@ is similar except that it is given a value to return
-on failure.
-
-\begin{code}
-mkLookupFun :: (key -> key -> Bool)	-- Equality predicate
-	    -> [(key,val)] 		-- The assoc list
-	    -> key 			-- The key
-	    -> Maybe val		-- The corresponding value
-
-mkLookupFun eq alist s
-  = case [a | (s',a) <- alist, s' `eq` s] of
-      []    -> Nothing
-      (a:_) -> Just a
-
-mkLookupFunDef :: (key -> key -> Bool)	-- Equality predicate
-	       -> [(key,val)] 		-- The assoc list
-	       -> val 			-- Value to return on failure
-	       -> key 			-- The key
-	       -> val			-- The corresponding value
-
-mkLookupFunDef eq alist deflt s
-  = case [a | (s',a) <- alist, s' `eq` s] of
-      []    -> deflt
-      (a:_) -> a
-\end{code}
 
 %************************************************************************
 %*									*

@@ -10,7 +10,7 @@ module TcDeriv ( tcDeriving ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsBinds(..), MonoBinds(..), collectMonoBinders )
+import HsSyn		( HsBinds(..), MonoBinds(..), collectLocatedMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds )
 import CmdLineOpts	( opt_D_dump_deriv )
@@ -18,7 +18,7 @@ import CmdLineOpts	( opt_D_dump_deriv )
 import TcMonad
 import TcEnv		( InstEnv, getEnvTyCons, tcSetInstEnv, newDFunName )
 import TcGenDeriv	-- Deriv stuff
-import TcInstUtil	( InstInfo(..), buildInstanceEnv )
+import TcInstUtil	( InstInfo(..), pprInstInfo, instInfoClass, simpleInstInfoTyCon, buildInstanceEnv )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
@@ -51,7 +51,8 @@ import TysWiredIn	( voidTy )
 import Var		( TyVar )
 import PrelNames
 import Bag		( bagToList )
-import Util		( zipWithEqual, sortLt, removeDups,  assoc, thenCmp )
+import Util		( zipWithEqual, sortLt, thenCmp )
+import ListSetOps	( removeDups,  assoc )
 import Outputable
 \end{code}
 
@@ -217,7 +218,7 @@ tcDeriving mod fixs rn_name_supply inst_decl_infos_in
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
 	method_binds_s   = map (gen_bind fixs) new_inst_infos
-	mbinders	 = bagToList (collectMonoBinders extra_mbinds)
+	mbinders	 = collectLocatedMonoBinders extra_mbinds
 	
 	-- Rename to get RenamedBinds.
 	-- The only tricky bit is that the extra_binds must scope over the
@@ -239,13 +240,8 @@ tcDeriving mod fixs rn_name_supply inst_decl_infos_in
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
     ddump_deriving inst_infos extra_binds
-      = vcat (map pp_info inst_infos) $$ ppr extra_binds
+      = vcat (map pprInstInfo inst_infos) $$ ppr extra_binds
       where
-	pp_info (InstInfo clas tvs [ty] inst_decl_theta _ mbinds _ _)
-	  = ppr (mkSigmaTy tvs inst_decl_theta' (mkDictTy clas [ty]))
-	    $$
-	    ppr mbinds
-	    where inst_decl_theta' = classesToPreds inst_decl_theta
 
 	-- Paste the dfun id and method binds into the InstInfo
     gen_inst_info (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ locn _, meth_binds)
@@ -256,7 +252,7 @@ tcDeriving mod fixs rn_name_supply inst_decl_infos_in
 	returnNF_Tc (InstInfo clas tyvars tys inst_decl_theta
 			      dfun_id meth_binds locn [])
 
-    rn_meths meths = rnMethodBinds meths `thenRn` \ (meths', _) -> returnRn meths'
+    rn_meths meths = rnMethodBinds [] meths `thenRn` \ (meths', _) -> returnRn meths'
 	-- Ignore the free vars returned
 \end{code}
 
@@ -460,7 +456,7 @@ add_solns inst_infos_in eqns solns
 
     mk_deriv_inst_info (clas, tycon, tyvars, _) theta
       = InstInfo clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)]
-		 theta
+		 theta'
 		 dummy_dfun_id
 		 (my_panic "binds") (getSrcLoc tycon)
 		 (my_panic "upragmas")
@@ -552,10 +548,10 @@ the renamer.  What a great hack!
 -- (paired with class name, as we need that when generating dict
 --  names.)
 gen_bind :: FixityEnv -> InstInfo -> RdrNameMonoBinds
-gen_bind fixities (InstInfo clas _ [ty] _ _ _ _ _)
-  | not from_here		= EmptyMonoBinds
-  | clas `hasKey` showClassKey  = gen_Show_binds fixities tycon
-  | clas `hasKey` readClassKey  = gen_Read_binds fixities tycon
+gen_bind fixities inst
+  | not (isLocallyDefined tycon) = EmptyMonoBinds
+  | clas `hasKey` showClassKey   = gen_Show_binds fixities tycon
+  | clas `hasKey` readClassKey   = gen_Read_binds fixities tycon
   | otherwise
   = assoc "gen_bind:bad derived class"
 	   [(eqClassKey,      gen_Eq_binds)
@@ -567,8 +563,8 @@ gen_bind fixities (InstInfo clas _ [ty] _ _ _ _ _)
 	   (classKey clas)
 	   tycon
   where
-      from_here   = isLocallyDefined tycon
-      (tycon,_,_) = splitAlgTyConApp ty	
+      clas  = instInfoClass inst
+      tycon = simpleInstInfoTyCon inst
 \end{code}
 
 
@@ -615,11 +611,9 @@ gen_taggery_Names inst_infos
     foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
     foldlTc do_tag2con names_so_far tycons_of_interest
   where
-    all_CTs = [ (c, get_tycon ty) | (InstInfo c _ [ty] _ _ _ _ _) <- inst_infos ]
+    all_CTs = [ (instInfoClass info, simpleInstInfoTyCon info) | info <- inst_infos ]
 		    
-    get_tycon ty = case splitAlgTyConApp ty of { (tc, _, _) -> tc }
-
-    all_tycons = map snd all_CTs
+    all_tycons		    = map snd all_CTs
     (tycons_of_interest, _) = removeDups compare all_tycons
     
     do_con2tag acc_Names tycon
