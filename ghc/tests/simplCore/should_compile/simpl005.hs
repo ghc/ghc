@@ -1,4 +1,4 @@
---!!! CPR on newtype with polymorphic argument
+-- !!! CPR on newtype with polymorphic argument
 
 {-# OPTIONS -O #-}
 
