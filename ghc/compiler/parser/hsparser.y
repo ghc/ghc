@@ -279,10 +279,10 @@ BOOLEAN pat_check=TRUE;
 		gcon gconk gtycon itycon qop1 qvarop1 
 		ename iname
 
-%type <ubinding>  topdecl topdecls topdecls1 letdecls
+%type <ubinding>  topdecl topdecls letdecls
 		  typed datad newtd classd instd defaultd foreignd
 		  decl decls fixdecl fix_op fix_ops valdef
- 		  maybe_where with_where where_body type_and_maybe_id
+ 		  maybe_where where_body type_and_maybe_id
 
 %type <uttype>    polytype
 		  conargatype conapptype
@@ -352,7 +352,7 @@ interface_pragma : /* empty */
         ;
 
 maybeexports :	/* empty */			{ $$ = mknothing(); }
-        |  OPAREN CPAREN			{ $$ = mknothing(); }
+	|  OPAREN CPAREN			{ $$ = mkjust(Lnil); }
 	|  OPAREN export_list CPAREN		{ $$ = mkjust($2); }
 	|  OPAREN export_list COMMA CPAREN	{ $$ = mkjust($2); }
 	;
@@ -440,12 +440,9 @@ iname   :  var					{ $$ = mknoqual($1); }
 **********************************************************************/
 
 topdecls : /* empty */                  { $$ = mknullbind(); }
-         | topdecls1
-	 ;
-
-topdecls1:  topdecl
-	 |  topdecls1 SEMI  		{ $$ = $1; }
-	 |  topdecls1 SEMI topdecl
+	 | topdecl
+	 | topdecls SEMI  		{ $$ = $1; }
+	 | topdecls SEMI topdecl
 		{
 		  if($1 != NULL)
 		    if($3 != NULL)
@@ -545,7 +542,8 @@ unsafe_flag: UNSAFE	{ $$ = 1; }
 	   | /*empty*/  { $$ = 0; }
 	   ;
 
-decls	: decl
+decls	: /* empty */		{ $$ = mknullbind(); }
+	| decl
 	| decls SEMI		{ $$ = $1; }
 	| decls SEMI decl
 		{
@@ -916,16 +914,11 @@ gdrhs	:  gd EQUAL get_line_no exp		{ $$ = lsing(mkpgdexp($1,$3,$4)); }
 	;
 
 maybe_where: /* empty */			{ $$ = mknullbind(); }
-	   | WHERE with_where			{ $$ = $2; }
-	   ;
-
-with_where : /* empty */			{ $$ = mknullbind(); }
-	   | where_body				{ $$ = $1; }
+	   | WHERE where_body			{ $$ = $2; }
 	   ;
 
 where_body : ocurly  decls ccurly		{ $$ = $2; }
 	   | vocurly decls vccurly		{ $$ = $2; }
-	   | ocurly ccurly			{ $$ = mknullbind(); }
 	   ;
 
 gd	:  VBAR quals				{ $$ = $2; }
@@ -1139,7 +1132,6 @@ list_rest : 	exp				{ $$ = lsing($1); }
 
 letdecls:  LET { pat_check = TRUE; }  ocurly decls ccurly		{ $$ = $4; }
 	|  LET { pat_check = TRUE; } vocurly decls vccurly		{ $$ = $4; }
-	|  LET /* empty */						{ $$ = mknullbind(); }
 	;
 
 /*
