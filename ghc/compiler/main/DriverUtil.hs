@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.24 2001/06/14 12:50:06 simonpj Exp $
+-- $Id: DriverUtil.hs,v 1.25 2001/06/27 10:14:13 rrt Exp $
 --
 -- Utils for the driver
 --
@@ -38,7 +38,7 @@ getOptionsFromSource
 	-> IO [String]		-- options, if any
 getOptionsFromSource file
   = do h <- openFile file ReadMode
-       catchJust ioErrors (look h)
+       catchJust ioErrors (look h `finally` hClose h)
 	  (\e -> if isEOFError e then return [] else ioError e)
   where
 	look h = do
