@@ -45,7 +45,7 @@ import TcRnMonad
 import IfaceEnv		( lookupOrig )
 import Class		( Class, classBigSig )
 import TyCon		( TyCon, AlgTyConRhs(..), tyConTyVars, getSynTyConDefn, 
-			  isSynTyCon, isNewTyCon, tyConDataCons, algTcRhs )
+			  isSynTyCon, isNewTyCon, tyConDataCons, algTyConRhs )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
 			  dataConName, dataConFieldLabels, dataConWrapId, dataConIsInfix, 
 			  isVanillaDataCon )
@@ -569,7 +569,7 @@ reifyTyCon tc
 	; return (TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
 
 reifyTyCon tc
-  = case algTcRhs tc of
+  = case algTyConRhs tc of
       NewTyCon data_con _ _ 
 	-> do	{ con <- reifyDataCon data_con
 		; return (TH.NewtypeD [] (reifyName tc) (reifyTyVars (tyConTyVars tc))

@@ -33,7 +33,7 @@ module TyCon(
 	tyConUnique,
 	tyConTyVars,
 	tyConArgVrcs,
-	algTcRhs, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
+	algTyConRhs, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
 	tyConFields, tyConSelIds,
 	tyConStupidTheta,
 	tyConArity,
@@ -490,6 +490,11 @@ tyConFields other_tycon		          = []
 
 tyConSelIds :: TyCon -> [Id]
 tyConSelIds tc = [id | (_,_,id) <- tyConFields tc]
+
+algTyConRhs :: TyCon -> AlgTyConRhs
+algTyConRhs (AlgTyCon {algTcRhs = rhs})  = rhs
+algTyConRhs (TupleTyCon {dataCon = con}) = DataTyCon (Just []) [con] False
+algTyConRhs other = pprPanic "algTyConRhs" (ppr other)
 \end{code}
 
 \begin{code}

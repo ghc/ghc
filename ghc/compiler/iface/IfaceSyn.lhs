@@ -53,7 +53,7 @@ import TyCon		( TyCon, ArgVrcs, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCo
 			  isSynTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
 			  isTupleTyCon, tupleTyConBoxity,
 			  tyConHasGenerics, tyConArgVrcs, getSynTyConDefn,
-			  tyConArity, tyConTyVars, algTcRhs, tyConExtName  )
+			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName  )
 import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon, dataConIsInfix, isVanillaDataCon )
 import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
@@ -490,7 +490,7 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
   | isAlgTyCon tycon
   = IfaceData {	ifName    = getOccName tycon,
 		ifTyVars  = toIfaceTvBndrs tyvars,
-		ifCons    = ifaceConDecls (algTcRhs tycon),
+		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifVrcs    = tyConArgVrcs tycon,
 		ifGeneric = tyConHasGenerics tycon }
