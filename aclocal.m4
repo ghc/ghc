@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.41 1999/05/17 14:48:30 simonm Exp $
+dnl $Id: aclocal.m4,v 1.42 1999/06/07 10:12:52 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -313,7 +313,7 @@ AC_DEFUN(FPTOOLS_PROG_GNUCPP,
 [AC_CACHE_CHECK([how to invoke GNU cpp directly], fptools_cv_gnu_cpp,
 [if test "$HaveGcc" = "YES"; then
 	echo > conftest.c
-	gcc -v -E conftest.c >/dev/null 2>conftest.out
+	$CC -v -E conftest.c >/dev/null 2>conftest.out
 	# \x5c = backslash
 	echo 'tr/\x5c/\//; /(\S+\/)cpp/ && print "[$]{1}cpp -iprefix [$]1";' > conftest.pl
 	fptools_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
