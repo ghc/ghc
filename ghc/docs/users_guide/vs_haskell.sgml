@@ -1,214 +1,160 @@
-<Sect1 id="vs-Haskell-defn">
-<Title>Haskell&nbsp;98 vs.&nbsp;Glasgow Haskell: language non-compliance
-</Title>
+<sect1 id="vs-Haskell-defn">
+  <title>Haskell&nbsp;98 vs.&nbsp;Glasgow Haskell: language non-compliance
+</title>
 
-<Para>
-<IndexTerm><Primary>GHC vs the Haskell 98 language</Primary></IndexTerm>
-<IndexTerm><Primary>Haskell 98 language vs GHC</Primary></IndexTerm>
-</Para>
+  <indexterm><primary>GHC vs the Haskell 98 language</primary></indexterm>
+  <indexterm><primary>Haskell 98 language vs GHC</primary></indexterm>
 
-<Para>
-This section lists Glasgow Haskell infelicities in its implementation
-of Haskell&nbsp;98.  See also the &ldquo;when things go wrong&rdquo; section
-(<XRef LinkEnd="wrong">)
-for information about crashes, space leaks, and other undesirable
-phenomena.
-</Para>
+  <para>This section lists Glasgow Haskell infelicities in its
+  implementation of Haskell&nbsp;98.  See also the &ldquo;when things
+  go wrong&rdquo; section (<XRef LinkEnd="wrong">) for information
+  about crashes, space leaks, and other undesirable phenomena.</para>
 
-<Para>
-The limitations here are listed in Haskell-Report order (roughly).
-</Para>
+  <para>The limitations here are listed in Haskell-Report order
+  (roughly).</para>
 
-  <sect2 id="infelicities-lexical">
-    <title>Lexical syntax</title>
+  <sect2 id="haskell98-divergence">
+    <title>Divergence from Haskell&nbsp;98</title>
     
-    <itemizedlist>
-      <listitem>
-	<para>The Haskell report specifies that programs may be
-	written using Unicode.  GHC only accepts the ISO-8859-1
-	character set at the moment.</para>
-      </listitem>
+      
+    <sect3 id="infelicities-lexical">
+      <title>Lexical syntax</title>
+      
+      <itemizedlist>
+	<listitem>
+	  <para>The Haskell report specifies that programs may be
+	  written using Unicode.  GHC only accepts the ISO-8859-1
+	  character set at the moment.</para>
+	</listitem>
 
-      <listitem>
-	<para>Certain lexical rules regarding qualified identifiers
-	are slightly different in GHC compared to the Haskell report.
-	When you have
-	<replaceable>module</replaceable><literal>.</literal><replaceable>reservedop</replaceable>,
-	such as <literal>M.\</literal>, GHC will interpret it as a
-	single qualified operator rather than the two lexemes
-	<literal>M</literal> and <literal>.\</literal>.</para>
-      </listitem>
-    </itemizedlist>
-  </sect2>
-
-  <sect2 id="infelicities-syntax">
-    <title>Context-free syntax</title>
-
-    <itemizedlist>
-      <listitem>
-	<para>GHC doesn't do fixity resolution on the left hand side
-	of a binding before deciding which symbol is the function
-	symbol.  For example, the following fails, because GHC makes
-	the assumption that the function symbol is
-	<literal>|-</literal>:</para>
+	<listitem>
+	  <para>Certain lexical rules regarding qualified identifiers
+	  are slightly different in GHC compared to the Haskell
+	  report.  When you have
+	  <replaceable>module</replaceable><literal>.</literal><replaceable>reservedop</replaceable>,
+	  such as <literal>M.\</literal>, GHC will interpret it as a
+	  single qualified operator rather than the two lexemes
+	  <literal>M</literal> and <literal>.\</literal>.</para>
+	</listitem>
+      </itemizedlist>
+    </sect3>
+      
+      <sect3 id="infelicities-syntax">
+	<title>Context-free syntax</title>
+	
+      <itemizedlist>
+	<listitem>
+	  <para>GHC doesn't do fixity resolution on the left hand side
+	  of a binding before deciding which symbol is the function
+	  symbol.  For example, the following fails, because GHC makes
+	  the assumption that the function symbol is
+	  <literal>|-</literal>:</para>
 <programlisting>
 infix 5 |- 
 infix 9 :=
 
 data Equal = Char := Int
 
-0 |- x:=y = 1 |- x:=y      -- XXX fails here
-</programlisting>
-      </listitem>
+0 |- x:=y = 1 |- x:=y      -- XXX fails here</programlisting>
+	</listitem>
 
-      <listitem>
-	<para>GHC doesn't do fixity resolution in expressions during
-	parsing.  For example, according to the Haskell report, the
-	following expression is legal Haskell:
+	<listitem>
+	  <para>GHC doesn't do fixity resolution in expressions during
+	  parsing.  For example, according to the Haskell report, the
+	  following expression is legal Haskell:
 <programlisting>
-    let x = 42 in x == 42 == True
-</programlisting>
+    let x = 42 in x == 42 == True</programlisting>
 	and parses as:
 <programlisting>
-    (let x = 42 in x == 42) == True
-</programlisting>
-	because according to the report, the <literal>let</literal>
-	expression <quote>extends as far to the right as
-	possible</quote>.  Since it can't extend past the second
-	equals sign without causing a parse error
-	(<literal>==</literal> is non-fix), the
-	<literal>let</literal>-expression must terminate there.  GHC
-	simply gobbles up the whole expression, parsing like this:
+    (let x = 42 in x == 42) == True</programlisting>
+
+          because according to the report, the <literal>let</literal>
+	  expression <quote>extends as far to the right as
+	  possible</quote>.  Since it can't extend past the second
+	  equals sign without causing a parse error
+	  (<literal>==</literal> is non-fix), the
+	  <literal>let</literal>-expression must terminate there.  GHC
+	  simply gobbles up the whole expression, parsing like this:
 <programlisting>
-    (let x = 42 in x == 42 == True)
-</programlisting>
-        The Haskell report is arguably wrong here, but nevertheless
-        it's a difference between GHC & Haskell 98.</para>
-      </listitem>
-    </itemizedlist>
-  </sect2>
+    (let x = 42 in x == 42 == True)</programlisting>
 
-<Sect2 id="infelicities-exprs-pats">
-<Title>Expressions and patterns
-</Title>
+          The Haskell report is arguably wrong here, but nevertheless
+          it's a difference between GHC & Haskell 98.</para>
+	</listitem>
+      </itemizedlist>
+    </sect3>
 
-<Para>
-<VariableList>
+  <sect3 id="infelicities-exprs-pats">
+      <title>Expressions and patterns</title>
 
-<VarListEntry>
-<Term>Very long <Literal>String</Literal> constants:</Term>
-<ListItem>
-<Para>
-May not go through.  If you add a &ldquo;string gap&rdquo; every
-few thousand characters, then the strings can be as long
-as you like.
-</Para>
+      <variablelist>
+	<varlistentry>
+	  <term>Very long <literal>String</literal> constants:</term>
+	  <listitem>
+	    <para>May not go through.  If you add a &ldquo;string
+            gap&rdquo; every few thousand characters, then the strings
+            can be as long as you like.</para>
 
-<Para>
-Bear in mind that string gaps and the <Option>-cpp</Option><IndexTerm><Primary>-cpp option</Primary></IndexTerm>
-option don't mix very well (see <XRef LinkEnd="c-pre-processor">).
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>Single quotes in module names:</Term>
-<ListItem>
-<Para>
-It might work, but it's just begging for trouble.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
+	    <para>Bear in mind that string gaps and the
+            <option>-cpp</option><indexterm><primary><option>-cpp</option>
+            </primary></indexterm> option don't mix very well (see
+            <xref linkend="c-pre-processor">).</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
-</Sect2>
+    </sect3>
 
-<Sect2 id="infelicities-decls">
-<Title>Declarations and bindings
-</Title>
+    <sect3 id="infelicities-decls">
+      <title>Declarations and bindings</title>
 
-<Para>
-None known.
-</Para>
+      <para>None known.</para>
 
-</Sect2>
+    </sect3>
 
-<Sect2 id="infelicities-Modules">
-<Title>Module system and interface files
-</Title>
+    <sect3 id="infelicities-Modules">
+      <title>Module system and interface files</title>
 
-<Para>
-<VariableList>
+      <variablelist>
 
-<VarListEntry>
-<Term> Namespace pollution </Term>
-<ListItem>
-<Para>
-Several modules internal to GHC are visible in the standard namespace.
-All of these modules begin with <Literal>Prel</Literal>, so the rule
-is: don't use any modules beginning with <Literal>Prel</Literal> in
-your program, or you will be comprehensively screwed.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
+	<varlistentry>
+	  <term> Namespace pollution </term>
+	  <listitem>
+	    <para>Several modules internal to GHC are visible in the
+            standard namespace.  All of these modules begin with
+            <literal>Prel</literal>, so the rule is: don't use any
+            modules beginning with <literal>Prel</literal> in your
+            program, or you will be comprehensively screwed.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
-</Sect2>
+    </sect3>
 
-<Sect2 id="infelicities-numbers">
-<Title>Numbers, basic types, and built-in classes
-</Title>
+    <sect3 id="infelicities-numbers">
+      <title>Numbers, basic types, and built-in classes</title>
 
-<Para>
-<VariableList>
+      <variablelist>
+	<varlistentry>
+	  <term>Multiply-defined array elements&mdash;not checked:</term>
+	  <listitem>
+	    <para>This code fragment <emphasis>should</emphasis>
+	    elicit a fatal error, but it does not:
 
-<VarListEntry>
-<Term>Unchecked arithmetic:</Term>
-<ListItem>
-<Para>
-Arguably <Emphasis>not</Emphasis> an infelicity, but&hellip; Bear in
-mind that operations on <Literal>Int</Literal>,
-<Literal>Float</Literal>, and <Literal>Double</Literal> numbers are
-<Emphasis>unchecked</Emphasis> for overflow, underflow, and other sad
-occurrences.  (note, however that some architectures trap
-floating-point overflow and loss-of-precision and report a
-floating-point exception, probably terminating the
-program)<IndexTerm><Primary>floating-point
-exceptions</Primary></IndexTerm>.
-</Para>
+<programlisting>
+main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 
-<Para>
-Use <Literal>Integer</Literal>, <Literal>Rational</Literal>, etc.,
-numeric types if this stuff keeps you awake at night.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>Multiply-defined array elements&mdash;not checked:</Term>
-<ListItem>
-<Para>
-This code fragment <Emphasis>should</Emphasis> elicit a fatal error, but it does not:
+            </para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+      
+    </sect3>
 
-<ProgramListing>
-main = print (array (1,1) [(1,2), (1,3)])
-</ProgramListing>
+      <sect3 id="infelicities-Prelude">
+	<title>In Prelude support</title>
 
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-
-</Sect2>
-
-<Sect2 id="infelicities-Prelude">
-<Title>In Prelude support
-</Title>
-
-<Para>
-<VariableList>
-
+      <variablelist>
 	<varlistentry>
 	  <term>The <literal>Char</literal> type</term>
 	  <indexterm><primary><literal>Char</literal></primary><secondary>size
@@ -222,29 +168,85 @@ main = print (array (1,1) [(1,2), (1,3)])
 	  </listitem>
 	</varlistentry>
 
-<VarListEntry>
-<Term>Arbitrary-sized tuples:</Term>
-<ListItem>
-<Para>
-Tuples are currently limited to size 61.  HOWEVER: standard instances
-for tuples (<Literal>Eq</Literal>, <Literal>Ord</Literal>,
-<Literal>Bounded</Literal>, <Literal>Ix</Literal>
-<Literal>Read</Literal>, and <Literal>Show</Literal>) are available
-<Emphasis>only</Emphasis> up to 5-tuples.
-</Para>
+	<varlistentry>
+	  <term>Arbitrary-sized tuples:</term>
+	  <listitem>
+	    <para>Tuples are currently limited to size 61.  HOWEVER:
+            standard instances for tuples (<literal>Eq</literal>,
+            <literal>Ord</literal>, <literal>Bounded</literal>,
+            <literal>Ix</literal> <literal>Read</literal>, and
+            <literal>Show</literal>) are available
+            <emphasis>only</emphasis> up to 5-tuples.</para>
 
-<Para>
-These limitations are easily subvertible, so please ask if you get
-stuck on them.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
+	    <para>This limitation is easily subvertible, so please ask
+            if you get stuck on it.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+    </sect3>
+  </sect2>
 
-</Sect2>
+  <sect2 id="haskell98-undefined">
+    <title>GHC's interpretation of undefined behaviour in
+    Haskell&nbsp;98</title>
 
-</Sect1>
+    <para>This section documents GHC's take on various issues that are
+    left undefined or implementation specific in Haskell 98.</para>
+
+    <variablelist>
+      <varlistentry>
+	<term>Sized integral types</term>
+	<indexterm><primary><literal>Int</literal></primary><secondary>size of</secondary>
+	</indexterm>
+	
+	<listitem>
+	  <para>In GHC the <literal>Int</literal> type follows the
+	  size of an address on the host architecture; in other words
+	  it holds 32 bits on a 32-bit machine, and 64-bits on a
+	  64-bit machine.</para>
+
+	  <para>Arithmetic on <literal>Int</literal> is unchecked for
+	  overflow<indexterm><primary>overflow</primary><secondary><literal>Int</literal></secondary>
+	    </indexterm>, so all operations on <literal>Int</literal> happen
+	  modulo
+	  2<superscript><replaceable>n</replaceable></superscript>
+	  where <replaceable>n</replaceable> is the size in bits of
+	  the <literal>Int</literal> type.</para>
+
+	  <para>The <literal>fromInteger</literal><indexterm><primary><literal>fromInteger</literal></primary>
+	    </indexterm>function (and hence
+	  also <literal>fromIntegral</literal><indexterm><primary><literal>fromIntegral</literal></primary>
+	    </indexterm>) is a special case when
+	  converting to <literal>Int</literal>.  The value of
+	  <literal>fromIntegral x :: Int</literal> is given by taking
+	  the lower <replaceable>n</replaceable> bits of <literal>(abs
+	  x)</literal>, multiplied by the sign of <literal>x</literal>
+	  (in 2's complement <replaceable>n</replaceable>-bit
+	  arithmetic).  This behaviour was chosen so that for example
+	  writing <literal>0xffffffff :: Int</literal> preserves the
+	  bit-pattern in the resulting <literal>Int</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Unchecked float arithmetic</term>
+	<listitem>
+	  <para>Operations on <literal>Float</literal> and
+          <literal>Double</literal> numbers are
+          <emphasis>unchecked</emphasis> for overflow, underflow, and
+          other sad occurrences.  (note, however that some
+          architectures trap floating-point overflow and
+          loss-of-precision and report a floating-point exception,
+          probably terminating the
+          program)<indexterm><primary>floating-point
+          exceptions</primary></indexterm>.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+      
+  </sect2>
+
+</sect1>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
