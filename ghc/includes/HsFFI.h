@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.15 2001/10/29 11:33:37 simonmar Exp $
+ * $Id: HsFFI.h,v 1.16 2001/11/07 19:11:43 sof Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -92,6 +92,13 @@ typedef void*			HsForeignObj;   /* DEPRECATED */
 /* this should correspond to the type of StgChar in StgTypes.h */
 #define HS_CHAR_MIN		0
 #define HS_CHAR_MAX		0x10FFFF
+
+/* is it true or not?  */
+#define HS_BOOL_FALSE           0
+#define HS_BOOL_TRUE            1
+
+#define HS_BOOL_MIN             HS_BOOL_FALSE
+#define HS_BOOL_MAX             HS_BOOL_TRUE
 
 /* this mirrors the distinction of cases in StgTypes.h */
 #if   SIZEOF_VOID_P == 8
