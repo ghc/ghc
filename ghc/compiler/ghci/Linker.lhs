@@ -11,8 +11,7 @@ module Linker (
    loadObj,      -- :: String -> IO ()
    unloadObj,    -- :: String -> IO ()
    lookupSymbol, -- :: String -> IO (Maybe (Ptr a))
-   resolveObjs,  -- :: IO Bool
-   addDLL	 -- :: String -> IO (Ptr CChar)
+   resolveObjs   -- :: IO Bool
   )  where
 
 import Monad            ( when )
@@ -52,13 +51,6 @@ resolveObjs = do
    r <- c_resolveObjs
    return (r /= 0)  -- returns True <=> success
 
-addDLL :: String -> String -> IO (Ptr CChar)
-addDLL path lib = do
-  withCString path $ \c_path -> do
-  withCString lib $ \c_lib -> do
-    maybe_errmsg <- c_addDLL c_path c_lib
-    return maybe_errmsg
-
 -- ---------------------------------------------------------------------------
 -- Foreign declaractions to RTS entry points which does the real work;
 -- ---------------------------------------------------------------------------
@@ -78,6 +70,4 @@ foreign import "unloadObj" unsafe
 foreign import "resolveObjs" unsafe
    c_resolveObjs :: IO Int
 
-foreign import "addDLL" unsafe 
-   c_addDLL :: CString -> CString -> IO (Ptr CChar)
 \end{code}
