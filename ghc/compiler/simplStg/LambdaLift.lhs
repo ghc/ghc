@@ -12,16 +12,18 @@ IMP_Ubiq(){-uitous-}
 
 import StgSyn
 
-import Bag		( emptyBag, unionBags, unitBag, snocBag, bagToList )
+import Bag		( Bag, emptyBag, unionBags, unitBag, snocBag, bagToList )
 import Id		( idType, mkSysLocal, addIdArity, 
 			  mkIdSet, unitIdSet, minusIdSet, setIdVisibility,
 			  unionManyIdSets, idSetToList, SYN_IE(IdSet),
-			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv)
+			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv),
+			  SYN_IE(Id)
 			)
 import IdInfo		( ArityInfo, exactArity )
+import Name             ( SYN_IE(Module) )
 import SrcLoc		( noSrcLoc )
-import Type		( splitForAllTy, mkForAllTys, mkFunTys )
-import UniqSupply	( getUnique, splitUniqSupply )
+import Type		( splitForAllTy, mkForAllTys, mkFunTys, SYN_IE(Type) )
+import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )
 import Util		( zipEqual, panic, assertPanic )
 \end{code}
 
