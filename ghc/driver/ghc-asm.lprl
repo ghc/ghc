@@ -795,10 +795,10 @@ sub mangle_asm {
             #
 	    if ( $TargetPlatform =~ /^i386/ && $to_move =~ /$TCOPYDIRVS/ ) {
 		$j = $i + 1;
-		while ( $j < ($numchks - 1)  && $chk[$j] =~ /$T_CONST_LBL/) {
+		while ( $j < $numchks  && $chk[$j] =~ /$T_CONST_LBL/) {
 			$j++;
 		}
-		if ( $j < ($numchks - 1)) {
+		if ( $j < $numchks ) {
 			$chk[$j] = $to_move . $chk[$j];
 	        }
 	    }
