@@ -1380,13 +1380,11 @@ primOpInfo NoFollowOp	-- noFollow# :: a -> a
 %************************************************************************
 
 \begin{code}
-primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
-  = PrimResult SLIT("errorIO#") []
-	[primio_ish_ty unitTy]
+-- errorIO# :: (State# RealWorld# -> a) -> State# RealWorld#
+primOpInfo ErrorIOPrimOp
+  = PrimResult SLIT("errorIO#") [alphaTyVar]
+	[mkFunTy realWorldStatePrimTy alphaTy]
 	statePrimTyCon VoidRep [realWorldTy]
-  where
-    primio_ish_ty result
-      = mkFunTy (mkStatePrimTy realWorldTy) (mkSTretTy realWorldTy result)
 \end{code}
 
 %************************************************************************

@@ -63,7 +63,7 @@ import Type		( applyTyCon, mkSynTy, SYN_IE(Type) )
 import PprType		( GenType, GenTyVar )
 import TysWiredIn	( unitTy )
 import PrelMods		( gHC_MAIN, mAIN )
-import PrelInfo		( main_NAME, mainPrimIO_NAME, ioTyCon_NAME, primIoTyCon_NAME )
+import PrelInfo		( main_NAME, ioTyCon_NAME )
 import TyVar		( GenTyVar, SYN_IE(TyVarEnv), nullTyVarEnv )
 import Unify		( unifyTauTy )
 import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
@@ -284,50 +284,38 @@ get_val_decls decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
 
 \begin{code}
 tcCheckMainSig mod_name
-  | not is_main && not is_ghc_main
+  | mod_name /= mAIN
   = returnTc ()		-- A non-main module
 
   | otherwise
   = 	-- Check that main is defined
-    tcLookupTyCon tycon_name			`thenTc` \ (_,_,tycon) ->
-    tcLookupLocalValue main_name		`thenNF_Tc` \ maybe_main_id ->
+    tcLookupTyCon ioTyCon_NAME		`thenTc`    \ (_,_,ioTyCon) ->
+    tcLookupLocalValue main_NAME	`thenNF_Tc` \ maybe_main_id ->
     case maybe_main_id of {
-	Nothing	 -> failTc (noMainErr mod_name main_name);
+	Nothing	 -> failTc noMainErr;
 	Just main_id   ->
 
 	-- Check that it has the right type (or a more general one)
-    let
-	expected_ty | isSynTyCon tycon = mkSynTy tycon [unitTy]
-		    | otherwise	       = applyTyCon tycon [unitTy]
-		-- This is bizarre.  There ought to be a suitable function in Type.lhs!
-    in
-    tcInstType [] expected_ty			`thenNF_Tc` \ expected_tau ->
-    tcId main_name				`thenNF_Tc` \ (_, lie, main_tau) ->
-    tcSetErrCtxt (mainTyCheckCtxt main_name) $
+    let expected_ty = applyTyCon ioTyCon [unitTy] in
+    tcInstType [] expected_ty		`thenNF_Tc` \ expected_tau ->
+    tcId main_NAME			`thenNF_Tc` \ (_, lie, main_tau) ->
+    tcSetErrCtxt mainTyCheckCtxt $
     unifyTauTy expected_tau
-	       main_tau				`thenTc_`
-    checkTc (isEmptyBag lie) (mainTyMisMatch main_name expected_ty (idType main_id))
+	       main_tau			`thenTc_`
+    checkTc (isEmptyBag lie) (mainTyMisMatch expected_ty (idType main_id))
     }
-  where
-    is_main     = mod_name == mAIN
-    is_ghc_main = mod_name == gHC_MAIN
 
-    main_name | is_main   = main_NAME
-	      | otherwise = mainPrimIO_NAME
+mainTyCheckCtxt sty
+  = hsep [ptext SLIT("When checking that"), ppr sty main_NAME, 
+	  ptext SLIT("has the required type")]
 
-    tycon_name | is_main   = ioTyCon_NAME
-	       | otherwise = primIoTyCon_NAME
+noMainErr sty
+  = hsep [ptext SLIT("Module"), pprModule sty mAIN, 
+	   ptext SLIT("must include a definition for"), ppr sty main_NAME]
 
-mainTyCheckCtxt main_name sty
-  = hsep [ptext SLIT("When checking that"), ppr sty main_name, ptext SLIT("has the required type")]
-
-noMainErr mod_name main_name sty
-  = hsep [ptext SLIT("Module"), pprModule sty mod_name, 
-	   ptext SLIT("must include a definition for"), ppr sty main_name]
-
-mainTyMisMatch :: Name -> Type -> TcType s -> Error
-mainTyMisMatch main_name expected actual sty
-  = hang (hsep [ppr sty main_name, ptext SLIT("has the wrong type")])
+mainTyMisMatch :: Type -> TcType s -> Error
+mainTyMisMatch expected actual sty
+  = hang (hsep [ppr sty main_NAME, ptext SLIT("has the wrong type")])
 	 4 (vcat [
 			hsep [ptext SLIT("Expected:"), ppr sty expected],
 			hsep [ptext SLIT("Inferred:"), ppr sty actual]

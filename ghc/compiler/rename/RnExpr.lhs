@@ -32,9 +32,11 @@ import RnMonad
 import RnEnv
 import CmdLineOpts	( opt_GlasgowExts )
 import BasicTypes	( Fixity(..), FixityDirection(..) )
-import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, ccallableClass_RDR,
-			  creturnableClass_RDR, monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
-			  ratioDataCon_RDR, negate_RDR
+import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
+			  ccallableClass_RDR, creturnableClass_RDR, 
+			  monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
+			  ratioDataCon_RDR, negate_RDR, 
+			  ioDataCon_RDR, ioOkDataCon_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
@@ -315,6 +317,8 @@ rnExpr (SectionR op expr)
 rnExpr (CCall fun args may_gc is_casm fake_result_ty)
   = lookupImplicitOccRn ccallableClass_RDR	`thenRn_`
     lookupImplicitOccRn creturnableClass_RDR	`thenRn_`
+    lookupImplicitOccRn ioDataCon_RDR		`thenRn_`
+    lookupImplicitOccRn ioOkDataCon_RDR		`thenRn_`
     rnExprs args				`thenRn` \ (args', fvs_args) ->
     returnRn (CCall fun args' may_gc is_casm fake_result_ty, fvs_args)
 

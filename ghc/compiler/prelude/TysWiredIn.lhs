@@ -46,21 +46,26 @@ module TysWiredIn (
 	liftTyCon,
 	listTyCon,
 	foreignObjTyCon,
+
 	mkLiftTy,
 	mkListTy,
-	mkPrimIoTy,
-	mkStateTy,
-	mkStateTransformerTy,
-	tupleTyCon, tupleCon, unitTyCon, unitDataCon, pairTyCon, pairDataCon,
 	mkTupleTy,
+	tupleTyCon, tupleCon, unitTyCon, unitDataCon, pairTyCon, pairDataCon,
 	nilDataCon,
-	primIoTyCon,
 	realWorldStateTy,
 	return2GMPsTyCon,
 	returnIntAndGMPTyCon,
+
+	-- ST and STret types
+	mkStateTy,
+	mkStateTransformerTy,
+	mkSTretTy,
 	stTyCon,
 	stDataCon,
-	stablePtrTyCon,
+	stRetDataCon,
+	stRetTyCon,
+
+	-- CCall result types
 	stateAndAddrPrimTyCon,
 	stateAndArrayPrimTyCon,
 	stateAndByteArrayPrimTyCon,
@@ -77,9 +82,8 @@ module TysWiredIn (
 	stateAndWordPrimTyCon,
 	stateDataCon,
 	stateTyCon,
-	stRetDataCon,
-	stRetTyCon,
-	mkSTretTy,
+
+	stablePtrTyCon,
 	stringTy,
 	trueDataCon,
 	unitTy,
@@ -258,8 +262,8 @@ wordDataCon = pcDataCon wordDataConKey fOREIGN SLIT("W#") [] [] [wordPrimTy] wor
 \begin{code}
 addrTy = mkTyConTy addrTyCon
 
-addrTyCon = pcDataTyCon addrTyConKey   fOREIGN SLIT("Addr") [] [addrDataCon]
-addrDataCon = pcDataCon addrDataConKey fOREIGN SLIT("A#") [] [] [addrPrimTy] addrTyCon nullSpecEnv
+addrTyCon = pcDataTyCon addrTyConKey   aDDR SLIT("Addr") [] [addrDataCon]
+addrDataCon = pcDataCon addrDataConKey aDDR SLIT("A#") [] [] [addrPrimTy] addrTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
@@ -284,18 +288,6 @@ stateTyCon = pcDataTyCon stateTyConKey sT_BASE SLIT("State") alpha_tyvar [stateD
 stateDataCon
   = pcDataCon stateDataConKey sT_BASE SLIT("S#")
 	alpha_tyvar [] [mkStatePrimTy alphaTy] stateTyCon nullSpecEnv
-\end{code}
-
-\begin{code}
-mkSTretTy alpha beta = applyTyCon stRetTyCon [alpha,beta]
-
-stRetTyCon
-  = pcDataTyCon stRetTyConKey sT_BASE SLIT("STret") 
-	alpha_beta_tyvars [stRetDataCon]
-stRetDataCon
-  = pcDataCon stRetDataConKey sT_BASE SLIT("STret")
-	alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy] 
-		stRetTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
@@ -534,7 +526,8 @@ getStatePairingConInfo prim_ty
 %*									*
 %************************************************************************
 
-This is really just an ordinary synonym, except it is ABSTRACT.
+The only reason this is wired in is because we have to represent the
+type of runST.
 
 \begin{code}
 mkStateTransformerTy s a = applyTyCon stTyCon [s, a]
@@ -545,22 +538,16 @@ stDataCon = pcDataCon stDataConKey sT_BASE SLIT("ST")
 			alpha_beta_tyvars [] [ty] stTyCon nullSpecEnv
   where
     ty = mkFunTy (mkStatePrimTy alphaTy) (mkSTretTy alphaTy betaTy)
-\end{code}
 
-%************************************************************************
-%*									*
-\subsection[TysWiredIn-IO]{The @PrimIO@ monadic-I/O type}
-%*									*
-%************************************************************************
+mkSTretTy alpha beta = applyTyCon stRetTyCon [alpha,beta]
 
-\begin{code}
-mkPrimIoTy a = mkStateTransformerTy realWorldTy a
-
-primIoTyCon
-  = pcSynTyCon
-     primIoTyConKey sT_BASE SLIT("PrimIO")
-     (mkBoxedTypeKind `mkArrowKind` mkBoxedTypeKind)
-     1 alpha_tyvar (mkPrimIoTy alphaTy)
+stRetTyCon
+  = pcDataTyCon stRetTyConKey sT_BASE SLIT("STret") 
+	alpha_beta_tyvars [stRetDataCon]
+stRetDataCon
+  = pcDataCon stRetDataConKey sT_BASE SLIT("STret")
+	alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy] 
+		stRetTyCon nullSpecEnv
 \end{code}
 
 %************************************************************************

@@ -17,9 +17,10 @@ module PrelMods
          gHC__, pRELUDE, pREL_BASE,
          pREL_READ , pREL_NUM, pREL_LIST,
 	 pREL_TUP  , pACKED_STRING, cONC_BASE,
-         iO_BASE   , mONAD, rATIO, iX,
+         iO_BASE   , eRROR, mONAD, rATIO, iX,
          sT_BASE   , aRR_BASE, fOREIGN, mAIN,
-         gHC_MAIN  , gHC_ERR
+         gHC_MAIN  , gHC_ERR,
+	 cCALL     , aDDR
 	) where
 
 CHK_Ubiq() -- debugging consistency check
@@ -43,12 +44,15 @@ pREL_TUP     = SLIT("PrelTup")
 pACKED_STRING= SLIT("PackBase")
 cONC_BASE    = SLIT("ConcBase")
 iO_BASE	     = SLIT("IOBase")
+eRROR	     = SLIT("Error")
 mONAD	     = SLIT("Monad")
 rATIO	     = SLIT("Ratio")
 iX	     = SLIT("Ix")
 sT_BASE	     = SLIT("STBase")
 aRR_BASE     = SLIT("ArrBase")
 fOREIGN	     = SLIT("Foreign")
+cCALL        = SLIT("CCall")
+aDDR         = SLIT("Addr")
 
 mAIN	     = SLIT("Main")
 gHC_MAIN     = SLIT("GHCmain")

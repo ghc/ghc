@@ -31,7 +31,8 @@ import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 import TcBinds		( tcBindsAndThen, checkSigTyVars )
 import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
 			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars,
-			  tcExtendGlobalTyVars, tcLookupGlobalValueMaybe 
+			  tcExtendGlobalTyVars, tcLookupGlobalValueMaybe,
+			  tcLookupTyCon
 			)
 import SpecEnv		( SpecEnv )
 import TcMatches	( tcMatchesCase, tcMatchExpected )
@@ -59,13 +60,14 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
 			  getAppDataTyCon, maybeAppDataTyCon
 			)
 import TyVar		( GenTyVar, SYN_IE(TyVarSet), unionTyVarSets, elementOfTyVarSet, mkTyVarSet )
+import TyCon		( tyConDataCons )
 import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
 			  floatPrimTy, addrPrimTy, realWorldTy
 			)
-import TysWiredIn	( addrTy,
-			  boolTy, charTy, stringTy, mkListTy,
-			  mkTupleTy, mkPrimIoTy, stDataCon
+import TysWiredIn	( addrTy, mkTupleTy,
+			  boolTy, charTy, stringTy, mkListTy
 			)
+import PrelInfo		( ioTyCon_NAME )
 import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, 
 			  unifyFunTy, unifyListTy, unifyTupleTy
 			)
@@ -251,6 +253,7 @@ tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
   = 	-- Get the callable and returnable classes.
     tcLookupClassByKey cCallableClassKey	`thenNF_Tc` \ cCallableClass ->
     tcLookupClassByKey cReturnableClassKey	`thenNF_Tc` \ cReturnableClass ->
+    tcLookupTyCon ioTyCon_NAME			`thenTc` \ (_,_,ioTyCon) ->
 
     let
 	new_arg_dict (arg, arg_ty)
@@ -266,20 +269,27 @@ tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
     tcExprs args ty_vars		   		       `thenTc`    \ (args', args_lie) ->
 
 	-- The argument types can be unboxed or boxed; the result
-	-- type must, however, be boxed since it's an argument to the PrimIO
+	-- type must, however, be boxed since it's an argument to the IO
 	-- type constructor.
     newTyVarTy mkBoxedTypeKind  		`thenNF_Tc` \ result_ty ->
-    unifyTauTy (mkPrimIoTy result_ty) res_ty    `thenTc_`
+    let
+	io_result_ty = applyTyCon ioTyCon [result_ty]
+    in
+    case tyConDataCons ioTyCon of { [ioDataCon] ->
+    unifyTauTy io_result_ty res_ty   `thenTc_`
 
 	-- Construct the extra insts, which encode the
 	-- constraints on the argument and result types.
-    mapNF_Tc new_arg_dict (zipEqual "tcExpr:CCall" args ty_vars)    `thenNF_Tc` \ ccarg_dicts_s ->
-    newDicts result_origin [(cReturnableClass, result_ty)]	    `thenNF_Tc` \ (ccres_dict, _) ->
+    mapNF_Tc new_arg_dict (zipEqual "tcExpr:CCall" args ty_vars)    
+						`thenNF_Tc` \ ccarg_dicts_s ->
+    newDicts result_origin [(cReturnableClass, result_ty)]	    
+						`thenNF_Tc` \ (ccres_dict, _) ->
 
-    returnTc (HsApp (HsVar (RealId stDataCon) `TyApp` [realWorldTy, result_ty])
-		    (CCall lbl args' may_gc is_asm result_ty),
+    returnTc (HsApp (HsVar (RealId ioDataCon) `TyApp` [result_ty])
+		    (CCall lbl args' may_gc is_asm io_result_ty),
 		      -- do the wrapping in the newtype constructor here
 	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie)
+    }
 \end{code}
 
 \begin{code}
