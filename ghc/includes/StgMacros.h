@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.52 2003/04/28 09:57:12 simonmar Exp $
+ * $Id: StgMacros.h,v 1.53 2003/04/28 10:02:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -258,6 +258,13 @@ typedef StgWord StgWordArray[];
 #define RET_DYN_BITMAP_SIZE 8
 #define RET_DYN_NONPTR_REGS_SIZE 10
 #define ALL_NON_PTRS 0xff
+
+// Sanity check that RESERVED_STACK_WORDS is reasonable.  We can't
+// just derive RESERVED_STACK_WORDS because it's used in Haskell code
+// too.
+#if RESERVED_STACK_WORDS != (3 + RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE)
+#error RESERVED_STACK_WORDS may be wrong!
+#endif
 
 #define LIVENESS_MASK(ptr_regs)  (ALL_NON_PTRS ^ (ptr_regs))
 
