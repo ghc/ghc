@@ -11,8 +11,8 @@ import Word
 foreign import stdcall "m" m_stdcall :: StablePtr a -> IO (StablePtr b)
 foreign import ccall   "m" unsafe m_ccall   :: ByteArray Int -> IO Int
 
-foreign import stdcall "Math" "sin" my_sin :: Double -> IO Double
-foreign import stdcall "Math" "cos" my_cos :: Double -> IO Double
+foreign import stdcall "sin" my_sin :: Double -> IO Double
+foreign import stdcall "cos" my_cos :: Double -> IO Double
 
 foreign import stdcall "m1" m8  :: IO Int8
 foreign import stdcall "m2" m16 :: IO Int16
