@@ -39,7 +39,7 @@ project-check :
 # -----------------------------------------------------------------------------
 # Make sure configure is up-to-date
 
-all boot :: configure
+all install dist binary-dist :: configure
 configure :: configure.in
 	@echo "WARNING: configure needs to be regenerated.  Type"
 	@echo "      make -f Makefile.config ./configure"
@@ -236,8 +236,11 @@ binary-dist::
 #
 # Do it like this: 
 #
-#	$ make boot
+#	$ make
 #	$ make dist Project=Ghc
+#
+# WARNING: `make dist' calls `make distclean' before tarring up the tree.
+#
 
 .PHONY: dist
 
