@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.14 1999/06/25 09:14:54 simonmar Exp $
+ * $Id: Stg.h,v 1.15 1999/07/05 17:25:23 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -101,6 +101,9 @@ void _stgAssert (char *, unsigned int);
 #include "MachRegs.h"
 #include "Regs.h"
 #include "TailCalls.h"
+
+/* RTS public interface */
+#include "RtsAPI.h"
 
 /* these are all ANSI C headers */
 #include <stdlib.h>
