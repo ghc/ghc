@@ -41,7 +41,7 @@ import Prelude	hiding	( lookup )
 import Data.Tuple	( fst )
 import Data.Bits
 import Data.Maybe
-import Data.List	( maximumBy, filter, length, concat )
+import Data.List	( maximumBy, filter, length, concat, foldl )
 import Data.Int		( Int32 )
 
 #if defined(__GLASGOW_HASKELL__)
@@ -153,8 +153,8 @@ hashInt = (`rem` prime) . fromIntegral
 -- which seems to give reasonable results.
 --
 hashString :: String -> Int32
-hashString = fromIntegral . foldr f 0
-  where f c m = ord c + (m * 128) `rem` fromIntegral prime
+hashString = fromIntegral . foldl f 0
+  where f m c = ord c + (m * 128) `rem` fromIntegral prime
 
 -- | A prime larger than the maximum hash table size
 prime :: Int32
@@ -254,6 +254,7 @@ expandHashTable
       table@HT{ dir=dir,
 		split=split,
 		max_bucket=max,
+		bcount=bcount,
 		mask2=mask2 } = do
   let
       oldsegment = split `shiftR` sEGMENT_SHIFT
@@ -269,10 +270,12 @@ expandHashTable
   --
   let table' =
   	if (split+1) < max
-     	    then table{ split = split+1 }
+     	    then table{ split = split+1,
+			bcount = bcount+1 }
      		-- we've expanded all the buckets in this table, so start from
 		-- the beginning again.
      	    else table{ split = 0,
+			bcount = bcount+1,
 			max_bucket = max * 2,
 			mask1 = mask2,
 			mask2 = mask2 `shiftL` 1 .|. 1 }
