@@ -244,7 +244,7 @@ putChar c       =  hPutChar stdout c
 putStr          :: String -> IO ()
 putStr s        =  hPutStr stdout s
 
--- | The same as 'putStrLn', but adds a newline character.
+-- | The same as 'putStr', but adds a newline character.
 
 putStrLn        :: String -> IO ()
 putStrLn s      =  do putStr s
