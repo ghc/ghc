@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.17 2000/04/13 18:49:21 panne Exp $
+# $Id: Makefile,v 1.18 2000/04/14 16:17:49 rrt Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -29,7 +29,7 @@ all :: DllVersionInfo.o
 $(DLL_NAME) : DllVersionInfo.o
 endif
 
-DLL_NAME = HSstdcbits.dll
+DLL_NAME = HSstd_cbits.dll
 DLL_IMPLIB_NAME = libHSstd_cbits_imp.a
 DLL_DESCRIPTION = "Haskell Prelude helpers"
 SRC_BLD_DLL_OPTS += --export-all --output-def=HSstdcbits.def DllVersionInfo.o
