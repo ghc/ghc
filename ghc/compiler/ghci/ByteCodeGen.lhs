@@ -612,8 +612,6 @@ doTailCall init_d s p fn args
     return (final_d, push_code `appOL` more_push_code)
 
 -- v. similar to CgStackery.findMatch, ToDo: merge
-findPushSeq (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: rest)
-  = (PUSH_APPLY_PPPPPPP, 7, rest)
 findPushSeq (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: rest)
   = (PUSH_APPLY_PPPPPP, 6, rest)
 findPushSeq (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: rest)

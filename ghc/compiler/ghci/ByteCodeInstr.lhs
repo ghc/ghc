@@ -83,7 +83,6 @@ data BCInstr
    | PUSH_APPLY_PPPP
    | PUSH_APPLY_PPPPP
    | PUSH_APPLY_PPPPPP
-   | PUSH_APPLY_PPPPPPP
 
    | SLIDE     Int{-this many-} Int{-down by this much-}
 
@@ -164,7 +163,6 @@ instance Outputable BCInstr where
    ppr PUSH_APPLY_PPPP		= text "PUSH_APPLY_PPPP"
    ppr PUSH_APPLY_PPPPP		= text "PUSH_APPLY_PPPPP"
    ppr PUSH_APPLY_PPPPPP	= text "PUSH_APPLY_PPPPPP"
-   ppr PUSH_APPLY_PPPPPPP	= text "PUSH_APPLY_PPPPPPP"
 
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
    ppr (ALLOC_AP sz)         = text "ALLOC_AP   " <+> int sz
@@ -228,7 +226,6 @@ bciStackUse PUSH_APPLY_PPP{}	  = 1
 bciStackUse PUSH_APPLY_PPPP{}	  = 1
 bciStackUse PUSH_APPLY_PPPPP{}	  = 1
 bciStackUse PUSH_APPLY_PPPPPP{}	  = 1
-bciStackUse PUSH_APPLY_PPPPPPP{}  = 1
 bciStackUse ALLOC_AP{}            = 1
 bciStackUse ALLOC_PAP{}           = 1
 bciStackUse (UNPACK sz)           = sz

@@ -249,7 +249,6 @@ mkBits findLabel st proto_insns
 	       PUSH_APPLY_PPPP	    -> do instr1 st bci_PUSH_APPLY_PPPP
 	       PUSH_APPLY_PPPPP	    -> do instr1 st bci_PUSH_APPLY_PPPPP
 	       PUSH_APPLY_PPPPPP    -> do instr1 st bci_PUSH_APPLY_PPPPPP
-	       PUSH_APPLY_PPPPPPP   -> do instr1 st bci_PUSH_APPLY_PPPPPPP
 
                SLIDE     n by     -> instr3 st bci_SLIDE n by
                ALLOC_AP  n        -> instr2 st bci_ALLOC_AP n
@@ -395,7 +394,6 @@ instrSize16s instr
 	PUSH_APPLY_PPPP{}	-> 1
 	PUSH_APPLY_PPPPP{}	-> 1
 	PUSH_APPLY_PPPPPP{}	-> 1
-	PUSH_APPLY_PPPPPPP{}	-> 1
         SLIDE{}			-> 3
         ALLOC_AP{}		-> 2
         ALLOC_PAP{}		-> 3

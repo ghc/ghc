@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.9 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: Bytecodes.h,v 1.10 2004/09/07 10:10:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -48,7 +48,7 @@
 #define bci_PUSH_APPLY_PPPP		22
 #define bci_PUSH_APPLY_PPPPP		23
 #define bci_PUSH_APPLY_PPPPPP		24
-#define bci_PUSH_APPLY_PPPPPPP		25
+/* #define bci_PUSH_APPLY_PPPPPPP		25 */
 #define bci_SLIDE     			26
 #define bci_ALLOC_AP   			27
 #define bci_ALLOC_PAP  			28
