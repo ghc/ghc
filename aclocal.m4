@@ -1,8 +1,7 @@
-dnl Extra autoconf macros for the Glasgow fptools
-dnl
-dnl To be a good autoconf citizen, names of local macros have
-dnl prefixed with FPTOOLS_ to ensure we don't clash
-dnl with any pre-supplied autoconf ones.
+# Extra autoconf macros for the Glasgow fptools
+#
+# To be a good autoconf citizen, names of local macros have prefixed with FP_ to
+# ensure we don't clash with any pre-supplied autoconf ones.
 
 dnl *** Is altzone available? ***
 dnl 
