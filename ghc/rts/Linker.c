@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.29 2001/02/14 11:02:36 sewardj Exp $
+ * $Id: Linker.c,v 1.30 2001/02/14 12:43:24 rrt Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -31,7 +31,7 @@
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS)
 #define OBJFORMAT_ELF
 #elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
-#define OBJFORMAT_PEi386
+/*  #define OBJFORMAT_PEi386 */
 #endif
 
 /* Hash table mapping symbol names to Symbol */
