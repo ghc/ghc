@@ -20,20 +20,26 @@ module Data.Generics (
 	Typeable(..), cast,
 
 	-- * Prime types of generic functions
-        GenericT, GenericQ, GenericM,
+        GenericT, GenericQ, GenericM, GenericG,
 
 	-- * Combinators to \"make\" generic functions
-	mkT, mkQ, mkM, extT, extQ, extM, sameType,
+	mkT, mkQ, mkM, mkF, mkG,
+	extT, extQ, extM, extF, extG,
 
 	-- * The Data class for folding and unfolding constructor applications
-	Data( gmapT,
-              gmapQ, 
-              gmapM, 
+	Data( 
 	      gfoldl,
+              gunfold,
 	      conOf,
-              consOf, 
-              gunfold
+              consOf 
             ),
+
+        -- * Typical generic maps defined in terms of gfoldl 
+
+	gmapT,
+        gmapQ, 
+        gmapM,
+        gmapF,
 
         -- * The Constr datatype for describing datatype constructors
         Constr(..),	
@@ -43,18 +49,23 @@ module Data.Generics (
         everywhere',
         everywhereBut,
         everywhereM,
+        somewhere,
 	everything,
         something,
 	synthesize,
 
 	-- * Generic operations such as show, equality, read
 	glength,
+	gcount,
 	gnodecount,
 	gtypecount,
 	gshow,
 	geq,
 	gzip,
-	gread
+	gread,
+
+	-- * Miscellaneous
+	sameType, orElse
 
 #ifndef __HADDOCK__
 	,
@@ -75,6 +86,7 @@ import GHC.Base ( (:*:)(..), (:+:)(..), Unit(..) )
 #endif
 #endif
 
+import Data.Maybe
 import Data.Dynamic
 import Control.Monad
 
@@ -102,6 +114,12 @@ type GenericQ r = forall a. Data a => a -> r
 --   i.e., take an \"a\" and compute an \"a\"
 --
 type GenericM m = forall a. Data a => a -> m a
+
+
+-- | Generic generators with input i,
+--   i.e., take an \"i\" and compute a tuple of type (a,i)
+--
+type GenericG m i = forall a. Data a => i -> m (a,i)
 
 
 
@@ -143,31 +161,68 @@ mkM f = case cast f of
           Nothing -> return
 
 
+{-
+
+For the remaining definitions, we stick to a more concise style, i.e.,
+we fold maybies with "maybe" instead of case ... of ..., and we also
+use a point-free style whenever possible.
+
+-}
+
+
+-- | Make a generic monadic transformation for MonadPlus;
+--   use "const mzero" (i.e., failure) instead of return as default.
+--
+mkF :: (Typeable a, Typeable b, Typeable (m a), Typeable (m b), MonadPlus m)
+    => (b -> m b) -> a -> m a
+mkF = maybe (const mzero) id . cast
+
+
+-- | Make a generic generator;
+--   start from a type-specific ase;
+--   resort to empty generation otherwise
+--
+mkG :: (Typeable a, Typeable b,
+	Typeable i,
+        Typeable (m (a,i)), Typeable (m (b,i)),
+        MonadPlus m)
+    => (i -> m (b,i)) -> i -> m (a,i)
+mkG = maybe (const mzero) id . cast
+
+
 -- | Extend a generic transformation by a type-specific case
 extT :: (Typeable a, Typeable b) => (a -> a) -> (b -> b) -> a -> a
-extT f g = case cast g of
-              Just g' -> g'
-              Nothing -> f
+extT f = maybe f id . cast
 
 
 -- | Extend a generic query by a type-specific case
 extQ :: (Typeable a, Typeable b) => (a -> q) -> (b -> q) -> a -> q
-extQ f g a = case cast a of
-                Just b -> g b
-                Nothing -> f a
+extQ f g a = maybe (f a) g (cast a)
 
 
 -- | Extend a generic monadic transformation by a type-specific case
-extM :: (Typeable a, Typeable b, Typeable (m a), Typeable (m b), Monad m)
-       => (a -> m a) -> (b -> m b) -> a -> m a
-extM f g = case cast g of
-              Just g' -> g'
-              Nothing -> f
+extM :: (Typeable a, Typeable b,
+         Typeable (m a), Typeable (m b), 
+         Monad m)
+     => (a -> m a) -> (b -> m b) -> a -> m a
+extM f = maybe f id . cast
 
 
--- | Test for two objects to agree on the type
-sameType :: (Typeable a, Typeable b) => a -> b -> Bool
-sameType (_::a) = maybe False (\(_::a) -> True) . cast
+-- | Extend a generic MonadPlus transformation by a type-specific case
+extF :: (Typeable a, Typeable b,
+         Typeable (m a), Typeable (m b), 
+         MonadPlus m)
+     => (a -> m a) -> (b -> m b) -> a -> m a
+extF = extM
+
+
+-- | Extend a generic generator by a type-specific case
+extG :: (Typeable a, Typeable b,
+         Typeable i,
+         Typeable (m (a,i)), Typeable (m (b,i)),
+         MonadPlus m)
+     => (i -> m (a,i)) -> (i -> m (b,i)) -> i -> m (a,i)
+extG f = maybe f id . cast
 
 
 
@@ -179,25 +234,10 @@ sameType (_::a) = maybe False (\(_::a) -> True) . cast
 
 class Typeable a => Data a where
 
-  -- | A generic transformation that maps over the immediate subterms
-  gmapT   :: (forall b. Data b => b -> b) -> a -> a
-
-  -- | A generic query that processes the immediate subterms and returns a list
-  gmapQ   :: (forall a. Data a => a -> u) -> a -> [u]
-
-  -- | A monadic variation on generic transformation
-  gmapM   :: Monad m => (forall a. Data a => a -> m a) -> a -> m a
-
   -- | Left-associative fold operation for constructor applications
   gfoldl  :: (forall a b. Data a => c (a -> b) -> a -> c b)
           -> (forall g. g -> c g)
           -> a -> c a
-
-  -- | Obtain the constructor from a given term
-  conOf   :: a -> Constr
-
-  -- | List all constructors for a given type
-  consOf  :: a -> [Constr]
 
   -- | Unfold operation to build terms from constructors and others
   gunfold :: (forall a b. Data a => c (a -> b) -> c b)
@@ -210,12 +250,17 @@ class Typeable a => Data a where
   --
   gfoldl _ z = z
 
+  -- | Obtain the constructor from a given term
+  conOf   :: a -> Constr
+
+  -- | List all constructors for a given type
+  consOf  :: a -> [Constr]
 
 {-
 
-The combinators gmapT, gmapQ, gmapM can all be defined in terms of
-gfoldl. We provide corresponding default definitions leaving open the
-opportunity to provide datatype-specific definitions if needed.
+The combinators gmapT, gmapQ, gmapM, gmapF can all be defined in terms
+of gfoldl. We provide corresponding default definitions leaving open
+the opportunity to provide datatype-specific definitions if needed.
 
 (Also, the inclusion of the gmap combinators as members of class Data
 allows the programmer or the compiler to derive specialised, and maybe
@@ -226,20 +271,12 @@ experiments.)
 Conceptually, the definition of the gmap combinators in terms of the
 primitive gfoldl requires the identification of the gfoldl function
 arguments. Technically, we also need to identify the type constructor
-c used all over the type of gfoldl. We give the default definitions in
-the order of increasing headache.
+c used all over the type of gfoldl.
 
 -}
 
-  -- Use immediately the monad datatype constructor 
-  -- to instantiate the type constructor c in the type of gfoldl,
-  -- so injection and projection is done by return and >>=.
-  --  
-  gmapM f = gfoldl k return
-          where
-            k c x = do c' <- c
-                       x' <- f x
-                       return (c' x')
+  -- | A generic transformation that maps over the immediate subterms
+  gmapT   :: (forall b. Data b => b -> b) -> a -> a
 
   -- Use an identity datatype constructor ID (see below)
   -- to instantiate the type constructor c in the type of gfoldl,
@@ -249,6 +286,10 @@ the order of increasing headache.
     where
       k (ID c) x = ID (c (f x))
 
+
+  -- | A generic query that processes the immediate subterms and returns a list
+  gmapQ   :: (forall a. Data a => a -> u) -> a -> [u]
+
   -- Use a phantom + function datatype constructor Q (see below),
   -- to instantiate the type constructor c in the type of gfoldl,
   -- and perform injections Q and projections unQ accordingly.
@@ -256,6 +297,37 @@ the order of increasing headache.
   gmapQ f x = unQ (gfoldl k (const (Q id)) x) []
     where
       k (Q c) x = Q (\rs -> c (f x : rs))
+
+
+  -- | A generic monadic transformation that maps over the immediate subterms
+  gmapM   :: Monad m => (forall a. Data a => a -> m a) -> a -> m a
+
+  -- Use immediately the monad datatype constructor 
+  -- to instantiate the type constructor c in the type of gfoldl,
+  -- so injection and projection is done by return and >>=.
+  --  
+  gmapM f = gfoldl k return
+    where
+      k c x = do c' <- c
+                 x' <- f x
+                 return (c' x')
+
+
+  -- | Transformation of at least one immediate subterm does not fail
+  gmapF :: MonadPlus m => (forall a. Data a => a -> m a) -> a -> m a
+
+  -- Use a datatype constructor F (see below)
+  -- to instantiate the type constructor c in the type of gfoldl.
+  --  
+  gmapF f x = unF (gfoldl k z x) >>= \(x',b) ->
+              if b then return x' else mzero
+    where
+      z g = F (return (g,False))
+      k (F c) x
+        = F ( c >>= \(h,b) -> 
+              (f x >>= \x' -> return (h x',True))
+              `mplus` return (h x, b)
+            )
 
 
 -- | The identity type constructor needed for the definition of gmapT
@@ -267,6 +339,11 @@ newtype ID x = ID { unID :: x }
 --   left-associative constructor application vs. right-associative lists.
 -- 
 newtype Q r a = Q { unQ  :: [r] -> [r] }
+
+
+-- | A pairing type constructor needed for the definition of gmapF;
+-- we keep track of the fact if a subterm was ever transformed successfully.
+newtype F m x = F { unF :: m (x, Bool) }
 
 
 
@@ -343,6 +420,16 @@ everywhereM :: Monad m => GenericM m -> GenericM m
 -- Bottom-up order is also reflected in order of do-actions
 everywhereM f x = do x' <- gmapM (everywhereM f) x
                      f x'
+
+
+-- | Apply a monadic transformation at least somewhere
+somewhere :: MonadPlus m => GenericM m -> GenericM m
+
+-- We try "f" in top-down manner, but descent into "x" when we fail
+-- at the root of the term. The transformation fails if "f" fails
+-- everywhere, say succeeds nowhere.
+-- 
+somewhere f x = f x `mplus` gmapF (somewhere f) x
 
 
 -- | Summarise all nodes in top-down, left-to-right order
@@ -481,14 +568,19 @@ glength :: GenericQ Int
 glength = length . gmapQ (const ())
 
 
+-- | Determine the number of all suitable nodes in a given term
+gcount :: GenericQ Bool -> GenericQ Int
+gcount p =  everything (+) (\x -> if p x then 1 else 0)
+
+
 -- | Determine the number of all nodes in a given term
 gnodecount :: GenericQ Int
-gnodecount = everything (+) (const 1)
+gnodecount = gcount (const True)
 
 
 -- | Determine the number of nodes of a given type in a given term
 gtypecount :: Typeable a => (a -> ()) -> GenericQ Int
-gtypecount f = everything (+) (0 `mkQ` (const 1 . f))
+gtypecount f = gcount (False `mkQ` (const True . f))
 
 
 -- | Generic show: an alternative to "deriving Show"
@@ -497,10 +589,12 @@ gshow :: Data a => a -> String
 -- This is a prefix-show using surrounding "(" and ")",
 -- where we recurse into subterms with gmapQ.
 -- 
-gshow t =    "("
-          ++ conString (conOf t)
-          ++ concat (gmapQ ((++) " " . gshow) t)
-          ++ ")"
+gshow = ( \t ->
+                "("
+             ++ conString (conOf t)
+             ++ concat (gmapQ ((++) " " . gshow) t)
+             ++ ")"
+        ) `extQ` (show :: String -> String)
 
 
 -- | Generic equality: an alternative to "deriving Eq"
@@ -541,32 +635,46 @@ gzip f x y =
    else Nothing
 
 
--- | The type constructor for gunfold a la ReadS from the Haskell 98 Prelude
+-- | The type constructor for gunfold a la ReadS from the Haskell 98 Prelude;
+--   we don't use lists here for simplicity but only maybes.
 newtype GRead i a = GRead (i -> Maybe (a, i))
 unGRead (GRead x) = x
 
 
 -- | Generic read: an alternative to "deriving Read"
-gread :: Data a => String -> Maybe (a, String)
+gread :: GenericG Maybe String
 
 {-
 
-This is a read operation which insists on prefix notation.
-(The Haskell 98 read is closer to conrete syntax.)
-We use gunfold to "parse" the input.
+This is a read operation which insists on prefix notation.  (The
+Haskell 98 read deals with infix operators as well.)  We use gunfold
+to "parse" the input. To be precise, gunfold is used for all result
+type except String. A type-specific case is incorporated for
+String. Another source of customisation would be to properly deal with
+infix operators subject to the capture of that information in the
+definition of Constr.
 
 -}
 
-gread s
- = do s' <- return $ dropWhile ((==) ' ') s
-      guard (not (s' == ""))
-      guard (head s' == '(')
-      (c,s'')  <- prefixConstr (dropWhile ((==) ' ') (tail s'))
-      (a,s''') <- unGRead (gunfold f z c) s''
-      guard (not (s''' == "")) 
-      guard (head s''' == ')')
-      return (a,tail s''')
+gread = gdefault `extG` scase
+
  where
+
+  -- a specific case for strings
+  scase s = case reads s of
+              [x::(String,String)] -> Just x
+              _ -> Nothing
+
+  -- the generic default of gread
+  gdefault s =
+    do s' <- return $ dropWhile ((==) ' ') s
+       guard (not (s' == ""))
+       guard (head s' == '(')
+       (c,s'')  <- prefixConstr (dropWhile ((==) ' ') (tail s'))
+       (a,s''') <- unGRead (gunfold f z c) s''
+       guard (not (s''' == "")) 
+       guard (head s''' == ')')
+       return (a,tail s''')
 
   -- Argument f for unfolding
   f :: Data a => GRead String (a -> b) -> GRead String b
@@ -657,7 +765,10 @@ instance for polymorphic lists. Given the current scheme of allowing
 overlapping instances, this would imply that ANY module that imports
 Data.Generics would need to explicitly and generally allow overlapping
 instances. This is prohibitive and calls for a more constrained model
-of allowing overlapping instances.
+of allowing overlapping instances. The present instance would also be
+more sensible for UNFOLDING. In the definition of gread, we still
+obtained the favoured behaviour by using a type-specific case for
+String.
 
 -- instance Data String where
  conOf x = Constr (show x)
@@ -708,3 +819,15 @@ instance (Typeable a, Typeable b) => Data (a -> b) where
  conOf _ = Constr "->"
  consOf _ = [Constr "->"]
  gunfold _ _ _ = undefined
+
+
+
+------------------------------------------------------------------------------
+--
+--	Miscellaneous
+--
+------------------------------------------------------------------------------
+
+-- | Test for two objects to agree on the type
+sameType :: (Typeable a, Typeable b) => a -> b -> Bool
+sameType (_::a) = maybe False (\(_::a) -> True) . cast
