@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.4 2000/11/15 09:58:00 sewardj Exp $
+-- $Id: DriverMkDepend.hs,v 1.5 2000/11/15 15:43:31 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -11,7 +11,6 @@ module DriverMkDepend where
 
 #include "HsVersions.h"
 
-import CmSummarise -- for mkdependHS stuff
 import DriverState
 import DriverUtil
 import DriverFlags
@@ -164,23 +163,19 @@ endMkDependHS = do
 	(unwords [ "cp", tmp_file, makefile ])
 
 
-findDependency :: String -> ModImport -> IO (Maybe (String, Bool))
-findDependency mod imp = do
+findDependency :: Bool -> String -> ModuleName -> IO (Maybe (String, Bool))
+findDependency is_source mod imp = do
    dir_contents <- readIORef v_Dep_dir_contents
    ignore_dirs  <- readIORef v_Dep_ignore_dirs
    hisuf <- readIORef v_Hi_suf
 
    let
-     (imp_mod, is_source) = 
-	case imp of
-	   MINormal str -> (moduleNameUserString str, False)
-	   MISource str -> (moduleNameUserString str, True )	
-
-     imp_hi = imp_mod ++ '.':hisuf
-     imp_hiboot = imp_mod ++ ".hi-boot"
+     imp_mod      = moduleNameUserString imp
+     imp_hi       = imp_mod ++ '.':hisuf
+     imp_hiboot   = imp_mod ++ ".hi-boot"
      imp_hiboot_v = imp_mod ++ ".hi-boot-" ++ cHscIfaceFileVersion
-     imp_hs = imp_mod ++ ".hs"
-     imp_lhs = imp_mod ++ ".lhs"
+     imp_hs       = imp_mod ++ ".hs"
+     imp_lhs      = imp_mod ++ ".lhs"
 
      deps | is_source = [ imp_hiboot_v, imp_hiboot, imp_hs, imp_lhs ]
      	  | otherwise = [ imp_hi, imp_hs, imp_lhs ]

@@ -4,19 +4,19 @@
 \section[CmSummarise]{Module summariser for GHCI}
 
 \begin{code}
-module CmSummarise ( ModImport(..), mimp_name,
-                     ModSummary(..), summarise, ms_get_imports,
-		     name_of_summary, deps_of_summary, is_source_import,
-		     getImports )
+module CmSummarise ( ModSummary(..), summarise, name_of_summary,
+		     getImports {-, source_has_changed-} )
 where
 
 #include "HsVersions.h"
 
 import List 		( nub )
 import Char		( isAlphaNum )
+--import Time		( ClockTime )
+--import Directory	( getModificationTime )
+
 import Util		( unJust )
 import HscTypes		( ModuleLocation(..) )
-
 import Module
 import Outputable
 \end{code}
@@ -24,54 +24,35 @@ import Outputable
 \begin{code}
 
 
--- The Module contains the original source filename of the module.
--- The ms_ppsource field contains another filename, which is intended to
--- be the cleaned-up source file after all preprocessing has happened to
--- it.  The point is that the summariser will have to cpp/unlit/whatever
+-- The ModuleLocation contains both the original source filename and the
+-- filename of the cleaned-up source file after all preprocessing has been
+-- done.  The point is that the summariser will have to cpp/unlit/whatever
 -- all files anyway, and there's no point in doing this twice -- just 
--- park the result in a temp file, put the name of it in ms_ppsource,
+-- park the result in a temp file, put the name of it in the location,
 -- and let @compile@ read from that file on the way back up.
 data ModSummary
    = ModSummary {
-        ms_mod      :: Module,                          -- name, package
-	ms_location :: ModuleLocation,			-- location
-        ms_imports  :: (Maybe [ModImport])              -- imports if .hs or .hi
+        ms_mod      :: Module,               -- name, package
+	ms_location :: ModuleLocation,	     -- location
+        ms_srcimps  :: [ModuleName],         -- source imports
+        ms_imps     :: [ModuleName]          -- non-source imports
+        --ms_date     :: Maybe ClockTime       -- timestamp of summarised
+					     -- file, if home && source
      }
 
 instance Outputable ModSummary where
    ppr ms
-      = sep [text "ModSummary {",
+      = sep [--text "ModSummary { ms_date = " <> text (show ms_date),
+             text "ModSummary {",
              nest 3 (sep [text "ms_mod =" <+> ppr (ms_mod ms) <> comma,
-             text "ms_imports =" <+> ppr (ms_imports ms)]),
+                          text "ms_imps =" <+> ppr (ms_imps ms),
+                          text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
              char '}'
             ]
-
-data ModImport
-   = MINormal ModuleName | MISource ModuleName
-     deriving Eq
-
-instance Outputable ModImport where
-   ppr (MINormal nm) = ppr nm
-   ppr (MISource nm) = text "{-# SOURCE #-}" <+> ppr nm
-
-
-mimp_name (MINormal nm) = nm
-mimp_name (MISource nm) = nm
-
-is_source_import (MINormal _) = False
-is_source_import (MISource _) = True
 
 name_of_summary :: ModSummary -> ModuleName
 name_of_summary = moduleName . ms_mod
 
-deps_of_summary :: ModSummary -> [ModuleName]
-deps_of_summary = map mimp_name . ms_get_imports
-
-ms_get_imports :: ModSummary -> [ModImport]
-ms_get_imports summ
-   = case ms_imports summ of { Just is -> is; Nothing -> [] }
-
-type Fingerprint = Int
 
 -- The first arg is supposed to be DriverPipeline.preprocess.
 -- Passed in here to avoid a hard-to-avoid circular dependency
@@ -84,10 +65,35 @@ summarise preprocess mod location
    = do let hs_fn = unJust (ml_hs_file location) "summarise"
         hspp_fn <- preprocess hs_fn
         modsrc <- readFile hspp_fn
-        let imps = getImports modsrc
-        return (ModSummary mod location{ml_hspp_file=Just hspp_fn} (Just imps))
+        let (srcimps,imps) = getImports modsrc
+
+--        maybe_timestamp
+--           <- case ml_hs_file location of 
+--                 Nothing     -> return Nothing
+--                 Just src_fn -> getModificationTime src_fn >>= Just
+
+        return (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
+                               srcimps imps
+                                {-maybe_timestamp-} )
    | otherwise
-   = return (ModSummary mod location Nothing)
+   = return (ModSummary mod location [] [])
+
+-- Compare the timestamp on the source file with that already
+-- in the summary, and see if the source file is younger.  If 
+-- in any doubt, return True (because False could cause compilation
+-- to be omitted).
+{-
+source_has_changed :: ModSummary -> IO Bool
+source_has_changed summary
+   = case ms_date summary of {
+        Nothing        -> True;   -- don't appear to have a previous timestamp
+        Just summ_date -> 
+     case ml_hs_file (ms_loc summary) of {
+        Nothing        -> True;   -- don't appear to have a source file (?!?!)
+        Just src_fn -> do now_date <- getModificationTime src_fn
+                          return (now_date > summ_date)
+     }}
+-}
 \end{code}
 
 Collect up the imports from a Haskell source module.  This is
@@ -95,28 +101,31 @@ approximate: we don't parse the module, but we do eliminate comments
 and strings.  Doesn't currently know how to unlit or cppify the module
 first.
 
-NB !!!!! Ignores source imports, pro tem.
-
 \begin{code}
-
-getImports :: String -> [ModImport]
-getImports = filter (not . is_source_import) .
-             nub . gmiBase . clean
+getImports :: String -> ([ModuleName], [ModuleName])
+getImports str
+   = let all_imps = (nub . gmiBase . clean) str
+         srcs     = concatMap (either unit nil) all_imps
+         normals  = concatMap (either nil unit) all_imps
+         unit x   = [x]
+         nil x    = []
+     in  (srcs, normals)
 
 -- really get the imports from a de-litted, cpp'd, de-literal'd string
-gmiBase :: String -> [ModImport]
+-- Lefts are source imports.  Rights are normal ones.
+gmiBase :: String -> [Either ModuleName ModuleName]
 gmiBase s
    = f (words s)
      where
 	f ("foreign" : "import" : ws) = f ws
         f ("import" : "{-#" : "SOURCE" : "#-}" : "qualified" : m : ws) 
-           = MISource (mkMN m) : f ws
+           = Left (mkMN m) : f ws
         f ("import" : "{-#" : "SOURCE" : "#-}" : m : ws) 
-           = MISource (mkMN m) : f ws
+           = Left (mkMN m) : f ws
         f ("import" : "qualified" : m : ws) 
-           = MINormal (mkMN m) : f ws
+           = Right (mkMN m) : f ws
         f ("import" : m : ws) 
-           = MINormal (mkMN m) : f ws
+           = Right (mkMN m) : f ws
         f (w:ws) = f ws
         f [] = []
 

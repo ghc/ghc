@@ -23,13 +23,13 @@ import Panic		( panic )
 import CmLink 		( PersistentLinkerState, emptyPLS, Linkable(..), 
 			  link, LinkResult(..), 
 			  filterModuleLinkables, modname_of_linkable,
-			  is_package_linkable )
+			  is_package_linkable, findModuleLinkable )
 import Interpreter	( HValue )
 import CmSummarise	( summarise, ModSummary(..), 
-			  name_of_summary, deps_of_summary,
-			  mimp_name, ms_get_imports {-, is_source_import-} )
+			  name_of_summary, {-, is_source_import-} )
 import Module		( ModuleName, moduleName, packageOfModule, 
-			  isModuleInThisPackage, PackageName, moduleEnvElts )
+			  isModuleInThisPackage, PackageName, moduleEnvElts,
+			  moduleNameUserString )
 import CmStaticInfo	( Package(..), PackageConfigInfo, GhciMode )
 import DriverPipeline 	( compile, preprocess, doLink, CompResult(..) )
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
@@ -40,6 +40,7 @@ import HscMain		( initPersistentCompilerState )
 import Finder		( findModule, emptyHomeDirCache )
 import DriverUtil	( BarfKind(..) )
 import Exception	( throwDyn )
+import IO		( hPutStrLn, stderr )
 \end{code}
 
 
@@ -107,7 +108,7 @@ type UnlinkedImage = [Linkable]	-- the unlinked images (should be a set, really)
 emptyUI :: UnlinkedImage
 emptyUI = []
 
-type ModuleGraph = [SCC ModSummary]  -- the module graph, topologically sorted
+type ModuleGraph = [ModSummary]  -- the module graph, topologically sorted
 emptyMG :: ModuleGraph
 emptyMG = []
 
@@ -122,7 +123,7 @@ cmLoadModule :: CmState
              -> ModuleName
              -> IO (CmState, Maybe ModuleName)
 
-cmLoadModule cmstate1 modname
+cmLoadModule cmstate1 rootname
    = do -- version 1's are the original, before downsweep
         let pcms1     = pcms   cmstate1
         let pls1      = pls    cmstate1
@@ -135,7 +136,7 @@ cmLoadModule cmstate1 modname
         let pcii      = pci   pcms1 -- this never changes
         let ghci_mode = gmode pcms1 -- ToDo: fix!
 
-        -- do the downsweep to reestablish the module graph
+        -- Do the downsweep to reestablish the module graph
         -- then generate version 2's by removing from HIT,HST,UI any
         -- modules in the old MG which are not in the new one.
 
@@ -143,195 +144,127 @@ cmLoadModule cmstate1 modname
         emptyHomeDirCache
 
         putStr "cmLoadModule: downsweep begins\n"
-        mg2unsorted <- downsweep modname
+        mg2unsorted <- downsweep [rootname]
 
-        let modnames1   = map name_of_summary (flattenSCCs mg1)
+        let modnames1   = map name_of_summary mg1
         let modnames2   = map name_of_summary mg2unsorted
         let mods_to_zap = filter (`notElem` modnames2) modnames1
 
         let (hst2, hit2, ui2)
                = removeFromTopLevelEnvs mods_to_zap (hst1, hit1, ui1)
-
-        let mg2 = topological_sort mg2unsorted
-
+        -- should be cycle free; ignores 'import source's
+        let mg2 = topological_sort False mg2unsorted
+        -- ... whereas this takes them into account.  Only used for
+        -- backing out partially complete cycles following a failed
+        -- upsweep.
+        let mg2_with_srcimps = topological_sort True mg2unsorted
+      
         putStrLn "after tsort:\n"
-        putStrLn (showSDoc (vcat (map ppr ({-flattenSCCs-} mg2))))
+        putStrLn (showSDoc (vcat (map ppr mg2)))
+
+        -- Because we don't take into account source imports when doing
+        -- the topological sort, there shouldn't be any cycles in mg2.
+        -- If there is, we complain and give up -- the user needs to
+        -- break the cycle using a boot file.
 
         -- Now do the upsweep, calling compile for each module in
         -- turn.  Final result is version 3 of everything.
 
-        let threaded2 = ModThreaded pcs1 hst2 hit2
+        let threaded2 = CmThreaded pcs1 hst2 hit2
 
-        (upsweepOK, threaded3, sccOKs, newLis)
-           <- upsweep_sccs threaded2 [] [] mg2
+        (upsweep_complete_success, threaded3, modsDone, newLis)
+           <- upsweep_mods ui2 threaded2 mg2
 
         let ui3 = add_to_ui ui2 newLis
-        let (ModThreaded pcs3 hst3 hit3) = threaded3
+        let (CmThreaded pcs3 hst3 hit3) = threaded3
+
+        -- At this point, modsDone and newLis should have the same
+        -- length, so there is one new (or old) linkable for each 
+        -- mod which was processed (passed to compile).
 
         -- Try and do linking in some form, depending on whether the
         -- upsweep was completely or only partially successful.
 
-        if upsweepOK
+        if upsweep_complete_success
 
          then 
+           -- Easy; just relink it all.
            do putStrLn "UPSWEEP COMPLETELY SUCCESSFUL"
-              let someone_exports_main = any exports_main (moduleEnvElts hst3)
-              let mods_to_relink = upwards_closure mg2 
-                                      (map modname_of_linkable newLis)
-              pkg_linkables <- find_pkg_linkables_for pcii
-                                                      mg2 mods_to_relink
-              putStrLn ("needed package modules =\n" 
-                        ++ showSDoc (vcat (map ppr pkg_linkables)))
-              let sccs_to_relink = group_uis ui3 mg2 mods_to_relink
-              let all_to_relink  = map AcyclicSCC pkg_linkables 
-                                   ++ sccs_to_relink
-              linkresult <- link doLink ghci_mode someone_exports_main
-                                 pcii all_to_relink pls1
+              linkresult 
+                 <- link doLink ghci_mode (any exports_main (moduleEnvElts hst3)) 
+                         newLis pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
                  LinkOK pls3 
                     -> do let pcms3 = PersistentCMState { hst=hst3, hit=hit3, 
-                                                          ui=ui3, mg=mg2, 
+                                                          ui=ui3, mg=modsDone, 
                                                           pci=pcii, gmode=ghci_mode }
                           let cmstate3 
                                  = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
-                          return (cmstate3, Just modname)
+                          return (cmstate3, Just rootname)
 
          else 
+           -- Tricky.  We need to back out the effects of compiling any
+           -- half-done cycles, both so as to clean up the top level envs
+           -- and to avoid telling the interactive linker to link them.
            do putStrLn "UPSWEEP PARTIALLY SUCCESSFUL"
-              let mods_to_relink = downwards_closure mg2 
-                                      (map name_of_summary (flattenSCCs sccOKs))
-              pkg_linkables <- find_pkg_linkables_for pcii
-                                                      mg2 mods_to_relink
-              let sccs_to_relink = group_uis ui3 mg2 mods_to_relink
-              let all_to_relink  = map AcyclicSCC pkg_linkables 
-                                   ++ sccs_to_relink
-              linkresult <- link doLink ghci_mode False pcii all_to_relink pls1
+
+              let modsDone_names
+                     = map name_of_summary modsDone
+              let mods_to_zap_names 
+                     = findPartiallyCompletedCycles modsDone_names mg2_with_srcimps
               let (hst4, hit4, ui4) 
-                     = removeFromTopLevelEnvs mods_to_relink (hst3,hit3,ui3)
+                     = removeFromTopLevelEnvs mods_to_zap_names (hst3,hit3,ui3)
+              let mods_to_keep
+                     = filter ((`notElem` mods_to_zap_names).name_of_summary) modsDone
+              let mods_to_keep_names 
+                     = map name_of_summary mods_to_keep
+              -- we could get the relevant linkables by filtering newLis, but
+              -- it seems easier to drag them out of the updated, cleaned-up UI
+              let linkables_to_link 
+                     = map (findModuleLinkable ui4) mods_to_keep_names
+
+              linkresult <- link doLink ghci_mode False linkables_to_link pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (2)"
                  LinkOK pls4
                     -> do let pcms4 = PersistentCMState { hst=hst4, hit=hit4, 
-                                                          ui=ui4, mg=mg2,
+                                                          ui=ui4, mg=mods_to_keep,
                                                           pci=pcii, gmode=ghci_mode }
                           let cmstate4 
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
-                          return (cmstate4, Just modname)
+                          return (cmstate4, 
+                                  -- choose rather arbitrarily who to return
+                                  if null mods_to_keep then Nothing 
+                                     else Just (last mods_to_keep_names))
+
+
+-- Return (names of) all those in modsDone who are part of a cycle
+-- as defined by theGraph.
+findPartiallyCompletedCycles :: [ModuleName] -> [SCC ModSummary] -> [ModuleName]
+findPartiallyCompletedCycles modsDone theGraph
+   = chew theGraph
+     where
+        chew [] = []
+        chew ((AcyclicSCC v):rest) = chew rest    -- acyclic?  not interesting.
+        chew ((CyclicSCC vs):rest)
+           = let names_in_this_cycle = nub (map name_of_summary vs)
+                 mods_in_this_cycle  
+                    = nub ([done | done <- modsDone, 
+                                   done `elem` names_in_this_cycle])
+                 chewed_rest = chew rest
+             in 
+             if   not (null mods_in_this_cycle) 
+                  && length mods_in_this_cycle < length names_in_this_cycle
+             then mods_in_this_cycle ++ chewed_rest
+             else chewed_rest
+
 
 exports_main :: ModDetails -> Bool
 exports_main md
    = maybeToBool (lookupNameEnv (md_types md) mainName)
-
--- Given a (home) module graph and a bunch of names of (home) modules
--- within that graph, return the names of any packages needed by the
--- named modules.  Do this by looking at their imports.  Assumes, and
--- checks, that all of "mods" are mentioned in "mg".
--- 
--- Then, having found the packages directly needed by "mods",
--- (1) round up, by looking in "pci", all packages they directly or
--- indirectly depend on, and (2) put these packages in topological
--- order, since that's important for some linkers.  Since cycles in
--- the package dependency graph aren't allowed, we can just return
--- the list of (package) linkables, rather than a list of SCCs.
-find_pkg_linkables_for :: PackageConfigInfo -> [SCC ModSummary] -> [ModuleName]
-                       -> IO [Linkable]
-find_pkg_linkables_for pcii mg mods
-   = let mg_summaries = flattenSCCs mg
-         mg_names     = map name_of_summary mg_summaries
-     in
-     -- Assert that the modules for which we seek the required packages
-     -- are all in the module graph, i.e. are all home modules.
-     if   not (all (`elem` mg_names) mods)
-     then panic "find_pkg_linkables_for"
-     else 
-     do let all_imports
-               = concat 
-                    [deps_of_summary summ
-                    | summ <- mg_summaries, name_of_summary summ `elem` mods]
-        let imports_not_in_home  -- imports which must be from packages
-               = nub (filter (`notElem` mg_names) all_imports)
-
-        -- Figure out the packages directly imported by the home modules
-        maybe_locs_n_mods <- mapM findModule imports_not_in_home
-        let home_pkgs_needed
-               = nub (concatMap get_pkg maybe_locs_n_mods)
-                 where get_pkg Nothing = []
-                       get_pkg (Just (mod, loc))
-                          = case packageOfModule mod of 
-                               Just p -> [p]; _ -> []
-
-        -- Discover the package dependency graph, and use it to find the
-        -- transitive closure of all the needed packages
-        let pkg_depend_graph :: [(PackageName,[PackageName])]
-            pkg_depend_graph = map (\pkg -> (_PK_ (name pkg), map _PK_ (package_deps pkg))) pcii
-
-        let all_pkgs_needed = simple_transitive_closure 
-                                 pkg_depend_graph home_pkgs_needed
-
-        -- Make a graph, in the style which Digraph.stronglyConnComp expects,
-        -- containing entries only for the needed packages.
-        let needed_graph
-               = concat
-                   [if srcP `elem` all_pkgs_needed
-                     then [(srcP, srcP, dstsP)] 
-                     else []
-                    | (srcP, dstsP) <- pkg_depend_graph]
-            tsorted = flattenSCCs (stronglyConnComp needed_graph)
-        
-        return (map LP tsorted)
-
-
-simple_transitive_closure :: Eq a => [(a,[a])] -> [a] -> [a]
-simple_transitive_closure graph set
-   = let set2      = nub (concatMap dsts set ++ set)
-         dsts node = fromMaybe [] (lookup node graph)
-     in
-         if   length set == length set2 
-         then set 
-         else simple_transitive_closure graph set2
-
-
--- For each module in mods_to_group, extract the relevant linkable
--- out of "ui", and arrange these linkables in SCCs as defined by modGraph.
--- All this is so that we can pass SCCified Linkable groups to the
--- linker.  A constraint that should be recorded somewhere is that
--- all sccs should either be all-interpreted or all-object, not a mixture.
-group_uis :: UnlinkedImage -> [SCC ModSummary] -> [ModuleName] -> [SCC Linkable]
-group_uis ui modGraph mods_to_group
-   = map extract (cleanup (fishOut modGraph mods_to_group))
-     where
-        fishOut :: [SCC ModSummary] -> [ModuleName] -> [(Bool,[ModuleName])]
-        fishOut [] unused
-           | null unused = []
-           | otherwise   = panic "group_uis: modnames not in modgraph"
-        fishOut ((AcyclicSCC ms):sccs) unused
-           = case split (== (name_of_summary ms)) unused of
-                (eq, not_eq) -> (False, eq) : fishOut sccs not_eq
-        fishOut ((CyclicSCC mss):sccs) unused
-           = case split (`elem` (map name_of_summary mss)) unused of
-                (eq, not_eq) -> (True, eq) : fishOut sccs not_eq
-
-        cleanup :: [(Bool,[ModuleName])] -> [SCC ModuleName]
-        cleanup [] = []
-        cleanup ((isRec,names):rest)
-           | null names = cleanup rest
-           | isRec      = CyclicSCC names : cleanup rest
-           | not isRec  = case names of [name] -> AcyclicSCC name : cleanup rest
-                                        other  -> panic "group_uis(cleanup)"
-
-        extract :: SCC ModuleName -> SCC Linkable
-        extract (AcyclicSCC nm) = AcyclicSCC (getLi nm)
-        extract (CyclicSCC nms) = CyclicSCC (map getLi nms)
-
-        getLi nm = case [li | li <- ui, not (is_package_linkable li),
-                                        nm == modname_of_linkable li] of
-                      [li]  -> li
-                      other -> panic "group_uis:getLi"
-
-        split f xs = (filter f xs, filter (not.f) xs)
 
 
 -- Add the given (LM-form) Linkables to the UI, overwriting previous
@@ -351,95 +284,51 @@ add_to_ui ui lis
              && modname_of_linkable li1 == modname_of_linkable li2
                                   
 
--- Compute upwards and downwards closures in the (home-) module graph.
-downwards_closure,
- upwards_closure :: [SCC ModSummary] -> [ModuleName] -> [ModuleName]
-
-upwards_closure   = up_down_closure True
-downwards_closure = up_down_closure False
-
-up_down_closure :: Bool -> [SCC ModSummary] -> [ModuleName] -> [ModuleName]
-up_down_closure up modGraph roots
-   = let mgFlat = flattenSCCs modGraph
-         nodes  = map name_of_summary mgFlat
-
-         fwdEdges, backEdges  :: [(ModuleName, [ModuleName])] 
-                   -- have an entry for each mod in mgFlat, and do not
-                   -- mention edges leading out of the home package
-         fwdEdges 
-            = map mkEdge mgFlat
-         backEdges -- Only calculated if needed, which is just as well!
-            = [(n, [m | (m, m_imports) <- fwdEdges, n `elem` m_imports])
-               | (n, n_imports) <- fwdEdges]
-
-         mkEdge summ
-            = (name_of_summary summ, 
-               -- ignore imports not from the home package
-               filter (`elem` nodes) (deps_of_summary summ))
-     in
-         simple_transitive_closure
-            (if up then backEdges else fwdEdges) (nub roots)
+data CmThreaded  -- stuff threaded through individual module compilations
+   = CmThreaded PersistentCompilerState HomeSymbolTable HomeIfaceTable
 
 
-
-data ModThreaded  -- stuff threaded through individual module compilations
-   = ModThreaded PersistentCompilerState HomeSymbolTable HomeIfaceTable
-
--- Compile multiple SCCs, stopping as soon as an error appears
-upsweep_sccs :: ModThreaded           -- PCS & HST & HIT
-             -> [SCC ModSummary]      -- accum: SCCs which succeeded
-             -> [Linkable]            -- accum: new Linkables
-             -> [SCC ModSummary]      -- SCCs to do (the worklist)
+-- Compile multiple modules, stopping as soon as an error appears.
+-- There better had not be any cyclic groups here -- we check for them.
+upsweep_mods :: UnlinkedImage         -- old linkables
+             -> CmThreaded            -- PCS & HST & HIT
+             -> [SCC ModSummary]      -- mods to do (the worklist)
                                       -- ...... RETURNING ......
-             -> IO (Bool{-success?-},
-                    ModThreaded,
-                    [SCC ModSummary], -- SCCs which succeeded
+             -> IO (Bool{-complete success?-},
+                    CmThreaded,
+                    [ModSummary],     -- mods which succeeded
                     [Linkable])       -- new linkables
 
-upsweep_sccs threaded sccOKs newLis []
-   = -- No more SCCs to do.
-     return (True, threaded, sccOKs, newLis)
+upsweep_mods oldUI threaded []
+   = return (True, threaded, [], [])
 
-upsweep_sccs threaded sccOKs newLis (scc:sccs)
-   = -- Start work on a new SCC.
-     do (sccOK, threaded2, lisSCC) 
-           <- upsweep_scc threaded (flattenSCC scc)
-        if    sccOK
-         then -- all the modules in the scc were ok
-              -- move on to the next SCC
-              upsweep_sccs threaded2 
-                           (scc:sccOKs) (lisSCC++newLis) sccs
-         else -- we got a compilation error; give up now
-              return
-                 (False, threaded2, sccOKs, lisSCC++newLis)
+upsweep_mods oldUI threaded ((CyclicSCC ms):_)
+   = do hPutStrLn stderr ("ghc: module imports form a cycle for modules:\n\t" ++
+                          unwords (map (moduleNameUserString.name_of_summary) ms))
+        return (False, threaded, [], [])
+
+upsweep_mods oldUI threaded ((AcyclicSCC mod):mods)
+   = do (threaded1, maybe_linkable) <- upsweep_mod oldUI threaded mod
+        case maybe_linkable of
+           Just linkable 
+              -> -- No errors; do the rest
+                 do (restOK, threaded2, modOKs, linkables) 
+                       <- upsweep_mods oldUI threaded1 mods
+                    return (restOK, threaded2, mod:modOKs, linkable:linkables)
+           Nothing -- we got a compilation error; give up now
+              -> return (False, threaded1, [], [])
 
 
--- Compile multiple modules (one SCC), stopping as soon as an error appears
-upsweep_scc :: ModThreaded
-             -> [ModSummary]
-             -> IO (Bool{-success?-}, ModThreaded, [Linkable])
-upsweep_scc threaded []
-   = return (True, threaded, [])
-upsweep_scc threaded (mod:mods)
-   = do (moduleOK, threaded1, maybe_linkable) 
-           <- upsweep_mod threaded mod
-        if moduleOK
-         then -- No errors; get contribs from the rest
-              do (restOK, threaded2, linkables)
-                    <- upsweep_scc threaded1 mods
-                 return
-                    (restOK, threaded2, maybeToList maybe_linkable ++ linkables)
-         else -- Errors; give up _now_
-              return (False, threaded1, [])
-
--- Compile a single module.
-upsweep_mod :: ModThreaded
+-- Compile a single module.  Always produce a Linkable for it if 
+-- successful.  If no compilation happened, return the old Linkable.
+upsweep_mod :: UnlinkedImage 
+            -> CmThreaded
             -> ModSummary
-            -> IO (Bool{-success?-}, ModThreaded, Maybe Linkable)
+            -> IO (CmThreaded, Maybe Linkable)
 
-upsweep_mod threaded1 summary1
+upsweep_mod oldUI threaded1 summary1
    = do let mod_name = name_of_summary summary1
-        let (ModThreaded pcs1 hst1 hit1) = threaded1
+        let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
         compresult <- compile summary1 old_iface hst1 hit1 pcs1
 
@@ -449,24 +338,25 @@ upsweep_mod threaded1 summary1
            -- linkable, meaning that compilation wasn't needed, and the
            -- new details were manufactured from the old iface.
            CompOK details Nothing pcs2
-              -> let hst2      = addToUFM hst1 mod_name details
-                     hit2      = hit1
-                     threaded2 = ModThreaded pcs2 hst2 hit2
-                 in  return (True, threaded2, Nothing)
+              -> let hst2         = addToUFM hst1 mod_name details
+                     hit2         = hit1
+                     threaded2    = CmThreaded pcs2 hst2 hit2
+                     old_linkable = findModuleLinkable oldUI mod_name
+                 in  return (threaded2, Just old_linkable)
 
            -- Compilation really did happen, and succeeded.  A new
            -- details, iface and linkable are returned.
            CompOK details (Just (new_iface, new_linkable)) pcs2
               -> let hst2      = addToUFM hst1 mod_name details
                      hit2      = addToUFM hit1 mod_name new_iface
-                     threaded2 = ModThreaded pcs2 hst2 hit2
-                 in  return (True, threaded2, Just new_linkable)
+                     threaded2 = CmThreaded pcs2 hst2 hit2
+                 in  return (threaded2, Just new_linkable)
 
            -- Compilation failed.  compile may still have updated
            -- the PCS, tho.
            CompErrs pcs2
-              -> let threaded2 = ModThreaded pcs2 hst1 hit1
-                 in  return (False, threaded2, Nothing)
+              -> let threaded2 = CmThreaded pcs2 hst1 hit1
+                 in  return (threaded2, Nothing)
 
 
 removeFromTopLevelEnvs :: [ModuleName]
@@ -478,13 +368,16 @@ removeFromTopLevelEnvs zap_these (hst, hit, ui)
       filterModuleLinkables (`notElem` zap_these) ui
      )
 
-topological_sort :: [ModSummary] -> [SCC ModSummary]
-topological_sort summaries
+
+topological_sort :: Bool -> [ModSummary] -> [SCC ModSummary]
+topological_sort include_source_imports summaries
    = let 
          toEdge :: ModSummary -> (ModSummary,ModuleName,[ModuleName])
          toEdge summ
-             = (summ, name_of_summary summ, deps_of_summary summ)
-         
+             = (summ, name_of_summary summ, 
+                      (if include_source_imports 
+                       then ms_srcimps summ else []) ++ ms_imps summ)
+        
          mash_edge :: (ModSummary,ModuleName,[ModuleName]) -> (ModSummary,Int,[Int])
          mash_edge (summ, m, m_imports)
             = case lookup m key_map of
@@ -500,12 +393,14 @@ topological_sort summaries
      in
          sccs
 
--- NB: ignores import-sources for the time being
-downsweep :: ModuleName          -- module to chase from
-          -> IO [ModSummary]
+
+-- Chase downwards from the specified root set, returning summaries
+-- for all home modules encountered.  Only follow source-import
+-- links.
+downsweep :: [ModuleName] -> IO [ModSummary]
 downsweep rootNm
-   = do rootLoc <- getSummary rootNm
-        loop [rootLoc]
+   = do rootSummaries <- mapM getSummary rootNm
+        loop (filter (isModuleInThisPackage.ms_mod) rootSummaries)
      where
         getSummary :: ModuleName -> IO ModSummary
         getSummary nm
@@ -517,15 +412,11 @@ downsweep rootNm
                                    ("no signs of life for module `" 
                                      ++ showSDoc (ppr nm) ++ "'"))
                                  
-
         -- loop invariant: homeSummaries doesn't contain package modules
         loop :: [ModSummary] -> IO [ModSummary]
         loop homeSummaries
            = do let allImps :: [ModuleName]
-                    allImps   -- all imports
-                       = (nub . map mimp_name 
-                              . concat . map ms_get_imports)
-                         homeSummaries
+                    allImps = (nub . concatMap ms_imps) homeSummaries
                 let allHome   -- all modules currently in homeSummaries
                        = map (moduleName.ms_mod) homeSummaries
                 let neededImps
