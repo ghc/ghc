@@ -19,4 +19,4 @@ ss = sin * sin
 cc = cos * cos
 tt = ss + cc
 
-main _ = [AppendChan stdout ((show (tt 0.4))++ "  "++(show (tt 1.652)))]
+main = putStr ((show (tt 0.4))++ "  "++(show (tt 1.652)))

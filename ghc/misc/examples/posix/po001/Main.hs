@@ -1,14 +1,14 @@
-import LibPosix
+import Posix
 
 main =
     getParentProcessID >>= \ ppid ->
     getProcessID >>= \ pid ->
     putStr "Parent Process ID: " >>
-    putText ppid >>
+    print ppid >>
     putStr "\nProcess ID: " >>
-    putText pid >>
+    print pid >>
     putStr "\nforking ps uxww" >>
-    putText ppid >>
+    print ppid >>
     putChar '\n' >>
     forkProcess >>= \ child ->
     case child of
@@ -18,6 +18,6 @@ main =
 doParent cpid pid =
     getProcessStatus True False cpid >>
     putStr "\nChild finished.  Now exec'ing ps uxww" >>
-    putText pid >>
+    print pid >>
     putChar '\n' >>
     executeFile "ps" True ["uxww" ++ show pid] Nothing

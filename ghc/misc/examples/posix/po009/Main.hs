@@ -1,4 +1,4 @@
-import LibPosix
+import Posix
 
 main =
     putStr "Blocking real time alarms.\n" >>
@@ -9,6 +9,6 @@ main =
     sleep 5 >>
     getPendingSignals >>= \ ints ->
     putStr "Checking pending interrupts for RealTimeAlarm\n" >>
-    putText (inSignalSet realTimeAlarm ints) >>
+    print (inSignalSet realTimeAlarm ints) >>
     putChar '\n'
 

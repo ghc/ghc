@@ -1,3 +1,5 @@
+import IO -- 1.3
+
 main =
       hSetBuffering stdout NoBuffering                  >>
       putStr   "Enter an integer: "                     >>

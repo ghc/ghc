@@ -1,4 +1,4 @@
-import LibPosix
+import Posix
 
 main =
     getUserEntryForName "mattson" >>= \ mattson ->

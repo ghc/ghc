@@ -1,4 +1,4 @@
-import LibTime
+import Time
 
 main = 
     getClockTime >>= \ time ->
@@ -7,7 +7,7 @@ main =
         time' = toClockTime (CalendarTime (year - 1) month mday hour min sec psec
                              wday yday timezone gmtoff isdst)
     in
-        putText time >>
+        print time >>
 	putChar '\n' >>
-	putText time' >> 
+	print time' >> 
 	putChar '\n'

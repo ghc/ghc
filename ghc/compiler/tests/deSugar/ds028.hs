@@ -1,5 +1,8 @@
 --!!! ds028: failable pats in top row
 
+module ShouldSucceed where
+
+
 -- when the first row of pats doesn't have convenient
 -- variables to grab...
 

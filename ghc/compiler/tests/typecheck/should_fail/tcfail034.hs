@@ -10,6 +10,8 @@ I came across a rather nasty error message when I gave a function an
 incorrect type signature (the context is wrong). I can remember reading 
 in the source about this problem - I just thought I'd let you know anyway :-)
 -}
+module ShouldSucceed where
+
 
 test::(Num a, Eq a) => a -> Bool
 test x = (x `mod` 3) == 0

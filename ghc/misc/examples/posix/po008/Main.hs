@@ -1,4 +1,4 @@
-import LibPosix
+import Posix
 
 main =
     installHandler realTimeAlarm (Catch alarmclock) Nothing >>

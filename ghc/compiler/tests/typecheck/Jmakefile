@@ -3,5 +3,4 @@
 SUBDIRS = /* TEMPORARILY OUT: check_mess */ \
 	  should_fail \
 	  /* TEMPORARILY OUT: test_exps */ \
-	  should_succeed \
-	  bugs
+	  should_succeed

@@ -156,7 +156,7 @@ CC_EXTERN(CC_DONTZuCARE);  	/* placeholder only */
 CC_EXTERN(CC_CAFs);		/* prelude cost centre (CAFs  only) */
 CC_EXTERN(CC_DICTs);		/* prelude cost centre (DICTs only) */
 
-# define IS_CAF_OR_DICT_OD_SUB_CC(cc) \
+# define IS_CAF_OR_DICT_OR_SUB_CC(cc) \
     ((cc)->is_subsumed & ' ') 	/* tests for lower case character */
 
 \end{code}

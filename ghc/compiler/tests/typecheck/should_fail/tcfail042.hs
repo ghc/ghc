@@ -10,7 +10,7 @@ instance Num a => Foo [a] where
     foo (x:xs) = map (x+) xs
 
 
-instance (Eq a, Text a) => Bar [a] where
+instance (Eq a, Show a) => Bar [a] where
     bar []     = []
     bar (x:xs) = foo xs where u = x==x
                               v = show x
@@ -20,7 +20,7 @@ instance (Eq a, Text a) => Bar [a] where
 {-
 class Foo a => Bar2 a where bar2 :: a -> a
 
-instance (Eq a, Text a) => Foo [a]
+instance (Eq a, Show a) => Foo [a]
 
 instance Num a => Bar2 [a]
 

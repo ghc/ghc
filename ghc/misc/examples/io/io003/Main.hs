@@ -1,4 +1,4 @@
-import LibSystem (getProgName, getArgs)
+import System (getProgName, getArgs)
 
 main = 
     getProgName >>= \ argv0 ->

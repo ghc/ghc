@@ -1,5 +1,6 @@
 --!! signature bugs exposed by Sigbjorne Finne
 --
+module ShouldFail where
 
 type Flarp a = (b,b)
 

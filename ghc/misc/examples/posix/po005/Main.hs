@@ -1,4 +1,4 @@
-import LibPosix
+import Posix
 
 main =
     getEnvVar "TERM" >>= \ term ->
@@ -6,25 +6,25 @@ main =
     putChar '\n' >>
     setEnvironment [("one","1"),("two","2")] >>
     getEnvironment >>= \ env ->
-    putText env >>
+    print env >>
     putChar '\n' >>
     setEnvVar "foo" "bar" >>
     getEnvironment >>= \ env ->
-    putText env >>
+    print env >>
     putChar '\n' >>
     setEnvVar "foo" "baz" >>
     getEnvironment >>= \ env ->
-    putText env >>
+    print env >>
     putChar '\n' >>
     setEnvVar "fu" "bar" >>
     getEnvironment >>= \ env ->
-    putText env >>
+    print env >>
     putChar '\n' >>
     removeEnvVar "foo" >>
     getEnvironment >>= \ env ->
-    putText env >>
+    print env >>
     putChar '\n' >>
     setEnvironment [] >>
     getEnvironment >>= \ env ->
-    putText env >>
+    print env >>
     putChar '\n'

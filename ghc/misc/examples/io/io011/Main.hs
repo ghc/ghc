@@ -1,4 +1,6 @@
-import LibDirectory
+import IO -- 1.3
+
+import Directory
 
 main =
     createDirectory "foo" >>

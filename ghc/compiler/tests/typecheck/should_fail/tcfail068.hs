@@ -6,22 +6,22 @@ module IndTree(IndTree(..), itgen, itiap, itrap, itrapstate) where
 --partain: import Auxiliary
 import PreludeGlaST
 
-type IndTree s t = _MutableArray s (Int,Int) t
+type IndTree s t = MutableArray s (Int,Int) t
 
 itgen :: Constructed a => (Int,Int) -> a -> IndTree s a
 itgen n x = 
-	_runST (
+	runST (
 	newArray ((1,1),n) x)
 
 itiap :: Constructed a => (Int,Int) -> (a->a) -> IndTree s a -> IndTree s a
 itiap i f arr =
-	_runST (
+	runST (
 	readArray arr i `thenStrictlyST` \val ->
 	writeArray arr i (f val) `seqStrictlyST`
 	returnStrictlyST arr)
 
 itrap :: Constructed a => ((Int,Int),(Int,Int)) -> (a->a) -> IndTree s a -> IndTree s a
-itrap ((i,k),(j,l)) f arr = _runST(itrap' i k)
+itrap ((i,k),(j,l)) f arr = runST(itrap' i k)
 	where
 	itrap' i k = if k > l then returnStrictlyST arr
 		     else (itrapsnd i k `seqStrictlyST`
@@ -33,7 +33,7 @@ itrap ((i,k),(j,l)) f arr = _runST(itrap' i k)
 
 itrapstate :: Constructed b => ((Int,Int),(Int,Int)) -> (a->b->(a,b)) -> ((Int,Int)->c->a) ->
 		(a->c) -> c -> IndTree s b -> (c, IndTree s b)
-itrapstate ((i,k),(j,l)) f c d s arr = _runST(itrapstate' i k s)
+itrapstate ((i,k),(j,l)) f c d s arr = runST(itrapstate' i k s)
 	where
 	itrapstate' i k s = if k > l then returnStrictlyST (s,arr)
 			    else (itrapstatesnd i k s `thenStrictlyST` \(s,arr) ->

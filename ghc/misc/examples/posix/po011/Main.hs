@@ -1,4 +1,4 @@
-import LibPosix
+import Posix
 
 main =
     getGroupEntryForName "grasp" >>= \ grasp ->

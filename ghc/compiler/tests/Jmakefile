@@ -7,5 +7,4 @@ SUBDIRS = reader \
 	  deSugar \
 	  printing \
 	  ccall \
-	  deriving \
-	  bugs
+	  deriving

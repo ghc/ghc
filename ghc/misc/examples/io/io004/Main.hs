@@ -1,3 +1,3 @@
-import LibSystem (exitWith, ExitCode(..))
+import System (exitWith, ExitCode(..))
 
 main = exitWith (ExitFailure 42)

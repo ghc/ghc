@@ -42,6 +42,7 @@ all right.
 	-- Lennart
 - ------- End of forwarded message -------
 -}
+module ShouldFail where
 
 sort :: Ord a => [a] -> [a]
 sort xs = s xs (length xs)

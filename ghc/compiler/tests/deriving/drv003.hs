@@ -1,5 +1,7 @@
 --!!! This is the example given in TcDeriv
 --
+module ShouldSucceed where
+
 data T a b
   = C1 (Foo a) (Bar b) 
   | C2 Int (T b a) 

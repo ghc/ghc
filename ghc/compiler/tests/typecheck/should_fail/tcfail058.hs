@@ -1,4 +1,5 @@
 module ShouldFail where
+import Array
 
 --!!! inadvertently using => instead of ->
 

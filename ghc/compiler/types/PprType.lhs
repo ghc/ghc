@@ -191,7 +191,7 @@ ppr_corner sty env ctxt_prec (TyConTy FunTyCon usage) arg_tys
 ppr_corner sty env ctxt_prec (TyConTy (TupleTyCon _ _ a) usage) arg_tys
   | not (codeStyle sty) -- no magic in that case
   = --ASSERT(length arg_tys == a)
-    (if (length arg_tys /= a) then pprTrace "ppr_corner:" (ppCat [ppInt a, ppInterleave ppComma (map (pprGenType PprDebug) arg_tys)]) else id) $
+    --(if (length arg_tys /= a) then pprTrace "ppr_corner:" (ppCat [ppInt a, ppInterleave ppComma (map (pprGenType PprDebug) arg_tys)]) else id) $
     ppBesides [ppLparen, arg_tys_w_commas, ppRparen]
   where
     arg_tys_w_commas = ppIntersperse pp'SP (map (ppr_ty sty env tOP_PREC) arg_tys)

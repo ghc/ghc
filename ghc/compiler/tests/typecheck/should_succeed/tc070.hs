@@ -1,3 +1,5 @@
+module ShouldSucceed where
+
 
 data Boolean = FF | TT
 

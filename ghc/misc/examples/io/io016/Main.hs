@@ -1,4 +1,7 @@
-import LibSystem (getArgs)
+import IO -- 1.3
+
+import System (getArgs)
+import Char   (toUpper)
 
 main   =  getArgs                           >>=        \ [f1,f2] ->
           openFile f1 ReadMode              >>=        \ h1      ->

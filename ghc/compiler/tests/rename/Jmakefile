@@ -7,7 +7,7 @@ runtests::
 	@echo '# Validation tests for the renamer (incl dependency analysis) #'
 	@echo '###############################################################'
 
-TEST_FLAGS=/*-ddump-rn1 -ddump-rn2 -ddump-rn3*/ -ddump-rn4
+TEST_FLAGS=/*-ddump-rn1 -ddump-rn2 -ddump-rn3*/ -ddump-rn
 
 RunStdTest(rn001,$(GHC), -noC $(TEST_FLAGS) rn001.hs -o2 rn001.stderr -x1)
 RunStdTest(rn002,$(GHC), -noC $(TEST_FLAGS) rn002.hs -o2 rn002.stderr -x1)

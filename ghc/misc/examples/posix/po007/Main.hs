@@ -1,4 +1,4 @@
-import LibPosix
+import Posix
 
 main = 
     installHandler keyboardSignal (Catch doCtrlC) Nothing >>
@@ -28,4 +28,4 @@ doCtrlC =
 ccStr '\DEL' = "^?"
 ccStr x 
   | x >= ' ' = [x]
-  | otherwise = ['^', (chr (ord x + ord '@'))]
+  | otherwise = ['^', (toEnum (fromEnum x + fromEnum '@'))]

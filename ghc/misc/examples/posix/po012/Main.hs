@@ -1,4 +1,5 @@
-import LibPosix
+import Posix
+import IO -- 1.3
 
 main =
     createFile "po012.out" stdFileMode >>= \ fd ->

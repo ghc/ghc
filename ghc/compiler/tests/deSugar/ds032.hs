@@ -1,5 +1,8 @@
 --!!! recursive funs tangled in an AbsBind
 
+module ShouldSucceed where
+
+
 flatten :: Int		-- Indentation
         -> Bool		-- True => just had a newline
         -> Float	-- Current seq to flatten

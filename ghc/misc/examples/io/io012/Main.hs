@@ -1,11 +1,12 @@
-import LibCPUTime
+import IO -- 1.3
+
+import CPUTime
 
 main = 
     openFile "/dev/null" WriteMode >>= \ h ->
-    hPutText h (nfib 30) >>
+    hPrint h (nfib 30) >>
     getCPUTime >>= \ t ->
-    putText t >>
-    putChar '\n'
+    print t
 
 nfib :: Integer -> Integer
 nfib n 

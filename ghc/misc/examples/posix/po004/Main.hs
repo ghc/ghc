@@ -1,5 +1,5 @@
-import LibPosix
-import LibSystem(ExitCode(..), exitWith)
+import Posix
+import System(ExitCode(..), exitWith)
 
 main = 
     forkProcess >>= \ maybe_pid ->
@@ -11,7 +11,7 @@ doParent =
     getAnyProcessStatus True False >>= \ (Just (pid, tc)) ->
     case tc of
 	Terminated sig | sig == floatingPointException -> forkChild2
-	_ -> fail "unexpected termination cause"
+	_ -> fail (userError "unexpected termination cause")
 
 forkChild2 =
     forkProcess >>= \ maybe_pid ->
@@ -23,7 +23,7 @@ doParent2 =
     getAnyProcessStatus True False >>= \ (Just (pid, tc)) ->
     case tc of
 	Exited (ExitFailure 42) -> forkChild3
-	_ -> fail "unexpected termination cause (2)"
+	_ -> fail (userError "unexpected termination cause (2)")
 	    
 forkChild3 =
     forkProcess >>= \ maybe_pid ->
@@ -35,7 +35,7 @@ doParent3 =
     getAnyProcessStatus True False >>= \ (Just (pid, tc)) ->
     case tc of
 	Exited ExitSuccess -> forkChild4
-	_ -> fail "unexpected termination cause (3)"
+	_ -> fail (userError "unexpected termination cause (3)")
 	    
 forkChild4 =
     forkProcess >>= \ maybe_pid ->
@@ -47,12 +47,12 @@ doParent4 =
     getAnyProcessStatus True True >>= \ (Just (pid, tc)) ->
     case tc of
 	Stopped sig | sig == softwareStop -> enoughAlready pid
-	_ -> fail "unexpected termination cause (4)"
+	_ -> fail (userError "unexpected termination cause (4)")
 	    
 enoughAlready pid =
     signalProcess killProcess pid >>
     getAnyProcessStatus True True >>= \ (Just (pid, tc)) ->
     case tc of
 	Terminated sig | sig == killProcess -> putStr "I'm happy.\n"
-	_ -> fail "unexpected termination cause (5)"
+	_ -> fail (userError "unexpected termination cause (5)")
     

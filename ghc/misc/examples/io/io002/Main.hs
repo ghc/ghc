@@ -1,4 +1,4 @@
-import LibSystem (getEnv)
+import System (getEnv)
 
 main = 
     getEnv "TERM" >>= \ term -> 

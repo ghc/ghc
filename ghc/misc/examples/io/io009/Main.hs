@@ -1,7 +1,6 @@
-import LibDirectory (getDirectoryContents)
+import Directory (getDirectoryContents)
 import QSort (sort)
 
 main =
     getDirectoryContents "." >>= \ names ->
-    putText (sort names) >>
-    putChar '\n'
+    print (sort names)

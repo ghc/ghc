@@ -108,8 +108,6 @@ if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
     $TopPwd	    = '$(TOP_PWD)';
     $InstLibDirGhc  = '$(INSTLIBDIR_GHC)';
     $InstDataDirGhc = '$(INSTDATADIR_GHC)';
-#   $InstSysLibDir  = '$(INSTLIBDIR_HSLIBS)'; ToDo ToDo
-    $InstSysLibDir  = '$(TOP_PWD)/hslibs';
 } else {
     $TopPwd = $ENV{'GLASGOW_HASKELL_ROOT'};
 
@@ -126,6 +124,13 @@ if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
 	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTDATADIR_GHC).\n(Installation error)\n";
 	exit(1);
     }
+}
+
+if ( $(INSTALLING) ) {
+    $InstSysLibDir  = $InstDataDirGhc;
+    $InstSysLibDir  =~ s/\/ghc\//\/hslibs\//;
+} else {
+    $InstSysLibDir  = "$TopPwd/hslibs";
 }
 
 $Status  = 0; # just used for exit() status
@@ -820,14 +825,18 @@ arg: while($_ = $ARGV[0]) {
 				? "$InstSysLibDir/$syslib/imports"
 				: "$TopPwd/hslibs/$syslib/src");
 
-			    if (! $(INSTALLING)) {
+			    if ( $(INSTALLING) ) {
+				push(@SysLibrary_dir,
+					("$InstSysLibDir/$TargetPlatform"));
+			    } else {
 				push(@SysLibrary_dir,
 					("$TopPwd/hslibs/$syslib"
 					,"$TopPwd/hslibs/$syslib/cbits"));
 			    }
 
-			    push(@SysLibrary, ("-lHS$syslib"
-						 ,"-lHS${syslib}_cbits"));
+			    push(@SysLibrary, "-lHS$syslib");
+			    push(@SysLibrary, "-lHS${syslib}_cbits")
+			      unless $syslib eq 'contrib'; #HACK! it has no cbits
 
 			    next arg; };
 
@@ -2282,7 +2291,7 @@ sub makeHiMap {
 	opendir(DIR, $d) || &tidy_up_and_die(1,"$Pgm: error when reading directory: $d\n");
 	local(@entry) = readdir(DIR);
 	foreach $e ( @entry ) {
-	    next unless $e =~ /([A-Z][A-Za-z0-9_]*)\.$HiSuffix$/o;
+	    next unless $e =~ /\b([A-Z][A-Za-z0-9_]*)\.$HiSuffix$/o;
 	    $mod  = $1;
 	    $path = "$d/$e";
 	    $path =~ s,^\./,,;

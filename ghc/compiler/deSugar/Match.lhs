@@ -25,11 +25,12 @@ import DsUtils
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 
-import FieldLabel	( allFieldLabelTags, fieldLabelTag )
-import Id		( idType, mkTupleCon,
+import FieldLabel	( FieldLabel {- Eq instance -} )
+import Id		( idType, mkTupleCon, dataConFieldLabels,
 			  dataConArgTys, recordSelectorFieldLabel,
 			  GenId{-instance-}
 			)
+import Name		( Name {--O only-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )
 import PrelVals		( pAT_ERROR_ID )
@@ -337,12 +338,12 @@ tidy1 v (RecPat con_id pat_ty rpats) match_result
 	-- Boring stuff to find the arg-tys of the constructor
     (_, inst_tys, _) = {-trace "Match.getAppDataTyConExpandingDicts" $-} getAppDataTyConExpandingDicts pat_ty
     con_arg_tys'     = dataConArgTys con_id inst_tys 
-    tagged_arg_tys   = con_arg_tys' `zip` allFieldLabelTags
+    tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels con_id)
 
 	-- mk_pat picks a WildPat of the appropriate type for absent fields,
 	-- and the specified pattern for present fields
-    mk_pat (arg_ty, tag) = case [pat | (sel_id,pat,_) <- rpats,
-					fieldLabelTag (recordSelectorFieldLabel sel_id) == tag 
+    mk_pat (arg_ty, lbl) = case [pat | (sel_id,pat,_) <- rpats,
+					recordSelectorFieldLabel sel_id == lbl
 				] of
 				(pat:pats) -> ASSERT( null pats )
 					      pat

@@ -1,3 +1,4 @@
+module ShouldFail where
 
 data Foo = MkFoo Bool
 

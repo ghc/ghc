@@ -2,20 +2,20 @@
 
 module Test where
 
-import PreludeGlaIO
+import PreludeGlaST
 
 -- Test returning results
 
-a :: PrimIO _MallocPtr
+a :: PrimIO ForeignObj
 a = _ccall_ a
 
-b :: PrimIO _StablePtr
+b :: PrimIO StablePtr
 b = _ccall_ b
 
 -- Test taking arguments
 
-c :: _MallocPtr -> PrimIO Int
+c :: ForeignObj -> PrimIO Int
 c x = _ccall_ c x
 
-d :: _StablePtr -> PrimIO Int
+d :: StablePtr -> PrimIO Int
 d x = _ccall_ d x

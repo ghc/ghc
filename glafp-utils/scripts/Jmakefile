@@ -1,6 +1,7 @@
 PROGRAMS = lndir \
 	   runstdtest \
 	   mkdependC \
+	   mkdirhier \
 	   fastmake \
 	   ltx
 
@@ -9,6 +10,9 @@ all:: $(PROGRAMS)
 MsubNeededHere($(PROGRAMS))
 
 /* === BUILD STUFF (installation, etc., below) ========== */
+
+/* std X11 stuff: used in installing ghc/hslibs */
+MsubProgramScriptTarget(BourneShell,mkdirhier,mkdirhier.sh,,)
 
 BuildPgmFromOneCFile(lndir)
 

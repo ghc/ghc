@@ -55,8 +55,8 @@
     (modify-syntax-entry ?\f "> b"    haskell-mode-syntax-table)
     (modify-syntax-entry ?\n "> b"    haskell-mode-syntax-table)
     (modify-syntax-entry ?\" "\"" haskell-mode-syntax-table)
-    (modify-syntax-entry ?\' "_" haskell-mode-syntax-table)
-    (modify-syntax-entry ?_  "_" haskell-mode-syntax-table)
+    (modify-syntax-entry ?\' "w" haskell-mode-syntax-table)
+    (modify-syntax-entry ?_  "w" haskell-mode-syntax-table)
     (modify-syntax-entry ?\\ "." haskell-mode-syntax-table)
     (modify-syntax-entry ?\( "()" haskell-mode-syntax-table)
     (modify-syntax-entry ?\) ")(" haskell-mode-syntax-table)
@@ -81,8 +81,6 @@
   (setq comment-column 40)
   (make-local-variable 'comment-indent-function)
   (setq comment-indent-function 'haskell-comment-indent)
-  ;(make-local-variable 'font-lock-keywords)
-  ;(setq font-lock-keywords haskell-literate-font-lock-keywords)
   )
 
 (defun haskell-mode ()
@@ -106,6 +104,8 @@ M-TAB toggles the state of the bird track on the current-line.
 Entry to this mode calls haskell-mode-hook and haskell-literate-mode-hook."
   (interactive)
   (haskell-vars)
+  (make-local-variable 'font-lock-keywords)
+  (setq font-lock-keywords haskell-literate-font-lock-keywords)
   (setq major-mode 'haskell-literate-mode)
   (setq mode-name "Literate Haskell")
   (use-local-map haskell-literate-mode-map)
@@ -190,12 +190,13 @@ Entry to this mode calls haskell-mode-hook and haskell-literate-mode-hook."
       (list
        '("^[^>\n].*$" . font-lock-comment-face)
        (concat "\\b\\("
-		    (mapconcat 'identity 
-			       '("case" "class" "data" "default" "deriving" "else" "hiding"
-				 "if" "import" "in" "infix" "infixl" "infixr" "instance"
-				 "interface" "let" "module" "of" "renaming" "then" "to"
-				 "type" "where")
-			       "\\|")
-		    "\\)\\b")
+	       (mapconcat 'identity 
+			  '("case" "class" "data" "default" "deriving" "else" 
+			    "hiding" "if" "import" "in" "infix" "infixl" 
+			    "infixr" "instance" "interface" "let" "module" 
+			    "of" "renaming" "then" "to" "type" "where")
+			  "\\|")
+	       "\\)\\b")
+;       '("(\\|)\\|\\[\\|\\]\\|,\\|[\\\\!$#^%&*@~?=-+<>.:]+" . font-lock-function-name-face)
        ))
 

@@ -14,11 +14,11 @@ subRangeValue (SubRange (lower, upper) value) = value
 subRange :: SubRange a -> (a, a)
 subRange (SubRange r value) = r
 
-newRange :: (Ord a, Text a) => (a, a) -> a -> SubRange a
+newRange :: (Ord a, Show a) => (a, a) -> a -> SubRange a
 newRange r value = checkRange (SubRange r value)
 
 
-checkRange :: (Ord a, Text a) => SubRange a -> SubRange a
+checkRange :: (Ord a, Show a) => SubRange a -> SubRange a
 checkRange (SubRange (lower, upper) value)
   = if (value < lower) || (value > upper) then
       error ("### sub range error. range = " ++ show lower ++ 
@@ -39,18 +39,18 @@ instance (Ord a) => Ord (SubRange a) where
 relOp :: Ord a => (a->a->Bool) -> SubRange a -> SubRange a -> Bool
 relOp op a b = (subRangeValue a) `op` (subRangeValue b)
 
-rangeOf :: (Ord a, Text a) => SubRange a -> SubRange a -> SubRange a
+rangeOf :: (Ord a, Show a) => SubRange a -> SubRange a -> SubRange a
 rangeOf a b = checkRange (SubRange (subRange b) (subRangeValue a))
 
-showRange :: Text a => SubRange a -> String
+showRange :: Show a => SubRange a -> String
 showRange (SubRange (lower, upper) value)
   = show value ++ " :" ++ show lower ++ ".." ++ show upper
 
-showRangePair :: (Text a, Text b) => (SubRange a, SubRange b) -> String
+showRangePair :: (Show a, Show b) => (SubRange a, SubRange b) -> String
 showRangePair (a, b)
   = "(" ++ showRange a ++ ", " ++ showRange b ++ ")"
 
-showRangeTriple :: (Text a, Text b, Text c) =>
+showRangeTriple :: (Show a, Show b, Show c) =>
                    (SubRange a, SubRange b, SubRange c) -> String
 showRangeTriple (a, b, c) 
   = "(" ++ showRange a ++ ", " ++ showRange b ++ ", " ++ showRange c ++ ")"

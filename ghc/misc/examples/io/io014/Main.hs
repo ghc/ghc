@@ -1,22 +1,22 @@
+import IO -- 1.3
+
 main = 
     accumulate (map hIsOpen [stdin, stdout, stderr]) >>= \ opens ->
-    putText opens >>
-    putChar '\n' >>
+    print opens >>
     accumulate (map hIsClosed [stdin, stdout, stderr]) >>= \ closeds ->
-    putText closeds >>
-    putChar '\n' >>
+    print closeds >>
     accumulate (map hIsReadable [stdin, stdout, stderr]) >>= \ readables ->
-    putText readables >>
-    putChar '\n' >>
+    print readables >>
     accumulate (map hIsWritable [stdin, stdout, stderr]) >>= \ writables ->
-    putText writables >>
-    putChar '\n' >>
+    print writables >>
     accumulate (map hIsBlockBuffered [stdin, stdout, stderr]) >>= \ buffereds ->
-    putText buffereds >>
-    putChar '\n' >>
+    print buffereds >>
     accumulate (map hIsLineBuffered [stdin, stdout, stderr]) >>= \ buffereds ->
-    putText buffereds >>
-    putChar '\n' >>
+    print buffereds >>
     accumulate (map hIsNotBuffered [stdin, stdout, stderr]) >>= \ buffereds ->
-    putText buffereds >>
-    putChar '\n'
+    print buffereds
+  where
+    -- these didn't make it into 1.3
+    hIsBlockBuffered h = hGetBuffering h >>= \ b -> return $ case b of { BlockBuffering _ -> True; _ -> False }
+    hIsLineBuffered  h = hGetBuffering h >>= \ b -> return $ case b of { LineBuffering -> True; _ -> False }
+    hIsNotBuffered   h = hGetBuffering h >>= \ b -> return $ case b of { NoBuffering -> True; _ -> False }

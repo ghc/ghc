@@ -1,9 +1,8 @@
-import LibTime
+import Time
 
 main = 
     getClockTime >>= \ time ->
-    putText time >>
-    putChar '\n' >>
+    print   time >>
 
     let (CalendarTime year month mday hour min sec psec 
                       wday yday timezone gmtoff isdst) = toUTCTime time

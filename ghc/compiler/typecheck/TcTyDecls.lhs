@@ -292,6 +292,8 @@ label; it has to be an Id, you see!
 
 \begin{code}
 mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
+		-- These fields all have the same name, but are from
+		-- different constructors in the data type
   = let
 	field_ty   = fieldLabelType first_field_label
 	field_name = fieldLabelName first_field_label

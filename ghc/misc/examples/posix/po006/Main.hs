@@ -1,4 +1,4 @@
-import LibPosix
+import Posix
 
 main = 
     epochTime >>= \ start ->
@@ -6,9 +6,9 @@ main =
     let timeleft = 0 in
     epochTime >>= \ finish ->
     putStr "Started: " >>
-    putText start >>
+    print start >>
     putStr "\nSlept: " >>
-    putText (5 - timeleft) >>
+    print (5 - timeleft) >>
     putStr "\nFinished: " >>
-    putText finish >>
+    print finish >>
     putChar '\n'

@@ -1,4 +1,6 @@
-import LibSystem(getArgs)
+import IO -- 1.3
+
+import System(getArgs)
 
 main =   getArgs                            >>=        \ [user,host] ->
          let username = (user ++ "@" ++ host) in

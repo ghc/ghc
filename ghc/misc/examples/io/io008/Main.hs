@@ -1,4 +1,7 @@
-import LibDirectory (removeFile)
+import IO -- 1.3
+import GHCio
+
+import Directory (removeFile)
 
 main =
     openFile "io008.in" ReadMode >>= \ hIn ->
@@ -14,5 +17,5 @@ main =
 
 copy :: Handle -> Handle -> IO ()
 copy hIn hOut =
-    try (hGetChar hIn) >>=
-    either (\ EOF -> return ()) ( \ x -> hPutChar hOut x >> copy hIn hOut)
+    tryIO (hGetChar hIn) >>=
+    either (\ err -> if isEOFError err then return () else error "copy") ( \ x -> hPutChar hOut x >> copy hIn hOut)
