@@ -1225,7 +1225,59 @@ disappointed if you try to glob etc. inside \tr{OPTIONS}.
 
 It is not recommended to move all the contents of your Makefiles into
 your source files, but in some circumstances, the \tr{OPTIONS} pragma
-is the Right Thing.
+is the Right Thing. (If you use \tr{-keep-hc-file-too} and have OPTION
+flags in your module, the OPTIONS will get put into the generated .hc
+file).
+
+%----------------------------------------------------------------------
+\subsubsection{How to compile mutually recursive modules}
+\index{module system, recursion}
+
+Currently, the compiler does not have proper support for dealing with
+mutually recursive modules:
+
+\begin{verbatim}
+module A where
+
+import B
+
+newtype A = A Int
+
+f :: B -> A
+f (B x) = A x
+--------
+module B where
+
+import A
+
+data B = B !Int
+
+g :: A -> B
+g (A x) = B x
+\end{verbatim}
+
+When compiling either module A and B, the compiler will try (in vain)
+to look for the interface file of the other. So, to get mutually
+recursive modules off the ground, you need to hand write an interface
+file for A or B, so as to break the loop. For the example at hand, the
+boot interface file for A would like the following:
+
+\begin{verbatim}
+_interface_ A 1
+_exports_
+A A(A) f;
+_declarations_
+1 newtype A = A PrelBase.Int ;
+1 f _:_ B.B -> A.A ;;
+\end{verbatim}
+
+To make sure you get the syntax right, tailoring an existing interface
+file is a Good Idea.
+
+\bf{Note:} This is all a temporary solution, a version of the compiler
+that handles mutually recursive properly without the manual
+construction of interface file, is in the works.
+
 
 %----------------------------------------------------------------------
 %\subsubsection[arity-checking]{Options to insert arity-checking code}

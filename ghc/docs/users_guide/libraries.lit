@@ -19,60 +19,78 @@
 \end{rawlatex}
 \end{onlystandalone}
 
-\section[syslibs]{Introduction}
+\section[ghc-prelude]{The GHC prelude and libraries}
 
 This document describes GHC's prelude and libraries.  The basic story is that of
-the Haskell 1.3 Report and Libraries document (which we do not reproduce here),
+the Haskell 1.4 Report and Libraries document (which we do not reproduce here),
 but this document describes in addition:
 \begin{itemize}
-\item	GHC's additional non-standard libraries and types, such as state transformers,
-	packed strings, foreign objects, stable pointers, and so on.
+\item	GHC's additional non-standard libraries and types, such as
+        state transformers, packed strings, foreign objects, stable
+	pointers, and so on.
 
-\item	GHC's primitive types and operations.  The standard Haskell functions are implemented
-	on top of these, and it is sometimes useful to use them directly.
+\item	GHC's primitive types and operations.  The standard Haskell
+        functions are implemented on top of these, and it is sometimes
+	useful to use them directly.
 
-\item	The organsiation of these libraries into directories.
+\item	The organisation of these libraries into directories.
+\item   Short description of programmer interface to the non-standard,
+        `built-in' libraries provided in addition to the standard
+        prelude and libraries.
 \end{itemize}
 
-\section{Overview}
+In addition to the GHC prelude libraries, GHC comes with a number of
+system libraries, which are presented in \ref{syslibs}.
 
-The libraries are organised into the following three groups, each of which
-is kept in a separate sub-directory of GHC's installed @lib/@ directory:
+\subsection{Prelude library organisation}
+
+{\em Probably only of interest to implementors..}
+
+The prelude libraries are organised into the following three groups,
+each of which is kept in a separate sub-directory of GHC's source
+@lib/@ directory: 
 \begin{description}
-\item[@lib/required/@]  These are the libraries {\em required} by the Haskell
-definition.  All are defined by the Haskell Report, or by the Haskell Libraries Report.
+\item[@lib/required/@]  These are the libraries {\em required} by the
+Haskell definition.  All are defined by the Haskell Report, or by the
+Haskell Libraries Report. 
 They currently comprise:
 \begin{itemize}
 \item @Prelude@.
 \item @List@: more functions on lists.
 \item @Char@: more functions on characters.
 \item @Maybe@: more functions on @Maybe@ types.
-\item @Complex@: functions on complex numbers.
+\item @Complex@: interface defining complex number type and functions over it.
 \item @Ratio@: functions on rational numbers.
-\item @Monad@: functions on characters.
+\item @Monad@: functions on monads.
 \item @Ix@: the @Ix@ class of indexing operations.
 \item @Array@: monolithic arrays.
-\item @IO@: basic input/output functions.
+\item @IO@: additional input/output functions.
 \item @Directory@: basic functions for accessing the file system.
 \item @System@: basic operating-system interface functions.
+\item @Numeric@: operations for reading and showing number values.
 \end{itemize}
 
 \item[@lib/glaExts@]  GHC extension libraries, currently comprising:
 \begin{itemize}
+\item @GlaExts@: collector interface to the various Glasgow
+extensions, primitive operations.
 \item @PackedString@: functions that manipulate strings packed efficiently, one character per byte.
 \item @ST@: the state transformer monad.
 \item @Foreign@: types and operations for GHC's foreign-language interface.
+\item @ByteArray@: operations over immutable chunks of (heap allocated) bytes.
+\item @MutableArray@: operations over mutable arrays.
+\item @MutVar@: operations over mutable variables.
 \end{itemize}
 
 \item[@lib/concurrent@] GHC extension libraries to support Concurrent Haskell, currently comprising:
 \begin{itemize}
-\item @Concurrent.hs@: main library.
-\item @Parallel.hs@: stuff for multi-processor parallelism.
-\item @Channel.hs@
-\item @ChannelVar.hs@
-\item @Merge.hs@
-\item @SampleVar.hs@
-\item @Semaphore.hs@
+\item @Concurrent@: main library.
+\item @Parallel@: stuff for multi-processor parallelism.
+\item @Channel@
+\item @ChannelVar@
+\item @Merge@
+\item @SampleVar@
+\item @Semaphore@
 \end{itemize}
 
 \item[@lib/ghc@] These libraries are the pieces on which all the others are built.
@@ -93,12 +111,15 @@ The types are: list, @Bool@, @Char@, @Ordering@, @String@, @Int@, @Integer@, @Ma
 \item @PrelList@: defines most of the list operations required by @Prelude@.  (A few are in @PrelBase@,
 to avoid gratuitous mutual recursion between modules.)
 
-\item @PrelNum@ defines: the numeric classes beyond @Num@ (namely @Real@, @Integral@, 
-@Fractional@, @Floating@, @RealFrac@, @RealFloat@; instances for appropriate classes 
-for @Int@ and @Integer@; the types @Float@, @Double@, and @Ratio@ and their instances.
+\item @PrelNum@ defines: the numeric classes beyond @Num@, namely
+@Real@, @Integral@, @Fractional@, @Floating@, @RealFrac@, @RealFloat@;
+instances for appropriate classes for @Int@ and @Integer@; the types
+@Float@, @Double@, and @Ratio@ and their instances.
 
-\item @PrelRead@: the @Read@ class and all its instances.  It's kept separate because many programs
-don't use @Read@ at all, so we don't even want to link in its code.
+\item @PrelRead@: the @Read@ class and all its instances.  It's kept
+separate because many programs don't use @Read@ at all, so we don't
+even want to link in its code. (If the prelude libraries are built by
+splitting the object files, this is all a non-issue)
 
 \item @ConcBase@: substrate stuff for Concurrent Haskell.
 
@@ -120,14 +141,14 @@ is hidden from the public interface.  For example the module @STBase@
 exports the type @ST@ including its representation, whereas the module
 @ST@ exports @ST@ abstractly.
 
-None of these modules are involved in any mutual recursion, with the sole exception that
-many modules import @IOBase.error@.
+None of these modules are involved in any mutual recursion, with the
+sole exception that many modules import @IOBase.error@.
 
-\section{The module @GHC@: really primitive stuff}
+\subsection{The module @GHC@: really primitive stuff}
 \label{sect:ghc}
 
-This section defines all the types which are primitive in Glasgow Haskell, and the
-operations provided for them.
+This section defines all the types which are primitive in Glasgow
+Haskell, and the operations provided for them.
 
 A primitive type is one which cannot be defined in Haskell, and which
 is therefore built into the language and compiler.  Primitive types
@@ -148,7 +169,7 @@ the other end of the pointer than the primitive value.
 This section also describes a few non-primitive types, which are needed 
 to express the result types of some primitive operations.
 
-\subsection{Character and numeric types}
+\subsubsection{Character and numeric types}
 
 There are the following obvious primitive types:
 \begin{verbatim}
@@ -157,8 +178,8 @@ type Int#	-- see also Word# and Addr#, later
 type Float#
 type Double#
 \end{verbatim}
-If you want to know their exact equivalents in C, see
-@ghc/includes/StgTypes.lh@ in the GHC source.
+If you really want to know their exact equivalents in C, see
+@ghc/includes/StgTypes.lh@ in the GHC source tree.
 
 Literals for these types may be written as follows:
 \begin{verbatim}
@@ -169,28 +190,28 @@ Literals for these types may be written as follows:
 "a"#		an Addr# (a `char *')
 \end{verbatim}
 
-\subsubsection{Comparison operations}
+\subsubsubsection{Comparison operations}
 \begin{verbatim}
 {gt,ge,eq,ne,lt,le}Char# :: Char# -> Char# -> Bool
     -- ditto for Int#, Word#, Float#, Double#, and Addr#
 \end{verbatim}
 
-\subsubsection{Unboxed-character operations}
+\subsubsubsection{Unboxed-character operations}
 \begin{verbatim}
 ord# :: Char# -> Int#
 chr# :: Int# -> Char#
 \end{verbatim}
 
 
-\subsubsection{Unboxed-@Int@ operations}
+\subsubsubsection{Unboxed-@Int@ operations}
 \begin{verbatim}
 {plus,minus,times,quot,div,rem}Int# :: Int# -> Int# -> Int#
 negateInt# :: Int# -> Int#
 \end{verbatim}
 
-NB: No error/overflow checking!
+\bf{Note:} No error/overflow checking!
 
-\subsubsection{Unboxed-@Double@ and @Float@ operations}
+\subsubsubsection{Unboxed-@Double@ and @Float@ operations}
 \begin{verbatim}
 {plus,minus,times,divide}Double# :: Double# -> Double# -> Double#
 negateDouble# :: Double# -> Double#
@@ -227,22 +248,21 @@ encodeDouble#	:: Int# -> Int# -> ByteArray#	-- Integer mantissa
 		-> Int#				-- Int exponent
 		-> Double#
 
-decodeDouble#	:: Double#
-		-> GHCbase.ReturnIntAndGMP
+decodeDouble#	:: Double# -> PrelNum.ReturnIntAndGMP
 \end{verbatim}
 
 (And the same for @Float#@s.)
 
-\subsection{Operations on/for @Integers@ (interface to GMP)}
+\subsubsection{Operations on/for @Integers@ (interface to GMP)}
 \label{sect:horrid-Integer-pairing-types}
 
 We implement @Integers@ (arbitrary-precision integers) using the GNU
-multiple-precision (GMP) package.
+multiple-precision (GMP) package (version 1.3.2).
 
-NB: some of this might change if we upgrade to using GMP~2.x.
+\bf{Note:} some of this might change when we upgrade to using GMP~2.x.
 
 The data type for @Integer@ must mirror that for @MP_INT@ in @gmp.h@
-(see @gmp.info@).  It comes out as:
+(see @gmp.info@ in \tr{ghc/includes/runtime/gmp}).  It comes out as:
 \begin{verbatim}
 data Integer = J# Int# Int# ByteArray#
 \end{verbatim}
@@ -275,22 +295,20 @@ cmpInteger# :: Int# -> Int# -> ByteArray#
 divModInteger#, quotRemInteger#
 	:: Int# -> Int# -> ByteArray#
 	-> Int# -> Int# -> ByteArray#
-	-> GHCbase.Return2GMPs
+	-> PrelNum.Return2GMPs
 
-integer2Int# :: Int# -> Int# -> ByteArray#
-	     -> Int# 
+integer2Int# :: Int# -> Int# -> ByteArray# -> Int# 
 
 int2Integer#  :: Int#  -> Integer -- NB: no error-checking on these two!
 word2Integer# :: Word# -> Integer
 
 addr2Integer# :: Addr# -> Integer
 	-- the Addr# is taken to be a `char *' string
-	-- to be converted into an Integer
+	-- to be converted into an Integer.
 \end{verbatim}
 
 
-
-\subsection{Words and addresses}
+\subsubsection{Words and addresses}
 
 A @Word#@ is used for bit-twiddling operations.  It is the same size as
 an @Int#@, but has no sign nor any arithmetic operations.
@@ -327,7 +345,7 @@ addr2Int#	:: Addr# -> Int#
 Operations for indexing off of C pointers (@Addr#@s) to snatch values
 are listed under ``arrays''.
 
-\subsection{Arrays}
+\subsubsection{Arrays}
 
 The type @Array# elt@ is the type of primitive,
 unboxed arrays of values of type @elt@.  
@@ -335,13 +353,13 @@ unboxed arrays of values of type @elt@.
 type Array# elt
 \end{verbatim}
 
-@Array#@ is more primitive than a Haskell
-array --- indeed, Haskell arrays are implemented using @Array#@ ---
-in that an @Array#@ is indexed only by @Int#@s, starting at zero.  It is also
-more primitive by virtue of being unboxed.  That doesn't mean that it isn't
-a heap-allocated object --- of course, it is.  Rather, being unboxed means
-that it is represented by a pointer to the array itself, and not to a thunk
-which will evaluate to the array (or to bottom).
+@Array#@ is more primitive than a Haskell array --- indeed, the
+Haskell @Array@ interface is implemented using @Array#@ --- in that an
+@Array#@ is indexed only by @Int#@s, starting at zero.  It is also
+more primitive by virtue of being unboxed.  That doesn't mean that it
+isn't a heap-allocated object --- of course, it is.  Rather, being
+unboxed means that it is represented by a pointer to the array itself,
+and not to a thunk which will evaluate to the array (or to bottom).
 The components of an @Array#@ are themselves boxed.
 
 The type @ByteArray#@ is similar to @Array#@, except that it contains
@@ -351,14 +369,15 @@ type ByteArray#
 \end{verbatim}
 
 Arrays of these types are useful when a Haskell program wishes to
-construct a value to pass to a C procedure.  It is also possible to
+construct a value to pass to a C procedure. It is also possible to
 use them to build (say) arrays of unboxed characters for internal use
 in a Haskell program.  Given these uses, @ByteArray#@ is deliberately
 a bit vague about the type of its components.  Operations are provided
 to extract values of type @Char#@, @Int#@, @Float#@, @Double#@, and
-@Addr#@ from arbitrary offsets within a @ByteArray#@.  (For type @Foo#@,
-the $i$th offset gets you the $i$th @Foo#@, not the @Foo#@ at byte-position $i$.  Mumble.)
-(If you want a @Word#@, grab an @Int#@, then coerce it.)
+@Addr#@ from arbitrary offsets within a @ByteArray#@.  (For type
+@Foo#@, the $i$th offset gets you the $i$th @Foo#@, not the @Foo#@ at
+byte-position $i$.  Mumble.)  (If you want a @Word#@, grab an @Int#@,
+then coerce it.)
 
 Lastly, we have static byte-arrays, of type @Addr#@ [mentioned
 previously].  (Remember the duality between arrays and pointers in C.)
@@ -367,7 +386,7 @@ world outside Haskell, so this pointer is not followed by the garbage
 collector.  In other respects they are just like @ByteArray#@.  They
 are only needed in order to pass values from C to Haskell.
 
-\subsubsection{Reading and writing.}
+\subsubsubsection{Reading and writing.}
 
 Primitive arrays are linear, and indexed starting at zero.
 
@@ -385,9 +404,9 @@ uses the primitive operation; the primitive operations themselves do
 {\em not} check for out-of-range indexes. The intention is that the
 primitive ops compile to one machine instruction or thereabouts.
 
-We use the terms ``reading'' and ``writing'' to refer to accessing {\em mutable} 
-arrays (see Section~\ref{sect:mutable}), and ``indexing'' 
-to refer to reading a value from an {\em immutable} 
+We use the terms ``reading'' and ``writing'' to refer to accessing
+{\em mutable} arrays (see Section~\ref{sect:mutable}), and
+``indexing'' to refer to reading a value from an {\em immutable}
 array.
 
 If you want to read/write a @Word#@, read an @Int#@ and coerce.
@@ -404,7 +423,8 @@ indexCharOffAddr#   :: Addr# -> Int# -> Char#
 indexIntOffAddr#    :: Addr# -> Int# -> Int#
 indexFloatOffAddr#  :: Addr# -> Int# -> Float#
 indexDoubleOffAddr# :: Addr# -> Int# -> Double#
-indexAddrOffAddr#   :: Addr# -> Int# -> Addr#	-- Get an Addr# from an Addr# offset
+indexAddrOffAddr#   :: Addr# -> Int# -> Addr#	
+ -- Get an Addr# from an Addr# offset
 \end{verbatim}
 
 The last of these, @indexAddrOffAddr#@, extracts an @Addr#@ using an offset
@@ -418,7 +438,7 @@ object!  This is a pain: primitive ops aren't supposed to do
 complicated things like enter objects.  The current solution is to
 return a lifted value, but I don't like it!
 \begin{verbatim}
-indexArray#       :: Array# elt -> Int# -> GHCbase.Lift elt  -- Yuk!
+indexArray#       :: Array# elt -> Int# -> PrelBase.Lift elt  -- Yuk!
 \end{verbatim}
 
 
@@ -436,7 +456,7 @@ type State# s
 \end{verbatim}
 
 
-The type @GHCbuiltins.RealWorld@ is truly opaque: there are no values defined
+The type @GHC.RealWorld@ is truly opaque: there are no values defined
 of this type, and no operations over it.  It is ``primitive'' in that
 sense---but it is {\em not unboxed!} Its only role in life is to be the type
 which distinguishes the @PrimIO@ state transformer (see
@@ -445,23 +465,24 @@ Section~\ref{sect:io-spec}).
 data RealWorld
 \end{verbatim}
 
-\subsubsection{States}
+\subsubsubsection{States}
 
 A single, primitive, value of type @State# RealWorld@ is provided.
 \begin{verbatim}
-realWorld# :: State# GHCbuiltins.RealWorld
+realWorld# :: State# GHC.RealWorld
 \end{verbatim}
 
-(Note: in the compiler, not a @PrimOp@; just a mucho magic @Id@.)
+(Note: in the compiler, not a @PrimOp@; just a mucho magic
+@Id@. Exported from @GHC@, though).
 
-\subsection{State pairing types}
+\subsubsection{State pairing types}
 \label{sect:horrid-pairing-types}
 
-This subsection defines some types which, while they aren't quite primitive 
-because we can define them in Haskell, are very nearly so.  They define 
-constructors which pair a primitive state with a value of each primitive type.
-They are required to express the result type of the primitive operations in the 
-state monad.
+This subsection defines some types which, while they aren't quite
+primitive because we can define them in Haskell, are very nearly so.
+They define constructors which pair a primitive state with a value of
+each primitive type.  They are required to express the result type of
+the primitive operations in the state monad.
 \begin{verbatim}
 data StateAndPtr#    s elt = StateAndPtr#    (State# s) elt 
 
@@ -482,27 +503,26 @@ data StateAndByteArray#        s = StateAndByteArray#        (State# s) ByteArra
 data StateAndMutableByteArray# s = StateAndMutableByteArray# (State# s) (MutableByteArray# s)
 \end{verbatim}
 
+Hideous.
 
-
-\subsection{Mutable arrays}
+\subsubsection{Mutable arrays}
 \label{sect:mutable}
 
-Corresponding to @Array#@ and @ByteArray#@,
-we have the types of mutable versions of each.  
-In each case, the representation is a pointer
-to a suitable block of (mutable) heap-allocated storage.
+Corresponding to @Array#@ and @ByteArray#@, we have the types of
+mutable versions of each.  In each case, the representation is a
+pointer to a suitable block of (mutable) heap-allocated storage.
 \begin{verbatim}
 type MutableArray# s elt
 type MutableByteArray# s
 \end{verbatim}
 
-\subsubsection{Allocation.}
+\subsubsubsection{Allocation.}
 
-Mutable arrays can be allocated.
-Only pointer-arrays are initialised; arrays of non-pointers are filled
-in by ``user code'' rather than by the array-allocation primitive.
-Reason: only the pointer case has to worry about GC striking with a
-partly-initialised array.
+Mutable arrays can be allocated. Only pointer-arrays are initialised;
+arrays of non-pointers are filled in by ``user code'' rather than by
+the array-allocation primitive.  Reason: only the pointer case has to
+worry about GC striking with a partly-initialised array.
+
 \begin{verbatim}
 newArray#       :: Int# -> elt -> State# s -> StateAndMutableArray# s elt 
 
@@ -515,7 +535,7 @@ newDoubleArray# :: Int# -> State# s -> StateAndMutableByteArray# s
 
 The size of a @ByteArray#@ is given in bytes.
 
-\subsubsection{Reading and writing}
+\subsubsubsection{Reading and writing}
 
 %OLD: Remember, offsets in a @MutableByteArray#@ are in bytes.
 \begin{verbatim}
@@ -535,7 +555,7 @@ writeDoubleArray# :: MutableByteArray# s -> Int# -> Double# -> State# s -> State
 \end{verbatim}
 
 
-\subsubsection{Equality.}
+\subsubsubsection{Equality.}
 
 One can take ``equality'' of mutable arrays.  What is compared is the
 {\em name} or reference to the mutable array, not its contents.
@@ -545,7 +565,7 @@ sameMutableByteArray# :: MutableByteArray# s -> MutableByteArray# s -> Bool
 \end{verbatim}
 
 
-\subsubsection{Freezing mutable arrays}
+\subsubsubsection{Freezing mutable arrays}
 
 Only unsafe-freeze has a primitive.  (Safe freeze is done directly in Haskell 
 by copying the array and then using @unsafeFreeze@.) 
@@ -555,35 +575,27 @@ unsafeFreezeByteArray# :: MutableByteArray# s -> State# s -> StateAndByteArray# 
 \end{verbatim}
 
 
-\subsubsection{Stable pointers}
+\subsubsubsection{Stable pointers}
 
-{\em Andy's comment.} \bf{Errors:} The following is not strictly true: the current
-implementation is not as polymorphic as claimed.  The reason for this
-is that the C programmer will have to use a different entry-routine
-for each type of stable pointer.  At present, we only supply a very
-limited number (1) of these routines.  It might be possible to
-increase the range of these routines by providing general purpose
-entry points to apply stable pointers to (stable pointers to)
-arguments and to enter (stable pointers to) boxed primitive values.
-{\em End of Andy's comment.}
+A stable pointer is a name for a Haskell object which can be passed to
+the external world.  It is ``stable'' in the sense that the name does
+not change when the Haskell garbage collector runs --- in contrast to
+the address of the object which may well change.
 
-A stable pointer is a name for a Haskell object which can be passed to the 
-external world.  It is ``stable'' in the sense that the name does not change when 
-the Haskell garbage collector runs --- in contrast to the address of the object 
-which may well change.
-
-The stable pointer type is parameterised by the type of the thing which is named.
+The stable pointer type is parameterised by the type of the thing
+which is named.
 \begin{verbatim}
 type StablePtr# a
 \end{verbatim}
 
-A stable pointer is represented by an index into the (static) 
-@StablePointerTable@.  The Haskell garbage collector treats the 
+A stable pointer is represented by an index into the (static)
+@StablePointerTable@.  The Haskell garbage collector treats the
 @StablePointerTable@ as a source of roots for GC.
 
-The @makeStablePointer@ function converts a value into a stable pointer.
-It is part of the @PrimIO@ monad, because we want to be sure we don't
-allocate one twice by accident, and then only free one of the copies.
+The @makeStablePointer@ function converts a value into a stable
+pointer.  It is part of the @PrimIO@ monad, because we want to be sure
+we don't allocate one twice by accident, and then only free one of the
+copies.
 \begin{verbatim}
 makeStablePointer#  :: a -> State# RealWorld -> StateAndStablePtr# RealWorld a
 freeStablePointer#  :: StablePtr# a -> State# RealWorld -> State# RealWorld
@@ -592,26 +604,36 @@ deRefStablePointer# :: StablePtr# a -> State# RealWorld -> StateAndPtr RealWorld
 
 There is also a C procedure @FreeStablePtr@ which frees a stable pointer.
 
+%{\em Andy's comment.} \bf{Errors:} The following is not strictly true: the current
+%implementation is not as polymorphic as claimed.  The reason for this
+%is that the C programmer will have to use a different entry-routine
+%for each type of stable pointer.  At present, we only supply a very
+%limited number (3) of these routines.  It might be possible to
+%increase the range of these routines by providing general purpose
+%entry points to apply stable pointers to (stable pointers to)
+%arguments and to enter (stable pointers to) boxed primitive values.
+%{\em End of Andy's comment.}
+
+
 %
 % Rewritten and updated for MallocPtr++ -- 4/96 SOF
 %
-\subsubsection{Foreign objects}
+\subsubsubsection{Foreign objects}
 
-A @ForeignObj@ is a reference to an object outside the Haskell
-world (i.e., from the C world, or a reference to an object on another
+A @ForeignObj@ is a reference to an object outside the Haskell world
+(i.e., from the C world, or a reference to an object on another
 machine completely.), where the Haskell world has been told ``Let me
 know when you're finished with this ...''.
 
-The @ForeignObj@ type is just a special @Addr#@ ({\em not} parameterised).
+%OLD:The @ForeignObj@ type is just a special @Addr#@ ({\em not} parameterised).
 \begin{verbatim}
 type ForeignObj#
 \end{verbatim}
 
-
-A typical use of @ForeignObj@ is in constructing Haskell bindings
+A typical use of @ForeignObj#@ is in constructing Haskell bindings
 to external libraries. A good example is that of writing a binding to
 an image-processing library (which was actually the main motivation
-for implementing @ForeignObj@'s precursor, @MallocPtr@). The
+for implementing @ForeignObj#@'s precursor, @MallocPtr#@). The
 images manipulated are not stored in the Haskell heap, either because
 the library insist on allocating them internally or we (sensibly)
 decide to spare the GC from having to heave heavy images around.
@@ -621,7 +643,6 @@ data Image = Image ForeignObj#
 
 instance CCallable Image
 \end{verbatim}
-
 
 The @ForeignObj#@ type is then used to refer to the externally
 allocated image, and to acheive some type safety, the Haskell binding
@@ -642,7 +663,7 @@ with the @ForeignObj#@, saying `` Thanks, I'm through with this
 now..'' For the image-processing library, the finalisation routine could for
 the images free up memory allocated for them. The finalisation routine has
 currently to be written in C (the finalisation routine can in turn call on
-@FreeStablePtr@ to deallocate a stable pointer.).
+@FreeStablePtr@ to deallocate a stable pointer).
 
 Associating a finalisation routine with an external object is done by 
 @makeForeignObj#@:
@@ -653,51 +674,54 @@ makeForeignObj# :: Addr# -- foreign reference
 		-> StateAndForeignObj# RealWorld ForeignObj#
 \end{verbatim}
 
+\bf{Note:} the foreign object value and its finaliser are contained
+in the primitive value @ForeignObj#@, so there's no danger of an
+aggressive optimiser somehow separating the two. (with the result
+that the foreign reference would not be freed).
 
 (Implementation: a linked list of all @ForeignObj#@s is maintained to allow the
  garbage collector to detect when a @ForeignObj#@ becomes garbage.)
 
 Like @Array@, @ForeignObj#@s are represented by heap objects.
 
-\bf{ToDo:} Decide whether @FreeCHeapPointer@ is allowed to call on a
-stable pointer. (I sincerely hope not since we will still be in the
-GC at this point.)
+Upon controlled termination of the Haskell program, all @ForeignObjs@
+are freed, invoking their respective finalisers before terminating.
 
-\subsubsection{Synchronizing variables (I-vars, M-vars)}
+%\bf{ToDo:} Decide whether @FreeCHeapPointer@ is allowed to call on a
+%stable pointer. (I sincerely hope not since we will still be in the
+%GC at this point.)
 
-ToDo ToDo ToDo
+\subsubsubsection{Synchronizing variables (M-vars)}
+
+Synchronising variables are the primitive type used to implement
+Concurrent Haskell's MVars (see the Concurrent Haskell paper for
+the operational behaviour of these operations).
 
 \begin{verbatim}
 type SynchVar# s elt	-- primitive
 
 newSynchVar#:: State# s -> StateAndSynchVar# s elt
-
 takeMVar#   :: SynchVar# s elt -> State# s -> StateAndPtr# s elt
 putMVar#    :: SynchVar# s elt -> State# s -> State# s
-
-readIVar#   :: SynchVar# s elt -> State# s -> StateAndPtr# s elt
-writeIVar#  :: SynchVar# s elt -> State# s -> State# s
 \end{verbatim}
 
+%\subsubsubsection{Controlling the garbage collector}
 
-\subsubsection{Controlling the garbage collector}
+%The C function {\tt PerformGC\/}, allows the C world to force Haskell
+%to do a garbage collection. It can only be called while Haskell is
+%performing a C Call.
 
-The C function {\tt PerformGC\/}, allows the C world to force Haskell
-to do a garbage collection.  It can only be called while Haskell
-is performing a C Call.
+%Note that this function can be used to define a Haskell IO operation
+%with the same effect:
+%\begin{verbatim}
+%>	performGCIO :: PrimIO ()
+%>	performGCIO = _ccall_gc_ StgPerformGarbageCollection
+%\end{verbatim}
 
-Note that this function can be used to define a Haskell IO operation
-with the same effect:
-\begin{verbatim}
->	performGCIO :: PrimIO ()
->	performGCIO = _ccall_gc_ PerformGC
-\end{verbatim}
-
-
-\bf{ToDo:} Is there any need for abnormal/normal termination to force
-a GC too?  Is there any need for a function that provides finer
-control over GC: argument = amount of space required; result = amount
-of space recovered.
+%\bf{ToDo:} Is there any need for abnormal/normal termination to force
+%a GC too?  Is there any need for a function that provides finer
+%control over GC: argument = amount of space required; result = amount
+%of space recovered.
 
 \subsection{@spark#@ primitive operation (for parallel execution)}
 
@@ -705,9 +729,10 @@ of space recovered.
 
 \subsection{The @errorIO#@ primitive operation}
 
-The @errorIO#@ primitive takes an argument much like @PrimIO@.  It aborts execution of
-the current program, and continues instead by performing the given @PrimIO@-like value
-on the current state of the world.
+The @errorIO#@ primitive takes an argument much like @PrimIO@.  It
+aborts execution of the current program, and continues instead by
+performing the given @PrimIO@-like value on the current state of the
+world.
 \begin{verbatim}
 errorIO# :: (State RealWorld -> ((), State RealWorld)) -> a
 \end{verbatim}
@@ -744,14 +769,14 @@ casm#  :: CAsmString -> a1# -> ... -> an# -> State# RealWorld -> StateAndR# Real
 \end{verbatim}
 
 %------------------------------------------------------------
-\section{Library stuff built with the Really Primitive Stuff}
+\subsection{Library stuff built with the Really Primitive Stuff}
 
-\subsection{The state transformer monad}
+\subsubsection{The state transformer monad}
 
-\subsubsection{Types}
+\subsubsubsection{Types}
 
-A state transformer is a function from a state to a pair of a result and a new 
-state.  
+A state transformer is a function from a state to a pair of a result
+and a new state.
 \begin{verbatim}
 newtype ST s a = ST (State s -> (a, State s))
 \end{verbatim}
@@ -774,26 +799,40 @@ with @data@ are all boxed.)
 data State s = S# (State# s)
 \end{verbatim}
 
-
-\subsubsection{The state transformer combinators}
+\subsubsubsection{The state transformer combinators}
 
 Now for the combinators, all of which live inside the @ST@
-abstraction.  Notice that @returnST@ and @thenST@ are lazy in the
-state.
+abstraction.  Notice that @returnST@ and @thenST@ are now strict
+in the state. @ST@ is an instance of the @Monad@ type class.
 \begin{verbatim}
 returnST :: a -> ST s a
-returnST a s = (a, s)
+returnST a = ST (\ s@(S# _) -> (a, s)) -- strict in state.
 
 thenST :: ST s a -> (a -> ST s b) -> ST s b
-thenST m k s = let (r,new_s) = m s
-               in 
-               k r new_s
+thenST m k =
+  = ST $ \ s ->
+    case (m s) of {(r, new_s) ->
+    case (k r) of { ST k2 ->
+    (k2 new_s) }}
+
+instance Monad ST where 
+  return = returnST
+  (>>=)  = thenST
 
 fixST :: (a -> ST s a) -> ST s a
-fixST k s = let ans = k r s
+fixST k s = ST $ \ s ->
+            let (ST k_r)  = k r
+                ans       = k_r s
                 (r,new_s) = ans
             in
             ans
+
+unsafeInterleaveST :: ST s a -> ST s a
+unsafeInterleaveST (ST m) = ST $ \ s ->
+    let
+	(r, new_s) = m s
+    in
+    (r, s)
 \end{verbatim}
 
 The interesting one is, of course, @runST@.  We can't infer its type!
@@ -805,7 +844,7 @@ runST m = case m (S# realWorld#) of
 \end{verbatim}
 
 
-\subsubsection{Other useful combinators}
+\subsubsubsection{Other useful combinators}
 
 There are various other standard combinators, all defined in terms the
 fundamental combinators above. The @seqST@ combinator is like
@@ -816,46 +855,48 @@ seqST :: ST s a -> ST s b -> ST s b
 seqST m1 m2 = m1 `thenST` (\_ -> m2)
 \end{verbatim}
 
-
-We also have {\em strict} (... in the state...) variants of the
+We also have {\em lazy} (... in the state...) variants of the
 then/return combinators (same types as their pals):
 \begin{verbatim}
-returnStrictlyST a s@(S# _) = (a, s)
+returnLazyST a = ST (\ s -> (a, s))
 
-thenStrictlyST m k s@(S# _)
-  = case (m s) of { (r, new_s@(S# _)) ->
-    k r new_s }
+thenLazyST m k
+ = ST $ \ s ->
+   let (r, new_s) = m s
+   in  
+   k r new_s
 
-seqStrictlyST m k = ... ditto, for seqST ...
+seqLazyST m k
+ = ST $ \ s ->
+   let (_, new_s) = m s
+   in  
+   k new_s
 \end{verbatim}
 
-The combinator @listST@ takes a list of state transformers, and
-composes them in sequence, returning a list of their results:
+The combinator @listST@ is provided for backwards compatibility, its
+behavior is captured in Haskell 1.3 (and later) by @Monad.accumulate@:
 \begin{verbatim}
 listST :: [ST s a] -> ST s [a]
-listST []     = returnST []
-listST (m:ms) = m		`thenST` \ r ->
-		listST ms	`thenST` \ rs ->
-		returnST (r:rs)
+listST ls = accumulate ls
 \end{verbatim}
 
-The @mapST@ combinator ``lifts'' a function from a value to state
-transformers to one which works over a list of values:
+Another function provided for backwards compatibility is @mapST@, it
+is just an instance of the more general monad combinator @Monad.mapM@:
 \begin{verbatim}
 mapST :: (a -> ST s b) -> [a] -> ST s [b]
-mapST f ms = listST (map f ms)
+mapST f ms = mapM f ms
 \end{verbatim}
 
 The @mapAndUnzipST@ combinator is similar to @mapST@, except that here the
 function returns a pair:
 \begin{verbatim}
 mapAndUnzipST :: (a -> ST s (b,c)) -> [a] -> ST s ([b],[c])
-mapAndUnzipST f (m:ms)
-  = f m			`thenST` \ ( r1,  r2) ->
-    mapAndUnzipST f ms	`thenST` \ (rs1, rs2) ->
-    returnST (r1:rs1, r2:rs2)
+mapAndUnzipST f ls = mapAndUnzipM f ls
 \end{verbatim}
 
+
+\bf{Note:} all the derived operators over @ST@ are implemented using
+the {\em strict} @ST@ instance of @Monad@.
 
 \subsubsection{The @PrimIO@ monad}
 \label{sect:io-spec}
@@ -872,50 +913,52 @@ The type @RealWorld@ and value @realWorld#@ do not need to be hidden (although
 there is no particular point in exposing them).  Even having a value of type 
 @realWorld#@ does not compromise safety, since the type @ST@ is hidden. 
 
-It is type-correct to use @returnST@ in an I/O context, but it is a
-bit more efficient to use @returnPrimIO@.  The latter is strict in the
-state, which propagates backwards to all the earlier combinators
-(provided they are unfolded).  Why is it safe for @returnPrimIO@ to be
-strict in the state?  Because every context in which an I/O state
-transformer is used will certainly evaluate the resulting state; it is
-the state of the real world!
+It is type-correct to use @returnST@ in an @PrimIO@ context, they're
+in effect the same (ditto for the bind combinator):
+
 \begin{verbatim}
 returnPrimIO :: a -> PrimIO a
-returnPrimIO a s@(S# _) = (a, s)
+returnPrimIO v = returnST v
+
+thenPrimIO  :: PrimIO a -> (a -> PrimIO b) -> PrimIO b
+thenPrimIO m k = thenST m k
+
+seqPrimIO   :: PrimIO a -> PrimIO b -> PrimIO b
+seqPrimIO m k = seqST m k
 \end{verbatim}
-We provide strict versions of the other combinators too.
-\begin{verbatim}
-thenPrimIO m k s = case m s of
-		     (r,s) -> k r s
-\end{verbatim}
+
+Why is it safe for @returnPrimIO@ to be strict in the state?  Because
+every context in which an I/O state transformer is used will certainly
+evaluate the resulting state; it is the state of the real world!
 
 @fixPrimIO@ has to be lazy, though!
 \begin{verbatim}
 fixPrimIO  = fixST
 \end{verbatim}
 
-The other combinators are just the same as before, but use the strict
-@thenPrimIO@ and @returnPrimIO@ for efficiency.
+\subsubsubsection{@PrimIO@ combinators}
+
+
+
 \begin{verbatim}
-foldrPrimIO f z []     = z
-foldrPrimIO f z (m:ms) = foldrPrimIO f z ms `thenPrimIO` \ ms' ->
-			 f m ms'
+unsafePerformPrimIO	:: PrimIO a -> a
+unsafeInterleavePrimIO	:: PrimIO a -> PrimIO a
 
-listPrimIO ms = foldrPrimIO (\ a xs -> a `thenPrimIO` \ x -> returnPrimIO (x : xs))
-		(returnPrimIO []) ms
+unsafePerformPrimIO	= runST
+unsafeInterleavePrimIO	= unsafeInterleaveST
 
-mapPrimIO f ms = listPrimIO (map f ms)
-
-mapAndUnzipPrimIO f (m:ms)
-  = f m			    `thenPrimIO` \ ( r1,  r2) ->
-    mapAndUnzipPrimIO f ms  `thenPrimIO` \ (rs1, rs2) ->
-    returnPrimIO (r1:rs1, r2:rs2)
+listPrimIO	  :: [PrimIO a] -> PrimIO [a]
+mapPrimIO	  :: (a -> PrimIO b) -> [a] -> PrimIO [b]
+mapAndUnzipPrimIO :: (a -> PrimIO (b,c)) -> [a] -> PrimIO ([b],[c])
 \end{verbatim}
 
+The function @unsafePerformPrimIO@ is as the name suggests, {\em
+unsafe}, placing a burden of proof on the programmer to ensure that
+performing the I/O action does not break referential transparency.
 
-\subsection{Arrays}
+\subsubsection{Arrays}
 
-\subsubsection{Types}
+\subsubsubsection{Types}
 
 \begin{verbatim}
 data Array      ix elt = Array     (ix,ix) (Array# elt)
@@ -926,7 +969,7 @@ data MutableByteArray s ix     = MutableByteArray (ix,ix) (MutableByteArray# s)
 \end{verbatim}
 
 
-\subsubsection{Operations on immutable arrays}
+\subsubsubsection{Operations on immutable arrays}
 
 Ordinary array indexing is straightforward.
 \begin{verbatim}
@@ -959,7 +1002,7 @@ indexStaticArray       :: Addr -> Int -> Addr
 \end{verbatim}
 
 
-\subsubsection{Operations on mutable arrays}
+\subsubsubsection{Operations on mutable arrays}
 \begin{verbatim}
 newArray     :: Ix ix => (ix,ix) -> elt -> ST s (MutableArray s ix elt)
 newCharArray :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
@@ -1008,19 +1051,20 @@ sameMutableByteArray :: MutableByteArray s ix -> MutableByteArray s ix -> Bool
 \end{verbatim}
 
 
+\subsubsection{Mutable Variables}
 
-\subsection{Variables}
+\subsubsubsection{Types}
 
-\subsubsection{Types}
+Mutable variables are (for now anyway) implemented as arrays.  The
+@MutableVar@ type is opaque, so we can change the implementation later
+if we want.
 
-Mutable variables are (for now anyway) implemented as arrays.  The @MutableVar@ type
-is opaque, so we can change the implementation later if we want.
 \begin{verbatim}
 type MutableVar s a = MutableArray s Int a
 \end{verbatim}
 
 
-\subsubsection{Operations}
+\subsubsubsection{Operations}
 \begin{verbatim}
 newVar   :: a -> ST s (MutableVar s a)
 readVar  :: MutableVar s a -> ST s a
@@ -1029,7 +1073,7 @@ sameVar  :: MutableVar s a -> MutableVar s a -> Bool
 \end{verbatim}
 
 
-\subsection{Stable pointers}
+\subsubsection{Stable pointers}
 
 Nothing exciting here, just simple boxing up.
 \begin{verbatim}
@@ -1039,20 +1083,22 @@ makeStablePointer :: a -> StablePtr a
 freeStablePointer :: StablePtr a -> PrimIO ()
 \end{verbatim}
 
-\subsection{Foreign objects}
+\subsubsection{Foreign objects}
 
 Again, just boxing up.
 \begin{verbatim}
 data ForeignObj = ForeignObj ForeignObj#
 
-makeForeignObj :: Addr -> Addr -> PrimIO ForeignObj
+makeForeignObj :: Addr   -- object to be boxed up as a ForeignObj
+               -> Addr   -- finaliser 
+	       -> PrimIO ForeignObj
 \end{verbatim}
 
-\subsection{C calls}
+\subsubsection{C calls}
 
 Everything in this section goes for @_casm_@ too.
 
-{\em ToDo: mention @_ccall_gc_@ and @_casm_gc_@...}
+\bf{ToDo:} {\em mention @_ccall_gc_@ and @_casm_gc_@...}
 
 The @_ccall_@ construct has the following form:
 $$@_ccall_@~croutine~a_1~\ldots~a_n$$
@@ -1109,9 +1155,8 @@ ForeignObj	  ForeignObj#	      StgForeignObj StgPtr
 
 All of the above are {\em C-returnable} except:
 \begin{verbatim}
-	Array, ByteArray, MutableArray, MutableByteArray
+  Array, ByteArray, MutableArray, MutableByteArray, ForeignObj
 \end{verbatim}
-
 
 \bf{ToDo:} I'm pretty wary of @Array@ and @MutableArray@ being in
 this list, and not too happy about @State@ [WDP].
@@ -1133,11 +1178,11 @@ f x = _ccall_ foo x
 \end{verbatim}
 
 
-\subsubsection{Implementation}
+\subsubsubsection{Implementation}
 
-The desugarer unwraps the @_ccall_@ construct by inserting the necessary 
-evaluations etc to unbox the arguments.  For example, the body of the definition 
-of @f@ above would become:
+The desugarer unwraps the @_ccall_@ construct by inserting the
+necessary evaluations etc to unbox the arguments.  For example, the
+body of the definition of @f@ above would become:
 \begin{verbatim}
         (\ s -> case x of { I# x# -> 
                 case s of { S# s# ->
@@ -1148,12 +1193,12 @@ of @f@ above would become:
 
 Notice that the state, too, is unboxed.
 
-The code generator must deal specially with primitive objects which
-are stored on the heap.
-
-\begin{verbatim}
-... details omitted ...
-\end{verbatim}
+%The code generator must deal specially with primitive objects which
+%are stored on the heap.
+%
+%\begin{verbatim}
+%... details omitted ...
+%\end{verbatim}
 
 %
 %More importantly, it must construct a C Heap Pointer heap-object after
@@ -1161,7 +1206,7 @@ are stored on the heap.
 %
 
 %--------------------------------------------------------
-\section{Non-primitive stuff that must be wired into GHC}
+\subsection{Non-primitive stuff that must be wired into GHC}
 
 \begin{verbatim}
 data Char    = C# Char#
@@ -1190,18 +1235,18 @@ type String  = [Char]    -- convenience, only
 
 
 %------------------------------------------------------------
-\section{Programmer interface(s)}
+\subsection{Programmer interface(s)}
 
-\subsection{The bog-standard interface}
+\subsubsection{The bog-standard interface}
 
 If you rely on the implicit @import Prelude@ that GHC normally does
 for you, and if you don't use any weird flags (notably
-@-fglasgow-exts@), and if you don't import one of the fairly-magic
-@PreludeGla*@ interfaces, then GHC should work {\em exactly} as the
+@-fglasgow-exts@), and if you don't import the Glasgow extensions
+interface, @GlaExts@, then GHC should work {\em exactly} as the
 Haskell report says, and the full user namespaces should be available
 to you.
 
-\subsection{If you mess about with @import Prelude@...}
+\subsubsubsection{If you mess about with @import Prelude@...}
 
 Innocent hiding, e.g.,
 \begin{verbatim}
@@ -1218,14 +1263,226 @@ import Prelude hiding ( Eq(..) )
 
 Don't do that.
 
-\subsection{Turning on Glasgow extensions with @-fglasgow-exts@}
+\subsubsection{Turning on Glasgow extensions with @-fglasgow-exts@}
 
-If you turn on @-fglasgow-exts@, then all the primitive types and
-operations described herein are available.
+% Updated to tell the 2.02+ story  -- SOF
 
-It is possible that some name conflicts between your code and the
-wired-in things might spring to life (though we doubt it...).
-Change your names :-)
+If you turn on @-fglasgow-exts@, the compiler will recognise and parse
+unboxed values properly. To get at the primitive operations described
+herein, import the interface @GlaExts@.
 
+% 1.3+ module system makes this a non-issue.
+%%It is possible that some name conflicts between your code and the
+%%wired-in things might spring to life (though we doubt it...).
+%%Change your names :-)
+
+%************************************************************************
+%*                                                                      *
+\subsubsection{The @GlaExts@ interface}
+\index{GlaExts interface (GHC extensions)}
+%*                                                                      *
+%************************************************************************
+
+The @GlaExts@ interface is the programmer gateway to most of the
+programmer extensions GHC implement. Currently on tap:
+
+\begin{verbatim}
+  -- PrimIO monad (state transformer, no exceptions).
+type PrimIO a = ST RealWorld a
+  -- instances of: Monad
+data RealWorld   -- abstract State value
+
+thenPrimIO       :: PrimIO a -> (a -> PrimIO b) -> PrimIO b
+returnPrimIO     :: a -> PrimIO a
+seqPrimIO        :: PrimIO a -> PrimIO b -> PrimIO b
+
+fixPrimIO        :: (a -> PrimIO a) -> PrimIO a
+unsafePerformPrimIO    :: PrimIO a -> a
+unsafeInterleavePrimIO :: PrimIO a -> PrimIO a
+
+-- backwards compatibility
+listPrimIO        :: [PrimIO a] -> PrimIO [a]
+mapPrimIO         :: (a -> PrimIO b) -> [a] -> PrimIO [b]
+mapAndUnzipPrimIO :: (a -> PrimIO (b,c)) -> [a] -> PrimIO ([b],[c])
+
+-- Combining ST and PrimIO monads with IO
+        stToIO,       -- :: ST RealWorld a -> IO a
+	primIOToIO,   -- :: PrimIO a       -> IO a
+	ioToST,	      -- :: IO a -> ST RealWorld a
+	ioToPrimIO,   -- :: IO a -> PrimIO       a
+        thenIO_Prim,  -- :: PrimIO a -> (a -> IO b) -> IO b
+        seqIO_Prim,   -- :: PrimIO a -> IO b -> IO b
+
+-- the representation of some basic types:
+data Char    = C# Char#
+data Int     = I# Int#
+data Addr    = A# Addr#
+data Word    = W# Word#
+data Float   = F# Float#
+data Double  = D# Double#
+data Integer = J# Int# Int# ByteArray#
+
+-- misc
+trace :: String -> a -> a
+
+-- re-exported interfaces:
+module ByteArray
+module MutableArray
+module GHC  -- all primops and primitive types.
+\end{verbatim}
+
+
+%************************************************************************
+%*                                                                      *
+\subsubsection{The @MutVar@ interface}
+\index{MutVar interface (GHC extensions)}
+%*                                                                      *
+%************************************************************************
+
+@MutVar@ defines an interface to mutable variables, defining type and
+IO operations:
+
+\begin{verbatim}
+data  MutVar   -- abstract
+
+newVar       :: a -> IO (MutVar a)
+readVar      :: MutVar a -> IO a
+writeVar     :: MutVar a -> a -> IO ()
+sameVar      :: MutVar a -> MutVar a -> Bool
+\end{verbatim}
+
+
+%************************************************************************
+%*                                                                      *
+\subsubsection{The @MutableArray@ interface}
+\index{MutableArray interface (GHC extensions)}
+%*                                                                      *
+%************************************************************************
+
+The @MutableArray@ interface defines a general set of operations over
+mutable arrays (@MutableArray@) and mutable chunks of memory
+(@MutableByteArray@):
+
+\begin{verbatim}
+data MutableArray s ix elt -- abstract
+data MutableByteArray s ix -- abstract
+                           -- instance of : CCallable
+-- Creators:
+newArray           :: Ix ix => (ix,ix) -> elt -> ST s (MutableArray s ix elt)
+newCharArray       :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
+newAddrArray       :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
+newIntArray        :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
+newFloatArray      :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
+newDoubleArray     :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
+
+boundsOfArray      :: Ix ix => MutableArray s ix elt -> (ix, ix)  
+boundsOfByteArray  :: Ix ix => MutableByteArray s ix -> (ix, ix)
+
+
+readArray   	   :: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
+
+readCharArray      :: Ix ix => MutableByteArray s ix -> ix -> ST s Char 
+readIntArray       :: Ix ix => MutableByteArray s ix -> ix -> ST s Int
+readAddrArray      :: Ix ix => MutableByteArray s ix -> ix -> ST s Addr
+readFloatArray     :: Ix ix => MutableByteArray s ix -> ix -> ST s Float
+readDoubleArray    :: Ix ix => MutableByteArray s ix -> ix -> ST s Double
+
+writeArray  	   :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
+writeCharArray     :: Ix ix => MutableByteArray s ix -> ix -> Char -> ST s () 
+writeIntArray      :: Ix ix => MutableByteArray s ix -> ix -> Int  -> ST s () 
+writeAddrArray     :: Ix ix => MutableByteArray s ix -> ix -> Addr -> ST s () 
+writeFloatArray    :: Ix ix => MutableByteArray s ix -> ix -> Float -> ST s () 
+writeDoubleArray   :: Ix ix => MutableByteArray s ix -> ix -> Double -> ST s () 
+
+freezeArray	   :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
+freezeCharArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+freezeIntArray     :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+freezeAddrArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+freezeFloatArray   :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+freezeDoubleArray  :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+
+unsafeFreezeArray     :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
+unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+thawArray             :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
+\end{verbatim}
+
+
+%************************************************************************
+%*                                                                      *
+\subsubsection{The @ByteArray@ interface}
+\index{ByteArray interface (GHC extensions)}
+%*                                                                      *
+%************************************************************************
+
+@ByteArray@s are chunks of immutable Haskell heap:
+
+\begin{verbatim}
+data ByteArray ix -- abstract
+		  -- instance of: CCallable
+
+indexCharArray     :: Ix ix => ByteArray ix -> ix -> Char 
+indexIntArray      :: Ix ix => ByteArray ix -> ix -> Int
+indexAddrArray     :: Ix ix => ByteArray ix -> ix -> Addr
+indexFloatArray    :: Ix ix => ByteArray ix -> ix -> Float
+indexDoubleArray   :: Ix ix => ByteArray ix -> ix -> Double
+
+indexCharOffAddr   :: Addr -> Int -> Char
+indexIntOffAddr    :: Addr -> Int -> Int
+indexAddrOffAddr   :: Addr -> Int -> Addr
+indexFloatOffAddr  :: Addr -> Int -> Float
+indexDoubleOffAddr :: Addr -> Int -> Double
+
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection{The @Foreign@ interface}
+\index{Foreign interface (GHC extensions)}
+%*                                                                      *
+%************************************************************************
+
+The @Foreign@ interface define and export operations over @ForeignObj@
+and @StablePtr@s:
+
+\begin{verbatim}
+-- semi-magic classes for pack/unpacking ccall arguments.
+class CCallable a
+ {- Instances defined for : 
+      Char Char# Int Int# Float Float#
+      Double Double# Addr Addr# Word Word#
+      (MutableByteArray s ix) (MutableByteArray# s)
+      (ByteArray ix) ByteArray#
+      ForeignObj ForeignObj# 
+      (StablePtr a)
+      (StablePtr# a)
+      [Char]
+ -}
+class CReturnable a
+ {- Instances defined for : 
+      Char Int Float Double Addr Word 
+      (StablePtr a)
+ -}
+
+data ForeignObj = ForeignObj ForeignObj#
+   -- instances of : CCallable Eq
+
+eqForeignObj    :: ForeignObj  -> ForeignObj -> Bool
+makeForeignObj  :: Addr        -> Addr       -> PrimIO ForeignObj
+writeForeignObj :: ForeignObj  -> Addr       -> PrimIO ()
+
+{- derived op - attaching a free() finaliser to a malloc() allocated reference. -}
+makeMallocPtr   :: Addr        -> PrimIO ForeignObj
+
+data StablePtr a = StablePtr (StablePtr# a)
+  -- instances of : CCallable
+
+makeStablePtr  :: a -> PrimIO (StablePtr a)
+deRefStablePtr :: StablePtr a -> PrimIO a
+freeStablePtr  :: StablePtr a -> PrimIO ()
+performGC      :: PrimIO ()
+\end{verbatim}
+
+\begin{onlystandalone}
 \end{document}
+\end{onlystandalone}
 							

@@ -24,6 +24,7 @@ Email: glasgow-haskell-\{bugs,users\}-request\@dcs.gla.ac.uk}
 \input{profiling.lit}
 \input{glasgow_exts.lit}
 \input{libraries.lit}
+\input{syslib.lit}
 \input{parallel.lit}
 \input{gone_wrong.lit}
 \input{backwards.lit}

@@ -1,0 +1,70 @@
+GHC 2.03 is a minor upgrade of GHC 2.02.  It differs in the following
+ways:
+
+\begin{itemize}
+\item
+    A slew of small bugs are fixed.  You can find the complete list
+    at @http://www.cse.ogi.edu/~simonpj/ghc-bugs.html@.  One
+    bug remains un-fixes, namely the crash when there's an empty
+    comment at the end of file.  It's wierd!
+
+\item
+    Last-minute language changes have been implemented (minor changes
+    to the libraries, and to module export/hiding scope rules)
+
+\item
+    It is only available as a source distribution.  If you want to
+    use it you'll have to build it from source.  Nowadays this is
+    a well-documented process (see the build and installation guide, but
+    note that this release is still not self-booting, you still need
+    to have The Good Old Compiler (0.29) at your disposal).
+\end{itemize}
+
+None of the bugs in GHC 2.02 are show-stoppers, so you'll only want
+to upgrade if you are a build-from-source junkie and the bugs are 
+irritating you.
+
+Apart from bug-fixes, which are itemized elsewhere, 
+the exact language and standard-library changes are as follows:
+\begin{itemize}
+\item
+A hiding clause hides the unqualified name, but not the qualified name.
+\item 
+There's a new @Numeric@ library, containing mostly mildly marginal
+code for showing and reading numbers.  Parts of its exports used to be
+exported by @Prelude@, but now you'll have to import them explicitly.
+It also defines some functions that weren't provided before; have a
+look in the Haskell library report for details of complete interface.
+\item
+The following extra functions are exported from @IO@: 
+@try@, @bracket@, @bracket_@, @hGetLine@, @hWaitForInput@.
+\end{itemize}
+
+In addition, we've made following changes to GHC libraries/GHC's
+implementation of the Haskell standard prelude:
+
+\begin{itemize}
+\item The function @fromRational__@, exported from @PrelNum@, is now called @fromRat@.
+(And it's exported by @Numeric@.)
+\item
+Documentation for the Glasgow specific interfaces plus the system
+libraries have been re-instated. Posix library documentation included also.
+\item
+@maybe@ is now exported from Prelude, as it should have been in 2.02.
+\item
+Equality on @IO.Handle@ is now defined as specified by the library
+report.
+\item
+@Ix.rangeSize@ returns \tr{0} on an empty range;previously it failed.
+\item
+The new interface @GlaExts@ which is meant to be the gateway to the
+various Glasgow extensions has now been documented.
+\item
+@GlaExts@ now exports the representation of @Char@.
+\item
+The mutable variable interface, @MutVar@, has also been documented,
+together with @ByteArray@, @MutableArray@ and @Foreign@.
+\item
+Added documentation on how to compile mutually recursive modules with
+2.03.
+\end{itemize}

@@ -26,6 +26,9 @@ Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 % pointers to it.  Mentioning something in the release notes is not
 % the same as documenting it.
 
+\section[release-2-03]{Release notes for version~2.03---4/97}
+\input{2-03-notes.lit}
+
 \section[release-2-02]{Release notes for version~2.02---3/97}
 \input{2-02-notes.lit}
 
@@ -37,20 +40,20 @@ Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 %\input{real-soon-now.lit}
 %\upsection
 
-\section{Versions 0.26 through 0.29}
+%\section{Versions 0.26 through 0.29}
 
-GHC~0.26 (7/95) was the last major release of GHC for Haskell~1.2.
+%GHC~0.26 (7/95) was the last major release of GHC for Haskell~1.2.
 
-GHC~0.27 (12/95) was a `` binary-only from-working-sources
-no-guarantees snapshot ...  for i386-unknown-linuxaout and
-i386-unknown-solaris2 platforms...''
+%GHC~0.27 (12/95) was a `` binary-only from-working-sources
+%no-guarantees snapshot ...  for i386-unknown-linuxaout and
+%i386-unknown-solaris2 platforms...''
 
-GHC~0.28 (5/96) was the same thing, for the i386-unknown-linux (ELF)
-platform.
+%GHC~0.28 (5/96) was the same thing, for the i386-unknown-linux (ELF)
+%platform.
 
-GHC~0.29 (7/96), released at the same time as 2.01, is just ``0.26
-with bug fixes''; i.e., the current state-of-play on the Haskell~1.2
-compiler development.
+%GHC~0.29 (7/96), released at the same time as 2.01, is just ``0.26
+%with bug fixes''; i.e., the current state-of-play on the Haskell~1.2
+%compiler development.
 
 \section{Old release notes}
 

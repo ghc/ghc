@@ -165,7 +165,7 @@ Here's a little example, stolen from Alastair Reid:
 \begin{verbatim}
 module GHCmain ( mainPrimIO ) where
 
-import PreludeGlaST
+import GlaExts
 
 mainPrimIO :: PrimIO ()
 mainPrimIO = do
@@ -195,9 +195,14 @@ and things go, you would be well-advised to keep your C-callery
 corraled in a few modules, rather than sprinkled all over your code.
 It will then be quite easy to update later on.
 
-WARNING AS OF 2.02: Yes, the \tr{_ccall_} stuff probably {\em will
-change}, to something better, of course!  We are still at the
-musing-about-it stage, however...
+WARNING AS OF 2.03: Yes, the \tr{_ccall_} stuff probably {\em will
+change}, to something better, of course!  One step in that direction
+is Green Card, a foreign function interface pre-processor for Haskell
+(``Glasgow'' Haskell in particular) --- check out 
+\begin{verbatim}
+ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/green-card.ANNOUNCE
+ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/green-card-src.tar.gz
+\end{verbatim}
 
 %************************************************************************
 %*                                                                      *
@@ -377,9 +382,14 @@ If you use \tr{Addr}, it is up to you to the programmer to arrange
 allocation and deallocation of the objects.
 
 If you use \tr{ForeignObj}, \tr{ghc}'s garbage collector will
-call the user-supplied C function
+call upon the user-supplied {\em finaliser} function to free
+the object when the Haskell world no longer can access the object.
+(An object is associated with a finaliser function when the abstract
+ Haskell type @ForeignObj@ is created). The finaliser function is
+expressed in C, and is passed as argument the object:
+
 \begin{verbatim}
-void freeForeignObj( StgForeignObj garbageMallocPtr )
+void foreignFinaliser ( StgForeignObj fo )
 \end{verbatim}
 when the Haskell world can no longer access the object.  Since
 \tr{ForeignObj}s only get released when a garbage collection occurs,
@@ -394,7 +404,7 @@ performGC :: PrimIO ()
 %*                                                                      *
 \subsubsection[glasgow-avoiding-monads]{Avoiding monads}
 \index{C calls to `pure C'}
-\index{unsafePerformPrimIO (PreludeGlaST)}
+\index{unsafePerformPrimIO (GlaExts)}
 %*                                                                      *
 %************************************************************************
 
@@ -430,7 +440,7 @@ For example, an imperative implementation of a purely functional
 lookup-table might be accessed using the following functions.
 
 \begin{verbatim}
-empty :: EFS x
+empty  :: EFS x
 update :: EFS x -> Int -> x -> EFS x
 lookup :: EFS a -> Int -> a
 
@@ -631,7 +641,7 @@ A related (and inter-operable-with) monad is the \tr{PrimIO} monad
 yourself.
 
 Should you wish to use the \tr{PrimIO} monad directly, you can import
-\tr{PreludeGlaST}.  It makes available the usual monadic stuff (@>>=@,
+\tr{GlaExts}.  It makes available the usual monadic stuff (@>>=@,
 @>>@, @return@, etc.), as well as these functions:
 \begin{verbatim}
 -- for backward compatibility:
