@@ -57,28 +57,30 @@ deSugar dflags mod_name unqual hst
 		    tc_binds = all_binds,
 		    tc_rules = rules,
 		    tc_fords = fo_decls})
-  = do
-	showPass dflags "Desugar"
-	us <- mkSplitUniqSupply 'd'
+  = do	{ showPass dflags "Desugar"
+	; us <- mkSplitUniqSupply 'd'
 
 	-- Do desugaring
-	let (result, ds_warns) = 
-		initDs dflags us (hst,pcs,global_val_env) mod_name
-			(dsProgram mod_name all_binds rules fo_decls)    
-	    (ds_binds, ds_rules, _, _, _) = result
+	; let (result, ds_warns) = initDs dflags us (hst,pcs,global_val_env) mod_name
+					  (dsProgram mod_name all_binds rules fo_decls)    
+	      (ds_binds, ds_rules, _, _, _) = result
 
 	-- Display any warnings
-        doIfSet (not (isEmptyBag ds_warns))
-		(printErrs unqual (pprBagOfWarnings ds_warns))
+        ; doIfSet (not (isEmptyBag ds_warns))
+		  (printErrs unqual (pprBagOfWarnings ds_warns))
 
 	-- Lint result if necessary
-        let do_dump_ds = dopt Opt_D_dump_ds dflags
-        endPass dflags "Desugar" do_dump_ds ds_binds
+        ; let do_dump_ds = dopt Opt_D_dump_ds dflags
+        ; endPass dflags "Desugar" do_dump_ds ds_binds
 
 	-- Dump output
-	doIfSet do_dump_ds (printDump (ppr_ds_rules ds_rules))
+	; doIfSet do_dump_ds (printDump (ppr_ds_rules ds_rules))
 
-        return result
+        ; return result
+	}
+
+-- deSugarExpr dflags unqual hst tc_expr
+--  = do	{
 
 dsProgram mod_name all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->

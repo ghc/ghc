@@ -4,7 +4,7 @@
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
-module TcExpr ( tcApp, tcExpr, tcPolyExpr, tcId ) where
+module TcExpr ( tcApp, tcExpr, tcMonoExpr, tcPolyExpr, tcId ) where
 
 #include "HsVersions.h"
 

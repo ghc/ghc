@@ -381,8 +381,17 @@ hscExpr dflags hst hit pcs this_module expr
 
 		-- Rename it
 	  (new_pcs, maybe_renamed_expr) <- renameExpr dflags hit hst pcs this_module parsed_expr ;
-	  case maybe_renamed_expr of {
-		Nothing -> 
+	; case maybe_renamed_expr of {
+		Nothing -> FAIL
+		Just renamed_expr -> 
+
+		-- Typecheck it
+	  maybe_tc_expr <- typecheckExpr dflags pcs hst unqual renamed_expr 
+	; case maybe_tc_expr of
+		Nothing -> FAIL
+		Just typechecked_expr ->
+
+	
 
 
 %************************************************************************

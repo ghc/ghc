@@ -32,7 +32,7 @@ import Name	        ( setNameUnique )
 import VarEnv
 import PrimOp		( PrimOp(..), setCCallUnique )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
-                          applyTy, repType, seqType, splitTyConApp_maybe,
+                          applyTy, repType, seqType, splitTyConApp_maybe, splitTyConApp,
 			  splitRepFunTys, mkFunTys,
                           uaUTy, usOnce, usMany, isTyVarTy
 			)
@@ -667,9 +667,8 @@ mkStgAlgAlts ty alts deflt
 		other		 	    -> StgAlgAlts Nothing alts deflt
 
 mkStgPrimAlts ty alts deflt 
-  = case splitTyConApp_maybe ty of
-	Just (tc,_) -> StgPrimAlts tc alts deflt
-	Nothing	    -> pprPanic "mkStgAlgAlts" (ppr ty)
+  = case splitTyConApp ty of
+	(tc,_) -> StgPrimAlts tc alts deflt
 
 mkStgLam ty bndrs body = seqType ty `seq` StgLam ty bndrs body
 

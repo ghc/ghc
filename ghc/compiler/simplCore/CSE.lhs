@@ -14,7 +14,7 @@ import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import Id		( Id, idType )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr )
 import DataCon		( isUnboxedTupleCon )
-import Type		( splitTyConApp_maybe )
+import Type		( tyConAppArgs )
 import Subst		( InScopeSet, uniqAway, emptyInScopeSet, 
 			  extendInScopeSet, elemInScopeSet )
 import CoreSyn
@@ -170,9 +170,7 @@ cseAlts env scrut' bndr bndr' alts
 		other ->  (bndr', extendCSEnv env bndr' scrut')	-- See "yet another wrinkle"
 								-- map: scrut' -> bndr'
 
-    arg_tys = case splitTyConApp_maybe (idType bndr) of
-		Just (_, arg_tys) -> arg_tys
-		other		  -> pprPanic "cseAlts" (ppr bndr)
+    arg_tys = tyConAppArgs (idType bndr)
 
     cse_alt (DataAlt con, args, rhs)
 	| not (null args || isUnboxedTupleCon con)

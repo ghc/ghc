@@ -38,7 +38,7 @@ import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon, tyConArity )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, mkTyVarTys,
 			  mkTyConApp, typePrimRep,
-			  splitFunTy_maybe, splitAlgTyConApp_maybe, splitTyConApp_maybe,
+			  splitFunTy_maybe, splitAlgTyConApp_maybe, splitTyConApp,
                           mkUTy, usOnce, usMany
 			)
 import Unique		( Unique, mkPrimOpIdUnique )
@@ -511,11 +511,9 @@ inFun op f g ty
         Nothing    -> pprPanic "primOpUsg:inFun" (ppr op <+> ppr ty)
 
 inUB op fs ty
-   = case splitTyConApp_maybe ty of
-        Just (tc,tys) -> ASSERT( tc == tupleTyCon Unboxed (length fs) )
-                         mkTupleTy Unboxed (length fs) (zipWithEqual "primOpUsg"
-                                                                     ($) fs tys)
-        Nothing       -> pprPanic "primOpUsg:inUB" (ppr op <+> ppr ty)
+   = case splitTyConApp ty of
+        (tc,tys) -> ASSERT( tc == tupleTyCon Unboxed (length fs) )
+                    mkTupleTy Unboxed (length fs) (zipWithEqual "primOpUsg" ($) fs tys)
 \end{code}
 
 \begin{code}

@@ -52,7 +52,7 @@ import VarSet
 import Type		( Type,
 			  tyVarsOfTypes, splitDFunTy,
 			  splitForAllTys, splitRhoTy,
-			  getDFunTyKey, splitTyConApp_maybe
+			  getDFunTyKey, tyConAppTyCon
 			)
 import DataCon		( DataCon )
 import TyCon		( TyCon )
@@ -529,9 +529,7 @@ simpleInstInfoTy info = case splitDFunTy (idType (iDFunId info)) of
 simpleInstInfoTyCon :: InstInfo -> TyCon
   -- Gets the type constructor for a simple instance declaration,
   -- i.e. one of the form 	instance (...) => C (T a b c) where ...
-simpleInstInfoTyCon inst
-   = case splitTyConApp_maybe (simpleInstInfoTy inst) of 
-	Just (tycon, _) -> tycon
+simpleInstInfoTyCon inst = tyConAppTyCon (simpleInstInfoTy inst)
 \end{code}
 
 

@@ -35,7 +35,7 @@ import Name		( setNameUnique )
 import Demand		( isStrict )
 import SimplMonad
 import Type		( Type, mkForAllTys, seqType, repType,
-			  splitTyConApp_maybe, mkTyVarTys, splitFunTys, 
+			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys, splitFunTys, 
 			  isDictTy, isDataType, isUnLiftedType,
 			  splitRepFunTys
 			)
@@ -854,8 +854,7 @@ mkCase scrut case_bndr alts
 					  		(mkConApp con (map Type arg_tys ++ map varToCoreExpr args))
     identity_alt other		          = False
 
-    arg_tys = case splitTyConApp_maybe (idType case_bndr) of
-		Just (tycon, arg_tys) -> arg_tys
+    arg_tys = tyConAppArgs (idType case_bndr)
 \end{code}
 
 The catch-all case

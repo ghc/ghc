@@ -5,8 +5,7 @@
 
 \begin{code}
 module TcModule (
-	typecheckModule,
-	TcResults(..)
+	typecheckModule, typecheckExpr, TcResults(..)
     ) where
 
 #include "HsVersions.h"
@@ -14,17 +13,20 @@ module TcModule (
 import CmdLineOpts	( DynFlag(..), DynFlags, opt_PprStyle_Debug )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..) )
 import HsTypes		( toHsType )
-import RnHsSyn		( RenamedHsDecl )
-import TcHsSyn		( TypecheckedMonoBinds, 
+import RnHsSyn		( RenamedHsDecl, RenamedHsExpr )
+import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
-			  zonkTopBinds, zonkForeignExports, zonkRules
+			  zonkTopBinds, zonkForeignExports, zonkRules, mkHsLet
 			)
 
+
 import TcMonad
+import TcType		( newTyVarTy )
 import Inst		( plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
+import TcExpr		( tcMonoExpr )
 import TcEnv		( TcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, 
 			  tcEnvTyCons, tcEnvClasses,  isLocalThing,
 			  tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
@@ -38,7 +40,7 @@ import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkImplicitDataBinds )
 
 import CoreUnfold	( unfoldingTemplate )
-import Type		( funResultTy, splitForAllTys )
+import Type		( funResultTy, splitForAllTys, openTypeKind )
 import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn, showPass )
 import Id		( idType, idUnfolding )
@@ -86,24 +88,52 @@ typecheckModule
 	-> IO (Maybe TcResults)
 
 typecheckModule dflags this_mod pcs hst mod_iface unqual decls
+  = do	{ maybe_tc_result <- typecheck dflags pcs hst unqual $
+			    tcModule pcs hst get_fixity this_mod decls
+	; printTcDump dflags maybe_tc_result
+	; return maybe_tc_result }
+  where
+    fixity_env = mi_fixities mod_iface
+
+    get_fixity :: Name -> Maybe Fixity
+    get_fixity nm = lookupNameEnv fixity_env nm
+
+---------------
+typecheckExpr :: DynFlags
+	      -> PersistentCompilerState
+	      -> HomeSymbolTable
+	      -> PrintUnqualified	-- For error printing
+	      -> RenamedHsExpr
+	      -> IO (Maybe TypecheckedHsExpr)
+
+typecheckExpr dflags pcs hst unqual expr
+  = typecheck dflags pcs hst unqual $
+    newTyVarTy openTypeKind	`thenTc` \ ty ->
+    tcMonoExpr expr ty		`thenTc` \ (expr', lie) ->
+    tcSimplifyTop lie		`thenTc` \ binds ->
+    returnTc (mkHsLet binds expr') 
+
+---------------
+typecheck :: DynFlags
+	  -> PersistentCompilerState
+	  -> HomeSymbolTable
+	  -> PrintUnqualified	-- For error printing
+	  -> TcM r
+	  -> IO (Maybe r)
+
+typecheck dflags pcs hst unqual thing_inside
   = do	{ showPass dflags "Typechecker";
 	; env <- initTcEnv hst (pcs_PTE pcs)
 
-	; (maybe_tc_result, (warns,errs)) <- initTc dflags env (tcModule pcs hst get_fixity this_mod decls)
+	; (maybe_tc_result, (warns,errs)) <- initTc dflags env thing_inside
 
 	; printErrorsAndWarnings unqual (errs,warns)
-	; printTcDump dflags maybe_tc_result
 
 	; if isEmptyBag errs then 
              return maybe_tc_result
            else 
              return Nothing 
 	}
-  where
-    fixity_env = mi_fixities mod_iface
-
-    get_fixity :: Name -> Maybe Fixity
-    get_fixity nm = lookupNameEnv fixity_env nm
 \end{code}
 
 The internal monster:

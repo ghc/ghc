@@ -22,7 +22,7 @@ import CoreFVs		( mustHaveLocalBinding )
 import Rules            ( RuleBase )
 import TypeRep          ( Type(..), TyNote(..) ) -- friend
 import Type             ( applyTy, applyTys,
-                          splitFunTy_maybe, splitFunTys, splitTyConApp_maybe,
+                          splitFunTy_maybe, splitFunTys, splitTyConApp,
                           mkFunTy, mkForAllTy )
 import TyCon            ( tyConArgVrcs_maybe, isFunTyCon )
 import Literal          ( Literal(..), literalType )
@@ -352,7 +352,7 @@ usgInfCE ve e0@(Case e1 v1 alts)
        (e2,y2u,h2,f2) <- usgInfCE ve e1
        let h3       = usgEqTy y2u y1u -- **! why not subty?
            (u2,y2)  = splitUsgTy y2u
-           (tc,y2s) = expectJust "usgInfCE:Case" $ splitTyConApp_maybe y2
+           (tc,y2s) = splitTyConApp y2
            (cs,v1ss,es) = unzip3 alts
            v2ss     = map (map (\ v -> setVarType v (mkUsgTy u2 (annotManyN (varType v)))))
                           v1ss

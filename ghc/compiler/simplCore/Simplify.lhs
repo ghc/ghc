@@ -50,7 +50,7 @@ import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial, exprIsConApp_maybe
 import Rules		( lookupRule )
 import CostCentre	( currentCCS )
 import Type		( mkTyVarTys, isUnLiftedType, seqType,
-			  mkFunTy, splitTyConApp_maybe, 
+			  mkFunTy, splitTyConApp_maybe, tyConAppArgs,
 			  funResultTy
 			)
 import Subst		( mkSubst, substTy, 
@@ -1344,8 +1344,7 @@ prepareCaseAlts _ _ scrut_cons alts
 simplAlts zap_occ_info scrut_cons case_bndr' alts cont'
   = mapSmpl simpl_alt alts
   where
-    inst_tys' = case splitTyConApp_maybe (idType case_bndr') of
-			Just (tycon, inst_tys) -> inst_tys
+    inst_tys' = tyConAppArgs (idType case_bndr')
 
 	-- handled_cons is all the constructors that are dealt
 	-- with, either by being impossible, or by there being an alternative

@@ -29,7 +29,7 @@ import TysWiredIn	( trueDataConId, falseDataConId )
 import TyCon		( tyConDataConsIfAvailable, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConId, fIRST_TAG )
 import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
-import Type		( splitTyConApp_maybe )
+import Type		( tyConAppTyCon )
 import OccName		( occNameUserString)
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey )
 import Name		( Name )
@@ -392,8 +392,8 @@ tagToEnumRule [Type ty, Lit (MachInt i)]
 		     Just (SLIT("TagToEnum"), Var (dataConId dc))
   where 
     correct_tag dc = (dataConTag dc - fIRST_TAG) == tag
-    tag = fromInteger i
-    (Just (tycon,_)) = splitTyConApp_maybe ty
+    tag   = fromInteger i
+    tycon = tyConAppTyCon ty
 
 tagToEnumRule other = Nothing
 \end{code}

@@ -22,7 +22,7 @@ import VarSet		( TyVarSet, unionVarSet, mkVarSet )
 import VarEnv		( TyVarSubstEnv )
 import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc )
-import Type		( Type, splitTyConApp_maybe, 
+import Type		( Type, tyConAppTyCon, 
 			  splitSigmaTy, splitDFunTy, tyVarsOfTypes
 			)
 import PprType		( )
@@ -54,8 +54,7 @@ simpleDFunClassTyCon dfun
   = (clas, tycon)
   where
     (_,_,clas,[ty]) = splitDFunTy (idType dfun)
-    tycon   	    = case splitTyConApp_maybe ty of
-			Just (tycon,_) -> tycon
+    tycon  	    = tyConAppTyCon ty 
 \end{code}		      
 
 %************************************************************************

@@ -33,7 +33,9 @@ module Type (
 	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, splitFunTys, splitFunTysN,
 	funResultTy, funArgTy, zipFunTys,
 
-	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
+	mkTyConApp, mkTyConTy, 
+	tyConAppTyCon, tyConAppArgs, 
+	splitTyConApp_maybe, splitTyConApp,
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
 
 	mkUTy, splitUTy, splitUTy_maybe,
@@ -339,6 +341,21 @@ mkTyConTy tycon = ASSERT( not (isSynTyCon tycon) )
 -- splitTyConApp "looks through" synonyms, because they don't
 -- mean a distinct type, but all other type-constructor applications
 -- including functions are returned as Just ..
+
+tyConAppTyCon :: Type -> TyCon
+tyConAppTyCon ty = case splitTyConApp_maybe ty of
+		     Just (tc,_) -> tc
+		     Nothing	 -> pprPanic "tyConAppTyCon" (pprType ty)
+
+tyConAppArgs :: Type -> [Type]
+tyConAppArgs ty = case splitTyConApp_maybe ty of
+		     Just (_,args) -> args
+		     Nothing	   -> pprPanic "tyConAppArgs" (pprType ty)
+
+splitTyConApp :: Type -> (TyCon, [Type])
+splitTyConApp ty = case splitTyConApp_maybe ty of
+			Just stuff -> stuff
+			Nothing	   -> pprPanic "splitTyConApp" (pprType ty)
 
 splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)

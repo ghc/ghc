@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.38 2000/11/15 14:37:08 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.39 2000/11/15 17:07:34 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -44,7 +44,7 @@ import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, PrimOp(..), PrimOpResultI
 import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( maybeTyConSingleCon,
 			  isUnboxedTupleTyCon, isEnumerationTyCon )
-import Type		( Type, typePrimRep, splitTyConApp_maybe, repType )
+import Type		( Type, typePrimRep, splitTyConApp, tyConAppTyCon, repType )
 import Maybes		( maybeToBool )
 import ListSetOps	( assocMaybe )
 import Unique		( mkBuiltinUnique )
@@ -143,7 +143,7 @@ cgExpr (StgPrimApp TagToEnumOp [arg] res_ty)
           --
 	  -- That won't work.
           --
-	(Just (tycon,_)) = splitTyConApp_maybe res_ty
+	tycon = tyConAppTyCon res_ty
 
 
 cgExpr x@(StgPrimApp op args res_ty)
@@ -462,12 +462,10 @@ primRetUnboxedTuple op args res_ty
       allocate some temporaries for the return values.
     -}
     let
-      (tc,ty_args)      = case splitTyConApp_maybe (repType res_ty) of
-			    Nothing -> pprPanic "primRetUnboxedTuple" (ppr res_ty)
-			    Just pr -> pr
-      prim_reps          = map typePrimRep ty_args
-      temp_uniqs         = map mkBuiltinUnique [ n_args .. n_args + length ty_args - 1]
-      temp_amodes        = zipWith CTemp temp_uniqs prim_reps
+      (tc,ty_args) = splitTyConApp (repType res_ty)
+      prim_reps    = map typePrimRep ty_args
+      temp_uniqs   = map mkBuiltinUnique [ n_args .. n_args + length ty_args - 1]
+      temp_amodes  = zipWith CTemp temp_uniqs prim_reps
     in
     returnUnboxedTuple temp_amodes (absC (COpStmt temp_amodes op arg_temps []))
 \end{code}

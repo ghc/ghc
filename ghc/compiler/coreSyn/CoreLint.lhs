@@ -33,7 +33,7 @@ import ErrUtils		( doIfSet_dyn, dumpIfSet, ghcExit, Message, showPass,
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Type		( Type, tyVarsOfType,
 			  splitFunTy_maybe, mkTyVarTy,
-			  splitForAllTy_maybe, splitTyConApp_maybe,
+			  splitForAllTy_maybe, splitTyConApp_maybe, splitTyConApp,
 			  isUnLiftedType, typeKind, 
 			  isUnboxedTupleType,
 			  hasMoreBoxityInfo
@@ -466,7 +466,7 @@ lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
 	-- Scrutinee type must be a tycon applicn; checked by caller
 	-- This code is remarkably compact considering what it does!
 	-- NB: args must be in scope here so that the lintCoreArgs line works.
-    case splitTyConApp_maybe scrut_ty of { Just (tycon, tycon_arg_tys) ->
+    case splitTyConApp scrut_ty of { (tycon, tycon_arg_tys) ->
 	lintTyApps (dataConRepType con) tycon_arg_tys	`thenL` \ con_type ->
 	lintCoreArgs con_type (map mk_arg args)		`thenL` \ con_result_ty ->
 	checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty)

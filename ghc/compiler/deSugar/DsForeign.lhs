@@ -30,7 +30,7 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  NamedThing(..),
 			)
 import Type		( repType,
-			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
+			  splitTyConApp_maybe, tyConAppTyCon, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, splitAppTy, applyTy, funResultTy
 			)
@@ -487,9 +487,5 @@ showStgType :: Type -> SDoc
 showStgType t = text "Hs" <> text (showFFIType t)
 
 showFFIType :: Type -> String
-showFFIType t = getOccString (getName tc)
- where
-  tc = case splitTyConApp_maybe (repType t) of
-	    Just (tc,_) -> tc
-	    Nothing	-> pprPanic "showFFIType" (ppr t)
+showFFIType t = getOccString (getName (tyConAppTyCon t))
 \end{code}
