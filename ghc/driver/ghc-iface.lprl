@@ -121,13 +121,22 @@ sub constructNewHiFile {
 	  $new_hi,	    # Filename for new one
 	  $show_hi_diffs) = @_;
     local($hiname,$hidir);
-
+    local($mod_name_dec);
+    
     &readHiFile('new',$hsc_hi)	      unless $HiHasBeenRead{'new'} == 1;
+
+    # Sigh, we need decode the module name found in the interface file
+    # since that's the (base)name we want to use when outputting the
+    # interface file.
+    $mod_name_dec = $ModuleName{'new'};
+    $mod_name_dec =~ s/zz/z/g;
+    $mod_name_dec =~ s/ZZ/Z/g;
+
     if ($Specific_hi_file eq '') {  # -ohi is used even if  module name != stem of filename.
         ($hiname = $hifile_target) = $1 if  $hifile_target =~ /\/?([^\/\.]+)\.$HiSuffix/;
-        if ($ModuleName{'new'} ne $hiname) {
+        if ( $mod_name_dec ne $hiname ) {
           ($hidir  = $hifile_target) =~ s/(.*)$hiname\.$HiSuffix/$1/;
-	  $hifile_target = $hidir . $ModuleName{'new'} . ".$HiSuffix";
+	  $hifile_target = $hidir . $mod_name_dec . ".$HiSuffix";
         }
     }
     &readHiFile('old',$hifile_target) unless $HiHasBeenRead{'old'} == 1;
