@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.17 2000/04/17 14:42:30 sewardj Exp $
+ * $Id: StgCRun.c,v 1.18 2000/04/17 14:46:31 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -71,7 +71,7 @@ extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
       IF_DEBUG(evaluator,
 	       fprintf(stderr,"Jumping to ");
 	       printPtr((P_)f);
-	       fprintf(stderr," %s\n",nameFromOPtr(f));
+	       fprintf(stderr,"\n");
 	      );
       f = (StgFunPtr) (f)();
    }
