@@ -1,6 +1,6 @@
-{-# OPTIONS -W #-}
+{-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.55 2000/08/18 06:42:37 qrczak Exp $
+-- $Id: Main.hs,v 1.56 2000/09/05 10:18:28 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -292,7 +292,7 @@ GLOBAL_VAR(keep_raw_s_files,	False,		Bool)
 GLOBAL_VAR(scale_sizes_by,      1.0,		Double)
 GLOBAL_VAR(dry_run, 		False,		Bool)
 GLOBAL_VAR(recomp,  		True,		Bool)
-GLOBAL_VAR(tmp_prefix, 		cTMPDIR,	String)
+GLOBAL_VAR(tmpdir,		cDEFAULT_TMPDIR, String)
 #if !defined(HAVE_WIN32_DLL_SUPPORT) || defined(DONT_WANT_WIN32_DLL_SUPPORT)
 GLOBAL_VAR(static, 		True,		Bool)
 #else
@@ -1076,12 +1076,12 @@ getOptionsFromSource file
 	    case () of
 		() | null l -> look h
 		   | prefixMatch "#" l -> look h
-		   | prefixMatch "{-# LINE" l -> look h
+		   | prefixMatch "{-# LINE" l -> look h   -- -}
 		   | Just (opts:_) <- matchRegex optionRegex l
 			-> return (words opts)
 		   | otherwise -> return []
 
-optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"
+optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"   -- -}
 
 -----------------------------------------------------------------------------
 -- Main loop
@@ -1121,6 +1121,10 @@ main =
 
 	-- grab any -B options from the command line first
    argv'  <- setTopDir argv
+
+	-- check whether TMPDIR is set in the environment
+   IO.try (do dir <- getEnv "TMPDIR" -- fails if not set
+	      writeIORef tmpdir dir)
 
 	-- read the package configuration
    conf_file <- readIORef package_config
@@ -1419,7 +1423,7 @@ run_pipeline ((phase, keep, o_suffix):phases)
 newTempName :: String -> IO String
 newTempName extn = do
   x <- getProcessID
-  tmp_dir <- readIORef tmp_prefix 
+  tmp_dir <- readIORef tmpdir
   findTempName tmp_dir x
   where findTempName tmp_dir x = do
   	   let filename = tmp_dir ++ "/ghc" ++ show x ++ '.':extn
@@ -1904,7 +1908,7 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
   = do  splitter <- readIORef pgm_s
 
 	-- this is the prefix used for the split .s files
-	tmp_pfx <- readIORef tmp_prefix
+	tmp_pfx <- readIORef tmpdir
 	x <- getProcessID
 	let split_s_prefix = tmp_pfx ++ "/ghc" ++ show x
 	writeIORef split_prefix split_s_prefix
@@ -2109,6 +2113,11 @@ driver_opts =
   ,  ( "caf-all"	, NoArg (addOpt_C "-fauto-sccs-on-individual-cafs") )
          -- "ignore-sccs"  doesn't work  (ToDo)
 
+  ,  ( "no-auto-dicts"	, NoArg (addAntiOpt_C "-fauto-sccs-on-dicts") )
+  ,  ( "no-auto-all"	, NoArg (addAntiOpt_C "-fauto-sccs-on-all-toplevs") )
+  ,  ( "no-auto"	, NoArg (addAntiOpt_C "-fauto-sccs-on-exported-toplevs") )
+  ,  ( "no-caf-all"	, NoArg (addAntiOpt_C "-fauto-sccs-on-individual-cafs") )
+
 	------- Miscellaneous -----------------------------------------------
   ,  ( "cpp"		, NoArg (updateState (\s -> s{ cpp_flag = True })) )
   ,  ( "#include"	, HasArg (addCmdlineHCInclude) )
@@ -2119,7 +2128,7 @@ driver_opts =
   ,  ( "o"		, SepArg (writeIORef output_file . Just) )
   ,  ( "osuf"		, HasArg (writeIORef output_suf  . Just) )
   ,  ( "hisuf"		, HasArg (writeIORef hi_suf) )
-  ,  ( "tmpdir"		, HasArg (writeIORef tmp_prefix  . (++ "/")) )
+  ,  ( "tmpdir"		, HasArg (writeIORef tmpdir . (++ "/")) )
   ,  ( "ohi"		, HasArg (\s -> case s of 
 					  "-" -> writeIORef hi_on_stdout True
 					  _   -> writeIORef output_hi (Just s)) )
