@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.103 2002/09/13 15:02:50 simonpj Exp $
+ * $Id: Linker.c,v 1.104 2002/10/02 09:36:00 wolfgang Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -64,6 +64,7 @@
 #  include <windows.h>
 #  include <math.h>
 #elif defined(darwin_TARGET_OS)
+#  include <mach-o/ppc/reloc.h>
 #  define OBJFORMAT_MACHO
 #  include <mach-o/loader.h>
 #  include <mach-o/nlist.h>
@@ -2963,12 +2964,32 @@ static void relocateSection(char *image,
 	    if(reloc->r_pcrel && !reloc->r_extern)
 		continue;
 		
-	    if(!reloc->r_pcrel
-		&& reloc->r_length == 2
-		&& reloc->r_type == GENERIC_RELOC_VANILLA)
+	    if(!reloc->r_pcrel && reloc->r_length == 2)
 	    {
-		unsigned long* word = (unsigned long*) (image + sect->offset + reloc->r_address);
+		unsigned long word;
+
+		unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
 		
+		if(reloc->r_type == GENERIC_RELOC_VANILLA)
+		{
+		    word = *wordPtr;
+		}
+		else if(reloc->r_type == PPC_RELOC_LO16)
+		{
+		    word = ((unsigned short*) wordPtr)[1];
+		    word |= ((unsigned long) relocs[i+1].r_address & 0xFFFF) << 16;
+		}
+		else if(reloc->r_type == PPC_RELOC_HI16)
+		{
+		    word = ((unsigned short*) wordPtr)[1] << 16;
+		    word |= ((unsigned long) relocs[i+1].r_address & 0xFFFF);
+		}
+		else if(reloc->r_type == PPC_RELOC_HA16)
+		{
+		    word = ((unsigned short*) wordPtr)[1] << 16;
+		    word += ((short)relocs[i+1].r_address & (short)0xFFFF);
+		}
+
 		if(!reloc->r_extern)
 		{
 		    long delta = 
@@ -2976,14 +2997,36 @@ static void relocateSection(char *image,
 			- sections[reloc->r_symbolnum-1].addr
 			+ ((long) image);
 		    
-		    *word += delta;
+		    word += delta;
 		}
 		else
 		{
 		    struct nlist *symbol = &nlist[reloc->r_symbolnum];
 		    char *nm = image + symLC->stroff + symbol->n_un.n_strx;
-		    *word = (unsigned long) (lookupSymbol(nm));
-		    ASSERT(*word);
+		    word = (unsigned long) (lookupSymbol(nm));
+		    ASSERT(word);
+		}
+		
+		if(reloc->r_type == GENERIC_RELOC_VANILLA)
+		{
+		    *wordPtr = word;
+		    continue;
+		}
+		else if(reloc->r_type == PPC_RELOC_LO16)
+		{
+		    ((unsigned short*) wordPtr)[1] = word & 0xFFFF;
+		    i++; continue;
+		}
+		else if(reloc->r_type == PPC_RELOC_HI16)
+		{
+		    ((unsigned short*) wordPtr)[1] = (word >> 16) & 0xFFFF;
+		    i++; continue;
+		}
+		else if(reloc->r_type == PPC_RELOC_HA16)
+		{
+		    ((unsigned short*) wordPtr)[1] = ((word >> 16) & 0xFFFF)
+			+ ((word & (1<<15)) ? 1 : 0);
+		    i++; continue;
 		}
 		continue;
 	    }
