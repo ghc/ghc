@@ -64,6 +64,7 @@ main = do
 
   hClose h
   putStrLn "\nUsing hSeek/SeekFromEnd: "
+  putStrLn "(Don't worry if you're seeing differing numbers here, it might be down to '\\n' vs '\\r\\n')"
   h  <- openFile "io001.hs" ReadMode
   recordDoAndRepos3 h $
    recordDoAndRepos3 h $
