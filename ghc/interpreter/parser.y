@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.12 $
- * $Date: 1999/10/26 17:27:37 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/17 16:57:42 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -40,7 +40,7 @@ static String local unexpected   Args((Void));
 static Cell   local checkPrec    Args((Cell));
 static Void   local fixDefn      Args((Syntax,Cell,Cell,List));
 static Cell   local buildTuple   Args((List));
-static List   local checkContext Args((List));
+static List   local checkCtxt    Args((List));
 static Cell   local checkPred    Args((Cell));
 static Pair   local checkDo      Args((List));
 static Cell   local checkTyLhs   Args((Cell));
@@ -715,10 +715,10 @@ sigType   : context IMPLIES type        {$$ = gc3(qualify($1,$3));}
 context   : '(' ')'                     {$$ = gc2(NIL);}
           | btype2                      {$$ = gc1(singleton(checkPred($1)));}
           | '(' btype2 ')'              {$$ = gc3(singleton(checkPred($2)));}
-          | '(' btypes2 ')'             {$$ = gc3(checkContext(rev($2)));}
+          | '(' btypes2 ')'             {$$ = gc3(checkCtxt(rev($2)));}
 /*#if TREX*/
           | lacks                       {$$ = gc1(singleton($1));}
-          | '(' lacks1 ')'              {$$ = gc3(checkContext(rev($2)));}
+          | '(' lacks1 ')'              {$$ = gc3(checkCtxt(rev($2)));}
           ;
 lacks     : varid '\\' varid            {
 #if TREX
@@ -1409,7 +1409,7 @@ List tup; {                             /* list [xn,...,x1]                */
     return tup;
 }
 
-static List local checkContext(con)     /* validate context                */
+static List local checkCtxt(con)     /* validate context                */
 Type con; {
     mapOver(checkPred, con);
     return con;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/12 16:38:31 $
+ * $Revision: 1.12 $
+ * $Date: 1999/11/17 16:57:40 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1657,9 +1657,12 @@ Void parseExp() {                      /* Read an expression to evaluate   */
     setLastExpr(inputExpr);
 }
 
+
+#if EXPLAIN_INSTANCE_RESOLUTION
 Void parseContext() {                  /* Read a context to prove   */
     parseInput(CONTEXT);
 }
+#endif
 
 Void parseInterface(nm,len)            /* Read a GHC interface file        */
 String nm;

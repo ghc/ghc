@@ -11,8 +11,8 @@
 #define MAJOR_RELEASE 0
 
 #if MAJOR_RELEASE
-#define HUGS_VERSION "October 1999  "
+#define HUGS_VERSION "November 1999 "
 #else
-#define HUGS_VERSION "STGHugs-991115"
+#define HUGS_VERSION "STGHugs-991117"
 #endif
 

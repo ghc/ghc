@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.12 $
- * $Date: 1999/11/12 17:32:47 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/17 16:57:48 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -638,6 +638,7 @@ struct strClass {
     Int    arity;                       /* Number of arguments             */
     Kinds  kinds;                       /* Kinds of constructors in class  */
     List   fds;				/* Functional Dependencies	   */
+    List   xfds;			/* Xpanded Functional Dependencies */
     Cell   head;                        /* Head of class                   */
     Name   dcon;                        /* Dictionary constructor function */
     List   supers;                      /* :: [Pred]                       */

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/11/16 17:39:00 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/17 16:57:50 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -68,7 +68,6 @@ static Cell   local typeExpr          Args((Int,Cell));
 
 static Cell   local typeAp            Args((Int,Cell));
 static Type   local typeExpected      Args((Int,String,Cell,Type,Int,Int,Bool));
-static Type   local typeExpected2     Args((Int,String,Cell,Type,Int,Int));
 static Void   local typeAlt           Args((String,Cell,Cell,Type,Int,Int));
 static Int    local funcType          Args((Int));
 static Void   local typeCase          Args((Int,Int,Cell));
@@ -1325,9 +1324,7 @@ Cell e; {                               /* bizarre manner for the benefit  */
 static Cell local typeWith(line,e)	/* Type check a with		   */
 Int  line;
 Cell e; {
-    static String update = "with";
     List fs    = snd(snd(e));		/* List of field specifications	   */
-    List ts    = NIL;			/* List of types for fields	   */
     Int  n     = length(fs);
     Int  alpha = newTyvars(2+n);
     Int  i;
@@ -1748,7 +1745,6 @@ Class c; {				/* defaults for class c		   */
     List defs   = cclass(c).defaults;
     List dsels  = cclass(c).dsels;
     Cell pat    = cclass(c).dcon;
-    Cell args   = NIL;
     Int  width  = cclass(c).numSupers + cclass(c).numMembers;
     char buf[FILENAME_MAX+1];
     Int  i      = 0;
@@ -1884,9 +1880,29 @@ Inst in; {                              /* member functions for instance in*/
 
     for (ps=supers; nonNull(ps); ps=tl(ps)) {   /* Superclass dictionaries */
         Cell pi = hd(ps);
-        Cell ev = scEntail(params,fst3(pi),intOf(snd3(pi)),0);
-        if (isNull(ev))
+	Cell ev = NIL;
+#if EXPLAIN_INSTANCE_RESOLUTION
+	if (showInstRes) {
+	    fputs("scEntail: ", stdout);
+	    printContext(stdout,copyPreds(params));
+	    fputs(" ||- ", stdout);
+	    printPred(stdout, copyPred(fst3(pi),intOf(snd3(pi))));
+	    fputc('\n', stdout);
+	}
+#endif
+	ev = scEntail(params,fst3(pi),intOf(snd3(pi)),0);
+	if (isNull(ev)) {
+#if EXPLAIN_INSTANCE_RESOLUTION
+	    if (showInstRes) {
+		fputs("inEntail: ", stdout);
+		printContext(stdout,copyPreds(evids));
+		fputs(" ||- ", stdout);
+		printPred(stdout, copyPred(fst3(pi),intOf(snd3(pi))));
+		fputc('\n', stdout);
+	    }
+#endif
             ev = inEntail(evids,fst3(pi),intOf(snd3(pi)),0);
+	} 
         if (isNull(ev)) {
             clearMarks();
             ERRMSG(inst(in).line) "Cannot build superclass instance" ETHEN

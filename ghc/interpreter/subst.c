@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: subst.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/10/16 02:17:27 $
+ * $Revision: 1.8 $
+ * $Date: 1999/11/17 16:57:49 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -56,6 +56,7 @@ static Cell local dupTyvars		Args((Cell,Int,List));
 static Pair local copyNoMark		Args((Cell,Int));
 static Type local dropRank1Body         Args((Type,Int,Int));
 static Type local liftRank1Body         Args((Type,Int));
+static Bool local matchTypeAbove	Args((Type,Int,Type,Int,Int));
 
 static Bool local varToVarBind          Args((Tyvar *,Tyvar *));
 static Bool local varToTypeBind         Args((Tyvar *,Type,Int));
@@ -65,9 +66,9 @@ static Int  local remover               Args((Text,Type,Int));
 static Int  local tailVar               Args((Type,Int));
 #endif
 
-static Bool local pairImprove		Args((Int,Class,Cell,Int,Cell,Int));
-static Bool local instImprove		Args((Int,Cell,Int));
 static Bool local improveAgainst	Args((Int,List,Cell,Int));
+static Bool local instImprove		Args((Int,Class,Cell,Int));
+static Bool local pairImprove		Args((Int,Class,Cell,Int,Cell,Int,Int));
 #if IPARAM
 static Bool local ipImprove		Args((Int,Cell,Int,Cell,Int));
 #endif
@@ -1418,7 +1419,7 @@ Int   o; {                              /* match is found, then tyvars from*/
 }
 
 #if MULTI_INST
-Cell findInstsFor(pi,o)			/* Find matching instance for pred */
+List findInstsFor(pi,o)			/* Find matching instance for pred */
 Cell  pi;				/* (pi,o), or otherwise NIL.  If a */
 Int   o; {				/* match is found, then tyvars from*/
     Class c = getHead(pi);		/* typeOff have been initialized to*/
@@ -1462,12 +1463,29 @@ List ps; {
 	    Cell pi = fst3(hd(ps1));
 	    Int  o  = intOf(snd3(hd(ps1)));
 	    Cell c  = getHead(pi);
-	    if ((isClass(c) && nonNull(cclass(c).fds)) || isIP(c)) {
+	    if ((isClass(c) && nonNull(cclass(c).xfds)) || isIP(c)) {
 		improved |= improveAgainst(line,sps,pi,o);
 		if (!isIP(c))
-		    improved |= instImprove(line,pi,o);
+		    improved |= instImprove(line,c,pi,o);
 		improved |= improveAgainst(line,tl(ps1),pi,o);
 	    }
+	}
+    } while (improved);
+}
+
+Void improve1(line,sps,pi,o)		/* Improve a single predicate	   */
+Int  line;
+List sps;
+Cell pi;
+Int o; {
+    Bool improved;
+    Cell c  = getHead(pi);
+    do {
+	improved = FALSE;
+	if ((isClass(c) && nonNull(cclass(c).xfds)) || isIP(c)) {
+	    improved |= improveAgainst(line,sps,pi,o);
+	    if (!isIP(c))
+		improved |= instImprove(line,c,pi,o);
 	}
     } while (improved);
 }
@@ -1484,12 +1502,32 @@ Int o; {
 	Cell pi1 = fst3(pr);
 	Int o1 = intOf(snd3(pr));
 	Cell h1 = getHead(pi1);
-	if (isClass(h1) && h==h1)
-	    improved |= pairImprove(line,h,pi,o,pi1,o1);
+	/* it would be nice to optimize for the common case
+	   where h == h1 */
+	if (isClass(h) && isClass(h1)) {
+	    improved |= pairImprove(line,h,pi,o,pi1,o1,numTyvars);
+	    if (h != h1)
+		improved |= pairImprove(line,h1,pi1,o1,pi,o,numTyvars);
+	}
 #if IPARAM
 	else if (isIP(h1) && textOf(h1) == textOf(h))
 	    improved |= ipImprove(line,pi,o,pi1,o1);
 #endif
+    }
+    return improved;
+}
+
+Bool instImprove(line,c,pi,o)
+Int line;
+Class c;
+Cell pi;
+Int o; {
+    Bool improved = FALSE;
+    List ins      = cclass(c).instances;
+    for (; nonNull(ins); ins=tl(ins)) {
+	Cell in   = hd(ins);
+	Int alpha = newKindedVars(inst(in).kinds);
+	improved |= pairImprove(line,c,pi,o,inst(in).head,alpha,alpha);
     }
     return improved;
 }
@@ -1520,101 +1558,66 @@ Int o1; {
 }
 #endif
 
-Bool pairImprove(line,c,pi1,o1,pi,o)	/* Look for improvement of (pi1,o1)*/
-Int   line;				/* against (pi,o), assuming that   */
-Class c;				/* both pi and pi1 are for class c */
+Bool pairImprove(line,c,pi1,o1,pi2,o2,above)	/* Look for improvement of (pi1,o1)*/
+Int   line;				/* against (pi2,o2)                */
+Class c;
 Cell  pi1;
 Int   o1;
-Cell  pi;
-Int   o; {
+Cell  pi2;
+Int   o2;
+Int above; {
     Bool improved = FALSE;
-    List fds      = cclass(c).fds;
-    for (; nonNull(fds); fds=tl(fds)) {
-	List as   = fst(hd(fds));
-	Bool same = TRUE;
-	for (; same && nonNull(as); as=tl(as)) {
-	    Int n = offsetOf(hd(as));
-	    same &= sameType(nthArg(n,pi1),o1,nthArg(n,pi),o);
+    List xfds     = cclass(c).xfds;
+    for (; nonNull(xfds); xfds=tl(xfds)) {
+	Cell xfd = hd(xfds);
+	Cell hs  = fst(xfd);
+	Int alpha;
+	for (; nonNull(hs); hs=tl(hs)) {
+	    Cell h  = hd(hs);
+	    Class d = getHead(h);
+	    alpha = newKindedVars(cclass(d).kinds);
+	    if (matchPred(pi2,o2,h,alpha))
+		break;
+	    numTyvars = alpha;
 	}
-	if (isNull(as) && same) {
-	    for (as=snd(hd(fds)); same && nonNull(as); as=tl(as)) {
-		Int  n  = offsetOf(hd(as));
-		Type t1 = nthArg(n,pi1);
-		Type t  = nthArg(n,pi);
-		if (!sameType(t1,o1,t,o)) {
-		    same &= unify(t1,o1,t,o);
-		    improved = TRUE;
-		}
-	    }
-	    if (!same) {
-		ERRMSG(line)
-		  "Constraints are not consistent with functional dependency"
-		ETHEN
-		ERRTEXT "\n*** Constraint       : "
-		ETHEN ERRPRED(copyPred(pi1,o1));
-		ERRTEXT "\n*** And constraint   : "
-		ETHEN ERRPRED(copyPred(pi,o));
-		ERRTEXT "\n*** For class        : "
-		ETHEN ERRPRED(cclass(c).head);
-		ERRTEXT "\n*** Break dependency : "
-		ETHEN ERRFD(hd(fds));
-		ERRTEXT "\n"
-		EEND;
-	    }
-	}
-    }
-    return improved;
-}
-
-Bool instImprove(line,pi,o)		/* Look for improvement of (pi,o)  */
-Int  line;				/* returning TRUE if an improvement*/
-Cell pi;				/* was made, and FALSE otherwise   */
-Int  o; {
-    Bool improved = FALSE;
-    Cell c        = getHead(pi);
-    if (isClass(c) && nonNull(cclass(c).fds)) {
-	List ins = cclass(c).instances;
-	for (; nonNull(ins); ins=tl(ins)) {
-	    Cell in   = hd(ins);
-	    List fds  = cclass(c).fds;
+	if (nonNull(hs)) {
+	    List fds = snd(xfd);
 	    for (; nonNull(fds); fds=tl(fds)) {
-		Int  beta = newKindedVars(inst(in).kinds);
-		Bool same = TRUE;
 		List as   = fst(hd(fds));
+		Bool same = TRUE;
 		for (; same && nonNull(as); as=tl(as)) {
 		    Int n = offsetOf(hd(as));
-		    same &= matchType(nthArg(n,pi),o,
-				      nthArg(n,inst(in).head),beta);
+		    same &= matchTypeAbove(nthArg(n,pi1),o1,
+					   mkOffset(n),alpha,above);
 		}
 		if (isNull(as) && same) {
 		    for (as=snd(hd(fds)); same && nonNull(as); as=tl(as)) {
-			Int  n  = offsetOf(hd(as));
-			Type tp = nthArg(n,pi);
-			Type ti = nthArg(n,inst(in).head);
-			if (!matchType(tp,o,ti,beta)) {
-			    same &= unify(tp,o,ti,beta);
+			Int  n    = offsetOf(hd(as));
+			Type t1   = nthArg(n,pi1);
+			Type t2   = mkOffset(n);
+			if (!matchTypeAbove(t1,o1,t2,alpha,above)) {
+			    same &= unify(t1,o1,t2,alpha);
 			    improved = TRUE;
 			}
 		    }
 		    if (!same) {
 			ERRMSG(line)
-			  "Constraint is not consistent with declared instance"
+			  "Constraints are not consistent with functional dependency"
 			ETHEN
 			ERRTEXT "\n*** Constraint       : "
-			ETHEN ERRPRED(copyPred(pi,o));
-			ERRTEXT "\n*** Instance         : "
-			ETHEN ERRPRED(inst(in).head);
+			ETHEN ERRPRED(copyPred(pi1,o1));
+			ERRTEXT "\n*** And constraint   : "
+			ETHEN ERRPRED(copyPred(pi2,o2));
 			ERRTEXT "\n*** For class        : "
 			ETHEN ERRPRED(cclass(c).head);
-			ERRTEXT "\n*** Under dependency : "
+			ERRTEXT "\n*** Break dependency : "
 			ETHEN ERRFD(hd(fds));
 			ERRTEXT "\n"
 			EEND;
 		    }
-		} else {
-		    numTyvars = beta;
 		}
 	    }
+	    numTyvars = alpha;
 	}
     }
     return improved;
@@ -1730,6 +1733,19 @@ Type t;					/* Assumes types are kind correct  */
 Int  o; {				/* and that no vars have been	   */
     Bool result;			/* alloc'd since o.		   */
     bindOnlyAbove(o);
+    result = unify(t1,o1,t,o);
+    unrestrictBind();
+    return result;
+}
+
+static Bool local matchTypeAbove(t1,o1,t,o,a)	/* match, allowing only vars */
+Type t1;				/* allocated since `a' to be bound   */
+Int  o1;				/* this is deeply hacky, since it    */
+Type t;					/* relies on careful use of the	     */
+Int  o;					/* substitution stack		     */
+Int  a; {
+    Bool result;
+    bindOnlyAbove(a);
     result = unify(t1,o1,t,o);
     unrestrictBind();
     return result;

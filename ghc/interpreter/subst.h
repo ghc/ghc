@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: subst.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/10/16 02:17:27 $
+ * $Revision: 1.6 $
+ * $Date: 1999/11/17 16:57:50 $
  * ------------------------------------------------------------------------*/
 
 typedef struct {                        /* Each type variable contains:    */
@@ -109,6 +109,7 @@ extern Bool  unifyPred          Args((Cell,Int,Cell,Int));
 extern Inst  findInstFor        Args((Cell,Int));
 
 extern Void  improve		Args((Int,List,List));
+extern Void  improve1		Args((Int,List,Cell,Int));
 
 extern Bool  sameSchemes	Args((Type,Type));
 extern Bool  sameType		Args((Type,Int,Type,Int));

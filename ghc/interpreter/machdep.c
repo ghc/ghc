@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/20 02:16:01 $
+ * $Revision: 1.10 $
+ * $Date: 1999/11/17 16:57:41 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -282,7 +282,7 @@ static String local hugsdir() {     /* directory containing lib/Prelude.hs */
         }
     }
     return dir;
-#elif HAVE_GETMODULEFILENAME && !DOS
+#elif HAVE_GETMODULEFILENAME && !DOS && !__CYGWIN32__
     /* On Windows, we can find the binary we're running and it's
      * conventional to put the libraries in the same place.
      */
@@ -293,7 +293,8 @@ static String local hugsdir() {     /* directory containing lib/Prelude.hs */
         if (dir[0] == '\0') { /* GetModuleFileName must have failed */
             return HUGSDIR;
         }
-        if (slash = strrchr(dir,SLASH)) { /* truncate after directory name */
+        slash = strrchr(dir,SLASH);
+        if (slash) { /* truncate after directory name */
             *slash = '\0';
         }
     }
@@ -1107,7 +1108,14 @@ Int readTerminalChar() {                /* read character from terminal    */
  	hIn = GetStdHandle(STD_INPUT_HANDLE);
  	GetConsoleMode(hIn, &mo);
  	SetConsoleMode(hIn, mo & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
- 	c = getc(stdin);
+	/* 
+	 * On Win9x, the first time you change the mode (as above) a
+	 * raw '\n' is inserted.  Since enter maps to a raw '\r', and we
+	 * map this (below) to '\n', we can just ignore all *raw* '\n's.
+	 */
+	do {
+	  c = getc(stdin);
+	} while (c == '\n');
  
  	/* Same as it ever was - revert back state of stdin. */
  	SetConsoleMode(hIn, mo);
@@ -1489,6 +1497,20 @@ Int    val; {
 }
 
 #endif /* USE_REGISTRY */
+
+/* --------------------------------------------------------------------------
+ * Things to do with the argv/argc and the env
+ * ------------------------------------------------------------------------*/
+
+int nh_argc ( void )
+{
+  return prog_argc;
+}
+
+int nh_argvb ( int argno, int offset )
+{
+  return (int)(prog_argv[argno][offset]);
+}
 
 /* --------------------------------------------------------------------------
  * Machine dependent control:

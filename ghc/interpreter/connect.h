@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/12 17:32:38 $
+ * $Revision: 1.16 $
+ * $Date: 1999/11/17 16:57:38 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -206,7 +206,9 @@ extern  Void   projInput        Args((String));
 extern  Void   stringInput      Args((String));
 extern  Void   parseScript      Args((String,Long));
 extern  Void   parseExp         Args((Void));
+#if EXPLAIN_INSTANCE_RESOLUTION
 extern  Void   parseContext     Args((Void));
+#endif
 extern  String readFilename     Args((Void));
 extern  String readLine         Args((Void));
 extern  Syntax defaultSyntax    Args((Text));
@@ -245,6 +247,9 @@ extern  Type   zonkType		Args((Type,Int));
 extern  Void   primDefn         Args((Cell,List,Cell));
 extern  Void   defaultDefn      Args((Int,List));
 extern  Void   checkExp         Args((Void));
+#if EXPLAIN_INSTANCE_RESOLUTION
+extern  Void   checkContext	Args((Void));
+#endif
 extern  Void   checkDefns       Args((Void));
 extern  Bool   h98Pred          Args((Bool,Cell));
 extern  Cell   h98Context       Args((Bool,List));
@@ -304,6 +309,9 @@ extern  Void   gcCStack         Args((Void));
 extern  Void   needPrims        Args((Int)); 
 extern  List   calcFunDepsPreds Args((List));
 extern  Inst   findInstFor      Args((Cell,Int));
+#if MULTI_INST
+extern  List   findInstsFor     Args((Cell,Int));
+#endif
 
 extern Type primType( Int /*AsmMonad*/ monad, String a_kinds, String r_kinds );
 #define aVar            mkOffset(0)     /* Simple skeleton for type var    */
