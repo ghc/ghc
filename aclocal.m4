@@ -1273,7 +1273,7 @@ char **argv;
   return 0;
 }],fptools_cv_readdir_eof_errno=`cat conftestval`, fptools_cv_readdir_eof_errno=bogus, fptools_cv_readdir_eof_errno=0)])
 dnl the cross value is somewhat bogus.
-AC_DEFINE([READDIR_ERRNO_EOF], [$fptools_cv_readdir_eof_errno], [readdir() sets errno to this upon EOF])
+AC_DEFINE_UNQUOTED([READDIR_ERRNO_EOF], [$fptools_cv_readdir_eof_errno], [readdir() sets errno to this upon EOF])
 ])
 
 dnl @synopsis FP_DIRENT_FLAT_LAYOUT
