@@ -25,6 +25,16 @@ awaitEvent(rtsBool wait)
 {
   int ret;
 
+#ifdef RTS_SUPPORTS_THREADS
+  // Small optimisation: we don't want the waiting thread to wake
+  // up straight away just because a previous returning worker has
+  // called abandonRequestWait().  If the event is no longer needed,
+  // reset it.  We must do this inside the sched_mutex.
+  if (!needToYieldToReturningWorker()) {
+      resetAbandonRequestWait();
+  }
+#endif
+
   do {
     /* Try to de-queue completed IO requests
      */
@@ -35,28 +45,19 @@ awaitEvent(rtsBool wait)
       return; /* still hold the lock */
     }
 
-    /* we were interrupted, return to the scheduler immediately.
-     */
-    if (interrupted) {
-      return; /* still hold the lock */
-    }
+    // Return to the scheduler if:
+    //
+    //  - we were interrupted
+    //  - new threads have arrived
+    //  - another worker wants to take over (RTS_SUPPORTS_THREADS)
 
-    /* If new runnable threads have arrived, stop waiting for
-     * I/O and run them.
-     */
-    if (run_queue_hd != END_TSO_QUEUE) {
-      return; /* still hold the lock */
-    }
-
+  } while (wait
+	   && !interrupted
+	   && run_queue_hd == END_TSO_QUEUE
 #ifdef RTS_SUPPORTS_THREADS
-    /* If another worker thread wants to take over,
-     * return to the scheduler
-     */
-    if (needToYieldToReturningWorker()) {
-      return; /* still hold the lock */
-    }
+	   && !needToYieldToReturningWorker()
 #endif
-  } while (wait && !interrupted && run_queue_hd == END_TSO_QUEUE);
+      );
 }
 
 #ifdef RTS_SUPPORTS_THREADS
