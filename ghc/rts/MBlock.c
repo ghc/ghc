@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.13 1999/12/15 09:43:24 simonmar Exp $
+ * $Id: MBlock.c,v 1.14 2000/01/22 12:06:43 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -39,7 +39,7 @@
 #include <windows.h>
 #endif
 
-#if freebsd2_TARGET_OS || freebsd3_TARGET_OS
+#if freebsd2_TARGET_OS || freebsd_TARGET_OS
 /* Executable is loaded from      0x0
  * Shared libraries are loaded at 0x2000000
  * Stack is at the top of the address space.  The kernel probably owns
