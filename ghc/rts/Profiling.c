@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.29 2001/12/12 14:31:43 simonmar Exp $
+ * $Id: Profiling.c,v 1.30 2001/12/12 15:13:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -677,10 +677,10 @@ report_per_cc_costs( void )
 static void 
 fprint_header( void )
 {
-  fprintf(prof_file, "%-24s %-10s           individual     inherited\n", "", "");
+  fprintf(prof_file, "%-24s %-10s                 individual     inherited\n", "", "");
 
   fprintf(prof_file, "%-24s %-10s", "COST CENTRE", "MODULE");  
-  fprintf(prof_file, "%8s  %5s %5s   %5s %5s", "entries", "%time", "%alloc", "%time", "%alloc");
+  fprintf(prof_file, "%6s %8s  %5s %5s   %5s %5s", "no.", "entries", "%time", "%alloc", "%time", "%alloc");
 
   if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
     fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
@@ -764,11 +764,11 @@ reportCCS(CostCentreStack *ccs, nat indent)
 	/* force printing of *all* cost centres if -P -P */ 
     {
 
-    fprintf(prof_file, "%6d %-*s%-*s %-10s", 
-	    ccs->ccsID, indent, "", 24-indent, cc->label, cc->module);
+    fprintf(prof_file, "%-*s%-*s %-10s", 
+	    indent, "", 24-indent, cc->label, cc->module);
 
-    fprintf(prof_file, "%8lld  %5.1f %5.1f    %5.1f %5.1f",
-	    ccs->scc_count, 
+    fprintf(prof_file, "%6d %8lld  %5.1f %5.1f    %5.1f %5.1f",
+	    ccs->ccsID, ccs->scc_count, 
 	    total_prof_ticks == 0 ? 0.0 : (ccs->time_ticks / (StgFloat) total_prof_ticks * 100),
 	    total_alloc == 0 ? 0.0 : (ccs->mem_alloc / (StgFloat) total_alloc * 100),
 	    total_prof_ticks == 0 ? 0.0 : (ccs->inherited_ticks / (StgFloat) total_prof_ticks * 100),
