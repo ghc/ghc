@@ -78,8 +78,7 @@ import FastString
 #endif
 import Maybes
 import Bag	  ( Bag, foldrBag )
-import Outputable ( Outputable(..) )
-import PprStyle	( PprStyle )
+import Outputable ( PprStyle, Outputable(..) )
 import Pretty	( Doc )
 
 #ifdef COMPILING_GHC
