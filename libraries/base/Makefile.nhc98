@@ -8,6 +8,7 @@ SRCS	= \
 	Data/Either.hs Data/FiniteMap.hs Data/IORef.hs Data/Int.hs \
 	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
 	Data/Ratio.hs Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
+	Data/HashTable.hs Data/Dynamic.hs Data/Monoid.hs Data/Tree.hs \
 	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Trans.hs \
 	Control/Arrow.hs Debug/Trace.hs \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
@@ -32,7 +33,6 @@ SRCS	= \
 	Text/Html/BlockTable.hs Text/Html.hs \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs
 
-#	Data/Dynamic.hs \
 #	[Data/Dynamic.hs] Data/Generics.hs Data/STRef.hs Data/Unique.hs
 #	Control/Monad/Identity.hs
 #	Debug/QuickCheck.hs
@@ -55,7 +55,7 @@ $(OBJDIR)/Data/FiniteMap.$O: $(OBJDIR)/Data/Maybe.$O
 $(OBJDIR)/Data/Set.$O: $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/FiniteMap.$O
 $(OBJDIR)/Data/Array.$O: $(OBJDIR)/Data/Ix.$O
 $(OBJDIR)/Data/Dynamic.$O: $(OBJDIR)/Foreign/Ptr.$O \
-	$(OBJDIR)/Foreign/StablePtr.$O
+	$(OBJDIR)/Foreign/StablePtr.$O $(OBJDIR)/Data/HashTable.$O
 $(OBJDIR)/System/IO.$O: $(OBJDIR)/System/IO/Error.$O
 $(OBJDIR)/System/Random.$O: $(OBJDIR)/Data/Char.$O $(OBJDIR)/Data/IORef.$O \
 	$(OBJDIR)/System/IO/Unsafe.$O
@@ -100,7 +100,7 @@ $(OBJDIR)/Text/ParserCombinators/Parsec/Token.$O: \
 Data/FiniteMap.$C: Data/Maybe.$C
 Data/Set.$C:       Data/Maybe.$C Data/FiniteMap.$C
 Data/Array.$C:     Data/Ix.$C
-Data/Dynamic.$C:   Foreign/Ptr.$C
+Data/Dynamic.$C:   Foreign/Ptr.$C Data/HashTable.$C
 System/IO.$C:      System/IO/Error.$C
 System/Random.$C:  Data/Char.$C Data/IORef.$C System/IO/Unsafe.$C
 Debug/Trace.$C:    System/IO.$C System/IO/Unsafe.$C
