@@ -353,6 +353,11 @@ data ExprSize = TooBig
 		       FastInt		-- Size to subtract if result is scrutinised 
 					-- by a case expression
 
+-- subtract the discount before deciding whether to bale out. eg. we
+-- want to inline a large constructor application into a selector:
+--  	tup = (a_1, ..., a_99)
+--  	x = case tup of ...
+--
 mkSizeIs max n xs d | (n -# d) ># max = TooBig
 		    | otherwise	      = SizeIs n xs d
  
