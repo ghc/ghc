@@ -24,13 +24,6 @@ max_buff_size = 1
 mergeIO :: [a] -> [a] -> IO [a]
 nmergeIO :: [[a]] -> IO [a]
 
-#ifndef __CONCURRENT_HASKELL__
-
-mergeIO _ _  = return []
-nmergeIO _   = return []
-
-#else
-
 mergeIO ls rs
  = newEmptyMVar		       >>= \ tail_node ->
    newMVar tail_node	       >>= \ tail_list ->
@@ -87,7 +80,5 @@ nmergeIO lss
     signalQSem e 	>>
     return val
   where
-    mapIO f xs = accumulate (map f xs)
-
-#endif {- __CONCURRENT_HASKELL__ -}
+    mapIO f xs = sequence (map f xs)
 \end{code}
