@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.5 1999/04/08 15:43:45 simonm Exp $
+ * $Id: Profiling.c,v 1.6 1999/04/23 09:47:32 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -132,15 +132,6 @@ initProfiling (void)
   /* for the benefit of allocate()... */
   CCCS = CCS_SYSTEM;
 
-  if (!RtsFlags.CcFlags.doCostCentres)
-    return;
-  
-  time_profiling = rtsTrue;
-
-  /* Initialise the log file name */
-  prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
-  sprintf(prof_filename, "%s.prof", prog_argv[0]);
-
   /* Initialize counters for IDs */
   CC_ID  = 0;
   CCS_ID = 0;
@@ -168,15 +159,27 @@ initProfiling (void)
 
   CCCS = CCS_OVERHEAD;
   registerCostCentres();
+  CCCS = CCS_SYSTEM;
+
+  if (!RtsFlags.CcFlags.doCostCentres)
+    return;
+  
+  time_profiling = rtsTrue;
+
+  /* Initialise the log file name */
+  prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
+  sprintf(prof_filename, "%s.prof", prog_argv[0]);
 
   /* find all the "special" cost centre stacks, and make them children
    * of CCS_MAIN.
    */
   ASSERT(CCS_MAIN->prevStack == 0);
+  CCS_MAIN->root = CC_MAIN;
   for (ccs = CCS_LIST; ccs != CCS_MAIN; ) {
     next = ccs->prevStack;
     ccs->prevStack = 0;
     ActualPush_(CCS_MAIN,ccs->cc,ccs);
+    ccs->root = ccs->cc;
     ccs = next;
   }
   
@@ -193,7 +196,7 @@ endProfiling ( void )
 }
 
 void
-heapCensus ( bdescr *bd )
+heapCensus ( bdescr *bd UNUSED )
 {
   /* nothing yet */
 }
@@ -232,6 +235,32 @@ registerCostCentres ( void )
   StgRun((StgFunPtr)stg_register);
 }
 
+
+/* -----------------------------------------------------------------------------
+   Set cost centre stack when entering a function.  Here we implement
+   the rule
+
+      "if CCSfn is an initial segment of CCCS, 
+          then set CCCS to CCSfn,
+	  else append CCSfn to CCCS"
+   -------------------------------------------------------------------------- */
+rtsBool entering_PAP;
+
+CostCentreStack *
+EnterFunCCS ( CostCentreStack *cccs, CostCentreStack *ccsfn )
+{
+  /* PAP_entry has already set CCCS for us */
+  if (entering_PAP) {
+    entering_PAP = rtsFalse;
+    return CCCS;
+  }
+
+  if (cccs->root == ccsfn->root) {
+    return ccsfn;
+  } else {
+    return AppendCCS(cccs,ccsfn);
+  }
+}
 
 /* -----------------------------------------------------------------------------
    Cost-centre stack manipulation
@@ -289,7 +318,6 @@ CostCentreStack *
 AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 #define AppendCCS _AppendCCS
 {
-  CostCentreStack *ccs;
   IF_DEBUG(prof, 
 	   if (ccs1 != ccs2) {
 	     fprintf(stderr,"Appending ");
@@ -359,16 +387,8 @@ ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
   new_ccs->time_ticks = 0;
   new_ccs->mem_alloc = 0;
   
-  /* stacks are subsumed if either:
-       - the top cost centre is boring, and the rest of the CCS is subsumed
-       - the top cost centre is subsumed.
-  */
-  if (cc->is_subsumed == CC_IS_BORING) {
-    new_ccs->is_subsumed = ccs->is_subsumed;
-  } else {
-    new_ccs->is_subsumed = cc->is_subsumed;
-  }
-  
+  new_ccs->root = ccs->root;
+
   /* update the memoization table for the parent stack */
   if (ccs != EMPTY_STACK)
     ccs->indexTable = AddToIndexTable(ccs->indexTable, new_ccs, cc);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.19 1999/03/18 17:57:23 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.20 1999/04/23 09:47:33 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,6 +13,7 @@
 #include "HeapStackCheck.h"   /* for stg_gen_yield */
 #include "Storage.h"
 #include "StoragePriv.h"
+#include "ProfRts.h"
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -54,7 +55,7 @@ STGFUN(IND_PERM_entry)
     FB_
     /* Don't add INDs to granularity cost */
 
-    /* Dont: ENT_IND(Node); for ticky-ticky; this ind is here only to help profi
+    /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profi
 ling */
 
     /* Enter PAP cost centre -- lexical scoping only */
@@ -86,6 +87,12 @@ STGFUN(IND_OLDGEN_PERM_entry)
     FB_
     TICK_ENT_IND(Node);	/* tick */
   
+    /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profi
+ling */
+
+    /* Enter PAP cost centre -- lexical scoping only */
+    ENTER_CCS_PAP_CL(R1.cl);
+
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
     JMP_(*R1.p);

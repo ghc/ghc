@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.5 1999/04/08 15:43:44 simonm Exp $
+ * $Id: StgProf.h,v 1.6 1999/04/23 09:47:31 simonm Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -104,7 +104,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 	    sub_cafcc_count 	: 0,				\
 	    time_ticks 		: 0,				\
 	    mem_alloc 		: 0,				\
-	    is_subsumed 	: subsumed,			\
+	    root 		: 0,				\
        }};
 
 # define CC_EXTERN(cc_ident) \
@@ -215,10 +215,10 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  * On entering a closure we only count the enter to thunks ...
  * ------------------------------------------------------------------------- */
 
-#define ENTER_CCS_T(ccs)                                    \
-        do {                                                \
-        CCCS = (CostCentreStack *)(ccs);                    \
-        CCCS_DETAIL_COUNT(CCCS->thunk_count);               \
+#define ENTER_CCS_T(ccs)				\
+        do {						\
+        CCCS = (CostCentreStack *)(ccs);		\
+        CCCS_DETAIL_COUNT(CCCS->thunk_count);		\
         } while(0)      
  
 #define ENTER_CCS_TCL(closure)  ENTER_CCS_T(CCS_HDR(closure))
@@ -231,35 +231,31 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  *  (b) The CCS is CAF-ish.
  * -------------------------------------------------------------------------- */
 
-#define ENTER_CCS_F(stack)					\
-        do {							\
-        CostCentreStack *ccs = (CostCentreStack *) (stack);	\
-        if ( ! IS_CAF_OR_SUB_CCS(ccs) ) {			\
-           CCCS = ccs;						\
-        } else {						\
-          CCCS = AppendCCS(CCCS,ccs);				\
-          CCCS_DETAIL_COUNT(ccs->caffun_subsumed);		\
-          CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);		\
-        }							\
-        CCCS_DETAIL_COUNT(CCCS->function_count);		\
+#define ENTER_CCS_F(stack)						\
+        do {								\
+        CostCentreStack *ccs = (CostCentreStack *) (stack);		\
+        CCCS_DETAIL_COUNT(CCCS->function_count);			\
+        CCCS = EnterFunCCS(CCCS,ccs);				  	\
         } while(0)
  
 #define ENTER_CCS_FCL(closure)  ENTER_CCS_F(CCS_HDR(closure))
 
 /* Entering a top-level function: costs are subsumed by the caller 
  */
-#define ENTER_CCS_FSUB()                                    \
-        do {                                                \
-        CCCS_DETAIL_COUNT(CCCS->subsumed_fun_count);        \
-        CCCS_DETAIL_COUNT(CCCS->function_count);            \
+#define ENTER_CCS_FSUB()				\
+        do {						\
+        CCCS_DETAIL_COUNT(CCCS->subsumed_fun_count);	\
+        CCCS_DETAIL_COUNT(CCCS->function_count);	\
+	entering_PAP = 0;				\
         } while(0)
  
-#define ENTER_CCS_FCAF(stack)                               \
-        do {                                                \
-        CostCentreStack *ccs = (CostCentreStack *) (stack); \
-        CCCS_DETAIL_COUNT(ccs->caffun_subsumed);            \
-        CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);        \
-        CCCS_DETAIL_COUNT(CCCS->function_count);            \
+#define ENTER_CCS_FCAF(stack)					\
+        do {							\
+        CostCentreStack *ccs = (CostCentreStack *) (stack);	\
+        CCCS_DETAIL_COUNT(ccs->caffun_subsumed);		\
+        CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);		\
+        CCCS_DETAIL_COUNT(CCCS->function_count);		\
+	entering_PAP = 0;					\
         } while(0)
  
 #define ENTER_CCS_FLOAD(ccs)                                \
@@ -270,20 +266,11 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  
 /* These ENTER_CC_PAP things are only used in the RTS */
  
-#define ENTER_CCS_PAP(stack) /* nothing */
-#if 0 /* old version */
-        do {							\
-        CostCentreStack *ccs = (CostCentreStack *) (stack);	\
-        if ( ! IS_CAF_OR_SUB_CCS(ccs) ) {			\
-            CCCS = ccs;						\
-        } else {						\
-          CCCS = AppendCCS(CCCS,ccs);				\
-          CCCS_DETAIL_COUNT(ccs->caffun_subsumed);		\
-          CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);		\
-        }							\
-        CCCS_DETAIL_COUNT(CCCS->pap_count);			\
-        } while(0)                      
-#endif
+#define ENTER_CCS_PAP(stack) 			\
+        do {					\
+	ENTER_CCS_F(stack);			\
+	entering_PAP = rtsTrue;			\
+	} while(0)
 
 #define ENTER_CCS_PAP_CL(closure)  \
         ENTER_CCS_PAP((closure)->header.prof.ccs)

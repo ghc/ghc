@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.14 1999/04/08 15:43:46 simonm Exp $
+ * $Id: Updates.hc,v 1.15 1999/04/23 09:47:33 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -11,6 +11,7 @@
 #include "RtsUtils.h"
 #include "HeapStackCheck.h"
 #include "Storage.h"
+#include "ProfRts.h"
 
 /*
   The update frame return address must be *polymorphic*, that means
@@ -140,7 +141,6 @@ STGFUN(PAP_entry)
        */
       
       CCCS = Su->header.prof.ccs;
-      ENTER_CCS_PAP(pap->header.prof.ccs);
 #endif /* PROFILING */
       
       Su = Su->link;
@@ -200,7 +200,7 @@ EXTFUN(stg_update_PAP)
 {
   nat Words, PapSize;
 #ifdef PROFILING
-  CostCentreStack *CCS_pap, *CCS_blame;
+  CostCentreStack *CCS_pap;
 #endif
   StgPAP* PapClosure;
   StgClosure *Fun, *Updatee;
@@ -226,12 +226,9 @@ EXTFUN(stg_update_PAP)
     ASSERT((int)Words >= 0);
 
 #if defined(PROFILING)
-    /* set "CC_pap" to go in the updatee (see Sansom thesis, p 183) */
-    CCS_pap = Fun->header.prof.ccs;
-    CCS_blame = Fun->header.prof.ccs;
-    if (IS_CAF_OR_SUB_CCS(CCS_pap)) {
-      CCS_blame = CCCS;
-    }
+    /* pretend we just entered the function closure */
+    ENTER_CCS_FCL(Fun);
+    CCS_pap = CCCS;
 #endif
 
     if (Words == 0) { 
@@ -268,7 +265,7 @@ EXTFUN(stg_update_PAP)
 
 	TICK_ALLOC_UPD_PAP(1/*fun*/ + Words, 0);
 #ifdef PROFILING
-	CCS_ALLOC(CCS_blame, PapSize);
+	CCS_ALLOC(CCS_pap, PapSize);
 #endif
 
 	PapClosure = (StgPAP *)(Hp + 1 - PapSize); /* The new PapClosure */
@@ -348,10 +345,6 @@ EXTFUN(stg_update_PAP)
 #endif	
 
 #if defined(PROFILING)
-      /* 
-       * Restore the Cost Centre too (if required); again see Sansom
-       * thesis p 183.  Take the CC out of the update frame if a CAF/DICT.
-       */
       CCCS = Su->header.prof.ccs;
       ENTER_CCS_PAP(CCS_pap);
 #endif /* PROFILING */
@@ -378,7 +371,7 @@ EXTFUN(stg_update_PAP)
      */
     JMP_(GET_ENTRY(R1.cl));
     FE_
-} 
+}
 
 
 /* -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.h,v 1.4 1999/03/25 13:14:03 simonm Exp $
+ * $Id: Profiling.h,v 1.5 1999/04/23 09:47:30 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -84,7 +84,7 @@ typedef struct _CostCentreStack {
   unsigned long time_ticks;
   unsigned long mem_alloc;
 
-  char is_subsumed; /* inherits value from is_subsumed flag of top CostCentre */
+  CostCentre *root;
 } CostCentreStack;
 
 
@@ -157,6 +157,7 @@ extern hash_t max_type_no;                      /* Hash on type description */
  * Functions 
  * ---------------------------------------------------------------------------*/
 
+CostCentreStack *EnterFunCCS ( CostCentreStack *cccs, CostCentreStack *ccsfn );
 CostCentreStack *PushCostCentre ( CostCentreStack *, CostCentre * );
 CostCentreStack *AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 );
 CostCentreStack *ActualPush ( CostCentreStack *, CostCentre * );
@@ -164,6 +165,8 @@ CostCentreStack *RemoveCC ( CostCentreStack *, CostCentre * );
 
 CostCentreStack *IsInIndexTable ( IndexTable *, CostCentre * );
 IndexTable *AddToIndexTable ( IndexTable *, CostCentreStack *, CostCentre * );
+
+extern unsigned int entering_PAP;
 
 #endif /* PROFILING */
 
