@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.67 1999/12/08 11:21:39 simonmar Exp $
+# $Id: Makefile,v 1.68 2000/01/24 09:25:36 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -80,10 +80,7 @@ SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
 # stuff you get for free in a source distribution
 # 
-# SRC_DIST_FILES += rename/ParseIface.hs \
-#  parser/U_tree.c parser/tree.h parser/tree.c \
-#  parser/hsparser.tab.c parser/hsparser.tab.h \
-#  parser/hslexer.c
+# SRC_DIST_FILES += rename/ParseIface.hs rename/Parser.hs
 
 # -----------------------------------------------------------------------------
 # 		Haskell compilations
@@ -145,7 +142,7 @@ parser/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
 rename/ParseIface_HAPPY_OPTS    += -g
 
-parser/Parser_HC_OPTS 		+= -Onot -H64m -K2m -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -Onot -H80m -K2m -fno-warn-incomplete-patterns
 parser/Parser_HAPPY_OPTS    	+= -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
