@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.17 2001/03/06 15:00:25 rrt Exp $
+-- $Id: DriverUtil.hs,v 1.18 2001/03/07 10:28:40 rrt Exp $
 --
 -- Utils for the driver
 --
@@ -14,6 +14,7 @@ module DriverUtil where
 
 import Util
 import Panic
+import TmpFiles ( v_TmpDir )
 
 import IOExts
 import Exception
