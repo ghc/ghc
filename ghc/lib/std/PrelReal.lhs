@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.10 2001/02/28 00:01:03 qrczak Exp $
+% $Id: PrelReal.lhs,v 1.11 2001/03/01 19:10:16 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -283,12 +283,12 @@ realToFrac = fromRational . toRational
     #-}
 
 -- For backward compatibility
-{- DEPRECATED fromInt "use fromIntegral instead" -}
+{-# DEPRECATED fromInt "use fromIntegral instead" #-}
 fromInt :: Num a => Int -> a
 fromInt = fromIntegral
 
 -- For backward compatibility
-{- DEPRECATED toInt "use fromIntegral instead" -}
+{-# DEPRECATED toInt "use fromIntegral instead" #-}
 toInt :: Integral a => a -> Int
 toInt = fromIntegral
 \end{code}
