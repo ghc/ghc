@@ -58,13 +58,14 @@ def normalise_errmsg ( $errmsg )
 def say_fail_because_noteq ( $filename1, $filename2 )
 {
    print "--- FAIL because the following files differ:"
-   print "        " ++ $filename1 ++ " " ++ $filename2
+   print "---      " ++ $filename1
+   print "---      " ++ $filename2
 }
 
 def say_fail_because_nonempty ( $filename1 )
 {
    print "--- FAIL because the following file is non-empty:"
-   print "        " ++ $filename1
+   print "---      " ++ $filename1
 }
 
 def say_fail_because_compiler_barfd ( $res )
@@ -180,7 +181,7 @@ def exist_and_same ( $_file1, $_file2 )
         $cts1 = contents($_file1)
         $cts2 = contents($_file2)
         $same = $cts1 == $cts2
-        if not($same) then say_failing_because_noteq($_file1, $_file2) fi
+        if not($same) then say_fail_because_noteq($_file1, $_file2) fi
         return $same
    fi
 }
