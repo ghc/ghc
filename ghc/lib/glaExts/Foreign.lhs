@@ -9,7 +9,9 @@
 
 module Foreign (
 	module Foreign,
+#ifndef __PARALLEL_HASKELL__
 	ForeignObj(..),
+#endif
 	Addr(..), Word(..)
    ) where
 
@@ -72,6 +74,7 @@ instance CReturnable () -- Why, exactly?
 %*********************************************************
 
 \begin{code}
+#ifndef __PARALLEL_HASKELL__
 --Defined in PrelBase: data ForeignObj = ForeignObj ForeignObj#
 data ForeignObj = ForeignObj ForeignObj#   -- another one
 
@@ -100,6 +103,7 @@ eqForeignObj mp1 mp2
 instance Eq ForeignObj where 
     p == q = eqForeignObj p q
     p /= q = not (eqForeignObj p q)
+#endif /* !__PARALLEL_HASKELL__ */
 \end{code}
 
 
