@@ -326,7 +326,7 @@ dynExceptions _ = Nothing
 asyncExceptions (AsyncException e) = Just e
 asyncExceptions _ = Nothing
 
-userErrors e | isUserError e = Just (ioeGetErrorString e)
+userErrors e@IOException{} | isUserError e = Just (ioeGetErrorString e)
 userErrors _ = Nothing
 
 -----------------------------------------------------------------------------
