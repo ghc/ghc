@@ -52,6 +52,8 @@ mips-sgi-irix*)
 	TargetPlatform=mips-sgi-irix;;
 powerpc-ibm-aix*)
 	TargetPlatform=powerpc-ibm-aix;;
+rs6000-ibm-aix*)
+	TargetPlatform=rs6000-ibm-aix;;
 sparc-sun-sunos4*)
 	TargetPlatform=sparc-sun-sunos4;;
 sparc-sun-solaris2*)
