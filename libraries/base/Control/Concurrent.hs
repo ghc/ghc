@@ -230,8 +230,8 @@ real_handler ex =
 	AsyncException ThreadKilled  -> return ()
 
 	-- report all others:
-	AsyncException StackOverflow -> reportStackOverflow False
-	other       -> reportError False other
+	AsyncException StackOverflow -> reportStackOverflow
+	other       -> reportError other
 
 #endif /* __GLASGOW_HASKELL__ */
 
