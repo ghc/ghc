@@ -450,6 +450,12 @@ doStmt (SReturn expr)
    = evalExpr expr				`thenEV` \ res ->
      returnEV (Just res)
 
+doStmt (SSkip expr)
+   = evalExprToBool expr			`thenEV` \ skip ->
+     if   skip
+     then resultsEV (Skipped, Skipped)
+     else returnEV Nothing
+
 runMacro :: MacroName -> [Expr] -> IOEV (Maybe String)
 runMacro mnm args
    = 
