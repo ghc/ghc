@@ -279,7 +279,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
 
     returnM (new_ic, bound_names, tc_expr)
     }
-\end{code}		
+\end{code}
 
 
 Here is the grand plan, implemented in tcUserStmt
