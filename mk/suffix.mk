@@ -135,7 +135,7 @@ endif
 .PRECIOUS: %.gc
 
 %.hs %_stub_ffi.c %_stub_ffi.h : %.gc
-	$(GREENCARD) $(GC_OPTS) $< -o $@
+	$(GREENCARD) $(GC_OPTS) $<
 
 %.lhs : %.gc
 	$(GREENCARD) $(GC_OPTS) $< -o $@
@@ -148,11 +148,11 @@ endif
 
 ifeq "$(UseGhcForCc)" "YES"
 
-$(odir_)%.$(way_)o : %.$(way_)s
+$(odir_)%.$(way_)o : %.c
 	@$(RM) $@
 	$(HC) $(GHC_CC_OPTS) -c $< -o $@
 
-$(odir_)%.$(way_)o : %.c
+$(odir_)%.$(way_)o : %.$(way_)s
 	@$(RM) $@
 	$(HC) $(GHC_CC_OPTS) -c $< -o $@
 
@@ -166,13 +166,13 @@ $(odir_)%.$(way_)s : %.c
 
 else
 
-$(odir_)%.$(way_)o : %.$(way_)s
-	@$(RM) $@
-	$(AS) $(AS_OPTS) -o $@ $<
-
 $(odir_)%.$(way_)o : %.c
 	@$(RM) $@
 	$(CC) $(CC_OPTS) -c $< -o $@
+
+$(odir_)%.$(way_)o : %.$(way_)s
+	@$(RM) $@
+	$(AS) $(AS_OPTS) -o $@ $<
 
 $(odir_)%.$(way_)o : %.S
 	@$(RM) $@
