@@ -329,10 +329,6 @@ zone x = do
 # endif /* ! HAVE_TZNAME */
 
 -- Get the offset in secs from UTC, if (struct tm) doesn't supply it. */
-#if defined(mingw32_TARGET_OS)
-#define timezone _timezone
-#endif
-
 # if HAVE_ALTZONE
 foreign import ccall "&altzone"  altzone  :: Ptr CTime
 foreign import ccall "&timezone" timezone :: Ptr CTime
@@ -342,7 +338,11 @@ gmtoff x = do
   return (fromIntegral tz)
 #  define GMTOFF(x)   	 (((struct tm *)x)->tm_isdst ? altzone : timezone )
 # else /* ! HAVE_ALTZONE */
+
+#if !defined(mingw32_TARGET_OS)
 foreign import ccall unsafe "timezone" timezone :: Ptr CLong
+#endif
+
 -- Assume that DST offset is 1 hour ...
 gmtoff x = do 
   dst <- (#peek struct tm,tm_isdst) x
