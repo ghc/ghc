@@ -476,11 +476,9 @@ clockToCalendarTime_aux is_utc p_tm psec = do
 toClockTime :: CalendarTime -> ClockTime
 #ifdef __HUGS__
 toClockTime (CalendarTime yr mon mday hour min sec psec
-			  _wday _yday _tzname tz isdst) =
+			  _wday _yday _tzname tz _isdst) =
   unsafePerformIO $ do
-    s <- toClockTimePrim (yr-1900) (fromEnum mon) mday
-  		         hour min sec
-		         tz (if isdst then 1 else 0)
+    s <- toClockTimePrim (yr-1900) (fromEnum mon) mday hour min sec tz
     return (TOD (fromIntegral s) psec)
 #else /* ! __HUGS__ */
 toClockTime (CalendarTime year mon mday hour min sec psec 
