@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.15 1999/01/19 17:06:02 simonm Exp $
+ * $Id: GC.c,v 1.16 1999/01/19 17:22:55 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -566,6 +566,9 @@ void GarbageCollect(void (*get_roots)(void))
   if (RtsFlags.GcFlags.generations == 1) {
     if (old_to_space != NULL) {
       freeChain(old_to_space);
+    }
+    for (bd = g0s0->to_space; bd != NULL; bd = bd->link) {
+      bd->evacuated = 0;	/* now from-space */
     }
     live = g0s0->to_blocks * BLOCK_SIZE_W + 
       ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
