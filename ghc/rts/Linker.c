@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.58 2001/08/15 08:57:31 simonmar Exp $
+ * $Id: Linker.c,v 1.59 2001/08/21 15:22:09 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -1825,6 +1825,17 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             w1 |= w2;
             *pP = w1;
             break;
+         /* According to the Sun documentation:
+            R_SPARC_UA32 
+            This relocation type resembles R_SPARC_32, except it refers to an
+            unaligned word. That is, the word to be relocated must be treated
+            as four separate bytes with arbitrary alignment, not as a word
+            aligned according to the architecture requirements.
+
+            (JRS: which means that freeloading on the R_SPARC_32 case
+            is probably wrong, but hey ...)  
+         */
+         case R_SPARC_UA32:
          case R_SPARC_32:
             w2 = (Elf32_Word)(S + A);
             *pP = w2;
