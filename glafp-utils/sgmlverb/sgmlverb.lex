@@ -28,6 +28,7 @@ miranda			([0-9]+(\-([0-9]+)?)?)?>
 			top = 0;
 <NORM>@@		{ printf ("@"); }
 <NORM>@			{ printf ("<tt>"); PUSH NORM;  BEGIN VERB; }
+<NORM>\\%               { printf ("&percnt;"); }
 <NORM>{comment}         { }
 <VERB>@			{ printf ("</tt>");  POP; }
 <VERB>@@		{ printf ("@"); }
