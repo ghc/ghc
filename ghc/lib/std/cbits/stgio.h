@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.26 2001/02/28 14:24:46 sewardj Exp $
+ * $Id: stgio.h,v 1.27 2001/03/01 12:25:33 rrt Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -14,6 +14,17 @@
 
 #include "stgerror.h"
 #include "fileObject.h"
+
+/* Fix for mingwin stat */
+#ifdef mingw32_TARGET_OS
+/* Need to #define __MSVCRT__ to get these versions, but in order to do this
+   early enough it's done in Stg.h (included by Rts.h) */
+#define Stat _stati64
+#define Fstat _fstati64
+#else
+#define Stat stat
+#define Fstat fstat
+#endif
 
 /* Function prototypes for the I/O subsytem...
  */

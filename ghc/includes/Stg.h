@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.35 2001/02/09 13:09:17 simonmar Exp $
+ * $Id: Stg.h,v 1.36 2001/03/01 12:25:32 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -40,6 +40,11 @@
 
 /* Some macros to handle DLLing (Win32 only at the moment). */
 #include "StgDLL.h"
+
+/* Fix for mingw stat problem (done here so it's early enough) */
+#ifdef mingw32_TARGET_OS
+#define __MSVCRT__ 1
+#endif
 
 /* Turn lazy blackholing and eager blackholing on/off.
  *

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getLock.c,v 1.7 1999/12/08 15:47:07 simonmar Exp $
+ * $Id: getLock.c,v 1.8 2001/03/01 12:25:33 rrt Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
@@ -48,9 +48,9 @@ int for_writing;
 int exclusive;
 {
     int i;
-    struct stat sb;
+    struct Stat sb;
 
-    while (fstat(fd, &sb) < 0) {
+    while (Fstat(fd, &sb) < 0) {
 	if (errno != EINTR) {
 #ifndef _WIN32
 	    return -1;

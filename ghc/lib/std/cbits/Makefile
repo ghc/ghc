@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.24 2000/11/07 10:42:57 simonmar Exp $
+# $Id: Makefile,v 1.25 2001/03/01 12:25:33 rrt Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -13,8 +13,8 @@ C_SRCS= $(wildcard *.c)
 C_OBJS  = $(C_SRCS:.c=.$(way_)o)
 LIBOBJS = $(C_OBJS)
 SRC_CC_OPTS += -O $(GhcLibCcOpts) -Wall -optc-DCOMPILING_STDLIB
-ifneq "$(DLLized)" "YES"
-SRC_CC_OPTS += -static
+ifeq "$(DLLized)" "YES"
+SRC_CC_OPTS += -dynamic
 endif
 
 #

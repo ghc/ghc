@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: setBuffering.c,v 1.10 2001/02/19 16:10:23 rrt Exp $
+ * $Id: setBuffering.c,v 1.11 2001/03/01 12:25:33 rrt Exp $
  *
  * hSetBuffering Runtime Support
  */
@@ -38,7 +38,7 @@ setBuffering(StgForeignPtr ptr, StgInt size)
 #ifndef mingw32_TARGET_OS
     struct termios tio;
 #endif
-    struct stat sb;
+    struct Stat sb;
 
     /* First off, flush old buffer.. */
     if ( (fo->flags & FILEOBJ_WRITE) ) {
@@ -100,7 +100,7 @@ setBuffering(StgForeignPtr ptr, StgInt size)
     case SB_BB:
 
 #ifdef HAVE_ST_BLKSIZE
-	while (fstat(fo->fd, &sb) < 0) {
+	while (Fstat(fo->fd, &sb) < 0) {
 	   /* not very likely.. */
 	   if ( errno != EINTR ) {
 	      cvtErrno();

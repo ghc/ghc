@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getBufferMode.c,v 1.3 1998/12/02 13:27:35 simonm Exp $
+ * $Id: getBufferMode.c,v 1.4 2001/03/01 12:25:33 rrt Exp $
  *
  * hIs...Buffered Runtime Support
  */
@@ -32,11 +32,11 @@ getBufferMode(ptr)
 StgForeignPtr ptr;
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    struct stat sb;
+    struct Stat sb;
     int fd = fo->fd;
 
     /* Try to find out the file type */
-    while (fstat(fd, &sb) < 0) {
+    while (Fstat(fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();

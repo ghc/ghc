@@ -113,7 +113,7 @@ package_details installing =
         hs_libraries      = [ "HSstd" ],
 	extra_libraries   = [ "HSstd_cbits" ] ++
 #                           ifdef mingw32_TARGET_OS
-                            ["wsock32"]
+                            ["wsock32", "msvcrt"]
 #                           else
                             ["m"]   -- libm, that is
 #                           endif

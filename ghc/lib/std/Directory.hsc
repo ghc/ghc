@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.7 2001/02/14 12:37:10 rrt Exp $
+-- $Id: Directory.hsc,v 1.8 2001/03/01 12:25:33 rrt Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -65,6 +65,8 @@ import PrelPtr
 import PrelIOBase
 import PrelBase
 
+-- Fix mingw stat problem
+#include "../includes/Stg.h"
 #include <sys/stat.h>
 #include <dirent.h>
 #include <limits.h>
@@ -498,24 +500,40 @@ setPermissions name (Permissions r w e s) = do
 
 withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
 withFileStatus name f = do
+#ifndef mingw32_TARGET_OS
     allocaBytes (#const sizeof(struct stat)) $ \p ->
+#else
+    allocaBytes (#const sizeof(struct _stati64)) $ \p ->
+#endif
       withUnsafeCString name $ \s -> do
         throwErrnoIfMinus1Retry_ "withFileStatus" (stat s p)
 	f p
 
 modificationTime :: Ptr CStat -> IO ClockTime
 modificationTime stat = do
+#ifndef mingw32_TARGET_OS
     mtime <- (#peek struct stat, st_mtime) stat
+#else
+    mtime <- (#peek struct _stati64, st_mtime) stat
+#endif
     return (TOD (toInteger (mtime :: CTime)) 0)
 
 isDirectory :: Ptr CStat -> IO Bool
 isDirectory stat = do
+#ifndef mingw32_TARGET_OS
   mode <- (#peek struct stat, st_mode) stat
+#else
+  mode <- (#peek struct _stati64, st_mode) stat
+#endif
   return (s_ISDIR mode /= 0)
 
 isRegularFile :: Ptr CStat -> IO Bool
 isRegularFile stat = do
+#ifndef mingw32_TARGET_OS
   mode <- (#peek struct stat, st_mode) stat
+#else
+  mode <- (#peek struct _stati64, st_mode) stat
+#endif
   return (s_ISREG mode /= 0)
 
 foreign import ccall unsafe s_ISDIR :: CMode -> Int

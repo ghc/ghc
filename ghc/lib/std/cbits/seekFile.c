@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: seekFile.c,v 1.5 2000/01/17 12:30:07 simonmar Exp $
+ * $Id: seekFile.c,v 1.6 2001/03/01 12:25:33 rrt Exp $
  *
  * hSeek and hIsSeekable Runtime Support
  */
@@ -22,7 +22,7 @@ StgInt
 seekFile(StgForeignPtr ptr, StgInt whence, StgInt size, StgByteArray d)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    struct stat sb;
+    struct Stat sb;
     off_t offset;
     int posn_delta =0;
     int rc = 0;
@@ -84,7 +84,7 @@ seekFile(StgForeignPtr ptr, StgInt whence, StgInt size, StgByteArray d)
     if (rc < 0) return rc;
 
     /* Try to find out the file type */
-    while (fstat(fo->fd, &sb) < 0) {
+    while (Fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -114,7 +114,7 @@ StgInt
 seekFile_int64(StgForeignPtr ptr, StgInt whence, StgInt64 d)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    struct stat sb;
+    struct Stat sb;
     off_t offset = d;
     int posn_delta =0;
     int rc = 0;
@@ -154,7 +154,7 @@ seekFile_int64(StgForeignPtr ptr, StgInt whence, StgInt64 d)
     if (rc < 0) return rc;
 
     /* Try to find out the file type & size for a physical file */
-    while (fstat(fo->fd, &sb) < 0) {
+    while (Fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -183,10 +183,10 @@ StgInt
 seekFileP(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    struct stat sb;
+    struct Stat sb;
 
     /* Try to find out the file type */
-    while (fstat(fo->fd, &sb) < 0) {
+    while (Fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
