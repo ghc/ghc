@@ -42,10 +42,9 @@ import TcTyClsDecls	( tcTyAndClassDecls )
 
 import CoreUnfold	( unfoldingTemplate, hasUnfolding )
 import Type		( funResultTy, splitForAllTys, openTypeKind )
-import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, errorsFound, dumpIfSet_dyn, showPass )
 import Id		( idType, idName, isLocalId, idUnfolding )
-import Module           ( Module )
+import Module           ( Module, isHomeModule )
 import Name		( Name, toRdrName, isGlobalName )
 import Name		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
@@ -123,6 +122,8 @@ typecheckExpr dflags pcs hst unqual this_mod (expr, decls)
     let all_expr = mkHsLet binds expr' in
     zonkExpr all_expr		`thenNF_Tc` \ zonked_expr ->
     zonkTcType ty		`thenNF_Tc` \ zonked_ty ->
+    ioToTc (dumpIfSet_dyn dflags 
+		Opt_D_dump_tc "Typechecked" (ppr zonked_expr)) `thenNF_Tc_`
     returnTc (new_pcs, zonked_expr, zonked_ty) 
   where
     get_fixity :: Name -> Maybe Fixity
@@ -307,7 +308,16 @@ tcImports pcs hst get_fixity this_mod decls
 
 	tcGetEnv						`thenTc` \ unf_env ->
 	let
-	    imported_things = filter (not . isLocalThing this_mod) (nameEnvElts (getTcGEnv unf_env))
+	    all_things = nameEnvElts (getTcGEnv unf_env)
+
+	     -- sometimes we're compiling in the context of a package module
+	     -- (on the GHCi command line, for example).  In this case, we
+	     -- want to treat everything we pulled in as an imported thing.
+	    imported_things
+		| isHomeModule this_mod
+			= filter (not . isLocalThing this_mod) all_things
+		| otherwise
+		        = all_things
 
 	    new_pte :: PackageTypeEnv
 	    new_pte = extendTypeEnvList (pcs_PTE pcs) imported_things

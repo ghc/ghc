@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.28 2001/01/18 12:54:16 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.29 2001/01/18 16:30:00 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -16,6 +16,7 @@ import CmStaticInfo
 import DriverFlags
 import DriverState
 import Linker
+import Finder
 import Module
 import Outputable
 import Util
@@ -110,9 +111,13 @@ interactiveUI cmstate mod = do
 #ifndef NO_READLINE
    Readline.initialize
 #endif
+
+   prel <- moduleNameToModule defaultCurrentModuleName
+   writeIORef defaultCurrentModule prel
+
    let this_mod = case mods of 
-			[] -> defaultCurrentModule
-			m:ms -> m
+	  	      []   -> prel
+  	  	      m:ms -> m
 
    (unGHCi uiLoop) GHCiState{ modules = mods,
 			      current_module = this_mod,
@@ -122,11 +127,12 @@ interactiveUI cmstate mod = do
                               last_expr = Nothing}
    return ()
 
+
 uiLoop :: GHCi ()
 uiLoop = do
   st <- getGHCiState
 #ifndef NO_READLINE
-  l <- io (readline (moduleNameUserString (current_module st) ++ "> "))
+  l <- io (readline (moduleUserString (current_module st) ++ "> "))
 #else
   l_ok <- io (hGetLine stdin)
   let l = Just l_ok
@@ -230,9 +236,18 @@ setContext ""
   = throwDyn (OtherError "syntax: `:m <module>'")
 setContext m | not (isUpper (head m)) || not (all isAlphaNum (tail m))
   = throwDyn (OtherError ("strange looking module name: `" ++ m ++ "'"))
-setContext m
-  = do st <- getGHCiState
-       setGHCiState st{current_module = mkModuleName m}
+setContext mn
+  = do m <- io (moduleNameToModule (mkModuleName mn))
+       st <- getGHCiState
+       setGHCiState st{current_module = m}
+
+moduleNameToModule :: ModuleName -> IO Module
+moduleNameToModule mn
+ = do maybe_stuff <- findModule mn
+      case maybe_stuff of
+	 Nothing -> throwDyn (OtherError ("can't find module `"
+					    ++ moduleNameUserString mn ++ "'"))
+   	 Just (m,_) -> return m
 
 changeDirectory :: String -> GHCi ()
 changeDirectory d = io (setCurrentDirectory d)
@@ -245,11 +260,13 @@ loadModule' path = do
   cmstate1 <- io (cmUnload (cmstate state))
   (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 path)
 
+  def_mod <- io (readIORef defaultCurrentModule)
+
   let new_state = state{
   			cmstate = cmstate2,
 			modules = mods,
 			current_module = case mods of 
-					   [] -> defaultCurrentModule
+					   [] -> def_mod
 					   xs -> head xs,
 			target = Just path
 		   }
@@ -258,7 +275,7 @@ loadModule' path = do
   let mod_commas 
 	| null mods = text "none."
 	| otherwise = hsep (
-	    punctuate comma (map (text.moduleNameUserString) mods)) <> text "."
+	    punctuate comma (map (text.moduleUserString) mods)) <> text "."
   case ok of
     False -> 
        io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
@@ -272,11 +289,12 @@ reloadModule "" = do
    Nothing -> io (putStr "no current target\n")
    Just path
       -> do (new_cmstate, ok, mods) <- io (cmLoadModule (cmstate state) path)
+	    def_mod <- io (readIORef defaultCurrentModule)
             setGHCiState 
                state{cmstate=new_cmstate,
                      modules = mods,
                      current_module = case mods of 
-                                         [] -> defaultCurrentModule
+                                         [] -> def_mod
                                          xs -> head xs
                     }
 
@@ -432,8 +450,8 @@ rememberExpr str
 
 data GHCiState = GHCiState
      { 
-	modules	       :: [ModuleName],
-	current_module :: ModuleName,
+	modules	       :: [Module],
+	current_module :: Module,
 	target         :: Maybe FilePath,
 	cmstate        :: CmState,
 	options        :: [GHCiOption],
@@ -442,7 +460,8 @@ data GHCiState = GHCiState
 
 data GHCiOption = ShowTiming | ShowType deriving Eq
 
-defaultCurrentModule = mkModuleName "Prelude"
+defaultCurrentModuleName = mkModuleName "Prelude"
+GLOBAL_VAR(defaultCurrentModule, error "no defaultCurrentModule", Module)
 
 newtype GHCi a = GHCi { unGHCi :: GHCiState -> IO (GHCiState, a) }
 

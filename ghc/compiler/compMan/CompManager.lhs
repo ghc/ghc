@@ -18,7 +18,7 @@ import CmLink
 import CmTypes
 import HscTypes
 import Module		( Module, ModuleName, moduleName, isHomeModule,
-			  mkHomeModule, mkModuleName, moduleNameUserString )
+			  mkModuleName, moduleNameUserString )
 import CmStaticInfo	( GhciMode(..) )
 import DriverPipeline
 import GetImports
@@ -68,13 +68,13 @@ cmInit gmode
 #ifdef GHCI
 cmGetExpr :: CmState
 	  -> DynFlags
-          -> ModuleName
+          -> Module
           -> String
           -> Bool
           -> IO (CmState, Maybe (HValue, PrintUnqualified, Type))
-cmGetExpr cmstate dflags modname expr wrap_print
+cmGetExpr cmstate dflags mod expr wrap_print
    = do (new_pcs, maybe_stuff) <- 
-	   hscExpr dflags hst hit pcs (mkHomeModule modname) expr wrap_print
+	   hscExpr dflags hst hit pcs mod expr wrap_print
         case maybe_stuff of
 	   Nothing     -> return (cmstate{ pcs=new_pcs }, Nothing)
 	   Just (bcos, print_unqual, ty) -> do
@@ -170,7 +170,7 @@ cmLoadModule :: CmState
              -> FilePath
              -> IO (CmState,		-- new state
 		    Bool, 		-- was successful
-		    [ModuleName])	-- list of modules loaded
+		    [Module])		-- list of modules loaded
 
 cmLoadModule cmstate1 rootname
    = do -- version 1's are the original, before downsweep
@@ -308,7 +308,7 @@ cmLoadModule cmstate1 rootname
                           let cmstate3 
                                  = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
                           return (cmstate3, True, 
-                                  map name_of_summary modsDone)
+                                  map ms_mod modsDone)
 
          else 
            -- Tricky.  We need to back out the effects of compiling any
@@ -344,7 +344,7 @@ cmLoadModule cmstate1 rootname
                           let cmstate4 
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
                           return (cmstate4, False, 
-                                  mods_to_keep_names)
+                                  map ms_mod mods_to_keep)
 
 
 
