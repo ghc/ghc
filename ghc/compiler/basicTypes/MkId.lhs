@@ -180,7 +180,8 @@ dataConInfo data_con
 
 	con_rhs = mkLams all_tyvars $ mkLams dict_args $ 
 		  mkLams ex_dict_args $ mkLams id_args $
-		  foldr mk_case con_app (zip id_args strict_marks) i3 []
+		  foldr mk_case con_app 
+		     (zip (ex_dict_args++id_args) strict_marks) i3 []
 
 	mk_case 
 	   :: (Id, StrictnessMark)	-- arg, strictness

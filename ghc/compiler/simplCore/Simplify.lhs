@@ -1488,8 +1488,8 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
     add_evals other_con    vs = vs
 
     cat_evals [] [] = []
-    cat_evals (v:vs) (str:strs) 
-	| isTyVar v = cat_evals vs (str:strs)
+    cat_evals (v:vs) (str:strs)
+	| isTyVar v = v : cat_evals vs (str:strs)
 	| otherwise = 
 	   case str of
 		MarkedStrict    -> 

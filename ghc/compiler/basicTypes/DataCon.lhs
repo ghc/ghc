@@ -190,10 +190,11 @@ mkDataCon name arg_stricts fields tyvars theta ex_tyvars ex_theta orig_arg_tys t
     (real_arg_stricts, strict_arg_tyss) 
 	= unzip (zipWith (unbox_strict_arg_ty tycon) arg_stricts orig_arg_tys)
     rep_arg_tys = concat strict_arg_tyss
-
-    all_stricts = (map mk_dict_strict_mark ex_theta) ++ real_arg_stricts
-    user_stricts = (map mk_dict_strict_mark ex_theta) ++ arg_stricts
+	
+    ex_dict_stricts = map mk_dict_strict_mark ex_theta
 	-- Add a strictness flag for the existential dictionary arguments
+    all_stricts     = ex_dict_stricts ++ real_arg_stricts
+    user_stricts    = ex_dict_stricts ++ arg_stricts
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
     ty  = mkSigmaTy (tyvars ++ ex_tyvars) 
@@ -255,12 +256,17 @@ maybe_unpack_field set ty MarkedStrict | not opt_UnboxStrictFields
 maybe_unpack_field set ty strict
   = case splitAlgTyConApp_maybe ty of
 	Just (tycon,ty_args,[con])
+		-- loop breaker
 	   | tycon `elementOfUniqSet` set -> Nothing
+		-- don't unpack constructors with existential tyvars
+	   | not (null ex_tyvars) -> Nothing
+		-- ok, let's do it
 	   | otherwise ->
 		let set' = addOneToUniqSet set tycon in
 		maybe_unpack_fields set' 
 		    (zip (dataConOrigArgTys con ty_args)
 			 (dcUserStricts con))
+	   where (_, _, ex_tyvars, _, _, _) = dataConSig con
 	_ -> Just [ty]
 
 maybe_unpack_fields :: UniqSet TyCon -> [(Type,StrictnessMark)] -> Maybe [Type]

@@ -239,6 +239,9 @@ rebuildConArgs
   -> DsM (CoreExpr, [Id])
 
 rebuildConArgs con [] stricts body = returnDs (body, [])
+rebuildConArgs con (arg:args) stricts body | isTyVar arg
+  = rebuildConArgs con args stricts body `thenDs` \ (body', args') ->
+    returnDs (body',arg:args')
 rebuildConArgs con (arg:args) (str:stricts) body
   = rebuildConArgs con args stricts body `thenDs` \ (body', real_args) ->
     case str of
