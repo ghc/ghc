@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.144 2002/09/25 14:46:34 simonmar Exp $
+ * $Id: GC.c,v 1.145 2002/10/25 09:40:47 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1382,8 +1382,12 @@ addBlock(step *stp)
 static __inline__ void 
 upd_evacuee(StgClosure *p, StgClosure *dest)
 {
-  p->header.info = &stg_EVACUATED_info;
-  ((StgEvacuated *)p)->evacuee = dest;
+    // Source object must be in from-space:
+    ASSERT((Bdescr((P_)p)->flags & BF_EVACUATED) == 0);
+    // not true: (ToDo: perhaps it should be)
+    // ASSERT(Bdescr((P_)dest)->flags & BF_EVACUATED);
+    p->header.info = &stg_EVACUATED_info;
+    ((StgEvacuated *)p)->evacuee = dest;
 }
 
 
@@ -1985,7 +1989,6 @@ selector_loop:
 	  return selectee->payload[field];
 
       case IND:
-      case IND_STATIC:
       case IND_PERM:
       case IND_OLDGEN:
       case IND_OLDGEN_PERM:
@@ -1996,6 +1999,11 @@ selector_loop:
 	  // We don't follow pointers into to-space; the constructor
 	  // has already been evacuated, so we won't save any space
 	  // leaks by evaluating this selector thunk anyhow.
+	  break;
+
+      case IND_STATIC:
+	  // We can't easily tell whether the indirectee is into 
+	  // from or to-space, so just bail out here.
 	  break;
 
       case THUNK_SELECTOR:
