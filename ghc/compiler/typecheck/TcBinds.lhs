@@ -24,6 +24,7 @@ import Inst		( Inst, LIE, emptyLIE, mkLIE, plusLIE, plusLIEs, InstOrigin(..),
 			)
 import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId,
+			  tcLookupTyCon, 
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
@@ -39,11 +40,13 @@ import TcType		( TcType, TcThetaType,
 			)
 import TcUnify		( unifyTauTy, unifyTauTyLists )
 
+import PrelInfo		( main_NAME, ioTyCon_NAME )
+
 import Id		( mkUserId )
 import Var		( idType, idName, setIdInfo )
 import IdInfo		( IdInfo, noIdInfo, setInlinePragInfo, InlinePragInfo(..) )
-import Name		( Name )
-import Type		( mkTyVarTy, tyVarsOfTypes,
+import Name		( Name, getName )
+import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
 			  splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, 
 			  mkDictTy, splitRhoTy, mkForAllTy, isUnLiftedType, 
 			  isUnboxedType, unboxedTypeKind, boxedTypeKind
@@ -52,6 +55,7 @@ import Var		( TyVar, tyVarKind )
 import VarSet
 import Bag
 import Util		( isIn )
+import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
 import SrcLoc           ( SrcLoc )
 import Outputable
@@ -250,18 +254,17 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs is_rec prag_info_fn
 	-- TYPECHECK THE BINDINGS
     tcMonoBinds mbind tc_ty_sigs is_rec	`thenTc` \ (mbind', lie_req, binder_names, mono_ids) ->
 
-    let
-	mono_id_tys = map idType mono_ids
-    in
-
 	-- CHECK THAT THE SIGNATURES MATCH
 	-- (must do this before getTyVarsToGen)
-    checkSigMatch tc_ty_sigs				`thenTc` \ (sig_theta, lie_avail) ->	
+    checkSigMatch top_lvl binder_names mono_ids tc_ty_sigs	`thenTc` \ maybe_sig_theta ->	
 
 	-- COMPUTE VARIABLES OVER WHICH TO QUANTIFY, namely tyvars_to_gen
 	-- The tyvars_not_to_gen are free in the environment, and hence
 	-- candidates for generalisation, but sometimes the monomorphism
 	-- restriction means we can't generalise them nevertheless
+    let
+	mono_id_tys = map idType mono_ids
+    in
     getTyVarsToGen is_unrestricted mono_id_tys lie_req	`thenNF_Tc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
 
 	-- Finally, zonk the generalised type variables to real TyVars
@@ -288,7 +291,8 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs is_rec prag_info_fn
 		-- No polymorphism, so no need to simplify context
 	    returnTc (lie_req, EmptyMonoBinds, [])
 	else
-	if null tc_ty_sigs then
+	case maybe_sig_theta of
+	  Nothing ->
 		-- No signatures, so just simplify the lie
 		-- NB: no signatures => no polymorphic recursion, so no
 		-- need to use lie_avail (which will be empty anyway)
@@ -296,7 +300,11 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs is_rec prag_info_fn
 		       top_lvl real_tyvars_to_gen lie_req	`thenTc` \ (lie_free, dict_binds, lie_bound) ->
 	    returnTc (lie_free, dict_binds, map instToId (bagToList lie_bound))
 
-	else
+	  Just (sig_theta, lie_avail) ->
+		-- There are signatures, and their context is sig_theta
+		-- Furthermore, lie_avail is an LIE containing the 'method insts'
+		-- for the things bound here
+
 	    zonkTcThetaType sig_theta			`thenNF_Tc` \ sig_theta' ->
 	    newDicts SignatureOrigin sig_theta'		`thenNF_Tc` \ (dicts_sig, dict_ids) ->
 		-- It's important that sig_theta is zonked, because
@@ -682,13 +690,46 @@ The error message here is somewhat unsatisfactory, but it'll do for
 now (ToDo).
 
 \begin{code}
-checkSigMatch []
-  = returnTc (error "checkSigMatch", emptyLIE)
+checkSigMatch top_lvl binder_names mono_ids sigs
+  | main_bound_here
+  = mapTc check_one_sig sigs			`thenTc_`
+    mapTc check_main_ctxt sigs			`thenTc_` 
 
-checkSigMatch tc_ty_sigs@( sig1@(TySigInfo _ id1 _ theta1 _ _ _ _) : all_sigs_but_first )
-  = 	-- CHECK THAT THE SIGNATURE TYVARS AND TAU_TYPES ARE OK
+	-- Now unify the main_id with IO t, for any old t
+    tcSetErrCtxt mainTyCheckCtxt (
+	tcLookupTyCon ioTyCon_NAME		`thenTc`    \ ioTyCon ->
+	newTyVarTy boxedTypeKind		`thenNF_Tc` \ t_tv ->
+	unifyTauTy ((mkTyConApp ioTyCon [t_tv]))
+		   (idType main_mono_id)
+    )						`thenTc_`
+    returnTc (Just ([], emptyLIE))
+
+  | not (null sigs)
+  = mapTc check_one_sig sigs			`thenTc_`
+    mapTc check_one_ctxt all_sigs_but_first	`thenTc_`
+    returnTc (Just (theta1, sig_lie))
+
+  | otherwise
+  = returnTc Nothing		-- No constraints from type sigs
+
+  where
+    (TySigInfo _ id1 _ theta1 _ _ _ _ : all_sigs_but_first) = sigs
+
+    sig1_dict_tys	= mk_dict_tys theta1
+    n_sig1_dict_tys	= length sig1_dict_tys
+    sig_lie 		= mkLIE [inst | TySigInfo _ _ _ _ _ _ inst _ <- sigs]
+
+    maybe_main        = find_main top_lvl binder_names mono_ids
+    main_bound_here   = maybeToBool maybe_main
+    Just main_mono_id = maybe_main
+		      
+   	-- CHECK THAT THE SIGNATURE TYVARS AND TAU_TYPES ARE OK
 	-- Doesn't affect substitution
-    mapTc check_one_sig tc_ty_sigs	`thenTc_`
+    check_one_sig (TySigInfo _ id sig_tyvars _ sig_tau _ _ src_loc)
+      = tcAddSrcLoc src_loc					$
+	tcAddErrCtxtM (sigCtxt (sig_msg id) (idType id))	$
+	checkSigTyVars sig_tyvars
+
 
 	-- CHECK THAT ALL THE SIGNATURE CONTEXTS ARE UNIFIABLE
 	-- The type signatures on a mutually-recursive group of definitions
@@ -697,15 +738,7 @@ checkSigMatch tc_ty_sigs@( sig1@(TySigInfo _ id1 _ theta1 _ _ _ _) : all_sigs_bu
 	-- We unify them because, with polymorphic recursion, their types
 	-- might not otherwise be related.  This is a rather subtle issue.
 	-- ToDo: amplify
-    mapTc check_one_cxt all_sigs_but_first		`thenTc_`
-
-    returnTc (theta1, sig_lie)
-  where
-    sig1_dict_tys	= mk_dict_tys theta1
-    n_sig1_dict_tys	= length sig1_dict_tys
-    sig_lie 		= mkLIE [inst | TySigInfo _ _ _ _ _ _ inst _ <- tc_ty_sigs]
-
-    check_one_cxt sig@(TySigInfo _ id _ theta _ _ _ src_loc)
+    check_one_ctxt sig@(TySigInfo _ id _ theta _ _ _ src_loc)
        = tcAddSrcLoc src_loc	$
 	 tcAddErrCtxt (sigContextsCtxt id1 id) $
 	 checkTc (length this_sig_dict_tys == n_sig1_dict_tys)
@@ -714,15 +747,23 @@ checkSigMatch tc_ty_sigs@( sig1@(TySigInfo _ id1 _ theta1 _ _ _ _) : all_sigs_bu
       where
 	 this_sig_dict_tys = mk_dict_tys theta
 
-    check_one_sig (TySigInfo _ id sig_tyvars _ sig_tau _ _ src_loc)
-      = tcAddSrcLoc src_loc					$
-	tcAddErrCtxtM (sigCtxt (sig_msg id) (idType id))	$
-	checkSigTyVars sig_tyvars
+	-- CHECK THAT FOR A GROUP INVOLVING Main.main, all 
+	-- the signature contexts are empty (what a bore)
+    check_main_ctxt sig@(TySigInfo _ id _ theta _ _ _ src_loc)
+	= tcAddSrcLoc src_loc	$
+	  checkTc (null theta) (mainContextsErr id)
 
     mk_dict_tys theta = [mkDictTy c ts | (c,ts) <- theta]
 
     sig_msg id tidy_ty = sep [ptext SLIT("When checking the type signature"),
 			      nest 4 (ppr id <+> dcolon <+> ppr tidy_ty)]
+
+	-- Search for Main.main in the binder_names, return corresponding mono_id
+    find_main NotTopLevel binder_names mono_ids = Nothing
+    find_main TopLevel    binder_names mono_ids = go binder_names mono_ids
+    go [] [] = Nothing
+    go (n:ns) (m:ms) | n == main_NAME = Just m
+		     | otherwise      = go ns ms
 \end{code}
 
 
@@ -904,10 +945,19 @@ bindSigsCtxt ids
 -----------------------------------------------
 sigContextsErr
   = ptext SLIT("Mismatched contexts")
+
 sigContextsCtxt s1 s2
   = hang (hsep [ptext SLIT("When matching the contexts of the signatures for"), 
 		quotes (ppr s1), ptext SLIT("and"), quotes (ppr s2)])
 	 4 (ptext SLIT("(the signature contexts in a mutually recursive group should all be identical)"))
+
+mainContextsErr id
+  | getName id == main_NAME = ptext SLIT("Main.main cannot be overloaded")
+  | otherwise
+  = quotes (ppr id) <+> ptext SLIT("cannot be overloaded, because it is mutually recursive with Main.main")
+
+mainTyCheckCtxt
+  = hsep [ptext SLIT("When checking that"), ppr main_NAME, ptext SLIT("has the required type")]
 
 -----------------------------------------------
 unliftedBindErr flavour mbind

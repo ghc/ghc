@@ -1032,7 +1032,13 @@ rebuild :: OutExpr -> SimplCont -> SimplM OutExprStuff
 
 rebuild expr cont
   = tick LeavesExamined					`thenSmpl_`
-    do_rebuild expr cont
+    case expr of
+	Var v -> case getIdStrictness v of
+		    NoStrictnessInfo		        -> do_rebuild expr cont
+		    StrictnessInfo demands result_bot _ -> ASSERT( not (null demands) || result_bot )
+								-- If this happened we'd get an infinite loop
+							   rebuild_strict demands result_bot expr (idType v) cont
+	other  -> do_rebuild expr cont
 
 rebuild_done expr
   = getInScope			`thenSmpl` \ in_scope ->		
@@ -1053,16 +1059,8 @@ do_rebuild expr (ArgOf _ cont_fn _) = cont_fn expr
 --	ApplyTo continuation
 
 do_rebuild expr cont@(ApplyTo _ arg se cont')
-  = case expr of
-	Var v -> case getIdStrictness v of
-		    NoStrictnessInfo		        -> non_strict_case
-		    StrictnessInfo demands result_bot _ -> ASSERT( not (null demands) || result_bot )
-								-- If this happened we'd get an infinite loop
-							   rebuild_strict demands result_bot expr (idType v) cont
-	other -> non_strict_case
-  where
-    non_strict_case = setSubstEnv se (simplArg arg)	`thenSmpl` \ arg' ->
-		      do_rebuild (App expr arg') cont'
+  = setSubstEnv se (simplArg arg)	`thenSmpl` \ arg' ->
+    do_rebuild (App expr arg') cont'
 
 
 ---------------------------------------------------------
@@ -1072,9 +1070,6 @@ do_rebuild expr (CoerceIt _ to_ty se cont)
   = setSubstEnv se	$
     simplType to_ty	`thenSmpl` \ to_ty' ->
     do_rebuild (mk_coerce to_ty' expr) cont
-  where
-    mk_coerce to_ty' (Note (Coerce _ from_ty) expr) = Note (Coerce to_ty' from_ty) expr
-    mk_coerce to_ty' expr			    = Note (Coerce to_ty' (coreExprType expr)) expr
 
 
 ---------------------------------------------------------
@@ -1209,6 +1204,8 @@ If so, then we can replace the case with one of the rhss.
 \begin{code}
 ---------------------------------------------------------
 --	Rebuiling a function with strictness info
+--	This just a version of do_rebuild, enhanced with info about
+--	the strictness of the thing being rebuilt.
 
 rebuild_strict :: [Demand] -> Bool 	-- Stricness info
 	       -> OutExpr -> OutType	-- Function and type
@@ -1218,6 +1215,11 @@ rebuild_strict :: [Demand] -> Bool 	-- Stricness info
 rebuild_strict [] True  fun fun_ty cont = rebuild_bot fun fun_ty cont
 rebuild_strict [] False fun fun_ty cont = do_rebuild fun cont
 
+rebuild_strict ds result_bot fun fun_ty (CoerceIt _ to_ty se cont)
+	= setSubstEnv se	$
+	  simplType to_ty	`thenSmpl` \ to_ty' ->
+	  rebuild_strict ds result_bot (mk_coerce to_ty' fun) to_ty' cont
+
 rebuild_strict ds result_bot fun fun_ty (ApplyTo _ (Type ty_arg) se cont)
 				-- Type arg; don't consume a demand
 	= setSubstEnv se (simplType ty_arg)	`thenSmpl` \ ty_arg' ->
@@ -1225,7 +1227,8 @@ rebuild_strict ds result_bot fun fun_ty (ApplyTo _ (Type ty_arg) se cont)
 			 (applyTy fun_ty ty_arg') cont
 
 rebuild_strict (d:ds) result_bot fun fun_ty (ApplyTo _ val_arg se cont)
-	| isStrict d || isUnLiftedType arg_ty	-- Strict value argument
+	| isStrict d || isUnLiftedType arg_ty
+				-- Strict value argument
 	= getInScope 				`thenSmpl` \ in_scope ->
 	  let
 		cont_ty = contResultType in_scope res_ty cont
@@ -1248,6 +1251,7 @@ rebuild_strict ds result_bot fun fun_ty cont = do_rebuild fun cont
 -- 	Dealing with
 --	* case (error "hello") of { ... }
 --	* (error "Hello") arg
+--	* f (error "Hello") where f is strict
 --	etc
 
 rebuild_bot expr expr_ty Stop				-- No coerce needed
@@ -1259,13 +1263,17 @@ rebuild_bot expr expr_ty (CoerceIt _ to_ty se Stop)	-- Don't "tick" on this,
     simplType to_ty	`thenSmpl` \ to_ty' ->
     rebuild_done (mkNote (Coerce to_ty' expr_ty) expr)
 
-rebuild_bot expr expr_ty cont
+rebuild_bot expr expr_ty cont				-- Abandon the (strict) continuation,
+							-- and just return expr
   = tick CaseOfError		`thenSmpl_`
     getInScope			`thenSmpl` \ in_scope ->
     let
 	result_ty = contResultType in_scope expr_ty cont
     in
     rebuild_done (mkNote (Coerce result_ty expr_ty) expr)
+
+mk_coerce to_ty (Note (Coerce _ from_ty) expr) = Note (Coerce to_ty from_ty) expr
+mk_coerce to_ty expr			       = Note (Coerce to_ty (coreExprType expr)) expr
 \end{code}
 
 Blob of helper functions for the "case-of-something-else" situation.

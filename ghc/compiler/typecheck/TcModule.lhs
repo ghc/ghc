@@ -52,16 +52,15 @@ import Name		( Name, nameUnique, isLocallyDefined, pprModule, NamedThing(..) )
 import TyCon		( TyCon, tyConKind )
 import DataCon		( dataConId )
 import Class		( Class, classSelIds, classTyCon )
-import Type		( mkTyConApp, mkForAllTy, mkTyVarTy, 
+import Type		( mkTyConApp, mkForAllTy,
 			  boxedTypeKind, getTyVar, Type )
 import TysWiredIn	( unitTy )
 import PrelMods		( mAIN )
-import PrelInfo		( main_NAME, ioTyCon_NAME,
-			  thinAirIdNames, setThinAirIds
-			)
+import PrelInfo		( main_NAME, thinAirIdNames, setThinAirIds )
 import TcUnify		( unifyTauTy )
 import Unique		( Unique  )
 import UniqSupply       ( UniqSupply )
+import Maybes		( maybeToBool )
 import Util
 import Bag		( Bag, isEmptyBag )
 import Outputable
@@ -224,8 +223,6 @@ tcModule rn_name_supply
 	tcInstDecls2  inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
 	tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
 
-	-- Check that "main" has the right signature
-	tcCheckMainSig mod_name		`thenTc_` 
 
 	     -- Deal with constant or ambiguous InstIds.  How could
 	     -- there be ambiguous ones?  They can only arise if a
@@ -241,9 +238,16 @@ tcModule rn_name_supply
 	in
 	tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
 
+		-- Check that Main defines main
+	(if mod_name == mAIN then
+		tcLookupValueMaybe main_NAME	`thenNF_Tc` \ maybe_main ->
+		checkTc (maybeToBool maybe_main) noMainErr
+	 else
+		returnTc ()
+	)					`thenTc_`
 
 	    -- Backsubstitution.    This must be done last.
-	    -- Even tcCheckMainSig and tcSimplifyTop may do some unification.
+	    -- Even tcSimplifyTop may do some unification.
 	let
 	    all_binds = data_binds 		`AndMonoBinds` 
 			val_binds		`AndMonoBinds`
@@ -278,45 +282,8 @@ get_val_decls decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
 
 
 \begin{code}
-tcCheckMainSig mod_name
-  | mod_name /= mAIN
-  = returnTc ()		-- A non-main module
-
-  | otherwise
-  = 	-- Check that main is defined
-    tcLookupTyCon ioTyCon_NAME		`thenTc`    \ ioTyCon ->
-    tcLookupValueMaybe main_NAME	`thenNF_Tc` \ maybe_main_id ->
-    case maybe_main_id of {
-	Nothing	       -> failWithTc noMainErr ;
-	Just main_id   ->
-
-	-- Check that it has the right type (or a more general one)
-	-- As of Haskell 98, anything that unifies with (IO a) is OK.
-    newTyVarTy boxedTypeKind		`thenNF_Tc` \ t_tv ->
-    let 
-        tv	     = getTyVar "tcCheckMainSig" t_tv
-	expected_tau = typeToTcType ((mkTyConApp ioTyCon [t_tv]))
-    in
-    tcId main_NAME				`thenNF_Tc` \ (_, lie, main_tau) ->
-    tcSetErrCtxt mainTyCheckCtxt $
-    unifyTauTy expected_tau
-	       main_tau			`thenTc_`
-    checkTc (isEmptyBag lie) (mainTyMisMatch expected_tau (idType main_id))
-    }
-
-
-mainTyCheckCtxt
-  = hsep [ptext SLIT("When checking that"), ppr main_NAME, ptext SLIT("has the required type")]
-
 noMainErr
   = hsep [ptext SLIT("Module"), quotes (pprModule mAIN), 
 	  ptext SLIT("must include a definition for"), quotes (ppr main_NAME)]
-
-mainTyMisMatch :: TcType -> TcType -> Message
-mainTyMisMatch expected actual
-  = hang (hsep [ppr main_NAME, ptext SLIT("has the wrong type")])
-	 4 (vcat [
-			hsep [ptext SLIT("Expected:"), ppr expected],
-			hsep [ptext SLIT("Inferred:"), ppr actual]
-		     ])
 \end{code}
+

@@ -11,7 +11,7 @@ module RnIfaces (
 	importDecl, recordSlurp,
 	getImportVersions, getSlurpedNames, getRnStats, getImportedFixities,
 
-	checkUpToDate, loadHomeInterface,
+	checkUpToDate,
 
 	getDeclBinders,
 	mkSearchPath
@@ -72,7 +72,6 @@ import Outputable
 
 import IO	( isDoesNotExistError )
 import List	( nub )
-
 \end{code}
 
 
@@ -784,10 +783,26 @@ getSpecialInstModules
   = getIfacesRn						`thenRn` \ ifaces ->
     returnRn (iInstMods ifaces)
 
-getImportedFixities :: RnMG FixityEnv
-getImportedFixities
-  = getIfacesRn						`thenRn` \ ifaces ->
+getImportedFixities :: GlobalRdrEnv -> RnMG FixityEnv
+	-- Get all imported fixities
+	-- We first make sure that all the home modules
+	-- of all in-scope variables are loaded.
+getImportedFixities gbl_env
+  = let
+	home_modules = [ nameModule name | names <- rdrEnvElts gbl_env,
+					   name <- names,
+					   not (isLocallyDefined name)
+		       ]
+    in
+    mapRn load (nub home_modules)	`thenRn_`
+
+	-- Now we can snaffle the fixity env
+    getIfacesRn						`thenRn` \ ifaces ->
     returnRn (iFixes ifaces)
+  where
+    load mod = loadInterface doc_str mod
+	     where
+	       doc_str = ptext SLIT("Need fixities from") <+> ppr mod
 \end{code}
 
 

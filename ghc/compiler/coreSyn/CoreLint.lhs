@@ -21,7 +21,7 @@ import CoreUtils	( idFreeVars )
 import Bag
 import Const		( Con(..), DataCon, conType, conOkForApp, conOkForAlt )
 import Id		( isConstantId, idMustBeINLINEd )
-import Var		( IdOrTyVar, Id, TyVar, idType, tyVarKind, isTyVar )
+import Var		( IdOrTyVar, Id, TyVar, idType, tyVarKind, isTyVar, isId )
 import VarSet
 import VarEnv		( mkVarEnv )
 import Name		( isLocallyDefined, getSrcLoc )
@@ -147,11 +147,20 @@ We use this to check all unfoldings that come in from interfaces
 (it is very painful to catch errors otherwise):
 
 \begin{code}
-lintUnfolding :: SrcLoc -> CoreExpr -> Maybe CoreExpr
+lintUnfolding :: SrcLoc
+	      -> [IdOrTyVar]		-- Treat these as in scope
+	      -> CoreExpr
+	      -> Maybe CoreExpr
 
-lintUnfolding locn expr
+lintUnfolding locn vars expr
+  | not opt_DoCoreLinting
+  = Just expr
+
+  | otherwise
   = case
-      initL (addLoc (ImportedUnfolding locn) (lintCoreExpr expr))
+      initL (addLoc (ImportedUnfolding locn) $
+	     addInScopeVars vars	     $
+	     lintCoreExpr expr)
     of
       Nothing  -> Just expr
       Just msg ->
@@ -560,13 +569,13 @@ checkBndrIdInScope binder id
 	   ppr binder
 
 checkInScope :: SDoc -> IdOrTyVar -> LintM ()
-checkInScope loc_msg id loc scope errs
-  |  isLocallyDefined id 
-  && not (id `elemVarSet` scope)
-  && not (idMustBeINLINEd id)	-- Constructors and dict selectors 
-				-- don't have bindings, 
-				-- just MustInline prags
-  = (Nothing, addErr errs (hsep [ppr id, loc_msg]) loc)
+checkInScope loc_msg var loc scope errs
+  |  isLocallyDefined var 
+  && not (var `elemVarSet` scope)
+  && not (isId var && idMustBeINLINEd var)	-- Constructors and dict selectors 
+						-- don't have bindings, 
+						-- just MustInline prags
+  = (Nothing, addErr errs (hsep [ppr var, loc_msg]) loc)
   | otherwise
   = (Nothing,errs)
 

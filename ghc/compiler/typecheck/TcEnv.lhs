@@ -265,7 +265,9 @@ tcLookupTy name
 		   maybe_arity | isSynTyCon tc = Just (tyConArity tc)
 			       | otherwise     = Nothing 
 
-	Nothing -> pprPanic "tcLookupTy" (ppr name)
+	Nothing -> 	-- This can happen if an interface-file
+			-- unfolding is screwed up
+		   failWithTc (tyNameOutOfScope name)
     }
 	
 tcLookupClass :: Name -> NF_TcM s Class
@@ -422,4 +424,7 @@ badCon con_id
   = quotes (ppr con_id) <+> ptext SLIT("is not a data constructor")
 badPrimOp op
   = quotes (ppr op) <+> ptext SLIT("is not a primop")
+
+tyNameOutOfScope name
+  = quotes (ppr name) <+> ptext SLIT("is not in scope")
 \end{code}

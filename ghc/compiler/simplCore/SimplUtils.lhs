@@ -30,8 +30,8 @@ import Maybes		( maybeToBool )
 import Const		( Con(..) )
 import Name		( isLocalName )
 import SimplMonad
-import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, mkTyVarTys,
-			  splitTyConApp_maybe, mkTyVarTy, substTyVar
+import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys,
+			  splitTyConApp_maybe, substTyVar, mkTyVarTys
 			)
 import Var		( setVarUnique )
 import VarSet

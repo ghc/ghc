@@ -123,7 +123,7 @@ module TcSimplify (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_MaxContextReductionDepth, opt_GlasgowExts )
+import CmdLineOpts	( opt_MaxContextReductionDepth, opt_GlasgowExts, opt_WarnTypeDefaults )
 import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
 import TcHsSyn		( TcExpr, TcId, 
 			  TcMonoBinds, TcDictBinds
@@ -972,7 +972,7 @@ tcSimplifyTop wanted_lie
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
     complain d | isEmptyVarSet (tyVarsOfInst d) = addTopInstanceErr d
-	       | otherwise			  = addAmbigErr tyVarsOfInst d
+	       | otherwise			= addAmbigErr tyVarsOfInst d
 
 get_tv d   = case getDictClassTys d of
 		   (clas, [ty]) -> getTyVar "tcSimplifyTop" ty
@@ -1034,8 +1034,9 @@ disambigGroup dicts
     in
     unifyTauTy chosen_default_tc_ty (mkTyVarTy tyvar)	`thenTc_`
     reduceContext (text "disambig" <+> ppr dicts)
-		  try_me [] dicts	`thenTc` \ (binds, frees, ambigs) ->
+		  try_me [] dicts			`thenTc` \ (binds, frees, ambigs) ->
     ASSERT( null frees && null ambigs )
+    warnDefault dicts chosen_default_ty			`thenTc_`
     returnTc binds
 
   | all isCreturnableClass classes
@@ -1111,6 +1112,23 @@ addAmbigErr ambig_tv_fn dict
   where
     ambig_tvs = varSetElems (ambig_tv_fn tidy_dict)
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
+
+warnDefault dicts default_ty
+  | not opt_WarnTypeDefaults
+  = returnNF_Tc ()
+
+  | otherwise
+  = tcAddSrcLoc (instLoc (head dicts))		$
+    warnTc True msg
+  where
+    msg | length dicts > 1 
+	= (ptext SLIT("Defaulting the following constraint(s) to type") <+> quotes (ppr default_ty))
+	  $$ pprInstsInFull tidy_dicts
+	| otherwise
+	= ptext SLIT("Defaulting") <+> quotes (pprInst (head tidy_dicts)) <+> 
+	  ptext SLIT("to type") <+> quotes (ppr default_ty)
+
+    (_, tidy_dicts) = mapAccumL tidyInst emptyTidyEnv dicts
 
 -- Used for top-level irreducibles
 addTopInstanceErr dict

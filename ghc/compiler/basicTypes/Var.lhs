@@ -150,12 +150,24 @@ setTyVarName   = setVarName
 
 \begin{code}
 mkTyVar :: Name -> Kind -> TyVar
-mkTyVar name kind = Var { varName = name, realUnique = getKey (nameUnique name),
-			  varType = kind, varDetails = TyVar }
+mkTyVar name kind = Var { varName    = name
+			, realUnique = getKey (nameUnique name)
+			, varType    = kind
+			, varDetails = TyVar
+#ifdef DEBUG
+			, varInfo = pprPanic "mkTyVar" (ppr name)
+#endif
+			}
 
 mkSysTyVar :: Unique -> Kind -> TyVar
-mkSysTyVar uniq kind = Var { varName = name, realUnique = getKey uniq,
-			     varType = kind, varDetails = TyVar }
+mkSysTyVar uniq kind = Var { varName    = name
+			   , realUnique = getKey uniq
+			   , varType    = kind
+			   , varDetails = TyVar
+#ifdef DEBUG
+			   , varInfo = pprPanic "mkSysTyVar" (ppr name)
+#endif
+			   }
 		     where
 		       name = mkSysLocalName uniq SLIT("t")
 

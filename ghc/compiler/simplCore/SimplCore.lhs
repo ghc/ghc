@@ -50,7 +50,7 @@ import PrelInfo		( unpackCStringId, unpackCString2Id,
 			  int2IntegerId, addr2IntegerId
 			)
 import Type		( Type, splitAlgTyConApp_maybe, 
-			  isUnLiftedType, mkTyVarTy, 
+			  isUnLiftedType,
 			  tidyType, tidyTypes, tidyTopType, tidyTyVar, tidyTyVars,
 			  Type
 			)

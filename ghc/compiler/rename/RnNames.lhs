@@ -24,7 +24,7 @@ import RdrHsSyn	( RdrNameIE, RdrNameImportDecl,
 		  RdrNameHsModule, RdrNameHsDecl
 		)
 import RnIfaces	( getInterfaceExports, getDeclBinders, getImportedFixities, 
-		  recordSlurp, checkUpToDate, loadHomeInterface
+		  recordSlurp, checkUpToDate
 		)
 import RnEnv
 import RnMonad
@@ -42,7 +42,6 @@ import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
 import Unique	( getUnique )
 import Util	( removeDups, equivClassesByUniq, sortLt )
-import List	( nubBy )
 \end{code}
 
 
@@ -65,12 +64,15 @@ getGlobalNames :: RdrNameHsModule
 getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
   = 	-- These two fix-loops are to get the right
 	-- provenance information into a Name
-    fixRn (\ ~(rec_exp_fn, _) ->
+    fixRn (\ ~(rec_exported_avails, _) ->
 
       fixRn (\ ~(rec_rn_env, _) ->
 	let
 	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
 	   rec_unqual_fn = unQualInScope rec_rn_env
+
+	   rec_exp_fn :: Name -> ExportFlag
+	   rec_exp_fn = mk_export_fn (availsToNameSet rec_exported_avails)
 	in
 	setOmitQualFn rec_unqual_fn		$
 	setModuleRn this_mod			$
@@ -91,11 +93,11 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	    imp_gbl_env = foldr plusGlobalRdrEnv emptyRdrEnv imp_gbl_envs
 	    gbl_env     = imp_gbl_env `plusGlobalRdrEnv` local_gbl_env
 
-	    export_avails :: ExportAvails
-	    export_avails = foldr plusExportAvails local_mod_avails imp_avails_s
+	    all_avails :: ExportAvails
+	    all_avails = foldr plusExportAvails local_mod_avails imp_avails_s
 	in
-	returnRn (gbl_env, export_avails)
-      )							`thenRn` \ (gbl_env, export_avails) ->
+	returnRn (gbl_env, all_avails)
+      )							`thenRn` \ (gbl_env, all_avails) ->
 
 	-- TRY FOR EARLY EXIT
 	-- We can't go for an early exit before this because we have to check
@@ -117,23 +119,42 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	returnRn (junk_exp_fn, Nothing)
       else
  
-	-- FIXITIES
-      fixitiesFromLocalDecls gbl_env decls		`thenRn` \ local_fixity_env ->
-      getImportedFixities				`thenRn` \ imp_fixity_env ->
-      let
-	fixity_env = imp_fixity_env `plusNameEnv` local_fixity_env
-	rn_env     = RnEnv gbl_env fixity_env
-	(_, global_avail_env) = export_avails
-      in
-      traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts fixity_env)))	`thenRn_`
-
 	-- PROCESS EXPORT LISTS
-      exportsFromAvail this_mod exports export_avails rn_env	`thenRn` \ (export_fn, export_env) ->
+      exportsFromAvail this_mod exports all_avails gbl_env 	`thenRn` \ exported_avails ->
 
 	-- DONE
-      returnRn (export_fn, Just (export_env, rn_env, global_avail_env))
-    )							`thenRn` \ (_, result) ->
-    returnRn result
+      returnRn (exported_avails, Just (all_avails, gbl_env))
+    )		`thenRn` \ (exported_avails, maybe_stuff) ->
+
+    case maybe_stuff of {
+	Nothing -> returnRn Nothing ;
+	Just (all_avails, gbl_env) ->
+
+
+	-- DEAL WITH FIXITIES
+   fixitiesFromLocalDecls gbl_env decls		`thenRn` \ local_fixity_env ->
+   getImportedFixities gbl_env			`thenRn` \ imp_fixity_env ->
+   let
+	-- Export only those fixities that are for names that are
+	--	(a) defined in this module
+	--	(b) exported
+	exported_fixities :: [(Name,Fixity)]
+	exported_fixities = [(name,fixity) | FixitySig name fixity _ <- nameEnvElts local_fixity_env,
+					     isLocallyDefined name
+			    ]
+
+	fixity_env = imp_fixity_env `plusNameEnv` local_fixity_env
+   in
+   traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts fixity_env)))	`thenRn_`
+
+	--- TIDY UP 
+   let
+	export_env	      = ExportEnv exported_avails exported_fixities
+	rn_env                = RnEnv gbl_env fixity_env
+	(_, global_avail_env) = all_avails
+   in
+   returnRn (Just (export_env, rn_env, global_avail_env))
+   }
   where
     junk_exp_fn = error "RnNames:export_fn"
 
@@ -198,26 +219,6 @@ importsFromImportDecl (ImportDecl imp_mod qual_only as_mod import_spec iloc)
 
     filterImports imp_mod import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
 
-	-- Load all the home modules for the things being
-	-- bought into scope.  This makes sure their fixities
-	-- are loaded before we grab the FixityEnv from Ifaces
-    let
-	home_modules = [name | avail <- filtered_avails,
-				-- Doesn't take account of hiding, but that doesn't matter
-		
-			       let name = availName avail,
-			       not (isLocallyDefined name || nameModule name == imp_mod)
-				-- Don't try to load the module being compiled
-				--	(this can happen in mutual-recursion situations)
-				-- or from the module being imported (it's already loaded)
-			]
-				
-	same_module n1 n2 = nameModule n1 == nameModule n2
-	load n		  = loadHomeInterface (doc_str n) n
-	doc_str n	  = ptext SLIT("Need fixities from") <+> ppr (nameModule n) <+> parens (ppr n)
-    in
-    mapRn load (nubBy same_module home_modules)			`thenRn_`
-    
 	-- We 'improve' the provenance by setting
 	--	(a) the import-reason field, so that the Name says how it came into scope
 	--		including whether it's explicitly imported
@@ -515,40 +516,25 @@ type ExportOccMap = FiniteMap OccName (Name, RdrNameIE)
 exportsFromAvail :: Module
 		 -> Maybe [RdrNameIE]	-- Export spec
 		 -> ExportAvails
-		 -> RnEnv
-		 -> RnMG (Name -> ExportFlag, ExportEnv)
+		 -> GlobalRdrEnv 
+		 -> RnMG Avails
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
-exportsFromAvail this_mod Nothing export_avails rn_env
-  = exportsFromAvail this_mod (Just [IEModuleContents this_mod]) export_avails rn_env
+exportsFromAvail this_mod Nothing export_avails global_name_env
+  = exportsFromAvail this_mod (Just [IEModuleContents this_mod]) 
+		     export_avails global_name_env
 
 exportsFromAvail this_mod (Just export_items) 
 		 (mod_avail_env, entity_avail_env)
-	         (RnEnv global_name_env fixity_env)
+	         global_name_env
   = foldlRn exports_from_item
 	    ([], emptyFM, emptyNameEnv) export_items	`thenRn` \ (_, _, export_avail_map) ->
     let
 	export_avails :: [AvailInfo]
 	export_avails   = nameEnvElts export_avail_map
-
-	export_names :: NameSet
-        export_names = availsToNameSet export_avails
-
-	-- Export only those fixities that are for names that are
-	--	(a) defined in this module
-	--	(b) exported
-	export_fixities :: [(Name,Fixity)]
-	export_fixities = [ (name,fixity) 
-			  | FixitySig name fixity _ <- nameEnvElts fixity_env,
-			    name `elemNameSet` export_names,
-			    isLocallyDefined name
-			  ]
-
-	export_fn :: Name -> ExportFlag
-	export_fn = mk_export_fn export_names
     in
-    returnRn (export_fn, ExportEnv export_avails export_fixities)
+    returnRn export_avails
 
   where
     exports_from_item :: ExportAccum -> RdrNameIE -> RnMG ExportAccum
