@@ -43,9 +43,11 @@ module Prelude (
     Ord(..), 
     Enum(..),
     Bounded(..), 
-    Num((+), (-), (*), negate, abs, signum, fromInteger, fromInt{-glaExt-}),
+    Num((+), (-), (*), negate, abs, signum, fromInteger),
+	-- The fromInt method is exposed only by GlaExts
     Real(..),
-    Integral(quot, rem, div, mod, quotRem, divMod, toInteger, toInt{-partain-}),
+    Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
+	-- The toInt method is exposed only by GlaExts
     Fractional(..),
     Floating(..),
     RealFrac(..),
