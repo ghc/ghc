@@ -27,7 +27,7 @@ import RnMonad
 import RnEnv
 import RnIfaces		( lookupFixity )
 import CmdLineOpts	( opt_GlasgowExts, opt_IgnoreAsserts )
-import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity )
+import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity, negatePrecedence )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
@@ -561,43 +561,56 @@ the programmer actually wrote, so you can't find it out from the Name.
 
 Furthermore, the second argument is guaranteed not to be another
 operator application.  Why? Because the parser parses all
-operator appications left-associatively.
+operator appications left-associatively, EXCEPT negation, which
+we need to handle specially.
 
 \begin{code}
-mkOpAppRn :: RenamedHsExpr -> RenamedHsExpr -> Fixity -> RenamedHsExpr
+mkOpAppRn :: RenamedHsExpr			-- Left operand; already rearranged
+	  -> RenamedHsExpr -> Fixity 		-- Operator and fixity
+	  -> RenamedHsExpr			-- Right operand (not an OpApp, but might
+						-- be a NegApp)
 	  -> RnMS RenamedHsExpr
 
-mkOpAppRn e1@(OpApp e11 op1 fix1 e12) 
-	  op2 fix2 e2
+---------------------------
+-- (e11 `op1` e12) `op2` e2
+mkOpAppRn e1@(OpApp e11 op1 fix1 e12) op2 fix2 e2
   | nofix_error
   = addErrRn (precParseErr (get op1,fix1) (get op2,fix2))	`thenRn_`
     returnRn (OpApp e1 op2 fix2 e2)
 
-  | rearrange_me
+  | associate_right
   = mkOpAppRn e12 op2 fix2 e2		`thenRn` \ new_e ->
     returnRn (OpApp e11 op1 fix1 new_e)
   where
-    (nofix_error, rearrange_me) = compareFixity fix1 fix2
+    (nofix_error, associate_right) = compareFixity fix1 fix2
 
-mkOpAppRn e1@(NegApp neg_arg neg_op) 
-	  op2 
-	  fix2@(Fixity prec2 dir2)
-	  e2
+---------------------------
+--	(- neg_arg) `op` e2
+mkOpAppRn e1@(NegApp neg_arg neg_op) op2 fix2 e2
   | nofix_error
-  = addErrRn (precParseErr (get neg_op,fix_neg) (get op2,fix2))	`thenRn_`
+  = addErrRn (precParseErr (get neg_op,negateFixity) (get op2,fix2))	`thenRn_`
     returnRn (OpApp e1 op2 fix2 e2)
 
-  | rearrange_me
+  | associate_right
   = mkOpAppRn neg_arg op2 fix2 e2	`thenRn` \ new_e ->
     returnRn (NegApp new_e neg_op)
   where
-    fix_neg = Fixity 6 InfixL  	-- Precedence of unary negate is wired in as infixl 6!
-    (nofix_error, rearrange_me) = compareFixity fix_neg fix2
+    (nofix_error, associate_right) = compareFixity negateFixity fix2
 
+---------------------------
+--	e1 `op` - neg_arg
+mkOpAppRn e1 op1 fix1 e2@(NegApp neg_arg neg_op)	-- NegApp can occur on the right
+  | not associate_right					-- We *want* right association
+  = addErrRn (precParseErr (get op1, fix1) (get neg_op, negateFixity))	`thenRn_`
+    returnRn (OpApp e1 op1 fix1 e2)
+  where
+    (nofix_err, associate_right) = compareFixity fix1 negateFixity
+
+---------------------------
+--	Default case
 mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
-  = ASSERT( if right_op_ok fix e2 then True
-	    else pprPanic "mkOpAppRn" (vcat [ppr e1, text "---", ppr op, 
-					     text "---", ppr fix, text "---", ppr e2])
+  = ASSERT2( right_op_ok fix e2,
+	     ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
     )
     returnRn (OpApp e1 op fix e2)
 
@@ -636,18 +649,18 @@ mkConOpPatRn p1@(ConOpPatIn p11 op1 fix1 p12)
   = addErrRn (precParseErr (op1,fix1) (op2,fix2))	`thenRn_`
     returnRn (ConOpPatIn p1 op2 fix2 p2)
 
-  | rearrange_me
+  | associate_right
   = mkConOpPatRn p12 op2 fix2 p2		`thenRn` \ new_p ->
     returnRn (ConOpPatIn p11 op1 fix1 new_p)
 
   where
-    (nofix_error, rearrange_me) = compareFixity fix1 fix2
+    (nofix_error, associate_right) = compareFixity fix1 fix2
 
 mkConOpPatRn p1@(NegPatIn neg_arg) 
 	  op2 
 	  fix2@(Fixity prec2 dir2)
 	  p2
-  | prec2 > 6 	-- Precedence of unary - is wired in as 6!
+  | prec2 > negatePrecedence 	-- Precedence of unary - is wired in
   = addErrRn (precParseNegPatErr (op2,fix2))	`thenRn_`
     returnRn (ConOpPatIn p1 op2 fix2 p2)
 
@@ -692,7 +705,7 @@ checkPrec op (ConOpPatIn _ op1 _ _) right
 
 checkPrec op (NegPatIn _) right
   = lookupFixity op	`thenRn` \ op_fix@(Fixity op_prec op_dir) ->
-    checkRn (op_prec <= 6) (precParseNegPatErr (op,op_fix))
+    checkRn (op_prec <= negatePrecedence) (precParseNegPatErr (op,op_fix))
 
 checkPrec op pat right
   = returnRn ()
@@ -829,13 +842,13 @@ negPatErr pat
 precParseNegPatErr op 
   = hang (ptext SLIT("precedence parsing error"))
       4 (hsep [ptext SLIT("prefix `-' has lower precedence than"), 
-	       quotes (pp_op op), 
+	       pp_op op, 
 	       ptext SLIT("in pattern")])
 
 precParseErr op1 op2 
   = hang (ptext SLIT("precedence parsing error"))
-      4 (hsep [ptext SLIT("cannot mix"), quotes (pp_op op1), ptext SLIT("and"), 
-	       quotes (pp_op op2),
+      4 (hsep [ptext SLIT("cannot mix"), pp_op op1, ptext SLIT("and"), 
+	       pp_op op2,
 	       ptext SLIT("in the same infix expression")])
 
 nonStdGuardErr guard
@@ -847,7 +860,7 @@ patSigErr ty
   =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
 	$$ nest 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
 
-pp_op (op, fix) = hcat [ppr op, space, parens (ppr fix)]
+pp_op (op, fix) = hcat [quotes (ppr op), space, parens (ppr fix)]
 
 patSynErr e 
   = sep [ptext SLIT("Pattern syntax in expression context:"),

@@ -16,8 +16,8 @@ types that
 module BasicTypes(
 	Version, Arity, 
 	Unused, unused,
-	Fixity(..), FixityDirection(..), 
-	defaultFixity, maxPrecedence,
+	Fixity(..), FixityDirection(..),
+	defaultFixity, maxPrecedence, negateFixity, negatePrecedence,
 	NewOrData(..), 
 	RecFlag(..), isRec, isNonRec,
 	TopLevelFlag(..), isTopLevel, isNotTopLevel
@@ -90,6 +90,12 @@ instance Eq Fixity where		-- Used to determine if two fixities conflict
 
 maxPrecedence = (9::Int)
 defaultFixity = Fixity maxPrecedence InfixL
+
+negateFixity :: Fixity
+negateFixity     = Fixity negatePrecedence InfixL  	-- Precedence of unary negate is wired in as infixl 6!
+
+negatePrecedence :: Int
+negatePrecedence = 6
 \end{code}
 
 
