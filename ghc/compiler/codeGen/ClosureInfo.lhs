@@ -1133,6 +1133,10 @@ fun_result_ty arity ty
 	   -> fun_result_ty (arity - n_arg_tys) rep_ty
 	   where
 	      ([rep_ty], _) = splitFunTys (applyTys (idType con) tycon_arg_tys)
+      Just _ ->
+           pprPanic "fun_result_ty:" (hsep [int arity,
+					    ppr ty,
+					    ppr res_ty])
   where
      (_, rho_ty)	= splitForAllTys ty
      (arg_tys, res_ty)  = splitFunTys rho_ty
