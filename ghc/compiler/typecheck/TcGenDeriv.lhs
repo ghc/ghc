@@ -40,7 +40,7 @@ import DataCon		( isNullaryDataCon, dataConTag,
 			  DataCon, ConTag,
 			  dataConFieldLabels )
 import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
-			  nameRdrName, varName,
+			  occNameUserString, nameRdrName, varName,
 			  OccName, Name, NamedThing(..), NameSpace
 			)
 
