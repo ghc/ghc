@@ -1,6 +1,6 @@
 
-tcfail033.hs:4:
+tests/ghc-regress/typecheck/should_fail/tcfail033.hs:4:
     Occurs check: cannot construct the infinite type: t = (t, t1)
 	Expected type: (t, t1)
 	Inferred type: t
-    in a `list comprension' pattern binding: x
+    In a 'list comprehension' pattern binding: x
