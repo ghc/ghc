@@ -50,10 +50,10 @@ mkdir $TMPDIR
 SAVE_PWD=`pwd`
 if [ $1 = `basename $1` ]; then
   echo "working on ../$1"
-  (cd $TMPDIR; jade -t sgml -ihtml -d ${DB_STYLESHEET}\#html ../$1; cd $SAVE_PWD)
+  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html ../$1; cd $SAVE_PWD)
 else
   echo "working on $1"
-  (cd $TMPDIR; jade -t sgml -ihtml -d ${DB_STYLESHEET}\#html $1; cd $SAVE_PWD)
+  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html $1; cd $SAVE_PWD)
 fi
 
 if [ $# -eq 1 ]
