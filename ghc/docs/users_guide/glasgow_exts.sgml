@@ -3483,31 +3483,46 @@ using combinators from the
 module.
 </para>
 
-<para>The extension adds a new kind of expression for defining arrows,
-of the form <literal>proc pat -> cmd</literal>,
+<para>The extension adds a new kind of expression for defining arrows:
+<screen>
+<replaceable>exp</replaceable><superscript>10</superscript> ::= ...
+       |  proc <replaceable>apat</replaceable> -> <replaceable>cmd</replaceable>
+</screen>
 where <literal>proc</literal> is a new keyword.
 The variables of the pattern are bound in the body of the 
 <literal>proc</literal>-expression,
 which is a new sort of thing called a <firstterm>command</firstterm>.
 The syntax of commands is as follows:
 <screen>
-cmd   ::= exp1 -&lt;  exp2
-       |  exp1 -&lt;&lt; exp2
-       |  do { cstmt1 .. cstmtn ; cmd }
-       |  let decls in cmd
-       |  if exp then cmd1 else cmd2
-       |  case exp of { calts }
-       |  cmd1 qop cmd2
-       |  (| aexp cmd1 .. cmdn |)
-       |  \ pat1 .. patn -> cmd
-       |  cmd aexp
-       |  ( cmd )
-
-cstmt ::= let decls
-       |  pat &lt;- cmd
-       |  rec { cstmt1 .. cstmtn }
-       |  cmd
+<replaceable>cmd</replaceable>   ::= <replaceable>exp</replaceable><superscript>10</superscript> -&lt;  <replaceable>exp</replaceable>
+       |  <replaceable>exp</replaceable><superscript>10</superscript> -&lt;&lt; <replaceable>exp</replaceable>
+       |  <replaceable>cmd</replaceable><superscript>0</superscript>
 </screen>
+with <replaceable>cmd</replaceable><superscript>0</superscript> up to
+<replaceable>cmd</replaceable><superscript>9</superscript> defined using
+infix operators as for expressions, and
+<screen>
+<replaceable>cmd</replaceable><superscript>10</superscript> ::= \ <replaceable>apat</replaceable> ... <replaceable>apat</replaceable> -> <replaceable>cmd</replaceable>
+       |  let <replaceable>decls</replaceable> in <replaceable>cmd</replaceable>
+       |  if <replaceable>exp</replaceable> then <replaceable>cmd</replaceable> else <replaceable>cmd</replaceable>
+       |  case <replaceable>exp</replaceable> of { <replaceable>calts</replaceable> }
+       |  do { <replaceable>cstmt</replaceable> ; ... <replaceable>cstmt</replaceable> ; <replaceable>cmd</replaceable> }
+       |  <replaceable>fcmd</replaceable>
+
+<replaceable>fcmd</replaceable>  ::= <replaceable>fcmd</replaceable> <replaceable>aexp</replaceable>
+       |  ( <replaceable>cmd</replaceable> )
+       |  (| <replaceable>aexp</replaceable> <replaceable>cmd</replaceable> ... <replaceable>cmd</replaceable> |)
+
+<replaceable>cstmt</replaceable> ::= let <replaceable>decls</replaceable>
+       |  <replaceable>pat</replaceable> &lt;- <replaceable>cmd</replaceable>
+       |  rec { <replaceable>cstmt</replaceable> ; ... <replaceable>cstmt</replaceable> [;] }
+       |  <replaceable>cmd</replaceable>
+</screen>
+where <replaceable>calts</replaceable> are like <replaceable>alts</replaceable>
+except that the bodies are commands instead of expressions.
+</para>
+
+<para>
 Commands produce values, but (like monadic computations)
 may yield more than one value,
 or none, and may do other things as well.
@@ -3692,7 +3707,7 @@ ArrowChoice a => (&lt;+>) :: a e c -> a e c -> a e c
 </programlisting>
 so we can use it to build commands:
 <programlisting>
-expr' = proc x ->
+expr' = proc x -> do
                 returnA -&lt; x
         &lt;+> do
                 symbol Plus -&lt; ()
@@ -3703,6 +3718,9 @@ expr' = proc x ->
                 y &lt;- term -&lt; ()
                 expr' -&lt; x - y
 </programlisting>
+(The <literal>do</literal> on the first line is needed to prevent the first
+<literal>&lt;+> ...</literal> from being interpreted as part of the
+expression on the previous line.)
 This is equivalent to
 <programlisting>
 expr' = (proc x -> returnA -&lt; x)

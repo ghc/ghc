@@ -59,6 +59,9 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
 1 for ambiguity in 'if x then y else z :: T'		[State 136]
 	(shift parses as 'if x then y else (z :: T)', as per longest-parse rule)
 
+4 for ambiguity in 'if x then y else z -< e'
+	(shift parses as 'if x then y else (z -< T)', as per longest-parse rule)
+
 8 for ambiguity in 'e :: a `b` c'.  Does this mean 	[States 160,246]
 	(e::a) `b` c, or 
 	(e :: (a `b` c))
@@ -978,10 +981,10 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 
 exp   :: { LHsExpr RdrName }
 	: infixexp '::' sigtype		{ LL $ ExprWithTySig $1 $3 }
-	| fexp '-<' exp		{ LL $ HsArrApp $1 $3 placeHolderType HsFirstOrderApp True }
-	| fexp '>-' exp		{ LL $ HsArrApp $3 $1 placeHolderType HsFirstOrderApp False }
-	| fexp '-<<' exp	{ LL $ HsArrApp $1 $3 placeHolderType HsHigherOrderApp True }
-	| fexp '>>-' exp	{ LL $ HsArrApp $3 $1 placeHolderType HsHigherOrderApp False}
+	| infixexp '-<' exp		{ LL $ HsArrApp $1 $3 placeHolderType HsFirstOrderApp True }
+	| infixexp '>-' exp		{ LL $ HsArrApp $3 $1 placeHolderType HsFirstOrderApp False }
+	| infixexp '-<<' exp		{ LL $ HsArrApp $1 $3 placeHolderType HsHigherOrderApp True }
+	| infixexp '>>-' exp		{ LL $ HsArrApp $3 $1 placeHolderType HsHigherOrderApp False}
 	| infixexp			{ $1 }
 
 infixexp :: { LHsExpr RdrName }
