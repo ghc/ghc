@@ -1,6 +1,10 @@
 -- !!! Testing IEEE Float and Double extremity predicates.
 module Main(main) where
 
+import Char
+import ST
+import MutableArray
+
 main :: IO ()
 main = do
  sequence_ (map putStrLn double_tests)
@@ -24,6 +28,7 @@ double_numbers :: [Double]
 double_numbers =
       [ 0
       , encodeFloat 0 0     -- 0 using encodeFloat method
+      , mkDouble (map chr [0,0,0,0,0,0, 0xf0, 0x7f])  -- +inf
       , encodeFloat 1 2047  -- +Inf 
       , encodeFloat 1 2048
       , encodeFloat 1  2047		  -- signalling NaN
@@ -156,7 +161,15 @@ doubleOrFloat ls
  where
    atType = undefined `asTypeOf` (head ls)
 
-
+-- make a double from a list of 8 bytes
+-- (caller deals with byte ordering.)
+mkDouble :: [Char] -> Double
+mkDouble ls = 
+ runST ( do
+   arr <- newCharArray (0,7)
+   sequence (zipWith (writeCharArray arr) [(0::Int)..] (take 8 ls))
+   readDoubleArray arr 0
+ )
 
 showAndPerform :: (Show a, Show b)
 	       => (a -> b)
