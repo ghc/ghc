@@ -8,11 +8,14 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Optional instance of Text.Show.Show for functions.
+-- Optional instance of 'Text.Show.Show' for functions:
+--
+-- > instance Show (a -> b) where
+-- > 	showsPrec _ _ = showString \"\<function\>\"
 --
 -----------------------------------------------------------------------------
 
-module Text.Show.Functions where
+module Text.Show.Functions () where
 
 import Prelude
 
