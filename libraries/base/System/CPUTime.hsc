@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: CPUTime.hsc,v 1.2 2001/06/29 09:44:03 simonmar Exp $
+-- $Id: CPUTime.hsc,v 1.3 2001/07/31 12:50:18 simonmar Exp $
 --
 -- The standard CPUTime library.
 --
@@ -41,7 +41,7 @@ import Data.Ratio
 getCPUTime :: IO Integer
 getCPUTime = do
 
-#ifndef _WIN32
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
 -- getrusage() is right royal pain to deal with when targetting multiple
 -- versions of Solaris, since some versions supply it in libc (2.3 and 2.5),
 -- while 2.4 has got it in libucb (I wouldn't be too surprised if it was back
@@ -85,7 +85,7 @@ foreign import unsafe times :: Ptr CTms -> CClock
 # endif
 #endif
 
-#else /* _WIN32 */
+#else /* win32 */
     allocaBytes (#const sizeof(FILETIME)) $ \ p_creationTime -> do
     allocaBytes (#const sizeof(FILETIME)) $ \ p_exitTime -> do
     allocaBytes (#const sizeof(FILETIME)) $ \ p_kernelTime -> do
