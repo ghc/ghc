@@ -86,7 +86,7 @@ Version 2.0     24 April 1997
         nest k empty = empty
     which wasn't true before.
 
-  * Fixed an obscure bug in sep that occassionally gave very wierd behaviour
+  * Fixed an obscure bug in sep that occassionally gave very weird behaviour
 
   * Added $+$
 
@@ -102,7 +102,7 @@ Relative to John's original paper, there are the following new features:
     It is Really Useful in practice.
 
 2.  There is a paragraph-fill combinator, fsep, that's much like sep,
-    only it keeps fitting things on one line until itc can't fit any more.
+    only it keeps fitting things on one line until it can't fit any more.
 
 3.  Some random useful extra combinators are provided.  
         <+> puts its arguments beside each other with a space between them,
@@ -115,8 +115,8 @@ Relative to John's original paper, there are the following new features:
 
         sep (separate) is either like hsep or like vcat, depending on what fits
 
-        cat  is behaves like sep,  but it uses <> for horizontal conposition
-        fcat is behaves like fsep, but it uses <> for horizontal conposition
+        cat  behaves like sep,  but it uses <> for horizontal conposition
+        fcat behaves like fsep, but it uses <> for horizontal conposition
 
         These new ones do the obvious things:
                 char, semi, comma, colon, space,
