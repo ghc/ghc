@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.68 2001/09/04 18:29:20 ken Exp $
+-- $Id: DriverFlags.hs,v 1.69 2001/09/06 15:43:35 simonpj Exp $
 --
 -- Driver flags
 --
@@ -76,8 +76,8 @@ processArgs _spec [] spare = return (reverse spare)
 
 processArgs spec args@(('-':arg):args') spare = do
   case findArg spec arg of
-    Just (rest,action) ->  do args' <- processOneArg action rest args
-			      processArgs spec args' spare
+    Just (rest,action) -> do args' <- processOneArg action rest args
+			     processArgs spec args' spare
     Nothing	       -> processArgs spec args' (('-':arg):spare)
 
 processArgs spec (arg:args) spare = 

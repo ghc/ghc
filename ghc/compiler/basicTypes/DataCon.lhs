@@ -25,7 +25,6 @@ module DataCon (
 import {-# SOURCE #-} Subst( substTyWith )
 import {-# SOURCE #-} PprType( pprType )
 
-import CmdLineOpts	( opt_DictsStrict )
 import Type		( Type, TauType, ThetaType, 
 			  mkForAllTys, mkFunTys, mkTyConApp,
 			  mkTyVarTys, splitTyConApp_maybe, repType, 

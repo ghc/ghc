@@ -118,8 +118,8 @@ import Type		(	-- Re-exports
 			  tidyTyVar, tidyTyVars, eqKind, eqUsage,
 			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind
 			)
-import TyCon		( TyCon, isPrimTyCon, tyConArity, isNewTyCon, isUnLiftedTyCon )
-import Class		( classTyCon, classHasFDs, Class )
+import TyCon		( TyCon, isUnLiftedTyCon )
+import Class		( classHasFDs, Class )
 import Var		( TyVar, tyVarKind )
 import ForeignCall	( Safety, playSafe )
 import VarEnv

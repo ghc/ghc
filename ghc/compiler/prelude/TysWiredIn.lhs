@@ -91,18 +91,16 @@ import RdrName		( rdrNameOcc )
 import DataCon		( DataCon, mkDataCon, dataConId )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), tyConDataCons,
-			  mkTupleTyCon, isUnLiftedTyCon, mkAlgTyCon
+			  mkTupleTyCon, mkAlgTyCon
 			)
 
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..) )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTys, 
 			  mkArrowKinds, liftedTypeKind, unliftedTypeKind,
-			  splitTyConApp_maybe,
 			  TauType, ThetaType )
 import Unique		( incrUnique, mkTupleTyConUnique, mkTupleDataConUnique )
 import PrelNames
-import CmdLineOpts
 import Array
 
 alpha_tyvar	  = [alphaTyVar]
