@@ -407,11 +407,11 @@ ifaceBinds hdl needed_ids final_ids binds
 	= case ifaceId get_idinfo needed False id rhs of
 		Nothing		      -> go needed binds pretties emitted
 		Just (pretty, extras) -> let
-					    needed' = (needed `unionVarSet` extras) `delVarSet` id
-						-- 'extras' can include the Id itself via a rule
-					    emitted' = emitted `extendVarSet` id
-					 in
-					 go needed' binds (pretty `consBag` pretties) emitted'
+			needed' = (needed `unionVarSet` extras) `delVarSet` id
+			-- 'extras' can include the Id itself via a rule
+			emitted' = emitted `extendVarSet` id
+			in
+			go needed' binds (pretty `consBag` pretties) emitted'
 
 	-- Recursive groups are a bit more of a pain.  We may only need one to
 	-- start with, but it may call out the next one, and so on.  So we
@@ -599,7 +599,7 @@ ppr_unqual_name name = pprOccName (getOccName name)
 
 %************************************************************************
 %*				 					*
-\subsection{Comparisons
+\subsection{Comparisons}
 %*				 					*
 %************************************************************************
 				 
