@@ -20,7 +20,16 @@ SUBDIRS = $(filter $(ProjectsToBuild), $(ProjectsThatExist))
 endif
 
 ifneq "$(Project)" ""
-   include $(shell echo $(Project) | tr A-Z a-z)/mk/config.mk
+   ifeq "$(Project)" "GreenCard"
+       ProjectDirectory=green-card
+   else
+	ifeq "$(Project)" "HaskellDirect"
+		ProjectDirectory=hdirect
+	else
+		ProjectDirectory=$(Project)
+	endif
+   endif
+   include $(shell echo $(ProjectDirectory) | tr A-Z a-z)/mk/config.mk
 endif
 
 # -----------------------------------------------------------------------------
@@ -102,6 +111,7 @@ ifeq "$(BIN_DIST)" ""
 endif
 	-rm -rf $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
 	-$(RM) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
+	-echo "BIN_DIST_DIRS = $(BIN_DIST_DIRS)"
 	@for i in $(BIN_DIST_DIRS); do 		 	 \
 	  if test -d "$$i"; then 			 \
 	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
@@ -161,19 +171,20 @@ binary-dist::
 #
 
 BINDIST_DOC_WAYS = html ps
+# BINDIST_DOC_WAYS =
 
 binary-dist ::
 	@for i in $(BIN_DIST_DIRS); do 		 	 	\
 	  if test -d "$$i"; then 			 	\
 	    $(MAKE) -C $$i $(MFLAGS) $(BINDIST_DOC_WAYS); 	\
-	    echo $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="html ps" \
+	    echo $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="$(BINDIST_DOC_WAYS)" \
 		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) 	\
 		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
 		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
 		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
 		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
 		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
-	    $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="html ps" \
+	    $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="$(BINDIST_DOC_WAYS)" \
 		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) 	\
 		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
 		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
