@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.25 2000/04/03 15:54:49 simonmar Exp $
+ * $Id: Stg.h,v 1.26 2000/04/13 23:03:12 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,8 +26,8 @@
 #endif
 
 #if IN_STG_CODE == 0
-# ifndef NO_REGS
-#  define NO_REGS			/* don't define fixed registers */
+# ifndef NO_MACHREGS
+#  define NO_MACHREGS			/* don't define fixed registers */
 # endif
 #endif
 
