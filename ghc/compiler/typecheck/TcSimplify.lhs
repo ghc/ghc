@@ -1953,15 +1953,23 @@ addTopInstanceErrs tidy_env tidy_dicts
 		   
 
 addTopAmbigErrs (tidy_env, tidy_dicts)
-  = groupErrs report tidy_dicts
+-- Divide into groups that share a common set of ambiguous tyvars
+  = mapM report (equivClasses cmp [(d, tvs_of d) | d <- tidy_dicts])
   where
-    report dicts = mkMonomorphismMsg tidy_env dicts 	`thenM` \ (tidy_env, mono_msg) ->
-		   addErrTcM (tidy_env, mk_msg dicts $$ mono_msg)
-    mk_msg dicts = addInstLoc dicts $
-		   sep [text "Ambiguous type variable(s)" <+> pprQuotedList ambig_tvs,
-		        nest 2 (text "in the constraint" <> plural dicts <+> pprInsts dicts)]
-		where
-		   ambig_tvs = varSetElems (tyVarsOfInsts dicts)
+    tvs_of :: Inst -> [TcTyVar]
+    tvs_of d = varSetElems (tyVarsOfInst d)
+    cmp (_,tvs1) (_,tvs2) = tvs1 `compare` tvs2
+    
+    report :: [(Inst,[TcTyVar])] -> TcM ()
+    report pairs@((_,tvs) : _)	-- The pairs share a common set of ambiguous tyvars
+	= mkMonomorphismMsg tidy_env dicts	`thenM` \ (tidy_env, mono_msg) ->
+	  addErrTcM (tidy_env, msg $$ mono_msg)
+	where
+	  dicts = map fst pairs
+	  msg = sep [text "Ambiguous type variable" <> plural tvs <+> 
+		       pprQuotedList tvs <+> text "in these top-level constraint" <> plural dicts,
+		     nest 2 (pprInstsInFull dicts)]
+
 
 mkMonomorphismMsg :: TidyEnv -> [Inst] -> TcM (TidyEnv, Message)
 -- There's an error with these Insts; if they have free type variables
