@@ -268,7 +268,7 @@ dsFExport i ty ext_name cconv isDyn =
 	  ExtName fs _ -> fs
 	  Dynamic      -> panic "dsFExport: Dynamic - shouldn't ever happen."
 
-      f_helper_glob    = mkIdVisible mod uniq f_helper
+      f_helper_glob    = mkIdVisible mod f_helper
       (h_stub, c_stub) = fexportEntry c_nm f_helper_glob wrapper_arg_tys the_result_ty cconv isDyn
      in
      returnDs (NonRec f_helper_glob the_body, h_stub, c_stub)
