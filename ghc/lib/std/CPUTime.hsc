@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.3 2001/05/18 16:54:04 simonmar Exp $
+-- $Id: CPUTime.hsc,v 1.4 2001/05/21 14:04:15 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -19,9 +19,7 @@ import PrelPtr
 import PrelBase		( Int(..) )
 import PrelByteArr  	( ByteArray(..), newIntArray )
 import PrelArrExtra     ( unsafeFreezeByteArray )
-import PrelIOBase	( IOException(..), 
-			  IOErrorType( UnsupportedOperation ), 
-			  unsafePerformIO, stToIO, ioException )
+import PrelIOBase	( IOException(..) )
 import Ratio
 
 #include "HsStd.h"
