@@ -40,7 +40,8 @@ ulpara  :: { ParsedDoc }
 olpara  :: { ParsedDoc } 
 	: '(n)' para		{ $2 }
 
-para	: seq			{ docParagraph $1 }
+para    :: { ParsedDoc }
+	: seq			{ docParagraph $1 }
 
 seq	:: { ParsedDoc }
 	: elem seq		{ DocAppend $1 $2 }
