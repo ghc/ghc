@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.22 2002/09/13 15:02:34 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.23 2002/09/18 10:51:01 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -31,7 +31,7 @@ import Monad            ( when )
 import Maybe            ( isJust )
 
 #if __GLASGOW_HASKELL__ <= 408
-import Util		( catchJust, ioErrors )
+import Panic		( catchJust, ioErrors )
 #endif
 
 -------------------------------------------------------------------------------

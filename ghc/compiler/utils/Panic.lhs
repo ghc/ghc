@@ -13,7 +13,11 @@ module Panic
    ( 
      GhcException(..), ghcError, progName, 
      panic, panic#, assertPanic, trace,
-     showException, showGhcException, throwDyn
+     showException, showGhcException, throwDyn, tryMost,
+
+#if __GLASGOW_HASKELL__ <= 408
+     catchJust, ioErrors, throwTo,
+#endif
    ) where
 
 #include "HsVersions.h"
@@ -22,7 +26,7 @@ import Config
 import FastTypes
 
 import DYNAMIC
-import EXCEPTION
+import EXCEPTION as Exception
 import TRACE		( trace )
 import UNSAFE_IO	( unsafePerformIO )
 
@@ -120,4 +124,38 @@ assertPanic :: String -> Int -> a
 assertPanic file line = 
   throw (AssertionFailed 
            ("ASSERT failed! file " ++ file ++ ", line " ++ show line))
+\end{code}
+
+\begin{code}
+-- | tryMost is like try, but passes through Interrupted and Panic
+-- exceptions.  Used when we want soft failures when reading interface
+-- files, for example.
+
+tryMost :: IO a -> IO (Either Exception a)
+tryMost action = do r <- myTry action; filter r
+  where
+   filter (Left e@(DynException d))
+	    | Just ghc_ex <- fromDynamic d
+		= case ghc_ex of
+		    Interrupted -> throw e
+		    Panic _     -> throw e
+		    _other      -> return (Left e)
+   filter other 
+     = return other
+
+#if __GLASGOW_HASKELL__ <= 408
+myTry = tryAllIO
+#else
+myTry = Exception.try
+#endif
+\end{code}	
+
+Compatibility stuff:
+
+\begin{code}
+#if __GLASGOW_HASKELL__ <= 408
+catchJust = catchIO
+ioErrors  = justIoErrors
+throwTo   = raiseInThread
+#endif
 \end{code}

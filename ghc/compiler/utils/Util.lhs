@@ -44,11 +44,6 @@ module Util (
 	unzipWith,
 
 	global,
-
-#if __GLASGOW_HASKELL__ <= 408
-	catchJust, ioErrors, throwTo
-#endif
-
     ) where
 
 #include "../includes/config.h"
@@ -786,14 +781,4 @@ Global variables:
 \begin{code}
 global :: a -> IORef a
 global a = unsafePerformIO (newIORef a)
-\end{code}
-
-Compatibility stuff:
-
-\begin{code}
-#if __GLASGOW_HASKELL__ <= 408
-catchJust = catchIO
-ioErrors  = justIoErrors
-throwTo   = raiseInThread
-#endif
 \end{code}

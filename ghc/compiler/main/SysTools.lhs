@@ -115,14 +115,6 @@ import SystemExts       ( rawSystem )
 #else
 import System		( system )
 #endif
-
--- Make catch work on older GHCs
-#if __GLASGOW_HASKELL__ > 408
-myCatch = Exception.catch
-#else
-myCatch = catchAllIO
-#endif
-
 \end{code}
 
 
@@ -675,7 +667,7 @@ removeTmpFiles verb fs
 	     ("Deleting: " ++ unwords fs)
 	     (mapM_ rm fs)
   where
-    rm f = removeFile f `myCatch` 
+    rm f = removeFile f `catch` 
 		(\_ignored -> 
 		    when (verb >= 2) $
 		      hPutStrLn stderr ("Warning: deleting non-existent " ++ f)
@@ -737,7 +729,7 @@ traceCmd phase_name cmd_line action
 	; unless n $ do {
 
 	   -- And run it!
-	; action `myCatch` handle_exn verb
+	; action `catch` handle_exn verb
 	}}
   where
     handle_exn verb exn = do { when (verb >= 2) (hPutStr   stderr "\n")

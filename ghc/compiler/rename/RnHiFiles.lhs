@@ -688,12 +688,12 @@ findHiFile mod_name hi_boot_file
 @readIface@ tries just the one file.
 
 \begin{code}
-readIface :: Module -> String -> IsBootInterface -> TcRn m (Either IOError ParsedIface)
+readIface :: Module -> String -> IsBootInterface -> TcRn m (Either Exception ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 
 readIface mod file_path is_hi_boot_file
-  = ioToTcRn_no_fail (read_iface mod file_path is_hi_boot_file)
+  = ioToTcRn (tryMost (read_iface mod file_path is_hi_boot_file))
 
 read_iface mod file_path is_hi_boot_file
  | is_hi_boot_file		-- Read ascii

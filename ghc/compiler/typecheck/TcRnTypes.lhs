@@ -9,7 +9,7 @@ module TcRnTypes(
 	thenM, thenM_, returnM, failM,
 
 	-- Non-standard operations
-	runTcRn, fixM, recoverM, ioToTcRn, ioToTcRn_no_fail,
+	runTcRn, fixM, recoverM, ioToTcRn,
 	newMutVar, readMutVar, writeMutVar,
 	getEnv, setEnv, updEnv, unsafeInterleaveM, 
 		
@@ -172,11 +172,6 @@ Performing arbitrary I/O, plus the read/write var (for efficiency)
 \begin{code}
 ioToTcRn :: IO a -> TcRn m a
 ioToTcRn io = TcRn (\ env -> io)
-
-ioToTcRn_no_fail :: IO a -> TcRn m (Either IOError a)
--- Catch any IO error and embody it in the result
-ioToTcRn_no_fail io = TcRn (\ env -> catch (io >>= \r -> return (Right r))
-					   (\ exn -> return (Left exn)))
 
 newMutVar :: a -> TcRn m (TcRef a)
 newMutVar val = TcRn (\ env -> newIORef val)
