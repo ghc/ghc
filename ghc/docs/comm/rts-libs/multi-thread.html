@@ -240,6 +240,15 @@ Scheduler may side-track it and also ask it to evaluate other Haskell threads.
 </li>
 </ul>
 
+<p>
+<strong>Note:</strong> As of 20020413, the implementation of the RTS API
+only serializes access to the allocator between multiple OS threads wanting
+to call into Haskell (via the RTS API.) It does not coordinate this access
+to the allocator with that of the OS worker thread that's currently executing
+within the RTS. This weakness/bug is scheduled to be tackled as part of an
+overhaul/reworking of the RTS API itself.
+
+
 <!---- ***************************************  ----->
 <h2>Subsystems introduced/modified</h2>
 
