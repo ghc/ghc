@@ -1,8 +1,16 @@
-# *** MSUB does some substitutions here ***
-# *** grep for $( ***
 #
-# tries to work like mkdependC
+# perl script expect the following variables to be prepended:
 #
+#  RAWCPP TMPDIR TOP_PWD
+#  INSTALL_LIB_DIR INSTALL_DATA_DIR INSTALL_HSLIBS_DIR INSTALLING
+#  PROJECTVERSION SED 
+#
+# tries to work like mkdependC - capable of dealing with:
+#
+#  -literate Haskell code (Bird tracks or Glasgow literate style) (.lhs)
+#  -straight Haskell source (.hs)
+#  -literate or straight Happy specs    (.ly)
+#  
 # ToDo: strip out all the .h junk
 #
 ($Pgm = $0) =~ s/.*\/([^\/]+)$/\1/;
@@ -54,7 +62,7 @@ $Dashdashes_seen = 0;
 
 # Try to guess how to run gcc's CPP directly -------------
 
-$OrigCpp = '$(RAWCPP)';
+$OrigCpp = ${RAWCPP};
 if ( $OrigCpp !~ /(\S+)\s+(.*)/ ) {
     $Cpp = $OrigCpp;
 } else {
@@ -75,8 +83,8 @@ if ( $OrigCpp !~ /(\S+)\s+(.*)/ ) {
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmp_prefix = $ENV{'TMPDIR'} . "/mkdependHS$$";
 } else {
-    $Tmp_prefix ="$(TMPDIR)/mkdependHS$$";
-    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+    $Tmp_prefix ="${TMPDIR}/mkdependHS$$";
+    $ENV{'TMPDIR'} = "${TMPDIR}"; # set the env var as well
 }
 
 #------------------------------------------------------------------------
@@ -87,40 +95,47 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
 # $ENV{'GLASGOW_HASKELL_ROOT'} = '/some/absolute/path/name';
 
 if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
-    $TopPwd	    = '$(TOP_PWD)';
-    $InstLibDirGhc  = '$(INSTLIBDIR_GHC)';
-    $InstDataDirGhc = '$(INSTDATADIR_GHC)';
+    $TopPwd	    = ${TOP_PWD};
+    $InstLibDirGhc  = ${INSTALL_LIB_DIR};
+    $InstDataDirGhc = ${INSTALL_DATA_DIR};
 } else {
     $TopPwd = $ENV{'GLASGOW_HASKELL_ROOT'};
 
-    if ('$(INSTLIBDIR_GHC)' =~ /.*(\/lib\/ghc\/\d\.\d\d\/[^-]-[^-]-[^-]\/.*)/) {
+    if (${INSTALL_LIB_DIR} =~ /.*(\/lib\/ghc\/\d\.\d\d\/[^-]+-[^-]+-[^-]+\/.*)/) {
 	$InstLibDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
     } else {
-	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTLIBDIR_GHC).\n(Installation error)\n";
+	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle ${INSTALL_LIB_DIR}.\n(Installation error)\n";
 	exit(1);
     }
 
-    if ('$(INSTDATADIR_GHC)' =~ /.*(\/lib\/ghc\/\d\.\d\d\/.*)/) {
+    if (${INSTAL_DATA_DIR} =~ /.*(\/lib\/ghc\/\d\.\d\d\/.*)/) {
 	$InstDataDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $2;
     } else {
-	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTDATADIR_GHC).\n(Installation error)\n";
+	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle ${INSTALL_DATA_DIR}.\n(Installation error)\n";
 	exit(1);
     }
 }
 
-$Unlit = ( $(INSTALLING) ) ? "$InstLibDirGhc/unlit"
-			   : "$TopPwd/ghc/utils/unlit/unlit";
+$Unlit = ${UNLIT_PROG};
 
 $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
 $Obj_suffix = 'o';
-$ghc_version_info = int ( $(PROJECTVERSION) * 100 );
+$ghc_version_info = int ( ${PROJECTVERSION} * 100 );
 
 $Import_dirs = '.';
 %Syslibs = ();
 %LibIfaces  = ();  # known prelude/syslib ifaces; read from a file
-%Ignore_dirs = (); # directories to considered stable.
+
 %IgnoreMe = ();
+# directories to considered stable.
+@Ignore_dirs = split(/:/,${PRELUDE_DIRS});
+
+#   ($INSTALLING) ? ("$InstLibDirGhc/imports")
+#		 : ("$TopPwd/ghc/lib/ghc",
+#		    "$TopPwd/ghc/lib/required",
+#		    "$TopPwd/ghc/lib/glaExts",
+#		    "$TopPwd/ghc/lib/concurrent");
 
 $Haskell_1 = 3; # assume Haskell 1.3. Changed by -fhaskell-1.?
 $Include_dirs = '-I.';
@@ -129,12 +144,13 @@ $Makefile = '';
 
 &mangle_command_line_args();
 
-# load up LibIfaces tables:
-&read_MODULES('prelude', 'prelude');
+# set up array of ignored modules
 foreach $lib ( @Syslibs ) {
-    &read_MODULES('syslib', $lib);
+    local($dir) = 
+      ($INSTALLING) ? "${INSTALL_HSLIBS_DIR}/${lib}/imports" 
+	            : "$TopPwd/hslibs/${lib}/src";
+    push(@Ignore_dirs,$dir);
 }
-#print STDERR "libs provide:",(keys %LibIfaces),"\n";
 
 if ( $Status ) {
     print stderr $Usage;
@@ -171,15 +187,15 @@ foreach $sf (@Src_files) {
     # a de-commenter (not implemented);
     # builds up @Depend_lines
     print STDERR "Here we go for source file: $sf\n" if $Verbose;
-    ($bf = $sf) =~ s/\.l?hs$//;
+    ($bf = $sf) =~ s/\.l?(hs|y)$//;
     #push(@Depend_lines, "$bf.$Obj_suffix $bf.hi : $sf\n");
     push(@Depend_lines, "$bf.$Obj_suffix : $sf\n");
     foreach $suff (@File_suffix) {
         push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $sf\n");
     }
 
-    # if it's a literate file, .lhs, then we de-literatize it:
-    if ( $sf !~ /\.lhs$/ ) {
+    # if it's a literate file, .lhs or .ly? (happy specs), then we de-literatize it: 
+    if ( $sf !~ /\.l(hs|y)$/ ) {
 	$file_to_read = $sf;
     } else {
     	$file_to_read = "$Tmp_prefix.hs";
@@ -188,14 +204,22 @@ foreach $sf (@Src_files) {
     }
     &slurp_file_for_imports($file_to_read, $sf);
 
-    if ( $sf =~ /\.lhs$/ ) {
+    if ( $sf =~ /\.l(hs|y)$/ ) {
 	unlink "$Tmp_prefix.hs";
     }
 }
 
 # OK, mangle the Makefile
 unlink("$Makefile.bak");
-rename($Makefile,"$Makefile.bak");
+
+#
+# If no output file exist as yet, create one.
+# 
+if ( ! -f $Makefile.bak ) {
+   system("touch $Makefile.bak");
+} else {
+   rename($Makefile,"$Makefile.bak");
+}
 # now copy Makefile.bak into Makefile, rm'ing old dependencies
 # and adding the new
 open(OMKF,"< $Makefile.bak") || die "$Pgm: can't open $Makefile.bak: $!\n";
@@ -252,7 +276,7 @@ sub mangle_command_line_args {
 		$IgnoreMe{$thing} = 'y';
 	    } elsif ( /^-(X|-exclude-directory=)(.*)/ ) { 
 		foreach $d ( split(/:/,&grab_arg_arg($1, $2)) ) {
-                   $Ignore_dirs{$d} = "$d";
+                   push(@Ignore_dirs,"$d");
                 }
 	    } elsif ( /^--include-module=(.*)/ ) { 
 		local($thing) = &grab_arg_arg($1,$2);
@@ -272,31 +296,6 @@ sub mangle_command_line_args {
 	}
     }
     @File_suffix = sort (@File_suffix);
-}
-
-sub read_MODULES {
-    local($flavor,$lib) = @_;
-
-    local($m_dir) = '';
-    if ($flavor eq 'prelude') {    
-	$m_dir = ( $(INSTALLING) ) ? "$InstDataDirGhc/imports" : "$TopPwd/ghc/lib";
-    } else {
-	$m_dir = ( $(INSTALLING) ) ? "$InstSysLibDir/$lib"     : "$TopPwd/hslibs/$lib";
-    }
-    local($m_file) = "$m_dir/MODULES";
-
-    open(MFILE, "< $m_file") || die "$Pgm: can't open $m_file to read\n";
-    while (<MFILE>) {
-	chop;
-	# strip comments and leading/trailing whitespace
-	s/#.*//;
-	s/^\s+//;
-	s/\s+$//;
-	next if /^$/; # nothing left!
-	
-	$LibIfaces{"$lib:$_"} = 1; # record that this library provides this iface
-    }
-    close(MFILE);
 }
 
 sub grab_arg_arg {
@@ -322,8 +321,8 @@ sub preprocess_import_dirs {
 
     foreach $d ( @Import_dirs ) {
         # Check to see if it can be ignored
-        print STDERR "Ignore imports from $d\n" if $Verbose && $Ignore_dirs{$d};
-        next if $Ignore_dirs{$d};
+        #print STDERR "Ignore imports from $d\n" if $Verbose && $Ignore_dirs{$d};
+        #next if $Ignore_dirs{$d};
 
 	opendir(DIR, $d) || die "$Pgm: can't open directory $d\n";
 
@@ -339,14 +338,14 @@ sub preprocess_import_dirs {
 	closedir(DIR); # No, don't check the error code
     }
 
-    # Add all the modules found in the ignorable directories
+    # Add all the modules
     # to the IgnoreMe array before we start scanning for imports.
-    foreach $d (keys %Ignore_dirs) {
+    foreach $d (@Ignore_dirs) {
 
 	opendir(DIR, $d) || die "$Pgm: can't open directory $d\n";
 
         for ($_ = readdir(DIR); $_; $_ = readdir(DIR)) {
-            next unless /(.*)\.(hi|l?hs)$/;
+            next unless /(.*)\.(hi|l?hs|l?y)$/;
             #don't tag it twice or overwrite it with a diff. value
             next if $IgnoreMe{$1};
             print STDERR "Module $d/$1.$2 will be ignored\n" if $Verbose;
@@ -368,44 +367,33 @@ sub slurp_file_for_imports {
     # we mangle #include's so they will also leave something
     # behind to indicate the dependency on _them_
     
-    # Worth our while to relativise the path or 
-    # assume it is there in the first place? -- SOF
-    #
-    print STDERR "/usr/bin/sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |\n" if $Verbose;
+    print STDERR "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |\n" if $Verbose;
 
-    open(SRCFILE, "/usr/bin/sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |")
+    open(SRCFILE, "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |")
 	|| die "$Pgm: Can't open $file_to_read: $!\n";
 
     while (<SRCFILE>) {
         #
-        # inport {-# SOURCE #-} Foo (bar) generates dependencies on the source file only,
+        # import {-# SOURCE #-} Foo (bar) generates dependencies on the source file only,
         # the compiler will deal with the absence of Foo.hi by consulting the
-        # source for Foo directly.
-        #
-        # >? import qualified ModuleName | !include "foo"
-        #
+        # source for Foo directly. (for dealing with recursive modules).
         #
 	next unless (/^>?\s*(import)(\s+{-#\s*SOURCE\s*#-})?(\s+qualified)?\s+([A-Z][A-Za-z0-9_']*)/ || /^!(include)(\s+)"(\S+)"/);
 	$todo    = $1;
         $source  = ( $2 ne '') ? 1 : 0;
 	$modname = $4;
 
+        next if $modname eq '';
 	if ($todo eq 'import') {
-	    if ( $IgnoreMe{$modname} eq 'y' ) {
-		$follow_file = '__ignore__';
-	    } elsif ( $ModuleIn{$modname} ) {
+	    if ( $ModuleIn{$modname} ) {
    		   $follow_file = "$ModuleIn{$modname}/$modname.hi";
 	    } else { # hard way
 		$follow_file
 		  = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir );
 	    }
 	} else {
-	    if ( $IgnoreMe{$modname} eq 'y' ) {
-		$follow_file = '__ignore__';
-	    } else {
 		$follow_file
 		  = &find_in_Include_dirs($orig_src_file, $modname, $last_seen_dir);
-	    }
 	}
 
 	if (! $follow_file) { # it didnae find anything
@@ -416,7 +404,7 @@ sub slurp_file_for_imports {
 		local($int_file);
 		$int_file = $follow_file;
 
-		if ( $int_file !~ /\.(l?hs|hi)$/ ) {
+		if ( $int_file !~ /\.(l?hs|hi|l?y)$/ ) {
 		    push(@Depend_lines, "$bf.$Obj_suffix : $int_file\n");
 		    foreach $suff (@File_suffix) {
 			push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $int_file\n");
@@ -424,6 +412,7 @@ sub slurp_file_for_imports {
 
 		} else {
 		    $int_file =~ s/\.l?hs$//;
+		    $int_file =~ s/\.l?y$//;
 		    $int_file =~ s/\.hi$//;
                     local($source_dep);
 
@@ -433,9 +422,12 @@ sub slurp_file_for_imports {
                     } elsif ( $source && -f "$int_file.lhs" ) {
                         $source_dep = "$int_file.lhs";
  		        push(@Depend_lines, "$bf.$Obj_suffix : $source_dep\n");
+                    } elsif ( $source && ( -f "$int_file.ly" || -f "$int_file.y" ) ) {
+                        $source_dep = "$int_file.hs";
+ 		        push(@Depend_lines, "$bf.$Obj_suffix : $source_dep\n");
                     } else {
                         if ( $source ) {
-                           print STDERR "Warning: could not find source file dependency $int_file.(hs|lhs)\n";
+                           print STDERR "Warning: could not find source file dependency $int_file.(hs|lhs|y|ly)\n";
                         }
 		        push(@Depend_lines, "$bf.$Obj_suffix : $int_file.hi\n");
 	            }
@@ -486,13 +478,11 @@ sub find_in_Import_dirs {
 	    }
     	}
 
-	$name_to_check = "$import_dir/$modname.hs";
-	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
-	return($name_to_check) if -f $name_to_check;
-
-	$name_to_check = "$import_dir/$modname.lhs";
-	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
-	return($name_to_check) if -f $name_to_check;
+	for $suff ('hs', 'lhs', 'ly', 'y') {
+	    $name_to_check = "$import_dir/$modname.$suff";
+	    print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
+	    return($name_to_check) if -f $name_to_check;
+        }
     }
     if ($do_magical_check == 1) {
 	$name_to_check = "$last_seen_dir/$modname.hi";
@@ -508,24 +498,22 @@ sub find_in_Import_dirs {
 	    }
     	}
 
-	$name_to_check = "$last_seen_dir/$modname.lhs";
-	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
-	return($name_to_check) if -f $name_to_check;
-
-	$name_to_check = "$last_seen_dir/$modname.hs";
-	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
-	return($name_to_check) if -f $name_to_check;
+	for $suff ('lhs', 'hs', 'ly', 'y') {
+	    $name_to_check = "$last_seen_dir/$modname.$suff";
+	    print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
+	    return($name_to_check) if -f $name_to_check;
+        }
     }
 
     # OK, maybe it's referring to something in a system library
-    foreach $lib ( @Syslibs ) {
-	return('__ignore__') if $LibIfaces{"$lib:$modname"};
-    }
+    #foreach $lib ( @Syslibs ) {
+    #	return('__ignore__') if $LibIfaces{"$lib:$modname"};
+    #}
 
     # Last hope: referring to a Prelude interface
-    return('__ignore__') if $LibIfaces{"prelude:$modname"};
+    return('__ignore__') if ( $IgnoreMe{$modname} eq 'y' );
 
-    die "No file `$modname.hi', `$modname.lhs' or `$modname.hs' (reqd from file `$orig_src_file')\namong import directories:\n\t$Import_dirs\n";
+    die "No file `$modname.hi', `$modname.lhs', `$modname.hs' (reqd from file `$orig_src_file')\namong import directories:\n\t$Import_dirs\n";
 }
 
 sub find_in_Include_dirs {
