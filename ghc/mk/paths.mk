@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.39 2002/02/12 15:17:22 simonmar Exp $
+# $Id: paths.mk,v 1.40 2002/04/01 13:57:10 simonpj Exp $
 #
 # ghc project specific make variables
 #
@@ -19,7 +19,7 @@ GHC_UTILS_DIR_REL 	= utils
 GHC_DRIVER_DIR_REL	= driver
 
 GHC_UNLIT_DIR_REL	= $(GHC_UTILS_DIR_REL)/unlit
-GHC_HSTAGS_DIR_REL	= $(GHC_UTILS_DIR_REL)/hstags
+GHC_HSTAGS_DIR_REL	= $(GHC_UTILS_DIR_REL)/hasktags
 GHC_TOUCHY_DIR_REL	= $(GHC_UTILS_DIR_REL)/touchy
 GHC_PKG_DIR_REL		= $(GHC_UTILS_DIR_REL)/ghc-pkg
 GHC_GENPRIMOP_DIR_REL	= $(GHC_UTILS_DIR_REL)/genprimopcode
@@ -43,7 +43,7 @@ GHC_LIB_DIR	 	= $(FPTOOLS_TOP)/libraries
 #      xxx_PGM	        the name of an executable, without the path
 
 GHC_UNLIT_PGM		= unlit$(EXE_SUFFIX)
-GHC_HSTAGS_PGM		= hstags
+GHC_HSTAGS_PGM		= hasktags
 GHC_TOUCHY_PGM		= touchy$(EXE_SUFFIX)
 GHC_MANGLER_PGM		= ghc-asm
 GHC_SPLIT_PGM		= ghc-split
