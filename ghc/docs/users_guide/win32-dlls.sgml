@@ -47,6 +47,26 @@ If you want to build a GUI-only application, with no console window, use the fla
 
 <sect1>
 <title>
+Differences in library behaviour </title>
+
+<para>
+Some of the standard Haskell libraries behave slightly differently on Windows.
+
+<itemizedlist>
+<listitem> <para>
+On Windows, the '<literal>^Z</literal>' character is interpreted as end-of-file, so
+if you read a file containing this character the file will appear to end just before it.
+To subvert this behaviour, you can put the file into Binary
+mode using <literal>GHC.Handle.hSetBinaryMode</literal>. (unfortunately this
+function isn't available form anywhere more stable, yet).
+</para>
+</listitem>
+</itemizedlist>
+</para>
+</sect1>
+
+<sect1>
+<title>
 Using GHC (and other GHC-compiled executables) with cygwin</title>
 
 <sect2>
