@@ -59,6 +59,9 @@
 #
 .PHONY: depend
 
+# Compiler produced files that are targets of the source's imports.
+MKDEPENDHS_OBJ_SUFFICES=o
+
 depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS)
 	@$(RM) .depend
 	@touch .depend
@@ -70,8 +73,8 @@ ifneq "$(MKDEPENDC_SRCS)" ""
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
 	@if ( echo $(notdir $(MKDEPENDHS)) | grep ghc >/dev/null 2>&1 ); then \
-	   echo $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
-	   $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
+	   echo $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
+	   $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
 	else \
 	   echo $(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(HC_OPTS) -- $(MKDEPENDHS_SRCS) ; \
 	   $(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(HC_OPTS) -- $(MKDEPENDHS_SRCS) ; \
