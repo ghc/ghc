@@ -17,13 +17,15 @@ module SaAbsInt (
 	fixpoint,
 	isBot
     ) where
-#endif /* DEBUG */
+
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
 import CoreUnfold	( maybeUnfoldingTemplate )
-import Id		( Id, idType, idStrictness, idUnfolding, isDataConId_maybe )
+import Id		( Id, idType, idUnfolding, isDataConId_maybe,
+			  idStrictness,
+			)
 import DataCon		( dataConTyCon, splitProductType_maybe, dataConRepArgTys )
 import IdInfo		( StrictnessInfo(..) )
 import Demand		( Demand(..), wwPrim, wwStrict, wwUnpack, wwLazy,
@@ -917,3 +919,7 @@ used.  But who cares about missing that?
 
 NB: despite only having a two-point domain, we may still have many
 iterations, because there are several variables involved at once.
+
+\begin{code}
+#endif /* DEBUG */
+\end{code}
