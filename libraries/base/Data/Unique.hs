@@ -21,7 +21,7 @@ module Data.Unique (
 
 import Prelude
 
-import Control.Concurrent
+import Control.Concurrent.MVar
 import System.IO.Unsafe (unsafePerformIO)
 
 #ifdef __GLASGOW_HASKELL__
@@ -57,5 +57,5 @@ hashUnique (Unique (S# i))   = I# i
 hashUnique (Unique (J# s d)) | s ==# 0#  = 0
 			     | otherwise = I# (indexIntArray# d 0#)
 #else
-hashUnique (Unique u) = u `mod` (fromIntegral (maxBound :: Int) + 1)
+hashUnique (Unique u) = fromInteger (u `mod` (toInteger (maxBound :: Int) + 1))
 #endif
