@@ -20,7 +20,10 @@ module PrelConc
 	, seq  		-- :: a -> b -> b
 	, yield         -- :: IO ()
 
-	{-threadDelay, threadWaitRead, threadWaitWrite,-}
+	-- Waiting
+	, threadDelay	  	-- :: Int -> IO ()
+	, threadWaitRead	-- :: Int -> IO ()
+	, threadWaitWrite	-- :: Int -> IO ()
 
 	-- MVars
 	, MVar		-- abstract
