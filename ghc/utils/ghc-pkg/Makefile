@@ -50,6 +50,7 @@ SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Distribution.Compat.Error \
 	-optdep--exclude-module=Distribution.Compat.ReadP \
 	-optdep--exclude-module=Distribution.Extension \
+	-optdep--exclude-module=Distribution.GetOpt \
 	-optdep--exclude-module=Distribution.InstalledPackageInfo \
 	-optdep--exclude-module=Distribution.License \
 	-optdep--exclude-module=Distribution.Package \

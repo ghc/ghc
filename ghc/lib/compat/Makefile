@@ -25,6 +25,7 @@ EXCLUDED_SRCS += \
 	Distribution/Compat/Error.hs \
 	Distribution/Compat/ReadP.hs \
 	Distribution/Extension.hs \
+	Distribution/GetOpt.hs \
 	Distribution/InstalledPackageInfo.hs \
 	Distribution/License.hs \
 	Distribution/Package.hs \
@@ -38,6 +39,7 @@ System/FilePath.$(way_)o : $(FPTOOLS_TOP)/libraries/base/System/FilePath.hs
 Distribution/Compat/Error.$(way_)o : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/Error.hs
 Distribution/Compat/ReadP.$(way_) : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/ReadP.hs
 Distribution/Extension.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Extension.hs
+Distribution/GetOpt.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/GetOpt.hs
 Distribution/InstalledPackageInfo.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/InstalledPackageInfo.hs
 Distribution/License.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/License.hs
 Distribution/Package.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Package.hs
