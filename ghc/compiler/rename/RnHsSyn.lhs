@@ -26,6 +26,7 @@ type RenamedClassOpSig		= Sig			Name
 type RenamedConDecl		= ConDecl		Name
 type RenamedContext		= Context 		Name
 type RenamedHsDecl		= HsDecl		Name RenamedPat
+type RenamedRuleDecl		= RuleDecl		Name RenamedPat
 type RenamedTyClDecl		= TyClDecl		Name RenamedPat
 type RenamedSpecDataSig		= SpecDataSig		Name
 type RenamedDefaultDecl		= DefaultDecl		Name

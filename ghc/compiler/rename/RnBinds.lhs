@@ -26,10 +26,10 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
-import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupOccRn, lookupGlobalOccRn,
-			  isUnboundName, warnUnusedLocalBinds,
-			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV,
-			  failUnboundNameErrRn
+import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupGlobalOccRn,
+			  warnUnusedLocalBinds, mapFvRn, 
+			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV,
+			  unknownNameErr
 			)
 import CmdLineOpts	( opt_WarnMissingSigs )
 import Digraph		( stronglyConnComp, SCC(..) )
@@ -41,7 +41,7 @@ import Util		( thenCmp, removeDups )
 import List		( partition )
 import ListSetOps	( minusList )
 import Bag		( bagToList )
-import FiniteMap	( emptyFM, addListToFM, lookupFM )
+import FiniteMap	( lookupFM, listToFM )
 import Maybe		( isJust )
 import Outputable
 \end{code}
@@ -161,7 +161,7 @@ it expects the global environment to contain bindings for the binders
 contains bindings for the binders of this particular binding.
 
 \begin{code}
-rnTopBinds    :: RdrNameHsBinds -> RnMS s (RenamedHsBinds, FreeVars)
+rnTopBinds    :: RdrNameHsBinds -> RnMS (RenamedHsBinds, FreeVars)
 
 rnTopBinds EmptyBinds		       	  = returnRn (EmptyBinds, emptyFVs)
 rnTopBinds (MonoBind bind sigs _) 	  = rnTopMonoBinds bind sigs
@@ -174,23 +174,23 @@ rnTopMonoBinds EmptyMonoBinds sigs
 rnTopMonoBinds mbinds sigs
  =  mapRn lookupBndrRn binder_rdr_names	`thenRn` \ binder_names ->
     let
-	binder_set = mkNameSet binder_names
-
-	binder_occ_fm = addListToFM emptyFM (map (\ x -> (nameOccName x,x)) binder_names)
-
-	   -- the names appearing in the sigs have to be bound by 
-	   -- this group's binders.
-	lookup_occ_rn_sig rdr_name = 
-	    case lookupFM binder_occ_fm (rdrNameOcc rdr_name) of
-	      Nothing -> failUnboundNameErrRn rdr_name
-	      Just x  -> returnRn x
+	binder_set    = mkNameSet binder_names
+	binder_occ_fm = listToFM [(nameOccName x,x) | x <- binder_names]
     in
-    renameSigs opt_WarnMissingSigs binder_set lookup_occ_rn_sig sigs
-						`thenRn` \ (siglist, sig_fvs) ->
-    rn_mono_binds siglist mbinds		`thenRn` \ (final_binds, bind_fvs) ->
+    renameSigs opt_WarnMissingSigs binder_set
+	       (lookupSigOccRn binder_occ_fm) sigs	`thenRn` \ (siglist, sig_fvs) ->
+    rn_mono_binds siglist mbinds			`thenRn` \ (final_binds, bind_fvs) ->
     returnRn (final_binds, bind_fvs `plusFV` sig_fvs)
   where
     binder_rdr_names = map fst (bagToList (collectMonoBinders mbinds))
+
+-- the names appearing in the sigs have to be bound by 
+-- this group's binders.
+lookupSigOccRn binder_occ_fm rdr_name
+  = case lookupFM binder_occ_fm (rdrNameOcc rdr_name) of
+	Nothing -> failWithRn (mkUnboundName rdr_name)
+			      (unknownNameErr rdr_name)
+	Just x  -> returnRn x
 \end{code}
 
 %************************************************************************
@@ -207,8 +207,8 @@ rnTopMonoBinds mbinds sigs
 
 \begin{code}
 rnBinds	      :: RdrNameHsBinds 
-	      -> (RenamedHsBinds -> RnMS s (result, FreeVars))
-	      -> RnMS s (result, FreeVars)
+	      -> (RenamedHsBinds -> RnMS (result, FreeVars))
+	      -> RnMS (result, FreeVars)
 
 rnBinds EmptyBinds	       thing_inside = thing_inside EmptyBinds
 rnBinds (MonoBind bind sigs _) thing_inside = rnMonoBinds bind sigs thing_inside
@@ -217,8 +217,8 @@ rnBinds (MonoBind bind sigs _) thing_inside = rnMonoBinds bind sigs thing_inside
 
 rnMonoBinds :: RdrNameMonoBinds 
             -> [RdrNameSig]
-	    -> (RenamedHsBinds -> RnMS s (result, FreeVars))
-	    -> RnMS s (result, FreeVars)
+	    -> (RenamedHsBinds -> RnMS (result, FreeVars))
+	    -> RnMS (result, FreeVars)
 
 rnMonoBinds EmptyMonoBinds sigs thing_inside = thing_inside EmptyBinds
 
@@ -238,28 +238,22 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
 	    isJust (lookupFM binder_occ_fm (rdrNameOcc name))
 	forLocalBind _ = True
 
-	binder_occ_fm = addListToFM emptyFM (map (\ x -> (nameOccName x,x)) new_mbinders)
+	binder_occ_fm = listToFM [(nameOccName x,x) | x <- new_mbinders]
 
-	   -- the names appearing in the sigs have to be bound by 
-	   -- this group's binders.
-	lookup_occ_rn_sig rdr_name = 
-	    case lookupFM binder_occ_fm (rdrNameOcc rdr_name) of
-	      Nothing -> failUnboundNameErrRn rdr_name
-	      Just x  -> returnRn x
     in
-       --
        -- Report the fixity declarations in this group that 
        -- don't refer to any of the group's binders.
        --
     mapRn_ (unknownSigErr) fixes_not_for_me     `thenRn_`
-    renameSigs False binder_set lookup_occ_rn_sig sigs_for_me
-						    `thenRn` \ (siglist, sig_fvs) ->
+    renameSigs False binder_set
+	       (lookupSigOccRn binder_occ_fm) sigs_for_me   `thenRn` \ (siglist, sig_fvs) ->
     let
 	fixity_sigs = [(name,sig) | FixSig sig@(FixitySig name _ _) <- siglist ]
     in
        -- Install the fixity declarations that do apply here and go.
-    extendFixityEnv  fixity_sigs (
-      rn_mono_binds siglist mbinds )	    `thenRn` \ (binds, bind_fvs) ->
+    extendFixityEnv fixity_sigs (
+      rn_mono_binds siglist mbinds
+    )	 				   `thenRn` \ (binds, bind_fvs) ->
 
 	-- Now do the "thing inside", and deal with the free-variable calculations
     thing_inside binds					`thenRn` \ (result,result_fvs) ->
@@ -288,7 +282,7 @@ This is done *either* by pass 3 (for the top-level bindings), *or* by
 \begin{code}
 rn_mono_binds :: [RenamedSig]	        -- Signatures attached to this group
 	      -> RdrNameMonoBinds	
-	      -> RnMS s (RenamedHsBinds, 	-- 
+	      -> RnMS (RenamedHsBinds, 	-- 
 		         FreeVars)	-- Free variables
 
 rn_mono_binds siglist mbinds
@@ -319,7 +313,7 @@ in case any of them
 \begin{code}
 flattenMonoBinds :: [RenamedSig]		-- Signatures
 		 -> RdrNameMonoBinds
-		 -> RnMS s [FlatMonoBindsInfo]
+		 -> RnMS [FlatMonoBindsInfo]
 
 flattenMonoBinds sigs EmptyMonoBinds = returnRn []
 
@@ -336,12 +330,11 @@ flattenMonoBinds sigs (PatMonoBind pat grhss locn)
     let
 	names_bound_here = mkNameSet (collectPatBinders pat')
 	sigs_for_me      = sigsForMe (`elemNameSet` names_bound_here) sigs
-	sigs_fvs         = foldr sig_fv emptyFVs sigs_for_me
     in
     rnGRHSs grhss			`thenRn` \ (grhss', fvs) ->
     returnRn 
 	[(names_bound_here,
-	  fvs `plusFV` sigs_fvs `plusFV` pat_fvs,
+	  fvs `plusFV` pat_fvs,
 	  PatMonoBind pat' grhss' locn,
 	  sigs_for_me
 	 )]
@@ -351,13 +344,12 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
     lookupBndrRn name					`thenRn` \ new_name ->
     let
 	sigs_for_me = sigsForMe (new_name ==) sigs
-	sigs_fvs    = foldr sig_fv emptyFVs sigs_for_me
     in
-    mapAndUnzipRn rnMatch matches			`thenRn` \ (new_matches, fv_lists) ->
+    mapFvRn rnMatch matches				`thenRn` \ (new_matches, fvs) ->
     mapRn_ (checkPrecMatch inf new_name) new_matches	`thenRn_`
     returnRn
       [(unitNameSet new_name,
-	plusFVs fv_lists `plusFV` sigs_fvs,
+	fvs,
 	FunMonoBind new_name inf new_matches locn,
 	sigs_for_me
 	)]
@@ -368,7 +360,7 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
 declaration.   like @rnMonoBinds@ but without dependency analysis.
 
 \begin{code}
-rnMethodBinds :: RdrNameMonoBinds -> RnMS s (RenamedMonoBinds, FreeVars)
+rnMethodBinds :: RdrNameMonoBinds -> RnMS (RenamedMonoBinds, FreeVars)
 
 rnMethodBinds EmptyMonoBinds = returnRn (EmptyMonoBinds, emptyFVs)
 
@@ -383,13 +375,13 @@ rnMethodBinds (FunMonoBind name inf matches locn)
     lookupGlobalOccRn name				`thenRn` \ sel_name -> 
 	-- We use the selector name as the binder
 
-    mapAndUnzipRn rnMatch matches			`thenRn` \ (new_matches, fvs_s) ->
+    mapFvRn rnMatch matches				`thenRn` \ (new_matches, fvs) ->
     mapRn_ (checkPrecMatch inf sel_name) new_matches	`thenRn_`
-    returnRn (FunMonoBind sel_name inf new_matches locn, plusFVs fvs_s)
+    returnRn (FunMonoBind sel_name inf new_matches locn, fvs)
 
 rnMethodBinds (PatMonoBind (VarPatIn name) grhss locn)
   = pushSrcLocRn locn			$
-    lookupGlobalOccRn name			`thenRn` \ sel_name -> 
+    lookupGlobalOccRn name		`thenRn` \ sel_name -> 
     rnGRHSs grhss			`thenRn` \ (grhss', fvs) ->
     returnRn (PatMonoBind (VarPatIn sel_name) grhss' locn, fvs)
 
@@ -399,18 +391,6 @@ rnMethodBinds mbind@(PatMonoBind other_pat _ locn)
     failWithRn (EmptyMonoBinds, emptyFVs) (methodBindErr mbind)
 \end{code}
 
-\begin{code}
--- If a SPECIALIZE pragma is of the "... = blah" form,
--- then we'd better make sure "blah" is taken into
--- acct in the dependency analysis (or we get an
--- unexpected out-of-scope error)! WDP 95/07
-
--- This is only necessary for the dependency analysis.  The free vars
--- of the types in the signatures is gotten from renameSigs
-
-sig_fv (SpecSig _ _ (Just blah) _) acc = acc `plusFV` unitFV blah
-sig_fv _			   acc = acc
-\end{code}
 
 %************************************************************************
 %*									*
@@ -485,13 +465,13 @@ signatures.  We'd only need this if we wanted to report unused tyvars.
 \begin{code}
 renameSigs ::  Bool			-- True => warn if (required) type signatures are missing.
 	    -> NameSet			-- Set of names bound in this group
-	    -> (RdrName -> RnMS s Name)
+	    -> (RdrName -> RnMS Name)
 	    -> [RdrNameSig]
-	    -> RnMS s ([RenamedSig], FreeVars)		 -- List of Sig constructors
+	    -> RnMS ([RenamedSig], FreeVars)		 -- List of Sig constructors
 
 renameSigs sigs_required binders lookup_occ_nm sigs
   =	 -- Rename the signatures
-    mapAndUnzipRn (renameSig lookup_occ_nm) sigs   	`thenRn` \ (sigs', fvs_s) ->
+    mapFvRn (renameSig lookup_occ_nm) sigs   	`thenRn` \ (sigs', fvs) ->
 
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
@@ -506,7 +486,7 @@ renameSigs sigs_required binders lookup_occ_nm sigs
     mapRn_ dupSigDeclErr dups 				`thenRn_`
     mapRn_ unknownSigErr not_this_group			`thenRn_`
     mapRn_ (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
-    returnRn (sigs', plusFVs fvs_s)	
+    returnRn (sigs', fvs)	
 		-- bad ones and all:
 		-- we need bindings of *some* sort for every name
 
@@ -523,38 +503,33 @@ renameSig lookup_occ_nm (Sig v ty src_loc)
   = pushSrcLocRn src_loc $
     lookup_occ_nm v				`thenRn` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty		`thenRn` \ (new_ty,fvs) ->
-    returnRn (Sig new_v new_ty src_loc, fvs)
+    returnRn (Sig new_v new_ty src_loc, fvs `addOneFV` new_v)
 
 renameSig _ (SpecInstSig ty src_loc)
   = pushSrcLocRn src_loc $
     rnHsSigType (text "A SPECIALISE instance pragma") ty	`thenRn` \ (new_ty, fvs) ->
     returnRn (SpecInstSig new_ty src_loc, fvs)
 
-renameSig lookup_occ_nm (SpecSig v ty using src_loc)
+renameSig lookup_occ_nm (SpecSig v ty src_loc)
   = pushSrcLocRn src_loc $
     lookup_occ_nm v			`thenRn` \ new_v ->
-    rnHsSigType (quotes (ppr v)) ty	`thenRn` \ (new_ty,fvs1) ->
-    rn_using using			`thenRn` \ (new_using,fvs2) ->
-    returnRn (SpecSig new_v new_ty new_using src_loc, fvs1 `plusFV` fvs2)
-  where
-    rn_using Nothing  = returnRn (Nothing, emptyFVs)
-    rn_using (Just x) = lookupOccRn x `thenRn` \ new_x ->
-			returnRn (Just new_x, unitFV new_x)
+    rnHsSigType (quotes (ppr v)) ty	`thenRn` \ (new_ty,fvs) ->
+    returnRn (SpecSig new_v new_ty src_loc, fvs `addOneFV` new_v)
 
 renameSig lookup_occ_nm (InlineSig v src_loc)
   = pushSrcLocRn src_loc $
     lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (InlineSig new_v src_loc, emptyFVs)
+    returnRn (InlineSig new_v src_loc, unitFV new_v)
 
 renameSig lookup_occ_nm (FixSig (FixitySig v fix src_loc))
   = pushSrcLocRn src_loc $
     lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (FixSig (FixitySig new_v fix src_loc), emptyFVs)
+    returnRn (FixSig (FixitySig new_v fix src_loc), unitFV new_v)
 
 renameSig lookup_occ_nm (NoInlineSig v src_loc)
   = pushSrcLocRn src_loc $
     lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (NoInlineSig new_v src_loc, emptyFVs)
+    returnRn (NoInlineSig new_v src_loc, unitFV new_v)
 \end{code}
 
 Checking for distinct signatures; oh, so boring
@@ -565,9 +540,9 @@ cmp_sig (Sig n1 _ _)	     (Sig n2 _ _)    	  = n1 `compare` n2
 cmp_sig (InlineSig n1 _)     (InlineSig n2 _) 	  = n1 `compare` n2
 cmp_sig (NoInlineSig n1 _)   (NoInlineSig n2 _)	  = n1 `compare` n2
 cmp_sig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = cmpHsType compare ty1 ty2
-cmp_sig (SpecSig n1 ty1 _ _) (SpecSig n2 ty2 _ _) 
+cmp_sig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _) 
   = -- may have many specialisations for one value;
-	-- but not ones that are exactly the same...
+    -- but not ones that are exactly the same...
 	thenCmp (n1 `compare` n2) (cmpHsType compare ty1 ty2)
 
 cmp_sig other_1 other_2					-- Tags *must* be different
@@ -575,7 +550,7 @@ cmp_sig other_1 other_2					-- Tags *must* be different
   | otherwise				     = GT
 
 sig_tag (Sig n1 _ _)    	   = (ILIT(1) :: FAST_INT)
-sig_tag (SpecSig n1 _ _ _)    	   = ILIT(2)
+sig_tag (SpecSig n1 _ _)    	   = ILIT(2)
 sig_tag (InlineSig n1 _)  	   = ILIT(3)
 sig_tag (NoInlineSig n1 _)  	   = ILIT(4)
 sig_tag (SpecInstSig _ _)	   = ILIT(5)
@@ -592,8 +567,7 @@ sig_tag _			   = panic# "tag(RnBinds)"
 \begin{code}
 dupSigDeclErr (sig:sigs)
   = pushSrcLocRn loc $
-    addErrRn (sep [ptext SLIT("Duplicate"),
-		   ptext what_it_is <> colon,
+    addErrRn (sep [ptext SLIT("Duplicate") <+> ptext what_it_is <> colon,
 		   ppr sig])
   where
     (what_it_is, loc) = sig_doc sig
@@ -608,7 +582,7 @@ unknownSigErr sig
 
 sig_doc (Sig        _ _ loc) 	     = (SLIT("type signature"),loc)
 sig_doc (ClassOpSig _ _ _ loc) 	     = (SLIT("class-method type signature"), loc)
-sig_doc (SpecSig    _ _ _ loc) 	     = (SLIT("SPECIALISE pragma"),loc)
+sig_doc (SpecSig    _ _ loc) 	     = (SLIT("SPECIALISE pragma"),loc)
 sig_doc (InlineSig  _     loc) 	     = (SLIT("INLINE pragma"),loc)
 sig_doc (NoInlineSig  _   loc) 	     = (SLIT("NOINLINE pragma"),loc)
 sig_doc (SpecInstSig _ loc)	     = (SLIT("SPECIALISE instance pragma"),loc)

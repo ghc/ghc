@@ -5,7 +5,6 @@ module ParseIface ( parseIface, IfaceStuff(..) ) where
 
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
-import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
 import HsTypes		( mkHsForAllTy )
 import HsCore
 import Const		( Literal(..), mkMachInt_safe )
@@ -19,7 +18,7 @@ import IdInfo           ( ArityInfo, exactArity, CprInfo(..) )
 import Lex		
 
 import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..),
-			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..)
+			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..), WhetherHasOrphans
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
@@ -29,7 +28,7 @@ import OccName          ( mkSysOccFS,
 			  tcName, varName, dataName, clsName, tvName,
 			  EncodedFS 
 			)
-import Module           ( Module, mkSysModuleFS, IfaceFlavour, hiFile, hiBootFile )			
+import Module           ( ModuleName, mkSysModuleFS )			
 import PrelMods         ( mkTupNameStr, mkUbxTupNameStr )
 import PrelInfo         ( mkTupConRdrName, mkUbxTupConRdrName )
 import SrcLoc		( SrcLoc )
@@ -76,11 +75,12 @@ import Ratio ( (%) )
 
  '__interface'	{ ITinterface }			-- GHC-extension keywords
  '__export'	{ ITexport }
- '__instimport'	{ ITinstimport }
+ '__depends'	{ ITdepends }
  '__forall'	{ ITforall }
  '__letrec'	{ ITletrec }
  '__coerce'	{ ITcoerce }
- '__inline'	{ ITinline }
+ '__inline_call'{ ITinlineCall }
+ '__inline_me'  { ITinlineMe }
  '__DEFAULT'	{ ITdefaultbranch }
  '__bot'	{ ITbottom }
  '__integer'	{ ITinteger_lit }
@@ -101,6 +101,7 @@ import Ratio ( (%) )
  '__C'		{ ITnocaf }
  '__U'		{ ITunfold $$ }
  '__S'		{ ITstrict $$ }
+ '__R'		{ ITrules }
  '__M'		{ ITcprinfo $$ }
 
  '..'		{ ITdotdot }  			-- reserved symbols
@@ -157,25 +158,26 @@ iface_stuff :: { IfaceStuff }
 iface_stuff : iface		{ let (nm, iff) = $1 in PIface nm iff }
       	    | type		{ PType   $1 }
       	    | id_info		{ PIdInfo $1 }
+	    | '__R' rules	{ PRules  $2 }
 
 
-iface		:: { (EncodedFS, ParsedIface) }
-iface		: '__interface' mod_fs INTEGER checkVersion 'where'
-                  import_part
-		  instance_import_part
+iface		:: { (ModuleName, ParsedIface) }
+iface		: '__interface' mod_fs INTEGER orphans checkVersion 'where'
 		  exports_part
+                  import_part
 		  instance_decl_part
 		  decls_part
+		  rules_part
 		  { ( $2                        -- Module name
-		    , ParsedIface 
-			(fromInteger $3) 	-- Module version
-			(reverse $6)	        -- Usages
-			(reverse $8)	        -- Exports
-			(reverse $7)	        -- Instance import modules
-			(reverse $10)		-- Decls
-			(reverse $9)		-- Local instances
-		    )
-		  }
+		    , ParsedIface {
+			pi_mod = fromInteger $3, 	-- Module version
+			pi_orphan  = $4,
+			pi_exports = $7,        -- Exports
+			pi_usages  = $8,	-- Usages
+			pi_insts   = $9,	-- Local instances
+			pi_decls   = $10,	-- Decls
+		 	pi_rules   = $11	-- Rules 
+		      } ) }
 
 --------------------------------------------------------------------------
 
@@ -184,12 +186,19 @@ import_part :				    		  { [] }
 	    |  import_part import_decl			  { $2 : $1 }
 	    
 import_decl :: { ImportVersion OccName }
-import_decl : 'import' mod_fs opt_bang INTEGER '::' whats_imported ';'
-			{ (mkSysModuleFS $2 $3, fromInteger $4, $6) }
+import_decl : 'import' mod_fs INTEGER orphans whats_imported ';'
+			{ (mkSysModuleFS $2, fromInteger $3, $4, $5) }
+	-- import Foo 3 :: a 1 b 3 c 7 ;	means import a,b,c from Foo
+	-- import Foo 3	;			means import all of Foo
+	-- import Foo 3 ! :: ...stuff... ;	the ! means that Foo contains orphans
+
+orphans		    :: { WhetherHasOrphans }
+orphans		    : 						{ False }
+		    | '!'					{ True }
 
 whats_imported      :: { WhatsImported OccName }
 whats_imported      :                                           { Everything }
-                    | name_version_pair name_version_pairs      { Specifically ($1:$2) }
+                    | '::' name_version_pairs      		{ Specifically $2 }
 
 name_version_pairs  ::	{ [LocalVersion OccName] }
 name_version_pairs  :  						{ [] }
@@ -199,21 +208,13 @@ name_version_pair   ::	{ LocalVersion OccName }
 name_version_pair   :  var_occ INTEGER			        { ($1, fromInteger $2) }
                     |  tc_occ  INTEGER                          { ($1, fromInteger $2) }
 
-instance_import_part :: { [Module] }
-instance_import_part : 						{   []    }
-                     | instance_import_part '__instimport' mod_name ';'
-						 		{ $3 : $1 }
 
 --------------------------------------------------------------------------
 
 exports_part	:: { [ExportItem] }
 exports_part	:  					{ [] }
-		| exports_part '__export' opt_bang mod_fs entities ';'
-						{ (mkSysModuleFS $4 $3,$5) : $1 }
-
-opt_bang	:: { IfaceFlavour }
-opt_bang	:					{ hiFile }
-		| '!'					{ hiBootFile }
+		| exports_part '__export' 
+		  mod_fs entities ';'			{ (mkSysModuleFS $3, $4) : $1 }
 
 entities	:: { [RdrAvailInfo] }
 entities	: 					{ [] }
@@ -259,11 +260,8 @@ csigs1		: csig				{ [$1] }
 		| csig ';' csigs1		{ $1 : $3 }
 
 csig		:: { RdrNameSig }
-csig		:  src_loc var_name '::' type { ClassOpSig $2 Nothing $4 $1 }
-	        |  src_loc var_name '=' '::' type	
-			{ ClassOpSig $2 
-			    (Just (error "Un-filled-in default method"))
-			    $5 $1 }
+csig		:  src_loc var_name '::' type		{ mkClassOpSig False $2 $4 $1 }
+	        |  src_loc var_name '=' '::' type	{ mkClassOpSig True  $2 $5 $1 }
 
 --------------------------------------------------------------------------
 
@@ -276,7 +274,7 @@ inst_decl	:  src_loc 'instance' type '=' var_name ';'
 			{ InstDecl $3
 				   EmptyMonoBinds	{- No bindings -}
 				   []    		{- No user pragmas -}
-				   (Just $5)		{- Dfun id -}
+				   $5			{- Dfun id -}
 				   $1
 			}
 
@@ -311,6 +309,26 @@ maybe_idinfo  : {- empty -} 	{ \_ -> [] }
 				                            (vcat [ppr x, err])
 				}
 
+-----------------------------------------------------------------------------
+
+rules_part :: { [RdrNameRuleDecl] }
+rules_part : {- empty -}	{ [] }
+	   | src_loc PRAGMA	{ case parseIface $2 $1 of
+				     Succeeded (PRules rules) -> rules
+				     Failed err -> pprPanic "Rules parse failed" err
+				}
+
+rules	   :: { [RdrNameRuleDecl] }
+	   : {- empty -}	{ [] }
+	   | rule ';' rules	{ $1:$3 }
+
+rule	   :: { RdrNameRuleDecl }
+rule	   : src_loc STRING rule_forall qvar_name 
+	     core_args '=' core_expr	{ IfaceRuleDecl $4 (UfRuleBody $2 $3 $5 $7) $1 } 
+
+rule_forall	:: { [UfBinder RdrName] }
+rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
+		  
 -----------------------------------------------------------------------------
 
 version		:: { Version }
@@ -414,8 +432,8 @@ atypes		:  					{ [] }
 mod_fs	        :: { EncodedFS }
 		:  CONID		{ $1 }
 
-mod_name	:: { Module }
-		:  mod_fs		{ mkSysModuleFS $1 hiFile }
+mod_name	:: { ModuleName }
+		:  mod_fs		{ mkSysModuleFS $1 }
 
 
 ---------------------------------------------------
@@ -426,7 +444,7 @@ var_fs		:: { EncodedFS }
 		| '!'	  		{ SLIT("!") }
 
 
-qvar_fs		:: { (EncodedFS, EncodedFS, IfaceFlavour) }
+qvar_fs		:: { (EncodedFS, EncodedFS) }
 		:  QVARID		{ $1 }
 		|  QVARSYM		{ $1 }
 
@@ -457,7 +475,7 @@ data_fs	        :: { EncodedFS }
 		:  CONID		{ $1 }
 		|  CONSYM		{ $1 }
 
-qdata_fs	:: { (EncodedFS, EncodedFS, IfaceFlavour) }
+qdata_fs	:: { (EncodedFS, EncodedFS) }
                 :  QCONID		{ $1 }
                 |  QCONSYM		{ $1 }
 
@@ -539,10 +557,7 @@ id_info_item	:: { HsIdInfo RdrName }
 		: '__A' arity_info		{ HsArity $2 }
 		| '__U' core_expr		{ HsUnfold $1 (Just $2) }
                 | '__U' 		 	{ HsUnfold $1 Nothing }
-                | '__P' spec_tvs
-                     atypes '=' core_expr       { HsSpecialise $2 $3 $5 }
 		| '__C'                         { HsNoCafRefs }
-
 
 strict_info     :: { [HsIdInfo RdrName] }
 		: cpr worker			{ ($1:$2) }
@@ -553,16 +568,11 @@ cpr		:: { HsIdInfo RdrName }
 		: '__M'				{ HsCprInfo $1 }
 
 strict		:: { HsIdInfo RdrName }
-		: '__S'			{ HsStrictness (HsStrictnessInfo $1) }
+		: '__S'				{ HsStrictness (HsStrictnessInfo $1) }
 
 worker		:: { [HsIdInfo RdrName] }
-		: qvar_name '{' qdata_names '}' { [HsWorker $1 $3] }
-		| qvar_name 			{ [HsWorker $1 []] }
+		: qvar_name 			{ [HsWorker $1] }
 		| {- nothing -}			{ [] }
-
-spec_tvs	:: { [HsTyVar RdrName] }
-		: '[' tv_bndrs ']' 		{ $2 }
-	
 
 arity_info	:: { ArityInfo }
 		: INTEGER			{ exactArity (fromInteger $1) }
@@ -581,7 +591,8 @@ core_expr	: '\\' core_bndrs '->' core_expr	{ foldr UfLam $4 $2 }
 		| con_or_primop '{' core_args '}'	{ UfCon $1 $3 }
                 | '__litlit' STRING atype               { UfCon (UfLitLitCon $2 $3) [] }
 
-                | '__inline' core_expr                  { UfNote UfInlineCall $2 }
+                | '__inline_me' core_expr               { UfNote UfInlineMe $2 }
+                | '__inline_call' core_expr             { UfNote UfInlineCall $2 }
                 | '__coerce' atype core_expr            { UfNote (UfCoerce $2) $3 }
 		| scc core_expr                         { UfNote (UfSCC $1) $2  }
 		| fexpr				        { $1 }
@@ -733,6 +744,7 @@ checkVersion :: { () }
 data IfaceStuff = PIface 	EncodedFS{-.hi module name-} ParsedIface
 		| PIdInfo	[HsIdInfo RdrName]
 		| PType		RdrNameHsType
+		| PRules	[RdrNameRuleDecl]
 
 mkConDecl name (ex_tvs, ex_ctxt) details loc = ConDecl name ex_tvs ex_ctxt details loc
 }

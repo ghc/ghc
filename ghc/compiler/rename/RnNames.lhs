@@ -14,16 +14,16 @@ import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports,
 			opt_SourceUnchanged, opt_WarnUnusedBinds
 		      )
 
-import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..), TyClDecl(..),
+import HsSyn	( HsModule(..), HsDecl(..), TyClDecl(..),
 		  IE(..), ieName, 
 		  ForeignDecl(..), ForKind(..), isDynamic,
-		  FixitySig(..), Sig(..),
+		  FixitySig(..), Sig(..), ImportDecl(..),
 		  collectTopBinders
 		)
 import RdrHsSyn	( RdrNameIE, RdrNameImportDecl,
 		  RdrNameHsModule, RdrNameHsDecl
 		)
-import RnIfaces	( getInterfaceExports, getDeclBinders, getImportedFixities, 
+import RnIfaces	( getInterfaceExports, getDeclBinders,
 		  recordSlurp, checkUpToDate
 		)
 import RnEnv
@@ -35,15 +35,19 @@ import PrelInfo ( main_RDR )
 import UniqFM	( lookupUFM )
 import Bag	( bagToList )
 import Maybes	( maybeToBool )
-import Module	( pprModule )
+import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
 import NameSet
-import Name
+import Name	( Name, ExportFlag(..), ImportReason(..), 
+		  isLocallyDefined, setNameImportReason,
+		  nameOccName, getSrcLoc, pprProvenance, getNameProvenance
+		)
 import RdrName	( RdrName, rdrNameOcc, mkRdrQual, mkRdrUnqual )
 import SrcLoc	( SrcLoc )
 import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
 import Unique	( getUnique )
 import Util	( removeDups, equivClassesByUniq, sortLt )
+import List	( partition )
 \end{code}
 
 
@@ -57,7 +61,8 @@ import Util	( removeDups, equivClassesByUniq, sortLt )
 \begin{code}
 getGlobalNames :: RdrNameHsModule
 	       -> RnMG (Maybe (ExportEnv, 
-			       RnEnv,
+			       GlobalRdrEnv,
+			       FixityEnv,		-- Fixities for local decls only
 			       NameEnv AvailInfo	-- Maps a name to its parent AvailInfo
 							-- Just for in-scope things only
 			       ))
@@ -85,18 +90,26 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	importsFromLocalDecls this_mod rec_exp_fn decls	`thenRn` \ (local_gbl_env, local_mod_avails) ->
 
 		-- PROCESS IMPORT DECLS
-	mapAndUnzipRn importsFromImportDecl all_imports	`thenRn` \ (imp_gbl_envs, imp_avails_s) ->
+		-- Do the non {- SOURCE -} ones first, so that we get a helpful
+		-- warning for {- SOURCE -} ones that are unnecessary
+	let
+	  (source, ordinary) = partition is_source_import all_imports
+	  is_source_import (ImportDecl _ ImportByUserSource _ _ _ _) = True
+	  is_source_import other				     = False
+	in
+	mapAndUnzipRn importsFromImportDecl ordinary	`thenRn` \ (imp_gbl_envs1, imp_avails_s1) ->
+	mapAndUnzipRn importsFromImportDecl source	`thenRn` \ (imp_gbl_envs2, imp_avails_s2) ->
 
 		-- COMBINE RESULTS
 		-- We put the local env second, so that a local provenance
 		-- "wins", even if a module imports itself.
 	let
 	    gbl_env :: GlobalRdrEnv
-	    imp_gbl_env = foldr plusGlobalRdrEnv emptyRdrEnv imp_gbl_envs
+	    imp_gbl_env = foldr plusGlobalRdrEnv emptyRdrEnv (imp_gbl_envs2 ++ imp_gbl_envs1)
 	    gbl_env     = imp_gbl_env `plusGlobalRdrEnv` local_gbl_env
 
 	    all_avails :: ExportAvails
-	    all_avails = foldr plusExportAvails local_mod_avails imp_avails_s
+	    all_avails = foldr plusExportAvails local_mod_avails (imp_avails_s2 ++ imp_avails_s1)
 	in
 	returnRn (gbl_env, all_avails)
       )							`thenRn` \ (gbl_env, all_avails) ->
@@ -115,7 +128,7 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	-- Then I must detect the name clash in A before going for an early
 	-- exit.  The early-exit code checks what's actually needed from B
 	-- to compile A, and of course that doesn't include B.f.  That's
-	-- why we wait till after the plusRnEnv stuff to do the early-exit.
+	-- why we wait till after the plusEnv stuff to do the early-exit.
       checkEarlyExit this_mod			`thenRn` \ up_to_date ->
       if up_to_date then
 	returnRn (junk_exp_fn, Nothing)
@@ -135,7 +148,6 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 
 	-- DEAL WITH FIXITIES
    fixitiesFromLocalDecls gbl_env decls		`thenRn` \ local_fixity_env ->
-   getImportedFixities gbl_env			`thenRn` \ imp_fixity_env ->
    let
 	-- Export only those fixities that are for names that are
 	--	(a) defined in this module
@@ -144,18 +156,15 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	exported_fixities = [(name,fixity) | FixitySig name fixity _ <- nameEnvElts local_fixity_env,
 					     isLocallyDefined name
 			    ]
-
-	fixity_env = imp_fixity_env `plusNameEnv` local_fixity_env
    in
-   traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts fixity_env)))	`thenRn_`
+   traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts local_fixity_env)))	`thenRn_`
 
 	--- TIDY UP 
    let
 	export_env	      = ExportEnv exported_avails exported_fixities
-	rn_env                = RnEnv gbl_env fixity_env
 	(_, global_avail_env) = all_avails
    in
-   returnRn (Just (export_env, rn_env, global_avail_env))
+   returnRn (Just (export_env, gbl_env, local_fixity_env, global_avail_env))
    }
   where
     junk_exp_fn = error "RnNames:export_fn"
@@ -165,19 +174,20 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
 	-- because the former doesn't even look at Prelude.hi for instance declarations,
 	-- whereas the latter does.
-    prel_imports | this_mod == pRELUDE ||
+    prel_imports | this_mod == pRELUDE_Name ||
 		   explicit_prelude_import ||
 		   opt_NoImplicitPrelude
 		 = []
 
-		 | otherwise		   = [ImportDecl pRELUDE 
+		 | otherwise		   = [ImportDecl pRELUDE_Name
+							 ImportByUser
 							 False		{- Not qualified -}
 							 Nothing	{- No "as" -}
 							 Nothing	{- No import list -}
 							 mod_loc]
     
     explicit_prelude_import
-      = not (null [ () | (ImportDecl mod qual _ _ _) <- imports, mod == pRELUDE ])
+      = not (null [ () | (ImportDecl mod _ _ _ _ _) <- imports, mod == pRELUDE_Name ])
 \end{code}
 	
 \begin{code}
@@ -209,17 +219,17 @@ importsFromImportDecl :: RdrNameImportDecl
 		      -> RnMG (GlobalRdrEnv, 
 			       ExportAvails) 
 
-importsFromImportDecl (ImportDecl imp_mod qual_only as_mod import_spec iloc)
+importsFromImportDecl (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
   = pushSrcLocRn iloc $
-    getInterfaceExports imp_mod 	`thenRn` \ (imp_mod, avails) ->
+    getInterfaceExports imp_mod_name from	`thenRn` \ (imp_mod, avails) ->
 
     if null avails then
 	-- If there's an error in getInterfaceExports, (e.g. interface
 	-- file not found) we get lots of spurious errors from 'filterImports'
-	returnRn (emptyRdrEnv, mkEmptyExportAvails imp_mod)
+	returnRn (emptyRdrEnv, mkEmptyExportAvails imp_mod_name)
     else
 
-    filterImports imp_mod import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
+    filterImports imp_mod_name import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
 
 	-- We 'improve' the provenance by setting
 	--	(a) the import-reason field, so that the Name says how it came into scope
@@ -230,7 +240,7 @@ importsFromImportDecl (ImportDecl imp_mod qual_only as_mod import_spec iloc)
 	improve_prov name = setNameImportReason name (UserImport imp_mod iloc (is_explicit name))
 	is_explicit name  = name `elemNameSet` explicits
     in
-    qualifyImports imp_mod 
+    qualifyImports imp_mod_name
 		   (not qual_only)	-- Maybe want unqualified names
 		   as_mod hides
 		   filtered_avails improve_prov		`thenRn` \ (rdr_name_env, mod_avails) ->
@@ -240,7 +250,7 @@ importsFromImportDecl (ImportDecl imp_mod qual_only as_mod import_spec iloc)
 
 
 \begin{code}
-importsFromLocalDecls mod rec_exp_fn decls
+importsFromLocalDecls mod_name rec_exp_fn decls
   = mapRn (getLocalDeclBinders newLocalName) decls	`thenRn` \ avails_s ->
 
     let
@@ -256,13 +266,13 @@ importsFromLocalDecls mod rec_exp_fn decls
 		non_singleton other      = False
     in
 	-- Check for duplicate definitions
-    mapRn_ (addErrRn . dupDeclErr) dups			`thenRn_` 
+    mapRn_ (addErrRn . dupDeclErr) dups		`thenRn_` 
 
 	-- Record that locally-defined things are available
-    mapRn_ (recordSlurp Nothing Compulsory) avails	`thenRn_`
+    mapRn_ (recordSlurp Nothing) avails		`thenRn_`
 
 	-- Build the environment
-    qualifyImports mod 
+    qualifyImports mod_name 
 		   True		-- Want unqualified names
 		   Nothing	-- no 'as M'
 		   []		-- Hide nothing
@@ -270,8 +280,9 @@ importsFromLocalDecls mod rec_exp_fn decls
 		   (\n -> n)
 
   where
-    newLocalName rdr_name loc = newLocallyDefinedGlobalName mod (rdrNameOcc rdr_name)
-							    rec_exp_fn loc
+    newLocalName rdr_name loc = newLocalTopBinder mod (rdrNameOcc rdr_name)
+						  rec_exp_fn loc
+    mod = mkThisModule mod_name
 
 getLocalDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)	-- New-name function
 		    -> RdrNameHsDecl
@@ -309,14 +320,13 @@ fixitiesFromLocalDecls gbl_env decls
     getFixities acc (FixD fix)
       = fix_decl acc fix
 
-	
-    getFixities acc (TyClD (ClassDecl _ _ _ sigs _ _ _ _ _))
+    getFixities acc (TyClD (ClassDecl _ _ _ sigs _ _ _ _ _ _))
       = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
 		-- Get fixities from class decl sigs too.
     getFixities acc other_decl
       = returnRn acc
 
-    fix_decl acc (FixitySig rdr_name fixity loc)
+    fix_decl acc sig@(FixitySig rdr_name fixity loc)
 	= 	-- Check for fixity decl for something not declared
 	  case lookupRdrEnv gbl_env rdr_name of {
 	    Nothing | opt_WarnUnusedBinds 
@@ -330,7 +340,6 @@ fixitiesFromLocalDecls gbl_env decls
 	  case lookupNameEnv acc name of {
 	    Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')	`thenRn_`
 					 returnRn acc ;
-
 
 	    Nothing -> returnRn (addToNameEnv acc name (FixitySig name fixity loc))
 	  }}
@@ -346,7 +355,7 @@ fixitiesFromLocalDecls gbl_env decls
 available, and filters it through the import spec (if any).
 
 \begin{code}
-filterImports :: Module				-- The module being imported
+filterImports :: ModuleName			-- The module being imported
 	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
 	      -> RnMG ([AvailInfo],		-- What's actually imported
@@ -432,9 +441,9 @@ right qualified names.  It also turns the @Names@ in the @ExportEnv@ into
 fully fledged @Names@.
 
 \begin{code}
-qualifyImports :: Module		-- Imported module
+qualifyImports :: ModuleName		-- Imported module
 	       -> Bool			-- True <=> want unqualified import
-	       -> Maybe Module		-- Optional "as M" part 
+	       -> Maybe ModuleName	-- Optional "as M" part 
 	       -> [AvailInfo]		-- What's to be hidden
 	       -> Avails		-- Whats imported and how
 	       -> (Name -> Name) 	-- Improves the provenance on imported things
@@ -503,7 +512,7 @@ includes ConcBase.StateAndSynchVar#, and so on...
 \begin{code}
 type ExportAccum	-- The type of the accumulating parameter of
 			-- the main worker function in exportsFromAvail
-     = ([Module], 		-- 'module M's seen so far
+     = ([ModuleName], 		-- 'module M's seen so far
 	ExportOccMap,		-- Tracks exported occurrence names
 	NameEnv AvailInfo)	-- The accumulated exported stuff, kept in an env
 				--   so we can common-up related AvailInfos
@@ -515,7 +524,7 @@ type ExportOccMap = FiniteMap OccName (Name, RdrNameIE)
 	--   that have the same occurrence name
 
 
-exportsFromAvail :: Module
+exportsFromAvail :: ModuleName
 		 -> Maybe [RdrNameIE]	-- Export spec
 		 -> ExportAvails
 		 -> GlobalRdrEnv 
@@ -526,7 +535,7 @@ exportsFromAvail :: Module
 exportsFromAvail this_mod Nothing export_avails global_name_env
   = exportsFromAvail this_mod true_exports export_avails global_name_env
   where
-    true_exports = Just $ if this_mod == mAIN
+    true_exports = Just $ if this_mod == mAIN_Name
                           then [IEVar main_RDR]
                                -- export Main.main *only* unless otherwise specified,
                           else [IEModuleContents this_mod]
@@ -629,16 +638,16 @@ mk_export_fn exported_names
 
 \begin{code}
 badImportItemErr mod ie
-  = sep [ptext SLIT("Module"), quotes (pprModule mod), 
+  = sep [ptext SLIT("Module"), quotes (pprModuleName mod), 
 	 ptext SLIT("does not export"), quotes (ppr ie)]
 
 dodgyImportWarn mod (IEThingAll tc)
-  = sep [ptext SLIT("Module") <+> quotes (pprModule mod) <+> ptext SLIT("exports") <+> quotes (ppr tc), 
+  = sep [ptext SLIT("Module") <+> quotes (pprModuleName mod) <+> ptext SLIT("exports") <+> quotes (ppr tc), 
 	 ptext SLIT("with no constructors/class operations;"),
 	 ptext SLIT("yet it is imported with a (..)")]
 
 modExportErr mod
-  = hsep [ ptext SLIT("Unknown module in export list: module"), quotes (pprModule mod)]
+  = hsep [ ptext SLIT("Unknown module in export list: module"), quotes (pprModuleName mod)]
 
 exportItemErr export_item
   = sep [ ptext SLIT("Bad export item"), quotes (ppr export_item)]
@@ -664,7 +673,7 @@ dupExportWarn occ_name ie1 ie2
 
 dupModuleExport mod
   = hsep [ptext SLIT("Duplicate"),
-	  quotes (ptext SLIT("Module") <+> pprModule mod), 
+	  quotes (ptext SLIT("Module") <+> pprModuleName mod), 
           ptext SLIT("in export list")]
 
 unusedFixityDecl rdr_name fixity

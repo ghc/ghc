@@ -1,8 +1,6 @@
 __interface RnSource 1 0 where
 __export RnSource rnHsSigType rnHsType;
-1 rnHsSigType :: __forall [_a] => Outputable.SDoc
-			       -> RdrHsSyn.RdrNameHsType
-			       -> RnMonad.RnMS _a (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;
-1 rnHsType :: __forall [_a] => Outputable.SDoc
-			       -> RdrHsSyn.RdrNameHsType
-			       -> RnMonad.RnMS _a (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;
+1 rnHsSigType :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType
+			         -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;
+1 rnHsType :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType
+			      -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;
