@@ -1,4 +1,4 @@
-#if !defined(COMPILING_GHC) && !defined(__GLASGOW_HASKELL__)
+#if !defined(COMPILING_NCG) && !defined(__GLASGOW_HASKELL__)
 extern int ghc_errno;
 extern int ghc_errtype;
 extern char *ghc_errstr;

@@ -40,7 +40,7 @@ ullong msTime(STG_NO_ARGS);
 
 #if defined(GRAN)
 
-#if !defined(COMPILING_GHC)
+#if !defined(COMPILING_NCG)
 #include "RtsFlags.h"
 #endif
 

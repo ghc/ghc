@@ -197,7 +197,7 @@ use extern declarations almost everywhere except for the single module
 (\tr{Rep.lc}) in which the rep tables are declared locally.
 
 \begin{code}
-#if defined(COMPILING_REP_LC) || defined(COMPILING_GHC)
+#if defined(COMPILING_REP_LC) || defined(COMPILING_NCG)
 # define MAYBE_DECLARE_RTBL(l,s,p)
 #else
 # define MAYBE_DECLARE_RTBL(l,s,p)	EXTDATA_RO(MK_REP_REF(l,s,p));
@@ -613,7 +613,7 @@ specialised marking code.
 # define INFO_MARKED_1S(infoptr)  	(((FP_)(INFO_RTBL(infoptr)))[COMPACTING_INFO_OFFSET+3])
 # define INFO_MARKING_1S(infoptr)  	(((FP_)(INFO_RTBL(infoptr)))[COMPACTING_INFO_OFFSET+4])
 
-#ifndef COMPILING_GHC
+#ifndef COMPILING_NCG
 extern F_ _Dummy_Static_entry(STG_NO_ARGS);
 extern F_ _Dummy_Ind_entry(STG_NO_ARGS);
 extern F_ _Dummy_Caf_entry(STG_NO_ARGS);
@@ -1165,7 +1165,7 @@ MAYBE_DECLARE_RTBL(Data,,)
     }
 
 /* Here is the decl for the only DATA info table used! */
-#ifndef COMPILING_GHC
+#ifndef COMPILING_NCG
 EXTDATA_RO(ArrayOfData_info);
 #endif
 \end{code}
@@ -1237,7 +1237,7 @@ MAYBE_DECLARE_RTBL(ImmuTuple,,)
 #endif
 
 /* Here are the decls for the only MUTUPLE info tables used. */
-#ifndef COMPILING_GHC
+#ifndef COMPILING_NCG
 EXTDATA_RO(ArrayOfPtrs_info);
 EXTDATA_RO(ImMutArrayOfPtrs_info);
 EXTDATA_RO(EmptySVar_info);
@@ -1745,7 +1745,7 @@ during a return.
     }
 
 /* Declare the phantom info table vectors (just Bool at the moment) */
-#ifndef COMPILING_GHC
+#ifndef COMPILING_NCG
 #ifndef aix_TARGET_OS /* AIX gives link errors with this as a const (RO assembler section) */
 EXTDATA_RO(PrelBase_Bool_itblvtbl);
 #else

@@ -9,7 +9,7 @@ NB: THIS FILE IS INCLUDED IN HASKELL SOURCE!
 #ifndef MACHREGS_H
 #define MACHREGS_H
 
-#if defined(__STG_GCC_REGS__) || defined(COMPILING_GHC)
+#if defined(__STG_GCC_REGS__) || defined(COMPILING_NCG)
 
 #include "StgMachDeps.h"
 
@@ -918,7 +918,7 @@ discretion being the better part of valor, we also don't take
 Concluding multi-slurp protection:
 \begin{code}
 
-#endif	/* __STG_GCC_REGS__ || COMPILING_GHC */
+#endif	/* __STG_GCC_REGS__ || COMPILING_NCG */
 
 #endif /* MACHREGS_H */
 \end{code}
