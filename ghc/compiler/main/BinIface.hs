@@ -575,7 +575,9 @@ instance Binary DmdResult where
 	    h <- getByte bh
 	    case h of
 	      0 -> do return TopRes
-	      1 -> do return retCPR
+	      1 -> do return RetCPR	-- Really use RetCPR even if -fcpr-off
+					-- The wrapper was generated for CPR in 
+					-- the imported module!
 	      _ -> do return BotRes
 
 instance Binary StrictSig where
