@@ -192,7 +192,7 @@ SRC_HC_PRE  += $(HC_PRE__)
 
 %.sgml : %.vsgml
 	@$(RM) $@
-	expand $*.verb | $(SGMLVERB) > $@
+	expand $*.vsgml | $(SGMLVERB) > $@
 
 %.tex : %.sgml
 	@$(RM) $@
