@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.54 2000/12/14 15:19:48 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.55 2000/12/14 16:32:40 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -53,26 +53,26 @@ STGFUN(stg_##type##_entry)							\
 
 #ifdef GHCI
 
-/* 9 bits of return code for constructors created by mci_make_constr. */
-FN_(stg_bco_constr_entry) 
+/* 9 bits of return code for constructors created by the interpreter. */
+FN_(stg_interp_constr_entry) 
 { 
   /* R1 points at the constructor */
   FB_ 
-    STGCALL2(fprintf,stderr,"stg_bco_constr_entry (direct return)!\n");
+    STGCALL2(fprintf,stderr,"stg_interp_constr_entry (direct return)!\n");
     /* Pointless, since SET_TAG doesn't do anything */
     SET_TAG( GET_TAG(GET_INFO(R1.cl))); 
     JMP_(ENTRY_CODE((P_)(*Sp))); 
   FE_ 
 }
 
-FN_(stg_bco_constr1_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),0)); FE_ }
-FN_(stg_bco_constr2_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),1)); FE_ }
-FN_(stg_bco_constr3_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),2)); FE_ }
-FN_(stg_bco_constr4_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),3)); FE_ }
-FN_(stg_bco_constr5_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),4)); FE_ }
-FN_(stg_bco_constr6_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),5)); FE_ }
-FN_(stg_bco_constr7_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),6)); FE_ }
-FN_(stg_bco_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
+FN_(stg_interp_constr1_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),0)); FE_ }
+FN_(stg_interp_constr2_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),1)); FE_ }
+FN_(stg_interp_constr3_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),2)); FE_ }
+FN_(stg_interp_constr4_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),3)); FE_ }
+FN_(stg_interp_constr5_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),4)); FE_ }
+FN_(stg_interp_constr6_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),5)); FE_ }
+FN_(stg_interp_constr7_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),6)); FE_ }
+FN_(stg_interp_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
  
 /* Some info tables to be used when compiled code returns a value to
    the interpreter, i.e. the interpreter pushes one of these onto the
@@ -109,7 +109,7 @@ FN_(stg_bco_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
 */
 
 /* When the returned value is in R1 ... */
-#define STG_BCORET_R1_Template(label) 	\
+#define STG_CtoI_RET_R1_Template(label) 	\
    IFN_(label)			        \
    {                                    \
       StgPtr bco;                       \
@@ -123,17 +123,39 @@ FN_(stg_bco_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
       FE_                               \
    }
 
-STG_BCORET_R1_Template(stg_bcoret_R1_entry);
-STG_BCORET_R1_Template(stg_bcoret_R1_0_entry);
-STG_BCORET_R1_Template(stg_bcoret_R1_1_entry);
-STG_BCORET_R1_Template(stg_bcoret_R1_2_entry);
-STG_BCORET_R1_Template(stg_bcoret_R1_3_entry);
-STG_BCORET_R1_Template(stg_bcoret_R1_4_entry);
-STG_BCORET_R1_Template(stg_bcoret_R1_5_entry);
-STG_BCORET_R1_Template(stg_bcoret_R1_6_entry);
-STG_BCORET_R1_Template(stg_bcoret_R1_7_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_0_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_1_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_2_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_3_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_4_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_5_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_6_entry);
+STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_7_entry);
 
-VEC_POLY_INFO_TABLE(stg_bcoret_R1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+
+/* When the returned value is in F1 ... */
+/* TODO */
+/* When the returned value is in D1 ... */
+/* TODO */
+
+
+/* The other way round: when the interpreter returns a value to
+   compiled code.  The stack looks like this:
+
+      return info table (pushed by compiled code)
+      return value (pushed by interpreter)
+
+   If the value is ptr-rep'd, the interpreter simply returns to the
+   scheduler, instructing it to ThreadEnterGHC.
+
+   Otherwise (unboxed return value), we replace the top stack word,
+   which must be the tag, with stg_gc_unbx_r1_info (or f1_info or d1_info),
+   and return to the scheduler, instructing it to ThreadRunGHC.
+
+   No supporting code needed!
+*/
 
 
 /* Entering a BCO.  Heave it on the stack and defer to the
