@@ -194,7 +194,10 @@ pprUfExpr add_par (UfLit l)       = ppr l
 pprUfExpr add_par (UfLitLit l ty) = add_par (hsep [ptext SLIT("__litlit"), pprFSAsString l, pprParendHsType ty])
 pprUfExpr add_par (UfCCall cc ty) = braces (pprCCallOp cc <+> ppr ty)
 pprUfExpr add_par (UfType ty)     = char '@' <+> pprParendHsType ty
-pprUfExpr add_par (UfLam b body)  = add_par (hsep [char '\\', ppr b, ptext SLIT("->"), pprUfExpr noParens body])
+
+pprUfExpr add_par e@(UfLam _ _)   = add_par (char '\\' <+> hsep (map ppr bndrs)
+                                             <+> ptext SLIT("->") <+> pprUfExpr noParens body)
+                                  where (bndrs,body) = collectUfBndrs e
 pprUfExpr add_par (UfApp fun arg) = add_par (pprUfExpr noParens fun <+> pprUfExpr parens arg)
 pprUfExpr add_par (UfTuple c as)  = hsTupParens c (interpp'SP as)
 
@@ -219,6 +222,13 @@ pprUfExpr add_par (UfLet (UfRec pairs) body)
 	pp_pair (b,rhs) = ppr b <+> equals <+> pprUfExpr noParens rhs <> semi
 
 pprUfExpr add_par (UfNote note body) = add_par (ppr note <+> pprUfExpr parens body)
+
+collectUfBndrs :: UfExpr name -> ([UfBinder name], UfExpr name)
+collectUfBndrs expr
+  = go [] expr
+  where
+    go bs (UfLam b e) = go (b:bs) e
+    go bs e           = (reverse bs, e)
 
 instance Outputable name => Outputable (UfNote name) where
     ppr (UfSCC cc)    = pprCostCentreCore cc
