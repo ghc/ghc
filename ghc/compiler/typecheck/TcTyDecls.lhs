@@ -38,9 +38,9 @@ import Id		( getIdUnfolding )
 import CoreUnfold	( getUnfoldingTemplate )
 import FieldLabel
 import Var		( Id, TyVar )
-import Name		( isLocallyDefined, OccName, NamedThing(..) )
+import Name		( Name, isLocallyDefined, OccName, NamedThing(..) )
 import Outputable
-import TyCon		( TyCon, mkSynTyCon, mkAlgTyCon, isAlgTyCon, 
+import TyCon		( TyCon, ArgVrcs, mkSynTyCon, mkAlgTyCon, isAlgTyCon, 
 			  isSynTyCon, tyConDataCons, isNewTyCon
 			)
 import Type		( getTyVar, tyVarsOfTypes,
@@ -52,6 +52,7 @@ import Type		( getTyVar, tyVarsOfTypes,
 import Var		( tyVarKind )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import Util		( equivClasses )
+import FiniteMap        ( FiniteMap, lookupWithDefaultFM )
 \end{code}
 
 %************************************************************************
@@ -104,20 +105,22 @@ kcConDecl (ConDecl _ ex_tvs ex_ctxt details loc)
 %************************************************************************
 
 \begin{code}
-tcTyDecl :: RecFlag -> RenamedTyClDecl -> TcM s TyCon
+tcTyDecl :: RecFlag -> FiniteMap Name ArgVrcs -> RenamedTyClDecl -> TcM s TyCon
 
-tcTyDecl is_rec (TySynonym tycon_name tyvar_names rhs src_loc)
+tcTyDecl is_rec rec_vrcs (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, Just arity, _) ->
     tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
     tcHsTopType rhs					`thenTc` \ rhs_ty ->
     let
 	-- Construct the tycon
-	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty
+        argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcTyDecl: argvrcs:" $ ppr tycon_name)
+                                      tycon_name
+	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty argvrcs
     in
     returnTc tycon
 
 
-tcTyDecl is_rec (TyData data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc)
+tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc)
   = 	-- Lookup the pieces
     tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, _, ATyCon rec_tycon) ->
     tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
@@ -134,7 +137,10 @@ tcTyDecl is_rec (TyData data_or_new context tycon_name tyvar_names con_decls der
 				DataType | all isNullaryDataCon data_cons -> EnumType
 					 | otherwise			  -> DataType
 
-	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt
+        argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcTyDecl: argvrcs:" $ ppr tycon_name)
+                                      tycon_name
+
+	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
 			   data_cons
 			   derived_classes
 			   Nothing		-- Not a dictionary

@@ -86,7 +86,7 @@ import Module		( Module )
 import Name		( mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, dataName )
 import DataCon		( DataCon, mkDataCon )
 import Var		( TyVar, tyVarKind )
-import TyCon		( TyCon, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
+import TyCon		( TyCon, ArgVrcs, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
 import BasicTypes	( Arity, NewOrData(..), 
 			  RecFlag(..), StrictnessMark(..) )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
@@ -107,18 +107,19 @@ alpha_beta_tyvars = [alphaTyVar, betaTyVar]
 
 pcRecDataTyCon, pcNonRecDataTyCon, pcNonRecNewTyCon
 	:: Unique{-TyConKey-} -> Module -> FAST_STRING
-	-> [TyVar] -> [DataCon] -> TyCon
+	-> [TyVar] -> ArgVrcs -> [DataCon] -> TyCon
 
 pcRecDataTyCon    = pcTyCon DataType Recursive
 pcNonRecDataTyCon = pcTyCon DataType NonRecursive
 pcNonRecNewTyCon  = pcTyCon NewType  NonRecursive
 
-pcTyCon new_or_data is_rec key mod str tyvars cons
+pcTyCon new_or_data is_rec key mod str tyvars argvrcs cons
   = tycon
   where
     tycon = mkAlgTyCon name kind 
 		tyvars 
 		[] 		-- No context
+                argvrcs
 		cons
 		[]		-- No derivings
 		Nothing		-- Not a dictionary
@@ -128,10 +129,10 @@ pcTyCon new_or_data is_rec key mod str tyvars cons
     name = mkWiredInTyConName key mod str tycon
     kind = mkArrowKinds (map tyVarKind tyvars) boxedTypeKind
 
-pcSynTyCon key mod str kind arity tyvars expansion
+pcSynTyCon key mod str kind arity tyvars expansion argvrcs  -- this fun never used!
   = tycon
   where
-    tycon = mkSynTyCon name kind arity tyvars expansion
+    tycon = mkSynTyCon name kind arity tyvars expansion argvrcs
     name  = mkWiredInTyConName key mod str tycon
 
 pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
@@ -262,7 +263,7 @@ voidTy = unitTy
 \begin{code}
 charTy = mkTyConTy charTyCon
 
-charTyCon = pcNonRecDataTyCon charTyConKey  pREL_BASE  SLIT("Char") [] [charDataCon]
+charTyCon = pcNonRecDataTyCon charTyConKey  pREL_BASE  SLIT("Char") [] [] [charDataCon]
 charDataCon = pcDataCon charDataConKey pREL_BASE SLIT("C#") [] [] [charPrimTy] charTyCon
 
 stringTy = mkListTy charTy -- convenience only
@@ -271,7 +272,7 @@ stringTy = mkListTy charTy -- convenience only
 \begin{code}
 intTy = mkTyConTy intTyCon 
 
-intTyCon = pcNonRecDataTyCon intTyConKey pREL_BASE SLIT("Int") [] [intDataCon]
+intTyCon = pcNonRecDataTyCon intTyConKey pREL_BASE SLIT("Int") [] [] [intDataCon]
 intDataCon = pcDataCon intDataConKey pREL_BASE SLIT("I#") [] [] [intPrimTy] intTyCon
 
 isIntTy :: Type -> Bool
@@ -293,14 +294,14 @@ min_int = toInteger minInt
 
 wordTy = mkTyConTy wordTyCon
 
-wordTyCon = pcNonRecDataTyCon wordTyConKey   pREL_ADDR SLIT("Word") [] [wordDataCon]
+wordTyCon = pcNonRecDataTyCon wordTyConKey   pREL_ADDR SLIT("Word") [] [] [wordDataCon]
 wordDataCon = pcDataCon wordDataConKey pREL_ADDR SLIT("W#") [] [] [wordPrimTy] wordTyCon
 \end{code}
 
 \begin{code}
 addrTy = mkTyConTy addrTyCon
 
-addrTyCon = pcNonRecDataTyCon addrTyConKey   pREL_ADDR SLIT("Addr") [] [addrDataCon]
+addrTyCon = pcNonRecDataTyCon addrTyConKey   pREL_ADDR SLIT("Addr") [] [] [addrDataCon]
 addrDataCon = pcDataCon addrDataConKey pREL_ADDR SLIT("A#") [] [] [addrPrimTy] addrTyCon
 
 isAddrTy :: Type -> Bool
@@ -314,7 +315,7 @@ isAddrTy ty
 \begin{code}
 floatTy	= mkTyConTy floatTyCon
 
-floatTyCon = pcNonRecDataTyCon floatTyConKey pREL_BASE SLIT("Float") [] [floatDataCon]
+floatTyCon = pcNonRecDataTyCon floatTyConKey pREL_BASE SLIT("Float") [] [] [floatDataCon]
 floatDataCon = pcDataCon floatDataConKey pREL_BASE SLIT("F#") [] [] [floatPrimTy] floatTyCon
 
 isFloatTy :: Type -> Bool
@@ -334,14 +335,14 @@ isDoubleTy ty
 	Just (tycon, [], _) -> getUnique tycon == doubleTyConKey
 	_		    -> False
 
-doubleTyCon = pcNonRecDataTyCon doubleTyConKey pREL_BASE SLIT("Double") [] [doubleDataCon]
+doubleTyCon = pcNonRecDataTyCon doubleTyConKey pREL_BASE SLIT("Double") [] [] [doubleDataCon]
 doubleDataCon = pcDataCon doubleDataConKey pREL_BASE SLIT("D#") [] [] [doublePrimTy] doubleTyCon
 \end{code}
 
 \begin{code}
 stablePtrTyCon
   = pcNonRecDataTyCon stablePtrTyConKey pREL_STABLE SLIT("StablePtr")
-	alpha_tyvar [stablePtrDataCon]
+	alpha_tyvar [(True,False)] [stablePtrDataCon]
   where
     stablePtrDataCon
       = pcDataCon stablePtrDataConKey pREL_STABLE SLIT("StablePtr")
@@ -351,7 +352,7 @@ stablePtrTyCon
 \begin{code}
 foreignObjTyCon
   = pcNonRecDataTyCon foreignObjTyConKey pREL_IO_BASE SLIT("ForeignObj")
-	[] [foreignObjDataCon]
+	[] [] [foreignObjDataCon]
   where
     foreignObjDataCon
       = pcDataCon foreignObjDataConKey pREL_IO_BASE SLIT("ForeignObj")
@@ -369,7 +370,8 @@ foreignObjTyCon
 integerTy :: Type
 integerTy = mkTyConTy integerTyCon
 
-integerTyCon = pcNonRecDataTyCon integerTyConKey pREL_BASE SLIT("Integer") [] [smallIntegerDataCon, largeIntegerDataCon]
+integerTyCon = pcNonRecDataTyCon integerTyConKey pREL_BASE SLIT("Integer")
+                   [] [] [smallIntegerDataCon, largeIntegerDataCon]
 
 smallIntegerDataCon = pcDataCon smallIntegerDataConKey pREL_BASE SLIT("S#")
 		[] [] [intPrimTy] integerTyCon
@@ -501,7 +503,7 @@ primitive counterpart.
 boolTy = mkTyConTy boolTyCon
 
 boolTyCon = pcTyCon EnumType NonRecursive boolTyConKey 
-		    pREL_BASE SLIT("Bool") [] [falseDataCon, trueDataCon]
+		    pREL_BASE SLIT("Bool") [] [] [falseDataCon, trueDataCon]
 
 falseDataCon = pcDataCon falseDataConKey pREL_BASE SLIT("False") [] [] [] boolTyCon
 trueDataCon  = pcDataCon trueDataConKey	 pREL_BASE SLIT("True")  [] [] [] boolTyCon
@@ -529,7 +531,7 @@ mkListTy ty = mkTyConApp listTyCon [ty]
 alphaListTy = mkSigmaTy alpha_tyvar [] (mkTyConApp listTyCon alpha_ty)
 
 listTyCon = pcRecDataTyCon listTyConKey pREL_BASE SLIT("[]") 
-			alpha_tyvar [nilDataCon, consDataCon]
+			alpha_tyvar [(True,False)] [nilDataCon, consDataCon]
 
 nilDataCon  = pcDataCon nilDataConKey  pREL_BASE SLIT("[]") alpha_tyvar [] [] listTyCon
 consDataCon = pcDataCon consDataConKey pREL_BASE SLIT(":")

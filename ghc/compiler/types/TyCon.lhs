@@ -5,7 +5,7 @@
 
 \begin{code}
 module TyCon(
-	TyCon, KindCon, SuperKindCon,
+	TyCon, KindCon, SuperKindCon, ArgVrcs,
 
 	isFunTyCon, isUnLiftedTyCon, isBoxedTyCon, isProductTyCon,
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
@@ -24,6 +24,7 @@ module TyCon(
 	tyConKind,
 	tyConUnique,
 	tyConTyVars,
+	tyConArgVrcs_maybe,
 	tyConDataCons,
 	tyConFamilySize,
 	tyConDerivings,
@@ -79,8 +80,9 @@ data TyCon
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
 	
-	tyConTyVars   	:: [TyVar],
-	dataTyConTheta  :: [(Class,[Type])],
+	tyConTyVars   	 :: [TyVar],
+	dataTyConTheta   :: [(Class,[Type])],
+	dataTyConArgVrcs :: ArgVrcs,
 
 	dataCons :: [DataCon],
 		-- Its data constructors, with fully polymorphic types
@@ -106,6 +108,7 @@ data TyCon
 	tyConName    :: Name,
 	tyConKind    :: Kind,
 	tyConArity   :: Arity,
+	primTyConArgVrcs :: ArgVrcs,
 	primTyConRep :: PrimRep
     }
 
@@ -126,10 +129,11 @@ data TyCon
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
 
-	tyConTyVars :: [TyVar],		-- Bound tyvars
-	synTyConDefn :: Type		-- Right-hand side, mentioning these type vars.
+	tyConTyVars     :: [TyVar],	-- Bound tyvars
+	synTyConDefn    :: Type,	-- Right-hand side, mentioning these type vars.
 					-- Acts as a template for the expansion when
 					-- the tycon is applied to some types.
+	synTyConArgVrcs :: ArgVrcs
     }
 
   | KindCon {		-- Type constructor at the kind level
@@ -143,6 +147,10 @@ data TyCon
 	tyConUnique :: Unique,
 	tyConName   :: Name
     }
+
+type ArgVrcs = [(Bool,Bool)]  -- Tyvar variance info: [(occPos,occNeg)]
+                              -- *NB*: this is tyvar variance info, *not*
+                              --       termvar usage info.
 \end{code}
 
 %************************************************************************
@@ -182,7 +190,7 @@ mkFunTyCon name kind
 	tyConArity  = 2
     }
 			    
-mkAlgTyCon name kind tyvars theta cons derivs maybe_clas flavour rec
+mkAlgTyCon name kind tyvars theta argvrcs cons derivs maybe_clas flavour rec
   = AlgTyCon {	
 	tyConName = name,
 	tyConUnique = nameUnique name,
@@ -190,6 +198,7 @@ mkAlgTyCon name kind tyvars theta cons derivs maybe_clas flavour rec
 	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
 	dataTyConTheta = theta,
+	dataTyConArgVrcs = argvrcs,
 	dataCons = cons,
 	dataTyConDerivings = derivs,
 	dataTyConClass_maybe = maybe_clas,
@@ -208,23 +217,25 @@ mkTupleTyCon name kind arity tyvars con boxed
 	dataCon = con
     }
 
-mkPrimTyCon name kind arity rep 
+mkPrimTyCon name kind arity arg_vrcs rep 
   = PrimTyCon {
 	tyConName = name,
 	tyConUnique = nameUnique name,
 	tyConKind = kind,
 	tyConArity = arity,
+        primTyConArgVrcs = arg_vrcs,
 	primTyConRep = rep
     }
 
-mkSynTyCon name kind arity tyvars rhs 
+mkSynTyCon name kind arity tyvars rhs argvrcs
   = SynTyCon {	
 	tyConName = name,
 	tyConUnique = nameUnique name,
 	tyConKind = kind,
 	tyConArity = arity,
 	tyConTyVars = tyvars,
-	synTyConDefn = rhs
+	synTyConDefn = rhs,
+	synTyConArgVrcs = argvrcs
     }
 
 setTyConName tc name = tc {tyConName = name, tyConUnique = nameUnique name}
@@ -315,6 +326,21 @@ tyConTheta (AlgTyCon {dataTyConTheta = theta}) = theta
 -- should ask about anything else
 \end{code}
 
+@tyConArgVrcs_maybe@ gives a list of (occPos,occNeg) flags, one for
+each tyvar, if available.  See @calcAlgTyConArgVrcs@ for how this is
+actually computed (in another file).
+
+\begin{code}
+tyConArgVrcs_maybe :: TyCon -> Maybe ArgVrcs
+
+tyConArgVrcs_maybe (FunTyCon   {}                     ) = Just [(False,True),(True,False)]
+tyConArgVrcs_maybe (AlgTyCon   {dataTyConArgVrcs = oi}) = Just oi
+tyConArgVrcs_maybe (PrimTyCon  {primTyConArgVrcs = oi}) = Just oi
+tyConArgVrcs_maybe (TupleTyCon {tyConArity = arity   }) = Just (replicate arity (True,False))
+tyConArgVrcs_maybe (SynTyCon   {synTyConArgVrcs = oi }) = Just oi
+tyConArgVrcs_maybe _                                    = Nothing
+\end{code}
+
 \begin{code}
 getSynTyConDefn :: TyCon -> ([TyVar], Type)
 getSynTyConDefn (SynTyCon {tyConTyVars = tyvars, synTyConDefn = ty}) = (tyvars,ty)
@@ -326,7 +352,9 @@ maybeTyConSingleCon (AlgTyCon {dataCons = [c]})  = Just c
 maybeTyConSingleCon (AlgTyCon {})	         = Nothing
 maybeTyConSingleCon (TupleTyCon {dataCon = con}) = Just con
 maybeTyConSingleCon (PrimTyCon {})               = Nothing
-maybeTyConSingleCon other = panic (showSDoc (ppr other))
+maybeTyConSingleCon (FunTyCon {})                = Nothing  -- case at funty
+maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $
+                         ppr tc
 \end{code}
 
 \begin{code}
