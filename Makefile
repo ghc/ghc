@@ -48,6 +48,9 @@ project-check :
 
 DIST_CLEAN_FILES += config.cache config.status
 
+extraclean::
+	$(RM) -rf autom4te.cache
+
 #
 # If you've ended up using an in-place version of Happy,
 # make sure it gets built early on.

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.22 2003/03/31 12:23:41 simonmar Exp $
+# $Id: Makefile,v 1.23 2003/10/17 17:52:33 panne Exp $
 #
 
 TOP=.
@@ -37,7 +37,10 @@ endif
 
 SRC_DIST_FILES += configure
 
-DIST_CLEAN_FILES += ghc.spec config.status
+DIST_CLEAN_FILES += config.cache config.status ghc.spec
+
+extraclean::
+	$(RM) -rf autom4te.cache
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 # These files need to be in the InstallShield
