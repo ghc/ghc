@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.61 2001/08/31 11:44:12 sewardj Exp $
+ * $Id: Linker.c,v 1.62 2001/08/31 14:32:03 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -1923,7 +1923,7 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       }
       IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
                                         (void*)P, (void*)S, (void*)A )); 
-      checkProddableBlock ( oc, pP );
+      checkProddableBlock ( oc, P );
       switch (ELF32_R_TYPE(info)) {
 #        if defined(sparc_TARGET_ARCH)
          case R_SPARC_WDISP30: 
