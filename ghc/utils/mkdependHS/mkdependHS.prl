@@ -21,7 +21,6 @@ Options recognised wherever they occur (mkdependHS or GHC):
 		"import"ing a module from that library).
     -fhaskell1.[2-9] Deal with the oddities associated with a
 		particular version of Haskell 1.
-    -ignore <mod>
 
 mkdependHS-specific options (not between --'s):
 
@@ -34,8 +33,19 @@ mkdependHS-specific options (not between --'s):
 		suffix <suf><osuf>; thus, "-o .hc -s _a" will
 		make dependencies both for .hc files and for _a.hc
 		files.  (Useful in conjunction with NoFib "ways".)
-    -x <file>   Regard <file> as "stable"; i.e., eXclude it from having
+    --exclude-module=<file> 
+                Regard <file> as "stable"; i.e., eXclude it from having
 		dependencies on it.
+    -x          same as --exclude-module
+    --exclude-directory=<dirs> 
+                Regard : separated list of directories as containing stable,
+                don't generate any dependencies on modules therein.
+    -Xdirs      same as --exclude-directory
+    --include-module=<file> 
+                Regard <file> as not "stable"; i.e., generate dependencies
+                on it (if any). This option is normally used in conjunction 
+                with the --exclude-directory option.
+
 EOUSAGE
 
 $Status  = 0; # just used for exit() status
@@ -103,12 +113,13 @@ $Unlit = ( $(INSTALLING) ) ? "$InstLibDirGhc/unlit"
 
 $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
-$Obj_suffix = '.o';
+$Obj_suffix = 'o';
 $ghc_version_info = int ( $(PROJECTVERSION) * 100 );
 
 $Import_dirs = '.';
 %Syslibs = ();
-%LibIfaces  = (); # known prelude/syslib ifaces; read from a file
+%LibIfaces  = ();  # known prelude/syslib ifaces; read from a file
+%Ignore_dirs = (); # directories to considered stable.
 %IgnoreMe = ();
 
 $Haskell_1 = 3; # assume Haskell 1.3. Changed by -fhaskell-1.?
@@ -161,9 +172,10 @@ foreach $sf (@Src_files) {
     # builds up @Depend_lines
     print STDERR "Here we go for source file: $sf\n" if $Verbose;
     ($bf = $sf) =~ s/\.l?hs$//;
-    push(@Depend_lines, "$bf.$Obj_suffix $bf.hi : $sf\n");
+    #push(@Depend_lines, "$bf.$Obj_suffix $bf.hi : $sf\n");
+    push(@Depend_lines, "$bf.$Obj_suffix : $sf\n");
     foreach $suff (@File_suffix) {
-        push(@Depend_lines, "$bf.$suff\_$Obj_suffix : $sf\n");
+        push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $sf\n");
     }
 
     # if it's a literate file, .lhs, then we de-literatize it:
@@ -232,9 +244,19 @@ sub mangle_command_line_args {
 		$Makefile	= &grab_arg_arg('-f',$1);
 	    } elsif ( /^-o(.*)/ ) {
 		$Obj_suffix	= &grab_arg_arg('-o',$1);
-	    } elsif ( /^-x(.*)/ ) { 
-		local($thing) = &grab_arg_arg($_,$1);
+            #
+	    # --exclude-module=mod => it's stable, trust me!
+            
+	    } elsif ( /^-(x|-exclude-module=)(.*)/ ) { 
+		local($thing) = &grab_arg_arg($1,$2);
 		$IgnoreMe{$thing} = 'y';
+	    } elsif ( /^-(X|-exclude-directory=)(.*)/ ) { 
+		foreach $d ( split(/:/,&grab_arg_arg($1, $2)) ) {
+                   $Ignore_dirs{$d} = "$d";
+                }
+	    } elsif ( /^--include-module=(.*)/ ) { 
+		local($thing) = &grab_arg_arg($1,$2);
+		$IgnoreMe{$thing} = 'n';
 	    } elsif ( /^-s(.*)/ ) {
 		local($suff)	=  &grab_arg_arg('-s',$1);
 		push(@File_suffix, $suff);
@@ -299,6 +321,10 @@ sub preprocess_import_dirs {
     %ModuleIn = ();
 
     foreach $d ( @Import_dirs ) {
+        # Check to see if it can be ignored
+        print STDERR "Ignore imports from $d\n" if $Verbose && $Ignore_dirs{$d};
+        next if $Ignore_dirs{$d};
+
 	opendir(DIR, $d) || die "$Pgm: can't open directory $d\n";
 
 	for ($_ = readdir(DIR); $_; $_ = readdir(DIR)) {
@@ -310,6 +336,23 @@ sub preprocess_import_dirs {
 		$ModuleIn{$thing} = $d;
 	    }
 	}
+	closedir(DIR); # No, don't check the error code
+    }
+
+    # Add all the modules found in the ignorable directories
+    # to the IgnoreMe array before we start scanning for imports.
+    foreach $d (keys %Ignore_dirs) {
+
+	opendir(DIR, $d) || die "$Pgm: can't open directory $d\n";
+
+        for ($_ = readdir(DIR); $_; $_ = readdir(DIR)) {
+            next unless /(.*)\.(hi|l?hs)$/;
+            #don't tag it twice or overwrite it with a diff. value
+            next if $IgnoreMe{$1};
+            print STDERR "Module $d/$1.$2 will be ignored\n" if $Verbose;
+
+            $IgnoreMe{$1} = 'y';
+        }
 	closedir(DIR); # No, don't check the error code
     }
 }
@@ -324,25 +367,37 @@ sub slurp_file_for_imports {
 
     # we mangle #include's so they will also leave something
     # behind to indicate the dependency on _them_
-
+    
+    # Worth our while to relativise the path or 
+    # assume it is there in the first place? -- SOF
+    #
     print STDERR "/usr/bin/sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |\n" if $Verbose;
 
     open(SRCFILE, "/usr/bin/sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |")
 	|| die "$Pgm: Can't open $file_to_read: $!\n";
 
     while (<SRCFILE>) {
-	next unless (/^>?\s*(import)(\s+qualified)?\s+([A-Z][A-Za-z0-9_']*)/ || /^!(include)(\s+)"(\S+)"/);
+        #
+        # inport {-# SOURCE #-} Foo (bar) generates dependencies on the source file only,
+        # the compiler will deal with the absence of Foo.hi by consulting the
+        # source for Foo directly.
+        #
+        # >? import qualified ModuleName | !include "foo"
+        #
+        #
+	next unless (/^>?\s*(import)(\s+{-#\s*SOURCE\s*#-})?(\s+qualified)?\s+([A-Z][A-Za-z0-9_']*)/ || /^!(include)(\s+)"(\S+)"/);
 	$todo    = $1;
-	$modname = $3;
+        $source  = ( $2 ne '') ? 1 : 0;
+	$modname = $4;
 
 	if ($todo eq 'import') {
 	    if ( $IgnoreMe{$modname} eq 'y' ) {
 		$follow_file = '__ignore__';
 	    } elsif ( $ModuleIn{$modname} ) {
-		$follow_file = "$ModuleIn{$modname}/$modname.hi";
+   		   $follow_file = "$ModuleIn{$modname}/$modname.hi";
 	    } else { # hard way
 		$follow_file
-		  = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir);
+		  = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir );
 	    }
 	} else {
 	    if ( $IgnoreMe{$modname} eq 'y' ) {
@@ -364,17 +419,36 @@ sub slurp_file_for_imports {
 		if ( $int_file !~ /\.(l?hs|hi)$/ ) {
 		    push(@Depend_lines, "$bf.$Obj_suffix : $int_file\n");
 		    foreach $suff (@File_suffix) {
-			push(@Depend_lines, "$bf.$suff\_$Obj_suffix : $int_file\n");
+			push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $int_file\n");
 		    }
 
 		} else {
 		    $int_file =~ s/\.l?hs$//;
 		    $int_file =~ s/\.hi$//;
+                    local($source_dep);
 
-		    push(@Depend_lines, "$bf.$Obj_suffix : $int_file.hi\n");
-		    foreach $suff (@File_suffix) {
-			push(@Depend_lines, "$bf.$suff\_$Obj_suffix : $int_file.$suff\_hi\n");
-		    }
+                    if ( $source && -f "$int_file.hs" ) {
+                        $source_dep = "$int_file.hs";
+ 		        push(@Depend_lines, "$bf.$Obj_suffix : $source_dep\n");
+                    } elsif ( $source && -f "$int_file.lhs" ) {
+                        $source_dep = "$int_file.lhs";
+ 		        push(@Depend_lines, "$bf.$Obj_suffix : $source_dep\n");
+                    } else {
+                        if ( $source ) {
+                           print STDERR "Warning: could not find source file dependency $int_file.(hs|lhs)\n";
+                        }
+		        push(@Depend_lines, "$bf.$Obj_suffix : $int_file.hi\n");
+	            }
+
+                    if ( ! $source ) {
+		       foreach $suff (@File_suffix) {
+			  push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $int_file.${suff}_hi\n");
+		       }
+                    } else {
+		       foreach $suff (@File_suffix) {
+			  push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $source_dep\n");
+		       }
+                   }
 		}
 	    }
 	}
@@ -387,7 +461,7 @@ sub slurp_file_for_imports {
 %FileExists = ();
 
 sub find_in_Import_dirs {
-    local($orig_src_file, $modname, $last_seen_dir) = @_;
+    local($orig_src_file, $modname, $last_seen_dir, $source) = @_;
     local($import_dir);
     local($do_magical_check) = 0;
     local($name_to_check);
