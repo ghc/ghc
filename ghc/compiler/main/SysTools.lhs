@@ -69,7 +69,7 @@ import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
 import Panic		( GhcException(..) )
-import Util		( global, notNull, toArgs )
+import Util		( global, notNull )
 import CmdLineOpts	( dynFlag, verbosity )
 
 import EXCEPTION	( throwDyn )
@@ -423,7 +423,7 @@ initSysTools minusB_args
 	}
 
 #if defined(mingw32_HOST_OS)
-foreign import stdcall "GetTempPathA" unsafe getTempPath :: Int -> CString -> IO Int32
+foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO Int32
 #endif
 \end{code}
 
@@ -860,14 +860,14 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
   where
     rootDir s = reverse (dropList "/bin/ghc.exe" (reverse (normalisePath s)))
 
-foreign import stdcall "GetModuleFileNameA" unsafe
+foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getBaseDir :: IO (Maybe String) = do return Nothing
 #endif
 
 #ifdef mingw32_HOST_OS
-foreign import ccall "_getpid" unsafe getProcessID :: IO Int -- relies on Int == Int32 on Windows
+foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #elif __GLASGOW_HASKELL__ > 504
 getProcessID :: IO Int
 getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
