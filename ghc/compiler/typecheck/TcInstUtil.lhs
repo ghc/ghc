@@ -48,10 +48,6 @@ import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-}, Ord3(..) )
 #if __GLASGOW_HASKELL__ >= 202
 import Outputable
 #endif
-
---import PprStyle
-
---import TcPragmas	( tcDictFunPragmas, tcGenPragmas )
 \end{code}
 
     instance c => k (t tvs) where b
