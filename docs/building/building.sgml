@@ -2652,7 +2652,8 @@ guide) before continuing to read these notes.
 <para>
 Before you start, make sure you've installed the Cygwin packages
 <filename>openssh</filename>, <filename>openssl</filename>,
-<filename>cvs</filename>, <filename>gdbm</filename> (needed by cvs), <filename>m4</filename> and
+<filename>cvs</filename>, <filename>gdbm</filename> (needed by cvs),
+<filename>zlib</filename> (needed by cvs), <filename>m4</filename> and
 <filename>autoconf</filename>. Do not install the <filename>cygwin</filename>
 package; the bits of it you need are supplied with GHC. You also need to make sure that the
 user environment variable <Constant>MAKE_MODE</Constant> is set to <Literal>UNIX</Literal>.  If you don't do
