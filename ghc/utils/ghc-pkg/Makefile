@@ -10,6 +10,7 @@ INSTALLING=1
 # ghc-pkg.bin
 
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
+ghc_ge_603 = $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
 
 SRC_HC_OPTS += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
 
@@ -23,6 +24,10 @@ endif
 
 ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
+endif
+
+ifeq "$(ghc_ge_603)" "YES"
+SRC_HC_OPTS +=  -package Cabal
 endif
 
 # On Windows, ghc-pkg is a standalone program
