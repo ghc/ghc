@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.12 2003/03/25 16:19:56 sof Exp $
+ * $Id: Block.h,v 1.13 2003/03/28 15:13:52 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -94,7 +94,7 @@ static inline bdescr *Bdescr(StgPtr p)
 /* Offset of first real data block in a megablock */
 
 #define FIRST_BLOCK_OFF \
-   ((W_)BLOCK_ROUND_UP(MBLOCK_SIZE / BLOCK_SIZE * BDESCR_SIZE))
+   ((W_)BLOCK_ROUND_UP(BDESCR_SIZE * (MBLOCK_SIZE / BLOCK_SIZE)))
 
 /* First data block in a given megablock */
 
