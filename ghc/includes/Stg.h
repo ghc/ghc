@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.13 1999/06/25 09:13:38 simonmar Exp $
+ * $Id: Stg.h,v 1.14 1999/06/25 09:14:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -47,6 +47,11 @@
 #define COMPILER 1
 #endif
 
+/* TABLES_NEXT_TO_CODE says whether to assume that info tables are
+ * assumed to reside just before the code for a function.
+ *
+ * UNDEFINING THIS WON'T WORK ON ITS OWN.  You have been warned.
+ */
 #ifndef USE_MINIINTERPRETER
 #define TABLES_NEXT_TO_CODE
 #endif
