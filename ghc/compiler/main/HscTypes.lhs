@@ -22,7 +22,7 @@ module HscTypes (
 	TypeEnv, lookupType, mkTypeEnv, extendTypeEnvList, 
 	typeEnvClasses, typeEnvTyCons,
 
-	WhetherHasOrphans, ImportVersion, WhatsImported(..),
+	ImportedModuleInfo, WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
 	IfaceInsts, IfaceRules, GatedDecl, IsExported,
 	NameSupply(..), OrigNameCache, OrigIParamCache,
@@ -457,10 +457,11 @@ type PackageRuleBase = RuleBase
 type PackageInstEnv  = InstEnv
 
 data PersistentRenamerState
-  = PRS { prsOrig  :: NameSupply,
-	  prsDecls :: DeclsMap,
-	  prsInsts :: IfaceInsts,
-	  prsRules :: IfaceRules
+  = PRS { prsOrig    :: NameSupply,
+	  prsImpMods :: ImportedModuleInfo,
+	  prsDecls   :: DeclsMap,
+	  prsInsts   :: IfaceInsts,
+	  prsRules   :: IfaceRules
     }
 \end{code}
 
@@ -490,6 +491,16 @@ type OrigNameCache   = FiniteMap (ModuleName,OccName) Name
 type OrigIParamCache = FiniteMap OccName Name
 \end{code}
 
+@ImportedModuleInfo@ contains info ONLY about modules that have not yet 
+been loaded into the iPIT.  These modules are mentioned in interfaces we've
+already read, so we know a tiny bit about them, but we havn't yet looked
+at the interface file for the module itself.  It needs to persist across 
+invocations of the renamer, at least from Rename.checkOldIface to Rename.renameSource.
+And there's no harm in it persisting across multiple compilations.
+
+\begin{code}
+type ImportedModuleInfo = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
+\end{code}
 
 A DeclsMap contains a binding for each Name in the declaration
 including the constructors of a type decl etc.  The Bool is True just

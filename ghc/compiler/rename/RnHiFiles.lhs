@@ -20,7 +20,7 @@ module RnHiFiles (
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import HscTypes		( ModuleLocation(..),
 			  ModIface(..), emptyModIface,
-			  VersionInfo(..),
+			  VersionInfo(..), ImportedModuleInfo,
 			  lookupIfaceByModName, 
 			  ImportVersion, WhetherHasOrphans, IsBootInterface,
 			  DeclsMap, GatedDecl, IfaceInsts, IfaceRules,
@@ -232,6 +232,7 @@ tryLoadInterface doc_str mod_name from
 			      iRules	  = new_rules,
 			      iImpModInfo = mod_map2  }
     in
+    seq mod_map2 $
     setIfacesRn new_ifaces		`thenRn_`
     returnRn (mod_iface, Nothing)
     }}
@@ -242,7 +243,7 @@ tryLoadInterface doc_str mod_name from
 -----------------------------------------------------
 
 addModDeps :: Module 
-	   -> (ModuleName -> Bool)	-- True for module interfaces
+	   -> (ModuleName -> Bool)	-- True for modules that are already loaded
 	   -> [ImportVersion a] 
 	   -> ImportedModuleInfo -> ImportedModuleInfo
 -- (addModDeps M ivs deps)
@@ -255,8 +256,7 @@ addModDeps mod is_loaded new_deps mod_deps
 	-- and in that case, forget about the boot indicator
     filtered_new_deps :: [(ModuleName, (WhetherHasOrphans, IsBootInterface))]
     filtered_new_deps
-	| isHomeModule mod 
-			    = [ (imp_mod, (has_orphans, is_boot))
+	| isHomeModule mod  = [ (imp_mod, (has_orphans, is_boot))
 			      | (imp_mod, has_orphans, is_boot, _) <- new_deps,
 				not (is_loaded imp_mod)
 			      ]			      

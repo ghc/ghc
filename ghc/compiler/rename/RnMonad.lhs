@@ -38,8 +38,8 @@ import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
 import HscTypes		( AvailEnv, lookupType,
 			  NameSupply(..), 
-			  WhetherHasOrphans, ImportVersion, 
-			  PersistentRenamerState(..), IsBootInterface, Avails,
+			  ImportedModuleInfo, WhetherHasOrphans, ImportVersion, 
+			  PersistentRenamerState(..), Avails,
 			  DeclsMap, IfaceInsts, IfaceRules, 
 			  HomeSymbolTable, TyThing,
 			  PersistentCompilerState(..), GlobalRdrEnv,
@@ -64,7 +64,7 @@ import NameSet
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import SrcLoc		( SrcLoc, generatedSrcLoc, noSrcLoc )
 import Unique		( Unique )
-import FiniteMap	( FiniteMap, emptyFM )
+import FiniteMap	( FiniteMap )
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
@@ -251,6 +251,11 @@ data Ifaces = Ifaces {
 		-- package symbol table, and the renamer incrementally adds
 		-- to it.
 
+	iImpModInfo :: ImportedModuleInfo,
+			-- Modules that we know something about, because they are mentioned
+			-- in interface files, BUT which we have not loaded yet.  
+			-- No module is both in here and in the PIT
+
 	iDecls :: DeclsMap,	
 		-- A single, global map of Names to unslurped decls
 
@@ -265,11 +270,6 @@ data Ifaces = Ifaces {
 
     -- EPHEMERAL FIELDS
     -- These fields persist during the compilation of a single module only
-	iImpModInfo :: ImportedModuleInfo,
-			-- Modules that we know something about, because they are mentioned
-			-- in interface files, BUT which we have not loaded yet.  
-			-- No module is both in here and in the PIT
-
 	iSlurp :: NameSet,
 		-- All the names (whether "big" or "small", whether wired-in or not,
 		-- whether locally defined or not) that have been slurped in so far.
@@ -282,16 +282,13 @@ data Ifaces = Ifaces {
 		-- names that have been slurped in so far, with their versions.
 		-- This is used to generate the "usage" information for this module.
 		-- Subset of the previous field.
+		--
 		-- The module set is the non-home-package modules from which we have
 		-- slurped at least one name.
 		-- It's worth keeping separately, because there's no very easy 
 		-- way to distinguish the "big" names from the "non-big" ones.
 		-- But this is a decision we might want to revisit.
     }
-
-type ImportedModuleInfo = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
-	-- Contains info ONLY about modules that 
-	-- have not yet been loaded into the iPIT
 \end{code}
 
 
@@ -324,7 +321,7 @@ initRn dflags hit hst pcs mod do_rn
 		  	      iInsts = prsInsts prs,
 		 	      iRules = prsRules prs,
 
-		 	      iImpModInfo = emptyFM,
+		 	      iImpModInfo = prsImpMods prs,
 			      iSlurp      = unitNameSet (mkUnboundName dummyRdrVarName),
 				-- Pretend that the dummy unbound name has already been
 				-- slurped.  This is what's returned for an out-of-scope name,
@@ -353,10 +350,11 @@ initRn dflags hit hst pcs mod do_rn
 	(warns, errs) 	<- readIORef errs_var
 	new_ifaces    	<- readIORef iface_var
 	new_orig	<- readIORef names_var
-	let new_prs = prs { prsOrig = new_orig,
-			    prsDecls = iDecls new_ifaces,
-			    prsInsts = iInsts new_ifaces,
-			    prsRules = iRules new_ifaces }
+	let new_prs = prs { prsOrig    = new_orig,
+			    prsImpMods = iImpModInfo new_ifaces,
+			    prsDecls   = iDecls new_ifaces,
+			    prsInsts   = iInsts new_ifaces,
+			    prsRules   = iRules new_ifaces }
 	let new_pcs = pcs { pcs_PIT = iPIT new_ifaces, 
 			    pcs_PRS = new_prs }
 	

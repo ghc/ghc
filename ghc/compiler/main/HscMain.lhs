@@ -515,9 +515,10 @@ initPersistentRenamerState :: IO PersistentRenamerState
         PRS { prsOrig  = NameSupply { nsUniqs = us,
 				      nsNames = initOrigNames,
 			      	      nsIPs   = emptyFM },
-	      prsDecls = (emptyNameEnv, 0),
-	      prsInsts = (emptyBag, 0),
-	      prsRules = (emptyBag, 0)
+	      prsDecls 	 = (emptyNameEnv, 0),
+	      prsInsts 	 = (emptyBag, 0),
+	      prsRules 	 = (emptyBag, 0),
+	      prsImpMods = emptyFM
             }
         )
 
