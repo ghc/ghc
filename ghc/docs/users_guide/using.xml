@@ -1823,7 +1823,7 @@ ordinary Haskell 98, when translated to External Core, uses things like rank-2 t
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: sgml ***
+     ;;; mode: xml ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
      ;;; End: ***
  -->
