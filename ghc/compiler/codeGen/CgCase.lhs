@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.58 2002/08/02 13:08:34 simonmar Exp $
+% $Id: CgCase.lhs,v 1.59 2002/09/04 10:00:45 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -500,11 +500,11 @@ cgAlgAlts :: GCFlag
 		    AbstractC			-- The default case
 	     )
 
-cgAlgAlts gc_flag uniq restore_cc must_label_branches is_fun alts deflt
+cgAlgAlts gc_flag uniq restore_cc must_label_branches is_poly alts deflt
           emit_yield{-should a yield macro be emitted?-}
 
   = forkAlts (map (cgAlgAlt gc_flag uniq restore_cc must_label_branches emit_yield) alts)
-	     (cgAlgDefault gc_flag is_fun uniq restore_cc must_label_branches deflt emit_yield)
+	     (cgAlgDefault gc_flag is_poly uniq restore_cc must_label_branches deflt emit_yield)
 \end{code}
 
 \begin{code}
@@ -515,10 +515,10 @@ cgAlgDefault :: GCFlag
 	     -> Bool
 	     -> FCode AbstractC		-- output
 
-cgAlgDefault gc_flag is_fun uniq cc_slot must_label_branch StgNoDefault _
+cgAlgDefault gc_flag is_poly uniq cc_slot must_label_branch StgNoDefault _
   = returnFC AbsCNop
 
-cgAlgDefault gc_flag is_fun uniq cc_slot must_label_branch
+cgAlgDefault gc_flag is_poly uniq cc_slot must_label_branch
 	     (StgBindDefault rhs)
           emit_yield{-should a yield macro be emitted?-}
 
@@ -529,7 +529,7 @@ cgAlgDefault gc_flag is_fun uniq cc_slot must_label_branch
              --(if emit_yield
              --   then yield [node] True
              --   else absC AbsCNop)                            `thenC`     
-	     possibleHeapCheck gc_flag is_fun [node] [] Nothing (cgExpr rhs)
+	     algAltHeapCheck gc_flag is_poly [node] [] Nothing (cgExpr rhs)
 	-- Node is live, but doesn't need to point at the thing itself;
 	-- it's ok for Node to point to an indirection or FETCH_ME
 	-- Hence no need to re-enter Node.
@@ -565,7 +565,7 @@ cgAlgAlt gc_flag uniq cc_slot must_label_branch
 		NoGC   	    -> mapFCs bindNewToTemp args `thenFC` \_ -> nopC
     		GCMayHappen -> bindConArgs con args
     	     )	`thenC`
-    	     possibleHeapCheck gc_flag False [node] [] Nothing (
+    	     algAltHeapCheck gc_flag False [node] [] Nothing (
 	     cgExpr rhs)
             ) `thenFC` \ abs_c -> 
     let
@@ -607,7 +607,7 @@ cgUnboxedTupleAlt lbl cc_slot emit_yield (con,args,use_mask,rhs)
 	freeStackSlots (map fst tags) 		`thenC`
 
 	-- generate a heap check if necessary
-  	possibleHeapCheck GCMayHappen False live_regs tags ret_addr (
+  	primAltHeapCheck GCMayHappen live_regs tags ret_addr (
 
 	-- and finally the code for the alternative
   	cgExpr rhs)
@@ -703,7 +703,7 @@ cgPrimAlt gc_flag regs (lit, rhs)
   = getAbsC rhs_code	 `thenFC` \ absC ->
     returnFC (lit,absC)
   where
-    rhs_code = possibleHeapCheck gc_flag False regs [] Nothing (cgExpr rhs)
+    rhs_code = primAltHeapCheck gc_flag regs [] Nothing (cgExpr rhs)
 
 cgPrimDefault :: GCFlag
 	      -> [MagicId]		-- live registers
@@ -714,7 +714,7 @@ cgPrimDefault gc_flag regs StgNoDefault
   = panic "cgPrimDefault: No default in prim case"
 
 cgPrimDefault gc_flag regs (StgBindDefault rhs)
-  = getAbsC (possibleHeapCheck gc_flag False regs [] Nothing (cgExpr rhs))
+  = getAbsC (primAltHeapCheck gc_flag regs [] Nothing (cgExpr rhs))
 \end{code}
 
 
@@ -890,17 +890,22 @@ heap check or not.  These heap checks are always in a case
 alternative, so we use altHeapCheck.
 
 \begin{code}
-possibleHeapCheck 
+algAltHeapCheck 
 	:: GCFlag 
-	-> Bool				--  True <=> algebraic case
+	-> Bool				--  True <=> polymorphic case
 	-> [MagicId]			--  live registers
 	-> [(VirtualSpOffset,Int)]	--  stack slots to tag
 	-> Maybe Unique			--  return address unique
 	-> Code				--  continuation
 	-> Code
 
-possibleHeapCheck GCMayHappen is_alg regs tags lbl code 
-  = altHeapCheck is_alg regs tags AbsCNop lbl code
-possibleHeapCheck NoGC	_ _ tags lbl code 
+algAltHeapCheck GCMayHappen is_poly regs tags lbl code 
+  = altHeapCheck is_poly False regs tags AbsCNop lbl code
+algAltHeapCheck NoGC	_ _ tags lbl code 
+  = code
+
+primAltHeapCheck GCMayHappen regs tags lbl code
+  = altHeapCheck False True regs tags AbsCNop lbl code
+primAltHeapCheck NoGC _ _ _ code 
   = code
 \end{code}

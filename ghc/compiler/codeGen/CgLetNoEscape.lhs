@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.16 2001/10/25 02:13:11 sof Exp $
+% $Id: CgLetNoEscape.lhs,v 1.17 2002/09/04 10:00:46 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -227,7 +227,7 @@ cgLetNoEscapeBody binder cc all_args body uniq
 
 	-- Do heap check [ToDo: omit for non-recursive case by recording in
 	--	in envt and absorbing at call site]
-     altHeapCheck False arg_regs stk_tags frame_hdr_asst (Just uniq) (
+     altHeapCheck False True arg_regs stk_tags frame_hdr_asst (Just uniq) (
 	cgExpr body
      )
 

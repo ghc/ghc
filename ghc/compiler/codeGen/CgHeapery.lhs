@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.32 2002/08/29 15:44:13 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.33 2002/09/04 10:00:46 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -236,7 +236,8 @@ have to do something about saving and restoring the other registers.
 
 \begin{code}
 altHeapCheck 
-	:: Bool				-- is an algebraic alternative
+	:: Bool				-- is a polymorphic case alt
+	-> Bool				-- is an primitive case alt
 	-> [MagicId]			-- live registers
 	-> [(VirtualSpOffset,Int)]	-- stack slots to tag
 	-> AbstractC
@@ -247,7 +248,7 @@ altHeapCheck
 -- unboxed tuple alternatives and let-no-escapes (the two most annoying
 -- constructs to generate code for!):
 
-altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
+altHeapCheck is_poly is_prim regs tags fail_code (Just ret_addr) code
   = mkTagAssts tags `thenFC` \tag_assts1 ->
     let tag_assts = mkAbstractCs [fail_code, tag_assts1]
     in
@@ -308,7 +309,7 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 
 -- normal algebraic and primitive case alternatives:
 
-altHeapCheck is_fun regs [] AbsCNop Nothing code
+altHeapCheck is_poly is_prim regs [] AbsCNop Nothing code
   = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
   where
     do_heap_chk :: HeapOffset -> Code
@@ -334,27 +335,20 @@ altHeapCheck is_fun regs [] AbsCNop Nothing code
 	    [] ->
 	       CCheck HP_CHK_NOREGS [mkIntCLit words_required] AbsCNop
 
-	    -- The SEQ case (polymophic/function typed case branch)
-	    -- We need this case because the closure in Node won't return
-	    -- directly when we enter it (it could be a function), so the
-	    -- heap check code needs to push a seq frame on top of the stack.
+	    -- R1 is boxed, but unlifted: DO NOT enter R1 when we return.
+	    --
+	    -- We also lump the polymorphic case in here, because we don't
+	    -- want to enter R1 if it is a function, and we're guarnateed
+	    -- that the return point has a direct return.
 	    [VanillaReg rep 1#]
-		|  rep == PtrRep
- 		&& is_fun ->
-	          CCheck HP_CHK_SEQ_NP
-			[mkIntCLit words_required, mkIntCLit 1{-regs live-}]
-			AbsCNop
+		| isFollowableRep rep && (is_poly || is_prim) ->
+		  CCheck HP_CHK_UNPT_R1 [mkIntCLit words_required] AbsCNop
 
 	    -- R1 is lifted (the common case)
-	    [VanillaReg rep 1#]
-	        | rep == PtrRep ->
-	          CCheck HP_CHK_NP
+	        | isFollowableRep rep ->
+ 	          CCheck HP_CHK_NP
 			[mkIntCLit words_required, mkIntCLit 1{-regs live-}]
 			AbsCNop
-
-	    -- R1 is boxed, but unlifted
-		| isFollowableRep rep ->
-		  CCheck HP_CHK_UNPT_R1 [mkIntCLit words_required] AbsCNop
 
 	    -- R1 is unboxed
 		| otherwise ->
