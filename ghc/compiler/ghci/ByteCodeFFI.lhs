@@ -8,6 +8,7 @@ module ByteCodeFFI ( taggedSizeW, untaggedSizeW, mkMarshalCode ) where
 
 #include "HsVersions.h"
 
+import Outputable
 import PrimRep		( PrimRep(..), getPrimRepSize, isFollowableRep )
 import Bits		( Bits(..), shiftR )
 import Word		( Word8, Word32 )
@@ -96,6 +97,7 @@ mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
               [ let -- where this arg's bits start
                     a_bits_offW = a_offW + sizeOfTagW a_rep
                 in 
+                    reverse 
                     [a_bits_offW .. a_bits_offW + untaggedSizeW a_rep - 1]
 
                 | (a_offW, a_rep) <- reverse arg_offs_n_reps
@@ -120,7 +122,10 @@ mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
             = [0x89, 0x86] ++ lit32 offB
          ret				-- ret
             = [0xC3]
-
+         fstl_offesimem	offB		-- fstl   offB(%esi)
+            = [0xDD, 0x96] ++ lit32 offB
+         fsts_offesimem	offB		-- fsts   offB(%esi)
+            = [0xD9, 0x96] ++ lit32 offB
          lit32 :: Int -> [Word8]
          lit32 i = let w32 = (fromIntegral i) :: Word32
                    in  map (fromIntegral . ( .&. 0xFF))
@@ -147,6 +152,14 @@ mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
             15      3412
             16 002a 89967856    movl %edx, 0x12345678(%esi)
             16      3412
+            17           
+            18 0030 DD967856    fstl    0x12345678(%esi)
+            18      3412
+            19 0036 DD9E7856    fstpl   0x12345678(%esi)
+            19      3412
+            20 003c D9967856    fsts    0x12345678(%esi)
+            20      3412
+            21 0042 D99E7856    fstps   0x12345678(%esi)
             18              
             19 0030 C3          ret
             20              
@@ -154,7 +167,7 @@ mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
          -}
 
      in
-     trace (show (map fst arg_offs_n_reps))
+     --trace (show (map fst arg_offs_n_reps))
      (
      {- On entry, top of C stack 0(%esp) is the RA and 4(%esp) is 
         arg passed from the interpreter.
@@ -216,12 +229,17 @@ mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
            movl        %edx, 4(%esi)
            movl        %eax, 8(%esi)
         or
-           fstpl       4(%esi)
+           fstl        4(%esi)
         or
-           fstps       4(%esi)
+           fsts        4(%esi)
      -}
      ++ case r_rep of
-           IntRep -> movl_eax_offesimem 4
+           IntRep    -> movl_eax_offesimem 4
+           WordRep   -> movl_eax_offesimem 4
+           AddrRep   -> movl_eax_offesimem 4
+           DoubleRep -> fstl_offesimem 4
+           FloatRep  -> fsts_offesimem 4
+           other     -> pprPanic "ByteCodeFFI.mkMarshalCode_wrk(x86)" (ppr r_rep)
 
      {- Restore all the pushed regs and go home.
 

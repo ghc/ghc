@@ -322,32 +322,36 @@ mkBits findLabel st proto_insns
        literal st (MachFloat r)  = float st (fromRational r)
        literal st (MachDouble r) = double st (fromRational r)
        literal st (MachChar c)   = int st c
-       literal st other          = pprPanic "ByteCodeLink.mkBits" (ppr other)
+       literal st other          = pprPanic "ByteCodeLink.literal" (ppr other)
 
        ctoi_itbl st pk
           = addr st ret_itbl_addr
             where
-               ret_itbl_addr = case pk of
-                                  PtrRep    -> stg_ctoi_ret_R1p_info
-                                  WordRep   -> stg_ctoi_ret_R1n_info
-                                  IntRep    -> stg_ctoi_ret_R1n_info
-                                  AddrRep   -> stg_ctoi_ret_R1n_info
-                                  CharRep   -> stg_ctoi_ret_R1n_info
-                                  FloatRep  -> stg_ctoi_ret_F1_info
-                                  DoubleRep -> stg_ctoi_ret_D1_info
-                                  VoidRep   -> stg_ctoi_ret_V_info
-                                  _ -> pprPanic "mkBits.ctoi_itbl" (ppr pk)
+               ret_itbl_addr 
+                  = case pk of
+                       PtrRep    -> stg_ctoi_ret_R1p_info
+                       WordRep   -> stg_ctoi_ret_R1n_info
+                       IntRep    -> stg_ctoi_ret_R1n_info
+                       AddrRep   -> stg_ctoi_ret_R1n_info
+                       CharRep   -> stg_ctoi_ret_R1n_info
+                       FloatRep  -> stg_ctoi_ret_F1_info
+                       DoubleRep -> stg_ctoi_ret_D1_info
+                       VoidRep   -> stg_ctoi_ret_V_info
+                       other     -> pprPanic "ByteCodeLink.ctoi_itbl" (ppr pk)
 
        itoc_itbl st pk
           = addr st ret_itbl_addr
             where
-               ret_itbl_addr = case pk of
-                                  CharRep   -> stg_gc_unbx_r1_ret_info
-                                  IntRep    -> stg_gc_unbx_r1_ret_info
-                                  FloatRep  -> stg_gc_f1_ret_info
-                                  DoubleRep -> stg_gc_d1_ret_info
-                                  VoidRep   -> nullAddr  
-                                  -- Interpreter.c spots this special case
+               ret_itbl_addr 
+                  = case pk of
+                       CharRep   -> stg_gc_unbx_r1_ret_info
+                       IntRep    -> stg_gc_unbx_r1_ret_info
+                       AddrRep   -> stg_gc_unbx_r1_ret_info
+                       FloatRep  -> stg_gc_f1_ret_info
+                       DoubleRep -> stg_gc_d1_ret_info
+                       VoidRep   -> nullAddr  
+                       -- Interpreter.c spots this special case
+                       other     -> pprPanic "ByteCodeLink.itoc_itbl" (ppr pk)
                      
 foreign label "stg_ctoi_ret_R1p_info" stg_ctoi_ret_R1p_info :: Addr
 foreign label "stg_ctoi_ret_R1n_info" stg_ctoi_ret_R1n_info :: Addr

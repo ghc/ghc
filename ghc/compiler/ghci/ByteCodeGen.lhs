@@ -360,16 +360,20 @@ schemeE d s p (fvs_case, AnnCase (fvs_scrut, scrut) bndr
          (schemeE d s p new_expr)
 
 
-schemeE d s p (fvs, AnnCase scrut bndr alts0)
-   = let
-        alts = case alts0 of
-                  [(DataAlt dc, [bind1, bind2], rhs)] 
-                     | isUnboxedTupleCon dc
-                       && VoidRep == typePrimRep (idType bind1)
-                     ->  [(DEFAULT, [bind2], rhs)]
-                  other
-                     -> alts0
 
+{- Convert case .... of (# VoidRep'd-thing, a #) -> ...
+      as
+   case .... of a -> ...
+   Use  a  as the name of the binder too.
+-}
+schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1, bind2], rhs)])
+   | isUnboxedTupleCon dc && VoidRep == typePrimRep (idType bind1)
+   = trace "automagic mashing of case alts (# VoidRep, a #)" (
+     schemeE d s p (fvs, AnnCase scrut bind2 [(DEFAULT, [bind2], rhs)])
+     )
+
+schemeE d s p (fvs, AnnCase scrut bndr alts)
+   = let
         -- Top of stack is the return itbl, as usual.
         -- underneath it is the pointer to the alt_code BCO.
         -- When an alt is entered, it assumes the returned value is
@@ -383,12 +387,15 @@ schemeE d s p (fvs, AnnCase scrut bndr alts0)
 
         scrut_primrep = typePrimRep (idType bndr)
         isAlgCase
-           = case scrut_primrep of
-                CharRep -> False ; AddrRep -> False ; WordRep -> False
-                IntRep -> False ; FloatRep -> False ; DoubleRep -> False
-                VoidRep -> False ;
-                PtrRep -> True
-                other  -> pprPanic "ByteCodeGen.schemeE" (ppr other)
+           | scrut_primrep == PtrRep
+           = True
+           | scrut_primrep `elem`
+             [CharRep, AddrRep, WordRep, IntRep, FloatRep, DoubleRep,
+              VoidRep, Int8Rep, Int16Rep, Int32Rep, Int64Rep,
+              Word8Rep, Word16Rep, Word32Rep, Word64Rep]
+           = False
+           | otherwise
+           =  pprPanic "ByteCodeGen.schemeE" (ppr scrut_primrep)
 
         -- given an alt, return a discr and code for it.
         codeAlt alt@(discr, binds_f, rhs)
@@ -648,11 +655,11 @@ schemeT d s p app
                             = mkMarshalCode (r_offW, r_rep) addr_offW
                                             (zip args_offW a_reps)               
            in
-               trace (show (arg1_offW, args_offW  ,  (map taggedSizeW a_reps) )) (
+               --trace (show (arg1_offW, args_offW  ,  (map taggedSizeW a_reps) )) (
                target_addr 
                `seq`
                (push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup)
-               )
+               --)
 
          | otherwise
          = case maybe_dcon of
@@ -674,8 +681,11 @@ bind x f
 mkDummyLiteral :: PrimRep -> Literal
 mkDummyLiteral pr
    = case pr of
-        IntRep -> MachInt 0
-        _      -> pprPanic "mkDummyLiteral" (ppr pr)
+        IntRep    -> MachInt 0
+        DoubleRep -> MachDouble 0
+        FloatRep  -> MachFloat 0
+        AddrRep   | taggedSizeW AddrRep == taggedSizeW WordRep -> MachWord 0
+        _         -> pprPanic "mkDummyLiteral" (ppr pr)
 
 
 -- Convert (eg) 
@@ -801,11 +811,10 @@ mkUnpackCode vars d p
         code_np = do_nptrs vreps_env_uszw ptrs_szw (reverse (map snd vreps_np))
         do_nptrs off_h off_s [] = nilOL
         do_nptrs off_h off_s (npr:nprs)
-           = case npr of
-                IntRep -> approved ; FloatRep -> approved
-                DoubleRep -> approved ; AddrRep -> approved
-                CharRep -> approved
-                _ -> pprPanic "ByteCodeGen.mkUnpackCode" (ppr npr)
+           | npr `elem` [IntRep, FloatRep, DoubleRep, CharRep, AddrRep]
+           = approved
+           | otherwise
+           = pprPanic "ByteCodeGen.mkUnpackCode" (ppr npr)
              where
                 approved = UPK_TAG usizeW (off_h-usizeW) off_s   `consOL` theRest
                 theRest  = do_nptrs (off_h-usizeW) (off_s + tsizeW) nprs
