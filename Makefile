@@ -211,6 +211,10 @@ BIN_DIST_TOP= distrib/Makefile-bin.in \
 	      config.sub   \
 	      aclocal.m4
 
+ifeq "$(darwin_TARGET_OS)" "1"
+BIN_DIST_TOP+=mk/fix_install_names.sh
+endif
+
 #
 # binary-dist creates a binary bundle, set BIN_DIST_NAME
 # to package name and do `make binary-dist Project=<project-name>'

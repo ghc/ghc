@@ -173,6 +173,13 @@ config-pkgs ::
 	   $(SED) -e "s|\$$libdir|$(libdir)|g;s|\$$datadir|$(datadir)|g" <lib/$(platform)/$$i.bak >lib/$(platform)/$$i; \
           fi; \
 	done
+	@if test "$(platform)" == "powerpc-apple-darwin"; then \
+	  echo "Configuring install names..."; \
+	  for i in lib/$(platform)/*; do \
+	    sh fix_install_names.sh "$(libdir)" "$$i"; \
+	  done; \
+	  echo "Done."; \
+	fi
 
 in-place ::
 	$(MAKE) $(MFLAGS) config-pkgs bindir=`pwd`/bin/$(platform) libdir=`pwd`/lib/$(platform) datadir=`pwd`/share
