@@ -22,7 +22,7 @@ import RnHsSyn
 import HsCore
 
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, renameSigsFVs )
-import RnEnv		( lookupTopBndrRn, lookupOccRn, newIPName,
+import RnEnv		( lookupTopBndrRn, lookupOccRn, newIPName, lookupIfaceName,
 			  lookupOrigNames, lookupSysBinder, newLocalsRn,
 			  bindLocalsFVRn, bindUVarRn,
 			  bindTyVarsRn, bindTyVars2Rn,
@@ -168,7 +168,7 @@ rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
 
     (case maybe_dfun_rdr_name of
 	Nothing		   -> returnRn Nothing
-	Just dfun_rdr_name -> lookupSysBinder dfun_rdr_name	`thenRn` \ dfun_name ->
+	Just dfun_rdr_name -> lookupIfaceName dfun_rdr_name	`thenRn` \ dfun_name ->
 			      returnRn (Just dfun_name)
     )							`thenRn` \ maybe_dfun_name ->
 

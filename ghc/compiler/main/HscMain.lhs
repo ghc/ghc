@@ -223,7 +223,10 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
 mkFinalIface dflags location maybe_old_iface new_iface new_details
  = case completeIface maybe_old_iface new_iface new_details of
       (new_iface, Nothing) -- no change in the interfacfe
-         -> return new_iface
+         -> do if dopt Opt_D_dump_hi_diffs dflags  then
+		 	printDump (text "INTERFACE UNCHANGED")
+		  else  return ()
+	       return new_iface
       (new_iface, Just sdoc)
          -> do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "NEW INTERFACE" sdoc
                -- Write the interface file

@@ -239,8 +239,8 @@ implicitFVs mod_name decls
     implicit_occs = string_occs ++ foldr ((++) . get) implicit_main decls
 
 	-- Virtually every program has error messages in it somewhere
-    string_occs = [unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
-		   eqString_RDR]
+    string_occs = [unpackCString_RDR, unpackCStringFoldr_RDR, 
+		   unpackCStringUtf8_RDR, eqString_RDR]
 
     get (TyClD (TyData _ _ _ _ _ _ (Just deriv_classes) _ _ _))
        = concat (map get_deriv deriv_classes)
@@ -385,7 +385,8 @@ checkOldIface dflags hit hst pcs iface_path source_unchanged maybe_iface
           -> do read_result <- readIface do_traceRn iface_path
                 case read_result of
                    Left err -> -- Old interface file not found, or garbled; give up
-                               return (pcs, False, (outOfDate, Nothing))
+			       do { ioTraceRn (text "Bad old interface file" $$ nest 4 err) ;
+	                            return (pcs, False, (outOfDate, Nothing)) }
                    Right parsed_iface
                       -> startRn (pi_mod parsed_iface) $
                          loadOldIface parsed_iface `thenRn` \ m_iface ->

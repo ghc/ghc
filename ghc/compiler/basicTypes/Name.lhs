@@ -45,7 +45,7 @@ module Name (
 import OccName		-- All of it
 import Module		( Module, moduleName, mkVanillaModule, 
 			  printModulePrefix, isModuleInThisPackage )
-import RdrName		( RdrName, mkRdrOrig, mkRdrIfaceUnqual, rdrNameOcc, rdrNameModule )
+import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), u2i, pprUnique, pprUnique10 )
@@ -355,7 +355,7 @@ nameRdrName :: Name -> RdrName
 -- Makes a qualified name for top-level (Global) names, whether locally defined or not
 -- and an unqualified name just for Locals
 nameRdrName (Name { n_occ = occ, n_sort = Global mod }) = mkRdrOrig (moduleName mod) occ
-nameRdrName (Name { n_occ = occ })			= mkRdrIfaceUnqual occ
+nameRdrName (Name { n_occ = occ })			= mkRdrUnqual occ
 
 isDllName :: Name -> Bool
 	-- Does this name refer to something in a different DLL?
@@ -471,32 +471,19 @@ pprLocal sty uniq occ pp_export
   | otherwise      = pprOccName occ
 
 pprGlobal sty uniq mod occ
-  |  codeStyle sty 
-  || ifaceStyle sty       = ppr (moduleName mod) <> char '_' <> pprOccName occ
+  |  codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
 
   | debugStyle sty        = ppr (moduleName mod) <> dot <> pprOccName occ <> 
 			    text "{-" <> pprUnique10 uniq <> text "-}"
 
-  | printModulePrefix mod = ppr (moduleName mod) <> dot <> pprOccName occ
-  | otherwise             = pprOccName occ
+  | ifaceStyle sty	
+  || printModulePrefix mod = ppr (moduleName mod) <> dot <> pprOccName occ
+
+  | otherwise              = pprOccName occ
 
 pprSysLocal sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | otherwise	   = pprOccName occ <> char '_' <> pprUnique uniq
-
-{-
-pprNameBndr :: Name -> SDoc
--- Print a binding occurrence of a name.
--- In interface files we can omit the "M." prefix, which tides things up a lot
-pprNameBndr name
-  = getPprStyle $ \ sty ->
-    case sort of
-      Global mod | ifaceStyle sty -> pprLocal sty uniq occ empty
-		 | otherwise	  -> pprGlobal sty uniq mod occ
-      System     -> pprSysLocal sty uniq occ
-      Local      -> pprLocal sty uniq occ empty
-      Exported   -> pprLocal sty uniq occ (char 'x')
--}
 \end{code}
 
 

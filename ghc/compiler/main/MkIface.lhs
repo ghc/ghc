@@ -223,8 +223,6 @@ ifaceTyCls (ATyCon tycon) so_far
     mk_field strict_mark field_label
 	= ([getName field_label], mk_bang_ty strict_mark (fieldLabelType field_label))
 
-ifaceTyCls (ATyCon tycon) so_far = pprPanic "ifaceTyCls" (ppr tycon)
-
 ifaceTyCls (AnId id) so_far
   | omitIfaceSigForId id = so_far
   | otherwise 		 = iface_sig : so_far
@@ -657,20 +655,17 @@ pprExport :: (ModuleName, Avails) -> SDoc
 pprExport (mod, items)
  = hsep [ ptext SLIT("__export "), ppr mod, hsep (map pp_avail items) ] <> semi
   where
-    ppr_name :: Name -> SDoc	-- Print the occurrence name only
-    ppr_name n = ppr (nameOccName n)
-
     pp_avail :: AvailInfo -> SDoc
-    pp_avail (Avail name)      = ppr_name name
-    pp_avail (AvailTC name []) = empty
-    pp_avail (AvailTC name ns) = hcat [ppr_name name, bang, pp_export ns']
-				where
-				  bang | name `elem` ns = empty
-				       | otherwise	= char '|'
-				  ns' = filter (/= name) ns
+    pp_avail (Avail name)    		     = pprOcc name
+    pp_avail (AvailTC n [])		     = empty
+    pp_avail (AvailTC n (n':ns)) | n==n'     = pprOcc n		    <> pp_export ns
+				 | otherwise = pprOcc n <> char '|' <> pp_export (n':ns)
     
     pp_export []    = empty
-    pp_export names = braces (hsep (map ppr_name names))
+    pp_export names = braces (hsep (map pprOcc names))
+
+pprOcc :: Name -> SDoc	-- Print the occurrence name only
+pprOcc n = pprOccName (nameOccName n)
 \end{code}
 
 
@@ -691,7 +686,7 @@ pprUsage (m, has_orphans, is_boot, whats_imported)
     pp_versions NothingAtAll   		    = empty
     pp_versions (Everything v) 		    = dcolon <+> int v
     pp_versions (Specifically vm ve nvs vr) = dcolon <+> int vm <+> pp_export_version ve <+> int vr 
-					      <+> hsep [ ppr n <+> int v | (n,v) <- nvs ]
+					      <+> hsep [ pprOcc n <+> int v | (n,v) <- nvs ]
 
 	-- HACK for the moment: print the export-list version even if
 	-- we don't use it, so that syntax of interface files doesn't change
@@ -733,5 +728,5 @@ pprDeprecs deprecs   = ptext SLIT("{-## __D") <+> guts <+> ptext SLIT("##-}")
 
 pp_deprecs env = vcat (punctuate semi (map pp_deprec (nameEnvElts env)))
 	       where
-		 pp_deprec (name, txt) = pprOccName (nameOccName name) <+> ptext txt
+		 pp_deprec (name, txt) = pprOcc name <+> ptext txt
 \end{code}

@@ -10,13 +10,13 @@ module RnEnv where		-- Export everything
 
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
-import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isSourceQual, isUnqual, isIface,
-			  mkRdrUnqual, mkRdrIfaceUnqual, qualifyRdrName, lookupRdrEnv
+import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
+			  mkRdrUnqual, mkRdrUnqual, qualifyRdrName, lookupRdrEnv
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  ImportReason(..), GlobalRdrEnv, AvailEnv,
-			  AvailInfo, Avails, GenAvailInfo(..), RdrAvailInfo )
+			  AvailInfo, Avails, GenAvailInfo(..) )
 import RnMonad
 import Name		( Name, NamedThing(..),
 			  getSrcLoc, 
@@ -57,11 +57,11 @@ newTopBinder :: Module -> RdrName -> SrcLoc -> RnM d Name
 
 newTopBinder mod rdr_name loc
   = 	-- First check the cache
-    traceRn (text "newTopBinder" <+> ppr mod <+> ppr loc) `thenRn_`
+    -- traceRn (text "newTopBinder" <+> ppr mod <+> ppr loc) `thenRn_`
 
     	-- There should never be a qualified name in a binding position (except in instance decls)
 	-- The parser doesn't check this because the same parser parses instance decls
-    (if isSourceQual rdr_name then
+    (if isQual rdr_name then
 	qualNameErr (text "its declaration") (rdr_name,loc)
      else
 	returnRn ()
@@ -86,7 +86,7 @@ newTopBinder mod rdr_name loc
 			new_cache = addToFM cache key new_name
 		     in
 		     setNameSupplyRn (us, new_cache, ipcache)	`thenRn_`
-		     traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
+		     -- traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
 		     returnRn new_name
 		     
 	-- Miss in the cache!
@@ -100,7 +100,7 @@ newTopBinder mod rdr_name loc
 			new_cache  = addToFM cache key new_name
 		   in
 		   setNameSupplyRn (us', new_cache, ipcache)	`thenRn_`
-		   traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
+		   -- traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
 		   returnRn new_name
 
 
@@ -128,11 +128,11 @@ newGlobalName mod_name occ
 	key = (mod_name, occ)
     in
     case lookupFM cache key of
-	Just name -> traceRn (text "newGlobalName: hit" <+> ppr name) `thenRn_`
+	Just name -> -- traceRn (text "newGlobalName: hit" <+> ppr name) `thenRn_`
 		     returnRn name
 
-	Nothing   -> setNameSupplyRn (us', new_cache, ipcache)		`thenRn_`
-		     traceRn (text "newGlobalName: new" <+> ppr name)	`thenRn_`
+	Nothing   -> setNameSupplyRn (us', new_cache, ipcache)			`thenRn_`
+		     -- traceRn (text "newGlobalName: new" <+> ppr name)	`thenRn_`
 		     returnRn name
 		  where
 		     (us', us1) = splitUniqSupply us
@@ -171,15 +171,16 @@ lookupBndrRn rdr_name
 	  Nothing   -> lookupTopBndrRn rdr_name
 
 lookupTopBndrRn rdr_name
-  | isIface rdr_name
-  = lookupOrigName rdr_name
+  = getModeRn	`thenRn` \ mode ->
+    case mode of 
+	InterfaceMode -> lookupIfaceName rdr_name	
 
-  | otherwise	-- Source mode, so look up a *qualified* version
-  = 		-- of the name, so that we get the right one even
-		-- if there are many with the same occ name
-		-- There must *be* a binding
-    getModuleRn		`thenRn` \ mod ->
-    lookupSrcGlobalOcc (qualifyRdrName (moduleName mod) rdr_name)
+	SourceMode    -> -- Source mode, so look up a *qualified* version
+			 -- of the name, so that we get the right one even
+			 -- if there are many with the same occ name
+			 -- There must *be* a binding
+		getModuleRn		`thenRn` \ mod ->
+		lookupSrcGlobalOcc (qualifyRdrName (moduleName mod) rdr_name)
 
 -- lookupSigOccRn is used for type signatures and pragmas
 -- Is this valid?
@@ -208,14 +209,17 @@ lookupOccRn rdr_name
 --	class op names in class and instance decls
 
 lookupGlobalOccRn rdr_name
-  | isIface rdr_name
+  | isOrig rdr_name	-- Can occur in source code too
   = lookupOrigName rdr_name
 
   | otherwise
-  = lookupSrcGlobalOcc rdr_name
+  = getModeRn 		`thenRn` \ mode ->
+    case mode of 
+	SourceMode    -> lookupSrcGlobalOcc rdr_name
+	InterfaceMode -> lookupIfaceUnqual rdr_name
 
 lookupSrcGlobalOcc rdr_name
-  -- Lookup a source-code rdr-name
+  -- Lookup a source-code rdr-name; may be qualified or not
   = getGlobalNameEnv			`thenRn` \ global_env ->
     case lookupRdrEnv global_env rdr_name of
 	Just [(name,_)]		-> returnRn name
@@ -223,6 +227,25 @@ lookupSrcGlobalOcc rdr_name
 		       		   returnRn name
 	Nothing			-> failWithRn (mkUnboundName rdr_name)
 				   	      (unknownNameErr rdr_name)
+
+lookupOrigName :: RdrName -> RnM d Name 
+lookupOrigName rdr_name
+  = ASSERT( isOrig rdr_name )
+    newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+
+lookupIfaceUnqual :: RdrName -> RnM d Name
+lookupIfaceUnqual rdr_name
+  = ASSERT( isUnqual rdr_name )
+  	-- An Unqual is allowed; interface files contain 
+	-- unqualified names for locally-defined things, such as
+	-- constructors of a data type.
+    getModuleRn 			`thenRn ` \ mod ->
+    newGlobalName (moduleName mod) (rdrNameOcc rdr_name)
+
+lookupIfaceName :: RdrName -> RnM d Name
+lookupIfaceName rdr_name
+  | isUnqual rdr_name = lookupIfaceUnqual rdr_name
+  | otherwise	      = lookupOrigName rdr_name
 
 lookupGlobalRn :: GlobalRdrEnv -> RdrName -> RnM d (Maybe Name)
   -- Checks that there is exactly one
@@ -233,7 +256,6 @@ lookupGlobalRn global_env rdr_name
 		       		   returnRn (Just name)
 	Nothing			-> returnRn Nothing
 \end{code}
-%
 
 @lookupOrigName@ takes an RdrName representing an {\em original}
 name, and adds it to the occurrence pool so that it'll be loaded
@@ -255,18 +277,6 @@ whether there are any instance decls in this module are ``special''.
 The name cache should have the correct provenance, though.
 
 \begin{code}
-lookupOrigName :: RdrName -> RnM d Name 
-lookupOrigName rdr_name
-  = ASSERT( isIface rdr_name )
-    if isQual rdr_name then
-	newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
-    else
-  	-- An Unqual is allowed; interface files contain 
-	-- unqualified names for locally-defined things, such as
-	-- constructors of a data type.
-  	getModuleRn 			`thenRn ` \ mod ->
-	newGlobalName (moduleName mod) (rdrNameOcc rdr_name)
-
 lookupOrigNames :: [RdrName] -> RnM d NameSet
 lookupOrigNames rdr_names
   = mapRn lookupOrigName rdr_names	`thenRn` \ names ->
@@ -371,17 +381,11 @@ bindCoreLocalsRn (b:bs) thing_inside = bindCoreLocalRn b	$ \ name' ->
 				       thing_inside (name':names')
 
 bindLocalNames names enclosed_scope
-  = getModeRn			`thenRn` \ mode ->
-    let
-	-- This is gruesome, but I can't think of a better way just now
-	mk_rdr_name = case mode of
-			SourceMode    -> mkRdrUnqual
-			InterfaceMode -> mkRdrIfaceUnqual
-	pairs = [(mk_rdr_name (nameOccName n), n) | n <- names]
-    in
-    getLocalNameEnv 		`thenRn` \ name_env ->
+  = getLocalNameEnv 		`thenRn` \ name_env ->
     setLocalNameEnv (addListToRdrEnv name_env pairs)
 		    enclosed_scope
+  where
+    pairs = [(mkRdrUnqual (nameOccName n), n) | n <- names]
 
 -------------------------------------
 bindLocalRn doc rdr_name enclosed_scope
@@ -473,7 +477,7 @@ checkDupOrQualNames doc_str rdr_names_w_loc
     mapRn_ (qualNameErr doc_str) quals 	`thenRn_`
     checkDupNames doc_str rdr_names_w_loc
   where
-    quals = filter (isSourceQual . fst) rdr_names_w_loc
+    quals = filter (isQual . fst) rdr_names_w_loc
     
 checkDupNames doc_str rdr_names_w_loc
   = 	-- Check for duplicated names in a binding group
@@ -558,7 +562,7 @@ plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
 plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n2 (nub (ns1 ++ ns2))
 -- Added SOF 4/97
 #ifdef DEBUG
-plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [pprAvail a1,pprAvail a2])
+plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
 #endif
 
 addAvail :: AvailEnv -> AvailInfo -> AvailEnv
@@ -591,13 +595,6 @@ availNames (AvailTC n ns) = ns
 addSysAvails :: AvailInfo -> [Name] -> AvailInfo
 addSysAvails avail          []  = avail
 addSysAvails (AvailTC n ns) sys = AvailTC n (sys ++ ns)
-
--------------------------------------
-rdrAvailInfo :: AvailInfo -> RdrAvailInfo
--- Used when building the avails we are going to put in an interface file
--- We sort the components to reduce needless wobbling of interfaces
-rdrAvailInfo (Avail n)	    = Avail   (nameOccName n)
-rdrAvailInfo (AvailTC n ns) = AvailTC (nameOccName n) (sortLt (<) (map nameOccName ns))
 
 -------------------------------------
 filterAvail :: RdrNameIE	-- Wanted
@@ -649,26 +646,29 @@ groupAvails this_mod avails
 	-- get a canonical ordering
     groupFM = foldl add emptyFM avails
 
-    add env avail = addToFM_C combine env mod_fs [avail]
+    add env avail = addToFM_C combine env mod_fs [avail']
 		  where
 		    mod_fs = moduleNameFS (moduleName avail_mod)
 		    avail_mod = case nameModule_maybe (availName avail) of
 					  Just m  -> m
 					  Nothing -> this_mod
-		    combine old _ = avail:old
+		    combine old _ = avail':old
+		    avail'	  = sortAvail avail
 
     a1 `lt` a2 = occ1 < occ2
 	       where
 		 occ1  = nameOccName (availName a1)
 		 occ2  = nameOccName (availName a2)
-				
--------------------------------------
-pprAvail :: AvailInfo -> SDoc
-pprAvail (AvailTC n ns) = ppr n <> case filter (/= n) ns of
-					[]  -> empty
-					ns' -> parens (hsep (punctuate comma (map ppr ns')))
 
-pprAvail (Avail n) = ppr n
+sortAvail :: AvailInfo -> AvailInfo
+-- Sort the sub-names into canonical order.
+-- The canonical order has the "main name" at the beginning 
+-- (if it's there at all)
+sortAvail (Avail n) = Avail n
+sortAvail (AvailTC n ns) | n `elem` ns = AvailTC n (n : sortLt lt (filter (/= n) ns))
+			 | otherwise   = AvailTC n (    sortLt lt ns)
+			 where
+			   n1 `lt` n2 = nameOccName n1 < nameOccName n2
 \end{code}
 
 

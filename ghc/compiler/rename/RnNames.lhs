@@ -88,9 +88,11 @@ getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
 	  (source, ordinary) = partition is_source_import all_imports
 	  is_source_import (ImportDecl _ ImportByUserSource _ _ _ _) = True
 	  is_source_import other				     = False
+
+	  get_imports = importsFromImportDecl this_mod_name rec_unqual_fn 
 	in
-	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn) ordinary	`thenRn` \ (imp_gbl_envs1, imp_avails_s1) ->
-	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn) source	`thenRn` \ (imp_gbl_envs2, imp_avails_s2) ->
+	mapAndUnzipRn get_imports ordinary	`thenRn` \ (imp_gbl_envs1, imp_avails_s1) ->
+	mapAndUnzipRn get_imports source	`thenRn` \ (imp_gbl_envs2, imp_avails_s2) ->
 
 		-- COMBINE RESULTS
 		-- We put the local env second, so that a local provenance
@@ -141,12 +143,13 @@ getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
 \end{code}
 	
 \begin{code}
-importsFromImportDecl :: (Name -> Bool)		-- OK to omit qualifier
+importsFromImportDecl :: ModuleName
+		      -> (Name -> Bool)		-- OK to omit qualifier
 		      -> RdrNameImportDecl
 		      -> RnMG (GlobalRdrEnv, 
 			       ExportAvails) 
 
-importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
+importsFromImportDecl this_mod_name is_unqual (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
   = pushSrcLocRn iloc $
     getInterfaceExports imp_mod_name from	`thenRn` \ (imp_mod, avails_by_module) ->
 
@@ -158,7 +161,26 @@ importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod i
 
     let
 	avails :: Avails
-	avails = concat (map snd avails_by_module)
+	avails = [ avail | (mod_name, avails) <- avails_by_module,
+			   mod_name /= this_mod_name,
+			   avail <- avails ]
+	-- If the module exports anything defined in this module, just ignore it.
+	-- Reason: otherwise it looks as if there are two local definition sites
+	-- for the thing, and an error gets reported.  Easiest thing is just to
+	-- filter them out up front. This situation only arises if a module
+	-- imports itself, or another module that imported it.  (Necessarily,
+	-- this invoves a loop.)  
+	--
+	-- Tiresome consequence: if you say
+	--	module A where
+	--	   import B( AType )
+	--	   type AType = ...
+	--
+	--	module B( AType ) where
+	--	   import {-# SOURCE #-} A( AType )
+	--
+	-- then you'll get a 'B does not export AType' message.  Oh well.
+
     in
     filterImports imp_mod_name import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
 

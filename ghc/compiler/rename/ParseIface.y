@@ -53,7 +53,7 @@ import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..),
                           ImportVersion, WhatsImported(..),
                           RdrAvailInfo )
 
-import RdrName          ( RdrName, mkRdrIfaceUnqual, mkIfaceOrig )
+import RdrName          ( RdrName, mkRdrUnqual, mkIfaceOrig )
 import Name		( OccName )
 import OccName          ( mkSysOccFS,
 			  tcName, varName, ipName, dataName, clsName, tvName, uvName,
@@ -283,11 +283,8 @@ entity		:: { RdrAvailInfo }
 entity		:  var_occ				{ Avail $1 }
 		|  tc_occ 				{ AvailTC $1 [$1] }
 		|  tc_occ '|' stuff_inside		{ AvailTC $1 $3 }
-		|  tc_occ stuff_inside		        { AvailTC $1 (insert $1 $2) }
-		-- The 'insert' is important.  The stuff_inside is sorted, and
-		-- insert keeps it that way.  This is important when comparing 
-		-- against the new interface file, which has the stuff in sorted order
-		-- If they differ, we'll bump the module number when it's unnecessary
+		|  tc_occ stuff_inside		        { AvailTC $1 ($1:$2) }
+		-- Note that the "main name" comes at the beginning
 
 stuff_inside	:: { [OccName] }
 stuff_inside	:  '{' val_occs '}'			{ $2 }
@@ -333,10 +330,10 @@ csigs1		: 				{ [] }
 		| csig ';' csigs1		{ $1 : $3 }
 
 csig		:: { RdrNameSig }
-csig		:  src_loc var_name '::' type		{ mkClassOpSig NoDefMeth $2 $4 $1 }
-	        |  src_loc var_name '=' '::' type	{ mkClassOpSig (DefMeth (error "DefMeth") )
+csig		:  src_loc qvar_name '::' type		{ mkClassOpSig NoDefMeth $2 $4 $1 }
+	        |  src_loc qvar_name '=' '::' type	{ mkClassOpSig (DefMeth (error "DefMeth") )
 								$2 $5 $1 }
-	        |  src_loc var_name ';' '::' type	{ mkClassOpSig GenDefMeth  $2 $5 $1 }		
+	        |  src_loc qvar_name ';' '::' type	{ mkClassOpSig GenDefMeth  $2 $5 $1 }		
 
 --------------------------------------------------------------------------
 
@@ -345,7 +342,7 @@ instance_decl_part : {- empty -}		       { [] }
 		   | instance_decl_part inst_decl      { $2 : $1 }
 
 inst_decl	:: { RdrNameInstDecl }
-inst_decl	:  src_loc 'instance' type '=' var_name ';'
+inst_decl	:  src_loc 'instance' type '=' qvar_name ';'
 			{ InstDecl $3
 				   EmptyMonoBinds	{- No bindings -}
 				   []    		{- No user pragmas -}
@@ -361,15 +358,15 @@ decls_part
 	|  opt_version decl ';' decls_part 		{ ($1,$2):$4 }
 
 decl	:: { RdrNameTyClDecl }
-decl    : src_loc var_name '::' type maybe_idinfo
+decl    : src_loc qvar_name '::' type maybe_idinfo
   		 	{ IfaceSig $2 $4 ($5 $2) $1 }
-	| src_loc 'type' tc_name tv_bndrs '=' type 		       
+	| src_loc 'type' qtc_name tv_bndrs '=' type 		       
 			{ TySynonym $3 $4 $6 $1 }
-	| src_loc 'data' opt_decl_context tc_name tv_bndrs constrs 	       
+	| src_loc 'data' opt_decl_context qtc_name tv_bndrs constrs 	       
 	       		{ mkTyData DataType $3 $4 $5 $6 (length $6) Nothing $1 }
-	| src_loc 'newtype' opt_decl_context tc_name tv_bndrs newtype_constr
+	| src_loc 'newtype' opt_decl_context qtc_name tv_bndrs newtype_constr
 			{ mkTyData NewType $3 $4 $5 $6 1 Nothing $1 }
-	| src_loc 'class' opt_decl_context tc_name tv_bndrs fds csigs
+	| src_loc 'class' opt_decl_context qtc_name tv_bndrs fds csigs
 			{ mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds $1 }
 
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
@@ -452,8 +449,8 @@ deprec		:: { (RdrName,DeprecTxt) }
 deprec		: deprec_name STRING	{ ($1, $2) }
 
 deprec_name	:: { RdrName }
-		: var_name		{ $1 }
-		| tc_name		{ $1 }
+		: qvar_name		{ $1 }
+		| qtc_name		{ $1 }
 
 -----------------------------------------------------------------------------
 
@@ -479,13 +476,13 @@ constrs1	:  constr		{ [$1] }
 		|  constr '|' constrs1	{ $1 : $3 }
 
 constr		:: { RdrNameConDecl }
-constr		:  src_loc ex_stuff data_name batypes		{ mk_con_decl $3 $2 (VanillaCon $4) $1 }
-		|  src_loc ex_stuff data_name '{' fields1 '}'	{ mk_con_decl $3 $2 (RecCon $5)     $1 }
+constr		:  src_loc ex_stuff qdata_name batypes		{ mk_con_decl $3 $2 (VanillaCon $4) $1 }
+		|  src_loc ex_stuff qdata_name '{' fields1 '}'	{ mk_con_decl $3 $2 (RecCon $5)     $1 }
                 -- We use "data_fs" so as to include ()
 
 newtype_constr	:: { [RdrNameConDecl] {- Not allowed to be empty -} }
-newtype_constr	: src_loc '=' ex_stuff data_name atype	{ [mk_con_decl $4 $3 (VanillaCon [Unbanged $5]) $1] }
-		| src_loc '=' ex_stuff data_name '{' var_name '::' atype '}'
+newtype_constr	: src_loc '=' ex_stuff qdata_name atype	{ [mk_con_decl $4 $3 (VanillaCon [Unbanged $5]) $1] }
+		| src_loc '=' ex_stuff qdata_name '{' qvar_name '::' atype '}'
 							{ [mk_con_decl $4 $3 (RecCon [([$6], Unbanged $8)]) $1] }
 
 ex_stuff :: { ([HsTyVarBndr RdrName], RdrNameContext) }
@@ -506,9 +503,9 @@ fields1		: field					{ [$1] }
 		| field ',' fields1			{ $1 : $3 }
 
 field		:: { ([RdrName], RdrNameBangType) }
-field		:  var_names1 '::' type		{ ($1, Unbanged $3) }
-		|  var_names1 '::' '!' type    	{ ($1, Banged   $4) }
-		|  var_names1 '::' '!' '!' type	{ ($1, Unpacked $5) }
+field		:  qvar_names1 '::' type		{ ($1, Unbanged $3) }
+		|  qvar_names1 '::' '!' type    	{ ($1, Banged   $4) }
+		|  qvar_names1 '::' '!' '!' type	{ ($1, Unpacked $5) }
 --------------------------------------------------------------------------
 
 type		:: { RdrNameHsType }
@@ -606,14 +603,18 @@ var_occ	        :: { OccName }
 		:  var_fs		{ mkSysOccFS varName $1 }
 
 var_name	:: { RdrName }
-var_name	:  var_occ		{ mkRdrIfaceUnqual $1 }
+var_name	:  var_occ		{ mkRdrUnqual $1 }
 
 qvar_name	:: { RdrName }
 qvar_name	:  var_name		{ $1 }
 		|  qvar_fs      	{ mkIfaceOrig varName $1 }
 
 ipvar_name	:: { RdrName }
-		:  IPVARID		{ mkRdrIfaceUnqual (mkSysOccFS ipName (tailFS $1)) }
+		:  IPVARID		{ mkRdrUnqual (mkSysOccFS ipName (tailFS $1)) }
+
+qvar_names1	:: { [RdrName] }
+qvar_names1	: qvar_name		{ [$1] }
+		| qvar_name qvar_names1	{ $1 : $2 }
 
 var_names	:: { [RdrName] }
 var_names	: 			{ [] }
@@ -640,22 +641,22 @@ data_occ	:: { OccName }
 		:  data_fs		{ mkSysOccFS dataName $1 }
 
 data_name	:: { RdrName }
-                :  data_occ             { mkRdrIfaceUnqual $1 }
+                :  data_occ             { mkRdrUnqual $1 }
 
 qdata_name	:: { RdrName }
 qdata_name	:  data_name		{ $1 }
 		|  qdata_fs 	        { mkIfaceOrig dataName $1 }
 				
 var_or_data_name :: { RdrName }
-                  : var_name                    { $1 }
-                  | data_name                   { $1 }
+                  : qvar_name                    { $1 }
+                  | qdata_name                   { $1 }
 
 ---------------------------------------------------
 tc_occ	        :: { OccName }
 		:  data_fs 		{ mkSysOccFS tcName $1 }
 
 tc_name		:: { RdrName }
-                :  tc_occ		{ mkRdrIfaceUnqual $1 }
+                :  tc_occ		{ mkRdrUnqual $1 }
 
 qtc_name	:: { RdrName }
                 : tc_name		{ $1 }
@@ -663,7 +664,7 @@ qtc_name	:: { RdrName }
 
 ---------------------------------------------------
 cls_name	:: { RdrName }
-        	:  data_fs		{ mkRdrIfaceUnqual (mkSysOccFS clsName $1) }
+        	:  data_fs		{ mkRdrUnqual (mkSysOccFS clsName $1) }
 
 qcls_name	:: { RdrName }
          	: cls_name		{ $1 }
@@ -671,7 +672,7 @@ qcls_name	:: { RdrName }
 
 ---------------------------------------------------
 uv_name		:: { RdrName }
-		:  VARID 		{ mkRdrIfaceUnqual (mkSysOccFS uvName $1) }
+		:  VARID 		{ mkRdrUnqual (mkSysOccFS uvName $1) }
 
 uv_bndr		:: { RdrName }
 		:  uv_name		{ $1 }
@@ -682,8 +683,8 @@ uv_bndrs	:: { [RdrName] }
 
 ---------------------------------------------------
 tv_name		:: { RdrName }
-		:  VARID 		{ mkRdrIfaceUnqual (mkSysOccFS tvName $1) }
-		|  VARSYM		{ mkRdrIfaceUnqual (mkSysOccFS tvName $1) {- Allow t2 as a tyvar -} }
+		:  VARID 		{ mkRdrUnqual (mkSysOccFS tvName $1) }
+		|  VARSYM		{ mkRdrUnqual (mkSysOccFS tvName $1) {- Allow t2 as a tyvar -} }
 
 tv_bndr		:: { HsTyVarBndr RdrName }
 		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }

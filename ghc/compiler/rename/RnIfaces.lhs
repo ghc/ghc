@@ -458,7 +458,7 @@ getSlurped
 
 recordSlurp ifaces@(Ifaces { iSlurp = slurped_names, iVSlurp = (imp_mods, imp_names) })
 	    avail
-  = ASSERT2( not (isLocalName (availName avail)), pprAvail avail )
+  = ASSERT2( not (isLocalName (availName avail)), ppr avail )
     ifaces { iSlurp  = new_slurped_names, iVSlurp = new_vslurp }
   where
     main_name = availName avail

@@ -331,6 +331,16 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 			-- Equality used when deciding if the interface has changed
 
 type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
+				
+instance Outputable n => Outputable (GenAvailInfo n) where
+   ppr = pprAvail
+
+pprAvail :: Outputable n => GenAvailInfo n -> SDoc
+pprAvail (AvailTC n ns) = ppr n <> case {- filter (/= n) -} ns of
+					[]  -> empty
+					ns' -> braces (hsep (punctuate comma (map ppr ns')))
+
+pprAvail (Avail n) = ppr n
 \end{code}
 
 

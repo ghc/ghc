@@ -263,24 +263,6 @@ loadExports (vers, items)
 
 loadExport :: Module -> ExportItem -> RnM d (ModuleName, Avails)
 loadExport this_mod (mod, entities)
-  | mod == moduleName this_mod = returnRn (mod, [])
-	-- If the module exports anything defined in this module, just ignore it.
-	-- Reason: otherwise it looks as if there are two local definition sites
-	-- for the thing, and an error gets reported.  Easiest thing is just to
-	-- filter them out up front. This situation only arises if a module
-	-- imports itself, or another module that imported it.  (Necessarily,
-	-- this invoves a loop.)  Consequence: if you say
-	--	module A where
-	--	   import B( AType )
-	--	   type AType = ...
-	--
-	--	module B( AType ) where
-	--	   import {-# SOURCE #-} A( AType )
-	--
-	-- then you'll get a 'B does not export AType' message.  A bit bogus
-	-- but it's a bogus thing to do!
-
-  | otherwise
   = mapRn (load_entity mod) entities	`thenRn` \ avails ->
     returnRn (mod, avails)
   where
@@ -359,7 +341,7 @@ loadInstDecl mod insts decl@(InstDecl inst_ty binds uprags dfun_name src_loc)
 	free_names     = extractHsTyRdrNames munged_inst_ty
     in
     setModuleRn mod $
-    mapRn lookupOrigName free_names	`thenRn` \ gate_names ->
+    mapRn lookupIfaceName free_names	`thenRn` \ gate_names ->
     returnRn ((mkNameSet gate_names, (mod, InstD decl)) `consBag` insts)
 
 
@@ -393,7 +375,7 @@ loadRule :: Module -> RdrNameRuleDecl -> RnM d GatedDecl
 -- "Gate" the rule simply by whether the rule variable is
 -- needed.  We can refine this later.
 loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
-  = lookupOrigName var		`thenRn` \ var_name ->
+  = lookupIfaceName var		`thenRn` \ var_name ->
     returnRn (unitNameSet var_name, (mod, RuleD decl))
 
 
@@ -408,7 +390,7 @@ loadDeprecs m (Just (Right prs)) = setModuleRn m 				$
     				   foldlRn loadDeprec emptyNameEnv prs	`thenRn` \ env ->
 				   returnRn (DeprecSome env)
 loadDeprec deprec_env (n, txt)
-  = lookupOrigName n 		`thenRn` \ name ->
+  = lookupIfaceName n 		`thenRn` \ name ->
     traceRn (text "Loaded deprecation(s) for" <+> ppr name <> colon <+> ppr txt) `thenRn_`
     returnRn (extendNameEnv deprec_env name (name,txt))
 \end{code}

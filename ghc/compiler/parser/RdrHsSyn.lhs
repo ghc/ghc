@@ -68,7 +68,7 @@ import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
 			  mkGenOcc2, 
                       	)
 import PrelNames	( negate_RDR )
-import RdrName		( RdrName, isRdrTyVar, mkRdrIfaceUnqual, rdrNameOcc,
+import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
 			)
 import List		( nub )
 import BasicTypes	( RecFlag(..) )
@@ -216,10 +216,10 @@ mkClassDecl cxt cname tyvars fds sigs mbinds loc
   where
     cls_occ  = rdrNameOcc cname
     data_occ = mkClassDataConOcc cls_occ
-    dname    = mkRdrIfaceUnqual data_occ
-    dwname   = mkRdrIfaceUnqual (mkWorkerOcc data_occ)
-    tname    = mkRdrIfaceUnqual (mkClassTyConOcc   cls_occ)
-    sc_sel_names = [ mkRdrIfaceUnqual (mkSuperDictSelOcc n cls_occ) 
+    dname    = mkRdrUnqual data_occ
+    dwname   = mkRdrUnqual (mkWorkerOcc data_occ)
+    tname    = mkRdrUnqual (mkClassTyConOcc   cls_occ)
+    sc_sel_names = [ mkRdrUnqual (mkSuperDictSelOcc n cls_occ) 
 		   | n <- [1..length cxt]]
       -- We number off the superclass selectors, 1, 2, 3 etc so that we 
       -- can construct names for the selectors.  Thus
@@ -233,22 +233,22 @@ mkClassDecl cxt cname tyvars fds sigs mbinds loc
 -- mkTyData :: ??
 mkTyData new_or_data context tname list_var list_con i maybe src
   = let t_occ  = rdrNameOcc tname
-        name1 = mkRdrIfaceUnqual (mkGenOcc1 t_occ) 
-	name2 = mkRdrIfaceUnqual (mkGenOcc2 t_occ) 
+        name1 = mkRdrUnqual (mkGenOcc1 t_occ) 
+	name2 = mkRdrUnqual (mkGenOcc2 t_occ) 
     in TyData new_or_data context 
               tname list_var list_con i maybe src name1 name2
 
 mkClassOpSig (DefMeth x) op ty loc
   = ClassOpSig op (Just (DefMeth dm_rn)) ty loc
   where
-    dm_rn = mkRdrIfaceUnqual (mkDefaultMethodOcc (rdrNameOcc op))
+    dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc op))
 mkClassOpSig x op ty loc =
     ClassOpSig op (Just x) ty loc
 
 mkConDecl cname ex_vars cxt details loc
   = ConDecl cname wkr_name ex_vars cxt details loc
   where
-    wkr_name = mkRdrIfaceUnqual (mkWorkerOcc (rdrNameOcc cname))
+    wkr_name = mkRdrUnqual (mkWorkerOcc (rdrNameOcc cname))
 \end{code}
 
 \begin{code}
