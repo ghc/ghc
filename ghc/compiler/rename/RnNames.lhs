@@ -273,7 +273,7 @@ exportsToAvails exports
 	-- ensures that the subordinate names record their parent; 
 	-- and that in turn ensures that the GlobalRdrEnv
 	-- has the correct parent for all the names in its range.
-	-- For imported things, we only suck in the binding site later, if ever.
+	-- For imported things, we may only suck in the interface later, if ever.
 	-- Reason for all this:
 	--   Suppose module M exports type A.T, and constructor A.MkT
 	--   Then, we know that A.MkT is a subordinate name of A.T,
