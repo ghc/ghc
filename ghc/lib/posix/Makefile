@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.3 1998/02/25 16:02:11 simonm Exp $
+# $Id: Makefile,v 1.4 1998/04/16 12:50:44 sof Exp $
 #
 # Makefile for POSIX library
 #
@@ -22,6 +22,7 @@ LIBRARY = libHSposix$(_way).a
 HS_SRCS	= $(wildcard *.lhs)
 LIBOBJS = $(HS_OBJS)
 HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi)
+SRC_MKDEPENDHS_OPTS += -optdep--include-prelude
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options

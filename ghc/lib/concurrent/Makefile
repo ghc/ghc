@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.3 1998/02/25 16:03:04 simonm Exp $
+# $Id: Makefile,v 1.4 1998/04/16 12:50:50 sof Exp $
 #
 # Makefile for concurrent libraries.
 #
@@ -23,6 +23,7 @@ HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi)
 # 	Setting the GHC compile options
 
 SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts)
+SRC_MKDEPENDHS_OPTS += -optdep--include-prelude
 
 #
 # Profiling options

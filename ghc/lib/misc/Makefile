@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.6 1998/02/25 16:02:20 simonm Exp $
+# $Id: Makefile,v 1.7 1998/04/16 12:50:41 sof Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -31,6 +31,7 @@ endif
 HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
 LIBOBJS = $(HS_OBJS)
 HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi)
+SRC_MKDEPENDHS_OPTS += -optdep--include-prelude
 
 
 #-----------------------------------------------------------------------------

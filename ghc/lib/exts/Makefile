@@ -45,7 +45,7 @@ Word_HC_OPTS         += -H8m
 #-----------------------------------------------------------------------------
 # 	Dependency generation
 
-SRC_MKDEPENDHS_OPTS += -i../std -I$(GHC_INCLUDE_DIR)
+SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR) -optdep--include-prelude -optdep-w
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
