@@ -45,10 +45,15 @@ import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
 import PrelInfo		( ioTyCon_NAME, primIoTyCon_NAME )
 import TyCon		( TyCon )
 import PrelMods		( mAIN, gHC_MAIN )
-import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
+import ErrUtils		( SYN_IE(Error), SYN_IE(Warning), pprBagOfErrors, 
+			  doIfSet, dumpIfSet, ghcExit
+			)
 import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, FiniteMap )
 import Pretty
-import Outputable	( Outputable(..), PprStyle(..) )
+import Outputable	( Outputable(..), PprStyle(..), 
+			  pprErrorsStyle, pprDumpStyle, printErrs
+			)
+import Bag		( isEmptyBag )
 import Util		( cmpPString, equivClasses, panic, assertPanic, pprTrace )
 #if __GLASGOW_HASKELL__ >= 202
 import UniqSupply
@@ -60,24 +65,46 @@ import UniqSupply
 \begin{code}
 renameModule :: UniqSupply
 	     -> RdrNameHsModule
-	     -> IO (Maybe 			-- Nothing <=> everything up to date;
-						-- no ned to recompile any further
-			  (RenamedHsModule, 	-- Output, after renaming
+	     -> IO (Maybe (RenamedHsModule, 	-- Output, after renaming
 			   InterfaceDetails,	-- Interface; for interface file generatino
 			   RnNameSupply,	-- Final env; for renaming derivings
-			   [Module]),	   	-- Imported modules; for profiling
-		    Bag Error, 
-		    Bag Warning
-		   )
-\end{code} 
+			   [Module]))	   	-- Imported modules; for profiling
+
+renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_decls loc)
+  = 	-- Initialise the renamer monad
+    initRn mod_name us (mkSearchPath opt_HiMap) loc
+	   (rename this_mod)				>>=
+	\ (maybe_rn_stuff, rn_errs_bag, rn_warns_bag) ->
+
+	-- Check for warnings
+    doIfSet (not (isEmptyBag rn_warns_bag))
+	    (print_errs rn_warns_bag)			>>
+
+	-- Check for errors; exit if so
+    doIfSet (not (isEmptyBag rn_errs_bag))
+	    (print_errs rn_errs_bag	 >>
+	     ghcExit 1
+	    )						 >>
+
+	-- Dump output, if any
+    (case maybe_rn_stuff of
+	Nothing  -> return ()
+	Just results@(rn_mod, _, _, _)
+		 -> dumpIfSet opt_D_dump_rn "Renamer:"
+			      (ppr pprDumpStyle rn_mod)
+    )							>>
+
+	-- Return results
+    return maybe_rn_stuff
+
+
+print_errs errs = printErrs (pprBagOfErrors pprErrorsStyle errs)
+\end{code}
 
 
 \begin{code}
-renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_decls loc)
-  = 	-- INITIALISE THE RENAMER MONAD
-    initRn mod_name us (mkSearchPath opt_HiMap) loc $
-
- 	-- FIND THE GLOBAL NAME ENVIRONMENT
+rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc)
+  = 	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ global_name_info ->
 
     case global_name_info of {
@@ -278,9 +305,8 @@ rnStats all_decls
         | opt_D_show_rn_trace || 
 	  opt_D_show_rn_stats ||
 	  opt_D_dump_rn 
- 	= getRnStats all_decls		        `thenRn` \ msg ->
-	  ioToRnMG (hPutStr stderr (show msg) >> 
-		    hPutStr stderr "\n")	`thenRn_`
+ 	= getRnStats all_decls		`thenRn` \ msg ->
+	  ioToRnMG (printErrs msg)	`thenRn_`
 	  returnRn ()
 
 	| otherwise = returnRn ()
