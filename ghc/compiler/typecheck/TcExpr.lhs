@@ -10,7 +10,6 @@ module TcExpr ( tcCheckSigma, tcCheckRho, tcInferRho, tcMonoExpr ) where
 
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
-import HsSyn		( HsReify(..), ReifyFlavour(..) )
 import Id		( Id )
 import TcType		( isTauTy )
 import TcEnv		( tcMetaTy, checkWellStaged )
@@ -564,17 +563,6 @@ tcMonoExpr (PArrSeqIn _) _
 
 tcMonoExpr (HsSplice n expr loc) res_ty = addSrcLoc loc (tcSpliceExpr n expr res_ty)
 tcMonoExpr (HsBracket brack loc) res_ty = addSrcLoc loc (tcBracket brack res_ty)
-
-tcMonoExpr (HsReify (Reify flavour name)) res_ty
-  = addErrCtxt (ptext SLIT("At the reification of") <+> ppr name)	$
-    tcMetaTy  tycon_name		`thenM` \ reify_ty ->
-    zapExpectedTo res_ty reify_ty	`thenM_`
-    returnM (HsReify (ReifyOut flavour name))
-  where
-    tycon_name = case flavour of
-		   ReifyDecl -> DsMeta.decQTyConName
-		   ReifyType -> DsMeta.typeQTyConName
-		   ReifyFixity -> pprPanic "tcMonoExpr: cant do reifyFixity yet" (ppr name)
 #endif /* GHCI */
 \end{code}
 

@@ -90,8 +90,8 @@ splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}
 
 \begin{code}
-uniqFromSupply  (MkSplitUniqSupply (I# n) _ _)  = mkUniqueGrimily n
-uniqsFromSupply (MkSplitUniqSupply (I# n) _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
+uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily n
+uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
 \end{code}
 
 %************************************************************************

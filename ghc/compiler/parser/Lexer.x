@@ -421,9 +421,8 @@ data Token__
   | ITcloseQuote		-- |]
   | ITidEscape   FastString	-- $x
   | ITparenEscape		-- $( 
-  | ITreifyType
-  | ITreifyDecl
-  | ITreifyFixity
+  | ITvarQuote			-- '
+  | ITtyQuote			-- ''
 
   -- Arrow notation extension
   | ITproc
@@ -498,9 +497,6 @@ reservedWordsFM = listToUFM $
 
       	( "forall",	ITforall,	 bit glaExtsBit),
 	( "mdo",	ITmdo,		 bit glaExtsBit),
-	( "reifyDecl",  ITreifyDecl,	 bit thBit),
-	( "reifyType",  ITreifyType,	 bit thBit),
-	( "reifyFixity",ITreifyFixity,	 bit thBit),
 
 	( "foreign",	ITforeign,	 bit ffiBit),
 	( "export",	ITexport,	 bit ffiBit),
@@ -862,6 +858,13 @@ lex_string s = do
 	c <- lex_char
 	lex_string (c:s)
 
+lex_char :: P Char
+lex_char = do
+  mc <- getCharOrFail
+  case mc of
+      '\\' -> lex_escape
+      c | is_any c -> return c
+      _other -> lit_error
 
 lex_stringgap s = do
   c <- getCharOrFail
@@ -872,34 +875,61 @@ lex_stringgap s = do
 
 
 lex_char_tok :: Action
-lex_char_tok loc _end buf len = do
-   c <- lex_char
-   mc <- getCharOrFail
-   case mc of
-	'\'' -> do
-	   glaexts <- extension glaExtsEnabled
-	   if glaexts
-		then do
-		   i@(end,_) <- getInput
-		   case alexGetChar i of
+-- Here we are basically parsing character literals, such as 'x' or '\n'
+-- but, when Template Haskell is on, we additionally spot
+-- 'x and ''T, returning ITvarQuote and ITtyQuote respectively, 
+-- but WIHTOUT CONSUMING the x or T part  (the parser does that).
+-- So we have to do two characters of lookahead: when we see 'x we need to
+-- see if there's a trailing quote
+lex_char_tok loc _end buf len = do	-- We've seen '
+   i1 <- getInput	-- Look ahead to first character
+   case alexGetChar i1 of
+	Nothing -> lit_error 
+
+	Just ('\'', i2@(end2,_)) -> do 	-- We've seen ''
+		  th_exts <- extension thEnabled
+		  if th_exts then do
+			setInput i2
+			return (T loc end2 ITtyQuote)
+		   else lit_error
+
+	Just ('\\', i2@(end2,_)) -> do 	-- We've seen 'backslash 
+		  setInput i2
+		  lit_ch <- lex_escape
+		  mc <- getCharOrFail	-- Trailing quote
+		  if mc == '\'' then finish_char_tok loc lit_ch
+			        else lit_error 
+
+        Just (c, i2@(end2,_)) | not (is_any c) -> lit_error
+			      | otherwise      ->
+
+		-- We've seen 'x, where x is a valid character
+		--  (i.e. not newline etc) but not a quote or backslash
+	   case alexGetChar i2 of	-- Look ahead one more character
+		Nothing -> lit_error
+		Just ('\'', i3) -> do 	-- We've seen 'x'
+			setInput i3 
+			finish_char_tok loc c
+		_other -> do 		-- We've seen 'x not followed by quote
+					-- If TH is on, just parse the quote only
+			th_exts <- extension thEnabled	
+			if th_exts then return (T loc (fst i1) ITvarQuote)
+				   else lit_error
+
+finish_char_tok :: SrcLoc -> Char -> P Token
+finish_char_tok loc ch	-- We've already seen the closing quote
+			-- Just need to check for trailing #
+  = do	glaexts <- extension glaExtsEnabled
+	if glaexts then do
+		i@(end,_) <- getInput
+		case alexGetChar i of
 			Just ('#',i@(end,_)) -> do
 				setInput i
-				return (T loc end (ITprimchar c))
+				return (T loc end (ITprimchar ch))
 			_other ->
-				return (T loc end (ITchar c))
-	        else do
-		   end <- getSrcLoc
-		   return (T loc end (ITchar c))
-
-	_other -> lit_error
-
-lex_char :: P Char
-lex_char = do
-  mc <- getCharOrFail
-  case mc of
-      '\\' -> lex_escape
-      c | is_any c -> return c
-      _other -> lit_error
+					return (T loc end (ITchar ch))
+	  else do end <- getSrcLoc
+		  return (T loc end (ITchar ch))
 
 lex_escape :: P Char
 lex_escape = do

@@ -90,7 +90,7 @@ type DsMetaEnv = NameEnv DsMetaVal
 data DsMetaVal
    = Bound Id		-- Bound by a pattern inside the [| |]. 
 			-- Will be dynamically alpha renamed.
-			-- The Id has type String
+			-- The Id has type THSyntax.Var
 
    | Splice TypecheckedHsExpr	-- These bindings are introduced by
 				-- the PendingSplices on a HsBracketOut
@@ -174,7 +174,9 @@ putSrcLocDs :: SrcLoc -> DsM a -> DsM a
 putSrcLocDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) thing_inside
 
 dsWarn :: DsWarning -> DsM ()
-dsWarn warn = do { env <- getGblEnv; updMutVar (ds_warns env) (`snocBag` warn) }
+dsWarn (loc,warn) = do { env <- getGblEnv; updMutVar (ds_warns env) (`snocBag` (loc,msg)) }
+	    where
+	      msg = ptext SLIT("Warning:") <+> warn
 \end{code}
 
 \begin{code}

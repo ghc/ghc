@@ -252,7 +252,7 @@ localiseName n = n { n_sort = Internal }
 
 \begin{code}
 hashName :: Name -> Int
-hashName name = iBox (getKey (nameUnique name))
+hashName name = getKey (nameUnique name)
 \end{code}
 
 

@@ -43,7 +43,7 @@ import Name		( Name, OccName, NamedThing(..),
 			  setNameUnique, setNameOcc, nameUnique, 
 			  mkSystemTvNameEncoded,
 			)
-import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
+import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey# )
 import FastTypes
 import Outputable
 
@@ -143,16 +143,16 @@ instance Ord Var where
 
 \begin{code}
 varUnique :: Var -> Unique
-varUnique (Var {realUnique = uniq}) = mkUniqueGrimily uniq
+varUnique (Var {realUnique = uniq}) = mkUniqueGrimily (iBox uniq)
 
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var@(Var {varName = name}) uniq 
-  = var {realUnique = getKey uniq, 
+  = var {realUnique = getKey# uniq, 
 	 varName = setNameUnique name uniq}
 
 setVarName :: Var -> Name -> Var
 setVarName var new_name
-  = var { realUnique = getKey (getUnique new_name), varName = new_name }
+  = var { realUnique = getKey# (getUnique new_name), varName = new_name }
 
 setVarOcc :: Var -> OccName -> Var
 setVarOcc var new_occ
@@ -184,7 +184,7 @@ setTyVarName   = setVarName
 \begin{code}
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = Var { varName    = name
-			, realUnique = getKey (nameUnique name)
+			, realUnique = getKey# (nameUnique name)
 			, varType    = kind
 			, varDetails = TyVar
 			, varInfo    = pprPanic "mkTyVar" (ppr name)
@@ -192,7 +192,7 @@ mkTyVar name kind = Var { varName    = name
 
 mkSysTyVar :: Unique -> Kind -> TyVar
 mkSysTyVar uniq kind = Var { varName    = name
-			   , realUnique = getKey uniq
+			   , realUnique = getKey# uniq
 			   , varType    = kind
 			   , varDetails = TyVar
 			   , varInfo    = pprPanic "mkSysTyVar" (ppr name)
@@ -203,7 +203,7 @@ mkSysTyVar uniq kind = Var { varName    = name
 mkMutTyVar :: Name -> Kind -> TyVarDetails -> IORef (Maybe Type) -> TyVar
 mkMutTyVar name kind details ref
   = Var { varName    = name
-	, realUnique = getKey (nameUnique name)
+	, realUnique = getKey# (nameUnique name)
 	, varType    = kind
 	, varDetails = MutTyVar ref details
 	, varInfo    = pprPanic "newMutTyVar" (ppr name)
@@ -284,7 +284,7 @@ maybeModifyIdInfo fn var@(Var {varInfo = info}) = case fn info of
 mkId :: Name -> Type -> VarDetails -> IdInfo -> Id
 mkId name ty details info
   = Var { varName    = name, 
-	  realUnique = getKey (nameUnique name), 	-- Cache the unique
+	  realUnique = getKey# (nameUnique name), 	-- Cache the unique
 	  varType    = ty,	
 	  varDetails = details,
 	  varInfo    = info }

@@ -9,7 +9,7 @@ module ErrUtils (
 	Messages, errorsFound, emptyMessages,
 
 	addShortErrLocLine, addShortWarnLocLine,
-	addErrLocHdrLine, addWarnLocHdrLine, 
+	addErrLocHdrLine, 
 
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 
@@ -50,7 +50,6 @@ addShortWarnLocLine :: SrcLoc -> PrintUnqualified -> Message -> WarnMsg
 	-- Be refined about qualification, return an ErrMsg
 
 addErrLocHdrLine    :: SrcLoc -> Message -> Message -> Message
-addWarnLocHdrLine   :: SrcLoc -> Message -> Message -> Message
 	-- Used by Lint and other system stuff
 	-- Always print qualified, return a Message
 
@@ -67,18 +66,11 @@ addShortWarnLocLine locn print_unqual msg
 addErrLocHdrLine locn hdr msg
   = mkErrDoc locn (hdr $$ msg)
 
-addWarnLocHdrLine locn hdr msg
-  = mkWarnDoc locn (hdr $$ msg)
-
 mkErrDoc locn msg
   | isGoodSrcLoc locn = hang (ppr locn <> colon) 4 msg
   | otherwise	      = msg
 	
-mkWarnDoc locn msg 
-  | isGoodSrcLoc locn = hang (ppr locn <> colon) 4 warn_msg
-  | otherwise	      = warn_msg
-  where
-    warn_msg = ptext SLIT("Warning:") <+> msg
+mkWarnDoc locn msg = mkErrDoc locn msg
 \end{code}
 
 \begin{code}

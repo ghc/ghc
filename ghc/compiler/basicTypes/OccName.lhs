@@ -26,7 +26,7 @@ module OccName (
 	unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts, 
 	foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
 
-	mkOccFS, mkSysOcc, mkSysOccFS, mkFCallOcc, mkKindOccFS,
+	mkOccName, mkOccFS, mkSysOcc, mkSysOccFS, mkFCallOcc, mkKindOccFS,
 	mkVarOcc, mkVarOccEncoded,
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
@@ -34,7 +34,7 @@ module OccName (
 	mkGenOcc1, mkGenOcc2, mkLocalOcc, mkDataTOcc, mkDataCOcc,
 	mkDataConWrapperOcc, mkDataConWorkerOcc,
 	
-	isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
+	isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
 	reportIfUnused,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, 
@@ -200,7 +200,7 @@ pprOccName (OccName sp occ)
 %*									*
 \subsection{Construction}
 %*									*
-%************************************************************************
+%*****p*******************************************************************
 
 *Sys* things do no encoding; the caller should ensure that the thing is
 already encoded
@@ -234,6 +234,9 @@ mkKindOccFS occ_sp fs = OccName occ_sp fs
 \begin{code}
 mkOccFS :: NameSpace -> UserFS -> OccName
 mkOccFS occ_sp fs = mkSysOccFS occ_sp (encodeFS fs)
+
+mkOccName :: NameSpace -> String -> OccName
+mkOccName ns s = mkSysOcc ns (encode s)
 
 mkVarOcc :: UserFS -> OccName
 mkVarOcc fs = mkSysOccFS varName (encodeFS fs)
@@ -372,7 +375,10 @@ briefNameSpaceFlavour TcClsName = "tc"
 \end{code}
 
 \begin{code}
-isTvOcc, isDataSymOcc, isSymOcc, isTcOcc :: OccName -> Bool
+isVarOcc, isTvOcc, isDataSymOcc, isSymOcc, isTcOcc :: OccName -> Bool
+
+isVarOcc (OccName VarName _) = True
+isVarOcc other               = False
 
 isTvOcc (OccName TvName _) = True
 isTvOcc other              = False

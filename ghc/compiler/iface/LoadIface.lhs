@@ -29,7 +29,7 @@ import HscTypes		( HscEnv(..), ModIface(..), emptyModIface,
 			  lookupIfaceByModName, emptyPackageIfaceTable,
 			  IsBootInterface, mkIfaceFixCache, 
 			  Pool(..), DeclPool, InstPool, 
-			  RulePool, Gated, addRuleToPool, RulePoolContents
+			  RulePool, addRuleToPool, RulePoolContents
 			 )
 
 import BasicTypes	( Version, Fixity(..), FixityDirection(..) )

@@ -48,7 +48,7 @@ module UniqFM (
 
 import {-# SOURCE #-} Name	( Name )
 
-import Unique		( Uniquable(..), Unique, getKey, mkUniqueGrimily )
+import Unique		( Uniquable(..), Unique, getKey#, mkUniqueGrimily )
 import Panic
 import FastTypes
 import Outputable
@@ -220,8 +220,8 @@ First the ways of building a UniqFM.
 
 \begin{code}
 emptyUFM		     = EmptyUFM
-unitUFM	     key elt = mkLeafUFM (getKey (getUnique key)) elt
-unitDirectlyUFM key elt = mkLeafUFM (getKey key) elt
+unitUFM	     key elt = mkLeafUFM (getKey# (getUnique key)) elt
+unitDirectlyUFM key elt = mkLeafUFM (getKey# key) elt
 
 listToUFM key_elt_pairs
   = addListToUFM_C use_snd EmptyUFM key_elt_pairs
@@ -240,20 +240,20 @@ could be optimised using it.
 \begin{code}
 addToUFM fm key elt = addToUFM_C use_snd fm key elt
 
-addToUFM_Directly fm u elt = insert_ele use_snd fm (getKey u) elt
+addToUFM_Directly fm u elt = insert_ele use_snd fm (getKey# u) elt
 
 addToUFM_C combiner fm key elt
-  = insert_ele combiner fm (getKey (getUnique key)) elt
+  = insert_ele combiner fm (getKey# (getUnique key)) elt
 
 addListToUFM fm key_elt_pairs = addListToUFM_C use_snd fm key_elt_pairs
 addListToUFM_Directly fm uniq_elt_pairs = addListToUFM_directly_C use_snd fm uniq_elt_pairs
 
 addListToUFM_C combiner fm key_elt_pairs
- = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey (getUnique k)) e)
+ = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey# (getUnique k)) e)
 	 fm key_elt_pairs
 
 addListToUFM_directly_C combiner fm uniq_elt_pairs
- = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey k) e)
+ = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey# k) e)
 	 fm uniq_elt_pairs
 \end{code}
 
@@ -262,8 +262,8 @@ Now ways of removing things from UniqFM.
 \begin{code}
 delListFromUFM fm lst = foldl delFromUFM fm lst
 
-delFromUFM          fm key = delete fm (getKey (getUnique key))
-delFromUFM_Directly fm u   = delete fm (getKey u)
+delFromUFM          fm key = delete fm (getKey# (getUnique key))
+delFromUFM_Directly fm u   = delete fm (getKey# u)
 
 delete EmptyUFM _   = EmptyUFM
 delete fm       key = del_ele fm
@@ -541,20 +541,20 @@ looking up in a hurry is the {\em whole point} of this binary tree lark.
 Lookup up a binary tree is easy (and fast).
 
 \begin{code}
-elemUFM key fm = case lookUp fm (getKey (getUnique key)) of
+elemUFM key fm = case lookUp fm (getKey# (getUnique key)) of
 			Nothing -> False
 			Just _  -> True
 
-lookupUFM	   fm key = lookUp fm (getKey (getUnique key))
-lookupUFM_Directly fm key = lookUp fm (getKey key)
+lookupUFM	   fm key = lookUp fm (getKey# (getUnique key))
+lookupUFM_Directly fm key = lookUp fm (getKey# key)
 
 lookupWithDefaultUFM fm deflt key
-  = case lookUp fm (getKey (getUnique key)) of
+  = case lookUp fm (getKey# (getUnique key)) of
       Nothing  -> deflt
       Just elt -> elt
 
 lookupWithDefaultUFM_Directly fm deflt key
-  = case lookUp fm (getKey key) of
+  = case lookUp fm (getKey# key) of
       Nothing  -> deflt
       Just elt -> elt
 
@@ -578,9 +578,9 @@ folds are *wonderful* things.
 \begin{code}
 eltsUFM fm = foldUFM (:) [] fm
 
-ufmToList fm = fold_tree (\ iu elt rest -> (mkUniqueGrimily iu, elt) : rest) [] fm
+ufmToList fm = fold_tree (\ iu elt rest -> (mkUniqueGrimily (iBox iu), elt) : rest) [] fm
 
-keysUFM fm = fold_tree (\ iu elt rest -> mkUniqueGrimily iu : rest) [] fm
+keysUFM fm = fold_tree (\ iu elt rest -> mkUniqueGrimily (iBox iu) : rest) [] fm
 
 fold_tree f a (NodeUFM _ _ t1 t2) = fold_tree f (fold_tree f a t2) t1
 fold_tree f a (LeafUFM iu obj)    = f iu obj a

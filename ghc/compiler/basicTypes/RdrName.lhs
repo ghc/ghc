@@ -300,9 +300,9 @@ extendLocalRdrEnv env names
   = extendOccEnvList env [(nameOccName n, n) | n <- names]
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
-lookupLocalRdrEnv env rdr_name
-  | isUnqual rdr_name = lookupOccEnv env (rdrNameOcc rdr_name)
-  | otherwise	      = Nothing
+lookupLocalRdrEnv env (Exact name) = Just name
+lookupLocalRdrEnv env (Unqual occ) = lookupOccEnv env occ
+lookupLocalRdrEnv env other	   = Nothing
 
 elemLocalRdrEnv :: RdrName -> LocalRdrEnv -> Bool
 elemLocalRdrEnv rdr_name env 

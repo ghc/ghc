@@ -688,6 +688,7 @@ rnTopSrcDecls group
 				 tcg_imports = imports `plusImportAvails` tcg_imports gbl }) 
 		  $ do {
 
+	traceRn (ptext SLIT("rnTopSrcDecls") <+> ppr rdr_env) ;
 	failIfErrsM ;	-- No point in continuing if (say) we have duplicate declarations
 
 		-- Rename the source decls

@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.128 2003/11/04 13:14:06 simonpj Exp $
+$Id: Parser.y,v 1.129 2003/11/06 17:09:53 simonpj Exp $
 
 Haskell grammar.
 
@@ -208,11 +208,10 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
 '[t|'           { T _ _ ITopenTypQuote  }      
 '[d|'           { T _ _ ITopenDecQuote  }      
 '|]'            { T _ _ ITcloseQuote    }
-ID_SPLICE       { T _ _ (ITidEscape $$) }     -- $x
+TH_ID_SPLICE    { T _ _ (ITidEscape $$) }     -- $x
 '$('	        { T _ _ ITparenEscape   }     -- $( exp )
-REIFY_TYPE	{ T _ _ ITreifyType }	
-REIFY_DECL	{ T _ _ ITreifyDecl }	
-REIFY_FIXITY	{ T _ _ ITreifyFixity }
+TH_VAR_QUOTE	{ T _ _ ITvarQuote      }     -- 'x
+TH_TY_QUOTE	{ T _ _ ITtyQuote      }      -- ''T
 
 %monad { P } { >>= } { return }
 %lexer { lexer } { T _ _ ITeof }
@@ -932,7 +931,6 @@ exp10 :: { RdrNameHsExpr }
 
         | '{-# CORE' STRING '#-}' exp           { HsCoreAnn $2 $4 }    -- hdaume: core annotation
 
-	| reifyexp				{ HsReify $1 }
 	| fexp					{ $1 }
 
 scc_annot :: { FastString }
@@ -942,12 +940,6 @@ scc_annot :: { FastString }
 fexp 	:: { RdrNameHsExpr }
 	: fexp aexp				{ HsApp $1 $2 }
   	| aexp					{ $1 }
-
-reifyexp :: { HsReify RdrName }
-	: REIFY_DECL gtycon  			{ Reify ReifyDecl $2 }
-	| REIFY_DECL qvar			{ Reify ReifyDecl $2 }
-	| REIFY_TYPE qcname			{ Reify ReifyType $2 }
-	| REIFY_FIXITY qcname			{ Reify ReifyFixity $2 }
 
 aexps 	:: { [RdrNameHsExpr] }
 	: aexps aexp				{ $2 : $1 }
@@ -985,8 +977,12 @@ aexp2	:: { RdrNameHsExpr }
 	| '_'				{ EWildPat }
 	
 	-- MetaHaskell Extension
-	| srcloc ID_SPLICE              { mkHsSplice (HsVar (mkUnqual varName $2)) $1 }  -- $x
+	| srcloc TH_ID_SPLICE           { mkHsSplice (HsVar (mkUnqual varName $2)) $1 }  -- $x
 	| srcloc '$(' exp ')'   	{ mkHsSplice $3 $1 }                             -- $( exp )
+	| srcloc TH_VAR_QUOTE qvar 	{ HsBracket (VarBr $3) $1 }
+	| srcloc TH_VAR_QUOTE qcon 	{ HsBracket (VarBr $3) $1 }
+	| srcloc TH_TY_QUOTE tyvar 	{ HsBracket (VarBr $3) $1 }
+ 	| srcloc TH_TY_QUOTE gtycon	{ HsBracket (VarBr $3) $1 }
 	| srcloc '[|' exp '|]'          { HsBracket (ExpBr $3) $1 }                       
 	| srcloc '[t|' ctype '|]'       { HsBracket (TypBr $3) $1 }                       
 	| srcloc '[p|' infixexp '|]'    {% checkPattern $1 $3 >>= \p ->

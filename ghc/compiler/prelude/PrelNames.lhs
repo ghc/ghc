@@ -315,9 +315,6 @@ dOTNET		= mkBasePkgModule dOTNET_Name
 gLA_EXTS	= mkBasePkgModule gLA_EXTS_Name
 mONAD_FIX	= mkBasePkgModule mONAD_FIX_Name
 
--- MetaHaskell Extension  text2 from Meta/work/gen.hs
-mETA_META_Name   = mkModuleName "Language.Haskell.THSyntax"
-
 rOOT_MAIN_Name = mkModuleName ":Main"		-- Root module for initialisation 
 rOOT_MAIN      = mkHomeModule rOOT_MAIN_Name	
 	-- The ':xxx' makes a moudle name that the user can never

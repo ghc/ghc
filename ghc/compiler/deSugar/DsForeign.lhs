@@ -102,8 +102,8 @@ dsForeigns fos
 
   warnDepr False _   = returnDs ()
   warnDepr True  loc = dsWarn (loc, msg)
-   where
-    msg = ptext SLIT("foreign declaration uses deprecated non-standard syntax")
+     where
+       msg = ptext SLIT("foreign declaration uses deprecated non-standard syntax")
 \end{code}
 
 

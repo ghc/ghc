@@ -508,8 +508,6 @@ zonkExpr env (HsBracketOut body bs)
     zonk_b (n,e) = zonkExpr env e	`thenM` \ e' ->
 		   returnM (n,e')
 
-zonkExpr env (HsReify r) = returnM (HsReify r)	-- Nothing to zonk; only top
-						-- level things can be reified (for now)
 zonkExpr env (HsSplice n e loc) = WARN( True, ppr e )	-- Should not happen
 			          returnM (HsSplice n e loc)
 

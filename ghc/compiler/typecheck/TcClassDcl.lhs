@@ -61,7 +61,7 @@ import Var		( TyVar )
 import PrelNames	( genericTyConNames )
 import CmdLineOpts
 import UnicodeUtil	( stringToUtf8 )
-import ErrUtils		( dumpIfSet, dumpIfSet_dyn )
+import ErrUtils		( dumpIfSet_dyn )
 import Util		( count, lengthIs, isSingleton, lengthExceeds )
 import Unique		( Uniquable(..) )
 import ListSetOps	( equivClassesByUniq, minusList	)

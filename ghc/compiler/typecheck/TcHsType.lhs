@@ -43,14 +43,12 @@ import TcType		( Type, PredType(..), ThetaType, TyVarDetails(..),
 		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy,
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
 			  liftedTypeKind, unliftedTypeKind, eqKind,
-			  tcSplitFunTy_maybe, tcSplitForAllTys, tcSplitSigmaTy, 
-			  pprKind, pprThetaArrow )
+			  tcSplitFunTy_maybe, tcSplitForAllTys, pprKind )
 import qualified Type	( splitFunTys )
 import Inst		( Inst, InstOrigin(..), newMethod, instToId )
 
 import Id		( mkLocalId, idName, idType )
 import Var		( TyVar, mkTyVar, tyVarKind )
-import ErrUtils		( Message )
 import TyCon		( TyCon, tyConKind )
 import Class		( classTyCon )
 import Name		( Name )

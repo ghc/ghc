@@ -228,12 +228,6 @@ rnExpr e@(HsSplice n splice loc)
     rnExpr splice 		`thenM` \ (splice', fvs_e) ->
     returnM (HsSplice n' splice' loc, fvs_e)
 
-rnExpr e@(HsReify (Reify flavour name))
-  = checkTH e "reify"		`thenM_`
-    lookupGlobalOccRn name	`thenM` \ name' ->
-	-- For now, we can only reify top-level things
-    returnM (HsReify (Reify flavour name'), unitFV name')
-
 rnExpr section@(SectionL expr op)
   = rnExpr expr	 				`thenM` \ (expr', fvs_expr) ->
     rnExpr op	 				`thenM` \ (op', fvs_op) ->
@@ -625,6 +619,8 @@ rnRbinds str rbinds
 %************************************************************************
 
 \begin{code}
+rnBracket (VarBr n) = lookupOccRn n		`thenM` \ name -> 
+		      returnM (VarBr name, unitFV name)
 rnBracket (ExpBr e) = rnExpr e		`thenM` \ (e', fvs) ->
 		      returnM (ExpBr e', fvs)
 rnBracket (PatBr p) = rnPat p		`thenM` \ (p', fvs) ->

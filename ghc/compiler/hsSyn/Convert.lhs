@@ -10,7 +10,8 @@ module Convert( convertToHsExpr, convertToHsDecls ) where
 
 #include "HsVersions.h"
 
-import Language.Haskell.THSyntax as Meta
+import Language.Haskell.TH.THSyntax as TH
+import Language.Haskell.TH.THLib    as TH	-- Pretty printing
 
 import HsSyn as Hs
 	(	HsExpr(..), HsLit(..), ArithSeqInfo(..), 
@@ -24,12 +25,14 @@ import HsSyn as Hs
 		mkSimpleMatch, mkImplicitHsForAllTy, mkExplicitHsForAllTy
 	) 
 
-import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig )
-import Module   ( mkModuleName )
+import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, nameRdrName, getRdrName )
+import Module   ( ModuleName, mkModuleName )
 import RdrHsSyn	( mkHsIntegral, mkHsFractional, mkClassDecl, mkTyData )
-import OccName
+import Name	( mkInternalName )
+import qualified OccName
 import SrcLoc	( SrcLoc, generatedSrcLoc )
 import Type	( Type )
+import TysWiredIn ( unitTyCon, tupleTyCon, trueDataCon, falseDataCon )
 import BasicTypes( Boxity(..), RecFlag(Recursive), NewOrData(..) )
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
                      CExportSpec(..)) 
@@ -38,12 +41,15 @@ import HsDecls ( CImportSpec(..), ForeignImport(..), ForeignExport(..),
 import FastString( FastString, mkFastString, nilFS )
 import Char 	( ord, isAscii, isAlphaNum, isAlpha )
 import List	( partition )
+import SrcLoc	( noSrcLoc )
+import Unique	( Unique, mkUniqueGrimily )
 import ErrUtils (Message)
+import GLAEXTS	( Int#, Int(..) )
 import Outputable
 
 
 -------------------------------------------------------------------
-convertToHsDecls :: [Meta.Dec] -> [Either (HsDecl RdrName) Message]
+convertToHsDecls :: [TH.Dec] -> [Either (HsDecl RdrName) Message]
 convertToHsDecls ds = map cvt_top ds
 
 mk_con con = case con of
@@ -68,9 +74,9 @@ mk_con con = case con of
 mk_derivs [] = Nothing
 mk_derivs cs = Just [HsClassP (tconName c) [] | c <- cs]
 
-cvt_top :: Meta.Dec -> Either (HsDecl RdrName) Message
-cvt_top d@(Meta.ValD _ _ _) = Left $ Hs.ValD (cvtd d)
-cvt_top d@(Meta.FunD _ _)   = Left $ Hs.ValD (cvtd d)
+cvt_top :: TH.Dec -> Either (HsDecl RdrName) Message
+cvt_top d@(TH.ValD _ _ _) = Left $ Hs.ValD (cvtd d)
+cvt_top d@(TH.FunD _ _)   = Left $ Hs.ValD (cvtd d)
  
 cvt_top (TySynD tc tvs rhs)
   = Left $ TyClD (TySynonym (tconName tc) (cvt_tvs tvs) (cvtType rhs) loc0)
@@ -100,7 +106,7 @@ cvt_top (InstanceD tys ty decs)
     (binds, sigs) = cvtBindsAndSigs decs
     inst_ty = mkImplicitHsForAllTy (cvt_context tys) (HsPredTy (cvt_pred ty))
 
-cvt_top (Meta.SigD nm typ) = Left $ Hs.SigD (Sig (vName nm) (cvtType typ) loc0)
+cvt_top (TH.SigD nm typ) = Left $ Hs.SigD (Sig (vName nm) (cvtType typ) loc0)
 
 cvt_top (ForeignD (ImportF callconv safety from nm typ))
  = case parsed of
@@ -116,7 +122,7 @@ cvt_top (ForeignD (ImportF callconv safety from nm typ))
                         Unsafe     -> PlayRisky
                         Safe       -> PlaySafe False
                         Threadsafe -> PlaySafe True
-          parsed = parse_ccall_impent nm from
+          parsed = parse_ccall_impent (TH.nameBase nm) from
 
 cvt_top (ForeignD (ExportF callconv as nm typ))
  = let e = CExport (CExportStatic (mkFastString as) callconv')
@@ -170,7 +176,7 @@ noExistentials = []
 noFunDeps      = []
 
 -------------------------------------------------------------------
-convertToHsExpr :: Meta.Exp -> HsExpr RdrName
+convertToHsExpr :: TH.Exp -> HsExpr RdrName
 convertToHsExpr = cvt
 
 cvt (VarE s) 	  = HsVar (vName s)
@@ -199,7 +205,7 @@ cvt (SigE e t)		= ExprWithTySig (cvt e) (cvtType t)
 cvt (RecConE c flds) = RecordCon (cName c) (map (\(x,y) -> (vName x, cvt y)) flds)
 cvt (RecUpdE e flds) = RecordUpd (cvt e) (map (\(x,y) -> (vName x, cvt y)) flds)
 
-cvtdecs :: [Meta.Dec] -> HsBinds RdrName
+cvtdecs :: [TH.Dec] -> HsBinds RdrName
 cvtdecs [] = EmptyBinds
 cvtdecs ds = MonoBind binds sigs Recursive
 	   where
@@ -210,27 +216,27 @@ cvtBindsAndSigs ds
   where 
     (sigs, non_sigs) = partition sigP ds
 
-cvtSig (Meta.SigD nm typ) = Hs.Sig (vName nm) (cvtType typ) loc0
+cvtSig (TH.SigD nm typ) = Hs.Sig (vName nm) (cvtType typ) loc0
 
-cvtds :: [Meta.Dec] -> MonoBinds RdrName
+cvtds :: [TH.Dec] -> MonoBinds RdrName
 cvtds []     = EmptyMonoBinds
 cvtds (d:ds) = AndMonoBinds (cvtd d) (cvtds ds)
 
-cvtd :: Meta.Dec -> MonoBinds RdrName
+cvtd :: TH.Dec -> MonoBinds RdrName
 -- Used only for declarations in a 'let/where' clause,
 -- not for top level decls
-cvtd (Meta.ValD (Meta.VarP s) body ds) = FunMonoBind (vName s) False 
+cvtd (TH.ValD (TH.VarP s) body ds) = FunMonoBind (vName s) False 
 					  [cvtclause (Clause [] body ds)] loc0
 cvtd (FunD nm cls)   	    = FunMonoBind (vName nm) False (map cvtclause cls) loc0
-cvtd (Meta.ValD p body ds)	    = PatMonoBind (cvtp p) (GRHSs (cvtguard body) 
+cvtd (TH.ValD p body ds)	    = PatMonoBind (cvtp p) (GRHSs (cvtguard body) 
 							  (cvtdecs ds) 
 							  void) loc0
 
 cvtd d = cvtPanic "Illegal kind of declaration in where clause" 
-		  (text (show (Meta.pprDec d)))
+		  (text (show (TH.pprDec d)))
 
 
-cvtclause :: Meta.Clause -> Hs.Match RdrName
+cvtclause :: TH.Clause -> Hs.Match RdrName
 cvtclause (Clause ps body wheres)
     = Hs.Match (map cvtp ps) Nothing (GRHSs (cvtguard body) (cvtdecs wheres) void)
 
@@ -243,23 +249,23 @@ cvtdd (FromToR x y)	      = (FromTo (cvt x) (cvt y))
 cvtdd (FromThenToR x y z) = (FromThenTo (cvt x) (cvt y) (cvt z))
 
 
-cvtstmts :: [Meta.Stmt] -> [Hs.Stmt RdrName]
+cvtstmts :: [TH.Stmt] -> [Hs.Stmt RdrName]
 cvtstmts []		       = [] -- this is probably an error as every [stmt] should end with ResultStmt
 cvtstmts [NoBindS e]           = [ResultStmt (cvt e) loc0]      -- when its the last element use ResultStmt
 cvtstmts (NoBindS e : ss)      = ExprStmt (cvt e) void loc0     : cvtstmts ss
-cvtstmts (Meta.BindS p e : ss) = BindStmt (cvtp p) (cvt e) loc0 : cvtstmts ss
-cvtstmts (Meta.LetS ds : ss)   = LetStmt (cvtdecs ds)	    : cvtstmts ss
-cvtstmts (Meta.ParS dss : ss)  = ParStmt [(cvtstmts ds, undefined) | ds <- dss] : cvtstmts ss
+cvtstmts (TH.BindS p e : ss) = BindStmt (cvtp p) (cvt e) loc0 : cvtstmts ss
+cvtstmts (TH.LetS ds : ss)   = LetStmt (cvtdecs ds)	    : cvtstmts ss
+cvtstmts (TH.ParS dss : ss)  = ParStmt [(cvtstmts ds, undefined) | ds <- dss] : cvtstmts ss
 
-cvtm :: Meta.Match -> Hs.Match RdrName
-cvtm (Meta.Match p body wheres)
+cvtm :: TH.Match -> Hs.Match RdrName
+cvtm (TH.Match p body wheres)
     = Hs.Match [cvtp p] Nothing (GRHSs (cvtguard body) (cvtdecs wheres) void)
                              
-cvtguard :: Meta.Body -> [GRHS RdrName]
+cvtguard :: TH.Body -> [GRHS RdrName]
 cvtguard (GuardedB pairs) = map cvtpair pairs
 cvtguard (NormalB e) 	 = [GRHS [  ResultStmt (cvt e) loc0 ] loc0]
 
-cvtpair :: (Meta.Exp,Meta.Exp) -> GRHS RdrName
+cvtpair :: (TH.Exp,TH.Exp) -> GRHS RdrName
 cvtpair (x,y) = GRHS [Hs.BindStmt truePat (cvt x) loc0,
 		      ResultStmt (cvt y) loc0] loc0
 
@@ -276,46 +282,46 @@ cvtLit (DoublePrimL f) = HsDoublePrim f
 cvtLit (CharL c)       = HsChar (ord c)
 cvtLit (StringL s)     = HsString (mkFastString s)
 
-cvtp :: Meta.Pat -> Hs.Pat RdrName
-cvtp (Meta.LitP l)
+cvtp :: TH.Pat -> Hs.Pat RdrName
+cvtp (TH.LitP l)
   | overloadedLit l = NPatIn (cvtOverLit l) Nothing	-- Not right for negative
 							-- patterns; need to think
 							-- about that!
   | otherwise	    = Hs.LitPat (cvtLit l)
-cvtp (Meta.VarP s)     = Hs.VarPat(vName s)
+cvtp (TH.VarP s)     = Hs.VarPat(vName s)
 cvtp (TupP [p])   = cvtp p
 cvtp (TupP ps)    = TuplePat (map cvtp ps) Boxed
 cvtp (ConP s ps)  = ConPatIn (cName s) (PrefixCon (map cvtp ps))
 cvtp (TildeP p)   = LazyPat (cvtp p)
-cvtp (Meta.AsP s p) = AsPat (vName s) (cvtp p)
-cvtp Meta.WildP   = WildPat void
+cvtp (TH.AsP s p) = AsPat (vName s) (cvtp p)
+cvtp TH.WildP   = WildPat void
 cvtp (RecP c fs)  = ConPatIn (cName c) $ Hs.RecCon (map (\(s,p) -> (vName s,cvtp p)) fs)
 cvtp (ListP ps)   = ListPat (map cvtp ps) void
 
 -----------------------------------------------------------
 --	Types and type variables
 
-cvt_tvs :: [String] -> [HsTyVarBndr RdrName]
+cvt_tvs :: [TH.Name] -> [HsTyVarBndr RdrName]
 cvt_tvs tvs = map (UserTyVar . tName) tvs
 
 cvt_context :: Cxt -> HsContext RdrName 
 cvt_context tys = map cvt_pred tys
 
-cvt_pred :: Meta.Type -> HsPred RdrName
+cvt_pred :: TH.Type -> HsPred RdrName
 cvt_pred ty = case split_ty_app ty of
 	   	(ConT tc, tys) -> HsClassP (tconName tc) (map cvtType tys)
 	   	(VarT tv, tys) -> HsClassP (tName tv) (map cvtType tys)
-		other -> cvtPanic "Malformed predicate" (text (show (Meta.pprType ty)))
+		other -> cvtPanic "Malformed predicate" (text (show (TH.pprType ty)))
 
-cvtType :: Meta.Type -> HsType RdrName
+cvtType :: TH.Type -> HsType RdrName
 cvtType ty = trans (root ty [])
   where root (AppT a b) zs = root a (cvtType b : zs)
         root t zs 	   = (t,zs)
 
         trans (TupleT n,args)
             | length args == n = HsTupleTy Boxed args
-            | n == 0 = foldl HsAppTy (HsTyVar (tconName "()")) args
-            | otherwise = foldl HsAppTy (HsTyVar (tconName ("(" ++ replicate (n-1) ',' ++ ")"))) args
+            | n == 0    = foldl HsAppTy (HsTyVar (getRdrName unitTyCon))	    args
+            | otherwise = foldl HsAppTy (HsTyVar (getRdrName (tupleTyCon Boxed n))) args
         trans (ArrowT,   [x,y]) = HsFunTy x y
         trans (ListT,    [x])   = HsListTy x
 
@@ -325,7 +331,7 @@ cvtType ty = trans (root ty [])
 	trans (ForallT tvs cxt ty, []) = mkExplicitHsForAllTy 
 						(cvt_tvs tvs) (cvt_context cxt) (cvtType ty)
 
-split_ty_app :: Meta.Type -> (Meta.Type, [Meta.Type])
+split_ty_app :: TH.Type -> (TH.Type, [TH.Type])
 split_ty_app ty = go ty []
   where
     go (AppT f a) as = go f (a:as)
@@ -333,7 +339,7 @@ split_ty_app ty = go ty []
 
 -----------------------------------------------------------
 sigP :: Dec -> Bool
-sigP (Meta.SigD _ _) = True
+sigP (TH.SigD _ _) = True
 sigP other	 = False
 
 
@@ -345,8 +351,8 @@ cvtPanic herald thing
 -----------------------------------------------------------
 -- some useful things
 
-truePat  = ConPatIn (cName "True") (PrefixCon [])
-falsePat = ConPatIn (cName "False") (PrefixCon [])
+truePat  = ConPatIn (getRdrName trueDataCon)  (PrefixCon [])
+falsePat = ConPatIn (getRdrName falseDataCon) (PrefixCon [])
 
 overloadedLit :: Lit -> Bool
 -- True for literals that Haskell treats as overloaded
@@ -360,46 +366,45 @@ void = placeHolderType
 loc0 :: SrcLoc
 loc0 = generatedSrcLoc
 
+--------------------------------------------------------------------
+--	Turning Name back into RdrName
+--------------------------------------------------------------------
+
 -- variable names
-vName :: String -> RdrName
-vName = mkName varName
+vName :: TH.Name -> RdrName
+vName = mk_name OccName.varName
 
 -- Constructor function names; this is Haskell source, hence srcDataName
-cName :: String -> RdrName
-cName = mkName srcDataName
+cName :: TH.Name -> RdrName
+cName = mk_name OccName.srcDataName
 
 -- Type variable names
-tName :: String -> RdrName
-tName = mkName tvName
+tName :: TH.Name -> RdrName
+tName = mk_name OccName.tvName
 
 -- Type Constructor names
-tconName = mkName tcName
+tconName = mk_name OccName.tcName
 
-mkName :: NameSpace -> String -> RdrName
--- Parse the string to see if it has a "." or ":" in it
--- so we know whether to generate a qualified or original name
--- It's a bit tricky because we need to parse 
---	Foo.Baz.x as Qual Foo.Baz x
--- So we parse it from back to front
+mk_name :: OccName.NameSpace -> TH.Name -> RdrName
 
-mkName ns str
-  = split [] (reverse str)
-  where
-    split occ [] = mkRdrUnqual (mk_occ occ)
-    split occ (c:d:rev) 	-- 'd' is the last char before the separator
-	|  is_sep c 		-- E.g.		Fo.x	d='o'
-	&& isAlphaNum d		--		Fo.+:	d='+' perhaps
-	= mk_qual (reverse (d:rev)) c occ
-    split occ (c:rev) = split (c:occ) rev
+-- This turns a Name into a RdrName
+-- The last case is slightly interesting.  It constructs a
+-- unique name from the unique in the TH thingy, so that the renamer
+-- won't mess about.  I hope.  (Another possiblity would be to generate 
+-- "x_77" etc, but that could conceivably clash.)
 
-    mk_qual mod '.' occ = mkRdrQual (mk_mod mod) (mk_occ occ)
-    mk_qual mod ':' occ = mkOrig    (mk_mod mod) (mk_occ occ)
+mk_name ns (TH.Name occ (TH.NameG ns' mod))  = mkOrig (mk_mod mod) (mk_occ ns occ)
+mk_name ns (TH.Name occ TH.NameS)            = mkRdrUnqual (mk_occ ns occ)
+mk_name ns (TH.Name occ (TH.NameU uniq))     = nameRdrName (mkInternalName (mk_uniq uniq) (mk_occ ns occ) noSrcLoc)
 
-    mk_occ occ = mkOccFS ns (mkFastString occ)
-    mk_mod mod = mkModuleName mod
+mk_uniq :: Int# -> Unique
+mk_uniq u = mkUniqueGrimily (I# u)
 
-    is_sep '.' 	 = True
-    is_sep ':' 	 = True
-    is_sep other = False
+-- The packing and unpacking is rather turgid :-(
+mk_occ :: OccName.NameSpace -> TH.OccName -> OccName.OccName
+mk_occ ns occ = OccName.mkOccFS ns (mkFastString (TH.occString occ))
+
+mk_mod :: TH.ModName -> ModuleName
+mk_mod mod = mkModuleName (TH.modString mod)
 \end{code}
 

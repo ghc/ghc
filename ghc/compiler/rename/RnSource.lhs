@@ -87,7 +87,9 @@ rnSrcDecls (HsGroup { hs_valds  = MonoBind binds sigs _,
 		  $ do {
 
 		-- Rename other declarations
+	traceRn (text "Start rnmono") ;
 	(rn_val_decls, bind_dus) <- rnTopMonoBinds binds sigs ;
+	traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
 
 		-- You might think that we could build proper def/use information
 		-- for type and class declarations, but they can be involved
@@ -117,6 +119,7 @@ rnSrcDecls (HsGroup { hs_valds  = MonoBind binds sigs _,
 	   src_dus = bind_dus `plusDU` usesOnly other_fvs 
 	} ;
 
+	traceRn (text "finish rnSrc" <+> ppr rn_group) ;
 	tcg_env <- getGblEnv ;
 	return (tcg_env `addTcgDUs` src_dus, rn_group)
     }}}

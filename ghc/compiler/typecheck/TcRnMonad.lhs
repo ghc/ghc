@@ -385,14 +385,17 @@ addErrs msgs = mappM_ add msgs
 	     where
 	       add (loc,msg) = addErrAt loc msg
 
-addWarn :: Message -> TcRn ()
-addWarn msg
+addReport :: Message -> TcRn ()
+addReport msg
   = do { errs_var <- getErrsVar ;
 	 loc <- getSrcLocM ;
 	 rdr_env <- getGlobalRdrEnv ;
 	 let { warn = addShortWarnLocLine loc (unQualInScope rdr_env) msg } ;
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns `snocBag` warn, errs) }
+
+addWarn :: Message -> TcRn ()
+addWarn msg = addReport (ptext SLIT("Warning:") <+> msg)
 
 checkErr :: Bool -> Message -> TcRn ()
 -- Add the error if the bool is False

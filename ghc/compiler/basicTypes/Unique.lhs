@@ -22,7 +22,8 @@ module Unique (
 
 	mkUnique,			-- Used in UniqSupply
 	mkUniqueGrimily,		-- Used in UniqSupply only!
-	getKey,				-- Used in Var, UniqFM, Name only!
+	getKey, getKey#,		-- Used in Var, UniqFM, Name only!
+	unpkUnique, 
 
 	incrUnique,			-- Used for renumbering
 	deriveUnique,			-- Ditto
@@ -77,9 +78,9 @@ The stuff about unique *supplies* is handled further down this module.
 mkUnique	:: Char -> Int -> Unique	-- Builds a unique from pieces
 unpkUnique	:: Unique -> (Char, Int)	-- The reverse
 
-mkUniqueGrimily :: Int# -> Unique		-- A trap-door for UniqSupply
-
-getKey		:: Unique -> Int#		-- for Var
+mkUniqueGrimily :: Int -> Unique		-- A trap-door for UniqSupply
+getKey		:: Unique -> Int		-- for Var
+getKey#		:: Unique -> Int#		-- for Var
 
 incrUnique	:: Unique -> Unique
 deriveUnique	:: Unique -> Int -> Unique
@@ -90,10 +91,12 @@ isTupleKey	:: Unique -> Bool
 
 
 \begin{code}
-mkUniqueGrimily x = MkUnique x
+mkUniqueGrimily (I# x) = MkUnique x
 
 {-# INLINE getKey #-}
-getKey (MkUnique x) = x
+getKey (MkUnique x) = I# x
+{-# INLINE getKey# #-}
+getKey# (MkUnique x) = x
 
 incrUnique (MkUnique i) = MkUnique (i +# 1#)
 
@@ -152,10 +155,10 @@ hasKey		:: Uniquable a => a -> Unique -> Bool
 x `hasKey` k	= getUnique x == k
 
 instance Uniquable FastString where
- getUnique fs = mkUniqueGrimily (uniqueOfFS fs)
+ getUnique fs = mkUniqueGrimily (I# (uniqueOfFS fs))
 
 instance Uniquable Int where
- getUnique (I# i#) = mkUniqueGrimily i#
+ getUnique i = mkUniqueGrimily i
 \end{code}
 
 

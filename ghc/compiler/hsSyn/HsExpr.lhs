@@ -191,8 +191,6 @@ data HsExpr id
 					-- The id is just a unique name to 
 					-- identify this splice point
 
-  | HsReify (HsReify id)		-- reifyType t, reifyDecl i, reifyFixity
-
   -----------------------------------------------------------
   -- Arrow notation extension
 
@@ -443,7 +441,6 @@ ppr_expr (HsType id) = ppr id
 ppr_expr (HsSplice n e _)    = char '$' <> brackets (ppr n) <> pprParendExpr e
 ppr_expr (HsBracket b _)     = pprHsBracket b
 ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("where") <+> ppr ps
-ppr_expr (HsReify r)	     = ppr r
 
 ppr_expr (HsProc pat (HsCmdTop cmd _ _ _) _)
   = hsep [ptext SLIT("proc"), ppr pat, ptext SLIT("->"), pprExpr cmd]
@@ -833,22 +830,6 @@ pprHsBracket (VarBr n) = char '\'' <> ppr n
 
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+> 
 			     pp_body <+> ptext SLIT("|]")
-
-data HsReify id = Reify    ReifyFlavour id	-- Pre typechecking
-		| ReifyOut ReifyFlavour Name	-- Post typechecking
-						-- The Name could be the name of
-						-- an Id, TyCon, or Class
-
-data ReifyFlavour = ReifyDecl | ReifyType | ReifyFixity
-
-instance Outputable id => Outputable (HsReify id) where
-   ppr (Reify flavour id) = ppr flavour <+> ppr id
-   ppr (ReifyOut flavour thing) = ppr flavour <+> ppr thing
-
-instance Outputable ReifyFlavour where
-   ppr ReifyDecl   = ptext SLIT("reifyDecl")
-   ppr ReifyType   = ptext SLIT("reifyType")
-   ppr ReifyFixity = ptext SLIT("reifyFixity")
 \end{code}
 
 %************************************************************************

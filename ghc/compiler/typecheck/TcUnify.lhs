@@ -30,7 +30,7 @@ module TcUnify (
 import HsSyn		( HsExpr(..) )
 import TcHsSyn		( mkHsLet,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
-import TypeRep		( Type(..), PredType(..), TyNote(..), typeCon, openKindCon, isSuperKind )
+import TypeRep		( Type(..), PredType(..), TyNote(..), openKindCon, isSuperKind )
 
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
