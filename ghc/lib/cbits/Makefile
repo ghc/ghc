@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.4 1997/03/24 04:37:06 sof Exp $
+# $Id: Makefile,v 1.5 1997/08/25 22:40:59 sof Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -12,7 +12,7 @@ SRCS= $(wildcard *.lc)
 C_SRCS  = $(SRCS:.lc=.c)
 C_OBJS  = $(C_SRCS:.c=.o)
 LIBOBJS = $(C_OBJS)
-SRC_CC_OPTS = -I$(GHC_INCLUDE_DIR)
+SRC_CC_OPTS = -O -I$(GHC_INCLUDE_DIR)
 
 #
 # Compile the files using the Haskell compiler (ghc really).
