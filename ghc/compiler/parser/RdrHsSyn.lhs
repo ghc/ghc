@@ -516,11 +516,12 @@ checkInstType t
 	      	returnP (HsForAllTy Nothing [] dict_ty)
 
 checkTyVars :: [RdrNameHsType] -> P [RdrNameHsTyVar]
-checkTyVars tvs = mapP chk tvs
-	        where
-		  chk (HsKindSig (HsTyVar tv) k) = returnP (IfaceTyVar tv k)
-		  chk (HsTyVar tv) 	         = returnP (UserTyVar tv)
-		  chk other	 		 = parseError "Type found where type variable expected"
+checkTyVars tvs 
+  = mapP chk tvs
+  where
+    chk (HsKindSig (HsTyVar tv) k) | isRdrTyVar tv = returnP (IfaceTyVar tv k)
+    chk (HsTyVar tv) 	           | isRdrTyVar tv = returnP (UserTyVar tv)
+    chk other	 		   = parseError "Type found where type variable expected"
 
 checkTyClHdr :: RdrNameHsType -> P (RdrName, [RdrNameHsTyVar])
 -- The header of a type or class decl should look like

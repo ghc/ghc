@@ -79,11 +79,15 @@ tdef	:: { RdrNameHsDecl }
 	: '%data' q_tc_name tbinds '=' '{' cons1 '}'
                 { TyClD (mkTyData DataType ([], $2, $3) (DataCons $6) Nothing noSrcLoc) }
 	| '%newtype' q_tc_name tbinds trep 
-		{ TyClD (mkTyData NewType ([], $2, $3) ($4 $2 $3) Nothing noSrcLoc) }
+		{ TyClD (mkTyData NewType ([], $2, $3) ($4 $2) Nothing noSrcLoc) }
 
-trep    :: { (RdrName -> [HsTyVarBndr RdrName] -> DataConDetails (ConDecl RdrName)) }
-        : {- empty -}   { (\ x ts -> Unknown) }
-        | '=' ty        { (\ x ts -> DataCons [ConDecl x ts [] (PrefixCon [unbangedType $2]) noSrcLoc]) }
+-- For a newtype we have to invent a fake data constructor name
+-- It doesn't matter what it is, because it won't be used
+trep    :: { (RdrName -> DataConDetails (ConDecl RdrName)) }
+        : {- empty -}   { (\ tc_name -> Unknown) }
+        | '=' ty        { (\ tc_name -> let { dc_name  = setRdrNameSpace tc_name dataName ;
+			                      con_info = PrefixCon [unbangedType $2] }
+			                in DataCons [ConDecl dc_name [] [] con_info noSrcLoc]) }
 
 tbind	:: { HsTyVarBndr RdrName }
 	:  name                    { IfaceTyVar $1 liftedTypeKind }
