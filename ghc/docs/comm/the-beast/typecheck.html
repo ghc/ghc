@@ -16,6 +16,7 @@
       checker as it has to handle the much more verbose Haskell AST, but it
       improves error messages, as the those message are based on the same
       structure that the user sees.
+    </p>
     <p>
       GHC defines the abstract syntax of Haskell programs in <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/hsSyn/HsSyn.lhs"><code>HsSyn</code></a>
@@ -23,51 +24,128 @@
       bound occurences of identifiers and patterns.  The module <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcHsSyn.lhs"><code>TcHsSyn</code></a>
       instantiates this structure for the type checker using <a
-      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcEnv.lhs"><code>TcEnv</code></a>.<code>TcId</code>
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcRnTypes.lhs"><code>TcRnTypes</code></a>.<code>TcId</code>
       to represent identifiers - in fact, a <code>TcId</code> is currently
       nothing but just a synonym for a <a href="vars.html">plain
       <code>Id</code>.</a>
+    </p>
+
+    <h4>Entry Points Into the Type Checker</h4>
+    <p>
+      The interface of the type checker (and renamer) to the rest of the
+      compiler is provided by <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcRnDriver.lhs"><code>TcRnDriver</code></a>.
+      Entire modules are processed by calling <code>tcRnModule</code> and GHCi
+      uses <code>tcRnStmt</code> and <code>tcRnExpr</code> to typecheck
+      statements and expressions, respectively.  Moreover,
+      <code>tcRnIface</code> and <code>tcRnExtCore</code> are provided to
+      typecheck interface files and external Core code.
+    </p>
 
     <h4>Types Variables and Zonking</h4>
     <p>
       During type checking type variables are represented by mutable variables
       - cf. the <a href="vars.html#TyVar">variable story.</a>  Consequently,
       unification can instantiate type variables by updating those mutable
-      variables.  This process of instantiation is (for reasons that elude
-      me) called <a
+      variables.  This process of instantiation is (for reasons that elude me)
+      called <a
       href="http://www.dictionary.com/cgi-bin/dict.pl?term=zonk&db=*">zonking</a>
       in GHC's sources.  The zonking routines for the various forms of Haskell
       constructs are responsible for most of the code in the module <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcHsSyn.lhs"><code>TcHsSyn</code>,</a>
       whereas the routines that actually operate on mutable types are defined
       in <a
-      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcMType.lhs"><code>TcMTypes</code></a>;
-      this includes routines to create mutable structures and update them as
-      well as routines that check constraints, such as that type variables in
-      function signatures have not been instantiated during type checking.
-      The actual type unification routine is <code>uTys</code> in the same
-      module.
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcMType.lhs"><code>TcMType</code></a>;
+      this includes the zonking of type variables and type terms, routines to
+      create mutable structures and update them as well as routines that check
+      constraints, such as that type variables in function signatures have not
+      been instantiated during type checking.  The actual type unification
+      routine is <code>uTys</code> in the module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcUnify.lhs"><code>TcUnify</code></a>.
+    </p>
     <p>
       All type variables that may be instantiated (those in signatures
       may not), but haven't been instantiated during type checking, are zonked
       to <code>()</code>, so that after type checking all mutable variables
       have been eliminated.
+    </p>
+
+    <h4>Type Representation</h4>
+    <p>
+      The representation of types is fixed in the module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcRep.lhs"><code>TcRep</code></a>
+      and exported as the data type <code>Type</code>.  As explained in <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcType.lhs"><code>TcType</code></a>,
+      GHC supports rank-N types, but, in the type checker, maintains the
+      restriction that type variables cannot be instantiated to quantified
+      types (i.e., the type system is predicative).  The type checker floats
+      universal quantifiers outside and maintains types in prenex form.
+      (However, quantifiers can, of course, not float out of negative
+      positions.)  Overall, we have
+    </p>
+    <blockquote>
+      <pre>
+sigma -> forall tyvars. phi
+phi   -> theta => rho
+rho   -> sigma -> rho
+       | tau
+tau   -> tyvar
+       | tycon tau_1 .. tau_n
+       | tau_1 tau_2
+       | tau_1 -> tau_2</pre>
+    </blockquote>
+    <p>
+      where <code>sigma</code> is in prenex form; i.e., there is never a
+      forall to the right of an arrow in a <code>phi</code> type.  Moreover, a
+      type of the form <code>tau</code> never contains a quantifier (which
+      includes arguments to type constructors).
+    </p>
+    <p>
+      Of particular interest are the variants <code>SourceTy</code> and
+      <code>NoteTy</code> of <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TypeRep.lhs"><code>TypeRep</code></a>.<code>Type</code>.
+      The constructor <code>SourceTy :: SourceType -> Type</code> represents a
+      type constraint; that is, a predicate over types represented by a
+      dictionary.  The type checker treats a <code>SourceTy</code> as opaque,
+      but during the translation to core it will be expanded into its concrete
+      representation (i.e., a dictionary type) by the function <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/types/Type.lhs"><code>Type</code></a>.<code>sourceTypeRep</code>.  
+      Note that newtypes are not covered by <code>SourceType</code>s anymore,
+      even if some comments in GHC still suggest this.  Instead, all newtype
+      applications are initially represented as a <code>NewTcApp</code>, until
+      they are eliminated by calls to <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/types/Type.lhs"><code>Type</code></a>.<code>newTypeRep</code>.
+    </p>
+    <p>
+      The <code>NoteTy</code> constructor is used to add non-essential
+      information to a type term.  Such information has the type
+      <code>TypeRep.TyNote</code> and is either the set of free type variables
+      of the annotated expression or the unexpanded version of a type synonym.
+      Free variables sets are cached as notes to save the overhead of
+      repeatedly computing the same set for a given term.  Unexpanded type
+      synonyms are useful for generating comprehensible error messages, but
+      have no influence on the process of type checking.
+    </p>
 
     <h4>Type Checking Environment</h4>
     <p>
       During type checking, GHC maintains a <em>type environment</em> whose
-      details are fixed in <a
-      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcEnv.lhs"><code>TcEnv.lhs</code>.</a>
+      type definitions are fixed in the module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcRnTypes.lhs"><code>TcRnTypes</code></a> with the operations defined in
+<a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcEnv.lhs"><code>TcEnv</code></a>.
       Among other things, the environment contains all imported and local
       instances as well as a list of <em>global</em> entities (imported and
       local types and classes together with imported identifiers) and
       <em>local</em> entities (locally defined identifiers).  This environment
-      is threaded through the type checking monad.
+      is threaded through the type checking monad, whose support functions
+      including initialisation can be found in the module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcRnMonad.lhs"><code>TcRnMonad</code>.</a>
 
     <h4>Expressions</h4>
     <p>
       Expressions are type checked by <a
-      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcExpr.lhs"><code>TcExpr.lhs</code>.</a>  
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcExpr.lhs"><code>TcExpr</code>.</a>  
     <p>
       Usage occurences of identifiers are processed by the function
       <code>tcId</code> whose main purpose is to <a href="#inst">instantiate
@@ -130,7 +208,7 @@
 
     <p><small>
 <!-- hhmts start -->
-Last modified: Tue Nov 13 14:28:44 EST 2001
+Last modified: Sat Sep 13 23:35:24 BST 2003
 <!-- hhmts end -->
     </small>
   </body>

@@ -73,21 +73,28 @@ data VarDetails
 
   | TyVar
   | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
-	     Bool			-- True <=> this is a type signature variable, which
-					--	    should not be unified with a non-tyvar type
+	     TyVarDetails
 </pre>
 
 <a name="TyVar">
 <h2>Type variables (<code>TyVar</code>)</h2>
 </a>
 <p>
-The <code>TyVar</code> case is self-explanatory.  The
-<code>MutTyVar</code> case is used only during type checking.  Then a
-type variable can be unified, using an imperative update, with a type,
-and that is what the <code>IORef</code> is for.  The <code>Bool</code>
-field records whether the type variable arose from a type signature,
-in which case it should not be unified with a type (only with another
-type variable).
+The <code>TyVar</code> case is self-explanatory.  The <code>MutTyVar</code>
+case is used only during type checking.  Then a type variable can be unified,
+using an imperative update, with a type, and that is what the
+<code>IORef</code> is for.  The <code>TcType.TyVarDetails</code> field records
+the sort of type variable we are dealing with.  It is defined as
+<pre>
+data TyVarDetails = SigTv | ClsTv | InstTv | VanillaTv
+</pre>
+<code>SigTv</code> marks type variables that were introduced when
+instantiating a type signature prior to matching it against the inferred type
+of a definition.  The variants <code>ClsTv</code> and <code>InstTv</code> mark
+scoped type variables introduced by class and instance heads, respectively.
+These first three sorts of type variables are skolem variables (tested by the
+predicate <code>isSkolemTyVar</code>); i.e., they must <em>not</em> be
+instantiated. All other type variables are marked as <code>VanillaTv</code>.
 <p>
 For a long time I tried to keep mutable Vars statically type-distinct
 from immutable Vars, but I've finally given up.   It's just too painful.
@@ -220,7 +227,7 @@ not the same as whether the Id has an <code>ExternaName</code> or an <code>Inter
 </ul>
 
 <!-- hhmts start -->
-Last modified: Tue Nov 13 14:11:35 EST 2001
+Last modified: Fri Sep 12 15:17:18 BST 2003
 <!-- hhmts end -->
     </small>
   </body>
