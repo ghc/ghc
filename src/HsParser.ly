@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.16 2002/07/15 16:16:50 simonmar Exp $
+$Id: HsParser.ly,v 1.17 2002/07/19 09:13:10 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -204,10 +204,10 @@ The Export List
 
 > export :: { HsExportSpec }
 > 	:  qvar					{ HsEVar $1 }
-> 	|  gtycon				{ HsEAbs $1 }
-> 	|  gtycon '(' '..' ')'			{ HsEThingAll $1 }
-> 	|  gtycon '(' ')'		        { HsEThingWith $1 [] }
-> 	|  gtycon '(' qcnames ')'		{ HsEThingWith $1 (reverse $3) }
+> 	|  qgtycon				{ HsEAbs $1 }
+> 	|  qgtycon '(' '..' ')'			{ HsEThingAll $1 }
+> 	|  qgtycon '(' ')'		        { HsEThingWith $1 [] }
+> 	|  qgtycon '(' qcnames ')'		{ HsEThingWith $1 (reverse $3) }
 > 	|  'module' modid			{ HsEModuleContents $2 }
 
 > qcnames :: { [HsQName] }
@@ -254,10 +254,17 @@ Import Declarations
 
 > import :: { HsImportSpec }
 > 	:  var					{ HsIVar $1 }
-> 	|  tyconorcls				{ HsIAbs $1 }
-> 	|  tyconorcls '(' '..' ')'		{ HsIThingAll $1 }
-> 	|  tyconorcls '(' ')'		        { HsIThingWith $1 [] }
-> 	|  tyconorcls '(' cnames ')'		{ HsIThingWith $1 (reverse $3) }
+> 	|  gtycon				{ HsIAbs $1 }
+> 	|  gtycon '(' '..' ')'			{ HsIThingAll $1 }
+> 	|  gtycon '(' ')'		        { HsIThingWith $1 [] }
+> 	|  gtycon '(' cnames ')'		{ HsIThingWith $1 (reverse $3) }
+
+> gtycon :: { HsName }
+>	: tyconorcls			{ $1 }
+>	| '(' ')'			{ unit_tycon_name }
+>	| '(' '->' ')'			{ fun_tycon_name }
+>	| '[' ']'			{ list_tycon_name }
+>	| '(' commas ')'		{ tuple_tycon_name $2 }
 
 > cnames :: { [HsName] }
 > 	:  cnames ',' cname			{ $3 : $1 }
@@ -406,7 +413,7 @@ Types
 >	| atype				{ $1 }
 
 > atype :: { HsType }
->	: gtycon			{ HsTyCon $1 }
+>	: qgtycon			{ HsTyCon $1 }
 >	| tyvar				{ HsTyVar $1 }
 >	| '(' types ')'			{ HsTyTuple True  $2 }
 >	| '(#' type '#)'		{ HsTyTuple False [$2] }
@@ -414,13 +421,12 @@ Types
 >	| '[' type ']'			{ HsTyApp list_tycon $2 }
 >	| '(' ctype ')'			{ $2 }
 
-> gtycon :: { HsQName }
+> qgtycon :: { HsQName }
 >	: qtycls			{ $1 }
->	| '(' ')'			{ unit_tycon_name }
->	| '(' '->' ')'			{ fun_tycon_name }
->	| '[' ']'			{ list_tycon_name }
->	| '(' commas ')'		{ tuple_tycon_name $2 }
-
+>	| '(' ')'			{ unit_tycon_qname }
+>	| '(' '->' ')'			{ fun_tycon_qname }
+>	| '[' ']'			{ list_tycon_qname }
+>	| '(' commas ')'		{ tuple_tycon_qname $2 }
 
 (Slightly edited) Comment from GHC's hsparser.y:
 "context => type" vs  "type" is a problem, because you can't distinguish between
