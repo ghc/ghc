@@ -17,6 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.Handle (
   withHandle, withHandle', withHandle_,
   wantWritableHandle, wantReadableHandle, wantSeekableHandle,

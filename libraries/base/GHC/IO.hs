@@ -16,6 +16,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.IO ( 
    hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
    commitBuffer',	-- hack, see below

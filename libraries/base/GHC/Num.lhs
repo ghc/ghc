@@ -23,6 +23,7 @@
 #error Please define LEFTMOST_BIT to be 2^(SIZEOF_HSWORD*8-1)
 #endif
 
+-- #hide
 module GHC.Num where
 
 import {-# SOURCE #-} GHC.Err

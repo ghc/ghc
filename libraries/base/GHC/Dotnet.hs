@@ -12,6 +12,7 @@
 -- Primitive operations and types for doing .NET interop
 -- 
 -----------------------------------------------------------------------------
+-- #hide
 module GHC.Dotnet 
 	( Object
 	, unmarshalObject

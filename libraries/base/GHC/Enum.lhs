@@ -14,6 +14,7 @@
 -- 
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.Enum(
 	Bounded(..), Enum(..),
 	boundedEnumFrom, boundedEnumFromThen,

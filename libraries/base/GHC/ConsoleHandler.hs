@@ -12,6 +12,7 @@
 -- Installing Win32 console handlers.
 -- 
 -----------------------------------------------------------------------------
+-- #hide
 module GHC.ConsoleHandler
 #ifndef mingw32_HOST_OS
 	where

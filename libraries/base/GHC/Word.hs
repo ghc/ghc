@@ -16,6 +16,7 @@
 
 #include "MachDeps.h"
 
+-- #hide
 module GHC.Word (
     Word(..), Word8(..), Word16(..), Word32(..), Word64(..),
     toEnumError, fromEnumError, succError, predError)

@@ -14,6 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.Stable 
 	( StablePtr(..)
 	, newStablePtr		-- :: a -> IO (StablePtr a)    

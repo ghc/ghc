@@ -14,6 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.IOBase(
     IO(..), unIO, failIO, liftIO, bindIO, thenIO, returnIO, 
     unsafePerformIO, unsafeInterleaveIO,

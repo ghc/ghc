@@ -81,6 +81,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
 
 #include "MachDeps.h"
 
+-- #hide
 module GHC.Base
 	(
 	module GHC.Base,

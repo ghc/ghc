@@ -14,6 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.TopHandler (
    runMainIO, runIO, runNonIO, reportStackOverflow, reportError
   ) where

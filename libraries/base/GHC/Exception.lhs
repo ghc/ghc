@@ -14,6 +14,7 @@
 -- 
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.Exception 
 	( module GHC.Exception, 
 	  Exception(..), AsyncException(..), 

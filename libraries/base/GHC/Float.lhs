@@ -16,6 +16,7 @@
 
 #include "ieee-flpt.h"
 
+-- #hide
 module GHC.Float( module GHC.Float, Float#, Double# )  where
 
 import Data.Maybe
