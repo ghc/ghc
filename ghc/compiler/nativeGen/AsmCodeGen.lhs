@@ -91,9 +91,7 @@ nativeCodeGen absC us
          stixOpt        = map genericOpt stixRaw
          insns          = initUs_ us1 (codeGen stixOpt)
          debug_stix     = vcat (map pprStixTrees stixOpt)
-     in 
-         trace "nativeGen: begin"
-         (debug_stix, insns)
+     in {- trace "nativeGen: begin" -} (debug_stix, insns)
 \end{code}
 
 @codeGen@ is the top-level code-generation function:
