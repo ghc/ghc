@@ -65,11 +65,6 @@ import Unique		( Unique )
 import UniqFM		( UniqFM )
 import Maybes		( assocMaybe )
 import Util		( zipEqual, nOfThem, panic{-, pprPanic, pprTrace ToDo:rm-} )
-
---import Outputable	( Outputable(..) )	-- Debugging messages
---import PprType		( GenTyVar, GenType )
---import Pretty					-- ditto
---import PprStyle		( PprStyle(..) )	-- ditto
 \end{code}
 
 
