@@ -405,7 +405,7 @@ pp_rbinds :: (Outputable id, Outputable pat)
 
 pp_rbinds thing rbinds
   = hang thing 
-	 4 (braces (hsep (punctuate comma (map (pp_rbind) rbinds))))
+	 4 (braces (sep (punctuate comma (map (pp_rbind) rbinds))))
   where
     pp_rbind (v, e, pun_flag) 
       = getPprStyle $ \ sty ->

@@ -1147,7 +1147,7 @@ sub setupIncPaths {
 
 \begin{code}
 sub setupSyslibs {
-  push(@SysLibrary, ( '-lHS', '-lHS_cbits' )); # basic I/O and prelude stuff
+  push(@SysLibrary, ( '-lHSstd', '-lHSstd_cbits' )); # basic I/O and prelude stuff
 
   local($f);
   foreach $f (@SysLibrary) {
@@ -2789,7 +2789,7 @@ sub splitCmdLine {
 arg: while($_ = $args[0]) {
     shift(@args);
     # sigh, we have to deal with these -option arg specially here.
-    /^-(tmpdir|odir|ohi|o|isuf|osuf|hisuf|odump|syslib)$/ && 
+    /^-(tmpdir|odir|ohi|o|isuf|osuf|hisuf|odump|syslib|package|package-name)$/ && 
        do { push(@Cmd_opts, $_); push(@Cmd_opts,$args[0]); shift(@args); next arg; };
     /^--?./  && do { push(@Cmd_opts, $_); next arg; };
 
@@ -3082,8 +3082,19 @@ arg: while($_ = $Args[0]) {
     /^-L(.*)/	    && do { push(@UserLibrary_dir, &grab_arg_arg(*Args,'-L', $1)); next arg; };
     /^-l(.*)/	    && do { push(@UserLibrary,'-l'.&grab_arg_arg(*Args,'-l', $1)); next arg; };
 
+	# DEPRECATED: use -package instead
     /^-syslib(.*)/  && do { local($syslib) = &grab_arg_arg(*Args,'-syslib',$1);
 			    &add_syslib($syslib);
+			    next arg; };
+
+    /^-package-name(.*)/ && do 
+			   { local($package) = &grab_arg_arg(*Args,'-package-name',$1);
+			     push(@HsC_flags,"-inpackage=$package"); 
+			     next arg; 
+			   };
+
+    /^-package(.*)/ && do { local($package) = &grab_arg_arg(*Args,'-package',$1);
+			    &add_syslib($package);
 			    next arg; };
 
     #=======================================================================

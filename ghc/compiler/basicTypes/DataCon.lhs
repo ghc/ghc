@@ -14,7 +14,7 @@ module DataCon (
 	dataConFieldLabels, dataConStrictMarks, 
 	dataConSourceArity, dataConRepArity,
 	dataConNumInstArgs, dataConId, dataConWrapId, dataConRepStrictness,
-	isNullaryDataCon, isTupleCon, isUnboxedTupleCon, isDynDataCon,
+	isNullaryDataCon, isTupleCon, isUnboxedTupleCon, 
 	isExistentialDataCon, 
 
 	splitProductType_maybe, splitProductType,
@@ -37,7 +37,7 @@ import Type		( Type, ThetaType, TauType, ClassContext,
 import TyCon		( TyCon, tyConDataCons, isDataTyCon, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
 import Class		( classTyCon )
-import Name		( Name, NamedThing(..), nameUnique, isDynName, isLocallyDefined )
+import Name		( Name, NamedThing(..), nameUnique, isLocallyDefined )
 import Var		( TyVar, Id )
 import FieldLabel	( FieldLabel )
 import BasicTypes	( Arity )
@@ -386,9 +386,6 @@ isUnboxedTupleCon (MkData {dcTyCon = tc}) = isUnboxedTupleTyCon tc
 
 isExistentialDataCon :: DataCon -> Bool
 isExistentialDataCon (MkData {dcExTyVars = tvs}) = not (null tvs)
-
-isDynDataCon :: DataCon -> Bool
-isDynDataCon con = isDynName (dataConName con)
 \end{code}
 
 

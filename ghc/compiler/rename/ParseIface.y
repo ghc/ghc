@@ -31,9 +31,10 @@ import OccName          ( mkSysOccFS,
 			  tcName, varName, ipName, dataName, clsName, tvName, uvName,
 			  EncodedFS 
 			)
-import Module           ( ModuleName, mkSysModuleFS )			
+import Module           ( ModuleName, PackageName, mkSysModuleFS, mkModule )			
 import PrelInfo         ( mkTupConRdrName, mkUbxTupConRdrName )
 import SrcLoc		( SrcLoc )
+import CmdLineOpts	( opt_InPackage )
 import Maybes
 import Outputable
 
@@ -75,7 +76,6 @@ import Ratio ( (%) )
  'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
---???? 'scc' { ITscc } 
 
  'forall'	{ ITforall }			-- GHC extension keywords
  'foreign'	{ ITforeign }
@@ -176,31 +176,31 @@ import Ratio ( (%) )
 --		 (c) the IdInfo part of a signature (same reason)
 
 iface_stuff :: { IfaceStuff }
-iface_stuff : iface		{ let (nm, iff) = $1 in PIface nm iff }
+iface_stuff : iface		{ PIface   $1 }
       	    | type		{ PType    $1 }
       	    | id_info		{ PIdInfo  $1 }
 	    | '__R' rules	{ PRules   $2 }
 	    | '__D' deprecs	{ PDeprecs $2 }
 
 
-iface		:: { (ModuleName, ParsedIface) }
-iface		: '__interface' mod_fs INTEGER orphans checkVersion 'where'
+iface		:: { ParsedIface }
+iface		: '__interface' package mod_name INTEGER orphans checkVersion 'where'
 		  exports_part
                   import_part
 		  instance_decl_part
 		  decls_part
 		  rules_and_deprecs
-		  { ( $2                        -- Module name
-		    , ParsedIface {
-			pi_mod = fromInteger $3, 	-- Module version
-			pi_orphan  = $4,
-			pi_exports = $7,        -- Exports
-			pi_usages  = $8,	-- Usages
-			pi_insts   = $9,	-- Local instances
-			pi_decls   = $10,	-- Decls
-		 	pi_rules   = fst $11,	-- Rules 
-		 	pi_deprecs = snd $11	-- Deprecations 
-		      } ) }
+		  { ParsedIface {
+			pi_mod  = mkModule $3 $2,	-- Module itself
+			pi_vers = fromInteger $4, 	-- Module version
+			pi_orphan  = $5,
+			pi_exports = $8,        -- Exports
+			pi_usages  = $9,	-- Usages
+			pi_insts   = $10,	-- Local instances
+			pi_decls   = $11,	-- Decls
+		 	pi_rules   = fst $12,	-- Rules 
+		 	pi_deprecs = snd $12	-- Deprecations 
+		      } }
 
 --------------------------------------------------------------------------
 
@@ -209,12 +209,11 @@ import_part :				    		  { [] }
 	    |  import_part import_decl			  { $2 : $1 }
 	    
 import_decl :: { ImportVersion OccName }
-import_decl : 'import' mod_fs INTEGER orphans is_boot whats_imported ';'
+import_decl : 'import' mod_name INTEGER orphans is_boot whats_imported ';'
 			{ (mkSysModuleFS $2, fromInteger $3, $4, $5, $6) }
 	-- import Foo 3 :: a 1 b 3 c 7 ;	means import a,b,c from Foo
 	-- import Foo 3	;			means import all of Foo
-	-- import Foo 3 ! @ :: ...stuff... ;	the ! means that Foo contains orphans
-        --                                      and @ that Foo is a boot interface
+	-- import Foo 3 ! :: ...stuff... ;	the ! means that Foo contains orphans
 
 orphans		    :: { WhetherHasOrphans }
 orphans		    : 						{ False }
@@ -242,7 +241,7 @@ name_version_pair   :  var_occ INTEGER			        { ($1, fromInteger $2) }
 exports_part	:: { [ExportItem] }
 exports_part	:  					{ [] }
 		| exports_part '__export' 
-		  mod_fs entities ';'			{ (mkSysModuleFS $3, $4) : $1 }
+		  mod_name entities ';'			{ (mkSysModuleFS $3, $4) : $1 }
 
 entities	:: { [RdrAvailInfo] }
 entities	: 					{ [] }
@@ -506,11 +505,14 @@ atypes		:: { [RdrNameHsType] 	{-  Zero or more -} }
 atypes		:  					{ [] }
 		|  atype atypes				{ $1 : $2 }
 ---------------------------------------------------------------------
-mod_fs	        :: { EncodedFS }
-		:  CONID		{ $1 }
+package		:: { PackageName }
+		:  STRING		{ $1 }
+		| {- empty -}		{ opt_InPackage }	-- Useful for .hi-boot files,
+								-- which can omit the package Id
+								-- Module loops are always within a package
 
 mod_name	:: { ModuleName }
-		:  mod_fs		{ mkSysModuleFS $1 }
+		:  CONID		{ mkSysModuleFS $1 }
 
 
 ---------------------------------------------------
@@ -868,7 +870,7 @@ checkVersion :: { () }
 happyError :: P a
 happyError buf PState{ loc = loc } = PFailed (ifaceParseErr buf loc)
 
-data IfaceStuff = PIface 	EncodedFS{-.hi module name-} ParsedIface
+data IfaceStuff = PIface 	ParsedIface
 		| PIdInfo	[HsIdInfo RdrName]
 		| PType		RdrNameHsType
 		| PRules	[RdrNameRuleDecl]

@@ -25,7 +25,7 @@ module Name (
 
 	isUserExportedName, isUserImportedName, isUserImportedExplicitlyName, 
 	maybeUserImportedFrom,
-	nameSrcLoc, isLocallyDefinedName, isDynName,
+	nameSrcLoc, isLocallyDefinedName, isDllName,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
 	
@@ -46,9 +46,9 @@ import {-# SOURCE #-} Var   ( Id, setIdName )
 import {-# SOURCE #-} TyCon ( TyCon, setTyConName )
 
 import OccName		-- All of it
-import Module		( Module, moduleName, pprModule, mkVanillaModule, isDynamicModule )
+import Module		( Module, moduleName, pprModule, mkVanillaModule, isLocalModule )
 import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
-import CmdLineOpts	( opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
+import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
 import Unique		( pprUnique, Unique, Uniquable(..), unboundKey, u2i )
@@ -435,10 +435,11 @@ isUserImportedName other			           		= False
 maybeUserImportedFrom (Name { n_prov = NonLocalDef (UserImport m _ _) _ }) = Just m
 maybeUserImportedFrom other			           		   = Nothing
 
-isDynName :: Name -> Bool
-	-- Does this name come from a DLL?
-isDynName nm = not (isLocallyDefinedName nm) && 
-	       isDynamicModule (nameModule nm)
+isDllName :: Name -> Bool
+	-- Does this name refer to something in a different DLL?
+isDllName nm = not opt_Static &&
+	       not (isLocallyDefinedName nm) && 
+	       not (isLocalModule (nameModule nm))
 
 nameSrcLoc name = provSrcLoc (n_prov name)
 

@@ -287,7 +287,8 @@ type LocalVersion name   = (name, Version)
 
 data ParsedIface
   = ParsedIface {
-      pi_mod	   :: Version,		 		-- Module version number
+      pi_mod	   :: Module,				-- Complete with package info
+      pi_vers	   :: Version,		 		-- Module version number
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
       pi_usages	   :: [ImportVersion OccName],		-- Usages
       pi_exports   :: [ExportItem],			-- Exports
@@ -349,7 +350,8 @@ data Ifaces = Ifaces {
 type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
 
 type ImportedModuleInfo 
-     = FiniteMap ModuleName (Version, WhetherHasOrphans, IsBootInterface, Maybe (Module, Avails))
+     = FiniteMap ModuleName (Version, WhetherHasOrphans, IsBootInterface, 
+			     Maybe (Module, WhereFrom, Avails))
 		-- Suppose the domain element is module 'A'
 		--
 		-- The first Bool is True if A contains 
@@ -752,12 +754,4 @@ getHiMaps :: RnM d (ModuleHiMap, ModuleHiMap)
 getHiMaps (RnDown {rn_hi_maps = himaps}) _ 
   = return himaps
 \end{code}
-
-\begin{code}
-lookupModuleRn :: ModuleName -> RnM d Module
-lookupModuleRn x = 
-  getHiMaps `thenRn` \ (himap, _) ->
-  case lookupFM himap x of
-    Nothing    -> returnRn (mkVanillaModule x)
-    Just (_,x) -> returnRn x
 \end{code}

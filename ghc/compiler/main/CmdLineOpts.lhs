@@ -119,7 +119,7 @@ module CmdLineOpts (
 	opt_UF_DearOp,
 
 	-- misc opts
-	opt_CompilingPrelude,
+	opt_InPackage,
 	opt_EmitCExternDecls,
 	opt_EnsureSplittableC,
 	opt_GranMacros,
@@ -390,14 +390,15 @@ opt_UnfoldCasms		        = lookUp SLIT("-funfold-casms-in-hi-file")
 opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
 opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
 
-  {-
-   It's a bit unfortunate to have to re-introduce this chap, but on Win32
-   platforms we do need a way of distinguishing between the case when we're
-   compiling a static version of the Prelude and one that's going to be
-   put into a DLL. Why? Because the compiler's wired in modules need to
-   be attributed as either coming from a DLL or not.
-  -}
-opt_CompilingPrelude		= lookUp  SLIT("-fcompiling-prelude")
+{-
+   The optional '-inpackage=P' flag tells what package 
+   we are compiling this module for.
+   The Prelude, for example is compiled with '-package prelude'
+-}
+opt_InPackage			= case lookup_str "-inpackage=" of
+				    Just p  -> _PK_ p
+				    Nothing -> SLIT("Main")	-- The package name if none is specified
+
 opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_GranMacros			= lookUp  SLIT("-fgransim")

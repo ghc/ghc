@@ -344,8 +344,8 @@ slurpSourceRefs source_binders source_fvs
 		-- the free variables returned are simply 'listTyCon_Name',
 		-- with a system provenance.  We could look them up every time
 		-- but that seems a waste.
-	| otherwise			      = loadHomeInterface doc name	`thenRn_`
-						returnRn ()
+	| otherwise = loadHomeInterface doc name	`thenRn_`
+		      returnRn ()
         where
 	  doc = ptext SLIT("need home module for wired in thing") <+> ppr name
 

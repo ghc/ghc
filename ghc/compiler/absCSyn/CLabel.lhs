@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.32 2000/03/23 17:45:17 simonpj Exp $
+% $Id: CLabel.lhs,v 1.33 2000/04/13 11:56:35 simonpj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -70,8 +70,8 @@ import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 import CmdLineOpts      ( opt_Static, opt_DoTickyProfiling )
 import CStrings		( pp_cSEP )
 import DataCon		( ConTag, DataCon )
-import Module		( isDynamicModule, ModuleName, moduleNameString )
-import Name		( Name, getName, isExternallyVisibleName, nameModule, isLocallyDefinedName )
+import Module		( ModuleName )
+import Name		( Name, getName, isDllName, isExternallyVisibleName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
 import PrimOp		( PrimOp, pprPrimOp )
@@ -337,12 +337,11 @@ in a DLL, be it a data reference or not.
 labelDynamic :: CLabel -> Bool
 labelDynamic lbl = 
   case lbl of
-   RtsLabel _  -> not opt_Static  -- i.e., is the RTS in a DLL or not?
-   IdLabel n k      | not (isLocallyDefinedName n) -> isDynamicModule (nameModule n)
-   DataConLabel n k | not (isLocallyDefinedName n) -> isDynamicModule (nameModule n)
-   TyConLabel tc    | not (isLocallyDefinedName (getName tc)) -> isDynamicModule (nameModule (getName tc))
-   _ -> False
-
+   RtsLabel _  	    -> not opt_Static  -- i.e., is the RTS in a DLL or not?
+   IdLabel n k      -> isDllName n
+   DataConLabel n k -> isDllName n
+   TyConLabel tc    -> isDllName (getName tc)
+   _ 		    -> False
 \end{code}
 
 

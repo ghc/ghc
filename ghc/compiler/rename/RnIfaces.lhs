@@ -50,7 +50,7 @@ import Name		( Name {-instance NamedThing-},
 			 )
 import Module		( Module, moduleString, pprModule,
 			  mkVanillaModule, pprModuleName,
-			  moduleUserString, moduleName, isPrelModule,
+			  moduleUserString, moduleName, isLocalModule,
 			  ModuleName, WhereFrom(..),
 			)
 import RdrName		( RdrName, rdrNameOcc )
@@ -102,41 +102,54 @@ loadInterface doc_str mod_name from
    let
 	mod_map  = iImpModInfo ifaces
 	mod_info = lookupFM mod_map mod_name
-	below_me = case mod_info of
-                      Nothing -> False
-                      Just (_, _, is_boot, _) -> not is_boot
+
+	hi_boot_file = case from of {
+		     	 ImportByUser       -> False ;		-- Not hi-boot
+		     	 ImportByUserSource -> True ;		-- hi-boot
+			 ImportBySystem     -> 
+		       case mod_info of
+			 Just (_, _, is_boot, _) -> is_boot
+
+			 Nothing -> False
+				-- We're importing a module we know absolutely
+				-- nothing about, so we assume it's from
+				-- another package, where we aren't doing 
+				-- dependency tracking. So it won't be a hi-boot file.
+		       }
+	redundant_source_import 
+	  = case (from, mod_info) of 
+		(ImportByUserSource, Just (_,_,False,_)) -> True
+		other					 -> False
    in
-
-	-- Issue a warning for a redundant {- SOURCE -} import
-	-- It's redundant if the moduld is in the iImpModInfo at all,
-	-- because we arrange to read all the ordinary imports before 
-	-- any of the {- SOURCE -} imports
-   warnCheckRn	(not (below_me && case from of {ImportByUserSource -> True; other -> False}))
-		(warnRedundantSourceImport mod_name)	`thenRn_`
-
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case mod_info of {
-	Just (_, _, _, Just (load_mod, _))
+	Just (_, _, _, Just (load_mod, _, _))
 		-> 	-- We're read it already so don't re-read it
 		    returnRn (load_mod, ifaces) ;
 
-	mod_map_result ->
+	_ ->
+
+	-- Issue a warning for a redundant {- SOURCE -} import
+	-- NB that we arrange to read all the ordinary imports before 
+	-- any of the {- SOURCE -} imports
+   warnCheckRn	(not redundant_source_import)
+		(warnRedundantSourceImport mod_name)	`thenRn_`
 
 	-- READ THE MODULE IN
-   findAndReadIface doc_str mod_name from below_me   `thenRn` \ (hi_boot_read, read_result) ->
+   findAndReadIface doc_str mod_name hi_boot_file   `thenRn` \ read_result ->
    case read_result of {
 	Nothing -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
 	   let
 		mod         = mkVanillaModule mod_name
-		new_mod_map = addToFM mod_map mod_name (0, False, False, Just (mod, []))
+		new_mod_map = addToFM mod_map mod_name (0, False, False, Just (mod, from, []))
 		new_ifaces  = ifaces { iImpModInfo = new_mod_map }
 	   in
 	   setIfacesRn new_ifaces		`thenRn_`
-	   failWithRn (mod, new_ifaces) (noIfaceErr mod hi_boot_read) ;
+	   failWithRn (mod, new_ifaces) (noIfaceErr mod hi_boot_file) ;
 
 	-- Found and parsed!
-	Just (mod, iface) ->
+	Just iface ->
 
 	-- LOAD IT INTO Ifaces
 
@@ -148,7 +161,14 @@ loadInterface doc_str mod_name from
     getModuleRn 		`thenRn` \ this_mod_nm ->
     let
 	rd_decls = pi_decls iface
+	mod	 = pi_mod   iface
     in
+	-- Sanity check.  If we're system-importing a module we know nothing at all
+	-- about, it should be from a different package to this one
+    WARN( not (maybeToBool mod_info) && 
+	  case from of { ImportBySystem -> True; other -> False } &&
+	  isLocalModule mod,
+	  ppr mod )
     foldlRn (loadDecl mod)	      (iDecls ifaces) rd_decls 			`thenRn` \ new_decls ->
     foldlRn (loadInstDecl mod)	      (iInsts ifaces) (pi_insts iface)		`thenRn` \ new_insts ->
     (if opt_IgnoreIfacePragmas
@@ -164,12 +184,13 @@ loadInterface doc_str mod_name from
 	-- the things the imported module depends on, extracted
 	-- from its usage info.
 	mod_map1 = case from of
-			ImportByUser -> addModDeps mod mod_map (pi_usages iface)
+			ImportByUser -> addModDeps mod (pi_usages iface) mod_map
 			other        -> mod_map
 
 	-- Now add info about this module
 	mod_map2    = addToFM mod_map1 mod_name mod_details
-	mod_details = (pi_mod iface, pi_orphan iface, hi_boot_read, Just (mod, concat avails_s))
+	cts	    = (pi_mod iface, from, concat avails_s)
+	mod_details = (pi_vers iface, pi_orphan iface, hi_boot_file, Just cts)
 
 	new_ifaces = ifaces { iImpModInfo = mod_map2,
 			      iDecls      = new_decls,
@@ -182,18 +203,25 @@ loadInterface doc_str mod_name from
     returnRn (mod, new_ifaces)
     }}
 
-addModDeps :: Module -> ImportedModuleInfo
-	   -> [ImportVersion a] -> ImportedModuleInfo
-addModDeps mod mod_deps new_deps
-  = foldr add mod_deps new_deps
+addModDeps :: Module -> [ImportVersion a] 
+	   -> ImportedModuleInfo -> ImportedModuleInfo
+-- (addModDeps M ivs deps)
+-- We are importing module M, and M.hi contains 'import' decls given by ivs
+addModDeps mod new_deps mod_deps
+  = foldr add mod_deps filtered_new_deps
   where
-    is_lib = isPrelModule mod	-- Don't record dependencies when importing a prelude module
-    add (imp_mod, version, has_orphans, is_boot, _) deps
-	| is_lib && not has_orphans = deps
-	| otherwise  =  addToFM_C combine deps imp_mod (version, has_orphans, is_boot, Nothing)
-	-- Record dependencies for modules that are
-	--	either are dependent via a non-library module
-	--	or contain orphan rules or instance decls
+	-- Don't record dependencies when importing a module from another package
+	-- Except for its descendents which contain orphans,
+	-- and in that case, forget about the boot indicator
+    filtered_new_deps
+	| isLocalModule mod = [ (imp_mod, (version, has_orphans, is_boot, Nothing))
+			      | (imp_mod, version, has_orphans, is_boot, _) <- new_deps 
+			      ]			      
+	| otherwise	    = [ (imp_mod, (version, True, False, Nothing))
+			      | (imp_mod, version, has_orphans, _, _) <- new_deps, 
+				has_orphans
+			      ]
+    add (imp_mod, dep) deps = addToFM_C combine deps imp_mod dep
 
     combine old@(_, _, old_is_boot, cts) new
 	| maybeToBool cts || not old_is_boot = old	-- Keep the old info if it's already loaded
@@ -375,28 +403,32 @@ namesFromIE (IEModuleContents _   ) = []
 %********************************************************
 
 \begin{code}
-checkUpToDate :: ModuleName -> RnMG Bool		-- True <=> no need to recompile
+upToDate  = True
+outOfDate = False
+
+checkUpToDate :: ModuleName -> RnMG Bool	-- True <=> no need to recompile
+	-- When this guy is called, we already know that the
+	-- source code is unchanged from last time
 checkUpToDate mod_name
   = getIfacesRn					`thenRn` \ ifaces ->
     findAndReadIface doc_str mod_name 
-		     ImportByUser
-		     (error "checkUpToDate")	`thenRn` \ (_, read_result) ->
+		     False {- Not hi-boot -}	`thenRn` \ read_result ->
 
 	-- CHECK WHETHER WE HAVE IT ALREADY
     case read_result of
 	Nothing -> 	-- Old interface file not found, so we'd better bail out
 		    traceRn (sep [ptext SLIT("Didnt find old iface"), 
 				  pprModuleName mod_name])	`thenRn_`
-		    returnRn False
+		    returnRn outOfDate
 
-	Just (_, iface)
+	Just iface
 		-> 	-- Found it, so now check it
 		    checkModUsage (pi_usages iface)
   where
 	-- Only look in current directory, with suffix .hi
     doc_str = sep [ptext SLIT("need usage info from"), pprModuleName mod_name]
 
-checkModUsage [] = returnRn True		-- Yes!  Everything is up to date!
+checkModUsage [] = returnRn upToDate		-- Yes!  Everything is up to date!
 
 checkModUsage ((mod_name, old_mod_vers, _, _, Specifically []) : rest)
 	-- If CurrentModule.hi contains 
@@ -407,19 +439,19 @@ checkModUsage ((mod_name, old_mod_vers, _, _, Specifically []) : rest)
   = traceRn (ptext SLIT("Nothing used from:") <+> ppr mod_name)	`thenRn_`
     checkModUsage rest	-- This one's ok, so check the rest
 
-checkModUsage ((mod_name, old_mod_vers, _, _, whats_imported) : rest)
+checkModUsage ((mod_name, old_mod_vers, _, _, whats_imported)  : rest)
   = loadInterface doc_str mod_name ImportBySystem	`thenRn` \ (mod, ifaces) ->
     let
 	maybe_mod_vers = case lookupFM (iImpModInfo ifaces) mod_name of
-			   Just (version, _, _, Just (_, _)) -> Just version
-			   other			     -> Nothing
+			   Just (version, _, _, Just (_, _, _)) -> Just version
+			   other			        -> Nothing
     in
     case maybe_mod_vers of {
 	Nothing -> 	-- If we can't find a version number for the old module then
 			-- bail out saying things aren't up to date
 		traceRn (sep [ptext SLIT("Can't find version number for module"), 
 			      pprModuleName mod_name])
-		`thenRn_` returnRn False ;
+		`thenRn_` returnRn outOfDate ;
 
 	Just new_mod_vers ->
 
@@ -437,7 +469,7 @@ checkModUsage ((mod_name, old_mod_vers, _, _, whats_imported) : rest)
 	-- In that case, we must recompile
     case whats_imported of {
       Everything -> traceRn (ptext SLIT("...and I needed the whole module"))	`thenRn_`
-		    returnRn False;		   -- Bale out
+		    returnRn outOfDate;		   -- Bale out
 
       Specifically old_local_vers ->
 
@@ -447,14 +479,14 @@ checkModUsage ((mod_name, old_mod_vers, _, _, whats_imported) : rest)
 	traceRn (ptext SLIT("...but the bits I use haven't."))	`thenRn_`
 	checkModUsage rest	-- This one's ok, so check the rest
     else
-	returnRn False		-- This one failed, so just bail out now
+	returnRn outOfDate		-- This one failed, so just bail out now
     }}
   where
     doc_str = sep [ptext SLIT("need version info for"), pprModuleName mod_name]
 
 
 checkEntityUsage mod decls [] 
-  = returnRn True	-- Yes!  All up to date!
+  = returnRn upToDate	-- Yes!  All up to date!
 
 checkEntityUsage mod decls ((occ_name,old_vers) : rest)
   = mkImportedGlobalName mod occ_name 	`thenRn` \ name ->
@@ -462,7 +494,7 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
 
 	Nothing       -> 	-- We used it before, but it ain't there now
 			  traceRn (sep [ptext SLIT("No longer exported:"), ppr name])
-			  `thenRn_` returnRn False
+			  `thenRn_` returnRn outOfDate
 
 	Just (new_vers,_,_,_) 	-- It's there, but is it up to date?
 		| new_vers == old_vers
@@ -472,7 +504,7 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
 		| otherwise
 			-- Out of date, so bale out
 		-> traceRn (sep [ptext SLIT("Out of date:"), ppr name])  `thenRn_`
-		   returnRn False
+		   returnRn outOfDate
 \end{code}
 
 
@@ -564,7 +596,7 @@ getInterfaceExports mod_name from
 		   --  anyway, but this does no harm.)
 		   returnRn (mod, [])
 
-	Just (_, _, _, Just (mod, avails)) -> returnRn (mod, avails)
+	Just (_, _, _, Just (mod, _, avails)) -> returnRn (mod, avails)
   where
     doc_str = sep [pprModuleName mod_name, ptext SLIT("is directly imported")]
 \end{code}
@@ -604,12 +636,6 @@ getImportedInstDecls gates
     returnRn decls
   where
     gate_list      = nameSetToList gates
-
-    load_home gate | isLocallyDefined gate
-		   = returnRn ()
-		   | otherwise
-		   = loadHomeInterface (ppr gate <+> text "is an instance gate") gate	`thenRn_`
-		     returnRn ()
 
 ppr_brief_inst_decl (mod, InstD (InstDecl inst_ty _ _ _ _))
   = case inst_ty of
@@ -776,10 +802,11 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
 			-- Foo in the module dependency hierarchy.  We want to propagate this
 			-- information.  The Nothing says that we didn't even open the interface
 			-- file but we must still propagate the dependeny info.
+			-- The module in question must be a local module (in the same package)
 		   go_for_it (Specifically [])
 
-		Just (mod, _)				-- We did open the interface
-		   |  is_lib_module && not has_orphans
+		Just (mod, how_imported, _)
+		   |  is_sys_import && is_lib_module && not has_orphans
 		   -> so_far		
 	   
 		   |  is_lib_module 			-- Record the module but not detailed
@@ -795,7 +822,10 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
 						-- but don't actually *use* anything from Foo
 					 	-- In which case record an empty dependency list
 		   where
-		     is_lib_module = isPrelModule mod
+		     is_lib_module = not (isLocalModule mod)
+		     is_sys_import = case how_imported of
+					ImportBySystem -> True
+					other	       -> False
 	     
     in
 
@@ -945,51 +975,35 @@ getDeclSysBinders new_name other_decl
 %*********************************************************
 
 \begin{code}
-findAndReadIface :: SDoc -> ModuleName -> WhereFrom 
-		 -> Bool	-- Only relevant for SystemImport
-				-- True  <=> Look for a .hi file
-				-- False <=> Look for .hi-boot file unless there's
-				--	     a library .hi file
-		 -> RnM d (Bool, Maybe (Module, ParsedIface))
-	-- Bool is True if the interface actually read was a .hi-boot one
+findAndReadIface :: SDoc -> ModuleName 
+		 -> IsBootInterface	-- True  <=> Look for a .hi-boot file
+					-- False <=> Look for .hi file
+		 -> RnM d (Maybe ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 
-findAndReadIface doc_str mod_name from hi_file
+findAndReadIface doc_str mod_name hi_boot_file
   = traceRn trace_msg			`thenRn_`
       -- we keep two maps for interface files,
       -- one for 'normal' ones, the other for .hi-boot files,
       -- hence the need to signal which kind we're interested.
 
-    getHiMaps			`thenRn` \ hi_maps ->
+    getHiMaps			`thenRn` \ (hi_map, hiboot_map) ->
+    let
+	relevant_map | hi_boot_file = hiboot_map
+		     | otherwise    = hi_map
+    in	
+    case lookupFM relevant_map mod_name of
+	-- Found the file
+      Just fpath -> traceRn (ptext SLIT("...reading from") <+> text fpath)	`thenRn_`
+		    readIface mod_name fpath
 	
-    case find_path from hi_maps of
-         -- Found the file
-       (hi_boot, Just (fpath, mod)) -> traceRn (ptext SLIT("...reading from") <+> text fpath)
-				       `thenRn_`
-				       readIface mod fpath	`thenRn` \ result ->
-				       returnRn (hi_boot, result)
-       (hi_boot, Nothing)           -> traceRn (ptext SLIT("...not found"))	`thenRn_`
-				       returnRn (hi_boot, Nothing)
+	-- Can't find it
+      Nothing    -> traceRn (ptext SLIT("...not found"))	`thenRn_`
+		    returnRn Nothing
   where
-    find_path ImportByUser       (hi_map, _)     = (False, lookupFM hi_map mod_name)
-    find_path ImportByUserSource (_, hiboot_map) = (True,  lookupFM hiboot_map mod_name)
-
-    find_path ImportBySystem     (hi_map, hiboot_map)
-      | hi_file
-      =		-- If the module we seek is in our dependent set, 
-		-- Look for a .hi file
-         (False, lookupFM hi_map mod_name)
-
-      | otherwise
-		-- Check if there's a prelude module of that name
-		-- If not, look for an hi-boot file
-      = case lookupFM hi_map mod_name of
-	   stuff@(Just (_, mod)) | isPrelModule mod -> (False, stuff)
-	   other		 		    -> (True, lookupFM hiboot_map mod_name)
-
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
-			   ppr from,
+			   if hi_boot_file then ptext SLIT("[boot]") else empty,
 			   ptext SLIT("interface for"), 
 			   pprModuleName mod_name <> semi],
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
@@ -998,10 +1012,10 @@ findAndReadIface doc_str mod_name from hi_file
 @readIface@ tries just the one file.
 
 \begin{code}
-readIface :: Module -> String -> RnM d (Maybe (Module, ParsedIface))
+readIface :: ModuleName -> String -> RnM d (Maybe ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
-readIface the_mod file_path
+readIface wanted_mod file_path
   = ioToRnM (hGetStringBuffer False file_path)       `thenRn` \ read_result ->
     case read_result of
 	Right contents	  -> 
@@ -1010,10 +1024,12 @@ readIface the_mod file_path
 				context = [],
 				glasgow_exts = 1#,
 				loc = mkSrcLoc (mkFastString file_path) 1 } of
-		  POk _  (PIface mod_nm iface) ->
-		    warnCheckRn (mod_nm == moduleName the_mod)
-		    	        (hiModuleNameMismatchWarn the_mod mod_nm) `thenRn_`
-		    returnRn (Just (the_mod, iface))
+		  POk _  (PIface iface) ->
+		      warnCheckRn (read_mod == wanted_mod)
+		    		  (hiModuleNameMismatchWarn wanted_mod read_mod) `thenRn_`
+		      returnRn (Just iface)
+		    where
+		      read_mod = moduleName (pi_mod iface)
 
 	          PFailed err   -> failWithRn Nothing err 
 	          other 	-> failWithRn Nothing (ptext SLIT("Unrecognisable interface file"))
@@ -1068,12 +1084,12 @@ warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
           <+> quotes (pprModuleName mod_name)
 
-hiModuleNameMismatchWarn :: Module -> ModuleName -> Message
-hiModuleNameMismatchWarn requested_mod mod_nm = 
+hiModuleNameMismatchWarn :: ModuleName -> ModuleName  -> Message
+hiModuleNameMismatchWarn requested_mod read_mod = 
     hsep [ ptext SLIT("Something is amiss; requested module name")
-	 , pprModule requested_mod
-	 , ptext SLIT("differs from name found in the interface file ")
-   	 , pprModuleName mod_nm
+	 , pprModuleName requested_mod
+	 , ptext SLIT("differs from name found in the interface file")
+   	 , pprModuleName read_mod
   	 ]
 
 \end{code}

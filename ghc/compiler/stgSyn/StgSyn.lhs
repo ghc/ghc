@@ -33,7 +33,7 @@ module StgSyn (
 
 	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs,
 	getArgPrimRep,
-	isLitLitArg, isDynArg, isStgTypeArg,
+	isLitLitArg, isDllConApp, isStgTypeArg,
 	stgArity, stgArgType,
 	collectFinalStgBinders
 
@@ -46,9 +46,9 @@ module StgSyn (
 
 import CostCentre	( CostCentreStack, CostCentre )
 import Id		( Id, idName, idPrimRep, idType )
-import Name		( isDynName )
+import Name		( isDllName )
 import Literal		( Literal, literalType, isLitLitLit, literalPrimRep )
-import DataCon		( DataCon, isDynDataCon, isNullaryDataCon )
+import DataCon		( DataCon, dataConName, isNullaryDataCon )
 import PrimOp		( PrimOp )
 import PrimRep		( PrimRep(..) )
 import Outputable
@@ -96,10 +96,16 @@ isLitLitArg _		    = False
 isStgTypeArg (StgTypeArg _) = True
 isStgTypeArg other	    = False
 
-isDynArg :: StgArg -> Bool
-	-- Does this argument refer to something in a DLL?
-isDynArg (StgVarArg v)   = isDynName (idName v)
-isDynArg (StgLitArg lit) = isLitLitLit lit
+isDllArg :: StgArg -> Bool
+	-- Does this argument refer to something in a different DLL?
+isDllArg (StgVarArg v)   = isDllName (idName v)
+isDllArg (StgLitArg lit) = isLitLitLit lit
+
+isDllConApp :: DataCon -> [StgArg] -> Bool
+	-- Does this constructor application refer to 
+	-- anything in a different DLL?
+	-- If so, we can't allocate it statically
+isDllConApp con args = isDllName (dataConName con) || any isDllArg args
 
 stgArgType :: StgArg -> Type
 	-- Very half baked becase we have lost the type arguments

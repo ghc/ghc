@@ -5,7 +5,7 @@
 --	primitive operations and types that GHC knows about.
 ---------------------------------------------------------------------------
 
-__interface PrelGHC 2 0 where
+__interface "std" PrelGHC 2 0 where
 
 __export PrelGHC
 

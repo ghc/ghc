@@ -27,10 +27,9 @@ import Id		( Id, mkSysLocal, idType, idStrictness, idUnique, isExportedId, mkVan
 import Var		( Var, varType, modifyIdInfo )
 import IdInfo		( setDemandInfo, StrictnessInfo(..), IdFlavour(..) )
 import UsageSPUtils     ( primOpUsgTys )
-import DataCon		( DataCon, dataConName, isDynDataCon, dataConWrapId )
+import DataCon		( DataCon, dataConName, dataConWrapId )
 import Demand		( Demand, isStrict, wwStrict, wwLazy )
 import Name	        ( Name, nameModule, isLocallyDefinedName, setNameUnique )
-import Module		( isDynamicModule )
 import Literal	        ( Literal(..) )
 import VarEnv
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..), primOpUsg )
@@ -302,12 +301,9 @@ exprToRhs dem _ (StgLam _ bndrs body)
   then be run at load time to fix up static closures.
 -}
 exprToRhs dem toplev (StgConApp con args)
-  | isNotTopLevel toplev ||
-    (not is_dynamic  &&
-     all (not . isLitLitArg) args)
+  | isNotTopLevel toplev || not (isDllConApp con args)
+	-- isDllConApp checks for LitLit args too
   = StgRhsCon noCCS con args
- where
-  is_dynamic = isDynDataCon con || any (isDynArg) args
 
 exprToRhs dem _ expr
   = upd `seq` 

@@ -103,8 +103,9 @@ startIface mod (InterfaceDetails has_orphans import_usages (ExportEnv avails fix
 
       Just fn -> do 
 	if_hdl <- openFile fn WriteMode
-	hPutStr		if_hdl ("__interface " ++ moduleString mod)
-	hPutStr		if_hdl (' ' : show (opt_HiVersion :: Int) ++ orphan_indicator)
+	hPutStr		if_hdl ("__interface \"" ++ show opt_InPackage ++ "\" " ++ moduleString mod)
+	hPutStr		if_hdl (' ' : show (opt_HiVersion :: Int))
+	hPutStr		if_hdl (' ' : orphan_indicator)
 	hPutStrLn	if_hdl " where"
 	ifaceExports	if_hdl avails
 	ifaceImports	if_hdl import_usages

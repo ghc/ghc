@@ -45,11 +45,10 @@ import ClosureInfo	( mkClosureLFInfo, mkConLFInfo, mkLFArgument,
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
 import DataCon		( DataCon, dataConName, dataConTag, dataConTyCon,
-			  isUnboxedTupleCon, isNullaryDataCon, isDynDataCon, dataConId, dataConWrapId
+			  isUnboxedTupleCon, isNullaryDataCon, dataConId, dataConWrapId
 			)
 import Id		( Id, idName, idType, idPrimRep )
 import Name		( nameModule, isLocallyDefinedName )
-import Module		( isDynamicModule )
 import Literal		( Literal(..) )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..), isFollowableRep )
@@ -100,7 +99,7 @@ cgTopRhsCon id con args
     top_ccc = mkCCostCentreStack dontCareCCS -- because it's static data
 
     -- stuff needed by the assert pred only.
-    dynamic_con_or_args = isDynDataCon con || any isDynArg args
+    dynamic_con_or_args = isDllConApp con args
 \end{code}
 
 %************************************************************************

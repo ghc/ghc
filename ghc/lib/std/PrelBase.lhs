@@ -82,6 +82,9 @@ module PrelBase
 	where
 
 import {-# SOURCE #-} PrelErr ( error )
+import {-# SOURCE #-} PrelNum ( addr2Integer )
+  -- Otherwise the system import of addr2Integer looks for PrelNum.hi
+
 import PrelGHC
 
 infixr 9  .

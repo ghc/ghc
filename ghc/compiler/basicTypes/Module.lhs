@@ -21,9 +21,9 @@ module Module
     , mkVanillaModule	    -- :: ModuleName -> Module
     , mkThisModule	    -- :: ModuleName -> Module
     , mkPrelModule          -- :: UserString -> Module
+    , mkModule		    -- :: ModuleName -> PackageName -> Module
     
-    , isDynamicModule       -- :: Module -> Bool
-    , isPrelModule
+    , isLocalModule       -- :: Module -> Bool
 
     , mkSrcModule
 
@@ -32,11 +32,7 @@ module Module
 
     , pprModule, pprModuleName
  
-	-- DllFlavour
-    , DllFlavour, dll, notDll
-
-	-- ModFlavour
-    , ModFlavour,
+    , PackageName
 
 	-- Where to find a .hi file
     , WhereFrom(..), SearchPath, mkSearchPath
@@ -48,7 +44,7 @@ module Module
 import OccName
 import Outputable
 import FiniteMap
-import CmdLineOpts	( opt_Static, opt_CompilingPrelude, opt_WarnHiShadows, opt_HiMapSep )
+import CmdLineOpts	( opt_Static, opt_InPackage, opt_WarnHiShadows, opt_HiMapSep )
 import Constants	( interfaceFileFormatVersion )
 import Maybes		( seqMaybe )
 import Maybe		( fromMaybe )
@@ -57,6 +53,7 @@ import DirUtils		( getDirectoryContents )
 import List		( intersperse )
 import Monad		( foldM )
 import IO		( hPutStrLn, stderr, isDoesNotExistError )
+import FastString	( FastString )
 \end{code}
 
 
@@ -78,16 +75,18 @@ The logic for how an interface file is marked as corresponding to a module that'
 hiding in a DLL is explained elsewhere (ToDo: give renamer href here.)
 
 \begin{code}
-data DllFlavour = NotDll	-- Ordinary module
-		| Dll		-- The module's object code lives in a DLL.
-		deriving( Eq )
+data PackageInfo = ThisPackage 			-- A module from the same package 
+						-- as the one being compiled
+		 | AnotherPackage PackageName	-- A module from a different package
 
-dll    = Dll
-notDll = NotDll
+type PackageName = FastString		-- No encoding at all
 
-instance Show DllFlavour where	-- Just used in debug prints of lex tokens
-  showsPrec n NotDll s = s
-  showsPrec n Dll    s = "dll " ++ s
+preludePackage :: PackageName
+preludePackage = SLIT("prelude")
+
+instance Show PackageInfo where	-- Just used in debug prints of lex tokens
+  showsPrec n ThisPackage s = s
+  showsPrec n (AnotherPackage p) s = (_UNPK_ p) ++ s
 \end{code}
 
 
@@ -145,19 +144,6 @@ type ModuleName = EncodedFS
 	-- Haskell module names can include the quote character ',
 	-- so the module names have the z-encoding applied to them
 
-	-- True for names of prelude modules
-isPrelModuleName :: ModuleName -> Bool
-	-- HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-	--  HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-	--   HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-	--    HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-isPrelModuleName m = take 4 m_str == "Prel" && m_str /= "PrelInfo"
-  where m_str = _UNPK_ m
-	--    HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-	--   HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-	--  HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-	-- HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-
 pprModuleName :: ModuleName -> SDoc
 pprModuleName nm = pprEncodedFS nm
 
@@ -178,10 +164,7 @@ mkSysModuleFS s = s
 \end{code}
 
 \begin{code}
-data Module = Module
-		ModuleName
-		ModFlavour
-		DllFlavour
+data Module = Module ModuleName PackageInfo
 \end{code}
 
 \begin{code}
@@ -189,80 +172,59 @@ instance Outputable Module where
   ppr = pprModule
 
 instance Eq Module where
-  (Module m1 _  _) == (Module m2 _ _) = m1 == m2
+  (Module m1 _) == (Module m2 _) = m1 == m2
 
 instance Ord Module where
-  (Module m1 _ _) `compare` (Module m2 _ _) = m1 `compare` m2
+  (Module m1 _) `compare` (Module m2 _) = m1 `compare` m2
 \end{code}
 
 
 \begin{code}
 pprModule :: Module -> SDoc
-pprModule (Module mod _ _) = getPprStyle $ \ sty ->
-			     if userStyle sty then
+pprModule (Module mod _) = getPprStyle $ \ sty ->
+			   if userStyle sty then
 				text (moduleNameUserString mod)				
-			     else
+			   else
 				pprModuleName mod
 \end{code}
 
 
 \begin{code}
-mkModule :: FilePath	-- Directory in which this module is
-	 -> ModuleName	-- Name of the module
-	 -> DllFlavour
+mkModule :: ModuleName	-- Name of the module
+	 -> PackageName
 	 -> Module
-mkModule dir_path mod_nm is_dll
-  | isPrelModuleName mod_nm = mkPrelModule mod_nm
-  | otherwise		    = Module mod_nm UserMod is_dll
-	-- Make every module into a 'user module'
-	-- except those constructed by mkPrelModule
-
+mkModule mod_nm pack_name
+  = Module mod_nm pack_info
+  where
+    pack_info | pack_name == opt_InPackage = ThisPackage
+	      | otherwise		   = AnotherPackage pack_name
 
 mkVanillaModule :: ModuleName -> Module
-mkVanillaModule name = Module name UserMod dell
- where
-  main_mod = mkSrcModuleFS SLIT("Main")
-
-   -- Main can never be in a DLL - need this
-   -- special case in order to correctly
-   -- compile PrelMain
-  dell | opt_Static || opt_CompilingPrelude || 
-         name == main_mod = NotDll
-       | otherwise	  = Dll
-
+mkVanillaModule name = Module name (pprTrace "mkVanillaModule" (ppr name) ThisPackage)
+	-- Used temporarily when we first come across Foo.x in an interface
+	-- file, but before we've opened Foo.hi.
+	-- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
 
 mkThisModule :: ModuleName -> Module	-- The module being comiled
-mkThisModule name = 
-  Module name UserMod NotDll -- This is fine, a Dll flag is only
-  			     -- pinned on imported modules.
+mkThisModule name = Module name ThisPackage
 
 mkPrelModule :: ModuleName -> Module
-mkPrelModule name = Module name sys dll
- where 
-  sys | opt_CompilingPrelude = UserMod
-      | otherwise	     = PrelMod
-
-  dll | opt_Static || opt_CompilingPrelude = NotDll
-      | otherwise		 	   = Dll
+mkPrelModule name = mkModule name preludePackage
 
 moduleString :: Module -> EncodedString
-moduleString (Module mod _ _) = _UNPK_ mod
+moduleString (Module mod _) = _UNPK_ mod
 
 moduleName :: Module -> ModuleName
-moduleName (Module mod _ _) = mod
+moduleName (Module mod _) = mod
 
 moduleUserString :: Module -> UserString
-moduleUserString (Module mod _ _) = moduleNameUserString mod
+moduleUserString (Module mod _) = moduleNameUserString mod
 \end{code}
 
 \begin{code}
-isDynamicModule :: Module -> Bool
-isDynamicModule (Module _ _ Dll)  = True
-isDynamicModule _		  = False
-
-isPrelModule :: Module -> Bool
-isPrelModule (Module _ PrelMod _) = True
-isPrelModule _			  = False
+isLocalModule :: Module -> Bool
+isLocalModule (Module _ ThisPackage) = True
+isLocalModule _		      	     = False
 \end{code}
 
 
@@ -273,10 +235,10 @@ isPrelModule _			  = False
 %************************************************************************
 
 \begin{code}
-type ModuleHiMap = FiniteMap ModuleName (String, Module)
+type ModuleHiMap = FiniteMap ModuleName String
   -- Mapping from module name to 
   -- 	* the file path of its corresponding interface file, 
-  --	* the Module, decorated with it's properties
+  --	* the ModuleName
 \end{code}
 
 (We allege that) it is quicker to build up a mapping from module names
@@ -293,17 +255,6 @@ mkModuleHiMaps dirs = foldM (getAllFilesMatching dirs) (env,env) dirs
  where
   env = emptyFM
 
-{- A pseudo file, currently "dLL_ifs.hi",
-   signals that the interface files
-   contained in a particular directory have got their
-   corresponding object codes stashed away in a DLL
-   
-   This stuff is only needed to deal with Win32 DLLs,
-   and conceivably we conditionally compile in support
-   for handling it. (ToDo?)
--}
-dir_contain_dll_his = "dLL_ifs.hi"
-
 getAllFilesMatching :: SearchPath
 		    -> (ModuleHiMap, ModuleHiMap)
 		    -> (FilePath, String) 
@@ -311,15 +262,7 @@ getAllFilesMatching :: SearchPath
 getAllFilesMatching dirs hims (dir_path, suffix) = ( do
     -- fpaths entries do not have dir_path prepended
   fpaths  <- getDirectoryContents dir_path
-  is_dll <- catch
-		(if opt_Static || dir_path == "." then
-		     return NotDll
-		 else
-		     do  exists <- doesFileExist (dir_path ++ '/': dir_contain_dll_his)
-			 return (if exists then Dll else NotDll)
-		)
-		(\ _ {-don't care-} -> return NotDll)
-  return (foldl (addModules is_dll) hims fpaths))
+  return (foldl addModules hims fpaths))
   -- soft failure
       `catch` 
         (\ err -> do
@@ -343,7 +286,7 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
       reverse (show interfaceFileFormatVersion) ++ '-':hi_boot_xiffus
    hi_boot_xiffus = "toob-ih." -- .hi-boot reversed!
 
-   addModules is_dll his@(hi_env, hib_env) filename = fromMaybe his $ 
+   addModules his@(hi_env, hib_env) filename = fromMaybe his $ 
         FMAP add_hi   (go xiffus		 rev_fname)	`seqMaybe`
 
         FMAP add_vhib (go hi_boot_version_xiffus rev_fname)	`seqMaybe`
@@ -363,7 +306,7 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
 	add_hib   file_nm = (hi_env, add_to_map addNewOne   hib_env file_nm)
 
 	add_to_map combiner env file_nm 
-	  = addToFM_C combiner env mod_nm (path, mkModule dir_path mod_nm is_dll)
+	  = addToFM_C combiner env mod_nm path
 	  where
      	    mod_nm = mkSrcModuleFS file_nm
 
@@ -379,15 +322,15 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
    stickWithOld old new = old
    overrideNew  old new = new
 
-   conflict (old_path,mod) (new_path,_)
+   conflict old_path new_path
     | old_path /= new_path = 
         pprTrace "Warning: " (text "Identically named interface files present on the import path, " $$
 			      text (show old_path) <+> text "shadows" $$
 			      text (show new_path) $$
 			      text "on the import path: " <+> 
 			      text (concat (intersperse ":" (map fst dirs))))
-        (old_path,mod)
-    | otherwise = (old_path,mod)  -- don't warn about innocous shadowings.
+        old_path
+    | otherwise = old_path	-- don't warn about innocous shadowings.
 \end{code}
 
 

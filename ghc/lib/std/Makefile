@@ -25,7 +25,9 @@ endif
 HC 	   = $(GHC_INPLACE)
 MKDEPENDHS = $(GHC_INPLACE)
 
-LIBRARY = libHS$(_way).a
+PACKAGE = std
+LIBRARY = libHS$(PACKAGE)$(_way).a
+
 LIBOBJS = $(HS_OBJS)
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 LIBOBJS = $(filter-out PrelHugs.$(way_)o,$(HS_OBJS))
@@ -34,7 +36,7 @@ endif
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts)
+SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts) -package-name $(PACKAGE)
 ifneq "$(way)" "dll"
 SRC_HC_OPTS += -static
 endif
@@ -82,9 +84,9 @@ boot :: PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
 DLL_NAME = HSprel.dll
 DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
-DLL_IMPLIB_NAME = libHS_imp.a
+DLL_IMPLIB_NAME = libHSstd_imp.a
 SRC_BLD_DLL_OPTS += --export-all --output-def=HSprel.def DllVersionInfo.o
-SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
+SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHSstd_cbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
 
 ifeq "$(way)" "dll"
 HS_SRCS := $(filter-out PrelMain.lhs PrelHugs.lhs, $(HS_SRCS))
@@ -127,11 +129,11 @@ endif
 # which hugs can load as an auxiliary object file when loading the Prelude.
 #
 ifeq "$(way)" "u"
-all :: libHS_cbits.u_o
-CLEAN_FILES += libHS_cbits.u_o
-libHS_cbits.u_o:
-	$(RM) libHS_cbits.u_o
-	ld -r -o libHS_cbits.u_o cbits/*.o
+all :: libHSstd_cbits.u_o
+CLEAN_FILES += libHSstd_cbits.u_o
+libHSstd_cbits.u_o:
+	$(RM) libHSstd_cbits.u_o
+	ld -r -o libHSstd_cbits.u_o cbits/*.o
 endif
 
 #-----------------------------------------------------------------------------

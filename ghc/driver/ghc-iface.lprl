@@ -153,7 +153,7 @@ sub constructNewHiFile {
     }
 
     local($new_module_version) = &calcNewModuleVersion(@decl_names);
-    print NEWHI "__interface ", $ModuleName{'new'}, " $new_module_version $Orphan{'new'} $ProjectVersionInt where\n";
+    print NEWHI "__interface ", $PackageName{'new'}, $ModuleName{'new'}, " $new_module_version $Orphan{'new'} $ProjectVersionInt where\n";
     print NEWHI $Stuff{'new:exports'};
     print NEWHI $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
     print NEWHI $Stuff{'new:instances'} unless $Stuff{'new:instances'} eq '';
@@ -211,14 +211,15 @@ sub readHiFile {
     hi_line: while (<HIFILE>) {
 	next if /^ *$/; # blank line
 
-	if ( /^__interface ([A-Z]\S*) (\d+)( \!)?/ ) {
+	if ( /^__interface ("[A-Za-z]*"\s*)([A-Z]\S*) (\d+) (\!)?/ ) {
 	    if ( $mod ne 'new' ) {
 		# Reading old .hi file
-		$ModuleVersion{$mod} = $2;
+		$ModuleVersion{$mod} = $3;
 	    }
 
-	    $ModuleName{$mod} = $1; # used to decide name of iface file.
-	    $Orphan{$mod}     = $3;
+	    $PackageName{$mod} = $1;
+	    $ModuleName{$mod}  = $2; # used to decide name of iface file.
+	    $Orphan{$mod}      = $4;
 		# optional "!" indicates that the
 		# module contains orphan rules or instance decls
 

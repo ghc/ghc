@@ -599,16 +599,14 @@ ppLocalnessMacro include_dyn_prefix clabel =
   where
    is_visible = externallyVisibleCLabel clabel
    label_type = labelType clabel
-   is_dynamic = labelDynamic clabel
 
    visiblity_prefix
      | is_visible = char 'E'
      | otherwise  = char 'I'
 
    dyn_prefix
-     | not include_dyn_prefix = empty
-     | is_dynamic	      = char 'D'
-     | otherwise	      = empty
+     | include_dyn_prefix && labelDynamic clabel = char 'D'
+     | otherwise	      			 = empty
 
 \end{code}
 
