@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.180 2001/08/02 05:15:33 qrczak Exp $
+# $Id: Makefile,v 1.181 2001/08/04 06:19:54 ken Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -309,10 +309,7 @@ SRC_C_OPTS     += -O -I. -IcodeGen
 #		Generate supporting stuff for prelude/PrimOp.lhs 
 #		from prelude/primops.txt
 
-# Run prelude/primops.txt through the preprocessor, to weed out
-# primitives that don't (need to) exist on 64-bit architectures.
-prelude/primops.i: prelude/primops.txt
-	$(CPP) -I$(GHC_INCLUDE_DIR) -x c $< 2>/dev/null | $(SED) -e '/^#/d' > $@
+CLEAN_FILES += prelude/primops.txt
 
 GENPOC=$(TOP)/utils/genprimopcode/genprimopcode
 
@@ -336,27 +333,27 @@ ifneq "$(BootingFromHc)" "YES"
 depend :: $(PRIMOP_BITS)
 endif
 
-primop-data-decl.hs-incl: prelude/primops.i
+primop-data-decl.hs-incl: prelude/primops.txt
 	$(GENPOC) --data-decl          < $< > $@
-primop-tag.hs-incl: prelude/primops.i
+primop-tag.hs-incl: prelude/primops.txt
 	$(GENPOC) --primop-tag         < $< > $@
-primop-list.hs-incl: prelude/primops.i
+primop-list.hs-incl: prelude/primops.txt
 	$(GENPOC) --primop-list        < $< > $@
-primop-has-side-effects.hs-incl: prelude/primops.i
+primop-has-side-effects.hs-incl: prelude/primops.txt
 	$(GENPOC) --has-side-effects   < $< > $@
-primop-out-of-line.hs-incl: prelude/primops.i
+primop-out-of-line.hs-incl: prelude/primops.txt
 	$(GENPOC) --out-of-line        < $< > $@
-primop-commutable.hs-incl: prelude/primops.i
+primop-commutable.hs-incl: prelude/primops.txt
 	$(GENPOC) --commutable         < $< > $@
-primop-needs-wrapper.hs-incl: prelude/primops.i
+primop-needs-wrapper.hs-incl: prelude/primops.txt
 	$(GENPOC) --needs-wrapper      < $< > $@
-primop-can-fail.hs-incl: prelude/primops.i
+primop-can-fail.hs-incl: prelude/primops.txt
 	$(GENPOC) --can-fail           < $< > $@
-primop-strictness.hs-incl: prelude/primops.i
+primop-strictness.hs-incl: prelude/primops.txt
 	$(GENPOC) --strictness         < $< > $@
-primop-usage.hs-incl: prelude/primops.i
+primop-usage.hs-incl: prelude/primops.txt
 	$(GENPOC) --usage              < $< > $@
-primop-primop-info.hs-incl: prelude/primops.i
+primop-primop-info.hs-incl: prelude/primops.txt
 	$(GENPOC) --primop-primop-info < $< > $@
 
 

@@ -5,6 +5,9 @@
 --	primitive operations and types that GHC knows about.
 ---------------------------------------------------------------------------
 
+#include "config.h"
+#include "Derived.h"
+
 __interface "std" PrelGHC 1 0 where
 
 __export PrelGHC
@@ -210,10 +213,12 @@ __export PrelGHC
   integer2Wordzh
   int2Integerzh
   word2Integerzh
+#ifdef SUPPORT_LONG_LONGS
   integerToInt64zh
   integerToWord64zh
   int64ToIntegerzh
   word64ToIntegerzh
+#endif
   andIntegerzh
   orIntegerzh
   xorIntegerzh
@@ -242,11 +247,15 @@ __export PrelGHC
   indexInt8Arrayzh
   indexInt16Arrayzh
   indexInt32Arrayzh
+#ifdef SUPPORT_LONG_LONGS
   indexInt64Arrayzh
+#endif
   indexWord8Arrayzh
   indexWord16Arrayzh
   indexWord32Arrayzh
+#ifdef SUPPORT_LONG_LONGS
   indexWord64Arrayzh
+#endif
 
   readArrayzh
   readCharArrayzh
@@ -260,11 +269,15 @@ __export PrelGHC
   readInt8Arrayzh
   readInt16Arrayzh
   readInt32Arrayzh
+#ifdef SUPPORT_LONG_LONGS
   readInt64Arrayzh
+#endif
   readWord8Arrayzh
   readWord16Arrayzh
   readWord32Arrayzh
+#ifdef SUPPORT_LONG_LONGS
   readWord64Arrayzh
+#endif
 
   writeArrayzh
   writeCharArrayzh
@@ -278,11 +291,15 @@ __export PrelGHC
   writeInt8Arrayzh
   writeInt16Arrayzh
   writeInt32Arrayzh
+#ifdef SUPPORT_LONG_LONGS
   writeInt64Arrayzh
+#endif
   writeWord8Arrayzh
   writeWord16Arrayzh
   writeWord32Arrayzh
+#ifdef SUPPORT_LONG_LONGS
   writeWord64Arrayzh
+#endif
 
   indexCharOffAddrzh
   indexWideCharOffAddrzh
@@ -295,11 +312,15 @@ __export PrelGHC
   indexInt8OffAddrzh
   indexInt16OffAddrzh
   indexInt32OffAddrzh
+#ifdef SUPPORT_LONG_LONGS
   indexInt64OffAddrzh
+#endif
   indexWord8OffAddrzh
   indexWord16OffAddrzh
   indexWord32OffAddrzh
+#ifdef SUPPORT_LONG_LONGS
   indexWord64OffAddrzh
+#endif
 
   readCharOffAddrzh
   readWideCharOffAddrzh
@@ -312,11 +333,15 @@ __export PrelGHC
   readInt8OffAddrzh
   readInt16OffAddrzh
   readInt32OffAddrzh
+#ifdef SUPPORT_LONG_LONGS
   readInt64OffAddrzh
+#endif
   readWord8OffAddrzh
   readWord16OffAddrzh
   readWord32OffAddrzh
+#ifdef SUPPORT_LONG_LONGS
   readWord64OffAddrzh
+#endif
 
   writeCharOffAddrzh
   writeWideCharOffAddrzh
@@ -330,11 +355,15 @@ __export PrelGHC
   writeInt8OffAddrzh
   writeInt16OffAddrzh
   writeInt32OffAddrzh
+#ifdef SUPPORT_LONG_LONGS
   writeInt64OffAddrzh
+#endif
   writeWord8OffAddrzh
   writeWord16OffAddrzh
   writeWord32OffAddrzh
+#ifdef SUPPORT_LONG_LONGS
   writeWord64OffAddrzh
+#endif
 
   eqForeignObjzh
   indexCharOffForeignObjzh
@@ -348,11 +377,15 @@ __export PrelGHC
   indexInt8OffForeignObjzh
   indexInt16OffForeignObjzh
   indexInt32OffForeignObjzh
+#ifdef SUPPORT_LONG_LONGS
   indexInt64OffForeignObjzh
+#endif
   indexWord8OffForeignObjzh
   indexWord16OffForeignObjzh
   indexWord32OffForeignObjzh
+#ifdef SUPPORT_LONG_LONGS
   indexWord64OffForeignObjzh
+#endif
 
   unsafeFreezzeArrayzh		-- Note zz in the middle
   unsafeFreezzeByteArrayzh	-- Ditto
@@ -402,7 +435,7 @@ __export PrelGHC
   addrToHValuezh
 ;
 
--- Export PrelErr.error, so that others don't have to import PrelErr
+-- Export PrelErr.error, so that others do not have to import PrelErr
 __export PrelErr error ;
 
 
@@ -426,7 +459,7 @@ instance __forall s => {CCallable (StablePtrzh s)} = zdfCCallableStablePtrzh;
 
 1 assert :: __forall a => PrelBase.Bool -> a -> a ;
 
--- These guys don't really exist:
+-- These guys do not really exist:
 --
 1 zdfCCallableCharzh :: {CCallable Charzh} ;
 1 zdfCCallableDoublezh :: {CCallable Doublezh} ;

@@ -271,3 +271,10 @@ endif
 %.$(way_)o : %.$(way_)rc
 	@$(RM) $@
 	windres $< $@
+
+#-----------------------------------------------------------------------------
+# Preprocessor suffix rule
+
+% : %.pp
+	rm -f $@
+	$(CPP) -I$(GHC_INCLUDE_DIR) -x c $< | $(SED) -e '/^#/d' > $@

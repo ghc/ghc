@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.23 2001/07/26 03:08:38 ken Exp $
+-- $Id: primops.txt.pp,v 1.1 2001/08/04 06:19:54 ken Exp $
 --
 -- Primitive Operations
 --
@@ -7,12 +7,12 @@
 
 -- To add a new primop, you currently need to update the following files:
 --
---	- this file (ghc/compiler/prelude/primops.txt), which includes
+--	- this file (ghc/compiler/prelude/primops.txt.pp), which includes
 --	  the type of the primop, and various other properties (its
 --	  strictness attributes, whether it is defined as a macro
 --	  or as out-of-line code, etc.)
 --
---	- ghc/lib/std/PrelGHC.hi-boot, to declare the primop
+--	- ghc/lib/std/PrelGHC.hi-boot.pp, to declare the primop
 --
 --	- if the primop is inline (i.e. a macro), then:
 --		ghc/includes/PrimOps.h

@@ -14,7 +14,7 @@ import Maybe ( catMaybes )
 
 main = getArgs >>= \args ->
        if length args /= 1 || head args `notElem` known_args
-       then error ("usage: genprimopcode command < primops.i > ...\n"
+       then error ("usage: genprimopcode command < primops.txt > ...\n"
                    ++ "   where command is one of\n"
                    ++ unlines (map ("            "++) known_args)
                   )
@@ -302,7 +302,7 @@ arity = length . fst . flatTys
 -- Abstract syntax -----------------------------------------------
 ------------------------------------------------------------------
 
--- info for all primops; the totality of the info in primops.txt
+-- info for all primops; the totality of the info in primops.txt(.pp)
 data Info
    = Info [Option] [PrimOpSpec]   -- defaults, primops
      deriving Show
