@@ -9,7 +9,7 @@
 GhcMainDir = ghc
 GhcBinDistDirs = ghc
 GhcBinDistDocs = docs ghc/docs/users_guide ghc/docs/libraries
-GhcBinDistPrlScripts = ghc-$(ProjectVersion) stat2resid hstags
+GhcBinDistPrlScripts = ghc-$(ProjectVersion) stat2resid
 GhcBinDistLibPrlScripts = hscpp mkdependHS
 GhcBinDistBins = hp2ps
 
