@@ -29,6 +29,11 @@
    This means that a sub-expression involving x is not "trapped" inside the RHS.
    And it's not inconvenient because we already have a substitution.
 
+  Note that this is EXACTLY BACKWARDS from the what the simplifier does.
+  The simplifier tries to get rid of occurrences of x, in favour of wild,
+  in the hope that there will only be one remaining occurrence of x, namely
+  the scrutinee of the case, and we can inline it.  
+
 \begin{code}
 module SetLevels (
 	setLevels,
