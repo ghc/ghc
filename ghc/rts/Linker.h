@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.h,v 1.3 2001/02/13 18:01:22 simonmar Exp $
+ * $Id: Linker.h,v 1.4 2001/02/14 11:02:36 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -23,4 +23,4 @@ HsInt loadObj( char *path );
 HsInt resolveObjs( void );
 
 /* load a dynamic library */
-HsInt addDLL( char *path );
+char *addDLL( char *path );

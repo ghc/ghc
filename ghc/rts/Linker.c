@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.28 2001/02/13 18:01:22 simonmar Exp $
+ * $Id: Linker.c,v 1.29 2001/02/14 11:02:36 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -285,18 +285,27 @@ initLinker( void )
  * lookupSymbol() will subsequently see them by dlsym on the program's
  * dl-handle.  Returns 0 if fail, 1 if success.
  */
-int
+char*
 addDLL ( char* dll_name )
 {
 #  if defined(OBJFORMAT_ELF)
    void *hdl;
    char *buf;
+   char *errmsg;
 
    buf = stgMallocBytes(strlen(dll_name) + 10, "addDll");
    sprintf(buf, "lib%s.so", dll_name);
-   hdl = dlopen(buf, RTLD_NOW | RTLD_GLOBAL);
+   hdl = dlopen(buf, RTLD_NOW | RTLD_GLOBAL );
    free(buf);
-   return (hdl == NULL) ? 0 : 1;
+   if (hdl == NULL) {
+      /* dlopen failed; return a ptr to the error msg. */
+      errmsg = dlerror();
+      if (errmsg == NULL) errmsg = "addDLL: unknown error";
+      return errmsg;
+   } else {
+      return NULL;
+   }
+   ASSERT(0); /*NOTREACHED*/
 #  elif defined(OBJFORMAT_PEi386)
    barf("addDLL: not implemented on PEi386 yet");
    return 0;
