@@ -74,7 +74,7 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 			  mkTemplateLocals, mkTemplateLocalsNum,
 			  mkTemplateLocal, idNewStrictness, idName
 			)
-import IdInfo		( IdInfo, noCafIdInfo,
+import IdInfo		( IdInfo, noCafIdInfo, hasCafIdInfo,
 			  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo, setCafInfo,
 			  setAllStrictnessInfo,
@@ -483,7 +483,7 @@ mkRecordSelId tycon field_label
     default_alt | no_default = []
 		| otherwise  = [(DEFAULT, [], error_expr)]
 
-	-- the default branch may have CAF refs, because it calls recSelError etc.
+	-- The default branch may have CAF refs, because it calls recSelError etc.
     caf_info    | no_default = NoCafRefs
 	        | otherwise  = MayHaveCafRefs
 
@@ -985,9 +985,18 @@ pcMiscPrelId key mod str ty info
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
+    bottoming_info = hasCafIdInfo `setAllStrictnessInfo` Just strict_sig
+	-- Do *not* mark them as NoCafRefs, because they can indeed have
+	-- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
+	-- which has some CAFs
+	-- In due course we may arrange that these error-y things are
+	-- regarded by the GC as permanently live, in which case we
+	-- can give them NoCaf info.  As it is, any function that calls
+	-- any pc_bottoming_Id will itself have CafRefs, which bloats
+	-- SRTs.
+
     strict_sig	   = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
-    bottoming_info = noCafIdInfo `setAllStrictnessInfo` Just strict_sig
-	-- these "bottom" out, no matter what their arguments
+	-- These "bottom" out, no matter what their arguments
 
 (openAlphaTyVar:openBetaTyVar:_) = openAlphaTyVars
 openAlphaTy  = mkTyVarTy openAlphaTyVar

@@ -11,7 +11,7 @@ module IdInfo (
 	GlobalIdDetails(..), notGlobalId, 	-- Not abstract
 
 	IdInfo,		-- Abstract
-	vanillaIdInfo, noCafIdInfo,
+	vanillaIdInfo, noCafIdInfo, hasCafIdInfo,
 	seqIdInfo, megaSeqIdInfo,
 
 	-- Zapping
@@ -396,10 +396,11 @@ vanillaIdInfo
 	    newStrictnessInfo   = Nothing
 	   }
 
-noCafIdInfo = vanillaIdInfo `setCgInfo`    CgInfo NoCafRefs
+hasCafIdInfo = vanillaIdInfo `setCgInfo`    CgInfo MayHaveCafRefs
+noCafIdInfo  = vanillaIdInfo `setCgInfo`    CgInfo NoCafRefs
 	-- Used for built-in type Ids in MkId.
-	-- Many built-in things have fixed types, so we shouldn't
-	-- run around generalising them
+	-- These must have a valid CgInfo set, so you can't
+	-- 	use vanillaIdInfo!
 \end{code}
 
 
