@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.11 1999/03/04 10:56:51 sof Exp $
+ * $Id: Stats.c,v 1.12 1999/03/04 13:07:48 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -63,6 +63,12 @@
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
+
+#ifdef __CYGWIN32__
+# ifdef HAVE_TIME_H
+#  include <time.h>
+# endif
 #endif
 
 #if ! irix_TARGET_OS && ! defined(__MINGW32__)
