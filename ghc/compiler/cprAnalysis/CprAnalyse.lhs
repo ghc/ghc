@@ -221,7 +221,14 @@ cprAnalExpr rho e@(Var v)
 -- has product type then this is a manifest constructor (hooray!)
 cprAnalExpr rho (Con con args)
     = (Con con args_cpr, 
-       if isConProdType con
+       -- If we are a product with 0 args we must be void(like)
+       -- We can't create an unboxed tuple with 0 args for this
+       -- and since Void has only one, constant value it should 
+       -- just mean returning a pointer to a pre-existing cell. 
+       -- So we won't really gain from doing anything fancy
+       -- and we treat this case as Top.
+       if    isConProdType con
+          && length args > 0
          then Tuple args_aval_filt_funs
          else Top)
     where 
