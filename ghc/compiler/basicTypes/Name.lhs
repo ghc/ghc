@@ -315,13 +315,11 @@ pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | debugStyle sty = pprOccName occ <> 
 		     text "{-" <> pprUnique uniq <> text "-}"
-  | otherwise      = pprOccName occ	-- User and Iface styles
+  | otherwise      = pprOccName occ	-- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
 pprSystem sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | ifaceStyle sty = pprOccName occ	-- The tidy phase has ensured 
-					-- that OccNames are enough
   | otherwise	   = pprOccName occ <> char '_' <> pprUnique uniq
 				-- If the tidy phase hasn't run, the OccName
 				-- is unlikely to be informative (like 's'),

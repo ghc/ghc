@@ -425,7 +425,7 @@ myParseModule dflags src_filename
       showPass dflags "Parser"
       _scc_  "Parser" do
 
-      buf <- hGetStringBuffer True{-expand tabs-} src_filename
+      buf <- hGetStringBuffer src_filename
 
       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
 			   parrEF	 = dopt Opt_PArr	dflags}

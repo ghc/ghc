@@ -741,10 +741,7 @@ noLBVarInfo = NoLBVarInfo
 -- property of the definition, but a property of the context.
 pprLBVarInfo NoLBVarInfo     = empty
 pprLBVarInfo (LBVarInfo u)   | u `eqUsage` usOnce
-                             = getPprStyle $ \ sty ->
-                               if ifaceStyle sty
-                               then empty
-                               else ptext SLIT("OneShot")
+                             = ptext SLIT("OneShot")
                              | otherwise
                              = empty
 

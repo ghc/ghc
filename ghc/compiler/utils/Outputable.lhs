@@ -13,7 +13,7 @@ module Outputable (
 
 	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
 	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper,
-	codeStyle, ifaceStyle, userStyle, debugStyle, asmStyle,
+	codeStyle, userStyle, debugStyle, asmStyle,
 	ifPprDebug, unqualStyle,
 
 	SDoc, 		-- Abstract
@@ -33,9 +33,9 @@ module Outputable (
 	speakNth, speakNTimes,
 
 	printSDoc, printErrs, printDump,
-	printForC, printForAsm, printForIface, printForUser,
+	printForC, printForAsm, printForUser,
 	pprCode, mkCodeStyle,
-	showSDoc, showSDocForUser, showSDocDebug, showSDocIface, 
+	showSDoc, showSDocForUser, showSDocDebug,
 	showSDocUnqual, showsPrecSDoc,
 	pprHsChar, pprHsString,
 
@@ -151,10 +151,6 @@ asmStyle :: PprStyle -> Bool
 asmStyle (PprCode AsmStyle)  = True
 asmStyle other               = False
 
-ifaceStyle :: PprStyle -> Bool
-ifaceStyle (PprInterface _) = True
-ifaceStyle other	    = False
-
 debugStyle :: PprStyle -> Bool
 debugStyle PprDebug	  = True
 debugStyle other	  = False
@@ -191,12 +187,6 @@ printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
   = Pretty.printDoc PageMode handle (doc (mkUserStyle unqual AllTheWay))
 
--- printForIface prints all on one line for interface files.
--- It's called repeatedly for successive lines
-printForIface :: Handle -> PrintUnqualified -> SDoc -> IO ()
-printForIface handle unqual doc 
-  = Pretty.printDoc LeftMode handle (doc (PprInterface unqual))
-
 -- printForC, printForAsm do what they sound like
 printForC :: Handle -> SDoc -> IO ()
 printForC handle doc = Pretty.printDoc LeftMode handle (doc (PprCode CStyle))
@@ -225,9 +215,6 @@ showSDocUnqual d = show (d (mkUserStyle neverQualify AllTheWay))
 
 showsPrecSDoc :: Int -> SDoc -> ShowS
 showsPrecSDoc p d = showsPrec p (d defaultUserStyle)
-
-showSDocIface :: SDoc -> String
-showSDocIface doc = showDocWith OneLineMode (doc (PprInterface alwaysQualify))
 
 showSDocDebug :: SDoc -> String
 showSDocDebug d = show (d PprDebug)

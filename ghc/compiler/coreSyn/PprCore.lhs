@@ -260,7 +260,7 @@ ppr_expr add_par pe (Note (SCC cc) expr)
 ppr_expr add_par pe (Note (Coerce to_ty from_ty) expr)
  = add_par $
    getPprStyle $ \ sty ->
-   if debugStyle sty && not (ifaceStyle sty) then
+   if debugStyle sty then
       sep [ptext SLIT("__coerce") <+> sep [pTy pe to_ty, pTy pe from_ty],
 	   ppr_parend_expr pe expr]
    else

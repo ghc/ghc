@@ -220,7 +220,7 @@ and when in debug mode.
 pprTyVarBndr :: TyVar -> SDoc
 pprTyVarBndr tyvar
   = getPprStyle $ \ sty ->
-    if (ifaceStyle sty  && not (kind `eqKind` liftedTypeKind)) || debugStyle sty then
+    if debugStyle sty then
         hsep [ppr tyvar, dcolon, pprParendKind kind]
 		-- See comments with ppDcolon in PprCore.lhs
     else

@@ -335,12 +335,9 @@ ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
 ppr_sig (ClassOpSig var dm ty _)
-      = getPprStyle $ \ sty ->
-        if ifaceStyle sty 
-	   then sep [ ppr var <+> pp_dm <+> dcolon, nest 4 (ppr ty) ]
-	   else sep [ ppr_var var <+> dcolon, 
-		      nest 4 (ppr ty),
-		      nest 4 (pp_dm_comment) ]
+      = sep [ ppr_var var <+> dcolon, 
+	      nest 4 (ppr ty),
+	      nest 4 (pp_dm_comment) ]
       where
 	pp_dm = case dm of 
 		  DefMeth _  -> equals 	-- Default method indicator

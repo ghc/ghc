@@ -551,17 +551,6 @@ dump_rules rs = vcat [ptext SLIT("{-# RULES"),
 %************************************************************************
 
 \begin{code}
-writeIface :: FilePath -> ModIface -> IO ()
-writeIface hi_path mod_iface
-  = do	{ if_hdl <- openFile hi_path WriteMode
-	; printForIface if_hdl from_this_mod (pprIface mod_iface)
-	; hClose if_hdl
-	}
-  where
-	-- Print names unqualified if they are from this module
-    from_this_mod n = nameModule n == this_mod
-    this_mod = mi_module mod_iface
-
 pprIface :: ModIface -> SDoc
 pprIface iface
  = vcat [ ptext SLIT("__interface")

@@ -673,7 +673,7 @@ mkFCallId uniq fcall ty
 	-- when doing substitutions won't substitute over it
     mkGlobalId (FCallId fcall) name ty info
   where
-    occ_str = showSDocIface (braces (ppr fcall <+> ppr ty))
+    occ_str = showSDoc (braces (ppr fcall <+> ppr ty))
 	-- The "occurrence name" of a ccall is the full info about the
 	-- ccall; it is encoded, but may have embedded spaces etc!
 

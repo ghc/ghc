@@ -570,7 +570,7 @@ readIface file_path
   if ".hi-boot" `isSuffixOf` file_path
      || hi_boot_ver `isSuffixOf` file_path then
 
-      ioToRnM (hGetStringBuffer False file_path) `thenRn` \ read_result ->
+      ioToRnM (hGetStringBuffer file_path) `thenRn` \ read_result ->
       case read_result of {
 	Left io_error  -> bale_out (text (show io_error));
 	Right contents -> 

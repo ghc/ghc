@@ -59,12 +59,7 @@ module StringBuffer
 
          -- conversion
         lexemeToString,     -- :: StringBuffer -> String
-        lexemeToByteArray,  -- :: StringBuffer -> _ByteArray Int
         lexemeToFastString, -- :: StringBuffer -> FastString
-        lexemeToBuffer,     -- :: StringBuffer -> StringBuffer
-
-        FastString,
-	ByteArray
        ) where
 
 #include "HsVersions.h"
@@ -92,7 +87,6 @@ import FastString
 import GlaExts
 import Foreign
 import IO		( openFile, isEOFError )
-import IOExts		( slurpFile )
 import Addr
 import Exception	( bracket )
 
@@ -124,17 +118,9 @@ instance Show StringBuffer where
 \end{code}
 
 \begin{code}
-hGetStringBuffer :: Bool -> FilePath -> IO StringBuffer
-hGetStringBuffer expand_tabs fname = do
-   (a, read) <- if expand_tabs 
-				then slurpFileExpandTabs fname 
-#if __GLASGOW_HASKELL__ < 411
-				else slurpFile fname
-#else
-				else do
-				    (Ptr a#, read) <- slurpFile fname
-				    return (A# a#, read)
-#endif
+hGetStringBuffer :: FilePath -> IO StringBuffer
+hGetStringBuffer fname = do
+   (a, read) <- slurpFileExpandTabs fname 
 
 	-- urk! slurpFile gives us a buffer that doesn't have room for
 	-- the sentinel.  Assume it has a final newline for now, and overwrite
@@ -289,9 +275,6 @@ trySlurp handle sz_i chunk =
 	-- and add 1 to allow room for the final sentinel \NUL at
 	-- the end of the file.
   (chunk', rc) <- slurpFile 0# 0# chunk chunk_sz (chunk_sz -# (tAB_SIZE +# 1#))
-#if __GLASGOW_HASKELL__ < 404
-  writeHandle handle handle_
-#endif
   return (chunk', rc+1 {- room for sentinel -})
 
 
@@ -513,32 +496,10 @@ lexemeToString (StringBuffer fo _ start_pos# current#) =
  else
     unpackCStringBA (copySubStr (A# fo) (I# start_pos#) (I# (current# -# start_pos#)))
     
-lexemeToByteArray :: StringBuffer -> ByteArray Int
-lexemeToByteArray (StringBuffer fo _ start_pos# current#) = 
- if start_pos# ==# current# then
-    error "lexemeToByteArray" 
- else
-    copySubStr (A# fo) (I# start_pos#) (I# (current# -# start_pos#))
-
 lexemeToFastString :: StringBuffer -> FastString
 lexemeToFastString (StringBuffer fo l# start_pos# current#) =
  if start_pos# ==# current# then
     mkFastString ""
  else
     mkFastSubString (A# fo) (I# start_pos#) (I# (current# -# start_pos#))
-
-{-
- Create a StringBuffer from the current lexeme, and add a sentinel
- at the end. Know What You're Doing before taking this function
- into use..
--}
-lexemeToBuffer :: StringBuffer -> StringBuffer
-lexemeToBuffer (StringBuffer fo l# start_pos# current#) =
- if start_pos# ==# current# then
-    StringBuffer fo 0# start_pos# current# -- an error, really. 
- else
-    unsafeWriteBuffer (StringBuffer fo (current# -# start_pos#) start_pos# start_pos#)
-		      (current# -# 1#)
-		      '\NUL'#
-
 \end{code}

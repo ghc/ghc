@@ -470,9 +470,7 @@ instance (NamedThing name, Outputable name, Outputable pat)
 
     ppr (IfaceSig {tcdName = var, tcdType = ty, tcdIdInfo = info})
 	= getPprStyle $ \ sty ->
-	   hsep [ if ifaceStyle sty then ppr var else ppr_var var,
-		  dcolon, ppr ty, pprHsIdInfo info
-		]
+	   hsep [ ppr_var var, dcolon, ppr ty, pprHsIdInfo info ]
 
     ppr (ForeignType {tcdName = tycon})
 	= hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
@@ -504,8 +502,7 @@ instance (NamedThing name, Outputable name, Outputable pat)
         top_matter  = ptext SLIT("class") <+> pp_decl_head context clas tyvars <+> pprFundeps fds
 	ppr_sig sig = ppr sig <> semi
 
-	pp_methods = getPprStyle $ \ sty ->
-        	     if ifaceStyle sty || isNothing methods
+	pp_methods = if isNothing methods
 			then empty
 			else ppr (fromJust methods)
         
@@ -629,9 +626,7 @@ ppr_con_details con (InfixCon ty1 ty2)
 -- we don't distinguish between the two.  Hence when printing these for the
 -- user, we need to parenthesise infix constructor names.
 ppr_con_details con (VanillaCon tys)
-  = getPprStyle $ \ sty ->
-    hsep ((if ifaceStyle sty then ppr con else ppr_var con)
-	  : map (ppr_bang) tys)
+  = hsep (ppr_var con : map (ppr_bang) tys)
 
 ppr_con_details con (RecCon fields)
   = ppr con <+> braces (sep (punctuate comma (map ppr_field fields)))
@@ -677,13 +672,9 @@ instance (Outputable name, Outputable pat)
 	      => Outputable (InstDecl name pat) where
 
     ppr (InstDecl inst_ty binds uprags maybe_dfun_name src_loc)
-      = getPprStyle $ \ sty ->
-        if ifaceStyle sty then
-           hsep [ptext SLIT("instance"), ppr inst_ty, equals, pp_dfun]
-	else
-	   vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
-	         nest 4 (ppr uprags),
-	         nest 4 (ppr binds) ]
+      = vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
+	      nest 4 (ppr uprags),
+	      nest 4 (ppr binds) ]
       where
 	pp_dfun = case maybe_dfun_name of
 		    Just df -> ppr df

@@ -367,7 +367,6 @@ pprLit lit
   = getPprStyle $ \ sty ->
     let
       code_style  = codeStyle  sty
-      iface_style = ifaceStyle sty
     in
     case lit of
       MachChar ch | code_style -> hcat [ptext SLIT("(C_)"), text (show ch)]
@@ -395,8 +394,7 @@ pprLit lit
       MachFloat f | code_style -> ptext SLIT("(StgFloat)") <> rational f
                   | otherwise  -> ptext SLIT("__float") <+> rational f
 
-      MachDouble d | iface_style && d < 0 -> parens (rational d)
-		   | otherwise            -> rational d
+      MachDouble d -> rational d
 
       MachAddr p | code_style -> ptext SLIT("(void*)") <> integer p
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p
