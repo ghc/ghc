@@ -1,0 +1,18 @@
+ 
+ds025.hs:3:
+    Conflicting definitions for: `Just'
+	Defined at ds025.hs:18
+	Imported from Prelude at ds025.hs:3
+ 
+ds025.hs:3:
+    Conflicting definitions for: `Nothing'
+	Defined at ds025.hs:18
+	Imported from Prelude at ds025.hs:3
+ 
+ds025.hs:3:
+    Conflicting definitions for: `Maybe'
+	Defined at ds025.hs:18
+	Imported from Prelude at ds025.hs:3
+
+
+Compilation had errors

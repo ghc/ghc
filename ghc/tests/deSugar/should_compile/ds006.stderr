@@ -1,0 +1,55 @@
+
+
+================================================================================
+Desugared:
+Rec {
+d.Num_aHu  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
+{-# L #-}
+d.Num_aHu =
+    PrelBase.$d3{-rb1,p-}
++_aJy  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Int{-3g,p-}
+    -> PrelBase.Int{-3g,p-}
+{-# L #-}
++_aJy =
+    PrelBase.+{-ras,p-}
+	_@_ PrelBase.Int{-3g,p-} d.Num_aHu
+d.Num_aHy  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
+{-# L #-}
+d.Num_aHy =
+    d.Num_aHu
+fromInt_aJG  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+fromInt_aJG =
+    PrelBase.fromInt{-8R,p-}
+	_@_ PrelBase.Int{-3g,p-} d.Num_aHy
+lit_aJF  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_aJF =
+    let {
+      ds_dKi  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      ds_dKi =
+	  PrelBase.I#{-5b,p-}{i}
+	      1
+    } in 
+      fromInt_aJG
+	  ds_dKi
+v_aHa  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+v_aHa =
+    +_aJy
+	v_aHa lit_aJF
+v{-r1,x-}  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+v{-r1,x-} =
+    v_aHa
+end Rec }

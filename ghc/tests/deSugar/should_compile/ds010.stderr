@@ -1,0 +1,338 @@
+
+
+================================================================================
+Desugared:
+Rec {
+d.Monad_aWF  :: 
+    {PrelBase.Monad{-28,p-} PrelBase.[]{-3j,p-}}
+{-# L #-}
+d.Monad_aWF =
+    PrelBase.$d24{-rq8,p-}
+>>=_a11I  :: 
+    _forall_
+    [rjI{-aWJ-} rjJ{-aWK-}]
+    =>
+    [rjI{-aWJ-}] -> (rjI{-aWJ-} -> [rjJ{-aWK-}]) -> [rjJ{-aWK-}]
+{-# L #-}
+>>=_a11I =
+    PrelBase.>>={-811,p-}
+	_@_ PrelBase.[]{-3j,p-} d.Monad_aWF
+d.Monad_aWI  :: 
+    {PrelBase.Monad{-28,p-} PrelBase.[]{-3j,p-}}
+{-# L #-}
+d.Monad_aWI =
+    d.Monad_aWF
+return_a11P  :: 
+    _forall_ [rjQ{-aWL-}] => rjQ{-aWL-} -> [rjQ{-aWL-}]
+{-# L #-}
+return_a11P =
+    PrelBase.return{-816,p-}
+	_@_ PrelBase.[]{-3j,p-} d.Monad_aWI
+z_aW0  :: 
+    [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+{-# L #-}
+z_aW0 =
+    _letrec_ {
+      ds_d12r  :: 
+	  [PrelBase.Char{-38,p-}]
+	  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+      {-# L #-}
+      ds_d12r =
+	  \ ds_d12w  :: 
+		[PrelBase.Char{-38,p-}]
+	    {-# L #-}
+	    ds_d12w ->
+	      case ds_d12w of {
+		PrelBase.[]{-5i,p-}{i} ->
+		    PrelBase.[]{-5i,p-}{i}
+			{_@_ (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})};
+		PrelBase.:{-55,p-}{i} ds_d12I ds_d12R ->
+		    let {
+		      a_r3d  :: 
+			  PrelBase.Char{-38,p-}
+		      {-# L #-}
+		      a_r3d =
+			  ds_d12I } in
+		    _letrec_ {
+		      ds_d12X  :: 
+			  [PrelBase.Char{-38,p-}]
+			  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+		      {-# L #-}
+		      ds_d12X =
+			  \ ds_d132  :: 
+				[PrelBase.Char{-38,p-}]
+			    {-# L #-}
+			    ds_d132 ->
+			      case ds_d132 of {
+				PrelBase.[]{-5i,p-}{i} ->
+				    ds_d12r
+					ds_d12R;
+				PrelBase.:{-55,p-}{i} ds_d13h ds_d13q ->
+				    let {
+				      b_r3f  :: 
+					  PrelBase.Char{-38,p-}
+				      {-# L #-}
+				      b_r3f =
+					  ds_d13h } in
+				    _letrec_ {
+				      ds_d13w  :: 
+					  [PrelBase.Char{-38,p-}]
+					  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+				      {-# L #-}
+				      ds_d13w =
+					  \ ds_d13B  :: 
+						[PrelBase.Char{-38,p-}]
+					    {-# L #-}
+					    ds_d13B ->
+					      case ds_d13B of {
+						PrelBase.[]{-5i,p-}{i} ->
+						    ds_d12X
+							ds_d13q;
+						PrelBase.:{-55,p-}{i} ds_d13Q ds_d13Z ->
+						    let {
+						      c_r3h  :: 
+							  PrelBase.Char{-38,p-}
+						      {-# L #-}
+						      c_r3h =
+							  ds_d13Q } in
+						    _letrec_ {
+						      ds_d145  :: 
+							  [PrelBase.Char{-38,p-}]
+							  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+						      {-# L #-}
+						      ds_d145 =
+							  \ ds_d14a  :: 
+								[PrelBase.Char{-38,p-}]
+							    {-# L #-}
+							    ds_d14a ->
+							      case ds_d14a of {
+								PrelBase.[]{-5i,p-}{i} ->
+								    ds_d13w
+									ds_d13Z;
+								PrelBase.:{-55,p-}{i} ds_d14p ds_d14y ->
+								    let {
+								      d_r3j  :: 
+									  PrelBase.Char{-38,p-}
+								      {-# L #-}
+								      d_r3j =
+									  ds_d14p } in
+								    _letrec_ {
+								      ds_d14E  :: 
+									  [PrelBase.Char{-38,p-}]
+									  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+								      {-# L #-}
+								      ds_d14E =
+									  \ ds_d14J  :: 
+										[PrelBase.Char{-38,p-}]
+									    {-# L #-}
+									    ds_d14J ->
+									      case ds_d14J of {
+										PrelBase.[]{-5i,p-}{i} ->
+										    ds_d145
+											ds_d14y;
+										PrelBase.:{-55,p-}{i} ds_d14Y ds_d157 ->
+										    let {
+										      e_r3l  :: 
+											  PrelBase.Char{-38,p-}
+										      {-# L #-}
+										      e_r3l =
+											  ds_d14Y } in
+										    _letrec_ {
+										      ds_d15d  :: 
+											  [PrelBase.Char{-38,p-}]
+											  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+										      {-# L #-}
+										      ds_d15d =
+											  \ ds_d15i  :: 
+												[PrelBase.Char{-38,p-}]
+											    {-# L #-}
+											    ds_d15i ->
+											      case
+												  ds_d15i
+											      of {
+												PrelBase.[]{-5i,p-}{i} ->
+												    ds_d14E
+													ds_d157;
+												PrelBase.:{-55,p-}{i} ds_d15x ds_d15G ->
+												    let {
+												      f_r3n  :: 
+													  PrelBase.Char{-38,p-}
+												      {-# L #-}
+												      f_r3n =
+													  ds_d15x } in
+												    _letrec_ {
+												      ds_d15M  :: 
+													  [PrelBase.Char{-38,p-}]
+													  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+												      {-# L #-}
+												      ds_d15M =
+													  \ ds_d15R  :: 
+														[PrelBase.Char{-38,p-}]
+													    {-# L #-}
+													    ds_d15R ->
+													      case
+														  ds_d15R
+													      of {
+														PrelBase.[]{-5i,p-}{i} ->
+														    ds_d15d
+															ds_d15G;
+														PrelBase.:{-55,p-}{i} ds_d166 ds_d16f ->
+														    let {
+														      g_r3p  :: 
+															  PrelBase.Char{-38,p-}
+														      {-# L #-}
+														      g_r3p =
+															  ds_d166 } in
+														    _letrec_ {
+														      ds_d16l  :: 
+															  [PrelBase.Char{-38,p-}]
+															  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+														      {-# L #-}
+														      ds_d16l =
+															  \ ds_d16q  :: 
+																[PrelBase.Char{-38,p-}]
+															    {-# L #-}
+															    ds_d16q ->
+															      case
+																  ds_d16q
+															      of {
+																PrelBase.[]{-5i,p-}{i} ->
+																    ds_d15M
+																	ds_d16f;
+																PrelBase.:{-55,p-}{i} ds_d16F ds_d16O ->
+																    let {
+																      h_r3r  :: 
+																	  PrelBase.Char{-38,p-}
+																      {-# L #-}
+																      h_r3r =
+																	  ds_d16F } in
+																    _letrec_ {
+																      ds_d16U  :: 
+																	  [PrelBase.Char{-38,p-}]
+																	  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+																      {-# L #-}
+																      ds_d16U =
+																	  \ ds_d16Z  :: 
+																		[PrelBase.Char{-38,p-}]
+																	    {-# L #-}
+																	    ds_d16Z ->
+																	      case
+																		  ds_d16Z
+																	      of {
+																		PrelBase.[]{-5i,p-}{i} ->
+																		    ds_d16l
+																			ds_d16O;
+																		PrelBase.:{-55,p-}{i} ds_d17e ds_d17n ->
+																		    let {
+																		      i_r3t  :: 
+																			  PrelBase.Char{-38,p-}
+																		      {-# L #-}
+																		      i_r3t =
+																			  ds_d17e } in
+																		    _letrec_ {
+																		      ds_d17t  :: 
+																			  [PrelBase.Char{-38,p-}]
+																			  -> [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+																		      {-# L #-}
+																		      ds_d17t =
+																			  \ ds_d17y  :: 
+																				[PrelBase.Char{-38,p-}]
+																			    {-# L #-}
+																			    ds_d17y ->
+																			      case
+																				  ds_d17y
+																			      of {
+																				PrelBase.[]{-5i,p-}{i} ->
+																				    ds_d16U
+																					ds_d17n;
+																				PrelBase.:{-55,p-}{i} ds_d17N ds_d186 ->
+																				    let {
+																				      j_r3v  :: 
+																					  PrelBase.Char{-38,p-}
+																				      {-# L #-}
+																				      j_r3v =
+																					  ds_d17N } in
+																				    let {
+																				      ds_d17Z  :: 
+																					  (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+																				      {-# L #-}
+																				      ds_d17Z =
+																					  PrelTup.(,,,,,,,,,){-6a,p-}{i}
+																					      {_@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       _@_ PrelBase.Char{-38,p-}
+																					       a_r3d
+																					       b_r3f
+																					       c_r3h
+																					       d_r3j
+																					       e_r3l
+																					       f_r3n
+																					       g_r3p
+																					       h_r3r
+																					       i_r3t
+																					       j_r3v} } in
+																				    let {
+																				      ds_d183  :: 
+																					  [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+																				      {-# L #-}
+																				      ds_d183 =
+																					  ds_d17t
+																					      ds_d186
+																				    } in 
+																				      PrelBase.:{-55,p-}{i}
+																					  {_@_ (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+																					   ds_d17Z
+																					   ds_d183};
+																			      };
+																		    } in 
+																		      ds_d17t
+																			  _string_ "12";
+																	      };
+																    } in 
+																      ds_d16U
+																	  _string_ "12";
+															      };
+														    } in 
+														      ds_d16l
+															  _string_ "12";
+													      };
+												    } in 
+												      ds_d15M
+													  _string_ "12";
+											      };
+										    } in 
+										      ds_d15d
+											  _string_ "12";
+									      };
+								    } in 
+								      ds_d14E
+									  _string_ "12";
+							      };
+						    } in 
+						      ds_d145
+							  _string_ "12";
+					      };
+				    } in 
+				      ds_d13w
+					  _string_ "12";
+			      };
+		    } in 
+		      ds_d12X
+			  _string_ "12";
+	      };
+    } in 
+      ds_d12r
+	  _string_ "12"
+z{-r3w,x-}  :: 
+    [(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})]
+{-# L #-}
+z{-r3w,x-} =
+    z_aW0
+end Rec }

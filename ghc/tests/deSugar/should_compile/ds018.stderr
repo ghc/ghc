@@ -1,0 +1,671 @@
+ds018.hs:41: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `fb'
+ds018.hs:39: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `fa'
+
+
+================================================================================
+Desugared:
+gb2_aCw  :: 
+    PrelBase.(){-40,p-} -> PrelBase.(){-40,p-}
+{-# L #-}
+gb2_aCw =
+    \ ds_d18I  :: 
+	  PrelBase.(){-40,p-}
+      {-# L #-}
+      ds_d18I ->
+	case ds_d18I of { PrelBase.(){-60,p-}{i}  ->
+	PrelBase.(){-60,p-}{i};}
+gb2{-r50,x-}  :: 
+    PrelBase.(){-40,p-} -> PrelBase.(){-40,p-}
+{-# L #-}
+gb2{-r50,x-} =
+    gb2_aCw
+gb{-r51,x-}  :: 
+    _forall_ [t{-aCG-}] => PrelBase.(){-40,p-} -> t{-aCG-} -> t{-aCG-}
+{-# L #-}
+gb{-r51,x-} =
+    _/\_ t{-aCG-} -> \ ds_d19f  :: 
+			   PrelBase.(){-40,p-}
+		       {-# L #-}
+		       ds_d19f x_r4Z  :: 
+				   t{-aCG-}
+			       {-# L #-}
+			       x_r4Z ->
+	case ds_d19f of { PrelBase.(){-60,p-}{i}  -> x_r4Z;}
+ga{-r52,x-}  :: 
+    _forall_
+    [t{-aDB-} t{-aDE-} t{-aDH-} t{-aDK-} t{-aDN-} t{-aDQ-} t{-aDT-} t{-aDW-} t{-aDZ-} t{-aE2-} t{-aE5-} t{-aE8-} t{-aEb-} t{-aEe-} t{-aEh-} t{-aEk-} t{-aEn-} t{-aEq-} t{-aEt-} t{-aEw-} t{-aEz-} t{-aEC-} t{-aEF-} t{-aEI-} t{-aEL-} t{-aEO-} t{-aER-} t{-aEU-} t{-aEX-} t{-aF0-} t{-aF3-} t{-aF6-} t{-aF9-} t{-aFc-} t{-aFf-} t{-aFi-} t{-aFl-} t{-aFo-} t{-aFr-} t{-aFu-} t{-aFx-} t{-aFA-} t{-aFD-} t{-aFG-} t{-aFJ-} t{-aFM-} t{-aFP-} t{-aFS-} t{-aFV-} t{-aFY-} t{-aG1-} t{-aG4-}]
+    =>
+    (t{-aDB-}, t{-aDE-}, t{-aDH-}, t{-aDK-}, t{-aDN-}, t{-aDQ-}, t{-aDT-}, t{-aDW-}, t{-aDZ-}, t{-aE2-}, t{-aE5-}, t{-aE8-}, t{-aEb-}, t{-aEe-}, t{-aEh-}, t{-aEk-}, t{-aEn-}, t{-aEq-}, t{-aEt-}, t{-aEw-}, t{-aEz-}, t{-aEC-}, t{-aEF-}, t{-aEI-}, t{-aEL-}, t{-aEO-}, t{-aER-}, t{-aEU-}, t{-aEX-}, t{-aF0-}, t{-aF3-}, t{-aF6-}, t{-aF9-}, t{-aFc-}, t{-aFf-}, t{-aFi-}, t{-aFl-}, t{-aFo-}, t{-aFr-}, t{-aFu-}, t{-aFx-}, t{-aFA-}, t{-aFD-}, t{-aFG-}, t{-aFJ-}, t{-aFM-}, t{-aFP-}, t{-aFS-}, t{-aFV-}, t{-aFY-}, t{-aG1-}, t{-aG4-})
+    -> t{-aEI-}
+{-# L #-}
+ga{-r52,x-} =
+    _/\_ t{-aDB-} t{-aDE-} t{-aDH-} t{-aDK-} t{-aDN-} t{-aDQ-} t{-aDT-} t{-aDW-} t{-aDZ-} t{-aE2-} t{-aE5-} t{-aE8-} t{-aEb-} t{-aEe-} t{-aEh-} t{-aEk-} t{-aEn-} t{-aEq-} t{-aEt-} t{-aEw-} t{-aEz-} t{-aEC-} t{-aEF-} t{-aEI-} t{-aEL-} t{-aEO-} t{-aER-} t{-aEU-} t{-aEX-} t{-aF0-} t{-aF3-} t{-aF6-} t{-aF9-} t{-aFc-} t{-aFf-} t{-aFi-} t{-aFl-} t{-aFo-} t{-aFr-} t{-aFu-} t{-aFx-} t{-aFA-} t{-aFD-} t{-aFG-} t{-aFJ-} t{-aFM-} t{-aFP-} t{-aFS-} t{-aFV-} t{-aFY-} t{-aG1-} t{-aG4-} -> \ ds_d1ar  :: 
+																																																												      (t{-aDB-}, t{-aDE-}, t{-aDH-}, t{-aDK-}, t{-aDN-}, t{-aDQ-}, t{-aDT-}, t{-aDW-}, t{-aDZ-}, t{-aE2-}, t{-aE5-}, t{-aE8-}, t{-aEb-}, t{-aEe-}, t{-aEh-}, t{-aEk-}, t{-aEn-}, t{-aEq-}, t{-aEt-}, t{-aEw-}, t{-aEz-}, t{-aEC-}, t{-aEF-}, t{-aEI-}, t{-aEL-}, t{-aEO-}, t{-aER-}, t{-aEU-}, t{-aEX-}, t{-aF0-}, t{-aF3-}, t{-aF6-}, t{-aF9-}, t{-aFc-}, t{-aFf-}, t{-aFi-}, t{-aFl-}, t{-aFo-}, t{-aFr-}, t{-aFu-}, t{-aFx-}, t{-aFA-}, t{-aFD-}, t{-aFG-}, t{-aFJ-}, t{-aFM-}, t{-aFP-}, t{-aFS-}, t{-aFV-}, t{-aFY-}, t{-aG1-}, t{-aG4-})
+																																																												  {-# L #-}
+																																																												  ds_d1ar ->
+	case
+	    ds_d1ar
+	of {
+	PrelTup.(,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,){-6Q,p-}{i} a_r47 b_r48 c_r49 d_r4a e_r4b f_r4c g_r4d h_r4e i_r4f j_r4g k_r4h l_r4i m_r4j n_r4k o_r4l p_r4m q_r4n r_r4o s_r4p t_r4q u_r4r v_r4s w_r4t x_r4u y_r4v z_r4w aa_r4x ab_r4y ac_r4z ad_r4A ae_r4B af_r4C ag_r4D ah_r4E ai_r4F aj_r4G ak_r4H al_r4I am_r4J an_r4K ao_r4L ap_r4M aq_r4N ar_r4O as_r4P at_r4Q au_r4R av_r4S aw_r4T ax_r4U ay_r4V az_r4W  ->
+	x_r4u;}
+fb{-r53,x-}  :: 
+    _forall_ [t{-aGc-} t{-aGe-}] => [t{-aGc-}] -> [t{-aGe-}]
+{-# L #-}
+fb{-r53,x-} =
+    _/\_ t{-aGc-} t{-aGe-} -> \ ds_d1aY  :: 
+				    [t{-aGc-}]
+				{-# L #-}
+				ds_d1aY ->
+	let {
+	  fail_d1aZ  :: 
+	      [t{-aGe-}]
+	  {-# L #-}
+	  fail_d1aZ =
+	      GHCerr.patError{-8r,p-}
+		  _@_ [t{-aGe-}] _string_ "ds018.hs:41|function `fb'"
+	} in 
+	  case ds_d1aY of {
+	    PrelBase.:{-55,p-}{i} ds_d1b7 ds_d1b6 ->
+		fail_d1aZ;
+	    PrelBase.[]{-5i,p-}{i} ->
+		PrelBase.[]{-5i,p-}{i}
+		    _@_ t{-aGe-};
+	  }
+fa{-r54,x-}  :: 
+    _forall_ [t{-aGJ-}] => [t{-aGJ-}] -> t{-aGJ-}
+{-# L #-}
+fa{-r54,x-} =
+    _/\_ t{-aGJ-} -> \ ds_d1bF  :: 
+			   [t{-aGJ-}]
+		       {-# L #-}
+		       ds_d1bF ->
+	let {
+	  fail_d1bG  :: 
+	      t{-aGJ-}
+	  {-# L #-}
+	  fail_d1bG =
+	      GHCerr.patError{-8r,p-}
+		  _@_ t{-aGJ-} _string_ "ds018.hs:39|function `fa'"
+	} in 
+	  case ds_d1bF of {
+	    PrelBase.[]{-5i,p-}{i} ->
+		fail_d1bG;
+	    PrelBase.:{-55,p-}{i} a_r3F ds_d1bT ->
+		case ds_d1bT of {
+		  PrelBase.[]{-5i,p-}{i} ->
+		      fail_d1bG;
+		  PrelBase.:{-55,p-}{i} b_r3G ds_d1c6 ->
+		      case ds_d1c6 of {
+			PrelBase.[]{-5i,p-}{i} ->
+			    fail_d1bG;
+			PrelBase.:{-55,p-}{i} c_r3H ds_d1cj ->
+			    case ds_d1cj of {
+			      PrelBase.[]{-5i,p-}{i} ->
+				  fail_d1bG;
+			      PrelBase.:{-55,p-}{i} d_r3I ds_d1cw ->
+				  case ds_d1cw of {
+				    PrelBase.[]{-5i,p-}{i} ->
+					fail_d1bG;
+				    PrelBase.:{-55,p-}{i} e_r3J ds_d1cJ ->
+					case ds_d1cJ of {
+					  PrelBase.[]{-5i,p-}{i} ->
+					      fail_d1bG;
+					  PrelBase.:{-55,p-}{i} f_r3K ds_d1cW ->
+					      case ds_d1cW of {
+						PrelBase.[]{-5i,p-}{i} ->
+						    fail_d1bG;
+						PrelBase.:{-55,p-}{i} g_r3L ds_d1d9 ->
+						    case ds_d1d9 of {
+						      PrelBase.[]{-5i,p-}{i} ->
+							  fail_d1bG;
+						      PrelBase.:{-55,p-}{i} h_r3M ds_d1dm ->
+							  case ds_d1dm of {
+							    PrelBase.[]{-5i,p-}{i} ->
+								fail_d1bG;
+							    PrelBase.:{-55,p-}{i} i_r3N ds_d1dz ->
+								case ds_d1dz of {
+								  PrelBase.[]{-5i,p-}{i} ->
+								      fail_d1bG;
+								  PrelBase.:{-55,p-}{i} j_r3O ds_d1dM ->
+								      case ds_d1dM of {
+									PrelBase.[]{-5i,p-}{i} ->
+									    fail_d1bG;
+									PrelBase.:{-55,p-}{i} k_r3P ds_d1dZ ->
+									    case ds_d1dZ of {
+									      PrelBase.[]{-5i,p-}{i} ->
+										  fail_d1bG;
+									      PrelBase.:{-55,p-}{i} l_r3Q ds_d1ec ->
+										  case ds_d1ec of {
+										    PrelBase.[]{-5i,p-}{i} ->
+											fail_d1bG;
+										    PrelBase.:{-55,p-}{i} m_r3R ds_d1ep ->
+											case
+											    ds_d1ep
+											of {
+											  PrelBase.[]{-5i,p-}{i} ->
+											      fail_d1bG;
+											  PrelBase.:{-55,p-}{i} n_r3S ds_d1eC ->
+											      case
+												  ds_d1eC
+											      of {
+												PrelBase.[]{-5i,p-}{i} ->
+												    fail_d1bG;
+												PrelBase.:{-55,p-}{i} o_r3T ds_d1eP ->
+												    case
+													ds_d1eP
+												    of {
+												      PrelBase.[]{-5i,p-}{i} ->
+													  fail_d1bG;
+												      PrelBase.:{-55,p-}{i} p_r3U ds_d1f2 ->
+													  case
+													      ds_d1f2
+													  of {
+													    PrelBase.[]{-5i,p-}{i} ->
+														fail_d1bG;
+													    PrelBase.:{-55,p-}{i} q_r3V ds_d1ff ->
+														case
+														    ds_d1ff
+														of {
+														  PrelBase.[]{-5i,p-}{i} ->
+														      fail_d1bG;
+														  PrelBase.:{-55,p-}{i} r_r3W ds_d1fs ->
+														      case
+															  ds_d1fs
+														      of {
+															PrelBase.[]{-5i,p-}{i} ->
+															    fail_d1bG;
+															PrelBase.:{-55,p-}{i} s_r3X ds_d1fF ->
+															    case
+																ds_d1fF
+															    of {
+															      PrelBase.[]{-5i,p-}{i} ->
+																  fail_d1bG;
+															      PrelBase.:{-55,p-}{i} t_r3Y ds_d1fS ->
+																  case
+																      ds_d1fS
+																  of {
+																    PrelBase.[]{-5i,p-}{i} ->
+																	fail_d1bG;
+																    PrelBase.:{-55,p-}{i} u_r3Z ds_d1g5 ->
+																	case
+																	    ds_d1g5
+																	of {
+																	  PrelBase.[]{-5i,p-}{i} ->
+																	      fail_d1bG;
+																	  PrelBase.:{-55,p-}{i} v_r40 ds_d1gi ->
+																	      case
+																		  ds_d1gi
+																	      of {
+																		PrelBase.[]{-5i,p-}{i} ->
+																		    fail_d1bG;
+																		PrelBase.:{-55,p-}{i} w_r41 ds_d1gv ->
+																		    case
+																			ds_d1gv
+																		    of {
+																		      PrelBase.[]{-5i,p-}{i} ->
+																			  fail_d1bG;
+																		      PrelBase.:{-55,p-}{i} x_r42 ds_d1gI ->
+																			  case
+																			      ds_d1gI
+																			  of {
+																			    PrelBase.[]{-5i,p-}{i} ->
+																				fail_d1bG;
+																			    PrelBase.:{-55,p-}{i} y_r43 ds_d1gV ->
+																				case
+																				    ds_d1gV
+																				of {
+																				  PrelBase.[]{-5i,p-}{i} ->
+																				      fail_d1bG;
+																				  PrelBase.:{-55,p-}{i} z_r44 ds_d1h8 ->
+																				      case
+																					  ds_d1h8
+																				      of {
+																					PrelBase.:{-55,p-}{i} ds_d1hg ds_d1hf ->
+																					    fail_d1bG;
+																					PrelBase.[]{-5i,p-}{i} ->
+																					    x_r42;
+																				      };
+																				};
+																			  };
+																		    };
+																	      };
+																	};
+																  };
+															    };
+														      };
+														};
+													  };
+												    };
+											      };
+											};
+										  };
+									    };
+								      };
+								};
+							  };
+						    };
+					      };
+					};
+				  };
+			    };
+		      };
+		};
+	  }
+g{-r55,x-}  :: 
+    _forall_
+    [t{-aHm-} t{-aHo-} t{-aHq-}]
+    =>
+    t{-aHm-}
+    -> t{-aHo-}
+    -> t{-aHq-}
+    -> (t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-}, t{-aHm-}, t{-aHo-}, t{-aHq-})
+{-# L #-}
+g{-r55,x-} =
+    _/\_ t{-aHm-} t{-aHo-} t{-aHq-} -> \ x_r3z  :: 
+					     t{-aHm-}
+					 {-# L #-}
+					 x_r3z y_r3B  :: 
+						   t{-aHo-}
+					       {-# L #-}
+					       y_r3B z_r3D  :: 
+							 t{-aHq-}
+						     {-# L #-}
+						     z_r3D ->
+	PrelTup.(,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,){-62q,p-}{i}
+	    {_@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     _@_ t{-aHm-}
+	     _@_ t{-aHo-}
+	     _@_ t{-aHq-}
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D
+	     x_r3z
+	     y_r3B
+	     z_r3D}
+g1{-r56,x-}  :: 
+    _forall_
+    [t{-aHA-} t{-aHC-}]
+    =>
+    t{-aHA-} -> t{-aHC-} -> PrelBase.(){-40,p-}
+{-# L #-}
+g1{-r56,x-} =
+    _/\_ t{-aHA-} t{-aHC-} -> \ x_r3v  :: 
+				    t{-aHA-}
+				{-# L #-}
+				x_r3v y_r3x  :: 
+					  t{-aHC-}
+				      {-# L #-}
+				      y_r3x ->
+	PrelBase.(){-60,p-}{i}
+f2{-r57,x-}  :: 
+    _forall_
+    [t{-aHO-} t{-aHQ-} t{-aHM-}]
+    =>
+    t{-aHO-} -> t{-aHQ-} -> [t{-aHM-}]
+{-# L #-}
+f2{-r57,x-} =
+    _/\_ t{-aHO-} t{-aHQ-} t{-aHM-} -> \ x_r3r  :: 
+					     t{-aHO-}
+					 {-# L #-}
+					 x_r3r y_r3t  :: 
+						   t{-aHQ-}
+					       {-# L #-}
+					       y_r3t ->
+	PrelBase.[]{-5i,p-}{i}
+	    _@_ t{-aHM-}
+f{-r58,x-}  :: 
+    _forall_
+    [t{-aI2-}]
+    =>
+    t{-aI2-} -> t{-aI2-} -> t{-aI2-} -> [t{-aI2-}]
+{-# L #-}
+f{-r58,x-} =
+    _/\_ t{-aI2-} -> \ x_r3l  :: 
+			   t{-aI2-}
+		       {-# L #-}
+		       x_r3l y_r3n  :: 
+				 t{-aI2-}
+			     {-# L #-}
+			     y_r3n z_r3p  :: 
+				       t{-aI2-}
+				   {-# L #-}
+				   z_r3p ->
+	let { ds_d1uJ  :: 
+		  [t{-aI2-}]
+	      {-# L #-}
+	      ds_d1uJ =
+	  let { ds_d1uV  :: 
+		    [t{-aI2-}]
+		{-# L #-}
+		ds_d1uV =
+	    let { ds_d1v7  :: 
+		      [t{-aI2-}]
+		  {-# L #-}
+		  ds_d1v7 =
+	      let { ds_d1vj  :: 
+			[t{-aI2-}]
+		    {-# L #-}
+		    ds_d1vj =
+		let { ds_d1vv  :: 
+			  [t{-aI2-}]
+		      {-# L #-}
+		      ds_d1vv =
+		  let {
+		    ds_d1vH  :: 
+			[t{-aI2-}]
+		    {-# L #-}
+		    ds_d1vH =
+			PrelBase.[]{-5i,p-}{i}
+			    {_@_ t{-aI2-}}
+		  } in 
+		    PrelBase.:{-55,p-}{i}
+			{_@_ t{-aI2-} z_r3p ds_d1vH}
+		} in
+		PrelBase.:{-55,p-}{i}
+		    {_@_ t{-aI2-} y_r3n ds_d1vv}
+	      } in
+	      PrelBase.:{-55,p-}{i}
+		  {_@_ t{-aI2-} x_r3l ds_d1vj}
+	    } in
+	    PrelBase.:{-55,p-}{i}
+		{_@_ t{-aI2-} z_r3p ds_d1v7}
+	  } in
+	  PrelBase.:{-55,p-}{i}
+	      {_@_ t{-aI2-} y_r3n ds_d1uV}
+	} in
+	PrelBase.:{-55,p-}{i}
+	    {_@_ t{-aI2-} x_r3l ds_d1uJ}

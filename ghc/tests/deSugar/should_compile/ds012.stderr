@@ -1,0 +1,299 @@
+
+
+================================================================================
+Desugared:
+h{-r3l,x-}  :: 
+    _forall_
+    [t{-aHu-} t{-aHz-}]
+    =>
+    {PrelBase.Num{-2c,p-} t{-aHu-}} -> t{-aHz-} -> t{-aHu-}
+{-# L #-}
+h{-r3l,x-} =
+    _/\_ t{-aHu-} t{-aHz-} -> \ d.Num_aHB  :: 
+				    {PrelBase.Num{-2c,p-} t{-aHu-}}
+				{-# L #-}
+				d.Num_aHB ->
+	let {
+	  +_aP0  :: 
+	      t{-aHu-} -> t{-aHu-} -> t{-aHu-}
+	  {-# L #-}
+	  +_aP0 =
+	      PrelBase.+{-r3k,p-}
+		  _@_ t{-aHu-} d.Num_aHB } in
+	let {
+	  d.Num_aHE  :: 
+	      {PrelBase.Num{-2c,p-} t{-aHu-}}
+	  {-# L #-}
+	  d.Num_aHE =
+	      d.Num_aHB } in
+	let {
+	  fromInteger_aOZ  :: 
+	      PrelBase.Integer{-3h,p-} -> t{-aHu-}
+	  {-# L #-}
+	  fromInteger_aOZ =
+	      PrelBase.fromInteger{-8S,p-}
+		  _@_ t{-aHu-} d.Num_aHE } in
+	let {
+	  lit_aOY  :: 
+	      t{-aHu-}
+	  {-# L #-}
+	  lit_aOY =
+	      fromInteger_aOZ
+		  _integer_  111111111111111111111111111111111111111111111111111111111111 } in
+	let {
+	  fromInteger_aOX  :: 
+	      PrelBase.Integer{-3h,p-} -> t{-aHu-}
+	  {-# L #-}
+	  fromInteger_aOX =
+	      fromInteger_aOZ } in
+	let {
+	  lit_aOW  :: 
+	      t{-aHu-}
+	  {-# L #-}
+	  lit_aOW =
+	      fromInteger_aOX
+		  _integer_  222222222222222222222222222222222222222222222222222222222222
+	} in 
+	  \ x_r3j  :: 
+		t{-aHz-}
+	    {-# L #-}
+	    x_r3j ->
+	      +_aP0
+		  lit_aOY lit_aOW
+f{-r3n,x-}  :: 
+    _forall_
+    [t{-aI9-} t{-aIe-}]
+    =>
+    {PrelBase.Num{-2c,p-} t{-aI9-}} -> t{-aIe-} -> t{-aI9-}
+{-# L #-}
+f{-r3n,x-} =
+    _/\_ t{-aI9-} t{-aIe-} -> \ d.Num_aIg  :: 
+				    {PrelBase.Num{-2c,p-} t{-aI9-}}
+				{-# L #-}
+				d.Num_aIg ->
+	let {
+	  +_aNl  :: 
+	      t{-aI9-} -> t{-aI9-} -> t{-aI9-}
+	  {-# L #-}
+	  +_aNl =
+	      PrelBase.+{-r3k,p-}
+		  _@_ t{-aI9-} d.Num_aIg } in
+	let {
+	  d.Num_aIi  :: 
+	      {PrelBase.Num{-2c,p-} t{-aI9-}}
+	  {-# L #-}
+	  d.Num_aIi =
+	      d.Num_aIg } in
+	let {
+	  -_aNk  :: 
+	      t{-aI9-} -> t{-aI9-} -> t{-aI9-}
+	  {-# L #-}
+	  -_aNk =
+	      PrelBase.-{-817,p-}
+		  _@_ t{-aI9-} d.Num_aIi } in
+	let {
+	  +_aN8  :: 
+	      t{-aI9-} -> t{-aI9-} -> t{-aI9-}
+	  {-# L #-}
+	  +_aN8 =
+	      +_aNl } in
+	let {
+	  d.Num_aIl  :: 
+	      {PrelBase.Num{-2c,p-} t{-aI9-}}
+	  {-# L #-}
+	  d.Num_aIl =
+	      d.Num_aIg } in
+	let {
+	  fromInt_aNj  :: 
+	      PrelBase.Int{-3g,p-} -> t{-aI9-}
+	  {-# L #-}
+	  fromInt_aNj =
+	      PrelBase.fromInt{-8R,p-}
+		  _@_ t{-aI9-} d.Num_aIl } in
+	let { lit_aNi  :: 
+		  t{-aI9-}
+	      {-# L #-}
+	      lit_aNi =
+	  let {
+	    ds_dQX  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_dQX =
+		PrelBase.I#{-5b,p-}{i}
+		    1
+	  } in 
+	    fromInt_aNj
+		ds_dQX
+	} in
+	let {
+	  fromInt_aNh  :: 
+	      PrelBase.Int{-3g,p-} -> t{-aI9-}
+	  {-# L #-}
+	  fromInt_aNh =
+	      fromInt_aNj } in
+	let { lit_aNg  :: 
+		  t{-aI9-}
+	      {-# L #-}
+	      lit_aNg =
+	  let {
+	    ds_dRc  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_dRc =
+		PrelBase.I#{-5b,p-}{i}
+		    2
+	  } in 
+	    fromInt_aNh
+		ds_dRc
+	} in
+	let {
+	  fromInt_aNf  :: 
+	      PrelBase.Int{-3g,p-} -> t{-aI9-}
+	  {-# L #-}
+	  fromInt_aNf =
+	      fromInt_aNj } in
+	let { lit_aNe  :: 
+		  t{-aI9-}
+	      {-# L #-}
+	      lit_aNe =
+	  let {
+	    ds_dRr  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_dRr =
+		PrelBase.I#{-5b,p-}{i}
+		    3
+	  } in 
+	    fromInt_aNf
+		ds_dRr
+	} in
+	let {
+	  d.Num_aIp  :: 
+	      {PrelBase.Num{-2c,p-} t{-aI9-}}
+	  {-# L #-}
+	  d.Num_aIp =
+	      d.Num_aIg } in
+	let {
+	  *_aNd  :: 
+	      t{-aI9-} -> t{-aI9-} -> t{-aI9-}
+	  {-# L #-}
+	  *_aNd =
+	      PrelBase.*{-rcJ,p-}
+		  _@_ t{-aI9-} d.Num_aIp } in
+	let {
+	  fromInt_aNc  :: 
+	      PrelBase.Int{-3g,p-} -> t{-aI9-}
+	  {-# L #-}
+	  fromInt_aNc =
+	      fromInt_aNj } in
+	let { lit_aNb  :: 
+		  t{-aI9-}
+	      {-# L #-}
+	      lit_aNb =
+	  let {
+	    ds_dRP  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_dRP =
+		PrelBase.I#{-5b,p-}{i}
+		    4
+	  } in 
+	    fromInt_aNc
+		ds_dRP
+	} in
+	let {
+	  fromInt_aNa  :: 
+	      PrelBase.Int{-3g,p-} -> t{-aI9-}
+	  {-# L #-}
+	  fromInt_aNa =
+	      fromInt_aNj } in
+	let { lit_aN9  :: 
+		  t{-aI9-}
+	      {-# L #-}
+	      lit_aN9 =
+	  let {
+	    ds_dS4  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_dS4 =
+		PrelBase.I#{-5b,p-}{i}
+		    5
+	  } in 
+	    fromInt_aNa
+		ds_dS4
+	} in
+	\ x_r3f  :: 
+	      t{-aIe-}
+	  {-# L #-}
+	  x_r3f ->
+	    let { ds_dSk  :: 
+		      t{-aI9-}
+		  {-# L #-}
+		  ds_dSk =
+	      let {
+		ds_dSw  :: 
+		    t{-aI9-}
+		{-# L #-}
+		ds_dSw =
+		    +_aN8
+			lit_aNi lit_aNg
+	      } in 
+		-_aNk
+		    ds_dSw lit_aNe
+	    } in
+	    let {
+	      ds_dSo  :: 
+		  t{-aI9-}
+	      {-# L #-}
+	      ds_dSo =
+		  *_aNd
+		      lit_aNb lit_aN9
+	    } in 
+	      +_aNl
+		  ds_dSk ds_dSo
+g{-r3m,x-}  :: 
+    _forall_
+    [t{-aID-}]
+    =>
+    {PrelBase.Num{-2c,p-} t{-aID-}} -> t{-aID-} -> t{-aID-}
+{-# L #-}
+g{-r3m,x-} =
+    _/\_ t{-aID-} -> \ d.Num_aIH  :: 
+			   {PrelBase.Num{-2c,p-} t{-aID-}}
+		       {-# L #-}
+		       d.Num_aIH ->
+	let {
+	  +_aTf  :: 
+	      t{-aID-} -> t{-aID-} -> t{-aID-}
+	  {-# L #-}
+	  +_aTf =
+	      PrelBase.+{-r3k,p-}
+		  _@_ t{-aID-} d.Num_aIH } in
+	let {
+	  d.Num_aIJ  :: 
+	      {PrelBase.Num{-2c,p-} t{-aID-}}
+	  {-# L #-}
+	  d.Num_aIJ =
+	      d.Num_aIH } in
+	let {
+	  f_aTe  :: 
+	      t{-aID-} -> t{-aID-}
+	  {-# L #-}
+	  f_aTe =
+	      f{-r3n,x-}
+		  _@_ t{-aID-} _@_ t{-aID-} d.Num_aIJ
+	} in 
+	  \ x_r3h  :: 
+		t{-aID-}
+	    {-# L #-}
+	    x_r3h ->
+	      let {
+		ds_dTJ  :: 
+		    t{-aID-}
+		{-# L #-}
+		ds_dTJ =
+		    f_aTe
+			x_r3h
+	      } in 
+		+_aTf
+		    x_r3h ds_dTJ

@@ -1,0 +1,78 @@
+
+
+================================================================================
+Desugared:
+g{-r3h,x-}  :: 
+    _forall_
+    [t{-aAR-} t{-aAL-} t{-aAN-} t{-aAP-}]
+    =>
+    t{-aAR-} -> ([t{-aAL-}], [t{-aAN-}], [t{-aAP-}])
+{-# L #-}
+g{-r3h,x-} =
+    _/\_ t{-aAR-} t{-aAL-} t{-aAN-} t{-aAP-} -> \ x_r3g  :: 
+						      t{-aAR-}
+						  {-# L #-}
+						  x_r3g ->
+	let {
+	  ds_dD1  :: 
+	      [t{-aAL-}]
+	  {-# L #-}
+	  ds_dD1 =
+	      PrelBase.[]{-5i,p-}{i}
+		  _@_ t{-aAL-} } in
+	let {
+	  ds_dD5  :: 
+	      [t{-aAN-}]
+	  {-# L #-}
+	  ds_dD5 =
+	      PrelBase.[]{-5i,p-}{i}
+		  _@_ t{-aAN-} } in
+	let {
+	  ds_dD9  :: 
+	      [t{-aAP-}]
+	  {-# L #-}
+	  ds_dD9 =
+	      PrelBase.[]{-5i,p-}{i}
+		  _@_ t{-aAP-}
+	} in 
+	  PrelTup.(,,){-63,p-}{i}
+	      {_@_ [t{-aAL-}] _@_ [t{-aAN-}] _@_ [t{-aAP-}] ds_dD1 ds_dD5 ds_dD9}
+f{-r3i,x-}  :: 
+    _forall_ [t{-aAZ-} t{-aB3-}] => t{-aB3-} -> [[t{-aAZ-}]]
+{-# L #-}
+f{-r3i,x-} =
+    _/\_ t{-aAZ-} t{-aB3-} -> \ x_r3e  :: 
+				    t{-aB3-}
+				{-# L #-}
+				x_r3e ->
+	let {
+	  ds_dDN  :: 
+	      [t{-aAZ-}]
+	  {-# L #-}
+	  ds_dDN =
+	      PrelBase.[]{-5i,p-}{i}
+		  _@_ t{-aAZ-} } in
+	let { ds_dDR  :: 
+		  [[t{-aAZ-}]]
+	      {-# L #-}
+	      ds_dDR =
+	  let {
+	    ds_dE7  :: 
+		[t{-aAZ-}]
+	    {-# L #-}
+	    ds_dE7 =
+		PrelBase.[]{-5i,p-}{i}
+		    _@_ t{-aAZ-} } in
+	  let {
+	    ds_dEb  :: 
+		[[t{-aAZ-}]]
+	    {-# L #-}
+	    ds_dEb =
+		PrelBase.[]{-5i,p-}{i}
+		    {_@_ [t{-aAZ-}]}
+	  } in 
+	    PrelBase.:{-55,p-}{i}
+		{_@_ [t{-aAZ-}] ds_dE7 ds_dEb}
+	} in
+	PrelBase.:{-55,p-}{i}
+	    {_@_ [t{-aAZ-}] ds_dDN ds_dDR}

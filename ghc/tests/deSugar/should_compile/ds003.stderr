@@ -1,0 +1,64 @@
+
+
+================================================================================
+Desugared:
+f{-r3C,x-}  :: 
+    _forall_
+    [t{-aBt-} t{-aBF-} t{-aBI-} t{-aBS-}]
+    =>
+    [t{-aBt-}]
+    -> (t{-aBF-}, t{-aBI-})
+    -> PrelBase.Bool{-34,p-}
+    -> [t{-aBS-}]
+{-# L #-}
+f{-r3C,x-} =
+    _/\_ t{-aBt-} t{-aBF-} t{-aBI-} t{-aBS-} -> \ ds_dGi  :: 
+						      [t{-aBt-}]
+						  {-# L #-}
+						  ds_dGi y_r3e  :: 
+							     (t{-aBF-}, t{-aBI-})
+							 {-# L #-}
+							 y_r3e ds_dGj  :: 
+								   PrelBase.Bool{-34,p-}
+							       {-# L #-}
+							       ds_dGj ->
+	let {
+	  fail_dGE  :: 
+	      [t{-aBS-}]
+	  {-# L #-}
+	  fail_dGE =
+	      case y_r3e of { PrelTup.(,){-62,p-}{i} y_r3k ys_r3l  ->
+	      let {
+		z_r3n  :: 
+		    PrelBase.Bool{-34,p-}
+		{-# L #-}
+		z_r3n =
+		    ds_dGj } in
+	      let {
+		a_r3j  :: 
+		    (t{-aBF-}, t{-aBI-})
+		{-# L #-}
+		a_r3j =
+		    y_r3e } in
+	      let {
+		x_r3h  :: 
+		    [t{-aBt-}]
+		{-# L #-}
+		x_r3h =
+		    ds_dGi
+	      } in 
+		PrelBase.[]{-5i,p-}{i}
+		    _@_ t{-aBS-};}
+	} in 
+	  case ds_dGi of {
+	    PrelBase.:{-55,p-}{i} ds_dGM ds_dGL ->
+		fail_dGE;
+	    PrelBase.[]{-5i,p-}{i} ->
+		case ds_dGj of {
+		  PrelBase.False{-58,p-}{i} ->
+		      fail_dGE;
+		  PrelBase.True{-5E,p-}{i} ->
+		      PrelBase.[]{-5i,p-}{i}
+			  _@_ t{-aBS-};
+		};
+	  }

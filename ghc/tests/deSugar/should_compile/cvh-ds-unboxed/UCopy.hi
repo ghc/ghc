@@ -1,0 +1,9 @@
+interface UCopy where
+import UTypes(F3I(..), FC(..), FI(..), LI(..), SC(..), SI(..))
+copy_FI :: Int -> IntPrim -> FI {-# ARITY _ = 2 #-}
+data F3I = F3IN | F3I1 IntPrim IntPrim IntPrim | F3I2 IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim | F3I3 IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim | F3I4 IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim | F3I5 IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim IntPrim F3I
+data FC = FCN | FC1 Char# | FC2 Char# Char# | FC3 Char# Char# Char# | FC4 Char# Char# Char# Char# | FC5 Char# Char# Char# Char# Char# FC
+data FI = FIN | FI1 IntPrim | FI2 IntPrim IntPrim | FI3 IntPrim IntPrim IntPrim | FI4 IntPrim IntPrim IntPrim IntPrim | FI5 IntPrim IntPrim IntPrim IntPrim IntPrim FI
+data LI = LIN | LI1 IntPrim LI
+data SC = SCN | SC1 Char# SC | SC2 Char# Char# SC | SC3 Char# Char# Char# SC | SC4 Char# Char# Char# Char# SC | SC5 Char# Char# Char# Char# Char# SC
+data SI = SIN | SI1 IntPrim SI | SI2 IntPrim IntPrim SI | SI3 IntPrim IntPrim IntPrim SI | SI4 IntPrim IntPrim IntPrim IntPrim SI | SI5 IntPrim IntPrim IntPrim IntPrim IntPrim SI

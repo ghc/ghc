@@ -1,0 +1,87 @@
+ds015.hs:9: 
+    Warning: Possibly incomplete patterns
+	in a lambda abstraction:
+	    `(x PrelBase.: xs) -> ...'
+
+
+================================================================================
+Desugared:
+h{-r3z,x-}  :: 
+    _forall_ [t{-an8-} t{-anf-}] => [t{-an8-}] -> t{-anf-} -> t{-an8-}
+{-# L #-}
+h{-r3z,x-} =
+    _/\_ t{-an8-} t{-anf-} -> \ x_r3t  :: 
+				    [t{-an8-}]
+				{-# L #-}
+				x_r3t y_r3v  :: 
+					  t{-anf-}
+				      {-# L #-}
+				      y_r3v ->
+	(\ ds_drl  :: 
+	       [t{-an8-}]
+	   {-# L #-}
+	   ds_drl ->
+	     let {
+	       fail_drm  :: 
+		   t{-an8-}
+	       {-# L #-}
+	       fail_drm =
+		   GHCerr.patError{-8r,p-}
+		       _@_ t{-an8-} _string_ "ds015.hs:9|lambda"
+	     } in 
+	       case ds_drl of {
+		 PrelBase.[]{-5i,p-}{i} ->
+		     fail_drm;
+		 PrelBase.:{-55,p-}{i} x_r3x xs_r3y ->
+		     x_r3x;
+	       })
+	    x_r3t
+g{-r3A,x-}  :: 
+    _forall_
+    [t{-any-} t{-anA-} t{-anC-}]
+    =>
+    ((t{-any-} -> t{-any-}) -> t{-anA-}) -> t{-anC-} -> t{-anA-}
+{-# L #-}
+g{-r3A,x-} =
+    _/\_ t{-any-} t{-anA-} t{-anC-} -> \ x_r3j  :: 
+					     (t{-any-} -> t{-any-}) -> t{-anA-}
+					 {-# L #-}
+					 x_r3j y_r3l  :: 
+						   t{-anC-}
+					       {-# L #-}
+					       y_r3l ->
+	let {
+	  ds_drT  :: 
+	      t{-any-} -> t{-any-}
+	  {-# L #-}
+	  ds_drT =
+	      \ x_r3r  :: 
+		    t{-any-}
+		{-# L #-}
+		x_r3r ->
+		  x_r3r
+	} in 
+	  (\ x_r3n  :: 
+		 t{-any-} -> t{-any-}
+	     {-# L #-}
+	     x_r3n y_r3p  :: 
+		       (t{-any-} -> t{-any-}) -> t{-anA-}
+		   {-# L #-}
+		   y_r3p ->
+	       y_r3p
+		   x_r3n)
+	      ds_drT x_r3j
+f{-r3B,x-}  :: 
+    _forall_ [t{-anM-}] => t{-anM-} -> t{-anM-}
+{-# L #-}
+f{-r3B,x-} =
+    _/\_ t{-anM-} -> \ x_r3f  :: 
+			   t{-anM-}
+		       {-# L #-}
+		       x_r3f ->
+	(\ x_r3h  :: 
+	       t{-anM-}
+	   {-# L #-}
+	   x_r3h ->
+	     x_r3h)
+	    x_r3f
