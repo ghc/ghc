@@ -536,8 +536,8 @@ as we would normally do.
 tryRhsTyLam :: OutExpr -> SimplM ([OutBind], OutExpr)
 
 tryRhsTyLam rhs 			-- Only does something if there's a let
-  | null tyvars || not (worth_it body)	-- inside a type lambda, and a WHNF inside that
-  = returnSmpl ([], rhs)
+  | null tyvars || not (worth_it body)	-- inside a type lambda, 
+  = returnSmpl ([], rhs)		-- and a WHNF inside that
 
   | otherwise
   = go (\x -> x) body		`thenSmpl` \ (binds, body') ->
@@ -546,8 +546,11 @@ tryRhsTyLam rhs 			-- Only does something if there's a let
   where
     (tyvars, body) = collectTyBinders rhs
 
-    worth_it (Let _ e)	     = whnf_in_middle e
-    worth_it other     	     = False
+    worth_it (Let (NonRec x rhs) e) | isUnLiftedType (exprType rhs) = False
+    worth_it (Let _ e) = whnf_in_middle e
+    worth_it other     = False
+
+    whnf_in_middle (Let (NonRec x rhs) e) | isUnLiftedType (exprType rhs) = False
     whnf_in_middle (Let _ e) = whnf_in_middle e
     whnf_in_middle e	     = exprIsCheap e
 
