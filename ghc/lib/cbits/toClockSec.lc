@@ -10,7 +10,7 @@
 #include "stgio.h"
 
 StgAddr 
-toClockSec(I_ year, I_ mon, I_ mday, I_ hour, I_ min, I_ sec, I_ tz, StgByteArray res)
+toClockSec(I_ year, I_ mon, I_ mday, I_ hour, I_ min, I_ sec, I_ isdst, StgByteArray res)
 {
     struct tm tm;
     time_t t;
@@ -21,7 +21,7 @@ toClockSec(I_ year, I_ mon, I_ mday, I_ hour, I_ min, I_ sec, I_ tz, StgByteArra
     tm.tm_hour = hour;
     tm.tm_min = min;
     tm.tm_sec = sec;
-    tm.tm_isdst = -1;
+    tm.tm_isdst = isdst;
 
 #ifdef HAVE_MKTIME
     t = mktime(&tm);
