@@ -85,16 +85,16 @@ typedef unsigned long  *StgPtr;		/* StgPtr is a ptr to a heap object
 typedef StgPtr	       *StgPtrPtr;	/* used for A stack pointer */
 typedef long		StgInt;
 
-/* seven shorthand forms: 
-     StgChar, StgWord, StgPtr, StgPtrPtr, StgInt, StgAddr, const StgPtr */
-
-typedef unsigned char	C_;
-typedef unsigned long	W_;
-typedef unsigned long  *P_;
-typedef P_  	       *PP_;
-typedef long		I_;
-typedef void	       *A_;
-typedef const unsigned long *D_;
+#if __GNUC__
+/* These types are only used to allow the passing of
+   64-bit ints from Haskell to ccalls and to ease
+   the implementation of the Int64 and Word64 libraries.
+*/
+typedef unsigned long long int StgWord64;
+typedef long long int          StgInt64;
+typedef StgInt64	       LI_;
+typedef StgWord64	       LW_;
+#endif
 
 typedef unsigned char	StgChar;
 typedef void	       *StgAddr;
@@ -106,6 +106,29 @@ typedef double		StgDouble;
 typedef float		StgFloat;
 typedef double		StgDouble;
 #endif
+
+/* seven shorthand forms: 
+     StgChar, StgWord, StgPtr, StgPtrPtr, StgInt, StgAddr, const StgPtr */
+
+typedef StgChar		C_;
+typedef StgWord		W_;
+typedef StgPtr          P_;
+typedef P_  	       *PP_;
+typedef StgInt		I_;
+typedef void	       *A_;
+typedef const unsigned long *D_;
+
+/* Typedefs for the various sized ints
+   (ToDo: better.)
+*/
+
+typedef unsigned char  StgWord8;
+typedef signed char    StgInt8;
+typedef unsigned short StgWord16;
+typedef short 	       StgInt16;
+typedef unsigned int   StgWord32;
+typedef signed int     StgInt32;
+	
 
 typedef StgPtr		StgArray;
 typedef StgChar	        *StgByteArray;
@@ -223,6 +246,16 @@ typedef union __dt
   { StgDouble d;
     unpacked_double du;
   } double_thing;
+
+typedef union __it
+  { StgInt64 i;
+    unpacked_double iu;
+  } int64_thing;
+
+typedef union __wt
+  { StgWord64 w;
+    unpacked_double wu;
+  } word64_thing;
 
 typedef StgWord unpacked_float;
 
