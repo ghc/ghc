@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.67 2005/01/24 00:36:03 ross Exp $
+-- $Id: Main.hs,v 1.68 2005/01/27 12:38:49 ross Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -660,7 +660,7 @@ onlyOne what = die ("Only one "++what++" may be specified\n")
 outFlagHeaderCProg :: Flag -> String
 outFlagHeaderCProg (Template t)          = "#include \""++t++"\"\n"
 outFlagHeaderCProg (Include  f)          = "#include "++f++"\n"
-outFlagHeaderCProg (Define   n Nothing)  = "#define "++n++"\n"
+outFlagHeaderCProg (Define   n Nothing)  = "#define "++n++" 1\n"
 outFlagHeaderCProg (Define   n (Just v)) = "#define "++n++" "++v++"\n"
 outFlagHeaderCProg _                     = ""
 
@@ -762,7 +762,7 @@ outEnum arg =
 
 outFlagH :: Flag -> String
 outFlagH (Include  f)          = "#include "++f++"\n"
-outFlagH (Define   n Nothing)  = "#define "++n++"\n"
+outFlagH (Define   n Nothing)  = "#define "++n++" 1\n"
 outFlagH (Define   n (Just v)) = "#define "++n++" "++v++"\n"
 outFlagH _                     = ""
 
