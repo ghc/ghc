@@ -660,7 +660,7 @@ hscParseStmt dflags str
 
       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
 			   parrEF	 = dopt Opt_PArr	dflags}
-	  loc  = mkSrcLoc SLIT("<interactive>") 1
+	  loc  = mkSrcLoc FSLIT("<interactive>") 1
 
       case parseStmt buf (mkPState loc exts) of {
 
@@ -744,7 +744,7 @@ myParseIdentifier dflags str
  
        let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
 			    parrEF	  = dopt Opt_PArr	 dflags}
-	   loc  = mkSrcLoc SLIT("<interactive>") 1
+	   loc  = mkSrcLoc FSLIT("<interactive>") 1
 
        case parseIdentifier buf (mkPState loc exts) of
 
