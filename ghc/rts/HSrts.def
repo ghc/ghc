@@ -503,5 +503,7 @@ EXPORTS
 	waitReadzh_fast @ 521 ;
 	delayzh_fast @ 522 ;
 	shutdownHaskellAndExit @ 523 ; 
+	cmp_thread @ 524 ;
+
 	
 
