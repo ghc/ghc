@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.111 2003/01/08 12:03:28 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.112 2003/01/26 12:56:00 panne Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1004,9 +1004,9 @@ esac
 ])
 
 dnl ######################################################################
-dnl NOTE: Because of portability issues between different autoconf
-dnl versions the AC_HELP_STRING macro has been removed from FPTOOLS_HAVE_OPENGL.
-dnl Furthermore, caching has been completely rewritten.
+dnl Some notes about the heavily changed OpenGL test below:
+dnl  * Caching has been completely rewritten, but is still no perfect yet.
+dnl  * Version detection for GL and GLU has been added.
 dnl ######################################################################
 
 dnl ########################### -*- Mode: M4 -*- #######################
@@ -1034,8 +1034,8 @@ dnl ####################################################################
 dnl @synopsis FPTOOLS_HAVE_OPENGL
 dnl 
 dnl Search for OpenGL.  We search first for Mesa (a GPL'ed version of
-dnl OpenGL) before a vendor's version of OpenGL, unless we were
-dnl specifically asked not to with `--with-Mesa=no' or `--without-Mesa'.
+dnl OpenGL) before a vendor's version of OpenGL if we were specifically
+dnl asked to with `--with-Mesa=yes' or `--with-Mesa'.
 dnl
 dnl The four "standard" OpenGL libraries are searched for: "-lGL",
 dnl "-lGLU", "-lGLX" (or "-lMesaGL", "-lMesaGLU" as the case may be) and
@@ -1079,12 +1079,12 @@ AC_DEFUN(FPTOOLS_HAVE_OPENGL,
   AC_REQUIRE([AC_PATH_XTRA])
   AC_REQUIRE([FPTOOLS_CHECK_LIBM])
 
-dnl Check for Mesa first, unless we were asked not to.
-dnl    AC_HELP_STRING([--with-Mesa],
-dnl                   [Prefer the Mesa library over a vendors native OpenGL library (default=yes)],
-dnl                   with_Mesa_help_string)
-dnl    AC_ARG_ENABLE(Mesa, $with_Mesa_help_string, use_Mesa=$enableval, use_Mesa=yes)
-  AC_ARG_ENABLE(Mesa, [  --with-Mesa             Prefer the Mesa library over a vendors native OpenGL library (default=no)], use_Mesa=$enableval, use_Mesa=no)
+dnl Check for Mesa first if we were asked to.
+  AC_ARG_ENABLE(Mesa,
+                AC_HELP_STRING([--enable-Mesa],
+                               [Prefer Mesa over a vendor's native OpenGL library (default=no)]),
+                use_Mesa=$enableval,
+                use_Mesa=no)
 
   if test x"$use_Mesa" = xyes; then
      GL_search_list="MesaGL  GL  opengl32"
@@ -1103,7 +1103,7 @@ dnl If we are running under X11 then add in the appropriate libraries.
   if test x"$no_x" != xyes; then
 dnl Add everything we need to compile and link X programs to GL_CFLAGS
 dnl and GL_X_LIBS.
-    GL_CFLAGS="$X_CFLAGS"
+    GL_CFLAGS="$CPPFLAGS $X_CFLAGS"
     GL_X_LIBS="$X_PRE_LIBS $X_LIBS -lX11 -lXext -lXmu -lXt -lXi $X_EXTRA_LIBS $LIBM"
   fi
   GL_save_CPPFLAGS="$CPPFLAGS"
@@ -1112,15 +1112,131 @@ dnl and GL_X_LIBS.
   GL_save_LIBS="$LIBS"
   LIBS="$GL_X_LIBS"
 
-  FPTOOLS_SEARCH_LIBS([#include <GL/gl.h>],   glEnd,         $GL_search_list,  have_GL=yes,   have_GL=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glu.h>],  gluNewQuadric, $GLU_search_list, have_GLU=yes,  have_GLU=no)
+  dnl Including <GL/glut.h> instead of plain <GL/gl.h> avoids problems on
+  dnl platforms like WinDoze where special headers like <windows.h> or
+  dnl some macro trickery would be needed
+  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glEnd, $GL_search_list, have_GL=yes, have_GL=no)
+
+  dnl TODO: The tests for GL features should better be cascaded and the
+  dnl results should be cached. A new macro would be helpful here.
+
+  AC_MSG_CHECKING(glTexSubImage1D)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [glTexSubImage1D(GL_TEXTURE_1D,0,0,2,GL_INTENSITY,GL_BYTE,(void*)0)],
+              fptools_gl_texsubimage1d=yes,
+              fptools_gl_texsubimage1d=no);
+  AC_MSG_RESULT($fptools_gl_texsubimage1d)
+
+  AC_MSG_CHECKING(glDrawRangeElements)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [glDrawRangeElements(GL_QUADS,0,0,0,GL_UNSIGNED_BYTE,(void*)0)],
+              fptools_gl_drawrangeelements=yes,
+              fptools_gl_drawrangeelements=no);
+  AC_MSG_RESULT($fptools_gl_drawrangeelements)
+
+  AC_MSG_CHECKING(glActiveTexture)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [glActiveTexture(GL_TEXTURE1)],
+              fptools_gl_activetexture=yes,
+              fptools_gl_activetexture=no);
+  AC_MSG_RESULT($fptools_gl_activetexture)
+
+  AC_MSG_CHECKING(glMultiDrawArrays)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [glMultiDrawArrays(GL_TRIANGLES, (GLint*)0, (GLsizei*)0, 0)],
+              fptools_gl_multidrawarrays=yes,
+              fptools_gl_multidrawarrays=no);
+  AC_MSG_RESULT($fptools_gl_multidrawarrays)
+
+  if test x"$fptools_gl_texsubimage1d" != xyes; then
+    fptools_gl_version=1.0
+  else
+     if test x"$fptools_gl_drawrangeelements" != xyes; then
+        fptools_gl_version=1.1
+     else
+       if test x"$fptools_gl_activetexture" != xyes; then
+          fptools_gl_version=1.2
+       else
+         if test x"$fptools_gl_multidrawarrays" != xyes; then
+            fptools_gl_version=1.3
+         else
+            fptools_gl_version=1.4
+         fi
+       fi
+     fi
+  fi
+  AC_MSG_NOTICE([It looks like GL version ${fptools_gl_version}])
+
+  dnl TODO: Cache the results of the tests for the imaging subset.
+
+  AC_MSG_CHECKING(EXT_blend_color)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [glBlendColorEXT((GLclampf)0.0,(GLclampf)0.0,(GLclampf)0.0,(GLclampf)0.0)],
+              hopengl_EXT_blend_color=yes,
+              hopengl_EXT_blend_color=no);
+  AC_MSG_RESULT($hopengl_EXT_blend_color)
+
+  AC_MSG_CHECKING(EXT_blend_minmax)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [glBlendEquationEXT(GL_FUNC_ADD_EXT)],
+              hopengl_EXT_blend_minmax=yes,
+              hopengl_EXT_blend_minmax=no);
+  AC_MSG_RESULT($hopengl_EXT_blend_minmax)
+
+  AC_MSG_CHECKING(EXT_blend_subtract)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [glBlendEquationEXT(GL_FUNC_SUBTRACT_EXT)],
+              hopengl_EXT_blend_subtract=yes,
+              hopengl_EXT_blend_subtract=no);
+  AC_MSG_RESULT($hopengl_EXT_blend_subtract)
+
+  FPTOOLS_SEARCH_LIBS([#include <GL/glu.h>], gluNewQuadric, $GLU_search_list, have_GLU=yes,  have_GLU=no)
+
+  dnl TODO: Cascade and cache...
+
+  AC_MSG_CHECKING(gluGetString)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [gluGetString(GLU_EXTENSIONS)],
+              fptools_glu_getstring=yes,
+              fptools_glu_getstring=no);
+  AC_MSG_RESULT($fptools_glu_getstring)
+
+  AC_MSG_CHECKING(gluTessEndPolygon)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [gluTessEndPolygon((GLUtesselator*)0)],
+              fptools_glu_tessendpolygon=yes,
+              fptools_glu_tessendpolygon=no);
+  AC_MSG_RESULT($fptools_glu_tessendpolygon)
+
+  AC_MSG_CHECKING(gluUnProject4)
+  AC_TRY_LINK([#include <GL/glut.h>],
+              [gluUnProject4(0.0,0.0,0.0,0.0,(GLdouble*)0,(GLdouble*)0,(GLint*)0,0.0,0.0,(GLdouble*)0,(GLdouble*)0,(GLdouble*)0,(GLdouble*)0)],
+              fptools_glu_unproject4=yes,
+              fptools_glu_unproject4=no);
+  AC_MSG_RESULT($fptools_glu_unproject4)
+
+  if test x"$fptools_glu_getstring" != xyes; then
+    fptools_glu_version=1.0
+  else
+     if test x"$fptools_glu_tessendpolygon" != xyes; then
+        fptools_glu_version=1.1
+     else
+       if test x"$fptools_glu_unproject4" != xyes; then
+          fptools_glu_version=1.2
+       else
+            fptools_glu_version=1.3
+       fi
+     fi
+  fi
+  AC_MSG_NOTICE([It looks like GLU version ${fptools_glu_version}])
+
   FPTOOLS_SEARCH_LIBS([#include <GL/glx.h>],  glXWaitX,      $GLX_search_list, have_GLX=yes,  have_GLX=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut glut32,      have_glut=yes, have_glut=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut32 glut,      have_glut=yes, have_glut=no)
 
   if test -n "$LIBS"; then
-    GL_LIBS="$LIBS"
+    GL_LIBS="$LDFLAGS $LIBS"
   else
-    GL_LIBS=
+    GL_LIBS="$LDFLAGS"
     GL_CFLAGS=
   fi
 
