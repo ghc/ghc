@@ -80,6 +80,11 @@ Things to be careful about:
 \item	Adjust the stack high water mark appropriately.
 \end{itemize}
 
+\begin{code}
+cgTailCall (StgConArg con) args live_vars
+  = panic "cgTailCall StgConArg"	-- Only occur in argument positions
+\end{code}
+
 Literals are similar to constructors; they return by putting
 themselves in an appropriate register and returning to the address on
 top of the B stack.

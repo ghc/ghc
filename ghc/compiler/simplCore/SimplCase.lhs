@@ -30,7 +30,6 @@ import PrelVals		( voidId )
 import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
 import SimplEnv
 import SimplMonad
-import SimplUtils	( mkValLamTryingEta )
 import Type		( isPrimType, getAppDataTyConExpandingDicts, mkFunTy, mkFunTys, eqTy )
 import TysPrim		( voidTy )
 import Unique		( Unique{-instance Eq-} )
@@ -451,10 +450,7 @@ bindLargeRhs env args rhs_ty rhs_c
     in
     rhs_c new_env		`thenSmpl` \ rhs' ->
     let
-	final_rhs
-	  = (if switchIsSet new_env SimplDoEtaReduction
-	     then mkValLamTryingEta
-	     else mkValLam) used_args' rhs'
+	final_rhs = mkValLam used_args' rhs'
     in
     returnSmpl (NonRec rhs_fun_id final_rhs,
 		foldl App (Var rhs_fun_id) used_arg_atoms)

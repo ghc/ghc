@@ -310,23 +310,6 @@ dsExpr (ExplicitTuple expr_list)
     mkConDs (tupleCon (length expr_list))
 	    (map (TyArg . coreExprType) core_exprs ++ map VarArg core_exprs)
 
--- Two cases, one for ordinary constructors and one for newtype constructors
-dsExpr (HsCon con tys args)
-  | isDataTyCon tycon			-- The usual datatype case
-  = mapDs dsExpr args	`thenDs` \ args_exprs ->
-    mkConDs con (map TyArg tys ++ map VarArg args_exprs)
-
-  | otherwise				-- The newtype case
-  = ASSERT( isNewTyCon tycon )
-    ASSERT( null rest_args )
-    dsExpr first_arg		`thenDs` \ arg_expr ->
-    returnDs (Coerce (CoerceIn con) result_ty arg_expr)
-
-  where
-    (first_arg:rest_args) = args
-    (args_tys, result_ty) = splitFunTy (foldl applyTy (idType con) tys)
-    (tycon,_) 	          = getAppTyCon result_ty
-
 dsExpr (ArithSeqOut expr (From from))
   = dsExpr expr		  `thenDs` \ expr2 ->
     dsExpr from		  `thenDs` \ from2 ->

@@ -98,7 +98,7 @@ dsCCall label args may_gc is_asm result_ty
 
 \begin{code}
 unboxArg :: CoreExpr			-- The supplied argument
-	 -> DsM (CoreExpr,			-- To pass as the actual argument
+	 -> DsM (CoreExpr,		-- To pass as the actual argument
 		 CoreExpr -> CoreExpr	-- Wrapper to unbox the arg
 		)
 unboxArg arg
@@ -106,6 +106,13 @@ unboxArg arg
   -- Primitive types
   -- ADR Question: can this ever be used?  None of the PrimTypes are
   -- instances of the CCallable class.
+  --
+  -- SOF response:
+  --    Oh yes they are, I've just added them :-) Having _ccall_ and _casm_
+  --  that accept unboxed arguments is a Good Thing if you have a stub generator
+  --  which generates the boiler-plate box-unbox code for you, i.e., it may help
+  --  us nuke this very module :-)
+  --
   | isPrimType arg_ty
   = returnDs (arg, \body -> body)
 

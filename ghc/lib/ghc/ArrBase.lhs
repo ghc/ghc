@@ -5,10 +5,11 @@
 \section[ArrBase]{Module @ArrBase@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module  ArrBase where
 
-import Prelude	()
-import IOBase	( error )		{-# SOURCE #-}
+import {#- SOURCE #-}	IOBase	( error )
 import Ix
 import PrelList
 import STBase

@@ -8,6 +8,8 @@ This sits on top of the sequencing/arrays world, notably @ByteArray#@s.
 Glorious hacking (all the hard work) by Bryan O'Sullivan.
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PackedString (
 
 	packString,        -- :: [Char] -> PackedString
@@ -67,8 +69,7 @@ module PackedString (
 	packCBytesST, unpackCString
     ) where
 
-import Prelude	()
-import IOBase	( error )		{-# SOURCE #-}
+import {#- SOURCE #-}	IOBase	( error )
 import Ix
 import PrelList
 import STBase

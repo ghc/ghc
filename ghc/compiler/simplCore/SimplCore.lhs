@@ -27,6 +27,7 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), switchIsOn,
 import CoreLint		( lintCoreBindings )
 import CoreSyn
 import CoreUtils	( coreExprType )
+import SimplUtils	( etaCoreExpr )
 import CoreUnfold
 import Literal		( Literal(..), literalType, mkMachInt )
 import ErrUtils		( ghcExit )
@@ -121,9 +122,13 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
     init_specdata = initSpecData local_tycons tycon_specs
 
     -------------
-    core_linter = if opt_DoCoreLinting
-		  then lintCoreBindings ppr_style
-		  else ( \ whodunnit spec_done binds -> binds )
+    core_linter what = if opt_DoCoreLinting
+		       then (if opt_D_show_passes then 
+				trace ("\n*** Core Lint result of " ++ what)
+			     else id
+		            )
+			    lintCoreBindings ppr_style what
+		       else ( \ spec_done binds -> binds )
 
     --------------
     do_core_pass info@(binds, us, spec_data, simpl_stats) to_do
@@ -307,6 +312,14 @@ Several tasks are done by @tidyCorePgm@
 
 6.	Eliminate polymorphic case expressions.  We can't generate code for them yet.
 
+7.	Do eta reduction for lambda abstractions appearing in:
+		- the RHS of case alternatives
+		- the body of a let
+	These will otherwise turn into local bindings during Core->STG; better to
+	nuke them if possible.   (In general the simplifier does eta expansion not
+	eta reduction, up to this point.)
+
+
 Eliminate indirections
 ~~~~~~~~~~~~~~~~~~~~~~
 In @elimIndirections@, we look for things at the top-level of the form...
@@ -453,22 +466,22 @@ tidyCoreExpr (Lam bndr body)
 
 tidyCoreExpr (Let bind body)
   = tidyCoreBinding bind	`thenTM` \ bind' ->
-    tidyCoreExpr body		`thenTM` \ body' ->
+    tidyCoreExprEta body	`thenTM` \ body' ->
     returnTM (Let bind' body')
 
 tidyCoreExpr (SCC cc body)
-  = tidyCoreExpr body		`thenTM` \ body' ->
+  = tidyCoreExprEta body	`thenTM` \ body' ->
     returnTM (SCC cc body')
 
 tidyCoreExpr (Coerce coercion ty body)
-  = tidyCoreExpr body		`thenTM` \ body' ->
+  = tidyCoreExprEta body	`thenTM` \ body' ->
     returnTM (Coerce coercion ty body')
 
 -- Wierd case for par, seq, fork etc. See notes above.
 tidyCoreExpr (Case scrut@(Prim op args) (PrimAlts _ (BindDefault binder rhs)))
   | funnyParallelOp op
   = tidyCoreExpr scrut			`thenTM` \ scrut' ->
-    tidyCoreExpr rhs			`thenTM` \ rhs' ->
+    tidyCoreExprEta rhs			`thenTM` \ rhs' ->
     returnTM (Case scrut' (PrimAlts [] (BindDefault binder rhs')))
 
 -- Eliminate polymorphic case, for which we can't generate code just yet
@@ -494,10 +507,10 @@ tidyCoreExpr (Case scrut alts)
 	  tidy_deflt deflt		`thenTM` \ deflt' ->
 	  returnTM (PrimAlts alts' deflt')
 
-    tidy_alg_alt (con,bndrs,rhs) = tidyCoreExpr rhs	`thenTM` \ rhs' ->
+    tidy_alg_alt (con,bndrs,rhs) = tidyCoreExprEta rhs	`thenTM` \ rhs' ->
 				   returnTM (con,bndrs,rhs')
 
-    tidy_prim_alt (lit,rhs) = tidyCoreExpr rhs	`thenTM` \ rhs' ->
+    tidy_prim_alt (lit,rhs) = tidyCoreExprEta rhs	`thenTM` \ rhs' ->
 			      returnTM (lit,rhs')
 
 	-- We convert	case x of {...; x' -> ...x'...}
@@ -510,12 +523,15 @@ tidyCoreExpr (Case scrut alts)
 
     tidy_deflt NoDefault = returnTM NoDefault
     tidy_deflt (BindDefault bndr rhs)
-	= extend_env (tidyCoreExpr rhs)	`thenTM` \ rhs' ->
+	= extend_env (tidyCoreExprEta rhs)	`thenTM` \ rhs' ->
 	  returnTM (BindDefault bndr rhs')
 	where
  	  extend_env = case scrut of
 			    Var v -> extendEnvTM bndr v
 			    other -> \x -> x
+
+tidyCoreExprEta e = tidyCoreExpr e	`thenTM` \ e' ->
+		    returnTM (etaCoreExpr e')
 \end{code}
 
 Arguments

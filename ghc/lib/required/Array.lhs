@@ -5,6 +5,8 @@
 \section[Array]{Module @Array@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module  Array ( 
     module Ix,			-- export all of Ix 
     Array, 			-- Array type abstractly
@@ -13,7 +15,6 @@ module  Array (
     accumArray, (//), accum, amap, ixmap
   ) where
 
-import Prelude	()
 import Ix
 import PrelList
 import PrelRead

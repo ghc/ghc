@@ -8,7 +8,7 @@ module TcMonad(
 	initTc,
 	returnTc, thenTc, thenTc_, mapTc, listTc,
 	foldrTc, foldlTc, mapAndUnzipTc, mapAndUnzip3Tc,
-	mapBagTc, fixTc, tryTc,
+	mapBagTc, fixTc, tryTc, getErrsTc, 
 
 	returnNF_Tc, thenNF_Tc, thenNF_Tc_, mapNF_Tc, fixNF_Tc, forkNF_Tc,
 
@@ -259,6 +259,12 @@ forkNF_Tc m (TcDown deflts u_var src_loc err_cxt err_var) env
 Error handling
 ~~~~~~~~~~~~~~
 \begin{code}
+getErrsTc :: NF_TcM s (Bag Error, Bag  Warning)
+getErrsTc down env
+  = readMutVarSST errs_var 
+  where
+    errs_var = getTcErrs down
+
 failTc :: Message -> TcM s a
 failTc err_msg down env
   = readMutVarSST errs_var	`thenSST` \ (warns,errs) ->

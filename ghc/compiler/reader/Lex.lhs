@@ -152,7 +152,6 @@ data IfaceToken
   | ITcbrack
   | ITcparen
   | ITsemi
-  | ITinteger Integer	-- numbers and names
   | ITvarid   FAST_STRING
   | ITconid   FAST_STRING
   | ITvarsym  FAST_STRING
@@ -165,9 +164,13 @@ data IfaceToken
 	-- Stuff for reading unfoldings
   | ITarity | ITstrict | ITunfold
   | ITdemand [Demand] | ITbottom
-  | ITlam | ITbiglam | ITcase | ITlet | ITletrec | ITin | ITof
-  | ITcoerce_in | ITcoerce_out
+  | ITlam | ITbiglam | ITcase | ITprim_case | ITlet | ITletrec | ITin | ITof
+  | ITcoerce_in | ITcoerce_out | ITatsign
+  | ITccall (Bool,Bool)		-- (is_casm, may_gc)
+
   | ITchar Char | ITstring FAST_STRING
+  | ITinteger Integer | ITdouble Double
+  | ITinteger_lit | ITfloat_lit | ITrational_lit | ITaddr_lit | ITlit_lit | ITstring_lit
   deriving Text -- debugging
 \end{code}
 
@@ -207,18 +210,24 @@ lexIface input
       ','		    : cs -> ITcomma	: lexIface cs
       ':' : ':'		    : cs -> ITdcolon    : lexIface cs
       ';'		    : cs -> ITsemi	: lexIface cs
-      '\"'		    : cs -> case read input of
-					((str, rest) : _) -> ITstring (_PK_ (str::String)) : lexIface rest
-      '\''		    : cs -> case read input of
-					((ch, rest) : _) -> ITchar ch : lexIface rest
+      '@'		    : cs -> ITatsign	: lexIface cs
+      '\"'		    : cs -> case reads input of
+					[(str, rest)] -> ITstring (_PK_ (str::String)) : lexIface rest
+      '\''		    : cs -> case reads input of
+					[(ch, rest)] -> ITchar ch : lexIface rest
 
+-- ``thingy'' form for casm
+      '`' : '`'		    : cs -> lex_cstring "" cs
+
+-- Keywords
       '_' : 'S' : '_'	    : cs -> ITstrict	: lex_demand cs
       '_' 		    : cs -> lex_keyword cs
 
-      c : cs | isDigit c 	 -> lex_num  input
-	     | otherwise	 -> lex_id input
-	     
-      other -> error ("lexing:"++other)
+-- Numbers
+      '-' : c : cs | isDigit c 	 -> lex_num "-" (c:cs)
+      c       : cs | isDigit c 	 -> lex_num ""  (c:cs)
+      
+      other			 -> lex_id input
   where
     lex_comment str
       = case (span ((/=) '\n') str) of { (junk, rest) ->
@@ -228,10 +237,17 @@ lexIface input
     lex_demand (c:cs) | isSpace c = lex_demand cs
 		      | otherwise = case readList (c:cs) of
 					((demand,rest) : _) -> ITdemand demand : lexIface rest
+
     -----------
-    lex_num str
+    lex_num minus str
       = case (span isDigit str) of { (num, rest) ->
-	ITinteger (read num) : lexIface rest }
+	case rest of 
+	   '.' : str2 -> case (span isDigit str2) of { (num2,rest2) ->
+			 ITdouble (read (minus ++ num ++ ('.':num2))) : lexIface rest2
+			 }
+
+	   other   -> ITinteger (read (minus ++ num)) : lexIface rest
+	}
 
     ------------
     lex_keyword str
@@ -245,6 +261,11 @@ lexIface input
     is_kwd_mod_char c   = isAlphanum c
 
     -----------
+    lex_cstring so_far ('\'' : '\'' : cs) = ITstring (_PK_ (reverse (so_far::String))) : lexIface cs
+    lex_cstring so_far (c	    : cs) = lex_cstring (c:so_far) cs
+	
+
+    -----------
     lex_tuple module_dot orig_cs = go 2 orig_cs
 		 where
 		   go n (',':cs) = go (n+1) cs
@@ -253,6 +274,7 @@ lexIface input
 
 	-- NB: ':' isn't valid inside an identifier, only at the start.
 	-- otherwise we get confused by a::t!
+	-- Similarly ' itself is ok inside an identifier, but not at the start
     is_id_char c = isAlphanum c || c `elem` "_'!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
 
     lex_id cs = go [] cs
@@ -313,8 +335,17 @@ lexIface input
        ,("coerce_out_",		ITcoerce_out)
        ,("A_",			ITarity)
        ,("A_",			ITarity)
-       ,("!_",			ITbottom)
-
+       ,("bot_",		ITbottom)
+       ,("integer_",		ITinteger_lit)
+       ,("rational_",		ITrational_lit)
+       ,("addr_",		ITaddr_lit)
+       ,("float_",		ITfloat_lit)
+       ,("string_",		ITstring_lit)
+       ,("litlit_",		ITlit_lit)
+       ,("ccall_",		ITccall (False, False))
+       ,("ccall_GC_",		ITccall (False, True))
+       ,("casm_",		ITccall (True,  False))
+       ,("casm_GC_",		ITccall (True,  True))
        ]
 
     haskellKeywordsFM = listToFM [
@@ -328,6 +359,7 @@ lexIface input
        ,("infixr",		ITinfixr)
        ,("infix",		ITinfix)
        ,("case",		ITcase)
+       ,("case#",		ITprim_case)
        ,("of",			ITof)
        ,("in",			ITin)
        ,("let",			ITlet)

@@ -326,45 +326,16 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) useful_split ma
 
     case (maybeAppDataTyConExpandingDicts arg_ty) of
 
-	  Nothing 	  -> 	   -- Not a data type
-				   panic "mk_ww_arg_processing: not datatype"
-
-	  Just (_, _, []) ->	   -- An abstract type
-				   -- We have to give up on the whole idea
-				   returnUs Nothing
-
-	  Just (_, _, (_:_:_)) ->  -- Two or more constructors; that's odd
-				   panic "mk_ww_arg_processing: multi-constr"
+	  Nothing 	  -> 	     -- Not a data type
+				     panic "mk_ww_arg_processing: not datatype"
 
 	  Just (arg_tycon, tycon_arg_tys, [data_con]) ->
-			-- The main event: a single-constructor data type
+				     -- The main event: a single-constructor data type
+				     do_single_constr arg_tycon tycon_arg_tys data_con
 
-	    let
-		inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
-	    in
-	    getUniques (length inst_con_arg_tys)    `thenUs` \ uniqs ->
+	  Just (_, _, data_cons) ->  -- Zero, or two or more constructors; that's odd
+				     panic "mk_ww_arg_processing: not one constr"
 
-	    let
-		unpk_args = zipWithEqual "mk_ww_arg_processing"
-			     (\ u t -> mkSysLocal SLIT("upk") u t noSrcLoc)
-			     uniqs inst_con_arg_tys
-	    in
-		-- In processing the rest, push the sub-component args
-		-- and infos on the front of the current bunch
-	    mk_ww_arg_processing (unpk_args ++ args) (cmpnt_infos ++ infos) True {- useful split -} new_max_extra_args
-			`thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
-
-	    returnUs (Just (
-	      -- wrapper: unpack the value
-	      \ hole -> mk_unpk_case arg unpk_args
-			    data_con arg_tycon
-			    (wrap_rest hole),
-
-	      -- worker: expect the unpacked value;
-	      -- reconstruct the orig value with a "let"
-	      work_args_info,
-	      \ hole -> work_rest (mk_pk_let arg data_con tycon_arg_tys unpk_args hole)
-	    ))
   where
     arg_ty = idType arg
 
@@ -372,6 +343,34 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) useful_split ma
       = max_extra_args
 	+ 1			    -- We won't pass the original arg now
 	- nonAbsentArgs cmpnt_infos -- But we will pass an arg for each cmpt
+
+    do_single_constr arg_tycon tycon_arg_tys data_con
+      = let
+	    inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
+	in
+	getUniques (length inst_con_arg_tys)    `thenUs` \ uniqs ->
+	
+	let
+	    unpk_args = zipWithEqual "mk_ww_arg_processing"
+	    	     (\ u t -> mkSysLocal SLIT("upk") u t noSrcLoc)
+	    	     uniqs inst_con_arg_tys
+	in
+	    -- In processing the rest, push the sub-component args
+	    -- and infos on the front of the current bunch
+	mk_ww_arg_processing (unpk_args ++ args) (cmpnt_infos ++ infos) True {- useful split -} new_max_extra_args
+	    	`thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
+	
+	returnUs (Just (
+	  -- wrapper: unpack the value
+	  \ hole -> mk_unpk_case arg unpk_args
+	    	    data_con arg_tycon
+	    	    (wrap_rest hole),
+	
+	  -- worker: expect the unpacked value;
+	  -- reconstruct the orig value with a "let"
+	  work_args_info,
+	  \ hole -> work_rest (mk_pk_let arg data_con tycon_arg_tys unpk_args hole)
+	))
 
     mk_unpk_case arg unpk_args boxing_con boxing_tycon body
       = Case (Var arg) (
@@ -405,5 +404,7 @@ mk_ww_arg_processing (arg : args) (arg_demand : infos) useful_split max_extra_ar
     --)
 
 nonAbsentArgs :: [Demand] -> Int
-nonAbsentArgs cmpts = length [() | WwLazy True <- cmpts]
+nonAbsentArgs []		 = 0
+nonAbsentArgs (WwLazy True : ds) = nonAbsentArgs ds
+nonAbsentArgs (d	   : ds) = 1 + nonAbsentArgs ds
 \end{code}

@@ -14,11 +14,14 @@ STGFUN(_regNcgLoop){}
 STGFUN(_regDsLoop){}
 STGFUN(_regIdLoop){}
 STGFUN(_regPrelLoop){}
+STGFUN(_regSmplLoop){}
 STGFUN(_regTyLoop){}
 STGFUN(_regHsLoop){}
 STGFUN(_regSpecLoop){}
 STGFUN(_regTcMLoop){}
 STGFUN(_regTcLoop){}
 STGFUN(_regRnLoop){}
+STGFUN(_regCgLoop1){}
+STGFUN(_regCgLoop2){}
 
 \end{code}

@@ -450,9 +450,14 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
 	    | otherwise		           = expr_cc
 	    where
 	      expr_cc =  coreExprCc rhs
+\end{code}
 
-{-	We need to be pretty careful when extending 
-	the environment with RHS info in recursive groups.
+
+
+Recursive bindings
+~~~~~~~~~~~~~~~~~~
+We need to be pretty careful when extending 
+the environment with RHS info in recursive groups.
 
 Here's a nasty example:
 
@@ -480,7 +485,7 @@ Our solution is this:
 	(a) we inline un-simplified RHSs, and then simplify
 	    them in a clone-only environment.  
 	(b) we inline only variables and values
-This means taht
+This means that
 
 
 	r = f x 	==>  r = f x
@@ -503,8 +508,8 @@ with a clone of y.  Instead we'll probably inline y (a small value) to give
 	    x = 1:y
 	
 which is OK if not clever.
--}
 
+\begin{code}
 extendEnvForRecBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
 		       (out_id, ((_,occ_info), old_rhs))
   = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps

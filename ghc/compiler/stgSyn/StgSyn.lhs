@@ -40,7 +40,7 @@ module StgSyn (
 IMP_Ubiq(){-uitous-}
 
 import CostCentre	( showCostCentre )
-import Id		( idPrimRep, GenId{-instance NamedThing-} )
+import Id		( idPrimRep, SYN_IE(DataCon), GenId{-instance NamedThing-} )
 import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
 import Name		( pprNonSym )
 import Outputable	( ifPprDebug, interppSP, interpp'SP,
@@ -83,10 +83,12 @@ data GenStgBinding bndr occ
 data GenStgArg occ
   = StgVarArg	occ
   | StgLitArg	Literal
+  | StgConArg   DataCon		-- A nullary data constructor
 \end{code}
 
 \begin{code}
 getArgPrimRep (StgVarArg  local) = idPrimRep local
+getArgPrimRep (StgConArg  con)	 = idPrimRep con
 getArgPrimRep (StgLitArg  lit)	 = literalPrimRep lit
 
 isLitLitArg (StgLitArg x) = isLitLitLit x
@@ -539,6 +541,7 @@ instance (Outputable bndr, Outputable bdee, Ord bdee)
 pprStgArg :: (Outputable bdee) => PprStyle -> GenStgArg bdee -> Pretty
 
 pprStgArg sty (StgVarArg var) = ppr sty var
+pprStgArg sty (StgConArg con) = ppr sty con
 pprStgArg sty (StgLitArg lit) = ppr sty lit
 \end{code}
 

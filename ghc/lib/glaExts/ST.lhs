@@ -4,9 +4,10 @@
 \section[module_ST]{The State Transformer Monad, @ST@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module ST where
 
-import Prelude	()
 import IOBase	( error )	-- [Source not needed]
 import ArrBase
 import STBase

@@ -235,6 +235,9 @@ calcUnfoldingGuidance
 
 calcUnfoldingGuidance True bOMB_OUT_SIZE expr = UnfoldAlways	-- Always inline if the INLINE pragma says so
 
+calcUnfoldingGuidance False any_size (Con _ _ ) = UnfoldAlways	-- We are very gung ho about inlining
+calcUnfoldingGuidance False any_size (Lit _)    = UnfoldAlways	-- constructors and literals
+
 calcUnfoldingGuidance False bOMB_OUT_SIZE expr
   = let
     	(use_binders, ty_binders, val_binders, body) = collectBinders expr
@@ -460,24 +463,19 @@ okToInline
 	-> Bool		-- True => it's small enough to inline
 	-> Bool		-- True => yes, inline it
 
--- Always inline bottoms
-okToInline BottomForm occ_info small_enough
-  = True	-- Unless one of the type args is unboxed??
-		-- This used to be checked for, but I can't
-		-- see why so I've left it out.
-
--- A WHNF can be inlined if it occurs once, or is small
+-- If there's no danger of duplicating work, we can inline if it occurs once, or is small
 okToInline form occ_info small_enough
- | is_whnf_form form
+ | no_dup_danger form
  = small_enough || one_occ
  where
    one_occ = case occ_info of
 		OneOcc _ _ _ n_alts _ -> n_alts <= 1
 		other		      -> False
    	
-   is_whnf_form VarForm   = True
-   is_whnf_form ValueForm = True
-   is_whnf_form other     = False
+   no_dup_danger VarForm    = True
+   no_dup_danger ValueForm  = True
+   no_dup_danger BottomForm = True
+   no_dup_danger other      = False
     
 -- A non-WHNF can be inlined if it doesn't occur inside a lambda,
 -- and occurs exactly once or 

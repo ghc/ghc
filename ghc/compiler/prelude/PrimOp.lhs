@@ -38,7 +38,7 @@ import TysWiredIn
 import CStrings		( identToC )
 import Constants   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
-import PprStyle		( codeStyle{-, PprStyle(..) ToDo:rm-} )
+import PprStyle		( codeStyle, ifaceStyle )
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
@@ -1742,26 +1742,31 @@ pprPrimOp sty (CCallOp fun is_casm may_gc arg_tys res_ty)
   = let
 	before
 	  = if is_casm then
-	       if may_gc then "(_casm_GC_ ``" else "(_casm_ ``"
+	       if may_gc then "_casm_GC_ ``" else "_casm_ ``"
 	    else
-	       if may_gc then "(_ccall_GC_ " else "(_ccall_ "
+	       if may_gc then "_ccall_GC_ " else "_ccall_ "
 
 	after
 	  = if is_casm then ppStr "''" else ppNil
 
 	pp_tys
-	  = ppBesides [ppStr " { [",
-		ppIntersperse pp'SP{-'-} (map (pprParendGenType sty) arg_tys),
-		ppRbrack, ppSP, pprParendGenType sty res_ty, ppStr " })"]
-
+	  = ppCat (map (pprParendGenType sty) (res_ty:arg_tys))
     in
-    ppBesides [ppStr before, ppPStr fun, after, pp_tys]
+    ppBesides [ppStr before, ppPStr fun, after, ppSP, ppLbrack, pp_tys, ppRbrack]
 
 pprPrimOp sty other_op
-  = let
-	str = primOp_str other_op
-    in
-    (if codeStyle sty then identToC else ppPStr) str
+  | codeStyle sty 	-- For C just print the primop itself
+  = identToC str
+
+  | ifaceStyle sty	-- For interfaces Print it qualified with GHC.
+  = ppPStr SLIT("GHC.") `ppBeside` ppPStr str
+
+  | otherwise		-- Unqualified is good enough
+  = ppPStr str
+  where
+    str = primOp_str other_op
+
+
 
 instance Outputable PrimOp where
     ppr sty op = pprPrimOp sty op

@@ -7,10 +7,11 @@
 The @Read@ class and many of its instances.
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelRead where
 
-import Prelude ()
-import IOBase	( error )		{-# SOURCE #-}
+import {#- SOURCE #-}	IOBase	( error )
 import PrelNum
 import PrelList
 import PrelTup

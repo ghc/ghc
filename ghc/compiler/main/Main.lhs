@@ -150,10 +150,6 @@ doIt (core_cmds, stg_cmds) input_pgm
     doDump opt_D_dump_deriv "Derived instances:"
 	(pp_show (ddump_deriv pprStyle))	>>
 
-	-- Now (and alas only now) we have the derived-instance information
-	-- so we can put instance information in the interface file
-    ifaceInstances if_handle inst_info			>>
-
     -- ******* DESUGARER
     show_pass "DeSugar " 			>>
     _scc_     "DeSugar"
@@ -207,12 +203,12 @@ doIt (core_cmds, stg_cmds) input_pgm
 	(pp_show (ppAboves (map (pprPlainStgBinding pprStyle) stg_binds2)))
 						>>
 
-	-- Dump type signatures into the interface file
+	-- Dump instance decls and type signatures into the interface file
     let
 	final_ids = collectFinalStgBinders stg_binds2
     in
-    ifaceDecls if_handle rn_mod final_ids simplified	>>
-    endIface if_handle					>>
+    ifaceDecls if_handle rn_mod inst_info final_ids simplified	>>
+    endIface if_handle						>>
     -- We are definitely done w/ interface-file stuff at this point:
     -- (See comments near call to "startIface".)
     

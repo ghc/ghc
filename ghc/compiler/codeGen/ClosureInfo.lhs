@@ -68,7 +68,7 @@ import CgRetConv	( assignRegs, dataReturnConvAlg,
 			)
 import CLabel		( mkStdEntryLabel, mkFastEntryLabel,
 			  mkPhantomInfoTableLabel, mkInfoTableLabel,
-			  mkConInfoTableLabel,
+			  mkConInfoTableLabel, mkStaticClosureLabel, 
 			  mkBlackHoleInfoTableLabel, mkVapInfoTableLabel,
 			  mkStaticInfoTableLabel, mkStaticConEntryLabel,
 			  mkConEntryLabel, mkClosureLabel, mkVapEntryLabel
@@ -1177,7 +1177,12 @@ mkConEntryPtr con rep
       _		    -> mkConEntryLabel con
 
 
-closureLabelFromCI (MkClosureInfo id _ _) = mkClosureLabel id
+closureLabelFromCI (MkClosureInfo id _ rep) 
+	| isConstantRep rep
+	= mkStaticClosureLabel id
+	-- This case catches those pesky static closures for nullary constructors
+
+closureLabelFromCI (MkClosureInfo id _ other_rep)   = mkClosureLabel id
 
 entryLabelFromCI :: ClosureInfo -> CLabel
 entryLabelFromCI (MkClosureInfo id lf_info rep)

@@ -567,13 +567,16 @@ namesOfType (ForAllUsageTy _ _ ty)	= panic "forall usage"
 Instantiating a type
 ~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-applyTy :: GenType (GenTyVar flexi) uvar 
-	-> GenType (GenTyVar flexi) uvar 
-	-> GenType (GenTyVar flexi) uvar
+-- applyTy :: GenType (GenTyVar flexi) uvar 
+-- 	-> GenType (GenTyVar flexi) uvar 
+--	-> GenType (GenTyVar flexi) uvar
 
-applyTy (SynTy _ _ fun)  arg = applyTy fun arg
-applyTy (ForAllTy tv ty) arg = instantiateTy [(tv,arg)] ty
-applyTy other		 arg = panic "applyTy"
+applyTy :: Type -> Type -> Type
+
+applyTy (SynTy _ _ fun)   arg = applyTy fun arg
+applyTy (ForAllTy tv ty)  arg = instantiateTy [(tv,arg)] ty
+applyTy ty@(DictTy _ _ _) arg = applyTy (expandTy ty) arg
+applyTy other		  arg = panic "applyTy"
 \end{code}
 
 \begin{code}

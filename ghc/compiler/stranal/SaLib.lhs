@@ -64,28 +64,25 @@ data AbsVal
 			    --    AbsProd [AbsBot, ..., AbsBot]
 
   | AbsFun	    	    -- An abstract function, with the given:
-	    [Id]	    -- arguments
-	    CoreExpr   -- body
+	    Id		    -- argument
+	    CoreExpr	    -- body
 	    AbsValEnv	    -- and environment
 
   | AbsApproxFun	    -- This is used to represent a coarse
-	    [Demand]	    -- approximation to a function value.  It's an
-	    		    -- abstract function which is strict in its i'th
-			    -- argument if the i'th element of the Demand
-			    -- list so indicates.
-			    -- The list of arguments is always non-empty.
-			    -- In effect, AbsApproxFun [] = AbsTop
+	    Demand	    -- approximation to a function value.  It's an
+	    AbsVal	    -- abstract function which is strict in its
+			    -- argument if the  Demand so indicates.
 
 instance Outputable AbsVal where
     ppr sty AbsTop = ppStr "AbsTop"
     ppr sty AbsBot = ppStr "AbsBot"
     ppr sty (AbsProd prod) = ppCat [ppStr "AbsProd", ppr sty prod]
-    ppr sty (AbsFun args body env)
-      = ppCat [ppStr "AbsFun{", ppr sty args,
+    ppr sty (AbsFun arg body env)
+      = ppCat [ppStr "AbsFun{", ppr sty arg,
 	       ppStr "???", -- ppStr "}{env:", ppr sty (keysFM env `zip` eltsFM env),
 	       ppStr "}" ]
-    ppr sty (AbsApproxFun demands)
-      = ppCat [ppStr "AbsApprox{", ppr sty demands, ppStr "}" ]
+    ppr sty (AbsApproxFun demand val)
+      = ppCat [ppStr "AbsApprox ", ppr sty demand, ppStr "", ppr sty val ]
 \end{code}
 
 %-----------
@@ -124,6 +121,5 @@ absValFromStrictness anal NoStrictnessInfo 	       = AbsTop
 absValFromStrictness StrAnal BottomGuaranteed 	       = AbsBot -- Guaranteed bottom
 absValFromStrictness AbsAnal BottomGuaranteed 	       = AbsTop	-- Check for poison in
 								-- arguments (if any)
-absValFromStrictness anal (StrictnessInfo []        _) = AbsTop
-absValFromStrictness anal (StrictnessInfo args_info _) = AbsApproxFun args_info
+absValFromStrictness anal (StrictnessInfo args_info _) = foldr AbsApproxFun AbsTop args_info
 \end{code}

@@ -73,11 +73,8 @@ IMPORT_DELOOPER(SpecLoop)
 import Maybes
 import Bag	  ( Bag, foldBag )
 import Outputable ( Outputable(..) )
-
-# ifdef DEBUG
 import PprStyle	( PprStyle )
 import Pretty	( SYN_IE(Pretty), PrettyRep )
-# endif
 
 #ifdef COMPILING_GHC
 
@@ -777,12 +774,10 @@ When the FiniteMap module is used in GHC, we specialise it for
 		 , FiniteMap FAST_STRING elt -> FAST_STRING -> elt  -> FiniteMap FAST_STRING elt
 		 , FiniteMap (FAST_STRING, FAST_STRING) elt -> (FAST_STRING, FAST_STRING) -> elt  -> FiniteMap (FAST_STRING, FAST_STRING) elt
 		 , FiniteMap RdrName elt -> RdrName -> elt  -> FiniteMap RdrName elt
-		 , FiniteMap OrigName elt -> OrigName -> elt  -> FiniteMap OrigName elt
     IF_NCG(COMMA   FiniteMap Reg elt -> Reg -> elt  -> FiniteMap Reg elt)
     #-}
 {-# SPECIALIZE addToFM_C
 		:: (elt -> elt -> elt) -> FiniteMap (RdrName, RdrName) elt -> (RdrName, RdrName) -> elt -> FiniteMap (RdrName, RdrName) elt
-		 , (elt -> elt -> elt) -> FiniteMap (OrigName, OrigName) elt -> (OrigName, OrigName) -> elt -> FiniteMap (OrigName, OrigName) elt
 		 , (elt -> elt -> elt) -> FiniteMap FAST_STRING elt -> FAST_STRING -> elt -> FiniteMap FAST_STRING elt
     IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> Reg -> elt -> FiniteMap Reg elt)
     #-}
@@ -791,7 +786,6 @@ When the FiniteMap module is used in GHC, we specialise it for
     #-}
 {-# SPECIALIZE delListFromFM
 		:: FiniteMap RdrName elt -> [RdrName]   -> FiniteMap RdrName elt
-		 , FiniteMap OrigName elt -> [OrigName]   -> FiniteMap OrigName elt
 		 , FiniteMap FAST_STRING elt -> [FAST_STRING]   -> FiniteMap FAST_STRING elt
     IF_NCG(COMMA   FiniteMap Reg elt -> [Reg]   -> FiniteMap Reg elt)
     #-}
@@ -799,7 +793,6 @@ When the FiniteMap module is used in GHC, we specialise it for
 		:: [([Char],elt)] -> FiniteMap [Char] elt
 		 , [(FAST_STRING,elt)] -> FiniteMap FAST_STRING elt
 		 , [((FAST_STRING,FAST_STRING),elt)] -> FiniteMap (FAST_STRING, FAST_STRING) elt
-		 , [(OrigName,elt)] -> FiniteMap OrigName elt
     IF_NCG(COMMA   [(Reg COMMA elt)] -> FiniteMap Reg elt)
     #-}
 {-# SPECIALIZE lookupFM
@@ -807,8 +800,6 @@ When the FiniteMap module is used in GHC, we specialise it for
 		 , FiniteMap [Char] elt -> [Char] -> Maybe elt
 		 , FiniteMap FAST_STRING elt -> FAST_STRING -> Maybe elt
 		 , FiniteMap (FAST_STRING,FAST_STRING) elt -> (FAST_STRING,FAST_STRING) -> Maybe elt
-		 , FiniteMap OrigName elt -> OrigName -> Maybe elt
-		 , FiniteMap (OrigName,OrigName) elt -> (OrigName,OrigName) -> Maybe elt
 		 , FiniteMap RdrName elt -> RdrName -> Maybe elt
 		 , FiniteMap (RdrName,RdrName) elt -> (RdrName,RdrName) -> Maybe elt
     IF_NCG(COMMA   FiniteMap Reg elt -> Reg -> Maybe elt)
@@ -819,7 +810,6 @@ When the FiniteMap module is used in GHC, we specialise it for
     #-}
 {-# SPECIALIZE plusFM
 		:: FiniteMap RdrName elt -> FiniteMap RdrName elt -> FiniteMap RdrName elt
-		 , FiniteMap OrigName elt -> FiniteMap OrigName elt -> FiniteMap OrigName elt
 		 , FiniteMap FAST_STRING elt -> FiniteMap FAST_STRING elt -> FiniteMap FAST_STRING elt
     IF_NCG(COMMA   FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
     #-}

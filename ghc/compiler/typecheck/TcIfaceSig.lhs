@@ -12,7 +12,9 @@ IMP_Ubiq()
 
 import TcMonad
 import TcMonoType	( tcHsType )
-import TcEnv		( tcLookupGlobalValue, tcExtendTyVarEnv, tcExtendGlobalValEnv )
+import TcEnv		( tcLookupGlobalValue, tcExtendTyVarEnv, tcExtendGlobalValEnv,
+			  tcLookupTyConByKey, tcLookupGlobalValueMaybe, tcLookupLocalValue
+			)
 import TcKind		( TcKind, kindToTcKind )
 
 import HsSyn		( IfaceSig(..), HsDecl(..), TyDecl, ClassDecl, InstDecl, DefaultDecl, HsBinds,
@@ -20,6 +22,7 @@ import HsSyn		( IfaceSig(..), HsDecl(..), TyDecl, ClassDecl, InstDecl, DefaultDe
 import RnHsSyn		( RenamedHsDecl(..) )
 import HsCore
 import HsDecls		( HsIdInfo(..) )
+import Literal		( Literal(..) )
 import CoreSyn
 import CoreUnfold
 import MagicUFs		( MagicUnfoldingFun )
@@ -27,9 +30,13 @@ import SpecEnv		( SpecEnv )
 import PrimOp		( PrimOp(..) )
 
 import Id		( GenId, mkImported, mkUserId, isPrimitiveId_maybe )
+import Type		( mkSynTy )
 import TyVar		( mkTyVar )
 import Name		( Name )
+import Unique		( rationalTyConKey )
+import TysWiredIn	( integerTy )
 import PragmaInfo	( PragmaInfo(..) )
+import ErrUtils		( pprBagOfErrors )
 import Maybes		( maybeToBool )
 import Pretty
 import PprStyle		( PprStyle(..) )
@@ -64,9 +71,6 @@ tcInterfaceSigs (other_decl : rest) = tcInterfaceSigs rest
 tcInterfaceSigs [] = returnTc []
 \end{code}
 
-Inside here we use only the Global environment, even for locally bound variables.
-Why? Because we know all the types and want to bind them to real Ids.
-
 \begin{code}
 tcIdInfo name info [] = returnTc info
 
@@ -96,8 +100,8 @@ tcIdInfo name info (HsStrictness strict : rest)
 
 \begin{code}
 tcStrictness (StrictnessInfo demands (Just worker))
-  = tcLookupGlobalValue worker		`thenNF_Tc` \ worker_id ->
-    returnTc (StrictnessInfo demands (Just worker_id))
+  = tcWorker worker		`thenNF_Tc` \ maybe_worker_id ->
+    returnTc (StrictnessInfo demands  maybe_worker_id)
 
 -- Boring to write these out, but the result type differe from the arg type...
 tcStrictness (StrictnessInfo demands Nothing) = returnTc (StrictnessInfo demands Nothing)
@@ -105,18 +109,53 @@ tcStrictness NoStrictnessInfo		      = returnTc NoStrictnessInfo
 tcStrictness BottomGuaranteed		      = returnTc BottomGuaranteed
 \end{code}
 
+\begin{code}
+tcWorker worker
+  = tcLookupGlobalValueMaybe worker	`thenNF_Tc` \ maybe_worker_id ->
+    returnNF_Tc (trace_maybe maybe_worker_id)
+  where
+	-- The trace is so we can see what's getting dropped
+    trace_maybe Nothing  = pprTrace "tcWorker failed:" (ppr PprDebug worker) Nothing
+    trace_maybe (Just x) = Just x
+\end{code}
+
+tcLookupGlobalValue worker
+
 For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
 
 \begin{code}
 tcUnfolding name core_expr
   = forkNF_Tc (
-	recoverNF_Tc (returnNF_Tc no_unfolding) (
+	recoverNF_Tc no_unfolding (
 		tcCoreExpr core_expr	`thenTc` \ core_expr' ->
 		returnTc (mkUnfolding False core_expr')
     ))			
   where
-    no_unfolding = pprTrace "tcUnfolding failed:" (ppr PprDebug name) NoUnfolding
+	-- The trace tells what wasn't available, for the benefit of
+	-- compiler hackers who want to improve it!
+    no_unfolding = getErrsTc		`thenNF_Tc` \ (warns,errs) ->
+		   returnNF_Tc (pprTrace "tcUnfolding failed with:" 
+				   	(ppHang (ppr PprDebug name) 4 (pprBagOfErrors PprDebug errs))
+					NoUnfolding)
+\end{code}
+
+
+Variables in unfoldings
+~~~~~~~~~~~~~~~~~~~~~~~
+****** Inside here we use only the Global environment, even for locally bound variables.
+****** Why? Because we know all the types and want to bind them to real Ids.
+
+\begin{code}
+tcVar :: Name -> TcM s Id
+tcVar name
+  = tcLookupGlobalValueMaybe name	`thenNF_Tc` \ maybe_id ->
+    case maybe_id of {
+	Just id -> returnTc id;
+	Nothing -> failTc (noDecl name)
+    }
+
+noDecl name sty = ppCat [ppStr "Warning: no binding for", ppr sty name]
 \end{code}
 
 UfCore expressions.
@@ -125,13 +164,27 @@ UfCore expressions.
 tcCoreExpr :: UfExpr Name -> TcM s CoreExpr
 
 tcCoreExpr (UfVar name)
-  = tcLookupGlobalValue name 	`thenNF_Tc` \ id ->
+  = tcVar name 	`thenTc` \ id ->
     returnTc (Var id)
 
-tcCoreExpr (UfLit lit) = returnTc (Lit lit)
+-- rationalTy isn't built in so we have to construct it
+-- (the "ty" part of the incoming literal is simply bottom)
+tcCoreExpr (UfLit (NoRepRational lit _)) 
+  = tcLookupTyConByKey rationalTyConKey	`thenNF_Tc` \ rational_tycon ->
+    let
+	rational_ty  = mkSynTy rational_tycon []
+    in
+    returnTc (Lit (NoRepRational lit rational_ty)) 
+
+-- Similarly for integers, except that it is wired in
+tcCoreExpr (UfLit (NoRepInteger lit _)) 
+  = returnTc (Lit (NoRepInteger lit integerTy))
+
+tcCoreExpr (UfLit other_lit)
+  = returnTc (Lit other_lit)
 
 tcCoreExpr (UfCon con args) 
-  = tcLookupGlobalValue con	`thenNF_Tc` \ con_id ->
+  = tcVar con			`thenTc` \ con_id ->
     mapTc tcCoreArg args	`thenTc` \ args' ->
     returnTc (Con con_id args')
 
@@ -221,8 +274,8 @@ tcCoreValBndrs bndrs thing_inside		-- Expect them all to be ValBinders
 \end{code}    
 
 \begin{code}
-tcCoreArg (UfVarArg v)	 = tcLookupGlobalValue v  `thenNF_Tc` \ v' -> returnTc (VarArg v')
-tcCoreArg (UfTyArg ty)	 = tcHsType ty		  `thenTc` \ ty' -> returnTc (TyArg ty')
+tcCoreArg (UfVarArg v)	 = tcVar v 		`thenTc` \ v' -> returnTc (VarArg v')
+tcCoreArg (UfTyArg ty)	 = tcHsType ty		`thenTc` \ ty' -> returnTc (TyArg ty')
 tcCoreArg (UfLitArg lit) = returnTc (LitArg lit)
 tcCoreArg (UfUsageArg u) = error "tcCoreArg: usage"
 
@@ -231,7 +284,7 @@ tcCoreAlts (UfAlgAlts alts deflt)
     tcCoreDefault deflt		`thenTc` \ deflt' ->
     returnTc (AlgAlts alts' deflt')
   where
-    tc_alt (con, bndrs, rhs) =	tcLookupGlobalValue con		`thenNF_Tc` \ con' ->
+    tc_alt (con, bndrs, rhs) =	tcVar con			`thenTc` \ con' ->
 				tcCoreValBndrs bndrs		$ \ bndrs' ->
 				tcCoreExpr rhs			`thenTc` \ rhs' ->
 				returnTc (con', bndrs', rhs')
@@ -249,11 +302,11 @@ tcCoreDefault (UfBindDefault bndr rhs) = tcCoreValBndr bndr	$ \ bndr' ->
 					 tcCoreExpr rhs		`thenTc` \ rhs' ->
 				  	 returnTc (BindDefault bndr' rhs')
 
-tcCoercion (UfIn  n) = tcLookupGlobalValue n `thenNF_Tc` \ n' -> returnTc (CoerceIn  n')
-tcCoercion (UfOut n) = tcLookupGlobalValue n `thenNF_Tc` \ n' -> returnTc (CoerceOut n')
+tcCoercion (UfIn  n) = tcVar n `thenTc` \ n' -> returnTc (CoerceIn  n')
+tcCoercion (UfOut n) = tcVar n `thenTc` \ n' -> returnTc (CoerceOut n')
 
 tcCorePrim (UfOtherOp op) 
-  = tcLookupGlobalValue op	`thenNF_Tc` \ op_id ->
+  = tcVar op		`thenTc` \ op_id ->
     case isPrimitiveId_maybe op_id of
 	Just prim_op -> returnTc prim_op
 	Nothing	     -> pprPanic "tcCorePrim" (ppr PprDebug op_id)

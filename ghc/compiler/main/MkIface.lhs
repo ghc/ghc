@@ -8,7 +8,7 @@
 
 module MkIface (
 	startIface, endIface,
-	ifaceMain, ifaceInstances,
+	ifaceMain,
 	ifaceDecls
     ) where
 
@@ -24,7 +24,7 @@ import TcInstUtil	( InstInfo(..) )
 
 import CmdLineOpts
 import Id		( idType, dataConRawArgTys, dataConFieldLabels, isDataCon,
-			  getIdInfo, idWantsToBeINLINEd, wantIdSigInIface,
+			  getIdInfo, idWantsToBeINLINEd, omitIfaceSigForId,
 			  dataConStrictMarks, StrictnessMark(..), 
 			  SYN_IE(IdSet), idSetToList, unionIdSets, unitIdSet, minusIdSet, 
 			  isEmptyIdSet, elementOfIdSet, emptyIdSet, mkIdSet,
@@ -58,7 +58,7 @@ import Unpretty		-- ditto
 
 import Bag		( bagToList )
 import Maybes		( catMaybes, maybeToBool )
-import FiniteMap	( emptyFM, addToFM, lookupFM, fmToList, eltsFM, FiniteMap )
+import FiniteMap	( emptyFM, addToFM, addToFM_C, lookupFM, fmToList, eltsFM, FiniteMap )
 import UniqFM		( UniqFM, lookupUFM, listToUFM )
 import Util		( sortLt, zipWithEqual, zipWith3Equal, mapAccumL,
 			  assertPanic, panic{-ToDo:rm-}, pprTrace )
@@ -81,10 +81,10 @@ ifaceMain   :: Maybe Handle
 	    -> InterfaceDetails
 	    -> IO ()
 
-ifaceInstances :: Maybe Handle -> Bag InstInfo -> IO ()
 
 ifaceDecls :: Maybe Handle
 	   -> RenamedHsModule
+	   -> Bag InstInfo 
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
 	   -> [CoreBinding]	-- In dependency order, later depend on earlier
 	   -> IO ()
@@ -117,16 +117,18 @@ ifaceMain (Just if_hdl)
     ifaceFixities		if_hdl fixities			>>
     return ()
 
-ifaceDecls Nothing rn_mod final_ids simplified = return ()
-ifaceDecls (Just hdl) 
+ifaceDecls Nothing rn_mod inst_info final_ids simplified = return ()
+ifaceDecls (Just hdl)
 	   (HsModule _ _ _ _ _ decls _)
+	   inst_infos
 	   final_ids binds
   | null decls = return ()		 
 	--  You could have a module with just (re-)exports/instances in it
   | otherwise
-  = hPutStr hdl "_declarations_\n"	>>
-    ifaceTCDecls hdl decls		>>
-    ifaceBinds hdl final_ids binds	>>
+  = ifaceInstances hdl inst_infos		>>= \ needed_ids ->
+    hPutStr hdl "_declarations_\n"		>>
+    ifaceTCDecls hdl decls			>>
+    ifaceBinds hdl needed_ids final_ids binds	>>
     return ()
 \end{code}
 
@@ -153,7 +155,21 @@ ifaceInstanceModules if_hdl imods
 ifaceExports if_hdl [] = return ()
 ifaceExports if_hdl avails
   = hPutStr if_hdl "_exports_\n"			>>
-    hPutCol if_hdl upp_avail (sortLt lt_avail avails)
+    hPutCol if_hdl do_one_module (fmToList export_fm)
+  where
+	-- Sort them into groups by module
+    export_fm :: FiniteMap Module [AvailInfo]
+    export_fm = foldr insert emptyFM avails
+    insert avail@(Avail name _) efm = addToFM_C (++) efm mod [avail] 
+			      where
+			  	    (mod,_) = modAndOcc name
+    insert NotAvailable efm = efm
+
+	-- Print one module's worth of stuff
+    do_one_module (mod_name, avails)
+	= uppBesides [upp_module mod_name, uppSP, 
+		      uppCat (map upp_avail (sortLt lt_avail avails)),
+		      uppSemi]
 
 ifaceFixities if_hdl [] = return ()
 ifaceFixities if_hdl fixities 
@@ -182,14 +198,15 @@ ifaceTCDecls if_hdl decls
 
 
 \begin{code}			 
-ifaceInstances Nothing{-no iface handle-} _ = return ()
-				 
-ifaceInstances (Just if_hdl) inst_infos
-  | null togo_insts = return ()		 
+ifaceInstances :: Handle -> Bag InstInfo -> IO IdSet		-- The IdSet is the needed dfuns
+ifaceInstances if_hdl inst_infos
+  | null togo_insts = return emptyIdSet		 
   | otherwise 	    = hPutStr if_hdl "_instances_\n" >>
-		      hPutCol if_hdl pp_inst (sortLt lt_inst togo_insts)
+		      hPutCol if_hdl pp_inst (sortLt lt_inst togo_insts) >>
+		      return needed_ids
   where				 
     togo_insts	= filter is_togo_inst (bagToList inst_infos)
+    needed_ids  = mkIdSet [dfun_id | InstInfo _ _ _ _ _ dfun_id _ _ _ <- togo_insts]
     is_togo_inst (InstInfo _ _ _ _ _ dfun_id _ _ _) = isLocallyDefined dfun_id
 				 
     -------			 
@@ -223,20 +240,22 @@ ifaceId :: (Id -> IdInfo)		-- This function "knows" the extra info added
 	    -> IdSet			-- Set of Ids that are needed by earlier interface
 					-- file emissions.  If the Id isn't in this set, and isn't
 					-- exported, there's no need to emit anything
+	    -> Bool			-- True <=> recursive, so don't print unfolding
 	    -> Id
 	    -> CoreExpr			-- The Id's right hand side
 	    -> Maybe (Pretty, IdSet)	-- The emitted stuff, plus a possibly-augmented set of needed Ids
 
-ifaceId get_idinfo needed_ids id rhs
-  | not (wantIdSigInIface (id `elementOfIdSet` needed_ids) 
-			  opt_OmitInterfacePragmas
-			  id)
+ifaceId get_idinfo needed_ids is_rec id rhs
+  | not (id `elementOfIdSet` needed_ids ||		-- Needed [no id in needed_ids has omitIfaceSigForId]
+	 (isExported id && not (omitIfaceSigForId id)))	-- or exported and not to be omitted
   = Nothing 		-- Well, that was easy!
 
-ifaceId get_idinfo needed_ids id rhs
+ifaceId get_idinfo needed_ids is_rec id rhs
   = Just (ppCat [sig_pretty, prag_pretty, ppSemi], new_needed_ids)
   where
-    idinfo     = get_idinfo id
+    idinfo        = get_idinfo id
+    inline_pragma = idWantsToBeINLINEd id 
+
     ty_pretty  = pprType PprInterface (initNmbr (nmbrType (idType id)))
     sig_pretty = ppBesides [ppr PprInterface (getOccName id), ppPStr SLIT(" :: "), ty_pretty]
 
@@ -255,13 +274,18 @@ ifaceId get_idinfo needed_ids id rhs
     unfold_pretty | show_unfold = ppCat [ppStr "_U_", pprIfaceUnfolding rhs]
 		  | otherwise   = ppNil
 
-    show_unfold = not (maybeToBool maybe_worker) &&		-- Unfolding is implicit
-		  not (bottomIsGuaranteed strict_info) &&	-- Ditto
-		  case guidance of 				-- Small enough to show
-			UnfoldNever -> False
-			other       -> True 
+    show_unfold = not implicit_unfolding && 			-- Unnecessary
+		  (inline_pragma || not dodgy_unfolding)	-- Dangerous
 
-    guidance    = calcUnfoldingGuidance (idWantsToBeINLINEd id) 
+    implicit_unfolding = maybeToBool maybe_worker ||
+			 bottomIsGuaranteed strict_info
+
+    dodgy_unfolding = is_rec ||					-- No recursive unfoldings please!
+		      case guidance of 				-- Too big to show
+			UnfoldNever -> True
+			other       -> False
+
+    guidance    = calcUnfoldingGuidance inline_pragma
 					opt_InterfaceUnfoldThreshold
 					rhs
 
@@ -282,19 +306,19 @@ ifaceId get_idinfo needed_ids id rhs
 	       | otherwise   = emptyIdSet
 			     where
 			       (_,free_vars) = addExprFVs interesting emptyIdSet rhs
-			       interesting bound id = not (id `elementOfIdSet` bound) &&
-						      not (isDataCon id) &&
-						      not (isWiredInName (getName id)) &&
-						      isLocallyDefined id 
+			       interesting bound id = isLocallyDefined id &&
+						      not (id `elementOfIdSet` bound) &&
+						      not (omitIfaceSigForId id)
 \end{code}
 
 \begin{code}
 ifaceBinds :: Handle
+	   -> IdSet		-- These Ids are needed already
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
 	   -> [CoreBinding]	-- In dependency order, later depend on earlier
 	   -> IO ()
 
-ifaceBinds hdl final_ids binds
+ifaceBinds hdl needed_ids final_ids binds
   = hPutStr hdl (uppShow 0 (prettyToUn (ppAboves pretties)))	>>
     hPutStr hdl "\n"
   where
@@ -304,7 +328,7 @@ ifaceBinds hdl final_ids binds
 			Nothing  -> pprTrace "ifaceBinds not found:" (ppr PprDebug id) $
 				    getIdInfo id
 
-    pretties = go emptyIdSet (reverse binds)	-- Reverse so that later things will 
+    pretties = go needed_ids (reverse binds)	-- Reverse so that later things will 
 						-- provoke earlier ones to be emitted
     go needed [] = if not (isEmptyIdSet needed) then
 			pprTrace "ifaceBinds: free vars:" 
@@ -314,7 +338,7 @@ ifaceBinds hdl final_ids binds
 			[]
 
     go needed (NonRec id rhs : binds)
-	= case ifaceId get_idinfo needed id rhs of
+	= case ifaceId get_idinfo needed False id rhs of
 		Nothing		       -> go needed binds
 		Just (pretty, needed') -> pretty : go needed' binds
 
@@ -338,7 +362,7 @@ ifaceBinds hdl final_ids binds
 	  (needed', maybes)	 	= mapAccumL do_one needed pairs
 	  (final_needed, more_pretties) = go_rec needed' reduced_pairs
 
-	  do_one needed (id,rhs) = case ifaceId get_idinfo needed id rhs of
+	  do_one needed (id,rhs) = case ifaceId get_idinfo needed True id rhs of
 					Nothing		       -> (needed,  Nothing)
 					Just (pretty, needed') -> (needed', Just pretty)
 \end{code}
@@ -352,11 +376,7 @@ ifaceBinds hdl final_ids binds
 				 
 \begin{code}
 upp_avail NotAvailable    = uppNil
-upp_avail (Avail name ns) = uppBesides [upp_module mod, uppSP, 
-					upp_occname occ, uppSP, 
-					upp_export ns]
-			     where
-				(mod,occ) = modAndOcc name
+upp_avail (Avail name ns) = uppBesides [upp_occname (getOccName name), upp_export ns]
 
 upp_export []    = uppNil
 upp_export names = uppBesides [uppStr "(", 

@@ -269,8 +269,9 @@ tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty)
     mapNF_Tc new_arg_dict (zipEqual "tcExpr:CCall" args arg_tys)    `thenNF_Tc` \ ccarg_dicts_s ->
     newDicts result_origin [(cReturnableClass, result_ty)]	    `thenNF_Tc` \ (ccres_dict, _) ->
 
-    returnTc (HsCon stDataCon [realWorldTy, result_ty] [CCall lbl args' may_gc is_asm result_ty],
-	      -- do the wrapping in the newtype constructor here
+    returnTc (HsApp (HsVar (RealId stDataCon) `TyApp` [realWorldTy, result_ty])
+		    (CCall lbl args' may_gc is_asm result_ty),
+		      -- do the wrapping in the newtype constructor here
 	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie,
 	      mkPrimIoTy result_ty)
 \end{code}

@@ -206,7 +206,7 @@ These variables represent parts of the -O/-O2/etc ``templates,''
 which are filled in later, using these.
 These are the default values, which may be changed by user flags.
 \begin{code}
-$Oopt_UnfoldingUseThreshold	= '-fsimpl-uf-use-threshold3';
+$Oopt_UnfoldingUseThreshold	= '-funfolding-use-threshold3';
 $Oopt_MaxSimplifierIterations	= '-fmax-simplifier-iterations4';
 $Oopt_PedanticBottoms		= '-fpedantic-bottoms'; # ON by default
 $Oopt_MonadEtaExpansion		= '';
@@ -891,15 +891,6 @@ arg: while($_ = $ARGV[0]) {
 
     /^-fno-implicit-prelude$/      && do { $NoImplicitPrelude= 1; push(@HsC_flags, $_); next arg; };
 
-    # ToDo: rename to -fcompiling-ghc-internals=<module>
-    # NB: not documented
-    /^-fcompiling-ghc-internals(.*)/	&& do { local($m) = &grab_arg_arg('-fcompiling-ghc-internals',$1);
-					push(@HsC_flags, "-fcompiling-ghc-internals=$m");
-					next arg; };
-
-    # NB: not really put to use and not documented
-    /^-fusing-ghc-internals$/ && do { $UsingGhcInternals = 1; next arg; };
-
     /^-user-prelude-force/	&& do { # ignore if not -user-prelude
 				        next arg; };
 
@@ -970,7 +961,7 @@ arg: while($_ = $ARGV[0]) {
 
     # ---------------
 
-    /^(-fsimpl-uf-use-threshold)(.*)$/
+    /^(-funfolding-use-threshold)(.*)$/
 		    && do { $Oopt_UnfoldingUseThreshold = $1 . &grab_arg_arg($1, $2);
 			    next arg; };
 
@@ -1327,6 +1318,8 @@ It really really wants to be the last STG-to-STG pass that is run.
 
 @HsC_minusO_flags # NOTE: used for *both* -O and -O2 (some conditional bits)
   = (
+	'-fdo-eta-reduction',
+
 	# initial simplify: mk specialiser happy: minimum effort please
 	'-fsimplify',
 	  '\(', 
@@ -1352,7 +1345,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-fcase-of-case',
 	  '-fdo-case-elim',
 	  '-fcase-merge',
-	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
 	  $Oopt_PedanticBottoms,
@@ -1374,7 +1366,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 #		  '-fcase-of-case',
 #		  '-fdo-case-elim',
 #		  '-fcase-merge',
-#		  '-fdo-eta-reduction',
 #		  '-fdo-lambda-eta-expansion',
 #		  '-freuse-con',
 #		  $Oopt_PedanticBottoms,
@@ -1401,7 +1392,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 	    '-fcase-of-case',
 	    '-fdo-case-elim',
 	    '-fcase-merge',
-	    '-fdo-eta-reduction',
 	    '-fdo-lambda-eta-expansion',	# After full laziness
 	    '-freuse-con',
 	    $Oopt_PedanticBottoms,
@@ -1421,7 +1411,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-fcase-of-case',
 	  '-fdo-case-elim',
 	  '-fcase-merge',
-	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
   	  ($Oopt_FoldrBuildInline),
@@ -1444,7 +1433,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-fcase-of-case',
 	  '-fdo-case-elim',
 	  '-fcase-merge',
-	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
 	  '-flet-to-case',		# Aha! Only done after strictness analysis
@@ -1461,7 +1449,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 
 #	( ($OptLevel != 2)
 #        ? ''
-#	: "-fliberate-case -fsimplify \\( $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations \\)" ),
+#	: "-fliberate-case -fsimplify \\( $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations \\)" ),
 
 # Final clean-up simplification:
 
@@ -1473,7 +1461,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-fcase-of-case',
 	  '-fdo-case-elim',
 	  '-fcase-merge',
-	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
 	  '-flet-to-case',

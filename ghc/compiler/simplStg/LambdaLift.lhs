@@ -148,6 +148,7 @@ liftExpr expr@(StgCon con args lvs) = returnLM (expr, emptyLiftInfo)
 liftExpr expr@(StgPrim op args lvs) = returnLM (expr, emptyLiftInfo)
 
 liftExpr expr@(StgApp (StgLitArg lit) args lvs) = returnLM (expr, emptyLiftInfo)
+liftExpr expr@(StgApp (StgConArg con) args lvs) = returnLM (expr, emptyLiftInfo)
 liftExpr expr@(StgApp (StgVarArg v)  args lvs)
   = lookUp v		`thenLM` \ ~(sc, sc_args) ->	-- NB the ~.  We don't want to
 							-- poke these bindings too early!

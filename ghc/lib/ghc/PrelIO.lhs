@@ -7,6 +7,8 @@
 Input/output functions mandated by the standard Prelude.
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelIO (
 	IO, FilePath, IOError, 
 	fail, userError, catch,
@@ -15,7 +17,6 @@ module PrelIO (
 	readFile, writeFile, appendFile, readIO, readLn
     ) where
 
-import Prelude	()
 import IO
 import IOHandle
 import IOBase

@@ -76,7 +76,7 @@ import PprStyle
 import SrcLoc		( SrcLoc )
 import Pretty
 import TyCon		( isSynTyCon, derivedFor )
-import Type		( GenType(..), SYN_IE(ThetaType), mkTyVarTys,
+import Type		( GenType(..), SYN_IE(ThetaType), mkTyVarTys, isPrimType,
 			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy, mkSigmaTy,
 			  getTyCon_maybe, maybeAppTyCon,
 			  maybeBoxedPrimType, maybeAppDataTyCon, splitRhoTy, eqTy
@@ -850,7 +850,8 @@ scrutiniseInstanceType dfun_name clas inst_tau
 -- These conditions come directly from what the DsCCall is capable of.
 -- Totally grotesque.  Green card should solve this.
 
-ccallable_type   ty = maybeToBool (maybeBoxedPrimType ty) ||
+ccallable_type   ty = isPrimType ty ||				-- Allow CCallable Int# etc
+                      maybeToBool (maybeBoxedPrimType ty) ||	-- Ditto Int etc
 		      ty `eqTy` stringTy ||
 		      byte_arr_thing
   where

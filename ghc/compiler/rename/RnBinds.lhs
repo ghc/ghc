@@ -158,7 +158,7 @@ it expects the global environment to contain bindings for the binders
 %*									*
 %************************************************************************
 
-@rnTopBinds@ and @rnTopMonoBinds@ assume that the environment already
+@rnTopBinds@ assumes that the environment already
 contains bindings for the binders of this particular binding.
 
 \begin{code}
@@ -169,10 +169,6 @@ rnTopBinds (SingleBind (RecBind bind))    = rnTopMonoBinds bind []
 rnTopBinds (BindWith (RecBind bind) sigs) = rnTopMonoBinds bind sigs
   -- The parser doesn't produce other forms
 
-
-rnTopMonoBinds :: RdrNameMonoBinds 
-	       -> [RdrNameSig] 
-	       -> RnMS s RenamedHsBinds
 
 rnTopMonoBinds EmptyMonoBinds sigs 
   = returnRn EmptyBinds
@@ -200,10 +196,6 @@ rnTopMonoBinds mbinds sigs
 	- checks that they form a set
 	- extends the environment to bind them to new local names
 	- calls @rnMonoBinds@ to do the real work
-
-In contrast, @rnTopMonoBinds@ doesn't extend the environment, because that's
-already done in pass3.	All it does is call @rnMonoBinds@ and discards
-the free var info.
 
 \begin{code}
 rnBinds	      :: RdrNameHsBinds 

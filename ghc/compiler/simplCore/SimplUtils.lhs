@@ -10,7 +10,7 @@ module SimplUtils (
 
 	floatExposesHNF,
 
-	mkTyLamTryingEta, mkValLamTryingEta,
+	etaCoreExpr,
 
 	etaExpandCount,
 
@@ -25,7 +25,7 @@ IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
 
 import BinderInfo
-import CmdLineOpts	( SimplifierSwitch(..) )
+import CmdLineOpts	( opt_DoEtaReduction, SimplifierSwitch(..) )
 import CoreSyn
 import CoreUnfold	( SimpleUnfolding, mkFormSummary, FormSummary(..) )
 import Id		( idType, isBottomingId, idWantsToBeINLINEd, dataConArgTys,
@@ -37,9 +37,10 @@ import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
-import Type		( eqTy, isPrimType, maybeAppDataTyConExpandingDicts, getTyVar_maybe )
+import Type		( tyVarsOfType, isPrimType, maybeAppDataTyConExpandingDicts )
 import TysWiredIn	( realWorldStateTy )
-import TyVar		( GenTyVar{-instance Eq-} )
+import TyVar		( elementOfTyVarSet,
+			  GenTyVar{-instance Eq-} )
 import Util		( isIn, panic )
 
 \end{code}
@@ -102,12 +103,16 @@ floatExposesHNF float_lets float_primops ok_to_dup rhs
     try_deflt (BindDefault _ rhs) = try rhs
 \end{code}
 
+Eta reduction
+~~~~~~~~~~~~~
+@etaCoreExpr@ trys an eta reduction at the top level of a Core Expr.
 
-Eta reduction on ordinary lambdas
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have a go at doing
+e.g.	\ x y -> f x y	===>  f
 
-	\ x y -> f x y	===>  f
+It is used
+	a) Before constructing an Unfolding, to 
+	   try to make the unfolding smaller;
+	b) In tidyCoreExpr, which is done just before converting to STG.
 
 But we only do this if it gets rid of a whole lambda, not part.
 The idea is that lambdas are often quite helpful: they indicate
@@ -123,43 +128,75 @@ It does arise:
 gives rise to a recursive function for the list comprehension, and
 f turns out to be just a single call to this recursive function.
 
+Doing eta on type lambdas is useful too:
+
+	/\a -> <expr> a	   ===>     <expr>
+
+where <expr> doesn't mention a.
+This is sometimes quite useful, because we can get the sequence:
+
+	f ab d = let d1 = ...d... in
+		 letrec f' b x = ...d...(f' b)... in
+		 f' b
+specialise ==>
+
+	f.Int b = letrec f' b x = ...dInt...(f' b)... in
+		  f' b
+
+float ==>
+
+	f' b x = ...dInt...(f' b)...
+	f.Int b = f' b
+
+Now we really want to simplify to
+
+	f.Int = f'
+
+and then replace all the f's with f.Ints.
+
+N.B. We are careful not to partially eta-reduce a sequence of type
+applications since this breaks the specialiser:
+
+	/\ a -> f Char# a  	=NO=> f Char#
+
 \begin{code}
-mkValLamTryingEta :: [Id]		-- Args to the lambda
-	       -> CoreExpr		-- Lambda body
-	       -> CoreExpr
+etaCoreExpr :: CoreExpr -> CoreExpr
 
-mkValLamTryingEta [] body = body
 
-mkValLamTryingEta orig_ids body
-  = reduce_it (reverse orig_ids) body
+etaCoreExpr expr@(Lam bndr body)
+  | opt_DoEtaReduction
+  = case etaCoreExpr body of
+	App fun arg | eta_match bndr arg &&
+		      residual_ok fun
+		    -> fun			-- Eta
+	other	    -> expr			-- Can't eliminate it, so do nothing at all
   where
-    bale_out = mkValLam orig_ids body
+    eta_match (ValBinder v) (VarArg v') = v == v'
+    eta_match (TyBinder tv) (TyArg  ty) = tv `elementOfTyVarSet` tyVarsOfType ty
+    eta_match bndr	    arg 	= False
 
-    reduce_it [] residual
-      | residual_ok residual = residual
-      | otherwise	     = bale_out
-
-    reduce_it (id:ids) (App fun (VarArg arg))
-      | id == arg
-      && not (idType id `eqTy` realWorldStateTy)
-	 -- *never* eta-reduce away a PrimIO state token! (WDP 94/11)
-      = reduce_it ids fun
-
-    reduce_it ids other = bale_out
-
-    is_elem = isIn "mkValLamTryingEta"
-
-    -----------
     residual_ok :: CoreExpr -> Bool	-- Checks for type application
 					-- and function not one of the
 					-- bound vars
 
-    residual_ok (Var v)	= not (v `is_elem` orig_ids)
-			  -- Fun mustn't be one of the bound ids
+    residual_ok (Var v)
+	= not (eta_match bndr (VarArg v))
     residual_ok (App fun arg)
-      | notValArg arg	= residual_ok fun
-    residual_ok other	= False
+	| eta_match bndr arg = False
+	| otherwise	     = residual_ok fun
+    residual_ok (Coerce coercion ty body)
+	| eta_match bndr (TyArg ty) = False
+	| otherwise		    = residual_ok body
+
+    residual_ok other	     = False		-- Safe answer
+	-- This last clause may seem conservative, but consider:
+	--	primops, constructors, and literals, are impossible here
+	-- 	let and case are unlikely (the argument would have been floated inside)
+	--	SCCs we probably want to be conservative about (not sure, but it's safe to be)
+	
+etaCoreExpr expr = expr		-- The common case
 \end{code}
+	
 
 Eta expansion
 ~~~~~~~~~~~~~
@@ -282,69 +319,6 @@ manifestlyCheap other_expr   -- look for manifest partial application
 
 \end{code}
 
-Eta reduction on type lambdas
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have a go at doing
-
-	/\a -> <expr> a	   ===>     <expr>
-
-where <expr> doesn't mention a.
-This is sometimes quite useful, because we can get the sequence:
-
-	f ab d = let d1 = ...d... in
-		 letrec f' b x = ...d...(f' b)... in
-		 f' b
-specialise ==>
-
-	f.Int b = letrec f' b x = ...dInt...(f' b)... in
-		  f' b
-
-float ==>
-
-	f' b x = ...dInt...(f' b)...
-	f.Int b = f' b
-
-Now we really want to simplify to
-
-	f.Int = f'
-
-and then replace all the f's with f.Ints.
-
-N.B. We are careful not to partially eta-reduce a sequence of type
-applications since this breaks the specialiser:
-
-	/\ a -> f Char# a  	=NO=> f Char#
-
-\begin{code}
-mkTyLamTryingEta :: [TyVar] -> CoreExpr -> CoreExpr
-
-mkTyLamTryingEta tyvars tylam_body
-  = if
-	tyvars == tyvar_args &&	-- Same args in same order
-	check_fun fun		-- Function left is ok
-    then
-	-- Eta reduction worked
-	fun
-    else
-	-- The vastly common case
-	mkTyLam tyvars tylam_body
-  where
-    (tyvar_args, fun) = strip_tyvar_args [] tylam_body
-
-    strip_tyvar_args args_so_far tyapp@(App fun (TyArg ty))
-      = case getTyVar_maybe ty of
-	  Just tyvar_arg -> strip_tyvar_args (tyvar_arg:args_so_far) fun
-	  Nothing        -> (args_so_far, tyapp)
-
-    strip_tyvar_args args_so_far (App _ (UsageArg _))
-      = panic "SimplUtils.mkTyLamTryingEta: strip_tyvar_args UsageArg"
-
-    strip_tyvar_args args_so_far fun
-      = (args_so_far, fun)
-
-    check_fun (Var f) = True	 -- Claim: tyvars not mentioned by type of f
-    check_fun other     = False
-\end{code}
 
 Let to case
 ~~~~~~~~~~~

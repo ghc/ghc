@@ -138,8 +138,9 @@ coreBindToStg env (NonRec binder rhs)
   = coreRhsToStg env rhs	`thenUs` \ stg_rhs ->
     let
 	-- Binds to return if RHS is trivial
-	triv_binds | externallyVisibleId binder = [StgNonRec binder stg_rhs]	-- Retain it
-		   | otherwise	      	        = []				-- Discard it
+	binder_w_arity = binder `addIdArity` (rhsArity stg_rhs)
+	triv_binds | externallyVisibleId binder = [StgNonRec binder_w_arity stg_rhs]	-- Retain it
+		   | otherwise	      	        = []					-- Discard it
     in
     case stg_rhs of
       StgRhsClosure cc bi fvs upd [] (StgApp atom [] lvs) ->
@@ -152,12 +153,11 @@ coreBindToStg env (NonRec binder rhs)
 		-- Trivial RHS, so augment envt, and ditch the binding
 		returnUs (triv_binds, new_env)
 	   where
-		new_env = addOneToIdEnv env binder (StgVarArg con_id)
+		new_env = addOneToIdEnv env binder (StgConArg con_id)
 
       other -> 	-- Non-trivial RHS, so don't augment envt
 		returnUs ([StgNonRec binder_w_arity stg_rhs], new_env)
 	   where
-		binder_w_arity = binder `addIdArity` (rhsArity stg_rhs)
 		new_env = addOneToIdEnv env binder (StgVarArg binder_w_arity)
 		-- new_env propagates the arity
 
@@ -246,7 +246,7 @@ coreExprToStg env (Lit lit)
   = returnUs (StgApp (StgLitArg lit) [] bOGUS_LVs)
 
 coreExprToStg env (Var var)
-  = returnUs (StgApp (stgLookup env var) [] bOGUS_LVs)
+  = returnUs (mk_app (stgLookup env var) [])
 
 coreExprToStg env (Con con args)
   = let
@@ -306,7 +306,7 @@ coreExprToStg env expr@(App _ _)
     case (fun, args) of
       (Var fun_id, _) -> 	-- A function Id, so do an StgApp; it's ok if
 				-- there are no arguments.
-			    returnUs (StgApp (stgLookup env fun_id) stg_args bOGUS_LVs)
+			    returnUs (mk_app (stgLookup env fun_id) stg_args)
 
       (non_var_fun, []) -> 	-- No value args, so recurse into the function
 			    coreExprToStg env non_var_fun
@@ -444,4 +444,10 @@ mkStgLets ::   [StgBinding]
 	    -> StgExpr
 
 mkStgLets binds body = foldr StgLet body binds
+
+-- mk_app spots an StgCon in a function position, 
+-- and turns it into an StgCon. See notes with
+-- getArgAmode in CgBindery.
+mk_app (StgConArg con) args = StgCon con       args bOGUS_LVs
+mk_app other_fun       args = StgApp other_fun args bOGUS_LVs
 \end{code}

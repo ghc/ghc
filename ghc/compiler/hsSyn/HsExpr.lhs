@@ -173,11 +173,6 @@ Everything from here on appears only in typechecker output.
   |  SingleDict			-- a simple special case of Dictionary
 		id		-- local dictionary name
 
-  |  HsCon 			-- TRANSLATION; a constructor application
-	Id			-- used only in the RHS of constructor definitions
-	[GenType tyvar uvar]
-	[HsExpr tyvar uvar id pat]
-
 type HsRecordBinds tyvar uvar id pat
   = [(id, HsExpr tyvar uvar id pat, Bool)]
 	-- True <=> source code used "punning",
@@ -364,8 +359,6 @@ pprExpr sty (Dictionary dicts methods)
 pprExpr sty (SingleDict dname)
   = ppCat [ppPStr SLIT("{-singleDict-}"), ppr sty dname]
 
-pprExpr sty (HsCon con tys exprs)
-  = ppCat [ppPStr SLIT("{-HsCon-}"), ppr sty con, interppSP sty tys, interppSP sty exprs]
 \end{code}
 
 Parenthesize unless very simple:

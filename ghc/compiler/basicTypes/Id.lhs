@@ -53,7 +53,7 @@ module Id (
 	recordSelectorFieldLabel,
 
 	-- PREDICATES
-	wantIdSigInIface,
+	omitIfaceSigForId,
 	cmpEqDataCon,
 	cmpId,
 	cmpId_withSpecDataCon,
@@ -153,7 +153,7 @@ import Class		( classOpString, SYN_IE(Class), GenClass, SYN_IE(ClassOp), GenClas
 import IdInfo
 import Maybes		( maybeToBool )
 import Name		( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
-			  mkCompoundName, mkInstDeclName, mkWiredInIdName, mkGlobalName,
+			  mkCompoundName, mkInstDeclName,
 			  isLocallyDefinedName, occNameString, modAndOcc,
 			  isLocallyDefined, changeUnique, isWiredInName,
 			  nameString, getOccString, setNameVisibility,
@@ -551,44 +551,35 @@ idHasNoFreeTyVars (Id _ _ _ details _ info)
     chk (SpecPragmaId _ no_free_tvs) = no_free_tvs
     chk (PrimitiveId _)		    = True
 
--- wantIdSigInIface decides whether to put an Id's type signature and
--- IdInfo in an interface file
-wantIdSigInIface
-	:: Bool		-- True <=> the thing is mentioned somewhere else in the 
-			-- 	    interface file
-	-> Bool		-- True <=> omit anything that doesn't *have* to go
-	-> Id
+-- omitIfaceSigForId tells whether an Id's info is implied by other declarations,
+-- so we don't need to put its signature in an interface file, even if it's mentioned
+-- in some other interface unfolding.
+
+omitIfaceSigForId
+	:: Id
 	-> Bool
 
-wantIdSigInIface mentioned_already omit_iface_prags (Id _ name _ details _ _)
-  = chk details
-  where
-    chk (LocalId _)	  = isExported name && 
-			    not (isWiredInName name)	-- User-declared thing!
-    chk ImportedId	  = False		-- Never put imports in interface file
-    chk (PrimitiveId _)	  = False		-- Ditto, for primitives
+omitIfaceSigForId (Id _ name _ details _ _)
+  | isWiredInName name
+  = True
+
+  | otherwise
+  = case details of
+        ImportedId	  -> True		-- Never put imports in interface file
+        (PrimitiveId _)	  -> True		-- Ditto, for primitives
 
 	-- This group is Ids that are implied by their type or class decl;
-	-- remember that all type and class decls appear in the interface file
-    chk (DataConId _ _ _ _ _ _ _) = False
-    chk (TupleConId _)    	  = False	-- Ditto
-    chk (RecordSelId _)   	  = False	-- Ditto
-    chk (SuperDictSelId _ _)	  = False	-- Ditto
-    chk (MethodSelId _ _)	  = False	-- Ditto
-    chk (ConstMethodId _ _ _ _)   = False	-- Scheduled for nuking
-    chk (DefaultMethodId _ _ _)   = False			-- Hmm.  No, for now
+	-- remember that all type and class decls appear in the interface file.
+	-- The dfun id must *not* be omitted, because it carries version info for
+	-- the instance decl
+        (DataConId _ _ _ _ _ _ _) -> True
+        (TupleConId _)    	  -> True
+        (RecordSelId _)   	  -> True
+        (SuperDictSelId _ _)	  -> True
+        (MethodSelId _ _)	  -> True
 
-	-- DictFunIds are more interesting, they may have IdInfo we can't
-	-- get from the instance declaration.  We emit them if we're gung ho.
-	-- No need to check the export flag; instance decls are always exposed
-    chk (DictFunId     _ _)	  = not omit_iface_prags
-
-	-- This group are only called out by being mentioned somewhere else
-    chk (WorkerId unwrkr)	  = mentioned_already
-    chk (SpecId _ _ _)		  = mentioned_already
-    chk (InstId _)		  = mentioned_already
-    chk (SysLocalId _)		  = mentioned_already
-    chk (SpecPragmaId _ _)	  = mentioned_already
+	other			  -> False	-- Don't omit!
+		-- NB DefaultMethodIds are not omitted
 \end{code}
 
 \begin{code}

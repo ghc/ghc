@@ -114,9 +114,9 @@ glb v1 v2
     else
 	AbsBot
   where
-    is_fun (AbsFun _ _ _)   = True
-    is_fun (AbsApproxFun _) = True	-- Not used, but the glb works ok
-    is_fun other            = False
+    is_fun (AbsFun _ _ _)     = True
+    is_fun (AbsApproxFun _ _) = True	-- Not used, but the glb works ok
+    is_fun other              = False
 
 -- The non-functional cases are quite straightforward
 
@@ -198,11 +198,11 @@ Used only in strictness analysis:
 \begin{code}
 isBot :: AbsVal -> Bool
 
-isBot AbsBot		     = True
-isBot (AbsFun args body env) = isBot (absEval StrAnal body env)
+isBot AbsBot		    = True
+isBot (AbsFun arg body env) = isBot (absEval StrAnal body env)
 			       -- Don't bother to extend the envt because
 			       -- unbound variables default to AbsTop anyway
-isBot other	 	     = False
+isBot other	 	    = False
 \end{code}
 
 Used only in absence analysis:
@@ -212,8 +212,8 @@ anyBot :: AbsVal -> Bool
 anyBot AbsBot 		      = True	-- poisoned!
 anyBot AbsTop 		      = False
 anyBot (AbsProd vals) 	      = any anyBot vals
-anyBot (AbsFun args body env) = anyBot (absEval AbsAnal body env)
-anyBot (AbsApproxFun demands) = False
+anyBot (AbsFun arg body env)  = anyBot (absEval AbsAnal body env)
+anyBot (AbsApproxFun _ _)     = False
 
     -- AbsApproxFun can only arise in absence analysis from the Demand
     -- info of an imported value; whatever it is we're looking for is
@@ -227,12 +227,17 @@ it, so it can be compared for equality by @sameVal@.
 \begin{code}
 widen :: AnalysisKind -> AbsVal -> AbsVal
 
-widen StrAnal (AbsFun args body env)
-  | isBot (absEval StrAnal body env) = AbsBot
-  | otherwise
-  = ASSERT (not (null args))
-    AbsApproxFun (map (findDemandStrOnly env body) args)
+widen StrAnal (AbsFun arg body env)
+  = AbsApproxFun (findDemandStrOnly env body arg)
+		 (widen StrAnal abs_body)
+  where
+    abs_body = absEval StrAnal body env
 
+{-	OLD comment... 
+	This stuff is now instead handled neatly by the fact that AbsApproxFun 
+	contains an AbsVal inside it.	SLPJ Jan 97
+
+  | isBot abs_body = AbsBot
     -- It's worth checking for a function which is unconditionally
     -- bottom.  Consider
     --
@@ -248,20 +253,23 @@ widen StrAnal (AbsFun args body env)
     -- alternative here would be to bind g to its exact abstract
     -- value, but that entails lots of potential re-computation, at
     -- every application of g.)
+-}
 
 widen StrAnal (AbsProd vals) = AbsProd (map (widen StrAnal) vals)
 widen StrAnal other_val	     = other_val
 
 
-widen AbsAnal (AbsFun args body env)
-  | anyBot (absEval AbsAnal body env) = AbsBot
+widen AbsAnal (AbsFun arg body env)
+  | anyBot abs_body = AbsBot
 	-- In the absence-analysis case it's *essential* to check
 	-- that the function has no poison in its body.  If it does,
 	-- anywhere, then the whole function is poisonous.
 
   | otherwise
-  = ASSERT (not (null args))
-    AbsApproxFun (map (findDemandAbsOnly env body) args)
+  = AbsApproxFun (findDemandAbsOnly env body arg)
+		 (widen AbsAnal abs_body)
+  where
+    abs_body = absEval AbsAnal body env
 
 widen AbsAnal (AbsProd vals) = AbsProd (map (widen AbsAnal) vals)
 
@@ -313,9 +321,9 @@ sameVal (AbsProd vals1) (AbsProd vals2) = and (zipWithEqual "sameVal" sameVal va
 sameVal (AbsProd _)	AbsTop 		= False
 sameVal (AbsProd _)	AbsBot 		= False
 
-sameVal (AbsApproxFun str1) (AbsApproxFun str2) = str1 == str2
-sameVal (AbsApproxFun _)    AbsTop		= False
-sameVal (AbsApproxFun _)    AbsBot 		= False
+sameVal (AbsApproxFun str1 v1) (AbsApproxFun str2 v2) = str1 == str2 && sameVal v1 v1
+sameVal (AbsApproxFun _ _)     AbsTop		      = False
+sameVal (AbsApproxFun _ _)     AbsBot 		      = False
 
 sameVal val1 val2 = panic "sameVal: type mismatch or AbsFun encountered"
 \end{code}
@@ -394,7 +402,7 @@ absId anal var env
 	(Just abs_val, _, _) ->
 			abs_val	-- Bound in the environment
 
-	(Nothing, noStrictnessInfo, CoreUnfolding (SimpleUnfolding _ _ unfolding)) ->
+	(Nothing, NoStrictnessInfo, CoreUnfolding (SimpleUnfolding _ _ unfolding)) ->
 			-- We have an unfolding for the expr
 			-- Assume the unfolding has no free variables since it
 			-- came from inside the Id
@@ -512,7 +520,7 @@ absEval anal (Con con as) env
 
 \begin{code}
 absEval anal (Lam (ValBinder binder) body) env
-  = AbsFun [binder] body env
+  = AbsFun binder body env
 absEval anal (Lam other_binder expr) env
   = absEval  anal expr env
 absEval anal (App f a) env | isValArg a
@@ -670,31 +678,22 @@ result.	 A @Lam@ with two or more args: return another @AbsFun@ with
 an augmented environment.
 
 \begin{code}
-absApply anal (AbsFun [binder] body env) arg
+absApply anal (AbsFun binder body env) arg
   = absEval anal body (addOneToAbsValEnv env binder arg)
-
-absApply anal (AbsFun (binder:bs) body env) arg
-  = AbsFun bs body (addOneToAbsValEnv env binder arg)
 \end{code}
 
 \begin{code}
-absApply StrAnal (AbsApproxFun (arg1_demand:ds)) arg
-  = if evalStrictness arg1_demand arg
+absApply StrAnal (AbsApproxFun demand val) arg
+  = if evalStrictness demand arg
     then AbsBot
-    else case ds of
-	   []    -> AbsTop
-	   other -> AbsApproxFun ds
+    else val
 
-absApply AbsAnal (AbsApproxFun (arg1_demand:ds)) arg
-  = if evalAbsence arg1_demand arg
+absApply AbsAnal (AbsApproxFun demand val) arg
+  = if evalAbsence demand arg
     then AbsBot
-    else case ds of
-	   []    -> AbsTop
-	   other -> AbsApproxFun ds
+    else val
 
 #ifdef DEBUG
-absApply anal (AbsApproxFun []) arg = panic ("absApply: Duff function: AbsApproxFun." ++ show anal)
-absApply anal (AbsFun [] _ _)   arg = panic ("absApply: Duff function: AbsFun." ++ show anal)
 absApply anal (AbsProd _)       arg = panic ("absApply: Duff function: AbsProd." ++ show anal)
 #endif
 \end{code}

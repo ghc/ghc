@@ -324,23 +324,12 @@ simplExpr env (Lam (TyBinder tyvar) body) (TyArg ty : args)
     simplExpr (extendTyEnv env tyvar ty) body args
 
 simplExpr env tylam@(Lam (TyBinder tyvar) body) []
-  = do_tylambdas env [] tylam
-  where
-    do_tylambdas env tyvars' (Lam (TyBinder tyvar) body)
-      =	  -- Clone the type variable
-	cloneTyVarSmpl tyvar		`thenSmpl` \ tyvar' ->
-	let
-	    new_env = extendTyEnv env tyvar (mkTyVarTy tyvar')
-	in
-	do_tylambdas new_env (tyvar':tyvars') body
-
-    do_tylambdas env tyvars' body
-      =	simplExpr env body []		`thenSmpl` \ body' ->
-	returnSmpl (
-	   (if switchIsSet env SimplDoEtaReduction
-	   then mkTyLamTryingEta
-	   else mkTyLam) (reverse tyvars')  body'
-	)
+  = cloneTyVarSmpl tyvar		`thenSmpl` \ tyvar' ->
+    let
+	new_env = extendTyEnv env tyvar (mkTyVarTy tyvar')
+    in
+    simplExpr new_env body []		`thenSmpl` \ body' ->
+    returnSmpl (Lam (TyBinder tyvar') body')
 
 #ifdef DEBUG
 simplExpr env (Lam (TyBinder _) _) (_ : _)
@@ -493,11 +482,6 @@ simplRhsExpr
 	-> SmplM (OutExpr, ArityInfo)
 
 simplRhsExpr env binder@(id,occ_info) rhs
-  | dont_eta_expand rhs
-  = simplExpr rhs_env rhs []	`thenSmpl` \ rhs' ->
-    returnSmpl (rhs', unknownArity)
-
-  | otherwise	-- Have a go at eta expansion
   = 	-- Deal with the big lambda part
     ASSERT( null uvars )	-- For now
 
@@ -511,12 +495,7 @@ simplRhsExpr env binder@(id,occ_info) rhs
     simplValLam lam_env body (getBinderInfoArity occ_info)	`thenSmpl` \ (lambda', arity) ->
 
 	-- Put it back together
-    returnSmpl (
-       (if switchIsSet env SimplDoEtaReduction
-       then mkTyLamTryingEta
-       else mkTyLam) tyvars' lambda',
-      arity
-    )
+    returnSmpl (mkTyLam tyvars' lambda', arity)
   where
 
     rhs_env | 	-- not (switchIsSet env IgnoreINLINEPragma) &&
@@ -552,25 +531,6 @@ simplRhsExpr env binder@(id,occ_info) rhs
 	-- We havn't solved this problem yet!
 
     (uvars, tyvars, body) = collectUsageAndTyBinders rhs
-
-	-- dont_eta_expand prevents eta expansion in silly situations.
-	-- For example, consider the defn
-	--	x = y
-	-- It would be silly to eta expand the "y", because it would just
-	-- get eta-reduced back to y.  Furthermore, if this was a top level defn,
-	-- and x was exported, then the defn won't be eliminated, so this
-	-- silly expand/reduce cycle will happen every time, which makes the
-	-- simplifier loop!.
-	-- The solution is to not even try eta expansion unless the rhs looks
-	-- non-trivial.
-    dont_eta_expand (Lit _)     = True
-    dont_eta_expand (Var _)     = True
-    dont_eta_expand (Con _ _)   = True
-    dont_eta_expand (App f a)
-      | notValArg    a		= dont_eta_expand f
-    dont_eta_expand (Lam x b)
-      | notValBinder x		= dont_eta_expand b
-    dont_eta_expand _		= False
 \end{code}
 
 
@@ -597,12 +557,7 @@ simplValLam env expr min_no_of_args
 	new_env = extendIdEnvWithClones env binders binders'
     in
     simplExpr new_env body []		`thenSmpl` \ body' ->
-    returnSmpl (
-      (if switchIsSet new_env SimplDoEtaReduction
-       then mkValLamTryingEta
-       else mkValLam) binders' body',
-      atLeastArity no_of_binders
-    )
+    returnSmpl (mkValLam binders' body', atLeastArity no_of_binders)
 
   | otherwise				-- Eta expansion possible
   = tick EtaExpansion			`thenSmpl_`
@@ -613,9 +568,7 @@ simplValLam env expr min_no_of_args
     newIds extra_binder_tys				`thenSmpl` \ extra_binders' ->
     simplExpr new_env body (map VarArg extra_binders')	`thenSmpl` \ body' ->
     returnSmpl (
-      (if switchIsSet new_env SimplDoEtaReduction
-       then mkValLamTryingEta
-       else mkValLam) (binders' ++ extra_binders') body',
+      mkValLam (binders' ++ extra_binders') body',
       atLeastArity (no_of_binders + no_of_extra_binders)
     )
 
@@ -1122,22 +1075,7 @@ completeNonRec env binder new_id (Coerce coercion ty rhs)
 		   (Coerce coercion ty atomic_rhs)	`thenSmpl` \ (env2, binds2) ->
 
     returnSmpl (env2, binds1 ++ binds2)
-  where
-    is_atomic (Var v) = True
-    is_atomic (Lit l) = not (isNoRepLit l)
-    is_atomic other   = False
 	
-	-- Atomic right-hand sides.
-	-- We used to have a "tick AtomicRhs" in here, but it causes more trouble
-	-- than it's worth.  For a top-level binding a = b, where a is exported,
-	-- we can't drop the binding, so we get repeated AtomicRhs ticks
-completeNonRec env binder new_id rhs@(Var v)
-  = returnSmpl (extendIdEnvWithAtom env binder (VarArg v), [NonRec new_id rhs])
-
-completeNonRec env binder new_id rhs@(Lit lit)
-  | not (isNoRepLit lit)
-  = returnSmpl (extendIdEnvWithAtom env binder (LitArg lit), [NonRec new_id rhs])
-
 	-- Right hand sides that are constructors
 	--	let v = C args
 	--	in
@@ -1156,12 +1094,26 @@ completeNonRec env binder new_id rhs@(Con con con_args)
     maybe_existing_con = lookForConstructor env con con_args
     Just it 	       = maybe_existing_con
 
+
 	-- Default case
-completeNonRec env binder@(id,occ_info) new_id rhs
- = returnSmpl (new_env, [NonRec new_id rhs])
+	-- Check for atomic right-hand sides.
+	-- We used to have a "tick AtomicRhs" in here, but it causes more trouble
+	-- than it's worth.  For a top-level binding a = b, where a is exported,
+	-- we can't drop the binding, so we get repeated AtomicRhs ticks
+completeNonRec env binder@(id,occ_info) new_id new_rhs
+ = returnSmpl (new_env , [NonRec new_id new_rhs])
  where
-   env1    = extendIdEnvWithClone env binder new_id
-   new_env = extendEnvGivenBinding env1 occ_info new_id rhs
+   new_env | is_atomic eta'd_rhs 		-- If rhs (after eta reduction) is atomic
+	   = extendIdEnvWithAtom env binder the_arg
+
+	   | otherwise				-- Non-atomic
+	   = extendEnvGivenBinding (extendIdEnvWithClone env binder new_id)
+			occ_info new_id new_rhs	-- Don't eta if it doesn't eliminate the binding
+
+   eta'd_rhs = etaCoreExpr new_rhs
+   the_arg   = case eta'd_rhs of
+		  Var v -> VarArg v
+		  Lit l -> LitArg l
 \end{code}
 
 %************************************************************************
@@ -1215,5 +1167,9 @@ computeResultType env expr args
 
 var `withArity` UnknownArity = var
 var `withArity` arity	     = var `addIdArity` arity
+
+is_atomic (Var v) = True
+is_atomic (Lit l) = not (isNoRepLit l)
+is_atomic other   = False
 \end{code}
 

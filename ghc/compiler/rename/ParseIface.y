@@ -93,14 +93,24 @@ parseIface = parseIToks . lexIface
 	LAM		{ ITlam }
 	BIGLAM		{ ITbiglam }
 	CASE		{ ITcase }
+	PRIM_CASE	{ ITprim_case }
 	OF		{ ITof }
 	LET		{ ITlet }
 	LETREC		{ ITletrec }
 	IN		{ ITin }
+	ATSIGN		{ ITatsign }
 	COERCE_IN	{ ITcoerce_in }
 	COERCE_OUT	{ ITcoerce_out }
 	CHAR		{ ITchar $$ }
 	STRING		{ ITstring $$ }	
+	DOUBLE		{ ITdouble $$ }
+	INTEGER_LIT	{ ITinteger_lit }
+	STRING_LIT	{ ITstring_lit }
+	FLOAT_LIT	{ ITfloat_lit }
+	RATIONAL_LIT	{ ITrational_lit }
+	ADDR_LIT	{ ITaddr_lit }
+	LIT_LIT		{ ITlit_lit }
+	CCALL		{ ITccall $$ }
 %%
 
 iface		:: { ParsedIface }
@@ -153,13 +163,17 @@ exports_part	:  EXPORTS_PART export_items			{ $2 }
 
 export_items	:: { [ExportItem] }
 export_items	:  			    			{ [] }
-		|  export_item export_items 			{ $1 : $2 }
+		|  mod_name entities SEMI export_items 		{ ($1,$2) : $4 }
 
-export_item	:: { ExportItem }
-export_item	:  mod_name entity_occ maybe_dotdot		{ ($1, $2, $3) }
+entities	:: { [(OccName, [OccName])] }
+entities	: 						{ [] }
+		|  entity entities				{ $1 : $2 }
 
-maybe_dotdot	:: { [OccName] }
-maybe_dotdot	:	     					{ [] }
+entity		:: { (OccName, [OccName]) }
+entity		:  entity_occ maybe_inside			{ ($1, $2) }
+
+maybe_inside	:: { [OccName] }
+maybe_inside	:	     					{ [] }
 		|  OPAREN val_occs CPAREN			{ $2
 --------------------------------------------------------------------------
 								}
@@ -209,7 +223,7 @@ topdecl		:  TYPE  tc_name tv_bndrs EQUAL type SEMI
 			{ TyD (TyNew $2 $3 $4 $6 $7 noDataPragmas mkIfaceSrcLoc) }
 		|  CLASS decl_context tc_name tv_bndr csigs SEMI
 			{ ClD (ClassDecl $2 $3 $4 $5 EmptyMonoBinds noClassPragmas mkIfaceSrcLoc) }
-		|  var_name DCOLON ctype id_info SEMI
+		|  var_name DCOLON type id_info SEMI
 			{ SigD (IfaceSig $1 $3 $4 mkIfaceSrcLoc) }
 
 decl_context	:: { RdrNameContext }
@@ -225,7 +239,7 @@ csigs1		: csig				{ [$1] }
 		| csig SEMI csigs1		{ $1 : $3 }
 
 csig		:: { RdrNameSig }
-csig		:  var_name DCOLON ctype 	{ ClassOpSig $1 $3 noClassOpPragmas mkIfaceSrcLoc
+csig		:  var_name DCOLON type 	{ ClassOpSig $1 $3 noClassOpPragmas mkIfaceSrcLoc
 ----------------------------------------------------------------
 			 			 }
 
@@ -257,8 +271,8 @@ fields1		: field					{ [$1] }
 		| field COMMA fields1			{ $1 : $3 }
 
 field		:: { ([RdrName], RdrNameBangType) }
-field		:  var_name DCOLON ctype	   	{ ([$1], Unbanged $3) }
-		|  var_name DCOLON BANG ctype    	{ ([$1], Banged   $4)
+field		:  var_name DCOLON type	   	{ ([$1], Unbanged $3) }
+		|  var_name DCOLON BANG type    	{ ([$1], Banged   $4)
 --------------------------------------------------------------------------
 						    	}
 
@@ -276,34 +290,34 @@ context_list1	: class					{ [$1] }
 class		:: { (RdrName, RdrNameHsType) }
 class		:  qtc_name atype			{ ($1, $2) }
 
-ctype		:: { RdrNameHsType }
-ctype		: FORALL forall context DARROW type	{ mkHsForAllTy $2 $3 $5 }
-		| type					{ $1 }
-
 type		:: { RdrNameHsType }
-type		:  btype				{ $1 }
-		|  btype RARROW type			{ MonoFunTy $1 $3 }
+type		: FORALL forall context DARROW tautype	{ mkHsForAllTy $2 $3 $5 }
+		| tautype				{ $1 }
 
-ctypes2		:: { [RdrNameHsType] 			{- Two or more -}  }	
-ctypes2		:  ctype COMMA ctype			{ [$1,$3] }
-		|  ctype COMMA ctypes2			{ $1 : $3 }
+tautype		:: { RdrNameHsType }
+tautype		:  btype				{ $1 }
+		|  btype RARROW tautype			{ MonoFunTy $1 $3 }
+
+types2		:: { [RdrNameHsType] 			{- Two or more -}  }	
+types2		:  type COMMA type			{ [$1,$3] }
+		|  type COMMA types2			{ $1 : $3 }
 
 btype		:: { RdrNameHsType }
 btype		:  atype				{ $1 }
-		|  qtc_name atypes1			{ MonoTyApp $1 $2 }
-		|  tv_name  atypes1			{ MonoTyApp $1 $2 }
+		|  qtc_name atype atypes		{ MonoTyApp $1 ($2:$3) }
+		|  tv_name  atype atypes		{ MonoTyApp $1 ($2:$3) }
 
 atype		:: { RdrNameHsType }
 atype		:  qtc_name 			  	{ MonoTyApp $1 [] }
 		|  tv_name			  	{ MonoTyVar $1 }
-		|  OPAREN ctypes2 CPAREN	  	{ MonoTupleTy dummyRdrTcName $2 }
+		|  OPAREN types2 CPAREN	  		{ MonoTupleTy dummyRdrTcName $2 }
 		|  OBRACK type CBRACK		  	{ MonoListTy  dummyRdrTcName $2 }
 		|  OCURLY qtc_name atype CCURLY		{ MonoDictTy $2 $3 }
-		|  OPAREN ctype CPAREN		  	{ $2 }
+		|  OPAREN type CPAREN		  	{ $2 }
 
-atypes1		:: { [RdrNameHsType] 	{-  One or more -} }
-atypes1		:  atype				{ [$1] }
-		|  atype atypes1			{ $1 : $2
+atypes		:: { [RdrNameHsType] 	{-  Zero or more -} }
+atypes		:  					{ [] }
+		|  atype atypes				{ $1 : $2
 ---------------------------------------------------------------------
 					 		}
 
@@ -337,6 +351,9 @@ qvar_name	:: { RdrName }
 var_name	:: { RdrName }
 var_name	:  var_occ		{ Unqual $1 }
 
+any_var_name	:: {RdrName}
+any_var_name	:  var_name		{ $1 }
+		|  qvar_name		{ $1 }
 
 qdata_name	:: { RdrName }
 qdata_name	:  QCONID		{ varQual $1 }
@@ -393,7 +410,7 @@ instdecls	:  			    { [] }
 		|  instd instdecls	    { $1 : $2 }
 
 instd		:: { RdrNameInstDecl }
-instd		:  INSTANCE ctype EQUAL var_name SEMI 
+instd		:  INSTANCE type EQUAL var_name SEMI 
 			{ InstDecl $2
 				   EmptyMonoBinds	{- No bindings -}
 				   []    		{- No user pragmas -}
@@ -404,40 +421,52 @@ instd		:  INSTANCE ctype EQUAL var_name SEMI
 
 id_info		:: { [HsIdInfo RdrName] }
 id_info		: 	 					{ [] }
-		| ARITY_PART arity_info id_info			{ HsArity $2 :  $3 }
-		| STRICT_PART strict_info id_info		{ HsStrictness $2 : $3 }
-		| UNFOLD_PART core_expr id_info			{ HsUnfold $2 : $3 }
+		| id_info_item id_info				{ $1 : $2 }
+
+id_info_item	:: { HsIdInfo RdrName }
+id_info_item	: ARITY_PART arity_info			{ HsArity $2 }
+		| STRICT_PART strict_info		{ HsStrictness $2 }
+		| BOTTOM 				{ HsStrictness mkBottomStrictnessInfo }
+		| UNFOLD_PART core_expr			{ HsUnfold $2 }
 
 arity_info	:: { ArityInfo }
 arity_info	: INTEGER					{ exactArity (fromInteger $1) }
 
 strict_info	:: { StrictnessInfo RdrName }
-strict_info	: DEMAND qvar_name				{ mkStrictnessInfo $1 (Just $2) }
+strict_info	: DEMAND any_var_name				{ mkStrictnessInfo $1 (Just $2) }
 		| DEMAND 					{ mkStrictnessInfo $1 Nothing }
-		| BOTTOM					{ mkBottomStrictnessInfo }
 
 core_expr	:: { UfExpr RdrName }
-core_expr	: var_name					{ UfVar $1 }
-		| qvar_name					{ UfVar $1 }
+core_expr	: any_var_name					{ UfVar $1 }
 		| qdata_name					{ UfVar $1 }
 		| core_lit					{ UfLit $1 }
+		| OPAREN core_expr CPAREN			{ $2 }
+
+		| core_expr ATSIGN atype			{ UfApp $1 (UfTyArg $3) }
 		| core_expr core_arg				{ UfApp $1 $2 }
-		| LAM core_val_bndr RARROW core_expr		{ UfLam $2 $4 }
+		| LAM core_val_bndrs RARROW core_expr		{ foldr UfLam $4 $2 }
 		| BIGLAM core_tv_bndrs RARROW core_expr		{ foldr UfLam $4 $2 }
 
 		| CASE core_expr OF 
 		  OCURLY alg_alts core_default CCURLY		{ UfCase $2 (UfAlgAlts  $5 $6) }
-		| CASE BANG core_expr OF 
-		  OCURLY prim_alts core_default CCURLY		{ UfCase $3 (UfPrimAlts $6 $7) }
+		| PRIM_CASE core_expr OF 
+		  OCURLY prim_alts core_default CCURLY		{ UfCase $2 (UfPrimAlts $5 $6) }
+
 
 		| LET OCURLY core_val_bndr EQUAL core_expr CCURLY
 		  IN core_expr					{ UfLet (UfNonRec $3 $5) $8 }
 		| LETREC OCURLY rec_binds CCURLY		
 		  IN core_expr					{ UfLet (UfRec $3) $6 }
 
-		| qdata_name BANG core_args			{ UfCon $1 $3 }
-		| qvar_name  BANG core_args			{ UfPrim (UfOtherOp $1) $3 }
 		| coerce atype core_expr			{ UfCoerce $1 $2 $3 }
+
+		| CCALL ccall_string 
+			OBRACK atype atypes CBRACK core_args	{ let
+									(is_casm, may_gc) = $1
+								  in
+								  UfPrim (UfCCallOp $2 is_casm may_gc $5 $4)
+									 $7
+								}
 
 rec_binds	:: { [(UfBinder RdrName, UfExpr RdrName)] }
 		:						{ [] }
@@ -458,23 +487,37 @@ alg_alts	:: { [(RdrName, [UfBinder RdrName], UfExpr RdrName)] }
 
 core_default	:: { UfDefault RdrName }
 		: 						{ UfNoDefault }
-		| core_val_bndr RARROW core_expr		{ UfBindDefault $1 $3 }
+		| core_val_bndr RARROW core_expr SEMI		{ UfBindDefault $1 $3 }
 
 core_arg	:: { UfArg RdrName }
 		: var_name					{ UfVarArg $1 }
 		| qvar_name					{ UfVarArg $1 }
 		| qdata_name					{ UfVarArg $1 }
 		| core_lit					{ UfLitArg $1 }
-		| OBRACK atype CBRACK				{ UfTyArg  $2 }
 
 core_args	:: { [UfArg RdrName] }
 		:						{ [] }
 		| core_arg core_args				{ $1 : $2 }
 
 core_lit	:: { Literal }
-core_lit	: INTEGER					{ MachInt $1 True }
-		| CHAR						{ MachChar $1 }
-		| STRING					{ MachStr $1 }
+core_lit	: INTEGER			{ MachInt $1 True }
+		| CHAR				{ MachChar $1 }
+		| STRING			{ MachStr $1 }
+		| STRING_LIT STRING		{ NoRepStr $2 }
+		| DOUBLE			{ MachDouble (toRational $1) }
+		| FLOAT_LIT DOUBLE		{ MachFloat (toRational $2) }
+
+		| INTEGER_LIT INTEGER		{ NoRepInteger  $2 (panic "NoRepInteger type") 
+							-- The type checker will add the types
+						}
+
+		| RATIONAL_LIT INTEGER INTEGER	{ NoRepRational ($2 % $3) 
+								(panic "NoRepRational type")
+									-- The type checker will add the type
+						}
+
+		| ADDR_LIT INTEGER		{ MachAddr $2 }
+		| LIT_LIT STRING		{ MachLitLit $2 (panic "ParseIface.y: ToDo: need PrimRep on LitLits in ifaces") }
 
 core_val_bndr 	:: { UfBinder RdrName }
 core_val_bndr	: var_name DCOLON atype				{ UfValBinder $1 $3 }
@@ -491,3 +534,7 @@ core_tv_bndrs	:: { [UfBinder RdrName] }
 core_tv_bndrs	: 						{ [] }
 		| core_tv_bndr core_tv_bndrs			{ $1 : $2 }
 
+ccall_string	:: { FAST_STRING }
+		: STRING					{ $1 }
+		| VARID						{ $1 }
+		| CONID						{ $1 }

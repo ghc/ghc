@@ -7,10 +7,11 @@
 This modules defines the typle data types.
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelTup where
 
-import Prelude	()
-import IOBase	( error )
+import {#- SOURCE #-}	IOBase	( error )
 import PrelBase
 \end{code}
 

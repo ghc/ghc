@@ -5,6 +5,8 @@
 \section[IO]{Module @IO@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module IO (
     Handle, HandlePosn,
 
@@ -23,7 +25,6 @@ module IO (
     ioeGetHandle, ioeGetFileName
   ) where
 
-import Prelude	()
 import Ix
 import STBase
 import IOBase

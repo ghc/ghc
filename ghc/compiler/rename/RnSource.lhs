@@ -201,7 +201,9 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun_name src_loc))
   where
     rn_dfun Nothing  = newDfunName src_loc	`thenRn` \ n' ->
 		       returnRn (Just n')
-    rn_dfun (Just n) = lookupOptionalOccRn n	`thenRn` \ n' ->
+    rn_dfun (Just n) = lookupOccRn n		`thenRn` \ n' ->
+				-- The dfun is not optional, because we use its version number
+				-- to identify the version of the instance declaration
 		       returnRn (Just n')
 
     rn_uprag (SpecSig op ty using locn)

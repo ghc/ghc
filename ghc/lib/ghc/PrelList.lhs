@@ -7,6 +7,8 @@
 The List data type and its operations
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelList (
    [] (..),
 
@@ -20,8 +22,7 @@ module PrelList (
    zip, zip3, zipWith, zipWith3, unzip, unzip3
  ) where
 
-import Prelude	()
-import IOBase	( error )	{-# SOURCE #-}
+import {#- SOURCE #-}	IOBase	( error )
 import PrelTup
 import PrelBase
 
@@ -189,7 +190,7 @@ all p                   =  and . map p
 -- e.g., x `elem` xs.  notElem is the negation.
 elem, notElem           :: (Eq a) => a -> [a] -> Bool
 elem x                  =  any (== x)
-notElem x               =  all (not . (/= x))
+notElem x               =  all (/= x)
 
 -- lookup key assocs looks up a key in an association list.
 lookup                  :: (Eq a) => a -> [(a,b)] -> Maybe b

@@ -12,12 +12,10 @@ IMP_Ubiq(){-uitous-}
 IMPORT_1_3(IO(hPutStr,stderr))
 
 import StgSyn
-import StgUtils
 
 import LambdaLift	( liftProgram )
 import Name		( isLocallyDefined )
 import SCCfinal		( stgMassageForProfiling )
-import SatStgRhs	( satStgRhs )
 import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
 import StgVarInfo	( setStgVarInfo )

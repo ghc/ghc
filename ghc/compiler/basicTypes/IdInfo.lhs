@@ -354,7 +354,7 @@ addStrictnessInfo id_info 		     NoStrictnessInfo = id_info
 addStrictnessInfo (IdInfo a b d _ e f g h i) strict	      = IdInfo a b d strict e f g h i
 
 ppStrictnessInfo sty NoStrictnessInfo = ppNil
-ppStrictnessInfo sty BottomGuaranteed = ppPStr SLIT("_S_ _!_")
+ppStrictnessInfo sty BottomGuaranteed = ppPStr SLIT("_bot_")
 
 ppStrictnessInfo sty (StrictnessInfo wrapper_args wrkr_maybe)
   = ppCat [ppPStr SLIT("_S_"), ppStr (showList wrapper_args ""), pp_wrkr]

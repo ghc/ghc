@@ -192,7 +192,8 @@ varsAtoms atoms
   = mapLne var_atom atoms	`thenLne` \ fvs_lists ->
     returnLne (unionFVInfos fvs_lists)
   where
-    var_atom a@(StgLitArg	   _) = returnLne emptyFVInfo
+    var_atom a@(StgLitArg _) = returnLne emptyFVInfo
+    var_atom a@(StgConArg _) = returnLne emptyFVInfo
     var_atom a@(StgVarArg v)
       = lookupVarEnv v	`thenLne` \ how_bound ->
 	returnLne (singletonFVInfo v how_bound stgArgOcc)
@@ -234,6 +235,9 @@ decisions.  Hence no black holes.
 \begin{code}
 varsExpr (StgApp lit@(StgLitArg _) args _)
   = returnLne (StgApp lit [] emptyIdSet, emptyFVInfo, emptyIdSet)
+
+varsExpr (StgApp lit@(StgConArg _) args _)
+  = panic "varsExpr StgConArg"	-- Only occur in argument positions
 
 varsExpr (StgApp fun@(StgVarArg f) args _) = varsApp Nothing f args
 

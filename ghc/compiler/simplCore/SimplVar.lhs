@@ -69,6 +69,14 @@ completeVar env var args
 	-- wrappers, even thouth the former have an unfold-always guidance.
     costCentreOk (getEnclosingCC env) (getEnclosingCC unfold_env)
   = tick UnfoldingDone	`thenSmpl_`
+#ifdef DEBUG
+    simplCount		`thenSmpl` \ n ->
+    (if n > 3000 then
+	pprTrace "Ticks > 3000 and unfolding" (ppr PprDebug var)
+    else
+	id
+    )
+#endif
     simplExpr unfold_env unf_template args
 
   | maybeToBool maybe_specialisation
@@ -93,10 +101,17 @@ completeVar env var args
 	---------- Unfolding stuff
     maybe_unfolding_info 
 	= case (lookupOutIdEnv env var, unfolding_from_id) of
+
 	     (Just (_, occ_info, OutUnfolding enc_cc unf), _)
 		-> Just (occ_info, setEnclosingCC env enc_cc, unf)	
+
 	     (Just (_, occ_info, InUnfolding env_unf unf), _)
-		-> Just (occ_info, combineSimplEnv env env_unf, unf)	
+		-> Just (occ_info, env_unf, unf)	
+-- 			This combineSimplEnv is WRONG.  InUnfoldings are used for
+--			recursive decls, and we're relying on using the old unfold enf
+--			to avoid getting outselves in a loop!
+--		-> Just (occ_info, combineSimplEnv env env_unf, unf)	
+
 	     (_, CoreUnfolding unf)
 		-> Just (noBinderInfo, env, unf)
 

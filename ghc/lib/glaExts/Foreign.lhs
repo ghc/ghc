@@ -5,12 +5,13 @@
 \section[Foreign]{Module @Foreign@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module Foreign (
 	module Foreign,
 	Addr, Word
    ) where
 
-import Prelude	()
 import STBase
 import ArrBase
 import PrelBase
@@ -29,30 +30,38 @@ class CCallable   a
 class CReturnable a
 
 instance CCallable Char
+instance CCallable   Char#
 instance CReturnable Char
 
 instance CCallable   Int
+instance CCallable   Int#
 instance CReturnable Int
 
 -- DsCCall knows how to pass strings...
 instance CCallable   [Char]
 
 instance CCallable   Float
+instance CCallable   Float#
 instance CReturnable Float
 
 instance CCallable   Double
+instance CCallable   Double#
 instance CReturnable Double
 
 instance CCallable Addr
+instance CCallable Addr#
 instance CReturnable Addr
 
 instance CCallable Word
+instance CCallable Word#
 instance CReturnable Word
 
 -- Is this right?
 instance CCallable (MutableByteArray s ix)
+instance CCallable (MutableByteArray# s)
 
 instance CCallable (ByteArray ix)
+instance CCallable ByteArray#
 
 instance CReturnable () -- Why, exactly?
 \end{code}
@@ -67,6 +76,7 @@ instance CReturnable () -- Why, exactly?
 \begin{code}
 data ForeignObj = ForeignObj ForeignObj#
 instance CCallable ForeignObj
+instance CCallable ForeignObj#
 
 eqForeignObj   :: ForeignObj -> ForeignObj -> Bool
 makeForeignObj :: Addr       -> Addr       -> PrimIO ForeignObj
@@ -94,6 +104,7 @@ instance Eq ForeignObj where
 #ifndef __PARALLEL_HASKELL__
 data StablePtr a = StablePtr (StablePtr# a)
 instance CCallable   (StablePtr a)
+instance CCallable   (StablePtr# a)
 instance CReturnable (StablePtr a)
 
 -- Nota Bene: it is important {\em not\/} to inline calls to

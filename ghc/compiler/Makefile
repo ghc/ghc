@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 1996/12/19 09:10:03 simonpj Exp $
+# $Id: Makefile,v 1.6 1997/01/06 21:08:42 simonpj Exp $
 
 TOP = ../..
 FlexSuffixRules = YES
@@ -155,9 +155,9 @@ endif
 all :: hsc libhsp.a
 
 hsc : $(OBJS)
-#	$(HC) -no-link-chk "-pgml time /projects/pacsoft/ghc/src/pureatria/purelink-1.2.2-solaris2/purelink gcc" $(HC_OPTS) -o $@ $^
-	$(HC) -no-link-chk "-pgml time gcc -B/projects/unsupported/gnu/sparc-sunos5/bin/g" $(HC_OPTS) -o $@ $^
-#	$(HC) -no-link-chk "-pgml time gcc" $(HC_OPTS) -o $@ $^
+#	$(HC) -no-link-chk "-pgml time /projects/pacsoft/ghc/src/pureatria/purelink-1.2.2-solaris2/purelink gcc" $(HC_OPTS) $(EXTRA_HC_OPTS) -o $@ $^
+	$(HC) -no-link-chk "-pgml time gcc -B/projects/unsupported/gnu/sparc-sunos5/bin/g" $(HC_OPTS)  $(EXTRA_HC_OPTS) -o $@ $^
+#	$(HC) -no-link-chk "-pgml time gcc" $(HC_OPTS)  $(EXTRA_HC_OPTS) -o $@ $^
 
 parser/hschooks.o : parser/hschooks.c
 	@$(RM) $@
@@ -165,7 +165,7 @@ parser/hschooks.o : parser/hschooks.c
 
 rename/ParseIface.hs : rename/ParseIface.y
 	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
-	happy +RTS -K2m -RTS -g rename/ParseIface.y
+	happy +RTS -K2m -H10m -RTS -g rename/ParseIface.y
 	@chmod 444 rename/ParseIface.hs
 
 # ----------------------------------------------------------------------------

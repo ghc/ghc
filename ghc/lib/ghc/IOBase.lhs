@@ -10,9 +10,10 @@ concretely; the @IO@ module itself exports abstractly.
 \begin{code}
 #include "error.h"
 
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module IOBase where
 
-import Prelude	()
 import STBase
 import PrelTup
 import Foreign

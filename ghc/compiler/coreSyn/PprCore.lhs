@@ -36,7 +36,7 @@ import Name		( OccName, parenInCode )
 import Outputable	-- quite a few things
 import PprEnv
 import PprType		( pprParendGenType, pprTyVarBndr, GenType{-instances-}, GenTyVar{-instance-} )
-import PprStyle		( PprStyle(..) )
+import PprStyle		( PprStyle(..), ifaceStyle )
 import Pretty
 import PrimOp		( PrimOp{-instances-} )
 import TyVar		( GenTyVar{-instances-} )
@@ -85,15 +85,27 @@ pprGenCoreBinding sty pbdr1 pbdr2 pocc bind
 init_ppr_env sty tvbndr pbdr1 pbdr2 pocc
   = initPprEnv sty
 	(Just (ppr sty)) -- literals
-	(Just (ppr sty)) -- data cons
-	(Just (ppr sty)) -- primops
+	(Just ppr_con)		-- data cons
+	(Just ppr_prim)		-- primops
 	(Just (\ cc -> ppStr (showCostCentre sty True cc)))
-	(Just tvbndr)	 -- tyvar binders
-	(Just (ppr sty)) -- tyvar occs
-	(Just (ppr sty)) -- usage vars
+	(Just tvbndr)	 	-- tyvar binders
+	(Just (ppr sty)) 	-- tyvar occs
+	(Just (ppr sty))	-- usage vars
 	(Just pbdr1) (Just pbdr2) (Just pocc) -- value vars
 	(Just (pprParendGenType sty)) -- types
-	(Just (ppr sty)) -- usages
+	(Just (ppr sty))	-- usages
+  where
+	-- ppr_con is used when printing Con expressions; we add a "!" 
+	-- to distinguish them from ordinary applications.  But not when
+	-- printing for interfaces, where they are treated as ordinary applications
+    ppr_con con | ifaceStyle sty = ppr sty con
+	        | otherwise	 = ppr sty con `ppBeside` ppChar '!'
+
+	-- We add a "!" to distinguish Primitive applications from ordinary applications.  
+	-- But not when printing for interfaces, where they are treated 
+	-- as ordinary applications
+    ppr_prim prim | ifaceStyle sty = ppr sty prim
+		  | otherwise	   = ppr sty prim `ppBeside` ppChar '!'
 
 --------------
 pprCoreBinding sty (NonRec binder expr)
@@ -243,11 +255,11 @@ ppr_expr pe (Lit lit)    = pLit pe lit
 ppr_expr pe (Con con []) = pCon pe con
 
 ppr_expr pe (Con con args)
-  = ppHang (ppBesides [pCon pe con, ppChar '!'])
+  = ppHang (pCon pe con)
 	 4 (ppSep (map (ppr_arg pe) args))
 
 ppr_expr pe (Prim prim args)
-  = ppHang (ppBesides [pPrim pe prim, ppChar '!'])
+  = ppHang (pPrim pe prim)
 	 4 (ppSep (map (ppr_arg pe) args))
 
 ppr_expr pe expr@(Lam _ _)
@@ -263,15 +275,13 @@ ppr_expr pe expr@(Lam _ _)
     pp_vars lam pp vs
       = ppCat [ppPStr lam, ppInterleave ppSP (map pp vs), ppStr "->"]
 
-ppr_expr pe expr@(App _ _)
+ppr_expr pe expr@(App fun arg)
   = let
-	(fun, uargs, targs, vargs) = collectArgs expr
+	(final_fun, final_args)      = go fun [arg]
+	go (App fun arg) args_so_far = go fun (arg:args_so_far)
+	go fun		 args_so_far = (fun, args_so_far)
     in
-    ppHang (ppr_parend_expr pe fun)
-	 4 (ppSep [ ppInterleave ppNil (map (pUse    pe) uargs)
-		  , ppInterleave ppNil (map (pTy     pe) targs)
-		  , ppInterleave ppNil (map (ppr_arg pe) vargs)
-	          ])
+    ppHang (ppr_parend_expr pe final_fun) 4 (ppSep (map (ppr_arg pe) final_args))
 
 ppr_expr pe (Case expr alts)
   | only_one_alt alts
@@ -282,7 +292,7 @@ ppr_expr pe (Case expr alts)
 	ppr_alt (PrimAlts [] (BindDefault n _)) = ppBeside (pMinBndr pe n) (ppStr " ->")
 	ppr_alt (PrimAlts ((l, _):[]) NoDefault)= ppBeside (pLit pe l)	   (ppStr " ->")
 	ppr_alt (AlgAlts  ((con, params, _):[]) NoDefault)
-	  = ppCat [ppr_alt_con con (pCon pe con),
+	  = ppCat [pCon pe con,
 		   ppInterleave ppSP (map (pMinBndr pe) params),
 		   ppStr "->"]
 
@@ -292,14 +302,18 @@ ppr_expr pe (Case expr alts)
 	ppr_rhs (PrimAlts ((_,expr):[]) NoDefault)  = ppr_expr pe expr
     in 
     ppSep
-    [ppSep [ppPStr SLIT("case"), ppNest 4 (ppr_expr pe expr), ppStr "of {", ppr_alt alts],
-	 ppBeside (ppr_rhs alts) (ppStr ";}")]
+    [ppSep [pp_keyword, ppNest 4 (ppr_expr pe expr), ppStr "of {", ppr_alt alts],
+	    ppBeside (ppr_rhs alts) (ppStr ";}")]
 
   | otherwise -- default "case" printing
   = ppSep
-    [ppSep [ppPStr SLIT("case"), ppNest 4 (ppr_expr pe expr), ppStr "of {"],
+    [ppSep [pp_keyword, ppNest 4 (ppr_expr pe expr), ppStr "of {"],
      ppNest 2 (ppr_alts pe alts),
      ppStr "}"]
+  where
+    pp_keyword = case alts of
+		  AlgAlts _ _  -> ppPStr SLIT("case")
+		  PrimAlts _ _ -> ppPStr SLIT("case#")
 
 -- special cases: let ... in let ...
 -- ("disgusting" SLPJ)
@@ -333,18 +347,16 @@ ppr_expr pe (SCC cc expr)
 	   ppr_parend_expr pe expr ]
 
 ppr_expr pe (Coerce c ty expr)
-  = ppSep [pp_coerce c, pTy pe ty, ppr_parend_expr pe expr ]
+  = ppSep [pp_coerce c, pTy pe ty, ppr_expr pe expr]
   where
-    pp_coerce (CoerceIn  v) = ppBeside (ppStr "_coerce_in_")  (ppr (pStyle pe) v)
-    pp_coerce (CoerceOut v) = ppBeside (ppStr "_coerce_out_") (ppr (pStyle pe) v)
+    pp_coerce (CoerceIn  v) = ppBeside (ppStr "_coerce_in_ ")  (ppr (pStyle pe) v)
+    pp_coerce (CoerceOut v) = ppBeside (ppStr "_coerce_out_ ") (ppr (pStyle pe) v)
 
 only_one_alt (AlgAlts []     (BindDefault _ _)) = True
 only_one_alt (AlgAlts (_:[])  NoDefault) 	= True
 only_one_alt (PrimAlts []    (BindDefault _ _)) = True
 only_one_alt (PrimAlts (_:[]) NoDefault) 	= True
 only_one_alt _					= False 
-
-ppr_alt_con con pp_con = if parenInCode (getOccName con) then ppParens pp_con else pp_con
 \end{code}
 
 \begin{code}
@@ -356,7 +368,7 @@ ppr_alts pe (AlgAlts alts deflt)
 		    ppCat [ppParens (ppInterleave ppComma (map (pMinBndr pe) params)),
 			   ppStr "->"]
 		else
-		    ppCat [ppr_alt_con con (pCon pe con),
+		    ppCat [pCon pe con,
 			   ppInterleave ppSP (map (pMinBndr pe) params),
 			   ppStr "->"]
 	       )
@@ -381,7 +393,7 @@ ppr_default pe (BindDefault val_bdr expr)
 \begin{code}
 ppr_arg pe (LitArg   lit) = pLit pe lit
 ppr_arg pe (VarArg   v)	  = pOcc pe v
-ppr_arg pe (TyArg    ty)  = pTy  pe ty
+ppr_arg pe (TyArg    ty)  = ppStr "@ " `ppBeside` pTy pe ty
 ppr_arg pe (UsageArg use) = pUse pe use
 \end{code}
 

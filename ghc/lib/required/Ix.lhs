@@ -5,12 +5,13 @@
 \section[Ix]{Module @Ix@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module Ix (
 	Ix(range, index, inRange)
   ) where
 
-import Prelude	()
-import IOBase	( error )		{-# SOURCE #-}
+import {#- SOURCE #-}	IOBase	( error )
 import PrelNum
 import PrelTup
 import PrelBase

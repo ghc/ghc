@@ -213,7 +213,10 @@ dfListComp expr expr_ty c_ty c_id n_ty n_id (FilterQual filt : quals)
     returnDs (mkCoreIfThenElse core_filt core_rest (Var n_id))
 
 dfListComp expr expr_ty c_ty c_id n_ty n_id (LetQual binds : quals)
-  = panic "dfListComp:LetQual"
+  -- new in 1.3, local bindings
+  = dsBinds False binds                               `thenDs` \ core_binds ->
+    dfListComp expr expr_ty c_ty c_id n_ty n_id quals `thenDs` \ core_rest ->
+    returnDs ( mkCoLetsAny core_binds core_rest )
 
 dfListComp expr expr_ty c_ty c_id n_ty n_id (GeneratorQual pat list1 : quals)
     -- evaluate the two lists

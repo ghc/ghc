@@ -160,7 +160,7 @@ data AvailInfo		= NotAvailable | Avail Name [Name]
 ===================================================
 
 \begin{code}
-type ExportItem		 = (Module, OccName, [OccName])
+type ExportItem		 = (Module, [(OccName, [OccName])])
 type VersionInfo name    = [ImportVersion name]
 type ImportVersion name  = (Module, Version, [LocalVersion name])
 type LocalVersion name   = (name, Version)

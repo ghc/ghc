@@ -28,8 +28,8 @@ import TysPrim		( getPrimRepInfo,
 import CStrings		( stringToC, charToC, charToEasyHaskell )
 import TysWiredIn	( stringTy )
 import Pretty		-- pretty-printing stuff
-import PprStyle		( PprStyle(..), codeStyle )
-import Util		( thenCmp, panic )
+import PprStyle		( PprStyle(..), codeStyle, ifaceStyle )
+import Util		( thenCmp, panic, pprPanic )
 \end{code}
 
 So-called @Literals@ are {\em either}:
@@ -48,17 +48,24 @@ function applications, etc., etc., has not yet been done.
 data Literal
   = MachChar	Char
   | MachStr	FAST_STRING
+
   | MachAddr	Integer	-- whatever this machine thinks is a "pointer"
+
   | MachInt	Integer	-- for the numeric types, these are
 		Bool	-- True <=> signed (Int#); False <=> unsigned (Word#)
+
   | MachFloat	Rational
   | MachDouble	Rational
+
   | MachLitLit  FAST_STRING
 		PrimRep
 
-  | NoRepStr	    FAST_STRING	-- the uncommitted ones
-  | NoRepInteger    Integer  Type{-save what we learned in the typechecker-}
-  | NoRepRational   Rational Type{-ditto-}
+  | NoRepStr	    FAST_STRING
+  | NoRepInteger    Integer  Type	-- This Type is always Integer
+  | NoRepRational   Rational Type	-- This Type is always Rational
+			-- We keep these Types in the literal because Rational isn't
+			-- (currently) wired in, so we can't conjure up its type out of
+			-- thin air.    Integer is, so the type here is really redundant.
 
   -- deriving (Eq, Ord): no, don't want to compare Types
   -- The Ord is needed for the FiniteMap used in the lookForConstructor
@@ -164,6 +171,11 @@ ppCast :: PprStyle -> FAST_STRING -> Pretty
 ppCast PprForC cast = ppPStr cast
 ppCast _       _    = ppNil
 
+-- MachX (i.e. unboxed) things are printed unadornded (e.g. 3, 'a', "foo")
+-- 	exceptions: MachFloat and MachAddr get an initial keyword prefix
+--
+-- NoRep things get an initial keyword prefix (e.g. _integer_ 3)
+
 instance Outputable Literal where
     ppr sty (MachChar ch)
       = let
@@ -171,64 +183,54 @@ instance Outputable Literal where
 	      = case sty of
 		  PprForC  	-> charToC ch
 		  PprForAsm _ _ -> charToC ch
-		  PprUnfolding	-> charToEasyHaskell ch
+		  PprInterface	-> charToEasyHaskell ch
 		  _		-> [ch]
 	in
-	ppBeside (ppBesides [ppCast sty SLIT("(C_)"), ppChar '\'', ppStr char_encoding, ppChar '\''])
-		 (if_ubxd sty)
+	ppBesides [ppCast sty SLIT("(C_)"), ppChar '\'', ppStr char_encoding, ppChar '\'']
 
     ppr sty (MachStr s)
-      = ppBeside (if codeStyle sty
-		  then ppBesides [ppChar '"', ppStr (stringToC (_UNPK_ s)), ppChar '"']
-		  else ppStr (show (_UNPK_ s)))
-		 (if_ubxd sty)
+      | codeStyle sty = ppBesides [ppChar '"', ppStr (stringToC (_UNPK_ s)), ppChar '"']
+      | otherwise     = ppStr (show (_UNPK_ s))
 
-    ppr sty (MachAddr p) = ppBesides [ppCast sty SLIT("(void*)"), ppInteger p, if_ubxd sty]
+    ppr sty lit@(NoRepStr s)
+      | codeStyle sty = pprPanic "NoRep in code style" (ppr PprDebug lit)
+      | otherwise     = ppBesides [ppStr "_string_", ppStr (show (_UNPK_ s))]
+
     ppr sty (MachInt i signed)
-      | codeStyle sty
-      && ((signed     && (i >= toInteger minInt && i <= toInteger maxInt))
-       || (not signed && (i >= toInteger 0      && i <= toInteger maxInt)))
-      -- ToDo: Think about these ranges!
-      = ppBesides [ppInteger i, if_ubxd sty]
+      | codeStyle sty && out_of_range
+      = panic ("ERROR: Int " ++ show i ++ " out of range [" ++
+		show range_min ++ " .. " ++ show range_max ++ "]\n")
 
-      | not (codeStyle sty) -- we'd prefer the code to the error message
-      = ppBesides [ppInteger i, if_ubxd sty]
+      | otherwise = ppInteger i
 
-      | otherwise
-      = error ("ERROR: Int " ++ show i ++ " out of range [" ++
-		show range_min ++ " .. " ++ show maxInt ++ "]\n")
       where
 	range_min = if signed then minInt else 0
+	range_max = maxInt
+        out_of_range = not (i >= toInteger range_min && i <= toInteger range_max)
 
-    ppr sty (MachFloat f)  = ppBesides [ppCast sty SLIT("(StgFloat)"), ppRational f, if_ubxd sty]
-    ppr sty (MachDouble d) = ppBesides [ppRational d, if_ubxd sty, if_ubxd sty]
+    ppr sty (MachFloat f)  
+       | codeStyle sty = ppBesides [ppCast sty SLIT("(StgFloat)"), ppRational f]
+       | otherwise     = ppBesides [ppStr "_float_", ppRational f]
 
-    ppr sty (NoRepInteger i _)
-      | codeStyle sty  = ppInteger i
-      | ufStyle sty    = ppCat [ppStr "_NOREP_I_", ppInteger i]
-      | otherwise      = ppBesides [ppInteger i, ppChar 'I']
+    ppr sty (MachDouble d) = ppRational d
 
-    ppr sty (NoRepRational r _)
-      | ufStyle sty    = ppCat [ppStr "_NOREP_R_", ppInteger (numerator r), ppInteger (denominator r)]
-      | codeStyle sty = panic "ppr.ForC.NoRepRational"
-      | otherwise     = ppBesides [ppRational r,  ppChar 'R']
+    ppr sty (MachAddr p) 
+       | codeStyle sty = ppBesides [ppCast sty SLIT("(void*)"), ppInteger p]
+       | otherwise     = ppBesides [ppStr "_addr_", ppInteger p]
 
-    ppr sty (NoRepStr s)
-      | codeStyle sty = ppBesides [ppStr (show (_UNPK_ s))]
-      | ufStyle   sty = ppCat [ppStr "_NOREP_S_", ppStr (show (_UNPK_ s))]
-      | otherwise     = ppBesides [ppStr (show (_UNPK_ s)), ppChar 'S']
+    ppr sty lit@(NoRepInteger i _)
+      | codeStyle sty  = pprPanic "NoRep in code style" (ppr PprDebug lit)
+      | otherwise      = ppCat [ppStr "_integer_", ppInteger i]
+
+    ppr sty lit@(NoRepRational r _)
+      | codeStyle sty = pprPanic "NoRep in code style" (ppr PprDebug lit)
+      | otherwise     = ppCat [ppStr "_rational_", ppInteger (numerator r), ppInteger (denominator r)]
 
     ppr sty (MachLitLit s k)
-      | codeStyle sty = ppPStr s
-      | ufStyle   sty = ppBesides [ppStr "``", ppPStr s, ppStr "'' _K_ ", ppr sty k]
-      | otherwise     = ppBesides [ppStr "``", ppPStr s, ppStr "''"]
-
-ufStyle PprUnfolding = True
-ufStyle _   	     = False
-
-if_ubxd sty = if codeStyle sty then ppNil else ppChar '#'
+      | codeStyle  sty = ppPStr s
+      | otherwise      = ppBesides [ppStr "_litlit_", ppStr (show (_UNPK_ s))]
 
 showLiteral :: PprStyle -> Literal -> String
-
 showLiteral sty lit = ppShow 80 (ppr sty lit)
 \end{code}
+

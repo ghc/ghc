@@ -15,7 +15,8 @@ IMP_Ubiq()
 import HsSyn		( HsDecl, FixityDecl, Fixity, InstDecl, 
 			  Sig, HsBinds(..), Bind(..), MonoBinds(..),
 			  GRHSsAndBinds, Match, HsExpr, HsLit, InPat,
-			  ArithSeqInfo, Fake, HsType
+			  ArithSeqInfo, Fake, HsType,
+			  collectMonoBinders
 			)
 import HsPragmas	( InstancePragmas(..) )
 import RdrHsSyn		( RdrName, SYN_IE(RdrNameMonoBinds) )
@@ -32,7 +33,7 @@ import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
-import RnEnv		( newDfunName )
+import RnEnv		( newDfunName, bindLocatedLocalsRn )
 import RnMonad		( SYN_IE(RnM), RnDown, GDown, SDown, RnNameSupply(..), 
 			  setNameSupplyRn, renameSourceCode, thenRn, mapRn, returnRn )
 
@@ -64,6 +65,7 @@ import TysPrim		( voidTy )
 import TyVar		( GenTyVar )
 import UniqFM		( emptyUFM )
 import Unique		-- Keys stuff
+import Bag		( bagToList )
 import Util		( zipWithEqual, zipEqual, sortLt, removeDups,  assoc,
 			  thenCmp, cmpList, panic, panic#, pprPanic, pprPanic#,
 			  assertPanic-- , pprTrace{-ToDo:rm-}
@@ -228,18 +230,20 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
 	method_binds_s   = map gen_bind new_inst_infos
+	mbinders	 = bagToList (collectMonoBinders extra_mbinds)
 	
 	-- Rename to get RenamedBinds.
 	-- The only tricky bit is that the extra_binds must scope over the
 	-- method bindings for the instances.
 	(dfun_names_w_method_binds, rn_extra_binds)
 		= renameSourceCode modname rn_name_supply (
+			bindLocatedLocalsRn "deriving" mbinders	$ \ _ ->
 			rnTopMonoBinds extra_mbinds []		`thenRn` \ rn_extra_binds ->
 			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
 			returnRn (dfun_names_w_method_binds, rn_extra_binds)
 		  )
 	rn_one meth_binds = newDfunName mkGeneratedSrcLoc	`thenRn` \ dfun_name ->
-			    rnMethodBinds meth_binds		`thenRn` \ rn_meth_binds ->
+			    rnMethodBinds meth_binds	`thenRn` \ rn_meth_binds ->
 			    returnRn (dfun_name, rn_meth_binds)
     in
 

@@ -10,9 +10,10 @@ which are supported for them.
 \begin{code}
 #include "error.h"
 
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module IOHandle where
 
-import Prelude	()
 import ST
 import STBase
 import ArrBase	( ByteArray(..) )

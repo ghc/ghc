@@ -5,7 +5,7 @@ SPECIALIZE pragmas.
 interface SpecLoop where
 
 import RdrHsSyn		( RdrName )
-import Name		( Name, OrigName, OccName )
+import Name		( Name, OccName )
 import TyVar		( GenTyVar )
 import TyCon		( TyCon )
 import Class		( GenClass, GenClassOp )
@@ -21,7 +21,6 @@ data GenClassOp a
 data GenId a		-- NB: fails the optimisation criterion
 data GenTyVar a		-- NB: fails the optimisation criterion
 data Name
-data OrigName
 data OccName
 data TyCon
 data Unique
@@ -37,7 +36,6 @@ instance Eq Reg
 instance Eq CLabel
 instance Eq OccName
 instance Eq RdrName
-instance Eq OrigName
 instance Eq (GenId a)
 instance Eq TyCon
 instance Eq (GenClass a b)
@@ -48,7 +46,6 @@ instance Ord Reg
 instance Ord CLabel
 instance Ord OccName
 instance Ord RdrName
-instance Ord OrigName
 instance Ord (GenId a)
 instance Ord TyCon
 instance Ord (GenClass a b)
@@ -56,7 +53,6 @@ instance Ord Unique
 instance Ord Name
 
 -- SPECIALIZing in UniqFM, UniqSet
-instance Uniquable OrigName
 instance Uniquable (GenId a)
 instance Uniquable TyCon
 instance Uniquable (GenClass a b)

@@ -97,11 +97,11 @@ loadInterface doc_str load_mod
 	Just (ParsedIface _ mod_vers usages exports rd_inst_mods fixs decls insts) ->
 
 	-- LOAD IT INTO Ifaces
-    mapRn loadExport exports					`thenRn` \ avails ->
+    mapRn loadExport exports					`thenRn` \ avails_s ->
     foldlRn (loadDecl load_mod) (decls_map,vers_map) decls	`thenRn` \ (new_decls_map, new_vers_map) ->
     foldlRn (loadInstDecl load_mod) inst_map insts		`thenRn` \ new_insts_map ->
     let
-	 export_env = (avails, fixs)
+	 export_env = (concat avails_s, fixs)
 
 			-- Exclude this module from the "special-inst" modules
 	 new_inst_mods = inst_mods `unionLists` (filter (/= this_mod) rd_inst_mods)
@@ -118,13 +118,16 @@ loadInterface doc_str load_mod
     returnRn new_ifaces
     }
 
-loadExport :: ExportItem -> RnMG AvailInfo
-loadExport (mod, occ, occs)
-  = new_name occ 		`thenRn` \ name ->
-    mapRn new_name occs 	`thenRn` \ names ->
-    returnRn (Avail name names)
+loadExport :: ExportItem -> RnMG [AvailInfo]
+loadExport (mod, entities)
+  = mapRn load_entity entities
   where
     new_name occ = newGlobalName mod occ
+
+    load_entity (occ, occs)
+      =	new_name occ 		`thenRn` \ name ->
+        mapRn new_name occs 	`thenRn` \ names ->
+        returnRn (Avail name names)
 
 loadVersion :: Module -> VersionMap -> (OccName,Version) -> RnMG VersionMap
 loadVersion mod vers_map (occ, version)

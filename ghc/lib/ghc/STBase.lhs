@@ -4,9 +4,10 @@
 \section[STBase]{The @ST@ and @PrimIO@ monads}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module STBase where
 
-import Prelude ()
 import Monad
 import PrelBase
 import GHC

@@ -23,7 +23,8 @@ sub postprocessHiFile {
 
     local($new_hi) = "$Tmp_prefix.hi-new";
 
-#    print STDERR `$Cat $hsc_hi`;
+    print STDERR "*** New hi file follows...\n"
+    print STDERR `$Cat $hsc_hi`;
 
     &constructNewHiFile($hsc_hi, $hifile_target, $new_hi);
 

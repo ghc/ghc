@@ -408,13 +408,13 @@ addStrictnessInfoToId strflags str_val abs_val binder body
   = binder `addIdStrictness` mkBottomStrictnessInfo
 
   | otherwise
-  = case (collectBinders body) of { (_, _, lambda_bounds, rhs) ->
-    let
-	tys        = map idType lambda_bounds
-	strictness = findStrictness strflags tys str_val abs_val
-    in
-    binder `addIdStrictness` mkStrictnessInfo strictness Nothing
-    }
+  = case (collectBinders body) of
+	(_, _, [], rhs) 	   -> binder
+	(_, _, lambda_bounds, rhs) -> binder `addIdStrictness` 
+				      mkStrictnessInfo strictness Nothing
+		where
+		    tys        = map idType lambda_bounds
+		    strictness = findStrictness strflags tys str_val abs_val
 \end{code}
 
 \begin{code}

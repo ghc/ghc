@@ -5,7 +5,6 @@ This is the mainPrimIO that must be used for Haskell~1.3.
 \begin{code}
 module GHCmain( mainPrimIO ) where
 
-import Prelude
 import qualified Main	-- for type of "Main.main"
 import IOBase
 import STBase

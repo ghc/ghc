@@ -7,11 +7,12 @@
 Standard functions on rational numbers
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module	Ratio (
     Ratio, Rational, (%), numerator, denominator, approxRational
   ) where
 
-import Prelude 	()
 import PrelNum
 \end{code}
 

@@ -55,7 +55,9 @@ import UniqSupply	( initUs, returnUs, thenUs,
 			  SYN_IE(UniqSM), UniqSupply
 			)
 import Usage		( SYN_IE(UVar) )
-import Util		( zipEqual, panic, pprPanic, assertPanic )
+import Util		( zipEqual, panic, pprTrace, pprPanic, assertPanic )
+import Pretty
+import Outputable	( Outputable(..) )
 
 type TypeEnv = TyVarEnv Type
 applyUsage = panic "CoreUtils.applyUsage:ToDo"
@@ -82,7 +84,14 @@ coreExprType (Coerce _ ty _)	= ty -- that's the whole point!
 -- a Con is a fully-saturated application of a data constructor
 -- a Prim is <ditto> of a PrimOp
 
-coreExprType (Con con args) = applyTypeToArgs (dataConRepType    con) args
+coreExprType (Con con args) = 
+--			      pprTrace "appTyArgs" (ppCat [ppr PprDebug con, ppSemi, 
+--						 	   ppr PprDebug con_ty, ppSemi,
+--							   ppr PprDebug args]) $
+    			      applyTypeToArgs con_ty args
+			    where
+				con_ty = dataConRepType con
+
 coreExprType (Prim op args) = applyTypeToArgs (primOpType op) args
 
 coreExprType (Lam (ValBinder binder) expr)
@@ -95,7 +104,11 @@ coreExprType (Lam (UsageBinder uvar) expr)
   = mkForAllUsageTy uvar (panic "coreExprType:Lam UsageBinder") (coreExprType expr)
 
 coreExprType (App expr (TyArg ty))
-  = applyTy (coreExprType expr) ty
+  = 
+--  pprTrace "appTy1" (ppCat [ppr PprDebug fun_ty, ppSP, ppr PprDebug ty]) $
+    applyTy fun_ty ty
+  where
+    fun_ty = coreExprType expr
 
 coreExprType (App expr (UsageArg use))
   = applyUsage (coreExprType expr) use

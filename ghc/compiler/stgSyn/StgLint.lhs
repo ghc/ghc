@@ -78,6 +78,7 @@ lintStgBindings sty whodunnit binds
 lintStgArg :: StgArg -> LintM (Maybe Type)
 
 lintStgArg (StgLitArg lit)       = returnL (Just (literalType lit))
+lintStgArg (StgConArg con)       = returnL (Just (idType con))
 lintStgArg a@(StgVarArg v)
   = checkInScope v	`thenL_`
     returnL (Just (idType v))

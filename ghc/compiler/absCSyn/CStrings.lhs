@@ -92,7 +92,7 @@ charToEasyHaskell c
     || (c >= '0' && c <= '9')
     then [c]
     else case c of
-	  _    -> '\\' : 'o' : (octify (ord c))
+	  _    -> '\\' : show (ord c)
 
 octify :: Int -> String
 octify n

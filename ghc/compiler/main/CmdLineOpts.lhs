@@ -46,6 +46,7 @@ module CmdLineOpts (
 	opt_D_verbose_stg2stg,
 	opt_DoCoreLinting,
 	opt_DoSemiTagging,
+	opt_DoEtaReduction,
 	opt_DoTickyProfiling,
 	opt_EnsureSplittableC,
 	opt_FoldrBuildOn,
@@ -60,6 +61,7 @@ module CmdLineOpts (
 	opt_IrrefutableEverything,
 	opt_IrrefutableTuples,
 	opt_LiberateCaseThreshold,
+	opt_NoImplicitPrelude,
 	opt_NumbersStrict,
 	opt_OmitBlackHoling,
 	opt_OmitDefaultInstanceMethods,
@@ -188,7 +190,6 @@ data SimplifierSwitch
 
   | IgnoreINLINEPragma
   | SimplDoLambdaEtaExpansion
-  | SimplDoEtaReduction
 
   | EssentialUnfoldingsOnly -- never mind the thresholds, only
 			    -- do unfoldings that *must* be done
@@ -279,6 +280,7 @@ opt_D_verbose_stg2stg		= lookUp  SLIT("-dverbose-stg")
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
+opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
 opt_FoldrBuildTrace		= lookUp  SLIT("-ffoldr-build-trace")
@@ -291,6 +293,7 @@ opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
 opt_IrrefutableEverything	= lookUp  SLIT("-firrefutable-everything")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
+opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitDefaultInstanceMethods	= lookUp  SLIT("-fomit-default-instance-methods")
@@ -411,7 +414,6 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-ffloat-primops-ok"		    -> SIMPL_SW(SimplOkToFloatPrimOps)
 	  "-falways-float-lets-from-lets"   -> SIMPL_SW(SimplAlwaysFloatLetsFromLets)
 	  "-fdo-case-elim"		    -> SIMPL_SW(SimplDoCaseElim)
-	  "-fdo-eta-reduction"		    -> SIMPL_SW(SimplDoEtaReduction)
 	  "-fdo-lambda-eta-expansion"	    -> SIMPL_SW(SimplDoLambdaEtaExpansion)
 	  "-fdo-foldr-build"		    -> SIMPL_SW(SimplDoFoldrBuild)
 	  "-fdo-not-fold-back-append"	    -> SIMPL_SW(SimplDontFoldBackAppend)
@@ -473,7 +475,6 @@ tagOf_SimplSwitch SimplDoFoldrBuild		= ILIT(12)
 tagOf_SimplSwitch SimplDoInlineFoldrBuild	= ILIT(14)
 tagOf_SimplSwitch IgnoreINLINEPragma 		= ILIT(15)
 tagOf_SimplSwitch SimplDoLambdaEtaExpansion	= ILIT(16)
-tagOf_SimplSwitch SimplDoEtaReduction		= ILIT(18)
 tagOf_SimplSwitch EssentialUnfoldingsOnly	= ILIT(19)
 tagOf_SimplSwitch ShowSimplifierProgress	= ILIT(20)
 tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(21)

@@ -14,10 +14,11 @@ It's rather big!
 \end{code}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelNum where
 
-import Prelude	()
-import IOBase	( error )			{-# SOURCE #-}
+import {#- SOURCE #-}	IOBase	( error )
 import PrelList
 import PrelBase
 import GHC

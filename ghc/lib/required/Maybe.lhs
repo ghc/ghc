@@ -5,13 +5,14 @@
 \section[Maybe]{Module @Maybe@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module Maybe(
     Maybe(..),
     the, exists, theExists, maybe, fromMaybe, listToMaybe, maybeToList,
     findMaybe, catMaybes, mapMaybe, joinMaybe, unfoldr
   ) where
 
-import Prelude	()
 import IOBase	( error )
 import Monad	( filter )
 import PrelList

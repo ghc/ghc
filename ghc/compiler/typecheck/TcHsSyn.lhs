@@ -505,10 +505,6 @@ zonkExpr te ve (Dictionary dicts methods)
 zonkExpr te ve (SingleDict name)
   = returnNF_Tc (SingleDict (zonkIdOcc ve name))
 
-zonkExpr te ve (HsCon con tys vargs)
-  = mapNF_Tc (zonkTcTypeToType te) tys	`thenNF_Tc` \ new_tys   ->
-    mapNF_Tc (zonkExpr te ve) vargs	`thenNF_Tc` \ new_vargs ->
-    returnNF_Tc (HsCon con new_tys new_vargs)
 
 -------------------------------------------------------------------------
 zonkArithSeq :: TyVarEnv Type -> IdEnv Id 

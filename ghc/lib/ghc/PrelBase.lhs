@@ -5,10 +5,11 @@
 
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module PrelBase where
 
-import Prelude ()
-import IOBase	( error )	{-# SOURCE #-}
+import {-# SOURCE #-}	IOBase	( error )	
 import GHC
 
 infixr 9  ., !!

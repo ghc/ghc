@@ -85,7 +85,8 @@ The classes are: @Eq@, @Ord@, @Enum@, @Bounded@, @Num@, @Show@, @Eval@, @Monad@,
 The types are: list, @Bool@, @Char@, @Ordering@, @String@, @Int@, @Integer@, @Maybe@, @Either@.
 
 \item @PrelTup@: defines tuples and their instances.
-\item @PrelList@: defines most of the list operations required by @Prelude@.  (A few are in @PrelBase@.
+\item @PrelList@: defines most of the list operations required by @Prelude@.  (A few are in @PrelBase@,
+to avoid gratuitous mutual recursion between modules.)
 
 \item @PrelNum@ defines: the numeric classes beyond @Num@ (namely @Real@, @Integral@, 
 @Fractional@, @Floating@, @RealFrac@, @RealFloat@; instances for appropriate classes 
@@ -99,11 +100,23 @@ don't use @Read@ at all, so we don't even want to link in its code.
 \item @IOBase@: substrate stuff for the main I/O libraries.
 \item @IOHandle@: large blob of code for doing I/O on handles.
 \item @PrelIO@: the remaining small pieces to produce the I/O stuff needed by @Prelude@.
+
+\item @STBase@: substrate stuff for @ST@.
+\item @ArrBase@: substrate stuff for @Array@.
+
 \item @GHCerr@: error reporting code, called from code that the compiler plants in compiled programs.
 \item @GHCmain@: the definition of @mainPrimIO@, which is what {\em really} gets
 	called by the runtime system.  @mainPrimIO@ in turn calls @main@.
 \end{itemize}
 \end{description}
+
+The @...Base@ modules generally export representation information that
+is hidden from the public interface.  For example the module @STBase@
+exports the type @ST@ including its representation, whereas the module
+@ST@ exports @ST@ abstractly.
+
+None of these modules are involved in any mutual recursion, with the sole exception that
+many modules import @IOBase.error@.
 
 \section{The module @GHC@: really primitive stuff}
 \label{sect:ghc}

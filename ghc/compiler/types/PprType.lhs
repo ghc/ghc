@@ -87,6 +87,27 @@ instance Outputable {-TyVar, i.e.:-}(GenTyVar Usage) where
 %*									*
 %************************************************************************
 
+Precedence
+~~~~~~~~~~
+@ppr_ty@ takes an @Int@ that is the precedence of the context.
+The precedence levels are:
+\begin{description}
+\item[tOP_PREC]   No parens required.
+\item[fUN_PREC]   Left hand argument of a function arrow.
+\item[tYCON_PREC] Argument of a type constructor.
+\end{description}
+
+
+\begin{code}
+tOP_PREC    = (0 :: Int)
+fUN_PREC    = (1 :: Int)
+tYCON_PREC  = (2 :: Int)
+
+maybeParen ctxt_prec inner_prec pretty
+  | ctxt_prec < inner_prec = pretty
+  | otherwise		   = ppParens pretty
+\end{code}
+
 @pprGenType@ is the std @Type@ printer; the overloaded @ppr@ function is
 defined to use this.  @pprParendGenType@ is the same, except it puts
 parens around the type, except for the atomic cases.  @pprParendGenType@
@@ -121,11 +142,13 @@ ppr_ty env ctxt_prec (TyConTy tycon usage)
   = ppr_tycon env tycon
 
 ppr_ty env ctxt_prec ty@(ForAllTy _ _)
-  | show_forall = ppSep [ ppPStr SLIT("_forall_"), pp_tyvars, 
+  | show_forall = maybeParen ctxt_prec fUN_PREC $
+		  ppSep [ ppPStr SLIT("_forall_"), pp_tyvars, 
 			  pp_theta, ppPStr SLIT("=>"), pp_body
 		        ]
-  | null theta = pp_body
-  | otherwise  = ppSep [pp_theta, ppPStr SLIT("=>"), pp_body]
+  | null theta = ppr_ty env ctxt_prec body_ty
+  | otherwise  = maybeParen ctxt_prec fUN_PREC $
+		 ppSep [pp_theta, ppPStr SLIT("=>"), pp_body]
   where
     (tyvars, rho_ty) = splitForAllTy ty
     (theta, body_ty) | show_context = splitRhoTy rho_ty
@@ -134,7 +157,7 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
     pp_tyvars = ppBracket (ppIntersperse ppSP (map (pTyVarB env) tyvars))
     pp_theta  | null theta = ppNil
 	      | otherwise  = ppCurlies (ppInterleave ppComma (map (ppr_dict env tOP_PREC) theta))
-    pp_body   = ppr_ty env ctxt_prec body_ty
+    pp_body   = ppr_ty env tOP_PREC body_ty
 
     sty = pStyle env
     show_forall = case sty of
@@ -236,25 +259,6 @@ init_ppr_env_type sty
 
 ppr_tycon  env tycon = ppr (pStyle env) tycon
 ppr_class  env clas  = ppr (pStyle env) clas
-\end{code}
-
-@ppr_ty@ takes an @Int@ that is the precedence of the context.
-The precedence levels are:
-\begin{description}
-\item[0:] What we start with.
-\item[1:] Function application (@FunTys@).
-\item[2:] Type constructors.
-\end{description}
-
-
-\begin{code}
-tOP_PREC    = (0 :: Int)
-fUN_PREC    = (1 :: Int)
-tYCON_PREC  = (2 :: Int)
-
-maybeParen ctxt_prec inner_prec pretty
-  | ctxt_prec < inner_prec = pretty
-  | otherwise		   = ppParens pretty
 \end{code}
 
 %************************************************************************

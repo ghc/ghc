@@ -5,6 +5,8 @@
 \section[Monad]{Module @Monad@}
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module Monad (
     Functor(..), Monad(..), MonadZero(..), MonadPlus(..),
 
@@ -16,7 +18,6 @@ module Monad (
     liftM, liftM2, liftM3, liftM4, liftM5
   ) where
 
-import Prelude	()
 import PrelList
 import PrelTup
 import PrelBase

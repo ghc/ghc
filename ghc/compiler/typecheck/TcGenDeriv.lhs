@@ -42,7 +42,7 @@ import Id		( GenId, dataConNumFields, isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
 			  isDataCon, SYN_IE(DataCon), SYN_IE(ConTag) )
 import Maybes		( maybeToBool )
-import Name		( getOccString, getSrcLoc, occNameString, modAndOcc, OccName, Name )
+import Name		( getOccString, getOccName, getSrcLoc, occNameString, modAndOcc, OccName, Name )
 
 import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
@@ -1047,6 +1047,13 @@ d_Pat		= VarPatIn d_RDR
 
 con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 
+con2tag_RDR tycon = varUnqual (SLIT("con2tag_") _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
+tag2con_RDR tycon = varUnqual (SLIT("tag2con_") _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
+maxtag_RDR tycon  = varUnqual (SLIT("maxtag_")  _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
+
+
+{- 	OLD, and wrong; the renamer doesn't like qualified names for locals.
+
 con2tag_RDR tycon
   = let	(mod, nm) = modAndOcc tycon
 	con2tag	  = SLIT("con2tag_") _APPEND_ occNameString nm _APPEND_ SLIT("#")
@@ -1064,4 +1071,5 @@ maxtag_RDR tycon
 	maxtag	  = SLIT("maxtag_") _APPEND_ occNameString nm _APPEND_ SLIT("#")
     in
     varQual (mod, maxtag)
+-}
 \end{code}

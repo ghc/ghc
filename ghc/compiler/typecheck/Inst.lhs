@@ -162,21 +162,30 @@ newDicts :: InstOrigin s
 	 -> NF_TcM s (LIE s, [TcIdOcc s])
 newDicts orig theta
   = tcGetSrcLoc				`thenNF_Tc` \ loc ->
+    newDictsAtLoc orig loc theta        `thenNF_Tc` \ (dicts, ids) ->
+    returnNF_Tc (listToBag dicts, ids)
+{-
     tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
     let
 	mk_dict u (clas, ty) = Dict u clas ty orig loc
 	dicts = zipWithEqual "newDicts" mk_dict new_uniqs theta
     in
     returnNF_Tc (listToBag dicts, map instToId dicts)
+-}
 
-newDictsAtLoc orig loc theta	-- Local function, similar to newDicts, 
-				-- but with slightly different interface
-  = tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
-    let
-	mk_dict u (clas, ty) = Dict u clas ty orig loc
-	dicts = zipWithEqual "newDictsAtLoc" mk_dict new_uniqs theta
-    in
-    returnNF_Tc (dicts, map instToId dicts)
+-- Local function, similar to newDicts, 
+-- but with slightly different interface
+newDictsAtLoc :: InstOrigin s
+              -> SrcLoc
+ 	      -> [(Class, TcType s)]
+	      -> NF_TcM s ([Inst s], [TcIdOcc s])
+newDictsAtLoc orig loc theta =
+ tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
+ let
+  mk_dict u (clas, ty) = Dict u clas ty orig loc
+  dicts = zipWithEqual "newDictsAtLoc" mk_dict new_uniqs theta
+ in
+ returnNF_Tc (dicts, map instToId dicts)
 
 newMethod :: InstOrigin s
 	  -> TcIdOcc s

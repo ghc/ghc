@@ -153,7 +153,7 @@ instance Outputable name => Outputable (UfPrimOp name) where
 	    after  = if is_casm then ppStr "'' " else ppSP
 	in
 	ppBesides [before, ppPStr str, after,
-		  ppLbrack, ppr sty arg_tys, ppRbrack, ppSP, ppr sty result_ty]
+		   ppLbrack, ppr sty arg_tys, ppRbrack, ppSP, ppr sty result_ty]
 
     ppr sty (UfOtherOp op)
       = ppr sty op

@@ -46,7 +46,6 @@ Name ExportFlag
 Name Module
 Name Name
 Name NamedThing (..)
-Name OrigName (..)
 Name RdrName (..)
 Outputable Outputable (..)
 PprStyle PprStyle

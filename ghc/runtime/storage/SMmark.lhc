@@ -665,8 +665,12 @@ STGFUN(_PRStart_MuTuple)
 	DEBUG_PR_MARKED;
         JUMP_MARK_RETURN;
     } else {
-    INIT_MARK_NODE("MUT ", MUTUPLE_CLOSURE_NoPTRS(Mark));
-	INIT_MSTACK(MUTUPLE_CLOSURE_PTR);
+        INIT_MARK_NODE("MUT ", MUTUPLE_CLOSURE_NoPTRS(Mark));
+        if (MUTUPLE_CLOSURE_NoPTRS(Mark) > 0) {
+            INIT_MSTACK(MUTUPLE_CLOSURE_PTR);
+        } else {
+            JUMP_MARK;
+        }
     }
     FUNEND;
 }

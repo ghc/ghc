@@ -12,7 +12,7 @@ module RnNames (
 
 IMP_Ubiq()
 
-import CmdLineOpts	( opt_SourceUnchanged )
+import CmdLineOpts	( opt_SourceUnchanged, opt_NoImplicitPrelude )
 import HsSyn	( HsModule(..), HsDecl(..), FixityDecl(..), Fixity, Fake, InPat, IE(..), HsTyVar,
 		  TyDecl, ClassDecl, InstDecl, DefaultDecl, ImportDecl(..), HsBinds, IfaceSig
 		)
@@ -91,8 +91,13 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 
     all_imports = prel_imports ++ imports
 
+	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
+	-- because the former doesn't even look at Prelude.hi for instance declarations,
+	-- whereas the latter does.
     prel_imports | this_mod == pRELUDE ||
-		   explicit_prelude_import = []
+		   explicit_prelude_import ||
+		   opt_NoImplicitPrelude
+		 = []
 
 		 | otherwise		   = [ImportDecl pRELUDE 
 							 False		{- Not qualified -}
@@ -125,12 +130,7 @@ checkEarlyExit mod
 importsFromImportDecl :: RdrNameImportDecl
 		      -> RnMG (RnEnv, ModuleAvails)
 
-	-- Check for "import M ()", and then don't even look at M.
-	-- This makes sense, and is actually rather useful for the Prelude.
-importsFromImportDecl (ImportDecl mod qual as_mod (Just (False,[])) loc)
-  = returnRn (emptyRnEnv, emptyModuleAvails)
-
-importsFromImportDecl (ImportDecl mod qual as_mod import_spec loc)
+importsFromImportDecl (ImportDecl mod qual_only as_mod import_spec loc)
   = pushSrcLocRn loc $
     getInterfaceExports mod			`thenRn` \ (avails, fixities) ->
     filterImports mod import_spec avails	`thenRn` \ filtered_avails ->
@@ -140,7 +140,11 @@ importsFromImportDecl (ImportDecl mod qual as_mod import_spec loc)
 			   ]
 	fixities'        = [ (occ,fixity,provenance) | (occ,fixity) <- fixities ]
     in
-    qualifyImports mod qual as_mod (ExportEnv filtered_avails' fixities')
+    qualifyImports mod 
+		   True 		-- Want qualified names
+		   (not qual_only)	-- Maybe want unqualified names
+		   as_mod
+		   (ExportEnv filtered_avails' fixities')
   where
     set_name_prov name = setNameProvenance name provenance
     provenance = Imported mod loc
@@ -152,7 +156,8 @@ importsFromLocalDecls rec_exp_fn (HsModule mod _ _ _ fix_decls decls _)
   = foldlRn getLocalDeclBinders [] decls		`thenRn` \ avails ->
     mapRn fixityFromFixDecl fix_decls			`thenRn` \ fixities ->
     qualifyImports mod 
-		   False	-- Not qualified
+		   False	-- Don't want qualified names
+		   True		-- Want unqualified names
 		   Nothing	-- No "as M" part
 		   (ExportEnv avails fixities)
   where
@@ -250,41 +255,52 @@ right qaulified names.  It also turns the @Names@ in the @ExportEnv@ into
 fully fledged @Names@.
 
 \begin{code}
-qualifyImports :: Module				-- Improrted module
-	       -> Bool					-- True <=> qualified import
+qualifyImports :: Module				-- Imported module
+	       -> Bool					-- True <=> want qualified import
+	       -> Bool					-- True <=> want unqualified import
 	       -> Maybe Module				-- Optional "as M" part 
 	       -> ExportEnv				-- What's imported
 	       -> RnMG (RnEnv, ModuleAvails)
 
-qualifyImports this_mod qual as_mod (ExportEnv avails fixities)
+qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities)
   = 	-- Make the qualified-name environments, checking of course for clashes
     foldlRn add_name emptyNameEnv avails			`thenRn` \ name_env ->
     foldlRn (add_fixity name_env) emptyFixityEnv fixities	`thenRn` \ fixity_env ->
-
-	-- Deal with the "qualified" part; if not qualifies then add unqualfied bindings
-    if qual then
-	returnRn (RnEnv name_env fixity_env, mod_avail_env)
-    else
-	returnRn (RnEnv (unQualify name_env) (unQualify fixity_env), mod_avail_env)
-
+    returnRn (RnEnv name_env fixity_env, mod_avail_env)
   where
-    mod_avail_env  = unitFM this_mod avails
+    qual_mod = case as_mod of
+		  Nothing  	    -> this_mod
+		  Just another_name -> another_name
+
+    mod_avail_env  = unitFM qual_mod avails
 
     add_name name_env NotAvailable = returnRn name_env
     add_name name_env (Avail n ns) = foldlRn add_one name_env (n : ns)
 
     add_one :: NameEnv -> Name -> RnMG NameEnv
-    add_one env name = addOneToNameEnvRn env (Qual this_mod occ_name) name
+    add_one env name = add_to_env addOneToNameEnvRn env occ_name name
 		     where
 			occ_name = nameOccName name
 
+    add_to_env add_fn env occ thing | qual_imp && unqual_imp = both
+				    | qual_imp		     = qual_only
+				    | unqual_imp	     = unqual_only
+				where
+				  unqual_only = add_fn env  (Unqual occ)        thing
+				  qual_only   = add_fn env  (Qual qual_mod occ) thing
+				  both	      = unqual_only 	`thenRn` \ env' ->
+						add_fn env' (Qual qual_mod occ) thing
+			
     add_fixity name_env fixity_env (occ_name, fixity, provenance)
-	| maybeToBool (lookupFM name_env qual_name)	-- The name is imported
-	= addOneToFixityEnvRn fixity_env qual_name (fixity,provenance)
-	| otherwise				-- It ain't imported
+	| maybeToBool (lookupFM name_env rdr_name)	-- It's imported
+	= add_to_env addOneToFixityEnvRn fixity_env occ_name (fixity,provenance)
+	| otherwise					-- It ain't imported
 	= returnRn fixity_env
 	where
-	  qual_name = Qual this_mod occ_name
+		-- rdr_name is a name by which the thing is guaranteed to be known,
+		-- *if it is imported at all*
+	  rdr_name | qual_imp  = Qual qual_mod occ_name
+		   | otherwise = Unqual occ_name
 \end{code}
 
 unQualify adds an Unqual binding for every existing Qual binding.
