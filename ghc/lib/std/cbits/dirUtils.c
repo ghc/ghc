@@ -69,3 +69,58 @@ HsInt prel_end_of_dir()
 #endif  
 }
 
+/*
+ * read an entry from the directory stream; opt for the
+ * re-entrant friendly way of doing this, if available.
+ */
+HsInt
+prel_readdir(HsAddr dirPtr, HsAddr pDirEnt)
+{
+#if HAVE_READDIR_R
+  struct dirent* p;
+  struct dirent* r;
+  int res;
+  static unsigned int nm_max = -1;
+  
+  if ((struct dirent**)pDirEnt == NULL) {
+    return -1;
+  }
+  if (nm_max == -1) {
+#ifdef NAME_MAX
+    nm_max = NAME_MAX;
+#else
+    char* res;
+    nm_max = pathconf(res, _PC_NAME_MAX);
+    if (nm_max == -1) { nm_max = 256; }
+#endif
+  }
+  p = (struct dirent*)malloc(sizeof(struct dirent) + nm_max);
+  res = readdir_r((DIR*)dirPtr, p, (struct dirent**)pDirEnt);
+  if (res != 0) {
+    *pDirEnt = NULL;
+    free(p);
+  }
+  return res;
+#else
+  struct dirent **pDirE = (struct dirent**)pDirEnt;
+
+  if (pDirE == NULL) {
+    return -1;
+  }
+
+  *pDirE = readdir((DIR*)dirPtr);
+  if (*pDirE == NULL) {
+    return -1;
+  } else {
+    return 0;
+  }  
+#endif
+}
+
+void
+prel_free_dirent(HsAddr dEnt)
+{
+#if HAVE_READDIR_R
+  free(dEnt);
+#endif
+}

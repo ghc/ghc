@@ -36,4 +36,6 @@ extern HsAddr prel_d_name(struct dirent* d);
 
 extern HsInt prel_end_of_dir();
 
+extern HsInt prel_readdir(HsAddr dirPtr, HsAddr pDirEnt);
+extern void  prel_free_dirent(HsAddr dEnt);
 #endif /* __DIRUTILS_H__ */

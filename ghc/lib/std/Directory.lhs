@@ -334,21 +334,24 @@ The path refers to an existing non-directory object.
 \begin{code}
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
-   p <- withCString path $ \s ->
+   alloca $ \ ptr_dEnt -> do
+    p <- withCString path $ \s ->
 	  throwErrnoIfNullRetry "getDirectoryContents" (opendir s)
-   loop p
+    loop ptr_dEnt p
   where
-    loop :: Ptr CDir -> IO [String]
-    loop dir = do
+    loop :: Ptr (Ptr CDirent) -> Ptr CDir -> IO [String]
+    loop ptr_dEnt dir = do
       resetErrno
-      p <- readdir dir
-      if (p /= nullPtr)
+      r <- readdir dir ptr_dEnt
+      if (r == 0) 
 	 then do
-	 	 entry   <- (d_name p >>= peekCString)
-		 entries <- loop dir
+	         dEnt    <- peek ptr_dEnt
+	 	 entry   <- (d_name dEnt >>= peekCString)
+		 freeDirEnt dEnt
+		 entries <- loop ptr_dEnt dir
 		 return (entry:entries)
 	 else do errno <- getErrno
-		 if (errno == eINTR) then loop dir else do
+		 if (errno == eINTR) then loop ptr_dEnt dir else do
 		 throwErrnoIfMinus1_ "getDirectoryContents" $ closedir dir
 		 let (Errno eo) = errno
 		 if (eo == end_of_dir)
@@ -548,12 +551,14 @@ foreign import ccall unsafe unlink   :: CString -> IO CInt
 foreign import ccall unsafe rename   :: CString -> CString -> IO CInt
 		     
 foreign import ccall unsafe opendir  :: CString  -> IO (Ptr CDir)
-foreign import ccall unsafe readdir  :: Ptr CDir -> IO (Ptr CDirent)
 foreign import ccall unsafe closedir :: Ptr CDir -> IO CInt
 
 foreign import ccall unsafe stat     :: CString -> Ptr CStat -> IO CInt
 
 foreign import ccall "prel_lstat" unsafe lstat :: CString -> Ptr CStat -> IO CInt
+foreign import ccall "prel_readdir" unsafe readdir  :: Ptr CDir -> Ptr (Ptr CDirent) -> IO CInt
+foreign import ccall "prel_free_dirent" unsafe freeDirEnt  :: Ptr CDirent -> IO ()
+
 
 type CDirent = ()
 
