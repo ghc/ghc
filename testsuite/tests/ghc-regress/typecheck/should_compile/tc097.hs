@@ -1,8 +1,6 @@
 -- !!! Local universal quantification.
 module ShouldSucceed where
 
-import PrelGHC -- to get at All
-
 data Monad2 m = MkMonad2 (forall a. a -> m a)
                          (forall a b.  m a -> (a -> m b) -> m b)
 
