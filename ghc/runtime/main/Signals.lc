@@ -163,7 +163,9 @@ install_segv_handler(void)
     /* FreeBSD seems to generate SIGBUS for stack overflows */
     if (signal(SIGBUS, segv_handler) == SIG_ERR)
 	return -1;
-    return ((int) signal(SIGSEGV, segv_handler));
+    if (signal(SIGSEGV, segv_handler) == SIG_ERR)
+	return -1;
+    return 0;
 #else
     return ((int) signal(SIGSEGV, segv_handler) == SIG_ERR);
     /* I think the "== SIG_ERR" is saying "there was no
