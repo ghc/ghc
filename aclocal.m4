@@ -58,7 +58,7 @@ dnl ** check for leading underscores in symbol names
 AC_DEFUN(AC_UNDERSCORE,
 [AC_CHECK_LIB(elf, nlist, LIBS="-lelf $LIBS")dnl
 AC_CACHE_CHECK([leading underscore in symbol names], ac_cv_lead_uscore,
-[#
+#
 # Hack!: nlist() under Digital UNIX insist on there being an _,
 # but symbol table listings show none. What is going on here?!?
 #
@@ -83,8 +83,7 @@ changequote([, ])dnl
 #endif
     exit(1);
 }], ac_cv_lead_uscore=yes, ac_cv_lead_uscore=no, ac_cv_lead_uscore=NO)
-fi
-])
+fi);
 LeadingUnderscore=`echo $ac_cv_lead_uscore | sed 'y/yesno/YESNO/'`
 AC_SUBST(LeadingUnderscore)
 ])
