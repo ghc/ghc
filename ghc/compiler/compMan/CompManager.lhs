@@ -309,10 +309,22 @@ cmRunStmt cmstate@CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext }
 			     return (cmstate{ pcs=new_pcs, pls=new_pls, ic=new_ic }, 
 				     CmRunOk names)
 
--- We run the statement in a "sandbox", which amounts to calling into
--- the RTS to request a new main thread.  The main benefit is that
--- there's no danger that exceptions raised by the expression can
--- affect the interpreter.
+
+-- We run the statement in a "sandbox" to protect the rest of the
+-- system from anything the expression might do.  For now, this
+-- consists of just wrapping it in an exception handler, but see below
+-- for another version.
+
+sandboxIO :: IO a -> IO (Either Int (Either Exception a))
+sandboxIO thing = do
+  r <- Exception.try thing
+  return (Right r)
+
+{-
+-- This version of sandboxIO runs the expression in a completely new
+-- RTS main thread.  It is disabled for now because ^C exceptions
+-- won't be delivered to the new thread, instead they'll be delivered
+-- to the (blocked) GHCi main thread.
 
 sandboxIO :: IO a -> IO (Either Int (Either Exception a))
 sandboxIO thing = do
@@ -331,6 +343,7 @@ sandboxIO thing = do
 foreign import "rts_evalStableIO"  {- safe -}
   rts_evalStableIO :: StablePtr (IO a) -> Ptr (StablePtr a) -> IO CInt
   -- more informative than the C type!
+-}
 #endif
 
 -----------------------------------------------------------------------------
