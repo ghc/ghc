@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.21 1999/05/11 16:47:57 keithw Exp $
+ * $Id: Schedule.c,v 1.22 1999/06/25 09:17:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -779,7 +779,6 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
      * fun field.
      */
     ap = (StgAP_UPD *)allocate(AP_sizeW(words));
-    TICK_ALLOC_UP_THK(words+1,0);
     
     ASSERT(words >= 0);
     
@@ -795,6 +794,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
     case UPDATE_FRAME:
       {
 	SET_HDR(ap,&AP_UPD_info,su->header.prof.ccs /* ToDo */); 
+	TICK_ALLOC_UP_THK(words+1,0);
 	
 	IF_DEBUG(scheduler,
 		 fprintf(stderr,  "Updating ");
@@ -823,10 +823,11 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	 * layout's the same.
 	 */
 	SET_HDR(ap,&PAP_info,su->header.prof.ccs /* ToDo */);
+	TICK_ALLOC_UPD_PAP(words+1,0);
 	
 	/* now build o = FUN(catch,ap,handler) */
 	o = (StgClosure *)allocate(sizeofW(StgClosure)+2);
-	TICK_ALLOC_SE_THK(2,0);
+	TICK_ALLOC_FUN(2,0);
 	SET_HDR(o,&catch_info,su->header.prof.ccs /* ToDo */);
 	o->payload[0] = (StgClosure *)ap;
 	o->payload[1] = cf->handler;
@@ -849,6 +850,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	StgClosure* o;
 	
 	SET_HDR(ap,&PAP_info,su->header.prof.ccs /* ToDo */);
+	TICK_ALLOC_UPD_PAP(words+1,0);
 	
 	/* now build o = FUN(seq,ap) */
 	o = (StgClosure *)allocate(sizeofW(StgClosure)+1);
