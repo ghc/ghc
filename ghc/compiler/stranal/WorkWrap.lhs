@@ -6,10 +6,9 @@
 \begin{code}
 #include "HsVersions.h"
 
-module WorkWrap ( workersAndWrappers ) where
+module WorkWrap ( workersAndWrappers, getWorkerIdAndCons ) where
 
 IMP_Ubiq(){-uitous-}
-IMPORT_1_3(List(nub))
 
 import CoreSyn
 import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidance )
@@ -17,7 +16,8 @@ import CmdLineOpts	( opt_UnfoldingCreationThreshold )
 
 import CoreUtils	( coreExprType )
 import Id		( getInlinePragma, getIdStrictness, mkWorkerId,
-			  addIdStrictness, addInlinePragma, 
+			  addIdStrictness, addInlinePragma,
+			  SYN_IE(IdSet), emptyIdSet, addOneToIdSet,
 			  GenId, SYN_IE(Id)
 			)
 import IdInfo		( noIdInfo, addUnfoldInfo,  
@@ -26,6 +26,9 @@ import IdInfo		( noIdInfo, addUnfoldInfo,
 import SaLib
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
 import WwLib
+import Pretty		( Doc )
+import Outputable	( ppr, PprStyle(..) )
+import Util		( pprPanic )
 \end{code}
 
 We take Core bindings whose binders have their strictness attached (by
@@ -210,12 +213,11 @@ tryWW fn_id rhs
     let
 	work_rhs  = work_fn body
 	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) work_info
-	work_info = noIdInfo `addStrictnessInfo` mkStrictnessInfo work_demands Nothing
+	work_info = noIdInfo `addStrictnessInfo` mkStrictnessInfo work_demands False
 
 	wrap_rhs = wrap_fn work_id
-	ww_cons  = nub (get_ww_cons wrap_rhs)
 	wrap_id  = addInlinePragma (fn_id `addIdStrictness`
-				    mkStrictnessInfo revised_wrap_args_info (Just (work_id, ww_cons)))
+				    mkStrictnessInfo revised_wrap_args_info True)
 		-- Add info to the wrapper:
 		--	(a) we want to inline it everywhere
 		-- 	(b) we want to pin on its revised stricteness info
@@ -233,11 +235,19 @@ tryWW fn_id rhs
 			StrictnessInfo args_info _ -> args_info
     revised_wrap_args_info = setUnpackStrategy wrap_args_info
 
--- This rather crude function snaffles out the constructors needed to 
--- make the wrapper, so that we can stick them in the strictness info.
--- They're only needed if this thing gets exported.
-get_ww_cons (Lam _ body)		       = get_ww_cons body
-get_ww_cons (App fn _)  		       = get_ww_cons fn
-get_ww_cons (Case _ (AlgAlts [(con,_,rhs)] _)) = con : get_ww_cons rhs
-get_ww_cons other			       = []
+-- This rather crude function looks at a wrapper function, and
+-- snaffles out (a) the worker Id and (b) constructors needed to 
+-- make the wrapper.
+-- These are needed when we write an interface file.
+getWorkerIdAndCons wrap_id wrapper_fn
+  = go wrapper_fn
+  where
+    go (Lam _ body)		      	  = go body
+    go (Case _ (AlgAlts [(con,_,rhs)] _)) = let (wrap_id, cons) = go rhs
+					    in  (wrap_id, cons `addOneToIdSet` con)
+    go other	 		      	  = (get_work_id other, emptyIdSet)
+
+    get_work_id (App fn _)    = get_work_id fn
+    get_work_id (Var work_id) = work_id
+    get_work_id other	      = pprPanic "getWorkerIdAndCons" (ppr PprDebug wrap_id)
 \end{code}
