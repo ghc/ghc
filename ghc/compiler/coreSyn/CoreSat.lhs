@@ -26,6 +26,7 @@ import Maybes
 import ErrUtils
 import CmdLineOpts
 import Outputable
+import PprCore
 \end{code}
 
 -- ---------------------------------------------------------------------------

@@ -36,6 +36,7 @@ import OccName		( occNameUserString )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel )
 import CmdLineOpts	( DynFlags )
 import Outputable
+import PprCore
 
 infixr 9 `thenLne`, `thenLne_`
 \end{code}
