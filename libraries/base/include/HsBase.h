@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.31 2003/10/13 03:19:48 sof Exp $
+ * $Id: HsBase.h,v 1.32 2003/10/13 05:09:40 sof Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -202,7 +202,7 @@ StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ 
 # endif
 #endif
 
-#if !defined(_MSC_VER) && !defined(__MINGW__)
+#if !defined(_MSC_VER)
 INLINE int __hscore_s_isreg(m)  { return S_ISREG(m);  }
 INLINE int __hscore_s_isdir(m)  { return S_ISDIR(m);  }
 INLINE int __hscore_s_isfifo(m) { return S_ISFIFO(m); }
@@ -213,7 +213,7 @@ INLINE int __hscore_s_issock(m) { return S_ISSOCK(m); }
 #endif
 #endif
 
-#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER) && !defined(__MINGW__)
+#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER) && !defined(__MINGW32__)
 INLINE int
 __hscore_sigemptyset( sigset_t *set )
 { return sigemptyset(set); }
@@ -470,11 +470,11 @@ INLINE mode_t __hscore_S_IWUSR() { return S_IWUSR; }
 INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
 #endif
 
-#if !defined(_MSC_VER) && !defined(__MINGW__)
+#if !defined(_MSC_VER)
 INLINE HsAddr
 __hscore_d_name( struct dirent* d )
 { 
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
   return (HsAddr)(&d->d_name);
 #else
   return (HsAddr)(d->d_name);
@@ -508,7 +508,7 @@ __hscore_sizeof_stat( void )
 
 INLINE time_t __hscore_st_mtime ( struct stat* st ) { return st->st_mtime; }
 INLINE off_t  __hscore_st_size  ( struct stat* st ) { return st->st_size; }
-#if !defined(_MSC_VER) && !defined(__MINGW__)
+#if !defined(_MSC_VER)
 INLINE mode_t __hscore_st_mode  ( struct stat* st ) { return st->st_mode; }
 #endif
 
@@ -533,7 +533,7 @@ __hscore_sizeof_termios( void )
 }
 #endif
 
-#if !defined(_MSC_VER) && !defined(__MINGW__)
+#if !defined(_MSC_VER) && !defined(__MINGW32__)
 INLINE HsInt
 __hscore_sizeof_sigset_t( void )
 {
