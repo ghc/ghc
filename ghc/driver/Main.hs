@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.51 2000/08/06 12:19:21 panne Exp $
+-- $Id: Main.hs,v 1.52 2000/08/07 23:29:46 qrczak Exp $
 --
 -- GHC Driver program
 --
@@ -1081,7 +1081,7 @@ getOptionsFromSource file
 			-> return (words opts)
 		   | otherwise -> return []
 
-optionRegex = mkRegex "{-#[ \t]+OPTIONS[ \t]+(.*)#-}"
+optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"
 
 -----------------------------------------------------------------------------
 -- Main loop
