@@ -44,11 +44,6 @@ touch libraries/base/GHC/PrimopWrappers.hs
 echo "*** Building compiler..."
 ./configure --enable-hc-boot $configopts
 
-# A couple of Makefiles test BootingFromHc before including
-# boilerplate.mk, so we have to pass it explicitly:
-MAKEFLAGS="BootingFromHc=YES"
-export MAKEFLAGS
-
 $MAKE -C glafp-utils boot all
 $MAKE -C ghc boot
 $MAKE -C libraries boot all
