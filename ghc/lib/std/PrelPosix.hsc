@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.11 2001/08/14 13:40:08 sewardj Exp $
+-- $Id: PrelPosix.hsc,v 1.12 2001/08/20 14:57:42 sof Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -285,8 +285,9 @@ foreign import "fcntl" unsafe
 foreign import "fork" unsafe
    fork :: IO CPid 
 
-foreign import "sigemptyset" unsafe
+foreign import "sigemptyset_wrap" unsafe
    c_sigemptyset :: Ptr CSigset -> IO ()
+#def inline void sigemptyset_wrap(sigset_t *set) { sigemptyset(set); }
 
 foreign import "sigaddset" unsafe
    c_sigaddset :: Ptr CSigset -> CInt -> IO ()
