@@ -577,6 +577,8 @@ if (  $Status == 0 && $Only_generate_deps ) {
     push (@MkDependHS_flags, "-o$Osuffix") if $Osuffix;
     push (@MkDependHS_flags, "-s$BuildTag") if $BuildTag;
     push (@MkDependHS_flags, "-D__HASKELL1__=$Haskell1Version");
+    # They're not (currently) needed, but we need to quote any -#include options
+    map(s/-#include.*$/'$&'/g, @Cmd_opts);
     local($to_do) = "$MkDependHS @MkDependHS_flags -- @Cmd_opts -- @Input_file" ;
     &run_something($to_do, 'Haskell dependencies');
     exit $Status;
@@ -2757,24 +2759,33 @@ arg: while($_ = $Args[0]) {
 			    print STDERR "$Pgm: no such system library (-syslib): $syslib\n",
 			      $Status++ unless $syslib =~ /^(hbc|ghc|posix|contrib)$/;
 
+			    again:
+			    #
+			    # The posix library is a `special' in that it relies on
+			    # the ghc system library (packed strings). Wielding our
+			    # sledgehammer, the problem is solved by silently including
+			    # the ghc system library as well.
+			    # (ToDo: `nub' -syslib list)
+			    #
 			    unshift(@SysImport_dir,
 				${INSTALLING}
 				? "$InstSysLibDir/$syslib/imports"
 				: "$TopPwd/hslibs/$syslib/src");
-
-			    if ( ${INSTALLING} ) {
-				push(@SysLibrary_dir,
-					("$InstSysLibDir"));
-			    } else {
-				push(@SysLibrary_dir,
-					("$TopPwd/hslibs/$syslib"
-					,"$TopPwd/hslibs/$syslib/cbits"));
-			    }
+			
+			    push(@SysLibrary_dir,
+			    	 ${INSTALLING}
+				 ? ("$InstSysLibDir")
+			         : ("$TopPwd/hslibs/$syslib"
+				   ,"$TopPwd/hslibs/$syslib/cbits"));
 
 			    push(@SysLibrary, "-lHS$syslib");
 			    push(@SysLibrary, "-lHS${syslib}_cbits")
 			      unless $syslib eq 'contrib'; #HACK! it has no cbits
 
+			    if ( $syslib eq 'posiz') {
+				$syslib='ghc';
+				goto again;
+			    }
 			    next arg; };
 
     #=======================================================================
