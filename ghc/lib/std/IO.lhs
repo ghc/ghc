@@ -216,14 +216,34 @@ hGetChar handle =
      then return (chr intc)
      else constructErrorAndFail "hGetChar"
 
+{-
+  If EOF is reached before EOL is encountered, ignore the
+  EOF and return the partial line. Next attempt at calling
+  hGetLine on the handle will yield an EOF IO exception though.
+-}
 hGetLine :: Handle -> IO String
 hGetLine h = do
   c <- hGetChar h
-  if c == '\n' 
-   then return "" 
+  if c == '\n' then
+     return ""
    else do
-     s <- hGetLine h
-     return (c:s)
+    l <- getRest
+    return (c:l)
+ where
+  getRest = do
+    c <- 
+      catch 
+        (hGetChar h)
+        (\ err -> do
+          if isEOFError err then
+	     return '\n'
+	   else
+	     ioError err)
+    if c == '\n' then
+       return ""
+     else do
+       s <- getRest
+       return (c:s)
 
 \end{code}
 
