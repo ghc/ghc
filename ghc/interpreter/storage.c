@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.71 $
- * $Date: 2000/04/14 15:18:06 $
+ * $Revision: 1.72 $
+ * $Date: 2000/04/25 17:43:50 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1918,6 +1918,7 @@ Heap    heapTopSnd;
 Bool    consGC = TRUE;                  /* Set to FALSE to turn off gc from*/
                                         /* C stack; use with extreme care! */
 Long    numCells;
+int     numEnters;
 Int     numGcs;                         /* number of garbage collections   */
 Int     cellsRecovered;                 /* number of cells recovered       */
 

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.43 $
- * $Date: 2000/04/11 16:36:53 $
+ * $Revision: 1.44 $
+ * $Date: 2000/04/25 17:43:50 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE               /* a moderate level of sanity checking */
@@ -278,7 +278,7 @@ extern  Ptr             cptrOf          ( Cell );
  * ------------------------------------------------------------------------*/
 
 #define TAG_PTR_MIN 200
-#define TAG_PTR_MAX 298
+#define TAG_PTR_MAX 299
 
 #define LETREC       200          /* LETREC     snd :: ([Decl],Exp)        */
 #define COND         201          /* COND       snd :: (Exp,Exp,Exp)       */
@@ -444,6 +444,7 @@ extern  Ptr             cptrOf          ( Cell );
 #define ZTUP4        297          /* snd :: (Cell,(Cell,(Cell,Cell)))      */
 #define ZTUP5        298       /* snd :: (Cell,(Cell,(Cell,(Cell,Cell))))  */
 
+#define MDOCOMP      299          /* MDOCOMP     snd :: (Exp,[Qual])       */
 
 
 /* --------------------------------------------------------------------------

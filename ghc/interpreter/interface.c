@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.55 $
- * $Date: 2000/04/17 13:28:17 $
+ * $Revision: 1.56 $
+ * $Date: 2000/04/25 17:43:49 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2700,7 +2700,6 @@ Type type; {
 #if defined(cygwin32_TARGET_OS)
 #define EXTERN_SYMS_THISPLATFORM EXTERN_SYMS_cygwin32
 #endif
-
 
 
 

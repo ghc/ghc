@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.17 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.18 $
+ * $Date: 2000/04/25 17:43:50 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -186,6 +186,9 @@ Cell e; {
                           break;
 
         case DOCOMP     : putStr("do {...}");
+                          break;
+
+        case MDOCOMP    : putStr("do {...}");
                           break;
 
         case COMP       : putComp(fst(snd(e)),snd(snd(e)));

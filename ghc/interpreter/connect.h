@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.38 $
- * $Date: 2000/04/10 09:40:03 $
+ * $Revision: 1.39 $
+ * $Date: 2000/04/25 17:43:49 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -312,6 +312,7 @@ extern Int    whnfInt;                  /* integer value of term in whnf   */
 extern Float  whnfFloat;                /* float value of term in whnf     */
 extern Long   numCells;                 /* number of cells allocated       */
 extern Int    numGcs;                   /* number of garbage collections   */
+extern int    numEnters;		/* number of enters                */
 extern Bool   preludeLoaded;            /* TRUE => prelude has been loaded */
 extern Bool   flagAssert;               /* TRUE => assert False <e> causes
                                                    an assertion failure    */

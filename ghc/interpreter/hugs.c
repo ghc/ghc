@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.67 $
- * $Date: 2000/04/17 11:39:23 $
+ * $Revision: 1.68 $
+ * $Date: 2000/04/25 17:43:49 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -173,7 +173,7 @@ char *argv[]; {
 
     Printf("__   __ __  __  ____   ___      _________________________________________\n");
     Printf("||   || ||  || ||  || ||__      STGHugs: Based on the Haskell 98 standard\n");
-    Printf("||___|| ||__|| ||__||  __||     Copyright (c) 1994-1999\n");
+    Printf("||___|| ||__|| ||__||  __||     Copyright (c) 1994-2000\n");
     Printf("||---||         ___||           World Wide Web: http://haskell.org/hugs\n");
     Printf("||   ||                         Report bugs to: hugs-bugs@haskell.org\n");
     Printf("||   || Version: %s _________________________________________\n\n",HUGS_VERSION);
@@ -1763,6 +1763,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
         bd = type;
 
     if (whatIs(bd)==QUAL) {
+	printing = FALSE;
        clearCurrentFile();
        ERRMSG(0) "Unresolved overloading" ETHEN
        ERRTEXT   "\n*** Type       : "    ETHEN ERRTYPE(type);
@@ -1773,6 +1774,8 @@ static Void local evaluator() {        /* evaluate expr and print value    */
     }
   
 #if 1
+    printing      = TRUE;
+    numEnters     = 0;
     if (isProgType(ks,bd)) {
         inputExpr = ap(nameRunIO_toplevel,inputExpr);
         evalExp();
@@ -1780,7 +1783,8 @@ static Void local evaluator() {        /* evaluate expr and print value    */
     } else {
         Cell d = provePred(ks,NIL,ap(classShow,bd));
         if (isNull(d)) {
-       clearCurrentFile();
+	    clearCurrentFile();
+	    printing = FALSE;
            ERRMSG(0) "Cannot find \"show\" function for:" ETHEN
            ERRTEXT   "\n*** expression : "   ETHEN ERREXPR(inputExpr);
            ERRTEXT   "\n*** of type    : "   ETHEN ERRTYPE(type);
@@ -1815,6 +1819,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
    nukeModule(evalMod);
    setCurrModule(currMod);
    setCurrentFile(currMod);
+   stopAnyPrinting();
 }
 
 
@@ -2408,8 +2413,10 @@ String argv[]; {
             case FIND   : find();
                           break;
             case LOAD   : modConIds = NIL;
-                          while ((s=readFilename())!=0)
-                             modConIds = cons(mkCon(findText(s)),modConIds);
+		while ((s=readFilename())!=0) {
+                          modConIds = cons(mkCon(findText(s)),modConIds);
+
+		}
                           loadActions(modConIds);
                           modConIds = NIL;
                           break;
@@ -2569,10 +2576,7 @@ static Void local stopAnyPrinting() {  /* terminate printing of expression,*/
         Putchar('\n');
         if (showStats) {
 #define plural(v)   v, (v==1?"":"s")
-            Printf("%lu cell%s",plural(numCells));
-            if (numGcs>0)
-                Printf(", %u garbage collection%s",plural(numGcs));
-            Printf(")\n");
+	    Printf("(%lu enter%s)\n",plural(numEnters));
 #undef plural
         }
         FlushStdout();

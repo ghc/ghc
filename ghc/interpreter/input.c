@@ -1,4 +1,3 @@
-
 /* --------------------------------------------------------------------------
  * Input functions, lexical analysis parsing etc...
  *
@@ -9,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.29 $
- * $Date: 2000/04/21 18:07:47 $
+ * $Revision: 1.30 $
+ * $Date: 2000/04/25 17:43:49 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -133,6 +132,7 @@ static Text textCase,    textOfK,      textData,   textType,   textIf;
 static Text textThen,    textElse,     textWhere,  textLet,    textIn;
 static Text textInfix,   textInfixl,   textInfixr, textForeign, textNewtype;
 static Text textDefault, textDeriving, textDo,     textClass,  textInstance;
+static Text textMdo;
 #if IPARAM
 static Text textWith,  textDlet;
 #endif
@@ -1216,7 +1216,7 @@ String readFilename() {                /* Read filename from input (if any)*/
 
     startToken();
     while (c0!=EOF && !isIn(c0,ZPACE)) {
-        if (c0=='"') {
+       if (c0=='"') {
             skip();
             while (c0!=EOF && c0!='\"') {
                 Cell c = readAChar(TRUE);
@@ -1524,6 +1524,7 @@ static Int local yylex() {             /* Read next input token ...        */
 #if IPARAM
 	if (it==textWith && !haskell98) lookAhead(WITH);
 	if (it==textDlet && !haskell98) lookAhead(DLET);
+        if (it==textMdo && !haskell98)  lookAhead(MDO);
 #endif
         if (it==textUUAll)             return ALL;
         if (it==textUUUsage)           return UUUSAGE;
@@ -1678,6 +1679,7 @@ Int what; {
                        textDefault    = findText("default");
                        textDeriving   = findText("deriving");
                        textDo         = findText("do");
+                       textMdo        = findText("mdo");
                        textClass      = findText("class");
 #if IPARAM
 		       textWith       = findText("with");

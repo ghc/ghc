@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.29 $
- * $Date: 2000/04/17 13:28:17 $
+ * $Revision: 1.30 $
+ * $Date: 2000/04/25 17:43:50 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -80,6 +80,7 @@ static Void   local noIP	 ( String );
 %token THEN       ELSE       WHERE      LET        IN
 %token INFIXN     INFIXL     INFIXR     FOREIGN    TNEWTYPE
 %token DEFAULT    DERIVING   DO         TCLASS     TINSTANCE
+%token MDO
 /*#if IPARAM*/
 %token WITH DLET
 /*#endif*/
@@ -1043,6 +1044,7 @@ infixExpb : infixExpa qop '-' exp10b    {$$ = gc4(ap(NEG,ap(ap($2,$1),$4)));}
           ;
 exp10a    : CASEXP exp OF '{' alts end  {$$ = gc6(ap(CASE,pair($2,rev($5))));}
           | DO '{' stmts end            {$$ = gc4(ap(DOCOMP,checkDo($3)));}
+          | MDO '{' stmts end           {$$ = gc4(ap(DOCOMP,checkDo($3)));}
           | appExp                      {$$ = $1;}
           ;
 exp10b    : '\\' pats ARROW exp         {$$ = gc4(ap(LAMBDA,      
