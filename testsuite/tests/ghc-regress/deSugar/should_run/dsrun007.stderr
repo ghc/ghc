@@ -1,4 +1,4 @@
 
-Fail: ./dsrun007.hs:5: Missing field in record construction 
+Fail: dsrun007.hs:5: Missing field in record construction 
 
 
