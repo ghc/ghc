@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.29 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.30 2000/12/19 12:50:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,8 +16,10 @@ struct GC_FLAGS {
     FILE   *statsFile;
     nat	    giveStats;
 #define NO_GC_STATS	 0
-#define SUMMARY_GC_STATS 1
-#define VERBOSE_GC_STATS 2
+#define COLLECT_GC_STATS 1
+#define ONELINE_GC_STATS 2
+#define SUMMARY_GC_STATS 3
+#define VERBOSE_GC_STATS 4
 
     nat     maxStkSize;         /* in *words* */
     nat     initialStkSize;     /* in *words* */
@@ -36,9 +38,7 @@ struct GC_FLAGS {
 
     rtsBool squeezeUpdFrames;
 
-#ifdef RTS_GTK_FRONTPANEL
     rtsBool frontpanel;
-#endif
 };
 
 /* Hack: this struct uses bitfields so that we can use a binary arg
@@ -72,10 +72,6 @@ struct DEBUG_FLAGS {
 #define DEBUG_MASK(n)        ((nat)(ldexp(1,n)))
 #define MAX_DEBUG_MASK       ((nat)(ldexp(1,(MAX_DEBUG_OPTION+1))-1))
 
-#if defined(PROFILING) || defined(PAR)
-    /* with PROFILING, full cost-centre stuff (also PROFILING_FLAGS);
-       with PAR, just the four fixed cost-centres.
-    */
 struct COST_CENTRE_FLAGS {
     unsigned int	    doCostCentres;
 # define COST_CENTRES_SUMMARY	1
@@ -86,7 +82,6 @@ struct COST_CENTRE_FLAGS {
     int	    profilerTicks;   /* derived */
     int	    msecsPerTick;    /* derived */
 };
-#endif
 
 #ifdef PROFILING
 struct PROFILING_FLAGS {

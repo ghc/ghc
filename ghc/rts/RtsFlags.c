@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.34 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.35 2000/12/19 12:50:37 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -367,8 +367,10 @@ usage_text[] = {
 "  -m<n>%   Minimum % of heap which must be available (default 3%)",
 "  -G<n>    Number of generations (default: 2)",
 "  -T<n>    Number of steps in younger generations (default: 2)",
-"  -s<file> Summary GC statistics   (default file: <program>.stat)",
-"  -S<file> Detailed GC statistics  (with -Sstderr going to stderr)",
+"",
+"  -t<file> One-line GC statistics  (default file: <program>.stat)",
+"  -s<file> Summary  GC statistics  (with -Sstderr going to stderr)",
+"  -S<file> Detailed GC statistics",
 #ifdef RTS_GTK_FRONTPANEL
 "  -f       Display front panel (requires X11 & GTK+)",
 #endif
@@ -671,6 +673,12 @@ error = rtsTrue;
 		RtsFlags.GcFlags.giveStats ++;
 
 	      case 's':
+		RtsFlags.GcFlags.giveStats ++;
+
+	      case 't':
+		RtsFlags.GcFlags.giveStats ++;
+
+		/* giveStats == 1 means "stats are being collected only" */
 		RtsFlags.GcFlags.giveStats ++;
 #ifdef PAR
 		/* Opening all those files would almost certainly fail... */
