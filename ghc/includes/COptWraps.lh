@@ -588,8 +588,17 @@ gets whatever it's after.
 
 #define WRAPPER_SETUP(f,ignore1,ignore2)  SaveAllStgContext();
 
+/* we have to make sure the STG registers are restored. 
+GCC tries to restore the value the registers had in
+the beginning of the current call, which we don't want. 
+We defeat it by saving the registers in the stack again. :-( */
+
 #define WRAPPER_RETURN(x)  \
-    do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
+    do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0); \
+    __asm__ volatile (		\
+	"cal 1,136(1)\n" \
+        "\tstm 13,-76(1)\n" \
+	"\tstu 1,-136(1)");
 
 #define SEPARATE_WRAPPER_RESTORE    /* none */
 
