@@ -184,7 +184,7 @@ Only relevant if you also use <Option>-fglasgow-exts</Option>.
 <Term> <Option>-finline-phase</Option>:</Term>
 <ListItem>
 <Para> See <XRef LinkEnd="rewrite-rules">.
-Only relevant if you also use <Option>-fglasgow-exts</Option>.
+Only relevant if you also use <Option>-fglasgow-exts</Option>.</para>
 </ListItem> </VarListEntry>
 
 <VarListEntry>
@@ -196,6 +196,7 @@ Independent of <Option>-fglasgow-exts</Option>.
 </ListItem> </VarListEntry>
 
 </VariableList>
+  </sect1>
 
 <Sect1 id="primitives">
 <Title>Unboxed types and primitive operations
@@ -381,8 +382,8 @@ Note: we may relax some of these restrictions in the future.
 </Para>
 
 <Para>
-The <Literal>IO</Literal> and <Literal>ST</Literal> monads use unboxed tuples to avoid unnecessary
-allocation during sequences of operations.
+The <Literal>IO</Literal> and <Literal>ST</Literal> monads use unboxed
+tuples to avoid unnecessary allocation during sequences of operations.
 </Para>
 
 </Sect2>
@@ -390,15 +391,13 @@ allocation during sequences of operations.
 <Sect2>
 <Title>Character and numeric types</Title>
 
-<Para>
 <IndexTerm><Primary>character types, primitive</Primary></IndexTerm>
 <IndexTerm><Primary>numeric types, primitive</Primary></IndexTerm>
 <IndexTerm><Primary>integer types, primitive</Primary></IndexTerm>
 <IndexTerm><Primary>floating point types, primitive</Primary></IndexTerm>
+<Para>
 There are the following obvious primitive types:
 </Para>
-
-<Para>
 
 <ProgramListing>
 type Char#
@@ -419,7 +418,6 @@ type Word64#
 <IndexTerm><Primary><literal>Double&num;</literal></Primary></IndexTerm>
 <IndexTerm><Primary><literal>Int64&num;</literal></Primary></IndexTerm>
 <IndexTerm><Primary><literal>Word64&num;</literal></Primary></IndexTerm>
-</Para>
 
 <Para>
 If you really want to know their exact equivalents in C, see

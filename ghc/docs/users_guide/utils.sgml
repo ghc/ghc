@@ -396,7 +396,7 @@ tags:
 	    or be empty) applied to the appropriate integer value. You can
 	    have multiple <literal>#enum</literal> definitions with the same
 	    <literal>type</literal>; this construct does not emit the type
-	    definition itself.
+	    definition itself.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -425,7 +425,7 @@ tags:
       macro whose expansion uses other <literal>#let</literal> macros.
       Plain <literal>#let</literal> prepends <literal>hsc_</literal>
       to the macro name and wraps the defininition in a
-      <literal>printf</literal> call.
+      <literal>printf</literal> call.</para>
 
     </sect2>
 
