@@ -98,10 +98,12 @@ IOWorkerProc(PVOID param)
 		    } else {
 			DWORD dw;
 
+			while (1) {
 			/* Do the read(), with extra-special handling for Ctrl+C */
 			len = read(work->workData.ioData.fd,
 				   work->workData.ioData.buf,
 				   work->workData.ioData.len);
+			dw = GetLastError();
 			if ( len == 0 && work->workData.ioData.len != 0 ) {
 			    /* Given the following scenario:
 			     *     - a console handler has been registered that handles Ctrl+C
@@ -115,20 +117,34 @@ IOWorkerProc(PVOID param)
 			     * and the above read() (i.e., under the hood, a ReadFile() op) returns
 			     * 0, with the error set to ERROR_OPERATION_ABORTED. We don't
 			     * want to percolate this non-EOF condition too far back up, but ignore
-			     * it. However, we do want to give the RTS an opportunity to deliver the
-			     * console event.
-			     * 
-			     * Hence, we set 'errorCode' to (-2), which we then look out for in
-			     * GHC.Conc.asyncRead.
+			     * it. 
+			     *
+			     * However, we do want to give the RTS an opportunity to deliver the
+			     * console event. Take care of this in the low-level console handler
+			     * in ConsoleHandler.c which wakes up the RTS thread that's blocked
+			     * waiting for I/O results from this worker (and possibly others).
+			     * It won't see any I/O, but notices and dispatches the queued up
+			     * signals/console events while in the Scheduler.
+			     *
+			     * The original, and way hackier scheme, was to have the worker
+			     * return a special return code representing aborted-due-to-ctrl-C-on-stdin,
+			     * which GHC.Conc.asyncRead would look out for and retry the I/O
+			     * call if encountered.
 			     */
-			    dw = GetLastError();
 			    if ( dw == ERROR_OPERATION_ABORTED ) {
 				/* Only do the retry when dealing with the standard input handle. */
 				HANDLE h  = (HANDLE)GetStdHandle(STD_INPUT_HANDLE);
 				if ( _get_osfhandle(work->workData.ioData.fd) == (long)h ) {
-				    errCode = (DWORD)-2;
+				    Sleep(0);
+				} else {
+				    break;
 				}
+			    } else {
+				break;
 			    }
+			} else {
+			    break;
+			}
 			}
 			if (len == -1) { errCode = errno; }
 		    }

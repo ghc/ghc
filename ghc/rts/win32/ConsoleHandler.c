@@ -9,6 +9,7 @@
 #include "Schedule.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
+#include "AsyncIO.h"
 
 extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
 
@@ -63,6 +64,9 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
 	    stg_exit(EXIT_INTERRUPTED);
 	} else {
 	    interruptStgRts();
+	    /* Cheesy pulsing of an event to wake up a waiting RTS thread, if any */
+	    abandonRequestWait();
+	    resetAbandonRequestWait();
 	}
 	return TRUE;
 
@@ -197,11 +201,15 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType)
 	 */
 	return FALSE;
     default:
+	if (!deliver_event) return TRUE;
+
 	if ( stg_pending_events < N_PENDING_EVENTS ) {
 	    stg_pending_buf[stg_pending_events] = dwCtrlType;
 	    stg_pending_events++;
 	}
-	context_switch = 1;
+	/* Cheesy pulsing of an event to wake up a waiting RTS thread, if any */
+	abandonRequestWait();
+	resetAbandonRequestWait();
 	return TRUE;
     }
 }

@@ -542,7 +542,10 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     // ToDo: add deadlock detection in GUM (similar to SMP) -- HWL
 #endif
 
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(RTS_SUPPORTS_THREADS) || defined(mingw32_TARGET_OS)
+    /* win32: might be back here due to awaitEvent() being abandoned
+     * as a result of a console event having been delivered.
+     */
     if ( EMPTY_RUN_QUEUE() ) {
 	continue; // nothing to do
     }
