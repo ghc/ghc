@@ -492,10 +492,8 @@ HAPPY_PREFIX    	= $(FPTOOLS_TOP)/happy/src/
 GREENCARD_PREFIX	= $(FPTOOLS_TOP)/green-card/src/
 
 UNLIT_PREFIX    	= $(FPTOOLS_TOP)/ghc/utils/unlit/
-UGEN_PREFIX             = $(FPTOOLS_TOP)/ghc/utils/ugen/
 STAT2RESID_PREFIX       = $(FPTOOLS_TOP)/ghc/utils/stat2resid/
 HP2PS_PREFIX            = $(FPTOOLS_TOP)/ghc/utils/hp2ps/
-HSCPP_PREFIX            = $(FPTOOLS_TOP)/ghc/utils/hscpp/
 HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
 
 
@@ -631,7 +629,7 @@ ZIP			= zip
 #
 # Under Windows, we have to deal with .exe suffixes
 #
-EXE_SUFFIX=@ExeSuffix@
+EXE_SUFFIX=@exeext@
 
 #
 # This is special to literate/, ToDo: add literate-specific
