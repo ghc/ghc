@@ -1,0 +1,17 @@
+
+tcfail113.hs:7:
+    Kind error: `Maybe' is not applied to enough type arguments
+    In the type: [Maybe]
+    While checking the type signature for `f'
+
+tcfail113.hs:10:
+    Kind error: Expecting kind `* -> *', but `Int' has kind `*'
+    When checking kinds in `T Int'
+    In the type: T Int
+    While checking the type signature for `g'
+
+tcfail113.hs:13:
+    Kind error: `Int' is applied to too many type arguments
+    When checking kinds in `Int Int'
+    In the type: Int Int
+    While checking the type signature for `h'
