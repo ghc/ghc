@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.141 2002/04/26 22:35:54 sof Exp $
+ * $Id: Schedule.c,v 1.142 2002/05/11 00:16:11 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -224,6 +224,7 @@ StgTSO *CurrentTSO;
 StgTSO dummy_tso;
 
 rtsBool ready_to_gc;
+rtsBool shutting_down_scheduler = rtsFalse;
 
 void            addToBlockedQueue ( StgTSO *tso );
 
@@ -714,15 +715,17 @@ schedule( void )
     if ( EMPTY_RUN_QUEUE() ) {
       /* Give up our capability */
       releaseCapability(cap);
+
+      /* If we're in the process of shutting down (& running the
+       * a batch of finalisers), don't wait around.
+       */
+      if ( shutting_down_scheduler ) {
+	RELEASE_LOCK(&sched_mutex);
+	return;
+      }
       IF_DEBUG(scheduler, sched_belch("thread %d: waiting for work", osThreadId()));
       waitForWorkCapability(&sched_mutex, &cap, rtsTrue);
       IF_DEBUG(scheduler, sched_belch("thread %d: work now available", osThreadId()));
-#if 0
-      while ( EMPTY_RUN_QUEUE() ) {
-	waitForWorkCapability(&sched_mutex, &cap);
-	IF_DEBUG(scheduler, sched_belch("thread %d: work now available", osThreadId()));
-      }
-#endif
     }
 #endif
 
@@ -2084,6 +2087,7 @@ exitScheduler( void )
 #if defined(RTS_SUPPORTS_THREADS)
   stopTaskManager();
 #endif
+  shutting_down_scheduler = rtsTrue;
 }
 
 /* -----------------------------------------------------------------------------

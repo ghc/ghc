@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.62 2002/04/26 22:35:55 sof Exp $
+ * $Id: RtsStartup.c,v 1.63 2002/05/11 00:16:12 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -273,9 +273,12 @@ shutdownHaskell(void)
   if (!rts_has_started_up)
      return;
   rts_has_started_up=0;
-
+  
   /* start timing the shutdown */
   stat_startExit();
+
+  /* stop all running tasks */
+  exitScheduler();
 
 #if !defined(GRAN)
   /* Finalize any remaining weak pointers */
@@ -287,9 +290,6 @@ shutdownHaskell(void)
   if (!RtsFlags.GranFlags.GranSimStats.Suppressed)
     end_gr_simulation();
 #endif
-
-  /* stop all running tasks */
-  exitScheduler();
 
   /* stop the ticker */
   stopVirtTimer();
