@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/11/09 00:41:19 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/11 16:24:12 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -206,7 +206,7 @@ Cell e; {
 
         case FLOATCELL  : {   Float f = floatOf(e);
                               if (f<0 && d>=UMINUS_PREC) putChr('(');
-                              putStr(floatToString(f));
+                              putStr(floatToString(e));
                               if (f<0 && d>=UMINUS_PREC) putChr(')');
                           }
                           break;
