@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.57 2001/11/28 14:47:54 simonmar Exp $
+ * $Id: Storage.c,v 1.58 2002/01/24 01:45:55 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -293,9 +293,9 @@ allocNurseries( void )
     g0s0->blocks = NULL;
     g0s0->n_blocks = 0;
     for (cap = free_capabilities; cap != NULL; cap = cap->link) {
-      cap->rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
-      cap->rCurrentNursery = cap->rNursery;
-      for (bd = cap->rNursery; bd != NULL; bd = bd->link) {
+      cap->r.rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
+      cap->r.rCurrentNursery = cap->r.rNursery;
+      for (bd = cap->r.rNursery; bd != NULL; bd = bd->link) {
 	bd->u.back = (bdescr *)cap;
       }
     }
@@ -325,13 +325,13 @@ resetNurseries( void )
   ASSERT(n_free_capabilities == RtsFlags.ParFlags.nNodes);
 
   for (cap = free_capabilities; cap != NULL; cap = cap->link) {
-    for (bd = cap->rNursery; bd; bd = bd->link) {
+    for (bd = cap->r.rNursery; bd; bd = bd->link) {
       bd->free = bd->start;
       ASSERT(bd->gen_no == 0);
       ASSERT(bd->step == g0s0);
       IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
     }
-    cap->rCurrentNursery = cap->rNursery;
+    cap->r.rCurrentNursery = cap->r.rNursery;
   }
 #else
   for (bd = g0s0->blocks; bd; bd = bd->link) {
@@ -635,13 +635,13 @@ calcAllocated( void )
     + allocated_bytes();
 
   for (cap = free_capabilities; cap != NULL; cap = cap->link) {
-    for ( bd = cap->rCurrentNursery->link; bd != NULL; bd = bd->link ) {
+    for ( bd = cap->r.rCurrentNursery->link; bd != NULL; bd = bd->link ) {
       allocated -= BLOCK_SIZE_W;
     }
-    if (cap->rCurrentNursery->free < cap->rCurrentNursery->start 
+    if (cap->r.rCurrentNursery->free < cap->r.rCurrentNursery->start 
 	+ BLOCK_SIZE_W) {
-      allocated -= (cap->rCurrentNursery->start + BLOCK_SIZE_W)
-	- cap->rCurrentNursery->free;
+      allocated -= (cap->r.rCurrentNursery->start + BLOCK_SIZE_W)
+	- cap->r.rCurrentNursery->free;
     }
   }
 
