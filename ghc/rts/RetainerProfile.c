@@ -1770,7 +1770,7 @@ computeRetainerSet( void )
     // object (computing sumOfNewCostExtra and updating costArray[] when
     // debugging retainer profiler).
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	ASSERT(g != 0 || (generations[g].mut_list == NULL))
+        ASSERT(g != 0 || (generations[g].mut_list == NULL));
 
 	// Traversing through mut_list is necessary
 	// because we can find MUT_VAR objects which have not been
