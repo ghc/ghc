@@ -281,7 +281,7 @@ mkIface hsc_env location maybe_old_iface
 			mi_boot     = False,
 			mi_deps     = deps,
 			mi_usages   = usages,
-			mi_exports  = groupAvails this_mod exports,
+			mi_exports  = groupAvails exports,
 			mi_insts    = iface_insts,
 			mi_rules    = iface_rules,
 			mi_fixities = fixities,
@@ -693,10 +693,10 @@ mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
 \end{code}
 
 \begin{code}
-groupAvails :: Module -> Avails -> [(ModuleName, [GenAvailInfo OccName])]
+groupAvails :: Avails -> [(ModuleName, [GenAvailInfo OccName])]
   -- Group by module and sort by occurrence
   -- This keeps the list in canonical order
-groupAvails this_mod avails 
+groupAvails avails 
   = [ (mkSysModuleNameFS fs, sortLt lt avails)
     | (fs,avails) <- fmToList groupFM
     ]
