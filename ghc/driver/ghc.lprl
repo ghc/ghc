@@ -272,17 +272,22 @@ warnings that you get all the time are
 	
 	-fwarn-overlapping-patterns
 	-fwarn-incomplete-patterns
+	-fwarn-missing-methods
 
 these are turned off by -Wnot.
 
 \begin{code}
 @StandardWarnings = ('-fwarn-overlapping-patterns', 
-		     '-fwarn-incomplete-patterns');
-@MinusWOpts    = (@StandardWarnings, '-fwarn-name-shadowing');
-@MinusWallOpts = @MinusWOpts;
+		     '-fwarn-missing-methods');
+@MinusWOpts    	  = (@StandardWarnings, 
+		     '-fwarn-incomplete-patterns', 
+		     '-fwarn-unused-names');
+@MinusWallOpts 	  = (@MinusWOpts, 
+		     '-fwarn-name-shadowing');
 \end{code}
 
 What options \tr{-user-setup-a} turn into (user-defined ``packages''
+
 of options).  Note that a particular user-setup implies a particular
 Prelude ({\em including} its interface file(s)).
 \begin{code}
