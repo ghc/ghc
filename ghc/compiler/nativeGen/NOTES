@@ -1,40 +1,21 @@
 
-Known bugs/issues in nativeGen, 000202 (JRS)
+Known bugs/issues in nativeGen, 000228 (JRS)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-All these bugs are for x86; I don't know about sparc/alpha.
 
 -- absC -> stix translation for GET_TAG and in fact anything
    to do with the packed-halfword layout info itbl field is
    pretty dubious.  I think I have it fixed for big and little
    endian 32-bit, but it won't work at all on a 64 bit platform.
 
--- Most of the x86 insn selector code in MachCode.lhs needs to
-   be checked against the Rules of the Game recorded in that file.
-   I think there are a lot of subtle violations.
+-- There may or may not be bugs in some of the x86 insn selector 
+   code in MachCode.lhs.  I have checked all of it against the 
+   Rules of the Game (+ Rules of the game for Amodes) recorded in 
+   that file, but am not 100% convinced that it is all correct.
+   I think most of it is, tho.
 
--- When selecting spill regs, don't use %eax if there is a CALL insn
-   (perhaps excluding calls to newCAF, since it doesn't return a
-    result).
+-- It won't compile on Solaris or Alphas because the insn selectors
+   are not up-to-date.
 
--- Keep track of the stack offset so that correct spill code can
-   be generated even if %esp moves.  At the moment %esp doesn't
-   move, so the problem doesn't exist, but there is a different
-   problem: ccalls put args in memory below %esp and only move
-   %esp immediately prior to the call.  This is dangerous because
-   (1) writing below %esp can cause a segmentation fault (as deemed
-   by the OS), and (2) if a signal should be handled on that stack
-   during argument construction, the args will get silently trashed.
-
-   Currently, implementation of GITOF et al use the stack, so are
-   incompatible with current ccall implementation.  When the latter
-   is fixed, GITOF et al should present no problem.  Same issue
-   applies to GCOS, GSIN, GTAN, GSQRT if they have to truncate their
-   result to 32-bit float.
-
--- nofib/real/hidden gets slightly different FP answers from the
-   via-C route; possibly due to exp/log not being done in-line.
-
--- Possibly implement GLDZ and GLD1 as analogues of FLDZ and FLD1
-   (x86), to reduce number of constants emitted in f-p code.
-
+-- NCG introduces a massive space leak; I think it generates all the
+   assembly code before printing any of it out (a depressingly 
+   familiar story ...).  Fixing this will await a working heap profiler.

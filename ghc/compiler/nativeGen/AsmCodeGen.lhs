@@ -19,17 +19,20 @@ import PprMach
 import AbsCStixGen	( genCodeAbstractC )
 import AbsCSyn		( AbstractC, MagicId )
 import AsmRegAlloc	( runRegAllocate )
-import OrdList		( OrdList, flattenOrdList )
 import PrimOp		( commutableOp, PrimOp(..) )
 import RegAllocInfo	( mkMRegsState, MRegsState, findReservedRegs )
 import Stix		( StixTree(..), StixReg(..), 
-                          pprStixTrees, CodeSegment(..) )
+                          pprStixTrees, ppStixTree, CodeSegment(..),
+                          stixCountTempUses, stixSubst,
+                          NatM, initNat, mapNat,
+                          NatM_State, mkNatM_State,
+                          uniqOfNatM_State, deltaOfNatM_State )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import UniqSupply	( returnUs, thenUs, mapUs, initUs, 
                           initUs_, UniqSM, UniqSupply )
-import UniqFM		( UniqFM, emptyUFM, addToUFM, lookupUFM )
 import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
 
+import OrdList		( fromOL, concatOL )
 import Outputable	
 
 \end{code}
@@ -85,11 +88,11 @@ So, here we go:
 nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, SDoc)
 nativeCodeGen absC us
    = let (stixRaw, us1) = initUs us (genCodeAbstractC absC)
-         stixOpt        = map (map genericOpt) stixRaw
+         stixOpt        = map genericOpt stixRaw
          insns          = initUs_ us1 (codeGen stixOpt)
          debug_stix     = vcat (map pprStixTrees stixOpt)
      in 
-         trace "--------- native code generator ---------"
+         trace "nativeGen: begin"
          (debug_stix, insns)
 \end{code}
 
@@ -108,25 +111,49 @@ codeGen stixFinal
         docs           = map (vcat . map pprInstr) static_instrss
 
         -- for debugging only
-        docs_prealloc  = map (vcat . map pprInstr . flattenOrdList) 
+        docs_prealloc  = map (vcat . map pprInstr . fromOL) 
                              dynamic_codes
         text_prealloc  = vcat (intersperse (char ' ' $$ char ' ') docs_prealloc)
     in
     -- trace (showSDoc text_prealloc) (
     returnUs (vcat (intersperse (char ' ' 
-                                 $$ text "# ___stg_split_marker" 
+                                 $$ ptext SLIT("# ___stg_split_marker")
                                  $$ char ' ') 
                     docs))
     -- )
 \end{code}
 
-Top level code generator for a chunk of stix code:
-\begin{code}
-genMachCode :: [StixTree] -> UniqSM InstrList
+Top level code generator for a chunk of stix code.  For this part of
+the computation, we switch from the UniqSM monad to the NatM monad.
+The latter carries not only a Unique, but also an Int denoting the
+current C stack pointer offset in the generated code; this is needed
+for creating correct spill offsets on architectures which don't offer,
+or for which it would be prohibitively expensive to employ, a frame
+pointer register.  Viz, x86.
 
-genMachCode stmts
-  = mapUs stmt2Instrs stmts    	    	`thenUs` \ blocks ->
-    returnUs (foldr (.) id blocks asmVoid)
+The offset is measured in bytes, and indicates the difference between
+the current (simulated) C stack-ptr and the value it was at the
+beginning of the block.  For stacks which grow down, this value should
+be either zero or negative.
+
+Switching between the two monads whilst carrying along the same Unique
+supply breaks abstraction.  Is that bad?
+
+\begin{code}
+genMachCode :: [StixTree] -> UniqSM InstrBlock
+
+genMachCode stmts initial_us
+  = let initial_st         = mkNatM_State initial_us 0
+        (blocks, final_st) = initNat initial_st 
+                                     (mapNat stmt2Instrs stmts)
+        instr_list         = concatOL blocks
+        final_us           = uniqOfNatM_State final_st
+        final_delta        = deltaOfNatM_State final_st
+    in
+        if   final_delta == 0
+        then (instr_list, final_us)
+        else pprPanic "genMachCode: nonzero final delta"
+                      (int final_delta)
 \end{code}
 
 The next bit does the code scheduling.  The scheduler must also deal
@@ -135,7 +162,7 @@ exposed via the OrdList, but more might occur, so further analysis
 might be needed.
 
 \begin{code}
-scheduleMachCode :: [InstrList] -> [[Instr]]
+scheduleMachCode :: [InstrBlock] -> [[Instr]]
 
 scheduleMachCode
   = map (runRegAllocate freeRegsState findReservedRegs)
@@ -160,71 +187,95 @@ have introduced some new opportunities for constant-folding wrt
 address manipulations.
 
 \begin{code}
-genericOpt :: StixTree -> StixTree
+genericOpt :: [StixTree] -> [StixTree]
+genericOpt = map stixConFold . stixPeep
+
+
+
+stixPeep :: [StixTree] -> [StixTree]
+
+-- This transformation assumes that the temp assigned to in t1
+-- is not assigned to in t2; for otherwise the target of the
+-- second assignment would be substituted for, giving nonsense
+-- code.  As far as I can see, StixTemps are only ever assigned
+-- to once.  It would be nice to be sure!
+stixPeep ( t1@(StAssign pka (StReg (StixTemp u pk)) rhs)
+         : t2
+         : ts )
+   | stixCountTempUses u t2 == 1
+     && sum (map (stixCountTempUses u) ts) == 0
+   = trace ("nativeGen: stixInline: " ++ showSDoc (ppStixTree rhs))
+           (stixPeep (stixSubst u rhs t2 : ts))
+
+stixPeep (t1:t2:ts) = t1 : stixPeep (t2:ts)
+stixPeep [t1]       = [t1]
+stixPeep []         = []
 \end{code}
 
 For most nodes, just optimize the children.
 
 \begin{code}
-genericOpt (StInd pk addr) = StInd pk (genericOpt addr)
+stixConFold :: StixTree -> StixTree
 
-genericOpt (StAssign pk dst src)
-  = StAssign pk (genericOpt dst) (genericOpt src)
+stixConFold (StInd pk addr) = StInd pk (stixConFold addr)
 
-genericOpt (StJump addr) = StJump (genericOpt addr)
+stixConFold (StAssign pk dst src)
+  = StAssign pk (stixConFold dst) (stixConFold src)
 
-genericOpt (StCondJump addr test)
-  = StCondJump addr (genericOpt test)
+stixConFold (StJump addr) = StJump (stixConFold addr)
 
-genericOpt (StCall fn cconv pk args)
-  = StCall fn cconv pk (map genericOpt args)
+stixConFold (StCondJump addr test)
+  = StCondJump addr (stixConFold test)
+
+stixConFold (StCall fn cconv pk args)
+  = StCall fn cconv pk (map stixConFold args)
 \end{code}
 
 Fold indices together when the types match:
 \begin{code}
-genericOpt (StIndex pk (StIndex pk' base off) off')
+stixConFold (StIndex pk (StIndex pk' base off) off')
   | pk == pk'
-  = StIndex pk (genericOpt base)
-    	       (genericOpt (StPrim IntAddOp [off, off']))
+  = StIndex pk (stixConFold base)
+    	       (stixConFold (StPrim IntAddOp [off, off']))
 
-genericOpt (StIndex pk base off)
-  = StIndex pk (genericOpt base) (genericOpt off)
+stixConFold (StIndex pk base off)
+  = StIndex pk (stixConFold base) (stixConFold off)
 \end{code}
 
 For PrimOps, we first optimize the children, and then we try our hand
 at some constant-folding.
 
 \begin{code}
-genericOpt (StPrim op args) = primOpt op (map genericOpt args)
+stixConFold (StPrim op args) = stixPrimFold op (map stixConFold args)
 \end{code}
 
 Replace register leaves with appropriate StixTrees for the given
 target.
 
 \begin{code}
-genericOpt leaf@(StReg (StixMagicId id))
+stixConFold leaf@(StReg (StixMagicId id))
   = case (stgReg id) of
-    	Always tree -> genericOpt tree
+    	Always tree -> stixConFold tree
     	Save _      -> leaf
 
-genericOpt other = other
+stixConFold other = other
 \end{code}
 
 Now, try to constant-fold the PrimOps.  The arguments have already
 been optimized and folded.
 
 \begin{code}
-primOpt
+stixPrimFold
     :: PrimOp	    	-- The operation from an StPrim
     -> [StixTree]   	-- The optimized arguments
     -> StixTree
 
-primOpt op arg@[StInt x]
+stixPrimFold op arg@[StInt x]
   = case op of
     	IntNegOp -> StInt (-x)
     	_ -> StPrim op arg
 
-primOpt op args@[StInt x, StInt y]
+stixPrimFold op args@[StInt x, StInt y]
   = case op of
     	CharGtOp -> StInt (if x > y  then 1 else 0)
     	CharGeOp -> StInt (if x >= y then 1 else 0)
@@ -253,13 +304,13 @@ also assume that constants have been shifted to the right when
 possible.
 
 \begin{code}
-primOpt op [x@(StInt _), y] | commutableOp op = primOpt op [y, x]
+stixPrimFold op [x@(StInt _), y] | commutableOp op = stixPrimFold op [y, x]
 \end{code}
 
 We can often do something with constants of 0 and 1 ...
 
 \begin{code}
-primOpt op args@[x, y@(StInt 0)]
+stixPrimFold op args@[x, y@(StInt 0)]
   = case op of
     	IntAddOp -> x
     	IntSubOp -> x
@@ -272,9 +323,15 @@ primOpt op args@[x, y@(StInt 0)]
     	ISllOp 	 -> x
     	ISraOp 	 -> x
     	ISrlOp 	 -> x
+        IntNeOp  | is_comparison -> x
     	_	 -> StPrim op args
+    where
+       is_comparison
+          = case x of
+               StPrim opp [_, _] -> opp `elem` comparison_ops
+               _                 -> False
 
-primOpt op args@[x, y@(StInt 1)]
+stixPrimFold op args@[x, y@(StInt 1)]
   = case op of
     	IntMulOp  -> x
     	IntQuotOp -> x
@@ -285,7 +342,7 @@ primOpt op args@[x, y@(StInt 1)]
 Now look for multiplication/division by powers of 2 (integers).
 
 \begin{code}
-primOpt op args@[x, y@(StInt n)]
+stixPrimFold op args@[x, y@(StInt n)]
   = case op of
     	IntMulOp -> case exactLog2 n of
 	    Nothing -> StPrim op args
@@ -299,5 +356,16 @@ primOpt op args@[x, y@(StInt n)]
 Anything else is just too hard.
 
 \begin{code}
-primOpt op args = StPrim op args
+stixPrimFold op args = StPrim op args
+\end{code}
+
+\begin{code}
+comparison_ops
+   = [ CharGtOp  , CharGeOp  , CharEqOp  , CharNeOp  , CharLtOp  , CharLeOp,
+       IntGtOp   , IntGeOp   , IntEqOp   , IntNeOp   , IntLtOp   , IntLeOp,
+       WordGtOp  , WordGeOp  , WordEqOp  , WordNeOp  , WordLtOp  , WordLeOp,
+       AddrGtOp  , AddrGeOp  , AddrEqOp  , AddrNeOp  , AddrLtOp  , AddrLeOp,
+       FloatGtOp , FloatGeOp , FloatEqOp , FloatNeOp , FloatLtOp , FloatLeOp,
+       DoubleGtOp, DoubleGeOp, DoubleEqOp, DoubleNeOp, DoubleLtOp, DoubleLeOp
+     ]
 \end{code}

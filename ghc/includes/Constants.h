@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.10 2000/02/01 14:08:22 sewardj Exp $
+ * $Id: Constants.h,v 1.11 2000/02/28 12:02:32 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -201,7 +201,7 @@
    world.  Used in StgRun.S and StgCRun.c.
    -------------------------------------------------------------------------- */
 
-#define RESERVED_C_STACK_BYTES (1024 * SIZEOF_LONG)
+#define RESERVED_C_STACK_BYTES (2048 * SIZEOF_LONG)
 
 /* -----------------------------------------------------------------------------
    How much Haskell stack space to reserve for the saving of registers

@@ -16,7 +16,6 @@ import AbsCSyn		( CStmtMacro(..), MagicId(..), CAddrMode, tagreg,
 			  CCheckMacro(..) )
 import Constants	( uF_RET, uF_SU, uF_UPDATEE, uF_SIZE, sEQ_FRAME_SIZE )
 import CallConv		( cCallConv )
-import OrdList		( OrdList )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix

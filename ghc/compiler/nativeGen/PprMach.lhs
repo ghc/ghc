@@ -175,12 +175,13 @@ pprSize x = ptext (case x of
 	 TF -> SLIT("t")
 #endif
 #if i386_TARGET_ARCH
-	B  -> SLIT("b")
---	HB -> SLIT("b") UNUSED
---	S  -> SLIT("w") UNUSED
-	L  -> SLIT("l")
-	F  -> SLIT("s")
-	DF -> SLIT("l")
+	B   -> SLIT("b")
+--	HB  -> SLIT("b") UNUSED
+--	S   -> SLIT("w") UNUSED
+	L   -> SLIT("l")
+	F   -> SLIT("s")
+	DF  -> SLIT("l")
+	F80 -> SLIT("t")
 #endif
 #if sparc_TARGET_ARCH
 	B   -> SLIT("sb")
@@ -299,27 +300,27 @@ pprAddr (AddrRegImm r1 i)
 
 #if i386_TARGET_ARCH
 pprAddr (ImmAddr imm off)
-  = let
-	pp_imm = pprImm imm
+  = let	pp_imm = pprImm imm
     in
     if (off == 0) then
 	pp_imm
     else if (off < 0) then
-	(<>) pp_imm (int off)
+	pp_imm <> int off
     else
-	hcat [pp_imm, char '+', int off]
+	pp_imm <> char '+' <> int off
 
 pprAddr (AddrBaseIndex base index displacement)
   = let
 	pp_disp  = ppr_disp displacement
-	pp_off p = (<>) pp_disp (parens p)
+	pp_off p = pp_disp <> char '(' <> p <> char ')'
 	pp_reg r = pprReg L r
     in
     case (base,index) of
       (Nothing, Nothing)    -> pp_disp
       (Just b,  Nothing)    -> pp_off (pp_reg b)
-      (Nothing, Just (r,i)) -> pp_off (hcat [pp_reg r, comma, int i])
-      (Just b,  Just (r,i)) -> pp_off (hcat [pp_reg b, comma, pp_reg r, comma, int i])
+      (Nothing, Just (r,i)) -> pp_off (pp_reg r <> comma <> int i)
+      (Just b,  Just (r,i)) -> pp_off (pp_reg b <> comma <> pp_reg r 
+                                       <> comma <> int i)
   where
     ppr_disp (ImmInt 0) = empty
     ppr_disp imm        = pprImm imm
@@ -367,6 +368,9 @@ pprInstr (COMMENT s)
      ,IF_ARCH_sparc( ((<>) (ptext SLIT("! "))   (ptext s))
      ,IF_ARCH_i386( ((<>) (ptext SLIT("# "))   (ptext s))
      ,)))
+
+pprInstr (DELTA d)
+   = pprInstr (COMMENT (_PK_ ("\tdelta = " ++ show d)))
 
 pprInstr (SEGMENT TextSegment)
     =  IF_ARCH_alpha(ptext SLIT("\t.text\n\t.align 3") {-word boundary-}
@@ -992,6 +996,11 @@ pprInstr g@(GST sz src addr)
  = pprG g (hcat [gtab, gpush src 0, gsemi, 
                  text "fstp", pprSize sz, gsp, pprAddr addr])
 
+pprInstr g@(GLDZ dst)
+ = pprG g (hcat [gtab, text "ffree %st(7) ; fldz ; ", gpop dst 1])
+pprInstr g@(GLD1 dst)
+ = pprG g (hcat [gtab, text "ffree %st(7) ; fld1 ; ", gpop dst 1])
+
 pprInstr g@(GFTOD src dst) 
    = pprG g bogus
 pprInstr g@(GFTOI src dst) 
@@ -1085,6 +1094,9 @@ pprGInstr (GMOV src dst)   = pprSizeRegReg SLIT("gmov") DF src dst
 pprGInstr (GLD sz src dst) = pprSizeAddrReg SLIT("gld") sz src dst
 pprGInstr (GST sz src dst) = pprSizeRegAddr SLIT("gst") sz src dst
 
+pprGInstr (GLDZ dst) = pprSizeReg SLIT("gldz") DF dst
+pprGInstr (GLD1 dst) = pprSizeReg SLIT("gld1") DF dst
+
 pprGInstr (GFTOD src dst) = pprSizeSizeRegReg SLIT("gftod") F DF src dst
 pprGInstr (GFTOI src dst) = pprSizeSizeRegReg SLIT("gftoi") F L  src dst
 
@@ -1112,11 +1124,11 @@ Continue with I386-only printing bits and bobs:
 \begin{code}
 pprDollImm :: Imm -> SDoc
 
-pprDollImm i     = hcat [ ptext SLIT("$"), pprImm i]
+pprDollImm i =  ptext SLIT("$") <> pprImm i
 
 pprOperand :: Size -> Operand -> SDoc
-pprOperand s (OpReg r) = pprReg s r
-pprOperand s (OpImm i) = pprDollImm i
+pprOperand s (OpReg r)   = pprReg s r
+pprOperand s (OpImm i)   = pprDollImm i
 pprOperand s (OpAddr ea) = pprAddr ea
 
 pprSizeImmOp :: FAST_STRING -> Size -> Imm -> Operand -> SDoc
@@ -1176,6 +1188,16 @@ pprSizeOpReg name size op1 reg
 	pprOperand size op1,
 	comma,
 	pprReg size reg
+    ]
+
+pprSizeReg :: FAST_STRING -> Size -> Reg -> SDoc
+pprSizeReg name size reg1
+  = hcat [
+    	char '\t',
+	ptext name,
+    	pprSize size,
+	space,
+	pprReg size reg1
     ]
 
 pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> SDoc

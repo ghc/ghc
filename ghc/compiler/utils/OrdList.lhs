@@ -4,54 +4,58 @@
 
 This is useful, general stuff for the Native Code Generator.
 
+Provide trees (of instructions), so that lists of instructions
+can be appended in linear time.
+
 \begin{code}
 module OrdList (
-	OrdList,
+	OrdList, 
+        nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL,
+        fromOL, toOL
+) where
 
-    	mkParList, mkSeqList, mkEmptyList, mkUnitList,
+infixl 5  `appOL`
+infixl 5  `snocOL`
+infixr 5  `consOL`
 
-    	flattenOrdList
-    ) where
-\end{code}
-
-This section provides an ordering list that allows fine grain
-parallelism to be expressed.  This is used (ultimately) for scheduling
-of assembly language instructions.
-
-\begin{code}
 data OrdList a
-  = SeqList (OrdList a) (OrdList a)
-  | ParList (OrdList a) (OrdList a)
-  | OrdObj a
-  | NoObj
-  deriving ()
+  = Many (OrdList a) (OrdList a)
+  | One  a
+  | None
 
-mkSeqList a b = SeqList a b
-mkParList a b = ParList a b
-mkEmptyList   = NoObj
-mkUnitList    = OrdObj
-\end{code}
+nilOL    :: OrdList a
+isNilOL  :: OrdList a -> Bool
 
-%------------------------------------------------------------------------
+unitOL   :: a           -> OrdList a
+snocOL   :: OrdList a   -> a         -> OrdList a
+consOL   :: a           -> OrdList a -> OrdList a
+appOL    :: OrdList a   -> OrdList a -> OrdList a
+concatOL :: [OrdList a] -> OrdList a
 
-Notice this this throws away all potential expression of parallelism.
+nilOL        = None
+unitOL as    = One as
+snocOL as b  = Many as (One b)
+consOL a  bs = Many (One a) bs
+concatOL aas = foldr Many None aas
 
-\begin{code}
-flattenOrdList :: OrdList a -> [a]
+isNilOL None         = True
+isNilOL (One _)      = False
+isNilOL (Many as bs) = isNilOL as && isNilOL bs
 
-flattenOrdList ol
-  = flat ol []
-  where
-    flat NoObj         rest = rest
-    flat (OrdObj x)    rest = x:rest
-    flat (ParList a b) rest = flat a (flat b rest)
-    flat (SeqList a b) rest = flat a (flat b rest)
+appOL None bs   = bs
+appOL as   None = as
+appOL as   bs   = Many as bs
 
-{- DEBUGGING ONLY:
-instance Text (OrdList a) where
-    showsPrec _ NoObj	= showString "_N_"
-    showsPrec _ (OrdObj _) = showString "_O_"
-    showsPrec _ (ParList a b) = showString "(PAR " . shows a . showChar ')'
-    showsPrec _ (SeqList a b) = showString "(SEQ " . shows a . showChar ')'
--}
+fromOL :: OrdList a -> [a]
+fromOL ol 
+   = flat ol []
+     where
+        flat None       rest = rest
+        flat (One x)    rest = x:rest
+        flat (Many a b) rest = flat a (flat b rest)
+
+toOL :: [a] -> OrdList a
+toOL []     = None
+toOL (x:xs) = Many (One x) (toOL xs)
+
 \end{code}

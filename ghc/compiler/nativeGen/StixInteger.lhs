@@ -20,7 +20,6 @@ import MachRegs
 import AbsCSyn		hiding (spRel) -- bits and bobs..
 import Const		( Literal(..) )
 import CallConv		( cCallConv )
-import OrdList		( OrdList )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import SMRep		( arrWordsHdrSize )

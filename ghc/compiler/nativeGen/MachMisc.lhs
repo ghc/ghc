@@ -301,6 +301,7 @@ data Size
     | L
     | F	    -- IEEE single-precision floating pt
     | DF    -- IEEE single-precision floating pt
+    | F80   -- Intel 80-bit internal FP format; only used for spilling
 #endif
 #if sparc_TARGET_ARCH
     = B     -- byte (signed)
@@ -351,6 +352,8 @@ data Instr
 	    String		-- the literal string
   | DATA    Size
 	    [Imm]
+  | DELTA   Int                 -- specify current stack offset for
+                                -- benefit of subsequent passes
 \end{code}
 
 \begin{code}
@@ -470,6 +473,10 @@ contents, would not impose a fixed mapping from %fake to %st regs, and
 hopefully could avoid most of the redundant reg-reg moves of the
 current translation.
 
+We might as well make use of whatever unique FP facilities Intel have
+chosen to bless us with (let's not be churlish, after all).
+Hence GLDZ and GLD1.  Bwahahahahahahaha!
+
 \begin{code}
 #if i386_TARGET_ARCH
 
@@ -509,10 +516,10 @@ current translation.
               | BT            Size Imm Operand
 	      | NOP
 
--- Float Arithmetic. -- ToDo for 386
+-- Float Arithmetic.
 
--- Note that we cheat by treating G{ABS,MOV,NEG} of doubles as single instructions
--- right up until we spit them out.
+-- Note that we cheat by treating G{ABS,MOV,NEG} of doubles 
+-- as single instructions right up until we spit them out.
 
               -- all the 3-operand fake fp insns are src1 src2 dst
               -- and furthermore are constrained to be fp regs only.
@@ -520,6 +527,9 @@ current translation.
     	      | GMOV	      Reg Reg -- src(fpreg), dst(fpreg)
               | GLD           Size MachRegsAddr Reg -- src, dst(fpreg)
               | GST           Size Reg MachRegsAddr -- src(fpreg), dst
+
+              | GLDZ          Reg -- dst(fpreg)
+              | GLD1          Reg -- dst(fpreg)
 
     	      | GFTOD	      Reg Reg -- src(fpreg), dst(fpreg)
               | GFTOI         Reg Reg -- src(fpreg), dst(intreg)
@@ -595,6 +605,7 @@ is_G_instr :: Instr -> Bool
 is_G_instr instr
    = case instr of
         GMOV _ _ -> True; GLD _ _ _ -> True; GST _ _ _ -> True;
+        GLDZ _ -> True; GLD1 _ -> True;
         GFTOD _ _ -> True; GFTOI _ _ -> True;
         GDTOF _ _ -> True; GDTOI _ _ -> True;
         GITOF _ _ -> True; GITOD _ _ -> True;

@@ -8,20 +8,20 @@ module AsmRegAlloc ( runRegAllocate, runHairyRegAllocate ) where
 
 #include "HsVersions.h"
 
-import MachCode		( InstrList )
-import MachMisc		( Instr )
+import MachCode		( InstrBlock )
+import MachMisc		( Instr(..) )
 import PprMach		( pprUserReg ) -- debugging
 import MachRegs
 import RegAllocInfo
 
-import FiniteMap	( emptyFM, addListToFM, delListFromFM, lookupFM, keysFM )
+import FiniteMap	( emptyFM, addListToFM, delListFromFM, 
+                         lookupFM, keysFM )
 import Maybes		( maybeToBool )
-import OrdList		( mkEmptyList, mkUnitList, mkSeqList, mkParList,
-			  flattenOrdList, OrdList
-			)
 import Unique		( mkBuiltinUnique )
 import Util		( mapAccumB )
+import OrdList		( unitOL, appOL, fromOL, concatOL )
 import Outputable
+import List		( mapAccumL )
 \end{code}
 
 This is the generic register allocator.
@@ -33,7 +33,7 @@ things the hard way.
 runRegAllocate
     :: MRegsState
     -> ([Instr] -> [[RegNo]])
-    -> InstrList
+    -> InstrBlock
     -> [Instr]
 
 runRegAllocate regs find_reserve_regs instrs
@@ -49,21 +49,21 @@ runRegAllocate regs find_reserve_regs instrs
             Nothing      -> tryHairy resvs
 
     reserves         = find_reserve_regs flatInstrs
-    flatInstrs       = flattenOrdList instrs
-    simpleAlloc      = simpleRegAlloc regs [] emptyFM   flatInstrs
+    flatInstrs       = fromOL instrs
+    simpleAlloc      = simpleRegAlloc regs [] emptyFM flatInstrs
     hairyAlloc resvd = hairyRegAlloc  regs resvd flatInstrs
 
 
 runHairyRegAllocate
     :: MRegsState
     -> [RegNo]
-    -> InstrList
+    -> InstrBlock
     -> Maybe [Instr]
 
 runHairyRegAllocate regs reserve_regs instrs
   = hairyRegAlloc regs reserve_regs flatInstrs
   where
-    flatInstrs	= flattenOrdList instrs
+    flatInstrs	= fromOL instrs
 \end{code}
 
 Here is the simple register allocator.	Just dole out registers until
@@ -157,8 +157,7 @@ hairyRegAlloc regs reserve_regs instrs =
         | null reserve_regs -> Nothing
         -- failed, but we have reserves, so attempt to do spilling
         | otherwise  
-        -> let instrs_patched' = patchMem instrs'
-               instrs_patched  = flattenOrdList instrs_patched'
+        -> let instrs_patched = patchMem instrs'
            in
                case mapAccumB (doRegAlloc []) (RH regs'' mloc1 emptyFM) 
                     noFuture instrs_patched of
@@ -185,30 +184,47 @@ hairyRegAlloc regs reserve_regs instrs =
             toMappedReg (I# i) = MappedReg i
 \end{code}
 
-Here we patch instructions that reference ``registers'' which are really in
-memory somewhere (the mapping is under the control of the machine-specific
-code generator).  We place the appropriate load sequences before any instructions
-that use memory registers as sources, and we place the appropriate spill sequences
-after any instructions that use memory registers as destinations.  The offending
-instructions are rewritten with new dynamic registers, so we have to run register
-allocation again after all of this is said and done.
+Here we patch instructions that reference ``registers'' which are
+really in memory somewhere (the mapping is under the control of the
+machine-specific code generator).  We place the appropriate load
+sequences before any instructions that use memory registers as
+sources, and we place the appropriate spill sequences after any
+instructions that use memory registers as destinations.  The offending
+instructions are rewritten with new dynamic registers, so we have to
+run register allocation again after all of this is said and done.
+
+On some architectures (x86, currently), we do without a frame-pointer,
+and instead spill relative to the stack pointer (%esp on x86).
+Because the stack pointer may move, the patcher needs to keep track of
+the current stack pointer "delta".  That's easy, because all it needs
+to do is spot the DELTA bogus-insns which will have been inserted by
+the relevant insn selector precisely so as to notify the spiller of
+stack-pointer movement.  The delta is passed to loadReg and spillReg,
+since they generate the actual spill code.  We expect the final delta
+to be the same as the starting one (zero), reflecting the fact that
+changes to the stack pointer should not extend beyond a basic block.
 
 \begin{code}
-patchMem :: [Instr] -> InstrList
+patchMem :: [Instr] -> [Instr]
+patchMem cs
+   = let (final_stack_delta, css) = mapAccumL patchMem' 0 cs
+     in
+         if   final_stack_delta == 0
+         then concat css
+         else pprPanic "patchMem: non-zero final delta" 
+                       (int final_stack_delta)
 
-patchMem cs = foldr (mkSeqList . patchMem') mkEmptyList cs
+patchMem' :: Int -> Instr -> (Int, [Instr])
+patchMem' delta instr
 
-patchMem' :: Instr -> InstrList
+ | null memSrcs && null memDsts 
+ = (delta', [instr])
 
-patchMem' instr
- | null memSrcs && null memDsts = mkUnitList instr
- | otherwise =
-    mkSeqList
-      (foldr mkParList mkEmptyList loadSrcs)
-      (mkSeqList instr'
-	         (foldr mkParList mkEmptyList spillDsts))
+ | otherwise
+ = (delta', loadSrcs ++ [instr'] ++ spillDsts)
+   where
+        delta' = case instr of DELTA d -> d ; _ -> delta
 
-    where
 	(RU srcs dsts) = regUsage instr
 
 	memToDyn (MemoryReg i pk) = UnmappedReg (mkBuiltinUnique i) pk
@@ -217,13 +233,13 @@ patchMem' instr
 	memSrcs = [ r | r@(MemoryReg _ _) <- regSetToList srcs]
 	memDsts = [ r | r@(MemoryReg _ _) <- regSetToList dsts]
 
-	loadSrcs = map load memSrcs
+	loadSrcs  = map load memSrcs
 	spillDsts = map spill memDsts
 
-	load mem = loadReg mem (memToDyn mem)
-	spill mem = spillReg (memToDyn mem) mem
+	load mem  = loadReg  delta  mem (memToDyn mem)
+	spill mem = spillReg delta' (memToDyn mem) mem
 
-	instr' = mkUnitList (patchRegs instr memToDyn)
+	instr'    = patchRegs instr memToDyn
 \end{code}
 
 \begin{code}

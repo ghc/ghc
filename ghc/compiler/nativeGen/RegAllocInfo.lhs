@@ -54,14 +54,14 @@ module RegAllocInfo (
 #include "HsVersions.h"
 
 import List		( partition )
+import OrdList		( unitOL )
 import MachMisc
 import MachRegs
-import MachCode		( InstrList )
+import MachCode		( InstrBlock )
 
 import BitSet		( unitBS, mkBS, minusBS, unionBS, listBS, BitSet )
 import CLabel		( pprCLabel_asm, CLabel{-instance Ord-} )
 import FiniteMap	( addToFM, lookupFM, FiniteMap )
-import OrdList		( mkUnitList )
 import PrimRep		( PrimRep(..) )
 import UniqSet		-- quite a bit of it
 import Outputable
@@ -355,117 +355,121 @@ regUsage instr = case instr of
 #if i386_TARGET_ARCH
 
 regUsage instr = case instr of
-    MOV  sz src dst	-> usage2  src dst
-    MOVZxL sz src dst	-> usage2  src dst
-    MOVSxL sz src dst	-> usage2  src dst
-    LEA  sz src dst	-> usage2  src dst
-    ADD  sz src dst	-> usage2s src dst
-    SUB  sz src dst	-> usage2s src dst
-    IMUL sz src dst	-> usage2s src dst
-    IDIV sz src		-> usage (eax:edx:opToReg src) [eax,edx]
-    AND  sz src dst	-> usage2s src dst
-    OR   sz src dst	-> usage2s src dst
-    XOR  sz src dst	-> usage2s src dst
-    NOT  sz op		-> usage1 op
-    NEGI sz op		-> usage1 op
-    SHL  sz imm dst	-> usage1 dst
-    SAR  sz imm dst	-> usage1 dst
-    SHR  sz imm dst	-> usage1 dst
-    BT   sz imm src	-> usage (opToReg src) []
+    MOV    sz src dst	-> usageRW src dst
+    MOVZxL sz src dst	-> usageRW src dst
+    MOVSxL sz src dst	-> usageRW src dst
+    LEA    sz src dst	-> usageRW src dst
+    ADD    sz src dst	-> usageRM src dst
+    SUB    sz src dst	-> usageRM src dst
+    IMUL   sz src dst	-> usageRM src dst
+    IDIV   sz src	-> mkRU (eax:edx:use_R src) [eax,edx]
+    AND    sz src dst	-> usageRM src dst
+    OR     sz src dst	-> usageRM src dst
+    XOR    sz src dst	-> usageRM src dst
+    NOT    sz op	-> usageM op
+    NEGI   sz op	-> usageM op
+    SHL    sz imm dst	-> usageM dst
+    SAR    sz imm dst	-> usageM dst
+    SHR    sz imm dst	-> usageM dst
+    BT     sz imm src	-> mkRU (use_R src) []
 
-    PUSH sz op		-> usage (opToReg op) []
-    POP  sz op		-> usage [] (opToReg op)
-    TEST sz src dst	-> usage (opToReg src ++ opToReg dst) []
-    CMP  sz src dst	-> usage (opToReg src ++ opToReg dst) []
-    SETCC cond op	-> usage [] (opToReg op)
-    JXX cond lbl	-> usage [] []
-    JMP op		-> usage (opToReg op) freeRegs
-    CALL imm		-> usage [] callClobberedRegs
-    CLTD		-> usage [eax] [edx]
-    NOP			-> usage [] []
+    PUSH   sz op	-> mkRU (use_R op) []
+    POP    sz op	-> mkRU [] (def_W op)
+    TEST   sz src dst	-> mkRU (use_R src ++ use_R dst) []
+    CMP    sz src dst	-> mkRU (use_R src ++ use_R dst) []
+    SETCC  cond op	-> mkRU [] (def_W op)
+    JXX    cond lbl	-> mkRU [] []
+    JMP    op		-> mkRU (use_R op) freeRegs
+    CALL   imm		-> mkRU [] callClobberedRegs
+    CLTD		-> mkRU [eax] [edx]
+    NOP			-> mkRU [] []
 
-    GMOV src dst	-> usage [src] [dst]
-    GLD sz src dst	-> usage (addrToRegs src) [dst]
-    GST sz src dst	-> usage [src] (addrToRegs dst)
+    GMOV   src dst	-> mkRU [src] [dst]
+    GLD    sz src dst	-> mkRU (use_EA src) [dst]
+    GST    sz src dst	-> mkRU (src : use_EA dst) []
 
-    GFTOD src dst	-> usage [src] [dst]
-    GFTOI src dst	-> usage [src] [dst]
+    GLDZ   dst		-> mkRU [] [dst]
+    GLD1   dst		-> mkRU [] [dst]
 
-    GDTOF src dst	-> usage [src] [dst]
-    GDTOI src dst	-> usage [src] [dst]
+    GFTOD  src dst	-> mkRU [src] [dst]
+    GFTOI  src dst	-> mkRU [src] [dst]
 
-    GITOF src dst	-> usage [src] [dst]
-    GITOD src dst	-> usage [src] [dst]
+    GDTOF  src dst	-> mkRU [src] [dst]
+    GDTOI  src dst	-> mkRU [src] [dst]
 
-    GADD sz s1 s2 dst	-> usage [s1,s2] [dst]
-    GSUB sz s1 s2 dst	-> usage [s1,s2] [dst]
-    GMUL sz s1 s2 dst	-> usage [s1,s2] [dst]
-    GDIV sz s1 s2 dst	-> usage [s1,s2] [dst]
+    GITOF  src dst	-> mkRU [src] [dst]
+    GITOD  src dst	-> mkRU [src] [dst]
 
-    GCMP sz src1 src2	-> usage [src1,src2] []
-    GABS sz src dst	-> usage [src] [dst]
-    GNEG sz src dst	-> usage [src] [dst]
-    GSQRT sz src dst	-> usage [src] [dst]
-    GSIN sz src dst	-> usage [src] [dst]
-    GCOS sz src dst	-> usage [src] [dst]
-    GTAN sz src dst	-> usage [src] [dst]
+    GADD   sz s1 s2 dst	-> mkRU [s1,s2] [dst]
+    GSUB   sz s1 s2 dst	-> mkRU [s1,s2] [dst]
+    GMUL   sz s1 s2 dst	-> mkRU [s1,s2] [dst]
+    GDIV   sz s1 s2 dst	-> mkRU [s1,s2] [dst]
+
+    GCMP   sz src1 src2	-> mkRU [src1,src2] []
+    GABS   sz src dst	-> mkRU [src] [dst]
+    GNEG   sz src dst	-> mkRU [src] [dst]
+    GSQRT  sz src dst	-> mkRU [src] [dst]
+    GSIN   sz src dst	-> mkRU [src] [dst]
+    GCOS   sz src dst	-> mkRU [src] [dst]
+    GTAN   sz src dst	-> mkRU [src] [dst]
 
     COMMENT _		-> noUsage
     SEGMENT _ 		-> noUsage
-    LABEL _		-> noUsage
-    ASCII _ _		-> noUsage
-    DATA _ _		-> noUsage
+    LABEL   _		-> noUsage
+    ASCII   _ _		-> noUsage
+    DATA    _ _		-> noUsage
+    DELTA   _           -> noUsage
     _			-> pprPanic "regUsage(x86)" empty
 
  where
-    -- 2 operand form in which the second operand is purely a destination
-    usage2 :: Operand -> Operand -> RegUsage
-    usage2 op (OpReg reg) = usage (opToReg op) [reg]
-    usage2 op (OpAddr ea) = usage (opToReg op ++ addrToRegs ea) []
-    usage2 op (OpImm imm) = usage (opToReg op) []
+    -- 2 operand form; first operand Read; second Written
+    usageRW :: Operand -> Operand -> RegUsage
+    usageRW op (OpReg reg) = mkRU (use_R op) [reg]
+    usageRW op (OpAddr ea) = mkRU (use_R op ++ use_EA ea) []
 
-    -- 2 operand form in which the second operand is also an input
-    usage2s :: Operand -> Operand -> RegUsage
-    usage2s op (OpReg reg) = usage (opToReg op ++ [reg]) [reg]
-    usage2s op (OpAddr ea) = usage (opToReg op ++ addrToRegs ea) []
-    usage2s op (OpImm imm) = usage (opToReg op) []
+    -- 2 operand form; first operand Read; second Modified
+    usageRM :: Operand -> Operand -> RegUsage
+    usageRM op (OpReg reg) = mkRU (use_R op ++ [reg]) [reg]
+    usageRM op (OpAddr ea) = mkRU (use_R op ++ use_EA ea) []
 
-    -- 1 operand form in which the operand is both used and written
-    usage1 :: Operand -> RegUsage
-    usage1 (OpReg reg)    = usage [reg] [reg]
-    usage1 (OpAddr ea)    = usage (addrToRegs ea) []
-
-    allFPRegs = [fake0,fake1,fake2,fake3,fake4,fake5]
+    -- 1 operand form; operand Modified
+    usageM :: Operand -> RegUsage
+    usageM (OpReg reg)    = mkRU [reg] [reg]
+    usageM (OpAddr ea)    = mkRU (use_EA ea) []
 
     --callClobberedRegs = [ eax, ecx, edx ] -- according to gcc, anyway.
     callClobberedRegs = [eax,fake0,fake1,fake2,fake3,fake4,fake5]
 
--- General purpose register collecting functions.
+    -- Registers defd when an operand is written.
+    def_W (OpReg reg)  = [reg]
+    def_W (OpAddr ea)  = []
 
-    opToReg (OpReg reg)   = [reg]
-    opToReg (OpImm imm)   = []
-    opToReg (OpAddr  ea)  = addrToRegs ea
+    -- Registers used when an operand is read.
+    use_R (OpReg reg)  = [reg]
+    use_R (OpImm imm)  = []
+    use_R (OpAddr ea)  = use_EA ea
 
-    addrToRegs (AddrBaseIndex base index _) = baseToReg base ++ indexToReg index
-      where  baseToReg Nothing       = []
-	     baseToReg (Just r)      = [r]
-	     indexToReg Nothing      = []
-	     indexToReg (Just (r,_)) = [r]
-    addrToRegs (ImmAddr _ _) = []
+    -- Registers used to compute an effective address.
+    use_EA (ImmAddr _ _)                           = []
+    use_EA (AddrBaseIndex Nothing  Nothing      _) = []
+    use_EA (AddrBaseIndex (Just b) Nothing      _) = [b]
+    use_EA (AddrBaseIndex Nothing  (Just (i,_)) _) = [i]
+    use_EA (AddrBaseIndex (Just b) (Just (i,_)) _) = [b,i]
 
-    usage src dst = RU (mkRegSet (filter interesting src))
-    	    	       (mkRegSet (filter interesting dst))
+    mkRU src dst = RU (mkRegSet (filter interesting src))
+  	    	      (mkRegSet (filter interesting dst))
 
     interesting (FixedReg _) = False
-    interesting _ = True
+    interesting _            = True
 
 
 -- Allow the spiller to decide whether or not it can use 
--- %eax and %edx as spill temporaries.
-hasFixedEAXorEDX instr = case instr of
-    IDIV _ _ -> True
-    CLTD     -> True
-    other    -> False
+-- %edx as spill temporaries.
+hasFixedEDX instr
+   = case instr of
+        IDIV _ _ -> True
+        CLTD     -> True
+        other    -> False
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -570,25 +574,31 @@ findReservedRegs instrs
     error "findReservedRegs: sparc"
 #endif
 #if i386_TARGET_ARCH
-    -- Sigh.  This is where it gets complicated.
-  = -- first of all, try without any at all.
-    map (map mappedRegNo) (
-    [ [],
-    -- if that doesn't work, try one integer reg (which might fail)
-    -- and two float regs (which will always fix any float insns)
-      [ecx, fake4,fake5]
-    ]
-    -- dire straits (but still correct): see if we can bag %eax and %edx
-    ++ if   any hasFixedEAXorEDX instrs
-       then []  -- bummer
-       else --[ [ecx,edx,fake4,fake5],
-            --  [ecx,edx,eax,fake4,fake5] ]
-            -- pro tem, don't use %eax until we institute a check that
-            -- instrs doesn't do a CALL insn, since that effectively
-            -- uses %eax in a fixed way
-            [ [ecx,edx,fake4,fake5] ]
+  -- We can use %fake4 and %fake5 safely for float temps.
+  -- Int regs are more troublesome.  Only %ecx is definitely
+  -- available.  If there are no division insns, we can use %edx
+  -- too.  At a pinch, we also could bag %eax if there are no 
+  -- divisions and no ccalls, but so far we've never encountered
+  -- a situation where three integer temporaries are necessary.
+  -- 
+  -- Because registers are in short supply on x86, we give the
+  -- allocator a whole bunch of possibilities, starting with zero
+  -- temporaries and working up to all that are available.  This
+  -- is inefficient, but spills are pretty rare, so we don't care
+  -- if the register allocator has to try half a dozen or so possibilities
+  -- before getting to one that works.
+  = let f1 = fake5
+        f2 = fake4
+        intregs_avail
+           = ecx : if any hasFixedEDX instrs then [] else [edx]
+        possibilities
+           = case intregs_avail of
+                [i1] -> [ [], [i1], [f1], [i1,f1], [f1,f2], [i1,f1,f2] ]
 
-    )
+                [i1,i2] -> [ [], [i1], [f1], [i1,i2], [i1,f1], [f1,f2],
+                             [i1,i2,f1], [i1,f1,f2], [i1,i2,f1,f2] ]
+    in
+        map (map mappedRegNo) possibilities
 #endif
 \end{code}
 
@@ -764,6 +774,9 @@ patchRegs instr env = case instr of
     GLD sz src dst	-> GLD sz (lookupAddr src) (env dst)
     GST sz src dst	-> GST sz (env src) (lookupAddr dst)
 
+    GLDZ dst		-> GLDZ (env dst)
+    GLD1 dst		-> GLD1 (env dst)
+
     GFTOD src dst	-> GFTOD (env src) (env dst)
     GFTOI src dst	-> GFTOI (env src) (env dst)
 
@@ -791,6 +804,7 @@ patchRegs instr env = case instr of
     LABEL _		-> instr
     ASCII _ _		-> instr
     DATA _ _		-> instr
+    DELTA _ 		-> instr
     JXX _ _		-> instr
     CALL _		-> instr
     CLTD		-> instr
@@ -870,7 +884,7 @@ for a 64-bit arch) of slop.
 
 \begin{code}
 maxSpillSlots :: Int
-maxSpillSlots = (rESERVED_C_STACK_BYTES - 64) `div` 8
+maxSpillSlots = (rESERVED_C_STACK_BYTES - 64) `div` 12
 
 -- convert a spill slot number to a *byte* offset, with no sign:
 -- decide on a per arch basis whether you are spilling above or below
@@ -878,45 +892,42 @@ maxSpillSlots = (rESERVED_C_STACK_BYTES - 64) `div` 8
 spillSlotToOffset :: Int -> Int
 spillSlotToOffset slot
    | slot >= 0 && slot < maxSpillSlots
-   = 64 + 8 * slot
+   = 64 + 12 * slot
    | otherwise
    = pprPanic "spillSlotToOffset:" 
               (text "invalid spill location: " <> int slot)
 
-spillReg, loadReg :: Reg -> Reg -> InstrList
+spillReg, loadReg :: Int -> Reg -> Reg -> Instr
 
-spillReg dyn (MemoryReg i pk)
+spillReg delta dyn (MemoryReg i pk)
   = let	sz  = primRepToSize pk
         off = spillSlotToOffset i
     in
-    mkUnitList (
 	{-Alpha: spill below the stack pointer (?)-}
 	 IF_ARCH_alpha( ST sz dyn (spRel (- (off `div` 8)))
 
-	{-I386: spill above stack pointer leaving 2 words/spill-}
-	,IF_ARCH_i386 ( let off_w = off `div` 4
+	{-I386: spill above stack pointer leaving 3 words/spill-}
+	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
                         in
                         if pk == FloatRep || pk == DoubleRep
-                        then GST DF dyn (spRel off_w)
+                        then GST F80 dyn (spRel off_w)
                         else MOV sz (OpReg dyn) (OpAddr (spRel off_w))
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
 	,IF_ARCH_sparc( ST sz dyn (fpRel (- (off `div` 4)))
         ,)))
-    )
+
    
-loadReg (MemoryReg i pk) dyn
+loadReg delta (MemoryReg i pk) dyn
   = let	sz  = primRepToSize pk
         off = spillSlotToOffset i
     in
-    mkUnitList (
 	 IF_ARCH_alpha( LD  sz dyn (spRel (- (off `div` 8)))
-	,IF_ARCH_i386 ( let off_w = off `div` 4
+	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
                         in
                         if   pk == FloatRep || pk == DoubleRep
-                        then GLD DF (spRel off_w) dyn
+                        then GLD F80 (spRel off_w) dyn
                         else MOV sz (OpAddr (spRel off_w)) (OpReg dyn)
 	,IF_ARCH_sparc( LD  sz (fpRel (- (off `div` 4))) dyn
 	,)))
-    )
 \end{code}

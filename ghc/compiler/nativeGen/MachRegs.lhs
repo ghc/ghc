@@ -64,11 +64,12 @@ import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
-import Stix		( sStLitLbl, StixTree(..), StixReg(..) )
+import Stix		( sStLitLbl, StixTree(..), StixReg(..),
+                          getUniqueNat, returnNat, thenNat, NatM )
 import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
 			  Uniquable(..), Unique
 			)
-import UniqSupply	( getUniqueUs, returnUs, thenUs, UniqSM )
+--import UniqSupply	( getUniqueUs, returnUs, thenUs, UniqSM )
 import Outputable
 \end{code}
 
@@ -270,10 +271,10 @@ data Reg
 mkReg :: Unique -> PrimRep -> Reg
 mkReg = UnmappedReg
 
-getNewRegNCG :: PrimRep -> UniqSM Reg
+getNewRegNCG :: PrimRep -> NatM Reg
 getNewRegNCG pk
-  = getUniqueUs	`thenUs` \ u ->
-    returnUs (UnmappedReg u pk)
+  = getUniqueNat `thenNat` \ u ->
+    returnNat (UnmappedReg u pk)
 
 instance Text Reg where
     showsPrec _ (FixedReg i)	= showString "%"  . shows IBOX(i)
