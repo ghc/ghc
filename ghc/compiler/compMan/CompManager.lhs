@@ -1093,14 +1093,7 @@ summarise mod location old_summary
    = do let hs_fn = unJust "summarise" (ml_hs_file location)
 
         case ml_hs_file location of {
-           Nothing -> do {
-		dflags <- getDynFlags;
-		when (verbosity dflags >= 1) $
-		    hPutStrLn stderr ("WARNING: module `" ++ 
-			moduleUserString mod ++ "' has no source file.");
-		return Nothing;
-	     };
-
+           Nothing -> noHsFileErr mod;
            Just src_fn -> do
 
         src_timestamp <- getModificationTime src_fn
