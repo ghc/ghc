@@ -516,9 +516,8 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 		then case rn_stmt of { (ExprStmt e _ _, decls) -> 
 		     typecheckExpr dflags pcs1 hst type_env
 			   print_unqual iNTERACTIVE (e,decls) }
-		else case rn_stmt of { (stmt, decls) -> 
-		     typecheckStmt dflags pcs1 hst type_env
-			   print_unqual iNTERACTIVE bound_names (stmt,decls) }
+		else typecheckStmt dflags pcs1 hst type_env
+			   print_unqual iNTERACTIVE bound_names rn_stmt
 
 	; case maybe_tc_return of
 		Nothing -> return (pcs0, Nothing)
