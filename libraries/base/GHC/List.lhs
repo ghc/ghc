@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: List.lhs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
+% $Id: List.lhs,v 1.4 2001/07/31 13:14:01 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -261,23 +261,17 @@ dropWhile p xs@(x:xs')
 -- is equivalent to (take n xs, drop n xs).
 #ifdef USE_REPORT_PRELUDE
 take                   :: Int -> [a] -> [a]
-take 0 _               =  []
+take n _      | n <= 0 =  []
 take _ []              =  []
-take n (x:xs) | n > 0  =  x : take (minusInt n 1) xs
-take _     _           =  errorNegativeIdx "take"
+take n (x:xs)          =  x : take (n-1) xs
 
 drop                   :: Int -> [a] -> [a]
-drop 0 xs              =  xs
+drop n xs     | n <= 0 =  xs
 drop _ []              =  []
-drop n (_:xs) | n > 0  =  drop (minusInt n 1) xs
-drop _     _           =  errorNegativeIdx "drop"
+drop n (_:xs)          =  drop (n-1) xs
 
-
-splitAt                   :: Int -> [a] -> ([a],[a])
-splitAt 0 xs              =  ([],xs)
-splitAt _ []              =  ([],[])
-splitAt n (x:xs) | n > 0  =  (x:xs',xs'') where (xs',xs'') = splitAt (minusInt n 1) xs
-splitAt _     _           =  errorNegativeIdx "splitAt"
+splitAt                  :: Int -> [a] -> ([a],[a])
+splitAt n xs             =  (take n xs, drop n xs)
 
 #else /* hack away */
 take	:: Int -> [b] -> [b]
@@ -290,7 +284,7 @@ take (I# n#) xs = takeUInt n# xs
 takeUInt :: Int# -> [b] -> [b]
 takeUInt n xs
   | n >=# 0#  =  take_unsafe_UInt n xs
-  | otherwise =  errorNegativeIdx "take"
+  | otherwise =  []
 
 take_unsafe_UInt :: Int# -> [b] -> [b]
 take_unsafe_UInt 0#  _  = []
@@ -302,7 +296,7 @@ take_unsafe_UInt m   ls =
 takeUInt_append :: Int# -> [b] -> [b] -> [b]
 takeUInt_append n xs rs
   | n >=# 0#  =  take_unsafe_UInt_append n xs rs
-  | otherwise =  errorNegativeIdx "take"
+  | otherwise =  []
 
 take_unsafe_UInt_append	:: Int# -> [b] -> [b] -> [b]
 take_unsafe_UInt_append	0#  _ rs  = rs
@@ -313,7 +307,7 @@ take_unsafe_UInt_append	m  ls rs  =
 
 drop		:: Int -> [b] -> [b]
 drop (I# n#) ls
-  | n# <# 0#	= errorNegativeIdx "drop"
+  | n# <# 0#	= []
   | otherwise	= drop# n# ls
     where
 	drop# :: Int# -> [a] -> [a]
@@ -323,7 +317,7 @@ drop (I# n#) ls
 
 splitAt	:: Int -> [b] -> ([b], [b])
 splitAt (I# n#) ls
-  | n# <# 0#	= errorNegativeIdx "splitAt"
+  | n# <# 0#	= ([], ls)
   | otherwise	= splitAt# n# ls
     where
 	splitAt# :: Int# -> [a] -> ([a], [a])
@@ -600,10 +594,6 @@ constant strings created when compiled:
 errorEmptyList :: String -> a
 errorEmptyList fun =
   error (prel_list_str ++ fun ++ ": empty list")
-
-errorNegativeIdx :: String -> a
-errorNegativeIdx fun =
- error (prel_list_str ++ fun ++ ": negative index")
 
 prel_list_str :: String
 prel_list_str = "Prelude."
