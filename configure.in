@@ -271,6 +271,15 @@ powerpc-ibm-aix*)
         HostVendor_CPP='ibm'
         HostOS_CPP='aix'
         ;;
+powerpc-apple-macosx*)
+      HostPlatform=powerpc-apple-macosx
+      TargetPlatform=powerpc-apple-macosx #hack
+      BuildPlatform=powerpc-apple-macosx #hack
+        HostPlatform_CPP='powerpc_apple_macosx'
+        HostArch_CPP='powerpc'
+        HostVendor_CPP='apple'
+        HostOS_CPP='macosx'
+        ;;
 sparc-sun-sunos4*)
 	HostPlatform=sparc-sun-sunos4
 	TargetPlatform=sparc-sun-sunos4 #hack

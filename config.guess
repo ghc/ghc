@@ -222,6 +222,9 @@ EOF
     powerpc:machten:*:*)
 	echo powerpc-apple-machten${UNAME_RELEASE}
 	exit 0 ;;
+    Power*:Darwin:*:*)
+        echo powerpc-apple-macosx${UNAME_RELEASE}
+        exit 0 ;;
     macppc:NetBSD:*:*)
         echo powerpc-apple-netbsd${UNAME_RELEASE}
         exit 0 ;;

@@ -775,6 +775,9 @@ case $os in
 	-xenix)
 		os=-xenix
 		;;
+        -macosx*)
+              os=-macosx
+              ;;
 	-none)
 		;;
 	*)
