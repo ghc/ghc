@@ -204,7 +204,6 @@ cmLoadModule cmstate1 rootname
 	-- See getValidLinkables below for details.
 	valid_linkables <- getValidLinkables ui1 mg2unsorted_names 
 				mg2_with_srcimps
-	pprTrace "valid_linkables" (ppr valid_linkables) $ do
 
         -- Figure out a stable set of modules which can be retained
         -- the top level envs, to avoid upsweeping them.  Goes to a
