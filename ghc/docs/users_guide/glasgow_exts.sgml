@@ -2900,12 +2900,18 @@ in lambda abstractions:
  Pattern type signatures, including the result part, can be used
 in <literal>case</literal> expressions:
 
-
 <programlisting>
-  case e of { (x::a, y) :: a -> x }
+  case e of { ((x::a, y) :: (a,b)) -> x }
 </programlisting>
 
+Note that the <literal>-&gt;</literal> symbol in a case alternative
+leads to difficulties when parsing a type signature in the pattern: in
+the absence of the extra parentheses in the example above, the parser
+would try to interpret the <literal>-&gt;</literal> as a function
+arrow and give a parse error later.
+
 </para>
+
 </listitem>
 
 <listitem>
