@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.23 2001/05/18 09:14:20 simonmar Exp $
+# 	$Id: opts.mk,v 1.24 2001/05/18 09:16:59 simonmar Exp $
 #
 #################################################################################
 
@@ -18,7 +18,7 @@
 #		AR AS CPP CTAGS C FLEX HC HSTAGS LD LINT 
 #		LIT2CHANGELOG LIT2HTML LIT2LATEX LIT2PGM
 #		MKDEPENDC MKDEPENDHS MKDEPENDLIT MSUB
-#		RUNTEST UGEN UNLIT YACC          
+#		RUNTEST UNLIT YACC          
 
 
 # For each such utility program P, this file defines
@@ -119,7 +119,6 @@ SGML2PS_OPTS       = $(SRC_SGML2PS_OPTS) $(WAY$(_way)_SGML2PS_OPTS) $(EXTRA_SGML
 SGML2PDF_OPTS      = $(SRC_SGML2PDF_OPTS) $(WAY$(_way)_SGML2PDF_OPTS) $(EXTRA_SGML2PDF_OPTS)
 SGML2RTF_OPTS      = $(SRC_SGML2RTF_OPTS) $(WAY$(_way)_SGML2RTF_OPTS) $(EXTRA_SGML2RTF_OPTS)
 SGML2HTML_OPTS     = $(SRC_SGML2HTML_OPTS) $(WAY$(_way)_SGML2HTML_OPTS) $(EXTRA_SGML2HTML_OPTS)
-UGEN_OPTS          = $(SRC_UGEN_OPTS) $(WAY$(_way)_UGEN_OPTS) $(EXTRA_UGEN_OPTS)
 UNLIT_OPTS         = $(SRC_UNLIT_OPTS) $(WAY$(_way)_UNLIT_OPTS) $(EXTRA_UNLIT_OPTS)
 YACC_OPTS          = $(SRC_YACC_OPTS) $(WAY$(_way)_YACC_OPTS) $(EXTRA_YACC_OPTS)
 ZIP_OPTS           = $(SRC_ZIP_OPTS) $(EXTRA_ZIP_OPTS)
