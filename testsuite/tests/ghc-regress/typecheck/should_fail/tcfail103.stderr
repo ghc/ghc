@@ -1,0 +1,11 @@
+
+tcfail103.hs:14:
+    Inferred type is less polymorphic than expected
+    Quantified type variable `t' escapes
+    It unifies with `s', which is mentioned in the environment:
+    Type variable `s'
+      is bound by pattern type signature at tcfail103.hs:15
+    Signature type:     forall t. ST t Int
+    Type to generalise: ST s Int
+    When checking the type signature for `f'
+    When generalising the type(s) for f
