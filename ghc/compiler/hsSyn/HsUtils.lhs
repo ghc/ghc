@@ -54,8 +54,12 @@ mkHsPar e = L (getLoc e) (HsPar e)
 
 mkSimpleMatch :: [LPat id] -> LHsExpr id -> Type -> LMatch id
 mkSimpleMatch pats rhs rhs_ty
-  = addCLoc (head pats) rhs $
+  = L loc $
     Match pats Nothing (GRHSs (unguardedRHS rhs) [] rhs_ty)
+  where
+    loc = case pats of
+		[]      -> getLoc rhs
+		(pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
 unguardedRHS :: LHsExpr id -> [LGRHS id]
 unguardedRHS rhs@(L loc _) = [L loc (GRHS [L loc (ResultStmt rhs)])]
