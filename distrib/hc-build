@@ -37,6 +37,8 @@ touch ghc/compiler/main/ParsePkgConf.hs
 
 echo "*** Building hsc..."
 ./configure --enable-hc-boot $configopts
+$MAKE -C glafp-utils boot all
+$MAKE -C ghc/utils boot all
 $MAKE -C ghc boot
 $MAKE -C hslibs boot all
 $MAKE -C ghc all
