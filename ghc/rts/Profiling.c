@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.30 2001/12/12 15:13:20 simonmar Exp $
+ * $Id: Profiling.c,v 1.31 2002/07/04 07:09:47 mthomas Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -767,12 +767,12 @@ reportCCS(CostCentreStack *ccs, nat indent)
     fprintf(prof_file, "%-*s%-*s %-10s", 
 	    indent, "", 24-indent, cc->label, cc->module);
 
-    fprintf(prof_file, "%6d %8lld  %5.1f %5.1f    %5.1f %5.1f",
-	    ccs->ccsID, ccs->scc_count, 
-	    total_prof_ticks == 0 ? 0.0 : (ccs->time_ticks / (StgFloat) total_prof_ticks * 100),
-	    total_alloc == 0 ? 0.0 : (ccs->mem_alloc / (StgFloat) total_alloc * 100),
-	    total_prof_ticks == 0 ? 0.0 : (ccs->inherited_ticks / (StgFloat) total_prof_ticks * 100),
-	    total_alloc == 0 ? 0.0 : (ccs->inherited_alloc / (StgFloat) total_alloc * 100)
+    fprintf(prof_file, "%6d %9.1f %5.1f  %5.1f   %5.1f  %5.1f",
+	    ccs->ccsID, (float) ccs->scc_count, 
+	    total_prof_ticks == 0 ? 0.0 : ((float)ccs->time_ticks / (float)total_prof_ticks * 100.0),
+	    total_alloc == 0 ? 0.0 : ((float)ccs->mem_alloc / (float)total_alloc * 100.0),
+	    total_prof_ticks == 0 ? 0.0 : ((float)ccs->inherited_ticks / (float)total_prof_ticks * 100.0),
+	    total_alloc == 0 ? 0.0 : ((float)ccs->inherited_alloc / (float)total_alloc * 100.0)
 	    );
 
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
