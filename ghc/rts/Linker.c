@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.2 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: Linker.c,v 1.3 2000/12/12 12:19:57 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -172,12 +172,7 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(gcdIntegerzh_fast)			\
       SymX(newArrayzh_fast)			\
       SymX(unsafeThawArrayzh_fast)		\
-      SymX(newDoubleArrayzh_fast)		\
-      SymX(newFloatArrayzh_fast)		\
-      SymX(newAddrArrayzh_fast)			\
-      SymX(newWordArrayzh_fast)			\
-      SymX(newIntArrayzh_fast)			\
-      SymX(newCharArrayzh_fast)			\
+      SymX(newByteArrayzh_fast)			\
       SymX(newMutVarzh_fast)			\
       SymX(quotRemIntegerzh_fast)		\
       SymX(quotIntegerzh_fast)			\

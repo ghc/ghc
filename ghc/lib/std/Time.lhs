@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Time.lhs,v 1.23 2000/08/29 16:38:04 simonpj Exp $
+% $Id: Time.lhs,v 1.24 2000/12/12 12:19:58 simonmar Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -98,7 +98,7 @@ module Time
 import PreludeBuiltin
 #else
 import PrelGHC		( RealWorld, (>#), (<#), (==#),
-			  newIntArray#, readIntArray#, 
+			  newByteArray#, readIntArray#, 
 			  unsafeFreezeByteArray#,
 			  int2Integer#, negateInt# )
 import PrelBase		( Int(..) )
@@ -108,7 +108,7 @@ import PrelShow		( showList__ )
 import PrelPack 	( unpackCString, unpackCStringBA,
 			  new_ps_array, freeze_ps_array
 			)
-import PrelByteArr	( MutableByteArray(..) )
+import PrelByteArr	( MutableByteArray(..), wORD_SCALE )
 import PrelHandle	( Bytes )
 import PrelAddr		( Addr )
 
@@ -280,7 +280,7 @@ cvtUnsigned arr = primReadInt64Array arr 0
 #else
 malloc1 :: IO (MutableByteArray RealWorld Int)
 malloc1 = IO $ \ s# ->
-  case newIntArray# 1# s# of 
+  case newByteArray# 1# s# of 
    (# s2#, barr# #) -> (# s2#, MutableByteArray bot bot barr# #)
   where 
 	bot = error "Time.malloc1"
@@ -550,7 +550,7 @@ allocChars (I# size#) = stToIO (new_ps_array size#)
 
 allocWords :: Int -> IO (MutableByteArray RealWorld Int)
 allocWords (I# size#) = IO $ \ s# ->
-    case newIntArray# size# s# of 
+    case newByteArray# (wORD_SCALE size#) s# of 
       (# s2#, barr# #) -> 
 	(# s2#, MutableByteArray bot bot barr# #)
   where

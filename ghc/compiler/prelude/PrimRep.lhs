@@ -171,10 +171,6 @@ getPrimRepSize :: PrimRep -> Int
 getPrimRepSize DoubleRep  = dOUBLE_SIZE	-- "words", of course
 getPrimRepSize Word64Rep  = wORD64_SIZE
 getPrimRepSize Int64Rep   = iNT64_SIZE
---getPrimRepSize FloatRep = 1
---getPrimRepSize CharRep  = 1	-- ToDo: count in bytes?
---getPrimRepSize ArrayRep = 1	-- Listed specifically for *documentation*
---getPrimRepSize ByteArrayRep = 1
 getPrimRepSize VoidRep	  = 0
 getPrimRepSize other	  = 1
 

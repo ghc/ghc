@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.62 2000/12/11 12:59:25 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.63 2000/12/12 12:19:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -244,15 +244,14 @@ W_ GHC_ZCCReturnable_static_info[0];
 
 #define BYTES_TO_STGWORDS(n) ((n) + sizeof(W_) - 1)/sizeof(W_)
 
-#define newByteArray(ty,scale)				\
- FN_(new##ty##Arrayzh_fast)				\
+FN_(newByteArrayzh_fast)				\
  {							\
-   W_ stuff_size, size, n;				\
+   W_ size, stuff_size, n;				\
    StgArrWords* p;					\
    FB_							\
-     MAYBE_GC(NO_PTRS,new##ty##Arrayzh_fast);		\
+     MAYBE_GC(NO_PTRS,newByteArrayzh_fast);		\
      n = R1.w;						\
-     stuff_size = BYTES_TO_STGWORDS(n*scale);		\
+     stuff_size = BYTES_TO_STGWORDS(n);			\
      size = sizeofW(StgArrWords)+ stuff_size;		\
      p = (StgArrWords *)RET_STGCALL1(P_,allocate,size);	\
      TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0); \
@@ -262,15 +261,6 @@ W_ GHC_ZCCReturnable_static_info[0];
      RET_P(p);						\
    FE_							\
  }
-
-newByteArray(Char,   1)
-/* Char arrays really contain only 8-bit bytes for compatibility. */
-newByteArray(Int,    sizeof(I_))
-newByteArray(Word,   sizeof(W_))
-newByteArray(Addr,   sizeof(P_))
-newByteArray(Float,  sizeof(StgFloat))
-newByteArray(Double, sizeof(StgDouble))
-newByteArray(StablePtr, sizeof(StgStablePtr))
 
 FN_(newArrayzh_fast)
 {

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelArrExtra.lhs,v 1.11 2000/08/29 16:36:23 simonpj Exp $
+% $Id: PrelArrExtra.lhs,v 1.12 2000/12/12 12:19:58 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -38,7 +38,7 @@ freezeByteArray   :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 -- only modifies its destination operand, which is already MutableByteArray.
 freezeByteArray (MutableByteArray l u arr) = ST $ \ s ->
 	let n = sizeofMutableByteArray# arr in
-	case (newCharArray# n s)                   of { (# s, newarr #) -> 
+	case (newByteArray# n s)                   of { (# s, newarr #) -> 
 	case ((unsafeCoerce# memcpy) newarr arr n s) of { (# s, () #) ->
 	case unsafeFreezeByteArray# newarr s       of { (# s, frozen #) ->
 	(# s, ByteArray l u frozen #) }}}

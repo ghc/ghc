@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.69 2000/12/11 12:56:14 simonmar Exp $
+ * $Id: PrimOps.h,v 1.70 2000/12/12 12:19:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -291,6 +291,12 @@ typedef union {
 #define readFloatOffAddrzh(r,a,i)  	r= PK_FLT((P_) (((StgFloat *)(a)) + i))
 #define readDoubleOffAddrzh(r,a,i) 	r= PK_DBL((P_) (((StgDouble *)(a)) + i))
 #define readStablePtrOffAddrzh(r,a,i)   r= ((StgStablePtr *)(a))[i]
+#define readInt8OffAddrzh(r,a,i)    	r= ((StgInt8 *)(a))[i]
+#define readInt16OffAddrzh(r,a,i)    	r= ((StgInt16 *)(a))[i]
+#define readInt32OffAddrzh(r,a,i)    	r= ((StgInt32 *)(a))[i]
+#define readWord8OffAddrzh(r,a,i)    	r= ((StgWord8 *)(a))[i]
+#define readWord16OffAddrzh(r,a,i)    	r= ((StgWord16 *)(a))[i]
+#define readWord32OffAddrzh(r,a,i)    	r= ((StgWord32 *)(a))[i]
 #ifdef SUPPORT_LONG_LONGS
 #define readInt64OffAddrzh(r,a,i)  	r= ((LI_ *)(a))[i]
 #define readWord64OffAddrzh(r,a,i) 	r= ((LW_ *)(a))[i]
@@ -305,6 +311,12 @@ typedef union {
 #define writeFloatOffAddrzh(a,i,v)      ASSIGN_FLT((P_) (((StgFloat *)(a)) + i),v)
 #define writeDoubleOffAddrzh(a,i,v)     ASSIGN_DBL((P_) (((StgDouble *)(a)) + i),v)
 #define writeStablePtrOffAddrzh(a,i,v)  ((StgStablePtr *)(a))[i] = (v)
+#define writeInt8OffAddrzh(a,i,v)       ((StgInt8 *)(a))[i] = (v)
+#define writeInt16OffAddrzh(a,i,v)      ((StgInt16 *)(a))[i] = (v)
+#define writeInt32OffAddrzh(a,i,v)      ((StgInt32 *)(a))[i] = (v)
+#define writeWord8OffAddrzh(a,i,v)      ((StgWord8 *)(a))[i] = (v)
+#define writeWord16OffAddrzh(a,i,v)     ((StgWord16 *)(a))[i] = (v)
+#define writeWord32OffAddrzh(a,i,v)     ((StgWord32 *)(a))[i] = (v)
 #ifdef SUPPORT_LONG_LONGS
 #define writeInt64OffAddrzh(a,i,v)   ((LI_ *)(a))[i] = (v)
 #define writeWord64OffAddrzh(a,i,v)  ((LW_ *)(a))[i] = (v)
@@ -318,6 +330,12 @@ typedef union {
 #define indexFloatOffAddrzh(r,a,i)  	r= PK_FLT((P_) (((StgFloat *)(a)) + i))
 #define indexDoubleOffAddrzh(r,a,i) 	r= PK_DBL((P_) (((StgDouble *)(a)) + i))
 #define indexStablePtrOffAddrzh(r,a,i)  r= ((StgStablePtr *)(a))[i]
+#define indexInt8OffAddrzh(r,a,i)    	r= ((StgInt8 *)(a))[i]
+#define indexInt16OffAddrzh(r,a,i)    	r= ((StgInt16 *)(a))[i]
+#define indexInt32OffAddrzh(r,a,i)    	r= ((StgInt32 *)(a))[i]
+#define indexWord8OffAddrzh(r,a,i)    	r= ((StgWord8 *)(a))[i]
+#define indexWord16OffAddrzh(r,a,i)    	r= ((StgWord16 *)(a))[i]
+#define indexWord32OffAddrzh(r,a,i)    	r= ((StgWord32 *)(a))[i]
 #ifdef SUPPORT_LONG_LONGS
 #define indexInt64OffAddrzh(r,a,i)  	r= ((LI_ *)(a))[i]
 #define indexWord64OffAddrzh(r,a,i) 	r= ((LW_ *)(a))[i]
@@ -604,6 +622,12 @@ extern I_ resetGenSymZh(void);
 #define readFloatArrayzh(r,a,i)	 indexFloatOffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define readDoubleArrayzh(r,a,i) indexDoubleOffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define readStablePtrArrayzh(r,a,i) indexStablePtrOffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define readInt8Arrayzh(r,a,i)	 indexInt8OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define readInt16Arrayzh(r,a,i)	 indexInt16OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define readInt32Arrayzh(r,a,i)	 indexInt32OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define readWord8Arrayzh(r,a,i)  indexWord8OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define readWord16Arrayzh(r,a,i) indexWord16OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define readWord32Arrayzh(r,a,i) indexWord32OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #ifdef SUPPORT_LONG_LONGS
 #define readInt64Arrayzh(r,a,i)  indexInt64OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define readWord64Arrayzh(r,a,i) indexWord64OffAddrzh(r,BYTE_ARR_CTS(a),i)
@@ -622,6 +646,12 @@ extern I_ resetGenSymZh(void);
 #define writeDoubleArrayzh(a,i,v) \
 	ASSIGN_DBL((P_) (((StgDouble *)(BYTE_ARR_CTS(a))) + i),v)
 #define writeStablePtrArrayzh(a,i,v)	  ((StgStablePtr *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeInt8Arrayzh(a,i,v)   ((StgInt8 *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeInt16Arrayzh(a,i,v)  ((StgInt16 *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeInt32Arrayzh(a,i,v)  ((StgInt32 *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeWord8Arrayzh(a,i,v)  ((StgWord8 *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeWord16Arrayzh(a,i,v) ((StgWord16 *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeWord32Arrayzh(a,i,v) ((StgWord32 *)(BYTE_ARR_CTS(a)))[i] = (v)
 #ifdef SUPPORT_LONG_LONGS
 #define writeInt64Arrayzh(a,i,v)  ((LI_ *)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeWord64Arrayzh(a,i,v) ((LW_ *)(BYTE_ARR_CTS(a)))[i] = (v)
@@ -636,6 +666,12 @@ extern I_ resetGenSymZh(void);
 #define indexFloatArrayzh(r,a,i)  indexFloatOffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define indexDoubleArrayzh(r,a,i) indexDoubleOffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define indexStablePtrArrayzh(r,a,i) indexStablePtrOffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define indexInt8Arrayzh(r,a,i)   indexInt8OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define indexInt16Arrayzh(r,a,i)  indexInt16OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define indexInt32Arrayzh(r,a,i)  indexInt32OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define indexWord8Arrayzh(r,a,i)  indexWord8OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define indexWord16Arrayzh(r,a,i) indexWord16OffAddrzh(r,BYTE_ARR_CTS(a),i)
+#define indexWord32Arrayzh(r,a,i) indexWord32OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #ifdef SUPPORT_LONG_LONGS
 #define indexInt64Arrayzh(r,a,i)  indexInt64OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define indexWord64Arrayzh(r,a,i) indexWord64OffAddrzh(r,BYTE_ARR_CTS(a),i)
@@ -663,13 +699,7 @@ EXTFUN_RTS(unsafeThawArrayzh_fast);
 
 /* and the out-of-line ones... */
 
-EXTFUN_RTS(newCharArrayzh_fast);
-EXTFUN_RTS(newIntArrayzh_fast);
-EXTFUN_RTS(newWordArrayzh_fast);
-EXTFUN_RTS(newAddrArrayzh_fast);
-EXTFUN_RTS(newFloatArrayzh_fast);
-EXTFUN_RTS(newDoubleArrayzh_fast);
-EXTFUN_RTS(newStablePtrArrayzh_fast);
+EXTFUN_RTS(newByteArrayzh_fast);
 EXTFUN_RTS(newArrayzh_fast);
 
 /* encoding and decoding of floats/doubles. */
@@ -936,6 +966,12 @@ EXTFUN_RTS(mkForeignObjzh_fast);
 #define indexFloatOffForeignObjzh(r,fo,i)  indexFloatOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexDoubleOffForeignObjzh(r,fo,i) indexDoubleOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexStablePtrOffForeignObjzh(r,fo,i)  indexStablePtrOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexInt8OffForeignObjzh(r,fo,i)    indexInt8OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexInt16OffForeignObjzh(r,fo,i)    indexInt16OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexInt32OffForeignObjzh(r,fo,i)    indexInt32OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexWord8OffForeignObjzh(r,fo,i)    indexWord8OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexWord16OffForeignObjzh(r,fo,i)    indexWord16OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexWord32OffForeignObjzh(r,fo,i)    indexWord32OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #ifdef SUPPORT_LONG_LONGS
 #define indexInt64OffForeignObjzh(r,fo,i)  indexInt64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexWord64OffForeignObjzh(r,fo,i) indexWord64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)

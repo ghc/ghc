@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelPack.lhs,v 1.14 2000/07/07 11:03:58 simonmar Exp $
+% $Id: PrelPack.lhs,v 1.15 2000/12/12 12:19:58 simonmar Exp $
 %
 % (c) The University of Glasgow, 1997-2000
 %
@@ -212,7 +212,7 @@ write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s ()
 freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
 new_ps_array size = ST $ \ s ->
-    case (newCharArray# size s)	  of { (# s2#, barr# #) ->
+    case (newByteArray# size s)	  of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray bot bot barr# #) }
   where
     bot = error "new_ps_array"

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelByteArr.lhs,v 1.8 2000/07/07 11:03:58 simonmar Exp $
+% $Id: PrelByteArr.lhs,v 1.9 2000/12/12 12:19:58 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -76,34 +76,41 @@ newCharArray, newIntArray, newWordArray, newAddrArray, newFloatArray, newDoubleA
 
 newCharArray (l,u) = ST $ \ s# ->
     case rangeSize (l,u)          of { I# n# ->
-    case (newCharArray# n# s#)	  of { (# s2#, barr# #) ->
+    case (newByteArray# (cHAR_SCALE n#) s#) of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray l u barr# #) }}
 
 newIntArray (l,u) = ST $ \ s# ->
     case rangeSize (l,u)          of { I# n# ->
-    case (newIntArray# n# s#)	  of { (# s2#, barr# #) ->
+    case (newByteArray# (wORD_SCALE n#) s#) of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray l u barr# #) }}
 
 newWordArray (l,u) = ST $ \ s# ->
     case rangeSize (l,u)          of { I# n# ->
-    case (newWordArray# n# s#)	  of { (# s2#, barr# #) ->
+    case (newByteArray# (wORD_SCALE n#) s#) of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray l u barr# #) }}
 
 newAddrArray (l,u) = ST $ \ s# ->
     case rangeSize (l,u)          of { I# n# ->
-    case (newAddrArray# n# s#)	  of { (# s2#, barr# #) ->
+    case (newByteArray# (wORD_SCALE n#) s#) of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray l u barr# #) }}
 
 newFloatArray (l,u) = ST $ \ s# ->
     case rangeSize (l,u)          of { I# n# ->
-    case (newFloatArray# n# s#)	  of { (# s2#, barr# #) ->
+    case (newByteArray# (fLOAT_SCALE n#) s#) of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray l u barr# #) }}
 
 newDoubleArray (l,u) = ST $ \ s# ->
     case rangeSize (l,u)          of { I# n# ->
-    case (newDoubleArray# n# s#)  of { (# s2#, barr# #) ->
+    case (newByteArray# (dOUBLE_SCALE n#) s#) of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray l u barr# #) }}
 
+#include "config.h"
+
+  -- Char arrays really contain only 8-bit bytes for compatibility.
+cHAR_SCALE   n = 1# *# n
+wORD_SCALE   n = (case SIZEOF_VOID_P :: Int of I# x -> x *# n)
+dOUBLE_SCALE n = (case SIZEOF_DOUBLE :: Int of I# x -> x *# n)
+fLOAT_SCALE  n = (case SIZEOF_FLOAT  :: Int of I# x -> x *# n)
 
 readCharArray   :: Ix ix => MutableByteArray s ix -> ix -> ST s Char 
 readIntArray    :: Ix ix => MutableByteArray s ix -> ix -> ST s Int

@@ -196,8 +196,8 @@ pREL_FLOAT_Name   = mkModuleName "PrelFloat"
 
 pREL_MAIN_Name    = mkModuleName "PrelMain"
 mAIN_Name	  = mkModuleName "Main"
-iNT_Name	  = mkModuleName "Int"
-wORD_Name	  = mkModuleName "Word"
+pREL_INT_Name	  = mkModuleName "PrelInt"
+pREL_WORD_Name	  = mkModuleName "PrelWord"
 
 pREL_GHC     	= mkPrelModule pREL_GHC_Name
 pREL_BASE    	= mkPrelModule pREL_BASE_Name
@@ -420,16 +420,16 @@ bindIOName	  = varQual  pREL_IO_BASE_Name SLIT("bindIO") bindIOIdKey
 returnIOName	  = varQual  pREL_IO_BASE_Name SLIT("returnIO") returnIOIdKey
 
 -- Int, Word, and Addr things
-int8TyConName     = tcQual iNT_Name       SLIT("Int8") int8TyConKey
-int16TyConName    = tcQual iNT_Name       SLIT("Int16") int16TyConKey
-int32TyConName    = tcQual iNT_Name       SLIT("Int32") int32TyConKey
+int8TyConName     = tcQual pREL_INT_Name  SLIT("Int8") int8TyConKey
+int16TyConName    = tcQual pREL_INT_Name  SLIT("Int16") int16TyConKey
+int32TyConName    = tcQual pREL_INT_Name  SLIT("Int32") int32TyConKey
 int64TyConName    = tcQual pREL_ADDR_Name SLIT("Int64") int64TyConKey
 
-wordTyConName     = tcQual   pREL_ADDR_Name SLIT("Word") wordTyConKey
-wordDataConName   = dataQual pREL_ADDR_Name SLIT("W#") wordDataConKey
-word8TyConName    = tcQual   wORD_Name      SLIT("Word8") word8TyConKey
-word16TyConName   = tcQual   wORD_Name      SLIT("Word16") word16TyConKey
-word32TyConName   = tcQual   wORD_Name      SLIT("Word32") word32TyConKey
+wordTyConName     = tcQual   pREL_ADDR_Name SLIT("Word")   wordTyConKey
+wordDataConName   = dataQual pREL_ADDR_Name SLIT("W#")     wordDataConKey
+word8TyConName    = tcQual   pREL_WORD_Name SLIT("Word8")  word8TyConKey
+word16TyConName   = tcQual   pREL_WORD_Name SLIT("Word16") word16TyConKey
+word32TyConName   = tcQual   pREL_WORD_Name SLIT("Word32") word32TyConKey
 word64TyConName   = tcQual   pREL_ADDR_Name SLIT("Word64") word64TyConKey
 
 addrTyConName	  = tcQual   pREL_ADDR_Name SLIT("Addr") addrTyConKey
