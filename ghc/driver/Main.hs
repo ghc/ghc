@@ -1690,8 +1690,18 @@ run_something phase_name cmd
    unless n $ do 
 
    -- and run it!
+#ifndef mingw32_TARGET_OS
    exit_code <- system cmd `catchAllIO` 
 		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+#else
+   tmp <- newTempName "sh"
+   h <- openFile tmp WriteMode
+   hPutStrLn h cmd
+   hClose h
+   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
+		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+   removeFile tmp
+#endif
 
    if exit_code /= ExitSuccess
 	then throwDyn (PhaseFailed phase_name exit_code)
