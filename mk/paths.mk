@@ -52,6 +52,7 @@ SRC_INSTALL_OPTS += $(INSTALL_OWNER) $(INSTALL_GROUP)
 #
 
 INSTALL_PROGRAM = $(INSTALL)
+INSTALL_SCRIPT  = $(INSTALL)
 INSTALL_DATA    = $(INSTALL) -m 644
 INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 
@@ -62,63 +63,6 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #INSTALL_PROGS += $(HS_PROG) $(C_PROG)
 #INSTALL_LIBS  += $(LIBRARY)
 #INSTALL_DATAS += $(HS_IFACES)
-
-#-----------------------------------------------------------------------------
-# Man pages & Documentation
-#
-# (AFAIK, not currently used)
-#
-
-#man1dir		= $(mandir)/man1
-#manext          = '.1'
-#man1ext          = '.1'
-#man2dir		= $(mandir)/man2
-#man2ext          = '.2'
-#man3dir		= $(mandir)/man3
-#man3ext          = '.3'
-#man4dir		= $(mandir)/man4
-#man4ext          = '.4'
-#man5dir		= $(mandir)/man5
-#man5ext          = '.5'
-#man6dir		= $(mandir)/man6
-#man6ext          = '.6'
-#man7dir		= $(mandir)/man7
-#man7ext          = '.7'
-#man8dir		= $(mandir)/man8
-#man8ext          = '.8'
-
-## top of manual page tree to install in
-## NB: not necessarily the same place as to look for man pages (?)
-#INSTALL_MAN_ROOT = $(mandir)
-
-## prefix for man page _sources_ (vs .../cat)
-#INSTALL_MAN_SRCROOT  = $(INSTALL_MAN_ROOT)/man
-
-## man pages for commands
-#INSTALL_COMMAND_DIR = $(INSTALL_MAN_SRCROOT)$(COMMANSUFFIX)
-
-## man pages for library routines
-#INSTALL_LIB_MANDIR = $(INSTALL_MAN_SRCROOT)$(LIBMANSUFFIX)
-
-## man pages for system commands
-#INSTALL_SYS_MANDIR = $(INSTALL_MAN_SRCROOT)$(SYSMANSUFFIX)
-
-## suffix for installing commands'/etcs' man pages
-#COMMANSUFFIX 	= 1
-#LIBMANSUFFIX 	= 3
-#SYSMANSUFFIX 	= 8
-
-INSTALL_INFO_DIR = $(infodir)
-
-
-INSTALL_FILE_OPTS =
-INSTALL_STRIP	  =
-INSTALL_BIN_OPTS  = \
-	-m 0755 $(INSTALL_OWNER) $(INSTALL_GROUP) $(INSTALL_FILE_FLAGS) $(INSTALL_STRIP)
-
-
-
-
 
 #################################################################################
 #
