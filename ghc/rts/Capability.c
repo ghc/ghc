@@ -28,9 +28,10 @@
 Capability MainCapability;     /* for non-SMP, we have one global capability */
 #endif
 
+#if defined(RTS_SUPPORTS_THREADS)
+
 nat rts_n_free_capabilities;
 
-#if defined(RTS_SUPPORTS_THREADS)
 /* returning_worker_cond: when a worker thread returns from executing an
  * external call, it needs to wait for an RTS Capability before passing
  * on the result of the call to the Haskell thread that made it.
@@ -107,15 +108,15 @@ static void initCapabilities_(nat n);
 void
 initCapabilities( void )
 {
-#if defined(RTS_SUPPORTS_THREADS)
-  initCondition(&returning_worker_cond);
-  initCondition(&thread_ready_cond);
-#endif
-
 #if defined(SMP)
   initCapabilities_(RtsFlags.ParFlags.nNodes);
 #else
   initCapability(&MainCapability);
+#endif
+
+#if defined(RTS_SUPPORTS_THREADS)
+  initCondition(&returning_worker_cond);
+  initCondition(&thread_ready_cond);
   rts_n_free_capabilities = 1;
 #endif
 
@@ -140,8 +141,10 @@ void
 grabCapability( Capability** cap )
 {
 #if !defined(SMP)
+#if defined(RTS_SUPPORTS_THREADS)
   ASSERT(rts_n_free_capabilities == 1);
   rts_n_free_capabilities = 0;
+#endif
   *cap = &MainCapability;
   handleSignalsInThisThread();
 #else
