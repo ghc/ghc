@@ -21,6 +21,8 @@ module PackedString (
 
 	psToByteArray,       -- :: PackedString  -> ByteArray Int
 	psToByteArrayST,     -- :: PackedString  -> ST s (ByteArray Int)
+	psToCString,	     -- :: PackedString  -> Addr
+        isCString,	     -- :: PackedString  -> Bool
 
 	unpackPS,    -- :: PackedString -> [Char]
 {-LATER:
@@ -73,7 +75,7 @@ module PackedString (
     ) where
 
 import GlaExts
-import PrelBase ( showList__ ) -- ToDo: better
+import PrelBase ( showList__  ) -- ToDo: better
 import Addr
 
 import PrelArr  ( StateAndMutableByteArray#(..) , StateAndByteArray#(..) )
@@ -275,6 +277,30 @@ psToByteArray (CPS addr len#)
     in
     case byte_array_form of { PS bytes _ _ ->
     ByteArray (0, len - 1) bytes }
+
+-- isCString is useful when passing PackedStrings to the
+-- outside world, and need to figure out whether you can
+-- pass it as an Addr or ByteArray.
+--
+isCString :: PackedString -> Bool
+isCString (CPS _ _ ) = True
+isCString _	     = False
+
+psToCString :: PackedString -> Addr
+psToCString (CPS addr _) = (A# addr)
+psToCString (PS bytes n# has_null) = 
+  unsafePerformIO $ do
+    stuff <- _ccall_ malloc ((I# n#) * (``sizeof(char)''))
+    let
+     fill_in n# i#
+      | n# ==# 0# = return ()
+      | otherwise = do
+         let ch#  = indexCharArray# bytes i#
+         writeCharOffAddr stuff (I# i#) (C# ch#)
+         fill_in (n# -# 1#) (i# +# 1#)
+    fill_in n# 0#
+    return stuff    
+
 \end{code}
 
 %************************************************************************
