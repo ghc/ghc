@@ -24,6 +24,9 @@ import TcMonad
 import Unique	( Unique, pprUnique10 )
 import Pretty
 import Util	( nOfThem )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 \end{code}
 
 
@@ -179,13 +182,13 @@ instance Outputable (TcKind s) where
   ppr sty kind = ppr_kind sty kind
 
 ppr_kind sty TcTypeKind 
-  = ppChar '*'
+  = char '*'
 ppr_kind sty (TcArrowKind kind1 kind2) 
-  = ppSep [ppr_parend sty kind1, ppPStr SLIT("->"), ppr_kind sty kind2]
+  = sep [ppr_parend sty kind1, ptext SLIT("->"), ppr_kind sty kind2]
 ppr_kind sty (TcVarKind uniq box) 
-  = ppBesides [ppChar 'k', pprUnique10 uniq]
+  = hcat [char 'k', pprUnique10 uniq]
 
-ppr_parend sty kind@(TcArrowKind _ _) = ppBesides [ppChar '(', ppr_kind sty kind, ppChar ')']
+ppr_parend sty kind@(TcArrowKind _ _) = hcat [char '(', ppr_kind sty kind, char ')']
 ppr_parend sty other_kind	      = ppr_kind sty other_kind
 \end{code}
 
@@ -195,20 +198,17 @@ Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
 unifyKindCtxt kind1 kind2 sty
-  = ppHang (ppPStr SLIT("When unifying two kinds")) 4
-	   (ppSep [ppr sty kind1, ppPStr SLIT("and"), ppr sty kind2])
+  = hang (ptext SLIT("When unifying two kinds")) 4
+	   (sep [ppr sty kind1, ptext SLIT("and"), ppr sty kind2])
 
 kindOccurCheck kind1 kind2 sty
-  = ppHang (ppPStr SLIT("Cannot construct the infinite kind:")) 4
-	(ppSep [ppBesides [ppChar '`', ppr sty kind1, ppChar '\''],
-		ppChar '=',
-		ppBesides [ppChar '`', ppr sty kind1, ppChar '\''],
-		ppPStr SLIT("(\"occurs check\")")])
+  = hang (ptext SLIT("Cannot construct the infinite kind:")) 4
+	(sep [ppr sty kind1, equals, ppr sty kind1, ptext SLIT("(\"occurs check\")")])
 
 kindMisMatchErr kind1 kind2 sty
- = ppHang (ppPStr SLIT("Couldn't match the kind")) 4
-	(ppSep [ppBesides [ppChar '`', ppr sty kind1, ppChar '\''],
-		ppPStr SLIT("against"),
-		ppBesides [ppChar '`', ppr sty kind2, ppChar '\'']
-	])
+ = hang (ptext SLIT("Couldn't match the kind")) 4
+	(sep [ppr sty kind1,
+	      ptext SLIT("against"),
+	      ppr sty kind2]
+	)
 \end{code}

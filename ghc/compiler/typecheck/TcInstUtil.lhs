@@ -24,13 +24,13 @@ import TcEnv		( tcAddImportedIdInfo )
 import TcMonad
 import Inst		( SYN_IE(InstanceMapper) )
 
-import Bag		( bagToList )
+import Bag		( bagToList, Bag )
 import Class		( GenClass, GenClassOp, SYN_IE(ClassInstEnv),
 			  classBigSig, classOps, classOpLocalType,
-			  SYN_IE(ClassOp)
+			  SYN_IE(ClassOp), SYN_IE(Class)
 			)
 import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
-import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
+import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal, SYN_IE(Id) )
 import MatchEnv		( nullMEnv, insertMEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, Name{--O only-} )
@@ -39,10 +39,16 @@ import Pretty
 import SpecEnv		( SpecEnv, nullSpecEnv, addOneToSpecEnv )
 import SrcLoc		( SrcLoc )
 import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTys,
-			  splitForAllTy, instantiateTy, matchTy, SYN_IE(ThetaType) )
-import TyVar		( GenTyVar )
+			  instantiateTy, matchTy, SYN_IE(ThetaType),
+			  SYN_IE(Type) )
+import TyVar		( GenTyVar, SYN_IE(TyVar) )
 import Unique		( Unique )
-import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-} )
+import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-}, Ord3(..) )
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
+
 --import PprStyle
 
 --import TcPragmas	( tcDictFunPragmas, tcGenPragmas )
@@ -229,10 +235,10 @@ addClassInstance
 dupInstFailure clas info1@(ty1, locn1) info2@(ty2, locn2)
 	-- Overlapping/duplicate instances for given class; msg could be more glamourous
   = tcAddErrCtxt ctxt $
-    failTc (\sty -> ppPStr SLIT("Duplicate or overlapping instance declarations"))
+    failTc (\sty -> ptext SLIT("Duplicate or overlapping instance declarations"))
   where
-    ctxt sty = ppHang (ppSep [ppBesides[ppPStr SLIT("Class `"), ppr sty clas, ppChar '\''],
-			      ppBesides[ppPStr SLIT("type `"), ppr sty ty1, ppChar '\'']])
-		    4 (ppSep [ppBesides [ppPStr SLIT("at "), ppr sty locn1],
-		    	      ppBesides [ppPStr SLIT("and "), ppr sty locn2]])
+    ctxt sty = hang (sep [ptext SLIT("Class"), ppr sty clas,
+			  ptext SLIT("type"),  ppr sty ty1])
+		    4 (sep [hcat [ptext SLIT("at "), ppr sty locn1],
+		    	      hcat [ptext SLIT("and "), ppr sty locn2]])
 \end{code}

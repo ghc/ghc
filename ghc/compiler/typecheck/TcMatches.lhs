@@ -11,7 +11,7 @@ module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatch ) where
 IMP_Ubiq()
 
 import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat,
-			  HsExpr, HsBinds, OutPat, Fake,
+			  HsExpr, HsBinds, OutPat, Fake, Stmt,
 			  collectPatBinders, pprMatch )
 import RnHsSyn		( SYN_IE(RenamedMatch) )
 import TcHsSyn		( TcIdOcc(..), SYN_IE(TcMatch) )
@@ -29,6 +29,11 @@ import Kind		( Kind, mkTypeKind )
 import Pretty
 import Type		( isTyVarTy, mkFunTy, getFunTy_maybe )
 import Util
+import Outputable
+#if __GLASGOW_HASKELL__ >= 202
+import SrcLoc           (SrcLoc)
+#endif
+
 \end{code}
 
 @tcMatchesFun@ typechecks a @[Match]@ list which occurs in a
@@ -208,16 +213,16 @@ Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
 matchCtxt MCase match sty
-  = ppHang (ppPStr SLIT("In a \"case\" branch:"))
+  = hang (ptext SLIT("In a \"case\" branch:"))
 	 4 (pprMatch sty True{-is_case-} match)
 
 matchCtxt (MFun fun) match sty
-  = ppHang (ppBesides [ppPStr SLIT("In an equation for function "), ppr sty fun, ppChar ':'])
-	 4 (ppBesides [ppr sty fun, ppSP, pprMatch sty False{-not case-} match])
+  = hang (hcat [ptext SLIT("In an equation for function "), ppr sty fun, char ':'])
+	 4 (pprQuote sty $ \sty -> hcat [ppr sty fun, space, pprMatch sty False{-not case-} match])
 \end{code}
 
 
 \begin{code}
 varyingArgsErr name matches sty
-  = ppSep [ppPStr SLIT("Varying number of arguments for function"), ppr sty name]
+  = sep [ptext SLIT("Varying number of arguments for function"), ppr sty name]
 \end{code}
