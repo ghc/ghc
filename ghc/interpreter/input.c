@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/11/17 16:57:40 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/25 11:10:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1507,7 +1507,7 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textExport)            return EXPORT;
         if (it==textDynamic)           return DYNAMIC;
         if (it==textCcall)             return CCALL;
-        if (it==textStdcall)           return STDCALL;
+        if (it==textStdcall)           return STDKALL;
         if (it==textUUExport)          return UUEXPORT;
         if (it==textHiding)            return HIDING;
         if (it==textQualified)         return QUALIFIED;

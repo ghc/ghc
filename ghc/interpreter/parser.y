@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/17 16:57:42 $
+ * $Revision: 1.14 $
+ * $Date: 1999/11/25 11:10:17 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -97,7 +97,7 @@ static Void   local noIP	 Args((String));
 %token '['        ';'        ']'        '`'        '.'
 %token TMODULE    IMPORT     HIDING     QUALIFIED  ASMOD
 %token EXPORT     UUEXPORT   INTERFACE  REQUIRES   UNSAFE     
-%token INSTIMPORT DYNAMIC    CCALL      STDCALL
+%token INSTIMPORT DYNAMIC    CCALL      STDKALL
 
 %%
 /*- Top level script/module structure -------------------------------------*/
@@ -637,7 +637,7 @@ topDecl   : FOREIGN IMPORT callconv ext_loc ext_name unsafe_flag var COCO type
 	  ;
 
 callconv  : CCALL                {$$ = gc1(textCcall);}
-          | STDCALL              {$$ = gc1(textStdcall);}
+          | STDKALL              {$$ = gc1(textStdcall);}
           | /* empty */          {$$ = gc0(NIL);}
           ;
 ext_loc   : STRINGLIT            {$$ = $1;}
