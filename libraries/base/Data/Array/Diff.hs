@@ -14,7 +14,9 @@
 
 module Data.Array.Diff (
 
-    -- Diff arrays have immutable interface, but rely on internal
+    -- * Diff array types
+
+    -- | Diff arrays have an immutable interface, but rely on internal
     -- updates in place to provide fast functional update operator
     -- '//'.
     --
@@ -26,25 +28,25 @@ module Data.Array.Diff (
     --
     -- So if a diff array is used in a single-threaded style,
     -- i.e. after '//' application the old version is no longer used,
-    -- 'a!i' takes O(1) time and 'a // d' takes O(length d). Accessing
-    -- elements of older versions gradually becomes slower.
+    -- @a'!'i@ takes O(1) time and @a '//' d@ takes O(@length d@).
+    -- Accessing elements of older versions gradually becomes slower.
     --
     -- Updating an array which is not current makes a physical copy.
     -- The resulting array is unlinked from the old family. So you
     -- can obtain a version which is guaranteed to be current and
-    -- thus have fast element access by 'a // []'.
+    -- thus have fast element access by @a '//' []@.
 
     -- Possible improvement for the future (not implemented now):
     -- make it possible to say "I will make an update now, but when
     -- I later return to the old version, I want it to mutate back
     -- instead of being copied".
 
-    -- An arbitrary MArray type living in the IO monad can be converted
-    -- to a diff array.
     IOToDiffArray, -- data IOToDiffArray
                    --     (a :: * -> * -> *) -- internal mutable array
                    --     (i :: *)           -- indices
                    --     (e :: *)           -- elements
+
+    -- | Type synonyms for the two most important IO array types.
 
     -- Two most important diff array types are fully polymorphic
     -- lazy boxed DiffArray:
@@ -52,14 +54,18 @@ module Data.Array.Diff (
     -- ...and strict unboxed DiffUArray, working only for elements
     -- of primitive types but more compact and usually faster:
     DiffUArray,    -- = IOToDiffArray IOUArray
+
+    -- * Overloaded immutable array interface
     
-    -- Module IArray provides the interface of diff arrays. They are
-    -- instances of class IArray.
+    -- | Module "Data.Array.IArray" provides the interface of diff arrays.
+    -- They are instances of class 'IArray'.
     module Data.Array.IArray,
-    
-    -- These are really internal functions, but you will need them
-    -- to make further IArray instances of various DiffArrays (for
-    -- either more MArray types or more unboxed element types).
+
+    -- * Low-level interface
+
+    -- | These are really internal functions, but you will need them
+    -- to make further 'IArray' instances of various diff array types
+    -- (for either more 'MArray' types or more unboxed element types).
     newDiffArray, readDiffArray, replaceDiffArray
     )
     where
@@ -88,7 +94,9 @@ import Control.Concurrent.MVar ( MVar, newMVar, takeMVar, putMVar, readMVar )
 ------------------------------------------------------------------------
 -- Diff array types.
 
--- Convert an IO array type to a diff array.
+-- | An arbitrary 'MArray' type living in the 'IO' monad can be converted
+-- to a diff array.
+
 newtype IOToDiffArray a i e =
     DiffArray {varDiffArray :: MVar (DiffArrayData a i e)}
 
@@ -97,8 +105,11 @@ newtype IOToDiffArray a i e =
 data DiffArrayData a i e = Current (a i e)
                          | Diff (IOToDiffArray a i e) [(Int, e)]
 
--- Type synonyms for two most important IO array types.
+-- | Fully polymorphic lazy boxed diff array.
 type DiffArray  = IOToDiffArray IOArray
+
+-- | Strict unboxed diff array, working only for elements
+-- of primitive types but more compact and usually faster than 'DiffArray'.
 type DiffUArray = IOToDiffArray IOUArray
 
 -- Having 'MArray a e IO' in instance context would require
