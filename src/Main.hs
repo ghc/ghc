@@ -882,8 +882,15 @@ buildImportEnv :: ModuleMap -> Module
 	-> [HsImportDecl]  -- the import decls
 	-> FiniteMap HsQName HsQName
 buildImportEnv mod_map this_mod exported_names imp_decls
-  = foldr plusFM emptyFM (map build imp_decls)
+  = foldr (plusFM_C best_name) emptyFM (map build imp_decls)
   where
+	-- choose qualified results over unqualified ones.  In the future
+	-- we might make more intelligent decisions about which name to
+	-- link to.
+	best_name n@(Qual _ _) _ = n
+	best_name _ n@(Qual _ _) = n
+	best_name n _ = n
+
 	build imp_decl@(HsImportDecl _ mdl _ _ _) = 
 	  case lookupFM mod_map mdl of
        	    Nothing    -> emptyFM
@@ -900,6 +907,8 @@ buildImportEnv mod_map this_mod exported_names imp_decls
 		 -- re-exported from the other module, but not documented there:
 		 -- find the right place using the iface_reexported environment.
 		 | Just new_qnm <- lookupFM reexport_env nm = new_qnm
+		 -- if the destination is hidden, we have nowhere to link to
+		 | OptHide `elem` iface_options iface  = UnQual nm
 		 -- otherwise, it's documented in the other module
 		 | otherwise = Qual mdl nm
 
