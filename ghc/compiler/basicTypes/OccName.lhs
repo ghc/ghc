@@ -358,11 +358,11 @@ setOccNameSpace :: NameSpace -> OccName -> OccName
 setOccNameSpace sp (OccName _ occ) = OccName sp occ
 
 -- occNameFlavour is used only to generate good error messages
-occNameFlavour :: OccName -> String
-occNameFlavour (OccName DataName _)  = "data constructor"
-occNameFlavour (OccName TvName _)    = "type variable"
-occNameFlavour (OccName TcClsName _) = "type constructor or class"
-occNameFlavour (OccName VarName s)   = ""
+occNameFlavour :: OccName -> SDoc
+occNameFlavour (OccName DataName _)  = ptext SLIT("data constructor")
+occNameFlavour (OccName TvName _)    = ptext SLIT("type variable")
+occNameFlavour (OccName TcClsName _) = ptext SLIT("type constructor or class")
+occNameFlavour (OccName VarName s)   = empty
 
 -- briefOccNameFlavour is used in debug-printing of names
 briefOccNameFlavour :: OccName -> String

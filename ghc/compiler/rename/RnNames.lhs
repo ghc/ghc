@@ -740,7 +740,7 @@ reportDeprecations tcg_env
       ,	Just deprec_txt <- lookupDeprec hpt pit name
       = addSrcSpan (is_loc imp_spec) $
 	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
-			text (occNameFlavour (nameOccName name)) <+> 
+			occNameFlavour (nameOccName name) <+> 
 		 	quotes (ppr name),
 		      (parens imp_msg),
 		      (ppr deprec_txt) ])

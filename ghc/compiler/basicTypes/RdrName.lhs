@@ -210,7 +210,7 @@ instance Outputable RdrName where
     ppr (Qual mod occ) = ppr mod <> dot <> ppr occ <+> ppr_name_space occ
     ppr (Orig mod occ) = ppr mod <> dot <> ppr occ <+> ppr_name_space occ
 
-ppr_name_space occ = ifPprDebug (parens (text (occNameFlavour occ)))
+ppr_name_space occ = ifPprDebug (parens (occNameFlavour occ))
 
 instance OutputableBndr RdrName where
     pprBndr _ n 

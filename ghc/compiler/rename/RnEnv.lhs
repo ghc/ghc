@@ -705,7 +705,9 @@ warnUnusedBinds names  = mappM_ warnUnusedName (filter reportable names)
 
 warnUnusedName :: (Name, Maybe Provenance) -> RnM ()
 warnUnusedName (name, prov)
-  = addWarnAt loc (sep [msg <> colon, nest 4 (ppr name)])
+  = addWarnAt loc $
+    sep [msg <> colon, 
+	 nest 2 $ occNameFlavour (nameOccName name) <+> quotes (ppr name)]
 	-- TODO should be a proper span
   where
     (loc,msg) = case prov of
@@ -735,13 +737,9 @@ shadowedNameWarn doc shadow
 	       ptext SLIT("shadows an existing binding")]
     $$ doc
 
-unknownNameErr name
+unknownNameErr rdr_name
   = sep [ptext SLIT("Not in scope:"), 
-	 if isVarOcc occ_name then quotes (ppr name)
-			      else text (occNameFlavour occ_name) 
-					<+> quotes (ppr name)]
-  where
-    occ_name = rdrNameOcc name
+	 nest 2 $ occNameFlavour (rdrNameOcc rdr_name) <+> quotes (ppr rdr_name)]
 
 unknownInstBndrErr cls op
   = quotes (ppr op) <+> ptext SLIT("is not a (visible) method of class") <+> quotes (ppr cls)
