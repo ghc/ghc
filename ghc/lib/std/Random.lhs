@@ -65,7 +65,7 @@ instance Read StdGen where
   readsPrec p = \ r ->
      case try_read r of
        r@[_] -> r
-       _   -> [(unsafePerformIO mkStdRNG,r)] -- because it shouldn't ever fail.
+       _   -> [(unsafePerformIO (mkStdRNG 0), r)] -- because it shouldn't ever fail.
     where 
       try_read r = do
          (s1, r1) <- readDec (dropWhile isSpace r)
@@ -155,11 +155,11 @@ instance Random Float where
 
 
 \begin{code}
-mkStdRNG :: IO StdGen
-mkStdRNG = do
+mkStdRNG :: Integer -> IO StdGen
+mkStdRNG o = do
     ct          <- getCPUTime
     (TOD sec _) <- getClockTime
-    return (createStdGen (sec * 12345 + ct))
+    return (createStdGen (sec * 12345 + ct + o))
 
 randomIvalInteger :: (RandomGen g, Num a) => (Integer, Integer) -> g -> (a, g)
 randomIvalInteger (l,h) rng
@@ -209,17 +209,18 @@ rand1 (StdGen s1 s2) = (z', StdGen s1'' s2'')
 		s2'' = if s2' < 0 then s2' + 2147483399 else s2'
 
 splitStdGen :: StdGen -> (StdGen, StdGen)
-splitStdGen std@(StdGen s1 s2) = (std, StdGen new_s1 new_s2)
+splitStdGen std@(StdGen s1 s2) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
+{- StdGen new_s1 new_s2
    where
        -- simple in the extreme..
       new_s1
-        | s1 == 2147483562 = 1
-	| otherwise	   = s1 + 1
+        | s2 == 2147483562 = 1
+	| otherwise	   = s2 + 1
 
       new_s2
-        | s2 == 1	   = 2147483398
-	| otherwise	   = s2 - 1
-
+        | s1 == 1	   = 2147483398
+	| otherwise	   = s1 - 1
+-}
    
 	
 \end{code}
@@ -228,7 +229,7 @@ splitStdGen std@(StdGen s1 s2) = (std, StdGen new_s1 new_s2)
 \begin{code}
 global_rng :: MutableVar RealWorld StdGen
 global_rng = unsafePerformIO $ do
-   rng <- mkStdRNG
+   rng <- mkStdRNG 0
    stToIO (newVar rng)
 
 setStdGen :: StdGen -> IO ()
