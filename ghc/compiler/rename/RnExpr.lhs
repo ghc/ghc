@@ -12,12 +12,12 @@ free variables.
 \begin{code}
 module RnExpr (
 	rnMatch, rnGRHSs, rnLExpr, rnExpr, rnStmts,
-	checkPrecMatch
+	checkPrecMatch, checkTH
    ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} RnSource  ( rnSrcDecls, rnBindGroupsAndThen, rnBindGroups ) 
+import {-# SOURCE #-} RnSource  ( rnSrcDecls, rnBindGroupsAndThen, rnBindGroups, rnSplice ) 
 
 -- 	RnSource imports RnBinds.rnTopMonoBinds, RnExpr.rnExpr
 --	RnBinds	 imports RnExpr.rnMatch, etc
@@ -29,7 +29,7 @@ import TcRnMonad
 import RnEnv
 import OccName		( plusOccEnv )
 import RnNames		( importsFromLocalDecls )
-import RnTypes		( rnHsTypeFVs, rnLPat, litFVs, rnOverLit, rnPatsAndThen,
+import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr,
 			  checkTupSize )
 import CmdLineOpts	( DynFlag(..) )
@@ -177,8 +177,8 @@ rnExpr (HsIPVar v)
     returnM (HsIPVar name, emptyFVs)
 
 rnExpr (HsLit lit) 
-  = litFVs lit		`thenM` \ fvs -> 
-    returnM (HsLit lit, fvs)
+  = rnLit lit		`thenM_`
+    returnM (HsLit lit, emptyFVs)
 
 rnExpr (HsOverLit lit) 
   = rnOverLit lit		`thenM` \ (lit', fvs) ->
@@ -227,12 +227,9 @@ rnExpr e@(HsBracket br_body)
     rnBracket br_body		`thenM` \ (body', fvs_e) ->
     returnM (HsBracket body', fvs_e)
 
-rnExpr e@(HsSplice n splice)
-  = checkTH e "splice"		`thenM_`
-    getSrcSpanM 		`thenM` \ loc ->
-    newLocalsRn [L loc n]	`thenM` \ [n'] ->
-    rnLExpr splice 		`thenM` \ (splice', fvs_e) ->
-    returnM (HsSplice n' splice', fvs_e)
+rnExpr e@(HsSpliceE splice)
+  = rnSplice splice 		`thenM` \ (splice', fvs) ->
+    returnM (HsSpliceE splice', fvs)
 
 rnExpr section@(SectionL expr op)
   = rnLExpr expr	 	`thenM` \ (expr', fvs_expr) ->

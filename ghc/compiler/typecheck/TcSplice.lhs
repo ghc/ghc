@@ -14,23 +14,27 @@ import TcRnDriver	( tcTopSrcDecls )
 	-- is very high up the module hierarchy
 
 import qualified Language.Haskell.TH.THSyntax as TH
+import qualified Language.Haskell.TH.THLib    as TH
 -- THSyntax gives access to internal functions and data types
 
 import HscTypes		( HscEnv(..) )
-import HsSyn		( HsBracket(..), HsExpr(..), LHsExpr, LHsDecl )
-import Convert		( convertToHsExpr, convertToHsDecls )
+import HsSyn		( HsBracket(..), HsExpr(..), HsSplice(..), LHsExpr, LHsDecl, 
+		   	  HsType, LHsType )
+import Convert		( convertToHsExpr, convertToHsDecls, convertToHsType )
 import RnExpr		( rnLExpr )
-import RnEnv		( lookupFixityRn )
+import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe )
+import RdrName		( RdrName, mkRdrUnqual, lookupLocalRdrEnv )
+import RnTypes		( rnLHsType )
 import TcExpr		( tcCheckRho, tcMonoExpr )
 import TcHsSyn		( mkHsLet, zonkTopLExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
-import TcType		( TcType, openTypeKind, mkAppTy, tcSplitSigmaTy )
+import TcType		( TcType, TcKind, openTypeKind, mkAppTy, tcSplitSigmaTy )
 import TcEnv		( spliceOK, tcMetaTy, bracketOK, tcLookup )
-import TcMType		( newTyVarTy, UserTypeCtxt(ExprSigCtxt), zonkTcType, zonkTcTyVar )
-import TcHsType		( tcHsSigType )
+import TcMType		( newTyVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType, zonkTcTyVar )
+import TcHsType		( tcHsSigType, kcHsType )
 import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
-import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName )
+import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName, mkInternalName )
 import OccName
 import Var		( Id, TyVar, idType )
 import RdrName		( RdrName )
@@ -47,17 +51,17 @@ import IdInfo		( GlobalIdDetails(..) )
 import TysWiredIn	( mkListTy )
 import DsMeta		( expQTyConName, typeQTyConName, decTyConName, qTyConName, nameTyConName )
 import ErrUtils		( Message )
-import SrcLoc		( noLoc, unLoc )
+import SrcLoc		( noLoc, unLoc, getLoc, noSrcLoc )
 import Outputable
-import Unique		( Unique, Uniquable(..), getKey )
+import Unique		( Unique, Uniquable(..), getKey, mkUniqueGrimily )
 import IOEnv		( IOEnv )
 import BasicTypes	( StrictnessMark(..), Fixity(..), FixityDirection(..) )
 import Module		( moduleUserString )
 import Panic		( showException )
-import FastString	( LitString )
+import FastString	( LitString, mkFastString )
 import FastTypes	( iBox )
 
-import GHC.Base		( unsafeCoerce#, Int(..) )	-- Should have a better home in the module hierarchy
+import GHC.Base		( unsafeCoerce#, Int#, Int(..) )	-- Should have a better home in the module hierarchy
 import Monad 		( liftM )
 \end{code}
 
@@ -70,11 +74,8 @@ import Monad 		( liftM )
 
 \begin{code}
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
-
-tcSpliceExpr :: Name 
-	     -> LHsExpr Name
-	     -> Expected TcType
-	     -> TcM (HsExpr Id)
+tcSpliceExpr  :: HsSplice Name -> Expected TcType -> TcM (HsExpr TcId)
+kcSpliceType  :: HsSplice Name -> TcM (HsType Name, TcKind)
 
 #ifndef GHCI
 tcSpliceExpr n e ty = pprPanic "Cant do tcSpliceExpr without GHCi" (ppr e)
@@ -150,8 +151,9 @@ tc_bracket (DecBr decls)
 %************************************************************************
 
 \begin{code}
-tcSpliceExpr name expr res_ty
-  = getStage		`thenM` \ level ->
+tcSpliceExpr (HsSplice name expr) res_ty
+  = addSrcSpan (getLoc expr) 	$
+    getStage		`thenM` \ level ->
     case spliceOK level of {
 	Nothing 	-> failWithTc (illegalSplice level) ;
 	Just next_level -> 
@@ -239,6 +241,71 @@ tcTopSpliceExpr expr meta_ty
 
 %************************************************************************
 %*									*
+		Splicing a type
+%*									*
+%************************************************************************
+
+Very like splicing an expression, but we don't yet share code.
+
+\begin{code}
+kcSpliceType (HsSplice name hs_expr)
+  = addSrcSpan (getLoc hs_expr) $ do 	
+	{ level <- getStage
+	; case spliceOK level of {
+		Nothing 	-> failWithTc (illegalSplice level) ;
+		Just next_level -> do 
+
+	{ case level of {
+		Comp 		       -> do { (t,k) <- kcTopSpliceType hs_expr 
+					     ; return (unLoc t, k) } ;
+		Brack _ ps_var lie_var -> do
+
+	{ 	-- A splice inside brackets
+	; meta_ty <- tcMetaTy typeQTyConName
+	; expr' <- setStage (Splice next_level) $
+		   setLIEVar lie_var	   	$
+		   tcCheckRho hs_expr meta_ty
+
+		-- Write the pending splice into the bucket
+	; ps <- readMutVar ps_var
+	; writeMutVar ps_var ((name,expr') : ps)
+
+	-- e.g.   [| Int -> $(h 4) |]
+	-- Here (h 4) :: Q Type
+	-- but $(h 4) :: forall a.a 	i.e. any kind
+	; kind <- newKindVar
+	; returnM (panic "kcSpliceType", kind)	-- The returned type is ignored
+    }}}}}
+
+kcTopSpliceType :: LHsExpr Name -> TcM (LHsType Name, TcKind)
+kcTopSpliceType expr
+  = do	{ meta_ty <- tcMetaTy typeQTyConName
+
+	-- Typecheck the expression
+	; zonked_q_expr <- tcTopSpliceExpr expr meta_ty
+
+	-- Run the expression
+	; traceTc (text "About to run" <+> ppr zonked_q_expr)
+	; simple_ty <- runMetaT zonked_q_expr
+  
+	; let 	-- simple_ty :: TH.Type
+		hs_ty2 :: LHsType RdrName
+		hs_ty2 = convertToHsType simple_ty
+	 
+	; traceTc (text "Got result" <+> ppr hs_ty2)
+
+	; showSplice "type" zonked_q_expr (ppr hs_ty2)
+
+	-- Rename it, but bale out if there are errors
+	-- otherwise the type checker just gives more spurious errors
+	; let doc = ptext SLIT("In the spliced type") <+> ppr hs_ty2
+	; hs_ty3 <- checkNoErrs (rnLHsType doc hs_ty2)
+
+	; kcHsType hs_ty3 }
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection{Splicing an expression}
 %*									*
 %************************************************************************
@@ -246,23 +313,22 @@ tcTopSpliceExpr expr meta_ty
 \begin{code}
 -- Always at top level
 tcSpliceDecls expr
-  = tcMetaTy decTyConName		`thenM` \ meta_dec_ty ->
-    tcMetaTy qTyConName    		`thenM` \ meta_q_ty ->
-    let
-	list_q = mkAppTy meta_q_ty (mkListTy meta_dec_ty)
-    in
-    tcTopSpliceExpr expr list_q		`thenM` \ zonked_q_expr ->
+  = do	{ meta_dec_ty <- tcMetaTy decTyConName
+	; meta_q_ty <- tcMetaTy qTyConName
+	; let list_q = mkAppTy meta_q_ty (mkListTy meta_dec_ty)
+	; zonked_q_expr <- tcTopSpliceExpr expr list_q
 
-	-- Run the expression
-    traceTc (text "About to run" <+> ppr zonked_q_expr) 	`thenM_`
-    runMetaD zonked_q_expr		`thenM` \ simple_expr ->
-    -- simple_expr :: [TH.Dec]
-    -- decls :: [RdrNameHsDecl]
-    handleErrors (convertToHsDecls simple_expr) `thenM` \ decls ->
-    traceTc (text "Got result" <+> vcat (map ppr decls))	`thenM_`
-    showSplice "declarations"
-	       zonked_q_expr (vcat (map ppr decls))		`thenM_`
-    returnM decls
+		-- Run the expression
+	; traceTc (text "About to run" <+> ppr zonked_q_expr)
+	; simple_expr <- runMetaD zonked_q_expr
+
+	    -- simple_expr :: [TH.Dec]
+	    -- decls :: [RdrNameHsDecl]
+	; decls <- handleErrors (convertToHsDecls simple_expr)
+	; traceTc (text "Got result" <+> vcat (map ppr decls))
+	; showSplice "declarations"
+	  	     zonked_q_expr (vcat (map ppr decls))
+	; returnM decls }
 
   where handleErrors :: [Either a Message] -> TcM [a]
         handleErrors [] = return []
@@ -283,7 +349,11 @@ runMetaE :: LHsExpr Id 	-- Of type (Q Exp)
 	 -> TcM TH.Exp	-- Of type Exp
 runMetaE e = runMeta e
 
-runMetaD :: LHsExpr Id 	-- Of type Q [Dec]
+runMetaT :: LHsExpr Id 		-- Of type (Q Type)
+	 -> TcM TH.Type		-- Of type Type
+runMetaT e = runMeta e
+
+runMetaD :: LHsExpr Id 		-- Of type Q [Dec]
 	 -> TcM [TH.Dec]	-- Of type [Dec]
 runMetaD e = runMeta e
 
@@ -366,17 +436,54 @@ illegalSplice level
 
 \begin{code}
 reify :: TH.Name -> TcM TH.Info
-reify (TH.Name occ (TH.NameG th_ns mod))
-  = do	{ name <- lookupOrig (mkModuleName (TH.modString mod))
-			     (OccName.mkOccName ghc_ns (TH.occString occ))
+reify th_name
+  = do	{ name <- lookupThName th_name
 	; thing <- tcLookup name
+		-- ToDo: this tcLookup could fail, which would give a
+		-- 	 rather unhelpful error message
 	; reifyThing thing
     }
+
+lookupThName :: TH.Name -> TcM Name
+lookupThName (TH.Name occ (TH.NameG th_ns mod))
+  = lookupOrig (mkModuleName (TH.modString mod))
+	       (OccName.mkOccName ghc_ns (TH.occString occ))
   where
     ghc_ns = case th_ns of
 		TH.DataName  -> dataName
 		TH.TcClsName -> tcClsName
 		TH.VarName   -> varName
+
+lookupThName th_name@(TH.Name occ TH.NameS) 
+  =  do { let rdr_name = mkRdrUnqual (OccName.mkOccFS ns occ_fs)
+	; rdr_env <- getLocalRdrEnv
+	; case lookupLocalRdrEnv rdr_env rdr_name of
+		Just name -> return name
+		Nothing   -> do
+	{ mb_name <- lookupSrcOcc_maybe rdr_name
+	; case mb_name of
+	    Just name -> return name ;
+	    Nothing   -> failWithTc (notInScope th_name)
+	}}
+  where
+    ns | isLexCon occ_fs = OccName.dataName
+       | otherwise	 = OccName.varName
+    occ_fs = mkFastString (TH.occString occ)
+
+lookupThName (TH.Name occ (TH.NameU uniq)) 
+  = return (mkInternalName (mk_uniq uniq) (OccName.mkOccFS bogus_ns occ_fs) noSrcLoc)
+  where
+    occ_fs = mkFastString (TH.occString occ)
+    bogus_ns = OccName.varName	-- Not yet recorded in the TH name
+				-- but only the unique matters
+
+mk_uniq :: Int# -> Unique
+mk_uniq u = mkUniqueGrimily (I# u)
+
+notInScope :: TH.Name -> SDoc
+notInScope th_name = quotes (text (show (TH.pprName th_name))) <+> 
+		     ptext SLIT("is not in scope at a reify")
+	-- Ugh! Rather an indirect way to display the name
 
 ------------------------------
 reifyThing :: TcTyThing -> TcM TH.Info

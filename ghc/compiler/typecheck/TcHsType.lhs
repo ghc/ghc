@@ -10,7 +10,7 @@ module TcHsType (
 
 		-- Kind checking
 	kcHsTyVars, kcHsSigType, kcHsLiftedSigType, 
-	kcCheckHsType, kcHsContext,
+	kcCheckHsType, kcHsContext, kcHsType,
 	
 		-- Typechecking kinded types
 	tcHsKindedContext, tcHsKindedType, tcTyVarBndrs, dsHsType, 
@@ -247,6 +247,9 @@ kcHsType ty = wrapLocFstM kc_hs_type ty
 kc_hs_type (HsParTy ty)
  = kcHsType ty		`thenM` \ (ty', kind) ->
    returnM (HsParTy ty', kind)
+
+-- kcHsType (HsSpliceTy s)
+--   = kcSpliceType s)
 
 kc_hs_type (HsTyVar name)
   = kcTyVar name	`thenM` \ kind ->

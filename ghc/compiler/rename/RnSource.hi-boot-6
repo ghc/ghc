@@ -9,5 +9,8 @@ rnBindGroups :: [HsBinds.HsBindGroup RdrName.RdrName]
 	-> TcRnTypes.RnM ([HsBinds.HsBindGroup Name.Name], NameSet.DefUses) ;
 
 rnSrcDecls :: HsDecls.HsGroup RdrName.RdrName
-	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name)
+	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name) ;
+
+rnSplice :: HsExpr.HsSplice RdrName.RdrName 
+	 -> TcRnTypes.RnM (HsExpr.HsSplice Name.Name, NameSet.FreeVars)
 

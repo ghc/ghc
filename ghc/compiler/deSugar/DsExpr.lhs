@@ -546,7 +546,7 @@ Here is where we desugar the Template Haskell brackets and escapes
 
 #ifdef GHCI	/* Only if bootstrapping */
 dsExpr (HsBracketOut x ps) = dsBracket x ps
-dsExpr (HsSplice n e)      = pprPanic "dsExpr:splice" (ppr e)
+dsExpr (HsSpliceE s)       = pprPanic "dsExpr:splice" (ppr s)
 #endif
 
 -- Arrow notation extension

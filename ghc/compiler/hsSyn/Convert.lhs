@@ -6,7 +6,7 @@ This module converts Template Haskell syntax into HsSyn
 
 
 \begin{code}
-module Convert( convertToHsExpr, convertToHsDecls ) where
+module Convert( convertToHsExpr, convertToHsDecls, convertToHsType ) where
 
 #include "HsVersions.h"
 
@@ -313,6 +313,8 @@ cvt_pred ty = case split_ty_app ty of
 	   	(VarT tv, tys) -> noLoc (HsClassP (tName tv) (map cvtType tys))
 		other -> cvtPanic "Malformed predicate" (text (show (TH.pprType ty)))
 
+convertToHsType = cvtType
+
 cvtType :: TH.Type -> LHsType RdrName
 cvtType ty = trans (root ty [])
   where root (AppT a b) zs = root a (cvtType b : zs)
@@ -372,30 +374,29 @@ loc0 = srcLocSpan generatedSrcLoc
 
 -- variable names
 vName :: TH.Name -> RdrName
-vName = mk_name OccName.varName
+vName = thRdrName OccName.varName
 
 -- Constructor function names; this is Haskell source, hence srcDataName
 cName :: TH.Name -> RdrName
-cName = mk_name OccName.srcDataName
+cName = thRdrName OccName.srcDataName
 
 -- Type variable names
 tName :: TH.Name -> RdrName
-tName = mk_name OccName.tvName
+tName = thRdrName OccName.tvName
 
 -- Type Constructor names
-tconName = mk_name OccName.tcName
+tconName = thRdrName OccName.tcName
 
-mk_name :: OccName.NameSpace -> TH.Name -> RdrName
-
+thRdrName :: OccName.NameSpace -> TH.Name -> RdrName
 -- This turns a Name into a RdrName
 -- The last case is slightly interesting.  It constructs a
 -- unique name from the unique in the TH thingy, so that the renamer
 -- won't mess about.  I hope.  (Another possiblity would be to generate 
 -- "x_77" etc, but that could conceivably clash.)
 
-mk_name ns (TH.Name occ (TH.NameG ns' mod))  = mkOrig (mk_mod mod) (mk_occ ns occ)
-mk_name ns (TH.Name occ TH.NameS)            = mkRdrUnqual (mk_occ ns occ)
-mk_name ns (TH.Name occ (TH.NameU uniq))     = nameRdrName (mkInternalName (mk_uniq uniq) (mk_occ ns occ) noSrcLoc)
+thRdrName ns (TH.Name occ (TH.NameG ns' mod))  = mkOrig (mk_mod mod) (mk_occ ns occ)
+thRdrName ns (TH.Name occ TH.NameS)            = mkRdrUnqual (mk_occ ns occ)
+thRdrName ns (TH.Name occ (TH.NameU uniq))     = nameRdrName (mkInternalName (mk_uniq uniq) (mk_occ ns occ) noSrcLoc)
 
 mk_uniq :: Int# -> Unique
 mk_uniq u = mkUniqueGrimily (I# u)

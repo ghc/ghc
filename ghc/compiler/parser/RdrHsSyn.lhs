@@ -117,6 +117,7 @@ extract_ty (HsPredTy p)		     acc = extract_pred (unLoc p) acc
 extract_ty (HsOpTy ty1 nam ty2)      acc = extract_lty ty1 (extract_lty ty2 acc)
 extract_ty (HsParTy ty)              acc = extract_lty ty acc
 extract_ty (HsNumTy num)             acc = acc
+extract_ty (HsSpliceTy _)            acc = acc	-- Type splices mention no type variables
 extract_ty (HsKindSig ty k)	     acc = extract_lty ty acc
 extract_ty (HsForAllTy exp [] cx ty) acc = extract_lctxt cx (extract_lty ty acc)
 extract_ty (HsForAllTy exp tvs cx ty) 
@@ -285,9 +286,10 @@ hsIfaceType (HsPArrTy t)       = IfaceTyConApp IfacePArrTc [hsIfaceLType t]
 hsIfaceType (HsTupleTy bx ts)  = IfaceTyConApp (IfaceTupTc bx (length ts)) (hsIfaceLTypes ts)
 hsIfaceType (HsOpTy t1 tc t2)  = hs_tc_app (HsTyVar (unLoc tc)) (hsIfaceLTypes [t1, t2])
 hsIfaceType (HsParTy t)	       = hsIfaceLType t
-hsIfaceType (HsNumTy n)	       = panic "hsIfaceType:HsNum"
 hsIfaceType (HsPredTy p)       = IfacePredTy (hsIfaceLPred p)
 hsIfaceType (HsKindSig t _)    = hsIfaceLType t
+hsIfaceType (HsNumTy n)	       = panic "hsIfaceType:HsNum"
+hsIfaceType (HsSpliceTy _)     = panic "hsIfaceType:HsSpliceTy"
 
 -----------
 hsIfaceLTypes tys = map (hsIfaceType.unLoc) tys

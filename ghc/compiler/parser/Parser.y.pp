@@ -37,11 +37,11 @@ import OrdList
 import Bag		( emptyBag )
 import Panic
 
-import GLAEXTS
 import CStrings		( CLabelString )
 import FastString
 import Maybes		( orElse )
 import Outputable
+import GLAEXTS
 }
 
 {-
@@ -1051,10 +1051,11 @@ aexp2	:: { LHsExpr RdrName }
 	| '_'				{ L1 EWildPat }
 	
 	-- MetaHaskell Extension
-	| TH_ID_SPLICE          { L1 $ mkHsSplice 
+	| TH_ID_SPLICE          { L1 $ HsSpliceE (mkHsSplice 
 					(L1 $ HsVar (mkUnqual varName 
-							(getTH_ID_SPLICE $1))) } -- $x
-	| '$(' exp ')'   	{ LL $ mkHsSplice $2 }                            -- $( exp )
+							(getTH_ID_SPLICE $1)))) } -- $x
+	| '$(' exp ')'   	{ LL $ HsSpliceE (mkHsSplice $2) }               -- $( exp )
+
 	| TH_VAR_QUOTE qvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }
 	| TH_VAR_QUOTE qcon 	{ LL $ HsBracket (VarBr (unLoc $2)) }
 	| TH_TY_QUOTE tyvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }
@@ -1076,8 +1077,12 @@ acmd	:: { LHsCmdTop RdrName }
 	: aexp2			{ L1 $ HsCmdTop $1 [] placeHolderType undefined }
 
 cvtopbody :: { [LHsDecl RdrName] }
-	:  '{'            cvtopdecls '}'		{ $2 }
-	|      vocurly    cvtopdecls close		{ $2 }
+	:  '{'            cvtopdecls0 '}'		{ $2 }
+	|      vocurly    cvtopdecls0 close		{ $2 }
+
+cvtopdecls0 :: { [LHsDecl RdrName] }
+	: {- empty -}		{ [] }
+	| cvtopdecls		{ $1 }
 
 texps :: { [LHsExpr RdrName] }
 	: texps ',' exp			{ $3 : $1 }

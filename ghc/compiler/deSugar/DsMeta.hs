@@ -489,15 +489,15 @@ repE (ArithSeqIn aseq) =
 repE (PArrSeqOut _ aseq)  = panic "DsMeta.repE: parallel array seq.s missing"
 repE (HsCoreAnn _ _)      = panic "DsMeta.repE: Can't represent CoreAnn" -- hdaume: core annotations
 repE (HsSCC _ _)          = panic "DsMeta.repE: Can't represent SCC"
-repE (HsBracketOut _ _)   = 
-  panic "DsMeta.repE: Can't represent Oxford brackets"
-repE (HsSplice n e)       = do { mb_val <- dsLookupMetaEnv n
-			       ; case mb_val of
-				 Just (Splice e) -> do { e' <- dsExpr e
-						       ; return (MkC e') }
-				 other	     -> pprPanic "HsSplice" (ppr n) }
-repE e                    = 
-  pprPanic "DsMeta.repE: Illegal expression form" (ppr e)
+repE (HsBracketOut _ _)   = panic "DsMeta.repE: Can't represent Oxford brackets"
+repE (HsSpliceE (HsSplice n _)) 
+  = do { mb_val <- dsLookupMetaEnv n
+       ; case mb_val of
+		 Just (Splice e) -> do { e' <- dsExpr e
+				       ; return (MkC e') }
+		 other	     -> pprPanic "HsSplice" (ppr n) }
+
+repE e = pprPanic "DsMeta.repE: Illegal expression form" (ppr e)
 
 -----------------------------------------------------------------------------
 -- Building representations of auxillary structures like Match, Clause, Stmt, 

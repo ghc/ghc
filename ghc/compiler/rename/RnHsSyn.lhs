@@ -56,6 +56,7 @@ extractHsTyNames ty
     get (HsParTy ty)           = getl ty
     get (HsNumTy n)            = emptyNameSet
     get (HsTyVar tv)	       = unitNameSet tv
+    get (HsSpliceTy _)         = emptyNameSet	-- Type splices mention no type variables
     get (HsKindSig ty k)       = getl ty
     get (HsForAllTy _ tvs 
 		    ctxt ty)   = (extractHsCtxtTyNames ctxt

@@ -7,7 +7,7 @@
 module RnTypes ( rnHsType, rnLHsType, rnContext,
 		 rnHsSigType, rnHsTypeFVs,
 		 rnLPat, rnPat, rnPatsAndThen,		-- Here because it's not part 
-		 rnOverLit, litFVs,		-- of any mutual recursion	
+		 rnLit, rnOverLit, 			-- of any mutual recursion	
 		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr, checkTupSize
   ) where
 
@@ -338,12 +338,9 @@ rnPat (SigPatIn pat ty)
   where
     doc = text "In a pattern type-signature"
     
-rnPat (LitPat s@(HsString _)) 
-  = returnM (LitPat s, unitFV eqStringName)
-
 rnPat (LitPat lit) 
-  = litFVs lit		`thenM` \ fvs ->
-    returnM (LitPat lit, fvs) 
+  = rnLit lit 	`thenM_` 
+    returnM (LitPat lit, emptyFVs) 
 
 rnPat (NPatIn lit mb_neg) 
   = rnOverLit lit			`thenM` \ (lit', fvs1) ->
@@ -484,22 +481,9 @@ that the types and classes they involve
 are made available.
 
 \begin{code}
-litFVs (HsChar c)
-   = checkErr (inCharRange c) (bogusCharError c) `thenM_`
-     returnM (unitFV charTyCon_name)
-
-litFVs (HsCharPrim c)         = returnM (unitFV (getName charPrimTyCon))
-litFVs (HsString s)           = returnM (mkFVs [listTyCon_name, charTyCon_name])
-litFVs (HsStringPrim s)       = returnM (unitFV (getName addrPrimTyCon))
-litFVs (HsInt i)	      = returnM (unitFV (getName intTyCon))
-litFVs (HsIntPrim i)          = returnM (unitFV (getName intPrimTyCon))
-litFVs (HsFloatPrim f)        = returnM (unitFV (getName floatPrimTyCon))
-litFVs (HsDoublePrim d)       = returnM (unitFV (getName doublePrimTyCon))
-litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)
-					-- HsInteger and HsRat only appear 
-					-- in post-typechecker translations
-bogusCharError c
-  = ptext SLIT("character literal out of range: '\\") <> char c <> char '\''
+rnLit :: HsLit -> RnM ()
+rnLit (HsChar c) = checkErr (inCharRange c) (bogusCharError c)
+rnLit other	 = returnM ()
 
 rnOverLit (HsIntegral i _)
   = lookupSyntaxName fromIntegerName	`thenM` \ (from_integer_name, fvs) ->
@@ -556,6 +540,9 @@ forAllWarn doc ty (L loc tyvar)
 		   $$
 		   doc
                 )
+
+bogusCharError c
+  = ptext SLIT("character literal out of range: '\\") <> char c  <> char '\''
 
 precParseErr op1 op2 
   = hang (ptext SLIT("precedence parsing error"))

@@ -28,6 +28,8 @@ module HsTypes (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
+
 import TcType		( Type, Kind, liftedTypeKind, eqKind )
 import Type		( {- instance Outputable Kind -}, pprParendKind, pprKind )
 import Name		( Name, mkInternalName )
@@ -133,6 +135,8 @@ data HsType name
   | HsKindSig		(LHsType name)	-- (ty :: kind)
 			Kind		-- A type with a kind signature
 
+  | HsSpliceTy		(HsSplice name)
+
 data HsExplicitForAll = Explicit | Implicit
 
 -----------------------
@@ -198,7 +202,7 @@ replaceTyVarName (KindedTyVar n k) n' = KindedTyVar n' k
 
 \begin{code}
 splitHsInstDeclTy 
-    :: Outputable name
+    :: OutputableBndr name
     => HsType name 
     -> ([LHsTyVarBndr name], HsContext name, name, [LHsType name])
 	-- Split up an instance decl type, returning the pieces
@@ -246,14 +250,14 @@ NB: these types get printed into interface files, so
     don't change the printing format lightly
 
 \begin{code}
-instance (Outputable name) => Outputable (HsType name) where
+instance (OutputableBndr name) => Outputable (HsType name) where
     ppr ty = pprHsType ty
 
 instance (Outputable name) => Outputable (HsTyVarBndr name) where
     ppr (UserTyVar name)        = ppr name
     ppr (KindedTyVar name kind) = pprHsTyVarBndr name kind
 
-instance Outputable name => Outputable (HsPred name) where
+instance OutputableBndr name => Outputable (HsPred name) where
     ppr (HsClassP clas tys) = ppr clas <+> hsep (map (pprParendHsType.unLoc) tys)
     ppr (HsIParam n ty)    = hsep [ppr n, dcolon, ppr ty]
 
@@ -270,7 +274,7 @@ pprHsForAll exp tvs cxt
     is_explicit = case exp of {Explicit -> True; Implicit -> False}
     forall_part = ptext SLIT("forall") <+> interppSP tvs <> dot
 
-pprHsContext :: (Outputable name) => HsContext name -> SDoc
+pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
 pprHsContext []	 = empty
 pprHsContext cxt = ppr_hs_context cxt <+> ptext SLIT("=>")
 
@@ -295,7 +299,7 @@ maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
 	
 -- printing works more-or-less as for Types
 
-pprHsType, pprParendHsType :: (Outputable name) => HsType name -> SDoc
+pprHsType, pprParendHsType :: (OutputableBndr name) => HsType name -> SDoc
 
 pprHsType ty       = getPprStyle $ \sty -> ppr_mono_ty pREC_TOP (prepare sty ty)
 pprParendHsType ty = ppr_mono_ty pREC_CON ty
@@ -321,6 +325,7 @@ ppr_mono_ty ctxt_prec (HsListTy ty)	  = brackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty ctxt_prec (HsPArrTy ty)	  = pabrackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty ctxt_prec (HsPredTy pred)     = braces (ppr pred)
 ppr_mono_ty ctxt_prec (HsNumTy n)         = integer n  -- generics only
+ppr_mono_ty ctxt_prec (HsSpliceTy s)      = pprSplice s
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen ctxt_prec pREC_CON $

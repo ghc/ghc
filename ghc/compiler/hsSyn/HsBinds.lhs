@@ -262,10 +262,10 @@ eqHsSig _other1 _other2 = False
 \end{code}
 
 \begin{code}
-instance (Outputable name) => Outputable (Sig name) where
+instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: Outputable name => Sig name -> SDoc
+ppr_sig :: OutputableBndr name => Sig name -> SDoc
 ppr_sig (Sig var ty)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 

@@ -1,6 +1,7 @@
 module HsExpr where
 
 data HsExpr i
+data HsSplice i
 data Match a
 data GRHSs a
 
@@ -9,6 +10,9 @@ type LMatch a  = SrcLoc.Located (Match a)
 
 pprExpr :: (Outputable.OutputableBndr i) => 
 	HsExpr.HsExpr i -> Outputable.SDoc
+
+pprSplice :: (Outputable.OutputableBndr i) => 
+	HsExpr.HsSplice i -> Outputable.SDoc
 
 pprPatBind :: (Outputable.OutputableBndr i) => 
 	HsPat.LPat i -> HsExpr.GRHSs i -> Outputable.SDoc

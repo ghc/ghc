@@ -7,7 +7,7 @@
 module RnSource ( 
 	rnSrcDecls, addTcgDUs, 
 	rnTyClDecls, checkModDeprec,
-	rnBindGroups, rnBindGroupsAndThen
+	rnBindGroups, rnBindGroupsAndThen, rnSplice
     ) where
 
 #include "HsVersions.h"
@@ -16,7 +16,7 @@ import HsSyn
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, elemLocalRdrEnv )
 import RdrHsSyn		( extractGenericPatTyVars )
 import RnHsSyn
-import RnExpr		( rnLExpr )
+import RnExpr		( rnLExpr, checkTH )
 import RnTypes		( rnLHsType, rnHsSigType, rnHsTypeFVs, rnContext )
 import RnBinds		( rnTopBinds, rnBinds, rnMethodBinds, 
 			  rnBindsAndThen, renameSigs, checkSigs )
@@ -677,3 +677,19 @@ rnHsTyVars doc tvs  = mappM (rnHsTyvar doc) tvs
 rnHsTyvar doc tyvar = lookupOccRn tyvar
 \end{code}
 
+
+%*********************************************************
+%*							*
+		Splices
+%*							*
+%*********************************************************
+
+\begin{code}
+rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
+rnSplice (HsSplice n expr)
+  = checkTH expr "splice"	`thenM_`
+    getSrcSpanM 		`thenM` \ loc ->
+    newLocalsRn [L loc n]	`thenM` \ [n'] ->
+    rnLExpr expr 		`thenM` \ (expr', fvs) ->
+    returnM (HsSplice n' expr', fvs)
+\end{code}

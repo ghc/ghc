@@ -151,9 +151,7 @@ data HsExpr id
 		 [PendingSplice]	-- renamed expression, plus *typechecked* splices
 					-- to be pasted back in by the desugarer
 
-  | HsSplice id (LHsExpr id)		-- $z  or $(f 4)
-					-- The id is just a unique name to 
-					-- identify this splice point
+  | HsSpliceE (HsSplice id) 
 
   -----------------------------------------------------------
   -- Arrow notation extension
@@ -403,8 +401,8 @@ ppr_expr (DictApp expr dnames)
 
 ppr_expr (HsType id) = ppr id
 
-ppr_expr (HsSplice n e)      = char '$' <> brackets (ppr n) <> pprParendExpr e
-ppr_expr (HsBracket b)       = ppr b
+ppr_expr (HsSpliceE s)       = pprSplice s
+ppr_expr (HsBracket b)       = pprHsBracket b
 ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("where") <+> ppr ps
 
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
@@ -766,6 +764,17 @@ pprComp brack stmts
 %************************************************************************
 
 \begin{code}
+data HsSplice id  = HsSplice 	-- $z  or $(f 4)
+			id 		-- The id is just a unique name to 
+			(LHsExpr id) 	-- identify this splice point
+					
+instance OutputableBndr id => Outputable (HsSplice id) where
+  ppr = pprSplice
+
+pprSplice :: OutputableBndr id => HsSplice id -> SDoc
+pprSplice (HsSplice n e) = char '$' <> brackets (ppr n) <> pprParendExpr e
+
+
 data HsBracket id = ExpBr (LHsExpr id)		-- [|  expr  |]
 		  | PatBr (LPat id)		-- [p| pat   |]
 		  | DecBr (HsGroup id)		-- [d| decls |]

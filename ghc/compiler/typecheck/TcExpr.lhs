@@ -574,11 +574,9 @@ tc_expr (PArrSeqIn _) _
 \begin{code}
 #ifdef GHCI	/* Only if bootstrapped */
 	-- Rename excludes these cases otherwise
-
-tc_expr (HsSplice n expr) res_ty = tcSpliceExpr n expr res_ty
-tc_expr (HsBracket brack) res_ty = do
-  e <- tcBracket brack res_ty
-  return (unLoc e)
+tc_expr (HsSpliceE splice) res_ty = tcSpliceExpr splice res_ty
+tc_expr (HsBracket brack)  res_ty = do	{ e <- tcBracket brack res_ty
+					; return (unLoc e) }
 #endif /* GHCI */
 \end{code}
 
