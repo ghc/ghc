@@ -300,7 +300,7 @@ AC_ARG_WITH(ghc-hc,
           recent version of GHC, but you could always try...)
 ],
 [WithGhcHc="$withval"],
-[WithGhcHc="ghc-2.10"]
+[WithGhcHc="ghc"]
 )
 AC_SUBST(WithGhcHc)
 
