@@ -569,18 +569,16 @@ sub mangle_asm {
 	    $chksymb[$i] = '';
 
 	} elsif ( $TargetPlatform =~ /^i386-.*-solaris2/
-	     &&   /^(_uname|uname|stat|fstat):/ ) {
-	    # for some utterly bizarre reason, this platform
-	    # likes to drop little local C routines with these names
-	    # into each and every .o file that #includes the
-	    # relevant system .h file.  Yuck.  We just don't
-	    # tolerate them in .hc files (which we are processing
-	    # here).  If you need to call one of these things from
-	    # Haskell, make a call to your own C wrapper, then
-	    # put that C wrapper (which calls one of these) in a
-	    # plain .c file.  WDP 95/12
+	     &&   /^[A-Za-z0-9][A-Za-z0-9_]*:/ ) {
+            # Some Solaris system headers contain function definitions (as
+	    # opposed to mere prototypes), which end up in the .hc file when
+	    # a Haskell module foreign imports the corresponding system 
+	    # functions (most notably stat()).  We put them into the text 
+            # segment.  Note that this currently does not extend to function
+	    # names starting with an underscore. 
+	    # - chak 7/2001
 	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'toss';
+	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = $1;
 
 	} elsif ( /^${T_US}[A-Za-z0-9_]/o
@@ -596,7 +594,8 @@ sub mangle_asm {
 		    || /^${T_US}__fexp_.*${T_POST_LBL}$/o       # foreign export
 		    || /^${T_US}__init.*${T_POST_LBL}$/o        # __init<module>
 		    || /^${T_US}.*_btm${T_POST_LBL}$/o          # large bitmaps
-		    || /^${T_US}.*_closure_tbl${T_POST_LBL}$/o; # closure tables
+		    || /^${T_US}.*_closure_tbl${T_POST_LBL}$/o  # closure tables
+                    || /^_uname:/o;			        # x86/Solaris2
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';
             if ($TargetPlatform =~ /^powerpc-|^rs6000-/) 
