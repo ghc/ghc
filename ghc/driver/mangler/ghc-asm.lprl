@@ -1216,8 +1216,23 @@ sub mangle_asm {
 		# If this is an entry point with an info table,
                 # eliminate the entry symbol and all directives involving it.
 		if (defined($infochk{$symb}) && $TargetPlatform !~ /^ia64-/) {
-			$c =~ s/^.*$symb_(entry|ret)${T_POST_LBL}\n//;
-			$c =~ s/^\s*\..*$symb.*\n//g;
+			@o = ();
+			foreach $l (split(/\n/,$c)) {
+			    next if $l =~ /^.*$symb_(entry|ret)${T_POST_LBL}/;
+
+			    # If we have .type/.size direrctives involving foo_entry,
+			    # then make them refer to foo_info instead.  The information
+			    # in these directives is used by the cachegrind annotator,
+			    # so it is worthwhile keeping.
+			    if ($l =~ /^\s*\.(type|size).*$symb_(entry|ret)/) {
+				$l =~ s/$symb(_entry|_ret)/${symb}_info/g;
+				push(@o,$l);
+				next;
+			    }
+			    next if $l =~ /^\s*\..*$symb.*\n/;
+			    push(@o,$l);
+			}
+			$c = join("\n",@o) . "\n";
 		}
 
 		print OUTASM $T_HDR_entry;
