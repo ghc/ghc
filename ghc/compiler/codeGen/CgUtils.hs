@@ -299,7 +299,12 @@ emitDataLits lbl lits
 emitRODataLits :: CLabel -> [CmmLit] -> Code
 -- Emit a read-only data block
 emitRODataLits lbl lits
-  = emitData ReadOnlyData (CmmDataLabel lbl : map CmmStaticLit lits)
+  = emitData section (CmmDataLabel lbl : map CmmStaticLit lits)
+  where section | any needsRelocation lits = RelocatableReadOnlyData
+                | otherwise                = ReadOnlyData
+        needsRelocation (CmmLabel _)      = True
+        needsRelocation (CmmLabelOff _ _) = True
+        needsRelocation _                 = False
 
 mkStringCLit :: String -> FCode CmmLit
 -- Make a global definition for the string,

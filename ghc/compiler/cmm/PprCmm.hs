@@ -444,6 +444,8 @@ pprSection s = case s of
     Text              -> section <+> doubleQuotes (ptext SLIT("text"))
     Data              -> section <+> doubleQuotes (ptext SLIT("data"))
     ReadOnlyData      -> section <+> doubleQuotes (ptext SLIT("readonly"))
+    RelocatableReadOnlyData
+                      -> section <+> doubleQuotes (ptext SLIT("relreadonly"))
     UninitialisedData -> section <+> doubleQuotes (ptext SLIT("uninitialised"))
     OtherSection s'   -> section <+> doubleQuotes (text s')
  where

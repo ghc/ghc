@@ -3388,12 +3388,19 @@ genSwitch expr ids
         dynRef <- cmmMakeDynamicReference addImportNat False lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let
-            jumpTable = map jumpTableEntry ids
-        
+            jumpTable = map jumpTableEntryRel ids
+            
+            jumpTableEntryRel Nothing
+                = CmmStaticLit (CmmInt 0 wordRep)
+            jumpTableEntryRel (Just (BlockId id))
+                = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
+                where blockLabel = mkAsmTempLabel id
+
             code = e_code `appOL` t_code `appOL` toOL [
                             LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
                             SLW tmp reg (RIImm (ImmInt 2)),
                             LD I32 tmp (AddrRegReg tableReg tmp),
+                            ADD tmp tmp (RIReg tableReg),
                             MTCTR tmp,
                             BCTR [ id | Just id <- ids ]
                     ]

@@ -239,6 +239,7 @@ data Section
   = Text
   | Data
   | ReadOnlyData
+  | RelocatableReadOnlyData
   | UninitialisedData
   | OtherSection String
 

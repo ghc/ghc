@@ -535,15 +535,6 @@ pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 -- -----------------------------------------------------------------------------
 -- pprData: print a 'CmmStatic'
 
-#if defined(linux_TARGET_OS)
-#if defined(powerpc_TARGET_ARCH) || defined(i386_TARGET_ARCH)
-    -- Hack to make dynamic linking work
-pprSectionHeader ReadOnlyData
-    | not opt_PIC && not opt_Static
-    = pprSectionHeader Data
-#endif
-#endif
-
 pprSectionHeader Text
     = ptext
 	IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
@@ -563,8 +554,16 @@ pprSectionHeader ReadOnlyData
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
-        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
+        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 2"),
                                       SLIT(".section .rodata\n\t.align 2"))
+	,))))
+pprSectionHeader RelocatableReadOnlyData
+    = ptext
+	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
+	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
+	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
+        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
+                                      SLIT(".data\n\t.align 2"))
 	,))))
 pprSectionHeader UninitialisedData
     = ptext
