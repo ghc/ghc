@@ -440,6 +440,9 @@ lexer cont buf s@(PState{
 		  let lexeme = mkFastString -- ToDo: too slow
 			          (map toUpper (lexemeToString buf2)) in
 		  case lookupUFM pragmaKeywordsFM lexeme of
+			-- ignore RULES pragmas when -fglasgow-exts is off
+			Just ITrules_prag | not (flag glaexts) ->
+			   skip_to_end (stepOnBy# buf 2#) s'
 			Just ITline_prag -> 
 			   line_prag skip_to_end buf2 s'
 			Just other -> is_a_token
