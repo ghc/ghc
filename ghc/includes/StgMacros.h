@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.5 1999/02/05 16:02:28 simonm Exp $
+ * $Id: StgMacros.h,v 1.6 1999/02/26 09:28:43 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -332,8 +332,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	R9.w = (W_)LIVENESS_MASK(liveness);			\
         R10.w = (W_)reentry;					\
         JMP_(stg_gen_chk);					\
-   }								\
-   TICK_ALLOC_HEAP(headroom);
+   }
 
 #define MAYBE_GC(liveness,reentry)		\
    if (doYouWantToGC()) {			\
