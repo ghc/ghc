@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.7 1999/07/12 10:43:13 sof Exp $
+ * $Id: readFile.c,v 1.8 1999/09/16 13:14:43 simonmar Exp $
  *
  * hGetContents Runtime Support
  */
@@ -76,9 +76,6 @@ StgForeignPtr ptr;
 #if 0
     fprintf(stderr, "rb: %d %d %d\n", fo->bufRPtr, fo->bufWPtr, fo->bufSize);
 #endif
-
-    if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady (ptr,0) != 1 )
-      return FILEOBJ_BLOCKED_READ;
 
     while ((count =
 	     (
@@ -169,9 +166,6 @@ StgInt len;
     p = buf;
     p += count;
     total_count = count;
-
-    if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady (ptr,0) != 1 )
-      return FILEOBJ_BLOCKED_READ;
 
     while ((count =
              (
@@ -316,9 +310,6 @@ StgForeignPtr ptr;
 	if (rc < 0) return rc;
     }
     fo->flags = (fo->flags & ~FILEOBJ_RW_WRITE) | FILEOBJ_RW_READ;
-
-    if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady (ptr,0) != 1 )
-      return FILEOBJ_BLOCKED_READ;
 
     while ( (count = 
 	       (

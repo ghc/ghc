@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.6 1999/02/04 12:13:15 sof Exp $
+ * $Id: openFile.c,v 1.7 1999/09/16 13:14:43 simonmar Exp $
  *
  * openFile Runtime Support
  */
@@ -40,6 +40,7 @@ StgInt flags;
 StgInt rd;
 {
     IOFileObject* fo;
+    long fd_flags;
 
     if ((fo = malloc(sizeof(IOFileObject))) == NULL)
        return NULL;
@@ -49,7 +50,12 @@ StgInt rd;
     fo->bufRPtr  = 0;
     fo->flags   = flags | FILEOBJ_STD | ( rd ? FILEOBJ_READ : FILEOBJ_WRITE);
     fo->connectedTo = NULL;
-    return fo;
+ 
+    /* set the non-blocking flag on this file descriptor */
+    fd_flags = fcntl(fd, F_GETFL);
+    fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
+
+   return fo;
 }
 
 #define OPENFILE_APPEND 0
@@ -79,19 +85,19 @@ StgInt flags;
 
     switch (how) {
       case OPENFILE_APPEND:
-        oflags = O_WRONLY | O_NOCTTY | O_APPEND; 
+        oflags = O_NONBLOCK | O_WRONLY | O_NOCTTY | O_APPEND; 
 	for_writing = 1;
 	break;
       case OPENFILE_WRITE:
-	oflags = O_WRONLY | O_NOCTTY;
+	oflags = O_NONBLOCK | O_WRONLY | O_NOCTTY;
 	for_writing = 1;
 	break;
     case OPENFILE_READ_ONLY:
-        oflags = O_RDONLY | O_NOCTTY;
+        oflags = O_NONBLOCK | O_RDONLY | O_NOCTTY;
 	for_writing = 0;
 	break;
     case OPENFILE_READ_WRITE:
-	oflags = O_RDWR | O_NOCTTY;
+	oflags = O_NONBLOCK | O_RDWR | O_NOCTTY;
 	for_writing = 1;
 	break;
     default:

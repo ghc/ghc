@@ -16,6 +16,7 @@ StgInt
 createSocket(I_ family, I_ type, I_ protocol)
 {
     int fd;
+    long flags;
 
     if ((fd = socket((int)family, (int)type, (int)protocol)) < 0) {
       if (errno != EINTR) {
@@ -48,5 +49,10 @@ createSocket(I_ family, I_ type, I_ protocol)
 	  return (StgInt)-1;
       }
     }
+
+    /* set the non-blocking flag on this file descriptor */
+    flags = fcntl(fd, F_GETFL);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
     return (StgInt)fd;
 }

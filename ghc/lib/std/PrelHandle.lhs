@@ -31,7 +31,7 @@ import PrelPack         ( packString )
 import PrelWeak		( addForeignFinalizer )
 import Ix
 
-#if __CONCURRENT_HASKELL__
+#ifdef __CONCURRENT_HASKELL__
 import PrelConc
 #endif
 
@@ -222,7 +222,7 @@ stdout = unsafePerformIO (do
 				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 #else
  	    fo <- CCALL(openStdFile) (1::Int)
-				     ((1{-flush on close-} + 128 {- don't block on I/O-})::Int)
+				     ((1{-flush on close-})::Int)
 				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 #endif
 
@@ -256,7 +256,7 @@ stdin = unsafePerformIO (do
 				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 #else
 	    fo <- CCALL(openStdFile) (0::Int)
-				     ((0{-flush on close-} + 128 {- don't block on I/O-})::Int)
+				     ((0{-flush on close-})::Int)
 				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 #endif
 
@@ -288,7 +288,7 @@ stderr = unsafePerformIO (do
 				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 #else
  	    fo <- CCALL(openStdFile) (2::Int)
-				     ((1{-flush on close-} + 128 {- don't block on I/O-})::Int)
+				     ((1{-flush on close-})::Int)
 				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 #endif
 
@@ -348,15 +348,7 @@ openFileEx f m = do
         BinaryMode bmo -> (bmo, 1)
 	TextMode tmo   -> (tmo, 0)
 
-#ifndef __CONCURRENT_HASKELL__
-    file_flags = file_flags'
-#else
-	-- See comment next to 'stderr' for why we leave
-	-- non-blocking off for now.
-    file_flags = file_flags' + 128  -- Don't block on I/O
-#endif
-
-    (file_flags', file_mode) =
+    (file_flags, file_mode) =
       case imo of
            AppendMode    -> (1, 0)
            WriteMode     -> (1, 1)
@@ -1164,21 +1156,16 @@ mayBlock fo act = do
      -5 -> do  -- (possibly blocking) read
         fd <- CCALL(getFileFd) fo
         threadWaitRead fd
-        CCALL(clearNonBlockingIOFlag__) fo  -- force read to happen this time.
 	mayBlock fo act  -- input available, re-try
      -6 -> do  -- (possibly blocking) write
         fd <- CCALL(getFileFd) fo
         threadWaitWrite fd
-        CCALL(clearNonBlockingIOFlag__) fo  -- force write to happen this time.
 	mayBlock fo act  -- output possible
      -7 -> do  -- (possibly blocking) write on connected handle
         fd <- CCALL(getConnFileFd) fo
         threadWaitWrite fd
-        CCALL(clearConnNonBlockingIOFlag__) fo  -- force write to happen this time.
 	mayBlock fo act  -- output possible
      _ -> do
-	CCALL(setNonBlockingIOFlag__) fo      -- reset file object.
-	CCALL(setConnNonBlockingIOFlag__) fo  -- reset (connected) file object.
         return rc
 \end{code}
 
@@ -1246,11 +1233,6 @@ foreign import ccall "libHS_cbits.so" "openFile"              unsafe prim_openFi
 foreign import ccall "libHS_cbits.so" "freeFileObject"        unsafe prim_freeFileObject    :: FILE_OBJ -> IO ()
 foreign import ccall "libHS_cbits.so" "freeStdFileObject"     unsafe prim_freeStdFileObject :: FILE_OBJ -> IO ()
 foreign import ccall "libHS_cbits.so" "const_BUFSIZ"          unsafe const_BUFSIZ          :: Int
-
-foreign import ccall "libHS_cbits.so" "setConnNonBlockingIOFlag__"   unsafe prim_setConnNonBlockingIOFlag__   :: FILE_OBJ -> IO ()
-foreign import ccall "libHS_cbits.so" "clearConnNonBlockingIOFlag__" unsafe prim_clearConnNonBlockingIOFlag__ :: FILE_OBJ -> IO ()
-foreign import ccall "libHS_cbits.so" "setNonBlockingIOFlag__"       unsafe prim_setNonBlockingIOFlag__       :: FILE_OBJ -> IO ()
-foreign import ccall "libHS_cbits.so" "clearNonBlockingIOFlag__"     unsafe prim_clearNonBlockingIOFlag__     :: FILE_OBJ -> IO ()
 
 foreign import ccall "libHS_cbits.so" "getErrStr__"  unsafe prim_getErrStr__  :: IO Addr 
 foreign import ccall "libHS_cbits.so" "getErrNo__"   unsafe prim_getErrNo__   :: IO Int  

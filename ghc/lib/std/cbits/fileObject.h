@@ -40,7 +40,6 @@ typedef struct _IOFileObject {
 #define FILEOBJ_READ    16
 #define FILEOBJ_WRITE   32
 #define FILEOBJ_STD     64
-#define FILEOBJ_NONBLOCKING_IO 128
 /* The next two flags are used for RW file objects only.
    They indicate whether the last operation was a read or a write.
    (Need this info to determine whether a RW file object's

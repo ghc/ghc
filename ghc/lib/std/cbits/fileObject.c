@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.5 1999/07/12 10:43:12 sof Exp $
+ * $Id: fileObject.c,v 1.6 1999/09/16 13:14:42 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -136,32 +136,6 @@ StgInt
 getPushbackBufSize()
 { return (__pushback_buf_size__); }
 
-void
-clearNonBlockingIOFlag__ (ptr)
-StgForeignPtr ptr;
-{ ((IOFileObject*)ptr)->flags &= ~FILEOBJ_NONBLOCKING_IO; }
-
-void
-setNonBlockingIOFlag__ (ptr)
-StgForeignPtr ptr;
-{ ((IOFileObject*)ptr)->flags |= FILEOBJ_NONBLOCKING_IO; }
-
-void
-clearConnNonBlockingIOFlag__ (ptr)
-StgForeignPtr ptr;
-{ ((IOFileObject*)ptr)->connectedTo->flags &= ~FILEOBJ_NONBLOCKING_IO; }
-
-void
-setConnNonBlockingIOFlag__ (ptr)
-StgForeignPtr ptr;
-{ 
-  if ( ((IOFileObject*)ptr)->connectedTo != NULL )  {
-    ((IOFileObject*)ptr)->connectedTo->flags |= FILEOBJ_NONBLOCKING_IO;
-  }
-  return;
-}
-
-
 /* Only ever called on line-buffered file objects */
 StgInt
 fill_up_line_buffer(fo)
@@ -179,9 +153,6 @@ IOFileObject* fo;
   ipos = fo->bufWPtr;
   len = fo->bufSize - fo->bufWPtr + 1;
   p   = (unsigned char*)fo->buf + fo->bufWPtr;
-
-  if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady ((StgForeignPtr)fo,0) != 1 )
-     return FILEOBJ_BLOCKED_READ;
 
   if ((count = 
          (

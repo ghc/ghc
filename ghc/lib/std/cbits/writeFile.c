@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.7 1999/09/12 19:18:22 sof Exp $
+ * $Id: writeFile.c,v 1.8 1999/09/16 13:14:43 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -52,9 +52,6 @@ StgInt bytes;
     /* Disallow short writes */
     if (bytes == 0  || fo->buf == NULL)
 	return 0;
-
-    if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady(ptr,0) != 1 )
-       return FILEOBJ_BLOCKED_WRITE;
 
     while ((count = 
 	       (
@@ -121,10 +118,6 @@ StgInt  len;
        return rc;
     }
 
-    if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady(ptr,0) != 1 )
-       return FILEOBJ_BLOCKED_WRITE;
-
-    /* Disallow short writes */
     while ((count = 
                (
 #ifdef USE_WINSOCK
@@ -134,13 +127,18 @@ StgInt  len;
 #else
 		 write(fo->fd, pBuf, (int)len))) < len ) {
 #endif
-	if (errno != EINTR) {
+        if ( count >= 0 ) {
+            len -= count;
+	    pBuf += count;
+	    continue;
+	} else if ( errno == EAGAIN ) {
+	    errno = 0;
+	    return FILEOBJ_BLOCKED_WRITE;
+	} else if ( errno != EINTR ) {
 	    cvtErrno();
 	    stdErrno();
 	    return -1;
 	}
-	len  -= count;
-	pBuf += count;
     }
 
     return 0;

@@ -87,6 +87,7 @@ import Ix
 import Weak	    ( addForeignFinalizer )
 import PrelIOBase  -- IOError, Handle representation
 import PrelHandle
+import PrelConc	    ( threadWaitRead )
 import Foreign
 import Addr	    ( nullAddr )
 
@@ -373,14 +374,26 @@ accept sock@(MkSocket s family stype protocol status) = do
      (ptr, sz) <- allocSockAddr family
      int_star <- stToIO (newIntArray ((0::Int),1))
      stToIO (writeIntArray int_star 0 sz)
+     new_sock <- accept_socket s ptr int_star
+     a_sz <- stToIO (readIntArray int_star 0)
+     addr <- unpackSockAddr ptr a_sz
+     new_status <- newIORef Connected
+     return ((MkSocket new_sock family stype protocol new_status), addr)
+
+accept_socket :: Int 
+	-> MutableByteArray RealWorld Int
+	-> MutableByteArray RealWorld Int
+	-> IO Int
+
+accept_socket s ptr int_star = do
      new_sock <- _ccall_ acceptSocket s ptr int_star
      case (new_sock::Int) of
 	  -1 -> constructErrorAndFail "accept"
-	  _  -> do
-		a_sz <- stToIO (readIntArray int_star 0)
-		addr <- unpackSockAddr ptr a_sz
-		new_status <- newIORef Connected
-		return ((MkSocket new_sock family stype protocol new_status), addr)
+
+		-- wait if there are no pending connections
+	  -5 -> threadWaitRead s >> accept_socket s ptr int_star
+
+	  _  -> return new_sock
 \end{code}
 
 %************************************************************************

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePutc.c,v 1.7 1999/07/12 10:43:13 sof Exp $
+ * $Id: filePutc.c,v 1.8 1999/09/16 13:14:43 simonmar Exp $
  *
  * hPutChar Runtime Support
  */
@@ -78,23 +78,25 @@ StgChar c;
       return rc;
     }
 
-    if ( fo->flags & FILEOBJ_NONBLOCKING_IO )
-      return FILEOBJ_BLOCKED_WRITE;
-
     /* Unbuffered, write the character directly. */
-    while ((rc = (
+    while (rc = (
 #ifdef USE_WINSOCK
 	         fo->flags & FILEOBJ_WINSOCK ?
 		 send(fo->fd, &c, 1, 0) :
-		 write(fo->fd, &c, 1))) == 0 && errno == EINTR) ;
+		 write(fo->fd, &c, 1)) <= 0) {
 #else
-		 write(fo->fd, &c, 1))) == 0 && errno == EINTR) ;
+  	         write(fo->fd, &c, 1)) <= 0) {
 #endif
-    if (rc == 0) {
-	cvtErrno();
-	stdErrno();
-	return -1;
-    }
-    return 0;
 
+        if ( rc == -1 && errno == EAGAIN) {
+	    errno = 0;
+	    return FILEOBJ_BLOCKED_WRITE;
+	} else if (rc == 0 || rc == -1 && errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+
+    return 0;
 }
