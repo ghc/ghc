@@ -3,10 +3,14 @@ include $(TOP)/mk/boilerplate.mk
 
 INSTALLING=1
 
+# NOTE: This is only a temporary workaround for a bug in GHC's simplifier!
+GHC_HAPPY_OPTS = -ag
+
 SRC_HC_OPTS += -package data -package text -package util -fglasgow-exts -cpp
 HS_PROG = haddock.bin
 
-HsParser_HC_OPTS += -Onot
+HsParser_HC_OPTS      += -Onot
+HaddockParse_HC_OPTS  += -Onot
 HaddockVersion_HC_OPTS = -DHADDOCK_VERSION=$(ProjectVersion)
 
 ifeq "$(INSTALLING)" "1"
