@@ -354,6 +354,7 @@ mkWWstr_one arg
 								-- components.   In effect
 								-- 	S(LA) -->  U(LL)
 			Drop -> cs
+			Defer -> pprTrace "wwlib" (ppr arg) cs
 	   in
 	   mkWWstr unpk_args_w_ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
 
