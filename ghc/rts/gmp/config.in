@@ -1,0 +1,162 @@
+/* config.in.  Generated automatically from configure.in by autoheader.  */
+/*
+Copyright (C) 2000 Free Software Foundation, Inc.
+
+This file is part of the GNU MP Library.
+
+The GNU MP Library is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
+option) any later version.
+
+The GNU MP Library is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
+the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
+MA 02111-1307, USA.
+*/
+
+
+/* Define if a limb is long long. */
+#undef _LONG_LONG_LIMB
+
+/* Define if we have native implementation of function. */
+#undef HAVE_NATIVE_
+#undef HAVE_NATIVE_mpn_add                 
+#undef HAVE_NATIVE_mpn_add_1               
+#undef HAVE_NATIVE_mpn_add_n               
+#undef HAVE_NATIVE_mpn_add_nc              
+#undef HAVE_NATIVE_mpn_addmul_1            
+#undef HAVE_NATIVE_mpn_addmul_1c
+#undef HAVE_NATIVE_mpn_addsub_n            
+#undef HAVE_NATIVE_mpn_addsub_nc
+#undef HAVE_NATIVE_mpn_and_n               
+#undef HAVE_NATIVE_mpn_andn_n              
+#undef HAVE_NATIVE_mpn_bdivmod             
+#undef HAVE_NATIVE_mpn_cmp                 
+#undef HAVE_NATIVE_mpn_com_n               
+#undef HAVE_NATIVE_mpn_copyd               
+#undef HAVE_NATIVE_mpn_copyi               
+#undef HAVE_NATIVE_mpn_divexact_by3c
+#undef HAVE_NATIVE_mpn_divrem              
+#undef HAVE_NATIVE_mpn_divrem_1            
+#undef HAVE_NATIVE_mpn_divrem_1c
+#undef HAVE_NATIVE_mpn_divrem_2            
+#undef HAVE_NATIVE_mpn_divrem_newton       
+#undef HAVE_NATIVE_mpn_divrem_classic      
+#undef HAVE_NATIVE_mpn_dump                
+#undef HAVE_NATIVE_mpn_gcd                 
+#undef HAVE_NATIVE_mpn_gcd_1               
+#undef HAVE_NATIVE_mpn_gcdext              
+#undef HAVE_NATIVE_mpn_get_str             
+#undef HAVE_NATIVE_mpn_hamdist             
+#undef HAVE_NATIVE_mpn_invert_limb
+#undef HAVE_NATIVE_mpn_ior_n               
+#undef HAVE_NATIVE_mpn_iorn_n              
+#undef HAVE_NATIVE_mpn_lshift              
+#undef HAVE_NATIVE_mpn_mod_1               
+#undef HAVE_NATIVE_mpn_mod_1c
+#undef HAVE_NATIVE_mpn_mul                 
+#undef HAVE_NATIVE_mpn_mul_1               
+#undef HAVE_NATIVE_mpn_mul_1c
+#undef HAVE_NATIVE_mpn_mul_basecase        
+#undef HAVE_NATIVE_mpn_mul_n               
+#undef HAVE_NATIVE_mpn_nand_n              
+#undef HAVE_NATIVE_mpn_nior_n              
+#undef HAVE_NATIVE_mpn_perfect_square_p    
+#undef HAVE_NATIVE_mpn_popcount            
+#undef HAVE_NATIVE_mpn_preinv_mod_1        
+#undef HAVE_NATIVE_mpn_random2             
+#undef HAVE_NATIVE_mpn_random              
+#undef HAVE_NATIVE_mpn_rawrandom           
+#undef HAVE_NATIVE_mpn_rshift              
+#undef HAVE_NATIVE_mpn_scan0               
+#undef HAVE_NATIVE_mpn_scan1               
+#undef HAVE_NATIVE_mpn_set_str             
+#undef HAVE_NATIVE_mpn_sqrtrem             
+#undef HAVE_NATIVE_mpn_sqr_basecase        
+#undef HAVE_NATIVE_mpn_sub                 
+#undef HAVE_NATIVE_mpn_sub_1               
+#undef HAVE_NATIVE_mpn_sub_n               
+#undef HAVE_NATIVE_mpn_sub_nc              
+#undef HAVE_NATIVE_mpn_submul_1            
+#undef HAVE_NATIVE_mpn_submul_1c
+#undef HAVE_NATIVE_mpn_udiv_w_sdiv         
+#undef HAVE_NATIVE_mpn_umul_ppmm
+#undef HAVE_NATIVE_mpn_udiv_qrnnd
+#undef HAVE_NATIVE_mpn_xor_n               
+#undef HAVE_NATIVE_mpn_xnor_n              
+
+/* Define to 1 if you have the declaration of `optarg', and to 0 if you don't.
+   */
+#undef HAVE_DECL_OPTARG
+
+/* ./configure --enable-assert option, to enable some ASSERT()s */
+#undef WANT_ASSERT
+
+/* Define if you have the <sys/sysctl.h> header file. */
+#undef HAVE_SYS_SYSCTL_H
+
+/* Define if you have the `strtoul' function. */
+#undef HAVE_STRTOUL
+
+/* Name of package */
+#undef PACKAGE
+
+/* Define if you have the `sysctlbyname' function. */
+#undef HAVE_SYSCTLBYNAME
+
+/* Define if the system has the type `void'. */
+#undef HAVE_VOID
+
+/* Define if you have the `popen' function. */
+#undef HAVE_POPEN
+
+/* ./configure --disable-alloca option, to use stack-alloc.c, not alloca */
+#undef USE_STACK_ALLOC
+
+/* Define if cpp supports the ANSI # stringizing operator. */
+#undef HAVE_STRINGIZE
+
+/* Define if you have the <sys/time.h> header file. */
+#undef HAVE_SYS_TIME_H
+
+/* Define if you have the `sysconf' function. */
+#undef HAVE_SYSCONF
+
+/* Define if you have the `getpagesize' function. */
+#undef HAVE_GETPAGESIZE
+
+/* Define if you have the `processor_info' function. */
+#undef HAVE_PROCESSOR_INFO
+
+/* Version number of package */
+#undef VERSION
+
+/* Define if you have the `getopt_long' function. */
+#undef HAVE_GETOPT_LONG
+
+/* Define if you have the <getopt.h> header file. */
+#undef HAVE_GETOPT_H
+
+/* Define if you have the ANSI C header files. */
+#undef STDC_HEADERS
+
+/* Define if a speed_cyclecounter exists (for the tune programs) */
+#undef HAVE_SPEED_CYCLECOUNTER
+
+/* Define if mpn/tests has calling conventions checking for the CPU */
+#undef HAVE_CALLING_CONVENTIONS
+
+/* ./configure --enable-fft option, to enable FFTs for multiplication */
+#undef WANT_FFT
+
+/* Define if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
+/* Define if you have the <unistd.h> header file. */
+#undef HAVE_UNISTD_H
