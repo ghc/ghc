@@ -20,6 +20,15 @@ def not ( $_bool )
    fi fi
 }
 
+def runCmd( $cmd )
+{
+   if defined $verbose then
+	print $cmd
+   fi
+   $res = run $cmd
+   return $res
+}
+
 -- (eg) "run.stdout"  -->  "testdir/testname.run.stdout"
 def qualify ( $_filename_frag )
 {
@@ -35,7 +44,7 @@ def qualify ( $_filename_frag )
 def rm_or_fail ( $_files )
 {
    $cmd = "rm -f " ++ $_files
-   $res = run $cmd
+   $res = runCmd($cmd)
    if $res /= "0" then framefail ("rm_or_fail: can't rm: " ++ $_files) fi
 }
 
@@ -43,7 +52,7 @@ def rm_or_fail ( $_files )
 def rm_nofail ( $_files )
 {
    $cmd = "rm -f " ++ $_files
-   $res = run $cmd
+   $res = runCmd($cmd)
 }
 
 -- Pipe an error message through normalise_errmsg.
@@ -74,8 +83,7 @@ def say_fail_because_compiler_barfd ( $res )
    $comp_stderr = qualify("comp.stderr")
    if   exists($comp_stderr)
    then print "--- Error messages:"
-        $barfage = contents(qualify("comp.stderr"))
-        print $barfage
+        print contents(qualify("comp.stderr"))
    fi
 }
 
@@ -101,7 +109,7 @@ def guess_compiler_flags()
 {
    if   $tool contains "ghc"
    then 
-        return "-no-recomp -dcore-lint"
+        return "-no-recomp -dcore-lint" 
    else 
    if   $tool contains "nhc"
    then 
@@ -129,13 +137,17 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
    $srcname = qualify("hs")
    rm_or_fail($errname)
    rm_or_fail($exename)
-   $cmd = $tool ++ " " ++ $flags ++ " " ++ $_extra_args
-          ++ if   $compile_only 
-             then " -c " 
-             else " -o " ++ $exename ++ " " 
+   $cmd = $tool ++ " " ++ $flags ++ " " ++ $_extra_args ++ " "
+	  ++ if defined $extra_hc_flags
+		  then $extra_hc_flags 
+		  else ""
+	     fi
+          ++ if $compile_only 
+                  then " -c " 
+                  else " -o " ++ $exename ++ " " 
              fi
           ++ $srcname ++ " &> " ++ $errname
-   $res = run $cmd
+   $res = runCmd($cmd)
    return $res
 }
 
@@ -164,7 +176,7 @@ def simple_run_main( $_extra_args )
           ++ " < " ++ $use_stdin
           ++ " > " ++ $run_stdout
           ++ " 2> " ++ $run_stderr
-   $res = run $cmd
+   $res = runCmd($cmd)
    return $res
 }
 
@@ -174,7 +186,10 @@ def exist_and_same ( $_file1, $_file2 )
 {
    if   not(exists($_file1) && exists($_file2))
    then return False
-   else print "vanilla-test: comparing " ++ $_file1 ++ " and " ++ $_file2
+   else if defined $verbose 
+	    then print "vanilla-test: comparing " ++ $_file1
+			 ++ " and " ++ $_file2
+	fi
         $cts1 = contents($_file1)
         $cts2 = contents($_file2)
         $same = $cts1 == $cts2
@@ -289,7 +304,7 @@ def vanilla-compok-test-actions ( $extra_compile_args )
         $stderr_e = normalise_errmsg(contents($expected_stderr))
         if   $stderr_e /= $stderr_a
         then print "UNMATCHED WARNING MSGS:"
-             $dummy = run ("diff " ++ $expected_stderr ++ " " ++ $actual_stderr)
+             $dummy = runCmd("diff " ++ $expected_stderr ++ " " ++ $actual_stderr)
              return False
         else return True
         fi
@@ -329,7 +344,7 @@ def vanilla-compfail-test-actions ( $extra_compile_args )
 
    if   $stderr_e /= $stderr_a
    then print "UNMATCHED ERROR MSGS:"
-        $dummy = run ("diff " ++ $expected_stderr ++ " " ++ $actual_stderr)
+        $dummy = runCmd("diff " ++ $expected_stderr ++ " " ++ $actual_stderr)
    fi
 
    if $res /= "0" && $stderr_e == $stderr_a
