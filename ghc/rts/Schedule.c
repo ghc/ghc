@@ -1334,7 +1334,7 @@ run_thread:
        * When next scheduled they will try to commit, this commit will fail and
        * they will retry. */
       for (t = all_threads; t != END_TSO_QUEUE; t = t -> link) {
-        if (t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
+        if (t -> what_next != ThreadRelocated && t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
           if (!stmValidateTransaction (t -> trec)) {
             IF_DEBUG(stm, sched_belch("trec %p found wasting its time", t));
 
