@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.17 2001/04/18 11:58:02 sewardj Exp $
+-- $Id: TmpFiles.hs,v 1.18 2001/04/21 10:19:53 panne Exp $
 --
 -- Temporary file management
 --
@@ -100,7 +100,6 @@ removeTmpFiles verb fs = do
 kludgedSystem cmd phase_name
  = do
 #ifndef mingw32_TARGET_OS
-   la la la
    exit_code <- system cmd `catchAllIO` 
 		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
 #else
