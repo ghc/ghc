@@ -6,4 +6,5 @@ include ($confdir ++ "/../vanilla-test.T")
 --                 expected process return value, if not zero
 
 test "strun001" { vtr("", "", "") }
+test "strun002" { vtr("-O", "", "1") }
 
